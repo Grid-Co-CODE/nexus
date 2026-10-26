@@ -63,8 +63,8 @@ Segurança: o Nexus não usa nenhuma credencial do app de ETM. Lê o Fracttal co
    da OS da Engenharia com o painel da ETM, o checklist e os comentários), o livro, o catálogo e o painel do histórico.
 2. **Depois (26/10/2026, Levi: "sinto falta daquelas outras seções também. A de histórico, e a de ETMs em aberto"):**
    as abas Histórico (cliente → usina → OS e o chat da usina) e Estações em Aberto (com o "Finalizar pela Engenharia" em
-   lote), com o nome curto da usina, o filtro que vale no clique e sem o filtro do solicitante. Ficam os Fechamentos
-   (por semana, pelo Fracttal e pela Engenharia).
+   lote), com o nome curto da usina, o filtro que vale no clique e sem o filtro do solicitante; no mesmo dia, os
+   Fechamentos (por semana, pelo Fracttal e pela Engenharia), e as quatro telas do app estão no Nexus.
 
 ## Provas
 

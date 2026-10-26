@@ -679,3 +679,23 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
   .etm-usina-acoes{width:100%}
   .etm-usina-acoes .gc-btn{flex:1;justify-content:center}
 }
+
+/* ── os Fechamentos por semana da tela ETMs (26/10/2026): a visão no segmentado do Nexus (o .cn-seg, aqui com botões), a
+   semana numa linha com a barra do tamanho dela perto da maior, e os cartões da semana ao abrir ── */
+.etm-visao button{font:600 12.5px/18px var(--font-sans);color:var(--mudo);background:transparent;border:0;padding:6px 12px;
+  border-radius:7px;white-space:nowrap;cursor:pointer}
+.etm-visao button:hover{color:var(--tinta)}
+.etm-visao button[aria-pressed="true"]{background:var(--verde);color:var(--sobre-verde)}
+.etm-visao button:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+.etm-semanas{display:flex;flex-direction:column;gap:8px}
+.etm-semana{background:var(--superficie);border:1px solid var(--linha);border-radius:12px}
+.etm-semana-cab{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;padding:11px 14px;background:transparent;
+  border:0;border-radius:12px;color:var(--tinta);font:inherit;text-align:left;cursor:pointer}
+.etm-semana-cab:hover .etm-semana-tit{color:var(--verde-texto)}
+.etm-semana-cab:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.etm-semana-cab>.ph{color:var(--mudo)}
+.etm-semana-tit{flex:1;min-width:0;font:600 13.5px/1.35 var(--font-sans)}
+.etm-semana-barra{flex:none;width:min(180px,28%);height:8px;border-radius:999px;background:var(--superficie-3);overflow:hidden}
+.etm-semana-barra span{display:block;height:100%;width:var(--p,0);background:var(--verde);border-radius:999px}
+.etm-semana-n{min-width:2.5ch;text-align:right;font:700 14px/1 var(--font-sans);font-variant-numeric:tabular-nums}
+.etm-semana-corpo{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;padding:2px 14px 14px}

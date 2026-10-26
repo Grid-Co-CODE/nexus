@@ -628,21 +628,25 @@ def test_a_tela_leva_o_nome_curto_e_as_usinas_das_etms(tela, cliente, monkeypatc
                              "etms": 1}]
 
 
-def test_as_abas_do_app_planner_historico_e_estacoes_em_aberto(tela, cliente):
+def test_as_abas_do_app_planner_historico_estacoes_em_aberto_e_fechamentos(tela, cliente):
     # Levi, 26/10/2026: "sinto falta daquelas outras seções também. A de histórico, e a de ETMs em aberto. Elas são bem
-    # interessantes para visualização histórica e atual. o deploy que te mandei tinham abas só disso!"
+    # interessantes para visualização histórica e atual. o deploy que te mandei tinham abas só disso!" e, depois, "Pode
+    # fazer a aba Fechamentos por semana, como no app."
     import re
 
     from test_engenharia_acompanhamento import ANA, _como
     html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
     nav = html.split('class="cn-abas etm-abas"', 1)[1].split("</nav>", 1)[0]
-    assert re.findall(r'data-aba="(\w+)"', nav) == ["planner", "historico", "abertas"]
-    assert [t.strip() for t in re.findall(r">([^<>]+)<", nav) if t.strip()][:3] == \
-           ["Planner", "Histórico", "Estações em Aberto"]
-    for painel in ("planner", "historico", "abertas"):
+    assert re.findall(r'data-aba="(\w+)"', nav) == ["planner", "historico", "abertas", "fechamentos"]
+    assert [t.strip() for t in re.findall(r">([^<>]+)<", nav) if t.strip()][:4] == \
+           ["Planner", "Histórico", "Estações em Aberto", "Fechamentos"]
+    for painel in ("planner", "historico", "abertas", "fechamentos"):
         assert f'id="etm-p-{painel}"' in html
     # o Chat da usina e o Finalizar pela Engenharia do app
     assert "Chat da usina" in html and "Finalizar pela Engenharia" in html and "Ver histórico desta usina" in html
+    # os Fechamentos do app: por semana, pela data de fechamento no Fracttal ou pela Engenharia
+    assert 'data-visao="fracttal"' in html and 'data-visao="engenharia"' in html
+    assert "Fechamento no Fracttal" in html and "Fechamento pela Engenharia" in html
 
 
 def test_quem_pode_finalizar_vai_no_json(tela, cliente, monkeypatch):
@@ -810,3 +814,39 @@ def test_o_chat_diz_quantos_comentarios_nao_abriram(tela, cliente, app):
     O.limpar()
     j = _como(cliente, ANA).get(URL_CHAT, query_string={"usina": U}).get_json()
     assert j["comentarios"] == [] and j["ilegiveis"] == 1
+
+
+# ── os Fechamentos por semana (26/10/2026, Levi: "Pode fazer a aba Fechamentos por semana, como no app.") ────────────
+def test_a_data_em_que_a_engenharia_encerrou_a_os(banco):
+    # a do app de ETM: o diagnóstico ou o finalizado pela Engenharia, o que veio por último; desligado o finalizado, vale
+    # o diagnóstico; sem os dois, a OS não está encerrada
+    from datetime import datetime, timezone
+
+    from nexus.engenharia import etm_marcas as M
+
+    def d(dia):
+        return datetime(2026, 10, dia, 12, 0, tzinfo=timezone.utc)
+
+    def marca(evento, dia, **k):
+        return dict({"os_": OSE, "evento": evento, "quando": d(dia), "origem_id": f"{evento}{dia}"}, **k)
+    M.importar_marcas([marca("diagnostico", 20, valor_id=2), marca("finalizado", 22, ligado=True)], "teste")
+    e = _marcas()
+    assert e["diagnostico_em"] == d(20) and M.encerrada_em(e) == d(22)
+    M.importar_marcas([marca("finalizado", 23, ligado=False)], "teste")
+    assert M.encerrada_em(_marcas()) == d(20)
+    M.importar_marcas([marca("diagnostico", 24, valor_id=0)], "teste")
+    e = _marcas()
+    assert e["diagnostico_em"] is None and M.encerrada_em(e) is None
+
+
+def test_a_tela_leva_o_dia_do_fechamento_pela_engenharia(tela, cliente):
+    from datetime import datetime, timedelta, timezone
+
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.engenharia import etm_marcas as M
+    M.marcar({"wid": 50001, "folio": "1", "codigo": "ALF100-ESTM1"}, "diagnostico", 1, ANA, True)
+    o = {x["os"]: x for x in _dados_da_tela(_como(cliente, ANA).get(URL_TELA).get_data(as_text=True))["oss"]}
+    hoje = datetime.now(timezone(timedelta(hours=-3))).date().isoformat()
+    assert o["1"]["eng_fim_dia"] == hoje                          # aberta no Fracttal, encerrada pela Engenharia hoje
+    assert o["3"]["eng_fim_dia"] == "" and o["3"]["fim_dia"]       # fechada no Fracttal, a Engenharia ainda não

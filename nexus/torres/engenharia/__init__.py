@@ -1150,7 +1150,9 @@ def _os_do_planner(o: dict, m: dict | None, n_coment: int | None = None) -> dict
     from ...engenharia import etm_marcas as M
     m = m or {}
     criada = o.get("criada") or ""
+    enc = M.encerrada_em(m)         # o dia da semana dos Fechamentos pela Engenharia (Brasília)
     return {"os": o["os"], "titulo": o["titulo"], "cliente": o["cliente"], "usina": o["usina"],
+            "eng_fim_dia": enc.astimezone(BRT).date().isoformat() if enc else "",
             "usina_nome": ETM.usina_curta(o["usina"]), "codigo": o["codigo"], "n_coment": n_coment,
             "ativo": o["ativo"], "responsavel": o["responsavel"], "solicitante": o["solicitante"],
             "criado_por": o["criado_por"], "trabalho": o["trabalho"], "coluna": o["coluna_etm"], "tipo": o["tipo"],

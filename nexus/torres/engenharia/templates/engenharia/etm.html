@@ -8,8 +8,9 @@
    O Planner (as colunas e os filtros do app: cliente, usina, Engenharia, Chamados ou Campo, o status da OS, quem criou, o
    responsável, o período em que a OS esteve ativa e, na coluna Em andamento, as etiquetas), o Histórico (cliente → usina
    → OS, com o chat da usina) e as Estações em Aberto (as usinas com OS aberta para a Engenharia e as em acompanhamento,
-   com o quadro de cada usina e o Finalizar pela Engenharia em lote). A leitura está em nexus/engenharia/etm.py e as
-   marcações em nexus/engenharia/etm_marcas.py; o clique numa OS abre a OS da ETM. #}
+   com o quadro de cada usina e o Finalizar pela Engenharia em lote) e os Fechamentos (as OS fechadas por semana, no
+   Fracttal ou pela Engenharia). A leitura está em nexus/engenharia/etm.py e as marcações em
+   nexus/engenharia/etm_marcas.py; o clique numa OS abre a OS da ETM. #}
 <div class="campo-nativa kb etm">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · ETMs</p>
@@ -40,6 +41,7 @@
     <a href="#planner" data-aba="planner" aria-current="page">Planner</a>
     <a href="#historico" data-aba="historico">Histórico</a>
     <a href="#abertas" data-aba="abertas">Estações em Aberto<i id="etm-n-abertas" hidden></i></a>
+    <a href="#fechamentos" data-aba="fechamentos">Fechamentos</a>
   </nav>
 
   {# o Planner e as Estações em Aberto dividem a coluna de filtros à esquerda (Levi, 26/10/2026: "o estilo de lista dos
@@ -55,12 +57,13 @@
           <input class="gc-campo" id="etm-f-busca" type="search" placeholder="OS, título, ETM, usina…" autocomplete="off"></div>
       </div>
       <div id="etm-filtros" class="etm-filtros"></div>
-      <div class="etm-periodo"><span class="gc-rotulo">Período (OS ativa entre)</span>
+      <div class="etm-periodo"><span class="gc-rotulo" id="etm-f-periodo-rot">Período (OS ativa entre)</span>
         <input type="date" class="gc-campo" id="etm-f-ini" aria-label="De"><input type="date" class="gc-campo" id="etm-f-fim" aria-label="Até"></div>
       <button class="gc-btn gc-btn--contorno etm-limpar" id="etm-f-limpar" type="button"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i>Redefinir filtros</button>
       <div class="etm-lado-nota"><span id="etm-mostrando"></span>
         <span data-nota="planner">Os filtros se cruzam: o número ao lado de cada opção diz quantas OS ela traz com os outros filtros. Sem marcar o status, as canceladas ficam de fora.</span>
-        <span data-nota="abertas" hidden>Os filtros valem para as estações e para o quadro de cada usina. O status da OS fica de fora: aqui vale a regra da aba.</span></div>
+        <span data-nota="abertas" hidden>Os filtros valem para as estações e para o quadro de cada usina. O status da OS fica de fora: aqui vale a regra da aba.</span>
+        <span data-nota="fechamentos" hidden>Os filtros valem para as OS de cada semana, e o período é o da data do fechamento. O status da OS fica de fora: aqui vale a regra da aba.</span></div>
     </aside>
     <div class="etm-main">
       <section class="etm-painel" id="etm-p-planner" aria-label="Planner">
@@ -98,6 +101,22 @@
           <p class="eg-pdf-msg" id="etm-ab-msg" role="status" hidden></p>
           <div class="kb-quadro" id="etm-ab-quadro" aria-live="polite"></div>
         </div>
+      </section>
+
+      {# os Fechamentos do app (Levi, 26/10/2026: "Pode fazer a aba Fechamentos por semana, como no app."): quantas OS
+         fecharam em cada semana (de segunda a domingo), pela data de fechamento no Fracttal ou pela data em que a
+         Engenharia encerrou (o diagnóstico ou o finalizado, o que veio por último; `etm_marcas.encerrada_em`). A semana
+         abre no clique e mostra os cartões dela. #}
+      <section class="etm-painel" id="etm-p-fechamentos" aria-label="Fechamentos" hidden>
+        <div class="etm-sec-cab">
+          <div class="cn-seg etm-visao" role="group" aria-label="Fechamento">
+            <button type="button" data-visao="fracttal" aria-pressed="true">Fechamento no Fracttal</button>
+            <button type="button" data-visao="engenharia" aria-pressed="false">Fechamento pela Engenharia</button>
+          </div>
+          <span class="etm-sec-n" id="etm-fe-n"></span>
+        </div>
+        <p class="etm-sec-dica" id="etm-fe-dica"></p>
+        <div class="etm-semanas" id="etm-fe-semanas" aria-live="polite"></div>
       </section>
     </div>
   </div>
@@ -196,8 +215,10 @@
   var estado = novoEstado();
   // a aba e onde ela está: o Histórico no cliente e na usina (com o período e as canceladas da lista), as Estações em
   // Aberto na usina aberta
-  var ABAS = ['planner', 'historico', 'abertas'];
-  var vista = {aba: 'planner', cliente: '', usina: '', aberta: '', hIni: '', hFim: '', hCanc: false};
+  var ABAS = ['planner', 'historico', 'abertas', 'fechamentos'];
+  // os Fechamentos: a visão (no Fracttal ou pela Engenharia) e as semanas abertas
+  function vistaNova() { return {aba: 'planner', cliente: '', usina: '', aberta: '', hIni: '', hFim: '', hCanc: false, feVisao: 'fracttal', feAbertas: []}; }
+  var vista = vistaNova();
   function fold(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
   function preencher(alvo, itens) { alvo.replaceChildren.apply(alvo, itens); }
@@ -221,6 +242,8 @@
       if (s && s.vista) {
         ['aba', 'cliente', 'usina', 'aberta', 'hIni', 'hFim'].forEach(function (k) { if (typeof s.vista[k] === 'string') vista[k] = s.vista[k]; });
         vista.hCanc = !!s.vista.hCanc;
+        if (s.vista.feVisao === 'engenharia') vista.feVisao = 'engenharia';
+        if (Array.isArray(s.vista.feAbertas)) vista.feAbertas = s.vista.feAbertas.filter(function (x) { return typeof x === 'string' && x.length === 10; }).slice(0, 60);
         // só o que ainda existe nas OS: a usina que saiu da leitura não vira um filtro que esconde tudo
         FILTROS.forEach(function (d) {
           var lista = s.f && s.f[d.k];
@@ -233,7 +256,7 @@
       }
     } catch (e) {     // o guardado torto (de outra versão da tela) não impede a tela de desenhar: começa do zero
       estado = novoEstado();
-      vista = {aba: 'planner', cliente: '', usina: '', aberta: '', hIni: '', hFim: '', hCanc: false};
+      vista = vistaNova();
       try { sessionStorage.removeItem(GUARDA); } catch (e2) { /* sem o armazenamento da aba */ }
     }
     var h = location.hash.replace('#', '');
@@ -256,6 +279,15 @@
     return true;
   }
   function ativo(d) { return !d.so || d.so === vista.aba; }
+  // o dia do fechamento da OS na visão escolhida dos Fechamentos ("" = não fechou nela): no Fracttal, a finalizada pelo
+  // dia do fim; pela Engenharia, o dia do diagnóstico ou do finalizado, de qualquer status no Fracttal (como no app)
+  function diaFech(o) { return vista.feVisao === 'engenharia' ? (o.eng_fim_dia || '') : (o.coluna === 'finalizada' ? (o.fim_dia || '') : ''); }
+  // o período dos filtros: nos Fechamentos é o da data do fechamento; nas outras abas, "OS ativa entre"
+  function noPeriodo(o) {
+    if (vista.aba !== 'fechamentos') return ativaEntre(o, estado.ini, estado.fim);
+    var d = diaFech(o);
+    return !!d && (!estado.ini || d >= estado.ini) && (!estado.fim || d <= estado.fim);
+  }
   // a OS passa nos filtros; `sem` é o filtro que não conta (a conta das opções dele, como no Acompanhamento PCM). Nada
   // marcado ou tudo marcado é Todos (no status, nada marcado deixa as canceladas de fora)
   function passa(o, sem) {
@@ -269,13 +301,14 @@
       var h = fold([o.os, o.titulo, o.codigo, o.usina, o.cliente, o.responsavel, o.solicitante, o.criado_por].join(' '));
       if (!fold(estado.q).split(/\s+/).every(function (w) { return h.indexOf(w) >= 0; })) return false;
     }
-    return ativaEntre(o, estado.ini, estado.fim);
+    return noPeriodo(o);
   }
   // aberta para a Engenharia (a regra das Estações em Aberto do app): sai com o diagnóstico ou o finalizado pela
   // Engenharia, não quando o Fracttal fecha a tarefa
   function abertaEng(o) { return o.coluna !== 'cancelada' && !o.diagnostico && !o.finalizado; }
   // as OS que a aba conta nos filtros
   function universo() {
+    if (vista.aba === 'fechamentos') return D.oss.filter(function (o) { return !!diaFech(o); });
     if (vista.aba !== 'abertas') return D.oss;
     if (vista.aberta) return D.oss.filter(function (o) { return o.usina === vista.aberta; });
     return D.oss.filter(function (o) { return abertaEng(o) || o.acompanhamento; });
@@ -376,14 +409,14 @@
   function paginaOs(o) { return nexusRota('/t/engenharia/etm/os/') + encodeURIComponent(o.os); }
   function selo(texto, cor) { return el('span', 'eg-tag eg-tag--' + cor, texto); }
   function corTrab(t) { return t === 'engenharia' ? 'info' : t === 'chamados' ? 'verde' : 'neutro'; }
-  function cartao(o) {
+  function cartao(o, prazo) {
     var c = el('article', 'kb-card kb-card--' + COR[o.coluna]);
     c.tabIndex = 0; c.dataset.os = o.os;
     var cab = el('header', 'kb-card-cab');
     var num = el('a', 'kb-os', 'OS ' + o.os);
     num.href = paginaOs(o); num.tabIndex = -1;
     cab.appendChild(num);
-    cab.appendChild(el('span', 'kb-prazo', o.criada ? 'criada ' + o.criada.slice(0, 5) : ''));
+    cab.appendChild(el('span', 'kb-prazo', prazo != null ? prazo : o.criada ? 'criada ' + o.criada.slice(0, 5) : ''));
     c.appendChild(cab);
     c.appendChild(el('h4', 'kb-card-tit', o.titulo || '(sem título)'));
     var s = el('div', 'kb-eng');
@@ -575,6 +608,72 @@
     var n = Object.keys(us).length; i.textContent = String(n); i.hidden = !n;
   }
 
+  // ── os Fechamentos por semana ──
+  var feSemanas = document.getElementById('etm-fe-semanas'), feN = document.getElementById('etm-fe-n');
+  var DICA_FE = {fracttal: 'As OS finalizadas no Fracttal, pela semana (de segunda a domingo) do dia do fechamento. Clique numa semana para ver as OS dela.',
+                 engenharia: 'As OS que a Engenharia encerrou (o diagnóstico ou o finalizado, o que veio por último), pela semana do dia do encerramento, de qualquer status no Fracttal. Clique numa semana para ver as OS dela.'};
+  // a segunda-feira da semana do dia ("AAAA-MM-DD"), como no app; a conta é em UTC para o fuso não mudar o dia
+  function segunda(dia) {
+    var p = dia.split('-'), t = Date.UTC(+p[0], +p[1] - 1, +p[2]);
+    return new Date(t - ((new Date(t).getUTCDay() + 6) % 7) * 864e5).toISOString().slice(0, 10);
+  }
+  function maisDias(dia, n) { var p = dia.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]) + n * 864e5).toISOString().slice(0, 10); }
+  function br(dia) { var p = dia.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  function semana(k, oss, maior, atual) {
+    var s = el('section', 'etm-semana');
+    var cab = el('button', 'etm-semana-cab'); cab.type = 'button';
+    var aberta = vista.feAbertas.indexOf(k) >= 0;
+    cab.setAttribute('aria-expanded', String(aberta));
+    var ic = el('i', 'ph ph-caret-' + (aberta ? 'down' : 'right')); ic.setAttribute('aria-hidden', 'true'); cab.appendChild(ic);
+    cab.appendChild(el('span', 'etm-semana-tit', 'Semana de ' + br(k) + ' a ' + br(maisDias(k, 6)) + (atual ? ' (esta semana)' : '')));
+    // a barra do tamanho da semana perto da maior: o rendimento do time num olhar
+    var barra = el('span', 'etm-semana-barra'), cheio = el('span');
+    cheio.style.setProperty('--p', Math.round(oss.length / maior * 100) + '%');
+    barra.appendChild(cheio); barra.setAttribute('aria-hidden', 'true'); cab.appendChild(barra);
+    cab.appendChild(el('b', 'etm-semana-n', String(oss.length)));
+    s.appendChild(cab);
+    var palavra = vista.feVisao === 'engenharia' ? 'encerrada ' : 'fechada ';
+    function corpo() {
+      var c = el('div', 'etm-semana-corpo');
+      oss.slice().sort(function (a, b) { return diaFech(b).localeCompare(diaFech(a)) || Number(b.os) - Number(a.os); })
+        .forEach(function (o) { c.appendChild(cartao(o, palavra + br(diaFech(o)).slice(0, 5))); });
+      return c;
+    }
+    if (aberta) s.appendChild(corpo());
+    // abre e fecha no lugar (o redesenho inteiro tiraria o foco do teclado do botão)
+    cab.addEventListener('click', function () {
+      var i = vista.feAbertas.indexOf(k), abrir = i < 0;
+      if (abrir) vista.feAbertas.push(k); else vista.feAbertas.splice(i, 1);
+      cab.setAttribute('aria-expanded', String(abrir)); ic.className = 'ph ph-caret-' + (abrir ? 'down' : 'right');
+      var c = s.querySelector('.etm-semana-corpo');
+      if (abrir && !c) s.appendChild(corpo());
+      if (!abrir && c) c.remove();
+      guardar();
+    });
+    return s;
+  }
+  function desenhaFechamentos() {
+    document.querySelectorAll('.etm-visao [data-visao]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.visao === vista.feVisao)); });
+    document.getElementById('etm-fe-dica').textContent = DICA_FE[vista.feVisao];
+    if (D.nunca_lido) { lendo(feSemanas); feN.textContent = ''; mostrando(''); return; }
+    if (vista.feVisao === 'engenharia' && D.sem_marcas) {     // sem o livro das marcações, nada de semana pela metade
+      preencher(feSemanas, [el('p', 'kb-vazio', 'Sem as marcações da Engenharia agora: não dá para saber quando ela encerrou cada OS. Recarregue em instantes.')]);
+      feN.textContent = ''; mostrando(''); return;
+    }
+    var lista = D.oss.filter(function (o) { return passa(o); }), por = {};
+    lista.forEach(function (o) { var k = segunda(diaFech(o)); (por[k] || (por[k] = [])).push(o); });
+    var chaves = Object.keys(por).sort().reverse();
+    var maior = chaves.reduce(function (m, k) { return Math.max(m, por[k].length); }, 0);
+    var resumo = plural(lista.length, 'OS fechada', 'OS fechadas') + ' em ' + plural(chaves.length, 'semana', 'semanas');
+    feN.textContent = resumo; mostrando(resumo);
+    var esta = segunda(D.hoje);
+    preencher(feSemanas, chaves.length ? chaves.map(function (k) { return semana(k, por[k], maior, k === esta); })
+      : [el('p', 'kb-vazio', 'Nenhuma OS fechada com estes filtros.')]);
+  }
+  document.querySelectorAll('.etm-visao [data-visao]').forEach(function (b) {
+    b.addEventListener('click', function () { if (vista.feVisao !== b.dataset.visao) { vista.feVisao = b.dataset.visao; desenha(); } });
+  });
+
   // ── o Histórico: os clientes, as usinas e as OS da usina ──
   var hBox = document.getElementById('etm-h-grade-box'), hUsina = document.getElementById('etm-h-usina');
   var hGrade = document.getElementById('etm-h-grade'), hBusca = document.getElementById('etm-h-busca');
@@ -717,7 +816,8 @@
   var abasNav = document.getElementById('etm-abas');
   var abas = abasNav.querySelectorAll('[data-aba]');
   var paineis = {app: document.getElementById('etm-app'), planner: document.getElementById('etm-p-planner'),
-                 abertas: document.getElementById('etm-p-abertas'), historico: document.getElementById('etm-p-historico')};
+                 abertas: document.getElementById('etm-p-abertas'), historico: document.getElementById('etm-p-historico'),
+                 fechamentos: document.getElementById('etm-p-fechamentos')};
   // a vista nova começa no alto: com a página rolada, sobe até as abas (o topo fixo do Nexus fica por cima)
   function subir() {
     var topo = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topo'), 10) || 64;
@@ -745,10 +845,13 @@
     paineis.historico.hidden = vista.aba !== 'historico';
     paineis.planner.hidden = vista.aba !== 'planner';
     paineis.abertas.hidden = vista.aba !== 'abertas';
+    paineis.fechamentos.hidden = vista.aba !== 'fechamentos';
     document.querySelectorAll('[data-nota]').forEach(function (n) { n.hidden = n.dataset.nota !== vista.aba; });
+    document.getElementById('etm-f-periodo-rot').textContent = vista.aba === 'fechamentos' ? 'Período (data do fechamento)' : 'Período (OS ativa entre)';
     if (vista.aba !== 'historico') filtros();
     if (vista.aba === 'planner') desenhaPlanner();
     else if (vista.aba === 'abertas') desenhaAbertas();
+    else if (vista.aba === 'fechamentos') desenhaFechamentos();
     else desenhaHistorico();
     contaAbertas();
     guardar();

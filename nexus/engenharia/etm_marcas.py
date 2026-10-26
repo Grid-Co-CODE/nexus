@@ -119,8 +119,8 @@ def _ligado(v) -> bool:
 
 
 def estado(eventos: list[dict]) -> dict[str, dict]:
-    """{os_id: {"diagnostico_id", "status_pos_id", "etiquetas" (set), "acompanhamento", "finalizado", "ultima" (a
-    marcação mais nova), "finalizado_em", "eventos" (o mais novo primeiro)}}."""
+    """{os_id: {"diagnostico_id", "diagnostico_em", "status_pos_id", "etiquetas" (set), "acompanhamento", "finalizado",
+    "ultima" (a marcação mais nova), "finalizado_em", "eventos" (o mais novo primeiro)}}."""
     cofre = AC._cofre_ou_nada()
     ordem = {id(e): i for i, e in enumerate(eventos)}
     linhas = sorted(eventos, key=lambda e: (_quando(e.get("registrado_em")) or datetime.min.replace(tzinfo=_BRT),
@@ -131,12 +131,12 @@ def estado(eventos: list[dict]) -> dict[str, dict]:
         if not oid or ev not in EVENTOS:
             continue
         oid = str(_int(oid) or oid)          # a API pode devolver o id como "50001.0": a chave é o número
-        e = out.setdefault(oid, {"diagnostico_id": None, "status_pos_id": None, "etiquetas": set(),
-                                 "acompanhamento": False, "finalizado": False, "ultima": None, "finalizado_em": None,
-                                 "eventos": []})
+        e = out.setdefault(oid, {"diagnostico_id": None, "diagnostico_em": None, "status_pos_id": None,
+                                 "etiquetas": set(), "acompanhamento": False, "finalizado": False, "ultima": None,
+                                 "finalizado_em": None, "eventos": []})
         q, v, lig = _quando(l.get("registrado_em")), _int(l.get("valor_id")), _ligado(l.get("ligado"))
         if ev == "diagnostico":
-            e["diagnostico_id"] = v or None
+            e["diagnostico_id"], e["diagnostico_em"] = v or None, (q if v else None)
         elif ev == "status_pos":
             e["status_pos_id"] = v or None
         elif ev == "etiqueta" and v:
@@ -152,6 +152,14 @@ def estado(eventos: list[dict]) -> dict[str, dict]:
                                 if q else "", "nome": ((d.get("quem") or {}).get("nome")) or "", "valor_id": v,
                                 "ligado": lig, "origem": _txt(l.get("origem")) or "nexus"})
     return out
+
+
+def encerrada_em(e: dict):
+    """Quando a Engenharia encerrou a OS: o diagnóstico ou o finalizado, o que veio por último (a regra dos Fechamentos
+    pela Engenharia do app de ETM); desligado o finalizado, vale o diagnóstico. None: a OS não está encerrada."""
+    datas = [d for d, ativo in ((e.get("diagnostico_em"), e.get("diagnostico_id")),
+                                (e.get("finalizado_em"), e.get("finalizado"))) if ativo and d]
+    return max(datas) if datas else None
 
 
 def _evento(cofre, evento: str, quem: dict, os_: dict, *, valor_id=None, ligado=None, origem="nexus",

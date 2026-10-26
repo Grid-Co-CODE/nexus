@@ -252,8 +252,8 @@ como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenhar
 `docs/superpowers/plans/2026-10-26-engenharia-etm.md`.
 
 - **A tela:** `/t/engenharia/etm` (`etm()`, `etm.html`, do setor Engenharia), as abas do app no desenho do Nexus
-  (Levi, 26/10/2026: "o deploy que te mandei tinham abas só disso!"): **Planner**, **Histórico** e **Estações em
-  Aberto**, com a faixa de números em cima. A aba, a usina aberta e os filtros ficam no `sessionStorage` da aba do
+  (Levi, 26/10/2026: "o deploy que te mandei tinham abas só disso!"): **Planner**, **Histórico**, **Estações em
+  Aberto** e **Fechamentos**, com a faixa de números em cima. A aba, a usina aberta e os filtros ficam no `sessionStorage` da aba do
   navegador: a volta da OS (`?atualizar=1`) cai no mesmo lugar; o endereço leva a aba (`#historico`, `#abertas`).
 - **O Planner:** à esquerda a coluna de filtros do Acompanhamento PCM (Levi, 26/10/2026: "o estilo de lista dos filtros
   está todo bugado e torto, deixe no nível do nexus!" e "tem um espaço livre do lado esquerdo que está sendo mau
@@ -325,7 +325,14 @@ como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenhar
   de novo não repete nada (o id no livro e a linha que já está na nota).
 - **Segurança:** o Nexus não usa nenhuma credencial do app de ETM: lê o Fracttal com a dele e o GitHub com o token do
   .env.
-- **Fica para depois:** os Fechamentos por semana (pelo Fracttal e pela Engenharia), a quarta aba do app.
+- **Os Fechamentos** (Levi, 26/10/2026: "Pode fazer a aba Fechamentos por semana, como no app."): quantas OS fecharam
+  em cada semana (de segunda a domingo, a conta em UTC para o fuso não mudar o dia), da mais nova para a mais velha,
+  com a barra do tamanho de cada semana perto da maior; a semana abre no clique e mostra os cartões, com o dia do
+  fechamento. Duas visões, como no app: **no Fracttal** (as finalizadas, pelo dia do fim) e **pela Engenharia** (o dia
+  em que ela encerrou a OS: o diagnóstico ou o finalizado, o que veio por último, de qualquer status no Fracttal;
+  `etm_marcas.encerrada_em`, e desligado o finalizado vale o diagnóstico). A coluna de filtros vale aqui, menos o
+  Status da OS, e o período passa a ser o da data do fechamento. Sem o livro das marcações, a visão pela Engenharia diz
+  e não lista nada.
 - **Prova:** `tests/test_engenharia_etm.py` e `tests/test_engenharia_etm_historico.py` (Fracttal, banco e GitHub falsos).
 
 ## Confiabilidade (06/10/2026)
