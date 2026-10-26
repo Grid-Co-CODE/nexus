@@ -228,7 +228,7 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
 - **Criar OS** (Levi, 25/10/2026: "ao lado do botão de solicitação quero um botão de 'Criar OS'. Fará os mesmos
   preenchimentos automáticos que já faz na solicitação"): o Criar OS do zero do OS Creator (o Tradicional,
   `/os/tradicional?` com o mesmo endereço do Solicitar OS) com o cliente, a usina e o ativo marcados, a data do
-  incidente desta OS e ela como OS pai no Passo 4, e as subtarefas "Descreva a atividade realizada" e "Ficou alguma
+  incidente desta OS e ela como OS pai no Passo 1 (ao lado das datas desde 26/10/2026), e as subtarefas "Descreva a atividade realizada" e "Ficou alguma
   pendência? Se sim, descreva", que viraram o padrão do Criar OS do zero para todos (`tradicional_web.SUBS_PADRAO`,
   as mesmas palavras da base da Solicitação; regra no README do OS Creator). A engenharia cria a OS de campo direto,
   sem passar pela Fila do PCM, e a resposta dela entra em Demais respostas do técnico.

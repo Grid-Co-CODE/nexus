@@ -46,6 +46,11 @@ body.os-form textarea:focus{outline:none;border-color:var(--f-green)}
 .trad-ospai-lista{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);max-height:220px;overflow:auto;background:var(--f-card);border:1px solid var(--f-border);border-radius:10px;padding:6px;box-shadow:0 14px 34px rgba(0,0,0,.45)}
 .trad-ospai-lista[hidden]{display:none}
 .trad-ospai-item{padding:5px 8px;border-radius:6px;cursor:pointer;color:var(--txt);font-size:13px}.trad-ospai-item:hover{background:var(--f-input)}
+/* 26/10/2026: as duas datas e a OS pai numa linha só (no celular, uma embaixo da outra); as etiquetas marcadas embaixo
+   da busca, cada uma um botão com o x para tirar (a lista só aparece ao pesquisar) */
+.trad-linha3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.trad-linha3{grid-template-columns:1fr}}
+.trad-etiq-marcadas{display:flex;flex-wrap:wrap;gap:6px}.trad-etiq-marcadas:empty{display:none}
 /* imagens: botões, grade de 3 miniaturas (150px), nome editável e Remover */
 
 /* ── tema claro (Nexus, 09/10/2026): a regra e a paleta --osc-* estão no bloco TEMA CLARO do fim do os.css ── */
