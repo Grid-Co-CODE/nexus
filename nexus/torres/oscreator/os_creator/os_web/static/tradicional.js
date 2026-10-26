@@ -31,6 +31,8 @@
     const card = $('card' + (i + 1));
     if (card && rolar !== false) card.scrollIntoView({behavior: 'smooth', block: 'start'});
   }
+  // sem os "Próximo" (Levi, 26/10/2026), o "Passo N de 4" segue o passo em que a pessoa está mexendo
+  [1, 2, 3].forEach((n) => { const c = $('card' + n); if (c) c.addEventListener('focusin', () => irPara(n - 1, false)); });
 
   // ── barra "Clonar OS nº" → a tela de clonagem ──
   const cloneIn = $('clone_in');
@@ -40,7 +42,7 @@
 
   // ═══ Passo 1 — Step1 ═══
   const cbCli = $('cb_cliente'), cbUsi = $('cb_usina'), cbTipo = $('cb_tipo'), busca = $('busca'), tbody = $('tbody'), hint = $('hint');
-  const dtProg = $('dt_prog'), dtExec = $('dt_exec'), bNext1 = $('b_next1');
+  const dtProg = $('dt_prog'), dtExec = $('dt_exec');
   let assets = [];                    // ativos da usina atual (Step1._assets, já filtrado por cliente/usina)
   const marcados = new Map();         // id -> ativo: persiste entre filtros E entre usinas (Step1._checked)
   // 10 em 10 (Levi, 22/09): so a EXIBICAO; o marcado continua valendo fora da tela
@@ -128,8 +130,7 @@
   function atualizaHint(base) {                                // Step1._atualiza_hint
     const n = marcados.size, nu = usinasMarcadas().size;
     hint.textContent = n ? base + '  ·  ' + n + ' marcado(s)' + (nu > 1 ? ' em ' + nu + ' usinas diferentes' : '') : base;
-    bNext1.textContent = n ? 'Próximo (' + n + ') ›››' : 'Próximo ›››';
-    bNext1.disabled = !n;
+    if (typeof previaDesc === 'function') previaDesc();       // a prévia do título acompanha o 1º marcado
   }
 
   tbody.addEventListener('change', (ev) => {
@@ -167,11 +168,10 @@
       await onCliente();
     } catch (e) { hint.textContent = '⚠ ' + e.message; }
   };
-  bNext1.onclick = () => { previaDesc(); irPara(1); };
 
   // ═══ Passo 2 — Step2 + TipoTarefaBox ═══
   const desc = $('desc'), obs = $('obs'), etiqBusca = $('etiq_busca'), etiqLista = $('etiq_lista');
-  const cbTipoTarefa = $('cb_tipo_tarefa'), cbCrit = $('cb_crit'), cbC1 = $('cb_c1'), cbC2 = $('cb_c2'), bNext2 = $('b_next2');
+  const cbTipoTarefa = $('cb_tipo_tarefa'), cbCrit = $('cb_crit'), cbC1 = $('cb_c1'), cbC2 = $('cb_c2');
   let labels = [];                    // catálogo [{id, description, color}]
   const etiqMarcadas = new Set();     // ids marcados (persistem ao filtrar)
 
@@ -180,16 +180,31 @@
     etiqBusca.placeholder = labels.length ? 'Filtrar etiquetas…' : '⚠ etiquetas não carregaram';
     filtrarEtiq();
   }
+  // a lista das etiquetas só aparece ao pesquisar (Levi, 26/10/2026: "não precisa ficar mostrando as opções, o ideal é
+  // quando a pessoa for pesquisar aparece a lista"); as marcadas ficam embaixo, cada uma um botão que a tira
   function filtrarEtiq() {
-    const txt = (etiqBusca.value || '').trim().toLowerCase();
-    etiqLista.innerHTML = labels.filter((l) => !txt || String(l.description || '').toLowerCase().includes(txt))
-      .map((l) => '<label class="trad-item"><input type="checkbox" value="' + esc(l.id) + '"' + (etiqMarcadas.has(l.id) ? ' checked' : '') + '> ' + esc(l.description) + '</label>').join('');
+    const txt = (etiqBusca.value || '').trim();
+    const vis = txt ? labels.filter((l) => casaNome(l.description, txt)) : [];
+    etiqLista.hidden = !txt;
+    etiqLista.innerHTML = vis.map((l) => '<label class="trad-item"><input type="checkbox" value="' + esc(l.id) + '"' + (etiqMarcadas.has(l.id) ? ' checked' : '') + '> ' + esc(l.description) + '</label>').join('')
+      || (txt ? '<div class="trad-vazio">Nenhuma etiqueta com “' + esc(txt) + '”.</div>' : '');
+    pintarEtiqMarcadas();
+  }
+  function pintarEtiqMarcadas() {
+    $('etiq_marcadas').innerHTML = labels.filter((l) => etiqMarcadas.has(l.id))
+      .map((l) => '<button type="button" class="os-btn secondary mini" data-tira="' + esc(l.id) + '" title="Tirar a etiqueta">' + esc(l.description) + ' ✕</button>').join('');
   }
   etiqBusca.oninput = filtrarEtiq;
+  etiqBusca.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { etiqBusca.value = ''; filtrarEtiq(); } });
   etiqLista.addEventListener('change', (ev) => {
     if (ev.target.type !== 'checkbox') return;
     const id = Number(ev.target.value);
     if (ev.target.checked) etiqMarcadas.add(id); else etiqMarcadas.delete(id);
+    pintarEtiqMarcadas();
+  });
+  $('etiq_marcadas').addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-tira]'); if (!b) return;
+    etiqMarcadas.delete(Number(b.dataset.tira)); filtrarEtiq();
   });
 
   function fill(cb, itens, comNenhuma) {
@@ -202,21 +217,22 @@
     } catch (e) { cbTipoTarefa.innerHTML = '<option value="">⚠ falha ao carregar — relogue</option>'; }
   }
   const tipoPronto = () => !!cbTipoTarefa.value;              // TipoTarefaBox.is_ready
-  // o título de cada OS é a descrição com o nome curto do SEU ativo na frente (26/10/2026; o servidor monta com
-  // `solic_web.titulo_do_ativo`): a marca [Ativo] vale, e o que já começa pelo ativo não repete
+  // o título de cada OS é "[Ativo] - Título", com o nome curto do SEU ativo (26/10/2026; o servidor monta com
+  // `tradicional_web.titulo_da_os`): o ativo da usina vira "Usina", a marca [Ativo] vale, e o que já começa pelo ativo não
+  // repete. `nome_titulo` vem do catálogo da cascata, o mesmo nome que o servidor usa
   function tituloCom(v, curto) {
     if (v.indexOf('[Ativo]') >= 0) return v.replace('[Ativo]', '[' + curto + ']');
     return v.toLowerCase().indexOf(('[' + curto + ']').toLowerCase()) === 0 ? v : '[' + curto + '] - ' + v;
   }
   function previaDesc() {
     const v = desc.value.trim(), m = [...marcados.values()], el = $('hint_desc');
-    if (!v || !m.length) { el.textContent = 'Escreva só a ação: o nome de cada ativo entra sozinho na frente do título.'; return; }
-    el.textContent = 'Vai sair “' + tituloCom(v, m[0].curto || 'Ativo') + '”'
+    if (!v || !m.length) { el.textContent = 'Escreva só o título: o nome de cada ativo entra sozinho na frente.'; return; }
+    el.textContent = 'Vai sair “' + tituloCom(v, nomeTitulo(m[0])) + '”'
       + (m.length > 1 ? ' — e assim com o nome de cada um dos ' + m.length + ' ativos marcados.' : '.');
   }
-  desc.oninput = () => { bNext2.disabled = !desc.value.trim(); previaDesc(); };
+  const nomeTitulo = (a) => a.nome_titulo || a.curto || 'Ativo';
+  desc.oninput = previaDesc;
   $('b_back2').onclick = () => irPara(0);
-  bNext2.onclick = () => { if (desc.value.trim()) irPara(2); };
 
   // ═══ Passo 3 — Step3 ═══
   const subsEl = $('subs'), bDone = $('b_done'), res = $('resultado');
@@ -246,7 +262,12 @@
   bDone.onclick = () => {                                     // MainWindow._gerar_os
     if (!marcados.size) { mostrarResultado('Marque ao menos um ativo no Passo 1.', true); irPara(0); return; }
     if (!tipoPronto()) { mostrarResultado('O tipo de tarefa ainda não carregou (ou a sessão expirou). Aguarde um instante ou relogue antes de gerar.', true); irPara(1); return; }
-    if (!desc.value.trim()) { mostrarResultado('Preencha a Descrição da tarefa no Passo 2.', true); irPara(1); return; }
+    if (!desc.value.trim()) { mostrarResultado('Preencha o Título da tarefa no Passo 2.', true); irPara(1); return; }
+    if (!pessoaSel) { mostrarResultado('Escolha o técnico responsável no Passo 2.', true); irPara(1); respBusca.focus(); return; }
+    if (ospaiIn.value.trim() && !ospaiSel) {
+      mostrarResultado('Escolha a OS pai na lista que aparece ao digitar o número (Passo 1) — ou apague o campo.', true);
+      irPara(0); ospaiIn.focus(); return;
+    }
     if (!subtarefas().length) return;
     abrirResponsavel();
   };
@@ -256,28 +277,29 @@
   const ckFin = $('ck_fin'), finpanel = $('finpanel'), finIni = $('fin_ini'), finFim = $('fin_fim'), finResp = $('fin_resp');
   const ckAgrupar = $('ck_agrupar'), wAgrupar = $('w_agrupar'), ospaiIn = $('ospai_in'), ospaiLista = $('ospai_lista'), respErro = $('resp_erro');
   let pessoas = null, pessoaSel = null, ospaiSel = null, ospaiTimer = null;
-  let ospaiSug = null;                // a OS pai que veio pelo endereço (o "Criar OS" da Engenharia): o Passo 4 abre com ela
 
   function erroModal(m) { respErro.hidden = !m; respErro.textContent = m ? '⚠ ' + m : ''; }
 
   async function abrirResponsavel() {
     const n = marcados.size, nu = usinasMarcadas().size;
-    $('resp_titulo').innerHTML = '<b>' + n + ' OS</b> a gerar — escolha o <b>responsável</b> <small>(obrigatório na criação)</small>:';
+    $('resp_titulo').innerHTML = '<b>' + n + ' OS</b> a gerar — confira antes de gerar:';
+    const m0 = [...marcados.values()][0];
+    $('resp_quem').innerHTML = 'Responsável: <b>' + esc(pessoaSel.name) + '</b>' + (ospaiSel ? ' · OS pai: <b>' + esc(ospaiSel.folio) + '</b>' : '')
+      + '<br>Título: “' + esc(tituloCom(desc.value.trim(), nomeTitulo(m0))) + '”' + (n > 1 ? ' (e assim com cada ativo)' : '');
     $('resp_usinas').hidden = nu < 2;
     $('resp_usinas').textContent = nu < 2 ? '' : 'Atenção: os ativos marcados são de ' + nu + ' usinas diferentes — confira: '
       + textoUsinas(' · ') + '.';
-    bGerar.textContent = n > 1 ? 'Gerar ' + n + ' OS' : 'Gerar OS'; bGerar.disabled = true; pessoaSel = null;
+    bGerar.textContent = n > 1 ? 'Gerar ' + n + ' OS' : 'Gerar OS'; bGerar.disabled = false;
     wAgrupar.hidden = !(n > 1); ckAgrupar.checked = false; $('fin').hidden = false;     // agrupar só com mais de um ativo
     ckFin.checked = false; finpanel.hidden = true;
     document.querySelector('input[name=fin_dest][value=final]').checked = true;          // default Finalizados
     finIni.value = dtProg.value; finFim.value = dtProg.value;                            // data inicial = incidente do Passo 1
     finResp.innerHTML = subtarefas().map(() => '').length
       ? subtarefas().map((s) => '<div class="trad-sub-lbl">' + esc(s) + '</div><input type="text" class="resp" placeholder="Resposta…">').join('') : '';
-    ospaiSel = ospaiSug; ospaiIn.value = ospaiSug ? ospaiSug.folio : ''; ospaiLista.hidden = true; erroModal('');
+    ospaiLista.hidden = true; erroModal('');
     modal.hidden = false; document.body.classList.add('os-modal-aberto');
     irPara(3, false);
-    if (!pessoas) await carregarPessoas(); else filtrarPessoas();
-    respBusca.focus();
+    bGerar.focus();
   }
   function fecharModal() {
     modal.hidden = true; document.body.classList.remove('os-modal-aberto');
@@ -319,14 +341,18 @@
     if (e.key !== 'Enter') k = k < 0 ? 0 : Math.max(0, Math.min(vis.length - 1, k + (e.key === 'ArrowDown' ? 1 : -1)));
     else if (k < 0) k = 0;
     pessoaSel = vis[k];
-    filtrarPessoas(); bGerar.disabled = !pessoaSel;
+    filtrarPessoas(); pintarEscolhido();
   });
   respLista.addEventListener('click', (ev) => {
     const el = ev.target.closest('.trad-pessoa'); if (!el) return;
     pessoaSel = (pessoas || []).find((p) => String(p.id_personnel) === el.dataset.id) || null;
-    filtrarPessoas(); bGerar.disabled = !pessoaSel;
+    filtrarPessoas(); pintarEscolhido();
   });
-  respLista.addEventListener('dblclick', (ev) => { if (ev.target.closest('.trad-pessoa') && pessoaSel) gerar(); });   // duplo clique gera
+  // o técnico mora no Passo 2 desde 26/10/2026: a escolha aparece embaixo da lista (o duplo clique que gerava saiu: aqui
+  // ele geraria sem a conferência do Passo 4)
+  function pintarEscolhido() {
+    $('resp_sel').textContent = pessoaSel ? 'Escolhido: ' + pessoaSel.name : 'Nenhum técnico escolhido.';
+  }
   ckFin.onchange = () => { finpanel.hidden = !ckFin.checked; };
   ckAgrupar.onchange = () => {                                // _on_agrupar: agrupar e "já realizada" não combinam
     $('fin').hidden = ckAgrupar.checked;
@@ -343,11 +369,13 @@
     ospaiLista.innerHTML = lista.map((r) => '<div class="trad-ospai-item" data-id="' + esc(r.id) + '" data-folio="' + esc(r.folio) + '">' + esc(r.folio) + (r.descricao ? ' — ' + esc(r.descricao) : '') + '</div>').join('');
     ospaiLista.hidden = !lista.length;
   }
-  ospaiLista.addEventListener('click', (ev) => {
+  ospaiLista.addEventListener('mousedown', (ev) => {         // mousedown: o blur do campo fecha a lista logo depois
     const it = ev.target.closest('.trad-ospai-item'); if (!it) return;
+    ev.preventDefault();
     ospaiSel = {id: Number(it.dataset.id), folio: it.dataset.folio};
     ospaiIn.value = it.textContent; ospaiLista.hidden = true;
   });
+  ospaiIn.addEventListener('blur', () => { setTimeout(() => { ospaiLista.hidden = true; }, 150); });
 
   async function gerar() {                                    // ResponsavelDialog._gerar
     if (!pessoaSel) return;
@@ -378,7 +406,7 @@
       ? '\n\nATENÇÃO: os ativos são de ' + usinasMarcadas().size + ' usinas diferentes:\n- ' + textoUsinas('\n- ') : '';
     if (!confirm(frase + extra + (ospaiSel ? '\nOS pai: ' + ospaiSel.folio + '.' : '') + usinas + '\n\nContinuar?')) return;
     bGerar.disabled = true; bCancel.disabled = true; erroModal('');
-    respBusca.placeholder = agrupar ? 'Gerando 1 OS com ' + ativos.length + ' tarefas…' : 'Gerando ' + ativos.length + ' OS (resp.: ' + pessoaSel.name + ')…';
+    const rotulo = bGerar.textContent; bGerar.textContent = 'Gerando…';
     try {
       let r;
       if (total > 0) {                                        // imagens → multipart: bytes, como Step1.selected_images()
@@ -394,7 +422,7 @@
       mostrarResultado(j.mensagem || '', !j.ok);
       if (j.ok) novaOs();                                     // _final → nova_os(): volta pronto para outra OS
     } catch (e) { erroModal(String(e)); }
-    finally { bGerar.disabled = !pessoaSel; bCancel.disabled = false; if (pessoas) respBusca.placeholder = 'Filtrar responsável…'; }
+    finally { bGerar.disabled = false; bGerar.textContent = rotulo; bCancel.disabled = false; }
   }
   bGerar.onclick = gerar;
   modal.addEventListener('click', (ev) => { if (ev.target.hasAttribute('data-fechar') && !bCancel.disabled) fecharModal(); });
@@ -404,12 +432,13 @@
     imgs.forEach((lista) => lista.forEach((im) => { if (im.url) URL.revokeObjectURL(im.url); })); imgs.clear();
     dtProg.value = agoraLocal(); progTocada = false; dtExec.value = amanhaLocal();
     busca.value = ''; cbCli.value = ''; onCliente();
-    desc.value = ''; obs.value = ''; bNext2.disabled = true; previaDesc();
+    desc.value = ''; obs.value = ''; previaDesc();
     etiqMarcadas.clear(); etiqBusca.value = ''; filtrarEtiq();
     cbCrit.value = CRIT_DEFAULT; if (cbC1.options.length) cbC1.selectedIndex = 0; if (cbC2.options.length) cbC2.selectedIndex = 0;
     if (cbTipoTarefa.options.length) cbTipoTarefa.selectedIndex = 0;
     subtarefasPadrao();
-    ospaiSug = null;                                          // a OS seguinte não herda a OS pai da sugestão (como na Solicitação)
+    ospaiSel = null; ospaiIn.value = ''; ospaiLista.hidden = true;   // a OS seguinte não herda a OS pai (como na Solicitação)
+    pessoaSel = null; respBusca.value = ''; filtrarPessoas(); pintarEscolhido();
     irPara(0);
   }
 
@@ -481,7 +510,8 @@
   //    ativo dela marcado, a data do incidente dela (já no campo) e ela como OS pai no Passo 4 ──
   async function sugerir() {
     const s = $('sug') ? $('sug').dataset : {};
-    if (s.sugOsPai && s.sugOsPaiFolio) ospaiSug = {id: Number(s.sugOsPai), folio: s.sugOsPaiFolio};
+    // a OS do Quadro da equipe já vem escolhida como OS pai no Passo 1 (a pessoa troca ou apaga)
+    if (s.sugOsPai && s.sugOsPaiFolio) { ospaiSel = {id: Number(s.sugOsPai), folio: s.sugOsPaiFolio}; ospaiIn.value = s.sugOsPaiFolio; }
     if (!s.sugCliente || !s.sugUsina) return;
     cbCli.value = s.sugCliente;
     if (cbCli.value !== s.sugCliente) return;
@@ -503,5 +533,6 @@
   atualizaHint('Selecione cliente e usina para ver os ativos.');
   carregarEtiquetas();
   carregarTipos();
+  carregarPessoas();                                          // o técnico é escolhido no Passo 2 (26/10/2026)
   sugerir();
 })();

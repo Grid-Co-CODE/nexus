@@ -44,10 +44,14 @@ def test_criar_os_com_sugestao_traz_o_ativo_a_os_pai_e_a_data(cli):
     assert _sugestao(h) == {"cliente": "Cliente X", "usina": USINA, "ativo": "TST-INV11", "os-pai": "555",
                             "os-pai-folio": "16784"}
     assert 'id="dt_prog" type="datetime-local" value="2026-10-08T06:00"' in h
-    # a página aplica a sugestão ao abrir; a OS pai vem escolhida no Passo 4 e não passa para a OS seguinte
+    # a página aplica a sugestão ao abrir; a OS pai vem escolhida no campo do Passo 1 (ao lado das datas desde 26/10/2026)
+    # e não passa para a OS seguinte
     assert "sugerir();" in JS.split("// arranque", 1)[1]
-    assert "ospaiSel = ospaiSug;" in JS.split("async function abrirResponsavel()", 1)[1].split("\n  }\n", 1)[0]
-    assert "ospaiSug = null;" in JS.split("function novaOs()", 1)[1].split("\n  }\n", 1)[0]
+    sug = JS.split("async function sugerir()", 1)[1].split("\n  }\n", 1)[0]
+    assert "ospaiSel = {id: Number(s.sugOsPai), folio: s.sugOsPaiFolio}; ospaiIn.value = s.sugOsPaiFolio;" in sug
+    assert "ospaiSel = null; ospaiIn.value = '';" in JS.split("function novaOs()", 1)[1].split("\n  }\n", 1)[0]
+    card1 = h.split('id="card1"', 1)[1].split('id="card2"', 1)[0]
+    assert 'id="dt_exec"' in card1 and 'id="ospai_in"' in card1
 
 
 def test_criar_os_sem_sugestao_ou_com_ela_torta_abre_como_sempre(cli):
