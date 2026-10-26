@@ -65,8 +65,11 @@ TORRE = Torre(
         # por região e equipe no Painel das Rondas e as fotos no histórico da usina. O endereço antigo leva à Central
         # (TELAS_QUE_SAIRAM).
         Tela("rondas", "Rondas", "Que usina está sem ronda de campo há mais tempo?", FONTE_APP),
+        # a vegetação e a sujidade das rondas, semana a semana e por cliente, com a zeladoria do Fracttal (Levi,
+        # 26/10/2026, no modelo "Rondas Sujidade e Vegetação"); os serviços de terceiros do App ficaram no fim da tela
         Tela("zeladoria", "Zeladoria",
-             "Que serviço de terceiro está parado, sem diária hoje ou com EPI pendente?", FONTE_APP),
+             "Como estão a vegetação e a sujidade dos módulos em cada usina, semana a semana, e onde a zeladoria tem de agir?",
+             "Rondas do App (o checklist da OS de ronda no Fracttal) + tarefas de Zeladoria do Fracttal no banco do Nexus"),
         Tela("triagem", "Triagem de qualidade", "O que exige ação hoje na qualidade do fechamento?", FONTE_APP),
         # o placar do ciclo de pontos do App (Levi, 13/10/2026: "Cria uma seção de Ranking de Pontos no App de Campo!"):
         # quem calcula é o App, que publica no livro ranking_app_campo (visao.ranking_pontos). Não é o Ranking de 08/10
@@ -1185,9 +1188,97 @@ def ronda_foto(os_, i):
     return Response(corpo, mimetype=mime, headers={"Cache-Control": guarda})
 
 
+# ── Zeladoria (26/10/2026) ───────────────────────────────────────────────────────────────────────────────────────
+# Levi, com o modelo "Rondas Sujidade e Vegetação": "Quero algo nesses padrões para a parte de zeladoria da seção campo
+# app do nexus. deixe no estilo do Nexus porém nesse padrão! a evolução por usina deve ser por cliente!". A conta é
+# `nexus/campo/zeladoria.py`, sobre o que as Rondas já leem (as rondas e o checklist da OS) e as tarefas de Zeladoria do
+# Fracttal no banco (as mesmas da Visão do responsável). Os serviços de terceiros que o App registra (`visao.zeladoria`)
+# ficaram no fim da tela.
+CAMPOS_ZELADORIA = ("vegetacao", "sujidade")
+
+
+def _tarefas_de_zeladoria() -> tuple[list[dict], str, dict]:
+    """As tarefas das OS do Fracttal no banco (`nexus_os · fato_tarefa_os`) e de quando é a foto delas (a mesma conta da
+    Visão do responsável, `foto_das_os`); sem o banco, nenhuma e o motivo (a tela diz, e as recomendações saem sem a
+    situação da OS)."""
+    from ...dados import fato_tarefa_os as FT
+    try:
+        tarefas = visao._livro(FT.LIVRO, FT.ABA)
+        q = next(iter(visao._livro(FT.LIVRO, "qualidade")), {})
+    except Exception as e:      # noqa: BLE001 — sem as OS, o resto da tela vale
+        return [], f"{type(e).__name__}: {str(e)[:120]}", {}
+    return tarefas, "", campo_resp.foto_das_os(q.get("gerado_em"), visao._agora())
+
+
+def _zeladoria_conta(semana=None):
+    """A conta da Zeladoria com a leitura das Rondas (cópia de 2 min), as respostas do checklist (as OS de ronda lidas
+    do Fracttal, relidas por trás, como na aba Sujidade e vegetação) e as tarefas de zeladoria."""
+    from ...campo import zeladoria as ZL
+    leitura = visao.rondas()
+    d = leitura.dados or {}
+    ronda_checklist.pedir_releitura()
+    campo_aprovacao._pedir_releitura()
+    tarefas, erro_os, foto = _tarefas_de_zeladoria()
+    hoje = date.fromisoformat(d["hoje"]) if d.get("hoje") else visao._agora().date()
+    z = ZL.montar(d.get("todas") or [], d.get("cobertura") or [], ronda_checklist.respostas(),
+                  d.get("validacoes") or [], tarefas, hoje, semana)
+    z["foto_os"] = foto
+    return leitura, d, z, erro_os, hoje
+
+
 @bp.route("/zeladoria")
 def zeladoria():
-    return render_template("campo/zeladoria.html", **_comum("zeladoria", visao.zeladoria()))
+    """Vegetação e sujidade dos módulos por usina: os números da semana, a evolução das 8 semanas agrupada por cliente,
+    as recomendações que pedem ação, a tabela por usina (a gaveta no clique) e a régua. Filtros: semana, cliente,
+    usina, situação, a região de campo e o gestor de contrato (como as Rondas); o módulo troca a evolução."""
+    from ...campo import zeladoria as ZL
+    leitura, d, z, erro_os, hoje = _zeladoria_conta(request.args.get("semana"))
+    regiao_campo, gestor = _regiao_campo(), _gestor()
+    cliente, usina = request.args.get("cliente", ""), request.args.get("usina", "")
+    campo = request.args.get("modulo") if request.args.get("modulo") in CAMPOS_ZELADORIA else "vegetacao"
+    sit = request.args.get("situacao", "") if request.args.get("situacao") in dict(ZL.SITUACOES) else ""
+
+    def filtra(lst, sem_usina=False):
+        return [u for u in lst if _do_papel(u, regiao_campo, gestor) and (not cliente or u.get("cliente") == cliente)
+                and (sem_usina or not usina or str(u["usina_id"]) == usina)]
+    base = filtra(z["usinas"])
+    linhas = [u for u in base if ZL.situacao(u, sit)]
+    # a ordem da tabela é a da aba Sujidade e vegetação: o mais crítico primeiro, depois o maior nível, depois o nome
+    linhas.sort(key=lambda u: _ordem_do_nome(u["usina"]))
+    linhas.sort(key=lambda u: (-u["pontos"], -max((u["leitura"] or {}).get("sujidade") or 0,
+                                                   (u["leitura"] or {}).get("vegetacao") or 0)))
+    clientes = sorted({u.get("cliente") for u in z["usinas"] if u.get("cliente")}, key=_ordem_do_nome)
+    opcoes_usina = sorted({(str(u["usina_id"]), u["usina"]) for u in filtra(z["usinas"], sem_usina=True)},
+                          key=lambda kv: _ordem_do_nome(kv[1]))
+    return render_template("campo/zeladoria.html", **_comum(
+        "zeladoria", leitura, z=z, linhas=linhas, grupos=ZL.por_cliente(linhas, z["semana"], z["janela"], campo),
+        fila=ZL.fila(base), r=ZL.resumo(base), campo=campo, sit=sit, situacoes=ZL.SITUACOES, cliente=cliente,
+        clientes=clientes, usina=usina, opcoes_usina=opcoes_usina, erro_os=erro_os, hoje=hoje.isoformat(),
+        alerta_acima=ZL.ALERTA_ACIMA, prazo_dias=ZL.PRAZO_DIAS, dias_velha=ZL.DIAS_LEITURA_VELHA,
+        suj_estado=ronda_checklist.estado(), servicos=visao.zeladoria(),
+        explicacao_avulsa=ronda_avulsa.EXPLICACAO, explicacao_validada=visao.VALIDADA_EXPLICACAO,
+        **_papeis(d, d.get("cobertura") or [], regiao_campo, gestor)))
+
+
+@bp.route("/zeladoria/usina/<int:usina_id>")
+def zeladoria_usina(usina_id):
+    """A gaveta de uma usina (o clique na linha, na célula da evolução ou na recomendação): a última leitura, a evolução
+    das 8 semanas nos dois campos, as leituras da semana clicada, a recomendação, a zeladoria do Fracttal e o botão das
+    fotos da última ronda com OS (o Fracttal só é lido no clique do botão)."""
+    from ...campo import zeladoria as ZL
+    _, d, z, erro_os, hoje = _zeladoria_conta(request.args.get("semana"))
+    u = next((x for x in z["usinas"] if x["usina_id"] == usina_id), None)
+    if u is None:
+        abort(404)
+    # a semana das leituras: a da célula clicada; sem ela (o clique na linha ou na recomendação), a da última leitura,
+    # se cair nas 8 semanas (na semana corrente ainda sem ronda, "sem leitura" não diz nada)
+    ultima = ZL.semana_de(u["leitura"]["data"]) if u["leitura"] else ""
+    sem = next((s for s in (request.args.get("ver"), ultima) if s in z["janela"]), z["semana"])
+    lidas = [x for s in z["janela"] for x in u["celulas"][s]["leituras"]]
+    com_os = next((x for x in reversed(lidas) if x.get("os")), None)
+    return render_template("campo/_zeladoria_gaveta.html", u=u, z=z, sem=sem, com_os=com_os, erro_os=erro_os,
+                           hoje=hoje.isoformat(), dia_curto=_dia_curto, alerta_acima=ZL.ALERTA_ACIMA,
+                           explicacao_avulsa=ronda_avulsa.EXPLICACAO, explicacao_validada=visao.VALIDADA_EXPLICACAO)
 
 
 # ── Ranking de pontos (13/10/2026) ───────────────────────────────────────────────────────────────────────────────

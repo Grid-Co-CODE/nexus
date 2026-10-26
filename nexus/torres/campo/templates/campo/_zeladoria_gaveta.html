@@ -1,0 +1,78 @@
+{# A gaveta de uma usina na Zeladoria (26/10/2026): pedaço carregado pela rota /zeladoria/usina/<id> no clique da linha,
+   da célula da evolução ou da recomendação. As fotos da última ronda com OS só vêm do Fracttal no clique do botão. #}
+{% macro nivel(n) %}{% if n is none %}<span class="mudo">—</span>{% else %}<b class="cn-nivel-txt cn-nivel-txt--{{ n }}">{{ n }}</b>{% endif %}{% endmacro %}
+{% macro dmy(iso) %}{{ iso[8:10] }}/{{ iso[5:7] }}/{{ iso[:4] }}{% endmacro %}
+{% set lei = u.leitura or {} %}
+{% set sx = (z.semanas|selectattr('id', 'equalto', sem)|list)[0] %}
+<div class="zl-gav-cab">
+  <p class="gc-eyebrow">{{ u.cliente or 'Sem cliente' }}{% if u.equipe %} · {{ u.equipe }}{% endif %}</p>
+  <h2>{{ u.usina }}</h2>
+  <p>{{ u.cidade or '—' }}{% if u.uf %} - {{ u.uf }}{% endif %} · região de campo {{ u.regiao_campo or '—' }}{% if u.gestor %} · gestor de contrato {{ u.gestor }}{% endif %}</p>
+</div>
+
+<div class="zl-gav-fatos">
+  <div><span class="gc-rotulo">Vegetação</span><span class="v">{{ nivel(lei.get('vegetacao')) }}</span><span class="d">{{ 'em ' ~ dia_curto(lei.get('data')) if lei else 'sem leitura' }}</span></div>
+  <div><span class="gc-rotulo">Sujidade</span><span class="v">{{ nivel(lei.get('sujidade')) }}</span><span class="d">{{ 'em ' ~ dia_curto(lei.get('data')) if lei else 'sem leitura' }}</span></div>
+  <div><span class="gc-rotulo">Vala de drenagem</span><span class="v zl-gav-txt">{{ lei.get('vala') or '—' }}</span><span class="d">{% if lei.get('sensores_sujos') %}<span class="cn-t-alerta">sensor sujo: {{ lei.get('sensores_sujos')|join(', ') }}</span>{% elif lei %}sensores limpos{% else %}—{% endif %}</span></div>
+  {% set us, ul = u.ultima_supressao, u.ultima_limpeza %}
+  <div><span class="gc-rotulo">Última supressão</span><span class="v zl-gav-txt">{{ dia_curto(us.fim) if us else '—' }}</span><span class="d">{{ (us.nome ~ ' · OS ' ~ us.os) if us else 'nenhuma em 90 dias' }}</span></div>
+  <div><span class="gc-rotulo">Última limpeza</span><span class="v zl-gav-txt">{{ dia_curto(ul.fim) if ul else '—' }}</span><span class="d">{{ ('OS ' ~ ul.os) if ul else 'nenhuma em 90 dias' }}</span></div>
+  <div><span class="gc-rotulo">Leitura</span><span class="v zl-gav-txt{% if u.velha %} cn-t-alerta{% endif %}">{{ (u.dias ~ ' d') if lei else '—' }}</span><span class="d">{{ 'desde a última' if lei else 'sem leitura em 90 dias' }}</span></div>
+</div>
+
+<h3>Evolução nas últimas 8 semanas</h3>
+<table class="zl-calor zl-calor--mini">
+  <thead><tr><th scope="col" class="zl-nome"></th>{% for s in z.semanas %}<th scope="col" class="zl-sem{% if s.id == sem %} zl-sem--on{% endif %}" title="{{ s.rotulo }}">{{ s.curto }}<small>{{ dia_curto(s.inicio) }}</small></th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for c, nome in (('vegetacao', 'Vegetação'), ('sujidade', 'Sujidade')) %}
+    <tr><th scope="row">{{ nome }}</th>{% for s in z.semanas %}{% set n = u.celulas[s.id][c] %}<td class="zl-c {% if n is not none %}zl-c--{{ n }}{% elif s.corrente %}zl-c--andamento{% else %}zl-c--sem{% endif %}" title="{{ s.rotulo }}: {{ nome|lower }} {{ '—' if n is none else n }}">{{ '' if n is none else n }}</td>{% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h3>Recomendação</h3>
+{% if u.recs %}
+<ul class="zl-gav-lista">
+  {% for rec in u.recs %}{% set zz = rec.z %}
+  <li class="zl-gav-rec zl-rec--{{ 'critico' if rec.nivel >= 5 else 'alerta' }}">
+    <b>{{ rec.acao }}</b> · {{ rec.nome_campo|lower }} {{ rec.nivel }} em {{ dia_curto(rec.data) }}
+    {% if rec.status == 'feita' %}<span class="det cn-t-ok">{{ zz.nome }} feita em {{ dia_curto(zz.fim) }} (OS {{ zz.os }}{% if zz.situacao == 'verificacao' %}, em verificação{% endif %})</span>
+    {% elif rec.status == 'aberta' %}<span class="det">OS {{ zz.os }} · {% if zz.situacao == 'execucao' %}em execução{% elif zz.atrasada %}<span class="cn-t-alerta">programada para {{ dia_curto(zz.programada) }}, atrasada</span>{% else %}programada para {{ dia_curto(zz.programada) }}{% endif %}</span>
+    {% elif rec.status == 'sem_dado' %}<span class="det">sem a situação da OS (as OS do Fracttal não vieram do banco)</span>
+    {% else %}<span class="det cn-t-alerta">sem OS de zeladoria no Fracttal{% if rec.vence %} · prazo {{ 'imediato' if rec.prazo_dias == 0 else 'até ' ~ dia_curto(rec.vence) }}{% endif %}</span>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% elif lei %}<p class="mudo">Sem alerta na última leitura: vegetação e sujidade até {{ alerta_acima }}.</p>
+{% else %}<p class="mudo">Sem leitura de vegetação ou sujidade nos últimos 90 dias.</p>{% endif %}
+
+<h3>Leituras da {{ sx.rotulo }}</h3>
+{% set da_semana = u.celulas[sem].leituras %}
+{% if da_semana %}
+<ul class="zl-gav-lista">
+  {% for x in da_semana|reverse %}
+  <li><b>{{ dia_curto(x.data) }}</b> · {% if x.validada %}<span class="cn-validada" tabindex="0" title="{{ explicacao_validada }}">Validada por foto</span> {{ x.tecnico or '—' }}{% else %}{{ x.tecnico or '—' }}{% if x.avulsa %} <span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% elif x.os %} · OS {{ x.os }}{% endif %}{% endif %}
+    <span class="det">vegetação {{ nivel(x.vegetacao) }} · sujidade {{ nivel(x.sujidade) }}{% if x.vala %} · vala {{ x.vala|lower }}{% endif %}{% if x.sensores_sujos %} · <span class="cn-t-alerta">sensor sujo: {{ x.sensores_sujos|join(', ') }}</span>{% endif %}</span></li>
+  {% endfor %}
+</ul>
+{% else %}<p class="mudo">{{ 'Semana em andamento, ainda sem leitura.' if sx.corrente else 'Sem leitura nesta semana.' }}</p>{% endif %}
+
+<h3>Zeladoria no Fracttal</h3>
+{% if erro_os %}<p class="cn-t-alerta">As OS de zeladoria não vieram do banco ({{ erro_os }}).</p>
+{% elif not z.tem_os %}<p class="mudo">As OS do Fracttal ainda não chegaram ao banco.</p>
+{% elif u.zel %}
+<ul class="zl-gav-lista">
+  {% for zz in u.zel %}
+  <li><b>{{ zz.nome }}</b> · OS {{ zz.os }}
+    <span class="det">{% if zz.situacao == 'feita' %}feita em {{ dmy(zz.fim) }}{% elif zz.situacao == 'verificacao' %}feita em {{ dmy(zz.fim) }} · em verificação{% elif zz.situacao == 'execucao' %}em execução{% if zz.programada %} · programada para {{ dmy(zz.programada) }}{% endif %}{% else %}{% if zz.atrasada %}<span class="cn-t-alerta">programada para {{ dmy(zz.programada) }}, atrasada</span>{% elif zz.programada %}programada para {{ dmy(zz.programada) }}{% else %}aberta{% endif %}{% endif %}</span></li>
+  {% endfor %}
+</ul>
+{% else %}<p class="mudo">Nenhuma OS de zeladoria aberta nem feita nos últimos 90 dias.</p>{% endif %}
+
+<h3>Fotos da última ronda</h3>
+{% if com_os %}
+<button type="button" class="zl-bt-fotos" data-url="{{ url_for('torre_campo.ronda_fotos_os', os_=com_os.os|int) }}">Ver as fotos da OS {{ com_os.os }} ({{ dia_curto(com_os.data) }})</button>
+<div class="zl-fotos"></div>
+{% else %}<p class="mudo">Nenhuma ronda com OS nas 8 semanas: as fotos da ronda sem OS ficam só no App.</p>{% endif %}
+
+<p class="zl-gav-rodape"><a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=u.usina_id) }}">Histórico de rondas da usina</a></p>
