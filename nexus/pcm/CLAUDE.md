@@ -581,6 +581,45 @@ para usar:
   `tests/test_pcm_inventario_livro.py` (inclusive o banco falso com `como_texto=True`, a leitura que falha, a listagem
   incompleta e as mutações nas regras).
 
+## Inventário do almoxarifado: a régua de mínimo e máximo (`inventario/regua.py`; 26/10/2026)
+
+Levi, 26/10/2026: a régua é "sugestão ajustável": o Nexus propõe pela régua de 14/10 e o PCM muda peça a peça. Tela
+`/t/pcm/pecas/inventario/regua?almox=<id>` (a tela dona é o `pecas`, do setor PCM; quem a vê por outro setor só lê). Por peça de
+cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal:
+
+- **Sugestão** (`sugestao`, pura): mínimo = 20% do saldo, máximo = 2x; a avariada (`-AV` no fim do código, ou a marca
+  "Avariado" do catálogo do App) fica sem mínimo e com 3x. Unidade inteira arredonda PARA CIMA (saldo 3 dá mínimo 1, e não 0); METRO
+  e MASSA (o `units_description` do Fracttal) têm duas casas. Saldo 0 (ou negativo) dá (0, 0); **saldo não informado dá
+  (None, None)**: em branco nunca é zero. O `15 x 0,2` do ponto flutuante dá 3,0000000000000004: a conta divide e arredonda
+  antes do teto.
+- **Recomendado** (a Grid): decisão do PCM, só no livro (`fato_regua_minimo`), é o histórico com que se defende o mínimo.
+- **Acordado** (o cliente): decisão do PCM e o ÚNICO que vai ao Fracttal (`definir_regua`, fora da sessão de ajuste: sem
+  movimento, sem mexer no saldo). Leva os DOIS números; o recomendado pode ficar sem mínimo. Mínimo acima do máximo é
+  recusado (400) antes de qualquer pedido.
+
+- **Cada linha do livro é o RETRATO da decisão**, porque vale a última de cada almoxarifado e peça: decidir só o recomendado
+  leva junto o acordado de antes (senão a última linha apagaria o que o cliente acordou), e a sugestão do momento fica ao lado
+  (o histórico do mínimo). `gravado_fracttal` só continua 1 se o acordado não mudou. A decisão lê o livro de novo (`ler(forcar)`)
+  sob uma trava do módulo: duas pessoas, uma peça.
+- **De onde vem o saldo:** o da última contagem GRAVADA (o `para_qtd` do evento `peca_gravada` mais novo); sem ela, o da
+  varredura do App (`almoxarifado.montar`). A peça vem do saldo do almoxarifado, nunca do ID que a página mandou (outro
+  almoxarifado ou ID chutado é 400). O almoxarifado de teste não tem linha na varredura (fica fora das telas): a prova dele passa
+  a `varredura=` à mão.
+- **Gravar** (`gravar_acordado`, no login de quem apertou, `estoque_da_sessao`): lê o almoxarifado (a leitura guarda a ligação),
+  `definir_regua`, relê, e SÓ ENTÃO anota o evento `regua_gravada` (o mínimo de -> para; o máximo fica no retrato) e o retrato
+  `gravado_fracttal`. A releitura que não bate é um evento `erro` e `NaoConfere` (502): o livro nunca diz que o Fracttal tem o
+  que não tem. O evento sai antes do retrato: se o retrato falhar, a peça segue "não gravada" e o PCM grava de novo (idempotente).
+  Sem acordado, ou peça não ligada ao almoxarifado: `Conflito` (409), nenhum pedido. Quem entrou pela senha de administrador
+  registra, mas não grava: `SemLogin` (401), e a tela diz por quê. Limite do Fracttal: 429. Rede que cai: 502 com "grave de novo,
+  é o mesmo número".
+- **Peças de apoio:** `quem.py` (a pessoa nas colunas do livro: `pessoa_hmac` pelo e-mail da sessão, e `pessoa_id` quando o
+  cadastro a acha; sem e-mail, vazio) e `erros.py` (`Conflito`, `NaoConfere` e a tabela erro -> status HTTP, a mesma da
+  curadoria). `Estoque.ler` passou a devolver também a `unidade`.
+- **Provar:** `tests/test_pcm_inventario_regua.py` (a conta, o quadro, o retrato, só o acordado ao Fracttal, a releitura, o 403
+  de quem não é PCM, o 400, o 409, o 401, o 429, a resposta perdida) com mutações nas regras (manda o recomendado, não confere a
+  releitura, teto vira piso, avariada com mínimo, gravado sobrevive ao acordado novo, perde o acordado de antes, aceita mínimo
+  acima do máximo, ignora a contagem gravada, vale a primeira decisão, peça de qualquer almoxarifado, os dois gates), todas pegas.
+
 ## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
 
 **O filtro na própria página** (Levi, 17/10/2026: "sempre que vou puxar um filtro ele carrega o site de novo, deveria só

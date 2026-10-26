@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block titulo %}Mínimo e máximo · Almoxarifado{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# PCM → Almoxarifado → Mínimo e máximo (26/10/2026, o inventário do almoxarifado). Levi: a régua é "sugestão ajustável": o
+   Nexus propõe pela régua de 14/10 e o PCM muda peça a peça. Três números por peça: a sugestão (calculada), o recomendado
+   (a Grid, só no Nexus) e o acordado (o cliente, o único que vai ao Fracttal). As contas e o livro estão em
+   nexus/pcm/inventario/regua.py. Abaixo de 640 px as linhas viram cartões (o data-r é o rótulo de cada valor, como no
+   Almoxarifado). O formulário de cada peça fica no fim da linha, e os campos apontam para ele pelo atributo form. #}
+<div class="pg alm rg">
+<p class="gc-eyebrow">PCM · Almoxarifado</p>
+<h1 class="titulo-pagina">Mínimo e máximo</h1>
+<nav class="rg-nav" aria-label="Partes do almoxarifado">
+  <a href="{{ raiz }}/t/pcm/pecas">Saldo e reposição</a>
+  <a href="{{ raiz }}/t/pcm/pecas/inventario/regua" aria-current="page">Mínimo e máximo</a>
+  <a href="{{ raiz }}/t/pcm/pecas/inventario/curadoria">Curadoria</a>
+</nav>
+<p class="pcm-sub">A régua de 14/10: o mínimo é 20% do saldo e o máximo é o dobro; a peça avariada (código com -AV) fica sem
+  mínimo e com o triplo. Unidade inteira arredonda o mínimo para cima; metro e massa têm duas casas. O
+  <b>recomendado</b> é o da Grid e fica só aqui, como histórico. O <b>acordado</b> é o do cliente: é o único que vai ao
+  Fracttal (o mínimo dispara o alarme), e só quando você manda gravar.</p>
+
+{% if ok %}<div class="cn-certo" role="status"><span><b>{{ ok }}</b></span></div>{% endif %}
+{% if erro %}<div class="cn-erro" role="alert"><span><b>{{ erro }}</b></span></div>{% endif %}
+{% if erro_livro %}<div class="cn-erro" role="alert"><span><b>Não consegui ler o livro do inventário.</b> {{ erro_livro }}</span></div>{% endif %}
+{% if erro_fonte %}<div class="cn-erro" role="alert">Uma fonte não respondeu agora: {{ erro_fonte }}</div>{% endif %}
+
+{% if estado == 'sem_livro' %}
+<p class="pcm-sub alm-vazio">O App ainda não publica o almoxarifado. Quando a varredura diária do inventário do Fracttal
+  chegar ao banco, as peças de cada almoxarifado aparecem aqui.</p>
+{% elif estado == 'incoerente' %}
+<div class="cn-erro cn-aviso" role="status">{{ aviso_varredura }}</div>
+{% else %}
+{% if aviso_varredura %}<div class="cn-erro cn-aviso" role="status">{{ aviso_varredura }}</div>{% endif %}
+
+<h2 class="rg-sub">Almoxarifado</h2>
+<ul class="rg-almoxes">
+  {% for a in almoxes %}
+  <li><a href="{{ raiz }}/t/pcm/pecas/inventario/regua?almox={{ a.id }}"{% if almox and almox.id == a.id %} aria-current="page"{% endif %}>
+    <b>{{ a.nome }}</b><span class="alm-det">{{ a.usina or 'usina não ligada' }} · {{ a.pecas }} peças</span></a></li>
+  {% endfor %}
+</ul>
+
+{% if almox %}
+<section class="alm-painel" aria-label="Régua de {{ almox.nome }}">
+  <h2>{{ almox.nome }}</h2>
+  <p class="alm-ajuda">O saldo é o da última contagem gravada; sem ela, o da varredura do App. Registrar guarda a decisão no
+    Nexus. Gravar no Fracttal manda só o acordado registrado, no seu login, e confere relendo.</p>
+  {% if linhas %}
+  <table class="alm-t rg-t">
+    <thead><tr><th>Peça</th><th class="num">Saldo</th><th>Sugestão</th><th>Recomendado (Grid)</th><th>Acordado (cliente)</th>
+      <th class="num">Mínimo no Fracttal</th><th>Gravar</th></tr></thead>
+    <tbody>
+    {% for x in linhas %}
+    {% set f = 'rg-' ~ x.id_item %}
+    <tr data-peca="{{ x.id_item }}">
+      <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ x.codigo or x.id_item }}</span>
+        <span class="alm-det">{{ x.nome }}{% if x.avariada %} · <span class="alm-aviso">avariada</span>{% endif %}{% if x.unidade %} · {{ x.unidade|lower }}{% endif %}</span></span></td>
+      <td class="num" data-r="Saldo">{% if x.saldo is none %}<span class="alm-v"><span class="mudo">não informado</span></span>
+        {% else %}<span class="alm-v">{{ fmt(x.saldo) }}<span class="alm-det">{{ x.saldo_de }}</span></span>{% endif %}</td>
+      <td data-r="Sugestão"><span class="alm-v rg-sug">
+        {% if x.sugestao_max is none %}<span class="mudo">sem saldo</span>
+        {% else %}{{ 'mín ' ~ fmt(x.sugestao_min) if x.sugestao_min is not none else 'sem mínimo' }} · máx {{ fmt(x.sugestao_max) }}{% endif %}
+        {% if pode and x.sugestao_max is not none %}<button type="button" class="gc-btn gc-btn--fantasma rg-usar" data-rg-sugestao data-rg-form="{{ f }}"
+          data-min="{{ fmt(x.sugestao_min) }}" data-max="{{ fmt(x.sugestao_max) }}" aria-label="Usar a sugestão como recomendado de {{ x.codigo }}">usar como recomendado</button>{% endif %}
+      </span></td>
+      <td data-r="Recomendado"><span class="alm-v rg-par">
+        {% if pode %}<input class="gc-campo rg-n" name="rec_min" form="{{ f }}" inputmode="decimal" autocomplete="off" placeholder="mín" value="{{ fmt(x.recomendado[0]) }}" aria-label="Recomendado, mínimo de {{ x.codigo }}">
+        <input class="gc-campo rg-n" name="rec_max" form="{{ f }}" inputmode="decimal" autocomplete="off" placeholder="máx" value="{{ fmt(x.recomendado[1]) }}" aria-label="Recomendado, máximo de {{ x.codigo }}">
+        {% elif x.recomendado[0] is none and x.recomendado[1] is none %}<span class="mudo">sem decisão</span>
+        {% else %}{{ 'mín ' ~ fmt(x.recomendado[0]) if x.recomendado[0] is not none else 'sem mínimo' }} · máx {{ fmt(x.recomendado[1]) }}{% endif %}</span></td>
+      <td data-r="Acordado"><span class="alm-v rg-par">
+        {% if pode %}<input class="gc-campo rg-n" name="aco_min" form="{{ f }}" inputmode="decimal" autocomplete="off" placeholder="mín" value="{{ fmt(x.acordado[0]) }}" aria-label="Acordado, mínimo de {{ x.codigo }}">
+        <input class="gc-campo rg-n" name="aco_max" form="{{ f }}" inputmode="decimal" autocomplete="off" placeholder="máx" value="{{ fmt(x.acordado[1]) }}" aria-label="Acordado, máximo de {{ x.codigo }}">
+        {% elif x.acordado[0] is none and x.acordado[1] is none %}<span class="mudo">sem acordo</span>
+        {% else %}{{ 'mín ' ~ fmt(x.acordado[0]) if x.acordado[0] is not none else 'sem mínimo' }} · máx {{ fmt(x.acordado[1]) }}{% endif %}</span></td>
+      <td class="num" data-r="Mínimo no Fracttal"><span class="alm-v">{% if x.no_fracttal_min is none %}<span class="mudo">—</span>{% else %}{{ fmt(x.no_fracttal_min) }}{% endif %}
+        <span class="alm-det">da varredura do App</span></span></td>
+      <td data-r="Gravar"><span class="alm-v rg-acao">
+        {% if x.acordado[0] is none and x.acordado[1] is none %}<span class="mudo">registre o acordado</span>
+        {% elif x.gravado %}<span class="alm-ok">gravado no Fracttal</span>
+        {% else %}<span class="alm-aviso">acordado ainda não gravado</span>{% endif %}
+        {% if pode %}
+        <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" form="{{ f }}">Registrar</button>
+        {% if not (x.acordado[0] is none and x.acordado[1] is none) %}
+        <form method="post" action="{{ raiz }}/t/pcm/pecas/inventario/regua/gravar" class="rg-grava">
+          <input type="hidden" name="almox" value="{{ almox.id }}"><input type="hidden" name="item" value="{{ x.id_item }}">
+          <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">{{ 'Gravar de novo' if x.gravado else 'Gravar no Fracttal' }}</button></form>
+        {% endif %}
+        <form id="{{ f }}" method="post" action="{{ raiz }}/t/pcm/pecas/inventario/regua/decidir">
+          <input type="hidden" name="almox" value="{{ almox.id }}"><input type="hidden" name="item" value="{{ x.id_item }}"></form>
+        {% endif %}
+      </span></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% elif not erro_livro %}
+  <p class="pcm-sub">Nenhuma peça com saldo neste almoxarifado na varredura do App.</p>
+  {% endif %}
+  {% if pode %}<p class="alm-ajuda rg-nota">Gravar no Fracttal manda o acordado que está registrado (os números dos campos só
+    valem depois de Registrar). Quem entrou pela senha de administrador registra, mas não grava: o Fracttal pede o login
+    dele.</p>{% endif %}
+</section>
+{% else %}
+<p class="pcm-sub alm-vazio">Escolha o almoxarifado acima.</p>
+{% endif %}
+{% endif %}
+</div>
+<script src="{{ url_for('static', filename='pcm-regua.js') }}"></script>
+{% endblock %}

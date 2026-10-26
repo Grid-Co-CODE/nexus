@@ -94,10 +94,13 @@ def estoque(fr, relogio=None, **kw):
     return E.EstoqueFracttal(fr, relogio=relogio, dormir=relogio.dormir, **kw)
 
 
-def linha_de_saldo(ligacao, item, codigo, stock, minimo, maximo):
-    return {"id": int(ligacao), "id_item": int(item), "code": codigo, "field_1": "Peça de teste", "id_type_item": 4,
-            "active": True, "id_warehouse": int(ALMOX), "stock": stock, "min_stock_level": minimo,
-            "max_stock_level": maximo, "reorder_level": 0, "stock_temp": 0, "qty_assigned": 0, "lots": []}
+def linha_de_saldo(ligacao, item, codigo, stock, minimo, maximo, unidade=None):
+    linha = {"id": int(ligacao), "id_item": int(item), "code": codigo, "field_1": "Peça de teste", "id_type_item": 4,
+             "active": True, "id_warehouse": int(ALMOX), "stock": stock, "min_stock_level": minimo,
+             "max_stock_level": maximo, "reorder_level": 0, "stock_temp": 0, "qty_assigned": 0, "lots": []}
+    if unidade is not None:
+        linha["units_description"] = unidade
+    return linha
 
 
 PECA_DE_TESTE = linha_de_saldo(LIGACAO, ITEM, "SP-TST-001", 5, 1, 4)
@@ -121,9 +124,12 @@ def test_ler_monta_saldo_minimo_maximo_e_ligacao():
     fr = Fracttal({SALDOS: em_paginas(linhas)})
     lido = estoque(fr, pagina=2).ler(ALMOX)
     assert lido == {
-        "53248312": {"saldo": 5.0, "minimo": 1.0, "maximo": 4.0, "ligacao": LIGACAO, "codigo": "SP-TST-001"},
-        "53248313": {"saldo": None, "minimo": None, "maximo": None, "ligacao": "15535398", "codigo": "SP-TST-002"},
-        "53248314": {"saldo": 0.0, "minimo": 0.0, "maximo": 0.0, "ligacao": "15535399", "codigo": "SP-TST-003"},
+        "53248312": {"saldo": 5.0, "minimo": 1.0, "maximo": 4.0, "ligacao": LIGACAO, "codigo": "SP-TST-001",
+                     "unidade": ""},
+        "53248313": {"saldo": None, "minimo": None, "maximo": None, "ligacao": "15535398", "codigo": "SP-TST-002",
+                     "unidade": ""},
+        "53248314": {"saldo": 0.0, "minimo": 0.0, "maximo": 0.0, "ligacao": "15535399", "codigo": "SP-TST-003",
+                     "unidade": ""},
     }
     assert lido["53248312"]["saldo"] is not None and lido["53248314"]["saldo"] == 0 and lido["53248313"]["saldo"] is None
     assert [(p["page"], p["start"], p["limit"]) for _, p in fr.pedidos] == [(1, 0, 2), (2, 2, 2)]
@@ -133,6 +139,18 @@ def test_ler_nao_pede_a_pagina_depois_do_total():
     """A página cheia que fecha o `total` é a última: pedir mais gastaria a cota da empresa (200/min) à toa."""
     fr = Fracttal({SALDOS: em_paginas([PECA_DE_TESTE, linha_de_saldo("15535398", "53248313", "SP-TST-002", 1, 0, 0)])})
     assert len(estoque(fr, pagina=2).ler(ALMOX)) == 2 and len(fr.pedidos) == 1
+
+
+def test_ler_traz_a_unidade_da_peca():
+    """A régua (Task 8) arredonda pela unidade: o METRO e a MASSA aceitam duas casas, a UNIDADE é inteira. Vem do
+    `units_description` da própria linha de saldo (o que a tela de Peças e Suprimentos mostra), sem pedido a mais; o que o
+    Fracttal não diz é vazio (e vazio nunca é "decimal")."""
+    fr = Fracttal({SALDOS: em_paginas([linha_de_saldo(LIGACAO, ITEM, "SP-TST-001", 5, 1, 4, "METRO"),
+                                       linha_de_saldo("15535398", "53248313", "SP-TST-002", 1, 0, 0),
+                                       linha_de_saldo("15535399", "53248314", "SP-TST-003", 1, 0, 0, None)])})
+    lido = estoque(fr).ler(ALMOX)
+    assert [lido[i]["unidade"] for i in (ITEM, "53248313", "53248314")] == ["METRO", "", ""]
+    assert len(fr.pedidos) == 1
 
 
 def test_ler_uma_linha_sem_peca_nao_passa_calada():
@@ -586,6 +604,18 @@ def test_falso_e_o_adaptador_tem_as_mesmas_assinaturas():
                [(p.name, p.kind, p.default) for p in b.parameters.values()], nome
 
 
+def test_falso_le_a_unidade_como_o_adaptador():
+    """O falso devolve as mesmas chaves do `ler` de verdade (a unidade inclusive): o que a régua prova com ele vale para o
+    Fracttal. A peça criada por `criar_peca` e ligada leva a unidade do catálogo."""
+    f = EstoqueFalso({ALMOX: {ITEM: {"saldo": 3, "unidade": "METRO", "codigo": "SP-TST-001"}, "2": 1}})
+    lido = f.ler(ALMOX)
+    assert lido[ITEM]["unidade"] == "METRO" and lido["2"]["unidade"] == ""
+    assert set(lido[ITEM]) == {"saldo", "minimo", "maximo", "ligacao", "codigo", "unidade"}
+    novo = f.criar_peca("SP-TST-009", "Peça nova", "METRO")
+    f.ligar(ALMOX, novo)
+    assert f.ler(ALMOX)[novo]["unidade"] == "METRO"
+
+
 def test_falso_perde_a_resposta_mas_grava():
     """A resposta que "se perde": a gravação aconteceu e a chamada levanta, como a conexão que cai depois do Fracttal
     gravar. É o caso que a retomada precisa resolver sem duplicar o ajuste (confere o saldo, acha o movimento)."""
@@ -659,7 +689,8 @@ def test_falso_limite_e_login_na_enesima_chamada():
 def test_falso_ligar_regua_peca_e_o_que_se_moveu():
     est = falso()
     ligacao = est.ligar(ALMOX, "777")
-    assert est.ler(ALMOX)["777"] == {"saldo": 0.0, "minimo": 0.0, "maximo": 0.0, "ligacao": ligacao, "codigo": ""}
+    assert est.ler(ALMOX)["777"] == {"saldo": 0.0, "minimo": 0.0, "maximo": 0.0, "ligacao": ligacao, "codigo": "",
+                                     "unidade": ""}
     with pytest.raises(E.ErroFracttal):
         est.ligar(ALMOX, "777")                          # já ligada: o Fracttal não liga duas vezes a mesma peça
     est.definir_regua(ALMOX, ITEM, 2, None)

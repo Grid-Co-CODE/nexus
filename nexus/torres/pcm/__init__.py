@@ -15,6 +15,7 @@ PCM essa visão de acompanhamento. O design quero alá Nexus [...] mas as estrut
 MPA, MPS, Radar de Backlog, Mapa e One Page, com as fontes do Nexus (`nexus/pcm/acompanhamento`), do setor PCM.
 """
 from ...pcm import acompanhamento, almoxarifado
+from ...pcm.inventario import regua as inventario_regua
 from ...pcm.telas import registrar_pcm
 from ..modelo import Tela, Torre
 
@@ -86,3 +87,5 @@ registrar_pcm(bp)
 acompanhamento.registrar(bp)
 # o Almoxarifado (nexus/pcm/almoxarifado.py)
 almoxarifado.registrar(bp)
+# a régua de mínimo e máximo do inventário do almoxarifado (nexus/pcm/inventario/regua.py)
+inventario_regua.registrar(bp)
