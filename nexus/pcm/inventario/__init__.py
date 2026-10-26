@@ -6,7 +6,8 @@ Fracttal de verdade aceita (os métodos, os corpos, as respostas): `...-passo0.m
 fala só com ele (ou com o `EstoqueFalso` dos testes). `contas` são as contas do inventário (situação de cada peça, contado
 efetivo com a curadoria, a contagem mais nova que substitui as velhas, a janela de aprovação), puras: quem lê o livro, mostra
 o lote e grava chama as mesmas. `leitura` lê as contagens que o App publica e o estado de cada uma pelos eventos do livro
-do inventário. As telas e a gravação em segundo plano entram nas tarefas seguintes.
+do inventário. `gravacao` grava o lote aprovado no Fracttal em segundo plano, por sessão de ajuste (Task 7); as operações que
+precisam do login do Fracttal (o cookie dele só vai para /os) moram na ponte `ponte_os`, em `/os/_nexus/inventario/...`.
 """
 
 
@@ -19,7 +20,22 @@ def registrar(bp) -> None:
     from ...dados import fato_inventario as F
     from ..telas import _de_outro_site, pode_programar
     from . import estoque as E
+    from . import gravacao as G
+    from . import ponte_os
     from . import revisao as R
+
+    # gravar e continuar precisam do login do Fracttal, que só chega em /os: a ponte vai na raiz, como o `bp_raiz` do OS Creator
+    bp.record_once(lambda estado: estado.app.register_blueprint(ponte_os.bp))
+
+    def _da_gravacao(contagem_id) -> dict:
+        """O andamento da gravação desta contagem para a tela (None sem gravação) e se quem abre pode continuar agora (ela
+        parou, e é quem aprovou, pelo HMAC do e-mail)."""
+        grav = G.estado(current_app.config, contagem_id)
+        usuario = session.get("usuario")
+        email = usuario.get("email") if isinstance(usuario, dict) else None
+        return {"gravacao": grav,
+                "pode_continuar": bool(grav) and grav["estado"] == "parada"
+                and G.e_o_aprovador(current_app.config, contagem_id, {"email": email})}
 
     @bp.route("/pecas/inventario", endpoint="inventario")
     def inventario():
@@ -36,7 +52,15 @@ def registrar(bp) -> None:
             return render_template("pcm/inventario_contagem.html", erro=str(ex), c=None, a_revisar=None)
         if ctx is None:
             abort(404)
-        return render_template("pcm/inventario_contagem.html", erro="", a_revisar=None, **ctx)
+        return render_template("pcm/inventario_contagem.html", erro="", a_revisar=None, **ctx, **_da_gravacao(contagem_id))
+
+    @bp.route("/pecas/inventario/<contagem_id>/estado.json", endpoint="inventario_estado")
+    def inventario_estado(contagem_id):
+        """O andamento da gravação (a tela olha a cada 3 s). Não fala com o Fracttal: lê o controle da gravação."""
+        d = _da_gravacao(contagem_id)
+        if d["gravacao"] is None:
+            return jsonify(ok=False, erro="Esta contagem não tem gravação."), 404
+        return jsonify(ok=True, pode_continuar=d["pode_continuar"], **d["gravacao"])
 
     @bp.route("/pecas/inventario/<contagem_id>/revisar", methods=["POST"], endpoint="inventario_revisar")
     def inventario_revisar(contagem_id):

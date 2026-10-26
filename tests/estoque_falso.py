@@ -22,7 +22,10 @@ sem par de movimentos.
 Os defeitos se pedem pelo construtor:
 - `perder_resposta`: nomes de operação (`{"gravar_saldo", "fechar_ajuste", "voltar_ao_normal"}`). A PRIMEIRA chamada de cada
   uma grava e depois levanta `ConnectionError` (a resposta "se perdeu", como a conexão que cai depois do Fracttal gravar); as
-  seguintes respondem. É o que a retomada precisa resolver sem duplicar o ajuste.
+  seguintes respondem. É o que a retomada precisa resolver sem duplicar o ajuste. `"finalizar"` é o 1º dos dois pedidos
+  do `fechar_ajuste` (Task 7): o finalize vale, os movimentos existem, a resposta se perde e o modo 0 nem é pedido (o
+  almoxarifado fica em modo 2, "finalizado, modo 0 pendente"). Não conta como chamada: o `limite_em` e o `expirar_em`
+  seguem contando como antes.
 - `limite_em`: a N-ésima chamada (contando todas, a partir de 1) levanta `Limite`, SEM executar nada. Só aquela: o limite
   passa e a seguinte responde. Aceita um número ou uma lista de números. `voltar_ao_normal` conta como chamada própria,
   logo depois da do `fechar_ajuste`: é assim que se faz o fechamento valer e só o modo 0 falhar.
@@ -174,6 +177,9 @@ class EstoqueFalso(Estoque):
             self._movimento(a, id_item, "entrada", self._itens[a][id_item]["saldo"] or 0.0, ref, quando)
         self._pendentes.add(a)                           # finalizado; o modo 0 é o passo seguinte, e pode falhar
         folio = str(self._n_movimento + 1)               # o "próximo número de movimento", como o `folio_return`
+        # o finalizar é um ponto de defeito à parte, que não conta como chamada (a numeração da Task 2 fica a mesma):
+        # `perder_resposta={"finalizar"}` é o finalize que valeu e cuja resposta se perdeu antes do pedido do modo 0
+        self._depois("finalizar")
         self.voltar_ao_normal(a)
         return folio
 

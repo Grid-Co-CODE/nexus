@@ -665,6 +665,53 @@ para usar:
   `tests/test_pcm_inventario_livro.py` (inclusive o banco falso com `como_texto=True`, a leitura que falha, a listagem
   incompleta e as mutações nas regras).
 
+## Inventário do almoxarifado: a gravação no Fracttal (`inventario/gravacao.py`, a ponte em `inventario/ponte_os.py`; 26/10/2026)
+
+O "Gravar N alterações" da contagem aberta grava o saldo CONTADO no Fracttal, no login de quem aprovou, numa thread (como o
+"Gerar a semana"); a tela olha o `estado.json` a cada 3 s. O Fracttal não ajusta por peça: abre-se uma SESSÃO do almoxarifado
+(modo 2), grava-se o saldo absoluto de cada peça e fecha-se com a referência (finalizar + voltar ao modo 0). **Com a sessão
+aberta o almoxarifado fica travado** (nem entrada, nem saída, nem pedido de compra; o ATHN-MTS200 ficou assim em 26/10, em
+inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado travado sem aviso.
+
+- **Onde mora cada rota:** o cookie do Fracttal (`os_sessao`) tem `Path=/os`, e o navegador não o manda para `/t/pcm/...`:
+  `estoque_da_sessao` numa rota da tela dá sempre `SemLogin` em produção. Por isso `POST /os/_nexus/inventario/<id>/gravar` e
+  `.../continuar` moram na ponte (`ponte_os.bp`, registrado na raiz pelo `registrar`, como o `bp_raiz` do OS Creator): outro
+  site 403, quem não `pode_programar` 403, a senha de administrador 409 (não é uma pessoa), sem o JWT 401 com o link do
+  `/os/login` e a volta à contagem. Quem entrou pelo Fracttal e perdeu o cookie nem chega à ponte: o portão do Nexus encerra a
+  sessão junto (401 `sessao_encerrada`). `GET /t/pcm/pecas/inventario/<id>/estado.json` fica na tela (não fala com o Fracttal).
+- **Aprovar** (`aprovar`, o que a ponte chama): relê o livro, lê o saldo NA HORA com o login de quem aprova, monta o lote pelas
+  contas (só `not tirada and situacao in MEXEM`) e recusa se o N mudou desde que a tela abriu (409 "recarregue"). `iniciar`
+  grava UM `aprovada` por peça (a leitura sabe o lote por eles), e o específico cujo genérico ainda tem linhas por identificar
+  na curadoria vira `conflito` já ali (as unidades pendentes talvez sejam dele).
+- **Por lote de 50, uma sessão** (`INVENTARIO-<contagem>-L<n>`; a 2ª sessão do mesmo lote, depois de uma parada, é `-S<k>`,
+  para o "achar o fechamento pela referência" nunca confundir as duas): modo → o que se moveu desde o "Contada em" → ler →
+  ligar as nunca ligadas (ANTES de abrir: ligar no modo 2 não foi provado) → modo DE NOVO (ninguém abriu no meio) → abrir →
+  ler (com o modo aberto nada se move: é a leitura que vale) → cada peça: saldo diferente do aprovado ou mexida depois da
+  contagem é `conflito` e não grava; senão grava o saldo absoluto → fechar → reler fora da sessão (bate: `peca_gravada` com o
+  folio do fechamento; não bate: `erro`). Modo 3: para sem mexer. Modo 2 que o controle não diz que é nosso: para sem mexer e
+  nunca o volta ao normal.
+- **O finalizar nunca se repete às cegas.** O fechamento são dois pedidos; o 429 no fechar espera 62 s e PROCURA o fechamento
+  pela referência (`achar_movimento` desde a hora em que a sessão abriu, menos 10 min de folga de relógio): achou, só volta ao
+  modo 0. A sessão em que nada se gravou não tem movimento para achar: só volta ao modo 0 (um 2º finalizar é erro no Fracttal).
+- **Parar:** 429 de novo depois dos 62 s → espera mais 62 s, fecha com o que gravou e para ("limite do Fracttal"); erro
+  inesperado → fecha, registra `erro` com o TIPO (nunca o texto do Fracttal) e para; login expirado → para sem poder fechar. Se a
+  sessão ficou aberta, a tela mostra o aviso forte "X ficou travado em ajuste no Fracttal; quem aprovou precisa continuar para
+  destravar". Releitura que não bateu → para; o "Continuar" só relê (bate: gravada; não bate: `conflito`). O disco que falha
+  enquanto para não segura o fechamento no Fracttal. O Nexus que reinicia no meio: a tela vê "parada" (e o aviso, se aberta).
+- **Continuar:** só quem aprovou (pelo `pessoa_hmac`; o controle não guarda e-mail), no login dele. A retomada parte do controle e
+  do modo: a sessão `aberto` com modo 2 regrava o que faltava (absoluto) e fecha; `fechando` procura antes de finalizar; com
+  modo 0 a releitura decide cada peça.
+- **O controle** `<NEXUS_DADOS>/almox_inventario/<contagem>.json` (o estado de cada lote e de cada peça, a hora da sessão) e
+  **a vez** `trava-<almoxarifado>.json`: uma gravação por almoxarifado ("já tem uma gravação em andamento neste almoxarifado"),
+  e a parada no meio segura a vez até quem aprovou continuar (o arquivo segura a reinicialização). **Nunca o login:** o JWT e o
+  e-mail vivem só na instância do `Estoque`. Os eventos vão ao livro SEMPRE com a sessão fechada (o banco lento não segura o
+  almoxarifado travado), com o `evento_id` tirado da contagem, do tipo e da peça: registrar de novo não duplica a auditoria.
+- **Provar:** `tests/test_pcm_inventario_gravacao.py` (o `EstoqueFalso`, com o `"finalizar"` como ponto de defeito à parte, e
+  um relógio de mentira: nada espera de verdade); 21 mutações nas regras acima, todas pegas. O teste da ponte manda o
+  `os_sessao` com `Path=/os` pelo `estoque_da_sessao` de verdade: a ponte vê o login, a rota `/t/pcm/...` não. Tela conferida
+  (1366 e 375 px, escuro e claro) com as páginas que os testes renderizam servidas estáticas. A prova no almoxarifado de
+  teste do Fracttal é da Task 10.
+
 ## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
 
 **O filtro na própria página** (Levi, 17/10/2026: "sempre que vou puxar um filtro ele carrega o site de novo, deveria só
