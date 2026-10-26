@@ -179,6 +179,34 @@ def test_a_recontagem_pedida_nao_substitui_as_boas(app, inv):
     assert por["C-BOA"]["aprovavel"]
 
 
+@pytest.mark.parametrize("quebrada", [
+    dict(id_linha="", contada=_iso(dias_atras=1)),                       # o App mandou a linha sem "ID da linha"
+    dict(id_linha="None", contada=_iso(dias_atras=1)),
+    dict(id_linha="L1", contada=_iso(horas=-5)),                         # o relógio do celular adiantado de horas: "contada no futuro"
+])
+def test_a_mais_nova_que_nao_se_aprova_nao_substitui_as_boas(app, inv, quebrada):
+    """A contagem mais nova que não se aprova (contrato do App violado, ou o relógio do celular adiantado) não pode tirar do
+    caminho as que se aprovam: com ela valendo como "a mais nova" o almoxarifado ficava sem nenhuma contagem para revisar."""
+    _publicar(inv,
+              _linha("C-ANTIGA", "L1", "501", "3", contada=_iso(dias_atras=3)),
+              _linha("C-BOA", "L1", "501", "3", contada=_iso(dias_atras=2)),
+              _linha("C-QUEBRADA", quebrada["id_linha"], "501", "3", contada=quebrada["contada"]))
+    por = _por_id(app)
+    assert not por["C-QUEBRADA"]["aprovavel"] and por["C-QUEBRADA"]["estado"] == "nova"
+    assert (por["C-BOA"]["estado"], por["C-BOA"]["aprovavel"]) == ("nova", True)         # a boa mais nova segue valendo
+    assert por["C-ANTIGA"]["estado"] == "substituida"                                     # e substitui a velha, como sempre
+
+
+def test_o_relogio_pouco_adiantado_ainda_vale_como_a_mais_nova(app, inv):
+    """Meia hora de relógio adiantado está dentro da tolerância (`RELOGIO_ADIANTADO`, 1 h): a contagem se aprova e vale como
+    a mais nova. A conta da substituição e a da janela de aprovação usam o mesmo limite."""
+    _publicar(inv,
+              _linha("C-VELHA", "L1", "501", "3", contada=_iso(dias_atras=1)),
+              _linha("C-NOVA", "L1", "501", "3", contada=_iso(horas=-0.5)))
+    por = _por_id(app)
+    assert (por["C-NOVA"]["estado"], por["C-NOVA"]["aprovavel"], por["C-VELHA"]["estado"]) == ("nova", True, "substituida")
+
+
 def test_o_evento_substituida_vale_e_a_leitura_nao_escreve(app, inv, tmp_path):
     """O estado `substituida` sai da conta ou do evento (quem aprova a nova pode registrá-lo); a leitura em si nunca
     grava: o arquivo do livro nem nasce."""

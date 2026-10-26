@@ -178,23 +178,24 @@ def curadoria_da(cfg, contagem_id: str, linhas_da_curadoria: list[dict] | None =
             for k, (_, l) in ultima.items()}
 
 
-def revisao_da(cfg, contagem_id: str) -> dict:
+def revisao_da(cfg, contagem_id: str, motivos: bool = True) -> dict:
     """O que o PCM já fez na revisão desta contagem, na forma que as contas pedem (`contas.itens_do_lote`): `tiradas`
     {id_item: motivo} e `corrigidos` {id_item: número}, com `motivos_corrigidos` {id_item: motivo}. Vale a última correção
-    de cada peça. O motivo só existe cifrado no livro; é aqui que se abre (a tela do PCM o mostra, a auditoria não)."""
-    tiradas, corrigidos, motivos = {}, {}, {}
+    de cada peça. O motivo só existe cifrado no livro; é aqui que se abre (a tela do PCM o mostra, a auditoria não). `motivos`
+    falso não decifra nada (quem não vai mostrar o texto não o abre: os outros setores leem só "tirada do lote")."""
+    tiradas, corrigidos, texto = {}, {}, {}
     for e in F.ler(cfg)[F.ABA_EVENTO]:
         if _txt(e.get("contagem_id")) != _txt(contagem_id) or not _txt(e.get("id_item")):
             continue
         item = _id(e.get("id_item"))
         if e.get("tipo") == "peca_tirada":
-            tiradas[item] = _txt(F.decifrar(cfg, F.ABA_EVENTO, e).get("motivo"))
+            tiradas[item] = _txt(F.decifrar(cfg, F.ABA_EVENTO, e).get("motivo")) if motivos else ""
         elif e.get("tipo") == "numero_corrigido":
             valor = A.contado(e.get("para_qtd"))
             if valor is not None:
                 corrigidos[item] = valor
-                motivos[item] = _txt(F.decifrar(cfg, F.ABA_EVENTO, e).get("motivo"))
-    return {"tiradas": tiradas, "corrigidos": corrigidos, "motivos_corrigidos": motivos}
+                texto[item] = _txt(F.decifrar(cfg, F.ABA_EVENTO, e).get("motivo")) if motivos else ""
+    return {"tiradas": tiradas, "corrigidos": corrigidos, "motivos_corrigidos": texto}
 
 
 # ── as contas de cada contagem ─────────────────────────────────────────────────────────────────────────────────────────
@@ -247,6 +248,18 @@ def _aviso(c: dict) -> str:
     return "; ".join(avisos)
 
 
+def _pode_substituir(c: dict, agora: datetime) -> bool:
+    """A contagem que pode valer como "a mais nova" de um almoxarifado: dentro do contrato do App e com a data da contagem
+    legível e que não passa do relógio adiantado do celular (`contas.RELOGIO_ADIANTADO`). A sem ID da linha, a sem almoxarifado
+    e a do futuro não se aprovam, e uma que não se aprova não pode substituir as que se aprovam."""
+    if c["aviso"]:
+        return False
+    try:
+        return instante(c["contada_em"]) - instante(agora) <= contas.RELOGIO_ADIANTADO
+    except ValueError:
+        return False
+
+
 def ler(cfg) -> dict:
     """`{"livro_existe", "contagens", "itens"}`: as contagens do App com o estado de cada uma (a lista de `contagens`) e o
     nome de cada peça (`itens`: `{id_item: {codigo, nome, unidade}}`). Levanta `fato_inventario.Recusada` se não leu o
@@ -262,16 +275,18 @@ def ler(cfg) -> dict:
     cs = [dict(c, linhas=[dict(l) for l in c["linhas"]]) for c in app["contagens"] if c["id_almox"] not in teste]
     for c in cs:
         c["estado"] = estado_dos_eventos(eventos.get(c["contagem_id"], []))
+        c["aviso"] = _aviso(c)
     # a substituição olha só as contagens VIVAS (a recontagem pedida, recusada pelo PCM, não tem número para pôr no lugar
-    # das boas) e deixa em paz as que já gravaram ou estão gravando
-    vivas = [c for c in cs if c["estado"] not in MORTAS]
+    # das boas) e BOAS (sem o contrato violado e com um "Contada em" legível e que não é do futuro): a mais nova que não se
+    # aprova não pode tirar do caminho as que se aprovam, senão o almoxarifado fica sem nenhuma contagem para revisar. E deixa
+    # em paz as que já gravaram ou estão gravando
+    vivas = [c for c in cs if c["estado"] not in MORTAS and _pode_substituir(c, agora)]
     velhas = contas.substituidas(vivas, {c["contagem_id"] for c in cs if c["estado"] in DA_GRAVACAO})
     for c in cs:
         if c["contagem_id"] in velhas:
             c["estado"] = "substituida"
         cur = curadoria_da(cfg, c["contagem_id"], curadoria)
         c["n_contadas"], c["n_em_branco"], c["n_curadoria"] = _conta_as_linhas(c["linhas"], cur)
-        c["aviso"] = _aviso(c)
         c["motivo_nao_aprovavel"] = _motivo_nao_aprovavel(c, agora)
         c["aprovavel"] = not c["motivo_nao_aprovavel"]
     cs.sort(key=lambda c: (_quando(c["contada_em"]), _quando(c["enviada_em"]), c["contagem_id"]), reverse=True)

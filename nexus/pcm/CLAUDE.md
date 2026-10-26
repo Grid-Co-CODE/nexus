@@ -62,7 +62,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe e a comparação com a foto do App |
-| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; `revisao.py` é a aba Inventário (a lista, a contagem aberta com o Sistema × Contado × Δ e a revisão do PCM), com as rotas em `__init__.py`; o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo; a gravação em segundo plano, a régua e a curadoria vêm nas próximas tarefas do plano |
+| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; `revisao.py` é a aba Inventário (a lista, a contagem aberta com o Sistema × Contado × Δ e a revisão do PCM), com as rotas em `__init__.py`; `ponte_os.py` é a ponte com o login do Fracttal (as rotas de `/os/_nexus/inventario`, a ÚNICA porta de tudo o que lê ou grava no Fracttal); o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo; a gravação em segundo plano, a régua e a curadoria vêm nas próximas tarefas do plano |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `cb8239c` (23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina, e o preenchimento dos dias livres respeita o dia fixo da usina e o feriado municipal) |
 
 ## O nome do cliente é o do cadastro do Nexus (`clientes.py`; 18/10/2026)
@@ -572,8 +572,10 @@ ele a tela diz que o App ainda não publica, e não "nenhuma contagem"); `ler(cf
   andamento ou parada com o controle dela.
 - **A substituição sai da conta, a leitura não escreve:** `contas.substituidas` recebe só as contagens VIVAS (nem
   `recontagem_pedida`, nem `substituida`; uma recontagem recusada como "a mais nova" substituiria as boas sem número para gravar
-  no lugar) e, como `gravadas`, as em `gravando`, `gravada` e `gravada_com_conflitos`. O evento `substituida`, se alguém o gravar,
-  também vale.
+  no lugar) e BOAS (sem `aviso` e com um "Contada em" legível e que não passa do relógio adiantado, `_pode_substituir`: a mais nova
+  que não se aprova, por contrato violado ou por relógio de celular no futuro, tirava do caminho as que se aprovam, e o almoxarifado
+  ficava sem nenhuma contagem para revisar), e, como `gravadas`, as em `gravando`, `gravada` e `gravada_com_conflitos`. O evento
+  `substituida`, se alguém o gravar, também vale.
 - **Contrato violado vira aviso, não número pela metade:** "ID da linha" vazio ou o texto "None" (o `sync-xlsx` escreve o vazio
   assim) junta duas linhas numa nas contas (`contas._unicas`) e perde unidades contadas; contagem sem o ID do almoxarifado não tem
   saldo do sistema para ler. Os dois dão `aviso` e `aprovavel` falso (a tela não mostra comparação).
@@ -585,54 +587,90 @@ ele a tela diz que o App ainda não publica, e não "nenhuma contagem"); `ler(cf
   identificar e o achado fora do catálogo, descontadas as decisões já gravadas na curadoria) e `n_contadas` (o resto).
 - **O que o PCM já fez** (`revisao_da`, `curadoria_da`) vem na forma que as contas pedem: `tiradas` {id_item: motivo},
   `corrigidos` {id_item: número} (vale a última) e as decisões da curadoria `{ID da linha: {decisao, id_item, codigo}}` (vale a
-  última). O motivo só existe cifrado no livro; é aqui que se abre.
+  última). O motivo só existe cifrado no livro; é aqui que se abre, e só quando `motivos=True` (quem não vai mostrar o texto não o
+  decifra).
 - **Provar:** `tests/test_pcm_inventario_leitura.py` (os estados, a substituição, o livro que não existe e o que não lê, a janela de
   90 dias, o contrato violado, a cópia que ninguém estraga); mutações no lote vazio, nas contagens vivas, nas gravadas, na cópia
   das linhas e na falha de leitura, todas pegas.
 
-## Inventário do almoxarifado: a aba Inventário (`inventario/revisao.py`, as rotas em `inventario/__init__.py`; 26/10/2026)
+## Inventário do almoxarifado: a aba Inventário (`inventario/revisao.py`, `ponte_os.py` e as rotas em `inventario/__init__.py`; 26/10/2026)
 
 Levi, 26/10/2026: o técnico conta no App e o PCM revisa e aprova no Nexus. A aba é um LINK na fila das abas do Almoxarifado (depois
 das cinco), com quantas contagens esperam o PCM; é outra página, `pcm/inventario.html` (a lista) e `pcm/inventario_contagem.html`
-(a contagem aberta), com as abas em `pcm/_almox_abas.html` (as cinco voltam à tela principal, em `?aba=`). As rotas são sub-rotas da
-tela `pecas`, que é do setor PCM (outros, pela marca em Base → Acessos): `GET /t/pcm/pecas/inventario`, `GET .../<contagem_id>` e
+(a contagem aberta), com as abas em `pcm/_almox_abas.html` (as cinco voltam à tela principal, em `?aba=`). As páginas são sub-rotas
+da tela `pecas`, que é do setor PCM (outros, pela marca em Base → Acessos): `GET /t/pcm/pecas/inventario`, `GET .../<contagem_id>` e
 `POST .../<contagem_id>/revisar` (JSON). O código das telas é o `revisao.py`, sem Flask (as rotas só passam a configuração, a
 função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada uma é o `leitura.py` (seção acima).
 
-- **O Sistema é lido NA HORA**, não o da varredura da madrugada (o saldo muda durante o dia): uma leitura do almoxarifado inteiro
-  pelo adaptador (`estoque.estoque_da_sessao(app).ler(id_almox)`, com o login do Fracttal de quem abre; os testes trocam esse
-  `estoque_da_sessao` pelo `EstoqueFalso`). **Sem o login** (quem entrou pela senha de administrador, ou a sessão do Fracttal que
-  acabou), com a cota esgotada (429) ou com o Fracttal fora do ar, a tela mostra SÓ o que o técnico contou, sem Sistema, Δ nem
-  situação, e diz por quê ("entre pelo Fracttal para ver o saldo do sistema e gravar", "o Fracttal pediu uma pausa; tente de novo em
-  1 minuto"): a situação de cada peça depende do saldo, e uma conta com o saldo 0 chutado mandaria "subir" o estoque inteiro. Nunca
-  500. **A contagem que já não se aprova** (velha, substituída, gravada, recontagem pedida) também não lê o Fracttal (gastaria a cota
-  de toda a empresa à toa), e a que o App mandou fora do contrato (sem "ID da linha") não mostra número nenhum.
+- **O login do Fracttal só chega em `/os` (revisão das Tasks 5 e 6, provada com o app de verdade).** O cookie `os_sessao`, onde mora o
+  JWT, é gravado com `Path=<raiz>/os` (`nexus.auth.os_cookie_path`: "só os pedidos de /os trazem o cookie do OS Creator"): o
+  navegador NÃO o manda para `/t/pcm/...`, e o `estoque_da_sessao(app)` numa rota do PCM dava `SemLogin` SEMPRE em produção. Os
+  testes não pegaram porque trocavam o `estoque_da_sessao` ou mandavam o cookie à mão. **Regra: toda operação que precisa do
+  Fracttal (ler o saldo, gravar a contagem, continuar, gravar a régua, cadastrar a peça na curadoria) roda numa rota de
+  `/os/_nexus/inventario/...`** (`ponte_os.py`, um blueprint na RAIZ do app, registrado junto com a torre como o `bp_raiz` do OS
+  Creator; a Engenharia faz igual em `/os/_nexus/engenharia/...`). O portão de login do Nexus vale (nada é público), mas o portão
+  por setor só olha `/t/...`: a ponte confere sozinha `pode_programar()` (403 para os outros setores; sem isso qualquer pessoa
+  logada leria o saldo da empresa) e `_de_outro_site()` (um site de fora não gasta a cota do Fracttal). O que NÃO precisa do
+  Fracttal fica em `/t/pcm/...`: a lista, a revisão, o `estado.json` da gravação, as decisões que só gravam no livro. Nos pedidos
+  de `/os` o portão do Nexus também confere o cookie: a sessão que nasceu do login do Fracttal e já não tem o JWT é ENCERRADA
+  (401 JSON com `sessao_encerrada` e `entrar` para o fetch); a que nasceu da Microsoft não cai, e é ela que chega ao 401 da ponte
+  com o link do `/os/login`.
+- **A página e o lote.** A PÁGINA (`revisao.montar`) mostra o que o técnico contou, o estado, os avisos, o "Pedir recontagem" e o
+  painel de revisão, e NÃO lê o Fracttal. O que depende dele (`revisao.montar_lote`, desenhado pelo parcial
+  `pcm/_inventario_lote.html`: os seis números, o Sistema × Contado × Δ × Situação, os seis grupos e o botão de gravar) a página busca
+  por `fetch(nexusRota(...))` em **`GET /os/_nexus/inventario/<id>/lote`** (HTML pronto, `Cache-Control: no-store`), dizendo "lendo o
+  saldo do Fracttal…" enquanto espera, e troca o que o técnico contou por ele. O Sistema é lido NA HORA, não o da varredura da
+  madrugada (o saldo muda durante o dia): uma leitura do almoxarifado inteiro pelo adaptador, com o login de quem pede. Respostas da
+  ponte: 200 o HTML; **401** sem o login do Fracttal (`{"erro": "Para ler o saldo e gravar, entre pelo Fracttal.", "login": o
+  /os/login com a volta para a página}`; a página mostra "entre pelo Fracttal para ver o saldo do sistema e gravar" com o link); 403
+  de outro site ou de quem não é do setor PCM; 404 contagem que não existe; **409** contagem que não se aprova ou fora do contrato
+  (nada a ler: velha, substituída, gravada e recontagem pedida não gastam a cota da empresa, que é de 200/min para todos); **429** a
+  pausa do Fracttal ("o Fracttal pediu uma pausa; tente de novo em 1 minuto"); 502 o Fracttal que falhou ou os livros que não
+  leram. Nunca 500, e a página segue de pé com o contado. A leitura do Sistema é só do setor PCM: os outros veem o contado, e a
+  tela diz que o saldo do sistema também é do PCM.
+- **Provar a ponte:** `test_a_ponte_ve_o_login_do_fracttal_e_a_rota_do_pcm_nao` usa o `estoque_da_sessao` DE VERDADE e o cookie
+  `os_sessao` com `Path=/os`, e só troca o `requests.post` do `api` do clone: a rota da ponte vê o login e lê o Sistema, uma rota
+  `/t/pcm/...` não (e com o `Path=/` de controle ela veria). Toda tarefa nova que use o Fracttal deve ter um teste assim.
 - **Os seis grupos da confirmação** (`contas.SITUACOES`): para cima, para baixo, zerar, sem alteração, não será tocada e curadoria;
   só os três primeiros mexem no estoque, e o botão "Gravar N alterações" conta só eles, sem a peça tirada. **O zerar abre aberto e
   destacado** (é a única ação que apaga estoque). A peça tirada do lote vai a "não será tocada" com o motivo; a de contado negativo
-  também, com "contado inválido"; a peça nunca ligada ao almoxarifado mostra "será ligada ao gravar" e a ligada com o saldo vazio, "não
-  informado" (vale 0 na conta, e contar 0 nela não é zerar). **O botão de gravar está desligado até a Task 7** (dica: "a gravação chega
-  na próxima entrega").
+  também, com "contado inválido" até o PCM corrigir (corrigida, ela entra no lote e a nota diz "o técnico contou um valor inválido;
+  o PCM corrigiu para X"). A peça nunca ligada ao almoxarifado mostra no Sistema "não ligada (0)" e a nota "será ligada ao gravar";
+  a ligada com o saldo vazio, "não informado", sem Δ (um "+5" contra um 0 que o Fracttal não disse seria inventado; a nota diz que
+  vale 0 na conta, e contar 0 nela não é zerar). **O botão de gravar está desligado até a Task 7** (dica: "a gravação chega na
+  próxima entrega").
 - **Curadoria aberta avisa e não bloqueia:** "N achados por decidir na curadoria; decidir depois soma ao contado da peça escolhida" (e o
   mesmo, dizendo o genérico, quando ele tem unidades ainda por identificar). O genérico por identificar e o achado não têm Δ: as
   unidades ainda não têm dono.
-- **Revisar** (`POST .../revisar`, `{"acao": "tirar" | "corrigir" | "recontagem", "id_item", "valor", "motivo"}`): só quem
-  `telas.pode_programar()` (administrador e setor PCM) e de uma página deste mesmo endereço, senão 403. O motivo é OBRIGATÓRIO nas
-  três (o desenho: "cada um com o motivo, na auditoria") e vai só cifrado (`dados={"motivo": ...}`; a API do banco é aberta). `corrigir`
-  aceita número de zero para cima, com vírgula ou ponto (o 0 vale: a peça acabou; negativo, vazio, texto e notação científica, 400);
-  contagem que não se aprova, 409 com o `motivo_nao_aprovavel`; peça que não é da contagem, 400; peça já tirada, 409; corrigir peça com
-  unidades por identificar, 409 (decide a curadoria antes). **Nada disso fala com o Fracttal:** grava UM evento no livro do inventário
-  (`peca_tirada`, `numero_corrigido` com `de_qtd` = o do campo, `para_qtd` = o corrigido e `contado_qtd` = o do campo, ou
-  `recontagem_pedida`), com a usina pela de-para do Fracttal (`usina_id` + `usina_ligada_por`) e a pessoa como `pessoa_hmac` (o código do
-  e-mail) e `pessoa_id` (quando a ficha do cadastro a acha). **Quem entrou pela senha de administrador não revisa** (409): não é uma
-  pessoa, e a revisão ficaria sem dono na auditoria.
+- **O motivo do PCM só vai a quem pode revisar** (`pode_programar`): a nota da peça tirada e do número corrigido leva o texto para o
+  PCM e, para os outros setores, só "tirada do lote" e "corrigida pelo PCM" (o motivo é texto livre e pode citar gente; nem o
+  decifra para eles, `revisao_da(motivos=False)`).
+- **A hora na tela é a da janela de aprovação:** `revisao._hora` usa o `estoque.instante` (um texto sem fuso é UTC, como o App
+  grava) e escreve "contada em 26/10/2026 às 09:00 (Brasília)". Antes lia pelo `visao._dt` (sem fuso = Brasília) e mostrava 12:00
+  onde a janela contava 09:00.
+- **Revisar** (`POST .../revisar`, `{"acao": "tirar" | "corrigir" | "recontagem", "id_item", "valor", "motivo", "sistema"?,
+  "confirmo"?}`): só quem `telas.pode_programar()` (administrador e setor PCM) e de uma página deste mesmo endereço, senão 403. O
+  motivo é OBRIGATÓRIO nas três (o desenho: "cada um com o motivo, na auditoria") e vai só cifrado (`dados={"motivo": ...}`; a API do
+  banco é aberta). `corrigir` aceita número de zero para cima, com vírgula ou ponto (o 0 vale: a peça acabou; negativo, vazio, texto e
+  notação científica, 400). **O exagero pede confirmação:** número acima de 10 vezes o maior entre o contado e o saldo do sistema (e
+  de 1000) é quase sempre um zero a mais e iria ao estoque da empresa: 400 com `confirmar: true`, e o `"confirmo": true` do corpo
+  aceita (o saldo do sistema é o que a página mostrou e vai no corpo como `sistema`, porque revisar não lê o Fracttal: é uma trava
+  contra o erro de digitação, não uma defesa). Contagem que não se aprova, 409 com o `motivo_nao_aprovavel`; peça que não é da
+  contagem, 400; peça já tirada, 409; corrigir peça com unidades por identificar, 409 (decide a curadoria antes). **Nada disso fala
+  com o Fracttal:** grava UM evento no livro do inventário (`peca_tirada`, `numero_corrigido` com `de_qtd` = o do campo, `para_qtd` = o
+  corrigido e `contado_qtd` = o do campo, ou `recontagem_pedida`), com a usina pela de-para do Fracttal (`usina_id` +
+  `usina_ligada_por`) e a pessoa como `pessoa_hmac` (o código do e-mail) e `pessoa_id` (quando a ficha do cadastro a acha). **Quem
+  entrou pela senha de administrador não revisa** (409 "entre com o seu login do Fracttal"): não é uma pessoa, e a revisão ficaria
+  sem dono na auditoria; e com a `NEXUS_PESSOA_HMAC` faltando no servidor o 409 diz que o servidor não está configurado e manda
+  avisar a T.I. (a pessoa já entrou: mandá-la entrar de novo não resolve).
 - **Por que a lista não guarda o estado:** a cópia de 5 min é do livro do App; o estado sai dos eventos a cada abertura, e a revisão
   renova a cópia dos eventos. Pedir a recontagem e ver "nova" por mais 5 min faria o PCM pedir de novo.
-- **Provar:** `tests/test_pcm_inventario_telas.py` (a lista e a contagem com os seis grupos e os números certos, o login do Fracttal que
-  falta, o 429 e a queda, cada ação com o evento e o motivo só cifrado, as recusas, o 403 dos outros setores, a aba, as cores só por
-  token e os endereços pela `{{ raiz }}`); mutações em cada regra acima, todas pegas. Conferida no navegador (1366 e 375 px, escuro e
-  claro) com a página que os testes renderizam servida estática, sem rolagem lateral e com o painel de revisão abrindo; a prova com o
-  servidor de verdade e o `EstoqueFalso` é da Task 10.
+- **Provar:** `tests/test_pcm_inventario_telas.py` (a lista; a página sem o Fracttal e o lote pela ponte, com os seis grupos e os
+  números certos; o login que falta, o 429 e a queda; a ponte com o cookie de verdade; cada ação com o evento e o motivo só cifrado,
+  as recusas, o exagero, o 403 dos outros setores e de outro site, a aba, as cores só por token e os endereços pela `{{ raiz }}`);
+  mutações em cada regra acima, todas pegas. Conferida no navegador (1366 e 375 px, escuro e claro) com a página que os testes
+  renderizam servida estática, sem rolagem lateral e com o painel de revisão abrindo; a prova com servidor de verdade e
+  `EstoqueFalso` é da Task 10.
 
 ## Inventário do almoxarifado: o livro (`nexus/dados/fato_inventario.py`; 26/10/2026)
 

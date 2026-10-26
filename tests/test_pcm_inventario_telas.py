@@ -4,6 +4,7 @@ do lote, corrigir o número, pedir a recontagem), que só o setor PCM faz. Desen
 docs/superpowers/specs/2026-10-26-inventario-almoxarifado-design.md (seção 4.2). O banco é o falso do Campo, o livro do
 inventário é um arquivo local e o Fracttal é o `EstoqueFalso`: nada vai à rede. Dado de mentira, sem nome de gente."""
 import re
+import time
 from pathlib import Path
 
 import pytest
@@ -64,10 +65,21 @@ def falso(monkeypatch):
     return f
 
 
-def _pcm(app, monkeypatch, email=EMAIL, setor="PCM"):
+def _via(c, via="microsoft"):
+    """De onde nasceu a sessão do Nexus. A que nasceu do login do Fracttal (`via="fracttal"`) acaba junto com o dele: nos pedidos
+    de /os o portão confere o cookie `os_sessao` e, sem o JWT, encerra a sessão (`nexus.auth._fim_do_fracttal`). Os testes da
+    ponte sem o cookie usam a da Microsoft, que não cai com a do Fracttal e é a que de fato chega ao "entre pelo Fracttal"."""
+    with c.session_transaction() as s:
+        s["via"] = via
+        if via == "microsoft":
+            s["ms_ate"] = time.time() + 3600
+    return c
+
+
+def _pcm(app, monkeypatch, email=EMAIL, setor="PCM", via="microsoft"):
     """Uma pessoa do setor `setor`, entrando com o e-mail de uma ficha do cadastro (o pessoa_id sai dela)."""
     _no_setor(monkeypatch, setor)
-    return _como(app, email)
+    return _via(_como(app, email), via)
 
 
 def _grupos(html):
@@ -83,18 +95,36 @@ def _revisar(c, corpo, contagem="C-1"):
     return c.post(f"{LISTA}/{contagem}/revisar", json=corpo)
 
 
+LOTE = "/os/_nexus/inventario/{}/lote"
+
+
+def _lote(c, contagem="C-1"):
+    """O pedaço da contagem que depende do Fracttal, pela ponte (o único lugar onde o login do Fracttal chega)."""
+    return c.get(LOTE.format(contagem))
+
+
 # ── a lista e a contagem ─────────────────────────────────────────────────────────────────────────────────────────────────
 def test_lista_e_contagem(app, inv, falso, monkeypatch):
-    """A lista mostra a contagem com o almoxarifado, a usina e as contas; aberta, o Sistema vem LIDO NA HORA do Fracttal
-    (uma leitura só) e as dez peças caem nos seis grupos com os números certos."""
+    """A lista mostra a contagem com o almoxarifado, a usina e as contas. A PÁGINA da contagem mostra o contado e NÃO lê o
+    Fracttal (o login dele só chega nas rotas de /os); o Sistema vem pela ponte, lido na hora (uma leitura só), e as dez peças
+    caem nos seis grupos com os números certos."""
     _cenario(inv)
     c = _pcm(app, monkeypatch)
     html = c.get(LISTA).get_data(as_text=True)
     assert "Almoxarifado Altair" in html and "Altair" in html and f"{LISTA}/C-1" in html
     assert ">Nova<" in html and "Contagens recebidas (1)" in html
+    # a página: o contado, e o lugar onde a ponte põe o resto
     r = c.get(f"{LISTA}/C-1")
+    pagina = r.get_data(as_text=True)
+    assert r.status_code == 200 and falso.chamadas == []
+    assert 'data-url="/os/_nexus/inventario/C-1/lote"' in pagina and "lendo o saldo do Fracttal…" in pagina
+    assert "data-grupo" not in pagina and ">Sistema</th>" not in pagina and "Gravar" not in pagina
+    assert "Fusível 10A" in pagina and re.search(r'data-item="501".*?>12<', pagina, re.S)
+    # o pedaço que depende do Fracttal, pela ponte
+    r = _lote(c)
     html = r.get_data(as_text=True)
-    assert r.status_code == 200 and falso.chamadas == ["ler"]
+    assert r.status_code == 200 and falso.chamadas == ["ler"] and "<html" not in html
+    assert r.headers["Cache-Control"] == "no-store"
     assert _grupos(html) == {"para_cima": 3, "para_baixo": 1, "zerar": 1, "sem_alteracao": 1, "nao_tocada": 2, "curadoria": 2}
     assert "Gravar 5 alterações" in html
     # o zerar abre já aberto e destacado; os outros começam fechados
@@ -109,7 +139,11 @@ def test_lista_e_contagem(app, inv, falso, monkeypatch):
     assert "Fusível 10A" in linha["501"] and "+2" in linha["501"] and "10" in linha["501"] and "12" in linha["501"]
     assert "-2" in linha["502"] and "-4" in linha["503"]
     assert "contado inválido" in linha["506"] and "em branco" in linha["505"]
-    assert "saldo não informado" in linha["509"] and "não ligada" in linha["508"]
+    # o saldo que o Fracttal não disse: o Δ não inventa um "+2" contra um 0 que ninguém viu (a nota diz que vale 0 na conta)
+    assert "saldo não informado" in linha["509"] and "não informado</span>" in linha["509"]
+    assert re.search(r'data-r="Δ"[^>]*><span class="alm-v">—<', linha["509"]) and "inv-delta--mais" not in linha["509"]
+    # a peça nunca ligada ao almoxarifado: o Sistema diz que não está ligada, em vez de um "0" pelado
+    assert "não ligada (0)" in linha["508"] and "não ligada ao almoxarifado" in linha["508"]
     assert "entre pelo Fracttal" not in html
     # a gravação é da próxima entrega: o botão aparece desligado, com a dica
     assert re.search(r'<button[^>]*\bdisabled\b[^>]*>\s*Gravar 5 alterações', html)
@@ -120,11 +154,12 @@ def test_a_curadoria_aberta_avisa_e_nao_bloqueia(app, inv, falso, monkeypatch):
     """O achado por decidir e o genérico por identificar avisam, dizendo que decidir depois soma ao contado da peça escolhida;
     a aprovação (o "Gravar N") não é barrada (o desenho 4.2 põe a curadoria como um dos seis grupos, que não mexe)."""
     _cenario(inv)
-    html = _pcm(app, monkeypatch).get(f"{LISTA}/C-1").get_data(as_text=True)
+    c = _pcm(app, monkeypatch)
+    html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
     assert "1 achado por decidir na curadoria; decidir depois soma ao contado da peça escolhida" in html
     assert "genérico SP-507" in html and "decidir depois soma ao contado da peça escolhida" in html
-    assert "Peça sem etiqueta, caixa azul" in html or "peça sem etiqueta, caixa azul" in html
-    assert "Gravar 5 alterações" in html
+    assert "peça sem etiqueta, caixa azul" in _lote(c).get_data(as_text=True)
+    assert "Gravar 5 alterações" in _lote(c).get_data(as_text=True)
 
 
 def test_a_curadoria_ja_decidida_nao_avisa_mais(app, inv, falso, monkeypatch):
@@ -132,8 +167,9 @@ def test_a_curadoria_ja_decidida_nao_avisa_mais(app, inv, falso, monkeypatch):
     F.acrescentar(app.config, F.ABA_CURADORIA, [
         {"contagem_id": "C-1", "chave_linha": "L8", "decisao": "e_a_peca", "id_item": "501"},
         {"contagem_id": "C-1", "chave_linha": "L7", "decisao": "confirmar", "id_item": "501"}])
-    html = _pcm(app, monkeypatch).get(f"{LISTA}/C-1").get_data(as_text=True)
-    assert "por decidir na curadoria" not in html
+    c = _pcm(app, monkeypatch)
+    assert "por decidir na curadoria" not in c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    html = _lote(c).get_data(as_text=True)
     # as 2 achadas e as 4 do genérico confirmado entram no contado de 501 (12 + 2 + 4 = 18); o genérico fica com 0 contra o
     # saldo 20 do Fracttal, e o zerar passa a ter a peça dele (o que o PCM confere aberto e destacado)
     g = _grupos(html)
@@ -142,25 +178,33 @@ def test_a_curadoria_ja_decidida_nao_avisa_mais(app, inv, falso, monkeypatch):
 
 
 def test_contagem_que_nao_se_aprova_nao_le_o_fracttal(app, inv, falso, monkeypatch):
-    """A de 91 dias, a substituída e a recontagem pedida só mostram o contado e o porquê: não gastam a cota do Fracttal."""
+    """A de 91 dias, a substituída e a recontagem pedida só mostram o contado e o porquê: não gastam a cota do Fracttal, nem
+    a página (que nem pede o lote) nem a ponte (que responde 409)."""
     _publicar(inv, _linha("C-VELHA", "L1", "501", "3", contada=_iso(dias_atras=91)))
-    html = _pcm(app, monkeypatch).get(f"{LISTA}/C-VELHA").get_data(as_text=True)
-    assert falso.chamadas == [] and "mais de 90 dias" in html and "data-grupo" not in html
+    c = _pcm(app, monkeypatch)
+    html = c.get(f"{LISTA}/C-VELHA").get_data(as_text=True)
+    assert falso.chamadas == [] and "mais de 90 dias" in html and "data-grupo" not in html and "data-lote" not in html
     assert 'data-item="501"' in html and "Gravar" not in html
+    r = _lote(c, "C-VELHA")
+    assert r.status_code == 409 and "mais de 90 dias" in r.get_json()["erro"] and falso.chamadas == []
 
 
 def test_contagem_do_app_fora_do_contrato_nao_mostra_comparacao(app, inv, falso, monkeypatch):
     """"ID da linha" vazio: as contas juntariam as linhas e perderiam unidades. A tela diz o que o App mandou de errado e não
-    mostra número pela metade."""
+    mostra número pela metade (nem a ponte devolve o lote)."""
     _publicar(inv, _linha("C-1", "", "501", "3"), _linha("C-1", "None", "502", "4"))
-    html = _pcm(app, monkeypatch).get(f"{LISTA}/C-1").get_data(as_text=True)
+    c = _pcm(app, monkeypatch)
+    html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
     assert "o App mandou linha sem ID da linha" in html and "data-grupo" not in html and falso.chamadas == []
-    assert 'data-rev="' not in html
+    assert 'data-rev="' not in html and "data-lote" not in html
+    assert _lote(c).status_code == 409 and falso.chamadas == []
 
 
 def test_contagem_que_nao_existe(app, inv, falso, monkeypatch):
     _cenario(inv)
-    assert _pcm(app, monkeypatch).get(f"{LISTA}/C-9").status_code == 404
+    c = _pcm(app, monkeypatch)
+    assert c.get(f"{LISTA}/C-9").status_code == 404
+    assert _lote(c, "C-9").status_code == 404
 
 
 def test_a_lista_sem_o_livro_do_app(app, inv, monkeypatch):
@@ -170,7 +214,7 @@ def test_a_lista_sem_o_livro_do_app(app, inv, monkeypatch):
 
 
 def test_o_livro_que_nao_le_nao_derruba_a_tela(app, inv, falso, monkeypatch, tmp_path):
-    """O livro do inventário que não deu para ler: a tela diz (200), nunca 500 nem "nenhuma contagem"."""
+    """O livro do inventário que não deu para ler: a tela diz (200), nunca 500 nem "nenhuma contagem"; a ponte diz 502."""
     _cenario(inv)
     (tmp_path / "inventario.json").write_text("{não é json", encoding="utf-8")
     F.limpar()
@@ -178,13 +222,25 @@ def test_o_livro_que_nao_le_nao_derruba_a_tela(app, inv, falso, monkeypatch, tmp
     for rota in (LISTA, f"{LISTA}/C-1"):
         r = c.get(rota)
         assert r.status_code == 200 and "Não consegui ler o livro do inventário" in r.get_data(as_text=True)
+    r = _lote(c)
+    assert r.status_code == 502 and "Não consegui ler o livro do inventário" in r.get_json()["erro"]
+
+
+def test_a_hora_sem_fuso_e_utc_na_tela(app, inv, falso, monkeypatch):
+    """Um "Contada em" sem fuso é UTC (o App grava assim), na janela de aprovação e na tela: 12:00 vira 09:00 em Brasília. A
+    tela lia como Brasília (`visao._dt`) e mostrava 12:00 onde a janela contava 09:00."""
+    _publicar(inv, _linha("C-1", "L1", "501", "3", contada="2026-10-26T12:00:00", enviada="2026-10-26T13:30:00"))
+    c = _pcm(app, monkeypatch)
+    html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert "contada em 26/10/2026 às 09:00 (Brasília), enviada em 26/10/2026 às 10:30 (Brasília)" in html
+    assert "26/10/2026 09:00" in c.get(LISTA).get_data(as_text=True)
 
 
 # ── sem o login do Fracttal ──────────────────────────────────────────────────────────────────────────────────────────────
 def test_sem_login_do_fracttal_nao_grava_nem_le(app, inv, monkeypatch):
     """Quem entrou pela senha de administrador (ou cuja sessão do Fracttal acabou) vê o que o técnico contou, sem Sistema
-    nem Δ, e a tela diz como ter o saldo; nada é lido do Fracttal e nada se grava (nem a revisão: sem login não se sabe quem
-    revisa)."""
+    nem Δ, e a tela diz como ter o saldo (a ponte responde 401 com o link para entrar pelo Fracttal); nada é lido do Fracttal e
+    nada se grava (nem a revisão: sem login não se sabe quem revisa)."""
     from nexus.pcm.inventario.estoque import SemLogin
     _cenario(inv)
     chamadas = []
@@ -196,10 +252,15 @@ def test_sem_login_do_fracttal_nao_grava_nem_le(app, inv, monkeypatch):
     c = _pcm(app, monkeypatch)
     r = c.get(f"{LISTA}/C-1")
     html = r.get_data(as_text=True)
-    assert r.status_code == 200 and "entre pelo Fracttal para ver o saldo do sistema e gravar" in html
+    assert r.status_code == 200 and "entre pelo Fracttal para ver o saldo do sistema e gravar" in html and not chamadas
     assert "data-grupo" not in html and ">Sistema</th>" not in html and ">Δ</th>" not in html
     assert "Fusível 10A" in html and re.search(r'data-item="501".*?>12<', html, re.S)   # o contado do técnico segue na tela
-    assert "Gravar" not in html or re.search(r'<button[^>]*\bdisabled\b[^>]*>\s*Gravar', html)
+    assert "Gravar" not in html
+    # a ponte: 401 com o link do login do Fracttal, que volta para esta página
+    r = _lote(c)
+    j = r.get_json()
+    assert r.status_code == 401 and "entre pelo Fracttal" in j["erro"] and len(chamadas) == 1
+    assert j["login"].startswith("/os/login?next=") and "%2Ft%2Fpcm%2Fpecas%2Finventario%2FC-1" in j["login"]
     # a senha de administrador: não é uma pessoa, e a revisão fica no nome de quem a faz
     admin = app.test_client()
     with admin.session_transaction() as s:
@@ -210,19 +271,93 @@ def test_sem_login_do_fracttal_nao_grava_nem_le(app, inv, monkeypatch):
 
 
 def test_o_fracttal_pediu_pausa_ou_caiu(app, inv, monkeypatch):
-    """429 e queda de rede são mensagens na tela, nunca 500."""
+    """429 e queda de rede são mensagens na tela (a ponte diz o que houve em JSON, e a página a põe no lugar do lote), nunca
+    500; a página em si segue de pé, com o contado."""
     from nexus.pcm.inventario.estoque import ErroFracttal, Limite
     _cenario(inv)
     c = _pcm(app, monkeypatch)
-    for erro, texto in ((Limite("RPC HTTP 429"), "o Fracttal pediu uma pausa; tente de novo em 1 minuto"),
-                        (ErroFracttal("ASSET_ERRADO", "inventories.warehouses_items_stock"), "O Fracttal recusou a leitura do saldo"),
-                        (ConnectionError("rede"), "Não consegui ler o saldo do Fracttal agora")):
+    for erro, status, texto in ((Limite("RPC HTTP 429"), 429, "o Fracttal pediu uma pausa; tente de novo em 1 minuto"),
+                                (ErroFracttal("ASSET_ERRADO", "inventories.warehouses_items_stock"), 502,
+                                 "O Fracttal recusou a leitura do saldo"),
+                                (ConnectionError("rede"), 502, "Não consegui ler o saldo do Fracttal agora")):
         def cair(app_, erro=erro):
             raise erro
         monkeypatch.setattr(E, "estoque_da_sessao", cair)
-        r = c.get(f"{LISTA}/C-1")
-        html = r.get_data(as_text=True)
-        assert r.status_code == 200 and texto in html and "data-grupo" not in html and "Fusível 10A" in html
+        r = _lote(c)
+        assert r.status_code == status and texto in r.get_json()["erro"]
+        pagina = c.get(f"{LISTA}/C-1")
+        assert pagina.status_code == 200 and "Fusível 10A" in pagina.get_data(as_text=True)
+
+
+# ── a ponte: o login do Fracttal só chega em /os ─────────────────────────────────────────────────────────────────────────
+def test_a_ponte_ve_o_login_do_fracttal_e_a_rota_do_pcm_nao(app, inv, monkeypatch):
+    """O defeito da revisão das Tasks 5 e 6: o cookie `os_sessao` (o login do Fracttal) é gravado com `Path=/os`, e o navegador
+    não o manda para `/t/pcm/...`: o `estoque_da_sessao` numa rota do PCM dava `SemLogin` SEMPRE, e o Sistema nunca aparecia em
+    produção (os outros testes trocam o `estoque_da_sessao`). Aqui o `estoque_da_sessao` é o DE VERDADE e o cookie vai com o
+    `Path=/os` que o Nexus grava; só o `requests.post` do `api` do clone é de mentira (nada vai ao Fracttal)."""
+    from flask import jsonify
+    from test_pcm_inventario_estoque import _jwt, _result, linha_de_saldo
+
+    from nexus.torres.oscreator import ponte
+
+    @app.route("/t/pcm/__sonda")                 # uma rota do PCM que pede o login do Fracttal, como a página pedia
+    def sonda():
+        try:
+            E.estoque_da_sessao(app)
+            return jsonify(login=True)
+        except E.SemLogin:
+            return jsonify(login=False)
+
+    _cenario(inv)
+    clone = ponte.clone(app)
+    import api as os_api
+    jwt, pedidos = _jwt(), []
+
+    def post(url, headers=None, json=None, timeout=None):
+        pedidos.append((headers["Authorization"], json[0]["method"], json[0]["params"].get("id_warehouse")))
+        linhas = [linha_de_saldo(f"90{i}", i, f"SP-{i}", saldo, 0, 0) for i, saldo in
+                  ((501, 10), (502, 5), (503, 4), (504, 7), (505, 9), (506, 3), (507, 20), (509, None))]
+        return _result({"success": True, "data": linhas, "total": len(linhas)})
+    monkeypatch.setattr(os_api.requests, "post", post)
+    valor = clone.session_interface.get_signing_serializer(clone).dumps({"jwt": jwt, "conta": {"email": EMAIL}})
+    c = _pcm(app, monkeypatch, via="fracttal")             # a sessão que nasceu do login do Fracttal, a que traz o cookie
+    c.set_cookie("os_sessao", valor, path="/os")           # o que o Nexus grava no login (nexus.auth.os_cookie_path)
+    assert c.get("/t/pcm/__sonda").get_json() == {"login": False}                  # a rota do PCM NÃO vê o login
+    assert c.get(f"{LISTA}/C-1").status_code == 200 and pedidos == []             # e a página nem tenta ler o Fracttal
+    r = _lote(c)                                                                    # a ponte vê o login e lê o Sistema
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and pedidos == [(f"Bearer {jwt}", "inventories.warehouses_items_stock", 10)]
+    assert _grupos(html)["para_cima"] == 3 and re.search(r'data-item="501".*?>10<', html, re.S)
+    # sem o cookie, a ponte pede o login: quem entrou pela Microsoft não tem o do Fracttal (e a sessão que nasceu do Fracttal,
+    # sem o JWT, o portão do Nexus já encerrou: o fetch recebe o 401 de sessão encerrada, com o link do Entrar do Nexus)
+    outro = _pcm(app, monkeypatch)
+    r = _lote(outro)
+    assert r.status_code == 401 and r.get_json()["login"].startswith("/os/login?next=") and len(pedidos) == 1
+    caida = _pcm(app, monkeypatch, via="fracttal")
+    r = caida.get(LOTE.format("C-1"), headers={"Sec-Fetch-Dest": "empty"})
+    j = r.get_json()
+    assert r.status_code == 401 and j["sessao_encerrada"] is True and j["entrar"].startswith("/entrar") and len(pedidos) == 1
+    # o cookie de um navegador que o mandou para a raiz (Path=/) chegaria à rota do PCM: a premissa do teste vale
+    controle = _pcm(app, monkeypatch, via="fracttal")
+    controle.set_cookie("os_sessao", valor, path="/")
+    assert controle.get("/t/pcm/__sonda").get_json() == {"login": True}
+
+
+def test_a_ponte_e_so_do_setor_pcm_e_de_dentro_do_site(app, inv, falso, monkeypatch):
+    """O portão por setor só olha `/t/...`: a ponte confere sozinha quem pode (o saldo da empresa não vai a qualquer pessoa
+    logada) e que o pedido veio de uma página deste endereço (um site de fora não gasta a cota do Fracttal)."""
+    _cenario(inv)
+    for setor in ("Performance", "Responsáveis UFV"):
+        r = _lote(_pcm(app, monkeypatch, setor=setor))
+        assert r.status_code == 403 and "setor PCM" in r.get_json()["erro"]
+    assert falso.chamadas == []
+    c = _pcm(app, monkeypatch, setor="pcm")
+    r = c.get(LOTE.format("C-1"), headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403 and falso.chamadas == []
+    assert c.get(LOTE.format("C-1"), headers={"Sec-Fetch-Site": "same-origin"}).status_code == 200
+    # quem não entrou no Nexus nem chega à ponte
+    assert app.test_client().get(LOTE.format("C-1")).status_code in (302, 303, 401)
+    assert falso.chamadas == ["ler"]
 
 
 # ── a revisão ────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -250,8 +385,9 @@ def test_revisar_tirar_corrigir_recontagem(app, inv, falso, monkeypatch):
     assert (float(e["de_qtd"]), float(e["para_qtd"]), float(e["contado_qtd"])) == (12, 11.5, 12)
     assert F.decifrar(cfg, F.ABA_EVENTO, e) == {"motivo": "o técnico errou o dedo"}
     # a tela: 502 saiu do lote (Gravar 4), 501 vale 11,5 (Δ +1,5), e a contagem está revisada
-    html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
-    assert "Gravar 4 alterações" in html and ">Revisada<" in html
+    assert ">Revisada<" in c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    html = _lote(c).get_data(as_text=True)
+    assert "Gravar 4 alterações" in html
     g = _grupos(html)
     assert g["para_baixo"] == 0 and g["nao_tocada"] == 3                       # a tirada vai a "não será tocada"
     l501 = re.search(r'data-item="501".*?</tr>', html, re.S).group(0)
@@ -265,8 +401,9 @@ def test_revisar_tirar_corrigir_recontagem(app, inv, falso, monkeypatch):
     assert F.decifrar(cfg, F.ABA_EVENTO, e) == {"motivo": "as fotos estão ilegíveis"}
     assert L.contagens(cfg)[0]["estado"] == "recontagem_pedida"
     html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
-    assert "recontagem pedida" in html.lower() and 'data-rev="' not in html
-    # só a abertura da tela revisada leu o saldo (a recontagem pedida não se aprova: nem lê); revisar não chamou o Fracttal
+    assert "recontagem pedida" in html.lower() and 'data-rev="' not in html and "data-lote" not in html
+    assert _lote(c).status_code == 409
+    # só o lote da contagem revisada leu o saldo (a recontagem pedida não se aprova: nem lê); revisar não chamou o Fracttal
     assert falso.chamadas == ["ler"]
 
 
@@ -294,7 +431,7 @@ def test_corrigir_para_zero_vale(app, inv, falso, monkeypatch):
     _cenario(inv)
     c = _pcm(app, monkeypatch)
     assert _revisar(c, {"acao": "corrigir", "id_item": "501", "valor": "0", "motivo": "acabou"}).status_code == 200
-    assert _grupos(c.get(f"{LISTA}/C-1").get_data(as_text=True))["zerar"] == 2
+    assert _grupos(_lote(c).get_data(as_text=True))["zerar"] == 2
 
 
 def test_corrigir_resolve_o_contado_invalido(app, inv, falso, monkeypatch):
@@ -302,10 +439,21 @@ def test_corrigir_resolve_o_contado_invalido(app, inv, falso, monkeypatch):
     _cenario(inv)
     c = _pcm(app, monkeypatch)
     assert _revisar(c, {"acao": "corrigir", "id_item": "506", "valor": "4", "motivo": "era 4, saiu -2"}).status_code == 200
-    html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    html = _lote(c).get_data(as_text=True)
     assert "Gravar 6 alterações" in html
     g = _grupos(html)
     assert g["nao_tocada"] == 1 and g["para_cima"] == 4
+    # a nota de "não será gravada" sai (a peça entrou no lote); fica a que diz o que houve, sem repetir um "contou —"
+    l506 = re.search(r'data-item="506".*?</tr>', html, re.S).group(0)
+    assert "contado inválido (negativo)" not in l506 and "não será gravada" not in l506
+    assert "o técnico contou um valor inválido; o PCM corrigiu para 4 (era 4, saiu -2)" in l506
+    na_lista = html.split('data-grupo="para_cima"')[1].split("</details>")[0]
+    assert "não será gravada" not in na_lista and "corrigiu para 4" in na_lista
+    # a peça em branco que o PCM preenche: o técnico não contou, e a nota diz isso
+    assert _revisar(c, {"acao": "corrigir", "id_item": "505", "valor": "6", "motivo": "contei na prateleira"}).status_code == 200
+    l505 = re.search(r'data-item="505".*?</tr>', _lote(c).get_data(as_text=True), re.S).group(0)
+    assert "o técnico deixou em branco; o PCM informou 6 (contei na prateleira)" in l505
+    assert "em branco: o técnico não contou" not in l505
 
 
 @pytest.mark.parametrize("corpo, status", [
@@ -362,19 +510,24 @@ def test_contagem_que_nao_se_aprova_nao_se_revisa(app, inv, falso, monkeypatch):
 
 
 def test_so_o_setor_pcm_revisa(app, inv, falso, monkeypatch):
-    """Como o `test_pcm_publicar`: administrador e setor PCM revisam; os outros setores (o Responsáveis UFV inclusive) veem a
-    contagem, sem os botões, e levam 403 ao tentar revisar."""
+    """Como o `test_pcm_publicar`: administrador e setor PCM revisam e leem o saldo do sistema; os outros setores (o
+    Responsáveis UFV inclusive) veem o que o técnico contou, sem os botões nem o lote, e levam 403 ao tentar revisar ou ler o
+    saldo pela ponte."""
     _cenario(inv)
     corpo = {"acao": "tirar", "id_item": "502", "motivo": "x"}
     for setor in ("Performance", "Responsáveis UFV"):
         c = _pcm(app, monkeypatch, setor=setor)
         assert _revisar(c, corpo).status_code == 403
+        assert _lote(c).status_code == 403
         html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
         assert 'data-rev="' not in html and "revisa o lote" in html and "Pedir recontagem" not in html
-    assert _eventos(app) == []
+        assert "data-lote" not in html and "Fusível 10A" in html
+    assert _eventos(app) == [] and falso.chamadas == []
     c = _pcm(app, monkeypatch, setor="pcm")
-    html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
-    assert 'data-rev="tirar"' in html and 'data-rev="corrigir"' in html and 'data-rev="recontagem"' in html
+    pagina = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert 'data-rev="recontagem"' in pagina and "data-lote" in pagina
+    lote = _lote(c).get_data(as_text=True)
+    assert 'data-rev="tirar"' in lote and 'data-rev="corrigir"' in lote
     assert _revisar(c, corpo).status_code == 200
     # o administrador pela lista de administradores também (a sessão do Fracttal, com e-mail e administrador)
     adm = app.test_client()
@@ -382,6 +535,60 @@ def test_so_o_setor_pcm_revisa(app, inv, falso, monkeypatch):
         s["logado"], s["admin"] = True, True
         s["usuario"] = {"email": EMAIL, "nome": "Pessoa Teste"}
     assert _revisar(adm, {"acao": "recontagem", "motivo": "x"}).status_code == 200
+
+
+def test_o_motivo_do_pcm_so_aparece_para_quem_revisa(app, inv, falso, monkeypatch):
+    """O motivo é texto livre (pode citar gente): o PCM o lê na tela; os outros setores leem só "tirada do lote" e "corrigida
+    pelo PCM"."""
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    _revisar(c, {"acao": "tirar", "id_item": "502", "motivo": "peça contada no almoxarifado errado"})
+    _revisar(c, {"acao": "corrigir", "id_item": "501", "valor": "11", "motivo": "o técnico errou o dedo"})
+    pagina = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    lote = _lote(c).get_data(as_text=True)
+    for html in (pagina, lote):
+        assert "tirada do lote: peça contada no almoxarifado errado" in html
+        assert "o técnico contou 12; o PCM corrigiu para 11 (o técnico errou o dedo)" in html
+    for setor in ("Performance", "Responsáveis UFV"):
+        html = _pcm(app, monkeypatch, setor=setor).get(f"{LISTA}/C-1").get_data(as_text=True)
+        assert "tirada do lote" in html and "corrigida pelo PCM" in html
+        assert "almoxarifado errado" not in html and "errou o dedo" not in html and "o técnico contou 12" not in html
+
+
+@pytest.mark.parametrize("extra, status", [
+    ({"valor": "900"}, 200),                                  # até 1000 passa sempre (o contado é 12)
+    ({"valor": "1000"}, 200),                                 # o limite é "mais de"
+    ({"valor": "1001"}, 400),
+    ({"valor": "5000"}, 400),
+    ({"valor": "5000", "confirmo": True}, 200),               # "confirmo": true aceita
+    ({"valor": "5000", "confirmo": "sim"}, 400),              # só o true de verdade
+    ({"valor": "4500", "sistema": "500"}, 200),               # o saldo que a página mostrou sobe o limite a 10 x 500
+    ({"valor": "6000", "sistema": "500"}, 400),
+    ({"valor": "6000", "sistema": "texto"}, 400),             # saldo ilegível não vale: fica o contado
+])
+def test_corrigir_exagerado_pede_confirmacao(app, inv, falso, monkeypatch, extra, status):
+    """Um número mais de 10 vezes o maior entre o contado (12) e o saldo do sistema, e acima de 1000, é quase sempre um zero a
+    mais, e iria ao estoque da empresa: 400 pedindo a confirmação (`"confirmo": true`)."""
+    _cenario(inv)
+    r = _revisar(_pcm(app, monkeypatch), {"acao": "corrigir", "id_item": "501", "motivo": "teste", **extra})
+    assert r.status_code == status, r.get_json()
+    if status == 400:
+        j = r.get_json()
+        assert j["confirmar"] is True and "confirme" in j["erro"] and _eventos(app) == []
+    else:
+        assert len(_eventos(app)) == 1
+
+
+def test_o_servidor_sem_a_chave_da_pessoa_diz_isso(app, inv, falso, monkeypatch):
+    """Sem a NEXUS_PESSOA_HMAC no servidor ninguém tem o código para a auditoria: a mensagem não manda a pessoa "entrar pelo
+    Fracttal" (ela já entrou), manda avisar a T.I."""
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    app.config["NEXUS_PESSOA_HMAC"] = ""
+    r = _revisar(c, {"acao": "recontagem", "motivo": "x"})
+    erro = r.get_json()["erro"]
+    assert r.status_code == 409 and "não está configurado" in erro and "T.I." in erro and "login do Fracttal" not in erro
+    assert _eventos(app) == []
 
 
 def test_pedido_de_outro_site_nao_revisa(app, inv, falso, monkeypatch):
@@ -397,6 +604,8 @@ def test_a_tela_e_do_setor_pcm(app, inv, falso, setores):  # noqa: F811
     assert _como(app, ANA).get(LISTA).status_code == 403                       # a Ana é da Performance
     assert _como(app, ANA).get(f"{LISTA}/C-1").status_code == 403
     assert _como(app, ANA).post(f"{LISTA}/C-1/revisar", json={"acao": "recontagem", "motivo": "x"}).status_code == 403
+    # o portão por setor só olha /t/...: a ponte (/os/_nexus) confere o setor sozinha
+    assert _lote(_via(_como(app, ANA))).status_code == 403
 
 
 def test_sem_login_a_tela_manda_entrar(app, inv, falso):
@@ -436,7 +645,7 @@ def test_a_aba_nao_quebra_se_o_inventario_nao_le(app, inv, falso, monkeypatch, t
 def test_sem_cor_fora_de_token():
     """Cor só por token do nexus.css (nos dois temas): nada de #hex nem rgba() nos templates novos, nem no CSS do inventário."""
     base = RAIZ / "nexus" / "templates" / "pcm"
-    for nome in ("inventario.html", "inventario_contagem.html", "_almox_abas.html"):
+    for nome in ("inventario.html", "inventario_contagem.html", "_inventario_lote.html", "_almox_abas.html"):
         t = (base / nome).read_text("utf-8")
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b", t) and "rgba(" not in t and "rgb(" not in t, nome
     css = (RAIZ / "nexus" / "static" / "pcm.css").read_text("utf-8")
@@ -447,7 +656,7 @@ def test_sem_cor_fora_de_token():
 def test_os_enderecos_nao_partem_da_raiz():
     """Endereço do Nexus nunca a partir da raiz (ele pode rodar debaixo de um prefixo): `{{ raiz }}` nos links e formulários."""
     base = RAIZ / "nexus" / "templates" / "pcm"
-    for nome in ("inventario.html", "inventario_contagem.html", "_almox_abas.html"):
+    for nome in ("inventario.html", "inventario_contagem.html", "_inventario_lote.html", "_almox_abas.html"):
         t = (base / nome).read_text("utf-8")
         assert not re.search(r'(?:href|action|src)="/(?!/)', t), nome
         assert not re.search(r"(?:fetch|location\.href\s*=)\s*\(?\s*['\"]/", t), nome

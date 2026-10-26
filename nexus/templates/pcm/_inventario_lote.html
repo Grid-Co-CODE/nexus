@@ -1,0 +1,69 @@
+{# O pedaço da contagem aberta que DEPENDE DO FRACTTAL (26/10/2026): os seis números, o Sistema × Contado × Δ × Situação e a
+   confirmação do lote nos seis grupos (só os três primeiros mexem no estoque; o zerar abre aberto e destacado). Quem o desenha
+   é a ponte (nexus/pcm/inventario/ponte_os.py, /os/_nexus/inventario/<id>/lote), porque o login do Fracttal só chega nas rotas de
+   /os; a página (inventario_contagem.html) o busca por fetch e o põe no lugar do que o técnico contou. Sem endereços aqui: os
+   botões só levam data-*, e o painel de revisão está na página. #}
+<section class="kb-kpis alm-kpis inv-kpis" aria-label="Resumo da contagem">
+  {% for g in grupos %}
+  <div class="kb-kpi"><span class="kb-kpi-rot">{{ g.titulo }}</span>
+    <div class="kb-kpi-linha"><b class="kb-kpi-v{% if g.id == 'zerar' and g.n %} kb-kpi-v--critico{% endif %}">{{ g.n }}</b></div></div>
+  {% endfor %}
+</section>
+
+<section class="alm-painel">
+  <h2>Sistema × Contado</h2>
+  <p class="alm-ajuda">O Sistema é o saldo do Fracttal lido agora; o Δ é o contado menos o Sistema. O contado do técnico é cego: ele
+    não viu o saldo.</p>
+  {% if itens %}
+  <table class="alm-t">
+    <thead><tr><th>Peça</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Δ</th><th>Situação</th></tr></thead>
+    <tbody>
+    {% for x in itens %}
+    <tr{% if x.id_item %} data-item="{{ x.id_item }}"{% endif %}{% if x.tirada %} class="inv-tirada"{% endif %}>
+      <td data-r="Peça"><span class="alm-v">{% if x.codigo %}<span class="alm-cod">{{ x.codigo }}</span> {% endif %}{{ x.nome }}{% if x.unidade %} <span class="alm-un">· {{ x.unidade }}</span>{% endif %}{% for n in x.notas %}<span class="alm-det">{{ n }}</span>{% endfor %}</span></td>
+      <td data-r="Sistema" class="num"><span class="alm-v">{{ x.sistema_txt }}</span></td>
+      <td data-r="Contado" class="num"><span class="alm-v">{{ x.contado_txt }}</span></td>
+      <td data-r="Δ" class="num"><span class="alm-v{% if x.delta_sinal %} inv-delta--{{ x.delta_sinal }}{% endif %}">{{ x.delta_txt }}</span></td>
+      <td data-r="Situação"><span class="alm-v">{{ x.rotulo }}</span></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="mudo">Nenhuma peça nesta contagem.</p>{% endif %}
+</section>
+
+<section class="alm-painel inv-confirma">
+  <h2>Revisar lote</h2>
+  <p class="alm-ajuda">Só o ajuste para cima, para baixo e o zerar mexem no estoque do Fracttal. O zerar fica aberto para conferência.
+    {% if pode and c.aprovavel %}Tirar a peça do lote ou corrigir o número pede o motivo, que fica na auditoria.{% endif %}</p>
+  <div class="inv-grupos">
+  {% for g in grupos %}
+    <details class="inv-grupo inv-grupo--{{ g.id }}{% if not g.n %} inv-grupo--vazio{% endif %}" data-grupo="{{ g.id }}" data-n="{{ g.n }}"{% if g.aberto %} open{% endif %}>
+      <summary><span class="inv-grupo-t">{{ g.titulo }}</span><span class="inv-grupo-n">{{ g.n }}</span></summary>
+      <div class="inv-grupo-corpo">
+        <p class="alm-ajuda">{{ g.ajuda }}</p>
+        {% if g.itens %}
+        <ul class="inv-lista">
+        {% for x in g.itens %}
+          <li class="inv-item">
+            <span class="inv-item-t">{% if x.codigo %}<span class="alm-cod">{{ x.codigo }}</span> {% endif %}{{ x.nome }}{% for n in x.notas %}<span class="alm-det">{{ n }}</span>{% endfor %}</span>
+            <span class="inv-item-n">{% if g.id in ('para_cima', 'para_baixo', 'zerar') %}{{ x.sistema_txt }} para {{ x.contado_txt }}{% if x.delta_txt != '—' %} <span{% if x.delta_sinal %} class="inv-delta--{{ x.delta_sinal }}"{% endif %}>({{ x.delta_txt }})</span>{% endif %}{% elif g.id == 'sem_alteracao' %}{{ x.contado_txt }}{% elif x.contado is not none %}contado {{ x.contado_txt }}{% endif %}</span>
+            {% if x.acoes %}
+            <span class="inv-item-a">
+              <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="corrigir" data-item="{{ x.id_item }}" data-peca="{{ x.codigo }} {{ x.nome }}" data-valor="{{ x.contado_txt }}" data-sistema="{{ x.sistema_num }}">Corrigir número</button>
+              {% if g.id != 'nao_tocada' %}<button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-rev="tirar" data-item="{{ x.id_item }}" data-peca="{{ x.codigo }} {{ x.nome }}">Tirar do lote</button>{% endif %}
+            </span>
+            {% endif %}
+          </li>
+        {% endfor %}
+        </ul>
+        {% else %}<p class="mudo">Nenhuma peça.</p>{% endif %}
+      </div>
+    </details>
+  {% endfor %}
+  </div>
+  <div class="inv-rodape">
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" disabled title="a gravação chega na próxima entrega">Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</button>
+  </div>
+  <p class="alm-ajuda">A gravação no Fracttal chega na próxima entrega. Por enquanto a revisão fica registrada na auditoria, no nome de quem a fez.</p>
+</section>

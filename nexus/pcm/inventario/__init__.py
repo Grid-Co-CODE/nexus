@@ -6,7 +6,9 @@ Fracttal de verdade aceita (os métodos, os corpos, as respostas): `...-passo0.m
 fala só com ele (ou com o `EstoqueFalso` dos testes). `contas` são as contas do inventário (situação de cada peça, contado
 efetivo com a curadoria, a contagem mais nova que substitui as velhas, a janela de aprovação), puras: quem lê o livro, mostra
 o lote e grava chama as mesmas. `leitura` lê as contagens que o App publica e o estado de cada uma pelos eventos do livro
-do inventário. As telas e a gravação em segundo plano entram nas tarefas seguintes.
+do inventário. `revisao` é a aba Inventário (a lista, a contagem aberta e a revisão do PCM) e `ponte_os` é a ponte com o login
+do Fracttal: o cookie dele só chega nas rotas de `/os`, então tudo o que lê ou grava no Fracttal roda em
+`/os/_nexus/inventario/...`. A gravação em segundo plano, a régua e a curadoria entram nas tarefas seguintes.
 """
 
 
@@ -18,8 +20,12 @@ def registrar(bp) -> None:
 
     from ...dados import fato_inventario as F
     from ..telas import _de_outro_site, pode_programar
-    from . import estoque as E
+    from . import ponte_os
     from . import revisao as R
+
+    # a ponte com o login do Fracttal fica na RAIZ do app (`/os/_nexus/inventario`, o cookie dele só vai para /os): entra junto com
+    # a torre, como a ponte do OS Creator (`torres/oscreator/__init__.py`)
+    bp.record_once(lambda estado: estado.app.register_blueprint(ponte_os.bp_raiz))
 
     @bp.route("/pecas/inventario", endpoint="inventario")
     def inventario():
@@ -27,11 +33,10 @@ def registrar(bp) -> None:
 
     @bp.route("/pecas/inventario/<contagem_id>", endpoint="inventario_contagem")
     def inventario_contagem(contagem_id):
-        """A contagem aberta: o Sistema (o saldo do Fracttal) lido agora com o login de quem abre, contra o contado."""
-        app = current_app._get_current_object()
-        # `E.estoque_da_sessao` pelo módulo, no momento do pedido: os testes o trocam pelo `EstoqueFalso`
+        """A contagem aberta, SEM o Fracttal: o login dele não chega a `/t/pcm` (o cookie vale só em /os). O Sistema, o Δ e os seis
+        grupos a página busca na ponte (`ponte_os.lote`)."""
         try:
-            ctx = R.montar(app.config, contagem_id, lambda id_almox: E.estoque_da_sessao(app).ler(id_almox), pode_programar())
+            ctx = R.montar(current_app.config, contagem_id, pode_programar())
         except F.Recusada as ex:
             return render_template("pcm/inventario_contagem.html", erro=str(ex), c=None, a_revisar=None)
         if ctx is None:
@@ -50,4 +55,4 @@ def registrar(bp) -> None:
             return jsonify(R.revisar(current_app.config, contagem_id, request.get_json(silent=True),
                                      R.pessoa(current_app.config, email)))
         except R.Recusa as ex:
-            return jsonify(ok=False, erro=ex.mensagem), ex.status
+            return jsonify(ok=False, erro=ex.mensagem, **ex.extra), ex.status
