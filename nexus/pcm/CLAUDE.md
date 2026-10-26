@@ -62,6 +62,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe e a comparação com a foto do App |
+| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça (seção abaixo); as telas e a gravação em segundo plano vêm nas próximas tarefas do plano |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `cb8239c` (23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina, e o preenchimento dos dias livres respeita o dia fixo da usina e o feriado municipal) |
 
 ## O nome do cliente é o do cadastro do Nexus (`clientes.py`; 18/10/2026)
@@ -445,6 +446,49 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
 - **Como provar:** `tests/test_pcm_almoxarifado.py`; no navegador, a cópia de prova com os 4 livros montados na memória
   a partir de uma cópia da tabela do App (fora do repositório) e o cadastro real por GET (25/10: 12 almoxarifados, 218
   peças com saldo, 54 no limite, 22 sem mínimo, 5 avariadas, 3 lançadas e 13 recusadas).
+
+## Inventário do almoxarifado: o adaptador do estoque (`inventario/estoque.py`; 26/10/2026)
+
+Levi, 26/10/2026: o técnico conta as peças no App, o PCM revisa e aprova, e o Nexus grava o saldo contado no Fracttal.
+Desenho e plano: `docs/superpowers/specs/2026-10-26-inventario-almoxarifado-design.md` e `docs/superpowers/plans/2026-10-26-
+inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpos, respostas, lidos da própria tela em 26/10):
+`docs/superpowers/specs/2026-10-26-inventario-almoxarifado-passo0.md`.
+
+- **Para que serve:** é a ÚNICA porta de leitura e gravação de estoque no Fracttal. A gravação, a régua e a curadoria só
+  chamam os métodos do `Estoque` (o contrato; a `EstoqueFracttal` o cumpre, e o `EstoqueFalso` dos testes também); nenhuma
+  tela fala `inventories.*` direto. Todo id é texto; `ler` devolve `{id_item: {saldo, minimo, maximo, ligacao, codigo}}`,
+  com o que o Fracttal não disse como None, nunca 0.
+- **O ajuste é uma SESSÃO do almoxarifado, não um movimento por peça:** `abrir_ajuste` (modo 2) → `gravar_saldo` (o saldo
+  ABSOLUTO de cada peça, idempotente) → `fechar_ajuste(referencia)` (a referência `INVENTARIO-<contagem>` vai na
+  `description`, e o almoxarifado volta ao modo 0). Ao fechar, o Fracttal gera, por peça mexida, um par de movimentos do tipo
+  15 (saída do saldo antigo inteiro, entrada do novo). **Enquanto o modo está aberto o almoxarifado trava Entradas, Saídas e
+  Pedidos de compra** (no passo 0, o `ATHN-MTS200` estava em inventário físico, modo 3, com as duas travadas): quem abre
+  fecha no mesmo trabalho, e a retomada começa pelo `modo`, fechando o que ficou aberto. Resposta perdida (a conexão cai
+  depois do Fracttal gravar): confere pelo `ler` (o saldo) e pelo `achar_movimento(referencia)` antes de repetir.
+- **Erros:** `Limite` (HTTP 429: a cota de 200/min é da EMPRESA inteira), `SemLogin` (sem login, recusado ou expirado) e
+  `ErroFracttal` (o `success: false` com HTTP 200 que o `_rpc_call` do OS Creator DEVOLVE em vez de levantar; a mensagem
+  é o código do Fracttal, ex. `ASSET_CANNOT_BE_DESABLED_STOCK`). Rede fora e 500 passam como vieram: a resposta pode ter
+  se perdido depois de gravar, e quem grava decide. O adaptador lê do `api.py` o marcador `session_expired` e o texto
+  "HTTP 429" (um teste cai se o `api.py` mudar um dos dois).
+- **Ritmo e login:** 1 pedido por segundo, do início de um ao início do outro (relógio e `dormir` injetáveis, os testes
+  não esperam). `estoque_da_sessao(app)` pega o login do Fracttal de quem está no pedido (`ponte.sessao_do_os`; sem ele,
+  `SemLogin`: quem entra pela senha não grava estoque); o JWT e o e-mail vivem só na memória da instância, que roda cada
+  pedido dentro de `os_web.sessao.contexto` e guarda o token que o `api` renovar no meio, para um trabalho de minutos
+  não renovar a cada pedido. Chamar dentro do pedido; a instância pode seguir numa thread.
+- **Nome de gente não entra:** o `responsible_description` do histórico de movimentos é nome de pessoa; o adaptador projeta
+  só `folio`, `id_item`, `date_create` e `description`, e nunca o guarda nem o devolve.
+- **A régua** (`definir_regua`) manda só o mínimo e o máximo que vieram (como texto, o que a tela e a prova de 26/10
+  mandaram), fora do modo de ajuste, sem mexer em saldo nem gerar movimento. **Conflito** (`mexidas_desde`): o histórico
+  vem do mais novo ao mais velho e se lê até passar da data (a cota é de todos); data ilegível numa linha conta como
+  mexida.
+- **O falso** (`tests/estoque_falso.py`): na memória, com o modo, o par de movimentos ao fechar e os defeitos pelo
+  construtor (`perder_resposta`, uma vez por operação: grava e levanta `ConnectionError`; `limite_em` e `expirar_em`: a
+  N-ésima chamada). O que o passo 0 não provou e o falso supõe (ligar duas vezes, código repetido, abrir ajuste em modo 3)
+  está no cabeçalho dele: conferir na prova com o App (Task 10).
+- **Provar:** `tests/test_pcm_inventario_estoque.py` (48 testes: os corpos e a ordem do passo 0, a paginação, o ritmo, os
+  erros, o histórico sem nome, e o `api` de verdade do clone com só o `requests.post` trocado); 11 mutações (ritmo, nulo
+  que vira 0, `success`, corte da data, token renovado, nome guardado, 429, volta ao modo 0, régua, total da página, saldo
+  negativo), todas pegas.
 
 ## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
 
