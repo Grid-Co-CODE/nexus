@@ -58,3 +58,25 @@ def test_contrato_e_dominio():
     assert A.COLUNAS_SALDO[-1] == "Início do ciclo" and "Local do almoxarifado" in A.COLUNAS_SALDO
     assert "Lançado por (HMAC)" in A.COLUNAS_PECAS and not any("e-mail" in c.lower() for c in A.COLUNAS_PECAS)
     assert dominios.RECUSA_PECA == ("chave recusada pelo Fracttal", "sem permissão", "outro")
+
+
+# ── catálogo ────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+def test_almoxarifado_no_catalogo():
+    """Fonte nova entra primeiro no catálogo (PRIORIDADE 0), com grão, tipo, medidas e o livro registrado antes de
+    existir: assim os livros do App não aparecem como "novos" no radar da Governança."""
+    from nexus.dados import catalogo, explica
+    s, c, p = (catalogo.POR_ID[f] for f in ("saldo_almox", "ciclo_varredura", "peca_lancada"))
+    assert (s.tipo, c.tipo, p.tipo) == ("snapshot_periodico", "snapshot_acumulado", "snapshot_acumulado")
+    assert s.area == c.area == p.area == "pcm"
+    assert s.dims["equipamento"][0] == "prop" and s.dims["usina"][0] == "nome" and p.dims["pessoa"][0] == "hmac"
+    med = {m.coluna: m for m in s.medidas}
+    assert med["saldo_qtd"].soma == med["minimo_qtd"].soma == "semi"
+    assert all(catalogo.medida_valida(m) for f in (s, c, p) for m in f.medidas)
+    assert A.LIVRO_SALDO + " · " + A.ABA_SALDO in s.fontes and A.LIVRO_PECAS + " · " + A.ABA_PECAS in p.fontes
+    assert catalogo.LIVRO_POR_NOME["nexus_almoxarifado"].so_cresce
+    assert not catalogo.LIVRO_POR_NOME["nexus_almoxarifado"].no_banco
+    assert catalogo.da_familia("nexus_almoxarifado_saldo_2026_10", "fato_saldo_almox")
+    assert any(k.livro == A.LIVRO_ITENS and k.papel == "dimensao" for k in catalogo.CONHECIDAS)
+    for f in (s, c, p):
+        assert explica.RESUMO.get(f.id) and explica.PARA_QUE.get(f.id), f.id
