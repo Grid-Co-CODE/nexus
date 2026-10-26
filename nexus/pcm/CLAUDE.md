@@ -394,8 +394,9 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
 
 Quadro da semana, Fora da programação (16/10/2026, dos mesmos setores do Quadro), Técnicos por usina (17/10/2026, dos
 mesmos setores; edita o PCM), Insights do PCM, Tarefas e OS, Gerar a
-semana, Gestão PCM, PCM 52 Semanas, Torre de controle e Peças e sobressalentes (Insights, 52 Semanas, Torre de controle e
-Peças ainda são placeholder). **A Semana saiu em 12/10/2026
+semana, Gestão PCM, PCM 52 Semanas, Torre de controle e Almoxarifado (Insights, 52 Semanas e Torre de controle ainda
+são placeholder; o Almoxarifado, desde 25/10/2026, ocupa o lugar do placeholder "Peças e sobressalentes", com o mesmo
+endereço `/t/pcm/pecas`). **A Semana saiu em 12/10/2026
 com o código dela** (Levi: "PCM > Semana -> pode excluir essa seção e o código dela!"): a rota, o `semana.html`, o
 `resumo` e o `por_equipe` do `semana.py` (aderência e horas por equipe e dia, contra as 7 h) e o CSS só dela; as regras
 que as outras telas usam ficaram no `semana.py`. O 1º item do PCM (e o cartão do PCM no Início) passou a ser o Quadro
@@ -407,6 +408,29 @@ as preventivas do mês seguinte, relatório mensal aos clientes no 5º dia útil
 MPS do semestre, MPA do ano, nova usina e saída de contrato...), e a página HTML de lá marcava o feito num `estado.json`
 que nunca recebeu marca (vazio desde 17/08). **Não montar por enquanto** (Levi, 11/10/2026: "Não acho que valha a pena
 montar essa torre agora, vou falar com o time de PCM"): a tela segue placeholder no menu até ele decidir.
+
+## Almoxarifado (`almoxarifado.py`, `templates/pcm/almoxarifado.html`, `/t/pcm/pecas`; 25/10/2026)
+
+Levi, 25/10/2026: "No fractall temos almoxarifado, gostaria de uma visão para a gestão desse almoxarifado na parte de
+PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `docs/superpowers/specs/` e
+`docs/superpowers/plans/2026-10-25-almoxarifado*`. Do setor PCM (outros pela marca em Base → Acessos).
+
+- **De onde vem:** o saldo do Fracttal só sai item a item (574 chamadas por leitura); o App de Campo já faz essa
+  varredura uma vez por dia, a partir de 00:00 de Brasília, e publica 4 livros (o pacote
+  `app-campo-docs/_propostas/almoxarifado-nexus`). O Nexus não chama o Fracttal. As contas e o contrato estão em
+  `nexus/dados/almoxarifado.py`, os MESMOS da carga do histórico (`nexus/dados/CLAUDE.md`, linha Almoxarifado).
+- **O que a tela mostra:** 6 números (almoxarifados, peças com saldo, abaixo do mínimo e no limite, sem mínimo,
+  avariadas, lançadas pelo App com as recusadas) e 5 abas: Reposição, Por almoxarifado, Catálogo e saldo, Consumo nas OS
+  (tudo desde o início, Levi 25/10/2026) e Cadastro a corrigir. Filtro na própria página (`filtro-local.js`).
+- **As contas:** abaixo = mínimo > 0 e saldo < mínimo; **no limite** = saldo igual ao mínimo, separado porque o Fracttal
+  costuma ter o mínimo igual ao saldo (25/10: 0 abaixo, 54 no limite); sem mínimo = mínimo 0; zerada = saldo 0.
+- **Número pela metade não vai:** o saldo é o do ciclo mais novo do App só com Ciclo, Itens e Saldo do mesmo ciclo e 90%
+  da lista lidos; senão, o último ciclo aplicado no histórico do Nexus, com o aviso; sem ele (o ensaio), só o aviso.
+  Ciclo com mais de 36 h: o aviso com a data. Item com Lido = Não: "não lido neste ciclo", nunca "sem saldo". O consumo
+  vem do `fato_peca_lancada`; enquanto ele não existe, do livro Peças do App (90 dias), com a nota.
+- **Como provar:** `tests/test_pcm_almoxarifado.py`; no navegador, a cópia de prova com os 4 livros montados na memória
+  a partir de uma cópia da tabela do App (fora do repositório) e o cadastro real por GET (25/10: 12 almoxarifados, 218
+  peças com saldo, 54 no limite, 22 sem mínimo, 5 avariadas, 3 lançadas e 13 recusadas).
 
 ## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
 
