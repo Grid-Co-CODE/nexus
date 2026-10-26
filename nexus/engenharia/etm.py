@@ -7,10 +7,14 @@ descrição confere) e `work_orders?items_log_description=Estação Meteorológi
 por trecho). Fica a OS cujo código é de uma ETM: 15 pedidos por leitura, contra os 172 do app (um por ETM). As linhas do
 REST são por tarefa; a tela é por OS (o número), como o Quadro da equipe, e o cartão é o dele (`os_equipe._cartao`).
 
+Engenharia, Chamados e Campo (Levi, 26/10/2026: "Engenharia e Chamados vai pelas pessoas dos setores, Campo é o
+restante!"): o setor de quem está com a OS, pelo id do Fracttal, nos setores de Base → Acessos → Pessoas e setores (livro
+`nexus_setores`, a última decisão de cada pessoa); quem não é de nenhum dos dois é Campo. Sem o banco dos setores, a
+Engenharia vem da lista do Quadro da equipe (`os_equipe.nomes`, pelo nome), Chamados não se separa e a tela diz.
+
 Quais OS entram (a regra do app, sem nome no código): as Corretivas e as Administrativas, mais as de responsável ou
-solicitante da equipe da Engenharia (a lista do Quadro da equipe, `os_equipe.nomes`, fora do git; no app eram nomes
-escritos no código). Análise de Engenharia = não é Corretiva e o responsável é da equipe; o resto é Campo. O solicitante
-do Fracttal é texto livre: casa sem acento nem caixa.
+solicitante da Engenharia ou de Chamados. O solicitante do Fracttal é texto livre: casa pelo nome do Fracttal das
+pessoas dos setores, sem acento nem caixa.
 
 A cópia vale 5 min e é relida por trás enquanto a tela é usada (o mesmo do `os_equipe`); a leitura que falha guarda a
 anterior e diz. Nada vai para o banco.
@@ -31,12 +35,14 @@ QUENTE_S = 60
 TETO_ETMS = 5       # páginas de 100 (172 ETMs em 26/10/2026)
 TETO_OS = 40        # páginas de 100 (1213 OS em 26/10/2026): um filtro ignorado não vira o Fracttal inteiro
 TIPOS_SEMPRE = ("corretiva", "administrativa")
+SETORES = ("engenharia", "chamados")      # os setores que separam a OS (o nome em Base → Acessos, sem acento nem caixa)
 COLUNAS = (("nao_iniciada", "Não iniciadas"), ("em_andamento", "Em andamento"), ("finalizada", "Finalizadas"),
            ("cancelada", "Canceladas"))
 # a coluna do quadro da equipe → a do Planner do app (a verificação ainda não fechou: está em andamento)
 _DA_COLUNA = {"fazer": "nao_iniciada", "execucao": "em_andamento", "verificacao": "em_andamento",
               "concluida": "finalizada", "cancelada": "cancelada"}
-_EST = {"ts": 0.0, "os": [], "etms": set(), "lendo": False, "erro": "", "erro_em": 0.0, "usado": 0.0}
+_EST = {"ts": 0.0, "os": [], "etms": set(), "lendo": False, "erro": "", "erro_em": 0.0, "usado": 0.0,
+        "erro_setores": ""}
 _TRAVA = threading.Lock()
 
 
@@ -61,34 +67,88 @@ def _limpo(v) -> str:
     return " ".join(str(v or "").split())
 
 
-def _da_equipe(nome: str, equipe: list[str]) -> bool:
-    """O nome do Fracttal é de alguém da lista: igual ou começando por ele, sem acento nem caixa (o nome da lista é o
-    curto; o do Fracttal pode vir mais comprido)."""
+def _id(v) -> str:
+    """O id do Fracttal como texto (a API pode devolver "123.0")."""
+    try:
+        return str(int(float(v)))
+    except (TypeError, ValueError):
+        return ""
+
+
+def _setor_pelo_nome(nome, setores: dict) -> str:
+    """O setor pelo nome do Fracttal: igual ou começando pelo nome da pessoa do setor, sem acento nem caixa (o nome da
+    lista pode ser o curto; o do Fracttal, mais comprido). "campo" quando não casa."""
     n = os_equipe._norm(nome)
-    return bool(n) and any(n == e or n.startswith(e + " ") for e in equipe)
+    for s in SETORES:
+        if n and any(n == e or n.startswith(e + " ") for e in (setores.get("nomes") or {}).get(s) or []):
+            return s
+    return "campo"
 
 
-def montar(linhas: list[dict], codigos_etm: set, equipe: list[str], hoje) -> list[dict]:
-    """As OS de ETM que a tela mostra (uma por número), no cartão do Quadro da equipe com o que o Planner pede."""
+def _setor_do_responsavel(w0: dict, setores: dict) -> str:
+    """Pelo id do Fracttal nos setores de Base → Acessos; sem eles (o banco fora), pelo nome."""
+    if setores.get("por_id"):
+        return setores["por_id"].get(_id(w0.get("id_personnel")), "campo")
+    return _setor_pelo_nome(w0.get("personnel_description"), setores)
+
+
+def montar(linhas: list[dict], codigos_etm: set, setores: dict, hoje) -> list[dict]:
+    """As OS de ETM que a tela mostra (uma por número), no cartão do Quadro da equipe com o que o Planner pede.
+    `setores` = {"por_id": {id do Fracttal: setor}, "nomes": {setor: [nomes do Fracttal, sem acento nem caixa]}}."""
     por: dict = {}
     for w in linhas:
         if _limpo(w.get("code")) in codigos_etm:
             por.setdefault(str(w.get("wo_folio") or w.get("id_work_order")), []).append(w)
-    eq = [os_equipe._norm(n) for n in equipe if os_equipe._norm(n)]
     out = []
     for folio, ts in por.items():
         w0 = ts[0]
         tipo = os_equipe._norm(w0.get("tasks_log_task_type_main"))
         resp, solic = _limpo(w0.get("personnel_description")), _limpo(w0.get("requested_by"))
-        resp_eq = _da_equipe(resp, eq)
-        if not (tipo in TIPOS_SEMPRE or resp_eq or _da_equipe(solic, eq)):
+        setor = _setor_do_responsavel(w0, setores)
+        if not (tipo in TIPOS_SEMPRE or setor != "campo" or _setor_pelo_nome(solic, setores) != "campo"):
             continue
         c = os_equipe._cartao(folio, ts, {"id": w0.get("id_personnel"), "nome": resp}, hoje)
-        c.update(coluna_etm=coluna_etm(c["coluna"]), trabalho="analise" if tipo != "corretiva" and resp_eq else "campo",
-                 cliente=cliente_de(c["usina"]), responsavel=resp, solicitante=solic,
-                 criado_por=_limpo(w0.get("created_by")))
+        c.update(coluna_etm=coluna_etm(c["coluna"]), trabalho=setor, cliente=cliente_de(c["usina"]), responsavel=resp,
+                 solicitante=solic, criado_por=_limpo(w0.get("created_by")))
         out.append(c)
     return out
+
+
+def _ler_setores(app) -> dict:
+    """Os setores Engenharia e Chamados de Base → Acessos → Pessoas e setores: quem é de cada um pela última decisão
+    (o id do Fracttal) e o nome do Fracttal dessas pessoas (para o solicitante, que é texto livre)."""
+    from ..cadastro import setores as S
+    from ..campo import visao
+    st = S.ler(visao._base(), visao._sessao())
+    if not st.get("lido_em"):
+        raise RuntimeError(st.get("erro") or "o livro dos setores não veio")
+    ids = {os_equipe._norm(s["nome"]): s["setor_id"] for s in S.ativos(st.get("setores") or [])}
+    alvo = {ids[n]: n for n in SETORES if n in ids}
+    por_id = {_id(fid): alvo[sid] for fid, sid in S.vigentes(st.get("decisoes") or []).items()
+              if sid in alvo and _id(fid)}
+    nomes: dict = {s: [] for s in SETORES}
+    try:
+        from ..cadastro import fracttal_pessoal as FP
+        pessoal = {_id(p.get("id")): p.get("nome") for p in (FP.ler_pessoal().get("pessoas") or [])}
+    except Exception:           # noqa: BLE001 — sem os nomes, o solicitante não separa; o responsável vai pelo id
+        pessoal = {}
+    for fid, s in por_id.items():
+        n = os_equipe._norm(pessoal.get(fid))
+        if n:
+            nomes[s].append(n)
+    return {"por_id": por_id, "nomes": nomes}
+
+
+def _setores(app) -> tuple[dict, str]:
+    """Os setores e o erro: sem o banco, a Engenharia pela lista do Quadro da equipe (os nomes) e Chamados vazio."""
+    try:
+        return _ler_setores(app), ""
+    except Exception as e:      # noqa: BLE001 — a tela lê assim mesmo, e diz
+        equipe = [os_equipe._norm(n) for n in os_equipe.nomes(app.config) if os_equipe._norm(n)]
+        return {"por_id": {}, "nomes": {"engenharia": equipe, "chamados": []}}, f"{type(e).__name__}: {str(e)[:160]}"
+
+
+_setores_original = _setores
 
 
 def _paginas(path: str, teto: int) -> list[dict]:
@@ -112,11 +172,11 @@ def _ler_etms() -> set:
 def _reler(app):
     try:
         with app.app_context():
-            equipe = os_equipe.nomes(app.config)
+            setores, erro_setores = _setores(app)
             etms = _ler_etms()
             linhas = _paginas(f"work_orders?items_log_description={quote(ETM)}", TETO_OS)
-            oss = montar(linhas, etms, equipe, datetime.now(BRT).date())
-            _EST.update(os=oss, etms=etms, ts=time.time(), erro="", erro_em=0.0)
+            oss = montar(linhas, etms, setores, datetime.now(BRT).date())
+            _EST.update(os=oss, etms=etms, ts=time.time(), erro="", erro_em=0.0, erro_setores=erro_setores)
     except Exception as e:      # noqa: BLE001 — 429 ou rede: fica a leitura anterior, e a tela diz
         _EST.update(erro=str(e)[:200], erro_em=time.time())
     finally:
@@ -168,7 +228,8 @@ def manter_quente(app):
 
 
 def dados() -> dict:
-    return {"os": list(_EST["os"]), "lido": _EST["ts"], "lendo": _EST["lendo"], "erro": _EST["erro"]}
+    return {"os": list(_EST["os"]), "lido": _EST["ts"], "lendo": _EST["lendo"], "erro": _EST["erro"],
+            "erro_setores": _EST["erro_setores"]}
 
 
 def eh_etm(codigo) -> bool | None:
@@ -179,4 +240,4 @@ def eh_etm(codigo) -> bool | None:
 
 
 def limpar():
-    _EST.update(ts=0.0, os=[], etms=set(), lendo=False, erro="", erro_em=0.0, usado=0.0)
+    _EST.update(ts=0.0, os=[], etms=set(), lendo=False, erro="", erro_em=0.0, usado=0.0, erro_setores="")

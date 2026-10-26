@@ -1170,15 +1170,15 @@ def faixa_etm(oss: list[dict], hoje, sem_marcas: bool = False, sem_leitura: bool
                 ("Abertas no Fracttal", "Abertas para a Engenharia", "Em acompanhamento",
                  f"Finalizadas em {JANELA_CONCLUIDAS} dias")]
     abertas = [o for o in oss if o["coluna"] in ("nao_iniciada", "em_andamento")]
-    analise = sum(1 for o in abertas if o["trabalho"] == "analise")
+    por = collections.Counter(o["trabalho"] for o in abertas)
     para_eng = [o for o in oss if o["coluna"] != "cancelada" and not o["diagnostico"] and not o["finalizado"]]
     usinas = len({o["usina"] for o in para_eng})
     piso = (hoje - timedelta(days=JANELA_CONCLUIDAS)).isoformat()
     fechadas = sum(1 for o in oss if o["coluna"] == "finalizada" and (o["fim_dia"] or "") >= piso)
     return [
         {"rotulo": "Abertas no Fracttal", "valor": len(abertas), "grav": "",
-         "nota": [(str(analise), True), (" em análise de engenharia, ", False), (str(len(abertas) - analise), True),
-                  (" em campo", False)]},
+         "nota": [(str(por["engenharia"]), True), (" com a engenharia, ", False), (str(por["chamados"]), True),
+                  (" com chamados, ", False), (str(por["campo"]), True), (" em campo", False)]},
         {"rotulo": "Abertas para a Engenharia", "valor": "—" if sem_marcas else len(para_eng),
          "grav": "" if sem_marcas or not para_eng else "alerta",
          "nota": [("sem as marcações agora", False)] if sem_marcas else
@@ -1214,7 +1214,7 @@ def etm():
     return render_template(
         "engenharia/etm.html", torre=TORRE, tela=TORRE.tela("etm"), oss=oss, colunas=ETM.COLUNAS,
         kpis=faixa_etm(oss, hoje, sem_marcas=bool(erro_marcas), sem_leitura=not d["lido"]), erro=d["erro"],
-        erro_marcas=erro_marcas, nunca_lido=not d["lido"], lendo=d["lendo"],
+        erro_marcas=erro_marcas, nunca_lido=not d["lido"], lendo=d["lendo"], erro_setores=d.get("erro_setores") or "",
         clientes=nomes("cliente"), criados=nomes("criado_por"), solicitantes=nomes("solicitante"),
         responsaveis=nomes("responsavel"), etiquetas_eng=[n for _, n in M.ETIQUETAS], hoje=hoje.isoformat(),
         admin=bool(session.get("admin")),           # o painel do histórico do app de ETM (uma vez, só o administrador)

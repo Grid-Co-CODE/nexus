@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
 {# A tela ETMs (Levi, 26/10/2026: "Quero que inclua essa visão de ETMs no Nexus, engenharia, aba própria. Deixe o design
    alá Nexus!"): o Planner do app de ETM da Engenharia no desenho do Quadro da equipe. As colunas e os filtros são os do
-   app (cliente, usina, criado por, solicitante, responsável, Análise de Engenharia ou Campo, o período em que a OS esteve
+   app (cliente, usina, criado por, solicitante, responsável, Engenharia, Chamados ou Campo, o período em que a OS esteve
    ativa, as canceladas e, na coluna Em andamento, as etiquetas), montados no navegador a partir do JSON abaixo. A
    leitura está em nexus/engenharia/etm.py e as marcações em nexus/engenharia/etm_marcas.py; o clique abre a OS da ETM. #}
 <div class="campo-nativa kb etm">
@@ -19,6 +19,7 @@
   </div>
   {% if nunca_lido and not erro %}<div class="cn-erro cn-aviso" role="status"><b>Lendo as OS de ETM no Fracttal pela primeira vez.</b> A tela se atualiza sozinha em instantes.</div>
   {% elif erro %}<div class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou a leitura agora ({{ erro }}).</b> {% if nunca_lido %}Ainda sem nenhuma leitura; nova tentativa em 1 minuto.{% else %}Mostrando a última leitura; nova tentativa em 1 minuto.{% endif %}</div>{% endif %}
+  {% if erro_setores %}<div class="cn-erro cn-aviso" role="status"><b>Sem os setores agora ({{ erro_setores.split(':')[0] }}).</b> A Engenharia vem da lista do Quadro da equipe e Chamados não se separa; recarregue em instantes.</div>{% endif %}
   {% if erro_marcas %}<div class="cn-erro cn-aviso" role="status"><b>Não consegui ler as marcações da Engenharia ({{ erro_marcas }}).</b> As OS aparecem sem o diagnóstico, o status pós-OS e as etiquetas; recarregue em instantes.</div>{% endif %}
 
   <section class="kb-kpis" aria-label="As ETMs agora">
@@ -43,7 +44,7 @@
     <label class="etm-f"><span>Responsável</span>
       <input class="gc-campo" id="etm-f-responsavel" list="etm-l-responsavel" placeholder="Todos" autocomplete="off"></label>
     <div class="etm-f"><span>Tipo de trabalho</span>
-      <span class="etm-chips"><button type="button" class="etm-chip" data-trabalho="analise" aria-pressed="true">Análise de Engenharia</button><button type="button" class="etm-chip" data-trabalho="campo" aria-pressed="true">Campo</button></span></div>
+      <span class="etm-chips"><button type="button" class="etm-chip" data-trabalho="engenharia" aria-pressed="true">Engenharia</button><button type="button" class="etm-chip" data-trabalho="chamados" aria-pressed="true">Chamados</button><button type="button" class="etm-chip" data-trabalho="campo" aria-pressed="true">Campo</button></span></div>
     <div class="etm-f etm-f--datas"><span>Período (OS ativa entre)</span>
       <span class="etm-datas"><input type="date" class="gc-campo" id="etm-f-ini" aria-label="De"><span>até</span><input type="date" class="gc-campo" id="etm-f-fim" aria-label="Até"></span></div>
     <div class="etm-f etm-f--fim">
@@ -58,8 +59,8 @@
 
   <div class="kb-quadro" aria-live="polite"></div>
   <p class="mudo kb-rodape">Coluna: Não iniciadas = a OS aberta sem nenhuma tarefa começada; Em andamento = alguma tarefa
-    começou ou a OS espera a verificação; Finalizadas e Canceladas, como no Fracttal. Análise de Engenharia = a OS que não
-    é corretiva e está com alguém da engenharia; o resto é Campo. "Abertas para a Engenharia" só saem com o diagnóstico ou
+    começou ou a OS espera a verificação; Finalizadas e Canceladas, como no Fracttal. Engenharia e Chamados = a OS está com
+    alguém desses setores (Base → Acessos → Pessoas e setores); o resto é Campo. "Abertas para a Engenharia" só saem com o diagnóstico ou
     o finalizado pela Engenharia, não quando o Fracttal fecha a tarefa.</p>
   {% if admin %}
   {# o histórico do app de ETM, trazido uma vez (Levi, 26/10/2026: "Traz 1 vez, para as OSs em aberto bota esses
@@ -79,11 +80,13 @@
 (function () {
   var D = JSON.parse(document.getElementById('etm-dados').textContent);
   var quadro = document.querySelector('.kb-quadro');
-  var estado = {cliente: '', usina: '', criado: '', solicitante: '', responsavel: '', trabalho: {analise: true, campo: true},
+  var estado = {cliente: '', usina: '', criado: '', solicitante: '', responsavel: '',
+                trabalho: {engenharia: true, chamados: true, campo: true},
                 ini: '', fim: '', canceladas: false, etiquetas: []};
   // as colunas do app com as cores das do Quadro da equipe
   var COR = {nao_iniciada: 'fazer', em_andamento: 'execucao', finalizada: 'concluida', cancelada: 'cancelada'};
   var ROT = {}; D.colunas.forEach(function (c) { ROT[c[0]] = c[1]; });
+  var TRAB = {engenharia: 'Engenharia', chamados: 'Chamados', campo: 'Campo'};
 
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
   // "OS ativa entre" do app: criada até o fim do período e, se já fechou, fechada depois do começo dele
@@ -123,7 +126,8 @@
     c.appendChild(cab);
     c.appendChild(el('h4', 'kb-card-tit', o.titulo || '(sem título)'));
     var s = el('div', 'kb-eng');
-    if (o.trabalho === 'analise') s.appendChild(selo('Análise de Engenharia', 'info'));
+    // de quem é a OS: Engenharia e Chamados pelos setores, o resto Campo (Levi, 26/10/2026)
+    s.appendChild(selo(TRAB[o.trabalho] || 'Campo', o.trabalho === 'engenharia' ? 'info' : o.trabalho === 'chamados' ? 'verde' : 'neutro'));
     if (o.diagnostico) s.appendChild(selo(o.diagnostico, 'ok'));
     if (o.status_pos) s.appendChild(selo(o.status_pos, 'neutro'));
     if (o.acompanhamento) s.appendChild(selo('Em acompanhamento', 'alerta'));
@@ -207,7 +211,8 @@
   document.getElementById('etm-f-limpar').addEventListener('click', function () {
     campos.forEach(function (e) { e.value = ''; });
     canceladas.checked = false;
-    estado = {cliente: '', usina: '', criado: '', solicitante: '', responsavel: '', trabalho: {analise: true, campo: true},
+    estado = {cliente: '', usina: '', criado: '', solicitante: '', responsavel: '',
+              trabalho: {engenharia: true, chamados: true, campo: true},
               ini: '', fim: '', canceladas: false, etiquetas: []};
     document.querySelectorAll('[data-trabalho]').forEach(function (b) { b.setAttribute('aria-pressed', 'true'); });
     desenha();

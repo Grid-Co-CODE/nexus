@@ -576,3 +576,5 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 /* o histórico do app de ETM (só o administrador), no pé da tela */
 .etm-hist{margin-top:20px}
 .etm-hist summary{cursor:pointer;font:600 13px/20px var(--font-sans);color:var(--tinta)}
+/* Chamados no cartão da tela ETMs (26/10/2026): o verde do Nexus, ao lado do azul da Engenharia e do neutro do Campo */
+.eg-tag--verde{color:var(--verde-texto);background:var(--verde-suave)}

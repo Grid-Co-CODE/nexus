@@ -34,10 +34,11 @@ Segurança: o Nexus não usa nenhuma credencial do app de ETM. Lê o Fracttal co
   e é relida por trás enquanto a tela é usada (o mesmo do `os_equipe`), no ritmo do leitor do Nexus (o limite do Fracttal
   é por empresa).
 - **Quais OS entram (a regra do app, sem nome no código):** Corretivas e Administrativas de ETM, mais as de ETM com
-  responsável ou solicitante da equipe da Engenharia (a lista `NEXUS_ENGENHARIA_RESPONSAVEIS`, fora do git, a mesma do
-  Quadro da equipe; no app são três nomes escritos no código). **Análise de Engenharia** = não é Corretiva e o
-  responsável é da equipe; o resto é **Campo**. O solicitante do Fracttal é texto livre: casa sem acento nem caixa, como o
-  `os_equipe.casar`.
+  responsável ou solicitante da Engenharia ou de Chamados. O solicitante do Fracttal é texto livre: casa sem acento nem
+  caixa pelo nome do Fracttal das pessoas dos setores.
+- **Engenharia, Chamados e Campo** (Levi, 26/10/2026, depois da 1ª entrega: "Engenharia e Chamados vai pelas pessoas dos
+  setores, Campo é o restante!"): o setor do responsável pelo id do Fracttal, em Base → Acessos → Pessoas e setores
+  (`nexus_setores`); quem não é de nenhum dos dois é Campo. No lugar do "Análise de Engenharia × Campo" do app.
 - **A coluna:** a da OS (`id_status_work_order` 3 Finalizada, 4 Cancelada); aberta, "Não iniciada" quando nenhuma tarefa
   começou, senão "Em andamento". A OS de várias tarefas é uma só (agrupada pelo nº).
 - **Onde mora o que a equipe marca:** livro novo `nexus_engenharia_etm`, registrado no catálogo antes da 1ª gravação:

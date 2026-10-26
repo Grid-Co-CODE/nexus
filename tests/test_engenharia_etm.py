@@ -11,8 +11,10 @@ from nexus.engenharia import etm as E
 
 HOJE = date(2026, 10, 26)
 U = "Cliente X - Usina Alfa - MG"
-EQUIPE = ["Ana Lima", "Beto Souza"]
 ETMS = {"ALF100-ESTM1", "GAM300-ESTM1"}
+# os setores de Base → Acessos → Pessoas e setores, pelo id do Fracttal (Levi, 26/10/2026: "Engenharia e Chamados vai
+# pelas pessoas dos setores, Campo é o restante!"); os nomes servem ao solicitante, que no Fracttal é texto livre
+SET = {"por_id": {"1": "engenharia", "2": "chamados"}, "nomes": {"engenharia": ["ana lima"], "chamados": ["carla dias"]}}
 
 
 def w(folio, tipo, resp="Técnico Um", solic="", cod="ALF100-ESTM1", status=1, task="NO_STARTED", criado_por="", pid=7,
@@ -26,39 +28,48 @@ def w(folio, tipo, resp="Técnico Um", solic="", cod="ALF100-ESTM1", status=1, t
 
 # ── a leitura das OS de ETM (Task 1) ─────────────────────────────────────────────────────────────────────────────────
 def test_entram_as_corretivas_e_as_administrativas_de_etm():
-    oss = E.montar([w(1, "Corretiva"), w(2, "Administrativa"), w(3, "Preventiva")], ETMS, EQUIPE, HOJE)
+    oss = E.montar([w(1, "Corretiva"), w(2, "Administrativa"), w(3, "Preventiva")], ETMS, SET, HOJE)
     assert sorted(o["os"] for o in oss) == ["1", "2"]
 
 
-def test_as_outras_so_com_a_equipe_e_analise_ou_campo():
-    # a regra do app sem nome no código: a equipe é a lista da Engenharia (a do Quadro da equipe, fora do git)
+def test_engenharia_chamados_e_campo_pelo_setor_do_responsavel():
+    # Levi, 26/10/2026: "Engenharia e Chamados vai pelas pessoas dos setores, Campo é o restante!"
     oss = {o["os"]: o for o in E.montar([
-        w(1, "Preventiva", resp="Ana  Lima"),                       # o nome do Fracttal com dois espaços
-        w(2, "Inspeção", resp="Técnico Um", solic="beto souza"),    # solicitante da equipe, sem caixa
-        w(3, "Corretiva", resp="Ana Lima"),                         # a corretiva vai a campo, mesmo com a equipe
-        w(4, "Administrativa", resp="Técnico Um"),
-        w(5, "Preventiva", resp="Ana Lima Souza"),                  # o nome do Fracttal mais comprido que o da lista
-    ], ETMS, EQUIPE, HOJE)}
-    assert {k: o["trabalho"] for k, o in oss.items()} == {"1": "analise", "2": "campo", "3": "campo", "4": "campo",
-                                                         "5": "analise"}
+        w(1, "Preventiva", resp="Ana Lima", pid=1),                  # do setor Engenharia: entra, de qualquer tipo
+        w(2, "Administrativa", resp="Carla Dias", pid=2),            # do setor Chamados
+        w(3, "Corretiva", resp="Ana Lima", pid=1),                   # o setor de quem está com a OS decide
+        w(4, "Corretiva", resp="Técnico Um", pid=7),                 # o resto é Campo
+        w(5, "Inspeção", resp="Técnico Um", pid=7, solic="carla  dias"),   # o solicitante dos setores põe a OS na tela
+        w(6, "Preventiva", resp="Técnico Um", pid=7),                # preventiva de campo não entra (a regra do app)
+    ], ETMS, SET, HOJE)}
+    assert {k: o["trabalho"] for k, o in oss.items()} == {"1": "engenharia", "2": "chamados", "3": "engenharia",
+                                                         "4": "campo", "5": "campo"}
+
+
+def test_sem_os_setores_a_engenharia_vem_pelo_nome():
+    # o banco dos setores fora: a Engenharia pela lista do Quadro da equipe (os nomes), e Chamados não se separa
+    sem = {"por_id": {}, "nomes": {"engenharia": ["ana lima"], "chamados": []}}
+    oss = {o["os"]: o["trabalho"] for o in E.montar([w(1, "Preventiva", resp="Ana  Lima", pid=1),
+                                                     w(2, "Administrativa", resp="Carla Dias", pid=2)], ETMS, sem, HOJE)}
+    assert oss == {"1": "engenharia", "2": "campo"}
 
 
 def test_codigo_que_nao_e_de_etm_nao_entra_e_e_uma_os_por_numero():
     linhas = [w(1, "Corretiva"), dict(w(1, "Corretiva"), description="Segunda tarefa"),
               w(5, "Corretiva", cod="ALF100-INV1")]
-    oss = E.montar(linhas, ETMS, EQUIPE, HOJE)
+    oss = E.montar(linhas, ETMS, SET, HOJE)
     assert [o["os"] for o in oss] == ["1"] and len(oss[0]["tarefas"]) == 2
 
 
 def test_a_coluna_do_planner():
     col = {o["os"]: o["coluna_etm"] for o in E.montar([
         w(1, "Corretiva"), w(2, "Corretiva", task="IN_PROGRESS"), w(3, "Corretiva", status=2, task="DONE"),
-        w(4, "Corretiva", status=3, task="DONE"), w(5, "Corretiva", status=4)], ETMS, EQUIPE, HOJE)}
+        w(4, "Corretiva", status=3, task="DONE"), w(5, "Corretiva", status=4)], ETMS, SET, HOJE)}
     assert col == {"1": "nao_iniciada", "2": "em_andamento", "3": "em_andamento", "4": "finalizada", "5": "cancelada"}
 
 
 def test_o_cartao_traz_cliente_solicitante_e_quem_criou():
-    o = E.montar([w(1, "Corretiva", solic="Pessoa Dois", criado_por="Pessoa Três")], ETMS, EQUIPE, HOJE)[0]
+    o = E.montar([w(1, "Corretiva", solic="Pessoa Dois", criado_por="Pessoa Três")], ETMS, SET, HOJE)[0]
     assert (o["cliente"], o["usina"], o["codigo"]) == ("Cliente X", U, "ALF100-ESTM1")
     assert (o["solicitante"], o["criado_por"], o["responsavel"]) == ("Pessoa Dois", "Pessoa Três", "Técnico Um")
     assert E.cliente_de("") == "Não identificado" and E.cliente_de("Só um nome") == "Só um nome"
@@ -77,6 +88,7 @@ def fracttal(monkeypatch, app):
             return {"data": [w(1, "Corretiva"), w(3, "Preventiva")]}
         raise AssertionError(f"a tela não lê {path}")
     monkeypatch.setattr(E, "_ler_fracttal", ler)
+    monkeypatch.setattr(E, "_setores", lambda app: (SET, ""))
     app.config["NEXUS_ENGENHARIA_RESPONSAVEIS"] = "Ana Lima"
     E.limpar()
     yield pedidos
@@ -96,6 +108,17 @@ def test_le_as_etms_e_as_os_delas_em_poucos_pedidos(fracttal, app):
 
 def test_sem_leitura_nao_se_sabe_se_e_etm(fracttal):
     assert E.eh_etm("ALF100-ESTM1") is None
+
+
+def test_sem_o_banco_dos_setores_a_tela_le_e_diz(fracttal, app, monkeypatch):
+    # sem os setores (banco fora), a Engenharia vem da lista do Quadro da equipe, Chamados não se separa e a tela diz
+    def cai(app_):
+        raise RuntimeError("banco fora")
+    monkeypatch.setattr(E, "_setores", E._setores_original)
+    monkeypatch.setattr(E, "_ler_setores", cai)
+    E.pedir_releitura(app, esperar=True)
+    d = E.dados()
+    assert [o["os"] for o in d["os"]] == ["1"] and "banco fora" in d["erro_setores"]
 
 
 def test_leitura_que_falha_guarda_a_anterior_e_diz(fracttal, app, monkeypatch):
@@ -245,10 +268,10 @@ def tela(banco, app, monkeypatch):
     from nexus.auth import setor_telas as ST
     fim = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
     linhas = [w(1, "Corretiva", solic="Pessoa Dois", criado_por="Pessoa Três"),
-              w(2, "Preventiva", resp="Ana Lima", task="IN_PROGRESS", cod="GAM300-ESTM1"),
+              w(2, "Preventiva", resp="Ana Lima", pid=1, task="IN_PROGRESS", cod="GAM300-ESTM1"),
               dict(w(3, "Corretiva", status=3, task="DONE"), final_date=fim, wo_final_date=fim),
               w(4, "Administrativa", status=4)]
-    oss = E.montar(linhas, ETMS, EQUIPE, date.today())
+    oss = E.montar(linhas, ETMS, SET, date.today())
     pedidos = []
     monkeypatch.setattr(E, "dados", lambda: {"os": oss, "lido": time.time(), "lendo": False, "erro": ""})
     monkeypatch.setattr(E, "pedir_releitura", lambda app=None, esperar=False, forcar=False:
@@ -276,7 +299,7 @@ def test_a_tela_etms_na_torre_da_engenharia(tela, cliente):
     o = {x["os"]: x for x in d["oss"]}
     assert (o["1"]["coluna"], o["2"]["coluna"], o["3"]["coluna"], o["4"]["coluna"]) == \
            ("nao_iniciada", "em_andamento", "finalizada", "cancelada")
-    assert o["2"]["trabalho"] == "analise" and o["1"]["cliente"] == "Cliente X"
+    assert o["2"]["trabalho"] == "engenharia" and o["1"]["trabalho"] == "campo" and o["1"]["cliente"] == "Cliente X"
     assert o["1"]["solicitante"] == "Pessoa Dois" and o["1"]["criado_por"] == "Pessoa Três"
     assert "nexusRota('/t/engenharia/etm/os/')" in html          # o clique abre a OS da ETM
 
@@ -285,10 +308,11 @@ def test_os_filtros_do_planner_do_app(tela, cliente):
     from test_engenharia_acompanhamento import ANA, _como
     html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
     for campo in ('id="etm-f-cliente"', 'id="etm-f-usina"', 'id="etm-f-criado"', 'id="etm-f-solicitante"',
-                  'id="etm-f-responsavel"', 'data-trabalho="analise"', 'data-trabalho="campo"', 'id="etm-f-ini"',
+                  'id="etm-f-responsavel"', 'data-trabalho="engenharia"', 'data-trabalho="chamados"', 'data-trabalho="campo"',
+                  'id="etm-f-ini"',
                   'id="etm-f-fim"', 'id="etm-f-canceladas"', 'id="etm-f-limpar"'):
         assert campo in html, campo
-    assert ">Análise de Engenharia<" in html and ">Campo<" in html
+    assert all(f'aria-pressed="true">{n}</button>' in html for n in ("Engenharia", "Chamados", "Campo"))
     assert '<option value="Cliente X">Cliente X</option>' in html
     # o filtro das etiquetas da Engenharia, na coluna Em andamento como no app
     assert all(f'data-etiqueta="{n}"' in html for n in ("OS em campo", "Stand By", "Validação Final"))
@@ -543,4 +567,12 @@ def test_primeira_leitura_em_andamento_nao_mostra_zeros(tela, cliente, monkeypat
     assert "Lendo as OS de ETM no Fracttal" in html and _dados_da_tela(html)["nunca_lido"] is True
     kpis = html.split('aria-label="As ETMs agora"', 1)[1].split("</section>", 1)[0]
     assert '">0</b>' not in kpis and kpis.count('">—</b>') == 4
+
+
+def test_a_tela_diz_quando_esta_sem_os_setores(tela, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, _como
+    d = E.dados()
+    monkeypatch.setattr(E, "dados", lambda: dict(d, erro_setores="RuntimeError: banco fora"))
+    html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
+    assert "Sem os setores agora" in html
 

@@ -254,7 +254,7 @@ como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenhar
 - **A tela:** `/t/engenharia/etm` (`etm()`, `etm.html`, do setor Engenharia), o Planner do app no desenho do Quadro da
   equipe (`kb-*`): as colunas Não iniciadas, Em andamento, Finalizadas e, pelo filtro, Canceladas (a coluna do quadro
   levada à do app: a verificação ainda está em andamento); os filtros do app no navegador (cliente, usina, criado por,
-  solicitante, responsável, Análise de Engenharia ou Campo, o período em que a OS esteve ativa, as canceladas e, na
+  solicitante, responsável, Engenharia, Chamados ou Campo, o período em que a OS esteve ativa, as canceladas e, na
   coluna Em andamento, as etiquetas da Engenharia); a faixa Abertas no Fracttal, Abertas para a Engenharia (a regra das
   "Estações em Aberto" do app: a OS só sai com o diagnóstico ou o finalizado, não quando o Fracttal fecha), Em
   acompanhamento e Finalizadas em 30 dias. Sem ler o livro das marcações, a tela diz e as duas contas dele ficam "—".
@@ -263,9 +263,15 @@ como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenhar
   pedidos, contra os 172 do app (um por ETM). Fica a OS cujo código é de ETM, uma por número, no cartão do Quadro
   (`os_equipe._cartao`). No teto de páginas a leitura é recusada (um filtro ignorado viraria o Fracttal inteiro). Cópia
   de 5 min, relida por trás enquanto a tela é usada e 270 s depois de subir (`etm.manter_quente`, no `instalar`).
+- **Engenharia, Chamados e Campo** (Levi, 26/10/2026: "Engenharia e Chamados vai pelas pessoas dos setores, Campo é o
+  restante!"): o setor de quem está com a OS, pelo id do Fracttal, nos setores de Base → Acessos → Pessoas e setores
+  (`nexus_setores`, a última decisão de cada pessoa; os nomes "Engenharia" e "Chamados", sem acento nem caixa). Cada
+  cartão tem o selo (azul, verde, neutro), os três filtram e a faixa conta as abertas de cada um. Sem o banco dos
+  setores, a Engenharia vem da lista do Quadro da equipe (pelo nome), Chamados não se separa e a tela diz. Medido em
+  26/10/2026: 7 pessoas na Engenharia e 2 em Chamados, 260 OS na tela (54, 1 e 205).
 - **Quais OS entram:** a regra do app sem nome no código. Corretivas e Administrativas de ETM, mais as de responsável ou
-  solicitante da equipe da Engenharia (`os_equipe.nomes`, a mesma lista do Quadro, fora do git; no app eram nomes
-  escritos no código). Análise de Engenharia = não é Corretiva e o responsável é da equipe; o resto é Campo.
+  solicitante da Engenharia ou de Chamados (o solicitante é texto livre: casa pelo nome do Fracttal das pessoas dos
+  setores, `fracttal_pessoal`).
 - **A OS de ETM:** `/t/engenharia/etm/os/<nº>`, a mesma página da OS do Quadro (`_pagina_da_os`, uma só para as duas
   telas) com o painel "Marcações da Engenharia" no lugar de Status e prioridade (o diagnóstico e o status pós-OS num
   formulário; a etiqueta, o acompanhamento e o finalizado um botão cada; só a Engenharia grava, pelo
