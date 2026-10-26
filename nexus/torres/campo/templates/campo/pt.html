@@ -88,7 +88,7 @@
   {% elif aba == 'sem' %}
   {# Sem APR ou PT (a TST, 24/10/2026): a APR que pedia PT e ficou sem, e a OS fechada pelo App sem APR, do livro da
      APR que o App publica (nexus/hseq/apr.py), de 20 em 20 #}
-  <div class="cn-seg cn-seg--mini" aria-label="O que mostrar">
+  <div class="cn-seg cn-seg--mini pt-sem-seg" aria-label="O que mostrar">
     <a href="{{ url(tipo=None, pag=None) }}"{% if tipo == 'pt' %} aria-current="page"{% endif %}>APR que pedia PT e ficou sem</a>
     <a href="{{ url(tipo='apr', pag=None) }}"{% if tipo == 'apr' %} aria-current="page"{% endif %}>OS fechada sem APR</a>
   </div>

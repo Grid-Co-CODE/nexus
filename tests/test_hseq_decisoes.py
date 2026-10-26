@@ -142,7 +142,7 @@ def test_o_botao_direito_exclui_o_extintor_com_o_motivo(com_nao_reconhecido, liv
     """Levi, 24/10/2026: "como cada extintor tem um cadastro unitário então o certo seria (...) ir na linha do extintor,
     clicar com o botão direito e poder excluir o extintor"."""
     us = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
-    assert '<tr class="hs-ext" data-codigo="ALT100-INFC1-PPCI-EXT03" ' in us and '<dialog class="hs-dialogo" id="hs-excluir"' in us
+    assert '<tr class="ext-linha hs-ext" data-codigo="ALT100-INFC1-PPCI-EXT03" ' in us and '<dialog class="hs-dialogo" id="hs-excluir"' in us
     dlg = us[us.index('id="hs-excluir"'):]
     assert re.findall(r'<option value="(\w+)">', dlg[:dlg.index("</select>")]) == ["retirado", "duplicado", "outro"]
     # "Outro motivo" pede a observação; motivo fora da lista não grava
@@ -263,7 +263,7 @@ def test_editar_grava_so_o_que_mudou_e_a_tela_mostra_na_hora(com_nao_reconhecido
     monkeypatch.setattr(DEC, "_agora", lambda: datetime(2026, 10, 9, 10, 0, tzinfo=timezone(timedelta(hours=-3))))
     us = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
     assert 'class="hs-editar-abre">Editar extintor</button>' in us and '<dialog class="hs-dialogo" id="hs-editar"' in us
-    assert (f'<tr class="hs-ext" data-codigo="{EXT03}" data-local="Cabine" data-posicao="Interno" data-classe="ABC pó" '
+    assert (f'<tr class="ext-linha hs-ext" data-codigo="{EXT03}" data-info="nao" data-local="Cabine" data-posicao="Interno" data-classe="ABC pó" '
             'data-peso="6" data-val2="12/2027" data-val3="2026">') in us
     # nada mudou, ou fora do formato: nada grava
     assert "Nada mudou" in _aviso(_editar(tst))[1]
@@ -293,8 +293,8 @@ def test_a_edicao_vale_ate_uma_conferencia_num_dia_depois(com_nao_reconhecido, l
     livro.write_text(json.dumps({DEC.ABA_EDIT: [ed("ALT100-INFC1-PPCI-EXT01"), ed(EXT03)]}), encoding="utf-8")
     DEC.limpar()
     us = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
-    assert f'data-codigo="{EXT03}" data-local="Casa de força"' in us
-    assert 'data-codigo="ALT100-INFC1-PPCI-EXT01" data-local="Cabine"' in us
+    assert f'data-codigo="{EXT03}" data-info="nao" data-local="Casa de força"' in us
+    assert 'data-codigo="ALT100-INFC1-PPCI-EXT01" data-info="nao" data-local="Cabine"' in us
 
 
 def test_a_assinatura_da_edicao_e_quem_nao_e_da_seguranca(com_nao_reconhecido, livro, cliente):

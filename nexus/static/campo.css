@@ -1138,3 +1138,5 @@ tr.ap-os:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
 .cn-paginas a{padding:3px 9px;border:1px solid var(--linha);border-radius:8px;color:var(--tinta-2);text-decoration:none}
 .cn-paginas a:hover,.cn-paginas a:focus-visible{border-color:var(--verde-texto);color:var(--tinta)}
 .cn-paginas a[aria-current="page"]{border-color:var(--verde);color:var(--tinta);font-weight:700}
+/* os dois botões da aba Sem APR ou PT longe dos filtros e da tabela (Levi, 26/10/2026: "esses botões muito colados") */
+.pt-sem-seg{margin:20px 0 16px}

@@ -240,7 +240,7 @@ a foto de cada conferência num `POST /t/hseq/extintores/foto` (multipart: `codi
 `HMAC-SHA256(NEXUS_PESSOA_HMAC, "nexus:hseq:fotos-extintor")`: a chave que o App e o Nexus já têm, nenhuma configuração
 nova (sem ela a rota responde 503). O Nexus confere a assinatura e a hora (15 min), abre a imagem, regrava em JPEG de
 até 1600 px e guarda a mais recente de cada extintor em `<dados>/hseq/extintores/fotos/<código>.jpg` (+ `.json` com o
-dia); foto de dia mais velho não substitui. É a única rota sem login (`auth.ROTAS_PUBLICAS`), e só por POST. Na tabela
+dia); foto de dia mais velho não substitui. É rota sem login (`auth.ROTAS_PUBLICAS`), e só por POST. Na tabela
 (a usina aberta e a visão por extintor), o extintor com foto ganha o botão "Foto" com o dia dela (até 19/10/2026, uma
 miniatura: ver "A página é leve"); o clique abre a caixa das fotos da ronda e só então pede a imagem (setas andam entre
 as fotos da usina). O PDF põe a mesma foto ao lado do extintor. No servidor (19/10): a listagem da pasta
@@ -302,12 +302,27 @@ extintor é excluído e vai para um histórico de extintores excluídos com o mo
   pendente. Grava também o nome da usina que o App usa (`usina_app`).
 - Saiu a "Editar quantidade de extintores" (Levi: "como cada extintor tem um cadastro unitário então o certo seria" a
   exclusão por extintor).
+- **A informação adicional da última ronda no clique da linha** (26/10/2026, Levi: "caso na última ronda tenha
+  informações adicionais quero ao clicar na linha que apareça as informações, caso não tenha que venha uma
+  notificação"; `nexus/hseq/info_extintor.py`). O livro do App só diz "Tem informação adicional" (sim/não): o texto é
+  livre (pode ter nome) e a API tem leitura aberta. Por isso ele vem como a foto: o App envia num `POST
+  /t/hseq/extintores/info` (`codigo`, `dia`, `ts`, `texto`, `assinatura` = HMAC-SHA256 hex de "código|dia|ts|sha256 hex
+  do texto" com `HMAC-SHA256(NEXUS_PESSOA_HMAC, "nexus:hseq:info-extintor")`; 15 min de janela), e o Nexus guarda o da
+  conferência mais recente CIFRADO (Cofre) em `<dados>/hseq/extintores/info/<código>.json`, nunca no banco; texto vazio
+  apaga. Toda linha de extintor leva `data-info` (o sim/não do livro) e a marca "com informação adicional"; o clique
+  abre a caixa com o texto (`/t/hseq/extintores/info/<código>`, com login) ou, sem informação, o aviso "Extintor X sem
+  informações adicionais na última ronda". Com o sim e sem o texto (o App ainda não envia), a caixa diz que ele ainda
+  não chegou. Contrato mandado à sessão do App de Campo.
 - **Editar o extintor** (`fato_edicao_extintor`; a TST, 24/10/2026: "Eu consigo editar o cadastro de extintores?"), no
   mesmo botão direito ("Editar extintor"): a caixa vem com o que a tela mostra (local, posição, classe, peso e as duas
   validades; o código não muda, nem se cadastra extintor novo, que entra pelo App) e grava só o que mudou
   (`decisoes.editar`, `campos` = JSON {coluna do livro do App: valor novo}). As validades no formato da etiqueta
   (recarga MM/AAAA ou Sem data; hidrostático AAAA, MM/AAAA ou Sem selo), o peso em kg (vazio não mexe: há extintor
-  sem peso no cadastro). A tela mostra o editado na hora, com a situação refeita (`extintores.editado`, por cima da
+  sem peso no cadastro). Local, posição e classe vêm numa lista com tudo o que já foi registrado no cadastro (Levi,
+  26/10/2026: "todas as classe possíveis e posições possíveis e locais possíveis registrados até o momento"; a lista
+  vem do Nexus ao abrir a caixa, `/t/hseq/extintores/opcoes`, para não pesar a página), com "Outro (escrever)" para o
+  que ainda não existe; até ali eram campos com sugestão do navegador, que abria a lista fora do lugar. A tela mostra o
+  editado na hora, com a situação refeita (`extintores.editado`, por cima da
   linha do livro guardada em `_bruto`) e a marca "editado dd/mm", em todas as contas (a Mesa, o PDF e o Excel
   também, porque a edição entra no `decisoes.separar`), até uma conferência num dia depois da edição; aí vale o que o
   App publicar.
@@ -382,6 +397,7 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   só vai o PDF da APR). Os endereços de antes (por equipe, região ou gestor, `regiao`, `regiao_campo`, `gestor`) caem no
   Por responsável e não filtram.
 - **A aba Sem APR ou PT** (a TST, 24/10/2026: "preciso de uma visibilidade de atividades realizadas sem APR e sem PT";
+  os dois botões com espaço dos filtros e da tabela, `pt-sem-seg`, 26/10: "esses botões muito colados";
   `nexus/hseq/apr.py`): do livro `apr_app_campo · APR` que o App publica desde a v298 do servidor (no catálogo antes da
   1ª gravação, fato `apr`; contrato com a sessão do App de Campo), duas listas de 20 em 20 com os mesmos filtros:
   **APR que pedia PT e ficou sem** ("Precisa de PT" = sim e PT vazia; vazio = ainda não medido, não entra) e **OS
