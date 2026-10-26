@@ -1319,3 +1319,23 @@ não lê as tarefas.
   administrador do Fracttal (o perfil do usuário). A tela passa a dizer isso (`_CHECKLIST_SEM_PERMISSAO`, com o código
   entre parênteses), como o `WITHOUT_PERMITS` de criar OS (`_RPC_MSG`). Prova: `tests/test_chamados_ordem_icone_permissao_24_10.py`.
 - No Nexus, a torre Chamados ficou na ordem Garantias, Fabricantes e Solicitações de clientes (`nexus/torres/chamados`).
+
+## O pulso laranja nas OS de Garantias paradas (25/10/2026)
+
+Levi, pelo chat da Engenharia: "sabe o pulsar que temos no quadro de equipe? passe instruções para o chat de Nexus
+(Chamados) implementar nas OSs de garantias porém quando a OS ficar a partir de 5 dias sem comentário de atualização!".
+
+- **A regra** (`acomp_web.parada`, `DIAS_PARADA = 5`): pulsa o cartão da OS ABERTA do quadro (Chegaram e Ticket aberto;
+  em verificação, finalizada e cancelada não) com 5 x 24 h ou mais desde o último comentário de atualização: a última
+  observação da tela (as do banco da Gridco, inclusive a anotação do ticket gravado) ou, na retroativa, a última data do
+  histórico da nota. Sem comentário nenhum, conta da abertura: a OS esquecida desde o início também pulsa. Sem as
+  observações lidas (o banco fora), nada pulsa e o aviso do quadro diz que o pulso fica desligado.
+- **O desenho é o do Quadro da equipe da Engenharia** (`nexus/static/engenharia.css`, `.kb-card--parada`, que usa 7 dias):
+  a camada `::after` de 0,5 a 1 de opacidade, com o contorno de 1,5 px e o halo, que pulsa mesmo com "reduzir movimento".
+  Aqui é `.card.parada` e `@keyframes ac-pulso`, com os tokens `--pulso-a71` a `--pulso-a14` no `chamados.css`, nos dois
+  temas (os mesmos valores do `nexus.css`, que não chega ao OS Creator). Mudou a sombra lá, traga para cá: o teste
+  compara as duas.
+- O cartão ganha no `title` "5 dias ou mais sem comentário".
+- Prova: `tests/test_oscreator_acomp_pulso_25_10.py` (4 d 23 h não, 5 d sim, as duas colunas abertas, as fechadas não,
+  sem comentário desde a abertura, o histórico da retroativa, o banco fora, a tela e o CSS). Na bancada (Fracttal
+  falso, metade das OS comentada na véspera): só as paradas pulsam, a 1440 e a 375 px, no escuro e no claro.

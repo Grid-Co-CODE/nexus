@@ -17,7 +17,7 @@
 {% set cls = {'chegou': 'cr', 'ticket': 'ca', 'fim': 'cg'}[c.col] %}
 {% set titulo = c.ativo_nome or c.code or '—' %}
 {% set onde = [c.code if c.code != titulo else '', c.local]|select|join(' · ') %}
-<a class="card {{ cls }} k-{{ c.urg }}{% if c.col == 'fim' %} fim{% endif %}" href="/os/chamados/acompanhamento/{{ c.folio }}" title="{{ c.tempo }}"
+<a class="card {{ cls }} k-{{ c.urg }}{% if c.col == 'fim' %} fim{% endif %}{% if c.parada %} parada{% endif %}" href="/os/chamados/acompanhamento/{{ c.folio }}" title="{{ c.tempo }}{% if c.parada %} · 5 dias ou mais sem comentário{% endif %}"
    data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-equipe="{{ '1' if c.da_equipe else '0' }}" data-busca="{{ c.busca }}">
   <div class="k-cab"><span class="k-os">OS {{ c.folio }}</span>{% if c.tempo_curto %}<span class="tag u-{{ c.urg }}">{{ c.tempo_curto }}</span>{% endif %}</div>
   <div class="k-tit">{{ titulo }}</div>
@@ -58,7 +58,7 @@
     <div class="kpi"><div class="lbl">Finalizados</div><div class="linha"><span class="val{% if q.n.fim %} g{% endif %}">{{ q.n.fim }}</span>
       <span class="note">nos últimos 90 dias</span></div></div>
   </div>
-  {% if erro_obs %}<p class="aviso">{{ erro_obs }}</p>{% endif %}
+  {% if erro_obs %}<p class="aviso">{{ erro_obs }} Sem elas, o pulso das OS paradas fica desligado.</p>{% endif %}
   {% if q.fora %}<p class="aviso"><b>{{ q.fora }} de {{ q.total }}</b> OS de acompanhamento estão no nome de outra pessoa, não da equipe de chamados{% if equipe %} ({{ equipe }}){% endif %}. O quadro mostra todas.</p>{% endif %}
   <div class="filtros">
     <label class="fcampo"><span class="flbl">Fornecedor</span><select data-f="marca" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.marca %}<option value="{{ o }}">{{ o }}</option>{% endfor %}</select></label>
