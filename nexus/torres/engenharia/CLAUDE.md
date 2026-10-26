@@ -243,6 +243,64 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
 - **Como provar:** `python -m pytest -q tests/test_engenharia_os_quadro.py tests/test_engenharia_equipe.py
   tests/test_oscreator_solic_pcm.py -k "os_quadro or quadro or sugestao"` e a página na cópia de prova.
 
+## ETMs (26/10/2026)
+
+Levi, com o zip do app de ETM da Engenharia (desktop, FastAPI, um .exe por máquina): "Quero que inclua essa visão de
+ETMs no Nexus, engenharia, aba própria. Deixe o design alá Nexus!". No quiz: o histórico do app vem uma vez, e nas OS
+em aberto os comentários vão também para a nota da OS; entrega por partes; o comentário da ETM vai para a nota da OS,
+como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenharia-etm-design.md`; plano em
+`docs/superpowers/plans/2026-10-26-engenharia-etm.md`.
+
+- **A tela:** `/t/engenharia/etm` (`etm()`, `etm.html`, do setor Engenharia), o Planner do app no desenho do Nexus: a
+  faixa de números em cima; à esquerda a coluna de filtros do Acompanhamento PCM (Levi, 26/10/2026: "o estilo de lista
+  dos filtros está todo bugado e torto, deixe no nível do nexus!" e "tem um espaço livre do lado esquerdo que está sendo
+  mau utilizado"): a pesquisa geral, os seletores Cliente, Usina, Tipo de trabalho, Status da OS, Criado por,
+  Solicitante e Responsável (a busca, as caixas de marcar com a conta de cada opção com os outros filtros, Selecionar
+  todos, Limpar e Aplicar; o painel abre dentro da coluna, que rola sozinha), o período e "Redefinir filtros"; à direita
+  o quadro, com as colunas Não iniciadas, Em andamento, Finalizadas e Canceladas (a coluna do quadro levada à do app: a
+  verificação ainda está em andamento) e, na coluna Em andamento, as etiquetas da Engenharia. O **Status da OS** (o do
+  Fracttal: Em Processo, Em Verificação, Concluída, Cancelada) entrou no lugar do "mostrar canceladas": sem marcar, as
+  canceladas ficam de fora. Abaixo de 1100 px a coluna sobe para cima do quadro, com os seletores em duas colunas. A
+  lista do navegador (datalist) saiu: abria clara e torta. Faixa: Abertas no Fracttal, Abertas para a Engenharia (a
+  regra das "Estações em Aberto" do app: a OS só sai com o diagnóstico ou o finalizado, não quando o Fracttal fecha), Em
+  acompanhamento e Finalizadas em 30 dias. Sem ler o livro das marcações, a tela diz e as duas contas dele ficam "—".
+- **A leitura** (`nexus/engenharia/etm.py`, medida em 26/10/2026, só leitura): `items?field_1=Estação Meteorológica` dá
+  as 172 ETMs (a descrição confere) e `work_orders?items_log_description=Estação Meteorológica` as 1213 OS delas: 15
+  pedidos, contra os 172 do app (um por ETM). Fica a OS cujo código é de ETM, uma por número, no cartão do Quadro
+  (`os_equipe._cartao`). No teto de páginas a leitura é recusada (um filtro ignorado viraria o Fracttal inteiro). Cópia
+  de 5 min, relida por trás enquanto a tela é usada e 270 s depois de subir (`etm.manter_quente`, no `instalar`).
+- **Engenharia, Chamados e Campo** (Levi, 26/10/2026: "Engenharia e Chamados vai pelas pessoas dos setores, Campo é o
+  restante!"): o setor de quem está com a OS, pelo id do Fracttal, nos setores de Base → Acessos → Pessoas e setores
+  (`nexus_setores`, a última decisão de cada pessoa; os nomes "Engenharia" e "Chamados", sem acento nem caixa). Cada
+  cartão tem o selo (azul, verde, neutro), os três filtram e a faixa conta as abertas de cada um. Sem o banco dos
+  setores, a Engenharia vem da lista do Quadro da equipe (pelo nome), Chamados não se separa e a tela diz. Medido em
+  26/10/2026: 7 pessoas na Engenharia e 2 em Chamados, 260 OS na tela (54, 1 e 205).
+- **Quais OS entram:** a regra do app sem nome no código. Corretivas e Administrativas de ETM, mais as de responsável ou
+  solicitante da Engenharia ou de Chamados (o solicitante é texto livre: casa pelo nome do Fracttal das pessoas dos
+  setores, `fracttal_pessoal`).
+- **A OS de ETM:** `/t/engenharia/etm/os/<nº>`, a mesma página da OS do Quadro (`_pagina_da_os`, uma só para as duas
+  telas) com o painel "Marcações da Engenharia" no lugar de Status e prioridade (o diagnóstico e o status pós-OS num
+  formulário; a etiqueta, o acompanhamento e o finalizado um botão cada; só a Engenharia grava, pelo
+  `/etm/os/<nº>/marcar`), o "Checklist da OS" (as subtarefas e as respostas, na ordem do Fracttal), as marcações na
+  linha do tempo junto dos comentários e os números Diagnóstico, Status pós-OS, Em aberto e Última atualização. A volta
+  e a troca de responsável voltam para ETMs; a OS que não é de ETM abre a página comum.
+- **O livro das marcações:** `nexus_engenharia_etm` (`nexus/engenharia/etm_marcas.py`; regra no `nexus/dados/CLAUDE.md`),
+  um evento por marcação, as listas do app nas três dim. Os comentários são os da OS da Engenharia
+  (`nexus_engenharia_os`), que vão para a nota da OS com as mesmas travas do Quadro.
+- **O histórico do app, uma vez:** o painel "Trazer o histórico do app de ETM" (só o administrador, no pé da tela) lê o
+  repositório privado do app no GitHub (`NEXUS_ETM_GITHUB_TOKEN` e `NEXUS_ETM_GITHUB_REPO` no .env: o nome do
+  repositório traz o de uma pessoa), mostra a prévia e grava por trás (`nexus/engenharia/etm_historico.py`; a ponte
+  `/os/_nexus/engenharia/etm/historico`, porque a nota vai na sessão do Fracttal de quem importa). Os comentários
+  ("**Autor:**\ntexto" no app) entram com o autor e a data de lá (`origem` "app_etm" e o id do comentário); as labels
+  viram as marcações atuais, com a data em que foram postas. Nas OS em aberto, os comentários vão para a nota da OS numa
+  escrita por OS, do mais antigo ao mais novo; a nota que falha deixa os comentários daquela OS para a próxima. Trazer
+  de novo não repete nada (o id no livro e a linha que já está na nota).
+- **Segurança:** o Nexus não usa nenhuma credencial do app de ETM: lê o Fracttal com a dele e o GitHub com o token do
+  .env.
+- **Fica para a 2ª parte:** o Histórico (cliente → usina → OS e o chat da usina), as Estações em Aberto (com o
+  "Finalizar pela Engenharia" em lote) e os Fechamentos por semana.
+- **Prova:** `tests/test_engenharia_etm.py` e `tests/test_engenharia_etm_historico.py` (Fracttal, banco e GitHub falsos).
+
 ## Confiabilidade (06/10/2026)
 
 Levi: "traga a aba Confiabilidade do https://pcm.gridco.com.br/, não referenciando diretamente esse caminho mas

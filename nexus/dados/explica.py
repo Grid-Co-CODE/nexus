@@ -23,6 +23,7 @@ RESUMO = {
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
     "acompanhamento_os": "O status, a prioridade e os comentários da Engenharia em cada OS",
+    "marcacao_etm": "O diagnóstico e as marcações da Engenharia em cada OS de ETM",
     "contestacao_cliente": "O que o cliente contestou no Dashboard Thopen, por setor",
     "decisao": "O que o painel do App decidiu: aprovar, tratar ou devolver",
     "zeladoria": "Cada etapa da vistoria de zeladoria feita pelo App",
@@ -124,6 +125,11 @@ PARA_QUE = {
                          "e cada comentário, com o dia e a hora; o comentário vai também para a nota da OS no "
                          "Fracttal. Serve para saber em que pé está cada OS da Engenharia, quais pararam e, com o "
                          "tempo, quanto cada etapa leva por tipo de ativo e usina. Quem e o texto vão cifrados.",
+    "marcacao_etm": "Guarda o que a Engenharia marca em cada OS das Estações Meteorológicas na tela ETMs: o diagnóstico "
+                    "(falha de equipamento, de comunicação, sujidade ou outro), o status pós-OS (chamado de garantia, "
+                    "alinhamento com o cliente ou regularizado), as etiquetas, o acompanhamento e o finalizado pela "
+                    "Engenharia, com o dia e a hora. Serve para saber o que derruba as ETMs por usina e cliente, quanto "
+                    "leva para a Engenharia encerrar e quais seguem em garantia. Quem marcou vai cifrado.",
     "decisao": "Registra as decisões tomadas no painel do App de Campo: a aprovação de uma tarefa, o tratamento de um "
                "alerta da Central de atenção e a devolução de uma tarefa ao técnico. Serve para saber quem decidiu o "
                "quê, quando e sobre qual OS.",

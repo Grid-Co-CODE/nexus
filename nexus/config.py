@@ -84,7 +84,11 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # Contratos e clientes → Acessos dos clientes (14/10/2026, nexus/contratos/acessos_clientes.py): a chave
              # PÚBLICA do Dashboard Thopen (as contas vão seladas para ela; também pela tela Base → Chaves do Nexus) e o
              # endereço do painel nos links de definir senha (padrão https://app.gridco.com.br/performance)
-             "NEXUS_ACESSOS_5080_PUBLICA", "NEXUS_THOPEN_URL")
+             "NEXUS_ACESSOS_5080_PUBLICA", "NEXUS_THOPEN_URL",
+             # Engenharia → ETMs (26/10/2026, nexus/engenharia/etm_historico.py): o histórico do app de ETM, trazido uma
+             # vez — um token que leia as Issues do repositório privado do app e o repositório (dono/nome; o nome traz
+             # o de uma pessoa, por isso não fica no código)
+             "NEXUS_ETM_GITHUB_TOKEN", "NEXUS_ETM_GITHUB_REPO")
 
 
 class ConfigErro(RuntimeError):

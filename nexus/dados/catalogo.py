@@ -261,6 +261,21 @@ FATOS = (
                     "estado de agora é o do último evento de cada tipo. nota_fracttal diz se o comentário foi para a "
                     "nota da OS (\"sim\") ou por que não foi. Quem e o texto só cifrados (Cofre, a chave do cadastro). "
                     "Só acrescenta: nada se edita nem se apaga"),
+    Fato("marcacao_etm", "O que a Engenharia marca nas OS de ETM", "engenharia",
+         "nexus_engenharia_etm · fato_marcacao_etm",
+         "1 linha = 1 marcação (diagnostico, status_pos, etiqueta, acompanhamento ou finalizado) da Engenharia sobre 1 "
+         "OS de ETM do Fracttal",
+         _d(data=("id", "data_id (o dia de Brasília da marcação)"),
+            usina=("id", "usina_id (a ligação da OS com o cadastro; usina_ligada_por)"),
+            equipamento=("id", "equipamento_id (o código da ETM)"),
+            pessoa=("cod", "pessoa_hmac (quem marcou)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_engenharia_etm · fato_marcacao_etm",),
+         janela_origem="o Nexus é a fonte; o histórico do app de ETM entra uma vez, com origem app_etm",
+         observacao="os_id é o id da OS no Fracttal e os_folio o nº; valor_id aponta dim_diagnostico_etm, "
+                    "dim_status_pos_etm ou dim_etiqueta_etm do mesmo livro (as listas do app de ETM) e 0 limpa; "
+                    "ligado liga ou desliga a etiqueta, o acompanhamento e o finalizado. O estado de agora é o do último "
+                    "evento de cada tipo. origem diz de onde veio (nexus ou app_etm) e origem_id a chave de lá. Quem só "
+                    "cifrado (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
     Fato("contestacao_cliente", "Contestação do cliente", "contratos", "thopen_contestacoes · contestacoes",
          "1 linha = 1 contestação de 1 cliente sobre 1 dia (ou intervalo) de 1 usina × 1 setor (Performance, COS "
          "ou Zeladoria)",
@@ -1116,6 +1131,13 @@ LIVROS = (
           "registrado em 24/10/2026 antes da 1ª gravação (regra 10): nasce no 1º status, prioridade ou comentário. As "
           "três abas vão juntas a cada gravação, sobre o livro relido do banco; as duas dim são as listas fixas do "
           "código",
+          so_cresce=True),
+    Livro("nexus_engenharia_etm", ("dim_diagnostico_etm", "dim_status_pos_etm", "dim_etiqueta_etm",
+                                   "fato_marcacao_etm"),
+          "a cada marcação na OS de ETM (tela Engenharia > ETMs) e uma vez com o histórico do app de ETM",
+          "nexus/engenharia/etm_marcas.py, pela OS de ETM da tela ETMs", False,
+          "registrado em 26/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª marcação. As quatro abas vão juntas a "
+          "cada gravação, sobre o livro relido do banco; as três dim são as listas fixas do código",
           so_cresce=True),
     Livro("nexus_observacoes", ("fato_observacao_responsavel",), "a cada observação escrita no Nexus",
           "nexus/campo/observacao_responsavel.py", False,

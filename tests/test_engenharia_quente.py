@@ -78,10 +78,13 @@ def test_abrir_a_tela_marca_o_uso(logado, monkeypatch):
 
 
 def test_instalar_liga_o_quente_sempre_e_a_leitura_da_subida_so_sem_a_chave(monkeypatch):
-    """O servidor (sem a chave) lê o quadro ao subir, depois das OS de falha; o PC (NEXUS_CAMPO_AQUECER=0) não lê nada
-    do Fracttal ao subir. O quadro pronto enquanto alguém usa liga nas duas: só lê com alguém usando."""
+    """O servidor (sem a chave) lê o quadro ao subir, depois das OS de falha, e a tela ETMs depois dele (26/10/2026); o
+    PC (NEXUS_CAMPO_AQUECER=0) não lê nada do Fracttal ao subir. O quadro e a tela ETMs prontos enquanto alguém usa ligam
+    nas duas: só leem com alguém usando."""
+    from nexus.engenharia import etm
     ligados, timers = [], []
     monkeypatch.setattr(E, "manter_quente", lambda app: ligados.append("quente"))
+    monkeypatch.setattr(etm, "manter_quente", lambda app: ligados.append("etm"))
 
     class _Timer:
         def __init__(self, segundos, fn):
@@ -95,8 +98,8 @@ def test_instalar_liga_o_quente_sempre_e_a_leitura_da_subida_so_sem_a_chave(monk
         def __init__(self, config):
             self.config = config
     engenharia.instalar(_App({}))
-    assert ligados == ["quente"] and timers == [150, 210]
+    assert ligados == ["quente", "etm"] and timers == [150, 210, 270]
     ligados.clear()
     timers.clear()
     engenharia.instalar(_App({"NEXUS_CAMPO_AQUECER": "0"}))
-    assert ligados == ["quente"] and timers == []
+    assert ligados == ["quente", "etm"] and timers == []

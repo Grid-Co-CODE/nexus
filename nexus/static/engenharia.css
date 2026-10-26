@@ -548,3 +548,78 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .eg-ac-btn--p{padding:6px 10px;font-size:11.5px}
 .eg-mais{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--mudo)}
 .eg-mais span{margin-right:auto}
+
+/* ── a tela ETMs (26/10/2026): os filtros do Planner do app de ETM no desenho do Quadro da equipe ── */
+.eg-tag--ok{color:var(--ok);background:var(--ok-suave)}
+.etm-chips{display:flex;flex-wrap:wrap;gap:6px}
+.etm-chip{font:600 12px/18px var(--font-sans);padding:4px 10px;border-radius:999px;cursor:pointer;color:var(--tinta-2);
+  background:transparent;border:1px solid var(--linha-forte)}
+.etm-chip[aria-pressed="true"]{color:var(--verde-texto);border-color:var(--verde);background:var(--verde-suave)}
+.etm-chip:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+.etm-chip--p{font-size:11px;padding:2px 8px}
+.etm-col-etq{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px 0}
+.etm-etq-eng{--etq:var(--info)}
+/* a OS de ETM: as etiquetas e os dois botões do painel das marcações */
+.etm-marcas{display:grid;gap:8px;margin-top:14px}
+.etm-marcas form,.etm-botoes form{display:inline}
+.etm-botoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+/* o histórico do app de ETM (só o administrador), no pé da tela */
+.etm-hist{margin-top:20px}
+.etm-hist summary{cursor:pointer;font:600 13px/20px var(--font-sans);color:var(--tinta)}
+/* Chamados no cartão da tela ETMs (26/10/2026): o verde do Nexus, ao lado do azul da Engenharia e do neutro do Campo */
+.eg-tag--verde{color:var(--verde-texto);background:var(--verde-suave)}
+
+/* ── os filtros da tela ETMs (26/10/2026, Levi: "deixe no nível do nexus!" e "tem um espaço livre do lado esquerdo"):
+   a coluna à esquerda e o seletor do Acompanhamento PCM (pcm-acomp.css), com os mesmos tokens ── */
+.etm-app{display:grid;grid-template-columns:268px minmax(0,1fr);gap:20px;align-items:start;margin-top:20px}
+@media (max-width:1100px){.etm-app{grid-template-columns:minmax(0,1fr)}}
+.etm-lado{position:sticky;top:calc(var(--topo) + 12px);max-height:calc(100vh - var(--topo) - 24px);overflow:auto;
+  background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:14px;display:flex;
+  flex-direction:column;gap:12px}
+@media (max-width:1100px){.etm-lado{position:static;max-height:none}}
+.etm-lado h2{margin:0}
+.etm-busca{display:flex;flex-direction:column;gap:5px}
+.etm-busca-campo{position:relative}
+.etm-busca-campo>.ph{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--mudo)}
+.etm-busca-campo input{width:100%;box-sizing:border-box;padding-left:30px}
+.etm-filtros{display:flex;flex-direction:column;gap:10px}
+.etm-periodo{display:flex;flex-direction:column;gap:6px}
+.etm-periodo .gc-campo{width:100%;box-sizing:border-box}
+.etm-limpar{justify-content:center}
+.etm-lado-nota{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--mudo);line-height:1.45;
+  border-top:1px solid var(--linha);padding-top:10px}
+.etm-lado-nota span:first-child{color:var(--tinta-2);font-weight:600}
+.etm-main{min-width:0}
+.etm-main .kb-quadro{margin-top:0}
+.etm-ms{position:relative;display:flex;flex-direction:column;gap:5px}
+.etm-ms-bt{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;font:400 13px/18px var(--font-sans);
+  color:var(--tinta);background:var(--superficie-2);border:1px solid var(--linha-forte);border-radius:var(--raio-controle);
+  padding:7px 10px;cursor:pointer;text-align:left}
+.etm-ms-bt .val{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.etm-ms-bt>.ph:first-child{color:var(--mudo)}
+.etm-ms.on .etm-ms-bt{border-color:var(--verde);background:var(--verde-suave)}
+.etm-ms-bt:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+/* o painel abre DENTRO da coluna, empurrando os filtros de baixo: flutuando, a coluna (que rola sozinha) o cortava */
+.etm-ms-painel{background:var(--superficie-2);border:1px solid var(--linha-forte);border-radius:var(--raio-md);padding:10px;
+  display:flex;flex-direction:column;gap:8px}
+.etm-ms-painel[hidden]{display:none}
+.etm-ms-busca{width:100%;box-sizing:border-box}
+.etm-ms-rapido{display:flex;gap:12px}
+.etm-ms-lista{max-height:240px;overflow:auto;display:flex;flex-direction:column}
+.etm-ms-op{display:flex;align-items:center;gap:8px;padding:5px 4px;font-size:13px;color:var(--tinta);cursor:pointer;border-radius:6px}
+.etm-ms-op[hidden]{display:none}
+.etm-ms-op:hover{background:var(--superficie-2)}
+.etm-ms-op span{flex:1;min-width:0}
+.etm-ms-op em{font-style:normal;color:var(--mudo);font-size:12px;font-variant-numeric:tabular-nums}
+.etm-ms-op.zero{color:var(--fraco)}
+.etm-ms-acoes{display:flex;justify-content:flex-end;gap:8px}
+.etm-lnk{background:transparent;border:0;padding:0;font:600 12.5px/16px var(--font-sans);color:var(--verde-texto);cursor:pointer;
+  text-decoration:underline;text-underline-offset:3px}
+/* abaixo de 1100 px a coluna sobe para cima do quadro: os seletores em duas colunas (senão o quadro só começava depois
+   de 7 seletores), e o aberto na largura toda */
+@media (max-width:1100px){
+  .etm-filtros{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .etm-ms:has(.etm-ms-painel:not([hidden])){grid-column:1/-1}
+  .etm-periodo{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .etm-periodo .gc-rotulo{grid-column:1/-1}
+}

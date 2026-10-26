@@ -31,8 +31,11 @@ from . import acompanhamento as AC
 
 LIVRO, NOME_LIVRO = "nexus_engenharia_os", "Nexus · a OS acompanhada pela Engenharia"
 ABA, ABA_STATUS, ABA_PRIORIDADE = "fato_acompanhamento_os", "dim_status_os", "dim_prioridade_os"
+# origem e origem_id (26/10/2026): de onde veio o evento ("nexus", ou "app_etm" no histórico do app de ETM trazido
+# uma vez, com o id do comentário de lá: trazer de novo não repete)
 CAB = ("id", "registrado_em", "data_id", "evento", "os_id", "os_folio", "codigo_ativo", "equipamento_id", "usina_id",
-       "usina_ligada_por", "pessoa_hmac", "status_id", "prioridade_id", "nota_fracttal", "dados_cifrados")
+       "usina_ligada_por", "pessoa_hmac", "status_id", "prioridade_id", "nota_fracttal", "dados_cifrados", "origem",
+       "origem_id")
 CAB_DIM = ("id", "nome")
 # os oito do anexo do pedido, na ordem dele (o número é o id: nunca reaproveitar nem reordenar)
 STATUS = ((1, "Análise de Solução"), (2, "Atividade em Andamento"), (3, "Diagnóstico em Andamento"),
@@ -155,9 +158,9 @@ def estado(eventos: list[dict]) -> dict[str, dict]:
 
 
 def _evento(cofre, evento: str, quem: dict, os_: dict, *, status_id=None, prioridade_id=None, texto: str = "",
-            nota: str | None = None) -> dict:
+            nota: str | None = None, quando: datetime | None = None, origem: str = "nexus", origem_id=None) -> dict:
     eid = uuid.uuid4().hex[:12]
-    agora = datetime.now(timezone.utc)
+    agora = (quando or datetime.now(timezone.utc)).astimezone(timezone.utc)
     dados = {"quem": {"nome": quem["nome"], "email": quem["email"]}}
     if texto:
         dados["texto"] = texto
@@ -168,7 +171,8 @@ def _evento(cofre, evento: str, quem: dict, os_: dict, *, status_id=None, priori
             "equipamento_id": equipamento_id(cod) if cod else None, "usina_id": _int(os_.get("usina_id")),
             "usina_ligada_por": _txt(os_.get("usina_ligada_por")) or None, "pessoa_hmac": quem["hmac"],
             "status_id": status_id, "prioridade_id": prioridade_id, "nota_fracttal": nota,
-            "dados_cifrados": cofre.cifrar(json.dumps(dados, ensure_ascii=False), _ctx(eid))}
+            "dados_cifrados": cofre.cifrar(json.dumps(dados, ensure_ascii=False), _ctx(eid)), "origem": origem,
+            "origem_id": origem_id}
 
 
 def _reler() -> dict:
@@ -260,6 +264,22 @@ def registrar_comentario(os_: dict, texto, usuario, pode: bool, nota: str) -> di
         novo = _evento(cofre, "comentario", quem, os_, texto=t, nota=_txt(nota)[:200] or None)
         _publicar(lido["eventos"] + [novo])
     return novo
+
+
+def importar_comentarios(itens: list[dict], origem: str) -> int:
+    """Os comentários trazidos de outro lugar (o histórico do app de ETM), com o autor e a data de lá e a `nota` de cada
+    um ("sim" ou o motivo). Só os que o livro não tem, pelo `origem_id`; uma gravação só. Devolve quantos entraram."""
+    cofre = AC._cofre()
+    with _TRAVA:
+        lido = _reler()
+        ja = {str(e.get("origem_id")) for e in lido["eventos"] if e.get("origem") == origem and e.get("origem_id")}
+        novos = [_evento(cofre, "comentario", {"nome": _txt(i["autor"]), "email": "", "hmac": None}, i["os_"],
+                         texto=_txt(i["texto"])[:4000], nota=_txt(i.get("nota"))[:200] or None, quando=i.get("quando"),
+                         origem=origem, origem_id=str(i["origem_id"]))
+                 for i in itens if str(i["origem_id"]) not in ja]
+        if novos:
+            _publicar(lido["eventos"] + novos)
+    return len(novos)
 
 
 def ultima_atualizacao(datas) -> datetime | None:
