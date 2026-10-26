@@ -62,7 +62,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe e a comparação com a foto do App |
-| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo; as telas e a gravação em segundo plano vêm nas próximas tarefas do plano |
+| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo; as telas e a gravação em segundo plano vêm nas próximas tarefas do plano |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `cb8239c` (23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina, e o preenchimento dos dias livres respeita o dia fixo da usina e o feriado municipal) |
 
 ## O nome do cliente é o do cadastro do Nexus (`clientes.py`; 18/10/2026)
@@ -549,6 +549,46 @@ para o número não mudar de uma tela para a outra. Provado em `tests/test_pcm_i
   sai dele, peça a peça, na gravação. Os 90 dias (`APROVAVEL_DIAS`) são só o teto: a janela do livro do App e do histórico a
   ler (que gasta da cota do Fracttal, de toda a empresa). Data ilegível ou do futuro (relógio do celular adiantado além de 1
   h, que esconderia todo movimento real) não se aprova.
+
+## Inventário do almoxarifado: as contagens e o estado de cada uma (`inventario/leitura.py`; 26/10/2026)
+
+`leitura.contagens(cfg)` é a lista que a tela do PCM mostra: uma contagem por "ID da contagem" do livro que o App publica
+(`almoxarifado_contagens_app_campo`, o contrato de 14 colunas), da mais nova para a mais velha, sem o almoxarifado de teste.
+Cada uma traz `contagem_id`, `id_almox` e `almox` (o nome), `usina`/`usina_id` (o nome do cadastro quando a de-para do Fracttal
+liga; senão o do Fracttal e `usina_id` None), `contada_em`, `enviada_em`, `linhas` (as do App), `n_contadas`, `n_em_branco`,
+`n_curadoria`, `estado`, `aprovavel`, `motivo_nao_aprovavel` e `aviso`. `livro_existe(cfg)` diz se o App já publicou o livro (sem
+ele a tela diz que o App ainda não publica, e não "nenhuma contagem"); `ler(cfg)` devolve os dois com o nome de cada peça.
+
+- **Duas fontes, dois relógios:** o livro do App vem pela cópia de 5 min do `visao._ler` (lê e liga a usina uma vez); o ESTADO sai
+  dos eventos do livro do inventário e é calculado a CADA chamada: o `acrescentar` renova a cópia do livro, e a tela mostra a
+  recontagem pedida na hora (com o estado guardado 5 min, o PCM a pediria de novo). **Falha de leitura (do App ou do livro do
+  inventário) levanta `fato_inventario.Recusada`:** nunca devolve lista vazia nem contagem `nova`, senão a já gravada
+  apareceria como a aprovar.
+- **Os estados** (`ESTADOS`): `nova` (nenhum evento que mude o estado), `revisada` (`peca_tirada` ou `numero_corrigido`),
+  `recontagem_pedida`, `substituida`, `gravando`, `gravada`, `gravada_com_conflitos`. **O lote é o conjunto de `id_item` dos
+  eventos `aprovada`: a gravação (Task 7) grava UM `aprovada` por peça do lote.** Sem as peças a leitura não sabe o que falta e
+  fica em `gravando`; só vira `gravada` quando toda peça do lote tem `peca_gravada`, e `gravada_com_conflitos` quando alguma tem
+  `conflito` no lugar. O `erro` não encerra a peça. O `gravando` daqui é "aprovada e sem o fim nos eventos"; a Task 7 refina em
+  andamento ou parada com o controle dela.
+- **A substituição sai da conta, a leitura não escreve:** `contas.substituidas` recebe só as contagens VIVAS (nem
+  `recontagem_pedida`, nem `substituida`; uma recontagem recusada como "a mais nova" substituiria as boas sem número para gravar
+  no lugar) e, como `gravadas`, as em `gravando`, `gravada` e `gravada_com_conflitos`. O evento `substituida`, se alguém o gravar,
+  também vale.
+- **Contrato violado vira aviso, não número pela metade:** "ID da linha" vazio ou o texto "None" (o `sync-xlsx` escreve o vazio
+  assim) junta duas linhas numa nas contas (`contas._unicas`) e perde unidades contadas; contagem sem o ID do almoxarifado não tem
+  saldo do sistema para ler. Os dois dão `aviso` e `aprovavel` falso (a tela não mostra comparação).
+- **`motivo_nao_aprovavel`** (a tela mostra o porquê): "já gravada" (gravando, gravada e com conflitos), "substituída",
+  "recontagem pedida", "contagem sem almoxarifado", "linha sem ID da linha", "data da contagem ilegível", "contada no futuro: o
+  relógio do celular" e "mais de 90 dias" (`contas.aprovavel`, `APROVAVEL_DIAS`).
+- **As contas de linhas** contam depois do dedupe da fila offline (mesmo "ID da contagem" e "ID da linha"), e somam as linhas de
+  peça: `n_em_branco` (sem número, o achado em branco inclusive), `n_curadoria` (com número e ainda por decidir: o genérico por
+  identificar e o achado fora do catálogo, descontadas as decisões já gravadas na curadoria) e `n_contadas` (o resto).
+- **O que o PCM já fez** (`revisao_da`, `curadoria_da`) vem na forma que as contas pedem: `tiradas` {id_item: motivo},
+  `corrigidos` {id_item: número} (vale a última) e as decisões da curadoria `{ID da linha: {decisao, id_item, codigo}}` (vale a
+  última). O motivo só existe cifrado no livro; é aqui que se abre.
+- **Provar:** `tests/test_pcm_inventario_leitura.py` (os estados, a substituição, o livro que não existe e o que não lê, a janela de
+  90 dias, o contrato violado, a cópia que ninguém estraga); mutações no lote vazio, nas contagens vivas, nas gravadas, na cópia
+  das linhas e na falha de leitura, todas pegas.
 
 ## Inventário do almoxarifado: o livro (`nexus/dados/fato_inventario.py`; 26/10/2026)
 
