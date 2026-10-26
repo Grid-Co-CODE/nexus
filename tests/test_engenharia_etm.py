@@ -126,3 +126,106 @@ def test_releitura_por_tras_so_com_a_tela_em_uso(fracttal, app, monkeypatch):
     assert E._tique(app, agora) is False                     # ninguém abriu a tela
     E.marcar_uso()
     assert E._tique(app, time.time()) is True and len(fracttal) == 2
+
+
+# ── o livro das marcações (Task 2) ───────────────────────────────────────────────────────────────────────────────────
+OSE = {"wid": 50001, "folio": "1", "codigo": "ALF100-ESTM1", "usina_id": 1, "usina_ligada_por": "de-para do Fracttal"}
+
+
+@pytest.fixture
+def banco(app):
+    from pg_falso import ApiPGFalsa
+
+    from nexus.cadastro.cifra import gerar_chave
+    from nexus.engenharia import etm_marcas as M
+    api = ApiPGFalsa()
+    app.config.update(GRIDCO_DB_API="http://pg.falso", NEXUS_CHAVE_CADASTRO=gerar_chave(),
+                      NEXUS_PESSOA_HMAC="hmac-teste", GRIDCO_SQL_TOKEN="tk")
+    app.extensions["nexus_dados_sessao"] = api
+    M.limpar()
+    with app.app_context():
+        yield api
+    M.limpar()
+    app.extensions.pop("nexus_dados_sessao", None)
+
+
+def _marcas(wid=OSE["wid"]):
+    from nexus.engenharia import etm_marcas as M
+    return M.estado(M.ler(forcar=True)["eventos"]).get(str(wid)) or {}
+
+
+def test_catalogo_registra_o_livro_das_marcacoes():
+    from nexus.dados import catalogo, explica
+    from nexus.engenharia import etm_marcas as M
+    l = catalogo.LIVRO_POR_NOME[M.LIVRO]
+    assert set(l.abas) == {M.ABA, M.ABA_DIAGNOSTICO, M.ABA_STATUS_POS, M.ABA_ETIQUETA}
+    assert set(l.so_cresce) == set(l.abas) and all(catalogo.aba_segue_a_regra(x) for x in l.abas)
+    f = next(x for x in catalogo.FATOS if x.id == "marcacao_etm")
+    assert "1 linha = 1 marcação" in f.grao and {"data", "usina", "equipamento", "pessoa"} <= set(f.dims)
+    assert 15 <= len(explica.RESUMO["marcacao_etm"]) <= 70
+    assert len(explica.PARA_QUE["marcacao_etm"]) >= 80 and explica.PARA_QUE["marcacao_etm"].endswith(".")
+
+
+def test_as_listas_sao_as_do_app():
+    from nexus.engenharia import etm_marcas as M
+    assert [n for _, n in M.DIAGNOSTICOS] == ["Falha de Equipamento", "Falha de Comunicação", "Sujidade", "Outro"]
+    assert [n for _, n in M.STATUS_POS] == ["Chamado de Garantia", "Alinhamento com o Cliente", "Regularizado"]
+    assert [n for _, n in M.ETIQUETAS] == ["OS em campo", "Stand By", "Validação Final"]
+
+
+def test_cada_marcacao_e_um_evento_e_o_estado_le_o_ultimo(banco):
+    import json
+
+    from test_engenharia_acompanhamento import ANA, BETO
+
+    from nexus.engenharia import etm_marcas as M
+    M.marcar(OSE, "diagnostico", 2, ANA, True)
+    M.marcar(OSE, "status_pos", 1, ANA, True)
+    M.marcar(OSE, "etiqueta", (2, True), BETO, True)
+    M.marcar(OSE, "etiqueta", (3, True), BETO, True)
+    M.marcar(OSE, "etiqueta", (2, False), BETO, True)          # desliga
+    M.marcar(OSE, "acompanhamento", True, ANA, True)
+    M.marcar(OSE, "finalizado", True, ANA, True)
+    e = _marcas()
+    assert (e["diagnostico_id"], e["status_pos_id"], e["etiquetas"]) == (2, 1, {3})
+    assert e["acompanhamento"] is True and e["finalizado"] is True and e["ultima"]
+    assert e["eventos"][0]["evento"] == "finalizado" and e["eventos"][0]["nome"] == "Ana Lima"
+    M.marcar(OSE, "diagnostico", 0, ANA, True)                 # 0 limpa
+    assert _marcas()["diagnostico_id"] is None
+    linhas = banco.linhas(M.LIVRO, M.ABA)
+    assert len(linhas) == 8 and {x["evento"] for x in linhas} == set(M.EVENTOS)
+    assert all(x["origem"] == "nexus" for x in linhas)
+    cru = json.dumps(linhas, ensure_ascii=False, default=str)
+    assert "Ana Lima" not in cru and "ana.lima" not in cru
+    assert [x["nome"] for x in banco.linhas(M.LIVRO, M.ABA_DIAGNOSTICO)][1] == "Falha de Comunicação"
+
+
+def test_marcacao_recusada(banco):
+    from test_engenharia_acompanhamento import ANA, BETO
+
+    from nexus.engenharia import etm_marcas as M
+    M.marcar(OSE, "diagnostico", 1, ANA, True)
+    with pytest.raises(M.Recusada, match="Nada mudou"):
+        M.marcar(OSE, "diagnostico", 1, ANA, True)
+    with pytest.raises(M.Recusada, match="Engenharia"):
+        M.marcar(OSE, "diagnostico", 2, BETO, False)
+    with pytest.raises(M.Recusada, match="lista"):
+        M.marcar(OSE, "status_pos", 9, ANA, True)
+    with pytest.raises(M.Recusada, match="marcação"):
+        M.marcar(OSE, "prioridade", 1, ANA, True)
+    with pytest.raises(M.Recusada, match="id do Fracttal"):
+        M.marcar(dict(OSE, wid=None), "diagnostico", 2, ANA, True)
+
+
+def test_livro_existente_sem_a_aba_e_leitura_incompleta(banco):
+    # a listagem que omite a aba por um instante não vira "sem marcação" (nem se grava por cima)
+    from test_engenharia_acompanhamento import ANA
+
+    from nexus.engenharia import etm_marcas as M
+    M.marcar(OSE, "diagnostico", 1, ANA, True)
+    banco.omitir.add(M.LIVRO)
+    M.limpar()
+    lido = M.ler()
+    assert lido["erro"] and lido["lido_em"] is None
+    with pytest.raises(Exception, match="não vieram"):
+        M.marcar(OSE, "diagnostico", 2, ANA, True)
