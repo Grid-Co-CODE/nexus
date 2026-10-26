@@ -569,3 +569,7 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .etm-col-etq{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px 0}
 .etm-etq-eng{--etq:var(--info)}
 @media (max-width:640px){.etm-f--datas,.etm-f--fim{grid-column:1/-1}}
+/* a OS de ETM: as etiquetas e os dois botões do painel das marcações */
+.etm-marcas{display:grid;gap:8px;margin-top:14px}
+.etm-marcas form,.etm-botoes form{display:inline}
+.etm-botoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}

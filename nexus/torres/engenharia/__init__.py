@@ -852,6 +852,95 @@ def _topo_da_os(o: dict, est: dict, agora, sem_livro: bool = False) -> dict:
 
 @bp.route("/equipe/os/<int:folio>")
 def equipe_os(folio: int):
+    return _pagina_da_os(folio, "equipe")
+
+
+@bp.route("/etm/os/<int:folio>")
+def etm_os(folio: int):
+    """A OS de ETM (26/10/2026): a página da OS da Engenharia com as marcações do app de ETM no lugar do status e da
+    prioridade, o checklist da OS e as marcações na linha do tempo. OS que não é de ETM abre a página comum."""
+    return _pagina_da_os(folio, "etm")
+
+
+def _eh_da_etm(o: dict) -> bool:
+    """A OS é de uma ETM: pela lista das ETMs da tela, se já lida; senão pelo nome do ativo no Fracttal."""
+    from ...engenharia import etm as ETM
+    from ...engenharia import os_equipe
+    r = ETM.eh_etm(o.get("codigo"))
+    if r is not None:
+        return r
+    alvo = os_equipe._norm(ETM.ETM)
+    return any(alvo in os_equipe._norm(a.get("nome")) for a in (o.get("ativos") or [{"nome": o.get("ativo")}]))
+
+
+# o que cada marcação diz na linha do tempo da OS
+def _rotulo_da_marca(e: dict) -> str:
+    from ...engenharia import etm_marcas as M
+    ev, v, lig = e["evento"], e.get("valor_id"), e.get("ligado")
+    if ev == "diagnostico":
+        return "Diagnóstico: " + M.nome(M.DIAGNOSTICOS, v) if v else "Diagnóstico limpo"
+    if ev == "status_pos":
+        return "Status pós-OS: " + M.nome(M.STATUS_POS, v) if v else "Status pós-OS limpo"
+    if ev == "etiqueta":
+        return f"Etiqueta {M.nome(M.ETIQUETAS, v)} {'ligada' if lig else 'desligada'}"
+    if ev == "acompanhamento":
+        return "Em acompanhamento" if lig else "Saiu do acompanhamento"
+    return "Finalizado pela Engenharia" if lig else "Reaberto para a Engenharia"
+
+
+def _faixa_da_etm(o: dict, est: dict, marcas: dict, agora, sem_marcas: bool) -> list[dict]:
+    """Os quatro números da OS de ETM: o Diagnóstico e o Status pós-OS da Engenharia, há quanto tempo a OS está aberta e
+    a última atualização (o registro da Engenharia, a marcação, as tarefas no Fracttal ou a criação)."""
+    from ...engenharia import etm_marcas as M
+    from ...engenharia import os_acompanhamento as O
+
+    def quem(evento, vazio):
+        e = next((x for x in marcas.get("eventos") or [] if x["evento"] == evento), None)
+        return ([("por ", False), (e["nome"] or "alguém", True), (" em " + e["quando"].astimezone(BRT).strftime("%d/%m"), False)]
+                if e and e.get("quando") else [(vazio, False)])
+    if sem_marcas:
+        k1 = {"rotulo": "Diagnóstico", "valor": "—", "grav": "", "nota": [("sem ler as marcações", False)]}
+        k2 = {"rotulo": "Status pós-OS", "valor": "—", "grav": "", "nota": [("sem ler as marcações", False)]}
+    else:
+        k1 = {"rotulo": "Diagnóstico", "valor": M.nome(M.DIAGNOSTICOS, marcas.get("diagnostico_id")) or "—", "grav": "",
+              "nota": quem("diagnostico", "a Engenharia ainda não diagnosticou")}
+        k2 = {"rotulo": "Status pós-OS", "valor": M.nome(M.STATUS_POS, marcas.get("status_pos_id")) or "—", "grav": "",
+              "nota": quem("status_pos", "ainda sem status pós-OS")}
+    criada = _iso(o.get("criada_iso"))
+    if o["coluna"] in ("concluida", "cancelada"):
+        k3 = {"rotulo": "Em aberto", "valor": (o.get("fim") or "—")[:5], "grav": "",
+              "nota": [("cancelada" if o["coluna"] == "cancelada" else "fechada no Fracttal", False)]}
+    elif criada:
+        d = max(0, (agora - criada).days)
+        k3 = {"rotulo": "Em aberto", "valor": "hoje" if d == 0 else _dias(d), "grav": "alerta" if d >= 7 else "",
+              "nota": [("criada em ", False), (criada.strftime("%d/%m/%Y"), True)]}
+    else:
+        k3 = {"rotulo": "Em aberto", "valor": "—", "grav": "", "nota": [("sem a data de criação", False)]}
+    fontes = [(est.get("ultimo"), "o último comentário da Engenharia"), (marcas.get("ultima"), "a última marcação"),
+              (_iso(o.get("atividade_iso")), "a última mexida nas tarefas no Fracttal"), (criada, "a criação da OS")]
+    ultima = O.ultima_atualizacao([d for d, _ in fontes])
+    if ultima:
+        d = max(0, (agora - ultima).days)
+        k4 = {"rotulo": "Última atualização", "valor": "hoje" if d == 0 else "há " + _dias(d), "grav": "",
+              "nota": [(next((q for x, q in fontes if x and x == ultima), ""), False)]}
+    else:
+        k4 = {"rotulo": "Última atualização", "valor": "—", "grav": "", "nota": [("sem data no Fracttal", False)]}
+    return [k1, k2, k3, k4]
+
+
+def _checklist(folio) -> tuple[list[dict], str]:
+    """O checklist da OS (as subtarefas e o que o técnico respondeu), na ordem do Fracttal."""
+    from ...engenharia import os_equipe
+    try:
+        linhas = os_equipe._paginas_ate(f"work_orders_subtasks/?folio={int(folio)}")
+    except Exception as e:      # noqa: BLE001 — o checklist não derruba a página: o bloco diz que não leu
+        return [], type(e).__name__
+    linhas = sorted(linhas, key=lambda s: (int(s.get("order_number") or 0)))
+    return [{"pergunta": str(s.get("description") or "").strip(), "resposta": str(s.get("value") or "").strip(),
+             "grupo": str(s.get("group") or "").strip()} for s in linhas], ""
+
+
+def _pagina_da_os(folio: int, tela_id: str):
     import logging
     from urllib.parse import quote, urlencode
 
@@ -859,8 +948,12 @@ def equipe_os(folio: int):
     from ...engenharia import os_acompanhamento as O
     from ...engenharia import os_equipe
     pode, _meu = _quem_pode()
-    base = {"torre": TORRE, "tela": TORRE.tela("equipe"), "folio": folio,
-            "msg_ok": request.args.get("ok", ""), "msg_erro": request.args.get("erro", "")}
+    eh_etm = tela_id == "etm"
+    base = {"torre": TORRE, "tela": TORRE.tela(tela_id), "folio": folio,
+            "msg_ok": request.args.get("ok", ""), "msg_erro": request.args.get("erro", ""),
+            # a volta e a OS de cada tela: o Quadro da equipe ou a tela ETMs
+            "volta_endpoint": "torre_engenharia." + tela_id, "volta_texto": TORRE.tela(tela_id).nome,
+            "rota_os": "torre_engenharia.etm_os" if eh_etm else "torre_engenharia.equipe_os"}
     try:
         o = os_equipe.ler_os(folio)
     except Exception as e:      # noqa: BLE001 — Fracttal fora ou cota: a página diz, sem número chutado
@@ -868,9 +961,33 @@ def equipe_os(folio: int):
         return render_template("engenharia/os_quadro.html", o=None, erro_fracttal=type(e).__name__, **base), 502
     if not o:
         return render_template("engenharia/os_quadro.html", o=None, nao_achou=True, **base), 404
+    if eh_etm and not _eh_da_etm(o):
+        return redirect(url_for("torre_engenharia.equipe_os", folio=folio))
     lido = O.ler()
     erro_livro = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0]
     est = O.estado(lido["eventos"]).get(str(o["wid"])) or {}
+    extra = {}
+    kpis = _faixa_da_os(o, est, datetime.now(BRT), sem_livro=bool(erro_livro))
+    if eh_etm:
+        from ...engenharia import etm_marcas as M
+        lm = M.ler()
+        erro_marcas = "" if lm.get("lido_em") else (lm.get("erro") or "").split(":")[0]
+        marcas = (M.estado(lm["eventos"]).get(str(o["wid"])) or {}) if not erro_marcas else {}
+        checklist, erro_checklist = _checklist(o["os"])
+        kpis = _faixa_da_etm(o, est, marcas, datetime.now(BRT), sem_marcas=bool(erro_marcas))
+        # as marcações entram na linha do tempo, junto do que a Engenharia comentou
+        linha = list(est.get("eventos") or []) + [dict(e, evento="marca", texto="", rotulo=_rotulo_da_marca(e))
+                                                  for e in marcas.get("eventos") or []]
+        linha.sort(key=lambda e: e.get("quando") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        est = dict(est, eventos=linha)
+        extra["etm"] = {"marcas": {"diagnostico_id": marcas.get("diagnostico_id"),
+                                   "status_pos_id": marcas.get("status_pos_id"),
+                                   "etiquetas": marcas.get("etiquetas") or set(),
+                                   "acompanhamento": bool(marcas.get("acompanhamento")),
+                                   "finalizado": bool(marcas.get("finalizado"))},
+                        "diagnosticos": M.DIAGNOSTICOS, "status_pos": M.STATUS_POS, "etiquetas": M.ETIQUETAS,
+                        "nome": M.nome, "erro_marcas": erro_marcas, "checklist": checklist,
+                        "erro_checklist": erro_checklist}
     erro_filhas = ""
     try:
         fs = os_equipe.filhas(o["wid"])
@@ -889,7 +1006,7 @@ def equipe_os(folio: int):
     return render_template(
         "engenharia/os_quadro.html", o=o, est=est, filhas=fs, erro_filhas=erro_filhas, erro_livro=erro_livro,
         velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
-        kpis=_faixa_da_os(o, est, datetime.now(BRT), sem_livro=bool(erro_livro)), pode=pode and not erro_livro,
+        kpis=kpis, pode=pode and not erro_livro, **extra,
         topo=_topo_da_os(o, est, datetime.now(BRT), sem_livro=bool(erro_livro)),
         status=O.STATUS,
         prioridades=O.PRIORIDADES, nome_status=O.nome_status, nome_prioridade=O.nome_prioridade,
@@ -899,8 +1016,51 @@ def equipe_os(folio: int):
         criar_url=na_raiz("/os/_nexus/ir") + "?" + urlencode({"url": "/os/tradicional?" + sugestao}),
         # a seta do PDF de cada OS da cadeia vai ao OS Creator na sessão do Fracttal: sem ela, este login volta para cá
         login_fracttal=na_raiz("/os/login") + "?next=" + quote(
-            "/os/_nexus/card/voltar?" + urlencode({"de": f"/t/engenharia/equipe/os/{o['os']}"}, safe="/"), safe=""),
+            "/os/_nexus/card/voltar?" + urlencode({"de": f"/t/engenharia/{tela_id}/os/{o['os']}"}, safe="/"), safe=""),
         comentar_url=na_raiz(f"/os/_nexus/engenharia/os/{o['wid']}/comentar"), **base)
+
+
+@bp.route("/etm/os/<int:folio>/marcar", methods=["POST"])
+def etm_os_marcar(folio: int):
+    """As marcações da OS de ETM: o diagnóstico e o status pós-OS num formulário só (um evento por mudança), e a
+    etiqueta, o acompanhamento e o finalizado um botão cada (liga ou desliga)."""
+    import logging
+    from urllib.parse import urlencode
+
+    from ...engenharia import etm_marcas as M
+    from ...engenharia import os_equipe
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    pode, _meu = _quem_pode()
+    volta = url_for("torre_engenharia.etm_os", folio=folio)
+    try:
+        o = os_equipe.ler_os(folio)                     # a OS conferida agora no Fracttal, não o que o formulário diz
+        if not o:
+            raise M.Recusada(f"Não achei a OS {folio} no Fracttal")
+        osg, quem, f = _os_para_gravar(o), session.get("usuario"), request.form
+        ev = f.get("evento")
+        if ev in ("etiqueta", "acompanhamento", "finalizado"):
+            lig = f.get("ligado") == "sim"
+            avisos = [M.marcar(osg, ev, (f.get("valor"), lig) if ev == "etiqueta" else lig, quem, pode)["aviso"]]
+        else:
+            avisos = []
+            for campo in ("diagnostico", "status_pos"):
+                if f.get(campo) is None:
+                    continue
+                try:
+                    avisos.append(M.marcar(osg, campo, f.get(campo), quem, pode)["aviso"])
+                except M.Recusada as e:
+                    if str(e) != "Nada mudou":
+                        raise
+            if not avisos:
+                raise M.Recusada("Nada mudou")
+        return redirect(volta + "?" + urlencode({"ok": "Salvo: " + "; ".join(avisos) + "."}), 303)
+    except M.Recusada as e:
+        return redirect(volta + "?" + urlencode({"erro": str(e)}), 303)
+    except Exception as e:      # noqa: BLE001 — banco ou Fracttal fora: nada mudou (a trava recusa antes de gravar)
+        logging.exception("ETMs: a marcação da OS %s não gravou", folio)
+        return redirect(volta + "?" + urlencode({"erro": FALHOU_BANCO.format(type(e).__name__)}), 303)
 
 
 @bp.route("/equipe/os/<int:folio>/classificar", methods=["POST"])

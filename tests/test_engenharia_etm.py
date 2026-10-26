@@ -142,10 +142,11 @@ def banco(app):
     app.config.update(GRIDCO_DB_API="http://pg.falso", NEXUS_CHAVE_CADASTRO=gerar_chave(),
                       NEXUS_PESSOA_HMAC="hmac-teste", GRIDCO_SQL_TOKEN="tk")
     app.extensions["nexus_dados_sessao"] = api
-    M.limpar()
+    from nexus.engenharia import os_acompanhamento as O
+    M.limpar(), O.limpar(), E.limpar()          # as cópias em memória dos dois livros e da leitura, de outro teste
     with app.app_context():
         yield api
-    M.limpar()
+    M.limpar(), O.limpar(), E.limpar()
     app.extensions.pop("nexus_dados_sessao", None)
 
 
@@ -354,3 +355,115 @@ def test_a_subida_liga_a_releitura_por_tras(app, monkeypatch):
     app.config["NEXUS_CAMPO_AQUECER"] = "0"
     eng_pkg.instalar(app)
     assert ligados == ["equipe", "etm"]
+
+
+# ── a OS da ETM (Task 4): a página da OS da Engenharia com o painel das marcações ───────────────────────────────────
+URL_OS = "/t/engenharia/etm/os/17003"
+
+
+@pytest.fixture
+def pagina_etm(banco, app, monkeypatch):
+    """A OS 17003 de ETM (em verificação) com o checklist respondido; a 17009 é de um inversor. Quem entra é do setor
+    Engenharia."""
+    from nexus.auth import setor_telas as ST
+    from nexus.engenharia import os_equipe
+    from nexus.torres import engenharia as torre
+    linhas = {"17003": [dict(w(17003, "Corretiva", status=2, task="DONE"), id_work_order=60003)],
+              "17009": [dict(w(17009, "Corretiva", cod="ALF100-INV1"), items_log_description="Inversor 1 {ALF100-INV1}")]}
+    subs = {"17003": [{"description": "Ficou alguma pendência? Se sim, descreva", "value": "Não", "order_number": 2},
+                      {"description": "Descreva a atividade realizada", "value": "Piranômetro trocado",
+                       "order_number": 1, "group": "ATIVIDADE"}]}
+
+    def rest(path):
+        valor = path.split("=", 1)[1].split("&", 1)[0]
+        if path.startswith("work_orders?wo_folio="):
+            return {"data": linhas.get(valor, [])}
+        if path.startswith("work_orders?id_parent_wo="):
+            return {"data": []}
+        if path.startswith("work_orders_subtasks/?folio="):
+            return {"data": subs.get(valor, [])}
+        raise AssertionError(path)
+    monkeypatch.setattr(os_equipe, "_ler_fracttal", rest)
+    monkeypatch.setattr(torre, "_onde_do_cadastro",
+                        lambda: (lambda texto, cod: {"usina_id": 7, "ligada_por": "de-para do Fracttal"}))
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 1, "nome": "Engenharia"},
+                                               "erro": ""})
+
+
+def _secao_os(html, titulo):
+    return html.split(f"<h2>{titulo}</h2>", 1)[1].split("</section>", 1)[0]
+
+
+def test_a_os_da_etm_tem_o_painel_das_marcacoes(pagina_etm, cliente):
+    import re
+
+    from test_engenharia_acompanhamento import ANA, _como
+    html = _como(cliente, ANA).get(URL_OS).get_data(as_text=True)
+    p = _secao_os(html, "Marcações da Engenharia")
+    assert '<option value="0">— sem diagnóstico —</option>' in p
+    assert all(f">{n}</option>" in p for n in ("Falha de Equipamento", "Falha de Comunicação", "Sujidade", "Outro"))
+    assert all(f">{n}</option>" in p for n in ("Chamado de Garantia", "Alinhamento com o Cliente", "Regularizado"))
+    assert all(f'aria-pressed="false">{n}</button>' in p for n in ("OS em campo", "Stand By", "Validação Final"))
+    assert ">Pôr em acompanhamento</button>" in p and ">Finalizar pela Engenharia</button>" in p
+    assert "<h2>Status e prioridade</h2>" not in html                    # o painel da ETM no lugar dele
+    assert re.search(r'class="eg-ac-volta" href="/t/engenharia/etm">← ETMs</a>', html)
+    rot = re.findall(r'<div class="lbl">([^<]+)</div>', html.split('class="eg-ac-kpis"', 1)[1].split("</section>", 1)[0])
+    assert rot == ["Diagnóstico", "Status pós-OS", "Em aberto", "Última atualização"]
+
+
+def test_marcar_grava_e_volta_com_o_aviso(pagina_etm, cliente):
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+
+    from nexus.engenharia import etm_marcas as M
+    c = _como(cliente, ANA)
+    r = c.post(URL_OS + "/marcar", data={"diagnostico": "2", "status_pos": "1"}, headers=SAME)
+    assert r.status_code == 303 and r.headers["Location"].split("?", 1)[0].endswith(URL_OS) and "ok=" in r.headers["Location"]
+    c.post(URL_OS + "/marcar", data={"evento": "etiqueta", "valor": "2", "ligado": "sim"}, headers=SAME)
+    c.post(URL_OS + "/marcar", data={"evento": "acompanhamento", "ligado": "sim"}, headers=SAME)
+    c.post(URL_OS + "/marcar", data={"evento": "finalizado", "ligado": "sim"}, headers=SAME)
+    e = M.estado(M.ler(forcar=True)["eventos"])["60003"]
+    assert (e["diagnostico_id"], e["status_pos_id"], e["etiquetas"], e["acompanhamento"], e["finalizado"]) == \
+           (2, 1, {2}, True, True)
+    html = c.get(URL_OS).get_data(as_text=True)
+    assert '<option value="2" selected>Falha de Comunicação</option>' in html
+    assert 'aria-pressed="true">Stand By</button>' in html and ">Tirar do acompanhamento</button>" in html
+    assert "Diagnóstico: Falha de Comunicação" in _secao_os(html, "Comentários")      # a linha do tempo diz
+    r = c.post(URL_OS + "/marcar", data={"diagnostico": "2", "status_pos": "1"}, headers=SAME)
+    assert "Nada+mudou" in r.headers["Location"] or "Nada%20mudou" in r.headers["Location"]
+
+
+def test_marcar_de_outro_site_e_recusado(pagina_etm, cliente):
+    from test_engenharia_acompanhamento import ANA, _como
+    r = _como(cliente, ANA).post(URL_OS + "/marcar", data={"diagnostico": "2"},
+                                 headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403
+
+
+def test_o_checklist_da_os_com_as_respostas(pagina_etm, cliente):
+    from test_engenharia_acompanhamento import ANA, _como
+    ch = _secao_os(_como(cliente, ANA).get(URL_OS).get_data(as_text=True), "Checklist da OS")
+    assert ch.index("Descreva a atividade realizada") < ch.index("Piranômetro trocado") < \
+           ch.index("Ficou alguma pendência? Se sim, descreva") < ch.index(">Não<")
+
+
+def test_quem_nao_e_da_engenharia_le_as_marcacoes_sem_formularios(pagina_etm, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import BETO, _como
+
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"etm"}, "setor": {"id": 2, "nome": "Performance"},
+                                               "erro": ""})
+    p = _secao_os(_como(cliente, BETO).get(URL_OS).get_data(as_text=True), "Marcações da Engenharia")
+    assert "<form" not in p and "<dt>Diagnóstico</dt><dd>—</dd>" in p
+
+
+def test_os_que_nao_e_de_etm_abre_a_pagina_comum(pagina_etm, cliente):
+    from test_engenharia_acompanhamento import ANA, _como
+    r = _como(cliente, ANA).get("/t/engenharia/etm/os/17009")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/engenharia/equipe/os/17009")
+
+
+def test_os_comentarios_sao_os_da_os_da_engenharia(pagina_etm, cliente):
+    from test_engenharia_acompanhamento import ANA, _como
+    html = _como(cliente, ANA).get(URL_OS).get_data(as_text=True)
+    assert 'data-comentar="/os/_nexus/engenharia/os/60003/comentar"' in html
+    assert 'data-volta="/t/engenharia/etm?atualizar=1"' in html            # a troca de responsável volta para ETMs
