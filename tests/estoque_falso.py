@@ -6,26 +6,34 @@ imita o que o passo 0 de 26/10 mostrou do Fracttal de verdade:
 
 - o saldo só se grava com o almoxarifado no modo 2 (sessão de ajuste); fora dele, `ErroFracttal`;
 - ao FECHAR a sessão, sai um par de movimentos por peça mexida (a saída do saldo antigo inteiro e a entrada do novo, os dois
-  com a referência) e o almoxarifado volta ao modo 0; as peças que ninguém mexeu não geram nada;
+  com a referência); as peças que ninguém mexeu não geram nada;
+- o fechamento são DOIS passos, como no Fracttal: `fechar_ajuste` finaliza (gera os movimentos) e então chama
+  `voltar_ao_normal` (modo 0), cada um uma operação à parte para os defeitos. Entre os dois o almoxarifado fica em modo 2 com
+  o ajuste "finalizado, modo 0 pendente": a recuperação é só `voltar_ao_normal`, e um segundo `fechar_ajuste` é erro;
 - a régua se muda a qualquer hora, sem movimento.
 
-O que o passo 0 NÃO provou e o falso supõe (conferir na prova com o App, Task 10): ligar duas vezes a mesma peça é erro;
-criar peça com código repetido é erro; abrir o ajuste num almoxarifado em inventário físico (modo 3) é erro; abrir de novo o
-que já está em ajuste não faz nada.
+O que o passo 0 NÃO provou e o falso SUPÕE (conferir na prova com o App, Task 10): gravar saldo fora do modo 2 é erro; ligar
+duas vezes a mesma peça é erro; criar peça com código repetido é erro; abrir o ajuste num almoxarifado em inventário físico
+(modo 3) é erro; abrir de novo o que já está em ajuste não faz nada; um segundo `fechar_ajuste` depois do finalize é erro;
+`mover` (entrada ou saída) em modo 2 ou 3 é erro (o passo 0 viu a tela travar Entradas e Saídas; a API recusar, não);
+`voltar_ao_normal` em modo 3 é erro, e num ajuste ainda aberto (sem finalizar) só solta o modo, deixando os saldos gravados
+sem par de movimentos.
 
 Os defeitos se pedem pelo construtor:
-- `perder_resposta`: nomes de operação (`{"gravar_saldo", "fechar_ajuste"}`). A PRIMEIRA chamada de cada uma grava e depois
-  levanta `ConnectionError` (a resposta "se perdeu", como a conexão que cai depois do Fracttal gravar); as seguintes
-  respondem. É o que a retomada precisa resolver sem duplicar o ajuste.
-- `limite_em` e `expirar_em`: a N-ésima chamada (contando todas, a partir de 1) levanta `Limite` e `SemLogin`, SEM executar
-  nada. Só aquela chamada: a seguinte responde (o limite passa; o login se refaz com outra sessão). Aceitam um número ou uma
-  lista de números.
+- `perder_resposta`: nomes de operação (`{"gravar_saldo", "fechar_ajuste", "voltar_ao_normal"}`). A PRIMEIRA chamada de cada
+  uma grava e depois levanta `ConnectionError` (a resposta "se perdeu", como a conexão que cai depois do Fracttal gravar); as
+  seguintes respondem. É o que a retomada precisa resolver sem duplicar o ajuste.
+- `limite_em`: a N-ésima chamada (contando todas, a partir de 1) levanta `Limite`, SEM executar nada. Só aquela: o limite
+  passa e a seguinte responde. Aceita um número ou uma lista de números. `voltar_ao_normal` conta como chamada própria,
+  logo depois da do `fechar_ajuste`: é assim que se faz o fechamento valer e só o modo 0 falhar.
+- `expirar_em`: da N-ésima chamada em diante TODA chamada desta instância levanta `SemLogin`, SEM executar nada: o login
+  morto não volta, e o adaptador de verdade reenvia o mesmo JWT morto. Continuar é com outra instância (outro login).
 - `agora`: o relógio dos movimentos (uma função que devolve `datetime` ou texto ISO); sem ele, a hora de verdade.
 
 `.chamadas` guarda o nome de cada operação chamada, em ordem (a que falhou também); `.movimentos`, os movimentos (dicts com
 `id_almox`, `id_item`, `tipo` "entrada" ou "saida", `qtd`, `referencia`, `quando`, `folio`), do mais velho ao mais novo.
-`mover` e `definir_modo` não são do contrato: o teste os usa para simular o que acontece fora do inventário (uma OS que
-lança peça, uma compra que entra, um almoxarifado que ficou em inventário físico).
+`mover` e `definir_modo` não são do contrato (nem contam como chamada): o teste os usa para simular o que acontece fora do
+inventário (uma OS que lança peça, uma compra que entra, um almoxarifado que ficou em inventário físico).
 """
 import functools
 from datetime import datetime, timezone
@@ -67,12 +75,14 @@ class EstoqueFalso(Estoque):
                     "maximo": None if v.get("maximo") is None else float(v["maximo"]),
                     "ligacao": str(v.get("ligacao") or self._nova_ligacao()), "codigo": str(v.get("codigo") or "")}
         self._modos: dict[str, int] = {}
+        self._pendentes: set[str] = set()                           # finalizado, modo 0 pendente
         self._sessoes: dict[str, dict[str, float | None]] = {}      # almoxarifado -> {id_item: saldo de quando mexeu}
         self._catalogo: dict[str, dict] = {}                        # as peças que `criar_peca` fez
         self._n_item, self._n_movimento = 53_000_000, 0
         self._perder, self._perdidas = ({perder_resposta} if isinstance(perder_resposta, str)
                                         else set(perder_resposta or ())), set()
-        self._limite, self._expirar, self._agora = _conjunto(limite_em), _conjunto(expirar_em), agora
+        self._limite, self._agora = _conjunto(limite_em), agora
+        self._expira_em = min(_conjunto(expirar_em), default=None)  # a partir desta chamada, o login está morto
         self.movimentos: list[dict] = []
         self.chamadas: list[str] = []
 
@@ -83,9 +93,11 @@ class EstoqueFalso(Estoque):
 
     def mover(self, id_almox: str, id_item: str, tipo: str, qtd: float, *, quando=None, referencia: str = "") -> None:
         """Um movimento real (uma OS lançou a peça, entrou uma compra): mexe no saldo e entra em `.movimentos`."""
-        item = self._item(id_almox, id_item)
         if tipo not in ("entrada", "saida"):
             raise ValueError(f"tipo de movimento desconhecido: {tipo!r}")
+        if self._modos.get(str(id_almox), 0) in (2, 3):
+            raise ErroFracttal("o almoxarifado trava entradas e saídas enquanto está em ajuste ou inventário", "mover")
+        item = self._item(id_almox, id_item)
         item["saldo"] = (item["saldo"] or 0.0) + (qtd if tipo == "entrada" else -qtd)
         self._movimento(id_almox, id_item, tipo, qtd, referencia, self._iso(quando))
 
@@ -93,7 +105,7 @@ class EstoqueFalso(Estoque):
     def _entrar(self, nome: str) -> None:
         self.chamadas.append(nome)
         n = len(self.chamadas)
-        if n in self._expirar:
+        if self._expira_em is not None and n >= self._expira_em:
             raise SemLogin("o login do Fracttal expirou (de mentira)")
         if n in self._limite:
             raise Limite("RPC HTTP 429 (de mentira)")
@@ -150,6 +162,8 @@ class EstoqueFalso(Estoque):
     @_operacao
     def fechar_ajuste(self, id_almox: str, referencia: str) -> str:
         a, ref = str(id_almox), str(referencia or "").strip()
+        if a in self._pendentes:
+            raise ErroFracttal("o ajuste já foi finalizado: falta só voltar ao modo normal", "fechar_ajuste")
         if self._modos.get(a, 0) != 2:
             raise ErroFracttal("não há ajuste de inventário aberto para fechar", "fechar_ajuste")
         if not ref:
@@ -158,8 +172,19 @@ class EstoqueFalso(Estoque):
         for id_item, antes in self._sessoes.pop(a, {}).items():
             self._movimento(a, id_item, "saida", antes or 0.0, ref, quando)
             self._movimento(a, id_item, "entrada", self._itens[a][id_item]["saldo"] or 0.0, ref, quando)
+        self._pendentes.add(a)                           # finalizado; o modo 0 é o passo seguinte, e pode falhar
+        folio = str(self._n_movimento + 1)               # o "próximo número de movimento", como o `folio_return`
+        self.voltar_ao_normal(a)
+        return folio
+
+    @_operacao
+    def voltar_ao_normal(self, id_almox: str) -> None:
+        a = str(id_almox)
+        if self._modos.get(a, 0) == 3:
+            raise ErroFracttal("o almoxarifado está em inventário físico: não é do Nexus", "voltar_ao_normal")
         self._modos[a] = 0
-        return str(self._n_movimento + 1)                # o "próximo número de movimento", como o `folio_return`
+        self._pendentes.discard(a)
+        self._sessoes.pop(a, None)
 
     @_operacao
     def ler(self, id_almox: str) -> dict[str, dict]:
@@ -177,12 +202,13 @@ class EstoqueFalso(Estoque):
         return ligacao
 
     @_operacao
-    def achar_movimento(self, id_almox: str, referencia: str) -> str | None:
+    def achar_movimento(self, id_almox: str, referencia: str, desde_iso: str | None = None) -> str | None:
         alvo = str(referencia or "").strip()
         if not alvo:
             raise ValueError("sem a referência, qualquer movimento seria o achado")
+        desde = instante(desde_iso) if desde_iso else None
         for m in reversed(self.movimentos):
-            if m["id_almox"] == str(id_almox) and m["referencia"] == alvo:
+            if m["id_almox"] == str(id_almox) and m["referencia"] == alvo and (desde is None or instante(m["quando"]) >= desde):
                 return m["folio"]
         return None
 

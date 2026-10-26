@@ -639,10 +639,16 @@ def test_falso_limite_e_login_na_enesima_chamada():
         est.ler(ALMOX)
     assert est.ler(ALMOX)[ITEM]["saldo"] == 3            # só a 2ª; a 3ª responde
     assert est.chamadas == ["modo", "ler", "ler"]
-    est = falso(expirar_em=1)
-    with pytest.raises(E.SemLogin):
+    est = falso(limite_em=1)
+    with pytest.raises(E.Limite):
         est.abrir_ajuste(ALMOX)
     assert est.modo(ALMOX) == 0                          # a chamada que caiu não abriu nada
+    est = falso(expirar_em=2)
+    est.modo(ALMOX)                                      # a 1ª responde
+    for chamada in (lambda: est.abrir_ajuste(ALMOX), lambda: est.ler(ALMOX), lambda: est.modo(ALMOX)):
+        with pytest.raises(E.SemLogin):                  # da 2ª em diante o login está morto, e não volta
+            chamada()
+    assert est.chamadas == ["modo", "abrir_ajuste", "ler", "modo"]
     est = falso(limite_em=[1, 2])
     for _ in range(2):
         with pytest.raises(E.Limite):
@@ -673,3 +679,233 @@ def test_falso_ligar_regua_peca_e_o_que_se_moveu():
     assert est.mexidas_desde(ALMOX, "2026-10-26T13:00:00Z") == {ITEM}
     assert est.mexidas_desde(ALMOX, "2026-10-26T11:00:00Z") == {ITEM, "53248313"}
     assert est.mexidas_desde(ALMOX, "2026-10-26T11:00:00Z", ignorar_referencia="Consumo da OS 16000") == {"53248313"}
+
+
+# ═══ a rodada de correções 1 (revisão de 26/10/2026) ═══════════════════════════════════════════════════════════════════════
+# ── a lista que chega pela metade não passa ────────────────────────────────────────────────────────────────────────────────
+LEITORES = [
+    (SALDOS, PECA_DE_TESTE, lambda e: e.ler(ALMOX)),
+    (PECAS, {"id": 1, "code": "SP-TST-001"}, lambda e: e.codigos("TST")),
+    (HISTORICO, HIST[0], lambda e: e.achar_movimento(ALMOX, "nada")),
+    (HISTORICO, HIST[0], lambda e: e.mexidas_desde(ALMOX, "2026-01-01T00:00:00Z")),
+    (LISTA, {"id": 1, "mode": 0}, lambda e: e.modo(ALMOX)),
+]
+
+
+@pytest.mark.parametrize("metodo, linha, ler", LEITORES)
+def test_pagina_vazia_antes_do_total_nao_vira_lista_curta(metodo, linha, ler):
+    """Caso reproduzido na revisão: `ler` devolvia 1 peça de `total: 5`. Uma página vazia com `start < total` termina a
+    lista em silêncio e a tela mostraria o almoxarifado pela metade (número pela metade não vai para a tela); vale para todo
+    leitor, porque todos passam pela mesma paginação."""
+    def resposta(params):
+        return {"success": True, "data": [linha] if params["start"] == 0 else [], "total": 5}
+    fr = Fracttal({metodo: resposta})
+    with pytest.raises(E.ErroFracttal, match="vazia"):
+        ler(estoque(fr))
+    assert len(fr.pedidos) == 2                          # a 2ª página veio vazia
+
+
+@pytest.mark.parametrize("data, total", [(None, 120), ({"id": 1}, 3), ("x", None), ({"id": 1}, None), (7, 0)])
+def test_data_que_nao_e_lista_e_erro(data, total):
+    """`data: null` com `total: 120` virava `{}` na revisão. `data` que não é lista nunca é "sem linhas"; só o `None` com
+    `total` ausente ou zero é lista vazia (testado abaixo)."""
+    corpo = {"success": True, "data": data}
+    if total is not None:
+        corpo["total"] = total
+    with pytest.raises(E.ErroFracttal):
+        estoque(Fracttal({SALDOS: corpo})).ler(ALMOX)
+
+
+@pytest.mark.parametrize("corpo", [{"data": None}, {"data": None, "total": 0}, {"data": []}, {"data": [], "total": 0}])
+def test_lista_vazia_de_verdade_e_vazia(corpo):
+    fr = Fracttal({SALDOS: {"success": True, **corpo}})
+    assert estoque(fr).ler(ALMOX) == {} and len(fr.pedidos) == 1
+
+
+# ── o fechamento são dois pedidos: finalizar e voltar ao modo normal ───────────────────────────────────────────────────────
+def test_fechamento_feito_e_modo_0_pendente_se_recupera_so_com_voltar_ao_normal():
+    """O `finalize` valeu e o `warehouse_update` do modo 0 falhou (o 429 da cota): o almoxarifado fica em modo 2 com os
+    movimentos já gerados. Repetir o fechamento geraria um 2º par de movimentos por cima; a recuperação é só o modo 0."""
+    fr = Fracttal({FECHAR: ok({"folio_return": 7, "total": 0}),
+                   ATUALIZA_ALMOX: [FracttalError("RPC inventories.warehouse_update HTTP 429 — Too Many Requests"), ok()]})
+    est = estoque(fr)
+    with pytest.raises(E.Limite):
+        est.fechar_ajuste(ALMOX, "INVENTARIO-c1")
+    assert fr.metodos == [FECHAR, ATUALIZA_ALMOX]
+    assert est.voltar_ao_normal(ALMOX) is None
+    assert fr.pedidos[2:] == [(ATUALIZA_ALMOX, {"id": 134082, "mode": 0})]
+    assert fr.metodos.count(FECHAR) == 1                 # nenhum 2º fechamento
+
+
+def test_voltar_ao_normal_so_manda_o_modo_0():
+    fr = Fracttal({ATUALIZA_ALMOX: ok()})
+    estoque(fr).voltar_ao_normal(ALMOX)
+    assert fr.pedidos == [(ATUALIZA_ALMOX, {"id": 134082, "mode": 0})]
+
+
+def test_falso_fechamento_feito_e_modo_0_pendente():
+    """O falso guarda o estado "finalizado, modo 2 pendente": os movimentos existem, o almoxarifado segue travado, um 2º
+    fechamento é erro e só o `voltar_ao_normal` o libera, sem outro par de movimentos."""
+    est = falso(limite_em=4)         # 1 abrir_ajuste, 2 gravar_saldo, 3 fechar_ajuste, 4 o voltar_ao_normal de dentro dele
+    est.abrir_ajuste(ALMOX)
+    est.gravar_saldo(ALMOX, ITEM, 2)
+    with pytest.raises(E.Limite):
+        est.fechar_ajuste(ALMOX, "INVENTARIO-c1")
+    assert est.chamadas == ["abrir_ajuste", "gravar_saldo", "fechar_ajuste", "voltar_ao_normal"]
+    assert est.modo(ALMOX) == 2                          # ainda travado
+    assert [m["tipo"] for m in est.movimentos] == ["saida", "entrada"]
+    assert est.achar_movimento(ALMOX, "INVENTARIO-c1")   # o fechamento valeu
+    with pytest.raises(E.ErroFracttal):
+        est.fechar_ajuste(ALMOX, "INVENTARIO-c1")        # nunca um 2º fechamento
+    with pytest.raises(E.ErroFracttal):
+        est.mover(ALMOX, ITEM, "saida", 1)               # e o almoxarifado ainda não aceita movimento
+    assert len(est.movimentos) == 2
+    est.voltar_ao_normal(ALMOX)
+    assert est.modo(ALMOX) == 0 and len(est.movimentos) == 2
+    est.mover(ALMOX, ITEM, "saida", 1)                   # liberado
+    est.voltar_ao_normal(ALMOX)                          # de novo no modo 0: nada a fazer
+    assert est.modo(ALMOX) == 0
+
+
+def test_falso_voltar_ao_normal_e_uma_operacao_a_parte_para_os_defeitos():
+    """A resposta do modo 0 que se perde (o Fracttal já voltou ao normal) e o login que morre justo nesse passo."""
+    est = falso(perder_resposta={"voltar_ao_normal"})
+    est.abrir_ajuste(ALMOX)
+    est.gravar_saldo(ALMOX, ITEM, 2)
+    with pytest.raises(ConnectionError):
+        est.fechar_ajuste(ALMOX, "INVENTARIO-c1")
+    assert est.modo(ALMOX) == 0 and est.achar_movimento(ALMOX, "INVENTARIO-c1") and len(est.movimentos) == 2
+    est = falso(expirar_em=4)
+    est.abrir_ajuste(ALMOX)
+    est.gravar_saldo(ALMOX, ITEM, 2)
+    with pytest.raises(E.SemLogin):
+        est.fechar_ajuste(ALMOX, "INVENTARIO-c1")
+    assert [m["tipo"] for m in est.movimentos] == ["saida", "entrada"]       # o fechamento valeu antes do login morrer
+    with pytest.raises(E.SemLogin):
+        est.voltar_ao_normal(ALMOX)                      # o login não volta nesta instância
+
+
+def test_falso_voltar_ao_normal_nao_mexe_em_inventario_fisico():
+    est = falso()
+    est.definir_modo(ALMOX, 3)
+    with pytest.raises(E.ErroFracttal):
+        est.voltar_ao_normal(ALMOX)
+    assert est.modo(ALMOX) == 3
+    with pytest.raises(E.ErroFracttal):
+        est.abrir_ajuste(ALMOX)
+
+
+def test_falso_trava_entradas_e_saidas_em_ajuste_e_em_inventario_fisico():
+    """O Fracttal de verdade trava Entradas e Saídas com o modo aberto (passo 0): um teste que "lança uma peça" no meio de
+    uma gravação tem de ver a recusa, e não passar com um falso mais bonzinho que o real."""
+    est = falso()
+    est.mover(ALMOX, ITEM, "saida", 1)                   # modo 0: passa
+    est.abrir_ajuste(ALMOX)
+    with pytest.raises(E.ErroFracttal):
+        est.mover(ALMOX, ITEM, "entrada", 1)
+    est.voltar_ao_normal(ALMOX)
+    est.definir_modo(ALMOX, 3)
+    with pytest.raises(E.ErroFracttal):
+        est.mover(ALMOX, ITEM, "saida", 1)
+
+
+# ── achar o movimento sem ler o histórico inteiro ──────────────────────────────────────────────────────────────────────────
+def test_achar_movimento_com_data_para_na_primeira_linha_mais_velha():
+    """O "não achei" de uma retomada lia o histórico INTEIRO do almoxarifado (a cota de 200/min é da empresa). Com a data
+    em que a gravação começou, para na primeira linha mais velha."""
+    fr = Fracttal({HISTORICO: em_paginas(HIST)})
+    est = estoque(fr, pagina=2)
+    assert est.achar_movimento(ALMOX, "INVENTARIO-c9", desde_iso="2026-10-26T14:00:00Z") is None
+    assert len(fr.pedidos) == 2                          # a MOV-3 (13:00) está na 2ª página e é mais velha: não há 3ª
+    fr.pedidos.clear()
+    assert est.achar_movimento(ALMOX, "INVENTARIO-c9") is None and len(fr.pedidos) == 3     # sem a data, lê tudo
+    assert est.achar_movimento(ALMOX, "Consumo antigo") == "MOV-2"
+    assert est.achar_movimento(ALMOX, "Consumo antigo", "2026-10-26T00:00:00Z") is None     # mais velho que a data: fora
+    assert est.achar_movimento(ALMOX, "INVENTARIO-c1", "2026-10-26T00:00:00Z") == "MOV-6"
+    with pytest.raises(ValueError):
+        est.achar_movimento(ALMOX, "x", "ontem")
+
+
+def test_falso_achar_movimento_com_data():
+    est = falso(agora=lambda: "2026-10-26T15:00:00Z")
+    est.abrir_ajuste(ALMOX)
+    est.gravar_saldo(ALMOX, ITEM, 2)
+    est.fechar_ajuste(ALMOX, "INVENTARIO-c1")
+    assert est.achar_movimento(ALMOX, "INVENTARIO-c1", "2026-10-26T14:00:00Z")
+    assert est.achar_movimento(ALMOX, "INVENTARIO-c1", "2026-10-26T16:00:00Z") is None
+    assert est.achar_movimento(ALMOX, "INVENTARIO-c1")
+
+
+# ── o ritmo é da empresa, não da instância ─────────────────────────────────────────────────────────────────────────────────
+def test_o_ritmo_e_dividido_entre_as_instancias():
+    """A cota de 200/min é da EMPRESA: duas pessoas gravando juntas, cada uma com a sua instância (o login é da pessoa),
+    não podem pedir 2 por segundo. Duas instâncias com o mesmo `Ritmo`: 4 pedidos levam pelo menos 3 s."""
+    relogio = Relogio()
+    ritmo = E.Ritmo(relogio, relogio.dormir)
+    a = E.EstoqueFracttal(Fracttal({LISTA: ok([{"id": 134082, "mode": 0}])}), ritmo=ritmo)
+    b = E.EstoqueFracttal(Fracttal({LISTA: ok([{"id": 134082, "mode": 0}])}), ritmo=ritmo)
+    t0 = relogio()
+    a.modo(ALMOX), b.modo(ALMOX), a.modo(ALMOX), b.modo(ALMOX)
+    assert relogio() - t0 >= 3 and relogio.dormiu == [1.0, 1.0, 1.0]
+
+
+def test_sem_ritmo_proprio_toda_instancia_usa_o_do_modulo(monkeypatch):
+    """O que a produção faz (`estoque_da_sessao` não passa ritmo): o `RITMO` do módulo, de todas as instâncias."""
+    relogio = Relogio()
+    monkeypatch.setattr(E, "RITMO", E.Ritmo(relogio, relogio.dormir))
+    a = E.EstoqueFracttal(Fracttal({LISTA: ok([{"id": 134082, "mode": 0}])}))
+    b = E.EstoqueFracttal(Fracttal({LISTA: ok([{"id": 134082, "mode": 0}])}))
+    t0 = relogio()
+    a.modo(ALMOX), b.modo(ALMOX), a.modo(ALMOX)
+    assert relogio() - t0 >= 2
+
+
+# ── o modo em branco não é "normal" ────────────────────────────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize("linha", [{"id": 134082, "mode": None}, {"id": 134082}, {"id": 134082, "mode": ""}])
+def test_modo_em_branco_e_erro_nunca_normal(linha):
+    """É a conferência da trava: um almoxarifado que veio sem o `mode` não pode ser dado como livre para movimento."""
+    with pytest.raises(E.ErroFracttal, match="mode"):
+        estoque(Fracttal({LISTA: ok([linha])})).modo(ALMOX)
+    assert estoque(Fracttal({LISTA: ok([{"id": 134082, "mode": 0}])})).modo(ALMOX) == 0      # o 0 de verdade segue 0
+
+
+# ── o `api` de verdade: o cache das OS, o JWT vencido e a sessão morta no corpo ──────────────────────────────────────────────
+def test_o_adaptador_nao_esvazia_o_cache_de_leitura_das_os(app, api_do_clone, monkeypatch):
+    """O `_rpc_call` do OS Creator trata como "gravação de OS" todo método que não é "_list", "get", "details" ou "load_" e,
+    a cada um, limpa a memória das leituras de OS do processo inteiro: `warehouses_items_stock` e toda gravação de estoque
+    caem aí. O adaptador chama o `_rpc_chamar` (o mesmo POST, sem a limpeza), e o `api.py` não se edita."""
+    assert not api_do_clone._eh_leitura(SALDOS) and not api_do_clone._eh_leitura(ATUALIZA_LIGACAO)      # a premissa
+    chave = ("tasks.work_orders_tasks_new_list", 99)
+    monkeypatch.setattr(api_do_clone.requests, "post", lambda *a, **k: _result({"success": True, "data": [], "total": 0}))
+    est = E._estoque_do_clone(app, _jwt(), "pessoa@exemplo.test", relogio=Relogio(), dormir=lambda s: None)
+    try:
+        api_do_clone._LEITURAS_OS[chave] = (time.time(), [{"id": 1}])
+        est.ler(ALMOX)
+        est.abrir_ajuste(ALMOX)
+        assert chave in api_do_clone._LEITURAS_OS        # o cache das OS segue de pé
+        from os_web import sessao as os_sessao
+        with os_sessao.contexto(_jwt(), ""):
+            api_do_clone._rpc_call(SALDOS, {"id_warehouse": 1})
+        assert chave not in api_do_clone._LEITURAS_OS    # e o teste enxerga a limpeza que o `_rpc_call` faria
+    finally:
+        api_do_clone._LEITURAS_OS.pop(chave, None)
+
+
+def test_pelo_api_de_verdade_jwt_vencido_e_sessao_morta_no_corpo(app, api_do_clone, monkeypatch):
+    """As duas frases/códigos de sessão morta que não vêm como HTTP 401: o JWT vencido que não renovou (texto do
+    `_rpc_headers`) e o `USER_NOT_LOGIN` no corpo (a `SessionExpired` do `_rpc_chamar`)."""
+    pedidos = []
+
+    def post(url, headers=None, json=None, timeout=None):
+        pedidos.append(url)
+        if url == api_do_clone.RPC_TOKEN_URL:
+            return _Resposta(401)                        # a renovação recusada
+        return _result({"success": False, "message": "USER_NOT_LOGIN"})
+    monkeypatch.setattr(api_do_clone.requests, "post", post)
+    est = E._estoque_do_clone(app, _jwt(exp_s=-600), "pessoa@exemplo.test", relogio=Relogio(), dormir=lambda s: None)
+    with pytest.raises(E.SemLogin, match="expirou"):
+        est.modo(ALMOX)
+    assert pedidos == [api_do_clone.RPC_TOKEN_URL]       # nem chegou ao proxy
+    est = E._estoque_do_clone(app, _jwt(), "pessoa@exemplo.test", relogio=Relogio(), dormir=lambda s: None)
+    with pytest.raises(E.SemLogin, match="expirou ou foi encerrada"):
+        est.modo(ALMOX)

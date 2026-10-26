@@ -5,9 +5,11 @@ inventario-almoxarifado-passo0.md`, com os métodos, os corpos e as respostas li
 
 - O Fracttal responde HTTP 200 com `success: false` e a mensagem no corpo (caso real: desativar peça com saldo,
   `ASSET_CANNOT_BE_DESABLED_STOCK`), e o `_rpc_call` do OS Creator DEVOLVE isso em vez de levantar. Aqui toda resposta é
-  conferida, e vira `ErroFracttal`.
-- A cota de 200 pedidos por minuto é da EMPRESA inteira (os robôs e o App de Campo gastam dela): cada pedido daqui sai no
-  máximo a 1 por segundo.
+  conferida, e vira `ErroFracttal`. Lista que chega pela metade (página vazia antes do `total`) também é erro: número
+  pela metade não vai para a tela.
+- A cota de 200 pedidos por minuto é da EMPRESA inteira (os robôs e o App de Campo gastam dela): os pedidos do adaptador
+  saem no máximo a 1 por segundo, no MESMO ritmo para todas as instâncias do processo (duas pessoas gravando juntas somam
+  1 por segundo, não 2).
 - O ajuste de saldo NÃO é um movimento por peça: é uma SESSÃO do almoxarifado (modo 2, "Ajuste de inventário"). Abre-se o
   modo, grava-se o saldo absoluto de cada peça e fecha-se com uma `description`; ao fechar, o Fracttal gera, por peça
   mexida, um par de movimentos do tipo 15 (saída do saldo antigo inteiro, entrada do novo). Gravar o mesmo número duas
@@ -34,6 +36,7 @@ from datetime import datetime, timezone
 INTERVALO_S = 1.0           # um pedido por segundo (a cota de 200/min é da empresa)
 PAGINA = 200                # o máximo que a tela do Fracttal pede
 PAGINAS_MAX = 1000          # trava de segurança: uma lista que não acaba seria um laço contra a cota da empresa
+TIMEOUT_S = 45              # o mesmo do `_rpc_call` do OS Creator
 TIPO_PECA = 4               # `id_type_item` das peças (o que a tela de Peças e Suprimentos lista)
 
 # Os métodos do Fracttal que o passo 0 provou (um nome só por operação, para o teste e o leitor acharem).
@@ -152,6 +155,30 @@ def _traduzir(erro: Exception) -> Exception | None:
     return None
 
 
+class Ritmo:
+    """O ritmo dos pedidos ao Fracttal: o relógio e a trava de UM só lugar, que todas as instâncias dividem (`RITMO`). A
+    cota de 200/min é da empresa: se cada instância tivesse o relógio dela, duas pessoas gravando ao mesmo tempo (cada uma
+    com o login e a instância dela) pediriam 2 por segundo. Reserva o próximo segundo livre sob trava e espera por ele fora
+    da trava. Conta do INÍCIO de um pedido ao início do outro: o Fracttal que levou 1,5 s já pagou o intervalo.
+    É por processo (o Nexus roda num só, com threads) e só dos pedidos do adaptador: os do OS Creator e os dos robôs não
+    passam por aqui. O relógio e o `dormir` são injetáveis para o teste não esperar de verdade."""
+
+    def __init__(self, relogio=time.monotonic, dormir=time.sleep, intervalo: float = INTERVALO_S):
+        self._relogio, self._dormir, self._intervalo = relogio, dormir, intervalo
+        self._trava, self._proximo = threading.Lock(), 0.0
+
+    def esperar(self) -> None:
+        with self._trava:
+            agora = self._relogio()
+            inicio = max(agora, self._proximo)
+            self._proximo = inicio + self._intervalo
+        if inicio > agora:
+            self._dormir(inicio - agora)
+
+
+RITMO = Ritmo()             # o da empresa: toda `EstoqueFracttal` sem ritmo próprio usa este
+
+
 # ── o contrato ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 class Estoque(abc.ABC):
     """O que a gravação, a régua e a curadoria esperam do estoque. A `EstoqueFracttal` (o Fracttal de verdade) e a
@@ -176,8 +203,16 @@ class Estoque(abc.ABC):
 
     @abc.abstractmethod
     def fechar_ajuste(self, id_almox: str, referencia: str) -> str:
-        """Fecha a sessão com a `referencia` na `description` dos movimentos e volta ao modo 0. Devolve o `folio_return`
-        do Fracttal como texto ('' se ele não disse)."""
+        """Fecha a sessão com a `referencia` na `description` dos movimentos (o `finalize`) e depois volta ao modo 0
+        (`voltar_ao_normal`). Devolve o `folio_return` do Fracttal como texto ('' se ele não disse). SÃO DOIS PEDIDOS: se
+        o 2º falhar, o fechamento JÁ VALEU (os movimentos existem) e o almoxarifado fica em modo 2 ("fechamento feito,
+        modo 0 pendente"): a recuperação é só `voltar_ao_normal`, nunca um segundo `fechar_ajuste`."""
+
+    @abc.abstractmethod
+    def voltar_ao_normal(self, id_almox: str) -> None:
+        """Põe o almoxarifado no modo 0 (`warehouse_update`), liberando Entradas, Saídas e Pedidos de compra. É o 2º passo
+        do `fechar_ajuste` e, sozinho, a recuperação do fechamento cujo modo 0 falhou. Só para o que o Nexus abriu: nunca
+        para o modo 3 (inventário físico, de outra pessoa)."""
 
     @abc.abstractmethod
     def ler(self, id_almox: str) -> dict[str, dict]:
@@ -189,9 +224,11 @@ class Estoque(abc.ABC):
         """Liga a peça ao almoxarifado (saldo e régua em 0). Devolve a ligação."""
 
     @abc.abstractmethod
-    def achar_movimento(self, id_almox: str, referencia: str) -> str | None:
+    def achar_movimento(self, id_almox: str, referencia: str, desde_iso: str | None = None) -> str | None:
         """O `folio` do movimento mais novo cuja `description` é exatamente a `referencia`, ou None. É como a retomada
-        confirma que um fechamento cuja resposta se perdeu valeu."""
+        confirma que um fechamento cuja resposta se perdeu valeu. Com `desde_iso` (ISO UTC, o "Contada em" ou o começo da
+        gravação), só olha os movimentos dessa data em diante e para na primeira linha mais velha: o "não achei" não lê o
+        histórico inteiro da cota que é de todos."""
 
     @abc.abstractmethod
     def mexidas_desde(self, id_almox: str, desde_iso: str, ignorar_referencia: str | None = None) -> set[str] | None:
@@ -217,31 +254,24 @@ class EstoqueFracttal(Estoque):
     """O estoque do Fracttal pelo RPC da própria tela. `chamar(metodo, params) -> dict` é o `_rpc_call` do OS Creator já
     dentro da sessão de quem aprovou (`estoque_da_sessao`); os testes passam um gravador no lugar.
 
-    `relogio` e `dormir` são injetáveis para o teste do ritmo não esperar de verdade. `pagina` é o `limit` dos pedidos.
+    O ritmo é o da empresa (`RITMO`, de todas as instâncias). Os testes dão o `ritmo` deles, ou o `relogio`, o `dormir` e o
+    `intervalo` (que montam um `Ritmo` só desta instância), para não esperar de verdade. `pagina` é o `limit` dos pedidos.
     Uma instância serve uma gravação de cada vez: guarda as ligações lidas (peça × almoxarifado) para gravar o saldo e a
     régua sem ler o almoxarifado a cada peça (uma leitura são alguns pedidos de 1 s)."""
 
-    def __init__(self, chamar, *, relogio=time.monotonic, dormir=time.sleep, intervalo: float = INTERVALO_S,
-                 pagina: int = PAGINA):
+    def __init__(self, chamar, *, relogio=None, dormir=None, intervalo: float | None = None, pagina: int = PAGINA,
+                 ritmo: Ritmo | None = None):
         if pagina < 1:
             raise ValueError("a página precisa ter ao menos 1 linha")
-        self._chamar_rpc, self._relogio, self._dormir = chamar, relogio, dormir
-        self._intervalo, self._pagina = intervalo, pagina
-        self._trava, self._proximo = threading.Lock(), 0.0
+        if ritmo is None and (relogio is not None or dormir is not None or intervalo is not None):
+            ritmo = Ritmo(relogio or time.monotonic, dormir or time.sleep, INTERVALO_S if intervalo is None else intervalo)
+        self._chamar_rpc, self._ritmo, self._pagina = chamar, ritmo, pagina
         self._ligacoes: dict[str, dict[str, str]] = {}      # almoxarifado -> {id_item: ligação}
         self._unidades: dict[str, tuple[int, str]] | None = None
 
     # o pedido: o ritmo, a tradução dos erros e o `success`
     def _esperar(self) -> None:
-        """Reserva o próximo segundo livre e espera por ele. Conta do INÍCIO de um pedido ao início do outro: o Fracttal
-        que levou 1,5 s já pagou o intervalo. A reserva é sob trava (duas threads não pegam o mesmo segundo); a espera,
-        fora dela."""
-        with self._trava:
-            agora = self._relogio()
-            inicio = max(agora, self._proximo)
-            self._proximo = inicio + self._intervalo
-        if inicio > agora:
-            self._dormir(inicio - agora)
+        (self._ritmo if self._ritmo is not None else RITMO).esperar()      # o do módulo, buscado a cada pedido
 
     def _rpc(self, metodo: str, params: dict) -> dict:
         self._esperar()
@@ -264,16 +294,23 @@ class EstoqueFracttal(Estoque):
         start = 0
         for _ in range(PAGINAS_MAX):
             r = self._rpc(metodo, {**base, "page": start // self._pagina + 1, "limit": self._pagina, "start": start})
-            dados = r.get("data")
-            dados = dados if isinstance(dados, list) else []
-            yield from dados
-            if not dados:
-                return
-            start += len(dados)
             try:
                 total = int(r.get("total"))
             except (TypeError, ValueError):
                 total = None
+            dados = r.get("data")
+            if dados is None:
+                dados = []                                    # sem linhas; se o `total` diz que há, é erro logo abaixo
+            elif not isinstance(dados, list):
+                raise ErroFracttal(f"o Fracttal mandou `data` que não é lista ({type(dados).__name__})", metodo)
+            if not dados:
+                if total is not None and start < total:
+                    # Caso reproduzido na revisão: `ler` devolvia 1 peça de `total: 5`, e `data: null, total: 120` virava
+                    # `{}`. Lista curta passando por inteira iria para a tela e para a conta do que "não mexeu".
+                    raise ErroFracttal(f"a lista veio vazia com {start} de {total} linhas lidas", metodo)
+                return
+            yield from dados
+            start += len(dados)
             # com o `total`, a última página é a que o fecha; sem ele, a que veio mais curta que o pedido
             acabou = start >= total if total is not None else len(dados) < self._pagina
             if acabou:
@@ -305,7 +342,12 @@ class EstoqueFracttal(Estoque):
         base = {"filter": [], "sort": [], "is_tree": False, "node": None}
         for l in self._linhas(LISTA, base):
             if isinstance(l, dict) and str(l.get("id")) == str(alvo):
-                return int(_numero_lido(l.get("mode"), "mode", LISTA) or 0)
+                modo = _numero_lido(l.get("mode"), "mode", LISTA)
+                if modo is None:
+                    # é a conferência da trava (o almoxarifado em ajuste ou em inventário físico não aceita movimento):
+                    # vazio nunca é "0 = normal"
+                    raise ErroFracttal(f"o almoxarifado {id_almox} veio sem o `mode`", LISTA)
+                return int(modo)
         raise ErroFracttal(f"o almoxarifado {id_almox} não está na lista do Fracttal", LISTA)
 
     def abrir_ajuste(self, id_almox: str) -> None:
@@ -320,16 +362,21 @@ class EstoqueFracttal(Estoque):
 
     def fechar_ajuste(self, id_almox: str, referencia: str) -> str:
         """Fecha com a `referencia` na `description` e só então volta ao modo 0: o fechamento que o Fracttal recusa
-        deixa o almoxarifado como está, e a retomada o vê aberto. Sem `folio_return` na resposta ('' no retorno), o
-        fechamento valeu mesmo assim: o modo volta a 0 e quem confere procura o movimento pela referência."""
+        deixa o almoxarifado como está, e a retomada o vê aberto. Se o fechamento valeu e o modo 0 falhou, o erro sobe
+        daqui e o almoxarifado fica em modo 2 com os movimentos já gerados: a recuperação é só `voltar_ao_normal`, nunca
+        um segundo fechamento. Sem `folio_return` na resposta ('' no retorno), o fechamento valeu mesmo assim: quem
+        confere procura o movimento pela referência."""
         alvo, ref = _id(id_almox), str(referencia or "").strip()
         if not ref:
             raise ValueError("o fechamento precisa da referência: é por ela que se confirma que valeu")
         r = self._rpc(FECHAR, {"id_warehouse": alvo, "description": ref})
-        self._rpc(ATUALIZAR_ALMOX, {"id": alvo, "mode": 0})
+        self.voltar_ao_normal(alvo)
         d = r.get("data")
         folio = d.get("folio_return") if isinstance(d, dict) else None
         return "" if folio is None else str(folio)
+
+    def voltar_ao_normal(self, id_almox: str) -> None:
+        self._rpc(ATUALIZAR_ALMOX, {"id": _id(id_almox), "mode": 0})
 
     # o saldo, a ligação e a régua
     def ler(self, id_almox: str) -> dict[str, dict]:
@@ -368,21 +415,31 @@ class EstoqueFracttal(Estoque):
         self._rpc(ATUALIZAR_LIGACAO, {"id": self._ligacao_de(id_almox, id_item), **corpo})
 
     # o histórico de movimentos
-    def _historico(self, id_almox: str):
+    def _historico(self, id_almox: str, desde: datetime | None = None):
         """Os movimentos do almoxarifado do mais novo ao mais velho, só com o que o adaptador usa. O resto da linha (e com
-        ele o `responsible_description`, o nome de quem movimentou) sai aqui e não vai a lugar nenhum."""
+        ele o `responsible_description`, o nome de quem movimentou) sai aqui e não vai a lugar nenhum. Com `desde`, para na
+        primeira linha mais velha (a lista é ordenada por `date_create`: o resto é mais velho ainda e a cota é de todos);
+        a linha de data ilegível não para nada e segue como mexida."""
         base = {"sort": [{"property": "date_create", "direction": "desc"}], "is_tree": False, "node": None,
                 "id_warehouse": _id(id_almox)}
         for l in self._linhas(HISTORICO, base):
-            if isinstance(l, dict):
-                yield {"folio": str(l.get("folio") or l.get("id_movements") or ""), "id_item": str(l.get("id_item") or ""),
-                       "quando": l.get("date_create"), "referencia": str(l.get("description") or "").strip()}
+            if not isinstance(l, dict):
+                continue
+            if desde is not None:
+                try:
+                    if instante(l.get("date_create")) < desde:
+                        return
+                except ValueError:
+                    pass
+            yield {"folio": str(l.get("folio") or l.get("id_movements") or ""), "id_item": str(l.get("id_item") or ""),
+                   "quando": l.get("date_create"), "referencia": str(l.get("description") or "").strip()}
 
-    def achar_movimento(self, id_almox: str, referencia: str) -> str | None:
+    def achar_movimento(self, id_almox: str, referencia: str, desde_iso: str | None = None) -> str | None:
         alvo = str(referencia or "").strip()
         if not alvo:
             raise ValueError("sem a referência, qualquer movimento sem descrição seria o achado")
-        for m in self._historico(id_almox):
+        desde = instante(desde_iso) if desde_iso else None
+        for m in self._historico(id_almox, desde):
             if m["referencia"] == alvo:
                 return m["folio"]
         return None
@@ -393,12 +450,7 @@ class EstoqueFracttal(Estoque):
         corte = instante(desde_iso)
         ignorar = str(ignorar_referencia).strip() if ignorar_referencia else None
         mexidas = set()
-        for m in self._historico(id_almox):
-            try:
-                if instante(m["quando"]) < corte:
-                    break
-            except ValueError:
-                pass
+        for m in self._historico(id_almox, corte):
             if ignorar and m["referencia"] == ignorar:
                 continue
             if m["id_item"]:
@@ -456,9 +508,15 @@ class _SessaoDoClone:
         self._api, self._sessao, self._jwt, self._email = os_api, os_sessao, jwt, email
 
     def chamar(self, metodo: str, params: dict):
+        # `_rpc_chamar` e não `_rpc_call`: o `_rpc_call` classifica pelo NOME do método (leitura é "_list", "get",
+        # "details" ou "load_"; o resto é gravação de OS) e, a cada "gravação", limpa a memória das leituras de OS do
+        # processo inteiro. `warehouses_items_stock` e toda gravação de estoque caem nesse "resto": cada pedido do
+        # adaptador esvaziaria o cache de card do OS Creator de todo mundo (o card voltaria a ler o Fracttal). Nenhum
+        # pedido daqui toca numa OS, e é o mesmo POST e os mesmos erros, sem essa limpeza. O `api.py` não se edita (o
+        # clone fica idêntico ao do oem). Buscado a cada pedido: o teste troca o que quiser.
         with self._sessao.contexto(self._jwt, self._email):
             try:
-                return self._api._rpc_call(metodo, params)        # buscado a cada pedido: o teste troca o `_rpc_call`
+                return self._api._rpc_chamar(metodo, params, TIMEOUT_S)
             finally:
                 novo = self._sessao.jwt_novo()
                 if novo:

@@ -460,35 +460,58 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
   com o que o Fracttal não disse como None, nunca 0.
 - **O ajuste é uma SESSÃO do almoxarifado, não um movimento por peça:** `abrir_ajuste` (modo 2) → `gravar_saldo` (o saldo
   ABSOLUTO de cada peça, idempotente) → `fechar_ajuste(referencia)` (a referência `INVENTARIO-<contagem>` vai na
-  `description`, e o almoxarifado volta ao modo 0). Ao fechar, o Fracttal gera, por peça mexida, um par de movimentos do tipo
-  15 (saída do saldo antigo inteiro, entrada do novo). **Enquanto o modo está aberto o almoxarifado trava Entradas, Saídas e
-  Pedidos de compra** (no passo 0, o `ATHN-MTS200` estava em inventário físico, modo 3, com as duas travadas): quem abre
-  fecha no mesmo trabalho, e a retomada começa pelo `modo`, fechando o que ficou aberto. Resposta perdida (a conexão cai
-  depois do Fracttal gravar): confere pelo `ler` (o saldo) e pelo `achar_movimento(referencia)` antes de repetir.
+  `description`). Ao fechar, o Fracttal gera, por peça mexida, um par de movimentos do tipo 15 (saída do saldo antigo
+  inteiro, entrada do novo). **Enquanto o modo está aberto o almoxarifado trava Entradas, Saídas e Pedidos de compra** (no
+  passo 0, o `ATHN-MTS200` estava em inventário físico, modo 3, com as duas travadas): quem abre fecha no mesmo trabalho, e
+  a retomada começa pelo `modo`, fechando o que ficou aberto. Resposta perdida (a conexão cai depois do Fracttal gravar):
+  confere pelo `ler` (o saldo) e pelo `achar_movimento(referencia, desde_iso)` antes de repetir; o `desde_iso` (o começo da
+  gravação) faz o "não achei" parar na primeira linha mais velha, em vez de ler o histórico inteiro da cota de todos.
+- **O fechamento são DOIS pedidos, e a gravação (Task 7) tem de tratar o estado do meio como um estado próprio:**
+  `fechar_ajuste` faz o `finalize` e depois chama `voltar_ao_normal` (o `warehouse_update` do modo 0). Se o 2º falhar
+  (429, rede, login), o fechamento JÁ VALEU: os movimentos existem e o almoxarifado segue em modo 2, travado para Entradas
+  e Saídas ("fechamento feito, modo 0 pendente"). A recuperação é SÓ `voltar_ao_normal`, nunca um segundo `fechar_ajuste`
+  (geraria outro par de movimentos por cima). Como reconhecer: `modo` == 2 e `achar_movimento(referencia, desde_iso)` acha
+  o movimento. `voltar_ao_normal` é só para o que o Nexus abriu: nunca para o modo 3 (inventário físico, de outra pessoa).
 - **Erros:** `Limite` (HTTP 429: a cota de 200/min é da EMPRESA inteira), `SemLogin` (sem login, recusado ou expirado) e
   `ErroFracttal` (o `success: false` com HTTP 200 que o `_rpc_call` do OS Creator DEVOLVE em vez de levantar; a mensagem
   é o código do Fracttal, ex. `ASSET_CANNOT_BE_DESABLED_STOCK`). Rede fora e 500 passam como vieram: a resposta pode ter
-  se perdido depois de gravar, e quem grava decide. O adaptador lê do `api.py` o marcador `session_expired` e o texto
-  "HTTP 429" (um teste cai se o `api.py` mudar um dos dois).
-- **Ritmo e login:** 1 pedido por segundo, do início de um ao início do outro (relógio e `dormir` injetáveis, os testes
-  não esperam). `estoque_da_sessao(app)` pega o login do Fracttal de quem está no pedido (`ponte.sessao_do_os`; sem ele,
-  `SemLogin`: quem entra pela senha não grava estoque); o JWT e o e-mail vivem só na memória da instância, que roda cada
-  pedido dentro de `os_web.sessao.contexto` e guarda o token que o `api` renovar no meio, para um trabalho de minutos
-  não renovar a cada pedido. Chamar dentro do pedido; a instância pode seguir numa thread.
+  se perdido depois de gravar, e quem grava decide. **Lista pela metade é `ErroFracttal`:** `data` que não é lista, ou
+  página vazia com `start < total` (caso da revisão: `ler` devolvia 1 peça de `total: 5`), nunca uma lista curta; vale
+  para `ler`, `codigos`, `achar_movimento`, `mexidas_desde` e `modo`, que passam pela mesma paginação. `modo` sem o `mode`
+  também é erro: é a conferência da trava, e vazio nunca é "0 = normal".
+- **O que o adaptador lê do `api.py` do OS Creator, e o que está provado contra ele:** o marcador `session_expired` da
+  `SessionExpired` (HTTP 401/403 e o `USER_NOT_LOGIN` no corpo), o texto "HTTP 429", e as frases "não está logado no
+  Fracttal" (sem JWT na sessão) e "JWT do login do Fracttal expirou" (vencido e sem renovar). Os quatro casos têm teste com
+  o `api` DE VERDADE do clone (só o `requests.post` trocado); se o `api.py` mudar um deles, o teste cai.
+- **Ritmo e login:** 1 pedido por segundo, do início de um ao início do outro, num relógio e numa trava DO MÓDULO (`RITMO`)
+  que todas as instâncias dividem: a cota é da empresa, e duas pessoas gravando juntas, cada uma com a instância dela,
+  somam 1 por segundo, não 2 (é por processo e só dos pedidos do adaptador: os do OS Creator e os dos robôs não passam
+  por ali). O teste dá o `ritmo` (ou o relógio e o `dormir`) e não espera de verdade. `estoque_da_sessao(app)` pega o login
+  do Fracttal de quem está no pedido (`ponte.sessao_do_os`; sem ele, `SemLogin`: quem entra pela senha não grava estoque); o
+  JWT e o e-mail vivem só na memória da instância, que roda cada pedido dentro de `os_web.sessao.contexto` e guarda o token
+  que o `api` renovar no meio, para um trabalho de minutos não renovar a cada pedido. Chamar dentro do pedido; a instância
+  pode seguir numa thread. **Chama o `api._rpc_chamar`, não o `_rpc_call`** (o `api.py` não se edita: o clone fica idêntico
+  ao do oem): o `_rpc_call` trata como "gravação de OS" todo método que não é "_list", "get", "details" ou "load_" e limpa o
+  cache de leituras de OS do processo inteiro a cada um; `warehouses_items_stock` e toda gravação de estoque caem aí, e cada
+  pedido do adaptador esvaziaria o cache dos cards de todo mundo. Nenhum pedido daqui toca numa OS.
 - **Nome de gente não entra:** o `responsible_description` do histórico de movimentos é nome de pessoa; o adaptador projeta
   só `folio`, `id_item`, `date_create` e `description`, e nunca o guarda nem o devolve.
 - **A régua** (`definir_regua`) manda só o mínimo e o máximo que vieram (como texto, o que a tela e a prova de 26/10
   mandaram), fora do modo de ajuste, sem mexer em saldo nem gerar movimento. **Conflito** (`mexidas_desde`): o histórico
   vem do mais novo ao mais velho e se lê até passar da data (a cota é de todos); data ilegível numa linha conta como
   mexida.
-- **O falso** (`tests/estoque_falso.py`): na memória, com o modo, o par de movimentos ao fechar e os defeitos pelo
-  construtor (`perder_resposta`, uma vez por operação: grava e levanta `ConnectionError`; `limite_em` e `expirar_em`: a
-  N-ésima chamada). O que o passo 0 não provou e o falso supõe (ligar duas vezes, código repetido, abrir ajuste em modo 3)
-  está no cabeçalho dele: conferir na prova com o App (Task 10).
-- **Provar:** `tests/test_pcm_inventario_estoque.py` (48 testes: os corpos e a ordem do passo 0, a paginação, o ritmo, os
-  erros, o histórico sem nome, e o `api` de verdade do clone com só o `requests.post` trocado); 11 mutações (ritmo, nulo
-  que vira 0, `success`, corte da data, token renovado, nome guardado, 429, volta ao modo 0, régua, total da página, saldo
-  negativo), todas pegas.
+- **O falso** (`tests/estoque_falso.py`): na memória, com o modo, o par de movimentos ao fechar, o fechamento em dois
+  passos (`finalizado, modo 0 pendente`) e os defeitos pelo construtor (`perder_resposta`, uma vez por operação: grava e
+  levanta `ConnectionError`; `limite_em`: a N-ésima chamada só; `expirar_em`: da N-ésima em diante TODA chamada da
+  instância é `SemLogin`, como o adaptador de verdade, que reenvia o JWT morto). `voltar_ao_normal` é uma operação à parte
+  para os defeitos, e `mover` (uma OS que lança peça) é recusado com o almoxarifado em modo 2 ou 3. O que o passo 0 não
+  provou e o falso supõe (gravar fora do modo, ligar duas vezes, código repetido, abrir em modo 3, um 2º finalize, mover em
+  modo 2) está no cabeçalho dele: conferir na prova com o App (Task 10).
+- **Provar:** `tests/test_pcm_inventario_estoque.py`: os corpos e a ordem do passo 0, a paginação (inclusive a lista pela
+  metade), o ritmo (uma instância e duas), os erros, o histórico sem nome, o fechamento em dois passos, o cache das OS
+  intacto e o `api` de verdade do clone com só o `requests.post` trocado. Mutações nas regras de cada item acima (ritmo,
+  nulo que vira 0, `success`, lista curta, corte da data, token renovado, nome guardado, 429, volta ao modo 0, `mode` vazio,
+  `_rpc_call`), todas pegas.
 
 ## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
 
