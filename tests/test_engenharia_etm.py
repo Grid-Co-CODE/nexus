@@ -760,3 +760,53 @@ def test_cada_os_leva_quantos_comentarios_tem(tela, cliente):
     O.registrar_comentario(os1, "Segundo", ANA, True, "sim")
     o = {x["os"]: x for x in _dados_da_tela(_como(cliente, ANA).get(URL_TELA).get_data(as_text=True))["oss"]}
     assert o["1"]["n_coment"] == 2 and o["3"]["n_coment"] == 0
+
+
+# ── a revisão da 4ª rodada (26/10/2026) ──────────────────────────────────────────────────────────────────────────────
+def test_a_usina_da_os_segue_a_da_etm():
+    # a OS sem grupo virava a usina "" (o cartão dela não abria) e o espaço dobrado separava uma usina em duas (as ETMs
+    # num cartão, as OS noutro): a OS usa o mesmo nome limpo da ETM
+    oss = {o["os"]: o for o in E.montar([dict(w(1, "Corretiva"), groups_1_description=""),
+                                         dict(w(2, "Corretiva"), groups_1_description="Cliente X -  Usina Alfa - MG ")],
+                                        ETMS, SET, HOJE)}
+    assert (oss["1"]["usina"], oss["1"]["cliente"]) == (E.SEM_USINA, "Não identificado")
+    assert oss["2"]["usina"] == U
+    assert E.cliente_de(E.SEM_USINA) == "Não identificado"
+
+
+def test_sem_leitura_do_fracttal_finalizar_e_chat_dizem_que_estao_lendo(tela, cliente, monkeypatch):
+    # depois de subir, a cópia vazia não vira "nenhum comentário" nem "não está mais finalizada": a tela diz que lê
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+
+    from nexus.engenharia import etm_marcas as M
+    monkeypatch.setattr(E, "dados", lambda: {"os": [], "usinas": {}, "lido": 0.0, "lendo": True, "erro": ""})
+    c = _como(cliente, ANA)
+    r = c.post(URL_FIN, json={"usina": U, "os": ["3"]}, headers=SAME)
+    assert r.status_code == 503 and "Lendo" in r.get_json()["erro"]
+    r = c.get(URL_CHAT, query_string={"usina": U})
+    assert r.status_code == 503 and "Lendo" in r.get_json()["erro"]
+    assert len(tela) == 2 and M._reler()["eventos"] == []                  # pediu a leitura e não gravou nada
+
+
+def test_finalizar_em_lote_recusa_o_pedido_torto(lote, cliente):
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+
+    from nexus.engenharia import etm_marcas as M
+    c = _como(cliente, ANA)
+    for corpo in ([U], {"usina": U, "os": "35"}, {"usina": U, "os": 5}, {"os": ["3"]},
+                  {"usina": U, "os": [str(n) for n in range(501)]}):
+        assert c.post(URL_FIN, json=corpo, headers=SAME).status_code == 400, corpo
+    assert M._reler()["eventos"] == []
+
+
+def test_o_chat_diz_quantos_comentarios_nao_abriram(tela, cliente, app):
+    # com a chave do cofre trocada (ou sem ela), o comentário não abre: o botão contava 1 e a gaveta dizia "nenhum"
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.cadastro.cifra import gerar_chave
+    from nexus.engenharia import os_acompanhamento as O
+    O.registrar_comentario({"wid": 50001, "folio": "1", "codigo": "ALF100-ESTM1"}, "Antes da troca", ANA, True, "sim")
+    app.config["NEXUS_CHAVE_CADASTRO"] = gerar_chave()
+    O.limpar()
+    j = _como(cliente, ANA).get(URL_CHAT, query_string={"usina": U}).get_json()
+    assert j["comentarios"] == [] and j["ilegiveis"] == 1

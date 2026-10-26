@@ -198,7 +198,7 @@
   // Aberto na usina aberta
   var ABAS = ['planner', 'historico', 'abertas'];
   var vista = {aba: 'planner', cliente: '', usina: '', aberta: '', hIni: '', hFim: '', hCanc: false};
-  function fold(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  function fold(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
   function preencher(alvo, itens) { alvo.replaceChildren.apply(alvo, itens); }
 
@@ -206,7 +206,10 @@
   var GUARDA = 'nexus-etm-vista';
   function guardar() {
     try {
-      var f = {}; FILTROS.forEach(function (d) { f[d.k] = Array.from(estado.f[d.k]); });
+      // tudo marcado é Todos: vai guardado vazio, senão a opção que aparece depois da volta (o responsável trocado na OS)
+      // ficava de fora de um filtro que dizia Todos (revisão de 26/10/2026)
+      var f = {};
+      FILTROS.forEach(function (d) { var s = estado.f[d.k]; f[d.k] = !d.padrao && s.size === OPTS[d.k].length ? [] : Array.from(s); });
       sessionStorage.setItem(GUARDA, JSON.stringify({vista: vista, f: f, q: estado.q, ini: estado.ini, fim: estado.fim,
                                                       etiquetas: estado.etiquetas}));
     } catch (e) { /* sem o armazenamento da aba: a tela funciona, só não lembra */ }
@@ -214,17 +217,24 @@
   function restaurar() {
     var s = null;
     try { s = JSON.parse(sessionStorage.getItem(GUARDA) || 'null'); } catch (e) { s = null; }
-    if (s && s.vista) {
-      ['aba', 'cliente', 'usina', 'aberta', 'hIni', 'hFim'].forEach(function (k) { if (typeof s.vista[k] === 'string') vista[k] = s.vista[k]; });
-      vista.hCanc = !!s.vista.hCanc;
-      // só o que ainda existe nas OS: a usina que saiu da leitura não vira um filtro que esconde tudo
-      FILTROS.forEach(function (d) {
-        ((s.f && s.f[d.k]) || []).forEach(function (v) { if (OPTS[d.k].indexOf(v) >= 0) estado.f[d.k].add(v); });
-      });
-      estado.q = typeof s.q === 'string' ? s.q : '';
-      estado.ini = typeof s.ini === 'string' ? s.ini : '';
-      estado.fim = typeof s.fim === 'string' ? s.fim : '';
-      estado.etiquetas = Array.isArray(s.etiquetas) ? s.etiquetas.filter(function (x) { return typeof x === 'string'; }) : [];
+    try {
+      if (s && s.vista) {
+        ['aba', 'cliente', 'usina', 'aberta', 'hIni', 'hFim'].forEach(function (k) { if (typeof s.vista[k] === 'string') vista[k] = s.vista[k]; });
+        vista.hCanc = !!s.vista.hCanc;
+        // só o que ainda existe nas OS: a usina que saiu da leitura não vira um filtro que esconde tudo
+        FILTROS.forEach(function (d) {
+          var lista = s.f && s.f[d.k];
+          if (Array.isArray(lista)) lista.forEach(function (v) { if (OPTS[d.k].indexOf(v) >= 0) estado.f[d.k].add(v); });
+        });
+        estado.q = typeof s.q === 'string' ? s.q : '';
+        estado.ini = typeof s.ini === 'string' ? s.ini : '';
+        estado.fim = typeof s.fim === 'string' ? s.fim : '';
+        estado.etiquetas = Array.isArray(s.etiquetas) ? s.etiquetas.filter(function (x) { return typeof x === 'string'; }) : [];
+      }
+    } catch (e) {     // o guardado torto (de outra versão da tela) não impede a tela de desenhar: começa do zero
+      estado = novoEstado();
+      vista = {aba: 'planner', cliente: '', usina: '', aberta: '', hIni: '', hFim: '', hCanc: false};
+      try { sessionStorage.removeItem(GUARDA); } catch (e2) { /* sem o armazenamento da aba */ }
     }
     var h = location.hash.replace('#', '');
     if (ABAS.indexOf(h) >= 0) vista.aba = h;
@@ -301,8 +311,8 @@
       busca.setAttribute('aria-label', 'Buscar ' + d.l); p.appendChild(busca);
     }
     var rap = el('div', 'etm-ms-rapido');
-    var todos = el('button', 'etm-lnk', 'Selecionar todos'); todos.type = 'button';
-    var nenhum = el('button', 'etm-lnk', 'Limpar'); nenhum.type = 'button';
+    var todos = el('button', 'etm-lnk', 'Selecionar todos'); todos.type = 'button'; todos.dataset.acao = 'todos';
+    var nenhum = el('button', 'etm-lnk', 'Limpar'); nenhum.type = 'button'; nenhum.dataset.acao = 'nenhum';
     rap.appendChild(todos); rap.appendChild(nenhum); p.appendChild(rap);
     var lista = el('div', 'etm-ms-lista'); lista.setAttribute('role', 'listbox'); lista.setAttribute('aria-multiselectable', 'true');
     opts.forEach(function (o) {
@@ -316,7 +326,8 @@
     function aplicar() {
       estado.f[d.k] = new Set(Array.from(lista.querySelectorAll('input:checked')).map(function (i) { return i.value; }));
       var a = document.activeElement;
-      manter = {k: d.k, q: busca ? busca.value : '', top: lista.scrollTop, foco: a && a.type === 'checkbox' ? a.value : null};
+      manter = {k: d.k, q: busca ? busca.value : '', top: lista.scrollTop, foco: a && a.type === 'checkbox' ? a.value : null,
+                acao: a && a.dataset ? a.dataset.acao || null : null};
       desenha();
     }
     b.addEventListener('click', function (e) {
@@ -330,7 +341,7 @@
     lista.addEventListener('change', aplicar);
     todos.addEventListener('click', function () { lista.querySelectorAll('.etm-ms-op:not([hidden]) input').forEach(function (i) { i.checked = true; }); aplicar(); });
     nenhum.addEventListener('click', function () { lista.querySelectorAll('input').forEach(function (i) { i.checked = false; }); aplicar(); });
-    p.addEventListener('keydown', function (e) { if (e.key === 'Escape') { fechar(); b.focus(); } });
+    w.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !p.hidden) { fechar(); b.focus(); } });
     return w;
   }
   function filtros() {
@@ -349,6 +360,7 @@
         li.scrollTop = manter.top;
         var foco = manter.foco;
         var alvo = foco == null ? null : Array.from(li.querySelectorAll('input')).filter(function (i) { return i.value === foco; })[0];
+        if (!alvo && manter.acao) alvo = p.querySelector('[data-acao="' + manter.acao + '"]');
         (alvo || bu || b).focus({preventScroll: true});
       }
       manter = null;
@@ -449,6 +461,7 @@
   var abN = document.getElementById('etm-ab-n'), acN = document.getElementById('etm-ac-n');
   var abQuadro = document.getElementById('etm-ab-quadro'), abMsg = document.getElementById('etm-ab-msg');
   var abFin = document.getElementById('etm-ab-finalizar');
+  var enviando = false;           // o Finalizar em lote no ar: o redesenho não religa o botão (revisão de 26/10/2026)
   // "3 semanas em aberto" / "2 dias em aberto", pela OS mais antiga da usina
   function tempoEmAberto(dia) {
     if (!dia) return null;
@@ -518,7 +531,7 @@
     abQuadro.replaceChildren(quadroDe(lista, colunasCom(lista, lista.some(function (o) { return o.coluna === 'cancelada'; }))));
     if (abFin) {
       var n = D.sem_marcas ? 0 : paraFinalizar(lista).length;
-      abFin.disabled = !n;
+      abFin.disabled = enviando || !n;
       abFin.querySelector('span').textContent = 'Finalizar pela Engenharia' + (n ? ' (' + n + ')' : '');
       abFin.title = n ? 'Marca as ' + n + ' OS da coluna Finalizadas (fechadas no Fracttal, sem diagnóstico nem o finalizado) como Finalizado pela Engenharia'
         : 'Nenhuma OS fechada no Fracttal esperando a Engenharia nesta usina';
@@ -526,24 +539,27 @@
   }
   function dizerAb(texto) { abMsg.textContent = texto || ''; abMsg.hidden = !texto; }
   if (abFin) abFin.addEventListener('click', function () {
-    var alvos = paraFinalizar(osDaAberta()), n = alvos.length;
-    if (!n) return;
+    var alvos = paraFinalizar(osDaAberta()), n = alvos.length, daUsina = vista.aberta;
+    if (!n || enviando) return;
     if (!confirm('Marcar ' + (n === 1 ? 'a OS finalizada' : 'as ' + n + ' OS finalizadas') + ' no Fracttal desta usina (a coluna Finalizadas) como "Finalizado pela Engenharia"?')) return;
-    abFin.disabled = true; dizerAb('Gravando…');
+    enviando = true; abFin.disabled = true; dizerAb('Gravando…');
+    // a resposta só fala na usina do pedido: quem já abriu outra não lê o aviso no lugar errado
+    var dizerDaUsina = function (texto) { if (vista.aba === 'abertas' && vista.aberta === daUsina) dizerAb(texto); };
     fetch(nexusRota('/t/engenharia/etm/finalizar'), {method: 'POST', credentials: 'same-origin',
           headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-          body: JSON.stringify({usina: vista.aberta, os: alvos.map(function (o) { return o.os; })})})
+          body: JSON.stringify({usina: daUsina, os: alvos.map(function (o) { return o.os; })})})
       .then(function (r) { return r.json().then(function (j) { return {r: r, j: j}; }); })
       .then(function (x) {
-        if (!x.r.ok) { desenha(); dizerAb(x.j.erro || ('HTTP ' + x.r.status)); return; }
+        enviando = false;
+        if (!x.r.ok) { desenha(); dizerDaUsina(x.j.erro || ('HTTP ' + x.r.status)); return; }
         var feitas = {}; x.j.feitas.forEach(function (f) { feitas[f] = true; });
         D.oss.forEach(function (o) { if (feitas[o.os]) o.finalizado = true; });
         var nf = x.j.feitas.length, partes = [nf + (nf === 1 ? ' OS finalizada' : ' OS finalizadas') + ' pela Engenharia'];
         if (x.j.ja.length) partes.push(x.j.ja.length + ' já tinha' + (x.j.ja.length === 1 ? '' : 'm') + ' o diagnóstico ou o finalizado (recarregue para ver)');
-        if (x.j.fora.length) partes.push(x.j.fora.length + ' não está' + (x.j.fora.length === 1 ? '' : 'ão') + ' mais finalizada' + (x.j.fora.length === 1 ? '' : 's') + ' no Fracttal (recarregue para ver)');
-        desenha(); dizerAb(partes.join('; ') + '.');
+        if (x.j.fora.length) partes.push(x.j.fora.length + (x.j.fora.length === 1 ? ' não está mais finalizada' : ' não estão mais finalizadas') + ' no Fracttal (recarregue para ver)');
+        desenha(); dizerDaUsina(partes.join('; ') + '.');
       })
-      .catch(function () { desenha(); dizerAb('Não consegui falar com o Nexus. Tente de novo.'); });
+      .catch(function () { enviando = false; desenha(); dizerDaUsina('Não consegui falar com o Nexus. Tente de novo.'); });
   });
   document.getElementById('etm-ab-volta').addEventListener('click', function () { vista.aberta = ''; abMsg.hidden = true; desenha(); });
   document.getElementById('etm-ab-hist').addEventListener('click', function () {
@@ -683,9 +699,12 @@
       .then(function (x) {
         if (vista.usina !== nome || gav.hidden) return;
         if (!x.r.ok) { chatStatus.textContent = x.j.erro || ('HTTP ' + x.r.status); return; }
-        var cs = x.j.comentarios;
-        chatStatus.textContent = cs.length ? plural(cs.length, 'comentário', 'comentários') + ' nas OS desta usina, o mais novo primeiro.'
-          : 'Nenhum comentário da Engenharia nas OS desta usina ainda.';
+        var cs = x.j.comentarios, il = x.j.ilegiveis || 0;
+        var txt = cs.length ? plural(cs.length, 'comentário', 'comentários') + ' nas OS desta usina, o mais novo primeiro.'
+          : il ? '' : 'Nenhum comentário da Engenharia nas OS desta usina ainda.';
+        // a cifra de outra chave (ou sem a chave do cofre): o botão contou, a gaveta diz por que não mostra
+        if (il) txt += (txt ? ' ' : '') + plural(il, 'comentário não abriu', 'comentários não abriram') + ': a chave do cofre deste Nexus não abre a cifra deles.';
+        chatStatus.textContent = txt;
         preencher(chatLista, cs.map(itemChat));
       })
       .catch(function () { chatStatus.textContent = 'Não consegui falar com o Nexus. Tente de novo.'; });

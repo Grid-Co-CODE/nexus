@@ -58,7 +58,7 @@ def _ler_fracttal(path):
 def cliente_de(usina) -> str:
     """O cliente é o trecho antes do primeiro " - " do nome da usina no Fracttal ("Cliente - Usina - UF")."""
     u = str(usina or "").strip()
-    if not u:
+    if not u or u == SEM_USINA:
         return "Não identificado"
     return u.split(" - ", 1)[0].strip() or u
 
@@ -128,8 +128,11 @@ def montar(linhas: list[dict], codigos_etm: set, setores: dict, hoje) -> list[di
         if not (tipo in TIPOS_SEMPRE or setor != "campo" or _setor_pelo_nome(solic, setores) != "campo"):
             continue
         c = os_equipe._cartao(folio, ts, {"id": w0.get("id_personnel"), "nome": resp}, hoje)
-        c.update(coluna_etm=coluna_etm(c["coluna"]), trabalho=setor, cliente=cliente_de(c["usina"]), responsavel=resp,
-                 solicitante=solic, criado_por=_limpo(w0.get("created_by")))
+        # a usina com o mesmo nome limpo da ETM (`_ler_etms`): a OS sem grupo virava "" (o cartão dela não abria) e o
+        # espaço dobrado separava uma usina em duas (revisão de 26/10/2026)
+        usina = _limpo(c["usina"]) or SEM_USINA
+        c.update(usina=usina, coluna_etm=coluna_etm(c["coluna"]), trabalho=setor, cliente=cliente_de(usina),
+                 responsavel=resp, solicitante=solic, criado_por=_limpo(w0.get("created_by")))
         out.append(c)
     return out
 

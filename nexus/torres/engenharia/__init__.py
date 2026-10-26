@@ -1195,6 +1195,10 @@ def faixa_etm(oss: list[dict], hoje, sem_marcas: bool = False, sem_leitura: bool
     ]
 
 
+LOTE_MAX = 500          # OS num Finalizar em lote (a usina com mais OS de ETM tinha dezenas em 26/10/2026)
+LENDO_ETM = "Lendo as OS de ETM no Fracttal agora; tente de novo em instantes"
+
+
 def _usinas_da_etm(d: dict, oss: list[dict]) -> list[dict]:
     """As usinas do Histórico: as das ETMs (com quantas ETMs cada uma tem; a usina sem OS também entra, como no app) e
     as das OS, por cliente e nome curto."""
@@ -1257,10 +1261,18 @@ def etm_finalizar():
     if _de_outro_site():
         abort(403)
     pode, _meu = _quem_pode()
-    corpo = request.get_json(silent=True) or {}
-    usina = str(corpo.get("usina") or "")
-    pedidas = list(dict.fromkeys(str(x).strip() for x in corpo.get("os") or [] if str(x).strip()))
-    alvo = {str(o["os"]): o for o in ETM.dados()["os"]
+    corpo = request.get_json(silent=True)
+    # o pedido torto não vira OS chutada: "35" era lido letra a letra (as OS 3 e 5) e a lista no lugar do objeto dava 500
+    if not (isinstance(corpo, dict) and isinstance(corpo.get("usina"), str) and corpo["usina"]
+            and isinstance(corpo.get("os"), list) and len(corpo["os"]) <= LOTE_MAX):
+        return jsonify({"erro": "Pedido sem a usina ou a lista das OS"}), 400
+    d = ETM.dados()
+    if not d["lido"]:               # a cópia vazia depois de subir: "fora" diria que nenhuma está mais finalizada
+        ETM.pedir_releitura()
+        return jsonify({"erro": LENDO_ETM}), 503
+    usina = corpo["usina"]
+    pedidas = list(dict.fromkeys(str(x).strip() for x in corpo["os"] if str(x).strip()))
+    alvo = {str(o["os"]): o for o in d["os"]
             if o.get("usina") == usina and o.get("coluna_etm") == "finalizada" and o.get("wid")}
     fora = [f for f in pedidas if f not in alvo]
     try:
@@ -1281,22 +1293,30 @@ def etm_usina_comentarios():
     from ...engenharia import etm as ETM
     from ...engenharia import os_acompanhamento as O
     usina = request.args.get("usina") or ""
-    oss = {O.chave_da_os(o.get("wid")): o for o in ETM.dados()["os"] if o.get("usina") == usina and o.get("wid")}
+    d = ETM.dados()
+    if not d["lido"]:               # a cópia vazia depois de subir: "nenhum comentário" seria mentira
+        ETM.pedir_releitura()
+        return jsonify({"erro": LENDO_ETM}), 503
+    oss = {O.chave_da_os(o.get("wid")): o for o in d["os"] if o.get("usina") == usina and o.get("wid")}
     lido = O.ler()
     if not lido.get("lido_em"):
         motivo = (lido.get("erro") or "sem leitura").split(":")[0]
         return jsonify({"erro": f"Não consegui ler os comentários da Engenharia ({motivo}); tente de novo em instantes"}), 503
     est = O.estado([l for l in lido["eventos"] if O.chave_da_os(l.get("os_id")) in oss])
-    out = []
+    out, ilegiveis = [], 0
     for wid, e in est.items():
         o = oss[wid]
         for ev in e["eventos"]:
-            if ev["evento"] == "comentario" and ev["texto"]:
-                out.append((ev["quando"] or datetime.min.replace(tzinfo=timezone.utc),
-                            {"os": str(o["os"]), "titulo": o.get("titulo") or "", "nome": ev["nome"] or "alguém",
-                             "quando": ev["quando_txt"], "texto": ev["texto"]}))
+            if ev["evento"] != "comentario":
+                continue
+            if not ev["texto"]:     # a cifra de outra chave (ou sem a chave): conta, para a gaveta dizer
+                ilegiveis += 1
+                continue
+            out.append((ev["quando"] or datetime.min.replace(tzinfo=timezone.utc),
+                        {"os": str(o["os"]), "titulo": o.get("titulo") or "", "nome": ev["nome"] or "alguém",
+                         "quando": ev["quando_txt"], "texto": ev["texto"]}))
     out.sort(key=lambda x: x[0], reverse=True)
-    return jsonify({"usina": usina, "comentarios": [c for _, c in out]})
+    return jsonify({"usina": usina, "comentarios": [c for _, c in out], "ilegiveis": ilegiveis})
 
 
 @bp.route("/equipe")

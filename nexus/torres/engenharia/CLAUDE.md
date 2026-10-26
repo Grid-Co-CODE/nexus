@@ -276,21 +276,26 @@ como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenhar
   usina sem OS também aparece, como no app) e a lista das OS da usina, a mais nova primeiro, com o status do Fracttal,
   as marcações e quantos comentários cada uma tem (contados pelas linhas do `nexus_engenharia_os`, sem abrir a cifra),
   o período, as canceladas e o **Chat da usina** (os comentários da Engenharia em todas as OS dela, numa gaveta, lidos no
-  clique pelo `/etm/usina/comentarios`: a cifra abre só para as OS da usina). A busca acha a usina em todos os clientes,
-  sem acento nem caixa. Sem a coluna de filtros: a navegação é a do app.
+  clique pelo `/etm/usina/comentarios`: a cifra abre só para as OS da usina; o comentário cuja cifra não abre, de outra
+  chave do cofre, é contado e a gaveta diz). A busca acha a usina em todos os clientes, sem acento nem caixa. Sem a
+  coluna de filtros: a navegação é a do app.
 - **As Estações em Aberto** (a visão atual do app): as usinas com OS aberta para a Engenharia (a mesma regra da faixa),
   com quantas OS e há quanto tempo (a OS mais antiga; alerta a partir de 7 dias), e as **Estações em Acompanhamento**
   (as usinas com OS marcada Em acompanhamento). A coluna de filtros vale aqui também, menos o Status da OS (a regra é a
   da aba). O clique abre o quadro da usina, com **Finalizar pela Engenharia** em lote (só quem é da Engenharia ou
   administrador): as OS da coluna Finalizadas que a pessoa vê, conferidas no servidor (`/etm/finalizar`) na última
   leitura do Fracttal (da usina e finalizadas nele) e no livro (sem diagnóstico nem o finalizado), numa gravação só
-  (`etm_marcas.finalizar_lote`); a resposta diz as que já estavam encerradas e as que não estão mais finalizadas. E
-  **Ver histórico desta usina**, que abre a usina no Histórico. Sem o livro das marcações, a aba diz e não lista nada
+  (`etm_marcas.finalizar_lote`); a resposta diz as que já estavam encerradas e as que não estão mais finalizadas. O
+  pedido torto (sem a usina, a lista que não é lista, mais de 500 OS) volta 400; enquanto o pedido está no ar o botão
+  fica desligado, e a resposta só aparece na usina do pedido. E **Ver histórico desta usina**, que abre a usina no
+  Histórico. As duas rotas (`/etm/finalizar` e `/etm/usina/comentarios`) respondem 503 "lendo" com a cópia ainda
+  vazia, logo depois de subir: "nenhum comentário" ou "não está mais finalizada" seria mentira. Sem o livro das marcações, a aba diz e não lista nada
   (não dá para saber o que está aberto para a Engenharia).
 - **A leitura** (`nexus/engenharia/etm.py`, medida em 26/10/2026, só leitura): `items?field_1=Estação Meteorológica` dá
   as 172 ETMs (a descrição confere) e `work_orders?items_log_description=Estação Meteorológica` as 1213 OS delas: 15
   pedidos, contra os 172 do app (um por ETM). Fica a OS cujo código é de ETM, uma por número, no cartão do Quadro
-  (`os_equipe._cartao`). A usina de cada ETM (`groups_1_description` do ativo) dá as usinas do Histórico. No teto de páginas a leitura é recusada (um filtro ignorado viraria o Fracttal inteiro). Cópia
+  (`os_equipe._cartao`). A usina de cada ETM (`groups_1_description` do ativo) dá as usinas do Histórico; a da OS
+  usa o mesmo nome limpo ("Usina não identificada" sem o grupo), senão o espaço dobrado separava uma usina em duas. No teto de páginas a leitura é recusada (um filtro ignorado viraria o Fracttal inteiro). Cópia
   de 5 min, relida por trás enquanto a tela é usada e 270 s depois de subir (`etm.manter_quente`, no `instalar`).
 - **Engenharia, Chamados e Campo** (Levi, 26/10/2026: "Engenharia e Chamados vai pelas pessoas dos setores, Campo é o
   restante!"): o setor de quem está com a OS, pelo id do Fracttal, nos setores de Base → Acessos → Pessoas e setores
