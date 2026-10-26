@@ -235,3 +235,9 @@ def anomalias(v) -> list[str]:
         if frase not in out:
             out.append(frase)
     return out
+
+# ── Almoxarifado ─────────────────────────────────────────────────────────────────────────────────────────────────
+# O motivo da peça recusada no lançamento pelo App (25/10/2026). Tirado das recusas reais: as 13 de 21–22/10 foram a
+# chave recusada pelo Fracttal (FOREIGN_KEY_VIOLATION, o erro corrigido no App v294). O texto do erro NUNCA vai ao
+# banco (pode trazer nome): o App classifica, e o que não for destes vira "outro".
+RECUSA_PECA = ("chave recusada pelo Fracttal", "sem permissão", "outro")
