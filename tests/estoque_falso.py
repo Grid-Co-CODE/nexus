@@ -62,8 +62,9 @@ def _operacao(f):
 
 class EstoqueFalso(Estoque):
     def __init__(self, saldos: dict, *, perder_resposta=(), limite_em=None, expirar_em=None, agora=None):
-        """`saldos`: `{id_almox: {id_item: saldo}}`, ou o item como `{"saldo", "minimo", "maximo", "codigo"}` quando o teste
-        precisa da régua ou do código (o que falta é None, e o código, vazio). Todo item de `saldos` já está ligado."""
+        """`saldos`: `{id_almox: {id_item: saldo}}`, ou o item como `{"saldo", "minimo", "maximo", "codigo", "unidade"}`
+        quando o teste precisa da régua, do código ou da unidade (o que falta é None, e o código e a unidade, vazios). Todo
+        item de `saldos` já está ligado."""
         self._itens: dict[str, dict[str, dict]] = {}
         self._n_ligacao = 9_000_000
         for id_almox, itens in saldos.items():
@@ -73,7 +74,8 @@ class EstoqueFalso(Estoque):
                     "saldo": None if v.get("saldo") is None else float(v["saldo"]),
                     "minimo": None if v.get("minimo") is None else float(v["minimo"]),
                     "maximo": None if v.get("maximo") is None else float(v["maximo"]),
-                    "ligacao": str(v.get("ligacao") or self._nova_ligacao()), "codigo": str(v.get("codigo") or "")}
+                    "ligacao": str(v.get("ligacao") or self._nova_ligacao()), "codigo": str(v.get("codigo") or ""),
+                    "unidade": str(v.get("unidade") or "")}
         self._modos: dict[str, int] = {}
         self._pendentes: set[str] = set()                           # finalizado, modo 0 pendente
         self._sessoes: dict[str, dict[str, float | None]] = {}      # almoxarifado -> {id_item: saldo de quando mexeu}
@@ -196,9 +198,9 @@ class EstoqueFalso(Estoque):
         if i in self._itens.get(a, {}):
             raise ErroFracttal("a peça já está ligada a este almoxarifado", "ligar")
         ligacao = self._nova_ligacao()
-        codigo = self._catalogo.get(i, {}).get("codigo", "")      # a peça criada por `criar_peca` leva o código
+        criada = self._catalogo.get(i, {})                        # a peça criada por `criar_peca` leva o código e a unidade
         self._itens.setdefault(a, {})[i] = {"saldo": 0.0, "minimo": 0.0, "maximo": 0.0, "ligacao": ligacao,
-                                            "codigo": codigo}
+                                            "codigo": criada.get("codigo", ""), "unidade": criada.get("unidade", "")}
         return ligacao
 
     @_operacao
@@ -250,6 +252,34 @@ class EstoqueFalso(Estoque):
             raise ValueError("a sigla da usina não pode ser vazia")
         prefixo = f"SP-{sigla}-".upper()
         return sorted(c for c in self._todos_os_codigos() if c.upper().startswith(prefixo))
+
+    @_operacao
+    def peca(self, codigo: str) -> dict | None:
+        alvo = str(codigo or "").strip().upper()
+        if not alvo:
+            raise ValueError("sem o código, qualquer peça seria a achada")
+        for id_item, v in self._catalogo.items():
+            if v["codigo"].upper() == alvo:
+                return {"id": id_item, "nome": v["nome"]}
+        for itens in self._itens.values():
+            for id_item, v in itens.items():
+                if v["codigo"] and v["codigo"].upper() == alvo:
+                    return {"id": id_item, "nome": ""}         # a peça que veio do saldo não traz o nome
+        return None
+
+    @_operacao
+    def achar_peca(self, codigo: str) -> str | None:
+        alvo = str(codigo or "").strip().upper()
+        if not alvo:
+            raise ValueError("sem o código, qualquer peça seria a achada")
+        for id_item, v in self._catalogo.items():
+            if v["codigo"].upper() == alvo:
+                return id_item
+        for itens in self._itens.values():
+            for id_item, v in itens.items():
+                if v["codigo"] and v["codigo"].upper() == alvo:
+                    return id_item
+        return None
 
     def _todos_os_codigos(self) -> set[str]:
         return ({c["codigo"] for c in self._catalogo.values()}

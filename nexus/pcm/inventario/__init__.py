@@ -25,7 +25,7 @@ def registrar(bp) -> None:
 
     # a ponte com o login do Fracttal fica na RAIZ do app (`/os/_nexus/inventario`, o cookie dele só vai para /os): entra junto com
     # a torre, como a ponte do OS Creator (`torres/oscreator/__init__.py`)
-    bp.record_once(lambda estado: estado.app.register_blueprint(ponte_os.bp_raiz))
+    ponte_os.registrar(bp)                     # idempotente: a torre também chama
 
     @bp.route("/pecas/inventario", endpoint="inventario")
     def inventario():

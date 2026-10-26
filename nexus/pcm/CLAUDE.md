@@ -703,6 +703,131 @@ para usar:
   `tests/test_pcm_inventario_livro.py` (inclusive o banco falso com `como_texto=True`, a leitura que falha, a listagem
   incompleta e as mutações nas regras).
 
+## Inventário do almoxarifado: a régua de mínimo e máximo (`inventario/regua.py`; 26/10/2026)
+
+Levi, 26/10/2026: a régua é "sugestão ajustável": o Nexus propõe pela régua de 14/10 e o PCM muda peça a peça. Tela
+`/t/pcm/pecas/inventario/regua?almox=<id>` (a tela dona é o `pecas`, do setor PCM; quem a vê por outro setor só lê). Por peça de
+cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal:
+
+- **Sugestão** (`sugestao`, pura): mínimo = 20% do saldo, máximo = 2x; a avariada (`-AV` no fim do código, ou a marca
+  "Avariado" do catálogo do App) fica sem mínimo e com 3x. Unidade inteira arredonda PARA CIMA (saldo 3 dá mínimo 1, e não 0); METRO
+  e MASSA (o `units_description` do Fracttal) têm duas casas. Saldo 0 (ou negativo) dá (0, 0); **saldo não informado dá
+  (None, None)**: em branco nunca é zero. O `15 x 0,2` do ponto flutuante dá 3,0000000000000004: a conta divide e arredonda
+  antes do teto.
+- **Recomendado** (a Grid): decisão do PCM, só no livro (`fato_regua_minimo`), é o histórico com que se defende o mínimo.
+- **Acordado** (o cliente): decisão do PCM e o ÚNICO que vai ao Fracttal (`definir_regua`, fora da sessão de ajuste: sem
+  movimento, sem mexer no saldo). Leva os DOIS números; o recomendado pode ficar sem mínimo. Mínimo acima do máximo é
+  recusado (400) antes de qualquer pedido. **O acordado com casa decimal só em METRO e MASSA** (400): a unidade da varredura vale ao
+  registrar, e a que o Fracttal diz (`Estoque.ler()["unidade"]`) vale antes do `definir_regua`; a unidade que ninguém disse é
+  inteira.
+
+- **Cada linha do livro é o RETRATO da decisão**, porque vale a última de cada almoxarifado e peça: decidir só o recomendado
+  leva junto o acordado de antes (senão a última linha apagaria o que o cliente acordou), e a sugestão do momento fica ao lado
+  (o histórico do mínimo). `gravado_fracttal` só continua 1 se o acordado não mudou. A decisão lê o livro de novo (`ler(forcar)`)
+  sob uma trava POR PEÇA (almoxarifado + peça, `travas.Travas`): duas pessoas na mesma peça esperam uma pela outra, e a gravação lenta
+  no Fracttal de uma peça não segura as outras (a 1ª versão tinha uma trava do módulo inteiro, segurada durante o pedido ao Fracttal).
+- **De onde vem o saldo:** o da última contagem GRAVADA (o `para_qtd` do evento `peca_gravada` mais novo); sem ela, o da
+  varredura do App (`almoxarifado.montar`). A peça vem do saldo do almoxarifado, nunca do ID que a página mandou (outro
+  almoxarifado ou ID chutado é 400). O almoxarifado de teste não tem linha na varredura (fica fora das telas): a prova dele passa
+  a `varredura=` à mão.
+- **Gravar roda na PONTE `/os/_nexus/inventario/regua/gravar` (`ponte_os.py`), não em `/t/pcm`:** o login do Fracttal é o cookie
+  `os_sessao`, gravado com `Path=<raiz>/os`, e o navegador não o manda para `/t/pcm/...`; `estoque_da_sessao` numa rota de `/t/pcm`
+  seria sempre `SemLogin` em produção (os testes que trocam a função não pegam isso: o teste `test_o_login_do_fracttal_so_chega_na_ponte`
+  usa a função de verdade, o cookie com `Path=/os`, e mostra a ponte vendo o login e uma rota de `/t/pcm` não). A página fica em
+  `/t/pcm`, e o botão "Gravar no Fracttal" (formulário `data-ponte`) vai por `fetch` (`static/pcm-ponte-inventario.js`); a ponte
+  responde JSON (`{ok, mensagem, volta}` ou `{erro, login?}`) e deixa o aviso na sessão, que a página mostra ao recarregar. Registrar
+  (`/t/pcm/.../regua/decidir`) só grava no livro e fica em `/t/pcm`. **O formulário de gravar leva o acordado que a tela
+  mostrava** (`aco_min`, `aco_max`, só para conferir; o que vai ao Fracttal é o do livro): se o registrado agora é outro (outra pessoa
+  do PCM mexeu com a tela aberta), 409 "a régua mudou desde que você abriu a tela; recarregue", nenhum pedido. Sem esses campos, 400.
+- **`gravar_acordado`** (no login de quem apertou, `estoque_da_sessao`): lê o almoxarifado (a leitura guarda a ligação),
+  `definir_regua`, relê, e SÓ ENTÃO anota o evento `regua_gravada` (o mínimo de -> para; o máximo fica no retrato) e o retrato
+  `gravado_fracttal`. A releitura que não bate é um evento `erro` e `NaoConfere` (502): o livro nunca diz que o Fracttal tem o
+  que não tem. Uma linha do livro com só um dos números acordados (a API aceita linha à mão) é `Conflito` ("incompleto"), nunca
+  um `TypeError` na conferência. O evento sai antes do retrato: se o retrato falhar, a peça segue "não gravada" e o PCM grava de novo (idempotente).
+  Sem acordado, ou peça não ligada ao almoxarifado: `Conflito` (409), nenhum pedido. Quem entrou pela senha de administrador
+  registra, mas não grava: `SemLogin` (401, com o link do `/os/login` e a volta à página), e a tela diz por quê. Quem entrou pelo Fracttal e
+  chega à ponte sem o cookie dele tem a sessão do Nexus encerrada pelo portão ("caiu"): o 401 com o link é de quem entrou pela Microsoft.
+  Limite do Fracttal: 429. Rede que cai: 502 com "grave de novo, é o mesmo número" (só na régua: `erros.resposta(ex, ao="regua")`).
+- **Peças de apoio:** `quem.py` (a pessoa nas colunas do livro: `pessoa_hmac` pelo e-mail da sessão, e `pessoa_id` quando o
+  cadastro a acha; sem e-mail, vazio), `erros.py` (`Conflito`, `NaoConfere` e a tabela erro -> status HTTP, a mesma da curadoria; o erro
+  de REDE, com um texto para cada operação, não se confunde com o de ARQUIVO local, 500, que não fala do Fracttal), `travas.py` (uma trava
+  por chave) e `ponte_os.py` (o blueprint `/os/_nexus/inventario`, registrado na raiz do app como o `bp_raiz` do OS Creator, com
+  `registrar` idempotente; cada tarefa põe as rotas dela num bloco próprio; `tests/test_pcm_inventario_ponte.py` prova o registro duas
+  vezes e as duas rotas debaixo do `NEXUS_PREFIXO=/nexus`). `Estoque.ler` passou a devolver também a `unidade`.
+- **Provar:** `tests/test_pcm_inventario_regua.py` (a conta, o quadro, o retrato, só o acordado ao Fracttal, a releitura, o 403
+  de quem não é PCM, o 400, o 409, o 401, o 429, a resposta perdida) com mutações nas regras (manda o recomendado, não confere a
+  releitura, teto vira piso, avariada com mínimo, gravado sobrevive ao acordado novo, perde o acordado de antes, aceita mínimo
+  acima do máximo, ignora a contagem gravada, vale a primeira decisão, peça de qualquer almoxarifado, os dois gates), todas pegas. A
+  revisão de 27/10 acrescentou: o acordado que mudou desde que a tela abriu, o decimal em unidade inteira (no registro e na gravação), o
+  acordado incompleto, a trava por peça (duas pessoas na mesma peça; a gravação lenta de uma não segura a outra) e o erro de rede.
+
+## Inventário do almoxarifado: a curadoria (`inventario/curadoria.py`; 26/10/2026)
+
+Levi, 26/10/2026: a peça que o técnico acha fora do catálogo vira pendência; o campo descreve, fotografa e conta, e quem decide é o
+PCM. Tela `/t/pcm/pecas/inventario/curadoria` (decide só quem `pode_programar`: administrador e setor PCM; **os outros veem só a
+lista, com "achado fora do catálogo", a quantidade e a usina: o que o técnico escreveu e a foto dele são de quem decide**, e a rota da
+foto também é 403 para eles).
+Duas pendências, só nas contagens que ainda NÃO foram gravadas: o **achado fora do catálogo** (cadastrar, é a peça X, descartar) e o
+**genérico a identificar** (confirmar o específico que o técnico escolheu, ou outro). O achado em branco não é pendência.
+
+- **A decisão é uma linha do livro** (`fato_curadoria_inventario`, chave `contagem_id` + "ID da linha") mais o evento `curadoria` na
+  auditoria, e entra no lote pela `contas.contado_efetivo`: "é a peça X" e "cadastrar" SOMAM as achadas ao contado da peça NESSA
+  contagem (o total substitui o saldo); o genérico confirmado tira do genérico e põe no específico. `decisoes(cfg, contagem)` devolve
+  `{ID da linha: {decisao, id_item, codigo}}`, o formato que `contado_efetivo` e `itens_do_lote` pedem. A peça cadastrada é ligada ao
+  almoxarifado e ajustada na gravação da contagem, não aqui.
+- **Uma linha decidida não se decide de novo** (`Conflito`, 409: dois do PCM com a tela aberta não cadastram a mesma peça duas
+  vezes), e **a decisão só vale até a contagem ser gravada**: gravada, aprovada (a gravação começou), recusada ou substituída pela
+  mais nova do almoxarifado = 409 com "faça uma nova contagem" (decidir depois não mudaria o que já foi gravado). Quem sabe o que já
+  foi gravado é `_estados` (os eventos do livro): é o ponto único para trocar pela leitura da lista de contagens (Task 5). **O estado é
+  conferido DE NOVO, no livro de agora, logo antes de escrever**: o cadastro pagina o catálogo e cria a peça (segundos) depois da
+  primeira leitura, e a gravação da contagem pode chegar nesse intervalo. Se a contagem já não está aberta, 409, nada é escrito, e para o
+  cadastro a mensagem diz o código que ficou criado no Fracttal ("a peça SP-XXX-NNN foi criada no Fracttal, mas a contagem já tinha sido
+  gravada"); a reserva continua, para o código não ser escolhido de novo.
+- **As travas são por chave, nunca uma do módulo** (`travas.Travas`): por (contagem, linha) para ler, conferir e escrever a decisão (duas
+  pessoas na mesma linha: uma ganha, a outra leva 409), por sigla para escolher o código e reservá-lo (duas linhas da mesma sigla não
+  escolhem o mesmo número) e por arquivo de controle para regravar as reservas, nessa ordem. O `criar_peca` e as páginas do catálogo
+  levam segundos: um cadastro lento não segura a decisão de outra linha.
+- **Cadastrar sem duplicar:** o `criar_peca` pode criar e perder a resposta. O código escolhido vai ANTES para
+  `<NEXUS_DADOS>/almox_inventario/curadoria_<contagem>.json` (sem login, sem nome); na nova tentativa da mesma linha, o código
+  reservado é o dela: se já existe no Fracttal (`Estoque.peca`), não cria de novo, acha o ID e só grava a decisão; se não existe,
+  cria com ele (o 013 não fica vazio). A reserva vale também para as outras linhas da sigla (a peça recém-criada pode não aparecer
+  ainda na lista). Arquivo de controle que não se lê PARA o cadastro (ignorá-lo escolheria o código de novo).
+  **A reserva guarda a sigla, o nome e a unidade pedidos, e a nova tentativa tem de vir com os MESMOS dados** (o nome sem ligar para
+  caixa nem espaço): com outro, `Conflito` antes de qualquer pedido ("repita com os dados da reserva"), porque com a peça já criada a
+  decisão ficaria ligada a uma peça com o nome errado, e sem ela criaria uma diferente da que a pessoa acha ter pedido. A tela volta
+  preenchida com a reserva (`pendencias`, `reserva`). **Quando o código reservado é achado no Fracttal, o NOME da peça (`field_1`) é
+  conferido com o da reserva**: outro nome é `Conflito` (o código foi usado por outra pessoa depois), a decisão não é ligada àquela
+  peça, e a reserva continua; a saída é decidir de outro jeito (é a peça de tal código, ou descartar). O nome que o Fracttal não diz
+  não bloqueia (a presença do `field_1` na lista de peças é para a prova da Task 10).
+- **O código:** `SP-<sigla>-NNN`, o número seguinte ao maior que existe (`Estoque.codigos` traz as peças DESATIVADAS também: a lista
+  de Peças e Suprimentos do Fracttal as mostra com "Não" em "Habilitado", então o código de peça desativada não é reaproveitado;
+  `-AV` no fim não tira o número). As siglas são as 12 do catálogo; `TST` só no almoxarifado de teste (`ids_de_teste`).
+- **O destino da peça** ("é a peça X", "confirmar") tem de existir no catálogo do App (ou ter sido cadastrado por aqui: a varredura
+  diária ainda não o viu); a tela aceita o CÓDIGO (o PCM conhece o código, não o ID) e converte. Sem o catálogo inteiro, não decide.
+- **O motivo** (texto livre) só cifrado, em `dados={"motivo": ...}` (o Cofre do cadastro; a API do banco é aberta); descartar o exige.
+  A pessoa vai como código (`quem.colunas`); a usina, pela de-para do Fracttal (`usina_ligada_por`).
+- **A foto** fica fora do banco: `<NEXUS_DADOS>/almox_inventario/fotos/<nome_da_foto(chave)>.jpg` (SHA-1 da chave que o App põe em
+  `Foto`; o nome nunca é caminho), servida em `.../curadoria/foto/<nome>.jpg` atrás do login, só para quem `pode_programar`. Sem a
+  foto, a tela diz "sem foto".
+  **Pendente (decisão de 27/10): a foto da curadoria: falta a rota assinada App→Nexus, como a do extintor (`hseq/fotos.receber`),
+  combinada com a sessão do App.** O App ainda não manda as fotos; o transporte (a rota, o rótulo da chave de assinatura e o esquema
+  do nome da foto) é um contrato a fechar com a sessão do App, e o Nexus não tem a rota de recebimento. Até lá, "sem foto".
+- **Lembrete na tela:** grupo, criticidade e Curva ABC da peça nova não se gravam pela API (testado em 09/10): completar na tela do
+  Fracttal.
+- **Cadastrar roda na PONTE `/os/_nexus/inventario/curadoria/cadastrar` (`ponte_os.py`), não em `/t/pcm`:** ele cria a peça no Fracttal
+  com o login de quem decide, e esse login (o cookie `os_sessao`, `Path=<raiz>/os`) não chega às rotas de `/t/pcm`. A página fica em
+  `/t/pcm`, o formulário do cadastro (`data-ponte`) vai por `fetch` (`static/pcm-ponte-inventario.js`) e a ponte responde JSON. As
+  outras três decisões (é a peça X, confirmar, descartar) só gravam no livro e ficam em `/t/pcm/.../curadoria/decidir`, que recusa
+  `cadastrar` (400). Quem entrou pela senha de administrador decide as três e no cadastro leva 401 com o link do login do
+  Fracttal. 429 do Fracttal e rede que cai também têm texto (`erros.resposta(ex, ao="cadastro")`: o código ficou reservado, repetir
+  com os mesmos dados não cria outra peça; não diz "é o mesmo número", que é da régua). Prova com o `estoque_da_sessao` DE VERDADE e o
+  cookie com `Path=/os`: `test_o_login_do_fracttal_so_chega_na_ponte` (régua e curadoria).
+- **Provar:** `tests/test_pcm_inventario_curadoria.py` (o código novo, as pendências, cadastrar com a resposta perdida e com o pedido
+  que nem chegou, a reserva entre linhas, "é a peça X" no lote, o genérico, o motivo cifrado, a linha decidida, a contagem gravada,
+  o 403 de quem não é PCM, os status, a foto) com mutações em cada regra acima, todas pegas. A revisão de 27/10 acrescentou: a
+  contagem gravada durante o cadastro, a reserva com outros dados, a peça achada com outro nome, as travas (a mesma linha, o cadastro
+  lento, a mesma sigla) e a tela de quem só olha sem descrição nem foto.
+
 ## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
 
 **O filtro na própria página** (Levi, 17/10/2026: "sempre que vou puxar um filtro ele carrega o site de novo, deveria só

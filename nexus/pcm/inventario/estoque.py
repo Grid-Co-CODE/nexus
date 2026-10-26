@@ -216,8 +216,9 @@ class Estoque(abc.ABC):
 
     @abc.abstractmethod
     def ler(self, id_almox: str) -> dict[str, dict]:
-        """As peças ligadas ao almoxarifado: `{id_item: {"saldo", "minimo", "maximo", "ligacao", "codigo"}}`. Saldo,
-        mínimo e máximo são número ou None (o Fracttal não disse: nunca 0). A peça nunca ligada não vem."""
+        """As peças ligadas ao almoxarifado: `{id_item: {"saldo", "minimo", "maximo", "ligacao", "codigo", "unidade"}}`.
+        Saldo, mínimo e máximo são número ou None (o Fracttal não disse: nunca 0); a `unidade` é o `units_description` da
+        linha (UNIDADE, METRO, MASSA), vazia quando ele não diz. A peça nunca ligada não vem."""
 
     @abc.abstractmethod
     def ligar(self, id_almox: str, id_item: str) -> str:
@@ -247,6 +248,18 @@ class Estoque(abc.ABC):
     @abc.abstractmethod
     def codigos(self, sigla: str) -> list[str]:
         """Os códigos `SP-<sigla>-NNN` que já existem no catálogo (ativas ou não: o código é de quem o usou primeiro)."""
+
+    @abc.abstractmethod
+    def achar_peca(self, codigo: str) -> str | None:
+        """O id do item do catálogo cujo código é exatamente `codigo` (sem caixa), ou None. É como a curadoria cadastra sem
+        duplicar: o `criar_peca` pode ter criado a peça e perdido a resposta, e a nova tentativa procura o código que ela
+        reservou antes de criar de novo."""
+
+    @abc.abstractmethod
+    def peca(self, codigo: str) -> dict | None:
+        """A peça de código exatamente `codigo` (sem caixa) como `{"id", "nome"}`, ou None. O `nome` é o `field_1` da linha da
+        lista de peças (vazio se o Fracttal não o diz). A curadoria confere o nome antes de ligar a decisão à peça que achou
+        pelo código reservado: o código que outra pessoa usou depois não pode virar a peça desta contagem."""
 
 
 # ── o de verdade ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -389,7 +402,9 @@ class EstoqueFracttal(Estoque):
             lido[item] = {"saldo": _numero_lido(l.get("stock"), "stock", SALDOS),
                           "minimo": _numero_lido(l.get("min_stock_level"), "min_stock_level", SALDOS),
                           "maximo": _numero_lido(l.get("max_stock_level"), "max_stock_level", SALDOS),
-                          "ligacao": str(l["id"]), "codigo": str(l.get("code") or "")}
+                          "ligacao": str(l["id"]), "codigo": str(l.get("code") or ""),
+                          # a régua (Task 8) arredonda por ela: METRO e MASSA aceitam duas casas, UNIDADE é inteira
+                          "unidade": str(l.get("units_description") or "").strip()}
             ligacoes[item] = str(l["id"])
         self._ligacoes[str(_id(id_almox))] = ligacoes
         return lido
@@ -495,6 +510,27 @@ class EstoqueFracttal(Estoque):
         base = {"filter": [], "sort": [], "is_tree": False, "node": 0, "id_type_item": TIPO_PECA}
         return [str(l["code"]) for l in self._linhas(PECAS, base)
                 if isinstance(l, dict) and l.get("code") and str(l["code"]).upper().startswith(prefixo)]
+
+    def peca(self, codigo: str) -> dict | None:
+        """Pede a lista de peças com o filtro do código (`code =`, o mesmo `filter` que o `api.py` do OS Creator usa nas
+        listas do Fracttal) e CONFERE a linha que volta: o filtro que o Fracttal ignorasse devolveria o catálogo inteiro (o
+        `api.py` anota esse caso com o `id_parent_wo`), e o código parecido (SP-CAB-0130) não é o procurado. Para na primeira
+        página que acha: a cota é de todos. O filtro `code =` e o `field_1` (o nome) nas linhas da lista de peças ainda não
+        foram provados contra o Fracttal de verdade (o passo 0 só listou os códigos); a conferência da linha vale de qualquer
+        jeito, e a prova com o App (Task 10) confirma."""
+        alvo = str(codigo or "").strip()
+        if not alvo:
+            raise ValueError("sem o código, qualquer peça seria a achada")
+        base = {"filter": [{"operator": "=", "property": "code", "value": alvo}], "sort": [], "is_tree": False, "node": 0,
+                "id_type_item": TIPO_PECA}
+        for l in self._linhas(PECAS, base):
+            if isinstance(l, dict) and l.get("id") is not None and str(l.get("code") or "").strip().upper() == alvo.upper():
+                return {"id": str(l["id"]), "nome": str(l.get("field_1") or "").strip()}
+        return None
+
+    def achar_peca(self, codigo: str) -> str | None:
+        achada = self.peca(codigo)
+        return None if achada is None else achada["id"]
 
 
 # ── a sessão do pedido ─────────────────────────────────────────────────────────────────────────────────────────────────

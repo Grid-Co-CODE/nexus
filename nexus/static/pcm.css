@@ -1072,4 +1072,55 @@ a.alm-aba{display:inline-block;text-decoration:none}
 .inv-rev-pe{display:flex;justify-content:flex-end;margin-top:4px}
 @media (max-width:640px){
   .inv-item-n{flex:1 1 100%}
+/* ── Régua de mínimo e máximo (26/10/2026, o inventário do almoxarifado): a sugestão, o recomendado (a Grid) e o acordado
+   (o cliente) de cada peça. A tabela é a `alm-t` do Almoxarifado (abaixo de 640 px vira cartão, com o data-r como rótulo);
+   aqui só o que é da tela: o menu entre as partes do almoxarifado, a lista de almoxarifados, os campos de número e o fim da
+   linha. Cor só por token. */
+.rg-nav{display:flex;gap:4px;margin-top:14px;border-bottom:1px solid var(--linha);overflow-x:auto}
+.rg-nav a{padding:10px 12px;border-bottom:2px solid transparent;color:var(--mudo);font:600 13px var(--font-sans);
+  white-space:nowrap;text-decoration:none}
+.rg-nav a:hover{color:var(--tinta)}
+.rg-nav a[aria-current=page]{color:var(--tinta);border-bottom-color:var(--verde)}
+.rg-sub{margin:18px 0 8px;font:700 15px var(--font-sans);color:var(--tinta)}
+.rg-almoxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin:0;padding:0;list-style:none}
+.rg-almoxes a{display:block;padding:10px 12px;background:var(--superficie-2);border:1px solid var(--linha);
+  border-radius:10px;color:var(--tinta);text-decoration:none}
+.rg-almoxes a:hover{border-color:var(--linha-forte)}
+.rg-almoxes a[aria-current=page]{border-color:var(--verde)}
+.rg-par{display:flex;gap:6px}
+.rg-n{width:84px;min-width:0;box-sizing:border-box;text-align:right}
+.rg-sug{display:flex;flex-direction:column;gap:2px}
+.rg-usar{align-self:flex-start;padding:0;font-size:12px}
+.rg-acao{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.rg-acao form{margin:0}
+.rg-nota{margin-top:12px}
+@media (max-width:640px){
+  .alm-t td .rg-par,.alm-t td .rg-acao,.alm-t td .rg-sug{align-items:flex-end}
+  .rg-n{width:72px}
+}
+
+/* ── Curadoria do inventário (26/10/2026): o que o campo contou fora do catálogo e o genérico que o técnico identificou, para
+   o PCM decidir. Cada achado é um cartão (a foto, o que o técnico escreveu, a quantidade) com as opções em <details>, cada uma
+   com o formulário dela (sem JavaScript, e no celular a foto passa para cima do texto). O menu entre as partes do almoxarifado
+   é o `rg-nav` da régua. Cor só por token. */
+.cu-card{display:flex;gap:14px;margin-top:12px;padding:14px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:12px}
+.cu-foto{flex:none;width:96px}
+.cu-img{display:block;width:96px;height:96px;object-fit:cover;border:1px solid var(--linha);border-radius:8px}
+.cu-sem-foto{display:flex;align-items:center;justify-content:center;width:96px;height:96px;text-align:center;font-size:12px;
+  border:1px dashed var(--linha-forte);border-radius:8px}
+.cu-corpo{flex:1 1 auto;min-width:0}
+.cu-tit{margin:0;font:600 15px var(--font-sans);color:var(--tinta)}
+.cu-escolha{margin:6px 0 0;font-size:13px;color:var(--tinta-2)}
+.cu-op{margin-top:8px;background:var(--superficie-2);border:1px solid var(--linha);border-radius:10px}
+.cu-op summary{padding:9px 12px;cursor:pointer;font:600 13px var(--font-sans);color:var(--tinta)}
+.cu-form{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.cu-op .cu-form{margin-top:0;padding:0 12px 12px}
+.cu-form .gc-campo{width:100%;box-sizing:border-box}
+.cu-form button{align-self:flex-start;margin-top:4px}
+@media (max-width:640px){
+  .cu-card{flex-direction:column}
+  .cu-foto,.cu-img,.cu-sem-foto{width:100%}
+  .cu-img{height:auto;max-height:260px}
+  .cu-sem-foto{height:64px}
 }
