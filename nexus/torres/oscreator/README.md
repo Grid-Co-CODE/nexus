@@ -985,7 +985,10 @@ vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo ma
 - **Quem chama:** a página da OS do Quadro da equipe (`/t/engenharia/equipe/os/<nº>`), pelo `/os/_nexus/ir` (abre na
   torre OS Creator do Nexus). O comentário daquela página vai à nota da OS pela ponte
   (`/os/_nexus/engenharia/os/<id>/comentar`, só do Nexus, na sessão do Fracttal da pessoa; `editar_nota_os` com a regra
-  do card: OS concluída, cancelada ou de várias tarefas não deixa).
+  do card: OS concluída, cancelada ou de várias tarefas não deixa). A linha do motivo do PCM vai pelo mesmo caminho
+  (`/os/_nexus/pcm/nota`, `ponte.pcm_nota`, desde 26/10/2026; a regra no `nexus/pcm/CLAUDE.md`, "A nota da OS ao
+  escolher o motivo"): rota do Nexus que precisa do login do Fracttal mora em `/os/_nexus`, porque o `os_sessao` só vai
+  para `/os`.
 - **Criar OS do zero (25/10/2026):** o mesmo endereço em `/os/tradicional?` (o "Criar OS" da OS do Quadro da equipe;
   Levi: "Fará os mesmos preenchimentos automáticos que já faz na solicitação"): o Passo 1 abre com o cliente, a usina e
   o ativo marcados (a busca mostra o ativo) e a data do incidente no campo; a OS pai vem escolhida no campo do Passo 1,

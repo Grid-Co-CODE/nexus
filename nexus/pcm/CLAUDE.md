@@ -171,10 +171,19 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   escreve a MESMA linha (`_fora_nota_linha`/`_fora_nota_juntar`, v300), e os dois testes usam os mesmos exemplos. Ao escolher (marcar ou trocar)
   no Nexus, o Nexus escreve (`nota_os.py`, na janela do Quadro e na troca do Painel) com o login do Fracttal de quem
   marcou: o login do Nexus pelo Fracttal abre a sessão do OS Creator da pessoa (`ponte.sessao_do_os`), e o
-  `api.editar_nota_os` reescreve a nota inteira, por isso lê a atual antes. A observação editada e o motivo tirado não
-  escrevem; quem entra pela senha não tem o login e a resposta diz que a nota não saiu; a falha na nota nunca derruba a
-  marca (a janela e o aviso dizem o resultado). A justificativa do técnico, o App escreve com o login dele, com a mesma
-  linha (`app-campo-docs/_propostas/nota-motivo/LEIA.md`). Prova: `tests/test_pcm_nota_os.py`. A lista do
+  `api.editar_nota_os` reescreve a nota inteira, por isso lê a atual antes (a linha que já está na nota não volta).
+  **Em dois pedidos** (26/10/2026): o cookie dessa sessão (`os_sessao`) mora em Path=/os e o navegador não o manda a
+  /t/pcm, então a marca, em /t/pcm, devolve só o pedido assinado da nota (`nota_os.pedido`: a OS e a linha feitas pelo
+  servidor, de quem marcou, 10 min) e a tela o manda à ponte `POST /os/_nexus/pcm/nota` (`ponte.pcm_nota`, a mesma
+  regra do comentário da Engenharia: outro site, `pode_marcar`, 401 com o login do OS Creator quando não há o do
+  Fracttal), que escreve. A janela do Quadro chama logo depois da marca (`pcm-quadro.js`, `escreverNota`); o painel, ao
+  abrir com o aviso da troca (`fora.html`, `data-nota-pedido`). Até 26/10 a marca escrevia no próprio pedido de /t/pcm,
+  nunca via o login e **nenhuma nota do Nexus chegou ao Fracttal de 20 a 26/10** (as marcas valeram; os testes passavam
+  o cookie à mão); essas notas não foram refeitas. A observação editada e o motivo tirado não escrevem; quem entra pela
+  senha ou pela Microsoft não tem o login e a tela diz que a nota não saiu, com o "Entrar pelo Fracttal"; a falha na
+  nota nunca derruba a marca. A justificativa do técnico, o App escreve com o login dele, com a mesma
+  linha (`app-campo-docs/_propostas/nota-motivo/LEIA.md`). Prova: `tests/test_pcm_nota_os.py` (o cookie em Path=/os e o
+  `sessao_do_os` de verdade: a marca não vê o login, a ponte vê). A lista do
   backoffice, de quem abre o Gerar a semana (como as observações).
 - **Pelo App** (`motivos_app.py`, a rota `POST /t/pcm/motivos/app`, pública só para quem assina, como a das fotos dos
   extintores): corpo JSON {os, codigo, tarefa, motivo (id; null = tirar), obs, tecnico_hmac, tecnico_nome}; cabeçalhos

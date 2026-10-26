@@ -309,6 +309,25 @@
       slot.innerHTML = mp ? ((el.hasAttribute("data-pend") ? " · " : "") + selo(mp.n, mp.tira)) : "";
     });
   }
+  // A nota da OS no Fracttal (20/10/2026), depois da marca gravada: pela ponte /os/_nexus/pcm/nota, porque o cookie do
+  // Fracttal só vai para /os (até 26/10/2026 a marca a escrevia em /t/pcm, sem o login, e nenhuma nota saía). A frase
+  // vai para a janela se ela ainda é a da marca; senão, para o aviso do topo.
+  function escreverNota(pedido, base, msg) {
+    function dizer(txt, login) {
+      if (msg && msg.isConnected) {
+        msg.innerHTML = esc(base + (txt ? " " + txt : "")) +
+          (login ? " <a href=\"" + esc(login) + "\">Entrar pelo Fracttal</a>" : "");
+      } else if (txt) aviso(txt);
+    }
+    fetch(D.url_nota, {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({pedido: pedido, tela: "quadro"})})
+      .then(function (r) {
+        return r.json().then(function (j) { return j; },
+                             function () { return {nota_txt: "A nota da OS não foi escrita: o Nexus não respondeu (" + r.status + ")."}; });
+      })
+      .then(function (j) { dizer(j.nota_txt || "A nota da OS não foi escrita.", j.login); })
+      .catch(function () { dizer("A nota da OS não foi escrita: o Nexus não respondeu."); });
+  }
   function enviarMotivo(i, t, c, tirar) {
     var sel = c.querySelector("[data-mp-sel]"), obs = c.querySelector("[data-mp-obs]");
     var msg = c.querySelector("[data-mp-msg]");
@@ -337,10 +356,11 @@
           return;
         }
         aplicarMarca(t, x.j);
-        t._mpMsg = (x.j.gravou ? x.j.efeito : "Nada mudou.") + (x.j.arquivo && x.j.arquivo.texto ? " " + x.j.arquivo.texto : "") +
-          (x.j.nota_txt ? " " + x.j.nota_txt : "");          // a nota da OS no Fracttal (20/10/2026)
+        var base = (x.j.gravou ? x.j.efeito : "Nada mudou.") + (x.j.arquivo && x.j.arquivo.texto ? " " + x.j.arquivo.texto : "");
+        t._mpMsg = base + (x.j.nota_pedido ? " Escrevendo a nota da OS no Fracttal…" : "");
         abrir(i, abriu);
         delete t._mpMsg;
+        if (x.j.nota_pedido) escreverNota(x.j.nota_pedido, base, dlg.querySelector("[data-mp-msg]"));
       })
       .catch(function () {
         msg.textContent = "O Nexus não respondeu: abra a janela de novo para conferir se gravou.";

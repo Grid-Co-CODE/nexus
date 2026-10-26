@@ -845,3 +845,41 @@ def _nota_do_historico(app, jwt: str, email: str, o: dict, linhas: list[str]) ->
             if os_sessao.morta():
                 raise H.SessaoVencida(str(e)) from e
             raise
+
+
+# ── a nota da OS do PCM ao escolher o motivo (20/10/2026; aqui desde 26/10/2026) ────────────────────────────────────
+# A marca grava em /t/pcm (não precisa do Fracttal) e devolve o pedido assinado da nota (`nota_os.pedido`); a tela o
+# manda aqui, em /os/_nexus, porque o cookie do Fracttal (os_sessao) só vai para /os. Até 26/10 a nota era escrita no
+# pedido da marca, em /t/pcm, que nunca via o login: nenhuma nota do Quadro nem do painel chegou ao Fracttal.
+_TELAS_DO_PCM = {"quadro": "/t/pcm/quadro", "fora": "/t/pcm/fora-da-programacao"}     # a volta do login do Fracttal
+
+
+@bp_raiz.route("/os/_nexus/pcm/nota", methods=["POST"])
+def pcm_nota():
+    from urllib.parse import quote, urlencode
+
+    from flask import jsonify
+
+    from ...pcm import nota_os as NO
+    from ...pcm.telas import pode_marcar
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        return jsonify({"erro": "Pedido de outro site: nada foi gravado."}), 403
+    if not pode_marcar():
+        return jsonify({"erro": "Quem marca o motivo é o PCM, os Responsáveis UFV e o administrador."}), 403
+    c = request.get_json(silent=True) or {}
+    app = current_app._get_current_object()
+    p = NO.abrir_pedido(app, c.get("pedido"), session.get("usuario"))
+    if not p:
+        r = {"ok": False, "erro": "o pedido venceu ou é de outro login (a marca vale)"}
+        return jsonify({"nota": r, "nota_txt": NO.frase(r)}), 400
+    if not str(sessao_do_os(app).get("jwt") or ""):
+        # sem o login do Fracttal (a senha de administrador, a conta Microsoft): o do OS Creator, de volta à tela
+        de = _TELAS_DO_PCM.get(str(c.get("tela") or ""), _TELAS_DO_PCM["quadro"])
+        login = na_raiz("/os/login") + "?next=" + quote("/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/"),
+                                                         safe="")
+        r = {"ok": False, "erro": "entre pelo Fracttal para o Nexus escrever na nota"}
+        return jsonify({"nota": r, "nota_txt": NO.frase(r), "login": login}), 401
+    with _trava_nota:                            # duas marcas juntas na mesma OS: uma não apaga a outra na nota
+        r = NO.escrever(app, p["os"], p["texto"])
+    return jsonify({"nota": r, "nota_txt": NO.frase(r)})
