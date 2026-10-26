@@ -96,8 +96,16 @@ def ler_github(token: str, repo: str, sessao=None) -> dict[str, dict]:
                 nome = (ev.get("label") or {}).get("name")
                 if ev.get("event") == "labeled" and nome in labels:
                     datas[nome] = ev.get("created_at")      # na ordem do GitHub: fica a última vez que foi posta
-        out[folio] = {"numero": i["number"], "labels": labels, "comentarios": coms, "datas": datas,
-                      "atualizada": i.get("updated_at")}
+        ja = out.get(folio)
+        if ja:
+            # duas issues com o mesmo título (revisão final de 26/10/2026): somam, nenhuma some
+            ja["labels"] |= labels
+            ja["comentarios"] += coms
+            ja["datas"].update(datas)
+            ja["atualizada"] = max(str(ja.get("atualizada") or ""), str(i.get("updated_at") or "")) or None
+        else:
+            out[folio] = {"numero": i["number"], "labels": labels, "comentarios": coms, "datas": datas,
+                          "atualizada": i.get("updated_at")}
     return out
 
 
@@ -137,10 +145,31 @@ def plano(gh: dict, ja_comentarios: set, ja_marcas: set) -> list[dict]:
 
 
 def previa(pl: list[dict], abertas: dict) -> dict:
-    """Os números da prévia; `abertas` = {nº: a OS está aberta?} pelo que a tela ETMs leu (a importação confere)."""
+    """Os números da prévia; `abertas` = {nº: a OS está aberta? (None = não deu para conferir, conta como aberta: a
+    prévia não promete menos notas do que a importação escreve)}."""
     return {"oss": len(pl), "comentarios": sum(len(x["comentarios"]) for x in pl),
             "marcacoes": sum(len(x["marcas"]) for x in pl),
-            "notas": sum(1 for x in pl if x["comentarios"] and abertas.get(x["folio"]))}
+            "notas": sum(1 for x in pl if x["comentarios"] and abertas.get(x["folio"], True) is not False)}
+
+
+def _abertas(pl: list[dict], do_quadro: dict) -> dict:
+    """{nº: aberta?} das OS do plano com comentário: a coluna que a tela ETMs leu, e a OS que não está nela conferida
+    agora no Fracttal (revisão final de 26/10/2026: a prévia contava só o quadro, e a importação escrevia nas outras)."""
+    from . import os_equipe
+    out = {}
+    for x in pl:
+        if not x["comentarios"]:
+            continue
+        col = do_quadro.get(x["folio"])
+        if col is None:
+            try:
+                o = os_equipe.ler_os(x["folio"])
+                col = o["coluna"] if o else "cancelada"          # a OS que não existe não recebe nota
+            except Exception:       # noqa: BLE001 — não deu para conferir: conta como aberta
+                out[x["folio"]] = None
+                continue
+        out[x["folio"]] = col not in ("concluida", "cancelada")
+    return out
 
 
 def linha(c: dict) -> str:
@@ -187,10 +216,11 @@ def iniciar_leitura(app, token: str, repo: str, sessao=None) -> dict:
                 gh = ler_github(token, repo, sessao)
                 com, mar = _ja_importados()
                 pl = plano(gh, com, mar)
-                abertas = {o["os"]: o["coluna"] not in ("concluida", "cancelada") for o in ETM.dados()["os"]}
+                abertas = _abertas(pl, {o["os"]: o["coluna"] for o in ETM.dados()["os"]})
                 pv = previa(pl, abertas)
+                ate = "até " if any(v is None for v in abertas.values()) else ""
                 _JOB.update(fase="lido", plano=pl, previa=pv, msg=(
-                    f"{pv['comentarios']} comentário(s) e {pv['marcacoes']} marcação(ões) em {pv['oss']} OS; "
+                    f"{pv['comentarios']} comentário(s) e {pv['marcacoes']} marcação(ões) em {pv['oss']} OS; {ate}"
                     f"{pv['notas']} OS em aberto {'recebe' if pv['notas'] == 1 else 'recebem'} os comentários na nota."
                     if pl else
                     "Nada a trazer: o Nexus já tem todo o histórico do app."))
@@ -229,7 +259,7 @@ def iniciar_importacao(app, escrever_nota) -> dict:
 
 
 def _importar(pl: list[dict], escrever_nota) -> dict:
-    from ..torres.engenharia import _os_para_gravar
+    from ..torres.engenharia import _na_etm, _os_para_gravar
     from . import etm_marcas as M
     from . import os_acompanhamento as O
     from . import os_equipe
@@ -243,7 +273,7 @@ def _importar(pl: list[dict], escrever_nota) -> dict:
         if not o:
             sem_os.append(item["folio"])
             continue
-        osg = _os_para_gravar(o)
+        osg = _os_para_gravar(_na_etm(o))          # a ETM da OS, mesmo que ela não seja o 1º ativo
         if item["comentarios"]:
             if o["coluna"] in ("concluida", "cancelada"):
                 nota = "OS fechada no Fracttal: o comentário do app de ETM ficou só no Nexus"

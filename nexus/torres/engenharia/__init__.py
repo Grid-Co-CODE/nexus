@@ -862,15 +862,27 @@ def etm_os(folio: int):
     return _pagina_da_os(folio, "etm")
 
 
-def _eh_da_etm(o: dict) -> bool:
-    """A OS é de uma ETM: pela lista das ETMs da tela, se já lida; senão pelo nome do ativo no Fracttal."""
+def _codigo_da_etm(o: dict) -> str | None:
+    """O código da ETM da OS: o 1º ativo dela que é de ETM, pela lista das ETMs da tela (se já lida) ou pelo nome do
+    ativo no Fracttal. A OS de várias tarefas pode ter um inversor antes da ETM (revisão final de 26/10/2026: a página
+    voltava para o Quadro, e a marcação ia com o código do inversor)."""
     from ...engenharia import etm as ETM
     from ...engenharia import os_equipe
-    r = ETM.eh_etm(o.get("codigo"))
-    if r is not None:
-        return r
     alvo = os_equipe._norm(ETM.ETM)
-    return any(alvo in os_equipe._norm(a.get("nome")) for a in (o.get("ativos") or [{"nome": o.get("ativo")}]))
+    for a in o.get("ativos") or [{"codigo": o.get("codigo"), "nome": o.get("ativo")}]:
+        r = ETM.eh_etm(a.get("codigo"))
+        if r or (r is None and alvo in os_equipe._norm(a.get("nome"))):
+            return a.get("codigo")
+    return None
+
+
+def _eh_da_etm(o: dict) -> bool:
+    return _codigo_da_etm(o) is not None
+
+
+def _na_etm(o: dict) -> dict:
+    """A OS com o código da ETM no lugar do 1º ativo: é ele que vai ao livro das marcações."""
+    return dict(o, codigo=_codigo_da_etm(o) or o.get("codigo"))
 
 
 # o que cada marcação diz na linha do tempo da OS
@@ -979,7 +991,10 @@ def _pagina_da_os(folio: int, tela_id: str):
         linha = list(est.get("eventos") or []) + [dict(e, evento="marca", texto="", rotulo=_rotulo_da_marca(e))
                                                   for e in marcas.get("eventos") or []]
         linha.sort(key=lambda e: e.get("quando") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
-        est = dict(est, eventos=linha)
+        # a marcação também é atualização (revisão final de 26/10/2026: a pílula dizia "sem atualização" com a
+        # marcação de hoje e o número da Última atualização dizendo "hoje")
+        ultimos = [d for d in (est.get("ultimo"), marcas.get("ultima")) if d]
+        est = dict(est, eventos=linha, ultimo=max(ultimos) if ultimos else None)
         extra["etm"] = {"marcas": {"diagnostico_id": marcas.get("diagnostico_id"),
                                    "status_pos_id": marcas.get("status_pos_id"),
                                    "etiquetas": marcas.get("etiquetas") or set(),
@@ -1040,24 +1055,36 @@ def etm_os_marcar(folio: int):
         o = os_equipe.ler_os(folio)                     # a OS conferida agora no Fracttal, não o que o formulário diz
         if not o:
             raise M.Recusada(f"Não achei a OS {folio} no Fracttal")
-        osg, quem, f = _os_para_gravar(o), session.get("usuario"), request.form
+        osg, quem, f = _os_para_gravar(_na_etm(o)), session.get("usuario"), request.form
         ev = f.get("evento")
         if ev in ("etiqueta", "acompanhamento", "finalizado"):
             lig = f.get("ligado") == "sim"
             avisos = [M.marcar(osg, ev, (f.get("valor"), lig) if ev == "etiqueta" else lig, quem, pode)["aviso"]]
-        else:
-            avisos = []
-            for campo in ("diagnostico", "status_pos"):
-                if f.get(campo) is None:
-                    continue
-                try:
-                    avisos.append(M.marcar(osg, campo, f.get(campo), quem, pode)["aviso"])
-                except M.Recusada as e:
-                    if str(e) != "Nada mudou":
-                        raise
-            if not avisos:
-                raise M.Recusada("Nada mudou")
-        return redirect(volta + "?" + urlencode({"ok": "Salvo: " + "; ".join(avisos) + "."}), 303)
+            return redirect(volta + "?" + urlencode({"ok": "Salvo: " + "; ".join(avisos) + "."}), 303)
+        # o diagnóstico e o status pós-OS são duas gravações: a que entrou e a que falhou são ditas as duas (revisão
+        # final de 26/10/2026: o diagnóstico salvo aparecia como "Nada mudou")
+        avisos, falha = [], ""
+        for campo in ("diagnostico", "status_pos"):
+            if f.get(campo) is None:
+                continue
+            try:
+                avisos.append(M.marcar(osg, campo, f.get(campo), quem, pode)["aviso"])
+            except M.Recusada as e:
+                if str(e) != "Nada mudou":
+                    falha = str(e)
+                    break
+            except Exception as e:      # noqa: BLE001 — o banco fora no meio: o que já entrou é dito
+                logging.exception("ETMs: a marcação %s da OS %s não gravou", campo, folio)
+                falha = f"Não consegui gravar no banco ({type(e).__name__}); tente de novo em instantes"
+                break
+        if not avisos and not falha:
+            falha = "Nada mudou"
+        q = {}
+        if avisos:
+            q["ok"] = "Salvo: " + "; ".join(avisos) + "."
+        if falha:
+            q["erro"] = falha
+        return redirect(volta + "?" + urlencode(q), 303)
     except M.Recusada as e:
         return redirect(volta + "?" + urlencode({"erro": str(e)}), 303)
     except Exception as e:      # noqa: BLE001 — banco ou Fracttal fora: nada mudou (a trava recusa antes de gravar)
@@ -1133,9 +1160,15 @@ def _os_do_planner(o: dict, m: dict | None) -> dict:
             "acompanhamento": bool(m.get("acompanhamento")), "finalizado": bool(m.get("finalizado"))}
 
 
-def faixa_etm(oss: list[dict], hoje, sem_marcas: bool = False) -> list[dict]:
+def faixa_etm(oss: list[dict], hoje, sem_marcas: bool = False, sem_leitura: bool = False) -> list[dict]:
     """Os quatro números da tela ETMs. "Abertas para a Engenharia" é a regra das Estações em Aberto do app: a OS só sai
-    quando a Engenharia encerra (o diagnóstico ou o finalizado), não quando o Fracttal fecha a tarefa."""
+    quando a Engenharia encerra (o diagnóstico ou o finalizado), não quando o Fracttal fecha a tarefa. Sem leitura
+    nenhuma do Fracttal ainda, os quatro são "—" (número pela metade não vai para a tela)."""
+    if sem_leitura:
+        nota = [("lendo o Fracttal", False)]
+        return [{"rotulo": r, "valor": "—", "grav": "", "nota": nota} for r in
+                ("Abertas no Fracttal", "Abertas para a Engenharia", "Em acompanhamento",
+                 f"Finalizadas em {JANELA_CONCLUIDAS} dias")]
     abertas = [o for o in oss if o["coluna"] in ("nao_iniciada", "em_andamento")]
     analise = sum(1 for o in abertas if o["trabalho"] == "analise")
     para_eng = [o for o in oss if o["coluna"] != "cancelada" and not o["diagnostico"] and not o["finalizado"]]
@@ -1180,7 +1213,8 @@ def etm():
         return sorted({o[campo] for o in oss if o[campo]}, key=lambda s: s.lower())
     return render_template(
         "engenharia/etm.html", torre=TORRE, tela=TORRE.tela("etm"), oss=oss, colunas=ETM.COLUNAS,
-        kpis=faixa_etm(oss, hoje, sem_marcas=bool(erro_marcas)), erro=d["erro"], erro_marcas=erro_marcas,
+        kpis=faixa_etm(oss, hoje, sem_marcas=bool(erro_marcas), sem_leitura=not d["lido"]), erro=d["erro"],
+        erro_marcas=erro_marcas, nunca_lido=not d["lido"], lendo=d["lendo"],
         clientes=nomes("cliente"), criados=nomes("criado_por"), solicitantes=nomes("solicitante"),
         responsaveis=nomes("responsavel"), etiquetas_eng=[n for _, n in M.ETIQUETAS], hoje=hoje.isoformat(),
         admin=bool(session.get("admin")),           # o painel do histórico do app de ETM (uma vez, só o administrador)

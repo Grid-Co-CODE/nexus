@@ -697,7 +697,12 @@ def _acrescentar_na_nota(os_api, regra, o: dict, linhas: list[str]) -> str:
     if na_pagina and na_pagina not in " ".join(atual.split()):
         return ("a nota da OS no Fracttal não bateu com a leitura da página; para não sobrescrever, o comentário ficou "
                 "só no Nexus")
-    novas = [x for x in linhas if x not in atual]
+    # a linha inteira, não um trecho (revisão final de 26/10/2026: "Trocar o chip" se achava dentro de "Trocar o chip
+    # amanhã" do mesmo minuto, e o comentário não ia)
+    def _n(s):
+        return "\n".join(x.rstrip() for x in str(s).replace("\r\n", "\n").split("\n"))
+    corpo = "\n" + _n(atual) + "\n"
+    novas = [x for x in linhas if "\n" + _n(x).strip() + "\n" not in corpo]
     if not novas:
         return "sim"
     r = os_api.editar_nota_os(o["wid"], "\n".join(([atual] if atual else []) + novas))
@@ -834,3 +839,9 @@ def _nota_do_historico(app, jwt: str, email: str, o: dict, linhas: list[str]) ->
             return _acrescentar_na_nota(os_api, regra, o, linhas)
         except os_api.SessionExpired as e:
             raise H.SessaoVencida(str(e)) from e
+        except os_api.FracttalError as e:
+            # o token vencido que não renova chega como FracttalError: com a sessão morta, a importação para e pede o
+            # login, em vez de adiar todas as OS que faltam (revisão final de 26/10/2026)
+            if os_sessao.morta():
+                raise H.SessaoVencida(str(e)) from e
+            raise

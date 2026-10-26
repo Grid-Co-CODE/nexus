@@ -286,3 +286,64 @@ def test_a_nota_nao_repete_a_linha_que_ja_esta_la():
                             "[19/10/2026 10:30] Pessoa Dois (Engenharia): Ok"]
     api.escritas.clear()
     assert ponte._acrescentar_na_nota(api, Regra(), o, novas[:1]) == "sim" and api.escritas == []
+
+
+# ── a revisão final (26/10/2026) ─────────────────────────────────────────────────────────────────────────────────────
+def test_issues_com_o_mesmo_titulo_somam():
+    gh = GitHubFalso()
+    gh.issues.append({"number": 6, "title": "OS 17001", "comments": 1, "updated_at": "2026-10-21T10:00:00Z",
+                      "labels": [{"name": "Sujidade"}]})
+    gh.comentarios[6] = [{"id": 950, "body": "**Pessoa Três:**\nDe novo.", "created_at": "2026-10-21T09:00:00Z"}]
+    d = H.ler_github("token-de-teste", REPO, sessao=gh)
+    assert [c["id"] for c in d["17001"]["comentarios"]] == ["901", "902", "950"]
+    assert {"Sujidade", "Stand By"} <= d["17001"]["labels"]
+
+
+def test_a_previa_confere_no_fracttal_a_os_que_nao_esta_no_quadro(importacao, app, monkeypatch):
+    # a prévia não pode prometer menos notas do que a importação escreve: a OS fora do quadro é conferida no Fracttal
+    from nexus.engenharia import etm as E
+    monkeypatch.setattr(E, "dados", lambda: {"os": [], "lido": 0.0, "lendo": False, "erro": "HTTP 429"})
+    j = H.iniciar_leitura(app, "token-de-teste", REPO, sessao=GitHubFalso())
+    assert j["fase"] == "lido" and j["previa"]["notas"] == 1           # a 17001 aberta; a 17004 fechada
+
+
+def test_a_nota_compara_a_linha_inteira():
+    from nexus.torres.oscreator import ponte
+
+    class Api:
+        escritas = []
+
+        def get_os_detalhes(self, wid):
+            return {"notas": "[26/10/2026 10:15] Pessoa Um (Engenharia): Trocar o chip amanhã", "tarefas": [{"id": 1}]}
+
+        def editar_nota_os(self, wid, nota):
+            self.escritas.append(nota)
+            return {"ok": True}
+
+    class Regra:
+        def nota_pode_editar(self, status, n):
+            return True, ""
+
+        def status_id_de(self, status, d):
+            return 1
+    api = Api()
+    nova = "[26/10/2026 10:15] Pessoa Um (Engenharia): Trocar o chip"
+    assert ponte._acrescentar_na_nota(api, Regra(), {"wid": 1, "status": "Em Processo", "nota": ""}, [nova]) == "sim"
+    assert api.escritas and api.escritas[0].endswith("\n" + nova)
+
+
+def test_sessao_morta_no_meio_da_importacao_para_tudo(app, monkeypatch):
+    # o token vencido que não renova chega como FracttalError, não SessionExpired: a sessão morta também para o trabalho
+    pytest.importorskip("PyQt6")
+    from nexus.torres.oscreator import ponte
+    ponte.clone(app)
+    import api as os_api
+    from os_web import sessao as os_sessao
+
+    def cai(wid):
+        raise os_api.FracttalError("token vencido e a renovação falhou")
+    monkeypatch.setattr(os_api, "get_os_detalhes", cai)
+    monkeypatch.setattr(os_sessao, "morta", lambda: True)
+    with app.app_context(), pytest.raises(H.SessaoVencida):
+        ponte._nota_do_historico(app, "aaa.bbb.ccc", "", {"wid": 1, "status": "Em Processo", "nota": ""}, ["linha"])
+

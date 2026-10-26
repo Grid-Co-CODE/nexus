@@ -17,7 +17,8 @@
         abrir a página dela (as marcações, o checklist e os comentários, que vão para a nota da OS).</p></div>
     <div class="cn-frescor">OS do Fracttal<br><b>lidas às {{ lido }}</b></div>
   </div>
-  {% if erro %}<div class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou a leitura agora ({{ erro }}).</b> Mostrando a última leitura; nova tentativa em 1 minuto.</div>{% endif %}
+  {% if nunca_lido and not erro %}<div class="cn-erro cn-aviso" role="status"><b>Lendo as OS de ETM no Fracttal pela primeira vez.</b> A tela se atualiza sozinha em instantes.</div>
+  {% elif erro %}<div class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou a leitura agora ({{ erro }}).</b> {% if nunca_lido %}Ainda sem nenhuma leitura; nova tentativa em 1 minuto.{% else %}Mostrando a última leitura; nova tentativa em 1 minuto.{% endif %}</div>{% endif %}
   {% if erro_marcas %}<div class="cn-erro cn-aviso" role="status"><b>Não consegui ler as marcações da Engenharia ({{ erro_marcas }}).</b> As OS aparecem sem o diagnóstico, o status pós-OS e as etiquetas; recarregue em instantes.</div>{% endif %}
 
   <section class="kb-kpis" aria-label="As ETMs agora">
@@ -73,7 +74,7 @@
   </details>
   {% endif %}
 </div>
-<script type="application/json" id="etm-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "sem_marcas": erro_marcas != ""}|tojson }}</script>
+<script type="application/json" id="etm-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "sem_marcas": erro_marcas != "", "nunca_lido": nunca_lido}|tojson }}</script>
 <script>
 (function () {
   var D = JSON.parse(document.getElementById('etm-dados').textContent);
@@ -148,6 +149,8 @@
     return c;
   }
   function desenha() {
+    // sem leitura nenhuma ainda (a primeira em curso, logo depois de subir): nada de colunas vazias, e a tela se relê
+    if (D.nunca_lido) { quadro.replaceChildren(el('p', 'kb-vazio', 'Lendo as OS de ETM no Fracttal…')); return; }
     var lista = D.oss.filter(passa);
     var cols = D.colunas.map(function (c) { return c[0]; }).filter(function (c) { return c !== 'cancelada' || estado.canceladas; });
     var g = el('div', 'kb-colunas');
@@ -250,6 +253,7 @@
     acompanhar();
   }
   {% endif %}
+  if (D.nunca_lido) setTimeout(function () { location.reload(); }, 8000);
   // voltou da OS com a tela relida: o ?atualizar=1 sai do endereço, para o F5 não reler de novo
   if (/[?&]atualizar=1(&|$)/.test(location.search)) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* sem history */ } }
   desenha();

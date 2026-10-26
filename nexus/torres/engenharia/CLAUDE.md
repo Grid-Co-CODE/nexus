@@ -283,8 +283,8 @@ como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenhar
   viram as marcações atuais, com a data em que foram postas. Nas OS em aberto, os comentários vão para a nota da OS numa
   escrita por OS, do mais antigo ao mais novo; a nota que falha deixa os comentários daquela OS para a próxima. Trazer
   de novo não repete nada (o id no livro e a linha que já está na nota).
-- **Segurança:** o `config.py` do app de ETM traz escritos no código a credencial do Fracttal da Grid e dois tokens do
-  GitHub (também dentro do .exe instalado no time). O Nexus não usa nenhum deles; a recomendação é trocá-los.
+- **Segurança:** o Nexus não usa nenhuma credencial do app de ETM: lê o Fracttal com a dele e o GitHub com o token do
+  .env.
 - **Fica para a 2ª parte:** o Histórico (cliente → usina → OS e o chat da usina), as Estações em Aberto (com o
   "Finalizar pela Engenharia" em lote) e os Fechamentos por semana.
 - **Prova:** `tests/test_engenharia_etm.py` e `tests/test_engenharia_etm_historico.py` (Fracttal, banco e GitHub falsos).

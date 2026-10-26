@@ -21,8 +21,7 @@ Sujidade, Outro), **status pós-OS** (Chamado de Garantia, Alinhamento com o Cli
 campo, Stand By, Validação Final; várias), **Em acompanhamento** e **Finalizado pela Engenharia** (liga/desliga). Os
 comentários e as marcações moram como Issues e labels num repositório privado do GitHub; o autor é um nome digitado.
 
-Segurança: o `config.py` do app traz escritos no código a credencial do Fracttal da Grid e dois tokens do GitHub, que
-vão também dentro do .exe instalado no time. O Nexus não usa nenhum deles; a recomendação ao Levi é trocá-los.
+Segurança: o Nexus não usa nenhuma credencial do app de ETM. Lê o Fracttal com a dele e o GitHub com o token do .env.
 
 ## Decisões
 

@@ -368,8 +368,16 @@ def pagina_etm(banco, app, monkeypatch):
     from nexus.auth import setor_telas as ST
     from nexus.engenharia import os_equipe
     from nexus.torres import engenharia as torre
+    from datetime import datetime, timedelta, timezone
+    velha = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat()
     linhas = {"17003": [dict(w(17003, "Corretiva", status=2, task="DONE"), id_work_order=60003)],
-              "17009": [dict(w(17009, "Corretiva", cod="ALF100-INV1"), items_log_description="Inversor 1 {ALF100-INV1}")]}
+              "17009": [dict(w(17009, "Corretiva", cod="ALF100-INV1"), items_log_description="Inversor 1 {ALF100-INV1}")],
+              # a OS de duas tarefas com o inversor primeiro e a ETM depois (revisão final de 26/10/2026)
+              "17010": [dict(w(17010, "Corretiva", cod="ALF100-INV1"), items_log_description="Inversor 1 {ALF100-INV1}",
+                             id_work_order=60010),
+                        dict(w(17010, "Corretiva"), id_work_order=60010, description="Segunda tarefa")],
+              # aberta há 20 dias, sem mexida nas tarefas
+              "17011": [dict(w(17011, "Corretiva"), id_work_order=60011, creation_date=velha)]}
     subs = {"17003": [{"description": "Ficou alguma pendência? Se sim, descreva", "value": "Não", "order_number": 2},
                       {"description": "Descreva a atividade realizada", "value": "Piranômetro trocado",
                        "order_number": 1, "group": "ATIVIDADE"}]}
@@ -485,4 +493,54 @@ def test_o_login_do_fracttal_do_comentario_volta_para_a_os_da_etm(pagina_etm, cl
     r = cliente.post("/os/_nexus/engenharia/os/60003/comentar",
                      json={"texto": "x", "folio": "17003", "de": "https://outro.site/x"}, headers=SAME)
     assert "%2Ft%2Fengenharia%2Fequipe%2Fos%2F17003" in r.get_json()["login"]      # endereço estranho: a de sempre
+
+
+# ── a revisão final (26/10/2026) ─────────────────────────────────────────────────────────────────────────────────────
+def test_os_de_varios_ativos_com_a_etm_depois_abre_como_etm_e_grava_a_etm(pagina_etm, cliente):
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+
+    from nexus.engenharia import etm_marcas as M
+    c = _como(cliente, ANA)
+    assert c.get("/t/engenharia/etm/os/17010").status_code == 200
+    c.post("/t/engenharia/etm/os/17010/marcar", data={"diagnostico": "1"}, headers=SAME)
+    (l,) = [x for x in M._reler()["eventos"] if str(x["os_folio"]) == "17010"]
+    assert l["codigo_ativo"] == "ALF100-ESTM1"
+
+
+def test_formulario_com_um_salvo_e_outro_falhando_diz_os_dois(pagina_etm, cliente, monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+
+    from nexus.engenharia import etm_marcas as M
+    real = M.marcar
+
+    def marcar(os_, evento, valor, usuario, pode):
+        if evento == "status_pos":
+            raise RuntimeError("banco fora")
+        return real(os_, evento, valor, usuario, pode)
+    monkeypatch.setattr(M, "marcar", marcar)
+    r = _como(cliente, ANA).post(URL_OS + "/marcar", data={"diagnostico": "2", "status_pos": "1"}, headers=SAME)
+    q = parse_qs(urlsplit(r.headers["Location"]).query)
+    assert "Diagnóstico: Falha de Comunicação" in q["ok"][0] and "RuntimeError" in q["erro"][0]
+    assert "Nada mudou" not in q["erro"][0]
+
+
+def test_a_pilula_da_os_de_etm_conta_a_marcacao(pagina_etm, cliente):
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+    c = _como(cliente, ANA)
+    antes = c.get("/t/engenharia/etm/os/17011").get_data(as_text=True)
+    assert "dias sem atualização" in antes.split('class="eg-ac-tag', 1)[1].split("</span>", 1)[0]
+    c.post("/t/engenharia/etm/os/17011/marcar", data={"diagnostico": "3"}, headers=SAME)
+    depois = c.get("/t/engenharia/etm/os/17011").get_data(as_text=True)
+    assert "sem atualização" not in depois.split('class="eg-ac-tag', 1)[1].split("</span>", 1)[0]
+
+
+def test_primeira_leitura_em_andamento_nao_mostra_zeros(tela, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, _como
+    monkeypatch.setattr(E, "dados", lambda: {"os": [], "lido": 0.0, "lendo": True, "erro": ""})
+    html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
+    assert "Lendo as OS de ETM no Fracttal" in html and _dados_da_tela(html)["nunca_lido"] is True
+    kpis = html.split('aria-label="As ETMs agora"', 1)[1].split("</section>", 1)[0]
+    assert '">0</b>' not in kpis and kpis.count('">—</b>') == 4
 
