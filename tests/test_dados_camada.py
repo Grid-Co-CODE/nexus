@@ -14,7 +14,7 @@ from pg_falso import ApiPGFalsa, Resposta
 
 from nexus.campo import decisao_pt, ronda_avulsa
 from nexus.dados import calendario, carga, catalogo, equipamento, fato_pt, fato_ronda, fatos, geracao, historico, livros
-from nexus.dados import fato_chamado, fato_tarefa_os, programacao
+from nexus.dados import fato_almoxarifado, fato_chamado, fato_tarefa_os, programacao
 from nexus.dados import telas as telas_dados
 
 BASE = "http://pg.falso"
@@ -39,8 +39,9 @@ def test_catalogo_declara_grao_estado_e_todas_as_dimensoes():
         assert all(p in catalogo.POR_ID and catalogo.POR_ID[p].estado not in ("parte", "aposentado")
                    for p in f.parte_de), f.id
     r = catalogo.resumo()
-    # a programação passou a gravar em 08/10 (decisão 7) e a geração em 11/10 (decisão 8): nada fica só montado
-    assert r["conformados"] >= 6 and r["montados"] == 0
+    # a programação passou a gravar em 08/10 (decisão 7) e a geração em 11/10 (decisão 8); os três do almoxarifado
+    # (25/10/2026) ficam montados até a NEXUS_ALMOX_GRAVAR ligar a gravação depois do ensaio com o 1º ciclo real do App
+    assert r["conformados"] >= 6 and r["montados"] == 3
     assert catalogo.POR_ID["geracao_usina_dia"].estado == catalogo.POR_ID["geracao_inversor_dia"].estado == "conformado"
     assert catalogo.POR_ID["programacao"].estado == "conformado"
     # a auditoria de 08/10: ronda e PT tinham o grão errado; checklist e avulsa viraram fonte do fato único de ronda
@@ -74,7 +75,8 @@ def test_todo_fato_declara_tipo_chave_e_medidas_com_unidade():
 CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt": fato_pt.CAB_PT,
         "programacao": programacao.CAB_PROGRAMACAO, "geracao_usina_dia": geracao.CAB_USINA_DIA,
         "geracao_inversor_dia": geracao.CAB_INVERSOR_DIA, "chamado": fato_chamado.CAB_CHAMADO,
-        "tarefa_os": fato_tarefa_os.CAB_TAREFA_OS}
+        "tarefa_os": fato_tarefa_os.CAB_TAREFA_OS, "saldo_almox": fato_almoxarifado.CAB_SALDO,
+        "ciclo_varredura": fato_almoxarifado.CAB_CICLO, "peca_lancada": fato_almoxarifado.CAB_PECA}
 PROIBIDAS = ("nome", "email", "tecnico", "observacao", "comentario", "motivo", "tarefa", "relatorio", "atividades")
 
 
@@ -110,7 +112,7 @@ def test_livros_do_nexus_registrados_antes_de_existir_e_na_regra_10():
         assert l.abas and all(catalogo.aba_segue_a_regra(a) for a in l.abas), l.nome
     for nome in (carga.LIVRO_DIM, carga.LIVRO_FATOS, equipamento.LIVRO, equipamento.LIVRO_FOTO, programacao.LIVRO,
                  geracao.LIVRO, ronda_avulsa.LIVRO, decisao_pt.LIVRO, "nexus_rondas_checklist", fato_chamado.LIVRO,
-                 fato_tarefa_os.LIVRO):
+                 fato_tarefa_os.LIVRO, fato_almoxarifado.LIVRO):
         assert nome in catalogo.LIVRO_POR_NOME, nome
     assert ronda_avulsa.ABA in catalogo.LIVRO_POR_NOME[ronda_avulsa.LIVRO].abas
     assert equipamento.ABA_FOTO in catalogo.LIVRO_POR_NOME[equipamento.LIVRO_FOTO].abas
