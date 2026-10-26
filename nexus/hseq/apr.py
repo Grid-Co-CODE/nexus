@@ -12,22 +12,25 @@ As duas listas:
   "Precisa de PT" vazio é "ainda não medido" (as APRs de antes da v298 são lidas do documento aos poucos): não entra.
   Caso real: a OS 16866 TINHA PT (PT-16866-2010-1457, da APR do dia); a TST a procurou no Fracttal, onde só vai o PDF
   da APR. A busca da tela de APR e PT acha a PT pelo número da OS.
-- **OS fechada pelo App sem APR**: cada tarefa do `fato_fechamento` desde 10/10/2026 sem APR da mesma OS no mesmo dia
-  de Brasília ou no anterior (a tarefa da noite fecha depois da meia-noite), nem APR da tarefa com a mesma OS e a mesma
-  tarefa. Por OS e dia, com quantas tarefas. A régua não olha o
-  técnico (a do App olha): melhor deixar passar um caso do que apontar quem fez a APR. Deve ser raro: o servidor do App
-  barra a 1ª tarefa da OS no dia sem a APR do dia desde a v246; o que aparecer tende a ser App velho, o robô ou APR
-  feita no Fracttal.
+- **OS fechada pelo App sem APR**: a tarefa do `fato_fechamento` de OS criada desde 10/10/2026 sem APR nenhuma da mesma
+  OS até o dia do serviço. A régua é a do App (26/10/2026, o diagnóstico da sessão do App de Campo): a APR vale para a
+  ATIVIDADE, não para o dia (regra de 15/10, decisão do Levi: "se para AQUELA atividade já tiver APR feita tá
+  tranquilo"): o App cobra a APR do dia no 1º Iniciar de uma tarefa nova da OS no dia, e a retomada de tarefa pausada
+  não pede outra. O dia do serviço é a "Hora do celular" do livro cru, não o "Registrado em" (a chegada ao servidor,
+  que pode ser dias depois, com o celular offline). A OS criada antes de 10/10 fica fora: pode ter a APR por TAREFA de
+  antes do registro (a 14334: APR de 06/10, retomada 20 dias depois). Caso real que a régua acha: a 16995, iniciada e
+  pausada no Fracttal, fora do App, que escapou da APR do dia. A régua não olha o técnico: melhor deixar passar um
+  caso do que apontar quem fez a APR.
 """
-from datetime import date, timedelta
+from datetime import date
 
 from ..campo import leitura, visao
 from ..dados import fatos as D
 from ..dados import livros
 
 LIVRO, ABA = "apr_app_campo", "APR"
-# a fila do PDF da APR do App registra toda APR desde a v251, que entrou ao longo de 09/10/2026: conta do dia seguinte
-# (medido em 25/10: 48 dos 138 casos de OS sem APR eram de 09/10, o dia da troca)
+# a fila do PDF da APR do App registra toda APR desde a v251, que entrou ao longo de 09/10/2026: só a OS criada do dia
+# seguinte em diante entra (a de antes pode ter a APR por tarefa, fora do livro)
 INICIO = date(2026, 10, 10)
 
 
@@ -61,11 +64,10 @@ def sem_apr_ou_pt() -> leitura.Leitura:
             return {"livro_existe": False, "sem_pt": [], "sem_apr": [], "hoje": hoje, **visao._estrutura(b)}
         aprs = visao._livro(LIVRO, ABA)
         quem = visao._quem() if aprs else {}
-        sem_pt, por_os_dia, por_os_tarefa, dias_da_os = [], set(), set(), {}
+        sem_pt, por_os_tarefa, dias_da_os = [], set(), {}
         for x in aprs:
             os_, dia = _txt(x.get("OS")), _dia(x.get("Dia"))
             if os_ and dia:
-                por_os_dia.add((os_, dia))
                 dias_da_os.setdefault(os_, set()).add(dia)
             if os_ and _txt(x.get("Tipo")) == "tarefa" and _txt(x.get("Tarefa")):
                 por_os_tarefa.add((os_, D.tarefa_chave(x.get("Tarefa"))))
@@ -89,23 +91,21 @@ def sem_apr_ou_pt() -> leitura.Leitura:
             pass
         grupos = {}
         f = visao._fato("fechamento", b)
+        # a "Hora do celular" (quando o técnico fez) do livro cru, junto ao fato pela chave dele
+        cru = {D.chave_fechamento(a): a for a in visao._livro(*visao.C.ORIGEM_FECHAMENTOS)} if f["linhas"] else {}
         for x in f["linhas"]:
-            os_, quando = _txt(x.get("os")), visao._dt(x.get("registrado_em"))
-            if not os_ or not quando or quando.date() < INICIO:
+            os_ = _txt(x.get("os"))
+            bruto = cru.get(_txt(x.get("fechamento_id"))) or {}
+            quando = visao._dt(bruto.get("Hora do celular")) or visao._dt(x.get("registrado_em"))
+            criada = _do_data_id(criada_em.get(os_))
+            if not os_ or not quando or not criada or criada < INICIO:
                 continue
             dia = quando.date()
-            # a APR do dia anterior também vale: a tarefa feita à noite fecha (ou chega do celular) depois da meia-noite
-            # (medido em 25/10: 89 dos 138 casos tinham a APR da mesma OS no dia anterior)
-            if ((os_, dia) in por_os_dia or (os_, dia - timedelta(days=1)) in por_os_dia
-                    or (os_, _txt(x.get("tarefa_chave"))) in por_os_tarefa):
+            if any(d_ <= dia for d_ in dias_da_os.get(os_, ())) or (os_, _txt(x.get("tarefa_chave"))) in por_os_tarefa:
                 continue
             uid = D._id(x.get("usina_id"))
-            # a última APR da OS antes do fechamento, se houve: fechada 24/10 com APR em 22/10 é, quase sempre, o
-            # fechamento registrado dias depois do serviço (medido em 25/10: 27 dos 39 casos); a TST vê e decide
-            antes = [d_ for d_ in dias_da_os.get(os_, ()) if d_ < dia]
             g = grupos.setdefault((os_, dia), {"dia": dia, "os": os_, **(b.onde(uid) if uid else {"usina": ""}),
-                                               "apr_antes": max(antes) if antes else None,
-                                               "os_criada": _do_data_id(criada_em.get(os_)), "tarefas": 0,
+                                               "os_criada": criada, "tarefas": 0,
                                                "tipo_os": _txt(x.get("tipo_os")), "pessoas": set()})
             g["tarefas"] += 1
             if D._id(x.get("pessoa_id")):

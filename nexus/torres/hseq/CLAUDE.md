@@ -36,10 +36,12 @@ Rota `/t/hseq/mesa` (`mesa()`), template `mesa.html`; as contas em `_pendencias(
   na planilha. **Baixar planilha** (`/t/hseq/mesa/pendencias.xlsx`, `planilha.gerar_pendencias`): a aba Resumo (uma
   linha por responsável ou cliente, os oito números) e uma aba por pendência, caso a caso (`ABAS_PENDENCIAS`), com os
   filtros e a fonte que não foi lida no topo. Medido no banco real em 24/10: 42 KB.
-- Cada número leva à tela de origem filtrada pelo grupo e pelos filtros do alto (`_links`): Extintores com o Status
-  (Atrasados, Não reconhecidos, Perto de vencer, Sem atualização), EPI na tabela com "Sem luvas" ou "Sem verificação"
-  (a UFV vai na busca dele, que não tem o filtro de usina); a PT ainda não tem o filtro de responsável nem de cliente, e
-  o número leva a APR e PT inteira.
+- Cada número leva à tela de origem filtrada pelo grupo e pelos filtros do alto (`_links`; Levi, 26/10/2026: "o certo
+  é cada opção levar a um caminho filtrado. Então PTs parados vai levar para APR e PT > Esperando o de acordo > Tabela >
+  Filtra o responsável"): as PTs paradas, à tabela de APR e PT com "Parada há mais de 2 h" e o cliente, a usina e o
+  responsável; os extintores, à tabela de Extintores no Status (Atrasados, Não reconhecidos, Perto de vencer, Sem
+  atualização); as luvas, à tabela de EPI com "Sem luvas" ou "Sem verificação" (a UFV vai na busca dele, que não tem o
+  filtro de usina); a nova ronda pedida, a Extintores do grupo.
 - Só lê; a fonte que falha diz e o número dela vira "—", sem derrubar as outras. Não lê o Fracttal.
 Prova: `tests/test_hseq_mesa.py` (os grupos, os filtros em cascata, os de atenção e a planilha).
 
@@ -383,14 +385,15 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   `nexus/hseq/apr.py`): do livro `apr_app_campo · APR` que o App publica desde a v298 do servidor (no catálogo antes da
   1ª gravação, fato `apr`; contrato com a sessão do App de Campo), duas listas de 20 em 20 com os mesmos filtros:
   **APR que pedia PT e ficou sem** ("Precisa de PT" = sim e PT vazia; vazio = ainda não medido, não entra) e **OS
-  fechada sem APR** (a tarefa do `fato_fechamento` desde 10/10/2026 sem APR da mesma OS no mesmo dia ou no anterior,
-  nem APR da tarefa com a mesma OS e tarefa; por OS e dia, com a coluna "APR da OS", a última antes do fechamento, ou
-  "nenhuma", e a "OS criada em", do `fato_tarefa_os` (Levi, 26/10: "quero uma coluna de data de criação da OS"; a OS
-  em processo ou em verificação, onde ela fica depois de o App fechar a tarefa: 50 das 52 em 26/10; a finalizada fica
-  "—"); a régua não olha o técnico). Medido no livro real em 25/10 (875 APRs, 149 já medidas): 2 APRs pediam PT e
-  ficaram sem (a mesma conta do App) e 39 OS fechadas sem APR, 12 sem APR nenhuma; a régua começou com 138, dos quais
-  48 eram de 09/10 (o dia da troca para a v251) e 89 tinham a APR no dia anterior (a tarefa da noite fecha depois da
-  meia-noite). Sem o livro, a aba diz que ele ainda não chegou.
+  fechada sem APR** (a tarefa do `fato_fechamento` de OS criada desde 10/10/2026 sem APR nenhuma da OS até o dia do
+  serviço; por OS e dia, com a "OS criada em", do `fato_tarefa_os`; Levi, 26/10: "quero uma coluna de data de criação
+  da OS"). A régua é a do App (o diagnóstico da sessão do App de Campo em 26/10): a APR vale para a ATIVIDADE (regra de
+  15/10: "se para AQUELA atividade já tiver APR feita tá tranquilo"), então a tarefa pausada e retomada dias depois não
+  pede outra; o dia do serviço é a "Hora do celular" do livro cru, não o "Registrado em" (4 OS feitas em 21 e 23/10
+  chegaram em 26/10, com o celular offline); a OS criada antes de 10/10 fica fora (a 14334 tinha a APR por tarefa de
+  06/10, de antes do registro). A régua começou contando pelo dia (138 casos em 25/10, 52 em 26/10, quase todos
+  retomadas e envios atrasados); com a do App, 6 em 26/10, entre eles a 16995, iniciada e pausada no Fracttal, fora do
+  App, que escapou da APR do dia (o buraco real: o conserto no App é decisão do Levi). A régua não olha o técnico. Sem o livro, a aba diz que ele ainda não chegou.
   Caso que motivou: a OS 16866 tinha PT (PT-16866-2010-1457, da APR do dia); a TST a procurou no Fracttal.
 - **O histórico inteiro, de 20 em 20** ("Em histórico quero todo o período mostrando de 20 em 20 para não pesar tanto";
   saiu o período 7/30/90 dias): `POR_PAGINA_PT`, `?pag=`, com "1–20 de N" e as páginas em volta da atual; leva a coluna

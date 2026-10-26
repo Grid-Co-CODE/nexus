@@ -298,8 +298,9 @@ def _cartoes(L, chave) -> list[dict]:
 
 
 def _links(nome, chave, fl) -> dict:
-    """Para onde leva cada número de um cartão: a tela de origem filtrada pelo grupo e pelos filtros da Mesa. O EPI não
-    tem o filtro de UFV: a usina vai na busca dele. A PT ainda não tem filtro de responsável nem de cliente."""
+    """Para onde leva cada número de um cartão: a tela de origem filtrada pelo grupo e pelos filtros da Mesa (Levi,
+    26/10/2026: "o certo é cada opção levar a um caminho filtrado. Então PTs parados vai levar para APR e PT > Esperando
+    o de acordo > Tabela > Filtra o responsável"). O EPI não tem o filtro de UFV: a usina vai na busca dele."""
     f = {c: v for c, v in fl.items() if v}
     if chave:
         f[chave] = nome
@@ -312,7 +313,10 @@ def _links(nome, chave, fl) -> dict:
 
     def epi(st):
         return url_for("torre_hseq.epi", modo="tabela", f=st, **epi_f)
-    return {"pts": url_for("torre_hseq.apr_pt"), "vencidos": ext("atrasado"), "nr": ext(NR), "sem_luvas": epi("sem_luvas"),
+    def pt():
+        return url_for("torre_hseq.apr_pt", modo="tabela", f="parada",
+                       **{c: v for c, v in f.items() if c in ("cliente", "usina", "responsavel")})
+    return {"pts": pt(), "vencidos": ext("atrasado"), "nr": ext(NR), "sem_luvas": epi("sem_luvas"),
             "perto": ext("perto"), "sem_atual": ext("sem_atualizacao"), "luvas_semv": epi("sem_verificacao"),
             "ronda": ext()}
 
