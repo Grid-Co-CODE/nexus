@@ -1,0 +1,40 @@
+/* O "Investigar ativo" (26/10/2026, templates/historico_ativo.html): a janela do Tempo real com o histórico de OS de um
+   ativo. Usa as peças do Histórico (hf-*, os-hist, os-seg, os-multi); aqui só o cabeçalho, a barra e os avisos. */
+.iv{padding-top:6px}
+.iv-cab{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.iv-kicker{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--f-muted);font-weight:600}
+.iv-titulo{margin:0;font-size:20px;font-weight:600;color:#e9eef6;line-height:1.25}
+.iv-sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:13px;color:#cfd6e4}
+.iv-cod{font-family:"IBM Plex Mono",Consolas,monospace;font-size:12.5px;color:var(--f-green);background:rgba(166,226,46,.10);
+  border:1px solid rgba(166,226,46,.30);border-radius:6px;padding:1px 8px}
+.iv-mudo{color:var(--f-muted)}
+.iv-aviso{margin:6px 0 0;background:rgba(250,178,25,.08);border:1px solid rgba(250,178,25,.35);color:#f3d99b;border-radius:10px;
+  padding:8px 12px;font-size:12.5px;line-height:1.45}
+.iv-barra{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 16px}
+.iv-seg button{background:var(--sec,#1A2337);color:var(--sec-txt,#c9cfe0);border:none;height:38px;padding:0 14px;font:inherit;
+  font-size:13px;font-weight:500;cursor:pointer}
+.iv-seg button b{margin-left:4px;font-weight:700}
+.iv-seg button.on{background:var(--f-green);color:var(--f-ink);font-weight:600}
+.iv-seg button:disabled{opacity:.45;cursor:not-allowed}
+.iv-per{flex:0 1 330px}
+.iv-atualizar{height:38px;width:38px;padding:0}
+.iv-grade{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:900px){.iv-grade{grid-template-columns:1fr}}
+/* a caixa da busca do Histórico cresce com flex-basis de 460px (pensada para a linha); na coluna da grade, isso virava
+   460px de ALTURA (visto na bancada de 26/10/2026) */
+.iv-busca .hf-filtro{flex:none;height:38px;min-width:0;box-sizing:border-box}
+.iv-periodo{margin:14px 0 6px;font-size:13px;color:#cfd6e4}
+.iv-periodo b{color:#e9eef6;font-weight:600}
+.iv-nota{margin:4px 0;font-size:12px;color:var(--f-muted);line-height:1.45}
+.iv-vazio-op{display:block;padding:8px 10px;color:var(--f-muted);font-size:12.5px}
+.iv-tab td.k-tipo_tarefa{white-space:nowrap}
+
+/* ── tema claro (Nexus): a regra e a paleta --osc-* estão no bloco TEMA CLARO do fim do os.css ── */
+:where(html[data-tema="claro"]) .iv-titulo,:where(html[data-tema="claro"]) .iv-periodo b{color:var(--osc-texto)}
+:where(html[data-tema="claro"]) .iv-sub,:where(html[data-tema="claro"]) .iv-periodo{color:var(--osc-texto)}
+:where(html[data-tema="claro"]) .iv-kicker,:where(html[data-tema="claro"]) .iv-mudo,
+:where(html[data-tema="claro"]) .iv-nota,:where(html[data-tema="claro"]) .iv-vazio-op{color:var(--osc-mudo)}
+:where(html[data-tema="claro"]) .iv-cod{color:var(--osc-musgo);background:var(--osc-lima-suave);border-color:var(--osc-musgo-borda)}
+:where(html[data-tema="claro"]) .iv-aviso{color:var(--osc-alerta);background:var(--osc-alerta-suave);border-color:var(--osc-alerta-borda)}
+:where(html[data-tema="claro"]) .iv-seg button{background:var(--osc-secao);color:var(--osc-texto)}
+:where(html[data-tema="claro"]) .iv-seg button.on{background:var(--osc-lima);color:var(--osc-sobre-lima)}

@@ -1363,3 +1363,44 @@ Levi, pelo chat da Engenharia: "sabe o pulsar que temos no quadro de equipe? pas
 - Prova: `tests/test_oscreator_acomp_pulso_25_10.py` (4 d 23 h não, 5 d sim, as duas colunas abertas, as fechadas não,
   sem comentário desde a abertura, o histórico da retroativa, o banco fora, a tela e o CSS). Na bancada (Fracttal
   falso, metade das OS comentada na véspera): só as paradas pulsam, a 1440 e a 375 px, no escuro e no claro.
+
+## Investigar ativo: o histórico de OS de um ativo, para o Tempo real (26/10/2026)
+
+Levi: "Gostaria de poder clicar com botão direito do mouse em cima do inversor e ter a opção 'Investigar ativo'. Vai
+aproveitar o pré carregamento de histórico de OS do OS Creator filtrando esse ativo, deve mostrar o período filtrado e eu
+devo conseguir fazer novos filtros e pesquisas pela visão. Vai abrir uma sub janela sobrepondo a tela dando um blur de
+fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Monitoramento, `plataforma/CLAUDE.md`, seção
+"Investigar ativo"); a visão mora aqui, onde a lista do Histórico já está carregada.
+
+- **O endereço:** `/os/historico/ativo?codigo=<código do Fracttal>&usina=<usina>&nome=<inversor>[&rotulo=&de=&ate=]`
+  (`os_web/rotas_investigar.py`; as regras, puras, em `os_web/investigar_web.py`; a tela em `templates/historico_ativo.html`
+  e `static/investigar.css`). A plataforma abre com `janela=1` (a ponte tira o topo, como no Criar OS), e o formulário
+  guarda o `janela` e o pedido a cada nova busca. Fica debaixo do `/os/`: o portão do Nexus pede uma tela da torre OS
+  (`setor_telas.pode`), e o Caddy já manda o `/os/*` ao Nexus. Sem a sessão do Fracttal, o login do OS Creator, como
+  em qualquer tela (`exige_sessao`).
+- **De onde vem o histórico (nenhuma busca a mais no Fracttal):** a lista de "Todos" dos últimos 30 dias, a MESMA da
+  Visão COS e do "Criado por: Todos" (`rotas.ler_lista`, que saiu de dentro do `historico` para as duas usarem a mesma
+  leitura: a chave `("hist", "TODOS", "criadas", "TODOS", None, de, ate, ())` do `historico_store`, a conferência da
+  mesma visão e a renovação por trás). Quem abriu a Visão COS deixa a janela pronta; a 1ª janela deixa a Visão COS
+  pronta. O período DENTRO dos 30 dias é recortado da lista (pela data de criação, como o Histórico), sem pedido; fora
+  deles, a lista daquele período (a régua do Histórico, guardada para quem vier depois), com o aviso na tela e o do teto
+  de 2.000 quando a lista corta as mais antigas. O ↻ é o do Histórico.
+- **O ativo, pelo catálogo do disco** (`api._catalogo_cru`, vencido também serve; nunca o Fracttal): o código que a
+  plataforma manda (o gravado no de-para ou o derivado do nome) quando está no catálogo; senão, o inversor da usina com o
+  mesmo número (`INVR` + N.M, sem zero à esquerda; 1.1 não casa com 1.10), com o aviso de que o código não existe (o
+  derivado erra onde a árvore do Fracttal mudou, a Pharma II); sem inversor, a usina inteira, com o aviso.
+- **A OS é do ativo** quando o código dele está entre os itens dela: a linha do Histórico ganhou `codigos`
+  (`api._extrai_codigos`, todos os `{ ... }` dos itens; o `_extrai_code` fica só com o último), e a OS agrupada de dois
+  inversores aparece nos dois. "Da usina", pelo nome curto, o do Histórico (inclui as do item da usina: religamento).
+- **Os filtros da janela:** "Este ativo N | A usina inteira N", Status e Tipo de tarefa (as opções que existem nas OS da
+  usina no período) e a busca por texto são locais, sobre as linhas da usina que vieram; o período re-lê no servidor. O
+  nº abre o card da OS do Histórico (o mesmo `os_acoes.js`); a ação que muda a OS relê ao fechar. O Esc sem card aberto
+  fecha a janela do Tempo real (`{gc: "depara-fechar"}` à página de baixo).
+- **Prova:** `tests/test_oscreator_investigar_ativo_26_10.py` (14: o catálogo, o número, os códigos dos itens, o
+  período, a janela sem busca a mais depois da Visão COS e o contrário, o recorte, o período fora, os campos guardados,
+  a usina inteira, o login e o Histórico igual depois da `ler_lista`). Na bancada (o clone sozinho em `127.0.0.1:5097`,
+  Fracttal falso, rede bloqueada, dentro de uma moldura com o fundo desfocado): o escopo, o status, a busca, o vazio e o
+  período (recorte sem pedido) funcionando; a caixa da busca crescia 460 px de altura (flex-basis do Histórico numa
+  coluna), corrigida no `investigar.css`.
+- **Falta:** levar ao oem (`api.py`, `rotas.py` e os quatro arquivos novos), com o OK do Levi (o oem é público); até lá,
+  a plataforma do PC aberta direto (o `/os/*` dela vai ao 5090) dá 404 na janela. E o olho do Levi com uma OS de verdade.

@@ -1563,6 +1563,13 @@ def _extrai_code(desc: str) -> str:
     return ""
 
 
+def _extrai_codigos(desc: str) -> list:
+    """TODOS os códigos '{ ... }' dos itens da OS, na ordem. A OS de várias tarefas traz um item por ativo, separados por
+    vírgula, e o `_extrai_code` fica só com o último: o "Investigar ativo" do Tempo real (26/10/2026) filtra a lista do
+    Histórico pelo código, e a OS agrupada de dois inversores tem de aparecer nos dois."""
+    return [c.strip() for c in re.findall(r"\{([^{}]*)\}", str(desc or "")) if c.strip()]
+
+
 HISTORICO_CAP = 2000   # teto de OS por carga do histórico (limita o enriquecimento de tipo_tarefa)
 
 
@@ -1616,6 +1623,7 @@ def _shape_wo_row(w: dict) -> dict:
                  for l in (w.get("labels") or []) if isinstance(l, dict)]
     return {"id": w.get("id"), "folio": w.get("wo_folio"), "cliente": cliente or "—",
             "usina": usina or "—", "ativo": ativo, "tipo": tipo or "—", "descricao": desc,
+            "codigos": _extrai_codigos(item),          # o filtro por ativo do "Investigar ativo" (26/10/2026)
             "criado_por": str(w.get("created_by") or "").strip(), "etiquetas": etiquetas,
             # QUEM está com a OS. A linha crua já traz isso — sem esses dois campos o
             # board de Performance precisaria de UMA CONSULTA POR ANALISTA; com eles,
