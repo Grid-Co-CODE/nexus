@@ -26,7 +26,7 @@ clica, como no OS Creator Web; ver "Aprovação de OS").
 | Permissões de trabalho → **em Segurança · HSEQ > APR e PT desde 09/10/2026** (`/t/hseq/apr-pt`; `/t/campo/pt` leva para lá). O código continua aqui (`pagina_pt`, a aprovação `/t/campo/pt/<número>`, os PDFs da PT e da APR); a regra de lá está em `nexus/torres/hseq/CLAUDE.md` | `fato_pt` (+ `pt_app_campo` para o texto) | `visao.pts` (conta nossa) |
 | Rondas | `fato_ronda` (App, checklist da carga única, avulsa) + usinas mobilizadas do cadastro + `fato_fechamento` (última OS da usina) + a validação por foto (só sujidade e vegetação) | `visao.rondas` (conta nossa) |
 | Ronda avulsa (`/t/campo/rondas/avulsa`) | lançada à mão no Nexus, com o login do Fracttal | `campo/ronda_avulsa.py` |
-| Zeladoria | `zeladoria_app_campo` | `visao.zeladoria` (conta nossa) |
+| **Zeladoria** (26/10/2026) | as rondas (o checklist da OS de ronda, a carga, a avulsa e a validação por foto, como na aba Sujidade e vegetação) + as tarefas de Zeladoria do Fracttal (`nexus_os · fato_tarefa_os`) + `zeladoria_app_campo` (os serviços de terceiros, no fim da tela) | `campo/zeladoria.py` (conta nossa; ver "Zeladoria" abaixo) |
 | Triagem de qualidade | `fechamentos_app_campo` + rondas | regras copiadas do App |
 | **Ranking de pontos** (13/10/2026) | `ranking_app_campo` (o placar do ciclo, que o App publica) | **o App** (`_ciclo_v2`); o Nexus só mostra (ver "Ranking de pontos" abaixo) |
 | Rotas do dia | placeholder: programação do PCM + localização das usinas | — |
@@ -146,6 +146,69 @@ só o Nexus. Desenho e as decisões dele no quiz: `docs/superpowers/specs/2026-1
   a página velha, o clique duplo, a usina que saiu da operação, o código do ativo, o relógio de duas máquinas e o banco
   que devolve tudo como texto).
 
+## Zeladoria (26/10/2026)
+
+Levi, com o modelo "Rondas Sujidade e Vegetação" (um HTML de visão do cliente): "Quero algo nesses padrões para a parte
+de zeladoria da seção campo app do nexus. deixe no estilo do Nexus porém nesse padrão! a evolução por usina deve ser por
+cliente!". A tela de antes (os serviços de terceiros que o App registra, `zeladoria_app_campo`) estava vazia desde
+05/10 e ficou no fim, recolhida. A conta é `nexus/campo/zeladoria.py`; a rota, `zeladoria` e `zeladoria_usina` (a
+gaveta) em `__init__.py`.
+
+- **Sem fonte nova.** A leitura de vegetação e de sujidade é a das Rondas, pela regra da aba Sujidade e vegetação
+  (`zeladoria.leituras`, a mesma de `visao.sujidade_vegetacao`): o texto da OS de ronda no Fracttal
+  (`ronda_checklist.respostas`), o checklist do fato (a carga das rondas sem OS, a avulsa), e a validação por foto do dia
+  no lugar das rondas daquele dia. A zeladoria feita e a programada são as tarefas do tipo Zeladoria do `nexus_os ·
+  fato_tarefa_os` (as abertas e as finalizadas de 90 dias, as mesmas da Visão do responsável). Nada escreve.
+- **As três tarefas de zeladoria são conhecidas pelo texto** (`TAREFAS_DE_ZELADORIA`): o fato guarda a tarefa como
+  `tarefa_chave` (sha1 do texto normalizado, `fatos.tarefa_chave`), e as chaves das três do plano foram achadas pelos
+  textos do `banco_dados.json` do PCM: "Acompanhamento - Limpeza de Módulos (Termografia se aplicável)" (atende a
+  sujidade), "Acompanhamento - Supressão Vegetal" e "Acompanhamento - Poda Química" (atendem a vegetação). Medido em
+  26/10/2026: 76 tarefas de zeladoria no fato, 36 de limpeza, 33 de supressão e 7 de poda, uma linha por OS; 18 usinas
+  com limpeza feita em 90 dias, 26 com supressão, 3 com poda. **O PCM renomear a tarefa no Fracttal muda a chave**: a
+  tarefa cai em "Outra tarefa de zeladoria" e não atende recomendação nenhuma até o texto novo entrar na lista.
+- **Semana** = segunda a domingo (`2026-W43`, a do PCM). A evolução mostra as 8 semanas (as do modelo) que terminam na
+  semana escolhida; o filtro oferece a corrente e as 4 anteriores (`SEMANAS_NO_FILTRO`, a janela que o checklist de 90
+  dias ainda cobre). A semana corrente fica "em andamento" (célula vazia com contorno, não o tracejado de "sem leitura").
+  **Semana com mais de uma leitura** (`REGRA_DA_SEMANA`): a última, como a aba Sujidade e vegetação e a Visão do
+  responsável (medido em 26/10: 206 usina×semana com 2 ou mais leituras em 9 semanas; a última abaixo da maior em 27 na
+  sujidade e 28 na vegetação). **Decisão do Levi (26/10/2026): a última** (a outra opção era a pior da semana).
+- **A evolução por cliente** (`por_cliente`): os clientes em ordem alfabética, recolhíveis (o nome, ou "Recolher os
+  clientes"); a linha do cliente diz, em cada semana, quantas usinas ficaram acima de 3 sobre quantas tiveram leitura.
+  Dentro do cliente, o nível mais alto na ÚLTIMA leitura primeiro (pela semana escolhida, na segunda-feira a ordem virava
+  a alfabética). Vegetação ou Sujidade no seletor (`modulo=`). Cor da célula = a régua da aba Sujidade e vegetação em tom
+  de fundo (1 e 2 verde, 3 azul, 4 âmbar, 5 vermelho); a dica da célula traz as leituras da semana.
+- **Situação por usina:** a última leitura até o fim da semana escolhida (na corrente, até hoje), com a seta para a
+  anterior; leitura com 7 dias ou mais (a régua de ronda pendente, `DIAS_SEM_RONDA_ALERTA`) com a data em âmbar. A ordem
+  é a criticidade das Rondas (`visao.criticidade`). Colunas: usina (cliente · UF), leitura, vegetação, sujidade, vala,
+  sensores, última supressão (supressão ou poda), última limpeza e a recomendação.
+- **Recomendação** (`recomendacoes`): vegetação acima de 3 na última leitura pede supressão vegetal; sujidade acima de 3,
+  limpeza de módulos. A situação no Fracttal: "feita" (tarefa do tipo terminada DEPOIS da leitura, inclusive a OS em
+  verificação; a feita antes não conta), "aberta" (programada ou em execução; a programada vencida diz "atrasada") ou
+  "sem_os". **Sem as OS no banco** (o fato vazio ou a leitura que falhou), "sem_dado" e o aviso: a tela não acusa falta
+  de OS que ela não viu. O prazo conta da leitura (`PRAZO_DIAS`: nível 5 imediato, nível 4 em até 7 dias, os do modelo;
+  **decisão do Levi, 26/10/2026**; as outras opções eram sem prazo ou 7 e 14 dias); vencido sem a feita = "atrasada
+  N d". A fila das Recomendações traz as não feitas, o nível 5 primeiro, sem OS antes de aberta, a leitura mais antiga
+  antes.
+- **Os números de cima** (sobre cliente, usina, região de campo e gestor; a situação não, é o que eles contam): com
+  leitura na semana, vegetação acima de 3, vegetação média, sujidade acima de 3, sujidade média e recomendações sem OS;
+  os de contagem filtram a tabela (`situacao=`). O modelo tinha altura média em cm e perda estimada em %: o App não mede
+  nenhum dos dois (o nível é de 1 a 5 pela foto de referência), e a tela mostra a média dos níveis no lugar.
+- **A gaveta** (o clique na linha, na célula ou na recomendação; `/zeladoria/usina/<id>`, carregada no clique): os seis
+  fatos, as 8 semanas nos dois campos, a recomendação, as leituras da semana clicada (sem a célula, a semana da última
+  leitura), a zeladoria do Fracttal da usina e o botão das fotos da última ronda com OS (o `ronda_fotos` das Rondas: o
+  Fracttal só é lido no clique). Sessão vencida recarrega a página (o portão leva ao Entrar), como a gaveta da Engenharia.
+- **Filtros:** semana, cliente, usina, situação, região de campo e gestor de contrato (o supervisor entra filtrado, como
+  nas Rondas). **Decisão do Levi (26/10/2026)**, como o limiar acima de 3 (o modelo dizia "nível ≥ 3": seriam 57
+  usinas na vegetação e 46 na sujidade, 103 recomendações, contra 30, 21 e 51); a semana padrão é a corrente.
+- **Medido na bancada em 26/10/2026** (o banco real e as respostas como a produção as tinha, sem ir ao Fracttal): 131
+  usinas mobilizadas de 13 clientes, 21 com leitura na W44 (segunda-feira) e 69 na W43; vegetação acima de 3 em 30
+  usinas (6 no nível 5), sujidade em 21 (5 no nível 5); 51 recomendações, 40 sem OS, 10 com OS aberta, 1 feita. Página:
+  481 KB (40 KB com gzip), 0,07 s com a conta das Rondas pronta; a gaveta, 4,5 KB em 0,02 s.
+- **Prova:** `tests/test_campo_zeladoria_semanal.py` (as semanas, as leituras pela regra da aba com a validação por foto,
+  a última × a pior, as três tarefas e as situações, a feita antes × depois da leitura, a aberta, o "sem_dado", a conta
+  da tela com a semana passada, a evolução por cliente e a ordem, a situação, os números, a fila, a tela e a gaveta com o
+  banco falso; mutações 5/5).
+
 ## De onde vem o dado
 
 **Os livros que o próprio App grava no banco** (Levi, 05/10: "operador faz ronda > após ronda input é dado na API do PG
@@ -220,7 +283,7 @@ decisões, 766 rondas, zeladoria vazia.
   App guarda de madrugada, `_enriquecer_qlog`, e não manda). Ficam desconhecidas, não aproximadas (com a duração do
   celular o "tempo vs. previsto" dava 5.726%; com a situação pela revisão do painel, 402 de 447 "em verificação"); a
   Triagem não acusa demora nem divergência de supervisor por isso. Para ter: o App mandar essas colunas (mudança no App).
-- **Zeladoria vazia é real:** em 90 dias o App não registrou nenhuma etapa de zeladoria. A tela diz isso.
+- **Os serviços de terceiros do App estão vazios de verdade:** em 90 dias o App não registrou nenhuma etapa de zeladoria (`zeladoria_app_campo`). Desde 26/10/2026 eles ficam no fim da tela Zeladoria, recolhidos, com o aviso.
 
 ## As contas nossas (`nexus/campo/visao.py`)
 
@@ -1256,7 +1319,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   `manutencao.py`: a conta pura do bloco Manutenção. `tarefas_os.py`: o laço que lê as tarefas das OS do Fracttal e
   grava o `nexus_os` (acima). `responsaveis_graficos.py`: a geometria dos gráficos das janelas (SVG).
   `chamados_acompanhamento.py`: os chamados de garantia no banco (acima). `ocorrencias.py`: as ocorrências com plano
-  de ação (o livro `nexus_ocorrencias`, acima).
+  de ação (o livro `nexus_ocorrencias`, acima). `zeladoria.py`: a Zeladoria (acima), pura: as leituras, a zeladoria
+  do Fracttal pelas três tarefas, as recomendações, a evolução por cliente, a situação, os números e a fila.
 - `livros_app.py`, `fonte_pg.py`, `tabelas.py`: os livros do App no formato que as regras copiadas consultam
   (`query_entities`, `get_entity`); erro de leitura fica anotado e vira aviso.
 - `aprovacao.py`, `triagem.py`: as telas pelas regras copiadas (`aprovacao.os_na_fila` e `tirar_da_fila` servem à
@@ -1269,7 +1333,7 @@ Telas: `templates/campo/*.html` + `static/campo.css`; filtros pela URL.
 
 Prova: `tests/test_torre_campo.py` (nenhuma tela com Azure, moldura ou "Abrir no App"), `test_campo_responsaveis.py`
 (a Visão do responsável), `test_campo_ocorrencias.py` (as ocorrências com plano de ação), `test_campo_chamados_acompanhamento.py` (os chamados no banco), `test_campo_visao.py` (as
-contas nossas, a Central em três visões e a aprovação da PT com o login do OS Creator, banco falso), `test_campo_ronda_avulsa.py` (lançar, cobertura, selo, recusas, anulação, catálogo; 08/10: vala do App, sensor em três estados, anulação sem dia nem usina, o caminho de gravação que a importação usa), `test_campo_importar_avulsas.py` (a importação da validação por foto com planilha sintética: de-para exato, data mais recente, "Sem foto", a pessoa que tem de ser uma ficha com e-mail, gravação, conferência linha a linha, idempotência, fora do fato de ronda), `test_campo_rondas_pedido_0810.py` (Rondas de 08/10: colunas e dica da duração, Fotos na tabela, nunca tiveram ronda, Sem ronda, criticidade, Quem ronda em blocos com as pendentes, Painel), `test_campo_sujidade.py`, `test_campo_regras_app.py`, `test_campo_aprovacao.py`, `test_campo_fila_rapida.py`,
+contas nossas, a Central em três visões e a aprovação da PT com o login do OS Creator, banco falso), `test_campo_ronda_avulsa.py` (lançar, cobertura, selo, recusas, anulação, catálogo; 08/10: vala do App, sensor em três estados, anulação sem dia nem usina, o caminho de gravação que a importação usa), `test_campo_importar_avulsas.py` (a importação da validação por foto com planilha sintética: de-para exato, data mais recente, "Sem foto", a pessoa que tem de ser uma ficha com e-mail, gravação, conferência linha a linha, idempotência, fora do fato de ronda), `test_campo_rondas_pedido_0810.py` (Rondas de 08/10: colunas e dica da duração, Fotos na tabela, nunca tiveram ronda, Sem ronda, criticidade, Quem ronda em blocos com as pendentes, Painel), `test_campo_sujidade.py`, `test_campo_zeladoria_semanal.py` (a Zeladoria de 26/10/2026), `test_campo_regras_app.py`, `test_campo_aprovacao.py`, `test_campo_fila_rapida.py`,
 `test_campo_aprovacao_supervisor.py` (08/10: fila inteira, cartões por região e por gestor, a tabela, o portão do
 Aprovar: supervisor de campo, coordenador com a vaga aberta, só admin sem os dois ou sem a estrutura publicada, gestor
 não aprova, sessão antiga, script válido),
