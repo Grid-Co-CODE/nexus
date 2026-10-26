@@ -405,7 +405,8 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
 - **O detalhe da PT esperando** (a linha abre; "estou achando o atual muito cru"): o cabeçalho da PT (número, OS,
   tarefa, equipamento, técnico, equipe, usina, aberta), as atividades críticas, as respostas NÃO e o que falta, a
   região de campo e o gestor, **quem assina**, as duas assinaturas lado a lado (a do técnico na APR, do Fracttal pelo
-  login de quem olha, carregada ao abrir; a da aprovação, esperando) e a decisão ali mesmo (De acordo / Não autorizo
+  login de quem olha, carregada ao abrir; desde 26/10/2026 a da APR feita no App sai do PDF dela, sem login; a da
+  aprovação, esperando) e a decisão ali mesmo (De acordo / Não autorizo
   com o motivo, Ver PT, Baixar APR), que volta para a lista com os filtros dela. É o mesmo pedaço da Central de atenção
   > Permissões de trabalho (`campo/_pt_esperando.html`); desde 19/10/2026 a Central e, desde 24/10, esta tela só
   pedem dele o Por responsável (o modo `responsaveis`) e a tabela.

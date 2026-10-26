@@ -512,6 +512,14 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     código). `pt_fracttal.tarefas_candidatas`: o código do ativo (quando a linha da PT tem), a única da OS, ou as de
     mesma descrição com a finalizada primeiro (depois a em andamento); a assinatura vem da 1ª candidata que a tiver (no
     máximo 4 pedidos com o login de quem olha, `assinatura_das_candidatas`).
+- **A assinatura da APR feita no App** (26/10/2026, Levi: "Como tem a mensagem 'o Fracttal não entregou a APR desta
+  tarefa'? sendo que a APR nem mais via fractall é, é via app de campo"): a APR do App não fica no formulário de
+  Compliance do Fracttal, então o caminho do formulário dizia "não entregou". Agora a rota da assinatura tenta primeiro
+  o PDF que o App anexa na OS (o mesmo do Baixar APR, `pt_fracttal.apr_pdf`) e tira dele a imagem PNG da página da
+  "Assinatura" (`assinatura_do_pdf`, com o `pypdf`; a foto da equipe é JPEG), pela credencial da empresa, sem pedir o
+  login de quem olha; a legenda diz "(App)". Só sem esse PDF (a APR de antes da v251) vale o formulário, com o login.
+  Guardada 1 h em memória, nunca em disco nem no banco. Medido em 26/10 nas OS 16982 e 16866: o PDF tem 3 páginas e
+  duas imagens (a foto, 900 × 1200 JPEG, e a assinatura, ~660 × 240 PNG RGBA).
 - **Central de atenção, só o que está pendente** (as rondas feitas foram para a tela Rondas em 05/10; o texto abaixo descreve a origem) (Levi, 05/10: "separar Rondas feitas (histórico de rondas) e rondas
   pendentes, dando bastante atenção nas pendentes"; "separe o que é ronda e o que é Permissão de Trabalho"):
   - **Rondas pendentes** (abre nela, com números grandes que filtram): uma linha por usina mobilizada que pede ronda:

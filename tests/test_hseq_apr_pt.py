@@ -185,3 +185,61 @@ def test_o_historico_inteiro_de_20_em_20_com_os_filtros(banco, logado):
     assert '<option value="Thopen">Thopen (25)</option>' in h1 and 'id="pt-responsavel"' in h1
     nada = logado.get("/t/hseq/apr-pt?aba=historico&cliente=Outro+Cliente").get_data(as_text=True)
     assert "Nenhuma PT decidida com esses filtros" in nada and '<option value="Outro Cliente" selected>Outro Cliente (0)' in nada
+
+
+# ── a assinatura da APR feita no App (26/10/2026, Levi: "Gostaria para as APRs que foram feitas via app de campo
+#    mostrem sim a assinatura") ────────────────────────────────────────────────────────────────────────────────────
+def _pdf_da_apr_do_app() -> bytes:
+    """Um PDF como o do App (ReportLab): a foto da equipe (JPEG) na 1ª página e a assinatura (PNG com fundo
+    transparente) na página da "Assinatura"."""
+    import io
+
+    from PIL import Image
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+    foto, ass = io.BytesIO(), io.BytesIO()
+    Image.new("RGB", (60, 80), (90, 120, 150)).save(foto, format="JPEG")
+    Image.new("RGBA", (66, 24), (0, 0, 0, 0)).save(ass, format="PNG")
+    foto.seek(0), ass.seek(0)
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf)
+    c.drawString(40, 800, "Análise Preliminar de Risco")
+    c.drawImage(ImageReader(foto), 40, 500, 60, 80)
+    c.showPage()
+    c.drawString(40, 800, "Assinatura")
+    c.drawImage(ImageReader(ass), 40, 700, 66, 24, mask="auto")
+    c.save()
+    return buf.getvalue()
+
+
+def test_a_assinatura_sai_do_pdf_da_apr_do_app():
+    img = pt_fracttal.assinatura_do_pdf(_pdf_da_apr_do_app())
+    assert img.startswith("data:image/png;base64,")
+    from io import BytesIO
+
+    from PIL import Image
+    assert Image.open(BytesIO(base64.b64decode(img.split(",", 1)[1]))).size == (66, 24)      # a PNG, não a foto
+    with pytest.raises(pt_fracttal.SemArquivo):
+        pt_fracttal.assinatura_do_pdf(b"%PDF-1.4 quebrado")
+
+
+def test_a_apr_do_app_mostra_a_assinatura_sem_o_login_do_fracttal(banco, logado, monkeypatch):
+    pt_fracttal.limpar()
+    pedidos = []
+
+    def apr_pdf(os_, criada=None, ler=None):
+        pedidos.append(os_)
+        return _pdf_da_apr_do_app(), f"APR OS {os_} 22-10-2026 11h01"
+    monkeypatch.setattr(pt_fracttal, "apr_pdf", apr_pdf)
+    j = logado.get("/os/_nexus/pt/PT-1/assinatura-tecnico?ativo=THPN-ALT100-INVR1").get_json()
+    assert j["ok"] and j["origem"] == "app" and j["img"].startswith("data:image/png;base64,") and pedidos == ["700"]
+    logado.get("/os/_nexus/pt/PT-1/assinatura-tecnico")
+    assert pedidos == ["700"]                                       # guardada 1 h: não pede de novo ao Fracttal
+    # sem o PDF do App (a APR de antes dele), o caminho do formulário, que pede o login do Fracttal
+    pt_fracttal.limpar()
+
+    def sem(os_, criada=None, ler=None):
+        raise pt_fracttal.SemArquivo("a APR da OS ainda não está nos anexos")
+    monkeypatch.setattr(pt_fracttal, "apr_pdf", sem)
+    assert logado.get("/os/_nexus/pt/PT-1/assinatura-tecnico").get_json()["login"] is True
+    pt_fracttal.limpar()
