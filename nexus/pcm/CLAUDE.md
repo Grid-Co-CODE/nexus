@@ -560,15 +560,23 @@ para usar:
 - **Tudo grava por `fato_inventario.acrescentar(cfg, aba, linhas)`** (uma lista de dicts pelas colunas do `CAB_*`); a leitura
   é `ler(cfg)` (as três abas, cópia de 2 min) e o motivo se abre com `decifrar(cfg, aba, linha)`. Nunca escreva no livro por
   outro caminho: a gravação relê e troca o livro inteiro, e só o `acrescentar` faz isso com a trava.
-- **O motivo é `dados={"motivo": ...}`** (no evento e na curadoria; a régua não tem texto): o módulo o cifra. `motivo=`,
-  nome ou e-mail como coluna é `ValueError` (erro de quem chama), e a pessoa vai como `pessoa_hmac` (sempre) e `pessoa_id`
-  (quando o cadastro a acha), nunca o e-mail.
+- **O motivo é `dados={"motivo": ...}`** (no evento e na curadoria; a régua não tem texto): o módulo o cifra, e o
+  `dados_cifrados` não se passa pronto. `motivo=`, nome, e-mail ou `dados_cifrados` como coluna é `ValueError` (erro de quem
+  chama). A pessoa vai como `pessoa_hmac` (sempre, os 24 hexadecimais do `codigo_da_pessoa`) e `pessoa_id` (quando o
+  cadastro a acha). Só entra o que cabe na coluna: `situacao` é uma das seis da peça (`dominios.SITUACAO_INVENTARIO`, igual a
+  `contas.SITUACOES`), `id_item`, `id_almoxarifado` e `movimento_fracttal` (o folio) são dígitos, `contagem_id`, `chave_linha`
+  e `evento_id` não levam espaço.
+- **A usina vai com a linhagem:** `usina_id` e `usina_ligada_por` (hoje só "de-para do Fracttal", o `LIGADA_DE_PARA` do
+  `fato_almoxarifado`) juntos, ou os dois vazios (almoxarifado que não liga a usina nenhuma: a Nobres, por exemplo). A
+  curadoria também leva `id_almoxarifado`, `usina_id` e `data_id`.
 - **`fato_inventario.Recusada` é a exceção desta camada** (as Tasks 6 a 9 a importam de lá): nada foi gravado, e o texto é para
   a tela mostrar (o banco não deixou reler, o evento já está, falta `GRIDCO_SQL_TOKEN` ou `NEXUS_CHAVE_CADASTRO`). `ler`
   também a levanta quando não consegue ler: nunca devolve vazio no lugar do que não leu, senão a contagem já gravada
   apareceria como `nova`.
-- **O módulo põe o que falta:** o `evento_id`, a hora (`quando` / `decidida_em`, UTC) e o `data_id` (o dia de Brasília). O que
-  o chamador traz pronto (a retomada de uma gravação) vale. O `evento_id` repetido é `Recusada` (é a chave do fato).
+- **O módulo põe o que falta:** o `evento_id`, a hora (`quando` / `decidida_em`, UTC com Z; outro fuso é convertido e sem fuso
+  é recusado) e o `data_id` (o dia de Brasília dessa hora; um `data_id` trazido que não bata é `ValueError`). O que o chamador
+  traz pronto (a retomada de uma gravação) vale. O `evento_id` repetido é `Recusada` (é a chave do fato). A leitura que volta
+  com menos linhas do que a listagem do banco diz (página curta) não grava e não é devolvida: `Recusada`.
 - **Na cópia de prova e nos testes:** `NEXUS_ALMOX_INVENTARIO_ARQUIVO` (um JSON); teste sem ele lê vazio e não grava. Prova:
   `tests/test_pcm_inventario_livro.py` (inclusive o banco falso com `como_texto=True`, a leitura que falha, a listagem
   incompleta e as mutações nas regras).

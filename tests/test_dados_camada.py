@@ -97,10 +97,8 @@ def test_catalogo_bate_com_o_codigo_de_cada_fato_conformado_ou_montado():
             if est == "id":
                 assert any(c.startswith(col_dim[d]) or c.endswith(col_dim[d]) for c in cab), (fid, d)
         # no inversor × dia a usina é a da aba: a linhagem dela está no usina × dia da mesma (fonte, aba), sem repetir
-        # um texto em ~700 mil linhas. No inventário (26/10/2026) a usina é a do almoxarifado: a linhagem dela mora na
-        # `dim_almoxarifado` (usina_ligada_por), e as colunas do livro são o contrato fixado com as telas do PCM
-        assert ("usina_id" not in cab) or "usina_ligada_por" in cab or fid in (
-            "geracao_inversor_dia", "evento_inventario", "regua_minimo"), fid
+        # um texto em ~700 mil linhas
+        assert ("usina_id" not in cab) or "usina_ligada_por" in cab or fid == "geracao_inversor_dia", fid
         assert ("equipamento_id" not in cab) or "equipamento_ligado_por" in cab, fid
         # texto pessoal não entra; a contagem (_qtd), a chave (tarefa_chave) e o indicador 1/0 declarado, sim
         indicadores = {m.coluna for m in f.medidas if m.unidade == "1/0"}

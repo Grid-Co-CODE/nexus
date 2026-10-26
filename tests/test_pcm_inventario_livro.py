@@ -12,25 +12,33 @@ import requests
 from pg_falso import ApiPGFalsa, Resposta
 
 from nexus.cadastro.cifra import gerar_chave
-from nexus.dados import catalogo, explica, fatos, livros
+from nexus.dados import catalogo, dominios, explica, fatos, livros
 from nexus.dados import fato_inventario as F
+from nexus.pcm.inventario import contas
 
 BASE = "http://pg.falso"
 HMAC = "a1b2c3d4e5f60718293a4b5c"
 ALMOX = "900"
+LIGADA = "de-para do Fracttal"          # por onde a usina do almoxarifado ligou (o mesmo texto do fato_almoxarifado)
 RAIZ = Path(__file__).resolve().parent.parent
 
 
 class ApiQueFalha(ApiPGFalsa):
-    """O banco que cai: qualquer leitura levanta (ou volta 500) enquanto `falhar` estiver ligado."""
+    """O banco que cai: qualquer leitura levanta (ou volta 500) enquanto `falhar` estiver ligado. `cortar` = N: a leitura
+    das linhas de cada aba perde as N últimas, e a listagem (`row_count`) segue dizendo o número de verdade (a página que
+    volta curta)."""
     falhar = ""
+    cortar = 0
 
     def get(self, url, params=None, headers=None, timeout=None):
         if self.falhar == "rede":
             raise requests.ConnectionError("banco fora do ar")
         if self.falhar == "500":
             return Resposta(500, {})
-        return super().get(url, params=params, headers=headers, timeout=timeout)
+        r = super().get(url, params=params, headers=headers, timeout=timeout)
+        if self.cortar and url.endswith("/rows"):
+            return Resposta(200, r.json()[:-self.cortar])
+        return r
 
 
 @pytest.fixture
@@ -56,38 +64,44 @@ def cfg(tmp_path):
 
 
 def _ev(tipo="contagem_recebida", **mais):
-    return {"tipo": tipo, "contagem_id": "C-1", "id_almoxarifado": ALMOX, "usina_id": 7, "id_item": "5001",
-            "codigo": "SP-TST-001", **mais}
+    return {"tipo": tipo, "contagem_id": "C-1", "id_almoxarifado": ALMOX, "usina_id": 7, "usina_ligada_por": LIGADA,
+            "id_item": "5001", "codigo": "SP-TST-001", **mais}
 
 
 def _regua(**mais):
-    return {"id_almoxarifado": ALMOX, "usina_id": 7, "id_item": "5001", "codigo": "SP-TST-001", "acordado_min_qtd": 2,
-            "acordado_max_qtd": 20, "pessoa_id": 3, "pessoa_hmac": HMAC, **mais}
+    return {"id_almoxarifado": ALMOX, "usina_id": 7, "usina_ligada_por": LIGADA, "id_item": "5001",
+            "codigo": "SP-TST-001", "acordado_min_qtd": 2, "acordado_max_qtd": 20, "pessoa_id": 3, "pessoa_hmac": HMAC,
+            **mais}
 
 
 def _cur(**mais):
     return {"contagem_id": "C-1", "chave_linha": "L-3", "decisao": "cadastrar", "id_item": "5099",
-            "codigo_criado": "SP-TST-002", "pessoa_id": 3, "pessoa_hmac": HMAC, **mais}
+            "codigo_criado": "SP-TST-002", "pessoa_id": 3, "pessoa_hmac": HMAC, "id_almoxarifado": ALMOX, "usina_id": 7,
+            "usina_ligada_por": LIGADA, **mais}
 
 
 # ── o contrato do livro ──────────────────────────────────────────────────────────────────────────────────────────────
 
 def test_contrato_do_livro():
     """As colunas e a lista de eventos, na ordem: as Tasks 5 a 9 (a lista, a revisão, a gravação, a régua, a curadoria)
-    leem e gravam por elas, e coluna nova só no FIM."""
+    leem e gravam por elas, e coluna nova só no FIM. Na revisão da Task 4 (26/10/2026, antes da 1ª gravação): o
+    `usina_ligada_por` (regra 5) no fim do evento e da régua, e a curadoria ganhou `data_id`, `id_almoxarifado`, `usina_id`
+    e `usina_ligada_por` (regras 3 e 7), no fim."""
     assert F.LIVRO == "nexus_almoxarifado_inventario"
     assert (F.ABA_EVENTO, F.ABA_REGUA, F.ABA_CURADORIA) == (
         "fato_evento_inventario", "fato_regua_minimo", "fato_curadoria_inventario")
     assert F.CAB_EVENTO == ["evento_id", "quando", "data_id", "contagem_id", "tipo", "id_almoxarifado", "usina_id",
                             "id_item", "codigo", "de_qtd", "para_qtd", "contado_qtd", "movimento_fracttal", "situacao",
-                            "lote", "pessoa_id", "pessoa_hmac", "dados_cifrados"]
+                            "lote", "pessoa_id", "pessoa_hmac", "dados_cifrados", "usina_ligada_por"]
     assert F.TIPOS_EVENTO == ("contagem_recebida", "aprovada", "peca_gravada", "conflito", "erro", "peca_tirada",
                               "recontagem_pedida", "numero_corrigido", "substituida", "curadoria", "regua_gravada")
     assert F.CAB_REGUA == ["decidida_em", "data_id", "id_almoxarifado", "usina_id", "id_item", "codigo",
                            "sugestao_min_qtd", "sugestao_max_qtd", "recomendado_min_qtd", "recomendado_max_qtd",
-                           "acordado_min_qtd", "acordado_max_qtd", "gravado_fracttal", "pessoa_id", "pessoa_hmac"]
+                           "acordado_min_qtd", "acordado_max_qtd", "gravado_fracttal", "pessoa_id", "pessoa_hmac",
+                           "usina_ligada_por"]
     assert F.CAB_CURADORIA == ["decidida_em", "contagem_id", "chave_linha", "decisao", "id_item", "codigo_criado",
-                               "pessoa_id", "pessoa_hmac", "dados_cifrados"]
+                               "pessoa_id", "pessoa_hmac", "dados_cifrados", "data_id", "id_almoxarifado", "usina_id",
+                               "usina_ligada_por"]
     assert F.DECISOES_CURADORIA == ("cadastrar", "e_a_peca", "confirmar", "descartar")
     assert issubclass(F.Recusada, ValueError)
 
@@ -101,7 +115,7 @@ def test_acrescentar_guarda_o_que_havia(banco):
     F.acrescentar(cfg, F.ABA_EVENTO, [_ev(), _ev("aprovada", pessoa_id=3, pessoa_hmac=HMAC)])
     F.acrescentar(cfg, F.ABA_REGUA, [_regua()])
     F.acrescentar(cfg, F.ABA_CURADORIA, [_cur(dados={"motivo": "foto não mostra a peça"})])
-    F.acrescentar(cfg, F.ABA_EVENTO, [_ev("peca_gravada", de_qtd=2, para_qtd=3, movimento_fracttal="M-77", lote=1)])
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev("peca_gravada", de_qtd=2, para_qtd=3, movimento_fracttal="77", lote=1)])
     ev = api.linhas(F.LIVRO, F.ABA_EVENTO)
     assert [e["tipo"] for e in ev] == ["contagem_recebida", "aprovada", "peca_gravada"]
     assert len(api.linhas(F.LIVRO, F.ABA_REGUA)) == 1 and len(api.linhas(F.LIVRO, F.ABA_CURADORIA)) == 1
@@ -109,7 +123,7 @@ def test_acrescentar_guarda_o_que_havia(banco):
     # o que o módulo põe sozinho: o ID do evento (único), a hora (UTC, com Z) e o dia de Brasília
     assert len({e["evento_id"] for e in ev}) == 3
     assert all(e["quando"].endswith("Z") and len(e["data_id"]) == 8 for e in ev)
-    assert ev[0]["usina_id"] == "7" and ev[2]["movimento_fracttal"] == "M-77"        # texto, como a API devolve
+    assert ev[0]["usina_id"] == "7" and ev[2]["movimento_fracttal"] == "77"        # texto, como a API devolve
     # as cinco abas do livro, sempre: faltar uma a apagaria (a trava do `so_cresce` recusa)
     assert [q["fato"] for q in api.linhas(F.LIVRO, "qualidade")] == [
         "evento_inventario", "regua_minimo", "curadoria_inventario"]
@@ -303,6 +317,8 @@ def test_texto_livre_em_claro_e_erro_de_quem_chama(cfg):
         with pytest.raises(ValueError, match="coluna"):
             F.acrescentar(cfg, F.ABA_EVENTO, [_ev(**ruim)])
     with pytest.raises(ValueError, match="e-mail"):
+        F.acrescentar(cfg, F.ABA_EVENTO, [_ev(codigo="alguem@exemplo.com")])
+    with pytest.raises(ValueError, match="pessoa_hmac"):
         F.acrescentar(cfg, F.ABA_EVENTO, [_ev(pessoa_hmac="alguem@exemplo.com")])
     with pytest.raises(ValueError, match="dados"):               # a régua não tem onde cifrar texto
         F.acrescentar(cfg, F.ABA_REGUA, [_regua(dados={"motivo": "x"})])
@@ -317,18 +333,165 @@ def test_sem_a_chave_do_cadastro_o_texto_livre_nao_vai(cfg):
     assert len(F.ler(sem, forcar=True)[F.ABA_EVENTO]) == 1
 
 
+# ── a revisão da Task 4 (26/10/2026): nenhuma coluna em claro aceita texto livre ─────────────────────────────────────
+
+def test_dados_cifrados_nao_entra_pronto(cfg):
+    """O revisor guardou `dados_cifrados="o motivo em claro..."` e o módulo aceitou: a cifra só vale se for o módulo a
+    fazê-la. O texto livre entra por `dados`; a coluna não se passa."""
+    with pytest.raises(ValueError, match="dados_cifrados"):
+        F.acrescentar(cfg, F.ABA_EVENTO, [_ev("peca_tirada", dados_cifrados="o motivo em claro: peça do fulano")])
+    with pytest.raises(ValueError, match="dados_cifrados"):
+        F.acrescentar(cfg, F.ABA_CURADORIA, [_cur(dados_cifrados="cf1:parece-cifra-mas-nao-e")])
+    assert F.ler(cfg, forcar=True)[F.ABA_EVENTO] == [] and F.ler(cfg)[F.ABA_CURADORIA] == []
+
+
+def test_pessoa_hmac_e_o_codigo_de_24_hexadecimais(cfg):
+    """O código de verdade é o `ligacao_cadastro.codigo_da_pessoa` (24 hexadecimais minúsculos). Nome, e-mail ou qualquer
+    outro texto na coluna é recusado, nos três fatos."""
+    from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+    real = codigo_da_pessoa("chave-hmac-de-teste", "pessoa.teste@exemplo.com")
+    assert F._RE_HMAC.fullmatch(real)
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev(pessoa_hmac=real)])
+    for ruim in ("Fulano de Tal", "alguem@exemplo.com", "A1B2C3D4E5F60718293A4B5C", HMAC[:-1], HMAC + "0", "g" * 24):
+        for aba, linha in ((F.ABA_EVENTO, _ev), (F.ABA_REGUA, _regua), (F.ABA_CURADORIA, _cur)):
+            with pytest.raises(ValueError, match="pessoa_hmac"):
+                F.acrescentar(cfg, aba, [linha(pessoa_hmac=ruim)])
+    assert len(F.ler(cfg, forcar=True)[F.ABA_EVENTO]) == 1
+
+
+def test_situacao_e_lista_fechada(cfg):
+    """A `situacao` é uma das seis situações da peça no lote (`contas.SITUACOES`) ou vazia: o texto do erro do Fracttal
+    ("erro do Fracttal para fulano") não tem coluna em claro. A lista mora em `dominios.py`, que não importa o PCM, e o teste
+    garante que é a mesma do PCM."""
+    assert dominios.SITUACAO_INVENTARIO == contas.SITUACOES
+    for boa in contas.SITUACOES:
+        F.acrescentar(cfg, F.ABA_EVENTO, [_ev("conflito", situacao=boa)])
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev("conflito", situacao="")])
+    for ruim in ("erro do Fracttal para fulano", "Para cima", "gravada"):
+        with pytest.raises(ValueError, match="situacao"):
+            F.acrescentar(cfg, F.ABA_EVENTO, [_ev("erro", situacao=ruim)])
+    assert len(F.ler(cfg, forcar=True)[F.ABA_EVENTO]) == len(contas.SITUACOES) + 1
+
+
+def test_ids_do_fracttal_sao_digitos(cfg):
+    """`id_item`, `id_almoxarifado` e `movimento_fracttal` (o folio que o Fracttal devolve) são números; vazio só onde a
+    coluna deixa (a peça fora do catálogo não tem item, e o evento sem gravação não tem movimento). O "5001.0" que a API às
+    vezes devolve é o 5001. Os IDs opacos (evento, contagem, linha) não levam espaço: frase não é ID."""
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev("contagem_recebida", id_item="", movimento_fracttal="", codigo=""),
+                                      _ev("peca_gravada", id_item="5001.0", movimento_fracttal=7)])
+    e = F.ler(cfg, forcar=True)[F.ABA_EVENTO]
+    assert (e[0]["id_item"], e[1]["id_item"], e[1]["movimento_fracttal"]) == (None, "5001", "7")
+    for coluna, ruim in (("id_item", "SP-TST-001"), ("id_item", "5 001"), ("id_almoxarifado", "almox norte"),
+                         ("movimento_fracttal", "M-77"), ("evento_id", "meu evento"), ("contagem_id", "contagem de ontem"),
+                         ("codigo", "x" * 61)):
+        with pytest.raises(ValueError, match=coluna):
+            F.acrescentar(cfg, F.ABA_EVENTO, [_ev("peca_gravada", **{coluna: ruim})])
+    with pytest.raises(ValueError, match="chave_linha"):
+        F.acrescentar(cfg, F.ABA_CURADORIA, [_cur(chave_linha="a linha do fulano")])
+    with pytest.raises(ValueError, match="id_item"):
+        F.acrescentar(cfg, F.ABA_REGUA, [_regua(id_item="SP-TST-001")])
+    assert len(F.ler(cfg, forcar=True)[F.ABA_EVENTO]) == 2
+
+
+def test_curadoria_leva_data_usina_e_almoxarifado(cfg):
+    """Revisão de 26/10/2026: a curadoria ganhou `data_id` (o dia de Brasília do `decidida_em`, regra 7), `id_almoxarifado`,
+    `usina_id` e `usina_ligada_por`. A decisão das 23:30 de Brasília é do dia de Brasília, não do dia UTC."""
+    F.acrescentar(cfg, F.ABA_CURADORIA, [_cur(decidida_em="2026-10-27T02:30:00Z")])
+    c = F.ler(cfg, forcar=True)[F.ABA_CURADORIA][0]
+    assert (c["data_id"], c["id_almoxarifado"], c["usina_id"], c["usina_ligada_por"]) == (20261026, ALMOX, 7, LIGADA)
+    with pytest.raises(ValueError, match="data_id"):
+        F.acrescentar(cfg, F.ABA_CURADORIA, [_cur(decidida_em="2026-10-27T02:30:00Z", data_id=20261027)])
+
+
+def test_usina_so_com_a_linhagem_dela(cfg):
+    """Regra 5: o fato diz por onde ligou a usina. `usina_id` sem `usina_ligada_por` não se grava (nem o inverso), e o
+    caminho tem de ser um que o almoxarifado conhece (a de-para do Fracttal, nunca o código da usina)."""
+    for aba, linha in ((F.ABA_EVENTO, _ev), (F.ABA_REGUA, _regua), (F.ABA_CURADORIA, _cur)):
+        with pytest.raises(ValueError, match="usina_ligada_por"):
+            F.acrescentar(cfg, aba, [linha(usina_ligada_por=None)])
+        with pytest.raises(ValueError, match="usina_ligada_por"):
+            F.acrescentar(cfg, aba, [linha(usina_id=None)])
+        with pytest.raises(ValueError, match="usina_ligada_por"):
+            F.acrescentar(cfg, aba, [linha(usina_ligada_por="código da usina")])
+        F.acrescentar(cfg, aba, [linha(usina_id=None, usina_ligada_por=None)])      # sem usina: vazio, nunca chutado
+    assert F.USINA_LIGADA_POR == (LIGADA,)
+
+
+def test_hora_em_utc_com_z_e_data_id_do_dia_de_brasilia(cfg):
+    """`quando` e `decidida_em` são normalizados para UTC com "Z" (a hora com o deslocamento de Brasília vira a UTC); sem
+    fuso a hora é ambígua e não entra; o `data_id` que o chamador traz tem de ser o dia de Brasília dessa hora."""
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev(quando="2026-10-26T23:30:00-03:00"), _ev(quando="2026-10-26T12:00:00+00:00"),
+                                      _ev(quando="2026-10-26T12:00:00.987Z", data_id=20261026)])
+    quandos = [e["quando"] for e in F.ler(cfg, forcar=True)[F.ABA_EVENTO]]
+    assert quandos == ["2026-10-27T02:30:00Z", "2026-10-26T12:00:00Z", "2026-10-26T12:00:00Z"]
+    assert F.ler(cfg)[F.ABA_EVENTO][0]["data_id"] == 20261026               # 23:30 em Brasília: ainda o dia 26
+    with pytest.raises(ValueError, match="fuso"):
+        F.acrescentar(cfg, F.ABA_EVENTO, [_ev(quando="2026-10-27T02:30:00")])
+    with pytest.raises(ValueError, match="data_id"):
+        F.acrescentar(cfg, F.ABA_EVENTO, [_ev(quando="2026-10-27T02:30:00Z", data_id=20261027)])
+    assert len(F.ler(cfg, forcar=True)[F.ABA_EVENTO]) == 3
+
+
+# ── a revisão da Task 4: a leitura que vem curta e a cópia ───────────────────────────────────────────────────────────
+
+def test_leitura_menor_que_o_banco_diz_nao_grava(banco):
+    """A listagem diz 3 linhas e a leitura devolve 2 (página curta): gravar +1 daria 3, e a trava `so_cresce` (que compara
+    com o `row_count`) deixaria passar, perdendo a peça gravada no Fracttal que as Tasks 6 a 8 derivam destes eventos. Antes
+    de gravar, o módulo compara o que leu com o `row_count` e recusa."""
+    api, cfg = banco
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev(), _ev("aprovada"), _ev("peca_gravada")])
+    api.cortar = 1
+    with pytest.raises(F.Recusada, match="nada foi gravado"):
+        F.acrescentar(cfg, F.ABA_EVENTO, [_ev("conflito")])
+    with pytest.raises(F.Recusada):
+        F.ler(cfg, forcar=True)
+    api.cortar = 0
+    assert api.syncs == 1 and len(api.linhas(F.LIVRO, F.ABA_EVENTO)) == 3
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev("conflito")])                     # a leitura inteira volta a gravar
+    assert len(api.linhas(F.LIVRO, F.ABA_EVENTO)) == 4
+
+
+def test_ler_devolve_copia_das_linhas(cfg):
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev(evento_id="E-1")])
+    F.ler(cfg)[F.ABA_EVENTO][0]["tipo"] = "adulterado"                      # a linha de quem recebe é só dele
+    assert F.ler(cfg)[F.ABA_EVENTO][0]["tipo"] == "contagem_recebida"
+    F.limpar()
+    F.ler(cfg)[F.ABA_EVENTO][0]["tipo"] = "adulterado"
+    assert F.ler(cfg)[F.ABA_EVENTO][0]["tipo"] == "contagem_recebida"
+
+
+def test_leitura_lenta_nao_sobrescreve_a_cache_mais_nova(cfg, monkeypatch):
+    """Uma leitura que demora enquanto outra thread grava não pode pôr a cópia velha por cima da que a gravação acabou de
+    renovar (a tela voltaria a mostrar a contagem como `nova` depois de gravada)."""
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev()])
+    original, feito = F._ler_cru, []
+
+    def lenta(c):
+        velho = original(c)
+        if not feito:
+            feito.append(1)
+            F.acrescentar(c, F.ABA_EVENTO, [_ev("aprovada")])                # outra thread gravou enquanto esta lia
+        return velho
+
+    monkeypatch.setattr(F, "_ler_cru", lenta)
+    F.ler(cfg, forcar=True)
+    monkeypatch.setattr(F, "_ler_cru", original)
+    assert [e["tipo"] for e in F.ler(cfg)[F.ABA_EVENTO]] == ["contagem_recebida", "aprovada"]
+
+
 # ── a qualidade e a atualização ──────────────────────────────────────────────────────────────────────────────────────
 
 def test_a_qualidade_mede_a_ligacao_de_cada_fato(banco):
     api, cfg = banco
     F.acrescentar(cfg, F.ABA_EVENTO, [_ev(pessoa_id=3, pessoa_hmac=HMAC), _ev("conflito"),
-                                      _ev("erro", usina_id=None)])
+                                      _ev("erro", usina_id=None, usina_ligada_por=None)])
     F.acrescentar(cfg, F.ABA_REGUA, [_regua()])
     q = {l["fato"]: l for l in api.linhas(F.LIVRO, "qualidade")}
     assert list(api.linhas(F.LIVRO, "qualidade")[0]) == fatos.CAB_QUALIDADE
     e = q["evento_inventario"]
     assert (e["linhas"], e["com_data"], e["com_usina"], e["com_pessoa"]) == ("3", "3", "2", "1")
     assert (float(e["pct_data"]), float(e["pct_usina"])) == (100.0, 66.7)
+    assert (e["usina_por_de_para"], e["usina_por_codigo"]) == ("2", "0")        # só liga pela de-para do Fracttal
     assert json.loads(e["extra"]) == {"tipo_contagem_recebida": 1, "tipo_conflito": 1, "tipo_erro": 1}
     assert q["regua_minimo"]["linhas"] == "1" and float(q["regua_minimo"]["pct_pessoa"]) == 100.0
     assert q["curadoria_inventario"]["linhas"] == "0" and q["curadoria_inventario"]["pct_data"] in (None, "")
@@ -369,6 +532,9 @@ def test_inventario_no_catalogo():
         assert set(f.dims) == set(catalogo.DIM_IDS) and f.dims["pessoa"][0] == "id", fid
         assert explica.RESUMO.get(fid) and explica.PARA_QUE.get(fid), fid
     assert catalogo.POR_ID["evento_inventario"].chave == ("evento_id",)
+    # data e usina ligam por ID nos três (a curadoria ganhou data_id e usina_id na revisão de 26/10/2026), com a linhagem
+    assert all(catalogo.POR_ID[f].dims[d][0] == "id" for f in por_id for d in ("data", "usina", "pessoa"))
+    assert all("usina_ligada_por" in cab for _aba, cab, _t in por_id.values())
     assert catalogo.POR_ID["evento_inventario"].dims["equipamento"][0] == "prop"     # o item, como no almoxarifado
     assert {m.coluna for m in catalogo.POR_ID["evento_inventario"].medidas} == {"de_qtd", "para_qtd", "contado_qtd"}
     assert "gravado_fracttal" in {m.coluna for m in catalogo.POR_ID["regua_minimo"].medidas}

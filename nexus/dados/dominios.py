@@ -241,3 +241,11 @@ def anomalias(v) -> list[str]:
 # chave recusada pelo Fracttal (FOREIGN_KEY_VIOLATION, o erro corrigido no App v294). O texto do erro NUNCA vai ao
 # banco (pode trazer nome): o App classifica, e o que não for destes vira "outro".
 RECUSA_PECA = ("chave recusada pelo Fracttal", "sem permissão", "outro")
+
+
+# ── Inventário do almoxarifado ───────────────────────────────────────────────────────────────────────────────────
+# A situação de uma peça contada no lote que o PCM revisa (26/10/2026): só as três primeiras mexem no estoque do Fracttal.
+# É a mesma lista de `nexus/pcm/inventario/contas.SITUACOES` (as contas do PCM mandam; a camada de dados não importa o
+# PCM, e `tests/test_pcm_inventario_livro.py` confere que as duas são iguais). Vai à coluna `situacao` do
+# `fato_evento_inventario`: coluna em claro de uma API aberta aceita só estes códigos (ou vazio), nunca o texto de um erro.
+SITUACAO_INVENTARIO = ("para_cima", "para_baixo", "zerar", "sem_alteracao", "nao_tocada", "curadoria")

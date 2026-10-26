@@ -736,14 +736,15 @@ FATOS = (
                     "(NEXUS_ALMOX_TESTE_IDS) fica fora das telas e das contas. Até o App publicar, o livro não existe"),
     # o livro do Nexus para o inventário (26/10/2026, `fato_inventario.py`): o Nexus é a FONTE (a revisão, a aprovação e a
     # gravação são do PCM, na tela). A usina e o item ligam como no resto do almoxarifado: a usina pelo almoxarifado
-    # (`dim_almoxarifado`, que carrega a linhagem dela: o `usina_ligada_por`), o item como `prop` (promover o item a
+    # (só pela de-para do Fracttal, com o `usina_ligada_por` em cada fato: regra 5), o item como `prop` (promover o item a
     # dimensão conformada fica para quando vierem compras e consumo)
     Fato("evento_inventario", "Evento do inventário do almoxarifado", "pcm",
          f"{fato_inventario.LIVRO} · {fato_inventario.ABA_EVENTO}",
          "1 linha = 1 evento do inventário de 1 contagem (recebida, aprovada, peça gravada, conflito, erro, peça tirada do "
          "lote, recontagem pedida, número corrigido, contagem substituída, curadoria ou régua gravada); nunca muda",
          _d(data=("id", "data_id (o dia de Brasília do evento; quando, a hora em UTC)"),
-            usina=("id", "usina_id (o almoxarifado da contagem, pela dim_almoxarifado; vazio quando não liga)"),
+            usina=("id", "usina_id + usina_ligada_por (o almoxarifado da contagem, só pela de-para do Fracttal; vazio "
+                         "quando não liga)"),
             pessoa=("id", "pessoa_id + pessoa_hmac (quem aprovou, corrigiu, tirou a peça ou pediu a recontagem; vazio no "
                           "evento do sistema)"),
             equipamento=("prop", "id_item + codigo (o item do inventário, cadastro próprio: nexus_almoxarifado · "
@@ -759,13 +760,15 @@ FATOS = (
                     "do MESMO item, nunca entre itens nem no tempo. movimento_fracttal é o número do movimento que o "
                     "Fracttal devolveu (dimensão degenerada); lote é o lote de 50 da gravação. O motivo do PCM é texto "
                     "livre e vai só em dados_cifrados (Cofre, amarrado à linha); a pessoa só como pessoa_id e "
-                    "pessoa_hmac, nunca nome nem e-mail. O livro só cresce (so_cresce)"),
+                    "pessoa_hmac (24 hexadecimais), nunca nome nem e-mail; situacao é uma das seis da peça no lote "
+                    "(dominios.SITUACAO_INVENTARIO). O livro só cresce (so_cresce)"),
     Fato("regua_minimo", "Régua de mínimo e máximo do almoxarifado", "pcm",
          f"{fato_inventario.LIVRO} · {fato_inventario.ABA_REGUA}",
          "1 linha = 1 decisão do PCM sobre a sugestão, o recomendado (Grid) ou o acordado (cliente) de mínimo e máximo de "
          "1 peça num almoxarifado; vale a última de cada almoxarifado e peça",
          _d(data=("id", "data_id (o dia de Brasília da decisão; decidida_em, a hora em UTC)"),
-            usina=("id", "usina_id (o almoxarifado, pela dim_almoxarifado; vazio quando não liga)"),
+            usina=("id", "usina_id + usina_ligada_por (o almoxarifado, só pela de-para do Fracttal; vazio quando não "
+                         "liga)"),
             pessoa=("id", "pessoa_id + pessoa_hmac (quem decidiu)"),
             equipamento=("prop", "id_item + codigo (o item do inventário, cadastro próprio: nexus_almoxarifado · "
                                  "dim_item_almox)")),
@@ -782,14 +785,15 @@ FATOS = (
                     "gravado_fracttal diz se foi (relido depois de gravar). Mínimo vazio é \"não decidido\", 0 é \"sem "
                     "mínimo\". Soma entre almoxarifados do MESMO item, nunca entre itens. Sem texto livre: a aba é só "
                     "número; a pessoa como pessoa_id e pessoa_hmac"),
-    # a curadoria não leva data_id nem usina_id (o contrato de 26/10/2026 fixou as colunas): a data sai do decidida_em e a
-    # usina da contagem, no livro do App (declarado `cod`, não `id`: a ligação por ID é a do evento da contagem)
+    # a curadoria leva data_id, id_almoxarifado, usina_id e usina_ligada_por desde a revisão da Task 4 (26/10/2026, antes da
+    # 1ª gravação): sem eles o fato não cruzava com o calendário nem com a usina por ID
     Fato("curadoria_inventario", "Curadoria do inventário do almoxarifado", "pcm",
          f"{fato_inventario.LIVRO} · {fato_inventario.ABA_CURADORIA}",
          "1 linha = 1 decisão do PCM (cadastrar, é a peça X, confirmar ou descartar) sobre 1 linha de 1 contagem que veio "
          "fora do catálogo ou como genérico a identificar; vale a última de cada contagem e linha",
-         _d(data=("cod", "decidida_em (a hora em UTC; o dia de Brasília sai dela)"),
-            usina=("cod", "contagem_id (a contagem, no livro do App, diz a usina e o almoxarifado)"),
+         _d(data=("id", "data_id (o dia de Brasília da decisão; decidida_em, a hora em UTC)"),
+            usina=("id", "usina_id + usina_ligada_por (o almoxarifado da contagem, id_almoxarifado, só pela de-para do "
+                         "Fracttal; vazio quando não liga)"),
             pessoa=("id", "pessoa_id + pessoa_hmac (quem decidiu)"),
             equipamento=("prop", "id_item (a peça escolhida) e codigo_criado (a peça nova que o PCM cadastrou no "
                                  "Fracttal)")),
@@ -799,7 +803,8 @@ FATOS = (
          janela_origem="o Nexus é a fonte (só acrescenta; vale a última decisão de cada contagem e linha)",
          observacao="contagem_id + chave_linha (o \"ID da linha\" do livro de contagens do App) identificam a linha. A "
                     "descrição e a foto da peça fora do catálogo ficam só no livro do App. O motivo do PCM (texto livre) "
-                    "vai só em dados_cifrados; a pessoa como pessoa_id e pessoa_hmac, nunca nome nem e-mail"),
+                    "vai só em dados_cifrados; a pessoa como pessoa_id e pessoa_hmac (24 hexadecimais), nunca nome nem "
+                    "e-mail"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),
