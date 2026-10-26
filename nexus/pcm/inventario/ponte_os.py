@@ -26,7 +26,7 @@ from flask import Blueprint, current_app, jsonify, request, session
 from ...dados import almoxarifado as A
 from ...prefixo import na_raiz
 from .. import telas
-from . import erros, quem, regua
+from . import curadoria, erros, quem, regua
 from . import estoque as E
 
 bp = Blueprint("pcm_inventario_ponte", __name__, url_prefix="/os/_nexus/inventario")
@@ -88,3 +88,16 @@ def regua_gravar():
     de = "/t/pcm/pecas/inventario/regua" + ("?" + urlencode({"almox": almox}) if almox else "")
     r = _com_o_fracttal(de, lambda est: regua.gravar_acordado(current_app.config, almox, item, est, quem.do_pedido()))
     return r if not isinstance(r, str) else _ok("pcm_regua_aviso", r, de)
+
+
+# ── a curadoria: cadastrar a peça nova no Fracttal (Task 9) ─────────────────────────────────────────────────────────────
+@bp.route("/curadoria/cadastrar", methods=["POST"])
+def curadoria_cadastrar():
+    """Cria a peça no Fracttal (`criar_peca`, com o código reservado antes, sem duplicar) e grava a decisão `cadastrar`. As
+    outras decisões da curadoria só gravam no livro e ficam em `/t/pcm/pecas/inventario/curadoria/decidir`."""
+    f = request.form
+    de = "/t/pcm/pecas/inventario/curadoria"
+    r = _com_o_fracttal(de, lambda est: curadoria.decidir(
+        current_app.config, str(f.get("contagem") or "").strip(), str(f.get("linha") or "").strip(), "cadastrar",
+        sigla=f.get("sigla"), nome=f.get("nome"), unidade=f.get("unidade"), estoque=est, pessoa=quem.do_pedido())["texto"])
+    return r if not isinstance(r, str) else _ok("pcm_curadoria_aviso", r, de)

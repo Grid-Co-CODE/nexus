@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block titulo %}Curadoria · Almoxarifado{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# PCM → Almoxarifado → Curadoria (26/10/2026, o inventário do almoxarifado). Levi: a peça que o técnico acha fora do catálogo
+   vira pendência: o campo descreve, fotografa e conta; quem decide é o PCM (cadastrar no Fracttal, é a peça X, descartar com o
+   motivo). O genérico com saldo que o técnico identificou pede a confirmação do específico. As regras, o controle do
+   código reservado e a foto estão em nexus/pcm/inventario/curadoria.py. Cada opção é um <details> com o próprio formulário
+   (funciona sem JavaScript e no celular). #}
+<div class="pg alm cu">
+<p class="gc-eyebrow">PCM · Almoxarifado</p>
+<h1 class="titulo-pagina">Curadoria</h1>
+<nav class="rg-nav" aria-label="Partes do almoxarifado">
+  <a href="{{ raiz }}/t/pcm/pecas">Saldo e reposição</a>
+  <a href="{{ raiz }}/t/pcm/pecas/inventario/regua">Mínimo e máximo</a>
+  <a href="{{ raiz }}/t/pcm/pecas/inventario/curadoria" aria-current="page">Curadoria</a>
+</nav>
+<p class="pcm-sub">O que o campo contou fora do catálogo, e o genérico que o técnico identificou, nas contagens que ainda não foram
+  gravadas. Decidir não grava no estoque: a quantidade entra no lote da contagem (as unidades achadas somam ao contado da peça, e o
+  total substitui o saldo no Fracttal quando você gravar). Cadastrar cria a peça no Fracttal agora, com o seu login.</p>
+<div class="cn-nota"><b>Grupo, criticidade e Curva ABC da peça nova</b> não se gravam pela API: complete na tela de Peças e
+  Suprimentos do Fracttal depois de cadastrar.</div>
+
+<div data-ponte-aviso aria-live="polite"></div>
+{% if ok %}<div class="cn-certo" role="status"><span><b>{{ ok }}</b></span></div>{% endif %}
+{% if erro %}<div class="cn-erro" role="alert"><span><b>{{ erro }}</b></span></div>{% endif %}
+{% if erro_livro %}<div class="cn-erro" role="alert"><span><b>Não consegui ler as contagens.</b> {{ erro_livro }}</span></div>{% endif %}
+
+<datalist id="cu-pecas">{% for cod, nome in pecas %}<option value="{{ cod }}">{{ nome }}</option>{% endfor %}</datalist>
+
+<h2 class="rg-sub">Para decidir ({{ pendentes|length }})</h2>
+{% for x in pendentes %}
+{% set n = loop.index %}
+<article class="cu-card" aria-label="{{ x.descricao or x.codigo }}">
+  <div class="cu-foto">
+    {% if x.tem_foto %}<a href="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ x.foto_id }}.jpg" target="_blank" rel="noopener">
+      <img class="cu-img" loading="lazy" src="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ x.foto_id }}.jpg" alt="Foto do que o técnico achou"></a>
+    {% else %}<span class="cu-sem-foto mudo">sem foto</span>{% endif %}
+  </div>
+  <div class="cu-corpo">
+    {% if x.tipo == 'fora_do_catalogo' %}
+    <p class="cu-tit">{{ x.descricao or 'Sem descrição' }}</p>
+    <p class="alm-det">Fora do catálogo · {{ fmt(x.contado) }} unidades · {{ x.usina or 'usina não informada' }} · contada em {{ x.contada_txt or '?' }} · contagem {{ x.contagem_id }}</p>
+    {% else %}
+    <p class="cu-tit">Genérico <span class="alm-cod">{{ x.codigo or x.id_item }}</span> a identificar</p>
+    <p class="alm-det">{{ fmt(x.contado) }} unidades · {{ x.usina or 'usina não informada' }} · contada em {{ x.contada_txt or '?' }} · contagem {{ x.contagem_id }}</p>
+    <p class="cu-escolha">O técnico escolheu:
+      {% if x.identificado_como %}<b>{{ x.identificado_codigo or ('peça ' ~ x.identificado_como) }}</b>{% if x.identificado_nome %} · {{ x.identificado_nome }}{% endif %}
+      {% else %}<span class="mudo">não soube dizer</span>{% endif %}</p>
+    {% endif %}
+
+    {% if pode %}
+    {% set rota = raiz ~ '/t/pcm/pecas/inventario/curadoria/decidir' %}
+    {% if x.tipo == 'fora_do_catalogo' %}
+    {# cadastrar fala com o Fracttal: vai pela ponte do login (ponte_os.py), por fetch (pcm-ponte-inventario.js) #}
+    <details class="cu-op"><summary>Cadastrar peça nova no Fracttal</summary>
+      <form method="post" action="{{ raiz }}/os/_nexus/inventario/curadoria/cadastrar" data-ponte class="cu-form">
+        <input type="hidden" name="contagem" value="{{ x.contagem_id }}"><input type="hidden" name="linha" value="{{ x.chave_linha }}">
+        <label class="gc-rotulo" for="cu-sigla-{{ n }}">Sigla do código</label>
+        <select class="gc-campo" id="cu-sigla-{{ n }}" name="sigla">
+          {% for s in siglas_de(x.id_almox) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+        <label class="gc-rotulo" for="cu-nome-{{ n }}">Nome da peça</label>
+        <input class="gc-campo" id="cu-nome-{{ n }}" name="nome" maxlength="120" required value="{{ x.descricao }}">
+        <label class="gc-rotulo" for="cu-un-{{ n }}">Unidade</label>
+        <select class="gc-campo" id="cu-un-{{ n }}" name="unidade">
+          {% for u in unidades %}<option value="{{ u }}">{{ u|lower }}</option>{% endfor %}
+        </select>
+        <p class="alm-det">O código é o próximo livre da sigla (SP-sigla-NNN). A peça é ligada ao almoxarifado e ajustada quando a contagem for gravada.</p>
+        <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Cadastrar no Fracttal</button>
+      </form></details>
+    <details class="cu-op"><summary>É uma peça do catálogo</summary>
+      <form method="post" action="{{ rota }}" class="cu-form">
+        <input type="hidden" name="contagem" value="{{ x.contagem_id }}"><input type="hidden" name="linha" value="{{ x.chave_linha }}">
+        <input type="hidden" name="decisao" value="e_a_peca">
+        <label class="gc-rotulo" for="cu-peca-{{ n }}">Qual peça (código)</label>
+        <input class="gc-campo" id="cu-peca-{{ n }}" name="peca" list="cu-pecas" autocomplete="off" required placeholder="ex.: SP-CAB-004">
+        <p class="alm-det">As unidades achadas somam ao contado dessa peça nesta contagem.</p>
+        <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Contar como essa peça</button>
+      </form></details>
+    <details class="cu-op"><summary>Descartar</summary>
+      <form method="post" action="{{ rota }}" class="cu-form">
+        <input type="hidden" name="contagem" value="{{ x.contagem_id }}"><input type="hidden" name="linha" value="{{ x.chave_linha }}">
+        <input type="hidden" name="decisao" value="descartar">
+        <label class="gc-rotulo" for="cu-motivo-{{ n }}">Motivo</label>
+        <input class="gc-campo" id="cu-motivo-{{ n }}" name="motivo" maxlength="300" required placeholder="ex.: a foto não mostra uma peça">
+        <p class="alm-det">O motivo fica cifrado.</p>
+        <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Descartar</button>
+      </form></details>
+    {% else %}
+    <form method="post" action="{{ rota }}" class="cu-form">
+      <input type="hidden" name="contagem" value="{{ x.contagem_id }}"><input type="hidden" name="linha" value="{{ x.chave_linha }}">
+      <input type="hidden" name="decisao" value="confirmar">
+      <label class="gc-rotulo" for="cu-peca-{{ n }}">Outra peça (código), se não for a que o técnico escolheu</label>
+      <input class="gc-campo" id="cu-peca-{{ n }}" name="peca" list="cu-pecas" autocomplete="off" placeholder="em branco: a do técnico">
+      <p class="alm-det">As unidades saem do genérico e entram na peça escolhida, nesta contagem.</p>
+      <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Confirmar</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </div>
+</article>
+{% else %}
+<p class="pcm-sub alm-vazio">Nada para decidir agora: as contagens abertas não têm achado fora do catálogo nem genérico por identificar.</p>
+{% endfor %}
+
+{% if decididas %}
+<h2 class="rg-sub">Já decididas, em contagens ainda não gravadas ({{ decididas|length }})</h2>
+<table class="alm-t cu-t">
+  <thead><tr><th>Achado</th><th>Decisão</th><th>Peça</th><th>Quando</th></tr></thead>
+  <tbody>
+  {% set rotulo = {'cadastrar': 'Cadastrada no Fracttal', 'e_a_peca': 'É uma peça do catálogo', 'confirmar': 'Confirmada', 'descartar': 'Descartada'} %}
+  {% for x in decididas %}
+  <tr>
+    <td data-r="Achado"><span class="alm-v">{{ x.descricao or x.codigo or x.chave_linha }}<span class="alm-det">{{ fmt(x.contado) }} unidades · {{ x.usina }}</span></span></td>
+    <td data-r="Decisão"><span class="alm-v">{{ rotulo.get(x.decisao.decisao, x.decisao.decisao) }}</span></td>
+    <td data-r="Peça"><span class="alm-v">{% if x.decisao.codigo_criado %}<span class="alm-cod">{{ x.decisao.codigo_criado }}</span>{% elif x.decisao.id_item %}peça {{ x.decisao.id_item }}{% else %}<span class="mudo">—</span>{% endif %}</span></td>
+    <td data-r="Quando"><span class="alm-v">{{ x.decisao.quando_txt or '?' }}</span></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+</div>
+<script src="{{ url_for('static', filename='pcm-ponte-inventario.js') }}"></script>
+{% endblock %}

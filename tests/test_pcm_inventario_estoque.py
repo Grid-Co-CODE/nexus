@@ -479,6 +479,31 @@ def test_codigos_so_os_da_sigla():
         estoque(fr).codigos("")
 
 
+def test_achar_peca_pelo_codigo_exato():
+    """A curadoria (Task 9) cadastra sem duplicar: antes de criar de novo, procura a peça pelo código que ela reservou (o
+    `criar_peca` pode ter criado e perdido a resposta). Pede a lista de peças pelo filtro do código, e confere a linha: o
+    filtro que o Fracttal ignora devolveria o catálogo inteiro, e o código parecido (SP-CAB-0130) não é o procurado."""
+    pecas = [{"id": 12, "code": "SP-CAB-0130"}, {"id": 11, "code": "SP-CAB-013"}, {"id": 13, "code": None}, {"id": 14}]
+    fr = Fracttal({PECAS: em_paginas(pecas)})
+    est = estoque(fr)
+    assert est.achar_peca(" sp-cab-013 ") == "11"
+    assert fr.pedidos[0] == (PECAS, {"filter": [{"operator": "=", "property": "code", "value": "sp-cab-013"}], "sort": [],
+                                     "page": 1, "limit": 200, "start": 0, "is_tree": False, "node": 0, "id_type_item": 4})
+    assert est.achar_peca("SP-CAB-999") is None
+    for vazio in ("", "  ", None):
+        with pytest.raises(ValueError):
+            est.achar_peca(vazio)
+
+
+def test_achar_peca_para_na_pagina_que_acha_e_lista_pela_metade_e_erro():
+    pecas = [{"id": 1, "code": "SP-A-001"}, {"id": 2, "code": "SP-A-002"}, {"id": 3, "code": "SP-A-003"}]
+    fr = Fracttal({PECAS: em_paginas(pecas)})
+    assert estoque(fr, pagina=2).achar_peca("SP-A-002") == "2" and len(fr.pedidos) == 1     # a cota é de todos
+    fr = Fracttal({PECAS: {"success": True, "data": None, "total": 3}})
+    with pytest.raises(E.ErroFracttal):
+        estoque(fr).achar_peca("SP-A-002")                  # lista vazia com total 3: não é "não achei"
+
+
 # ── o `api` de verdade do clone do OS Creator: o contrato que o adaptador lê dele ────────────────────────────────────────────
 def _jwt(email="pessoa@exemplo.test", exp_s=3600):
     corpo = base64.urlsafe_b64encode(json.dumps({"email": email, "exp": time.time() + exp_s}).encode())
@@ -614,6 +639,16 @@ def test_falso_le_a_unidade_como_o_adaptador():
     novo = f.criar_peca("SP-TST-009", "Peça nova", "METRO")
     f.ligar(ALMOX, novo)
     assert f.ler(ALMOX)[novo]["unidade"] == "METRO"
+
+
+def test_falso_acha_a_peca_criada_e_a_que_ja_estava_no_almoxarifado():
+    f = EstoqueFalso({ALMOX: {ITEM: {"saldo": 3, "codigo": "SP-TST-001"}}})
+    novo = f.criar_peca("SP-TST-009", "Peça nova")
+    assert f.achar_peca("sp-tst-009") == novo and f.achar_peca("SP-TST-001") == ITEM
+    assert f.achar_peca("SP-TST-777") is None
+    assert f.chamadas[-3:] == ["achar_peca"] * 3
+    with pytest.raises(ValueError):
+        f.achar_peca("")
 
 
 def test_falso_perde_a_resposta_mas_grava():

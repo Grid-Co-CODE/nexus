@@ -249,6 +249,12 @@ class Estoque(abc.ABC):
     def codigos(self, sigla: str) -> list[str]:
         """Os códigos `SP-<sigla>-NNN` que já existem no catálogo (ativas ou não: o código é de quem o usou primeiro)."""
 
+    @abc.abstractmethod
+    def achar_peca(self, codigo: str) -> str | None:
+        """O id do item do catálogo cujo código é exatamente `codigo` (sem caixa), ou None. É como a curadoria cadastra sem
+        duplicar: o `criar_peca` pode ter criado a peça e perdido a resposta, e a nova tentativa procura o código que ela
+        reservou antes de criar de novo."""
+
 
 # ── o de verdade ───────────────────────────────────────────────────────────────────────────────────────────────────────
 class EstoqueFracttal(Estoque):
@@ -498,6 +504,22 @@ class EstoqueFracttal(Estoque):
         base = {"filter": [], "sort": [], "is_tree": False, "node": 0, "id_type_item": TIPO_PECA}
         return [str(l["code"]) for l in self._linhas(PECAS, base)
                 if isinstance(l, dict) and l.get("code") and str(l["code"]).upper().startswith(prefixo)]
+
+    def achar_peca(self, codigo: str) -> str | None:
+        """Pede a lista de peças com o filtro do código (`code =`, o mesmo `filter` que o `api.py` do OS Creator usa nas
+        listas do Fracttal) e CONFERE a linha que volta: o filtro que o Fracttal ignorasse devolveria o catálogo inteiro (o
+        `api.py` anota esse caso com o `id_parent_wo`), e o código parecido (SP-CAB-0130) não é o procurado. Para na primeira
+        página que acha: a cota é de todos. O filtro `code =` ainda não foi provado contra o Fracttal de verdade (o passo 0 só
+        listou); a conferência da linha vale de qualquer jeito, e a prova com o App (Task 10) confirma."""
+        alvo = str(codigo or "").strip()
+        if not alvo:
+            raise ValueError("sem o código, qualquer peça seria a achada")
+        base = {"filter": [{"operator": "=", "property": "code", "value": alvo}], "sort": [], "is_tree": False, "node": 0,
+                "id_type_item": TIPO_PECA}
+        for l in self._linhas(PECAS, base):
+            if isinstance(l, dict) and l.get("id") is not None and str(l.get("code") or "").strip().upper() == alvo.upper():
+                return str(l["id"])
+        return None
 
 
 # ── a sessão do pedido ─────────────────────────────────────────────────────────────────────────────────────────────────

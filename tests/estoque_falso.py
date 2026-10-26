@@ -253,6 +253,20 @@ class EstoqueFalso(Estoque):
         prefixo = f"SP-{sigla}-".upper()
         return sorted(c for c in self._todos_os_codigos() if c.upper().startswith(prefixo))
 
+    @_operacao
+    def achar_peca(self, codigo: str) -> str | None:
+        alvo = str(codigo or "").strip().upper()
+        if not alvo:
+            raise ValueError("sem o código, qualquer peça seria a achada")
+        for id_item, v in self._catalogo.items():
+            if v["codigo"].upper() == alvo:
+                return id_item
+        for itens in self._itens.values():
+            for id_item, v in itens.items():
+                if v["codigo"] and v["codigo"].upper() == alvo:
+                    return id_item
+        return None
+
     def _todos_os_codigos(self) -> set[str]:
         return ({c["codigo"] for c in self._catalogo.values()}
                 | {v["codigo"] for itens in self._itens.values() for v in itens.values() if v["codigo"]})
