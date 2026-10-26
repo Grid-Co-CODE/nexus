@@ -196,13 +196,16 @@ Test `tests/test_pcm_inventario_estoque.py`.
   `fato_curadoria_inventario`, `qualidade`, `atualizacao`; `so_cresce=True` nas três de fato.
 - `CAB_EVENTO = ["evento_id", "quando", "data_id", "contagem_id", "tipo", "id_almoxarifado", "usina_id", "id_item",
   "codigo", "de_qtd", "para_qtd", "contado_qtd", "movimento_fracttal", "situacao", "lote", "pessoa_id",
-  "pessoa_hmac", "dados_cifrados"]`; `TIPOS_EVENTO = ("contagem_recebida", "aprovada", "peca_gravada", "conflito",
+  "pessoa_hmac", "dados_cifrados", "usina_ligada_por"]`; `TIPOS_EVENTO = ("contagem_recebida", "aprovada", "peca_gravada", "conflito",
   "erro", "peca_tirada", "recontagem_pedida", "numero_corrigido", "substituida", "curadoria", "regua_gravada")`.
 - `CAB_REGUA = ["decidida_em", "data_id", "id_almoxarifado", "usina_id", "id_item", "codigo", "sugestao_min_qtd",
   "sugestao_max_qtd", "recomendado_min_qtd", "recomendado_max_qtd", "acordado_min_qtd", "acordado_max_qtd",
-  "gravado_fracttal", "pessoa_id", "pessoa_hmac"]`.
+  "gravado_fracttal", "pessoa_id", "pessoa_hmac", "usina_ligada_por"]`.
 - `CAB_CURADORIA = ["decidida_em", "contagem_id", "chave_linha", "decisao", "id_item", "codigo_criado", "pessoa_id",
-  "pessoa_hmac", "dados_cifrados"]`.
+  "pessoa_hmac", "dados_cifrados", "data_id", "id_almoxarifado", "usina_id", "usina_ligada_por"]`.
+- (Revisão da Task 4, 26/10: as colunas do fim entraram pela governança; quem grava passa `usina_id` junto com
+  `usina_ligada_por`, o `pessoa_hmac` de 24 hex, a `situacao` da lista `contas.SITUACOES`, os `id_*` só com dígitos e o
+  texto livre só pelo `dados={"motivo": ...}`, que o módulo cifra; o `dados_cifrados` direto é recusado.)
 - `acrescentar(cfg, aba: str, linhas: list[dict]) -> None` — relê o livro inteiro, acrescenta, grava todas as abas
   (`livros.publicar`); `NEXUS_ALMOX_INVENTARIO_ARQUIVO` troca o banco por um arquivo (a cópia de prova e os testes,
   como o `atribuicoes._ler_cru`/`_gravar_cru`); leitura que falha → `Recusada` (a exceção deste módulo, que as
