@@ -47,29 +47,59 @@ def test_a_apr_que_pedia_pt_e_ficou_sem(banco, logado):
     assert "Nenhuma APR pedindo PT" in logado.get("/t/hseq/apr-pt?aba=sem&cliente=Outro+Cliente").get_data(as_text=True)
 
 
+def _os_800_criada(banco, data_id=20261020):
+    _aba(banco, "nexus_os", "fato_tarefa_os", [{"fracttal_tarefa_id": 1, "os": "800", "data_id_criacao": data_id},
+                                               {"fracttal_tarefa_id": 2, "os": "800", "data_id_criacao": data_id + 2}])
+
+
 def test_a_os_fechada_sem_apr_e_a_que_tem(banco, logado):
+    """A régua do App (26/10/2026): a APR vale para a atividade, não para o dia; qualquer APR da OS até o dia do serviço
+    cobre (a retomada de tarefa pausada não pede outra)."""
     _aba(banco, "apr_app_campo", "APR", [_apr("16866", "2026-10-20")])
+    _os_800_criada(banco)
     visao.limpar()
     html = logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
     corpo = html[html.index("<tbody>"):html.index("</tbody>")]
     assert ">800<" in corpo and "Altair" in corpo and "Preventiva" in corpo           # as tarefas da OS 800, sem APR
-    assert ">nenhuma<" in corpo                                                         # a OS 800 nunca teve APR
-    # a APR do dia anterior também vale (a tarefa da noite fecha depois da meia-noite)
+    assert "<th>Feita em</th>" in html and "<th>OS criada em</th>" in html and ">20/10/2026<" in corpo
+    # uma APR da OS dias antes do serviço cobre (a tarefa iniciada com APR, pausada e fechada depois)
     from datetime import date as _date, timedelta as _td
-    _aba(banco, "apr_app_campo", "APR", [_apr("800", (_date.fromisoformat(d) - _td(days=1)).isoformat())
-                                         for d in _dias_dos_fechamentos()])
+    antes = (_date.fromisoformat(_dias_dos_fechamentos()[0]) - _td(days=3)).isoformat()
+    _aba(banco, "apr_app_campo", "APR", [_apr("800", antes)])
     visao.limpar()
     assert "Nenhuma OS fechada pelo App sem APR" in logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
-    # a de dois dias antes não vale, e a coluna diz quando foi
-    dois_antes = (_date.fromisoformat(_dias_dos_fechamentos()[0]) - _td(days=2)).isoformat()
-    _aba(banco, "apr_app_campo", "APR", [_apr("800", dois_antes)])
+    # a APR feita DEPOIS do serviço não cobre
+    depois = (_date.fromisoformat(_dias_dos_fechamentos()[-1]) + _td(days=1)).isoformat()
+    _aba(banco, "apr_app_campo", "APR", [_apr("800", depois)])
     visao.limpar()
-    assert ">em " in logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
-    # com a APR do dia da OS 800 (nos dias em que as tarefas fecharam), sai
-    _aba(banco, "apr_app_campo", "APR", [_apr("800", d) for d in _dias_dos_fechamentos()])
+    assert ">800<" in logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
+
+
+def test_a_os_criada_antes_do_registro_das_aprs_fica_fora(banco, logado):
+    """A OS criada antes de 10/10 pode ter a APR por tarefa de antes do registro (a 14334: APR de 06/10, retomada 20 dias
+    depois); a OS sem a data de criação (finalizada, fora do fato_tarefa_os) também fica fora."""
+    _aba(banco, "apr_app_campo", "APR", [_apr("16866", "2026-10-20")])
+    _os_800_criada(banco, 20261001)
+    visao.limpar()
+    assert "Nenhuma OS fechada pelo App sem APR" in logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
+    _aba(banco, "nexus_os", "fato_tarefa_os", [{"fracttal_tarefa_id": 1, "os": "999", "data_id_criacao": 20261020}])
+    visao.limpar()
+    assert "Nenhuma OS fechada pelo App sem APR" in logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
+
+
+def test_o_dia_do_servico_e_a_hora_do_celular(banco, logado):
+    """O fechamento que chegou ao servidor dias depois (o celular offline) vale pelo dia em que o técnico fez: com a APR
+    nesse dia, cobre (medido em 26/10: 4 OS da mesma usina feitas em 21 e 23/10 chegaram em 26/10)."""
+    from test_campo_visao import _fech
+    _aba(banco, "fechamentos_app_campo", "Fechamentos", [_fech(1, 90, **{"Hora do celular": "2026-10-21T13:00:00.000Z"})])
+    _aba(banco, "apr_app_campo", "APR", [_apr("800", "2026-10-21")])
+    _os_800_criada(banco, 20261020)
+    visao.limpar()
+    assert "Nenhuma OS fechada pelo App sem APR" in logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
+    _aba(banco, "apr_app_campo", "APR", [_apr("800", "2026-10-25")])
     visao.limpar()
     html = logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
-    assert "Nenhuma OS fechada pelo App sem APR" in html
+    assert ">800<" in html and ">21/10/2026<" in html                                  # feita em 21/10, sem APR até lá
 
 
 def test_o_livro_da_apr_esta_no_catalogo_antes_da_primeira_gravacao():
