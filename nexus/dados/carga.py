@@ -492,6 +492,15 @@ def _programacao(le: "_Leitor", dados, lido_em, lig, m, equip, hist_q, iso, maqu
     sha_fonte = programacao.sha_linhas(fonte)
     rel = {"semanas_do_arquivo": rp.get("semanas"), "linhas_do_arquivo": len(fonte),
            "fora_do_plano": rp.get("fora_do_plano"), "blocos_repetidos": rp.get("blocos_repetidos")}
+    # o arquivo degradado do PCM (26/10/2026: o Fracttal devolveu 0 registros e as 4 semanas saíram sem status): a
+    # semana sem status não troca a do banco (`mesclar_semanas`), e o arquivo todo degradado não grava nada
+    ruins = programacao.semanas_degradadas(fonte)
+    if ruins:
+        rel["semanas_degradadas"] = sorted(ruins)
+        log.warning("programação: o arquivo do PCM chegou sem o status das tarefas nas semanas %s", sorted(ruins))
+        if len(ruins) == len({l[programacao.CAB_PROGRAMACAO.index("data_id_semana")] for l in fonte}):
+            return None, False, dict(rel, nao_grava="o arquivo do PCM chegou degradado (nenhuma tarefa com status) "
+                                                    "em todas as semanas: o fato do banco fica como está")
     existe = bool(le.abas(programacao.LIVRO))
     ant = _ler_ou(le, programacao.LIVRO, "atualizacao", []) if existe else []
     ant = dict(ant[0]) if ant else {}

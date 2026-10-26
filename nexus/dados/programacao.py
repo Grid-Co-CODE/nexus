@@ -543,10 +543,13 @@ def mesclar_semanas(no_banco: list, da_fonte: list) -> list:
     `fato_programacao` (`carga._programacao`) e como a carga única do histórico junta as semanas do git às do arquivo.
     Sem isto, a troca integral deixaria no banco só as 4 semanas que a fonte guarda. `no_banco`: as linhas lidas do
     banco (dicionários, valores às vezes como texto); `da_fonte`: as linhas de `fato_programacao`. Linha do banco sem
-    semana não é descartada (não se sabe a que semana pertence). Não protege contra a fonte que publica uma semana
-    pela metade nem contra a semana regerada depois de fechada (a W35, em 31/08): recusar carga encolhida é o passo 1,
-    adiado."""
+    semana não é descartada (não se sabe a que semana pertence). A semana DEGRADADA da fonte (nenhuma tarefa com status,
+    `semanas_degradadas`) não troca a do banco, e a nova degradada não entra (26/10/2026). Não protege contra a fonte que
+    publica uma semana pela metade COM status nem contra a semana regerada depois de fechada (a W35, em 31/08): recusar
+    carga encolhida é o passo 1, adiado."""
     i_sem = CAB_PROGRAMACAO.index("data_id_semana")
+    ruins = semanas_degradadas(da_fonte)
+    da_fonte = [l for l in da_fonte if _no_tipo("data_id_semana", l[i_sem]) not in ruins]
     semanas_fonte = {_no_tipo("data_id_semana", l[i_sem]) for l in da_fonte}
     ficam = []
     for l in no_banco or []:
@@ -554,6 +557,22 @@ def mesclar_semanas(no_banco: list, da_fonte: list) -> list:
         if lin[i_sem] is None or lin[i_sem] not in semanas_fonte:
             ficam.append(lin)
     return ficam + [list(l) for l in da_fonte]
+
+
+def semanas_degradadas(da_fonte: list) -> set:
+    """As semanas da fonte em que NENHUMA tarefa tem status (`status_execucao` vazio em todas as linhas). O robô do PCM
+    põe o status em toda linha (medido em 26/10/2026 nas 4 semanas da rodada boa: 100%); sem nenhum, a leitura do
+    Fracttal falhou calada. Caso que criou a regra: na rodada das 03:36Z de 26/10 o Fracttal devolveu 0 registros (o
+    limite de 200/min da empresa), o arquivo saiu sem status, datas e responsável, e a carga das :40 trocou as 4
+    semanas do histórico por ele."""
+    i_sem, i_st = CAB_PROGRAMACAO.index("data_id_semana"), CAB_PROGRAMACAO.index("status_execucao")
+    todas, com = set(), set()
+    for l in da_fonte:
+        w = _no_tipo("data_id_semana", l[i_sem])
+        todas.add(w)
+        if l[i_st] not in (None, ""):
+            com.add(w)
+    return {w for w in todas - com if w is not None}
 
 
 def _linha_tipada(l) -> list:

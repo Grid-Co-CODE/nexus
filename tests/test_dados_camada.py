@@ -322,7 +322,7 @@ PCM = {"geradoEm": "2026-10-05T12:00:00Z", "semanas": [{"week": "2026-W41", "dat
        "geradaEm": "2026-10-04T20:00:00", "rows": [
            {"codigo": "THPN-PRM200-TRFR1", "os_id": "15500", "tarefa": "Inspeção do trafo", "dia": "Segunda-feira",
             "h_ini": "08:00", "usina": "Cliente Exemplo - Usina Exemplo 1 e 2 - PA", "cluster": "PR Oeste 01", "duracao": 1.5,
-            "resp_os": "Pessoa Inventada"},
+            "resp_os": "Pessoa Inventada", "status": "Não Iniciada"},   # o robô põe o status em toda linha
            {"foraDoPlano": True, "codigo": "THPN-PRM200-FORA9", "os_id": "15501", "tarefa": "x", "dia": "Terça-feira"}]}]}
 
 
@@ -718,3 +718,20 @@ def test_governanca_mostra_a_classificacao_1_de_outra_usina(app):
     assert "Cliente X - Oito - BA" in bloco and "Cliente X - Sete II - BA" in bloco and "CLX-STE200-NBRK1" in bloco
     assert "usina trocada" in bloco and "nome a conferir" in bloco and "16341" in bloco
     assert bloco.index("Cliente X - Oito - BA") < bloco.index("Thopen - Altair 1 - SP")     # a troca vem primeiro
+
+
+def test_carga_nao_troca_a_programacao_pelo_arquivo_degradado(banco):
+    """26/10/2026: o arquivo do PCM sem o status de nenhuma tarefa (a leitura do Fracttal falhou calada) não troca a
+    semana do banco; a carga diz quais semanas ficaram de fora."""
+    api, cfg = banco
+    _semana_velha(api)
+    from pathlib import Path
+    pcm = json.loads(Path(cfg["NEXUS_PCM_FONTE"]).read_text(encoding="utf-8"))
+    for s in pcm["semanas"]:
+        for r in s["rows"]:
+            r["status"] = r["status_bd"] = ""
+    Path(cfg["NEXUS_PCM_FONTE"]).write_text(json.dumps(pcm), encoding="utf-8")
+    r = carga.rodar(cfg, api, agora=datetime(2026, 10, 5, 15, 40, tzinfo=BRT))
+    assert r["programacao"]["semanas_degradadas"] == [20261005] and "degradado" in r["programacao"]["nao_grava"]
+    p = {x["data_id_semana"]: x for x in livros.ler(BASE, api, programacao.LIVRO, programacao.ABA)}
+    assert p[20261005]["os"] == "15499"                                 # a W41 do banco ficou
