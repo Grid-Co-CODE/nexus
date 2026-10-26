@@ -77,3 +77,18 @@ def test_o_livro_da_apr_esta_no_catalogo_antes_da_primeira_gravacao():
     from nexus.hseq import apr as APR
     f = {x.id: x for x in C.FATOS}["apr"]
     assert f.livro == f"{APR.LIVRO} · {APR.ABA}" and f.area == "hseq"
+
+
+def test_a_data_de_criacao_da_os(banco, logado):
+    """Levi, 26/10/2026: "quero uma coluna de data de criação da OS". Vem do `fato_tarefa_os` (a OS em processo ou em
+    verificação, onde ela fica depois de o App fechar a tarefa); sem a OS lá, "—"."""
+    _aba(banco, "apr_app_campo", "APR", [_apr("16866", "2026-10-20")])
+    _aba(banco, "nexus_os", "fato_tarefa_os", [{"fracttal_tarefa_id": 1, "os": "800", "data_id_criacao": 20261001},
+                                               {"fracttal_tarefa_id": 2, "os": "800", "data_id_criacao": 20261003}])
+    visao.limpar()
+    html = logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
+    assert "<th>OS criada em</th>" in html and ">01/10/2026<" in html                  # a mais antiga das tarefas
+    _aba(banco, "nexus_os", "fato_tarefa_os", [{"fracttal_tarefa_id": 1, "os": "999", "data_id_criacao": 20261001}])
+    visao.limpar()
+    corpo = logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
+    assert ">800<" in corpo and ">01/10/2026<" not in corpo

@@ -42,6 +42,14 @@ def _dia(v) -> date | None:
         return None
 
 
+def _do_data_id(v) -> date | None:
+    s = str(v or "")
+    try:
+        return date(int(s[:4]), int(s[4:6]), int(s[6:8])) if len(s) == 8 else None
+    except ValueError:
+        return None
+
+
 def sem_apr_ou_pt() -> leitura.Leitura:
     """{livro_existe, sem_pt: [APR que pedia PT sem PT], sem_apr: [OS e dia fechados sem APR], hoje}. Cópia de 5 min,
     renovada em segundo plano (`visao._ler`)."""
@@ -68,6 +76,17 @@ def sem_apr_ou_pt() -> leitura.Leitura:
                                "atividades": [a.strip() for a in _txt(x.get("Atividades críticas")).split(";")
                                               if a.strip()],
                                "tecnico": visao._nome(quem, x.get("Técnico (HMAC)"))})
+        # quando a OS foi criada no Fracttal (Levi, 26/10/2026: "quero uma coluna de data de criação da OS"): o
+        # `fato_tarefa_os` (as OS em processo e em verificação, que é onde a OS fica depois de o App fechar a tarefa);
+        # a OS já finalizada fica sem (medido em 26/10: 50 das 52)
+        criada_em = {}
+        try:
+            for t in visao._livro("nexus_os", "fato_tarefa_os"):
+                o, d = _txt(t.get("os")), D._id(t.get("data_id_criacao"))
+                if o and d:
+                    criada_em[o] = min(criada_em.get(o, d), d)
+        except Exception:       # noqa: BLE001 — sem o fato das OS, a coluna fica vazia e a lista segue
+            pass
         grupos = {}
         f = visao._fato("fechamento", b)
         for x in f["linhas"]:
@@ -85,7 +104,8 @@ def sem_apr_ou_pt() -> leitura.Leitura:
             # fechamento registrado dias depois do serviço (medido em 25/10: 27 dos 39 casos); a TST vê e decide
             antes = [d_ for d_ in dias_da_os.get(os_, ()) if d_ < dia]
             g = grupos.setdefault((os_, dia), {"dia": dia, "os": os_, **(b.onde(uid) if uid else {"usina": ""}),
-                                               "apr_antes": max(antes) if antes else None, "tarefas": 0,
+                                               "apr_antes": max(antes) if antes else None,
+                                               "os_criada": _do_data_id(criada_em.get(os_)), "tarefas": 0,
                                                "tipo_os": _txt(x.get("tipo_os")), "pessoas": set()})
             g["tarefas"] += 1
             if D._id(x.get("pessoa_id")):

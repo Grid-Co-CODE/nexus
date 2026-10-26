@@ -385,7 +385,9 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   **APR que pedia PT e ficou sem** ("Precisa de PT" = sim e PT vazia; vazio = ainda não medido, não entra) e **OS
   fechada sem APR** (a tarefa do `fato_fechamento` desde 10/10/2026 sem APR da mesma OS no mesmo dia ou no anterior,
   nem APR da tarefa com a mesma OS e tarefa; por OS e dia, com a coluna "APR da OS", a última antes do fechamento, ou
-  "nenhuma"; a régua não olha o técnico). Medido no livro real em 25/10 (875 APRs, 149 já medidas): 2 APRs pediam PT e
+  "nenhuma", e a "OS criada em", do `fato_tarefa_os` (Levi, 26/10: "quero uma coluna de data de criação da OS"; a OS
+  em processo ou em verificação, onde ela fica depois de o App fechar a tarefa: 50 das 52 em 26/10; a finalizada fica
+  "—"); a régua não olha o técnico). Medido no livro real em 25/10 (875 APRs, 149 já medidas): 2 APRs pediam PT e
   ficaram sem (a mesma conta do App) e 39 OS fechadas sem APR, 12 sem APR nenhuma; a régua começou com 138, dos quais
   48 eram de 09/10 (o dia da troca para a v251) e 89 tinham a APR no dia anterior (a tarefa da noite fecha depois da
   meia-noite). Sem o livro, a aba diz que ele ainda não chegou.
