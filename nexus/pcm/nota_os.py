@@ -16,21 +16,26 @@ from datetime import datetime, timedelta, timezone
 _BRT = timezone(timedelta(hours=-3))
 
 
+def _um(s) -> str:
+    """Quebra de linha e espaço repetido viram um espaço só: a justificativa cabe numa linha da nota."""
+    return " ".join(str(s or "").split())
+
+
 def linha(quando: datetime, motivo: str, tarefa: str, codigo: str, obs: str) -> str:
-    """O que vai na nota, como o Levi escolheu (20/10/2026): a data e a hora, o motivo, a tarefa, o ativo e a observação."""
-    partes = [f"{quando.astimezone(_BRT):%d/%m/%Y %H:%M} · Fora da programação: {str(motivo or '').strip()}",
-              f"Tarefa: {str(tarefa or '').strip()} · Ativo: {str(codigo or '').strip() or 'todos os ativos da OS'}"]
-    if str(obs or "").strip():
-        partes.append(f"Observação: {str(obs).strip()}")
-    return "\n".join(partes)
+    """Uma linha por justificativa, no formato do Levi (25/10/2026): "[Data e hora] - [Nome da atividade] - Motivo -
+    [Justificativa do técnico, se tiver]". O ativo (`codigo`) não entra: não está no formato. Espelho do
+    `_fora_nota_linha` do App (v300): os dois escrevem a mesma linha (os mesmos exemplos nos dois testes)."""
+    l = f"[{quando.astimezone(_BRT):%d/%m/%Y %H:%M}] - [{_um(tarefa)}] - {_um(motivo)}"
+    return l + (f" - [{_um(obs)}]" if _um(obs) else "")
 
 
 def juntar(atual, nova: str) -> str:
-    """A nota de agora com a linha nova no fim (o RPC às vezes manda o texto "None" na nota vazia)."""
+    """A nota de agora com a linha nova no fim, sem linha em branco entre as justificativas (o RPC às vezes manda o texto
+    "None" na nota vazia). Espelho do `_fora_nota_juntar` do App."""
     a = str(atual or "").strip()
     if a.lower() == "none":
         a = ""
-    return f"{a}\n\n{nova}" if a else nova
+    return f"{a}\n{nova}" if a else nova
 
 
 def gravar(api, folio, texto: str) -> dict:

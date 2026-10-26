@@ -164,8 +164,11 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   justificativa do técnico etiqueta (a marca do PCM no Nexus, não). O contrato: `app-campo-docs/_propostas/etiqueta-motivo/LEIA.md`.
   **A nota da OS ao escolher o motivo** (20/10/2026, Levi: "quando selecionar o motivo vai preencher na nota da OS a
   data, o nome da tarefa, o ativo e o motivo de não fazer a tarefa"; "a justificativa do técnico também deve estar na
-  OS"): uma linha no FIM da nota da OS no Fracttal ("20/10/2026 14:32 · Fora da programação: <motivo>", "Tarefa: <nome> ·
-  Ativo: <código ou todos os ativos da OS>", "Observação: <texto>"), o que já existe fica. Ao escolher (marcar ou trocar)
+  OS"): uma linha no FIM da nota da OS no Fracttal, o que já existe fica. O formato é o do Levi (25/10/2026), uma linha
+  por justificativa: `[21/10/2026 14:32] - [<tarefa da programação>] - <motivo>`, mais ` - [<justificativa>]` só quando
+  há texto (quebra de linha e espaço repetido viram um espaço). O ativo não entra. As justificativas se juntam com uma
+  quebra de linha, sem linha em branco entre elas; as notas antigas, no formato de 3 linhas, ficam como estão. O App
+  escreve a MESMA linha (`_fora_nota_linha`/`_fora_nota_juntar`, v300), e os dois testes usam os mesmos exemplos. Ao escolher (marcar ou trocar)
   no Nexus, o Nexus escreve (`nota_os.py`, na janela do Quadro e na troca do Painel) com o login do Fracttal de quem
   marcou: o login do Nexus pelo Fracttal abre a sessão do OS Creator da pessoa (`ponte.sessao_do_os`), e o
   `api.editar_nota_os` reescreve a nota inteira, por isso lê a atual antes. A observação editada e o motivo tirado não
