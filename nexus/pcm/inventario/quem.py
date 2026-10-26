@@ -48,3 +48,11 @@ def colunas(cfg, pessoa: dict | None) -> dict:
         return {}
     pid = pessoa.get("id") or _mapa_de_codigos(cfg).get(codigo)
     return {"pessoa_hmac": codigo, **({"pessoa_id": pid} if pid else {})}
+
+
+def do_pedido() -> dict:
+    """Quem está no pedido: só o e-mail (de onde sai o código da pessoa) e o nome, nada mais da sessão. Quem entrou pela
+    senha de administrador não tem e-mail."""
+    from flask import session
+    u = session.get("usuario")
+    return {"email": u.get("email"), "nome": u.get("nome")} if isinstance(u, dict) else {"nome": "administrador (senha)"}

@@ -22,6 +22,7 @@
   <b>recomendado</b> é o da Grid e fica só aqui, como histórico. O <b>acordado</b> é o do cliente: é o único que vai ao
   Fracttal (o mínimo dispara o alarme), e só quando você manda gravar.</p>
 
+<div data-ponte-aviso aria-live="polite"></div>
 {% if ok %}<div class="cn-certo" role="status"><span><b>{{ ok }}</b></span></div>{% endif %}
 {% if erro %}<div class="cn-erro" role="alert"><span><b>{{ erro }}</b></span></div>{% endif %}
 {% if erro_livro %}<div class="cn-erro" role="alert"><span><b>Não consegui ler o livro do inventário.</b> {{ erro_livro }}</span></div>{% endif %}
@@ -85,7 +86,7 @@
         {% if pode %}
         <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" form="{{ f }}">Registrar</button>
         {% if not (x.acordado[0] is none and x.acordado[1] is none) %}
-        <form method="post" action="{{ raiz }}/t/pcm/pecas/inventario/regua/gravar" class="rg-grava">
+        <form method="post" action="{{ raiz }}/os/_nexus/inventario/regua/gravar" data-ponte class="rg-grava">
           <input type="hidden" name="almox" value="{{ almox.id }}"><input type="hidden" name="item" value="{{ x.id_item }}">
           <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">{{ 'Gravar de novo' if x.gravado else 'Gravar no Fracttal' }}</button></form>
         {% endif %}
@@ -101,8 +102,8 @@
   <p class="pcm-sub">Nenhuma peça com saldo neste almoxarifado na varredura do App.</p>
   {% endif %}
   {% if pode %}<p class="alm-ajuda rg-nota">Gravar no Fracttal manda o acordado que está registrado (os números dos campos só
-    valem depois de Registrar). Quem entrou pela senha de administrador registra, mas não grava: o Fracttal pede o login
-    dele.</p>{% endif %}
+    valem depois de Registrar), no seu login do Fracttal. Quem entrou pela senha de administrador registra, mas não grava:
+    o Fracttal pede o login dele.</p>{% endif %}
 </section>
 {% else %}
 <p class="pcm-sub alm-vazio">Escolha o almoxarifado acima.</p>
@@ -110,4 +111,5 @@
 {% endif %}
 </div>
 <script src="{{ url_for('static', filename='pcm-regua.js') }}"></script>
+<script src="{{ url_for('static', filename='pcm-ponte-inventario.js') }}"></script>
 {% endblock %}

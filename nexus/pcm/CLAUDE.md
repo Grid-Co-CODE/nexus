@@ -605,16 +605,25 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   varredura do App (`almoxarifado.montar`). A peça vem do saldo do almoxarifado, nunca do ID que a página mandou (outro
   almoxarifado ou ID chutado é 400). O almoxarifado de teste não tem linha na varredura (fica fora das telas): a prova dele passa
   a `varredura=` à mão.
-- **Gravar** (`gravar_acordado`, no login de quem apertou, `estoque_da_sessao`): lê o almoxarifado (a leitura guarda a ligação),
+- **Gravar roda na PONTE `/os/_nexus/inventario/regua/gravar` (`ponte_os.py`), não em `/t/pcm`:** o login do Fracttal é o cookie
+  `os_sessao`, gravado com `Path=<raiz>/os`, e o navegador não o manda para `/t/pcm/...`; `estoque_da_sessao` numa rota de `/t/pcm`
+  seria sempre `SemLogin` em produção (os testes que trocam a função não pegam isso: o teste `test_o_login_do_fracttal_so_chega_na_ponte`
+  usa a função de verdade, o cookie com `Path=/os`, e mostra a ponte vendo o login e uma rota de `/t/pcm` não). A página fica em
+  `/t/pcm`, e o botão "Gravar no Fracttal" (formulário `data-ponte`) vai por `fetch` (`static/pcm-ponte-inventario.js`); a ponte
+  responde JSON (`{ok, mensagem, volta}` ou `{erro, login?}`) e deixa o aviso na sessão, que a página mostra ao recarregar. Registrar
+  (`/t/pcm/.../regua/decidir`) só grava no livro e fica em `/t/pcm`.
+- **`gravar_acordado`** (no login de quem apertou, `estoque_da_sessao`): lê o almoxarifado (a leitura guarda a ligação),
   `definir_regua`, relê, e SÓ ENTÃO anota o evento `regua_gravada` (o mínimo de -> para; o máximo fica no retrato) e o retrato
   `gravado_fracttal`. A releitura que não bate é um evento `erro` e `NaoConfere` (502): o livro nunca diz que o Fracttal tem o
   que não tem. O evento sai antes do retrato: se o retrato falhar, a peça segue "não gravada" e o PCM grava de novo (idempotente).
   Sem acordado, ou peça não ligada ao almoxarifado: `Conflito` (409), nenhum pedido. Quem entrou pela senha de administrador
-  registra, mas não grava: `SemLogin` (401), e a tela diz por quê. Limite do Fracttal: 429. Rede que cai: 502 com "grave de novo,
+  registra, mas não grava: `SemLogin` (401, com o link do `/os/login` e a volta à página), e a tela diz por quê. Quem entrou pelo Fracttal e
+  chega à ponte sem o cookie dele tem a sessão do Nexus encerrada pelo portão ("caiu"): o 401 com o link é de quem entrou pela Microsoft. Limite do Fracttal: 429. Rede que cai: 502 com "grave de novo,
   é o mesmo número".
 - **Peças de apoio:** `quem.py` (a pessoa nas colunas do livro: `pessoa_hmac` pelo e-mail da sessão, e `pessoa_id` quando o
-  cadastro a acha; sem e-mail, vazio) e `erros.py` (`Conflito`, `NaoConfere` e a tabela erro -> status HTTP, a mesma da
-  curadoria). `Estoque.ler` passou a devolver também a `unidade`.
+  cadastro a acha; sem e-mail, vazio), `erros.py` (`Conflito`, `NaoConfere` e a tabela erro -> status HTTP, a mesma da curadoria) e
+  `ponte_os.py` (o blueprint `/os/_nexus/inventario`, registrado na raiz do app como o `bp_raiz` do OS Creator; cada tarefa põe as
+  rotas dela num bloco próprio). `Estoque.ler` passou a devolver também a `unidade`.
 - **Provar:** `tests/test_pcm_inventario_regua.py` (a conta, o quadro, o retrato, só o acordado ao Fracttal, a releitura, o 403
   de quem não é PCM, o 400, o 409, o 401, o 429, a resposta perdida) com mutações nas regras (manda o recomendado, não confere a
   releitura, teto vira piso, avariada com mínimo, gravado sobrevive ao acordado novo, perde o acordado de antes, aceita mínimo

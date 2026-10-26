@@ -298,12 +298,6 @@ def gravar_acordado(cfg, id_almox: str, id_item: str, estoque: E.Estoque, pessoa
 
 
 # ── as telas ─────────────────────────────────────────────────────────────────────────────────────────────────────────
-def _pessoa() -> dict:
-    """Quem está no pedido: só o e-mail (de onde sai o código da pessoa) e o nome, nada mais da sessão."""
-    u = session.get("usuario")
-    return {"email": u.get("email"), "nome": u.get("nome")} if isinstance(u, dict) else {"nome": "administrador (senha)"}
-
-
 def _volta(almox: str) -> str:
     return na_raiz("/t/pcm/pecas/inventario/regua" + ("?" + urlencode({"almox": almox}) if almox else ""))
 
@@ -347,31 +341,17 @@ def registrar(bp) -> None:
     @bp.route("/pecas/inventario/regua/decidir", methods=["POST"], endpoint="inventario_regua_decidir")
     def regua_decidir():
         """Registra o recomendado e/ou o acordado de uma peça. Só administrador e setor PCM (`pode_programar`). A peça vem
-        do saldo do almoxarifado, nunca do que a página trouxe."""
+        do saldo do almoxarifado, nunca do que a página trouxe. Só grava no livro do Nexus: o que vai ao Fracttal (gravar o
+        acordado) roda na ponte `/os/_nexus/inventario/regua/gravar` (`ponte_os.py`), porque o login do Fracttal só chega em /os."""
         if not telas.pode_programar() or telas._de_outro_site():
             abort(403)
         f = request.form
         almox, item = _id(f.get("almox")), _id(f.get("item"))
         try:
             decidir(current_app.config, almox, item, recomendado=_do_form(f, "rec"), acordado=_do_form(f, "aco"),
-                    pessoa=_pessoa())
+                    pessoa=quem.do_pedido())
         except ValueError as ex:
             status, texto = erros.resposta(ex)
             return _pagina(almox, erro=texto, status=status)
         session["pcm_regua_aviso"] = "Registrado. Só o acordado vai ao Fracttal, quando você mandar gravar."
-        return redirect(_volta(almox), code=303)
-
-    @bp.route("/pecas/inventario/regua/gravar", methods=["POST"], endpoint="inventario_regua_gravar")
-    def regua_gravar():
-        """Manda o acordado registrado ao Fracttal, no login de quem apertou (`estoque_da_sessao`), relê e anota."""
-        if not telas.pode_programar() or telas._de_outro_site():
-            abort(403)
-        almox, item = _id(request.form.get("almox")), _id(request.form.get("item"))
-        try:
-            texto = gravar_acordado(current_app.config, almox, item, E.estoque_da_sessao(current_app._get_current_object()),
-                                    _pessoa())
-        except (ValueError, OSError, E.Limite, E.SemLogin, E.ErroFracttal) as ex:
-            status, texto = erros.resposta(ex)
-            return _pagina(almox, erro=texto, status=status)
-        session["pcm_regua_aviso"] = texto
         return redirect(_volta(almox), code=303)

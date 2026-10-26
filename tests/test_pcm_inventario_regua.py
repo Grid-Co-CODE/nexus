@@ -20,6 +20,7 @@ from nexus.campo import visao
 from nexus.dados import fato_inventario as F
 from nexus.pcm.inventario import estoque as E
 from nexus.pcm.inventario import regua as R
+from test_pcm_inventario_estoque import _jwt, _result, api_do_clone  # noqa: F401  (api_do_clone é fixture)
 
 ALMOX, LIGADA = "900", "de-para do Fracttal"
 HMAC_CHAVE = "chave-de-teste"
@@ -345,13 +346,23 @@ def inv(app, banco, tmp_path, monkeypatch):  # noqa: F811
     return app
 
 
+def _pessoa_ms(app):
+    """Quem entrou pela conta Microsoft da Grid: não tem o login do Fracttal, e o portão não encerra a sessão por isso (a de quem
+    entrou pelo Fracttal cai se o pedido a /os chega sem o cookie dele). É quem a ponte atende sem o `os_sessao`."""
+    import time
+    c = _pessoa(app)
+    with c.session_transaction() as sessao:
+        sessao["via"], sessao["ms_ate"] = "microsoft", time.time() + 3600
+    return c
+
+
 def _estoque_da_sessao(monkeypatch, falso):
     monkeypatch.setattr(E, "estoque_da_sessao", lambda app: falso)
 
 
 def test_tela_mostra_o_quadro_e_o_formulario_do_pcm(inv, monkeypatch):
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa(inv)
+    c = _pessoa_ms(inv)
     html = c.get("/t/pcm/pecas/inventario/regua").get_data(as_text=True)
     assert "Mínimo e máximo" in html and "Almoxarifado 10" in html and "Almoxarifado 20" in html
     r = c.get("/t/pcm/pecas/inventario/regua?almox=10")
@@ -370,10 +381,10 @@ def test_so_o_setor_pcm_decide(inv, monkeypatch):
     falso = _falso()
     _estoque_da_sessao(monkeypatch, falso)
     corpo = {"almox": "10", "item": "1", "aco_min": "1", "aco_max": "9"}
-    c = _pessoa(inv)
+    c = _pessoa_ms(inv)
     _no_setor(monkeypatch, "Performance")
     assert c.post("/t/pcm/pecas/inventario/regua/decidir", data=corpo).status_code == 403
-    assert c.post("/t/pcm/pecas/inventario/regua/gravar", data={"almox": "10", "item": "1"}).status_code == 403
+    assert c.post("/os/_nexus/inventario/regua/gravar", data={"almox": "10", "item": "1"}).status_code == 403
     _no_setor(monkeypatch, "Responsáveis UFV")                       # os supervisores veem o Quadro, mas régua é do PCM
     assert c.post("/t/pcm/pecas/inventario/regua/decidir", data=corpo).status_code == 403
     assert falso.chamadas == [] and F.ler(inv.config, forcar=True)[F.ABA_REGUA] == []
@@ -388,7 +399,7 @@ def test_tela_de_quem_so_olha_nao_tem_botao(inv, monkeypatch):
     """Quem vê a tela por outro setor lê a régua (os números registrados em texto) e não tem formulário nem botão."""
     from nexus.pcm import telas
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa(inv)
+    c = _pessoa_ms(inv)
     assert c.post("/t/pcm/pecas/inventario/regua/decidir",
                   data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9", "rec_max": "5"}).status_code == 303
     monkeypatch.setattr(telas, "pode_programar", lambda: False)
@@ -400,7 +411,7 @@ def test_tela_de_quem_so_olha_nao_tem_botao(inv, monkeypatch):
 
 def test_decidir_pela_tela_grava_e_volta_para_o_almoxarifado(inv, monkeypatch):
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa(inv)
+    c = _pessoa_ms(inv)
     r = c.post("/t/pcm/pecas/inventario/regua/decidir", data={
         "almox": "10", "item": "1", "rec_min": "1", "rec_max": "4", "aco_min": "2,5", "aco_max": "9"})
     assert r.status_code == 303 and r.headers["Location"].endswith("/t/pcm/pecas/inventario/regua?almox=10")
@@ -415,7 +426,7 @@ def test_decidir_pela_tela_grava_e_volta_para_o_almoxarifado(inv, monkeypatch):
 
 def test_minimo_acima_do_maximo_e_400_e_nao_grava(inv, monkeypatch):
     _no_setor(monkeypatch, "PCM")
-    r = _pessoa(inv).post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1",
+    r = _pessoa_ms(inv).post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1",
                                                                         "aco_min": "9", "aco_max": "2"})
     assert r.status_code == 400 and "mínimo" in r.get_data(as_text=True).lower()
     assert F.ler(inv.config, forcar=True)[F.ABA_REGUA] == []
@@ -423,53 +434,65 @@ def test_minimo_acima_do_maximo_e_400_e_nao_grava(inv, monkeypatch):
 
 def test_peca_de_outro_almoxarifado_e_400(inv, monkeypatch):
     _no_setor(monkeypatch, "PCM")
-    r = _pessoa(inv).post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "3",
+    r = _pessoa_ms(inv).post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "3",
                                                                         "aco_min": "1", "aco_max": "2"})
     assert r.status_code == 400 and F.ler(inv.config, forcar=True)[F.ABA_REGUA] == []
 
 
-def test_gravar_pela_tela_usa_o_login_de_quem_aprova(inv, monkeypatch):
-    """O Fracttal é o da sessão de quem apertou (`estoque_da_sessao`); a tela só grava o que está no livro."""
+PONTE = "/os/_nexus/inventario/regua/gravar"
+
+
+def test_gravar_pela_ponte_usa_o_login_de_quem_aprova(inv, monkeypatch):
+    """O Fracttal é o da sessão de quem apertou (`estoque_da_sessao`); a ponte só grava o que está no livro, e a página mostra o
+    aviso quando recarrega."""
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa(inv)
+    c = _pessoa_ms(inv)
     corpo = {"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"}
     assert c.post("/t/pcm/pecas/inventario/regua/decidir", data=corpo).status_code == 303
     assert falso.chamadas == []
-    r = c.post("/t/pcm/pecas/inventario/regua/gravar", data={"almox": "10", "item": "1"})
-    assert r.status_code == 303
+    r = c.post(PONTE, data={"almox": "10", "item": "1"})
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+    assert r.get_json()["volta"].endswith("/t/pcm/pecas/inventario/regua?almox=10")
     assert falso.chamadas == ["ler", "definir_regua", "ler"]
     assert (falso.ler("10")["1"]["minimo"], falso.ler("10")["1"]["maximo"]) == (2.0, 9.0)
-    html = c.get(r.headers["Location"]).get_data(as_text=True)
+    html = c.get(r.get_json()["volta"]).get_data(as_text=True)
     assert "régua gravada no fracttal: mínimo 2, máximo 9" in html.lower()
+
+
+def test_a_gravacao_nao_e_mais_uma_rota_de_t_pcm(inv, monkeypatch):
+    """O que fala com o Fracttal mora na ponte; em /t/pcm o login do Fracttal nunca chega."""
+    _no_setor(monkeypatch, "PCM")
+    assert _pessoa_ms(inv).post("/t/pcm/pecas/inventario/regua/gravar", data={"almox": "10", "item": "1"}).status_code == 404
 
 
 def test_gravar_sem_o_acordado_e_409(inv, monkeypatch):
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    r = _pessoa(inv).post("/t/pcm/pecas/inventario/regua/gravar", data={"almox": "10", "item": "1"})
-    assert r.status_code == 409 and "acordad" in r.get_data(as_text=True).lower() and falso.chamadas == []
+    r = _pessoa_ms(inv).post(PONTE, data={"almox": "10", "item": "1"})
+    assert r.status_code == 409 and "acordad" in r.get_json()["erro"].lower() and falso.chamadas == []
 
 
 def test_quem_entrou_pela_senha_nao_grava_no_fracttal(inv, logado, monkeypatch):
-    """Sem o login do Fracttal na sessão (a senha de administrador não tem) a gravação para antes de qualquer pedido, e a
-    tela diz por quê. Registrar a decisão no Nexus continua valendo."""
+    """Sem o login do Fracttal na sessão (a senha de administrador não tem) a gravação para antes de qualquer pedido: 401 com o
+    link do login do Fracttal (o `/os/login`, com a volta à página). Registrar a decisão no Nexus continua valendo."""
     assert logado.post("/t/pcm/pecas/inventario/regua/decidir",
                        data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"}).status_code == 303
-    r = logado.post("/t/pcm/pecas/inventario/regua/gravar", data={"almox": "10", "item": "1"})
-    assert r.status_code == 401 and "Fracttal" in r.get_data(as_text=True)
+    r = logado.post(PONTE, data={"almox": "10", "item": "1"})
+    assert r.status_code == 401 and "Fracttal" in r.get_json()["erro"]
+    assert "/os/login?next=" in r.get_json()["login"] and "voltar" in r.get_json()["login"]
 
 
 def test_limite_do_fracttal_e_429_com_o_que_fazer(inv, monkeypatch):
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}}, limite_em=1)
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa(inv)
+    c = _pessoa_ms(inv)
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
-    r = c.post("/t/pcm/pecas/inventario/regua/gravar", data={"almox": "10", "item": "1"})
-    assert r.status_code == 429 and "tente de novo" in r.get_data(as_text=True).lower()
+    r = c.post(PONTE, data={"almox": "10", "item": "1"})
+    assert r.status_code == 429 and "tente de novo" in r.get_json()["erro"].lower()
 
 
 def test_resposta_perdida_do_fracttal_grava_de_novo_sem_duplicar(inv, monkeypatch):
@@ -479,23 +502,83 @@ def test_resposta_perdida_do_fracttal_grava_de_novo_sem_duplicar(inv, monkeypatc
                          perder_resposta={"definir_regua"})
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa(inv)
+    c = _pessoa_ms(inv)
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
-    r = c.post("/t/pcm/pecas/inventario/regua/gravar", data={"almox": "10", "item": "1"})
-    assert r.status_code == 502 and "grave de novo" in r.get_data(as_text=True)
+    r = c.post(PONTE, data={"almox": "10", "item": "1"})
+    assert r.status_code == 502 and "grave de novo" in r.get_json()["erro"]
     assert F.ler(inv.config, forcar=True)[F.ABA_EVENTO] == []             # nada anotado como gravado
-    r = c.post("/t/pcm/pecas/inventario/regua/gravar", data={"almox": "10", "item": "1"})
-    assert r.status_code == 303
+    r = c.post(PONTE, data={"almox": "10", "item": "1"})
+    assert r.status_code == 200
     assert [e["tipo"] for e in F.ler(inv.config, forcar=True)[F.ABA_EVENTO]] == ["regua_gravada"]
     assert (falso.ler("10")["1"]["minimo"], falso.ler("10")["1"]["maximo"]) == (2.0, 9.0)
 
 
+def _jwt_e_cookie(app):
+    """O cookie `os_sessao` como o login do Fracttal o grava (a sessão assinada do clone do OS Creator, com o JWT)."""
+    from nexus.torres.oscreator import ponte
+    clone = ponte.clone(app)
+    jwt = _jwt()
+    valor = clone.session_interface.get_signing_serializer(clone).dumps(
+        {"jwt": jwt, "conta": {"email": "pessoa@exemplo.test", "nome": "Pessoa"}})
+    return jwt, valor
+
+
+def test_o_login_do_fracttal_so_chega_na_ponte(inv, api_do_clone, monkeypatch):
+    """O defeito que a revisão achou: o cookie `os_sessao` (o JWT do Fracttal) é gravado com Path=/os, e o navegador não o manda
+    para /t/pcm. Aqui o `estoque_da_sessao` é o DE VERDADE (só a rede do `api` do clone é de mentira), o cookie vai com
+    Path=/os como o login o grava, e: a rota da ponte vê o login e grava no Fracttal; uma rota /t/pcm, com o mesmo cliente, não
+    vê (a sonda chama o mesmo `estoque_da_sessao` e leva `SemLogin`)."""
+    @inv.route("/t/pcm/pecas/inventario/_sonda")
+    def sonda():                        # uma rota de /t/pcm: o que o `estoque_da_sessao` veria ali
+        try:
+            E.estoque_da_sessao(inv)
+            return "viu o login"
+        except E.SemLogin:
+            return "sem login"
+
+    pedidos = []
+    nivel = {"min": 1.0, "max": 3.0}
+
+    def post(url, headers=None, json=None, timeout=None):
+        metodo = json[0]["method"]
+        pedidos.append((metodo, headers["Authorization"]))
+        if metodo == "inventories.warehouses_items_stock":
+            return _result({"success": True, "total": 1, "data": [{
+                "id": 777, "id_item": 1, "code": "SP-1", "stock": 1, "min_stock_level": nivel["min"],
+                "max_stock_level": nivel["max"]}]})
+        assert metodo == "inventories.warehouses_items_update", metodo
+        nivel.update(min=float(json[0]["params"]["min_stock_level"]), max=float(json[0]["params"]["max_stock_level"]))
+        return _result({"success": True, "data": None})
+    monkeypatch.setattr(api_do_clone.requests, "post", post)
+    monkeypatch.setattr(E, "RITMO", E.Ritmo(dormir=lambda s: None))           # sem esperar o 1 pedido por segundo de verdade
+    jwt, cookie = _jwt_e_cookie(inv)
+    _no_setor(monkeypatch, "PCM")
+    c = _pessoa(inv)                                                           # a sessão nasceu do login do Fracttal
+    c.set_cookie("os_sessao", cookie, path="/os")                              # como o login do Fracttal o grava
+    assert c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2",
+                                                                   "aco_max": "9"}).status_code == 303
+    assert c.get("/t/pcm/pecas/inventario/_sonda").get_data(as_text=True) == "sem login"
+    assert pedidos == []
+    r = c.post(PONTE, data={"almox": "10", "item": "1"})
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+    assert [m for m, _ in pedidos] == ["inventories.warehouses_items_stock", "inventories.warehouses_items_update",
+                                       "inventories.warehouses_items_stock"]
+    assert {h for _, h in pedidos} == {f"Bearer {jwt}"}                        # no login de quem apertou
+    assert nivel == {"min": 2.0, "max": 9.0}
+    assert [e["tipo"] for e in F.ler(inv.config, forcar=True)[F.ABA_EVENTO]] == ["regua_gravada"]
+    # sem o cookie (a senha de administrador, ou o login que venceu), a mesma ponte responde 401 com o link do login
+    r = _pessoa_ms(inv).post(PONTE, data={"almox": "10", "item": "1"})
+    assert r.status_code == 401 and "/os/login" in r.get_json()["login"]
+
+
 def test_pedido_de_outro_site_e_recusado(inv, monkeypatch):
     _no_setor(monkeypatch, "PCM")
-    r = _pessoa(inv).post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "1",
+    r = _pessoa_ms(inv).post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "1",
                                                                         "aco_max": "2"},
                           headers={"Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 403
+    r = _pessoa_ms(inv).post(PONTE, data={"almox": "10", "item": "1"}, headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403 and "erro" in r.get_json()
 
 
 def test_sem_cor_fora_de_token_nem_endereco_da_raiz():
@@ -503,8 +586,10 @@ def test_sem_cor_fora_de_token_nem_endereco_da_raiz():
     t = (RAIZ / "nexus" / "templates" / "pcm" / "inventario_regua.html").read_text("utf-8")
     assert not re.search(r"#[0-9a-fA-F]{3,8}", t) and "rgba(" not in t
     assert not re.search(r"""(href|action|src)="/""", t)
-    js = (RAIZ / "nexus" / "static" / "pcm-regua.js").read_text("utf-8")
-    assert not re.search(r"""["']/t/""", js)
+    for nome in ("pcm-regua.js", "pcm-ponte-inventario.js"):
+        js = (RAIZ / "nexus" / "static" / nome).read_text("utf-8")
+        assert not re.search(r"""["']/(t|os)/""", js)                      # o endereço vem do action, por nexusRota()
+    assert 'action="{{ raiz }}/os/_nexus/inventario/regua/gravar"' in t and "data-ponte" in t
     css = (RAIZ / "nexus" / "static" / "pcm.css").read_text("utf-8")
     bloco = css[css.index("/* ── Régua de mínimo e máximo"):]
     proximo = bloco.find("/* ── ", 10)
