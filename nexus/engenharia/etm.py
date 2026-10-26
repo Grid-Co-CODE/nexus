@@ -5,7 +5,8 @@ docs/superpowers/specs/2026-10-26-engenharia-etm-design.md.
 Leitura (medida em 26/10/2026, só leitura): `items?field_1=Estação Meteorológica` dá as ETMs (172, duas páginas; a
 descrição confere) e `work_orders?items_log_description=Estação Meteorológica` as OS delas (1213, 13 páginas; o filtro é
 por trecho). Fica a OS cujo código é de uma ETM: 15 pedidos por leitura, contra os 172 do app (um por ETM). As linhas do
-REST são por tarefa; a tela é por OS (o número), como o Quadro da equipe, e o cartão é o dele (`os_equipe._cartao`).
+REST são por tarefa; a tela é por OS (o número), como o Quadro da equipe, e o cartão é o dele (`os_equipe._cartao`). A
+usina de cada ETM (o `groups_1_description` do ativo) dá as usinas do Histórico, com quantas ETMs cada uma tem.
 
 Engenharia, Chamados e Campo (Levi, 26/10/2026: "Engenharia e Chamados vai pelas pessoas dos setores, Campo é o
 restante!"): o setor de quem está com a OS, pelo id do Fracttal, nos setores de Base → Acessos → Pessoas e setores (livro
@@ -41,7 +42,10 @@ COLUNAS = (("nao_iniciada", "Não iniciadas"), ("em_andamento", "Em andamento"),
 # a coluna do quadro da equipe → a do Planner do app (a verificação ainda não fechou: está em andamento)
 _DA_COLUNA = {"fazer": "nao_iniciada", "execucao": "em_andamento", "verificacao": "em_andamento",
               "concluida": "finalizada", "cancelada": "cancelada"}
-_EST = {"ts": 0.0, "os": [], "etms": set(), "lendo": False, "erro": "", "erro_em": 0.0, "usado": 0.0,
+SEM_USINA = "Usina não identificada"
+UFS = frozenset("AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split())
+# "etms" = {código da ETM: a usina dela no Fracttal}; "usinas" = {usina: quantas ETMs} (o Histórico lista por elas)
+_EST = {"ts": 0.0, "os": [], "etms": {}, "usinas": {}, "lendo": False, "erro": "", "erro_em": 0.0, "usado": 0.0,
         "erro_setores": ""}
 _TRAVA = threading.Lock()
 
@@ -57,6 +61,22 @@ def cliente_de(usina) -> str:
     if not u:
         return "Não identificado"
     return u.split(" - ", 1)[0].strip() or u
+
+
+def usina_curta(usina) -> str:
+    """O nome da usina sem o cliente e o estado (Levi, 26/10/2026: "o nome da usina está vindo completo, o ideal seria
+    sem a informação do nome do cliente e estado!"): do "Cliente - Usina - UF" do Fracttal fica o meio. Se não sobra
+    nada ("Cliente - MG"), o nome inteiro."""
+    u = " ".join(str(usina or "").split())
+    if not u:
+        return SEM_USINA
+    partes = [p.strip() for p in u.split(" - ")]
+    if len(partes) == 1:
+        return u
+    meio = partes[1:]
+    if meio[-1].upper() in UFS:
+        meio = meio[:-1]
+    return " - ".join(meio) or u
 
 
 def coluna_etm(coluna: str) -> str:
@@ -163,9 +183,11 @@ def _paginas(path: str, teto: int) -> list[dict]:
     raise RuntimeError(f"a leitura passou do teto de {teto} páginas de {path.split('?')[0]}: nada foi trocado")
 
 
-def _ler_etms() -> set:
+def _ler_etms() -> dict:
+    """{código da ETM: a usina dela} (o `groups_1_description` do ativo, o mesmo que o app de ETM agrupava)."""
     alvo = os_equipe._norm(ETM)
-    return {_limpo(i.get("code")) for i in _paginas(f"items?field_1={quote(ETM)}", TETO_ETMS)
+    return {_limpo(i.get("code")): _limpo(i.get("groups_1_description")) or SEM_USINA
+            for i in _paginas(f"items?field_1={quote(ETM)}", TETO_ETMS)
             if i.get("code") and alvo in os_equipe._norm(i.get("description"))}
 
 
@@ -176,7 +198,11 @@ def _reler(app):
             etms = _ler_etms()
             linhas = _paginas(f"work_orders?items_log_description={quote(ETM)}", TETO_OS)
             oss = montar(linhas, etms, setores, datetime.now(BRT).date())
-            _EST.update(os=oss, etms=etms, ts=time.time(), erro="", erro_em=0.0, erro_setores=erro_setores)
+            usinas: dict = {}
+            for u in etms.values():
+                usinas[u] = usinas.get(u, 0) + 1
+            _EST.update(os=oss, etms=etms, usinas=usinas, ts=time.time(), erro="", erro_em=0.0,
+                        erro_setores=erro_setores)
     except Exception as e:      # noqa: BLE001 — 429 ou rede: fica a leitura anterior, e a tela diz
         _EST.update(erro=str(e)[:200], erro_em=time.time())
     finally:
@@ -228,8 +254,8 @@ def manter_quente(app):
 
 
 def dados() -> dict:
-    return {"os": list(_EST["os"]), "lido": _EST["ts"], "lendo": _EST["lendo"], "erro": _EST["erro"],
-            "erro_setores": _EST["erro_setores"]}
+    return {"os": list(_EST["os"]), "usinas": dict(_EST["usinas"]), "lido": _EST["ts"], "lendo": _EST["lendo"],
+            "erro": _EST["erro"], "erro_setores": _EST["erro_setores"]}
 
 
 def eh_etm(codigo) -> bool | None:
@@ -240,4 +266,4 @@ def eh_etm(codigo) -> bool | None:
 
 
 def limpar():
-    _EST.update(ts=0.0, os=[], etms=set(), lendo=False, erro="", erro_em=0.0, usado=0.0, erro_setores="")
+    _EST.update(ts=0.0, os=[], etms={}, usinas={}, lendo=False, erro="", erro_em=0.0, usado=0.0, erro_setores="")

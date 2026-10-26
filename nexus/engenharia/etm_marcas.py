@@ -242,6 +242,28 @@ def marcar(os_: dict, evento: str, valor, usuario, pode: bool) -> dict:
     return {"aviso": aviso[0].upper() + aviso[1:], "evento": novo}
 
 
+def finalizar_lote(oss: list[dict], usuario, pode: bool) -> dict:
+    """O "Finalizar pela Engenharia" de várias OS de uma vez (o botão do quadro da usina nas Estações em Aberto, como no
+    app): só as que o livro relido agora ainda tem sem diagnóstico nem o finalizado; uma gravação só. Devolve
+    {"feitas", "ja"} com os números das OS."""
+    quem = AC._quem(usuario, pode, "finaliza as OS de ETM")
+    cofre = AC._cofre()
+    feitas, ja, novos = [], [], []
+    with _TRAVA:
+        lido = _reler()
+        est = estado(lido["eventos"])
+        for o in oss:
+            atual = est.get(str(_int(o.get("wid")))) or {}
+            if atual.get("diagnostico_id") or atual.get("finalizado"):
+                ja.append(_txt(o.get("folio")))
+                continue
+            novos.append(_evento(cofre, "finalizado", quem, o, ligado=True))
+            feitas.append(_txt(o.get("folio")))
+        if novos:
+            _publicar(lido["eventos"] + novos)
+    return {"feitas": feitas, "ja": ja}
+
+
 def importar_marcas(itens: list[dict], origem: str) -> int:
     """As marcações trazidas de outro lugar (as labels do app de ETM), com a data de lá. Só as que o livro não tem, pelo
     `origem_id`; uma gravação só. Devolve quantas entraram."""

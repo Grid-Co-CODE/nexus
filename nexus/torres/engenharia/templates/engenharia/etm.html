@@ -4,10 +4,12 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
 {# A tela ETMs (Levi, 26/10/2026: "Quero que inclua essa visão de ETMs no Nexus, engenharia, aba própria. Deixe o design
-   alá Nexus!"): o Planner do app de ETM da Engenharia no desenho do Quadro da equipe. As colunas e os filtros são os do
-   app (cliente, usina, criado por, solicitante, responsável, Engenharia, Chamados ou Campo, o período em que a OS esteve
-   ativa, as canceladas e, na coluna Em andamento, as etiquetas), montados no navegador a partir do JSON abaixo. A
-   leitura está em nexus/engenharia/etm.py e as marcações em nexus/engenharia/etm_marcas.py; o clique abre a OS da ETM. #}
+   alá Nexus!"): as abas do app de ETM da Engenharia no desenho do Nexus, montadas no navegador a partir do JSON abaixo.
+   O Planner (as colunas e os filtros do app: cliente, usina, Engenharia, Chamados ou Campo, o status da OS, quem criou, o
+   responsável, o período em que a OS esteve ativa e, na coluna Em andamento, as etiquetas), o Histórico (cliente → usina
+   → OS, com o chat da usina) e as Estações em Aberto (as usinas com OS aberta para a Engenharia e as em acompanhamento,
+   com o quadro de cada usina e o Finalizar pela Engenharia em lote). A leitura está em nexus/engenharia/etm.py e as
+   marcações em nexus/engenharia/etm_marcas.py; o clique numa OS abre a OS da ETM. #}
 <div class="campo-nativa kb etm">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · ETMs</p>
@@ -31,11 +33,20 @@
     </div>{% endfor %}
   </section>
 
-  {# os filtros à esquerda e o quadro ao lado (Levi, 26/10/2026: "o estilo de lista dos filtros está todo bugado e torto,
-     deixe no nível do nexus!" e "tem um espaço livre do lado esquerdo que está sendo mau utilizado"): a coluna e o
-     seletor do Acompanhamento PCM (a busca, as caixas de marcar com a conta de cada opção, Selecionar todos, Limpar e
-     Aplicar); a lista do navegador (datalist) saiu. Abaixo de 1100 px a coluna sobe para cima do quadro. #}
-  <div class="etm-app">
+  {# as abas do app (Levi, 26/10/2026: "sinto falta daquelas outras seções também. A de histórico, e a de ETMs em aberto.
+     Elas são bem interessantes para visualização histórica e atual. o deploy que te mandei tinham abas só disso!"). A aba,
+     a usina aberta e os filtros ficam guardados na aba do navegador: a volta da OS cai no mesmo lugar. #}
+  <nav class="cn-abas etm-abas" id="etm-abas" aria-label="Visões das ETMs">
+    <a href="#planner" data-aba="planner" aria-current="page">Planner</a>
+    <a href="#historico" data-aba="historico">Histórico</a>
+    <a href="#abertas" data-aba="abertas">Estações em Aberto<i id="etm-n-abertas" hidden></i></a>
+  </nav>
+
+  {# o Planner e as Estações em Aberto dividem a coluna de filtros à esquerda (Levi, 26/10/2026: "o estilo de lista dos
+     filtros está todo bugado e torto, deixe no nível do nexus!", "tem um espaço livre do lado esquerdo que está sendo mau
+     utilizado" e "não precisa desse botão "aplicar" clicou já filtrou!"): o seletor do Acompanhamento PCM, que filtra no
+     clique. Abaixo de 1100 px a coluna sobe para cima do quadro. #}
+  <div class="etm-app" id="etm-app">
     <aside class="etm-lado" aria-label="Filtros">
       <h2 class="gc-rotulo">Filtros</h2>
       <div class="etm-busca">
@@ -48,18 +59,83 @@
         <input type="date" class="gc-campo" id="etm-f-ini" aria-label="De"><input type="date" class="gc-campo" id="etm-f-fim" aria-label="Até"></div>
       <button class="gc-btn gc-btn--contorno etm-limpar" id="etm-f-limpar" type="button"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i>Redefinir filtros</button>
       <div class="etm-lado-nota"><span id="etm-mostrando"></span>
-        <span>Os filtros se cruzam: o número ao lado de cada opção diz quantas OS ela traz com os outros filtros. Sem marcar o status, as canceladas ficam de fora.</span></div>
+        <span data-nota="planner">Os filtros se cruzam: o número ao lado de cada opção diz quantas OS ela traz com os outros filtros. Sem marcar o status, as canceladas ficam de fora.</span>
+        <span data-nota="abertas" hidden>Os filtros valem para as estações e para o quadro de cada usina. O status da OS fica de fora: aqui vale a regra da aba.</span></div>
     </aside>
     <div class="etm-main">
-      {# as etiquetas da Engenharia filtram a coluna Em andamento, como no app (o JS põe os botões no cabeçalho dela) #}
-      <template id="etm-etiquetas">{% for n in etiquetas_eng %}<button type="button" class="etm-chip etm-chip--p" data-etiqueta="{{ n }}" aria-pressed="false">{{ n }}</button>{% endfor %}</template>
-      <div class="kb-quadro" aria-live="polite"></div>
-      <p class="mudo kb-rodape">Coluna: Não iniciadas = a OS aberta sem nenhuma tarefa começada; Em andamento = alguma tarefa
-        começou ou a OS espera a verificação; Finalizadas e Canceladas, como no Fracttal. Engenharia e Chamados = a OS está
-        com alguém desses setores (Base → Acessos → Pessoas e setores); o resto é Campo. "Abertas para a Engenharia" só
-        saem com o diagnóstico ou o finalizado pela Engenharia, não quando o Fracttal fecha a tarefa.</p>
+      <section class="etm-painel" id="etm-p-planner" aria-label="Planner">
+        {# as etiquetas da Engenharia filtram a coluna Em andamento, como no app (o JS põe os botões no cabeçalho dela) #}
+        <template id="etm-etiquetas">{% for n in etiquetas_eng %}<button type="button" class="etm-chip etm-chip--p" data-etiqueta="{{ n }}" aria-pressed="false">{{ n }}</button>{% endfor %}</template>
+        <div class="kb-quadro" id="etm-quadro" aria-live="polite"></div>
+        <p class="mudo kb-rodape">Coluna: Não iniciadas = a OS aberta sem nenhuma tarefa começada; Em andamento = alguma tarefa
+          começou ou a OS espera a verificação; Finalizadas e Canceladas, como no Fracttal. Engenharia e Chamados = a OS está
+          com alguém desses setores (Base → Acessos → Pessoas e setores); o resto é Campo. "Abertas para a Engenharia" só
+          saem com o diagnóstico ou o finalizado pela Engenharia, não quando o Fracttal fecha a tarefa.</p>
+      </section>
+
+      {# as Estações em Aberto do app: as usinas com OS aberta para a Engenharia (o tempo é o da OS mais antiga) e, logo
+         abaixo, as em acompanhamento; o clique abre o quadro da usina, com o Finalizar pela Engenharia em lote #}
+      <section class="etm-painel" id="etm-p-abertas" aria-label="Estações em Aberto" hidden>
+        <div id="etm-ab-lista">
+          <div class="etm-sec-cab"><h2 class="etm-sec-tit">Estações em Aberto</h2><span class="etm-sec-n" id="etm-ab-n"></span></div>
+          <p class="etm-sec-dica">As usinas com OS aberta para a Engenharia: a OS sai daqui com o diagnóstico ou o finalizado
+            pela Engenharia, não quando o Fracttal fecha a tarefa. O tempo em aberto é o da OS mais antiga.</p>
+          <div class="etm-usinas" id="etm-ab-grade"></div>
+          <div class="etm-sec-cab etm-sec-cab--2"><h2 class="etm-sec-tit">Estações em Acompanhamento</h2><span class="etm-sec-n" id="etm-ac-n"></span></div>
+          <p class="etm-sec-dica">As usinas com OS marcada Em acompanhamento: em geral já fechada no Fracttal, com uma
+            pendência (a garantia, por exemplo) que a Engenharia segue por aqui.</p>
+          <div class="etm-usinas" id="etm-ac-grade"></div>
+        </div>
+        <div id="etm-ab-usina" hidden>
+          <button type="button" class="etm-volta" id="etm-ab-volta"><i class="ph ph-arrow-left" aria-hidden="true"></i>Estações em Aberto</button>
+          <div class="etm-usina-cab">
+            <div><p class="gc-eyebrow" id="etm-ab-cliente"></p><h2 class="etm-usina-tit" id="etm-ab-titulo"></h2><p class="etm-usina-sub" id="etm-ab-sub"></p></div>
+            <div class="etm-usina-acoes">
+              {% if pode %}<button type="button" class="gc-btn gc-btn--primario" id="etm-ab-finalizar"><i class="ph ph-check-circle" aria-hidden="true"></i><span>Finalizar pela Engenharia</span></button>{% endif %}
+              <button type="button" class="gc-btn gc-btn--contorno" id="etm-ab-hist"><span>Ver histórico desta usina</span><i class="ph ph-arrow-right" aria-hidden="true"></i></button>
+            </div>
+          </div>
+          <p class="eg-pdf-msg" id="etm-ab-msg" role="status" hidden></p>
+          <div class="kb-quadro" id="etm-ab-quadro" aria-live="polite"></div>
+        </div>
+      </section>
     </div>
   </div>
+
+  {# o Histórico do app: os clientes, as usinas de cada um (com quantas ETMs e OS) e a lista das OS da usina, com o
+     período, as canceladas e o chat da usina (os comentários de todas as OS dela). Sem a coluna de filtros: a navegação
+     é a do app. #}
+  <section class="etm-painel etm-historico" id="etm-p-historico" aria-label="Histórico" hidden>
+    <nav class="etm-trilha" id="etm-h-trilha" aria-label="Onde você está"></nav>
+    <div id="etm-h-grade-box">
+      <div class="etm-sec-cab"><h2 class="etm-sec-tit" id="etm-h-tit">Clientes</h2><span class="etm-sec-n" id="etm-h-n"></span>
+        <div class="etm-busca-campo etm-h-busca"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+          <input class="gc-campo" id="etm-h-busca" type="search" placeholder="Buscar usina…" aria-label="Buscar usina" autocomplete="off"></div></div>
+      <div class="etm-usinas" id="etm-h-grade"></div>
+    </div>
+    <div id="etm-h-usina" hidden>
+      <div class="etm-usina-cab">
+        <div><p class="gc-eyebrow" id="etm-h-cliente"></p><h2 class="etm-usina-tit" id="etm-h-titulo"></h2><p class="etm-usina-sub" id="etm-h-sub"></p></div>
+        <div class="etm-usina-acoes"><button type="button" class="gc-btn gc-btn--contorno" id="etm-h-chat"><i class="ph ph-chats-circle" aria-hidden="true"></i><span>Chat da usina</span></button></div>
+      </div>
+      <div class="etm-h-filtros">
+        <span class="gc-rotulo">OS ativa entre</span>
+        <input type="date" class="gc-campo" id="etm-h-ini" aria-label="De"><input type="date" class="gc-campo" id="etm-h-fim" aria-label="Até">
+        <label class="etm-h-canc"><input type="checkbox" id="etm-h-canceladas">Mostrar canceladas</label>
+      </div>
+      <div class="etm-h-lista" id="etm-h-lista" aria-live="polite"></div>
+    </div>
+  </section>
+
+  {# o chat da usina: os comentários da Engenharia em todas as OS dela, lidos no clique #}
+  <div class="eg-veu" id="etm-chat-veu" hidden></div>
+  <aside class="eg-gaveta etm-chat" id="etm-chat" role="dialog" aria-modal="true" aria-labelledby="etm-chat-tit" hidden>
+    <button type="button" class="eg-gav-fechar" aria-label="Fechar">×</button>
+    <div class="eg-gav-cab"><div><h2 id="etm-chat-tit">Chat da usina</h2><p id="etm-chat-sub"></p></div></div>
+    <p class="eg-dica" id="etm-chat-status" role="status"></p>
+    <ol class="etm-chat-lista" id="etm-chat-lista"></ol>
+  </aside>
+
   {% if admin %}
   {# o histórico do app de ETM, trazido uma vez (Levi, 26/10/2026: "Traz 1 vez, para as OSs em aberto bota esses
      comentários na nota da OS"): lê o repositório do app, mostra a prévia e grava; roda por trás, e a tela acompanha #}
@@ -73,77 +149,147 @@
   </details>
   {% endif %}
 </div>
-<script type="application/json" id="etm-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "sem_marcas": erro_marcas != "", "nunca_lido": nunca_lido, "status": status}|tojson }}</script>
+<script type="application/json" id="etm-dados">{{ {"oss": oss, "usinas": usinas, "colunas": colunas, "hoje": hoje, "sem_marcas": erro_marcas != "", "nunca_lido": nunca_lido, "status": status, "pode": pode}|tojson }}</script>
 <script>
 (function () {
   var D = JSON.parse(document.getElementById('etm-dados').textContent);
-  var quadro = document.querySelector('.kb-quadro');
   // as colunas do app com as cores das do Quadro da equipe
   var COR = {nao_iniciada: 'fazer', em_andamento: 'execucao', finalizada: 'concluida', cancelada: 'cancelada'};
   var ROT = {}; D.colunas.forEach(function (c) { ROT[c[0]] = c[1]; });
   var TRAB = {engenharia: 'Engenharia', chamados: 'Chamados', campo: 'Campo'};
-  // os filtros da coluna, na ordem do Planner do app; o status da OS (Levi, 26/10/2026: "Quero um filtro também para
-  // status da OS, se está em processo, concluída, em verificação etc") no lugar do "mostrar canceladas"
+  // o status da OS no Fracttal e a cor do selo dele (a lista do Histórico)
+  var COR_STATUS = {'Em Processo': 'info', 'Em Verificação': 'alerta', 'Concluída': 'ok', 'Cancelada': 'neutro'};
+  // as usinas: o nome curto, sem o cliente e o estado (Levi, 26/10/2026: "o nome da usina está vindo completo, o ideal
+  // seria sem a informação do nome do cliente e estado!"); duas usinas de clientes diferentes com o mesmo nome curto
+  // levam o cliente junto no filtro
+  var USINA = {};
+  D.usinas.forEach(function (u) { USINA[u.nome] = u; });
+  D.oss.forEach(function (o) { if (!USINA[o.usina]) USINA[o.usina] = {nome: o.usina, curta: o.usina_nome, cliente: o.cliente, etms: 0}; });
+  var REPETE = {};
+  Object.keys(USINA).forEach(function (n) { var c = USINA[n].curta; REPETE[c] = (REPETE[c] || 0) + 1; });
+  function nomeUsina(n) { var u = USINA[n]; if (!u) return n; return REPETE[u.curta] > 1 ? u.curta + ' · ' + u.cliente : u.curta; }
+  var N_OS = {}; D.oss.forEach(function (o) { N_OS[o.usina] = (N_OS[o.usina] || 0) + 1; });
+
+  // os filtros da coluna, na ordem do Planner do app (o Solicitante saiu: Levi, 26/10/2026, "tire o filtro do
+  // solicitante!"); o status da OS (Levi: "Quero um filtro também para status da OS, se está em processo, concluída, em
+  // verificação etc") vale só no Planner: nas Estações em Aberto a regra é a da aba
   var FILTROS = [
     {k: 'cliente', l: 'Cliente', i: 'buildings'},
-    {k: 'usina', l: 'Usina', i: 'solar-panel'},
+    {k: 'usina', l: 'Usina', i: 'solar-panel', rotf: nomeUsina},
     {k: 'trabalho', l: 'Tipo de trabalho', i: 'users-three', ordem: ['engenharia', 'chamados', 'campo'], rot: TRAB},
-    {k: 'status', l: 'Status da OS', i: 'flag', ordem: D.status, padrao: 'Sem as canceladas'},
+    {k: 'status', l: 'Status da OS', i: 'flag', ordem: D.status, padrao: 'Sem as canceladas', so: 'planner'},
     {k: 'criado_por', l: 'Criado por', i: 'user-plus'},
-    {k: 'solicitante', l: 'Solicitante', i: 'user-circle'},
     {k: 'responsavel', l: 'Responsável', i: 'user-gear'}
   ];
+  function rotulo(d, v) { return d.rotf ? d.rotf(v) : d.rot ? (d.rot[v] || v) : v; }
+  // as opções de cada filtro: a ordem dele ou os valores das OS, em ordem pelo que a tela mostra
+  var OPTS = {};
+  FILTROS.forEach(function (d) {
+    if (d.ordem) { OPTS[d.k] = d.ordem.slice(); return; }
+    var tem = {}; D.oss.forEach(function (o) { var v = String(o[d.k] || ''); if (v) tem[v] = true; });
+    OPTS[d.k] = Object.keys(tem).sort(function (a, b) { return rotulo(d, a).localeCompare(rotulo(d, b), 'pt'); });
+  });
   function novoEstado() {
     var f = {}; FILTROS.forEach(function (d) { f[d.k] = new Set(); });
     return {f: f, q: '', ini: '', fim: '', etiquetas: []};
   }
   var estado = novoEstado();
-  function fold(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
-
+  // a aba e onde ela está: o Histórico no cliente e na usina (com o período e as canceladas da lista), as Estações em
+  // Aberto na usina aberta
+  var ABAS = ['planner', 'historico', 'abertas'];
+  var vista = {aba: 'planner', cliente: '', usina: '', aberta: '', hIni: '', hFim: '', hCanc: false};
+  function fold(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function preencher(alvo, itens) { alvo.replaceChildren.apply(alvo, itens); }
+
+  // ── a aba do navegador lembra a vista e os filtros: a volta da OS (?atualizar=1) cai no mesmo lugar ──
+  var GUARDA = 'nexus-etm-vista';
+  function guardar() {
+    try {
+      var f = {}; FILTROS.forEach(function (d) { f[d.k] = Array.from(estado.f[d.k]); });
+      sessionStorage.setItem(GUARDA, JSON.stringify({vista: vista, f: f, q: estado.q, ini: estado.ini, fim: estado.fim,
+                                                      etiquetas: estado.etiquetas}));
+    } catch (e) { /* sem o armazenamento da aba: a tela funciona, só não lembra */ }
+  }
+  function restaurar() {
+    var s = null;
+    try { s = JSON.parse(sessionStorage.getItem(GUARDA) || 'null'); } catch (e) { s = null; }
+    if (s && s.vista) {
+      ['aba', 'cliente', 'usina', 'aberta', 'hIni', 'hFim'].forEach(function (k) { if (typeof s.vista[k] === 'string') vista[k] = s.vista[k]; });
+      vista.hCanc = !!s.vista.hCanc;
+      // só o que ainda existe nas OS: a usina que saiu da leitura não vira um filtro que esconde tudo
+      FILTROS.forEach(function (d) {
+        ((s.f && s.f[d.k]) || []).forEach(function (v) { if (OPTS[d.k].indexOf(v) >= 0) estado.f[d.k].add(v); });
+      });
+      estado.q = typeof s.q === 'string' ? s.q : '';
+      estado.ini = typeof s.ini === 'string' ? s.ini : '';
+      estado.fim = typeof s.fim === 'string' ? s.fim : '';
+      estado.etiquetas = Array.isArray(s.etiquetas) ? s.etiquetas.filter(function (x) { return typeof x === 'string'; }) : [];
+    }
+    var h = location.hash.replace('#', '');
+    if (ABAS.indexOf(h) >= 0) vista.aba = h;
+    if (ABAS.indexOf(vista.aba) < 0) vista.aba = 'planner';
+    if (vista.usina && !USINA[vista.usina]) vista.usina = '';
+    if (vista.aberta && !USINA[vista.aberta]) vista.aberta = '';
+    if (vista.cliente && !Object.keys(USINA).some(function (n) { return USINA[n].cliente === vista.cliente; })) vista.cliente = '';
+  }
+  function trocaHash() { try { history.replaceState(null, '', location.pathname + '#' + vista.aba); } catch (e) { /* sem history */ } }
+
   // "OS ativa entre" do app: criada até o fim do período e, se já fechou, fechada depois do começo dele
-  function ativaNoPeriodo(o) {
-    if (!estado.ini && !estado.fim) return true;
+  function ativaEntre(o, ini, fim) {
+    if (!ini && !fim) return true;
     if (!o.criada_dia) return true;
     var fechou = o.coluna === 'finalizada' || o.coluna === 'cancelada';
-    var fim = fechou ? (o.fim_dia || o.criada_dia) : '';
-    if (estado.fim && o.criada_dia > estado.fim) return false;
-    if (estado.ini && fim && fim < estado.ini) return false;
+    var f = fechou ? (o.fim_dia || o.criada_dia) : '';
+    if (fim && o.criada_dia > fim) return false;
+    if (ini && f && f < ini) return false;
     return true;
   }
-  // a OS passa nos filtros; `sem` é o filtro que não conta (a conta das opções dele, como no Acompanhamento PCM)
+  function ativo(d) { return !d.so || d.so === vista.aba; }
+  // a OS passa nos filtros; `sem` é o filtro que não conta (a conta das opções dele, como no Acompanhamento PCM). Nada
+  // marcado ou tudo marcado é Todos (no status, nada marcado deixa as canceladas de fora)
   function passa(o, sem) {
     for (var i = 0; i < FILTROS.length; i++) {
       var d = FILTROS[i], sel = estado.f[d.k];
-      if (d.k === sem) continue;
-      if (sel.size) { if (!sel.has(String(o[d.k] || ''))) return false; }
-      else if (d.k === 'status' && o.status === 'Cancelada') return false;     // sem marcar, as canceladas ficam de fora
+      if (d.k === sem || !ativo(d)) continue;
+      if (sel.size && sel.size < OPTS[d.k].length) { if (!sel.has(String(o[d.k] || ''))) return false; }
+      else if (!sel.size && d.k === 'status' && o.status === 'Cancelada') return false;
     }
     if (estado.q) {
       var h = fold([o.os, o.titulo, o.codigo, o.usina, o.cliente, o.responsavel, o.solicitante, o.criado_por].join(' '));
       if (!fold(estado.q).split(/\s+/).every(function (w) { return h.indexOf(w) >= 0; })) return false;
     }
-    return ativaNoPeriodo(o);
+    return ativaEntre(o, estado.ini, estado.fim);
   }
+  // aberta para a Engenharia (a regra das Estações em Aberto do app): sai com o diagnóstico ou o finalizado pela
+  // Engenharia, não quando o Fracttal fecha a tarefa
+  function abertaEng(o) { return o.coluna !== 'cancelada' && !o.diagnostico && !o.finalizado; }
+  // as OS que a aba conta nos filtros
+  function universo() {
+    if (vista.aba !== 'abertas') return D.oss;
+    if (vista.aberta) return D.oss.filter(function (o) { return o.usina === vista.aberta; });
+    return D.oss.filter(function (o) { return abertaEng(o) || o.acompanhamento; });
+  }
+
   // ── o seletor de cada filtro (o do Acompanhamento PCM): o botão com o valor e o painel com a busca, as caixas de
-  //    marcar com a conta, Selecionar todos, Limpar, Cancelar e Aplicar ──
-  var aberto = null;
+  //    marcar com a conta, Selecionar todos e Limpar. Sem Aplicar (Levi, 26/10/2026: "não precisa desse botão "aplicar"
+  //    clicou já filtrou!"): a caixa marcada filtra na hora e o painel fica aberto para marcar outra ──
+  var aberto = null, manter = null;
   function fechar() { if (aberto) { aberto.hidden = true; aberto.previousElementSibling.setAttribute('aria-expanded', 'false'); aberto = null; } }
   document.addEventListener('click', fechar);
-  function rotulo(d, v) { return d.rot ? (d.rot[v] || v) : v; }
   function seletor(d) {
-    var sel = estado.f[d.k], conta = {};
-    D.oss.filter(function (o) { return passa(o, d.k); }).forEach(function (o) { var v = String(o[d.k] || ''); if (v) conta[v] = (conta[v] || 0) + 1; });
-    var tem = {}; D.oss.forEach(function (o) { var v = String(o[d.k] || ''); if (v) tem[v] = true; });
-    var opts = d.ordem ? d.ordem.slice() : Object.keys(tem).sort(function (a, b) { return a.localeCompare(b, 'pt'); });
+    var sel = estado.f[d.k], conta = {}, opts = OPTS[d.k];
     if (!opts.length) return null;
-    var w = el('div', 'etm-ms' + (sel.size ? ' on' : ''));
+    universo().filter(function (o) { return passa(o, d.k); }).forEach(function (o) { var v = String(o[d.k] || ''); if (v) conta[v] = (conta[v] || 0) + 1; });
+    var tudo = sel.size === opts.length;
+    var w = el('div', 'etm-ms' + (sel.size && !tudo ? ' on' : ''));
+    w.dataset.k = d.k;
     var lid = 'etm-ms-' + d.k + '-l';
     var lab = el('span', 'gc-rotulo', d.l); lab.id = lid; w.appendChild(lab);
     var b = el('button', 'etm-ms-bt'); b.type = 'button';
     b.setAttribute('aria-haspopup', 'listbox'); b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-labelledby', lid);
-    var v = sel.size === 0 ? (d.padrao || 'Todos') : sel.size === 1 ? rotulo(d, Array.from(sel)[0]) : sel.size + ' selecionados';
-    b.title = sel.size ? Array.from(sel).map(function (x) { return rotulo(d, x); }).join(', ') : v;
+    var v = sel.size === 0 ? (d.padrao || 'Todos') : tudo ? 'Todos' : sel.size === 1 ? rotulo(d, Array.from(sel)[0]) : sel.size + ' selecionados';
+    b.title = sel.size && !tudo ? Array.from(sel).map(function (x) { return rotulo(d, x); }).join(', ') : v;
     var ic = el('i', 'ph ph-' + d.i); ic.setAttribute('aria-hidden', 'true'); b.appendChild(ic);
     b.appendChild(el('span', 'val', v));
     var car = el('i', 'ph ph-caret-down'); car.setAttribute('aria-hidden', 'true'); b.appendChild(car);
@@ -166,11 +312,13 @@
       lista.appendChild(op);
     });
     p.appendChild(lista);
-    var ac = el('div', 'etm-ms-acoes');
-    var cancelar = el('button', 'gc-btn gc-btn--contorno', 'Cancelar'); cancelar.type = 'button';
-    var aplicar = el('button', 'gc-btn gc-btn--primario', 'Aplicar'); aplicar.type = 'button';
-    ac.appendChild(cancelar); ac.appendChild(aplicar); p.appendChild(ac);
     w.appendChild(p);
+    function aplicar() {
+      estado.f[d.k] = new Set(Array.from(lista.querySelectorAll('input:checked')).map(function (i) { return i.value; }));
+      var a = document.activeElement;
+      manter = {k: d.k, q: busca ? busca.value : '', top: lista.scrollTop, foco: a && a.type === 'checkbox' ? a.value : null};
+      desenha();
+    }
     b.addEventListener('click', function (e) {
       e.stopPropagation(); var era = !p.hidden; fechar();
       if (!era) { p.hidden = false; b.setAttribute('aria-expanded', 'true'); aberto = p; (busca || p.querySelector('input')).focus(); }
@@ -179,32 +327,43 @@
     if (busca) busca.addEventListener('input', function () {
       var q = fold(busca.value); lista.querySelectorAll('.etm-ms-op').forEach(function (o) { o.hidden = fold(o.textContent).indexOf(q) < 0; });
     });
-    todos.addEventListener('click', function () { lista.querySelectorAll('.etm-ms-op:not([hidden]) input').forEach(function (i) { i.checked = true; }); });
-    nenhum.addEventListener('click', function () { lista.querySelectorAll('input').forEach(function (i) { i.checked = false; }); });
-    cancelar.addEventListener('click', function () { fechar(); b.focus(); });
-    aplicar.addEventListener('click', function () {
-      var s = new Set(Array.from(lista.querySelectorAll('input:checked')).map(function (i) { return i.value; }));
-      // tudo marcado = Todos (no status, tudo marcado é com as canceladas, que o padrão deixa de fora)
-      estado.f[d.k] = s.size === opts.length && !d.padrao ? new Set() : s;
-      fechar(); desenha();
-    });
-    p.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { fechar(); b.focus(); }
-      if (e.key === 'Enter' && e.target.type !== 'checkbox' && e.target.tagName !== 'BUTTON') aplicar.click();
-    });
+    lista.addEventListener('change', aplicar);
+    todos.addEventListener('click', function () { lista.querySelectorAll('.etm-ms-op:not([hidden]) input').forEach(function (i) { i.checked = true; }); aplicar(); });
+    nenhum.addEventListener('click', function () { lista.querySelectorAll('input').forEach(function (i) { i.checked = false; }); aplicar(); });
+    p.addEventListener('keydown', function (e) { if (e.key === 'Escape') { fechar(); b.focus(); } });
     return w;
   }
   function filtros() {
     var box = document.getElementById('etm-filtros');
     box.replaceChildren();
-    FILTROS.forEach(function (d) { var w = seletor(d); if (w) box.appendChild(w); });
+    aberto = null;
+    FILTROS.forEach(function (d) { if (!ativo(d)) return; var w = seletor(d); if (w) box.appendChild(w); });
+    // o painel que a pessoa estava usando volta aberto, na mesma busca, rolagem e caixa
+    if (manter) {
+      var w = box.querySelector('.etm-ms[data-k="' + manter.k + '"]');
+      if (w) {
+        var b = w.querySelector('.etm-ms-bt'), p = w.querySelector('.etm-ms-painel');
+        var bu = p.querySelector('.etm-ms-busca'), li = p.querySelector('.etm-ms-lista');
+        p.hidden = false; b.setAttribute('aria-expanded', 'true'); aberto = p;
+        if (bu && manter.q) { bu.value = manter.q; bu.dispatchEvent(new Event('input')); }
+        li.scrollTop = manter.top;
+        var foco = manter.foco;
+        var alvo = foco == null ? null : Array.from(li.querySelectorAll('input')).filter(function (i) { return i.value === foco; })[0];
+        (alvo || bu || b).focus({preventScroll: true});
+      }
+      manter = null;
+    }
   }
+  function mostrando(texto) { document.getElementById('etm-mostrando').textContent = texto; }
+
+  // ── o quadro (o Planner e o de cada usina nas Estações em Aberto) ──
   function passaEtiquetas(o) {
     if (!estado.etiquetas.length) return true;
     return o.etiquetas_eng.some(function (n) { return estado.etiquetas.indexOf(n) >= 0; });
   }
   function paginaOs(o) { return nexusRota('/t/engenharia/etm/os/') + encodeURIComponent(o.os); }
   function selo(texto, cor) { return el('span', 'eg-tag eg-tag--' + cor, texto); }
+  function corTrab(t) { return t === 'engenharia' ? 'info' : t === 'chamados' ? 'verde' : 'neutro'; }
   function cartao(o) {
     var c = el('article', 'kb-card kb-card--' + COR[o.coluna]);
     c.tabIndex = 0; c.dataset.os = o.os;
@@ -217,13 +376,13 @@
     c.appendChild(el('h4', 'kb-card-tit', o.titulo || '(sem título)'));
     var s = el('div', 'kb-eng');
     // de quem é a OS: Engenharia e Chamados pelos setores, o resto Campo (Levi, 26/10/2026)
-    s.appendChild(selo(TRAB[o.trabalho] || 'Campo', o.trabalho === 'engenharia' ? 'info' : o.trabalho === 'chamados' ? 'verde' : 'neutro'));
+    s.appendChild(selo(TRAB[o.trabalho] || 'Campo', corTrab(o.trabalho)));
     if (o.diagnostico) s.appendChild(selo(o.diagnostico, 'ok'));
     if (o.status_pos) s.appendChild(selo(o.status_pos, 'neutro'));
     if (o.acompanhamento) s.appendChild(selo('Em acompanhamento', 'alerta'));
     if (o.finalizado) s.appendChild(selo('Finalizado pela Engenharia', 'ok'));
-    if (s.children.length) c.appendChild(s);
-    c.appendChild(el('p', 'kb-onde', [o.codigo, o.usina].filter(Boolean).join(' · ')));
+    c.appendChild(s);
+    c.appendChild(el('p', 'kb-onde', [o.codigo, nomeUsina(o.usina)].filter(Boolean).join(' · ')));
     if (o.etiquetas_eng.length || o.etiquetas.length) {
       var et = el('div', 'kb-etq');
       o.etiquetas_eng.forEach(function (n) { et.appendChild(el('span', 'kb-etiqueta etm-etq-eng', n)); });
@@ -242,14 +401,7 @@
     c.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); location.href = paginaOs(o); } });
     return c;
   }
-  function desenha() {
-    // sem leitura nenhuma ainda (a primeira em curso, logo depois de subir): nada de colunas vazias, e a tela se relê
-    if (D.nunca_lido) { quadro.replaceChildren(el('p', 'kb-vazio', 'Lendo as OS de ETM no Fracttal…')); return; }
-    filtros();
-    var lista = D.oss.filter(function (o) { return passa(o); });
-    document.getElementById('etm-mostrando').textContent = 'Mostrando ' + lista.length + ' de ' + D.oss.length + ' OS';
-    // a coluna das canceladas só com elas marcadas no status
-    var cols = D.colunas.map(function (c) { return c[0]; }).filter(function (c) { return c !== 'cancelada' || estado.f.status.has('Cancelada'); });
+  function quadroDe(lista, cols) {
     var g = el('div', 'kb-colunas');
     g.style.setProperty('--n', cols.length);
     cols.forEach(function (c) {
@@ -274,18 +426,327 @@
       col.appendChild(corpo);
       g.appendChild(col);
     });
-    quadro.replaceChildren(g);
+    return g;
   }
-  // os controles
+  function lendo(alvo) { preencher(alvo, [el('p', 'kb-vazio', 'Lendo as OS de ETM no Fracttal…')]); }
+  function colunasCom(lista, canceladas) {
+    return D.colunas.map(function (c) { return c[0]; }).filter(function (c) { return c !== 'cancelada' || canceladas; });
+  }
+
+  // ── o Planner ──
+  var quadro = document.getElementById('etm-quadro');
+  function desenhaPlanner() {
+    if (D.nunca_lido) { lendo(quadro); mostrando(''); return; }
+    var lista = D.oss.filter(function (o) { return passa(o); });
+    mostrando('Mostrando ' + lista.length + ' de ' + D.oss.length + ' OS');
+    // a coluna das canceladas só com elas marcadas no status
+    quadro.replaceChildren(quadroDe(lista, colunasCom(lista, estado.f.status.has('Cancelada'))));
+  }
+
+  // ── as Estações em Aberto ──
+  var abLista = document.getElementById('etm-ab-lista'), abUsina = document.getElementById('etm-ab-usina');
+  var abGrade = document.getElementById('etm-ab-grade'), acGrade = document.getElementById('etm-ac-grade');
+  var abN = document.getElementById('etm-ab-n'), acN = document.getElementById('etm-ac-n');
+  var abQuadro = document.getElementById('etm-ab-quadro'), abMsg = document.getElementById('etm-ab-msg');
+  var abFin = document.getElementById('etm-ab-finalizar');
+  // "3 semanas em aberto" / "2 dias em aberto", pela OS mais antiga da usina
+  function tempoEmAberto(dia) {
+    if (!dia) return null;
+    var d = Math.round((Date.parse(D.hoje) - Date.parse(dia)) / 864e5), s = Math.floor(d / 7);
+    var txt = d <= 0 ? 'aberta hoje' : d < 7 ? d + (d === 1 ? ' dia' : ' dias') + ' em aberto'
+      : s + (s === 1 ? ' semana' : ' semanas') + ' em aberto';
+    return {dias: d, txt: txt};
+  }
+  function cartaoUsina(nome, linhas, seloDele, aoClicar) {
+    var u = USINA[nome] || {curta: nome, cliente: ''};
+    var c = el('button', 'etm-usina'); c.type = 'button';
+    var l1 = el('span', 'etm-usina-l1');
+    l1.appendChild(el('b', 'etm-usina-nome', u.curta));
+    if (seloDele) l1.appendChild(seloDele);
+    c.appendChild(l1);
+    if (u.cliente) c.appendChild(el('span', 'etm-usina-cli', u.cliente));
+    linhas.forEach(function (t) { if (t) c.appendChild(el('span', 'etm-usina-n', t)); });
+    c.addEventListener('click', aoClicar);
+    return c;
+  }
+  function porNome(a, b) { return nomeUsina(a.nome).localeCompare(nomeUsina(b.nome), 'pt'); }
+  function desenhaAbertas() {
+    abLista.hidden = !!vista.aberta; abUsina.hidden = !vista.aberta;
+    if (D.nunca_lido) { lendo(abGrade); acGrade.replaceChildren(); abN.textContent = ''; acN.textContent = ''; mostrando(''); return; }
+    if (vista.aberta) { desenhaAbertaUsina(); return; }
+    if (D.sem_marcas) {     // sem as marcações não se sabe o que está aberto para a Engenharia: nada pela metade
+      preencher(abGrade, [el('p', 'kb-vazio', 'Sem as marcações da Engenharia agora: não dá para saber quais OS estão abertas para ela. Recarregue em instantes.')]);
+      acGrade.replaceChildren(); abN.textContent = ''; acN.textContent = ''; mostrando(''); return;
+    }
+    var ab = {}, ac = {};
+    D.oss.forEach(function (o) {
+      if (!passa(o)) return;
+      if (abertaEng(o)) {
+        var u = ab[o.usina] || (ab[o.usina] = {nome: o.usina, n: 0, antiga: ''});
+        u.n++;
+        if (o.criada_dia && (!u.antiga || o.criada_dia < u.antiga)) u.antiga = o.criada_dia;
+      }
+      if (o.acompanhamento) { var a = ac[o.usina] || (ac[o.usina] = {nome: o.usina, n: 0}); a.n++; }
+    });
+    var lab = Object.keys(ab).map(function (k) { return ab[k]; }).sort(porNome);
+    var lac = Object.keys(ac).map(function (k) { return ac[k]; }).sort(porNome);
+    var nOs = lab.reduce(function (s, u) { return s + u.n; }, 0);
+    abN.textContent = lab.length + (lab.length === 1 ? ' estação · ' : ' estações · ') + nOs + ' OS em aberto';
+    acN.textContent = lac.length + (lac.length === 1 ? ' estação' : ' estações');
+    mostrando(nOs + (nOs === 1 ? ' OS aberta' : ' OS abertas') + ' para a Engenharia com estes filtros');
+    preencher(abGrade, lab.length ? lab.map(function (u) {
+      var t = tempoEmAberto(u.antiga);
+      return cartaoUsina(u.nome, [u.n + ' OS em aberto'], t ? selo(t.txt, t.dias >= 7 ? 'alerta' : 'neutro') : null,
+                         function () { abrir(u.nome); });
+    }) : [el('p', 'kb-vazio', 'Nenhuma estação com OS aberta para a Engenharia com estes filtros.')]);
+    preencher(acGrade, lac.length ? lac.map(function (u) {
+      return cartaoUsina(u.nome, [u.n + ' OS em acompanhamento'], null, function () { abrir(u.nome); });
+    }) : [el('p', 'kb-vazio', 'Nenhuma estação em acompanhamento com estes filtros.')]);
+  }
+  function abrir(nome) { vista.aberta = nome; abMsg.hidden = true; desenha(); subir(); }
+  // as OS da coluna Finalizadas que esperam a Engenharia (o que o Finalizar em lote marca)
+  function paraFinalizar(lista) { return lista.filter(function (o) { return o.coluna === 'finalizada' && !o.diagnostico && !o.finalizado; }); }
+  function osDaAberta() { return D.oss.filter(function (o) { return o.usina === vista.aberta && passa(o); }); }
+  function desenhaAbertaUsina() {
+    var u = USINA[vista.aberta] || {curta: vista.aberta, cliente: ''};
+    document.getElementById('etm-ab-cliente').textContent = u.cliente;
+    document.getElementById('etm-ab-titulo').textContent = u.curta;
+    var lista = osDaAberta(), abertas = D.sem_marcas ? null : lista.filter(abertaEng).length;
+    document.getElementById('etm-ab-sub').textContent = lista.length + ' OS com estes filtros' +
+      (abertas == null ? '' : ' · ' + abertas + (abertas === 1 ? ' aberta' : ' abertas') + ' para a Engenharia');
+    mostrando('Mostrando ' + lista.length + ' OS desta usina');
+    abQuadro.replaceChildren(quadroDe(lista, colunasCom(lista, lista.some(function (o) { return o.coluna === 'cancelada'; }))));
+    if (abFin) {
+      var n = D.sem_marcas ? 0 : paraFinalizar(lista).length;
+      abFin.disabled = !n;
+      abFin.querySelector('span').textContent = 'Finalizar pela Engenharia' + (n ? ' (' + n + ')' : '');
+      abFin.title = n ? 'Marca as ' + n + ' OS da coluna Finalizadas (fechadas no Fracttal, sem diagnóstico nem o finalizado) como Finalizado pela Engenharia'
+        : 'Nenhuma OS fechada no Fracttal esperando a Engenharia nesta usina';
+    }
+  }
+  function dizerAb(texto) { abMsg.textContent = texto || ''; abMsg.hidden = !texto; }
+  if (abFin) abFin.addEventListener('click', function () {
+    var alvos = paraFinalizar(osDaAberta()), n = alvos.length;
+    if (!n) return;
+    if (!confirm('Marcar ' + (n === 1 ? 'a OS finalizada' : 'as ' + n + ' OS finalizadas') + ' no Fracttal desta usina (a coluna Finalizadas) como "Finalizado pela Engenharia"?')) return;
+    abFin.disabled = true; dizerAb('Gravando…');
+    fetch(nexusRota('/t/engenharia/etm/finalizar'), {method: 'POST', credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          body: JSON.stringify({usina: vista.aberta, os: alvos.map(function (o) { return o.os; })})})
+      .then(function (r) { return r.json().then(function (j) { return {r: r, j: j}; }); })
+      .then(function (x) {
+        if (!x.r.ok) { desenha(); dizerAb(x.j.erro || ('HTTP ' + x.r.status)); return; }
+        var feitas = {}; x.j.feitas.forEach(function (f) { feitas[f] = true; });
+        D.oss.forEach(function (o) { if (feitas[o.os]) o.finalizado = true; });
+        var nf = x.j.feitas.length, partes = [nf + (nf === 1 ? ' OS finalizada' : ' OS finalizadas') + ' pela Engenharia'];
+        if (x.j.ja.length) partes.push(x.j.ja.length + ' já tinha' + (x.j.ja.length === 1 ? '' : 'm') + ' o diagnóstico ou o finalizado (recarregue para ver)');
+        if (x.j.fora.length) partes.push(x.j.fora.length + ' não está' + (x.j.fora.length === 1 ? '' : 'ão') + ' mais finalizada' + (x.j.fora.length === 1 ? '' : 's') + ' no Fracttal (recarregue para ver)');
+        desenha(); dizerAb(partes.join('; ') + '.');
+      })
+      .catch(function () { desenha(); dizerAb('Não consegui falar com o Nexus. Tente de novo.'); });
+  });
+  document.getElementById('etm-ab-volta').addEventListener('click', function () { vista.aberta = ''; abMsg.hidden = true; desenha(); });
+  document.getElementById('etm-ab-hist').addEventListener('click', function () {
+    var u = USINA[vista.aberta];
+    vista.aba = 'historico'; vista.cliente = u ? u.cliente : ''; vista.usina = vista.aberta;
+    hBusca.value = ''; trocaHash(); desenha(); subir();
+  });
+  // quantas estações estão abertas para a Engenharia (o número da aba, sem os filtros)
+  function contaAbertas() {
+    var i = document.getElementById('etm-n-abertas');
+    if (D.nunca_lido || D.sem_marcas) { i.hidden = true; return; }
+    var us = {}; D.oss.forEach(function (o) { if (abertaEng(o)) us[o.usina] = true; });
+    var n = Object.keys(us).length; i.textContent = String(n); i.hidden = !n;
+  }
+
+  // ── o Histórico: os clientes, as usinas e as OS da usina ──
+  var hBox = document.getElementById('etm-h-grade-box'), hUsina = document.getElementById('etm-h-usina');
+  var hGrade = document.getElementById('etm-h-grade'), hBusca = document.getElementById('etm-h-busca');
+  var hLista = document.getElementById('etm-h-lista'), hChat = document.getElementById('etm-h-chat');
+  var hIni = document.getElementById('etm-h-ini'), hFim = document.getElementById('etm-h-fim'), hCanc = document.getElementById('etm-h-canceladas');
+  function trilha() {
+    var t = document.getElementById('etm-h-trilha');
+    var passos = [{txt: 'Clientes', ir: function () { vista.cliente = ''; vista.usina = ''; }}];
+    if (vista.cliente) passos.push({txt: vista.cliente, ir: function () { vista.usina = ''; }});
+    if (vista.usina) passos.push({txt: (USINA[vista.usina] || {}).curta || vista.usina});
+    var itens = [];
+    passos.forEach(function (p, i) {
+      if (i) itens.push(el('span', 'etm-trilha-sep', '›'));
+      if (i < passos.length - 1) {
+        var b = el('button', 'etm-lnk', p.txt); b.type = 'button';
+        b.addEventListener('click', function () { p.ir(); hBusca.value = ''; desenha(); });
+        itens.push(b);
+      } else { var a = el('span', 'etm-trilha-aqui', p.txt); a.setAttribute('aria-current', 'page'); itens.push(a); }
+    });
+    preencher(t, itens);
+  }
+  function plural(n, um, varios) { return n + ' ' + (n === 1 ? um : varios); }
+  function desenhaHistorico() {
+    trilha();
+    hBox.hidden = !!vista.usina; hUsina.hidden = !vista.usina;
+    if (D.nunca_lido) { lendo(vista.usina ? hLista : hGrade); return; }
+    if (vista.usina) desenhaHistUsina(); else desenhaHistGrade();
+  }
+  function desenhaHistGrade() {
+    var q = fold(hBusca.value.trim()), nomes = Object.keys(USINA);
+    var tit = document.getElementById('etm-h-tit'), n = document.getElementById('etm-h-n');
+    if (vista.cliente) nomes = nomes.filter(function (x) { return USINA[x].cliente === vista.cliente; });
+    hBusca.placeholder = vista.cliente ? 'Buscar usina deste cliente…' : 'Buscar usina em todos os clientes…';
+    if (!vista.cliente && !q) {
+      var cli = {};
+      nomes.forEach(function (x) {
+        var c = USINA[x].cliente, k = cli[c] || (cli[c] = {nome: c, usinas: 0, os: 0});
+        k.usinas++; k.os += N_OS[x] || 0;
+      });
+      var lc = Object.keys(cli).map(function (k) { return cli[k]; }).sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt'); });
+      tit.textContent = 'Clientes';
+      n.textContent = plural(lc.length, 'cliente', 'clientes') + ' · ' + plural(nomes.length, 'usina com ETM', 'usinas com ETM');
+      preencher(hGrade, lc.length ? lc.map(function (c) {
+        var b = el('button', 'etm-usina'); b.type = 'button';
+        var l1 = el('span', 'etm-usina-l1'); l1.appendChild(el('b', 'etm-usina-nome', c.nome)); b.appendChild(l1);
+        b.appendChild(el('span', 'etm-usina-n', plural(c.usinas, 'usina', 'usinas') + ' · ' + c.os + ' OS'));
+        b.addEventListener('click', function () { vista.cliente = c.nome; hBusca.value = ''; desenha(); });
+        return b;
+      }) : [el('p', 'kb-vazio', 'Nenhuma usina com ETM na leitura do Fracttal.')]);
+      return;
+    }
+    if (q) nomes = nomes.filter(function (x) { return fold(USINA[x].curta + ' ' + USINA[x].cliente + ' ' + x).indexOf(q) >= 0; });
+    nomes.sort(function (a, b) { return USINA[a].curta.localeCompare(USINA[b].curta, 'pt'); });
+    tit.textContent = vista.cliente || 'Usinas';
+    n.textContent = plural(nomes.length, 'usina', 'usinas');
+    preencher(hGrade, nomes.length ? nomes.map(function (x) {
+      var u = USINA[x];
+      return cartaoUsina(x, [[u.etms ? plural(u.etms, 'ETM', 'ETMs') : '', (N_OS[x] || 0) + ' OS'].filter(Boolean).join(' · ')], null,
+                         function () { vista.cliente = u.cliente; vista.usina = x; hBusca.value = ''; desenha(); subir(); });
+    }) : [el('p', 'kb-vazio', 'Nenhuma usina encontrada.')]);
+  }
+  function linhaHist(o) {
+    var a = el('a', 'etm-h-os'); a.href = paginaOs(o);
+    var l1 = el('span', 'etm-h-os-l1');
+    l1.appendChild(el('b', null, 'OS ' + o.os));
+    l1.appendChild(selo(o.status || ROT[o.coluna], COR_STATUS[o.status] || 'neutro'));
+    l1.appendChild(selo(TRAB[o.trabalho] || 'Campo', corTrab(o.trabalho)));
+    if (o.diagnostico) l1.appendChild(selo(o.diagnostico, 'ok'));
+    if (o.status_pos) l1.appendChild(selo(o.status_pos, 'neutro'));
+    if (o.acompanhamento) l1.appendChild(selo('Em acompanhamento', 'alerta'));
+    if (o.finalizado) l1.appendChild(selo('Finalizado pela Engenharia', 'ok'));
+    a.appendChild(l1);
+    a.appendChild(el('span', 'etm-h-os-tit', o.titulo || '(sem título)'));
+    var meta = [o.codigo, o.criada ? 'criada em ' + o.criada : '', o.responsavel || 'sem responsável'];
+    if (o.n_coment) meta.push(plural(o.n_coment, 'comentário', 'comentários'));
+    a.appendChild(el('span', 'etm-h-os-meta', meta.filter(Boolean).join(' · ')));
+    return a;
+  }
+  function desenhaHistUsina() {
+    var u = USINA[vista.usina] || {curta: vista.usina, cliente: '', etms: 0};
+    document.getElementById('etm-h-cliente').textContent = u.cliente;
+    document.getElementById('etm-h-titulo').textContent = u.curta;
+    var todas = D.oss.filter(function (o) { return o.usina === vista.usina; });
+    var lista = todas.filter(function (o) { return (vista.hCanc || o.coluna !== 'cancelada') && ativaEntre(o, vista.hIni, vista.hFim); })
+      .sort(function (a, b) { return (b.criada_dia || '').localeCompare(a.criada_dia || '') || Number(b.os) - Number(a.os); });
+    var nCom = todas.reduce(function (s, o) { return s + (o.n_coment || 0); }, 0);
+    document.getElementById('etm-h-sub').textContent = [u.etms ? plural(u.etms, 'ETM', 'ETMs') : '', plural(todas.length, 'OS', 'OS'),
+      lista.length !== todas.length ? lista.length + ' com estes filtros' : ''].filter(Boolean).join(' · ');
+    hChat.querySelector('span').textContent = 'Chat da usina' + (nCom ? ' (' + nCom + ')' : '');
+    preencher(hLista, lista.length ? lista.map(linhaHist)
+      : [el('p', 'kb-vazio', todas.length ? 'Nenhuma OS desta usina com estes filtros.' : 'Nenhuma OS das ETMs desta usina na leitura do Fracttal.')]);
+  }
+  hBusca.addEventListener('input', function () { if (!vista.usina) desenhaHistGrade(); });
+  hIni.addEventListener('input', function () { vista.hIni = hIni.value; desenha(); });
+  hFim.addEventListener('input', function () { vista.hFim = hFim.value; desenha(); });
+  hCanc.addEventListener('change', function () { vista.hCanc = hCanc.checked; desenha(); });
+
+  // ── o chat da usina: os comentários da Engenharia em todas as OS dela, lidos no clique ──
+  var veu = document.getElementById('etm-chat-veu'), gav = document.getElementById('etm-chat');
+  var chatLista = document.getElementById('etm-chat-lista'), chatStatus = document.getElementById('etm-chat-status');
+  var chatDe = null;
+  function itemChat(c) {
+    var li = el('li', 'etm-chat-item');
+    var cab = el('div', 'etm-chat-cab');
+    var a = el('a', 'etm-chat-os', 'OS ' + c.os); a.href = paginaOs(c);
+    cab.appendChild(a); cab.appendChild(el('span', 'etm-chat-tit', c.titulo));
+    li.appendChild(cab);
+    li.appendChild(el('div', 'etm-chat-meta', c.nome + ' · ' + c.quando));
+    li.appendChild(el('p', 'etm-chat-texto', c.texto));
+    return li;
+  }
+  function fecharChat() { veu.hidden = true; gav.hidden = true; if (chatDe) chatDe.focus(); }
+  hChat.addEventListener('click', function () {
+    var nome = vista.usina, u = USINA[nome] || {curta: nome, cliente: ''};
+    chatDe = hChat;
+    document.getElementById('etm-chat-sub').textContent = u.curta + (u.cliente ? ' · ' + u.cliente : '');
+    chatLista.replaceChildren(); chatStatus.textContent = 'Lendo os comentários…';
+    veu.hidden = false; gav.hidden = false; gav.querySelector('.eg-gav-fechar').focus();
+    fetch(nexusRota('/t/engenharia/etm/usina/comentarios') + '?usina=' + encodeURIComponent(nome),
+          {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+      .then(function (r) { return r.json().then(function (j) { return {r: r, j: j}; }); })
+      .then(function (x) {
+        if (vista.usina !== nome || gav.hidden) return;
+        if (!x.r.ok) { chatStatus.textContent = x.j.erro || ('HTTP ' + x.r.status); return; }
+        var cs = x.j.comentarios;
+        chatStatus.textContent = cs.length ? plural(cs.length, 'comentário', 'comentários') + ' nas OS desta usina, o mais novo primeiro.'
+          : 'Nenhum comentário da Engenharia nas OS desta usina ainda.';
+        preencher(chatLista, cs.map(itemChat));
+      })
+      .catch(function () { chatStatus.textContent = 'Não consegui falar com o Nexus. Tente de novo.'; });
+  });
+  veu.addEventListener('click', fecharChat);
+  gav.querySelector('.eg-gav-fechar').addEventListener('click', fecharChat);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !gav.hidden) fecharChat(); });
+
+  // ── as abas ──
+  var abasNav = document.getElementById('etm-abas');
+  var abas = abasNav.querySelectorAll('[data-aba]');
+  var paineis = {app: document.getElementById('etm-app'), planner: document.getElementById('etm-p-planner'),
+                 abertas: document.getElementById('etm-p-abertas'), historico: document.getElementById('etm-p-historico')};
+  // a vista nova começa no alto: com a página rolada, sobe até as abas (o topo fixo do Nexus fica por cima)
+  function subir() {
+    var topo = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topo'), 10) || 64;
+    var y = abasNav.getBoundingClientRect().top + window.scrollY - topo - 8;
+    if (window.scrollY > y) window.scrollTo(0, y);
+  }
+  abas.forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      // a aba de novo volta ao começo dela (o Histórico aos clientes, as Estações em Aberto à lista)
+      if (vista.aba === a.dataset.aba) {
+        if (vista.aba === 'historico') { vista.cliente = ''; vista.usina = ''; hBusca.value = ''; }
+        if (vista.aba === 'abertas') { vista.aberta = ''; abMsg.hidden = true; }
+      }
+      vista.aba = a.dataset.aba; fechar(); trocaHash(); desenha();
+    });
+  });
+  window.addEventListener('hashchange', function () {
+    var h = location.hash.replace('#', '');
+    if (ABAS.indexOf(h) >= 0 && h !== vista.aba) { vista.aba = h; desenha(); }
+  });
+  function desenha() {
+    abas.forEach(function (a) { if (a.dataset.aba === vista.aba) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    paineis.app.hidden = vista.aba === 'historico';
+    paineis.historico.hidden = vista.aba !== 'historico';
+    paineis.planner.hidden = vista.aba !== 'planner';
+    paineis.abertas.hidden = vista.aba !== 'abertas';
+    document.querySelectorAll('[data-nota]').forEach(function (n) { n.hidden = n.dataset.nota !== vista.aba; });
+    if (vista.aba !== 'historico') filtros();
+    if (vista.aba === 'planner') desenhaPlanner();
+    else if (vista.aba === 'abertas') desenhaAbertas();
+    else desenhaHistorico();
+    contaAbertas();
+    guardar();
+  }
+
+  // ── os controles da coluna de filtros ──
   var busca = document.getElementById('etm-f-busca'), dIni = document.getElementById('etm-f-ini'), dFim = document.getElementById('etm-f-fim');
   busca.addEventListener('input', function () { estado.q = busca.value.trim(); desenha(); });
   dIni.addEventListener('input', function () { estado.ini = dIni.value; desenha(); });
   dFim.addEventListener('input', function () { estado.fim = dFim.value; desenha(); });
-  quadro.addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-etiqueta]'); if (!b) return;
-    var i = estado.etiquetas.indexOf(b.dataset.etiqueta);
-    if (i >= 0) estado.etiquetas.splice(i, 1); else estado.etiquetas.push(b.dataset.etiqueta);
-    desenha();
+  [quadro, abQuadro].forEach(function (q) {
+    q.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-etiqueta]'); if (!b) return;
+      var i = estado.etiquetas.indexOf(b.dataset.etiqueta);
+      if (i >= 0) estado.etiquetas.splice(i, 1); else estado.etiquetas.push(b.dataset.etiqueta);
+      desenha();
+    });
   });
   document.getElementById('etm-f-limpar').addEventListener('click', function () {
     busca.value = ''; dIni.value = ''; dFim.value = '';
@@ -311,7 +772,7 @@
           if (j.fase === 'erro') { dizer('Não deu: ' + j.erro); return; }
           dizer(j.msg);
           importar.disabled = !(j.fase === 'lido' && j.previa && (j.previa.comentarios || j.previa.marcacoes));
-          if (j.fase === 'feito') setTimeout(function () { location.replace(location.pathname + '?atualizar=1'); }, 3000);
+          if (j.fase === 'feito') setTimeout(function () { location.replace(location.pathname + '?atualizar=1' + location.hash); }, 3000);
         })
         .catch(function () { dizer('Não consegui falar com o Nexus. Tente de novo.'); });
     };
@@ -333,8 +794,12 @@
   }
   {% endif %}
   if (D.nunca_lido) setTimeout(function () { location.reload(); }, 8000);
-  // voltou da OS com a tela relida: o ?atualizar=1 sai do endereço, para o F5 não reler de novo
-  if (/[?&]atualizar=1(&|$)/.test(location.search)) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* sem history */ } }
+  // voltou da OS com a tela relida: o ?atualizar=1 sai do endereço (a aba fica), para o F5 não reler de novo
+  if (/[?&]atualizar=1(&|$)/.test(location.search)) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* sem history */ } }
+  restaurar();
+  busca.value = estado.q; dIni.value = estado.ini; dFim.value = estado.fim;
+  hIni.value = vista.hIni; hFim.value = vista.hFim; hCanc.checked = vista.hCanc;
+  trocaHash();
   desenha();
 })();
 </script>

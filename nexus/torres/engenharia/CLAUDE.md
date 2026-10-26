@@ -251,23 +251,46 @@ em aberto os comentários vão também para a nota da OS; entrega por partes; o 
 como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenharia-etm-design.md`; plano em
 `docs/superpowers/plans/2026-10-26-engenharia-etm.md`.
 
-- **A tela:** `/t/engenharia/etm` (`etm()`, `etm.html`, do setor Engenharia), o Planner do app no desenho do Nexus: a
-  faixa de números em cima; à esquerda a coluna de filtros do Acompanhamento PCM (Levi, 26/10/2026: "o estilo de lista
-  dos filtros está todo bugado e torto, deixe no nível do nexus!" e "tem um espaço livre do lado esquerdo que está sendo
-  mau utilizado"): a pesquisa geral, os seletores Cliente, Usina, Tipo de trabalho, Status da OS, Criado por,
-  Solicitante e Responsável (a busca, as caixas de marcar com a conta de cada opção com os outros filtros, Selecionar
-  todos, Limpar e Aplicar; o painel abre dentro da coluna, que rola sozinha), o período e "Redefinir filtros"; à direita
-  o quadro, com as colunas Não iniciadas, Em andamento, Finalizadas e Canceladas (a coluna do quadro levada à do app: a
-  verificação ainda está em andamento) e, na coluna Em andamento, as etiquetas da Engenharia. O **Status da OS** (o do
-  Fracttal: Em Processo, Em Verificação, Concluída, Cancelada) entrou no lugar do "mostrar canceladas": sem marcar, as
-  canceladas ficam de fora. Abaixo de 1100 px a coluna sobe para cima do quadro, com os seletores em duas colunas. A
-  lista do navegador (datalist) saiu: abria clara e torta. Faixa: Abertas no Fracttal, Abertas para a Engenharia (a
-  regra das "Estações em Aberto" do app: a OS só sai com o diagnóstico ou o finalizado, não quando o Fracttal fecha), Em
-  acompanhamento e Finalizadas em 30 dias. Sem ler o livro das marcações, a tela diz e as duas contas dele ficam "—".
+- **A tela:** `/t/engenharia/etm` (`etm()`, `etm.html`, do setor Engenharia), as abas do app no desenho do Nexus
+  (Levi, 26/10/2026: "o deploy que te mandei tinham abas só disso!"): **Planner**, **Histórico** e **Estações em
+  Aberto**, com a faixa de números em cima. A aba, a usina aberta e os filtros ficam no `sessionStorage` da aba do
+  navegador: a volta da OS (`?atualizar=1`) cai no mesmo lugar; o endereço leva a aba (`#historico`, `#abertas`).
+- **O Planner:** à esquerda a coluna de filtros do Acompanhamento PCM (Levi, 26/10/2026: "o estilo de lista dos filtros
+  está todo bugado e torto, deixe no nível do nexus!" e "tem um espaço livre do lado esquerdo que está sendo mau
+  utilizado"): a pesquisa geral, os seletores Cliente, Usina, Tipo de trabalho, Status da OS, Criado por e Responsável
+  (a busca, as caixas de marcar com a conta de cada opção com os outros filtros, Selecionar todos e Limpar; o painel
+  abre dentro da coluna, que rola sozinha), o período e "Redefinir filtros"; à direita o quadro, com as colunas Não
+  iniciadas, Em andamento, Finalizadas e Canceladas (a coluna do quadro levada à do app: a verificação ainda está em
+  andamento) e, na coluna Em andamento, as etiquetas da Engenharia. **O clique filtra** (Levi: "não precisa desse botão
+  "aplicar" clicou já filtrou!"): a caixa marcada vale na hora e o painel fica aberto, na mesma busca e rolagem; nada
+  ou tudo marcado é Todos. O Solicitante saiu ("tire o filtro do solicitante!"; segue na pesquisa geral). A **usina vai
+  curta** ("o nome da usina está vindo completo, o ideal seria sem a informação do nome do cliente e estado!",
+  `etm.usina_curta`: do "Cliente - Usina - UF" fica o meio; se não sobra nada, o nome inteiro); o filtro guarda o nome
+  inteiro, porque duas usinas de clientes diferentes podem ter o mesmo nome curto (aí a opção leva o cliente). O
+  **Status da OS** (o do Fracttal: Em Processo, Em Verificação, Concluída, Cancelada) entrou no lugar do "mostrar
+  canceladas": sem marcar, as canceladas ficam de fora. Abaixo de 1100 px a coluna sobe para cima do quadro, com os
+  seletores em duas colunas. Faixa: Abertas no Fracttal, Abertas para a Engenharia (a regra das "Estações em Aberto" do
+  app: a OS só sai com o diagnóstico ou o finalizado, não quando o Fracttal fecha), Em acompanhamento e Finalizadas em
+  30 dias. Sem ler o livro das marcações, a tela diz e as duas contas dele ficam "—".
+- **O Histórico** (a visão histórica do app): os clientes, as usinas de cada um (pelas ETMs, com quantas ETMs e OS; a
+  usina sem OS também aparece, como no app) e a lista das OS da usina, a mais nova primeiro, com o status do Fracttal,
+  as marcações e quantos comentários cada uma tem (contados pelas linhas do `nexus_engenharia_os`, sem abrir a cifra),
+  o período, as canceladas e o **Chat da usina** (os comentários da Engenharia em todas as OS dela, numa gaveta, lidos no
+  clique pelo `/etm/usina/comentarios`: a cifra abre só para as OS da usina). A busca acha a usina em todos os clientes,
+  sem acento nem caixa. Sem a coluna de filtros: a navegação é a do app.
+- **As Estações em Aberto** (a visão atual do app): as usinas com OS aberta para a Engenharia (a mesma regra da faixa),
+  com quantas OS e há quanto tempo (a OS mais antiga; alerta a partir de 7 dias), e as **Estações em Acompanhamento**
+  (as usinas com OS marcada Em acompanhamento). A coluna de filtros vale aqui também, menos o Status da OS (a regra é a
+  da aba). O clique abre o quadro da usina, com **Finalizar pela Engenharia** em lote (só quem é da Engenharia ou
+  administrador): as OS da coluna Finalizadas que a pessoa vê, conferidas no servidor (`/etm/finalizar`) na última
+  leitura do Fracttal (da usina e finalizadas nele) e no livro (sem diagnóstico nem o finalizado), numa gravação só
+  (`etm_marcas.finalizar_lote`); a resposta diz as que já estavam encerradas e as que não estão mais finalizadas. E
+  **Ver histórico desta usina**, que abre a usina no Histórico. Sem o livro das marcações, a aba diz e não lista nada
+  (não dá para saber o que está aberto para a Engenharia).
 - **A leitura** (`nexus/engenharia/etm.py`, medida em 26/10/2026, só leitura): `items?field_1=Estação Meteorológica` dá
   as 172 ETMs (a descrição confere) e `work_orders?items_log_description=Estação Meteorológica` as 1213 OS delas: 15
   pedidos, contra os 172 do app (um por ETM). Fica a OS cujo código é de ETM, uma por número, no cartão do Quadro
-  (`os_equipe._cartao`). No teto de páginas a leitura é recusada (um filtro ignorado viraria o Fracttal inteiro). Cópia
+  (`os_equipe._cartao`). A usina de cada ETM (`groups_1_description` do ativo) dá as usinas do Histórico. No teto de páginas a leitura é recusada (um filtro ignorado viraria o Fracttal inteiro). Cópia
   de 5 min, relida por trás enquanto a tela é usada e 270 s depois de subir (`etm.manter_quente`, no `instalar`).
 - **Engenharia, Chamados e Campo** (Levi, 26/10/2026: "Engenharia e Chamados vai pelas pessoas dos setores, Campo é o
   restante!"): o setor de quem está com a OS, pelo id do Fracttal, nos setores de Base → Acessos → Pessoas e setores
@@ -297,8 +320,7 @@ como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenhar
   de novo não repete nada (o id no livro e a linha que já está na nota).
 - **Segurança:** o Nexus não usa nenhuma credencial do app de ETM: lê o Fracttal com a dele e o GitHub com o token do
   .env.
-- **Fica para a 2ª parte:** o Histórico (cliente → usina → OS e o chat da usina), as Estações em Aberto (com o
-  "Finalizar pela Engenharia" em lote) e os Fechamentos por semana.
+- **Fica para depois:** os Fechamentos por semana (pelo Fracttal e pela Engenharia), a quarta aba do app.
 - **Prova:** `tests/test_engenharia_etm.py` e `tests/test_engenharia_etm_historico.py` (Fracttal, banco e GitHub falsos).
 
 ## Confiabilidade (06/10/2026)

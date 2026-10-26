@@ -612,7 +612,6 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .etm-ms-op span{flex:1;min-width:0}
 .etm-ms-op em{font-style:normal;color:var(--mudo);font-size:12px;font-variant-numeric:tabular-nums}
 .etm-ms-op.zero{color:var(--fraco)}
-.etm-ms-acoes{display:flex;justify-content:flex-end;gap:8px}
 .etm-lnk{background:transparent;border:0;padding:0;font:600 12.5px/16px var(--font-sans);color:var(--verde-texto);cursor:pointer;
   text-decoration:underline;text-underline-offset:3px}
 /* abaixo de 1100 px a coluna sobe para cima do quadro: os seletores em duas colunas (senão o quadro só começava depois
@@ -622,4 +621,61 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
   .etm-ms:has(.etm-ms-painel:not([hidden])){grid-column:1/-1}
   .etm-periodo{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .etm-periodo .gc-rotulo{grid-column:1/-1}
+}
+
+/* ── as abas da tela ETMs (26/10/2026, Levi: "sinto falta daquelas outras seções também. A de histórico, e a de ETMs em
+   aberto"): o Histórico e as Estações em Aberto do app, com os cartões das usinas, a lista das OS e o chat da usina ── */
+.etm [hidden]{display:none}
+.etm-sec-cab{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 4px}
+.etm-sec-cab--2{margin-top:28px}
+.etm-sec-tit{margin:0;font:700 16px/1.3 var(--font-sans);color:var(--tinta)}
+.etm-sec-n{font-size:12.5px;color:var(--mudo)}
+.etm-sec-dica{margin:0 0 12px;font-size:12.5px;line-height:1.5;color:var(--mudo);max-width:80ch}
+.etm-usinas{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.etm-usina{display:flex;flex-direction:column;align-items:stretch;gap:4px;text-align:left;padding:12px 14px;border-radius:12px;
+  background:var(--superficie);border:1px solid var(--linha);color:var(--tinta);font:inherit;cursor:pointer}
+.etm-usina:hover{border-color:var(--verde)}
+.etm-usina:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.etm-usina-l1{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.etm-usina-nome{font:700 14px/1.3 var(--font-sans);color:var(--tinta);min-width:0;overflow-wrap:anywhere}
+.etm-usina-cli{font-size:12px;color:var(--mudo)}
+.etm-usina-n{font-size:12.5px;color:var(--tinta-2)}
+.etm-volta{display:inline-flex;align-items:center;gap:6px;background:transparent;border:0;padding:0;margin:0 0 10px;
+  font:500 12.5px var(--font-sans);color:var(--mudo);cursor:pointer}
+.etm-volta:hover{color:var(--verde-texto)}
+.etm-usina-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}
+.etm-usina-tit{margin:2px 0 0;font:700 20px/1.25 var(--font-sans);color:var(--tinta)}
+.etm-usina-sub{margin:4px 0 0;font-size:12.5px;color:var(--mudo)}
+.etm-usina-acoes{display:flex;flex-wrap:wrap;gap:8px}
+.etm-usina-acoes .gc-btn{display:inline-flex;align-items:center;gap:6px}
+/* o Finalizar sem OS para finalizar: apagado (o gc-btn não tem o desligado; verde cheio parecia clicável) */
+.etm-usina-acoes .gc-btn:disabled{opacity:.45;cursor:default}
+.etm-historico{margin-top:20px}
+.etm-trilha{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 14px;font-size:13px}
+.etm-trilha-sep{color:var(--mudo)}
+.etm-trilha-aqui{font-weight:600;color:var(--tinta)}
+.etm-h-busca{margin-left:auto;width:min(320px,100%)}
+.etm-h-filtros{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 12px}
+.etm-h-canc{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--tinta-2);cursor:pointer}
+.etm-h-lista{display:flex;flex-direction:column;gap:8px}
+.etm-h-os{display:flex;flex-direction:column;gap:5px;padding:12px 14px;border-radius:12px;background:var(--superficie);
+  border:1px solid var(--linha);color:var(--tinta);text-decoration:none}
+.etm-h-os:hover{border-color:var(--verde)}
+.etm-h-os:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.etm-h-os-l1{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.etm-h-os-l1 b{font:700 13.5px var(--font-sans);margin-right:2px}
+.etm-h-os-tit{font-size:14px;color:var(--tinta)}
+.etm-h-os-meta{font-size:12px;color:var(--mudo)}
+.etm-chat-lista{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.etm-chat-item{padding:10px 12px;border-radius:10px;background:var(--superficie-2);border:1px solid var(--linha)}
+.etm-chat-cab{display:flex;align-items:baseline;gap:8px;min-width:0}
+.etm-chat-os{font:700 12.5px var(--font-sans);color:var(--verde-texto);text-decoration:none;white-space:nowrap}
+.etm-chat-os:hover{text-decoration:underline}
+.etm-chat-tit{font-size:12px;color:var(--mudo);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.etm-chat-meta{margin-top:4px;font-size:11.5px;color:var(--mudo)}
+.etm-chat-texto{margin:6px 0 0;font-size:13.5px;line-height:1.5;color:var(--tinta);white-space:pre-wrap;overflow-wrap:anywhere}
+@media (max-width:600px){
+  .etm-h-busca{margin-left:0;width:100%}
+  .etm-usina-acoes{width:100%}
+  .etm-usina-acoes .gc-btn{flex:1;justify-content:center}
 }

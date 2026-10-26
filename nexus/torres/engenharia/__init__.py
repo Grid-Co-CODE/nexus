@@ -13,7 +13,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 
-from flask import abort, redirect, render_template, request, session, url_for
+from flask import abort, jsonify, redirect, render_template, request, session, url_for
 
 from ..modelo import Tela, Torre
 
@@ -1142,12 +1142,16 @@ def _com_a_engenharia(oss: list[dict]) -> tuple[list[dict], str]:
 
 
 # ── a tela ETMs (26/10/2026): o Planner do app de ETM da Engenharia ──────────────────────────────────────────────────
-def _os_do_planner(o: dict, m: dict | None) -> dict:
-    """A OS de ETM como o Planner a desenha: o cartão do Fracttal enxuto e as marcações da Engenharia."""
+def _os_do_planner(o: dict, m: dict | None, n_coment: int | None = None) -> dict:
+    """A OS de ETM como as abas a desenham: o cartão do Fracttal enxuto, as marcações da Engenharia e quantos comentários
+    ela tem (None sem ler o livro). A usina vai inteira (a chave do filtro: duas usinas de clientes diferentes podem ter
+    o mesmo nome curto) e curta (o que a tela mostra)."""
+    from ...engenharia import etm as ETM
     from ...engenharia import etm_marcas as M
     m = m or {}
     criada = o.get("criada") or ""
-    return {"os": o["os"], "titulo": o["titulo"], "cliente": o["cliente"], "usina": o["usina"], "codigo": o["codigo"],
+    return {"os": o["os"], "titulo": o["titulo"], "cliente": o["cliente"], "usina": o["usina"],
+            "usina_nome": ETM.usina_curta(o["usina"]), "codigo": o["codigo"], "n_coment": n_coment,
             "ativo": o["ativo"], "responsavel": o["responsavel"], "solicitante": o["solicitante"],
             "criado_por": o["criado_por"], "trabalho": o["trabalho"], "coluna": o["coluna_etm"], "tipo": o["tipo"],
             "status": o["status"], "criada": criada[:10],
@@ -1191,12 +1195,25 @@ def faixa_etm(oss: list[dict], hoje, sem_marcas: bool = False, sem_leitura: bool
     ]
 
 
+def _usinas_da_etm(d: dict, oss: list[dict]) -> list[dict]:
+    """As usinas do Histórico: as das ETMs (com quantas ETMs cada uma tem; a usina sem OS também entra, como no app) e
+    as das OS, por cliente e nome curto."""
+    from ...engenharia import etm as ETM
+    from ...engenharia import os_equipe
+    etms = d.get("usinas") or {}
+    nomes = set(etms) | {o["usina"] for o in oss if o.get("usina")}
+    us = [{"nome": n, "curta": ETM.usina_curta(n), "cliente": ETM.cliente_de(n), "etms": etms.get(n, 0)} for n in nomes]
+    return sorted(us, key=lambda u: (os_equipe._norm(u["cliente"]), os_equipe._norm(u["curta"]), u["nome"]))
+
+
 @bp.route("/etm")
 def etm():
-    """O Planner das OS das Estações Meteorológicas (o app de ETM da Engenharia): as colunas do app, os filtros dele no
-    navegador e as marcações da Engenharia em cada OS. Quem volta com ?atualizar=1 relê o Fracttal na hora."""
+    """As OS das Estações Meteorológicas (o app de ETM da Engenharia) nas três abas do app: o Planner (as colunas e os
+    filtros dele no navegador), o Histórico (cliente → usina → OS, com o chat da usina) e as Estações em Aberto (as
+    usinas com OS aberta para a Engenharia e as em acompanhamento). Quem volta com ?atualizar=1 relê o Fracttal na hora."""
     from ...engenharia import etm as ETM
     from ...engenharia import etm_marcas as M
+    from ...engenharia import os_acompanhamento as O
     ETM.marcar_uso()                # relida por trás nas próximas 2 h (`etm.manter_quente`)
     if request.args.get("atualizar") == "1":
         ETM.pedir_releitura(esperar=True, forcar=True)
@@ -1206,17 +1223,80 @@ def etm():
     lido = M.ler()
     erro_marcas = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0]
     est = M.estado(lido["eventos"]) if not erro_marcas else {}
-    oss = [_os_do_planner(o, est.get(str(o.get("wid")))) for o in d["os"]]
+    # quantos comentários cada OS tem (a lista do Histórico); sem o livro, a lista não diz
+    lc = O.ler()
+    n_coment = O.comentarios_por_os(lc["eventos"]) if lc.get("lido_em") else None
+    oss = [_os_do_planner(o, est.get(str(o.get("wid"))),
+                          None if n_coment is None else n_coment.get(O.chave_da_os(o.get("wid")), 0))
+           for o in d["os"]]
     hoje = datetime.now(BRT).date()
+    pode, _meu = _quem_pode()
     from ...engenharia import os_equipe
     return render_template(
         "engenharia/etm.html", torre=TORRE, tela=TORRE.tela("etm"), oss=oss, colunas=ETM.COLUNAS,
+        usinas=_usinas_da_etm(d, oss), pode=pode,
         kpis=faixa_etm(oss, hoje, sem_marcas=bool(erro_marcas), sem_leitura=not d["lido"]), erro=d["erro"],
         erro_marcas=erro_marcas, nunca_lido=not d["lido"], lendo=d["lendo"], erro_setores=d.get("erro_setores") or "",
         # os status da OS no Fracttal, na ordem dele (o filtro "Status da OS", 26/10/2026)
         status=list(os_equipe.STATUS_OS.values()), etiquetas_eng=[n for _, n in M.ETIQUETAS], hoje=hoje.isoformat(),
         admin=bool(session.get("admin")),           # o painel do histórico do app de ETM (uma vez, só o administrador)
         lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")
+
+
+@bp.route("/etm/finalizar", methods=["POST"])
+def etm_finalizar():
+    """O "Finalizar pela Engenharia" em lote do quadro da usina nas Estações em Aberto (como no app): as OS que a pessoa
+    viu na coluna Finalizadas, conferidas aqui na última leitura do Fracttal (da usina pedida e finalizadas nele) e no
+    livro (sem diagnóstico nem o finalizado), numa gravação só. As outras voltam em "fora" (não são da usina, não estão
+    finalizadas no Fracttal) ou em "ja" (a Engenharia já encerrou)."""
+    import logging
+
+    from ...engenharia import etm as ETM
+    from ...engenharia import etm_marcas as M
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    pode, _meu = _quem_pode()
+    corpo = request.get_json(silent=True) or {}
+    usina = str(corpo.get("usina") or "")
+    pedidas = list(dict.fromkeys(str(x).strip() for x in corpo.get("os") or [] if str(x).strip()))
+    alvo = {str(o["os"]): o for o in ETM.dados()["os"]
+            if o.get("usina") == usina and o.get("coluna_etm") == "finalizada" and o.get("wid")}
+    fora = [f for f in pedidas if f not in alvo]
+    try:
+        r = M.finalizar_lote([_os_para_gravar(_na_etm(alvo[f])) for f in pedidas if f in alvo],
+                             session.get("usuario"), pode)
+    except M.Recusada as e:
+        return jsonify({"erro": str(e)}), 403
+    except Exception as e:      # noqa: BLE001 — banco fora: nada mudou (a trava recusa antes de gravar)
+        logging.exception("ETMs: o finalizar em lote da usina não gravou")
+        return jsonify({"erro": FALHOU_BANCO.format(type(e).__name__)}), 502
+    return jsonify({"feitas": r["feitas"], "ja": r["ja"], "fora": fora})
+
+
+@bp.route("/etm/usina/comentarios")
+def etm_usina_comentarios():
+    """O "Chat da usina" do Histórico (como no app): os comentários da Engenharia em todas as OS de ETM da usina, o mais
+    novo primeiro, com o número e o título da OS. A cifra abre aqui, no clique, só para as OS da usina."""
+    from ...engenharia import etm as ETM
+    from ...engenharia import os_acompanhamento as O
+    usina = request.args.get("usina") or ""
+    oss = {O.chave_da_os(o.get("wid")): o for o in ETM.dados()["os"] if o.get("usina") == usina and o.get("wid")}
+    lido = O.ler()
+    if not lido.get("lido_em"):
+        motivo = (lido.get("erro") or "sem leitura").split(":")[0]
+        return jsonify({"erro": f"Não consegui ler os comentários da Engenharia ({motivo}); tente de novo em instantes"}), 503
+    est = O.estado([l for l in lido["eventos"] if O.chave_da_os(l.get("os_id")) in oss])
+    out = []
+    for wid, e in est.items():
+        o = oss[wid]
+        for ev in e["eventos"]:
+            if ev["evento"] == "comentario" and ev["texto"]:
+                out.append((ev["quando"] or datetime.min.replace(tzinfo=timezone.utc),
+                            {"os": str(o["os"]), "titulo": o.get("titulo") or "", "nome": ev["nome"] or "alguém",
+                             "quando": ev["quando_txt"], "texto": ev["texto"]}))
+    out.sort(key=lambda x: x[0], reverse=True)
+    return jsonify({"usina": usina, "comentarios": [c for _, c in out]})
 
 
 @bp.route("/equipe")

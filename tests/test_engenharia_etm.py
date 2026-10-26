@@ -82,7 +82,8 @@ def fracttal(monkeypatch, app):
     def ler(path):
         pedidos.append(path)
         if path.startswith("items?field_1="):
-            return {"data": [{"code": "ALF100-ESTM1", "description": "Estação Meteorológica  Alfa  Minas Gerais"},
+            return {"data": [{"code": "ALF100-ESTM1", "description": "Estação Meteorológica  Alfa  Minas Gerais",
+                              "groups_1_description": U},
                              {"code": "X-1", "description": "Inversor 1"}]}
         if path.startswith("work_orders?items_log_description="):
             return {"data": [w(1, "Corretiva"), w(3, "Preventiva")]}
@@ -307,7 +308,8 @@ def test_a_tela_etms_na_torre_da_engenharia(tela, cliente):
 def test_os_filtros_do_planner_no_padrao_do_nexus(tela, cliente):
     # Levi, 26/10/2026: "o estilo de lista dos filtros está todo bugado e torto, deixe no nível do nexus!" — a lista do
     # navegador (datalist) saiu; os filtros são o seletor do Acompanhamento PCM (a busca, as caixas de marcar com a conta
-    # de cada opção, Selecionar todos, Limpar e Aplicar), montados no navegador
+    # de cada opção, Selecionar todos e Limpar), montados no navegador. Depois: "não precisa desse botão "aplicar"
+    # clicou já filtrou!" e "tire o filtro do solicitante!"
     from test_engenharia_acompanhamento import ANA, _como
     html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
     assert "<datalist" not in html and 'id="etm-f-canceladas"' not in html
@@ -315,11 +317,13 @@ def test_os_filtros_do_planner_no_padrao_do_nexus(tela, cliente):
         assert campo in html, campo
     defs = html.split("var FILTROS = [", 1)[1].split("];", 1)[0]
     chaves = [x.split("'")[1] for x in defs.split("k: ")[1:]]
-    assert chaves == ["cliente", "usina", "trabalho", "status", "criado_por", "solicitante", "responsavel"]
+    assert chaves == ["cliente", "usina", "trabalho", "status", "criado_por", "responsavel"]
     # a coluna de filtros à esquerda (Levi: "tem um espaço livre do lado esquerdo que está sendo mau utilizado")
     assert html.index('class="etm-lado"') < html.index('class="kb-quadro"')
     assert "l: 'Status da OS'" in defs and "l: 'Tipo de trabalho'" in defs
-    assert "etm-ms-painel" in html and "'Selecionar todos'" in html and "'Aplicar'" in html
+    assert "etm-ms-painel" in html and "'Selecionar todos'" in html
+    # a caixa marcada filtra na hora: sem Aplicar nem Cancelar
+    assert "'Aplicar'" not in html and "'Cancelar'" not in html and "addEventListener('change'" in html
     # o filtro das etiquetas da Engenharia, na coluna Em andamento como no app
     assert all(f'data-etiqueta="{n}"' in html for n in ("OS em campo", "Stand By", "Validação Final"))
 
@@ -593,3 +597,166 @@ def test_a_tela_diz_quando_esta_sem_os_setores(tela, cliente, monkeypatch):
     html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
     assert "Sem os setores agora" in html
 
+
+# ── a 4ª rodada (26/10/2026): o nome curto da usina, as abas Histórico e Estações em Aberto ─────────────────────────
+def test_o_nome_curto_da_usina_sem_o_cliente_e_o_estado():
+    # Levi, 26/10/2026: "o nome da usina está vindo completo, o ideal seria sem a informação do nome do cliente e estado!"
+    assert E.usina_curta("Cliente X - Usina Alfa - MG") == "Usina Alfa"
+    assert E.usina_curta("Cliente Y - Usina Beta (Fase 2) - CE") == "Usina Beta (Fase 2)"
+    assert E.usina_curta("Cliente Z - Usina Gama - Bloco 2 - SP") == "Usina Gama - Bloco 2"
+    assert E.usina_curta("Cliente W - Usina Delta") == "Usina Delta"            # sem o estado
+    assert E.usina_curta("Usina Sozinha") == "Usina Sozinha"                    # sem o cliente
+    assert E.usina_curta("Cliente V - MG") == "Cliente V - MG"                  # não sobraria nada: o nome inteiro
+    assert E.usina_curta("") == "Usina não identificada"
+
+
+def test_a_leitura_guarda_a_usina_de_cada_etm(fracttal, app):
+    # o Histórico do app lista as usinas pelas ETMs (a usina sem OS também aparece, com quantas ETMs tem)
+    E.pedir_releitura(app, esperar=True)
+    assert E.dados()["usinas"] == {U: 1}
+
+
+def test_a_tela_leva_o_nome_curto_e_as_usinas_das_etms(tela, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, _como
+    d = E.dados()
+    monkeypatch.setattr(E, "dados", lambda: dict(d, usinas={U: 2, "Cliente Y - Usina Beta - CE": 1}))
+    dt = _dados_da_tela(_como(cliente, ANA).get(URL_TELA).get_data(as_text=True))
+    o = {x["os"]: x for x in dt["oss"]}
+    assert o["1"]["usina"] == U and o["1"]["usina_nome"] == "Usina Alfa"
+    assert dt["usinas"] == [{"nome": U, "curta": "Usina Alfa", "cliente": "Cliente X", "etms": 2},
+                            {"nome": "Cliente Y - Usina Beta - CE", "curta": "Usina Beta", "cliente": "Cliente Y",
+                             "etms": 1}]
+
+
+def test_as_abas_do_app_planner_historico_e_estacoes_em_aberto(tela, cliente):
+    # Levi, 26/10/2026: "sinto falta daquelas outras seções também. A de histórico, e a de ETMs em aberto. Elas são bem
+    # interessantes para visualização histórica e atual. o deploy que te mandei tinham abas só disso!"
+    import re
+
+    from test_engenharia_acompanhamento import ANA, _como
+    html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
+    nav = html.split('class="cn-abas etm-abas"', 1)[1].split("</nav>", 1)[0]
+    assert re.findall(r'data-aba="(\w+)"', nav) == ["planner", "historico", "abertas"]
+    assert [t.strip() for t in re.findall(r">([^<>]+)<", nav) if t.strip()][:3] == \
+           ["Planner", "Histórico", "Estações em Aberto"]
+    for painel in ("planner", "historico", "abertas"):
+        assert f'id="etm-p-{painel}"' in html
+    # o Chat da usina e o Finalizar pela Engenharia do app
+    assert "Chat da usina" in html and "Finalizar pela Engenharia" in html and "Ver histórico desta usina" in html
+
+
+def test_quem_pode_finalizar_vai_no_json(tela, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, BETO, _como
+
+    from nexus.auth import setor_telas as ST
+    assert _dados_da_tela(_como(cliente, ANA).get(URL_TELA).get_data(as_text=True))["pode"] is True
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"engenharia/etm"},
+                                               "setor": {"id": 2, "nome": "Performance"}, "erro": ""})
+    assert _dados_da_tela(_como(cliente, BETO).get(URL_TELA).get_data(as_text=True))["pode"] is False
+
+
+URL_FIN = "/t/engenharia/etm/finalizar"
+
+
+@pytest.fixture
+def lote(tela, monkeypatch):
+    """O `tela` com mais uma OS finalizada no Fracttal (a 5) e a usina ligada ao cadastro."""
+    from nexus.torres import engenharia as torre
+    d = E.dados()
+    mais = E.montar([w(5, "Corretiva", status=3, task="DONE")], ETMS, SET, date.today())
+    monkeypatch.setattr(E, "dados", lambda: dict(d, os=d["os"] + mais))
+    monkeypatch.setattr(torre, "_onde_do_cadastro",
+                        lambda: (lambda texto, cod: {"usina_id": 7, "ligada_por": "de-para do Fracttal"}))
+
+
+def test_finalizar_pela_engenharia_em_lote(lote, cliente, monkeypatch):
+    # o botão do quadro da usina nas Estações em Aberto: as finalizadas no Fracttal que a pessoa vê, sem diagnóstico nem
+    # o finalizado, numa gravação só; a que não está finalizada no Fracttal (a 1) e a que não é da tela (a 99) ficam
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+
+    from nexus.engenharia import etm_marcas as M
+    gravacoes = []
+    real = M._publicar
+    monkeypatch.setattr(M, "_publicar", lambda eventos: (gravacoes.append(len(eventos)), real(eventos)))
+    c = _como(cliente, ANA)
+    r = c.post(URL_FIN, json={"usina": U, "os": ["3", "5", "1", "99"]}, headers=SAME)
+    j = r.get_json()
+    assert r.status_code == 200 and sorted(j["feitas"]) == ["3", "5"] and sorted(j["fora"]) == ["1", "99"]
+    assert len(gravacoes) == 1
+    e = M.estado(M.ler(forcar=True)["eventos"])
+    assert e["50003"]["finalizado"] is True and e["50005"]["finalizado"] is True and "50001" not in e
+    assert {x["usina_id"] for x in M._reler()["eventos"]} == {7}
+    # de novo: já estão finalizadas, nada a gravar
+    j = c.post(URL_FIN, json={"usina": U, "os": ["3"]}, headers=SAME).get_json()
+    assert j["feitas"] == [] and j["ja"] == ["3"] and len(gravacoes) == 1
+
+
+def test_finalizar_em_lote_pula_a_que_tem_diagnostico(lote, cliente):
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+
+    from nexus.engenharia import etm_marcas as M
+    M.marcar({"wid": 50003, "folio": "3", "codigo": "ALF100-ESTM1"}, "diagnostico", 1, ANA, True)
+    j = _como(cliente, ANA).post(URL_FIN, json={"usina": U, "os": ["3", "5"]}, headers=SAME).get_json()
+    assert j["feitas"] == ["5"] and j["ja"] == ["3"]
+
+
+def test_finalizar_em_lote_so_quem_e_da_engenharia_e_do_proprio_site(lote, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, BETO, SAME, _como
+
+    from nexus.auth import setor_telas as ST
+    from nexus.engenharia import etm_marcas as M
+    r = _como(cliente, ANA).post(URL_FIN, json={"usina": U, "os": ["3"]}, headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"engenharia/etm"},
+                                               "setor": {"id": 2, "nome": "Performance"}, "erro": ""})
+    r = _como(cliente, BETO).post(URL_FIN, json={"usina": U, "os": ["3"]}, headers=SAME)
+    assert r.status_code == 403 and "Engenharia" in r.get_json()["erro"]
+    assert M._reler()["eventos"] == []
+
+
+URL_CHAT = "/t/engenharia/etm/usina/comentarios"
+
+
+def test_o_chat_da_usina_junta_os_comentarios_das_os_dela(tela, cliente):
+    # o "Chat da usina" do Histórico do app: os comentários da Engenharia em todas as OS da usina, o mais novo primeiro
+    from datetime import datetime, timezone
+
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.engenharia import os_acompanhamento as O
+
+    def item(wid, folio, texto, dia, autor="Pessoa Um"):
+        return {"os_": {"wid": wid, "folio": folio, "codigo": "ALF100-ESTM1"}, "autor": autor, "texto": texto,
+                "quando": datetime(2026, 10, dia, 12, 0, tzinfo=timezone.utc), "origem_id": f"c{wid}{dia}", "nota": "sim"}
+    O.importar_comentarios([item(50001, "1", "Sem comunicação desde ontem", 20),
+                            item(50003, "3", "Piranômetro trocado", 22, autor="Pessoa Dois"),
+                            item(99999, "9", "De outra usina", 23)], "teste")
+    O.classificar({"wid": 50001, "folio": "1", "codigo": "ALF100-ESTM1"}, 2, None, ANA, True)   # não é comentário
+    c = _como(cliente, ANA)
+    j = c.get(URL_CHAT, query_string={"usina": U}).get_json()
+    assert [x["os"] for x in j["comentarios"]] == ["3", "1"]
+    x = j["comentarios"][0]
+    assert (x["texto"], x["nome"], x["titulo"], x["quando"]) == ("Piranômetro trocado", "Pessoa Dois",
+                                                                  "Estação sem comunicação", "22/10/2026 09:00")
+    assert c.get(URL_CHAT, query_string={"usina": "Cliente Y - Usina Beta - CE"}).get_json()["comentarios"] == []
+
+
+def test_o_chat_da_usina_sem_o_livro_diz(tela, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.engenharia import os_acompanhamento as O
+    monkeypatch.setattr(O, "ler", lambda forcar=False: {"eventos": [], "lido_em": None, "erro": "Timeout: banco"})
+    r = _como(cliente, ANA).get(URL_CHAT, query_string={"usina": U})
+    assert r.status_code == 503 and "Timeout" in r.get_json()["erro"]
+
+
+def test_cada_os_leva_quantos_comentarios_tem(tela, cliente):
+    # a lista do Histórico diz quantos comentários cada OS tem (a conta sai das linhas, sem abrir a cifra)
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.engenharia import os_acompanhamento as O
+    os1 = {"wid": 50001, "folio": "1", "codigo": "ALF100-ESTM1"}
+    O.registrar_comentario(os1, "Primeiro", ANA, True, "sim")
+    O.registrar_comentario(os1, "Segundo", ANA, True, "sim")
+    o = {x["os"]: x for x in _dados_da_tela(_como(cliente, ANA).get(URL_TELA).get_data(as_text=True))["oss"]}
+    assert o["1"]["n_coment"] == 2 and o["3"]["n_coment"] == 0

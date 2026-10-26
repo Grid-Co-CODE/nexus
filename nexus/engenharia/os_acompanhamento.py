@@ -157,6 +157,22 @@ def estado(eventos: list[dict]) -> dict[str, dict]:
     return out
 
 
+def chave_da_os(v) -> str:
+    """O id da OS como chave: a API pode devolver "39550452.0"."""
+    t = _txt(v)
+    return str(_int(t) or t) if t else ""
+
+
+def comentarios_por_os(eventos: list[dict]) -> dict[str, int]:
+    """Quantos comentários cada OS tem, contados pelas linhas, sem abrir a cifra (a lista do Histórico da tela ETMs)."""
+    out: dict[str, int] = {}
+    for l in eventos:
+        oid = chave_da_os(l.get("os_id"))
+        if oid and _txt(l.get("evento")) == "comentario":
+            out[oid] = out.get(oid, 0) + 1
+    return out
+
+
 def _evento(cofre, evento: str, quem: dict, os_: dict, *, status_id=None, prioridade_id=None, texto: str = "",
             nota: str | None = None, quando: datetime | None = None, origem: str = "nexus", origem_id=None) -> dict:
     eid = uuid.uuid4().hex[:12]
