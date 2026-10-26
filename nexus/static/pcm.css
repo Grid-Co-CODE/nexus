@@ -1074,13 +1074,8 @@ a.alm-aba{display:inline-block;text-decoration:none}
   .inv-item-n{flex:1 1 100%}
 /* ── Régua de mínimo e máximo (26/10/2026, o inventário do almoxarifado): a sugestão, o recomendado (a Grid) e o acordado
    (o cliente) de cada peça. A tabela é a `alm-t` do Almoxarifado (abaixo de 640 px vira cartão, com o data-r como rótulo);
-   aqui só o que é da tela: o menu entre as partes do almoxarifado, a lista de almoxarifados, os campos de número e o fim da
-   linha. Cor só por token. */
-.rg-nav{display:flex;gap:4px;margin-top:14px;border-bottom:1px solid var(--linha);overflow-x:auto}
-.rg-nav a{padding:10px 12px;border-bottom:2px solid transparent;color:var(--mudo);font:600 13px var(--font-sans);
-  white-space:nowrap;text-decoration:none}
-.rg-nav a:hover{color:var(--tinta)}
-.rg-nav a[aria-current=page]{color:var(--tinta);border-bottom-color:var(--verde)}
+   aqui só o que é da tela: a lista de almoxarifados, os campos de número e o fim da linha. As partes do almoxarifado são a
+   fila das abas (`.alm-abas`, pcm/_almox_abas.html). Cor só por token. */
 .rg-sub{margin:18px 0 8px;font:700 15px var(--font-sans);color:var(--tinta)}
 .rg-almoxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin:0;padding:0;list-style:none}
 .rg-almoxes a{display:block;padding:10px 12px;background:var(--superficie-2);border:1px solid var(--linha);
@@ -1101,8 +1096,8 @@ a.alm-aba{display:inline-block;text-decoration:none}
 
 /* ── Curadoria do inventário (26/10/2026): o que o campo contou fora do catálogo e o genérico que o técnico identificou, para
    o PCM decidir. Cada achado é um cartão (a foto, o que o técnico escreveu, a quantidade) com as opções em <details>, cada uma
-   com o formulário dela (sem JavaScript, e no celular a foto passa para cima do texto). O menu entre as partes do almoxarifado
-   é o `rg-nav` da régua. Cor só por token. */
+   com o formulário dela (sem JavaScript, e no celular a foto passa para cima do texto). As partes do almoxarifado são a fila
+   das abas (`.alm-abas`). Cor só por token. */
 .cu-card{display:flex;gap:14px;margin-top:12px;padding:14px;background:var(--superficie);border:1px solid var(--linha);
   border-radius:12px}
 .cu-foto{flex:none;width:96px}

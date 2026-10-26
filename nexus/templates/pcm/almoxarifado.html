@@ -49,8 +49,12 @@
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="catalogo">Catálogo e saldo ({{ d.catalogo|length }})</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="consumo">Consumo nas OS ({{ d.consumo|length }})</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="cadastro">Cadastro a corrigir</button>
-  {# o Inventário (26/10/2026) é OUTRA página: um link na fila das abas, com quantas contagens esperam o PCM #}
+  {# as quatro partes do inventário (26/10/2026) são OUTRAS páginas: links na fila das abas, juntas (o Inventário com quantas
+     contagens esperam o PCM), as mesmas do pcm/_almox_abas.html das páginas do inventário #}
   <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/inventario">Inventário{% if inventario_a_revisar %} ({{ inventario_a_revisar }}){% endif %}</a>
+  <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/inventario/regua">Mínimo e máximo</a>
+  <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/inventario/curadoria">Curadoria</a>
+  <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/inventario/auditoria">Auditoria</a>
 </nav>
 
 <form class="cn-filtros alm-filtros" method="get" id="alm-f" data-filtro-local>

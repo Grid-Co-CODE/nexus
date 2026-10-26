@@ -48,6 +48,16 @@ def registrar(bp) -> None:
         return render_template("pcm/inventario.html", **R.montar_lista(current_app.config),
                                travadas=G.travadas(current_app.config))
 
+    @bp.route("/pecas/inventario/auditoria", endpoint="inventario_auditoria")
+    def inventario_auditoria():
+        """A aba Auditoria: os eventos do livro do inventário, com o filtro por tipo e a busca na própria página. Não fala com o
+        Fracttal; o motivo (cifrado) não aparece, e o nome de quem fez só para quem pode revisar."""
+        from .. import telas         # pelo módulo, na hora do pedido (como a régua e a curadoria): quem pode é decidido agora
+        a = request.args
+        return render_template("pcm/inventario_auditoria.html", a_revisar=R.a_revisar(current_app.config),
+                               **R.montar_auditoria(current_app.config, telas.pode_programar(), str(a.get("tipo") or ""),
+                                                    str(a.get("busca") or "")))
+
     @bp.route("/pecas/inventario/<contagem_id>", endpoint="inventario_contagem")
     def inventario_contagem(contagem_id):
         """A contagem aberta, SEM o Fracttal: o login dele não chega a `/t/pcm` (o cookie vale só em /os). O Sistema, o Δ e os seis

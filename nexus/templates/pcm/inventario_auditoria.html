@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block titulo %}Auditoria do inventário · Almoxarifado{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# PCM → Almoxarifado → Auditoria (26/10/2026, o inventário do almoxarifado; desenho 4.6): uma linha por evento do livro do
+   inventário (fato_evento_inventario), que nunca muda: contagem recebida, aprovação, peça gravada (de → para e o movimento que
+   o Fracttal devolveu), conflito, erro, revisão, curadoria e régua gravada. É também o histórico com que o PCM defende o mínimo.
+   O motivo do PCM é texto livre e mora só cifrado no livro: aqui a linha diz que ele existe, e a contagem aberta o mostra a quem
+   revisa. O nome de quem fez só vai a quem pode revisar. O filtro é da própria página (filtro-local.js); o endereço com ?tipo= e
+   ?busca= já chega filtrado (nexus/pcm/inventario/revisao.py, montar_auditoria). Abaixo de 640 px a tabela vira cartões. #}
+<div class="pg alm inv">
+<p class="gc-eyebrow">PCM · Almoxarifado · Inventário</p>
+<h1 class="titulo-pagina">Almoxarifado</h1>
+{% set aba_inventario = 'auditoria' %}
+{% include "pcm/_almox_abas.html" %}
+
+{% if erro %}
+<div class="cn-erro" role="alert">Não consegui ler o livro do inventário: {{ erro }}</div>
+{% endif %}
+
+<section class="alm-painel">
+  <h2>Auditoria do inventário (<span data-fl-conta="inv-aud">{{ n_visiveis }}</span>)</h2>
+  <p class="alm-ajuda">Cada linha é um evento que já aconteceu, do mais novo ao mais velho, e não muda depois. O motivo de cada
+    revisão fica guardado cifrado: quem revisa o lê na contagem aberta.{% if not pode %} Quem fez cada passo, só o setor PCM vê.{% endif %}</p>
+  {% if not erro %}
+  {% if eventos %}
+  <form class="cn-filtros alm-filtros" method="get" id="inv-aud" data-filtro-local>
+    <label class="gc-rotulo" for="aud-tipo">Tipo</label>
+    <select id="aud-tipo" name="tipo" class="gc-campo" data-fl>
+      <option value="">Todos</option>
+      {% for t in tipos %}<option value="{{ t.valor }}" data-rotulo="{{ t.rotulo }}"{% if t.valor == tipo %} selected{% endif %}>{{ t.rotulo }} ({{ t.n }})</option>{% endfor %}
+    </select>
+    <input id="aud-busca" name="busca" class="gc-campo" type="search" placeholder="Buscar por peça, almoxarifado, contagem ou movimento"
+           aria-label="Buscar na auditoria" autocomplete="off" data-fl-texto="contem" value="{{ busca }}">
+    <a class="cn-filtro-ativo" href="?" data-fl-limpar{% if not (tipo or busca) %} hidden{% endif %}>Limpar</a>
+  </form>
+  <table class="alm-t inv-aud" data-fl-grupo="inv-aud" data-fl-nome="inv-aud">
+    <thead><tr><th>Quando</th><th>Evento</th><th>Almoxarifado</th><th>Peça</th><th>Contagem</th><th>Números</th>{% if pode %}<th>Quem</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for x in eventos %}
+    <tr data-fl-linha data-f-tipo="{{ x.tipo }}" data-f-busca="{{ x.busca }}"{% if x.oculta %} hidden{% endif %}>
+      <td data-r="Quando"><span class="alm-v">{{ x.hora }}</span></td>
+      <td data-r="Evento"><span class="alm-v"><b{% if x.classe %} class="{{ x.classe }}"{% endif %}>{{ x.rotulo }}</b>{% if x.motivo %}<span class="alm-det">motivo cifrado</span>{% endif %}</span></td>
+      <td data-r="Almoxarifado"><span class="alm-v">{{ x.almox or '—' }}</span></td>
+      <td data-r="Peça"><span class="alm-v">{% if x.codigo or x.peca %}{% if x.codigo %}<span class="alm-cod">{{ x.codigo }}</span> {% endif %}{{ x.peca }}{% else %}—{% endif %}</span></td>
+      <td data-r="Contagem"><span class="alm-v">{% if x.contagem_id %}<a class="inv-abrir" href="{{ raiz }}/t/pcm/pecas/inventario/{{ x.contagem_id|urlencode }}">{{ x.contagem_id }}</a>{% else %}—{% endif %}</span></td>
+      <td data-r="Números"><span class="alm-v">{{ x.numeros or '—' }}{% for d in x.detalhes %}<span class="alm-det">{{ d }}</span>{% endfor %}</span></td>
+      {% if pode %}<td data-r="Quem"><span class="alm-v">{{ x.quem or '—' }}</span></td>{% endif %}
+    </tr>
+    {% endfor %}
+    <tr data-fl-vazio="inv-aud"{% if n_visiveis %} hidden{% endif %}><td colspan="{{ 7 if pode else 6 }}" class="mudo">Nenhum evento com esses filtros.</td></tr>
+    </tbody>
+  </table>
+  {% else %}<p class="mudo">Nenhum evento ainda: a primeira revisão, aprovação ou régua gravada aparece aqui.</p>{% endif %}
+  {% endif %}
+</section>
+</div>
+<script src="{{ url_for('static', filename='filtro-local.js') }}"></script>
+{% endblock %}

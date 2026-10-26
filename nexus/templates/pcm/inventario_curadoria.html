@@ -12,11 +12,9 @@
 <div class="pg alm cu">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
 <h1 class="titulo-pagina">Curadoria</h1>
-<nav class="rg-nav" aria-label="Partes do almoxarifado">
-  <a href="{{ raiz }}/t/pcm/pecas">Saldo e reposição</a>
-  <a href="{{ raiz }}/t/pcm/pecas/inventario/regua">Mínimo e máximo</a>
-  <a href="{{ raiz }}/t/pcm/pecas/inventario/curadoria" aria-current="page">Curadoria</a>
-</nav>
+{# as partes do almoxarifado: a fila das abas, com as quatro do inventário juntas (pcm/_almox_abas.html) #}
+{% set aba_inventario = 'curadoria' %}
+{% include "pcm/_almox_abas.html" %}
 <p class="pcm-sub">O que o campo contou fora do catálogo, e o genérico que o técnico identificou, nas contagens que ainda não foram
   gravadas. Decidir não grava no estoque: a quantidade entra no lote da contagem (as unidades achadas somam ao contado da peça, e o
   total substitui o saldo no Fracttal quando você gravar). Cadastrar cria a peça no Fracttal agora, com o seu login.</p>

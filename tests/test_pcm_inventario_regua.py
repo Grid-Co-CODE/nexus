@@ -728,5 +728,5 @@ def test_sem_cor_fora_de_token_nem_endereco_da_raiz():
     bloco = css[css.index("/* ── Régua de mínimo e máximo"):]
     proximo = bloco.find("/* ── ", 10)
     bloco = bloco if proximo < 0 else bloco[:proximo]
-    assert ".rg-nav" in bloco and ".rg-n{" in bloco
+    assert ".rg-almoxes" in bloco and ".rg-n{" in bloco          # o menu próprio (rg-nav) saiu: as abas do Almoxarifado
     assert not re.search(r"#[0-9a-fA-F]{3,8}", bloco) and "rgba(" not in bloco

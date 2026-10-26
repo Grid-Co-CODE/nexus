@@ -602,6 +602,7 @@ def test_a_tela_e_do_setor_pcm(app, inv, falso, setores):  # noqa: F811
     _cenario(inv)
     assert _como(app, ANA).get(LISTA).status_code == 403                       # a Ana é da Performance
     assert _como(app, ANA).get(f"{LISTA}/C-1").status_code == 403
+    assert _como(app, ANA).get(f"{LISTA}/auditoria").status_code == 403
     assert _como(app, ANA).post(f"{LISTA}/C-1/revisar", json={"acao": "recontagem", "motivo": "x"}).status_code == 403
     # o portão por setor só olha /t/...: a ponte (/os/_nexus) confere o setor sozinha
     assert _lote(_via(_como(app, ANA))).status_code == 403
@@ -622,13 +623,34 @@ def test_a_aba_inventario_ao_lado_das_cinco(app, inv, falso, monkeypatch):
     c = _pcm(app, monkeypatch)
     html = c.get("/t/pcm/pecas").get_data(as_text=True)
     abas = re.findall(r'<(?:button|a)[^>]*class="alm-aba"[^>]*>(.*?)</(?:button|a)>', html, re.S)
-    assert [re.sub(r"\s+", " ", a).split(" (")[0].strip() for a in abas] == [
-        "Reposição", "Por almoxarifado", "Catálogo e saldo", "Consumo nas OS", "Cadastro a corrigir", "Inventário"]
+    assert [re.sub(r"\s+", " ", a).split(" (")[0].strip() for a in abas] == ABAS
     assert re.search(r'<a[^>]*href="/t/pcm/pecas/inventario"[^>]*>\s*Inventário \(1\)', html)
     pagina = c.get(LISTA).get_data(as_text=True)
     for aba in ("reposicao", "almoxarifados", "catalogo", "consumo", "cadastro"):
         assert f'href="/t/pcm/pecas?aba={aba}"' in pagina
     assert re.search(r'aria-selected="true"[^>]*href="/t/pcm/pecas/inventario"|href="/t/pcm/pecas/inventario"[^>]*aria-selected="true"', pagina)
+
+
+ABAS = ["Reposição", "Por almoxarifado", "Catálogo e saldo", "Consumo nas OS", "Cadastro a corrigir", "Inventário",
+        "Mínimo e máximo", "Curadoria", "Auditoria"]
+
+
+def test_as_abas_do_inventario_ficam_juntas(app, inv, falso, monkeypatch):
+    """As quatro partes do inventário (Inventário, Mínimo e máximo, Curadoria, Auditoria) ficam juntas na fila das abas do
+    Almoxarifado, em toda página delas, com a de agora marcada; o menu próprio da régua e da curadoria saiu."""
+    _semear_almox(inv)
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    for caminho, marcada in ((LISTA, "inventario"), (f"{LISTA}/C-1", "inventario"), (f"{LISTA}/regua", "regua"),
+                             (f"{LISTA}/curadoria", "curadoria"), (f"{LISTA}/auditoria", "auditoria")):
+        html = c.get(caminho).get_data(as_text=True)
+        nav = re.search(r'<nav class="alm-abas".*?</nav>', html, re.S).group(0)
+        abas = re.findall(r'<a[^>]*class="alm-aba"[^>]*>(.*?)</a>', nav, re.S)
+        assert [re.sub(r"\s+", " ", a).split(" (")[0].strip() for a in abas] == ABAS, caminho
+        sel = re.findall(r'<a[^>]*aria-selected="true"[^>]*href="([^"]+)"', nav)
+        destino = LISTA if marcada == "inventario" else f"{LISTA}/{marcada}"
+        assert sel == [destino], caminho
+        assert "rg-nav" not in html, caminho
 
 
 def test_a_aba_nao_quebra_se_o_inventario_nao_le(app, inv, falso, monkeypatch, tmp_path):
@@ -640,11 +662,101 @@ def test_a_aba_nao_quebra_se_o_inventario_nao_le(app, inv, falso, monkeypatch, t
     assert r.status_code == 200 and 'href="/t/pcm/pecas/inventario"' in r.get_data(as_text=True)
 
 
+# ── a auditoria ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+AUDITORIA = f"{LISTA}/auditoria"
+
+
+def _historia(app):
+    """Uma história no almoxarifado 10 (a Altair), do mais velho ao mais novo: a peça tirada (com motivo), a aprovação, a
+    peça gravada (com o movimento do Fracttal), um conflito (com motivo) e a régua gravada. E um evento no almoxarifado de
+    teste (99), que fica fora das telas."""
+    quem = {"pessoa_hmac": codigo_da_pessoa(CHAVE, EMAIL), "pessoa_id": 92, "id_almoxarifado": "10"}
+    F.acrescentar(app.config, F.ABA_EVENTO, [
+        dict(quem, tipo="peca_tirada", contagem_id="C-1", id_item="506", codigo="SP-506", quando="2026-10-26T12:00:00Z",
+             dados={"motivo": "motivo secreto da peça tirada"}),
+        dict(quem, tipo="aprovada", contagem_id="C-1", id_item="501", codigo="SP-501", de_qtd=10, para_qtd=12,
+             situacao="para_cima", quando="2026-10-26T12:10:00Z"),
+        dict(quem, tipo="peca_gravada", contagem_id="C-1", id_item="501", codigo="SP-501", de_qtd=10, para_qtd=12,
+             movimento_fracttal="4321", lote=1, quando="2026-10-26T12:20:00Z"),
+        dict(quem, tipo="conflito", contagem_id="C-1", id_item="502", codigo="SP-502", de_qtd=5, para_qtd=3,
+             quando="2026-10-26T12:21:00Z", dados={"motivo": "a peça se moveu no Fracttal depois da contagem"}),
+        dict(quem, tipo="regua_gravada", id_item="501", codigo="SP-501", de_qtd=2, para_qtd=3, quando="2026-10-26T13:00:00Z"),
+        dict(quem, tipo="peca_gravada", contagem_id="T-1", id_almoxarifado="99", id_item="777", codigo="SP-TST-001",
+             de_qtd=5, para_qtd=3, movimento_fracttal="9999", quando="2026-10-26T14:00:00Z"),
+    ])
+
+
+def _linhas_da_auditoria(html):
+    return re.findall(r'<tr[^>]*\bdata-fl-linha\b[^>]*>.*?</tr>', html, re.S)
+
+
+def _visiveis(html):
+    return [l for l in _linhas_da_auditoria(html) if not re.match(r'<tr[^>]*\bhidden\b', l)]
+
+
+def test_auditoria_lista_e_filtra(app, inv, falso, monkeypatch):
+    """A aba Auditoria (desenho 4.6): os eventos do livro do inventário, do mais novo ao mais velho, com o tipo (cor E palavra),
+    o almoxarifado, a peça, a contagem e os números (de → para, o movimento do Fracttal). O filtro por tipo e a busca são da
+    própria página (filtro-local.js: cada linha leva o data-f-tipo e o data-f-busca sem acento nem caixa), e o endereço com
+    ?tipo= e ?busca= já chega filtrado. O motivo nunca aparece (é cifrado; a contagem aberta o mostra a quem revisa), o
+    almoxarifado de teste fica de fora, e o nome de quem fez só vai a quem pode revisar (o PCM)."""
+    from nexus.pcm.inventario import revisao as R
+    assert set(R.ROTULO_EVENTO) == set(F.TIPOS_EVENTO)                       # todo tipo do livro tem nome na tela
+    _cenario(inv)
+    app.config["NEXUS_ALMOX_TESTE_IDS"] = "99"
+    _historia(app)
+    c = _pcm(app, monkeypatch)
+    r = c.get(AUDITORIA)
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and falso.chamadas == []                     # a auditoria não fala com o Fracttal
+    linhas = _linhas_da_auditoria(html)
+    assert [re.search(r'data-f-tipo="(\w+)"', l).group(1) for l in linhas] == [
+        "regua_gravada", "conflito", "peca_gravada", "aprovada", "peca_tirada"]
+    assert "SP-TST-001" not in html and "9999" not in html                   # o almoxarifado de teste fica de fora
+    gravada = linhas[2]
+    assert "Peça gravada" in gravada and "SP-501" in gravada and "Fusível 10A" in gravada and "Almoxarifado Altair" in gravada
+    assert re.search(r"10\s*para\s*12", gravada) and "4321" in gravada and 'href="/t/pcm/pecas/inventario/C-1"' in gravada
+    assert "26/10/2026 09:20" in gravada                                     # a hora de Brasília
+    assert "Supervisora Campo" in gravada                                    # quem: o nome da ficha, para o PCM
+    assert "fusivel 10a" in re.search(r'data-f-busca="([^"]*)"', gravada).group(1)
+    assert "Conflito" in linhas[1] and "alm-aviso" in linhas[1]
+    assert "Régua gravada" in linhas[0] and re.search(r"2\s*para\s*3", linhas[0]) and "C-1" not in linhas[0]
+    # o motivo nunca (é cifrado no livro); a tela só diz que ele existe
+    assert "motivo secreto" not in html and "se moveu no Fracttal" not in html
+    assert "motivo cifrado" in linhas[4] and "motivo cifrado" not in linhas[2]
+    # o filtro na própria página
+    assert re.search(r'<select[^>]*name="tipo"[^>]*data-fl\b', html) and 'data-fl-texto="contem"' in html
+    assert "filtro-local.js" in html and re.search(r'<option value="conflito"[^>]*>Conflito \(1\)', html)
+    filtrada = c.get(f"{AUDITORIA}?tipo=conflito").get_data(as_text=True)
+    assert [re.search(r'data-f-tipo="(\w+)"', l).group(1) for l in _visiveis(filtrada)] == ["conflito"]
+    assert re.search(r'<option value="conflito"[^>]*\bselected\b', filtrada)
+    buscada = c.get(f"{AUDITORIA}?busca=FUSÍVEL").get_data(as_text=True)
+    assert len(_visiveis(buscada)) == 3 and 'value="FUSÍVEL"' in buscada      # as três da peça 501 (a régua também)
+    # quem só olha (outro setor com a tela marcada): os eventos, sem o nome de quem fez
+    from nexus.pcm import telas
+    monkeypatch.setattr(telas, "pode_programar", lambda: False)
+    olha = c.get(AUDITORIA).get_data(as_text=True)
+    assert "Peça gravada" in olha and "Supervisora Campo" not in olha
+    assert "ficha 92" not in olha and ">Quem</th>" not in olha               # nem o número da ficha, nem na busca
+
+
+def test_auditoria_sem_livro_diz_e_nao_quebra(app, inv, falso, monkeypatch, tmp_path):
+    """O livro do inventário que não se lê: a tela diz, e não mostra "nenhum evento" (seria mentira)."""
+    _cenario(inv)
+    (tmp_path / "inventario.json").write_text("{não é json", encoding="utf-8")
+    F.limpar()
+    r = _pcm(app, monkeypatch).get(AUDITORIA)
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and "Auditoria do inventário" in html
+    assert re.search(r'class="cn-erro" role="alert">[^<]*livro do inventário', html) and "Nenhum evento" not in html
+
+
 # ── o visual ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 def test_sem_cor_fora_de_token():
     """Cor só por token do nexus.css (nos dois temas): nada de #hex nem rgba() nos templates novos, nem no CSS do inventário."""
     base = RAIZ / "nexus" / "templates" / "pcm"
-    for nome in ("inventario.html", "inventario_contagem.html", "_inventario_lote.html", "_almox_abas.html"):
+    for nome in ("inventario.html", "inventario_contagem.html", "_inventario_lote.html", "_almox_abas.html",
+                 "inventario_auditoria.html"):
         t = (base / nome).read_text("utf-8")
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b", t) and "rgba(" not in t and "rgb(" not in t, nome
     css = (RAIZ / "nexus" / "static" / "pcm.css").read_text("utf-8")
@@ -655,7 +767,8 @@ def test_sem_cor_fora_de_token():
 def test_os_enderecos_nao_partem_da_raiz():
     """Endereço do Nexus nunca a partir da raiz (ele pode rodar debaixo de um prefixo): `{{ raiz }}` nos links e formulários."""
     base = RAIZ / "nexus" / "templates" / "pcm"
-    for nome in ("inventario.html", "inventario_contagem.html", "_inventario_lote.html", "_almox_abas.html"):
+    for nome in ("inventario.html", "inventario_contagem.html", "_inventario_lote.html", "_almox_abas.html",
+                 "inventario_auditoria.html"):
         t = (base / nome).read_text("utf-8")
         assert not re.search(r'(?:href|action|src)="/(?!/)', t), nome
         assert not re.search(r"(?:fetch|location\.href\s*=)\s*\(?\s*['\"]/", t), nome

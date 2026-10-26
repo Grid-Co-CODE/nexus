@@ -12,11 +12,9 @@
 <div class="pg alm rg">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
 <h1 class="titulo-pagina">Mínimo e máximo</h1>
-<nav class="rg-nav" aria-label="Partes do almoxarifado">
-  <a href="{{ raiz }}/t/pcm/pecas">Saldo e reposição</a>
-  <a href="{{ raiz }}/t/pcm/pecas/inventario/regua" aria-current="page">Mínimo e máximo</a>
-  <a href="{{ raiz }}/t/pcm/pecas/inventario/curadoria">Curadoria</a>
-</nav>
+{# as partes do almoxarifado: a fila das abas, com as quatro do inventário juntas (pcm/_almox_abas.html) #}
+{% set aba_inventario = 'regua' %}
+{% include "pcm/_almox_abas.html" %}
 <p class="pcm-sub">A régua de 14/10: o mínimo é 20% do saldo e o máximo é o dobro; a peça avariada (código com -AV) fica sem
   mínimo e com o triplo. Unidade inteira arredonda o mínimo para cima; metro e massa têm duas casas. O
   <b>recomendado</b> é o da Grid e fica só aqui, como histórico. O <b>acordado</b> é o do cliente: é o único que vai ao

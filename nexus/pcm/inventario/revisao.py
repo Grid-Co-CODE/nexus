@@ -30,6 +30,8 @@ from ...campo import visao
 from ...campo.ligacao_cadastro import codigo_da_pessoa, mapas_de
 from ...dados import almoxarifado as A
 from ...dados import fato_inventario as F
+from ...dados import fatos as D
+from ...dados.dominios import norm
 from . import contas, leitura
 from .estoque import ErroFracttal, Limite, SemLogin, instante
 
@@ -131,6 +133,124 @@ def a_revisar(cfg) -> int | None:
     g = visao._ler(("pcm_inventario_a_revisar",),
                    lambda: {"n": sum(1 for c in leitura.contagens(cfg) if c["aprovavel"])})
     return None if g.erro or not g.dados else g.dados["n"]
+
+
+# ── a auditoria ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+# o nome de cada tipo de evento na tela (um para cada `fato_inventario.TIPOS_EVENTO`; o teste confere que não falta nenhum)
+ROTULO_EVENTO = {"contagem_recebida": "Contagem recebida", "aprovada": "Aprovada para gravar", "peca_gravada": "Peça gravada",
+                 "conflito": "Conflito", "erro": "Erro", "peca_tirada": "Peça tirada do lote",
+                 "recontagem_pedida": "Recontagem pedida", "numero_corrigido": "Número corrigido",
+                 "substituida": "Contagem substituída", "curadoria": "Curadoria decidida", "regua_gravada": "Régua gravada"}
+# a severidade é a palavra (o rótulo) E a cor: o que pede olho do PCM em âmbar ou vermelho, o que foi ao Fracttal em verde
+CLASSE_EVENTO = {"peca_gravada": "alm-ok", "regua_gravada": "alm-ok", "conflito": "alm-aviso", "recontagem_pedida": "alm-aviso",
+                 "erro": "alm-ruim"}
+
+
+def _qtd(v) -> float | None:
+    """A quantidade do livro como número (a API devolve texto, "3,0" ou "None"; o arquivo, número); vazio é None."""
+    t = str(v if v is not None else "").strip().replace(",", ".")
+    if t.lower() in ("", "none", "nan"):
+        return None
+    try:
+        return float(t)
+    except ValueError:
+        return None
+
+
+def _nomes_para_auditoria() -> dict:
+    """{"almox": {id: nome}, "itens": {id: {codigo, nome}}}: só enfeitam a tela (o evento traz os IDs e o código), pela cópia de
+    5 min do `visao._ler`. Sem os livros do App, a linha aparece pelo ID."""
+    def ler():
+        almox = {}
+        for s in leitura._livro_ou_vazio(A.LIVRO_SALDO, A.ABA_SALDO):
+            if A._txt(s.get("ID do almoxarifado")) and A._txt(s.get("Almoxarifado")):
+                almox.setdefault(A._id(s.get("ID do almoxarifado")), A._txt(s.get("Almoxarifado")))
+        itens = {A._id(i.get("ID do item")): {"codigo": A._txt(i.get("Código")), "nome": A._txt(i.get("Nome"))}
+                 for i in leitura._livro_ou_vazio(A.LIVRO_ITENS, A.ABA_ITENS) if A._txt(i.get("ID do item"))}
+        return {"almox": almox, "itens": itens}
+    g = visao._ler(("pcm_inventario_auditoria_nomes",), ler)
+    return g.dados if g.dados and not g.erro else {"almox": {}, "itens": {}}
+
+
+def _nomes_das_pessoas(ids: set) -> dict:
+    """{pessoa_id: "Nome padrão"} pela ficha do cadastro (cifrada; a mesma conta das telas do Campo). O livro só guarda o
+    `pessoa_id` e o código do e-mail: o nome é atributo da pessoa e sai da ficha, na hora. Sem o cadastro, vazio (a tela
+    mostra o número da ficha)."""
+    if not ids:
+        return {}
+    try:
+        return visao._Base._nomes(ids, visao._livro("cadastro_nexus", "pessoas"))
+    except Exception:       # noqa: BLE001 — o nome só enfeita a auditoria: sem o cadastro, o número da ficha
+        return {}
+
+
+def montar_auditoria(cfg, pode: bool, tipo: str = "", busca: str = "") -> dict:
+    """A aba Auditoria (desenho 4.6): uma linha por evento do `fato_evento_inventario`, do mais novo ao mais velho, sem o
+    almoxarifado de teste (como as outras telas). Nunca o motivo: ele é texto livre, mora só cifrado no livro, e quem revisa o
+    lê na contagem aberta; aqui a linha só diz que ele existe. O nome de quem fez só para quem `pode` revisar (o PCM): os outros
+    setores que veem a tela leem o que aconteceu, não quem. `tipo` e `busca` são os filtros do endereço: a página aberta já
+    filtrada chega com as outras linhas escondidas, e o `filtro-local.js` segue dali sem voltar ao servidor. Não fala com o
+    Fracttal; `erro` quando o livro não se lê (a tela diz, e não mostra "nenhum evento")."""
+    tipo = tipo if tipo in F.TIPOS_EVENTO else ""
+    busca_n = norm(busca)
+    ctx = {"erro": "", "eventos": [], "tipos": [], "tipo": tipo, "busca": str(busca or "").strip()[:100], "pode": pode,
+           "n_visiveis": 0}
+    try:
+        eventos = F.ler(cfg)[F.ABA_EVENTO]
+    except F.Recusada as ex:
+        ctx["erro"] = str(ex)
+        return ctx
+    teste = A.ids_de_teste(cfg)
+    eventos = [e for e in eventos if A._id(e.get("id_almoxarifado")) not in teste]
+    nomes = _nomes_para_auditoria() if eventos else {"almox": {}, "itens": {}}
+    pessoas = _nomes_das_pessoas({D._id(e.get("pessoa_id")) for e in eventos} - {None}) if pode else {}
+    linhas = []
+    for n, e in enumerate(eventos):
+        t = A._txt(e.get("tipo"))
+        almox, item, cid = A._id(e.get("id_almoxarifado")), A._id(e.get("id_item")), A._txt(e.get("contagem_id"))
+        peca = nomes["itens"].get(item, {})
+        codigo = A._txt(e.get("codigo")) or peca.get("codigo", "")
+        de, para, contado = _qtd(e.get("de_qtd")), _qtd(e.get("para_qtd")), _qtd(e.get("contado_qtd"))
+        numeros = (f"{'mínimo ' if t == 'regua_gravada' else ''}{_num(de)} para {_num(para)}" if de is not None or para is not None
+                   else f"contado {_num(contado)}" if contado is not None else "")
+        detalhes = []
+        if A._txt(e.get("situacao")) in ROTULO_SITUACAO:
+            detalhes.append(ROTULO_SITUACAO[A._txt(e.get("situacao"))])
+        if A._id(e.get("movimento_fracttal")):
+            detalhes.append(f"movimento {A._id(e.get('movimento_fracttal'))} no Fracttal")
+        if D._id(e.get("lote")):
+            detalhes.append(f"lote {D._id(e.get('lote'))}")
+        pid = D._id(e.get("pessoa_id"))
+        quem = (pessoas.get(pid) or f"ficha {pid} do cadastro") if pid else ("sem ficha no cadastro" if e.get("pessoa_hmac") else "")
+        rotulo = ROTULO_EVENTO.get(t, t)
+        nome_almox = nomes["almox"].get(almox) or (f"Almoxarifado {almox}" if almox else "")
+        procura = norm(" ".join(x for x in (rotulo, nome_almox, almox, codigo, peca.get("nome", ""), item, cid,
+                                            A._id(e.get("movimento_fracttal")), quem if pode else "") if x))
+        linhas.append({"n": n, "quando": _quando_do_evento(e.get("quando")), "hora": _hora(e.get("quando")), "tipo": t,
+                       "rotulo": rotulo, "classe": CLASSE_EVENTO.get(t, ""), "almox": nome_almox, "id_item": item,
+                       "codigo": codigo, "peca": peca.get("nome", ""), "contagem_id": cid, "numeros": numeros,
+                       "detalhes": detalhes, "quem": quem if pode else "", "motivo": bool(A._txt(e.get("dados_cifrados"))),
+                       "busca": procura, "_achou": not busca_n or busca_n in procura})
+    linhas.sort(key=lambda x: (x["quando"], x["n"]), reverse=True)
+    for x in linhas:
+        x["oculta"] = not x["_achou"] or bool(tipo and x["tipo"] != tipo)
+    # as opções do tipo: os que aparecem, na ordem do livro, cada um com a conta sob a busca (a mesma cascata do filtro-local)
+    conta = {}
+    for x in linhas:
+        if x["_achou"]:
+            conta[x["tipo"]] = conta.get(x["tipo"], 0) + 1
+    presentes = {x["tipo"] for x in linhas} | ({tipo} if tipo else set())
+    ctx["tipos"] = [{"valor": t, "rotulo": ROTULO_EVENTO[t], "n": conta.get(t, 0)} for t in F.TIPOS_EVENTO if t in presentes]
+    ctx["eventos"], ctx["n_visiveis"] = linhas, sum(1 for x in linhas if not x["oculta"])
+    return ctx
+
+
+def _quando_do_evento(iso):
+    """O instante do evento para ordenar (o livro tem a hora em UTC com Z); a hora ilegível vai para o fim."""
+    try:
+        return instante(iso)
+    except ValueError:
+        return instante("2000-01-01T00:00:00Z")
 
 
 # ── a contagem aberta ────────────────────────────────────────────────────────────────────────────────────────────────────
