@@ -970,3 +970,57 @@ html.pgp-aberto{overflow:hidden}
 .tu-hist li{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid var(--linha);font-size:13px;color:var(--tinta-2)}
 .tu-hist li:first-child{border-top:0}
 .tu-hist-quando{font:600 11.5px/16px var(--font-sans);color:var(--mudo)}
+
+/* ── Almoxarifado (25/10/2026, a prévia aprovada pelo Levi): o saldo de cada peça em cada almoxarifado do Fracttal. A
+   faixa de números é a kb-kpis da casa (engenharia.css), com 6 números; a barra do saldo é a parte do mínimo que o
+   saldo cobre; abaixo de 640 px as tabelas viram cartões, com o data-r como rótulo de cada valor. */
+.alm-kpis{grid-template-columns:repeat(6,minmax(0,1fr))}
+/* com o menu aberto, 6 números não cabem numa linha abaixo de ~1200 px (medido a 1024 px: as notas quebravam em
+   três linhas): três por linha até 900 px, e dali a régua da kb-kpis (dois por linha) */
+@media (min-width:901px) and (max-width:1200px){.alm-kpis{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:14px}
+  .alm-kpis .kb-kpi:nth-child(3n+1){padding-left:0;border-left:0}}
+@media (max-width:900px){.alm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.alm-vazio{margin-top:18px}
+.alm-abas{display:flex;gap:4px;margin-top:20px;border-bottom:1px solid var(--linha);overflow-x:auto}
+.alm-aba{background:none;border:0;border-bottom:2px solid transparent;color:var(--mudo);font:600 13px var(--font-sans);
+  padding:10px 12px;cursor:pointer;white-space:nowrap}
+.alm-aba[aria-selected=true]{color:var(--tinta);border-bottom-color:var(--verde)}
+.alm-filtros .gc-campo{min-width:0;flex:1 1 180px}
+.alm-painel{margin-top:14px;padding:14px;background:var(--superficie);border:1px solid var(--linha);border-radius:12px}
+.alm-painel h2{margin:0 0 4px;font:700 15px var(--font-sans);color:var(--tinta)}
+.alm-ajuda{margin:0 0 12px;font-size:12.5px;color:var(--mudo)}
+table.alm-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--tinta)}
+.alm-t th{padding:8px;text-align:left;font-size:12px;font-weight:600;color:var(--mudo);border-bottom:1px solid var(--linha-forte)}
+.alm-t td{padding:8px;border-bottom:1px solid var(--linha);vertical-align:top}
+.alm-t .num{text-align:right;white-space:nowrap}
+.alm-cod{font-family:var(--font-mono);font-size:12.5px;color:var(--tinta-2)}
+.alm-det{display:block;font-size:12px;color:var(--mudo)}
+.alm-falta,.alm-ruim{color:var(--critico)}
+.alm-limite,.alm-aviso{color:var(--alerta);font-size:12px}
+.alm-ok{color:var(--ok)}
+.alm-barra{display:inline-block;width:46px;height:5px;margin-left:6px;overflow:hidden;vertical-align:middle;border-radius:3px;
+  background:var(--linha-forte)}
+.alm-barra i{display:block;height:100%;background:var(--alerta)}
+.alm-barra--larga{width:100%;margin:10px 0 0}
+.alm-barra--larga i{background:var(--verde)}
+.alm-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.alm-card{padding:12px;background:var(--superficie-2);border:1px solid var(--linha);border-radius:10px}
+.alm-card h3{margin:0;font:600 14px var(--font-sans);color:var(--tinta)}
+.alm-card .alm-det{margin:2px 0 8px}
+.alm-card-n{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:12.5px;color:var(--tinta-2)}
+.alm-card-n b{color:var(--tinta)}
+.alm-card-n .alm-ruim b{color:var(--critico)}
+.alm-card-n .alm-aviso{font-size:12.5px}
+.alm-card-n .alm-aviso b{color:var(--alerta)}
+.alm-lista{margin:0;padding-left:18px;font-size:13px;line-height:1.8;color:var(--tinta)}
+@media (max-width:640px){
+  .alm-t thead{display:none}
+  .alm-t tr{display:block;margin-bottom:8px;padding:6px 8px;border:1px solid var(--linha);border-radius:10px}
+  .alm-t td{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border:0;text-align:right}
+  .alm-t td::before{flex:none;content:attr(data-r);font-size:12px;color:var(--mudo);text-align:left}
+  /* o valor da célula num bloco só (o almoxarifado com a usina, o código com o nome, o saldo com a barra): sem ele o
+     flex espalhava cada pedaço (conferido a 375 px em 25/10/2026) */
+  .alm-v{min-width:0;text-align:right}
+  .alm-t .num{white-space:normal}
+  .alm-t tr[data-fl-vazio] td::before{content:none}
+}

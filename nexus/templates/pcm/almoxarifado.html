@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block titulo %}Almoxarifado{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# PCM → Almoxarifado (25/10/2026, a prévia aprovada pelo Levi): o saldo de cada peça em cada almoxarifado do Fracttal,
+   pela varredura diária do App de Campo. As contas estão em nexus/dados/almoxarifado.py (as mesmas da carga do
+   histórico) e a montagem em nexus/pcm/almoxarifado.py. O filtro é na própria página (filtro-local.js): escolher não
+   recarrega a tela. Abaixo de 640 px as tabelas viram cartões (o data-r é o rótulo de cada valor). #}
+<div class="pg alm">
+<p class="gc-eyebrow">PCM · Almoxarifado</p>
+<h1 class="titulo-pagina">Almoxarifado</h1>
+{% if erro %}<div class="cn-erro" role="alert">Uma fonte não respondeu agora: {{ erro }}</div>{% endif %}
+
+{% if d.estado == 'sem_livro' %}
+<p class="pcm-sub alm-vazio">O App ainda não publica o almoxarifado. Quando a varredura diária do inventário do Fracttal
+  chegar ao banco, o saldo de cada peça aparece aqui.</p>
+
+{% elif d.estado == 'incoerente' %}
+<div class="cn-erro cn-aviso" role="status">{{ d.aviso }}</div>
+
+{% elif d.estado == 'ok' %}
+{% set k = d.kpis %}
+<p class="pcm-sub">O saldo do Fracttal de {{ d.ciclo.fim }} ({{ d.ciclo.lidos }} de {{ d.ciclo.total }} itens lidos), pela
+  varredura diária do App de Campo. Abaixo do mínimo: o saldo é menor que o mínimo cadastrado. No limite: o saldo é o
+  mínimo, e a próxima saída já fica abaixo.</p>
+{% if d.aviso %}<div class="cn-erro cn-aviso" role="status">{{ d.aviso }}</div>{% endif %}
+
+<section class="kb-kpis alm-kpis" aria-label="Resumo do almoxarifado">
+  <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Almoxarifados</span>
+    <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.almoxarifados }}</b><span class="kb-kpi-nota">nas usinas</span></div></div>
+  <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Peças com saldo</span>
+    <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.com_saldo }}</b><span class="kb-kpi-nota">em algum almoxarifado</span></div></div>
+  <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Abaixo do mínimo</span>
+    <div class="kb-kpi-linha"><b class="kb-kpi-v{% if k.abaixo %} kb-kpi-v--critico{% elif k.no_limite %} kb-kpi-v--alerta{% endif %}">{{ k.abaixo }}</b>
+      <span class="kb-kpi-nota">e <b>{{ k.no_limite }}</b> no limite</span></div></div>
+  <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Sem mínimo</span>
+    <div class="kb-kpi-linha"><b class="kb-kpi-v{% if k.sem_minimo %} kb-kpi-v--alerta{% endif %}">{{ k.sem_minimo }}</b><span class="kb-kpi-nota">peça × almoxarifado</span></div></div>
+  <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Avariadas</span>
+    <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.avariadas }}</b><span class="kb-kpi-nota">no catálogo</span></div></div>
+  <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Lançadas pelo App</span>
+    <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.lancadas }}</b><span class="kb-kpi-nota"><b{% if k.recusadas %} class="alm-ruim"{% endif %}>{{ k.recusadas }}</b> recusadas</span></div></div>
+</section>
+
+<nav class="alm-abas" role="tablist" aria-label="Partes do almoxarifado">
+  <button class="alm-aba" role="tab" aria-selected="true" data-aba="reposicao">Reposição ({{ k.abaixo }} + {{ k.no_limite }} no limite)</button>
+  <button class="alm-aba" role="tab" aria-selected="false" data-aba="almoxarifados">Por almoxarifado ({{ k.almoxarifados }})</button>
+  <button class="alm-aba" role="tab" aria-selected="false" data-aba="catalogo">Catálogo e saldo ({{ d.catalogo|length }})</button>
+  <button class="alm-aba" role="tab" aria-selected="false" data-aba="consumo">Consumo nas OS ({{ d.consumo|length }})</button>
+  <button class="alm-aba" role="tab" aria-selected="false" data-aba="cadastro">Cadastro a corrigir</button>
+</nav>
+
+<form class="cn-filtros alm-filtros" method="get" id="alm-f" data-filtro-local>
+  <label class="gc-rotulo" for="f-almox">Almoxarifado</label>
+  <select id="f-almox" name="almox" class="gc-campo" data-fl>
+    <option value="">Todos</option>
+    {% for a in d.almoxarifados %}<option value="{{ a }}" data-rotulo="{{ a }}">{{ a }} ({{ d.linhas|selectattr('almox', 'equalto', a)|list|length }})</option>{% endfor %}
+  </select>
+  <label class="gc-rotulo" for="f-familia">Família</label>
+  <select id="f-familia" name="familia" class="gc-campo" data-fl>
+    <option value="">Todas</option>
+    {% for f in d.familias %}<option value="{{ f }}" data-rotulo="{{ f }}">{{ f }} ({{ d.linhas|selectattr('familia', 'equalto', f)|list|length }})</option>{% endfor %}
+  </select>
+  <input id="f-busca" name="busca" class="gc-campo" type="search" placeholder="Buscar peça por código ou nome"
+         aria-label="Buscar peça" autocomplete="off" data-fl-texto="contem">
+  <a class="cn-filtro-ativo" href="?" data-fl-limpar hidden>Limpar</a>
+</form>
+
+{% macro filtro(almox, familia, busca) %} data-fl-linha data-f-almox="{{ almox }}" data-f-familia="{{ familia }}" data-f-busca="{{ busca }}"{% endmacro %}
+
+<section class="alm-painel" data-painel="reposicao">
+  <h2>Peças abaixo do mínimo e no limite</h2>
+  <p class="alm-ajuda">A falta é o que repõe até o mínimo. Ordem: a mais longe do mínimo primeiro, depois as no limite.</p>
+  {% if d.reposicao %}
+  <table class="alm-t" data-fl-grupo="alm-f">
+    <thead><tr><th>Almoxarifado</th><th>Peça</th><th>Família</th><th class="num">Saldo</th><th class="num">Mínimo</th><th class="num">Falta</th></tr></thead>
+    <tbody>
+    {% for x in d.reposicao %}
+    <tr{{ filtro(x.almox, x.familia, x.codigo ~ ' ' ~ x.nome) }}>
+      <td data-r="Almoxarifado"><span class="alm-v">{{ x.almox }}{% if x.usina %}<span class="alm-det">{{ x.usina }}</span>{% endif %}</span></td>
+      <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ x.codigo }}</span> {{ x.nome }}</span></td>
+      <td data-r="Família"><span class="alm-v">{{ x.familia }}</span></td>
+      <td data-r="Saldo" class="num"><span class="alm-v">{{ '%g'|format(x.saldo) }} <span class="alm-barra" aria-hidden="true"><i style="width:{{ x.pct }}%"></i></span></span></td>
+      <td data-r="Mínimo" class="num"><span class="alm-v">{{ '%g'|format(x.minimo) }}</span></td>
+      <td data-r="Falta" class="num"><span class="alm-v">{% if x.situacao == 'abaixo' %}<b class="alm-falta">{{ '%g'|format(x.falta) }}</b> {{ x.unidade }}{% else %}<span class="alm-limite">no limite</span>{% endif %}</span></td>
+    </tr>
+    {% endfor %}
+    <tr data-fl-vazio="alm-f" hidden><td colspan="6" class="mudo">Nenhuma peça com esses filtros.</td></tr>
+    </tbody>
+  </table>
+  {% else %}<p class="mudo">Nenhuma peça abaixo do mínimo nem no limite.</p>{% endif %}
+</section>
+
+<section class="alm-painel" data-painel="almoxarifados" hidden>
+  <h2>Por almoxarifado</h2>
+  <p class="alm-ajuda">A barra é a parte das peças acima do mínimo.</p>
+  <div class="alm-cards">
+  {% for c in d.por_almoxarifado %}
+    <article class="alm-card">
+      <h3>{{ c.nome }}</h3>
+      <p class="alm-det">{% if c.usina %}{{ c.usina }}{% else %}<span class="alm-ruim">usina não ligada</span> (ligar em Base → Ligações){% endif %}</p>
+      <div class="alm-card-n">
+        <span><b>{{ c.pecas }}</b> peças</span>
+        <span{% if c.abaixo %} class="alm-ruim"{% endif %}><b>{{ c.abaixo }}</b> abaixo · <b>{{ c.no_limite }}</b> no limite</span>
+        <span{% if c.sem_minimo %} class="alm-aviso"{% endif %}><b>{{ c.sem_minimo }}</b> sem mínimo</span>
+        <span><b>{{ c.zeradas }}</b> zeradas</span>
+      </div>
+      <span class="alm-barra alm-barra--larga" title="{{ c.pct_ok }}% acima do mínimo"><i style="width:{{ c.pct_ok }}%"></i></span>
+    </article>
+  {% endfor %}
+  </div>
+</section>
+
+<section class="alm-painel" data-painel="catalogo" hidden>
+  <h2>Catálogo e saldo</h2>
+  <p class="alm-ajuda">Todas as peças do inventário e onde cada uma tem saldo.</p>
+  <table class="alm-t" data-fl-grupo="alm-f">
+    <thead><tr><th>Peça</th><th>Família</th><th class="num">Saldo total</th><th>Onde tem</th></tr></thead>
+    <tbody>
+    {% for c in d.catalogo %}
+    <tr{{ filtro(c.almoxes|join('|'), c.familia, c.codigo ~ ' ' ~ c.nome) }}>
+      <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ c.codigo }}</span> {{ c.nome }}{% if c.avariado %} <span class="alm-aviso">avariada</span>{% endif %}</span></td>
+      <td data-r="Família"><span class="alm-v">{{ c.familia }}</span></td>
+      <td data-r="Saldo total" class="num"><span class="alm-v">{% if c.nao_lido %}<span class="alm-aviso">não lido neste ciclo</span>{% else %}{{ '%g'|format(c.total) }} {{ c.unidade|lower }}{% endif %}</span></td>
+      <td data-r="Onde tem"><span class="alm-v">{% if c.nao_lido %}—{% elif c.onde %}{{ c.onde|join(' · ') }}{% else %}<span class="mudo">sem saldo em nenhum almoxarifado</span>{% endif %}</span></td>
+    </tr>
+    {% endfor %}
+    <tr data-fl-vazio="alm-f" hidden><td colspan="4" class="mudo">Nenhuma peça com esses filtros.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="alm-painel" data-painel="consumo" hidden>
+  <h2>Peças lançadas nas OS pelo App</h2>
+  <p class="alm-ajuda">O que o técnico lançou pelo App de Campo, desde o início. A baixa no estoque é do Fracttal, quando a
+    OS fecha; a recusada nunca saiu do saldo.{% if d.consumo_fonte == 'app' %}
+    Por enquanto, o histórico ainda não é gravado: mostrando os 90 dias do App.{% endif %}</p>
+  <table class="alm-t" data-fl-grupo="alm-f">
+    <thead><tr><th>Dia</th><th>OS</th><th>Peça</th><th class="num">Qtd</th><th>Almoxarifado</th><th>No Fracttal</th></tr></thead>
+    <tbody>
+    {% for c in d.consumo|reverse %}
+    <tr{{ filtro(c.almox, c.familia, c.codigo ~ ' ' ~ c.nome ~ ' ' ~ c.os) }}>
+      <td data-r="Dia"><span class="alm-v">{{ c.dia }}</span></td>
+      <td data-r="OS" class="alm-cod"><span class="alm-v">{{ c.os }}</span></td>
+      <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ c.codigo }}</span> {{ c.nome }}</span></td>
+      <td data-r="Qtd" class="num"><span class="alm-v">{{ '%g'|format(c.quantidade) }}</span></td>
+      <td data-r="Almoxarifado"><span class="alm-v">{{ c.almox }}</span></td>
+      <td data-r="No Fracttal"><span class="alm-v">{% if c.situacao == 'lançada' %}<span class="alm-ok">lançada</span>{% else %}<span class="alm-ruim">recusada</span>{% if c.recusa %} <span class="alm-det">{{ c.recusa }}</span>{% endif %}{% endif %}</span></td>
+    </tr>
+    {% endfor %}
+    <tr data-fl-vazio="alm-f"{% if d.consumo %} hidden{% endif %}><td colspan="6" class="mudo">Nenhuma peça lançada pelo App.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="alm-painel" data-painel="cadastro" hidden>
+  <h2>Cadastro a corrigir no Fracttal</h2>
+  <p class="alm-ajuda">Quem corrige é o PCM, no Fracttal; o Nexus só lê. Sem o mínimo, a peça nunca aparece na Reposição.</p>
+  <ul class="alm-lista">
+    {% for s in d.cadastro.sem_minimo %}<li><b>{{ s.n }}</b> peça(s) sem mínimo em {{ s.almoxarifado }}</li>{% endfor %}
+    {% for a in d.cadastro.avariadas %}<li><span class="alm-cod">{{ a.codigo }}</span> {{ a.nome }}: avariada com saldo {{ '%g'|format(a.saldo) }} em {{ a.almox }}</li>{% endfor %}
+    {% for r in d.cadastro.recusadas %}<li><span class="alm-ruim">corrigir no Fracttal</span>: a peça <span class="alm-cod">{{ r.codigo }}</span> da OS {{ r.os }} foi recusada{% if r.recusa %} ({{ r.recusa }}){% endif %} e não saiu do saldo</li>{% endfor %}
+    {% if not (d.cadastro.sem_minimo or d.cadastro.avariadas or d.cadastro.recusadas) %}<li class="mudo">Nada a corrigir.</li>{% endif %}
+  </ul>
+</section>
+<script>
+  // as abas: mostrar uma esconde as outras (a tabela escondida não conta no filtro) e o endereço guarda qual está aberta
+  (function () {
+    var abas = Array.prototype.slice.call(document.querySelectorAll('.alm-aba'));
+    var paineis = Array.prototype.slice.call(document.querySelectorAll('[data-painel]'));
+    function abrir(nome) {
+      if (!abas.some(function (b) { return b.dataset.aba === nome; })) nome = 'reposicao';
+      abas.forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.aba === nome)); });
+      paineis.forEach(function (p) { p.hidden = p.dataset.painel !== nome; });
+      var u = new URL(location.href); u.searchParams.set('aba', nome); history.replaceState(null, '', u);
+      var f = document.getElementById('alm-f'); if (f) f.dispatchEvent(new Event('input', {bubbles: true}));
+    }
+    abas.forEach(function (b) { b.addEventListener('click', function () { abrir(b.dataset.aba); }); });
+    abrir(new URL(location.href).searchParams.get('aba') || 'reposicao');
+  })();
+</script>
+<script src="{{ url_for('static', filename='filtro-local.js') }}"></script>
+{% endif %}
+</div>
+{% endblock %}
