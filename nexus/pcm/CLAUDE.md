@@ -62,7 +62,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe e a comparação com a foto do App |
-| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça (seção abaixo); as telas e a gravação em segundo plano vêm nas próximas tarefas do plano |
+| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro). As seções abaixo; as telas e a gravação em segundo plano vêm nas próximas tarefas do plano |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `cb8239c` (23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina, e o preenchimento dos dias livres respeita o dia fixo da usina e o feriado municipal) |
 
 ## O nome do cliente é o do cadastro do Nexus (`clientes.py`; 18/10/2026)
@@ -512,6 +512,33 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
   intacto e o `api` de verdade do clone com só o `requests.post` trocado. Mutações nas regras de cada item acima (ritmo,
   nulo que vira 0, `success`, lista curta, corte da data, token renovado, nome guardado, 429, volta ao modo 0, `mode` vazio,
   `_rpc_call`), todas pegas.
+
+## Inventário do almoxarifado: as contas (`inventario/contas.py`; 26/10/2026)
+
+Puro (dicts entram, dicts saem): a leitura do livro, a tela do PCM, a gravação e a curadoria chamam estas contas, e só elas,
+para o número não mudar de uma tela para a outra. Provado em `tests/test_pcm_inventario_contas.py` (com mutações em cada regra).
+
+- **As seis situações** (`SITUACOES`; só `MEXEM` = para cima, para baixo e zerar grava no Fracttal): `sem_alteracao`,
+  `nao_tocada` (em branco) e `curadoria` (o que o PCM ainda decide) não mexem. **Em branco não é zero:** o livro volta da API
+  todo como texto ("3,0", "" e "None" no lugar do vazio) e o vazio é "não contei"; só o 0 digitado é `zerar`. **Saldo não
+  informado** (peça ligada com o saldo vazio no Fracttal) vale 0 na conta, mas contar 0 nela é `sem_alteracao`, e o `sistema`
+  do lote segue None para a conferência da gravação comparar igual com igual. **Peça fora da leitura de estoque** (nunca
+  ligada ao almoxarifado) entra com `sistema` 0 e `ligada` falso: a gravação a liga antes. **Contado negativo** nunca mexe: a
+  peça entra como não contada e `invalido`. O 0.1 + 0.2 do metro não vira "ajuste" (soma arredondada, comparação com folga).
+- **O contado efetivo** (`contado_efetivo`, a chave da linha é o "ID da linha"): a peça vale o "Contado" da linha; "é a peça
+  X" e "cadastrar" SOMAM as unidades achadas ao contado de X nessa contagem (X em branco vira só as achadas) e o total substitui
+  o saldo; o genérico (`identificar`) confirmado tira as unidades do genérico e as põe no específico. Sem decisão (ou com
+  uma que não é do tipo da linha), o genérico e o achado ficam na `curadoria` e não gravam. O genérico entra só como linhas
+  `identificar`: se o App mandar também uma linha `item` dele, as duas somam.
+- **`itens_do_lote`:** uma entrada por peça, na ordem do livro (`contado_campo` é o do campo já com a curadoria; `contado`, o
+  que vai ao Fracttal, é o corrigido pelo PCM quando há; `tirada` fica de fora da gravação mas mantém a situação). O achado
+  fora do catálogo por decidir é uma entrada à parte, sem `id_item`, na `curadoria`, com a linha em `pendentes`.
+- **`substituidas`:** por almoxarifado vale a contagem mais nova pelo "Contada em" (o instante: -03:00 e Z se comparam); as
+  velhas não gravadas ficam substituídas. **`aprovavel`: 90 dias, não 7.** Os 7 dias do desenho valiam enquanto não houvesse
+  jeito de saber o que se moveu depois da contagem; o passo 0 achou o histórico do almoxarifado (`mexidas_desde`) e o conflito
+  sai dele, peça a peça, na gravação. Os 90 dias (`APROVAVEL_DIAS`) são só o teto: a janela do livro do App e do histórico a
+  ler (que gasta da cota do Fracttal, de toda a empresa). Data ilegível ou do futuro (relógio do celular adiantado além de 1
+  h, que esconderia todo movimento real) não se aprova.
 
 ## Filtros em cascata (todas as telas do PCM com filtro; 09/10/2026)
 
