@@ -78,6 +78,7 @@ fora do catálogo). Janela: a dos outros livros do App (90 dias); o Nexus guarda
 | Descrição | só no fora do catálogo: o que o técnico escreveu (descrição de peça, não de gente) |
 | Foto | só no fora do catálogo: a chave da foto no App (o Nexus mostra pela rota de fotos do App, como as do extintor) |
 | Contou (HMAC) | HMAC do e-mail de quem contou; nunca o e-mail |
+| ID da linha | um por linha, único dentro da contagem (o App gera); a chave é (ID da contagem, ID da linha). Entrou em 26/10, na revisão da Task 1: sem ela, duas linhas fora do catálogo com a mesma descrição se confundiam |
 
 Uma contagem "enviada" está completa (o App manda tudo de uma vez, no botão "Enviar contagem"); o Nexus não mostra
 contagem pela metade. O genérico com saldo que o técnico achou ser de mais de um específico vai em uma linha por

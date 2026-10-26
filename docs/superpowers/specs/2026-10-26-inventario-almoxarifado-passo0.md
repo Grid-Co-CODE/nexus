@@ -29,7 +29,7 @@ almoxarifado de teste, cada uma com o OK do Levi ("Pode, já entrei"). Desenho: 
 |---|---|
 | Almoxarifado de teste | `TESTE-INVENTARIO`, id **134082**, local `TESTE - PA` (id 43128211), `visible_to_all: false` |
 | Peça de teste | `SP-TST-001` ("Peça de teste do inventário (Nexus)", UNIDADE), id do item **53248312** |
-| Ligação peça × almoxarifado | id **15535397** (mín. 1, máx. 4); saldo depois da prova: 5 |
+| Ligação peça × almoxarifado | id **15535397** (ligada com mín. 1 e máx. 4; depois da prova da régua, mín. 2 e máx. 6); saldo 5 |
 | Movimentos da prova | MOV-1/MOV-2 (0 → 3), MOV-3/MOV-4 (3 → 2), MOV-5/MOV-6 (2 → 5), todos do tipo 15 |
 
 `NEXUS_ALMOX_TESTE_IDS=134082` no `.env` do Nexus (e a App Setting equivalente no App) tira esse almoxarifado das telas.
@@ -122,8 +122,8 @@ foram mexidas (a prova tinha uma peça só): a prova com o App (Task 10) usa dua
 `{"filter": [], "sort": [], "page": 1, "limit": 200, "start": 0, "is_tree": false, "node": 0, "id_type_item": 4}` (o que
 a tela de Peças e Suprimentos chama; o App já usa o mesmo método) → `data[].code`; 629 peças em 26/10.
 
-## O que ficou de fora do passo 0
+### Mudar a régua (mínimo e máximo) — `inventories.warehouses_items_update`
 
-- **A régua (mínimo e máximo) numa ligação que já existe:** a tela de ajuste mostra os dois campos ao lado do saldo, e o
-  método provável é o mesmo `inventories.warehouses_items_update` com `min_stock_level`/`max_stock_level`; **não foi
-  gravado**. Precisa de uma gravação de prova no almoxarifado de teste, com o OK do Levi, antes da Task 8.
+`{"id": 15535397, "min_stock_level": "2", "max_stock_level": "6"}` → `data: null`. Provado em 26/10 (com o OK do Levi),
+**fora do modo de ajuste**: não gera movimento, e a releitura deu mínimo 2, máximo 6 e saldo 5. É a tela Estoque →
+a peça, com o saldo bloqueado e os dois níveis editáveis.
