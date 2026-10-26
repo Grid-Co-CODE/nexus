@@ -1,8 +1,8 @@
 {# O pedaço da contagem aberta que DEPENDE DO FRACTTAL (26/10/2026): os seis números, o Sistema × Contado × Δ × Situação e a
    confirmação do lote nos seis grupos (só os três primeiros mexem no estoque; o zerar abre aberto e destacado). Quem o desenha
    é a ponte (nexus/pcm/inventario/ponte_os.py, /os/_nexus/inventario/<id>/lote), porque o login do Fracttal só chega nas rotas de
-   /os; a página (inventario_contagem.html) o busca por fetch e o põe no lugar do que o técnico contou. Sem endereços aqui: os
-   botões só levam data-*, e o painel de revisão está na página. #}
+   /os; a página (inventario_contagem.html) o busca por fetch e o põe no lugar do que o técnico contou. Os botões só levam data-*
+   (o único endereço é o do "Gravar", na ponte, pela {{ raiz }}); o painel de revisão e os scripts estão na página. #}
 <section class="kb-kpis alm-kpis inv-kpis" aria-label="Resumo da contagem">
   {% for g in grupos %}
   <div class="kb-kpi"><span class="kb-kpi-rot">{{ g.titulo }}</span>
@@ -63,7 +63,16 @@
   {% endfor %}
   </div>
   <div class="inv-rodape">
-    <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" disabled title="a gravação chega na próxima entrega">Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</button>
+    {# o N e a assinatura são do lote que ESTE pedaço mostra (o Sistema lido agora): o gravar os confere contra o saldo lido de
+       novo, e recusa se o lote mudou. O clique é ouvido pela página (o script dela), porque este HTML chega por fetch #}
+    {% if pode and c.aprovavel and n_gravar %}
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-gravar="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/gravar" data-n="{{ n_gravar }}" data-assinatura="{{ assinatura }}" data-confirmar="Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }} no Fracttal, no seu login? Enquanto cada lote de 50 grava, o almoxarifado fica travado para entradas e saídas.">Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</button>
+    {% else %}
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" disabled title="{% if not n_gravar %}nada a gravar: nenhuma peça mexe no estoque{% else %}só o setor PCM grava{% endif %}">Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</button>
+    {% endif %}
   </div>
-  <p class="alm-ajuda">A gravação no Fracttal chega na próxima entrega. Por enquanto a revisão fica registrada na auditoria, no nome de quem a fez.</p>
+  <div class="cn-erro" role="alert" data-gravar-erro hidden></div>
+  <p class="alm-ajuda">Gravar abre um ajuste de inventário no Fracttal, no login de quem aprova, em lotes de 50 peças: enquanto cada lote
+    grava (cerca de 1 minuto), o almoxarifado fica travado para entradas, saídas e pedidos de compra. Antes de gravar cada peça o Nexus
+    confere o saldo de novo: a que se moveu depois da contagem vira conflito e não é gravada.</p>
 </section>

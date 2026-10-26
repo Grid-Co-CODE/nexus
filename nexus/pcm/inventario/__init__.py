@@ -6,9 +6,10 @@ Fracttal de verdade aceita (os métodos, os corpos, as respostas): `...-passo0.m
 fala só com ele (ou com o `EstoqueFalso` dos testes). `contas` são as contas do inventário (situação de cada peça, contado
 efetivo com a curadoria, a contagem mais nova que substitui as velhas, a janela de aprovação), puras: quem lê o livro, mostra
 o lote e grava chama as mesmas. `leitura` lê as contagens que o App publica e o estado de cada uma pelos eventos do livro
-do inventário. `revisao` é a aba Inventário (a lista, a contagem aberta e a revisão do PCM) e `ponte_os` é a ponte com o login
-do Fracttal: o cookie dele só chega nas rotas de `/os`, então tudo o que lê ou grava no Fracttal roda em
-`/os/_nexus/inventario/...`. A gravação em segundo plano, a régua e a curadoria entram nas tarefas seguintes.
+do inventário. `revisao` é a aba Inventário (a lista, a contagem aberta e a revisão do PCM), `gravacao` grava o lote aprovado
+no Fracttal em segundo plano, por sessão de ajuste, `regua` é a régua de mínimo e máximo e `curadoria` o fora do catálogo.
+`ponte_os` é a ponte com o login do Fracttal: o cookie dele só chega nas rotas de `/os`, então tudo o que lê ou grava no
+Fracttal (o lote, gravar, continuar, encerrar, a régua acordada, cadastrar a peça) roda em `/os/_nexus/inventario/...`.
 """
 
 
@@ -20,6 +21,7 @@ def registrar(bp) -> None:
 
     from ...dados import fato_inventario as F
     from ..telas import _de_outro_site, pode_programar
+    from . import gravacao as G
     from . import ponte_os
     from . import revisao as R
 
@@ -27,9 +29,24 @@ def registrar(bp) -> None:
     # a torre, como a ponte do OS Creator (`torres/oscreator/__init__.py`)
     ponte_os.registrar(bp)                     # idempotente: a torre também chama
 
+    def _da_gravacao(contagem_id) -> dict:
+        """O andamento da gravação desta contagem para a tela (None sem gravação) e se quem abre pode continuar agora (ela
+        parou, e é quem aprovou, pelo HMAC do e-mail)."""
+        grav = G.estado(current_app.config, contagem_id)
+        usuario = session.get("usuario")
+        email = usuario.get("email") if isinstance(usuario, dict) else None
+        parada = bool(grav) and grav["estado"] == "parada"
+        return {"gravacao": grav,
+                "pode_continuar": parada and G.e_o_aprovador(current_app.config, contagem_id, {"email": email}),
+                # quem aprovou, a qualquer hora; o administrador, parada há mais de 24 h
+                "pode_encerrar": parada and G.pode_encerrar(current_app.config, contagem_id, {"email": email},
+                                                            admin=bool(session.get("admin")))}
+
     @bp.route("/pecas/inventario", endpoint="inventario")
     def inventario():
-        return render_template("pcm/inventario.html", **R.montar_lista(current_app.config))
+        # a gravação parada com o almoxarifado travado no Fracttal avisa também aqui (quem aprovou talvez nem abra a contagem)
+        return render_template("pcm/inventario.html", **R.montar_lista(current_app.config),
+                               travadas=G.travadas(current_app.config))
 
     @bp.route("/pecas/inventario/<contagem_id>", endpoint="inventario_contagem")
     def inventario_contagem(contagem_id):
@@ -41,7 +58,17 @@ def registrar(bp) -> None:
             return render_template("pcm/inventario_contagem.html", erro=str(ex), c=None, a_revisar=None)
         if ctx is None:
             abort(404)
-        return render_template("pcm/inventario_contagem.html", erro="", a_revisar=None, **ctx)
+        # o botão "Gravar N alterações" e a assinatura do lote vêm no pedaço da ponte (`ponte_os.lote`), junto do Sistema que
+        # eles conferem; aqui fica o andamento da gravação, que não depende do Fracttal (o controle no disco)
+        return render_template("pcm/inventario_contagem.html", erro="", a_revisar=None, **ctx, **_da_gravacao(contagem_id))
+
+    @bp.route("/pecas/inventario/<contagem_id>/estado.json", endpoint="inventario_estado")
+    def inventario_estado(contagem_id):
+        """O andamento da gravação (a tela olha a cada 3 s). Não fala com o Fracttal: lê o controle da gravação."""
+        d = _da_gravacao(contagem_id)
+        if d["gravacao"] is None:
+            return jsonify(ok=False, erro="Esta contagem não tem gravação."), 404
+        return jsonify(ok=True, pode_continuar=d["pode_continuar"], pode_encerrar=d["pode_encerrar"], **d["gravacao"])
 
     @bp.route("/pecas/inventario/<contagem_id>/revisar", methods=["POST"], endpoint="inventario_revisar")
     def inventario_revisar(contagem_id):

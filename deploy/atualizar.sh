@@ -131,6 +131,20 @@ if ! no_venv .venv/bin/python -B "$CONFERIDA/deploy/conferir_boot.py"; then
   exit 1
 fi
 
+# 2b. a gravação do inventário com um lote aberto no Fracttal deixa o almoxarifado travado, e o restart no meio a mataria
+# (Levi, 26/10/2026): o restart espera o lote fechar, por no máximo 10 min contados da 1ª espera. Quem decide é o ajudante
+# do Nexus que está no ar; sem ele, ou com qualquer falha dele, segue (só a saída 1 COM o "ESPERAR" segura). A pasta do
+# serviço não andou: a próxima rodada (o timer, 2 min depois) confere de novo. DEPLOY.md, seção 8
+AJUDANTE="$RAIZ/ferramentas/gravacao_aberta.py"
+if [ -f "$AJUDANTE" ]; then
+  espera=0
+  decisao="$(no_venv .venv/bin/python -B "$AJUDANTE")" || espera=$?
+  if [ "$espera" -eq 1 ] && [ "$decisao" = "ESPERAR" ]; then
+    echo "Uma gravação do inventário tem um lote aberto no Fracttal: o restart fica para a próxima rodada."
+    exit 0
+  fi
+fi
+
 # 3. aprovado: só agora a pasta do serviço anda (até o commit conferido, nem um a mais), e o serviço reinicia
 como git merge --ff-only --quiet "$alvo_completo"
 echo "Reiniciando o serviço $SERVICO..."

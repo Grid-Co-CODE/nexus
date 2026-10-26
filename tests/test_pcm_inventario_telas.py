@@ -145,9 +145,8 @@ def test_lista_e_contagem(app, inv, falso, monkeypatch):
     # a peça nunca ligada ao almoxarifado: o Sistema diz que não está ligada, em vez de um "0" pelado
     assert "não ligada (0)" in linha["508"] and "não ligada ao almoxarifado" in linha["508"]
     assert "entre pelo Fracttal" not in html
-    # a gravação é da próxima entrega: o botão aparece desligado, com a dica
-    assert re.search(r'<button[^>]*\bdisabled\b[^>]*>\s*Gravar 5 alterações', html)
-    assert "a gravação chega na próxima entrega" in html
+    # o botão grava (Task 7): ligado, pela ponte do Fracttal (/os/_nexus), com o N que a tela mostrou
+    assert re.search(r'<button[^>]*\bdata-gravar="/os/_nexus/inventario/C-1/gravar"[^>]*>\s*Gravar 5 alterações', html)
 
 
 def test_a_curadoria_aberta_avisa_e_nao_bloqueia(app, inv, falso, monkeypatch):

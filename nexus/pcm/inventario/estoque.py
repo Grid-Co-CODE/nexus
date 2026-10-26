@@ -232,9 +232,12 @@ class Estoque(abc.ABC):
         histórico inteiro da cota que é de todos."""
 
     @abc.abstractmethod
-    def mexidas_desde(self, id_almox: str, desde_iso: str, ignorar_referencia: str | None = None) -> set[str] | None:
+    def mexidas_desde(self, id_almox: str, desde_iso: str, ignorar_referencia: str | None = None,
+                      ignorar_prefixo: str | None = None) -> set[str] | None:
         """Os `id_item` com movimento a partir de `desde_iso` (o "Contada em", ISO UTC), sem os movimentos cuja
-        `description` é a `ignorar_referencia` (o ajuste da própria contagem). None = o Fracttal não diz."""
+        `description` é a `ignorar_referencia` (o ajuste da própria contagem) ou começa pelo `ignorar_prefixo` (todas as
+        sessões de uma contagem, `INVENTARIO-<contagem>-`: a gravação abre uma por lote, e a 2ª do mesmo lote leva
+        `-S<k>`). None = o Fracttal não diz."""
 
     @abc.abstractmethod
     def definir_regua(self, id_almox: str, id_item: str, minimo: float | None, maximo: float | None) -> None:
@@ -459,14 +462,16 @@ class EstoqueFracttal(Estoque):
                 return m["folio"]
         return None
 
-    def mexidas_desde(self, id_almox: str, desde_iso: str, ignorar_referencia: str | None = None) -> set[str] | None:
+    def mexidas_desde(self, id_almox: str, desde_iso: str, ignorar_referencia: str | None = None,
+                      ignorar_prefixo: str | None = None) -> set[str] | None:
         """O histórico vem do mais novo ao mais velho (ordenado por `date_create`): lê até passar da data e para. A
         linha com data ilegível conta como mexida (na dúvida, vira conflito para o PCM olhar, e não ajuste por cima)."""
         corte = instante(desde_iso)
         ignorar = str(ignorar_referencia).strip() if ignorar_referencia else None
+        prefixo = str(ignorar_prefixo).strip() if ignorar_prefixo else None
         mexidas = set()
         for m in self._historico(id_almox, corte):
-            if ignorar and m["referencia"] == ignorar:
+            if (ignorar and m["referencia"] == ignorar) or (prefixo and m["referencia"].startswith(prefixo)):
                 continue
             if m["id_item"]:
                 mexidas.add(m["id_item"])
