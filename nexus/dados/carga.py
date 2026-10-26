@@ -682,7 +682,10 @@ def gerar_almoxarifado(config, sessao=None, *, gravar=True, forcar=False, agora=
         if antes and agora_n is not None and agora_n < almox.COMPLETUDE_MIN * antes:
             # só aviso: o PCM pode ter limpado o catálogo (a completude é a do próprio ciclo)
             extra["queda_itens"] = rel["queda_itens"] = {"antes": antes, "agora": agora_n}
-        foto = F.saldo_do_ciclo(saldo, lig)
+        # o almoxarifado de teste (NEXUS_ALMOX_TESTE_IDS) não entra no histórico, que só cresce; o filtro vem DEPOIS do
+        # `conferir_ciclo` acima, que conta as linhas do livro inteiro (o ciclo conta as do teste)
+        saldo_real = almox.sem_almoxarifado_de_teste(saldo, config)
+        foto = F.saldo_do_ciclo(saldo_real, lig)
         ids = [l[0] for l in foto]
         rel.update(saldo_linhas=len(foto), saldo_repetidos=len(ids) - len(set(ids)), nao_lidos=nao_lidos)
         uid = [l[F.CAB_SALDO.index("usina_id")] for l in foto]
@@ -706,7 +709,7 @@ def gerar_almoxarifado(config, sessao=None, *, gravar=True, forcar=False, agora=
             i = F.CAB_SALDO.index("ciclo_inicio")
             linhas_ciclo.append(F.linha_ciclo(c0, "aplicado", conta, iso, nao_lidos))
             dim_item = F.mesclar_dim(banco[F.ABA_DIM_ITEM], F.dim_itens(itens), "id_item", F.CAB_DIM_ITEM)
-            novas_almox = F.dim_almoxarifados(saldo, lig)
+            novas_almox = F.dim_almoxarifados(saldo_real, lig)
             dim_almox = F.religar_almox(F.mesclar_dim(banco[F.ABA_DIM_ALMOX], novas_almox, "id_almoxarifado",
                                                       F.CAB_DIM_ALMOX), lig)
             # o mês corrente religado pela dimensão de agora (o almoxarifado ligado depois ganha a usina nas fotos dele)

@@ -708,6 +708,30 @@ FATOS = (
          janela_origem="90 dias (App)",
          observacao="a recusa vai como o domínio (dominios.RECUSA_PECA), nunca o texto do erro do Fracttal; a tarefa "
                     "vira tarefa_chave. A recusada nunca saiu do saldo do Fracttal"),
+    # o inventário (26/10/2026: o técnico conta as peças no App e o PCM aprova e grava no Fracttal; desenho
+    # docs/superpowers/specs/2026-10-26-inventario-almoxarifado-design.md): a contagem é o 5º livro do App, e o Nexus guarda
+    # o resto (a aprovação e as gravações vão em livro dele, `nexus_almoxarifado_inventario`, na fase seguinte). Registrado
+    # ANTES de o App publicar: o livro novo não pode aparecer como "novo" no radar da Governança
+    Fato("contagem_inventario", "Contagem do inventário", "pcm",
+         f"{almoxarifado.LIVRO_CONTAGENS} · {almoxarifado.ABA_CONTAGENS}",
+         "1 linha = 1 peça de uma contagem enviada pelo App (a pendência fora do catálogo também; o genérico com saldo "
+         "que é de mais de um específico vem em uma linha por específico)",
+         _d(data=("cod", "Contada em (a hora do celular; Enviada em, a do servidor)"),
+            usina=("nome", "Usina (o nome da usina no Fracttal, como os outros livros do App)"),
+            pessoa=("hmac", "Contou (HMAC)"),
+            equipamento=("prop", "ID do item (o item do inventário, cadastro próprio: nexus_almoxarifado · "
+                                 "dim_item_almox; vazio no fora do catálogo)")),
+         tipo="transacao", chave=("ID da contagem", "ID do item", "Identificado como", "Descrição"),
+         medidas=_m((("contado_qtd", "a do item", "semi"),)),
+         fontes=(f"{almoxarifado.LIVRO_CONTAGENS} · {almoxarifado.ABA_CONTAGENS}",), janela_origem="90 dias (App)",
+         observacao="colunas ID da contagem, Enviada em e Contada em (UTC), ID do almoxarifado, Usina, Tipo (item, "
+                    "identificar, fora_do_catalogo), ID do item, Código, Contado, Identificado como, Descrição, Foto e "
+                    "Contou (HMAC). Contado vazio é \"não contei\", nunca 0 (o 0 digitado é \"zerar\"; a API devolve "
+                    "texto, e o \"None\" do sync-xlsx também é vazio: almoxarifado.contado). O contrato não tem ID de "
+                    "linha: a linha é a contagem × a peça (o item, o Identificado como e a descrição). A soma é entre "
+                    "almoxarifados do MESMO item, nunca entre itens. Sem nome nem e-mail (quem contou, só o HMAC); a "
+                    "descrição e a foto do fora do catálogo ficam só neste livro do App. O almoxarifado de teste "
+                    "(NEXUS_ALMOX_TESTE_IDS) fica fora das telas e das contas. Até o App publicar, o livro não existe"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),

@@ -53,6 +53,7 @@ RESUMO = {
     "saldo_almox": "O saldo de cada peça em cada almoxarifado, a cada varredura diária",
     "ciclo_varredura": "Cada varredura do almoxarifado: se leu tudo e se valeu",
     "peca_lancada": "Cada peça que o técnico lançou (ou tentou lançar) pelo App numa OS",
+    "contagem_inventario": "Cada peça que o técnico contou no inventário do almoxarifado",
     "exclusao_extintor": "Os extintores que a Segurança excluiu, e por quê",
     "pedido_ronda_extintor": "As novas rondas de extintores que a Segurança pediu, por usina",
     "edicao_extintor": "As edições que a Segurança fez no cadastro dos extintores",
@@ -209,6 +210,9 @@ PARA_QUE = {
     "peca_lancada": "Guarda cada peça que o técnico lançou pelo App numa tarefa de OS, de qual almoxarifado e "
                     "quanto, e as que o Fracttal recusou (com o motivo em poucas palavras). Liga a peça à tarefa "
                     "fechada, para saber o que cada manutenção consumiu.",
+    "contagem_inventario": "Guarda cada peça que o técnico contou no almoxarifado, pelo App, e as que ele não achou no "
+                           "catálogo. Peça deixada em branco quer dizer que ninguém contou, e nunca vira zero. É a "
+                           "entrada do inventário: o PCM compara com o saldo do Fracttal antes de gravar qualquer ajuste.",
     "decisao_tela_setor":"Guarda cada decisão de liberar ou fechar uma tela do menu do Nexus para um setor, tomada por "
                           "um administrador na tela Acessos. O que cada setor vê é a última decisão de cada tela; tela "
                           "nunca marcada fica fechada, e quem é administrador do Nexus vê tudo sem precisar de marca. "

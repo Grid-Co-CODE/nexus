@@ -10,12 +10,15 @@ De onde vem cada parte:
 - o saldo, do ciclo mais novo dos livros do App quando os três (Ciclo, Itens, Saldo) são do mesmo ciclo e o ciclo leu
   90% da lista; senão, do último ciclo aplicado no histórico do Nexus (`nexus_almoxarifado`), com o aviso. Sem ciclo
   aplicado no Nexus (o ensaio, antes da NEXUS_ALMOX_GRAVAR), o aviso e nenhum número: número pela metade não vai à tela;
+- o almoxarifado de TESTE (NEXUS_ALMOX_TESTE_IDS, 26/10/2026: a prova das gravações do inventário no Fracttal) não entra
+  em nada daqui: as linhas dele saem do Saldo DEPOIS de os três livros serem conferidos como inteiros (o ciclo conta as
+  do teste nas "Linhas de saldo"), senão todo ciclo com o teste viraria "chegou pela metade";
 - o consumo, do `fato_peca_lancada` do Nexus (tudo desde o início, Levi, 25/10/2026); enquanto ele não existe, do livro
   Peças do App (90 dias), com a nota.
 """
 from datetime import timedelta, timezone
 
-from flask import render_template
+from flask import current_app, render_template
 
 from ..campo import visao
 from ..dados import almoxarifado as A
@@ -71,13 +74,15 @@ def _do_app(ciclo: dict, itens: list[dict], saldo: list[dict], b) -> dict:
             "linhas": linhas}
 
 
-def _do_nexus(ult: dict, abas_nx: dict) -> dict | None:
-    """O último ciclo aplicado no histórico: a foto dele no livro do mês e as dimensões do Nexus."""
+def _do_nexus(ult: dict, abas_nx: dict, teste: frozenset | set = frozenset()) -> dict | None:
+    """O último ciclo aplicado no histórico: a foto dele no livro do mês e as dimensões do Nexus. `teste`: os
+    almoxarifados de teste (a carga não grava mais as linhas deles, mas o ID pode ser posto depois de uma já gravada)."""
     mes = F.livro_do_mes(int(float(_id(ult.get("data_id")))))
     if F.ABA_SALDO not in _abas(mes):
         return None
     inicio = _txt(ult.get("ciclo_inicio"))
-    foto = [l for l in visao._livro(mes, F.ABA_SALDO) if _txt(l.get("ciclo_inicio")) == inicio]
+    foto = [l for l in visao._livro(mes, F.ABA_SALDO)
+            if _txt(l.get("ciclo_inicio")) == inicio and _id(l.get("id_almoxarifado")) not in teste]
     almox = {_id(a.get("id_almoxarifado")): _txt(a.get("nome"))
              for a in (visao._livro(F.LIVRO, F.ABA_DIM_ALMOX) if F.ABA_DIM_ALMOX in abas_nx else [])}
     # só os itens que estão na foto (a revisão de 25/10/2026): a dimensão guarda todo item já visto, inclusive os
@@ -206,8 +211,10 @@ def montar():
                   if A.conferir_ciclo(ciclo, itens, saldo)
                   else "O último ciclo do App leu menos de 90% dos itens" if not A.completo(ciclo[0])
                   else f"O ciclo de {_quando(inicio)} foi anulado no Nexus" if inicio in anulados else "")
+        cfg = current_app.config
         if not porque:
-            fonte = _do_app(ciclo[0], itens, saldo, b)
+            # o teste sai AGORA, depois de `conferir_ciclo` (que conta as linhas do livro inteiro)
+            fonte = _do_app(ciclo[0], itens, A.sem_almoxarifado_de_teste(saldo, cfg), b)
             antes = [c for c in bons if _txt(c.get("ciclo_inicio")) != inicio]
             n_antes = A.numero(max(antes, key=lambda c: _txt(c.get("ciclo_inicio"))).get("itens_lista_qtd")) if antes \
                 else None
@@ -216,7 +223,8 @@ def montar():
                 aviso = (f"O Fracttal listou {n_agora:g} itens, {n_antes - n_agora:g} a menos que no ciclo anterior: "
                          "confira se o catálogo foi limpo.")
         else:
-            fonte = _do_nexus(max(bons, key=lambda c: _txt(c.get("ciclo_inicio"))), abas_nx) if bons else None
+            fonte = _do_nexus(max(bons, key=lambda c: _txt(c.get("ciclo_inicio"))), abas_nx,
+                              A.ids_de_teste(cfg)) if bons else None
             if not fonte:
                 return {"estado": "incoerente",
                         "aviso": f"{porque}, e o Nexus ainda não guardou um ciclo bom: nenhum número até o próximo."}
