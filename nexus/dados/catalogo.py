@@ -721,14 +721,15 @@ FATOS = (
             pessoa=("hmac", "Contou (HMAC)"),
             equipamento=("prop", "ID do item (o item do inventário, cadastro próprio: nexus_almoxarifado · "
                                  "dim_item_almox; vazio no fora do catálogo)")),
-         tipo="transacao", chave=("ID da contagem", "ID do item", "Identificado como", "Descrição"),
+         tipo="transacao", chave=("ID da contagem", "ID da linha"),
          medidas=_m((("contado_qtd", "a do item", "semi"),)),
          fontes=(f"{almoxarifado.LIVRO_CONTAGENS} · {almoxarifado.ABA_CONTAGENS}",), janela_origem="90 dias (App)",
          observacao="colunas ID da contagem, Enviada em e Contada em (UTC), ID do almoxarifado, Usina, Tipo (item, "
-                    "identificar, fora_do_catalogo), ID do item, Código, Contado, Identificado como, Descrição, Foto e "
-                    "Contou (HMAC). Contado vazio é \"não contei\", nunca 0 (o 0 digitado é \"zerar\"; a API devolve "
-                    "texto, e o \"None\" do sync-xlsx também é vazio: almoxarifado.contado). O contrato não tem ID de "
-                    "linha: a linha é a contagem × a peça (o item, o Identificado como e a descrição). A soma é entre "
+                    "identificar, fora_do_catalogo), ID do item, Código, Contado, Identificado como, Descrição, Foto, "
+                    "Contou (HMAC) e ID da linha. Contado vazio é \"não contei\", nunca 0 (o 0 digitado é \"zerar\"; a "
+                    "API devolve texto, e o \"None\" do sync-xlsx também é vazio: almoxarifado.contado). A linha é a "
+                    "contagem × o ID da linha (um por peça contada, gerado pelo App, único dentro da contagem: duas "
+                    "peças fora do catálogo com a mesma descrição não podem ter a mesma chave). A soma é entre "
                     "almoxarifados do MESMO item, nunca entre itens. Sem nome nem e-mail (quem contou, só o HMAC); a "
                     "descrição e a foto do fora do catálogo ficam só neste livro do App. O almoxarifado de teste "
                     "(NEXUS_ALMOX_TESTE_IDS) fica fora das telas e das contas. Até o App publicar, o livro não existe"),

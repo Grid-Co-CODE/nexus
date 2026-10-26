@@ -44,10 +44,12 @@ INICIO = "Início do ciclo"
 # O livro das contagens do inventário (26/10/2026): 1 linha = 1 peça de uma contagem enviada, a pendência fora do catálogo
 # inclusa. "Contado" vazio é "não contei" (nunca 0: o 0 digitado é "zerar"), o genérico com saldo que é de mais de um
 # específico vem em uma linha por específico (o mesmo código do genérico, com o "Identificado como" de cada um), e quem
-# contou vai só como HMAC do e-mail. O contrato inteiro, coluna a coluna: seção 4.1 do desenho.
+# contou vai só como HMAC do e-mail. O contrato inteiro, coluna a coluna: seção 4.1 do desenho. O "ID da linha" (a 14ª,
+# no FIM, como manda o contrato) é um por peça contada, gerado pelo App e único dentro da contagem: sem ele, duas
+# peças "fora do catálogo" com a mesma descrição na mesma contagem teriam a mesma chave.
 LIVRO_CONTAGENS, ABA_CONTAGENS = "almoxarifado_contagens_app_campo", "Contagens"
 COLUNAS_CONTAGENS = ("ID da contagem", "Enviada em", "Contada em", "ID do almoxarifado", "Usina", "Tipo", "ID do item",
-                     "Código", "Contado", "Identificado como", "Descrição", "Foto", "Contou (HMAC)")
+                     "Código", "Contado", "Identificado como", "Descrição", "Foto", "Contou (HMAC)", "ID da linha")
 # peça do catálogo; genérico com saldo que o técnico identifica; peça que não está no catálogo (vai à curadoria)
 TIPOS_CONTAGEM = ("item", "identificar", "fora_do_catalogo")
 

@@ -38,10 +38,8 @@ def _num(v) -> float:
     return A.numero(v) or 0.0
 
 
-def _id(v) -> str:
-    """O ID como texto, sem o ".0" que a API às vezes põe ("7.0" é o 7)."""
-    t = _txt(v)
-    return t[:-2] if t.endswith(".0") else t
+# o ID sem o ".0" que a API às vezes põe ("7.0" é o 7): o mesmo da dimensão de dados, que a carga e o filtro do teste usam
+_id = A._id
 
 
 def _abas(livro) -> dict:

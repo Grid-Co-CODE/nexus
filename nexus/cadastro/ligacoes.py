@@ -172,11 +172,12 @@ def fontes(config) -> dict:
     abas = {(x["workbook_key"], x["sheet_name"]): x["id"] for x in requests.get(f"{base}/api/sheets", timeout=60).json()}
     out = {FRACTTAL: fracttal(config)}
     # os locais dos almoxarifados (25/10/2026): "Cliente - Usina - UF", a mesma chave da Classificação 1, lidos do livro
-    # que o App publica (igual nas duas máquinas); o que a Classificação 1 não tem (a Nobres) entra para ligar à mão
+    # que o App publica (igual nas duas máquinas); o que a Classificação 1 não tem (a Nobres) entra para ligar à mão.
+    # O almoxarifado de TESTE do inventário (NEXUS_ALMOX_TESTE_IDS) não: o local dele não é usina para ligar
     from ..dados import almoxarifado as ALM
     if (ALM.LIVRO_SALDO, ALM.ABA_SALDO) in abas:
-        out[FRACTTAL] += locais_de_almoxarifado(_linhas_api(base, abas[(ALM.LIVRO_SALDO, ALM.ABA_SALDO)]),
-                                                {str(i.get("chave")) for i in out[FRACTTAL]})
+        saldo = ALM.sem_almoxarifado_de_teste(_linhas_api(base, abas[(ALM.LIVRO_SALDO, ALM.ABA_SALDO)]), config)
+        out[FRACTTAL] += locais_de_almoxarifado(saldo, {str(i.get("chave")) for i in out[FRACTTAL]})
     dicas = {}
     if ("de_para_trackers", "Resumo por usina") in abas:
         for t in _linhas_api(base, abas[("de_para_trackers", "Resumo por usina")]):

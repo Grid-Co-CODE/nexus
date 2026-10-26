@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from test_campo_visao import BRT, banco  # noqa: F401  (banco é fixture)
-from test_dados_almoxarifado import ALMOX_LIVRO, CFG, IRC, MES, _api, _saldo
+from test_dados_almoxarifado import ALMOX_LIVRO, BASE, CFG, IRC, MES, NOB, _api, _saldo
 from test_pcm_almoxarifado import _semear as _semear_app
 from test_pcm_almoxarifado import ALT, _s
 
@@ -24,8 +24,9 @@ def test_contrato_das_contagens():
     assert A.LIVRO_CONTAGENS == "almoxarifado_contagens_app_campo" and A.ABA_CONTAGENS == "Contagens"
     assert A.COLUNAS_CONTAGENS == ("ID da contagem", "Enviada em", "Contada em", "ID do almoxarifado", "Usina", "Tipo",
                                    "ID do item", "Código", "Contado", "Identificado como", "Descrição", "Foto",
-                                   "Contou (HMAC)")
-    assert "Contou (HMAC)" in A.COLUNAS_CONTAGENS
+                                   "Contou (HMAC)", "ID da linha")
+    assert "Contou (HMAC)" in A.COLUNAS_CONTAGENS and len(A.COLUNAS_CONTAGENS) == 14
+    assert A.COLUNAS_CONTAGENS[-1] == "ID da linha"      # coluna nova só no FIM, dos dois lados
     assert not any("e-mail" in c.lower() or "email" in c.lower() for c in A.COLUNAS_CONTAGENS)
     assert A.TIPOS_CONTAGEM == ("item", "identificar", "fora_do_catalogo")
 
@@ -114,10 +115,58 @@ def test_contagem_no_catalogo():
     # almoxarifado (o mesmo `prop` do saldo); os IDs do Nexus vêm com o fato conformado, numa fase seguinte
     assert (f.dims["usina"][0], f.dims["pessoa"][0], f.dims["equipamento"][0]) == ("nome", "hmac", "prop")
     assert f.dims["data"][0] == "cod" and f.dims["cliente"][0] == f.dims["equipe"][0] == "nao"
-    # o contrato não tem ID de linha: a chave é a contagem e a peça (o item, o específico e a descrição)
-    assert f.chave[0] == "ID da contagem" and set(f.chave) <= set(A.COLUNAS_CONTAGENS)
+    # a chave é a contagem e o ID da linha (um por peça, do App): duas peças fora do catálogo com a mesma descrição na
+    # mesma contagem não podem colidir
+    assert f.chave == ("ID da contagem", "ID da linha") and set(f.chave) <= set(A.COLUNAS_CONTAGENS)
     assert f.tipo == "transacao" and [m.coluna for m in f.medidas] == ["contado_qtd"]
     assert all(catalogo.medida_valida(m) for m in f.medidas)
     assert explica.RESUMO.get(f.id) and explica.PARA_QUE.get(f.id)
     assert 15 <= len(explica.RESUMO[f.id]) <= 70 and not explica.RESUMO[f.id].endswith(".")
     assert explica.PARA_QUE[f.id].endswith(".") and len(explica.PARA_QUE[f.id]) >= 80
+
+
+# ── o teste fora da Base → Ligações e fora da reserva do histórico ───────────────────────────────────────────────────────
+
+def test_almoxarifado_de_teste_fora_da_ligacao(monkeypatch):
+    """O local do almoxarifado de teste ("Cliente - Usina - UF") não é usina para ligar: sem o filtro, ele apareceria na
+    Base → Ligações como um local do Fracttal sem usina, para alguém ligar à mão."""
+    import requests
+    from pg_falso import ApiPGFalsa
+    from test_campo_visao import _aba
+    from nexus.cadastro import ligacoes as L
+    api = ApiPGFalsa()
+    for _sis, wb, aba, *_r in L.FONTES_API:
+        _aba(api, wb, aba, [])
+    for _sis, wb, ref in L.FONTES_ABA:
+        _aba(api, wb, ref, [])
+    teste = "// Teste/ Teste - Local de Teste - PA/"
+    _aba(api, A.LIVRO_SALDO, A.ABA_SALDO, [_saldo(1, 123675, NOB, 1, 1), _saldo(1, 999, teste, 1, 1)])
+    monkeypatch.setattr(requests, "get", api.get)
+    monkeypatch.setattr(L, "fracttal", lambda config: [])
+    com = L.fontes({"GRIDCO_DB_API": BASE})
+    assert [i["chave"] for i in com[L.FRACTTAL]] == ["RenoGrid - Nobres 1 - MT", "Teste - Local de Teste - PA"]
+    sem = L.fontes({"GRIDCO_DB_API": BASE, "NEXUS_ALMOX_TESTE_IDS": "999"})
+    assert [i["chave"] for i in sem[L.FRACTTAL]] == ["RenoGrid - Nobres 1 - MT"]
+
+
+def test_almoxarifado_de_teste_fora_da_reserva_do_historico(app, banco, monkeypatch):  # noqa: F811
+    """A reserva (o ciclo do App recusado, a tela mostra a foto guardada no histórico) também deixa o teste de fora: o ID
+    pode ser posto na chave DEPOIS de a carga já ter gravado a linha dele no livro do mês."""
+    from nexus.dados import carga
+    from nexus.pcm import almoxarifado as T
+    monkeypatch.setattr(visao, "_agora", lambda: datetime(2026, 10, 25, 10, 0, tzinfo=BRT))
+    _semear_app(banco, saldo_extra=[_s(1, 999, ALT, 0, 5)])
+    carga.gerar_almoxarifado(CFG, banco)                       # sem a chave: a linha do teste vai para o histórico
+    assert "999" in {l["id_almoxarifado"] for l in banco.linhas(MES, "fato_saldo_almox")}
+    _semear_app(banco, saldo_inicio="2026-10-26T03:00:05Z", saldo_extra=[_s(1, 999, ALT, 0, 5)])  # o Saldo é de outro ciclo
+    visao.limpar()
+    antes = T.montar().dados
+    assert antes["aviso"].startswith("Os livros do App chegaram de ciclos diferentes")        # é a reserva
+    assert "999" in {x["id_almox"] for x in antes["linhas"]} and antes["kpis"]["almoxarifados"] == 3
+    app.config.update(NEXUS_ALMOX_TESTE_IDS="999")
+    visao.limpar()
+    d = T.montar().dados
+    assert d["estado"] == "ok" and d["aviso"].startswith("Os livros do App chegaram de ciclos diferentes")
+    assert "999" not in {x["id_almox"] for x in d["linhas"]} and "999" not in {x["id_almox"] for x in d["reposicao"]}
+    assert d["kpis"]["almoxarifados"] == 2 and d["kpis"]["abaixo"] == 1
+    assert "999" not in {c["id"] for c in d["por_almoxarifado"]}

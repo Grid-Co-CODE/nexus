@@ -434,11 +434,14 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   (a dimensão guarda todo item já visto); o Fracttal listando menos de 90% dos itens do ciclo anterior dá um aviso; a
   busca compara sem acento e sem caixa (o `data-f-busca` vai normalizado, como nas outras telas).
 - **O almoxarifado de teste fica de fora (26/10/2026):** a chave `NEXUS_ALMOX_TESTE_IDS` (IDs do Fracttal separados por
-  vírgula; a prova das gravações do inventário é num almoxarifado de teste, nunca num de usina) tira as linhas dele do
-  Saldo, nas telas (`_do_app`, `_do_nexus`) e no histórico (`carga.gerar_almoxarifado`). O filtro vem DEPOIS da conferência
-  dos livros (`conferir_ciclo` conta as `Linhas de saldo` do livro inteiro, as do teste incluídas). Prova:
-  `tests/test_pcm_inventario_contrato.py`. O contrato do livro das contagens do inventário (`almoxarifado_contagens_app_campo`)
-  mora em `nexus/dados/almoxarifado.py` (`COLUNAS_CONTAGENS`, `contado`).
+  vírgula; a prova das gravações do inventário é num almoxarifado de teste, nunca num de usina: o `TESTE-INVENTARIO`, id
+  134082) tira as linhas dele do Saldo, nas telas (`_do_app`, `_do_nexus`), na Base → Ligações (`ligacoes.fontes`) e no
+  histórico (`carga.gerar_almoxarifado`). O filtro vem DEPOIS da conferência dos livros (`conferir_ciclo` conta as
+  `Linhas de saldo` do livro inteiro, as do teste incluídas). **O consumo (`_consumo`, o livro Peças) NÃO é filtrado:** o
+  almoxarifado de teste é só para ajuste de inventário, e uma peça lançada nele por uma OS entraria nas contas
+  (lançadas e recusadas). Prova: `tests/test_pcm_inventario_contrato.py`. O contrato do livro das contagens do
+  inventário (`almoxarifado_contagens_app_campo`, 14 colunas, a última o `ID da linha`, a chave da linha junto da
+  contagem) mora em `nexus/dados/almoxarifado.py` (`COLUNAS_CONTAGENS`, `contado`).
 - **Como provar:** `tests/test_pcm_almoxarifado.py`; no navegador, a cópia de prova com os 4 livros montados na memória
   a partir de uma cópia da tabela do App (fora do repositório) e o cadastro real por GET (25/10: 12 almoxarifados, 218
   peças com saldo, 54 no limite, 22 sem mínimo, 5 avariadas, 3 lançadas e 13 recusadas).
