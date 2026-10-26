@@ -211,3 +211,177 @@ def test_os_fatos_montados_no_catalogo_batem_com_o_codigo():
         f = catalogo.POR_ID[fid]
         assert f.estado == "montado" and f.chave[0] == cab[0], fid
         assert f.conformado_em.split(" · ")[0] in (F.LIVRO, "nexus_almoxarifado_saldo_AAAA_MM"), fid
+
+
+# ── a carga do histórico (portão próprio, travas, ensaio) ───────────────────────────────────────────────────────────
+
+BASE = "http://pg.falso"
+CFG = {"GRIDCO_DB_API": BASE, "GRIDCO_SQL_TOKEN": "t", "NEXUS_ALMOX_GRAVAR": "1"}
+ALMOX_LIVRO = "nexus_almoxarifado"
+MES = "nexus_almoxarifado_saldo_2026_10"
+
+
+def _semear(api, inicio=INICIO, lidos=574, total=574, saldo_inicio=None, pecas=None, txt=False):
+    """Os 4 livros do App e o cadastro, no banco de mentira. `txt`: tudo como texto (a API pode devolver assim)."""
+    from test_campo_visao import _aba
+    t = (lambda v: None if v is None else str(v)) if txt else (lambda v: v)
+    conv = lambda linhas: [{k: t(v) for k, v in l.items()} for l in linhas]      # noqa: E731
+    _aba(api, "cadastro_nexus", "usinas", [{"usina_id": 7, "codigo": "GRYL-IRC100", "excluido": "não"}])
+    _aba(api, "cadastro_nexus", "de_para", [{"usina_id": 7, "sistema": "Fracttal · Classificação 1",
+                                              "chave_externa": "Greenyellow - Irecê 1 - BA"}])
+    _aba(api, "cadastro_nexus", "equipes", [{"equipe_id": 1, "nome": "BA Oeste 01", "excluido": "não"}])
+    _aba(api, A.LIVRO_CICLO, A.ABA_CICLO, conv([_ciclo(lidos, total, inicio)]))
+    _aba(api, A.LIVRO_ITENS, A.ABA_ITENS, conv([
+        {"ID do item": "1", "Código": "A", "Nome": "Fusível", "Unidade": "UNIDADE", "Família": "F", "Avariado": "Não",
+         "Ferramenta": "Não", "Início do ciclo": inicio, "Lido": "Sim"},
+        {"ID do item": "2", "Código": "B", "Nome": "Cabo", "Unidade": "METRO", "Família": "C", "Avariado": "Não",
+         "Ferramenta": "Não", "Início do ciclo": inicio, "Lido": "Sim"}]))
+    _aba(api, A.LIVRO_SALDO, A.ABA_SALDO, conv([_saldo(1, 123021, IRC, 4, 2, inicio=saldo_inicio or inicio),
+                                                _saldo(2, 123021, IRC, 0, 0, inicio=saldo_inicio or inicio),
+                                                _saldo(1, 123675, NOB, 1, 1, inicio=saldo_inicio or inicio)]))
+    _aba(api, A.LIVRO_PECAS, A.ABA_PECAS, conv(pecas if pecas is not None else [_peca("A", "lançada")]))
+
+
+def _api(**kw):
+    from pg_falso import ApiPGFalsa
+    api = ApiPGFalsa(como_texto=kw.pop("como_texto", False))
+    _semear(api, **kw)
+    return api
+
+
+def test_sem_os_livros_do_app_pula():
+    from pg_falso import ApiPGFalsa
+    from nexus.dados import carga
+    api = ApiPGFalsa()
+    assert carga.gerar_almoxarifado(CFG, api)["pulou"] == "o App ainda não publica o almoxarifado"
+    assert api.syncs == 0
+
+
+def test_sem_a_chave_e_ensaio():
+    from nexus.dados import carga
+    api = _api()
+    r = carga.gerar_almoxarifado({k: v for k, v in CFG.items() if k != "NEXUS_ALMOX_GRAVAR"}, api)
+    assert r["ensaio"] and r["saldo_linhas"] == 3 and api.syncs == 0
+
+
+def test_grava_o_mes_e_a_marca_e_na_mesma_hora_pula():
+    from nexus.dados import carga
+    api = _api()
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert set(r["gravado"]) == {MES, ALMOX_LIVRO}
+    assert len(api.linhas(MES, "fato_saldo_almox")) == 3
+    ciclos = api.linhas(ALMOX_LIVRO, "fato_ciclo_varredura")
+    assert [c["situacao"] for c in ciclos] == ["aplicado"] and len(api.linhas(ALMOX_LIVRO, "fato_peca_lancada")) == 1
+    assert len(api.linhas(ALMOX_LIVRO, "dim_almoxarifado")) == 2 and len(api.linhas(ALMOX_LIVRO, "qualidade")) == 3
+    syncs = api.syncs
+    assert "pulou" in carga.gerar_almoxarifado(CFG, api) and api.syncs == syncs
+
+
+def test_peca_nova_sem_ciclo_novo_grava_so_o_livro_do_nexus():
+    from nexus.dados import carga
+    from test_campo_visao import _aba
+    api = _api()
+    carga.gerar_almoxarifado(CFG, api)
+    _aba(api, A.LIVRO_PECAS, A.ABA_PECAS, [_peca("A", "lançada"), _peca("B", "recusada", "sem permissão")])
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert set(r["gravado"]) == {ALMOX_LIVRO} and len(api.linhas(ALMOX_LIVRO, "fato_peca_lancada")) == 2
+    assert len(api.linhas(MES, "fato_saldo_almox")) == 3
+
+
+def test_releitura_no_mesmo_dia_vira_outra_foto():
+    from nexus.dados import carga
+    api = _api()
+    carga.gerar_almoxarifado(CFG, api)
+    _semear(api, inicio="2026-10-25T18:40:00Z")
+    carga.gerar_almoxarifado(CFG, api)
+    assert len(api.linhas(MES, "fato_saldo_almox")) == 6
+    assert [c["situacao"] for c in api.linhas(ALMOX_LIVRO, "fato_ciclo_varredura")] == ["aplicado", "aplicado"]
+
+
+def test_ciclo_incompleto_e_recusado():
+    from nexus.dados import carga
+    api = _api(lidos=516)
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert set(r["gravado"]) == {ALMOX_LIVRO} and not api.linhas(MES, "fato_saldo_almox")
+    c = api.linhas(ALMOX_LIVRO, "fato_ciclo_varredura")[0]
+    assert c["situacao"] == "recusado" and "516 de 574" in c["porque"]
+
+
+def test_livros_de_ciclos_diferentes_nao_aplicam():
+    from nexus.dados import carga
+    api = _api(saldo_inicio="2026-10-24T03:00:05Z")
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert r["incoerente"] and not api.linhas(MES, "fato_saldo_almox")
+    assert not api.linhas(ALMOX_LIVRO, "fato_ciclo_varredura")       # nenhum ciclo a registrar; as peças, sim
+    assert len(api.linhas(ALMOX_LIVRO, "fato_peca_lancada")) == 1
+
+
+def test_leitura_vazia_do_livro_existente_nao_grava():
+    from nexus.dados import carga
+    api = _api()
+    carga.gerar_almoxarifado(CFG, api)
+    for aba in ("fato_ciclo_varredura", "fato_peca_lancada"):              # a leitura veio vazia por um instante
+        api.abas[(ALMOX_LIVRO, aba)]["linhas"] = []
+    _semear(api, inicio="2026-10-26T03:00:12Z")
+    syncs = api.syncs
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert "nao_grava" in r and api.syncs == syncs
+
+
+def test_listagem_sem_as_abas_do_livro_e_recusada():
+    """A listagem do banco omitiu as abas do nexus_almoxarifado por um instante: parece livro novo, e gravar trocaria o
+    histórico; a trava do `livros.publicar` (so_cresce) recusa."""
+    import pytest
+    from nexus.dados import carga, livros
+    api = _api()
+    carga.gerar_almoxarifado(CFG, api)
+    api.omitir.add(ALMOX_LIVRO)
+    _semear(api, pecas=[_peca("A", "lançada"), _peca("B", "lançada")])
+    with pytest.raises(livros.GravacaoRecusada):
+        carga.gerar_almoxarifado(CFG, api)
+
+
+def test_mes_gravado_e_marca_que_falhou_nao_duplica_a_foto():
+    """O livro do mês grava antes da marca (o nexus_almoxarifado); se a marca falhou, a hora seguinte vê o ciclo como
+    novo e grava de novo: a foto do mesmo ciclo troca, não duplica."""
+    from nexus.dados import carga
+    api = _api()
+    carga.gerar_almoxarifado(CFG, api)
+    api.abas[(ALMOX_LIVRO, "fato_ciclo_varredura")]["linhas"] = []         # a marca não ficou
+    carga.gerar_almoxarifado(CFG, api)
+    assert len(api.linhas(MES, "fato_saldo_almox")) == 3
+
+
+def test_livro_do_mes_tem_a_trava_do_catalogo():
+    from nexus.dados import livros
+    assert livros._so_cresce(MES) == ("fato_saldo_almox",)
+
+
+def test_como_texto():
+    from nexus.dados import carga
+    api = _api(como_texto=True, txt=True)
+    carga.gerar_almoxarifado(CFG, api)
+    assert "pulou" in carga.gerar_almoxarifado(CFG, api)             # o ciclo lido de volta como texto é o mesmo
+    _semear(api, inicio="2026-10-26T03:00:12Z", txt=True)
+    carga.gerar_almoxarifado(CFG, api)
+    assert len(api.linhas("nexus_almoxarifado_saldo_2026_10", "fato_saldo_almox")) == 6
+    assert len(api.linhas(ALMOX_LIVRO, "fato_peca_lancada")) == 1
+
+
+def test_anular_marca_sem_apagar():
+    from nexus.dados import carga
+    api = _api()
+    carga.gerar_almoxarifado(CFG, api)
+    n = len(api.linhas(MES, "fato_saldo_almox"))
+    r = carga.anular_ciclo_almox(CFG, INICIO, api, gravar=True)
+    assert r["anulado"] == INICIO
+    c = api.linhas(ALMOX_LIVRO, "fato_ciclo_varredura")[0]
+    assert str(c["anulado"]) == "1" and len(api.linhas(MES, "fato_saldo_almox")) == n
+    assert "nao_achou" in carga.anular_ciclo_almox(CFG, "2026-01-01T00:00:00Z", api, gravar=True)
+
+
+def test_a_chave_da_gravacao_vem_do_env():
+    from pathlib import Path
+    from nexus import config
+    assert "NEXUS_ALMOX_GRAVAR" in config.OPCIONAIS
+    assert "NEXUS_ALMOX_GRAVAR=" in Path(__file__).resolve().parent.parent.joinpath(".env.example").read_text("utf-8")
