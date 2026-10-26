@@ -100,7 +100,8 @@ gravação de prova.
 **Interfaces — Produces:**
 - `almoxarifado.LIVRO_CONTAGENS = "almoxarifado_contagens_app_campo"`, `ABA_CONTAGENS = "Contagens"`,
   `COLUNAS_CONTAGENS = ("ID da contagem", "Enviada em", "Contada em", "ID do almoxarifado", "Usina", "Tipo",
-  "ID do item", "Código", "Contado", "Identificado como", "Descrição", "Foto", "Contou (HMAC)")`,
+  "ID do item", "Código", "Contado", "Identificado como", "Descrição", "Foto", "Contou (HMAC)", "ID da linha")`
+  (a 14ª coluna entrou na revisão da Task 1; chave (ID da contagem, ID da linha)),
   `TIPOS_CONTAGEM = ("item", "identificar", "fora_do_catalogo")`.
 - `almoxarifado.contado(v) -> float | None` ("" e "None" → None; "3,0" → 3.0; nunca 0 para vazio).
 - `almoxarifado.ids_de_teste(config) -> set[str]` (da `NEXUS_ALMOX_TESTE_IDS`, ids separados por vírgula).
