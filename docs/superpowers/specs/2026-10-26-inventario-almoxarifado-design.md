@@ -101,9 +101,10 @@ específico (o mesmo código do genérico, com o "Identificado como" e o "Contad
   `substituída`, e não se aprovam mais): aprovar a velha depois da nova desfaria a nova.
 - **O que se moveu depois da contagem** (uma peça lançada numa OS, uma entrada pela tela do Fracttal): a peça com
   movimento depois do "Contada em" vira **conflito** e não é gravada, para o ajuste não desfazer um movimento real. Como
-  achar o movimento é parte do passo 0 (seção 6); enquanto não houver um jeito, a contagem só se aprova até 7 dias depois
-  do "Contada em" e as peças lançadas pelo App depois dela (o `fato_peca_lancada`) viram conflito. *Decisão do
-  construtor.*
+  achar o movimento era parte do passo 0 (seção 6), que achou: o histórico do almoxarifado no Fracttal
+  (`inventories.movement_history_list_new`, por `date_create`). Por isso a janela de 7 dias, que valia só "enquanto não
+  houver um jeito", virou **90 dias** (a janela do livro do App e o teto do histórico a ler; revisão da Task 3, 26/10).
+  *Decisão do construtor.*
 - Situações da contagem: `nova`, `revisada`, `recontagem pedida`, `substituída`, `gravando`, `gravada`, `gravada com
   conflitos`.
 

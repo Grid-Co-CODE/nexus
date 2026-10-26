@@ -171,7 +171,7 @@ Test `tests/test_pcm_inventario_estoque.py`.
   `corrigido` (bool), `tirada` (bool); `revisao`: `{"tiradas": {id_item: motivo}, "corrigidos": {id_item: valor}}`.
 - `substituidas(contagens: list[dict], gravadas: set[str]) -> set[str]` (por almoxarifado, vale a mais nova pelo
   "Contada em"; as mais velhas não gravadas são substituídas).
-- `aprovavel(contada_em: str, agora: datetime, dias: int = 7) -> bool`.
+- `aprovavel(contada_em: str, agora: datetime, dias: int = 90) -> bool` (eram 7 dias; o passo 0 achou o histórico, ver o desenho 4.2).
 
 - [ ] **Step 1: Tests** (valores exatos): `test_situacao` — (4, 6) para_cima; (4, 2) para_baixo; (4, 0) zerar;
   (0, 0) sem_alteracao; (4, None) nao_tocada; (None, 3) para_cima com `sistema` None tratado como 0;
@@ -180,7 +180,7 @@ Test `tests/test_pcm_inventario_estoque.py`.
   `test_texto_da_api` — "3,0", "" e "None" (o foco 3); `test_peca_nao_ligada` — a peça fora da leitura entra com
   `sistema` 0 e `ligada` False (o foco 2); `test_saldo_vazio_nao_zera` — sistema None e contado 0: situação
   `sem_alteracao`, não `zerar` (o foco 5); `test_corrigido_e_tirada`; `test_a_mais_nova_substitui`;
-  `test_aprovavel_ate_7_dias`.
+  `test_aprovavel_ate_90_dias`.
 - [ ] **Step 2:** Rodar → FAIL.
 - [ ] **Step 3:** Implementar (puro: nada de rede).
 - [ ] **Step 4:** Rodar → PASS.
@@ -233,7 +233,7 @@ Test `tests/test_pcm_inventario_estoque.py`.
 
 - [ ] **Step 1: Tests:** `test_estados_pelos_eventos` (sem evento: nova; `recontagem_pedida`; com `peca_gravada` de
   todas: gravada; com `conflito`: gravada_com_conflitos); `test_a_mais_nova_substitui_a_velha_nao_gravada`;
-  `test_livro_do_app_que_nao_existe` (lista vazia e `livro_existe` falso); `test_contagem_de_8_dias_nao_aprova`.
+  `test_livro_do_app_que_nao_existe` (lista vazia e `livro_existe` falso); `test_contagem_de_91_dias_nao_aprova`.
 - [ ] **Step 2:** Rodar → FAIL. **Step 3:** Implementar. **Step 4:** Rodar → PASS. **Step 5:** Commit.
 
 ### Task 6: A aba Inventário (lista, revisão e aprovação)
