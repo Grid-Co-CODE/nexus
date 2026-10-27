@@ -671,7 +671,13 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   "THPN-SDI100-INVR11.1" (`codigo_do_equipamento`; ler só o 1º pedaço deu 47% em 04/10). Ativo **sem Classificação 1**
   não é "sem usina": a usina sai do código e, sem código, da "Localização ou parte de" ("// Thopen/ Thopen - Brodowski
   1 - SP/…"). Assim BWK200 e "Transformador 2" acham Brodowski e Nobres (Levi, 04/10: "você sabe que é Brodowski e
-  Nobres").
+  Nobres"). **A usina sem tarefa vem da árvore de ativos** (27/10/2026, `usinas_da_arvore`): o
+  `_ativos_classificacao_cache.json` que o motor do PCM grava AO LADO da foto (a Classificação 1 de cada ativo) dá as
+  usinas "Cliente - Usina - UF" que as tarefas não têm, com `origem` "árvore de ativos do Fracttal"; grafia que só muda
+  no espaço, caixa ou acento de uma chave que já existe não entra. Caso: 53 usinas iam ao App de Campo sem o nome do
+  Fracttal (PCM → Técnicos por usina); 40 da Faro, da Apolo e da RenoGrid estavam na árvore e quase sem tarefa, e não
+  apareciam nas Ligações. O cliente do Fracttal ("Faro") não é o do cadastro ("Faro Energy"): elas ligam à mão. As 13 da
+  Elis Energia em operação não estão no Fracttal (nem tarefa, nem ativo) e seguem sem nome até serem cadastradas lá.
 - **`casamento.py` (BD_Thopen, sem código):** romano → número, "1 e 2"/"1 a 4" abertos, usina sem número = a "1".
   Nome igual casa mesmo com cidade/estado diferente (o BD_Thopen erra: Saturnino "no PR", Sítio dos Nogueiras "no MT")
   e fica anotado; nome só-base precisa de localização igual e potência (±15%) — é o que separa "Ouro Branco I" (PR) da
@@ -706,8 +712,8 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   geracao_de_para_faltando.csv` (fora do git). Os sistemas antigos saem idênticos (876 linhas, 0 diferenças contra o
   publicado). **Ainda não publicado** (é do Levi, passo 1/decisão 8): até lá o `usina_id` da geração fica 0%.
 - **A regra de ignorar "Grid Co." do Fracttal pega "RenoGrid - Colíder 1/2" por acaso** (`ignorado` compara texto
-  normalizado contido: "renoGRID COlider"). As duas chaves estão fora do de-para do Fracttal desde 04/10; trocar a regra
-  por chave exata na tela Ligações.
+  normalizado contido: "renoGRID COlider"). Desde 27/10/2026 as duas chaves estão ligadas à mão (a decisão da tela vence
+  a regra); trocar a regra por chave exata na tela Ligações continua a fazer.
 - **A foto do Fracttal de 05/10 da pasta do PCM não abre neste PC** (`ModuleNotFoundError: pyarrow`: o motor do PCM a
   gravou com strings do pyarrow). O `fracttal()` pega a mais nova e "Ler as bases de novo" quebra (e o
   `publicar_cadastro.py` sem `--bases-guardadas` também, ainda em 08/10); as fotos das rodadas do Nexus (02/10) abrem.

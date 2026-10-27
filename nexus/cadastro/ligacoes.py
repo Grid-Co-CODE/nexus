@@ -4,7 +4,7 @@ Pedido do Levi (04/10/2026): "quero uma tela para fazer os de-para pelo Nexus, q
 expostos para que possamos corrigir". Três tipos de buraco:
 - chave de uma base que não liga a usina nenhuma (ex.: "Solier - Cascavel - CE" no Fracttal);
 - ligação feita só pelo nome, que alguém precisa conferir;
-- usina em operação que uma base não enxerga (ex.: as 36 da Faro Energy fora do Fracttal).
+- usina em operação que uma base não enxerga (ex.: as 13 da Elis Energia fora do Fracttal, 27/10/2026).
 
 As decisões (ligar à mão, desligar, ignorar, ausência esperada) moram no arquivo de regras, fora do git (são nomes de
 usina de cliente), e valem no próximo cálculo e no próximo envio ao banco. O cálculo guarda as fontes lidas
@@ -328,13 +328,38 @@ def itens_abas(sistema: str, primeiras: dict, referencia: list, dicas: dict | No
     return out
 
 
+_USINA_UF = re.compile(r"\s*(.+?)\s+-\s+(.+?)\s+-\s+[A-Z]{2}\s*")
+ARVORE = "_ativos_classificacao_cache.json"      # {id do ativo: [Classificação 1, Classificação 2]}, do motor do PCM
+
+
 def usina_do_caminho(caminho):
     """"// Thopen/ Thopen - Brodowski 1 - SP/ Cabine 1/" -> ("Thopen", "Brodowski 1"). Só o pedaço "Cliente - Usina - UF"."""
     for p in str(caminho or "").split("/"):
-        m = re.fullmatch(r"\s*(.+?)\s+-\s+(.+?)\s+-\s+[A-Z]{2}\s*", p)
+        m = _USINA_UF.fullmatch(p)
         if m:
             return m.group(1), m.group(2)
     return None
+
+
+def usinas_da_arvore(caminho: Path, ja: set) -> list[dict]:
+    """As usinas da árvore de ativos do Fracttal ("Cliente - Usina - UF", a Classificação 1 de cada ativo, que o motor do
+    PCM guarda ao lado da foto) que as tarefas ainda não têm. Caso de 27/10/2026: das 53 usinas que iam ao App sem o nome
+    do Fracttal (PCM → Técnicos por usina), 40 da Faro, da Apolo e da RenoGrid estão na árvore e quase não têm tarefa;
+    sem esta leitura elas não apareciam nas Ligações e não havia como ligá-las. Nome que só muda no espaço, na caixa ou
+    no acento de uma chave que já existe não entra (seria a mesma usina duas vezes)."""
+    if not caminho.exists():
+        return []
+    try:
+        dado = json.loads(caminho.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []                        # árvore ilegível: fica só o que as tarefas dizem
+    vistos = {B.norm(k) for k in ja}
+    novos = []
+    for n in sorted({str(v[0]).strip() for v in dado.values() if isinstance(v, list) and v and v[0]}):
+        if _USINA_UF.fullmatch(n) and B.norm(n) not in vistos:
+            vistos.add(B.norm(n))
+            novos.append({"chave": n, "nome": n, "origem": "árvore de ativos do Fracttal"})
+    return novos
 
 
 def locais_de_almoxarifado(linhas_saldo: list[dict], ja: set) -> list[dict]:
@@ -353,7 +378,8 @@ def locais_de_almoxarifado(linhas_saldo: list[dict], ja: set) -> list[dict]:
 
 def fracttal(config) -> list[dict]:
     """Usinas do Fracttal ("Cliente - Usina - UF") com o código tirado dos códigos de equipamento das tarefas: a foto
-    mais nova que o motor do PCM gravou (pasta do PCM ou rodadas do Nexus). Sem foto, só a lista de ativos (pelo nome)."""
+    mais nova que o motor do PCM gravou (pasta do PCM ou rodadas do Nexus), mais as usinas da árvore de ativos guardada
+    ao lado dela que ainda não têm tarefa (`usinas_da_arvore`). Sem foto, só a lista de ativos (pelo nome)."""
     from ..pcm import geracao as G
     trab, origem = G.pasta_trabalho(config), G.pasta_origem(config)
     fotos = [p for p in ([Path(origem) / ".cache_semanal_api.pkl"] if origem else [])
@@ -380,9 +406,9 @@ def fracttal(config) -> list[dict]:
                 it.update({"cliente": cliente, "nomes": [usina], "origem": "localização no Fracttal",
                            "nome": f"{cliente} - {usina}"})
             itens.append(it)
-        return itens
+        return itens + usinas_da_arvore(foto.parent / ARVORE, {str(i["chave"]) for i in itens})
     for pasta in (trab, origem):
-        cache = Path(pasta or "") / "_ativos_classificacao_cache.json"
+        cache = Path(pasta or "") / ARVORE
         if pasta and cache.exists():
             nomes = sorted({v[0] for v in json.loads(cache.read_text(encoding="utf-8")).values() if v and v[0]})
             return [{"chave": n, "nome": n} for n in nomes]

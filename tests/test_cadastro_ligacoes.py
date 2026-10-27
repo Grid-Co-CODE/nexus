@@ -171,3 +171,66 @@ def test_sugestao_respeita_cidade_e_potencia():
     assert L.sugestoes({"chave": "Ouro Branco I", "nome": "Ouro Branco I", "cliente": "Thopen", "cidade": "Bandeirantes"}, usinas) == []
     assert L.sugestoes({"chave": "AP. do Taboado", "nome": "AP. do Taboado", "cliente": "Thopen",
                         "cidade": "Aparecida do Taboado", "mwp": 0.413}, usinas) == []
+
+
+# ── a árvore de ativos do Fracttal (27/10/2026) ────────────────────────────────────────────────────────────────────
+
+def _arvore(pasta, nomes):
+    p = pasta / L.ARVORE
+    p.write_text(json.dumps({str(i): [n, "Equipe X"] for i, n in enumerate(nomes)}, ensure_ascii=False), "utf-8")
+    return p
+
+
+def test_usina_da_arvore_sem_tarefa_entra_na_ligacao(tmp_path):
+    """Caso de 27/10/2026: as usinas da Faro estão na árvore de ativos e quase não têm tarefa; sem esta leitura não
+    apareciam nas Ligações e iam ao App de Campo sem o nome do Fracttal. Só "Cliente - Usina - UF" entra (a
+    Classificação 1 também tem "1.Essencial" e o cliente sozinho), e a grafia que só muda no espaço ou na caixa de uma
+    chave que já existe não entra de novo."""
+    p = _arvore(tmp_path, ["Faro - Pedra do Sal 1 - PI", "Faro - Pedra do Sal 1 - PI", "Thopen - Brodowski  1 - SP",
+                           "thopen - brodowski 1 - SP", "Faro", "1.Essencial", "", "Apolo - Iramaia 2 - BA"])
+    novos = L.usinas_da_arvore(p, {"Thopen - Brodowski 1 - SP"})
+    assert novos == [{"chave": "Apolo - Iramaia 2 - BA", "nome": "Apolo - Iramaia 2 - BA",
+                      "origem": "árvore de ativos do Fracttal"},
+                     {"chave": "Faro - Pedra do Sal 1 - PI", "nome": "Faro - Pedra do Sal 1 - PI",
+                      "origem": "árvore de ativos do Fracttal"}]
+    assert L.usinas_da_arvore(tmp_path / "nao-existe.json", set()) == []
+    (tmp_path / "torta.json").write_text("{nao é json", "utf-8")
+    assert L.usinas_da_arvore(tmp_path / "torta.json", set()) == []
+
+
+def test_fracttal_le_a_arvore_ao_lado_da_foto(tmp_path):
+    """A foto das tarefas e a árvore guardada AO LADO dela (a do motor do PCM, na pasta da rodada): as usinas das tarefas
+    com o código, as da árvore sem tarefa com a origem; a árvore de outra rodada não entra."""
+    import pickle
+    import pandas as pd
+    rodada = tmp_path / "trabalho" / "geracoes" / "20261023-W44"
+    rodada.mkdir(parents=True)
+    df = pd.DataFrame([{"Ativo Classificação 1": "Thopen - Brodowski 1 - SP", "Código": "THPN-BWK100-INVR1.1",
+                        "Localização ou parte de": ""}])
+    with open(rodada / ".cache_semanal_api.pkl", "wb") as f:
+        pickle.dump({"v": 1, "df": df}, f)
+    _arvore(rodada, ["Thopen - Brodowski 1 - SP", "Faro - Pedra do Sal 1 - PI"])
+    outra = tmp_path / "trabalho" / "geracoes" / "20261001-W41"
+    outra.mkdir(parents=True)
+    _arvore(outra, ["Faro - Corisco - PE"])
+    cfg = {"NEXUS_PCM_TRABALHO": str(tmp_path / "trabalho"), "NEXUS_PCM_ORIGEM": str(tmp_path / "sem-pcm")}
+    itens = {i["chave"]: i for i in L.fracttal(cfg)}
+    assert set(itens) == {"Thopen - Brodowski 1 - SP", "Faro - Pedra do Sal 1 - PI"}
+    assert itens["Thopen - Brodowski 1 - SP"]["codigo"] == "THPN-BWK100"
+    assert itens["Faro - Pedra do Sal 1 - PI"]["origem"] == "árvore de ativos do Fracttal"
+
+
+def test_usina_da_arvore_liga_a_mao_na_tela(app_lig, cli):
+    """A chave da árvore vira buraco nas Ligações (a Faro do Fracttal não é a "Faro Energy" do cadastro, e o nome não
+    casa sozinho) e liga pela decisão da tela, como qualquer chave."""
+    from nexus.cadastro.telas import servico
+    fontes = {FR: FONTES[FR] + [{"chave": "Faro - Pedra do Sal 1 - PI", "nome": "Faro - Pedra do Sal 1 - PI",
+                                 "origem": "árvore de ativos do Fracttal"}]}
+    with app_lig.app_context():
+        L.calcular(app_lig.config, servico(), fontes)
+        assert ["", FR, "Faro - Pedra do Sal 1 - PI"] in [[l[0] or "", l[1], l[2]] for l in L.ler(app_lig.config)["linhas"]]
+    cli.post("/t/base/ligacoes/decidir", data={"acao": "ligar", "alvo_sistema": FR,
+                                               "chave": "Faro - Pedra do Sal 1 - PI", "usina": "3"})
+    with app_lig.app_context():
+        linhas = L.ler(app_lig.config)["linhas"]
+    assert [3, FR, "Faro - Pedra do Sal 1 - PI"] in [l[:3] for l in linhas]
