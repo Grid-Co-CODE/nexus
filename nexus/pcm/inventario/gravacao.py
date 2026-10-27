@@ -76,7 +76,7 @@ from pathlib import Path
 from ...campo.ligacao_cadastro import codigo_da_pessoa
 from ...dados import almoxarifado as A
 from ...dados import fato_inventario as F
-from . import contas
+from . import contas, travas
 from .estoque import ErroFracttal, Limite, SemLogin, instante, validar_quantidade
 
 TAMANHO_LOTE = 50
@@ -951,12 +951,20 @@ def aprovar(cfg, contagem_id: str, estoque, aprovador: dict, n_visto=None, assin
     """O botão "Gravar N alterações": confere a contagem de agora (o livro relido), lê o saldo NA HORA com o login de quem
     aprova, monta o lote pelas contas (com a revisão e a curadoria) e começa. `n_visto` e `assinatura_vista`: o N e a
     `assinatura` do lote que a tela mostrou (obrigatórios); se o lote mudou desde então (um saldo mudou, outro PCM revisou),
-    recusa: ninguém grava o que não viu. `SemLogin` sobe (a ponte manda entrar pelo Fracttal); o resto vira `Recusada`."""
+    recusa: ninguém grava o que não viu. `SemLogin` sobe (a ponte manda entrar pelo Fracttal); o resto vira `Recusada`.
+
+    Segura a trava da contagem (`travas.CONTAGEM`) das leituras até o registro da aprovação (no `iniciar`): a revisão e a
+    curadoria que chegam no meio esperam e são recusadas depois, em vez de gravadas e ignoradas pelo lote já montado."""
     from . import leitura
     if not aprovador or not aprovador.get("pessoa_hmac"):
         raise Recusada(SEM_PESSOA)
     if n_visto is None or not isinstance(assinatura_vista, str) or not assinatura_vista.strip():
         raise Recusada("A tela não mandou o lote que mostrou: recarregue a página. Nada foi gravado.", 400)
+    with travas.CONTAGEM.de(A._txt(contagem_id)):
+        return _aprovar(cfg, contagem_id, estoque, aprovador, n_visto, assinatura_vista, leitura, **opcoes)
+
+
+def _aprovar(cfg, contagem_id, estoque, aprovador, n_visto, assinatura_vista, leitura, **opcoes) -> dict:
     try:
         F.ler(cfg, forcar=True)
         todas = leitura.ler(cfg)

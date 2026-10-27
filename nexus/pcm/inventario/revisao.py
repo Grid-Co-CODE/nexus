@@ -32,7 +32,7 @@ from ...dados import almoxarifado as A
 from ...dados import fato_inventario as F
 from ...dados import fatos as D
 from ...dados.dominios import norm
-from . import contas, leitura
+from . import contas, leitura, travas
 from .estoque import ErroFracttal, Limite, SemLogin, instante
 
 ROTULO_ESTADO = {"nova": "Nova", "revisada": "Revisada", "recontagem_pedida": "Recontagem pedida", "substituida": "Substituída",
@@ -483,6 +483,18 @@ def revisar(cfg, contagem_id: str, pedido, quem: dict | None) -> dict:
         raise Recusa(400, "Escreva o motivo: ele fica na auditoria.")
     if len(motivo) > MOTIVO_MAX:
         raise Recusa(400, f"O motivo passa de {MOTIVO_MAX} caracteres: resuma.")
+    # da conferência do estado até a escrita, a vez da contagem (`travas.CONTAGEM`): a aprovação que está lendo o lote termina
+    # antes (e então a contagem já não se revisa), em vez de montar o lote sem esta revisão
+    with travas.CONTAGEM.de(A._txt(contagem_id)):
+        c = _revisar(cfg, contagem_id, pedido, quem, acao, motivo)
+    novo = next((x for x in leitura.contagens(cfg) if x["contagem_id"] == contagem_id), c)
+    texto = {"tirar": "Peça tirada do lote.", "corrigir": "Número corrigido.",
+             "recontagem": "Recontagem pedida: nada será gravado desta contagem."}[acao]
+    return {"ok": True, "mensagem": texto, "estado": novo["estado"]}
+
+
+def _revisar(cfg, contagem_id: str, pedido: dict, quem: dict, acao: str, motivo: str):
+    """Confere o estado de agora e grava o evento (chamar com a trava da contagem). Devolve a contagem conferida."""
     try:
         F.ler(cfg, forcar=True)         # o estado de agora: dois PCMs revisando a mesma contagem não se atropelam
         _, c = _contagem(cfg, contagem_id)
@@ -516,7 +528,4 @@ def revisar(cfg, contagem_id: str, pedido, quem: dict | None) -> dict:
         raise Recusa(503, str(ex)) from None
     except ValueError as ex:        # o livro não aceita a linha (um ID que não cabe na coluna): nada foi gravado
         raise Recusa(400, f"O livro do inventário não aceitou: {ex}") from None
-    novo = next((x for x in leitura.contagens(cfg) if x["contagem_id"] == contagem_id), c)
-    texto = {"tirar": "Peça tirada do lote.", "corrigir": "Número corrigido.",
-             "recontagem": "Recontagem pedida: nada será gravado desta contagem."}[acao]
-    return {"ok": True, "mensagem": texto, "estado": novo["estado"]}
+    return c

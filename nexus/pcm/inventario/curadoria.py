@@ -61,7 +61,7 @@ from ...dados import fatos as D
 from ...prefixo import na_raiz
 from .. import telas
 from . import contas as C
-from . import erros, quem
+from . import erros, quem, travas
 from . import estoque as E
 from .erros import Conflito
 from .regua import fmt
@@ -78,7 +78,8 @@ _FOTO_ID = re.compile(r"[0-9a-f]{24}")
 # - `_LINHA`, por (contagem, linha): ler, conferir e escrever a decisão (a mesma linha por dois ao mesmo tempo: um ganha, o outro 409);
 # - `_SIGLA`, por sigla: escolher o próximo código e reservá-lo (duas linhas da mesma sigla não escolhem o mesmo número);
 # - `_ARQUIVO`, por arquivo de controle: ler e regravar as reservas de uma contagem (linhas de siglas diferentes dividem o arquivo).
-# A ordem é sempre essa (linha, sigla, arquivo), para uma não esperar pela outra em círculo.
+# A ordem é sempre essa (linha, sigla, arquivo), para uma não esperar pela outra em círculo; a da contagem (`travas.CONTAGEM`, a
+# vez contra a aprovação) vem por último, só em volta da conferência final e da escrita, com a do arquivo e a da sigla já soltas.
 _LINHA, _SIGLA, _ARQUIVO = Travas(), Travas(), Travas()
 _txt, _id = A._txt, A._id
 
@@ -491,29 +492,33 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
             texto = ("As unidades saem do genérico e entram na peça escolhida." if decisao == "confirmar"
                      else "As unidades achadas contam como unidades dessa peça nesta contagem.")
         usina = _usina_id(_txt(l.get("Usina")))
-        # a contagem pode ter sido gravada (ou recusada, ou substituída) enquanto o catálogo era paginado e a peça criada: a
-        # decisão só vale para o lote de uma contagem ainda aberta. O estado vem do livro de AGORA, logo antes de escrever
-        estado_agora = _estados(cfg, forcar=True)[1].get(_txt(cid))
-        if estado_agora != "aberta":
-            ja = _PORQUE.get(estado_agora, ("deixou de estar aberta", "já tinha deixado de estar aberta"))[1]
-            if decisao == "cadastrar" and codigo:
-                raise Conflito(f"A peça {codigo} foi criada no Fracttal, mas a contagem {ja}: a decisão não foi registrada, e o "
-                               "código continua reservado nesta linha. Faça uma nova contagem.")
-            raise Conflito(f"Esta contagem {ja} enquanto você decidia: a decisão não foi registrada. Faça uma nova contagem.")
         quem_ = quem.colunas(cfg, pessoa)
-        linha = {"contagem_id": cid, "chave_linha": chave, "decisao": decisao, "id_item": id_final or None,
-                 "codigo_criado": codigo or None, "id_almoxarifado": almox, "usina_id": usina,
-                 "usina_ligada_por": F.USINA_LIGADA_POR[0] if usina else None, **quem_}
-        if motivo:
-            linha["dados"] = {"motivo": motivo}
-        F.acrescentar(cfg, F.ABA_CURADORIA, [linha])
-        try:
-            F.acrescentar(cfg, F.ABA_EVENTO, [{
-                "tipo": "curadoria", "contagem_id": cid, "id_almoxarifado": almox, "id_item": id_final or None,
-                "codigo": codigo or None, "usina_id": usina, "usina_ligada_por": F.USINA_LIGADA_POR[0] if usina else None,
-                **quem_}])
-        except F.Recusada as ex:
-            raise F.Recusada(f"A decisão ficou registrada, mas não consegui anotá-la na auditoria ({ex}).") from ex
+        # a vez da contagem (`travas.CONTAGEM`) da conferência até a escrita: a aprovação que está lendo o lote termina antes, e
+        # a decisão que chegou no meio dela é recusada aqui, em vez de gravada e ignorada pelo lote já montado (27/10/2026)
+        with travas.CONTAGEM.de(cid):
+            # a contagem pode ter sido gravada (ou recusada, ou substituída) enquanto o catálogo era paginado e a peça criada:
+            # a decisão só vale para o lote de uma contagem ainda aberta. O estado vem do livro de AGORA, logo antes de escrever
+            estado_agora = _estados(cfg, forcar=True)[1].get(cid)
+            if estado_agora != "aberta":
+                ja = _PORQUE.get(estado_agora, ("deixou de estar aberta", "já tinha deixado de estar aberta"))[1]
+                if decisao == "cadastrar" and codigo:
+                    raise Conflito(f"A peça {codigo} foi criada no Fracttal, mas a contagem {ja}: a decisão não foi registrada, "
+                                   "e o código continua reservado nesta linha. Faça uma nova contagem.")
+                raise Conflito(f"Esta contagem {ja} enquanto você decidia: a decisão não foi registrada. Faça uma nova "
+                               "contagem.")
+            linha = {"contagem_id": cid, "chave_linha": chave, "decisao": decisao, "id_item": id_final or None,
+                     "codigo_criado": codigo or None, "id_almoxarifado": almox, "usina_id": usina,
+                     "usina_ligada_por": F.USINA_LIGADA_POR[0] if usina else None, **quem_}
+            if motivo:
+                linha["dados"] = {"motivo": motivo}
+            F.acrescentar(cfg, F.ABA_CURADORIA, [linha])
+            try:
+                F.acrescentar(cfg, F.ABA_EVENTO, [{
+                    "tipo": "curadoria", "contagem_id": cid, "id_almoxarifado": almox, "id_item": id_final or None,
+                    "codigo": codigo or None, "usina_id": usina,
+                    "usina_ligada_por": F.USINA_LIGADA_POR[0] if usina else None, **quem_}])
+            except F.Recusada as ex:
+                raise F.Recusada(f"A decisão ficou registrada, mas não consegui anotá-la na auditoria ({ex}).") from ex
     return {"decisao": decisao, "id_item": id_final, "codigo": codigo, "criada": criada, "texto": texto}
 
 

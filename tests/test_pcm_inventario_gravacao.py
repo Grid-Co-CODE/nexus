@@ -854,6 +854,89 @@ def test_continuar_pela_ponte_so_de_quem_aprovou(app, inv, ponte_falsa, monkeypa
     assert c.post(f"{PONTE}/C-9/continuar", json={}).status_code == 404
 
 
+# ── a revisão e a curadoria que chegam durante a aprovação (a revisão final, 27/10/2026) ─────────────────────────────────
+def _segurar_a_1a_leitura(falso):
+    """A 1ª leitura do saldo (a da aprovação, depois de ler o livro, a revisão e a curadoria) espera o teste soltar: é a janela
+    em que um "tirar" ou um "descartar" de outra pessoa entrava e era ignorado (a aprovação já tinha lido o livro)."""
+    entrou, solta = threading.Event(), threading.Event()
+    ler = falso.ler
+
+    def ler_preso(id_almox):
+        if not entrou.is_set():
+            entrou.set()
+            solta.wait(10)
+        return ler(id_almox)
+    falso.ler = ler_preso
+    return entrou, solta
+
+
+def _na_thread(app, f, saida):
+    def rodar():
+        with app.app_context():
+            try:
+                saida["r"] = f()
+            except Exception as ex:      # noqa: BLE001 — o teste olha o que foi
+                saida["erro"] = ex
+    t = threading.Thread(target=rodar)
+    t.start()
+    return t
+
+
+def _aprovar_preso(app, inv, grav):  # noqa: F811
+    """A aprovação de C-1 começada e parada na leitura do saldo: (o falso, a thread, o que ela devolveu, o soltar)."""
+    _cenario(inv)
+    falso = _estoque(agora=grav["relogio"])
+    visto = _visto(app, falso)
+    entrou, solta = _segurar_a_1a_leitura(falso)
+    aprovou = {}
+    a = _na_thread(app, lambda: G.aprovar(grav["cfg"], "C-1", falso, APROVADOR, visto["n"], visto["assinatura"],
+                                          dormir=grav["esperas"].append, agora=grav["relogio"]), aprovou)
+    assert entrou.wait(5)
+    return falso, a, aprovou, solta
+
+
+def test_a_revisao_durante_a_aprovacao_espera_e_e_recusada(app, inv, grav):  # noqa: F811
+    """A aprovação lê o livro, a revisão e a curadoria e só depois o saldo do Fracttal; um "tirar" que caía nessa janela era
+    registrado e IGNORADO (o lote já estava montado). Agora a contagem tem UMA trava: a revisão espera a aprovação gravar o
+    `aprovada` e é recusada (409, a contagem já está gravando), nunca aceita em silêncio."""
+    from nexus.pcm.inventario import revisao as R
+    quem = R.pessoa(grav["cfg"], EMAIL)
+    _falso_, a, aprovou, solta = _aprovar_preso(app, inv, grav)
+    revisou = {}
+    b = _na_thread(app, lambda: R.revisar(grav["cfg"], "C-1", {"acao": "tirar", "id_item": "501",
+                                                                 "motivo": "a peça foi para o conserto"}, quem), revisou)
+    b.join(0.5)
+    assert b.is_alive()                                   # espera a aprovação, em vez de entrar no meio dela
+    solta.set()
+    a.join(10)
+    b.join(10)
+    G.aguardar("C-1")
+    assert "r" in aprovou, aprovou
+    assert isinstance(revisou.get("erro"), R.Recusa), revisou
+    assert revisou["erro"].status == 409 and "já gravada" in revisou["erro"].mensagem
+    assert [e for e in _eventos(app) if e["tipo"] == "peca_tirada"] == []
+
+
+def test_a_curadoria_durante_a_aprovacao_espera_e_e_recusada(app, inv, grav):  # noqa: F811
+    """O mesmo para a curadoria: o "descartar" que chega durante a aprovação espera e é recusado (`Conflito`), e a decisão não
+    vai ao livro."""
+    from nexus.pcm.inventario import curadoria as CU
+    from nexus.pcm.inventario.erros import Conflito
+    _falso_, a, aprovou, solta = _aprovar_preso(app, inv, grav)
+    decidiu = {}
+    b = _na_thread(app, lambda: CU.decidir(grav["cfg"], "C-1", "L8", "descartar", motivo="não é peça do almoxarifado",
+                                           pessoa={"email": EMAIL}), decidiu)
+    b.join(0.5)
+    assert b.is_alive()
+    solta.set()
+    a.join(10)
+    b.join(10)
+    G.aguardar("C-1")
+    assert "r" in aprovou, aprovou
+    assert isinstance(decidiu.get("erro"), Conflito), decidiu
+    assert F.ler(app.config, forcar=True)[F.ABA_CURADORIA] == []
+
+
 def test_o_controle_ilegivel_na_ponte_e_409(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
     """O controle que não se lê: a ponte diz isso (409), e não "só quem aprovou" (ninguém sabe quem aprovou)."""
     _cenario(inv)

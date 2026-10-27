@@ -852,7 +852,9 @@ Duas pendências, só nas contagens que ainda NÃO foram gravadas: o **achado fo
 - **As travas são por chave, nunca uma do módulo** (`travas.Travas`): por (contagem, linha) para ler, conferir e escrever a decisão (duas
   pessoas na mesma linha: uma ganha, a outra leva 409), por sigla para escolher o código e reservá-lo (duas linhas da mesma sigla não
   escolhem o mesmo número) e por arquivo de controle para regravar as reservas, nessa ordem. O `criar_peca` e as páginas do catálogo
-  levam segundos: um cadastro lento não segura a decisão de outra linha.
+  levam segundos: um cadastro lento não segura a decisão de outra linha. Por último, só em volta da conferência final e da escrita,
+  a trava da contagem (`travas.CONTAGEM`, a mesma da aprovação, seção da gravação): a decisão que chega durante a aprovação espera e
+  é recusada, em vez de gravada e ignorada pelo lote já montado.
 - **Cadastrar sem duplicar:** o `criar_peca` pode criar e perder a resposta. O código escolhido vai ANTES para
   `<NEXUS_DADOS>/almox_inventario/curadoria_<contagem>.json` (sem login, sem nome); na nova tentativa da mesma linha, o código
   reservado é o dela: se já existe no Fracttal (`Estoque.peca`), não cria de novo, acha o ID e só grava a decisão; se não existe,
@@ -919,7 +921,11 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
   igual não basta: o saldo que foi de 10 para 11 com o contado 12 segue "para cima". Mudou: 409 "a contagem mudou desde que
   você abriu a tela; recarregue". `iniciar` grava UM `aprovada` por peça (a leitura sabe o lote por eles), e o específico cujo
   genérico ainda tem linhas por identificar na curadoria vira `conflito` já ali (as unidades pendentes talvez sejam dele; o
-  "confirmar" sem alvo é pendente, como em `contas._ler`).
+  "confirmar" sem alvo é pendente, como em `contas._ler`). **A contagem tem UMA trava** (`travas.CONTAGEM`, um processo só):
+  `aprovar` a segura das leituras até o registro da aprovação; `revisar` e `curadoria.decidir`, da conferência do estado até a
+  escrita. Caso da revisão final de 27/10/2026: o "tirar" ou o "é a peça X" que caía entre a leitura do livro e o `aprovada` era
+  gravado e ignorado pelo lote já montado; agora espera e é recusado (409, a contagem já está gravando). Prova:
+  `test_a_revisao_durante_a_aprovacao_espera_e_e_recusada` e `test_a_curadoria_durante_a_aprovacao_espera_e_e_recusada`.
 - **Por lote de 50, uma sessão** (`INVENTARIO-<contagem>-L<n>`; a 2ª sessão do mesmo lote, depois de uma parada, é `-S<k>`,
   para o "achar o fechamento pela referência" nunca confundir as duas): modo → o que se moveu desde o "Contada em" (sem as
   sessões da própria contagem: `mexidas_desde(..., ignorar_prefixo="INVENTARIO-<contagem>-")`) → ler → ligar as nunca ligadas

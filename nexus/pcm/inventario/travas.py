@@ -20,3 +20,12 @@ class Travas:
     def de(self, chave) -> threading.Lock:
         with self._registro:
             return self._por_chave.setdefault(chave, threading.Lock())
+
+
+# A vez de cada CONTAGEM (a revisão final, 27/10/2026): aprovar × revisar × decidir a curadoria. A aprovação lê o livro, a
+# revisão e a curadoria, depois o saldo do Fracttal (segundos), e só então grava os `aprovada`; um "tirar", um "corrigir" ou um
+# "é a peça X" que caía nessa janela era registrado e IGNORADO (o lote já estava montado). Quem aprova segura a trava das
+# leituras até o registro da aprovação; quem revisa ou decide, da conferência do estado até a escrita: o que chega durante a
+# aprovação espera e, depois, é recusado (a contagem já está gravando). Um processo só, como o servidor (as threads dividem a
+# memória). A chave é o `contagem_id` sem os espaços das pontas (`almoxarifado._txt`).
+CONTAGEM = Travas()
