@@ -1229,13 +1229,27 @@ escolhe a semana ativa pela data de hoje: a W43 publicada na quinta vira a do Ap
 Levi: "Eles tem essa visão [...] no site de PCM, gostaria que tenhamos uma visão dessa no Nexus também e consigamos
 reprogramar tarefas que nem na imagem 1". É o quadro da aba Semana do painel do PCM (`novo.html`: `vSemana`, `cardHTML`,
 `abrirDet`, a fila `rp*`), com as mesmas contas: colunas pelos dias que a semana tem, contagem e horas do conjunto
-FILTRADO, cartões na ordem do relógio (40 por coluna; "mostrar todas" põe `todos=1`), turno pela hora de início (manhã
-07–12, tarde 12–17, noite 17–07), "Nª sem" pelo campo de vezes, trajetória da tarefa pelas semanas do arquivo (OS + 60
-caracteres da tarefa; vale a última da semana, como o `Map` do painel). Filtros: equipe, responsável, cliente, tipo,
-situação, turno e busca, em cascata (seção acima). O gestor de contrato que entra pelo Fracttal já vem filtrado nele
+FILTRADO, cartões na ordem do relógio (40 por coluna no HTML, 4 à vista com a rolagem da coluna; "mostrar todas" põe
+`todos=1`), turno pela hora de início (manhã 07–12, tarde 12–17, noite 17–07), "Nª sem" pelo campo de vezes, trajetória
+da tarefa pelas semanas do arquivo (OS + 60 caracteres da tarefa; vale a última da semana, como o `Map` do painel).
+Filtros: equipe, responsável, cliente, tipo, situação e turno, cada um com **mais de uma opção** (`quadro.varios`: a URL
+repete o nome, `tipo=MPA&tipo=MPM`, e por dentro vira "MPA|MPM"), em cascata (seção acima), mais a busca. O gestor de
+contrato que entra pelo Fracttal já vem filtrado nele
 (quando o nome casa com a coluna Responsável). Semanas: as do `banco_dados.json` e os rascunhos do Nexus (a rodada mais recente de cada semana que
 ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também as de prova).
 
+- **O topo, os filtros e o cartão** (Levi, 27/10/2026, num protótipo em quatro rodadas; CSS no fim do `pcm.css`):
+  - os textos longos (de onde lê, o que reprogramar faz, a semana do PCM, "criadas após o plano"; no bloco das
+    reprogramações, o que o arquivo é e quando vale) estão na **exclamação amarela da Segurança** (`hseq/_legenda.html`,
+    `aviso`; a página carrega o `hseq.css`): "quero o mesmo para ocultar esse texto enorme". O erro de leitura segue à vista;
+  - os **filtros** são chips sem fundo que abrem a lista com caixas de marcar e aplicam ao fechar ou no "Aplicar"; o
+    escolhido fica verde ("2 escolhidos"); a busca vem sozinha embaixo; a conta e as Reprogramações na linha dos chips;
+  - o **cartão** tem altura fixa (112 px): a OS e a situação; o tipo com o "Reprog." e o motivo (cortado em "…", inteiro
+    no `title`); a usina numa linha; o título em até duas; o pé (hora, turno, horas, Nª sem). O texto é 20% menor que o de
+    antes de 27/10, e os números do topo de cada dia saíram da fonte de título para a do texto, em negrito, 30% menores;
+  - cada **coluna mostra 4 OS** ("limite em 4 OSs por coluna") e rola sozinha, com a barra fina do Nexus.
+  Provar: `tests/test_pcm_quadro_filtros_varios.py` (os vários valores no `filtrar`, nas pendentes, nas opções e no
+  `_ctx_quadro`, e a tela com a exclamação e os chips) e a tela numa cópia de prova (1440 e 375 px, escuro e claro).
 - **A janela da OS** (Levi, 18/10/2026; `tests/test_pcm_quadro_janela_js.py` a abre no node): os cartões do topo são
   Tipo, Situação, Criticidade, Semanas na fila e Reprogramada (a seção "Situação da OS" de baixo saiu, e com ela o
   Status da OS, Em paralelo, Termografia, Origem e Etiqueta); Onde e Quem lado a lado e o Quando embaixo (o dia da

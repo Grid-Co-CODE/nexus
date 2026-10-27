@@ -5,10 +5,35 @@
    Nexus também e consigamos reprogramar tarefas"). As contas estão em nexus/pcm/quadro.py; a janela da OS e a fila, em
    static/pcm-quadro.js (dependem dos atributos data-* daqui). #}
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# 27/10/2026 (Levi: "quero o mesmo [a exclamação dos Extintores] para ocultar esse texto enorme"): os textos de como o
+   Quadro lê, grava e conta a semana vão para a exclamação amarela da Segurança (`hseq/_legenda.html`, estilo no hseq.css);
+   os erros de leitura continuam à vista. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
+{% from 'hseq/_legenda.html' import aviso, termo %}
 <p class="gc-eyebrow">PCM · Programação semanal</p>
-<div class="pcm-topo">
+<div class="pcm-topo q-topo">
   <div>
-    <h1 class="titulo-pagina">Quadro da semana</h1>
+    <div class="q-titulo"><h1 class="titulo-pagina">Quadro da semana</h1>
+    {% if sem and not fonte_erro %}
+    {% call aviso('Como o Quadro lê e conta a semana', fonte_frase if not rodada else '') %}
+      {% if rodada %}
+      {{ termo('De onde vem') }}<dd>A planilha que o Nexus gerou nesta rodada, que ainda não é a programação do App.</dd>
+      {{ termo('Reprogramar') }}<dd>Grava nas observações da semana no Nexus (Gerar a semana, bloco 2), que valem na próxima
+        geração; o que já foi gravado fica em "Já gravadas para esta semana", no fim da página.</dd>
+      {% else %}
+      {{ termo('De onde vem') }}<dd>O <span class="gc-dado">banco_dados.json</span> do repositório do PCM, o mesmo que o App de
+        Campo e o painel do PCM leem{% if fonte_gerada %}, regravado pelo robô do PCM em {{ fonte_gerada }}{% endif %}.</dd>
+      {% endif %}
+      {% if q %}
+      {{ termo('A semana do PCM') }}<dd>Vai do sábado {{ q.janela[0].strftime('%d/%m') }} 00:00 à sexta
+        {{ q.janela[1].strftime('%d/%m') }}: o plano fecha no fim da sexta anterior.</dd>
+      {{ termo('Criadas após o plano') }}<dd>As OS criadas nesse intervalo, depois que o plano fechou.{% if q.novas is none %}
+        Esta semana ainda não tem a data de criação das OS (o rascunho sai da planilha gerada; a criação vem quando o robô do
+        PCM publica).{% endif %}</dd>
+      {% endif %}
+    {% endcall %}
+    {% endif %}
+    </div>
     {% if sem %}<p class="pcm-sub">{{ sem.label }} · {{ origem_txt }}</p>{% endif %}
   </div>
   {% if chips %}
@@ -17,16 +42,10 @@
   </nav>
   {% endif %}
   {# 19/10/2026: o programador do PCM "não achou a reprogramação"; o botão leva ao bloco do fim da página #}
-  {% if rp_url %}<a class="gc-btn gc-btn--ui gc-btn--contorno q-rp-link" href="#reprogramacoes" data-rp-abrir><i class="ph ph-list-checks"></i>
-    Reprogramações da semana em curso</a>{% endif %}
 </div>
 
-{% if rodada %}
-<p class="pcm-fonte"><i class="ph ph-file-xls"></i><span>Lê a planilha que o Nexus gerou nesta rodada, que ainda não é a
-  programação do App. Reprogramar daqui grava nas observações da semana no Nexus (<a class="pcm-link"
-  href="{{ raiz }}/t/pcm/gerar?semana={{ sem.week }}">Gerar a semana, bloco 2</a>), que valem na próxima geração; o que já foi gravado
-  fica em "Já gravadas para esta semana", no fim da página.</span></p>
-{% else %}{% include "pcm/_fonte.html" %}{% endif %}
+{# o texto de onde a tela lê está na exclamação; aqui só o erro de leitura, que não pode ficar escondido #}
+{% if fonte_erro and not rodada %}{% include "pcm/_fonte.html" %}{% endif %}
 {% if ok %}<div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div>{{ ok }}{% if ok_link %}
   <a class="pcm-link" href="{{ (ok_link)|na_raiz }}">Ver nas observações da semana</a>.{% endif %}</div></div>{% endif %}
 {% if erro %}<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>{{ erro }}</strong></div></div>{% endif %}
@@ -34,37 +53,61 @@
   agora ({{ motivos_erro }}): o quadro sai sem eles e não dá para marcar até a leitura voltar.</div></div>{% endif %}
 
 {% if sem %}
-<form class="pcm-filtros q-filtros" method="get">
+{# Os filtros (27/10/2026, Levi: "melhor posicionamento dos filtros acima para ter mais espaço na tela para ver o card das
+   OSs"; "prefiro fundo transparente e o buscar em baixo isolado dos opcionais"; "quero poder escolher mais de uma opção"):
+   cada filtro é um chip sem fundo que abre a lista com caixas de marcar (aplica ao fechar a lista ou no "Aplicar"); a
+   conta da semana e as Reprogramações na mesma linha; a busca embaixo, sozinha. Vários valores vão repetidos na URL
+   (`tipo=MPA&tipo=MPM`) e o `quadro.varios` os lê. #}
+<form class="q-barra" method="get" data-q-barra>
   <input type="hidden" name="semana" value="{{ sem.week }}">
   {% if rodada %}<input type="hidden" name="rodada" value="{{ rodada }}">{% endif %}
-  <div class="campo busca">
-    <label class="gc-rotulo" for="q">Buscar</label>
-    <input id="q" name="q" class="gc-campo" value="{{ filtros.q or '' }}" placeholder="OS, usina, tarefa, equipamento…" autocomplete="off">
-  </div>
+  <div class="q-barra-l">
   {% for campo, rot, todos in [("equipe", "Equipe", "Todas"), ("resp", "Responsável", "Todos"), ("cliente", "Cliente", "Todos"),
                                ("tipo", "Tipo", "Todos"), ("estado", "Situação", "Todas"), ("turno", "Turno", "Todos")] %}
-  <div class="campo">
-    <label class="gc-rotulo" for="f-{{ campo }}">{{ rot }}</label>
-    <select id="f-{{ campo }}" name="{{ campo }}" class="gc-campo" onchange="this.form.submit()">
-      <option value="">{{ todos }}</option>
-      {% for v, n in q.opcoes[campo] %}<option value="{{ v }}"{% if v == filtros[campo] %} selected{% endif %}>{{ v }} ({{ n }})</option>{% endfor %}
-    </select>
-  </div>
+  {% set sel = (filtros[campo] or '').split('|') | reject('equalto', '') | list %}
+  <details class="q-ms{% if sel %} q-ms--ativo{% endif %}" data-ms>
+    <summary><span class="q-ms-r">{{ rot }}</span><span class="q-ms-v">{% if not sel %}{{ todos }}{% elif sel|length == 1 %}{{ sel[0] }}{% else %}{{ sel|length }} escolhidos{% endif %}</span><i class="ph ph-caret-down"></i></summary>
+    <div class="q-ms-caixa" role="group" aria-label="{{ rot }}">
+      {% for v, n in q.opcoes[campo] %}
+      <label class="q-ms-op"><input type="checkbox" name="{{ campo }}" value="{{ v }}"{% if v in sel %} checked{% endif %}>
+        <span>{{ v }}</span><small class="gc-num">{{ n }}</small></label>
+      {% else %}<p class="q-ms-vazio">Nada para escolher com os outros filtros.</p>{% endfor %}
+      <div class="q-ms-pe"><button type="button" class="q-ms-nenhum" data-ms-nenhum>Desmarcar</button>
+        <button type="submit" class="gc-btn gc-btn--ui gc-btn--primario">Aplicar</button></div>
+    </div>
+  </details>
   {% endfor %}
-  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button>
-  {% if tem_filtro %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ (url_limpar)|na_raiz }}">Limpar</a>{% endif %}
-</form>
-
-<div class="q-resumo">
-  <p class="pcm-conta"><b class="gc-num">{{ q.total }}</b>{% if q.total != q.total_semana %} de {{ q.total_semana }}{% endif %}
-    tarefas · {{ q.horas }} programadas{% if q.novas is not none %} · <b class="gc-num">{{ q.novas }}</b>
+  {% if tem_filtro %}<a class="q-limpar" href="{{ (url_limpar)|na_raiz }}"><i class="ph ph-x"></i> Limpar</a>{% endif %}
+  <p class="pcm-conta q-conta"><b class="gc-num">{{ q.total }}</b>{% if q.total != q.total_semana %} de {{ q.total_semana }}{% endif %}
+    tarefas · {{ q.horas }}{% if q.novas is not none %} · <b class="gc-num">{{ q.novas }}</b>
     {{ 'criada' if q.novas == 1 else 'criadas' }} após o plano{% endif %}{% if q.sem_dia %} · {{ q.sem_dia }} sem dia{% endif %}{% if filtro_gestor %} · filtrado em
     {{ filtros.resp }}, o gestor de contrato que entrou{% endif %}</p>
-  <p class="gc-ajuda q-janela"><i class="ph ph-calendar-dots"></i> A semana do PCM vai do sábado {{ q.janela[0].strftime('%d/%m') }} 00:00
-    à sexta {{ q.janela[1].strftime('%d/%m') }}: o plano fecha no fim da sexta anterior, e "criadas após o plano" conta as OS
-    criadas nesse intervalo.{% if q.novas is none %} Esta semana ainda não tem a data de criação das OS (o rascunho sai da
-      planilha gerada; a criação vem quando o robô do PCM publica).{% endif %}</p>
-</div>
+  {% if rp_url %}<a class="gc-btn gc-btn--ui gc-btn--contorno q-rp-link" href="#reprogramacoes" data-rp-abrir
+     title="Reprogramações da semana em curso"><i class="ph ph-list-checks"></i> Reprogramações</a>{% endif %}
+  </div>
+  <label class="q-busca"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+    <input id="q" name="q" value="{{ filtros.q or '' }}" placeholder="Buscar OS, usina, tarefa, equipamento…" autocomplete="off"
+           aria-label="Buscar"></label>
+</form>
+<script>
+  /* os chips de múltipla escolha: um aberto por vez; clicar fora ou Esc fecha; fechar com a escolha mudada aplica */
+  (function () {
+    var f = document.querySelector("[data-q-barra]"); if (!f) return;
+    var chips = Array.prototype.slice.call(f.querySelectorAll("[data-ms]"));
+    function estado(d) { return Array.prototype.map.call(d.querySelectorAll("input:checked"), function (i) { return i.value; }).join("|"); }
+    chips.forEach(function (d) {
+      d.dataset.antes = estado(d);
+      d.addEventListener("toggle", function () {
+        if (d.open) { chips.forEach(function (o) { if (o !== d) o.open = false; }); return; }
+        if (estado(d) !== d.dataset.antes) f.submit();
+      });
+      var nenhum = d.querySelector("[data-ms-nenhum]");
+      if (nenhum) nenhum.addEventListener("click", function () { d.querySelectorAll("input").forEach(function (i) { i.checked = false; }); });
+    });
+    document.addEventListener("click", function (ev) { chips.forEach(function (d) { if (d.open && !d.contains(ev.target)) d.open = false; }); });
+    document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") chips.forEach(function (d) { if (d.open) { d.open = false; d.querySelector("summary").focus(); } }); });
+  })();
+</script>
 
 <div class="q-rolo" tabindex="0" aria-label="Quadro da semana, rolagem horizontal">
   <div class="q-quadro" style="--cols:{{ q.colunas|length or 1 }}">
@@ -89,15 +132,18 @@
             <span class="q-c-os gc-num">OS {{ k.os }}</span>
             <span class="q-st q-st--{{ {'Finalizada': 'feita', 'Em progresso': 'andamento', 'Pausada': 'pausada'}.get(k.st, 'nao') }}">{{ k.st }}</span>
           </div>
-          <div class="q-c-tipo"><i class="q-ponto"></i>{{ k.tp or 'Sem tipo' }}</div>
-          <div class="q-c-usina">{{ k.uc }}</div>
-          <div class="q-c-tarefa">{{ k.t }}</div>
-          <div class="q-c-mp" data-mp-slot{% if not k.mp %} hidden{% endif %}>{% if k.mp %}<span class="q-mp{% if k.mpt %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if k.mpt else 'tag' }}"></i>{{ k.mp }}</span>{% endif %}</div>
+          {# O cartão (27/10/2026, Levi: "um tamanho padrão por OS"; "o Reprog. pode ficar ao lado de MPM, MPA, PREVENTIVA";
+             "aí vem: Usina; Título (até duas linhas)"; "junta mais"): todos com a mesma altura; o tipo, o Reprog. e o motivo
+             (quando há, cortado em "…", inteiro ao passar o mouse) na mesma linha; a usina numa só; o título em até duas #}
+          <div class="q-c-tipo"><i class="q-ponto"></i><span class="q-c-tp">{{ k.tp or 'Sem tipo' }}</span>
+            {% if k.rep %}<span class="q-c-rep"><i class="ph ph-arrow-clockwise"></i> Reprog.</span>{% endif %}
+            <span class="q-c-mp" data-mp-slot{% if not k.mp %} hidden{% endif %}{% if k.mp %} title="{{ k.mp }}"{% endif %}>{% if k.mp %}<span class="q-mp{% if k.mpt %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if k.mpt else 'tag' }}"></i>{{ k.mp }}</span>{% endif %}</span></div>
+          <div class="q-c-usina" title="{{ k.uc }}">{{ k.uc }}</div>
+          <div class="q-c-tarefa" title="{{ k.t }}">{{ k.t }}</div>
           <div class="q-c-pe">
             {% if k.ini %}<span class="gc-dado">{{ k.ini }}</span>{% endif %}
             <span class="q-tur q-tur--{{ {'Manhã': 'manha', 'Tarde': 'tarde', 'Noite': 'noite'}.get(k.tur, 'sem') }}">{{ k.tur }}</span>
             <span>{{ k.h }}</span>
-            {% if k.rep %}<span class="q-c-rep"><i class="ph ph-arrow-clockwise"></i> Reprog.</span>{% endif %}
             <span class="q-c-n{% if k.rol >= 3 %} q-mal{% endif %}">{{ k.rol or 1 }}ª sem</span>
           </div>
         </div>

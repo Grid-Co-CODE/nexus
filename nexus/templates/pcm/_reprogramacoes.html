@@ -13,9 +13,22 @@
   {% if rp.tentativa %}<p class="gc-ajuda">O que você tinha deixado (copie se precisar):</p>
   <pre class="pcm-pre q-pre">{{ rp.tentativa|join('\n') }}</pre>{% endif %}</div></div>{% endif %}
 
-<p class="rp-sub">Tudo o que está no <span class="gc-dado">Observacoes_Semana_Atual.txt</span> do repositório do PCM, lido às
-  {{ rp.lido }}: as linhas que a fila do Quadro gravou e as que vieram do painel do PCM. O robô do PCM lê o arquivo inteiro a
-  cada rodada (15 a 30 minutos) e aplica na programação {% if rp.num %}da Semana {{ rp.num }}{% else %}da semana em curso{% endif %}.</p>
+{# 27/10/2026 (Levi: "quero o mesmo para ocultar esse texto enorme"): o que o arquivo é, quando vale e o que tirar uma
+   linha faz vão na exclamação amarela da Segurança; à vista fica só a hora da leitura. Este pedaço chega pelo fetch do
+   pcm-reprogramacoes.js, e o script do `aviso` não roda: a exclamação abre e fecha no clique, sem o "clicar fora fecha". #}
+{% from 'hseq/_legenda.html' import aviso, termo %}
+<div class="rp-cab"><p class="rp-sub">O <span class="gc-dado">Observacoes_Semana_Atual.txt</span> do repositório do PCM, lido às
+  {{ rp.lido }}.</p>
+  {% call aviso('Como as reprogramações valem') %}
+    {{ termo('O que está aqui') }}<dd>Tudo o que está no <span class="gc-dado">Observacoes_Semana_Atual.txt</span> do
+      repositório do PCM: as linhas que a fila do Quadro gravou e as que vieram do painel do PCM.</dd>
+    {{ termo('Quando vale') }}<dd>O robô do PCM lê o arquivo inteiro a cada rodada (15 a 30 minutos) e aplica na programação
+      {% if rp.num %}da Semana {{ rp.num }}{% else %}da semana em curso{% endif %}.</dd>
+    {{ termo('Tirar uma linha') }}<dd>O robô refaz a semana a cada rodada, a partir da programação publicada, e aplica o arquivo
+      inteiro de novo: tirar uma linha desfaz o que ela fazia na rodada seguinte (até 15 minutos).</dd>
+    {{ termo('Subtarefa') }}<dd>A tarefa num ativo só vai como <span class="gc-dado">nome @ CÓDIGO do ativo</span>.</dd>
+  {% endcall %}
+</div>
 
 {% if rp.atual.erro %}
 <div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-plugs"></i><div><strong>Não consegui ler o repositório do PCM:</strong>
@@ -36,9 +49,6 @@
   {% if rp.pode %}
 {# 19/10/2026: o robô refaz a semana a cada rodada a partir da planilha publicada (só o banco_dados.json vai ao
    repositório): tirar a linha desfaz o que ela fazia. O aviso de antes dizia o contrário. #}
-<p class="pcm-fonte"><i class="ph ph-info"></i><span>O robô refaz a semana a cada rodada, a partir da programação publicada,
-  e aplica o arquivo inteiro de novo: tirar uma linha desfaz o que ela fazia na rodada seguinte (até 15 minutos). A
-  subtarefa, a tarefa num ativo só, vai como <span class="gc-dado">nome @ CÓDIGO do ativo</span>.</span></p>
 <form class="rp-form" method="post" action="{{ raiz }}/t/pcm/quadro/reprogramacoes" data-rp-form>
   <input type="hidden" name="semana" value="{{ rp.semana }}">
   <input type="hidden" name="sha_visto" value="{{ rp.sha }}">

@@ -572,28 +572,41 @@ def opcoes(rows: list[dict], filtros: dict | None = None) -> dict:
         conta.pop("", None)
         ordem = {"estado": ESTADOS, "turno": TURNOS_CARTAO}.get(campo)
         valores = [v for v in ordem if conta.get(v)] if ordem else sorted(conta, key=_norm)
-        escolhido = filtros.get(campo)
-        if escolhido and escolhido not in valores:
-            valores.append(escolhido)
+        for escolhido in sorted(varios(filtros.get(campo)), key=_norm):
+            if escolhido not in valores:
+                valores.append(escolhido)
         out[campo] = [(v, conta.get(v, 0)) for v in valores]
     return out
 
 
+# Vários valores por filtro (27/10/2026, Levi: "nos filtros também quero poder escolher mais de uma opção"): cada um aceita
+# valores, separados por "|" no valor (a tela manda `equipe=A&equipe=B`, e o `telas._ctx_quadro` junta). O "|" não
+# aparece em equipe, responsável, cliente, tipo, situação nem turno; os links e a fila de reprogramação levam o valor
+# junto como sempre levaram.
+SEP = "|"
+
+
+def varios(v) -> set[str]:
+    """Os valores escolhidos de um filtro (vazio = sem filtro)."""
+    return {x.strip() for x in str(v or "").split(SEP) if x.strip()}
+
+
 def filtrar(rows: list[dict], f: dict) -> list[dict]:
     termo = _norm(f.get("q"))
+    eq, rp, cl, tp, es, tu = (varios(f.get(k)) for k in ("equipe", "resp", "cliente", "tipo", "estado", "turno"))
     out = []
     for r in rows:
-        if f.get("equipe") and str(r.get("cluster") or "").strip() != f["equipe"]:
+        if eq and str(r.get("cluster") or "").strip() not in eq:
             continue
-        if f.get("resp") and str(r.get("responsavel") or "").strip() != f["resp"]:
+        if rp and str(r.get("responsavel") or "").strip() not in rp:
             continue
-        if f.get("cliente") and str(r.get("cliente") or "").strip() != f["cliente"]:
+        if cl and str(r.get("cliente") or "").strip() not in cl:
             continue
-        if f.get("tipo") and str(r.get("tipo") or "").strip() != f["tipo"]:
+        if tp and str(r.get("tipo") or "").strip() not in tp:
             continue
-        if f.get("estado") and estado(r) != f["estado"]:
+        if es and estado(r) not in es:
             continue
-        if f.get("turno") and turno(r.get("h_ini")) != f["turno"]:
+        if tu and turno(r.get("h_ini")) not in tu:
             continue
         if termo and termo not in _norm(" ".join(str(r.get(c) or "") for c in ("os_id", "usina", "tarefa", "cluster",
                                                                                 "codigo"))):
@@ -605,13 +618,14 @@ def filtrar(rows: list[dict], f: dict) -> list[dict]:
 def filtrar_pendentes(pend: list[dict], f: dict) -> list[dict]:
     """As pendentes têm cliente, usina, equipe e tipo; responsável, situação e turno não existem nelas."""
     termo = _norm(f.get("q"))
+    eq, cl, tp = (varios(f.get(k)) for k in ("equipe", "cliente", "tipo"))
     out = []
     for p in pend:
-        if f.get("equipe") and str(p.get("cluster") or "").strip() != f["equipe"]:
+        if eq and str(p.get("cluster") or "").strip() not in eq:
             continue
-        if f.get("cliente") and str(p.get("cliente") or "").strip() != f["cliente"]:
+        if cl and str(p.get("cliente") or "").strip() not in cl:
             continue
-        if f.get("tipo") and str(p.get("tipo") or "").strip() != f["tipo"]:
+        if tp and str(p.get("tipo") or "").strip() not in tp:
             continue
         if termo and termo not in _norm(" ".join(str(p.get(c) or "") for c in ("os_id", "usina", "tarefa", "cluster"))):
             continue

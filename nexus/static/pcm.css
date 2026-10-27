@@ -438,12 +438,6 @@ tr.pg-det p{margin:4px 0}
 .q-t--zeladoria{--q-cor:var(--ok)}
 .q-t--outro{--q-cor:var(--fraco)}
 
-.q-filtros select.gc-campo{min-width:104px;max-width:180px}
-.q-filtros .busca{flex:1 1 200px}
-.q-resumo{margin:0 0 12px}
-.q-resumo .pcm-conta b{color:var(--tinta);font-weight:700}
-.q-janela{display:flex;gap:6px;align-items:flex-start;max-width:900px}
-.q-janela i{font-size:15px;margin-top:1px}
 
 .q-rolo{overflow-x:auto;padding-bottom:6px}
 .q-rolo:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
@@ -1324,4 +1318,96 @@ details.inv-card:not([open])>summary{border-bottom:0}
   .cu-foto,.cu-img,.cu-sem-foto{width:100%}
   .cu-img{height:auto;max-height:260px}
   .cu-sem-foto{height:64px}
+}
+
+/* ── O topo, os filtros, o cartão e as colunas do Quadro (27/10/2026, Levi, num protótipo em quatro rodadas) ──────────
+   - Os textos longos (de onde a tela lê, o que reprogramar faz, a semana do PCM, "criadas após o plano", e no bloco das
+     reprogramações o que o arquivo é e quando vale) foram para a exclamação amarela da Segurança (`hseq/_legenda.html`,
+     estilo no hseq.css, que a página carrega): "quero o mesmo para ocultar esse texto enorme". Os erros seguem à vista.
+   - Os filtros: "melhor posicionamento dos filtros acima para ter mais espaço na tela para ver o card das OSs"; "esse
+     fundo azul tá escroto, prefiro fundo transparente e o buscar em baixo isolado dos opcionais"; "nos filtros também quero
+     poder escolher mais de uma opção". Cada filtro é um chip sem fundo que abre a lista com caixas de marcar; o escolhido
+     fica verde; a busca vem sozinha embaixo; a conta da semana e as Reprogramações ficam na linha dos chips.
+   - O cartão: "um tamanho padrão por OS"; o "Reprog." ao lado do tipo (MPM, MPA, PREVENTIVA...); depois a usina e o título
+     em até duas linhas; o texto 20% menor e a altura junto (112 px). O motivo, quando há, vai na linha do tipo, cortado em
+     "…" (o inteiro no title), para não reservar uma linha vazia ("tá sobrando um pouco de espaço abaixo, junta mais").
+   - Os números do topo de cada dia saíram da fonte de título ("todos tortos") para a do texto, em negrito, 30% menores.
+   - As colunas mostram 4 OS por vez ("limite em 4 OSs por coluna"), com rolagem própria e a barra fina do Nexus.
+   Abaixo de 640 px os chips ficam dois por linha e a lista abre presa ao pé da tela. */
+.q-topo{align-items:center;margin-bottom:10px}
+.q-titulo{display:flex;align-items:center;gap:10px}
+.q-titulo .titulo-pagina{margin:0}
+.q-titulo .hs-aviso{margin-top:2px}
+.rp-cab{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rp-cab .rp-sub{margin:0}
+
+.q-barra{display:grid;gap:8px;margin:0 0 10px}
+.q-barra-l{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.q-busca{display:flex;align-items:center;gap:6px;max-width:560px;height:34px;padding:0 10px;border:1px solid var(--linha);
+  border-radius:var(--raio-tag);color:var(--mudo)}
+.q-busca:focus-within{border-color:var(--verde-a35)}
+.q-busca input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--tinta);font:500 13px var(--font-sans)}
+.q-limpar{display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 10px;font:600 12.5px var(--font-sans);
+  color:var(--mudo);text-decoration:none}
+.q-limpar:hover{color:var(--tinta)}
+.q-conta{margin:0 4px 0 auto;font-size:12.5px;white-space:nowrap}
+.q-conta b{color:var(--tinta);font-weight:700}
+.q-barra .q-rp-link{margin:0;height:32px;padding:0 12px}
+.q-ms{position:relative}
+.q-ms>summary{list-style:none;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid var(--linha);
+  border-radius:var(--raio-tag);cursor:pointer;font:500 13px var(--font-sans);color:var(--tinta);white-space:nowrap}
+.q-ms>summary::-webkit-details-marker{display:none}
+.q-ms>summary:hover{border-color:var(--linha-forte)}
+.q-ms>summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.q-ms-r{font:700 10px/1 var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.q-ms-v{max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.q-ms>summary i{font-size:12px;color:var(--mudo);transition:transform .15s}
+.q-ms[open]>summary i{transform:rotate(180deg)}
+.q-ms--ativo>summary{border-color:var(--verde-a35);color:var(--verde-texto)}
+.q-ms--ativo .q-ms-r{color:var(--verde-texto)}
+.q-ms-caixa{position:absolute;z-index:40;top:calc(100% + 6px);left:0;min-width:240px;max-width:340px;padding:6px;
+  max-height:min(380px,calc(100vh - 220px));overflow:auto;border:1px solid var(--linha-forte);border-radius:var(--raio-md);
+  background:var(--superficie-3);box-shadow:0 8px 24px var(--sombra)}
+.q-ms-op{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:13px;color:var(--tinta);cursor:pointer}
+.q-ms-op:hover{background:var(--superficie-2)}
+.q-ms-op span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.q-ms-op small{color:var(--mudo);font-size:11.5px}
+.q-ms-op input{accent-color:var(--verde-texto);margin:0}
+.q-ms-vazio{margin:6px 8px;font-size:12.5px;color:var(--mudo)}
+.q-ms-pe{position:sticky;bottom:-6px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px -6px -6px;
+  padding:8px;border-top:1px solid var(--linha);background:var(--superficie-3)}
+.q-ms-nenhum{border:0;background:transparent;color:var(--mudo);font:600 12.5px var(--font-sans);cursor:pointer;padding:4px}
+.q-ms-nenhum:hover{color:var(--tinta)}
+
+.q-col-n{font:800 20px/24px var(--font-sans);letter-spacing:-.01em;font-variant-numeric:tabular-nums lining-nums}
+.q-cartoes{max-height:calc(4 * 112px + 3 * 8px + 20px);overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
+.q-cartoes:hover{scrollbar-color:var(--rolagem-hover) transparent}
+.q-cartao{height:112px;overflow:hidden;grid-template-rows:16px 14px 13px 28px 15px;align-content:start;gap:3px;
+  padding:6px 8px 6px 9px}
+.q-cartao .q-c-topo{flex-wrap:nowrap;overflow:hidden;white-space:nowrap}   /* no celular a etiqueta quebrava e encavalava no tipo */
+.q-cartao .q-c-topo .q-st{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.q-cartao .q-c-os{font-size:9.6px}
+.q-cartao .q-st{font-size:8.8px;line-height:13px;padding:0 6px;gap:4px}
+.q-cartao .q-st::before{width:5px;height:5px}
+.q-cartao .q-c-tipo{min-width:0;white-space:nowrap;font-size:8.4px;line-height:12px}
+.q-cartao .q-ponto{width:6px;height:6px}
+.q-c-tp{overflow:hidden;text-overflow:ellipsis}
+.q-cartao .q-c-tipo .q-c-rep{margin-left:6px;font:600 8.8px/12px var(--font-sans);letter-spacing:0;text-transform:none}
+.q-cartao .q-c-tipo .q-c-mp{min-width:0;margin-left:6px;overflow:hidden;text-transform:none;letter-spacing:0}
+.q-cartao .q-c-tipo .q-c-mp .q-mp{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 6px;
+  font-size:8.4px;line-height:12px}
+.q-cartao .q-c-usina{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9.6px;line-height:13px}
+.q-cartao .q-c-tarefa{font-size:10px;line-height:14px;height:28px}
+.q-cartao .q-c-pe{flex-wrap:nowrap;overflow:hidden;white-space:nowrap;font-size:8.8px;gap:3px 6px}
+.q-cartao .q-c-pe .gc-dado{font-size:9.2px;line-height:13px}
+.q-cartao .q-tur{font-size:8.8px;line-height:13px;padding:0 5px}
+.q-cartao .q-tur::before{width:5px;height:5px}
+@media (max-width:640px){
+  .q-ms{flex:1 1 calc(50% - 6px);min-width:0}
+  .q-ms>summary{width:100%;box-sizing:border-box}
+  .q-ms-v{flex:1;max-width:none}
+  .q-ms-caixa{position:fixed;left:16px;right:16px;top:auto;bottom:16px;max-width:none;max-height:60vh}
+  .q-busca{max-width:none}
+  .q-conta{flex:1 1 100%;margin:2px 4px 0;white-space:normal}
 }

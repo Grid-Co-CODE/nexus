@@ -984,7 +984,13 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
             return None
         return dict(ctx, sem=None, chips=[], erro=erro, ok=None)
     sem = _tipo_do_fracttal(cfg, sem)
-    filtros = {k: str(args.get(k) or "").strip()[:160] for k in Q.FILTROS}
+    # vários valores por filtro (27/10/2026): `equipe=A&equipe=B`, ou "A|B" vindo de um link, viram "A|B" (`Q.varios`)
+    def _valores(k):
+        lista = args.getlist(k) if hasattr(args, "getlist") else [args.get(k)]
+        if k == "q":
+            return str(lista[0] if lista else "").strip()[:160]
+        return Q.SEP.join(sorted({x for v in lista for x in Q.varios(v)}))[:400]
+    filtros = {k: _valores(k) for k in Q.FILTROS}
     filtro_gestor = False
     if not pedida and not any(filtros.values()) and not args.get("rodada"):
         g = _gestor_da_sessao(sem)
