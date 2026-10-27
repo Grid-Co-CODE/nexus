@@ -81,8 +81,18 @@ ligações de uma peça: `inventories.associate_warehouses_list` (`{"id_item": .
 
 A tela manda como `description` o nome do almoxarifado; o campo é texto livre (os ajustes por API de 08/10 têm
 descrições próprias, e o `document` deles também veio preenchido, ex. `MESCLA-DUPLICATAS-0810`; mandar o `document` no
-fechamento **não foi provado**). Não se sabe ainda se o fechamento gera par de movimentos também para as peças que não
-foram mexidas (a prova tinha uma peça só): a prova com o App (Task 10) usa duas peças para responder.
+fechamento **não foi provado**). **O fechamento só gera par para a peça mexida** (provado em 27/10: com a SP-TST-002 ligada
+e parada, zerar só a SP-TST-001 deu o par MOV-9/MOV-10 só dela). Num fechamento com várias peças, todas as saídas levam o
+MESMO folio e todas as entradas o seguinte (a gravação do Nexus de 27/10 deu MOV-7 nas duas saídas e MOV-8 nas duas
+entradas), com a `description` = a referência.
+
+### A prova pelo Nexus no Fracttal de verdade (27/10/2026, com o login do Levi, só no almoxarifado de teste)
+
+Numa cópia de prova com uma contagem de mentira (nunca no banco da API): a curadoria cadastrou a peça nova pelo Nexus
+(`SP-TST-002`, id 53279817: `companies.units_list`, `inventories.items_list` e `item_insert` provados); a gravação abriu a
+sessão, ligou a peça nova, gravou 5 → 3 e 0 → 1, fechou com `INVENTARIO-PROVA-TST-1-L1`, voltou ao modo 0 e a releitura
+confirmou as duas (eventos `peca_gravada` com o movimento 7); a régua mandou só o acordado (mínimo 1, máximo 5), conferido na
+releitura e na tela do Fracttal. Depois, pela tela do Fracttal, as duas peças de teste foram zeradas e desativadas.
 
 ### Achar o movimento e o que se moveu — `inventories.movement_history_list_new`
 
