@@ -766,6 +766,7 @@ def test_gravar_pela_tela(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
     assert j["texto"] and j["pode_encerrar"] is False
     html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
     assert "Gravação no Fracttal" in html and "data-gravar=" not in html and 'data-estado="/t/pcm/pecas/inventario/C-1/estado.json"' in html
+    assert "O lote foi para a gravação no Fracttal" in html and "Ver as peças em conflito" not in html      # sem conflito
     assert ponte_falsa["falso"].ler("10")["508"]["saldo"] == 3            # a nunca ligada foi ligada e gravada
     assert L.contagens(app.config)[0]["estado"] == "gravada"
 
@@ -888,6 +889,9 @@ def test_encerrar_pela_ponte(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
     assert r.status_code == 200, r.get_json()
     assert G.estado(app.config, "C-1")["estado"] == "encerrada"
     assert L.contagens(app.config)[0]["estado"] == "gravada_com_conflitos"
+    # a página aponta as peças em conflito na Auditoria (filtrada nesta contagem), e não diz que falta o saldo do sistema
+    html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert "/t/pcm/pecas/inventario/auditoria?tipo=conflito&amp;busca=C-1" in html and "Sem o saldo do sistema" not in html
 
 
 def test_a_tela_e_a_lista_mostram_o_aviso_de_travado(app, inv, ponte_falsa, monkeypatch):  # noqa: F811

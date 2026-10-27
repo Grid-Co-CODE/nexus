@@ -42,6 +42,8 @@
     <div class="kb-kpi"><span class="kb-kpi-rot">Com erro</span><div class="kb-kpi-linha"><b class="kb-kpi-v{% if gravacao.erros %} kb-kpi-v--critico{% endif %}" data-grav-n="erros">{{ gravacao.erros }}</b></div></div>
     <div class="kb-kpi"><span class="kb-kpi-rot">No lote</span><div class="kb-kpi-linha"><b class="kb-kpi-v" data-grav-n="total">{{ gravacao.total }}</b></div></div>
   </div>
+  {# quais peças ficaram em conflito, e de quê: a Auditoria filtrada nesta contagem (o motivo fica cifrado no livro) #}
+  {% if gravacao.conflitos %}<p class="alm-ajuda"><a class="inv-abrir" href="{{ raiz }}/t/pcm/pecas/inventario/auditoria?tipo=conflito&amp;busca={{ c.contagem_id|urlencode }}">Ver as peças em conflito na Auditoria</a></p>{% endif %}
   <div class="cn-erro" role="alert" data-grav-erro hidden></div>
   <div class="inv-rodape">
     <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-grav-continuar{% if not (pode_continuar and gravacao.estado == 'parada') %} hidden{% endif %}>Continuar</button>
@@ -140,7 +142,7 @@
 
 <section class="alm-painel">
   <h2>O que o técnico contou</h2>
-  <p class="alm-ajuda">{% if vai_ler %}O saldo do sistema, o Δ e a situação de cada peça chegam logo abaixo, lidos agora no Fracttal.{% else %}Sem o saldo do sistema não há Δ nem situação: só o número que o técnico contou.{% endif %}</p>
+  <p class="alm-ajuda">{% if vai_ler %}O saldo do sistema, o Δ e a situação de cada peça chegam logo abaixo, lidos agora no Fracttal.{% elif gravacao %}O lote foi para a gravação no Fracttal (acima); aqui, o número que o técnico contou.{% else %}Sem o saldo do sistema não há Δ nem situação: só o número que o técnico contou.{% endif %}</p>
   {% if itens %}
   <table class="alm-t">
     <thead><tr><th>Peça</th><th class="num">Contado</th><th>Observação</th></tr></thead>

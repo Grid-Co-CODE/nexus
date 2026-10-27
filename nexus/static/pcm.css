@@ -981,9 +981,11 @@ html.pgp-aberto{overflow:hidden}
   .alm-kpis .kb-kpi:nth-child(3n+1){padding-left:0;border-left:0}}
 @media (max-width:900px){.alm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .alm-vazio{margin-top:18px}
-.alm-abas{display:flex;gap:4px;margin-top:20px;border-bottom:1px solid var(--linha);overflow-x:auto}
+/* nove abas desde o inventário (26/10/2026): com o menu aberto, a 1366 px a fila passava 40 px da largura e a Auditoria
+   ficava cortada atrás da rolagem; com 10 px de lado e 2 px entre elas, cabe. Abaixo disso a fila rola por dentro */
+.alm-abas{display:flex;gap:2px;margin-top:20px;border-bottom:1px solid var(--linha);overflow-x:auto}
 .alm-aba{background:none;border:0;border-bottom:2px solid transparent;color:var(--mudo);font:600 13px var(--font-sans);
-  padding:10px 12px;cursor:pointer;white-space:nowrap}
+  padding:10px 10px;cursor:pointer;white-space:nowrap}
 .alm-aba[aria-selected=true]{color:var(--tinta);border-bottom-color:var(--verde)}
 .alm-filtros .gc-campo{min-width:0;flex:1 1 180px}
 .alm-painel{margin-top:14px;padding:14px;background:var(--superficie);border:1px solid var(--linha);border-radius:12px}
@@ -1070,8 +1072,13 @@ a.alm-aba{display:inline-block;text-decoration:none}
 .inv-rev-form textarea.gc-campo{resize:vertical}
 .inv-rev-form [hidden]{display:none}
 .inv-rev-pe{display:flex;justify-content:flex-end;margin-top:4px}
+/* a Auditoria: a tabela desgruda do filtro; o rótulo do tipo tem o tamanho dos outros (o `.alm-aviso` da casa é 12 px) */
+.inv-aud{margin-top:12px}
+.inv-aud b.alm-aviso{font-size:inherit}
 @media (max-width:640px){
   .inv-item-n{flex:1 1 100%}
+}
+
 /* ── Régua de mínimo e máximo (26/10/2026, o inventário do almoxarifado): a sugestão, o recomendado (a Grid) e o acordado
    (o cliente) de cada peça. A tabela é a `alm-t` do Almoxarifado (abaixo de 640 px vira cartão, com o data-r como rótulo);
    aqui só o que é da tela: a lista de almoxarifados, os campos de número e o fim da linha. As partes do almoxarifado são a

@@ -13,3 +13,17 @@
   <a class="alm-aba" role="tab" aria-selected="{{ 'true' if _aba == chave else 'false' }}" href="{{ raiz }}/t/pcm/pecas/inventario/{{ chave }}">{{ rotulo }}</a>
   {% endfor %}
 </nav>
+<script>
+  // no celular a fila das nove abas rola por dentro e a de agora (o Inventário é a 6ª, a Auditoria a 9ª) ficava fora da tela:
+  // ela vem para o meio da fila ao abrir a página, e de novo quando a fonte chega (as abas alargam e a empurravam para fora)
+  (function () {
+    var fila = document.currentScript.previousElementSibling, aba = fila && fila.querySelector('[aria-selected="true"]');
+    if (!aba) return;
+    function centrar() {
+      if (fila.scrollWidth <= fila.clientWidth) return;
+      fila.scrollLeft += aba.getBoundingClientRect().left - fila.getBoundingClientRect().left - (fila.clientWidth - aba.offsetWidth) / 2;
+    }
+    centrar();
+    window.addEventListener('load', centrar);
+  })();
+</script>

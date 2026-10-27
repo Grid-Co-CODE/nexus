@@ -494,6 +494,9 @@ script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o liv
   arquivo, a pasta de dados (`NEXUS_DADOS`) numa pasta temporária (a padrão, no Windows, é a do Nexus do PC), o
   `estoque._estoque_do_clone` trocado pelo `EstoqueFalso` e uma rota só da cópia que abre a sessão de uma pessoa do PCM com o cookie
   do Fracttal em `/os` (a cópia recusa todo POST para fora, e o login do Fracttal é um POST).
+  A prova de 26/10/2026 achou o `}` do `@media` do fim do inventário perdido no `pcm.css` (a régua e a curadoria sem estilo na
+  tela larga): `test_o_css_do_pcm_fecha_toda_chave`. As nove abas cabem a 1366 px com o menu aberto; no celular a fila rola por
+  dentro e a aba de agora vem para o meio ao abrir.
 - No Fracttal de verdade: a mesma cópia sem o `EstoqueFalso`, liberando o POST só para `app.fracttal.com` e `one.fracttal.com`, o
   login do Fracttal de quem prova e a contagem de mentira da `SP-TST-001` (contado 3 contra o saldo 5) mais uma linha
   `fora_do_catalogo`.
@@ -732,9 +735,8 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
 - **Provar:** `tests/test_pcm_inventario_telas.py` (a lista; a página sem o Fracttal e o lote pela ponte, com os seis grupos e os
   números certos; o login que falta, o 429 e a queda; a ponte com o cookie de verdade; cada ação com o evento e o motivo só cifrado,
   as recusas, o exagero, o 403 dos outros setores e de outro site, a aba, as cores só por token e os endereços pela `{{ raiz }}`);
-  mutações em cada regra acima, todas pegas. Conferida no navegador (1366 e 375 px, escuro e claro) com a página que os testes
-  renderizam servida estática, sem rolagem lateral e com o painel de revisão abrindo; a prova com servidor de verdade e
-  `EstoqueFalso` é da Task 10.
+  mutações em cada regra acima, todas pegas. Provada no navegador em 26/10/2026 numa cópia de prova com o `EstoqueFalso` (a seção do
+  fluxo, "Como provar"), a 1366 e 375 px, escuro e claro: o lote pela ponte, o painel de revisão, a correção que muda a situação.
 
 ## Inventário do almoxarifado: o livro (`nexus/dados/fato_inventario.py`; 26/10/2026)
 
@@ -961,8 +963,12 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
 - **Provar:** `tests/test_pcm_inventario_gravacao.py` (o `EstoqueFalso`, com o `"finalizar"` como ponto de defeito à parte, e
   um relógio de mentira: nada espera de verdade) e `tests/test_deploy_espera_gravacao.py` (o ajudante e o script); mutações nas
   regras acima, todas pegas. O teste da ponte manda o `os_sessao` com `Path=/os` pelo `estoque_da_sessao` de verdade: a ponte
-  vê o login, a rota `/t/pcm/...` não. Tela conferida (1366 e 375 px, escuro e claro) com as páginas que os testes renderizam
-  servidas estáticas. A prova no almoxarifado de teste do Fracttal é da Task 10.
+  vê o login, a rota `/t/pcm/...` não. Provada no navegador em 26/10/2026 numa cópia de prova com o `EstoqueFalso` (1366 e 375 px,
+  escuro e claro): o "Gravar" pelo pedaço do lote, a peça mexida depois da contagem em conflito, o login que expira com a sessão
+  aberta (o aviso forte na contagem e na lista), o "Encerrar" recusado em modo 2 e o "Continuar" que termina (6 gravadas, 1 em
+  conflito, o par de movimentos com `INVENTARIO-C-1-L1`, o almoxarifado de volta ao modo 0). A página da contagem gravada com
+  conflito aponta as peças na Auditoria (filtrada pela contagem). A prova no almoxarifado de teste do Fracttal de verdade é a
+  seção do fluxo, "Falta".
 
 ## Inventário do almoxarifado: a auditoria (`revisao.montar_auditoria`, `templates/pcm/inventario_auditoria.html`; 26/10/2026)
 

@@ -764,6 +764,18 @@ def test_sem_cor_fora_de_token():
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b", bloco) and "rgba(" not in bloco and "rgb(" not in bloco
 
 
+def test_o_css_do_pcm_fecha_toda_chave():
+    """Toda chave aberta no pcm.css se fecha (fora dos comentários). Caso real (26/10/2026): a junção das Tasks 8/9 com a 5/6
+    perdeu o `}` do `@media (max-width:640px)` do fim do inventário, e o CSS da régua e da curadoria, que vinha depois, passou a
+    valer só abaixo de 640 px: na tela larga a lista dos almoxarifados e os cartões da curadoria saíam sem estilo."""
+    css = re.sub(r"/\*.*?\*/", "", (RAIZ / "nexus" / "static" / "pcm.css").read_text("utf-8"), flags=re.S)
+    nivel = 0
+    for ch in css:
+        nivel += {"{": 1, "}": -1}.get(ch, 0)
+        assert nivel >= 0
+    assert nivel == 0
+
+
 def test_os_enderecos_nao_partem_da_raiz():
     """Endereço do Nexus nunca a partir da raiz (ele pode rodar debaixo de um prefixo): `{{ raiz }}` nos links e formulários."""
     base = RAIZ / "nexus" / "templates" / "pcm"
