@@ -322,3 +322,85 @@ def fila(usinas) -> list[dict]:
     itens.sort(key=lambda r: r["data"])
     itens.sort(key=lambda r: (-r["nivel"], r["status"] != "sem_os"))
     return itens
+
+
+# ── a visão no banco, para o dashboard do cliente (26/10/2026) ───────────────────────────────────────────────────────
+# Levi, 26/10/2026, depois de aprovar a tela: "agora faz a mesma tela no dashboard do cliente". O 5080 não lê o checklist
+# das rondas (o texto da OS no Fracttal, que só o Nexus lê e guarda); decisão do Levi (pelo chat do Dashboard Thopen): o
+# Nexus PUBLICA a visão pronta no banco e o 5080 só mostra (`zeladoria_banco.py` grava). 1 linha = usina × semana com
+# leitura, das 12 semanas até a corrente (as 8 da evolução até a mais velha que o filtro de semana oferece). A leitura
+# da semana é a mesma da célula da evolução (`valor_da_semana`), e a recomendação é a da tela feita sobre ESSA leitura:
+# a situação diz se a zeladoria do tipo foi feita depois dela, está programada ou falta programar. Para o cliente: nada
+# de nome nem de texto livre (regra 8: a API do banco tem leitura aberta), e a situação em palavras dele.
+SEMANAS_NO_BANCO = SEMANAS + SEMANAS_NO_FILTRO - 1
+CAB_BANCO = ("semana", "data_id_semana", "usina_id", "vegetacao_nivel", "sujidade_nivel", "vala", "data_id_leitura",
+             "os", "leituras_qtd", "recomendacao",
+             "situacao_vegetacao", "data_id_prazo_vegetacao", "data_id_situacao_vegetacao", "os_zeladoria_vegetacao",
+             "situacao_sujidade", "data_id_prazo_sujidade", "data_id_situacao_sujidade", "os_zeladoria_sujidade",
+             "data_id_ultima_supressao", "data_id_ultima_limpeza")
+# a situação da recomendação no banco (o 5080 escreve "a programar", "programada para 28/10", "feita em 23/10")
+SITUACAO_NO_BANCO = {"sem_os": "a_programar", "aberta": "programada", "feita": "feita", "sem_dado": "sem_dado"}
+RECOMENDACAO_NO_BANCO = {"vegetacao": "supressao_vegetal", "sujidade": "limpeza_modulos"}
+
+
+def _data_id(iso) -> int | None:
+    s = str(iso or "")[:10]
+    return int(s.replace("-", "")) if len(s) == 10 else None
+
+
+def _vala_do_dominio(v):
+    """A vala com a palavra do App ("Limpa", "Parcial", "Obstruída", "Não se aplica"), ou vazio: outra palavra (o
+    "Suja" do formulário de 07/10 da avulsa) vai vazia e conta (`dominios.vala_fora`), nunca o texto como veio."""
+    from ..dados import dominios as DOM
+    n = DOM.vala(v)
+    if n is not None:
+        return DOM.VALA_ROTULO[n]
+    return "Não se aplica" if DOM.norm(v) == DOM.VALA_NAO_SE_APLICA else None
+
+
+def visao_do_banco(todas, cobertura, respostas: dict, validacoes, tarefas, hoje: date) -> tuple[list[list], dict]:
+    """As linhas da `zeladoria_semana` (`CAB_BANCO`, ordenadas por usina e semana) e o relatório (só contagens)."""
+    from ..dados import dominios as DOM
+    janela = semanas_ate(semana_de(hoje), SEMANAS_NO_BANCO)
+    lei = leituras(todas, respostas, validacoes, {c["usina_id"] for c in cobertura})
+    zel = zeladoria_por_usina(tarefas, hoje)
+    tem_os = bool(tarefas)
+    linhas, rel = [], {"usinas": 0, "linhas": 0, "vala_fora": 0, "recomendacoes": 0, "sem_dado": 0}
+    for uid in sorted(lei):
+        por_sem = {}
+        for x in lei[uid]:
+            s = semana_de(x["data"])
+            if s in janela:
+                por_sem.setdefault(s, []).append(x)
+        if not por_sem:
+            continue
+        rel["usinas"] += 1
+        z = zel.get(uid, [])
+        for s in sorted(por_sem):
+            lst = por_sem[s]
+            ult = lst[-1]
+            veg, suj = valor_da_semana(lst, "vegetacao"), valor_da_semana(lst, "sujidade")
+            recs = {r["campo"]: r for r in recomendacoes({"data": ult["data"], "vegetacao": veg, "sujidade": suj},
+                                                          z, hoje, tem_os)}
+            fim_sem = min(segunda(s) + timedelta(days=6), hoje).isoformat()
+            ate_a_semana = [x for x in z if x["fim"] and x["fim"] <= fim_sem]
+            sup, limp = ultima_feita(ate_a_semana, {"supressao", "poda"}), ultima_feita(ate_a_semana, {"limpeza"})
+            rel["vala_fora"] += DOM.vala_fora(ult.get("vala"))
+            rel["recomendacoes"] += len(recs)
+            rel["sem_dado"] += sum(1 for r in recs.values() if r["status"] == "sem_dado")
+
+            def campo(c):
+                r = recs.get(c)
+                if not r:
+                    return [None, None, None, None]
+                zz = r["z"] or {}
+                quando = zz.get("fim") if r["status"] == "feita" else (zz.get("programada") if r["status"] == "aberta"
+                                                                        else None)
+                return [SITUACAO_NO_BANCO[r["status"]], _data_id(r["vence"]), _data_id(quando), zz.get("os")]
+            linhas.append([s, _data_id(segunda(s).isoformat()), uid, veg, suj, _vala_do_dominio(ult.get("vala")),
+                           _data_id(ult["data"]), next((D._id(x["os"]) for x in reversed(lst) if x.get("os")), None),
+                           len(lst), ";".join(RECOMENDACAO_NO_BANCO[c] for c, _ in CAMPOS if c in recs) or None,
+                           *campo("vegetacao"), *campo("sujidade"),
+                           _data_id(sup["fim"]) if sup else None, _data_id(limp["fim"]) if limp else None])
+    rel["linhas"] = len(linhas)
+    return linhas, rel

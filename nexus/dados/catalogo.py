@@ -1207,6 +1207,17 @@ LIVROS = (
           "nasceu na 1ª gravação, à mão depois do ensaio (ferramentas/ensaio_tarefas_os.py --gravar, 18/10/2026: "
           "8.746 tarefas, conferidas por GET depois de gravar); grava só a leitura inteira do Fracttal e se a "
           "última gravação tiver mais de 50 min"),
+    # a Zeladoria pronta para o dashboard do cliente (26/10/2026, Levi: "agora faz a mesma tela no dashboard do
+    # cliente"; a decisão dele, pelo chat do Dashboard Thopen: o Nexus publica a visão e o 5080 só mostra). É VISÃO, não
+    # fato: a conta da tela Zeladoria (nexus/campo/zeladoria.py) sobre o checklist das rondas, que só o Nexus lê
+    Livro("nexus_zeladoria", ("zeladoria_semana", "atualizacao"),
+          "de hora em hora (entre :32 e :37), só na máquina que relê o checklist das rondas (o servidor)",
+          "nexus/campo/zeladoria_banco.py (laço do Campo; NEXUS_ZELADORIA_PUBLICAR=0 desliga; não liga onde "
+          "NEXUS_CAMPO_AQUECER=0)", False,
+          "registrado em 26/10/2026 antes de existir: nasce na 1ª volta do servidor depois do deploy. Grava só com o "
+          "checklist das rondas inteiro e novo (aprovadas relidas há menos de 3 h, fila da Aprovação há menos de 6 h), "
+          "as rondas do banco sem erro e as OS de zeladoria presentes, e se a última gravação tiver mais de 50 min; "
+          "troca o livro inteiro (as 12 semanas até a corrente)"),
     Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na aba Pessoas e setores de Base → Acessos",
           "nexus/cadastro/setores.py, pela tela Base > Acessos > Pessoas e setores", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
@@ -1305,6 +1316,10 @@ ABAS_FORA_DA_REGRA = {
     "aba_equipamentos": "a visão da estrutura das usinas no formato da aba Equipamentos do bd_performance (as mesmas "
                         "colunas, com os IDs no fim), só das chaves marcadas \"no lugar da aba\": é o que deixa cada "
                         "leitor antigo da aba trocar a fonte sem ser reescrito (nexus/cadastro/estrutura_usina.py)",
+    "zeladoria_semana": "a visão pronta da tela Zeladoria do Campo · App para o dashboard do cliente (26/10/2026): 1 linha "
+                        "= usina × semana com leitura, os níveis da semana, a recomendação e a situação da zeladoria "
+                        "em palavras do cliente; conta do Nexus (nexus/campo/zeladoria.py), não fato conformado: o "
+                        "checklist das rondas que a origina não está no banco",
 }
 
 

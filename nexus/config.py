@@ -44,6 +44,9 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_CHAMADOS_PUBLICAR",
              # as tarefas das OS do Fracttal no banco (18/10/2026, nexus/campo/tarefas_os.py): "0" desliga numa máquina
              "NEXUS_OS_PUBLICAR",
+             # a Zeladoria no banco para o dashboard do cliente (26/10/2026, nexus/campo/zeladoria_banco.py): "0" desliga;
+             # onde NEXUS_CAMPO_AQUECER=0 (o PC) ela nem liga
+             "NEXUS_ZELADORIA_PUBLICAR",
              # login pelo Fracttal (06/10/2026): e-mails (separados por vírgula) que entram como admin (o Cadastro)
              "NEXUS_ADMINS",
              # Entrar com a Microsoft da Grid Co. (14/10/2026, nexus/auth/microsoft.py): as QUATRO primeiras ligam a porta

@@ -204,6 +204,14 @@ gaveta) em `__init__.py`.
   usinas mobilizadas de 13 clientes, 21 com leitura na W44 (segunda-feira) e 69 na W43; vegetação acima de 3 em 30
   usinas (6 no nível 5), sujidade em 21 (5 no nível 5); 51 recomendações, 40 sem OS, 10 com OS aberta, 1 feita. Página:
   481 KB (40 KB com gzip), 0,07 s com a conta das Rondas pronta; a gaveta, 4,5 KB em 0,02 s.
+- **No banco, para o dashboard do cliente** (26/10/2026, Levi: "agora faz a mesma tela no dashboard do cliente"; a
+  decisão dele, pelo chat do Dashboard Thopen: o Nexus publica a visão pronta e o 5080 só mostra, agrupando pela
+  carteira): `zeladoria_banco.py` grava `nexus_zeladoria · zeladoria_semana` (1 linha = usina × semana com leitura, 12
+  semanas, a recomendação e a situação da zeladoria em palavras do cliente, sem nome) e `atualizacao`, de hora em hora,
+  só no servidor (o PC sobe com `NEXUS_CAMPO_AQUECER=0` e não relê o checklist) e só com o checklist inteiro e novo. O
+  contrato e as recusas estão no `nexus/dados/CLAUDE.md` (linha "Zeladoria para o dashboard do cliente"). Das 131 usinas,
+  80 têm a linha "BD_Thopen · Dados Gerais Usinas" no de-para (a que o 5080 usa para o nome): só a Ouro Branco, das 81
+  da Thopen, não tem.
 - **Prova:** `tests/test_campo_zeladoria_semanal.py` (as semanas, as leituras pela regra da aba com a validação por foto,
   a última × a pior, as três tarefas e as situações, a feita antes × depois da leitura, a aberta, o "sem_dado", a conta
   da tela com a semana passada, a evolução por cliente e a ordem, a situação, os números, a fila, a tela e a gaveta com o
