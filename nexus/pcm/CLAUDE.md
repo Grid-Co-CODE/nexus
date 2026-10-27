@@ -909,7 +909,8 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
   o link do `/os/login` e a volta à contagem, a conta do Fracttal do cookie que não é a pessoa da sessão do Nexus 409 ("a
   sessão do Fracttal é de outra conta"; o cookie do OS Creator sobrevive à troca de pessoa no mesmo navegador), o controle
   ilegível 409 com o texto dele (não "só quem aprovou"). Quem entrou pelo Fracttal e perdeu o cookie nem chega à ponte: o
-  portão do Nexus encerra a sessão junto (401 `sessao_encerrada`). `GET /t/pcm/pecas/inventario/<id>/estado.json` fica na
+  portão do Nexus encerra a sessão junto (401 `sessao_encerrada`, com `login: true` e o endereço em `entrar`; as telas da ponte
+  tratam esse 401 à parte e só usam o `login` quando ele é texto: antes o `true` virava o endereço e a página ia para /true). `GET /t/pcm/pecas/inventario/<id>/estado.json` fica na
   tela (não fala com o Fracttal).
 - **Aprovar** (`aprovar`, o que a ponte chama): relê o livro, lê o saldo NA HORA com o login de quem aprova, monta o lote pelas
   contas (só `not tirada and situacao in MEXEM`) e confere o que a tela mostrou: o N e a `assinatura` (o hash de id_item,

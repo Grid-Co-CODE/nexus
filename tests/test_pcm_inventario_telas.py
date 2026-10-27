@@ -776,6 +776,18 @@ def test_o_css_do_pcm_fecha_toda_chave():
     assert nivel == 0
 
 
+def test_o_401_da_sessao_encerrada_nao_vira_endereco():
+    """O 401 do portão do Nexus nos pedidos de /os (a sessão que nasceu do Fracttal e perdeu o cookie dele) traz `login: true`
+    e o endereço em `entrar`. Caso da revisão de 27/10/2026: o gravar, o continuar e o encerrar faziam `location.href =
+    r.j.login`, e a página ia para "/true"; a régua e a curadoria punham "true" no link. Toda tela da ponte trata o
+    `sessao_encerrada` à parte e só usa o `login` quando ele é texto."""
+    contagem = (RAIZ / "nexus" / "templates" / "pcm" / "inventario_contagem.html").read_text("utf-8")
+    ponte = (RAIZ / "nexus" / "static" / "pcm-ponte-inventario.js").read_text("utf-8")
+    assert "location.href = r.j.login" not in contagem and contagem.count("entrarDeNovo(r.j)") == 3
+    assert "j.sessao_encerrada && window.nexusEntrarDeNovo" in contagem and "typeof j.login === 'string'" in contagem
+    assert "x.d.sessao_encerrada" in ponte and 'typeof login === "string"' in ponte
+
+
 def test_os_enderecos_nao_partem_da_raiz():
     """Endereço do Nexus nunca a partir da raiz (ele pode rodar debaixo de um prefixo): `{{ raiz }}` nos links e formulários."""
     base = RAIZ / "nexus" / "templates" / "pcm"

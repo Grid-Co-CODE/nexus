@@ -26,6 +26,15 @@
 <p class="pcm-sub">{% if c.usina %}{{ c.usina }} · {% endif %}contada em {{ contada_txt }} (Brasília), enviada em {{ enviada_txt }} (Brasília).
   <span class="inv-estado inv-estado--{{ c.estado }}">{{ rotulo }}</span></p>
 
+<script>
+  // a resposta 401 da ponte: o portão encerrou a sessão do Nexus junto com a do Fracttal (`sessao_encerrada`: o `login` é um true,
+  // e o endereço é o `entrar`) ou falta o login do Fracttal (o `login` é o endereço do /os/login). Antes, o `true` virava o
+  // endereço e a página ia para /true
+  function entrarDeNovo(j) {
+    if (j && j.sessao_encerrada && window.nexusEntrarDeNovo) window.nexusEntrarDeNovo(j.entrar);
+    else if (j && typeof j.login === 'string') location.href = j.login;
+  }
+</script>
 {% if gravacao %}
 {# a gravação no Fracttal: o andamento (a cada 3 s, enquanto grava), o aviso forte quando ela parou com o almoxarifado travado
    em ajuste e o "Continuar", só para quem aprovou #}
@@ -96,7 +105,7 @@
           botao.disabled = false;
           if (r.ok) { situacao = 'gravando'; botao.hidden = true; setTimeout(olhar, 1000); return; }
           mostrarErro(r.j.erro || 'Não consegui continuar agora: tente de novo.');
-          if (r.j.login) location.href = r.j.login;
+          entrarDeNovo(r.j);
         })
         .catch(function () { botao.disabled = false; mostrarErro('Não consegui falar com o servidor: tente de novo.'); });
     });
@@ -117,7 +126,7 @@
           encerrar.disabled = false;
           if (r.ok) { location.reload(); return; }
           mostrarErro(r.j.erro || 'Não consegui encerrar agora: tente de novo.');
-          if (r.j.login) location.href = r.j.login;
+          entrarDeNovo(r.j);
         })
         .catch(function () { encerrar.disabled = false; mostrarErro('Não consegui falar com o servidor: tente de novo.'); });
     });
@@ -316,7 +325,7 @@
           if (r.ok) { location.reload(); return; }
           b.disabled = false;
           mostrar(r.j.erro || 'Não consegui começar a gravação agora: tente de novo.');
-          if (r.j.login) location.href = r.j.login;
+          entrarDeNovo(r.j);
         })
         .catch(function () { b.disabled = false; mostrar('Não consegui falar com o servidor: tente de novo.'); });
     });

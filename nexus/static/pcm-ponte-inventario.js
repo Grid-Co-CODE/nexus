@@ -10,7 +10,7 @@
     while (caixa.firstChild) caixa.removeChild(caixa.firstChild);
     return caixa;
   }
-  function mostrar(texto, login) {
+  function mostrar(texto, login, rotulo) {
     var caixa = aviso();
     if (!caixa) return;
     var div = document.createElement("div");
@@ -19,11 +19,11 @@
     var b = document.createElement("b");
     b.textContent = texto;
     div.appendChild(b);
-    if (login) {
+    if (typeof login === "string" && login) {      // o `login` do portão é um true, não um endereço (ver abaixo)
       div.appendChild(document.createTextNode(" "));
       var a = document.createElement("a");
       a.href = login;
-      a.textContent = "Entrar pelo Fracttal";
+      a.textContent = rotulo || "Entrar pelo Fracttal";
       div.appendChild(a);
     }
     caixa.appendChild(div);
@@ -41,7 +41,10 @@
       return r.json().then(function (d) { return {r: r, d: d || {}}; }, function () { return {r: r, d: {}}; });
     }).then(function (x) {
       if (x.r.ok && x.d.ok) { window.location.assign(window.nexusRota(x.d.volta || window.location.pathname)); return; }
-      mostrar(x.d.erro || "O Nexus não respondeu como esperado (HTTP " + x.r.status + "). Nada foi anotado.", x.d.login);
+      // o 401 do portão do Nexus (a sessão que nasceu do Fracttal e perdeu o cookie dele foi encerrada junto): o `login` é um
+      // true e o endereço de entrar de novo é o `entrar`; o 401 da ponte traz o `login` com o /os/login do Fracttal
+      if (x.d.sessao_encerrada) mostrar(x.d.erro || "A sessão acabou: entre de novo.", x.d.entrar, "Entrar de novo");
+      else mostrar(x.d.erro || "O Nexus não respondeu como esperado (HTTP " + x.r.status + "). Nada foi anotado.", x.d.login);
       if (botao) botao.disabled = false;
     }).catch(function () {
       mostrar("Não consegui falar com o Nexus agora. Nada foi anotado; confira a página antes de tentar de novo.");
