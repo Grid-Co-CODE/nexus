@@ -46,6 +46,9 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # o livro do inventário num arquivo (só na cópia de prova e nos testes; no servidor ele vem do banco,
              # `nexus_almoxarifado_inventario`, nexus/dados/fato_inventario.py)
              "NEXUS_ALMOX_INVENTARIO_ARQUIVO",
+             # a gravação do inventário no Fracttal (27/10/2026, nexus/pcm/inventario/gravacao.py): só onde vale "1", o
+             # servidor (a vez do almoxarifado e a espera do deploy moram na máquina que grava); vazia, o PC não grava
+             "NEXUS_INVENTARIO_GRAVAR",
              # os chamados de garantia no banco (12/10/2026, nexus/campo/chamados_acompanhamento.py): "0" desliga numa máquina
              "NEXUS_CHAMADOS_PUBLICAR",
              # as tarefas das OS do Fracttal no banco (18/10/2026, nexus/campo/tarefas_os.py): "0" desliga numa máquina

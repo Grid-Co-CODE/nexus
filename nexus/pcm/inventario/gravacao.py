@@ -110,6 +110,7 @@ AVISO_TRAVADO = "{almox} ficou travado em ajuste no Fracttal; quem aprovou preci
 SEM_PESSOA = ("Não sei quem está aprovando: entre com o seu login do Fracttal (a gravação fica no nome de quem aprova, e a "
               "senha de administrador não é uma pessoa).")
 MUDOU = "A contagem mudou desde que você abriu a tela; recarregue. Nada foi gravado."
+SO_NO_SERVIDOR = "A gravação do inventário só roda no servidor do Nexus: nada foi gravado."
 ADMIN_ENCERRA_H = 24            # o administrador encerra a gravação parada há mais que isto (quem aprovou, a qualquer hora)
 MOTIVO_MAX = 1000
 ENCERRADA = "a gravação foi encerrada: {motivo}"
@@ -308,6 +309,16 @@ def _soltar(cfg, id_almox: str, contagem_id: str) -> None:
     dono = _ler_json(p)
     if dono is None or str(dono.get("contagem_id") or "") == contagem_id:
         _apagar(p)
+
+
+def _so_no_servidor(cfg) -> None:
+    """A gravação (aprovar, continuar, encerrar) só roda onde `NEXUS_INVENTARIO_GRAVAR=1`: o servidor. A vez do almoxarifado (a
+    trava da memória e o `trava-<almox>.json`), o controle e a espera do deploy moram na máquina que grava; um Nexus no PC, com
+    o login do Fracttal de verdade, abriria a sessão de um almoxarifado que o servidor não sabe que está travado, e o servidor
+    abriria outra por cima (a revisão final de 27/10/2026). A régua e o cadastro da curadoria não passam por aqui: não têm a
+    vez do almoxarifado nem sessão aberta. 409 antes de qualquer leitura."""
+    if str(cfg.get("NEXUS_INVENTARIO_GRAVAR") or "").strip() != "1":
+        raise Recusada(SO_NO_SERVIDOR, 409)
 
 
 # ── quem aprova ──────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -821,7 +832,9 @@ def iniciar(cfg, contagem: dict, itens: list[dict], estoque, aprovador: dict, *,
     `{"pessoa_hmac", "pessoa_id"}`. Grava UM evento `aprovada` por peça do lote antes de começar.
 
     `Recusada` (nada foi gravado, nem no livro nem no Fracttal): sem quem aprova, nada a gravar, a contagem já aprovada,
-    outra gravação andando (ou parada no meio) no mesmo almoxarifado, sem a pasta de dados, o livro que não aceitou."""
+    outra gravação andando (ou parada no meio) no mesmo almoxarifado, sem a pasta de dados, o livro que não aceitou, fora do
+    servidor (`_so_no_servidor`)."""
+    _so_no_servidor(cfg)
     cid = A._txt(contagem.get("contagem_id"))
     almox = A._id(contagem.get("id_almox"))
     if not cid:
@@ -917,6 +930,7 @@ def continuar(cfg, contagem_id: str, estoque, pessoa: dict, *, dormir=None, agor
     """Retoma a gravação parada (ou a que o Nexus interrompeu ao reiniciar), no login de `pessoa`, que tem de ser quem
     aprovou (`SoQuemAprovou`, pelo HMAC). A retomada parte do controle: a sessão aberta é fechada (ou terminada) antes de
     qualquer outra coisa, e o `erro` da releitura só é relido."""
+    _so_no_servidor(cfg)
     cid = A._txt(contagem_id)
     ctrl = _controle(cfg, cid)
     if ctrl is None:
@@ -964,6 +978,7 @@ def aprovar(cfg, contagem_id: str, estoque, aprovador: dict, n_visto=None, assin
     Segura a trava da contagem (`travas.CONTAGEM`) das leituras até o registro da aprovação (no `iniciar`): a revisão e a
     curadoria que chegam no meio esperam e são recusadas depois, em vez de gravadas e ignoradas pelo lote já montado."""
     from . import leitura
+    _so_no_servidor(cfg)
     if not aprovador or not aprovador.get("pessoa_hmac"):
         raise Recusada(SEM_PESSOA)
     if n_visto is None or not isinstance(assinatura_vista, str) or not assinatura_vista.strip():
@@ -1060,6 +1075,7 @@ def encerrar(cfg, contagem_id: str, estoque, pessoa: dict, motivo, *, admin: boo
     O motivo é obrigatório e vai só cifrado. As peças já conferidas ficam `peca_gravada`; cada uma das outras vira
     `conflito` com o motivo (no nome de quem encerra), e a contagem sai de "gravando". Solta a vez do almoxarifado.
     `Recusada` (nada mudou) com o status; `SemLogin` sobe."""
+    _so_no_servidor(cfg)
     cid = A._txt(contagem_id)
     ctrl = _controle(cfg, cid)
     if ctrl is None:

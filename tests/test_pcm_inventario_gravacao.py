@@ -48,6 +48,7 @@ def grav(app, inv, tmp_path):  # noqa: F811
     """A pasta de dados no tmp_path, as esperas anotadas (nunca dormidas) e o relógio de mentira. Ao fim, nenhuma
     gravação fica viva para o teste seguinte."""
     app.config["NEXUS_DADOS"] = str(tmp_path / "dados")
+    app.config["NEXUS_INVENTARIO_GRAVAR"] = "1"            # a gravação só roda onde a chave está ligada (o servidor)
     ctx = {"esperas": [], "relogio": Relogio(), "cfg": app.config}
     yield ctx
     for t in [t for _, t in list(G._ATIVAS.values()) if t is not None]:
@@ -699,6 +700,45 @@ def test_nunca_guarda_o_login(app, grav):
             assert proibido not in texto, (p.name, proibido)
     livro = (grav_pasta(app).parent.parent / "inventario.json").read_text("utf-8")
     assert "@" not in livro and "eyJ" not in livro
+
+
+def test_a_gravacao_so_roda_no_servidor(app, grav):
+    """A revisão final de 27/10/2026: a vez do almoxarifado (a trava da memória e o `trava-<almox>.json`), o controle e a espera
+    do deploy moram na máquina que grava. Um Nexus no PC, com o login do Fracttal de verdade, abriria a sessão de um almoxarifado
+    que o servidor não sabe que está travado (e o servidor abriria outra). Sem `NEXUS_INVENTARIO_GRAVAR=1`, aprovar, continuar e
+    encerrar recusam com 409 antes de qualquer pedido; a régua e o cadastro da curadoria seguem (não têm a vez do almoxarifado)."""
+    falso = _falso(agora=grav["relogio"])
+    falso.definir_modo("10", 3)
+    _iniciar(grav, falso)                                          # uma gravação parada, feita no servidor
+    falso.definir_modo("10", 0)
+    falso.chamadas.clear()
+    grav["cfg"].pop("NEXUS_INVENTARIO_GRAVAR")
+    antes = len(_eventos(app))
+    with pytest.raises(G.Recusada, match="só roda no servidor do Nexus") as erro:
+        G.aprovar(grav["cfg"], "C-2", falso, APROVADOR, 3, "assinatura")
+    assert erro.value.status == 409
+    with pytest.raises(G.Recusada, match="só roda no servidor do Nexus"):
+        _iniciar(grav, falso, cid="C-2")
+    with pytest.raises(G.Recusada, match="só roda no servidor do Nexus"):
+        _continuar(grav, falso)
+    with pytest.raises(G.Recusada, match="só roda no servidor do Nexus"):
+        _encerrar(grav, falso)
+    assert falso.chamadas == [] and len(_eventos(app)) == antes and G.estado(app.config, "C-1")["estado"] == "parada"
+    grav["cfg"]["NEXUS_INVENTARIO_GRAVAR"] = "0"
+    with pytest.raises(G.Recusada, match="só roda no servidor do Nexus"):
+        _continuar(grav, falso)
+
+
+def test_a_chave_da_gravacao_e_opcional_e_documentada():
+    from pathlib import Path
+
+    from nexus import config
+    raiz = Path(__file__).resolve().parent.parent
+    assert "NEXUS_INVENTARIO_GRAVAR" in config.OPCIONAIS
+    linhas = raiz.joinpath(".env.example").read_text("utf-8").splitlines()
+    assert "NEXUS_INVENTARIO_GRAVAR=" in linhas                       # vazia: o PC não grava
+    deploy = raiz.joinpath("DEPLOY.md").read_text("utf-8")
+    assert "NEXUS_INVENTARIO_GRAVAR=1" in deploy and "NEXUS_ALMOX_TESTE_IDS=134082" in deploy
 
 
 def test_contagem_vazia_ou_sem_pessoa_e_recusada(app, grav):

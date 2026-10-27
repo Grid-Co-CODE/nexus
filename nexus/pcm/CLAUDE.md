@@ -923,6 +923,11 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
   portão do Nexus encerra a sessão junto (401 `sessao_encerrada`, com `login: true` e o endereço em `entrar`; as telas da ponte
   tratam esse 401 à parte e só usam o `login` quando ele é texto: antes o `true` virava o endereço e a página ia para /true). `GET /t/pcm/pecas/inventario/<id>/estado.json` fica na
   tela (não fala com o Fracttal).
+- **Só no servidor** (`NEXUS_INVENTARIO_GRAVAR=1`, revisão final de 27/10/2026): sem a chave, `aprovar`, `iniciar`, `continuar` e
+  `encerrar` recusam com 409 ("a gravação do inventário só roda no servidor do Nexus") antes de qualquer leitura. A vez do
+  almoxarifado (a trava da memória e o `trava-<almox>.json`), o controle e a espera do deploy moram na máquina que grava: um Nexus
+  no PC com o login do Fracttal de verdade abriria uma sessão que o servidor não vê. A régua e o cadastro da curadoria seguem (não
+  têm a vez do almoxarifado). `DEPLOY.md`, seção 7i; os testes ligam a chave no `app.config` (a fixture `grav`).
 - **Aprovar** (`aprovar`, o que a ponte chama): relê o livro, lê o saldo NA HORA com o login de quem aprova, monta o lote pelas
   contas (só `not tirada and situacao in MEXEM`) e confere o que a tela mostrou: o N e a `assinatura` (o hash de id_item,
   sistema e contado de cada peça do lote, posta como `data-assinatura` no botão, que vem no pedaço do `lote` da ponte junto do

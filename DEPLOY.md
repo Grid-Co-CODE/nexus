@@ -490,6 +490,22 @@ atraso das MPA/MPS no Acompanhamento do PCM (PCM → Acompanhamento PCM, 14/10/2
 e o relatório mostra "tarefas abertas há +30 dias" no lugar, como o painel do PCM sem a senha. Senha errada: a Gestão PCM
 avisa "a senha da Gerencial do .env não abriu o mpas.json". Regras: `nexus/pcm/relatorio_exec/CLAUDE.md`.
 
+## 7i. PCM: o inventário do almoxarifado (27/10/2026)
+
+PCM → Almoxarifado → Inventário: o técnico conta no App, o PCM revisa e aprova, e o Nexus grava o saldo contado no Fracttal
+(regras: `nexus/pcm/CLAUDE.md`, seções do inventário). **Duas linhas no `.env` do servidor:**
+
+```
+NEXUS_INVENTARIO_GRAVAR=1
+NEXUS_ALMOX_TESTE_IDS=134082
+```
+
+e reiniciar. A 1ª liga a gravação no Fracttal **só no servidor**: enquanto um lote grava, o almoxarifado fica travado no
+Fracttal, e a vez de cada almoxarifado, o controle da gravação e a espera do deploy (seção 8) moram na máquina que grava; um
+Nexus no PC com o login do Fracttal de verdade abriria uma sessão que o servidor não vê. Sem ela, "Gravar", "Continuar" e
+"Encerrar" respondem que a gravação só roda no servidor (a régua e o cadastro da curadoria seguem). A 2ª é o almoxarifado de
+teste do Fracttal (`TESTE-INVENTARIO`), que fica fora das telas do PCM e do histórico.
+
 ## 8. Atualizar
 
 Um comando, no servidor (desde 06/10/2026):
