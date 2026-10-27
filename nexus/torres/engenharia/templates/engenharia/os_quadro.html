@@ -126,6 +126,7 @@
           {% else %}<dt>Ativo</dt><dd class="mono">{{ o.codigo or '—' }}</dd>{% endif %}
           <dt>Usina</dt><dd>{{ o.usina or '—' }}</dd>
           <dt>Responsável</dt><dd class="eg-resp"><span data-resp-nome>{{ o.pessoa or '—' }}</span>{% if pode %}<button type="button" class="eg-resp-bt" data-trocar-resp data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-volta="{{ url_for(volta_endpoint, atualizar=1) }}" title="Atribuir esta OS a outra pessoa">trocar</button>{% endif %}</dd>
+          <dt>Criado por</dt><dd>{{ o.criado_por or '—' }}</dd>
           <dt>Criada em</dt><dd>{{ o.criada or '—' }}</dd>
           <dt>Etiquetas</dt><dd>{% for e in o.etiquetas %}{{ tag(e.nome, 'neutro') }} {% else %}—{% endfor %}</dd>
         </dl>

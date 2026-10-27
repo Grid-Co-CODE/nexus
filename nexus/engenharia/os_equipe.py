@@ -208,6 +208,8 @@ def _cartao(folio: str, ts: list[dict], pessoa: dict, hoje) -> dict:
         "fim": fim.astimezone(BRT).strftime("%d/%m/%Y") if fim else "",
         "fim_iso": fim.astimezone(BRT).date().isoformat() if fim else "",
         "solicitante": str(w0.get("requested_by") or w0.get("created_by") or "").strip(),
+        # quem criou a OS no Fracttal, no bloco Dados da página da OS (Levi, 27/10/2026)
+        "criado_por": " ".join(str(w0.get("created_by") or "").split()),
         "nota": _nota_da_os(ts)[:600],
         "tarefas": [{"t": str(t.get("description") or "")[:120], "st": str(t.get("task_status") or ""),
                      "obs": str(t.get("task_note") or "").strip()[:300]} for t in ts]}

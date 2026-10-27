@@ -208,7 +208,8 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   Programada (atrasada, vence ou abre em) e Última atualização (o mais novo entre o registro da engenharia, o início e o
   fim das tarefas no Fracttal e a criação; laranja a partir de 7 dias, a mesma conta do pulso). O corpo também é o da tela do chamado (`.ac-det`, `.bloco`, `ol.cadeia`, `dl.dados`, `.tl`,
   copiados em `eg-ac-det`, `eg-bloco`, `eg-cadeia`, `eg-ac-dados`, `eg-tl`): à esquerda, em 310 px, o que a engenharia
-  faz (Status e prioridade; A cadeia da OS; Dados, só ativo, usina, responsável, criação e etiquetas); à direita o que
+  faz (Status e prioridade; A cadeia da OS; Dados, só ativo, usina, responsável, quem criou a OS no Fracttal, o
+  `created_by`, desde 27/10/2026, criação e etiquetas); à direita o que
   ela lê (Na nota da OS; Demais respostas do técnico, numa tabela por OS de campo; Comentários, na linha do tempo das
   Observações de lá: a data e o ano à esquerda, o mais novo em verde, a mudança de status ou prioridade com o ponto
   âmbar). **A nota da OS** é a que o card do OS Creator lê (`os_equipe._nota_da_os`: a da tarefa, `task_note`, senão a
