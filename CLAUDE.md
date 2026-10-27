@@ -148,6 +148,7 @@ PerformancePainel.
   abriu o pedido ("Como entregar" em `nexus/torres/cos/CLAUDE.md` e em `nexus/torres/engenharia/CLAUDE.md`). Quem
   obriga é a regra da `main` no GitHub (ruleset "main: pull request e pasta de cada área"). As áreas (as pastas) estão
   no `.github/workflows/pasta-da-area.yml`; quem é de cada uma, nas variáveis do repositório `LOGINS_COS` e
-  `LOGINS_ENGENHARIA` (o login traz o nome: fora do código público). Essas pessoas têm o papel **write**: o admin passa
-  por cima da regra, com a conferência vermelha e tudo.
+  `LOGINS_ENGENHARIA` (o login traz o nome: fora do código público). Quem programa a Engenharia tem o papel **write**;
+  o admin passa por cima da regra, com a conferência vermelha e tudo. O programador do COS ficou admin por decisão do
+  Levi (27/10/2026): para ele a conferência só avisa.
 - Antes de dar algo por pronto: testes passando e a tela conferida no navegador (desktop e 375 px).

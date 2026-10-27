@@ -47,8 +47,9 @@ Quem programa o COS tem escrita no repositório, mas a `main` só aceita o traba
 1. Crie um ramo (`cos/<assunto>`), commite e faça push dele.
 2. Abra o pull request para a `main`. A conferência **pasta-da-area** (`.github/workflows/pasta-da-area.yml`, a do COS
    até 27/10/2026, quando ganhou a Engenharia) aprova se o pedido mexe só na área do COS e reprova, listando os
-   arquivos, se mexe fora dela. Quem é do COS: a variável `LOGINS_COS` do repositório; o papel no GitHub é write (o
-   admin passa por cima da regra da `main`).
+   arquivos, se mexe fora dela. Quem é do COS: a variável `LOGINS_COS` do repositório. O programador do COS é admin
+   no GitHub por decisão do Levi (27/10/2026), e o admin passa por cima da regra da `main`: para ele a conferência só
+   avisa.
 3. Verde: pode juntar (merge). O servidor recebe na próxima atualização (`git pull`, ver `DEPLOY.md`).
 
 **Área do COS:** `nexus/torres/cos/`, `nexus/cos/`, `nexus/static/cos.css` (ou `nexus/static/cos/`), `tests/cos/` e
