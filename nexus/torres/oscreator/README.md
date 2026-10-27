@@ -1443,3 +1443,31 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
 - **Levado ao oem em 26/10/2026** pela `ferramentas/sincronizar_oscreator.py --aplicar`, com o OK do Levi ("sincroniza o
   oem"): `api.py`, `rotas.py` e os quatro arquivos novos (sem commit lá: o oem é público). O 5090 só passa a servir a
   janela depois de reiniciado. Falta o olho do Levi com uma OS de verdade.
+
+## Garantias: status do chamado, tabela, texto que quebra e quem criou (27/10/2026)
+
+- **O status do chamado** (Levi: "Gostaria de poder mudar os status, pode ter essas opções", a lista da analista de
+  chamados): `acomp_web.STATUS_CHAMADO`, na grafia dela (Testes em campo, Aguardando retorno do Cliente, do Supervisor,
+  do Fabricante, Pré - Operação, Aguardando Abertura de OS, Standby, Aguardando coleta do equipamento defeituoso), mais
+  o "Sem status". Mora no banco da Gridco como as observações (`chamados_obs_store`, tipo `status`: uma linha por troca,
+  com quem e quando, o status em `extra` e a frase no texto, "Status: Standby", que o código de antes mostra como
+  observação comum). O atual é o da última troca (`status_por_os`); sem troca nenhuma, o "Status atual" da nota da
+  retroativa (`acomp_web.status_atual`). Não vai ao Fracttal. A tela do chamado tem o bloco "Status do chamado" (só no
+  aberto; `POST /os/api/acomp/<nº>/status`, que recusa o que não é da lista e não regrava o mesmo), a troca entra na
+  linha do tempo como evento, e conta como atualização para o pulso das paradas. No quadro, o status é o 1º chip do
+  cartão.
+- **A vista em tabela** (Levi: "Em garantias quero uma visão de tabela o mais enxuta e direta possível"): a troca
+  Quadro | Tabela ao lado dos filtros, guardada neste navegador (`localStorage`, `acomp.vista`, posta antes da 1ª
+  pintura). Uma linha por chamado, na ordem das colunas do quadro: OS, Ativo, Usina, Fornecedor, Status, Ticket,
+  Situação (a coluna e os dias, curta: "Sem ticket · 35 d", "Com o fornecedor · 8 d", "Fechado 26/09"; a frase inteira
+  no title) e Responsável. As linhas têm os mesmos `data-*` do cartão, e os filtros (e o filtro guardado) valem nas duas
+  vistas; o clique na linha abre o chamado; a parada tem o ponto laranja que pulsa. No celular, a tabela rola dentro da
+  caixa dela. Ao voltar ao quadro, as colunas são medidas de novo (escondidas, mediriam zero).
+- **O texto do cartão quebra** (Levi: "não quero as OSs quebrando para os lados, pode quebrar o texto"; o ticket com a
+  descrição longa fazia a coluna rolar para o lado): o `.k-chip` quebra (`overflow-wrap:anywhere`), a coluna não rola
+  na horizontal, e o ticket do topo da tela do chamado também quebra.
+- **Quem criou e quando** (Levi: "Em dados inclua um 'Criado por' ... e data da criação da OS"): nos Dados da tela do
+  chamado, "Criado por" (o `criado_por` do detalhe da OS) e "Criada em" (a criação no Fracttal, em Brasília).
+- Prova: `tests/test_oscreator_garantias_27_10.py` e `tests/test_oscreator_acomp_tabela_js_27_10.py` (o script no
+  node). Na bancada (Fracttal e banco falsos): a troca do status gravada e na linha do tempo, os status no cartão e na
+  tabela, o ticket longo quebrando no cartão, na célula e no topo, a 1440 e a 375 px, no escuro e no claro.

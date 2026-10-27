@@ -31,6 +31,12 @@ DIAS_FINALIZADOS = 90
 # o pulso laranja da OS aberta sem comentário de atualização há 5 dias ou mais (Levi, 25/10/2026: "quando a OS ficar a
 # partir de 5 dias sem comentário de atualização!"; o desenho é o do Quadro da equipe da Engenharia, que usa 7 dias)
 DIAS_PARADA = 5
+# o status do chamado que a analista de chamados escolhe na tela (27/10/2026, Levi: "Gostaria de poder mudar os status,
+# pode ter essas opções"): a lista que ela mandou, na grafia dela (a mesma da planilha de gestão de chamados, de onde
+# vem o "Status atual" da nota da retroativa). A linha em branco da lista dela é o "Sem status" da tela.
+STATUS_CHAMADO = ("Testes em campo", "Aguardando retorno do Cliente", "Aguardando retorno do Supervisor",
+                  "Aguardando retorno do Fabricante", "Aguardando retorno Pré - Operação", "Aguardando Abertura de OS",
+                  "Standby", "Aguardando coleta do equipamento defeituoso")
 
 # o nome técnico do campo (o que a nota traz) → como a tela chama. É esse nome que liga a resposta do técnico ao campo
 # do formulário do fornecedor — por isso ele continua visível, pequeno, embaixo do rótulo.
@@ -341,12 +347,22 @@ def cor_avatar(nome: str) -> int:
     return sum(map(ord, _norm(nome))) % CORES_AVATAR if _norm(nome) else 0
 
 
-def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str = "", obs_lidas: bool = True) -> dict:
+def status_atual(trocado, n: dict) -> str:
+    """O status do chamado: o da última troca pela tela (`trocado`, "" = trocado para "sem status"); sem troca nenhuma
+    (None), o "Status atual" escrito na nota da retroativa."""
+    if trocado is not None:
+        return str(trocado).strip()
+    return next((x["valor"] for x in n.get("info") or [] if _norm(x.get("rotulo")) == "status atual"), "")
+
+
+def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str = "", obs_lidas: bool = True,
+           status=None) -> dict:
     """Uma linha da lista do Fracttal + o ticket + a última observação → o que o card e a tela precisam.
 
     `finalizado` = quando a tela finalizou (do banco). A OS de acompanhamento é concluída sem registro de execução, e
     o Fracttal deixa a data de fim vazia nesse caso — então a data da finalização é a que diz "em 26/09".
-    `obs_lidas` falso = as observações não vieram do banco: nenhuma OS pulsa (`parada`)."""
+    `obs_lidas` falso = as observações não vieram do banco: nenhuma OS pulsa (`parada`). `status` = o da última troca
+    pela tela (None: nunca trocado; ver `status_atual`)."""
     n = ler_nota(l.get("note"))
     criada = utc_para_brt(l.get("data"))
     # a retroativa (criada à mão para um chamado que já existia) conta a idade da abertura escrita na nota, e não do dia
@@ -376,7 +392,8 @@ def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str 
          # nunca sairia da coluna dos 90 dias
          "fim": fim.strftime("%d/%m") if fim else "", "dias_fim": dias(fim or chegou, hoje),
          "responsavel": " ".join(str(l.get("atribuido_a") or "").split()), "da_equipe": da_equipe(l),
-         "parada": parada(col, max(comentarios) if comentarios else chegou, hoje, obs_lidas)}
+         "parada": parada(col, max(comentarios) if comentarios else chegou, hoje, obs_lidas),
+         "status_ch": status_atual(status, n), "criado_por": " ".join(str(l.get("criado_por") or "").split())}
     c["cor"] = cor_avatar(c["responsavel"])
     # `tempo_curto` é o estado no canto do cartão, no jeito do Quadro da equipe da Engenharia do Nexus ("atrasada 10 d",
     # "fechada 02/10"). Levi, 08/10/2026: "Precisamos padronizar a estética para que coisas parecidas não pareçam
@@ -424,10 +441,11 @@ def precisa_ticket(l: dict, hoje: dt.datetime) -> bool:
 
 
 def montar_quadro(linhas, tickets: dict, ultimas: dict, hoje: dt.datetime, fins: dict = None,
-                  obs_lidas: bool = True) -> dict:
-    fins = fins or {}
+                  obs_lidas: bool = True, status: dict = None) -> dict:
+    fins, status = fins or {}, status or {}
     cards = [cartao(l, tickets.get(l.get("id"), ""), (ultimas or {}).get(str(l.get("folio") or ""), ""), hoje,
-                    fins.get(str(l.get("folio") or ""), ""), obs_lidas) for l in (linhas or []) if eh_os3(l)]
+                    fins.get(str(l.get("folio") or ""), ""), obs_lidas, status.get(str(l.get("folio") or "")))
+             for l in (linhas or []) if eh_os3(l)]
     col = {"chegou": [], "ticket": [], "fim": []}
     canceladas = antigas = 0
     for c in cards:
@@ -464,7 +482,7 @@ def entrada(reg: dict) -> dict:
     q = brt_iso(reg.get("quando"))
     return {"d": q.strftime("%d/%m") if q else "", "a": q.strftime("%Y") if q else "", "texto": reg.get("texto") or "",
             "autor": " · ".join(x for x in (reg.get("quem") or "", q.strftime("%d/%m %H:%M") if q else "") if x),
-            "ev": reg.get("tipo") in ("ticket", "finalizado"), "quando": reg.get("quando") or ""}
+            "ev": reg.get("tipo") in ("ticket", "finalizado", "status"), "quando": reg.get("quando") or ""}
 
 
 def linha_do_tempo(c: dict, obs, historico=None) -> list:

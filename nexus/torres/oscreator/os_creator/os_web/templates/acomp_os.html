@@ -68,6 +68,22 @@
         <p class="dica">Esta OS não tem a subtarefa do nº do ticket.</p>
         {% endif %}
       </section>
+      {# o status do chamado (27/10/2026, Levi: "Gostaria de poder mudar os status, pode ter essas opções"): no banco da
+         Gridco, como as observações; a troca entra sozinha nas observações, com o nome e a hora. Só no chamado aberto. #}
+      {% set st_livre = c.col in ('chegou', 'ticket') and pode_gravar %}
+      <section class="bloco" data-status-caixa>
+        <div class="bloco-h"><h2>Status do chamado</h2></div>
+        <div class="linha-tk">
+          <select class="campo-tk" id="status_ch" data-osb="nativo"{% if not st_livre %} disabled{% endif %}>
+            <option value="">Sem status</option>
+            {%- for o in opcoes_status %}<option value="{{ o }}"{% if o == c.status_ch %} selected{% endif %}>{{ o }}</option>{% endfor %}
+            {%- if c.status_ch and c.status_ch not in opcoes_status %}<option value="{{ c.status_ch }}" selected>{{ c.status_ch }}</option>{% endif %}
+          </select>
+          <button type="button" class="btn btn-g" id="b_status"{% if not st_livre %} disabled{% endif %}>Salvar</button>
+        </div>
+        <p class="dica">{% if c.col not in ('chegou', 'ticket') %}Chamado finalizado: o status fica como estava.{% else %}Fica no Nexus (não vai ao Fracttal) e entra sozinho nas observações.{% endif %}</p>
+        <div class="msg" id="msg_status"></div>
+      </section>
       <section class="bloco">
         <div class="bloco-h"><h2>Como abrir</h2></div>
         <p class="canal">{{ canal or 'Canal de abertura ainda não documentado para este fornecedor.' }}</p>
@@ -93,6 +109,9 @@
           <dt>Fornecedor</dt><dd>{{ c.marca or '—' }}</dd>
           <dt>Responsável</dt><dd class="resp{% if not c.da_equipe %} a{% endif %}"><span data-resp-nome>{{ c.responsavel or '—' }}</span>
             <button type="button" class="det-mini" data-acao="responsavel" title="Atribuir esta OS a outra pessoa">trocar</button></dd>
+          {# quem criou a OS de acompanhamento e quando (27/10/2026: "inclua um 'Criado por' ... e data da criação da OS") #}
+          <dt>Criado por</dt><dd>{{ c.criado_por or '—' }}</dd>
+          <dt>Criada em</dt><dd>{{ c.criada or '—' }}</dd>
         </dl>
         <div class="msg ok" data-msg hidden></div>
         {% with d = {"folio": c.folio, "responsavel": c.responsavel} %}{% include "_dlg_responsavel.html" %}{% endwith %}

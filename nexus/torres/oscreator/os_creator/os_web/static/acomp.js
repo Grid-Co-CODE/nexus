@@ -61,6 +61,7 @@
     const CARTOES_A_VISTA = 6;
     const medir = function () {
       quadro.querySelectorAll(".cards").forEach(function (box) {
+        if (box.offsetParent === null) return;                            // escondida (a vista em tabela): mede ao voltar
         const vis = Array.prototype.filter.call(box.querySelectorAll(".card"), function (c) { return !c.classList.contains("oculto"); });
         if (vis.length <= CARTOES_A_VISTA) { box.style.setProperty("--cards-max", "none"); return; }
         const fim = vis[CARTOES_A_VISTA - 1].getBoundingClientRect().bottom - box.getBoundingClientRect().top + box.scrollTop;
@@ -99,6 +100,18 @@
         const vazio = col.querySelector("[data-vazio]");
         if (vazio) vazio.classList.toggle("oculto", n > 0);
       });
+      // a tabela (27/10/2026): as linhas têm os mesmos data-* do cartão, e o filtro vale nas duas vistas
+      let nLinhas = 0;
+      quadro.querySelectorAll("tr[data-linha]").forEach(function (tr) {
+        const d = tr.dataset;
+        const ok = (!f.marca || d.marca === f.marca) && (!f.cliente || d.cliente === f.cliente) &&
+                   (!f.tipo || d.tipo === f.tipo) && (!f.equipe || d.equipe === f.equipe) &&
+                   (!f.busca || (d.busca || "").indexOf(f.busca) >= 0);
+        tr.classList.toggle("oculto", !ok);
+        if (ok) nLinhas++;
+      });
+      const vazioTabela = quadro.querySelector("[data-vazio-tabela]");
+      if (vazioTabela) vazioTabela.classList.toggle("oculto", nLinhas > 0);
       medir();                                                            // o filtro muda quais são os 6 primeiros
     };
     campos.forEach(function (c) { c.addEventListener(c.tagName === "INPUT" ? "input" : "change", aplicar); });
@@ -106,6 +119,21 @@
     if (limpar) limpar.addEventListener("click", function () {
       campos.forEach(function (c) { c.value = ""; });
       aplicar();
+    });
+    // quadro ou tabela (27/10/2026): a escolha fica neste navegador; o <script> curto do acomp.html já a pôs antes da
+    // 1ª pintura (a mesma chave). Ao voltar ao quadro, as colunas são medidas de novo (escondidas, não dá para medir).
+    quadro.querySelectorAll(".vistas [data-vista]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        quadro.dataset.vista = b.dataset.vista;
+        try { localStorage.setItem("acomp.vista", b.dataset.vista); } catch (e) { /* aba anônima: vale só agora */ }
+        if (b.dataset.vista === "quadro") remedir();
+      });
+    });
+    quadro.querySelectorAll("tr[data-linha]").forEach(function (tr) {
+      tr.addEventListener("click", function (ev) {
+        if (ev.target && ev.target.closest && ev.target.closest("a")) return;   // o nº da OS já é o link
+        location.href = tr.dataset.href;
+      });
     });
     const salvo = lerGuardado(CHAVE_FILTRO) || {};
     let comFiltro = false;
@@ -196,6 +224,23 @@
       } catch (e) {
         if (e.message !== "sessão") msg(m, "Não gravou: " + e.message, "er");
         bTicket.disabled = false;
+      }
+    });
+  }
+
+  // o status do chamado (27/10/2026): grava no banco da Gridco e recarrega, para a troca aparecer nas observações
+  const bStatus = document.getElementById("b_status");
+  if (bStatus) {
+    bStatus.addEventListener("click", async function () {
+      const campo = document.getElementById("status_ch"), m = document.getElementById("msg_status");
+      bStatus.disabled = true; msg(m, "Gravando…");
+      try {
+        const j = await postar("/os/api/acomp/" + folio + "/status", {status: campo.value || "", wid: wid});
+        msg(m, j.mensagem || "Status gravado.", "ok");
+        setTimeout(function () { location.reload(); }, 700);
+      } catch (e) {
+        if (e.message !== "sessão") msg(m, "Não gravou: " + e.message, "er");
+        bStatus.disabled = false;
       }
     });
   }

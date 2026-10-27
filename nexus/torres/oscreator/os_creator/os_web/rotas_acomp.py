@@ -334,13 +334,13 @@ def _renovar_por_tras(pessoa) -> None:
 
 
 def _ultimas(forcar: bool = False) -> tuple:
-    """({nº: última observação}, {nº: quando foi finalizada}, erro)."""
+    """({nº: última observação}, {nº: quando foi finalizada}, {nº: status da última troca}, erro)."""
     try:
         if forcar:
             obs_store.listar(forcar=True)
-        return obs_store.ultima_por_os(), obs_store.finalizado_por_os(), ""
+        return obs_store.ultima_por_os(), obs_store.finalizado_por_os(), obs_store.status_por_os(), ""
     except Exception as e:                              # noqa: BLE001 — sem o banco, o quadro sai; só o "dias sem" usa a chegada
-        return {}, {}, "Não consegui ler as observações no banco da Gridco (%s)." % str(e)[:120]
+        return {}, {}, {}, "Não consegui ler as observações no banco da Gridco (%s)." % str(e)[:120]
 
 
 def _ler_quadro(forcar: bool = False, dono=None) -> tuple:
@@ -377,8 +377,9 @@ def quadro():
             _renovar_por_tras(dono)
         else:
             d, erro = _ler_quadro(forcar, dono)
-        ultimas, fins, erro_obs = f_obs.result()
-    q = aw.montar_quadro(d["linhas"], d["tickets"], ultimas, aw.agora_brt(), fins, obs_lidas=not erro_obs)
+        ultimas, fins, status, erro_obs = f_obs.result()
+    q = aw.montar_quadro(d["linhas"], d["tickets"], ultimas, aw.agora_brt(), fins, obs_lidas=not erro_obs,
+                         status=status)
     return render_template("acomp.html", conta=_conta(), aba="criar", q=q, quando=d.get("quando") or "", erro=erro,
                            erro_obs=erro_obs, equipe=aw.equipe()[1], renovando=por_tras)
 
@@ -554,9 +555,11 @@ def detalhe(folio):
                  "status_id": 3 if det.get("data_fim") else 1, "atribuido_a": det.get("responsavel")}
     else:
         linha = _com_o_detalhe(linha, det)
+    linha["criado_por"] = det.get("criado_por") or linha.get("criado_por") or ""     # Dados: "Criado por" (27/10/2026)
     hoje = aw.agora_brt()
     fim_tela = max((o["quando"] for o in obs if o["tipo"] == "finalizado"), default="")
-    c = aw.cartao(dict(linha, note=nota), ticket, (obs[-1]["quando"] if obs else ""), hoje, fim_tela)
+    c = aw.cartao(dict(linha, note=nota), ticket, (obs[-1]["quando"] if obs else ""), hoje, fim_tela,
+                  status=_status_trocado(obs))
     n = aw.ler_nota(nota)
     # a OS 3 criada à mão sem a cadeia na nota (20/10/2026): a OS mãe do Fracttal entra no lugar. Só nesse caso há um
     # pedido a mais; a do App sempre traz a cadeia, e o id da mãe já vem no detalhe enxuto (`os_pai_id`)
@@ -570,7 +573,14 @@ def detalhe(folio):
                            tl=aw.linha_do_tempo(c, obs, n["historico"]), outros=aw.outros(c, todos),
                            canal=cs.CANAL.get(c["marca"], ""),
                            menos7=aw.menos_7d(n["data_falha"], hoje), copiar=aw.copiar_tudo(n["campos"]),
-                           erro_obs=erro_obs, pode_gravar=ga.pode_gravar(), equipe=aw.equipe()[1])
+                           erro_obs=erro_obs, pode_gravar=ga.pode_gravar(), equipe=aw.equipe()[1],
+                           opcoes_status=aw.STATUS_CHAMADO)
+
+
+def _status_trocado(obs):
+    """O status da última troca entre as observações desta OS (None: nunca trocado)."""
+    return next((str((o.get("extra") or {}).get("status") or "").strip() for o in reversed(obs or [])
+                 if o.get("tipo") == "status"), None)
 
 
 @bp.route("/chamados/acompanhamento/<int:folio>/preparar")
@@ -642,6 +652,38 @@ def api_ticket(folio):
     _ajustar(wid, ticket=novo)                  # a volta ao quadro mostra o ticket sem reler o Fracttal (20/10/2026)
     aviso = _anotar(folio, aw.texto_ticket(novo, antigo), "ticket", det)
     return jsonify({"ok": True, "ticket": novo, "mensagem": "Ticket gravado na OS %s." % folio, "aviso": aviso})
+
+
+@bp.route("/api/acomp/<int:folio>/status", methods=["POST"])
+@exige_sessao
+def api_status(folio):
+    """Troca o status do chamado (27/10/2026, Levi: "Gostaria de poder mudar os status, pode ter essas opções"): uma
+    linha no banco da Gridco, como as observações, com quem e quando; não vai ao Fracttal. Só da lista
+    (`acomp_web.STATUS_CHAMADO`) ou "" (sem status), e só no chamado aberto: o finalizado fica com o que tinha."""
+    c = _corpo()
+    novo = " ".join(str(c.get("status") or "").split())
+    if novo and novo not in aw.STATUS_CHAMADO:
+        return _erro("Status fora da lista: %s." % novo)
+    wid, det = _os_conferida(folio, c.get("wid"))
+    if not wid:
+        return _erro("Não achei a OS %s no Fracttal." % folio, 404)
+    if det.get("status_id") in (2, 3, 4):
+        return _erro("O chamado da OS %s já foi finalizado: o status fica como estava." % folio)
+    obs, erro = _obs_do_os(folio)
+    if erro:
+        return _erro(erro, 502)
+    atual = aw.status_atual(_status_trocado(obs), aw.ler_nota(_nota_da_os(det, None)))
+    if novo == atual:
+        return jsonify({"ok": True, "status": novo, "mensagem": "O status já era este."})
+    nome, email = _quem()
+    try:
+        obs_store.adicionar(folio, ("Status: %s" % novo) if novo else "Status retirado", "status",
+                            ativo=det.get("code") or "", quem=nome, email=email, extra={"status": novo})
+    except ga.SemCredencial as e:
+        return _erro(e, 403)
+    except requests.RequestException as e:
+        return _erro("O banco da Gridco não respondeu: %s" % str(e)[:160], 502)
+    return jsonify({"ok": True, "status": novo, "mensagem": "Status gravado."})
 
 
 @bp.route("/api/acomp/<int:folio>/obs", methods=["POST"])

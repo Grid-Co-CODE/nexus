@@ -22,7 +22,8 @@
   <div class="k-cab"><span class="k-os">OS {{ c.folio }}</span>{% if c.tempo_curto %}<span class="tag u-{{ c.urg }}">{{ c.tempo_curto }}</span>{% endif %}</div>
   <div class="k-tit">{{ titulo }}</div>
   {% if onde %}<div class="k-onde">{{ onde }}</div>{% endif %}
-  {% if c.marca or c.tipo or c.inspecao or c.ticket %}<div class="k-etq">
+  {% if c.marca or c.tipo or c.inspecao or c.ticket or c.status_ch %}<div class="k-etq">
+    {%- if c.status_ch %}<span class="k-chip k-st">{{ c.status_ch }}</span>{% endif %}
     {%- if c.marca %}<span class="k-chip k-forn">{{ c.marca }}</span>{% endif %}
     {%- if c.tipo %}<span class="k-chip">{{ c.tipo }}</span>{% endif %}
     {%- if c.inspecao %}<span class="k-chip">inspeção {{ c.inspecao }}</span>{% endif %}
@@ -39,7 +40,10 @@
     <p class="vazio{% if q.colunas[chave] %} oculto{% endif %}" data-vazio>{{ vazio }}</p></div>
 </section>
 {%- endmacro %}
-<section class="ac" id="acomp">
+<section class="ac" id="acomp" data-vista="quadro">
+{# a vista escolhida (quadro ou tabela, 27/10/2026) volta antes da 1ª pintura: pelo acomp.js, no fim da página, o quadro
+   apareceria e trocaria na frente da pessoa. O clique e a gravação da escolha moram no acomp.js (mesma chave). #}
+<script>try{if(localStorage.getItem("acomp.vista")==="tabela")document.getElementById("acomp").dataset.vista="tabela"}catch(e){}</script>
   <div class="ac-head">
     <div class="ac-tit"><a class="ac-volta" href="/os/chamados">← Chamados</a><h1>Acompanhamento <span>de chamados</span></h1></div>
     <div class="ac-acoes">
@@ -67,12 +71,28 @@
     <label class="fcampo"><span class="flbl">Responsável</span><select data-f="equipe" data-osb="nativo"><option value="">Todos</option><option value="1">Equipe de chamados</option><option value="0">Outra pessoa</option></select></label>
     <label class="fcampo"><span class="flbl">Buscar</span><input data-f="busca" type="search" placeholder="nº da OS, ativo, usina, ticket…" autocomplete="off"></label>
     <button type="button" class="limpar" data-limpar>Limpar filtros</button>
+    <div class="vistas" role="group" aria-label="Ver como"><button type="button" data-vista="quadro">Quadro</button><button type="button" data-vista="tabela">Tabela</button></div>
   </div>
   <div class="board">
     {{ coluna('cr', 'chegou', 'Chegaram', 'abrir o ticket', 'Nenhuma OS esperando ticket.') }}
     {{ coluna('ca', 'ticket', 'Ticket aberto', 'com o fornecedor', 'Nenhum ticket aberto no fornecedor.') }}
     {{ coluna('cg', 'fim', 'Finalizados', 'últimos 90 dias', 'Nenhum chamado finalizado nos últimos 90 dias.') }}
   </div>
+  {# a tabela (27/10/2026, Levi: "Em garantias quero uma visão de tabela o mais enxuta e direta possível"): uma linha por
+     chamado, na ordem das colunas do quadro, com os mesmos data-* do cartão (os filtros valem nas duas vistas); o clique
+     na linha abre o chamado, e a parada tem o ponto que pulsa #}
+  <div class="tabela"><table class="tq"><thead><tr><th>OS</th><th>Ativo</th><th>Usina</th><th>Fornecedor</th><th>Status</th><th>Ticket</th><th>Situação</th><th>Responsável</th></tr></thead><tbody>
+  {%- for chave, nome in (('chegou', 'Sem ticket'), ('ticket', 'Com o fornecedor'), ('fim', 'Finalizado')) %}{% for c in q.colunas[chave] %}
+    <tr data-linha data-href="/os/chamados/acompanhamento/{{ c.folio }}"{% if c.parada %} class="parada"{% endif %} data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-equipe="{{ '1' if c.da_equipe else '0' }}" data-busca="{{ c.busca }}">
+      <td class="t-os"><a href="/os/chamados/acompanhamento/{{ c.folio }}">{{ c.folio }}</a></td><td class="t-at">{{ c.ativo_nome or c.code or '—' }}</td>
+      <td>{{ c.usina or '—' }}</td><td>{{ c.marca or '—' }}</td><td>{{ c.status_ch or '—' }}</td><td class="t-tk">{{ c.ticket or '—' }}</td>
+      {# a situação curta: a coluna e os dias (desde a chegada sem ticket; sem atualização com o fornecedor); a frase inteira no title #}
+      {%- set dias_sit = c.dias if chave == 'chegou' else c.dias_sem %}
+      <td class="t-sit" title="{{ c.tempo }}"><span class="tag u-{{ c.urg }}">{% if chave == 'fim' %}{{ (c.tempo_curto or nome)|capitalize }}{% else %}{{ nome }}{% if dias_sit is not none %} · {{ dias_sit }} d{% endif %}{% endif %}</span></td>
+      <td class="t-quem{% if not c.da_equipe %} a{% endif %}">{{ c.responsavel or '—' }}</td></tr>
+  {%- endfor %}{% endfor %}
+  </tbody></table>
+  <p class="vazio oculto" data-vazio-tabela>Nenhum chamado com esses filtros.</p></div>
   {% if q.canceladas or q.antigas %}<p class="rodape">{% if q.canceladas %}{{ q.canceladas }} cancelada{{ '' if q.canceladas == 1 else 's' }} fora do quadro{% endif %}{% if q.canceladas and q.antigas %} · {% endif %}{% if q.antigas %}{{ q.antigas }} finalizada{{ '' if q.antigas == 1 else 's' }} há mais de 90 dias{% endif %}.</p>{% endif %}
 </section>
 {% endblock %}

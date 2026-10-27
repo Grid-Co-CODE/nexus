@@ -27,7 +27,10 @@ WORKBOOK = "os_creator"
 NOME_ABA = "chamados_obs"
 # `extra` é JSON para o que vier depois: a aba não alarga depois de criada (ver gridco_abas.Aba.id)
 COLUNAS = ["id", "quando", "os", "ativo", "tipo", "texto", "quem", "email", "extra"]
-TIPOS = ("obs", "ticket", "finalizado")
+# "status" (27/10/2026): a troca do status do chamado pela tela (Testes em campo, Aguardando retorno do Fabricante...),
+# uma linha por troca, com o status em `extra` e a frase no texto ("Status: Standby"), que o código de antes mostra como
+# observação comum
+TIPOS = ("obs", "ticket", "finalizado", "status")
 LIMITE_TEXTO = 2000
 TTL = 60           # s: a leitura da aba inteira vale isto (a própria escrita já entra no cache na hora)
 
@@ -100,6 +103,17 @@ def finalizado_por_os() -> dict:
     for x in listar():
         if x["tipo"] == "finalizado":
             out[x["os"]] = max(out.get(x["os"], ""), x["quando"])
+    return out
+
+
+def status_por_os() -> dict:
+    """{nº da OS: o status da última troca} — "" quando a última troca foi para "sem status". OS nunca trocada não
+    aparece (aí vale o "Status atual" da nota da retroativa, `acomp_web.status_atual`)."""
+    out = {}
+    for x in listar():
+        if x["tipo"] == "status":
+            st = (x.get("extra") or {}).get("status")
+            out[x["os"]] = str(st if st is not None else "").strip()
     return out
 
 
