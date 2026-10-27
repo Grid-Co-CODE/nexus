@@ -322,7 +322,8 @@ def test_sem_ler_os_avisos_nenhuma_usina_aparece_em_verde(mundo, leituras):
     t = texto(html)
     assert "mp-n-sem" not in svg(html) and "mp-n-nx" in svg(html)
     assert re.search(r"Sem leitura completa 6\b", t)                                         # as 6 estariam "sem alerta"
-    assert "mp-chave mp-n-sem" not in html                                                   # e a linha "Sem alerta" nem aparece
+    # e o nível "Sem alerta" nem aparece na faixa em cima do mapa (o "!" do título segue explicando o que ele é, texto fixo)
+    assert 'data-nivel="sem"' not in html
     assert "sem leitura de avisos do Instituto Nacional de Meteorologia (INMET), não dá para dizer que não há alerta" in t
     assert "Usina Teta" in usinas_do_svg(html)
 
@@ -398,7 +399,8 @@ def test_usina_sem_coordenada_vai_para_a_lista_de_pendencias_e_nao_para_o_mapa(m
     t = texto(html)
     assert "Sem coordenada no cadastro (1)" in t and "Usina Sem Posicao" in t
     assert "Usina Sem Posicao" not in usinas_do_svg(html)
-    assert "Alertas para 6 usinas" not in t and "6 usinas em operação com coordenada" in t
+    # a frase das "6 usinas em operação com coordenada" virou o título da tabela e o texto do "!" (27/10/2026, a tela enxuta)
+    assert "Alertas para 6 usinas" not in t and "Usinas por risco (6)" in t and "em operação com coordenada no cadastro" in t
 
 
 def test_usina_com_coordenada_fora_do_brasil_tambem_fica_na_lista(tmp_path, monkeypatch, leituras):
@@ -677,9 +679,22 @@ def test_cadeia_real_fonte_que_cai_no_meio_vira_leitura_velha_no_mapa(cadeia):
 
 # ── a legenda à esquerda e a tabela à direita (Levi, 09/10/2026) ─────────────────────────────────────────────────────
 
-def test_a_legenda_fica_a_esquerda_do_mapa_e_a_tabela_a_direita(mundo):
-    corpo = trecho(pagina(mundo), '<div class="mp-corpo">', '<h2 class="cl-h2">Fontes</h2>')
-    assert corpo.index('class="mp-legenda"') < corpo.index('class="mp-mapa"') < corpo.index('class="mp-tabela"')
+def test_filtros_e_chave_na_lateral_niveis_em_cima_do_mapa_e_a_tabela_a_direita(mundo):
+    """Levi, 27/10/2026: "o foco da tela é o mapa" e "talvez seria legal os filtros laterais": os filtros e a chave de cores na
+    lateral, os níveis numa faixa em cima do mapa, a tabela à direita; a pergunta da tela e o como ler, no "!" do título."""
+    html = pagina(mundo)
+    corpo = trecho(html, '<div class="mp-corpo">', '<h2 class="cl-h2">Fontes</h2>')
+    assert (corpo.index('class="mp-lado"') < corpo.index('data-parte="barra"') < corpo.index('mp-legenda--compacta')
+            < corpo.index('class="mp-status"') < corpo.index('class="mp-mapa"') < corpo.index('class="mp-tabela"'))
+    cab = trecho(html, '<header class="cl-cab mp-cab">', '</header>')
+    assert 'class="mp-aviso"' in cab and 'class="cl-pergunta"' not in cab
+    # a faixa dos níveis é o filtro de antes: cada nível esconde e mostra, com o estado no endereço
+    status = trecho(corpo, 'class="mp-status"', '</div>')
+    for nivel in ("agir", "atencao", "regiao", "sem"):
+        assert f'data-nivel="{nivel}"' in status and f"ocultar={nivel}" in status
+    # a legenda compacta não repete os níveis nem os textos longos (estão no "!")
+    leg = trecho(corpo, 'mp-legenda--compacta', '</aside>')
+    assert 'data-nivel=' not in leg and "mp-leg-nota--longa" not in leg
 
 
 def test_a_tabela_traz_cada_usina_com_o_risco_e_o_motivo_curto_e_quem_pede_acao_vem_primeiro(mundo):

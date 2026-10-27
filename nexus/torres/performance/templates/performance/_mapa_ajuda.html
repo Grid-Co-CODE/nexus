@@ -1,0 +1,37 @@
+{# O "como ler" do Mapa de risco numa exclamação amarela ao lado do título, o mesmo desenho do aviso da tela de Extintores
+   (hseq/_legenda.html; Levi, 27/10/2026: "caso tenha um disclaimer eu clico para ver que nem é no extintores"). Era a legenda
+   inteira ao lado do mapa e a pergunta da tela no cabeçalho, quase metade da altura antes de chegar ao mapa. Texto FIXO: o que muda
+   a cada leitura (os números, a hora, a fonte que não respondeu) continua na tela, na faixa dos níveis e na chave da camada. Fora de
+   qualquer data-parte, de propósito: a releitura do clima-mapa.js troca os pedaços e fecharia a caixa aberta. Clicar fora ou Esc
+   fecha. #}
+<details class="mp-aviso">
+  <summary class="mp-aviso-bt" title="Como ler o mapa" aria-label="Como ler o mapa">!</summary>
+  <section class="mp-aviso-caixa" aria-label="Como ler o mapa">
+    <p class="mp-aviso-t"><b>Como ler o mapa</b></p>
+    <p class="mp-aviso-p">{{ tela.pergunta }} Cada usina em operação com coordenada no cadastro aparece na cor do nível de alerta dela. A coordenada não aparece nesta tela.</p>
+    <dl class="mp-aviso-dl">
+      <dt><span class="mp-chave mp-n-agir" aria-hidden="true"></span>Agir agora</dt><dd>Foco a até 5 km, aviso Grande Perigo, ou aviso Perigo de um destes eventos: {{ eventos|join(", ") }}.</dd>
+      <dt><span class="mp-chave mp-n-atencao" aria-hidden="true"></span>Atenção</dt><dd>Fogo perto: visto pelos satélites a até 5 km nas últimas 24 h, ou a até 10 km com risco de fogo crítico hoje ou amanhã.</dd>
+      <dt><span class="mp-chave mp-n-regiao" aria-hidden="true"></span>Acompanhar</dt><dd>Condição da região, nada perto da usina: tempo seco, calor, aviso leve do {{ v.nomes.inmet }}, ou risco de fogo alto ou crítico.</dd>
+      <dt><span class="mp-chave mp-n-sem" aria-hidden="true"></span>Sem alerta</dt><dd>Nenhum aviso, foco a até 5 km nem risco de fogo alto. Com uma fonte lida só em parte, vira "Sem alerta nas fontes lidas".</dd>
+      <dt><span class="mp-chave mp-n-nx" aria-hidden="true"></span>Sem leitura completa</dt><dd>Uma das fontes não foi lida: sem ela, não dá para dizer que não há alerta.</dd>
+    </dl>
+    <p class="mp-aviso-sub">Os números em cima do mapa contam as usinas de cada nível; clicar num deles esconde ou mostra o nível no mapa e na tabela.</p>
+    <p class="mp-aviso-t mp-aviso-t--2"><b>As camadas</b></p>
+    <dl class="mp-aviso-dl">
+      <dt>Avisos do {{ v.nomes.inmet }}</dt><dd>Perigo Potencial, Perigo e Grande Perigo, cada aviso no polígono dele; o contorno tracejado é o aviso que ainda vai começar. O risco de fogo do {{ v.nomes.inpe }} entra na cor da usina: Acompanhar, quando alto ou crítico em algum dos quatro dias; Atenção, quando crítico hoje ou amanhã com fogo a até 10 km.</dd>
+      <dt>Risco de fogo</dt><dd>A previsão do {{ v.nomes.inpe }} para hoje e os três dias seguintes, em quadrados com a média dos pixels de ~1 km que têm dado; sem cor onde o INPE não calcula (cidade, água). A usina usa o pixel dela: a cor do ponto pode ser outra que a do quadrado. Para vê-lo em quadrados, escolha a camada de fundo Risco de fogo.</dd>
+      <dt>Densidade de focos</dt><dd>Os focos da última hora somados em volta de cada um (até 50 km no Brasil inteiro, 25 km numa região), em focos por mil km².</dd>
+      <dt>Focos</dt><dd>Um foco é um pixel com fogo detectado na última hora, não um incêndio confirmado; o anel marca o foco a até 5 km de uma usina.</dd>
+      <dt>Fogo nas últimas 24 h</dt><dd>{{ v.nomes.nasa_firms }}, só a até 25 km das usinas: o tamanho do ponto é a força do fogo (FRP, a energia que ele irradia, em megawatts). Os satélites passam perto das 13h30 e da 01h30, e o dado chega em até 3 horas.</dd>
+    </dl>
+    <p class="mp-aviso-pe">A chave de cores da camada escolhida, a hora de cada leitura e o que ficou de fora estão ao lado do mapa; as fontes, no fim da tela.</p>
+  </section>
+</details>
+<script>
+  (function () {
+    var d = document.currentScript.previousElementSibling;
+    document.addEventListener('click', function (ev) { if (d.open && !d.contains(ev.target)) d.open = false; });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && d.open) { d.open = false; d.querySelector('summary').focus(); } });
+  })();
+</script>

@@ -585,11 +585,24 @@ Fernando de Noronha: uma malha com ilhas alargaria o recorte do Brasil em ~15% d
   o contorno fica fino em qualquer largura. O SVG ocupa 100% da largura (`height:auto`, `max-height:84vh` no desktop); abaixo de
   820 px entram o `--mp-k` e o fim do `max-height`. O `clima-mapa.js` (09/10) só ENFEITA: sem ele, o mapa é o do servidor, os
   controles são links e a página se recarrega (o `<meta refresh>` foi para dentro de `<noscript>`).
-- **Legenda à esquerda, mapa no meio, tabela à direita** (Levi, 09/10/2026: "jogue essa visão do anexo para a esquerda do mapa e
-  na direita uma tabela com o nome das usinas, os riscos e uma forma resumida do motivo do risco"). Container query no `.mp`
-  (conta a largura da tela, não a da janela): o padrão é uma coluna com o mapa primeiro; a partir de 760 px, legenda e mapa lado a
-  lado e a tabela embaixo; a partir de 1120 px, as três lado a lado, e a tabela rola por dentro na altura da linha (o
-  `contain:size` impede as 154 linhas de esticarem a página). A página do mapa vai até 1720 px (a lista fica nos 1280 do `.cl`),
+- **A tela enxuta (27/10/2026)**: Levi: "o foco da tela é o mapa, mas até chega no mapa é quase metade da tela só de texto e
+  filtros, talvez seria legal os filtros laterais" e "poderia ficar escondido toda essa legenda, imagino os status na parte de
+  cima ... caso tenha um disclaimer eu clico para ver que nem é no extintores". O cabeçalho é uma linha (título + "!"); a
+  pergunta da tela, o que cada nível quer dizer e o como ler de cada camada moram no "!" (`_mapa_ajuda.html`, o mesmo desenho do
+  aviso dos Extintores, `hseq/_legenda.html`, com o CSS copiado como `.mp-aviso*`; texto FIXO e fora de qualquer `data-parte`, senão
+  a releitura fecharia a caixa aberta). Os níveis viraram uma faixa em cima do mapa (`_mapa_status.html`, `data-parte="status"`):
+  cor, palavra e número, e o clique é o mesmo filtro `ocultar` da legenda de antes. Os filtros (região, camada de fundo, mostrar,
+  cliente, busca) e a chave de cores da camada (a legenda com `compacto`: sem os níveis, sem as notas longas) estão num cartão só, à
+  esquerda (`.mp-lado`; o `_mapa_barra.html` com `lado`). O porquê do cinza ("Sem leitura completa: sem leitura de X") ficou à
+  vista nas notas acima do mapa. A 1680 x 945 com o menu aberto, o mapa começa em 206 px (antes, abaixo de três linhas de filtro e
+  de uma frase) e cabe inteiro na primeira tela; a lateral e a tabela têm a altura do mapa e rolam por dentro (`contain:size`). **O
+  modo TV não mudou**: ele inclui `_mapa_legenda.html` e `_mapa_barra.html` sem `compacto` nem `lado`.
+- **Filtros e chave à esquerda, mapa no meio, tabela à direita** (Levi, 09/10/2026, a tabela: "jogue essa visão do anexo para a
+  esquerda do mapa e na direita uma tabela com o nome das usinas, os riscos e uma forma resumida do motivo do risco"; até 27/10 a
+  coluna da esquerda era a legenda inteira e os filtros ficavam numa faixa acima). Container query no `.mp`
+  (conta a largura da tela, não a da janela): o padrão é uma coluna com o mapa primeiro; a partir de 760 px, a lateral e o mapa
+  lado a lado e a tabela embaixo; a partir de 1120 px, as três lado a lado, e a lateral e a tabela rolam por dentro na altura do
+  mapa (o `contain:size` impede as 154 linhas e a chave de cores de esticarem a página). A página do mapa vai até 1720 px (a lista fica nos 1280 do `.cl`),
   e a tabela tem até 400 px; com 1300 px de tela útil ou mais, até 520 px, e o motivo cabe numa linha (Levi, 09/10: "aumente o
   tamanho de usinas em risco um pouco para a direita"). Só com folga: a 1440 px com o menu aberto, 520 px deixavam o mapa com
   uns 390 px; com o limite, ele fica com uns 520. A tabela (`m["tabela"]`) tem uma linha por usina do recorte, na

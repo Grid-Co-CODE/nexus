@@ -3,7 +3,9 @@
    lista). Tudo é link ou formulário com o estado no endereço: funciona sem JavaScript, e o clima-mapa.js troca a tela sem
    recarregar. #}
 {% set rota = 'torre_performance.mapa_de_risco' %}
-<div class="mp-barra" data-parte="barra">
+<div class="mp-barra{% if lado %} mp-barra--lado{% endif %}" data-parte="barra">
+  {# na lateral do mapa (27/10/2026) os grupos descem um embaixo do outro, cada um com o nome; no modo TV, a faixa de antes #}
+  {% if lado %}<span class="gc-rotulo" id="mp-regiao-r">Região</span>{% endif %}
   <nav class="mp-regioes" aria-label="Região do mapa">
     {% for r in v.regioes %}<a class="mp-regiao" data-acao="regiao" href="{{ url_for(rota, **v.links.regiao[r.id]) }}"{% if r.atual %} aria-current="page"{% endif %}>{{ r.nome }}</a>{% endfor %}
   </nav>

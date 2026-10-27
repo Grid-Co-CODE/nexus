@@ -272,6 +272,78 @@
 .mp-palco:fullscreen .mp-tab-rolagem{flex:1 1 auto;max-height:none;min-height:0;contain:size}
 .mp-palco:fullscreen .mp-legenda{overflow:auto}
 
+/* ── 27/10/2026: a tela enxuta ─────────────────────────────────────────────────────────────────────────────────────────
+   Levi: "o foco da tela é o mapa, mas até chega no mapa é quase metade da tela só de texto e filtros, talvez seria legal os filtros
+   laterais" e "poderia ficar escondido toda essa legenda, imagino os status na parte de cima ... caso tenha um disclaimer eu clico
+   para ver que nem é no extintores". Cabeçalho de uma linha com o "!" do como ler; os níveis numa faixa em cima do mapa; os
+   filtros e a chave de cores da camada num cartão só, na lateral. O modo TV não muda (os pedaços dele não passam lado/compacto). */
+.mp-cab{align-items:center}
+.mp-cab .cl-titulo{margin:4px 0 0}
+.mp-titulo{display:flex;align-items:center;gap:12px}
+.mp-notas .cl-nota{margin:10px 0 0}
+.mp-corpo{margin-top:16px}
+.mp-centro{order:-1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.mp-centro .mp-mapa{order:0}
+/* a lateral: os filtros em cima e, embaixo, a chave de cores da camada, num cartão (um nível de superfície só) */
+.mp-lado{min-width:0;display:flex;flex-direction:column;gap:14px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio-md);padding:14px 16px}
+.mp-barra--lado{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:8px;margin:0}
+.mp-barra--lado .mp-regioes{gap:6px}
+.mp-barra--lado .mp-regiao{padding:5px 11px}
+.mp-barra--lado .mp-grupo{gap:6px;margin-top:8px}
+.mp-barra--lado .mp-grupo .gc-rotulo{flex-basis:100%;margin:0 0 2px}
+.mp-barra--lado .mp-chip{padding:5px 11px}
+.mp-barra--lado .mp-cliente{display:flex;flex-direction:column;align-items:stretch;gap:6px;margin-top:8px}
+.mp-barra--lado .mp-cliente select{width:100%;max-width:none}
+.mp-lado .mp-busca{flex-direction:column;align-items:stretch;gap:6px;margin:0}
+.mp-lado .mp-busca .gc-campo{width:100%}
+.mp-legenda--compacta{background:none;border:0;border-radius:0;padding:14px 0 0;border-top:1px solid var(--linha)}
+/* os níveis em cima do mapa: cor, palavra e número; o clique esconde e mostra o nível (riscado quando escondido) */
+.mp-status{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.mp-st{display:inline-flex;align-items:center;gap:8px;padding:6px 13px 6px 10px;border-radius:999px;border:1px solid var(--linha-forte);
+  background:var(--superficie);color:var(--tinta-2);text-decoration:none;font:600 13px/18px var(--font-sans);white-space:nowrap}
+.mp-st:hover{background:var(--superficie-3);color:var(--tinta)}
+.mp-st .mp-chave{margin:0;flex:none}
+.mp-st-n{font:800 15px/18px var(--font-display);color:var(--tinta)}
+.mp-st[aria-pressed="false"],.mp-st[aria-pressed="false"] .mp-st-n{color:var(--mudo);text-decoration:line-through}
+.mp-st[aria-pressed="false"] .mp-chave{background:transparent;border:1.5px dashed var(--fraco)}
+/* o "!" do como ler: o mesmo desenho do aviso da tela de Extintores (hseq.css, .hs-aviso), aqui com a chave de cada nível */
+.mp-aviso{position:relative}
+.mp-aviso-bt{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1.5px solid var(--alerta);
+  border-radius:50%;background:var(--alerta-suave);color:var(--alerta);font:800 14px/1 var(--font-sans);cursor:pointer;list-style:none}
+.mp-aviso-bt::-webkit-details-marker{display:none}
+.mp-aviso-bt:hover,.mp-aviso[open] .mp-aviso-bt{background:var(--alerta);color:var(--sobre-cheio)}
+.mp-aviso-bt:focus-visible{outline:2px solid var(--alerta);outline-offset:2px}
+.mp-aviso-caixa{position:absolute;z-index:40;top:calc(100% + 8px);left:0;width:min(660px,calc(100vw - 32px));
+  max-height:calc(100vh - 140px);overflow:auto;margin:0;padding:14px 18px 16px;border:1px solid var(--alerta);corner-shape:bevel;
+  border-radius:14px;background:linear-gradient(var(--alerta-suave),var(--alerta-suave)),var(--superficie-3);
+  box-shadow:0 8px 24px var(--sombra)}
+.mp-aviso-t{margin:0 0 10px;font-size:14px;color:var(--tinta)}
+.mp-aviso-t--2{margin-top:18px}
+.mp-aviso-p{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--tinta-2)}
+.mp-aviso-sub{margin:10px 0 0;font-size:12.5px;line-height:1.45;color:var(--tinta-2)}
+.mp-aviso-dl{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:9px 18px;align-items:baseline;margin:0}
+.mp-aviso-dl dt{display:flex;align-items:center;gap:8px;margin:0;font:600 13px/1.4 var(--font-sans);color:var(--tinta)}
+.mp-aviso-dl dt .mp-chave{margin:0;flex:none}
+.mp-aviso-dl dd{margin:0;font-size:13px;line-height:1.45;color:var(--tinta-2)}
+.mp-aviso-pe{margin:14px 0 0;padding-top:10px;border-top:1px solid var(--alerta);font-size:12.5px;line-height:1.45;color:var(--tinta-2)}
+@media (max-width:640px){.mp-aviso-caixa{position:fixed;top:72px;left:16px;right:16px;width:auto;max-height:calc(100vh - 96px)}
+  .mp-aviso-dl{grid-template-columns:minmax(0,1fr);gap:3px 0}.mp-aviso-dl dd{margin-bottom:9px}}
+@container mp (min-width:760px){
+  .mp-corpo{grid-template-columns:minmax(220px,250px) minmax(0,1fr);align-items:stretch}
+  .mp-centro{order:0}
+  /* a lateral não dita a altura: quem dita é o mapa, e a chave de cores rola por dentro (sem isso, a chave com os eventos e o
+     fogo da NASA esticava a linha e a tabela ao lado, e a página descia mil pixels abaixo do mapa) */
+  .mp-lado{contain:size;overflow:auto}
+}
+@container mp (min-width:1120px){
+  .mp-corpo{grid-template-columns:minmax(220px,250px) minmax(0,1fr) minmax(330px,400px)}
+}
+@container mp (min-width:1300px){
+  .mp-corpo{grid-template-columns:minmax(220px,250px) minmax(0,1fr) minmax(360px,520px)}
+}
+.mp-palco:fullscreen .mp-lado{overflow:auto}
+
 /* ── o modo TV (?tv=1): sem a casca, sem rolagem, o tamanho da letra segue a altura da tela ─────────────────────────────
    A conta é em vh: 2,2% da altura dá ~24 px em 1920 x 1080 (lê-se de uns 3 m) e ~48 px em 3840 x 2160; com a escala do Windows a
    200%, a tela de 4K é 1920 x 1080 para o navegador e sai igual à de 1080. */

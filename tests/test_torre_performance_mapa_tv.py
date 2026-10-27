@@ -42,7 +42,7 @@ def partes(html):
 
 def test_os_controles_sao_links_que_levam_o_estado_no_endereco(mundo):
     html = pagina(mundo)
-    barra = re.search(r'<div class="mp-barra" data-parte="barra">(.*?)</div>\s*<div class="mp-busca"', html, flags=re.S).group(1)
+    barra = re.search(r'<div class="mp-barra[^"]*" data-parte="barra">(.*?)</div>\s*<div class="mp-busca"', html, flags=re.S).group(1)
     fundos = re.findall(r'data-fundo="(\w+)" href="([^"]*)" aria-pressed="(\w+)"', barra)
     assert fundos == [("avisos", URL, "true"), ("risco", f"{URL}?fundo=risco", "false"),
                       ("densidade", f"{URL}?fundo=densidade", "false"), ("nenhum", f"{URL}?fundo=nenhum", "false")]

@@ -1,0 +1,16 @@
+{# Os níveis das usinas numa faixa em cima do mapa (Levi, 27/10/2026: "poderia ficar escondido toda essa legenda, imagino os status
+   na parte de cima"). O número de cada nível e, no clique, o mesmo filtro da legenda de antes: esconde ou mostra o nível no mapa e
+   na tabela (sem JavaScript, um link que recarrega com o filtro no endereço). O que cada nível quer dizer mora no "!" do título
+   (_mapa_ajuda.html). No modo TV, os números são os do lado (mapa_tv.html), não esta faixa. #}
+{% macro nivel(id, rotulo, n) -%}
+<a class="mp-st" href="{{ url_for('torre_performance.mapa_de_risco', **v.links.ocultar[id]) }}" role="button" aria-pressed="{{ 'false' if id in v.ocultar else 'true' }}" data-acao="estado" data-nivel="{{ id }}" title="Mostrar ou esconder no mapa e na tabela"><span class="mp-chave mp-n-{{ id }}" aria-hidden="true"></span><span class="mp-st-r">{{ rotulo }}</span> <strong class="mp-st-n">{{ n }}</strong></a>
+{%- endmacro %}
+<div class="mp-status" role="group" aria-label="Usinas por nível de alerta" data-parte="status">
+  {{ nivel("agir", "Agir agora", v.contagem.agir) }}
+  {{ nivel("atencao", "Atenção", v.contagem.atencao) }}
+  {{ nivel("regiao", "Acompanhar", v.contagem.regiao) }}
+  {# com uma fonte sem leitura ninguém pode ser "Sem alerta": o nível some, e quem seria vira "Sem leitura completa" #}
+  {% if not v.sem_leitura_de %}{{ nivel("sem", v.rotulo_sem, v.contagem.sem) }}{% endif %}
+  {% if v.contagem.nx %}{{ nivel("nx", "Sem leitura completa", v.contagem.nx) }}{% endif %}
+  {# o total não entra: o título da tabela já diz "Usinas por risco (N)", e com ele os quatro níveis não cabiam numa linha #}
+</div>

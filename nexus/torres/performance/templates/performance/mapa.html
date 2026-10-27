@@ -11,11 +11,12 @@
    enquanto uma fonte é lida pela primeira vez) e os controles são links. #}
 <noscript><meta http-equiv="refresh" content="{{ v.recarrega_em }}"></noscript>
 <div class="cl mp{% for s in v.sobre if s not in v.ver %} mp-sem-{{ s }}{% endfor %}{% for n in v.ocultar %} mp-oculta-{{ n }}{% endfor %}" data-mapa data-fundo="{{ v.fundo }}" data-proxima-s="{{ v.proxima_s }}">
-  <header class="cl-cab">
+  {# Cabeçalho de uma linha (Levi, 27/10/2026: "o foco da tela é o mapa, mas até chega no mapa é quase metade da tela só de texto
+     e filtros"): a pergunta da tela e a legenda inteira foram para o "!" ao lado do título; os filtros, para a lateral do mapa. #}
+  <header class="cl-cab mp-cab">
     <div>
       <p class="gc-eyebrow">{{ torre.nome }}</p>
-      <h1 class="cl-titulo">{{ tela.nome }}</h1>
-      <p class="cl-pergunta">{{ tela.pergunta }}</p>
+      <div class="mp-titulo"><h1 class="cl-titulo">{{ tela.nome }}</h1>{% if not v.erro_cadastro and not v.sem_usinas %}{% include "performance/_mapa_ajuda.html" %}{% endif %}</div>
     </div>
     <div class="mp-cab-lado">
       <a class="gc-btn gc-btn--contorno" href="{{ raiz }}/t/performance/clima{% if v.cliente %}?cliente={{ v.cliente|urlencode }}{% endif %}">Ver a lista</a>
@@ -31,26 +32,34 @@
   {% else %}
 
   <div class="mp-palco" id="mp-palco">
-    {% include "performance/_mapa_barra.html" %}
-    <div class="mp-busca" hidden>
-      <label class="gc-rotulo" for="mp-busca">Buscar usina</label>
-      <input id="mp-busca" class="gc-campo" type="search" list="mp-busca-lista" placeholder="Nome da usina" autocomplete="off" spellcheck="false">
-      <datalist id="mp-busca-lista" data-parte="busca">{% for u in v.tabela %}<option value="{{ u.nome }}"></option>{% endfor %}</datalist>
-      <span class="mp-busca-msg" role="status" aria-live="polite"></span>
-    </div>
+    {# só o que pede atenção fica acima do mapa: a fonte fora, a leitura em curso, o contorno que não abriu, a usina fora do recorte.
+       A frase das "N usinas com coordenada" virou o total da faixa dos níveis e o texto do "!". #}
     <div class="mp-notas" data-parte="notas">
-      <p class="cl-base">{{ v.n_usinas }} {{ "usina em operação com coordenada" if v.n_usinas == 1 else "usinas em operação com coordenada" }} no cadastro{% if v.cliente %} ({{ v.cliente }}){% endif %}, cada uma na cor do nível de alerta dela. A coordenada não aparece nesta tela.{% if v.fora_do_recorte %} {{ v.fora_do_recorte }} {{ "usina em operação está fora deste recorte" if v.fora_do_recorte == 1 else "usinas em operação estão fora deste recorte" }}: escolha outra região ou o Brasil inteiro.{% endif %}</p>
+      {% if v.fora_do_recorte %}<p class="cl-nota">{{ v.fora_do_recorte }} {{ "usina em operação está fora deste recorte" if v.fora_do_recorte == 1 else "usinas em operação estão fora deste recorte" }}: escolha outra região ou o Brasil inteiro.</p>{% endif %}
       {% if v.faltando %}<p class="cl-nota cl-nota--atencao">O mapa não inclui: {{ v.faltando|join(", ") }}. A fonte está fora e a tela tenta de novo sozinha.</p>{% endif %}
       {% if v.lendo %}<p class="cl-nota cl-nota--atencao">Lendo agora: {{ v.lendo|join(", ") }}. O mapa ainda não inclui essa leitura; a tela se atualiza sozinha em {{ v.recarrega_em }} s.</p>{% endif %}
       {% if v.erro_contorno %}<p class="cl-nota cl-nota--atencao" role="alert">{{ v.erro_contorno }}</p>{% endif %}
+      {# o porquê do cinza fica à vista (era a ajuda da linha na legenda): sem uma fonte, ninguém pode ser "Sem alerta" #}
+      {% if v.contagem.nx %}<p class="cl-nota">Sem leitura completa: sem leitura de {{ v.sem_leitura_de }}, não dá para dizer que não há alerta. Essas usinas ficam em cinza no mapa.</p>{% endif %}
     </div>
     <p class="mp-faixa-estado" role="status" aria-live="polite" hidden></p>
 
     <div class="mp-corpo">
-      {# Legenda à esquerda do mapa e, à direita, a tabela das usinas com o risco e o motivo resumido (Levi, 09/10/2026:
-         "jogue essa visão do anexo para a esquerda do mapa e na direita uma tabela com o nome das usinas, os riscos e uma
-         forma resumida do motivo do risco"). Estreito, as três descem uma embaixo da outra (clima-mapa.css). #}
-      {% include "performance/_mapa_legenda.html" %}
+      {# Os filtros e a chave de cores na lateral do mapa e, à direita, a tabela das usinas com o risco e o motivo resumido
+         (Levi, 09/10/2026, a tabela; 27/10/2026, "talvez seria legal os filtros laterais"). Estreito, o mapa vem primeiro e o
+         resto desce (clima-mapa.css). #}
+      <aside class="mp-lado" aria-label="Filtros e chave do mapa">
+        {% with lado = true %}{% include "performance/_mapa_barra.html" %}{% endwith %}
+        <div class="mp-busca" hidden>
+          <label class="gc-rotulo" for="mp-busca">Buscar usina</label>
+          <input id="mp-busca" class="gc-campo" type="search" list="mp-busca-lista" placeholder="Nome da usina" autocomplete="off" spellcheck="false">
+          <datalist id="mp-busca-lista" data-parte="busca">{% for u in v.tabela %}<option value="{{ u.nome }}"></option>{% endfor %}</datalist>
+          <span class="mp-busca-msg" role="status" aria-live="polite"></span>
+        </div>
+        {% with compacto = true %}{% include "performance/_mapa_legenda.html" %}{% endwith %}
+      </aside>
+      <div class="mp-centro">
+      {% include "performance/_mapa_status.html" %}
       <figure class="mp-mapa" id="mp-mapa" tabindex="0" aria-label="Mapa de risco: {{ v.regiao_nome }}" aria-describedby="mp-ajuda">
         <div class="mp-ferramentas" hidden>
           <div class="mp-zoom" role="group" aria-label="Aproximar e afastar o mapa">
@@ -65,6 +74,7 @@
         <div class="mp-dica" id="mp-dica" role="tooltip" hidden></div>
         <figcaption class="mp-mapa-ajuda" id="mp-ajuda">Roda do mouse aproxima, arrastar move, clique no estado aproxima, clique na usina destaca a linha da tabela (outro clique abre a página dela). No teclado: setas movem, + e − aproximam, 0 enquadra tudo, Backspace volta.</figcaption>
       </figure>
+      </div>
       {% include "performance/_mapa_tabela.html" %}
     </div>
   </div>

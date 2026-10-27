@@ -11,7 +11,11 @@
 {% macro nivel(id, rotulo, n, ajuda) -%}
 <li><a class="mp-leg-filtro" href="{{ url_for('torre_performance.mapa_de_risco', **v.links.ocultar[id]) }}" role="button" aria-pressed="{{ 'false' if id in v.ocultar else 'true' }}" data-acao="estado" data-nivel="{{ id }}" title="Mostrar ou esconder no mapa e na tabela"><span class="mp-chave mp-n-{{ id }}"></span><span class="mp-leg-txt"><strong>{{ rotulo }}</strong> <span class="mp-leg-n">{{ n }}</span><span class="mp-leg-ajuda">{{ ajuda }}</span></span></a></li>
 {%- endmacro %}
-<aside class="mp-legenda" aria-label="Legenda" data-parte="legenda">
+<aside class="mp-legenda{% if compacto %} mp-legenda--compacta{% endif %}" aria-label="Legenda" data-parte="legenda">
+  {# compacto (a tela, 27/10/2026): os níveis foram para a faixa em cima do mapa e o texto longo para o "!" do título
+     (_mapa_status.html e _mapa_ajuda.html); fica a chave de cores da camada, a hora da leitura e os filtros por evento. O modo
+     TV não passa `compacto` e segue com a legenda inteira. #}
+  {% if not compacto %}
   <h2 class="mp-leg-h">Usinas{% if v.regiao != "brasil" %} nesta região{% endif %} ({{ v.n_no_recorte }})</h2>
   <ul class="mp-leg-lista">
     {{ nivel("agir", "Agir agora", v.contagem.agir, "foco a até 5 km, aviso Grande Perigo, ou aviso Perigo de um destes eventos: " ~ eventos|join(", ")) }}
@@ -26,6 +30,7 @@
     {% endif %}
   </ul>
   {% if v.ocultar %}<p class="mp-leg-nota mp-leg-nota--filtro">Escondidas: {% for n in ["agir", "atencao", "regiao", "sem", "nx"] if n in v.ocultar %}{{ {"agir": "Agir agora", "atencao": "Atenção", "regiao": "Acompanhar", "sem": "Sem alerta", "nx": "Sem leitura completa"}[n] }}{% if not loop.last %}, {% endif %}{% endfor %}. Clique de novo para mostrar.</p>{% endif %}
+  {% endif %}
 
   {% for f in (v.giro if v.girar else [v.fundo]) %}
   <section class="mp-leg-camada" data-camada="{{ f }}">
@@ -51,7 +56,7 @@
     {% else %}
     <p class="mp-leg-nota mp-leg-nota--fora"><strong>Avisos do {{ v.nomes.inmet }}:</strong> sem leitura boa, a camada não aparece no mapa.</p>
     {% endif %}
-    <p class="mp-leg-nota mp-leg-nota--longa">O risco de fogo do {{ v.nomes.inpe }} entra na cor da usina (Acompanhar, quando alto ou crítico em algum dos quatro dias; Atenção, quando crítico hoje ou amanhã com fogo a até 10 km). Para vê-lo em quadrados, escolha a camada de fundo Risco de fogo.</p>
+    {% if not compacto %}<p class="mp-leg-nota mp-leg-nota--longa">O risco de fogo do {{ v.nomes.inpe }} entra na cor da usina (Acompanhar, quando alto ou crítico em algum dos quatro dias; Atenção, quando crítico hoje ou amanhã com fogo a até 10 km). Para vê-lo em quadrados, escolha a camada de fundo Risco de fogo.</p>{% endif %}
   {% elif f == "risco" %}
     <h2 class="mp-leg-h">Risco de fogo do {{ v.nomes.inpe }}</h2>
     {% if cr %}
@@ -62,7 +67,7 @@
       {% endfor %}
       <li><span class="mp-chave mp-chave--vazio"></span><span class="mp-leg-txt"><strong>Sem cor</strong> sem dado: o INPE não calcula onde não há vegetação (cidade, água){% if cr.sem_dado_pct %}<span class="mp-leg-pct">{{ cr.sem_dado_pct }} da área</span>{% endif %}</span></li>
     </ul>
-    <p class="mp-leg-nota mp-leg-nota--longa">Cada quadrado tem cerca de {{ cr.lado_km }} km de lado e mostra a média dos pixels de ~1 km que têm dado. A usina usa o pixel dela: a cor do ponto pode ser outra que a do quadrado.</p>
+    {% if not compacto %}<p class="mp-leg-nota mp-leg-nota--longa">Cada quadrado tem cerca de {{ cr.lado_km }} km de lado e mostra a média dos pixels de ~1 km que têm dado. A usina usa o pixel dela: a cor do ponto pode ser outra que a do quadrado.</p>{% endif %}
     <p class="mp-leg-nota mp-leg-fonte">{{ cr.texto }}{% for q in cr.qualifica %} <span class="mp-leg-q">{{ q }}</span>{% endfor %}</p>
     {% elif cr.estado == "lendo" %}
     <p class="mp-leg-nota mp-leg-nota--atencao">{{ cr.texto }}</p>
@@ -78,7 +83,7 @@
       {% endfor %}
       <li><span class="mp-chave mp-chave--vazio"></span><span class="mp-leg-txt"><strong>Sem cor</strong> nenhum foco a até {{ cd.raio_km|int }} km na última hora</span></li>
     </ul>
-    <p class="mp-leg-nota">Cada foco pesa até {{ cd.raio_km|int }} km em volta dele: um foco sozinho dá até {{ cd.pico_um }} no centro, e os focos perto um do outro se somam. Quadrados de cerca de {{ cd.lado_km }} km.</p>
+    {% if not compacto %}<p class="mp-leg-nota">Cada foco pesa até {{ cd.raio_km|int }} km em volta dele: um foco sozinho dá até {{ cd.pico_um }} no centro, e os focos perto um do outro se somam. Quadrados de cerca de {{ cd.lado_km }} km.</p>{% endif %}
     <p class="mp-leg-nota mp-leg-fonte">{{ cd.texto }}{% for q in cd.qualifica %} <span class="mp-leg-q">{{ q }}</span>{% endfor %}</p>
     {% elif cd and cd.estado == "lendo" %}
     <p class="mp-leg-nota mp-leg-nota--atencao">{{ cd.texto }}</p>
@@ -115,7 +120,7 @@
     {% endfor %}
   </ul>
   <p class="mp-leg-nota">{{ na.n }} {{ "detecção" if na.n == 1 else "detecções" }} a até {{ na.raio_km|int }} km das usinas nas últimas 24 h{% if v.regiao != "brasil" %} neste recorte{% endif %}, {{ na.n_perto }} a até 5 km{% if na.ate %}; passagens até {{ na.ate }}{% endif %}{% if na.lido %}; lidas às {{ na.lido }}{% endif %}.{% for q in na.qualifica %} <span class="mp-leg-q">{{ q }}</span>{% endfor %}</p>
-  <p class="mp-leg-nota">O tamanho é a força do fogo (FRP: a energia que ele irradia, em megawatts). Os satélites passam perto das 13h30 e da 01h30, e o dado chega em até 3 horas.</p>
+  {% if not compacto %}<p class="mp-leg-nota">O tamanho é a força do fogo (FRP: a energia que ele irradia, em megawatts). Os satélites passam perto das 13h30 e da 01h30, e o dado chega em até 3 horas.</p>{% endif %}
   {% elif na.estado == "lendo" %}
   <p class="mp-leg-nota mp-leg-nota--atencao"><strong>Fogo nas últimas 24 h, {{ v.nomes.nasa_firms }}:</strong> lendo agora, a camada aparece quando a leitura terminar.</p>
   {% else %}
