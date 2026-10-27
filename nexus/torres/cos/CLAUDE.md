@@ -45,8 +45,10 @@ def mesa():
 Quem programa o COS tem escrita no repositório, mas a `main` só aceita o trabalho dele por **pull request**:
 
 1. Crie um ramo (`cos/<assunto>`), commite e faça push dele.
-2. Abra o pull request para a `main`. A conferência **pasta-do-cos** (`.github/workflows/pasta-do-cos.yml`) aprova se
-   o pedido mexe só na área do COS e reprova, listando os arquivos, se mexe fora dela.
+2. Abra o pull request para a `main`. A conferência **pasta-da-area** (`.github/workflows/pasta-da-area.yml`, a do COS
+   até 27/10/2026, quando ganhou a Engenharia) aprova se o pedido mexe só na área do COS e reprova, listando os
+   arquivos, se mexe fora dela. Quem é do COS: a variável `LOGINS_COS` do repositório; o papel no GitHub é write (o
+   admin passa por cima da regra da `main`).
 3. Verde: pode juntar (merge). O servidor recebe na próxima atualização (`git pull`, ver `DEPLOY.md`).
 
 **Área do COS:** `nexus/torres/cos/`, `nexus/cos/`, `nexus/static/cos.css` (ou `nexus/static/cos/`), `tests/cos/` e

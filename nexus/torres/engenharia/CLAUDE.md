@@ -2,8 +2,28 @@
 
 Engenharia de manutenção: confiabilidade dos ativos, criticidade, FMEA e causa raiz, laudos. Hoje são telas de verdade
 a **Mesa do engenheiro** (a primeira da torre, 18/10/2026), a **Confiabilidade** (com o **acompanhamento** dos ativos
-com sinal desde 18/10/2026) e o **Quadro da equipe** (com a **página da OS** desde 24/10/2026); as outras caem no
-placeholder da casca.
+com sinal desde 18/10/2026), o **Quadro da equipe** (com a **página da OS** desde 24/10/2026) e as **ETMs**
+(26/10/2026); as outras caem no placeholder da casca.
+
+## Como entregar (trava da área da Engenharia, desde 27/10/2026)
+
+Levi, 27/10/2026: "gostaria que ele pudesse editar somente a parte de engenharia". Quem programa a Engenharia tem o
+papel **write** no repositório (nunca admin: o admin passa por cima da regra da `main`), e a `main` só aceita o trabalho
+dele por **pull request**:
+
+1. Crie um ramo (`engenharia/<assunto>`), commite e faça push dele.
+2. Abra o pull request para a `main`. A conferência **pasta-da-area** (`.github/workflows/pasta-da-area.yml`) aprova se
+   o pedido mexe só na área da Engenharia e reprova, listando os arquivos, se mexe fora dela.
+3. Verde: pode juntar (merge). Produção segue a `main` sozinha: em ~2 min o servidor reinicia com o pedido (teste
+   antes de juntar: `python -m pytest -q`, e a tela no navegador, desktop e 375 px).
+
+**Área da Engenharia:** `nexus/torres/engenharia/` (rotas, templates e este `.md`), `nexus/engenharia/` (a regra sem
+Flask), `nexus/static/engenharia*` (o estilo e o JS), `tests/test_engenharia*.py` e o desenho e o plano em
+`docs/superpowers/specs/` e `docs/superpowers/plans/` com "engenharia" no nome. Fora dela, com o Levi: o catálogo dos
+dados (`nexus/dados/`: livro novo entra primeiro no catálogo), a ponte do OS Creator (`nexus/torres/oscreator/`), o
+menu, a casca, o `requirements.txt` e a própria conferência. Precisou mexer fora? Abra o pedido assim mesmo e peça ao
+Levi: ele revisa e junta. Quem é da área: a variável `LOGINS_ENGENHARIA` do repositório (os logins do GitHub ficam
+fora do código, que é público).
 
 Endereços nunca a partir da raiz (porta única, 09/10/2026: o Nexus pode rodar debaixo de `/nexus`, como no servidor até a fase 4): o link da OS na
 Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusRota` (regra das torres em

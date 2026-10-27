@@ -1,0 +1,78 @@
+# Trava da área de cada pessoa: quem programa uma área do Nexus sobe commits nela, e só nela. Começou no COS (Levi,
+# 05/10/2026) e ganhou a Engenharia (Levi, 27/10/2026: "gostaria que ele pudesse editar somente a parte de engenharia").
+#
+# O GitHub não dá permissão por pasta. Então: a regra da main exige pull request com esta conferência verde, e a
+# conferência reprova o pedido que mexe fora da área de quem o abriu. Os administradores (lista LIVRES) passam direto e
+# continuam commitando na main. Atenção: o papel "admin" do repositório passa por cima da regra da main (bypass), com a
+# conferência vermelha e tudo; quem programa uma área entra com o papel "write".
+#
+# Quem é de qual área mora nas variáveis do repositório (Settings → Secrets and variables → Actions → Variables:
+# LOGINS_COS e LOGINS_ENGENHARIA, os logins do GitHub separados por espaço), e não aqui: o repositório é público e o
+# login traz o nome da pessoa. Login sem área: o pedido vai para o Levi.
+#
+# pull_request_target, e não pull_request: roda a versão DESTE arquivo que está na main, e não a do pedido. Assim o
+# pedido não consegue trocar a própria conferência. Por isso mesmo, este job nunca baixa nem executa o código do
+# pedido: só lê a lista de arquivos pela API.
+name: Pasta da área
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  pasta-da-area:
+    name: pasta-da-area
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conferir se o pedido mexe só na área de quem o abriu
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          AUTOR: ${{ github.event.pull_request.user.login }}
+          LIVRES: "Levi-6242 admin-gridco"
+          LOGINS_COS: ${{ vars.LOGINS_COS }}
+          LOGINS_ENGENHARIA: ${{ vars.LOGINS_ENGENHARIA }}
+          # a torre (rotas e templates), a regra sem Flask, o estilo e os testes do COS
+          AREA_COS: '^(nexus/torres/cos/|nexus/cos/|nexus/static/cos/|nexus/static/cos\.css$|tests/cos/|tests/test_cos[^/]*\.py$)'
+          # a torre (rotas, templates e o CLAUDE.md), a regra sem Flask, o estilo e o JS, os testes e o desenho e o
+          # plano da Engenharia; o catálogo dos dados, a ponte do OS Creator, o menu e a casca ficam com o Levi
+          AREA_ENGENHARIA: '^(nexus/torres/engenharia/|nexus/engenharia/|nexus/static/engenharia[^/]*$|tests/test_engenharia[^/]*\.py$|docs/superpowers/(specs|plans)/[^/]*engenharia[^/]*\.md$)'
+        run: |
+          for livre in $LIVRES; do
+            if [ "$AUTOR" = "$livre" ]; then echo "Administrador ($AUTOR): sem trava de pasta."; exit 0; fi
+          done
+          # a área de quem abriu o pedido (o login casa sem caixa); quem é de duas áreas tem as duas
+          padrao=""; areas=""
+          for q in $LOGINS_COS; do
+            if [ "${AUTOR,,}" = "${q,,}" ]; then padrao="${padrao:+$padrao|}$AREA_COS"; areas="$areas COS"; fi
+          done
+          for q in $LOGINS_ENGENHARIA; do
+            if [ "${AUTOR,,}" = "${q,,}" ]; then padrao="${padrao:+$padrao|}$AREA_ENGENHARIA"; areas="$areas Engenharia"; fi
+          done
+          if [ -z "$padrao" ]; then
+            echo "::error::O login $AUTOR não tem área no Nexus (variáveis LOGINS_COS e LOGINS_ENGENHARIA). Peça ao Levi."
+            exit 1
+          fi
+          # Pelos commits exatos do evento (base...cabeça), e não pela lista de arquivos do pedido: essa lista demora uns
+          # segundos para incluir o push novo, e a conferência aprovava com a lista velha (ensaio de 05/10/2026).
+          comparacao="repos/$REPO/compare/$BASE...$HEAD"
+          # a comparação lista no máximo 300 arquivos: com 300, pode haver mais, e o pedido vai para o Levi
+          if [ "$(gh api "$comparacao" --jq '.files | length')" -ge 300 ]; then
+            echo "::error::Pedido grande demais para conferir (300 arquivos ou mais). Peça ao Levi."; exit 1
+          fi
+          # arquivo renomeado conta pelos dois nomes: tirar algo de fora para dentro da área também é mexer fora
+          arquivos=$(gh api "$comparacao" --jq '.files[] | .filename, (.previous_filename // empty)')
+          fora=$(printf '%s\n' "$arquivos" | grep -Ev "$padrao" | grep -v '^$' || true)
+          if [ -n "$fora" ]; then
+            echo "::error::Este pedido mexe fora da área de$areas. Peça ao Levi para revisar estes arquivos:"
+            printf '%s\n' "$fora"
+            exit 1
+          fi
+          echo "Só arquivos da área de$areas:"
+          printf '%s\n' "$arquivos"
