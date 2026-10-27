@@ -21,6 +21,7 @@ RESUMO = {
     "evento_ocorrencia": "Cada ocorrência das usinas, o plano de ação e o andamento",
     "sugestao": "As sugestões que as pessoas mandam para melhorar o Nexus",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
+    "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
     "acompanhamento_os": "O status, a prioridade e os comentários da Engenharia em cada OS",
     "marcacao_etm": "O diagnóstico e as marcações da Engenharia em cada OS de ETM",
@@ -114,6 +115,11 @@ PARA_QUE = {
     "tratamento_contestacao": "Guarda o acompanhamento de cada contestação do cliente: quem pegou a demanda (\"Pegar "
                               "para mim\") e cada atualização que o responsável escreveu, com o dia e a hora. Quem e o "
                               "texto vão cifrados; a tela Contratos e clientes → Contestações mostra.",
+    "passagem_turno": "Guarda cada troca de turno do COS (06:00 e 18:00): o que quem saiu escreveu para o próximo turno, "
+                      "quantas ocorrências estavam abertas na hora e quem entrou e assumiu, com o dia e a hora. Serve "
+                      "para provar que a passagem aconteceu (sem registro, ela não aconteceu) e, com o tempo, ver as "
+                      "trocas sem registro ou que ninguém assumiu. Quem e o texto vão cifrados; a tela COS → Passagem "
+                      "de turno mostra.",
     "acompanhamento_ativo": "Guarda o acompanhamento dos ativos que acenderam na Confiabilidade: quem da Engenharia "
                             "pegou cada ativo (ou para quem foi encaminhado), o início e o fim da análise, o "
                             "diagnóstico e cada comentário, com o dia e a hora. Serve para saber quem está olhando "

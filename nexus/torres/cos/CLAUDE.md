@@ -6,7 +6,7 @@ do programador do tempo real/COS. Leia também o `CLAUDE.md` da raiz (convençõ
 ## O que a torre vai ser
 
 As telas estão declaradas em `__init__.py`. Ronda padronizada, Parede de eventos, Ocorrências, Religamentos e
-Acionamentos já leem o Andamento da Ronda COS (seções abaixo); as outras são placeholder (cada uma diz a pergunta que vai responder e a fonte prevista). A base de produto são as specs do Fillipe, no SharePoint `Gridco/4. O&M/6.Gerencial/10. Nexus`:
+Acionamentos já leem o Andamento da Ronda COS, e a Passagem de turno grava no banco do Nexus (seções abaixo); as outras são placeholder (cada uma diz a pergunta que vai responder e a fonte prevista). A base de produto são as specs do Fillipe, no SharePoint `Gridco/4. O&M/6.Gerencial/10. Nexus`:
 
 - **R04, COS como visão global:**
   - **Mesas:** cada operador tem uma carteira de clientes, e o líder enxerga todas.
@@ -146,6 +146,28 @@ O desfecho e a repetição são daqui (`nexus/cos/religamentos.py`).
 - **Número pela metade não vai à faixa:** sem a leitura do Andamento de todos os clientes, "com canal", "chamados" e
   "pedem ação" saem como "—". O Andamento de antes da rota responde 404, e a tela diz por cliente.
 - Testes: `tests/test_cos_acionamentos.py` (controle positivo: sem o telefone pessoal como reserva, vermelho).
+
+## Passagem de turno: a R12 no banco do Nexus (26/10/2026)
+
+*"O que o próximo turno precisa saber e quem assumiu?"* — R12: a passagem é registrada no sistema; sem registro, ela não
+aconteceu. Nada disso existia: a Ronda COS só sabe os turnos e deduz o plantonista pelas ações nas ocorrências. **O Nexus
+é a fonte**: livro `nexus_cos_turno` · `fato_passagem_turno` (`nexus/cos/turno.py`, no catálogo antes da 1ª gravação),
+1 linha = 1 evento (`passagem` ou `assumiu`) sobre 1 troca, só acrescenta. Quem e o texto vão cifrados (o Cofre, como o
+acompanhamento das Contestações); a pessoa liga pelo `pessoa_hmac`. Por mexer em `nexus/dados/` (catálogo e
+`explica.py`), o pedido sai da área do COS e precisa da revisão do Levi.
+
+- **Os turnos** são os da Ronda COS (`TURNOS`: dia das 06:00, noite das 18:00; `turnoInicio` de lá). Mudou lá, muda aqui.
+- **A troca de cada passagem** (`destino`): a do fim do turno em curso, ou a que acabou de acontecer se escrita até
+  `TOLERANCIA_MIN` (60 min) depois dela, com o atraso dito na tela. Quem já assumiu essa troca está no turno novo e
+  escreve para a seguinte. Mais de um operador escreve na mesma troca (cada um a sua carteira).
+- **Assumir:** só a troca que começou o turno em curso (ou a seguinte, a menos de 60 min), só com passagem e nunca a
+  própria passagem. A senha de administrador lê e não grava (não diz quem é a pessoa).
+- **A situação de cada troca:** sem passagem 60 min depois da hora, **sem registro** (vermelho: não aconteceu); com
+  passagem e ninguém assumindo, **ninguém assumiu** (âmbar). A faixa conta só as trocas que já fecharam, em 7 dias.
+- **O que estava aberto** na hora da passagem (`abertas_qtd`, `criticas_qtd`) é a soma do Andamento entre os clientes;
+  com um cliente sem leitura, vai vazio (número pela metade não se grava). Sem o Andamento ligado, a passagem vai sem ele.
+- Testes: `tests/test_cos_turno.py` (o relógio, a situação, a gravação cifrada, as recusas e a tela), com controle
+  positivo (sem a trava da própria passagem ou sem o "sem registro", vermelhos).
 
 ## Regras desta torre
 

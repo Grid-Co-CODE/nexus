@@ -228,6 +228,21 @@ FATOS = (
          observacao="contestacao_linha_id liga à linha do thopen_contestacoes (o id dela, 1 contestação × 1 setor); "
                     "evento = responsavel (o responsável de agora é o do último) ou atualizacao. Quem (nome e e-mail) e "
                     "o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
+    # a passagem de turno do COS (R12 do Fillipe: "a passagem é registrada no sistema; sem registro, ela não aconteceu").
+    # Nada disso existia na Ronda COS (26/10/2026). O Nexus é a FONTE; registrado antes da 1ª gravação
+    Fato("passagem_turno", "Passagem de turno do COS", "cos", "nexus_cos_turno · fato_passagem_turno",
+         "1 linha = 1 evento (passagem escrita por quem sai, ou assumiu, de quem entra) sobre 1 troca de turno",
+         _d(data=("id", "data_id (o dia de Brasília do evento); papel data_id_troca (o dia da troca)"),
+            pessoa=("cod", "pessoa_hmac (o código do e-mail de quem passou ou assumiu)")),
+         tipo="transacao", chave=("id",),
+         medidas=_m((("abertas_qtd", "qtd", "nao"), ("criticas_qtd", "qtd", "nao"))),
+         fontes=("nexus_cos_turno · fato_passagem_turno",),
+         janela_origem="o Nexus é a fonte",
+         observacao="troca_em é a hora da troca (06:00 ou 18:00 de Brasília, os turnos da Ronda COS) e turno_que_sai o "
+                    "turno que termina nela (dia ou noite). As medidas só na passagem: o que estava aberto no Andamento "
+                    "da Ronda COS na hora, somado entre os clientes (vazio se algum não foi lido); são fotos, não somam "
+                    "entre passagens. Quem e o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se "
+                    "edita nem se apaga"),
     # o acompanhamento dos ativos com sinal da Confiabilidade (Levi, 18/10/2026: "os membros de engenharia ou
     # administradores pegar aqueles ativos com sinal para acompanhar ou alguém da engenharia poder encaminhar para a
     # pessoa ver!"). O Nexus é a FONTE; registrado antes da 1ª gravação
@@ -1116,6 +1131,11 @@ LIVROS = (
           "a cada \"Pegar para mim\" e a cada atualização na tela Contestações",
           "nexus/contratos/tratamento.py, pela tela Contratos e clientes > Contestações", False,
           "registrado em 15/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª demanda que alguém pega",
+          so_cresce=True),
+    Livro("nexus_cos_turno", ("fato_passagem_turno",),
+          "a cada passagem registrada e a cada \"Assumi o turno\" (tela COS > Passagem de turno)",
+          "nexus/cos/turno.py, pela tela COS > Passagem de turno", False,
+          "registrado em 26/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª passagem registrada",
           so_cresce=True),
     Livro("nexus_engenharia_acompanhamento", ("dim_diagnostico", "fato_acompanhamento_ativo"),
           "a cada pegar, encaminhar, salvar, comentário e mudança no cadastro dos diagnósticos (tela Engenharia > "
