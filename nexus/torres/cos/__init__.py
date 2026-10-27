@@ -2,8 +2,9 @@
 
 Ronda padronizada, Parede de eventos e Ocorrências leem o Andamento da Ronda COS (22/10/2026, nexus/cos/andamento.py;
 os prazos das Ocorrências em nexus/cos/ocorrencias.py). Religamentos e Acionamentos (26/10/2026) também: as contas em
-nexus/cos/religamentos.py e nexus/cos/acionamentos.py. As outras telas caem no placeholder da casca. Para dar vida a uma
-tela, crie uma view com a mesma rota (ela vence a genérica), por exemplo:
+nexus/cos/religamentos.py e nexus/cos/acionamentos.py. A Passagem de turno (26/10/2026) grava no livro nexus_cos_turno
+(nexus/cos/turno.py). As outras telas caem no placeholder da casca. Para dar vida a uma tela, crie uma view com a mesma
+rota (ela vence a genérica), por exemplo:
 
     @bp.route("/mesa")
     def mesa():
@@ -13,14 +14,18 @@ import logging
 from datetime import datetime
 from urllib.parse import urlencode
 
-from flask import current_app, render_template, request
+from flask import abort, current_app, redirect, render_template, request, session
 
 from ...cos import acionamentos as AC
 from ...cos import andamento as AND
 from ...cos import ocorrencias as OC
 from ...cos import religamentos as RE
+from ...cos import turno as TU
+from ...prefixo import na_raiz
 from ..modelo import Tela, Torre
-from ..moldura import registrar_molduras
+from ..moldura import _de_outro_site, registrar_molduras
+
+_log = logging.getLogger(__name__)
 
 TORRE = Torre(
     id="cos",
@@ -35,9 +40,6 @@ TORRE = Torre(
         Tela("desempenho", "Desempenho da equipe",
              "As mesas estão dentro do MTTA e do aviso no prazo?",
              "Ocorrências do Nexus"),
-        Tela("turno", "Passagem de turno",
-             "O que o próximo turno precisa saber e quem assumiu?",
-             "Registros de passagem de turno do Nexus"),
         # Porta única (09/10/2026): o /cos da Plataforma de Performance (MTTA das OS), numa moldura do Nexus. A view sai do
         # mapa das telas da plataforma (nexus/performance/porta.py), pelo registrar_molduras abaixo.
         Tela("acompanhamento", "Acompanhamento COS",
@@ -68,11 +70,15 @@ TORRE = Torre(
         Tela("acionamentos", "Acionamentos e distribuidoras",
              "Quem aciono e qual o canal da distribuidora desta UF?",
              "Cadastro do Nexus (quem aciono) + Andamento da Ronda COS (UCs, canais e chamados à concessionária)"),
+        # 26/10/2026: a passagem de turno da spec R12 ("sem registro, ela não aconteceu"), gravada no livro
+        # nexus_cos_turno (nexus/cos/turno.py). Depois do Acompanhamento pelo mesmo motivo da Ronda e da Parede.
+        Tela("turno", "Passagem de turno",
+             "O que o próximo turno precisa saber e quem assumiu?",
+             "Passagens registradas no Nexus + o que está aberto no Andamento da Ronda COS"),
     ],
 )
 
 bp = TORRE.criar_blueprint(__name__)
-_log = logging.getLogger(__name__)
 registrar_molduras(bp, TORRE)
 
 # A Parede mostra até 300 linhas: 7 dias de 3 clientes passam disso em dia agitado, e o filtro afunila.
@@ -218,3 +224,82 @@ def acionamentos():
         "cos/acionamentos.html", torre=TORRE, tela=TORRE.tela("acionamentos"), ligada=fonte.ligada, p=p,
         erro_cadastro=erro_cadastro, erro_clientes=erro_clientes if fonte.ligada else "", cliente=cliente, uf=uf,
         busca=busca, com_chave=bool(chave), confianca=AC.CONFIANCA, lido=_lido(leituras), url=_url)
+
+
+# ── Passagem de turno (26/10/2026) ───────────────────────────────────────────────────────────────────────────────────
+_TURNO_AVISO = "cos_turno_aviso"
+
+
+def _aberto_agora(cfg) -> dict | None:
+    """O que está aberto no Andamento agora, por cliente (a cópia de 30 s de cada um); None sem a fonte ligada."""
+    if not AND.fonte(cfg).ligada:
+        return None
+    clientes, erro = AND.clientes(cfg)
+    a = TU.aberto_no_andamento([AND.ler(cfg, c) for c in clientes])
+    a["erro_clientes"] = erro
+    return a
+
+
+def _turno(erro: str = "", texto: str = "", status: int = 200):
+    """A tela: o turno em curso, o formulário de quem sai, a troca que quem entra assume e o histórico de 7 dias. Na
+    recusa volta com o motivo e o texto digitado (o texto não cabe no cookie da sessão)."""
+    cfg = current_app.config
+    usuario = session.get("usuario")
+    eu = TU.codigo(usuario) if usuario else None
+    try:
+        p, erro_livro = TU.painel(AND.agora(), eu=eu), ""
+    except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, sem um histórico de "sem registro" falso
+        _log.exception("Passagem de turno: o livro não foi lido")
+        p, erro_livro = None, f"Não consegui ler as passagens no banco ({type(e).__name__})"
+    return render_template(
+        "cos/turno.html", torre=TORRE, tela=TORRE.tela("turno"), p=p, erro_livro=erro_livro,
+        aberto=_aberto_agora(cfg), com_login=bool((usuario or {}).get("email")), aviso=session.pop(_TURNO_AVISO, None), erro=erro, texto=texto,
+        tolerancia=TU.TOLERANCIA_MIN, turnos=TU.TURNOS, texto_max=TU.TEXTO_MAX, situacoes=TU.SITUACOES), status
+
+
+@bp.route("/turno")
+def turno():
+    """Passagem de turno (R12: "a passagem é registrada no sistema; sem registro, ela não aconteceu"): quem sai escreve o
+    que o próximo turno precisa saber, quem entra diz que assumiu, e as trocas de 7 dias ficam com a situação de cada
+    uma. Grava no livro nexus_cos_turno (nexus/cos/turno.py)."""
+    return _turno()
+
+
+@bp.route("/turno/passar", methods=["POST"])
+def turno_passar():
+    if _de_outro_site():
+        abort(403)
+    texto = request.form.get("texto") or ""
+    a = _aberto_agora(current_app.config) or {}
+    try:
+        nova = TU.passar(session.get("usuario"), texto, AND.agora(), a.get("abertas"), a.get("criticas"))
+    except TU.Recusada as e:
+        return _turno(erro=str(e), texto=texto, status=422)
+    except Exception as e:      # noqa: BLE001 — banco fora: o texto digitado não se perde
+        _log.exception("Passagem de turno: a passagem não gravou")
+        return _turno(erro=f"Não consegui gravar no banco ({type(e).__name__}). Tente de novo em instantes.",
+                      texto=texto, status=503)
+    troca = TU._brt(datetime.fromisoformat(nova["troca_em"]))
+    session[_TURNO_AVISO] = (f"Passagem registrada na troca de {troca.strftime('%d/%m')} às {troca.strftime('%H:%M')} "
+                             f"({TU.rotulo_da_troca(troca)})")
+    return redirect(na_raiz("/t/cos/turno"), code=303)
+
+
+@bp.route("/turno/assumir", methods=["POST"])
+def turno_assumir():
+    if _de_outro_site():
+        abort(403)
+    try:
+        troca = TU._brt(datetime.fromisoformat(request.form.get("troca") or ""))
+    except ValueError:
+        abort(400)
+    try:
+        TU.assumir(session.get("usuario"), troca, AND.agora())
+    except TU.Recusada as e:
+        return _turno(erro=str(e), status=422)
+    except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, nada mudou
+        _log.exception("Passagem de turno: o assumir não gravou")
+        return _turno(erro=f"Não consegui gravar no banco ({type(e).__name__}). Tente de novo em instantes.",
+                      status=503)
+    session[_TURNO_AVISO] = f"Você assumiu o turno ({TU.rotulo_da_troca(troca)} das {troca.strftime('%H:%M')})"
+    return redirect(na_raiz("/t/cos/turno"), code=303)
