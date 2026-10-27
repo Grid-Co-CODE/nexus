@@ -234,9 +234,10 @@ def test_a_pagina_do_mapa_tem_a_camada_a_legenda_e_a_citacao(tmp_path, monkeypat
     # o contorno rosa nas usinas com fogo a até 5 km: a Delta (forte, 25 MW) e a Teta (fraco, 3 MW); a Alfa (foco do INPE) não
     assert html.count('class="mp-anel-nasa mp-anel-nasa--forte"') == 1 and html.count('class="mp-anel-nasa mp-anel-nasa--fraco"') == 1
     t = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
-    assert "Fogo nas últimas 24 h · Fire Information for Resource Management System, sistema da NASA (NASA FIRMS)" in t
-    assert "2 detecções a até 25 km das usinas nas últimas 24 h, 2 a até 5 km" in t
-    assert "Forte 20 MW ou mais" in t and "Fraco abaixo de 5 MW" in t and "Usina com fogo a até 5 km nas últimas 24 h" in t
+    # a chave da lateral é curta (27/10/2026, "ainda tem mt informação aqui"): o nome curto e as forças numa linha, com a faixa
+    # no balão; o nome por extenso fica no balão do título, no "!" e no rodapé (a citação, abaixo)
+    assert "Fogo em 24 h · NASA" in t and "2 detecções a até 25 km das usinas nas últimas 24 h, 2 a até 5 km" in t
+    assert 'title="20 MW ou mais"' in html and 'title="abaixo de 5 MW"' in html and "a até 5 km" in t
     assert "Fogo das últimas 24 h: Fire Information for Resource Management System, sistema da NASA (NASA FIRMS)." in t
     assert "Dados e imagens do FIRMS, parte do Earth Science Data and Information System (ESDIS) da NASA." in t
     # o botão "Focos" liga e desliga as camadas de fogo: a da NASA e o contorno das usinas vão junto

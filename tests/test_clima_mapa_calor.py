@@ -35,65 +35,17 @@ def seco_no_leste(lat, lon):
     return 0.97 if lon > -41.2 else 0.10
 
 
-# ── a camada de fundo: risco de fogo ─────────────────────────────────────────────────────────────────────────────────
+# ── o risco de fogo saiu das camadas (27/10/2026) ────────────────────────────────────────────────────────────────────
 
-def test_o_risco_de_fogo_desenha_as_classes_com_a_fonte_a_hora_e_a_escala(leituras):
-    chamadas = tudo_instalado(leituras)
-    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(risco_baixo()), grade=lei_grade(seco_no_leste))
+def test_o_risco_de_fogo_nao_e_mais_camada_e_o_arquivo_grande_do_inpe_nem_e_lido(leituras):
+    """Levi, 27/10/2026: "esse risco de fogo não faz tanto sentido pq deixa o mapa todo vermelho e demora muito para carregar". O
+    endereço antigo (?fundo=risco) cai nos avisos, o modo TV não gira por ele e o arquivo grande do INPE nem é pedido; o risco segue
+    na cor de cada usina (o pixel dela)."""
+    chamadas = leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(risco_baixo()), grade=lei_grade(seco_no_leste))
     m = montar(fundo="risco")
-    cr = m["calor_risco"]
-    assert cr["estado"] == "ok" and m["fundos_no_svg"] == ["risco"] and m["camada_avisos"]["grupos"] == []
-    com_caminho = {c["id"] for c in cr["classes"] if c["d"]}
-    assert com_caminho == {1, 5}                                                 # só o que existe vira cor
-    assert [c["rotulo"] for c in cr["classes"]] == ["Mínimo", "Baixo", "Médio", "Alto", "Crítico"]
-    assert all(c["faixa"] for c in cr["classes"]) and cr["sem_dado_pct"] != ""
-    assert cr["texto"].startswith(f"{INPE} · risco de fogo: previsão para hoje, do arquivo de 07/10 às 06:32 · lido às 15:00")
-    assert cr["qualifica"] == []
-    assert [d["nome"] for d in cr["dias"]] == ["hoje", "amanhã", "sex 09/10", "sáb 10/10"] and cr["dias"][0]["atual"]
-    assert cr["lado_km"] == round(0.16 * C.KM_POR_GRAU)                          # 2 x 2 blocos-base no Brasil inteiro
-    assert m["divisas"] and "M" in m["divisas"]                                  # as divisas vêm por cima do calor
-    assert "grade0" in chamadas
-
-
-def test_a_regiao_desenha_o_risco_em_quadrados_menores(leituras):
-    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(risco_baixo()), grade=lei_grade(seco_no_leste))
-    assert montar(fundo="risco", regiao="nordeste")["calor_risco"]["lado_km"] == round(0.08 * C.KM_POR_GRAU)
-
-
-def test_o_risco_lendo_diz_lendo_nao_desenha_e_a_tela_volta_em_10_s(leituras):
-    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(risco_baixo()), grade=L.Leitura(None, None, erro=L.LENDO))
-    m = montar(fundo="risco")
-    assert m["calor_risco"]["estado"] == "lendo" and m["calor_risco"]["classes"] == []
-    assert "lendo a área do Brasil" in m["calor_risco"]["texto"] and m["proxima_s"] == V.RECARGA_LENDO_S
-    assert m["divisas"] == ""
-
-
-def test_o_risco_fora_diz_fora_e_a_ultima_boa_vem_com_a_hora_dela(leituras):
-    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(risco_baixo()), grade=L.Leitura(None, None, erro="HTTP 503"))
-    cr = montar(fundo="risco")["calor_risco"]
-    assert cr["estado"] == "fora" and cr["classes"] == [] and "fora agora; ainda sem leitura boa" in cr["texto"]
-    velha = lei_grade(seco_no_leste, erro="HTTP 503", velha=True)
-    velha.lido_em = LIDO - 3600
-    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(risco_baixo()), grade=velha)
-    cr = montar(fundo="risco")["calor_risco"]
-    assert cr["estado"] == "ok" and "última leitura boa às 14:00" in cr["texto"] and "dado de 14:00" in cr["qualifica"]
-
-
-def test_a_previsao_de_ontem_fica_qualificada_e_o_hoje_e_o_dia_seguinte_do_arquivo(leituras):
-    ontem = datetime(2026, 10, 6, 9, 32, tzinfo=UTC)
-    leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(risco_baixo(), arquivos={0: ontem}),
-             grade={1: lei_grade(seco_no_leste, modificado=ontem), 0: lei_grade(seco_no_leste, modificado=ontem)})
-    cr = montar(fundo="risco")["calor_risco"]
-    assert cr["dia"] == 1 and [d["nome"] for d in cr["dias"]][:2] == ["ontem", "hoje"]   # o T1 de ontem é a previsão de hoje
-    assert "previsão de 06/10" in cr["qualifica"]
-
-
-def test_o_dia_escolhido_le_o_arquivo_daquele_dia(leituras):
-    chamadas = leituras(avisos=lei_avisos(), focos=lei_focos(), risco=lei_risco(risco_baixo()),
-                        grade={2: lei_grade(seco_no_leste)})
-    cr = montar(fundo="risco", dia=2)["calor_risco"]
-    assert "grade2" in chamadas and cr["dia"] == 2 and cr["dia_nome"] == "sex 09/10"
-    assert "previsão para sex 09/10" in cr["texto"]
+    assert m["fundo"] == "avisos" and not m.get("calor_risco") and "risco" not in M.FUNDOS and "risco" not in M.GIRO
+    assert "risco" in chamadas and not [c for c in chamadas if c.startswith("grade")]
+    assert M.estado_da_tela({"fundo": "risco"})["fundo"] == "avisos"
 
 
 def test_sem_o_risco_no_fundo_o_arquivo_grande_do_inpe_nem_e_lido(leituras):
@@ -143,12 +95,12 @@ def test_fundo_desconhecido_cai_nos_avisos(leituras):
     assert montar(fundo="marte")["fundo"] == "avisos"
 
 
-def test_no_modo_tv_com_giro_as_tres_camadas_vem_prontas(leituras):
+def test_no_modo_tv_com_giro_as_duas_camadas_vem_prontas(leituras):
     leituras(avisos=lei_avisos(aviso(2, "Tempestade", ALFA)), focos=lei_focos(foco_a(1.0, DELTA)), risco=lei_risco(risco_baixo()),
              grade=lei_grade(seco_no_leste))
     m = montar(tv=True, girar=20)
-    assert m["fundos_no_svg"] == list(M.GIRO) and m["girar"] == 20
-    assert m["calor_risco"]["estado"] == "ok" and m["calor_densidade"]["estado"] == "ok"
+    assert m["fundos_no_svg"] == list(M.GIRO) == ["avisos", "densidade"] and m["girar"] == 20
+    assert not m.get("calor_risco") and m["calor_densidade"]["estado"] == "ok"
     assert m["dados_js"]["giro"] == list(M.GIRO) and m["dados_js"]["girar"] == 20
     assert montar(girar=20)["girar"] is None                                     # o giro é só do modo TV
 
@@ -191,9 +143,9 @@ def test_o_mapa_marca_a_proxima_leitura_pelas_fontes_que_usou(leituras):
 # ── o estado da tela no endereço ─────────────────────────────────────────────────────────────────────────────────────
 
 def test_o_estado_vem_do_endereco_validado_e_o_que_nao_existe_cai_no_padrao():
-    e = M.estado_da_tela({"fundo": "Risco", "ver": "usinas,focos,lixo", "dia": "2", "cliente": " X ", "ocultar": "sem,nada",
+    e = M.estado_da_tela({"fundo": "Densidade", "ver": "usinas,focos,lixo", "dia": "2", "cliente": " X ", "ocultar": "sem,nada",
                           "sem_eventos": "baixa-umidade,<script>", "tv": "1", "girar": "30", "regiao": "sul"})
-    assert e == {"regiao": "sul", "fundo": "risco", "ver": frozenset({"usinas", "focos"}), "dia": 2, "cliente": "X",
+    assert e == {"regiao": "sul", "fundo": "densidade", "ver": frozenset({"usinas", "focos"}), "dia": 2, "cliente": "X",
                  "ocultar": frozenset({"sem"}), "sem_eventos": frozenset({"baixa-umidade"}), "tv": True, "girar": 30}
     assert M.estado_da_tela({"dia": "9", "girar": "5", "fundo": "x"}) == {
         "regiao": "", "fundo": "avisos", "ver": None, "dia": None, "cliente": "", "ocultar": frozenset(),
@@ -205,10 +157,10 @@ def test_os_links_levam_o_resto_do_estado_e_o_padrao_e_o_endereco_puro(leituras)
     tudo_instalado(leituras)
     padrao = montar()
     assert padrao["links"]["regiao"]["brasil"] == {} and padrao["links"]["regiao"]["sul"] == {"regiao": "sul"}
-    assert padrao["links"]["fundo"]["risco"] == {"fundo": "risco"} and padrao["links"]["ver"]["focos"] == {"ver": "usinas,siglas"}
-    m = montar(fundo="risco", regiao="sul", ocultar=frozenset({"sem"}))
-    assert m["links"]["regiao"]["norte"] == {"regiao": "norte", "fundo": "risco", "ocultar": "sem"}
-    assert m["links"]["ocultar"]["sem"] == {"regiao": "sul", "fundo": "risco"}       # clicar de novo mostra
+    assert padrao["links"]["fundo"]["densidade"] == {"fundo": "densidade"} and padrao["links"]["ver"]["focos"] == {"ver": "usinas,siglas"}
+    m = montar(fundo="densidade", regiao="sul", ocultar=frozenset({"sem"}))
+    assert m["links"]["regiao"]["norte"] == {"regiao": "norte", "fundo": "densidade", "ocultar": "sem"}
+    assert m["links"]["ocultar"]["sem"] == {"regiao": "sul", "fundo": "densidade"}       # clicar de novo mostra
     assert m["links"]["tv"]["tv"] == 1 and "tv" not in m["links"]["sair_tv"]
 
 

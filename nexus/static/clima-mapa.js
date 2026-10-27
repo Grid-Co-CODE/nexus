@@ -151,15 +151,40 @@
     return [p.x, p.y];
   }
 
+  // O mapa ANDA até o lugar (27/10/2026, Levi: "deixe mais visual e dinâmico o mapa inteiro"): os botões, o teclado, o clique no
+  // estado e a busca levam a vista até lá em vez de saltar, e dá para ver de onde ela veio. A roda e o arrasto seguem na hora (eles
+  // já são o movimento) e param o que estiver andando. No Windows com os efeitos de animação desligados (o do Levi, que o navegador
+  // repassa como prefers-reduced-motion) o movimento encurta, não some: sem ele, o salto não diz para onde a vista foi.
+  var REDUZIDO = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var DURACAO_MS = REDUZIDO ? 140 : 320;
+  var animacao = 0;
+  var trocouFundo = false;          // a pessoa trocou a camada de fundo: o desenho que chegar entra suave (só nessa troca)
+  function pararAnimacao() { if (animacao) { cancelAnimationFrame(animacao); animacao = 0; } }
+  function irPara(novo, guardar) {
+    if (!vb || !base) { aplicar(novo, guardar); return; }
+    pararAnimacao();
+    var alvo = limitar(novo, base), de = vb.slice(), t0 = null;
+    if (guardar) {
+      historico.push(vb.slice());
+      if (historico.length > 50) historico.shift();
+    }
+    function passo(t) {
+      if (t0 === null) t0 = t;
+      var k = Math.min(1, (t - t0) / DURACAO_MS), e = 1 - Math.pow(1 - k, 3);       // sai rápido e assenta
+      aplicar(de.map(function (v, i) { return v + (alvo[i] - v) * e; }), false);
+      animacao = k < 1 ? requestAnimationFrame(passo) : 0;
+    }
+    animacao = requestAnimationFrame(passo);
+  }
+
   function zoomBotao(fator) {
     if (!vb) return;
-    aplicar(zoomEm(vb, base, vb[0] + vb[2] / 2, vb[1] + vb[3] / 2, fator), true);
+    irPara(zoomEm(vb, base, vb[0] + vb[2] / 2, vb[1] + vb[3] / 2, fator), true);
   }
 
   function voltar() {
     if (!historico.length) return;
-    vb = historico.pop();
-    aplicar(vb, false);
+    irPara(historico.pop(), false);
   }
 
   function iniciarDesenho(preservar) {
@@ -251,9 +276,9 @@
       var dentro = x > vb[0] && x < vb[0] + vb[2] && y > vb[1] && y < vb[1] + vb[3];
       if (opcoes.zoom) {
         var w = Math.min(vb[2], base[2] / 6);
-        aplicar([x - w / 2, y - w * base[3] / base[2] / 2, w, w * base[3] / base[2]], true);
+        irPara([x - w / 2, y - w * base[3] / base[2] / 2, w, w * base[3] / base[2]], true);
       } else if (!dentro) {
-        aplicar([x - vb[2] / 2, y - vb[3] / 2, vb[2], vb[3]], true);
+        irPara([x - vb[2] / 2, y - vb[3] / 2, vb[2], vb[3]], true);
       }
     }
     // a dica não fica presa em cima do mapa (a 1440 px o mapa tem ~390 px e ela cobria metade dele): a marca é o aro no mapa e a linha
@@ -384,6 +409,7 @@
     ultimoTipo = e.pointerType || "mouse";
     var s = svg();
     if (!s || !s.contains(e.target) || e.button !== 0 || ultimoTipo === "touch") return;
+    pararAnimacao();
     arrasto = { x: e.clientX, y: e.clientY, vb: vb.slice(), id: e.pointerId, ativo: false, escala: s.getScreenCTM().a };
     arrastou = false;
   });
@@ -437,6 +463,7 @@
     var s = svg();
     if (!s || !s.contains(e.target) || !vb) return;
     e.preventDefault();
+    pararAnimacao();
     var p = pontoDoDesenho(e.clientX, e.clientY);
     if (!p) return;
     var unidade = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
@@ -463,7 +490,7 @@
       }
       var uf = ufNoPonto(e.clientX, e.clientY);
       var info = uf && (dados.ufs || {})[uf];
-      if (info && ultimoTipo !== "touch") { aplicar(enquadrar(info.caixa, base), true); return; }
+      if (info && ultimoTipo !== "touch") { irPara(enquadrar(info.caixa, base), true); return; }
       if (selecionada) selecionar(null);
       return;
     }
@@ -472,7 +499,7 @@
       var z = bt.getAttribute("data-zoom");
       if (z === "mais") zoomBotao(PASSO_ZOOM);
       else if (z === "menos") zoomBotao(1 / PASSO_ZOOM);
-      else if (z === "tudo") aplicar(base, true);
+      else if (z === "tudo") irPara(base, true);
       else if (z === "voltar") voltar();
       return;
     }
@@ -502,13 +529,13 @@
     var f = figura();
     if (!f || !f.contains(e.target) || e.altKey || e.ctrlKey || e.metaKey || !vb) return;
     var passo = 0.12, feito = true;
-    if (e.key === "ArrowLeft") aplicar([vb[0] - vb[2] * passo, vb[1], vb[2], vb[3]], true);
-    else if (e.key === "ArrowRight") aplicar([vb[0] + vb[2] * passo, vb[1], vb[2], vb[3]], true);
-    else if (e.key === "ArrowUp") aplicar([vb[0], vb[1] - vb[3] * passo, vb[2], vb[3]], true);
-    else if (e.key === "ArrowDown") aplicar([vb[0], vb[1] + vb[3] * passo, vb[2], vb[3]], true);
+    if (e.key === "ArrowLeft") irPara([vb[0] - vb[2] * passo, vb[1], vb[2], vb[3]], true);
+    else if (e.key === "ArrowRight") irPara([vb[0] + vb[2] * passo, vb[1], vb[2], vb[3]], true);
+    else if (e.key === "ArrowUp") irPara([vb[0], vb[1] - vb[3] * passo, vb[2], vb[3]], true);
+    else if (e.key === "ArrowDown") irPara([vb[0], vb[1] + vb[3] * passo, vb[2], vb[3]], true);
     else if (e.key === "+" || e.key === "=") zoomBotao(PASSO_ZOOM);
     else if (e.key === "-" || e.key === "_") zoomBotao(1 / PASSO_ZOOM);
-    else if (e.key === "0") aplicar(base, true);
+    else if (e.key === "0") irPara(base, true);
     else if (e.key === "Backspace") voltar();
     else if (e.key === "Escape") { selecionar(null); esconderDica(true); }
     else feito = false;
@@ -531,7 +558,7 @@
       var id = idDoHref(link.getAttribute("href")), u = linkDaUsina(id);
       if (u && vb) {
         var p = u.querySelector(".mp-ponto"), x = parseFloat(p.getAttribute("cx")), y = parseFloat(p.getAttribute("cy"));
-        if (!(x > vb[0] && x < vb[0] + vb[2] && y > vb[1] && y < vb[1] + vb[3])) aplicar([x - vb[2] / 2, y - vb[3] / 2, vb[2], vb[3]], true);
+        if (!(x > vb[0] && x < vb[0] + vb[2] && y > vb[1] && y < vb[1] + vb[3])) irPara([x - vb[2] / 2, y - vb[3] / 2, vb[2], vb[3]], true);
         mostrarDicaDaUsina(u, null, false);
       }
     }
@@ -547,6 +574,7 @@
     var nivel = link.getAttribute("data-nivel"), ev = link.getAttribute("data-ev");
     if (fundo) {
       mapa.setAttribute("data-fundo", fundo);
+      trocouFundo = true;           // a camada nova chega com a releitura; quem a faz entrar suave é o trocar()
       link.parentNode.querySelectorAll("[data-fundo]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === link)); });
     } else if (sobre) {
       var some = mapa.classList.toggle("mp-sem-" + sobre);
@@ -620,6 +648,7 @@
     });
     lerDados();
     iniciarDesenho(true);
+    if (trocouFundo) { trocouFundo = false; var novo = svg(); if (novo) novo.classList.add("mp-troca"); }
     if (selecionada && !linkDaUsina(selecionada)) selecionada = null;
     if (selecionada) {
       var tr = linhaDaUsina(selecionada);

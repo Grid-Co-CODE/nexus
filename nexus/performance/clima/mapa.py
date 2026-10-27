@@ -299,9 +299,13 @@ CLASSES_NASA = (("fraco", "Fraco", "abaixo de 5 MW"), ("médio", "Médio", "de 5
 # As camadas (Levi, 09/10/2026: "Além de tempestade conseguimos uma outra visão tipo um mapa de calor no mapa? quanto mais
 # versatilidade melhor!"). A camada de FUNDO é uma por vez: duas camadas de área juntas (o vermelho do aviso e o do calor) viram uma
 # mancha só, e ninguém sabe o que está lendo. Por cima dela, as usinas, os focos e as siglas ligam e desligam à vontade.
-FUNDOS = {"avisos": "Avisos meteorológicos", "risco": "Risco de fogo", "densidade": "Densidade de focos", "nenhum": "Nenhuma"}
+# O Risco de fogo saiu das camadas em 27/10/2026 (Levi: "esse risco de fogo não faz tanto sentido pq deixa o mapa todo vermelho e
+# demora muito para carregar"): na seca o Brasil inteiro fica em alto ou crítico, e a camada pedia ~8 MB do INPE e uns 7 s de CPU
+# na primeira visita do dia. O risco continua na cor de cada usina (o pixel dela, `alertas`); o desenho em quadrados (`calor.py`,
+# `leitura.risco_grade`) fica pronto: voltar a camada é pôr "risco" aqui e no GIRO.
+FUNDOS = {"avisos": "Avisos meteorológicos", "densidade": "Densidade de focos", "nenhum": "Nenhuma"}
 FUNDO_PADRAO = "avisos"
-GIRO = ("avisos", "risco", "densidade")              # o que o modo TV alterna sozinho (`girar`)
+GIRO = ("avisos", "densidade")                       # o que o modo TV alterna sozinho (`girar`)
 SOBRE = {"usinas": "Usinas", "focos": "Focos", "siglas": "Siglas dos estados"}
 NIVEIS = (A.AGIR, A.ATENCAO, A.REGIAO, A.SEM_ALERTA, NX)
 GIRAR_MIN_S, GIRAR_MAX_S = 10, 600

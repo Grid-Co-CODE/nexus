@@ -72,8 +72,8 @@ ESCURO_DE_SEMPRE = {
     "--papel-crit": "#b42318", "--papel-alerta": "#8a5300", "--papel-ok": "#1f7a4d",
     # as camadas de calor do Mapa de risco (09/10/2026): tokens novos, nenhum valor de antes mudou
     "--calor-risco-1": "#503f2b", "--calor-risco-2": "#724a26", "--calor-risco-3": "#985224", "--calor-risco-4": "#bf582b",
-    "--calor-risco-5": "#e75b3c", "--calor-densidade-1": "#234950", "--calor-densidade-2": "#1e5e68",
-    "--calor-densidade-3": "#0e7580", "--calor-densidade-4": "#068b95", "--calor-densidade-5": "#09a2a9",
+    "--calor-risco-5": "#e75b3c", "--calor-densidade-1": "#5e3420", "--calor-densidade-2": "#8a3c19",
+    "--calor-densidade-3": "#bc4f17", "--calor-densidade-4": "#e86d1d", "--calor-densidade-5": "#ffa83d",
     # o pódio das olimpíadas do Ranking de pontos (18/10/2026): tokens novos, nenhum valor de antes mudou
     "--ouro": "#e3b341", "--prata": "#c3cad7", "--bronze": "#cd8a52",
     # a faixa do bloco destacado da Visão geral (18/10/2026, Levi: "deixe 1/3 do que está", "uma cor só destacando a

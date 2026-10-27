@@ -592,11 +592,29 @@ Fernando de Noronha: uma malha com ilhas alargaria o recorte do Brasil em ~15% d
   aviso dos Extintores, `hseq/_legenda.html`, com o CSS copiado como `.mp-aviso*`; texto FIXO e fora de qualquer `data-parte`, senão
   a releitura fecharia a caixa aberta). Os níveis viraram uma faixa em cima do mapa (`_mapa_status.html`, `data-parte="status"`):
   cor, palavra e número, e o clique é o mesmo filtro `ocultar` da legenda de antes. Os filtros (região, camada de fundo, mostrar,
-  cliente, busca) e a chave de cores da camada (a legenda com `compacto`: sem os níveis, sem as notas longas) estão num cartão só, à
-  esquerda (`.mp-lado`; o `_mapa_barra.html` com `lado`). O porquê do cinza ("Sem leitura completa: sem leitura de X") ficou à
-  vista nas notas acima do mapa. A 1680 x 945 com o menu aberto, o mapa começa em 206 px (antes, abaixo de três linhas de filtro e
-  de uma frase) e cabe inteiro na primeira tela; a lateral e a tabela têm a altura do mapa e rolam por dentro (`contain:size`). **O
-  modo TV não mudou**: ele inclui `_mapa_legenda.html` e `_mapa_barra.html` sem `compacto` nem `lado`.
+  cliente, busca) e a chave de cores estão num cartão só, à esquerda (`.mp-lado`; o `_mapa_barra.html` com `lado`). A chave é a
+  CURTA (`_mapa_chave.html`, `data-parte="chave"`; Levi, sobre a legenda que tinha ido para a lateral: "ainda tem mt informação
+  aqui"): as cores de cada camada numa linha, com o nome curto da fonte (o por extenso fica no balão do título, no "!", no rodapé e
+  em Fontes), o número e a hora da leitura numa linha, os eventos dos avisos como botões; fonte fora ou lendo continua dita, com o
+  nome por extenso. O porquê do cinza ("Sem leitura completa: sem leitura de X") ficou à vista nas notas acima do mapa. A 1680 x 945
+  com o menu aberto, o mapa começa em 206 px (antes, abaixo de três linhas de filtro e de uma frase) e cabe inteiro na primeira tela;
+  a lateral e a tabela têm a altura do mapa e rolam por dentro (`contain:size`). **O modo TV segue com a legenda inteira**
+  (`_mapa_legenda.html`) e a faixa de controles dele (`_mapa_barra.html` sem `lado`).
+- **Mais visual e dinâmico (27/10/2026)**: Levi: "melhor a cor dessa densidade de focos de queimada esse risco de fogo não faz
+  tanto sentido pq deixa o mapa todo vermelho e demora muito para carregar, deixe mais visual e dinâmico o mapa inteiro".
+  (1) **O Risco de fogo saiu das camadas** (`FUNDOS` e `GIRO` em `mapa.py`): na seca pintava o país inteiro e pedia ~8 MB do INPE
+  e ~7 s de CPU na 1ª visita do dia. O endereço antigo (`?fundo=risco`) cai nos avisos e o arquivo grande nem é pedido; o risco
+  continua na cor de cada usina (o pixel dela). O desenho em quadrados (`calor.py`, `leitura.risco_grade`) ficou pronto: voltar é
+  pôr "risco" em `FUNDOS` e `GIRO`. (2) **A densidade de focos com cor de fogo** (`--calor-densidade-*`, era azul-petróleo): da brasa
+  ao brilho no escuro, do creme ao marrom no claro, um matiz só e luminosidade monótona (o validador do skill em ordinal; o 1º passo
+  encosta na terra de propósito, 1,4:1, a régua de mapa de calor do `test_clima_calor`), e **em mancha contínua**: os quadrados
+  passam por um desfoque de ~1 quadrado (`<filter id="mp-suave">`) antes do recorte pelo contorno, então a costa segue nítida; os
+  focos e o fogo da NASA ficam em tinta neutra por cima dela. (3) **O movimento**: o zoom ANDA até o lugar nos botões, no teclado,
+  no clique no estado e na busca (`irPara` no `clima-mapa.js`, 320 ms, sai rápido e assenta); a roda e o arrasto seguem na hora e
+  param o que estiver andando; a usina cresce ao passar o mouse (`--mp-real`, registrado com `@property` para a transição não
+  arrastar o zoom); a usina em "Agir agora" pulsa (`.mp-pulso`); a camada de fundo nova entra suave só quando a pessoa a escolhe (a
+  releitura no ritmo dos caches não pisca). No Windows com os efeitos de animação desligados (o do Levi), o movimento funcional
+  encurta (140 ms) e o pulso vira um anel parado.
 - **Filtros e chave à esquerda, mapa no meio, tabela à direita** (Levi, 09/10/2026, a tabela: "jogue essa visão do anexo para a
   esquerda do mapa e na direita uma tabela com o nome das usinas, os riscos e uma forma resumida do motivo do risco"; até 27/10 a
   coluna da esquerda era a legenda inteira e os filtros ficavam numa faixa acima). Container query no `.mp`
@@ -670,7 +688,8 @@ Celular ficou fora (Levi, 09/10: "não precisa de no celular, por hora"): nada f
 - **A camada de FUNDO é uma por vez:** duas camadas de área juntas (o vermelho do aviso e o do calor) viram uma mancha só. Por cima,
   usinas, focos e siglas ligam e desligam à vontade. Os níveis (legenda) e os eventos dos avisos também escondem e mostram, no mapa
   e na tabela (`:has()` no CSS).
-- **Risco de fogo do INPE em quadrados** (`calor.py`, `fontes.inpe_risco_grade`, `GeoTiff.somar_em_blocos`): o MESMO arquivo do risco
+- **Risco de fogo do INPE em quadrados** (FORA das camadas desde 27/10/2026, ver "Mais visual e dinâmico"; o que segue é como o
+  desenho funciona, para o dia em que voltar) (`calor.py`, `fontes.inpe_risco_grade`, `GeoTiff.somar_em_blocos`): o MESMO arquivo do risco
   por usina, lido na área do Brasil (só as tiles que encostam no contorno: 148 de 289 em 09/10/2026, 8,1 MB), em blocos de 0,08 grau
   (8 pixels); no Brasil inteiro, 2 x 2 (0,16 grau, ~18 km). A cor é a MÉDIA dos pixels com dado (soma e contagem, nunca média de
   médias), nas cinco classes da régua das usinas (`alertas.classe_risco_fogo`); quadrado com menos de 1/4 dos pixels com dado fica

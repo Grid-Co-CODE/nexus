@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='clima-mapa.css') }}">
 {# Mapa de risco (07/10/2026): o Clima e risco num mapa do Brasil, desenhado no servidor (ver _mapa_svg.html). Desde 09/10/2026 (Levi:
    "Quero o mapa mais interativo", "uma outra visão tipo um mapa de calor", "visão de tela cheia para colocar no video wall"): camada
-   de fundo (avisos, risco de fogo ou densidade de focos), camadas de cima, filtros, busca, zoom, dica, tela cheia e o modo TV
+   de fundo (avisos ou densidade de focos; o risco de fogo saiu em 27/10/2026), camadas de cima, filtros, busca, zoom, dica, tela cheia e o modo TV
    (?tv=1). O estado mora no endereço; o clima-mapa.js enfeita o que o servidor desenhou e relê a página no ritmo dos caches das
    fontes (data-proxima-s), sem recarregar e sem perder o zoom. Sem JavaScript, a tela se recarrega como a da lista (60 s; 10 s
    enquanto uma fonte é lida pela primeira vez) e os controles são links. #}
@@ -56,7 +56,7 @@
           <datalist id="mp-busca-lista" data-parte="busca">{% for u in v.tabela %}<option value="{{ u.nome }}"></option>{% endfor %}</datalist>
           <span class="mp-busca-msg" role="status" aria-live="polite"></span>
         </div>
-        {% with compacto = true %}{% include "performance/_mapa_legenda.html" %}{% endwith %}
+        {% include "performance/_mapa_chave.html" %}
       </aside>
       <div class="mp-centro">
       {% include "performance/_mapa_status.html" %}
@@ -109,7 +109,7 @@
       <li>Posição das usinas: cadastro do Nexus, acessível só com login. Os números da coordenada não são mostrados.</li>
       <li>Avisos: {{ v.nomes.inmet }}, avisos meteorológicos ativos, cada um com o seu polígono. O contorno tracejado é o aviso que ainda vai começar.</li>
       <li>Focos: {{ v.nomes.inpe }}, Programa Queimadas, arquivos de 10 em 10 min da última hora. Um foco é um pixel com fogo detectado, não um incêndio confirmado. A densidade de focos é calculada no Nexus com esses mesmos focos (núcleo de 25 km).</li>
-      <li>Risco de fogo: {{ v.nomes.inpe }}, previsão para hoje e os três dias seguintes, em pixels de cerca de 1 km (0 a 1). Na camada de fundo, a média dos pixels com dado em quadrados de ~9 km (~18 km no Brasil inteiro); a usina usa o pixel dela.</li>
+      <li>Risco de fogo: {{ v.nomes.inpe }}, previsão para hoje e os três dias seguintes, em pixels de cerca de 1 km (0 a 1); entra na cor de cada usina pelo pixel dela.</li>
       <li>Fogo das últimas 24 h: {{ v.nomes.nasa_firms }}, focos dos satélites VIIRS (S-NPP, NOAA-20 e NOAA-21, pixel de 375 m) e MODIS (Aqua e Terra, pixel de 1 km), com a força (FRP) e a confiança de cada um; no mapa, só os que estão a até 25 km de uma usina. Dados e imagens do FIRMS, parte do Earth Science Data and Information System (ESDIS) da NASA.</li>
       <li>Os níveis da usina são os da lista de Clima e risco: a mesma regra, as mesmas fontes, o mesmo cache.</li>
     </ul>

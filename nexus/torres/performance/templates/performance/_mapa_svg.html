@@ -11,13 +11,16 @@
 {% set na = v.camada_nasa %}
 <svg class="mp-svg mp-svg--{{ 'brasil' if v.regiao == 'brasil' else 'regiao' }}" viewBox="{{ v.viewbox }}" role="group" aria-labelledby="mp-titulo" preserveAspectRatio="xMidYMid meet" data-parte="svg">
   <title id="mp-titulo">Mapa de risco: {{ v.regiao_nome }}</title>
-  {% if v.ufs and (cr or cd) %}<defs><clipPath id="mp-recorte">{% for u in v.ufs %}<use href="#mp-uf-{{ u.sigla }}"/>{% endfor %}</clipPath></defs>{% endif %}
+  {% if v.ufs and (cr or cd) %}<defs><clipPath id="mp-recorte">{% for u in v.ufs %}<use href="#mp-uf-{{ u.sigla }}"/>{% endfor %}</clipPath>
+    {# a densidade em mancha contínua (27/10/2026, "deixe mais visual"): os quadrados desfocados em ~1 quadrado viram um mapa de
+       calor de verdade; o desfoque vem antes do recorte (a ordem do SVG), então a costa e a fronteira continuam nítidas #}
+    {% if cd and cd.classes %}<filter id="mp-suave" x="-2%" y="-2%" width="104%" height="104%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="{{ (cd.altura|float * 0.9)|round(1) }}"/></filter>{% endif %}</defs>{% endif %}
   <g class="mp-ufs">
     {% for u in v.ufs %}<path class="mp-uf" id="mp-uf-{{ u.sigla }}" data-uf="{{ u.sigla }}" d="{{ u.d }}"/>
     {% endfor %}
   </g>
   {% if cr and cr.classes %}<g class="mp-calor mp-calor--risco" data-camada="risco"{% if v.ufs %} clip-path="url(#mp-recorte)"{% endif %} shape-rendering="crispEdges">{% for c in cr.classes if c.d %}<path class="mp-cr mp-cr-{{ c.id }}" data-classe="{{ c.id }}" stroke-width="{{ cr.altura }}" d="{{ c.d }}"/>{% endfor %}</g>{% endif %}
-  {% if cd and cd.classes %}<g class="mp-calor mp-calor--densidade" data-camada="densidade"{% if v.ufs %} clip-path="url(#mp-recorte)"{% endif %} shape-rendering="crispEdges">{% for c in cd.classes if c.d %}<path class="mp-cd mp-cd-{{ c.id }}" data-classe="{{ c.id }}" stroke-width="{{ cd.altura }}" d="{{ c.d }}"/>{% endfor %}</g>{% endif %}
+  {% if cd and cd.classes %}<g class="mp-calor mp-calor--densidade" data-camada="densidade"{% if v.ufs %} clip-path="url(#mp-recorte)"{% endif %}><g filter="url(#mp-suave)">{% for c in cd.classes if c.d %}<path class="mp-cd mp-cd-{{ c.id }}" data-classe="{{ c.id }}" stroke-width="{{ cd.altura }}" d="{{ c.d }}"/>{% endfor %}</g></g>{% endif %}
   {% if v.divisas %}<path class="mp-divisas" d="{{ v.divisas }}"/>{% endif %}
   {% if "avisos" in v.fundos_no_svg and av and av.estado == "ok" %}
   <g class="mp-avisos" data-camada="avisos">
@@ -44,7 +47,7 @@
   </g>
   {% endif %}
   <g class="mp-usinas">
-    {% for u in v.usinas %}<a href="{{ (u.href)|na_raiz }}"><title>{{ u.titulo }}</title><circle class="mp-alvo" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r_alvo }}"/>{% if u.fogo24 %}<circle class="mp-anel-nasa mp-anel-nasa--{{ u.fogo24 }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ (u.r + 3.5)|round(1) }}"/>{% endif %}<circle class="mp-ponto mp-n-{{ u.nivel }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r }}"/></a>
+    {% for u in v.usinas %}<a href="{{ (u.href)|na_raiz }}"><title>{{ u.titulo }}</title><circle class="mp-alvo" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r_alvo }}"/>{% if u.nivel == "agir" %}<circle class="mp-pulso" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r }}"/>{% endif %}{% if u.fogo24 %}<circle class="mp-anel-nasa mp-anel-nasa--{{ u.fogo24 }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ (u.r + 3.5)|round(1) }}"/>{% endif %}<circle class="mp-ponto mp-n-{{ u.nivel }}" cx="{{ u.x }}" cy="{{ u.y }}" r="{{ u.r }}"/></a>
     {% endfor %}
   </g>
   <g class="mp-selecao" aria-hidden="true"></g>

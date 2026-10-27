@@ -20,7 +20,7 @@
     <p class="mp-aviso-t mp-aviso-t--2"><b>As camadas</b></p>
     <dl class="mp-aviso-dl">
       <dt>Avisos do {{ v.nomes.inmet }}</dt><dd>Perigo Potencial, Perigo e Grande Perigo, cada aviso no polígono dele; o contorno tracejado é o aviso que ainda vai começar. O risco de fogo do {{ v.nomes.inpe }} entra na cor da usina: Acompanhar, quando alto ou crítico em algum dos quatro dias; Atenção, quando crítico hoje ou amanhã com fogo a até 10 km.</dd>
-      <dt>Risco de fogo</dt><dd>A previsão do {{ v.nomes.inpe }} para hoje e os três dias seguintes, em quadrados com a média dos pixels de ~1 km que têm dado; sem cor onde o INPE não calcula (cidade, água). A usina usa o pixel dela: a cor do ponto pode ser outra que a do quadrado. Para vê-lo em quadrados, escolha a camada de fundo Risco de fogo.</dd>
+      <dt>Risco de fogo</dt><dd>A previsão do {{ v.nomes.inpe }} para hoje e os três dias seguintes, no pixel de ~1 km de cada usina: entra só na cor da usina. Deixou de ser camada do mapa em 27/10/2026: na seca pintava o país inteiro e demorava a carregar.</dd>
       <dt>Densidade de focos</dt><dd>Os focos da última hora somados em volta de cada um (até 50 km no Brasil inteiro, 25 km numa região), em focos por mil km².</dd>
       <dt>Focos</dt><dd>Um foco é um pixel com fogo detectado na última hora, não um incêndio confirmado; o anel marca o foco a até 5 km de uma usina.</dd>
       <dt>Fogo nas últimas 24 h</dt><dd>{{ v.nomes.nasa_firms }}, só a até 25 km das usinas: o tamanho do ponto é a força do fogo (FRP, a energia que ele irradia, em megawatts). Os satélites passam perto das 13h30 e da 01h30, e o dado chega em até 3 horas.</dd>

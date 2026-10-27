@@ -200,8 +200,8 @@
 .mp-divisas{fill:none;stroke:var(--tinta);stroke-opacity:.35;stroke-width:1px;stroke-linejoin:round;vector-effect:non-scaling-stroke;
   pointer-events:none}
 /* sobre o risco de fogo (laranja e vermelho), o foco laranja sumia: vai em cinza claro (no claro, ardósia), na legenda também */
-.mp[data-fundo="risco"] .mp-focos{stroke:var(--tinta-2);stroke-opacity:.8}
-.mp[data-fundo="risco"] .mp-chave--foco{background:var(--tinta-2)}
+.mp[data-fundo="risco"] .mp-focos,.mp[data-fundo="densidade"] .mp-focos{stroke:var(--tinta-2);stroke-opacity:.8}
+.mp[data-fundo="risco"] .mp-chave--foco,.mp[data-fundo="densidade"] .mp-chave--foco{background:var(--tinta-2)}
 /* a camada de fundo é uma por vez: no modo TV com o giro as três estão na página, e só a da vez aparece */
 .mp[data-fundo="avisos"] [data-camada]:not([data-camada="avisos"]),
 .mp[data-fundo="risco"] [data-camada]:not([data-camada="risco"]),
@@ -297,7 +297,26 @@
 .mp-barra--lado .mp-cliente select{width:100%;max-width:none}
 .mp-lado .mp-busca{flex-direction:column;align-items:stretch;gap:6px;margin:0}
 .mp-lado .mp-busca .gc-campo{width:100%}
-.mp-legenda--compacta{background:none;border:0;border-radius:0;padding:14px 0 0;border-top:1px solid var(--linha)}
+/* a chave de cores (_mapa_chave.html): uma linha de cores por camada, o número numa linha curta, a hora ao lado do título */
+.mp-chaves{display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--linha);font-size:12px;
+  line-height:1.4;color:var(--tinta-2)}
+.mp-ch-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:8px 0 0;font:700 11px/14px var(--font-sans);
+  letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.mp-ch-h:first-child{margin-top:0}
+.mp-ch-hora{font:500 11px/14px var(--font-mono);letter-spacing:0;text-transform:none;color:var(--mudo)}
+.mp-ch-linha,.mp-ch-eventos{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 12px}
+.mp-ch-linha li{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.mp-ch-linha .mp-chave,.mp-ch-ev .mp-chave{margin:0;flex:none}
+.mp-ch-n{margin:0;color:var(--mudo)}
+.mp-ch-eventos{gap:4px 6px;margin-top:2px}
+.mp-ch-ev{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--linha);border-radius:999px;
+  color:var(--tinta-2);text-decoration:none;white-space:nowrap}
+.mp-ch-ev b{color:var(--tinta)}
+.mp-ch-ev:hover{background:var(--superficie-2)}
+.mp-ch-ev[aria-pressed="false"],.mp-ch-ev[aria-pressed="false"] b{color:var(--mudo);text-decoration:line-through}
+.mp-ch-ev[aria-pressed="false"] .mp-chave{background:transparent;border:1.5px dashed var(--fraco)}
+.mp-chaves .mp-dias{margin:0}
+.mp-chaves .mp-leg-nota{margin:0}
 /* os níveis em cima do mapa: cor, palavra e número; o clique esconde e mostra o nível (riscado quando escondido) */
 .mp-status{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .mp-st{display:inline-flex;align-items:center;gap:8px;padding:6px 13px 6px 10px;border-radius:999px;border:1px solid var(--linha-forte);
@@ -343,6 +362,29 @@
   .mp-corpo{grid-template-columns:minmax(220px,250px) minmax(0,1fr) minmax(360px,520px)}
 }
 .mp-palco:fullscreen .mp-lado{overflow:auto}
+
+/* ── 27/10/2026: o mapa mais visual e dinâmico (Levi: "deixe mais visual e dinâmico o mapa inteiro") ──────────────────────────
+   A usina cresce ao passar o mouse; a que pede "Agir agora" pulsa; a camada de fundo nova entra suave quando a pessoa a escolhe (a
+   releitura no ritmo dos caches não pisca); o zoom anda até o lugar (clima-mapa.js, irPara). No Windows com os efeitos de animação
+   desligados (prefers-reduced-motion, o do Levi): o que é funcional encurta e o enfeite para; o pulso vira um anel parado. */
+@property --mp-real{syntax:"<number>";inherits:true;initial-value:1}
+.mp-ponto{transform:scale(var(--mp-k,1)) scale(var(--mp-zp,1)) scale(var(--mp-real,1));transition:--mp-real .16s ease-out}
+.mp-usinas a:hover .mp-ponto,.mp-usinas a:focus-visible .mp-ponto{--mp-real:1.7}
+.mp-pulso{fill:none;stroke:var(--cl-critico);stroke-width:2px;vector-effect:non-scaling-stroke;pointer-events:none;
+  transform-box:fill-box;transform-origin:center;opacity:.55;transform:scale(var(--mp-k,1)) scale(var(--mp-zp,1)) scale(1.9)}
+@keyframes mp-pulso{
+  from{opacity:.8;transform:scale(var(--mp-k,1)) scale(var(--mp-zp,1)) scale(1)}
+  to{opacity:0;transform:scale(var(--mp-k,1)) scale(var(--mp-zp,1)) scale(3.2)}
+}
+@keyframes mp-surge{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:no-preference){
+  .mp-pulso{animation:mp-pulso 2.2s ease-out infinite}
+  .mp-troca .mp-calor,.mp-troca .mp-avisos{animation:mp-surge .4s ease-out}
+}
+@media (prefers-reduced-motion:reduce){
+  .mp-ponto{transition-duration:.08s}
+  .mp-troca .mp-calor,.mp-troca .mp-avisos{animation:mp-surge .15s ease-out}
+}
 
 /* ── o modo TV (?tv=1): sem a casca, sem rolagem, o tamanho da letra segue a altura da tela ─────────────────────────────
    A conta é em vh: 2,2% da altura dá ~24 px em 1920 x 1080 (lê-se de uns 3 m) e ~48 px em 3840 x 2160; com a escala do Windows a
@@ -430,12 +472,12 @@ html.mp-tv-html{height:100%;overflow:hidden;font-size:2.2vh}
 .mp-na-fraco{stroke-width:3px}
 .mp-na-medio{stroke-width:5px}
 .mp-na-forte{stroke-width:8px;stroke-opacity:.85}
-.mp[data-fundo="risco"] .mp-na{stroke:var(--tinta)}
+.mp[data-fundo="risco"] .mp-na,.mp[data-fundo="densidade"] .mp-na{stroke:var(--tinta)}
 .mp-chave--nasa{border:0;border-radius:50%;background:var(--cl-nasa);opacity:.8}
 .mp-chave--na-fraco{width:4px;height:4px;margin:7px 7px 0}
 .mp-chave--na-medio{width:6px;height:6px;margin:6px 6px 0}
 .mp-chave--na-forte{width:10px;height:10px;margin:4px 4px 0}
-.mp[data-fundo="risco"] .mp-chave--nasa{background:var(--tinta)}
+.mp[data-fundo="risco"] .mp-chave--nasa,.mp[data-fundo="densidade"] .mp-chave--nasa{background:var(--tinta)}
 /* o contorno da usina que teve fogo da NASA a até 5 km nas últimas 24 h: visível no Brasil inteiro, onde os pontos ficam embaixo dela */
 .mp-anel-nasa{fill:none;stroke:var(--cl-nasa);stroke-width:2.5px;vector-effect:non-scaling-stroke;pointer-events:none}
 .mp-anel-nasa--forte{stroke-width:3.5px}

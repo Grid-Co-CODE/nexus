@@ -279,7 +279,7 @@ def test_a_legenda_explica_as_camadas_com_o_que_ha_no_recorte(mundo):
     assert "4 focos na última hora" in t and "2 a até 5 km de uma usina" in t              # focos
     # desde 09/10/2026 o risco de fogo também é camada de fundo: a legenda dos avisos diz onde ele entra e como vê-lo
     assert "O risco de fogo do Instituto Nacional de Pesquisas Espaciais (INPE) entra na cor da usina" in t
-    assert "escolha a camada de fundo Risco de fogo" in t
+    assert "Deixou de ser camada do mapa em 27/10/2026" in t                               # o risco de fogo só na cor da usina
 
 
 def test_a_legenda_do_recorte_conta_so_o_que_esta_nele(mundo):
@@ -509,7 +509,7 @@ def test_375_px_o_css_do_mapa_quebra_em_uma_coluna_e_o_svg_ocupa_a_largura(mundo
     blocos = _blocos_de_midia(css)
     assert blocos and all(375 < largura <= 1200 for largura, _ in blocos)               # nenhuma regra só do desktop escondida
     assert any(largura <= 820 and "mp-legenda" in corpo for largura, corpo in blocos)
-    for classe in ("mp-corpo", "mp-legenda", "mp-tabela"):
+    for classe in ("mp-corpo", "mp-lado", "mp-tabela"):
         assert classe in html, classe
     assert "overflow-wrap:anywhere" in css and "min-width:0" in css
 
@@ -684,7 +684,7 @@ def test_filtros_e_chave_na_lateral_niveis_em_cima_do_mapa_e_a_tabela_a_direita(
     lateral, os níveis numa faixa em cima do mapa, a tabela à direita; a pergunta da tela e o como ler, no "!" do título."""
     html = pagina(mundo)
     corpo = trecho(html, '<div class="mp-corpo">', '<h2 class="cl-h2">Fontes</h2>')
-    assert (corpo.index('class="mp-lado"') < corpo.index('data-parte="barra"') < corpo.index('mp-legenda--compacta')
+    assert (corpo.index('class="mp-lado"') < corpo.index('data-parte="barra"') < corpo.index('data-parte="chave"')
             < corpo.index('class="mp-status"') < corpo.index('class="mp-mapa"') < corpo.index('class="mp-tabela"'))
     cab = trecho(html, '<header class="cl-cab mp-cab">', '</header>')
     assert 'class="mp-aviso"' in cab and 'class="cl-pergunta"' not in cab
@@ -692,9 +692,11 @@ def test_filtros_e_chave_na_lateral_niveis_em_cima_do_mapa_e_a_tabela_a_direita(
     status = trecho(corpo, 'class="mp-status"', '</div>')
     for nivel in ("agir", "atencao", "regiao", "sem"):
         assert f'data-nivel="{nivel}"' in status and f"ocultar={nivel}" in status
-    # a legenda compacta não repete os níveis nem os textos longos (estão no "!")
-    leg = trecho(corpo, 'mp-legenda--compacta', '</aside>')
-    assert 'data-nivel=' not in leg and "mp-leg-nota--longa" not in leg
+    # a chave da lateral não repete os níveis nem o como ler (estão na faixa e no "!"), nem o nome da fonte por extenso
+    # (Levi, 27/10/2026, sobre a legenda que tinha ido para a lateral: "ainda tem mt informação aqui")
+    chave = trecho(corpo, 'data-parte="chave"', '</aside>')
+    assert 'data-nivel=' not in chave and "mp-leg-nota--longa" not in chave and "Instituto Nacional" not in texto(chave)
+    assert 'data-ev="' in chave                                       # os eventos dos avisos seguem botões de esconder e mostrar
 
 
 def test_a_tabela_traz_cada_usina_com_o_risco_e_o_motivo_curto_e_quem_pede_acao_vem_primeiro(mundo):

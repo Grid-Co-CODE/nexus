@@ -18,7 +18,9 @@ from test_torre_performance_mapa import cadeia, nova_app, pagina, svg, texto  # 
 
 URL = "/t/performance/clima/mapa"
 INMET, INPE = F.extenso("inmet"), F.extenso("inpe")
-PARTES = {"svg", "legenda", "tabela", "fontes", "dados", "hora", "notas"}
+# as partes que a releitura troca nas duas telas; a tela tem também a faixa dos níveis e a chave curta (27/10/2026), o modo TV
+# a legenda inteira
+PARTES = {"svg", "tabela", "fontes", "dados", "hora", "notas"}
 
 
 @pytest.fixture
@@ -44,8 +46,8 @@ def test_os_controles_sao_links_que_levam_o_estado_no_endereco(mundo):
     html = pagina(mundo)
     barra = re.search(r'<div class="mp-barra[^"]*" data-parte="barra">(.*?)</div>\s*<div class="mp-busca"', html, flags=re.S).group(1)
     fundos = re.findall(r'data-fundo="(\w+)" href="([^"]*)" aria-pressed="(\w+)"', barra)
-    assert fundos == [("avisos", URL, "true"), ("risco", f"{URL}?fundo=risco", "false"),
-                      ("densidade", f"{URL}?fundo=densidade", "false"), ("nenhum", f"{URL}?fundo=nenhum", "false")]
+    assert fundos == [("avisos", URL, "true"), ("densidade", f"{URL}?fundo=densidade", "false"),
+                      ("nenhum", f"{URL}?fundo=nenhum", "false")]                    # o risco de fogo saiu em 27/10/2026
     sobre = re.findall(r'data-sobre="(\w+)" href="([^"]*)" aria-pressed="(\w+)"', barra)
     assert sobre == [("usinas", f"{URL}?ver=focos,siglas", "true"), ("focos", f"{URL}?ver=usinas,siglas", "true"),
                      ("siglas", f"{URL}?ver=usinas,focos", "true")]
@@ -55,17 +57,18 @@ def test_os_controles_sao_links_que_levam_o_estado_no_endereco(mundo):
 def test_a_camada_de_fundo_escolhida_pelo_endereco_e_o_que_o_svg_desenha(mundo, leituras):
     leituras(avisos=lei_avisos(aviso(3, "Vendaval", ALFA)), focos=lei_focos(foco_a(1.0, DELTA)), risco=lei_risco(risco_baixo()),
              grade=lei_grade(lambda lat, lon: 0.97 if lon > -41.2 else 0.1))
-    s = svg(pagina(mundo, fundo="risco"))
-    assert 'class="mp-calor mp-calor--risco"' in s and 'clip-path="url(#mp-recorte)"' in s and 'class="mp-avisos"' not in s
-    assert s.count("<use href=\"#mp-uf-") == 27 and 'class="mp-divisas"' in s
-    assert re.search(r'<path class="mp-cr mp-cr-5" data-classe="5" stroke-width="[\d.]+" d="M', s)
-    t = texto(pagina(mundo, fundo="risco"))
-    assert f"Risco de fogo do {INPE}" in t and "Crítico acima de 0,95" in t and "Sem cor sem dado" in t
-    d = svg(pagina(mundo, fundo="densidade"))
-    assert 'class="mp-calor mp-calor--densidade"' in d and "focos por 1.000 km²" in texto(pagina(mundo, fundo="densidade"))
+    # o risco de fogo saiu das camadas (27/10/2026): o endereço antigo cai nos avisos e nada do risco é desenhado
+    r = svg(pagina(mundo, fundo="risco"))
+    assert "mp-calor--risco" not in r and 'class="mp-avisos"' in r
+    # a densidade: mancha contínua (os quadrados desfocados) recortada pelo contorno, com a chave de cor de fogo na lateral
+    html = pagina(mundo, fundo="densidade")
+    d = svg(html)
+    assert 'class="mp-calor mp-calor--densidade"' in d and 'clip-path="url(#mp-recorte)"' in d and 'filter="url(#mp-suave)"' in d
+    assert re.search(r'<filter id="mp-suave"[^>]*><feGaussianBlur stdDeviation="[0-9.]+"/></filter>', d)
+    assert d.count('<use href="#mp-uf-') == 27 and 'class="mp-divisas"' in d
+    assert "Densidade de focos · INPE" in texto(html) and "focos por mil km²" in html
     n = svg(pagina(mundo, fundo="nenhum"))
     assert "mp-calor" not in n and 'class="mp-avisos"' not in n and len(re.findall(r'class="mp-ponto ', n)) == 6
-
 
 def test_o_que_vai_por_cima_e_os_niveis_escondidos_vem_como_classe_da_tela(mundo):
     html = pagina(mundo, ver="usinas", ocultar="sem")
@@ -83,9 +86,9 @@ def test_o_evento_escondido_vem_marcado_no_desenho_e_na_legenda(mundo, leituras)
 
 
 def test_o_filtro_de_cliente_do_mapa_e_o_mesmo_da_lista_e_leva_o_resto_do_estado(mundo):
-    html = pagina(mundo, fundo="risco")
+    html = pagina(mundo, fundo="densidade")
     form = re.search(r'<form class="cl-filtro mp-cliente".*?</form>', html, flags=re.S).group(0)
-    assert 'name="cliente"' in form and '<input type="hidden" name="fundo" value="risco">' in form
+    assert 'name="cliente"' in form and '<input type="hidden" name="fundo" value="densidade">' in form
     assert 'data-acao="cliente"' in form and "<noscript>" in form
 
 
@@ -93,7 +96,7 @@ def test_o_filtro_de_cliente_do_mapa_e_o_mesmo_da_lista_e_leva_o_resto_do_estado
 
 def test_a_pagina_marca_as_partes_que_se_trocam_e_a_proxima_leitura(mundo):
     html = pagina(mundo)
-    assert PARTES <= partes(html)
+    assert PARTES | {"chave", "status"} <= partes(html)
     assert re.search(r'data-mapa data-fundo="avisos" data-proxima-s="\d+"', html)
     assert '<noscript><meta http-equiv="refresh" content="60"></noscript>' in html          # sem JavaScript, a recarga de sempre
     assert '<script src="/static/clima-mapa.js" defer></script>' in html
@@ -131,7 +134,7 @@ def test_o_modo_tv_nao_tem_a_casca_e_tem_relogio_camada_e_fontes(mundo):
     assert '<header class="topo">' not in html and 'class="menu"' not in html and "Sair" not in html.split("mp-tv-controles")[0]
     assert re.search(r'<html lang="pt-BR" class="mp-tv-html" data-nexus data-tema="escuro">', html)
     assert "data-tv" in html and 'class="mp-tv-hora"' in html and "mp-tv-camada-nome" in html
-    assert PARTES - {"busca"} <= partes(html)
+    assert PARTES | {"legenda"} <= partes(html)
     t = texto(html)
     assert f"Avisos meteorológicos do {INMET}" in t
     assert re.findall(r'<div class="cl-fonte cl-\w+"><span class="cl-fonte-texto">([^<]*)', html)[0].startswith(INMET)
@@ -150,15 +153,15 @@ def test_o_modo_tv_segue_o_tema(mundo):
     assert 'class="mp-tv-html" data-nexus data-tema="claro"' in pagina(mundo, tv="1")
 
 
-def test_o_giro_do_modo_tv_traz_as_tres_camadas_e_os_tres_titulos(mundo, leituras):
+def test_o_giro_do_modo_tv_traz_as_duas_camadas_e_os_dois_titulos(mundo, leituras):
     leituras(avisos=lei_avisos(aviso(2, "Tempestade", ALFA)), focos=lei_focos(foco_a(1.0, DELTA)), risco=lei_risco(risco_baixo()),
              grade=lei_grade(lambda lat, lon: 0.8))
     html = pagina(mundo, tv="1", girar="30")
     assert 'data-girar="30"' in html
-    assert [c for c in re.findall(r'class="mp-tv-camada-nome" data-camada="(\w+)"', html)] == ["avisos", "risco", "densidade"]
+    assert [c for c in re.findall(r'class="mp-tv-camada-nome" data-camada="(\w+)"', html)] == ["avisos", "densidade"]
     s = svg(html)
-    assert 'class="mp-avisos" data-camada="avisos"' in s and "mp-calor--risco" in s and "mp-calor--densidade" in s
-    assert len(re.findall(r'<section class="mp-leg-camada" data-camada="(\w+)"', html)) == 3
+    assert 'class="mp-avisos" data-camada="avisos"' in s and "mp-calor--risco" not in s and "mp-calor--densidade" in s
+    assert len(re.findall(r'<section class="mp-leg-camada" data-camada="(\w+)"', html)) == 2
     assert "a cada 30 s" in html and 'aria-pressed="true" role="button">a cada 30 s' in html
 
 
@@ -169,24 +172,18 @@ def test_o_modo_tv_sem_cadastro_diz_e_nao_quebra(app, logado):
 
 # ── a cadeia de verdade: o COG do risco lido na área, por sessão falsa ──────────────────────────────────────────────
 
-def test_cadeia_real_o_risco_de_fogo_sai_do_cog_na_area_e_a_primeira_visita_ouve_lendo(cadeia):
+def test_cadeia_real_sem_a_camada_o_arquivo_grande_do_risco_nem_e_pedido(cadeia):
+    # o risco de fogo saiu das camadas (27/10/2026): mesmo com o endereço antigo, a página não pede a área do Brasil ao INPE (o
+    # T0 por Range continua sendo lido para o pixel de cada usina, que dá a cor dela)
     c, sessao = cadeia
     tarefas = []
     L.usar_executor(tarefas.append)
     try:
-        primeira = pagina(c, URL, fundo="risco")
-        assert "lendo a área do Brasil" in texto(primeira) and 'data-proxima-s="10"' in primeira
-        assert len(tarefas) == 1
-        tarefas.pop()()                                                          # a leitura ao fundo termina
         html = pagina(c, URL, fundo="risco")
-        s = svg(html)
-        assert re.search(r'class="mp-cr mp-cr-1"', s)                            # o 0,05 do COG de mentira é "Mínimo"
-        assert f"{INPE} · risco de fogo: previsão para hoje, do arquivo de 07/10 às 06:32" in texto(html)
-        pedidos = [u for u, _ in sessao.pedidos if "RF.PREV.T0" in u]
-        assert pedidos                                                           # o T0, por Range, como o risco por usina
+        assert "lendo a área do Brasil" not in texto(html) and "mp-calor--risco" not in svg(html)
+        assert not tarefas
     finally:
         L.usar_executor(None)
-
 
 def test_cada_camada_diz_na_legenda_de_quando_e_o_dado(mundo):
     t = texto(pagina(mundo))
