@@ -1216,18 +1216,99 @@ def _texto(est: dict) -> str:
     return f"Gravação parada: {est['motivo']}."
 
 
+# a etapa Gravação da contagem aberta (Levi, 27/10/2026, no desenho do mockup do Spare Parts): uma linha por lote, com a barra
+# e a situação dele, e um registro curto do que DE FATO aconteceu, tirado do controle (nada inventado: o mockup tinha um log
+# de exemplo). Só texto do Nexus: o motivo de cada peça no controle é sempre um dos textos daqui (o do encerramento, com o
+# motivo livre, fica só cifrado no livro), e o login nunca está no controle
+ROTULO_DO_LOTE = {"na_fila": "na fila", "gravando": "gravando", "concluido": "concluído", "parado": "parado",
+                  "encerrado": "encerrado"}
+TOM_DO_LOTE = {"na_fila": "neutro", "gravando": "alerta", "concluido": "ok", "parado": "critico", "encerrado": "neutro"}
+REGISTRO_PECAS_MAX = 12          # as peças em conflito ou com erro no registro; o resto, numa linha ("e mais N")
+_BRT = timezone(timedelta(hours=-3))
+
+
+def _hora_curta(iso) -> str:
+    try:
+        return instante(iso).astimezone(_BRT).strftime("%d/%m %H:%M")
+    except (TypeError, ValueError):
+        return ""
+
+
+def _lotes_da_tela(ctrl: dict, situacao: str, atual: int) -> list[dict]:
+    """Uma linha por lote: as peças, quantas já andaram (escritas, conferidas ou em conflito), a situação (na fila, gravando,
+    concluído, parado, encerrado) e a faixa de códigos."""
+    itens, out = ctrl.get("itens") or {}, []
+    for l in ctrl.get("lotes") or []:
+        ids = list(l.get("itens") or [])
+        estados = [(itens.get(i) or {}).get("estado") for i in ids]
+        if l.get("estado") == "feito":
+            sit = "encerrado" if situacao == "encerrada" else "concluido"
+        elif l.get("n") == atual or l.get("estado") in SESSAO:
+            sit = "gravando" if situacao == "gravando" else "parado"
+        else:
+            sit = "na_fila"
+        andou = sum(1 for e in estados if e not in (None, "pendente", "enviando"))
+        codigos = [(itens.get(i) or {}).get("codigo") or i for i in ids]
+        out.append({"n": l.get("n"), "pecas": len(ids), "andou": andou, "pct": round(100 * andou / len(ids)) if ids else 100,
+                    "gravadas": estados.count("gravada"), "conflitos": estados.count("conflito"), "situacao": sit,
+                    "rotulo": ROTULO_DO_LOTE[sit], "tom": TOM_DO_LOTE[sit], "de": codigos[0] if codigos else "",
+                    "ate": codigos[-1] if codigos else ""})
+    return out
+
+
+def _registro(ctrl: dict, situacao: str, motivo: str) -> list[dict]:
+    """O que aconteceu, do controle, na ordem: a aprovação, a sessão de cada lote (aberta e fechada, com as peças que não
+    gravaram e o porquê) e o fim. `[{"hora", "texto", "tom"}]`; a hora vazia é o passo sem hora própria no controle."""
+    itens, lotes = ctrl.get("itens") or {}, ctrl.get("lotes") or []
+    out = [{"hora": _hora_curta(ctrl.get("aprovada_em")), "tom": "info",
+            "texto": f"Aprovada no Nexus: {len(itens)} {'peça' if len(itens) == 1 else 'peças'} em {len(lotes)} "
+                     f"{'lote' if len(lotes) == 1 else 'lotes'} de até {TAMANHO_LOTE}."}]
+    problemas = [(i, it) for i, it in itens.items() if it.get("estado") in ("conflito", "erro")]
+
+    def pecas(do_lote) -> None:
+        for _, it in [x for x in problemas if x[1].get("lote") == do_lote][:REGISTRO_PECAS_MAX]:
+            out.append({"hora": "", "tom": "critico" if it.get("estado") == "erro" else "alerta",
+                        "texto": f"{it.get('codigo') or 'Peça'}: {it.get('motivo') or it.get('estado')}."})
+        resto = sum(1 for x in problemas if x[1].get("lote") == do_lote) - REGISTRO_PECAS_MAX
+        if resto > 0:
+            out.append({"hora": "", "tom": "", "texto": f"E mais {resto} peças: veja a Auditoria."})
+
+    pecas(None)                                  # o específico preso pela curadoria vira conflito já na aprovação
+    for l in lotes:
+        if l.get("aberto_em"):
+            out.append({"hora": _hora_curta(l["aberto_em"]), "tom": "",
+                        "texto": f"Lote {l['n']}: ajuste {l.get('ref') or ''} aberto no Fracttal (o almoxarifado trava "
+                                 "entradas e saídas até fechar)."})
+        if l.get("estado") == "feito":
+            ids = l.get("itens") or []
+            g = sum(1 for i in ids if (itens.get(i) or {}).get("estado") == "gravada")
+            c = sum(1 for i in ids if (itens.get(i) or {}).get("estado") == "conflito")
+            out.append({"hora": "", "tom": "ok", "texto": f"Lote {l['n']} fechado e relido: {g} "
+                                                         f"{'gravada' if g == 1 else 'gravadas'}, {c} em conflito."})
+        pecas(l.get("n"))
+    if situacao in ("parada", "concluida", "encerrada") and ctrl.get("fim"):
+        fim = {"concluida": ("ok", "Gravação concluída."), "encerrada": ("", f"Gravação {motivo}."),
+               "parada": ("critico", f"Gravação parada: {motivo}.")}[situacao]
+        out.append({"hora": _hora_curta(ctrl.get("fim")), "tom": fim[0], "texto": fim[1]})
+    elif situacao == "parada":
+        out.append({"hora": "", "tom": "critico", "texto": f"Gravação parada: {motivo}."})
+    return out
+
+
 def estado(cfg, contagem_id: str) -> dict | None:
     """O andamento da gravação desta contagem, ou None se ela não tem. `{"estado": "gravando" | "parada" | "concluida" |
     "encerrada", "motivo", "feitas" (peças já escritas no Fracttal), "gravadas" (conferidas na releitura), "total",
     "conflitos", "erros", "lote" (o lote em curso), "lotes", "travado" (parada com a sessão talvez aberta), "aviso" (o aviso
-    forte), "parada_desde" (ISO UTC, ou ""), "texto"}`. O controle que diz "gravando" sem a gravação viva neste processo (o
-    Nexus reiniciou) é "parada"."""
+    forte), "parada_desde" (ISO UTC, ou ""), "texto", "lotes_tela" (uma linha por lote, `_lotes_da_tela`), "registro" (o que
+    aconteceu, `_registro`)}`. O controle que diz "gravando" sem a gravação viva neste processo (o Nexus reiniciou) é
+    "parada"."""
     cid = A._txt(contagem_id)
     try:
         ctrl = _controle(cfg, cid)
     except Recusada as ex:
         est = {"estado": "parada", "motivo": str(ex), "feitas": 0, "gravadas": 0, "total": 0, "conflitos": 0, "erros": 0,
-               "lote": 0, "lotes": 0, "travado": True, "aviso": str(ex), "parada_desde": ""}
+               "lote": 0, "lotes": 0, "travado": True, "aviso": str(ex), "parada_desde": "", "lotes_tela": [],
+               "registro": [{"hora": "", "tom": "critico", "texto": str(ex)}]}
         return dict(est, texto=_texto(est))
     if ctrl is None:
         return None
@@ -1244,7 +1325,8 @@ def estado(cfg, contagem_id: str) -> dict | None:
            "gravadas": conta("gravada"), "total": len(itens), "conflitos": conta("conflito"), "erros": conta("erro"),
            "lote": atual, "lotes": len(lotes), "travado": travado,
            "aviso": AVISO_TRAVADO.format(almox=ctrl.get("almox_nome") or "O almoxarifado") if travado else "",
-           "parada_desde": _iso(_parada_desde(ctrl)) if situacao == "parada" and _parada_desde(ctrl) else ""}
+           "parada_desde": _iso(_parada_desde(ctrl)) if situacao == "parada" and _parada_desde(ctrl) else "",
+           "lotes_tela": _lotes_da_tela(ctrl, situacao, atual), "registro": _registro(ctrl, situacao, motivo)}
     est["texto"] = _texto(est)
     return est
 

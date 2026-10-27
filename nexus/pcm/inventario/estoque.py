@@ -233,9 +233,10 @@ class Estoque(abc.ABC):
 
     @abc.abstractmethod
     def ler(self, id_almox: str) -> dict[str, dict]:
-        """As peças ligadas ao almoxarifado: `{id_item: {"saldo", "minimo", "maximo", "ligacao", "codigo", "unidade"}}`.
-        Saldo, mínimo e máximo são número ou None (o Fracttal não disse: nunca 0); a `unidade` é o `units_description` da
-        linha (UNIDADE, METRO, MASSA), vazia quando ele não diz. A peça nunca ligada não vem."""
+        """As peças ligadas ao almoxarifado: `{id_item: {"saldo", "minimo", "maximo", "ligacao", "codigo", "unidade",
+        "criticidade"}}`. Saldo, mínimo e máximo são número ou None (o Fracttal não disse: nunca 0); a `unidade` é o
+        `units_description` da linha (UNIDADE, METRO, MASSA) e a `criticidade` o `groups_1_description` ("1.Crítico",
+        "2.Necessário", ...), os dois vazios quando ele não diz. A peça nunca ligada não vem."""
 
     @abc.abstractmethod
     def ligar(self, id_almox: str, id_item: str) -> str:
@@ -441,7 +442,9 @@ class EstoqueFracttal(Estoque):
                           "maximo": _numero_lido(l.get("max_stock_level"), "max_stock_level", SALDOS),
                           "ligacao": str(l["id"]), "codigo": str(l.get("code") or ""),
                           # a régua (Task 8) arredonda por ela: METRO e MASSA aceitam duas casas, UNIDADE é inteira
-                          "unidade": str(l.get("units_description") or "").strip()}
+                          "unidade": str(l.get("units_description") or "").strip(),
+                          # a coluna Crit. da aprovação (27/10/2026): o grupo 1 da peça no Fracttal é a criticidade dela
+                          "criticidade": str(l.get("groups_1_description") or "").strip()}
             ligacoes[item] = str(l["id"])
         self._ligacoes[str(_id(id_almox))] = ligacoes
         return lido

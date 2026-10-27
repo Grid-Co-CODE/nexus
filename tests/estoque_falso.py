@@ -68,9 +68,9 @@ def _operacao(f):
 
 class EstoqueFalso(Estoque):
     def __init__(self, saldos: dict, *, perder_resposta=(), limite_em=None, expirar_em=None, agora=None):
-        """`saldos`: `{id_almox: {id_item: saldo}}`, ou o item como `{"saldo", "minimo", "maximo", "codigo", "unidade"}`
-        quando o teste precisa da régua, do código ou da unidade (o que falta é None, e o código e a unidade, vazios). Todo
-        item de `saldos` já está ligado."""
+        """`saldos`: `{id_almox: {id_item: saldo}}`, ou o item como `{"saldo", "minimo", "maximo", "codigo", "unidade",
+        "criticidade"}` quando o teste precisa da régua, do código, da unidade ou da criticidade (o que falta é None, e o
+        código, a unidade e a criticidade, vazios). Todo item de `saldos` já está ligado."""
         self._itens: dict[str, dict[str, dict]] = {}
         self._n_ligacao = 9_000_000
         for id_almox, itens in saldos.items():
@@ -81,7 +81,7 @@ class EstoqueFalso(Estoque):
                     "minimo": None if v.get("minimo") is None else float(v["minimo"]),
                     "maximo": None if v.get("maximo") is None else float(v["maximo"]),
                     "ligacao": str(v.get("ligacao") or self._nova_ligacao()), "codigo": str(v.get("codigo") or ""),
-                    "unidade": str(v.get("unidade") or "")}
+                    "unidade": str(v.get("unidade") or ""), "criticidade": str(v.get("criticidade") or "")}
         self._modos: dict[str, int] = {}
         self._pendentes: set[str] = set()                           # finalizado, modo 0 pendente
         self._sessoes: dict[str, dict[str, float | None]] = {}      # almoxarifado -> {id_item: saldo de quando mexeu}
@@ -213,7 +213,8 @@ class EstoqueFalso(Estoque):
         ligacao = self._nova_ligacao()
         criada = self._catalogo.get(i, {})                        # a peça criada por `criar_peca` leva o código e a unidade
         self._itens.setdefault(a, {})[i] = {"saldo": 0.0, "minimo": 0.0, "maximo": 0.0, "ligacao": ligacao,
-                                            "codigo": criada.get("codigo", ""), "unidade": criada.get("unidade", "")}
+                                            "codigo": criada.get("codigo", ""), "unidade": criada.get("unidade", ""),
+                                            "criticidade": ""}
         return ligacao
 
     @_operacao

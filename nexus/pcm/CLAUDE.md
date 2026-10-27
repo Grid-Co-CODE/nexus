@@ -457,18 +457,20 @@ Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaix
 1. **O App** (a sessão do App, pelo contrato de 14 colunas): o técnico conta às cegas (sem ver o saldo) e o App publica
    `almoxarifado_contagens_app_campo`. O que ele acha fora do catálogo e o genérico que identifica vão como linhas próprias.
 2. **Inventário** (`/t/pcm/pecas/inventario`): a lista das contagens, com o estado de cada uma pelos eventos do livro. Abrir uma
-   mostra o que o técnico contou; o Sistema (lido NA HORA no Fracttal), o Δ, a situação e os seis grupos chegam pela ponte
-   (`GET /os/_nexus/inventario/<id>/lote`), com o botão "Gravar N alterações".
+   é a contagem nas quatro etapas (Contagem, Aprovação, Gravação, Auditoria; a seção da aba Inventário, "O visual"); o Sistema
+   (lido NA HORA no Fracttal), o Δ, a situação e os seis grupos chegam pela ponte (`GET /os/_nexus/inventario/<id>/lote`), com o
+   botão "Gravar N alterações".
 3. **Revisão:** tirar uma peça do lote, corrigir o número ou pedir a recontagem, sempre com o motivo (cifrado). Só grava no
    livro do inventário. **Curadoria** (`.../curadoria`): o achado fora do catálogo (cadastrar no Fracttal pela ponte, é a peça X,
    descartar) e o genérico (confirmar o específico); a quantidade entra no lote da contagem.
 4. **Gravar:** a ponte confere o N e a assinatura do lote que a tela mostrou, relê o saldo e começa a gravação em segundo plano,
-   por sessão de ajuste do almoxarifado (lotes de 50; a peça que se moveu depois da contagem vira conflito e não grava). A página
-   acompanha pelo `estado.json`; a parada mostra o "Continuar" a quem aprovou (e o aviso forte se o almoxarifado ficou travado),
+   por sessão de ajuste do almoxarifado (lotes de 50; a peça que se moveu depois da contagem vira conflito e não grava). A etapa
+   Gravação acompanha pelo `estado.json` (os números, uma linha por lote e o que aconteceu); a parada mostra o "Continuar" a quem aprovou (e o aviso forte se o almoxarifado ficou travado),
    e o "Encerrar" fecha a que ninguém vai continuar.
 5. **Mínimo e máximo** (`.../regua`): a sugestão, o recomendado (Grid, só no livro) e o acordado (cliente), o único que vai ao
    Fracttal, pela ponte.
-6. **Auditoria** (`.../auditoria`): todos os eventos do livro, com o filtro por tipo e a busca.
+6. **Auditoria** (`.../auditoria`): todos os eventos do livro, com o filtro por tipo e a busca; os de uma contagem, na etapa 4
+   dela.
 
 **As regras que valem em todas as partes:** tudo o que lê ou grava no Fracttal roda na ponte `/os/_nexus/inventario/...` (o cookie
 do login dele só chega em /os); só o administrador e o setor PCM (`pode_programar`) leem o saldo, revisam e gravam, e só de uma
@@ -529,7 +531,9 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
 - **Para que serve:** é a ÚNICA porta de leitura e gravação de estoque no Fracttal. A gravação, a régua e a curadoria só
   chamam os métodos do `Estoque` (o contrato; a `EstoqueFracttal` o cumpre, e o `EstoqueFalso` dos testes também); nenhuma
   tela fala `inventories.*` direto. Todo id é texto; `ler` devolve `{id_item: {saldo, minimo, maximo, ligacao, codigo}}`,
-  com o que o Fracttal não disse como None, nunca 0.
+  com o que o Fracttal não disse como None, nunca 0. A `criticidade` (27/10/2026, a coluna Crit. da aprovação) é o
+  `groups_1_description` da linha de saldo ("1.Crítico", "2.Necessário", "3.Importante"), vazia quando ele não diz. **Não foi
+  provada no Fracttal de verdade:** a linha do passo 0 não a lista; se o campo não vier, a coluna mostra "–", nunca um nível.
 - **O ajuste é uma SESSÃO do almoxarifado, não um movimento por peça:** `abrir_ajuste` (modo 2) → `gravar_saldo` (o saldo
   ABSOLUTO de cada peça, idempotente) → `fechar_ajuste(referencia)` (a referência `INVENTARIO-<h>-L<n>` vai na
   `description`). Ao fechar, o Fracttal gera, por peça mexida, um par de movimentos do tipo 15 (saída do saldo antigo
@@ -700,11 +704,24 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   de `/os` o portão do Nexus também confere o cookie: a sessão que nasceu do login do Fracttal e já não tem o JWT é ENCERRADA
   (401 JSON com `sessao_encerrada` e `entrar` para o fetch); a que nasceu da Microsoft não cai, e é ela que chega ao 401 da ponte
   com o link do `/os/login`.
+- **O visual (Levi, 27/10/2026: "as páginas queria nesse estilo porém design do nexus"):** a ESTRUTURA do mockup do Spare Parts
+  (`.superpowers/sdd/2026-10-26-inventario-almoxarifado/visual-rulings.md`), as cores e a fonte do Nexus (só token, nunca o lilás).
+  A contagem aberta é uma barra de QUATRO ETAPAS (um `tablist`; a aberta segue o estado: a que espera o PCM abre na Aprovação para
+  quem lê o saldo e na Contagem para os outros, a gravando na Gravação, a gravada na Auditoria; "agora" marca a do estado; trocar não
+  recarrega e o endereço guarda a etapa, `#aprovacao`): **1 · Contagem** (os números, a cobertura e as maiores divergências, que vêm
+  da ponte, as peças contadas e as regras), **2 · Aprovação** (os seis números, o Código · Peça · Crit. · Sistema · Contado · Δ ·
+  Situação com a busca e o filtro do `filtro-local.js`, e o "Revisar lote", que abre os seis grupos com o resumo e o "Gravar N
+  alterações"), **3 · Gravação** (os números, uma linha por lote, o que aconteceu pelo controle, o aviso de travado, Continuar e
+  Encerrar, e o que acontece em cada peça) e **4 · Auditoria** (os eventos só dela, a tabela da Auditoria geral). O celular da tela 1
+  do mockup é o App e não entra. A lista, a Auditoria geral, a régua e a curadoria usam os mesmos componentes (`.inv-*` no
+  `pcm.css`: os números do alto, o cartão com cabeçalho, a faixa da tabela, o selo). Abaixo de 640 px as tabelas viram cartões e a
+  barra das etapas rola na horizontal. Prova: `test_o_lote_no_desenho_do_mockup` e `test_a_contagem_nas_quatro_etapas`.
 - **A página e o lote.** A PÁGINA (`revisao.montar`) mostra o que o técnico contou, o estado, os avisos, o "Pedir recontagem" e o
   painel de revisão, e NÃO lê o Fracttal. O que depende dele (`revisao.montar_lote`, desenhado pelo parcial
-  `pcm/_inventario_lote.html`: os seis números, o Sistema × Contado × Δ × Situação, os seis grupos e o botão de gravar) a página busca
-  por `fetch(nexusRota(...))` em **`GET /os/_nexus/inventario/<id>/lote`** (HTML pronto, `Cache-Control: no-store`), dizendo "lendo o
-  saldo do Fracttal…" enquanto espera, e troca o que o técnico contou por ele. O Sistema é lido NA HORA, não o da varredura da
+  `pcm/_inventario_lote.html`: a cobertura e as divergências da etapa 1 no bloco `data-ponte-para="contagem"`, e a etapa 2 inteira)
+  a página busca por `fetch(nexusRota(...))` em **`GET /os/_nexus/inventario/<id>/lote`** (HTML pronto, `Cache-Control: no-store`),
+  dizendo "lendo o saldo do Fracttal…" enquanto espera, e distribui entre as duas etapas (o `filtro-local.js` carrega depois que o
+  pedaço chega, para ligar a busca dele). O Sistema é lido NA HORA, não o da varredura da
   madrugada (o saldo muda durante o dia): uma leitura do almoxarifado inteiro pelo adaptador, com o login de quem pede. Respostas da
   ponte: 200 o HTML; **401** sem o login do Fracttal (`{"erro": "Para ler o saldo e gravar, entre pelo Fracttal.", "login": o
   /os/login com a volta para a página}`; a página mostra "entre pelo Fracttal para ver o saldo do sistema e gravar" com o link); 403
@@ -717,8 +734,10 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   `os_sessao` com `Path=/os`, e só troca o `requests.post` do `api` do clone: a rota da ponte vê o login e lê o Sistema, uma rota
   `/t/pcm/...` não (e com o `Path=/` de controle ela veria). Toda tarefa nova que use o Fracttal deve ter um teste assim.
 - **Os seis grupos da confirmação** (`contas.SITUACOES`): para cima, para baixo, zerar, sem alteração, não será tocada e curadoria;
-  só os três primeiros mexem no estoque, e o botão "Gravar N alterações" conta só eles, sem a peça tirada. **O zerar abre aberto e
-  destacado** (é a única ação que apaga estoque). A peça tirada do lote vai a "não será tocada" com o motivo; a de contado negativo
+  só os três primeiros mexem no estoque, e o botão "Gravar N alterações" conta só eles, sem a peça tirada. Ficam atrás do "Revisar
+  lote" (escondidos até ele; a revisão que recarrega a página volta com eles abertos), cada um com o selo do que vai ao Fracttal
+  ("grava", "grava · atenção", "não grava"). **O zerar abre aberto e destacado** (é a única ação que apaga estoque), e o "não será
+  tocada" também abre aberto (é o que fica como está). A peça tirada do lote vai a "não será tocada" com o motivo; a de contado negativo
   também, com "contado inválido" até o PCM corrigir (corrigida, ela entra no lote e a nota diz "o técnico contou um valor inválido;
   o PCM corrigiu para X"). A peça nunca ligada ao almoxarifado mostra no Sistema "não ligada (0)" e a nota "será ligada ao gravar";
   a ligada com o saldo vazio, "não informado", sem Δ (um "+5" contra um 0 que o Fracttal não disse seria inventado; a nota diz que
@@ -756,7 +775,10 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   números certos; o login que falta, o 429 e a queda; a ponte com o cookie de verdade; cada ação com o evento e o motivo só cifrado,
   as recusas, o exagero, o 403 dos outros setores e de outro site, a aba, as cores só por token e os endereços pela `{{ raiz }}`);
   mutações em cada regra acima, todas pegas. Provada no navegador em 26/10/2026 numa cópia de prova com o `EstoqueFalso` (a seção do
-  fluxo, "Como provar"), a 1366 e 375 px, escuro e claro: o lote pela ponte, o painel de revisão, a correção que muda a situação.
+  fluxo, "Como provar"), a 1366 e 375 px, escuro e claro: o lote pela ponte, o painel de revisão, a correção que muda a situação. O
+  visual de 27/10/2026, na mesma cópia com uma contagem em cada estado (nova; gravando com o lote 2 parado; gravada com um conflito):
+  as quatro etapas, a lista, a Auditoria geral, a régua e a curadoria, a 1366 e 375 px, escuro e claro, a troca de etapa, a busca e
+  o filtro, o "Revisar lote", o "Gravar" e o "Continuar" de ponta a ponta.
 
 ## Inventário do almoxarifado: o livro (`nexus/dados/fato_inventario.py`; 26/10/2026)
 
@@ -1019,8 +1041,13 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
   vê o login, a rota `/t/pcm/...` não. Provada no navegador em 26/10/2026 numa cópia de prova com o `EstoqueFalso` (1366 e 375 px,
   escuro e claro): o "Gravar" pelo pedaço do lote, a peça mexida depois da contagem em conflito, o login que expira com a sessão
   aberta (o aviso forte na contagem e na lista), o "Encerrar" recusado em modo 2 e o "Continuar" que termina (6 gravadas, 1 em
-  conflito, o par de movimentos com a referência da contagem, o almoxarifado de volta ao modo 0). A página da contagem gravada com
-  conflito aponta as peças na Auditoria (filtrada pela contagem). **Provada no Fracttal de verdade em 27/10/2026** (o
+  conflito, o par de movimentos com a referência da contagem, o almoxarifado de volta ao modo 0). A contagem gravada com conflito
+  abre na etapa Auditoria e aponta as peças nela (`?tipo=conflito#auditoria`). **O que a etapa Gravação mostra** (`estado`, também no
+  `estado.json`): `lotes_tela` (uma linha por lote: as peças, quantas andaram, na fila, gravando, concluído, parado ou encerrado) e
+  `registro` (o que aconteceu, do controle: a aprovação, a sessão de cada lote com a referência, o fechamento com as gravadas e as em
+  conflito, cada peça que não gravou com o porquê e o fim), só com texto do Nexus: o motivo livre do encerramento fica cifrado no
+  livro e o login nunca está no controle. Terminada ou parada, a página recarrega na etapa Gravação (`#gravacao`). Prova:
+  `test_o_estado_traz_os_lotes_e_o_que_aconteceu` e `test_o_estado_da_gravacao_parada_diz_o_lote_parado`. **Provada no Fracttal de verdade em 27/10/2026** (o
   almoxarifado de teste, a cópia de prova com o login do Levi): 5 → 3 e 0 → 1 com a peça ligada antes de abrir, a referência
   `INVENTARIO-PROVA-TST-1-L1` (o formato de antes do `h`), os movimentos MOV-7 (as saídas) e MOV-8 (as entradas), a releitura
   e os `peca_gravada` com o movimento 7. O que ela não passou está na seção do fluxo, "Falta".
@@ -1030,10 +1057,14 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
 O desenho (4.6): uma linha por evento, que nunca muda, e o histórico com que o PCM defende o mínimo. Tela
 `/t/pcm/pecas/inventario/auditoria` (sub-rota da tela `pecas`, do setor PCM; outros, pela marca).
 
-- **O que mostra:** os eventos do `fato_evento_inventario`, do mais novo ao mais velho: a hora de Brasília, o tipo
-  (`ROTULO_EVENTO`, um nome para cada `fato_inventario.TIPOS_EVENTO`; a cor só reforça a palavra: verde o que foi ao Fracttal,
-  âmbar o conflito e a recontagem, vermelho o erro), o almoxarifado e a peça (os nomes vêm dos livros do App, numa cópia de 5 min;
-  sem eles, o ID), a contagem (link para ela) e os números (de para; na régua, o mínimo; o movimento do Fracttal e o lote).
+- **O que mostra** (Quando · Evento · Onde · Peça · Alteração · Quem · Lote · Retorno do Fracttal, a tabela do mockup em
+  `pcm/_inventario_auditoria.html`, a mesma da etapa 4 da contagem, que não tem o "Onde"): os eventos do `fato_evento_inventario`,
+  do mais novo ao mais velho: a hora de Brasília, o tipo (`ROTULO_EVENTO`, um nome para cada `fato_inventario.TIPOS_EVENTO`, no selo
+  da família, `SELO_EVENTO`: a gravação no Fracttal em verde, a curadoria em âmbar, a aprovação e a revisão em azul, o conflito e o
+  erro em vermelho; a cor só reforça a palavra), o almoxarifado e a contagem (link para a etapa Auditoria dela), a peça (os nomes vêm
+  dos livros do App, numa cópia de 5 min; sem eles, o ID), os números (de para; na régua, o mínimo), o lote e o retorno do Fracttal
+  (o movimento da peça gravada, a régua gravada, a peça cadastrada, "não gravada" no conflito; o resto do livro é do Nexus, "—").
+  `montar_auditoria(..., contagem_id=)` dá só os de uma contagem.
 - **O motivo nunca:** é texto livre e mora só cifrado no livro; a linha diz "motivo cifrado", e a contagem aberta o mostra a quem
   revisa. **Quem fez, só para quem pode revisar** (`pode_programar`): o nome sai da ficha do cadastro pelo `pessoa_id` (sem a
   ficha, "ficha N do cadastro" ou "sem ficha no cadastro"); para os outros setores a coluna nem existe, e o nome não entra na busca.

@@ -125,11 +125,11 @@ def test_ler_monta_saldo_minimo_maximo_e_ligacao():
     lido = estoque(fr, pagina=2).ler(ALMOX)
     assert lido == {
         "53248312": {"saldo": 5.0, "minimo": 1.0, "maximo": 4.0, "ligacao": LIGACAO, "codigo": "SP-TST-001",
-                     "unidade": ""},
+                     "unidade": "", "criticidade": ""},
         "53248313": {"saldo": None, "minimo": None, "maximo": None, "ligacao": "15535398", "codigo": "SP-TST-002",
-                     "unidade": ""},
+                     "unidade": "", "criticidade": ""},
         "53248314": {"saldo": 0.0, "minimo": 0.0, "maximo": 0.0, "ligacao": "15535399", "codigo": "SP-TST-003",
-                     "unidade": ""},
+                     "unidade": "", "criticidade": ""},
     }
     assert lido["53248312"]["saldo"] is not None and lido["53248314"]["saldo"] == 0 and lido["53248313"]["saldo"] is None
     assert [(p["page"], p["start"], p["limit"]) for _, p in fr.pedidos] == [(1, 0, 2), (2, 2, 2)]
@@ -139,6 +139,18 @@ def test_ler_nao_pede_a_pagina_depois_do_total():
     """A página cheia que fecha o `total` é a última: pedir mais gastaria a cota da empresa (200/min) à toa."""
     fr = Fracttal({SALDOS: em_paginas([PECA_DE_TESTE, linha_de_saldo("15535398", "53248313", "SP-TST-002", 1, 0, 0)])})
     assert len(estoque(fr, pagina=2).ler(ALMOX)) == 2 and len(fr.pedidos) == 1
+
+
+def test_ler_traz_a_criticidade_da_peca():
+    """A coluna Crit. da aprovação (27/10/2026): o `groups_1_description` da linha de saldo ("1.Crítico", "2.Necessário",
+    "3.Importante") é a criticidade da peça, sem pedido a mais; o que o Fracttal não diz é vazio, nunca um nível chutado. O
+    falso guarda a que o teste der."""
+    critica = dict(PECA_DE_TESTE, groups_1_description=" 1.Crítico ")
+    sem = linha_de_saldo("15535398", "53248313", "SP-TST-002", 1, 0, 0)
+    lido = estoque(Fracttal({SALDOS: em_paginas([critica, sem])})).ler(ALMOX)
+    assert lido[ITEM]["criticidade"] == "1.Crítico" and lido["53248313"]["criticidade"] == ""
+    falso = EstoqueFalso({ALMOX: {ITEM: {"saldo": 3, "criticidade": "2.Necessário"}, "2": 1}})
+    assert falso.ler(ALMOX)[ITEM]["criticidade"] == "2.Necessário" and falso.ler(ALMOX)["2"]["criticidade"] == ""
 
 
 def test_ler_traz_a_unidade_da_peca():
@@ -704,7 +716,9 @@ def test_falso_le_a_unidade_como_o_adaptador():
     f = EstoqueFalso({ALMOX: {ITEM: {"saldo": 3, "unidade": "METRO", "codigo": "SP-TST-001"}, "2": 1}})
     lido = f.ler(ALMOX)
     assert lido[ITEM]["unidade"] == "METRO" and lido["2"]["unidade"] == ""
-    assert set(lido[ITEM]) == {"saldo", "minimo", "maximo", "ligacao", "codigo", "unidade"}
+    assert set(lido[ITEM]) == {"saldo", "minimo", "maximo", "ligacao", "codigo", "unidade", "criticidade"}
+    # as chaves do de verdade, pela linha de saldo do passo 0: o falso não pode ter uma a mais nem a menos
+    assert set(estoque(Fracttal({SALDOS: em_paginas([PECA_DE_TESTE])})).ler(ALMOX)[ITEM]) == set(lido[ITEM])
     novo = f.criar_peca("SP-TST-009", "Peça nova", "METRO")
     f.ligar(ALMOX, novo)
     assert f.ler(ALMOX)[novo]["unidade"] == "METRO"
@@ -796,7 +810,7 @@ def test_falso_ligar_regua_peca_e_o_que_se_moveu():
     est = falso()
     ligacao = est.ligar(ALMOX, "777")
     assert est.ler(ALMOX)["777"] == {"saldo": 0.0, "minimo": 0.0, "maximo": 0.0, "ligacao": ligacao, "codigo": "",
-                                     "unidade": ""}
+                                     "unidade": "", "criticidade": ""}
     with pytest.raises(E.ErroFracttal):
         est.ligar(ALMOX, "777")                          # já ligada: o Fracttal não liga duas vezes a mesma peça
     est.definir_regua(ALMOX, ITEM, 2, None)

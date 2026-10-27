@@ -8,17 +8,22 @@
    Nexus propõe pela régua de 14/10 e o PCM muda peça a peça. Três números por peça: a sugestão (calculada), o recomendado
    (a Grid, só no Nexus) e o acordado (o cliente, o único que vai ao Fracttal). As contas e o livro estão em
    nexus/pcm/inventario/regua.py. Abaixo de 640 px as linhas viram cartões (o data-r é o rótulo de cada valor, como no
-   Almoxarifado). O formulário de cada peça fica no fim da linha, e os campos apontam para ele pelo atributo form. #}
-<div class="pg alm rg">
+   Almoxarifado). O formulário de cada peça fica no fim da linha, e os campos apontam para ele pelo atributo form. Desde
+   27/10/2026 com os componentes das outras partes do inventário (o mockup do Spare Parts, no design do Nexus): os números do
+   alto, o cartão com a tabela e o selo do que está no Fracttal; a estrutura é a mesma. #}
+<div class="pg alm inv rg">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
 <h1 class="titulo-pagina">Mínimo e máximo</h1>
 {# as partes do almoxarifado: a fila das abas, com as quatro do inventário juntas (pcm/_almox_abas.html) #}
 {% set aba_inventario = 'regua' %}
 {% include "pcm/_almox_abas.html" %}
-<p class="pcm-sub">A régua de 14/10: o mínimo é 20% do saldo e o máximo é o dobro; a peça avariada (código com -AV) fica sem
-  mínimo e com o triplo. Unidade inteira arredonda o mínimo para cima; metro e massa têm duas casas. O
-  <b>recomendado</b> é o da Grid e fica só aqui, como histórico. O <b>acordado</b> é o do cliente: é o único que vai ao
-  Fracttal (o mínimo dispara o alarme), e só quando você manda gravar.</p>
+<div class="inv-tela-cab">
+  <h2>Mínimo e máximo</h2>
+  <p>A régua de 14/10: o mínimo é 20% do saldo e o máximo é o dobro; a peça avariada (código com -AV) fica sem
+    mínimo e com o triplo. Unidade inteira arredonda o mínimo para cima; metro e massa têm duas casas. O
+    <b>recomendado</b> é o da Grid e fica só aqui, como histórico. O <b>acordado</b> é o do cliente: é o único que vai ao
+    Fracttal (o mínimo dispara o alarme), e só quando você manda gravar.</p>
+</div>
 
 <div data-ponte-aviso aria-live="polite"></div>
 {% if ok %}<div class="cn-certo" role="status"><span><b>{{ ok }}</b></span></div>{% endif %}
@@ -27,14 +32,14 @@
 {% if erro_fonte %}<div class="cn-erro" role="alert">Uma fonte não respondeu agora: {{ erro_fonte }}</div>{% endif %}
 
 {% if estado == 'sem_livro' %}
-<p class="pcm-sub alm-vazio">O App ainda não publica o almoxarifado. Quando a varredura diária do inventário do Fracttal
-  chegar ao banco, as peças de cada almoxarifado aparecem aqui.</p>
+<div class="inv-vazio"><p><b>O App ainda não publica o almoxarifado.</b> Quando a varredura diária do inventário do Fracttal
+  chegar ao banco, as peças de cada almoxarifado aparecem aqui.</p></div>
 {% elif estado == 'incoerente' %}
 <div class="cn-erro cn-aviso" role="status">{{ aviso_varredura }}</div>
 {% else %}
 {% if aviso_varredura %}<div class="cn-erro cn-aviso" role="status">{{ aviso_varredura }}</div>{% endif %}
 
-<h2 class="rg-sub">Almoxarifado</h2>
+<h3 class="rg-sub">Almoxarifado</h3>
 <ul class="rg-almoxes">
   {% for a in almoxes %}
   <li><a href="{{ raiz }}/t/pcm/pecas/inventario/regua?almox={{ a.id }}"{% if almox and almox.id == a.id %} aria-current="page"{% endif %}>
@@ -43,12 +48,20 @@
 </ul>
 
 {% if almox %}
-<section class="alm-painel" aria-label="Régua de {{ almox.nome }}">
-  <h2>{{ almox.nome }}</h2>
-  <p class="alm-ajuda">O saldo é o da última contagem gravada; sem ela, o da varredura do App. Registrar guarda a decisão no
-    Nexus. Gravar no Fracttal manda só o acordado registrado, no seu login, e confere relendo.</p>
+{% set com_acordo = linhas|rejectattr('acordado', 'equalto', (none, none))|list %}
+<div class="inv-tiles" aria-label="Resumo da régua de {{ almox.nome }}">
+  <div class="inv-tile"><b class="inv-tile-v">{{ linhas|length }}</b><span class="inv-tile-r">Peças</span></div>
+  <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ com_acordo|length }}</b><span class="inv-tile-r">Com acordado</span></div>
+  <div class="inv-tile inv-tile--ok"><b class="inv-tile-v">{{ com_acordo|selectattr('gravado')|list|length }}</b><span class="inv-tile-r">Gravadas no Fracttal</span></div>
+  <div class="inv-tile inv-tile--alerta"><b class="inv-tile-v">{{ com_acordo|rejectattr('gravado')|list|length }}</b><span class="inv-tile-r">Acordado a gravar</span></div>
+</div>
+<section class="inv-card" aria-label="Régua de {{ almox.nome }}">
+  <div class="inv-card-cab"><h3>{{ almox.nome }}</h3>
+    <span class="inv-card-nota">O saldo é o da última contagem gravada; sem ela, o da varredura do App. Registrar guarda a decisão no
+      Nexus. Gravar no Fracttal manda só o acordado registrado, no seu login, e confere relendo.</span></div>
   {% if linhas %}
-  <table class="alm-t rg-t">
+  <div class="inv-tw">
+  <table class="alm-t inv-t rg-t">
     <thead><tr><th>Peça</th><th class="num">Saldo</th><th>Sugestão</th><th>Recomendado (Grid)</th><th>Acordado (cliente)</th>
       <th class="num">Mínimo no Fracttal</th><th>Gravar</th></tr></thead>
     <tbody>
@@ -56,7 +69,7 @@
     {% set f = 'rg-' ~ x.id_item %}
     <tr data-peca="{{ x.id_item }}">
       <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ x.codigo or x.id_item }}</span>
-        <span class="alm-det">{{ x.nome }}{% if x.avariada %} · <span class="alm-aviso">avariada</span>{% endif %}{% if x.unidade %} · {{ x.unidade|lower }}{% endif %}</span></span></td>
+        <span class="alm-det">{{ x.nome }}{% if x.avariada %} <span class="inv-selo inv-selo--alerta">avariada</span>{% endif %}{% if x.unidade %} · {{ x.unidade|lower }}{% endif %}</span></span></td>
       <td class="num" data-r="Saldo">{% if x.saldo is none %}<span class="alm-v"><span class="mudo">não informado</span></span>
         {% else %}<span class="alm-v">{{ fmt(x.saldo) }}<span class="alm-det">{{ x.saldo_de }}</span></span>{% endif %}</td>
       <td data-r="Sugestão"><span class="alm-v rg-sug">
@@ -78,9 +91,9 @@
       <td class="num" data-r="Mínimo no Fracttal"><span class="alm-v">{% if x.no_fracttal_min is none %}<span class="mudo">—</span>{% else %}{{ fmt(x.no_fracttal_min) }}{% endif %}
         <span class="alm-det">da varredura do App</span></span></td>
       <td data-r="Gravar"><span class="alm-v rg-acao">
-        {% if x.acordado[0] is none and x.acordado[1] is none %}<span class="mudo">registre o acordado</span>
-        {% elif x.gravado %}<span class="alm-ok">gravado no Fracttal</span>
-        {% else %}<span class="alm-aviso">acordado ainda não gravado</span>{% endif %}
+        {% if x.acordado[0] is none and x.acordado[1] is none %}<span class="inv-selo inv-selo--neutro">registre o acordado</span>
+        {% elif x.gravado %}<span class="inv-selo inv-selo--ok">gravado no Fracttal</span>
+        {% else %}<span class="inv-selo inv-selo--alerta">acordado ainda não gravado</span>{% endif %}
         {% if pode %}
         <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" form="{{ f }}">Registrar</button>
         {% if not (x.acordado[0] is none and x.acordado[1] is none) %}
@@ -98,15 +111,16 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
   {% elif not erro_livro %}
-  <p class="pcm-sub">Nenhuma peça com saldo neste almoxarifado na varredura do App.</p>
+  <p class="mudo inv-card-corpo">Nenhuma peça com saldo neste almoxarifado na varredura do App.</p>
   {% endif %}
-  {% if pode %}<p class="alm-ajuda rg-nota">Gravar no Fracttal manda o acordado que está registrado (os números dos campos só
+  {% if pode %}<p class="inv-card-pe">Gravar no Fracttal manda o acordado que está registrado (os números dos campos só
     valem depois de Registrar), no seu login do Fracttal. Quem entrou pela senha de administrador registra, mas não grava:
     o Fracttal pede o login dele.</p>{% endif %}
 </section>
 {% else %}
-<p class="pcm-sub alm-vazio">Escolha o almoxarifado acima.</p>
+<div class="inv-vazio"><p><b>Escolha o almoxarifado acima</b> para ver a régua de cada peça dele.</p></div>
 {% endif %}
 {% endif %}
 </div>

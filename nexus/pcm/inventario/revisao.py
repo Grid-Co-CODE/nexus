@@ -34,9 +34,14 @@ from ...dados import fatos as D
 from ...dados.dominios import norm
 from . import contas, leitura, travas
 from .estoque import ErroFracttal, Limite, SemLogin, instante
+from .gravacao import TAMANHO_LOTE
 
 ROTULO_ESTADO = {"nova": "Nova", "revisada": "Revisada", "recontagem_pedida": "Recontagem pedida", "substituida": "Substituída",
                  "gravando": "Gravando", "gravada": "Gravada", "gravada_com_conflitos": "Gravada com conflitos"}
+# o selo do estado da contagem (a lista e a contagem aberta): espera o PCM em azul, gravando em âmbar, gravada em verde, com
+# conflito em vermelho; a recusada e a substituída, neutras (não há o que fazer nelas)
+TOM_ESTADO = {"nova": "info", "revisada": "info", "recontagem_pedida": "neutro", "substituida": "neutro", "gravando": "alerta",
+              "gravada": "ok", "gravada_com_conflitos": "critico"}
 ROTULO_SITUACAO = {"para_cima": "Para cima", "para_baixo": "Para baixo", "zerar": "Zerar", "sem_alteracao": "Sem alteração",
                    "nao_tocada": "Não será tocada", "curadoria": "Curadoria"}
 # os seis grupos da confirmação, na ordem das `contas.SITUACOES`: (título, o que acontece com a peça nele)
@@ -51,6 +56,17 @@ GRUPOS = {
     "curadoria": ("Curadoria", "O que o PCM ainda decide (o genérico por identificar e a peça fora do catálogo): nada é "
                                "gravado até decidir."),
 }
+# a cor de cada situação (o tom do selo, do número do alto e da barra; a palavra vem sempre junto) e o selo do grupo na
+# confirmação (o que acontece no Fracttal). O desenho é o do mockup do Spare Parts (Levi, 27/10/2026): para cima verde, para
+# baixo vermelho, zerar âmbar ("grava · atenção": é a única que apaga estoque), a curadoria azul e o que não mexe, neutro
+TOM_SITUACAO = {"para_cima": "ok", "para_baixo": "critico", "zerar": "alerta", "sem_alteracao": "neutro",
+                "nao_tocada": "neutro", "curadoria": "info"}
+SELO_GRUPO = {"para_cima": "grava", "para_baixo": "grava", "zerar": "grava · atenção", "sem_alteracao": "não grava",
+              "nao_tocada": "não grava", "curadoria": "não grava"}
+# os que abrem já abertos na confirmação: o zerar (a única ação que apaga estoque) e o "não será tocada" (o que fica como está
+# no Fracttal: a peça em branco, a tirada e a de contado inválido; é o que o PCM confere para não achar que zerou)
+ABERTOS = ("zerar", "nao_tocada")
+DIVERGENCIAS_MAX = 8          # as maiores Δ na etapa Contagem (a lista inteira está na Aprovação)
 SEM_DELTA = ("nao_tocada", "curadoria")
 MOTIVO_MAX = 1000
 LIMITE_VEZES, LIMITE_MINIMO = 10, 1000        # o número corrigido além disto pede confirmação (`_conferir_exagero`)
@@ -62,6 +78,19 @@ PAUSA = "Não li o saldo do sistema: o Fracttal pediu uma pausa; tente de novo e
 SO_PCM = "Só o setor PCM lê o saldo do sistema no Fracttal, revisa o lote e pede a recontagem."
 
 _NUMERO = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+_CRITICIDADE = re.compile(r"(\d{1,2})\s*[.)\-]?\s*(.*)")
+
+
+def _criticidade(texto) -> tuple[int | None, str]:
+    """(o nível, o nome) da criticidade da peça no Fracttal (o `groups_1_description` que o `Estoque.ler` devolve: "1.Crítico",
+    "2.Necessário", "3.Importante", ...). Sem número, (None, o texto): a tela mostra "–" e nunca chuta um nível."""
+    t = A._txt(texto)
+    m = _CRITICIDADE.fullmatch(t)
+    if not m:
+        return None, t
+    return int(m.group(1)), m.group(2).strip() or t
 
 
 class Recusa(Exception):
@@ -120,7 +149,7 @@ def montar_lista(cfg) -> dict:
     except F.Recusada as ex:
         return {"erro": str(ex), "livro_existe": False, "contagens": [], "a_revisar": 0}
     cs = [dict(c, contada_txt=_hora(c["contada_em"]), enviada_txt=_hora(c["enviada_em"]),
-               rotulo=ROTULO_ESTADO[c["estado"]]) for c in d["contagens"]]
+               rotulo=ROTULO_ESTADO[c["estado"]], tom=TOM_ESTADO[c["estado"]]) for c in d["contagens"]]
     return {"erro": "", "livro_existe": d["livro_existe"], "contagens": cs,
             "a_revisar": sum(1 for c in cs if c["aprovavel"])}
 
@@ -141,9 +170,26 @@ ROTULO_EVENTO = {"contagem_recebida": "Contagem recebida", "aprovada": "Aprovada
                  "conflito": "Conflito", "erro": "Erro", "peca_tirada": "Peça tirada do lote",
                  "recontagem_pedida": "Recontagem pedida", "numero_corrigido": "Número corrigido",
                  "substituida": "Contagem substituída", "curadoria": "Curadoria decidida", "regua_gravada": "Régua gravada"}
-# a severidade é a palavra (o rótulo) E a cor: o que pede olho do PCM em âmbar ou vermelho, o que foi ao Fracttal em verde
-CLASSE_EVENTO = {"peca_gravada": "alm-ok", "regua_gravada": "alm-ok", "conflito": "alm-aviso", "recontagem_pedida": "alm-aviso",
-                 "erro": "alm-ruim"}
+# o selo de cada evento, pelas quatro famílias do mockup do Spare Parts (Levi, 27/10/2026): a gravação no Fracttal em verde, a
+# curadoria em âmbar, a aprovação e a revisão em azul, o conflito e o erro em vermelho. A cor só reforça a palavra (o rótulo)
+SELO_EVENTO = {"peca_gravada": "ok", "regua_gravada": "ok", "curadoria": "alerta", "conflito": "critico", "erro": "critico"}
+
+
+def _retorno(tipo: str, movimento: str, codigo: str) -> str:
+    """O que o Fracttal devolveu, na coluna "Retorno do Fracttal": o movimento do ajuste da peça gravada, a régua gravada, a
+    peça cadastrada pela curadoria, a peça que não foi gravada. O resto do livro é do Nexus (revisar, aprovar): o Fracttal nem
+    foi tocado, e a coluna diz "—". O motivo do conflito e do erro é texto livre cifrado: aqui, nunca."""
+    if tipo == "peca_gravada":
+        return f"movimento {movimento}" if movimento else "gravada"
+    if tipo == "regua_gravada":
+        return "gravada no Fracttal"
+    if tipo == "curadoria" and codigo:            # o evento da curadoria só leva o código quando a peça foi criada
+        return f"peça {codigo} cadastrada"
+    if tipo == "conflito":
+        return "não gravada"
+    if tipo == "erro":
+        return "não confirmada"
+    return ""
 
 
 def _qtd(v) -> float | None:
@@ -184,13 +230,14 @@ def _nomes_das_pessoas(ids: set) -> dict:
         return {}
 
 
-def montar_auditoria(cfg, pode: bool, tipo: str = "", busca: str = "") -> dict:
+def montar_auditoria(cfg, pode: bool, tipo: str = "", busca: str = "", contagem_id: str | None = None) -> dict:
     """A aba Auditoria (desenho 4.6): uma linha por evento do `fato_evento_inventario`, do mais novo ao mais velho, sem o
     almoxarifado de teste (como as outras telas). Nunca o motivo: ele é texto livre, mora só cifrado no livro, e quem revisa o
     lê na contagem aberta; aqui a linha só diz que ele existe. O nome de quem fez só para quem `pode` revisar (o PCM): os outros
     setores que veem a tela leem o que aconteceu, não quem. `tipo` e `busca` são os filtros do endereço: a página aberta já
-    filtrada chega com as outras linhas escondidas, e o `filtro-local.js` segue dali sem voltar ao servidor. Não fala com o
-    Fracttal; `erro` quando o livro não se lê (a tela diz, e não mostra "nenhum evento")."""
+    filtrada chega com as outras linhas escondidas, e o `filtro-local.js` segue dali sem voltar ao servidor. `contagem_id`: só os
+    eventos dessa contagem (a etapa Auditoria da contagem aberta). Não fala com o Fracttal; `erro` quando o livro não se lê (a
+    tela diz, e não mostra "nenhum evento")."""
     tipo = tipo if tipo in F.TIPOS_EVENTO else ""
     busca_n = norm(busca)
     ctx = {"erro": "", "eventos": [], "tipos": [], "tipo": tipo, "busca": str(busca or "").strip()[:100], "pode": pode,
@@ -201,7 +248,8 @@ def montar_auditoria(cfg, pode: bool, tipo: str = "", busca: str = "") -> dict:
         ctx["erro"] = str(ex)
         return ctx
     teste = A.ids_de_teste(cfg)
-    eventos = [e for e in eventos if A._id(e.get("id_almoxarifado")) not in teste]
+    eventos = [e for e in eventos if A._id(e.get("id_almoxarifado")) not in teste
+               and (contagem_id is None or A._txt(e.get("contagem_id")) == A._txt(contagem_id))]
     nomes = _nomes_para_auditoria() if eventos else {"almox": {}, "itens": {}}
     pessoas = _nomes_das_pessoas({D._id(e.get("pessoa_id")) for e in eventos} - {None}) if pode else {}
     linhas = []
@@ -213,13 +261,8 @@ def montar_auditoria(cfg, pode: bool, tipo: str = "", busca: str = "") -> dict:
         de, para, contado = _qtd(e.get("de_qtd")), _qtd(e.get("para_qtd")), _qtd(e.get("contado_qtd"))
         numeros = (f"{'mínimo ' if t == 'regua_gravada' else ''}{_num(de)} para {_num(para)}" if de is not None or para is not None
                    else f"contado {_num(contado)}" if contado is not None else "")
-        detalhes = []
-        if A._txt(e.get("situacao")) in ROTULO_SITUACAO:
-            detalhes.append(ROTULO_SITUACAO[A._txt(e.get("situacao"))])
-        if A._id(e.get("movimento_fracttal")):
-            detalhes.append(f"movimento {A._id(e.get('movimento_fracttal'))} no Fracttal")
-        if D._id(e.get("lote")):
-            detalhes.append(f"lote {D._id(e.get('lote'))}")
+        situacao = ROTULO_SITUACAO.get(A._txt(e.get("situacao")), "")
+        movimento, lote = A._id(e.get("movimento_fracttal")), D._id(e.get("lote"))
         pid = D._id(e.get("pessoa_id"))
         quem = (pessoas.get(pid) or f"ficha {pid} do cadastro") if pid else ("sem ficha no cadastro" if e.get("pessoa_hmac") else "")
         rotulo = ROTULO_EVENTO.get(t, t)
@@ -227,10 +270,12 @@ def montar_auditoria(cfg, pode: bool, tipo: str = "", busca: str = "") -> dict:
         procura = norm(" ".join(x for x in (rotulo, nome_almox, almox, codigo, peca.get("nome", ""), item, cid,
                                             A._id(e.get("movimento_fracttal")), quem if pode else "") if x))
         linhas.append({"n": n, "quando": _quando_do_evento(e.get("quando")), "hora": _hora(e.get("quando")), "tipo": t,
-                       "rotulo": rotulo, "classe": CLASSE_EVENTO.get(t, ""), "almox": nome_almox, "id_item": item,
+                       "rotulo": rotulo, "selo": SELO_EVENTO.get(t, "info"), "almox": nome_almox, "id_item": item,
                        "codigo": codigo, "peca": peca.get("nome", ""), "contagem_id": cid, "numeros": numeros,
-                       "detalhes": detalhes, "quem": quem if pode else "", "motivo": bool(A._txt(e.get("dados_cifrados"))),
-                       "busca": procura, "_achou": not busca_n or busca_n in procura})
+                       "situacao": situacao, "lote": str(lote) if lote is not None else "", "movimento": movimento,
+                       "retorno": _retorno(t, movimento, A._txt(e.get("codigo"))), "quem": quem if pode else "",
+                       "motivo": bool(A._txt(e.get("dados_cifrados"))), "busca": procura,
+                       "_achou": not busca_n or busca_n in procura})
     linhas.sort(key=lambda x: (x["quando"], x["n"]), reverse=True)
     for x in linhas:
         x["oculta"] = not x["_achou"] or bool(tipo and x["tipo"] != tipo)
@@ -284,7 +329,7 @@ def _avisos_da_curadoria(itens: list[dict]) -> list[str]:
     return avisos
 
 
-def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, com_sistema: bool, pode: bool) -> dict:
+def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, sistema: dict | None, pode: bool) -> dict:
     """O item das contas com o que a tela mostra: o nome, os números como texto, o porquê de a peça não ser gravada e as ações.
     O MOTIVO do PCM (da peça tirada e do número corrigido) só vai a quem pode revisar: os outros setores leem "tirada do lote" e
     "corrigida pelo PCM", sem o texto (ele é livre, e pode citar gente)."""
@@ -312,6 +357,7 @@ def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, com
                      else f"o técnico contou {_num(i['contado_campo'])}; o PCM corrigiu para {agora}")
             notas.append(texto + (f" ({motivo_correcao})" if motivo_correcao else ""))
     sem_saldo = i["ligada"] and i["sistema"] is None
+    com_sistema = sistema is not None
     if com_sistema and i["id_item"] and i["contado"] is not None and not tirada:
         if not i["ligada"]:
             notas.append("não ligada ao almoxarifado: será ligada ao gravar")
@@ -329,8 +375,13 @@ def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, com
     # genérico com 4 unidades por identificar contra o saldo 20 diria "-16", e não é isso) e a de saldo não informado (o Δ
     # contra um 0 que o Fracttal não disse seria um "+5" que ninguém viu; a nota diz que vale 0 na conta)
     sem_delta = i["delta"] is None or sit in SEM_DELTA or sem_saldo
-    return dict(i, nome=nome, unidade=meta.get("unidade", ""), grupo=grupo,
-                rotulo="Tirada do lote" if tirada else ROTULO_SITUACAO[sit], notas=notas, mexe=mexe, descricao=descricao,
+    crit_n, crit_nome = _criticidade(((sistema or {}).get(i["id_item"]) or {}).get("criticidade")) if i["id_item"] else (None, "")
+    rotulo = "Tirada do lote" if tirada else ROTULO_SITUACAO[sit]
+    return dict(i, nome=nome, unidade=meta.get("unidade", ""), grupo=grupo, rotulo=rotulo, notas=notas, mexe=mexe,
+                descricao=descricao, tom="neutro" if tirada else TOM_SITUACAO[sit],
+                crit=crit_n, crit_nivel=min(crit_n, 4) if crit_n else None, crit_nome=crit_nome,
+                # o que a busca da tabela da Aprovação olha (o filtro-local compara sem acento nem caixa)
+                busca=norm(" ".join(x for x in (i["codigo"], nome, rotulo, crit_nome) if x)),
                 sistema_txt=("—" if not i["id_item"] else "não informado" if sem_saldo
                              else "não ligada (0)" if not i["ligada"] else _num(i["sistema"])),
                 sistema_num="" if i["sistema"] is None or not i["ligada"] else _num(i["sistema"]),
@@ -355,7 +406,7 @@ def _itens(cfg, c: dict, todas: dict, sistema: dict | None, pode: bool) -> tuple
     curadoria = leitura.curadoria_da(cfg, c["contagem_id"])
     lote = contas.itens_do_lote(c["linhas"], sistema or {}, curadoria, revisao)
     achados = {A._id(l.get("ID da linha")): l for l in c["linhas"]}
-    return [_enriquecer(i, c, todas["itens"], revisao, achados, sistema is not None, pode) for i in lote], lote
+    return [_enriquecer(i, c, todas["itens"], revisao, achados, sistema, pode) for i in lote], lote
 
 
 def montar(cfg, contagem_id: str, pode: bool = False) -> dict | None:
@@ -367,7 +418,8 @@ def montar(cfg, contagem_id: str, pode: bool = False) -> dict | None:
     todas, c = _contagem(cfg, contagem_id)
     if c is None:
         return None
-    ctx = {"c": c, "rotulo": ROTULO_ESTADO[c["estado"]], "contada_txt": _hora(c["contada_em"], com_as=True),
+    ctx = {"c": c, "rotulo": ROTULO_ESTADO[c["estado"]], "tom_estado": TOM_ESTADO[c["estado"]],
+           "contada_txt": _hora(c["contada_em"], com_as=True),
            "enviada_txt": _hora(c["enviada_em"], com_as=True), "itens": [], "avisos_curadoria": [], "pode": pode,
            "so_pcm": SO_PCM, "vai_ler": False, "sem_login": SEM_LOGIN, "pausa": PAUSA}
     if c["aviso"]:
@@ -407,8 +459,27 @@ def montar_lote(cfg, contagem_id: str, ler_sistema, pode: bool = False) -> dict:
     for sit in contas.SITUACOES:
         membros = sorted((i for i in itens if i["grupo"] == sit), key=lambda i: (i["codigo"], i["id_item"]))
         grupos.append({"id": sit, "titulo": GRUPOS[sit][0], "ajuda": GRUPOS[sit][1], "itens": membros, "n": len(membros),
-                       "aberto": sit == "zerar" and bool(membros), "destaque": sit == "zerar"})
-    return {"c": c, "itens": itens, "grupos": grupos, "n_gravar": sum(1 for i in itens if i["mexe"]), "pode": pode}
+                       "aberto": sit in ABERTOS and bool(membros), "destaque": sit == "zerar", "tom": TOM_SITUACAO[sit],
+                       "selo": SELO_GRUPO[sit], "grava": sit in contas.MEXEM})
+    n_gravar = sum(1 for i in itens if i["mexe"])
+    por = {g["id"]: g["n"] for g in grupos}
+    return {"c": c, "itens": itens, "grupos": grupos, "n_gravar": n_gravar, "pode": pode,
+            "n_lotes": -(-n_gravar // TAMANHO_LOTE), "cobertura": _cobertura(por, len(itens)),
+            # as maiores Δ primeiro; a de saldo não informado (sem Δ na tela: um "+6" contra um 0 que o Fracttal não disse) no fim
+            "divergencias": sorted((i for i in itens if i["mexe"]),
+                                   key=lambda i: (i["delta_txt"] == "—", -abs(i["delta"] or 0), i["codigo"]))[:DIVERGENCIAS_MAX]}
+
+
+def _cobertura(por: dict, total: int) -> dict:
+    """A barra "Cobertura do inventário" da etapa Contagem: das peças da contagem, as que batem com o Sistema, as que divergem
+    (as três que gravam), as da curadoria e as que ficam fora do lote (em branco, contado inválido, tirada). Depende do Sistema:
+    vem no pedaço da ponte, nunca da página."""
+    mexem = sum(por.get(s, 0) for s in contas.MEXEM)
+    partes = {"bate": por.get("sem_alteracao", 0), "diverge": mexem, "curadoria": por.get("curadoria", 0),
+              "fora": por.get("nao_tocada", 0)}
+    pct = {k: (round(100 * v / total, 1) if total else 0) for k, v in partes.items()}
+    contadas = partes["bate"] + partes["diverge"] + partes["curadoria"]
+    return dict(partes, total=total, pct=pct, pct_contado=round(100 * contadas / total) if total else 0)
 
 
 # ── revisar ──────────────────────────────────────────────────────────────────────────────────────────────────────────────

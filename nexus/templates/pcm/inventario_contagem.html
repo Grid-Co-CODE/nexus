@@ -4,16 +4,37 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
-{# Uma contagem aberta (26/10/2026, Levi): o que o técnico contou, e, lido na hora do Fracttal, o Sistema × Contado × Δ × Situação
-   com a confirmação do lote nos seis grupos (só os três primeiros mexem no estoque; o zerar abre aberto e destacado). O PCM
-   tira uma peça do lote, corrige o número ou pede a recontagem, sempre com o motivo (a auditoria), e grava o lote no Fracttal.
-   A PÁGINA não lê o Fracttal: o login dele vive no cookie os_sessao, que o navegador só manda para /os. O pedaço que depende
-   dele (pcm/_inventario_lote.html: o Sistema, o Δ, os seis grupos e o botão "Gravar N alterações" com o N e a assinatura do
-   lote) a página busca por fetch na ponte /os/_nexus/inventario/<id>/lote (nexus/pcm/inventario/ponte_os.py) e põe no lugar do
-   que o técnico contou; sem o login, com a pausa do 429 ou com o Fracttal fora, fica o que o técnico contou e a mensagem. O
-   "Gravar", o "Continuar" e o "Encerrar" vão à mesma ponte; o andamento (que não depende do Sistema) vem do estado.json de
-   /t/pcm a cada 3 s (nexus/pcm/inventario/gravacao.py). A revisão não fala com o Fracttal: grava um evento no livro do
-   inventário (nexus/pcm/inventario/revisao.py). #}
+{# Uma contagem aberta (26/10/2026, Levi), desde 27/10/2026 nas QUATRO ETAPAS do mockup do Spare Parts, com o design do Nexus
+   ("as páginas queria nesse estilo porém design do nexus"; o celular da tela 1 do mockup é o App, e não entra): 1 · Contagem
+   (o que o técnico contou, a cobertura, as maiores divergências, as regras), 2 · Aprovação (o Sistema × Contado, a busca e o
+   filtro, e o "Revisar lote" com os seis grupos e o "Gravar N alterações"), 3 · Gravação (os lotes, o que aconteceu, o
+   aviso de travado, Continuar e Encerrar) e 4 · Auditoria (os eventos desta contagem). A etapa aberta segue o estado da
+   contagem; a pessoa troca na página, sem recarregar, e o endereço guarda a etapa (#aprovacao).
+   A PÁGINA não lê o Fracttal: o login dele vive no cookie os_sessao, que o navegador só manda para /os. O que depende dele
+   (pcm/_inventario_lote.html: a cobertura e as divergências da etapa 1, e a etapa 2 inteira, com o N e a assinatura do lote
+   no botão de gravar) a página busca por fetch na ponte /os/_nexus/inventario/<id>/lote (nexus/pcm/inventario/ponte_os.py) e
+   distribui entre as duas etapas; sem o login, com a pausa do 429 ou com o Fracttal fora, fica o que o técnico contou e a
+   mensagem. O "Gravar", o "Continuar" e o "Encerrar" vão à mesma ponte; o andamento (que não depende do Sistema) vem do
+   estado.json de /t/pcm a cada 3 s (nexus/pcm/inventario/gravacao.py). A revisão não fala com o Fracttal: grava um evento no
+   livro do inventário (nexus/pcm/inventario/revisao.py). #}
+{% from "pcm/_inventario_auditoria.html" import tabela, filtro with context %}
+{# o que acontece em cada peça na gravação: o algoritmo de verdade (gravacao.py), na ordem; aparece com ou sem gravação #}
+{% macro passos() %}
+<aside class="inv-card inv-lado" aria-label="O que acontece em cada peça">
+  <div class="inv-card-cab"><h3>O que acontece em cada peça</h3></div>
+  <ol class="inv-regras inv-regras--letras">
+    <li><b>Abre o ajuste no Fracttal</b>, no login de quem aprovou: uma sessão do almoxarifado por lote de 50. A peça que nunca
+      esteve nele é ligada antes de abrir.</li>
+    <li><b>Relê o saldo com o almoxarifado travado.</b> Com a sessão aberta nada se move: esta é a leitura que vale.</li>
+    <li><b>A peça que mudou vira conflito</b> e não é gravada: o saldo não é o da aprovação, ou ela se moveu depois da
+      contagem.</li>
+    <li><b>Grava o saldo contado</b>, o número absoluto (gravar o mesmo número de novo não muda nada).</li>
+    <li><b>Fecha com a referência</b> <span class="alm-cod">INVENTARIO-…-L&lt;n&gt;</span>: o Fracttal gera o par de movimentos e o
+      almoxarifado volta ao normal.</li>
+    <li><b>Relê fora da sessão</b>, e só então a peça é gravada (a que não bate fica com erro, e o Continuar relê).</li>
+  </ol>
+</aside>
+{% endmacro %}
 <div class="pg alm inv">
 <p class="gc-eyebrow">PCM · Almoxarifado · Inventário</p>
 <h1 class="titulo-pagina">{% if c %}{{ c.almox or 'Contagem' }}{% else %}Contagem{% endif %}</h1>
@@ -23,8 +44,8 @@
 {% if erro %}
 <div class="cn-erro" role="alert">{{ erro }}</div>
 {% else %}
-<p class="pcm-sub">{% if c.usina %}{{ c.usina }} · {% endif %}contada em {{ contada_txt }} (Brasília), enviada em {{ enviada_txt }} (Brasília).
-  <span class="inv-estado inv-estado--{{ c.estado }}">{{ rotulo }}</span></p>
+<p class="pcm-sub inv-sub">{% if c.usina %}{{ c.usina }} · {% endif %}contada em {{ contada_txt }} (Brasília), enviada em {{ enviada_txt }} (Brasília).
+  <span class="inv-selo inv-selo--{{ tom_estado }}">{{ rotulo }}</span></p>
 
 <script>
   // a resposta 401 da ponte: o portão encerrou a sessão do Nexus junto com a do Fracttal (`sessao_encerrada`: o `login` é um true,
@@ -35,259 +56,479 @@
     else if (j && typeof j.login === 'string') location.href = j.login;
   }
 </script>
-{% if gravacao %}
-{# a gravação no Fracttal: o andamento (a cada 3 s, enquanto grava), o aviso forte quando ela parou com o almoxarifado travado
-   em ajuste e o "Continuar", só para quem aprovou #}
-<section class="alm-painel inv-gravacao" id="inv-gravacao" aria-live="polite" data-situacao="{{ gravacao.estado }}"
-  data-estado="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}/estado.json"
-  data-continuar="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/continuar"
-  data-encerrar="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/encerrar">
-  <h2>Gravação no Fracttal</h2>
-  <p class="alm-ajuda" data-grav-texto>{{ gravacao.texto }}</p>
-  <div class="cn-erro" role="alert" data-grav-aviso{% if not gravacao.aviso %} hidden{% endif %}>{{ gravacao.aviso }}</div>
-  <div class="kb-kpis alm-kpis inv-kpis" aria-label="Andamento da gravação">
-    <div class="kb-kpi"><span class="kb-kpi-rot">Gravadas</span><div class="kb-kpi-linha"><b class="kb-kpi-v" data-grav-n="gravadas">{{ gravacao.gravadas }}</b></div></div>
-    <div class="kb-kpi"><span class="kb-kpi-rot">Em conflito</span><div class="kb-kpi-linha"><b class="kb-kpi-v{% if gravacao.conflitos %} kb-kpi-v--alerta{% endif %}" data-grav-n="conflitos">{{ gravacao.conflitos }}</b></div></div>
-    <div class="kb-kpi"><span class="kb-kpi-rot">Com erro</span><div class="kb-kpi-linha"><b class="kb-kpi-v{% if gravacao.erros %} kb-kpi-v--critico{% endif %}" data-grav-n="erros">{{ gravacao.erros }}</b></div></div>
-    <div class="kb-kpi"><span class="kb-kpi-rot">No lote</span><div class="kb-kpi-linha"><b class="kb-kpi-v" data-grav-n="total">{{ gravacao.total }}</b></div></div>
-  </div>
-  {# quais peças ficaram em conflito, e de quê: a Auditoria filtrada nesta contagem (o motivo fica cifrado no livro) #}
-  {% if gravacao.conflitos %}<p class="alm-ajuda"><a class="inv-abrir" href="{{ raiz }}/t/pcm/pecas/inventario/auditoria?tipo=conflito&amp;busca={{ c.contagem_id|urlencode }}">Ver as peças em conflito na Auditoria</a></p>{% endif %}
-  <div class="cn-erro" role="alert" data-grav-erro hidden></div>
-  <div class="inv-rodape">
-    <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-grav-continuar{% if not (pode_continuar and gravacao.estado == 'parada') %} hidden{% endif %}>Continuar</button>
-    {# encerrar: quem aprovou a qualquer hora, o administrador depois de 24 h parada; só com o almoxarifado fora do modo 2 #}
-    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-grav-encerrar{% if not pode_encerrar %} hidden{% endif %}>Encerrar a gravação</button>
-  </div>
-</section>
-<script>
-  // o andamento da gravação: olha o estado.json a cada 3 s enquanto grava, e recarrega quando ela termina ou para (o estado
-  // da contagem sai dos eventos do livro). O "Continuar" vai à ponte /os/_nexus (o cookie do Fracttal só vai para /os).
-  (function () {
-    var box = document.getElementById('inv-gravacao');
-    if (!box) return;
-    var rota = window.nexusRota || String;
-    var urlEstado = rota(box.dataset.estado), urlContinuar = rota(box.dataset.continuar), urlEncerrar = rota(box.dataset.encerrar);
-    var texto = box.querySelector('[data-grav-texto]'), aviso = box.querySelector('[data-grav-aviso]');
-    var botao = box.querySelector('[data-grav-continuar]'), erro = box.querySelector('[data-grav-erro]');
-    var encerrar = box.querySelector('[data-grav-encerrar]');
-    var situacao = box.dataset.situacao;
-    function mostrarErro(msg) { erro.textContent = msg || ''; erro.hidden = !msg; }
-    function mostrar(j) {
-      texto.textContent = j.texto || '';
-      aviso.textContent = j.aviso || '';
-      aviso.hidden = !j.aviso;
-      ['gravadas', 'conflitos', 'erros', 'total'].forEach(function (k) {
-        var el = box.querySelector('[data-grav-n="' + k + '"]');
-        if (el) el.textContent = j[k];
-      });
-      botao.hidden = !(j.pode_continuar && j.estado === 'parada');
-      encerrar.hidden = !j.pode_encerrar;
-      if (situacao === 'gravando' && j.estado !== 'gravando') { location.reload(); return; }
-      situacao = j.estado;
-    }
-    function olhar() {
-      fetch(urlEstado, {credentials: 'same-origin', cache: 'no-store'})
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) { if (j) mostrar(j); })
-        .catch(function () {})
-        .then(function () { if (situacao === 'gravando') setTimeout(olhar, 3000); });
-    }
-    if (situacao === 'gravando') setTimeout(olhar, 3000);
-    botao.addEventListener('click', function () {
-      botao.disabled = true;
-      mostrarErro('');
-      fetch(urlContinuar, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: '{}'})
-        .then(function (r) {
-          return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; });
-        })
-        .then(function (r) {
-          botao.disabled = false;
-          if (r.ok) { situacao = 'gravando'; botao.hidden = true; setTimeout(olhar, 1000); return; }
-          mostrarErro(r.j.erro || 'Não consegui continuar agora: tente de novo.');
-          entrarDeNovo(r.j);
-        })
-        .catch(function () { botao.disabled = false; mostrarErro('Não consegui falar com o servidor: tente de novo.'); });
-    });
-    // encerrar: o motivo vai à auditoria (cifrado); o servidor confere no Fracttal que o almoxarifado não está em ajuste
-    encerrar.addEventListener('click', function () {
-      var motivo = window.prompt('Encerrar a gravação: as peças que faltam ficam de fora (conflito), e o almoxarifado fica livre '
-                                 + 'para outra contagem. Qual o motivo? (fica na auditoria)');
-      if (motivo === null) return;
-      if (!motivo.trim()) { mostrarErro('Escreva o motivo: ele fica na auditoria.'); return; }
-      encerrar.disabled = true;
-      mostrarErro('');
-      fetch(urlEncerrar, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
-                          body: JSON.stringify({motivo: motivo})})
-        .then(function (r) {
-          return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; });
-        })
-        .then(function (r) {
-          encerrar.disabled = false;
-          if (r.ok) { location.reload(); return; }
-          mostrarErro(r.j.erro || 'Não consegui encerrar agora: tente de novo.');
-          entrarDeNovo(r.j);
-        })
-        .catch(function () { encerrar.disabled = false; mostrarErro('Não consegui falar com o servidor: tente de novo.'); });
-    });
-  })();
-</script>
-{% endif %}
 
 {% if c.aviso %}
 <div class="cn-erro" role="alert">O App mandou esta contagem fora do contrato ({{ c.aviso }}): ela não pode ser revisada, e nenhum
   número é mostrado, para não mostrar conta pela metade. Avise quem cuida do App.</div>
 {% else %}
 {% if not c.aprovavel and not gravacao %}<div class="cn-erro cn-aviso" role="status">Esta contagem não se aprova: {{ c.motivo_nao_aprovavel }}.</div>{% endif %}
-{% for a in avisos_curadoria %}<div class="cn-erro cn-aviso" role="status">{{ a }}</div>{% endfor %}
-{% if c.aprovavel and not pode %}<p class="alm-ajuda inv-so-pcm">{{ so_pcm }}</p>{% endif %}
 
-<div data-so-contado>
-<section class="kb-kpis alm-kpis inv-kpis" aria-label="Resumo da contagem">
-  <div class="kb-kpi"><span class="kb-kpi-rot">Contadas</span><div class="kb-kpi-linha"><b class="kb-kpi-v">{{ c.n_contadas }}</b></div></div>
-  <div class="kb-kpi"><span class="kb-kpi-rot">Em branco</span><div class="kb-kpi-linha"><b class="kb-kpi-v">{{ c.n_em_branco }}</b></div></div>
-  <div class="kb-kpi"><span class="kb-kpi-rot">Na curadoria</span><div class="kb-kpi-linha"><b class="kb-kpi-v{% if c.n_curadoria %} kb-kpi-v--alerta{% endif %}">{{ c.n_curadoria }}</b></div></div>
-</section>
+{# a etapa aberta segue o estado da contagem: a que espera o PCM abre na Aprovação (só para quem lê o saldo), a gravação na
+   Gravação, a gravada na Auditoria; a recusada, a substituída e a velha, na Contagem. A marca "agora" fica na etapa do estado #}
+{% if gravacao and gravacao.estado in ('gravando', 'parada') or c.estado == 'gravando' %}{% set etapa = 'gravacao' %}
+{% elif c.estado in ('gravada', 'gravada_com_conflitos') %}{% set etapa = 'auditoria' %}
+{% elif vai_ler %}{% set etapa = 'aprovacao' %}
+{% else %}{% set etapa = 'contagem' %}{% endif %}
+<nav class="inv-fluxo" role="tablist" aria-label="Etapas da contagem" data-fluxo data-filtro-js="{{ url_for('static', filename='filtro-local.js') }}">
+  {% for chave, titulo, linha in (('contagem', '1 · Contagem', 'O que o técnico contou no App'), ('aprovacao', '2 · Aprovação', 'Sistema × contado, revisar e gravar'), ('gravacao', '3 · Gravação', 'No Fracttal, em lotes de 50'), ('auditoria', '4 · Auditoria', 'O que aconteceu nesta contagem')) %}
+  <button type="button" role="tab" id="inv-etapa-{{ chave }}" aria-controls="inv-tela-{{ chave }}" aria-selected="{{ 'true' if chave == etapa else 'false' }}" tabindex="{{ '0' if chave == etapa else '-1' }}" data-etapa="{{ chave }}">
+    <b>{{ titulo }}</b><span>{{ linha }}</span>{% if chave == etapa %}<em class="inv-fluxo-agora">agora</em>{% endif %}</button>
+  {% endfor %}
+</nav>
 
-<section class="alm-painel">
-  <h2>O que o técnico contou</h2>
-  <p class="alm-ajuda">{% if vai_ler %}O saldo do sistema, o Δ e a situação de cada peça chegam logo abaixo, lidos agora no Fracttal.{% elif gravacao %}O lote foi para a gravação no Fracttal (acima); aqui, o número que o técnico contou.{% else %}Sem o saldo do sistema não há Δ nem situação: só o número que o técnico contou.{% endif %}</p>
-  {% if itens %}
-  <table class="alm-t">
-    <thead><tr><th>Peça</th><th class="num">Contado</th><th>Observação</th></tr></thead>
-    <tbody>
-    {% for x in itens %}
-    <tr{% if x.id_item %} data-item="{{ x.id_item }}"{% endif %}{% if x.tirada %} class="inv-tirada"{% endif %}>
-      <td data-r="Peça"><span class="alm-v">{% if x.codigo %}<span class="alm-cod">{{ x.codigo }}</span> {% endif %}{{ x.nome }}{% if x.unidade %} <span class="alm-un">· {{ x.unidade }}</span>{% endif %}</span></td>
-      <td data-r="Contado" class="num"><span class="alm-v">{{ x.contado_txt }}</span></td>
-      <td data-r="Observação"><span class="alm-v">{% if x.notas %}{% for n in x.notas %}<span class="alm-det">{{ n }}</span>{% endfor %}{% else %}—{% endif %}</span></td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}<p class="mudo">Nenhuma peça nesta contagem.</p>{% endif %}
-</section>
-</div>
-
-{% if vai_ler %}
-<div class="inv-lote" data-lote data-url="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/lote" data-sem-login="{{ sem_login }}">
-  <p class="alm-ajuda" data-lote-msg role="status">lendo o saldo do Fracttal…</p>
-</div>
-{% endif %}
-
-{% if pode and c.aprovavel %}
-<div class="inv-rodape">
-  <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="recontagem">Pedir recontagem</button>
-</div>
-
-<dialog class="q-det" id="inv-rev" aria-label="Revisar a contagem" data-url="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}/revisar">
-  <div class="q-det-corpo">
-    <div class="q-det-acoes"><button type="button" data-rev-fechar aria-label="Fechar"><i class="ph ph-x"></i></button></div>
-    <p class="gc-eyebrow">Revisar a contagem</p>
-    <h2 class="q-det-titulo" data-rev-titulo></h2>
-    <p class="alm-ajuda" data-rev-ajuda></p>
-    <form class="inv-rev-form" data-rev-form novalidate>
-      <div data-rev-valor hidden>
-        <label class="gc-rotulo" for="inv-rev-valor">Número certo</label>
-        <input id="inv-rev-valor" class="gc-campo" inputmode="decimal" autocomplete="off">
-      </div>
-      <label class="gc-rotulo" for="inv-rev-motivo">Motivo</label>
-      <textarea id="inv-rev-motivo" class="gc-campo" rows="3" maxlength="1000"></textarea>
-      <div class="cn-erro" role="alert" data-rev-erro hidden></div>
-      <div class="inv-rev-pe"><button type="submit" class="gc-btn gc-btn--ui gc-btn--primario" data-rev-enviar>Confirmar</button></div>
-    </form>
+{# ── 1 · Contagem ─────────────────────────────────────────────────────────────────────────────────────────────────────── #}
+<section class="inv-tela" id="inv-tela-contagem" role="tabpanel" aria-labelledby="inv-etapa-contagem"{% if etapa != 'contagem' %} hidden{% endif %}>
+  <div class="inv-tela-cab">
+    <h2>O que o técnico contou</h2>
+    <p>A contagem é cega: no App o técnico não vê o saldo do Fracttal. A divergência nasce aqui, com o saldo lido na hora.</p>
   </div>
-</dialog>
-<script>
-  // a revisão: UM painel só, montado a cada clique (tirar, corrigir ou recontagem). O servidor confere tudo de novo; ao dar
-  // certo a página recarrega, e o Sistema é lido outra vez, com a revisão já valendo. Os botões de tirar e corrigir chegam
-  // depois, dentro do pedaço que a ponte devolve: por isso o clique é ouvido no documento
-  (function () {
-    var dlg = document.getElementById('inv-rev');
-    if (!dlg) return;
-    var rota = (window.nexusRota || String)(dlg.dataset.url);
-    var form = dlg.querySelector('[data-rev-form]'), erro = dlg.querySelector('[data-rev-erro]');
-    var caixaValor = dlg.querySelector('[data-rev-valor]'), titulo = dlg.querySelector('[data-rev-titulo]');
-    var ajuda = dlg.querySelector('[data-rev-ajuda]'), enviar = dlg.querySelector('[data-rev-enviar]');
-    var valor = document.getElementById('inv-rev-valor'), motivo = document.getElementById('inv-rev-motivo');
-    var TEXTOS = {
-      tirar: ['Tirar do lote', 'A peça não será gravada no Fracttal, e fica na auditoria com o motivo. As outras peças seguem.', 'Tirar do lote'],
-      corrigir: ['Corrigir o número', 'O Fracttal recebe este número no lugar do que o técnico contou. A auditoria guarda os dois e o motivo.', 'Corrigir'],
-      recontagem: ['Pedir recontagem', 'Recusa a contagem inteira: nada é gravado e o técnico pode contar de novo no App. O motivo fica na auditoria.', 'Pedir recontagem']
-    };
-    var atual = null;
-    function mostrar(msg) { erro.textContent = msg || ''; erro.hidden = !msg; }
-    function abrir(b) {
-      // o saldo do sistema que a página mostrou vai junto: o servidor não lê o Fracttal ao revisar, e com ele confere o número
-      // que passa muito do contado e do saldo (um zero a mais)
-      atual = {acao: b.dataset.rev, id_item: b.dataset.item || '', sistema: b.dataset.sistema || '', confirmo: false};
-      var t = TEXTOS[atual.acao];
-      titulo.textContent = t[0] + (b.dataset.peca ? ': ' + b.dataset.peca : '');
-      ajuda.textContent = t[1];
-      enviar.textContent = t[2];
-      caixaValor.hidden = atual.acao !== 'corrigir';
-      valor.value = atual.acao === 'corrigir' && b.dataset.valor !== '—' ? (b.dataset.valor || '') : '';
-      motivo.value = '';
-      mostrar('');
-      enviar.disabled = false;
-      if (!dlg.open) dlg.showModal();
-      (atual.acao === 'corrigir' ? valor : motivo).focus();
-    }
-    document.addEventListener('click', function (ev) {
-      var b = ev.target.closest('[data-rev]');
-      if (b) { abrir(b); return; }
-      // o <dialog> não tem margem interna: o clique que cai nele mesmo (e não no corpo) foi no véu
-      if (ev.target === dlg || ev.target.closest('[data-rev-fechar]')) dlg.close();
-    });
-    valor.addEventListener('input', function () {
-      // mudou o número: a confirmação do exagero era do número de antes
-      if (atual && atual.confirmo) { atual.confirmo = false; enviar.textContent = TEXTOS[atual.acao][2]; }
-    });
-    form.addEventListener('submit', function (ev) {
-      ev.preventDefault();
-      if (!atual) return;
-      var corpo = {acao: atual.acao, motivo: motivo.value};
-      if (atual.id_item) corpo.id_item = atual.id_item;
-      if (atual.acao === 'corrigir') {
-        corpo.valor = valor.value;
-        if (atual.sistema) corpo.sistema = atual.sistema;
-        if (atual.confirmo) corpo.confirmo = true;
+  <div class="inv-duas">
+    <div class="inv-pilha">
+      <div class="inv-tiles" aria-label="Resumo da contagem">
+        <div class="inv-tile"><b class="inv-tile-v">{{ c.n_contadas }}</b><span class="inv-tile-r">Contadas</span></div>
+        <div class="inv-tile inv-tile--alerta"><b class="inv-tile-v" data-divergentes>—</b><span class="inv-tile-r">Divergentes</span></div>
+        <div class="inv-tile"><b class="inv-tile-v">{{ c.n_em_branco }}</b><span class="inv-tile-r">Em branco</span></div>
+        <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ c.n_curadoria }}</b><span class="inv-tile-r">Curadoria</span></div>
+      </div>
+      {% if vai_ler %}
+      {# a cobertura e as maiores divergências dependem do Sistema: chegam no pedaço da ponte, que a página põe aqui #}
+      <div class="inv-pilha" data-ponte-alvo="contagem"><p class="inv-espera" data-lote-msg role="status">lendo o saldo do Fracttal…</p></div>
+      {% elif c.aprovavel and not pode %}<p class="inv-espera">{{ so_pcm }}</p>
+      {% elif gravacao %}<p class="inv-espera">O saldo do sistema foi lido na aprovação: o que cada peça virou no Fracttal está nas etapas Gravação e Auditoria.</p>
+      {% else %}<p class="inv-espera">Sem o saldo do sistema não há divergência: aqui, só o número que o técnico contou.</p>{% endif %}
+      <details class="inv-card inv-contado"{% if not vai_ler %} open{% endif %}>
+        <summary class="inv-card-cab"><h3>Peças contadas ({{ itens|length }})</h3><span class="inv-card-nota">o número do App, sem o saldo do sistema</span></summary>
+        {% if itens %}
+        <div class="inv-tw">
+        <table class="alm-t inv-t">
+          <thead><tr><th>Peça</th><th class="num">Contado</th><th>Observação</th></tr></thead>
+          <tbody>
+          {% for x in itens %}
+          <tr{% if x.id_item %} data-item="{{ x.id_item }}"{% endif %}{% if x.tirada %} class="inv-tirada"{% endif %}>
+            <td data-r="Peça"><span class="alm-v">{% if x.codigo %}<span class="alm-cod">{{ x.codigo }}</span> {% endif %}{{ x.nome }}{% if x.unidade and x.unidade|upper != 'UNIDADE' %} <span class="alm-un">· {{ x.unidade|lower }}</span>{% endif %}</span></td>
+            <td data-r="Contado" class="num"><span class="alm-v">{{ x.contado_txt }}</span></td>
+            <td data-r="Observação"><span class="alm-v">{% if x.notas %}{% for n in x.notas %}<span class="alm-det">{{ n }}</span>{% endfor %}{% else %}—{% endif %}</span></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}<p class="mudo inv-card-corpo">Nenhuma peça nesta contagem.</p>{% endif %}
+      </details>
+    </div>
+    <aside class="inv-card inv-lado" aria-label="Regras do inventário">
+      <div class="inv-card-cab"><h3>Regras</h3></div>
+      <ol class="inv-regras">
+        <li><b>Contagem cega.</b> O App não mostra o saldo do Fracttal ao técnico: a divergência nasce aqui, com o saldo lido na hora.</li>
+        <li><b>Em branco não vira zero.</b> Só o 0 digitado zera o saldo; a peça em branco não é gravada.</li>
+        <li><b>O contado substitui o saldo.</b> O Fracttal recebe o número contado, o saldo inteiro, e não uma soma ou subtração.</li>
+        <li><b>Fora do catálogo vai para a curadoria.</b> O técnico descreve e conta; quem decide e cadastra é o PCM.</li>
+        <li><b>O genérico com saldo se identifica.</b> As unidades dele só entram no específico que o PCM confirmar na curadoria.</li>
+        <li><b>O almoxarifado trava enquanto grava.</b> Cada lote de 50 abre um ajuste no Fracttal, e entradas, saídas e pedidos de
+          compra esperam (cerca de 1 minuto por lote).</li>
+      </ol>
+    </aside>
+  </div>
+</section>
+
+{# ── 2 · Aprovação ────────────────────────────────────────────────────────────────────────────────────────────────────── #}
+<section class="inv-tela" id="inv-tela-aprovacao" role="tabpanel" aria-labelledby="inv-etapa-aprovacao"{% if etapa != 'aprovacao' %} hidden{% endif %}>
+  <div class="inv-tela-cab">
+    <h2>Aprovação do PCM</h2>
+    <p>O saldo do sistema, lido agora no Fracttal, ao lado do contado. Nada vai ao Fracttal antes de revisar o lote e gravar.</p>
+  </div>
+  {% for a in avisos_curadoria %}<div class="cn-erro cn-aviso" role="status">{{ a }}</div>{% endfor %}
+  {% if vai_ler %}
+  <div class="inv-lote" data-lote data-url="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/lote" data-sem-login="{{ sem_login }}" data-contagem="{{ c.contagem_id }}">
+    <p class="inv-espera" data-lote-msg role="status">lendo o saldo do Fracttal…</p>
+  </div>
+  {% elif c.aprovavel and not pode %}<p class="inv-espera inv-so-pcm">{{ so_pcm }}</p>
+  {% elif gravacao %}<p class="inv-espera">O lote foi para a gravação no Fracttal: o andamento está na etapa Gravação.</p>
+  {% else %}<p class="inv-espera">Nada a aprovar: {{ c.motivo_nao_aprovavel or 'esta contagem não se aprova' }}.</p>{% endif %}
+
+  {% if pode and c.aprovavel %}
+  <div class="inv-rodape inv-rodape--fim">
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="recontagem">Pedir recontagem</button>
+    <span class="alm-ajuda">Recusa a contagem inteira: nada é gravado, e o técnico conta de novo no App.</span>
+  </div>
+
+  <dialog class="q-det" id="inv-rev" aria-label="Revisar a contagem" data-url="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}/revisar">
+    <div class="q-det-corpo">
+      <div class="q-det-acoes"><button type="button" data-rev-fechar aria-label="Fechar"><i class="ph ph-x"></i></button></div>
+      <p class="gc-eyebrow">Revisar a contagem</p>
+      <h2 class="q-det-titulo" data-rev-titulo></h2>
+      <p class="alm-ajuda" data-rev-ajuda></p>
+      <form class="inv-rev-form" data-rev-form novalidate>
+        <div data-rev-valor hidden>
+          <label class="gc-rotulo" for="inv-rev-valor">Número certo</label>
+          <input id="inv-rev-valor" class="gc-campo" inputmode="decimal" autocomplete="off">
+        </div>
+        <label class="gc-rotulo" for="inv-rev-motivo">Motivo</label>
+        <textarea id="inv-rev-motivo" class="gc-campo" rows="3" maxlength="1000"></textarea>
+        <div class="cn-erro" role="alert" data-rev-erro hidden></div>
+        <div class="inv-rev-pe"><button type="submit" class="gc-btn gc-btn--ui gc-btn--primario" data-rev-enviar>Confirmar</button></div>
+      </form>
+    </div>
+  </dialog>
+  <script>
+    // a revisão: UM painel só, montado a cada clique (tirar, corrigir ou recontagem). O servidor confere tudo de novo; ao dar
+    // certo a página recarrega, e o Sistema é lido outra vez, com a revisão já valendo. Os botões de tirar e corrigir chegam
+    // depois, dentro do pedaço que a ponte devolve: por isso o clique é ouvido no documento
+    (function () {
+      var dlg = document.getElementById('inv-rev');
+      if (!dlg) return;
+      var rota = (window.nexusRota || String)(dlg.dataset.url);
+      var form = dlg.querySelector('[data-rev-form]'), erro = dlg.querySelector('[data-rev-erro]');
+      var caixaValor = dlg.querySelector('[data-rev-valor]'), titulo = dlg.querySelector('[data-rev-titulo]');
+      var ajuda = dlg.querySelector('[data-rev-ajuda]'), enviar = dlg.querySelector('[data-rev-enviar]');
+      var valor = document.getElementById('inv-rev-valor'), motivo = document.getElementById('inv-rev-motivo');
+      var TEXTOS = {
+        tirar: ['Tirar do lote', 'A peça não será gravada no Fracttal, e fica na auditoria com o motivo. As outras peças seguem.', 'Tirar do lote'],
+        corrigir: ['Corrigir o número', 'O Fracttal recebe este número no lugar do que o técnico contou. A auditoria guarda os dois e o motivo.', 'Corrigir'],
+        recontagem: ['Pedir recontagem', 'Recusa a contagem inteira: nada é gravado e o técnico pode contar de novo no App. O motivo fica na auditoria.', 'Pedir recontagem']
+      };
+      var atual = null;
+      function mostrar(msg) { erro.textContent = msg || ''; erro.hidden = !msg; }
+      function abrir(b) {
+        // o saldo do sistema que a página mostrou vai junto: o servidor não lê o Fracttal ao revisar, e com ele confere o número
+        // que passa muito do contado e do saldo (um zero a mais)
+        atual = {acao: b.dataset.rev, id_item: b.dataset.item || '', sistema: b.dataset.sistema || '', confirmo: false};
+        var t = TEXTOS[atual.acao];
+        titulo.textContent = t[0] + (b.dataset.peca ? ': ' + b.dataset.peca : '');
+        ajuda.textContent = t[1];
+        enviar.textContent = t[2];
+        caixaValor.hidden = atual.acao !== 'corrigir';
+        valor.value = atual.acao === 'corrigir' && b.dataset.valor !== '—' ? (b.dataset.valor || '') : '';
+        motivo.value = '';
+        mostrar('');
+        enviar.disabled = false;
+        if (!dlg.open) dlg.showModal();
+        (atual.acao === 'corrigir' ? valor : motivo).focus();
       }
-      enviar.disabled = true;
-      mostrar('');
-      fetch(rota, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
-                   body: JSON.stringify(corpo)})
-        .then(function (r) {
-          return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; });
-        })
-        .then(function (r) {
-          if (r.ok) { location.reload(); return; }
-          enviar.disabled = false;
-          if (r.j.confirmar) { atual.confirmo = true; enviar.textContent = 'Confirmar mesmo assim'; }
-          mostrar(r.j.erro || 'Não consegui gravar a revisão agora: tente de novo.');
-        })
-        .catch(function () { enviar.disabled = false; mostrar('Não consegui falar com o servidor: tente de novo.'); });
+      document.addEventListener('click', function (ev) {
+        var b = ev.target.closest('[data-rev]');
+        if (b) { abrir(b); return; }
+        // o <dialog> não tem margem interna: o clique que cai nele mesmo (e não no corpo) foi no véu
+        if (ev.target === dlg || ev.target.closest('[data-rev-fechar]')) dlg.close();
+      });
+      valor.addEventListener('input', function () {
+        // mudou o número: a confirmação do exagero era do número de antes
+        if (atual && atual.confirmo) { atual.confirmo = false; enviar.textContent = TEXTOS[atual.acao][2]; }
+      });
+      form.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        if (!atual) return;
+        var corpo = {acao: atual.acao, motivo: motivo.value};
+        if (atual.id_item) corpo.id_item = atual.id_item;
+        if (atual.acao === 'corrigir') {
+          corpo.valor = valor.value;
+          if (atual.sistema) corpo.sistema = atual.sistema;
+          if (atual.confirmo) corpo.confirmo = true;
+        }
+        enviar.disabled = true;
+        mostrar('');
+        fetch(rota, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+                     body: JSON.stringify(corpo)})
+          .then(function (r) {
+            return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; });
+          })
+          .then(function (r) {
+            if (r.ok) { location.reload(); return; }
+            enviar.disabled = false;
+            if (r.j.confirmar) { atual.confirmo = true; enviar.textContent = 'Confirmar mesmo assim'; }
+            mostrar(r.j.erro || 'Não consegui gravar a revisão agora: tente de novo.');
+          })
+          .catch(function () { enviar.disabled = false; mostrar('Não consegui falar com o servidor: tente de novo.'); });
+      });
+    })();
+  </script>
+  {% endif %}
+</section>
+
+{# ── 3 · Gravação ─────────────────────────────────────────────────────────────────────────────────────────────────────── #}
+<section class="inv-tela" id="inv-tela-gravacao" role="tabpanel" aria-labelledby="inv-etapa-gravacao"{% if etapa != 'gravacao' %} hidden{% endif %}>
+  <div class="inv-tela-cab">
+    <h2>Gravação no Fracttal</h2>
+    <p>O Nexus grava o saldo contado no Fracttal, no login de quem aprovou, em lotes de 50. Enquanto grava, esta etapa se atualiza a
+      cada 3 segundos.</p>
+  </div>
+  {% if gravacao %}
+  {# a gravação no Fracttal: o andamento (a cada 3 s, enquanto grava), o aviso forte quando ela parou com o almoxarifado travado
+     em ajuste, o "Continuar" só para quem aprovou e o "Encerrar" #}
+  <div class="inv-duas" id="inv-gravacao" data-situacao="{{ gravacao.estado }}"
+    data-estado="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}/estado.json"
+    data-continuar="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/continuar"
+    data-encerrar="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/encerrar">
+    <div class="inv-pilha">
+      <div class="cn-erro" role="alert" data-grav-aviso{% if not gravacao.aviso %} hidden{% endif %}>{{ gravacao.aviso }}</div>
+      <div class="inv-tiles" aria-label="Andamento da gravação">
+        <div class="inv-tile"><b class="inv-tile-v" data-grav-n="total">{{ gravacao.total }}</b><span class="inv-tile-r">A gravar</span></div>
+        <div class="inv-tile inv-tile--ok"><b class="inv-tile-v" data-grav-n="gravadas">{{ gravacao.gravadas }}</b><span class="inv-tile-r">Gravadas</span></div>
+        <div class="inv-tile inv-tile--alerta"><b class="inv-tile-v" data-grav-n="conflitos">{{ gravacao.conflitos }}</b><span class="inv-tile-r">Conflitos</span></div>
+        <div class="inv-tile inv-tile--critico"><b class="inv-tile-v" data-grav-n="erros">{{ gravacao.erros }}</b><span class="inv-tile-r">Com erro</span></div>
+      </div>
+      {% set selo_grav = {'gravando': ('alerta', 'Gravando'), 'parada': ('critico', 'Parada'), 'concluida': ('ok', 'Concluída'), 'encerrada': ('neutro', 'Encerrada')}[gravacao.estado] %}
+      <section class="inv-card">
+        <div class="inv-card-cab"><h3>Lotes</h3><span class="inv-selo inv-selo--{{ selo_grav[0] }}" data-grav-selo>{{ selo_grav[1] }}</span></div>
+        <div class="inv-card-corpo">
+          <p class="inv-grav-texto" data-grav-texto aria-live="polite">{{ gravacao.texto }}</p>
+          <ol class="inv-lotes" data-grav-lotes>
+            {% for l in gravacao.lotes_tela %}
+            <li class="inv-lote-l inv-lote-l--{{ l.situacao }}">
+              <b class="inv-lote-n">Lote {{ l.n }}</b>
+              <span class="inv-lote-meio"><span class="alm-det">{{ l.rotulo }} · {{ l.pecas }} {{ 'peça' if l.pecas == 1 else 'peças' }}{% if l.de %} · {{ l.de }}{% if l.ate != l.de %} … {{ l.ate }}{% endif %}{% endif %}</span>
+                <span class="inv-barra" role="img" aria-label="{{ l.andou }} de {{ l.pecas }} peças"><i style="width:{{ l.pct }}%"></i></span></span>
+              <span class="inv-selo inv-selo--{{ l.tom }}">{{ l.andou }} de {{ l.pecas }}</span>
+            </li>
+            {% endfor %}
+          </ol>
+          {# quais peças ficaram em conflito, e de quê: a etapa Auditoria filtrada no conflito (o motivo fica cifrado no livro) #}
+          {% if gravacao.conflitos %}<p class="alm-ajuda"><a class="inv-abrir" href="?tipo=conflito#auditoria">Ver as peças em conflito na Auditoria</a></p>{% endif %}
+          <div class="cn-erro" role="alert" data-grav-erro hidden></div>
+          <div class="inv-rodape">
+            <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-grav-continuar{% if not (pode_continuar and gravacao.estado == 'parada') %} hidden{% endif %}>Continuar</button>
+            {# encerrar: quem aprovou a qualquer hora, o administrador depois de 24 h parada; só com o almoxarifado fora do modo 2 #}
+            <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-grav-encerrar{% if not pode_encerrar %} hidden{% endif %}>Encerrar a gravação</button>
+          </div>
+        </div>
+      </section>
+      <section class="inv-card">
+        <div class="inv-card-cab"><h3>O que aconteceu</h3><span class="inv-card-nota">pelo controle da gravação, na ordem</span></div>
+        <ol class="inv-registro" data-grav-registro>
+          {% for r in gravacao.registro %}<li class="inv-registro-l{% if r.tom %} inv-registro-l--{{ r.tom }}{% endif %}"><span class="inv-registro-h">{{ r.hora }}</span><span>{{ r.texto }}</span></li>{% endfor %}
+        </ol>
+      </section>
+    </div>
+    {{ passos() }}
+  </div>
+  <script>
+    // o andamento da gravação: olha o estado.json a cada 3 s enquanto grava (os números, os lotes e o que aconteceu), e
+    // recarrega quando ela termina ou para (o estado da contagem sai dos eventos do livro). O "Continuar" e o "Encerrar" vão à
+    // ponte /os/_nexus (o cookie do Fracttal só vai para /os). Os textos do estado.json entram por textContent: nada vira HTML
+    (function () {
+      var box = document.getElementById('inv-gravacao');
+      if (!box) return;
+      var rota = window.nexusRota || String;
+      var urlEstado = rota(box.dataset.estado), urlContinuar = rota(box.dataset.continuar), urlEncerrar = rota(box.dataset.encerrar);
+      var texto = box.querySelector('[data-grav-texto]'), aviso = box.querySelector('[data-grav-aviso]');
+      var botao = box.querySelector('[data-grav-continuar]'), erro = box.querySelector('[data-grav-erro]');
+      var encerrar = box.querySelector('[data-grav-encerrar]');
+      var lotes = box.querySelector('[data-grav-lotes]'), registro = box.querySelector('[data-grav-registro]');
+      var situacao = box.dataset.situacao;
+      function el(tag, classe, conteudo) {
+        var e = document.createElement(tag);
+        if (classe) e.className = classe;
+        if (conteudo !== undefined) e.textContent = conteudo;
+        return e;
+      }
+      function desenharLotes(ls) {
+        lotes.textContent = '';
+        (ls || []).forEach(function (l) {
+          var li = el('li', 'inv-lote-l inv-lote-l--' + l.situacao), meio = el('span', 'inv-lote-meio');
+          var faixa = l.de ? ' · ' + l.de + (l.ate !== l.de ? ' … ' + l.ate : '') : '';
+          meio.appendChild(el('span', 'alm-det', l.rotulo + ' · ' + l.pecas + (l.pecas === 1 ? ' peça' : ' peças') + faixa));
+          var barra = el('span', 'inv-barra'), i = el('i');
+          barra.setAttribute('role', 'img');
+          barra.setAttribute('aria-label', l.andou + ' de ' + l.pecas + ' peças');
+          i.style.width = l.pct + '%';
+          barra.appendChild(i);
+          meio.appendChild(barra);
+          li.appendChild(el('b', 'inv-lote-n', 'Lote ' + l.n));
+          li.appendChild(meio);
+          li.appendChild(el('span', 'inv-selo inv-selo--' + l.tom, l.andou + ' de ' + l.pecas));
+          lotes.appendChild(li);
+        });
+      }
+      function desenharRegistro(rs) {
+        registro.textContent = '';
+        (rs || []).forEach(function (r) {
+          var li = el('li', 'inv-registro-l' + (r.tom ? ' inv-registro-l--' + r.tom : ''));
+          li.appendChild(el('span', 'inv-registro-h', r.hora || ''));
+          li.appendChild(el('span', '', r.texto));
+          registro.appendChild(li);
+        });
+      }
+      function mostrarErro(msg) { erro.textContent = msg || ''; erro.hidden = !msg; }
+      // a gravação terminou, parou ou foi encerrada: recarrega na etapa Gravação (sem o #, a contagem gravada abriria na
+      // Auditoria, e quem acompanhava não veria como terminou)
+      function voltarNaGravacao() {
+        history.replaceState(history.state, '', location.pathname + location.search + '#gravacao');
+        location.reload();
+      }
+      function mostrar(j) {
+        texto.textContent = j.texto || '';
+        aviso.textContent = j.aviso || '';
+        aviso.hidden = !j.aviso;
+        ['gravadas', 'conflitos', 'erros', 'total'].forEach(function (k) {
+          var e = box.querySelector('[data-grav-n="' + k + '"]');
+          if (e) e.textContent = j[k];
+        });
+        desenharLotes(j.lotes_tela);
+        desenharRegistro(j.registro);
+        botao.hidden = !(j.pode_continuar && j.estado === 'parada');
+        encerrar.hidden = !j.pode_encerrar;
+        if (situacao === 'gravando' && j.estado !== 'gravando') { voltarNaGravacao(); return; }
+        situacao = j.estado;
+      }
+      function olhar() {
+        fetch(urlEstado, {credentials: 'same-origin', cache: 'no-store'})
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (j) { if (j) mostrar(j); })
+          .catch(function () {})
+          .then(function () { if (situacao === 'gravando') setTimeout(olhar, 3000); });
+      }
+      if (situacao === 'gravando') setTimeout(olhar, 3000);
+      botao.addEventListener('click', function () {
+        botao.disabled = true;
+        mostrarErro('');
+        fetch(urlContinuar, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: '{}'})
+          .then(function (r) {
+            return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; });
+          })
+          .then(function (r) {
+            botao.disabled = false;
+            if (r.ok) { situacao = 'gravando'; botao.hidden = true; setTimeout(olhar, 1000); return; }
+            mostrarErro(r.j.erro || 'Não consegui continuar agora: tente de novo.');
+            entrarDeNovo(r.j);
+          })
+          .catch(function () { botao.disabled = false; mostrarErro('Não consegui falar com o servidor: tente de novo.'); });
+      });
+      // encerrar: o motivo vai à auditoria (cifrado); o servidor confere no Fracttal que o almoxarifado não está em ajuste
+      encerrar.addEventListener('click', function () {
+        var motivo = window.prompt('Encerrar a gravação: as peças que faltam ficam de fora (conflito), e o almoxarifado fica livre '
+                                   + 'para outra contagem. Qual o motivo? (fica na auditoria)');
+        if (motivo === null) return;
+        if (!motivo.trim()) { mostrarErro('Escreva o motivo: ele fica na auditoria.'); return; }
+        encerrar.disabled = true;
+        mostrarErro('');
+        fetch(urlEncerrar, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({motivo: motivo})})
+          .then(function (r) {
+            return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; });
+          })
+          .then(function (r) {
+            encerrar.disabled = false;
+            if (r.ok) { voltarNaGravacao(); return; }
+            mostrarErro(r.j.erro || 'Não consegui encerrar agora: tente de novo.');
+            entrarDeNovo(r.j);
+          })
+          .catch(function () { encerrar.disabled = false; mostrarErro('Não consegui falar com o servidor: tente de novo.'); });
+      });
+    })();
+  </script>
+  {% else %}
+  <div class="inv-duas">
+    <div class="inv-pilha">
+      <div class="inv-vazio"><p><b>Nada foi gravado no Fracttal ainda.</b> A gravação começa quando o PCM revisa o lote na etapa
+        Aprovação e aperta o botão de gravar; daí em diante, os lotes e o que aconteceu aparecem aqui.</p></div>
+    </div>
+    {{ passos() }}
+  </div>
+  {% endif %}
+</section>
+
+{# ── 4 · Auditoria ────────────────────────────────────────────────────────────────────────────────────────────────────── #}
+<section class="inv-tela" id="inv-tela-auditoria" role="tabpanel" aria-labelledby="inv-etapa-auditoria"{% if etapa != 'auditoria' %} hidden{% endif %}>
+  <div class="inv-tela-cab">
+    <h2>Auditoria desta contagem</h2>
+    <p>Uma linha por evento, que não muda depois: a revisão, a aprovação, cada peça gravada ou em conflito, a curadoria.
+      <a class="inv-abrir" href="{{ raiz }}/t/pcm/pecas/inventario/auditoria">A de todas as contagens</a>.</p>
+  </div>
+  {% if auditoria.erro %}
+  <div class="cn-erro" role="alert">Não consegui ler o livro do inventário: {{ auditoria.erro }}</div>
+  {% elif auditoria.eventos %}
+  <section class="inv-card">
+    <div class="inv-card-cab">
+      <h3>Eventos (<span data-fl-conta="inv-aud-c">{{ auditoria.n_visiveis }}</span>)</h3>
+      {{ filtro(auditoria, 'inv-aud-c') }}
+    </div>
+    {{ tabela(auditoria, 'inv-aud-c', False) }}
+  </section>
+  {% else %}
+  <div class="inv-vazio"><p><b>Nenhum evento desta contagem ainda.</b> A primeira revisão, a aprovação e cada peça gravada aparecem
+    aqui.</p></div>
+  {% endif %}
+</section>
+
+<script>
+  // as quatro etapas: trocar mostra uma e esconde as outras, sem recarregar; o endereço guarda a etapa (#aprovacao), e quem
+  // abre com ela no endereço já cai nela. Setas e Home/End andam entre as abas (o tablist do ARIA)
+  (function () {
+    var nav = document.querySelector('[data-fluxo]');
+    if (!nav) return;
+    var abas = Array.prototype.slice.call(nav.querySelectorAll('[data-etapa]'));
+    function ir(nome, foco) {
+      var aba = abas.filter(function (b) { return b.dataset.etapa === nome; })[0];
+      if (!aba) return;
+      abas.forEach(function (b) {
+        var sim = b === aba;
+        b.setAttribute('aria-selected', String(sim));
+        b.tabIndex = sim ? 0 : -1;
+        document.getElementById(b.getAttribute('aria-controls')).hidden = !sim;
+      });
+      if (foco) aba.focus();
+      if (nav.scrollWidth > nav.clientWidth) aba.scrollIntoView({block: 'nearest', inline: 'nearest'});
+      history.replaceState(history.state, '', location.pathname + location.search + '#' + nome);
+    }
+    nav.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-etapa]');
+      if (b) ir(b.dataset.etapa);
     });
+    nav.addEventListener('keydown', function (ev) {
+      var i = abas.indexOf(document.activeElement);
+      if (i < 0) return;
+      var j = {ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: abas.length - 1}[ev.key];
+      if (j === undefined) return;
+      ev.preventDefault();
+      ir(abas[(j + abas.length) % abas.length].dataset.etapa, true);
+    });
+    var pedida = location.hash.replace('#', '');
+    if (pedida) ir(pedida);
+    window.addEventListener('hashchange', function () { ir(location.hash.replace('#', '')); });
+
+    // o filtro-local.js da casa (a busca e o filtro da Aprovação e da Auditoria) liga os formulários que existem quando ele
+    // carrega: com o pedaço da ponte a caminho, ele carrega depois que o pedaço chega (ou falha), uma vez só
+    var carregado = false;
+    window.invCarregarFiltro = function () {
+      if (carregado) return;
+      carregado = true;
+      var s = document.createElement('script');
+      s.src = nav.dataset.filtroJs;
+      document.body.appendChild(s);
+    };
+    {% if not vai_ler %}window.invCarregarFiltro();{% endif %}
   })();
 </script>
-{% endif %}
 
 {% if vai_ler %}
 <script>
-  // o pedaço que depende do Fracttal: a ponte (/os, onde o cookie do login chega) devolve o HTML pronto. 200 troca o que o
-  // técnico contou pelo Sistema × Contado e os seis grupos; 401 é o login que falta (com o link), e o resto diz o que houve
+  // o pedaço que depende do Fracttal: a ponte (/os, onde o cookie do login chega) devolve o HTML pronto. 200: a cobertura e as
+  // divergências vão para a etapa Contagem e o resto (o Sistema × Contado, os seis grupos, o gravar) fica na Aprovação; 401 é o
+  // login que falta (com o link), e o resto diz o que houve
   (function () {
     var cx = document.querySelector('[data-lote]');
     if (!cx) return;
-    var msg = cx.querySelector('[data-lote-msg]'), soContado = document.querySelector('[data-so-contado]');
+    var msgs = Array.prototype.slice.call(document.querySelectorAll('[data-lote-msg]'));
+    var alvo = document.querySelector('[data-ponte-alvo="contagem"]');
+    var guardado = 'inv-revisar-' + cx.dataset.contagem;
     function dizer(texto, link, rotulo) {
-      msg.textContent = texto + ' ';
-      if (link) {
-        var a = document.createElement('a');
-        a.href = link;
-        a.textContent = rotulo;
-        msg.appendChild(a);
-      }
+      msgs.forEach(function (msg) {
+        msg.textContent = texto + ' ';
+        if (link) {
+          var a = document.createElement('a');
+          a.href = link;
+          a.textContent = rotulo;
+          msg.appendChild(a);
+        }
+      });
+    }
+    function confirmacao(aberta, rolar) {
+      var c = cx.querySelector('[data-confirma]'), b = cx.querySelector('[data-revisar-lote]');
+      if (!c) return;
+      c.hidden = !aberta;
+      if (b) b.setAttribute('aria-expanded', String(aberta));
+      try { if (aberta) sessionStorage.setItem(guardado, '1'); else sessionStorage.removeItem(guardado); } catch (e) {}
+      if (rolar) (aberta ? c : cx).scrollIntoView({behavior: 'smooth', block: 'start'});
     }
     fetch((window.nexusRota || String)(cx.dataset.url), {credentials: 'same-origin'})
       .then(function (r) {
@@ -295,7 +536,20 @@
         // DENTRO da contagem; recarregar leva a página inteira ao login, com a volta para cá
         if (r.redirected) { window.location.reload(); return; }
         if (r.ok) {
-          return r.text().then(function (html) { cx.innerHTML = html; if (soContado) soContado.hidden = true; });
+          return r.text().then(function (html) {
+            cx.innerHTML = html;
+            var daContagem = cx.querySelector('[data-ponte-para="contagem"]');
+            if (daContagem && alvo) {
+              alvo.textContent = '';
+              alvo.appendChild(daContagem);
+              var n = document.querySelector('[data-divergentes]');
+              if (n) n.textContent = daContagem.dataset.divergentes;
+            }
+            // a confirmação que estava aberta antes de recarregar (uma revisão de dentro dela) volta aberta
+            var antes = false;
+            try { antes = sessionStorage.getItem(guardado) === '1'; } catch (e) {}
+            if (antes) confirmacao(true, false);
+          });
         }
         return r.json().catch(function () { return {}; }).then(function (j) {
           // 401: o Fracttal que falta (a ponte manda o `login`, o /os/login com a volta para esta página) ou a sessão do Nexus que
@@ -305,7 +559,14 @@
           else dizer(j.erro || 'Não li o saldo do sistema agora: tente de novo em instantes.');
         });
       })
-      .catch(function () { dizer('Não consegui falar com o servidor para ler o saldo: tente de novo em instantes.'); });
+      .catch(function () { dizer('Não consegui falar com o servidor para ler o saldo: tente de novo em instantes.'); })
+      .then(function () { window.invCarregarFiltro(); });
+
+    // o "Revisar lote" abre os seis grupos; o "Voltar à tabela" os fecha (os dois chegam no pedaço da ponte)
+    document.addEventListener('click', function (ev) {
+      if (ev.target.closest('[data-revisar-lote]')) confirmacao(true, true);
+      else if (ev.target.closest('[data-voltar-tabela]')) confirmacao(false, true);
+    });
 
     // o botão de gravar chega DENTRO do pedaço da ponte (o N e a assinatura são do lote que ele mostra): o clique é ouvido no
     // documento. Confirma, manda o N e a assinatura (se o lote mudou desde então, o servidor recusa) à ponte /os/_nexus (o
@@ -325,7 +586,13 @@
           return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; });
         })
         .then(function (r) {
-          if (r.ok) { location.reload(); return; }
+          if (r.ok) {
+            // a página volta na etapa Gravação (o endereço podia estar em #aprovacao, que venceria o estado da contagem)
+            try { sessionStorage.removeItem(guardado); } catch (e) {}
+            history.replaceState(history.state, '', location.pathname + location.search + '#gravacao');
+            location.reload();
+            return;
+          }
           b.disabled = false;
           mostrar(r.j.erro || 'Não consegui começar a gravação agora: tente de novo.');
           entrarDeNovo(r.j);

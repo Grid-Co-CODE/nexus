@@ -69,8 +69,13 @@ def registrar(bp) -> None:
         if ctx is None:
             abort(404)
         # o botão "Gravar N alterações" e a assinatura do lote vêm no pedaço da ponte (`ponte_os.lote`), junto do Sistema que
-        # eles conferem; aqui fica o andamento da gravação, que não depende do Fracttal (o controle no disco)
-        return render_template("pcm/inventario_contagem.html", erro="", a_revisar=None, **ctx, **_da_gravacao(contagem_id))
+        # eles conferem; aqui fica o andamento da gravação, que não depende do Fracttal (o controle no disco), e a etapa
+        # Auditoria: os eventos do livro só desta contagem (o `?tipo=` e o `?busca=` já chegam filtrados, como na Auditoria geral)
+        a = request.args
+        auditoria = R.montar_auditoria(current_app.config, pode_programar(), str(a.get("tipo") or ""),
+                                       str(a.get("busca") or ""), contagem_id=contagem_id)
+        return render_template("pcm/inventario_contagem.html", erro="", a_revisar=None, auditoria=auditoria, **ctx,
+                               **_da_gravacao(contagem_id))
 
     @bp.route("/pecas/inventario/<contagem_id>/estado.json", endpoint="inventario_estado")
     def inventario_estado(contagem_id):

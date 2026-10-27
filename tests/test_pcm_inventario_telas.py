@@ -149,6 +149,84 @@ def test_lista_e_contagem(app, inv, falso, monkeypatch):
     assert re.search(r'<button[^>]*\bdata-gravar="/os/_nexus/inventario/C-1/gravar"[^>]*>\s*Gravar 5 alterações', html)
 
 
+def test_o_lote_no_desenho_do_mockup(app, inv, monkeypatch):
+    """O pedaço da ponte no desenho do mockup do Spare Parts (Levi, 27/10/2026): a coluna Crit. pela criticidade que o
+    `Estoque.ler` traz (o quadradinho com o nível; sem ela, "–"); a cobertura e as maiores divergências num bloco que a página
+    leva para a etapa Contagem (com o número de divergentes); a busca e o filtro por situação do filtro-local.js; o "Revisar
+    lote" que abre os seis grupos (escondidos até lá), com o zerar e o "não será tocada" abertos; e o resumo do rodapé (as
+    alterações em lotes de até 50, as que não serão tocadas e as da curadoria)."""
+    _cenario(inv)
+    f = EstoqueFalso({"10": {"501": {"saldo": 10, "codigo": "SP-501", "criticidade": "1.Crítico"},
+                             "502": {"saldo": 5, "criticidade": "2.Necessário"}, "503": {"saldo": 4, "criticidade": "7.Outro"},
+                             "504": 7, "505": 9, "506": 3, "507": 20, "509": {"saldo": None}}})
+    monkeypatch.setattr(E, "estoque_da_sessao", lambda app_: f)
+    html = _lote(_pcm(app, monkeypatch)).get_data(as_text=True)
+    assert "<th><abbr" in html and ">Crit.</abbr></th>" in html
+    linha = {m.group(1): m.group(0) for m in re.finditer(r'<tr[^>]*data-item="(\d+)".*?</tr>', html, re.S)}
+    assert re.search(r'class="inv-crit inv-crit--1" title="Crítico">1<', linha["501"])
+    assert "inv-crit--2" in linha["502"] and 'inv-crit--4" title="Outro">7<' in linha["503"]   # do 4 em diante, neutro
+    assert 'title="sem criticidade no Fracttal">–<' in linha["504"] and "inv-crit" not in linha["504"]
+    # as colunas na ordem do mockup, e cada linha com o que o filtro olha
+    cab = re.findall(r"<th[^>]*>(.*?)</th>", html.split('id="inv-lote-f"')[1].split("</thead>")[0])
+    assert [re.sub(r"<[^>]+>", "", x) for x in cab] == ["Código", "Peça", "Crit.", "Sistema", "Contado", "Δ", "Situação"]
+    assert 'data-f-situacao="para_cima"' in linha["501"] and 'data-f-situacao="zerar"' in linha["503"]
+    assert 'data-f-busca="sp-501 fusivel 10a para cima critico"' in linha["501"]
+    assert re.search(r'<form[^>]*id="inv-lote-f"[^>]*data-filtro-local', html) and 'name="situacao"' in html
+    assert re.search(r'<option value="zerar" data-rotulo="Zerar o estoque">Zerar o estoque \(1\)', html)
+    # a etapa Contagem: a cobertura e as divergências, num bloco à parte, com o número de divergentes (as 5 que gravam)
+    bloco = re.search(r'<div[^>]*data-ponte-para="contagem"[^>]*>', html).group(0)
+    assert 'data-divergentes="5"' in bloco and "Cobertura do inventário" in html and "% contado" in html
+    divergencias = html.split('data-ponte-para="contagem"')[1].split('class="inv-tiles')[0]
+    assert divergencias.index("Relé") < divergencias.index("Fusível 10A")         # a maior Δ primeiro (-4 antes de +2)
+    assert "data-item" not in divergencias                                       # a linha da peça é só a da tabela
+    # o "Revisar lote" abre a confirmação, escondida até lá; o zerar e o "não será tocada" abrem abertos
+    assert re.search(r'<button[^>]*data-revisar-lote[^>]*aria-expanded="false"', html)
+    assert re.search(r'<div class="inv-confirma"[^>]*data-confirma hidden', html)
+    for g in ("zerar", "nao_tocada"):
+        assert re.search(rf'<details[^>]*data-grupo="{g}"[^>]*\bopen\b', html), g
+    for g in ("para_cima", "para_baixo", "sem_alteracao", "curadoria"):
+        assert not re.search(rf'<details[^>]*data-grupo="{g}"[^>]*\bopen\b', html), g
+    assert "grava · atenção" in html.split('data-grupo="zerar"')[1].split("</summary>")[0]
+    resumo = re.sub(r"\s+", " ", re.search(r'<p class="inv-confirma-resumo">(.*?)</p>', html, re.S).group(1))
+    assert "<b>5 alterações</b> em 1 lote de até 50" in resumo and "2 peças não serão tocadas" in resumo
+    assert "2 ficam na curadoria" in resumo and "no seu login do Fracttal" in resumo
+
+
+def test_a_contagem_nas_quatro_etapas(app, inv, falso, monkeypatch):
+    """A página da contagem no desenho do mockup: a barra das quatro etapas (o tablist, com a etapa aberta pelo estado da
+    contagem e a marca "agora"), as quatro telas, e a etapa Auditoria só com os eventos desta contagem. A etapa que espera o PCM
+    é a Aprovação para quem lê o saldo; para os outros setores, a Contagem; a gravada abre na Auditoria."""
+    _publicar(inv, _linha("C-1", "L1", "501", "12"), _linha("C-1", "L2", "502", "3"),
+              _linha("C-2", "M1", "501", "3", almox="11"))
+    F.acrescentar(app.config, F.ABA_EVENTO, [
+        {"tipo": "peca_tirada", "contagem_id": "C-1", "id_almoxarifado": "10", "id_item": "502", "pessoa_hmac": "a" * 24},
+        {"tipo": "aprovada", "contagem_id": "C-2", "id_almoxarifado": "11", "id_item": "501", "pessoa_hmac": "a" * 24},
+        {"tipo": "peca_gravada", "contagem_id": "C-2", "id_almoxarifado": "11", "id_item": "501", "pessoa_hmac": "a" * 24}])
+    c = _pcm(app, monkeypatch)
+    html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    nav = re.search(r'<nav class="inv-fluxo" role="tablist".*?</nav>', html, re.S).group(0)
+    abas = re.findall(r'<button type="button" role="tab" id="inv-etapa-(\w+)" aria-controls="inv-tela-\1" '
+                      r'aria-selected="(true|false)"', nav)
+    assert abas == [("contagem", "false"), ("aprovacao", "true"), ("gravacao", "false"), ("auditoria", "false")]
+    assert re.findall(r"<b>(.*?)</b>", nav) == ["1 · Contagem", "2 · Aprovação", "3 · Gravação", "4 · Auditoria"]
+    assert nav.count("inv-fluxo-agora") == 1 and re.search(r'data-etapa="aprovacao">.*?inv-fluxo-agora', nav, re.S)
+    for t in ("contagem", "aprovacao", "gravacao", "auditoria"):
+        assert re.search(rf'<section class="inv-tela" id="inv-tela-{t}" role="tabpanel" aria-labelledby="inv-etapa-{t}"'
+                         + ("" if t == "aprovacao" else " hidden"), html), t
+    # a etapa Auditoria: só o evento desta contagem (os da C-2 ficam fora), sem a coluna "Onde"
+    etapa = html.split('id="inv-tela-auditoria"')[1]
+    assert etapa.count("data-fl-linha ") == 1 and 'data-f-tipo="peca_tirada"' in etapa and ">Onde</th>" not in etapa
+    assert "filtro-local.js" in html and "data-filtro-local" in etapa
+    assert "Nada foi gravado no Fracttal ainda" in html and "estado.json" not in html
+    # o outro setor (sem o saldo): a etapa aberta é a Contagem
+    outro = _pcm(app, monkeypatch, setor="Performance").get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert re.search(r'id="inv-etapa-contagem" aria-controls="inv-tela-contagem" aria-selected="true"', outro)
+    # a gravada abre na Auditoria, sem buscar o lote na ponte
+    gravada = c.get(f"{LISTA}/C-2").get_data(as_text=True)
+    assert re.search(r'id="inv-etapa-auditoria" aria-controls="inv-tela-auditoria" aria-selected="true"', gravada)
+    assert "data-lote" not in gravada and gravada.split('id="inv-tela-auditoria"')[1].count("data-fl-linha ") == 2
+
+
 def test_a_curadoria_aberta_avisa_e_nao_bloqueia(app, inv, falso, monkeypatch):
     """O achado por decidir e o genérico por identificar avisam, dizendo que decidir depois soma ao contado da peça escolhida;
     a aprovação (o "Gravar N") não é barrada (o desenho 4.2 põe a curadoria como um dos seis grupos, que não mexe)."""
@@ -735,11 +813,16 @@ def test_auditoria_lista_e_filtra(app, inv, falso, monkeypatch):
     assert "SP-TST-001" not in html and "9999" not in html                   # o almoxarifado de teste fica de fora
     gravada = linhas[2]
     assert "Peça gravada" in gravada and "SP-501" in gravada and "Fusível 10A" in gravada and "Almoxarifado Altair" in gravada
-    assert re.search(r"10\s*para\s*12", gravada) and "4321" in gravada and 'href="/t/pcm/pecas/inventario/C-1"' in gravada
+    # o de para, o movimento do Fracttal na coluna do retorno, o lote, e o link para a etapa Auditoria da contagem
+    assert re.search(r"10\s*para\s*12", gravada) and 'href="/t/pcm/pecas/inventario/C-1#auditoria"' in gravada
+    assert re.search(r'data-r="Retorno do Fracttal"><span class="alm-v">movimento 4321<', gravada)
+    assert re.search(r'data-r="Lote" class="num"><span class="alm-v">1<', gravada)
     assert "26/10/2026 09:20" in gravada                                     # a hora de Brasília
     assert "Supervisora Campo" in gravada                                    # quem: o nome da ficha, para o PCM
     assert "fusivel 10a" in re.search(r'data-f-busca="([^"]*)"', gravada).group(1)
-    assert "Conflito" in linhas[1] and "alm-aviso" in linhas[1]
+    # o selo pela família do evento (a cor só reforça a palavra): a gravação em verde, o conflito em vermelho, a revisão em azul
+    assert "inv-selo--ok" in gravada and "inv-selo--info" in linhas[3] and "inv-selo--info" in linhas[4]
+    assert "Conflito" in linhas[1] and "inv-selo--critico" in linhas[1] and "não gravada" in linhas[1]
     assert "Régua gravada" in linhas[0] and re.search(r"2\s*para\s*3", linhas[0]) and "C-1" not in linhas[0]
     # o motivo nunca (é cifrado no livro); a tela só diz que ele existe
     assert "motivo secreto" not in html and "se moveu no Fracttal" not in html
@@ -776,7 +859,7 @@ def test_sem_cor_fora_de_token():
     """Cor só por token do nexus.css (nos dois temas): nada de #hex nem rgba() nos templates novos, nem no CSS do inventário."""
     base = RAIZ / "nexus" / "templates" / "pcm"
     for nome in ("inventario.html", "inventario_contagem.html", "_inventario_lote.html", "_almox_abas.html",
-                 "inventario_auditoria.html"):
+                 "inventario_auditoria.html", "_inventario_auditoria.html"):
         t = (base / nome).read_text("utf-8")
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b", t) and "rgba(" not in t and "rgb(" not in t, nome
     css = (RAIZ / "nexus" / "static" / "pcm.css").read_text("utf-8")
@@ -822,7 +905,7 @@ def test_os_enderecos_nao_partem_da_raiz():
     """Endereço do Nexus nunca a partir da raiz (ele pode rodar debaixo de um prefixo): `{{ raiz }}` nos links e formulários."""
     base = RAIZ / "nexus" / "templates" / "pcm"
     for nome in ("inventario.html", "inventario_contagem.html", "_inventario_lote.html", "_almox_abas.html",
-                 "inventario_auditoria.html"):
+                 "inventario_auditoria.html", "_inventario_auditoria.html"):
         t = (base / nome).read_text("utf-8")
         assert not re.search(r'(?:href|action|src)="/(?!/)', t), nome
         assert not re.search(r"(?:fetch|location\.href\s*=)\s*\(?\s*['\"]/", t), nome

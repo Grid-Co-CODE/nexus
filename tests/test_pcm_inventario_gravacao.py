@@ -223,6 +223,41 @@ def test_mexida_depois_da_contagem_vira_conflito(app, grav):
     assert {e["id_item"] for e in _eventos(app, "peca_gravada")} == {"501", "503"}
 
 
+def test_o_estado_traz_os_lotes_e_o_que_aconteceu(app, grav):
+    """A etapa Gravação da contagem aberta (27/10/2026, no desenho do mockup): uma linha por lote (as peças, quantas andaram, a
+    situação, a faixa de códigos) e o registro do que DE FATO aconteceu, tirado do controle (no lugar do log de exemplo do
+    mockup): a aprovação, a sessão de cada lote com a referência, o fechamento com as gravadas e as em conflito, a peça em
+    conflito com o porquê (um texto do Nexus) e o fim. Nada de login nem de nome de gente."""
+    falso = _falso(agora=grav["relogio"])
+    depois = (AGORA - timedelta(hours=1)).isoformat()
+    falso.mover("10", "502", "saida", 2, quando=depois, referencia="Consumo da OS 1")
+    falso.mover("10", "502", "entrada", 2, quando=depois, referencia="Devolução da OS 1")
+    _iniciar(grav, falso)
+    est = G.estado(app.config, "C-1")
+    assert est["lotes_tela"] == [{"n": 1, "pecas": 3, "andou": 3, "pct": 100, "gravadas": 2, "conflitos": 1,
+                                  "situacao": "concluido", "rotulo": "concluído", "tom": "ok", "de": "SP-501", "ate": "SP-503"}]
+    textos = [r["texto"] for r in est["registro"]]
+    assert textos[0] == "Aprovada no Nexus: 3 peças em 1 lote de até 50." and est["registro"][0]["hora"]
+    assert textos[1].startswith(f"Lote 1: ajuste {REF}-L1 aberto no Fracttal")
+    assert textos[2] == "Lote 1 fechado e relido: 2 gravadas, 1 em conflito."
+    assert textos[3] == f"SP-502: {G.MEXIDA}." and est["registro"][3]["tom"] == "alerta"
+    assert textos[-1] == "Gravação concluída." and est["registro"][-1]["tom"] == "ok"
+    assert re.fullmatch(r"\d\d/\d\d \d\d:\d\d", est["registro"][1]["hora"])           # a hora de Brasília, curta
+    assert "@" not in json.dumps(est) and APROVADOR["pessoa_hmac"] not in json.dumps(est)
+
+
+def test_o_estado_da_gravacao_parada_diz_o_lote_parado(app, grav):
+    """Parada com a sessão aberta (o login expirou no meio do lote): o lote fica "parado" (não "na fila"), com o que andou, e o
+    registro termina na parada, com o motivo."""
+    falso = _falso(expirar_em=9, agora=grav["relogio"])
+    _iniciar(grav, falso)
+    est = G.estado(app.config, "C-1")
+    lote = est["lotes_tela"][0]
+    assert (lote["situacao"], lote["tom"], lote["andou"]) == ("parado", "critico", 1) and est["travado"]
+    assert est["registro"][-1] == {"hora": est["registro"][-1]["hora"], "tom": "critico",
+                                   "texto": f"Gravação parada: {G.LOGIN}."}
+
+
 def test_especifico_com_generico_pendente_vira_conflito(app, grav):
     """O genérico 507 tem uma linha confirmada como a 501 e outra ainda por identificar: a 501 não se grava (as unidades
     pendentes talvez sejam dela também), vira `conflito` logo na aprovação e espera a curadoria; o resto segue."""
@@ -1106,9 +1141,15 @@ def test_encerrar_pela_ponte(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
     assert r.status_code == 200, r.get_json()
     assert G.estado(app.config, "C-1")["estado"] == "encerrada"
     assert L.contagens(app.config)[0]["estado"] == "gravada_com_conflitos"
-    # a página aponta as peças em conflito na Auditoria (filtrada nesta contagem), e não diz que falta o saldo do sistema
+    # a página abre na etapa Auditoria (a contagem gravada com conflitos), aponta as peças em conflito nela (o filtro do tipo,
+    # só os eventos desta contagem) e não diz que falta o saldo do sistema
     html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
-    assert "/t/pcm/pecas/inventario/auditoria?tipo=conflito&amp;busca=C-1" in html and "Sem o saldo do sistema" not in html
+    assert 'href="?tipo=conflito#auditoria"' in html and "Sem o saldo do sistema" not in html
+    assert re.search(r'<button[^>]*aria-selected="true"[^>]*data-etapa="auditoria"', html)
+    filtrada = c.get(f"{LISTA}/C-1?tipo=conflito").get_data(as_text=True)
+    etapa = filtrada.split('id="inv-tela-auditoria"')[1]
+    visiveis = [l for l in re.findall(r'<tr[^>]*\bdata-fl-linha\b[^>]*>', etapa) if " hidden" not in l]
+    assert visiveis and all('data-f-tipo="conflito"' in l for l in visiveis)
 
 
 def test_a_tela_e_a_lista_mostram_o_aviso_de_travado(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
