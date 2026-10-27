@@ -3,8 +3,9 @@
 Ronda padronizada, Parede de eventos e Ocorrências leem o Andamento da Ronda COS (22/10/2026, nexus/cos/andamento.py;
 os prazos das Ocorrências em nexus/cos/ocorrencias.py). Religamentos e Acionamentos (26/10/2026) também: as contas em
 nexus/cos/religamentos.py e nexus/cos/acionamentos.py. A Passagem de turno (26/10/2026) grava no livro nexus_cos_turno
-(nexus/cos/turno.py). As outras telas caem no placeholder da casca. Para dar vida a uma tela, crie uma view com a mesma
-rota (ela vence a genérica), por exemplo:
+(nexus/cos/turno.py). OS em aberto (27/10/2026) é o Panorama da Ronda COS, pelo Andamento (os filtros e as contas em
+nexus/cos/os_abertas.py). As outras telas caem no placeholder da casca. Para dar vida a uma tela, crie uma view com a
+mesma rota (ela vence a genérica), por exemplo:
 
     @bp.route("/mesa")
     def mesa():
@@ -19,6 +20,7 @@ from flask import abort, current_app, redirect, render_template, request, sessio
 from ...cos import acionamentos as AC
 from ...cos import andamento as AND
 from ...cos import ocorrencias as OC
+from ...cos import os_abertas as OA
 from ...cos import religamentos as RE
 from ...cos import turno as TU
 from ...prefixo import na_raiz
@@ -75,6 +77,11 @@ TORRE = Torre(
         Tela("turno", "Passagem de turno",
              "O que o próximo turno precisa saber e quem assumiu?",
              "Passagens registradas no Nexus + o que está aberto no Andamento da Ronda COS"),
+        # 27/10/2026: o Panorama da Ronda COS (as OS abertas no Fracttal que o COS abriu), pelo Andamento; depois da
+        # Passagem de turno, como o dono pediu.
+        Tela("os-abertas", "OS em aberto",
+             "Que OS o COS abriu e seguem abertas no Fracttal, e há quanto tempo?",
+             "Andamento da Ronda COS (o Panorama das OS abertas no Fracttal)"),
     ],
 )
 
@@ -303,3 +310,25 @@ def turno_assumir():
                       status=503)
     session[_TURNO_AVISO] = f"Você assumiu o turno ({TU.rotulo_da_troca(troca)} das {troca.strftime('%H:%M')})"
     return redirect(na_raiz("/t/cos/turno"), code=303)
+
+
+# ── OS em aberto (27/10/2026) ─────────────────────────────────────────────────────────────────────────────────────────
+@bp.route("/os-abertas")
+def os_abertas():
+    """OS em aberto: o Panorama da Ronda COS, as OS abertas no Fracttal que o COS abriu, a mais antiga primeiro. O que
+    entra, a situação e o alerta vêm do Andamento; os filtros e as contas, de nexus/cos/os_abertas.py. Só lê: a OS abre
+    no card do Fracttal, com o login de quem clica."""
+    cfg = current_app.config
+    fonte = AND.fonte(cfg)
+    leitura = AND.ler_os_abertas(cfg) if fonte.ligada else AND.Leitura("", None)
+    a = request.args
+    situacao = OA.situacao_pedida(a.get("situacao"))
+    faixa = a.get("faixa", "") if a.get("faixa") in OA.FAIXAS else ""
+    sem_registro = a.get("sem_registro") == "1"
+    busca = " ".join((a.get("q") or "").split())[:OA.BUSCA_MAX]
+    cliente, tipo = a.get("cliente", ""), a.get("tipo", "")
+    p = OA.painel(leitura, AND.agora(), situacao, cliente, tipo, faixa, sem_registro, busca)
+    return render_template(
+        "cos/os_abertas.html", torre=TORRE, tela=TORRE.tela("os-abertas"), ligada=fonte.ligada, leitura=leitura, p=p,
+        situacao=situacao, cliente=cliente, tipo=tipo, faixa=faixa, sem_registro=sem_registro, busca=busca,
+        situacoes=OA.SITUACOES, faixas=OA.FAIXAS, lido=_lido([leitura]), url=_url)

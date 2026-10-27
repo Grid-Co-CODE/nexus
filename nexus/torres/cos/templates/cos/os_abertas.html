@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+<noscript><meta http-equiv="refresh" content="120"></noscript>
+{# OS em aberto (27/10/2026): o Panorama da Ronda COS no Nexus. As OS vêm do Andamento (o que entra, a situação e o
+   alerta são regra de lá); os filtros e as contas, de nexus/cos/os_abertas.py. Só lê: a OS abre no card do Fracttal. #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Panorama da Ronda COS{% if p and p.varredura %}<br>varredura do Fracttal às <b>{{ p.varredura.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
+  </div>
+
+  {% if not ligada %}
+  <div class="cn-vazio cos-aviso">A fonte do Andamento ainda não está ligada neste servidor: faltam o endereço e a chave
+    (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>), que um administrador grava em Base →
+    Chaves do Nexus. O resto do Nexus segue igual.</div>
+  {% else %}
+  {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro[:1]|upper }}{{ leitura.erro[1:] }}.</b>
+    {% if leitura.velha %}A tela mostra a última leitura boa, das {{ lido }}.{% endif %}</div>{% endif %}
+
+  {% if p %}
+  {% if p.varredura_velha %}<div class="cn-erro cn-aviso" role="status"><b>A varredura do Fracttal não passa desde
+    {{ p.varredura.strftime('%d/%m às %H:%M') }}.</b> Ela roda de 30 em 30 minutos na Ronda COS: até voltar, uma OS que
+    fechou no Fracttal pode continuar na lista.</div>
+  {% elif not p.varredura %}<div class="cn-erro cn-aviso" role="status"><b>A varredura do Fracttal ainda não gravou nenhuma
+    OS na Ronda COS.</b> A lista vazia não quer dizer que não há OS em aberto.</div>{% endif %}
+
+  <div class="cn-filtros">
+    <div class="cn-seg" aria-label="Situação">
+      {% for k, rot in situacoes.items() %}<a href="{{ url(situacao=k) }}"{% if k == situacao %} aria-current="page"{% endif %}>{{ rot }} <i>{{ p.contagem.situacao[k] }}</i></a>{% endfor %}
+    </div>
+  </div>
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">OS em aberto</span><span class="v">{{ p.resumo.total }}</span>
+      <span class="d">{{ situacoes[situacao]|lower }}, que o COS abriu</span></span>
+    <span><span class="gc-rotulo">Acima de 30 dias</span><span class="v{% if p.resumo.acima_30 %} ruim{% endif %}">{{ p.resumo.acima_30 }}</span>
+      <span class="d">{{ p.resumo.acima_90 }} acima de 90 dias</span></span>
+    <span><span class="gc-rotulo">Sem registro na Ronda COS</span><span class="v">{{ p.resumo.sem_registro }}</span>
+      <span class="d">ninguém acompanha pela plataforma</span></span>
+    <span><span class="gc-rotulo">Em alerta</span><span class="v{% if p.resumo.em_alerta %} ruim{% endif %}">{{ p.resumo.em_alerta }}</span>
+      <span class="d">pendentes há mais de {{ p.horas_para_alerta }} h, sem ninguém assumir</span></span>
+  </div>
+
+  <form class="cn-filtros" method="get">
+    <input type="hidden" name="situacao" value="{{ situacao }}">
+    {% if sem_registro %}<input type="hidden" name="sem_registro" value="1">{% endif %}
+    <label class="cn-filtro-par"><span class="gc-rotulo">Cliente</span>
+    <select class="gc-campo" name="cliente" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for c, n in p.contagem.cliente.items() %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    <label class="cn-filtro-par"><span class="gc-rotulo">Tipo</span>
+    <select class="gc-campo" name="tipo" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for t, n in p.contagem.tipo.items() %}<option value="{{ t }}"{% if t|lower == tipo|lower %} selected{% endif %}>{{ t }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    <label class="cn-filtro-par"><span class="gc-rotulo">Aberta há</span>
+    <select class="gc-campo" name="faixa" onchange="this.form.submit()">
+      <option value="">Qualquer idade</option>{% for k, f in faixas.items() %}<option value="{{ k }}"{% if k == faixa %} selected{% endif %}>{{ f[0] }} ({{ p.contagem.faixa[k] }})</option>{% endfor %}
+    </select></label>
+    <input class="gc-campo" type="search" name="q" value="{{ busca }}" placeholder="Nº da OS, usina ou ativo" aria-label="Buscar OS">
+  </form>
+
+  <div class="cn-chips" aria-label="Recorte">
+    <a href="{{ url(sem_registro=None if sem_registro else '1') }}"{% if sem_registro %} aria-current="page"{% endif %}>Só sem registro na Ronda COS<i>{{ p.resumo.sem_registro }}</i></a>
+    {% if cliente or tipo or faixa or sem_registro or busca %}<a href="{{ url(cliente=None, tipo=None, faixa=None, sem_registro=None, q=None) }}">Limpar o recorte</a>{% endif %}
+  </div>
+
+  {% if p.itens %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Aberta há</th><th class="cos-esq">OS</th><th class="cos-esq">Cliente / usina</th><th class="cos-esq">Ativo</th>
+      <th class="cos-esq">Tipo</th><th>Feito</th><th class="cos-esq">Na Ronda COS</th><th class="cos-esq">Alerta</th></tr></thead>
+    <tbody>
+    {% for o in p.itens %}
+      <tr class="cos-os" tabindex="0" data-wo="{{ o.id_wo or '' }}" data-folio="{{ o.folio }}" data-status="{{ o.status_card }}" title="Abrir o card da OS {{ o.folio }}">
+        <td class="cos-esq"><b class="cos-idade{% if o.dias >= 30 %} cn-t-critico{% elif o.dias >= 7 %} cn-t-alerta{% endif %}">{{ o.aberta_ha }}</b>
+          <span class="det">{{ o.criada.strftime('%d/%m/%Y %H:%M') if o.criada else '—' }}</span></td>
+        <td class="cos-esq"><b class="cos-folio">{{ o.folio }}</b><span class="det">{{ o.status }}</span></td>
+        <td class="cos-esq cos-usina"><b>{{ o.usina }}</b><span class="det">{{ o.cliente }}{% if o.usina_codigo %} · {{ o.usina_codigo }}{% endif %}</span></td>
+        <td class="cos-esq">{{ o.ativo or '—' }}{% if o.mais_ativos %} <span class="mudo">e mais {{ o.mais_ativos }}</span>{% endif %}</td>
+        <td class="cos-esq">{{ o.tipo or '—' }}{% if o.classificacao or o.prioridade %}<span class="det">{{ [o.classificacao, o.prioridade]|select|join(' · ') }}</span>{% endif %}</td>
+        <td>{% if o.situacao == 'concluida' %}<span class="cn-pill cn-ok">100%</span>{% else %}{{ o.pct }}%{% endif %}</td>
+        <td class="cos-esq"><span class="cn-pill cn-{{ o.registro[1] }}">{{ o.registro[0] }}</span></td>
+        <td class="cos-esq">{% if o.em_alerta %}<span class="cn-pill cn-critico">Em alerta</span>{% elif o.reconhecida %}<span class="cn-pill cn-neutro">Reconhecida {{ o.reconhecida.strftime('%d/%m %H:%M') }}</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if p.truncado %}<p class="mudo">O Andamento mandou só as mais antigas: há mais OS em aberto do que cabem numa resposta.</p>{% endif %}
+  {% else %}<p class="cn-vazio">{% if cliente or tipo or faixa or sem_registro or busca %}Nenhuma OS neste recorte.{% else %}Nenhuma OS {{ situacoes[situacao]|lower }} que o COS abriu.{% endif %}</p>{% endif %}
+
+  {% if p.cortes %}<p class="mudo cos-cortes">Fora do Panorama, das {{ p.cortes.na_varredura }} OS abertas no Fracttal:
+    {{ p.cortes.fora_do_cos }} de tipos que o COS não abre, {{ p.cortes.usina_de_teste }} da usina de teste e
+    {{ p.cortes.assunto_encerrado }} normalizadas na Ronda COS e feitas no Fracttal.</p>{% endif %}
+  {% endif %}
+
+  <div class="cn-nota"><b>Como se conta.</b> É o Panorama da Ronda COS: entram as OS abertas no Fracttal (em processo e em
+    verificação) que o COS abre — corretiva emergencial, religamento e religamento remoto —, menos as de classificação
+    programada, as da usina de teste e as normalizadas na Ronda COS que já estão 100% feitas no Fracttal. A normalizada com
+    a OS abaixo de 100% fica: a Ronda COS diz que acabou e o Fracttal diz que não. <b>Pendentes</b> são as que ainda não
+    foram feitas; <b>feitas, falta finalizar</b> estão 100% no Fracttal e só falta alguém finalizar a OS. O <b>alerta</b> é
+    a pendente aberta há mais de {{ p.horas_para_alerta if p else 1 }} h que ninguém reconheceu; reconhecer é na Ronda COS.
+    <b>Sem registro</b> é a OS que ninguém acompanha pela Ronda COS. A varredura do Fracttal roda lá de 30 em 30 minutos.
+    Clique na OS para abrir o card do Fracttal (com o seu login do Fracttal).</div>
+  {% endif %}
+</div>
+{% include "oscreator/card_os_abrir.html" %}
+<script>
+  // a linha abre o card da OS do OS Creator por cima, como nas outras torres (Aprovação de OS, Quadro da equipe)
+  (function () {
+    function abrir(tr) {
+      if (!window.NexusOsCard) { return; }
+      var wo = tr.getAttribute('data-wo'), folio = tr.getAttribute('data-folio');
+      var op = {status: tr.getAttribute('data-status') || '', folio: folio};
+      if (wo) { NexusOsCard.abrir(wo, op); } else { NexusOsCard.abrirFolio(folio, op); }
+    }
+    document.querySelectorAll('tr.cos-os').forEach(function (tr) {
+      var wo = tr.getAttribute('data-wo');
+      if (wo && window.NexusOsCard) { NexusOsCard.prepararAoParar(tr, wo); }
+      tr.addEventListener('click', function () { abrir(tr); });
+      tr.addEventListener('keydown', function (e) { if (e.key === 'Enter') { abrir(tr); } });
+    });
+  })();
+</script>
+{% endblock %}
