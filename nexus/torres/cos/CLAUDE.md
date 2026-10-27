@@ -6,7 +6,8 @@ do programador do tempo real/COS. Leia também o `CLAUDE.md` da raiz (convençõ
 ## O que a torre vai ser
 
 As telas estão declaradas em `__init__.py`. Ronda padronizada, Parede de eventos, Ocorrências, Religamentos e
-Acionamentos já leem o Andamento da Ronda COS, e a Passagem de turno grava no banco do Nexus (seções abaixo); as outras são placeholder (cada uma diz a pergunta que vai responder e a fonte prevista). A base de produto são as specs do Fillipe, no SharePoint `Gridco/4. O&M/6.Gerencial/10. Nexus`:
+Acionamentos já leem o Andamento da Ronda COS, a Passagem de turno grava no banco do Nexus e OS em aberto é o Panorama da
+Ronda COS (seções abaixo); as outras são placeholder (cada uma diz a pergunta que vai responder e a fonte prevista). A base de produto são as specs do Fillipe, no SharePoint `Gridco/4. O&M/6.Gerencial/10. Nexus`:
 
 - **R04, COS como visão global:**
   - **Mesas:** cada operador tem uma carteira de clientes, e o líder enxerga todas.
@@ -171,6 +172,28 @@ acompanhamento das Contestações); a pessoa liga pelo `pessoa_hmac`. Por mexer 
   com um cliente sem leitura, vai vazio (número pela metade não se grava). Sem o Andamento ligado, a passagem vai sem ele.
 - Testes: `tests/test_cos_turno.py` (o relógio, a situação, a gravação cifrada, as recusas e a tela), com controle
   positivo (sem a trava da própria passagem ou sem o "sem registro", vermelhos).
+
+## OS em aberto: o Panorama da Ronda COS (27/10/2026)
+
+*"Que OS o COS abriu e seguem abertas no Fracttal, e há quanto tempo?"* — a tela "OS em aberto" da Ronda COS (o Panorama),
+no Nexus, logo depois da Passagem de turno (pedido do dono). Só lê.
+
+- **De onde:** `GET <Andamento>/api/nexus/os-abertas` (`ler_os_abertas`, `versao: 1`, 60 s de cópia), um retrato de TODOS
+  os clientes numa resposta (a varredura da Ronda COS lê o Fracttal inteiro de 30 em 30 min). O Andamento de antes da rota
+  responde 404, e a tela diz que ele ainda não a tem.
+- **O que entra é regra de lá**, e o Nexus não refaz: só corretiva emergencial, religamento e religamento remoto (o que o
+  COS abre); fora a classificação programada (a vazia fica), a usina de teste e o assunto encerrado (normalizada na Ronda
+  COS **e** 100% no Fracttal; a normalizada abaixo de 100% fica). A situação (`pendente` ou `concluida` = feita, falta
+  finalizar) e o alerta (pendente há mais de 1 h sem reconhecimento) também vêm prontos. A tela diz quantas cada corte tirou.
+- **Daqui** (`nexus/cos/os_abertas.py`): os filtros (situação, com a pendente no padrão; cliente, tipo, idade, só sem
+  registro, busca pelo nº, usina ou ativo), a idade na hora em que a tela abre (em horas até 48 h, como o Panorama conta)
+  e as contas. As pílulas de cliente, tipo e idade contam sobre a situação, ANTES dos outros filtros; o alerta é do painel
+  inteiro. A varredura parada há mais de 90 min (três passagens) acende o aviso: uma OS fechada pode seguir na lista.
+- **Sem nome de pessoa e sem texto livre:** quem abriu, o responsável, a descrição, a nota e quem reconheceu ficam na
+  Ronda COS. O detalhe abre no **card da OS** do OS Creator (`oscreator/card_os_abrir.html`, com o login do Fracttal de
+  quem clica); reconhecer o alerta é na Ronda COS.
+- Testes: `tests/test_cos_os_abertas.py` (controle positivo: a pílula contando depois do filtro, o padrão em "todas", o
+  alerta pela situação e o 404 sem a frase própria, vermelhos).
 
 ## Regras desta torre
 

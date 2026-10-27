@@ -69,3 +69,12 @@
 .cos-ler{margin-top:4px;font-size:12.5px}
 .cos-ler summary{cursor:pointer;color:var(--tinta-2)}
 .cos-ler .cos-texto-passagem{max-width:520px}
+
+/* OS em aberto: a linha abre o card da OS do Fracttal (clique ou Enter); o nº da segmentação com o mesmo cinza das pílulas */
+.cn-seg a i{font-style:normal;color:var(--mudo);margin-left:4px;font-variant-numeric:tabular-nums}
+.cn-seg a[aria-current="page"] i{color:inherit;opacity:.7}
+tr.cos-os{cursor:pointer}
+tr.cos-os:hover td,tr.cos-os:focus-visible td{background:var(--superficie-2)}
+tr.cos-os:focus-visible{outline:2px solid var(--verde);outline-offset:-2px}
+.cos-idade,.cos-folio{font-variant-numeric:tabular-nums;white-space:nowrap}
+.cos-cortes{margin-top:10px;font-size:12.5px}

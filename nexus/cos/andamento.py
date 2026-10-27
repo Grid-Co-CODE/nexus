@@ -306,6 +306,52 @@ def ler_distribuidoras(config, cliente: str) -> Leitura:
     return Leitura(cliente, dados, lido_em=time.time())
 
 
+# A tela OS em aberto (27/10/2026) lê a quarta rota, com contrato próprio: o Panorama da Ronda COS, de TODOS os clientes
+# numa resposta só (`GET /api/nexus/os-abertas`). A varredura do Fracttal lá roda de 30 em 30 min: 60 s de cópia.
+VERSAO_DAS_OS_ABERTAS = 1
+TTL_OS_ABERTAS_S = 60
+
+
+def validar_os_abertas(d) -> dict:
+    if not isinstance(d, dict):
+        raise FonteErro("a resposta do Andamento não é um objeto")
+    if d.get("versao") != VERSAO_DAS_OS_ABERTAS:
+        raise FonteErro(f"o Andamento fala a versão {d.get('versao')!r} das OS abertas, e o Nexus entende a "
+                        f"{VERSAO_DAS_OS_ABERTAS}")
+    if not isinstance(d.get("os"), list) or not isinstance(d.get("cortes"), dict):
+        raise FonteErro("a resposta do Andamento não tem as OS abertas")
+    return d
+
+
+def ler_os_abertas(config) -> Leitura:
+    """O Panorama das OS abertas que o COS abriu (a tela OS em aberto). Na falha, a última cópia boa continua, dita
+    velha. O Andamento de antes da rota responde 404, e o erro diz isso, e não "não tem este cliente"."""
+    f = fonte(config)
+    if not f.ligada:
+        return Leitura("", None, erro="a fonte do Andamento não está ligada neste servidor")
+    chave = (f.url, "|os-abertas")
+    agora = time.monotonic()
+    with _trava:
+        em_cache = _cache.get(chave)
+        if em_cache and agora - em_cache[0] < TTL_OS_ABERTAS_S:
+            return Leitura("", em_cache[1], lido_em=em_cache[2])
+    try:
+        try:
+            dados = validar_os_abertas(_pedir(f, "/api/nexus/os-abertas"))
+        except FonteErro as ex:
+            if ex.codigo == 404:
+                raise FonteErro("o Andamento ainda não tem a rota das OS abertas, ou a rota do Nexus está desligada lá",
+                                404) from None
+            raise
+    except FonteErro as ex:
+        if em_cache:
+            return Leitura("", em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
+        return Leitura("", None, erro=str(ex))
+    with _trava:
+        _cache[chave] = (agora, dados, time.time())
+    return Leitura("", dados, lido_em=time.time())
+
+
 def limpar_cache() -> None:
     with _trava:
         _cache.clear()
