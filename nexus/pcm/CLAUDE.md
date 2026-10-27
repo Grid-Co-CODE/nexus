@@ -473,6 +473,9 @@ Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaix
 **As regras que valem em todas as partes:** tudo o que lê ou grava no Fracttal roda na ponte `/os/_nexus/inventario/...` (o cookie
 do login dele só chega em /os); só o administrador e o setor PCM (`pode_programar`) leem o saldo, revisam e gravam, e só de uma
 página do Nexus; quem entrou pela senha de administrador não é uma pessoa e não revisa nem grava (a auditoria ficaria sem dono);
+tudo o que grava no Fracttal (gravar, continuar, encerrar, a régua, o cadastro) confere a pessoa (`ponte_os._estoque_da_pessoa`: a
+senha 409, a conta do Fracttal do cookie que não é a pessoa da sessão do Nexus 409; a régua e o cadastro não conferiam até a
+revisão final de 27/10/2026);
 número pela metade não vai à tela (sem o Sistema, só o contado); o motivo e o texto livre vão só cifrados (a API do banco é
 aberta), e a pessoa como código (`pessoa_hmac`) e `pessoa_id`; a contagem com mais de 90 dias, do futuro ou fora do contrato não
 se aprova; o deploy espera o lote aberto (`DEPLOY.md`, seção 8).
@@ -815,8 +818,10 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   que não tem. Uma linha do livro com só um dos números acordados (a API aceita linha à mão) é `Conflito` ("incompleto"), nunca
   um `TypeError` na conferência. O evento sai antes do retrato: se o retrato falhar, a peça segue "não gravada" e o PCM grava de novo (idempotente).
   Sem acordado, ou peça não ligada ao almoxarifado: `Conflito` (409), nenhum pedido. Quem entrou pela senha de administrador
-  registra, mas não grava: `SemLogin` (401, com o link do `/os/login` e a volta à página), e a tela diz por quê. Quem entrou pelo Fracttal e
-  chega à ponte sem o cookie dele tem a sessão do Nexus encerrada pelo portão ("caiu"): o 401 com o link é de quem entrou pela Microsoft.
+  registra, mas não grava: 409 (não é uma pessoa; o `os_sessao` que estiver no navegador seria o login de outra), e a tela diz por
+  quê; a conta do Fracttal do cookie que não é a pessoa da sessão: 409 com o link para entrar de novo; sem o cookie (quem entrou pela
+  Microsoft): 401 com o link do `/os/login` e a volta à página. Quem entrou pelo Fracttal e chega à ponte sem o cookie dele tem a
+  sessão do Nexus encerrada pelo portão ("caiu").
   Limite do Fracttal: 429. Rede que cai: 502 com "grave de novo, é o mesmo número" (só na régua: `erros.resposta(ex, ao="regua")`).
 - **Peças de apoio:** `quem.py` (a pessoa nas colunas do livro: `pessoa_hmac` pelo e-mail da sessão, e `pessoa_id` quando o
   cadastro a acha; sem e-mail, vazio), `erros.py` (`Conflito`, `NaoConfere` e a tabela erro -> status HTTP, a mesma da curadoria; o erro
@@ -890,8 +895,8 @@ Duas pendências, só nas contagens que ainda NÃO foram gravadas: o **achado fo
   com o login de quem decide, e esse login (o cookie `os_sessao`, `Path=<raiz>/os`) não chega às rotas de `/t/pcm`. A página fica em
   `/t/pcm`, o formulário do cadastro (`data-ponte`) vai por `fetch` (`static/pcm-ponte-inventario.js`) e a ponte responde JSON. As
   outras três decisões (é a peça X, confirmar, descartar) só gravam no livro e ficam em `/t/pcm/.../curadoria/decidir`, que recusa
-  `cadastrar` (400). Quem entrou pela senha de administrador decide as três e no cadastro leva 401 com o link do login do
-  Fracttal. 429 do Fracttal e rede que cai também têm texto (`erros.resposta(ex, ao="cadastro")`: o código ficou reservado, repetir
+  `cadastrar` (400). Quem entrou pela senha de administrador decide as três e no cadastro leva 409 (não é uma pessoa); a conta do
+  Fracttal do cookie que não é a pessoa da sessão, 409; sem o cookie, 401 com o link do login do Fracttal. 429 do Fracttal e rede que cai também têm texto (`erros.resposta(ex, ao="cadastro")`: o código ficou reservado, repetir
   com os mesmos dados não cria outra peça; não diz "é o mesmo número", que é da régua). Prova com o `estoque_da_sessao` DE VERDADE e o
   cookie com `Path=/os`: `test_o_login_do_fracttal_so_chega_na_ponte` (régua e curadoria).
 - **Provar:** `tests/test_pcm_inventario_curadoria.py` (o código novo, as pendências, cadastrar com a resposta perdida e com o pedido

@@ -23,7 +23,7 @@ from nexus.pcm.inventario import contas as C
 from nexus.pcm.inventario import curadoria as CU
 from nexus.pcm.inventario import estoque as E
 from nexus.pcm.inventario.erros import Conflito
-from test_pcm_inventario_estoque import _jwt, _result, api_do_clone  # noqa: F401  (api_do_clone é fixture)
+from test_pcm_inventario_estoque import _jwt, _result, api_do_clone, com_o_fracttal  # noqa: F401  (api_do_clone é fixture)
 
 ALMOX = "10"
 LIGADA = "de-para do Fracttal"
@@ -483,7 +483,7 @@ def test_tela_cadastra_pelo_login_de_quem_decide(cur, monkeypatch):
     falso = _falso()
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa_ms(cur)
+    c = com_o_fracttal(cur, _pessoa_ms(cur))
     r = c.post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm",
                                 "unidade": "METRO"})
     assert r.status_code == 200 and r.get_json()["ok"] is True and r.get_json()["volta"].endswith(URL)
@@ -533,20 +533,37 @@ def test_status_de_cada_recusa(cur, monkeypatch):
     assert r.status_code == 409 and "nova contagem" in r.get_data(as_text=True)
 
 
-def test_cadastrar_pela_senha_de_administrador_pede_o_login_do_fracttal(cur, logado):
-    """Cadastrar fala com o Fracttal, e a senha de administrador não tem login nele: 401 com o link do login (o `/os/login`, com a
-    volta à curadoria). As outras decisões (descartar, é a peça X, confirmar) são do Nexus e valem."""
+def test_cadastrar_pela_senha_de_administrador_e_recusado(cur, logado, monkeypatch):
+    """Cadastrar fala com o Fracttal no nome de quem decide, e a senha de administrador não é uma pessoa; o `os_sessao` que
+    estiver no navegador é o login de OUTRA pessoa (a revisão final de 27/10/2026): 409 antes de qualquer pedido. As outras
+    decisões (descartar, é a peça X, confirmar) são do Nexus e valem."""
+    falso = _falso()
+    _estoque_da_sessao(monkeypatch, falso)
+    com_o_fracttal(cur, logado, "outra.pessoa@exemplo.test")
     r = logado.post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo"})
-    assert r.status_code == 401 and "Fracttal" in r.get_json()["erro"] and "/os/login?next=" in r.get_json()["login"]
+    assert r.status_code == 409 and "senha de administrador" in r.get_json()["erro"] and falso.chamadas == []
     assert F.ler(cur.config, forcar=True)[F.ABA_CURADORIA] == []
     assert logado.post(f"{URL}/decidir", data={"contagem": "C-1", "linha": "L-3", "decisao": "descartar",
                                                "motivo": "x"}).status_code == 303
 
 
+def test_cadastrar_com_a_conta_do_fracttal_de_outra_pessoa_e_recusado(cur, monkeypatch):
+    """O cookie do OS Creator de outra conta no mesmo navegador: a peça nasceria no login de uma pessoa e a decisão no nome de
+    outra. 409 com o link para entrar de novo, e nada vai ao Fracttal nem ao livro."""
+    from nexus.pcm.inventario import ponte_os
+    falso = _falso()
+    _estoque_da_sessao(monkeypatch, falso)
+    _no_setor(monkeypatch, "PCM")
+    c = com_o_fracttal(cur, _pessoa_ms(cur), "outra.pessoa@exemplo.test")
+    r = c.post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm"})
+    assert r.status_code == 409 and r.get_json()["erro"] == ponte_os.OUTRA_CONTA and "/os/login?next=" in r.get_json()["login"]
+    assert falso.chamadas == [] and F.ler(cur.config, forcar=True)[F.ABA_CURADORIA] == []
+
+
 def test_limite_do_fracttal_na_curadoria_e_429(cur, monkeypatch):
     _estoque_da_sessao(monkeypatch, _falso(limite_em=1))
     _no_setor(monkeypatch, "PCM")
-    r = _pessoa_ms(cur).post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm"})
+    r = com_o_fracttal(cur, _pessoa_ms(cur)).post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm"})
     assert r.status_code == 429 and "tente de novo" in r.get_json()["erro"].lower()
 
 
@@ -555,7 +572,7 @@ def test_rede_que_cai_no_cadastro_diz_que_o_codigo_ficou_reservado(cur, monkeypa
     mesmos dados não cria outra peça), e não o da régua ("grave de novo, é o mesmo número")."""
     _estoque_da_sessao(monkeypatch, _falso(perder_resposta={"criar_peca"}))
     _no_setor(monkeypatch, "PCM")
-    r = _pessoa_ms(cur).post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm"})
+    r = com_o_fracttal(cur, _pessoa_ms(cur)).post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm"})
     assert r.status_code == 502 and "reservado" in r.get_json()["erro"] and "mesmo número" not in r.get_json()["erro"]
     assert F.ler(cur.config, forcar=True)[F.ABA_CURADORIA] == []
 
@@ -591,7 +608,7 @@ def test_o_login_do_fracttal_so_chega_na_ponte(cur, api_do_clone, monkeypatch):
     clone = ponte.clone(cur)
     jwt = _jwt()
     cookie = clone.session_interface.get_signing_serializer(clone).dumps(
-        {"jwt": jwt, "conta": {"email": "pessoa@exemplo.test", "nome": "Pessoa"}})
+        {"jwt": jwt, "conta": {"email": "pessoa.teste@exemplo.com", "nome": "Pessoa"}})     # a pessoa da sessão (`_pessoa`)
     _no_setor(monkeypatch, "PCM")
     c = _pessoa(cur)                                                    # a sessão nasceu do login do Fracttal
     c.set_cookie("os_sessao", cookie, path="/os")                       # como o login do Fracttal o grava

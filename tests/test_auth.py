@@ -79,6 +79,18 @@ def test_entrar_com_o_fracttal_abre_o_nexus_e_o_os_creator(cliente, monkeypatch)
     assert any(h.startswith("os_sessao=;") for h in sair.headers.getlist("Set-Cookie"))
 
 
+def test_a_senha_de_administrador_apaga_o_fracttal_de_quem_usou_o_navegador_antes(cliente):
+    """A revisão final do inventário (27/10/2026): quem entra pela senha de administrador não tem login no Fracttal, mas o
+    `os_sessao` de quem usou o navegador antes (o PC da sala do NOC) ficava, e o OS Creator e a ponte do inventário falariam
+    com o Fracttal no login de outra pessoa. O login pela senha o apaga, como o da Microsoft; a senha errada não mexe nele."""
+    cliente.set_cookie("os_sessao", "sessao-do-fracttal-de-outra-pessoa", path="/os")
+    errada = cliente.post("/entrar", data={"senha": "errada"})
+    assert not any(h.startswith("os_sessao=") for h in errada.headers.getlist("Set-Cookie"))
+    r = cliente.post("/entrar", data={"senha": SENHA_TESTE})
+    assert r.status_code == 302
+    assert any(h.startswith("os_sessao=;") and "Path=/os" in h for h in r.headers.getlist("Set-Cookie"))
+
+
 def test_fracttal_que_recusa_mostra_o_motivo(cliente, monkeypatch):
     from nexus.auth import fracttal
 

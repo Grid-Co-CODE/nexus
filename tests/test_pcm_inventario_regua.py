@@ -20,7 +20,7 @@ from nexus.campo import visao
 from nexus.dados import fato_inventario as F
 from nexus.pcm.inventario import estoque as E
 from nexus.pcm.inventario import regua as R
-from test_pcm_inventario_estoque import _jwt, _result, api_do_clone  # noqa: F401  (api_do_clone é fixture)
+from test_pcm_inventario_estoque import _jwt, _result, api_do_clone, com_o_fracttal  # noqa: F401  (api_do_clone é fixture)
 
 ALMOX, LIGADA = "900", "de-para do Fracttal"
 HMAC_CHAVE = "chave-de-teste"
@@ -451,7 +451,7 @@ def test_gravar_pela_ponte_usa_o_login_de_quem_aprova(inv, monkeypatch):
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa_ms(inv)
+    c = com_o_fracttal(inv, _pessoa_ms(inv))
     corpo = {"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"}
     assert c.post("/t/pcm/pecas/inventario/regua/decidir", data=corpo).status_code == 303
     assert falso.chamadas == []
@@ -474,25 +474,43 @@ def test_gravar_sem_o_acordado_e_409(inv, monkeypatch):
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    r = _pessoa_ms(inv).post(PONTE, data=GRAVAR)
+    r = com_o_fracttal(inv, _pessoa_ms(inv)).post(PONTE, data=GRAVAR)
     assert r.status_code == 409 and "acordad" in r.get_json()["erro"].lower() and falso.chamadas == []
 
 
 def test_quem_entrou_pela_senha_nao_grava_no_fracttal(inv, logado, monkeypatch):
-    """Sem o login do Fracttal na sessão (a senha de administrador não tem) a gravação para antes de qualquer pedido: 401 com o
-    link do login do Fracttal (o `/os/login`, com a volta à página). Registrar a decisão no Nexus continua valendo."""
+    """A senha de administrador não é uma pessoa (a régua gravada no Fracttal ficaria sem dono), e o `os_sessao` que estiver no
+    navegador é o login do Fracttal de OUTRA pessoa (a revisão final de 27/10/2026: a régua e o cadastro não conferiam): 409
+    antes de qualquer pedido ao Fracttal. Registrar a decisão no Nexus continua valendo."""
+    falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
+    _estoque_da_sessao(monkeypatch, falso)
     assert logado.post("/t/pcm/pecas/inventario/regua/decidir",
                        data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"}).status_code == 303
+    com_o_fracttal(inv, logado, "outra.pessoa@exemplo.test")      # o login do Fracttal de quem usou o navegador antes
     r = logado.post(PONTE, data=GRAVAR)
-    assert r.status_code == 401 and "Fracttal" in r.get_json()["erro"]
-    assert "/os/login?next=" in r.get_json()["login"] and "voltar" in r.get_json()["login"]
+    assert r.status_code == 409 and "senha de administrador" in r.get_json()["erro"] and falso.chamadas == []
+    assert F.ler(inv.config, forcar=True)[F.ABA_EVENTO] == []
+
+
+def test_a_conta_do_fracttal_de_outra_pessoa_nao_grava(inv, monkeypatch):
+    """O cookie do OS Creator sobrevive à troca de pessoa no mesmo navegador: a régua iria no nome de uma pessoa e no login de
+    outra. 409 "a sessão do Fracttal é de outra conta" com o link para entrar de novo, como na gravação, e nada vai ao Fracttal."""
+    from nexus.pcm.inventario import ponte_os
+    falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
+    _estoque_da_sessao(monkeypatch, falso)
+    _no_setor(monkeypatch, "PCM")
+    c = com_o_fracttal(inv, _pessoa_ms(inv), "outra.pessoa@exemplo.test")
+    assert c.post("/t/pcm/pecas/inventario/regua/decidir", data=GRAVAR).status_code == 303
+    r = c.post(PONTE, data=GRAVAR)
+    assert r.status_code == 409 and r.get_json()["erro"] == ponte_os.OUTRA_CONTA and "/os/login?next=" in r.get_json()["login"]
+    assert falso.chamadas == [] and F.ler(inv.config, forcar=True)[F.ABA_EVENTO] == []
 
 
 def test_limite_do_fracttal_e_429_com_o_que_fazer(inv, monkeypatch):
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}}, limite_em=1)
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa_ms(inv)
+    c = com_o_fracttal(inv, _pessoa_ms(inv))
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
     r = c.post(PONTE, data=GRAVAR)
     assert r.status_code == 429 and "tente de novo" in r.get_json()["erro"].lower()
@@ -505,7 +523,7 @@ def test_resposta_perdida_do_fracttal_grava_de_novo_sem_duplicar(inv, monkeypatc
                          perder_resposta={"definir_regua"})
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa_ms(inv)
+    c = com_o_fracttal(inv, _pessoa_ms(inv))
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
     r = c.post(PONTE, data=GRAVAR)
     assert r.status_code == 502 and "grave de novo" in r.get_json()["erro"]
@@ -522,7 +540,7 @@ def test_gravar_com_a_regua_que_mudou_desde_que_a_tela_abriu_e_409(inv, monkeypa
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa_ms(inv)
+    c = com_o_fracttal(inv, _pessoa_ms(inv))
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "4", "aco_max": "9"})   # a outra pessoa
     r = c.post(PONTE, data=GRAVAR)                         # a tela da 1ª pessoa ainda mostrava 2 e 9
@@ -536,7 +554,7 @@ def test_gravar_sem_o_acordado_que_a_tela_mostrava_e_400(inv, monkeypatch):
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, "PCM")
-    c = _pessoa_ms(inv)
+    c = com_o_fracttal(inv, _pessoa_ms(inv))
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
     r = c.post(PONTE, data={"almox": "10", "item": "1"})
     assert r.status_code == 400 and "acordado que mostrava" in r.get_json()["erro"]
@@ -648,12 +666,13 @@ def test_duas_pessoas_na_mesma_peca_nao_apagam_o_que_a_outra_registrou(cfg, monk
 
 
 def _jwt_e_cookie(app):
-    """O cookie `os_sessao` como o login do Fracttal o grava (a sessão assinada do clone do OS Creator, com o JWT)."""
+    """O cookie `os_sessao` como o login do Fracttal o grava (a sessão assinada do clone do OS Creator, com o JWT), da mesma
+    conta da pessoa da sessão do Nexus (`_pessoa`): a ponte confere."""
     from nexus.torres.oscreator import ponte
     clone = ponte.clone(app)
     jwt = _jwt()
     valor = clone.session_interface.get_signing_serializer(clone).dumps(
-        {"jwt": jwt, "conta": {"email": "pessoa@exemplo.test", "nome": "Pessoa"}})
+        {"jwt": jwt, "conta": {"email": "pessoa.teste@exemplo.com", "nome": "Pessoa"}})
     return jwt, valor
 
 

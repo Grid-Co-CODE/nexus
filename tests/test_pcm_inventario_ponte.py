@@ -16,6 +16,8 @@ from flask import Blueprint, Flask
 from test_campo_visao import BRT, _aba, banco  # noqa: F401  (banco é fixture)
 from test_pcm_almoxarifado import _semear
 from test_pcm_inventario_curadoria import CABO, CONECTOR, GENERICO, PECA_DA_LISTA
+from test_pcm_inventario_estoque import com_o_fracttal
+from test_pcm_publicar import _no_setor
 
 from nexus import create_app
 from nexus.campo import visao
@@ -59,6 +61,20 @@ def _administrador(app):
     return c
 
 
+def _pcm(app, monkeypatch, fracttal=True):
+    """Uma pessoa do setor PCM que entrou pela conta Microsoft; com `fracttal`, também com o login do Fracttal da MESMA conta (o
+    cookie `os_sessao`): a ponte grava no nome e no login da mesma pessoa. O cookie vai no caminho do prefixo, e não no
+    `/nexus/os` do navegador: o cliente de teste do Flask casa o cookie com o endereço que ele monta, o `APPLICATION_ROOT` na frente
+    do caminho pedido (`/nexus/nexus/os/...`). O caminho de verdade (`os_cookie_path`) é provado no `test_prefixo` e no login."""
+    import time
+    _no_setor(monkeypatch, "PCM")
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s["logado"], s["admin"], s["via"], s["ms_ate"] = True, False, "microsoft", time.time() + 3600
+        s["usuario"] = {"email": "pessoa.teste@exemplo.com", "nome": "Pessoa Teste"}
+    return com_o_fracttal(app, c, path=PREFIXO) if fracttal else c
+
+
 def test_registrar_duas_vezes_registra_a_ponte_uma_vez_so():
     """A torre registra a ponte e outro módulo (a gravação, a Task 7) pode registrá-la de novo: o mesmo blueprint duas vezes no
     mesmo app levantaria `ValueError`. O registro é idempotente, também com duas torres."""
@@ -78,7 +94,7 @@ def test_a_ponte_da_regua_debaixo_do_prefixo(inv, monkeypatch):
     e a ponte responde no caminho que o navegador pede (`/nexus/os/_nexus/...`), sem dobrar o prefixo."""
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     monkeypatch.setattr(E, "estoque_da_sessao", lambda app: falso)
-    c = _administrador(inv)
+    c = _pcm(inv, monkeypatch)
     r = c.post(f"{REGUA}/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
     assert r.status_code == 303 and r.headers["Location"].endswith(f"{REGUA}?almox=10")
     html = c.get(f"{REGUA}?almox=10").get_data(as_text=True)
@@ -93,7 +109,7 @@ def test_a_ponte_da_regua_debaixo_do_prefixo(inv, monkeypatch):
 def test_a_ponte_da_curadoria_debaixo_do_prefixo(inv, monkeypatch):
     falso = EstoqueFalso({"10": {"5": {"saldo": 1, "codigo": "SP-CAB-001"}}})
     monkeypatch.setattr(E, "estoque_da_sessao", lambda app: falso)
-    c = _administrador(inv)
+    c = _pcm(inv, monkeypatch)
     html = c.get(CURADORIA).get_data(as_text=True)
     assert f'action="{PREFIXO}/os/_nexus/inventario/curadoria/cadastrar"' in html and "/nexus/nexus" not in html
     r = c.post(f"{PREFIXO}/os/_nexus/inventario/curadoria/cadastrar",
@@ -102,15 +118,24 @@ def test_a_ponte_da_curadoria_debaixo_do_prefixo(inv, monkeypatch):
     assert "SP-CAB-002" in c.get(CURADORIA).get_data(as_text=True)
 
 
-def test_sem_o_login_do_fracttal_o_link_do_login_sai_com_o_prefixo(inv):
-    """Quem entrou pela senha de administrador não tem o cookie do Fracttal: 401 e o link do `/os/login` do OS Creator, debaixo do
-    prefixo, nas duas rotas da ponte."""
-    c = _administrador(inv)
+def test_sem_o_login_do_fracttal_o_link_do_login_sai_com_o_prefixo(inv, monkeypatch):
+    """Quem entrou pela conta Microsoft e não tem o cookie do Fracttal: 401 e o link do `/os/login` do OS Creator, debaixo do
+    prefixo, nas duas rotas da ponte. A senha de administrador não é uma pessoa: 409 nas duas (a revisão final de 27/10/2026), e
+    o login dela apaga o `os_sessao` de quem usou o navegador antes, no /os debaixo do prefixo."""
+    c = _pcm(inv, monkeypatch, fracttal=False)
     c.post(f"{REGUA}/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
-    for rota, corpo in (("regua/gravar", GRAVAR), ("curadoria/cadastrar", {"contagem": "C-1", "linha": "L-2", "sigla": "CAB",
-                                                                        "nome": "Cabo"})):
+    corpos = (("regua/gravar", GRAVAR), ("curadoria/cadastrar", {"contagem": "C-1", "linha": "L-2", "sigla": "CAB",
+                                                                 "nome": "Cabo"}))
+    for rota, corpo in corpos:
         r = c.post(f"{PREFIXO}/os/_nexus/inventario/{rota}", data=corpo)
         assert r.status_code == 401 and r.get_json()["login"].startswith(f"{PREFIXO}/os/login?next=")
+    admin = inv.test_client()
+    admin.set_cookie("os_sessao", "sessao-do-fracttal-de-outra-pessoa", path=f"{PREFIXO}/os")
+    r = admin.post(f"{PREFIXO}/entrar", data={"senha": SENHA})
+    assert any(h.startswith("os_sessao=;") and f"Path={PREFIXO}/os" in h for h in r.headers.getlist("Set-Cookie"))
+    for rota, corpo in corpos:
+        r = admin.post(f"{PREFIXO}/os/_nexus/inventario/{rota}", data=corpo)
+        assert r.status_code == 409 and "senha de administrador" in r.get_json()["erro"]
 
 
 # ── a tabela de erros ──────────────────────────────────────────────────────────────────────────────────────────────────

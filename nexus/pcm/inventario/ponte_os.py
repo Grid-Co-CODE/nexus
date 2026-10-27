@@ -14,8 +14,11 @@ checagem qualquer pessoa logada leria o saldo da empresa. O que NÃO precisa do 
 gravação, registrar a régua, "é a peça X", confirmar, descartar) fica em `/t/pcm/...`.
 
 Cada rota daqui: só administrador e setor PCM, pedido só da própria página (`_de_outro_site`), o login do Fracttal de quem pediu
-(`estoque_da_sessao`); sem ele, 401 com `{"erro", "login"}` (o `/os/login` do OS Creator, com a volta à página). Cada tarefa põe as
-rotas dela num bloco próprio: o lote da contagem (Tasks 5 e 6), a régua (Task 8), a curadoria (Task 9), a gravação (Task 7).
+(`estoque_da_sessao`); sem ele, 401 com `{"erro", "login"}` (o `/os/login` do OS Creator, com a volta à página). O que GRAVA no
+Fracttal (a régua, o cadastro da curadoria, gravar, continuar, encerrar) confere também a PESSOA (`_estoque_da_pessoa`): a senha de
+administrador não é uma pessoa (409), e a conta do Fracttal do cookie tem de ser a pessoa da sessão do Nexus (409; a revisão final
+de 27/10/2026 achou a régua e o cadastro sem essa conferência). Cada tarefa põe as rotas dela num bloco próprio: o lote da contagem
+(Tasks 5 e 6), a régua (Task 8), a curadoria (Task 9), a gravação (Task 7).
 """
 from __future__ import annotations
 
@@ -34,6 +37,8 @@ bp = Blueprint("pcm_inventario_ponte", __name__, url_prefix="/os/_nexus/inventar
 bp_raiz = bp                     # o nome que a Task 6 usou; um blueprint só
 
 ENTRAR = "Para ler o saldo e gravar, entre pelo Fracttal."
+SEM_PESSOA = ("Não sei quem está gravando no Fracttal: entre no Nexus com o seu login do Fracttal (o que se grava fica no nome de "
+              "quem grava, e a senha de administrador não é uma pessoa). Nada foi gravado.")
 
 
 def registrar(bp_torre) -> None:
@@ -75,14 +80,18 @@ def _barrar():
 
 def _com_o_fracttal(de: str, fazer, ao: str | None = None):
     """Roda `fazer(estoque)` com o login do Fracttal de quem apertou e devolve a resposta JSON (`ao`: o que se faz, para o texto
-    do erro de rede, `erros.resposta`). `fazer` devolve o texto que a página mostra ao recarregar. Sem login do Fracttal na
-    sessão (a senha de administrador não tem; ou o `os_sessao` não veio): 401 com o link do login. O que o Fracttal ou o livro
-    recusam sobe pela tabela de `erros.resposta`."""
+    do erro de rede, `erros.resposta`). `fazer` devolve o texto que a página mostra ao recarregar. Passa pelo `_estoque_da_pessoa`,
+    como a gravação: a senha de administrador (sem pessoa) leva 409, o `os_sessao` que não veio leva 401 com o link do login, e
+    a conta do Fracttal que não é a pessoa da sessão do Nexus leva 409 (a régua e o cadastro iam no login de quem usou o navegador
+    antes; a revisão final de 27/10/2026). O que o Fracttal ou o livro recusam sobe pela tabela de `erros.resposta`."""
     barrado = _barrar()
     if barrado is not None:
         return barrado
+    est, recusa = _estoque_da_pessoa(de)
+    if recusa:
+        return recusa
     try:
-        texto = fazer(E.estoque_da_sessao(current_app._get_current_object()))
+        texto = fazer(est)
     except (ValueError, OSError, E.Limite, E.SemLogin, E.ErroFracttal) as ex:
         status, msg = erros.resposta(ex, ao=ao)
         corpo = {"erro": msg}
@@ -189,26 +198,30 @@ def _sem_login(contagem_id: str):
     return jsonify(ok=False, erro=ENTRAR, login=_login(_de_volta(contagem_id))), 401
 
 
-def _estoque_da_pessoa(contagem_id: str):
-    """(o estoque com o login do Fracttal de quem está no pedido, None) ou (None, a resposta de recusa): sem o JWT, 401 com o
-    link do login; a conta do Fracttal que não é a pessoa do Nexus, 409. `E.estoque_da_sessao` pelo módulo, no momento do
-    pedido (o teste que prova o cookie o deixa ser o de verdade)."""
+def _estoque_da_pessoa(volta: str):
+    """(o estoque com o login do Fracttal de quem está no pedido, None) ou (None, a resposta de recusa). `volta`: a página a que o
+    link do login devolve. Sem pessoa na sessão do Nexus (a senha de administrador), 409; sem o JWT, 401 com o link do login; a
+    conta do Fracttal que não é a pessoa do Nexus, 409. `E.estoque_da_sessao` pelo módulo, no momento do pedido (o teste que
+    prova o cookie o deixa ser o de verdade)."""
     from ...torres.oscreator import ponte
+    if not str(_email() or "").strip():
+        return None, (jsonify(ok=False, erro=SEM_PESSOA), 409)
     app = current_app._get_current_object()
     try:
         s = ponte.sessao_do_os(app)
     except Exception as ex:      # noqa: BLE001 — o clone do OS Creator que não sobe: nada foi gravado
         logging.error("inventário: a sessão do OS Creator não abriu: %s", type(ex).__name__)
         return None, (jsonify(ok=False, erro="O OS Creator não respondeu agora: tente de novo. Nada foi gravado."), 503)
+    sem_login = (jsonify(ok=False, erro=ENTRAR, login=_login(volta)), 401)
     if not str(s.get("jwt") or ""):
-        return None, _sem_login(contagem_id)
+        return None, sem_login
     conta = str((s.get("conta") or {}).get("email") or "").strip().lower()
     if not conta or conta != str(_email() or "").strip().lower():
-        return None, (jsonify(ok=False, erro=OUTRA_CONTA, login=_login(_de_volta(contagem_id))), 409)
+        return None, (jsonify(ok=False, erro=OUTRA_CONTA, login=_login(volta)), 409)
     try:
         return E.estoque_da_sessao(app), None
     except E.SemLogin:
-        return None, _sem_login(contagem_id)
+        return None, sem_login
 
 
 def _recusa(ex):
@@ -231,7 +244,7 @@ def gravar(contagem_id):
     pessoa = R.pessoa(cfg, _email())
     if pessoa is None:
         return jsonify(ok=False, erro=G.SEM_PESSOA), 409
-    est, recusa = _estoque_da_pessoa(contagem_id)
+    est, recusa = _estoque_da_pessoa(_de_volta(contagem_id))
     if recusa:
         return recusa
     corpo = request.get_json(silent=True)
@@ -273,7 +286,7 @@ def continuar(contagem_id):
     pessoa = R.pessoa(cfg, _email())
     if pessoa is None:
         return jsonify(ok=False, erro=G.SEM_PESSOA), 409
-    est, recusa = _estoque_da_pessoa(contagem_id)
+    est, recusa = _estoque_da_pessoa(_de_volta(contagem_id))
     if recusa:
         return recusa
     try:
@@ -303,7 +316,7 @@ def encerrar(contagem_id):
         G.conferir_quem_encerra(cfg, contagem_id, pessoa, admin)      # antes do Fracttal: quem não pode nem chega lá
     except F.Recusada as ex:
         return _recusa(ex)
-    est, recusa = _estoque_da_pessoa(contagem_id)
+    est, recusa = _estoque_da_pessoa(_de_volta(contagem_id))
     if recusa:
         return recusa
     corpo = request.get_json(silent=True)

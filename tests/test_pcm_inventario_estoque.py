@@ -554,6 +554,18 @@ def _jwt(email="pessoa@exemplo.test", exp_s=3600):
     return "x." + corpo.decode().rstrip("=") + ".y"
 
 
+def com_o_fracttal(app, cliente, email="pessoa.teste@exemplo.com", path="/os", jwt=None):
+    """O cookie `os_sessao` do login do Fracttal da conta `email`, assinado com a chave do clone e no caminho /os, como o login o
+    grava (debaixo do prefixo, `path="/nexus/os"`). A ponte do inventário confere que a conta é a pessoa da sessão do Nexus
+    (`pessoa.teste@exemplo.com` é a do `_pessoa` dos testes do PCM)."""
+    from nexus.torres.oscreator import ponte
+    clone = ponte.clone(app)
+    valor = clone.session_interface.get_signing_serializer(clone).dumps(
+        {"jwt": jwt or _jwt(email), "conta": {"email": email, "nome": "Pessoa Teste"}})
+    cliente.set_cookie("os_sessao", valor, path=path)
+    return cliente
+
+
 class _Resposta:
     """O que o `requests.post` devolveria."""
 
