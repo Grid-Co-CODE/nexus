@@ -5,6 +5,7 @@ e enquanto ela está aberta o almoxarifado fica travado (nem entrada, nem saída
 assim em 26/10, em inventário físico). Os testes provam cada caminho que pode deixar o almoxarifado travado, com o
 `EstoqueFalso` e um relógio de mentira: nada vai à rede e nada espera de verdade (a espera de 62 s do 429 é injetada).
 O livro do inventário é um arquivo local e a pasta de dados é a do `tmp_path`. Dado de mentira, sem nome de gente."""
+import hashlib
 import json
 import re
 import threading
@@ -29,6 +30,9 @@ PONTE = "/os/_nexus/inventario"
 CONTADA = (AGORA.astimezone(timezone.utc) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
 APROVADOR = {"pessoa_hmac": codigo_da_pessoa(CHAVE, EMAIL), "pessoa_id": 92}
 OUTRA = {"pessoa_hmac": codigo_da_pessoa(CHAVE, "outra.pessoa@exemplo.test"), "pessoa_id": None}
+# a referência das sessões da C-1 no Fracttal: os 12 primeiros hexadecimais do sha1 do ID da contagem (a revisão final de
+# 27/10/2026: o ID do App tem até 80 caracteres, e ninguém mediu o limite da `description` do Fracttal)
+REF = "INVENTARIO-" + hashlib.sha1(b"C-1").hexdigest()[:12]
 
 
 class Relogio:
@@ -120,7 +124,7 @@ def test_grava_e_confirma(app, grav):
                               "gravar_saldo", "gravar_saldo", "fechar_ajuste", "voltar_ao_normal", "achar_movimento", "ler"]
     assert _saldos(falso) == {"501": 12, "502": 3, "503": 0} and falso.modo("10") == 0
     assert _pares(falso) == {"501": ["saida", "entrada"], "502": ["saida", "entrada"], "503": ["saida", "entrada"]}
-    assert {m["referencia"] for m in falso.movimentos} == {"INVENTARIO-C-1-L1"}
+    assert {m["referencia"] for m in falso.movimentos} == {f"{REF}-L1"}
     aprovadas = _eventos(app, "aprovada")
     assert sorted(e["id_item"] for e in aprovadas) == ["501", "502", "503"] and {e["lote"] for e in aprovadas} == {1}
     gravadas = {e["id_item"]: e for e in _eventos(app, "peca_gravada")}
@@ -144,6 +148,21 @@ def grav_pasta(app):
     return Path(app.config["NEXUS_DADOS"]) / "almox_inventario"
 
 
+def test_a_referencia_e_curta_e_o_id_inteiro_fica_no_livro(app, grav):
+    """A referência vai na `description` dos movimentos do Fracttal, cujo limite ninguém mediu, e o ID da contagem do App tem
+    até 80 caracteres: `INVENTARIO-<h>-L<n>`, com `h` os 12 primeiros hexadecimais do sha1 do ID (a revisão final de
+    27/10/2026; a prova de 27/10 usou `INVENTARIO-PROVA-TST-1-L1`, o formato de antes). O ID inteiro fica no evento e no
+    controle."""
+    cid = "contagem-do-app-" + "x" * 64
+    falso = _falso(agora=grav["relogio"])
+    _iniciar(grav, falso, cid=cid)
+    h = hashlib.sha1(cid.encode("utf-8")).hexdigest()[:12]
+    assert {m["referencia"] for m in falso.movimentos} == {f"INVENTARIO-{h}-L1"}
+    assert {e["contagem_id"] for e in _eventos(app)} == {cid} and G.estado(app.config, cid)["estado"] == "concluida"
+    ctrl = json.loads(next(grav_pasta(app).glob("contagem-do-app-*.json")).read_text("utf-8"))
+    assert ctrl["contagem_id"] == cid and ctrl["lotes"][0]["ref"] == f"INVENTARIO-{h}-L1"
+
+
 def test_lotes_de_50(app, grav):
     """120 peças: três lotes (50, 50, 20), uma sessão cada, cada uma com a sua referência. Entre um lote e outro o
     almoxarifado volta ao normal (o técnico lança peça no intervalo)."""
@@ -152,8 +171,8 @@ def test_lotes_de_50(app, grav):
     _iniciar(grav, falso, {i: 2 for i in saldos})
     assert falso.chamadas.count("abrir_ajuste") == 3 and falso.chamadas.count("fechar_ajuste") == 3
     refs = [m["referencia"] for m in falso.movimentos]
-    assert sorted(set(refs)) == ["INVENTARIO-C-1-L1", "INVENTARIO-C-1-L2", "INVENTARIO-C-1-L3"]
-    assert [refs.count(f"INVENTARIO-C-1-L{n}") for n in (1, 2, 3)] == [100, 100, 40]       # um par por peça
+    assert sorted(set(refs)) == [f"{REF}-L1", f"{REF}-L2", f"{REF}-L3"]
+    assert [refs.count(f"{REF}-L{n}") for n in (1, 2, 3)] == [100, 100, 40]                # um par por peça
     por_lote = {}
     for e in _eventos(app, "aprovada"):
         por_lote[e["lote"]] = por_lote.get(e["lote"], 0) + 1
@@ -338,7 +357,7 @@ def test_limite_fecha_antes_de_parar(app, grav):
     assert G.estado(app.config, "C-1")["estado"] == "concluida"
     assert _saldos(falso) == {"501": 12, "502": 3, "503": 0}
     assert _pares(falso) == {i: ["saida", "entrada"] for i in ("501", "502", "503")}
-    assert {m["referencia"] for m in falso.movimentos} == {"INVENTARIO-C-1-L1", "INVENTARIO-C-1-L1-S2"}
+    assert {m["referencia"] for m in falso.movimentos} == {f"{REF}-L1", f"{REF}-L1-S2"}
     assert {e["id_item"] for e in _eventos(app, "peca_gravada")} == {"501", "502", "503"}
     assert len(_eventos(app, "peca_gravada")) == 3                        # a 501 não é registrada duas vezes
 
@@ -450,7 +469,7 @@ def test_o_disco_que_falha_nao_deixa_o_almoxarifado_travado(app, grav, monkeypat
 
 
 def test_a_gravacao_nao_conta_as_proprias_sessoes_como_mexidas(app, grav):
-    """O que se moveu depois da contagem é lido sem as sessões da própria contagem (`INVENTARIO-<contagem>-`): o movimento
+    """O que se moveu depois da contagem é lido sem as sessões da própria contagem (`INVENTARIO-<h>-`): o movimento
     que o Nexus fez num lote (ou numa sessão anterior do mesmo lote) não é conflito."""
     falso = _falso(agora=grav["relogio"])
     pedidos, mexidas = [], falso.mexidas_desde
@@ -460,7 +479,7 @@ def test_a_gravacao_nao_conta_as_proprias_sessoes_como_mexidas(app, grav):
         return mexidas(*args)
     falso.mexidas_desde = anotar
     _iniciar(grav, falso)
-    assert pedidos == [("10", CONTADA, None, "INVENTARIO-C-1-")]
+    assert pedidos == [("10", CONTADA, None, f"{REF}-")]
 
 
 def test_o_adaptador_e_o_falso_ignoram_o_prefixo():
@@ -999,6 +1018,28 @@ def test_a_curadoria_durante_a_aprovacao_espera_e_e_recusada(app, inv, grav):  #
     assert "r" in aprovou, aprovou
     assert isinstance(decidiu.get("erro"), Conflito), decidiu
     assert F.ler(app.config, forcar=True)[F.ABA_CURADORIA] == []
+
+
+def test_aprovar_rele_o_livro_do_app_sem_a_copia_de_5_min(app, inv, grav):  # noqa: F811
+    """A lista das contagens vem da cópia de 5 min do livro do App; a aprovação relê o livro AGORA (a revisão final de
+    27/10/2026): a contagem mais nova do mesmo almoxarifado que acabou de chegar substitui a velha antes de ela ir ao Fracttal
+    (aprovar a velha depois da nova desfaria a nova)."""
+    from test_campo_visao import _aba
+    from test_pcm_inventario_leitura import _iso, _publicar
+
+    from nexus.dados import almoxarifado as A
+    velha = [_linha("C-1", "L1", "501", "12"), _linha("C-1", "L2", "502", "3")]
+    _publicar(inv, *velha)
+    falso = _estoque(agora=grav["relogio"])
+    visto = _visto(app, falso)                                    # a tela abriu com a cópia que só tem a C-1
+    nova = _linha("C-2", "L1", "501", "11", contada=_iso(horas=1), enviada=_iso(horas=0.5))
+    _aba(inv, A.LIVRO_CONTAGENS, A.ABA_CONTAGENS, velha + [nova])  # a C-2 chega ao banco; a cópia de 5 min não sabe
+    assert [c["contagem_id"] for c in L.contagens(app.config)] == ["C-1"]
+    with pytest.raises(G.Recusada, match="substituída"):
+        G.aprovar(grav["cfg"], "C-1", falso, APROVADOR, visto["n"], visto["assinatura"], dormir=grav["esperas"].append,
+                  agora=grav["relogio"])
+    assert _eventos(app) == [] and falso.chamadas == []
+    assert {c["contagem_id"]: c["estado"] for c in L.contagens(app.config)} == {"C-2": "nova", "C-1": "substituida"}
 
 
 def test_o_controle_ilegivel_na_ponte_e_409(app, inv, ponte_falsa, monkeypatch):  # noqa: F811

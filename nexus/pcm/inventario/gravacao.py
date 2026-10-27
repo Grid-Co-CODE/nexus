@@ -9,8 +9,10 @@ nem entrada, nem saída, nem pedido de compra; o técnico em campo não consegue
 ATHN-MTS200 estava parado em "Inventário físico" (modo 3) com tudo travado. Por isso:
 
 - **Uma sessão por lote de 50** (o ritmo é 1 pedido/s: ~1 minuto travado por lote; entre um lote e outro o almoxarifado
-  volta ao normal). A referência é `INVENTARIO-<contagem>-L<n>`; a 2ª sessão do mesmo lote (a que grava o resto depois de
-  uma parada) leva `-S<k>`, para o "achar o fechamento pela referência" nunca confundir as duas.
+  volta ao normal). A referência é `INVENTARIO-<h>-L<n>`, com `h` os 12 primeiros hexadecimais do sha1 do ID da contagem
+  (o ID do App tem até 80 caracteres e ninguém mediu o limite da `description` do Fracttal; o ID inteiro fica no evento e
+  no controle); a 2ª sessão do mesmo lote (a que grava o resto depois de uma parada) leva `-S<k>`, para o "achar o
+  fechamento pela referência" nunca confundir as duas.
 - **O modo manda.** 3 (inventário físico): para sem mexer. 2 que o controle não diz que é nosso (outra pessoa ou outra
   tela): para sem mexer (voltá-lo ao normal deixaria os saldos dela sem o par de movimentos). O modo se confere no começo do
   lote e de novo logo antes de abrir: entre uma conferência e a outra passam segundos (ligar as peças, ler). O 2 que o
@@ -203,6 +205,14 @@ def _digitos(folio) -> str:
     pela referência ("MOV-6" → "6"). Sem número, vazio."""
     m = re.search(r"\d{1,20}", str(folio or ""))
     return m.group(0) if m else ""
+
+
+def referencia_da(contagem_id: str) -> str:
+    """`INVENTARIO-<h>`, com `h` os 12 primeiros hexadecimais do sha1 do ID da contagem: o começo da `description` das sessões
+    da contagem no Fracttal. O ID do App tem até 80 caracteres, e o limite da `description` ninguém mediu (a revisão final de
+    27/10/2026; a prova de 27/10 usou `INVENTARIO-PROVA-TST-1-L1`, o formato de antes). 12 hexadecimais são 48 bits: duas
+    contagens com o mesmo `h` no mesmo almoxarifado não acontecem na prática."""
+    return "INVENTARIO-" + hashlib.sha1(str(contagem_id).encode("utf-8")).hexdigest()[:12]
 
 
 def _id_evento(*partes) -> str:
@@ -409,7 +419,7 @@ class _Trabalho:
         self.salvar()
 
     def ref(self, lote: dict) -> str:
-        base = f"INVENTARIO-{self.c['contagem_id']}-L{lote['n']}"
+        base = f"{self.prefixo()}L{lote['n']}"
         return base if lote["sessao"] <= 1 else f"{base}-S{lote['sessao']}"
 
     def desde(self, lote: dict) -> str:
@@ -495,7 +505,8 @@ class _Trabalho:
             raise _Parar(OUTRO_DEPOIS)
 
     def prefixo(self) -> str:
-        return f"INVENTARIO-{self.c['contagem_id']}-"
+        """`INVENTARIO-<h>-`, o começo da referência de todas as sessões desta contagem (`referencia_da`)."""
+        return f"{referencia_da(self.c['contagem_id'])}-"
 
     def retomar_sessao(self, lote: dict, m: int) -> None:
         """A sessão que a rodada anterior deixou em `abrindo`, `aberto` ou `fechando`, pelo modo de agora (já conferido:
@@ -970,7 +981,7 @@ def assinatura(itens: list[dict]) -> str:
 
 
 def aprovar(cfg, contagem_id: str, estoque, aprovador: dict, n_visto=None, assinatura_vista=None, **opcoes) -> dict:
-    """O botão "Gravar N alterações": confere a contagem de agora (o livro relido), lê o saldo NA HORA com o login de quem
+    """O botão "Gravar N alterações": confere a contagem de agora (o livro do inventário e o do App relidos), lê o saldo NA HORA com o login de quem
     aprova, monta o lote pelas contas (com a revisão e a curadoria) e começa. `n_visto` e `assinatura_vista`: o N e a
     `assinatura` do lote que a tela mostrou (obrigatórios); se o lote mudou desde então (um saldo mudou, outro PCM revisou),
     recusa: ninguém grava o que não viu. `SemLogin` sobe (a ponte manda entrar pelo Fracttal); o resto vira `Recusada`.
@@ -990,7 +1001,9 @@ def aprovar(cfg, contagem_id: str, estoque, aprovador: dict, n_visto=None, assin
 def _aprovar(cfg, contagem_id, estoque, aprovador, n_visto, assinatura_vista, leitura, **opcoes) -> dict:
     try:
         F.ler(cfg, forcar=True)
-        todas = leitura.ler(cfg)
+        # o livro do App também relido agora, sem a cópia de 5 min: a contagem mais nova que acabou de chegar substitui esta
+        # antes de ela ir ao Fracttal (a revisão final de 27/10/2026)
+        todas = leitura.ler(cfg, app_agora=True)
     except F.Recusada as ex:
         raise Recusada(str(ex), 503) from None
     c = next((x for x in todas["contagens"] if x["contagem_id"] == contagem_id), None)
@@ -1170,14 +1183,16 @@ def travadas(cfg) -> list[dict]:
 
 
 def com_lote_aberto(pasta: Path | None, agora: datetime | None = None) -> list[str]:
-    """As contagens com uma gravação VIVA e um lote aberto no Fracttal agora (o deploy espera por elas, decisão do Levi
-    de 26/10/2026): o controle em "gravando", um lote em `abrindo`/`aberto`/`fechando`, e salvo há menos de `VIVA_S`. O
-    processo que pergunta (o `ferramentas/gravacao_aberta.py`) não é o do Nexus e não vê a thread: a gravação viva salva o
-    controle a cada pedido, e a parada (a que o reinício matou, ou a sem login) não ganha nada com a espera."""
+    """As contagens com uma gravação VIVA (o deploy espera por elas, decisão do Levi de 26/10/2026): o controle em
+    "gravando" e salvo há menos de `VIVA_S`, com um lote aberto no Fracttal OU entre um lote e outro. A 1ª versão só segurava
+    com um lote em `abrindo`/`aberto`/`fechando`: o intervalo entre dois lotes (a releitura, o registro no livro) deixava o
+    restart passar, e ele matava a gravação logo antes de abrir o lote seguinte (a revisão final de 27/10/2026). O teto de 10
+    min é do `ferramentas/gravacao_aberta.py`. O processo que pergunta não é o do Nexus e não vê a thread: a gravação viva
+    salva o controle a cada pedido, e a parada (a que o reinício matou, ou a sem login) não ganha nada com a espera."""
     agora = instante(agora or _agora())
     out = []
     for ctrl in _controles(pasta):
-        if ctrl.get("estado") != "gravando" or not any(l.get("estado") in SESSAO for l in ctrl.get("lotes") or []):
+        if ctrl.get("estado") != "gravando":
             continue
         try:
             salvo = instante(ctrl.get("atualizado_em"))

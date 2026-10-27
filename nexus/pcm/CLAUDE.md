@@ -478,7 +478,9 @@ senha 409, a conta do Fracttal do cookie que não é a pessoa da sessão do Nexu
 revisão final de 27/10/2026);
 número pela metade não vai à tela (sem o Sistema, só o contado); o motivo e o texto livre vão só cifrados (a API do banco é
 aberta), e a pessoa como código (`pessoa_hmac`) e `pessoa_id`; a contagem com mais de 90 dias, do futuro ou fora do contrato não
-se aprova; o deploy espera o lote aberto (`DEPLOY.md`, seção 8).
+se aprova; a gravação só roda no servidor (`NEXUS_INVENTARIO_GRAVAR=1`, `DEPLOY.md` seção 7i), e o deploy espera a gravação viva
+(seção 8). **Os eventos `contagem_recebida` e `substituida` não são gravados** (decisão da Task 5, confirmada na revisão final de
+27/10/2026): a leitura calcula a substituição a cada vez e não escreve; a Auditoria mostra o que foi gravado.
 
 **A chave de teste: `NEXUS_ALMOX_TESTE_IDS`** (IDs do Fracttal, por vírgula; no servidor, `134082`, o almoxarifado
 `TESTE-INVENTARIO`, com a peça `SP-TST-001`, id 53248312). O almoxarifado de teste fica FORA das telas (o Saldo, a lista do
@@ -508,10 +510,13 @@ script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o liv
 - A foto da curadoria: a rota assinada App→Nexus, como a do extintor (`hseq/fotos.receber`), combinada com a sessão do App (a seção
   da curadoria).
 - A tela da contagem no App (a sessão do App constrói pelo contrato).
-- O que só o Fracttal de verdade responde (vira "provado em DD/MM" depois da prova no almoxarifado de teste): voltar ao modo 0
-  numa sessão aberta sem finalizar; finalizar uma sessão vazia; se o histórico (`movement_history_list_new`) mostra o finalize
-  na hora; repetir o `warehouse_change_mode` no 429; ligar a peça duas vezes; mover em modo 2; o `field_1` (o nome) na lista de
-  peças; a régua acordada relida.
+- O que a prova real de 27/10/2026 no almoxarifado de teste NÃO passou (são os caminhos de defeito; o `EstoqueFalso` os supõe):
+  voltar ao modo 0 numa sessão aberta sem finalizar; finalizar uma sessão vazia; repetir o `warehouse_change_mode` no 429; ligar
+  a peça duas vezes; mover em modo 2; o filtro `code =` e o `field_1` (o nome) da lista de peças (o `Estoque.peca`, só da nova
+  tentativa do cadastro). **Provado em 27/10/2026**, pela cópia de prova com o login do Levi (`...-passo0.md`): o cadastro da peça
+  (`units_list`, `items_list`, `item_insert`), ligar, a sessão inteira (abrir, gravar 5 → 3 e 0 → 1, fechar com a referência,
+  voltar ao modo 0), o histórico mostrando o fechamento na hora (o `achar_movimento` logo depois de fechar deu o movimento 7),
+  o fechamento gerando par só para a peça mexida, o `id_movements` numérico e crescente, e a régua acordada relida.
 
 ## Inventário do almoxarifado: o adaptador do estoque (`inventario/estoque.py`; 26/10/2026)
 
@@ -525,7 +530,7 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
   tela fala `inventories.*` direto. Todo id é texto; `ler` devolve `{id_item: {saldo, minimo, maximo, ligacao, codigo}}`,
   com o que o Fracttal não disse como None, nunca 0.
 - **O ajuste é uma SESSÃO do almoxarifado, não um movimento por peça:** `abrir_ajuste` (modo 2) → `gravar_saldo` (o saldo
-  ABSOLUTO de cada peça, idempotente) → `fechar_ajuste(referencia)` (a referência `INVENTARIO-<contagem>` vai na
+  ABSOLUTO de cada peça, idempotente) → `fechar_ajuste(referencia)` (a referência `INVENTARIO-<h>-L<n>` vai na
   `description`). Ao fechar, o Fracttal gera, por peça mexida, um par de movimentos do tipo 15 (saída do saldo antigo
   inteiro, entrada do novo). **Enquanto o modo está aberto o almoxarifado trava Entradas, Saídas e Pedidos de compra** (no
   passo 0, o `ATHN-MTS200` estava em inventário físico, modo 3, com as duas travadas): quem abre fecha no mesmo trabalho, e
@@ -570,7 +575,7 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
   mandaram), fora do modo de ajuste, sem mexer em saldo nem gerar movimento. **Conflito** (`mexidas_desde`): o histórico
   vem do mais novo ao mais velho e se lê até passar da data (a cota é de todos); data ilegível numa linha conta como
   mexida. Sem a `ignorar_referencia` (uma referência exata) nem o que começa pelo `ignorar_prefixo` (todas as sessões de uma
-  contagem, `INVENTARIO-<contagem>-`, que a gravação passa).
+  contagem, `INVENTARIO-<h>-`, que a gravação passa).
 - **O falso** (`tests/estoque_falso.py`): na memória, com o modo, o par de movimentos ao fechar, o fechamento em dois
   passos (`finalizado, modo 0 pendente`) e os defeitos pelo construtor (`perder_resposta`, uma vez por operação: grava e
   levanta `ConnectionError`; `limite_em`: a N-ésima chamada só; `expirar_em`: da N-ésima em diante TODA chamada da
@@ -630,7 +635,10 @@ liga; senão o do Fracttal e `usina_id` None), `contada_em`, `enviada_em`, `linh
 `n_curadoria`, `estado`, `aprovavel`, `motivo_nao_aprovavel` e `aviso`. `livro_existe(cfg)` diz se o App já publicou o livro (sem
 ele a tela diz que o App ainda não publica, e não "nenhuma contagem"); `ler(cfg)` devolve os dois com o nome de cada peça.
 
-- **Duas fontes, dois relógios:** o livro do App vem pela cópia de 5 min do `visao._ler` (lê e liga a usina uma vez); o ESTADO sai
+- **Duas fontes, dois relógios:** o livro do App vem pela cópia de 5 min do `visao._ler` (lê e liga a usina uma vez), menos na
+  aprovação (`ler(cfg, app_agora=True)`: relido no pedido, e a cópia renovada com ele; a contagem mais nova que acabou de chegar
+  substitui a velha antes de a velha ir ao Fracttal, revisão final de 27/10/2026); `com_teste=True` traz o almoxarifado de teste (a
+  curadoria); o ESTADO sai
   dos eventos do livro do inventário e é calculado a CADA chamada: o `acrescentar` renova a cópia do livro, e a tela mostra a
   recontagem pedida na hora (com o estado guardado 5 min, o PCM a pediria de novo). **Falha de leitura (do App ou do livro do
   inventário) levanta `fato_inventario.Recusada`:** nunca devolve lista vazia nem contagem `nova`, senão a já gravada
@@ -853,7 +861,10 @@ Duas pendências, só nas contagens que ainda NÃO foram gravadas: o **achado fo
 - **Uma linha decidida não se decide de novo** (`Conflito`, 409: dois do PCM com a tela aberta não cadastram a mesma peça duas
   vezes), e **a decisão só vale até a contagem ser gravada**: gravada, aprovada (a gravação começou), recusada ou substituída pela
   mais nova do almoxarifado = 409 com "faça uma nova contagem" (decidir depois não mudaria o que já foi gravado). Quem sabe o que já
-  foi gravado é `_estados` (os eventos do livro): é o ponto único para trocar pela leitura da lista de contagens (`leitura.py`). **O estado é
+  foi gravado é `_estados`, pela leitura da lista das contagens (`leitura.ler(cfg, com_teste=True)`): a mesma regra das outras telas
+  (o estado pelos eventos e a substituição só pelas vivas e boas, `_pode_substituir`), com o almoxarifado de teste incluído (fora da
+  lista, não da curadoria, a única em que a sigla `TST` vale). Até a revisão final de 27/10/2026 ela tinha a conta dela, e a
+  contagem do futuro ou fora do contrato sumia com as pendências da boa. **O estado é
   conferido DE NOVO, no livro de agora, logo antes de escrever**: o cadastro pagina o catálogo e cria a peça (segundos) depois da
   primeira leitura, e a gravação da contagem pode chegar nesse intervalo. Se a contagem já não está aberta, 409, nada é escrito, e para o
   cadastro a mensagem diz o código que ficou criado no Fracttal ("a peça SP-XXX-NNN foi criada no Fracttal, mas a contagem já tinha sido
@@ -928,7 +939,7 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
   almoxarifado (a trava da memória e o `trava-<almox>.json`), o controle e a espera do deploy moram na máquina que grava: um Nexus
   no PC com o login do Fracttal de verdade abriria uma sessão que o servidor não vê. A régua e o cadastro da curadoria seguem (não
   têm a vez do almoxarifado). `DEPLOY.md`, seção 7i; os testes ligam a chave no `app.config` (a fixture `grav`).
-- **Aprovar** (`aprovar`, o que a ponte chama): relê o livro, lê o saldo NA HORA com o login de quem aprova, monta o lote pelas
+- **Aprovar** (`aprovar`, o que a ponte chama): relê o livro do inventário e o do App (sem a cópia de 5 min), lê o saldo NA HORA com o login de quem aprova, monta o lote pelas
   contas (só `not tirada and situacao in MEXEM`) e confere o que a tela mostrou: o N e a `assinatura` (o hash de id_item,
   sistema e contado de cada peça do lote, posta como `data-assinatura` no botão, que vem no pedaço do `lote` da ponte junto do
   Sistema que ele confere; a página só ouve o clique), os dois obrigatórios (400 sem eles). O N
@@ -940,9 +951,12 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
   escrita. Caso da revisão final de 27/10/2026: o "tirar" ou o "é a peça X" que caía entre a leitura do livro e o `aprovada` era
   gravado e ignorado pelo lote já montado; agora espera e é recusado (409, a contagem já está gravando). Prova:
   `test_a_revisao_durante_a_aprovacao_espera_e_e_recusada` e `test_a_curadoria_durante_a_aprovacao_espera_e_e_recusada`.
-- **Por lote de 50, uma sessão** (`INVENTARIO-<contagem>-L<n>`; a 2ª sessão do mesmo lote, depois de uma parada, é `-S<k>`,
+- **Por lote de 50, uma sessão** (`INVENTARIO-<h>-L<n>`, com `h` os 12 primeiros hexadecimais do sha1 do ID da contagem,
+  `gravacao.referencia_da`: o ID do App tem até 80 caracteres e ninguém mediu o limite da `description` do Fracttal; o ID
+  inteiro fica no evento e no controle. A prova de 27/10/2026 usou `INVENTARIO-PROVA-TST-1-L1`, o formato de antes. A 2ª
+  sessão do mesmo lote, depois de uma parada, é `-S<k>`,
   para o "achar o fechamento pela referência" nunca confundir as duas): modo → o que se moveu desde o "Contada em" (sem as
-  sessões da própria contagem: `mexidas_desde(..., ignorar_prefixo="INVENTARIO-<contagem>-")`) → ler → ligar as nunca ligadas
+  sessões da própria contagem: `mexidas_desde(..., ignorar_prefixo="INVENTARIO-<h>-")`) → ler → ligar as nunca ligadas
   (ANTES de abrir: ligar no modo 2 não foi provado) → modo DE NOVO (ninguém abriu no meio) → o marco → abrir → ler (com o modo aberto
   nada se move: é a leitura que vale) → cada peça: saldo diferente do aprovado ou mexida depois da contagem é `conflito` e não
   grava; senão grava o saldo absoluto → fechar → achar o movimento pela referência (o `movimento_fracttal` do evento é o folio
@@ -983,18 +997,22 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
   o login:** o JWT e o e-mail vivem só na instância do `Estoque`. Os eventos vão ao livro SEMPRE com a sessão fechada (o banco
   lento não segura o almoxarifado travado), com o `evento_id` tirado da contagem, do tipo e da peça: registrar de novo não
   duplica a auditoria.
-- **O deploy espera o lote aberto** (Levi, 26/10/2026): o `deploy/atualizar.sh` pergunta ao `ferramentas/gravacao_aberta.py`
-  (`gravacao.com_lote_aberto`: "gravando", um lote em sessão, salvo há menos de 5 min) e deixa o restart para a rodada seguinte,
-  por no máximo 10 min contados da 1ª espera (`DEPLOY.md`, seção 8). Qualquer falha do ajudante deixa o deploy seguir.
+- **O deploy espera a gravação viva** (Levi, 26/10/2026): o `deploy/atualizar.sh` pergunta ao `ferramentas/gravacao_aberta.py`
+  (`gravacao.com_lote_aberto`: "gravando" e salvo há menos de 5 min, com um lote aberto OU entre um lote e outro) e deixa o
+  restart para a rodada seguinte, por no máximo 10 min contados da 1ª espera (`DEPLOY.md`, seção 8). A 1ª versão só segurava com
+  um lote em sessão, e o intervalo entre dois lotes deixava o restart passar (a revisão final de 27/10/2026). Qualquer falha do
+  ajudante deixa o deploy seguir.
 - **Provar:** `tests/test_pcm_inventario_gravacao.py` (o `EstoqueFalso`, com o `"finalizar"` como ponto de defeito à parte, e
   um relógio de mentira: nada espera de verdade) e `tests/test_deploy_espera_gravacao.py` (o ajudante e o script); mutações nas
   regras acima, todas pegas. O teste da ponte manda o `os_sessao` com `Path=/os` pelo `estoque_da_sessao` de verdade: a ponte
   vê o login, a rota `/t/pcm/...` não. Provada no navegador em 26/10/2026 numa cópia de prova com o `EstoqueFalso` (1366 e 375 px,
   escuro e claro): o "Gravar" pelo pedaço do lote, a peça mexida depois da contagem em conflito, o login que expira com a sessão
   aberta (o aviso forte na contagem e na lista), o "Encerrar" recusado em modo 2 e o "Continuar" que termina (6 gravadas, 1 em
-  conflito, o par de movimentos com `INVENTARIO-C-1-L1`, o almoxarifado de volta ao modo 0). A página da contagem gravada com
-  conflito aponta as peças na Auditoria (filtrada pela contagem). A prova no almoxarifado de teste do Fracttal de verdade é a
-  seção do fluxo, "Falta".
+  conflito, o par de movimentos com a referência da contagem, o almoxarifado de volta ao modo 0). A página da contagem gravada com
+  conflito aponta as peças na Auditoria (filtrada pela contagem). **Provada no Fracttal de verdade em 27/10/2026** (o
+  almoxarifado de teste, a cópia de prova com o login do Levi): 5 → 3 e 0 → 1 com a peça ligada antes de abrir, a referência
+  `INVENTARIO-PROVA-TST-1-L1` (o formato de antes do `h`), os movimentos MOV-7 (as saídas) e MOV-8 (as entradas), a releitura
+  e os `peca_gravada` com o movimento 7. O que ela não passou está na seção do fluxo, "Falta".
 
 ## Inventário do almoxarifado: a auditoria (`revisao.montar_auditoria`, `templates/pcm/inventario_auditoria.html`; 26/10/2026)
 

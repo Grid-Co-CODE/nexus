@@ -788,6 +788,16 @@ def test_o_401_da_sessao_encerrada_nao_vira_endereco():
     assert "x.d.sessao_encerrada" in ponte and 'typeof login === "string"' in ponte
 
 
+def test_a_sessao_que_caiu_recarrega_e_nao_injeta_a_pagina_de_login():
+    """O pedaço do lote vem por `fetch` da ponte; com a sessão do Nexus caída, o portão manda ao /entrar, o `fetch` segue o
+    redirecionamento e recebe 200 com a página de login, que ia parar DENTRO da contagem (estacionado da revisão das Tasks 5 e
+    6, corrigido na revisão final de 27/10/2026). O `r.redirected` recarrega a página: o portão leva ao login com a volta."""
+    contagem = (RAIZ / "nexus" / "templates" / "pcm" / "inventario_contagem.html").read_text("utf-8")
+    i = contagem.index("fetch((window.nexusRota || String)(cx.dataset.url)")
+    trecho = contagem[i:contagem.index("cx.innerHTML = html", i)]
+    assert "if (r.redirected) { window.location.reload(); return; }" in trecho
+
+
 def test_os_enderecos_nao_partem_da_raiz():
     """Endereço do Nexus nunca a partir da raiz (ele pode rodar debaixo de um prefixo): `{{ raiz }}` nos links e formulários."""
     base = RAIZ / "nexus" / "templates" / "pcm"

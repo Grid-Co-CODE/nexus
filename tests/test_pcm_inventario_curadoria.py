@@ -135,6 +135,21 @@ def test_pendencias_so_das_contagens_nao_gravadas(cur):
     assert CU.pendencias(cur.config) == []
 
 
+def test_a_contagem_que_nao_se_aprova_nao_tira_a_boa_da_curadoria(cur):
+    """A curadoria usa a regra da lista das contagens (`leitura.ler`, a revisão final de 27/10/2026): a mais nova do
+    almoxarifado que não se aprova (do futuro pelo relógio do celular, ou com o contrato do App violado) não substitui as
+    boas. Antes a curadoria tinha a conta dela, e a contagem do futuro sumia com as pendências da boa, que a lista ainda
+    mostrava para aprovar."""
+    futura = _linha("F-1", contagem="C-9", **{"Contada em": "2026-10-26T10:00:00Z", "Enviada em": "2026-10-26T11:00:00Z"})
+    sem_linha = _linha("", contagem="C-8", **{"Contada em": "2026-10-25T12:00:00Z", "Enviada em": "2026-10-25T12:30:00Z"})
+    _aba(cur.extensions["nexus_dados_sessao"], A.LIVRO_CONTAGENS, A.ABA_CONTAGENS,
+         [PECA_DA_LISTA, CABO, CONECTOR, GENERICO, futura, sem_linha])
+    visao.limpar()
+    p = {(x["contagem_id"], x["chave_linha"]) for x in CU.pendencias(cur.config)}
+    assert {("C-1", "L-2"), ("C-1", "L-3"), ("C-1", "L-4")} <= p
+    CU.decidir(cur.config, "C-1", "L-3", "descartar", motivo="não é peça", pessoa=PESSOA)     # e ainda se decide
+
+
 def test_pendencia_decidida_mostra_a_decisao(cur):
     CU.decidir(cur.config, "C-1", "L-3", "descartar", motivo="foto não mostra a peça", pessoa=PESSOA)
     p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
@@ -215,6 +230,26 @@ def test_cadastrar_que_nao_chegou_ao_fracttal_reaproveita_o_codigo(cur):
     r = _cadastrar(cur.config, falso)
     assert r["codigo"] == "SP-CAB-013" and r["criada"] is True
     assert falso.codigos("CAB")[-1] == "SP-CAB-013"
+
+
+def test_o_cadastro_que_o_fracttal_recusa_solta_a_reserva(cur):
+    """O Fracttal recusou o `criar_peca` (`ErroFracttal`, o `success: false`: nada foi criado). A reserva do código sai, e a nova
+    tentativa com os dados corrigidos (outro nome) não fica presa no "repita com os dados da reserva" (estacionado da revisão
+    das Tasks 8 e 9, corrigido na revisão final de 27/10/2026)."""
+    falso = _falso()
+    criar = falso.criar_peca
+
+    def recusa(codigo, nome, unidade="UNIDADE"):
+        raise E.ErroFracttal("INVALID_NAME", "inventories.item_insert")
+    falso.criar_peca = recusa
+    with pytest.raises(E.ErroFracttal):
+        CU.decidir(cur.config, "C-1", "L-2", "cadastrar", sigla="CAB", nome="Cabo azul 6 mm ###", unidade="METRO",
+                   estoque=falso, pessoa=PESSOA)
+    assert json.loads(CU._arquivo_reserva(cur.config, "C-1").read_text("utf-8")) == {}
+    falso.criar_peca = criar
+    r = _cadastrar(cur.config, falso)                      # o nome corrigido
+    assert r["codigo"] == "SP-CAB-013" and r["criada"] is True
+    assert [x["codigo_criado"] for x in _livro(cur.config, F.ABA_CURADORIA)] == ["SP-CAB-013"]
 
 
 def test_a_reserva_vale_para_a_outra_linha_da_mesma_sigla(cur):

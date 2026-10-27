@@ -291,6 +291,9 @@
     }
     fetch((window.nexusRota || String)(cx.dataset.url), {credentials: 'same-origin'})
       .then(function (r) {
+        // a sessão do Nexus caiu: o portão manda ao /entrar, o fetch segue e recebe 200 com a página de login, que entraria
+        // DENTRO da contagem; recarregar leva a página inteira ao login, com a volta para cá
+        if (r.redirected) { window.location.reload(); return; }
         if (r.ok) {
           return r.text().then(function (html) { cx.innerHTML = html; if (soContado) soContado.hidden = true; });
         }

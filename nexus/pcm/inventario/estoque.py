@@ -13,7 +13,7 @@ inventario-almoxarifado-passo0.md`, com os métodos, os corpos e as respostas li
 - O ajuste de saldo NÃO é um movimento por peça: é uma SESSÃO do almoxarifado (modo 2, "Ajuste de inventário"). Abre-se o
   modo, grava-se o saldo absoluto de cada peça e fecha-se com uma `description`; ao fechar, o Fracttal gera, por peça
   mexida, um par de movimentos do tipo 15 (saída do saldo antigo inteiro, entrada do novo). Gravar o mesmo número duas
-  vezes dá o mesmo saldo (idempotente), e a referência `INVENTARIO-<contagem>` da `description` é como se confirma, depois
+  vezes dá o mesmo saldo (idempotente), e a referência `INVENTARIO-<h>-L<n>` da `description` é como se confirma, depois
   de uma resposta perdida, que o fechamento valeu. ENQUANTO O MODO ESTÁ ABERTO, O ALMOXARIFADO TRAVA Entradas, Saídas e
   Pedidos de compra: quem abre fecha no mesmo trabalho, e a retomada começa fechando o que ficou aberto.
 
@@ -150,7 +150,7 @@ def _norm(texto) -> str:
 
 
 def _traduzir(erro: Exception) -> Exception | None:
-    """O erro do `_rpc_call` do OS Creator como o adaptador o diz; None quando não é limite nem login (segue como veio).
+    """O erro do `_rpc_chamar` do OS Creator como o adaptador o diz; None quando não é limite nem login (segue como veio).
     O adaptador não importa o `api.py` (só está no caminho depois que o clone sobe): lê o que ele escreve nos erros,
     e o `test_o_marcador_de_sessao_morta_e_o_do_api_de_verdade` cai se o `api.py` mudar. Sessão morta: o marcador
     `session_expired` da `SessionExpired` (HTTP 401/403 ou USER_NOT_LOGIN no corpo) e, sem marcador, as duas frases do
@@ -245,7 +245,7 @@ class Estoque(abc.ABC):
                       ignorar_prefixo: str | None = None) -> set[str] | None:
         """Os `id_item` com movimento a partir de `desde_iso` (o "Contada em", ISO UTC), sem os movimentos cuja
         `description` é a `ignorar_referencia` (o ajuste da própria contagem) ou começa pelo `ignorar_prefixo` (todas as
-        sessões de uma contagem, `INVENTARIO-<contagem>-`: a gravação abre uma por lote, e a 2ª do mesmo lote leva
+        sessões de uma contagem, `INVENTARIO-<h>-`: a gravação abre uma por lote, e a 2ª do mesmo lote leva
         `-S<k>`). None = o Fracttal não diz."""
 
     @abc.abstractmethod
@@ -293,8 +293,8 @@ class Estoque(abc.ABC):
 
 # ── o de verdade ───────────────────────────────────────────────────────────────────────────────────────────────────────
 class EstoqueFracttal(Estoque):
-    """O estoque do Fracttal pelo RPC da própria tela. `chamar(metodo, params) -> dict` é o `_rpc_call` do OS Creator já
-    dentro da sessão de quem aprovou (`estoque_da_sessao`); os testes passam um gravador no lugar.
+    """O estoque do Fracttal pelo RPC da própria tela. `chamar(metodo, params) -> dict` é o `_rpc_chamar` do OS Creator já
+    dentro da sessão de quem aprovou (`estoque_da_sessao`, `_SessaoDoClone.chamar`); os testes passam um gravador no lugar.
 
     O ritmo é o da empresa (`RITMO`, de todas as instâncias). Os testes dão o `ritmo` deles, ou o `relogio`, o `dormir` e o
     `intervalo` (que montam um `Ritmo` só desta instância), para não esperar de verdade. `pagina` é o `limit` dos pedidos.

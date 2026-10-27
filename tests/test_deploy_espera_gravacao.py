@@ -1,4 +1,4 @@
-"""O deploy espera o lote aberto da gravação do inventário (Levi, 26/10/2026; DEPLOY.md, seção 8).
+"""O deploy espera a gravação do inventário (Levi, 26/10/2026; DEPLOY.md, seção 8).
 
 Enquanto a gravação do inventário tem um lote aberto no Fracttal (a sessão de ajuste, modo 2), o almoxarifado fica travado.
 Push na `main` reinicia o Nexus em ~2 min, e o restart no meio do lote mataria a gravação com o almoxarifado travado. O
@@ -28,7 +28,11 @@ def _controle(pasta, cid="C-1", estado="gravando", lote="aberto", salvo=AGORA - 
 def test_espera_o_lote_aberto_por_no_maximo_10_min(tmp_path):
     pasta = tmp_path / "almox_inventario"
     _controle(pasta)
-    assert GA.decidir(pasta, AGORA)[0] == 1 and (pasta / GA.MARCA).exists()            # a 1ª espera marca a hora
+    codigo, porque = GA.decidir(pasta, AGORA)
+    assert codigo == 1 and (pasta / GA.MARCA).exists()                                  # a 1ª espera marca a hora
+    assert "no máximo mais 10 min" in porque                                           # e não "mais 11" (27/10/2026)
+    _controle(pasta, salvo=AGORA + timedelta(minutes=9, seconds=20))                   # a gravação viva salva sempre
+    assert "no máximo mais 1 min" in GA.decidir(pasta, AGORA + timedelta(minutes=9, seconds=30))[1]
     _controle(pasta, salvo=AGORA + timedelta(minutes=8, seconds=50))                   # a gravação viva salva sempre
     assert GA.decidir(pasta, AGORA + timedelta(minutes=9))[0] == 1                     # ainda dentro dos 10 min
     _controle(pasta, salvo=AGORA + timedelta(minutes=9, seconds=50))                   # a gravação segue viva
@@ -39,8 +43,6 @@ def test_espera_o_lote_aberto_por_no_maximo_10_min(tmp_path):
 
 
 @pytest.mark.parametrize("estado, lote, salvo", [
-    ("gravando", "pendente", AGORA),                          # entre um lote e outro: o almoxarifado está normal
-    ("gravando", "feito", AGORA),
     ("parada", "aberto", AGORA),                              # parada (sem login): esperar não a ajuda
     ("concluida", "feito", AGORA),
     ("encerrada", "feito", AGORA),
@@ -53,8 +55,10 @@ def test_o_que_nao_segura_o_restart(tmp_path, estado, lote, salvo):
     assert GA.decidir(pasta, AGORA)[0] == 0 and not (pasta / GA.MARCA).exists()
 
 
-@pytest.mark.parametrize("lote", ["abrindo", "aberto", "fechando"])
-def test_os_tres_estados_da_sessao_seguram(tmp_path, lote):
+@pytest.mark.parametrize("lote", ["abrindo", "aberto", "fechando", "pendente", "feito"])
+def test_a_gravacao_viva_segura_com_o_lote_aberto_e_entre_um_lote_e_outro(tmp_path, lote):
+    """Os três estados da sessão seguram, e também a gravação VIVA entre um lote e outro (a revisão final de 27/10/2026): o
+    intervalo entre lotes deixava o restart passar, e ele matava a gravação logo antes de abrir o lote seguinte."""
     pasta = tmp_path / "almox_inventario"
     _controle(pasta, lote=lote)
     assert GA.decidir(pasta, AGORA)[0] == 1
@@ -121,7 +125,7 @@ def test_o_script_espera_o_lote_aberto_e_depois_reinicia(tmp_path):
     s.falhar("espera")
     codigo, feito, saida = s.rodar()
     assert (codigo, feito) == (0, ["pip", "python", "ajudante"]), saida              # sem restart
-    assert s.head() == antes and "lote aberto" in saida                              # a pasta do serviço não andou
+    assert s.head() == antes and "gravação do inventário está andando" in saida      # a pasta do serviço não andou
     s.falhar("espera", False)
     codigo, feito, saida = s.rodar()                                                 # a rodada seguinte: o lote fechou
     assert (codigo, feito) == (0, ["pip", "python", "ajudante", "systemctl"]), saida

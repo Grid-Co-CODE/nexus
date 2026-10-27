@@ -1,22 +1,23 @@
-"""O deploy espera o lote aberto da gravação do inventário (Levi, 26/10/2026). O `deploy/atualizar.sh` chama:
+"""O deploy espera a gravação do inventário (Levi, 26/10/2026). O `deploy/atualizar.sh` chama:
 
     .venv/bin/python -B ferramentas/gravacao_aberta.py
 
 Enquanto a gravação do inventário tem um lote aberto no Fracttal (a sessão de ajuste, modo 2), o almoxarifado fica travado:
 nem entrada, nem saída, nem pedido de compra. Push na `main` reinicia o Nexus em ~2 min (`DEPLOY.md`, seção 8), e o restart
-no meio do lote mata a gravação com o almoxarifado travado até quem aprovou voltar e continuar. Então o restart espera o
-lote fechar, por no máximo 10 minutos contados da 1ª espera; depois reinicia assim mesmo (um deploy não fica preso por
-uma gravação que não termina).
+no meio do lote mata a gravação com o almoxarifado travado até quem aprovou voltar e continuar; entre um lote e outro, a mata
+logo antes de abrir o seguinte. Então o restart espera a gravação terminar, por no máximo 10 minutos contados da 1ª espera;
+depois reinicia assim mesmo (um deploy não fica preso por uma gravação que não termina).
 
-- Saída 1 e a linha `ESPERAR` (só ela, na saída padrão): há uma gravação VIVA com um lote aberto (o controle em
-  "gravando", um lote em `abrindo`/`aberto`/`fechando` e salvo há menos de 5 min: `gravacao.com_lote_aberto`) e a 1ª espera
-  foi há menos de 10 min. A hora da 1ª espera fica em `<NEXUS_DADOS>/almox_inventario/deploy-espera.txt`.
-- Saída 0: pode reiniciar (nenhum lote aberto, os 10 min passaram, ou QUALQUER erro aqui: o deploy nunca fica preso por
+- Saída 1 e a linha `ESPERAR` (só ela, na saída padrão): há uma gravação VIVA (o controle em "gravando" e salvo há menos de
+  5 min, com um lote aberto ou entre um lote e outro: `gravacao.com_lote_aberto`) e a 1ª espera foi há menos de 10 min. A
+  hora da 1ª espera fica em `<NEXUS_DADOS>/almox_inventario/deploy-espera.txt`.
+- Saída 0: pode reiniciar (nenhuma gravação viva, os 10 min passaram, ou QUALQUER erro aqui: o deploy nunca fica preso por
   causa deste ajudante). O script só espera com a saída 1 E o `ESPERAR`: um `sudo` ou um Python que falhe também sai com 1.
 
 A pasta é achada como o Nexus a acha (`NEXUS_DADOS` do .env ou do ambiente, senão a padrão: `gravacao._pasta`). O porquê vai
 para a saída de erro (o journal do timer); nunca o conteúdo do controle.
 """
+import math
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -44,14 +45,14 @@ def _apagar(marca: Path | None) -> None:
 
 
 def decidir(pasta: Path | None, agora: datetime, limite: timedelta = LIMITE) -> tuple[int, str]:
-    """(saída, o porquê). 1 = esperar; 0 = pode reiniciar. A marca da 1ª espera nasce na 1ª vez que há lote aberto e some
-    quando não há mais, ou quando os 10 min passam (a próxima gravação aberta ganha os 10 min dela)."""
+    """(saída, o porquê). 1 = esperar; 0 = pode reiniciar. A marca da 1ª espera nasce na 1ª vez que há gravação viva e some
+    quando não há mais, ou quando os 10 min passam (a próxima gravação ganha os 10 min dela)."""
     from nexus.pcm.inventario import gravacao as G
     abertas = G.com_lote_aberto(pasta, agora)
     marca = pasta / MARCA if pasta is not None else None
     if not abertas:
         _apagar(marca)
-        return 0, "nenhuma gravação do inventário com lote aberto no Fracttal: pode reiniciar"
+        return 0, "nenhuma gravação do inventário andando no Fracttal: pode reiniciar"
     desde = _ler_marca(marca) if marca is not None else None
     if desde is None:
         desde = agora
@@ -59,11 +60,12 @@ def decidir(pasta: Path | None, agora: datetime, limite: timedelta = LIMITE) -> 
             marca.parent.mkdir(parents=True, exist_ok=True)
             marca.write_text(agora.astimezone(timezone.utc).isoformat(), encoding="utf-8")
     if agora - desde < limite:
-        falta = int((limite - (agora - desde)).total_seconds() // 60) + 1
-        return 1, (f"{len(abertas)} gravação(ões) do inventário com lote aberto no Fracttal: o restart espera o lote fechar "
+        # para cima, e só isso: o "+ 1" de antes dizia "mais 11 min" na 1ª espera de um teto de 10
+        falta = math.ceil((limite - (agora - desde)).total_seconds() / 60)
+        return 1, (f"{len(abertas)} gravação(ões) do inventário andando no Fracttal: o restart espera ela terminar "
                    f"(no máximo mais {falta} min)")
     _apagar(marca)
-    return 0, "a gravação do inventário segue com lote aberto há 10 min: reinicia assim mesmo"
+    return 0, "a gravação do inventário segue andando há 10 min: reinicia assim mesmo"
 
 
 def main(argv=None, *, cfg=None, agora: datetime | None = None) -> int:

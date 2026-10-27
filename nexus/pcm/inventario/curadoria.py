@@ -26,7 +26,8 @@ Regras com o caso que as criou:
   (`Estoque.peca`), não cria de novo, acha o ID e só grava a decisão; se não existe, cria com ele. A reserva também vale
   para as outras linhas da mesma sigla (a peça recém-criada pode ainda não aparecer na lista do Fracttal). A reserva guarda a sigla,
   o nome e a unidade, e a nova tentativa tem de vir com os mesmos (`Conflito` se não); e a peça achada pelo código reservado tem de ter
-  o mesmo nome (`field_1`), senão o código foi usado por outra pessoa e a decisão não se liga a ela.
+  o mesmo nome (`field_1`), senão o código foi usado por outra pessoa e a decisão não se liga a ela. O `criar_peca` que o Fracttal
+  RECUSA (`ErroFracttal`: nada foi criado) solta a reserva, para a nova tentativa com os dados corrigidos; a resposta perdida não.
 - **Antes de escrever, o estado da contagem é conferido de novo** (o cadastro leva segundos, e a gravação pode chegar no meio): a
   decisão que chega à contagem já fechada é recusada, e a mensagem do cadastro diz o código que ficou criado no Fracttal.
 - **As travas são por chave** (`travas.Travas`: a linha, a sigla, o arquivo de controle), nunca uma do módulo segurada enquanto se
@@ -106,32 +107,28 @@ def proximo_codigo(codigos: list[str], sigla: str) -> str:
 
 
 # ── o que o livro e o catálogo dizem ─────────────────────────────────────────────────────────────────────────────────
+# o estado da lista das contagens (`leitura.ESTADOS`) como a curadoria o diz: a contagem aprovada, gravando ou gravada não se
+# decide mais, nem a recusada nem a substituída
+_DA_LEITURA = {"nova": "aberta", "revisada": "aberta", "recontagem_pedida": "recontagem", "substituida": "substituida",
+               "gravando": "gravada", "gravada": "gravada", "gravada_com_conflitos": "gravada"}
+
+
 def _estados(cfg, forcar: bool = False) -> tuple[dict, dict]:
     """({contagem_id: as linhas do livro das contagens}, {contagem_id: estado}). O estado diz se ainda se decide: `aberta`; ou
-    `gravada` (a gravação feita ou começada: um evento `aprovada` ou `peca_gravada`), `recontagem` (recusada) e `substituida`
-    (a mais nova do almoxarifado a substituiu, `contas.substituidas`).
+    `gravada` (a gravação feita ou começada), `recontagem` (recusada) e `substituida` (a mais nova do almoxarifado a substituiu).
 
-    É o ÚNICO ponto que olha o que já foi gravado: a tela da lista de contagens (Task 5) tem a leitura dela, e quem juntar os
-    dois troca só esta função."""
-    por: dict[str, list[dict]] = {}
-    for l in visao._livro(A.LIVRO_CONTAGENS, A.ABA_CONTAGENS):
-        cid = _txt(l.get("ID da contagem"))
-        if cid:
-            por.setdefault(cid, []).append(l)
-    eventos = F.ler(cfg, forcar=forcar)[F.ABA_EVENTO]
-    gravadas = {_txt(e.get("contagem_id")) for e in eventos if _txt(e.get("tipo")) in ("aprovada", "peca_gravada")}
-    recusadas = {_txt(e.get("contagem_id")) for e in eventos if _txt(e.get("tipo")) == "recontagem_pedida"}
-    substituidas = {_txt(e.get("contagem_id")) for e in eventos if _txt(e.get("tipo")) == "substituida"}
-    vivas = []
-    for cid, ls in por.items():
-        if cid not in recusadas and cid not in substituidas:
-            p = ls[0]
-            vivas.append({"contagem_id": cid, "id_almox": _id(p.get("ID do almoxarifado")),
-                          "contada_em": _txt(p.get("Contada em")), "enviada_em": _txt(p.get("Enviada em"))})
-    velhas = C.substituidas(vivas, gravadas)
-    estado = {cid: ("gravada" if cid in gravadas else "recontagem" if cid in recusadas
-                    else "substituida" if cid in substituidas or cid in velhas else "aberta") for cid in por}
-    return por, estado
+    Pela leitura da lista das contagens (`leitura.ler`), a mesma regra das outras telas: o estado pelos eventos e a
+    substituição só pelas contagens vivas e boas (`leitura._pode_substituir`). A curadoria tinha a conta dela, sem esse
+    filtro: a contagem do futuro (o relógio do celular) ou fora do contrato sumia com as pendências da boa, que a lista ainda
+    mostrava para aprovar (a revisão final de 27/10/2026). Com o almoxarifado de teste (`com_teste`): ele fica fora da lista,
+    não da curadoria, que é o único lugar em que a sigla `TST` vale. `forcar`: o livro do inventário relido agora (quem vai
+    escrever)."""
+    from . import leitura
+    if forcar:
+        F.ler(cfg, forcar=True)
+    contagens = leitura.ler(cfg, com_teste=True)["contagens"]
+    return ({c["contagem_id"]: c["linhas"] for c in contagens},
+            {c["contagem_id"]: _DA_LEITURA[c["estado"]] for c in contagens})
 
 
 # por que a contagem não se decide mais: (como está agora, como já estava quando a decisão chegou ao fim)
@@ -438,7 +435,19 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) ->
                 reservas[chave] = {"codigo": codigo, "sigla": sigla, "nome": nome, "unidade": unidade,
                                    "reservado_em": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
                 _gravar_reservas(arq, reservas)      # ANTES de criar: se a resposta se perder, a nova tentativa sabe qual era
-    return str(estoque.criar_peca(codigo, nome, unidade)), codigo, True
+    try:
+        return str(estoque.criar_peca(codigo, nome, unidade)), codigo, True
+    except E.ErroFracttal:
+        # o Fracttal recusou (o `success: false`): nada foi criado. A reserva sai, para a nova tentativa com os dados corrigidos
+        # não ficar presa no "repita com os dados da reserva" (a revisão final de 27/10/2026). A resposta perdida (rede) e o 429
+        # NÃO soltam: a peça pode ter sido criada, e é a reserva que impede a segunda
+        with _ARQUIVO.de(arq.name):
+            reservas = _ler_reservas(arq)
+            minha = reservas.get(chave)
+            if isinstance(minha, dict) and _txt(minha.get("codigo")) == codigo:
+                reservas.pop(chave)
+                _gravar_reservas(arq, reservas)
+        raise
 
 
 def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: str | None = None, sigla: str | None = None,

@@ -120,8 +120,16 @@ def _livro_ou_vazio(livro: str, aba: str) -> list[dict]:
         return []
 
 
-def _app() -> dict:
-    g = visao._ler(CHAVE_APP, _do_app)
+def _app(agora: bool = False) -> dict:
+    """As contagens do App pela cópia de 5 min; `agora`: relidas do banco neste pedido (sem a cópia de 5 min nem a do livro, de
+    2 min), e a cópia renovada com elas. É o que a aprovação pede: a contagem mais nova do almoxarifado que acabou de chegar
+    tem de substituir a velha ANTES de a velha ir ao Fracttal (a revisão final de 27/10/2026)."""
+    if agora:
+        visao._LIVROS.pop((A.LIVRO_CONTAGENS, A.ABA_CONTAGENS), None)
+        visao._LIVROS.pop(("_abas", A.LIVRO_CONTAGENS), None)
+        g = visao._calcular(CHAVE_APP, _do_app)       # deu certo: vira a cópia que a tela lê
+    else:
+        g = visao._ler(CHAVE_APP, _do_app)
     if g.erro or not g.dados:
         raise F.Recusada(f"{g.erro or 'Não consegui ler as contagens do App'}: tente de novo em instantes.")
     return g.dados
@@ -260,14 +268,18 @@ def _pode_substituir(c: dict, agora: datetime) -> bool:
         return False
 
 
-def ler(cfg) -> dict:
+def ler(cfg, *, com_teste: bool = False, app_agora: bool = False) -> dict:
     """`{"livro_existe", "contagens", "itens"}`: as contagens do App com o estado de cada uma (a lista de `contagens`) e o
     nome de cada peça (`itens`: `{id_item: {codigo, nome, unidade}}`). Levanta `fato_inventario.Recusada` se não leu o
-    livro do App ou o do inventário (nunca devolve vazio no lugar do que não leu)."""
-    app = _app()
+    livro do App ou o do inventário (nunca devolve vazio no lugar do que não leu).
+
+    `com_teste`: com as contagens do almoxarifado de teste (a curadoria, o único lugar em que ele vale; elas só se substituem
+    entre si, porque a substituição é por almoxarifado). `app_agora`: o livro do App relido agora, sem a cópia de 5 min (a
+    aprovação)."""
+    app = _app(agora=app_agora)
     if not app["livro_existe"]:
         return {"livro_existe": False, "contagens": [], "itens": {}}
-    teste = A.ids_de_teste(cfg)
+    teste = set() if com_teste else A.ids_de_teste(cfg)
     do_livro = F.ler(cfg)
     eventos, curadoria = _por_contagem(do_livro[F.ABA_EVENTO]), do_livro[F.ABA_CURADORIA]
     agora = visao._agora()
