@@ -97,7 +97,9 @@ def test_o_mapa_pinta_o_acompanhar_de_azul_e_a_legenda_explica(tmp_path, monkeyp
     html = c.get("/t/performance/clima/mapa").get_data(as_text=True)
     assert 'class="mp-ponto mp-n-regiao"' in html and 'class="mp-ponto mp-n-atencao"' in html
     t = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
-    assert re.search(r"Acompanhar 2 condição da região, nada perto da usina", t) and re.search(r"Atenção 1 fogo perto", t)
+    # desde 27/10/2026 (a tela enxuta) o número fica na faixa em cima do mapa e a explicação no "!" do título
+    assert re.search(r"Acompanhar 2\b", t) and re.search(r"Atenção 1\b", t)
+    assert re.search(r"Acompanhar Condição da região, nada perto da usina", t) and re.search(r"Atenção Fogo perto", t)
     css = (Path(V.__file__).resolve().parents[2] / "static" / "clima-mapa.css").read_text(encoding="utf-8")
     assert ".mp-ponto.mp-n-regiao{fill:var(--cl-regiao)}" in css
     assert ".mp-oculta-regiao .mp-usinas a:has(.mp-n-regiao),.mp-oculta-regiao .mp-tab--regiao," in css
