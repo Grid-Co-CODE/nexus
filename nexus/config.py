@@ -53,6 +53,9 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_CHAMADOS_PUBLICAR",
              # as tarefas das OS do Fracttal no banco (18/10/2026, nexus/campo/tarefas_os.py): "0" desliga numa máquina
              "NEXUS_OS_PUBLICAR",
+             # a Zeladoria no banco para o dashboard do cliente (26/10/2026, nexus/campo/zeladoria_banco.py): "0" desliga;
+             # onde NEXUS_CAMPO_AQUECER=0 (o PC) ela nem liga
+             "NEXUS_ZELADORIA_PUBLICAR",
              # login pelo Fracttal (06/10/2026): e-mails (separados por vírgula) que entram como admin (o Cadastro)
              "NEXUS_ADMINS",
              # Entrar com a Microsoft da Grid Co. (14/10/2026, nexus/auth/microsoft.py): as QUATRO primeiras ligam a porta
@@ -93,7 +96,11 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # Contratos e clientes → Acessos dos clientes (14/10/2026, nexus/contratos/acessos_clientes.py): a chave
              # PÚBLICA do Dashboard Thopen (as contas vão seladas para ela; também pela tela Base → Chaves do Nexus) e o
              # endereço do painel nos links de definir senha (padrão https://app.gridco.com.br/performance)
-             "NEXUS_ACESSOS_5080_PUBLICA", "NEXUS_THOPEN_URL")
+             "NEXUS_ACESSOS_5080_PUBLICA", "NEXUS_THOPEN_URL",
+             # Engenharia → ETMs (26/10/2026, nexus/engenharia/etm_historico.py): o histórico do app de ETM, trazido uma
+             # vez — um token que leia as Issues do repositório privado do app e o repositório (dono/nome; o nome traz
+             # o de uma pessoa, por isso não fica no código)
+             "NEXUS_ETM_GITHUB_TOKEN", "NEXUS_ETM_GITHUB_REPO")
 
 
 class ConfigErro(RuntimeError):

@@ -147,7 +147,12 @@
       fetch(f.dataset.url, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (a) {
         if (a.sessao_encerrada && window.nexusEntrarDeNovo) { window.nexusEntrarDeNovo(a.entrar); return; }
         q.textContent = '';
-        if (a.ok) { var img = document.createElement('img'); img.src = a.img; img.alt = 'Assinatura do técnico'; q.appendChild(img); return; }
+        if (a.ok) {
+          var img = document.createElement('img'); img.src = a.img; img.alt = 'Assinatura do técnico'; q.appendChild(img);
+          // a APR feita no App (26/10/2026): a assinatura vem do PDF que ele anexa na OS
+          var cap = f.querySelector('figcaption'); if (cap && a.origem === 'app') cap.textContent = 'Executante · assinatura da APR (App)';
+          return;
+        }
         var s = document.createElement('span'); s.className = 'mudo';
         if (a.login) { s.innerHTML = 'Para ver a assinatura, <a class="cn-link" href="' + a.entrar + '">entre com o seu login do Fracttal</a>.'; }
         else { s.textContent = 'Sem a assinatura: ' + (a.motivo || 'o Fracttal não respondeu') + '.'; }

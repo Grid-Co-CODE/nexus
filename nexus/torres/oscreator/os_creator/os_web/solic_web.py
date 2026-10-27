@@ -210,9 +210,10 @@ def nome_curto(asset: dict, frases=None) -> str:
     return nomes.do_catalogo(asset, frases)
 
 
-def titulo_do_ativo(descricao: str, asset: dict, frases=None) -> str:
+def titulo_do_ativo(descricao: str, asset: dict, frases=None, nome=None) -> str:
+    """`nome`: o nome do ativo já escolhido por quem chama (o Criar OS põe "Usina" no ativo da usina, 26/10/2026)."""
     descricao = str(descricao or "").strip()
-    nome = nome_curto(asset, frases)
+    nome = nome if nome is not None else nome_curto(asset, frases)
     if MARCA_ATIVO in descricao:
         return descricao.replace(MARCA_ATIVO, "[%s]" % nome)
     if not nome or descricao.lower().startswith("[%s]" % nome.lower()):

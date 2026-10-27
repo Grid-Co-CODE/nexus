@@ -25,6 +25,7 @@ from ...hseq import decisoes as DEC
 from ...hseq import epi as EPI
 from ...hseq import extintores as EXT
 from ...hseq import fotos as FOT
+from ...hseq import info_extintor as INFO
 from ...hseq import planilha as PLA
 from ...hseq import relatorio as REL
 from ..campo import _lido, _url
@@ -298,8 +299,9 @@ def _cartoes(L, chave) -> list[dict]:
 
 
 def _links(nome, chave, fl) -> dict:
-    """Para onde leva cada número de um cartão: a tela de origem filtrada pelo grupo e pelos filtros da Mesa. O EPI não
-    tem o filtro de UFV: a usina vai na busca dele. A PT ainda não tem filtro de responsável nem de cliente."""
+    """Para onde leva cada número de um cartão: a tela de origem filtrada pelo grupo e pelos filtros da Mesa (Levi,
+    26/10/2026: "o certo é cada opção levar a um caminho filtrado. Então PTs parados vai levar para APR e PT > Esperando
+    o de acordo > Tabela > Filtra o responsável"). O EPI não tem o filtro de UFV: a usina vai na busca dele."""
     f = {c: v for c, v in fl.items() if v}
     if chave:
         f[chave] = nome
@@ -312,7 +314,10 @@ def _links(nome, chave, fl) -> dict:
 
     def epi(st):
         return url_for("torre_hseq.epi", modo="tabela", f=st, **epi_f)
-    return {"pts": url_for("torre_hseq.apr_pt"), "vencidos": ext("atrasado"), "nr": ext(NR), "sem_luvas": epi("sem_luvas"),
+    def pt():
+        return url_for("torre_hseq.apr_pt", modo="tabela", f="parada",
+                       **{c: v for c, v in f.items() if c in ("cliente", "usina", "responsavel")})
+    return {"pts": pt(), "vencidos": ext("atrasado"), "nr": ext(NR), "sem_luvas": epi("sem_luvas"),
             "perto": ext("perto"), "sem_atual": ext("sem_atualizacao"), "luvas_semv": epi("sem_verificacao"),
             "ronda": ext()}
 
@@ -406,7 +411,6 @@ def extintores():
         nr_lista=nrs if ver == "extintor" and f == NR else [],
         historico=_historico(d, fl) if modo == "excluidos" else [], n_excluidos=len(fl["excluidos"]),
         pode=_pode(), rondas=_rondas(est, todas, fl["seguem"]), decisoes_erro=est.get("erro"),
-        classes=sorted({x["classe"] for x in todas + fl["seguem"] if x.get("classe")}, key=str.lower),
         motivos=DEC.MOTIVOS, motivos_botao=DEC.MOTIVOS_DO_BOTAO_DIREITO,
         aviso_ok=request.args.get("ok", ""), aviso_erro=request.args.get("erro", ""),
         cartoes=EXT.por_responsavel(base, d.get("times") or {}) if modo == "responsaveis" else [],
@@ -493,10 +497,23 @@ def extintores_editar():
         x = next((x for x in todas + seguem if x["codigo"] == form.get("codigo", "")), None)
         if x is None:
             raise DEC.Recusada("Este extintor não está mais na tela (alguém o excluiu): atualize a página.")
-        valores = {c: form[c] for c, _col in DEC.CAMPOS_EDICAO if c in form}
+        # "Outro (escrever)" na lista de local, posição ou classe: vale o que foi escrito (26/10/2026)
+        valores = {c: (form.get(f"{c}_outro", "") if form[c] == "__outro" else form[c])
+                   for c, _col in DEC.CAMPOS_EDICAO if c in form}
         return (DEC.editar(current_app.config, extintor=x, valores=valores, obs=form.get("obs", ""),
                            usuario=session.get("usuario"), pode=_pode()), x.get("cliente") or EXT.SEM_CLIENTE, x["usina"])
     return _decidir(fazer)
+
+
+@bp.route("/extintores/opcoes")
+def extintores_opcoes():
+    """As listas da caixa de editar extintor (Levi, 26/10/2026: "Em classe eu quero uma lista com todas as classe possíveis
+    e posições possíveis e locais possíveis registrados até o momento"): o que existe no cadastro de agora, com as
+    edições da Segurança, em ordem alfabética."""
+    d = EXT.extintores().dados or {}
+    todas, seguem, _ = DEC.separar(d.get("extintores") or [], d.get("nao_reconhecidos") or [], _decisoes())
+    return jsonify({c: sorted({str(x.get(c) or "").strip() for x in todas + seguem} - {""}, key=str.lower)
+                    for c in ("local", "posicao", "classe")})
 
 
 @bp.route("/extintores/ronda", methods=["POST"])
@@ -595,6 +612,24 @@ def extintores_foto_receber():
     status, msg = FOT.receber(current_app.config, request.form.get("codigo"), request.form.get("dia"),
                               request.form.get("ts"), request.form.get("assinatura"), arq.read() if arq else b"")
     return jsonify({"ok": status == 200, "mensagem": msg}), status
+
+
+@bp.route("/extintores/info", methods=["POST"])
+def extintores_info_receber():
+    """O App envia o texto da informação adicional de cada conferência de extintor (26/10/2026, Levi: "caso na última
+    ronda tenha informações adicionais quero ao clicar na linha que apareça as informações"). Sem sessão: vale a
+    assinatura HMAC (`info_extintor.receber`); o texto fica cifrado no disco, nunca no banco."""
+    status, msg = INFO.receber(current_app.config, request.form.get("codigo"), request.form.get("dia"),
+                               request.form.get("ts"), request.form.get("texto"), request.form.get("assinatura"))
+    return jsonify({"ok": status == 200, "mensagem": msg}), status
+
+
+@bp.route("/extintores/info/<codigo>")
+def extintores_info(codigo):
+    """A informação adicional da última conferência do extintor, para o clique na linha: {ok, texto, dia} ou
+    {ok: false}. Só com login (a pessoa que olha a tela)."""
+    d = INFO.ler(current_app.config, codigo)
+    return jsonify({"ok": True, **d} if d else {"ok": False})
 
 
 @bp.route("/extintores/foto/<codigo>.jpg")

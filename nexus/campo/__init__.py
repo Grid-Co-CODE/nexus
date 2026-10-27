@@ -44,6 +44,11 @@ def instalar(app):
         threading.Timer(20, lambda: aprovacao.aquecer(app)).start()
         # as OS de ronda aprovadas (sujidade e vegetação), depois da fila: as duas leituras não saem juntas
         threading.Timer(90, lambda: ronda_checklist.pedir_releitura(app)).start()
+        # a Zeladoria no banco para o dashboard do cliente (26/10/2026): só aqui, onde o checklist das rondas é relido
+        # (regra 12 do nexus/dados: o arquivo local das aprovadas mudaria o conteúdo conforme a máquina).
+        # NEXUS_ZELADORIA_PUBLICAR=0 desliga
+        from . import zeladoria_banco
+        zeladoria_banco.ligar(app)
     # o relatório de cada rodada (só contagens) vai para o log do processo: sem isto, um 429 ou um erro de gravação
     # ficava só na memória (1ª carga, 04/10: a rodada parou e ninguém via por quê)
     log = logging.getLogger("nexus.campo")

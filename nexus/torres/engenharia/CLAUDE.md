@@ -2,8 +2,28 @@
 
 Engenharia de manutenção: confiabilidade dos ativos, criticidade, FMEA e causa raiz, laudos. Hoje são telas de verdade
 a **Mesa do engenheiro** (a primeira da torre, 18/10/2026), a **Confiabilidade** (com o **acompanhamento** dos ativos
-com sinal desde 18/10/2026) e o **Quadro da equipe** (com a **página da OS** desde 24/10/2026); as outras caem no
-placeholder da casca.
+com sinal desde 18/10/2026), o **Quadro da equipe** (com a **página da OS** desde 24/10/2026) e as **ETMs**
+(26/10/2026); as outras caem no placeholder da casca.
+
+## Como entregar (trava da área da Engenharia, desde 27/10/2026)
+
+Levi, 27/10/2026: "gostaria que ele pudesse editar somente a parte de engenharia". Quem programa a Engenharia tem o
+papel **write** no repositório (nunca admin: o admin passa por cima da regra da `main`), e a `main` só aceita o trabalho
+dele por **pull request**:
+
+1. Crie um ramo (`engenharia/<assunto>`), commite e faça push dele.
+2. Abra o pull request para a `main`. A conferência **pasta-da-area** (`.github/workflows/pasta-da-area.yml`) aprova se
+   o pedido mexe só na área da Engenharia e reprova, listando os arquivos, se mexe fora dela.
+3. Verde: pode juntar (merge). Produção segue a `main` sozinha: em ~2 min o servidor reinicia com o pedido (teste
+   antes de juntar: `python -m pytest -q`, e a tela no navegador, desktop e 375 px).
+
+**Área da Engenharia:** `nexus/torres/engenharia/` (rotas, templates e este `.md`), `nexus/engenharia/` (a regra sem
+Flask), `nexus/static/engenharia*` (o estilo e o JS), `tests/test_engenharia*.py` e o desenho e o plano em
+`docs/superpowers/specs/` e `docs/superpowers/plans/` com "engenharia" no nome. Fora dela, com o Levi: o catálogo dos
+dados (`nexus/dados/`: livro novo entra primeiro no catálogo), a ponte do OS Creator (`nexus/torres/oscreator/`), o
+menu, a casca, o `requirements.txt` e a própria conferência. Precisou mexer fora? Abra o pedido assim mesmo e peça ao
+Levi: ele revisa e junta. Quem é da área: a variável `LOGINS_ENGENHARIA` do repositório (os logins do GitHub ficam
+fora do código, que é público).
 
 Endereços nunca a partir da raiz (porta única, 09/10/2026: o Nexus pode rodar debaixo de `/nexus`, como no servidor até a fase 4): o link da OS na
 Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusRota` (regra das torres em
@@ -228,7 +248,7 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
 - **Criar OS** (Levi, 25/10/2026: "ao lado do botão de solicitação quero um botão de 'Criar OS'. Fará os mesmos
   preenchimentos automáticos que já faz na solicitação"): o Criar OS do zero do OS Creator (o Tradicional,
   `/os/tradicional?` com o mesmo endereço do Solicitar OS) com o cliente, a usina e o ativo marcados, a data do
-  incidente desta OS e ela como OS pai no Passo 4, e as subtarefas "Descreva a atividade realizada" e "Ficou alguma
+  incidente desta OS e ela como OS pai no Passo 1 (ao lado das datas desde 26/10/2026), e as subtarefas "Descreva a atividade realizada" e "Ficou alguma
   pendência? Se sim, descreva", que viraram o padrão do Criar OS do zero para todos (`tradicional_web.SUBS_PADRAO`,
   as mesmas palavras da base da Solicitação; regra no README do OS Creator). A engenharia cria a OS de campo direto,
   sem passar pela Fila do PCM, e a resposta dela entra em Demais respostas do técnico.
@@ -242,6 +262,98 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
 - **Quem mexe:** o setor Engenharia e o administrador, com login de pessoa; os demais leem, sem formulários.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_os_quadro.py tests/test_engenharia_equipe.py
   tests/test_oscreator_solic_pcm.py -k "os_quadro or quadro or sugestao"` e a página na cópia de prova.
+
+## ETMs (26/10/2026)
+
+Levi, com o zip do app de ETM da Engenharia (desktop, FastAPI, um .exe por máquina): "Quero que inclua essa visão de
+ETMs no Nexus, engenharia, aba própria. Deixe o design alá Nexus!". No quiz: o histórico do app vem uma vez, e nas OS
+em aberto os comentários vão também para a nota da OS; entrega por partes; o comentário da ETM vai para a nota da OS,
+como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenharia-etm-design.md`; plano em
+`docs/superpowers/plans/2026-10-26-engenharia-etm.md`.
+
+- **A tela:** `/t/engenharia/etm` (`etm()`, `etm.html`, do setor Engenharia), as abas do app no desenho do Nexus
+  (Levi, 26/10/2026: "o deploy que te mandei tinham abas só disso!"): **Planner**, **Histórico**, **Estações em
+  Aberto** e **Fechamentos**, com a faixa de números em cima. A aba, a usina aberta e os filtros ficam no `sessionStorage` da aba do
+  navegador: a volta da OS (`?atualizar=1`) cai no mesmo lugar; o endereço leva a aba (`#historico`, `#abertas`).
+- **O Planner:** à esquerda a coluna de filtros do Acompanhamento PCM (Levi, 26/10/2026: "o estilo de lista dos filtros
+  está todo bugado e torto, deixe no nível do nexus!" e "tem um espaço livre do lado esquerdo que está sendo mau
+  utilizado"): a pesquisa geral, os seletores Cliente, Usina, Tipo de trabalho, Status da OS, Criado por e Responsável
+  (a busca, as caixas de marcar com a conta de cada opção com os outros filtros, Selecionar todos e Limpar; o painel
+  abre dentro da coluna, que rola sozinha), o período e "Redefinir filtros"; à direita o quadro, com as colunas Não
+  iniciadas, Em andamento, Finalizadas e Canceladas (a coluna do quadro levada à do app: a verificação ainda está em
+  andamento) e, na coluna Em andamento, as etiquetas da Engenharia. **O clique filtra** (Levi: "não precisa desse botão
+  "aplicar" clicou já filtrou!"): a caixa marcada vale na hora e o painel fica aberto, na mesma busca e rolagem; nada
+  ou tudo marcado é Todos. O Solicitante saiu ("tire o filtro do solicitante!"; segue na pesquisa geral). A **usina vai
+  curta** ("o nome da usina está vindo completo, o ideal seria sem a informação do nome do cliente e estado!",
+  `etm.usina_curta`: do "Cliente - Usina - UF" fica o meio; se não sobra nada, o nome inteiro); o filtro guarda o nome
+  inteiro, porque duas usinas de clientes diferentes podem ter o mesmo nome curto (aí a opção leva o cliente). O
+  **Status da OS** (o do Fracttal: Em Processo, Em Verificação, Concluída, Cancelada) entrou no lugar do "mostrar
+  canceladas": sem marcar, as canceladas ficam de fora. Abaixo de 1100 px a coluna sobe para cima do quadro, com os
+  seletores em duas colunas. Faixa: Abertas no Fracttal, Abertas para a Engenharia (a regra das "Estações em Aberto" do
+  app: a OS só sai com o diagnóstico ou o finalizado, não quando o Fracttal fecha), Em acompanhamento e Finalizadas em
+  30 dias. Sem ler o livro das marcações, a tela diz e as duas contas dele ficam "—".
+- **O Histórico** (a visão histórica do app): os clientes, as usinas de cada um (pelas ETMs, com quantas ETMs e OS; a
+  usina sem OS também aparece, como no app) e a lista das OS da usina, a mais nova primeiro, com o status do Fracttal,
+  as marcações e quantos comentários cada uma tem (contados pelas linhas do `nexus_engenharia_os`, sem abrir a cifra),
+  o período, as canceladas e o **Chat da usina** (os comentários da Engenharia em todas as OS dela, numa gaveta, lidos no
+  clique pelo `/etm/usina/comentarios`: a cifra abre só para as OS da usina; o comentário cuja cifra não abre, de outra
+  chave do cofre, é contado e a gaveta diz). A busca acha a usina em todos os clientes, sem acento nem caixa. Sem a
+  coluna de filtros: a navegação é a do app.
+- **As Estações em Aberto** (a visão atual do app): as usinas com OS aberta para a Engenharia (a mesma regra da faixa),
+  com quantas OS e há quanto tempo (a OS mais antiga; alerta a partir de 7 dias), e as **Estações em Acompanhamento**
+  (as usinas com OS marcada Em acompanhamento). A coluna de filtros vale aqui também, menos o Status da OS (a regra é a
+  da aba). O clique abre o quadro da usina, com **Finalizar pela Engenharia** em lote (só quem é da Engenharia ou
+  administrador): as OS da coluna Finalizadas que a pessoa vê, conferidas no servidor (`/etm/finalizar`) na última
+  leitura do Fracttal (da usina e finalizadas nele) e no livro (sem diagnóstico nem o finalizado), numa gravação só
+  (`etm_marcas.finalizar_lote`); a resposta diz as que já estavam encerradas e as que não estão mais finalizadas. O
+  pedido torto (sem a usina, a lista que não é lista, mais de 500 OS) volta 400; enquanto o pedido está no ar o botão
+  fica desligado, e a resposta só aparece na usina do pedido. E **Ver histórico desta usina**, que abre a usina no
+  Histórico. As duas rotas (`/etm/finalizar` e `/etm/usina/comentarios`) respondem 503 "lendo" com a cópia ainda
+  vazia, logo depois de subir: "nenhum comentário" ou "não está mais finalizada" seria mentira. Sem o livro das marcações, a aba diz e não lista nada
+  (não dá para saber o que está aberto para a Engenharia).
+- **A leitura** (`nexus/engenharia/etm.py`, medida em 26/10/2026, só leitura): `items?field_1=Estação Meteorológica` dá
+  as 172 ETMs (a descrição confere) e `work_orders?items_log_description=Estação Meteorológica` as 1213 OS delas: 15
+  pedidos, contra os 172 do app (um por ETM). Fica a OS cujo código é de ETM, uma por número, no cartão do Quadro
+  (`os_equipe._cartao`). A usina de cada ETM (`groups_1_description` do ativo) dá as usinas do Histórico; a da OS
+  usa o mesmo nome limpo ("Usina não identificada" sem o grupo), senão o espaço dobrado separava uma usina em duas. No teto de páginas a leitura é recusada (um filtro ignorado viraria o Fracttal inteiro). Cópia
+  de 5 min, relida por trás enquanto a tela é usada e 270 s depois de subir (`etm.manter_quente`, no `instalar`).
+- **Engenharia, Chamados e Campo** (Levi, 26/10/2026: "Engenharia e Chamados vai pelas pessoas dos setores, Campo é o
+  restante!"): o setor de quem está com a OS, pelo id do Fracttal, nos setores de Base → Acessos → Pessoas e setores
+  (`nexus_setores`, a última decisão de cada pessoa; os nomes "Engenharia" e "Chamados", sem acento nem caixa). Cada
+  cartão tem o selo (azul, verde, neutro), os três filtram e a faixa conta as abertas de cada um. Sem o banco dos
+  setores, a Engenharia vem da lista do Quadro da equipe (pelo nome), Chamados não se separa e a tela diz. Medido em
+  26/10/2026: 7 pessoas na Engenharia e 2 em Chamados, 260 OS na tela (54, 1 e 205).
+- **Quais OS entram:** a regra do app sem nome no código. Corretivas e Administrativas de ETM, mais as de responsável ou
+  solicitante da Engenharia ou de Chamados (o solicitante é texto livre: casa pelo nome do Fracttal das pessoas dos
+  setores, `fracttal_pessoal`).
+- **A OS de ETM:** `/t/engenharia/etm/os/<nº>`, a mesma página da OS do Quadro (`_pagina_da_os`, uma só para as duas
+  telas) com o painel "Marcações da Engenharia" no lugar de Status e prioridade (o diagnóstico e o status pós-OS num
+  formulário; a etiqueta, o acompanhamento e o finalizado um botão cada; só a Engenharia grava, pelo
+  `/etm/os/<nº>/marcar`), o "Checklist da OS" (as subtarefas e as respostas, na ordem do Fracttal), as marcações na
+  linha do tempo junto dos comentários e os números Diagnóstico, Status pós-OS, Em aberto e Última atualização. A volta
+  e a troca de responsável voltam para ETMs; a OS que não é de ETM abre a página comum.
+- **O livro das marcações:** `nexus_engenharia_etm` (`nexus/engenharia/etm_marcas.py`; regra no `nexus/dados/CLAUDE.md`),
+  um evento por marcação, as listas do app nas três dim. Os comentários são os da OS da Engenharia
+  (`nexus_engenharia_os`), que vão para a nota da OS com as mesmas travas do Quadro.
+- **O histórico do app, uma vez:** o painel "Trazer o histórico do app de ETM" (só o administrador, no pé da tela) lê o
+  repositório privado do app no GitHub (`NEXUS_ETM_GITHUB_TOKEN` e `NEXUS_ETM_GITHUB_REPO` no .env: o nome do
+  repositório traz o de uma pessoa), mostra a prévia e grava por trás (`nexus/engenharia/etm_historico.py`; a ponte
+  `/os/_nexus/engenharia/etm/historico`, porque a nota vai na sessão do Fracttal de quem importa). Os comentários
+  ("**Autor:**\ntexto" no app) entram com o autor e a data de lá (`origem` "app_etm" e o id do comentário); as labels
+  viram as marcações atuais, com a data em que foram postas. Nas OS em aberto, os comentários vão para a nota da OS numa
+  escrita por OS, do mais antigo ao mais novo; a nota que falha deixa os comentários daquela OS para a próxima. Trazer
+  de novo não repete nada (o id no livro e a linha que já está na nota).
+- **Segurança:** o Nexus não usa nenhuma credencial do app de ETM: lê o Fracttal com a dele e o GitHub com o token do
+  .env.
+- **Os Fechamentos** (Levi, 26/10/2026: "Pode fazer a aba Fechamentos por semana, como no app."): quantas OS fecharam
+  em cada semana (de segunda a domingo, a conta em UTC para o fuso não mudar o dia), da mais nova para a mais velha,
+  com a barra do tamanho de cada semana perto da maior; a semana abre no clique e mostra os cartões, com o dia do
+  fechamento. Duas visões, como no app: **no Fracttal** (as finalizadas, pelo dia do fim) e **pela Engenharia** (o dia
+  em que ela encerrou a OS: o diagnóstico ou o finalizado, o que veio por último, de qualquer status no Fracttal;
+  `etm_marcas.encerrada_em`, e desligado o finalizado vale o diagnóstico). A coluna de filtros vale aqui, menos o
+  Status da OS, e o período passa a ser o da data do fechamento. Sem o livro das marcações, a visão pela Engenharia diz
+  e não lista nada.
+- **Prova:** `tests/test_engenharia_etm.py` e `tests/test_engenharia_etm_historico.py` (Fracttal, banco e GitHub falsos).
 
 ## Confiabilidade (06/10/2026)
 

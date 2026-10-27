@@ -228,6 +228,21 @@ FATOS = (
          observacao="contestacao_linha_id liga à linha do thopen_contestacoes (o id dela, 1 contestação × 1 setor); "
                     "evento = responsavel (o responsável de agora é o do último) ou atualizacao. Quem (nome e e-mail) e "
                     "o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
+    # a passagem de turno do COS (R12 do Fillipe: "a passagem é registrada no sistema; sem registro, ela não aconteceu").
+    # Nada disso existia na Ronda COS (26/10/2026). O Nexus é a FONTE; registrado antes da 1ª gravação
+    Fato("passagem_turno", "Passagem de turno do COS", "cos", "nexus_cos_turno · fato_passagem_turno",
+         "1 linha = 1 evento (passagem escrita por quem sai, ou assumiu, de quem entra) sobre 1 troca de turno",
+         _d(data=("id", "data_id (o dia de Brasília do evento); papel data_id_troca (o dia da troca)"),
+            pessoa=("cod", "pessoa_hmac (o código do e-mail de quem passou ou assumiu)")),
+         tipo="transacao", chave=("id",),
+         medidas=_m((("abertas_qtd", "qtd", "nao"), ("criticas_qtd", "qtd", "nao"))),
+         fontes=("nexus_cos_turno · fato_passagem_turno",),
+         janela_origem="o Nexus é a fonte",
+         observacao="troca_em é a hora da troca (06:00 ou 18:00 de Brasília, os turnos da Ronda COS) e turno_que_sai o "
+                    "turno que termina nela (dia ou noite). As medidas só na passagem: o que estava aberto no Andamento "
+                    "da Ronda COS na hora, somado entre os clientes (vazio se algum não foi lido); são fotos, não somam "
+                    "entre passagens. Quem e o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se "
+                    "edita nem se apaga"),
     # o acompanhamento dos ativos com sinal da Confiabilidade (Levi, 18/10/2026: "os membros de engenharia ou
     # administradores pegar aqueles ativos com sinal para acompanhar ou alguém da engenharia poder encaminhar para a
     # pessoa ver!"). O Nexus é a FONTE; registrado antes da 1ª gravação
@@ -261,6 +276,21 @@ FATOS = (
                     "estado de agora é o do último evento de cada tipo. nota_fracttal diz se o comentário foi para a "
                     "nota da OS (\"sim\") ou por que não foi. Quem e o texto só cifrados (Cofre, a chave do cadastro). "
                     "Só acrescenta: nada se edita nem se apaga"),
+    Fato("marcacao_etm", "O que a Engenharia marca nas OS de ETM", "engenharia",
+         "nexus_engenharia_etm · fato_marcacao_etm",
+         "1 linha = 1 marcação (diagnostico, status_pos, etiqueta, acompanhamento ou finalizado) da Engenharia sobre 1 "
+         "OS de ETM do Fracttal",
+         _d(data=("id", "data_id (o dia de Brasília da marcação)"),
+            usina=("id", "usina_id (a ligação da OS com o cadastro; usina_ligada_por)"),
+            equipamento=("id", "equipamento_id (o código da ETM)"),
+            pessoa=("cod", "pessoa_hmac (quem marcou)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_engenharia_etm · fato_marcacao_etm",),
+         janela_origem="o Nexus é a fonte; o histórico do app de ETM entra uma vez, com origem app_etm",
+         observacao="os_id é o id da OS no Fracttal e os_folio o nº; valor_id aponta dim_diagnostico_etm, "
+                    "dim_status_pos_etm ou dim_etiqueta_etm do mesmo livro (as listas do app de ETM) e 0 limpa; "
+                    "ligado liga ou desliga a etiqueta, o acompanhamento e o finalizado. O estado de agora é o do último "
+                    "evento de cada tipo. origem diz de onde veio (nexus ou app_etm) e origem_id a chave de lá. Quem só "
+                    "cifrado (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
     Fato("contestacao_cliente", "Contestação do cliente", "contratos", "thopen_contestacoes · contestacoes",
          "1 linha = 1 contestação de 1 cliente sobre 1 dia (ou intervalo) de 1 usina × 1 setor (Performance, COS "
          "ou Zeladoria)",
@@ -1211,6 +1241,11 @@ LIVROS = (
           "nexus/contratos/tratamento.py, pela tela Contratos e clientes > Contestações", False,
           "registrado em 15/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª demanda que alguém pega",
           so_cresce=True),
+    Livro("nexus_cos_turno", ("fato_passagem_turno",),
+          "a cada passagem registrada e a cada \"Assumi o turno\" (tela COS > Passagem de turno)",
+          "nexus/cos/turno.py, pela tela COS > Passagem de turno", False,
+          "registrado em 26/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª passagem registrada",
+          so_cresce=True),
     Livro("nexus_engenharia_acompanhamento", ("dim_diagnostico", "fato_acompanhamento_ativo"),
           "a cada pegar, encaminhar, salvar, comentário e mudança no cadastro dos diagnósticos (tela Engenharia > "
           "Confiabilidade)",
@@ -1225,6 +1260,13 @@ LIVROS = (
           "registrado em 24/10/2026 antes da 1ª gravação (regra 10): nasce no 1º status, prioridade ou comentário. As "
           "três abas vão juntas a cada gravação, sobre o livro relido do banco; as duas dim são as listas fixas do "
           "código",
+          so_cresce=True),
+    Livro("nexus_engenharia_etm", ("dim_diagnostico_etm", "dim_status_pos_etm", "dim_etiqueta_etm",
+                                   "fato_marcacao_etm"),
+          "a cada marcação na OS de ETM (tela Engenharia > ETMs) e uma vez com o histórico do app de ETM",
+          "nexus/engenharia/etm_marcas.py, pela OS de ETM da tela ETMs", False,
+          "registrado em 26/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª marcação. As quatro abas vão juntas a "
+          "cada gravação, sobre o livro relido do banco; as três dim são as listas fixas do código",
           so_cresce=True),
     Livro("nexus_observacoes", ("fato_observacao_responsavel",), "a cada observação escrita no Nexus",
           "nexus/campo/observacao_responsavel.py", False,
@@ -1274,6 +1316,19 @@ LIVROS = (
           "nasceu na 1ª gravação, à mão depois do ensaio (ferramentas/ensaio_tarefas_os.py --gravar, 18/10/2026: "
           "8.746 tarefas, conferidas por GET depois de gravar); grava só a leitura inteira do Fracttal e se a "
           "última gravação tiver mais de 50 min"),
+    # a Zeladoria pronta para o dashboard do cliente (26/10/2026, Levi: "agora faz a mesma tela no dashboard do
+    # cliente"; a decisão dele, pelo chat do Dashboard Thopen: o Nexus publica a visão e o 5080 só mostra). É VISÃO, não
+    # fato: a conta da tela Zeladoria (nexus/campo/zeladoria.py) sobre o checklist das rondas, que só o Nexus lê
+    Livro("nexus_zeladoria", ("zeladoria_semana", "atualizacao"),
+          "de hora em hora (entre :32 e :37), só na máquina que relê o checklist das rondas (o servidor)",
+          "nexus/campo/zeladoria_banco.py (laço do Campo; NEXUS_ZELADORIA_PUBLICAR=0 desliga; não liga onde "
+          "NEXUS_CAMPO_AQUECER=0)", True,
+          "registrado em 26/10/2026 antes de existir; nasceu na 1ª volta do servidor depois do deploy, 27/10/2026 às "
+          "08:48 (687 linhas, 113 usinas, W33 a W44), conferida por GET: os totais pela linha mais recente de cada usina "
+          "batem com a tela Zeladoria (30 com vegetação acima de 3, 21 com sujidade, 51 recomendações). Grava só com o "
+          "checklist das rondas inteiro e novo (aprovadas relidas há menos de 3 h, fila da Aprovação há menos de 6 h), "
+          "as rondas do banco sem erro e as OS de zeladoria presentes, e se a última gravação tiver mais de 50 min; "
+          "troca o livro inteiro (as 12 semanas até a corrente)"),
     Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na aba Pessoas e setores de Base → Acessos",
           "nexus/cadastro/setores.py, pela tela Base > Acessos > Pessoas e setores", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
@@ -1372,6 +1427,10 @@ ABAS_FORA_DA_REGRA = {
     "aba_equipamentos": "a visão da estrutura das usinas no formato da aba Equipamentos do bd_performance (as mesmas "
                         "colunas, com os IDs no fim), só das chaves marcadas \"no lugar da aba\": é o que deixa cada "
                         "leitor antigo da aba trocar a fonte sem ser reescrito (nexus/cadastro/estrutura_usina.py)",
+    "zeladoria_semana": "a visão pronta da tela Zeladoria do Campo · App para o dashboard do cliente (26/10/2026): 1 linha "
+                        "= usina × semana com leitura, os níveis da semana, a recomendação e a situação da zeladoria "
+                        "em palavras do cliente; conta do Nexus (nexus/campo/zeladoria.py), não fato conformado: o "
+                        "checklist das rondas que a origina não está no banco",
 }
 
 

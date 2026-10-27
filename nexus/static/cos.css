@@ -35,3 +35,37 @@
 .cos-ciclo td.cos-usina{min-width:190px}
 .cos-neutro{font:500 12.5px/16px var(--font-mono);color:var(--tinta-2)}
 .cos-abrir{display:inline-block;margin-top:6px;font-size:12.5px}
+
+/* Religamentos: a lista de OS de cada equipamento em fonte de número; quebra em vez de alargar a tabela */
+.cos-os-lista{font:500 12px/18px var(--font-mono);color:var(--tinta-2);white-space:normal;max-width:260px}
+
+/* Acionamentos: a distribuidora (UC e canal) e quem aciono, um por linha dentro da célula; o telefone é um link tel: */
+.cos-acion td{vertical-align:top;white-space:normal}
+.cos-acion td.cos-usina{min-width:180px}
+.cos-dist + .cos-dist,.cos-quem-aciono + .cos-quem-aciono{margin-top:8px}
+.cos-dist .det,.cos-quem-aciono .det{display:block;margin:0}
+.cos-canal{display:block;margin-top:2px;font-size:12.5px;color:var(--tinta)}
+.cos-canal code{font:500 12px/1 var(--font-mono);color:var(--tinta-2)}
+.cos-canal .det{display:inline;margin:0 4px 0 0}
+.cos-tel{font:500 12.5px/18px var(--font-mono);white-space:nowrap}
+
+/* Passagem de turno: o cartão de quem sai (o formulário) e o de quem entra (a passagem e o assumi), e o histórico */
+.cos-destino{margin:0 0 6px;color:var(--tinta)}
+.cos-destino .cn-pill{margin:0 4px}
+.cos-aberto{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.cos-aberto li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--linha)}
+.cos-aberto li:last-child{border-bottom:0}
+.cos-form{display:grid;gap:8px;margin-top:16px}
+.cos-form textarea{width:100%;min-height:132px;resize:vertical;box-sizing:border-box}
+.cos-sit{margin:-2px 0 10px}
+.cos-troca + .cos-troca{margin-top:18px;padding-top:4px;border-top:1px solid var(--linha)}
+.cos-passagem{padding:10px 12px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie-2);margin-bottom:8px}
+.cos-passagem-cab{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px}
+.cos-texto-passagem{margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--tinta)}
+.cos-quem{display:inline-flex;align-items:baseline;gap:6px;margin-right:12px;white-space:nowrap}
+.cos-quem b{font-weight:600}
+.cos-quem .det{display:inline;margin:0}
+.cos-assumiu{margin:4px 0 10px}
+.cos-ler{margin-top:4px;font-size:12.5px}
+.cos-ler summary{cursor:pointer;color:var(--tinta-2)}
+.cos-ler .cos-texto-passagem{max-width:520px}

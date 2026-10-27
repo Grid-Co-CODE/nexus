@@ -10,8 +10,8 @@
    "Agrupar em UMA OS com várias tarefas" e a OS pai (steps/ospai.py). O diálogo de imagens por ativo é o PerfAnexoDialog. #}
 <section class="os-pagina" id="trad" data-agora="{{ agora }}" data-programada="{{ programada }}" data-crit-default="{{ crit_default }}" data-subs-padrao='{{ subs_padrao|tojson }}'>
   {# a sugestão pelo endereço (25/10/2026): o "Criar OS" da OS do Quadro da equipe da Engenharia abre esta tela com o
-     ativo dela marcado, a data do incidente dela e ela como OS pai no Passo 4 (`tradicional_web.sugestao`, a mesma da
-     Nova solicitação); a pessoa pode trocar tudo #}
+     ativo dela marcado, a data do incidente dela e ela como OS pai no Passo 1, ao lado das datas desde 26/10/2026
+     (`tradicional_web.sugestao`, a mesma da Nova solicitação); a pessoa pode trocar tudo #}
   {% set sug = sugestao or {} %}
   <div id="sug" hidden data-sug-cliente="{{ sug.cliente or '' }}" data-sug-usina="{{ sug.usina or '' }}" data-sug-ativo="{{ sug.ativo or '' }}" data-sug-os-pai="{{ sug.os_pai or '' }}" data-sug-os-pai-folio="{{ sug.os_pai_folio or '' }}"></div>
   <div class="os-topo-linha">
@@ -47,30 +47,39 @@
       </table>
     </div>
     <div class="os-ajuda" id="hint">Selecione cliente e usina para ver os ativos.</div>
-    <div class="os-linha2">
+    {# 26/10/2026, Levi: a OS pai ao lado das duas datas (até então no Passo 4) e sem os botões "Próximo" (os passos já
+       estão todos na página) #}
+    <div class="trad-linha3">
       <label class="os-campo"><span class="os-lbl">Data do incidente <small>(Brasília)</small></span>
         <span class="trad-dt-agora"><input id="dt_prog" type="datetime-local" value="{{ sug.data or agora }}" max="{{ agora }}" title="Data do evento não aceita futuro — é quando aconteceu."><button type="button" class="os-btn secondary" id="b_agora">Agora</button></span></label>
       <label class="os-campo"><span class="os-lbl">Data programada <small>(quando executar)</small></span>
         <input id="dt_exec" type="datetime-local" value="{{ programada }}"></label>
+      <div class="os-campo"><label class="os-lbl" for="ospai_in">OS pai <small>(opcional — ela depende de outra OS?)</small></label>
+        <div class="trad-ospai">
+          <input id="ospai_in" type="text" placeholder="Selecione a OS pai (nº) — opcional" title="Opcional: vincula esta OS a uma OS pai. Digite o número e escolha." autocomplete="off" inputmode="numeric">
+          <div class="trad-ospai-lista" id="ospai_lista" hidden></div>
+        </div></div>
     </div>
     <div class="os-rodape">
       <button type="button" class="os-btn secondary trad-reload" id="b_reload" title="Recarregar ativos do Fracttal">↻</button>
-      <button type="button" class="os-btn primaria trad-cresce" id="b_next1" disabled>Próximo ›››</button>
     </div>
   </div>
 
   {# ── Passo 2 — Step2: Card "Detalhes da OS" + Card "Classificação" (TipoTarefaBox) ── #}
   <div class="os-cardf" id="card2"><div class="os-cardf-h"><span class="os-badge">2</span><span class="os-cardf-t">{{ passos[1] }}</span></div>
     <div class="trad-sub-t">Detalhes da OS</div>
-    <label class="os-campo"><span class="os-lbl">Descrição da tarefa <i>*</i></span>
-      <textarea id="desc" rows="2" placeholder="Somente uma ação"></textarea></label>
-    {# 26/10/2026: o nome do ativo entra sozinho no título de cada OS; aqui a prévia com o 1º marcado #}
-    <div class="os-ajuda" id="hint_desc">Escreva só a ação: o nome de cada ativo entra sozinho na frente do título.</div>
+    {# 26/10/2026, Levi: "Título da tarefa", no padrão "[Ativo] - Título": a pessoa escreve o título e o nome curto de cada
+       ativo entra sozinho (o ativo da usina vira "Usina"); aqui a prévia com o 1º marcado #}
+    <label class="os-campo"><span class="os-lbl">Título da tarefa <i>*</i></span>
+      <input id="desc" type="text" placeholder="Somente uma ação" autocomplete="off"></label>
+    <div class="os-ajuda" id="hint_desc">Escreva só o título: o nome de cada ativo entra sozinho na frente.</div>
     <label class="os-campo"><span class="os-lbl">Observação <small>(opcional)</small></span>
       <textarea id="obs" rows="2" placeholder="Observações da OS (opcional)"></textarea></label>
-    <label class="os-campo"><span class="os-lbl">Etiquetas <small>(opcional — marque as que quiser)</small></span>
+    {# 26/10/2026: a lista das etiquetas só aparece ao pesquisar; as marcadas ficam embaixo, com o x para tirar #}
+    <label class="os-campo"><span class="os-lbl">Etiquetas <small>(opcional — pesquise e marque as que quiser)</small></span>
       <input id="etiq_busca" type="search" placeholder="carregando etiquetas…" autocomplete="off"></label>
-    <div class="trad-lista" id="etiq_lista"></div>
+    <div class="trad-lista" id="etiq_lista" hidden></div>
+    <div class="trad-etiq-marcadas" id="etiq_marcadas"></div>
     <div class="trad-sub-t">Classificação</div>
     <div class="os-linha2">
       <label class="os-campo"><span class="os-lbl">Tipo de tarefa</span>
@@ -84,9 +93,14 @@
       <label class="os-campo"><span class="os-lbl">Classificação 2 <small>(opcional)</small></span>
         <select id="cb_c2"><option value="">{{ nenhuma }}</option></select></label>
     </div>
+    {# 26/10/2026, Levi: o técnico abaixo da Classificação (até então no Passo 4) #}
+    <div class="trad-sub-t">Técnico</div>
+    <label class="os-campo"><span class="os-lbl">Técnico responsável pela OS <i>*</i> <small>(obrigatório na criação)</small></span>
+      <input id="resp_busca" type="search" placeholder="Filtrar responsável…" autocomplete="off"></label>
+    <div class="trad-lista trad-pessoas" id="resp_lista"></div>
+    <div class="os-ajuda" id="resp_sel">Nenhum técnico escolhido.</div>
     <div class="os-rodape">
       <button type="button" class="os-btn secondary" id="b_back2">‹‹‹ Voltar</button>
-      <button type="button" class="os-btn primaria trad-cresce" id="b_next2" disabled>Próximo ›››</button>
     </div>
   </div>
 
@@ -104,17 +118,17 @@
   </div>
 </section>
 
-{# ── Passo 4 — ResponsavelDialog (440x520): responsável + "já realizada" + agrupar + OS pai + Cancelar/Gerar N OS ── #}
+{# ── Passo 4 — ResponsavelDialog: desde 26/10/2026 a conferência antes de gerar (o técnico foi para o Passo 2 e a OS pai
+   para o Passo 1): quem, a OS pai, o aviso das usinas, "já realizada", agrupar e Cancelar/Gerar N OS ── #}
 <div class="os-modal" id="modal_resp" hidden>
   <div class="os-modal-fundo" data-fechar></div>
   <div class="os-modal-card os-form trad-modal" role="dialog" aria-modal="true" aria-label="{{ passos[3] }}">
     <div class="trad-modal-h"><span class="os-badge">4</span><span class="os-cardf-t">{{ passos[3] }}</span></div>
     <div class="trad-modal-corpo">
-      <p class="trad-txt" id="resp_titulo"><b>1 OS</b> a gerar — escolha o <b>responsável</b> <small>(obrigatório na criação)</small>:</p>
+      <p class="trad-txt" id="resp_titulo"><b>1 OS</b> a gerar — confira antes de gerar:</p>
+      <p class="trad-txt" id="resp_quem"></p>
       {# 26/10/2026: os marcados de mais de uma usina, em âmbar (a OS 16996 nasceu num tracker de outra usina) #}
       <p class="osb-aviso" id="resp_usinas" hidden></p>
-      <input id="resp_busca" type="search" placeholder="Filtrar responsável…" autocomplete="off">
-      <div class="trad-lista trad-pessoas" id="resp_lista"></div>
       <div id="fin">
         <label class="trad-check"><input type="checkbox" id="ck_fin"> Esta tarefa já foi realizada?</label>
         <div class="trad-finpanel" id="finpanel" hidden>
@@ -130,15 +144,10 @@
         </div>
       </div>
       <label class="trad-check" id="w_agrupar" hidden title="Em vez de uma OS por ativo, cria uma OS só em que cada ativo marcado vira uma tarefa."><input type="checkbox" id="ck_agrupar"> Agrupar em UMA OS com várias tarefas</label>
-      <div class="os-lbl">Ela depende de outra OS? <small>(opcional)</small></div>
-      <div class="trad-ospai">
-        <input id="ospai_in" type="text" placeholder="Selecione a OS pai (nº) — opcional" title="Opcional: vincula esta OS a uma OS pai. Digite o número e escolha." autocomplete="off" inputmode="numeric">
-        <div class="trad-ospai-lista" id="ospai_lista" hidden></div>
-      </div>
       <p class="os-erro" id="resp_erro" hidden></p>
       <div class="os-rodape">
         <button type="button" class="os-btn secondary" id="b_cancel" data-fechar>Cancelar</button>
-        <button type="button" class="os-btn primaria trad-cresce" id="b_gerar" disabled>Gerar OS</button>
+        <button type="button" class="os-btn primaria trad-cresce" id="b_gerar">Gerar OS</button>
       </div>
     </div>
   </div>

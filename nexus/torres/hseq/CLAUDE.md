@@ -15,6 +15,26 @@ o aviso ("Como cada extintor entra") fica numa exclamação amarela ao lado do t
 (macro `aviso`; Levi, 24/10/2026: "deve ficar compactado em um símbolo de exclamação amarelo, quando a pessoa clica
 aparece o comunicado"); clicar fora ou Esc fecha; no celular a caixa vem presa à tela.
 
+## Como entregar (trava da área da Segurança, desde 27/10/2026)
+
+Levi, 27/10/2026: "quero o mesmo para essa pessoa só que no módulo Segurança" (o mesmo da Engenharia). Quem programa a
+Segurança tem o papel **write** no repositório (nunca admin: o admin passa por cima da regra da `main`), e a `main` só
+aceita esse trabalho por **pull request**:
+
+1. Crie um ramo (`hseq/<assunto>`), commite e faça push dele.
+2. Abra o pull request para a `main`. A conferência **pasta-da-area** (`.github/workflows/pasta-da-area.yml`) aprova se
+   o pedido mexe só na área da Segurança e reprova, listando os arquivos, se mexe fora dela.
+3. Verde: pode juntar (merge). Produção segue a `main` sozinha: em ~2 min o servidor reinicia com o pedido (teste
+   antes de juntar: `python -m pytest -q`, e a tela no navegador, desktop e 375 px).
+
+**Área da Segurança:** `nexus/torres/hseq/` (rotas, templates e este `.md`), `nexus/hseq/` (a regra sem Flask),
+`nexus/static/hseq*` (o estilo), `tests/test_hseq*.py` e o desenho e o plano em `docs/superpowers/specs/` e
+`docs/superpowers/plans/` com "hseq" ou "seguranca" no nome. Fora dela, com o Levi: o App de Campo (`nexus/campo/`, de
+onde vêm as rondas, as PT e as APR), o catálogo dos dados (`nexus/dados/`), o cadastro, o PCM, o menu, a casca, o
+`requirements.txt` e a própria conferência. Precisou mexer fora? Abra o pedido assim mesmo e peça ao Levi: ele revisa e
+junta. Quem é da área: a variável `LOGINS_HSEQ` do repositório (os logins do GitHub ficam fora do código, que é
+público).
+
 ## Mesa da Segurança (24/10/2026)
 
 Levi: "Criação de mesa da segurança, como PTs atrasadas, extintores vencidos, usinas sem luvas"; e, no mesmo dia, "quero
@@ -36,10 +56,12 @@ Rota `/t/hseq/mesa` (`mesa()`), template `mesa.html`; as contas em `_pendencias(
   na planilha. **Baixar planilha** (`/t/hseq/mesa/pendencias.xlsx`, `planilha.gerar_pendencias`): a aba Resumo (uma
   linha por responsável ou cliente, os oito números) e uma aba por pendência, caso a caso (`ABAS_PENDENCIAS`), com os
   filtros e a fonte que não foi lida no topo. Medido no banco real em 24/10: 42 KB.
-- Cada número leva à tela de origem filtrada pelo grupo e pelos filtros do alto (`_links`): Extintores com o Status
-  (Atrasados, Não reconhecidos, Perto de vencer, Sem atualização), EPI na tabela com "Sem luvas" ou "Sem verificação"
-  (a UFV vai na busca dele, que não tem o filtro de usina); a PT ainda não tem o filtro de responsável nem de cliente, e
-  o número leva a APR e PT inteira.
+- Cada número leva à tela de origem filtrada pelo grupo e pelos filtros do alto (`_links`; Levi, 26/10/2026: "o certo
+  é cada opção levar a um caminho filtrado. Então PTs parados vai levar para APR e PT > Esperando o de acordo > Tabela >
+  Filtra o responsável"): as PTs paradas, à tabela de APR e PT com "Parada há mais de 2 h" e o cliente, a usina e o
+  responsável; os extintores, à tabela de Extintores no Status (Atrasados, Não reconhecidos, Perto de vencer, Sem
+  atualização); as luvas, à tabela de EPI com "Sem luvas" ou "Sem verificação" (a UFV vai na busca dele, que não tem o
+  filtro de usina); a nova ronda pedida, a Extintores do grupo.
 - Só lê; a fonte que falha diz e o número dela vira "—", sem derrubar as outras. Não lê o Fracttal.
 Prova: `tests/test_hseq_mesa.py` (os grupos, os filtros em cascata, os de atenção e a planilha).
 
@@ -238,7 +260,7 @@ a foto de cada conferência num `POST /t/hseq/extintores/foto` (multipart: `codi
 `HMAC-SHA256(NEXUS_PESSOA_HMAC, "nexus:hseq:fotos-extintor")`: a chave que o App e o Nexus já têm, nenhuma configuração
 nova (sem ela a rota responde 503). O Nexus confere a assinatura e a hora (15 min), abre a imagem, regrava em JPEG de
 até 1600 px e guarda a mais recente de cada extintor em `<dados>/hseq/extintores/fotos/<código>.jpg` (+ `.json` com o
-dia); foto de dia mais velho não substitui. É a única rota sem login (`auth.ROTAS_PUBLICAS`), e só por POST. Na tabela
+dia); foto de dia mais velho não substitui. É rota sem login (`auth.ROTAS_PUBLICAS`), e só por POST. Na tabela
 (a usina aberta e a visão por extintor), o extintor com foto ganha o botão "Foto" com o dia dela (até 19/10/2026, uma
 miniatura: ver "A página é leve"); o clique abre a caixa das fotos da ronda e só então pede a imagem (setas andam entre
 as fotos da usina). O PDF põe a mesma foto ao lado do extintor. No servidor (19/10): a listagem da pasta
@@ -300,12 +322,27 @@ extintor é excluído e vai para um histórico de extintores excluídos com o mo
   pendente. Grava também o nome da usina que o App usa (`usina_app`).
 - Saiu a "Editar quantidade de extintores" (Levi: "como cada extintor tem um cadastro unitário então o certo seria" a
   exclusão por extintor).
+- **A informação adicional da última ronda no clique da linha** (26/10/2026, Levi: "caso na última ronda tenha
+  informações adicionais quero ao clicar na linha que apareça as informações, caso não tenha que venha uma
+  notificação"; `nexus/hseq/info_extintor.py`). O livro do App só diz "Tem informação adicional" (sim/não): o texto é
+  livre (pode ter nome) e a API tem leitura aberta. Por isso ele vem como a foto: o App envia num `POST
+  /t/hseq/extintores/info` (`codigo`, `dia`, `ts`, `texto`, `assinatura` = HMAC-SHA256 hex de "código|dia|ts|sha256 hex
+  do texto" com `HMAC-SHA256(NEXUS_PESSOA_HMAC, "nexus:hseq:info-extintor")`; 15 min de janela), e o Nexus guarda o da
+  conferência mais recente CIFRADO (Cofre) em `<dados>/hseq/extintores/info/<código>.json`, nunca no banco; texto vazio
+  apaga. Toda linha de extintor leva `data-info` (o sim/não do livro) e a marca "com informação adicional"; o clique
+  abre a caixa com o texto (`/t/hseq/extintores/info/<código>`, com login) ou, sem informação, o aviso "Extintor X sem
+  informações adicionais na última ronda". Com o sim e sem o texto (o App ainda não envia), a caixa diz que ele ainda
+  não chegou. Contrato mandado à sessão do App de Campo.
 - **Editar o extintor** (`fato_edicao_extintor`; a TST, 24/10/2026: "Eu consigo editar o cadastro de extintores?"), no
   mesmo botão direito ("Editar extintor"): a caixa vem com o que a tela mostra (local, posição, classe, peso e as duas
   validades; o código não muda, nem se cadastra extintor novo, que entra pelo App) e grava só o que mudou
   (`decisoes.editar`, `campos` = JSON {coluna do livro do App: valor novo}). As validades no formato da etiqueta
   (recarga MM/AAAA ou Sem data; hidrostático AAAA, MM/AAAA ou Sem selo), o peso em kg (vazio não mexe: há extintor
-  sem peso no cadastro). A tela mostra o editado na hora, com a situação refeita (`extintores.editado`, por cima da
+  sem peso no cadastro). Local, posição e classe vêm numa lista com tudo o que já foi registrado no cadastro (Levi,
+  26/10/2026: "todas as classe possíveis e posições possíveis e locais possíveis registrados até o momento"; a lista
+  vem do Nexus ao abrir a caixa, `/t/hseq/extintores/opcoes`, para não pesar a página), com "Outro (escrever)" para o
+  que ainda não existe; até ali eram campos com sugestão do navegador, que abria a lista fora do lugar. A tela mostra o
+  editado na hora, com a situação refeita (`extintores.editado`, por cima da
   linha do livro guardada em `_bruto`) e a marca "editado dd/mm", em todas as contas (a Mesa, o PDF e o Excel
   também, porque a edição entra no `decisoes.separar`), até uma conferência num dia depois da edição; aí vale o que o
   App publicar.
@@ -380,15 +417,19 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   só vai o PDF da APR). Os endereços de antes (por equipe, região ou gestor, `regiao`, `regiao_campo`, `gestor`) caem no
   Por responsável e não filtram.
 - **A aba Sem APR ou PT** (a TST, 24/10/2026: "preciso de uma visibilidade de atividades realizadas sem APR e sem PT";
+  os dois botões com espaço dos filtros e da tabela, `pt-sem-seg`, 26/10: "esses botões muito colados";
   `nexus/hseq/apr.py`): do livro `apr_app_campo · APR` que o App publica desde a v298 do servidor (no catálogo antes da
   1ª gravação, fato `apr`; contrato com a sessão do App de Campo), duas listas de 20 em 20 com os mesmos filtros:
   **APR que pedia PT e ficou sem** ("Precisa de PT" = sim e PT vazia; vazio = ainda não medido, não entra) e **OS
-  fechada sem APR** (a tarefa do `fato_fechamento` desde 10/10/2026 sem APR da mesma OS no mesmo dia ou no anterior,
-  nem APR da tarefa com a mesma OS e tarefa; por OS e dia, com a coluna "APR da OS", a última antes do fechamento, ou
-  "nenhuma"; a régua não olha o técnico). Medido no livro real em 25/10 (875 APRs, 149 já medidas): 2 APRs pediam PT e
-  ficaram sem (a mesma conta do App) e 39 OS fechadas sem APR, 12 sem APR nenhuma; a régua começou com 138, dos quais
-  48 eram de 09/10 (o dia da troca para a v251) e 89 tinham a APR no dia anterior (a tarefa da noite fecha depois da
-  meia-noite). Sem o livro, a aba diz que ele ainda não chegou.
+  fechada sem APR** (a tarefa do `fato_fechamento` de OS criada desde 10/10/2026 sem APR nenhuma da OS até o dia do
+  serviço; por OS e dia, com a "OS criada em", do `fato_tarefa_os`; Levi, 26/10: "quero uma coluna de data de criação
+  da OS"). A régua é a do App (o diagnóstico da sessão do App de Campo em 26/10): a APR vale para a ATIVIDADE (regra de
+  15/10: "se para AQUELA atividade já tiver APR feita tá tranquilo"), então a tarefa pausada e retomada dias depois não
+  pede outra; o dia do serviço é a "Hora do celular" do livro cru, não o "Registrado em" (4 OS feitas em 21 e 23/10
+  chegaram em 26/10, com o celular offline); a OS criada antes de 10/10 fica fora (a 14334 tinha a APR por tarefa de
+  06/10, de antes do registro). A régua começou contando pelo dia (138 casos em 25/10, 52 em 26/10, quase todos
+  retomadas e envios atrasados); com a do App, 6 em 26/10, entre eles a 16995, iniciada e pausada no Fracttal, fora do
+  App, que escapou da APR do dia (o buraco real: o conserto no App é decisão do Levi). A régua não olha o técnico. Sem o livro, a aba diz que ele ainda não chegou.
   Caso que motivou: a OS 16866 tinha PT (PT-16866-2010-1457, da APR do dia); a TST a procurou no Fracttal.
 - **O histórico inteiro, de 20 em 20** ("Em histórico quero todo o período mostrando de 20 em 20 para não pesar tanto";
   saiu o período 7/30/90 dias): `POR_PAGINA_PT`, `?pag=`, com "1–20 de N" e as páginas em volta da atual; leva a coluna
@@ -405,7 +446,8 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
 - **O detalhe da PT esperando** (a linha abre; "estou achando o atual muito cru"): o cabeçalho da PT (número, OS,
   tarefa, equipamento, técnico, equipe, usina, aberta), as atividades críticas, as respostas NÃO e o que falta, a
   região de campo e o gestor, **quem assina**, as duas assinaturas lado a lado (a do técnico na APR, do Fracttal pelo
-  login de quem olha, carregada ao abrir; a da aprovação, esperando) e a decisão ali mesmo (De acordo / Não autorizo
+  login de quem olha, carregada ao abrir; desde 26/10/2026 a da APR feita no App sai do PDF dela, sem login; a da
+  aprovação, esperando) e a decisão ali mesmo (De acordo / Não autorizo
   com o motivo, Ver PT, Baixar APR), que volta para a lista com os filtros dela. É o mesmo pedaço da Central de atenção
   > Permissões de trabalho (`campo/_pt_esperando.html`); desde 19/10/2026 a Central e, desde 24/10, esta tela só
   pedem dele o Por responsável (o modo `responsaveis`) e a tabela.

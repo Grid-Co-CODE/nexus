@@ -229,6 +229,14 @@
   {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use os filtros, o status ou a busca para afunilar.</p>{% endif %}
   {% endif %}
   {% endif %}
+  {# a informação adicional da última ronda (o clique na linha do extintor) e o aviso de quando não há #}
+  <dialog class="hs-dialogo" id="hs-info" aria-labelledby="hs-info-t">
+    <h2 id="hs-info-t">Informação adicional</h2>
+    <p class="hs-dlg-ext"></p>
+    <p class="hs-info-texto"></p>
+    <div class="hs-dlg-botoes"><button type="button" class="gc-btn gc-btn--ui gc-btn--contorno hs-cancelar">Fechar</button></div>
+  </dialog>
+  <p class="hs-toast" id="hs-toast" role="status" hidden></p>
   {% if pode %}
   {# pedir nova ronda (o formulário que os três pontos da usina enviam) e o botão direito na linha do extintor #}
   <form id="hs-form-ronda" method="post" action="{{ url_for('torre_hseq.extintores_ronda') }}" hidden>
@@ -243,16 +251,18 @@
       <p class="hs-dlg-ext"></p>
       <input type="hidden" name="codigo">
       <div class="hs-dlg-grade">
-        <label><span class="gc-rotulo">Local</span><input class="gc-campo" name="local" maxlength="60"></label>
-        <label><span class="gc-rotulo">Posição</span><input class="gc-campo" name="posicao" maxlength="60" list="hs-posicoes"></label>
-        <label><span class="gc-rotulo">Classe</span><input class="gc-campo" name="classe" maxlength="60" list="hs-classes"></label>
+        {# local, posição e classe numa lista com tudo o que já foi registrado (Levi, 26/10/2026: "Em classe eu quero uma
+           lista com todas as classe possíveis e posições possíveis e locais possíveis registrados até o momento"); a
+           lista vem do Nexus ao abrir a caixa (`extintores_opcoes`), e "Outro" abre o campo para escrever #}
+        {% for campo, rotulo in (('local', 'Local'), ('posicao', 'Posição'), ('classe', 'Classe')) %}
+        <label class="hs-dlg-lista"><span class="gc-rotulo">{{ rotulo }}</span><select class="gc-campo" name="{{ campo }}" data-lista="{{ campo }}"></select>
+          <input class="gc-campo hs-dlg-outro" name="{{ campo }}_outro" maxlength="60" placeholder="escreva {{ rotulo|lower }}" hidden></label>
+        {% endfor %}
         <label><span class="gc-rotulo">Peso (kg)</span><input class="gc-campo" name="peso" inputmode="decimal" placeholder="vazio não muda"></label>
         <label><span class="gc-rotulo">Validade da recarga</span><input class="gc-campo" name="val2" placeholder="MM/AAAA ou Sem data" list="hs-sem-data"></label>
         <label><span class="gc-rotulo">Validade do hidrostático</span><input class="gc-campo" name="val3" placeholder="AAAA ou Sem selo" list="hs-sem-selo"></label>
       </div>
       <label><span class="gc-rotulo">Observação</span><input class="gc-campo" name="obs" maxlength="300" placeholder="opcional"></label>
-      <datalist id="hs-posicoes"><option value="Interno"><option value="Externo"></datalist>
-      <datalist id="hs-classes">{% for c in classes %}<option value="{{ c }}">{% endfor %}</datalist>
       <datalist id="hs-sem-data"><option value="Sem data"></datalist><datalist id="hs-sem-selo"><option value="Sem selo"></datalist>
       <p class="hs-dlg-nota">Só o que mudar é gravado. A tela mostra o novo valor na hora, e o App de Campo grava no cadastro dele. Se a equipe conferir o extintor numa ronda depois, vale o que ela conferiu.</p>
       <div class="hs-dlg-botoes"><button type="button" class="gc-btn gc-btn--ui gc-btn--contorno hs-cancelar">Cancelar</button>
@@ -316,6 +326,24 @@
       tr.addEventListener('click', alterna);
       tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
     });
+    // o clique na linha do extintor mostra a informação adicional da última ronda; sem ela, o aviso (26/10/2026)
+    (function () {
+      var toast = document.getElementById('hs-toast'), tempo = null;
+      function avisa(t) { toast.textContent = t; toast.hidden = false; clearTimeout(tempo); tempo = setTimeout(function () { toast.hidden = true; }, 3500); }
+      document.addEventListener('click', function (ev) {
+        var tr = ev.target.closest('tr.ext-linha');
+        if (!tr || ev.target.closest('a, button, input, select, form')) return;
+        var m = tr.querySelector('.m[title]'), nome = (m ? m.textContent : tr.dataset.codigo);
+        if (tr.dataset.info !== 'sim') { avisa('Extintor ' + nome + ' sem informações adicionais na última ronda.'); return; }
+        fetch(nexusRota('/t/hseq/extintores/info/' + encodeURIComponent(tr.dataset.codigo)), {credentials: 'same-origin'})
+          .then(function (r) { return r.json(); }).then(function (j) {
+            var d = document.getElementById('hs-info');
+            d.querySelector('.hs-dlg-ext').textContent = nome + ' · ' + tr.dataset.codigo + (j.ok && j.dia ? ' · ronda de ' + j.dia.slice(8, 10) + '/' + j.dia.slice(5, 7) : '');
+            d.querySelector('.hs-info-texto').textContent = j.ok ? j.texto : 'A última ronda tem informação adicional, mas o texto ainda não chegou do App de Campo.';
+            d.showModal();
+          }).catch(function () { avisa('Não consegui buscar a informação adicional agora.'); });
+      });
+    })();
     // a caixa dos não reconhecidos lembra se a pessoa a recolheu (só neste navegador; sem armazenamento, abre)
     (function () {
       var d = document.querySelector('.ext-naorec-dobra'), K = 'nexus.hseq.naorec';
@@ -351,6 +379,21 @@
         b.parentNode.appendChild(menu); menu.hidden = false; dono = b; b.setAttribute('aria-expanded', 'true');
       }
       var alvo = null;
+      // as listas de local, posição e classe (tudo o que já foi registrado), pedidas uma vez ao abrir a caixa
+      var opcoes = null;
+      function listas() {
+        return opcoes || (opcoes = fetch(nexusRota('/t/hseq/extintores/opcoes'), {credentials: 'same-origin'})
+          .then(function (r) { return r.json(); }).catch(function () { opcoes = null; return {}; }));
+      }
+      function preenche(sel, outro, valores, atual) {
+        sel.textContent = '';
+        var vals = valores.slice();
+        if (atual && vals.indexOf(atual) < 0) vals.unshift(atual);
+        [''].concat(vals).forEach(function (v) { var o = document.createElement('option'); o.value = v; o.textContent = v || '—'; sel.appendChild(o); });
+        var o = document.createElement('option'); o.value = '__outro'; o.textContent = 'Outro (escrever)'; sel.appendChild(o);
+        sel.value = atual; outro.hidden = true; outro.value = '';
+        sel.onchange = function () { outro.hidden = sel.value !== '__outro'; if (!outro.hidden) outro.focus(); };
+      }
       document.addEventListener('contextmenu', function (ev) {
         var tr = ev.target.closest('tr.hs-ext'), ctx = el('hs-ctx');
         if (!tr || !ctx) return;
@@ -375,10 +418,14 @@
           ev.stopPropagation();
           var de = el('hs-editar'), fe = de.querySelector('form'), ce = alvo.dataset.codigo, me = alvo.querySelector('.m[title="' + ce + '"]');
           fe.elements.codigo.value = ce;
-          ['local', 'posicao', 'classe', 'peso', 'val2', 'val3'].forEach(function (k) { fe.elements[k].value = alvo.dataset[k] || ''; });
+          ['peso', 'val2', 'val3'].forEach(function (k) { fe.elements[k].value = alvo.dataset[k] || ''; });
           fe.elements.obs.value = '';
           de.querySelector('.hs-dlg-ext').textContent = (me ? me.textContent : ce) + ' · ' + ce;
-          fecha(); de.showModal(); fe.elements.local.focus(); return;
+          var linha = alvo;
+          listas().then(function (op) {
+            ['local', 'posicao', 'classe'].forEach(function (k) { preenche(fe.elements[k], fe.elements[k + '_outro'], op[k] || [], linha.dataset[k] || ''); });
+          });
+          fecha(); de.showModal(); fe.elements.peso.focus(); return;
         }
         if (ev.target.closest('.hs-excluir-abre') && alvo) {
           ev.stopPropagation();

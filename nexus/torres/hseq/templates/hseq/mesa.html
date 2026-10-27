@@ -76,7 +76,7 @@
     {% endfor %}
   </div>
 
-  {% call legenda('Como ler a mesa', 'A mesa só lê: cada número leva à tela de origem, já filtrada pelo responsável ou pelo cliente (e pelos filtros do alto), onde a Segurança age. A PT ainda não tem o filtro de responsável nem de cliente: o número leva a APR e PT inteira. A planilha leva caso a caso, com os mesmos filtros.') %}
+  {% call legenda('Como ler a mesa', 'A mesa só lê: cada número leva à tela de origem, já filtrada pelo responsável ou pelo cliente (e pelos filtros do alto), onde a Segurança age: as PTs paradas, à tabela de APR e PT; os extintores, à tabela de Extintores no status; as luvas, à tabela de EPI. A planilha leva caso a caso, com os mesmos filtros.') %}
     {{ termo('PTs paradas', 'critico') }}<dd>A PT está esperando o De acordo há mais de 2 h.</dd>
     {{ termo('Extintores vencidos', 'critico') }}<dd>A recarga ou o teste hidrostático do extintor venceu.</dd>
     {{ termo('Não reconhecidos', 'alerta') }}<dd>A equipe não achou o extintor na usina; na usina, a Segurança aceita (o extintor é excluído) ou pede nova ronda.</dd>

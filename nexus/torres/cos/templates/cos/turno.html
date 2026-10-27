@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+{# Passagem de turno (26/10/2026), spec R12: "a passagem é registrada no sistema; sem registro, ela não aconteceu". Quem
+   sai escreve o que o próximo turno precisa saber; quem entra diz que assumiu. Grava no livro nexus_cos_turno
+   (nexus/cos/turno.py); o que está aberto vem do Andamento da Ronda COS. #}
+{% macro pessoas(eventos) %}{% for e in eventos %}<span class="cos-quem"><b>{{ e.nome or 'alguém' }}</b> <span class="det">{{ e.hora }}</span></span>{% endfor %}{% endmacro %}
+{% macro aberto_txt(e) %}{% if e.abertas is not none %}{{ e.abertas }} aberta{{ '' if e.abertas == 1 else 's' }}{% if e.criticas %}, {{ e.criticas }} crítica{{ '' if e.criticas == 1 else 's' }}{% endif %}{% else %}—{% endif %}{% endmacro %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    {% if p %}<div class="cn-frescor">Turno <b>{{ p.turno.nome }}</b><br>{{ p.turno_inicio.strftime('%d/%m %H:%M') }} às {{ p.turno_fim.strftime('%H:%M') }}</div>{% endif %}
+  </div>
+
+  {% if aviso %}<div class="cn-erro cn-aviso" role="status"><b>{{ aviso }}.</b></div>{% endif %}
+  {% if erro %}<div class="cn-erro" role="alert"><b>Nada foi gravado.</b> {{ erro }}.</div>{% endif %}
+  {% if erro_livro %}<div class="cn-erro" role="alert"><b>{{ erro_livro }}.</b> Sem as passagens gravadas, a tela não diz
+    quais trocas aconteceram: tente de novo em instantes.</div>{% endif %}
+
+  {% if p %}
+  {% set faltam = ((p.turno_fim - p.agora).total_seconds() // 60)|int %}
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Turno em curso</span><span class="v">{{ p.turno.nome }}</span>
+      <span class="d">troca às {{ p.turno_fim.strftime('%H:%M') }}, em {{ faltam // 60 }} h {{ '%02d'|format(faltam % 60) }}</span></span>
+    <span><span class="gc-rotulo">Trocas registradas</span><span class="v{% if p.pct_registradas is not none and p.pct_registradas < 100 %} ruim{% endif %}">{% if p.pct_registradas is none %}—{% else %}{{ p.pct_registradas }}%{% endif %}</span>
+      <span class="d">{{ p.registradas }} de {{ p.fechadas }} nos últimos 7 dias</span></span>
+    <span><span class="gc-rotulo">Assumidas</span><span class="v">{{ p.assumidas }}</span>
+      <span class="d">{% if p.sem_assumir %}{{ p.sem_assumir }} registrada{{ '' if p.sem_assumir == 1 else 's' }} sem ninguém assumir{% else %}das {{ p.registradas }} registradas{% endif %}</span></span>
+    <span><span class="gc-rotulo">Sem registro</span><span class="v{% if p.sem_registro %} ruim{% endif %}">{{ p.sem_registro }}</span>
+      <span class="d">a passagem não aconteceu</span></span>
+  </div>
+
+  <div class="cn-duas">
+    <section class="cn-cartao">
+      <h2>Passar o turno</h2>
+      <p class="cos-destino">Vai para a troca de <b>{{ p.destino.strftime('%d/%m') }} às {{ p.destino.strftime('%H:%M') }}</b> ({{ p.destino_rotulo }}).
+        {% if p.destino_atrasada %}<span class="cn-pill cn-alerta">depois da troca</span> A troca já passou: a passagem fica registrada com o atraso.{% endif %}</p>
+      {% if p.destino_passagens %}<p class="mudo">Esta troca já tem {{ p.destino_passagens|length }} passagem{{ '' if p.destino_passagens|length == 1 else 's' }}: a sua se soma (cada operador passa o que é dele).</p>
+      {% for x in p.destino_passagens %}
+      <div class="cos-passagem">
+        <div class="cos-passagem-cab">{{ pessoas([x]) }}<span class="det">{% if x.abertas is not none %}{{ aberto_txt(x) }} na hora{% else %}sem a contagem do Andamento{% endif %}</span></div>
+        <p class="cos-texto-passagem">{{ x.texto or 'O texto não abre neste Nexus (sem a chave do cadastro).' }}</p>
+      </div>
+      {% endfor %}{% endif %}
+
+      <h3>Aberto agora</h3>
+      {% if aberto is none %}
+      <p class="mudo">O Andamento da Ronda COS não está ligado neste servidor: a passagem vai sem a contagem do que estava aberto.</p>
+      {% else %}
+      <ul class="cos-aberto">
+        {% for c in aberto.por_cliente %}
+        <li><b>{{ c.cliente }}</b> <span>{% if c.abertas is none %}<span class="cn-pill cn-alerta">sem leitura</span>{% else %}{{ aberto_txt(c) }}{% endif %}</span></li>
+        {% else %}<li class="mudo">{{ aberto.erro_clientes or 'O Andamento não informou nenhum cliente' }}</li>
+        {% endfor %}
+      </ul>
+      <p class="det">Pela Ronda padronizada: <a class="cn-link" href="{{ '/t/cos/ronda'|na_raiz }}">o que está aberto em cada usina</a>.
+        {% if aberto.abertas is none %} Com um cliente sem leitura, a passagem vai sem a contagem.{% endif %}</p>
+      {% endif %}
+
+      {% if com_login %}
+      <form class="cos-form" method="post" action="{{ '/t/cos/turno/passar'|na_raiz }}">
+        <label class="gc-rotulo" for="cos-texto">O que o próximo turno precisa saber</label>
+        <textarea id="cos-texto" name="texto" class="gc-campo" rows="6" maxlength="{{ texto_max }}" required
+          placeholder="Pendências, usinas em acompanhamento, chamados à distribuidora, retorno que o cliente espera. Se não há nada pendente, diga isso.">{{ texto }}</textarea>
+        <div><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Registrar a passagem</button></div>
+      </form>
+      {% else %}
+      <p class="mudo">Entre com o seu login (Fracttal ou Microsoft) para registrar a passagem: a senha de administrador não diz quem é a pessoa.</p>
+      {% endif %}
+    </section>
+
+    <section class="cn-cartao">
+      <h2>Assumir o turno</h2>
+      {% for a in p.assumiveis %}
+      <div class="cos-troca">
+        <h3>Troca de {{ a.troca.strftime('%d/%m') }} às {{ a.troca.strftime('%H:%M') }} · {{ a.rotulo }}</h3>
+        {% set s = situacoes[a.situacao] %}<p class="cos-sit"><span class="{{ 'cn-pill cn-' ~ s[1] if s[1] != 'neutro' else 'cos-neutro' }}">{{ s[0] }}</span></p>
+        {% for x in a.passagens %}
+        <div class="cos-passagem">
+          <div class="cos-passagem-cab">{{ pessoas([x]) }}<span class="det">{% if x.abertas is not none %}{{ aberto_txt(x) }} na hora{% else %}sem a contagem do Andamento{% endif %}</span></div>
+          <p class="cos-texto-passagem">{{ x.texto or 'O texto não abre neste Nexus (sem a chave do cadastro).' }}</p>
+        </div>
+        {% else %}
+        <p class="mudo">A passagem desta troca ainda não foi registrada.</p>
+        {% endfor %}
+        {% if a.assumiu %}<p class="cos-assumiu">Assumiu: {{ pessoas(a.assumiu) }}</p>{% endif %}
+        {% if a.eu_assumi %}<p class="mudo">Você já assumiu este turno.</p>
+        {% elif a.eu_passei %}<p class="mudo">Você passou este turno: quem entra assume.</p>
+        {% elif a.passagens and com_login %}
+        <form method="post" action="{{ '/t/cos/turno/assumir'|na_raiz }}">
+          <input type="hidden" name="troca" value="{{ a.troca.isoformat() }}">
+          <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Li e assumi o turno</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </section>
+  </div>
+
+  <h2 class="cos-sub">As trocas dos últimos 7 dias</h2>
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Troca</th><th class="cos-esq">Situação</th><th class="cos-esq">Passou</th><th class="cos-esq">Assumiu</th><th>Aberto na passagem</th></tr></thead>
+    <tbody>
+    {% for h in p.historico %}
+      <tr>
+        <td class="cos-esq cos-usina"><b>{{ h.troca.strftime('%d/%m %H:%M') }}</b><span class="det">{{ h.rotulo }}</span></td>
+        <td class="cos-esq"><span class="{{ 'cn-pill cn-' ~ h.tom if h.tom != 'neutro' else 'cos-neutro' }}">{{ h.situacao_rotulo }}</span>
+          {% if h.atraso_min %}<span class="det">registrada {{ h.atraso_min }} min depois da troca</span>{% endif %}</td>
+        <td class="cos-esq">{% if h.passagens %}{{ pessoas(h.passagens) }}
+          <details class="cos-ler"><summary>ler a passagem</summary>{% for x in h.passagens %}<p class="cos-texto-passagem">{{ x.texto or 'O texto não abre neste Nexus.' }}</p>{% endfor %}</details>
+          {% else %}<span class="mudo">—</span>{% endif %}</td>
+        <td class="cos-esq">{% if h.assumiu %}{{ pessoas(h.assumiu) }}{% else %}<span class="mudo">—</span>{% endif %}</td>
+        <td>{% if h.passagens %}{{ aberto_txt(h.passagens[-1]) }}{% else %}<span class="mudo">—</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+
+  <div class="cn-nota"><b>Como funciona.</b> Os turnos são os da Ronda COS: {% for t in turnos %}{{ t.nome|lower }} a partir das
+    {{ '%02d'|format(t.inicio_h) }}:00{{ ', ' if not loop.last else '' }}{% endfor %}. Quem sai escreve a passagem, e ela vai para
+    a troca do fim do turno, ou para a que acabou de acontecer se for escrita até {{ tolerancia }} min depois dela
+    (quem já assumiu essa troca escreve para a seguinte). Quem entra
+    lê e marca <b>assumi</b>: quem passou não assume a própria passagem. Troca sem passagem {{ tolerancia }} min depois da
+    hora fica <b>sem registro</b>: pela R12, a passagem não aconteceu. Quem passou e o texto vão cifrados para o banco; o
+    que estava aberto é a contagem do Andamento da Ronda COS na hora da passagem.</div>
+  {% endif %}
+</div>
+{% endblock %}

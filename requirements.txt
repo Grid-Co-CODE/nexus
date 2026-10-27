@@ -14,3 +14,5 @@ pandas==3.0.3
 pillow==12.2.0
 # relatório dos extintores em PDF (nexus/hseq/relatorio.py, Segurança · HSEQ, 09/10/2026)
 reportlab==5.0.0
+# a assinatura do técnico na APR feita no App, lida do PDF que ele anexa na OS (nexus/campo/pt_fracttal.py, 26/10/2026)
+pypdf==6.14.2

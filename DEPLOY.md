@@ -477,6 +477,9 @@ O e-mail semanal das pendências da Segurança (24/10/2026) sai pelo App de Camp
 livro `nexus_hseq_email` na segunda depois das 07:00, e só com `NEXUS_HSEQ_EMAIL_AUTO=1` no `.env` (sem ela, desligado).
 **Nada a fazer da T.I.** além de pôr a variável quando o App estiver pronto. Regras: `nexus/torres/hseq/CLAUDE.md`.
 
+A assinatura da APR feita no App (26/10/2026) é lida do PDF da APR com o `pypdf`, que entrou no `requirements.txt`: o
+`deploy/atualizar.sh` o instala sozinho no próximo commit (o pip roda antes da conferência do boot).
+
 O Relatório executivo do PCM (Interno Grid, Cliente e Abertura da Semana, no bloco "Relatório Gerencial PCM" da mesma
 Central) mostra "MPA/MPS atrasadas" quando o servidor abre a planilha Gerencial do PCM (o `mpas.json`, cifrado no
 repositório público de lá). Para isso, **uma linha no `.env`** (o Levi passa o valor por fora; é segredo):

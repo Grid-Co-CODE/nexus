@@ -1,22 +1,31 @@
 """Torre COS: Mesa do operador: ver, informar o cliente e acionar o campo em minutos.
 
 Ronda padronizada, Parede de eventos e Ocorrências leem o Andamento da Ronda COS (22/10/2026, nexus/cos/andamento.py;
-os prazos das Ocorrências em nexus/cos/ocorrencias.py). As outras telas caem no placeholder da casca. Para dar vida a uma tela, crie uma view com a mesma rota (ela vence a genérica),
-por exemplo:
+os prazos das Ocorrências em nexus/cos/ocorrencias.py). Religamentos e Acionamentos (26/10/2026) também: as contas em
+nexus/cos/religamentos.py e nexus/cos/acionamentos.py. A Passagem de turno (26/10/2026) grava no livro nexus_cos_turno
+(nexus/cos/turno.py). As outras telas caem no placeholder da casca. Para dar vida a uma tela, crie uma view com a mesma
+rota (ela vence a genérica), por exemplo:
 
     @bp.route("/mesa")
     def mesa():
         return render_template("cos/mesa.html")
 """
+import logging
 from datetime import datetime
 from urllib.parse import urlencode
 
-from flask import current_app, render_template, request
+from flask import abort, current_app, redirect, render_template, request, session
 
+from ...cos import acionamentos as AC
 from ...cos import andamento as AND
 from ...cos import ocorrencias as OC
+from ...cos import religamentos as RE
+from ...cos import turno as TU
+from ...prefixo import na_raiz
 from ..modelo import Tela, Torre
-from ..moldura import registrar_molduras
+from ..moldura import _de_outro_site, registrar_molduras
+
+_log = logging.getLogger(__name__)
 
 TORRE = Torre(
     id="cos",
@@ -28,18 +37,9 @@ TORRE = Torre(
         Tela("mesa", "Mesa do operador",
              "O que está aberto na minha mesa e o que falta avisar ao cliente?",
              "Tempo real da Performance + ocorrências do Nexus"),
-        Tela("acionamentos", "Acionamentos e distribuidoras",
-             "Quem aciono e qual o canal da distribuidora desta UF?",
-             "Cadastro de distribuidoras e contatos por cliente"),
         Tela("desempenho", "Desempenho da equipe",
              "As mesas estão dentro do MTTA e do aviso no prazo?",
              "Ocorrências do Nexus"),
-        Tela("religamentos", "Religamentos",
-             "Onde o religamento remoto resolve e onde se repete na mesma cabine?",
-             "COS + Fracttal (OS de religamento)"),
-        Tela("turno", "Passagem de turno",
-             "O que o próximo turno precisa saber e quem assumiu?",
-             "Registros de passagem de turno do Nexus"),
         # Porta única (09/10/2026): o /cos da Plataforma de Performance (MTTA das OS), numa moldura do Nexus. A view sai do
         # mapa das telas da plataforma (nexus/performance/porta.py), pelo registrar_molduras abaixo.
         Tela("acompanhamento", "Acompanhamento COS",
@@ -61,6 +61,20 @@ TORRE = Torre(
         Tela("eventos", "Parede de eventos",
              "O que aconteceu na frota nas últimas horas?",
              "Andamento da Ronda COS (eventos das ocorrências)"),
+        # 26/10/2026: Religamentos e Acionamentos também leem o Andamento (o ciclo das ocorrências, com a tag da cabine e o
+        # religamento de cada uma; e as UCs, os canais e os chamados à concessionária). Depois do Acompanhamento pelo
+        # mesmo motivo da Ronda e da Parede. O "quem aciono" é do cadastro do Nexus (nexus/cos/acionamentos.py).
+        Tela("religamentos", "Religamentos",
+             "Onde o religamento remoto resolve e onde se repete na mesma cabine?",
+             "Andamento da Ronda COS (as ocorrências de 30 dias, com o religamento e a cabine de cada uma)"),
+        Tela("acionamentos", "Acionamentos e distribuidoras",
+             "Quem aciono e qual o canal da distribuidora desta UF?",
+             "Cadastro do Nexus (quem aciono) + Andamento da Ronda COS (UCs, canais e chamados à concessionária)"),
+        # 26/10/2026: a passagem de turno da spec R12 ("sem registro, ela não aconteceu"), gravada no livro
+        # nexus_cos_turno (nexus/cos/turno.py). Depois do Acompanhamento pelo mesmo motivo da Ronda e da Parede.
+        Tela("turno", "Passagem de turno",
+             "O que o próximo turno precisa saber e quem assumiu?",
+             "Passagens registradas no Nexus + o que está aberto no Andamento da Ronda COS"),
     ],
 )
 
@@ -158,3 +172,134 @@ def ocorrencias():
         cliente=cliente, leitura=leitura, p=OC.painel(leitura, AND.agora(), situacao, fonte.url), dias=dias,
         dias_opcoes=AND.DIAS_DAS_OCORRENCIAS, situacao=situacao, situacoes=OC.SITUACOES, etapas=OC.ETAPAS,
         prazos=OC.PRAZOS, lido=_lido([leitura]), url=_url)
+
+
+@bp.route("/religamentos")
+def religamentos():
+    """Religamentos (26/10/2026): onde o religamento remoto resolve e onde se repete na mesma cabine. As ocorrências do
+    período vêm do Andamento (a rota das Ocorrências, com a tag da cabine e o religamento de cada uma); o desfecho e a
+    repetição são de nexus/cos/religamentos.py. Só lê."""
+    cfg = current_app.config
+    fonte = AND.fonte(cfg)
+    clientes, erro_clientes = AND.clientes(cfg)
+    cliente = request.args.get("cliente", "")
+    if cliente not in clientes:
+        cliente = clientes[0] if clientes else ""
+    dias = RE.dias_pedidos(request.args.get("dias"))
+    leitura = AND.ler_ocorrencias(cfg, cliente, dias) if cliente else AND.Leitura("", None, erro=erro_clientes or (
+        "" if not fonte.ligada else "o Andamento não informou nenhum cliente"))
+    if not fonte.ligada:
+        leitura.erro = ""
+    ver = request.args.get("ver", "repetem")
+    if ver not in RE.VER:
+        ver = "repetem"
+    return render_template(
+        "cos/religamentos.html", torre=TORRE, tela=TORRE.tela("religamentos"), ligada=fonte.ligada, clientes=clientes,
+        cliente=cliente, leitura=leitura, p=RE.painel(leitura, ver), dias=dias, dias_opcoes=RE.DIAS_OPCOES, ver=ver,
+        vers=RE.VER, desfechos=RE.DESFECHOS, repete=RE.REPETE_A_PARTIR, reincidente=RE.REINCIDENTE_A_PARTIR,
+        lido=_lido([leitura]), url=_url)
+
+
+@bp.route("/acionamentos")
+def acionamentos():
+    """Acionamentos e distribuidoras (26/10/2026): quem aciono e qual o canal da distribuidora desta UF. Quem aciono é do
+    cadastro do Nexus (o contato decifrado só para a tela); a UC, o canal e os chamados à concessionária, do Andamento
+    (nexus/cos/acionamentos.py). Só lê."""
+    cfg = current_app.config
+    fonte = AND.fonte(cfg)
+    clientes, erro_clientes = AND.clientes(cfg)
+    leituras = [AND.ler_distribuidoras(cfg, c) for c in clientes] if fonte.ligada else []
+    cliente, uf = request.args.get("cliente", ""), request.args.get("uf", "")
+    busca = " ".join((request.args.get("q") or "").split())[:80]
+    chave = cfg.get("NEXUS_CHAVE_CADASTRO")
+    try:
+        from ...cadastro.cifra import Cofre
+        from ...campo import visao
+        p, erro_cadastro = AC.painel(visao._Base(), Cofre(chave) if chave else None, leituras, AND.agora(), cliente, uf,
+                                     busca), ""
+    except Exception as e:      # noqa: BLE001 — cadastro fora: a tela diz, sem lista pela metade
+        _log.exception("Acionamentos: o cadastro não foi lido")
+        p, erro_cadastro = None, f"Não consegui ler o cadastro do Nexus ({type(e).__name__})"
+    return render_template(
+        "cos/acionamentos.html", torre=TORRE, tela=TORRE.tela("acionamentos"), ligada=fonte.ligada, p=p,
+        erro_cadastro=erro_cadastro, erro_clientes=erro_clientes if fonte.ligada else "", cliente=cliente, uf=uf,
+        busca=busca, com_chave=bool(chave), confianca=AC.CONFIANCA, lido=_lido(leituras), url=_url)
+
+
+# ── Passagem de turno (26/10/2026) ───────────────────────────────────────────────────────────────────────────────────
+_TURNO_AVISO = "cos_turno_aviso"
+
+
+def _aberto_agora(cfg) -> dict | None:
+    """O que está aberto no Andamento agora, por cliente (a cópia de 30 s de cada um); None sem a fonte ligada."""
+    if not AND.fonte(cfg).ligada:
+        return None
+    clientes, erro = AND.clientes(cfg)
+    a = TU.aberto_no_andamento([AND.ler(cfg, c) for c in clientes])
+    a["erro_clientes"] = erro
+    return a
+
+
+def _turno(erro: str = "", texto: str = "", status: int = 200):
+    """A tela: o turno em curso, o formulário de quem sai, a troca que quem entra assume e o histórico de 7 dias. Na
+    recusa volta com o motivo e o texto digitado (o texto não cabe no cookie da sessão)."""
+    cfg = current_app.config
+    usuario = session.get("usuario")
+    eu = TU.codigo(usuario) if usuario else None
+    try:
+        p, erro_livro = TU.painel(AND.agora(), eu=eu), ""
+    except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, sem um histórico de "sem registro" falso
+        _log.exception("Passagem de turno: o livro não foi lido")
+        p, erro_livro = None, f"Não consegui ler as passagens no banco ({type(e).__name__})"
+    return render_template(
+        "cos/turno.html", torre=TORRE, tela=TORRE.tela("turno"), p=p, erro_livro=erro_livro,
+        aberto=_aberto_agora(cfg), com_login=bool((usuario or {}).get("email")), aviso=session.pop(_TURNO_AVISO, None), erro=erro, texto=texto,
+        tolerancia=TU.TOLERANCIA_MIN, turnos=TU.TURNOS, texto_max=TU.TEXTO_MAX, situacoes=TU.SITUACOES), status
+
+
+@bp.route("/turno")
+def turno():
+    """Passagem de turno (R12: "a passagem é registrada no sistema; sem registro, ela não aconteceu"): quem sai escreve o
+    que o próximo turno precisa saber, quem entra diz que assumiu, e as trocas de 7 dias ficam com a situação de cada
+    uma. Grava no livro nexus_cos_turno (nexus/cos/turno.py)."""
+    return _turno()
+
+
+@bp.route("/turno/passar", methods=["POST"])
+def turno_passar():
+    if _de_outro_site():
+        abort(403)
+    texto = request.form.get("texto") or ""
+    a = _aberto_agora(current_app.config) or {}
+    try:
+        nova = TU.passar(session.get("usuario"), texto, AND.agora(), a.get("abertas"), a.get("criticas"))
+    except TU.Recusada as e:
+        return _turno(erro=str(e), texto=texto, status=422)
+    except Exception as e:      # noqa: BLE001 — banco fora: o texto digitado não se perde
+        _log.exception("Passagem de turno: a passagem não gravou")
+        return _turno(erro=f"Não consegui gravar no banco ({type(e).__name__}). Tente de novo em instantes.",
+                      texto=texto, status=503)
+    troca = TU._brt(datetime.fromisoformat(nova["troca_em"]))
+    session[_TURNO_AVISO] = (f"Passagem registrada na troca de {troca.strftime('%d/%m')} às {troca.strftime('%H:%M')} "
+                             f"({TU.rotulo_da_troca(troca)})")
+    return redirect(na_raiz("/t/cos/turno"), code=303)
+
+
+@bp.route("/turno/assumir", methods=["POST"])
+def turno_assumir():
+    if _de_outro_site():
+        abort(403)
+    try:
+        troca = TU._brt(datetime.fromisoformat(request.form.get("troca") or ""))
+    except ValueError:
+        abort(400)
+    try:
+        TU.assumir(session.get("usuario"), troca, AND.agora())
+    except TU.Recusada as e:
+        return _turno(erro=str(e), status=422)
+    except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, nada mudou
+        _log.exception("Passagem de turno: o assumir não gravou")
+        return _turno(erro=f"Não consegui gravar no banco ({type(e).__name__}). Tente de novo em instantes.",
+                      status=503)
+    session[_TURNO_AVISO] = f"Você assumiu o turno ({TU.rotulo_da_troca(troca)} das {troca.strftime('%H:%M')})"
+    return redirect(na_raiz("/t/cos/turno"), code=303)

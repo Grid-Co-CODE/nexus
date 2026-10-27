@@ -18,6 +18,10 @@
 
 {% if ok %}<div class="cn-certo" role="status"><span>{{ ok }}</span></div>{% endif %}
 {% if erro %}<div class="cn-erro" role="alert"><span><b>{{ erro }}</b></span></div>{% endif %}
+{# a nota da OS no Fracttal da troca de motivo (20/10/2026): a página a escreve pela ponte /os/_nexus/pcm/nota, porque o
+   cookie do Fracttal só vai para /os (até 26/10/2026 a troca a escrevia em /t/pcm, sem o login, e nenhuma nota saía) #}
+{% if nota_pedido %}<div class="cn-certo cn-aviso" role="status" data-nota-pedido="{{ nota_pedido }}"
+  data-url="{{ raiz }}/os/_nexus/pcm/nota"><span>Escrevendo a nota da OS no Fracttal…</span></div>{% endif %}
 {% if erro_banco %}<div class="cn-erro" role="alert"><span><b>Não consegui ler os
   motivos no banco.</b> {{ erro_banco }}. Enquanto isso, nada se marca.</span></div>{% endif %}
 {% if ilegiveis %}<div class="cn-erro cn-aviso" role="status"><span>{{ ilegiveis }}
@@ -219,6 +223,27 @@
       s.form.submit();
     });
   });
+  // a nota da OS da troca de motivo que acabou de gravar (o pedido vem no aviso): verde quando escreveu, vermelho quando não
+  var nota = document.querySelector('[data-nota-pedido]');
+  if (nota) {
+    var dizer = function (j) {
+      var ok = j.nota && j.nota.ok;
+      nota.className = ok ? 'cn-certo' : 'cn-erro';
+      nota.setAttribute('role', ok ? 'status' : 'alert');
+      var s = nota.querySelector('span');
+      s.textContent = j.nota_txt || 'A nota da OS não foi escrita.';
+      if (j.login) {
+        var a = document.createElement('a');
+        a.href = j.login; a.textContent = 'Entrar pelo Fracttal';
+        s.appendChild(document.createTextNode(' ')); s.appendChild(a);
+      }
+    };
+    fetch(nota.getAttribute('data-url'), {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({pedido: nota.getAttribute('data-nota-pedido'), tela: 'fora'})})
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(dizer, function () { dizer({nota_txt: 'A nota da OS não foi escrita: o Nexus não respondeu.'}); });
+  }
 })();
 </script>
 {% else %}

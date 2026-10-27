@@ -217,5 +217,11 @@ def estado() -> dict:
             "fila": regras_app._FILA_CACHE.get("linhas") is not None}
 
 
+def lida_em() -> float:
+    """Quando as aprovadas foram relidas por inteiro pela última vez neste processo (segundos desde 1970; 0 = ainda não):
+    a Zeladoria no banco (`zeladoria_banco`) só grava com o checklist novo."""
+    return _APROVADAS["ts"]
+
+
 def limpar():
     _APROVADAS.update(ts=0.0, resp={}, ate="", retomar=0, topo="", lendo=False, erro="", erro_em=0.0, carregado=False)

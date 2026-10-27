@@ -265,6 +265,47 @@ def ler_ocorrencias(config, cliente: str, dias: int) -> Leitura:
     return Leitura(cliente, dados, lido_em=time.time())
 
 
+# A tela Acionamentos e distribuidoras (26/10/2026) lê a terceira rota, com contrato próprio: a UC de cada usina, o canal
+# de cada concessionária e os chamados de 30 dias (`GET /api/nexus/<cliente>/distribuidoras`). Muda devagar: 60 s.
+VERSAO_DAS_DISTRIBUIDORAS = 1
+TTL_DISTRIBUIDORAS_S = 60
+
+
+def validar_distribuidoras(d) -> dict:
+    if not isinstance(d, dict):
+        raise FonteErro("a resposta do Andamento não é um objeto")
+    if d.get("versao") != VERSAO_DAS_DISTRIBUIDORAS:
+        raise FonteErro(f"o Andamento fala a versão {d.get('versao')!r} das distribuidoras, e o Nexus entende a "
+                        f"{VERSAO_DAS_DISTRIBUIDORAS}")
+    for k in ("usinas", "canais", "chamados"):
+        if not isinstance(d.get(k), list):
+            raise FonteErro(f"a resposta do Andamento não tem {k}")
+    return d
+
+
+def ler_distribuidoras(config, cliente: str) -> Leitura:
+    """As UCs, os canais e os chamados à concessionária de um cliente (a tela Acionamentos). Na falha, a última cópia
+    boa continua, dita velha; o Andamento de antes da rota responde 404 e a tela diz que ele ainda não a tem."""
+    f = fonte(config)
+    if not f.ligada:
+        return Leitura(cliente, None, erro="a fonte do Andamento não está ligada neste servidor")
+    chave = (f.url, f"{cliente}|distribuidoras")
+    agora = time.monotonic()
+    with _trava:
+        em_cache = _cache.get(chave)
+        if em_cache and agora - em_cache[0] < TTL_DISTRIBUIDORAS_S:
+            return Leitura(cliente, em_cache[1], lido_em=em_cache[2])
+    try:
+        dados = validar_distribuidoras(_pedir(f, f"/api/nexus/{urllib.parse.quote(cliente, safe='')}/distribuidoras"))
+    except FonteErro as ex:
+        if em_cache:
+            return Leitura(cliente, em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
+        return Leitura(cliente, None, erro=str(ex))
+    with _trava:
+        _cache[chave] = (agora, dados, time.time())
+    return Leitura(cliente, dados, lido_em=time.time())
+
+
 def limpar_cache() -> None:
     with _trava:
         _cache.clear()

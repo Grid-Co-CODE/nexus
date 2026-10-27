@@ -4,7 +4,8 @@ A Confiabilidade é nossa desde 06/10/2026 (Levi: "traga a aba Confiabilidade do
 diretamente esse caminho mas construindo algo nosso!"): o Nexus lê as OS de falha do Fracttal (`nexus/engenharia/
 os_falhas.py`) e faz as contas (`nexus/engenharia/confiabilidade.py`). Desde 18/10/2026 a Confiabilidade tem o
 acompanhamento dos ativos com sinal (pegar, encaminhar, diagnóstico, comentários; `nexus/engenharia/acompanhamento.py`).
-O Quadro da equipe também é nosso; as outras telas seguem no placeholder da casca.
+O Quadro da equipe também é nosso, e a tela ETMs (26/10/2026) traz o app de ETM da Engenharia; as outras telas seguem
+no placeholder da casca.
 Leia o CLAUDE.md desta pasta antes de mexer.
 """
 import collections
@@ -12,7 +13,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 
-from flask import abort, redirect, render_template, request, session, url_for
+from flask import abort, jsonify, redirect, render_template, request, session, url_for
 
 from ..modelo import Tela, Torre
 
@@ -39,6 +40,12 @@ TORRE = Torre(
         Tela("equipe", "Quadro da equipe",
              "Quem da engenharia está com o quê, o que atrasou e o que vem por aí?",
              "OS do Fracttal dos responsáveis da engenharia"),
+        # o app de ETM da Engenharia dentro do Nexus (Levi, 26/10/2026: "Quero que inclua essa visão de ETMs no Nexus,
+        # engenharia, aba própria"); do setor Engenharia, como a Mesa e a Confiabilidade
+        Tela("etm", "ETMs",
+             "Quais estações meteorológicas têm OS aberta, com quem e há quanto tempo?",
+             "OS de ETM do Fracttal e as marcações da Engenharia (banco)",
+             do_setor="Engenharia"),
         Tela("criticidade", "Matriz de criticidade",
              "Qual ativo, se parar, dói mais?",
              "engenharia.json do painel PCM"),
@@ -845,6 +852,107 @@ def _topo_da_os(o: dict, est: dict, agora, sem_livro: bool = False) -> dict:
 
 @bp.route("/equipe/os/<int:folio>")
 def equipe_os(folio: int):
+    return _pagina_da_os(folio, "equipe")
+
+
+@bp.route("/etm/os/<int:folio>")
+def etm_os(folio: int):
+    """A OS de ETM (26/10/2026): a página da OS da Engenharia com as marcações do app de ETM no lugar do status e da
+    prioridade, o checklist da OS e as marcações na linha do tempo. OS que não é de ETM abre a página comum."""
+    return _pagina_da_os(folio, "etm")
+
+
+def _codigo_da_etm(o: dict) -> str | None:
+    """O código da ETM da OS: o 1º ativo dela que é de ETM, pela lista das ETMs da tela (se já lida) ou pelo nome do
+    ativo no Fracttal. A OS de várias tarefas pode ter um inversor antes da ETM (revisão final de 26/10/2026: a página
+    voltava para o Quadro, e a marcação ia com o código do inversor)."""
+    from ...engenharia import etm as ETM
+    from ...engenharia import os_equipe
+    alvo = os_equipe._norm(ETM.ETM)
+    for a in o.get("ativos") or [{"codigo": o.get("codigo"), "nome": o.get("ativo")}]:
+        r = ETM.eh_etm(a.get("codigo"))
+        if r or (r is None and alvo in os_equipe._norm(a.get("nome"))):
+            return a.get("codigo")
+    return None
+
+
+def _eh_da_etm(o: dict) -> bool:
+    return _codigo_da_etm(o) is not None
+
+
+def _na_etm(o: dict) -> dict:
+    """A OS com o código da ETM no lugar do 1º ativo: é ele que vai ao livro das marcações."""
+    return dict(o, codigo=_codigo_da_etm(o) or o.get("codigo"))
+
+
+# o que cada marcação diz na linha do tempo da OS
+def _rotulo_da_marca(e: dict) -> str:
+    from ...engenharia import etm_marcas as M
+    ev, v, lig = e["evento"], e.get("valor_id"), e.get("ligado")
+    if ev == "diagnostico":
+        return "Diagnóstico: " + M.nome(M.DIAGNOSTICOS, v) if v else "Diagnóstico limpo"
+    if ev == "status_pos":
+        return "Status pós-OS: " + M.nome(M.STATUS_POS, v) if v else "Status pós-OS limpo"
+    if ev == "etiqueta":
+        return f"Etiqueta {M.nome(M.ETIQUETAS, v)} {'ligada' if lig else 'desligada'}"
+    if ev == "acompanhamento":
+        return "Em acompanhamento" if lig else "Saiu do acompanhamento"
+    return "Finalizado pela Engenharia" if lig else "Reaberto para a Engenharia"
+
+
+def _faixa_da_etm(o: dict, est: dict, marcas: dict, agora, sem_marcas: bool) -> list[dict]:
+    """Os quatro números da OS de ETM: o Diagnóstico e o Status pós-OS da Engenharia, há quanto tempo a OS está aberta e
+    a última atualização (o registro da Engenharia, a marcação, as tarefas no Fracttal ou a criação)."""
+    from ...engenharia import etm_marcas as M
+    from ...engenharia import os_acompanhamento as O
+
+    def quem(evento, vazio):
+        e = next((x for x in marcas.get("eventos") or [] if x["evento"] == evento), None)
+        return ([("por ", False), (e["nome"] or "alguém", True), (" em " + e["quando"].astimezone(BRT).strftime("%d/%m"), False)]
+                if e and e.get("quando") else [(vazio, False)])
+    if sem_marcas:
+        k1 = {"rotulo": "Diagnóstico", "valor": "—", "grav": "", "nota": [("sem ler as marcações", False)]}
+        k2 = {"rotulo": "Status pós-OS", "valor": "—", "grav": "", "nota": [("sem ler as marcações", False)]}
+    else:
+        k1 = {"rotulo": "Diagnóstico", "valor": M.nome(M.DIAGNOSTICOS, marcas.get("diagnostico_id")) or "—", "grav": "",
+              "nota": quem("diagnostico", "a Engenharia ainda não diagnosticou")}
+        k2 = {"rotulo": "Status pós-OS", "valor": M.nome(M.STATUS_POS, marcas.get("status_pos_id")) or "—", "grav": "",
+              "nota": quem("status_pos", "ainda sem status pós-OS")}
+    criada = _iso(o.get("criada_iso"))
+    if o["coluna"] in ("concluida", "cancelada"):
+        k3 = {"rotulo": "Em aberto", "valor": (o.get("fim") or "—")[:5], "grav": "",
+              "nota": [("cancelada" if o["coluna"] == "cancelada" else "fechada no Fracttal", False)]}
+    elif criada:
+        d = max(0, (agora - criada).days)
+        k3 = {"rotulo": "Em aberto", "valor": "hoje" if d == 0 else _dias(d), "grav": "alerta" if d >= 7 else "",
+              "nota": [("criada em ", False), (criada.strftime("%d/%m/%Y"), True)]}
+    else:
+        k3 = {"rotulo": "Em aberto", "valor": "—", "grav": "", "nota": [("sem a data de criação", False)]}
+    fontes = [(est.get("ultimo"), "o último comentário da Engenharia"), (marcas.get("ultima"), "a última marcação"),
+              (_iso(o.get("atividade_iso")), "a última mexida nas tarefas no Fracttal"), (criada, "a criação da OS")]
+    ultima = O.ultima_atualizacao([d for d, _ in fontes])
+    if ultima:
+        d = max(0, (agora - ultima).days)
+        k4 = {"rotulo": "Última atualização", "valor": "hoje" if d == 0 else "há " + _dias(d), "grav": "",
+              "nota": [(next((q for x, q in fontes if x and x == ultima), ""), False)]}
+    else:
+        k4 = {"rotulo": "Última atualização", "valor": "—", "grav": "", "nota": [("sem data no Fracttal", False)]}
+    return [k1, k2, k3, k4]
+
+
+def _checklist(folio) -> tuple[list[dict], str]:
+    """O checklist da OS (as subtarefas e o que o técnico respondeu), na ordem do Fracttal."""
+    from ...engenharia import os_equipe
+    try:
+        linhas = os_equipe._paginas_ate(f"work_orders_subtasks/?folio={int(folio)}")
+    except Exception as e:      # noqa: BLE001 — o checklist não derruba a página: o bloco diz que não leu
+        return [], type(e).__name__
+    linhas = sorted(linhas, key=lambda s: (int(s.get("order_number") or 0)))
+    return [{"pergunta": str(s.get("description") or "").strip(), "resposta": str(s.get("value") or "").strip(),
+             "grupo": str(s.get("group") or "").strip()} for s in linhas], ""
+
+
+def _pagina_da_os(folio: int, tela_id: str):
     import logging
     from urllib.parse import quote, urlencode
 
@@ -852,8 +960,12 @@ def equipe_os(folio: int):
     from ...engenharia import os_acompanhamento as O
     from ...engenharia import os_equipe
     pode, _meu = _quem_pode()
-    base = {"torre": TORRE, "tela": TORRE.tela("equipe"), "folio": folio,
-            "msg_ok": request.args.get("ok", ""), "msg_erro": request.args.get("erro", "")}
+    eh_etm = tela_id == "etm"
+    base = {"torre": TORRE, "tela": TORRE.tela(tela_id), "folio": folio,
+            "msg_ok": request.args.get("ok", ""), "msg_erro": request.args.get("erro", ""),
+            # a volta e a OS de cada tela: o Quadro da equipe ou a tela ETMs
+            "volta_endpoint": "torre_engenharia." + tela_id, "volta_texto": TORRE.tela(tela_id).nome,
+            "rota_os": "torre_engenharia.etm_os" if eh_etm else "torre_engenharia.equipe_os"}
     try:
         o = os_equipe.ler_os(folio)
     except Exception as e:      # noqa: BLE001 — Fracttal fora ou cota: a página diz, sem número chutado
@@ -861,9 +973,36 @@ def equipe_os(folio: int):
         return render_template("engenharia/os_quadro.html", o=None, erro_fracttal=type(e).__name__, **base), 502
     if not o:
         return render_template("engenharia/os_quadro.html", o=None, nao_achou=True, **base), 404
+    if eh_etm and not _eh_da_etm(o):
+        return redirect(url_for("torre_engenharia.equipe_os", folio=folio))
     lido = O.ler()
     erro_livro = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0]
     est = O.estado(lido["eventos"]).get(str(o["wid"])) or {}
+    extra = {}
+    kpis = _faixa_da_os(o, est, datetime.now(BRT), sem_livro=bool(erro_livro))
+    if eh_etm:
+        from ...engenharia import etm_marcas as M
+        lm = M.ler()
+        erro_marcas = "" if lm.get("lido_em") else (lm.get("erro") or "").split(":")[0]
+        marcas = (M.estado(lm["eventos"]).get(str(o["wid"])) or {}) if not erro_marcas else {}
+        checklist, erro_checklist = _checklist(o["os"])
+        kpis = _faixa_da_etm(o, est, marcas, datetime.now(BRT), sem_marcas=bool(erro_marcas))
+        # as marcações entram na linha do tempo, junto do que a Engenharia comentou
+        linha = list(est.get("eventos") or []) + [dict(e, evento="marca", texto="", rotulo=_rotulo_da_marca(e))
+                                                  for e in marcas.get("eventos") or []]
+        linha.sort(key=lambda e: e.get("quando") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        # a marcação também é atualização (revisão final de 26/10/2026: a pílula dizia "sem atualização" com a
+        # marcação de hoje e o número da Última atualização dizendo "hoje")
+        ultimos = [d for d in (est.get("ultimo"), marcas.get("ultima")) if d]
+        est = dict(est, eventos=linha, ultimo=max(ultimos) if ultimos else None)
+        extra["etm"] = {"marcas": {"diagnostico_id": marcas.get("diagnostico_id"),
+                                   "status_pos_id": marcas.get("status_pos_id"),
+                                   "etiquetas": marcas.get("etiquetas") or set(),
+                                   "acompanhamento": bool(marcas.get("acompanhamento")),
+                                   "finalizado": bool(marcas.get("finalizado"))},
+                        "diagnosticos": M.DIAGNOSTICOS, "status_pos": M.STATUS_POS, "etiquetas": M.ETIQUETAS,
+                        "nome": M.nome, "erro_marcas": erro_marcas, "checklist": checklist,
+                        "erro_checklist": erro_checklist}
     erro_filhas = ""
     try:
         fs = os_equipe.filhas(o["wid"])
@@ -882,7 +1021,7 @@ def equipe_os(folio: int):
     return render_template(
         "engenharia/os_quadro.html", o=o, est=est, filhas=fs, erro_filhas=erro_filhas, erro_livro=erro_livro,
         velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
-        kpis=_faixa_da_os(o, est, datetime.now(BRT), sem_livro=bool(erro_livro)), pode=pode and not erro_livro,
+        kpis=kpis, pode=pode and not erro_livro, **extra,
         topo=_topo_da_os(o, est, datetime.now(BRT), sem_livro=bool(erro_livro)),
         status=O.STATUS,
         prioridades=O.PRIORIDADES, nome_status=O.nome_status, nome_prioridade=O.nome_prioridade,
@@ -892,8 +1031,65 @@ def equipe_os(folio: int):
         criar_url=na_raiz("/os/_nexus/ir") + "?" + urlencode({"url": "/os/tradicional?" + sugestao}),
         # a seta do PDF de cada OS da cadeia vai ao OS Creator na sessão do Fracttal: sem ela, este login volta para cá
         login_fracttal=na_raiz("/os/login") + "?next=" + quote(
-            "/os/_nexus/card/voltar?" + urlencode({"de": f"/t/engenharia/equipe/os/{o['os']}"}, safe="/"), safe=""),
-        comentar_url=na_raiz(f"/os/_nexus/engenharia/os/{o['wid']}/comentar"), **base)
+            "/os/_nexus/card/voltar?" + urlencode({"de": f"/t/engenharia/{tela_id}/os/{o['os']}"}, safe="/"), safe=""),
+        comentar_url=na_raiz(f"/os/_nexus/engenharia/os/{o['wid']}/comentar"),
+        # a página de onde o comentário sai, sem o prefixo: o login do Fracttal volta para ela (a ponte confere)
+        de_pagina=f"/t/engenharia/{tela_id}/os/{o['os']}", **base)
+
+
+@bp.route("/etm/os/<int:folio>/marcar", methods=["POST"])
+def etm_os_marcar(folio: int):
+    """As marcações da OS de ETM: o diagnóstico e o status pós-OS num formulário só (um evento por mudança), e a
+    etiqueta, o acompanhamento e o finalizado um botão cada (liga ou desliga)."""
+    import logging
+    from urllib.parse import urlencode
+
+    from ...engenharia import etm_marcas as M
+    from ...engenharia import os_equipe
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    pode, _meu = _quem_pode()
+    volta = url_for("torre_engenharia.etm_os", folio=folio)
+    try:
+        o = os_equipe.ler_os(folio)                     # a OS conferida agora no Fracttal, não o que o formulário diz
+        if not o:
+            raise M.Recusada(f"Não achei a OS {folio} no Fracttal")
+        osg, quem, f = _os_para_gravar(_na_etm(o)), session.get("usuario"), request.form
+        ev = f.get("evento")
+        if ev in ("etiqueta", "acompanhamento", "finalizado"):
+            lig = f.get("ligado") == "sim"
+            avisos = [M.marcar(osg, ev, (f.get("valor"), lig) if ev == "etiqueta" else lig, quem, pode)["aviso"]]
+            return redirect(volta + "?" + urlencode({"ok": "Salvo: " + "; ".join(avisos) + "."}), 303)
+        # o diagnóstico e o status pós-OS são duas gravações: a que entrou e a que falhou são ditas as duas (revisão
+        # final de 26/10/2026: o diagnóstico salvo aparecia como "Nada mudou")
+        avisos, falha = [], ""
+        for campo in ("diagnostico", "status_pos"):
+            if f.get(campo) is None:
+                continue
+            try:
+                avisos.append(M.marcar(osg, campo, f.get(campo), quem, pode)["aviso"])
+            except M.Recusada as e:
+                if str(e) != "Nada mudou":
+                    falha = str(e)
+                    break
+            except Exception as e:      # noqa: BLE001 — o banco fora no meio: o que já entrou é dito
+                logging.exception("ETMs: a marcação %s da OS %s não gravou", campo, folio)
+                falha = f"Não consegui gravar no banco ({type(e).__name__}); tente de novo em instantes"
+                break
+        if not avisos and not falha:
+            falha = "Nada mudou"
+        q = {}
+        if avisos:
+            q["ok"] = "Salvo: " + "; ".join(avisos) + "."
+        if falha:
+            q["erro"] = falha
+        return redirect(volta + "?" + urlencode(q), 303)
+    except M.Recusada as e:
+        return redirect(volta + "?" + urlencode({"erro": str(e)}), 303)
+    except Exception as e:      # noqa: BLE001 — banco ou Fracttal fora: nada mudou (a trava recusa antes de gravar)
+        logging.exception("ETMs: a marcação da OS %s não gravou", folio)
+        return redirect(volta + "?" + urlencode({"erro": FALHOU_BANCO.format(type(e).__name__)}), 303)
 
 
 @bp.route("/equipe/os/<int:folio>/classificar", methods=["POST"])
@@ -943,6 +1139,186 @@ def _com_a_engenharia(oss: list[dict]) -> tuple[list[dict], str]:
                         ultima_iso=ultima.isoformat() if ultima else "",
                         parada=bool(not erro and O.parada(o["coluna"], ultima, agora))))
     return out, erro
+
+
+# ── a tela ETMs (26/10/2026): o Planner do app de ETM da Engenharia ──────────────────────────────────────────────────
+def _os_do_planner(o: dict, m: dict | None, n_coment: int | None = None) -> dict:
+    """A OS de ETM como as abas a desenham: o cartão do Fracttal enxuto, as marcações da Engenharia e quantos comentários
+    ela tem (None sem ler o livro). A usina vai inteira (a chave do filtro: duas usinas de clientes diferentes podem ter
+    o mesmo nome curto) e curta (o que a tela mostra)."""
+    from ...engenharia import etm as ETM
+    from ...engenharia import etm_marcas as M
+    m = m or {}
+    criada = o.get("criada") or ""
+    enc = M.encerrada_em(m)         # o dia da semana dos Fechamentos pela Engenharia (Brasília)
+    return {"os": o["os"], "titulo": o["titulo"], "cliente": o["cliente"], "usina": o["usina"],
+            "eng_fim_dia": enc.astimezone(BRT).date().isoformat() if enc else "",
+            "usina_nome": ETM.usina_curta(o["usina"]), "codigo": o["codigo"], "n_coment": n_coment,
+            "ativo": o["ativo"], "responsavel": o["responsavel"], "solicitante": o["solicitante"],
+            "criado_por": o["criado_por"], "trabalho": o["trabalho"], "coluna": o["coluna_etm"], "tipo": o["tipo"],
+            "status": o["status"], "criada": criada[:10],
+            # o dia de Brasília da criação e o do fim: o "OS ativa entre" do app compara dias
+            "criada_dia": "-".join(reversed(criada[:10].split("/"))) if criada else "", "fim_dia": o.get("fim_iso") or "",
+            "etiquetas": o["etiquetas"], "n_tarefas": len(o.get("tarefas") or []),
+            "diagnostico": M.nome(M.DIAGNOSTICOS, m.get("diagnostico_id")) or None,
+            "status_pos": M.nome(M.STATUS_POS, m.get("status_pos_id")) or None,
+            "etiquetas_eng": [M.nome(M.ETIQUETAS, i) for i in sorted(m.get("etiquetas") or ())],
+            "acompanhamento": bool(m.get("acompanhamento")), "finalizado": bool(m.get("finalizado"))}
+
+
+def faixa_etm(oss: list[dict], hoje, sem_marcas: bool = False, sem_leitura: bool = False) -> list[dict]:
+    """Os quatro números da tela ETMs. "Abertas para a Engenharia" é a regra das Estações em Aberto do app: a OS só sai
+    quando a Engenharia encerra (o diagnóstico ou o finalizado), não quando o Fracttal fecha a tarefa. Sem leitura
+    nenhuma do Fracttal ainda, os quatro são "—" (número pela metade não vai para a tela)."""
+    if sem_leitura:
+        nota = [("lendo o Fracttal", False)]
+        return [{"rotulo": r, "valor": "—", "grav": "", "nota": nota} for r in
+                ("Abertas no Fracttal", "Abertas para a Engenharia", "Em acompanhamento",
+                 f"Finalizadas em {JANELA_CONCLUIDAS} dias")]
+    abertas = [o for o in oss if o["coluna"] in ("nao_iniciada", "em_andamento")]
+    por = collections.Counter(o["trabalho"] for o in abertas)
+    para_eng = [o for o in oss if o["coluna"] != "cancelada" and not o["diagnostico"] and not o["finalizado"]]
+    usinas = len({o["usina"] for o in para_eng})
+    piso = (hoje - timedelta(days=JANELA_CONCLUIDAS)).isoformat()
+    fechadas = sum(1 for o in oss if o["coluna"] == "finalizada" and (o["fim_dia"] or "") >= piso)
+    return [
+        {"rotulo": "Abertas no Fracttal", "valor": len(abertas), "grav": "",
+         "nota": [(str(por["engenharia"]), True), (" com a engenharia, ", False), (str(por["chamados"]), True),
+                  (" com chamados, ", False), (str(por["campo"]), True), (" em campo", False)]},
+        {"rotulo": "Abertas para a Engenharia", "valor": "—" if sem_marcas else len(para_eng),
+         "grav": "" if sem_marcas or not para_eng else "alerta",
+         "nota": [("sem as marcações agora", False)] if sem_marcas else
+                 [("em ", False), (str(usinas), True), (" usina" + ("s" if usinas != 1 else ""), False),
+                  (", sem diagnóstico nem o finalizado", False)]},
+        {"rotulo": "Em acompanhamento", "valor": "—" if sem_marcas else sum(1 for o in oss if o["acompanhamento"]),
+         "grav": "", "nota": [("seguidas mesmo depois de fechadas no Fracttal", False)]},
+        {"rotulo": f"Finalizadas em {JANELA_CONCLUIDAS} dias", "valor": fechadas, "grav": "",
+         "nota": [("no Fracttal", False)]},
+    ]
+
+
+LOTE_MAX = 500          # OS num Finalizar em lote (a usina com mais OS de ETM tinha dezenas em 26/10/2026)
+LENDO_ETM = "Lendo as OS de ETM no Fracttal agora; tente de novo em instantes"
+
+
+def _usinas_da_etm(d: dict, oss: list[dict]) -> list[dict]:
+    """As usinas do Histórico: as das ETMs (com quantas ETMs cada uma tem; a usina sem OS também entra, como no app) e
+    as das OS, por cliente e nome curto."""
+    from ...engenharia import etm as ETM
+    from ...engenharia import os_equipe
+    etms = d.get("usinas") or {}
+    nomes = set(etms) | {o["usina"] for o in oss if o.get("usina")}
+    us = [{"nome": n, "curta": ETM.usina_curta(n), "cliente": ETM.cliente_de(n), "etms": etms.get(n, 0)} for n in nomes]
+    return sorted(us, key=lambda u: (os_equipe._norm(u["cliente"]), os_equipe._norm(u["curta"]), u["nome"]))
+
+
+@bp.route("/etm")
+def etm():
+    """As OS das Estações Meteorológicas (o app de ETM da Engenharia) nas três abas do app: o Planner (as colunas e os
+    filtros dele no navegador), o Histórico (cliente → usina → OS, com o chat da usina) e as Estações em Aberto (as
+    usinas com OS aberta para a Engenharia e as em acompanhamento). Quem volta com ?atualizar=1 relê o Fracttal na hora."""
+    from ...engenharia import etm as ETM
+    from ...engenharia import etm_marcas as M
+    from ...engenharia import os_acompanhamento as O
+    ETM.marcar_uso()                # relida por trás nas próximas 2 h (`etm.manter_quente`)
+    if request.args.get("atualizar") == "1":
+        ETM.pedir_releitura(esperar=True, forcar=True)
+    else:
+        ETM.pedir_releitura(esperar=not ETM.dados()["lido"])
+    d = ETM.dados()
+    lido = M.ler()
+    erro_marcas = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0]
+    est = M.estado(lido["eventos"]) if not erro_marcas else {}
+    # quantos comentários cada OS tem (a lista do Histórico); sem o livro, a lista não diz
+    lc = O.ler()
+    n_coment = O.comentarios_por_os(lc["eventos"]) if lc.get("lido_em") else None
+    oss = [_os_do_planner(o, est.get(str(o.get("wid"))),
+                          None if n_coment is None else n_coment.get(O.chave_da_os(o.get("wid")), 0))
+           for o in d["os"]]
+    hoje = datetime.now(BRT).date()
+    pode, _meu = _quem_pode()
+    from ...engenharia import os_equipe
+    return render_template(
+        "engenharia/etm.html", torre=TORRE, tela=TORRE.tela("etm"), oss=oss, colunas=ETM.COLUNAS,
+        usinas=_usinas_da_etm(d, oss), pode=pode,
+        kpis=faixa_etm(oss, hoje, sem_marcas=bool(erro_marcas), sem_leitura=not d["lido"]), erro=d["erro"],
+        erro_marcas=erro_marcas, nunca_lido=not d["lido"], lendo=d["lendo"], erro_setores=d.get("erro_setores") or "",
+        # os status da OS no Fracttal, na ordem dele (o filtro "Status da OS", 26/10/2026)
+        status=list(os_equipe.STATUS_OS.values()), etiquetas_eng=[n for _, n in M.ETIQUETAS], hoje=hoje.isoformat(),
+        admin=bool(session.get("admin")),           # o painel do histórico do app de ETM (uma vez, só o administrador)
+        lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")
+
+
+@bp.route("/etm/finalizar", methods=["POST"])
+def etm_finalizar():
+    """O "Finalizar pela Engenharia" em lote do quadro da usina nas Estações em Aberto (como no app): as OS que a pessoa
+    viu na coluna Finalizadas, conferidas aqui na última leitura do Fracttal (da usina pedida e finalizadas nele) e no
+    livro (sem diagnóstico nem o finalizado), numa gravação só. As outras voltam em "fora" (não são da usina, não estão
+    finalizadas no Fracttal) ou em "ja" (a Engenharia já encerrou)."""
+    import logging
+
+    from ...engenharia import etm as ETM
+    from ...engenharia import etm_marcas as M
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    pode, _meu = _quem_pode()
+    corpo = request.get_json(silent=True)
+    # o pedido torto não vira OS chutada: "35" era lido letra a letra (as OS 3 e 5) e a lista no lugar do objeto dava 500
+    if not (isinstance(corpo, dict) and isinstance(corpo.get("usina"), str) and corpo["usina"]
+            and isinstance(corpo.get("os"), list) and len(corpo["os"]) <= LOTE_MAX):
+        return jsonify({"erro": "Pedido sem a usina ou a lista das OS"}), 400
+    d = ETM.dados()
+    if not d["lido"]:               # a cópia vazia depois de subir: "fora" diria que nenhuma está mais finalizada
+        ETM.pedir_releitura()
+        return jsonify({"erro": LENDO_ETM}), 503
+    usina = corpo["usina"]
+    pedidas = list(dict.fromkeys(str(x).strip() for x in corpo["os"] if str(x).strip()))
+    alvo = {str(o["os"]): o for o in d["os"]
+            if o.get("usina") == usina and o.get("coluna_etm") == "finalizada" and o.get("wid")}
+    fora = [f for f in pedidas if f not in alvo]
+    try:
+        r = M.finalizar_lote([_os_para_gravar(_na_etm(alvo[f])) for f in pedidas if f in alvo],
+                             session.get("usuario"), pode)
+    except M.Recusada as e:
+        return jsonify({"erro": str(e)}), 403
+    except Exception as e:      # noqa: BLE001 — banco fora: nada mudou (a trava recusa antes de gravar)
+        logging.exception("ETMs: o finalizar em lote da usina não gravou")
+        return jsonify({"erro": FALHOU_BANCO.format(type(e).__name__)}), 502
+    return jsonify({"feitas": r["feitas"], "ja": r["ja"], "fora": fora})
+
+
+@bp.route("/etm/usina/comentarios")
+def etm_usina_comentarios():
+    """O "Chat da usina" do Histórico (como no app): os comentários da Engenharia em todas as OS de ETM da usina, o mais
+    novo primeiro, com o número e o título da OS. A cifra abre aqui, no clique, só para as OS da usina."""
+    from ...engenharia import etm as ETM
+    from ...engenharia import os_acompanhamento as O
+    usina = request.args.get("usina") or ""
+    d = ETM.dados()
+    if not d["lido"]:               # a cópia vazia depois de subir: "nenhum comentário" seria mentira
+        ETM.pedir_releitura()
+        return jsonify({"erro": LENDO_ETM}), 503
+    oss = {O.chave_da_os(o.get("wid")): o for o in d["os"] if o.get("usina") == usina and o.get("wid")}
+    lido = O.ler()
+    if not lido.get("lido_em"):
+        motivo = (lido.get("erro") or "sem leitura").split(":")[0]
+        return jsonify({"erro": f"Não consegui ler os comentários da Engenharia ({motivo}); tente de novo em instantes"}), 503
+    est = O.estado([l for l in lido["eventos"] if O.chave_da_os(l.get("os_id")) in oss])
+    out, ilegiveis = [], 0
+    for wid, e in est.items():
+        o = oss[wid]
+        for ev in e["eventos"]:
+            if ev["evento"] != "comentario":
+                continue
+            if not ev["texto"]:     # a cifra de outra chave (ou sem a chave): conta, para a gaveta dizer
+                ilegiveis += 1
+                continue
+            out.append((ev["quando"] or datetime.min.replace(tzinfo=timezone.utc),
+                        {"os": str(o["os"]), "titulo": o.get("titulo") or "", "nome": ev["nome"] or "alguém",
+                         "quando": ev["quando_txt"], "texto": ev["texto"]}))
+    out.sort(key=lambda x: x[0], reverse=True)
+    return jsonify({"usina": usina, "comentarios": [c for _, c in out], "ilegiveis": ilegiveis})
 
 
 @bp.route("/equipe")

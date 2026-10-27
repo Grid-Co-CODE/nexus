@@ -51,6 +51,11 @@ def test_a_mesa_por_responsavel_mostra_onde_atacar(com_cadastro, logado):
     assert 'href="/t/hseq/extintores?f=atrasado&amp;responsavel=Supervisora+Campo#tabela"' in html
     assert 'href="/t/hseq/extintores?f=nao_reconhecido&amp;responsavel=Supervisora+Campo#tabela"' in html
     assert 'href="/t/hseq/epi?modo=tabela&amp;f=sem_luvas&amp;responsavel=Coordenador+Campo"' in html
+    # as PTs paradas, à tabela de APR e PT filtrada (Levi, 26/10/2026: "PTs parados vai levar para APR e PT > Esperando
+    # o de acordo > Tabela > Filtra o responsável")
+    assert 'href="/t/hseq/apr-pt?modo=tabela&amp;f=parada&amp;responsavel=Supervisora+Campo"' in html
+    tabela = logado.get("/t/hseq/apr-pt?modo=tabela&f=parada&responsavel=Supervisora+Campo").get_data(as_text=True)
+    assert tabela.count('class="cn-link cn-os"') == 1                          # a PT-1, parada (a PT-2 tem 30 min)
     assert 'class="hs-legenda"' in html and "Como ler a mesa" in _texto(html)
     # só lê: nenhum formulário que grava no conteúdo (o do topo é a troca de tema da casca)
     assert 'method="post"' not in html[html.index('class="campo-nativa"'):].lower()

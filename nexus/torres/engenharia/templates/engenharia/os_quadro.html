@@ -19,7 +19,7 @@
 {% set ROT = {'fazer': 'A fazer', 'execucao': 'Em execução', 'verificacao': 'Em verificação', 'concluida': 'Concluída', 'cancelada': 'Cancelada'} %}
 <div class="campo-nativa eg-os eg-ac">
   {% if not o %}
-  <a class="eg-ac-volta" href="{{ url_for('torre_engenharia.equipe') }}">← Quadro da equipe</a>
+  <a class="eg-ac-volta" href="{{ url_for(volta_endpoint) }}">← {{ volta_texto }}</a>
   <h1 class="cn-titulo">OS {{ folio }}</h1>
   {% if nao_achou %}<p class="cn-erro" role="status"><b>Não achei a OS {{ folio }} no Fracttal.</b> Confira o número.</p>
   {% else %}<p class="cn-erro" role="status"><b>O Fracttal não respondeu ({{ erro_fracttal }}).</b> Recarregue em instantes.</p>{% endif %}
@@ -29,7 +29,7 @@
      local, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o "Solicitar OS" #}
   <div class="eg-ac-head">
     <div class="eg-ac-esq">
-      <div class="eg-ac-tit"><a class="eg-ac-volta" href="{{ url_for('torre_engenharia.equipe') }}">← Quadro da equipe</a>
+      <div class="eg-ac-tit"><a class="eg-ac-volta" href="{{ url_for(volta_endpoint) }}">← {{ volta_texto }}</a>
         <span class="eg-ac-tag eg-ac-tag--{{ topo.cor }}">{{ topo.texto }}</span>
         <h1>{{ o.titulo or ('OS ' ~ o.os) }}</h1></div>
       {# Levi, 24/10/2026: "No título invés de OS e ativo bote o título da OS, no lugar do título da OS bote OS e ativo";
@@ -55,6 +55,39 @@
      resposta do técnico nas OS de campo e os comentários, na linha do tempo das Observações de lá) #}
   <div class="eg-ac-det">
     <aside>
+      {% if etm %}
+      {# a OS de ETM (26/10/2026): as marcações do app de ETM da Engenharia no lugar do status e da prioridade. O
+         diagnóstico e o status pós-OS num formulário; a etiqueta, o acompanhamento e o finalizado um botão cada #}
+      {% set m = etm.marcas %}
+      <section class="eg-bloco">
+        <div class="eg-bloco-h"><h2>Marcações da Engenharia</h2></div>
+        {% if etm.erro_marcas %}<p class="eg-dica">Não consegui ler as marcações ({{ etm.erro_marcas }}); recarregue em instantes. Nada se grava sem elas.</p>
+        {% elif pode %}
+        <form class="eg-ac-form" method="post" action="{{ url_for('torre_engenharia.etm_os_marcar', folio=o.os) }}">
+          <label><span class="eg-ac-lbl">Diagnóstico</span>
+            <select class="eg-ac-campo" name="diagnostico"><option value="0">— sem diagnóstico —</option>
+              {% for i, n in etm.diagnosticos %}<option value="{{ i }}"{% if i == m.diagnostico_id %} selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+          <label><span class="eg-ac-lbl">Status pós-OS</span>
+            <select class="eg-ac-campo" name="status_pos"><option value="0">— sem status —</option>
+              {% for i, n in etm.status_pos %}<option value="{{ i }}"{% if i == m.status_pos_id %} selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+          <button type="submit" class="eg-ac-btn eg-ac-btn--g">Salvar</button>
+        </form>
+        <div class="etm-marcas"><span class="eg-ac-lbl">Etiquetas</span>
+          <div class="etm-chips">{% for i, n in etm.etiquetas %}{% set on = i in m.etiquetas %}<form method="post" action="{{ url_for('torre_engenharia.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="etiqueta"><input type="hidden" name="valor" value="{{ i }}"><input type="hidden" name="ligado" value="{{ 'não' if on else 'sim' }}"><button type="submit" class="etm-chip" aria-pressed="{{ 'true' if on else 'false' }}">{{ n }}</button></form>{% endfor %}</div></div>
+        <div class="etm-botoes">
+          <form method="post" action="{{ url_for('torre_engenharia.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="acompanhamento"><input type="hidden" name="ligado" value="{{ 'não' if m.acompanhamento else 'sim' }}"><button type="submit" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">{{ 'Tirar do acompanhamento' if m.acompanhamento else 'Pôr em acompanhamento' }}</button></form>
+          <form method="post" action="{{ url_for('torre_engenharia.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="finalizado"><input type="hidden" name="ligado" value="{{ 'não' if m.finalizado else 'sim' }}"><button type="submit" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">{{ 'Reabrir para a Engenharia' if m.finalizado else 'Finalizar pela Engenharia' }}</button></form>
+        </div>
+        <p class="eg-dica">Fica no Nexus com o seu nome, a data e a hora, e entra na linha do tempo. A OS sai das abertas para a Engenharia com o diagnóstico ou o finalizado.</p>
+        {% else %}
+        <dl class="eg-ac-dados"><dt>Diagnóstico</dt><dd>{{ etm.nome(etm.diagnosticos, m.diagnostico_id) or '—' }}</dd>
+          <dt>Status pós-OS</dt><dd>{{ etm.nome(etm.status_pos, m.status_pos_id) or '—' }}</dd>
+          <dt>Etiquetas</dt><dd>{% for i, n in etm.etiquetas if i in m.etiquetas %}{{ n }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd>
+          <dt>Acompanhamento</dt><dd>{{ 'Sim' if m.acompanhamento else 'Não' }}</dd>
+          <dt>Finalizado pela Engenharia</dt><dd>{{ 'Sim' if m.finalizado else 'Não' }}</dd></dl>
+        {% endif %}
+      </section>
+      {% else %}
       <section class="eg-bloco">
         <div class="eg-bloco-h"><h2>Status e prioridade</h2></div>
         {% if pode %}
@@ -73,12 +106,13 @@
           <dt>Prioridade</dt><dd>{{ nome_prioridade(est.prioridade_id) or '—' }}</dd></dl>
         {% endif %}
       </section>
+      {% endif %}
       <section class="eg-bloco" data-pdf-caixa data-login-fracttal="{{ login_fracttal }}">
         <div class="eg-bloco-h"><h2>A cadeia da OS</h2></div>
         {# a OS da engenharia como OS pai das OS de campo que nascem do Solicitar OS (Levi: "o ideal é que essa OS da
            engenharia se torne OS pai de OSs de campo futuramente") #}
         <ol class="eg-cadeia">
-          <li class="aqui"><span class="i">1</span><span class="t">OS da engenharia</span><a href="{{ url_for('torre_engenharia.equipe_os', folio=o.os) }}">{{ o.os }}</a>{{ seta_pdf(o.os, o.wid) }}</li>
+          <li class="aqui"><span class="i">1</span><span class="t">OS da engenharia</span><a href="{{ url_for(rota_os, folio=o.os) }}">{{ o.os }}</a>{{ seta_pdf(o.os, o.wid) }}</li>
           {% for f in filhas %}<li><span class="i">{{ loop.index + 1 }}</span><span class="t">OS de campo{% if f.coluna in ('concluida', 'cancelada') %} · {{ ROT.get(f.coluna) }}{% endif %}</span><a href="{{ url_for('torre_engenharia.equipe_os', folio=f.os) }}">{{ f.os }}</a>{{ seta_pdf(f.os, f.wid) }}</li>{% endfor %}
         </ol>
         {% if erro_filhas %}<p class="eg-dica">Não consegui ler as OS de campo ({{ erro_filhas }}).</p>
@@ -91,7 +125,7 @@
           {% if o.ativos|length > 1 %}<dt>Ativo</dt><dd>{{ o.ativos|length }} ativos</dd>
           {% else %}<dt>Ativo</dt><dd class="mono">{{ o.codigo or '—' }}</dd>{% endif %}
           <dt>Usina</dt><dd>{{ o.usina or '—' }}</dd>
-          <dt>Responsável</dt><dd class="eg-resp"><span data-resp-nome>{{ o.pessoa or '—' }}</span>{% if pode %}<button type="button" class="eg-resp-bt" data-trocar-resp data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-volta="{{ url_for('torre_engenharia.equipe', atualizar=1) }}" title="Atribuir esta OS a outra pessoa">trocar</button>{% endif %}</dd>
+          <dt>Responsável</dt><dd class="eg-resp"><span data-resp-nome>{{ o.pessoa or '—' }}</span>{% if pode %}<button type="button" class="eg-resp-bt" data-trocar-resp data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-volta="{{ url_for(volta_endpoint, atualizar=1) }}" title="Atribuir esta OS a outra pessoa">trocar</button>{% endif %}</dd>
           <dt>Criada em</dt><dd>{{ o.criada or '—' }}</dd>
           <dt>Etiquetas</dt><dd>{% for e in o.etiquetas %}{{ tag(e.nome, 'neutro') }} {% else %}—{% endfor %}</dd>
         </dl>
@@ -112,6 +146,15 @@
         <div class="eg-bloco-h"><h2>Na nota da OS</h2></div>
         {% if o.nota %}<p class="eg-ac-nota">{{ o.nota }}</p>{% else %}<p class="eg-vazio-l">A OS está sem nota.</p>{% endif %}
       </section>
+      {% if etm %}<section class="eg-bloco">
+        <div class="eg-bloco-h"><h2>Checklist da OS</h2><span class="n">{{ etm.checklist|length }}</span></div>
+        {% if etm.erro_checklist %}<p class="eg-vazio-l">Não consegui ler o checklist agora ({{ etm.erro_checklist }}).</p>
+        {% elif etm.checklist %}<table class="eg-t"><thead><tr><th>Pergunta</th><th>Resposta do técnico</th></tr></thead><tbody>
+          {% for s in etm.checklist %}<tr><td class="k">{{ s.pergunta }}{% if s.grupo %}<small>{{ s.grupo }}</small>{% endif %}</td>
+            <td class="v">{% if s.resposta %}{{ s.resposta }}{% else %}<span class="eg-vazio-l">sem resposta</span>{% endif %}</td></tr>{% endfor %}
+        </tbody></table>
+        {% else %}<p class="eg-vazio-l">A OS não tem checklist.</p>{% endif %}
+      </section>{% endif %}
       <section class="eg-bloco">
         <div class="eg-bloco-h"><h2>Demais respostas do técnico</h2><span class="n">{{ filhas|length }}</span></div>
         {% if erro_filhas %}<p class="eg-vazio-l">Não consegui ler as OS de campo ({{ erro_filhas }}).</p>
@@ -127,7 +170,7 @@
       <section class="eg-bloco">
         <div class="eg-bloco-h"><h2>Comentários</h2><span class="n">{{ (est.eventos or [])|length }}</span></div>
         {% if pode %}
-        <div class="eg-os-coment" data-comentar="{{ comentar_url }}" data-folio="{{ o.os }}">
+        <div class="eg-os-coment" data-comentar="{{ comentar_url }}" data-folio="{{ o.os }}" data-de="{{ de_pagina }}">
           <textarea class="eg-tl-obs" maxlength="2000" aria-label="Comentário" placeholder="O que a engenharia viu ou fez? (a data entra sozinha)"></textarea>
           <div class="eg-tl-comp"><span class="eg-dica">Vai para a nota da OS {{ o.os }} no Fracttal, com o seu nome, a data e a hora.</span>
             <button type="button" class="eg-ac-btn eg-ac-btn--g">Salvar comentário</button></div>
@@ -136,7 +179,7 @@
         {% endif %}
         {% if est.eventos %}<div class="eg-tl">
           {% for e in est.eventos %}<div class="eg-tl-e{{ ' novo' if loop.first }}{{ ' ev' if e.evento != 'comentario' }}"><div class="eg-tl-g"><div class="eg-tl-d">{{ e.quando.strftime('%d/%m') if e.quando else '—' }}</div><div class="eg-tl-a">{{ e.quando.strftime('%Y') if e.quando else '' }}</div></div>
-            <div class="eg-tl-b"><div class="eg-tl-x"><div class="eg-tl-t">{% if e.evento == 'comentario' %}{{ e.texto }}{% elif e.evento == 'status' %}Status: {{ nome_status(e.status_id) }}{% else %}Prioridade: {{ nome_prioridade(e.prioridade_id) }}{% endif %}</div><div class="eg-tl-u">{{ e.nome or 'alguém' }} · {{ e.quando_txt }}{% if e.evento == 'comentario' and e.nota and e.nota != 'sim' %} · só no Nexus: {{ e.nota }}{% endif %}</div></div></div></div>{% endfor %}
+            <div class="eg-tl-b"><div class="eg-tl-x"><div class="eg-tl-t">{% if e.evento == 'comentario' %}{{ e.texto }}{% elif e.evento == 'status' %}Status: {{ nome_status(e.status_id) }}{% elif e.evento == 'prioridade' %}Prioridade: {{ nome_prioridade(e.prioridade_id) }}{% else %}{{ e.rotulo }}{% endif %}</div><div class="eg-tl-u">{{ e.nome or 'alguém' }} · {{ e.quando_txt }}{% if e.evento == 'comentario' and e.nota and e.nota != 'sim' %} · só no Nexus: {{ e.nota }}{% endif %}</div></div></div></div>{% endfor %}
         </div>
         {% else %}<p class="eg-vazio-l">Nenhum comentário nem mudança da engenharia ainda.</p>{% endif %}
       </section>
@@ -295,7 +338,7 @@
     if (!texto) { diz('Escreva o comentário antes de salvar.', true); ta.focus(); return; }
     btn.disabled = true; diz('Salvando na nota da OS…');
     fetch(box.dataset.comentar, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({texto: texto, folio: box.dataset.folio})})
+      body: JSON.stringify({texto: texto, folio: box.dataset.folio, de: box.dataset.de})})
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); })
       .then(function (x) {
         btn.disabled = false;

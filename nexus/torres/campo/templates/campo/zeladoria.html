@@ -2,35 +2,328 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# Zeladoria, visão do Nexus (05/10/2026): o livro de zeladoria que o App grava no banco (nexus/campo/visao.py). #}
-<div class="campo-nativa">
+{# Zeladoria (Levi, 26/10/2026, com o modelo "Rondas Sujidade e Vegetação": "Quero algo nesses padrões para a parte de
+   zeladoria da seção campo app do nexus. deixe no estilo do Nexus porém nesse padrão! a evolução por usina deve ser por
+   cliente!"). Números da semana, evolução das 8 semanas agrupada por cliente, recomendações, tabela por usina com a
+   gaveta, e a régua. A conta: nexus/campo/zeladoria.py. Os serviços de terceiros do App (visao.zeladoria) no fim. #}
+{# nível só com a cor da fonte e a seta para a leitura anterior, como na aba Sujidade e vegetação das Rondas #}
+{% macro nivel(n, ant=none) %}{% if n is none %}<span class="mudo">—</span>{% else %}<b class="cn-nivel-txt cn-nivel-txt--{{ n }}">{{ n }}</b>{% if ant is not none and ant != n %}<span class="cn-t-{{ 'critico' if n > ant else 'ok' }} cn-seta" title="antes {{ ant }}">{{ '▲' if n > ant else '▼' }} {{ ant }}</span>{% endif %}{% endif %}{% endmacro %}
+{% macro prazo(rec) %}{% if rec.status == 'feita' %}<span class="cn-t-ok">feita</span>{% elif rec.prazo_dias is none %}<span class="mudo">sem prazo</span>{% elif rec.vencida %}<span class="cn-t-critico" title="prazo {{ 'imediato' if rec.prazo_dias == 0 else 'até ' ~ dia_curto(rec.vence) }}">atrasada {{ rec.atraso_dias }} d</span>{% elif rec.prazo_dias == 0 %}imediata{% else %}até {{ dia_curto(rec.vence) }}{% endif %}{% endmacro %}
+{% macro situacao_os(rec) %}{% set zz = rec.z %}{% if rec.status == 'feita' %}<span class="cn-t-ok">{{ zz.nome }} feita em {{ dia_curto(zz.fim) }} (OS {{ zz.os }}{% if zz.situacao == 'verificacao' %}, em verificação{% endif %})</span>{% elif rec.status == 'aberta' %}OS {{ zz.os }} · {% if zz.situacao == 'execucao' %}em execução{% elif zz.atrasada %}<span class="cn-t-alerta">programada para {{ dia_curto(zz.programada) }}, atrasada</span>{% else %}programada para {{ dia_curto(zz.programada) }}{% endif %}{% elif rec.status == 'sem_dado' %}<span class="mudo">sem a situação da OS (as OS do Fracttal não vieram do banco)</span>{% else %}<span class="cn-t-alerta">sem OS de zeladoria no Fracttal</span>{% endif %}{% endmacro %}
+{% set nome_campo = {'vegetacao': 'vegetação', 'sujidade': 'sujidade'} %}
+{% set sem_escolhida = z.semanas[-1] %}
+<div class="campo-nativa zl">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">livro de zeladoria do App<br><b>lido às {{ lido }}</b></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }} · Zeladoria</p>
+      <h1 class="cn-titulo">Vegetação e sujidade dos módulos</h1>
+      <p class="cn-pergunta">Em cada ronda o técnico compara a vegetação sob os módulos e a sujidade dos painéis com as
+        fotos de referência do App e dá um nível de 1 a 5; acima de {{ alerta_acima }} o App alerta. Aqui, a situação de
+        cada usina, a evolução semana a semana por cliente e a zeladoria que o Fracttal tem feita ou programada.</p></div>
   </div>
+  <details class="cn-entenda">
+    <summary>Entenda esta tela</summary>
+    <ul>
+      <li><b>Nível:</b> o julgamento do técnico na ronda, comparando com as fotos de referência do App (a premissa de cada
+        nível), com pelo menos 2 fotos. Vem do texto da OS de ronda no Fracttal; a ronda sem OS, do checklist que o App
+        gravou; a ronda avulsa, do que foi lançado no Nexus. Acima de {{ alerta_acima }} pede ação (a régua do App).</li>
+      <li><b>Semana:</b> de segunda a domingo (W43, a mesma do PCM). Com mais de uma leitura na usina na semana, vale a
+        última. A semana corrente fica marcada "em andamento" até o domingo.</li>
+      <li><b>Evolução por cliente:</b> o nível de cada usina em cada uma das 8 semanas que terminam na semana escolhida;
+        o tracejado é semana sem leitura. A linha do cliente diz quantas usinas ficaram acima de {{ alerta_acima }} sobre
+        quantas tiveram leitura. Clique no cliente para recolher; clique na célula para abrir a usina.</li>
+      <li><b>Situação por usina:</b> a última leitura até o fim da semana escolhida (na corrente, até hoje); leitura com
+        {{ dias_velha }} dias ou mais fica marcada. A seta compara com a leitura anterior da usina. A ordem é a da aba
+        Sujidade e vegetação das Rondas: o mais crítico primeiro (vegetação, sujidade, vala e sensores somados).</li>
+      <li><b>Recomendações:</b> vegetação acima de {{ alerta_acima }} pede supressão vegetal; sujidade acima de
+        {{ alerta_acima }}, limpeza de módulos. Ao lado, o que o Fracttal tem: a OS de zeladoria aberta (programada ou em
+        execução), a feita depois da leitura (resolve a recomendação) ou nenhuma.</li>
+      <li><b>Validada por foto:</b> níveis revisados a partir das fotos das rondas do App, em nome de quem validou; vale no
+        lugar das rondas do mesmo dia. <b>Avulsa:</b> ronda lançada à mão no Nexus.</li>
+    </ul>
+  </details>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
-  {% set r = d.get('resumo') or {} %}
-  <div class="cn-numeros">
-    <span><span class="gc-rotulo">Serviços</span><span class="v">{{ r.get('servicos', 0) }}</span><span class="d">com registro pelo App</span></span>
-    <span><span class="gc-rotulo">Abertos</span><span class="v">{{ r.get('abertos', 0) }}</span><span class="d">OS ainda não fechada</span></span>
-    <span><span class="gc-rotulo">Sem diária hoje</span><span class="v{% if r.get('sem_diaria_hoje') %} ruim{% endif %}">{{ r.get('sem_diaria_hoje', 0) }}</span><span class="d">dos abertos</span></span>
-    <span><span class="gc-rotulo">Sem EPI registrado</span><span class="v">{{ r.get('sem_epi', 0) }}</span><span class="d">dos abertos</span></span>
+  {% set foto = z.get('foto_os') or {} %}
+  {% if erro_os %}<div class="cn-erro cn-aviso" role="status"><b>As OS de zeladoria do Fracttal não vieram do banco ({{ erro_os }}).</b> As recomendações aparecem sem a situação da OS.</div>
+  {% elif not z.tem_os %}<div class="cn-erro cn-aviso" role="status"><b>As OS do Fracttal ainda não chegaram ao banco.</b> As recomendações aparecem sem a situação da OS (não dá para dizer que falta OS de zeladoria).</div>
+  {% elif foto.get('velha') %}<div class="cn-erro cn-aviso" role="status"><b>As OS de zeladoria da tela são da leitura {{ foto.quando }}.</b> A leitura do Fracttal de hora em hora não gravou depois disso.</div>{% endif %}
+  {% include 'campo/_aviso_checklist.html' %}
+  {% include 'campo/_aviso_estrutura.html' %}
+
+  <form class="cn-barra-filtros" method="get">
+    <span class="gc-rotulo">Zeladoria</span>
+    <select class="gc-campo" name="semana" aria-label="Semana" onchange="this.form.submit()">
+      {% for v, rot in z.opcoes_semana %}<option value="{{ v }}"{% if v == z.semana %} selected{% endif %}>{{ rot }}</option>{% endfor %}
+    </select>
+    <select class="gc-campo" name="cliente" aria-label="Cliente" onchange="this.form.submit()">
+      <option value="">todos os clientes</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+    <select class="gc-campo" name="usina" aria-label="Usina" onchange="this.form.submit()">
+      <option value="">todas as usinas</option>{% for v, nome in opcoes_usina %}<option value="{{ v }}"{% if v == usina %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+    </select>
+    <select class="gc-campo" name="situacao" aria-label="Situação" onchange="this.form.submit()">
+      {% for v, rot in situacoes %}<option value="{{ v }}"{% if v == sit %} selected{% endif %}>{{ rot }}</option>{% endfor %}
+    </select>
+    {% with com_rotulo=false %}{% include 'campo/_filtros_papeis.html' %}{% endwith %}
+    {% if campo != 'vegetacao' %}<input type="hidden" name="modulo" value="{{ campo }}">{% endif %}
+    <span class="cn-barra-fonte">rondas do App · lido às {{ lido }}{% if foto.get('quando') %} · OS de zeladoria {{ foto.quando }}{% endif %}</span>
+  </form>
+
+  {# cada número filtra a tabela (como nas Rondas); o ativo fica marcado e o clique de novo tira o filtro #}
+  {% macro card(qual, dica='') %}<a class="cn-kpi cn-kpi--link" href="{{ url(situacao=None if sit == qual else qual) }}"{% if sit == qual %} aria-current="true"{% endif %}{% if dica %} title="{{ dica }}"{% endif %}>{% endmacro %}
+  <div class="cn-kpis zl-kpis">
+    {{ card('sem_leitura', 'Usinas mobilizadas com ao menos uma leitura de vegetação ou sujidade na semana escolhida.') }}<span class="gc-rotulo">Com leitura na semana</span>
+      <span class="v">{{ r.na_semana }}<small>de {{ r.usinas }}</small></span>
+      <span class="d">{{ sem_escolhida.rotulo }}{% if sem_escolhida.corrente %} · em andamento{% endif %}</span>
+      <span class="d cn-kpi-acao">ver as {{ r.usinas - r.na_semana }} sem leitura</span></a>
+    {{ card('vegetacao') }}<span class="gc-rotulo">Vegetação acima de {{ alerta_acima }}</span>
+      <span class="v{% if r.vegetacao_acima %} cn-t-alerta{% endif %}">{{ r.vegetacao_acima }}</span>
+      <span class="d">{{ r.vegetacao_5 }} no nível 5 · na última leitura</span><span class="d cn-kpi-acao">ver quais</span></a>
+    <div class="cn-kpi"><span class="gc-rotulo">Vegetação média</span>
+      <span class="v">{{ (r.vegetacao_media|string).replace('.', ',') if r.vegetacao_media is not none else '—' }}<small>de 1 a 5</small></span>
+      <span class="d">{{ r.com_leitura }} usinas com leitura</span></div>
+    {{ card('sujidade') }}<span class="gc-rotulo">Sujidade acima de {{ alerta_acima }}</span>
+      <span class="v{% if r.sujidade_acima %} cn-t-alerta{% endif %}">{{ r.sujidade_acima }}</span>
+      <span class="d">{{ r.sujidade_5 }} no nível 5 · na última leitura</span><span class="d cn-kpi-acao">ver quais</span></a>
+    <div class="cn-kpi"><span class="gc-rotulo">Sujidade média</span>
+      <span class="v">{{ (r.sujidade_media|string).replace('.', ',') if r.sujidade_media is not none else '—' }}<small>de 1 a 5</small></span>
+      <span class="d">{{ r.com_leitura }} usinas com leitura</span></div>
+    {{ card('sem_os', 'Recomendações (vegetação ou sujidade acima de ' ~ alerta_acima ~ ') sem OS de zeladoria do tipo aberta nem feita depois da leitura.') }}<span class="gc-rotulo">Recomendações sem OS</span>
+      <span class="v{% if r.sem_os %} cn-t-critico{% endif %}">{{ r.sem_os }}</span>
+      <span class="d">de {{ r.recs }} · {{ r.abertas }} com OS aberta · {{ r.feitas }} feita{{ 's' if r.feitas != 1 }}</span><span class="d cn-kpi-acao">ver quais</span></a>
   </div>
-  <div class="cn-tab"><table>
-    <thead><tr><th>OS</th><th>Usina</th><th>Serviço</th><th>Prestador</th><th>Etapas registradas</th><th>Última</th><th>Diária hoje</th><th>Situação</th></tr></thead>
+
+  <div class="zl-duas">
+    <section class="zl-evolucao" aria-labelledby="zl-evo-tit">
+      <div class="cn-lista-cab">
+        <h2 id="zl-evo-tit">Evolução por cliente</h2>
+        <div class="cn-seg" aria-label="O que a evolução mostra">{% for c in ('vegetacao', 'sujidade') %}<a href="{{ url(modulo=None if c == 'vegetacao' else c) }}"{% if c == campo %} aria-current="page"{% endif %}>{{ 'Vegetação' if c == 'vegetacao' else 'Sujidade' }}</a>{% endfor %}</div>
+        <button type="button" class="zl-recolher" aria-pressed="false">Recolher os clientes</button>
+      </div>
+      <p class="mudo zl-sub">Nível de {{ nome_campo[campo] }} nas 8 semanas até a {{ sem_escolhida.curto }} · clique na célula para abrir a usina</p>
+      <div class="zl-calor-caixa">
+        <table class="zl-calor">
+          <thead><tr><th scope="col" class="zl-nome">Cliente · usina</th>
+            {% for s in z.semanas %}<th scope="col" class="zl-sem{% if s.escolhida %} zl-sem--on{% endif %}" title="{{ s.rotulo }}{% if s.corrente %} · em andamento{% endif %}">{{ s.curto }}<small>{{ dia_curto(s.inicio) }}</small></th>{% endfor %}
+          </tr></thead>
+          {% for g in grupos %}
+          <tbody class="zl-grupo">
+            <tr class="zl-cli"><th scope="rowgroup"><button type="button" class="zl-cli-bt" aria-expanded="true">{{ g.cliente }} <span class="mudo">{{ g.usinas|length }}</span></button></th>
+              {% for s in z.janela %}{% set q = g.semanas[s] %}<td class="zl-cli-c" title="{{ g.cliente }} · {{ z.semanas[loop.index0].rotulo }}: {{ q.acima }} de {{ q.lidas }} usina{{ 's' if q.lidas != 1 }} com leitura acima de {{ alerta_acima }}{% if g.usinas|length > q.lidas %}; {{ g.usinas|length - q.lidas }} sem leitura{% endif %}">{% if q.lidas %}<b class="{{ 'cn-t-alerta' if q.acima else 'mudo' }}">{{ q.acima }}</b><small>/{{ q.lidas }}</small>{% else %}<span class="mudo">—</span>{% endif %}</td>{% endfor %}
+            </tr>
+            {% for u in g.usinas %}
+            <tr class="zl-u">
+              <th scope="row"><button type="button" class="zl-abre" data-usina="{{ u.usina_id }}" title="{{ u.usina }}">{{ u.usina }}</button></th>
+              {% for s in z.janela %}{% set c = u.celulas[s] %}{% set n = c[campo] %}{% set sx = z.semanas[loop.index0] %}
+              {% if n is not none %}<td class="zl-c zl-c--{{ n }}" data-usina="{{ u.usina_id }}" data-sem="{{ s }}" data-dica="{{ u.usina }} · {{ sx.rotulo }}&#10;{{ nome_campo[campo] }} {{ n }}{% if c.leituras|length > 1 %} (a última de {{ c.leituras|length }} leituras){% endif %}{% for x in c.leituras %}&#10;{{ dia_curto(x.data) }} · vegetação {{ '—' if x.vegetacao is none else x.vegetacao }} · sujidade {{ '—' if x.sujidade is none else x.sujidade }} · {{ 'validada por foto' if x.validada else (x.tecnico or '—') }}{% endfor %}">{{ n }}</td>
+              {% elif sx.corrente %}<td class="zl-c zl-c--andamento" data-dica="{{ u.usina }} · {{ sx.rotulo }}&#10;semana em andamento, ainda sem leitura"></td>
+              {% else %}<td class="zl-c zl-c--sem" data-dica="{{ u.usina }} · {{ sx.rotulo }}&#10;sem leitura nesta semana"></td>{% endif %}
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+          {% else %}
+          <tbody><tr><td colspan="{{ z.janela|length + 1 }}" class="mudo zl-vazio">Nenhuma usina com esses filtros.</td></tr></tbody>
+          {% endfor %}
+        </table>
+      </div>
+      <div class="zl-legenda" aria-label="Legenda">
+        <span><i class="zl-c--1"></i>1 e 2 sem alerta</span><span><i class="zl-c--3"></i>3</span>
+        <span><i class="zl-c--4"></i>4 alta</span><span><i class="zl-c--5"></i>5 muito alta</span>
+        <span><i class="zl-c--sem"></i>sem leitura</span><span><i class="zl-c--andamento"></i>semana em andamento</span>
+      </div>
+    </section>
+
+    <section class="zl-recs" aria-labelledby="zl-rec-tit">
+      <div class="cn-lista-cab"><h2 id="zl-rec-tit">Recomendações</h2><span class="mudo">{{ fila|length }} pede{{ 'm' if fila|length != 1 }} ação · {{ r.sem_os }} sem OS</span></div>
+      <p class="mudo zl-sub">Vegetação ou sujidade acima de {{ alerta_acima }} na última leitura, a mais grave primeiro</p>
+      <ol class="zl-fila">
+        {% for rec in fila %}
+        <li class="zl-rec zl-rec--{{ 'critico' if rec.nivel >= 5 else 'alerta' }}">
+          <button type="button" class="zl-rec-bt" data-usina="{{ rec.u.usina_id }}">
+            <span class="zl-rec-acao">{{ rec.acao }}</span>
+            <span class="zl-rec-usina">{{ rec.u.usina }} <span class="mudo">· {{ rec.u.cliente or '—' }}</span></span>
+            <span class="zl-rec-det">{{ rec.nome_campo }} {{ rec.nivel }} · lida em {{ dia_curto(rec.data) }}{% if rec.tecnico %} · {{ rec.tecnico }}{% endif %}</span>
+            <span class="zl-rec-det">{{ situacao_os(rec) }}</span>
+          </button>
+          <span class="zl-rec-prazo">{{ prazo(rec) }}</span>
+        </li>
+        {% else %}
+        <li class="zl-rec-vazio mudo">Nenhuma usina com vegetação ou sujidade acima de {{ alerta_acima }} pedindo ação com esses filtros.</li>
+        {% endfor %}
+      </ol>
+    </section>
+  </div>
+
+  <div class="cn-lista-cab"><h2>Situação por usina</h2><span class="mudo">a última leitura até {{ dia_curto(z.ate) }} · o mais crítico primeiro · clique na linha para ver a usina e as fotos</span></div>
+  <div class="cn-tab zl-tab"><table class="cn-ordenavel">
+    <thead><tr><th>Usina</th><th data-primeiro="desc">Leitura</th><th data-primeiro="desc">Vegetação</th><th data-primeiro="desc">Sujidade</th><th data-primeiro="desc">Vala</th><th data-primeiro="desc">Sensores</th><th data-primeiro="desc">Última supressão</th><th data-primeiro="desc">Última limpeza</th><th data-primeiro="desc" aria-sort="descending">Recomendação</th></tr></thead>
     <tbody>
-    {% for s in d.get('servicos') or [] %}
-      <tr><td class="m">{{ s.os }}</td><td>{{ s.usina }}</td><td>{{ s.servico }}</td><td>{{ s.prestador or '—' }}</td>
-        <td>{% for e in s.etapas %}<span class="cn-tag" title="{{ e.data }}{% if e.quem %} · {{ e.quem }}{% endif %}">{{ e.etapa }}</span> {% endfor %}</td>
-        <td class="m">{{ dia_curto(s.ultima) if s.ultima else '—' }}</td>
-        <td>{{ 'Sim' if s.diaria_hoje else ('—' if s.fechada else 'Não') }}</td>
-        <td><span class="cn-pill cn-{{ 'ok' if s.fechada else 'alerta' }}">{{ 'Fechada' if s.fechada else 'Aberta' }}</span></td></tr>
-    {% else %}
-      <tr><td colspan="8" class="cn-vazio">Nenhum registro de zeladoria pelo App ainda. A tela de zeladoria do App entrou
-        na v226 (05/10/2026): o primeiro registro aparece aqui na rodada seguinte do App (de hora em hora).</td></tr>
-    {% endfor %}
+    {% for u in linhas %}{% set lei = u.leitura or {} %}{% set ant = u.anterior or {} %}
+      <tr class="zl-linha" data-usina="{{ u.usina_id }}">
+        <td class="zl-tab-usina" data-ordem="{{ u.usina }}"><button type="button" class="zl-abre zl-link" data-usina="{{ u.usina_id }}">{{ u.usina }}</button><span class="det">{{ u.cliente or '—' }}{% if u.uf %} · {{ u.uf }}{% endif %}</span></td>
+        <td class="zl-tab-leitura" data-ordem="{{ lei.get('data') or '' }}">{% if lei %}<b class="zl-dia{% if u.velha %} cn-t-alerta{% endif %}"{% if u.velha %} title="Leitura de {{ u.dias }} dias atrás"{% endif %}>{{ dia_curto(lei.get('data')) }}</b><span class="det">{% if lei.get('validada') %}<span class="cn-validada" tabindex="0" title="{{ explicacao_validada }}">Validada por foto</span>{% else %}{{ lei.get('tecnico') or '—' }}{% if lei.get('avulsa') %} <span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% endif %}{% endif %}</span>{% else %}<span class="mudo">sem leitura</span>{% endif %}</td>
+        <td data-ordem="{{ '' if lei.get('vegetacao') is none else lei.get('vegetacao') }}">{{ nivel(lei.get('vegetacao'), ant.get('vegetacao')) }}</td>
+        <td data-ordem="{{ '' if lei.get('sujidade') is none else lei.get('sujidade') }}">{{ nivel(lei.get('sujidade'), ant.get('sujidade')) }}</td>
+        {% set vp = {'obstruida': 4, 'obstruída': 4, 'suja': 4, 'parcial': 2}.get((lei.get('vala') or '')|lower, 0) %}
+        <td data-ordem="{{ vp if lei.get('vala') else '' }}">{% if lei.get('vala') %}<span{% if vp %} class="cn-t-{{ 'critico' if vp >= 4 else 'alerta' }}"{% endif %}>{{ lei.get('vala') }}</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
+        <td data-ordem="{{ (lei.get('sensores_sujos') or [])|length if lei else '' }}">{% if lei.get('sensores_sujos') %}<span class="cn-t-alerta">{{ lei.get('sensores_sujos')|join(', ') }}</span>{% elif lei %}<span class="mudo">limpos</span>{% else %}—{% endif %}</td>
+        {% set us, ul = u.ultima_supressao, u.ultima_limpeza %}
+        <td class="m" data-ordem="{{ us.fim if us else '' }}">{% if us %}<span title="{{ us.nome }} · OS {{ us.os }}">{{ dia_curto(us.fim) }}</span>{% else %}—{% endif %}</td>
+        <td class="m" data-ordem="{{ ul.fim if ul else '' }}">{% if ul %}<span title="{{ ul.nome }} · OS {{ ul.os }}">{{ dia_curto(ul.fim) }}</span>{% else %}—{% endif %}</td>
+        <td class="zl-tab-rec" data-ordem="{{ u.pontos }}">{% for rec in u.recs %}<span class="zl-tab-rec-l"><b>{{ rec.acao }}</b> · {{ prazo(rec) }}<span class="det">{{ situacao_os(rec) }}</span></span>{% else %}{% if lei %}<span class="mudo">sem alerta</span>{% else %}—{% endif %}{% endfor %}</td>
+      </tr>
+    {% else %}<tr><td colspan="9" class="mudo">Nenhuma usina com esses filtros.</td></tr>{% endfor %}
     </tbody></table></div>
-  <div class="cn-nota"><b>De onde vem.</b> Cada etapa (APR, vistoria inicial, diária, final, EPI) que o App grava no banco do
-    Nexus. Do prestador vai só a empresa; da pessoa, o código do e-mail (o nome sai do cadastro do App, na hora).</div>
+
+  <div class="cn-lista-cab"><h2>Como classificamos</h2><span class="mudo">a régua do App, a mesma em todas as rondas</span></div>
+  <div class="zl-regua">
+    {% for c, titulo, acao in (('vegetacao', 'Vegetação · altura sob e entre os módulos', 'Supressão vegetal (ou poda química)'), ('sujidade', 'Sujidade dos módulos', 'Limpeza de módulos')) %}
+    <div class="cn-tab"><table>
+      <caption>{{ titulo }}</caption>
+      <thead><tr><th>Nível</th><th>Leitura</th><th>O que a zeladoria faz</th></tr></thead>
+      <tbody>
+        <tr><td><b class="cn-nivel-txt cn-nivel-txt--1">1</b> <span class="mudo">e</span> <b class="cn-nivel-txt cn-nivel-txt--2">2</b></td><td>sem alerta</td><td class="mudo">ciclo regular</td></tr>
+        <tr><td><b class="cn-nivel-txt cn-nivel-txt--3">3</b></td><td>observar na próxima ronda</td><td class="mudo">ciclo regular</td></tr>
+        {% for n in (4, 5) %}<tr><td><b class="cn-nivel-txt cn-nivel-txt--{{ n }}">{{ n }}</b></td><td>{{ 'alta' if n == 4 else 'muito alta' }} · pede ação</td><td>{{ acao }}{% if prazo_dias.get(n) is not none %} · {{ 'imediata' if prazo_dias[n] == 0 else 'em até ' ~ prazo_dias[n] ~ ' dias' }}{% endif %}</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% endfor %}
+  </div>
+  <p class="mudo zl-regua-nota">O técnico escolhe o nível comparando com as fotos de referência de cada nível no App e tira ao menos 2 fotos.
+    A zeladoria vem das tarefas do tipo Zeladoria do Fracttal: Supressão Vegetal e Poda Química atendem a vegetação, Limpeza
+    de Módulos atende a sujidade (as abertas e as feitas nos últimos 90 dias).</p>
+
+  {# os serviços de terceiros que o App registra (o livro zeladoria_app_campo, a tela de antes: 05/10/2026) #}
+  {% set sv = servicos.dados or {} %}{% set rs = sv.get('resumo') or {} %}
+  <details class="zl-servicos"{% if rs.get('abertos') %} open{% endif %}>
+    <summary>Serviços de terceiros registrados pelo App <span class="mudo">{{ rs.get('servicos', 0) }} serviço{{ 's' if rs.get('servicos', 0) != 1 }}{% if rs.get('abertos') %} · {{ rs.abertos }} aberto{{ 's' if rs.abertos != 1 }}{% endif %}</span></summary>
+    <div class="cn-tab"><table>
+      <thead><tr><th>OS</th><th>Usina</th><th>Serviço</th><th>Prestador</th><th>Etapas registradas</th><th>Última</th><th>Diária hoje</th><th>Situação</th></tr></thead>
+      <tbody>
+      {% for s in sv.get('servicos') or [] %}
+        <tr><td class="m">{{ s.os }}</td><td>{{ s.usina }}</td><td>{{ s.servico }}</td><td>{{ s.prestador or '—' }}</td>
+          <td>{% for e in s.etapas %}<span class="cn-tag" title="{{ e.data }}{% if e.quem %} · {{ e.quem }}{% endif %}">{{ e.etapa }}</span> {% endfor %}</td>
+          <td class="m">{{ dia_curto(s.ultima) if s.ultima else '—' }}</td>
+          <td>{{ 'Sim' if s.diaria_hoje else ('—' if s.fechada else 'Não') }}</td>
+          <td><span class="cn-pill cn-{{ 'ok' if s.fechada else 'alerta' }}">{{ 'Fechada' if s.fechada else 'Aberta' }}</span></td></tr>
+      {% else %}
+        <tr><td colspan="8" class="cn-vazio">Nenhum registro de zeladoria pelo App ainda. A tela de zeladoria do App entrou
+          na v226 (05/10/2026): o primeiro registro aparece aqui na rodada seguinte do App (de hora em hora).</td></tr>
+      {% endfor %}
+      </tbody></table></div>
+  </details>
+
+  <div class="cn-nota"><b>De onde vem.</b> Os níveis são as respostas do checklist da ronda que o App copia no texto da OS
+    de ronda no Fracttal (o Nexus lê as OS em verificação e as aprovadas dos 90 dias); a ronda sem OS, do checklist que o
+    App gravou; a avulsa e a validação por foto, do livro do Nexus. A zeladoria é a das tarefas do tipo Zeladoria das OS do
+    Fracttal que o Nexus guarda no banco de hora em hora. Nada desta tela escreve no Fracttal nem no App.</div>
 </div>
+
+{# a gaveta da usina: o conteúdo vem da rota /zeladoria/usina/<id>, no clique #}
+<div class="zl-veu" hidden></div>
+<aside class="zl-gaveta" hidden aria-label="Detalhe da usina" data-url="{{ url_for('torre_campo.zeladoria_usina', usina_id=0) }}" data-semana="{{ z.semana }}">
+  <button type="button" class="zl-gav-fechar" aria-label="Fechar">×</button>
+  <div class="zl-gav-corpo"></div>
+</aside>
+<div class="zl-dica" role="tooltip" hidden></div>
+{% include 'campo/_ronda_fotos_caixa.html' %}
+{% include 'campo/_ordenar.html' %}
+<script>
+  // Zeladoria: a gaveta da usina (linha, célula da evolução, recomendação), a dica da célula, recolher os clientes e as
+  // fotos da última ronda dentro da gaveta. O texto vindo do livro entra por textContent ou já escapado no servidor.
+  (function () {
+    var gav = document.querySelector('.zl-gaveta'), veu = document.querySelector('.zl-veu');
+    var corpo = gav.querySelector('.zl-gav-corpo'), caixa = document.querySelector('.cn-caixa-foto'), origem = null;
+    function abre(uid, ver, quem) {
+      origem = quem || null;
+      corpo.textContent = 'Abrindo a usina...';
+      gav.hidden = false; veu.hidden = false; gav.querySelector('.zl-gav-fechar').focus();
+      var url = gav.dataset.url.replace(/\/0$/, '/' + encodeURIComponent(uid)) + '?semana=' +
+        encodeURIComponent(gav.dataset.semana) + (ver ? '&ver=' + encodeURIComponent(ver) : '');
+      fetch(url, {credentials: 'same-origin'}).then(function (r) {
+        // sessão vencida: o portão leva ao Entrar (a página inteira não entra na gaveta)
+        if ((r.redirected && /\/entrar([/?#]|$)/.test(r.url || '')) || r.status === 401) { location.reload(); return null; }
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      }).then(function (html) { if (html !== null) corpo.innerHTML = html; })
+        .catch(function (e) { corpo.textContent = 'Não consegui abrir a usina (' + e.message + '). Feche e tente de novo.'; });
+    }
+    function fecha() {
+      gav.hidden = true; veu.hidden = true; corpo.replaceChildren();
+      if (origem && document.body.contains(origem)) origem.focus();
+      origem = null;
+    }
+    document.addEventListener('click', function (ev) {
+      if (gav.contains(ev.target)) return;
+      var b = ev.target.closest('[data-usina]');
+      if (!b || ev.target.closest('a')) return;
+      var tr = b.closest('tr.zl-linha');
+      abre(b.dataset.usina, b.dataset.sem || '', tr ? tr.querySelector('.zl-abre') : b);
+    });
+    gav.querySelector('.zl-gav-fechar').addEventListener('click', fecha);
+    veu.addEventListener('click', fecha);
+    // Esc fecha a gaveta, mas não quando a foto ampliada está aberta (aí o Esc fecha só a foto): na captura, antes do
+    // script da caixa da foto
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && !gav.hidden && caixa.hidden) fecha();
+    }, true);
+
+    // as fotos da última ronda com OS: só no clique (1 pedido ao Fracttal por OS, guardado 20 min no servidor)
+    function fotos(b) {
+      var alvo = corpo.querySelector('.zl-fotos');
+      if (!alvo) return;
+      b.disabled = true;
+      alvo.textContent = 'Buscando as fotos da OS no Fracttal...';
+      fetch(b.dataset.url, {credentials: 'same-origin'}).then(function (r) {
+        if ((r.redirected && /\/entrar([/?#]|$)/.test(r.url || '')) || r.status === 401) { location.reload(); return null; }
+        return r.text();
+      }).then(function (html) {
+          if (html === null) return;
+          alvo.innerHTML = html; b.hidden = !alvo.querySelector('[data-erro]'); b.disabled = false;
+        })
+        .catch(function () { alvo.textContent = 'Não consegui buscar as fotos. Tente de novo.'; b.disabled = false; });
+    }
+    corpo.addEventListener('click', function (ev) {
+      var b = ev.target.closest('.zl-bt-fotos');
+      if (b) { fotos(b); return; }
+      var t = ev.target.closest('.cn-bt-tentar');
+      if (t) { ev.stopPropagation(); var bt = corpo.querySelector('.zl-bt-fotos'); if (bt) fotos(bt); }
+    });
+
+    // a dica da célula da evolução (a semana, o nível e as leituras dela)
+    var dica = document.querySelector('.zl-dica'), tab = document.querySelector('.zl-calor');
+    if (tab) {
+      tab.addEventListener('mouseover', function (ev) {
+        var td = ev.target.closest('td[data-dica]');
+        if (!td) { dica.hidden = true; return; }
+        dica.textContent = td.dataset.dica;
+        dica.hidden = false;
+        var r = td.getBoundingClientRect(), w = dica.offsetWidth, h = dica.offsetHeight;
+        var esq = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8));
+        var cima = r.top - h - 8;
+        dica.style.left = esq + 'px';
+        dica.style.top = (cima < 8 ? r.bottom + 8 : cima) + 'px';
+      });
+      tab.addEventListener('mouseleave', function () { dica.hidden = true; });
+      document.querySelector('.zl-calor-caixa').addEventListener('scroll', function () { dica.hidden = true; });
+    }
+
+    // recolher um cliente (o clique no nome) ou todos (o botão)
+    function recolhe(tbody, fechar) {
+      var bt = tbody.querySelector('.zl-cli-bt');
+      if (!bt) return;
+      bt.setAttribute('aria-expanded', String(!fechar));
+      tbody.querySelectorAll('tr.zl-u').forEach(function (tr) { tr.hidden = fechar; });
+    }
+    document.querySelectorAll('.zl-cli-bt').forEach(function (bt) {
+      bt.addEventListener('click', function () { recolhe(bt.closest('tbody'), bt.getAttribute('aria-expanded') === 'true'); });
+    });
+    var todos = document.querySelector('.zl-recolher');
+    if (todos) todos.addEventListener('click', function () {
+      var fechar = todos.getAttribute('aria-pressed') !== 'true';
+      todos.setAttribute('aria-pressed', String(fechar));
+      todos.textContent = fechar ? 'Abrir os clientes' : 'Recolher os clientes';
+      document.querySelectorAll('tbody.zl-grupo').forEach(function (tb) { recolhe(tb, fechar); });
+    });
+  })();
+</script>
 {% endblock %}

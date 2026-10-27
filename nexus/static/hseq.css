@@ -249,3 +249,14 @@
 .hs-email-corpo{font-size:14px;line-height:1.5;color:var(--tinta)}
 .hs-email-corpo ul{margin:4px 0 12px;padding-left:20px}
 .hs-email-corpo a{color:var(--verde-texto)}
+
+/* o clique na linha do extintor (26/10/2026): a linha com informação adicional mostra a marca e o cursor de clique; o
+   aviso de quando não há sobe no rodapé da tela e some sozinho; as listas da caixa de editar com o "Outro" embaixo */
+.ext-tab tr.ext-linha{cursor:pointer}
+.ext-tab .ext-par > .hs-tem-info{font-weight:600}
+.hs-info-texto{white-space:pre-wrap;font-size:14px;line-height:1.5;color:var(--tinta)}
+.hs-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:40;max-width:calc(100vw - 32px);margin:0;
+  padding:10px 16px;border:1px solid var(--linha-forte);border-radius:10px;background:var(--superficie-3);color:var(--tinta);
+  font-size:13px;box-shadow:0 8px 24px var(--sombra)}
+.hs-dlg-lista select{width:100%}
+.hs-dlg-outro{margin-top:4px}

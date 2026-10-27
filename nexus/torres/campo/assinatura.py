@@ -102,12 +102,22 @@ def quem():
 @bp_assinatura.route("/os/_nexus/pt/<numero>/assinatura-tecnico")
 def assinatura_tecnico(numero):
     """A assinatura que o técnico desenhou na APR, para a tela da PT pôr ao lado de "A PT" (Levi, 05/10). JSON:
-    {"ok", "img"} ou {"ok": false, "login" | "motivo"}. Só com o login do Fracttal de quem olha. O `?ativo=` (a linha de
-    onde se pede) vai no "entre com o seu login do Fracttal", para a volta cair na mesma linha."""
+    {"ok", "img"} ou {"ok": false, "login" | "motivo"}. Primeiro a da APR feita no App, do PDF que ele anexa na OS
+    (26/10/2026, Levi: "Gostaria para as APRs que foram feitas via app de campo mostrem sim a assinatura"), que não
+    pede login; sem esse PDF, a do formulário do Fracttal, com o login do Fracttal de quem olha. O `?ativo=` (a linha
+    de onde se pede) vai no "entre com o seu login do Fracttal", para a volta cair na mesma linha."""
+    p = visao.pt(numero)
+    if p and p.get("os"):
+        try:
+            return jsonify({"ok": True, "img": pt_fracttal.assinatura_da_apr_do_app(p["numero"], p["os"], p.get("criada")),
+                            "origem": "app"})
+        except pt_fracttal.SemArquivo:
+            pass                # a APR de antes do App (ou o PDF que ainda não chegou): o caminho do formulário
+        except Exception:       # noqa: BLE001 — Fracttal fora: tenta o formulário, que diz o motivo
+            pass
     jwt, conta = _sessao_os()
     if not jwt:
         return jsonify({"ok": False, "login": True, "entrar": _login(numero, request.args.get("ativo"))})
-    p = visao.pt(numero)
     if not p or not p.get("os"):
         return jsonify({"ok": False, "motivo": "a PT não está no livro do App"})
     try:

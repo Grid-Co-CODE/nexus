@@ -31,7 +31,7 @@ BRT = dt.timezone(dt.timedelta(hours=-3))                                       
 ERRO_SEM_ATIVO = "Marque ao menos um ativo no Passo 1."
 ERRO_TIPO = ("O tipo de tarefa ainda não carregou (ou a sessão expirou). Aguarde um instante ou relogue antes de gerar.")
 ERRO_DATAS = "A Data final não pode ser anterior à Data inicial."
-ERRO_SEM_DESC = "Preencha a Descrição da tarefa no Passo 2."
+ERRO_SEM_DESC = "Preencha o Título da tarefa no Passo 2."           # "Título da tarefa" desde 26/10/2026 (era "Descrição")
 ERRO_SEM_SUB = "Adicione ao menos uma subtarefa no Passo 3."
 ERRO_SEM_RESP = "Escolha o responsável."
 ERRO_FUTURO = "Data do evento não aceita futuro — é quando aconteceu."
@@ -128,8 +128,22 @@ def ativos_de(assets: list, cliente: str, usina: str, tipo: str | None = None, b
         if txt and txt not in str(a.get("label") or "").lower():
             continue
         out.append({"id": a.get("id"), "code": a.get("code"), "label": a.get("label"), "tipo": a.get("tipo"),
-                    "curto": ativo_curto.do_catalogo(a, frases)})
+                    "curto": ativo_curto.do_catalogo(a, frases), "nome_titulo": nome_no_titulo(a, frases)})
     return out
+
+
+def nome_no_titulo(asset: dict, frases=None) -> str:
+    """O nome do ativo no título da OS do Criar OS, "[Ativo] - Título" (Levi, 26/10/2026: "APENAS NOME DO ATIVO, NÃO NOME
+    COMPLETO, SE FOR O ATIVO DA USINA ENTÃO FICARÁ 'Usina' se for inversor ficará Inversor 1.1"): o item da planta vira
+    "Usina" (o `do_catalogo` daria o nome dela); os outros, o nome curto do catálogo, o da coluna Ativo do Histórico."""
+    a = asset or {}
+    if a.get("tipo") == "Usina" or str(a.get("tipo_code") or "").upper() == "USINA":
+        return "Usina"
+    return ativo_curto.do_catalogo(a, frases)
+
+
+def titulo_da_os(desc: str, asset: dict, frases=None) -> str:
+    return titulo_do_ativo(desc, asset, frases, nome=nome_no_titulo(asset, frases))
 
 
 # ── datas ─────────────────────────────────────────────────────────────────────────────────────────
@@ -224,8 +238,9 @@ def montar_payload(corpo: dict, assets: list, imagens: dict | None = None, frase
     # Ventoinha": o marcado continua marcado ao trocar de usina (Step1._checked), a descrição ia igual para todas, e o
     # tracker marcado em outra usina levou o título do inversor. Agora a pessoa escreve a ação e o ativo entra sozinho,
     # com a regra da Nova solicitação (`solic_web.titulo_do_ativo`: a marca [Ativo] vale; o que já começa pelo ativo não
-    # repete). O `desc` posicional segue o digitado: quem manda é o `por_ativo`, o mesmo caminho do COS e da Engenharia.
-    por_ativo = {a.get("code"): {"description": titulo_do_ativo(desc, a, frases)} for a in ativos}
+    # repete) e o nome do `nome_no_titulo` (o ativo da usina vira "Usina"). O `desc` posicional segue o digitado: quem
+    # manda é o `por_ativo`, o mesmo caminho do COS e da Engenharia.
+    por_ativo = {a.get("code"): {"description": titulo_da_os(desc, a, frases)} for a in ativos}
     finalizar = None
     fin = corpo.get("finalizar") if isinstance(corpo.get("finalizar"), dict) else None
     # Agrupar e "já realizada" não combinam (app.py::_on_agrupar esconde o painel): com agrupar, o painel é ignorado.

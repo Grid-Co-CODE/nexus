@@ -12,8 +12,16 @@ pessoal e só aparece na tela de quem entrou no Nexus.
   login de uma PESSOA. O Nexus usa o login do Fracttal do OS Creator de quem está olhando (o mesmo com que ele
   assina a PT). O valor pode vir como imagem (data URI), como link pronto ou como caminho do arquivo, que se assina
   com `companies.s3_object_get` (os três formatos que o `_pt_ass_de_valor` do App aceita).
+- **A APR feita no App** (26/10/2026, Levi: "Como tem a mensagem 'o Fracttal não entregou a APR desta tarefa'? sendo
+  que a APR nem mais via fractall é, é via app de campo. Gostaria para as APRs que foram feitas via app de campo mostrem
+  sim a assinatura"): a APR do App não fica no formulário do Fracttal; a assinatura está no PDF que o App anexa na OS
+  ("APR OS <n> dd-mm-aaaa HHhMM", o mesmo do Baixar APR). Medido em 26/10 nas OS 16982 e 16866: o PDF (ReportLab, 3
+  páginas) leva só duas imagens, a foto da equipe (JPEG) e a assinatura (PNG com fundo transparente) na página da
+  "Assinatura". O Nexus tira a PNG dessa página (`assinatura_da_apr_do_app`), pela credencial da empresa (o REST de
+  anexos), sem pedir o login de quem olha; só sem esse PDF vale o caminho do formulário.
 """
 import base64
+import io
 import re
 import time
 import unicodedata
@@ -188,6 +196,38 @@ def assinatura_das_candidatas(numero, ids, rpc, maximo: int = 4) -> str:
         except SemArquivo as e:
             ultimo = e
     raise ultimo or SemArquivo("a APR desta tarefa não tem a assinatura do técnico")
+
+
+def assinatura_do_pdf(corpo: bytes) -> str:
+    """A assinatura (data URI PNG) do PDF da APR do App: a última imagem PNG da página que fala de "assinatura" (a foto
+    da equipe é JPEG). SemArquivo quando não há."""
+    from pypdf import PdfReader
+    try:
+        paginas = PdfReader(io.BytesIO(corpo)).pages
+    except Exception as e:      # noqa: BLE001 — PDF que não abre: sem a assinatura, a tela diz
+        raise SemArquivo(f"não consegui abrir o PDF da APR ({type(e).__name__})") from e
+    for p in reversed(list(paginas)):
+        if "assinatura" not in (p.extract_text() or "").lower():
+            continue
+        pngs = [im for im in p.images if str(im.name).lower().endswith(".png") and im.data]
+        if pngs:
+            dado = pngs[-1].data
+            if len(dado) > IMG_MAX:
+                raise SemArquivo("a assinatura na APR é grande demais")
+            return "data:image/png;base64," + base64.b64encode(dado).decode()
+    raise SemArquivo("a APR do App não tem a assinatura do técnico")
+
+
+def assinatura_da_apr_do_app(numero, os_, criada=None, ler=None) -> str:
+    """A assinatura do técnico na APR feita no App (data URI), do PDF que o App anexou na OS (`apr_pdf`: com mais de uma
+    APR, a de horário mais perto da criação da PT). Guardada 1 h em memória com as outras (nunca em disco nem no banco)."""
+    guardada = _ASSINATURAS.get(numero)
+    if guardada and time.time() - guardada[0] < CACHE_S:
+        return guardada[1]
+    corpo, _descricao_do_anexo = apr_pdf(os_, criada, ler)
+    img = assinatura_do_pdf(corpo)
+    _ASSINATURAS[numero] = (time.time(), img)
+    return img
 
 
 def limpar():

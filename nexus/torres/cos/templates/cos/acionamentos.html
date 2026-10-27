@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+{# Acionamentos e distribuidoras (26/10/2026): quem aciono e qual o canal da distribuidora desta UF. Quem aciono é do
+   cadastro do Nexus (o contato decifrado só para a tela); a UC, o canal e os chamados à concessionária, do Andamento da
+   Ronda COS (nexus/cos/acionamentos.py). Só lê. #}
+{% macro canal(c) %}{% if c %}
+  {% if c.sms %}<span class="cos-canal"><span class="det">SMS</span> <b>{{ c.sms.numero }}</b> · <code>{{ c.sms.formato }}</code> <span class="det">{{ confianca.get(c.sms.confianca, c.sms.confianca) }}</span></span>{% endif %}
+  {% if c.contato %}<span class="cos-canal"><span class="det">À mão</span> {{ c.contato }}</span>{% endif %}
+  {% if not c.sms and not c.contato %}<span class="det">canal não levantado na Ronda COS</span>{% endif %}
+{% else %}<span class="det">canal não levantado na Ronda COS</span>{% endif %}{% endmacro %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Cadastro do Nexus{% if ligada %} + Andamento da Ronda COS{% endif %}{% if lido %}<br>lido às <b>{{ lido }}</b>{% endif %}</div>
+  </div>
+
+  {% if not ligada %}
+  <div class="cn-vazio cos-aviso">O Andamento da Ronda COS não está ligado neste servidor: a tela mostra quem acionar e a
+    concessionária do cadastro, sem a UC, o canal da distribuidora e os chamados. Um administrador liga a fonte em Base →
+    Chaves do Nexus (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>).</div>
+  {% endif %}
+  {% if erro_clientes %}<div class="cn-erro" role="alert"><b>{{ erro_clientes[:1]|upper }}{{ erro_clientes[1:] }}.</b></div>{% endif %}
+  {% if erro_cadastro %}<div class="cn-erro" role="alert"><b>{{ erro_cadastro }}.</b> Sem o cadastro, a tela não diz quem
+    acionar: tente de novo em instantes.</div>{% endif %}
+  {% if not com_chave %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não tem a chave do cadastro.</b> Sem ela, os
+    nomes saem como o papel com o número da pessoa, e os contatos não abrem.</div>{% endif %}
+
+  {% if p %}
+  {% for c, erro, velha in p.erros %}<div class="cn-erro{% if velha %} cn-aviso{% endif %}" role="alert"><b>{{ c }}: {{ erro }}.</b>
+    {% if velha %}A tela mostra a última leitura boa.{% else %}A UC, o canal e os chamados deste cliente ficam de fora agora.{% endif %}</div>{% endfor %}
+
+  <form class="cn-filtros" method="get">
+    <label class="cn-filtro-par"><span class="gc-rotulo">Cliente</span>
+    <select class="gc-campo" name="cliente" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for c, n in p.clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    <label class="cn-filtro-par"><span class="gc-rotulo">UF</span>
+    <select class="gc-campo" name="uf" onchange="this.form.submit()">
+      <option value="">Todas</option>{% for u in p.ufs %}<option value="{{ u }}"{% if u == uf %} selected{% endif %}>{{ u }}</option>{% endfor %}
+    </select></label>
+    <input class="gc-campo" type="search" name="q" value="{{ busca }}" placeholder="Usina, cidade ou código" aria-label="Buscar usina">
+  </form>
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Usinas</span><span class="v">{{ p.resumo.usinas }}</span>
+      <span class="d">em operação{% if cliente or uf or busca %}, no filtro{% endif %}</span></span>
+    {% if p.andamento_completo %}
+    <span><span class="gc-rotulo">Com canal da distribuidora</span><span class="v">{{ p.resumo.com_canal }}</span>
+      <span class="d">{% if p.resumo.sem_distribuidora %}{{ p.resumo.sem_distribuidora }} sem concessionária no cadastro{% else %}das {{ p.resumo.usinas }}{% endif %}</span></span>
+    <span><span class="gc-rotulo">Chamados à distribuidora</span><span class="v">{{ p.resumo.chamados }}</span>
+      <span class="d">em {{ p.dias }} dias · {{ p.resumo.com_protocolo }} com protocolo</span></span>
+    <span><span class="gc-rotulo">Pedem ação</span><span class="v{% if p.resumo.pedem_acao %} ruim{% endif %}">{{ p.resumo.pedem_acao }}</span>
+      <span class="d">{% if p.sinal %}celular do SMS: {{ p.sinal.rotulo }}, {{ p.sinal.detalhe }}{% else %}pendente, sem protocolo ou falhou{% endif %}</span></span>
+    {% else %}
+    <span><span class="gc-rotulo">Canal e chamados</span><span class="v">—</span>
+      <span class="d">sem a leitura do Andamento de todos os clientes</span></span>
+    {% endif %}
+  </div>
+
+  {% if p.linhas %}
+  <div class="cn-tab cos-tab cos-acion"><table>
+    <thead><tr><th class="cos-esq">Usina</th><th class="cos-esq">Distribuidora</th><th class="cos-esq">Quem aciono</th></tr></thead>
+    <tbody>
+    {% for x in p.linhas %}
+      <tr>
+        <td class="cos-esq cos-usina"><b>{{ x.usina }}</b><span class="det">{{ [x.cidade ~ ('/' ~ x.uf if x.uf else ''), x.cliente]|select|join(' · ') }}</span>
+          {% if x.regiao_campo %}<span class="det">{{ x.regiao_campo }}</span>{% endif %}
+          {% if x.chamados_pedem_acao %}<span class="cn-pill cn-alerta">{{ x.chamados_pedem_acao }} chamado{{ '' if x.chamados_pedem_acao == 1 else 's' }} pede{{ '' if x.chamados_pedem_acao == 1 else 'm' }} ação</span>{% endif %}</td>
+        <td class="cos-esq">{% for d in x.distribuidoras %}
+          <div class="cos-dist"><b>{{ d.nome }}</b>{% if d.parte %} <span class="det">{{ d.parte }}</span>{% endif %}
+            <span class="det">{% if d.uc %}UC {{ d.uc }}{% elif d.de == 'cadastro' %}UC não está na Ronda COS{% endif %}</span>
+            {{ canal(d.canal) }}</div>
+          {% else %}<span class="mudo">sem concessionária no cadastro</span>{% endfor %}</td>
+        <td class="cos-esq">{% for c in x.contatos %}
+          <div class="cos-quem-aciono"><span class="det">{{ c.papel }}{% if c.detalhe %} · {{ c.detalhe }}{% endif %}</span>
+            <b>{{ c.nome }}</b>{% if c.contato %}{% if c.discar %} <a class="cn-link cos-tel" href="tel:{{ c.discar }}">{{ c.contato }}</a>{% else %} {{ c.contato }}{% endif %}{% endif %}</div>
+          {% else %}<span class="mudo">ninguém no cadastro</span>{% endfor %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="cn-vazio">Nenhuma usina em operação {% if cliente or uf or busca %}no filtro{% else %}no cadastro{% endif %}.</p>{% endif %}
+
+  {% if ligada %}
+  <h2 class="cos-sub">Chamados à distribuidora nos últimos {{ p.dias }} dias</h2>
+  {% if p.chamados %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Usina</th><th class="cos-esq">Situação</th><th class="cos-esq">Aberto</th><th class="cos-esq">Protocolo</th><th class="cos-esq">Proteções</th></tr></thead>
+    <tbody>
+    {% for c in p.chamados[:100] %}
+      <tr>
+        <td class="cos-esq cos-usina"><b>{{ c.usina }}</b><span class="det">{{ c.parte or '' }}{% if c.uc %}{{ ' · ' if c.parte else '' }}UC {{ c.uc }}{% endif %} · {{ c.concessionaria or 'concessionária não informada' }}</span>
+          <span class="det">{{ c.cliente }}{% if c.os %} · OS {{ c.os }}{% endif %}</span></td>
+        <td class="cos-esq"><span class="cn-pill cn-{{ c.tom }}">{{ c.estado_rotulo }}</span></td>
+        <td class="cos-esq">{{ c.criado.strftime('%d/%m %H:%M') if c.criado else '—' }}
+          <span class="det">{% if c.enviado %}enviado às {{ c.enviado.strftime('%H:%M') }}{% if c.aberto_por %}, {{ 'pelo sistema' if c.aberto_por == 'sistema' else 'por pessoa' }}{% endif %}{% else %}não enviado{% endif %}</span></td>
+        <td class="cos-esq">{% if c.protocolo %}<span class="cos-os">{{ c.protocolo }}</span><span class="det">{{ c.protocolo_quando.strftime('%d/%m %H:%M') if c.protocolo_quando else '' }}{% if c.protocolo_por %} · {{ 'lido da resposta' if c.protocolo_por == 'sistema' else 'registrado à mão' }}{% endif %}</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
+        <td class="cos-esq">{{ (c.protecoes or [])|join(', ') or '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if p.chamados|length > 100 %}<p class="mudo">Mostrando os 100 mais recentes de {{ p.chamados|length }}.</p>{% endif %}
+  {% else %}<p class="cn-vazio">Nenhum chamado à distribuidora {% if cliente or uf or busca %}das usinas do filtro {% endif %}nos últimos {{ p.dias }} dias.</p>{% endif %}
+  {% endif %}
+
+  {% if p.distribuidoras %}
+  <h2 class="cos-sub">As distribuidoras das usinas listadas</h2>
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Distribuidora</th><th>Usinas</th><th class="cos-esq">Canal</th></tr></thead>
+    <tbody>
+    {% for chave, d in p.distribuidoras %}
+      <tr><td class="cos-esq"><b>{{ d.nome }}</b></td><td>{{ d.usinas }}</td><td class="cos-esq">{{ canal(d.canal) }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+
+  {% if p.sem_ligacao %}<p class="mudo">Com UC na Ronda COS e sem ligação no cadastro do Nexus (o código não casa com uma usina
+    só): {% for s in p.sem_ligacao %}{{ s.usina }} ({{ s.codigo }}){{ ', ' if not loop.last else '.' }}{% endfor %} O conserto é
+    no cadastro (Base → Ligações).</p>{% endif %}
+  {% endif %}
+
+  <div class="cn-nota"><b>De onde vem.</b> <b>Quem aciono</b> é do cadastro do Nexus: o Supervisor de Campo da região da
+    usina, o Responsável O&M e o técnico, o eletricista e o mantenedor dela, com o contato que o cadastro guarda cifrado
+    (o corporativo, ou o pessoal). <b>A distribuidora</b> é a UC da planilha do cliente que a Ronda COS usa para abrir o
+    chamado (uma por sub-usina); sem UC lá, a concessionária do cadastro. O <b>canal</b> é o que a Ronda COS declarou: o
+    SMS de registro de falta de energia, com o formato e quanto ele está confirmado, e o canal para abrir à mão (quase
+    sempre o WhatsApp da distribuidora). Concessionária com outro nome no cadastro fica "canal não levantado". Os
+    <b>chamados</b> são os que a Ronda COS abriu nos últimos {{ p.dias if p else 30 }} dias, com o protocolo da distribuidora.</div>
+</div>
+{% endblock %}

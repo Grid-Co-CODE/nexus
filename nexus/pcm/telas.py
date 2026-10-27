@@ -524,17 +524,18 @@ def registrar_pcm(bp) -> None:
         arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
         marca = r["marca"]
         geral = not alvo["codigo"]
-        # a nota da OS no Fracttal ao ESCOLHER o motivo (20/10/2026, `nota_os`): marcar ou trocar; a observação e o tirar, não
-        nota = None
+        # a nota da OS no Fracttal ao ESCOLHER o motivo (20/10/2026, `nota_os`): marcar ou trocar; a observação e o tirar,
+        # não. Quem escreve é a ponte /os/_nexus/pcm/nota, que a janela chama com este pedido (o cookie do Fracttal não
+        # vem a /t/pcm; 26/10/2026)
+        nota_pedido = None
         if not tirar and r["gravou"] and marca and (not atual or atual["motivo_id"] != marca["motivo_id"]):
-            nota = NO.escrever(current_app._get_current_object(), linha["os"], NO.linha(
-                M._agora(), marca["motivo"], linha["tarefa"], alvo["codigo"], str(d.get("obs") or "")))
+            nota_pedido = NO.pedido(current_app._get_current_object(), linha["os"], NO.linha(
+                M._agora(), marca["motivo"], linha["tarefa"], alvo["codigo"], str(d.get("obs") or "")), _usuario())
         os_, t_ = linha["os"], M.norm(linha["tarefa"])
         # a que passou a valer na linha: a do ativo vence a da OS
         efetiva = ((antes.get((os_, M.canon(linha["codigo"]), t_)) if linha["codigo"] else None) or marca) if geral             else (marca or antes.get((os_, "", t_)))
         return jsonify(ok=True, gravou=r["gravou"], geral=geral, marca=_marca_curta(marca) if marca else None,
-                       efetiva=_marca_curta(efetiva) if efetiva else None, arquivo=arq, nota=nota,
-                       nota_txt=NO.frase(nota),
+                       efetiva=_marca_curta(efetiva) if efetiva else None, arquivo=arq, nota_pedido=nota_pedido,
                        efeito=_efeito(efetiva, _destino_quadro(cfg, base)["id"], tirou=tirar and not efetiva))
 
     @bp.route("/motivos/app", methods=["POST"])
@@ -596,20 +597,18 @@ def registrar_pcm(bp) -> None:
         else:
             arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
             nova = r["marca"]
-            # trocar o motivo é escolher: a nota da OS no Fracttal (20/10/2026, `nota_os`)
-            nota = None
+            # trocar o motivo é escolher: a nota da OS no Fracttal (20/10/2026, `nota_os`), que a página escreve pela ponte
+            # /os/_nexus/pcm/nota ao abrir com este pedido (o cookie do Fracttal não vem a /t/pcm; 26/10/2026)
+            nota_pedido = None
             if not tirar and r["gravou"] and nova and nova["motivo_id"] != m["motivo_id"]:
-                nota = NO.escrever(current_app._get_current_object(), alvo["os"], NO.linha(
-                    M._agora(), nova["motivo"], alvo["tarefa"], alvo["codigo"], obs))
+                nota_pedido = NO.pedido(current_app._get_current_object(), alvo["os"], NO.linha(
+                    M._agora(), nova["motivo"], alvo["tarefa"], alvo["codigo"], obs), _usuario())
             ok = ("Nada mudou." if not r["gravou"] else
                   f"Motivo tirado da OS {alvo['os']}." if tirar else
                   f"OS {alvo['os']}: {nova['motivo']}." if nova and nova["motivo_id"] != m["motivo_id"] else
                   f"OS {alvo['os']}: observação salva.")
-            session["pcm_motivos_aviso"] = {
-                "ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "",
-                                           NO.frase(nota) if nota and nota.get("ok") else "") if x),
-                "erro": " ".join(x for x in ("" if arq["ok"] else arq["texto"],
-                                             NO.frase(nota) if nota and not nota.get("ok") else "") if x)}
+            session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
+                                            "erro": "" if arq["ok"] else arq["texto"], "nota_pedido": nota_pedido}
         return redirect(na_raiz("/t/pcm/fora-da-programacao") + ("?" + urlencode(volta) if volta else ""), code=303)
 
     @bp.route("/fora-da-programacao/cadastro", methods=["POST"])
@@ -1024,7 +1023,7 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
              "feito": feito in ("salvo", "aplicado"),
              # os motivos (16/10/2026): o cadastro para a janela e quem marca (PCM, Responsáveis UFV, administrador)
              "motivos": mot["lista"], "pode_marcar": pode_marcar() and not mot["erro"],
-             "url_motivo": na_raiz("/t/pcm/quadro/motivo")}
+             "url_motivo": na_raiz("/t/pcm/quadro/motivo"), "url_nota": na_raiz("/os/_nexus/pcm/nota")}
     # para onde vai a reprogramação desta semana, dito com o nome do lugar (Levi, 09/10/2026, sobre a frase anterior,
     # "vira linha de observação, que só o PCM grava, e vale onde a fila diz": "Onde o PCM tem essa informação?")
     ctx["fonte_frase"] = {
@@ -1474,7 +1473,7 @@ def _ctx_fora(cfg, args) -> dict:
             "finalizadas": finalizadas, "ilegiveis": ilegiveis, "erro_banco": est.get("erro") or "",
             "gestao_ok": g is not None, "pode": pode_marcar(), "pode_cadastro": pode_programar(),
             "repo": M.estado_no_repositorio(cfg, est),
-            "ok": aviso.get("ok"), "erro": aviso.get("erro")}
+            "ok": aviso.get("ok"), "erro": aviso.get("erro"), "nota_pedido": aviso.get("nota_pedido")}
 
 
 # como o período acabou, no Histórico: o texto e o tom (o resolvido em verde, o que segue no painel em âmbar)

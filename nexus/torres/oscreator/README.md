@@ -293,8 +293,8 @@ filtro do histórico".
   (Geração e ETM e os outros planos), em Nova solicitação · Engenharia e no "trocar" responsável do card da OS. A
   Clonagem tinha um filtro dela, separado do `<select>`: com a busca comum por cima, eram duas caixas. Saiu.
 - **Onde vale:** Performance, Engenharia, Clonagem, Inspeção de chamados, PCM, COS ("Requerido por"), a Fila do PCM
-  (aprovar e criar), a Solicitação (técnico sugerido) e o trocar responsável. A Tradicional segue com a lista dela no
-  Passo 4, que já se via inteira: passou a casar do mesmo jeito (`OsBusca.casa`) e a aceitar setas e Enter. O Enter só
+  (aprovar e criar), a Solicitação (técnico sugerido) e o trocar responsável. A Tradicional segue com a lista dela (no
+  Passo 2 desde 26/10/2026), que já se via inteira: passou a casar do mesmo jeito (`OsBusca.casa`) e a aceitar setas e Enter. O Enter só
   escolhe; quem gera as OS continua sendo o botão.
 - **Regras da busca:**
   - casa sem acento, sem caixa, palavra por palavra e em qualquer ordem: "joao" acha "João", "silva ana" acha
@@ -985,11 +985,15 @@ vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo ma
 - **Quem chama:** a página da OS do Quadro da equipe (`/t/engenharia/equipe/os/<nº>`), pelo `/os/_nexus/ir` (abre na
   torre OS Creator do Nexus). O comentário daquela página vai à nota da OS pela ponte
   (`/os/_nexus/engenharia/os/<id>/comentar`, só do Nexus, na sessão do Fracttal da pessoa; `editar_nota_os` com a regra
-  do card: OS concluída, cancelada ou de várias tarefas não deixa).
+  do card: OS concluída, cancelada ou de várias tarefas não deixa). A linha do motivo do PCM vai pelo mesmo caminho
+  (`/os/_nexus/pcm/nota`, `ponte.pcm_nota`, desde 26/10/2026; a regra no `nexus/pcm/CLAUDE.md`, "A nota da OS ao
+  escolher o motivo"): rota do Nexus que precisa do login do Fracttal mora em `/os/_nexus`, porque o `os_sessao` só vai
+  para `/os`.
 - **Criar OS do zero (25/10/2026):** o mesmo endereço em `/os/tradicional?` (o "Criar OS" da OS do Quadro da equipe;
   Levi: "Fará os mesmos preenchimentos automáticos que já faz na solicitação"): o Passo 1 abre com o cliente, a usina e
-  o ativo marcados (a busca mostra o ativo) e a data do incidente no campo; o Passo 4 abre com a OS pai escolhida
-  (`ospaiSug`), e a OS seguinte, depois de gerar, não herda a OS pai (como na Solicitação).
+  o ativo marcados (a busca mostra o ativo) e a data do incidente no campo; a OS pai vem escolhida no campo do Passo 1,
+  ao lado das datas desde 26/10/2026 (`sugerir`), e a OS seguinte, depois de gerar, não herda a OS pai (como na
+  Solicitação).
 - **As subtarefas padrão do Criar OS do zero (25/10/2026):** Levi: "quero que essas subtarefas já fiquem como padrão na
   parte de criação de OS do zero!". O Passo 3 abre, e volta depois de gerar, com "Descreva a atividade realizada" e
   "Ficou alguma pendência? Se sim, descreva" (`tradicional_web.SUBS_PADRAO`, no `data-subs-padrao` da página); a pessoa
@@ -1023,6 +1027,40 @@ no título e a tela avisa quando os marcados são de mais de uma usina.
   com "2 marcado(s) em 2 usinas diferentes", a prévia do título, o aviso âmbar do Passo 4 e a confirmação com as duas
   usinas, sem rolagem lateral. No oem, o `test_os_web_tradicional.py` passou a cobrar o `por_ativo` junto com a sincronia
   (cópia de trabalho; sem commit lá).
+
+## Criar OS do zero: a tela de uma vez, sem os "Próximo" (26/10/2026)
+
+Levi, no mesmo dia: "1 - Tirar esses botões de Próximo"; "2 - Ao lado de data do incidente e data programada inclua OS
+pai"; "3 - Em etiquetas não precisa ficar mostrando as opções ... o ideal é quando a pessoa for pesquisar aparece a lista";
+"4 - ... troque por Título da tarefa ... [Ativo(APENAS NOME DO ATIVO ... SE FOR O ATIVO DA USINA ENTÃO FICARÁ Usina se for
+inversor ficará Inversor 1.1 ...)] - Título"; "5 - Abaixo de classificação adicione a parte de adicionar o técnico".
+
+- **Sem os "Próximo"** (Passos 1 e 2): os passos já estão todos na página. O "Passo N de 4" segue o card em que a pessoa
+  mexe (`focusin`); o "Voltar" dos Passos 2 e 3 ficou. Quem valida é o "Concluir e Gerar OS": ativo, tipo, título, técnico,
+  OS pai digitada e não escolhida, subtarefa.
+- **A OS pai no Passo 1**, ao lado das duas datas (`.trad-linha3`, uma embaixo da outra a menos de 900 px), com a mesma
+  busca de antes (`/os/api/tradicional/os-pai`; a escolha agora no `mousedown`, e o `blur` fecha a lista). A sugestão pelo
+  endereço (`?os_pai=<id>&os_pai_folio=<nº>`, o "Criar OS" do Quadro da equipe da Engenharia) já a deixa escolhida.
+  Saiu do Passo 4.
+- **Etiquetas:** a lista só aparece com texto na busca (casa como a busca comum, `OsBusca.casa`); as marcadas ficam embaixo,
+  cada uma um botão "nome ✕" (`os-btn secondary mini`) que a tira; Esc limpa a busca.
+- **"Título da tarefa"** (era "Descrição da tarefa", e o campo virou uma linha): cada OS sai "[Ativo] - Título" pelo
+  `tradicional_web.titulo_da_os`, e o nome do ativo é o `nome_no_titulo`: o item da planta (tipo "Usina") vira "Usina";
+  os outros, o nome curto do catálogo ("Inversor 1.1"). A cascata manda o mesmo nome (`nome_titulo`) para a prévia. A Nova
+  solicitação segue com o nome dela (no ativo da usina, o nome da usina).
+- **O técnico no Passo 2**, embaixo da Classificação: a mesma lista com a busca (`resp_busca`, `resp_lista`), carregada ao
+  abrir a tela, e "Escolhido: …" embaixo. O duplo clique que gerava saiu (geraria sem a conferência). A OS seguinte começa
+  sem técnico e sem OS pai.
+- **O Passo 4 é a conferência:** quantas OS, o responsável, a OS pai, o título com o 1º ativo, o aviso das usinas, "já
+  realizada" e agrupar, Cancelar/Gerar. O rótulo do passo continua o do app ("Responsável", `STEP_LABELS`, que o teste do
+  oem compara com o app de mesa).
+- **Prova:** `tests/test_oscreator_criar_os_titulo_26_10.py` (o "Usina" e a tela pedida, item a item) e
+  `tests/test_oscreator_criar_os_25_10.py` (a OS pai da sugestão no Passo 1). Na bancada (o Criar OS do fixture com a
+  cascata e as buscas de mentira), a 1024 e a 375 px, no escuro e no claro: o "Criar OS" com a sugestão abre com a OS pai
+  16784 no Passo 1; datas e OS pai na mesma linha; a etiqueta pela busca vira o botão e a lista some; o técnico escolhido
+  no Passo 2; a conferência; o pedido com a OS pai, o técnico e a etiqueta; a tela zerada depois; as travas (sem técnico;
+  OS pai digitada e não escolhida); "[Usina] - Limpeza da subestação"; sem rolagem lateral. No oem, o
+  `test_os_web_tradicional.py` cobra os textos novos (cópia de trabalho; sem commit lá).
 
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 
