@@ -14,10 +14,12 @@ ATHN-MTS200 estava parado em "Inventário físico" (modo 3) com tudo travado. Po
 - **O modo manda.** 3 (inventário físico): para sem mexer. 2 que o controle não diz que é nosso (outra pessoa ou outra
   tela): para sem mexer (voltá-lo ao normal deixaria os saldos dela sem o par de movimentos). O modo se confere no começo do
   lote e de novo logo antes de abrir: entre uma conferência e a outra passam segundos (ligar as peças, ler). O 2 que o
-  controle diz ser nosso, numa retomada, é conferido pelo histórico desde que a sessão abriu: movimento sem a nossa
-  referência é a sessão que saiu das nossas mãos (alguém a finalizou e abriu outra), e a gravação para. QUASE nunca, e não
-  nunca: quem solta o modo no Fracttal sem finalizar não deixa rastro, e uma sessão aberta por outra pessoa logo depois
-  pareceria a nossa.
+  controle diz ser nosso, numa retomada, é conferido pelo histórico: logo antes de abrir, o controle guarda o id do
+  movimento mais novo do almoxarifado (o `marco`), e um AJUSTE (tipo 15) sem a nossa referência com id maior que ele é a
+  sessão que saiu das nossas mãos (alguém a finalizou e abriu outra): a gravação para e diz o que fazer. Compara id, não
+  relógio (a prova de 27/10/2026 parou uma retomada por um movimento do mesmo segundo da abertura), e só ajuste: entrada e
+  saída comuns não acontecem com o modo aberto. QUASE nunca, e não nunca: quem solta o modo no Fracttal sem finalizar não
+  deixa rastro, e uma sessão aberta por outra pessoa logo depois pareceria a nossa.
 - **Conflito, nunca gravar por cima:** com a sessão aberta nada se move, e a leitura feita ali é a que vale; a peça cujo
   saldo não é o da aprovação, ou que se moveu no histórico depois do "Contada em", vira o evento `conflito` e não é gravada.
   O específico cujo genérico ainda tem unidades por identificar na curadoria também (as unidades pendentes talvez sejam
@@ -35,7 +37,7 @@ ATHN-MTS200 estava parado em "Inventário físico" (modo 3) com tudo travado. Po
 |---|---|
 | modo 3 (inventário físico) | como estava (de outra pessoa) |
 | modo 2 de outra pessoa ou tela | como estava (de outra pessoa) |
-| na retomada, o modo 2 com movimento de outra referência desde que a nossa sessão abriu | como estava (saiu das nossas mãos) |
+| na retomada, o modo 2 com um ajuste de outra referência depois do marco da nossa sessão | como estava (saiu das nossas mãos) |
 | 429, de novo depois de 62 s | fechado com o que gravou; travado (aviso forte) só se nem o fechamento passou |
 | login do Fracttal expirou | travado se a sessão estava aberta (aviso forte); quem aprovou entra de novo e continua |
 | erro inesperado (o Fracttal recusou, a rede caiu) | fechado com o que gravou (evento `erro` com o tipo); travado só se não fechou |
@@ -51,7 +53,8 @@ motivo (cifrado). As peças já conferidas ficam `peca_gravada`; cada uma das ou
 sai de "gravando" e fica "gravada com conflitos"), e a vez do almoxarifado é solta.
 
 O controle (`<NEXUS_DADOS>/almox_inventario/<contagem_id>.json`) guarda o ponto de retomada: o estado de cada lote
-(`pendente`, `abrindo`, `aberto`, `fechando`, `feito`), a hora em que a sessão abriu, as peças que se moveram, e o de cada
+(`pendente`, `abrindo`, `aberto`, `fechando`, `feito`), a hora em que a sessão abriu e o `marco` (o id do movimento mais
+novo de logo antes de abrir), as peças que se moveram, e o de cada
 peça (`pendente`, `enviando` = a peça sem resposta, `escrita`, `fechada`, `duvida` = a sem resposta numa sessão já fechada,
 `gravada`, `conflito`, `erro`). NUNCA o login: o JWT e o e-mail vivem só na instância do `Estoque` (a do pedido de quem
 aprovou); quem aprovou é o `pessoa_hmac`. O arquivo `trava-<almoxarifado>.json` é a vez do almoxarifado: o servidor é um
@@ -92,7 +95,8 @@ TIPO_DO_EVENTO = {"gravada": "peca_gravada", "conflito": "conflito", "erro": "er
 
 MODO_3 = "o almoxarifado está em Inventário físico no Fracttal"
 OUTRO = "o almoxarifado já está em ajuste no Fracttal (outra pessoa ou outra tela)"
-OUTRO_DEPOIS = "o almoxarifado está em ajuste por outra pessoa ou outra tela"
+OUTRO_DEPOIS = ("o almoxarifado está em ajuste por outra pessoa ou outra tela: feche o ajuste na tela do Fracttal e depois "
+                "clique em Continuar ou Encerrar")
 MODO_DESCONHECIDO = "o almoxarifado está num modo que o Nexus não conhece ({modo})"
 LIMITE = "limite do Fracttal"
 LOGIN = "o login do Fracttal expirou"
@@ -470,10 +474,12 @@ class _Trabalho:
 
     def conferir_que_e_nossa(self, lote: dict) -> None:
         """O modo 2 que o controle diz ser nosso é mesmo a nossa sessão? O controle pode estar velho: alguém finalizou a
-        nossa sessão no Fracttal e abriu outra, e a retomada finalizaria a dos outros. O histórico desde a hora em que a
-        nossa abriu (sem folga: a de outra pessoa é depois) não pode ter movimento de outra referência. QUASE sempre pega:
-        quem só solta o modo, sem finalizar, não deixa rastro."""
-        outros = self.chamar(self.e.mexidas_desde, self.almox, lote["aberto_em"], None, self.prefixo())
+        nossa sessão no Fracttal e abriu outra, e a retomada finalizaria a dos outros. Nenhum AJUSTE de outra referência pode
+        ter id maior que o `marco` (o movimento mais novo de logo antes de a nossa abrir). Antes contava todo movimento sem a
+        nossa referência desde o `aberto_em`, cortado no segundo: a prova de 27/10/2026 parou uma retomada por um movimento
+        do mesmo segundo da abertura, e pararia sempre. A leitura vai até a abertura menos a folga do relógio. QUASE sempre
+        pega: quem só solta o modo, sem finalizar, não deixa rastro."""
+        outros = self.chamar(self.e.ajustes_depois, self.almox, lote.get("marco"), self.desde(lote), self.prefixo())
         if outros is None or outros:
             raise _Parar(OUTRO_DEPOIS)
 
@@ -519,8 +525,10 @@ class _Trabalho:
                 self.chamar(self.e.ligar, self.almox, i)
         self._atual = None
         self.modo(lote)                             # de novo, logo antes de abrir: nunca gravar na sessão de outra pessoa
+        # o marco da retomada: o que tiver id maior que ele veio depois da abertura (`conferir_que_e_nossa`)
+        marco = self.chamar(self.e.ultimo_movimento, self.almox)
         lote["sessao"] = lote.get("sessao", 0) + 1
-        self.marcar_lote(lote, "abrindo", ref=self.ref(lote), aberto_em=_iso(self._agora()),
+        self.marcar_lote(lote, "abrindo", ref=self.ref(lote), aberto_em=_iso(self._agora()), marco=marco,
                          mexidas=sorted({str(m) for m in mexidas} & set(lote["itens"])))
         self.chamar(self.e.abrir_ajuste, self.almox)
         self.marcar_lote(lote, "aberto")
@@ -851,7 +859,7 @@ def iniciar(cfg, contagem: dict, itens: list[dict], estoque, aprovador: dict, *,
     presos = _com_generico_pendente(contagem.get("linhas") or [], curadoria or {})
     gravaveis = [x for x in lote if x[0] not in presos]
     lotes = [{"n": n, "itens": [x[0] for x in gravaveis[k:k + TAMANHO_LOTE]], "estado": "pendente", "sessao": 0, "ref": "",
-              "aberto_em": "", "mexidas": []}
+              "aberto_em": "", "marco": None, "mexidas": []}
              for n, k in enumerate(range(0, len(gravaveis), TAMANHO_LOTE), 1)]
     n_do_lote = {i: l["n"] for l in lotes for i in l["itens"]}
     agora_ = _iso((agora or _agora)())

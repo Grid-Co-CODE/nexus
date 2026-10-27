@@ -427,6 +427,43 @@ def test_mexidas_desde_data_ruim_e_erro_de_quem_chama():
         estoque(Fracttal({HISTORICO: em_paginas(HIST)})).mexidas_desde(ALMOX, "ontem")
 
 
+def test_ultimo_movimento_e_o_maior_id_da_primeira_pagina():
+    """O marco que a gravação guarda logo antes de abrir a sessão: o maior `id_movements` (numérico e crescente, provado em
+    27/10/2026) da 1ª página do histórico, num pedido só. O maior, e não o da 1ª linha: no mesmo instante a ordem por
+    `date_create` não diz qual veio antes."""
+    fr = Fracttal({HISTORICO: em_paginas(HIST)})
+    assert estoque(fr, pagina=2).ultimo_movimento(ALMOX) == 84000006 and len(fr.pedidos) == 1
+    trocadas = [HIST[1], HIST[0]] + HIST[2:]
+    assert estoque(Fracttal({HISTORICO: em_paginas(trocadas)}), pagina=2).ultimo_movimento(ALMOX) == 84000006
+    assert estoque(Fracttal({HISTORICO: em_paginas([])})).ultimo_movimento(ALMOX) is None      # almoxarifado sem movimento
+    sem_id = [dict(HIST[0], id_movements=None)]
+    with pytest.raises(E.ErroFracttal):                   # sem o id não há marco: a gravação não abre a sessão
+        estoque(Fracttal({HISTORICO: em_paginas(sem_id)})).ultimo_movimento(ALMOX)
+
+
+def test_ajustes_depois_so_os_ajustes_de_id_maior_que_o_marco():
+    """Na retomada, a sessão é nossa se nenhum AJUSTE (tipo 15) de outra referência tem id maior que o marco. A entrada e a
+    saída comuns não acontecem com o modo aberto (o que aparece delas é de antes), e o id compara o que veio depois sem o
+    relógio (a prova de 27/10 parou uma retomada por um movimento do mesmo segundo da abertura)."""
+    fr = Fracttal({HISTORICO: em_paginas(HIST)})
+    est = estoque(fr, pagina=2)
+    assert est.ajustes_depois(ALMOX, 84000003, "2026-10-26T13:00:00Z", "INVENTARIO-c") == set()   # os nossos, pelo prefixo
+    assert est.ajustes_depois(ALMOX, 84000003, "2026-10-26T13:00:00Z", "INVENTARIO-x") == {ITEM}
+    assert est.ajustes_depois(ALMOX, 84000006, "2026-10-26T13:00:00Z", "INVENTARIO-x") == set()   # nada depois do marco
+    assert est.ajustes_depois(ALMOX, 84000005, "2026-10-26T13:00:00Z", "INVENTARIO-x") == {ITEM}  # a MOV-6 só
+    # o consumo (tipo 2) e a compra (tipo 1) depois do marco não contam
+    assert est.ajustes_depois(ALMOX, 84000000, "2026-10-20T00:00:00Z", "INVENTARIO-c") == set()
+    assert est.ajustes_depois(ALMOX, None, "2026-10-26T13:00:00Z", "INVENTARIO-x") == {ITEM}       # sem marco: todos
+    fr.pedidos.clear()
+    est.ajustes_depois(ALMOX, 84000003, "2026-10-26T14:00:00Z", "INVENTARIO-c")
+    assert len(fr.pedidos) == 2                           # para na data (a abertura menos a folga): a cota é de todos
+    # o ajuste sem id e o sem tipo legível contam (na dúvida, a retomada para e diz o que fazer)
+    duvida = [dict(HIST[0], description="Outra tela", id_movements=None),
+              dict(HIST[1], description="Outra tela", id_item=53248399, id_movement_type="")]
+    assert estoque(Fracttal({HISTORICO: em_paginas(duvida)})).ajustes_depois(
+        ALMOX, 84000004, "2026-10-26T13:00:00Z", "INVENTARIO-c") == {ITEM, "53248399"}
+
+
 def test_nunca_devolve_o_nome_do_responsavel():
     """`responsible_description` do histórico é nome de pessoa: o repositório e a API são compartilhados, e o nome ao lado
     de um movimento é dado pessoal ligado a trabalho. O adaptador não devolve nem guarda."""

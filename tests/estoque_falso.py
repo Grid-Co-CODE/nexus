@@ -34,14 +34,16 @@ Os defeitos se pedem pelo construtor:
 - `agora`: o relógio dos movimentos (uma função que devolve `datetime` ou texto ISO); sem ele, a hora de verdade.
 
 `.chamadas` guarda o nome de cada operação chamada, em ordem (a que falhou também); `.movimentos`, os movimentos (dicts com
-`id_almox`, `id_item`, `tipo` "entrada" ou "saida", `qtd`, `referencia`, `quando`, `folio`), do mais velho ao mais novo.
+`id_almox`, `id_item`, `tipo` "entrada" ou "saida", `qtd`, `referencia`, `quando`, `folio`, `id` (o `id_movements`, crescente)
+e `tipo_fracttal` (15 o ajuste do fechamento; 1 a entrada e 2 a saída de `mover`, ou 15 com `ajuste=True`)), do mais velho ao
+mais novo.
 `mover` e `definir_modo` não são do contrato (nem contam como chamada): o teste os usa para simular o que acontece fora do
 inventário (uma OS que lança peça, uma compra que entra, um almoxarifado que ficou em inventário físico).
 """
 import functools
 from datetime import datetime, timezone
 
-from nexus.pcm.inventario.estoque import (ErroFracttal, Estoque, Limite, SemLogin, instante, validar_nivel,
+from nexus.pcm.inventario.estoque import (TIPO_AJUSTE, ErroFracttal, Estoque, Limite, SemLogin, instante, validar_nivel,
                                           validar_quantidade)
 
 
@@ -96,15 +98,18 @@ class EstoqueFalso(Estoque):
         """Põe o almoxarifado num modo (3 = inventário físico, o `ATHN-MTS200` do passo 0)."""
         self._modos[str(id_almox)] = int(modo)
 
-    def mover(self, id_almox: str, id_item: str, tipo: str, qtd: float, *, quando=None, referencia: str = "") -> None:
-        """Um movimento real (uma OS lançou a peça, entrou uma compra): mexe no saldo e entra em `.movimentos`."""
+    def mover(self, id_almox: str, id_item: str, tipo: str, qtd: float, *, quando=None, referencia: str = "",
+              ajuste: bool = False) -> None:
+        """Um movimento real (uma OS lançou a peça, entrou uma compra): mexe no saldo e entra em `.movimentos`. `ajuste`: o
+        movimento é um ajuste de inventário (tipo 15) feito por fora (outra tela), e não uma entrada ou saída comum."""
         if tipo not in ("entrada", "saida"):
             raise ValueError(f"tipo de movimento desconhecido: {tipo!r}")
         if self._modos.get(str(id_almox), 0) in (2, 3):
             raise ErroFracttal("o almoxarifado trava entradas e saídas enquanto está em ajuste ou inventário", "mover")
         item = self._item(id_almox, id_item)
         item["saldo"] = (item["saldo"] or 0.0) + (qtd if tipo == "entrada" else -qtd)
-        self._movimento(id_almox, id_item, tipo, qtd, referencia, self._iso(quando))
+        self._movimento(id_almox, id_item, tipo, qtd, referencia, self._iso(quando),
+                        TIPO_AJUSTE if ajuste else (1 if tipo == "entrada" else 2))
 
     # ── as regras do falso ───────────────────────────────────────────────────────────────────────────────────────────────
     def _entrar(self, nome: str) -> None:
@@ -134,10 +139,11 @@ class EstoqueFalso(Estoque):
         except KeyError:
             raise ValueError(f"a peça {id_item} não está ligada ao almoxarifado {id_almox}") from None
 
-    def _movimento(self, id_almox, id_item, tipo, qtd, referencia, quando) -> dict:
+    def _movimento(self, id_almox, id_item, tipo, qtd, referencia, quando, tipo_fracttal=None) -> dict:
         self._n_movimento += 1
         m = {"id_almox": str(id_almox), "id_item": str(id_item), "tipo": tipo, "qtd": float(qtd),
-             "referencia": referencia, "quando": quando, "folio": f"MOV-{self._n_movimento}"}
+             "referencia": referencia, "quando": quando, "folio": f"MOV-{self._n_movimento}",
+             "id": 84_000_000 + self._n_movimento, "tipo_fracttal": TIPO_AJUSTE if tipo_fracttal is None else tipo_fracttal}
         self.movimentos.append(m)
         return m
 
@@ -227,6 +233,19 @@ class EstoqueFalso(Estoque):
         return {m["id_item"] for m in self.movimentos
                 if m["id_almox"] == str(id_almox) and instante(m["quando"]) >= corte
                 and not (ignorar_referencia and m["referencia"] == ignorar_referencia)
+                and not (ignorar_prefixo and m["referencia"].startswith(ignorar_prefixo))}
+
+    @_operacao
+    def ultimo_movimento(self, id_almox: str) -> int | None:
+        return max((m["id"] for m in self.movimentos if m["id_almox"] == str(id_almox)), default=None)
+
+    @_operacao
+    def ajustes_depois(self, id_almox: str, depois_de: int | None, desde_iso: str,
+                       ignorar_prefixo: str | None = None) -> set[str] | None:
+        instante(desde_iso)                              # a data ruim é erro de quem chama, como no de verdade
+        return {m["id_item"] for m in self.movimentos
+                if m["id_almox"] == str(id_almox) and m["tipo_fracttal"] == TIPO_AJUSTE
+                and (depois_de is None or m["id"] > depois_de)
                 and not (ignorar_prefixo and m["referencia"].startswith(ignorar_prefixo))}
 
     @_operacao

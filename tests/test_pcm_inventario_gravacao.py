@@ -110,13 +110,13 @@ def _saldos(falso, almox="10"):
 
 # ── o caminho feliz ──────────────────────────────────────────────────────────────────────────────────────────────────────
 def test_grava_e_confirma(app, grav):
-    """Uma sessão por lote: confere o modo, lê o que se moveu e o saldo, confere o modo de novo, abre, lê (a leitura que
-    vale), grava cada peça, fecha com a referência e relê. Cada peça vira `peca_gravada` com o folio do fechamento."""
+    """Uma sessão por lote: confere o modo, lê o que se moveu e o saldo, confere o modo de novo, guarda o marco (o movimento
+    mais novo), abre, lê (a leitura que vale), grava cada peça, fecha com a referência e relê. Cada peça vira `peca_gravada` com o folio do fechamento."""
     falso = _falso(agora=grav["relogio"])
     d = _iniciar(grav, falso)
     assert d["estado"] == "gravando" and d["total"] == 3
-    assert falso.chamadas == ["modo", "mexidas_desde", "ler", "modo", "abrir_ajuste", "ler", "gravar_saldo", "gravar_saldo",
-                              "gravar_saldo", "fechar_ajuste", "voltar_ao_normal", "achar_movimento", "ler"]
+    assert falso.chamadas == ["modo", "mexidas_desde", "ler", "modo", "ultimo_movimento", "abrir_ajuste", "ler", "gravar_saldo",
+                              "gravar_saldo", "gravar_saldo", "fechar_ajuste", "voltar_ao_normal", "achar_movimento", "ler"]
     assert _saldos(falso) == {"501": 12, "502": 3, "503": 0} and falso.modo("10") == 0
     assert _pares(falso) == {"501": ["saida", "entrada"], "502": ["saida", "entrada"], "503": ["saida", "entrada"]}
     assert {m["referencia"] for m in falso.movimentos} == {"INVENTARIO-C-1-L1"}
@@ -280,7 +280,7 @@ def test_finalizar_perdido_nao_finaliza_duas_vezes(app, grav):
 def test_modo_0_pendente_so_volta_ao_normal(app, grav):
     """O fechamento valeu e o 2º pedido (o modo 0) levou 429: espera 62 s, acha o fechamento pela referência e só volta ao
     normal (nunca um 2º finalizar), e segue."""
-    falso = _falso(limite_em=11, agora=grav["relogio"])      # a 11ª chamada é o voltar_ao_normal de dentro do fechar
+    falso = _falso(limite_em=12, agora=grav["relogio"])      # a 12ª chamada é o voltar_ao_normal de dentro do fechar
     _iniciar(grav, falso)
     assert grav["esperas"] == [62]
     assert falso.chamadas.count("fechar_ajuste") == 1 and falso.chamadas.count("voltar_ao_normal") == 2
@@ -292,7 +292,7 @@ def test_modo_0_pendente_so_volta_ao_normal(app, grav):
 def test_modo_0_pendente_retomado_por_outro_login(app, grav):
     """O login morreu justo no modo 0: o almoxarifado ficou em "fechamento feito, modo 0 pendente", travado. A tela avisa
     forte; quem aprovou entra de novo e o "Continuar" só volta ao normal."""
-    falso = _falso(expirar_em=11, agora=grav["relogio"])
+    falso = _falso(expirar_em=12, agora=grav["relogio"])     # o login morre no modo 0 de dentro do fechar
     _iniciar(grav, falso)
     est = G.estado(app.config, "C-1")
     assert est["estado"] == "parada" and "login do Fracttal expirou" in est["motivo"]
@@ -307,7 +307,7 @@ def test_modo_0_pendente_retomado_por_outro_login(app, grav):
 def test_sessao_sem_escrita_nunca_finaliza_duas_vezes(app, grav):
     """Tudo deu conflito (nada se gravou na sessão) e o modo 0 levou 429 duas vezes: sem movimento com a referência não
     há como saber se o finalizar valeu, e um 2º finalizar seria erro no Fracttal. Sem nada gravado, só volta ao normal."""
-    falso = _falso(limite_em=[8, 9], agora=grav["relogio"])   # 8: o modo 0 de dentro do fechar; 9: o modo da retomada
+    falso = _falso(limite_em=[9, 10], agora=grav["relogio"])  # 9: o modo 0 de dentro do fechar; 10: o modo da retomada
     aprovado = {i: dict(v, saldo=1.0) for i, v in falso.ler("10").items()}   # o saldo de todas mudou
     _iniciar(grav, falso, aprovado=aprovado)
     assert grav["esperas"] == [62, 62] and "achar_movimento" not in falso.chamadas
@@ -318,7 +318,7 @@ def test_sessao_sem_escrita_nunca_finaliza_duas_vezes(app, grav):
 
 # ── o 429 e o login que expira ───────────────────────────────────────────────────────────────────────────────────────────
 def test_limite_espera_e_tenta_uma_vez(app, grav):
-    falso = _falso(limite_em=8, agora=grav["relogio"])        # a 8ª chamada é a gravação da 2ª peça
+    falso = _falso(limite_em=9, agora=grav["relogio"])        # a 9ª chamada é a gravação da 2ª peça
     _iniciar(grav, falso)
     assert grav["esperas"] == [62] and G.estado(app.config, "C-1")["estado"] == "concluida"
 
@@ -327,7 +327,7 @@ def test_limite_fecha_antes_de_parar(app, grav):
     """429 de novo depois da espera: antes de parar, espera mais 62 s e fecha a sessão com o que já gravou (o almoxarifado
     não fica travado). Para como "limite do Fracttal"; o "Continuar" grava o resto numa sessão nova, com outra
     referência (a do 1º fechamento já está no histórico)."""
-    falso = _falso(limite_em=[8, 9], agora=grav["relogio"])
+    falso = _falso(limite_em=[9, 10], agora=grav["relogio"])  # a gravação da 2ª peça, e de novo depois dos 62 s
     _iniciar(grav, falso)
     est = G.estado(app.config, "C-1")
     assert est["estado"] == "parada" and "limite do Fracttal" in est["motivo"] and not est["travado"] and not est["aviso"]
@@ -345,7 +345,7 @@ def test_limite_fecha_antes_de_parar(app, grav):
 def test_limite_que_nao_deixa_fechar_avisa_que_ficou_travado(app, grav):
     """Nem o fechamento passou (o login morreu no meio): a gravação para com o aviso forte, e o almoxarifado espera quem
     aprovou continuar."""
-    falso = _falso(limite_em=[8, 9], expirar_em=10, agora=grav["relogio"])
+    falso = _falso(limite_em=[9, 10], expirar_em=11, agora=grav["relogio"])
     _iniciar(grav, falso)
     est = G.estado(app.config, "C-1")
     assert est["estado"] == "parada" and "limite do Fracttal" in est["motivo"] and est["travado"]
@@ -360,7 +360,7 @@ def test_login_expirado_para_com_aviso_de_travado(app, grav):
     """O login do Fracttal expira no meio do lote (o foco 4 do plano): não dá para fechar sem login. Para como "o login do
     Fracttal expirou", com o aviso forte (a sessão ficou aberta); quem aprovou entra de novo e o "Continuar" regrava o que
     faltava (absoluto: a peça sem resposta não duplica) e fecha."""
-    falso = _falso(expirar_em=8, agora=grav["relogio"])
+    falso = _falso(expirar_em=9, agora=grav["relogio"])       # o login morre na gravação da 2ª peça
     _iniciar(grav, falso)
     est = G.estado(app.config, "C-1")
     assert est["estado"] == "parada" and est["motivo"] == "o login do Fracttal expirou" and est["travado"]
@@ -404,7 +404,7 @@ def test_releitura_que_nao_bate_vira_erro_e_o_continuar_decide(app, grav):
     falso.fechar_ajuste = fechar
     _continuar(grav, falso)
     assert G.estado(app.config, "C-1")["estado"] == "concluida"
-    assert [e["id_item"] for e in _eventos(app, "conflito")] == ["502"] and falso.chamadas[13:] == ["ler"]   # só relê
+    assert [e["id_item"] for e in _eventos(app, "conflito")] == ["502"] and falso.chamadas[14:] == ["ler"]   # só relê
     assert L.estado_dos_eventos(_eventos(app)) == "gravada_com_conflitos"
 
 
@@ -479,9 +479,9 @@ def test_o_adaptador_e_o_falso_ignoram_o_prefixo():
 
 def test_retomada_com_movimento_de_outro_nao_finaliza_a_sessao_dos_outros(app, grav):
     """A nossa sessão ficou aberta (o login expirou); alguém a finalizou no Fracttal e abriu outra. O controle velho diz
-    "aberto", e o modo é 2: o histórico desde que a nossa abriu tem movimento sem a nossa referência, então a sessão saiu
-    das nossas mãos. Para sem gravar nem finalizar."""
-    falso = _falso(expirar_em=8, agora=grav["relogio"])
+    "aberto", e o modo é 2: o histórico tem um AJUSTE de outra referência depois do marco guardado logo antes de a nossa
+    abrir, então a sessão saiu das nossas mãos. Para sem gravar nem finalizar, e diz o que fazer."""
+    falso = _falso(expirar_em=9, agora=grav["relogio"])                # o login morre na 2ª peça, com a sessão aberta
     _iniciar(grav, falso)
     falso._expira_em = None
     falso.fechar_ajuste("10", "Ajuste feito na tela do Fracttal")      # outra pessoa finaliza a nossa sessão...
@@ -490,14 +490,38 @@ def test_retomada_com_movimento_de_outro_nao_finaliza_a_sessao_dos_outros(app, g
     _continuar(grav, falso)
     est = G.estado(app.config, "C-1")
     assert est["estado"] == "parada" and "ajuste por outra pessoa ou outra tela" in est["motivo"]
-    assert falso.chamadas[n:] == ["modo", "mexidas_desde"] and falso.modo("10") == 2
+    assert "feche o ajuste na tela do Fracttal e depois clique em Continuar ou Encerrar" in est["motivo"]
+    assert falso.chamadas[n:] == ["modo", "ajustes_depois"] and falso.modo("10") == 2
+
+
+def test_retomada_com_movimento_comum_no_mesmo_segundo_da_abertura_continua(app, grav):
+    """A prova de 27/10/2026 parou uma retomada por um movimento do MESMO segundo em que a sessão abriu: o `aberto_em` é
+    cortado no segundo, e a conferência contava todo movimento sem a nossa referência daquele segundo em diante, para
+    sempre. Agora conta só os AJUSTES (tipo 15) com id maior que o marco de logo antes de abrir: a entrada e a saída comuns
+    não acontecem com o modo aberto, então a que aparece é de antes. A retomada segue e termina."""
+    falso = _falso({"501": 10, "502": 5, "503": 4, "509": 1}, expirar_em=9, agora=grav["relogio"])
+    abrir = falso.abrir_ajuste
+
+    def abrir_com_uma_entrada_no_mesmo_segundo(id_almox):
+        ctrl = json.loads(next(grav_pasta(app).glob("C-1*.json")).read_text("utf-8"))
+        # o técnico lançou uma peça no mesmo segundo em que a sessão abriu (antes dela: com o modo aberto não se lança)
+        falso.mover("10", "509", "entrada", 1, quando=ctrl["lotes"][0]["aberto_em"])
+        return abrir(id_almox)
+    falso.abrir_ajuste = abrir_com_uma_entrada_no_mesmo_segundo
+    _iniciar(grav, falso)
+    falso._expira_em = None
+    assert G.estado(app.config, "C-1")["travado"] and falso.modo("10") == 2
+    _continuar(grav, falso)
+    est = G.estado(app.config, "C-1")
+    assert est["estado"] == "concluida", est["motivo"]
+    assert _saldos(falso) == {"501": 12, "502": 3, "503": 0, "509": 2} and falso.modo("10") == 0
 
 
 def test_retomada_com_modo_2_procura_antes_de_finalizar(app, grav):
     """A falha dupla: o finalizar valeu, o modo 0 falhou, e o controle não soube que o lote estava "fechando" (o disco que
     falhou enquanto parava). A retomada com o modo 2 procura o fechamento pela referência antes de gravar mais ou de
     finalizar de novo: achou, só volta ao normal."""
-    falso = _falso(expirar_em=11, agora=grav["relogio"])     # o login morre no modo 0 de dentro do fechar
+    falso = _falso(expirar_em=12, agora=grav["relogio"])     # o login morre no modo 0 de dentro do fechar
     _iniciar(grav, falso)
     caminho = next(grav_pasta(app).glob("C-1*.json"))
     ctrl = json.loads(caminho.read_text("utf-8"))
@@ -582,7 +606,7 @@ def test_encerrar_administrador_so_depois_de_24h(app, grav):
 def test_encerrar_com_o_almoxarifado_em_modo_2_e_recusado(app, grav):
     """A sessão ficou aberta (o login expirou): encerrar agora largaria o almoxarifado travado sem dono. Recusado, e nada
     muda; quem aprovou continua (ou fecha o ajuste no Fracttal) antes."""
-    falso = _falso(expirar_em=8, agora=grav["relogio"])
+    falso = _falso(expirar_em=9, agora=grav["relogio"])
     _iniciar(grav, falso)
     falso._expira_em = None
     antes = len(_eventos(app))
@@ -650,7 +674,7 @@ def test_duas_gravacoes_no_mesmo_almoxarifado(app, grav):
 def test_reiniciou_no_meio_aparece_parada(app, grav):
     """O controle diz "gravando" e não há gravação viva neste processo (o Nexus reiniciou): a tela vê "parada", com o aviso
     forte se a sessão ficou aberta, e quem aprovou continua."""
-    falso = _falso(expirar_em=8, agora=grav["relogio"])
+    falso = _falso(expirar_em=9, agora=grav["relogio"])
     _iniciar(grav, falso)
     caminho = next(grav_pasta(app).glob("C-1*.json"))
     ctrl = json.loads(caminho.read_text("utf-8"))
@@ -665,7 +689,7 @@ def test_nunca_guarda_o_login(app, grav):
     inventário também não (a pessoa vai como HMAC)."""
     class ComLogin(EstoqueFalso):
         jwt, token, email = "eyJ.segredo.jwt", "token-secreto", "aprovador@exemplo.test"
-    falso = ComLogin({"10": {"501": 10, "502": 5, "503": 4}}, expirar_em=8, agora=grav["relogio"])
+    falso = ComLogin({"10": {"501": 10, "502": 5, "503": 4}}, expirar_em=9, agora=grav["relogio"])
     _iniciar(grav, falso, aprovador=dict(APROVADOR, email=EMAIL))
     arquivos = list(grav_pasta(app).iterdir())
     assert arquivos
@@ -958,7 +982,7 @@ def test_encerrar_pela_ponte(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
     _cenario(inv)
     falso = ponte_falsa["falso"]
     visto = _visto(app, falso)
-    falso._expira_em = 8                                      # para com a sessão aberta (modo 2)
+    falso._expira_em = 9                                      # para com a sessão aberta (modo 2)
     c = _pcm(app, monkeypatch)
     _cookie_os(app, c)
     assert c.post(f"{PONTE}/C-1/gravar", json=visto).status_code == 200
@@ -982,7 +1006,7 @@ def test_a_tela_e_a_lista_mostram_o_aviso_de_travado(app, inv, ponte_falsa, monk
     _cenario(inv)
     falso = ponte_falsa["falso"]
     visto = _visto(app, falso)
-    falso._expira_em = 8
+    falso._expira_em = 9                                      # para com a sessão aberta (modo 2)
     c = _pcm(app, monkeypatch)
     _cookie_os(app, c)
     assert c.post(f"{PONTE}/C-1/gravar", json=visto).status_code == 200

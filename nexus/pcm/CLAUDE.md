@@ -540,8 +540,8 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
   é o código do Fracttal, ex. `ASSET_CANNOT_BE_DESABLED_STOCK`). Rede fora e 500 passam como vieram: a resposta pode ter
   se perdido depois de gravar, e quem grava decide. **Lista pela metade é `ErroFracttal`:** `data` que não é lista, ou
   página vazia com `start < total` (caso da revisão: `ler` devolvia 1 peça de `total: 5`), nunca uma lista curta; vale
-  para `ler`, `codigos`, `achar_movimento`, `mexidas_desde` e `modo`, que passam pela mesma paginação. `modo` sem o `mode`
-  também é erro: é a conferência da trava, e vazio nunca é "0 = normal".
+  para `ler`, `codigos`, `achar_movimento`, `mexidas_desde`, `ultimo_movimento`, `ajustes_depois` e `modo`, que passam
+  pela mesma paginação. `modo` sem o `mode` também é erro: é a conferência da trava, e vazio nunca é "0 = normal".
 - **O que o adaptador lê do `api.py` do OS Creator, e o que está provado contra ele:** o marcador `session_expired` da
   `SessionExpired` (HTTP 401/403 e o `USER_NOT_LOGIN` no corpo), o texto "HTTP 429", e as frases "não está logado no
   Fracttal" (sem JWT na sessão) e "JWT do login do Fracttal expirou" (vencido e sem renovar). Os quatro casos têm teste com
@@ -558,7 +558,11 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
   cache de leituras de OS do processo inteiro a cada um; `warehouses_items_stock` e toda gravação de estoque caem aí, e cada
   pedido do adaptador esvaziaria o cache dos cards de todo mundo. Nenhum pedido daqui toca numa OS.
 - **Nome de gente não entra:** o `responsible_description` do histórico de movimentos é nome de pessoa; o adaptador projeta
-  só `folio`, `id_item`, `date_create` e `description`, e nunca o guarda nem o devolve.
+  só `folio`, `id_item`, `date_create`, `description`, `id_movements` e `id_movement_type`, e nunca o guarda nem o devolve.
+- **O marco da retomada** (27/10/2026): `ultimo_movimento` é o maior `id_movements` (numérico e crescente, provado na prova
+  real) da 1ª página do histórico, num pedido só; `ajustes_depois(marco, desde_iso, ignorar_prefixo)` dá as peças dos
+  movimentos de AJUSTE (tipo 15, `TIPO_AJUSTE`) com id maior que o marco, sem as sessões da contagem. Entrada e saída comuns não
+  contam (com o modo aberto não acontecem), e o movimento sem id ou sem tipo legível conta (na dúvida, para).
 - **A régua** (`definir_regua`) manda só o mínimo e o máximo que vieram (como texto, o que a tela e a prova de 26/10
   mandaram), fora do modo de ajuste, sem mexer em saldo nem gerar movimento. **Conflito** (`mexidas_desde`): o histórico
   vem do mais novo ao mais velho e se lê até passar da data (a cota é de todos); data ilegível numa linha conta como
@@ -929,15 +933,20 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
 - **Por lote de 50, uma sessão** (`INVENTARIO-<contagem>-L<n>`; a 2ª sessão do mesmo lote, depois de uma parada, é `-S<k>`,
   para o "achar o fechamento pela referência" nunca confundir as duas): modo → o que se moveu desde o "Contada em" (sem as
   sessões da própria contagem: `mexidas_desde(..., ignorar_prefixo="INVENTARIO-<contagem>-")`) → ler → ligar as nunca ligadas
-  (ANTES de abrir: ligar no modo 2 não foi provado) → modo DE NOVO (ninguém abriu no meio) → abrir → ler (com o modo aberto
+  (ANTES de abrir: ligar no modo 2 não foi provado) → modo DE NOVO (ninguém abriu no meio) → o marco → abrir → ler (com o modo aberto
   nada se move: é a leitura que vale) → cada peça: saldo diferente do aprovado ou mexida depois da contagem é `conflito` e não
   grava; senão grava o saldo absoluto → fechar → achar o movimento pela referência (o `movimento_fracttal` do evento é o folio
   dele, nos dois caminhos, e não o `folio_return`) → reler fora da sessão (bate: `peca_gravada`; não bate: `erro`). Modo 3:
   para sem mexer. Modo 2 que o controle não diz que é nosso: para sem mexer.
-- **O 2 que o controle diz ser nosso, numa retomada, é conferido:** o histórico desde a hora em que a sessão abriu (sem folga)
-  não pode ter movimento sem a nossa referência (alguém finalizou a nossa e abriu a dela); tendo, para como "o almoxarifado
-  está em ajuste por outra pessoa ou outra tela". **QUASE nunca se finaliza a sessão dos outros, e não nunca:** quem só solta
-  o modo no Fracttal, sem finalizar, não deixa rastro, e uma sessão aberta por outra pessoa logo depois pareceria a nossa.
+- **O 2 que o controle diz ser nosso, numa retomada, é conferido:** logo antes de abrir, o controle guarda o `marco` (o id do
+  movimento mais novo do almoxarifado, `ultimo_movimento`); na retomada, um AJUSTE (tipo 15) sem a nossa referência com id
+  maior que ele (`ajustes_depois`) é alguém que finalizou a nossa e abriu a dela: para com "o almoxarifado está em ajuste por
+  outra pessoa ou outra tela: feche o ajuste na tela do Fracttal e depois clique em Continuar ou Encerrar". Compara id, não
+  relógio, e só ajuste: a 1ª versão contava todo movimento sem a nossa referência desde o `aberto_em` (cortado no segundo), e a
+  prova de 27/10/2026 parou uma retomada, para sempre, por um movimento do mesmo segundo da abertura; entrada e saída comuns não
+  acontecem com o modo aberto, então a que aparece é de antes. **QUASE nunca se finaliza a sessão dos outros, e não nunca:**
+  quem só solta o modo no Fracttal, sem finalizar, não deixa rastro, e uma sessão aberta por outra pessoa logo depois pareceria a
+  nossa.
 - **O finalizar nunca se repete às cegas.** O fechamento são dois pedidos. O 429 no fechar espera 62 s e PROCURA o fechamento
   pela referência (`achar_movimento` desde a hora em que a sessão abriu, menos 10 min de folga de relógio): achou, só volta ao
   modo 0. A resposta perdida (não o 429) espera os mesmos 62 s antes de procurar (o histórico pode ainda não mostrar o

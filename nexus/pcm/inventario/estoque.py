@@ -38,6 +38,7 @@ PAGINA = 200                # o máximo que a tela do Fracttal pede
 PAGINAS_MAX = 1000          # trava de segurança: uma lista que não acaba seria um laço contra a cota da empresa
 TIMEOUT_S = 45              # o mesmo do `_rpc_call` do OS Creator
 TIPO_PECA = 4               # `id_type_item` das peças (o que a tela de Peças e Suprimentos lista)
+TIPO_AJUSTE = 15            # `id_movement_type` do "Ajuste de inventário" (o par que o fechamento da sessão gera)
 
 # Os métodos do Fracttal que o passo 0 provou (um nome só por operação, para o teste e o leitor acharem).
 LISTA = "inventories.warehouses_list"
@@ -123,6 +124,14 @@ def _numero_lido(valor, onde: str, metodo: str) -> float | None:
     if not math.isfinite(n):
         raise ErroFracttal(f"{onde} ilegível: {valor!r}", metodo)
     return n
+
+
+def _inteiro(valor) -> int | None:
+    """O id ou o tipo de uma linha do histórico como número; vazio ou ilegível é None (quem usa decide o que a dúvida vale)."""
+    try:
+        return int(str(valor).strip())
+    except (TypeError, ValueError):
+        return None
 
 
 def _no_corpo(n: float):
@@ -238,6 +247,23 @@ class Estoque(abc.ABC):
         `description` é a `ignorar_referencia` (o ajuste da própria contagem) ou começa pelo `ignorar_prefixo` (todas as
         sessões de uma contagem, `INVENTARIO-<contagem>-`: a gravação abre uma por lote, e a 2ª do mesmo lote leva
         `-S<k>`). None = o Fracttal não diz."""
+
+    @abc.abstractmethod
+    def ultimo_movimento(self, id_almox: str) -> int | None:
+        """O `id_movements` do movimento mais novo do almoxarifado (numérico e crescente, provado em 27/10/2026), ou None se
+        ele não tem nenhum. É o marco que a gravação guarda logo ANTES de abrir a sessão: na retomada, o que tem id maior
+        veio depois dele, sem depender do relógio (`ajustes_depois`)."""
+
+    @abc.abstractmethod
+    def ajustes_depois(self, id_almox: str, depois_de: int | None, desde_iso: str,
+                       ignorar_prefixo: str | None = None) -> set[str] | None:
+        """Os `id_item` dos movimentos de AJUSTE de inventário (tipo 15) com `id_movements` maior que `depois_de` (o marco
+        do `ultimo_movimento`; None = todos), sem os cuja `description` começa pelo `ignorar_prefixo` (as sessões da própria
+        contagem). Entrada e saída comuns não contam: com o modo de ajuste aberto elas não acontecem, então a que aparece é de
+        antes da abertura (a prova de 27/10/2026 parou uma retomada por uma do mesmo segundo). `desde_iso` só põe fim à
+        leitura (o histórico vem do mais novo ao mais velho; o que é mais velho que isto não tem id maior que o marco). O
+        movimento sem o id ou sem o tipo legível conta (o sem a peça, como ''): na dúvida, a retomada para. None = o Fracttal
+        não diz."""
 
     @abc.abstractmethod
     def definir_regua(self, id_almox: str, id_item: str, minimo: float | None, maximo: float | None) -> None:
@@ -450,7 +476,8 @@ class EstoqueFracttal(Estoque):
                 except ValueError:
                     pass
             yield {"folio": str(l.get("folio") or l.get("id_movements") or ""), "id_item": str(l.get("id_item") or ""),
-                   "quando": l.get("date_create"), "referencia": str(l.get("description") or "").strip()}
+                   "quando": l.get("date_create"), "referencia": str(l.get("description") or "").strip(),
+                   "id": _inteiro(l.get("id_movements")), "tipo": _inteiro(l.get("id_movement_type"))}
 
     def achar_movimento(self, id_almox: str, referencia: str, desde_iso: str | None = None) -> str | None:
         alvo = str(referencia or "").strip()
@@ -461,6 +488,34 @@ class EstoqueFracttal(Estoque):
             if m["referencia"] == alvo:
                 return m["folio"]
         return None
+
+    def ultimo_movimento(self, id_almox: str) -> int | None:
+        """O maior id da 1ª página do histórico (um pedido só), e não o da 1ª linha: no mesmo instante (o par saída e entrada
+        de um fechamento) a ordem por `date_create` não diz qual veio antes. A linha sem o id é erro: sem ele não há marco,
+        e a gravação não abre a sessão."""
+        maior, n = None, 0
+        for m in self._historico(id_almox):
+            if m["id"] is None:
+                raise ErroFracttal("movimento sem o `id_movements`: não há como marcar o mais novo", HISTORICO)
+            maior = m["id"] if maior is None else max(maior, m["id"])
+            n += 1
+            if n >= self._pagina:
+                break                                     # a 1ª página basta: as outras são mais velhas
+        return maior
+
+    def ajustes_depois(self, id_almox: str, depois_de: int | None, desde_iso: str,
+                       ignorar_prefixo: str | None = None) -> set[str] | None:
+        prefixo = str(ignorar_prefixo).strip() if ignorar_prefixo else None
+        achados = set()
+        for m in self._historico(id_almox, instante(desde_iso)):
+            if prefixo and m["referencia"].startswith(prefixo):
+                continue
+            if m["tipo"] is not None and m["tipo"] != TIPO_AJUSTE:
+                continue                                  # entrada e saída comuns: não com o modo aberto
+            if m["id"] is not None and depois_de is not None and m["id"] <= depois_de:
+                continue                                  # de antes da abertura
+            achados.add(m["id_item"])                     # sem a peça, '' (o conjunto não fica vazio: a retomada para)
+        return achados
 
     def mexidas_desde(self, id_almox: str, desde_iso: str, ignorar_referencia: str | None = None,
                       ignorar_prefixo: str | None = None) -> set[str] | None:
