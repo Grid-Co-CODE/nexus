@@ -576,7 +576,12 @@ def entrar():
     session["logado"] = True
     session["admin"] = True
     acessos.registrar_login(current_app.config, acessos.SENHA_DE_ADMIN)
-    return _sem_a_sessao_velha_da_raiz(redirect(na_raiz(destino)))
+    resp = redirect(na_raiz(destino))
+    # como no login da Microsoft: o `os_sessao` de quem usou este navegador antes é o Fracttal de OUTRA pessoa, e o OS Creator e
+    # a ponte do inventário falariam com o Fracttal no login dela (a revisão final do inventário, 27/10/2026). Quem entrou pela
+    # senha e precisa do Fracttal entra nele pelo /os/login, com a conta dele
+    resp.delete_cookie("os_sessao", path=os_cookie_path())
+    return _sem_a_sessao_velha_da_raiz(resp)
 
 
 def _tela_entrar(**contexto):

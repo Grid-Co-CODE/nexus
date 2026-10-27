@@ -981,9 +981,11 @@ html.pgp-aberto{overflow:hidden}
   .alm-kpis .kb-kpi:nth-child(3n+1){padding-left:0;border-left:0}}
 @media (max-width:900px){.alm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .alm-vazio{margin-top:18px}
-.alm-abas{display:flex;gap:4px;margin-top:20px;border-bottom:1px solid var(--linha);overflow-x:auto}
+/* nove abas desde o inventário (26/10/2026): com o menu aberto, a 1366 px a fila passava 40 px da largura e a Auditoria
+   ficava cortada atrás da rolagem; com 10 px de lado e 2 px entre elas, cabe. Abaixo disso a fila rola por dentro */
+.alm-abas{display:flex;gap:2px;margin-top:20px;border-bottom:1px solid var(--linha);overflow-x:auto}
 .alm-aba{background:none;border:0;border-bottom:2px solid transparent;color:var(--mudo);font:600 13px var(--font-sans);
-  padding:10px 12px;cursor:pointer;white-space:nowrap}
+  padding:10px 10px;cursor:pointer;white-space:nowrap}
 .alm-aba[aria-selected=true]{color:var(--tinta);border-bottom-color:var(--verde)}
 .alm-filtros .gc-campo{min-width:0;flex:1 1 180px}
 .alm-painel{margin-top:14px;padding:14px;background:var(--superficie);border:1px solid var(--linha);border-radius:12px}
@@ -1023,4 +1025,297 @@ table.alm-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--tinta
   .alm-v{min-width:0;text-align:right}
   .alm-t .num{white-space:normal}
   .alm-t tr[data-fl-vazio] td::before{content:none}
+}
+
+/* ── Inventário do almoxarifado (26/10/2026, Levi): a lista das contagens do App, a contagem aberta, a auditoria, a régua e a
+   curadoria. Desde 27/10/2026 no desenho do mockup do Spare Parts (Levi: "as páginas queria nesse estilo porém design do
+   nexus"): a ESTRUTURA e a hierarquia vêm de lá (a barra das quatro etapas, os números do alto, os cartões com cabeçalho, a
+   tabela com a faixa no cabeçalho, os selos, o quadradinho da criticidade, os seis grupos, os lotes), as cores e a fonte são as
+   do Nexus, só por token nos dois temas (nunca o lilás do mockup). A cor só reforça a palavra. Abaixo de 640 px as tabelas
+   viram cartões, como as outras abas (a regra `.alm-t`), e a barra das etapas rola na horizontal. */
+a.alm-aba{display:inline-block;text-decoration:none}
+.inv-voltar{margin:14px 0 0;font-size:13px}
+.inv-voltar a{color:var(--mudo)}
+.inv-voltar a:hover{color:var(--tinta)}
+.inv-sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:6px}
+.inv-abrir{color:var(--verde-texto);font-weight:600;text-decoration:none}
+.inv-abrir:hover{text-decoration:underline}
+.inv-so-leitor{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.alm-un{color:var(--mudo);font-size:12px}
+
+/* a barra das quatro etapas (o `.flow` do mockup): a peça que se lembra da tela. A etapa aberta tem o traço verde embaixo e o
+   título em verde; "agora" marca a etapa em que a contagem está */
+.inv-fluxo{display:flex;gap:2px;margin:16px 0 4px;padding:4px 4px 0;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:12px;overflow-x:auto;scrollbar-width:none}
+.inv-fluxo::-webkit-scrollbar{display:none}
+.inv-fluxo button{position:relative;flex:1 0 170px;padding:10px 14px 12px;background:none;border:0;border-bottom:3px solid transparent;
+  border-radius:8px 8px 0 0;color:var(--mudo);font:400 12px/1.35 var(--font-sans);text-align:left;cursor:pointer}
+.inv-fluxo button b{display:block;margin-bottom:2px;font:700 15px/1.3 var(--font-sans);color:var(--tinta)}
+.inv-fluxo button span{display:block}
+.inv-fluxo button:hover{background:var(--clarao-a04)}
+.inv-fluxo button[aria-selected="true"]{border-bottom-color:var(--verde);background:var(--clarao-a05)}
+.inv-fluxo button[aria-selected="true"] b{color:var(--verde-texto)}
+.inv-fluxo button:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.inv-fluxo-agora{position:absolute;top:10px;right:10px;padding:1px 7px;border-radius:999px;background:var(--verde-suave);
+  color:var(--verde-texto);font:600 10.5px/16px var(--font-sans);font-style:normal}
+
+/* cada etapa: o título, a frase do que ela é, e (nas que têm) a coluna do lado com as regras */
+.inv-tela-cab{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin:20px 0 12px}
+.inv-tela-cab h2{margin:0;font:700 20px/1.25 var(--font-sans);color:var(--tinta)}
+.inv-tela-cab p{margin:0;max-width:78ch;font-size:13px;color:var(--mudo)}
+.inv-duas{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+.inv-pilha{display:grid;gap:12px;min-width:0}
+
+/* os números do alto (o `.tile` do mockup): um cartão por número, o valor grande, a cor só no valor */
+.inv-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.inv-tile{min-width:0;padding:12px 14px;background:var(--superficie);border:1px solid var(--linha);border-radius:10px}
+.inv-tile-v{display:block;font:700 26px/1.1 var(--font-sans);color:var(--tinta);font-variant-numeric:tabular-nums}
+.inv-tile-r{display:block;margin-top:4px;font-size:12px;line-height:1.3;color:var(--mudo)}
+.inv-tile--ok .inv-tile-v{color:var(--ok)}
+.inv-tile--alerta .inv-tile-v{color:var(--alerta)}
+.inv-tile--critico .inv-tile-v{color:var(--critico)}
+.inv-tile--info .inv-tile-v{color:var(--info)}
+.inv-tiles+.inv-card,.inv-tiles+.inv-pilha{margin-top:12px}
+.inv-tiles--seis{margin-bottom:12px}
+
+/* o cartão com cabeçalho (o `.card > .hd` do mockup): o título, a nota curta e, quando há, o filtro à direita */
+.inv-card{min-width:0;background:var(--superficie);border:1px solid var(--linha);border-radius:12px;overflow:hidden}
+.inv-card+.inv-card{margin-top:12px}
+.inv-pilha>.inv-card+.inv-card{margin-top:0}
+.inv-card-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:11px 14px;border-bottom:1px solid var(--linha)}
+.inv-card-cab h3{margin:0;font:700 14.5px/1.3 var(--font-sans);color:var(--tinta)}
+.inv-card-nota{font-size:12px;color:var(--mudo)}
+.inv-card-corpo{padding:12px 14px}
+.inv-card-pe{margin:0;padding:10px 14px;border-top:1px solid var(--linha);font-size:12.5px;color:var(--mudo)}
+details.inv-card>summary{cursor:pointer;list-style:none}
+details.inv-card>summary::-webkit-details-marker{display:none}
+details.inv-card>summary h3::before{content:"";display:inline-block;width:7px;height:7px;margin:0 9px 2px 1px;
+  border-right:2px solid var(--mudo);border-bottom:2px solid var(--mudo);transform:rotate(-45deg);transition:transform .15s}
+details.inv-card[open]>summary h3::before{transform:rotate(45deg)}
+details.inv-card:not([open])>summary{border-bottom:0}
+.inv-filtros{margin:0 0 0 auto;flex:1 1 360px;justify-content:flex-end}
+.inv-filtros .gc-campo{flex:1 1 170px;max-width:280px}
+.inv-filtros .gc-btn{flex:none}
+.inv-espera{margin:0;padding:12px 14px;background:var(--superficie);border:1px dashed var(--linha-forte);border-radius:10px;
+  font-size:13px;color:var(--tinta-2)}
+.inv-espera a{color:var(--verde-texto);font-weight:600}
+.inv-vazio{margin-top:12px;padding:18px;background:var(--superficie);border:1px dashed var(--linha-forte);border-radius:12px}
+.inv-vazio p{margin:0;max-width:72ch;font-size:13.5px;color:var(--tinta-2)}
+.inv-vazio b{color:var(--tinta)}
+.inv-pilha>.inv-vazio{margin-top:0}
+.inv-tela>.cn-erro+.inv-lote,.inv-tela>.cn-erro+.inv-espera{margin-top:14px}
+.inv-pilha>.cn-erro{margin-top:0}
+
+/* a tabela: a mesma `.alm-t` das outras abas, com a faixa no cabeçalho (o `th` navy do mockup, aqui a `--barra`) */
+.inv-tw{overflow-x:auto}
+.inv-t th{padding:8px 10px;background:var(--barra);color:var(--tinta-2);font-size:11.5px;font-weight:600;letter-spacing:.02em;
+  white-space:nowrap;border-bottom:1px solid var(--linha)}
+.inv-t td{padding:8px 10px}
+.inv-t tbody tr:last-child td{border-bottom:0}
+.inv-t abbr{text-decoration:none}
+.inv-quando{font-family:var(--font-mono);font-size:12px;color:var(--tinta-2);white-space:nowrap}
+.inv-mudanca{font-family:var(--font-mono);font-size:12.5px;white-space:nowrap}
+.inv-t-acao{width:1%;text-align:right}
+.inv-btn-p{padding:5px 12px;font-size:12px}
+.inv-tirada .alm-v{color:var(--mudo)}
+
+/* o selo (o `.pill` do mockup): a palavra no tom, com o ponto na frente, como o gc-status da casa */
+.inv-selo{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font:600 11.5px/16px var(--font-sans);
+  white-space:nowrap;color:var(--tinta-2);background:var(--superficie-3)}
+.inv-selo::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:currentColor}
+.inv-selo--ok{color:var(--ok);background:var(--ok-suave)}
+.inv-selo--alerta{color:var(--alerta);background:var(--alerta-suave)}
+.inv-selo--critico{color:var(--critico);background:var(--critico-suave)}
+.inv-selo--info{color:var(--info);background:var(--info-suave)}
+.inv-n--info{color:var(--info);font-weight:600}
+
+/* a criticidade (o quadradinho numerado do mockup): o nível no preenchimento do semáforo, com a tinta escura por cima */
+.inv-crit{display:inline-block;min-width:20px;height:20px;padding:0 4px;border-radius:5px;font:700 11.5px/20px var(--font-sans);
+  text-align:center;color:var(--sobre-cheio);background:var(--prata)}
+.inv-crit--1{background:var(--critico-cheio)}
+.inv-crit--2{background:var(--alerta-cheio)}
+.inv-crit--3{background:var(--info-cheio)}
+
+/* o Δ: subir em verde, descer em vermelho, zerar em âmbar (a única que apaga estoque) */
+.inv-delta{font:600 13px var(--font-mono);white-space:nowrap}
+.inv-delta--mais{color:var(--ok)}
+.inv-delta--menos{color:var(--critico)}
+.inv-delta--zerar{color:var(--alerta)}
+
+/* a etapa Contagem: a cobertura (bate, diverge, curadoria; o trilho é o que ficou fora) e as maiores divergências */
+.inv-cobertura{display:flex;height:8px;overflow:hidden;border-radius:999px;background:var(--superficie-3)}
+.inv-cobertura i{display:block;height:100%}
+.inv-cobertura--bate{background:var(--ok-cheio)}
+.inv-cobertura--diverge{background:var(--alerta-cheio)}
+.inv-cobertura--curadoria{background:var(--info-cheio)}
+.inv-cobertura--fora{background:var(--superficie-3);box-shadow:inset 0 0 0 1px var(--linha-forte)}
+.inv-legenda{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 0;padding:0;list-style:none;font-size:12px;color:var(--mudo)}
+.inv-legenda i{display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:2px;vertical-align:-1px}
+.inv-legenda b{color:var(--tinta);font-weight:600}
+.inv-div{margin:0;padding:0 14px;list-style:none}
+.inv-div li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;
+  border-bottom:1px solid var(--linha);font-size:13px;color:var(--tinta)}
+.inv-div li:last-child{border-bottom:0}
+.inv-div-t{min-width:0;overflow-wrap:anywhere}
+
+/* as regras (o `.rules` do mockup): o número no círculo verde. As da etapa Gravação são a sequência do que acontece em cada
+   peça, de a até f */
+.inv-lado{position:sticky;top:calc(var(--topo) + 12px)}
+.inv-regras{display:grid;gap:10px;margin:0;padding:12px 14px 14px;list-style:none;counter-reset:regra;font-size:13px;
+  line-height:1.45;color:var(--tinta-2)}
+.inv-regras li{position:relative;padding-left:32px;counter-increment:regra}
+.inv-regras li::before{content:counter(regra);position:absolute;left:0;top:0;width:22px;height:22px;border-radius:50%;
+  background:var(--verde);color:var(--sobre-verde);font:700 11.5px/22px var(--font-sans);text-align:center}
+.inv-regras--letras li::before{content:counter(regra, lower-alpha)}
+.inv-regras b{color:var(--tinta)}
+.inv-regras .alm-cod{white-space:nowrap}
+
+/* a etapa Aprovação: os seis grupos da confirmação (o `.grp` do mockup): o número, o título com o que acontece e o selo do que
+   vai ao Fracttal. Os que gravam no tom do ok, o zerar no âmbar (aberto, destacado), o "não será tocada" com a borda forte
+   (aberto: é o que fica como está) e os outros neutros */
+.inv-confirma{margin-top:16px}
+.inv-confirma .inv-tela-cab{margin-top:4px}
+.inv-grupos{display:grid;gap:10px}
+.inv-grupo{overflow:hidden;background:var(--superficie);border:1px solid var(--linha);border-radius:10px}
+.inv-grupo>summary{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 14px;
+  cursor:pointer;list-style:none}
+.inv-grupo>summary::-webkit-details-marker{display:none}
+.inv-grupo-n{min-width:44px;font:700 22px/1 var(--font-sans);text-align:right;color:var(--tinta);font-variant-numeric:tabular-nums}
+.inv-grupo-t b{display:block;font:600 14px/1.3 var(--font-sans);color:var(--tinta)}
+.inv-grupo-t span{display:block;font-size:12.5px;color:var(--mudo)}
+.inv-grupo-selo{padding:3px 10px;border-radius:999px;font:600 11.5px/16px var(--font-sans);white-space:nowrap;
+  color:var(--tinta-2);background:var(--superficie-3)}
+.inv-grupo-selo--grava{color:var(--sobre-cheio);background:var(--ok-cheio)}
+.inv-grupo--para_cima,.inv-grupo--para_baixo{background:var(--ok-a12)}
+.inv-grupo--zerar{background:var(--alerta-a12);border-color:var(--alerta-a45)}
+.inv-grupo--zerar .inv-grupo-n{color:var(--alerta)}
+.inv-grupo--zerar .inv-grupo-selo{color:var(--sobre-cheio);background:var(--alerta-cheio)}
+.inv-grupo--nao_tocada{border-width:2px;border-color:var(--linha-forte)}
+.inv-grupo--nao_tocada .inv-grupo-selo{color:var(--fundo);background:var(--tinta)}
+.inv-grupo--vazio>summary{cursor:default}
+.inv-grupo--vazio .inv-grupo-n,.inv-grupo--vazio .inv-grupo-t b{color:var(--mudo)}
+.inv-grupo-corpo{max-height:340px;overflow:auto;padding:0 14px 4px;background:var(--superficie);border-top:1px solid var(--linha)}
+.inv-lista{margin:0;padding:0;list-style:none}
+.inv-item{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:9px 0;border-top:1px solid var(--linha);
+  font-size:13px;color:var(--tinta)}
+.inv-item:first-child{border-top:0}
+.inv-item-t{flex:1 1 240px;min-width:0;overflow-wrap:anywhere}
+.inv-item-n{flex:none;font-family:var(--font-mono);font-size:12.5px;color:var(--tinta-2)}
+.inv-item-n b{color:var(--tinta);font-weight:600}
+.inv-item-a{display:flex;flex-wrap:wrap;gap:6px}
+.inv-item-a .gc-btn{padding:4px 10px;font-size:12px}
+.inv-confirma-pe{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:12px;
+  padding:12px 14px;background:var(--superficie);border:1px solid var(--linha);border-radius:10px}
+.inv-confirma-resumo{flex:1 1 360px;margin:0;max-width:78ch;font-size:13px;color:var(--tinta-2)}
+.inv-confirma-resumo b{color:var(--tinta)}
+.inv-confirma-pe .inv-rodape{margin:0}
+.inv-rodape{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px}
+.inv-rodape--fim{margin-top:16px}
+.inv-rodape--fim .alm-ajuda{margin:0}
+.inv-rodape .gc-btn[disabled]{opacity:.55;cursor:not-allowed}
+.inv-rev-form .gc-campo{width:100%;box-sizing:border-box;margin-bottom:12px}
+.inv-rev-form textarea.gc-campo{resize:vertical}
+.inv-rev-form [hidden]{display:none}
+.inv-rev-pe{display:flex;justify-content:flex-end;margin-top:4px}
+
+/* a etapa Gravação: uma linha por lote (o `.lote` do mockup), com a barra e a situação, e o que aconteceu (no lugar do log de
+   exemplo do mockup, só o que o controle da gravação registrou) */
+.inv-grav-texto{margin:0 0 10px;font-size:13px;color:var(--tinta-2)}
+.inv-lotes{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.inv-lote-l{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 12px;
+  background:var(--superficie-2);border:1px solid var(--linha);border-radius:8px}
+.inv-lote-n{font:700 13px var(--font-sans);color:var(--tinta)}
+.inv-lote-meio{display:grid;gap:5px;min-width:0}
+.inv-barra{display:block;height:6px;overflow:hidden;border-radius:999px;background:var(--superficie-3)}
+.inv-barra i{display:block;height:100%;background:var(--verde);transition:width .3s}
+.inv-lote-l--concluido .inv-barra i{background:var(--ok-cheio)}
+.inv-lote-l--parado .inv-barra i{background:var(--critico-cheio)}
+.inv-lote-l--encerrado .inv-barra i,.inv-lote-l--na_fila .inv-barra i{background:var(--fraco)}
+.inv-lote-l--parado{border-color:var(--critico-a45)}
+.inv-registro{margin:0;padding:6px 14px 8px;list-style:none}
+.inv-registro-l{display:grid;grid-template-columns:88px minmax(0,1fr);gap:10px;padding:7px 0 7px 10px;
+  border-left:3px solid var(--linha-forte);border-bottom:1px solid var(--linha);font-size:13px;color:var(--tinta)}
+.inv-registro-l:last-child{border-bottom:0}
+.inv-registro-h{font-family:var(--font-mono);font-size:11.5px;line-height:19px;color:var(--mudo);white-space:nowrap}
+.inv-registro-l--ok{border-left-color:var(--ok)}
+.inv-registro-l--alerta{border-left-color:var(--alerta)}
+.inv-registro-l--critico{border-left-color:var(--critico)}
+.inv-registro-l--info{border-left-color:var(--info)}
+@media (prefers-reduced-motion:reduce){.inv-barra i,details.inv-card>summary h3::before{transition:none}}
+
+@media (max-width:980px){
+  .inv-duas{grid-template-columns:minmax(0,1fr)}
+  .inv-lado{position:static}
+}
+@media (max-width:640px){
+  .inv-fluxo button{flex:0 0 156px;padding:9px 12px 11px}
+  .inv-fluxo-agora{position:static;display:inline-block;margin-top:5px}
+  .inv-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .inv-tile-v{font-size:22px}
+  .inv-filtros{flex-basis:100%;margin:0}
+  .inv-filtros .gc-campo{max-width:none}
+  .alm-t.inv-t tr{margin:8px 10px}
+  .inv-t td{padding:4px 0}
+  .inv-t-acao{width:auto}
+  .alm-t td.inv-t-acao::before{content:none}
+  .inv-item-n{flex:1 1 100%}
+  .inv-grupo>summary{grid-template-columns:auto minmax(0,1fr);gap:8px 10px}
+  .inv-grupo-selo{grid-column:2;justify-self:start}
+  .inv-grupo-n{min-width:32px;font-size:19px}
+  .inv-lote-l{grid-template-columns:minmax(0,1fr) auto}
+  .inv-lote-meio{grid-column:1/-1;grid-row:2}
+  .inv-registro-l{grid-template-columns:minmax(0,1fr);gap:2px}
+  .inv-confirma-pe .inv-rodape{width:100%}
+}
+
+/* ── Régua de mínimo e máximo (26/10/2026, o inventário do almoxarifado): a sugestão, o recomendado (a Grid) e o acordado
+   (o cliente) de cada peça. A tabela é a `alm-t` do Almoxarifado (abaixo de 640 px vira cartão, com o data-r como rótulo);
+   aqui só o que é da tela: a lista de almoxarifados, os campos de número e o fim da linha. Os números do alto, o cartão, a
+   faixa da tabela e os selos são os do inventário (27/10/2026, acima). As partes do almoxarifado são a fila das abas
+   (`.alm-abas`, pcm/_almox_abas.html). Cor só por token. */
+.rg-sub{margin:18px 0 8px;font:700 14.5px var(--font-sans);color:var(--tinta)}
+.rg-almoxes+.inv-tiles{margin-top:14px}
+.rg-almoxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin:0;padding:0;list-style:none}
+.rg-almoxes a{display:block;padding:10px 12px;background:var(--superficie-2);border:1px solid var(--linha);
+  border-radius:10px;color:var(--tinta);text-decoration:none}
+.rg-almoxes a:hover{border-color:var(--linha-forte)}
+.rg-almoxes a[aria-current=page]{border-color:var(--verde)}
+.rg-par{display:flex;gap:6px}
+.rg-n{width:84px;min-width:0;box-sizing:border-box;text-align:right}
+.rg-sug{display:flex;flex-direction:column;gap:2px}
+.rg-usar{align-self:flex-start;padding:0;font-size:12px}
+.rg-acao{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.rg-acao form{margin:0}
+@media (max-width:640px){
+  .alm-t td .rg-par,.alm-t td .rg-acao,.alm-t td .rg-sug{align-items:flex-end}
+  .rg-n{width:72px}
+}
+
+/* ── Curadoria do inventário (26/10/2026): o que o campo contou fora do catálogo e o genérico que o técnico identificou, para
+   o PCM decidir. Cada achado é um cartão (a foto, o que o técnico escreveu, a quantidade) com as opções em <details>, cada uma
+   com o formulário dela (sem JavaScript, e no celular a foto passa para cima do texto). O selo do tipo, os números do alto e
+   o cartão das já decididas são os do inventário (27/10/2026, acima). As partes do almoxarifado são a fila das abas
+   (`.alm-abas`). Cor só por token. */
+.cu-card{display:flex;gap:14px;margin-top:12px;padding:14px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:12px}
+.cu-foto{flex:none;width:96px}
+.cu-img{display:block;width:96px;height:96px;object-fit:cover;border:1px solid var(--linha);border-radius:8px}
+.cu-sem-foto{display:flex;align-items:center;justify-content:center;width:96px;height:96px;text-align:center;font-size:12px;
+  border:1px dashed var(--linha-forte);border-radius:8px}
+.cu-corpo{flex:1 1 auto;min-width:0}
+.cu-tit{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:0;font:600 15px var(--font-sans);color:var(--tinta)}
+.cu-tit+.alm-det{margin-top:4px}
+.inv-tiles+.rg-sub{margin-top:20px}
+.cu-escolha{margin:6px 0 0;font-size:13px;color:var(--tinta-2)}
+.cu-op{margin-top:8px;background:var(--superficie-2);border:1px solid var(--linha);border-radius:10px}
+.cu-op summary{padding:9px 12px;cursor:pointer;font:600 13px var(--font-sans);color:var(--tinta)}
+.cu-form{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.cu-op .cu-form{margin-top:0;padding:0 12px 12px}
+.cu-form .gc-campo{width:100%;box-sizing:border-box}
+.cu-form button{align-self:flex-start;margin-top:4px}
+@media (max-width:640px){
+  .cu-card{flex-direction:column}
+  .cu-foto,.cu-img,.cu-sem-foto{width:100%}
+  .cu-img{height:auto;max-height:260px}
+  .cu-sem-foto{height:64px}
 }

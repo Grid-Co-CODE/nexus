@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block titulo %}Inventário do almoxarifado{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# PCM → Almoxarifado → Inventário (26/10/2026, Levi): o técnico conta as peças no App sem ver o saldo do Fracttal, e o PCM
+   revisa e aprova aqui. A lista das contagens que chegaram, com a situação de cada uma (nexus/pcm/inventario/leitura.py);
+   abrir uma é a contagem nas quatro etapas (inventario_contagem.html). Desde 27/10/2026 no desenho do mockup do Spare Parts,
+   com o design do Nexus: os números do alto e a tabela num cartão, o selo de estado e o "Abrir". Abaixo de 640 px a tabela
+   vira cartões (o data-r é o rótulo). #}
+<div class="pg alm inv">
+<p class="gc-eyebrow">PCM · Almoxarifado</p>
+<h1 class="titulo-pagina">Almoxarifado</h1>
+{% include "pcm/_almox_abas.html" %}
+
+{# a gravação parada com o almoxarifado travado em ajuste no Fracttal (nexus/pcm/inventario/gravacao.py): avisa aqui também,
+   porque quem aprovou talvez nem abra a contagem, e o técnico em campo não lança peça enquanto isso #}
+{% for t in travadas or [] %}
+<div class="cn-erro" role="alert" data-travada="{{ t.contagem_id }}">{{ t.aviso }}
+  <a href="{{ raiz }}/t/pcm/pecas/inventario/{{ t.contagem_id|urlencode }}#gravacao">Abrir a contagem</a></div>
+{% endfor %}
+
+{% if erro %}
+<div class="cn-erro" role="alert">{{ erro }}</div>
+{% elif not livro_existe %}
+<div class="inv-vazio"><p><b>O App ainda não publica as contagens do inventário.</b> Quando o técnico enviar a primeira contagem
+  (Ronda, a usina, Inventário de almoxarifado), ela aparece aqui para o PCM revisar.</p></div>
+{% else %}
+<div class="inv-tela-cab">
+  <h2>Inventário</h2>
+  <p>O técnico conta as peças no App sem ver o saldo do Fracttal. Aqui o PCM compara a contagem com o saldo lido na hora, revisa
+    e aprova. A contagem mais nova de cada almoxarifado substitui as mais velhas que ainda não foram gravadas.</p>
+</div>
+<div class="inv-tiles" aria-label="Resumo das contagens">
+  <div class="inv-tile"><b class="inv-tile-v">{{ contagens|length }}</b><span class="inv-tile-r">Recebidas</span></div>
+  <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ a_revisar }}</b><span class="inv-tile-r">Esperam o PCM</span></div>
+  <div class="inv-tile inv-tile--alerta"><b class="inv-tile-v">{{ contagens|selectattr('estado', 'equalto', 'gravando')|list|length }}</b><span class="inv-tile-r">Gravando</span></div>
+  <div class="inv-tile inv-tile--ok"><b class="inv-tile-v">{{ contagens|selectattr('estado', 'equalto', 'gravada')|list|length }}</b><span class="inv-tile-r">Gravadas</span></div>
+  <div class="inv-tile inv-tile--critico"><b class="inv-tile-v">{{ contagens|selectattr('estado', 'equalto', 'gravada_com_conflitos')|list|length }}</b><span class="inv-tile-r">Com conflito</span></div>
+</div>
+
+<section class="inv-card">
+  <div class="inv-card-cab">
+    <h3>Contagens recebidas ({{ contagens|length }})</h3>
+    <span class="inv-card-nota">Da mais nova para a mais velha.{% if a_revisar %} {{ a_revisar }} {{ 'espera' if a_revisar == 1 else 'esperam' }} o PCM.{% endif %}</span>
+  </div>
+  {% if contagens %}
+  <div class="inv-tw">
+  <table class="alm-t inv-t">
+    <thead><tr><th>Almoxarifado</th><th>Contada em</th><th>Enviada em</th><th class="num">Contadas</th><th class="num">Em branco</th><th class="num">Curadoria</th><th>Situação</th><th><span class="inv-so-leitor">Abrir</span></th></tr></thead>
+    <tbody>
+    {% for c in contagens %}
+    <tr>
+      <td data-r="Almoxarifado"><span class="alm-v"><a class="inv-abrir" href="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}">{{ c.almox or 'sem almoxarifado' }}</a>{% if c.usina %}<span class="alm-det">{{ c.usina }}</span>{% endif %}</span></td>
+      <td data-r="Contada em"><span class="alm-v inv-quando">{{ c.contada_txt }}</span></td>
+      <td data-r="Enviada em"><span class="alm-v inv-quando">{{ c.enviada_txt }}</span></td>
+      <td data-r="Contadas" class="num"><span class="alm-v">{{ c.n_contadas }}</span></td>
+      <td data-r="Em branco" class="num"><span class="alm-v">{{ c.n_em_branco }}</span></td>
+      <td data-r="Curadoria" class="num"><span class="alm-v">{% if c.n_curadoria %}<span class="inv-n inv-n--info">{{ c.n_curadoria }}</span>{% else %}0{% endif %}</span></td>
+      <td data-r="Situação"><span class="alm-v"><span class="inv-selo inv-selo--{{ c.tom }}">{{ c.rotulo }}</span>{% if c.motivo_nao_aprovavel and c.estado in ('nova', 'revisada') %}<span class="alm-det">não se aprova: {{ c.motivo_nao_aprovavel }}</span>{% endif %}{% if c.aviso %}<span class="alm-det alm-ruim">{{ c.aviso }}</span>{% endif %}</span></td>
+      <td data-r="" class="inv-t-acao"><span class="alm-v"><a class="gc-btn gc-btn--ui {{ 'gc-btn--primario' if c.aprovavel else 'gc-btn--contorno' }} inv-btn-p" href="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}" aria-label="Abrir a contagem de {{ c.almox or 'sem almoxarifado' }}, {{ c.contada_txt }}">Abrir</a></span></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p class="mudo inv-card-corpo">Nenhuma contagem recebida ainda.</p>{% endif %}
+</section>
+{% endif %}
+</div>
+{% endblock %}

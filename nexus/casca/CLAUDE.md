@@ -608,7 +608,11 @@ conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no
   10/2026, o PAPEL de quem entrou no Campo · App ({pessoa_id, nome, papel: supervisor_campo | coordenador | gestor,
   regioes ou gestor}; o filtro que já vem marcado e quem vê o Aprovar; ver `nexus/torres/campo/CLAUDE.md`). Sessão de
   antes, com o nome do supervisor em texto, não vale como papel. A
-  senha de admin segue em "Entrar com a senha de administrador" (`/entrar?admin=1`) e é a porta do Cadastro. Quem
+  senha de admin segue em "Entrar com a senha de administrador" (`/entrar?admin=1`) e é a porta do Cadastro. **O login
+  pela senha apaga o `os_sessao`**, como o da Microsoft (revisão final do inventário, 27/10/2026): o Fracttal de quem
+  usou o navegador antes não passa para quem entrou, e nem o OS Creator nem a ponte do inventário falam com o Fracttal no
+  login de outra pessoa; quem entrou pela senha e precisa do Fracttal entra nele pelo `/os/login`. Prova:
+  `test_a_senha_de_administrador_apaga_o_fracttal_de_quem_usou_o_navegador_antes`. Quem
   tem conta no Fracttal entra, técnico inclusive: restringir por perfil, se o Levi pedir, é aqui. Com a Microsoft
   ligada (seção "Entrar com a Microsoft"), o Fracttal sai da porta e só entra quem é da Grid.
   Em produção o IP vem do `X-Forwarded-For` do proxy, por isso o `trusted_proxy` do `servir.py`.

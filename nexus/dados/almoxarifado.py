@@ -13,7 +13,14 @@ O ciclo é identificado pelo INÍCIO, não pela data: o "Atualizar" do Admin no 
 (cursor 0), e o pedido entre 21:00 e 23:59 de Brasília cai na data UTC do dia seguinte. A completude é a do PRÓPRIO
 ciclo (lidos ÷ itens na lista do Fracttal): comparar com o ciclo anterior travaria o histórico para sempre se o PCM
 limpasse o catálogo, e não pegaria o ciclo encerrado cedo.
+
+O inventário (26/10/2026, desenho docs/superpowers/specs/2026-10-26-inventario-almoxarifado-design.md): o técnico conta
+as peças no App e o livro das contagens (`LIVRO_CONTAGENS`, o 5º livro do App) chega aqui para o PCM aprovar e gravar no
+Fracttal. O contrato dele mora aqui, do mesmo jeito dos outros: `COLUNAS_CONTAGENS` na ordem, coluna nova só no FIM, dos
+dois lados. O almoxarifado de TESTE (a prova das gravações no Fracttal) fica fora das contas e das telas pelo ID
+(`ids_de_teste`, da `NEXUS_ALMOX_TESTE_IDS`).
 """
+import math
 import re
 
 LIVRO_CICLO, ABA_CICLO = "almoxarifado_ciclo_app_campo", "Ciclo"
@@ -33,6 +40,18 @@ COLUNAS_PECAS = ("ID do lançamento", "Recebido em", "Usada em", "OS", "Tarefa",
                  "Código", "ID do almoxarifado", "Quantidade", "Unidade", "Situação", "Motivo da recusa",
                  "Lançado por (HMAC)")
 INICIO = "Início do ciclo"
+
+# O livro das contagens do inventário (26/10/2026): 1 linha = 1 peça de uma contagem enviada, a pendência fora do catálogo
+# inclusa. "Contado" vazio é "não contei" (nunca 0: o 0 digitado é "zerar"), o genérico com saldo que é de mais de um
+# específico vem em uma linha por específico (o mesmo código do genérico, com o "Identificado como" de cada um), e quem
+# contou vai só como HMAC do e-mail. O contrato inteiro, coluna a coluna: seção 4.1 do desenho. O "ID da linha" (a 14ª,
+# no FIM, como manda o contrato) é um por peça contada, gerado pelo App e único dentro da contagem: sem ele, duas
+# peças "fora do catálogo" com a mesma descrição na mesma contagem teriam a mesma chave.
+LIVRO_CONTAGENS, ABA_CONTAGENS = "almoxarifado_contagens_app_campo", "Contagens"
+COLUNAS_CONTAGENS = ("ID da contagem", "Enviada em", "Contada em", "ID do almoxarifado", "Usina", "Tipo", "ID do item",
+                     "Código", "Contado", "Identificado como", "Descrição", "Foto", "Contou (HMAC)", "ID da linha")
+# peça do catálogo; genérico com saldo que o técnico identifica; peça que não está no catálogo (vai à curadoria)
+TIPOS_CONTAGEM = ("item", "identificar", "fora_do_catalogo")
 
 COMPLETUDE_MIN = 0.9        # lidos ÷ itens na lista: abaixo disso o ciclo é recusado (fica no último bom)
 CICLO_VELHO_H = 36          # a varredura é diária: mais de 36 h sem ciclo novo é o App parado
@@ -56,6 +75,38 @@ def numero(v) -> float | None:
         return float(_txt(v).replace(",", "."))
     except ValueError:
         return None
+
+
+def contado(v) -> float | None:
+    """O número que o técnico contou, ou None se NÃO CONTOU. Em branco é "não contei" e a peça não é tocada: virar 0
+    zeraria o estoque de uma peça que ninguém contou (o 0 é só o que o técnico digitou). A API devolve tudo como texto, e
+    o `sync-xlsx` escreve o vazio como "None": é "não contei" por regra, e não por acaso de o `float` não ler o texto.
+    O "nan" e o "inf", que o `float` aceita, também são "não contei"."""
+    if isinstance(v, bool) or _txt(v).lower() in ("", "none"):
+        return None
+    n = numero(v)
+    return n if n is not None and math.isfinite(n) else None
+
+
+def _id(v) -> str:
+    """O ID do Fracttal como texto, sem o ".0" que a API às vezes põe ("999.0" é o 999)."""
+    t = _txt(v)
+    return t[:-2] if t.endswith(".0") else t
+
+
+def ids_de_teste(config) -> set[str]:
+    """Os IDs dos almoxarifados de TESTE (NEXUS_ALMOX_TESTE_IDS, separados por vírgula). A prova das gravações do
+    inventário no Fracttal é num almoxarifado de teste, nunca num de usina; ele não conta nas telas do PCM nem no
+    histórico (que só cresce: uma linha de teste gravada ficaria para sempre). Sem a chave, nenhum é de teste."""
+    return {_id(p) for p in _txt((config or {}).get("NEXUS_ALMOX_TESTE_IDS")).split(",") if _txt(p)}
+
+
+def sem_almoxarifado_de_teste(saldo: list[dict], config) -> list[dict]:
+    """As linhas do Saldo sem as dos almoxarifados de teste. Vale DEPOIS de `ciclo_comum` e `conferir_ciclo`: o ciclo diz
+    quantas linhas o livro do App tem (as do teste inclusas), e conferir já filtrado recusaria todo ciclo como "pela
+    metade"."""
+    ids = ids_de_teste(config)
+    return [l for l in saldo if _id(l.get("ID do almoxarifado")) not in ids] if ids else saldo
 
 
 def chave_do_local(caminho) -> str | None:

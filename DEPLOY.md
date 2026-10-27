@@ -493,6 +493,22 @@ atraso das MPA/MPS no Acompanhamento do PCM (PCM → Acompanhamento PCM, 14/10/2
 e o relatório mostra "tarefas abertas há +30 dias" no lugar, como o painel do PCM sem a senha. Senha errada: a Gestão PCM
 avisa "a senha da Gerencial do .env não abriu o mpas.json". Regras: `nexus/pcm/relatorio_exec/CLAUDE.md`.
 
+## 7i. PCM: o inventário do almoxarifado (27/10/2026)
+
+PCM → Almoxarifado → Inventário: o técnico conta no App, o PCM revisa e aprova, e o Nexus grava o saldo contado no Fracttal
+(regras: `nexus/pcm/CLAUDE.md`, seções do inventário). **Duas linhas no `.env` do servidor:**
+
+```
+NEXUS_INVENTARIO_GRAVAR=1
+NEXUS_ALMOX_TESTE_IDS=134082
+```
+
+e reiniciar. A 1ª liga a gravação no Fracttal **só no servidor**: enquanto um lote grava, o almoxarifado fica travado no
+Fracttal, e a vez de cada almoxarifado, o controle da gravação e a espera do deploy (seção 8) moram na máquina que grava; um
+Nexus no PC com o login do Fracttal de verdade abriria uma sessão que o servidor não vê. Sem ela, "Gravar", "Continuar" e
+"Encerrar" respondem que a gravação só roda no servidor (a régua e o cadastro da curadoria seguem). A 2ª é o almoxarifado de
+teste do Fracttal (`TESTE-INVENTARIO`), que fica fora das telas do PCM e do histórico.
+
 ## 8. Atualizar
 
 Um comando, no servidor (desde 06/10/2026):
@@ -564,6 +580,19 @@ servidor: ela roda antes de cada push, na máquina de quem empurra. Commit que n
 não instalou) para na conferência do boot, sem restart e sem mexer na pasta do serviço. Commit que monta e mesmo assim não sobe (o `/saude` não responde
 com ele; o `.env`, por exemplo) deixa o Nexus fora até o próximo commit consertar, como na plataforma: ele já ficou
 marcado como instalado, para o timer não reiniciar a cada 2 min (cada boot relê a Aprovação no Fracttal).
+
+**O restart espera a gravação do inventário (26/10/2026, Levi).** A gravação do inventário (PCM →
+Almoxarifado → Inventário) grava no Fracttal por sessão de ajuste, e enquanto um lote está aberto o almoxarifado fica
+travado (nem entrada, nem saída, nem pedido de compra). O restart no meio do lote mataria a gravação com o almoxarifado
+travado até quem aprovou voltar e continuar. Por isso, depois do pip e da conferência do boot e antes de a pasta do serviço
+andar, o script pergunta ao `ferramentas/gravacao_aberta.py` **do Nexus que está no ar** se há gravação viva (o controle em
+`<NEXUS_DADOS>/almox_inventario/` em "gravando" e salvo há menos de 5 min, com um lote aberto ou entre um lote e outro: o
+intervalo entre lotes deixava o restart passar até 27/10/2026). Havendo, a rodada para sem reiniciar e sem mexer na pasta, e a seguinte (2 min depois) pergunta de novo;
+**no máximo 10 minutos** contados da 1ª espera (a hora fica em `almox_inventario/deploy-espera.txt`), e então reinicia
+assim mesmo. Só a saída 1 com a linha `ESPERAR` segura o restart: sem o ajudante (o 1º deploy que o traz), ou com
+qualquer falha dele (o Python, o `sudo`, um controle ilegível), o deploy segue como sempre. A gravação parada (sem login,
+ou a que um restart já matou) não segura nada: esperar não a ajuda, e o "Continuar" de quem aprovou a retoma. Conferir à
+mão: `sudo -u nexus /opt/nexus/.venv/bin/python -B /opt/nexus/ferramentas/gravacao_aberta.py; echo $?`.
 
 **Depois da 1ª subida, a `dados/` do servidor é a original**: o que se edita no Nexus (cadastro, decisões do de-para,
 observações e gerações do PCM) mora lá. Se o Levi mandar um pacote novo, descompacte **só os `.env`**, a menos que ele

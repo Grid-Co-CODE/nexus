@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block titulo %}Auditoria do inventário · Almoxarifado{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# PCM → Almoxarifado → Auditoria (26/10/2026, o inventário do almoxarifado; desenho 4.6): uma linha por evento do livro do
+   inventário (fato_evento_inventario), que nunca muda: aprovação, peça gravada (de → para e o movimento que o Fracttal
+   devolveu), conflito, erro, revisão, curadoria e régua gravada, de TODAS as contagens. É também o histórico com que o PCM
+   defende o mínimo. Desde 27/10/2026 no desenho do mockup do Spare Parts, com o design do Nexus: os números do alto, a tabela
+   (pcm/_inventario_auditoria.html, a mesma da etapa 4 da contagem aberta) com o selo de cada evento. O motivo do PCM é texto
+   livre e mora só cifrado no livro; o nome de quem fez só vai a quem pode revisar. O filtro é da própria página
+   (filtro-local.js); o endereço com ?tipo= e ?busca= já chega filtrado (nexus/pcm/inventario/revisao.py, montar_auditoria). #}
+{% from "pcm/_inventario_auditoria.html" import tabela, filtro with context %}
+<div class="pg alm inv">
+<p class="gc-eyebrow">PCM · Almoxarifado · Inventário</p>
+<h1 class="titulo-pagina">Almoxarifado</h1>
+{% set aba_inventario = 'auditoria' %}
+{% include "pcm/_almox_abas.html" %}
+
+{% if erro %}
+<div class="cn-erro" role="alert">Não consegui ler o livro do inventário: {{ erro }}</div>
+{% endif %}
+
+<div class="inv-tela-cab">
+  <h2>Auditoria do inventário</h2>
+  <p>Cada linha é um evento que já aconteceu, do mais novo ao mais velho, e não muda depois. O motivo de cada revisão fica
+    guardado cifrado: quem revisa o lê na contagem aberta.{% if not pode %} Quem fez cada passo, só o setor PCM vê.{% endif %}</p>
+</div>
+{% if not erro %}
+{% if eventos %}
+<div class="inv-tiles" aria-label="Resumo da auditoria">
+  <div class="inv-tile"><b class="inv-tile-v">{{ eventos|length }}</b><span class="inv-tile-r">Eventos</span></div>
+  <div class="inv-tile inv-tile--ok"><b class="inv-tile-v">{{ eventos|selectattr('selo', 'equalto', 'ok')|list|length }}</b><span class="inv-tile-r">Gravados no Fracttal</span></div>
+  <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ eventos|selectattr('selo', 'equalto', 'info')|list|length }}</b><span class="inv-tile-r">Aprovação e revisão</span></div>
+  <div class="inv-tile inv-tile--alerta"><b class="inv-tile-v">{{ eventos|selectattr('selo', 'equalto', 'alerta')|list|length }}</b><span class="inv-tile-r">Curadoria</span></div>
+  <div class="inv-tile inv-tile--critico"><b class="inv-tile-v">{{ eventos|selectattr('selo', 'equalto', 'critico')|list|length }}</b><span class="inv-tile-r">Conflito e erro</span></div>
+</div>
+<section class="inv-card">
+  <div class="inv-card-cab">
+    <h3>Todas as contagens (<span data-fl-conta="inv-aud">{{ n_visiveis }}</span>)</h3>
+    {{ filtro({'tipos': tipos, 'tipo': tipo, 'busca': busca}, 'inv-aud') }}
+  </div>
+  {{ tabela({'eventos': eventos, 'pode': pode, 'n_visiveis': n_visiveis}, 'inv-aud', True) }}
+</section>
+{% else %}
+<div class="inv-vazio"><p><b>Nenhum evento ainda.</b> A primeira revisão, aprovação ou régua gravada aparece aqui.</p></div>
+{% endif %}
+{% endif %}
+</div>
+<script src="{{ url_for('static', filename='filtro-local.js') }}"></script>
+{% endblock %}

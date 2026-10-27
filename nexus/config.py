@@ -40,6 +40,15 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # o histórico do almoxarifado (25/10/2026): "1" liga a gravação; sem ela a carga só mede (Levi: o Nexus sobe
              # antes do App, em ensaio, e a gravação liga depois do ensaio com o 1º ciclo real)
              "NEXUS_ALMOX_GRAVAR",
+             # o almoxarifado de TESTE do inventário (26/10/2026): IDs do Fracttal, separados por vírgula; ficam fora das
+             # telas do PCM e do histórico (a prova das gravações é nele, nunca num almoxarifado de usina)
+             "NEXUS_ALMOX_TESTE_IDS",
+             # o livro do inventário num arquivo (só na cópia de prova e nos testes; no servidor ele vem do banco,
+             # `nexus_almoxarifado_inventario`, nexus/dados/fato_inventario.py)
+             "NEXUS_ALMOX_INVENTARIO_ARQUIVO",
+             # a gravação do inventário no Fracttal (27/10/2026, nexus/pcm/inventario/gravacao.py): só onde vale "1", o
+             # servidor (a vez do almoxarifado e a espera do deploy moram na máquina que grava); vazia, o PC não grava
+             "NEXUS_INVENTARIO_GRAVAR",
              # os chamados de garantia no banco (12/10/2026, nexus/campo/chamados_acompanhamento.py): "0" desliga numa máquina
              "NEXUS_CHAMADOS_PUBLICAR",
              # as tarefas das OS do Fracttal no banco (18/10/2026, nexus/campo/tarefas_os.py): "0" desliga numa máquina

@@ -1,0 +1,43 @@
+{# A tabela da auditoria do inventário (Levi, 27/10/2026, no desenho do mockup do Spare Parts): Quando · Evento · Peça ·
+   Alteração · Quem · Lote · Retorno do Fracttal, com o selo do evento pelas quatro famílias (a gravação, a curadoria, a
+   aprovação e a revisão, o conflito e o erro: `revisao.SELO_EVENTO`). Duas telas a usam: a Auditoria geral
+   (inventario_auditoria.html), que põe também ONDE (o almoxarifado e a contagem), e a etapa 4 da contagem aberta, só com os
+   eventos dela. "Quem" só para quem pode revisar (o PCM): para os outros a coluna nem existe. O motivo é texto livre e mora
+   cifrado no livro: aqui a linha só diz que ele existe. O filtro é o filtro-local.js da página (`form_id`). Abaixo de 640 px
+   vira cartões, como as outras tabelas do Almoxarifado (o data-r é o rótulo). Importar `with context` (a `raiz`). #}
+{% macro tabela(a, form_id, onde) %}
+<div class="inv-tw">
+<table class="alm-t inv-t inv-aud" data-fl-grupo="{{ form_id }}" data-fl-nome="{{ form_id }}">
+  <thead><tr><th>Quando</th><th>Evento</th>{% if onde %}<th>Onde</th>{% endif %}<th>Peça</th><th>Alteração</th>{% if a.pode %}<th>Quem</th>{% endif %}<th class="num">Lote</th><th>Retorno do Fracttal</th></tr></thead>
+  <tbody>
+  {% for x in a.eventos %}
+  <tr data-fl-linha data-f-tipo="{{ x.tipo }}" data-f-busca="{{ x.busca }}"{% if x.oculta %} hidden{% endif %}>
+    <td data-r="Quando"><span class="alm-v inv-quando">{{ x.hora }}</span></td>
+    <td data-r="Evento"><span class="alm-v"><span class="inv-selo inv-selo--{{ x.selo }}">{{ x.rotulo }}</span>{% if x.motivo %}<span class="alm-det">motivo cifrado</span>{% endif %}</span></td>
+    {% if onde %}<td data-r="Onde"><span class="alm-v">{{ x.almox or '—' }}{% if x.contagem_id %}<a class="inv-abrir alm-det" href="{{ raiz }}/t/pcm/pecas/inventario/{{ x.contagem_id|urlencode }}#auditoria">{{ x.contagem_id }}</a>{% endif %}</span></td>{% endif %}
+    <td data-r="Peça"><span class="alm-v">{% if x.codigo or x.peca %}{% if x.codigo %}<span class="alm-cod">{{ x.codigo }}</span> {% endif %}{{ x.peca }}{% else %}—{% endif %}</span></td>
+    <td data-r="Alteração"><span class="alm-v"><span class="inv-mudanca">{{ x.numeros or '—' }}</span>{% if x.situacao %}<span class="alm-det">{{ x.situacao }}</span>{% endif %}</span></td>
+    {% if a.pode %}<td data-r="Quem"><span class="alm-v">{{ x.quem or '—' }}</span></td>{% endif %}
+    <td data-r="Lote" class="num"><span class="alm-v">{{ x.lote or '—' }}</span></td>
+    <td data-r="Retorno do Fracttal"><span class="alm-v">{{ x.retorno or '—' }}</span></td>
+  </tr>
+  {% endfor %}
+  <tr data-fl-vazio="{{ form_id }}"{% if a.n_visiveis %} hidden{% endif %}><td colspan="{{ 6 + (1 if onde else 0) + (1 if a.pode else 0) }}" class="mudo">Nenhum evento com esses filtros.</td></tr>
+  </tbody>
+</table>
+</div>
+{% endmacro %}
+
+{# O filtro da tabela: o tipo do evento (com quantos de cada) e a busca, sem recarregar (filtro-local.js); o endereço com
+   ?tipo= e ?busca= já chega filtrado #}
+{% macro filtro(a, form_id) %}
+<form class="cn-filtros alm-filtros inv-filtros" method="get" id="{{ form_id }}" data-filtro-local>
+  <select id="{{ form_id }}-tipo" name="tipo" class="gc-campo" data-fl aria-label="Filtrar por evento">
+    <option value="">Todos os eventos</option>
+    {% for t in a.tipos %}<option value="{{ t.valor }}" data-rotulo="{{ t.rotulo }}"{% if t.valor == a.tipo %} selected{% endif %}>{{ t.rotulo }} ({{ t.n }})</option>{% endfor %}
+  </select>
+  <input id="{{ form_id }}-busca" name="busca" class="gc-campo" type="search" placeholder="Buscar peça, contagem ou movimento"
+         aria-label="Buscar na auditoria" autocomplete="off" data-fl-texto="contem" value="{{ a.busca }}">
+  <a class="cn-filtro-ativo" href="?" data-fl-limpar{% if not (a.tipo or a.busca) %} hidden{% endif %}>Limpar</a>
+</form>
+{% endmacro %}
