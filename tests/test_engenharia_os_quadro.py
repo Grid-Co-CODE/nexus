@@ -165,6 +165,19 @@ def test_pagina_da_os_tem_os_quatro_numeros_e_os_blocos(pagina, cliente):
     assert _secao(html, "OS filhas") == ""
 
 
+def test_os_dados_dizem_quem_criou_a_os(pagina, cliente):
+    # Levi, 27/10/2026: "em quadro da equipe, ao clicar na OS em dados deve ter o "Criado por" e mostra quem criou essa
+    # OS" (o `created_by` do Fracttal, com o espaço dobrado limpo)
+    from test_engenharia_acompanhamento import _como
+    pagina["created_by"] = "Pessoa  Três"
+    dados = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Dados")
+    assert "<dt>Criado por</dt><dd>Pessoa Três</dd>" in dados
+    assert dados.index("Criado por") < dados.index("Criada em")
+    pagina["created_by"] = ""
+    dados = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Dados")
+    assert "<dt>Criado por</dt><dd>—</dd>" in dados
+
+
 def test_demais_respostas_vem_da_os_filha(pagina, cliente):
     from test_engenharia_acompanhamento import _como
     html = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Demais respostas do técnico")
@@ -529,10 +542,12 @@ def test_nota_da_os_e_a_que_o_card_do_os_creator_mostra(pagina, cliente):
     assert "Inversor desarmando à tarde; pedir as curvas." in nota and "Nota antiga da OS" not in nota
 
 
-def test_dados_so_com_ativo_usina_responsavel_criacao_e_etiquetas(pagina, cliente):
+def test_dados_so_com_ativo_usina_responsavel_quem_criou_criacao_e_etiquetas(pagina, cliente):
+    # o "Criado por" entrou em 27/10/2026 (Levi: "em dados deve ter o "Criado por"")
     from test_engenharia_acompanhamento import _como
     dados = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Dados")
-    assert re.findall(r"<dt>([^<]+)</dt>", dados) == ["Ativo", "Usina", "Responsável", "Criada em", "Etiquetas"]
+    assert re.findall(r"<dt>([^<]+)</dt>", dados) == ["Ativo", "Usina", "Responsável", "Criado por", "Criada em",
+                                                       "Etiquetas"]
 
 
 def test_cadeia_da_os_com_o_numero_e_o_pdf_de_cada_uma(pagina, cliente):
