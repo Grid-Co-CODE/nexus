@@ -15,6 +15,26 @@ o aviso ("Como cada extintor entra") fica numa exclamação amarela ao lado do t
 (macro `aviso`; Levi, 24/10/2026: "deve ficar compactado em um símbolo de exclamação amarelo, quando a pessoa clica
 aparece o comunicado"); clicar fora ou Esc fecha; no celular a caixa vem presa à tela.
 
+## Como entregar (trava da área da Segurança, desde 27/10/2026)
+
+Levi, 27/10/2026: "quero o mesmo para essa pessoa só que no módulo Segurança" (o mesmo da Engenharia). Quem programa a
+Segurança tem o papel **write** no repositório (nunca admin: o admin passa por cima da regra da `main`), e a `main` só
+aceita esse trabalho por **pull request**:
+
+1. Crie um ramo (`hseq/<assunto>`), commite e faça push dele.
+2. Abra o pull request para a `main`. A conferência **pasta-da-area** (`.github/workflows/pasta-da-area.yml`) aprova se
+   o pedido mexe só na área da Segurança e reprova, listando os arquivos, se mexe fora dela.
+3. Verde: pode juntar (merge). Produção segue a `main` sozinha: em ~2 min o servidor reinicia com o pedido (teste
+   antes de juntar: `python -m pytest -q`, e a tela no navegador, desktop e 375 px).
+
+**Área da Segurança:** `nexus/torres/hseq/` (rotas, templates e este `.md`), `nexus/hseq/` (a regra sem Flask),
+`nexus/static/hseq*` (o estilo), `tests/test_hseq*.py` e o desenho e o plano em `docs/superpowers/specs/` e
+`docs/superpowers/plans/` com "hseq" ou "seguranca" no nome. Fora dela, com o Levi: o App de Campo (`nexus/campo/`, de
+onde vêm as rondas, as PT e as APR), o catálogo dos dados (`nexus/dados/`), o cadastro, o PCM, o menu, a casca, o
+`requirements.txt` e a própria conferência. Precisou mexer fora? Abra o pedido assim mesmo e peça ao Levi: ele revisa e
+junta. Quem é da área: a variável `LOGINS_HSEQ` do repositório (os logins do GitHub ficam fora do código, que é
+público).
+
 ## Mesa da Segurança (24/10/2026)
 
 Levi: "Criação de mesa da segurança, como PTs atrasadas, extintores vencidos, usinas sem luvas"; e, no mesmo dia, "quero

@@ -25,14 +25,14 @@ def _bash():
     return b
 
 
-def _roda(autor, arquivos, logins_cos="pessoa-cos", logins_eng="pessoa-eng", renomeados=()):
+def _roda(autor, arquivos, logins_cos="pessoa-cos", logins_eng="pessoa-eng", renomeados=(), logins_hseq="pessoa-seg"):
     """Roda o script da conferência: `arquivos` é a lista do pedido; `renomeados` são os nomes antigos."""
     _d, job = _job()
     passo = job["steps"][0]
     env = {k: str(v) for k, v in passo["env"].items() if not str(v).startswith("${{")}
     linhas = list(arquivos) + list(renomeados)
     env.update(GH_TOKEN="x", REPO="dono/repo", BASE="a", HEAD="b", AUTOR=autor, LOGINS_COS=logins_cos,
-               LOGINS_ENGENHARIA=logins_eng, PATH=str(Path(_bash()).parent))
+               LOGINS_ENGENHARIA=logins_eng, LOGINS_HSEQ=logins_hseq, PATH=str(Path(_bash()).parent))
     # o gh de mentira: a contagem e a lista dos arquivos da comparação
     falso = ("gh() { case \"$*\" in *length*) echo %d;; *) printf '%%s\\n' %s;; esac; }\n"
              % (len(arquivos), " ".join("'%s'" % a for a in linhas)))
@@ -62,7 +62,25 @@ def test_quem_e_de_cada_area_mora_nas_variaveis_e_nao_no_arquivo():
     _d, job = _job()
     env = job["steps"][0]["env"]
     assert env["LOGINS_COS"] == "${{ vars.LOGINS_COS }}" and env["LOGINS_ENGENHARIA"] == "${{ vars.LOGINS_ENGENHARIA }}"
+    assert env["LOGINS_HSEQ"] == "${{ vars.LOGINS_HSEQ }}"
     assert env["LIVRES"].split() == ["Levi-6242", "admin-gridco"]
+
+
+def test_quem_e_da_seguranca_passa_so_com_a_area_dela():
+    # Levi, 27/10/2026: "quero o mesmo para essa pessoa só que no módulo Segurança"
+    seg = ["nexus/torres/hseq/__init__.py", "nexus/torres/hseq/templates/hseq/extintores.html",
+           "nexus/torres/hseq/CLAUDE.md", "nexus/hseq/info_extintor.py", "nexus/static/hseq.css",
+           "tests/test_hseq_extintores.py", "docs/superpowers/specs/2026-11-02-hseq-dss-design.md"]
+    ok, saida = _roda("pessoa-seg", seg)
+    assert ok == 0, saida
+    # o App de Campo, o catálogo dos dados, o cadastro, o PCM e a Engenharia ficam de fora
+    for fora in ("nexus/campo/visao.py", "nexus/dados/catalogo.py", "nexus/cadastro/ligacoes.py",
+                 "nexus/pcm/motivos.py", "nexus/engenharia/etm.py", "tests/test_campo_zeladoria_semanal.py"):
+        ok, saida = _roda("pessoa-seg", seg[:1] + [fora])
+        assert ok == 1 and fora in saida, fora
+    # e a Segurança não entra na área da Engenharia
+    ok, saida = _roda("pessoa-eng", ["nexus/torres/hseq/__init__.py"])
+    assert ok == 1 and "nexus/torres/hseq/__init__.py" in saida
 
 
 def test_quem_e_da_engenharia_passa_so_com_a_area_dela():

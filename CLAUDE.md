@@ -143,12 +143,13 @@ PerformancePainel.
 - **Segredos** só no `.env` (gitignorado). Nunca imprima `NEXUS_SENHA_ADMIN` nem `NEXUS_SECRET_KEY`,
   nunca desligue o portão de login. Para validar tela atrás da senha, faça login por sessão lendo o `.env`.
 - Commit só quando pedido. Há deploy automático: push na `main` vai para produção em ~2 min, com restart.
-- **Quem sobe o quê:** os administradores (Levi) commitam direto na `main`. Quem programa o COS e quem programa a
-  Engenharia (27/10/2026) entram por pull request, e a conferência `pasta-da-area` só aprova o que mexe na área de quem
-  abriu o pedido ("Como entregar" em `nexus/torres/cos/CLAUDE.md` e em `nexus/torres/engenharia/CLAUDE.md`). Quem
-  obriga é a regra da `main` no GitHub (ruleset "main: pull request e pasta de cada área"). As áreas (as pastas) estão
-  no `.github/workflows/pasta-da-area.yml`; quem é de cada uma, nas variáveis do repositório `LOGINS_COS` e
-  `LOGINS_ENGENHARIA` (o login traz o nome: fora do código público). Quem programa a Engenharia tem o papel **write**;
-  o admin passa por cima da regra, com a conferência vermelha e tudo. O programador do COS ficou admin por decisão do
+- **Quem sobe o quê:** os administradores (Levi) commitam direto na `main`. Quem programa o COS, a Engenharia e a
+  Segurança · HSEQ (as duas desde 27/10/2026) entra por pull request, e a conferência `pasta-da-area` só aprova o que
+  mexe na área de quem abriu o pedido ("Como entregar" no `CLAUDE.md` de `nexus/torres/cos/`, `nexus/torres/engenharia/`
+  e `nexus/torres/hseq/`). Quem obriga é a regra da `main` no GitHub (ruleset "main: pull request e pasta de cada
+  área"). As áreas (as pastas) estão no `.github/workflows/pasta-da-area.yml`; quem é de cada uma, nas variáveis do
+  repositório `LOGINS_COS`, `LOGINS_ENGENHARIA` e `LOGINS_HSEQ` (o login traz o nome: fora do código público). Quem
+  programa a Engenharia e a Segurança tem o papel **write**; o admin passa por cima da regra, com a conferência vermelha
+  e tudo. O programador do COS ficou admin por decisão do
   Levi (27/10/2026): para ele a conferência só avisa.
 - Antes de dar algo por pronto: testes passando e a tela conferida no navegador (desktop e 375 px).

@@ -1,5 +1,6 @@
 # Trava da área de cada pessoa: quem programa uma área do Nexus sobe commits nela, e só nela. Começou no COS (Levi,
-# 05/10/2026) e ganhou a Engenharia (Levi, 27/10/2026: "gostaria que ele pudesse editar somente a parte de engenharia").
+# 05/10/2026) e ganhou a Engenharia (Levi, 27/10/2026: "gostaria que ele pudesse editar somente a parte de engenharia")
+# e a Segurança · HSEQ (no mesmo dia: "quero o mesmo para essa pessoa só que no módulo Segurança").
 #
 # O GitHub não dá permissão por pasta. Então: a regra da main exige pull request com esta conferência verde, e a
 # conferência reprova o pedido que mexe fora da área de quem o abriu. Os administradores (lista LIVRES) passam direto e
@@ -7,8 +8,8 @@
 # conferência vermelha e tudo; quem programa uma área entra com o papel "write".
 #
 # Quem é de qual área mora nas variáveis do repositório (Settings → Secrets and variables → Actions → Variables:
-# LOGINS_COS e LOGINS_ENGENHARIA, os logins do GitHub separados por espaço), e não aqui: o repositório é público e o
-# login traz o nome da pessoa. Login sem área: o pedido vai para o Levi.
+# LOGINS_COS, LOGINS_ENGENHARIA e LOGINS_HSEQ, os logins do GitHub separados por espaço), e não aqui: o repositório é
+# público e o login traz o nome da pessoa. Login sem área: o pedido vai para o Levi.
 #
 # pull_request_target, e não pull_request: roda a versão DESTE arquivo que está na main, e não a do pedido. Assim o
 # pedido não consegue trocar a própria conferência. Por isso mesmo, este job nunca baixa nem executa o código do
@@ -38,11 +39,15 @@ jobs:
           LIVRES: "Levi-6242 admin-gridco"
           LOGINS_COS: ${{ vars.LOGINS_COS }}
           LOGINS_ENGENHARIA: ${{ vars.LOGINS_ENGENHARIA }}
+          LOGINS_HSEQ: ${{ vars.LOGINS_HSEQ }}
           # a torre (rotas e templates), a regra sem Flask, o estilo e os testes do COS
           AREA_COS: '^(nexus/torres/cos/|nexus/cos/|nexus/static/cos/|nexus/static/cos\.css$|tests/cos/|tests/test_cos[^/]*\.py$)'
           # a torre (rotas, templates e o CLAUDE.md), a regra sem Flask, o estilo e o JS, os testes e o desenho e o
           # plano da Engenharia; o catálogo dos dados, a ponte do OS Creator, o menu e a casca ficam com o Levi
           AREA_ENGENHARIA: '^(nexus/torres/engenharia/|nexus/engenharia/|nexus/static/engenharia[^/]*$|tests/test_engenharia[^/]*\.py$|docs/superpowers/(specs|plans)/[^/]*engenharia[^/]*\.md$)'
+          # a torre da Segurança · HSEQ (rotas, templates e o CLAUDE.md), a regra sem Flask, o estilo, os testes e o
+          # desenho e o plano; o App de Campo, o catálogo dos dados, o cadastro e o PCM, que ela lê, ficam com o Levi
+          AREA_HSEQ: '^(nexus/torres/hseq/|nexus/hseq/|nexus/static/hseq[^/]*$|nexus/static/hseq/|tests/test_hseq[^/]*\.py$|docs/superpowers/(specs|plans)/[^/]*(hseq|seguranca)[^/]*\.md$)'
         run: |
           for livre in $LIVRES; do
             if [ "$AUTOR" = "$livre" ]; then echo "Administrador ($AUTOR): sem trava de pasta."; exit 0; fi
@@ -55,8 +60,11 @@ jobs:
           for q in $LOGINS_ENGENHARIA; do
             if [ "${AUTOR,,}" = "${q,,}" ]; then padrao="${padrao:+$padrao|}$AREA_ENGENHARIA"; areas="$areas Engenharia"; fi
           done
+          for q in $LOGINS_HSEQ; do
+            if [ "${AUTOR,,}" = "${q,,}" ]; then padrao="${padrao:+$padrao|}$AREA_HSEQ"; areas="$areas Segurança"; fi
+          done
           if [ -z "$padrao" ]; then
-            echo "::error::O login $AUTOR não tem área no Nexus (variáveis LOGINS_COS e LOGINS_ENGENHARIA). Peça ao Levi."
+            echo "::error::O login $AUTOR não tem área no Nexus (variáveis LOGINS_COS, LOGINS_ENGENHARIA e LOGINS_HSEQ). Peça ao Levi."
             exit 1
           fi
           # Pelos commits exatos do evento (base...cabeça), e não pela lista de arquivos do pedido: essa lista demora uns
