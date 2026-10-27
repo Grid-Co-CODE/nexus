@@ -23,15 +23,21 @@
 
 {% if erro %}
 <div class="cn-erro" role="alert">{{ erro }}</div>
-{% elif not livro_existe %}
-<div class="inv-vazio"><p><b>O App ainda não publica as contagens do inventário.</b> Quando o técnico enviar a primeira contagem
-  (Ronda, a usina, Inventário de almoxarifado), ela aparece aqui para o PCM revisar.</p></div>
 {% else %}
 <div class="inv-tela-cab">
   <h2>Inventário</h2>
   <p>O técnico conta as peças no App sem ver o saldo do Fracttal. Aqui o PCM compara a contagem com o saldo lido na hora, revisa
     e aprova. A contagem mais nova de cada almoxarifado substitui as mais velhas que ainda não foram gravadas.</p>
 </div>
+<ol class="inv-fluxo inv-fluxo--guia" aria-label="As etapas de cada contagem">
+  <li><b>1 · Contagem</b><span>O técnico conta no App, sem ver o saldo</span></li>
+  <li><b>2 · Aprovação</b><span>Sistema × contado, revisar e gravar</span></li>
+  <li><b>3 · Gravação</b><span>No Fracttal, em lotes de 50</span></li>
+  <li><b>4 · Auditoria</b><span>O que aconteceu em cada contagem</span></li>
+</ol>
+
+<div class="inv-duas">
+<div class="inv-pilha">
 <div class="inv-tiles" aria-label="Resumo das contagens">
   <div class="inv-tile"><b class="inv-tile-v">{{ contagens|length }}</b><span class="inv-tile-r">Recebidas</span></div>
   <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ a_revisar }}</b><span class="inv-tile-r">Esperam o PCM</span></div>
@@ -65,8 +71,24 @@
     </tbody>
   </table>
   </div>
+  {% elif not livro_existe %}<p class="mudo inv-card-corpo"><b>O App ainda não publica as contagens do inventário.</b> Quando o
+    técnico enviar a primeira contagem (Ronda, a usina, Inventário de almoxarifado), ela aparece aqui para o PCM revisar.</p>
   {% else %}<p class="mudo inv-card-corpo">Nenhuma contagem recebida ainda.</p>{% endif %}
 </section>
+</div>
+<aside class="inv-card inv-lado" aria-label="Regras do inventário">
+  <div class="inv-card-cab"><h3>Regras</h3></div>
+  <ol class="inv-regras">
+    <li><b>Contagem cega.</b> O App não mostra o saldo do Fracttal ao técnico: a divergência nasce aqui, com o saldo lido na hora.</li>
+    <li><b>Em branco não vira zero.</b> Só o 0 digitado zera o saldo; a peça em branco não é gravada.</li>
+    <li><b>O contado substitui o saldo.</b> O Fracttal recebe o número contado, o saldo inteiro, e não uma soma ou subtração.</li>
+    <li><b>Fora do catálogo vai para a curadoria.</b> O técnico descreve e conta; quem decide e cadastra é o PCM.</li>
+    <li><b>O genérico com saldo se identifica.</b> As unidades dele só entram no específico que o PCM confirmar na curadoria.</li>
+    <li><b>O almoxarifado trava enquanto grava.</b> Cada lote de 50 abre um ajuste no Fracttal, e entradas, saídas e pedidos de
+      compra esperam (cerca de 1 minuto por lote).</li>
+  </ol>
+</aside>
+</div>
 {% endif %}
 </div>
 {% endblock %}

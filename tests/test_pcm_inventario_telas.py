@@ -287,7 +287,10 @@ def test_contagem_que_nao_existe(app, inv, falso, monkeypatch):
 def test_a_lista_sem_o_livro_do_app(app, inv, monkeypatch):
     visao.limpar()
     html = _pcm(app, monkeypatch).get(LISTA).get_data(as_text=True)
-    assert "O App ainda não publica as contagens do inventário" in html and "Contagens recebidas" not in html
+    # a tela vazia tem o mesmo desenho da referência (Levi, 27/10/2026): o guia das 4 etapas, os números em 0, a lista com o
+    # aviso de que o App ainda não publica e as regras ao lado
+    assert "O App ainda não publica as contagens do inventário" in html and "Contagens recebidas (0)" in html
+    assert "1 · Contagem" in html and "4 · Auditoria" in html and "Contagem cega." in html
 
 
 def test_o_livro_que_nao_le_nao_derruba_a_tela(app, inv, falso, monkeypatch, tmp_path):

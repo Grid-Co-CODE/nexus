@@ -1056,6 +1056,12 @@ a.alm-aba{display:inline-block;text-decoration:none}
 .inv-fluxo button[aria-selected="true"]{border-bottom-color:var(--verde);background:var(--clarao-a05)}
 .inv-fluxo button[aria-selected="true"] b{color:var(--verde-texto)}
 .inv-fluxo button:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+/* a barra das etapas como GUIA na lista das contagens (não clicável): o mesmo desenho, a etapa 1 marcada como o começo */
+.inv-fluxo--guia{list-style:none}
+.inv-fluxo--guia li{flex:1 0 170px;padding:10px 14px 12px;border-bottom:3px solid transparent;font-size:12.5px;color:var(--mudo)}
+.inv-fluxo--guia li:first-child{border-bottom-color:var(--verde)}
+.inv-fluxo--guia li b{display:block;margin-bottom:2px;font:700 15px/1.3 var(--font-sans);color:var(--tinta)}
+.inv-fluxo--guia li span{display:block}
 .inv-fluxo-agora{position:absolute;top:10px;right:10px;padding:1px 7px;border-radius:999px;background:var(--verde-suave);
   color:var(--verde-texto);font:600 10.5px/16px var(--font-sans);font-style:normal}
 
