@@ -120,13 +120,13 @@ def _estados(cfg, forcar: bool = False) -> tuple[dict, dict]:
     Pela leitura da lista das contagens (`leitura.ler`), a mesma regra das outras telas: o estado pelos eventos e a
     substituição só pelas contagens vivas e boas (`leitura._pode_substituir`). A curadoria tinha a conta dela, sem esse
     filtro: a contagem do futuro (o relógio do celular) ou fora do contrato sumia com as pendências da boa, que a lista ainda
-    mostrava para aprovar (a revisão final de 27/10/2026). Com o almoxarifado de teste (`com_teste`): ele fica fora da lista,
-    não da curadoria, que é o único lugar em que a sigla `TST` vale. `forcar`: o livro do inventário relido agora (quem vai
-    escrever)."""
+    mostrava para aprovar (a revisão final de 27/10/2026). Sem o almoxarifado de teste, como as outras telas: até 27/10/2026
+    ele aparecia só aqui, e uma decisão do PCM do servidor podia cair numa contagem da prova; a cópia de prova esvazia o
+    `NEXUS_ALMOX_TESTE_IDS` para vê-lo. `forcar`: o livro do inventário relido agora (quem vai escrever)."""
     from . import leitura
     if forcar:
         F.ler(cfg, forcar=True)
-    contagens = leitura.ler(cfg, com_teste=True)["contagens"]
+    contagens = leitura.ler(cfg)["contagens"]
     return ({c["contagem_id"]: c["linhas"] for c in contagens},
             {c["contagem_id"]: _DA_LEITURA[c["estado"]] for c in contagens})
 
@@ -137,6 +137,22 @@ _PORQUE = {"gravada": ("já foi gravada no Fracttal (ou a gravação já começo
            "recontagem": ("foi recusada (recontagem pedida)", "já tinha sido recusada (recontagem pedida)"),
            "substituida": ("foi substituída por uma contagem mais nova do almoxarifado",
                            "já tinha sido substituída por uma contagem mais nova do almoxarifado")}
+
+
+FOI_GRAVAR = ("Esta contagem já foi para a gravação: o lote foi congelado na aprovação, e a decisão não entra mais nele. Faça "
+             "uma nova contagem.")
+
+
+def _foi_para_a_gravacao(cfg, contagem_id: str) -> bool:
+    """A contagem já tem o controle da gravação (`gravacao.existe`)? Vale mesmo quando o livro ainda a mostra aberta: o
+    `iniciar` cria o controle ANTES de registrar a aprovação no livro, e se o registro falhou no meio (o banco que não
+    confirmou), a contagem segue "nova" nos eventos com o lote já congelado. O controle ilegível conta como existente (na
+    dúvida, nada entra)."""
+    from . import gravacao
+    try:
+        return gravacao.existe(cfg, contagem_id)
+    except F.Recusada:
+        return True
 
 
 def contagens_abertas(cfg) -> dict[str, list[dict]]:
@@ -338,6 +354,8 @@ def _achar_a_linha(cfg, contagem_id: str, chave_linha: str) -> dict:
     if estado[cid] != "aberta":
         raise Conflito(f"Esta contagem {_PORQUE[estado[cid]][0]}: a decisão não muda o que já foi gravado. Faça uma nova "
                        "contagem.")
+    if _foi_para_a_gravacao(cfg, cid):                 # antes do Fracttal: o cadastro nem cria a peça
+        raise Conflito(FOI_GRAVAR)
     chave = _id(chave_linha)
     for l in C._unicas(por[cid]):
         if _id(l.get("ID da linha")) == chave:
@@ -437,10 +455,12 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) ->
                 _gravar_reservas(arq, reservas)      # ANTES de criar: se a resposta se perder, a nova tentativa sabe qual era
     try:
         return str(estoque.criar_peca(codigo, nome, unidade)), codigo, True
-    except E.ErroFracttal:
-        # o Fracttal recusou (o `success: false`): nada foi criado. A reserva sai, para a nova tentativa com os dados corrigidos
-        # não ficar presa no "repita com os dados da reserva" (a revisão final de 27/10/2026). A resposta perdida (rede) e o 429
-        # NÃO soltam: a peça pode ter sido criada, e é a reserva que impede a segunda
+    except E.Recusado:
+        # o Fracttal recusou com todas as letras (o `success: false`): nada foi criado. A reserva sai, para a nova tentativa com
+        # os dados corrigidos não ficar presa no "repita com os dados da reserva" (a revisão final de 27/10/2026). SÓ o
+        # `Recusado`: o `ErroFracttal` sem corpo ou sem o id, a resposta perdida (rede) e o 429 NÃO soltam, porque a peça pode
+        # ter sido criada; a reserva fica, e a nova tentativa a acha pelo código e confere o nome (`peca`). Soltar no "sem o
+        # id" escolheria outro código e criaria uma 2ª peça no catálogo do cliente (a re-revisão de 27/10/2026)
         with _ARQUIVO.de(arq.name):
             reservas = _ler_reservas(arq)
             minha = reservas.get(chave)
@@ -508,6 +528,8 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
             # a contagem pode ter sido gravada (ou recusada, ou substituída) enquanto o catálogo era paginado e a peça criada:
             # a decisão só vale para o lote de uma contagem ainda aberta. O estado vem do livro de AGORA, logo antes de escrever
             estado_agora = _estados(cfg, forcar=True)[1].get(cid)
+            if estado_agora == "aberta" and _foi_para_a_gravacao(cfg, cid):
+                estado_agora = "gravada"                 # o controle da gravação existe: o lote já foi congelado
             if estado_agora != "aberta":
                 ja = _PORQUE.get(estado_agora, ("deixou de estar aberta", "já tinha deixado de estar aberta"))[1]
                 if decisao == "cadastrar" and codigo:

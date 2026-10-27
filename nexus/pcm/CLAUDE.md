@@ -484,7 +484,7 @@ se aprova; a gravação só roda no servidor (`NEXUS_INVENTARIO_GRAVAR=1`, `DEPL
 
 **A chave de teste: `NEXUS_ALMOX_TESTE_IDS`** (IDs do Fracttal, por vírgula; no servidor, `134082`, o almoxarifado
 `TESTE-INVENTARIO`, com a peça `SP-TST-001`, id 53248312). O almoxarifado de teste fica FORA das telas (o Saldo, a lista do
-Inventário, a régua e a Auditoria) e do histórico, e é o único onde a curadoria aceita a sigla `TST`. Consequência: **a prova no
+Inventário, a régua, a Curadoria e a Auditoria) e do histórico, e a sigla `TST` só vale para ele. Consequência: **a prova no
 Fracttal de verdade não passa pelas telas do servidor**; ela roda numa cópia de prova em que o almoxarifado de teste aparece (o
 script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o livro do inventário num arquivo
 (`NEXUS_ALMOX_INVENTARIO_ARQUIVO`) e a contagem de mentira injetada só na cópia, nunca no banco.
@@ -502,7 +502,8 @@ script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o liv
   A prova de 26/10/2026 achou o `}` do `@media` do fim do inventário perdido no `pcm.css` (a régua e a curadoria sem estilo na
   tela larga): `test_o_css_do_pcm_fecha_toda_chave`. As nove abas cabem a 1366 px com o menu aberto; no celular a fila rola por
   dentro e a aba de agora vem para o meio ao abrir.
-- No Fracttal de verdade: a mesma cópia sem o `EstoqueFalso`, liberando o POST só para `app.fracttal.com` e `one.fracttal.com`, o
+- No Fracttal de verdade: a mesma cópia sem o `EstoqueFalso`, com `NEXUS_INVENTARIO_GRAVAR=1` no ambiente dela (sem a chave a
+  gravação recusa com 409, seção da gravação), liberando o POST só para `app.fracttal.com` e `one.fracttal.com`, o
   login do Fracttal de quem prova e a contagem de mentira da `SP-TST-001` (contado 3 contra o saldo 5) mais uma linha
   `fora_do_catalogo`.
 
@@ -544,7 +545,9 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
   (geraria outro par de movimentos por cima). Como reconhecer: `modo` == 2 e `achar_movimento(referencia, desde_iso)` acha
   o movimento. `voltar_ao_normal` é só para o que o Nexus abriu: nunca para o modo 3 (inventário físico, de outra pessoa).
 - **Erros:** `Limite` (HTTP 429: a cota de 200/min é da EMPRESA inteira), `SemLogin` (sem login, recusado ou expirado) e
-  `ErroFracttal` (o `success: false` com HTTP 200 que o `_rpc_call` do OS Creator DEVOLVE em vez de levantar; a mensagem
+  `ErroFracttal`. O `success: false` com HTTP 200 (que o `_rpc_call` do OS Creator DEVOLVE em vez de levantar) é o `Recusado`,
+  um `ErroFracttal` à parte: o único em que se sabe que nada foi feito (a resposta sem corpo ou o `criar_peca` sem o id podem
+  ter vindo DEPOIS de o Fracttal gravar; a curadoria só solta a reserva do código no `Recusado`, re-revisão de 27/10/2026; a mensagem
   é o código do Fracttal, ex. `ASSET_CANNOT_BE_DESABLED_STOCK`). Rede fora e 500 passam como vieram: a resposta pode ter
   se perdido depois de gravar, e quem grava decide. **Lista pela metade é `ErroFracttal`:** `data` que não é lista, ou
   página vazia com `start < total` (caso da revisão: `ler` devolvia 1 peça de `total: 5`), nunca uma lista curta; vale
@@ -637,8 +640,8 @@ ele a tela diz que o App ainda não publica, e não "nenhuma contagem"); `ler(cf
 
 - **Duas fontes, dois relógios:** o livro do App vem pela cópia de 5 min do `visao._ler` (lê e liga a usina uma vez), menos na
   aprovação (`ler(cfg, app_agora=True)`: relido no pedido, e a cópia renovada com ele; a contagem mais nova que acabou de chegar
-  substitui a velha antes de a velha ir ao Fracttal, revisão final de 27/10/2026); `com_teste=True` traz o almoxarifado de teste (a
-  curadoria); o ESTADO sai
+  substitui a velha antes de a velha ir ao Fracttal, revisão final de 27/10/2026); `com_teste=True` traz o almoxarifado de teste (nenhuma
+  tela o pede: a curadoria o esconde como as outras desde 27/10/2026); o ESTADO sai
   dos eventos do livro do inventário e é calculado a CADA chamada: o `acrescentar` renova a cópia do livro, e a tela mostra a
   recontagem pedida na hora (com o estado guardado 5 min, o PCM a pediria de novo). **Falha de leitura (do App ou do livro do
   inventário) levanta `fato_inventario.Recusada`:** nunca devolve lista vazia nem contagem `nova`, senão a já gravada
@@ -737,7 +740,9 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   notação científica, 400). **O exagero pede confirmação:** número acima de 10 vezes o maior entre o contado e o saldo do sistema (e
   de 1000) é quase sempre um zero a mais e iria ao estoque da empresa: 400 com `confirmar: true`, e o `"confirmo": true` do corpo
   aceita (o saldo do sistema é o que a página mostrou e vai no corpo como `sistema`, porque revisar não lê o Fracttal: é uma trava
-  contra o erro de digitação, não uma defesa). Contagem que não se aprova, 409 com o `motivo_nao_aprovavel`; peça que não é da
+  contra o erro de digitação, não uma defesa). Contagem que não se aprova, 409 com o `motivo_nao_aprovavel`; a que já tem o controle da gravação
+  (`gravacao.existe`, mesmo com os eventos ainda em "nova": o registro da aprovação que falhou no meio deixa o lote congelado),
+  409 "a contagem já foi para a gravação"; peça que não é da
   contagem, 400; peça já tirada, 409; corrigir peça com unidades por identificar, 409 (decide a curadoria antes). **Nada disso fala
   com o Fracttal:** grava UM evento no livro do inventário (`peca_tirada`, `numero_corrigido` com `de_qtd` = o do campo, `para_qtd` = o
   corrigido e `contado_qtd` = o do campo, ou `recontagem_pedida`), com a usina pela de-para do Fracttal (`usina_id` +
@@ -859,12 +864,14 @@ Duas pendências, só nas contagens que ainda NÃO foram gravadas: o **achado fo
   `{ID da linha: {decisao, id_item, codigo}}`, o formato que `contado_efetivo` e `itens_do_lote` pedem. A peça cadastrada é ligada ao
   almoxarifado e ajustada na gravação da contagem, não aqui.
 - **Uma linha decidida não se decide de novo** (`Conflito`, 409: dois do PCM com a tela aberta não cadastram a mesma peça duas
-  vezes), e **a decisão só vale até a contagem ser gravada**: gravada, aprovada (a gravação começou), recusada ou substituída pela
-  mais nova do almoxarifado = 409 com "faça uma nova contagem" (decidir depois não mudaria o que já foi gravado). Quem sabe o que já
-  foi gravado é `_estados`, pela leitura da lista das contagens (`leitura.ler(cfg, com_teste=True)`): a mesma regra das outras telas
-  (o estado pelos eventos e a substituição só pelas vivas e boas, `_pode_substituir`), com o almoxarifado de teste incluído (fora da
-  lista, não da curadoria, a única em que a sigla `TST` vale). Até a revisão final de 27/10/2026 ela tinha a conta dela, e a
-  contagem do futuro ou fora do contrato sumia com as pendências da boa. **O estado é
+  vezes), e **a decisão só vale até a contagem ser gravada**: gravada, aprovada (a gravação começou), com o controle da gravação já
+  criado (`gravacao.existe`: o registro da aprovação que falhou no meio deixa os eventos em "nova" com o lote congelado; antes do
+  Fracttal, o cadastro nem cria a peça), recusada ou substituída pela mais nova do almoxarifado = 409 com "faça uma nova contagem"
+  (decidir depois não mudaria o que já foi gravado). Quem sabe o que já foi gravado é `_estados`, pela leitura da lista das
+  contagens (`leitura.ler(cfg)`): a mesma regra das outras telas (o estado pelos eventos e a substituição só pelas vivas e boas,
+  `_pode_substituir`), e sem o almoxarifado de teste, como elas (até 27/10/2026 ele aparecia só aqui, e uma decisão do servidor podia
+  cair na contagem da prova; a cópia de prova esvazia o `NEXUS_ALMOX_TESTE_IDS` e libera a sigla `TST` para ele). Até a revisão
+  final de 27/10/2026 ela tinha a conta dela, e a contagem do futuro ou fora do contrato sumia com as pendências da boa. **O estado é
   conferido DE NOVO, no livro de agora, logo antes de escrever**: o cadastro pagina o catálogo e cria a peça (segundos) depois da
   primeira leitura, e a gravação da contagem pode chegar nesse intervalo. Se a contagem já não está aberta, 409, nada é escrito, e para o
   cadastro a mensagem diz o código que ficou criado no Fracttal ("a peça SP-XXX-NNN foi criada no Fracttal, mas a contagem já tinha sido
@@ -879,7 +886,10 @@ Duas pendências, só nas contagens que ainda NÃO foram gravadas: o **achado fo
   `<NEXUS_DADOS>/almox_inventario/curadoria_<contagem>.json` (sem login, sem nome); na nova tentativa da mesma linha, o código
   reservado é o dela: se já existe no Fracttal (`Estoque.peca`), não cria de novo, acha o ID e só grava a decisão; se não existe,
   cria com ele (o 013 não fica vazio). A reserva vale também para as outras linhas da sigla (a peça recém-criada pode não aparecer
-  ainda na lista). Arquivo de controle que não se lê PARA o cadastro (ignorá-lo escolheria o código de novo).
+  ainda na lista). Arquivo de controle que não se lê PARA o cadastro (ignorá-lo escolheria o código de novo). **Só o `Recusado` (o
+  `success: false`: nada foi criado) solta a reserva**, para a nova tentativa com os dados corrigidos não ficar presa; o
+  `ErroFracttal` sem o id ou sem corpo, a rede e o 429 a mantêm (a peça pode ter sido criada; a nova tentativa a acha pelo código e
+  confere o nome). Até a re-revisão de 27/10/2026 soltava em qualquer `ErroFracttal`, e o "sem o id" criaria uma 2ª peça.
   **A reserva guarda a sigla, o nome e a unidade pedidos, e a nova tentativa tem de vir com os MESMOS dados** (o nome sem ligar para
   caixa nem espaço): com outro, `Conflito` antes de qualquer pedido ("repita com os dados da reserva"), porque com a peça já criada a
   decisão ficaria ligada a uma peça com o nome errado, e sem ela criaria uma diferente da que a pessoa acha ter pedido. A tela volta
@@ -968,7 +978,8 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
   outra pessoa ou outra tela: feche o ajuste na tela do Fracttal e depois clique em Continuar ou Encerrar". Compara id, não
   relógio, e só ajuste: a 1ª versão contava todo movimento sem a nossa referência desde o `aberto_em` (cortado no segundo), e a
   prova de 27/10/2026 parou uma retomada, para sempre, por um movimento do mesmo segundo da abertura; entrada e saída comuns não
-  acontecem com o modo aberto, então a que aparece é de antes. **QUASE nunca se finaliza a sessão dos outros, e não nunca:**
+  acontecem com o modo aberto, então a que aparece é de antes. O ajuste de outra tela feito ANTES da abertura (id até o marco, dentro dos 10 min de folga) não
+  para a retomada: `test_retomada_com_ajuste_de_outro_de_antes_do_marco_continua` (sem ele, um marco sempre None passaria). **QUASE nunca se finaliza a sessão dos outros, e não nunca:**
   quem só solta o modo no Fracttal, sem finalizar, não deixa rastro, e uma sessão aberta por outra pessoa logo depois pareceria a
   nossa.
 - **O finalizar nunca se repete às cegas.** O fechamento são dois pedidos. O 429 no fechar espera 62 s e PROCURA o fechamento

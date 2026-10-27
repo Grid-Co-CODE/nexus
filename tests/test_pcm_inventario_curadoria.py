@@ -233,16 +233,16 @@ def test_cadastrar_que_nao_chegou_ao_fracttal_reaproveita_o_codigo(cur):
 
 
 def test_o_cadastro_que_o_fracttal_recusa_solta_a_reserva(cur):
-    """O Fracttal recusou o `criar_peca` (`ErroFracttal`, o `success: false`: nada foi criado). A reserva do código sai, e a nova
+    """O Fracttal recusou o `criar_peca` (`Recusado`, o `success: false`: nada foi criado). A reserva do código sai, e a nova
     tentativa com os dados corrigidos (outro nome) não fica presa no "repita com os dados da reserva" (estacionado da revisão
     das Tasks 8 e 9, corrigido na revisão final de 27/10/2026)."""
     falso = _falso()
     criar = falso.criar_peca
 
     def recusa(codigo, nome, unidade="UNIDADE"):
-        raise E.ErroFracttal("INVALID_NAME", "inventories.item_insert")
+        raise E.Recusado("INVALID_NAME", "inventories.item_insert")
     falso.criar_peca = recusa
-    with pytest.raises(E.ErroFracttal):
+    with pytest.raises(E.Recusado):
         CU.decidir(cur.config, "C-1", "L-2", "cadastrar", sigla="CAB", nome="Cabo azul 6 mm ###", unidade="METRO",
                    estoque=falso, pessoa=PESSOA)
     assert json.loads(CU._arquivo_reserva(cur.config, "C-1").read_text("utf-8")) == {}
@@ -250,6 +250,66 @@ def test_o_cadastro_que_o_fracttal_recusa_solta_a_reserva(cur):
     r = _cadastrar(cur.config, falso)                      # o nome corrigido
     assert r["codigo"] == "SP-CAB-013" and r["criada"] is True
     assert [x["codigo_criado"] for x in _livro(cur.config, F.ABA_CURADORIA)] == ["SP-CAB-013"]
+
+
+@pytest.mark.parametrize("resposta, solta", [
+    ({"success": False, "message": "INVALID_NAME"}, True),   # o "não" com todas as letras: nada foi criado
+    ({"success": True, "data": {}}, False),                    # sem o id: o Fracttal pode ter criado e não disse qual
+    (None, False),                                             # sem corpo: idem
+])
+def test_so_a_recusa_do_fracttal_solta_a_reserva(cur, resposta, solta):
+    """Pelo adaptador DE VERDADE (só o RPC é de mentira): a reserva do código sai só no `Recusado` (o `success: false`). O
+    `ErroFracttal` sem o id ou sem corpo pode ter vindo depois de o Fracttal criar a peça: a reserva fica, e a nova tentativa a
+    acha pelo código (`peca`, com o nome conferido) em vez de criar uma 2ª peça com outro código no catálogo do cliente (a
+    re-revisão de 27/10/2026: a curadoria soltava em qualquer `ErroFracttal`)."""
+    from test_pcm_inventario_estoque import CRIAR, PECAS, UNIDADES, Fracttal, em_paginas, estoque, ok
+    catalogo = [{"id": 5, "code": "SP-CAB-001", "field_1": "Cabo 4 mm"}, {"id": 6, "code": "SP-CAB-012", "field_1": "Cabo 10 mm"}]
+    fr = Fracttal({PECAS: em_paginas(catalogo), UNIDADES: ok([{"id": 362333, "description": "METRO"}]), CRIAR: resposta})
+    with pytest.raises(E.ErroFracttal) as ex:
+        _cadastrar(cur.config, estoque(fr))
+    assert isinstance(ex.value, E.Recusado) is solta
+    reservas = json.loads(CU._arquivo_reserva(cur.config, "C-1").read_text("utf-8"))
+    assert ("L-2" in reservas) is not solta and _livro(cur.config, F.ABA_CURADORIA) == []
+    if solta:
+        return
+    assert reservas["L-2"]["codigo"] == "SP-CAB-013"
+    # a peça tinha sido criada: a nova tentativa a acha pelo código reservado, confere o nome e não cria outra
+    fr.respostas[PECAS] = em_paginas(catalogo + [{"id": 77, "code": "SP-CAB-013", "field_1": "Cabo azul 6 mm"}])
+    r = _cadastrar(cur.config, estoque(fr))
+    assert (r["codigo"], r["id_item"], r["criada"]) == ("SP-CAB-013", "77", False) and fr.metodos.count(CRIAR) == 1
+
+
+def test_a_decisao_depois_do_controle_da_gravacao_e_recusada(cur):
+    """O controle da gravação existe (o `iniciar` o cria ANTES de registrar a aprovação no livro, e o registro falhou no meio):
+    os eventos ainda dizem "nova", mas o lote já foi congelado. Decidir ali seria gravar o que a gravação ignora: `Conflito`
+    (409), nada no livro, e o cadastro nem chega ao Fracttal (a re-revisão de 27/10/2026)."""
+    from nexus.pcm.inventario import gravacao as G
+    G._gravar_json(G._caminho(cur.config, "C-1"), {"contagem_id": "C-1", "id_almox": ALMOX, "estado": "parada",
+                                                     "lotes": [], "itens": {}})
+    falso = _falso()
+    with pytest.raises(Conflito, match="já foi para a gravação"):
+        _cadastrar(cur.config, falso)
+    with pytest.raises(Conflito, match="já foi para a gravação"):
+        CU.decidir(cur.config, "C-1", "L-3", "descartar", motivo="não é peça", pessoa=PESSOA)
+    assert falso.chamadas == [] and _livro(cur.config, F.ABA_CURADORIA) == []
+    assert not CU._arquivo_reserva(cur.config, "C-1").exists()
+
+
+def test_a_decisao_que_chega_com_o_controle_novo_e_recusada(cur, monkeypatch):
+    """O controle nasce enquanto o cadastro pagina o catálogo e cria a peça: a conferência de logo antes de escrever (com a
+    trava da contagem) o vê, e a decisão não é registrada (o código fica reservado, como na contagem gravada no meio)."""
+    from nexus.pcm.inventario import gravacao as G
+    falso = _falso()
+    criar = falso.criar_peca
+
+    def criar_e_a_aprovacao_chega(codigo, nome, unidade="UNIDADE"):
+        G._gravar_json(G._caminho(cur.config, "C-1"), {"contagem_id": "C-1", "id_almox": ALMOX, "estado": "gravando",
+                                                         "lotes": [], "itens": {}})
+        return criar(codigo, nome, unidade)
+    falso.criar_peca = criar_e_a_aprovacao_chega
+    with pytest.raises(Conflito, match="SP-CAB-013 foi criada no Fracttal"):
+        _cadastrar(cur.config, falso)
+    assert _livro(cur.config, F.ABA_CURADORIA) == []
 
 
 def test_a_reserva_vale_para_a_outra_linha_da_mesma_sigla(cur):
@@ -286,10 +346,26 @@ def test_cadastrar_exige_sigla_da_lista_nome_e_o_fracttal(cur):
 
 
 def test_a_sigla_de_teste_so_vale_no_almoxarifado_de_teste(cur):
+    """O cadastro com a sigla `TST` no almoxarifado de teste (o código `SP-TST-001`). Na tela do servidor ele nem aparece (o
+    teste abaixo); quem o usa é a cópia de prova, que esvazia o `NEXUS_ALMOX_TESTE_IDS` e libera a sigla só para ele."""
     cur.config["NEXUS_ALMOX_TESTE_IDS"] = ALMOX
-    r = CU.decidir(cur.config, "C-1", "L-2", "cadastrar", sigla="TST", nome="Peça de teste", unidade="UNIDADE",
-                   estoque=_falso(), pessoa=PESSOA)
-    assert r["codigo"] == "SP-TST-001"
+    _id, codigo, criada = CU._cadastrar(cur.config, "C-1", "L-2", ALMOX, "TST", "Peça de teste", "UNIDADE", _falso())
+    assert (codigo, criada) == ("SP-TST-001", True)
+
+
+def test_o_almoxarifado_de_teste_fica_fora_da_curadoria(cur):
+    """Como a lista do Inventário, a régua e a Auditoria: a contagem do almoxarifado de teste não aparece na curadoria nem se
+    decide (até 27/10/2026 a curadoria lia com `com_teste=True`, e uma decisão do PCM do servidor podia cair na contagem da
+    prova). Nada é gravado nem pedido ao Fracttal."""
+    cur.config["NEXUS_ALMOX_TESTE_IDS"] = ALMOX
+    visao.limpar()
+    assert CU.pendencias(cur.config) == [] and CU.contagens_abertas(cur.config) == {}
+    falso = _falso()
+    with pytest.raises(ValueError, match="não está no livro das contagens"):
+        CU.decidir(cur.config, "C-1", "L-3", "descartar", motivo="não é peça", pessoa=PESSOA)
+    with pytest.raises(ValueError):
+        _cadastrar(cur.config, falso)
+    assert falso.chamadas == [] and _livro(cur.config, F.ABA_CURADORIA) == []
 
 
 # ── é a peça X, confirmar, descartar ─────────────────────────────────────────────────────────────────────────────────

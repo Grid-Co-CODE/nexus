@@ -5,7 +5,7 @@ inventario-almoxarifado-passo0.md`, com os métodos, os corpos e as respostas li
 
 - O Fracttal responde HTTP 200 com `success: false` e a mensagem no corpo (caso real: desativar peça com saldo,
   `ASSET_CANNOT_BE_DESABLED_STOCK`), e o `_rpc_call` do OS Creator DEVOLVE isso em vez de levantar. Aqui toda resposta é
-  conferida, e vira `ErroFracttal`. Lista que chega pela metade (página vazia antes do `total`) também é erro: número
+  conferida, e vira `Recusado` (um `ErroFracttal`: o único em que se sabe que nada foi feito). Lista que chega pela metade (página vazia antes do `total`) também é erro: número
   pela metade não vai para a tela.
 - A cota de 200 pedidos por minuto é da EMPRESA inteira (os robôs e o App de Campo gastam dela): os pedidos do adaptador
   saem no máximo a 1 por segundo, no MESMO ritmo para todas as instâncias do processo (duas pessoas gravando juntas somam
@@ -63,12 +63,20 @@ class SemLogin(Exception):
 
 
 class ErroFracttal(Exception):
-    """O Fracttal respondeu `success: false` (HTTP 200). `mensagem` é o texto dele (um código, como
-    `ASSET_CANNOT_BE_DESABLED_STOCK`) e `metodo`, o RPC que recusou."""
+    """O Fracttal não fez o que se pediu, ou respondeu o que não se entende: `success: false` (o `Recusado`, abaixo), a
+    resposta sem corpo, sem o id, a lista pela metade. `mensagem` é o texto dele (um código, como
+    `ASSET_CANNOT_BE_DESABLED_STOCK`) ou o nosso, e `metodo`, o RPC."""
 
     def __init__(self, mensagem: str, metodo: str = ""):
         super().__init__(f"{metodo}: {mensagem}" if metodo else mensagem)
         self.mensagem, self.metodo = mensagem, metodo
+
+
+class Recusado(ErroFracttal):
+    """O "não" com todas as letras: o Fracttal respondeu `success: false` (HTTP 200), e nada foi feito. É o único
+    `ErroFracttal` em que se sabe isso: a resposta sem corpo ou sem o id (`criar_peca`) pode ter vindo DEPOIS de o Fracttal
+    criar. Caso da revisão de 27/10/2026: a curadoria soltava a reserva do código em qualquer `ErroFracttal`, e o "sem o id"
+    deixaria a nova tentativa escolher outro código, com a peça do primeiro já criada no catálogo do cliente."""
 
 
 # ── as regras que o adaptador e o Fracttal de mentira dividem ──────────────────────────────────────────────────────────
@@ -327,7 +335,7 @@ class EstoqueFracttal(Estoque):
         if not isinstance(r, dict):
             raise ErroFracttal("o Fracttal respondeu sem corpo", metodo)
         if r.get("success") is False:
-            raise ErroFracttal(str(r.get("message") or "o Fracttal recusou o pedido"), metodo)
+            raise Recusado(str(r.get("message") or "o Fracttal recusou o pedido"), metodo)
         return r
 
     def _linhas(self, metodo: str, base: dict):

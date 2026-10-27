@@ -508,6 +508,26 @@ def test_contagem_que_nao_se_aprova_nao_se_revisa(app, inv, falso, monkeypatch):
     assert len(_eventos(app)) == antes
 
 
+def test_a_revisao_depois_do_controle_da_gravacao_e_recusada(app, inv, falso, monkeypatch, tmp_path):
+    """O `iniciar` cria o controle da gravação ANTES de registrar a aprovação no livro: se o registro falhou no meio, os
+    eventos ainda dizem "nova", mas o lote já foi congelado. Revisar ali seria gravar um evento que a gravação ignora: 409
+    "a contagem já foi para a gravação", e nada é gravado (a re-revisão de 27/10/2026). O controle ilegível também recusa."""
+    from nexus.pcm.inventario import gravacao as G
+    _cenario(inv)
+    app.config["NEXUS_DADOS"] = str(tmp_path / "dados")
+    c = _pcm(app, monkeypatch)
+    assert L.contagens(app.config)[0]["estado"] == "nova"
+    G._gravar_json(G._caminho(app.config, "C-1"), {"contagem_id": "C-1", "id_almox": "10", "estado": "parada",
+                                                     "lotes": [], "itens": {}})
+    for corpo in ({"acao": "tirar", "id_item": "502", "motivo": "x"}, {"acao": "recontagem", "motivo": "x"},
+                  {"acao": "corrigir", "id_item": "501", "valor": "11", "motivo": "x"}):
+        r = _revisar(c, corpo)
+        assert r.status_code == 409 and "já foi para a gravação" in r.get_json()["erro"], corpo
+    G._caminho(app.config, "C-1").write_text("{não é json", encoding="utf-8")
+    assert _revisar(c, {"acao": "recontagem", "motivo": "x"}).status_code == 409
+    assert _eventos(app) == [] and falso.chamadas == []
+
+
 def test_so_o_setor_pcm_revisa(app, inv, falso, monkeypatch):
     """Como o `test_pcm_publicar`: administrador e setor PCM revisam e leem o saldo do sistema; os outros setores (o
     Responsáveis UFV inclusive) veem o que o técnico contou, sem os botões nem o lote, e levam 403 ao tentar revisar ou ler o

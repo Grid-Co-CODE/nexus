@@ -537,6 +537,35 @@ def test_retomada_com_movimento_comum_no_mesmo_segundo_da_abertura_continua(app,
     assert _saldos(falso) == {"501": 12, "502": 3, "503": 0, "509": 2} and falso.modo("10") == 0
 
 
+def test_retomada_com_ajuste_de_outro_de_antes_do_marco_continua(app, grav):
+    """O marco é o que separa o antes do depois: um AJUSTE (tipo 15) de outra referência, feito por fora logo antes de a
+    nossa sessão abrir (dentro dos 10 min de folga do relógio que a retomada relê), tem id menor ou igual ao marco e NÃO para
+    a retomada: é de antes da nossa sessão. Sem o marco (sempre None), a conferência contaria esse ajuste e pararia para
+    sempre; os outros testes passariam assim mesmo (a re-revisão de 27/10/2026)."""
+    falso = _falso({"501": 10, "502": 5, "503": 4, "509": 1}, expirar_em=9, agora=grav["relogio"])
+    ultimo, de_fora = falso.ultimo_movimento, []
+
+    def ajuste_de_fora_e_o_marco(id_almox):
+        # outra tela fecha um ajuste do almoxarifado (a peça 509, fora do lote) um segundo antes de o Nexus ler o marco
+        falso.mover("10", "509", "entrada", 1, referencia="Ajuste feito na tela do Fracttal", ajuste=True)
+        de_fora.append(falso.movimentos[-1])
+        return ultimo(id_almox)
+    falso.ultimo_movimento = ajuste_de_fora_e_o_marco
+    _iniciar(grav, falso)
+    falso._expira_em = None
+    ctrl = json.loads(next(grav_pasta(app).glob("C-1*.json")).read_text("utf-8"))
+    lote = ctrl["lotes"][0]
+    m = de_fora[0]
+    assert m["tipo_fracttal"] == E.TIPO_AJUSTE and m["id"] <= lote["marco"]          # de antes do marco...
+    assert E.instante(lote["aberto_em"]) - G.MARGEM_RELOGIO <= E.instante(m["quando"])  # ...e dentro da janela relida
+    assert G.estado(app.config, "C-1")["travado"] and falso.modo("10") == 2
+    falso.ultimo_movimento = ultimo
+    _continuar(grav, falso)
+    est = G.estado(app.config, "C-1")
+    assert est["estado"] == "concluida", est["motivo"]
+    assert _saldos(falso) == {"501": 12, "502": 3, "503": 0, "509": 2} and falso.modo("10") == 0
+
+
 def test_retomada_com_modo_2_procura_antes_de_finalizar(app, grav):
     """A falha dupla: o finalizar valeu, o modo 0 falhou, e o controle não soube que o lote estava "fechando" (o disco que
     falhou enquanto parava). A retomada com o modo 2 procura o fechamento pela referência antes de gravar mais ou de

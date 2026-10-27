@@ -493,6 +493,21 @@ def revisar(cfg, contagem_id: str, pedido, quem: dict | None) -> dict:
     return {"ok": True, "mensagem": texto, "estado": novo["estado"]}
 
 
+FOI_GRAVAR = "A contagem já foi para a gravação: o lote foi congelado na aprovação, e nenhuma revisão entra depois dele."
+
+
+def _foi_para_a_gravacao(cfg, contagem_id: str) -> bool:
+    """A contagem já tem o controle da gravação (`gravacao.existe`)? O `iniciar` cria o controle ANTES de registrar a aprovação
+    no livro: se o registro falhou no meio (o banco que não confirmou), os eventos ainda dizem "nova" com o lote já congelado,
+    e a revisão que entrasse ali seria ignorada pela gravação. O controle ilegível conta como existente (na dúvida, nada
+    entra)."""
+    from . import gravacao
+    try:
+        return gravacao.existe(cfg, contagem_id)
+    except F.Recusada:
+        return True
+
+
 def _revisar(cfg, contagem_id: str, pedido: dict, quem: dict, acao: str, motivo: str):
     """Confere o estado de agora e grava o evento (chamar com a trava da contagem). Devolve a contagem conferida."""
     try:
@@ -504,6 +519,8 @@ def _revisar(cfg, contagem_id: str, pedido: dict, quem: dict, acao: str, motivo:
         raise Recusa(404, "Contagem não encontrada: atualize a página.")
     if not c["aprovavel"]:
         raise Recusa(409, f"Esta contagem não se revisa: {c['motivo_nao_aprovavel']}.")
+    if _foi_para_a_gravacao(cfg, contagem_id):
+        raise Recusa(409, FOI_GRAVAR)
     item, extra = None, {}
     if acao != "recontagem":
         id_item = A._id(pedido.get("id_item")) if isinstance(pedido.get("id_item"), (str, int)) else ""

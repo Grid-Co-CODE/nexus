@@ -4,7 +4,8 @@
 o teste confere) e vive na memória. É o que os testes da gravação, da régua e da curadoria usam no lugar do Fracttal. Ele
 imita o que o passo 0 de 26/10 mostrou do Fracttal de verdade:
 
-- o saldo só se grava com o almoxarifado no modo 2 (sessão de ajuste); fora dele, `ErroFracttal`;
+- o saldo só se grava com o almoxarifado no modo 2 (sessão de ajuste); fora dele, `Recusado` (o `success: false`: toda
+  recusa do falso é o "não" com todas as letras, que é o que o Fracttal de verdade responde a cada uma delas);
 - ao FECHAR a sessão, sai um par de movimentos por peça mexida (a saída do saldo antigo inteiro e a entrada do novo, os dois
   com a referência); as peças que ninguém mexeu não geram nada;
 - o fechamento são DOIS passos, como no Fracttal: `fechar_ajuste` finaliza (gera os movimentos) e então chama
@@ -43,7 +44,7 @@ inventário (uma OS que lança peça, uma compra que entra, um almoxarifado que 
 import functools
 from datetime import datetime, timezone
 
-from nexus.pcm.inventario.estoque import (TIPO_AJUSTE, ErroFracttal, Estoque, Limite, SemLogin, instante, validar_nivel,
+from nexus.pcm.inventario.estoque import (TIPO_AJUSTE, Estoque, Limite, Recusado, SemLogin, instante, validar_nivel,
                                           validar_quantidade)
 
 
@@ -105,7 +106,7 @@ class EstoqueFalso(Estoque):
         if tipo not in ("entrada", "saida"):
             raise ValueError(f"tipo de movimento desconhecido: {tipo!r}")
         if self._modos.get(str(id_almox), 0) in (2, 3):
-            raise ErroFracttal("o almoxarifado trava entradas e saídas enquanto está em ajuste ou inventário", "mover")
+            raise Recusado("o almoxarifado trava entradas e saídas enquanto está em ajuste ou inventário", "mover")
         item = self._item(id_almox, id_item)
         item["saldo"] = (item["saldo"] or 0.0) + (qtd if tipo == "entrada" else -qtd)
         self._movimento(id_almox, id_item, tipo, qtd, referencia, self._iso(quando),
@@ -156,7 +157,7 @@ class EstoqueFalso(Estoque):
     def abrir_ajuste(self, id_almox: str) -> None:
         a = str(id_almox)
         if self._modos.get(a, 0) == 3:
-            raise ErroFracttal("o almoxarifado está em inventário físico", "abrir_ajuste")
+            raise Recusado("o almoxarifado está em inventário físico", "abrir_ajuste")
         self._modos[a] = 2
         self._sessoes.setdefault(a, {})
 
@@ -164,7 +165,7 @@ class EstoqueFalso(Estoque):
     def gravar_saldo(self, id_almox: str, id_item: str, para: float) -> None:
         a = str(id_almox)
         if self._modos.get(a, 0) != 2:
-            raise ErroFracttal("o saldo só se grava com o almoxarifado em ajuste de inventário", "gravar_saldo")
+            raise Recusado("o saldo só se grava com o almoxarifado em ajuste de inventário", "gravar_saldo")
         n = validar_quantidade(para, "saldo")
         item = self._item(id_almox, id_item)
         self._sessoes.setdefault(a, {}).setdefault(str(id_item), item["saldo"])      # o saldo de antes da 1ª mexida
@@ -174,9 +175,9 @@ class EstoqueFalso(Estoque):
     def fechar_ajuste(self, id_almox: str, referencia: str) -> str:
         a, ref = str(id_almox), str(referencia or "").strip()
         if a in self._pendentes:
-            raise ErroFracttal("o ajuste já foi finalizado: falta só voltar ao modo normal", "fechar_ajuste")
+            raise Recusado("o ajuste já foi finalizado: falta só voltar ao modo normal", "fechar_ajuste")
         if self._modos.get(a, 0) != 2:
-            raise ErroFracttal("não há ajuste de inventário aberto para fechar", "fechar_ajuste")
+            raise Recusado("não há ajuste de inventário aberto para fechar", "fechar_ajuste")
         if not ref:
             raise ValueError("o fechamento precisa da referência")
         quando = self._iso()
@@ -195,7 +196,7 @@ class EstoqueFalso(Estoque):
     def voltar_ao_normal(self, id_almox: str) -> None:
         a = str(id_almox)
         if self._modos.get(a, 0) == 3:
-            raise ErroFracttal("o almoxarifado está em inventário físico: não é do Nexus", "voltar_ao_normal")
+            raise Recusado("o almoxarifado está em inventário físico: não é do Nexus", "voltar_ao_normal")
         self._modos[a] = 0
         self._pendentes.discard(a)
         self._sessoes.pop(a, None)
@@ -208,7 +209,7 @@ class EstoqueFalso(Estoque):
     def ligar(self, id_almox: str, id_item: str) -> str:
         a, i = str(id_almox), str(id_item)
         if i in self._itens.get(a, {}):
-            raise ErroFracttal("a peça já está ligada a este almoxarifado", "ligar")
+            raise Recusado("a peça já está ligada a este almoxarifado", "ligar")
         ligacao = self._nova_ligacao()
         criada = self._catalogo.get(i, {})                        # a peça criada por `criar_peca` leva o código e a unidade
         self._itens.setdefault(a, {})[i] = {"saldo": 0.0, "minimo": 0.0, "maximo": 0.0, "ligacao": ligacao,
@@ -267,7 +268,7 @@ class EstoqueFalso(Estoque):
         if not codigo or not nome:
             raise ValueError("a peça precisa de código e de nome")
         if codigo.upper() in {c.upper() for c in self._todos_os_codigos()}:
-            raise ErroFracttal("já existe peça com esse código", "criar_peca")
+            raise Recusado("já existe peça com esse código", "criar_peca")
         self._n_item += 1
         self._catalogo[str(self._n_item)] = {"codigo": codigo, "nome": nome, "unidade": unidade}
         return str(self._n_item)

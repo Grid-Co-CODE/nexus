@@ -266,9 +266,9 @@ def test_sucesso_falso_vira_erro_fracttal():
     fr = Fracttal({LIGAR: recusa, ATUALIZA_LIGACAO: recusa, FECHAR: recusa, ATUALIZA_ALMOX: ok(), SALDOS: recusa})
     est = estoque(fr)
     for chamada in (lambda: est.ligar(ALMOX, ITEM), lambda: est.ler(ALMOX), lambda: est.fechar_ajuste(ALMOX, "INVENTARIO-c1")):
-        with pytest.raises(E.ErroFracttal, match="ASSET_CANNOT_BE_DESABLED_STOCK") as erro:
+        with pytest.raises(E.Recusado, match="ASSET_CANNOT_BE_DESABLED_STOCK") as erro:
             chamada()
-        assert erro.value.mensagem == "ASSET_CANNOT_BE_DESABLED_STOCK"
+        assert erro.value.mensagem == "ASSET_CANNOT_BE_DESABLED_STOCK" and isinstance(erro.value, E.ErroFracttal)
     # fechar que o Fracttal recusou não segue para o "volta ao modo 0": o almoxarifado fica como está, para a retomada ver
     assert ATUALIZA_ALMOX not in fr.metodos
 
@@ -282,6 +282,19 @@ def test_sucesso_falso_na_gravacao_do_saldo():
 def test_resposta_sem_corpo_e_erro():
     with pytest.raises(E.ErroFracttal):
         estoque(Fracttal({SALDOS: None})).ler(ALMOX)
+
+
+def test_so_o_sucesso_falso_e_recusado():
+    """`Recusado` é o "não" com todas as letras (o `success: false`), o único `ErroFracttal` em que se sabe que nada foi feito.
+    A resposta sem corpo e o `criar_peca` sem o id NÃO são `Recusado`: podem ter vindo depois de o Fracttal criar, e quem
+    trata (a reserva do código na curadoria) não pode agir como se nada tivesse acontecido (a re-revisão de 27/10/2026)."""
+    unidades = ok([{"id": 362334, "description": "UNIDADE"}])
+    casos = {"recusa": {"success": False, "message": "INVALID_CODE"}, "sem corpo": None, "sem id": ok({}),
+             "data sem dict": ok([1])}
+    for nome, resposta in casos.items():
+        with pytest.raises(E.ErroFracttal) as erro:
+            estoque(Fracttal({UNIDADES: unidades, CRIAR: resposta})).criar_peca("SP-CAB-013", "Cabo azul", "UNIDADE")
+        assert isinstance(erro.value, E.Recusado) is (nome == "recusa"), nome
 
 
 def test_429_vira_limite():
