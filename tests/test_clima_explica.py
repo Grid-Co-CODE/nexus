@@ -105,7 +105,7 @@ def test_aviso_que_ainda_vai_comecar_diz_a_partir_de():
 def test_motivo_curto_junta_o_mesmo_evento_e_para_nos_dois_mais_importantes():
     avisos = [_aviso(2, "Baixa Umidade"), _aviso(1, "Baixa Umidade"), _aviso(1, "Tempestade")]
     assert V.motivo_curto(avisos, None, _dias(1.0, 1.0, 1.0, 1.0), REF) == (
-        "Baixa umidade (Perigo) · Tempestade (Perigo Potencial) · e mais 1")
+        "Baixa umidade (Perigo) · Tempestade · e mais 1")             # Perigo Potencial só com o nome (27/10/2026)
 
 
 def test_motivo_curto_poe_o_fogo_perto_primeiro_e_o_risco_com_os_dias_falados():
@@ -113,7 +113,7 @@ def test_motivo_curto_poe_o_fogo_perto_primeiro_e_o_risco_com_os_dias_falados():
         "Fogo a 2,3 km · Risco de fogo crítico de hoje a seg 12/10")
     inicio = (REF + timedelta(days=1)).replace(hour=8, minute=0)
     assert V.motivo_curto([_aviso(2, "Vendaval", inicio=inicio, fim=inicio + timedelta(hours=1))], None, _dias(0.1, 0.1, 0.1, 0.1),
-                          REF) == "Vendaval (Perigo, a partir de 10/10 08:00)"
+                          REF) == "Vendaval (Perigo) a partir de 10/10 08h"
     assert V.motivo_curto([], None, _dias(0.1, 0.1, 0.1, 0.1), REF) == ""          # risco baixo não é motivo
 
 

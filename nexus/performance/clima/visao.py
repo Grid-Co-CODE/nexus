@@ -486,10 +486,19 @@ def risco_curto(dias) -> str:
 MOTIVOS_CURTOS = 2      # o motivo resumido leva os dois mais importantes e "e mais N"
 
 
+def _hora_curta(texto: str) -> str:
+    """ "08/10 15:00" -> "08/10 15h"; "15:30" -> "15h30" (a hora do motivo curto, 27/10/2026)."""
+    return texto[:-3] + "h" if texto.endswith(":00") else texto.replace(":", "h")
+
+
 def motivo_curto(avisos, foco, dias, ref, fogo=None, perto=None) -> str:
     """Por que a usina está no nível dela, numa linha curta e em língua de gente (09/10/2026): o fogo perto (o da última hora do
     INPE; sem ele, o das últimas 24 h da NASA, 10/10/2026; sem os dois, o fogo a até 10 km com risco crítico), os avisos (os que
-    mandam agir antes, iguais juntos) e o risco de fogo alto. É o "por quê" das tabelas e o motivo da tabela do mapa."""
+    mandam agir antes, iguais juntos) e o risco de fogo alto. É o "por quê" das tabelas e o motivo da tabela do mapa.
+
+    Mais curto desde 27/10/2026 (Levi, sobre a tabela do mapa: "quero mais resumido e direto, sabemos que é perigo potencial"): o
+    aviso de Perigo Potencial vai só com o nome do evento (o nível da usina, ao lado, já diz que é leve); Perigo e Grande Perigo
+    seguem escritos, porque mudam o que fazer; o aviso que ainda vai começar diz quando, com a hora curta ("a partir de 08/10 15h")."""
     if foco:
         itens = [f"Fogo a {numero(foco['km'], 1)} km"]
     elif fogo:
@@ -499,7 +508,8 @@ def motivo_curto(avisos, foco, dias, ref, fogo=None, perto=None) -> str:
     else:
         itens = []
     for e in por_evento(agrupar_avisos(avisos, ref), ref):
-        itens.append(f"{e['nome']} ({e['severidade']}" + (f", a partir de {e['comeca']}" if e["comeca"] else "") + ")")
+        itens.append(e["nome"] + (f" ({e['severidade']})" if e["nivel"] > 1 else "")
+                     + (f" a partir de {_hora_curta(e['comeca'])}" if e["comeca"] else ""))
     if risco_curto(dias):
         itens.append(risco_curto(dias))
     if len(itens) > MOTIVOS_CURTOS:

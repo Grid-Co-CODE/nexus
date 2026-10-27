@@ -705,7 +705,7 @@ def test_a_linha_da_tabela_traz_o_aviso_o_foco_e_os_quatro_dias(leituras):
     # a célula diz com palavra que leu e não há (09/10/2026; antes "—"), o risco vai em palavra e o porquê cabe numa linha
     assert (v["aviso_vazio"], v["foco_vazio"]) == ("nenhum", "não")
     assert [d["palavra"] for d in c["dias"]] == ["Crítico", "Alto", "Mínimo", "—"]
-    assert c["por_que"] == "Onda de calor (Perigo) · Baixa umidade (Perigo Potencial) · e mais 1"
+    assert c["por_que"] == "Onda de calor (Perigo) · Baixa umidade · e mais 1"
 
 
 def test_celula_vazia_diz_sem_leitura_quando_a_fonte_nao_foi_lida(leituras):

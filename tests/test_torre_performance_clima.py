@@ -171,7 +171,7 @@ def test_a_linha_da_atencao_com_aviso_mostra_o_evento_e_a_coluna_do_foco_diz_que
     assert "Baixa umidade" in texto(beta) and 'title="Perigo Potencial: agora, até 23:59"' in beta
     assert "Perigo Potencial · agora, até 23:59" in texto(beta)
     assert re.search(r'<td class="cl-col-foco">não</td>', beta) and re.search(r'<td class="cl-col-aviso">nenhum</td>', linhas(pagina(c))["Usina Gama"])
-    assert re.search(r'<td class="cl-col-porque">Baixa umidade \(Perigo Potencial\)</td>', beta)          # o porquê em uma linha
+    assert re.search(r'<td class="cl-col-porque">Baixa umidade</td>', beta)          # o porquê em uma linha
 
 
 def test_pixel_mascarado_usa_o_entorno_e_marca_o_valor(mundo):

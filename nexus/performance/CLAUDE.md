@@ -350,7 +350,10 @@ dizia o QUE havia ("Tempestade · vermelho", "1,00") e não o que quer dizer nem
   com quantos são) e `visao.por_evento` (o mesmo evento em níveis diferentes vira um: o nível mais alto, a janela de todos e
   quando vale cada nível no balão). O cartão tem UM motivo por evento que manda agir; os outros níveis vão para o "Também".
 - **Motivo resumido** (`visao.motivo_curto`): fogo perto, os eventos (os que mandam agir antes) e o risco de fogo alto, cortado
-  nos dois primeiros com "e mais N". É a coluna "Por quê" da Atenção e o motivo da tabela do mapa.
+  nos dois primeiros com "e mais N". É a coluna "Por quê" da Atenção e o motivo da tabela do mapa. Desde 27/10/2026 (Levi, na
+  tabela do mapa: "quero mais resumido e direto, sabemos que é perigo potencial"), o aviso de Perigo Potencial vai só com o nome
+  do evento ("Baixa umidade"); Perigo e Grande Perigo seguem escritos ("Vendaval (Grande Perigo)"); o que vai começar diz quando,
+  com a hora curta ("Onda de calor a partir de 08/10 15h").
 - **Risco de fogo em palavra** (Mínimo, Baixo, Médio, Alto, Crítico) na célula; o número do INPE e o dia ficam no balão. Os dias
   com o nome que se fala (`visao.dias_amigaveis`: "hoje", "amanhã", "sáb 11/10"; "ontem" com o arquivo de ontem); os rótulos
   internos "D+1" seguem em `rotulos_dos_dias` para as regras de frescor.

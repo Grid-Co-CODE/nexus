@@ -711,7 +711,7 @@ def test_a_tabela_traz_cada_usina_com_o_risco_e_o_motivo_curto_e_quem_pede_acao_
     assert por["Usina Alfa"] == ("agir", "/t/performance/clima/usina/1", "Vendaval (Grande Perigo)")
     assert por["Usina Delta"][0] == "agir" and por["Usina Delta"][2] == "Fogo a 1,0 km"
     assert por["Usina Beta"][0] == "regiao" and por["Usina Beta"][2] == "Baixa umidade (Perigo)"
-    assert por["Usina Gama"][2] == "Onda de calor (Perigo Potencial, a partir de 08/10 15:00)"
+    assert por["Usina Gama"][2] == "Onda de calor a partir de 08/10 15h"
     assert por["Usina Epsilon"][2] == "Risco de fogo alto hoje"
     assert por["Usina Teta"] == ("sem", "/t/performance/clima/usina/6", "Nada previsto")
     assert ">Agir agora<" in tab and ">Acompanhar<" in tab and ">Sem alerta<" in tab     # o risco vai na palavra, não só na cor
