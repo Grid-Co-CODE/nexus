@@ -187,3 +187,13 @@ def test_livro_registrado_antes_de_existir_e_a_visao_fora_da_regra_com_motivo():
     assert livro.abas == (ZB.ABA, "atualizacao") and not livro.so_cresce
     assert ZB.ABA in catalogo.ABAS_FORA_DA_REGRA and catalogo.aba_segue_a_regra(ZB.ABA)
     assert "NEXUS_ZELADORIA_PUBLICAR" in livro.quem_grava
+    # nasceu na 1ª volta do servidor (27/10/2026 08:48, 687 linhas), conferida por GET
+    assert livro.no_banco
+
+
+def test_checklist_ate_nao_passa_de_hoje(app, banco):
+    """A 1ª gravação disse checklist_ate = 28/10 num 27/10 (OS aprovada com a data de fim adiante no Fracttal)."""
+    d = dict(_dados(), checklist_ate="2026-10-28")
+    with app.app_context():
+        ZB.publicar(app.config, banco, agora=AGORA, dados=d, conferir_checklist=False)
+    assert banco.linhas(ZB.LIVRO, "atualizacao")[0]["checklist_ate"] == "2026-10-26"

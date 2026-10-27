@@ -122,8 +122,10 @@ def publicar(config, sessao=None, *, agora=None, forcar=False, dados=None, confe
         return dict(rel, recusou="a visão saiu vazia e o banco tem linhas: o livro fica como está")
     if pulou := gravou_ha_pouco():          # outra volta gravou enquanto esta fazia a conta
         return dict(rel, pulou=pulou)
-    atu = [agora.isoformat(timespec="seconds"), ZL.semana_de(hoje), ZL.SEMANAS_NO_BANCO, len(linhas), rel["usinas"],
-           d.get("checklist_ate") or ""]
+    # o checklist_ate não passa de hoje: a 1ª gravação (27/10/2026) disse 28/10, porque uma OS aprovada tinha a data de
+    # fim adiante no Fracttal, e o 5080 leria "lido até amanhã"
+    ate = min(str(d.get("checklist_ate") or ""), hoje.isoformat()) if d.get("checklist_ate") else ""
+    atu = [agora.isoformat(timespec="seconds"), ZL.semana_de(hoje), ZL.SEMANAS_NO_BANCO, len(linhas), rel["usinas"], ate]
     rel["gravado"] = livros.publicar(LIVRO, NOME_LIVRO, {ABA: (ZL.CAB_BANCO, linhas),
                                                          "atualizacao": (CAB_ATUALIZACAO, [atu])},
                                      base=base, token=config["GRIDCO_SQL_TOKEN"], sessao=s)

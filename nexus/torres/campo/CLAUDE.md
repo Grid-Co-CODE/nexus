@@ -209,7 +209,9 @@ gaveta) em `__init__.py`.
   carteira): `zeladoria_banco.py` grava `nexus_zeladoria · zeladoria_semana` (1 linha = usina × semana com leitura, 12
   semanas, a recomendação e a situação da zeladoria em palavras do cliente, sem nome) e `atualizacao`, de hora em hora,
   só no servidor (o PC sobe com `NEXUS_CAMPO_AQUECER=0` e não relê o checklist) e só com o checklist inteiro e novo. O
-  contrato e as recusas estão no `nexus/dados/CLAUDE.md` (linha "Zeladoria para o dashboard do cliente"). Das 131 usinas,
+  contrato e as recusas estão no `nexus/dados/CLAUDE.md` (linha "Zeladoria para o dashboard do cliente"). **No ar:**
+  1ª gravação em 27/10/2026 às 08:48 (687 linhas, os totais iguais aos da tela) e a aba Zeladoria do 5080 lendo desde
+  09:02 (PerformancePainel `e648dc1`, conferida pelo chat do Dashboard Thopen com os mesmos números). Das 131 usinas,
   80 têm a linha "BD_Thopen · Dados Gerais Usinas" no de-para (a que o 5080 usa para o nome): só a Ouro Branco, das 81
   da Thopen, não tem.
 - **Prova:** `tests/test_campo_zeladoria_semanal.py` (as semanas, as leituras pela regra da aba com a validação por foto,

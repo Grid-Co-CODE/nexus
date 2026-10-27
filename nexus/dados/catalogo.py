@@ -1213,8 +1213,10 @@ LIVROS = (
     Livro("nexus_zeladoria", ("zeladoria_semana", "atualizacao"),
           "de hora em hora (entre :32 e :37), só na máquina que relê o checklist das rondas (o servidor)",
           "nexus/campo/zeladoria_banco.py (laço do Campo; NEXUS_ZELADORIA_PUBLICAR=0 desliga; não liga onde "
-          "NEXUS_CAMPO_AQUECER=0)", False,
-          "registrado em 26/10/2026 antes de existir: nasce na 1ª volta do servidor depois do deploy. Grava só com o "
+          "NEXUS_CAMPO_AQUECER=0)", True,
+          "registrado em 26/10/2026 antes de existir; nasceu na 1ª volta do servidor depois do deploy, 27/10/2026 às "
+          "08:48 (687 linhas, 113 usinas, W33 a W44), conferida por GET: os totais pela linha mais recente de cada usina "
+          "batem com a tela Zeladoria (30 com vegetação acima de 3, 21 com sujidade, 51 recomendações). Grava só com o "
           "checklist das rondas inteiro e novo (aprovadas relidas há menos de 3 h, fila da Aprovação há menos de 6 h), "
           "as rondas do banco sem erro e as OS de zeladoria presentes, e se a última gravação tiver mais de 50 min; "
           "troca o livro inteiro (as 12 semanas até a corrente)"),
