@@ -41,6 +41,8 @@ from .fatos import _id, _int, _txt, ligar_equipamento
 
 LIVRO, ABA = "nexus_chamados", "fato_chamado"
 NOME_LIVRO = "Nexus · chamados de garantia (OS de acompanhamento de chamado do Fracttal)"
+# CÓPIA no PerformancePainel (`plataforma/diag_tratamento.py`, 27/10/2026): o Diagnóstico da usina lê este livro para dizer
+# "aguardando fabricante há N dias". A leitura de lá é por NOME de coluna: coluna nova aqui não quebra, renomear quebra.
 CAB_CHAMADO = ["os", "data_id_abertura", "data_id_fim", "usina_id", "usina_ligada_por", "site_fracttal",
                "equipamento_id", "equipamento_ligado_por", "codigo_ativo", "situacao", "fabricante", "componente",
                "duracao_min", "abertura_por"]

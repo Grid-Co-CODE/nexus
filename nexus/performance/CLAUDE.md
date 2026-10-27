@@ -100,6 +100,10 @@ navegador fala com cada sistema.
   (401), o `porta.js` abre a sessão por `fetch` com um passe próprio da página (`passe_lista`, destino `/painel`, o 303
   não é seguido) e lê de novo. Escolher a usina recarrega a página do Nexus com `?p=/painel/usina/<id>?...` (passe novo
   para aquele destino).
+  **A lista de problemas é da plataforma** (a tela dona): desde 27/10/2026 ela separa "Sem tratamento" (na frente) e
+  "Explicado / em tratamento" (recolhido: OS de desligamento/religamento no período ou chamado de garantia aberto, com
+  causa, prova, desde e ação). Regra e fontes em `plataforma/CLAUDE.md`, seção "Diagnóstico: o que já tem tratamento"; o
+  dado de chamado é o livro `nexus_chamados · fato_chamado` daqui. Nada muda no Nexus: o mapa e o passe são os mesmos.
 - **Modo TV do Painel NOC** (11/10/2026; Levi: "onde eu quiser que tenha TV já deixe um botão de TV, no caso só mapa e
   NOC mesmo! não precisa de conta fixa"). Só o Painel NOC e o Mapa de risco (o dele está na seção do Mapa) têm TV:
   `registrar_molduras(bp, TORRE, ..., tv={"noc"})` marca a tela (`moldura.COM_TV`); tela nova com TV entra nesse

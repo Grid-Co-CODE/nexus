@@ -227,7 +227,9 @@ equipamento), com a linhagem, o fabricante e o componente da marca da nota e a `
 `nexus/campo/chamados_acompanhamento.py`, FORA da carga de hora em hora (aquela não toca no Fracttal): aos :50, uma
 máquina por vez (a última gravação do livro tem de ter mais de 50 min); `NEXUS_CHAMADOS_PUBLICAR=0` desliga. O REST não
 traz a subtarefa do ticket: "aguardando ticket" × "com o fabricante" fica só no quadro. A Visão do responsável lê daqui
-(até 12/10 contava pela planilha de tickets). **A OS retroativa (20/10/2026):** a criada à mão para um chamado que já
+(até 12/10 contava pela planilha de tickets), e desde 27/10/2026 também o Diagnóstico da usina da plataforma: o problema
+com chamado aberto para o ativo vai para "Explicado / em tratamento", "aguardando fabricante há N dias" (o cabeçalho está
+copiado em `plataforma/diag_tratamento.py`; renomear coluna aqui quebra lá). **A OS retroativa (20/10/2026):** a criada à mão para um chamado que já
 existia traz na nota a "Data da ocorrência / abertura do chamado"; o `data_id_abertura` e a `duracao_min` contam dela
 (Levi: "A abertura do chamado"), se for data de verdade e não depois da criação da OS, e `abertura_por` diz `nota` ou
 `os` (linhagem, regra 5). A 1ª, de um chamado de 21/08, entraria com 0 dias.
