@@ -5,8 +5,8 @@ do programador do tempo real/COS. Leia também o `CLAUDE.md` da raiz (convençõ
 
 ## O que a torre vai ser
 
-As telas estão declaradas em `__init__.py`. Ronda padronizada, Parede de eventos e Ocorrências já leem o Andamento da
-Ronda COS (seções abaixo); as outras são placeholder (cada uma diz a pergunta que vai responder e a fonte prevista). A base de produto são as specs do Fillipe, no SharePoint `Gridco/4. O&M/6.Gerencial/10. Nexus`:
+As telas estão declaradas em `__init__.py`. Ronda padronizada, Parede de eventos, Ocorrências, Religamentos e
+Acionamentos já leem o Andamento da Ronda COS (seções abaixo); as outras são placeholder (cada uma diz a pergunta que vai responder e a fonte prevista). A base de produto são as specs do Fillipe, no SharePoint `Gridco/4. O&M/6.Gerencial/10. Nexus`:
 
 - **R04, COS como visão global:**
   - **Mesas:** cada operador tem uma carteira de clientes, e o líder enxerga todas.
@@ -109,6 +109,43 @@ usina e o que entra nos eventos (só o que já tem OS) são regra do Andamento, 
   primeira tela pronta, e ela continua sendo o Acompanhamento.
 - Testes: `tests/test_cos_ocorrencias.py`, com controle positivo (o escalonamento contado, "só automático" e "não
   precisou" contados como cumpridos, a régua de "antes do envio" desligada e a porta do link trocada: vermelhos).
+
+## Religamentos: onde o remoto resolve e onde se repete (26/10/2026)
+
+*"Onde o religamento remoto resolve e onde se repete na mesma cabine?"* Lê a rota das Ocorrências (30 dias por padrão;
+7 no filtro), com quatro campos que o Andamento passou a mandar para esta tela, sem mudar a versão do contrato:
+`ativos` (as tags, na ordem de `equipamentos`), `tipo_falha_codigo`, `protecoes` e `religamento` (`remoto`, `local`).
+O desfecho e a repetição são daqui (`nexus/cos/religamentos.py`).
+
+- **O desfecho:** com remoto, **resolveu** (fechou sem ir a campo), **foi a campo depois** (veio a OS com religamento
+  local ou o campo foi acionado por pessoa) ou **ainda aberta**; só com local, **só local**. A passagem automática a
+  "Técnico acionado" não é ida a campo (a mesma regra das Ocorrências). O "Persistiu"/"Parcial" do religamento remoto
+  fica só no checklist da OS na Ronda COS: a tela não o inventa.
+- **A repetição** é pela tag do equipamento (a ocorrência de vários conta em cada um; sem equipamento, a usina inteira):
+  repete com `REPETE_A_PARTIR` (2) e fica vermelho com `REINCIDENTE_A_PARTIR` (3), a régua de reincidência do RDO.
+- **Andamento antigo** (sem os campos novos): conta o remoto que normalizou pela plataforma e a OS com religamento local,
+  agrupa pelo nome, e a tela diz que está incompleta.
+- Testes: `tests/test_cos_religamentos.py` (controle positivo: contando o escalonamento automático como campo, vermelho).
+
+## Acionamentos e distribuidoras: quem aciono e o canal da distribuidora (26/10/2026)
+
+*"Quem aciono e qual o canal da distribuidora desta UF?"* Duas metades, duas fontes (`nexus/cos/acionamentos.py`):
+
+- **Quem aciono** é do cadastro do Nexus: o Supervisor de Campo da região da usina (ou "vaga"), o Responsável O&M e o
+  técnico, o eletricista e o mantenedor da usina, com o contato que o cadastro guarda cifrado (o da ficha da usina, ou o
+  corporativo da pessoa, ou o pessoal). Decifrado só para a tela, com link `tel:`; nada disso é gravado nem vai ao
+  Andamento. Sem `NEXUS_CHAVE_CADASTRO`, a tela diz e não mostra contato.
+- **A distribuidora** é do Andamento: `GET <Andamento>/api/nexus/<cliente>/distribuidoras` (`ler_distribuidoras`,
+  `versao: 1`, 60 s de cópia): a UC de cada usina (a planilha do cliente que a Ronda COS usa para abrir o chamado; sem
+  titular nem CNPJ), o canal de cada concessionária (o SMS de registro com o formato e a confiança, e o canal para abrir
+  à mão, que a Ronda COS declara em código) e os chamados de 30 dias com o protocolo (o "por" só como sistema ou pessoa).
+  Usina sem UC lá usa a concessionária do cadastro, casada ao canal pela mesma chave da Ronda COS
+  (`chave_da_concessionaria`); nome que não casa fica "canal não levantado", sem chute.
+- **A ligação** da usina do Andamento ao cadastro é pelo código (o `Ligador` dos fatos). A que tem UC lá e não liga aqui
+  é listada no pé da tela, para o conserto no cadastro (Base → Ligações).
+- **Número pela metade não vai à faixa:** sem a leitura do Andamento de todos os clientes, "com canal", "chamados" e
+  "pedem ação" saem como "—". O Andamento de antes da rota responde 404, e a tela diz por cliente.
+- Testes: `tests/test_cos_acionamentos.py` (controle positivo: sem o telefone pessoal como reserva, vermelho).
 
 ## Regras desta torre
 

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+<noscript><meta http-equiv="refresh" content="120"></noscript>
+{# Religamentos (26/10/2026): onde o religamento remoto resolve e onde se repete na mesma cabine. Os fatos vêm do
+   Andamento da Ronda COS (as ocorrências do período, com a tag da cabine e o religamento de cada uma); o desfecho e a
+   repetição, de nexus/cos/religamentos.py. Só lê. #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Andamento da Ronda COS{% if p and p.gerado_em %}<br>leitura das <b>{{ p.gerado_em.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
+  </div>
+
+  {% if not ligada %}
+  <div class="cn-vazio cos-aviso">A fonte do Andamento ainda não está ligada neste servidor: faltam o endereço e a chave
+    (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>), que um administrador grava em Base →
+    Chaves do Nexus. O resto do Nexus segue igual.</div>
+  {% else %}
+  {% if clientes|length > 1 %}
+  <nav class="cn-abas" aria-label="Clientes">
+    {% for c in clientes %}<a href="{{ url(cliente=c) }}"{% if c == cliente %} aria-current="page"{% endif %}>{{ c }}</a>{% endfor %}
+  </nav>
+  {% endif %}
+
+  {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro[:1]|upper }}{{ leitura.erro[1:] }}.</b>
+    {% if leitura.velha %}A tela mostra a última leitura boa, das {{ lido }}.{% endif %}</div>{% endif %}
+
+  {% if p %}
+  <div class="cn-filtros">
+    <div class="cn-seg" aria-label="Período">
+      {% for d in dias_opcoes %}<a href="{{ url(dias=d) }}"{% if d == dias %} aria-current="page"{% endif %}>Últimos {{ d }} dias</a>{% endfor %}
+    </div>
+  </div>
+
+  {% if not p.completo or not p.pela_tag %}
+  <div class="cn-erro cn-aviso" role="status"><b>O Andamento deste servidor ainda não manda tudo o que a tela usa.</b>
+    {% if not p.completo %}Sem o religamento de cada ocorrência, conta-se só o remoto que normalizou pela plataforma e a OS
+    aberta com religamento local; o remoto aberto direto no Fracttal fica de fora.{% endif %}
+    {% if not p.pela_tag %}Sem a tag dos equipamentos, a cabine é agrupada pelo nome.{% endif %}</div>
+  {% endif %}
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Religamentos remotos</span><span class="v">{{ p.resumo.remotos }}</span>
+      <span class="d">ocorrências{% if p.desde %} desde {{ p.desde.strftime('%d/%m') }}{% endif %}{% if p.resumo.so_local %} · {{ p.resumo.so_local }} só local{% endif %}</span></span>
+    <span><span class="gc-rotulo">Remoto resolveu</span><span class="v">{% if p.resumo.pct_resolveu is none %}—{% else %}{{ p.resumo.pct_resolveu }}%{% endif %}</span>
+      <span class="d">{{ p.resumo.resolveu }} sem ir a campo, das {{ p.resumo.fechados }} já resolvidas{% if p.resumo.em_aberto %} · {{ p.resumo.em_aberto }} ainda aberta{{ '' if p.resumo.em_aberto == 1 else 's' }}{% endif %}</span></span>
+    <span><span class="gc-rotulo">Foram a campo depois</span><span class="v{% if p.resumo.foi_a_campo %} ruim{% endif %}">{{ p.resumo.foi_a_campo }}</span>
+      <span class="d">o remoto não segurou</span></span>
+    <span><span class="gc-rotulo">Equipamentos que repetem</span><span class="v{% if p.resumo.reincidentes %} ruim{% endif %}">{{ p.contagem.repetem }}</span>
+      <span class="d">{{ repete }} religamentos ou mais{% if p.resumo.reincidentes %} · {{ p.resumo.reincidentes }} com {{ reincidente }} ou mais{% endif %}</span></span>
+  </div>
+  {% if p.truncado %}<p class="mudo">O Andamento mandou só as mais recentes: o período tem mais ocorrências do que cabem numa resposta.</p>{% endif %}
+
+  <div class="cn-chips" aria-label="Equipamentos">
+    {% for v, rot in vers.items() %}
+    <a href="{{ url(ver=v) }}"{% if v == ver %} aria-current="page"{% endif %}>{{ rot }}<b>{{ p.contagem[v] }}</b></a>
+    {% endfor %}
+  </div>
+
+  {% if p.itens %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Equipamento</th><th>Religamentos</th>{% for k, d in desfechos.items() %}<th>{{ d[0] }}</th>{% endfor %}<th class="cos-esq">Último</th><th class="cos-esq">OS</th></tr></thead>
+    <tbody>
+    {% for e in p.itens %}
+      <tr>
+        <td class="cos-esq cos-usina"><b>{{ e.usina }}</b><span class="det">{{ e.rotulo }}{% if e.tag and e.tag != e.rotulo %} · {{ e.tag }}{% endif %}</span>
+          {% if e.tipos %}<span class="det">{{ e.tipos|join(', ') }}</span>{% endif %}</td>
+        <td>{% if e.reincidente %}<span class="cn-pill cn-critico">{{ e.total }}</span>{% elif e.repete %}<span class="cn-pill cn-alerta">{{ e.total }}</span>{% else %}{{ e.total }}{% endif %}</td>
+        {% for k, d in desfechos.items() %}<td>{% if e.desfechos.get(k) %}<span class="cn-pill cn-{{ d[1] }}">{{ e.desfechos[k] }}</span>{% else %}<span class="mudo">—</span>{% endif %}</td>{% endfor %}
+        <td class="cos-esq">{{ e.ultima.strftime('%d/%m %H:%M') if e.ultima else '—' }}</td>
+        <td class="cos-esq cos-os-lista">{{ e.os[:6]|join(' · ') or '—' }}{% if e.os|length > 6 %} <span class="mudo">e mais {{ e.os|length - 6 }}</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="cn-vazio">{% if ver == 'repetem' and p.contagem.todos %}Nenhum equipamento com {{ repete }} religamentos ou mais no período: veja todos os equipamentos.{% else %}Nenhum religamento no período.{% endif %}</p>{% endif %}
+  {% endif %}
+
+  <div class="cn-nota"><b>Como se conta.</b> Entram as ocorrências registradas no período com religamento: <b>remoto</b>
+    (a ação declarada na abertura, a OS de Religamento Remoto ou a normalização pela plataforma) ou <b>local</b> (a ação
+    declarada ou a OS de Religamento). O remoto <b>resolveu</b> quando a ocorrência fechou sem ir a campo; <b>foi a campo
+    depois</b> quando veio a OS com religamento local ou o campo foi acionado por pessoa (a passagem automática a "Técnico
+    acionado" não conta). O resultado "Persistiu" ou "Parcial" do religamento remoto fica só no checklist da OS e não
+    entra aqui. A ocorrência de vários equipamentos conta em cada um; sem equipamento, conta na usina inteira. O
+    equipamento <b>repete</b> com {{ repete }} religamentos no período e fica em vermelho com {{ reincidente }} ou mais, a
+    régua de reincidência do RDO da Ronda COS.</div>
+  {% endif %}
+</div>
+{% endblock %}
