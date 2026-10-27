@@ -104,11 +104,12 @@ def fonte(config) -> Fonte:
     )
 
 
-def _pedir(f: Fonte, caminho: str):
-    """GET com a chave no cabeçalho. O erro diz o que aconteceu em palavras, nunca a chave."""
+def _pedir(f: Fonte, caminho: str, timeout: float = TIMEOUT_S):
+    """GET com a chave no cabeçalho. O erro diz o que aconteceu em palavras, nunca a chave. O `timeout` maior é só da
+    primeira carga das Normalizações (nexus/cos/normalizacoes.py: 360 itens levam ~2,4 s lá)."""
     req = urllib.request.Request(f.url + caminho, headers={"X-Nexus-Chave": f.chave, "User-Agent": "Nexus-GridCo/1 (cos)"})
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:  # noqa: S310 — endereço do .env
+        with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 — endereço do .env
             return json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as ex:
         motivo = {

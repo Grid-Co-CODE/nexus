@@ -4,7 +4,8 @@ Ronda padronizada, Parede de eventos e Ocorrências leem o Andamento da Ronda CO
 os prazos das Ocorrências em nexus/cos/ocorrencias.py). Religamentos e Acionamentos (26/10/2026) também: as contas em
 nexus/cos/religamentos.py e nexus/cos/acionamentos.py. A Passagem de turno (26/10/2026) grava no livro nexus_cos_turno
 (nexus/cos/turno.py). OS em aberto (27/10/2026) é o Panorama da Ronda COS, pelo Andamento (os filtros e as contas em
-nexus/cos/os_abertas.py). As outras telas caem no placeholder da casca. Para dar vida a uma tela, crie uma view com a
+nexus/cos/os_abertas.py). Normalizações (27/10/2026) lê a API de normalizações do Andamento, de minuto em minuto pelo
+cursor (nexus/cos/normalizacoes.py). As outras telas caem no placeholder da casca. Para dar vida a uma tela, crie uma view com a
 mesma rota (ela vence a genérica), por exemplo:
 
     @bp.route("/mesa")
@@ -19,6 +20,7 @@ from flask import abort, current_app, redirect, render_template, request, sessio
 
 from ...cos import acionamentos as AC
 from ...cos import andamento as AND
+from ...cos import normalizacoes as NO
 from ...cos import ocorrencias as OC
 from ...cos import os_abertas as OA
 from ...cos import religamentos as RE
@@ -82,6 +84,11 @@ TORRE = Torre(
         Tela("os-abertas", "OS em aberto",
              "Que OS o COS abriu e seguem abertas no Fracttal, e há quanto tempo?",
              "Andamento da Ronda COS (o Panorama das OS abertas no Fracttal)"),
+        # 27/10/2026 (Levi: "Gostaria de inserir no COS" a API de normalizações): a hora em que cada usina voltou, pela
+        # Ronda COS, ao lado da OS que segue aberta no Fracttal. Depois das OS em aberto, que é o outro lado da mesma conta.
+        Tela("normalizacoes", "Normalizações",
+             "Quando cada usina voltou, e a OS dela já fechou no Fracttal?",
+             "Andamento da Ronda COS (as normalizações, com a hora da volta registrada pelo COS)"),
     ],
 )
 
@@ -332,3 +339,25 @@ def os_abertas():
         "cos/os_abertas.html", torre=TORRE, tela=TORRE.tela("os-abertas"), ligada=fonte.ligada, leitura=leitura, p=p,
         situacao=situacao, cliente=cliente, tipo=tipo, faixa=faixa, sem_registro=sem_registro, busca=busca,
         situacoes=OA.SITUACOES, faixas=OA.FAIXAS, lido=_lido([leitura]), url=_url)
+
+
+# ── Normalizações (27/10/2026) ────────────────────────────────────────────────────────────────────────────────────────
+@bp.route("/normalizacoes")
+def normalizacoes():
+    """Normalizações: a hora em que cada usina voltou, registrada pelo COS, e se a OS segue aberta no Fracttal. As
+    normalizações vêm do Andamento (guardadas em memória pelo cursor, nexus/cos/normalizacoes.py); os filtros e as contas
+    são daqui. Só lê: a OS abre no card do Fracttal."""
+    cfg = current_app.config
+    fonte = AND.fonte(cfg)
+    agora = AND.agora()
+    leitura = NO.ler(cfg, agora) if fonte.ligada else AND.Leitura("", None)
+    a = request.args
+    dias = NO.dias_pedidos(a.get("dias"))
+    mes = NO.mes_pedido(a.get("mes"), agora)
+    severidade = a.get("severidade", "") if a.get("severidade") in NO.SEVERIDADES else ""
+    cliente, so_aberta = a.get("cliente", ""), a.get("aberta") == "1"
+    p = NO.painel(leitura, agora, dias, cliente, severidade, so_aberta, mes)
+    return render_template(
+        "cos/normalizacoes.html", torre=TORRE, tela=TORRE.tela("normalizacoes"), ligada=fonte.ligada, leitura=leitura,
+        p=p, dias=dias, mes=mes, meses=NO.meses(agora), cliente=cliente, severidade=severidade, so_aberta=so_aberta, opcoes_dias=NO.DIAS,
+        severidades=NO.SEVERIDADES, lido=_lido([leitura]), url=_url)

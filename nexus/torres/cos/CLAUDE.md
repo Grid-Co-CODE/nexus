@@ -195,6 +195,34 @@ no Nexus, logo depois da Passagem de turno (pedido do dono). Só lê.
 - Testes: `tests/test_cos_os_abertas.py` (controle positivo: a pílula contando depois do filtro, o padrão em "todas", o
   alerta pela situação e o 404 sem a frase própria, vermelhos).
 
+## Normalizações: a hora da volta pela Ronda COS (27/10/2026)
+
+*"Quando cada usina voltou, e a OS dela já fechou no Fracttal?"* — Levi: "Gostaria de inserir no COS" a API de
+normalizações da Ronda COS (o guia `API-NORMALIZACOES.md`, do dono da Ronda COS). Por que importa: o Fracttal só encerra a
+OS quando o técnico fecha, muitas vezes dias depois da volta; na semana até 27/10/2026, 208 de 341 normalizações tinham a
+OS aberta no Fracttal (a OS 16702, de Mandaguaçu, normalizada em 19/10 às 05:53, seguia "em processo" oito dias depois).
+Só lê; nada vai ao banco (decisão do Levi, 27/10/2026: a tela, sem guardar).
+
+- **De onde:** `GET <Andamento>/api/normalizacoes?desde=&limite=` (contrato `versao: 1`, a mesma chave `X-Nexus-Chave`). A
+  API é **incremental**: devolve `cursor` e `mais`. O Nexus guarda em memória (`nexus/cos/normalizacoes.py`) desde o
+  1º dia do mês mais antigo da tela (em 27/10: desde 01/08), **por `registro`** (o mesmo registro volta com o estado novo e SUBSTITUI: o cursor fica 2 min atrás do
+  relógio de propósito), e pergunta pelo cursor a cada minuto. A 1ª carga vem em páginas de 500 com 15 s de teto (lá,
+  360 itens levam ~2,4 s); no máximo 4 páginas por pedido da tela, e o resto no pedido seguinte, com o aviso "carregando".
+  Falhou: a memória continua, dita velha, e a próxima tentativa espera 1 minuto. O processo reiniciado (deploy) carrega
+  de novo. 404 = o Andamento sem a rota.
+- **O que é regra de lá:** o que é normalização, a hora da volta (`normalizado_em`, já a corrigida), `fora_min`,
+  `hora_real` e a OS aberta no Fracttal (a varredura de 30 em 30 min de lá; `varrida_em`). **Daqui:** o período (1, 7 ou
+  30 dias pela hora da volta; 7 no padrão, o da API) ou **o mês** (o corrente e os 2 anteriores, `MESES`; Levi, 27/10/2026:
+  "a única mudança que quero é ver por mês"), os filtros (cliente, severidade, só com a OS aberta), a faixa e
+  "há quantos dias da volta a OS segue aberta" (7 dias ou mais em vermelho).
+- **As contas:** as pílulas contam o período, antes dos filtros; a faixa conta o recorte de cliente e severidade SEM o
+  "só com a OS aberta" (senão a fatia aberta seria sempre 100%). A desfeita (`normalizada: false`) sai da lista e é dita
+  à parte; a sem hora real fica na lista, marcada, e fora da mediana do tempo fora.
+- **A chave e o endereço** só na tela Base → Chaves (o repositório é público). O texto do informe (`informe.resumo`, curto,
+  sem nome de pessoa) aparece embaixo da falha.
+- Testes: `tests/test_cos_normalizacoes.py` (o upsert pelo registro, a paginação que continua, a pausa de 1 min depois
+  da falha e a desfeita fora: mutados, vermelhos).
+
 ## Regras desta torre
 
 - Prazo e meta (15 min, 30 min, horários de ronda) são **dado**, e não número solto no código: um só lugar, com o
