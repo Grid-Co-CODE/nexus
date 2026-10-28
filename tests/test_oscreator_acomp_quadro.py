@@ -129,12 +129,16 @@ def test_o_quadro_mantem_o_que_os_filtros_e_o_clique_usam(quadro):
         assert col.index("data-vazio") > col.index('<div class="cards">')    # o vazio mora dentro da coluna
     c = _cartao(quadro, 9103)
     for attr in ('href="/os/chamados/acompanhamento/9103"', 'data-marca="STI"', 'data-cliente="Cliente Teste"',
-                 'data-tipo="Estrutura Trackers"', 'data-equipe="1"', 'data-busca="9103 9102 9101 tst100-etkr1.100'):
+                 'data-tipo="Estrutura Trackers"', 'data-geral=""', 'data-ufv=""',
+                 'data-busca="9103 9102 9101 tst100-etkr1.100'):
         assert attr in c
-    assert 'data-equipe="0"' in _cartao(quadro, 9106)
-    for f in ("marca", "cliente", "tipo", "equipe", "busca"):
+    # 28/10/2026: o filtro Responsável (equipe ou outra pessoa) saiu; entraram o Status geral e o Responsável UFV
+    # (este só com o Nexus dizendo quem é: test_oscreator_garantias_28_10.py)
+    for f in ("marca", "cliente", "tipo", "geral", "busca"):
         assert 'data-f="%s"' % f in quadro
-    assert "data-limpar>Limpar filtros</button>" in quadro and 'href="/os/chamados/acompanhamento?atualizar=1"' in quadro
+    assert 'data-f="equipe"' not in quadro
+    # o Limpar filtros saiu em 28/10/2026 (Levi: "Tire o botão de limpar filtros"); o Atualizar fica
+    assert "data-limpar" not in quadro and 'href="/os/chamados/acompanhamento?atualizar=1"' in quadro
     assert '<script src="/os/static/acomp.js"></script>' in quadro
     # a faixa de números ficou como estava (é a que o Levi gosta)
     assert '<div class="lbl">Sem ticket</div><div class="linha"><span class="val r">3</span>' in quadro

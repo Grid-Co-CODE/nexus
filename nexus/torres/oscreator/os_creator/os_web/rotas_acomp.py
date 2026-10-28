@@ -14,11 +14,14 @@ A regra pura (colunas, tempo parado, a nota lida de volta) está em `acomp_web.p
 from __future__ import annotations
 
 import datetime as dt
+import io
 import threading
 import time
+import zipfile
 
 import requests
-from flask import Blueprint, has_request_context, jsonify, redirect, render_template, request, session, url_for
+from flask import (Blueprint, has_request_context, jsonify, redirect, render_template, request, send_file, session,
+                   url_for)
 
 import api
 import chamado_spec as cs
@@ -357,10 +360,29 @@ def _ler_quadro(forcar: bool = False, dono=None) -> tuple:
         return {"linhas": [], "tickets": {}, "quando": ""}, str(e)
 
 
-@bp.route("/chamados/acompanhamento")
-@exige_sessao
-def quadro():
-    forcar = request.args.get("atualizar") == "1"
+# Quem é o Responsável UFV de cada chamado (o supervisor da usina; Levi, 28/10/2026: "inclua o filtro Responsável UFV
+# que é o supervisor da UFV"). O OS Creator não sabe: quem diz é o Nexus, pelo cadastro dele (o Responsável O&M da ficha
+# da usina), e a ponte põe a função aqui ao criar o clone (`nexus/torres/chamados/ufv.py`). fn(cartões) -> {nº: nome}.
+# Sozinho (o oem, o supervisório), sem a função: o filtro não aparece e o relatório não diz o supervisor.
+RESPONSAVEL_UFV = None
+
+
+def _com_responsavel_ufv(q: dict) -> None:
+    cards = [c for col in q["colunas"].values() for c in col]
+    ufv = {}
+    if RESPONSAVEL_UFV is not None:
+        try:
+            ufv = RESPONSAVEL_UFV(cards) or {}
+        except Exception:                               # noqa: BLE001 — sem o cadastro, o quadro sai sem o supervisor
+            ufv = {}
+    for c in cards:
+        c["resp_ufv"] = str(ufv.get(c["folio"]) or "")
+    q["opcoes"]["ufv"] = (sorted({c["resp_ufv"] for c in cards if c["resp_ufv"]}, key=aw._norm)
+                          if RESPONSAVEL_UFV is not None else None)
+
+
+def _montar(forcar: bool = False) -> dict:
+    """O quadro como a tela mostra (o mesmo do Exportar relatório e do Exportar tabela)."""
     # as observações (banco da Gridco) vêm ao mesmo tempo que o Fracttal, e não depois dele (08/10/2026), e a conferência
     # de quem é a cópia (`_dono`) também
     with api._ExecutorComContexto(max_workers=1) as ex:
@@ -380,8 +402,94 @@ def quadro():
         ultimas, fins, status, erro_obs = f_obs.result()
     q = aw.montar_quadro(d["linhas"], d["tickets"], ultimas, aw.agora_brt(), fins, obs_lidas=not erro_obs,
                          status=status)
-    return render_template("acomp.html", conta=_conta(), aba="criar", q=q, quando=d.get("quando") or "", erro=erro,
-                           erro_obs=erro_obs, equipe=aw.equipe()[1], renovando=por_tras)
+    _com_responsavel_ufv(q)
+    return {"q": q, "d": d, "erro": erro, "erro_obs": erro_obs, "por_tras": por_tras}
+
+
+@bp.route("/chamados/acompanhamento")
+@exige_sessao
+def quadro():
+    m = _montar(request.args.get("atualizar") == "1")
+    return render_template("acomp.html", conta=_conta(), aba="criar", q=m["q"], quando=m["d"].get("quando") or "",
+                           erro=m["erro"], erro_obs=m["erro_obs"], equipe=aw.equipe()[1], renovando=m["por_tras"],
+                           status_geral=aw.STATUS_GERAL)
+
+
+def _cartoes_do_quadro(q: dict) -> list:
+    return [c for chave in ("chegou", "ticket", "fim") for c in q["colunas"][chave]]
+
+
+def _ultima_obs() -> dict:
+    """{nº: (quando, texto)} da última observação escrita (tipo obs) de cada OS: a "última atualização" do relatório."""
+    try:
+        lista = obs_store.listar()
+    except Exception:                                   # noqa: BLE001 — sem o banco, o relatório sai sem ela
+        return {}
+    out = {}
+    for x in lista:
+        if x.get("tipo") == "obs":
+            out[x["os"]] = (x["quando"], x["texto"])
+    return out
+
+
+@bp.route("/chamados/acompanhamento/relatorio", methods=["POST"])
+@exige_sessao
+def relatorio():
+    """O relatório dos chamados de garantia em andamento, para mandar ao cliente (Levi, 28/10/2026: "Incluir um botão de
+    Exportar Relatório ... deixe mais polido visualmente e no linguajar para enviar para o cliente, quero conseguir
+    exportar por cliente, então tem que ter um checkbox por cliente"): um PDF por cliente marcado; dois ou mais, num
+    .zip. É o quadro que a tela mostra (sem ler o Fracttal de novo)."""
+    from . import relatorio_chamados as rc
+    clientes = list(dict.fromkeys(" ".join(str(x or "").split()) for x in (_corpo().get("clientes") or [])))
+    clientes = [x for x in clientes if x]
+    if not clientes:
+        return _erro("Marque ao menos um cliente.")
+    cards = _cartoes_do_quadro(_montar(False)["q"])
+    hoje, obs = aw.agora_brt(), _ultima_obs()
+    arquivos = [("Chamados de garantia - %s - %s.pdf" % (rc.nome_de_arquivo(cli), hoje.strftime("%d-%m-%Y")),
+                 rc.gerar(rc.modelo(cards, cli, hoje, obs))) for cli in clientes]
+    if len(arquivos) == 1:
+        nome, pdf = arquivos[0]
+        return send_file(io.BytesIO(pdf), mimetype="application/pdf", as_attachment=True, download_name=nome)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for nome, pdf in arquivos:
+            z.writestr(nome, pdf)
+    buf.seek(0)
+    return send_file(buf, mimetype="application/zip", as_attachment=True,
+                     download_name="Chamados de garantia - %s.zip" % hoje.strftime("%d-%m-%Y"))
+
+
+@bp.route("/chamados/acompanhamento/tabela", methods=["POST"])
+@exige_sessao
+def tabela():
+    """A tabela em Excel (Levi, 28/10/2026: "Em tabela, tem que ter a opção de Exportar tabela"): as linhas que a tela
+    mostra com os filtros (os nºs vêm do navegador, na ordem dela), com as colunas da tabela e as que ajudam a planilha."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    folios = [str(x).strip() for x in (_corpo().get("folios") or []) if str(x).strip()]
+    por = {c["folio"]: c for c in _cartoes_do_quadro(_montar(False)["q"])}
+    linhas = [por[f] for f in folios if f in por]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Garantias"
+    ws.append(["OS", "Ativo", "Cliente", "Usina", "Responsável UFV", "Fornecedor", "Geral", "Status", "Ticket",
+               "Situação", "Aberto há (dias)", "Sem atualização (dias)", "Responsável"])
+    for c in linhas:
+        ws.append([int(c["folio"]) if c["folio"].isdigit() else c["folio"], c["ativo_nome"] or c["code"], c["cliente"],
+                   c["usina"], c["resp_ufv"], c["marca"], c["geral"], c["status_ch"], c["ticket"], c["situacao"],
+                   c["dias"], c["dias_sem"], c["responsavel"]])
+    for x in ws[1]:
+        x.font = Font(bold=True)
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+    for col, larg in zip("ABCDEFGHIJKLM", (9, 34, 18, 26, 24, 14, 11, 34, 26, 26, 12, 14, 24)):
+        ws.column_dimensions[col].width = larg
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                     as_attachment=True, download_name="Garantias - %s.xlsx" % aw.agora_brt().strftime("%d-%m-%Y"))
 
 
 @bp.route("/chamados/acompanhamento/estado")

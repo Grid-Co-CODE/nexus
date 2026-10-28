@@ -77,6 +77,19 @@ body.cham .filtros option{color:var(--tx);background:var(--sf)}
 .aviso{background:var(--sf);border:1px solid var(--ln);border-left:3px solid var(--am);border-radius:8px;padding:10px 14px;
   margin:0 0 14px;font-size:12.5px;color:var(--tx)}
 .aviso.err{border-left-color:var(--rd)}
+/* os avisos do quadro numa exclamação ao lado do título (28/10/2026, o mesmo desenho de Segurança > Extintores,
+   .hs-aviso do Nexus): o clique abre a caixa, o clique fora e o Esc fecham */
+.ac-aviso{position:relative;align-self:center}
+.ac-aviso-bt{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1.5px solid var(--am);
+  border-radius:50%;background:var(--am-tint);color:var(--am-t);font:800 14px/1 var(--font);cursor:pointer;list-style:none}
+.ac-aviso-bt::-webkit-details-marker{display:none}
+.ac-aviso-bt:hover,.ac-aviso[open] .ac-aviso-bt{border-width:2px}
+.ac-aviso-bt:focus-visible{outline:2px solid var(--am);outline-offset:2px}
+.ac-aviso-caixa{position:absolute;z-index:30;top:calc(100% + 8px);left:0;width:min(560px,calc(100vw - 32px));
+  padding:12px 14px;border:1px solid var(--ln2);border-left:3px solid var(--am);border-radius:10px;background:var(--sf3)}
+.ac-aviso-caixa p{margin:0 0 8px;font-size:12.5px;line-height:1.5;color:var(--tx)}
+.ac-aviso-caixa p:last-child{margin-bottom:0}
+@media (max-width:640px){.ac-aviso-caixa{position:fixed;top:72px;left:16px;right:16px;width:auto}}
 .aviso b{font-weight:600}
 
 /* o quadro (08/10/2026): a estética do Quadro da equipe da Engenharia do Nexus. Levi: "Precisamos padronizar a estética
@@ -440,3 +453,16 @@ html[data-tema="claro"]{--bg:var(--osc-pagina);--sf:var(--osc-cartao);--sf2:var(
   vertical-align:1px;background:var(--pulso-a71);animation:ac-pulso 1.4s ease-in-out infinite alternate}
 @media (prefers-reduced-motion:reduce){.tq tr.parada .t-sit .tag::before{animation:ac-pulso 1.4s ease-in-out infinite alternate!important}}
 @media (max-width:640px){.vistas{margin-left:0}.tq{font-size:12px}.tq th,.tq td{padding:8px 10px}}
+
+/* ── o status geral, a exportação da tabela e o diálogo do relatório para o cliente (28/10/2026) ── */
+.st-geral{margin:8px 0 0;font-size:12.5px;color:var(--mu)}
+.st-geral b{color:var(--tx)}
+#acomp:not([data-vista="tabela"]) .exportar-tabela{display:none}
+.ac-dlg{border:1px solid var(--ln2);border-radius:12px;background:var(--sf);color:var(--tx);padding:18px 20px;
+  width:min(460px,calc(100vw - 32px))}
+.ac-dlg::backdrop{background:rgba(9,13,24,.62)}
+:where(html[data-tema="claro"]) .ac-dlg::backdrop{background:rgba(20,30,50,.32)}
+.ac-dlg h2{margin:0 0 6px;font:700 16px/1.3 var(--font);color:var(--tx)}
+.ac-dlg-lista{display:grid;gap:9px;margin:14px 0;max-height:50vh;overflow:auto}
+.ac-dlg-lista label{display:flex;gap:9px;align-items:center;font-size:13.5px;cursor:pointer;color:var(--tx)}
+.ac-dlg-acoes{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}

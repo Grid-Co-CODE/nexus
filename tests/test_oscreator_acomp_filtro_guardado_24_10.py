@@ -92,11 +92,6 @@ def test_o_que_saiu_da_lista_nao_vira_filtro():
     assert (r["marca"], r["visiveis"]) == ("", 3)
 
 
-def test_limpar_filtros_limpa_o_guardado():
-    r = _rodar({"acomp.filtros": json.dumps({"marca": "Huawei"})}, acao="limpar")
-    assert _filtro(r) == {"marca": "", "busca": ""} and r["visiveis"] == 3
-
-
 def test_a_rolagem_da_coluna_e_da_pagina_tambem_voltam():
     r = _rodar(acao="sair")
     assert json.loads(r["armazem"]["acomp.rolagem"]) == {"pagina": 380, "colunas": [240]}

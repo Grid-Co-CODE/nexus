@@ -169,7 +169,7 @@ def test_a_tabela_tem_uma_linha_por_chamado_com_as_colunas_enxutas(tela):
     tab = h.split('<table class="tq">', 1)[1].split("</table>", 1)[0]
     assert [x.strip() for x in tab.split("<thead>", 1)[1].split("</thead>", 1)[0].replace("</th>", "|").replace(
         "<tr>", "").replace("</tr>", "").replace("<th>", "").split("|") if x.strip()] == \
-        ["OS", "Ativo", "Usina", "Fornecedor", "Status", "Ticket", "Situação", "Responsável"]
+        ["OS", "Ativo", "Usina", "Fornecedor", "Geral", "Status", "Ticket", "Situação", "Responsável"]
     linhas = tab.split("<tbody>", 1)[1].split("<tr ")[1:]
     assert [l.split('data-href="/os/chamados/acompanhamento/', 1)[1].split('"', 1)[0] for l in linhas] == \
         ["9103", "9104", "9105"]

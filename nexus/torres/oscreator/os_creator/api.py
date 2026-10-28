@@ -1623,6 +1623,7 @@ def _shape_wo_row(w: dict) -> dict:
                  for l in (w.get("labels") or []) if isinstance(l, dict)]
     return {"id": w.get("id"), "folio": w.get("wo_folio"), "cliente": cliente or "—",
             "usina": usina or "—", "ativo": ativo, "tipo": tipo or "—", "descricao": desc,
+            "code": code,       # o código do ativo (28/10/2026: o Responsável UFV da usina, pelo cadastro do Nexus)
             "codigos": _extrai_codigos(item),          # o filtro por ativo do "Investigar ativo" (26/10/2026)
             "criado_por": str(w.get("created_by") or "").strip(), "etiquetas": etiquetas,
             # QUEM está com a OS. A linha crua já traz isso — sem esses dois campos o

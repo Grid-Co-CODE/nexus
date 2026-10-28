@@ -37,6 +37,17 @@ DIAS_PARADA = 5
 STATUS_CHAMADO = ("Testes em campo", "Aguardando retorno do Cliente", "Aguardando retorno do Supervisor",
                   "Aguardando retorno do Fabricante", "Aguardando retorno Pré - Operação", "Aguardando Abertura de OS",
                   "Standby", "Aguardando coleta do equipamento defeituoso")
+# o status geral, AUTOMÁTICO pelo status (Levi, 28/10/2026: "Os gerais serão automáticos: Atividade Grid: Teste em Campo,
+# Aguardando abertura de OS, Aguardando retorno Pré - Operação, Aguardando retorno do Supervisor; Atividade Cliente:
+# Aguardando retorno do Cliente; Atividade Fabricante: Aguardando coleta do equipamento defeituoso, Aguardando retorno do
+# Fabricante"; "stand by deixa de ser status comum e vira status geral": escolhido no mesmo seletor). É ele que agrupa
+# o relatório que vai ao cliente e o filtro Status Gerais do quadro.
+STATUS_GERAL = ("Grid", "Cliente", "Fabricante", "Standby")
+GERAL_DO_STATUS = {"Testes em campo": "Grid", "Aguardando Abertura de OS": "Grid",
+                   "Aguardando retorno Pré - Operação": "Grid", "Aguardando retorno do Supervisor": "Grid",
+                   "Aguardando retorno do Cliente": "Cliente",
+                   "Aguardando coleta do equipamento defeituoso": "Fabricante",
+                   "Aguardando retorno do Fabricante": "Fabricante", "Standby": "Standby"}
 
 # o nome técnico do campo (o que a nota traz) → como a tela chama. É esse nome que liga a resposta do técnico ao campo
 # do formulário do fornecedor — por isso ele continua visível, pequeno, embaixo do rótulo.
@@ -347,6 +358,11 @@ def cor_avatar(nome: str) -> int:
     return sum(map(ord, _norm(nome))) % CORES_AVATAR if _norm(nome) else 0
 
 
+def status_geral(status: str) -> str:
+    """O status geral do status (`GERAL_DO_STATUS`); "" sem status ou com um que não é da lista (o da planilha antiga)."""
+    return GERAL_DO_STATUS.get(str(status or "").strip(), "")
+
+
 def status_atual(trocado, n: dict) -> str:
     """O status do chamado: o da última troca pela tela (`trocado`, "" = trocado para "sem status"); sem troca nenhuma
     (None), o "Status atual" escrito na nota da retroativa."""
@@ -393,7 +409,12 @@ def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str 
          "fim": fim.strftime("%d/%m") if fim else "", "dias_fim": dias(fim or chegou, hoje),
          "responsavel": " ".join(str(l.get("atribuido_a") or "").split()), "da_equipe": da_equipe(l),
          "parada": parada(col, max(comentarios) if comentarios else chegou, hoje, obs_lidas),
-         "status_ch": status_atual(status, n), "criado_por": " ".join(str(l.get("criado_por") or "").split())}
+         "status_ch": status_atual(status, n), "criado_por": " ".join(str(l.get("criado_por") or "").split()),
+         # o Responsável UFV (o supervisor da usina) quem diz é o Nexus, pelo cadastro dele (rotas_acomp.RESPONSAVEL_UFV)
+         "resp_ufv": ""}
+    c["geral"] = status_geral(c["status_ch"])
+    if not c["code"]:
+        c["code"] = str(l.get("code") or "").strip()     # o código do ativo da lista, quando a nota não diz
     c["cor"] = cor_avatar(c["responsavel"])
     # `tempo_curto` é o estado no canto do cartão, no jeito do Quadro da equipe da Engenharia do Nexus ("atrasada 10 d",
     # "fechada 02/10"). Levi, 08/10/2026: "Precisamos padronizar a estética para que coisas parecidas não pareçam
@@ -413,6 +434,14 @@ def cartao(l: dict, ticket, ultima_obs: str, hoje: dt.datetime, finalizado: str 
             c["tempo_curto"] = ("em verificação %s" % c["fim"]) if c["fim"] else "em verificação"
         else:
             c["tempo_curto"] = ("fechado %s" % c["fim"]) if c["fim"] else "fechado"
+    # a situação curta da tabela e da planilha (27/10/2026): a coluna e os dias (desde a chegada sem ticket; sem
+    # atualização com o fornecedor); a finalizada, o estado do canto do cartão
+    if col == "chegou":
+        c["situacao"] = "Sem ticket" + ("" if d_chegou is None else " · %d d" % d_chegou)
+    elif col == "ticket":
+        c["situacao"] = "Com o fornecedor" + ("" if d_sem is None else " · %d d" % d_sem)
+    else:
+        c["situacao"] = (c["tempo_curto"] or "finalizado").capitalize()
     c["busca"] = _norm(" ".join(str(x or "") for x in (c["folio"], c["inspecao"], c["os_campo"], c["code"],
                                                           c["ativo_nome"], c["cliente"], c["usina"], marca,
                                                           c["ticket"], c["responsavel"])))

@@ -59,6 +59,10 @@ _VOLTAR_DE = (b'<a class="os-topo-voltar" href="/" title="Voltar para a Platafor
 # levará para o oem"): a tela foi apagada da cópia (a sincronia só lista o apagado, não apaga no oem), e os links que o
 # código do oem ainda desenha para ela (o card "Tickets" da Performance e a pílula no card do setor, no Início) saem
 # aqui, na resposta, para a cópia continuar igual à do oem.
+# Garantias sem o "← Chamados" no Nexus (Levi, 28/10/2026: "Em garantias tire esse botão de voltar para chamados"): o
+# Nexus chega ao quadro pelo menu (Chamados > Garantias); no oem, sozinho, a volta ao card de Chamados fica. Só o voltar
+# do quadro (para /os/chamados); o "← Acompanhamento" da tela de um chamado fica.
+_SEM_VOLTAR_CHAMADOS = re.compile(rb'<a class="ac-volta" href="/os/chamados">[^<]*</a>')
 _SEM_TICKETS = re.compile(rb'<a\b[^>]*\bhref="/os/tickets(?:[?#][^"]*)?"[^>]*>.*?</a>\s*', re.S)
 _MARCA_DE = ('<img src="/os/assets/grid-icon.png" alt="" class="os-simbolo">\n'
              '    <div><div class="os-n1">Grid Co.</div><div class="os-n2">Sistema de Ordens de Serviço</div></div>').encode()
@@ -245,6 +249,11 @@ def _criar_clone(app):
     from os_web import criar_app
 
     clone = criar_app(segredo=_segredo(app))
+    # o Responsável UFV dos chamados de Garantias, pelo cadastro do Nexus (28/10/2026; nexus/torres/chamados/ufv.py)
+    from os_web import rotas_acomp
+
+    from ..chamados import ufv
+    rotas_acomp.RESPONSAVEL_UFV = ufv.ligar(app)
     # o original fala http com a plataforma na mesma máquina; aqui o cookie segue o do Nexus (Secure no servidor)
     clone.config["SESSION_COOKIE_SECURE"] = bool(app.config.get("SESSION_COOKIE_SECURE"))
     # e mora no /os do Nexus, debaixo do prefixo em que ele roda (o clone fixa "/os", que debaixo de /nexus não ia ao
@@ -400,6 +409,7 @@ def encaminhar(resto: str):
             resp.headers["Location"] = base + destino
     if resp.mimetype == "text/html":
         corpo = _SEM_TICKETS.sub(b"", _trocar(resp.get_data().replace(_VOLTAR_DE, b""), _MARCA_DE, _MARCA_PARA))
+        corpo = _SEM_VOLTAR_CHAMADOS.sub(b"", corpo)
         if b"<head>" in corpo:
             # a função entra antes de qualquer script da página, que já a usa no <head>
             janela = _JANELA_OS if request.args.get("janela") == "1" else b""

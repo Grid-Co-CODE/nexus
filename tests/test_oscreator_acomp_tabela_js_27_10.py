@@ -28,15 +28,18 @@ function el(extra) {
     getBoundingClientRect: () => ({top: 0, bottom: 0}), getAttribute: () => "/os/chamados/acompanhamento/1",
     setAttribute(k, v) { this["_" + k] = v; }}, extra);
 }
-const linhas = [["Huawei", "9103"], ["Sungrow", "9104"], ["Huawei", "9105"]].map(([m, f]) =>
-  el({dataset: {marca: m, busca: "os " + f, href: "/os/chamados/acompanhamento/" + f}, tagName: "TR"}));
+const linhas = [["Huawei", "9103", "Cliente", "Supervisor Um"], ["Sungrow", "9104", "Fabricante", ""],
+                ["Huawei", "9105", "", "Supervisor Um"]].map(([m, f, g, u]) =>
+  el({dataset: {marca: m, busca: "os " + f, href: "/os/chamados/acompanhamento/" + f, geral: g, ufv: u}, tagName: "TR"}));
 const vazioTabela = el();
 const marca = el({tagName: "SELECT", dataset: {f: "marca"}, options: [{value: ""}, {value: "Huawei"}, {value: "Sungrow"}]});
+const geral = el({tagName: "SELECT", dataset: {f: "geral"}, options: [{value: ""}, {value: "Cliente"}, {value: "_sem"}]});
+const ufv = el({tagName: "SELECT", dataset: {f: "ufv"}, options: [{value: ""}, {value: "Supervisor Um"}, {value: "_sem"}]});
 const bQuadro = el({dataset: {vista: "quadro"}}), bTabela = el({dataset: {vista: "tabela"}});
 let navegou = null;
 const quadro = el({
   dataset: {vista: "quadro"},
-  querySelectorAll: (s) => ({"[data-f]": [marca], "tr[data-linha]": linhas, ".vistas [data-vista]": [bQuadro, bTabela]}[s] || []),
+  querySelectorAll: (s) => ({"[data-f]": [marca, geral, ufv], "tr[data-linha]": linhas, ".vistas [data-vista]": [bQuadro, bTabela]}[s] || []),
   querySelector: (s) => (s === "[data-vazio-tabela]" ? vazioTabela : null),
 });
 global.document = {querySelector: () => null, querySelectorAll: () => [], getElementById: (id) => (id === "acomp" ? quadro : null),
@@ -51,6 +54,10 @@ global.OsCarga = {buscar: async () => ({})};
 eval(fs.readFileSync(process.argv[3], "utf8"));
 if (acao === "filtrar") { marca.value = "Sungrow"; marca._ev.change(); }
 if (acao === "nada") { marca.value = "Ninguem"; marca._ev.change(); }
+if (acao === "geral") { geral.value = "Cliente"; geral._ev.change(); }
+if (acao === "sem_geral") { geral.value = "_sem"; geral._ev.change(); }
+if (acao === "ufv") { ufv.value = "Supervisor Um"; ufv._ev.change(); }
+if (acao === "sem_ufv") { ufv.value = "_sem"; ufv._ev.change(); }
 if (acao === "tabela") { bTabela._ev.click(); }
 if (acao === "clique") { linhas[1]._ev.click({target: {closest: () => null}}); }
 console.log(JSON.stringify({vista: quadro.dataset.vista, guardada: local["acomp.vista"] || null, navegou,
@@ -85,3 +92,10 @@ def test_a_troca_para_tabela_fica_guardada():
 
 def test_o_clique_na_linha_abre_o_chamado():
     assert _rodar(acao="clique")["navegou"] == "/os/chamados/acompanhamento/9104"
+
+
+@pytest.mark.parametrize("acao,ficam", [("geral", ["os 9103"]), ("sem_geral", ["os 9105"]),
+                                        ("ufv", ["os 9103", "os 9105"]), ("sem_ufv", ["os 9104"])])
+def test_os_filtros_status_geral_e_responsavel_ufv(acao, ficam):
+    """28/10/2026: o Status geral e o Responsável UFV no lugar do Responsável; "_sem" acha o que não tem."""
+    assert _rodar(acao=acao)["visiveis"] == ficam

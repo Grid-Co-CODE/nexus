@@ -33,11 +33,15 @@ COLUNAS = ["id", "quando", "os", "ativo", "tipo", "texto", "quem", "email", "ext
 TIPOS = ("obs", "ticket", "finalizado", "status")
 LIMITE_TEXTO = 2000
 TTL = 60           # s: a leitura da aba inteira vale isto (a própria escrita já entra no cache na hora)
+# Vencida, a leitura de antes sai NA HORA e a aba é relida por trás, uma releitura por vez (28/10/2026: o banco da Gridco
+# levou 20,2 s com erro, 21,4 s e 0,8 s em três leituras seguidas; o quadro do Acompanhamento esperava isso a cada
+# minuto, e no erro mostrava "Read timed out" e desligava o pulso e o status). Só a 1ª leitura, sem nada guardado,
+# espera; a releitura que falha fica com a de antes.
 
 ABA = ga.Aba(WORKBOOK, NOME_ABA, COLUNAS)
 SemCredencial = ga.SemCredencial
 
-_estado = {"lista": None, "lido": 0.0}
+_estado = {"lista": None, "lido": 0.0, "renovando": False}
 _trava = threading.Lock()
 BRT = dt.timezone(dt.timedelta(hours=-3))
 
@@ -66,11 +70,34 @@ def _de_linha(l: dict):
             "email": str(r.get("email") or "").strip(), "extra": extra if isinstance(extra, dict) else {}}
 
 
+def _em_segundo_plano(fn):
+    """Onde a releitura roda: uma thread solta (os testes trocam para rodar quando querem)."""
+    threading.Thread(target=fn, daemon=True, name="chamados-obs-reler").start()
+
+
+def _reler():
+    try:
+        _ler()
+    except Exception:                                   # noqa: BLE001 — fica a leitura de antes; a próxima visita tenta
+        pass
+    finally:
+        with _trava:
+            _estado["renovando"] = False
+
+
 def listar(forcar: bool = False) -> list:
-    """Todas as observações, da mais antiga à mais nova. Levanta se o banco não responder."""
+    """Todas as observações, da mais antiga à mais nova. Vencida, sai a de antes e a aba é relida por trás; levanta só
+    sem nada guardado (ou no `forcar`) e o banco sem responder."""
     with _trava:
-        if _estado["lista"] is not None and not forcar and time.time() - _estado["lido"] < TTL:
+        if _estado["lista"] is not None and not forcar:
+            if time.time() - _estado["lido"] >= TTL and not _estado["renovando"]:
+                _estado["renovando"] = True
+                _em_segundo_plano(_reler)
             return list(_estado["lista"])
+    return _ler()
+
+
+def _ler() -> list:
     vistos, lista = set(), []
     for l in _linhas():
         x = _de_linha(l)

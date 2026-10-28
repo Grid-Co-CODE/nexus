@@ -1471,3 +1471,41 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
 - Prova: `tests/test_oscreator_garantias_27_10.py` e `tests/test_oscreator_acomp_tabela_js_27_10.py` (o script no
   node). Na bancada (Fracttal e banco falsos): a troca do status gravada e na linha do tempo, os status no cartão e na
   tabela, o ticket longo quebrando no cartão, na célula e no topo, a 1440 e a 375 px, no escuro e no claro.
+
+## Garantias: status geral, relatório ao cliente, exportar tabela e os filtros novos (28/10/2026)
+
+- **O status geral é automático** (Levi: "Os gerais serão automáticos"), pelo status: Grid (Testes em campo, Aguardando
+  Abertura de OS, Aguardando retorno Pré - Operação, Aguardando retorno do Supervisor), Cliente (Aguardando retorno do
+  Cliente), Fabricante (Aguardando coleta do equipamento defeituoso, Aguardando retorno do Fabricante) e Standby ("stand
+  by deixa de ser status comum e vira status geral", escolhido no mesmo seletor). `acomp_web.GERAL_DO_STATUS` e
+  `status_geral`; o status que não é da lista (o "Status atual" da planilha antiga) fica sem geral. A tela do chamado o
+  mostra embaixo do seletor; o quadro e a tabela o levam (`data-geral`, a coluna Geral).
+- **Os filtros:** entra o Status geral (com "Sem status"); o Responsável (equipe ou outra pessoa) sai, e entra o
+  Responsável UFV, o supervisor da usina: o Responsável O&M da ficha da usina no cadastro do Nexus. O OS Creator não
+  sabe: a ponte põe em `rotas_acomp.RESPONSAVEL_UFV` a função do Nexus (`nexus/torres/chamados/ufv.py`), que roda no
+  app do Nexus (o nome vem do cofre do cadastro), liga a usina pelo nome do Fracttal ou pelo código do ativo (`Ligador`,
+  o código entrou na linha da lista, `api`) e guarda o cadastro 10 min. Sozinho (o oem), sem a função, o filtro não
+  aparece. O "Limpar filtros" saiu ("Tire o botão de limpar filtros"); o filtro guardado na aba do navegador continua.
+- **Os avisos numa exclamação** ao lado do título (o "Não consegui ler as observações" e o "N de M no nome de outra
+  pessoa"), o desenho do `.hs-aviso` de Segurança > Extintores; o clique fora e o Esc fecham. O erro do Fracttal (o
+  quadro sem OS) continua à vista.
+- **Sem o "← Chamados" no Nexus:** a ponte tira o voltar do quadro (`ponte._SEM_VOLTAR_CHAMADOS`); no oem ele fica. O
+  "← Acompanhamento" da tela de um chamado fica nos dois.
+- **Exportar relatório** (`relatorio_chamados.py`, `POST /os/chamados/acompanhamento/relatorio`): um checkbox por
+  cliente com chamado em andamento (o cliente do filtro vem marcado); um PDF por cliente, dois ou mais num .zip. O
+  modelo é a "Atualização dos chamados de garantia" que a gestão de chamados mandava ao cliente: o resumo executivo
+  (em andamento, aguardando o cliente, o fabricante, em tratativa pela Grid Co., em standby), a visão por usina com o
+  supervisor, os chamados por quem precisa agir (o ticket, a usina e o ativo, o status, a última observação escrita na
+  tela com a data, os dias em aberto) e os próximos passos, no visual do PDF da OS. A última observação vai ao cliente:
+  quem escreve sabe disso.
+- **Exportar tabela** (`POST /os/chamados/acompanhamento/tabela`, na vista de tabela): as linhas que os filtros deixam,
+  na ordem da tela, numa planilha (o cabeçalho congelado e o filtro do Excel), com o cliente, o Responsável UFV e os
+  dias em aberto e sem atualização a mais.
+- **As observações não esperam o banco lento** (`chamados_obs_store.listar`): vencida (60 s), a leitura de antes sai na
+  hora e a aba é relida por trás, uma releitura por vez, e a que falha fica com a de antes. Medido em 28/10/2026: 20,2 s
+  com erro, 21,4 s e 0,8 s em três leituras seguidas; o quadro esperava isso a cada minuto, e no erro mostrava o "Read
+  timed out" e desligava o pulso e o status. Só a 1ª leitura (sem nada guardado) e o Atualizar esperam.
+- Prova: `tests/test_oscreator_garantias_28_10.py`, `tests/test_oscreator_acomp_tabela_js_27_10.py` (os filtros no
+  node). Na bancada: a exclamação, os filtros (Fabricante, Standby, um supervisor), o diálogo com um checkbox por
+  cliente, o relatório (um PDF; dois clientes, um .zip) e a planilha; a 375 px a página não rola para o lado e a caixa
+  dos avisos fica na tela.

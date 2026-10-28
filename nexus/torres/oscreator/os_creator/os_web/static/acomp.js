@@ -42,6 +42,32 @@
     return j;
   }
 
+  // um arquivo do servidor (o relatório em PDF, a tabela em Excel): POST com o círculo de carga, e o download pelo
+  // nome que o servidor deu
+  async function baixar(url, corpo, padrao) {
+    const r = await OsCarga.buscar(url, {method: "POST", headers: {"Content-Type": "application/json", "X-Requested-With": "fetch"},
+                                body: JSON.stringify(corpo || {})}, "Montando…");
+    if (r.status === 401) {
+      location.href = "/os/login?next=" + encodeURIComponent(location.pathname + location.search);
+      throw new Error("sessão");
+    }
+    if (!r.ok) {
+      let j = {};
+      try { j = await r.json(); } catch (e) { j = {}; }
+      throw new Error(j.erro || ("HTTP " + r.status));
+    }
+    const blob = await r.blob();
+    const cd = r.headers.get("Content-Disposition") || "";
+    const m = /filename\*=UTF-8''([^;]+)/i.exec(cd) || /filename="?([^";]+)"?/i.exec(cd);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = m ? decodeURIComponent(m[1]) : padrao;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  }
+
   function contar(el, n) {
     if (el) el.textContent = String(n);
   }
@@ -82,6 +108,13 @@
     const lerGuardado = function (k) { try { return JSON.parse(sessionStorage.getItem(k) || "null"); } catch (e) { return null; } };
     const guardar = function (k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* aba anônima: vale só agora */ } };
     const campos = quadro.querySelectorAll("[data-f]");
+    // a mesma regra no cartão e na linha da tabela (28/10/2026: o Status geral e o Responsável UFV no lugar do
+    // Responsável); "_sem" = o que não tem (sem status geral, sem Responsável UFV)
+    const casa = function (v, d) { return !v || (v === "_sem" ? !d : d === v); };
+    const passa = function (d, f) {
+      return casa(f.marca, d.marca) && casa(f.cliente, d.cliente) && casa(f.tipo, d.tipo) && casa(f.geral, d.geral) &&
+             casa(f.ufv, d.ufv) && (!f.busca || (d.busca || "").indexOf(f.busca) >= 0);
+    };
     const aplicar = function () {
       const f = {}, crus = {};
       campos.forEach(function (c) { crus[c.dataset.f] = c.value; f[c.dataset.f] = c.dataset.f === "busca" ? norm(c.value) : c.value; });
@@ -89,10 +122,7 @@
       quadro.querySelectorAll(".col").forEach(function (col) {
         let n = 0;
         col.querySelectorAll(".card").forEach(function (card) {
-          const d = card.dataset;
-          const ok = (!f.marca || d.marca === f.marca) && (!f.cliente || d.cliente === f.cliente) &&
-                     (!f.tipo || d.tipo === f.tipo) && (!f.equipe || d.equipe === f.equipe) &&
-                     (!f.busca || (d.busca || "").indexOf(f.busca) >= 0);
+          const ok = passa(card.dataset, f);
           card.classList.toggle("oculto", !ok);
           if (ok) n++;
         });
@@ -103,10 +133,7 @@
       // a tabela (27/10/2026): as linhas têm os mesmos data-* do cartão, e o filtro vale nas duas vistas
       let nLinhas = 0;
       quadro.querySelectorAll("tr[data-linha]").forEach(function (tr) {
-        const d = tr.dataset;
-        const ok = (!f.marca || d.marca === f.marca) && (!f.cliente || d.cliente === f.cliente) &&
-                   (!f.tipo || d.tipo === f.tipo) && (!f.equipe || d.equipe === f.equipe) &&
-                   (!f.busca || (d.busca || "").indexOf(f.busca) >= 0);
+        const ok = passa(tr.dataset, f);
         tr.classList.toggle("oculto", !ok);
         if (ok) nLinhas++;
       });
@@ -115,11 +142,6 @@
       medir();                                                            // o filtro muda quais são os 6 primeiros
     };
     campos.forEach(function (c) { c.addEventListener(c.tagName === "INPUT" ? "input" : "change", aplicar); });
-    const limpar = quadro.querySelector("[data-limpar]");
-    if (limpar) limpar.addEventListener("click", function () {
-      campos.forEach(function (c) { c.value = ""; });
-      aplicar();
-    });
     // quadro ou tabela (27/10/2026): a escolha fica neste navegador; o <script> curto do acomp.html já a pôs antes da
     // 1ª pintura (a mesma chave). Ao voltar ao quadro, as colunas são medidas de novo (escondidas, não dá para medir).
     quadro.querySelectorAll(".vistas [data-vista]").forEach(function (b) {
@@ -135,6 +157,51 @@
         location.href = tr.dataset.href;
       });
     });
+    // os avisos na exclamação (28/10/2026, como em Segurança > Extintores): o clique fora e o Esc fecham
+    const avisos = quadro.querySelector("details.ac-aviso");
+    if (avisos) {
+      document.addEventListener("click", function (ev) { if (avisos.open && !avisos.contains(ev.target)) avisos.open = false; });
+      document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && avisos.open) avisos.open = false; });
+    }
+    // Exportar tabela (28/10/2026): as linhas que os filtros deixam, na ordem da tela, numa planilha
+    const bTabela = quadro.querySelector("[data-exportar-tabela]");
+    if (bTabela) bTabela.addEventListener("click", async function () {
+      const folios = Array.prototype.filter.call(quadro.querySelectorAll("tr[data-linha]"), function (tr) {
+        return !tr.classList.contains("oculto");
+      }).map(function (tr) { return tr.dataset.folio; });
+      bTabela.disabled = true;
+      try { await baixar("/os/chamados/acompanhamento/tabela", {folios: folios}, "Garantias.xlsx"); }
+      catch (e) { if (e.message !== "sessão") alert("Não exportou: " + e.message); }
+      bTabela.disabled = false;
+    });
+    // Exportar relatório (28/10/2026): um checkbox por cliente; o filtro de cliente da tela vem marcado
+    const dlg = quadro.querySelector("[data-dlg-relatorio]"), bRel = quadro.querySelector("[data-relatorio]");
+    if (dlg && bRel) {
+      const mRel = dlg.querySelector("[data-msg-relatorio]");
+      bRel.addEventListener("click", function () {
+        const fc = quadro.querySelector('[data-f="cliente"]');
+        dlg.querySelectorAll('input[type="checkbox"]').forEach(function (x) { x.checked = !!fc && fc.value === x.value; });
+        msg(mRel, "");
+        if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+      });
+      dlg.querySelector("[data-fechar]").addEventListener("click", function () { dlg.close ? dlg.close() : dlg.removeAttribute("open"); });
+      const bExp = dlg.querySelector("[data-exportar-relatorio]");
+      bExp.addEventListener("click", async function () {
+        const clientes = Array.prototype.filter.call(dlg.querySelectorAll('input[type="checkbox"]'), function (x) { return x.checked; })
+          .map(function (x) { return x.value; });
+        if (!clientes.length) { msg(mRel, "Marque ao menos um cliente.", "er"); return; }
+        bExp.disabled = true; msg(mRel, "Montando o relatório…");
+        try {
+          await baixar("/os/chamados/acompanhamento/relatorio", {clientes: clientes},
+                       clientes.length === 1 ? "Chamados de garantia.pdf" : "Chamados de garantia.zip");
+          msg(mRel, "Pronto.", "ok");
+          setTimeout(function () { if (dlg.close) dlg.close(); }, 600);
+        } catch (e) {
+          if (e.message !== "sessão") msg(mRel, "Não exportou: " + e.message, "er");
+        }
+        bExp.disabled = false;
+      });
+    }
     const salvo = lerGuardado(CHAVE_FILTRO) || {};
     let comFiltro = false;
     campos.forEach(function (c) {

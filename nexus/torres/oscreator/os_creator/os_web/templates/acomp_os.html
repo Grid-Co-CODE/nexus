@@ -81,7 +81,9 @@
           </select>
           <button type="button" class="btn btn-g" id="b_status"{% if not st_livre %} disabled{% endif %}>Salvar</button>
         </div>
-        <p class="dica">{% if c.col not in ('chegou', 'ticket') %}Chamado finalizado: o status fica como estava.{% else %}Fica no Nexus (não vai ao Fracttal) e entra sozinho nas observações.{% endif %}</p>
+        {# o status geral sai sozinho do status (28/10/2026): Grid, Cliente, Fabricante ou Standby #}
+        <p class="st-geral">Status geral: <b>{{ c.geral or '—' }}</b></p>
+        <p class="dica">{% if c.col not in ('chegou', 'ticket') %}Chamado finalizado: o status fica como estava.{% else %}Fica no Nexus (não vai ao Fracttal) e entra sozinho nas observações. O status geral sai do status.{% endif %}</p>
         <div class="msg" id="msg_status"></div>
       </section>
       <section class="bloco">

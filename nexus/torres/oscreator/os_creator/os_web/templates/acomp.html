@@ -18,7 +18,7 @@
 {% set titulo = c.ativo_nome or c.code or '—' %}
 {% set onde = [c.code if c.code != titulo else '', c.local]|select|join(' · ') %}
 <a class="card {{ cls }} k-{{ c.urg }}{% if c.col == 'fim' %} fim{% endif %}{% if c.parada %} parada{% endif %}" href="/os/chamados/acompanhamento/{{ c.folio }}" title="{{ c.tempo }}{% if c.parada %} · 5 dias ou mais sem comentário{% endif %}"
-   data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-equipe="{{ '1' if c.da_equipe else '0' }}" data-busca="{{ c.busca }}">
+   data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-geral="{{ c.geral }}" data-ufv="{{ c.resp_ufv }}" data-busca="{{ c.busca }}">
   <div class="k-cab"><span class="k-os">OS {{ c.folio }}</span>{% if c.tempo_curto %}<span class="tag u-{{ c.urg }}">{{ c.tempo_curto }}</span>{% endif %}</div>
   <div class="k-tit">{{ titulo }}</div>
   {% if onde %}<div class="k-onde">{{ onde }}</div>{% endif %}
@@ -45,9 +45,19 @@
    apareceria e trocaria na frente da pessoa. O clique e a gravação da escolha moram no acomp.js (mesma chave). #}
 <script>try{if(localStorage.getItem("acomp.vista")==="tabela")document.getElementById("acomp").dataset.vista="tabela"}catch(e){}</script>
   <div class="ac-head">
-    <div class="ac-tit"><a class="ac-volta" href="/os/chamados">← Chamados</a><h1>Acompanhamento <span>de chamados</span></h1></div>
+    <div class="ac-tit"><a class="ac-volta" href="/os/chamados">← Chamados</a><h1>Acompanhamento <span>de chamados</span></h1>
+      {# os avisos numa exclamação amarela ao lado do título (Levi, 28/10/2026: "Os avisos ... poderiam ficar em um
+         exclamação ao lado de 'Acompanhamento de chamados' como está sendo feito em segurança > extintores"); o clique
+         abre, o clique fora e o Esc fecham (acomp.js) #}
+      {% if erro_obs or q.fora %}<details class="ac-aviso"><summary class="ac-aviso-bt" title="Avisos" aria-label="Avisos">!</summary>
+        <section class="ac-aviso-caixa" aria-label="Avisos">
+          {% if erro_obs %}<p>{{ erro_obs }} Sem elas, o pulso das OS paradas fica desligado e o status pode não aparecer.</p>{% endif %}
+          {% if q.fora %}<p><b>{{ q.fora }} de {{ q.total }}</b> OS de acompanhamento estão no nome de outra pessoa, não da equipe de chamados{% if equipe %} ({{ equipe }}){% endif %}. O quadro mostra todas.</p>{% endif %}
+        </section></details>{% endif %}</div>
     <div class="ac-acoes">
       {% if quando %}<span class="ac-fonte"{% if renovando %} data-renovando data-quando="{{ quando }}" title="A tela abriu com a leitura anterior e já está relendo o Fracttal: a nova entra sozinha quando chegar, ou agora no Atualizar."{% endif %}>lido do Fracttal às {{ quando[11:] }} de {{ quando[:5] }}{% if renovando %} · atualizando{% endif %}</span>{% endif %}
+      {# o relatório para o cliente (28/10/2026): um checkbox por cliente, um PDF por cliente marcado #}
+      <button type="button" class="btn btn-o" data-relatorio>Exportar relatório</button>
       <a class="btn btn-g" href="/os/chamados/acompanhamento?atualizar=1">Atualizar</a>
     </div>
   </div>
@@ -62,16 +72,16 @@
     <div class="kpi"><div class="lbl">Finalizados</div><div class="linha"><span class="val{% if q.n.fim %} g{% endif %}">{{ q.n.fim }}</span>
       <span class="note">nos últimos 90 dias</span></div></div>
   </div>
-  {% if erro_obs %}<p class="aviso">{{ erro_obs }} Sem elas, o pulso das OS paradas fica desligado.</p>{% endif %}
-  {% if q.fora %}<p class="aviso"><b>{{ q.fora }} de {{ q.total }}</b> OS de acompanhamento estão no nome de outra pessoa, não da equipe de chamados{% if equipe %} ({{ equipe }}){% endif %}. O quadro mostra todas.</p>{% endif %}
   <div class="filtros">
     <label class="fcampo"><span class="flbl">Fornecedor</span><select data-f="marca" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.marca %}<option value="{{ o }}">{{ o }}</option>{% endfor %}</select></label>
     <label class="fcampo"><span class="flbl">Cliente</span><select data-f="cliente" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.cliente %}<option value="{{ o }}">{{ o }}</option>{% endfor %}</select></label>
     <label class="fcampo"><span class="flbl">Tipo de ativo</span><select data-f="tipo" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.tipo %}<option value="{{ o }}">{{ o }}</option>{% endfor %}</select></label>
-    <label class="fcampo"><span class="flbl">Responsável</span><select data-f="equipe" data-osb="nativo"><option value="">Todos</option><option value="1">Equipe de chamados</option><option value="0">Outra pessoa</option></select></label>
+    <label class="fcampo"><span class="flbl">Status geral</span><select data-f="geral" data-osb="nativo"><option value="">Todos</option>{% for o in status_geral %}<option value="{{ o }}">{{ o }}</option>{% endfor %}<option value="_sem">Sem status</option></select></label>
+    {% if q.opcoes.ufv is not none %}<label class="fcampo"><span class="flbl">Responsável UFV</span><select data-f="ufv" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.ufv %}<option value="{{ o }}">{{ o }}</option>{% endfor %}<option value="_sem">Sem responsável UFV</option></select></label>{% endif %}
     <label class="fcampo"><span class="flbl">Buscar</span><input data-f="busca" type="search" placeholder="nº da OS, ativo, usina, ticket…" autocomplete="off"></label>
-    <button type="button" class="limpar" data-limpar>Limpar filtros</button>
     <div class="vistas" role="group" aria-label="Ver como"><button type="button" data-vista="quadro">Quadro</button><button type="button" data-vista="tabela">Tabela</button></div>
+    {# a tabela em Excel, com as linhas que os filtros deixam (28/10/2026) #}
+    <button type="button" class="btn btn-o btn-p exportar-tabela" data-exportar-tabela>Exportar tabela</button>
   </div>
   <div class="board">
     {{ coluna('cr', 'chegou', 'Chegaram', 'abrir o ticket', 'Nenhuma OS esperando ticket.') }}
@@ -81,18 +91,25 @@
   {# a tabela (27/10/2026, Levi: "Em garantias quero uma visão de tabela o mais enxuta e direta possível"): uma linha por
      chamado, na ordem das colunas do quadro, com os mesmos data-* do cartão (os filtros valem nas duas vistas); o clique
      na linha abre o chamado, e a parada tem o ponto que pulsa #}
-  <div class="tabela"><table class="tq"><thead><tr><th>OS</th><th>Ativo</th><th>Usina</th><th>Fornecedor</th><th>Status</th><th>Ticket</th><th>Situação</th><th>Responsável</th></tr></thead><tbody>
+  <div class="tabela"><table class="tq"><thead><tr><th>OS</th><th>Ativo</th><th>Usina</th><th>Fornecedor</th><th>Geral</th><th>Status</th><th>Ticket</th><th>Situação</th><th>Responsável</th></tr></thead><tbody>
   {%- for chave, nome in (('chegou', 'Sem ticket'), ('ticket', 'Com o fornecedor'), ('fim', 'Finalizado')) %}{% for c in q.colunas[chave] %}
-    <tr data-linha data-href="/os/chamados/acompanhamento/{{ c.folio }}"{% if c.parada %} class="parada"{% endif %} data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-equipe="{{ '1' if c.da_equipe else '0' }}" data-busca="{{ c.busca }}">
+    <tr data-linha data-href="/os/chamados/acompanhamento/{{ c.folio }}"{% if c.parada %} class="parada"{% endif %} data-folio="{{ c.folio }}" data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-geral="{{ c.geral }}" data-ufv="{{ c.resp_ufv }}" data-busca="{{ c.busca }}">
       <td class="t-os"><a href="/os/chamados/acompanhamento/{{ c.folio }}">{{ c.folio }}</a></td><td class="t-at">{{ c.ativo_nome or c.code or '—' }}</td>
-      <td>{{ c.usina or '—' }}</td><td>{{ c.marca or '—' }}</td><td>{{ c.status_ch or '—' }}</td><td class="t-tk">{{ c.ticket or '—' }}</td>
-      {# a situação curta: a coluna e os dias (desde a chegada sem ticket; sem atualização com o fornecedor); a frase inteira no title #}
-      {%- set dias_sit = c.dias if chave == 'chegou' else c.dias_sem %}
-      <td class="t-sit" title="{{ c.tempo }}"><span class="tag u-{{ c.urg }}">{% if chave == 'fim' %}{{ (c.tempo_curto or nome)|capitalize }}{% else %}{{ nome }}{% if dias_sit is not none %} · {{ dias_sit }} d{% endif %}{% endif %}</span></td>
+      <td>{{ c.usina or '—' }}</td><td>{{ c.marca or '—' }}</td><td>{{ c.geral or '—' }}</td><td>{{ c.status_ch or '—' }}</td><td class="t-tk">{{ c.ticket or '—' }}</td>
+      <td class="t-sit" title="{{ c.tempo }}"><span class="tag u-{{ c.urg }}">{{ c.situacao }}</span></td>
       <td class="t-quem{% if not c.da_equipe %} a{% endif %}">{{ c.responsavel or '—' }}</td></tr>
   {%- endfor %}{% endfor %}
   </tbody></table>
   <p class="vazio oculto" data-vazio-tabela>Nenhum chamado com esses filtros.</p></div>
+  {% set clientes_abertos = (q.colunas.chegou + q.colunas.ticket)|map(attribute='cliente')|select|unique|sort %}
+  <dialog class="ac-dlg" data-dlg-relatorio aria-labelledby="dlg_rel_t">
+    <h2 id="dlg_rel_t">Exportar relatório</h2>
+    <p class="dica">Um PDF por cliente marcado, com os chamados em andamento, para mandar ao cliente. A última observação de cada chamado entra como a atualização dele.</p>
+    {% if clientes_abertos %}<div class="ac-dlg-lista">{% for cli in clientes_abertos %}<label><input type="checkbox" value="{{ cli }}"> {{ cli }}</label>{% endfor %}</div>
+    {% else %}<p class="vazio-l">Nenhum chamado em andamento.</p>{% endif %}
+    <div class="msg" data-msg-relatorio></div>
+    <div class="ac-dlg-acoes"><button type="button" class="btn btn-o" data-fechar>Cancelar</button><button type="button" class="btn btn-g" data-exportar-relatorio>Exportar</button></div>
+  </dialog>
   {% if q.canceladas or q.antigas %}<p class="rodape">{% if q.canceladas %}{{ q.canceladas }} cancelada{{ '' if q.canceladas == 1 else 's' }} fora do quadro{% endif %}{% if q.canceladas and q.antigas %} · {% endif %}{% if q.antigas %}{{ q.antigas }} finalizada{{ '' if q.antigas == 1 else 's' }} há mais de 90 dias{% endif %}.</p>{% endif %}
 </section>
 {% endblock %}
