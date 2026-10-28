@@ -26,7 +26,16 @@ TIMEOUT_S = 30
 
 # fonte -> (monotonic da última conferência, dados, epoch do download, ETag do GitHub, versão do mapa de clientes aplicado)
 _cache: dict[str, tuple[float, dict, float, str | None, int]] = {}
+# Uma trava POR ARQUIVO (ronda de dados do PCM, 27/10/2026): com uma só, pega antes de olhar a cópia, o download lento do
+# gestao_pcm.json (14,9 MB, até 30 s) segurava a leitura de todos os outros arquivos, mesmo com a cópia deles válida.
+# A `_trava` só guarda o dicionário das travas.
+_travas: dict[str, threading.Lock] = {}
 _trava = threading.Lock()
+
+
+def _trava_de(fonte: str) -> threading.Lock:
+    with _trava:
+        return _travas.setdefault(fonte, threading.Lock())
 
 
 class FonteErro(RuntimeError):
@@ -175,7 +184,14 @@ def _ler(config, chave: str, padrao: str, validar) -> Leitura:
     m = clientes.mapa()                  # fora da trava: a 1ª leitura do cadastro em 10 min vai ao banco
     local = not fonte.startswith(("http://", "https://"))
     agora = time.monotonic()
-    with _trava:
+    trava = _trava_de(fonte)
+    em_cache = _cache.get(fonte)
+    # a cópia que já está com os nomes do cadastro sai sem esperar: dentro do prazo, ou enquanto outro pedido já baixa
+    # este mesmo arquivo (esperar o download dele seria a tela parada pelo GitHub; a próxima leitura pega a cópia nova)
+    if em_cache and not local and em_cache[4] == clientes.versao(m) and (
+            agora - em_cache[0] < TTL_S or trava.locked()):
+        return Leitura(em_cache[1], fonte, baixado_em=em_cache[2])
+    with trava:
         em_cache = _cache.get(fonte)
         if em_cache and not local and agora - em_cache[0] < TTL_S:
             em_cache = _com_nomes_do_nexus(fonte, em_cache, m)

@@ -442,3 +442,27 @@ def test_semana_da_fonte_sem_status_nao_troca_a_do_banco():
     m = [dict(zip(P.CAB_PROGRAMACAO, l)) for l in P.mesclar_semanas(velho, l_fonte)]
     assert sorted((x["data_id_semana"], x["os"]) for x in m) == [(20261005, "15001"), (20261005, "2"), (20261019, "5")]
     assert P.semanas_degradadas([]) == set()
+
+
+# ── a ligação do equipamento das semanas antigas (ronda de dados do PCM, 27/10/2026) ─────────────────────────────────
+def test_a_semana_antiga_ganha_o_equipamento_que_entrou_na_dimensao_e_nunca_perde_ligacao():
+    """A carga só remonta as 4 semanas do arquivo: as antigas guardavam o rótulo da hora em que foram montadas. Em 27/10,
+    456 blocos diziam "fora da dimensão" e 453 deles já estavam nela (a Governança contava 456 órfãos; eram 3)."""
+    from nexus.dados import equipamento as E
+    cod = "XPT-ALF100-INVR1.1"
+    _, _, velhas = _fato(_dados(_semana("2026-W38", [_r(), _r(os_id="2", codigo="")])), equip=lambda c: E.ligar(c, {}))
+    ix = {c: P.CAB_PROGRAMACAO.index(c) for c in ("equipamento_id", "equipamento_ligado_por", "codigo_ativo")}
+    assert velhas[0][ix["equipamento_ligado_por"]] == E.FORA_DA_DIMENSAO
+    dim = {E.canon(cod): (E.equipamento_id(cod), True)}
+    novas = P.religar_equipamento(velhas, lambda c: E.ligar(c, dim))
+    assert novas[0][ix["equipamento_id"]] == velhas[0][ix["equipamento_id"]] == E.equipamento_id(cod)
+    assert novas[0][ix["equipamento_ligado_por"]] == E.NA_FOTO
+    assert novas[1] == velhas[1]                                    # sem código: nada muda
+    # o que já ligou não volta a "fora" quando a dimensão some numa hora; sem índice, nada muda
+    assert P.religar_equipamento(novas, lambda c: E.ligar(c, {})) == novas
+    assert P.religar_equipamento(velhas, None) == velhas
+    # o bloco antigo sem ID, com o código hoje na dimensão, ganha o ID
+    sem_id = list(velhas[0])
+    sem_id[ix["equipamento_id"]], sem_id[ix["equipamento_ligado_por"]] = None, None
+    r = P.religar_equipamento([sem_id], lambda c: E.ligar(c, dim))[0]
+    assert r[ix["equipamento_id"]] == E.equipamento_id(cod) and r[ix["equipamento_ligado_por"]] == E.NA_FOTO

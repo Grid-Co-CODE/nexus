@@ -509,6 +509,21 @@ Nexus no PC com o login do Fracttal de verdade abriria uma sessão que o servido
 "Encerrar" respondem que a gravação só roda no servidor (a régua e o cadastro da curadoria seguem). A 2ª é o almoxarifado de
 teste do Fracttal (`TESTE-INVENTARIO`), que fica fora das telas do PCM e do histórico.
 
+## 7j. PCM: o histórico do saldo do almoxarifado (27/10/2026)
+
+O App guarda só a última varredura do almoxarifado; o histórico (a foto do saldo de cada ciclo, por mês, e as peças lançadas)
+é o Nexus que guarda, na carga de hora em hora (`nexus/dados/CLAUDE.md`, linha "Almoxarifado do PCM"). **Uma linha no `.env`
+do servidor:**
+
+```
+NEXUS_ALMOX_GRAVAR=1
+```
+
+e reiniciar. Sem ela a carga só monta e não grava, e **cada dia sem ela é uma foto de saldo perdida** (o App sobrescreve). Ensaio de
+27/10/2026 com o ciclo real (sem gravar): 268 linhas de saldo, 0 repetidas, 0 itens sem leitura, 99,6% com usina, 13
+almoxarifados. Conferir na hora seguinte: os livros `nexus_almoxarifado` e `nexus_almoxarifado_saldo_AAAA_MM` aparecem em
+Base → Governança de dados. Desligar: tirar a linha e reiniciar (o que foi gravado fica; o histórico só cresce).
+
 ## 8. Atualizar
 
 Um comando, no servidor (desde 06/10/2026):

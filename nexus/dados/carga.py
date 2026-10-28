@@ -515,8 +515,10 @@ def _programacao(le: "_Leitor", dados, lido_em, lig, m, equip, hist_q, iso, maqu
                                                     "o fato não encolhe")
         if not no_banco:
             return None, False, dict(rel, nao_grava="o livro existe e o fato veio vazio: o fato não encolhe")
-    # a linha que não mudou guarda o lido_em que já está no banco: a API guarda o histórico de cada linha que muda
-    linhas = programacao.manter_lido_em(programacao.mesclar_semanas(no_banco, fonte), no_banco)
+    # a linha que não mudou guarda o lido_em que já está no banco: a API guarda o histórico de cada linha que muda; as
+    # semanas antigas ganham o equipamento que entrou na dimensão depois delas (só melhora, `religar_equipamento`)
+    linhas = programacao.manter_lido_em(
+        programacao.religar_equipamento(programacao.mesclar_semanas(no_banco, fonte), equip), no_banco)
     tab, rm, q = tabelas_programacao(linhas, rp, hist_q, iso, maquina, sha_fonte)
     mudou = str(ant.get("sha_linhas") or "") != tab["atualizacao"][1][0][programacao.CAB_ATUALIZACAO.index(
         "sha_linhas")]

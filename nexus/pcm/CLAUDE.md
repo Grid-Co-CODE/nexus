@@ -44,7 +44,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 
 | Arquivo | O que faz |
 |---|---|
-| `fonte.py` | lê o `banco_dados.json` do App (a semana que está valendo) e, para a Gestão PCM, o `gestao_pcm.json` e o `mpas.json`; cópia de 5 min e, passado isso, confere pelo ETag (304 = segue a cópia, sem baixar de novo); na cópia em memória, o `cliente` já vem pelo nome do cadastro (`clientes.py`) |
+| `fonte.py` | lê o `banco_dados.json` do App (a semana que está valendo) e, para a Gestão PCM, o `gestao_pcm.json` e o `mpas.json`; cópia de 5 min e, passado isso, confere pelo ETag (304 = segue a cópia, sem baixar de novo); na cópia em memória, o `cliente` já vem pelo nome do cadastro (`clientes.py`). **Uma trava por arquivo** (27/10/2026, ronda de dados do PCM): com uma só, o download lento do `gestao_pcm.json` (14,9 MB, até 30 s) segurava a leitura de todos os outros arquivos, mesmo com cópia válida; e quem já tem cópia não espera o download que outro pedido já faz do mesmo arquivo (`tests/test_pcm_fonte_trava.py`) |
 | `clientes.py` | **o nome do cliente é o do cadastro do Nexus** (18/10/2026, seção abaixo) |
 | `gestao.py` | as contas da Gestão PCM (Plano & Fila), transcritas do `js/preventivas.js` do painel |
 | `prova_gestao.py` + `.js` | a prova de que a Gestão PCM bate célula a célula com o painel (roda o JS dele no node) |

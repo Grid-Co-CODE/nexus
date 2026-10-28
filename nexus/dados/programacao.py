@@ -575,6 +575,31 @@ def semanas_degradadas(da_fonte: list) -> set:
     return {w for w in todas - com if w is not None}
 
 
+def religar_equipamento(linhas: list, equip) -> list:
+    """As semanas que ficam do banco ganham a ligação do equipamento que entrou na dimensão depois de montadas.
+
+    A carga só remonta as 4 semanas do arquivo: as antigas guardavam o rótulo da hora em que foram montadas. Em
+    27/10/2026 (ronda de dados do PCM), 456 blocos diziam "código com usina (fora da dimensão)" e 453 deles já estavam
+    nela: a Governança contava 456 órfãos, e eram 3. Só MELHORA: o bloco sem ID ou "fora da dimensão" cujo código hoje
+    é membro ganha o ID e o rótulo; o que já ligou nunca volta a "fora" (a hora em que a dimensão não foi lida não
+    desfaz nada) e o ID que já existe não troca (o ID é o mesmo em qualquer máquina, `equipamento.equipamento_id`).
+    Sem `equip`, nada muda."""
+    from .equipamento import FORA_DA_DIMENSAO
+    if not equip:
+        return linhas
+    i_id, i_como, i_cod = (CAB_PROGRAMACAO.index(c) for c in ("equipamento_id", "equipamento_ligado_por",
+                                                                "codigo_ativo"))
+    out = []
+    for l in linhas:
+        if l[i_cod] and (l[i_id] is None or l[i_como] == FORA_DA_DIMENSAO):
+            eid, como = _equipamento(equip, l[i_cod])
+            if eid and como not in (None, FORA_DA_DIMENSAO) and l[i_id] in (None, eid):
+                l = list(l)
+                l[i_id], l[i_como] = eid, como
+        out.append(l)
+    return out
+
+
 def _linha_tipada(l) -> list:
     lin = [l.get(c) for c in CAB_PROGRAMACAO] if isinstance(l, dict) else list(l)
     return [_no_tipo(c, v) for c, v in zip(CAB_PROGRAMACAO, lin)]

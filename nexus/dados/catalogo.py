@@ -1365,15 +1365,15 @@ LIVROS = (
           so_cresce=True),
     Livro("nexus_pcm_curadoria", ("fato_decisao_curadoria",),
           "a cada carga da curadoria do PCM (ferramentas/carregar_curadoria_pcm.py; a tela de edição vem depois)",
-          "nexus/pcm/acompanhamento/curadoria.py", False,
-          "registrado em 14/10/2026 antes de existir: nasce com a 1ª carga do arquivo do painel do PCM; o Acompanhamento "
+          "nexus/pcm/acompanhamento/curadoria.py", True,
+          "registrado em 14/10/2026 antes de existir e no banco desde a 1ª carga (GET em 27/10/2026: 56 linhas, todas de 14/10): nasce com a 1ª carga do arquivo do painel do PCM; o Acompanhamento "
           "lê com cache de 2 minutos, e a gravação relê o banco antes (troca o livro inteiro)",
           so_cresce=True),
     Livro("nexus_pcm_motivos", ("dim_motivo", "fato_decisao_motivo", "fato_decisao_backoffice"),
           "a cada marca de motivo (Quadro da semana e Fora da programação), a cada mudança no cadastro dos motivos e na "
           "lista do backoffice (Gerar a semana)",
-          "nexus/pcm/motivos.py, pelas telas do PCM", False,
-          "registrado em 16/10/2026 antes de existir: nasce com a 1ª gravação (o cadastro inicial, os 12 motivos do "
+          "nexus/pcm/motivos.py, pelas telas do PCM", True,
+          "registrado em 16/10/2026 antes de existir; no banco (GET em 27/10/2026: 12 motivos, 124 decisões e 13 do backoffice): nasce com a 1ª gravação (o cadastro inicial, os 12 motivos do "
           "pedido do Levi, entra junto). As telas leem com cache de 1 minuto e a gravação relê o banco antes (troca o "
           "livro inteiro, as três abas juntas)",
           so_cresce=True),
@@ -1388,8 +1388,8 @@ LIVROS = (
           so_cresce=True),
     # os técnicos por usina (17/10/2026): o PCM põe e tira técnicos de cada usina; o App de Campo lê o executa daqui
     Livro("nexus_pcm_atribuicoes", ("fato_decisao_atribuicao",), "a cada decisão na tela Técnicos por usina",
-          "nexus/pcm/atribuicoes.py, pela tela Técnicos por usina do PCM", False,
-          "registrado em 17/10/2026 antes de existir: nasce com a 1ª decisão ou com a carga inicial (a regra da equipe "
+          "nexus/pcm/atribuicoes.py, pela tela Técnicos por usina do PCM", True,
+          "registrado em 17/10/2026 antes de existir; no banco (GET em 27/10/2026: 287 decisões): nasce com a 1ª decisão ou com a carga inicial (a regra da equipe "
           "do cadastro). A tela lê com cache de 1 minuto e a gravação relê o banco antes (troca o livro inteiro)",
           so_cresce=True),
     # as decisões da Segurança sobre os extintores (24/10/2026): a exclusão de extintor (o não reconhecido aceito e o
