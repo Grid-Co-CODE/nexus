@@ -211,17 +211,31 @@ Só lê; nada vai ao banco (decisão do Levi, 27/10/2026: a tela, sem guardar).
   Falhou: a memória continua, dita velha, e a próxima tentativa espera 1 minuto. O processo reiniciado (deploy) carrega
   de novo. 404 = o Andamento sem a rota.
 - **O que é regra de lá:** o que é normalização, a hora da volta (`normalizado_em`, já a corrigida), `fora_min`,
-  `hora_real` e a OS aberta no Fracttal (a varredura de 30 em 30 min de lá; `varrida_em`). **Daqui:** o período (1, 7 ou
-  30 dias pela hora da volta; 7 no padrão, o da API) ou **o mês** (o corrente e os 2 anteriores, `MESES`; Levi, 27/10/2026:
-  "a única mudança que quero é ver por mês"), os filtros (cliente, severidade, só com a OS aberta), a faixa e
-  "há quantos dias da volta a OS segue aberta" (7 dias ou mais em vermelho).
-- **As contas:** as pílulas contam o período, antes dos filtros; a faixa conta o recorte de cliente e severidade SEM o
-  "só com a OS aberta" (senão a fatia aberta seria sempre 100%). A desfeita (`normalizada: false`) sai da lista e é dita
-  à parte; a sem hora real fica na lista, marcada, e fora da mediana do tempo fora.
-- **A chave e o endereço** só na tela Base → Chaves (o repositório é público). O texto do informe (`informe.resumo`, curto,
-  sem nome de pessoa) aparece embaixo da falha.
+  `hora_real` e a OS aberta no Fracttal (a varredura de 30 em 30 min de lá; `varrida_em`). **Daqui:** **o mês** pela hora
+  da volta (o corrente no padrão e os 2 anteriores, `MESES`; os 1, 7 e 30 dias saíram no mesmo dia: "Pode tirar esses
+  filtros de 7, 30 dias ou último dia"), os filtros, a faixa e "há quantos dias da volta a OS segue aberta" (7 dias ou
+  mais em vermelho).
+- **A tela, como o Levi pediu (27/10/2026, a 2ª rodada):** as colunas OS, Início (com o tempo fora), Normalização (com
+  por onde foi registrada), Cliente, Usina (com a falha e os equipamentos embaixo), Operador e No Fracttal, nessa ordem;
+  sem a severidade (só no CSV). Filtros: cliente, usina (as do cliente escolhido), criado por, status no Fracttal (em
+  processo, em verificação, fechada) e um texto livre (OS, usina, falha, equipamento, quem criou, informe). O "Como se
+  conta" é a exclamação amarela ao lado do título, a macro `aviso` de `hseq/_legenda.html` (a mesma dos Extintores).
+  **Exportar CSV** = `?formato=csv` com os filtros da tela (`;`, com BOM para o Excel; o texto que começa com `=`, `+`,
+  `-` ou `@` vai com apóstrofo, para o Excel não o executar).
+- **"Operador" é quem criou a OS no Fracttal** (`nexus/cos/criadores.py`). A API das normalizações não manda nome de
+  pessoa; o Fracttal diz (`created_by` do REST, `work_orders?wo_folio=N`). Uma linha de fundo lê UMA OS a cada 2 s (30
+  por minuto, 15% da cota de 200/min da empresa), a mais recente primeiro; recusa espera 1 min. O criador não muda: lido
+  uma vez, fica, na memória e num arquivo da pasta de dados **cifrado pelo Cofre** (a chave do cadastro), para o deploy
+  não refazer a leitura inteira; sem a chave, só na memória. Até ler, a linha diz "lendo no Fracttal" e o filtro Criado
+  por ainda não tem a OS (a tela diz quantas faltam). Antes desta rodada, "Operador" embaixo da hora queria dizer que
+  uma pessoa do COS registrou a volta (`declarada_por: pessoa`); virou "registrada pelo COS".
+- **As contas:** as opções dos filtros contam o mês, antes dos filtros; a faixa conta a lista filtrada SEM o status
+  (senão a fatia aberta seria sempre 100%). A desfeita (`normalizada: false`) sai da lista e é dita à parte; a sem hora
+  real fica na lista, marcada, e fora da mediana do tempo fora.
+- **A chave e o endereço** só na tela Base → Chaves (o repositório é público).
 - Testes: `tests/test_cos_normalizacoes.py` (o upsert pelo registro, a paginação que continua, a pausa de 1 min depois
-  da falha e a desfeita fora: mutados, vermelhos).
+  da falha e a desfeita fora: mutados, vermelhos; os filtros, as colunas e o CSV) e `tests/test_cos_criadores.py` (a
+  fila na ordem da tela, a recusa que devolve à fila, o arquivo só cifrado).
 
 ## Regras desta torre
 

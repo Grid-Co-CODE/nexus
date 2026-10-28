@@ -1,14 +1,27 @@
 {% extends "base.html" %}
+{% from "hseq/_legenda.html" import aviso, termo %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
 <noscript><meta http-equiv="refresh" content="120"></noscript>
 {# Normalizações (27/10/2026): a hora em que cada usina voltou, pela Ronda COS, ao lado da OS que segue aberta no
-   Fracttal. As normalizações vêm do Andamento (nexus/cos/normalizacoes.py); os filtros e as contas são daqui. Só lê. #}
-<div class="campo-nativa">
+   Fracttal, por mês. As normalizações vêm do Andamento (nexus/cos/normalizacoes.py); quem criou a OS, do Fracttal
+   (nexus/cos/criadores.py); os filtros e as contas são daqui. Só lê. #}
+<div class="campo-nativa cos-norm">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="hs-titulo"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+    {# o "Como se conta" numa exclamação ao lado do título, como em Segurança > Extintores (Levi, 27/10/2026) #}
+    {% call aviso('Como se conta', 'Clique na linha para abrir o card da OS, com o seu login do Fracttal. O Exportar CSV baixa a lista com os filtros da tela, com a falha, os equipamentos e a severidade de cada uma.') %}
+      {{ termo('Início') }}<dd>A hora em que a falha começou, e quanto tempo a usina ficou fora até voltar.</dd>
+      {{ termo('Normalização') }}<dd>A hora em que a usina voltou, registrada na Ronda COS (a corrigida, quando alguém corrigiu). É esta a hora para MTTR e disponibilidade, e não o fechamento da OS no Fracttal, que acontece quando o técnico fecha, muitas vezes dias depois. Embaixo, por onde a volta foi registrada: pelo COS, pelo sistema, pelo Fracttal, por religamento remoto ou na criação da OS.</dd>
+      {{ termo('Operador') }}<dd>Quem criou a OS no Fracttal. O Nexus lê do Fracttal aos poucos, para não gastar a cota da empresa: a OS ainda não lida aparece como "lendo no Fracttal".</dd>
+      {{ termo('No Fracttal', 'alerta') }}<dd>Se a OS ainda estava aberta na última varredura da Ronda COS, que roda de 30 em 30 minutos, e há quantos dias depois da volta. Vermelho a partir de 7 dias. "Fechada" é a OS que não está entre as abertas: finalizada ou cancelada.</dd>
+      {{ termo('Sem hora real', 'neutro') }}<dd>Encerrada sem a hora da volta (o fim igual ao início): fica na lista e fora da mediana do tempo fora.</dd>
+      {{ termo('Desfeita') }}<dd>A normalização foi desfeita e a ocorrência voltou a aberta: sai da lista e é dita embaixo dela.</dd>
+    {% endcall %}
+    </div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">Normalizações da Ronda COS{% if p and p.varredura %}<br>varredura do Fracttal às <b>{{ p.varredura.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
   </div>
 
@@ -25,12 +38,8 @@
     as mais antigas; recarregue em instantes para ver as mais novas.</div>{% endif %}
 
   <div class="cn-filtros">
-    <div class="cn-seg" aria-label="Período">
-      {% for d in opcoes_dias %}<a href="{{ url(dias=d, mes=None) }}"{% if d == dias and not mes %} aria-current="page"{% endif %}>{{ 'Último dia' if d == 1 else 'Últimos ' ~ d ~ ' dias' }}</a>{% endfor %}
-    </div>
-    {# por mês (27/10/2026, Levi: "a única mudança que quero é ver por mês"): o mês inteiro, pela hora da volta #}
     <div class="cn-seg" aria-label="Mês">
-      {% for k, rot, _i, _f in meses %}<a href="{{ url(mes=k, dias=None) }}"{% if k == mes %} aria-current="page"{% endif %}>{{ rot }}</a>{% endfor %}
+      {% for k, rot, _i, _f in meses %}<a href="{{ url(mes=k) }}"{% if k == mes %} aria-current="page"{% endif %}>{{ rot }}</a>{% endfor %}
     </div>
   </div>
 
@@ -45,58 +54,58 @@
       <span class="d">encerradas sem a hora: fora da mediana</span></span>
   </div>
 
-  <form class="cn-filtros" method="get">
-    {% if mes %}<input type="hidden" name="mes" value="{{ mes }}">{% else %}<input type="hidden" name="dias" value="{{ dias }}">{% endif %}
-    {% if severidade %}<input type="hidden" name="severidade" value="{{ severidade }}">{% endif %}
-    {% if so_aberta %}<input type="hidden" name="aberta" value="1">{% endif %}
+  <form class="cn-filtros cos-norm-filtros" method="get">
+    <input type="hidden" name="mes" value="{{ mes }}">
     <label class="cn-filtro-par"><span class="gc-rotulo">Cliente</span>
-    <select class="gc-campo" name="cliente" onchange="this.form.submit()">
+    <select class="gc-campo" name="cliente" onchange="this.form.usina.value='';this.form.submit()">
       <option value="">Todos</option>{% for c, n in p.contagem.cliente.items() %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
     </select></label>
-    <noscript><button class="gc-btn gc-btn--ui" type="submit">Filtrar</button></noscript>
+    <label class="cn-filtro-par"><span class="gc-rotulo">Usina</span>
+    <select class="gc-campo" name="usina" onchange="this.form.submit()">
+      <option value="">Todas</option>{% for u, n in p.contagem.usina.items() %}<option value="{{ u }}"{% if u == usina %} selected{% endif %}>{{ u }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    <label class="cn-filtro-par"><span class="gc-rotulo">Criado por</span>
+    <select class="gc-campo" name="criado_por" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for c, n in p.contagem.criado_por.items() %}<option value="{{ c }}"{% if c == criado_por %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    <label class="cn-filtro-par"><span class="gc-rotulo">Status Fracttal</span>
+    <select class="gc-campo" name="status" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for k, rot in status_filtro.items() %}<option value="{{ k }}"{% if k == status %} selected{% endif %}>{{ rot }} ({{ p.contagem.status[k] }})</option>{% endfor %}
+    </select></label>
+    <input class="gc-campo cos-norm-busca" type="search" name="q" value="{{ busca }}" placeholder="OS, usina, falha, equipamento..." aria-label="Buscar nas normalizações">
+    <a class="gc-btn gc-btn--ui cos-norm-csv" href="{{ url(formato='csv') }}" download><i class="ph ph-download-simple" aria-hidden="true"></i> Exportar CSV</a>
   </form>
-
-  <div class="cn-chips" aria-label="Recorte">
-    {% for k, s in severidades.items() %}<a href="{{ url(severidade=None if severidade == k else k) }}"{% if severidade == k %} aria-current="page"{% endif %}>{{ s[0] }}<i>{{ p.contagem.severidade[k] }}</i></a>{% endfor %}
-    <a href="{{ url(aberta=None if so_aberta else '1') }}"{% if so_aberta %} aria-current="page"{% endif %}>Só com a OS aberta no Fracttal<i>{{ p.contagem.abertas }}</i></a>
-    {% if cliente or severidade or so_aberta %}<a href="{{ url(cliente=None, severidade=None, aberta=None) }}">Limpar o recorte</a>{% endif %}
-  </div>
+  {% if cliente or usina or criado_por or status or busca %}<div class="cn-chips"><a href="{{ url(cliente=None, usina=None, criado_por=None, status=None, q=None) }}">Limpar os filtros</a></div>{% endif %}
+  {% if p.contagem.sem_criador %}<p class="mudo cos-norm-fila">Lendo no Fracttal quem criou {{ p.contagem.sem_criador }} {{ 'OS' }} deste mês (aos poucos, para não gastar a cota da empresa): o filtro Criado por ainda não as tem.</p>{% endif %}
 
   {% if p.itens %}
   <div class="cn-tab cos-tab"><table>
-    <thead><tr><th class="cos-esq">Voltou em</th><th class="cos-esq">Cliente / usina</th><th class="cos-esq">Falha</th>
-      <th class="cos-esq">Severidade</th><th>Fora</th><th class="cos-esq">OS</th><th class="cos-esq">No Fracttal</th></tr></thead>
+    <thead><tr><th class="cos-esq">OS</th><th class="cos-esq">Início</th><th class="cos-esq">Normalização</th>
+      <th class="cos-esq">Cliente</th><th class="cos-esq">Usina</th><th class="cos-esq" title="Quem criou a OS no Fracttal">Operador</th>
+      <th class="cos-esq">No Fracttal</th></tr></thead>
     <tbody>
     {% for n in p.itens %}
       <tr{% if n.os %} class="cos-os" tabindex="0" data-folio="{{ n.os }}" data-status="{{ n.status_card }}" title="Abrir o card da OS {{ n.os }}"{% endif %}>
+        <td class="cos-esq">{% if n.os %}<b class="cos-folio">{{ n.os }}</b>{% else %}<span class="mudo">sem OS</span>{% endif %}
+          {% if n.os_relacionadas %}<span class="det">e {{ n.os_relacionadas|join(', ') }}</span>{% endif %}</td>
+        <td class="cos-esq">{{ n.inicio.strftime('%d/%m %H:%M') if n.inicio else '—' }}
+          <span class="det">{% if n.hora_real %}fora {{ n.fora_txt }}{% else %}<span class="cn-pill cn-neutro">sem hora real</span>{% endif %}</span></td>
         <td class="cos-esq"><b>{{ n.volta.strftime('%d/%m %H:%M') if n.volta else '—' }}</b>
           <span class="det">{% if n.fim_corrigido %}hora corrigida · {% endif %}{{ n.declarada_por }}</span></td>
-        <td class="cos-esq cos-usina"><b>{{ n.usina }}</b><span class="det">{{ n.cliente }}{% if n.usina_codigo %} · {{ n.usina_codigo }}{% endif %}{% if n.fora_do_escopo %} · fora do escopo O&amp;M{% endif %}</span></td>
-        <td class="cos-esq cos-texto">{{ n.falha }}
-          <span class="det">{% if n.equipamentos %}{{ n.equipamentos[:2]|join(', ') }}{% if n.equipamentos|length > 2 %} e mais {{ n.equipamentos|length - 2 }}{% endif %}{% else %}a usina inteira{% endif %}{% if n.resumo %} · {{ n.resumo }}{% endif %}</span></td>
-        <td class="cos-esq"><span class="cn-pill cn-{{ n.sev[1] }}">{{ n.sev[0] }}</span></td>
-        <td>{% if n.hora_real %}{{ n.fora_txt }}{% else %}<span class="cn-pill cn-neutro">sem hora real</span>{% endif %}
-          <span class="det">desde {{ n.inicio.strftime('%d/%m %H:%M') if n.inicio else '—' }}</span></td>
-        <td class="cos-esq">{% if n.os %}<b class="cos-folio">{{ n.os }}</b>{% else %}<span class="mudo">—</span>{% endif %}
-          {% if n.os_relacionadas %}<span class="det">e {{ n.os_relacionadas|join(', ') }}</span>{% endif %}</td>
-        <td class="cos-esq">{% if n.aberta %}<span class="cn-pill cn-{{ 'critico' if (n.aberta_ha_dias or 0) >= 7 else 'alerta' }}">Aberta · {{ n.status }} {{ n.pct }}%</span>
-          <span class="det">{% if n.aberta_ha_dias %}{{ n.aberta_ha_dias }} {{ 'dia' if n.aberta_ha_dias == 1 else 'dias' }} depois da volta{% else %}a usina voltou hoje{% endif %}</span>
-          {% else %}<span class="mudo">Fechada ou fora das abertas</span>{% endif %}</td>
+        <td class="cos-esq">{{ n.cliente }}</td>
+        <td class="cos-esq cos-usina cos-texto"><b>{{ n.usina }}</b>
+          <span class="det">{{ n.falha }}{% if n.equipamentos %} · {{ n.equipamentos[:2]|join(', ') }}{% if n.equipamentos|length > 2 %} e mais {{ n.equipamentos|length - 2 }}{% endif %}{% endif %}</span></td>
+        <td class="cos-esq">{% if n.criado_por %}{{ n.criado_por }}{% elif n.criado_por is none %}<span class="mudo">lendo no Fracttal</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
+        <td class="cos-esq">{% if n.aberta %}<span class="cn-pill cn-{{ 'critico' if (n.aberta_ha_dias or 0) >= 7 else 'alerta' }}">{{ n.status }} {{ n.pct }}%</span>
+          <span class="det">{% if n.aberta_ha_dias %}aberta {{ n.aberta_ha_dias }} {{ 'dia' if n.aberta_ha_dias == 1 else 'dias' }} depois da volta{% else %}a usina voltou hoje{% endif %}</span>
+          {% else %}<span class="cn-pill cn-ok">Fechada</span>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
   </table></div>
-  {% else %}<p class="cn-vazio">{% if cliente or severidade or so_aberta %}Nenhuma normalização neste recorte.{% else %}Nenhuma normalização no período.{% endif %}</p>{% endif %}
-  {% if p.desfeitas %}<p class="mudo">{{ p.desfeitas }} {{ 'normalização foi desfeita' if p.desfeitas == 1 else 'normalizações foram desfeitas' }} no período (a ocorrência voltou a aberta) e {{ 'fica' if p.desfeitas == 1 else 'ficam' }} fora da lista.</p>{% endif %}
+  {% else %}<p class="cn-vazio">{% if cliente or usina or criado_por or status or busca %}Nenhuma normalização com estes filtros.{% else %}Nenhuma normalização neste mês.{% endif %}</p>{% endif %}
+  {% if p.desfeitas %}<p class="mudo">{{ p.desfeitas }} {{ 'normalização foi desfeita' if p.desfeitas == 1 else 'normalizações foram desfeitas' }} no mês (a ocorrência voltou a aberta) e {{ 'fica' if p.desfeitas == 1 else 'ficam' }} fora da lista.</p>{% endif %}
   {% endif %}
-
-  <div class="cn-nota"><b>Como se conta.</b> <b>Voltou em</b> é a hora em que a usina voltou, registrada pelo COS na
-    Ronda COS (a corrigida, quando alguém corrigiu): é esta a hora para MTTR e disponibilidade, não o fechamento da OS no
-    Fracttal, que acontece quando o técnico fecha, muitas vezes dias depois. <b>Fora</b> é do início da falha até a volta;
-    a encerrada sem a hora da volta aparece como "sem hora real" e fica fora da mediana. <b>No Fracttal</b> diz se a OS
-    ainda estava aberta na última varredura da Ronda COS, que roda de 30 em 30 minutos: "aberta" quer dizer aberta naquela
-    hora. A normalização desfeita (a ocorrência voltou a aberta) sai da lista. Clique na linha para abrir o card da OS
-    (com o seu login do Fracttal).</div>
   {% endif %}
 </div>
 {% include "oscreator/card_os_abrir.html" %}

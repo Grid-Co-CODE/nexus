@@ -25,11 +25,10 @@ from statistics import median
 from . import andamento as AND
 
 VERSAO = 1
-# O período da tela (dias para trás da hora da volta). 7 é o padrão da própria API.
-DIAS = (1, 7, 30)
-DIAS_PADRAO = 7
-# Por mês (27/10/2026, Levi: "a única mudança que quero é ver por mês"): o mês corrente e os anteriores, até MESES no
-# total. A memória guarda desde o 1º dia do mais antigo (em 27/10: desde 01/08), ~1.500 normalizações por mês.
+# Os 30 dias que a memória cobre além dos meses (o 1º dia do mês mais antigo já vem antes deles; fica de piso).
+JANELA_MIN_DIAS = 31
+# Por mês (27/10/2026, Levi: "a única mudança que quero é ver por mês"; e depois "Pode tirar esses filtros de 7, 30 dias
+# ou último dia"): o mês corrente (o padrão) e os anteriores, até MESES no total. A memória guarda desde o 1º dia do mais antigo (em 27/10: desde 01/08), ~1.500 normalizações por mês.
 MESES = 3
 MESES_NOME = ("Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro",
               "Novembro", "Dezembro")
@@ -41,13 +40,16 @@ PAGINA = 500
 PAGINAS_POR_PEDIDO = 4
 TIMEOUT_S = 15
 
-SEVERIDADES = {"CRITICO": ("Crítico", "critico"), "ALTO": ("Alto", "alerta"), "MEDIO": ("Médio", "info"),
-               "BAIXO": ("Baixo", "neutro")}
 # O status da OS aberta no Fracttal (o mesmo das OS em aberto). O segundo valor é o que o card da OS espera.
 STATUS_OS = {1: ("Em processo", "Em Processo"), 2: ("Em verificação", "Em Verificação")}
-# Por onde a normalização foi registrada (`declarada_por`).
-DECLARADA_POR = {"pessoa": "Operador", "sistema": "Sistema", "fracttal": "Fracttal",
-                 "religamento_remoto": "Religamento remoto", "criacao_da_os": "Criação da OS"}
+# O filtro "Status Fracttal" (Levi, 27/10/2026): as duas abertas e a fechada (a OS que não está entre as abertas na
+# última varredura: finalizada ou cancelada).
+STATUS_FILTRO = {"processo": "Em processo", "verificacao": "Em verificação", "fechada": "Fechada"}
+# Por onde a normalização foi registrada (`declarada_por`). Era "Operador" para `pessoa` até 27/10/2026, e o Levi
+# perguntou o que queria dizer: é que uma pessoa do COS registrou a volta na Ronda COS (o nome a API não manda).
+DECLARADA_POR = {"pessoa": "registrada pelo COS", "sistema": "registrada pelo sistema", "fracttal": "pelo Fracttal",
+                 "religamento_remoto": "por religamento remoto", "criacao_da_os": "na criação da OS"}
+BUSCA_MAX = 80
 
 _estado: dict[str, dict] = {}
 _trava = threading.Lock()          # a memória
@@ -85,19 +87,13 @@ def meses(agora: datetime) -> list[tuple[str, str, datetime, datetime]]:
 
 def inicio_da_guarda(agora: datetime) -> datetime:
     """Desde quando a memória guarda: o 1º dia do mês mais antigo da tela (cobre também os 30 dias)."""
-    return min(meses(agora)[-1][2], agora - timedelta(days=max(DIAS) + 1))
+    return min(meses(agora)[-1][2], agora - timedelta(days=JANELA_MIN_DIAS))
 
 
 def mes_pedido(v, agora: datetime) -> str:
-    return v if v in {m[0] for m in meses(agora)} else ""
-
-
-def dias_pedidos(v) -> int:
-    try:
-        d = int(v)
-    except (TypeError, ValueError):
-        return DIAS_PADRAO
-    return d if d in DIAS else DIAS_PADRAO
+    """O mês pedido ("2026-10"), ou o corrente."""
+    ms = meses(agora)
+    return v if v in {m[0] for m in ms} else ms[0][0]
 
 
 def limpar() -> None:
@@ -204,7 +200,6 @@ def _item(n: dict, agora: datetime) -> dict:
         "equipamentos": [str(e.get("nome") or e.get("codigo") or "") for e in equip],
         "falha": str(n.get("tipo_falha_rotulo") or n.get("tipo_falha") or "").strip() or "—",
         "severidade": sev,
-        "sev": SEVERIDADES.get(sev, (sev.title() or "—", "neutro")),
         "normalizada": n.get("normalizada") is not False,
         "inicio": AND.instante(n.get("inicio")),
         "volta": volta,
@@ -215,6 +210,8 @@ def _item(n: dict, agora: datetime) -> dict:
         "fim_corrigido": bool(n.get("fim_corrigido")),
         "declarada_por": DECLARADA_POR.get(str(n.get("declarada_por") or ""), str(n.get("declarada_por") or "") or "—"),
         "aberta": bool(aberta),
+        "status_filtro": ({1: "processo", 2: "verificacao"}.get(aberta.get("status"), "outro") if aberta
+                          else "fechada"),
         "status": status[0],
         "status_card": status[1],
         "pct": int((aberta or {}).get("concluida_pct") or 0),
@@ -225,37 +222,51 @@ def _item(n: dict, agora: datetime) -> dict:
     }
 
 
-def painel(leitura, agora: datetime, dias: int = DIAS_PADRAO, cliente: str = "", severidade: str = "",
-           so_aberta: bool = False, mes: str = "") -> Painel | None:
-    """A tela. O período é dos últimos `dias` ou, com `mes` ("2026-10"), daquele mês inteiro, pela hora da volta. As pílulas de cliente e de severidade e o "só com OS aberta" contam sobre o período, ANTES dos outros
-    filtros (um contador que encolhe ao filtrar não diz mais quanto existe). A faixa conta o recorte de cliente e
-    severidade, sem o "só com OS aberta" (senão a fatia com a OS aberta seria sempre 100%). A normalização desfeita (a
-    ocorrência voltou a aberta) fica fora da lista e é contada à parte; a sem hora real fica na lista e fora da mediana."""
+def _casa(i: dict, q: str) -> bool:
+    q = q.lower()
+    if q.isdigit() and (i["os"] == q or q in i["os_relacionadas"]):
+        return True
+    alvo = " ".join([i["os"], *i["os_relacionadas"], i["cliente"], i["usina"], i["usina_codigo"], i["falha"],
+                     *i["equipamentos"], i["criado_por"] or "", i["resumo"], i["status"]]).lower()
+    return q in alvo
+
+
+def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: str = "", criado_por: str = "",
+           status: str = "", busca: str = "", criadores: dict | None = None) -> Painel | None:
+    """A tela, do mês pedido (o corrente no padrão), pela hora da volta. Os filtros (Levi, 27/10/2026): cliente, usina,
+    criado por, status no Fracttal e um texto livre. As opções de cada filtro contam sobre o mês, ANTES dos outros
+    filtros (um contador que encolhe ao filtrar não diz mais quanto existe); as de usina, dentro do cliente escolhido.
+    A faixa conta a lista filtrada, menos o status (senão a fatia aberta seria sempre 100%). A desfeita (a ocorrência
+    voltou a aberta) fica fora da lista e é contada à parte; a sem hora real fica na lista e fora da mediana.
+    `criadores` = {OS: nome, "" (o Fracttal não disse) ou None (ainda não lido)}."""
     d = leitura.dados if leitura else None
     if not d:
         return None
-    dias = dias_pedidos(dias)
-    desde, ate = agora - timedelta(days=dias), None
-    um_mes = next((m for m in meses(agora) if m[0] == mes), None)
-    if um_mes:                                  # o mês escolhido vale no lugar dos dias
-        desde, ate = um_mes[2], um_mes[3]
+    criadores = criadores or {}
+    um_mes = next(m for m in meses(agora) if m[0] == mes_pedido(mes, agora))
+    desde, ate = um_mes[2], um_mes[3]
     todos = [_item(n, agora) for n in d.get("itens") or []]
-    no_periodo = [i for i in todos if i["data"] and i["data"] >= desde and (ate is None or i["data"] < ate)]
-    base = [i for i in no_periodo if i["normalizada"]]
-    recorte = [i for i in base if (not cliente or i["cliente"] == cliente)
-               and (not severidade or i["severidade"] == severidade)]
-    lista = [i for i in recorte if i["aberta"]] if so_aberta else recorte
+    for i in todos:
+        i["criado_por"] = criadores.get(i["os"]) if i["os"] else ""
+    no_mes = [i for i in todos if i["data"] and desde <= i["data"] < ate]
+    base = [i for i in no_mes if i["normalizada"]]
+    busca = " ".join((busca or "").split())[:BUSCA_MAX]
+    recorte = [i for i in base if (not cliente or i["cliente"] == cliente) and (not usina or i["usina"] == usina)
+               and (not criado_por or i["criado_por"] == criado_por) and (not busca or _casa(i, busca))]
+    lista = [i for i in recorte if i["status_filtro"] == status] if status in STATUS_FILTRO else list(recorte)
     lista.sort(key=lambda i: i["data"], reverse=True)
     com_hora = [i["fora"] for i in recorte if i["hora_real"] and i["fora"] is not None]
     abertas = [i for i in recorte if i["aberta"]]
     varridas = [i["varrida_em"] for i in todos if i["varrida_em"]]
-    sev_count = Counter(i["severidade"] for i in base)
+    do_cliente = [i for i in base if not cliente or i["cliente"] == cliente]
     return Painel(
         itens=lista,
         contagem={
             "cliente": dict(sorted(Counter(i["cliente"] for i in base).items())),
-            "severidade": {k: sev_count.get(k, 0) for k in SEVERIDADES},
-            "abertas": sum(1 for i in base if i["aberta"]),
+            "usina": dict(sorted(Counter(i["usina"] for i in do_cliente).items())),
+            "criado_por": dict(sorted(Counter(i["criado_por"] for i in base if i["criado_por"]).items())),
+            "status": {k: sum(1 for i in base if i["status_filtro"] == k) for k in STATUS_FILTRO},
+            "sem_criador": sum(1 for i in base if i["os"] and i["criado_por"] is None),
         },
         resumo={
             "total": len(recorte),
@@ -266,6 +277,34 @@ def painel(leitura, agora: datetime, dias: int = DIAS_PADRAO, cliente: str = "",
             "sem_hora_real": sum(1 for i in recorte if not i["hora_real"]),
         },
         varredura=max(varridas) if varridas else None,
-        desfeitas=sum(1 for i in no_periodo if not i["normalizada"]),
+        desfeitas=sum(1 for i in no_mes if not i["normalizada"]),
         carregando=bool(d.get("carregando")),
     )
+
+
+def folios(leitura, agora: datetime) -> list[str]:
+    """As OS (e as relacionadas) das normalizações guardadas, da mais recente para a mais antiga: a fila de quem criou
+    lê primeiro o que está no alto da tela."""
+    d = leitura.dados if leitura else None
+    itens = sorted((_item(n, agora) for n in (d or {}).get("itens") or []),
+                   key=lambda i: i["data"] or agora, reverse=True)
+    return [f for i in itens for f in [i["os"], *i["os_relacionadas"]] if f]
+
+
+# O "Exportar CSV" (Levi, 27/10/2026): a lista da tela, com os filtros, e o que a tela resume numa coluna só.
+CSV_COLUNAS = ("OS", "OS relacionadas", "Início", "Normalização", "Tempo fora (min)", "Hora real da volta",
+               "Hora corrigida", "Registrada", "Cliente", "Código da usina", "Usina", "Falha", "Equipamentos",
+               "Severidade", "Criado por", "Status no Fracttal", "% concluída", "Dias aberta depois da volta",
+               "Informe", "Fora do escopo O&M")
+
+
+def csv_linhas(p: Painel) -> list[list]:
+    def h(d):
+        return d.strftime("%d/%m/%Y %H:%M") if d else ""
+    return [[i["os"], ", ".join(i["os_relacionadas"]), h(i["inicio"]), h(i["volta"]),
+             "" if i["fora"] is None else i["fora"], "sim" if i["hora_real"] else "não",
+             "sim" if i["fim_corrigido"] else "não", i["declarada_por"], i["cliente"], i["usina_codigo"], i["usina"],
+             i["falha"], ", ".join(i["equipamentos"]), i["severidade"].title(), i["criado_por"] or "",
+             i["status"] if i["aberta"] else "Fechada", i["pct"] if i["aberta"] else "",
+             "" if i["aberta_ha_dias"] is None else i["aberta_ha_dias"], i["resumo"],
+             "sim" if i["fora_do_escopo"] else "não"] for i in p.itens]

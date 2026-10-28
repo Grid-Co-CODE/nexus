@@ -81,39 +81,67 @@ def _painel(**filtros):
 
 # --- as contas -------------------------------------------------------------------------------------------------------
 
-def test_o_periodo_padrao_e_7_dias_e_a_desfeita_sai_da_lista():
+CRIADORES = {"17001": "Fulana Operadora", "16702": "Ciclano Operador"}
+
+
+def test_o_mes_corrente_no_padrao_e_a_desfeita_sai_da_lista():
+    """Levi, 27/10/2026: "Pode tirar esses filtros de 7, 30 dias ou último dia"."""
     p = _painel()
-    assert [i["registro"] for i in p.itens] == ["r1", "r3", "r4"]           # a mais recente primeiro; r2 tem 8 dias
+    assert [i["registro"] for i in p.itens] == ["r1", "r3", "r4", "r2", "r6"]      # outubro, a mais recente primeiro
     assert p.desfeitas == 1
-    assert [i["registro"] for i in _painel(dias=30).itens] == ["r1", "r3", "r4", "r2", "r6"]
-    assert [i["registro"] for i in _painel(dias=1).itens] == ["r1", "r3"]
-    assert NO.dias_pedidos("90") == NO.dias_pedidos("x") == 7
+    assert NO.mes_pedido("x", AGORA) == NO.mes_pedido("2026-07", AGORA) == "2026-10"
+    assert not hasattr(NO, "DIAS") and not hasattr(NO, "SEVERIDADES")
 
 
 def test_a_faixa_conta_a_os_aberta_e_a_mediana_sem_a_hora_falsa():
-    r = _painel(dias=30).resumo
+    r = _painel().resumo
     assert (r["total"], r["abertas"], r["abertas_pct"], r["abertas_7d"], r["sem_hora_real"]) == (5, 2, 40, 1, 1)
     assert r["mediana"] == "2 h 26"                    # mediana de 60, 233, 30 e 600 (o 0 sem hora real fica fora)
-    # o "só com OS aberta" não muda a faixa (senão a fatia aberta seria sempre 100%)
-    assert _painel(dias=30, so_aberta=True).resumo == r
-    assert [i["registro"] for i in _painel(dias=30, so_aberta=True).itens] == ["r3", "r2"]
+    # o status do Fracttal não muda a faixa (senão a fatia aberta seria sempre 100%)
+    assert _painel(status="processo").resumo == r
 
 
-def test_as_pilulas_contam_o_periodo_antes_dos_filtros():
-    p = _painel(dias=30, cliente="CLIENTE B")
-    assert [i["registro"] for i in p.itens] == ["r2"] and p.resumo["total"] == 1
+def test_os_filtros_cliente_usina_criado_por_status_e_texto():
+    """Levi, 27/10/2026: "Filtros: Cliente, Usina, Criado por, Status fracttal, um filtro livre para digitar texto"."""
+    def regs(**f):
+        return [i["registro"] for i in _painel(criadores=CRIADORES, **f).itens]
+    assert regs(cliente="CLIENTE B") == ["r2"]
+    assert regs(usina="Usina Exemplo Dois") == ["r2"]
+    assert regs(criado_por="Fulana Operadora") == ["r1", "r3", "r4", "r6"]
+    assert regs(status="processo") == ["r2"] and regs(status="verificacao") == ["r3"]
+    assert regs(status="fechada") == ["r1", "r4", "r6"]
+    assert regs(busca="16702") == ["r2"] and regs(busca="exemplo dois") == ["r2"] and regs(busca="ciclano") == ["r2"]
+    assert regs(status="inventado") == regs()                                       # valor estranho: sem o filtro
+
+
+def test_as_opcoes_dos_filtros_contam_o_mes_antes_dos_filtros():
+    p = _painel(cliente="CLIENTE B", criadores=CRIADORES)
     assert p.contagem["cliente"] == {"CLIENTE A": 4, "CLIENTE B": 1}
-    assert p.contagem["severidade"] == {"CRITICO": 1, "ALTO": 4, "MEDIO": 0, "BAIXO": 0}
-    assert p.contagem["abertas"] == 2
-    assert [i["registro"] for i in _painel(dias=30, severidade="CRITICO").itens] == ["r2"]
+    assert p.contagem["usina"] == {"Usina Exemplo Dois": 1}                         # as usinas do cliente escolhido
+    assert p.contagem["criado_por"] == {"Ciclano Operador": 1, "Fulana Operadora": 4}
+    assert p.contagem["status"] == {"processo": 1, "verificacao": 1, "fechada": 3}
+    assert p.contagem["sem_criador"] == 0
+    assert _painel(criadores={"16702": "Ciclano Operador"}).contagem["sem_criador"] == 4     # 17001 ainda não lida
 
 
 def test_a_os_aberta_diz_ha_quantos_dias_da_volta_e_a_varredura_mais_nova():
-    p = _painel(dias=30)
+    p = _painel()
     i = {x["registro"]: x for x in p.itens}
     assert (i["r2"]["aberta"], i["r2"]["status"], i["r2"]["pct"], i["r2"]["aberta_ha_dias"]) == (True, "Em processo", 40, 8)
     assert (i["r3"]["status_card"], i["r3"]["aberta_ha_dias"]) == ("Em Verificação", 0)
     assert not i["r1"]["aberta"] and p.varredura.strftime("%H:%M") == "09:43"
+
+
+def test_o_csv_leva_a_lista_filtrada_e_o_que_a_tela_resume():
+    """Levi, 27/10/2026: "Botão de exportar csv"."""
+    linhas = NO.csv_linhas(_painel(status="processo", criadores=CRIADORES))
+    assert len(linhas) == 1 and len(linhas[0]) == len(NO.CSV_COLUNAS)
+    d = dict(zip(NO.CSV_COLUNAS, linhas[0]))
+    assert (d["OS"], d["Início"], d["Normalização"], d["Tempo fora (min)"]) == ("16702", "19/10/2026 02:00",
+                                                                               "19/10/2026 05:53", 233)
+    assert (d["Cliente"], d["Usina"], d["Criado por"], d["Status no Fracttal"], d["% concluída"]) == (
+        "CLIENTE B", "Usina Exemplo Dois", "Ciclano Operador", "Em processo", 40)
+    assert d["Severidade"] == "Critico" and d["Dias aberta depois da volta"] == 8 and d["Registrada"] == "registrada pelo COS"
 
 
 def test_por_mes_o_mes_inteiro_pela_hora_da_volta():
@@ -127,7 +155,7 @@ def test_por_mes_o_mes_inteiro_pela_hora_da_volta():
     assert [i["registro"] for i in p.itens] == ["r1", "r3", "r4", "r2", "r6", "o1"]       # o mês todo, sem a desfeita
     p = NO.painel(AND.Leitura("", {"itens": itens}), AGORA, mes="2026-09")
     assert [i["registro"] for i in p.itens] == ["s1"] and p.resumo["total"] == 1
-    assert NO.mes_pedido("2026-07", AGORA) == "" and NO.mes_pedido("2026-09", AGORA) == "2026-09"
+    assert NO.mes_pedido("2026-07", AGORA) == "2026-10" and NO.mes_pedido("2026-09", AGORA) == "2026-09"
 
 
 def test_a_duracao_em_palavras():
@@ -189,16 +217,30 @@ def test_o_que_passou_da_janela_sai_da_memoria(ligada, monkeypatch):
 def test_a_tela(ligada, logado, monkeypatch):
     monkeypatch.setattr(AND, "agora", lambda: AGORA)
     _servir(monkeypatch, _resp(ITENS))
-    html = logado.get("/t/cos/normalizacoes?dias=30").get_data(as_text=True)
+    html = logado.get("/t/cos/normalizacoes").get_data(as_text=True)
     assert html.index('data-folio="17001"') < html.index('data-folio="16702"')
-    assert "Aberta · Em processo 40%" in html and "8 dias depois da volta" in html
+    assert "Em processo 40%" in html and "aberta 8 dias depois da volta" in html
     assert 'data-status="Em Processo"' in html and "NexusOsCard" in html
     assert "sem hora real" in html and "2 h 26" in html and "fora da lista" in html
+    # as colunas na ordem pedida, sem a severidade; o "Como se conta" na exclamação ao lado do título
+    cab = html.split("<thead>", 1)[1].split("</thead>", 1)[0]
+    assert [c.split(">")[-1] for c in cab.split("</th>")[:-1]] == ["OS", "Início", "Normalização", "Cliente", "Usina",
+                                                                  "Operador", "No Fracttal"]
+    assert "Severidade" not in cab and "Crítico" not in html and 'class="hs-aviso"' in html
+    assert "Último dia" not in html and "Últimos 7 dias" not in html
+    assert "lendo no Fracttal" in html                       # sem o Fracttal no teste, quem criou ainda não foi lido
     assert "varredura do Fracttal às <b>09:43</b>" in html
     html = logado.get("/t/cos/normalizacoes?mes=2026-10").get_data(as_text=True)
     assert 'aria-current="page">Outubro<' in html and 'data-folio="16702"' in html and "Setembro" in html
-    html = logado.get("/t/cos/normalizacoes?dias=30&aberta=1&severidade=CRITICO").get_data(as_text=True)
-    assert 'data-folio="16702"' in html and 'data-folio="17001"' not in html and "Limpar o recorte" in html
+    html = logado.get("/t/cos/normalizacoes?status=processo").get_data(as_text=True)
+    assert 'data-folio="16702"' in html and 'data-folio="17001"' not in html and "Limpar os filtros" in html
+    # o CSV, com os filtros, e o texto que o Excel leria como fórmula vai com apóstrofo
+    _servir(monkeypatch, _resp(ITENS + [_n("rx", os="17009", informe={"resumo": "=HYPERLINK(1)"})]))
+    NO.limpar()
+    r = logado.get("/t/cos/normalizacoes?formato=csv&q=17009")
+    corpo = r.data.decode("utf-8")
+    assert r.status_code == 200 and r.mimetype == "text/csv" and "normalizacoes-2026-10.csv" in r.headers["Content-Disposition"]
+    assert corpo.startswith("\ufeffOS;") and "17009" in corpo and "'=HYPERLINK(1)" in corpo and "17001" not in corpo
 
 
 def test_a_tela_sem_fonte(ligada, app, logado):

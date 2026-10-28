@@ -12,14 +12,17 @@ mesma rota (ela vence a genérica), por exemplo:
     def mesa():
         return render_template("cos/mesa.html")
 """
+import csv
+import io
 import logging
 from datetime import datetime
 from urllib.parse import urlencode
 
-from flask import abort, current_app, redirect, render_template, request, session
+from flask import Response, abort, current_app, redirect, render_template, request, session
 
 from ...cos import acionamentos as AC
 from ...cos import andamento as AND
+from ...cos import criadores as CR
 from ...cos import normalizacoes as NO
 from ...cos import ocorrencias as OC
 from ...cos import os_abertas as OA
@@ -342,22 +345,42 @@ def os_abertas():
 
 
 # ── Normalizações (27/10/2026) ────────────────────────────────────────────────────────────────────────────────────────
+def _celula_csv(v):
+    """O texto que o Excel leria como fórmula (=, +, -, @ no começo) vai com um apóstrofo na frente."""
+    t = "" if v is None else str(v)
+    return "'" + t if t[:1] in ("=", "+", "-", "@") else t
+
+
 @bp.route("/normalizacoes")
 def normalizacoes():
-    """Normalizações: a hora em que cada usina voltou, registrada pelo COS, e se a OS segue aberta no Fracttal. As
-    normalizações vêm do Andamento (guardadas em memória pelo cursor, nexus/cos/normalizacoes.py); os filtros e as contas
-    são daqui. Só lê: a OS abre no card do Fracttal."""
+    """Normalizações: a hora em que cada usina voltou, registrada pelo COS, e se a OS segue aberta no Fracttal, por mês.
+    As normalizações vêm do Andamento (guardadas em memória pelo cursor, nexus/cos/normalizacoes.py); quem criou a OS,
+    do Fracttal, aos poucos (nexus/cos/criadores.py); os filtros e as contas são daqui. Só lê: a OS abre no card do
+    Fracttal. `?formato=csv` baixa a lista com os filtros."""
     cfg = current_app.config
     fonte = AND.fonte(cfg)
     agora = AND.agora()
     leitura = NO.ler(cfg, agora) if fonte.ligada else AND.Leitura("", None)
     a = request.args
-    dias = NO.dias_pedidos(a.get("dias"))
     mes = NO.mes_pedido(a.get("mes"), agora)
-    severidade = a.get("severidade", "") if a.get("severidade") in NO.SEVERIDADES else ""
-    cliente, so_aberta = a.get("cliente", ""), a.get("aberta") == "1"
-    p = NO.painel(leitura, agora, dias, cliente, severidade, so_aberta, mes)
+    status = a.get("status", "") if a.get("status") in NO.STATUS_FILTRO else ""
+    cliente, usina, criado_por = a.get("cliente", ""), a.get("usina", ""), a.get("criado_por", "")
+    busca = " ".join((a.get("q") or "").split())[:NO.BUSCA_MAX]
+    criadores = CR.nomes(NO.folios(leitura, agora), cfg) if leitura.dados else {}
+    p = NO.painel(leitura, agora, mes, cliente, usina, criado_por, status, busca, criadores)
+    if a.get("formato") == "csv":
+        if not p:
+            abort(404)
+        buf = io.StringIO()
+        w = csv.writer(buf, delimiter=";")
+        w.writerow(NO.CSV_COLUNAS)
+        w.writerows([[_celula_csv(v) for v in linha] for linha in NO.csv_linhas(p)])
+        # com o BOM, o Excel abre os acentos certos
+        resp = Response("\ufeff" + buf.getvalue(), mimetype="text/csv; charset=utf-8")
+        resp.headers["Content-Disposition"] = f'attachment; filename="normalizacoes-{mes}.csv"'
+        resp.headers["Cache-Control"] = "private, no-store"
+        return resp
     return render_template(
         "cos/normalizacoes.html", torre=TORRE, tela=TORRE.tela("normalizacoes"), ligada=fonte.ligada, leitura=leitura,
-        p=p, dias=dias, mes=mes, meses=NO.meses(agora), cliente=cliente, severidade=severidade, so_aberta=so_aberta, opcoes_dias=NO.DIAS,
-        severidades=NO.SEVERIDADES, lido=_lido([leitura]), url=_url)
+        p=p, mes=mes, meses=NO.meses(agora), cliente=cliente, usina=usina, criado_por=criado_por, status=status,
+        busca=busca, status_filtro=NO.STATUS_FILTRO, na_fila=CR.na_fila(), lido=_lido([leitura]), url=_url)

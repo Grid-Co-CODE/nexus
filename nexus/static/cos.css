@@ -78,3 +78,16 @@ tr.cos-os:hover td,tr.cos-os:focus-visible td{background:var(--superficie-2)}
 tr.cos-os:focus-visible{outline:2px solid var(--verde);outline-offset:-2px}
 .cos-idade,.cos-folio{font-variant-numeric:tabular-nums;white-space:nowrap}
 .cos-cortes{margin-top:10px;font-size:12.5px}
+
+/* Normalizações (27/10/2026): os filtros numa linha, a busca que cresce e o Exportar CSV na ponta */
+.cos-norm-filtros{align-items:flex-end}
+.cos-norm-filtros .cn-filtro-par{flex-direction:column;align-items:stretch;gap:4px}
+.cos-norm-filtros select.gc-campo{max-width:220px}
+.cos-norm-busca{flex:1 1 200px;min-width:0;max-width:320px}
+.cos-norm-csv{margin-left:auto;text-decoration:none;white-space:nowrap}
+.cos-norm-fila{margin:10px 0 0;font-size:12.5px}
+@media (max-width:640px){.cos-norm-filtros select.gc-campo,.cos-norm-busca{max-width:none;width:100%}
+  .cos-norm-filtros .cn-filtro-par{flex:1 1 100%}.cos-norm-csv{margin-left:0}}
+/* todas as letras da tela 20% menores (Levi, 27/10/2026: "diminua o tamanho de todas as fontes em 20%"). O zoom leva
+   junto os espaços, que a tabela larga agradece; o card da OS fica fora (abre por cima, no tamanho normal) */
+.cos-norm{zoom:.8}
