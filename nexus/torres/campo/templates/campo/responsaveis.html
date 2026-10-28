@@ -108,12 +108,13 @@
   {% if modo == 'painel' and painel %}
   {# O Painel do responsável (Levi, 28/10/2026: "quero uma tela feita mesmo para o responsável que não seja um tabelão
      (...) mostrará: Usinas abaixo da performance, chamados abertos, PTs pendentes, Ranking das equipes do maior para
-     menor, acompanhamento de rondas! (...) uma tela inicial claro, se for para se aprofundar aí é outro nível"). Cinco
+     menor, acompanhamento de rondas! (...) uma tela inicial claro, se for para se aprofundar aí é outro nível"; e, na 2ª
+     rodada, os extintores vencidos). Seis
      quadros numa tela, nenhuma régua nova (nexus/campo/painel_responsavel.py). Nada fica de fora ("Tem que ter todas as
      usinas e equipes daquele supervisor"): cada quadro traz a lista inteira e rola por dentro, na barra de rolagem do
      Nexus. O outro nível: o "ver todas" de cada quadro abre a Visão geral com o filtro dele (ou o Ranking), e cada linha
      abre a janela que a Visão já tem (o dia a dia da meta, o card da OS, a PT, a equipe, a ronda) #}
-  {% set pf, ch, pt, rk, rd = painel.perf, painel.chamados, painel.pts, painel.ranking, painel.rondas %}
+  {% set pf, ch, pt, rk, rd, ex = painel.perf, painel.chamados, painel.pts, painel.ranking, painel.rondas, painel.extintores %}
   {% set cor_situ = {'critico': 'cn-t-critico', 'alerta': 'cn-t-alerta', 'ok': 'cn-t-ok', 'sem_meta': 'mudo'} %}
   {% set barra_situ = {'critico': 'c', 'alerta': 'a', 'ok': 'o', 'sem_meta': 'n'} %}
   {# o endereço sai do url() aqui dentro, nunca pronto de fora: o Nexus mora debaixo do /nexus e o test_prefixo confere
@@ -139,11 +140,17 @@
       <header class="pn-cab"><h2 id="pn-ch-t"><i class="ph ph-lifebuoy" aria-hidden="true"></i>Chamados abertos</h2>{{ ver(modo='geral', filtro='acomp.chamados', bloco=None, equipe=None) }}</header>
       <div class="pn-num"><b class="{{ 'cn-t-alerta' if ch.abertos else 'cn-t-ok' }}">{{ ch.abertos }}</b>
         <span>em aberto com o fabricante{% if ch.abertos %} em {{ ch.usinas }} usina{{ 's' if ch.usinas != 1 }}{% endif %}<small>{{ ch.verificacao }} em verificação{% if ch.mais_antigo is not none %} · o mais antigo há {{ ch.mais_antigo }} dias{% endif %}</small></span></div>
-      <ol class="pn-lista" tabindex="0" aria-label="Todos os chamados em aberto, o mais antigo primeiro">
-        {% for x in ch.linhas %}
-        <li><button type="button" class="pn-it cr-os" data-folio="{{ x.os or '' }}" title="Abrir o card da OS {{ x.os }}">
-          <span class="pn-it-nome"><b>{{ x.usina }}</b><small>{{ x.equip }}{% if x.fabricante %} · {{ x.fabricante }}{% endif %} · OS {{ x.os }}</small></span>
-          <b class="pn-v">{{ '—' if x.dias is none else x.dias ~ ' d' }}</b></button></li>
+      {# por usina (Levi, 28/10/2026: "pode só botar o nome da UFV uma vez e dizer qual os ativos daquela UFV"): o nome
+         fica preso no alto enquanto os ativos dela rolam; o ativo sem a marca, com o status do chamado, e o clique abre
+         a tela do chamado de Garantias por cima, sem sair daqui ("Não deve direcionar, apenas sobrepor a tela") #}
+      <ol class="pn-lista pn-ch" tabindex="0" aria-label="Todos os chamados em aberto, por usina, o mais antigo primeiro">
+        {% for g in ch.grupos %}
+        <li class="pn-grupo"><p class="pn-grupo-cab"><b>{{ g.usina }}</b><span>{{ g.itens|length }} chamado{{ 's' if g.itens|length != 1 }}</span></p>
+          <ul>{% for x in g.itens %}
+            <li><button type="button" class="pn-it pn-it--ch" data-cr-chamado="{{ x.os or '' }}" title="Abrir o chamado da OS {{ x.os }}">
+              <span class="pn-it-nome"><b>{{ x.ativo }}</b><small>{% if x.status %}{{ x.status }}{% else %}<i>Sem status</i>{% endif %} · OS {{ x.os }}</small></span>
+              <b class="pn-v">{{ '—' if x.dias is none else x.dias ~ ' d' }}</b></button></li>{% endfor %}
+          </ul></li>
         {% else %}<li class="pn-vazio">Nenhum chamado em aberto.</li>{% endfor %}
       </ol>
     </section>
@@ -151,7 +158,7 @@
     <section class="pn-q" aria-labelledby="pn-pt-t">
       <header class="pn-cab"><h2 id="pn-pt-t"><i class="ph ph-file-text" aria-hidden="true"></i>PTs pendentes</h2>{{ ver(modo='geral', filtro='acomp.pts', bloco=None, equipe=None) }}</header>
       <div class="pn-num"><b class="{{ 'cn-t-critico' if pt.paradas else ('cn-t-alerta' if pt.aguardando else 'cn-t-ok') }}">{{ pt.aguardando }}</b>
-        <span>esperando o De acordo{% if pt.paradas %} · <b class="cn-t-critico">{{ pt.paradas }}</b> há mais de 2 h{% endif %}<small>{% if pt.agora %}{{ pt.agora }} parada{{ 's' if pt.agora != 1 }} hoje: técnico esperando agora{% else %}nenhum técnico parado hoje{% endif %}</small></span></div>
+        <span>esperando o De acordo</span></div>
       <ol class="pn-lista" tabindex="0" aria-label="Todas as PT esperando o De acordo">
         {% for x in pt.linhas %}
         <li><button type="button" class="pn-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=x.numero, ativo=x.codigo, volta=request.full_path) }}" title="Abrir a PT {{ x.numero }} para decidir">
@@ -161,9 +168,9 @@
       </ol>
     </section>
 
-    <section class="pn-q pn-q--largo" aria-labelledby="pn-rk-t">
-      <header class="pn-cab"><h2 id="pn-rk-t"><i class="ph ph-ranking" aria-hidden="true"></i>Ranking das equipes</h2>{{ ver('ver o ranking', modo='ranking', equipe=None, filtro=None, bloco=None) }}</header>
-      <p class="pn-nota">A nota do App em 30 dias, da maior para a menor; a posição é a do ranking de todas as {{ rk.total }} equipes.</p>
+    <section class="pn-q" aria-labelledby="pn-rk-t">
+      <header class="pn-cab"><h2 id="pn-rk-t"><i class="ph ph-ranking" aria-hidden="true"></i>Ranking das Equipes - {{ rk.mes }}</h2>{{ ver('ver o ranking', modo='ranking', equipe=None, filtro=None, bloco=None) }}</header>
+      <p class="pn-nota">A nota do App desde {{ rk.desde.strftime('%d/%m') }}, da maior para a menor; a posição é a do ranking de todas as {{ rk.total }} equipes.</p>
       <ol class="pn-lista pn-rk" tabindex="0" aria-label="Todas as equipes, da maior nota para a menor">
         {% for c in rk.equipes %}
         <li>{% if c.sem_equipe %}<a class="pn-rk-it" href="{{ url(modo='geral', equipe=c.equipe, responsavel=responsavel or '*', filtro=None, bloco=None) }}" title="Usinas sem equipe no cadastro: ver na Visão geral">{% else %}<button type="button" class="pn-rk-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_equipe', equipe=c.equipe, responsavel=responsavel or '*') }}" title="{{ c.equipe }}: o motivo da nota, para cobrar">{% endif %}
@@ -178,9 +185,11 @@
 
     <section class="pn-q" aria-labelledby="pn-rd-t">
       <header class="pn-cab"><h2 id="pn-rd-t"><i class="ph ph-path" aria-hidden="true"></i>Acompanhamento de rondas</h2>{{ ver(modo='geral', filtro='acomp.rondas', bloco=None, equipe=None) }}</header>
-      {# a cor da cobertura é a régua das Rondas (o `cor_pct` do Painel delas: 80% ou mais verde, 50% ou mais âmbar) #}
-      <div class="pn-num"><b class="{{ 'cn-t-neutro' if rd.em_dia_pct is none else ('cn-t-ok' if rd.em_dia_pct >= 80 else ('cn-t-alerta' if rd.em_dia_pct >= 50 else 'cn-t-critico')) }}">{{ rd.em_dia }}</b>
-        <span>de {{ rd.usinas }} com ronda nos últimos 7 dias<small>{{ rd.sem_ronda }} sem ronda há 7 dias ou mais · {{ rd.nunca }} nunca teve{% if rd.longa %} · {{ rd.longa }} longa pendente{% endif %}</small></span></div>
+      {# o número é o das usinas sem ronda há 7 dias ou mais, somadas as que nunca tiveram ronda pelo App (Levi,
+         28/10/2026: "o número do KPI deve falar quantas usinas estão sem ronda a 7 dias ou mais"; "Somar as que nunca
+         tiveram"); vermelho com uma ou mais, como a Visão marca a usina sem ronda #}
+      <div class="pn-num"><b class="{{ 'cn-t-critico' if rd.sem_7 else 'cn-t-ok' }}">{{ rd.sem_7 }}</b>
+        <span>sem ronda há 7 dias ou mais<small>{% if rd.nunca %}{{ rd.nunca }} nunca teve ronda pelo App · {% endif %}{{ rd.em_dia }} de {{ rd.usinas }} em dia{% if rd.longa %} · {{ rd.longa }} com a longa pendente{% endif %}</small></span></div>
       <div class="pn-seg" role="img" aria-label="{{ rd.em_dia }} em dia, {{ rd.longa }} com a longa pendente, {{ rd.sem_ronda }} sem ronda há 7 dias ou mais e {{ rd.nunca }} que nunca tiveram ronda">{% if rd.em_dia %}<span class="o" style="flex: {{ rd.em_dia }}"></span>{% endif %}{% if rd.longa %}<span class="a" style="flex: {{ rd.longa }}"></span>{% endif %}{% if rd.sem_ronda %}<span class="c" style="flex: {{ rd.sem_ronda }}"></span>{% endif %}{% if rd.nunca %}<span class="n" style="flex: {{ rd.nunca }}"></span>{% endif %}</div>
       <ol class="pn-lista" tabindex="0" aria-label="Todas as usinas pela ronda, a que mais pede primeiro">
         {% for x in rd.linhas %}
@@ -189,6 +198,21 @@
           <span class="pn-it-nome"><b>{{ x.usina }}</b><small>{% if x.situacao == 'nunca' %}nunca teve ronda pelo App{% elif x.situacao == 'sem_dado' %}sem dado de ronda{% else %}{% if x.situacao == 'longa_pendente' %}longa pendente · {% endif %}última em {{ dia_curto(x.ultima) }}{% if x.tecnico %} · {{ x.tecnico }}{% endif %}{% endif %}</small></span>
           <b class="pn-v {{ cls }}">{% if x.situacao == 'nunca' %}nunca{% elif x.dias is not none %}{{ 'hoje' if x.dias == 0 else x.dias ~ ' d' }}{% else %}—{% endif %}</b>{% if x.os %}</button>{% else %}</span>{% endif %}</li>
         {% else %}<li class="pn-vazio">Nenhuma usina com esses filtros.</li>{% endfor %}
+      </ol>
+    </section>
+
+    {# o 6º quadro (Levi, 28/10/2026: "quero que mostre também as usinas com extintores vencidos daquele supervisor"): a
+       conta do HSEQ que a Visão já lê; a linha abre os extintores da usina por cima #}
+    <section class="pn-q" aria-labelledby="pn-ex-t">
+      <header class="pn-cab"><h2 id="pn-ex-t"><i class="ph ph-fire-extinguisher" aria-hidden="true"></i>Extintores vencidos</h2>{{ ver(modo='geral', filtro='acomp.ext', bloco=None, equipe=None) }}</header>
+      <div class="pn-num"><b class="{{ 'cn-t-critico' if ex.usinas else 'cn-t-ok' }}">{{ ex.usinas }}</b>
+        <span>usina{{ 's' if ex.usinas != 1 }} com extintor vencido<small>{{ ex.vencidos }} extintor{{ 'es' if ex.vencidos != 1 }} vencido{{ 's' if ex.vencidos != 1 }}{% if ex.a_vencer %} · {{ ex.a_vencer }} a vencer{% endif %}</small></span></div>
+      <ol class="pn-lista" tabindex="0" aria-label="As usinas com extintor vencido, a com mais vencidos primeiro">
+        {% for x in ex.linhas %}
+        <li><button type="button" class="pn-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel='extintores') }}" title="{{ x.usina }}: ver os extintores">
+          <span class="pn-it-nome"><b>{{ x.usina }}</b><small>{% if x.pior %}{% if x.pior_ext %}{{ x.pior_ext }}: {% endif %}{{ x.pior }}{% else %}{{ x.total }} extintores{% endif %}{% if x.a_vencer %} · {{ x.a_vencer }} a vencer{% endif %}</small></span>
+          <b class="pn-v cn-t-critico">{{ x.vencidos }} vencido{{ 's' if x.vencidos != 1 }}</b></button></li>
+        {% else %}<li class="pn-vazio">Nenhum extintor vencido nas usinas da tela.</li>{% endfor %}
       </ol>
     </section>
   </div>
@@ -252,10 +276,11 @@
     <div class="cr-rk-kpi"><span>Amplitude</span><b>{{ '—' if k.amplitude is none else k.amplitude ~ ' pts' }}</b><small>entre a melhor e a menor nota</small></div>
   </div>
   <p class="cr-rk-regua"><b>A régua do App (Ranking por região):</b> nota = 60% qualidade (a nota média das tarefas e das
-    rondas feitas pelo App) + 40% cobertura (usinas da equipe com ronda nos últimos 30 dias). A posição é só essa nota.
+    rondas feitas pelo App) + 40% cobertura (usinas da equipe com ronda no mês). O período é o mês vigente, do dia 1º até
+    hoje (no começo do mês a nota tem poucos dias). A posição é só essa nota.
     No empate, vence a maior qualidade, depois a maior cobertura, mais notas e o nome. "Em quê cobrar" traz os alertas da
     Visão, na régua de cada tela, e não muda a posição. A cor é a do painel do App (85
-    ou mais verde, 70 ou mais âmbar). A seta compara com os 30 dias anteriores. Diferenças contra o painel do App: a
+    ou mais verde, 70 ou mais âmbar). A seta compara com o mesmo trecho do mês anterior. Diferenças contra o painel do App: a
     equipe da usina é a do cadastro do Nexus (no App, a do catálogo e da programação dele), a base da cobertura são as
     usinas mobilizadas, o dia é o de Brasília e a ronda avulsa do Nexus conta na cobertura. Com filtro, a posição e a
     nota continuam as do ranking de todas as equipes: o filtro só escolhe os cartões. O clique no cartão abre o detalhe
@@ -283,7 +308,7 @@
         <div class="cn-eq-titulo"><b>{{ c.equipe }}</b>{% if c.base_pequena and not c.sem_equipe %}<i class="cr-tag cr-tag--neutro" title="Menos de {{ base_pequena }} usinas: uma usina a mais ou a menos muda muito a nota">base pequena</i>{% endif %}</div>
         <span>{{ c.usinas }} usina{{ 's' if c.usinas != 1 }} · {{ c.tecnicos }} técnico{{ 's' if c.tecnicos != 1 }}{% if c.regiao_campo and c.regiao_campo != sem_regiao %} · {{ c.regiao_campo }}{% endif %}</span>
       </div>
-      <p class="cr-rk-comp">{% if c.sem_equipe %}usinas sem equipe no cadastro: o conserto é no cadastro{% elif c.nota is none %}{% if c.n_ronda %}sem nota do App: {{ c.n_ronda }} ronda{{ 's' if c.n_ronda != 1 }} em 30 dias, nenhuma com nota{% else %}sem nota do App: nenhuma OS nem ronda pelo App em 30 dias{% endif %}{% else %}qualidade <b>{{ c.qualidade }}</b> · cobertura <b>{{ c.cobertura }}%</b> · {{ c.n_os }} tarefa{{ 's' if c.n_os != 1 }} e {{ c.n_ronda }} ronda{{ 's' if c.n_ronda != 1 }}{% if c.antes.nota is not none %} · antes {{ c.antes.nota }}{% if c.antes.posicao %} ({{ c.antes.posicao }}º){% endif %}{% endif %}{% endif %}</p>
+      <p class="cr-rk-comp">{% if c.sem_equipe %}usinas sem equipe no cadastro: o conserto é no cadastro{% elif c.nota is none %}{% if c.n_ronda %}sem nota do App: {{ c.n_ronda }} ronda{{ 's' if c.n_ronda != 1 }} no mês, nenhuma com nota{% else %}sem nota do App: nenhuma OS nem ronda pelo App no mês{% endif %}{% else %}qualidade <b>{{ c.qualidade }}</b> · cobertura <b>{{ c.cobertura }}%</b> · {{ c.n_os }} tarefa{{ 's' if c.n_os != 1 }} e {{ c.n_ronda }} ronda{{ 's' if c.n_ronda != 1 }}{% if c.antes.nota is not none %} · antes {{ c.antes.nota }}{% if c.antes.posicao %} ({{ c.antes.posicao }}º){% endif %}{% endif %}{% endif %}</p>
       <div class="cr-rk-mini">
         {# "Acompanh.": a palavra inteira cortava a 1440 e a 375 px; a dica leva o nome inteiro #}
         {% for b, nome, curto in (('perf', 'Performance', 'Performance'), ('acomp', 'Acompanhamento', 'Acompanh.'), ('manut', 'Manutenção', 'Manutenção')) %}{% set t = c.tri[b] %}
@@ -469,9 +494,49 @@
     <div class="cr-modal-barra"><button type="button" class="gc-btn gc-btn--contorno cr-modal-fechar">Fechar</button></div>
     <div class="cr-modal-corpo"></div>
   </dialog>
+  {# a tela do chamado de Garantias por cima (Levi, 28/10/2026: "Ao clicar no chamado deve aparecer a tela que aparece
+     quando clicamos na OS de chamados na parte de garantias. Não deve direcionar, apenas sobrepor a tela como uma meio
+     que janela dando um blur de fundo"): a MESMA tela do OS Creator, sem cópia, numa moldura (/os/_nexus/chamado/<nº>,
+     ponte.chamado_os), com o mesmo fundo desfocado das outras janelas. A moldura nasce no clique, pelo script, como a do
+     card da OS: a tela do Campo não traz moldura nenhuma no HTML (05/10/2026: nada do App nem do Azure embutido) #}
+  <dialog class="cr-modal cr-modal--chamado" id="cr-chamado" aria-label="Chamado">
+    <div class="cr-modal-barra"><button type="button" class="gc-btn gc-btn--contorno cr-modal-fechar">Fechar</button></div>
+  </dialog>
 </div>
 {% include "oscreator/card_os_abrir.html" %}
 <script>
+// o chamado do Painel abre a tela dele de Garantias por cima (28/10/2026); Esc, o Fechar, o clique fora e o "fechar" que
+// a moldura manda (o Esc dentro dela) fecham, e a moldura sai junto (a tela do chamado não fica viva por trás)
+(function () {
+  var dlg = document.getElementById('cr-chamado');
+  if (!dlg) { return; }
+  var moldura = null;
+  function tirar() { if (moldura) { moldura.remove(); moldura = null; } }
+  // os fechamentos daqui tiram a moldura na hora; o evento `close` (que chega depois) cobre o Esc do próprio <dialog>
+  function fechar() { if (dlg.open) { dlg.close(); } tirar(); }
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-cr-chamado]');
+    if (!b) { return; }
+    var os = String(b.getAttribute('data-cr-chamado') || '').replace(/\D/g, '');
+    if (!os) { return; }
+    ev.preventDefault();
+    tirar();
+    var q = new URLSearchParams({de: location.pathname + location.search});
+    moldura = document.createElement('iframe');
+    moldura.className = 'cr-chamado-moldura';
+    moldura.title = 'Chamado da OS ' + os;
+    moldura.src = nexusRota('/os/_nexus/chamado/') + os + '?' + q.toString();
+    dlg.appendChild(moldura);
+    dlg.showModal();
+  });
+  dlg.addEventListener('close', tirar);
+  dlg.addEventListener('click', function (ev) { if (ev.target === dlg) { fechar(); } });
+  dlg.querySelector('.cr-modal-fechar').addEventListener('click', fechar);
+  window.addEventListener('message', function (e) {
+    if (!moldura || e.origin !== location.origin || e.source !== moldura.contentWindow) { return; }
+    if (e.data && e.data.nexusChamado === 1 && e.data.tipo === 'fechar') { fechar(); }
+  });
+})();
 // a OS do bloco Manutenção abre o card dela por cima (18/10/2026), sem sair da Visão: pelo id do Fracttal quando o fato
 // tem, senão pelo número (o clone acha o id)
 document.addEventListener('click', function (ev) {

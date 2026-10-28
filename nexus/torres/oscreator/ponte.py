@@ -658,6 +658,31 @@ def card_os_folio(folio: int):
     return _card(f"/os/os/folio/{folio}")
 
 
+# ── a tela do chamado de Garantias por cima de uma tela do Nexus (28/10/2026) ─────────────────────────────────────────
+# Levi, no Painel do responsável: "Ao clicar no chamado deve aparecer a tela que aparece quando clicamos na OS de chamados
+# na parte de garantias. Não deve direcionar, apenas sobrepor a tela como uma meio que janela dando um blur de fundo".
+@bp_raiz.route("/os/_nexus/chamado/<int:folio>")
+def chamado_os(folio: int):
+    """A moldura do meio (`oscreator/chamado_os.html`) entre a tela do Nexus e a tela do chamado do clone
+    (/os/chamados/acompanhamento/<nº>, a MESMA, sem cópia): com ela no meio, a tela do chamado se vê embutida (o
+    `window.__osTopo()` dela para aqui, que não é uma página do Nexus) e sai sem o cabeçalho e as abas do OS Creator. Mora
+    em /os/_nexus pelo motivo do card: o cookie do Fracttal (os_sessao) só vai para /os, e sem o login do Fracttal a
+    moldura diz como entrar (e volta à tela `de`), em vez de o login do clone tomar a janela."""
+    from urllib.parse import quote, urlencode
+
+    from ...auth import next_seguro
+    de = next_seguro(request.args.get("de"))
+    try:
+        estado = "ok" if _tem_login_fracttal(clone(current_app._get_current_object())) else "sem"
+    except Exception:            # noqa: BLE001 — clone que não sobe: a moldura diz, e a tela de baixo segue
+        logging.exception("OS Creator: o clone não subiu (tela do chamado)")
+        estado = "fora"
+    volta = "/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/")
+    return render_template("oscreator/chamado_os.html", folio=folio, estado=estado,
+                           pagina=f"/os/chamados/acompanhamento/{folio}",
+                           entrar=na_raiz("/os/login") + "?next=" + quote(volta, safe=""))
+
+
 @bp_raiz.route("/os/_nexus/ir")
 def ir():
     """Um link do card da OS para outra tela do OS Creator (Clonar esta OS, Abrir chamado): a torre OS Creator do Nexus,

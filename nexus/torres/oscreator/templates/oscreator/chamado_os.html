@@ -1,0 +1,67 @@
+<!doctype html>
+{# o tema do Nexus: no claro a moldura já nasce clara, desenhada pelo servidor; no escuro, o <html> de sempre #}
+<html lang="pt-BR"{% if tema == "claro" %} data-tema="claro"{% endif %}>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chamado {{ folio }} · Grid Co.</title>
+{# A tela do chamado de Garantias por cima de uma tela do Nexus (Levi, 28/10/2026, no Painel do responsável: "Ao clicar
+   no chamado deve aparecer a tela que aparece quando clicamos na OS de chamados na parte de garantias. Não deve
+   direcionar, apenas sobrepor a tela como uma meio que janela dando um blur de fundo"). É a MESMA tela do clone
+   (/os/chamados/acompanhamento/<nº>), sem cópia, numa moldura dentro desta: com esta página no meio, o
+   `window.__osTopo()` da tela do chamado para aqui (não é uma página do Nexus), e ela se vê embutida, sem o cabeçalho e
+   as abas do OS Creator. O fundo desfocado e o Fechar são da janela do Nexus (o <dialog> que abre esta moldura).
+   Rota: ponte.chamado_os. #}
+<link rel="icon" href="{{ raiz }}/os/assets/grid-icon.png">
+<link rel="stylesheet" href="{{ raiz }}/os/static/os.css">
+<link rel="stylesheet" href="{{ raiz }}/os/static/os_acoes.css">
+{% include "oscreator/_tema_os.html" %}
+<script>{% include "_raiz_js.html" %}</script>
+<style>
+  /* quem rola é a tela do chamado, na moldura de dentro: esta não rola (eram duas barras de rolagem lado a lado) */
+  html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+  .nx-ch { display: block; width: 100%; height: 100%; border: 0; }
+  .nx-ch-aviso { display: flex; flex-direction: column; gap: 12px; max-width: 560px; margin: 48px auto; padding: 26px 24px 22px; }
+  .nx-ch-aviso .acoes-bts { justify-content: flex-start; flex-wrap: wrap; }
+</style>
+</head>
+<body class="os-form">
+{% if estado == "ok" %}
+<iframe class="nx-ch" id="nx_ch" src="{{ (pagina)|na_raiz }}" title="Chamado {{ folio }}"></iframe>
+{% elif estado == "fora" %}
+<div class="nx-ch-aviso"><div class="acoes-t">O OS Creator não abriu nesta máquina</div>
+  <div class="acoes-s">A tela do chamado é a do OS Creator, e ele não subiu agora. O resto do Nexus segue normal.</div></div>
+{% else %}
+<div class="nx-ch-aviso"><div class="acoes-t">Para abrir o chamado, entre pelo Fracttal</div>
+  <div class="acoes-s">A tela do chamado é a de Garantias do OS Creator, que lê e grava no Fracttal com o seu usuário.
+    Esta sessão do Nexus ainda não tem o login do Fracttal (ele não vem com a conta Microsoft nem com a senha de
+    administrador): entre com o seu e-mail e senha do Fracttal e você volta a esta tela.</div>
+  <div class="acoes-bts"><a class="det-b verde" href="{{ (entrar)|na_raiz }}" target="_top">Entrar com o Fracttal</a></div></div>
+{% endif %}
+<script>
+(function () {
+  'use strict';
+  // aberta sozinha (link copiado, aba nova): é a tela do chamado no OS Creator
+  if (window.parent === window) { location.replace({{ ((pagina)|na_raiz)|tojson }}); return; }
+  function fechar() {
+    try { window.parent.postMessage({nexusChamado: 1, tipo: 'fechar'}, location.origin); } catch (e) { /* a tela de baixo foi embora */ }
+  }
+  // o Esc fecha a janela, aqui e dentro da tela do chamado; com um diálogo dela aberto, o Esc é dele
+  function aoEsc(doc) {
+    doc.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (doc.querySelector('dialog[open]') || (doc.body && doc.body.classList.contains('os-modal-aberto'))) return;
+      fechar();
+    });
+  }
+  aoEsc(document);
+  var fr = document.getElementById('nx_ch');
+  if (fr) {
+    fr.addEventListener('load', function () {
+      try { aoEsc(fr.contentDocument); fr.contentWindow.focus(); } catch (e) { /* outra origem: só o Fechar da janela */ }
+    });
+  }
+})();
+</script>
+</body>
+</html>

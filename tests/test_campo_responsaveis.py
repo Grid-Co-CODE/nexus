@@ -128,7 +128,9 @@ def test_cada_fonte_chega_a_usina_do_cadastro(tela):
     assert a["ativos"]["critico"] == 1 and b["ativos"]["monitorar"] == 1 and not c["ativos"]
     # chamados = o fato do banco (as OS de acompanhamento), com o nome do equipamento pela dimensão; concluído não conta
     assert (a["chamados"]["abertos"], a["chamados"]["verificacao"]) == (1, 0)
+    # o ativo sem a marca e o status do chamado (28/10/2026, o Painel do responsável): o fato falso não tem status
     assert a["chamados"]["lista"][0] == {"os": 16034, "situacao": "aberto", "dias": 26, "equip": "Tracker 1 STI",
+                                         "ativo": "Tracker 1", "status": "",
                                          "fabricante": "STI", "componente": "Estrutura Trackers"}
     assert (b["chamados"]["abertos"], b["chamados"]["verificacao"]) == (0, 1) and c["chamados"]["abertos"] == 1
     # extintores = a conta do HSEQ
@@ -830,8 +832,8 @@ def test_equipe_com_ronda_sem_nota_nao_e_chamada_de_sem_ronda(tela, logado, monk
     monkeypatch.setattr(R, "ranking_fonte", lambda *a, **k: (por, {}))
     visao.limpar()
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
-    assert "sem nota do App: 1 ronda em 30 dias, nenhuma com nota" in html
-    assert "sem nota do App: nenhuma OS nem ronda pelo App em 30 dias" in html      # a SP Norte 01, sem nada
+    assert "sem nota do App: 1 ronda no mês, nenhuma com nota" in html
+    assert "sem nota do App: nenhuma OS nem ronda pelo App no mês" in html      # a SP Norte 01, sem nada
 
 
 def test_o_filtro_de_cliente_escolhe_as_equipes(tela, logado):
@@ -1039,8 +1041,10 @@ def test_o_cabecalho_e_as_colunas_ficam_no_centro():
 def test_o_ranking_diz_o_periodo_e_de_onde_vieram_as_notas(tela, logado):
     # pendência da revisão (achado 8): a aba não dizia as datas dos dois períodos nem que as notas saíram na hora
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
-    atual = f"de {(HOJE - timedelta(days=29)):%d/%m} a {HOJE:%d/%m}"
-    anterior = f"de {(HOJE - timedelta(days=59)):%d/%m} a {(HOJE - timedelta(days=30)):%d/%m}"
+    # o mês vigente e o mesmo trecho do mês anterior (28/10/2026: "Ranking das Equipes - Outubro, sempre o mês vigente")
+    fim_passado = HOJE.replace(day=1) - timedelta(days=1)
+    atual = f"de 01/{HOJE:%m} a {HOJE:%d/%m}"
+    anterior = f"de 01/{fim_passado:%m} a {fim_passado.replace(day=min(HOJE.day, fim_passado.day)):%d/%m}"
     assert f"Período: {atual} (o anterior: {anterior})" in html
     assert "fato_fechamento calculado na hora" in html          # o banco falso não tem o fato: a conta é feita na hora
 

@@ -17,6 +17,7 @@ máquina. O Fracttal que devolve 0 chamados com o livro cheio não apaga o livro
 import logging
 import threading
 import time
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
@@ -25,6 +26,8 @@ from ..dados import fatos as D
 from ..dados import livros
 
 INTERVALO_MIN = 50
+# as observações da equipe de chamados (o OS Creator grava: `chamados_obs_store`), de onde sai o status trocado na tela
+OBS_LIVRO, OBS_ABA = "os_creator", "chamados_obs"
 PRIMEIRA_S = 120            # a 1ª volta depois de subir (o boot já lê o banco para as telas)
 MINUTO_DA_HORA = 50         # depois da carga de dados (:40)
 PAGINAS_MAX = 40
@@ -100,9 +103,16 @@ def publicar(config, sessao=None, *, ler=None, agora=None, forcar=False) -> dict
     equip = {D._txt(r.get("codigo")): D._id(r.get("equipamento_id"))
              for r in livros.ler(base, s, "nexus_equipamentos", "dim_equipamento")
              if D._txt(r.get("codigo")) and D._id(r.get("equipamento_id"))}
-    lin = F.linhas(rows, lig, equip, hoje)
+    # o status trocado pela tela de Garantias (28/10/2026): a aba das observações da equipe de chamados, no banco. A
+    # leitura que falha derruba a volta como a do cadastro: o livro fica como está (com o status da volta anterior),
+    # em vez de gravar o status da nota por cima de uma troca feita na tela
+    tela = F.status_da_tela(livros.ler(base, s, OBS_LIVRO, OBS_ABA))
+    conta = Counter()
+    lin = F.linhas(rows, lig, equip, hoje, tela, conta)
     rel = {"lidas": len(rows), "linhas": len(lin), "abertas": sum(1 for r in lin if r[9] == "aberto"),
-           "sem_usina": sum(1 for r in lin if not r[3])}
+           "sem_usina": sum(1 for r in lin if not r[3]),
+           "status_tela": sum(1 for r in lin if r[15] == "tela"), "status_nota": sum(1 for r in lin if r[15] == "nota"),
+           "status_fora_da_lista": conta["status_fora_da_lista"]}
     if not lin:
         atuais = livros.ler(base, s, F.LIVRO, F.ABA)
         if atuais:

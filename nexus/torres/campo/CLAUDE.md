@@ -19,7 +19,7 @@ clica, como no OS Creator Web; ver "Aprovação de OS").
 
 | Tela | De onde vem | Quem calcula |
 |---|---|---|
-| **Visão do responsável** (12/10/2026, a 1ª do Campo) | o **Painel** (28/10/2026, a tela inicial de um responsável: cinco quadros, ver "O Painel do responsável" abaixo) e três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
+| **Visão do responsável** (12/10/2026, a 1ª do Campo) | o **Painel** (28/10/2026, a tela inicial de um responsável: seis quadros, ver "O Painel do responsável" abaixo) e três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
 | **Ocorrências** (18/10/2026) | o livro `nexus_ocorrencias` (escrito nesta tela) + cadastro do Nexus | `campo/ocorrencias.py` (ver "Ocorrências com plano de ação" abaixo) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
 | Aprovação de OS | fila de verificação do Fracttal INTEIRA (só GET) + nota do livro do App + o Responsável O&M da usina (cadastro); aprovar é o Concluir do card do OS Creator | regras copiadas do App (a conta pronta por fila lida) |
@@ -837,13 +837,29 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
 - **Nenhum número novo, nenhuma régua nova:** cada quadro reorganiza o que a Visão já calcula por usina (`montar`) e o
   Ranking (`ranking_equipes.cartoes`, sobre as mesmas usinas). A meta é a régua da Visão gerencial (97/90), a ronda a
   da Central (7 dias), a cor da cobertura a das Rondas (80/50, o `cor_pct` do Painel delas) e a nota a do App (85/70).
-- **Os cinco quadros, cada um com o total e a lista inteira:** Usinas abaixo da performance (todas as usinas, da pior
-  meta para a melhor, sem meta no fim; PR contra o previsto e disponibilidade na linha), Chamados abertos (todos os em
-  aberto, o mais antigo primeiro; os em verificação na contagem), PTs pendentes (todas; a parada de hoje primeiro, depois
-  as paradas de outros dias, depois as que esperam há menos de 2 h), Ranking das equipes (todas as equipes das usinas,
-  da maior nota para a menor; a posição é a do ranking de todas; as usinas sem equipe no fim) e Acompanhamento de
-  rondas (todas as usinas, a que mais pede primeiro, as em dia no fim, com a barra em dia / longa pendente / sem ronda /
-  nunca).
+- **Os seis quadros, cada um com o total e a lista inteira** (3 × 2):
+  - Usinas abaixo da performance: todas as usinas, da pior meta para a melhor, sem meta no fim; PR contra o previsto e
+    disponibilidade na linha.
+  - Chamados abertos **por usina** (2ª rodada, Levi: "pode só botar o nome da UFV uma vez e dizer qual os ativos daquela
+    UFV"): a usina do chamado mais antigo primeiro, o nome dela preso no alto enquanto os ativos rolam; cada ativo sem a
+    marca ("Não precisa mostrar a marca do ativo": `responsaveis.nome_do_ativo`, medido nos 184 ativos dos chamados
+    abertos: "Inversor 1.7", "Estrutura de Trackers", "Usina inteira") com o **status do chamado** ("Seria bom mostrar
+    o status do chamado": o da tela de Garantias, no fato desde 28/10/2026, ver `nexus/dados/fato_chamado.py`; a troca
+    feita na tela depois da última publicação vale por cima, lida de `os_creator · chamados_obs`) e os dias. Concluído
+    não entra ("As concluídas não mostra"); os em verificação só na contagem.
+  - PTs pendentes: todas; a parada de hoje primeiro, depois as paradas de outros dias, depois as que esperam há menos
+    de 2 h. O texto do número é só "esperando o De acordo" (2ª rodada: "pode enxugar o texto").
+  - Ranking das Equipes - <mês> (2ª rodada: "sempre o mês vigente"; a conta passou ao mês, ver "O Ranking das
+    equipes"): todas as equipes das usinas, da maior nota para a menor; a posição é a do ranking de todas; as usinas
+    sem equipe no fim.
+  - Acompanhamento de rondas: todas as usinas, a que mais pede primeiro, as em dia no fim, com a barra em dia / longa
+    pendente / sem ronda / nunca. O número é o das usinas **sem ronda há 7 dias ou mais, somadas as que nunca tiveram**
+    ronda pelo App (2ª rodada: "o número do KPI deve falar quantas usinas estão sem ronda a 7 dias ou mais"; decisão
+    dele: "Somar as que nunca tiveram"); a linha de baixo diz quantas nunca tiveram, as em dia e as longas pendentes.
+  - Extintores vencidos (o 6º, Levi no mesmo dia: "quero que mostre também as usinas com extintores vencidos daquele
+    supervisor"): só as usinas com vencido, a com mais vencidos primeiro, o pior extintor e os a vencer na linha (a
+    conta do HSEQ que a Visão já lê). A linha abre a janela da usina `painel=extintores` (vencidos, a vencer, sem
+    conferência).
 - **Nada fica de fora, 6 por vez** (Levi, ao ver a 1ª versão com 5 linhas e "e mais N": "poderia ter um scroll para o
   que não cabe no card, scroll alá Nexus (...) Tem que ter todas as usinas e equipes daquele supervisor, não podemos
   deixar nada de fora"; e, ao ver o quadro com a metade da tela: "Ficou mt grande! Limite de 6 em 6 com um scroll"): a
@@ -851,11 +867,19 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
   agora" também mostra todas no Painel (nas outras visões, as 6 mais antigas). Conferido na bancada com o banco real
   (28/10): nos 8 responsáveis, a Performance e as Rondas trazem exatamente as usinas do título.
 - **O outro nível:** o "ver todas" de cada quadro abre a Visão geral com o filtro dele (`perf.abaixo_meta`,
-  `acomp.chamados`, `acomp.pts`, `acomp.rondas`) ou o Ranking; cada linha abre a janela que a Visão já tem: o dia a dia
-  da meta, o card da OS do chamado, a PT para decidir, o motivo da nota da equipe, a última ronda.
-- **Prova:** `tests/test_campo_painel_responsavel.py` (a ordem e a completude de cada quadro, o padrão de quem entra, o
-  "Todos", o CSS das 6 linhas com a rolagem); os testes da Visão que esperavam a Visão geral como padrão do responsável
-  escolhido passaram a pedir `modo=geral`.
+  `acomp.chamados`, `acomp.pts`, `acomp.rondas`, `acomp.ext`) ou o Ranking; cada linha abre a janela que a Visão já
+  tem: o dia a dia da meta, a PT para decidir, o motivo da nota da equipe, a última ronda, os extintores da usina. O
+  **chamado abre a tela dele de Garantias por cima** (2ª rodada: "Não deve direcionar, apenas sobrepor a tela como uma
+  meio que janela dando um blur de fundo"): o `<dialog id="cr-chamado">` (o mesmo fundo desfocado das outras janelas)
+  com a moldura `/os/_nexus/chamado/<nº>` (`ponte.chamado_os`), que traz a MESMA tela do OS Creator numa moldura dentro
+  dela (assim ela se vê embutida, sem o cabeçalho e as abas do OS Creator); sem o login do Fracttal, a moldura diz como
+  entrar e volta ao Painel.
+- **Prova:** `tests/test_campo_painel_responsavel.py` (a ordem e a completude de cada quadro, o nome do ativo, o número
+  das rondas, os extintores, o padrão de quem entra, o "Todos", o CSS das 6 linhas com a rolagem e da janela do
+  chamado), `tests/test_dados_fato_chamado_status.py` (o status no fato) e `tests/test_oscreator_chamado_por_cima.py`
+  (a moldura). Conferido na bancada com o banco real (28/10, 2ª rodada, com o status que a publicação nova grava): nos
+  8 responsáveis e em "Todos", cada número igual às linhas do quadro (todos: 254 chamados em 63 usinas, 47 sem status;
+  71 usinas sem ronda há 7 dias ou mais, 14 nunca; 36 usinas com extintor vencido).
 
 ### O bloco Manutenção, a Limpeza e a faixa "Parada agora" (18/10/2026)
 
@@ -966,11 +990,14 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
 
 - **A posição é a régua do App** ("de acordo com as regras do ranking do app de campo"): o Ranking por região do painel
   do App (`_ranking_regioes`), a única conta por equipe que o App tem (o placar do ciclo é só por técnico). Nota = 60%
-  qualidade + 40% cobertura, nos últimos 30 dias (hoje − 29 a hoje; o App não tem janela oficial). Qualidade = a média
+  qualidade + 40% cobertura, no **mês vigente** (do dia 1º até hoje; Levi, 28/10/2026: "Ranking das Equipes - Outubro,
+  sempre o mês vigente", no Painel e no Ranking; até então, os últimos 30 dias, porque o App não tem janela oficial; no
+  começo do mês a nota tem poucos dias, e ele aceitou). Qualidade = a média
   simples das notas das tarefas fechadas pelo App (`fato_fechamento.nota_pts`) e das rondas do App (`fato_ronda.nota_pts`);
   cobertura = usinas da equipe com ronda ÷ usinas. A cor é a escala do painel do App (85 verde, 70 âmbar), não régua da
   nota. Empate: qualidade, cobertura, volume, nome (a tela diz). Sem nota (nenhuma OS nem ronda do App): sem posição,
-  antes das ranqueadas; "Sem equipe" no fim. A seta compara com os 30 dias anteriores (a mesma lista de equipes); a usina
+  antes das ranqueadas; "Sem equipe" no fim. A seta compara com o mesmo trecho do mês anterior (do dia 1º ao mesmo dia,
+  ou ao último dia do mês passado quando ele é mais curto: `ranking_equipes.periodos`; a mesma lista de equipes); a usina
   mobilizada depois do fim do período anterior fica fora dele (revisão de 18/10/2026: contava como "sem ronda" de antes,
   e a seta "subia" sem a equipe ter melhorado).
   A régua da tela diz as datas dos dois períodos e, quando o fato de fechamento saiu na hora (o banco sem a carga desta

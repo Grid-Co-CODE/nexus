@@ -14,16 +14,25 @@ from nexus.campo import visao
 HOJE = date(2026, 10, 18)
 
 
-def test_periodos_de_30_dias():
+def test_periodos_do_mes_vigente():
+    """Levi, 28/10/2026: "Ranking das Equipes - Outubro, sempre o mês vigente" (até então, os últimos 30 dias); a seta
+    compara com o mesmo trecho do mês passado."""
     p = RE.periodos(HOJE)
-    assert p["atual"] == (date(2026, 9, 19), date(2026, 10, 18))
-    assert p["anterior"] == (date(2026, 8, 20), date(2026, 9, 18))
+    assert p["atual"] == (date(2026, 10, 1), date(2026, 10, 18))
+    assert p["anterior"] == (date(2026, 9, 1), date(2026, 9, 18))
+    # o mês passado mais curto vai até o último dia dele
+    assert RE.periodos(date(2026, 3, 31))["anterior"] == (date(2026, 2, 1), date(2026, 2, 28))
+    # o dia 1º, na virada do ano
+    assert RE.periodos(date(2027, 1, 1)) == {"atual": (date(2027, 1, 1), date(2027, 1, 1)),
+                                             "anterior": (date(2026, 12, 1), date(2026, 12, 1))}
+    assert (RE.mes(HOJE), RE.mes(date(2027, 3, 2))) == ("Outubro", "Março")
 
 
 def test_agrega_tarefas_e_rondas_por_usina_e_periodo():
     fech = [{"data_id": 20261018, "usina_id": 1, "nota_pts": 90},
-            {"data_id": "20260919", "usina_id": "1", "nota_pts": "70"},     # texto da API: a mesma conta
-            {"data_id": 20260918, "usina_id": 1, "nota_pts": 100},          # hoje − 30: o período anterior
+            {"data_id": "20261001", "usina_id": "1", "nota_pts": "70"},     # texto da API: a mesma conta
+            {"data_id": 20260918, "usina_id": 1, "nota_pts": 100},          # 18/09: o mesmo trecho do mês anterior
+            {"data_id": 20260919, "usina_id": 1, "nota_pts": 30},           # 19/09: depois do trecho, fora dos dois
             {"data_id": 20261010, "usina_id": 1, "nota_pts": None},         # sem nota: fora de tudo
             {"data_id": 20261010, "usina_id": 9, "nota_pts": 50},           # usina não mobilizada: fora
             {"data_id": 20260801, "usina_id": 1, "nota_pts": 10}]           # antes dos dois períodos: fora

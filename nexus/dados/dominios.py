@@ -249,3 +249,41 @@ RECUSA_PECA = ("chave recusada pelo Fracttal", "sem permissão", "outro")
 # PCM, e `tests/test_pcm_inventario_livro.py` confere que as duas são iguais). Vai à coluna `situacao` do
 # `fato_evento_inventario`: coluna em claro de uma API aberta aceita só estes códigos (ou vazio), nunca o texto de um erro.
 SITUACAO_INVENTARIO = ("para_cima", "para_baixo", "zerar", "sem_alteracao", "nao_tocada", "curadoria")
+
+
+# ── O status do chamado de garantia (28/10/2026) ─────────────────────────────────────────────────────────────────
+# O que a analista de chamados escolhe na tela de Garantias do OS Creator (CÓPIA de `acomp_web.STATUS_CHAMADO`, na grafia
+# dela; `tests/test_dados_fato_chamado_status.py` confere as duas). Até ela escolher, vale o "Status atual" escrito na
+# nota da OS retroativa, que vem da planilha de gestão de chamados, com a mesma lista. Medido em 28/10/2026 nas 254 OS de
+# acompanhamento abertas: 205 com um status da lista na nota, 46 sem a linha (as do App: sem status até a analista
+# escolher), 2 "STANDBY – chamado fechado pelo fabricante…" e 1 "(em branco na V02)"; 2 trocados pela tela.
+STATUS_CHAMADO = ("Testes em campo", "Aguardando retorno do Cliente", "Aguardando retorno do Supervisor",
+                  "Aguardando retorno do Fabricante", "Aguardando retorno Pré - Operação", "Aguardando Abertura de OS",
+                  "Standby", "Aguardando coleta do equipamento defeituoso")
+# de onde veio o status (regra 5, linhagem): a última troca pela tela de Garantias ou, sem troca, a nota da OS
+STATUS_CHAMADO_POR = ("tela", "nota")
+_STATUS_CHAMADO = sorted(((norm(s), s) for s in STATUS_CHAMADO), key=lambda x: -len(x[0]))
+
+
+def _minusculo_sem_acento(v) -> str:
+    """Como o `norm`, mas guarda a pontuação (o `norm` joga fora o travessão, que separa o status do resto)."""
+    s = "".join(c for c in unicodedata.normalize("NFKD", "" if v is None else str(v)) if not unicodedata.combining(c))
+    return " ".join(s.lower().split())
+
+
+def status_chamado(v):
+    """O status da lista (`STATUS_CHAMADO`, na grafia da tela) ou None (fora da lista: vazio e conta, regra 4). Vale o
+    texto igual a um da lista, sem acento nem caixa, e o que COMEÇA por um da lista seguido de travessão, hífen ou
+    dois-pontos (Levi, 28/10/2026, sobre os 2 "STANDBY – chamado fechado pelo fabricante…" da planilha: "Standby nos 2;
+    Sem status no outro"). O "(em branco na V02)" não começa por nenhum: fica vazio."""
+    n = norm(v)
+    if not n:
+        return None
+    for k, s in _STATUS_CHAMADO:
+        if n == k:
+            return s
+    t = _minusculo_sem_acento(v)
+    for k, s in _STATUS_CHAMADO:
+        if t.startswith(k) and re.match(r"\s*[-–—:]", t[len(k):]):
+            return s
+    return None

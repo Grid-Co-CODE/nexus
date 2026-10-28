@@ -32,10 +32,10 @@
 {% endif %}{% endfor %}
 {% if not cob %}<p class="cr-rk-j-ok">Nada a cobrar nos três blocos: o semáforo da equipe está em dia.</p>{% endif %}
 <section class="cr-rk-j-bloco">
-  <h3 class="cr-rk-j-nivel">Nota do App{% if m and m.perde %} <b class="cn-t-{{ cor }}">{{ n.nota }}</b><span>perde {{ m.perde }}{% if info.get('atual') %} nos 30 dias até {{ dia_curto(info.atual[1]) }}{% endif %}</span>{% endif %}</h3>
+  <h3 class="cr-rk-j-nivel">Nota do App{% if m and m.perde %} <b class="cn-t-{{ cor }}">{{ n.nota }}</b><span>perde {{ m.perde }}{% if info.get('atual') %} no mês, de {{ dia_curto(info.atual[0]) }} até {{ dia_curto(info.atual[1]) }}{% endif %}</span>{% endif %}</h3>
   {% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}.</b></div>
   {% elif n.nota is none %}
-  <p class="cr-rk-j-txt">Sem nota do App nos últimos 30 dias: {% if n.n_ronda %}{{ n.n_ronda }} ronda{{ 's' if n.n_ronda != 1 }} pelo App, nenhuma com nota{% else %}nenhuma OS nem ronda pelo App{% endif %}. O App deixa a equipe fora do ranking; ela entra quando as tarefas e as rondas passam pelo App.{% if m and m.cobertura.sem_ronda %} Sem ronda em 30 dias: {{ m.cobertura.sem_ronda|join(', ') }}{% if m.cobertura.mais_sem_ronda %} e mais {{ m.cobertura.mais_sem_ronda }}{% endif %}.{% endif %}</p>
+  <p class="cr-rk-j-txt">Sem nota do App no mês: {% if n.n_ronda %}{{ n.n_ronda }} ronda{{ 's' if n.n_ronda != 1 }} pelo App, nenhuma com nota{% else %}nenhuma OS nem ronda pelo App{% endif %}. O App deixa a equipe fora do ranking; ela entra quando as tarefas e as rondas passam pelo App.{% if m and m.cobertura.sem_ronda %} Sem ronda no mês: {{ m.cobertura.sem_ronda|join(', ') }}{% if m.cobertura.mais_sem_ronda %} e mais {{ m.cobertura.mais_sem_ronda }}{% endif %}.{% endif %}</p>
   {% elif m %}
   {% if m.perde %}
   <ul class="cr-rk-j-perdas">

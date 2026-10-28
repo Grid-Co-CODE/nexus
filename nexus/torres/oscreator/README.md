@@ -503,6 +503,16 @@ aparece quando clicamos em uma OS no histórico do OS Creator Web. Como fazem pa
   no meio, a ponte manda o pedido do card para o login, e a moldura diz que venceu.
 - **Links do card** para outras telas do OS Creator ("Clonar esta OS", "Abrir chamado") passam por `/os/_nexus/ir`,
   que abre a torre OS Creator do Nexus com a tela numa aba (`tela_do_endereco`). Com Ctrl, numa aba nova.
+- **A tela do chamado de Garantias por cima** (28/10/2026, Levi, no Painel do responsável: "Ao clicar no chamado deve
+  aparecer a tela que aparece quando clicamos na OS de chamados na parte de garantias. Não deve direcionar, apenas
+  sobrepor a tela como uma meio que janela dando um blur de fundo"): `/os/_nexus/chamado/<nº>?de=<a tela>`
+  (`ponte.chamado_os`, template `oscreator/chamado_os.html`) é a moldura do MEIO, que a tela do Nexus põe num `<dialog>`
+  com o fundo desfocado. Dentro dela vem a tela inteira do clone (`/os/chamados/acompanhamento/<nº>`, sem cópia) numa
+  moldura própria: com a página do meio entre ela e o Nexus, o `window.__osTopo()` da tela para na do meio (ela não tem o
+  `data-nexus`), a tela se vê embutida (`os-embutido`) e sai sem o cabeçalho e as abas. Sem o login do Fracttal, a do
+  meio diz "Para abrir o chamado, entre pelo Fracttal", com a mesma volta do card (`/os/_nexus/card/voltar`). O Esc
+  dentro dela avisa o Nexus para fechar (`{nexusChamado: 1, tipo: 'fechar'}`), salvo com um diálogo da tela aberto.
+  Os links da tela (o "← Acompanhamento", a OS, os outros chamados do ativo) andam dentro da janela.
 - **O X do card** ficava escondido atrás do cabeçalho fixo dele, também no Histórico (`.os-modal-x` com z-index 2, o
   `.det-top` com 3, e o clique caía no cabeçalho). Passou a 4, no `os.css`.
 - **Como provar:** `tests/test_torre_oscreator.py` (a moldura, o aviso sem login, o `ir`) e

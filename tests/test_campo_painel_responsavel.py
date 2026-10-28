@@ -1,7 +1,10 @@
 """O Painel do responsável (Levi, 28/10/2026: "quero uma tela feita mesmo para o responsável que não seja um tabelão (...)
-uma tela inicial claro"; e, ao ver a 1ª versão: "não podemos deixar nada de fora"): os cinco quadros sobre o que a Visão
-do responsável já calcula, completos, e a tela com o banco falso."""
+uma tela inicial claro"; e, ao ver a 1ª versão: "não podemos deixar nada de fora"): os quadros sobre o que a Visão do
+responsável já calcula, completos, e a tela com o banco falso. A 2ª rodada (no mesmo dia, ao ver no ar): os chamados por
+usina com o ativo sem a marca e o status do chamado, a tela do chamado por cima, o número das Rondas, o texto das PT, o
+Ranking do mês e o 6º quadro, os extintores vencidos."""
 import re
+from datetime import date
 
 from test_campo_responsaveis import _responsavel, banco, tela  # noqa: F401  (fixtures)
 
@@ -9,28 +12,34 @@ from nexus.campo import painel_responsavel as P
 from nexus.campo import responsaveis as R
 
 
-def _u(uid, nome, ating=None, pr=None, pr_meta=None, ronda=None, chamados=(), pts=(), equipe="SP Norte 01"):
-    lista_ch = [{"os": 100 + i, "situacao": s, "dias": d, "equip": "Inversor 1", "fabricante": "Sungrow", "componente": ""}
-                for i, (s, d) in enumerate(chamados)]
+def _u(uid, nome, ating=None, pr=None, pr_meta=None, ronda=None, chamados=(), pts=(), equipe="SP Norte 01", ext=None):
+    lista_ch = [{"os": 100 + i, "situacao": s, "dias": d, "equip": "Inversor 1 Sungrow SG125HV", "ativo": "Inversor 1",
+                 "status": st, "fabricante": "Sungrow", "componente": ""}
+                for i, (s, d, st) in enumerate(chamados)]
     return {"usina_id": uid, "usina": nome, "cliente": "Thopen", "equipe": equipe,
             "meta": {"atingimento": ating, "pr": pr, "pr_meta": pr_meta} if ating is not None else None,
             "disp": {"disp": 99.5}, "ronda": ronda or {},
-            "chamados": {"abertos": sum(1 for s, _ in chamados if s == "aberto"),
-                         "verificacao": sum(1 for s, _ in chamados if s == "verificacao"), "lista": lista_ch},
+            "chamados": {"abertos": sum(1 for s, _, _ in chamados if s == "aberto"),
+                         "verificacao": sum(1 for s, _, _ in chamados if s == "verificacao"), "lista": lista_ch},
             "pt": {**R._pt_vazia(), "aguardando": len(pts), "paradas": sum(1 for x in pts if x["parada"]),
                    "lista": list(pts)}, "perf": {"nivel": "ok"}, "acomp": {"nivel": "ok"},
-            "nivel": "ok"}
+            "extintores": ext or {}, "nivel": "ok"}
 
 
 USINAS = [
     _u(1, "Altair", 85.0, ronda={"tipo": "sem_ronda", "dias": 9, "ultima": "2026-10-19", "os": "500"},
-       chamados=[("aberto", 26), ("verificacao", 3)],
-       pts=[{"numero": "PT-1", "codigo": "A", "idade_min": 30, "parada": False, "hoje": True}]),
+       chamados=[("aberto", 26, "Testes em campo"), ("verificacao", 3, ""), ("aberto", 40, "")],
+       pts=[{"numero": "PT-1", "codigo": "A", "idade_min": 30, "parada": False, "hoje": True}],
+       ext={"total": 4, "vencidos": 1, "a_vencer": 2, "lista": [{"ext": "EXT-02", "onde": "Cabine", "txt":
+            "recarga venceu em 12/10", "ordem": 0}, {"ext": "EXT-03", "onde": "", "txt": "recarga vence em 9 dias",
+                                                     "ordem": 1}]}),
     _u(2, "Brodowski 1", 95.0, pr=70.0, pr_meta=80.0, ronda={"dias": 2, "ultima": "2026-10-26", "os": "501"},
-       chamados=[("aberto", 300)],
+       chamados=[("aberto", 300, "Aguardando retorno do Fabricante")],
        pts=[{"numero": "PT-2", "codigo": "B", "idade_min": 400, "parada": True, "hoje": True},
-            {"numero": "PT-3", "codigo": "C", "idade_min": 3000, "parada": True, "hoje": False}]),
-    _u(3, "Coração 1", 101.0, ronda={"tipo": "nunca", "dias": 999}),
+            {"numero": "PT-3", "codigo": "C", "idade_min": 3000, "parada": True, "hoje": False}],
+       ext={"total": 6, "vencidos": 3, "a_vencer": 0, "lista": [{"ext": "EXT-01", "onde": "", "txt":
+            "teste hidrostático venceu em 01/10", "ordem": 0}]}),
+    _u(3, "Coração 1", 101.0, ronda={"tipo": "nunca", "dias": 999}, ext={"total": 2, "vencidos": 0, "a_vencer": 1}),
     _u(4, "Sem Meta", None, ronda={"tipo": "longa_pendente", "dias": 1, "ultima": "2026-10-27"}),
     _u(5, "Dourados", 70.0, ronda={"dias": 5, "ultima": "2026-10-23"}),
 ]
@@ -44,47 +53,88 @@ def test_performance_traz_todas_as_usinas_da_pior_para_a_melhor():
     assert p["linhas"][2]["pr_abaixo"] and not p["linhas"][0]["pr_abaixo"]
 
 
-def test_chamados_e_pts_completos_na_ordem_de_quem_cobra():
+def test_chamados_por_usina_o_mais_antigo_primeiro_com_o_ativo_e_o_status():
+    """Levi, 28/10/2026: "pode só botar o nome da UFV uma vez e dizer qual os ativos daquela UFV"; sem a marca; com o
+    status do chamado; os concluídos e os em verificação fora da lista."""
     c = P.chamados(USINAS)
-    assert (c["abertos"], c["verificacao"], c["usinas"], c["mais_antigo"]) == (2, 1, 2, 300)
-    assert [x["usina"] for x in c["linhas"]] == ["Brodowski 1", "Altair"]        # o mais antigo primeiro
+    assert (c["abertos"], c["verificacao"], c["usinas"], c["mais_antigo"]) == (3, 1, 2, 300)
+    assert [g["usina"] for g in c["grupos"]] == ["Brodowski 1", "Altair"]           # a do chamado mais antigo primeiro
+    altair = c["grupos"][1]
+    assert [x["dias"] for x in altair["itens"]] == [40, 26] and altair["mais_antigo"] == 40
+    assert altair["itens"][1] == {"os": 100, "ativo": "Inversor 1", "status": "Testes em campo", "dias": 26}
+    assert altair["itens"][0]["status"] == ""                                         # sem status: a tela diz
+    assert all(x["dias"] != 3 for g in c["grupos"] for x in g["itens"])               # o em verificação não entra
+
+
+def test_pts_completas_na_ordem_de_quem_cobra():
     p = P.pts(USINAS)
     # a parada de hoje (técnico parado agora), depois a parada de outro dia, depois a que espera há menos de 2 h
     assert [x["numero"] for x in p["linhas"]] == ["PT-2", "PT-3", "PT-1"]
     assert (p["aguardando"], p["paradas"], p["agora"]) == (3, 2, 1)
 
 
-def test_rondas_traz_todas_as_usinas_a_que_mais_pede_primeiro():
+def test_rondas_traz_todas_as_usinas_e_o_numero_soma_as_que_nunca_tiveram():
     r = P.rondas(USINAS)
     assert [x["usina"] for x in r["linhas"]] == ["Coração 1", "Altair", "Sem Meta", "Dourados", "Brodowski 1"]
     assert [x["situacao"] for x in r["linhas"]] == ["nunca", "sem_ronda", "longa_pendente", "em_dia", "em_dia"]
     assert (r["usinas"], r["em_dia"], r["sem_ronda"], r["nunca"], r["longa"], r["em_dia_pct"]) == (5, 2, 1, 1, 1, 40)
+    # Levi, 28/10/2026: "o número do KPI deve falar quantas usinas estão sem ronda a 7 dias ou mais"; "Somar as que
+    # nunca tiveram"
+    assert r["sem_7"] == 2
     assert r["linhas"][0]["dias"] is None and r["linhas"][1]["os"] == "500"
 
 
-def test_ranking_todas_as_equipes_da_maior_nota_para_a_menor_e_sem_equipe_no_fim():
+def test_extintores_so_as_usinas_com_vencido_a_com_mais_primeiro():
+    e = P.extintores(USINAS)
+    assert [x["usina"] for x in e["linhas"]] == ["Brodowski 1", "Altair"]            # Coração 1 só tem a vencer
+    assert (e["usinas"], e["vencidos"], e["com_extintor"], e["a_vencer"]) == (2, 4, 3, 3)
+    assert e["linhas"][1]["pior"] == "recarga venceu em 12/10" and e["linhas"][1]["pior_ext"] == "EXT-02"
+
+
+def test_ranking_todas_as_equipes_da_maior_nota_para_a_menor_e_o_mes():
     rk = {"total": 9, "cartoes": [
         {"equipe": "B", "nota": 70, "sem_equipe": False}, {"equipe": "Sem equipe", "nota": None, "sem_equipe": True},
         {"equipe": "A", "nota": 93, "sem_equipe": False}, {"equipe": "C", "nota": None, "sem_equipe": False},
         *({"equipe": f"E{i}", "nota": 50 + i, "sem_equipe": False} for i in range(9))]}
-    r = P.ranking(rk)
+    r = P.ranking(rk, date(2026, 10, 28))
     nomes = [c["equipe"] for c in r["equipes"]]
     assert nomes[:2] == ["A", "B"] and nomes[-2:] == ["C", "Sem equipe"] and len(nomes) == 13    # nada fica de fora
-    assert r["total"] == 9
+    # "Ranking das Equipes - Outubro, sempre o mês vigente"
+    assert (r["total"], r["mes"], r["desde"]) == (9, "Outubro", date(2026, 10, 1))
 
 
 def test_montar_e_o_cabecalho():
-    p = P.montar("Ciclano Chefe", USINAS, {"cartoes": [], "total": 0})
+    p = P.montar("Ciclano Chefe", USINAS, {"cartoes": [], "total": 0}, date(2026, 10, 28))
     assert (p["nome"], p["usinas"], p["clientes"], p["equipes"]) == ("Ciclano Chefe", 5, ["Thopen"], ["SP Norte 01"])
-    assert all(k in p for k in ("perf", "chamados", "pts", "ranking", "rondas"))
+    assert all(k in p for k in ("perf", "chamados", "pts", "ranking", "rondas", "extintores"))
+
+
+def test_o_nome_do_ativo_sem_a_marca():
+    """Levi, 28/10/2026: "Não precisa mostrar a marca do ativo"."""
+    assert R.nome_do_ativo("Inversor 1.7 Sungrow SG125HV") == "Inversor 1.7"
+    assert R.nome_do_ativo("Tracker 5.100 STI STI-H250 Bi-linha") == "Tracker 5.100"
+    assert R.nome_do_ativo("Tracker 24.300 Trina Solar Vanguard 1P") == "Tracker 24.300"
+    assert R.nome_do_ativo("RSU 1") == "RSU 1"
+    assert R.nome_do_ativo("Disjuntor do Inversor 1") == "Disjuntor do Inversor 1"
+    assert R.nome_do_ativo("SKID 1 Sítio Serrote s/n - Setor C Zona Rural") == "SKID 1"
+    # a estrutura inteira de trackers vem com o endereço da usina depois (com e sem número de rodovia)
+    assert R.nome_do_ativo("Estrutura Trackers  Aparecida do Taboado  Mato Grosso do Sul Brasil") == "Estrutura de Trackers"
+    assert R.nome_do_ativo("Estrutura Trackers BR 226 S/N Zona Rural") == "Estrutura de Trackers"
+    assert R.nome_do_ativo("Estrutura de Trackers") == "Estrutura de Trackers"
+    # o ativo que é a própria usina; o tipo sem número, com o endereço depois
+    assert R.nome_do_ativo("Thopen - Usina Teste 1 - DF BR 070 km 5") == "Usina inteira"
+    assert R.nome_do_ativo("Estação Meteorológica Rodovia BR 365 KM 2") == "Estação Meteorológica"
+    assert R.nome_do_ativo("Preventiva Grupo de Inversores") == "Preventiva Grupo de Inversores"
+    assert R.nome_do_ativo("", "THPN-FZL100-ETKR14.101") == "THPN-FZL100-ETKR14.101"
+    assert R.nome_do_ativo(None, None) == "equipamento"
 
 
 # ── a tela, com o banco falso ───────────────────────────────────────────────────────────────────────────────────────
 def test_a_tela_do_painel_do_responsavel(tela, logado):
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
     assert 'aria-current="page">Painel' in html and '<h1 class="cn-titulo">Ciclano Chefe</h1>' in html
-    for t in ("Usinas abaixo da performance", "Chamados abertos", "PTs pendentes", "Ranking das equipes",
-              "Acompanhamento de rondas"):
+    for t in ("Usinas abaixo da performance", "Chamados abertos", "PTs pendentes", "Ranking das Equipes - ",
+              "Acompanhamento de rondas", "Extintores vencidos"):
         assert t in html
     # todas as usinas do responsável na Performance e nas Rondas (Altair e Brodowski 1), nunca a do outro
     for qual in ("pn-perf-t", "pn-rd-t"):
@@ -92,13 +142,23 @@ def test_a_tela_do_painel_do_responsavel(tela, logado):
         sec = html[i:html.index("</section>", i)]
         assert "Altair" in sec and "Brodowski 1" in sec and "Coração 1" not in sec
     secoes = re.findall(r'<section class="pn-q.*?</section>', html, re.S)
-    assert len(secoes) == 5 and not any(">e mais " in x for x in secoes)         # nada fica de fora
+    assert len(secoes) == 6 and not any(">e mais " in x for x in secoes)         # nada fica de fora
+    # o texto das PT enxuto (Levi, 28/10/2026): só "esperando o De acordo"
+    i = html.index('id="pn-pt-t"')
+    pt = html[i:html.index("</section>", i)]
+    assert "<span>esperando o De acordo</span>" in pt and "há mais de 2 h" not in pt and "técnico esperando" not in pt
     # o outro nível: o dia a dia da meta, a PT por cima, a equipe e a Visão geral com o filtro do quadro
     assert "/t/campo/responsaveis/usina/1/meta" in html and "/t/campo/responsaveis/pt/PT-1" in html
     assert "/t/campo/responsaveis/equipe" in html and "filtro=perf.abaixo_meta" in html
     assert "filtro=acomp.chamados" in html and "filtro=acomp.rondas" in html and "modo=ranking" in html
+    assert "filtro=acomp.ext" in html
+    # o chamado abre a tela dele de Garantias por cima (a moldura da ponte), sem sair do Painel
+    assert 'id="cr-chamado"' in html and "nexusRota('/os/_nexus/chamado/')" in html
+    i = html.index('id="pn-ch-t"')
+    ch = html[i:html.index("</section>", i)]
+    assert 'data-cr-chamado="' in ch and 'class="pn-grupo"' in ch
     # as listas rolam por dentro do quadro (a barra de rolagem do Nexus)
-    assert html.count('class="pn-lista') == 5
+    assert html.count('class="pn-lista') == 6
 
 
 def test_todos_sem_responsavel_segue_nos_cartoes_e_o_painel_de_todos_abre(tela, logado):
@@ -117,6 +177,12 @@ def test_o_responsavel_logado_entra_no_painel_dele(tela, cliente):
     assert 'aria-current="page">Visão geral' in html and 'class="pn"' not in html
 
 
+def test_a_janela_dos_extintores_da_usina(tela, logado):
+    h = logado.get("/t/campo/responsaveis/usina/1/extintores").get_data(as_text=True)
+    assert "Extintores vencidos" in h and ("<th>Extintor</th>" in h or "Nenhum extintor desta usina" in h)
+    assert logado.get("/t/campo/responsaveis/usina/1/qualquer").status_code == 404
+
+
 def test_o_css_da_rolagem_e_da_altura_do_quadro():
     from pathlib import Path
     css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
@@ -125,6 +191,9 @@ def test_o_css_da_rolagem_e_da_altura_do_quadro():
     # 6 linhas por vez (Levi, 28/10/2026: "Limite de 6 em 6 com um scroll"), cada uma com a altura fixa
     assert "max-height:calc(6 * var(--pn-linha)" in lista and re.search(r"\.pn-it,\.pn-rk-it\{[^}]*height:var\(--pn-linha\)", css)
     assert ".pn-lista::-webkit-scrollbar-thumb{background:var(--rolagem)" in css
+    # o nome da usina preso no alto dos chamados; a janela do chamado só com display quando aberta
+    assert re.search(r"\.pn-grupo-cab\{[^}]*position:sticky", css)
+    assert ".cr-modal--chamado[open]{display:flex" in css and not re.search(r"\.cr-modal--chamado\{[^}]*display:", css)
 
 
 def test_nenhuma_regua_nova():

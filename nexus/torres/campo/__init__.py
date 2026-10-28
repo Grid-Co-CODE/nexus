@@ -523,7 +523,10 @@ def responsaveis():
 # vindo!"): um pedaço de página (sem a moldura do Nexus) que a tela carrega num <dialog> com o fundo desfocado. Meta: a
 # tabela do dia a dia; PR: a geração com a linha do POA e a curva do PR; Disponibilidade: o mapa diário e as OS que
 # formaram o valor. Cada uma lê o MESMO dado da tela dona, publicado no banco pela plataforma.
-PAINEIS = {"meta": "Meta do mês", "pr": "PR do mês", "disp": "Disponibilidade do mês", "ativos": "Ativos falhando"}
+# Extintores (28/10/2026): a linha do quadro "Extintores vencidos" do Painel do responsável abre os extintores da usina
+# que pedem atenção (vencidos, a vencer, sem conferência), a conta do HSEQ que a Visão já leu
+PAINEIS = {"meta": "Meta do mês", "pr": "PR do mês", "disp": "Disponibilidade do mês", "ativos": "Ativos falhando",
+           "extintores": "Extintores"}
 
 
 @bp.route("/responsaveis/usina/<int:usina_id>/<painel>")
@@ -692,6 +695,10 @@ def _resp_painel_montar(usina_id, painel, obs_aviso="", obs_erro="", obs_texto="
     ctx = {"u": u, "painel": painel, "titulo": PAINEIS[painel], "mes_txt": hoje.strftime("%m/%Y"), "erro": "",
            "limites": {"meta_ok": campo_resp.META_NA_META, "meta_atencao": campo_resp.META_ATENCAO,
                        "disp_ok": campo_resp.DISP_OK, "disp_critico": campo_resp.DISP_CRITICO}}
+    if painel == "extintores":       # nada a ler: a conta do HSEQ já veio com a usina (`responsaveis.extintores`)
+        from ...hseq import extintores as EXT
+        ctx["ext_alerta"] = EXT.ALERTA_DIAS
+        return render_template("campo/_resp_painel.html", **ctx, duracao=_idade_min)
     try:
         nomes = campo_resp.Nomes(visao._Base())
         if painel in ("meta", "pr"):
@@ -704,7 +711,7 @@ def _resp_painel_montar(usina_id, painel, obs_aviso="", obs_erro="", obs_texto="
         elif painel == "disp":
             ctx.update(disp=campo_resp.disp_diaria(usina_id, hoje.strftime("%Y-%m"), nomes),
                        oss=campo_resp.os_disponibilidade(usina_id, hoje.strftime("%Y-%m"), nomes))
-        else:       # os ativos falhando da Engenharia › Confiabilidade (Levi, 13/10/2026)
+        elif painel == "ativos":       # os ativos falhando da Engenharia › Confiabilidade (Levi, 13/10/2026)
             ctx.update(at=campo_resp.ativos_da_usina(usina_id, hoje),
                        tela_confiabilidade="torre_engenharia.confiabilidade")
     except Exception as e:      # noqa: BLE001 — banco fora: a janela diz, a tela segue

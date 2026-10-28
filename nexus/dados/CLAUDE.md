@@ -233,7 +233,16 @@ com chamado aberto para o ativo vai para "Explicado / em tratamento", "aguardand
 copiado em `plataforma/diag_tratamento.py`; renomear coluna aqui quebra lá). **A OS retroativa (20/10/2026):** a criada à mão para um chamado que já
 existia traz na nota a "Data da ocorrência / abertura do chamado"; o `data_id_abertura` e a `duracao_min` contam dela
 (Levi: "A abertura do chamado"), se for data de verdade e não depois da criação da OS, e `abertura_por` diz `nota` ou
-`os` (linhagem, regra 5). A 1ª, de um chamado de 21/08, entraria com 0 dias.
+`os` (linhagem, regra 5). A 1ª, de um chamado de 21/08, entraria com 0 dias. **O status do chamado (28/10/2026):** Levi,
+no Painel do responsável: "Seria bom mostrar o status do chamado". As colunas `status` e `status_por`, no FIM do fato:
+o status da tela de Garantias do OS Creator (`acomp_web.status_atual`), a última troca pela tela (lida da aba
+`os_creator · chamados_obs`, tipo "status", só o status: o texto, a pessoa e o e-mail ficam lá) ou, sem troca, o
+"Status atual" da nota da retroativa; `status_por` = `tela` ou `nota`. Domínio fechado (regra 4):
+`dominios.STATUS_CHAMADO`, a lista da analista (cópia conferida por teste contra a da tela); o texto que começa por um
+status da lista seguido de travessão, hífen ou dois-pontos vale como ele (decisão do Levi sobre os 2 "STANDBY – chamado
+fechado pelo fabricante…": "Standby nos 2"); o resto = vazio e conta no relatório da volta (`status_fora_da_lista`).
+Medido em 28/10/2026 nas 256 OS: 205 pela nota, 2 pela tela, 1 fora da lista, 48 sem status (as do App, até a analista
+escolher). A Visão do responsável lê daqui e põe por cima a troca feita na tela depois da última publicação.
 
 **As tarefas das OS do Fracttal (18/10/2026):** Levi: "pegando tudo do Fracttal ou Nexus, sem fontes externas!". As
 telas do PCM leem as tarefas do `gestao_pcm.json` que o robô do PCM regrava no GitHub dele; para a Visão do responsável

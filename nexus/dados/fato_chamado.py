@@ -31,11 +31,17 @@ chamado abre nessa data ("A abertura do chamado"), e não no dia em que a OS ent
 0 dias. A data da nota vale quando é uma data de verdade e não depois da criação da OS; a duração conta dela (o dia, 00:00
 em Brasília: a nota não traz a hora). `abertura_por` diz de onde veio (regra 5, linhagem): `nota` ou `os` (a criação).
 A mesma leitura da tela está em `acomp_web.ler_nota` e `acomp_web.abertura_valida` (o OS Creator não importa o Nexus).
+O STATUS DO CHAMADO (28/10/2026): Levi, no Painel do responsável: "Seria bom mostrar o status do chamado". É o da tela de
+Garantias (`acomp_web.status_atual`): a última troca pela tela (`os_creator · chamados_obs`, tipo "status") ou, sem
+troca, o "Status atual" da nota da retroativa. Só os valores da lista da analista (`dominios.STATUS_CHAMADO`; fora dela =
+vazio e conta); `status_por` diz de onde veio (`tela` ou `nota`).
 """
+import json
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
 
+from . import dominios
 from .calendario import data_id
 from .fatos import _id, _int, _txt, ligar_equipamento
 
@@ -43,9 +49,10 @@ LIVRO, ABA = "nexus_chamados", "fato_chamado"
 NOME_LIVRO = "Nexus · chamados de garantia (OS de acompanhamento de chamado do Fracttal)"
 # CÓPIA no PerformancePainel (`plataforma/diag_tratamento.py`, 27/10/2026): o Diagnóstico da usina lê este livro para dizer
 # "aguardando fabricante há N dias". A leitura de lá é por NOME de coluna: coluna nova aqui não quebra, renomear quebra.
+# O `status` e o `status_por` (28/10/2026) entram no FIM, pelo mesmo motivo.
 CAB_CHAMADO = ["os", "data_id_abertura", "data_id_fim", "usina_id", "usina_ligada_por", "site_fracttal",
                "equipamento_id", "equipamento_ligado_por", "codigo_ativo", "situacao", "fabricante", "componente",
-               "duracao_min", "abertura_por"]
+               "duracao_min", "abertura_por", "status", "status_por"]
 TIPO = "snapshot_acumulado"
 GRAO = ("1 linha = 1 OS de acompanhamento de chamado do Fracttal (em processo, em verificação ou concluída nos "
         "últimos 90 dias)")
@@ -99,6 +106,56 @@ def abertura_da_nota(nota, criada: datetime | None) -> datetime | None:
     return a
 
 
+def status_da_nota(nota) -> str | None:
+    """O "Status atual" escrito na nota da OS retroativa, como a tela de Garantias o lê (`acomp_web.ler_nota` e
+    `status_atual`: as linhas "rótulo: valor" do cabeçalho, antes do Histórico e dos campos do formulário, partidas no
+    '·'; vale a 1ª). O texto como está (quem o põe na lista é `dominios.status_chamado`); None sem a linha."""
+    txt = str(nota or "")
+    i = txt.find(MARCA)
+    if i < 0:
+        return None
+    for linha in txt[i:].split("\n")[1:]:
+        s = linha.strip()
+        if s.startswith(("Histórico", "Campos do formulário", "Demais respostas")):
+            break
+        for parte in s.split("·"):
+            k, _, v = parte.partition(":")
+            if _norm(k) == "status atual":
+                return v.strip()
+    return None
+
+
+def status_da_tela(obs) -> dict:
+    """{nº da OS: o status da última troca pela tela de Garantias}, das linhas de `os_creator · chamados_obs` (tipo
+    "status", o status em `extra`; "" = trocado para "Sem status"). A regra do `chamados_obs_store.status_por_os`: vale a
+    última troca, pela hora gravada (`quando`). Desta aba só o status sai: o texto, a pessoa e o e-mail ficam lá."""
+    out = {}
+    for x in sorted(obs or (), key=lambda x: str(x.get("quando") or "")):
+        if str(x.get("tipo") or "").strip() != "status" or not str(x.get("os") or "").strip():
+            continue
+        e = x.get("extra")
+        if isinstance(e, str):
+            try:
+                e = json.loads(e) if e.strip() else {}
+            except ValueError:
+                e = {}
+        st = e.get("status") if isinstance(e, dict) else None
+        out[str(x.get("os")).strip()] = str(st if st is not None else "").strip()
+    return out
+
+
+def status_do_chamado(os_, nota, tela: dict) -> tuple[str | None, str | None, bool]:
+    """(status, de onde veio, fora da lista): a última troca pela tela de Garantias vale; sem troca, o "Status atual" da
+    nota (`acomp_web.status_atual`, a mesma ordem). Fora da lista (`dominios.status_chamado`) = vazio e conta (regra 4);
+    trocado na tela para "Sem status" = vazio, pela tela."""
+    k = str(os_ or "").strip()
+    bruto, por = (tela[k], "tela") if k in (tela or {}) else (status_da_nota(nota), "nota")
+    if bruto is None:
+        return None, None, False
+    st = dominios.status_chamado(bruto)
+    return st, por, bool(str(bruto).strip()) and st is None
+
+
 def _dt(v) -> datetime | None:
     s = _txt(v).replace("Z", "+00:00")
     if not s:
@@ -115,10 +172,12 @@ def _dia(d: datetime | None) -> int | None:
     return data_id(d.astimezone(_BRT).date()) if d else None
 
 
-def linhas(rows, lig, equip=None, hoje=None) -> list[list]:
+def linhas(rows, lig, equip=None, hoje=None, tela=None, conta=None) -> list[list]:
     """As linhas do fato, na ordem de `CAB_CHAMADO`, pela OS. `rows` = as linhas do REST (uma por tarefa: a OS 3 tem uma
     só; repetida, vale a de criação mais antiga); `lig` = o `Ligador` do cadastro; `equip` = {código: equipamento_id}
-    da dimensão de equipamento; `hoje` = o dia de Brasília (a concluída há mais de 90 dias sai, como no quadro)."""
+    da dimensão de equipamento; `hoje` = o dia de Brasília (a concluída há mais de 90 dias sai, como no quadro); `tela` =
+    as trocas de status pela tela de Garantias (`status_da_tela`); `conta` (um Counter, opcional) recebe quantos status
+    ficaram fora da lista (`status_fora_da_lista`)."""
     por_os = {}
     for w in rows or ():
         st = _int(w.get("id_status_work_order"))
@@ -143,7 +202,10 @@ def linhas(rows, lig, equip=None, hoje=None) -> list[list]:
         aberta = abertura_da_nota(nota, cri)
         ini = aberta or cri
         dur = round((fim - ini).total_seconds() / 60) if fim and ini and fim >= ini else None
+        status, status_por, fora = status_do_chamado(os_, nota, tela)
+        if conta is not None and fora:
+            conta["status_fora_da_lista"] += 1
         out.append([os_, _dia(ini), _dia(fim), uid, como, site or None, eid, ecomo, codigo or None, SITUACAO[st],
-                    fab or None, comp or None, dur, "nota" if aberta else ("os" if cri else None)])
+                    fab or None, comp or None, dur, "nota" if aberta else ("os" if cri else None), status, status_por])
     out.sort(key=lambda r: r[0])
     return out

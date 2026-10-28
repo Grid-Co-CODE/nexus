@@ -49,7 +49,8 @@ def test_so_a_os_de_acompanhamento_entra_com_os_ids_e_sem_pessoa():
                         "usina_ligada_por": "de-para do Fracttal", "site_fracttal": "Thopen - Altair 1 - SP",
                         "equipamento_id": 900, "equipamento_ligado_por": "código do ativo",
                         "codigo_ativo": "THPN-ALT100-ETKR1", "situacao": "aberto", "fabricante": "STI",
-                        "componente": "Estrutura Trackers", "duracao_min": None, "abertura_por": "os"}
+                        "componente": "Estrutura Trackers", "duracao_min": None, "abertura_por": "os",
+                        "status": None, "status_por": None}
     assert (d[16040]["usina_id"], d[16040]["usina_ligada_por"], d[16040]["situacao"]) == (3, "código do ativo", "verificacao")
     assert (d[16040]["fabricante"], d[16040]["componente"], d[16040]["duracao_min"]) == ("Convert", "Cabine", 2880)
     assert d[15000]["situacao"] == "concluido" and d[15000]["duracao_min"] == 1470

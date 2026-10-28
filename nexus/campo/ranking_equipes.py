@@ -25,16 +25,28 @@ from datetime import date, timedelta
 from ..dados import fatos as D
 from . import visao
 
-# "Últimos 30 dias", o padrão da barra do painel do App (PER='30'): o App não tem janela oficial, e o Levi escolheu 30
-JANELA_DIAS = 30
+# O período é o MÊS VIGENTE (Levi, 28/10/2026, no Painel do responsável: "Ranking das Equipes - Outubro, sempre o mês
+# vigente", no Painel e no Ranking). De 18/10 a 28/10/2026 eram os "Últimos 30 dias", o padrão da barra do painel do App
+# (PER='30'), que o Levi tinha escolhido por o App não ter janela oficial. No começo do mês a nota tem poucos dias.
+MESES = ("Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro",
+         "Dezembro")
 # a escala de cor do painel do App (qcor no gestao.html): 85 ou mais verde, 70 ou mais âmbar, abaixo vermelho
 COR_VERDE, COR_AMBAR = 85, 70
 
 
 def periodos(hoje: date) -> dict:
-    """O período atual (de hoje − 29 a hoje, o "Últimos 30 dias" do painel do App) e o anterior, do mesmo tamanho."""
-    ini = hoje - timedelta(days=JANELA_DIAS - 1)
-    return {"atual": (ini, hoje), "anterior": (ini - timedelta(days=JANELA_DIAS), ini - timedelta(days=1))}
+    """O período atual (do dia 1º do mês até hoje) e o anterior, o mesmo trecho do mês passado: do dia 1º ao mesmo dia,
+    ou ao último dia do mês passado quando ele é mais curto (31/03 compara com 01/02 a 28/02). A seta da posição compara
+    os dois."""
+    ini = hoje.replace(day=1)
+    fim_passado = ini - timedelta(days=1)
+    ini_passado = fim_passado.replace(day=1)
+    return {"atual": (ini, hoje), "anterior": (ini_passado, fim_passado.replace(day=min(hoje.day, fim_passado.day)))}
+
+
+def mes(hoje: date) -> str:
+    """O nome do mês do período ("Outubro"), para o título do ranking."""
+    return MESES[hoje.month - 1]
 
 
 def _vazio() -> dict:

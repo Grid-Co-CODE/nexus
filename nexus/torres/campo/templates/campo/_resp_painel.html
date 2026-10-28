@@ -7,13 +7,14 @@
 {% macro mwh(v) %}{{ '—' if v is none else ('%.1f'|format(v))|replace('.', ',') }}{% endmacro %}
 {% macro pct(v, casas=0) %}{{ '—' if v is none else ('%.*f'|format(casas, v))|replace('.', ',') ~ '%' }}{% endmacro %}
 <header class="cr-jan-cab">
-  <div><p class="gc-eyebrow">{{ titulo }} · {{ ('últimos ' ~ at.janela ~ ' dias') if painel == 'ativos' and at else mes_txt }}</p><h2>{{ u.usina }}</h2>
+  <div><p class="gc-eyebrow">{{ titulo }} · {{ ('últimos ' ~ at.janela ~ ' dias') if painel == 'ativos' and at else ('hoje' if painel == 'extintores' else mes_txt) }}</p><h2>{{ u.usina }}</h2>
     <p class="mudo">{{ u.cliente or '—' }} · {{ u.equipe or '—' }} · {{ u.cidade or '—' }}{% if u.uf %}/{{ u.uf }}{% endif %}</p></div>
   {% set m = u.meta or {} %}{% set d = u.disp or {} %}
   <div class="cr-jan-resumo">
     {% if painel == 'meta' %}<span class="gc-rotulo">Meta do mês (Gerencial)</span><b class="cr-v cr-v--{{ u.perf.valores.meta.cls }}">{{ pct(m.get('atingimento')) }}</b>
     {% elif painel == 'pr' %}<span class="gc-rotulo">PR do mês</span><b class="cr-v cr-v--{{ u.perf.valores.pr.cls }}">{{ pct(m.get('pr'), 1) }}</b><span class="mudo">previsto {{ pct(m.get('pr_meta'), 1) }}</span>
     {% elif painel == 'ativos' %}{% if at %}<span class="gc-rotulo">Na Confiabilidade</span><b class="cr-v cr-v--{{ 'critico' if at.criticos else ('alerta' if at.atencao else 'neutro') }}">{% set partes = [] %}{% if at.criticos %}{% set _ = partes.append(at.criticos ~ ' crítico' ~ ('s' if at.criticos != 1 else '')) %}{% endif %}{% if at.atencao %}{% set _ = partes.append(at.atencao ~ ' em atenção') %}{% endif %}{{ partes|join(' · ') or 'nenhum' }}</b>{% if at.monitorar %}<span class="mudo">e {{ at.monitorar }} em monitorar</span>{% endif %}{% endif %}
+    {% elif painel == 'extintores' %}{% set e = u.extintores or {} %}<span class="gc-rotulo">Extintores vencidos</span><b class="cr-v cr-v--{{ 'critico' if e.get('vencidos') else 'ok' }}">{{ e.get('vencidos') or 0 }}</b><span class="mudo">de {{ e.get('total') or 0 }} na usina{% if e.get('a_vencer') %} · {{ e.a_vencer }} a vencer{% endif %}</span>
     {% else %}<span class="gc-rotulo">Disponibilidade do mês</span><b class="cr-v cr-v--{{ u.perf.valores.disp.cls }}">{{ pct(d.get('disp'), 1) }}</b><span class="mudo">{{ num(d.get('h_perdidas')) }} h paradas</span>{% endif %}
   </div>
 </header>
@@ -132,6 +133,20 @@
   </section>
   <p class="cr-jan-nota">A régua do Gerencial › Disponibilidade: as OS de religamento e de corretiva emergencial contam das 6 às 18 h, pesadas pela potência que pararam (usina inteira, cabine ou inversor). Horas de sol = as da OS que caem nesse horário dentro do mês; perda = a da OS nesta usina, kWp parado × horas de sol (sem a irradiação). A OS aberta conta até o último dia fechado. Só o Fracttal: a geração da usina não entra na conta. Somadas, dão a perda da usina no Gerencial.</p>
   {% endif %}
+{% elif painel == 'extintores' %}
+  {# os extintores da usina que pedem atenção (28/10/2026, a linha do quadro "Extintores vencidos" do Painel do
+     responsável): a conta do Segurança · HSEQ › Extintores que a Visão já leu, o vencido primeiro #}
+  {% set e = u.extintores or {} %}
+  {% if not e.get('lista') %}
+  <p class="cr-jan-vazio">Nenhum extintor desta usina vencido, a vencer ou sem conferência.</p>
+  {% else %}
+  <div class="cr-jan-tab"><table>
+    <thead><tr><th>Extintor</th><th>Onde</th><th>Situação</th></tr></thead>
+    <tbody>{% for x in e.lista %}
+      <tr><td><b>{{ x.ext or '—' }}</b></td><td>{{ x.onde or '—' }}</td><td class="{{ 'cn-t-critico' if x.ordem == 0 else ('cn-t-alerta' if x.ordem == 1 else 'mudo') }}">{{ x.txt }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+  <p class="cr-jan-nota">A conta do Segurança · HSEQ › Extintores: vencido é a validade que já passou; a vencer, a que vence nos próximos {{ ext_alerta }} dias; sem conferência, o extintor que a ronda não confere há tempo.</p>
 {% else %}
   {# os ativos falhando da Engenharia › Confiabilidade (Levi, 13/10/2026: "Para esses ativos falhando da engenharia,
      conseguimos criar uma visão?"): a linha do tempo das OS dos 30 dias e, de cada ativo, o que a gaveta de lá mostra #}

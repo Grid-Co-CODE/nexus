@@ -12,6 +12,7 @@ import sys
 
 import pytest
 
+from nexus.dados import dominios as DOM
 from nexus.dados import fato_chamado as F
 from nexus.dados import fatos as D
 from nexus.torres.oscreator import ponte
@@ -167,8 +168,11 @@ def test_no_banco_o_chamado_retroativo_abre_na_data_da_nota_e_diz_de_onde_veio()
     # a duração conta da abertura (o dia da nota, 00:00 em Brasília) até o fim: 61 dias e 12 h
     assert d[16858]["duracao_min"] == (61 * 24 + 12) * 60
     assert (d[16762]["data_id_abertura"], d[16762]["abertura_por"]) == (20261019, "os")
-    # nada da nota vai ao banco além das categorias (a API tem leitura aberta)
-    assert "Pessoa Exemplo" not in str(out) and "Testes em campo" not in str(out)
+    # nada da nota vai ao banco além das categorias (a API tem leitura aberta). Desde 28/10/2026 o status do chamado é
+    # uma delas: o valor da lista da analista (`dominios.STATUS_CHAMADO`), nunca outro texto da nota
+    assert "Pessoa Exemplo" not in str(out)
+    assert (d[16858]["status"], d[16858]["status_por"]) == ("Testes em campo", "nota")
+    assert d[16858]["status"] in DOM.STATUS_CHAMADO and d[16762]["status"] is None
 
 
 def test_data_da_nota_depois_da_criacao_nao_vale():

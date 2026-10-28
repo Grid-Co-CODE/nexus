@@ -45,6 +45,9 @@ LIVRO_CHAMADOS, ABA_CHAMADOS = "nexus_chamados", "fato_chamado"
 ABA_DIA = "fato_desempenho_usina_dia"
 ABA_DISP_OS = "disponibilidade_os"
 LIVRO_EQUIP, ABA_EQUIP = "nexus_equipamentos", "dim_equipamento"
+# as observações da equipe de chamados (o OS Creator grava), de onde sai a troca de status feita na tela de Garantias
+# depois da última publicação do fato (28/10/2026)
+LIVRO_OBS_CH, ABA_OBS_CH = "os_creator", "chamados_obs"
 # os sistemas do de-para em que a chave é o NOME da usina como a planilha escreve (o Gerencial e o diário da
 # disponibilidade usam esses nomes: "Santa Bárbara I", "Boa Esperança do Sul 1 e 2")
 SISTEMAS_NOME = ("BD_Thopen · aba", "BD_Performance · aba", "BD_Thopen · Dados Gerais Usinas",
@@ -560,15 +563,53 @@ def ativos_da_usina(uid: int, hoje: date) -> dict:
 
 
 # ── Chamados (as OS de acompanhamento de chamado, no banco) ─────────────────────────────────────────────────────
+_RX_ATIVO = re.compile(r"^(\D+?)\s*(\d+(?:[.,]\d+)*)")
+
+
+def nome_do_ativo(descricao, codigo="") -> str:
+    """O ativo sem a marca nem o modelo (Levi, 28/10/2026, no Painel do responsável: "Não precisa mostrar a marca do
+    ativo"): o tipo e o número do começo da descrição do Fracttal ("Inversor 1.7 Sungrow SG125HV" → "Inversor 1.7",
+    "Disjuntor do Inversor 1" fica inteiro). Medido nos 184 ativos dos chamados abertos de 28/10: a estrutura inteira de
+    trackers vem com o ENDEREÇO da usina depois ("Estrutura Trackers BR 226 S/N Zona Rural…") e vira "Estrutura de
+    Trackers"; o ativo que é a própria usina ("Thopen - Ceilândia 1 - DF …") vira "Usina inteira"; sem número, a
+    descrição curta inteira ("Preventiva Grupo de Inversores") ou, na longa ("Estação Meteorológica Rodovia BR 365…"),
+    as duas primeiras palavras; sem descrição, o código do ativo."""
+    d = " ".join(str(descricao or "").split())
+    if not d:
+        return str(codigo or "").strip() or "equipamento"
+    palavras = d.split()
+    if palavras[0].lower() == "estrutura" and any(p.lower().startswith("tracker") for p in palavras[1:3]):
+        return "Estrutura de Trackers"
+    m = _RX_ATIVO.match(d)
+    if m:
+        tipo = m.group(1).strip()
+        if " - " in tipo:
+            return "Usina inteira"
+        if 1 <= len(tipo.split()) <= 3:
+            return f"{tipo} {m.group(2)}"
+    return d if len(palavras) <= 4 else " ".join(palavras[:2])
+
+
+def _status_da_tela() -> dict:
+    """{nº da OS: o status da última troca pela tela de Garantias}: a troca feita depois da última publicação do fato
+    (de hora em hora) aparece na próxima leitura da Visão. Sem a aba, vale o status do fato (a Visão segue)."""
+    from ..dados import fato_chamado as FCH
+    try:
+        return FCH.status_da_tela(visao._livro(LIVRO_OBS_CH, ABA_OBS_CH))
+    except Exception:       # noqa: BLE001 — a aba das observações fora: fica o status publicado no fato
+        return {}
+
+
 def chamados(hoje: date) -> tuple[dict, dict]:
     """{usina_id: abertos, em verificação e a lista}: o fato `nexus_chamados · fato_chamado` (o mesmo dado do quadro
     Acompanhamento de chamados). O nome do equipamento sai da dimensão de equipamento pelo `equipamento_id` (sem ele, o
     código do ativo). Concluído não conta: é o Finalizados do quadro."""
     linhas = visao._livro(LIVRO_CHAMADOS, ABA_CHAMADOS)
-    nome_equip = {}
+    nome_equip, tela = {}, {}
     if linhas:
         nome_equip = {visao.D._id(r.get("equipamento_id")): str(r.get("descricao") or "").strip()
                       for r in visao._livro(LIVRO_EQUIP, ABA_EQUIP) if visao.D._id(r.get("equipamento_id"))}
+        tela = _status_da_tela()
     por = collections.defaultdict(lambda: {"abertos": 0, "verificacao": 0, "lista": []})
     sem = 0
     for r in linhas:
@@ -583,8 +624,12 @@ def chamados(hoje: date) -> tuple[dict, dict]:
         x["abertos" if sit == "aberto" else "verificacao"] += 1
         ini = _dia_do_id(r.get("data_id_abertura"))
         eid = visao.D._id(r.get("equipamento_id"))
-        x["lista"].append({"os": _int(r.get("os")), "situacao": sit, "dias": (hoje - ini).days if ini else None,
+        os_ = _int(r.get("os"))
+        # o status do fato (publicado de hora em hora); a troca feita na tela depois disso vale por cima
+        st = DOM.status_chamado(tela[str(os_)]) if str(os_) in tela else DOM.status_chamado(r.get("status"))
+        x["lista"].append({"os": os_, "situacao": sit, "dias": (hoje - ini).days if ini else None,
                            "equip": (nome_equip.get(eid) or str(r.get("codigo_ativo") or "") or "equipamento")[:48],
+                           "ativo": nome_do_ativo(nome_equip.get(eid), r.get("codigo_ativo"))[:48], "status": st or "",
                            "fabricante": str(r.get("fabricante") or ""), "componente": str(r.get("componente") or "")})
     for x in por.values():
         x["lista"].sort(key=lambda c: (c["situacao"] != "aberto", -(c["dias"] or 0)))
@@ -1486,7 +1531,7 @@ def pre_leitura() -> tuple:
     return (("cadastro_nexus", "usinas"), ("cadastro_nexus", "equipes"), ("cadastro_nexus", "de_para"),
             ("cadastro_nexus", "pessoas"), ("cadastro_nexus", "clientes"), ("cadastro_nexus", "regioes_campo"),
             (LIVRO_META, ABA_META), (LIVRO_DISP, ABA_DISP), (LIVRO_DISP, ABA_DISP_OS),
-            (LIVRO_CHAMADOS, ABA_CHAMADOS), (LIVRO_EQUIP, ABA_EQUIP), (E.LIVRO, E.ABA),
+            (LIVRO_CHAMADOS, ABA_CHAMADOS), (LIVRO_EQUIP, ABA_EQUIP), (LIVRO_OBS_CH, ABA_OBS_CH), (E.LIVRO, E.ABA),
             (FT.LIVRO, FT.ABA), (FT.LIVRO, "qualidade"),
             # o Ranking das equipes: o fato de fechamento do banco ou, quando ele está atrás do livro do App (o App
             # grava o dia todo e a carga é de hora em hora), o livro do App (`visao._fato`); e as rondas ligadas

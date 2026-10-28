@@ -1268,10 +1268,10 @@ tr.ap-os:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
    "poderia ter um scroll para o que não cabe no card, scroll alá Nexus (...) não podemos deixar nada de fora"; e, ao ver
    o quadro com a metade da tela: "Ficou mt grande! Limite de 6 em 6 com um scroll"). A linha tem altura fixa
    (`--pn-linha`) para as 6 caberem exatas. */
+/* Seis quadros em 3 × 2 (28/10/2026: o 6º, os extintores vencidos; o Ranking deixou de ocupar duas colunas) */
 .pn{--pn-linha:42px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px;align-items:start}
 .pn-q{display:flex;flex-direction:column;min-width:0;padding:12px 14px 8px;background:var(--superficie);
   border:1px solid var(--linha);border-radius:var(--raio-md)}
-.pn-q--largo{grid-column:span 2}
 .pn-cab{display:flex;align-items:center;gap:10px}
 .pn-cab h2{display:flex;align-items:center;gap:8px;margin:0;font:600 14px/20px var(--font-sans);color:var(--tinta)}
 .pn-cab h2 .ph{font-size:17px;color:var(--mudo)}
@@ -1305,15 +1305,32 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
 .pn-barra i{display:block;height:100%;border-radius:999px}
 .pn-barra .o{background:var(--ok-cheio)} .pn-barra .a{background:var(--alerta-cheio)}
 .pn-barra .c{background:var(--critico-cheio)} .pn-barra .n{background:var(--linha-forte)}
-.pn-barra--rk{flex:1 1 40%}
+.pn-barra--rk{flex:0 1 72px}
 .pn-rk-pos{min-width:34px;font:600 13px/18px var(--font-mono);color:var(--tinta-2)}
-.pn-rk-nome{flex:0 1 210px}
+.pn-rk-nome{flex:1 1 auto}
+/* Os chamados por usina (28/10/2026, Levi: "pode só botar o nome da UFV uma vez e dizer qual os ativos daquela UFV"):
+   o nome da usina fica preso no alto do quadro enquanto os ativos dela rolam, e o da próxima o empurra */
+.pn-grupo{display:flex;flex-direction:column;gap:2px}
+.pn-grupo ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.pn-grupo-cab{position:sticky;top:0;z-index:1;display:flex;align-items:baseline;gap:8px;margin:0;padding:6px 8px 3px;
+  background:var(--superficie);border-bottom:1px solid var(--linha)}
+.pn-grupo-cab b{font:600 12px/16px var(--font-sans);color:var(--tinta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pn-grupo-cab span{margin-left:auto;font-size:11.5px;color:var(--mudo);white-space:nowrap}
+.pn-it--ch{padding-left:16px}
+.pn-it-nome small i{font-style:normal;color:var(--mudo);opacity:.8}
 .pn-rk-seta{min-width:36px;font:600 11px/16px var(--font-mono);color:var(--mudo)}
 .pn-rk-seta--sobe{color:var(--ok)} .pn-rk-seta--desce{color:var(--critico)}
 .pn-seg{display:flex;height:8px;margin:0 0 8px;border-radius:999px;overflow:hidden;background:var(--superficie-3);gap:2px}
 .pn-seg .o{background:var(--ok-cheio)} .pn-seg .a{background:var(--alerta-cheio)}
 .pn-seg .c{background:var(--critico-cheio)} .pn-seg .n{background:var(--critico-cheio);opacity:.55}
 .pn-vazio{padding:10px 8px;font-size:13px;color:var(--mudo)}
-@media (max-width:1180px){.pn{grid-template-columns:repeat(2,minmax(0,1fr))}.pn-q--largo{grid-column:span 2}}
-@media (max-width:760px){.pn{grid-template-columns:minmax(0,1fr)}.pn-q--largo{grid-column:auto}.pn-barra{flex-basis:56px}
+@media (max-width:1180px){.pn{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.pn{grid-template-columns:minmax(0,1fr)}.pn-barra{flex-basis:56px}
 }
+/* A tela do chamado de Garantias por cima (28/10/2026): a janela grande, a moldura ocupa tudo embaixo do Fechar. O
+   display só com ela aberta (o <dialog> fechado é display:none, e um display aqui o mostraria) */
+.cr-modal--chamado{width:min(1400px,calc(100vw - 96px));height:calc(100vh - 80px);max-height:none;overflow:hidden}
+.cr-modal--chamado[open]{display:flex;flex-direction:column}
+.cr-modal--chamado .cr-modal-barra{flex:none;padding-bottom:10px;border-bottom:1px solid var(--linha)}
+.cr-chamado-moldura{flex:1;display:block;width:100%;min-height:0;border:0;background:var(--fundo)}
+@media (max-width:760px){.cr-modal--chamado{width:calc(100vw - 16px);height:calc(100vh - 32px)}}
