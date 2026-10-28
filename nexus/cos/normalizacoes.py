@@ -216,6 +216,11 @@ def _item(n: dict, agora: datetime) -> dict:
         "aberta_ha_dias": (agora - volta).days if aberta and volta else None,
         "varrida_em": AND.instante((aberta or {}).get("varrida_em")),
         "resumo": str(informe.get("resumo") or "").strip()[:160],
+        # os dois nomes de pessoa que a API manda desde 28/10/2026 (o guia, seção 5): quem abriu a OS (o operador de
+        # plantão; vazio quando a OS já existia e só foi ligada à ocorrência) e o técnico atribuído no Fracttal (quem a
+        # recebeu, não prova quem foi ao local). Só na tela e no CSV: o Nexus não os guarda
+        "operador": " ".join(str(n.get("os_aberta_por") or "").split()),
+        "tecnico": " ".join(str(n.get("tecnico") or "").split()),
         "fora_do_escopo": bool(n.get("fora_do_escopo_oem")),
     }
 
@@ -225,15 +230,15 @@ def _casa(i: dict, q: str) -> bool:
     if q.isdigit() and (i["os"] == q or q in i["os_relacionadas"]):
         return True
     alvo = " ".join([i["os"], *i["os_relacionadas"], i["cliente"], i["usina"], i["usina_codigo"], i["falha"],
-                     *i["equipamentos"], i["resumo"], i["status"]]).lower()
+                     *i["equipamentos"], i["operador"], i["tecnico"], i["resumo"], i["status"]]).lower()
     return q in alvo
 
 
 def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: str = "", status: str = "",
-           busca: str = "") -> Painel | None:
+           busca: str = "", operador: str = "", tecnico: str = "") -> Painel | None:
     """A tela, do mês pedido (o corrente no padrão), pela hora da volta. Os filtros (Levi, 27/10/2026): cliente, usina,
-    status no Fracttal e um texto livre (o "Criado por" saiu com o Operador, na 3ª rodada). As opções de cada filtro contam sobre o mês, ANTES dos outros
-    filtros (um contador que encolhe ao filtrar não diz mais quanto existe); as de usina, dentro do cliente escolhido.
+    status no Fracttal e um texto livre; desde 28/10/2026 também o operador que abriu a OS ("Criado por") e o técnico, que
+    a API passou a mandar. As opções de cada filtro contam sobre o mês, ANTES dos outros filtros (um contador que encolhe ao filtrar não diz mais quanto existe); as de usina, dentro do cliente escolhido.
     A faixa conta a lista filtrada, menos o status (senão a fatia aberta seria sempre 100%). A desfeita (a ocorrência
     voltou a aberta) fica fora da lista e é contada à parte; a sem hora real fica na lista e fora da mediana."""
     d = leitura.dados if leitura else None
@@ -246,6 +251,7 @@ def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: st
     base = [i for i in no_mes if i["normalizada"]]
     busca = " ".join((busca or "").split())[:BUSCA_MAX]
     recorte = [i for i in base if (not cliente or i["cliente"] == cliente) and (not usina or i["usina"] == usina)
+               and (not operador or i["operador"] == operador) and (not tecnico or i["tecnico"] == tecnico)
                and (not busca or _casa(i, busca))]
     lista = [i for i in recorte if i["status_filtro"] == status] if status in STATUS_FILTRO else list(recorte)
     lista.sort(key=lambda i: i["data"], reverse=True)
@@ -259,6 +265,8 @@ def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: st
             "cliente": dict(sorted(Counter(i["cliente"] for i in base).items())),
             "usina": dict(sorted(Counter(i["usina"] for i in do_cliente).items())),
             "status": {k: sum(1 for i in base if i["status_filtro"] == k) for k in STATUS_FILTRO},
+            "operador": dict(sorted(Counter(i["operador"] for i in base if i["operador"]).items())),
+            "tecnico": dict(sorted(Counter(i["tecnico"] for i in base if i["tecnico"]).items())),
         },
         resumo={
             "total": len(recorte),
@@ -277,7 +285,7 @@ def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: st
 # O "Exportar CSV" (Levi, 27/10/2026): a lista da tela, com os filtros, e o que a tela resume numa coluna só.
 CSV_COLUNAS = ("OS", "OS relacionadas", "Indisponível (min)", "Início", "Normalização", "Hora real da volta",
                "Hora corrigida", "Registrada", "Cliente", "Código da usina", "Usina", "Falha", "Equipamentos",
-               "Severidade", "Status no Fracttal", "% concluída", "Dias aberta depois da volta",
+               "Severidade", "Aberta por (operador)", "Técnico", "Status no Fracttal", "% concluída", "Dias aberta depois da volta",
                "Informe", "Fora do escopo O&M")
 
 
@@ -287,7 +295,7 @@ def csv_linhas(p: Painel) -> list[list]:
     return [[i["os"], ", ".join(i["os_relacionadas"]), "" if i["fora"] is None else i["fora"], h(i["inicio"]),
              h(i["volta"]), "sim" if i["hora_real"] else "não",
              "sim" if i["fim_corrigido"] else "não", i["declarada_por"], i["cliente"], i["usina_codigo"], i["usina"],
-             i["falha"], ", ".join(i["equipamentos"]), i["severidade"].title(),
+             i["falha"], ", ".join(i["equipamentos"]), i["severidade"].title(), i["operador"], i["tecnico"],
              i["status"] if i["aberta"] else "Fechada", i["pct"] if i["aberta"] else "",
              "" if i["aberta_ha_dias"] is None else i["aberta_ha_dias"], i["resumo"],
              "sim" if i["fora_do_escopo"] else "não"] for i in p.itens]

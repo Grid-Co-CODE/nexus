@@ -364,8 +364,9 @@ def normalizacoes():
     mes = NO.mes_pedido(a.get("mes"), agora)
     status = a.get("status", "") if a.get("status") in NO.STATUS_FILTRO else ""
     cliente, usina = a.get("cliente", ""), a.get("usina", "")
+    operador, tecnico = a.get("criado_por", ""), a.get("tecnico", "")
     busca = " ".join((a.get("q") or "").split())[:NO.BUSCA_MAX]
-    p = NO.painel(leitura, agora, mes, cliente, usina, status, busca)
+    p = NO.painel(leitura, agora, mes, cliente, usina, status, busca, operador, tecnico)
     if a.get("formato") == "csv":
         if not p:
             abort(404)
@@ -381,4 +382,5 @@ def normalizacoes():
     return render_template(
         "cos/normalizacoes.html", torre=TORRE, tela=TORRE.tela("normalizacoes"), ligada=fonte.ligada, leitura=leitura,
         p=p, mes=mes, meses=NO.meses(agora), cliente=cliente, usina=usina, status=status, busca=busca,
+        operador=operador, tecnico=tecnico,
         status_filtro=NO.STATUS_FILTRO, lido=_lido([leitura]), url=_url)

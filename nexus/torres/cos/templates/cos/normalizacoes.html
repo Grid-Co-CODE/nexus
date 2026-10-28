@@ -17,6 +17,8 @@
       {{ termo('Indisp.') }}<dd>Quanto tempo a usina ficou indisponível: do início da falha até a normalização, em minutos e horas.</dd>
       {{ termo('Início') }}<dd>A hora em que a falha começou.</dd>
       {{ termo('Normalização') }}<dd>A hora em que a usina voltou, registrada na Ronda COS (a corrigida, quando alguém corrigiu). É esta a hora para MTTR e disponibilidade, e não o fechamento da OS no Fracttal, que acontece quando o técnico fecha, muitas vezes dias depois. Embaixo, por onde a volta foi registrada: pelo COS, pelo sistema, pelo Fracttal, por religamento remoto ou na criação da OS.</dd>
+      {{ termo('Operador') }}<dd>Quem abriu a OS, o operador de plantão: pela Ronda COS ou direto no Fracttal. Em branco quando a OS já existia e só foi ligada à ocorrência.</dd>
+      {{ termo('Técnico') }}<dd>O responsável atribuído à OS no Fracttal, quem a recebeu. Não prova quem foi ao local: quem iniciou e finalizou a tarefa no aplicativo fica só no Fracttal.</dd>
       {{ termo('No Fracttal', 'alerta') }}<dd>Se a OS ainda estava aberta na última varredura da Ronda COS, que roda de 30 em 30 minutos, e há quantos dias depois da volta. Vermelho a partir de 7 dias. "Fechada" é a OS que não está entre as abertas: finalizada ou cancelada.</dd>
       {{ termo('Sem hora real', 'neutro') }}<dd>Encerrada sem a hora da volta (o fim igual ao início): a indisponibilidade não se conta, e fica fora da mediana.</dd>
       {{ termo('Desfeita') }}<dd>A normalização foi desfeita e a ocorrência voltou a aberta: sai da lista e é dita embaixo dela.</dd>
@@ -64,6 +66,14 @@
     <select class="gc-campo" name="usina" onchange="this.form.submit()">
       <option value="">Todas</option>{% for u, n in p.contagem.usina.items() %}<option value="{{ u }}"{% if u == usina %} selected{% endif %}>{{ u }} ({{ n }})</option>{% endfor %}
     </select></label>
+    <label class="cn-filtro-par"><span class="gc-rotulo">Criado por</span>
+    <select class="gc-campo" name="criado_por" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for c, n in p.contagem.operador.items() %}<option value="{{ c }}"{% if c == operador %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    <label class="cn-filtro-par"><span class="gc-rotulo">Técnico</span>
+    <select class="gc-campo" name="tecnico" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for c, n in p.contagem.tecnico.items() %}<option value="{{ c }}"{% if c == tecnico %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
+    </select></label>
     <label class="cn-filtro-par"><span class="gc-rotulo">Status Fracttal</span>
     <select class="gc-campo" name="status" onchange="this.form.submit()">
       <option value="">Todos</option>{% for k, rot in status_filtro.items() %}<option value="{{ k }}"{% if k == status %} selected{% endif %}>{{ rot }} ({{ p.contagem.status[k] }})</option>{% endfor %}
@@ -71,13 +81,14 @@
     <input class="gc-campo cos-norm-busca" type="search" name="q" value="{{ busca }}" placeholder="OS, usina, falha, equipamento..." aria-label="Buscar nas normalizações">
     <a class="gc-btn gc-btn--ui cos-norm-csv" href="{{ url(formato='csv') }}" download><i class="ph ph-download-simple" aria-hidden="true"></i> Exportar CSV</a>
   </form>
-  {% if cliente or usina or status or busca %}<div class="cn-chips"><a href="{{ url(cliente=None, usina=None, status=None, q=None) }}">Limpar os filtros</a></div>{% endif %}
+  {% if cliente or usina or status or busca or operador or tecnico %}<div class="cn-chips"><a href="{{ url(cliente=None, usina=None, status=None, q=None, criado_por=None, tecnico=None) }}">Limpar os filtros</a></div>{% endif %}
 
   {% if p.itens %}
   <div class="cn-tab cos-tab"><table>
     <thead><tr><th class="cos-esq">OS</th><th title="Do início da falha até a normalização">Indisp.</th>
       <th class="cos-esq">Início</th><th class="cos-esq">Normalização</th><th class="cos-esq">Cliente</th>
-      <th class="cos-esq">Usina</th><th class="cos-esq">No Fracttal</th></tr></thead>
+      <th class="cos-esq">Usina</th><th class="cos-esq" title="Quem abriu a OS">Operador</th>
+      <th class="cos-esq" title="O responsável atribuído à OS no Fracttal">Técnico</th><th class="cos-esq">No Fracttal</th></tr></thead>
     <tbody>
     {% for n in p.itens %}
       <tr{% if n.os %} class="cos-os" tabindex="0" data-folio="{{ n.os }}" data-status="{{ n.status_card }}" title="Abrir o card da OS {{ n.os }}"{% endif %}>
@@ -90,6 +101,8 @@
         <td class="cos-esq">{{ n.cliente }}</td>
         <td class="cos-esq cos-usina cos-texto"><b>{{ n.usina }}</b>
           <span class="det">{{ n.falha }}{% if n.equipamentos %} · {{ n.equipamentos[:2]|join(', ') }}{% if n.equipamentos|length > 2 %} e mais {{ n.equipamentos|length - 2 }}{% endif %}{% endif %}</span></td>
+        <td class="cos-esq">{{ n.operador or '—' }}</td>
+        <td class="cos-esq">{{ n.tecnico or '—' }}</td>
         <td class="cos-esq">{% if n.aberta %}<span class="cn-pill cn-{{ 'critico' if (n.aberta_ha_dias or 0) >= 7 else 'alerta' }}">{{ n.status }} {{ n.pct }}%</span>
           <span class="det">{% if n.aberta_ha_dias %}aberta {{ n.aberta_ha_dias }} {{ 'dia' if n.aberta_ha_dias == 1 else 'dias' }} depois da volta{% else %}a usina voltou hoje{% endif %}</span>
           {% else %}<span class="cn-pill cn-ok">Fechada</span>{% endif %}</td>
@@ -97,7 +110,7 @@
     {% endfor %}
     </tbody>
   </table></div>
-  {% else %}<p class="cn-vazio">{% if cliente or usina or status or busca %}Nenhuma normalização com estes filtros.{% else %}Nenhuma normalização neste mês.{% endif %}</p>{% endif %}
+  {% else %}<p class="cn-vazio">{% if cliente or usina or status or busca or operador or tecnico %}Nenhuma normalização com estes filtros.{% else %}Nenhuma normalização neste mês.{% endif %}</p>{% endif %}
   {% if p.desfeitas %}<p class="mudo">{{ p.desfeitas }} {{ 'normalização foi desfeita' if p.desfeitas == 1 else 'normalizações foram desfeitas' }} no mês (a ocorrência voltou a aberta) e {{ 'fica' if p.desfeitas == 1 else 'ficam' }} fora da lista.</p>{% endif %}
   {% endif %}
   {% endif %}

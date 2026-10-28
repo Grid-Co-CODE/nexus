@@ -21,7 +21,8 @@ def _n(registro, volta="2026-10-27T08:00:00-03:00", inicio="2026-10-27T07:00:00-
          "severidade": severidade, "estado": "NORMALIZADO", "normalizada": True, "inicio": inicio, "normalizado_em": volta,
          "fora_min": fora, "hora_real": True, "fim_corrigido": False, "declarada_em": volta, "declarada_por": "pessoa",
          "desfeita_em": None, "encerrada_em": None, "encerrada_por": None, "os_aberta_no_fracttal": aberta,
-         "informe": None, "fora_do_escopo_oem": False, "mudou_em": volta}
+         "informe": None, "fora_do_escopo_oem": False, "mudou_em": volta,
+         "os_aberta_por": "Fulana Operadora", "tecnico": "Beltrano Tecnico"}
     n.update(mudar)
     return n
 
@@ -36,12 +37,13 @@ ABERTA = {"status": 2, "concluida_pct": 100, "varrida_em": "2026-10-27T09:43:00-
 ITENS = [
     _n("r1"),                                                                               # hoje, fechada
     _n("r2", volta="2026-10-19T05:53:00-03:00", inicio="2026-10-19T02:00:00-03:00", fora=233, os="16702",
-       usina="Usina Exemplo Dois", cliente="CLIENTE B", severidade="CRITICO",
+       usina="Usina Exemplo Dois", cliente="CLIENTE B", severidade="CRITICO", os_aberta_por="Ciclano  Operador",
+       tecnico="Tecnica Dois",
        aberta={"status": 1, "concluida_pct": 40, "varrida_em": "2026-10-27T09:13:00-03:00"}),   # 8 dias, aberta
     _n("r3", volta="2026-10-26T20:00:00-03:00", fora=30, aberta=ABERTA),                   # ontem, aberta
     _n("r4", volta="2026-10-26T09:00:00-03:00", hora_real=False, fora=0),                   # sem hora real
     _n("r5", volta="2026-10-25T09:00:00-03:00", normalizada=False, estado="TRATATIVA_REMOTA"),   # desfeita
-    _n("r6", volta="2026-10-05T09:00:00-03:00", fora=600),                                  # 22 dias
+    _n("r6", volta="2026-10-05T09:00:00-03:00", fora=600, os_aberta_por=None, tecnico=None),   # OS só ligada                                  # 22 dias
 ]
 
 
@@ -108,6 +110,9 @@ def test_os_filtros_cliente_usina_status_e_texto():
     assert regs(status="processo") == ["r2"] and regs(status="verificacao") == ["r3"]
     assert regs(status="fechada") == ["r1", "r4", "r6"]
     assert regs(busca="16702") == ["r2"] and regs(busca="exemplo dois") == ["r2"]
+    # 28/10/2026: o operador que abriu a OS e o técnico, que a API passou a mandar (o nome com espaço duplo vem limpo)
+    assert regs(operador="Ciclano Operador") == ["r2"] and regs(tecnico="Beltrano Tecnico") == ["r1", "r3", "r4"]
+    assert regs(busca="tecnica dois") == ["r2"]
     assert regs(status="inventado") == regs()                                       # valor estranho: sem o filtro
 
 
@@ -115,7 +120,9 @@ def test_as_opcoes_dos_filtros_contam_o_mes_antes_dos_filtros():
     p = _painel(cliente="CLIENTE B")
     assert p.contagem == {"cliente": {"CLIENTE A": 4, "CLIENTE B": 1},
                           "usina": {"Usina Exemplo Dois": 1},                        # as usinas do cliente escolhido
-                          "status": {"processo": 1, "verificacao": 1, "fechada": 3}}
+                          "status": {"processo": 1, "verificacao": 1, "fechada": 3},
+                          "operador": {"Ciclano Operador": 1, "Fulana Operadora": 3},   # a r6 (OS só ligada) fica fora
+                          "tecnico": {"Beltrano Tecnico": 3, "Tecnica Dois": 1}}
 
 
 def test_a_os_aberta_diz_ha_quantos_dias_da_volta_e_a_varredura_mais_nova():
@@ -136,6 +143,7 @@ def test_o_csv_leva_a_lista_filtrada_e_o_que_a_tela_resume():
                                                                                  "19/10/2026 05:53")
     assert (d["Cliente"], d["Usina"], d["Status no Fracttal"], d["% concluída"]) == (
         "CLIENTE B", "Usina Exemplo Dois", "Em processo", 40)
+    assert (d["Aberta por (operador)"], d["Técnico"]) == ("Ciclano Operador", "Tecnica Dois")
     assert "Criado por" not in NO.CSV_COLUNAS
     assert d["Severidade"] == "Critico" and d["Dias aberta depois da volta"] == 8 and d["Registrada"] == "registrada pelo COS"
 
@@ -223,11 +231,13 @@ def test_a_tela(ligada, logado, monkeypatch):
     # as colunas na ordem pedida, sem a severidade; o "Como se conta" na exclamação ao lado do título
     cab = html.split("<thead>", 1)[1].split("</thead>", 1)[0]
     assert [c.split(">")[-1] for c in cab.split("</th>")[:-1]] == ["OS", "Indisp.", "Início", "Normalização",
-                                                                  "Cliente", "Usina", "No Fracttal"]
+                                                                  "Cliente", "Usina", "Operador", "Técnico",
+                                                                  "No Fracttal"]
+    assert ">Ciclano Operador<" in html and ">Tecnica Dois<" in html and 'name="criado_por"' in html
     assert "Severidade" not in cab and "Crítico" not in html and 'class="hs-aviso"' in html
     assert "Último dia" not in html and "Últimos 7 dias" not in html
-    # sem o Operador: nenhuma leitura do Fracttal uma a uma (Levi: "isso vai pesar muito nas requisições!")
-    assert "Operador" not in html and "Criado por" not in html and "lendo no Fracttal" not in html
+    # o Operador vem da API, nunca de uma leitura do Fracttal uma a uma (Levi: "isso vai pesar muito nas requisições!")
+    assert "lendo no Fracttal" not in html
     assert "varredura do Fracttal às <b>09:43</b>" in html
     html = logado.get("/t/cos/normalizacoes?mes=2026-10").get_data(as_text=True)
     assert 'aria-current="page">Outubro<' in html and 'data-folio="16702"' in html and "Setembro" in html

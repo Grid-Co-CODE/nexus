@@ -91,3 +91,5 @@ tr.cos-os:focus-visible{outline:2px solid var(--verde);outline-offset:-2px}
 /* todas as letras da tela 20% menores (Levi, 27/10/2026: "diminua o tamanho de todas as fontes em 20%"). O zoom leva
    junto os espaços, que a tabela larga agradece; o card da OS fica fora (abre por cima, no tamanho normal) */
 .cos-norm{zoom:.8}
+/* a data e a hora numa linha só (com Operador e Técnico, 28/10/2026, a tabela apertou e "27/10 07:00" quebrava) */
+.cos-norm .cn-tab td:nth-child(3),.cos-norm .cn-tab td:nth-child(4){white-space:nowrap}

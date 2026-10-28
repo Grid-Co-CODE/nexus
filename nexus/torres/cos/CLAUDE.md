@@ -215,26 +215,31 @@ Só lê; nada vai ao banco (decisão do Levi, 27/10/2026: a tela, sem guardar).
   da volta (o corrente no padrão e os 2 anteriores, `MESES`; os 1, 7 e 30 dias saíram no mesmo dia: "Pode tirar esses
   filtros de 7, 30 dias ou último dia"), os filtros, a faixa e "há quantos dias da volta a OS segue aberta" (7 dias ou
   mais em vermelho).
-- **A tela, como o Levi pediu (27/10/2026, 2ª e 3ª rodadas):** as colunas OS, **Indisp.** (do início da falha até a
-  normalização, em minutos e horas, nunca em dias: "Conta em minutos e horas"; "sem hora real" quando a volta não tem
-  hora), Início, Normalização (com por onde foi registrada), Cliente, Usina (com a falha e os equipamentos embaixo) e No
-  Fracttal, nessa ordem; sem a severidade (só no CSV). Filtros: cliente, usina (as do cliente escolhido), status no
-  Fracttal (em processo, em verificação, fechada) e um texto livre (OS, usina, falha, equipamento, informe). O "Como se
-  conta" é a exclamação amarela ao lado do título, a macro `aviso` de `hseq/_legenda.html` (a mesma dos Extintores). As
-  letras são 20% menores (`zoom:.8` no `.cos-norm`, "diminua o tamanho de todas as fontes em 20%"). **Exportar CSV** =
-  `?formato=csv` com os filtros da tela (`;`, com BOM para o Excel; o texto que começa com `=`, `+`, `-` ou `@` vai com
-  apóstrofo, para o Excel não o executar).
-- **Sem "quem criou a OS"** (decisão do Levi, 27/10/2026): a API das normalizações não manda nome de pessoa, e a 2ª
-  rodada lia o `created_by` do REST do Fracttal OS a OS, 30 por minuto, no ar por poucos minutos (`a37eeb7`). Na 3ª saiu:
-  "Não precisa trazer o operador se for ficar puxando um a um no fractal, isso vai pesar muito nas requisições!". Se
-  voltar, só por uma fonte em lote (o Andamento mandar, ou uma leitura do Fracttal que o Nexus já faça). O "Operador"
-  que aparecia embaixo da hora era `declarada_por: pessoa` (uma pessoa do COS registrou a volta): é "registrada pelo COS".
+- **A tela, como o Levi pediu (27 e 28/10/2026, da 2ª à 4ª rodada):** as colunas OS, **Indisp.** (do início da falha
+  até a normalização, em minutos e horas, nunca em dias: "Conta em minutos e horas"; "sem hora real" quando a volta não
+  tem hora), Início, Normalização (com por onde foi registrada), Cliente, Usina (com a falha e os equipamentos embaixo),
+  **Operador**, **Técnico** e No Fracttal, nessa ordem; sem a severidade (só no CSV). Filtros: cliente, usina (as do
+  cliente escolhido), criado por (o operador), técnico, status no Fracttal (em processo, em verificação, fechada) e um
+  texto livre (OS, usina, falha, equipamento, operador, técnico, informe). O "Como se conta" é a exclamação amarela ao
+  lado do título, a macro `aviso` de `hseq/_legenda.html` (a mesma dos Extintores). As letras são 20% menores
+  (`zoom:.8` no `.cos-norm`, "diminua o tamanho de todas as fontes em 20%"). **Exportar CSV** = `?formato=csv` com os
+  filtros da tela (`;`, com BOM para o Excel; o texto que começa com `=`, `+`, `-` ou `@` vai com apóstrofo, para o
+  Excel não o executar).
+- **Operador e Técnico vêm da API** (desde 28/10/2026, `os_aberta_por` e `tecnico`; Levi: "boa, inclui lá"). Operador =
+  quem abriu a OS, o operador de plantão (pela Ronda COS ou direto no Fracttal), em branco quando a OS já existia e só
+  foi ligada; Técnico = o responsável atribuído no Fracttal, quem RECEBEU a OS (não prova quem foi ao local). São os
+  únicos nomes de pessoa da API: só na tela e no CSV, o Nexus não os guarda (a memória é a do processo). **Nunca ler o
+  Fracttal OS a OS para isso:** a 2ª rodada (27/10, `a37eeb7`) lia o `created_by` do REST, 30 OS por minuto, e saiu na 3ª
+  ("Não precisa trazer o operador se for ficar puxando um a um no fractal, isso vai pesar muito nas requisições!"). As
+  normalizações lidas antes de 28/10 não voltam sozinhas com os dois campos (a linha só volta quando muda): o Nexus relê
+  desde o 1º dia do mês mais antigo a cada reinício, então o deploy os preenche. O "registrada pelo COS" embaixo da
+  Normalização é o `declarada_por: pessoa` (até 27/10 dizia "Operador" ali, e confundia).
 - **As contas:** as opções dos filtros contam o mês, antes dos filtros; a faixa conta a lista filtrada SEM o status
   (senão a fatia aberta seria sempre 100%). A desfeita (`normalizada: false`) sai da lista e é dita à parte; a sem hora
   real fica na lista, marcada, e fora da mediana.
 - **A chave e o endereço** só na tela Base → Chaves (o repositório é público).
 - Testes: `tests/test_cos_normalizacoes.py` (o upsert pelo registro, a paginação que continua, a pausa de 1 min depois
-  da falha e a desfeita fora: mutados, vermelhos; os filtros, as colunas, a Indisp. e o CSV).
+  da falha e a desfeita fora: mutados, vermelhos; os filtros, as colunas, a Indisp., o operador e o técnico e o CSV).
 
 ## Regras desta torre
 
