@@ -33,7 +33,13 @@
 {% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
+    {# no Painel, o nome do responsável é o título (Levi, 28/10/2026: "vai ter o nome do responsável como [título]") #}
+    {% if modo == 'painel' and painel %}
+    <div><p class="gc-eyebrow">{{ torre.nome }} · {{ tela.nome }}</p><h1 class="cn-titulo">{{ painel.nome }}</h1>
+      <p class="cn-pergunta">{{ painel.usinas }} usina{{ 's' if painel.usinas != 1 }}{% if painel.clientes %} · {{ painel.clientes|join(', ') }}{% endif %}{% if painel.equipes %} · {{ painel.equipes|length }} equipe{{ 's' if painel.equipes|length != 1 }}{% endif %}</p></div>
+    {% else %}
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    {% endif %}
     <div class="cn-frescor">Gerencial, Confiabilidade, chamados, extintores,<br>rondas e PT, pelo banco do Nexus<br><b>lido às {{ lido }}</b></div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
@@ -67,6 +73,7 @@
        18/10/2026 ocupa o lugar de Onde focar; o Ranking das equipes é para todos, com as equipes do filtro #}
     <div class="cn-seg" aria-label="Visão">
       {% if not responsavel_logado %}<a href="{{ url(modo='cartoes', responsavel='*', equipe=None, filtro=None, bloco=None) }}"{% if modo == 'cartoes' %} aria-current="page"{% endif %}>Por responsável</a>{% endif %}
+      <a href="{{ url(modo='painel', equipe=None, filtro=None, bloco=None) }}"{% if modo == 'painel' %} aria-current="page"{% endif %}>Painel</a>
       <a href="{{ url(modo='geral', responsavel=responsavel or '*', filtro=None, bloco=None) }}"{% if modo == 'geral' %} aria-current="page"{% endif %}>Visão geral</a>
       <a href="{{ url(modo='ranking', equipe=None, filtro=None, bloco=None) }}"{% if modo == 'ranking' %} aria-current="page"{% endif %}>Ranking das equipes</a>
     </div>
@@ -91,12 +98,99 @@
   {% if faixa %}
   <div class="cr-parada" role="status">
     <b>Parada agora</b>
-    {% for u, p in faixa[:faixa_max] %}<span>{{ u.usina }} · {{ p.escopo }} · OS {{ p.os }} · desde {{ p.inicio }}</span>{% endfor %}
-    {% if faixa|length > faixa_max %}<span class="mudo">e mais {{ faixa|length - faixa_max }}</span>{% endif %}
+    {# no Painel, todas (Levi, 28/10/2026: "não podemos deixar nada de fora"); nas outras visões, as 6 mais antigas #}
+    {% set faixa_vista = faixa if modo == 'painel' else faixa[:faixa_max] %}
+    {% for u, p in faixa_vista %}<span>{{ u.usina }} · {{ p.escopo }} · OS {{ p.os }} · desde {{ p.inicio }}</span>{% endfor %}
+    {% if faixa|length > faixa_vista|length %}<span class="mudo">e mais {{ faixa|length - faixa_vista|length }}</span>{% endif %}
   </div>
   {% endif %}
 
-  {% if modo == 'cartoes' %}
+  {% if modo == 'painel' and painel %}
+  {# O Painel do responsável (Levi, 28/10/2026: "quero uma tela feita mesmo para o responsável que não seja um tabelão
+     (...) mostrará: Usinas abaixo da performance, chamados abertos, PTs pendentes, Ranking das equipes do maior para
+     menor, acompanhamento de rondas! (...) uma tela inicial claro, se for para se aprofundar aí é outro nível"). Cinco
+     quadros numa tela, nenhuma régua nova (nexus/campo/painel_responsavel.py). Nada fica de fora ("Tem que ter todas as
+     usinas e equipes daquele supervisor"): cada quadro traz a lista inteira e rola por dentro, na barra de rolagem do
+     Nexus. O outro nível: o "ver todas" de cada quadro abre a Visão geral com o filtro dele (ou o Ranking), e cada linha
+     abre a janela que a Visão já tem (o dia a dia da meta, o card da OS, a PT, a equipe, a ronda) #}
+  {% set pf, ch, pt, rk, rd = painel.perf, painel.chamados, painel.pts, painel.ranking, painel.rondas %}
+  {% set cor_situ = {'critico': 'cn-t-critico', 'alerta': 'cn-t-alerta', 'ok': 'cn-t-ok', 'sem_meta': 'mudo'} %}
+  {% set barra_situ = {'critico': 'c', 'alerta': 'a', 'ok': 'o', 'sem_meta': 'n'} %}
+  {% macro ver(destino, txt='ver todas') %}<a class="pn-ver" href="{{ destino }}">{{ txt }}</a>{% endmacro %}
+  {% macro idade(m) %}{% if m is none %}—{% elif m >= 1440 %}{{ m // 1440 }} d {{ (m % 1440) // 60 }} h{% elif m >= 60 %}{{ m // 60 }} h {{ m % 60 }} min{% else %}{{ m }} min{% endif %}{% endmacro %}
+  <div class="pn">
+    <section class="pn-q" aria-labelledby="pn-perf-t">
+      <header class="pn-cab"><h2 id="pn-perf-t"><i class="ph ph-chart-line-up" aria-hidden="true"></i>Usinas abaixo da performance</h2>{{ ver(url(modo='geral', filtro='perf.abaixo_meta', bloco=None, equipe=None)) }}</header>
+      <div class="pn-num"><b class="{{ 'cn-t-critico' if pf.criticas else ('cn-t-alerta' if pf.abaixo else 'cn-t-ok') }}">{{ pf.abaixo }}</b>
+        <span>de {{ pf.com_meta }} com meta abaixo de {{ limites.meta_ok }}%{% if pf.criticas %} · <b class="cn-t-critico">{{ pf.criticas }}</b> abaixo de {{ limites.meta_atencao }}%{% endif %}<small>meta do grupo no mês {{ pct(pf.meta_grupo, 1) }} · {{ pf.na_meta }} na meta{% if pf.sem_meta %} · {{ pf.sem_meta }} sem meta publicada{% endif %}</small></span></div>
+      <ol class="pn-lista" tabindex="0" aria-label="Todas as usinas pela meta do mês, da pior para a melhor">
+        {% for x in pf.linhas %}
+        <li><button type="button" class="pn-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel='meta') }}" title="{{ x.usina }}: ver o dia a dia da meta">
+          <span class="pn-it-nome"><b>{{ x.usina }}</b><small>{% if x.pr_abaixo %}PR {{ pct(x.pr, 1) }}, previsto {{ pct(x.pr_meta, 1) }}{% else %}{{ x.cliente or '—' }}{% endif %}{% if x.disp is not none %} · disp. {{ pct(x.disp, 1) }}{% endif %}{% if x.anomalia %} · anômalo{% endif %}</small></span>
+          <span class="pn-barra" aria-hidden="true">{% if x.atingimento is not none %}<i class="{{ barra_situ[x.situacao] }}" style="width: {{ [[x.atingimento, 0]|max, 100]|min }}%"></i>{% endif %}</span>
+          <b class="pn-v {{ cor_situ[x.situacao] }}">{{ 'sem meta' if x.atingimento is none else pct(x.atingimento) }}</b></button></li>
+        {% else %}<li class="pn-vazio">Nenhuma usina com esses filtros.</li>{% endfor %}
+      </ol>
+    </section>
+
+    <section class="pn-q" aria-labelledby="pn-ch-t">
+      <header class="pn-cab"><h2 id="pn-ch-t"><i class="ph ph-lifebuoy" aria-hidden="true"></i>Chamados abertos</h2>{{ ver(url(modo='geral', filtro='acomp.chamados', bloco=None, equipe=None)) }}</header>
+      <div class="pn-num"><b class="{{ 'cn-t-alerta' if ch.abertos else 'cn-t-ok' }}">{{ ch.abertos }}</b>
+        <span>em aberto com o fabricante{% if ch.abertos %} em {{ ch.usinas }} usina{{ 's' if ch.usinas != 1 }}{% endif %}<small>{{ ch.verificacao }} em verificação{% if ch.mais_antigo is not none %} · o mais antigo há {{ ch.mais_antigo }} dias{% endif %}</small></span></div>
+      <ol class="pn-lista" tabindex="0" aria-label="Todos os chamados em aberto, o mais antigo primeiro">
+        {% for x in ch.linhas %}
+        <li><button type="button" class="pn-it cr-os" data-folio="{{ x.os or '' }}" title="Abrir o card da OS {{ x.os }}">
+          <span class="pn-it-nome"><b>{{ x.usina }}</b><small>{{ x.equip }}{% if x.fabricante %} · {{ x.fabricante }}{% endif %} · OS {{ x.os }}</small></span>
+          <b class="pn-v">{{ '—' if x.dias is none else x.dias ~ ' d' }}</b></button></li>
+        {% else %}<li class="pn-vazio">Nenhum chamado em aberto.</li>{% endfor %}
+      </ol>
+    </section>
+
+    <section class="pn-q" aria-labelledby="pn-pt-t">
+      <header class="pn-cab"><h2 id="pn-pt-t"><i class="ph ph-file-text" aria-hidden="true"></i>PTs pendentes</h2>{{ ver(url(modo='geral', filtro='acomp.pts', bloco=None, equipe=None)) }}</header>
+      <div class="pn-num"><b class="{{ 'cn-t-critico' if pt.paradas else ('cn-t-alerta' if pt.aguardando else 'cn-t-ok') }}">{{ pt.aguardando }}</b>
+        <span>esperando o De acordo{% if pt.paradas %} · <b class="cn-t-critico">{{ pt.paradas }}</b> há mais de 2 h{% endif %}<small>{% if pt.agora %}{{ pt.agora }} parada{{ 's' if pt.agora != 1 }} hoje: técnico esperando agora{% else %}nenhum técnico parado hoje{% endif %}</small></span></div>
+      <ol class="pn-lista" tabindex="0" aria-label="Todas as PT esperando o De acordo">
+        {% for x in pt.linhas %}
+        <li><button type="button" class="pn-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=x.numero, ativo=x.codigo, volta=request.full_path) }}" title="Abrir a PT {{ x.numero }} para decidir">
+          <span class="pn-it-nome"><b>{{ x.numero }} · {{ x.usina }}</b><small>{{ x.tarefa or '—' }}</small></span>
+          <b class="pn-v {{ 'cn-t-critico' if x.parada else 'cn-t-alerta' }}">{% if x.parada and x.hoje %}agora · {% endif %}{{ idade(x.idade_min) }}</b></button></li>
+        {% else %}<li class="pn-vazio">Nenhuma PT esperando o De acordo.</li>{% endfor %}
+      </ol>
+    </section>
+
+    <section class="pn-q pn-q--largo" aria-labelledby="pn-rk-t">
+      <header class="pn-cab"><h2 id="pn-rk-t"><i class="ph ph-ranking" aria-hidden="true"></i>Ranking das equipes</h2>{{ ver(url(modo='ranking', equipe=None, filtro=None, bloco=None), 'ver o ranking') }}</header>
+      <p class="pn-nota">A nota do App em 30 dias, da maior para a menor; a posição é a do ranking de todas as {{ rk.total }} equipes.</p>
+      <ol class="pn-lista pn-rk" tabindex="0" aria-label="Todas as equipes, da maior nota para a menor">
+        {% for c in rk.equipes %}
+        <li>{% if c.sem_equipe %}<a class="pn-rk-it" href="{{ url(modo='geral', equipe=c.equipe, responsavel=responsavel or '*', filtro=None, bloco=None) }}" title="Usinas sem equipe no cadastro: ver na Visão geral">{% else %}<button type="button" class="pn-rk-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_equipe', equipe=c.equipe, responsavel=responsavel or '*') }}" title="{{ c.equipe }}: o motivo da nota, para cobrar">{% endif %}
+          <span class="pn-rk-pos">{{ c.posicao ~ 'º' if c.posicao else '—' }}</span>
+          <span class="pn-rk-nome"><b>{{ c.equipe }}</b><small>{% if c.sem_equipe %}{{ c.usinas }} usina{{ 's' if c.usinas != 1 }} sem equipe no cadastro{% else %}{{ c.usinas }} usina{{ 's' if c.usinas != 1 }} · {{ c.tecnicos }} técnico{{ 's' if c.tecnicos != 1 }}{% endif %}</small></span>
+          <span class="pn-barra pn-barra--rk" aria-hidden="true">{% if c.nota is not none and not c.sem_equipe %}<i class="{{ {'ok': 'o', 'alerta': 'a', 'critico': 'c'}.get(c.cor, 'n') }}" style="width: {{ [[c.nota, 0]|max, 100]|min }}%"></i>{% endif %}</span>
+          <b class="pn-v cn-t-{{ c.cor }}">{{ '—' if c.nota is none or c.sem_equipe else c.nota }}</b>
+          <span class="pn-rk-seta pn-rk-seta--{{ c.seta.tipo }}">{% if c.seta.tipo == 'sobe' %}▲ {{ c.seta.n }}{% elif c.seta.tipo == 'desce' %}▼ {{ c.seta.n }}{% elif c.seta.tipo == 'igual' %}={% endif %}</span>{% if c.sem_equipe %}</a>{% else %}</button>{% endif %}</li>
+        {% else %}<li class="pn-vazio">Nenhuma equipe nas usinas da tela.</li>{% endfor %}
+      </ol>
+    </section>
+
+    <section class="pn-q" aria-labelledby="pn-rd-t">
+      <header class="pn-cab"><h2 id="pn-rd-t"><i class="ph ph-path" aria-hidden="true"></i>Acompanhamento de rondas</h2>{{ ver(url(modo='geral', filtro='acomp.rondas', bloco=None, equipe=None)) }}</header>
+      {# a cor da cobertura é a régua das Rondas (o `cor_pct` do Painel delas: 80% ou mais verde, 50% ou mais âmbar) #}
+      <div class="pn-num"><b class="{{ 'cn-t-neutro' if rd.em_dia_pct is none else ('cn-t-ok' if rd.em_dia_pct >= 80 else ('cn-t-alerta' if rd.em_dia_pct >= 50 else 'cn-t-critico')) }}">{{ rd.em_dia }}</b>
+        <span>de {{ rd.usinas }} com ronda nos últimos 7 dias<small>{{ rd.sem_ronda }} sem ronda há 7 dias ou mais · {{ rd.nunca }} nunca teve{% if rd.longa %} · {{ rd.longa }} longa pendente{% endif %}</small></span></div>
+      <div class="pn-seg" role="img" aria-label="{{ rd.em_dia }} em dia, {{ rd.longa }} com a longa pendente, {{ rd.sem_ronda }} sem ronda há 7 dias ou mais e {{ rd.nunca }} que nunca tiveram ronda">{% if rd.em_dia %}<span class="o" style="flex: {{ rd.em_dia }}"></span>{% endif %}{% if rd.longa %}<span class="a" style="flex: {{ rd.longa }}"></span>{% endif %}{% if rd.sem_ronda %}<span class="c" style="flex: {{ rd.sem_ronda }}"></span>{% endif %}{% if rd.nunca %}<span class="n" style="flex: {{ rd.nunca }}"></span>{% endif %}</div>
+      <ol class="pn-lista" tabindex="0" aria-label="Todas as usinas pela ronda, a que mais pede primeiro">
+        {% for x in rd.linhas %}
+        {% set cls = {'nunca': 'cn-t-critico', 'sem_ronda': 'cn-t-critico', 'longa_pendente': 'cn-t-alerta', 'em_dia': 'cn-t-ok'}.get(x.situacao, 'mudo') %}
+        <li>{% if x.os %}<button type="button" class="pn-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel='ronda', os=x.os, data=x.ultima) }}" title="{{ x.usina }}: ver a última ronda">{% else %}<span class="pn-it">{% endif %}
+          <span class="pn-it-nome"><b>{{ x.usina }}</b><small>{% if x.situacao == 'nunca' %}nunca teve ronda pelo App{% elif x.situacao == 'sem_dado' %}sem dado de ronda{% else %}{% if x.situacao == 'longa_pendente' %}longa pendente · {% endif %}última em {{ dia_curto(x.ultima) }}{% if x.tecnico %} · {{ x.tecnico }}{% endif %}{% endif %}</small></span>
+          <b class="pn-v {{ cls }}">{% if x.situacao == 'nunca' %}nunca{% elif x.dias is not none %}{{ 'hoje' if x.dias == 0 else x.dias ~ ' d' }}{% else %}—{% endif %}</b>{% if x.os %}</button>{% else %}</span>{% endif %}</li>
+        {% else %}<li class="pn-vazio">Nenhuma usina com esses filtros.</li>{% endfor %}
+      </ol>
+    </section>
+  </div>
+  {% elif modo == 'cartoes' %}
   {# um cartão por Responsável O&M, com os dois blocos: quantas usinas pedem foco, acompanhamento ou podem esperar em
      cada um e os números do grupo; o cartão abre as usinas dele #}
   <div class="cn-equipes">

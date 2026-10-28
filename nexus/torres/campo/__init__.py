@@ -439,12 +439,16 @@ def responsaveis():
     # ENTÃO PODE TIRAR O ONDE FOCAR"): o endereço antigo (`modo=foco`, link guardado) abre a Visão geral
     if modo == "foco":
         modo = "geral"
+    # o Painel do responsável (28/10/2026, Levi: "quero uma tela feita mesmo para o responsável que não seja um tabelão
+    # (...) uma tela inicial claro, se for para se aprofundar aí é outro nível"): a tela de entrada de quem tem um
+    # responsável escolhido (pelo login, pelo cartão ou pelo filtro); a Visão geral e o Ranking são o outro nível
     if logado:
-        # o responsável logado nunca vê os cartões dos outros responsáveis; o Ranking das equipes e a Visão geral das
-        # usinas dele, sim (18/10/2026)
-        modo = modo if modo in ("ranking", "geral") else "geral"
-    elif modo not in ("cartoes", "ranking", "geral"):
-        modo = "geral" if responsavel else "cartoes"
+        # o responsável logado nunca vê os cartões dos outros responsáveis; o Painel, o Ranking das equipes e a Visão
+        # geral das usinas dele, sim (18/10/2026; o Painel em 28/10/2026). Com "Todos" escolhido não há um responsável:
+        # fica a Visão geral de todas, como antes
+        modo = modo if modo in ("painel", "ranking", "geral") else ("painel" if responsavel else "geral")
+    elif modo not in ("cartoes", "ranking", "geral", "painel"):
+        modo = "painel" if responsavel else "cartoes"
     # a Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas"): todas as usinas do filtro numa lista
     # só, e o clique num bloco, nível ou número do resumo filtra (`filtro`, a condição daquele número no `soma`)
     filtro = campo_resp.filtro_geral(request.args.get("filtro")) if modo == "geral" else None
@@ -478,7 +482,10 @@ def responsaveis():
     # permancer mesmo filtrados": filtrado por um responsável, as equipes dele contavam de 1 a 11). Em
     # nexus/campo/ranking_equipes.py
     ranking = (campo_ranking.cartoes(todas, d.get("ranking_por_usina") or {}, d.get("tecnicos_por_equipe") or {}, usinas)
-               if modo == "ranking" else None)
+               if modo in ("ranking", "painel") else None)
+    # o Painel: os cinco quadros sobre as MESMAS usinas e o mesmo Ranking (nexus/campo/painel_responsavel.py)
+    from ...campo import painel_responsavel as campo_painel
+    painel = campo_painel.montar(responsavel or "Todos os responsáveis", usinas, ranking) if modo == "painel" else None
     nomes = sorted({u.get("responsavel") or visao.SEM_RESPONSAVEL for u in todas} | ({responsavel} if responsavel else set()),
                    key=lambda n: (n == visao.SEM_RESPONSAVEL, n))
     # a faixa "Parada agora" (18/10/2026): as OS de parada abertas nas usinas DO FILTRO, a mais antiga primeiro
@@ -487,7 +494,7 @@ def responsaveis():
     from ...campo import tarefas_os
     html = render_template("campo/responsaveis.html", **_comum(
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
-        equipe=equipe, ranking=ranking, ranking_cor=campo_ranking.cor, sem_regiao=visao.SEM_REGIAO,
+        equipe=equipe, ranking=ranking, ranking_cor=campo_ranking.cor, sem_regiao=visao.SEM_REGIAO, painel=painel,
         filtro=filtro, filtros_geral=campo_resp.FILTROS_GERAL, lista_geral=lista_geral, contagem_geral=contagem_geral,
         ocorrencias_abertas=ocorrencias_abertas, cor_ocorrencia=campo_oc.COR_ETIQUETA, ocorrencias_link=ocorrencias_link,
         bloco_sel=bloco_sel, bloco_ordem=bloco_ordem, ver=ver, mapa=mapa, usina_sel=usina_sel, erro_mapa=erro_mapa,

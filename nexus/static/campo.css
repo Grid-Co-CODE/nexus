@@ -1261,3 +1261,59 @@ tr.ap-os:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
 .zl-fotos{margin-top:10px}
 .zl-gav-rodape{margin-top:22px}
 @media (max-width:560px){.zl-gav-fatos{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* O Painel do responsável (28/10/2026): cinco quadros numa tela, à la Nexus (os quadros são os únicos cartões, direto
+   no fundo; a cor só no número e na barra do estado). Três colunas; a 2ª linha com o Ranking ocupando duas. Cada quadro
+   mostra 6 linhas por vez e a lista INTEIRA rola por dentro, na barra de rolagem do Nexus (Levi, no mesmo dia:
+   "poderia ter um scroll para o que não cabe no card, scroll alá Nexus (...) não podemos deixar nada de fora"; e, ao ver
+   o quadro com a metade da tela: "Ficou mt grande! Limite de 6 em 6 com um scroll"). A linha tem altura fixa
+   (`--pn-linha`) para as 6 caberem exatas. */
+.pn{--pn-linha:42px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px;align-items:start}
+.pn-q{display:flex;flex-direction:column;min-width:0;padding:12px 14px 8px;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-md)}
+.pn-q--largo{grid-column:span 2}
+.pn-cab{display:flex;align-items:center;gap:10px}
+.pn-cab h2{display:flex;align-items:center;gap:8px;margin:0;font:600 14px/20px var(--font-sans);color:var(--tinta)}
+.pn-cab h2 .ph{font-size:17px;color:var(--mudo)}
+.pn-ver{margin-left:auto;font:600 12px/16px var(--font-sans);color:var(--verde-texto);text-decoration:none;white-space:nowrap}
+.pn-ver:hover{text-decoration:underline}
+.pn-q > .pn-ver{margin:8px 0 0;align-self:flex-start}
+.pn-num{display:flex;align-items:baseline;gap:10px;margin:6px 0 6px}
+.pn-num > b{font:600 28px/32px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.pn-num > span{font-size:13px;color:var(--tinta-2);line-height:1.35}
+.pn-num small{display:block;font-size:12px;color:var(--mudo)}
+.pn-nota{margin:6px 0 8px;font-size:12px;color:var(--mudo)}
+.pn-lista{max-height:calc(6 * var(--pn-linha) + 5 * 2px);min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  list-style:none;margin:0 -6px 0 0;
+  padding:0 6px 0 0;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
+.pn-lista::-webkit-scrollbar{width:8px}
+.pn-lista::-webkit-scrollbar-thumb{background:var(--rolagem);border-radius:8px}
+.pn-lista::-webkit-scrollbar-thumb:hover{background:var(--rolagem-hover)}
+.pn-lista:focus-visible{outline:2px solid var(--foco);outline-offset:2px;border-radius:6px}
+.pn-it,.pn-rk-it{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;
+  height:var(--pn-linha);padding:3px 8px;border-radius:8px;cursor:pointer}
+span.pn-it{cursor:default}
+button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
+.pn-it:focus-visible,.pn-rk-it:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.pn-it-nome,.pn-rk-nome{display:grid;min-width:0;flex:1}
+.pn-it-nome b,.pn-rk-nome b{font:600 13px/17px var(--font-sans);color:var(--tinta);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.pn-it-nome small,.pn-rk-nome small{font-size:11.5px;line-height:15px;color:var(--mudo);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.pn-v{font:600 13px/18px var(--font-mono);white-space:nowrap;text-align:right;min-width:52px}
+.pn-barra{flex:0 0 90px;height:6px;border-radius:999px;background:var(--superficie-3);overflow:hidden}
+.pn-barra i{display:block;height:100%;border-radius:999px}
+.pn-barra .o{background:var(--ok-cheio)} .pn-barra .a{background:var(--alerta-cheio)}
+.pn-barra .c{background:var(--critico-cheio)} .pn-barra .n{background:var(--linha-forte)}
+.pn-barra--rk{flex:1 1 40%}
+.pn-rk-pos{min-width:34px;font:600 13px/18px var(--font-mono);color:var(--tinta-2)}
+.pn-rk-nome{flex:0 1 210px}
+.pn-rk-seta{min-width:36px;font:600 11px/16px var(--font-mono);color:var(--mudo)}
+.pn-rk-seta--sobe{color:var(--ok)} .pn-rk-seta--desce{color:var(--critico)}
+.pn-seg{display:flex;height:8px;margin:0 0 8px;border-radius:999px;overflow:hidden;background:var(--superficie-3);gap:2px}
+.pn-seg .o{background:var(--ok-cheio)} .pn-seg .a{background:var(--alerta-cheio)}
+.pn-seg .c{background:var(--critico-cheio)} .pn-seg .n{background:var(--critico-cheio);opacity:.55}
+.pn-vazio{padding:10px 8px;font-size:13px;color:var(--mudo)}
+@media (max-width:1180px){.pn{grid-template-columns:repeat(2,minmax(0,1fr))}.pn-q--largo{grid-column:span 2}}
+@media (max-width:760px){.pn{grid-template-columns:minmax(0,1fr)}.pn-q--largo{grid-column:auto}.pn-barra{flex-basis:56px}
+}

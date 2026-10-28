@@ -235,8 +235,11 @@ def test_tela_dos_cartoes_e_a_dos_dois_blocos(tela, logado):
     html = logado.get("/t/campo/responsaveis").get_data(as_text=True)
     assert "Visão do responsável" in html and "Ciclano Chefe" in html and "Beltrano Supervisor" in html
     assert "responsavel=Ciclano+Chefe" in html and "Extintores vencidos" in html   # o cartão abre as usinas dele
-    # escolhido o responsável, a Visão geral (Levi, 18/10/2026: "pode tirar o Onde focar")
+    # escolhido o responsável, o Painel (Levi, 28/10/2026: "uma tela inicial claro, se for para se aprofundar aí é outro
+    # nível"); a Visão geral (18/10/2026, no lugar de Onde focar) é a aba do outro nível
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
+    assert 'aria-current="page">Painel' in html and '<h1 class="cn-titulo">Ciclano Chefe</h1>' in html
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe&modo=geral").get_data(as_text=True)
     assert 'aria-current="page">Visão geral' in html
     lista = _bloco_manut(html)
     assert "Altair" in lista and "85%" in lista and "1 ativo crítico" in lista
@@ -252,7 +255,8 @@ def test_quem_entra_pelo_fracttal_cai_nas_usinas_dele(tela, cliente):
     with cliente.session_transaction() as s:
         s["usuario"] = {"email": "beltrano@exemplo.test", "nome": "Beltrano Supervisor", "perfil": ""}
     html = cliente.get("/t/campo/responsaveis").get_data(as_text=True)
-    assert '<option value="Beltrano Supervisor" selected>' in html and 'class="cr-gr"' in html
+    # desde 28/10/2026 ele entra no Painel dele (a tela inicial); a Visão geral é a aba ao lado
+    assert '<option value="Beltrano Supervisor" selected>' in html and 'class="pn"' in html
     # o responsável logado não vê os cartões (Levi, 12/10/2026: "não vai aparecer por responsável, já vai direto para
     # Onde Focar!"): nem pelo endereço; "Todos" mostra as usinas de todos, ainda nos dois blocos
     assert ">Por responsável</a>" not in html
@@ -364,7 +368,7 @@ def test_a_pt_por_cima_decide_e_volta_para_a_visao(tela, logado):
 
 
 def test_a_tela_abre_as_janelas_pelo_valor_e_pela_os_da_pt(tela, logado):
-    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe&modo=geral").get_data(as_text=True)
     assert 'id="cr-modal"' in html and "data-cr-painel=" in html
     assert "/t/campo/responsaveis/usina/1/meta" in html and "/t/campo/responsaveis/usina/1/disp" in html
     assert "/t/campo/responsaveis/pt/PT-1" in html and "dia a dia" in html
@@ -414,7 +418,7 @@ def test_o_dia_da_os_sem_o_ano():
 
 
 def test_a_etiqueta_e_o_detalhe_abrem_os_ativos(tela, logado):
-    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe&modo=geral").get_data(as_text=True)
     assert html.count("/t/campo/responsaveis/usina/1/ativos") == 2           # a etiqueta e o "ver os ativos"
     assert "ver os ativos" in html and 'class="cr-tag cr-tag--critico cr-abre"' in html
 
@@ -783,7 +787,7 @@ def test_o_responsavel_logado_ve_o_ranking_das_equipes_dele(tela, cliente):
     assert ">Ranking das equipes</a>" in html and ">Por responsável</a>" not in html
     assert "SC Oeste 01" in html and "SP Norte 01" not in html                # Beltrano é o responsável da Coração 1
     html = cliente.get("/t/campo/responsaveis?modo=cartoes").get_data(as_text=True)
-    assert 'class="cr-gr"' in html and 'class="cn-equipes"' not in html      # nunca os cartões dos outros
+    assert 'class="pn"' in html and 'class="cn-equipes"' not in html         # nunca os cartões dos outros: o Painel dele
 
 
 def test_o_filtro_de_equipe_na_visao_geral(tela, logado):
@@ -1098,8 +1102,9 @@ def test_a_lista_unica_vira_cartoes_ate_1180_px():
 # FOCAR, ENTÃO PODE TIRAR O ONDE FOCAR"; as colunas na ordem Performance, Manutenção e Acompanhamento; "AO CLICAR NO
 # BLOCO EM VISÃO GERAL DESTAQUE AS COLUNAS DAQUELE BLOCO E ORDENE DE ACORDO COM AQUELE BLOCO") ──────────────────────
 def test_onde_focar_saiu_e_a_visao_geral_e_o_padrao(manut, logado):
+    # desde 28/10/2026 o padrão de um responsável escolhido é o Painel; a Visão geral segue na aba, sem Onde focar
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
-    assert 'aria-current="page">Visão geral' in html and ">Onde focar</a>" not in html
+    assert 'aria-current="page">Painel' in html and ">Visão geral</a>" in html and ">Onde focar</a>" not in html
     # o endereço antigo (o link guardado, o cartão do ranking de antes) abre a Visão geral
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=foco").get_data(as_text=True)
     assert 'aria-current="page">Visão geral' in html and 'class="cr-gr"' in html
@@ -1199,8 +1204,9 @@ def test_pausadas_em_toda_a_tela(manut, logado, monkeypatch):
 
 
 def test_todos_os_responsaveis_fica_na_visao_geral(manut, logado):
-    """Revisão: quem veio do cartão (sem `modo` no endereço) caía nos cartões ao clicar em "Todos os responsáveis ×"."""
-    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
+    """Revisão: quem veio do cartão (sem `modo` no endereço) caía nos cartões ao clicar em "Todos os responsáveis ×". O
+    "Todos os responsáveis ×" mora na Visão geral (desde 28/10/2026 o padrão do responsável escolhido é o Painel)."""
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe&modo=geral").get_data(as_text=True)
     todos = re.search(r'href="([^"]*)" title="As usinas de todos os responsáveis"', html).group(1)
     assert "modo=geral" in todos
     html = logado.get("/t/campo/responsaveis?modo=cartoes&responsavel=*&filtro=manut.atrasadas&bloco=perf").get_data(as_text=True)

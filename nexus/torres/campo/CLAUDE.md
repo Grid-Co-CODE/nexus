@@ -19,7 +19,7 @@ clica, como no OS Creator Web; ver "Aprovação de OS").
 
 | Tela | De onde vem | Quem calcula |
 |---|---|---|
-| **Visão do responsável** (12/10/2026, a 1ª do Campo) | três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
+| **Visão do responsável** (12/10/2026, a 1ª do Campo) | o **Painel** (28/10/2026, a tela inicial de um responsável: cinco quadros, ver "O Painel do responsável" abaixo) e três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
 | **Ocorrências** (18/10/2026) | o livro `nexus_ocorrencias` (escrito nesta tela) + cadastro do Nexus | `campo/ocorrencias.py` (ver "Ocorrências com plano de ação" abaixo) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
 | Aprovação de OS | fila de verificação do Fracttal INTEIRA (só GET) + nota do livro do App + o Responsável O&M da usina (cadastro); aprovar é o Concluir do card do OS Creator | regras copiadas do App (a conta pronta por fila lida) |
@@ -728,12 +728,13 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
 - **Cartões por responsável** (o padrão de quem não é responsável): os dois blocos, cada um com a triagem e os números
   do grupo (meta, abaixo da meta, disponibilidade; rondas, PT paradas, chamados, extintores vencidos). Responsável O&M
   = `usinas.responsavel_om_id`, o mesmo da Central.
-- **O responsável que entra pelo Fracttal vai direto para a Visão geral** (Levi, 12/10/2026: "caso a pessoa que logue
+- **O responsável que entra pelo Fracttal vai direto para o Painel dele** (Levi, 12/10/2026: "caso a pessoa que logue
   seja algum desses responsáveis não vai aparecer por responsável, já vai direto para Onde Focar!"; Onde focar virou a
-  Visão geral em 18/10/2026): `_responsavel_do_login`
+  Visão geral em 18/10/2026, e o Painel passou a ser a tela inicial em 28/10/2026): `_responsavel_do_login`
   (guardado em `session["responsavel_padrao"]`) marca o filtro nele, a aba "Por responsável" some e o `modo=cartoes` do
   endereço não vale para ele (o Ranking das equipes, desde 18/10/2026, ele vê, com as equipes dele); o filtro continua (para olhar as usinas de quem ele estiver cobrindo; "Todos" mostra as
-  de todos, ainda na Visão geral). Quem não é responsável (admin, coordenador) segue com os cartões.
+  de todos, ainda na Visão geral). Quem não é responsável (admin, coordenador) segue com os cartões; o clique no cartão
+  de um responsável abre o Painel dele.
 - **Esperando o De acordo é só PT** (Levi, 12/10: "na verdade esperando de acordo é só PT então mostra só PT"): o rótulo
   é "PT".
 - **As janelas por cima da tela** (Levi, 12/10/2026: "precisamos mostrar para o supervisor de onde está vindo!"; "ao
@@ -820,6 +821,41 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   repositório: o resultado tem nome de responsável). A tela inteira sem senha no navegador: o `test_client` com
   `session_transaction` (`logado` e `admin`), a trava da cópia de prova (`subir_copia_de_prova.instalar_trava`: nada
   que não seja GET sai) e o HTML salvo com o `static` ao lado, servido por `python -m http.server` (18/10/2026).
+
+### O Painel do responsável (28/10/2026)
+
+Levi: "com base no que já temos no acompanhamento do responsável quero uma tela feita mesmo para o responsável que não
+seja um tabelão. Então eu escolheria o responsável, vai ter o nome do responsável como [título] e mostrará: Usinas abaixo
+da performance, chamados abertos, PTs pendentes, Ranking das equipes do maior para menor, acompanhamento de rondas! (...)
+uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **Painel** (`modo=painel`), a conta em
+`nexus/campo/painel_responsavel.py` (pura) e o bloco `{% if modo == 'painel' %}` do `responsaveis.html`.
+
+- **A tela inicial de um responsável:** é o padrão quando há um escolhido (pelo login do Fracttal, pelo cartão do
+  responsável ou pelo filtro); sem escolha, quem não é responsável segue nos cartões e o responsável logado com "Todos"
+  na Visão geral, como antes. O `modo=painel` com "Todos" mostra o painel de todas as usinas. O título é o nome do
+  responsável, com as usinas, os clientes e as equipes embaixo.
+- **Nenhum número novo, nenhuma régua nova:** cada quadro reorganiza o que a Visão já calcula por usina (`montar`) e o
+  Ranking (`ranking_equipes.cartoes`, sobre as mesmas usinas). A meta é a régua da Visão gerencial (97/90), a ronda a
+  da Central (7 dias), a cor da cobertura a das Rondas (80/50, o `cor_pct` do Painel delas) e a nota a do App (85/70).
+- **Os cinco quadros, cada um com o total e a lista inteira:** Usinas abaixo da performance (todas as usinas, da pior
+  meta para a melhor, sem meta no fim; PR contra o previsto e disponibilidade na linha), Chamados abertos (todos os em
+  aberto, o mais antigo primeiro; os em verificação na contagem), PTs pendentes (todas; a parada de hoje primeiro, depois
+  as paradas de outros dias, depois as que esperam há menos de 2 h), Ranking das equipes (todas as equipes das usinas,
+  da maior nota para a menor; a posição é a do ranking de todas; as usinas sem equipe no fim) e Acompanhamento de
+  rondas (todas as usinas, a que mais pede primeiro, as em dia no fim, com a barra em dia / longa pendente / sem ronda /
+  nunca).
+- **Nada fica de fora, 6 por vez** (Levi, ao ver a 1ª versão com 5 linhas e "e mais N": "poderia ter um scroll para o
+  que não cabe no card, scroll alá Nexus (...) Tem que ter todas as usinas e equipes daquele supervisor, não podemos
+  deixar nada de fora"; e, ao ver o quadro com a metade da tela: "Ficou mt grande! Limite de 6 em 6 com um scroll"): a
+  lista mostra 6 linhas (`--pn-linha`, altura fixa) e rola por dentro, na barra de rolagem do Nexus; a faixa "Parada
+  agora" também mostra todas no Painel (nas outras visões, as 6 mais antigas). Conferido na bancada com o banco real
+  (28/10): nos 8 responsáveis, a Performance e as Rondas trazem exatamente as usinas do título.
+- **O outro nível:** o "ver todas" de cada quadro abre a Visão geral com o filtro dele (`perf.abaixo_meta`,
+  `acomp.chamados`, `acomp.pts`, `acomp.rondas`) ou o Ranking; cada linha abre a janela que a Visão já tem: o dia a dia
+  da meta, o card da OS do chamado, a PT para decidir, o motivo da nota da equipe, a última ronda.
+- **Prova:** `tests/test_campo_painel_responsavel.py` (a ordem e a completude de cada quadro, o padrão de quem entra, o
+  "Todos", o CSS das 6 linhas com a rolagem); os testes da Visão que esperavam a Visão geral como padrão do responsável
+  escolhido passaram a pedir `modo=geral`.
 
 ### O bloco Manutenção, a Limpeza e a faixa "Parada agora" (18/10/2026)
 
