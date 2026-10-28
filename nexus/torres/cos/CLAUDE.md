@@ -215,27 +215,26 @@ Só lê; nada vai ao banco (decisão do Levi, 27/10/2026: a tela, sem guardar).
   da volta (o corrente no padrão e os 2 anteriores, `MESES`; os 1, 7 e 30 dias saíram no mesmo dia: "Pode tirar esses
   filtros de 7, 30 dias ou último dia"), os filtros, a faixa e "há quantos dias da volta a OS segue aberta" (7 dias ou
   mais em vermelho).
-- **A tela, como o Levi pediu (27/10/2026, a 2ª rodada):** as colunas OS, Início (com o tempo fora), Normalização (com
-  por onde foi registrada), Cliente, Usina (com a falha e os equipamentos embaixo), Operador e No Fracttal, nessa ordem;
-  sem a severidade (só no CSV). Filtros: cliente, usina (as do cliente escolhido), criado por, status no Fracttal (em
-  processo, em verificação, fechada) e um texto livre (OS, usina, falha, equipamento, quem criou, informe). O "Como se
-  conta" é a exclamação amarela ao lado do título, a macro `aviso` de `hseq/_legenda.html` (a mesma dos Extintores).
-  **Exportar CSV** = `?formato=csv` com os filtros da tela (`;`, com BOM para o Excel; o texto que começa com `=`, `+`,
-  `-` ou `@` vai com apóstrofo, para o Excel não o executar).
-- **"Operador" é quem criou a OS no Fracttal** (`nexus/cos/criadores.py`). A API das normalizações não manda nome de
-  pessoa; o Fracttal diz (`created_by` do REST, `work_orders?wo_folio=N`). Uma linha de fundo lê UMA OS a cada 2 s (30
-  por minuto, 15% da cota de 200/min da empresa), a mais recente primeiro; recusa espera 1 min. O criador não muda: lido
-  uma vez, fica, na memória e num arquivo da pasta de dados **cifrado pelo Cofre** (a chave do cadastro), para o deploy
-  não refazer a leitura inteira; sem a chave, só na memória. Até ler, a linha diz "lendo no Fracttal" e o filtro Criado
-  por ainda não tem a OS (a tela diz quantas faltam). Antes desta rodada, "Operador" embaixo da hora queria dizer que
-  uma pessoa do COS registrou a volta (`declarada_por: pessoa`); virou "registrada pelo COS".
+- **A tela, como o Levi pediu (27/10/2026, 2ª e 3ª rodadas):** as colunas OS, **Indisp.** (do início da falha até a
+  normalização, em minutos e horas, nunca em dias: "Conta em minutos e horas"; "sem hora real" quando a volta não tem
+  hora), Início, Normalização (com por onde foi registrada), Cliente, Usina (com a falha e os equipamentos embaixo) e No
+  Fracttal, nessa ordem; sem a severidade (só no CSV). Filtros: cliente, usina (as do cliente escolhido), status no
+  Fracttal (em processo, em verificação, fechada) e um texto livre (OS, usina, falha, equipamento, informe). O "Como se
+  conta" é a exclamação amarela ao lado do título, a macro `aviso` de `hseq/_legenda.html` (a mesma dos Extintores). As
+  letras são 20% menores (`zoom:.8` no `.cos-norm`, "diminua o tamanho de todas as fontes em 20%"). **Exportar CSV** =
+  `?formato=csv` com os filtros da tela (`;`, com BOM para o Excel; o texto que começa com `=`, `+`, `-` ou `@` vai com
+  apóstrofo, para o Excel não o executar).
+- **Sem "quem criou a OS"** (decisão do Levi, 27/10/2026): a API das normalizações não manda nome de pessoa, e a 2ª
+  rodada lia o `created_by` do REST do Fracttal OS a OS, 30 por minuto, no ar por poucos minutos (`a37eeb7`). Na 3ª saiu:
+  "Não precisa trazer o operador se for ficar puxando um a um no fractal, isso vai pesar muito nas requisições!". Se
+  voltar, só por uma fonte em lote (o Andamento mandar, ou uma leitura do Fracttal que o Nexus já faça). O "Operador"
+  que aparecia embaixo da hora era `declarada_por: pessoa` (uma pessoa do COS registrou a volta): é "registrada pelo COS".
 - **As contas:** as opções dos filtros contam o mês, antes dos filtros; a faixa conta a lista filtrada SEM o status
   (senão a fatia aberta seria sempre 100%). A desfeita (`normalizada: false`) sai da lista e é dita à parte; a sem hora
-  real fica na lista, marcada, e fora da mediana do tempo fora.
+  real fica na lista, marcada, e fora da mediana.
 - **A chave e o endereço** só na tela Base → Chaves (o repositório é público).
 - Testes: `tests/test_cos_normalizacoes.py` (o upsert pelo registro, a paginação que continua, a pausa de 1 min depois
-  da falha e a desfeita fora: mutados, vermelhos; os filtros, as colunas e o CSV) e `tests/test_cos_criadores.py` (a
-  fila na ordem da tela, a recusa que devolve à fila, o arquivo só cifrado).
+  da falha e a desfeita fora: mutados, vermelhos; os filtros, as colunas, a Indisp. e o CSV).
 
 ## Regras desta torre
 

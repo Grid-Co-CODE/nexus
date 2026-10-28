@@ -81,9 +81,6 @@ def _painel(**filtros):
 
 # --- as contas -------------------------------------------------------------------------------------------------------
 
-CRIADORES = {"17001": "Fulana Operadora", "16702": "Ciclano Operador"}
-
-
 def test_o_mes_corrente_no_padrao_e_a_desfeita_sai_da_lista():
     """Levi, 27/10/2026: "Pode tirar esses filtros de 7, 30 dias ou último dia"."""
     p = _painel()
@@ -101,27 +98,24 @@ def test_a_faixa_conta_a_os_aberta_e_a_mediana_sem_a_hora_falsa():
     assert _painel(status="processo").resumo == r
 
 
-def test_os_filtros_cliente_usina_criado_por_status_e_texto():
-    """Levi, 27/10/2026: "Filtros: Cliente, Usina, Criado por, Status fracttal, um filtro livre para digitar texto"."""
+def test_os_filtros_cliente_usina_status_e_texto():
+    """Levi, 27/10/2026: "Filtros: Cliente, Usina, Criado por, Status fracttal, um filtro livre para digitar texto"; o
+    Criado por saiu com o Operador ("Não precisa trazer o operador se for ficar puxando um a um no fractal")."""
     def regs(**f):
-        return [i["registro"] for i in _painel(criadores=CRIADORES, **f).itens]
+        return [i["registro"] for i in _painel(**f).itens]
     assert regs(cliente="CLIENTE B") == ["r2"]
     assert regs(usina="Usina Exemplo Dois") == ["r2"]
-    assert regs(criado_por="Fulana Operadora") == ["r1", "r3", "r4", "r6"]
     assert regs(status="processo") == ["r2"] and regs(status="verificacao") == ["r3"]
     assert regs(status="fechada") == ["r1", "r4", "r6"]
-    assert regs(busca="16702") == ["r2"] and regs(busca="exemplo dois") == ["r2"] and regs(busca="ciclano") == ["r2"]
+    assert regs(busca="16702") == ["r2"] and regs(busca="exemplo dois") == ["r2"]
     assert regs(status="inventado") == regs()                                       # valor estranho: sem o filtro
 
 
 def test_as_opcoes_dos_filtros_contam_o_mes_antes_dos_filtros():
-    p = _painel(cliente="CLIENTE B", criadores=CRIADORES)
-    assert p.contagem["cliente"] == {"CLIENTE A": 4, "CLIENTE B": 1}
-    assert p.contagem["usina"] == {"Usina Exemplo Dois": 1}                         # as usinas do cliente escolhido
-    assert p.contagem["criado_por"] == {"Ciclano Operador": 1, "Fulana Operadora": 4}
-    assert p.contagem["status"] == {"processo": 1, "verificacao": 1, "fechada": 3}
-    assert p.contagem["sem_criador"] == 0
-    assert _painel(criadores={"16702": "Ciclano Operador"}).contagem["sem_criador"] == 4     # 17001 ainda não lida
+    p = _painel(cliente="CLIENTE B")
+    assert p.contagem == {"cliente": {"CLIENTE A": 4, "CLIENTE B": 1},
+                          "usina": {"Usina Exemplo Dois": 1},                        # as usinas do cliente escolhido
+                          "status": {"processo": 1, "verificacao": 1, "fechada": 3}}
 
 
 def test_a_os_aberta_diz_ha_quantos_dias_da_volta_e_a_varredura_mais_nova():
@@ -134,13 +128,15 @@ def test_a_os_aberta_diz_ha_quantos_dias_da_volta_e_a_varredura_mais_nova():
 
 def test_o_csv_leva_a_lista_filtrada_e_o_que_a_tela_resume():
     """Levi, 27/10/2026: "Botão de exportar csv"."""
-    linhas = NO.csv_linhas(_painel(status="processo", criadores=CRIADORES))
+    linhas = NO.csv_linhas(_painel(status="processo"))
     assert len(linhas) == 1 and len(linhas[0]) == len(NO.CSV_COLUNAS)
     d = dict(zip(NO.CSV_COLUNAS, linhas[0]))
-    assert (d["OS"], d["Início"], d["Normalização"], d["Tempo fora (min)"]) == ("16702", "19/10/2026 02:00",
-                                                                               "19/10/2026 05:53", 233)
-    assert (d["Cliente"], d["Usina"], d["Criado por"], d["Status no Fracttal"], d["% concluída"]) == (
-        "CLIENTE B", "Usina Exemplo Dois", "Ciclano Operador", "Em processo", 40)
+    assert NO.CSV_COLUNAS[:5] == ("OS", "OS relacionadas", "Indisponível (min)", "Início", "Normalização")
+    assert (d["OS"], d["Indisponível (min)"], d["Início"], d["Normalização"]) == ("16702", 233, "19/10/2026 02:00",
+                                                                                 "19/10/2026 05:53")
+    assert (d["Cliente"], d["Usina"], d["Status no Fracttal"], d["% concluída"]) == (
+        "CLIENTE B", "Usina Exemplo Dois", "Em processo", 40)
+    assert "Criado por" not in NO.CSV_COLUNAS
     assert d["Severidade"] == "Critico" and d["Dias aberta depois da volta"] == 8 and d["Registrada"] == "registrada pelo COS"
 
 
@@ -158,9 +154,10 @@ def test_por_mes_o_mes_inteiro_pela_hora_da_volta():
     assert NO.mes_pedido("2026-07", AGORA) == "2026-10" and NO.mes_pedido("2026-09", AGORA) == "2026-09"
 
 
-def test_a_duracao_em_palavras():
-    assert [NO.duracao(m) for m in (0, 59, 60, 75, 2879, 2880, 3000, None)] == [
-        "0 min", "59 min", "1 h", "1 h 15", "47 h 59", "2 d", "2 d 2 h", "—"]
+def test_a_indisponibilidade_em_minutos_e_horas():
+    """Levi, 27/10/2026: "Conta em minutos e horas" (nunca em dias)."""
+    assert [NO.duracao(m) for m in (0, 59, 60, 75, 185, 2880, 4520, None, "x")] == [
+        "0 min", "59 min", "1 h", "1 h 15", "3 h 05", "48 h", "75 h 20", "—", "—"]
 
 
 # --- a leitura incremental -----------------------------------------------------------------------------------------
@@ -222,13 +219,15 @@ def test_a_tela(ligada, logado, monkeypatch):
     assert "Em processo 40%" in html and "aberta 8 dias depois da volta" in html
     assert 'data-status="Em Processo"' in html and "NexusOsCard" in html
     assert "sem hora real" in html and "2 h 26" in html and "fora da lista" in html
+    assert "fora 1 h" not in html and '<td class="cos-indisp"><b>3 h 53</b></td>' in html     # a 16702: 233 min
     # as colunas na ordem pedida, sem a severidade; o "Como se conta" na exclamação ao lado do título
     cab = html.split("<thead>", 1)[1].split("</thead>", 1)[0]
-    assert [c.split(">")[-1] for c in cab.split("</th>")[:-1]] == ["OS", "Início", "Normalização", "Cliente", "Usina",
-                                                                  "Operador", "No Fracttal"]
+    assert [c.split(">")[-1] for c in cab.split("</th>")[:-1]] == ["OS", "Indisp.", "Início", "Normalização",
+                                                                  "Cliente", "Usina", "No Fracttal"]
     assert "Severidade" not in cab and "Crítico" not in html and 'class="hs-aviso"' in html
     assert "Último dia" not in html and "Últimos 7 dias" not in html
-    assert "lendo no Fracttal" in html                       # sem o Fracttal no teste, quem criou ainda não foi lido
+    # sem o Operador: nenhuma leitura do Fracttal uma a uma (Levi: "isso vai pesar muito nas requisições!")
+    assert "Operador" not in html and "Criado por" not in html and "lendo no Fracttal" not in html
     assert "varredura do Fracttal às <b>09:43</b>" in html
     html = logado.get("/t/cos/normalizacoes?mes=2026-10").get_data(as_text=True)
     assert 'aria-current="page">Outubro<' in html and 'data-folio="16702"' in html and "Setembro" in html

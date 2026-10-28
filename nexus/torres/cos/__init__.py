@@ -22,7 +22,6 @@ from flask import Response, abort, current_app, redirect, render_template, reque
 
 from ...cos import acionamentos as AC
 from ...cos import andamento as AND
-from ...cos import criadores as CR
 from ...cos import normalizacoes as NO
 from ...cos import ocorrencias as OC
 from ...cos import os_abertas as OA
@@ -354,8 +353,8 @@ def _celula_csv(v):
 @bp.route("/normalizacoes")
 def normalizacoes():
     """Normalizações: a hora em que cada usina voltou, registrada pelo COS, e se a OS segue aberta no Fracttal, por mês.
-    As normalizações vêm do Andamento (guardadas em memória pelo cursor, nexus/cos/normalizacoes.py); quem criou a OS,
-    do Fracttal, aos poucos (nexus/cos/criadores.py); os filtros e as contas são daqui. Só lê: a OS abre no card do
+    As normalizações vêm do Andamento (guardadas em memória pelo cursor, nexus/cos/normalizacoes.py); os filtros e as
+    contas são daqui. Só lê: a OS abre no card do
     Fracttal. `?formato=csv` baixa a lista com os filtros."""
     cfg = current_app.config
     fonte = AND.fonte(cfg)
@@ -364,10 +363,9 @@ def normalizacoes():
     a = request.args
     mes = NO.mes_pedido(a.get("mes"), agora)
     status = a.get("status", "") if a.get("status") in NO.STATUS_FILTRO else ""
-    cliente, usina, criado_por = a.get("cliente", ""), a.get("usina", ""), a.get("criado_por", "")
+    cliente, usina = a.get("cliente", ""), a.get("usina", "")
     busca = " ".join((a.get("q") or "").split())[:NO.BUSCA_MAX]
-    criadores = CR.nomes(NO.folios(leitura, agora), cfg) if leitura.dados else {}
-    p = NO.painel(leitura, agora, mes, cliente, usina, criado_por, status, busca, criadores)
+    p = NO.painel(leitura, agora, mes, cliente, usina, status, busca)
     if a.get("formato") == "csv":
         if not p:
             abort(404)
@@ -382,5 +380,5 @@ def normalizacoes():
         return resp
     return render_template(
         "cos/normalizacoes.html", torre=TORRE, tela=TORRE.tela("normalizacoes"), ligada=fonte.ligada, leitura=leitura,
-        p=p, mes=mes, meses=NO.meses(agora), cliente=cliente, usina=usina, criado_por=criado_por, status=status,
-        busca=busca, status_filtro=NO.STATUS_FILTRO, na_fila=CR.na_fila(), lido=_lido([leitura]), url=_url)
+        p=p, mes=mes, meses=NO.meses(agora), cliente=cliente, usina=usina, status=status, busca=busca,
+        status_filtro=NO.STATUS_FILTRO, lido=_lido([leitura]), url=_url)

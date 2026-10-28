@@ -165,18 +165,16 @@ def _leitura(st: dict) -> AND.Leitura:
 
 # ── o que a tela mostra (puro) ───────────────────────────────────────────────────────────────────────────────────────
 def duracao(minutos) -> str:
-    """O tempo fora: minutos até 1 h, horas e minutos até 2 dias, depois dias e horas."""
+    """O tempo em minutos e horas, nunca em dias (Levi, 27/10/2026: "Conta em minutos e horas"): "45 min", "3 h 05",
+    "75 h"."""
     try:
         m = max(0, int(minutos))
     except (TypeError, ValueError):
         return "—"
     if m < 60:
         return f"{m} min"
-    if m < 48 * 60:
-        h, r = divmod(m, 60)
-        return f"{h} h {r:02d}" if r else f"{h} h"
-    d, r = divmod(m, 24 * 60)
-    return f"{d} d {r // 60} h" if r // 60 else f"{d} d"
+    h, r = divmod(m, 60)
+    return f"{h} h {r:02d}" if r else f"{h} h"
 
 
 def _item(n: dict, agora: datetime) -> dict:
@@ -227,32 +225,28 @@ def _casa(i: dict, q: str) -> bool:
     if q.isdigit() and (i["os"] == q or q in i["os_relacionadas"]):
         return True
     alvo = " ".join([i["os"], *i["os_relacionadas"], i["cliente"], i["usina"], i["usina_codigo"], i["falha"],
-                     *i["equipamentos"], i["criado_por"] or "", i["resumo"], i["status"]]).lower()
+                     *i["equipamentos"], i["resumo"], i["status"]]).lower()
     return q in alvo
 
 
-def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: str = "", criado_por: str = "",
-           status: str = "", busca: str = "", criadores: dict | None = None) -> Painel | None:
+def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: str = "", status: str = "",
+           busca: str = "") -> Painel | None:
     """A tela, do mês pedido (o corrente no padrão), pela hora da volta. Os filtros (Levi, 27/10/2026): cliente, usina,
-    criado por, status no Fracttal e um texto livre. As opções de cada filtro contam sobre o mês, ANTES dos outros
+    status no Fracttal e um texto livre (o "Criado por" saiu com o Operador, na 3ª rodada). As opções de cada filtro contam sobre o mês, ANTES dos outros
     filtros (um contador que encolhe ao filtrar não diz mais quanto existe); as de usina, dentro do cliente escolhido.
     A faixa conta a lista filtrada, menos o status (senão a fatia aberta seria sempre 100%). A desfeita (a ocorrência
-    voltou a aberta) fica fora da lista e é contada à parte; a sem hora real fica na lista e fora da mediana.
-    `criadores` = {OS: nome, "" (o Fracttal não disse) ou None (ainda não lido)}."""
+    voltou a aberta) fica fora da lista e é contada à parte; a sem hora real fica na lista e fora da mediana."""
     d = leitura.dados if leitura else None
     if not d:
         return None
-    criadores = criadores or {}
     um_mes = next(m for m in meses(agora) if m[0] == mes_pedido(mes, agora))
     desde, ate = um_mes[2], um_mes[3]
     todos = [_item(n, agora) for n in d.get("itens") or []]
-    for i in todos:
-        i["criado_por"] = criadores.get(i["os"]) if i["os"] else ""
     no_mes = [i for i in todos if i["data"] and desde <= i["data"] < ate]
     base = [i for i in no_mes if i["normalizada"]]
     busca = " ".join((busca or "").split())[:BUSCA_MAX]
     recorte = [i for i in base if (not cliente or i["cliente"] == cliente) and (not usina or i["usina"] == usina)
-               and (not criado_por or i["criado_por"] == criado_por) and (not busca or _casa(i, busca))]
+               and (not busca or _casa(i, busca))]
     lista = [i for i in recorte if i["status_filtro"] == status] if status in STATUS_FILTRO else list(recorte)
     lista.sort(key=lambda i: i["data"], reverse=True)
     com_hora = [i["fora"] for i in recorte if i["hora_real"] and i["fora"] is not None]
@@ -264,9 +258,7 @@ def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: st
         contagem={
             "cliente": dict(sorted(Counter(i["cliente"] for i in base).items())),
             "usina": dict(sorted(Counter(i["usina"] for i in do_cliente).items())),
-            "criado_por": dict(sorted(Counter(i["criado_por"] for i in base if i["criado_por"]).items())),
             "status": {k: sum(1 for i in base if i["status_filtro"] == k) for k in STATUS_FILTRO},
-            "sem_criador": sum(1 for i in base if i["os"] and i["criado_por"] is None),
         },
         resumo={
             "total": len(recorte),
@@ -282,29 +274,20 @@ def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: st
     )
 
 
-def folios(leitura, agora: datetime) -> list[str]:
-    """As OS (e as relacionadas) das normalizações guardadas, da mais recente para a mais antiga: a fila de quem criou
-    lê primeiro o que está no alto da tela."""
-    d = leitura.dados if leitura else None
-    itens = sorted((_item(n, agora) for n in (d or {}).get("itens") or []),
-                   key=lambda i: i["data"] or agora, reverse=True)
-    return [f for i in itens for f in [i["os"], *i["os_relacionadas"]] if f]
-
-
 # O "Exportar CSV" (Levi, 27/10/2026): a lista da tela, com os filtros, e o que a tela resume numa coluna só.
-CSV_COLUNAS = ("OS", "OS relacionadas", "Início", "Normalização", "Tempo fora (min)", "Hora real da volta",
+CSV_COLUNAS = ("OS", "OS relacionadas", "Indisponível (min)", "Início", "Normalização", "Hora real da volta",
                "Hora corrigida", "Registrada", "Cliente", "Código da usina", "Usina", "Falha", "Equipamentos",
-               "Severidade", "Criado por", "Status no Fracttal", "% concluída", "Dias aberta depois da volta",
+               "Severidade", "Status no Fracttal", "% concluída", "Dias aberta depois da volta",
                "Informe", "Fora do escopo O&M")
 
 
 def csv_linhas(p: Painel) -> list[list]:
     def h(d):
         return d.strftime("%d/%m/%Y %H:%M") if d else ""
-    return [[i["os"], ", ".join(i["os_relacionadas"]), h(i["inicio"]), h(i["volta"]),
-             "" if i["fora"] is None else i["fora"], "sim" if i["hora_real"] else "não",
+    return [[i["os"], ", ".join(i["os_relacionadas"]), "" if i["fora"] is None else i["fora"], h(i["inicio"]),
+             h(i["volta"]), "sim" if i["hora_real"] else "não",
              "sim" if i["fim_corrigido"] else "não", i["declarada_por"], i["cliente"], i["usina_codigo"], i["usina"],
-             i["falha"], ", ".join(i["equipamentos"]), i["severidade"].title(), i["criado_por"] or "",
+             i["falha"], ", ".join(i["equipamentos"]), i["severidade"].title(),
              i["status"] if i["aberta"] else "Fechada", i["pct"] if i["aberta"] else "",
              "" if i["aberta_ha_dias"] is None else i["aberta_ha_dias"], i["resumo"],
              "sim" if i["fora_do_escopo"] else "não"] for i in p.itens]
