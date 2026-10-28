@@ -132,6 +132,17 @@ def ativos_de(assets: list, cliente: str, usina: str, tipo: str | None = None, b
     return out
 
 
+def ativos_do_cliente(assets: list, cliente: str, frases=None) -> list:
+    """Os ativos de TODAS as usinas do cliente numa leitura só, cada um com a `usina` dele e os campos do `ativos_de`, na
+    ordem do catálogo (Levi, 28/10/2026, na Nova solicitação: "quando pesquisa o cliente carrega, quando pesquiso a usina
+    carrega novamente. na minha cabeça os ativos devem carregar apenas 1 vez"). A tela escolhe a usina sem novo pedido."""
+    if not cliente:
+        return []
+    return [{"id": a.get("id"), "code": a.get("code"), "label": a.get("label"), "tipo": a.get("tipo"),
+             "curto": ativo_curto.do_catalogo(a, frases), "nome_titulo": nome_no_titulo(a, frases), "usina": a.get("usina")}
+            for a in (assets or []) if a.get("cliente") == cliente and a.get("usina") and a.get("tipo")]
+
+
 def nome_no_titulo(asset: dict, frases=None) -> str:
     """O nome do ativo no título da OS do Criar OS, "[Ativo] - Título" (Levi, 26/10/2026: "APENAS NOME DO ATIVO, NÃO NOME
     COMPLETO, SE FOR O ATIVO DA USINA ENTÃO FICARÁ 'Usina' se for inversor ficará Inversor 1.1"): o item da planta vira

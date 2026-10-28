@@ -156,13 +156,26 @@
   // a cascata reaproveita o catalogo do Tradicional: e o MESMO `load_assets_cached` do lado de la,
   // e ter dois endpoints para a mesma pergunta so criaria duas respostas possiveis.
   function busca_json(u) { return OsCarga.buscar(u, {credentials: "same-origin"}, "Carregando…").then(function (r) { return r.json(); }); }
-  // as duas etapas da cascata devolvem a promessa: a sugestão pelo endereço (sugerir, no fim) espera cada uma
+  // as duas etapas da cascata devolvem a promessa: a sugestão pelo endereço (sugerir, no fim) espera cada uma.
+  // Os ativos do cliente vêm UMA vez, com as usinas (Levi, 28/10/2026: "quando pesquisa o cliente carrega, quando pesquiso
+  // a usina carrega novamente. na minha cabeça os ativos devem carregar apenas 1 vez e depois é mais fluido"): a usina, o
+  // tipo e a busca filtram na tela, e o cliente que já veio nesta página não é pedido de novo.
+  var porCliente = new Map();
+  function doCliente(c) {
+    if (porCliente.has(c)) return Promise.resolve(porCliente.get(c));
+    return busca_json("/os/api/tradicional/catalogo?cliente=" + encodeURIComponent(c) + "&ativos=1").then(function (j) {
+      if (j && j.usinas) porCliente.set(c, j);                // erro não fica guardado
+      return j || {};
+    });
+  }
   function carregarUsinas() {
     cbUsi.innerHTML = '<option value="">{{ todos_usina }}</option>'; cbUsi.disabled = true;
     cbTipo.innerHTML = '<option value="">{{ todos_tipo }}</option>'; cbTipo.disabled = true;
     busca.disabled = true; ativos = []; marcados.clear(); pintar(); filtrarTemas();
-    if (!cbCli.value) return Promise.resolve();
-    return busca_json("/os/api/tradicional/catalogo?cliente=" + encodeURIComponent(cbCli.value)).then(function (j) {
+    var c = cbCli.value;
+    if (!c) return Promise.resolve();
+    return doCliente(c).then(function (j) {
+      if (cbCli.value !== c) return;                          // trocou de cliente enquanto lia
       (j.usinas || []).forEach(function (u) { cbUsi.add(new Option(u, u)); });
       cbUsi.disabled = false;
     });
@@ -170,12 +183,17 @@
   function carregarAtivos() {
     ativos = []; marcados.clear(); pintar(); filtrarTemas();
     if (!cbUsi.value) { cbTipo.disabled = true; busca.disabled = true; return Promise.resolve(); }
-    return busca_json("/os/api/tradicional/catalogo?cliente=" + encodeURIComponent(cbCli.value)
-      + "&usina=" + encodeURIComponent(cbUsi.value)).then(function (j) {
+    var u = cbUsi.value;
+    return doCliente(cbCli.value).then(function (j) {
+      if (cbUsi.value !== u) return;
+      ativos = (j.ativos || []).filter(function (a) { return a.usina === u; });
+      var tipos = [];
+      ativos.forEach(function (a) { if (tipos.indexOf(a.tipo) < 0) tipos.push(a.tipo); });
+      tipos.sort(function (x, y) { return x < y ? -1 : x > y ? 1 : 0; });   // a ordem do `sorted` do servidor
       cbTipo.innerHTML = '<option value="">{{ todos_tipo }}</option>';
-      (j.tipos || []).forEach(function (t) { cbTipo.add(new Option(t, t)); });
+      tipos.forEach(function (t) { cbTipo.add(new Option(t, t)); });
       cbTipo.disabled = false; busca.disabled = false;
-      ativos = j.ativos || []; limite = PAGINA; pintar();
+      limite = PAGINA; pintar();
     });
   }
   cbCli.addEventListener("change", carregarUsinas);

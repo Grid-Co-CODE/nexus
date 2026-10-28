@@ -46,7 +46,8 @@ def tradicional():
 @exige_sessao
 def api_catalogo():
     """A cascata do Step 1 em três pedidos: sem parâmetro → clientes; ?cliente= → usinas; ?cliente=&usina= → tipos + ativos
-    (o filtro por tipo e a busca são locais, em memória, como no app). ?recarregar=1 é o botão ↻ (load_assets_cached(force))."""
+    (o filtro por tipo e a busca são locais, em memória, como no app). ?recarregar=1 é o botão ↻ (load_assets_cached(force)).
+    ?cliente=&ativos=1 → as usinas e os ativos de todas elas (a Nova solicitação, numa leitura só)."""
     force = request.args.get("recarregar") == "1"
     assets = api.load_assets_cached(True) if force else api.load_assets_cached()
     cliente = (request.args.get("cliente") or "").strip()
@@ -56,6 +57,11 @@ def api_catalogo():
         frases = _memo(("frases_ativo",), 3600, lambda: ativo_curto.frases(api._read_asset_cache() or []))
         return jsonify({"cliente": cliente, "usina": usina, "tipos": trad.tipos_de(assets, cliente, usina),
                         "ativos": trad.ativos_de(assets, cliente, usina, frases=frases)})
+    if cliente and request.args.get("ativos") == "1":
+        # a Nova solicitação (28/10/2026): as usinas e os ativos do cliente de uma vez; a usina filtra na tela
+        frases = _memo(("frases_ativo",), 3600, lambda: ativo_curto.frases(api._read_asset_cache() or []))
+        return jsonify({"cliente": cliente, "usinas": trad.usinas_de(assets, cliente),
+                        "ativos": trad.ativos_do_cliente(assets, cliente, frases)})
     if cliente:
         return jsonify({"cliente": cliente, "usinas": trad.usinas_de(assets, cliente)})
     return jsonify({"clientes": trad.clientes(assets), "recarregado": force})

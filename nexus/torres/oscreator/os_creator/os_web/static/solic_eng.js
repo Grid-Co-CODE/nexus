@@ -1,5 +1,5 @@
 // os_creator/os_web/static/solic_eng.js — a Nova solicitação para a ENGENHARIA (Levi, 06/10/2026). Cascata cliente →
-// usina, TODOS os ativos da usina (filtro por texto e por tipo, com o nome no lugar da sigla), uma OS por ativo com
+// usina, os ativos da usina de 10 em 10 (filtro por texto e por tipo, com o nome no lugar da sigla), uma OS por ativo com
 // '[Ativo] - Descrição' — ou, desde 08/10, uma OS com todos os ativos, uma atividade por ativo —, o problema na
 // observação, os anexos (08/10), o responsável só entre os da Engenharia e a data programada de 7 dias (Urgente: 2), que
 // NÃO se edita: a tela só mostra, e o servidor calcula ao criar. As regras de verdade são do servidor (solic_eng_web.py)
@@ -31,6 +31,20 @@
   if (!NOVO) raiz.querySelectorAll('.eng-modo, .eng-anexos').forEach((x) => { x.hidden = true; });
   let ativos = [], pessoas = [], criando = false, arquivos = [];
   const marcados = new Set();
+  // a tabela de 10 em 10, como a Nova solicitação PCM (Levi, 28/10/2026: "tá mostrando todos os ativos de uma vez, o
+  // certo é de 10 em 10"): só a EXIBIÇÃO; o marcado fora da tela continua valendo, e o rodapé diz quantos são
+  const PAGINA = 10;
+  let limite = PAGINA;
+  function rodapeMais(rows, vis, estaMarcado, colunas) {
+    if (rows.length <= vis.length) return '';
+    const fora = rows.slice(vis.length).filter(estaMarcado).length, faltam = rows.length - vis.length;
+    return '<tr class="mais"><td colspan="' + colunas + '"><div class="mais-in">'
+      + '<span class="os-ajuda">Mostrando ' + vis.length + ' de ' + rows.length + ' ativos'
+      + (fora ? ' · <b>' + fora + ' marcado(s) fora da tela</b>' : '') + '</span>'
+      + '<button type="button" class="os-btn secondary mini" data-mais="' + PAGINA + '">Mostrar mais ' + Math.min(PAGINA, faltam) + '</button>'
+      + '<button type="button" class="os-btn secondary mini" data-mais="tudo">Mostrar todos (' + rows.length + ')</button>'
+      + '</div></td></tr>';
+  }
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const semAcento = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -71,7 +85,7 @@
       cbTipo.innerHTML = '<option value="">Todos os tipos</option>'
         + (j.tipos || []).map((t) => '<option value="' + esc(t.tipo) + '">' + esc(t.nome) + '</option>').join('');
       [busca, cbTipo, bAll, bNone].forEach((x) => { x.disabled = false; });
-      busca.value = '';
+      busca.value = ''; limite = PAGINA;
       pintar();
     } catch (e) { semAtivos('Não consegui carregar os ativos: ' + e.message); }
   }
@@ -86,9 +100,11 @@
     if (!ativos.length) tbody.innerHTML = '<tr class="vazio"><td colspan="3">Esta usina não tem ativos no catálogo.</td></tr>';
     else if (!vs.length) tbody.innerHTML = '<tr class="vazio"><td colspan="3">Nenhum ativo com esse filtro.</td></tr>';
     else {
-      tbody.innerHTML = vs.map((a) => '<tr data-id="' + esc(a.id) + '"' + (marcados.has(String(a.id)) ? ' class="sel"' : '') + '>'
+      const mostra = vs.slice(0, limite);
+      tbody.innerHTML = mostra.map((a) => '<tr data-id="' + esc(a.id) + '"' + (marcados.has(String(a.id)) ? ' class="sel"' : '') + '>'
         + '<td class="c-chk"><input type="checkbox"' + (marcados.has(String(a.id)) ? ' checked' : '') + ' aria-label="Marcar ' + esc(a.label) + '"></td>'
-        + '<td>' + esc(a.label) + '</td><td>' + esc(a.tipo_nome) + '</td></tr>').join('');
+        + '<td>' + esc(a.label) + '</td><td>' + esc(a.tipo_nome) + '</td></tr>').join('')
+        + rodapeMais(vs, mostra, (a) => marcados.has(String(a.id)), 3);
     }
     contar();
   }
@@ -104,6 +120,8 @@
       : 'O prefixo [Ativo] entra automático em cada ' + (agrupar() ? 'atividade.' : 'OS.');
   }
   tbody.addEventListener('click', (e) => {
+    const mais = e.target.dataset && e.target.dataset.mais;
+    if (mais) { limite = mais === 'tudo' ? Infinity : limite + PAGINA; pintar(); return; }
     const tr = e.target.closest('tr[data-id]');
     if (!tr) return;
     const ck = tr.querySelector('input[type=checkbox]');
@@ -115,8 +133,8 @@
   });
   bAll.addEventListener('click', () => { visiveis().forEach((a) => marcados.add(String(a.id))); pintar(); });
   bNone.addEventListener('click', () => { marcados.clear(); pintar(); });
-  busca.addEventListener('input', pintar);
-  cbTipo.addEventListener('change', pintar);
+  busca.addEventListener('input', () => { limite = PAGINA; pintar(); });
+  cbTipo.addEventListener('change', () => { limite = PAGINA; pintar(); });
   cbCli.addEventListener('change', trocarCliente);
   cbUsi.addEventListener('change', trocarUsina);
   edDesc.addEventListener('input', contar);
