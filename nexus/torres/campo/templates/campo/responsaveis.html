@@ -116,11 +116,13 @@
   {% set pf, ch, pt, rk, rd = painel.perf, painel.chamados, painel.pts, painel.ranking, painel.rondas %}
   {% set cor_situ = {'critico': 'cn-t-critico', 'alerta': 'cn-t-alerta', 'ok': 'cn-t-ok', 'sem_meta': 'mudo'} %}
   {% set barra_situ = {'critico': 'c', 'alerta': 'a', 'ok': 'o', 'sem_meta': 'n'} %}
-  {% macro ver(destino, txt='ver todas') %}<a class="pn-ver" href="{{ destino }}">{{ txt }}</a>{% endmacro %}
+  {# o endereço sai do url() aqui dentro, nunca pronto de fora: o Nexus mora debaixo do /nexus e o test_prefixo confere
+     que todo href passa pelo url()/raiz, o que um destino recebido pronto não deixa conferir #}
+  {% macro ver(txt='ver todas') %}<a class="pn-ver" href="{{ url(**kwargs) }}">{{ txt }}</a>{% endmacro %}
   {% macro idade(m) %}{% if m is none %}—{% elif m >= 1440 %}{{ m // 1440 }} d {{ (m % 1440) // 60 }} h{% elif m >= 60 %}{{ m // 60 }} h {{ m % 60 }} min{% else %}{{ m }} min{% endif %}{% endmacro %}
   <div class="pn">
     <section class="pn-q" aria-labelledby="pn-perf-t">
-      <header class="pn-cab"><h2 id="pn-perf-t"><i class="ph ph-chart-line-up" aria-hidden="true"></i>Usinas abaixo da performance</h2>{{ ver(url(modo='geral', filtro='perf.abaixo_meta', bloco=None, equipe=None)) }}</header>
+      <header class="pn-cab"><h2 id="pn-perf-t"><i class="ph ph-chart-line-up" aria-hidden="true"></i>Usinas abaixo da performance</h2>{{ ver(modo='geral', filtro='perf.abaixo_meta', bloco=None, equipe=None) }}</header>
       <div class="pn-num"><b class="{{ 'cn-t-critico' if pf.criticas else ('cn-t-alerta' if pf.abaixo else 'cn-t-ok') }}">{{ pf.abaixo }}</b>
         <span>de {{ pf.com_meta }} com meta abaixo de {{ limites.meta_ok }}%{% if pf.criticas %} · <b class="cn-t-critico">{{ pf.criticas }}</b> abaixo de {{ limites.meta_atencao }}%{% endif %}<small>meta do grupo no mês {{ pct(pf.meta_grupo, 1) }} · {{ pf.na_meta }} na meta{% if pf.sem_meta %} · {{ pf.sem_meta }} sem meta publicada{% endif %}</small></span></div>
       <ol class="pn-lista" tabindex="0" aria-label="Todas as usinas pela meta do mês, da pior para a melhor">
@@ -134,7 +136,7 @@
     </section>
 
     <section class="pn-q" aria-labelledby="pn-ch-t">
-      <header class="pn-cab"><h2 id="pn-ch-t"><i class="ph ph-lifebuoy" aria-hidden="true"></i>Chamados abertos</h2>{{ ver(url(modo='geral', filtro='acomp.chamados', bloco=None, equipe=None)) }}</header>
+      <header class="pn-cab"><h2 id="pn-ch-t"><i class="ph ph-lifebuoy" aria-hidden="true"></i>Chamados abertos</h2>{{ ver(modo='geral', filtro='acomp.chamados', bloco=None, equipe=None) }}</header>
       <div class="pn-num"><b class="{{ 'cn-t-alerta' if ch.abertos else 'cn-t-ok' }}">{{ ch.abertos }}</b>
         <span>em aberto com o fabricante{% if ch.abertos %} em {{ ch.usinas }} usina{{ 's' if ch.usinas != 1 }}{% endif %}<small>{{ ch.verificacao }} em verificação{% if ch.mais_antigo is not none %} · o mais antigo há {{ ch.mais_antigo }} dias{% endif %}</small></span></div>
       <ol class="pn-lista" tabindex="0" aria-label="Todos os chamados em aberto, o mais antigo primeiro">
@@ -147,7 +149,7 @@
     </section>
 
     <section class="pn-q" aria-labelledby="pn-pt-t">
-      <header class="pn-cab"><h2 id="pn-pt-t"><i class="ph ph-file-text" aria-hidden="true"></i>PTs pendentes</h2>{{ ver(url(modo='geral', filtro='acomp.pts', bloco=None, equipe=None)) }}</header>
+      <header class="pn-cab"><h2 id="pn-pt-t"><i class="ph ph-file-text" aria-hidden="true"></i>PTs pendentes</h2>{{ ver(modo='geral', filtro='acomp.pts', bloco=None, equipe=None) }}</header>
       <div class="pn-num"><b class="{{ 'cn-t-critico' if pt.paradas else ('cn-t-alerta' if pt.aguardando else 'cn-t-ok') }}">{{ pt.aguardando }}</b>
         <span>esperando o De acordo{% if pt.paradas %} · <b class="cn-t-critico">{{ pt.paradas }}</b> há mais de 2 h{% endif %}<small>{% if pt.agora %}{{ pt.agora }} parada{{ 's' if pt.agora != 1 }} hoje: técnico esperando agora{% else %}nenhum técnico parado hoje{% endif %}</small></span></div>
       <ol class="pn-lista" tabindex="0" aria-label="Todas as PT esperando o De acordo">
@@ -160,7 +162,7 @@
     </section>
 
     <section class="pn-q pn-q--largo" aria-labelledby="pn-rk-t">
-      <header class="pn-cab"><h2 id="pn-rk-t"><i class="ph ph-ranking" aria-hidden="true"></i>Ranking das equipes</h2>{{ ver(url(modo='ranking', equipe=None, filtro=None, bloco=None), 'ver o ranking') }}</header>
+      <header class="pn-cab"><h2 id="pn-rk-t"><i class="ph ph-ranking" aria-hidden="true"></i>Ranking das equipes</h2>{{ ver('ver o ranking', modo='ranking', equipe=None, filtro=None, bloco=None) }}</header>
       <p class="pn-nota">A nota do App em 30 dias, da maior para a menor; a posição é a do ranking de todas as {{ rk.total }} equipes.</p>
       <ol class="pn-lista pn-rk" tabindex="0" aria-label="Todas as equipes, da maior nota para a menor">
         {% for c in rk.equipes %}
@@ -175,7 +177,7 @@
     </section>
 
     <section class="pn-q" aria-labelledby="pn-rd-t">
-      <header class="pn-cab"><h2 id="pn-rd-t"><i class="ph ph-path" aria-hidden="true"></i>Acompanhamento de rondas</h2>{{ ver(url(modo='geral', filtro='acomp.rondas', bloco=None, equipe=None)) }}</header>
+      <header class="pn-cab"><h2 id="pn-rd-t"><i class="ph ph-path" aria-hidden="true"></i>Acompanhamento de rondas</h2>{{ ver(modo='geral', filtro='acomp.rondas', bloco=None, equipe=None) }}</header>
       {# a cor da cobertura é a régua das Rondas (o `cor_pct` do Painel delas: 80% ou mais verde, 50% ou mais âmbar) #}
       <div class="pn-num"><b class="{{ 'cn-t-neutro' if rd.em_dia_pct is none else ('cn-t-ok' if rd.em_dia_pct >= 80 else ('cn-t-alerta' if rd.em_dia_pct >= 50 else 'cn-t-critico')) }}">{{ rd.em_dia }}</b>
         <span>de {{ rd.usinas }} com ronda nos últimos 7 dias<small>{{ rd.sem_ronda }} sem ronda há 7 dias ou mais · {{ rd.nunca }} nunca teve{% if rd.longa %} · {{ rd.longa }} longa pendente{% endif %}</small></span></div>
