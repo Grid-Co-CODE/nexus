@@ -87,7 +87,7 @@ def inicio():
                            # a versão no ar: a hora do commit e desde quando está no ar; leva às Atualizações
                            # (casca/versao.py, 13/10/2026). Os pedidos presos saíram do cartão a pedido do Levi
                            # ("tire ... preso em 24hrs"): seguem no log, pelo casca/presos.py
-                           versao=versao.cartao(app), aba="inicio")
+                           versao=versao.cartao(app), aba="inicio", sug_abertas=_sugestoes_abertas())
 
 
 def _torres_da_pessoa() -> list:
@@ -98,7 +98,7 @@ def _torres_da_pessoa() -> list:
 
 
 # ── Sugestões (24/10/2026) ───────────────────────────────────────────────────────────────────────────────────────────
-_CHAVE_CODIGO, _CHAVE_AVISO = "sugestoes_codigo", "sugestoes_aviso"
+_CHAVE_CODIGO, _CHAVE_AVISO, _CHAVE_AVISO_STATUS = "sugestoes_codigo", "sugestoes_aviso", "sugestoes_aviso_status"
 
 
 def _codigo() -> str:
@@ -106,6 +106,22 @@ def _codigo() -> str:
     if not session.get(_CHAVE_CODIGO):
         session[_CHAVE_CODIGO] = secrets.token_urlsafe(24)
     return session[_CHAVE_CODIGO]
+
+
+def _email_da_sessao() -> str:
+    u = session.get("usuario")
+    return str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
+
+
+def _sugestoes_abertas():
+    """O número ao lado de "Sugestões" nas abas do Início (28/10/2026): as não concluídas (de todos, para o
+    administrador; as da pessoa, para ela). Nunca segura a página: sem a cópia, a aba sai sem número."""
+    from . import sugestoes as S
+    try:
+        return S.contador(bool(session.get("admin")), _email_da_sessao())
+    except Exception:            # noqa: BLE001 — o contador nunca derruba o Início
+        current_app.logger.exception("contador das sugestões")
+        return None
 
 
 def _sugestoes():
@@ -117,20 +133,38 @@ def _sugestoes():
         return _anexo_da_sugestao(S, admin)
     areas = {t.id: t.nome for t in _torres_da_pessoa()}
     erro, form = "", {}
+    # a troca do status vem pelo endereço (?acao=status), e não pelo corpo: ler o corpo antes da conta do tamanho do envio
+    # das sugestões tiraria dela a recusa do pedido grande sem ler
+    if request.method == "POST" and request.args.get("acao") == "status":
+        return _mudar_status_sugestao(S, admin)
     if request.method == "POST":
         erro, form = _enviar_sugestao(S, areas)
         if not erro:
             session[_CHAVE_AVISO] = "Sugestão enviada. Os administradores do Nexus recebem e leem por aqui."
             return redirect(url_for("casca.inicio", aba="sugestoes"))
     usuario = session.get("usuario") if isinstance(session.get("usuario"), dict) else {}
-    recebidas, erro_lista = [], ""
-    if admin:
-        todas = {t.id: t.nome for t in current_app.extensions["nexus_torres"]}
-        recebidas, erro_lista = S.lista(todas), S.ler()["erro"]
+    email = _email_da_sessao()
+    recebidas, minhas, erro_lista = [], [], ""
+    todas = {t.id: t.nome for t in current_app.extensions["nexus_torres"]}
+    if (admin or email) and not S.faltam_chaves():
+        lista = S.lista(todas)
+        erro_lista = S.ler()["erro"]
+        if admin:
+            # as que faltam concluir primeiro (a mais nova no alto), as concluídas depois
+            recebidas = sorted(lista, key=lambda x: x["status"] == "concluida")
+        # Minhas sugestões (28/10/2026, Levi: "Do lado direito tem um espaço para 'Minhas sugestões' - a pessoa consegue
+        # ver o que mandou e qual status está"): pelo código do e-mail, em claro no livro
+        if email:
+            from ..campo.ligacao_cadastro import codigo_da_pessoa
+            meu = (codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or "").lower()
+            minhas = [x for x in lista if meu and x["pessoa_hmac"] == meu]
     resp = render_template("sugestoes.html", aba="sugestoes", areas=areas, form=form, erro=erro,
                            aviso=session.pop(_CHAVE_AVISO, None), codigo=_codigo(), novo_id=S.novo_id(),
                            tem_login=bool(str(usuario.get("email") or "").strip()), faltam=S.faltam_chaves(),
-                           admin=admin, recebidas=recebidas, erro_lista=erro_lista, aceitos=S.aceitos(),
+                           admin=admin, recebidas=recebidas, minhas=minhas, erro_lista=erro_lista,
+                           aceitos=S.aceitos(), status_mudaveis=[(k, S.STATUS[k][0]) for k in S.STATUS_MUDAVEIS],
+                           aviso_status=session.pop(_CHAVE_AVISO_STATUS, None),
+                           sug_abertas=_sugestoes_abertas(),
                            max_mb=S.MAX_MB_ARQUIVO, max_arquivos=S.MAX_ARQUIVOS, max_total=S.MAX_MB_TOTAL,
                            titulo_max=S.TITULO_MAX, texto_max=S.TEXTO_MAX)
     return resp, (400 if erro else 200)
@@ -167,6 +201,31 @@ def _enviar_sugestao(S, areas: dict) -> tuple[str, dict]:
     return "", form
 
 
+def _mudar_status_sugestao(S, admin: bool):
+    """`POST /?aba=sugestoes` com `acao=status`: o administrador muda o status (Iniciada, Em verificação, Concluída). A
+    resposta volta à aba, com o aviso (deu certo ou não) no alto da lista."""
+    from ..torres.moldura import _de_outro_site
+    if not admin:
+        abort(403)
+    certo = session.get(_CHAVE_CODIGO) or ""
+    enviado = request.form.get("codigo") or ""
+    if _de_outro_site() or not certo or not hmac.compare_digest(enviado.encode(), certo.encode()):
+        session[_CHAVE_AVISO_STATUS] = ("erro", "O formulário venceu (a sessão mudou desde que a tela abriu): abra a aba "
+                                                "de novo. O status não mudou.")
+        return redirect(url_for("casca.inicio", aba="sugestoes"))
+    usuario = session.get("usuario") if isinstance(session.get("usuario"), dict) else {}
+    sid = request.form.get("sugestao")
+    try:
+        S.mudar_status(sid, request.form.get("status"), usuario)
+        session[_CHAVE_AVISO_STATUS] = ("ok", f"Status mudado para {S.STATUS[request.form.get('status')][0]}.")
+    except S.Recusada as ex:
+        session[_CHAVE_AVISO_STATUS] = ("erro", f"{ex}. O status não mudou.")
+    except Exception as ex:      # noqa: BLE001 — banco fora: a pessoa sabe que não foi
+        current_app.logger.exception("status da sugestão não gravado")
+        session[_CHAVE_AVISO_STATUS] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). O status não mudou.")
+    return redirect(url_for("casca.inicio", aba="sugestoes") + f"#sug-{sid}")
+
+
 def _anexo_da_sugestao(S, admin: bool):
     """`/?aba=sugestoes&anexo=<id>&n=<n>`: só o administrador baixa. Imagem abre no navegador; o resto baixa. Com
     `n=todos` (o "Baixar arquivos", 24/10/2026), todos os anexos da sugestão num .zip."""
@@ -201,7 +260,8 @@ def _atualizacoes():
     itens = versao.da_aba(historico)
     return render_template("atualizacoes.html", dias=versao.dias(itens), total=len(itens), tem_git=bool(historico),
                            janela=versao.JANELA_DIAS, no_ar=versao.local()["sha"],
-                           versao=versao.cartao(current_app._get_current_object()), aba="atualizacoes")
+                           versao=versao.cartao(current_app._get_current_object()), aba="atualizacoes",
+                           sug_abertas=_sugestoes_abertas())
 
 
 @bp.route("/tema", methods=["POST"])

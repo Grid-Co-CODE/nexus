@@ -429,6 +429,20 @@ server".
 - **Baixar arquivos** (24/10/2026, Levi: "gostaria a opção 'Baixar arquivos' baixa todos os arquivos da sugestão"):
   `/?aba=sugestoes&anexo=<id>&n=todos` devolve um .zip com todos os anexos (o nome original; repetido ganha " (2)"),
   chamado pelo título da sugestão. Montado na memória (15 MB no máximo); só o administrador; sem anexo, sem o botão.
+- **Status, Minhas sugestões e o contador** (28/10/2026, Levi: "Do lado direito tem um espaço para 'Minhas sugestões'";
+  "opção de mudar o status da solicitação: Iniciada, Em verificação e Conclusão"; "As sugestões recebidas devem ficar
+  recolhidas"; "um contador no cabeçalho ao lado de Sugestões mostrando quantas sugestões ainda não estão concluídas"):
+  - o status é a 2ª aba do livro, `fato_status_sugestao` (1 linha por mudança, só acrescenta, vale a última; sem linha =
+    **Nova**). Só o administrador muda, pelo `POST /?aba=sugestoes&acao=status` (a ação no endereço, e não no corpo: ler o
+    corpo antes tiraria do envio das sugestões a recusa do pedido grande sem ler). A mesma mudança repetida não grava.
+    **As duas abas vão juntas em toda gravação** (livro que só cresce recusa gravar sem uma aba que o banco tem);
+  - **Minhas sugestões**, à direita do formulário (embaixo no celular): as da pessoa pelo `pessoa_hmac` (o código do
+    e-mail, em claro no livro), com o status;
+  - as recebidas vêm **recolhidas** (`<details>`): a linha diz o status, o título, quem e quando; aberta, o texto, os
+    anexos e a troca do status. As que faltam concluir primeiro;
+  - o **contador** ao lado de "Sugestões" nas três abas do Início = as não concluídas: de todos para o administrador, as
+    da pessoa para ela. Sai da cópia de 1 minuto; velha ou ausente, a releitura vai **por trás** (`contador`) e a aba
+    sai sem número: o Início é a primeira página de todos e nunca espera o banco por causa dele.
 - **Prova**: `tests/test_casca_sugestoes_24_10.py`.
 
 ## Um cabeçalho só: quem entrou no topo do Nexus (13/10/2026)

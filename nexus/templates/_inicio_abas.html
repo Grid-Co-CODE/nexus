@@ -1,7 +1,8 @@
 {# as abas do Início: a visão geral, as Atualizações (13/10/2026: os últimos commits e o que mudou) e as Sugestões
-   (24/10/2026: a pessoa sugere, o administrador lê) #}
+   (24/10/2026: a pessoa sugere, o administrador lê). O número ao lado de Sugestões (28/10/2026) são as não concluídas:
+   de todos para o administrador, as da pessoa para ela; sem a leitura, a aba sai sem número #}
 <nav class="gc-subabas" aria-label="Início">
   <a href="{{ url_for('casca.inicio') }}"{% if aba == 'inicio' %} aria-current="page"{% endif %}>Visão geral</a>
   <a href="{{ url_for('casca.inicio', aba='atualizacoes') }}"{% if aba == 'atualizacoes' %} aria-current="page"{% endif %}>Atualizações</a>
-  <a href="{{ url_for('casca.inicio', aba='sugestoes') }}"{% if aba == 'sugestoes' %} aria-current="page"{% endif %}>Sugestões</a>
+  <a href="{{ url_for('casca.inicio', aba='sugestoes') }}"{% if aba == 'sugestoes' %} aria-current="page"{% endif %}>Sugestões{% if sug_abertas %} <span class="sug-contador" title="Sugestões ainda não concluídas">{{ sug_abertas }}</span>{% endif %}</a>
 </nav>

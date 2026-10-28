@@ -14,7 +14,9 @@
 {% if aviso %}<p class="sug-aviso sug-aviso--ok" role="status"><i class="ph ph-check-circle" aria-hidden="true"></i> {{ aviso }}</p>{% endif %}
 {% if erro %}<p class="sug-aviso sug-aviso--erro" role="alert"><i class="ph ph-warning" aria-hidden="true"></i> {{ erro }}</p>{% endif %}
 
-<section class="sug-bloco" aria-labelledby="sug-nova">
+{# o formulário à esquerda e, à direita, o que a pessoa já mandou com o status (28/10/2026) #}
+<div class="sug-topo">
+<section class="sug-bloco sug-nova" aria-labelledby="sug-nova">
   <h2 class="ui-kicker" id="sug-nova">Nova sugestão</h2>
   {% if faltam %}
   <p class="aviso">Este Nexus ainda não grava sugestões: faltam as chaves {{ faltam|join(', ') }} no .env do servidor.</p>
@@ -58,25 +60,52 @@
   {% endif %}
 </section>
 
+{% if tem_login %}
+<aside class="sug-minhas" aria-labelledby="sug-minhas-t">
+  {# Levi, 28/10/2026: "Do lado direito tem um espaço para 'Minhas sugestões' - a pessoa consegue ver o que mandou e
+     qual status está" #}
+  <h2 class="ui-kicker" id="sug-minhas-t">Minhas sugestões{% if minhas %} ({{ minhas|length }}){% endif %}</h2>
+  {% if minhas %}
+  <ol class="sug-minhas-lista">
+    {% for m in minhas %}
+    <li><div class="sug-minhas-cab"><span class="gc-status gc-status--{{ m.status_tom }}">{{ m.status_rotulo }}</span>
+        <span class="sug-quando">{{ m.quando_txt }}</span></div>
+      <p class="sug-minhas-titulo">{{ m.titulo or 'Sem o título (texto ilegível)' }}</p>
+      {% if m.area %}<span class="atu-area">{{ m.area_nome }}</span>{% endif %}
+      {% if m.status_em_txt %}<p class="mudo sug-minhas-st">{{ m.status_rotulo }} em {{ m.status_em_txt }}</p>{% endif %}</li>
+    {% endfor %}
+  </ol>
+  {% elif not faltam %}
+  <p class="mudo">Você ainda não mandou nenhuma sugestão. Ela aparece aqui com o status: Nova, Iniciada, Em verificação ou Concluída.</p>
+  {% endif %}
+</aside>
+{% endif %}
+</div>
+
 {% if admin %}
 <section class="sug-bloco" aria-labelledby="sug-recebidas">
   <h2 class="ui-kicker" id="sug-recebidas">Sugestões recebidas{% if recebidas %} ({{ recebidas|length }}){% endif %}</h2>
-  <p class="gc-ajuda sug-so-admin">Só os administradores veem esta lista.</p>
+  <p class="gc-ajuda sug-so-admin">Só os administradores veem esta lista. As que faltam concluir vêm primeiro; clique numa para abrir.</p>
+  {% if aviso_status %}<p class="sug-aviso sug-aviso--{{ aviso_status[0] }}" role="{{ 'status' if aviso_status[0] == 'ok' else 'alert' }}"><i class="ph {{ 'ph-check-circle' if aviso_status[0] == 'ok' else 'ph-warning' }}" aria-hidden="true"></i> {{ aviso_status[1] }}</p>{% endif %}
   {% if erro_lista %}<p class="sug-aviso sug-aviso--erro">Não consegui ler as sugestões do banco agora ({{ erro_lista }}){% if recebidas %}: a lista é a da última leitura{% endif %}.</p>{% endif %}
   {% if not recebidas and not erro_lista %}
   <p class="aviso">Nenhuma sugestão ainda.</p>
   {% else %}
+  {# recolhidas (28/10/2026, Levi: "As sugestões recebidas devem ficar recolhidas"): a linha diz o status, o título, quem
+     pediu e quando; ao abrir, o texto, os anexos e a troca do status #}
   <ol class="sug-lista">
     {% for s in recebidas %}
-    <li class="sug-item">
-      <div class="sug-cab">
-        <span class="sug-quem">{{ s.nome or 'Sem o nome (texto ilegível)' }}</span>
-        {% if s.email %}<span class="mudo">{{ s.email }}</span>{% endif %}
+    <li class="sug-item" id="sug-{{ s.id }}"><details class="sug-dobra">
+      <summary class="sug-cab">
+        <span class="gc-status gc-status--{{ s.status_tom }}">{{ s.status_rotulo }}</span>
+        <span class="sug-resumo-titulo">{{ s.titulo or 'Sem o título (texto ilegível)' }}</span>
+        <span class="sug-quem">{{ s.nome }}</span>
         {% if s.area %}<span class="atu-area">{{ s.area_nome }}</span>{% endif %}
         <span class="sug-quando">{{ s.quando_txt }}</span>
-      </div>
+      </summary>
+      <div class="sug-corpo">
       {% if s.legivel %}
-      <p class="sug-titulo">{{ s.titulo }}</p>
+      {% if s.email %}<p class="mudo sug-email">{{ s.email }}</p>{% endif %}
       <p class="sug-texto">{{ s.descricao }}</p>
       {% if s.anexos %}
       <ul class="sug-anexos" aria-label="Anexos">
@@ -93,7 +122,20 @@
       {% else %}
       <p class="mudo">O texto desta sugestão não abriu (a chave do cadastro deste Nexus não é a que gravou).</p>
       {% endif %}
-    </li>
+      {# o status (28/10/2026, Levi: "deve ter a opção de mudar o status da solicitação: Iniciada, Em verificação e
+         Conclusão") #}
+      <form class="sug-status" method="post" action="{{ url_for('casca.inicio', aba='sugestoes', acao='status') }}">
+        <input type="hidden" name="codigo" value="{{ codigo }}">
+        <input type="hidden" name="sugestao" value="{{ s.id }}">
+        <label class="gc-rotulo" for="st-{{ s.id }}">Status</label>
+        <select class="gc-campo" id="st-{{ s.id }}" name="status">
+          {% for k, rot in status_mudaveis %}<option value="{{ k }}"{% if k == s.status %} selected{% endif %}>{{ rot }}</option>{% endfor %}
+        </select>
+        <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Salvar</button>
+        {% if s.status_em_txt %}<span class="mudo">{{ s.status_rotulo }} em {{ s.status_em_txt }}{% if s.status_por %} por {{ s.status_por }}{% endif %}</span>{% endif %}
+      </form>
+      </div>
+    </details></li>
     {% endfor %}
   </ol>
   {% endif %}

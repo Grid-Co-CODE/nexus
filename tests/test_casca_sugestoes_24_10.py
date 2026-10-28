@@ -222,7 +222,11 @@ def test_as_tres_abas_do_inicio_e_o_post_so_na_de_sugestoes(app, banco, dados):
 
 def test_o_livro_esta_no_catalogo_antes_da_1a_gravacao():
     l = catalogo.LIVRO_POR_NOME[S.LIVRO]
-    assert l.abas == (S.ABA,) and l.so_cresce == (S.ABA,) and not l.no_banco
+    # 28/10/2026: a 2ª aba, a do status, registrada antes da 1ª mudança; o livro já existe (a 1ª sugestão foi mandada)
+    assert l.abas == (S.ABA, S.ABA_STATUS) and l.so_cresce == (S.ABA, S.ABA_STATUS) and l.no_banco
+    st = catalogo.POR_ID["status_sugestao"]
+    assert st.livro == f"{S.LIVRO} · {S.ABA_STATUS}" and st.chave == ("id",) and st.chave[0] == S.CAB_STATUS[0]
+    assert "status_sugestao" in explica.RESUMO and "status_sugestao" in explica.PARA_QUE
     f = catalogo.POR_ID["sugestao"]
     assert f.livro == f"{S.LIVRO} · {S.ABA}" and f.chave == ("id",) and f.tipo == "sem_medida"
     assert f.chave[0] == S.CAB[0] and "pessoa_id" in S.CAB and "data_id" in S.CAB
@@ -260,3 +264,105 @@ def test_sugestao_sem_anexo_nao_mostra_baixar_arquivos(app, banco, dados):
     assert "Filtro por usina no relatório" in html and "Baixar arquivos" not in html
     sid = banco.linhas(S.LIVRO, S.ABA)[0]["id"]
     assert adm.get(f"{URL}&anexo={sid}&n=todos").status_code == 404
+
+
+
+# ── 28/10/2026: o status, as Minhas sugestões, a lista recolhida e o contador ──────────────────────────────────────────
+ADMIN = {"email": "chefe@exemplo.test", "nome": "Chefe de Teste"}
+OUTRA = {"email": "beltrana@exemplo.test", "nome": "Beltrana de Teste", "perfil": ""}
+
+
+def _admin(app):
+    app.config["NEXUS_ADMINS"] = ADMIN["email"]       # o portão segue a lista de administradores a cada pedido
+    return _cliente(app, admin=True, usuario=ADMIN)
+
+
+def _mandar(c, titulo, novo_id):
+    assert c.post(URL, data=_form(c, titulo=titulo, novo_id=novo_id)).status_code == 302
+
+
+def _status(c, sid, status, **kw):
+    return c.post(URL + "&acao=status", data=dict({"codigo": _codigo(c), "sugestao": sid, "status": status}, **kw))
+
+
+def test_o_administrador_muda_o_status_e_a_pessoa_ve_em_minhas_sugestoes(app, banco, dados):
+    """Levi, 28/10/2026: "No sugestões recebidas deve ter a opção de mudar o status da solicitação: Iniciada, Em
+    verificação e Conclusão" e "Do lado direito tem um espaço para 'Minhas sugestões'"."""
+    c = _cliente(app)
+    _mandar(c, "Primeira ideia", "s00000000001")
+    _mandar(c, "Segunda ideia", "s00000000002")
+    _mandar(_cliente(app, usuario=OUTRA), "Ideia da outra", "s00000000003")
+    adm = _admin(app)
+    r = _status(adm, "s00000000001", "verificacao")
+    assert r.status_code == 302 and r.headers["Location"].endswith("#sug-s00000000001")
+    linhas = banco.linhas(S.LIVRO, S.ABA_STATUS)
+    assert [(l["sugestao_id"], l["status"]) for l in linhas] == [("s00000000001", "verificacao")]
+    assert linhas[0]["pessoa_hmac"] and "Chefe" not in str(linhas[0])                # quem mudou, só cifrado
+    assert len(banco.linhas(S.LIVRO, S.ABA)) == 3                                     # as sugestões ficaram
+    _status(adm, "s00000000001", "verificacao")                                       # a mesma de novo: não grava
+    assert len(banco.linhas(S.LIVRO, S.ABA_STATUS)) == 1
+    _status(adm, "s00000000001", "concluida")
+    assert [l["status"] for l in banco.linhas(S.LIVRO, S.ABA_STATUS)] == ["verificacao", "concluida"]
+    # a pessoa vê as dela, com o status; não vê a da outra pessoa
+    html = c.get(URL).get_data(as_text=True)
+    minhas = html.split('class="sug-minhas"', 1)[1].split("</aside>", 1)[0]
+    assert "Primeira ideia" in minhas and "Segunda ideia" in minhas and "Ideia da outra" not in minhas
+    assert "Concluída" in minhas and "Nova" in minhas
+    assert "Sugestões recebidas" not in html
+
+
+def test_a_lista_recebida_vem_recolhida_e_a_concluida_por_ultimo(app, banco, dados):
+    c = _cliente(app)
+    _mandar(c, "Ideia antiga", "s00000000001")
+    _mandar(c, "Ideia concluida", "s00000000002")
+    adm = _admin(app)
+    _status(adm, "s00000000002", "concluida")
+    html = adm.get(URL).get_data(as_text=True)
+    lista = html.split('class="sug-lista"', 1)[1].split("</ol>", 1)[0]
+    assert '<details class="sug-dobra">' in lista and "<details class=\"sug-dobra\" open" not in lista
+    assert lista.index("Ideia antiga") < lista.index("Ideia concluida")
+    assert 'action="/?aba=sugestoes&amp;acao=status"' in lista and 'name="status"' in lista
+    assert "Status mudado para Concluída" in html                              # o aviso da troca, uma vez
+    assert "Status mudado" not in adm.get(URL).get_data(as_text=True)
+
+
+def test_so_o_administrador_muda_e_o_formulario_vencido_nao_grava(app, banco, dados):
+    c = _cliente(app)
+    _mandar(c, "Ideia", "s00000000001")
+    assert _status(c, "s00000000001", "concluida").status_code == 403
+    adm = _admin(app)
+    _status(adm, "s00000000001", "concluida", codigo="velho")
+    _status(adm, "s00000000001", "inventado")
+    _status(adm, "s99999999999", "concluida")
+    assert banco.linhas(S.LIVRO, S.ABA_STATUS) == []
+    html = adm.get(URL).get_data(as_text=True)
+    assert "O status não mudou" in html
+
+
+def test_o_contador_ao_lado_de_sugestoes(app, banco, dados):
+    """Levi, 28/10/2026: "Tem que ter um contador no cabeçalho ao lado de Sugestões mostrando quantas sugestões ainda
+    não estão concluídas!". O administrador conta todas; a pessoa, as dela."""
+    c = _cliente(app)
+    _mandar(c, "Uma", "s00000000001")
+    _mandar(c, "Duas", "s00000000002")
+    _mandar(_cliente(app, usuario=OUTRA), "Da outra", "s00000000003")
+    adm = _admin(app)
+    _status(adm, "s00000000001", "concluida")
+    S.limpar()
+
+    def numero(cli, url="/"):
+        nav = cli.get(url).get_data(as_text=True).split('class="gc-subabas"', 1)[1].split("</nav>", 1)[0]
+        return nav.split('class="sug-contador"', 1)[1].split(">", 1)[1].split("<", 1)[0] if "sug-contador" in nav else None
+    assert numero(adm) == "2" and numero(adm, "/?aba=atualizacoes") == "2" and numero(adm, URL) == "2"
+    assert numero(c) == "1"                                       # só a dela que falta concluir
+    _status(adm, "s00000000002", "concluida")
+    S.limpar()
+    assert numero(c) is None                                      # tudo concluído: sem número
+    assert S.abertas({"linhas": [{"id": "s00000000009"}], "status": []}) == 1
+
+
+def test_o_contador_nunca_segura_o_inicio_sem_banco(app, logado):
+    """Sem o banco falso no teste (e, no servidor, sem a cópia), a aba sai sem número e o Início abre."""
+    S.limpar()
+    r = logado.get("/")
+    assert r.status_code == 200 and "sug-contador" not in r.get_data(as_text=True)

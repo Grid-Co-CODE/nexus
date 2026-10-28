@@ -20,6 +20,7 @@ RESUMO = {
     "observacao_responsavel": "A observação do Responsável O&M sobre a usina, com dia e hora",
     "evento_ocorrencia": "Cada ocorrência das usinas, o plano de ação e o andamento",
     "sugestao": "As sugestões que as pessoas mandam para melhorar o Nexus",
+    "status_sugestao": "Cada mudança de status das sugestões, de Iniciada a Concluída",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
@@ -107,6 +108,9 @@ PARA_QUE = {
     "observacao_responsavel": "Guarda o que o Responsável O&M escreveu sobre a usina na Visão do responsável, com o dia "
                               "e a hora e se ele cobria outro responsável (férias). O texto e o nome vão cifrados; "
                               "serve para juntar as observações nos relatórios.",
+    "status_sugestao": "Guarda cada vez que um administrador mudou o status de uma sugestão (Iniciada, Em "
+                       "verificação ou Concluída), com o dia e a hora. Serve para a pessoa acompanhar em Minhas "
+                       "sugestões e para contar as que ainda não foram concluídas.",
     "sugestao": "Guarda cada sugestão que alguém mandou pelo Início → Sugestões: o título, a descrição, a área do "
                 "Nexus a que se refere e os anexos, com o dia e quem mandou. O texto e quem mandou vão cifrados; os "
                 "administradores leem a lista na mesma aba.",
