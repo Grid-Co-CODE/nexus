@@ -22,6 +22,12 @@
    com ela, fica a lista direta de antes (08/10/2026) #}
 {% set grupos = acoes_grupos_tarefas(d) if acoes_grupos_tarefas is defined else [] %}
 {% set n_tarefas = grupos|selectattr('n')|list|length %}
+{# a OS de VÁRIOS ATIVOS (Levi, 28/10/2026: "quando a OS tem mais de um ativo e eu abro o card da OS não diferencia. Tem que
+   dar para ver as subtarefas por ativo"): a "Verificação de Tracker Parado" em dois trackers tinha o mesmo título nas
+   duas tarefas, o ativo pequeno embaixo e as subtarefas fechadas. Com mais de um ativo, cada tarefa abre pelo ATIVO, o
+   banner diz quais, e até 4 ativos as subtarefas já vêm abertas (13 abertas virariam uma página só de checklist) #}
+{% set ativos_os = grupos|selectattr('n')|map(attribute='ativo')|select|unique|list %}
+{% set por_ativo = ativos_os|length > 1 %}
 {% set rotulo = acoes_rotulos_tarefas(d) if grupos and acoes_rotulos_tarefas is defined else {} %}
 {% macro subtarefa(s) %}<details class="det-sub{% if s.feito %} feito{% endif %}"{% if s.id_form_item %} data-fid="{{ s.id_form_item }}"{% endif %}>
       <summary><span class="det-chk">{% if s.feito %}✓{% endif %}</span><span class="det-sub-t">{{ s.descricao }}</span>{% if s.tipo %}<span class="det-kind">{{ s.tipo }}</span>{% endif %}<span class="det-chev">›</span></summary>
@@ -42,8 +48,9 @@
     <div class="os-resultado acoes-msg" data-msg hidden></div>
     <div class="det-card det-banner">
       <span class="det-ico-sq v">{{ icone('clipboard', '#A6E22E', 22) }}</span>
-      <span class="det-banner-t">{{ d.ativo or '—' }}</span>
-      {% if d.code %}<span class="det-banner-code">{{ d.code }}</span>{% endif %}
+      {% if por_ativo %}<span class="det-banner-t">{{ ativos_os|length }} ativos: {{ ativos_os|join(' · ') }}</span>
+      {% else %}<span class="det-banner-t">{{ d.ativo or '—' }}</span>
+      {% if d.code %}<span class="det-banner-code">{{ d.code }}</span>{% endif %}{% endif %}
     </div>
 
     <div class="det-cols">
@@ -85,13 +92,14 @@
        subtarefas DELA — o seletor de tarefa do app (steps/os_detalhe.py), em lista. <details>: o clique, o Enter e o Espaço
        abrem, sem JS. A barra e o "X de Y" são da OS inteira, cada subtarefa uma vez. Com uma tarefa só, a lista direta. #}
     {% if grupos %}
-    <div class="det-sec-line"><span class="det-sec">TAREFAS ({{ n_tarefas }})</span><span class="det-ajuda">clique na tarefa para ver as subtarefas dela</span><span class="os-cresce"></span>
+    <div class="det-sec-line">{% if por_ativo %}<span class="det-sec">SUBTAREFAS POR ATIVO ({{ n_tarefas }})</span><span class="det-ajuda">clique no ativo para abrir ou fechar as subtarefas dele</span>{% else %}<span class="det-sec">TAREFAS ({{ n_tarefas }})</span><span class="det-ajuda">clique na tarefa para ver as subtarefas dela</span>{% endif %}<span class="os-cresce"></span>
       <span class="det-pill-ok">{{ n_feitas }} de {{ n_sub }} subtarefas concluídas</span></div>
     <div class="det-prog"><div class="det-prog-f{% if n_sub and not completo %} parcial{% endif %}" style="width:{{ pct }}%"></div></div>
     {% for g in grupos %}
-    <details class="det-tarefa{% if g.total and g.feitas == g.total %} feito{% endif %}" data-tarefa="{% if g.n %}{{ g.id if g.id is not none else '' }}{% else %}sem-tarefa{% endif %}">
+    <details class="det-tarefa{% if g.total and g.feitas == g.total %} feito{% endif %}" data-tarefa="{% if g.n %}{{ g.id if g.id is not none else '' }}{% else %}sem-tarefa{% endif %}"{% if por_ativo and ativos_os|length <= 4 %} open{% endif %}>
       <summary><span class="det-tarefa-n">{{ g.n or '—' }}</span>
-        <span class="det-tarefa-t"><b>{{ g.titulo }}</b>{% if g.ativo and g.ativo != g.titulo %}<small>{{ g.ativo }}</small>{% endif %}</span>
+        {% if por_ativo and g.ativo %}<span class="det-tarefa-t"><b>{{ g.ativo }}</b>{% if g.titulo != g.ativo %}<small>{{ g.titulo }}</small>{% endif %}</span>
+        {% else %}<span class="det-tarefa-t"><b>{{ g.titulo }}</b>{% if g.ativo and g.ativo != g.titulo %}<small>{{ g.ativo }}</small>{% endif %}</span>{% endif %}
         {% if g.n %}<span class="det-situ {{ g.sit }}">{{ g.situacao }}</span>{% endif %}
         <span class="det-tarefa-c{% if g.total and g.feitas == g.total %} ok{% elif g.feitas %} parcial{% endif %}">{% if g.total %}{{ g.feitas }} de {{ g.total }} concluídas{% else %}sem subtarefas{% endif %}</span>
         <span class="det-chev">›</span></summary>

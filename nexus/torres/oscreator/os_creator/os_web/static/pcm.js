@@ -366,6 +366,7 @@
   $('b_data').onclick = () => { const d = bulkDate.value; if (d) editores((v) => d + v.slice(10)); };
   $('b_manha').onclick = () => editores((v) => v.slice(0, 10) + 'T07:00');
   $('b_tarde').onclick = () => editores((v) => v.slice(0, 10) + 'T13:00');
+  $('b_noite').onclick = () => editores((v) => v.slice(0, 10) + 'T17:00');
   $('b_mes').onclick = () => editores(maisUmMes);
   bulkDate.addEventListener('change', () => { if (bulkDate.value) ultimaData = bulkDate.value; else bulkDate.value = ultimaData; });
 

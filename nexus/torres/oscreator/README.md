@@ -550,7 +550,12 @@ as subtarefas e não aparecendo as tarefas, tem que dividir por tarefa quando cl
     número, o título, o ativo, a situação e "x de y concluídas". O clique, o Enter ou o Espaço abrem as subtarefas DELA,
     com o tipo, a programada e a execução da tarefa. É `<details>`, sem JS. A barra e o "x de y subtarefas concluídas"
     contam a OS inteira, e o rodapé diz "N subtarefa(s) em M tarefas". A tabela solta saiu. Com uma tarefa só, nada
-    mudou;
+    mudou. **Com mais de um ativo (28/10/2026)**, a seção vira "SUBTAREFAS POR ATIVO (n)" e cada linha abre pelo ATIVO,
+    com o título embaixo; o banner do topo diz "N ativos: …"; até 4 ativos as subtarefas de cada um já vêm abertas
+    (Levi: "quando a OS tem mais de um ativo e eu abro o card da OS não diferencia. Tem que dar para ver as subtarefas por
+    ativo", a "Verificação de Tracker Parado" em dois trackers, o mesmo título nas duas tarefas). Várias tarefas no mesmo
+    ativo seguem pela tarefa. Prova: `tests/test_oscreator_card_por_ativo_28_10.py`; conferido no Chrome sem janela a
+    1280 px e numa moldura de 375 px (escuro e claro, 375 de 375 sem rolagem);
   - a situação sai das datas de execução que o card já lê (`os_acoes_web.situacao_tarefa`): com fim, Finalizada (verde);
     só com início, Iniciada (âmbar); sem as duas, Não iniciada (cinza). O `task_status` do REST não foi usado porque
     não se sabe se o RPC do card o traz;
@@ -1061,6 +1066,13 @@ inversor ficará Inversor 1.1 ...)] - Título"; "5 - Abaixo de classificação a
   no Passo 2; a conferência; o pedido com a OS pai, o técnico e a etiqueta; a tela zerada depois; as travas (sem técnico;
   OS pai digitada e não escolhida); "[Usina] - Limpeza da subestação"; sem rolagem lateral. No oem, o
   `test_os_web_tradicional.py` cobra os textos novos (cópia de trabalho; sem commit lá).
+
+## Clonagem de planos: a Noite (17:00) na programação em massa (28/10/2026)
+
+Levi: "Em OS Creator > PCM > Clonagem de Planos > Em 'Plano de tarefas' quero a opção Noite 17:00". Na "Programação em
+massa" do card Plano de tarefas (`pcm.html`, `/os/pcm`), ao lado de Manhã (07:00) e Tarde (13:00): o botão Noite (17:00)
+põe 17:00 em todas as linhas marcadas e mantém o dia de cada uma (`pcm.js`, o mesmo `editores` dos outros dois). O app de
+mesa não tem o botão. Prova: `tests/test_oscreator_card_por_ativo_28_10.py::test_a_clonagem_de_planos_tem_a_noite_17h`.
 
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 
