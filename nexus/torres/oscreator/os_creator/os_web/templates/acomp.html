@@ -3,7 +3,7 @@
 {% block body_class %}os-form cham{% endblock %}
 {% block head %}<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/os/static/chamados.css">{% endblock %}
+<link rel="stylesheet" href="{{ estatico('chamados.css') }}">{% endblock %}
 {% block conteudo %}
 {# O quadro da equipe de chamados (Levi, 27/09/2026 — 3ª rodada, aprovada: escuro navy, limpo, com o topo numa linha só e a
    faixa de números baixa; a clara "ficou muito branco" e a parte de cima "ocupava boa parte da tela"). As colunas saem da
@@ -113,4 +113,4 @@
   {% if q.canceladas or q.antigas %}<p class="rodape">{% if q.canceladas %}{{ q.canceladas }} cancelada{{ '' if q.canceladas == 1 else 's' }} fora do quadro{% endif %}{% if q.canceladas and q.antigas %} · {% endif %}{% if q.antigas %}{{ q.antigas }} finalizada{{ '' if q.antigas == 1 else 's' }} há mais de 90 dias{% endif %}.</p>{% endif %}
 </section>
 {% endblock %}
-{% block scripts %}<script src="/os/static/acomp.js"></script>{% endblock %}
+{% block scripts %}<script src="{{ estatico('acomp.js') }}"></script>{% endblock %}

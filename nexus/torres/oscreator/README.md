@@ -1574,3 +1574,7 @@ quem pode: "qualquer um que é ADM ou do setor de chamados".
   botões.
 - Prova: `tests/test_oscreator_garantias_obs_29_10.py`. Na bancada: editar (o texto novo e a marca "editada") e excluir
   (some da tela, as duas linhas gravadas no banco falso), a 1440 e a 375 px.
+- **Os arquivos da tela com a versão no endereço** (`estatico()`, um global do Jinja em `os_web/__init__.py`): o
+  `acomp.js`, o `chamados.css` e o `os_acoes.*` das telas de Garantias vão com `?v=<a hora em que o arquivo mudou>`. O
+  /os/static sai sem prazo de cache e o navegador chutava um: em 29/10/2026 o editar e o excluir subiram e a tela do Levi
+  seguiu com o acomp.js de antes até o Ctrl+Shift+R. Tela nova com JavaScript que muda, use `estatico()`.

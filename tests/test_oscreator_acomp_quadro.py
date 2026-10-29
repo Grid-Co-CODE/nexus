@@ -139,7 +139,8 @@ def test_o_quadro_mantem_o_que_os_filtros_e_o_clique_usam(quadro):
     assert 'data-f="equipe"' not in quadro
     # o Limpar filtros saiu em 28/10/2026 (Levi: "Tire o botão de limpar filtros"); o Atualizar fica
     assert "data-limpar" not in quadro and 'href="/os/chamados/acompanhamento?atualizar=1"' in quadro
-    assert '<script src="/os/static/acomp.js"></script>' in quadro
+    # com a versão no endereço desde 29/10/2026 (o navegador reusava o acomp.js de antes)
+    assert re.search(r'<script src="/os/static/acomp\.js\?v=\d+"></script>', quadro)
     # a faixa de números ficou como estava (é a que o Levi gosta)
     assert '<div class="lbl">Sem ticket</div><div class="linha"><span class="val r">3</span>' in quadro
     assert 'a mais antiga: <b>9103</b>, 7 dias' in quadro

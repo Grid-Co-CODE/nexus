@@ -65,6 +65,17 @@ def criar_app(segredo: str | None = None, testing: bool = False) -> Flask:
             for k in [k for k in _rotas._MEMO if isinstance(k, tuple) and k and k[0] in ("cat", "solic_cat")]:
                 _rotas._MEMO.pop(k, None)
     app.jinja_env.filters["iniciais"] = lancador.iniciais
+
+    def estatico(nome: str) -> str:
+        """O endereço do arquivo de /os/static com a versão (a hora em que ele mudou no disco). Sem ela o navegador usa a
+        cópia de antes por horas (o arquivo vai sem prazo de cache, e ele chuta um): em 29/10/2026 o editar e o excluir
+        das observações de Garantias subiram e a tela seguiu com o acomp.js de antes."""
+        try:
+            v = int(os.path.getmtime(os.path.join(_AQUI, "static", nome)))
+        except OSError:
+            v = 0
+        return "/os/static/%s?v=%d" % (nome, v)
+    app.jinja_env.globals["estatico"] = estatico
     app.jinja_env.globals.update(icone=lancador.icone, abas=lancador.ABAS, abas_secoes=lancador.ABAS_SECOES,
                                  icone_secao=lancador.ICONE_SECAO)
     app.register_blueprint(bp)

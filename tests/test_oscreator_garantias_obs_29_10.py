@@ -192,3 +192,15 @@ def test_a_ponte_so_le_o_setor_na_tela_do_chamado_e_no_editar_excluir():
                          ("chamados/acompanhamento/estado", False), ("api/acomp/9101/obs", False),
                          ("api/acomp/9101/ticket", False)):
         assert bool(ponte._ROTA_OBS.fullmatch(resto)) is marca, resto
+
+
+def test_a_tela_pede_os_arquivos_com_a_versao(tela):
+    """Em 29/10/2026 o editar e o excluir subiram e a tela seguiu com o acomp.js de antes (o navegador reusava a cópia):
+    o endereço leva a hora em que o arquivo mudou, e o arquivo novo é outro endereço."""
+    import re
+    c, _ = tela
+    h = _pagina(c)
+    for nome in ("acomp.js", "chamados.css", "os_acoes.js", "os_acoes.css"):
+        assert re.search(r'/os/static/%s\?v=\d{9,}"' % re.escape(nome), h), nome
+    q = c.get("/os/chamados/acompanhamento").get_data(as_text=True)
+    assert re.search(r'/os/static/acomp\.js\?v=\d{9,}"', q) and re.search(r'/os/static/chamados\.css\?v=\d{9,}"', q)
