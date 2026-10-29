@@ -56,6 +56,13 @@ def test_performance_traz_todas_as_usinas_da_pior_para_a_melhor():
     com_valores = dict(USINAS[1], perf={"nivel": "ok", "valores": {"pr": {"cls": "alerta"}, "disp": {"cls": "ok"}}})
     linha = P.performance([com_valores])["linhas"][0]
     assert (linha["pr_cls"], linha["disp_cls"]) == ("alerta", "ok")
+    # a última sujidade e vegetação (29/10/2026: "em performance mostre última sujidade e vegetação de todas as
+    # usinas"), na régua das Rondas: o 5 crítico, o 4 atenção, abaixo sem alerta; sem leitura, neutro
+    com_limpeza = dict(USINAS[1], limpeza={"sujidade": 5, "vegetacao": 2, "data": "2026-10-15"})
+    linha = P.performance([com_limpeza])["linhas"][0]
+    assert (linha["sujidade"], linha["sujidade_cls"], linha["vegetacao"], linha["vegetacao_cls"]) == (5, "critico", 2, "ok")
+    assert linha["limpeza_data"] == "2026-10-15" and P._cls_nivel("vegetacao", 4) == "alerta"
+    assert (p["linhas"][0]["sujidade"], p["linhas"][0]["sujidade_cls"]) == (None, "neutro")
 
 
 def test_chamados_por_usina_o_mais_antigo_primeiro_com_o_ativo_e_o_status():
@@ -175,6 +182,7 @@ def test_a_tela_do_painel_do_responsavel(tela, logado):
     i = html.index('id="pn-perf-t"')
     perf = html[i:html.index("</section>", i)]
     assert 'class="pn-num pn-num--linha"' in perf and "meta do grupo no mês</span>" in perf and "na meta</span>" in perf
+    assert "<span>Disponibilidade</span><span>Sujidade</span><span>Vegetação</span>" in perf     # depois da disp.
     # as Rondas no mesmo formato ("faça algo parecido com a parte de rondas"), os números na linha de baixo
     i = html.index('id="pn-rd-t"')
     rondas = html[i:html.index("</section>", i)]
