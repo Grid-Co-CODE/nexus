@@ -435,7 +435,8 @@ def api_alvo(aid):
 @bp.route("/api/performance/plano")
 @exige_sessao
 def api_plano():
-    plan = api.get_plan_details(request.args.get("id_task"), request.args.get("id_item"))
+    # o tipo de tarefa que a OS vai levar (a Inspeção Geral do Inversor sai Corretiva, 29/10/2026), e não o do plano
+    plan = api.com_tipo_da_tarefa(api.get_plan_details(request.args.get("id_task"), request.args.get("id_item")))
     return jsonify({"resumo": perf_web.resumo_plano(plan)})
 
 

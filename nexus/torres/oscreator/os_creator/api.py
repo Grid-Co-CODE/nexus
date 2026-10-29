@@ -3580,6 +3580,24 @@ SUBTAREFAS_EXTRA = {
 }
 _TIPO_ITEM_DESC = {1: "TEXT", 2: "BOOLEAN", 3: "NUMBER", 4: "CHECK", 7: "DROPDOWN"}
 
+# ── O TIPO DE TAREFA que o app põe no lugar do tipo do plano (Levi, 29/10/2026: "PERFORMANCE > INSPEÇÃO DO INVERSOR QUERO O
+# TIPO DA TAREFA COMO CORRETIVA!"). O `create_planned_os` copia o tipo do plano do Fracttal; fica aqui, e não no plano,
+# pelo mesmo motivo das SUBTAREFAS_EXTRA: o plano é de outra área e vale para quem cria OS por fora do app. Casado pelo
+# trecho do nome do plano, como as extras.
+TIPO_TAREFA_DO_PLANO = {
+    "inspecao geral do inversor": "Corretiva",
+}
+
+
+def com_tipo_da_tarefa(plan: dict) -> dict:
+    """O plano com o tipo de tarefa do TIPO_TAREFA_DO_PLANO, quando o nome casa. Devolve uma CÓPIA (o plano fica em cache
+    por id_task); sem regra para o plano, devolve o mesmo."""
+    desc = _norm_txt((plan or {}).get("description"))
+    tipo = next((t for frase, t in TIPO_TAREFA_DO_PLANO.items() if frase in desc), None)
+    if not tipo or tipo not in TASK_TYPE_MAIN:
+        return plan
+    return dict(plan, id_task_type_main=TASK_TYPE_MAIN[tipo], tasks_types_main_description=tipo)
+
 
 def com_subtarefas_extra(plan: dict) -> dict:
     """O plano com as subtarefas do app acrescentadas no fim. Devolve uma CÓPIA — o plano fica
@@ -4075,7 +4093,7 @@ def create_performance_os(itens: list, id_responsible=None, responsible_name: st
             k = it.get("plano_id_task")
             if k not in cache:
                 # as subtarefas extras entram UMA vez, junto do cache — ver com_subtarefas_extra
-                cache[k] = com_subtarefas_extra(get_plan_details(k, it.get("plano_id_item")))
+                cache[k] = com_tipo_da_tarefa(com_subtarefas_extra(get_plan_details(k, it.get("plano_id_item"))))
             plan = cache[k]
             nome = (it.get("titulo") or "").strip() or \
                 perf_os_nome(a, it.get("base") or plano_base_nome(plan.get("description")))
@@ -6313,7 +6331,7 @@ def create_performance_os_agrupada(itens: list, id_responsible=None, responsible
             k = it.get("plano_id_task")
             if k not in cache:
                 # as subtarefas extras entram UMA vez, junto do cache — ver com_subtarefas_extra
-                cache[k] = com_subtarefas_extra(get_plan_details(k, it.get("plano_id_item")))
+                cache[k] = com_tipo_da_tarefa(com_subtarefas_extra(get_plan_details(k, it.get("plano_id_item"))))
             plan = cache[k]
             plano_de[id(it)] = plan.get("description")
             nome = (it.get("titulo") or "").strip() or \

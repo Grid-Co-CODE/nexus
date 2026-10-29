@@ -1105,6 +1105,17 @@ de uma vez, o certo é de 10 em 10".
   o "Criar OS" da Engenharia abriu com o ativo marcado e a OS pai); na Engenharia,
   10 → 20 → 25, a busca filtra e limpar volta aos 10 com o marcado mantido; a 375 px, no claro, sem rolagem lateral.
 
+## Performance: a Inspeção Geral do Inversor sai Corretiva (29/10/2026)
+
+Levi: "No OS CREATOR PERFORMANCE > INSPEÇÃO DO INVERSOR QUERO O TIPO DA TAREFA COMO CORRETIVA!". O tipo vinha do plano
+do Fracttal ("[Grid Co.] - Inspeção Geral do Inversor"), que o `create_planned_os` copia. Agora o app troca na hora de
+criar (`api.TIPO_TAREFA_DO_PLANO` e `api.com_tipo_da_tarefa`, casados pelo trecho do nome do plano, como as
+`SUBTAREFAS_EXTRA`): `id_task_type_main` = Corretiva (43885) e o nome dele. Vale na OS por ativo
+(`create_performance_os`) e na agrupada (`create_performance_os_agrupada`), e o resumo do plano na tela diz "Tipo:
+Corretiva" (`/os/api/performance/plano`). O plano do Fracttal não muda (é de outra área e vale para quem cria por fora);
+os outros planos seguem com o tipo deles, e a Clonagem de planos do PCM não passa por aqui. Prova:
+`tests/test_oscreator_perf_tipo_corretiva_29_10.py`. Falta conferir numa OS real.
+
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 
 Levi, 19/10/2026, em Nexus > Chamados > Garantias: "ao clicar na OS em responsável dê para alterar o responsável da OS que

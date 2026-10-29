@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-29T14:10:48",
+ "atualizado_em": "2026-10-29T14:14:30",
  "arquivos": {
   "chamado_garantia/README.md": "ebd082efad2568dc",
   "chamado_garantia/__init__.py": "0d87fb4d38a98e72",
@@ -8,7 +8,7 @@
   "chamado_garantia/registro.py": "de93430921043512",
   "chamado_garantia/regras.py": "bf2bbf933aad78d0",
   "chamado_garantia/spec.py": "6c4a221fddc68521",
-  "os_creator/api.py": "2fe22a287ffdbab9",
+  "os_creator/api.py": "501cf193c6f2c52b",
   "os_creator/assets/chamados.qss": "f5e222357226608f",
   "os_creator/assets/fonts/LEIA-ME.txt": "481bfed83ca359c7",
   "os_creator/assets/grid-icon.ico": "46b6cf136f0ffaff",
@@ -40,7 +40,7 @@
   "os_creator/os_web/perf_web.py": "1cb148f505192ddb",
   "os_creator/os_web/relatorio_chamados.py": "cc5ddbac931d0d0a",
   "os_creator/os_web/relay/volta.html": "c59f69695a000fcd",
-  "os_creator/os_web/rotas.py": "f26364f728174e48",
+  "os_creator/os_web/rotas.py": "640a3002258beae7",
   "os_creator/os_web/rotas_acomp.py": "6d58c0c3c3ae0e8b",
   "os_creator/os_web/rotas_ativos.py": "0c324959db794e34",
   "os_creator/os_web/rotas_chamados.py": "e4d9361279a9b0f1",
