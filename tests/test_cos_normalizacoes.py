@@ -48,7 +48,8 @@ ITENS = [
        conferencia_da_os={"situacao": "AGUARDANDO_TECNICO", "tarefas": 3, "concluidas": 1}),                   # ontem, aberta
     _n("r4", volta="2026-10-26T09:00:00-03:00", hora_real=False, fora=0),                   # sem hora real
     _n("r5", volta="2026-10-25T09:00:00-03:00", normalizada=False, estado="TRATATIVA_REMOTA"),   # desfeita
-    _n("r6", volta="2026-10-05T09:00:00-03:00", fora=600, os_aberta_por=None, tecnico=None),   # OS só ligada                                  # 22 dias
+    _n("r6", volta="2026-10-05T09:00:00-03:00", fora=600, os_aberta_por=None, tecnico=None,    # OS só ligada
+       tipo_falha="DESLIGAMENTO_CABINE", tipo_falha_rotulo="Desligamento de cabine"),                                  # 22 dias
 ]
 
 
@@ -118,6 +119,8 @@ def test_os_filtros_cliente_usina_status_e_texto():
     # 28/10/2026: o operador que abriu a OS e o técnico, que a API passou a mandar (o nome com espaço duplo vem limpo)
     assert regs(operador="Ciclano Operador") == ["r2"] and regs(tecnico="Beltrano Tecnico") == ["r1", "r3", "r4"]
     assert regs(busca="tecnica dois") == ["r2"]
+    # 29/10/2026: o tipo de falha (comunicação ou desligamento), pelo rótulo da Ronda COS
+    assert regs(falha="Desligamento de cabine") == ["r6"] and regs(falha="Falha de comunicação") == ["r1", "r3", "r4", "r2"]
     assert regs(status="inventado") == regs()                                       # valor estranho: sem o filtro
 
 
@@ -127,7 +130,8 @@ def test_as_opcoes_dos_filtros_contam_o_mes_antes_dos_filtros():
                           "usina": {"Usina Exemplo Dois": 1},                        # as usinas do cliente escolhido
                           "status": {"processo": 1, "verificacao": 1, "fechada": 3},
                           "operador": {"Ciclano Operador": 1, "Fulana Operadora": 3},   # a r6 (OS só ligada) fica fora
-                          "tecnico": {"Beltrano Tecnico": 3, "Tecnica Dois": 1}}
+                          "tecnico": {"Beltrano Tecnico": 3, "Tecnica Dois": 1},
+                          "falha": {"Falha de comunicação": 4, "Desligamento de cabine": 1}}
 
 
 def test_a_os_aberta_diz_ha_quantos_dias_da_volta_e_a_varredura_mais_nova():

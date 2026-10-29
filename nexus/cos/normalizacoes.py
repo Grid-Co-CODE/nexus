@@ -273,7 +273,7 @@ def _casa(i: dict, q: str) -> bool:
 
 
 def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: str = "", status: str = "",
-           busca: str = "", operador: str = "", tecnico: str = "") -> Painel | None:
+           busca: str = "", operador: str = "", tecnico: str = "", falha: str = "") -> Painel | None:
     """A tela, do mês pedido (o corrente no padrão), pela hora da volta. Os filtros (Levi, 27/10/2026): cliente, usina,
     status no Fracttal e um texto livre; desde 28/10/2026 também o operador que abriu a OS ("Criado por") e o técnico, que
     a API passou a mandar. As opções de cada filtro contam sobre o mês, ANTES dos outros filtros (um contador que encolhe ao filtrar não diz mais quanto existe); as de usina, dentro do cliente escolhido.
@@ -290,6 +290,9 @@ def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: st
     busca = " ".join((busca or "").split())[:BUSCA_MAX]
     recorte = [i for i in base if (not cliente or i["cliente"] == cliente) and (not usina or i["usina"] == usina)
                and (not operador or i["operador"] == operador) and (not tecnico or i["tecnico"] == tecnico)
+               # o tipo de falha (29/10/2026, Levi: "quero um filtro para saber se foi falha de comunicação ou
+               # desligamento"): pelo rótulo da Ronda COS, com os tipos que existem no mês
+               and (not falha or i["falha"] == falha)
                and (not busca or _casa(i, busca))]
     lista = [i for i in recorte if i["status_filtro"] == status] if status in STATUS_FILTRO else list(recorte)
     lista.sort(key=lambda i: i["data"], reverse=True)
@@ -305,6 +308,7 @@ def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: st
             "status": {k: sum(1 for i in base if i["status_filtro"] == k) for k in STATUS_FILTRO},
             "operador": dict(sorted(Counter(i["operador"] for i in base if i["operador"]).items())),
             "tecnico": dict(sorted(Counter(i["tecnico"] for i in base if i["tecnico"]).items())),
+            "falha": dict(Counter(i["falha"] for i in base).most_common()),
         },
         resumo={
             "total": len(recorte),

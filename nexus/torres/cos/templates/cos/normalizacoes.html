@@ -61,6 +61,10 @@
 
   <form class="cn-filtros cos-norm-filtros" method="get">
     <input type="hidden" name="mes" value="{{ mes }}">
+    <label class="cn-filtro-par"><span class="gc-rotulo">Tipo de falha</span>
+    <select class="gc-campo" name="falha" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for f, n in p.contagem.falha.items() %}<option value="{{ f }}"{% if f == falha %} selected{% endif %}>{{ f }} ({{ n }})</option>{% endfor %}
+    </select></label>
     <label class="cn-filtro-par"><span class="gc-rotulo">Cliente</span>
     <select class="gc-campo" name="cliente" onchange="this.form.usina.value='';this.form.submit()">
       <option value="">Todos</option>{% for c, n in p.contagem.cliente.items() %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
@@ -84,7 +88,7 @@
     <input class="gc-campo cos-norm-busca" type="search" name="q" value="{{ busca }}" placeholder="OS, usina, falha, equipamento..." aria-label="Buscar nas normalizações">
     <a class="gc-btn gc-btn--ui cos-norm-csv" href="{{ url(formato='csv') }}" download><i class="ph ph-download-simple" aria-hidden="true"></i> Exportar CSV</a>
   </form>
-  {% if cliente or usina or status or busca or operador or tecnico %}<div class="cn-chips"><a href="{{ url(cliente=None, usina=None, status=None, q=None, criado_por=None, tecnico=None) }}">Limpar os filtros</a></div>{% endif %}
+  {% if cliente or usina or status or busca or operador or tecnico or falha %}<div class="cn-chips"><a href="{{ url(cliente=None, usina=None, status=None, q=None, criado_por=None, tecnico=None, falha=None) }}">Limpar os filtros</a></div>{% endif %}
 
   {% if p.itens %}
   <div class="cn-tab cos-tab"><table>
@@ -124,7 +128,7 @@
     {% endfor %}
     </tbody>
   </table></div>
-  {% else %}<p class="cn-vazio">{% if cliente or usina or status or busca or operador or tecnico %}Nenhuma normalização com estes filtros.{% else %}Nenhuma normalização neste mês.{% endif %}</p>{% endif %}
+  {% else %}<p class="cn-vazio">{% if cliente or usina or status or busca or operador or tecnico or falha %}Nenhuma normalização com estes filtros.{% else %}Nenhuma normalização neste mês.{% endif %}</p>{% endif %}
   {% if p.desfeitas %}<p class="mudo">{{ p.desfeitas }} {{ 'normalização foi desfeita' if p.desfeitas == 1 else 'normalizações foram desfeitas' }} no mês (a ocorrência voltou a aberta) e {{ 'fica' if p.desfeitas == 1 else 'ficam' }} fora da lista.</p>{% endif %}
   {% endif %}
   {% endif %}
