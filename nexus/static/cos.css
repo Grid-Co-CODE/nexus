@@ -98,3 +98,13 @@ tr.cos-os:focus-visible{outline:2px solid var(--verde);outline-offset:-2px}
 .cos-norm .cn-tab th,.cos-norm .cn-tab td{padding-left:7px;padding-right:7px}
 .cos-norm .cn-tab td.cos-usina{min-width:150px}
 .cos-norm .cn-tab td.cos-protecoes{max-width:110px;white-space:normal}
+/* os Detalhes da Atividade (29/10/2026): o botão embaixo da OS e a linha inteira de baixo */
+.cos-det-bt{all:unset;display:block;margin-top:4px;font:600 11.5px/16px var(--font-sans);color:var(--verde-texto);cursor:pointer}
+.cos-det-bt:hover{text-decoration:underline}
+.cos-det-bt:focus-visible{outline:2px solid var(--foco);outline-offset:2px;border-radius:3px}
+.cos-det-bt[aria-expanded="true"]{color:var(--tinta)}
+.cn-tab tr.cos-det-linha td{text-align:left;background:var(--superficie-2);padding:12px 16px}
+.cos-det{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 16px;margin:0;max-width:1100px;font-size:13px;line-height:1.5}
+.cos-det dt{color:var(--mudo);font-weight:600}
+.cos-det dd{margin:0;color:var(--tinta-2);white-space:pre-wrap;overflow-wrap:anywhere}
+.cos-det ul{margin:0;padding-left:18px;display:grid;gap:4px}

@@ -39,6 +39,8 @@ ITENS = [
     _n("r2", volta="2026-10-19T05:53:00-03:00", inicio="2026-10-19T02:00:00-03:00", fora=233, os="16702",
        usina="Usina Exemplo Dois", cliente="CLIENTE B", severidade="CRITICO", os_aberta_por="Ciclano  Operador",
        tecnico="Tecnica Dois", protecoes=["27ABC", " 59C "], geracao_parou=True,
+       detalhes={"descricao": "Ação: Religamento Remoto | Falha: cabine exemplo desligada.", "acao": "Religamento Remoto",
+                 "notas": ["Religada remotamente as 06:00, trip exemplo.", "  "]},
        conferencia_da_os={"situacao": "HORA_A_CORRIGIR", "status_os": 1, "tarefas": 2, "concluidas": 2,
                           "inicio_no_fracttal": "2026-10-19T02:00:00-03:00", "diferenca_inicio_min": 0,
                           "conclusao_no_fracttal": "2026-10-19T07:55:00-03:00", "diferenca_fim_min": 122,
@@ -119,6 +121,7 @@ def test_os_filtros_cliente_usina_status_e_texto():
     # 28/10/2026: o operador que abriu a OS e o técnico, que a API passou a mandar (o nome com espaço duplo vem limpo)
     assert regs(operador="Ciclano Operador") == ["r2"] and regs(tecnico="Beltrano Tecnico") == ["r1", "r3", "r4"]
     assert regs(busca="tecnica dois") == ["r2"]
+    assert regs(busca="trip exemplo") == ["r2"] and regs(busca="religamento remoto") == ["r2"]     # a busca acha os Detalhes
     # 29/10/2026: o tipo de falha (comunicação ou desligamento), pelo rótulo da Ronda COS
     assert regs(falha="Desligamento de cabine") == ["r6"] and regs(falha="Falha de comunicação") == ["r1", "r3", "r4", "r2"]
     assert regs(status="inventado") == regs()                                       # valor estranho: sem o filtro
@@ -161,6 +164,9 @@ def test_o_csv_leva_a_lista_filtrada_e_o_que_a_tela_resume():
     sem = dict(zip(NO.CSV_COLUNAS, NO.csv_linhas(_painel(status="fechada"))[0]))       # a r1: sem os campos novos
     assert (sem["Proteções"], sem["Geração parou"], sem["Conferência da OS"], sem["Conclusão no Fracttal"]) == ("", "", "", "")
     assert "Criado por" not in NO.CSV_COLUNAS
+    # 29/10/2026: os Detalhes da Atividade (a ação, a descrição e as notas, juntas por " | "; a nota vazia sai)
+    assert (d["Ação"], d["Notas"]) == ("Religamento Remoto", "Religada remotamente as 06:00, trip exemplo.")
+    assert d["Descrição da ocorrência"].startswith("Ação: Religamento Remoto | Falha")
     assert d["Severidade"] == "Critico" and d["Dias aberta depois da volta"] == 8 and d["Registrada"] == "registrada pelo COS"
 
 
@@ -253,6 +259,10 @@ def test_a_tela(ligada, logado, monkeypatch):
     assert ">27ABC, 59C<" in html and 'cn-pill cn-critico">Sim<' in html and 'cn-pill cn-ok">Não<' in html
     assert 'cn-pill cn-alerta">Hora a corrigir<' in html and "conclusão +122 min no Fracttal" in html
     assert 'cn-pill cn-info">Aguardando técnico<' in html and "1/3 tarefas concluídas" in html
+    # os Detalhes: o botão na OS que tem, a linha de baixo fechada, com a ação, a descrição e as notas
+    assert html.count('class="cos-det-bt"') == 1 and 'class="cos-det-linha"' in html and " hidden><td colspan=\"12\">" in html
+    linha = html.split('class="cos-det-linha"', 1)[1].split("</tr>", 1)[0]
+    assert "<dt>Ação</dt><dd>Religamento Remoto</dd>" in linha and "<li>Religada remotamente as 06:00, trip exemplo.</li>" in linha
     assert ">Ciclano Operador<" in html and ">Tecnica Dois<" in html and 'name="criado_por"' in html
     assert "Severidade" not in cab and "Crítico" not in html and 'class="hs-aviso"' in html
     assert "Último dia" not in html and "Últimos 7 dias" not in html

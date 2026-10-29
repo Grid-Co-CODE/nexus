@@ -23,6 +23,7 @@
       {{ termo('Geração parou') }}<dd>Só na falha de comunicação: a resposta do operador ao normalizar, se a geração parou. Desde 28/10.</dd>
       {{ termo('No Fracttal', 'alerta') }}<dd>Se a OS ainda estava aberta na última varredura da Ronda COS, que roda de 30 em 30 minutos, e há quantos dias depois da volta. Vermelho a partir de 7 dias. "Fechada" é a OS que não está entre as abertas: finalizada ou cancelada.</dd>
       {{ termo('Conferência da OS', 'alerta') }}<dd>A Ronda COS relê a OS no Fracttal de 10 em 10 minutos e a compara com a normalização: Aguardando técnico (alguma tarefa não concluída), Hora a corrigir (tudo concluído, mas a conclusão ou a Data do Evento difere da hora do COS em mais de 2 minutos; embaixo, quantos minutos), Hora confere (falta só finalizar), Finalizada, Travada (finalizada com a hora errada: finalizada não se edita) ou Ainda não lida. "—" é a OS que não foi criada pela Ronda COS.</dd>
+      {{ termo('Detalhes') }}<dd>O "Detalhes da Atividade" do informe: a ação, a descrição da ocorrência e as notas escritas pelo time. O botão Detalhes, embaixo do número da OS, abre a linha; a busca acha o texto, e o CSV o leva.</dd>
       {{ termo('Sem hora real', 'neutro') }}<dd>Encerrada sem a hora da volta (o fim igual ao início): a indisponibilidade não se conta, e fica fora da mediana.</dd>
       {{ termo('Desfeita') }}<dd>A normalização foi desfeita e a ocorrência voltou a aberta: sai da lista e é dita embaixo dela.</dd>
     {% endcall %}
@@ -103,7 +104,8 @@
     {% for n in p.itens %}
       <tr{% if n.os %} class="cos-os" tabindex="0" data-folio="{{ n.os }}" data-status="{{ n.status_card }}" title="Abrir o card da OS {{ n.os }}"{% endif %}>
         <td class="cos-esq">{% if n.os %}<b class="cos-folio">{{ n.os }}</b>{% else %}<span class="mudo">sem OS</span>{% endif %}
-          {% if n.os_relacionadas %}<span class="det">e {{ n.os_relacionadas|join(', ') }}</span>{% endif %}</td>
+          {% if n.os_relacionadas %}<span class="det">e {{ n.os_relacionadas|join(', ') }}</span>{% endif %}
+          {% if n.acao or n.descricao or n.notas %}<button class="cos-det-bt" type="button" aria-expanded="false" aria-controls="cos-det-{{ loop.index }}">Detalhes</button>{% endif %}</td>
         <td class="cos-indisp">{% if n.hora_real %}<b>{{ n.fora_txt }}</b>{% else %}<span class="cn-pill cn-neutro">sem hora real</span>{% endif %}</td>
         <td class="cos-esq">{{ n.inicio.strftime('%d/%m %H:%M') if n.inicio else '—' }}</td>
         <td class="cos-esq"><b>{{ n.volta.strftime('%d/%m %H:%M') if n.volta else '—' }}</b>
@@ -125,6 +127,16 @@
           {% elif c.tarefas %}<span class="det">{{ c.concluidas }}/{{ c.tarefas }} tarefas concluídas</span>{% endif %}
           {% else %}<span class="mudo" title="A OS não foi criada pela Ronda COS">—</span>{% endif %}</td>
       </tr>
+      {# os Detalhes da Atividade do informe (29/10/2026): a linha de baixo, aberta pelo botão da OS #}
+      {% if n.acao or n.descricao or n.notas %}
+      <tr class="cos-det-linha" id="cos-det-{{ loop.index }}" hidden><td colspan="12">
+        <dl class="cos-det">
+          {% if n.acao %}<dt>Ação</dt><dd>{{ n.acao }}</dd>{% endif %}
+          {% if n.descricao %}<dt>Descrição</dt><dd>{{ n.descricao }}</dd>{% endif %}
+          {% if n.notas %}<dt>Notas</dt><dd><ul>{% for x in n.notas %}<li>{{ x }}</li>{% endfor %}</ul></dd>{% endif %}
+        </dl>
+      </td></tr>
+      {% endif %}
     {% endfor %}
     </tbody>
   </table></div>
@@ -143,8 +155,18 @@
       NexusOsCard.abrirFolio(folio, {status: tr.getAttribute('data-status') || '', folio: folio});
     }
     document.querySelectorAll('tr.cos-os').forEach(function (tr) {
-      tr.addEventListener('click', function () { abrir(tr); });
-      tr.addEventListener('keydown', function (e) { if (e.key === 'Enter') { abrir(tr); } });
+      tr.addEventListener('click', function (e) { if (!e.target.closest('.cos-det-bt')) { abrir(tr); } });
+      tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.target.closest('.cos-det-bt')) { abrir(tr); } });
+    });
+    // o botão Detalhes abre e fecha a linha de baixo (sem abrir o card da OS)
+    document.querySelectorAll('.cos-det-bt').forEach(function (bt) {
+      bt.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var linha = document.getElementById(bt.getAttribute('aria-controls'));
+        var abre = linha.hidden;
+        linha.hidden = !abre;
+        bt.setAttribute('aria-expanded', String(abre));
+      });
     });
   })();
 </script>

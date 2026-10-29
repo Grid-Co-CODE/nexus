@@ -210,6 +210,13 @@ def _conferencia(c) -> dict | None:
             "finalizada_em": AND.instante(c.get("finalizada_em")), "lida_em": AND.instante(c.get("lida_em"))}
 
 
+def _detalhes(d) -> dict:
+    d = d if isinstance(d, dict) else {}
+    notas = [str(x).strip() for x in d.get("notas") or [] if str(x or "").strip()]
+    return {"acao": " ".join(str(d.get("acao") or "").split()), "descricao": str(d.get("descricao") or "").strip(),
+            "notas": notas}
+
+
 def _item(n: dict, agora: datetime) -> dict:
     volta = AND.instante(n.get("normalizado_em"))
     sev = str(n.get("severidade") or "").upper()
@@ -260,6 +267,10 @@ def _item(n: dict, agora: datetime) -> dict:
         "protecoes": [" ".join(str(x).split()) for x in n.get("protecoes") or [] if str(x or "").strip()],
         "geracao_parou": n.get("geracao_parou") if isinstance(n.get("geracao_parou"), bool) else None,
         "conferencia": _conferencia(n.get("conferencia_da_os")),
+        # o "Detalhes da Atividade" do informe (29/10/2026, Levi: "quero o campo detalhes no normalizações"): a ação, a
+        # descrição da ocorrência (sem o planejamento do PCM) e as notas das pessoas. Texto livre do time, às vezes com
+        # nome e telefone: só na tela e no CSV, o Nexus não guarda (o guia da API, seção 2.3)
+        **_detalhes(n.get("detalhes")),
     }
 
 
@@ -268,7 +279,8 @@ def _casa(i: dict, q: str) -> bool:
     if q.isdigit() and (i["os"] == q or q in i["os_relacionadas"]):
         return True
     alvo = " ".join([i["os"], *i["os_relacionadas"], i["cliente"], i["usina"], i["usina_codigo"], i["falha"],
-                     *i["equipamentos"], i["operador"], i["tecnico"], i["resumo"], i["status"]]).lower()
+                     *i["equipamentos"], i["operador"], i["tecnico"], i["resumo"], i["status"], i["acao"],
+                     i["descricao"], *i["notas"]]).lower()
     return q in alvo
 
 
@@ -331,7 +343,7 @@ CSV_COLUNAS = ("OS", "OS relacionadas", "Indisponível (min)", "Início", "Norma
                "Informe", "Fora do escopo O&M", "Proteções", "Geração parou", "Conferência da OS",
                "Tarefas concluídas", "Data do evento no Fracttal", "Diferença do início (min)",
                "Conclusão no Fracttal", "Diferença da conclusão (min)", "Finalizada no Fracttal em",
-               "Conferência lida em")
+               "Conferência lida em", "Ação", "Descrição da ocorrência", "Notas")
 
 
 def csv_linhas(p: Painel) -> list[list]:
@@ -344,7 +356,8 @@ def csv_linhas(p: Painel) -> list[list]:
              i["status"] if i["aberta"] else "Fechada", i["pct"] if i["aberta"] else "",
              "" if i["aberta_ha_dias"] is None else i["aberta_ha_dias"], i["resumo"],
              "sim" if i["fora_do_escopo"] else "não", ", ".join(i["protecoes"]),
-             {True: "sim", False: "não"}.get(i["geracao_parou"], ""), *_csv_conferencia(i["conferencia"], h)]
+             {True: "sim", False: "não"}.get(i["geracao_parou"], ""), *_csv_conferencia(i["conferencia"], h),
+             i["acao"], i["descricao"], " | ".join(i["notas"])]
             for i in p.itens]
 
 

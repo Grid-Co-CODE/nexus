@@ -243,8 +243,11 @@ Só lê; nada vai ao banco (decisão do Levi, 27/10/2026: a tela, sem guardar).
   Data do Evento e conclusão no Fracttal, as duas diferenças em minutos, finalizada e lida em). Filtro **Tipo de falha**
   (29/10/2026, "quero um filtro para saber se foi falha de comunicação ou desligamento"): pelo rótulo da Ronda COS, com
   os tipos que existem no mês e quantas cada um (as opções vêm do dado, não de uma lista fixa daqui). Com 12 colunas, cada célula tem 7 px de folga dos lados e a Usina 150 px de mínimo: cabe em 1366 px.
-  `impacto` e `detalhes` (texto livre do time, com nome e telefone às vezes) NÃO entraram; se entrarem, só na tela e no
-  CSV, e nunca texto real em teste (o guia da API, seção 2.3).
+  **Detalhes** (29/10/2026, "quero o campo detalhes no normalizações"): o `detalhes` da API (a ação, a descrição da
+  ocorrência sem o planejamento do PCM e as notas das pessoas) numa linha de baixo, aberta pelo botão Detalhes embaixo do
+  número da OS (o botão não abre o card da OS); a busca acha o texto e o CSV leva Ação, Descrição e Notas (juntas por
+  " | "). É texto livre do time, às vezes com nome e telefone: só na tela e no CSV, e nunca texto real em teste (o guia
+  da API, seção 2.3). O `impacto` não entrou.
 - **As contas:** as opções dos filtros contam o mês, antes dos filtros; a faixa conta a lista filtrada SEM o status
   (senão a fatia aberta seria sempre 100%). A desfeita (`normalizada: false`) sai da lista e é dita à parte; a sem hora
   real fica na lista, marcada, e fora da mediana.
