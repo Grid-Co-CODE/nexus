@@ -847,7 +847,9 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
   **Performance, com duas colunas de largura** ("Aproveita o espaço para dar um destaque nas usinas abaixo da
   performance"): 1ª linha, a Performance e os Chamados; 2ª, o Ranking, as Rondas e os Extintores. Os números ficaram
   diretos: "N chamados em aberto", "N equipes", "N extintores vencidos e M a vencer"; saíram a barra das Rondas e o
-  aviso do Ranking ("os supervisores não são crianças!").
+  aviso do Ranking ("os supervisores não são crianças!"). A **página do Painel é 20% menor** ("reduza a fonte de toda a página em 20%": o
+  `zoom:.8` nos filhos de `.pn-pagina`, o cabeçalho, as abas, os filtros, a faixa e os quadros na mesma proporção;
+  as janelas por cima ficam no tamanho de sempre).
 - **Cada quadro com o total e a lista inteira:**
   - Usinas abaixo da performance: todas as usinas, da pior meta para a melhor, sem meta no fim; em colunas, a meta do
     mês (a barra e o número), o PR contra o previsto e a disponibilidade, com a cor que a Visão já dá na linha da usina

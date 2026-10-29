@@ -150,6 +150,7 @@ def test_o_nome_do_ativo_sem_a_marca():
 def test_a_tela_do_painel_do_responsavel(tela, logado):
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
     assert 'aria-current="page">Painel' in html and '<h1 class="cn-titulo">Ciclano Chefe</h1>' in html
+    assert '<div class="campo-nativa pn-pagina">' in html                     # a página 20% menor (29/10/2026)
     for t in ("Usinas abaixo da performance", "Chamados abertos", "PTs pendentes", "Ranking das Equipes - ",
               "Acompanhamento de rondas", "Extintores vencidos"):
         assert t in html
@@ -247,6 +248,8 @@ def test_o_css_da_rolagem_e_da_altura_do_quadro():
     # que encolhe e rola, e a Performance com duas colunas de largura
     assert re.search(r"\.pn-q\{[^}]*height:var\(--pn-card\)", css) and re.search(r"\.pn\{[^}]*--pn-card:\d+px", css)
     assert ".pn-q--largo{grid-column:span 2}" in css and "min-height:0" in lista
+    # a página do Painel 20% menor ("reduza a fonte de toda a página em 20%"), sem mexer nas janelas por cima
+    assert ".pn-pagina > :not(dialog):not(template){zoom:.8}" in css
 
 
 def test_nenhuma_regua_nova():

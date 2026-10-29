@@ -31,7 +31,7 @@
               {% if i.get('mais') %}<span class="it mudo">e mais {{ i.mais }}</span>{% endif %}</dd>{% endfor %}
           </dl>
 {% endmacro %}
-<div class="campo-nativa">
+<div class="campo-nativa{% if modo == 'painel' and painel %} pn-pagina{% endif %}">
   <div class="cn-cab">
     {# no Painel, o nome do responsável é o título (Levi, 28/10/2026: "vai ter o nome do responsável como [título]") #}
     {% if modo == 'painel' and painel %}

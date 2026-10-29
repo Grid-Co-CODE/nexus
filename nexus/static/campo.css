@@ -1379,6 +1379,10 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
 .pn-kpi--critico .pn-kpi-ico{background:var(--critico-suave);color:var(--critico)} .pn-kpi--critico b{color:var(--critico)}
 .pn-kpi--alerta .pn-kpi-ico{background:var(--alerta-suave);color:var(--alerta)} .pn-kpi--alerta b{color:var(--alerta)}
 .pn-kpi--ok .pn-kpi-ico{background:var(--ok-suave);color:var(--ok)} .pn-kpi--ok b{color:var(--ok)}
+/* a página do Painel 20% menor (Levi, 29/10/2026: "reduza a fonte de toda a página em 20%"): o cabeçalho, as abas, os
+   filtros, a faixa e os quadros, na mesma proporção (o `zoom` refaz o desenho como o zoom do navegador, e o conteúdo
+   continua ocupando a largura toda). As janelas por cima (os <dialog>) ficam no tamanho de sempre */
+.pn-pagina > :not(dialog):not(template){zoom:.8}
 /* o número das PT à esquerda da faixa "Parada agora", na mesma linha e com a mesma altura (29/10/2026: "faça caber ao
    lado esquerdo de parado agora"); sem paradas, ele fica sozinho na linha */
 .pn-topo{display:flex;align-items:stretch;gap:14px;margin-top:16px}
