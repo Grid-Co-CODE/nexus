@@ -271,8 +271,10 @@ FATOS = (
          observacao="acompanhamento_id junta os eventos de um acompanhamento; quem acompanha é o do último pegou ou "
                     "encaminhou; encerrou leva o fim e o diagnóstico (diagnostico_id aponta a aba dim_diagnostico do "
                     "mesmo livro). As medidas são a foto do sinal na entrada, só no evento que começa (somam entre "
-                    "acompanhamentos, não no tempo de um ativo). Quem, o nome de quem acompanha e o texto só "
-                    "cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
+                    "acompanhamentos, não no tempo de um ativo). os_id e os_folio (no fim, desde 29/10/2026) são a "
+                    "OS de análise do Fracttal que o pegou ou o encaminhou do ativo livre criou. Quem, o nome de quem "
+                    "acompanha e o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se "
+                    "apaga"),
     Fato("acompanhamento_os", "A OS acompanhada pela Engenharia", "engenharia",
          "nexus_engenharia_os · fato_acompanhamento_os",
          "1 linha = 1 evento (status, prioridade ou comentario) da Engenharia sobre 1 OS do Fracttal",

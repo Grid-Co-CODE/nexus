@@ -38,7 +38,10 @@ ABA_DIAG, ABA_EVENTO = "dim_diagnostico", "fato_acompanhamento_ativo"
 CAB_EVENTO = ("id", "registrado_em", "data_id", "acompanhamento_id", "evento", "codigo_ativo", "equipamento_id",
               "usina_id", "usina_ligada_por", "pessoa_hmac", "responsavel_hmac", "diagnostico_id",
               "data_id_inicio_analise", "data_id_fim_analise", "nivel_na_entrada", "falhas_30d_qtd", "falhas_7d_qtd",
-              "dados_cifrados")
+              "dados_cifrados",
+              # a OS de análise no Fracttal (29/10/2026: o Pegar e o Encaminhar criam a OS): no fim, como manda a regra das
+              # colunas novas; o acompanhamento de antes fica sem ela (o quiz do Levi: "Ficam sem OS")
+              "os_id", "os_folio")
 CAB_DIAG = ("diagnostico_id", "nome", "descricao", "criado_em", "alterado_em", "excluido", "alterado_por_hmac")
 EVENTOS = ("pegou", "encaminhou", "dados", "comentario", "encerrou")
 COMECO = ("pegou", "encaminhou")          # os eventos que começam um acompanhamento (e trocam quem acompanha)
@@ -212,7 +215,10 @@ def estado(eventos: list[dict]) -> dict[str, dict]:
                 "inicio": None,
                 "fim": None, "diagnostico_id": None, "comentarios": [], "aberto": True, "encerrado_em": None,
                 "nivel_entrada": _txt(l.get("nivel_na_entrada")), "falhas30_entrada": _int(l.get("falhas_30d_qtd")),
-                "falhas7_entrada": _int(l.get("falhas_7d_qtd"))}
+                "falhas7_entrada": _int(l.get("falhas_7d_qtd")), "os_id": None, "os_folio": ""}
+        if _int(l.get("os_id")):
+            # a OS de análise do Fracttal: a do evento que a criou (o Pegar ou o Encaminhar do ativo livre)
+            a["os_id"], a["os_folio"] = _int(l.get("os_id")), _txt(l.get("os_folio")).split(".")[0]
         if ev in COMECO:
             resp = _txt(l.get("responsavel_hmac"))
             a["responsavel"] = {"hmac": resp, "nome": dados.get("responsavel") or ""}
@@ -274,9 +280,10 @@ def _quem(usuario, pode: bool, o_que: str) -> dict:
 
 def _evento(cofre, evento: str, quem: dict, aid: str, ativo: dict, *, responsavel: dict | None = None,
             inicio: date | None = None, fim: date | None = None, diagnostico_id: int | None = None,
-            texto: str = "", entrada: dict | None = None) -> dict:
+            texto: str = "", entrada: dict | None = None, os: dict | None = None) -> dict:
     """Uma linha do fato. `ativo` = {"cod", "usina_id", "usina_ligada_por"}; `entrada` = a foto do sinal, só no evento
-    que começa o acompanhamento ({"nivel", "nFalha", "n7"})."""
+    que começa o acompanhamento ({"nivel", "nFalha", "n7"}); `os` = a OS de análise que o Fracttal acabou de criar
+    ({"id", "folio"})."""
     eid = uuid.uuid4().hex[:12]
     agora = datetime.now(timezone.utc)
     dados = {"quem": {"nome": quem["nome"], "email": quem["email"]}}
@@ -294,7 +301,8 @@ def _evento(cofre, evento: str, quem: dict, aid: str, ativo: dict, *, responsave
             "data_id_inicio_analise": _id_dia(inicio), "data_id_fim_analise": _id_dia(fim),
             "nivel_na_entrada": _txt(entrada.get("nivel")) or None, "falhas_30d_qtd": _int(entrada.get("nFalha")),
             "falhas_7d_qtd": _int(entrada.get("n7")),
-            "dados_cifrados": cofre.cifrar(json.dumps(dados, ensure_ascii=False), _ctx(eid))}
+            "dados_cifrados": cofre.cifrar(json.dumps(dados, ensure_ascii=False), _ctx(eid)),
+            "os_id": _int((os or {}).get("id")), "os_folio": _txt((os or {}).get("folio")) or None}
 
 
 def _reler() -> dict:
@@ -320,9 +328,10 @@ def _publicar(eventos: list[dict], diags: list[dict]) -> None:
     limpar()
 
 
-def pegar(ativo: dict, usuario, pode: bool) -> dict:
+def pegar(ativo: dict, usuario, pode: bool, os: dict | None = None) -> dict:
     """A pessoa do login começa a acompanhar o ativo, com o início da análise em hoje. `ativo` = o item de sinais da
-    Confiabilidade no formato {"cod", "usina_id", "usina_ligada_por", "nivel", "nFalha", "n7"}."""
+    Confiabilidade no formato {"cod", "usina_id", "usina_ligada_por", "nivel", "nFalha", "n7"}; `os` = a OS de análise
+    que a ponte acabou de criar no Fracttal ({"id", "folio"}; sem ela, o acompanhamento só no Nexus)."""
     quem = _quem(usuario, pode, "pega um ativo para acompanhar")
     cofre = _cofre()
     if not canon(ativo.get("cod")):
@@ -333,7 +342,7 @@ def pegar(ativo: dict, usuario, pode: bool) -> dict:
         if ab:
             raise Recusada(f"Este ativo já está com {ab['responsavel']['nome'] or 'outra pessoa'}")
         nova = _evento(cofre, "pegou", quem, uuid.uuid4().hex[:12], ativo, responsavel=quem,
-                       inicio=datetime.now(_BRT).date(), entrada=ativo)
+                       inicio=datetime.now(_BRT).date(), entrada=ativo, os=os)
         _publicar(lido["eventos"] + [nova], lido["diagnosticos"])
     return nova
 
@@ -352,9 +361,10 @@ def _do_livro(lido: dict, acompanhamento_id) -> dict:
     return a
 
 
-def encaminhar(ativo: dict, para_hmac: str, usuario, pode: bool, pessoas: list[dict]) -> dict:
+def encaminhar(ativo: dict, para_hmac: str, usuario, pode: bool, pessoas: list[dict], os: dict | None = None) -> dict:
     """Passa o ativo para uma pessoa da Engenharia (`pessoas`, de `pessoas_da_engenharia`). Ativo livre: começa o
-    acompanhamento com quem recebeu, o início em hoje. Ativo acompanhado: troca quem acompanha (para si mesmo = assumir)."""
+    acompanhamento com quem recebeu, o início em hoje (e `os`, a OS de análise criada no nome dela). Ativo acompanhado:
+    troca quem acompanha (para si mesmo = assumir); a OS dele, se tem, a ponte já passou para quem recebe."""
     quem = _quem(usuario, pode, "encaminha um ativo")
     para = next((p for p in pessoas or [] if p.get("hmac") and p["hmac"] == _txt(para_hmac)), None)
     if not para:
@@ -372,7 +382,7 @@ def encaminhar(ativo: dict, para_hmac: str, usuario, pode: bool, pessoas: list[d
             nova = _evento(cofre, "encaminhou", quem, ab["id"], _ativo_de(ab), responsavel=resp)
         else:
             nova = _evento(cofre, "encaminhou", quem, uuid.uuid4().hex[:12], ativo, responsavel=resp,
-                           inicio=datetime.now(_BRT).date(), entrada=ativo)
+                           inicio=datetime.now(_BRT).date(), entrada=ativo, os=os)
         _publicar(lido["eventos"] + [nova], lido["diagnosticos"])
     return nova
 
@@ -391,12 +401,9 @@ def _data(v, campo: str) -> date | None:
     return d
 
 
-def salvar(acompanhamento_id: str, inicio: str, fim: str, diagnostico_id: str, usuario, pode: bool,
-           hoje: date | None = None) -> dict:
-    """Muda o início e o diagnóstico (evento `dados`) ou, com o fim, encerra (evento `encerrou`, que exige o
-    diagnóstico: o fim da análise é o dia em que ela terminou, decisão do Levi de 18/10/2026)."""
-    quem = _quem(usuario, pode, "muda um acompanhamento")
-    hoje = hoje or datetime.now(_BRT).date()
+def _datas_do_salvar(inicio: str, fim: str, diagnostico_id: str, hoje: date) -> tuple:
+    """(início, fim, diagnóstico) do formulário, com as regras do salvar: o encerrar com a OS no Fracttal confere as
+    mesmas antes de ir lá (concluir a OS não volta)."""
     ini = _data(inicio, "início da análise")
     if not ini:
         raise Recusada("Escolha o início da análise")
@@ -410,6 +417,32 @@ def salvar(acompanhamento_id: str, inicio: str, fim: str, diagnostico_id: str, u
         raise Recusada("O fim da análise não pode ser antes do início")
     if f and not diag:
         raise Recusada("Para encerrar, escolha o diagnóstico")
+    return ini, f, diag
+
+
+def conferir_encerrar(acompanhamento_id: str, inicio: str, fim: str, diagnostico_id: str, usuario, pode: bool,
+                      hoje: date | None = None) -> dict:
+    """O encerrar de um acompanhamento com OS, conferido ANTES do Fracttal (a OS concluída não volta), pelas mesmas
+    regras do salvar e sem gravar nada. → {"inicio", "fim", "diagnostico" (o nome, que responde a subtarefa), "acomp"}."""
+    _quem(usuario, pode, "muda um acompanhamento")
+    ini, f, diag = _datas_do_salvar(inicio, fim, diagnostico_id, hoje or datetime.now(_BRT).date())
+    lido = ler(forcar=True)
+    if not lido.get("lido_em"):
+        raise Recusada("Não consegui ler os acompanhamentos agora: nada foi encerrado; tente de novo em instantes")
+    a = _do_livro(lido, acompanhamento_id)
+    d = next((x for x in diagnosticos(lido["diagnosticos"]) if x["id"] == (diag or a["diagnostico_id"])
+              and not x["excluido"]), None)
+    if not d:
+        raise Recusada("Este diagnóstico não existe no cadastro (ou foi excluído): escolha outro")
+    return {"inicio": ini, "fim": f, "diagnostico": d["nome"], "acomp": a}
+
+
+def salvar(acompanhamento_id: str, inicio: str, fim: str, diagnostico_id: str, usuario, pode: bool,
+           hoje: date | None = None) -> dict:
+    """Muda o início e o diagnóstico (evento `dados`) ou, com o fim, encerra (evento `encerrou`, que exige o
+    diagnóstico: o fim da análise é o dia em que ela terminou, decisão do Levi de 18/10/2026)."""
+    quem = _quem(usuario, pode, "muda um acompanhamento")
+    ini, f, diag = _datas_do_salvar(inicio, fim, diagnostico_id, hoje or datetime.now(_BRT).date())
     cofre = _cofre()
     with _TRAVA:
         lido = _reler()

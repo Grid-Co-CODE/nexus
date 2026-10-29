@@ -111,6 +111,27 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   números dela ficam centrados.
 - **Falha nova** é a do sinal (corretiva e corretiva emergencial, sem o serviço registrado como corretiva): "desde que
   entrou" conta da gravação do Pegar (o início pode ser anterior), e o retorno conta do dia seguinte ao fim.
+- **A OS de análise no Fracttal** (29/10/2026: "quando eu clico em pegar para acompanhar criar uma OS para a pessoa que
+  pegou a atividade"; "Ao encaminhar gera uma OS no nome daquela pessoa da engenharia"). O Pegar e o Encaminhar do ativo
+  livre criam a OS (`nexus/engenharia/os_analise.py`): o título "[<nome curto do ativo>] - Análise de recorrência de
+  falhas" (o `os_web.ativo_curto.curto` do clone, sem marca, modelo nem endereço), o tipo Administrativa com a
+  classificação Programada / Elétrica (a OS de análise do clone, como as de ETM; decisão do quiz), a etiqueta ENGENHARIA
+  (sem ela no Fracttal a OS sai e a gaveta avisa), o responsável pelo id do Fracttal da pessoa (a lista do setor; sem o id,
+  recusa), a data do evento na 2ª falha dos 30 dias (a que acendeu o sinal), a nota com o dia, a hora, quem assumiu (ou
+  quem encaminhou para quem) e as falhas até ali, e a subtarefa "Diagnóstico". Encerrar (o fim com o diagnóstico) responde
+  a subtarefa com o nome do diagnóstico, lança a execução das 8h do início às 18h do fim (nunca depois de agora) e CONCLUI
+  a OS, o que não volta: as regras do salvar são conferidas antes (`acompanhamento.conferir_encerrar`), e a OS que outra
+  tentativa já concluiu (`ERROR_WO_FINISHED`) segue para o Nexus. Encaminhar um acompanhamento com OS troca o responsável
+  dela (`mudar_responsavel`, a nota fica) e escreve a linha na nota; o comentário vai para a nota da OS, como no Quadro da
+  equipe (a mesma `_acrescentar_na_nota` e a mesma trava). Com a OS, a gaveta mostra o número (a página dela no Quadro) e o
+  Solicitar OS e o Criar OS com ela como OS pai e a data do evento dela, como a página da OS do Quadro. As ações da gaveta
+  (e o Pegar do cartão da Mesa) vão para a ponte do OS Creator (`/os/_nexus/engenharia/acompanhamento/...`, em
+  `nexus/torres/oscreator/ponte.py`), porque o cookie do Fracttal só vai para /os; o Fracttal vem ANTES do livro (o que ele
+  recusa não entra no Nexus), e o livro que falha depois diz o número da OS e pede para não repetir. Sem a sessão do
+  Fracttal (quem entrou pela Microsoft), a recusa traz o "Entrar pelo Fracttal", que volta à tela; a sessão vencida no
+  meio tira do Nexus quem entrou pelo Fracttal (a regra do comentário da OS). O acompanhamento aberto antes de 29/10/2026
+  fica sem OS e segue só no Nexus (o quiz: "Ficam sem OS"). As rotas antigas da Confiabilidade continuam, sem o Fracttal.
+  Prova: `tests/test_engenharia_os_analise.py` (o Fracttal falso; o clone de verdade, sem rede).
 - **A gaveta grava sem sair dela:** cada ação é POST (`_de_outro_site` → 403) e responde a própria gaveta relida do banco
   com o aviso ou o erro (`_gaveta.html`, a mesma peça da página); ao fechar depois de gravar, a página recarrega. O Pegar
   do cartão da Mesa (Críticos sem dono) também responde na gaveta. O ativo é casado pelo código canônico
@@ -133,7 +154,8 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   (`livros.existe`): o inicial tem as mesmas 2 linhas, passaria pela trava e desfaria o diagnóstico mexido (auditoria
   da trava, 18/10/2026).
   Quem, o nome de quem acompanha e o comentário só cifrados.
-- **Como provar:** `python -m pytest -q tests/test_engenharia_acompanhamento.py tests/test_engenharia_gaveta_js.py`
+- **Como provar:** `python -m pytest -q tests/test_engenharia_acompanhamento.py tests/test_engenharia_gaveta_js.py
+  tests/test_engenharia_os_analise.py`
   (o livro, as regras, a separação das abas, a tela e as ações, no banco falso; inclusive a API devolvendo tudo como
   texto, o código com caixa e espaço, o comentário com HTML, o banco fora e cada achado da revisão final; o JS da
   resposta, no node). A prova não grava no banco de verdade: o livro é para sempre.

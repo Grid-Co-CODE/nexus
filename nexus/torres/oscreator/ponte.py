@@ -939,3 +939,261 @@ def pcm_nota():
     with _trava_nota:                            # duas marcas juntas na mesma OS: uma não apaga a outra na nota
         r = NO.escrever(app, p["os"], p["texto"])
     return jsonify({"nota": r, "nota_txt": NO.frase(r)})
+
+
+# ── a OS do acompanhamento da Confiabilidade (29/10/2026) ───────────────────────────────────────────────────────────
+# Levi: "quando eu clico em pegar para acompanhar criar uma OS para a pessoa que pegou a atividade"; "Ao encaminhar gera
+# uma OS no nome daquela pessoa da engenharia"; o diagnóstico e o fim da análise respondem a subtarefa e fecham a
+# atividade; e os comentários vão para a nota da OS, como no Quadro da equipe. As ações da gaveta do ativo (a
+# Confiabilidade e a Mesa do engenheiro) moram aqui, em /os/_nexus, pelo motivo do comentário da OS: o cookie do Fracttal
+# (os_sessao) só vai para /os. O Fracttal vem ANTES do livro (o que ele recusa não entra no Nexus); as regras de lá estão
+# em nexus/engenharia/os_analise.py, as do livro em acompanhamento.py, e a resposta é a gaveta do ativo (o `_acao` da
+# torre). O acompanhamento aberto antes disto, sem OS, segue só no Nexus (o quiz do Levi: "Ficam sem OS").
+def _de_volta() -> str:
+    """A tela de onde veio a ação (a Mesa ou a Confiabilidade), sem o prefixo: o login do Fracttal volta para ela."""
+    return "/t/engenharia/mesa" if "/t/engenharia/mesa" in (request.referrer or "") else "/t/engenharia/confiabilidade"
+
+
+def _sem_fracttal(msg: str, de: str):
+    """A recusa com o "Entrar pelo Fracttal" (o login do OS Creator, que volta para a tela `de`): a gaveta mostra o link."""
+    from urllib.parse import quote, urlencode
+
+    from ...engenharia import acompanhamento as AC
+    e = AC.Recusada(msg)
+    e.entrar = "/os/login?next=" + quote("/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/"), safe="")
+    return e
+
+
+def _no_fracttal(fazer, de: str):
+    """`fazer(api, regra, curto)` na sessão do Fracttal da pessoa (o api do clone, como o comentário da OS). Sem a
+    sessão, ou com ela vencida: a recusa com o Entrar pelo Fracttal. O Fracttal que recusa ou não responde: a recusa com
+    o porquê, e nada se grava no Nexus."""
+    from flask import g
+
+    from ...engenharia import acompanhamento as AC
+    from ...engenharia import os_analise as OA
+    app = current_app._get_current_object()
+    s = sessao_do_os(app)
+    jwt = str(s.get("jwt") or "")
+    if not jwt:
+        raise _sem_fracttal("Para criar e mexer na OS da análise, entre pelo Fracttal: a OS sai na sua sessão de lá.", de)
+    clone(app)                                   # põe o `api` do clone no sys.path
+    import api as os_api                         # noqa: E402
+    from os_web import ativo_curto               # noqa: E402
+    from os_web import os_acoes_web as regra     # noqa: E402
+    from os_web import sessao as os_sessao       # noqa: E402
+    with os_sessao.contexto(jwt, str((s.get("conta") or {}).get("email") or "")):
+        try:
+            return fazer(os_api, regra, ativo_curto.curto)
+        except OA.Falhou as e:
+            raise AC.Recusada(str(e)) from None
+        except AC.Recusada:
+            raise
+        except os_api.SessionExpired:
+            g.fracttal_venceu = True
+            raise _sem_fracttal("A sessão do Fracttal venceu: entre de novo pelo Fracttal.", de) from None
+        except os_api.FracttalError as e:
+            raise AC.Recusada(f"O Fracttal recusou: {str(e)[:200]}. Nada foi gravado no Nexus.") from None
+        except Exception as e:                   # noqa: BLE001 — Fracttal fora, cota
+            logging.warning("acompanhamento: o Fracttal não respondeu (%s: %s)", type(e).__name__, str(e)[:160])
+            raise AC.Recusada(f"O Fracttal não respondeu ({type(e).__name__}). Nada foi gravado; tente de novo.") \
+                from None
+
+
+def _depois_do_fracttal(gravar, folio: str):
+    """Grava no livro o que o Fracttal já fez. Se o livro falha, a OS existe lá: dizer o número e pedir para não repetir
+    (repetir criaria outra OS)."""
+    from ...engenharia import acompanhamento as AC
+    try:
+        return gravar()
+    except Exception as e:                       # noqa: BLE001
+        logging.exception("acompanhamento: o Fracttal fez (OS %s), o livro do Nexus não gravou", folio)
+        motivo = str(e) if isinstance(e, AC.Recusada) else type(e).__name__
+        raise AC.Recusada(f"A OS {folio} já está no Fracttal, mas o Nexus não gravou o acompanhamento ({motivo}). Não "
+                          "repita: recarregue a página e, se o ativo não mudou, avise o administrador com o número da "
+                          "OS.") from None
+
+
+def _resposta_da_gaveta(r):
+    """A gaveta da ação; com a sessão do Fracttal vencida no meio, quem entrou pelo Fracttal sai do Nexus junto e quem
+    entrou pela Microsoft perde só o cookie do OS Creator (a regra do comentário da OS, revisão final de 24/10/2026)."""
+    from flask import g, make_response
+    resp = make_response(r)
+    if g.get("fracttal_venceu"):
+        from ...auth import encerrar, os_cookie_path, via_fracttal
+        if via_fracttal():
+            return encerrar("caiu", json=True)
+        resp.delete_cookie("os_sessao", path=os_cookie_path())
+    return resp
+
+
+def _agora_brt():
+    from datetime import datetime, timedelta, timezone
+    return datetime.now(timezone(timedelta(hours=-3)))
+
+
+@bp_raiz.route("/os/_nexus/engenharia/acompanhamento/pegar", methods=["POST"])
+def engenharia_acomp_pegar():
+    from flask import session
+
+    from ...dados.equipamento import canon
+    from ...engenharia import acompanhamento as AC
+    from ...engenharia import os_analise as OA
+    from .. import engenharia as T
+    cod, de = request.form.get("cod", ""), _de_volta()
+
+    def fazer():
+        pode, _ = T._quem_pode()
+        usuario = session.get("usuario")
+        if not pode:                  # a recusa de quem não pode vale antes de todas (e não vai ao Fracttal)
+            AC.pegar({"cod": cod}, usuario, pode)
+        quem = AC._quem(usuario, pode, "pega um ativo para acompanhar")
+        d, _l, acomps, sep = T._agora_do_livro()
+        ab = AC.aberto_de(acomps, cod)
+        if ab:
+            raise AC.Recusada(f"Este ativo já está com {ab['responsavel']['nome'] or 'outra pessoa'}: recarregue a página")
+        s = next((x for x in sep["sinal"] if canon(x["cod"]) == canon(cod)), None)
+        if not s:
+            raise AC.Recusada("Este ativo não está em Ativos com sinal agora: recarregue a página")
+        # a OS sai no nome da pessoa do login, pelo id dela no Fracttal (a lista do setor Engenharia)
+        eu = next((p for p in T._pessoas(pode) if p.get("hmac") == quem["hmac"]), None) or {}
+        para = {"fid": eu.get("fid"), "nome": quem["nome"]}
+        falhas = (d.get("falhasEm") or {}).get(canon(cod), [])
+        agora = _agora_brt()
+        os_ = _no_fracttal(lambda api, regra, curto: OA.criar(api, s, para, quem["nome"], agora, falhas, curto), de)
+        _depois_do_fracttal(lambda: AC.pegar(T._para_gravar(s), usuario, pode, os=os_), os_["folio"])
+        return (f"Agora este ativo está com você, com a OS {os_['folio']} no Fracttal: ele saiu de Ativos com sinal e foi "
+                "para Em acompanhamento." + (f" {os_['aviso']}" if os_["aviso"] else ""))
+    return _resposta_da_gaveta(T._acao(cod, fazer, form="pegar"))
+
+
+@bp_raiz.route("/os/_nexus/engenharia/acompanhamento/encaminhar", methods=["POST"])
+def engenharia_acomp_encaminhar():
+    from flask import session
+
+    from ...dados.equipamento import canon
+    from ...engenharia import acompanhamento as AC
+    from ...engenharia import os_analise as OA
+    from .. import engenharia as T
+    cod, para_hmac, de = request.form.get("cod", ""), request.form.get("para", ""), _de_volta()
+    viu_livre = request.form.get("livre") == "1"
+
+    def fazer():
+        pode, _ = T._quem_pode()
+        usuario = session.get("usuario")
+        pessoas = T._pessoas(pode)
+        if not pode:
+            AC.encaminhar({"cod": cod}, para_hmac, usuario, pode, pessoas)
+        quem = AC._quem(usuario, pode, "encaminha um ativo")
+        d, _l, _a, sep = T._agora_do_livro()
+        s = next((x for x in sep["sinal"] if canon(x["cod"]) == canon(cod)), None)
+        ab = next((x["acomp"] for x in sep["aberto"] if canon(x["acomp"]["cod"]) == canon(cod)), None)
+        if viu_livre and ab:          # a gaveta viu o ativo livre e alguém o pegou depois (revisão final)
+            raise AC.Recusada(f"Este ativo já está com {ab['responsavel']['nome'] or 'outra pessoa'}: recarregue a "
+                              "página para encaminhar")
+        if not s and not ab:
+            raise AC.Recusada("Este ativo não está em Ativos com sinal nem em acompanhamento: recarregue a página")
+        para = next((p for p in pessoas if p.get("hmac") and p["hmac"] == para_hmac), None)
+        if not para:
+            raise AC.Recusada("Escolha uma pessoa da Engenharia para encaminhar")
+        if ab and ab["responsavel"]["hmac"] == para["hmac"]:
+            raise AC.Recusada(f"Este ativo já está com {ab['responsavel']['nome'] or para['nome']}")
+        agora, os_, extra = _agora_brt(), None, ""
+        if not ab:                    # o ativo livre ganha a OS no nome de quem recebe
+            falhas = (d.get("falhasEm") or {}).get(canon(cod), [])
+            os_ = _no_fracttal(lambda api, regra, curto: OA.criar(api, s, para, quem["nome"], agora, falhas, curto), de)
+            extra = f", com a OS {os_['folio']} no Fracttal no nome de quem recebe" + (
+                f". {os_['aviso']}" if os_["aviso"] else "")
+        elif ab.get("os_id"):         # o acompanhamento com OS: ela passa para quem recebe, com a linha na nota
+
+            def trocar(api, regra, curto):
+                OA.trocar_responsavel(api, ab["os_id"], para.get("fid"))
+                try:
+                    return _acrescentar_na_nota(api, regra, {"wid": ab["os_id"], "status": None, "nota": ""},
+                                                [OA.linha_encaminhou(quem["nome"], para["nome"], agora)])
+                except (_NotaIncompleta, _NotaNaoGravou) as e:
+                    return f"a linha do encaminhar não foi à nota ({type(e).__name__})"
+            nota = _no_fracttal(trocar, de)
+            extra = f"; a OS {ab['os_folio']} passou para {para['nome']} no Fracttal" + (
+                "" if nota == "sim" else f" ({nota})")
+        folio = (os_ or {}).get("folio") or (ab or {}).get("os_folio") or ""
+        gravar = (lambda: AC.encaminhar(T._para_gravar(s) if s and not ab else {"cod": cod}, para["hmac"], usuario,
+                                        pode, pessoas, os=os_))
+        if folio and (os_ or (ab or {}).get("os_id")):
+            _depois_do_fracttal(gravar, folio)
+        else:
+            gravar()
+        return f"Encaminhado para {para['nome']}{extra}."
+    return _resposta_da_gaveta(T._acao(cod, fazer, form="encaminhar"))
+
+
+@bp_raiz.route("/os/_nexus/engenharia/acompanhamento/<aid>/salvar", methods=["POST"])
+def engenharia_acomp_salvar(aid):
+    from flask import abort, session
+
+    from ...engenharia import acompanhamento as AC
+    from ...engenharia import os_analise as OA
+    from .. import engenharia as T
+    from ..moldura import _de_outro_site
+    if _de_outro_site():              # antes de qualquer leitura do banco
+        abort(403)
+    cod, de = request.form.get("cod") or T._cod_do(aid), _de_volta()
+    f = request.form
+
+    def fazer():
+        pode, _ = T._quem_pode()
+        usuario = session.get("usuario")
+        extra = ""
+        a = AC.estado(AC.ler(forcar=True)["eventos"]).get(aid) if f.get("fim") else None
+        if a and a["aberto"] and a.get("os_id"):
+            # o encerrar com OS: as regras do Nexus primeiro (concluir no Fracttal não volta), depois o Fracttal
+            c = AC.conferir_encerrar(aid, f.get("inicio", ""), f.get("fim", ""), f.get("diagnostico", ""), usuario, pode)
+            feito = _no_fracttal(lambda api, regra, curto: OA.encerrar(
+                api, a["os_id"], c["diagnostico"], c["inicio"], c["fim"], a["responsavel"]["nome"] or ""), de)
+            extra = (f" A OS {a['os_folio']} foi concluída no Fracttal"
+                     + (" (já estava concluída)" if "ja_concluida" in feito else
+                        ": o diagnóstico respondeu a subtarefa e o fim da análise virou o fim da atividade") + ".")
+            return _depois_do_fracttal(lambda: T._salvar_acompanhamento(aid, cod, extra), a["os_folio"])
+        return T._salvar_acompanhamento(aid, cod, extra)
+    return _resposta_da_gaveta(T._acao(cod, fazer, form="salvar"))
+
+
+@bp_raiz.route("/os/_nexus/engenharia/acompanhamento/<aid>/comentar", methods=["POST"])
+def engenharia_acomp_comentar(aid):
+    from flask import abort, session
+
+    from ...engenharia import acompanhamento as AC
+    from ...engenharia import os_acompanhamento as O
+    from .. import engenharia as T
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    cod, de = request.form.get("cod") or T._cod_do(aid), _de_volta()
+    texto = request.form.get("texto", "")
+
+    def fazer():
+        pode, _ = T._quem_pode()
+        usuario = session.get("usuario")
+        a = AC.estado(AC.ler(forcar=True)["eventos"]).get(aid)
+        if not (a and a["aberto"] and a.get("os_id")):
+            AC.comentar(aid, texto, usuario, pode)
+            return "Comentário salvo."
+        quem = AC._quem(usuario, pode, "comenta um acompanhamento")
+        linha = O.linha_da_nota(O.texto_do_comentario(texto), quem["nome"], _agora_brt())
+
+        def escrever(api, regra, curto):
+            try:
+                return _acrescentar_na_nota(api, regra, {"wid": a["os_id"], "status": None, "nota": ""}, [linha])
+            except _NotaIncompleta:
+                raise AC.Recusada("O Fracttal não devolveu a OS inteira agora. Nada foi gravado; tente de novo.") \
+                    from None
+            except _NotaNaoGravou as e:
+                raise AC.Recusada(f"O Fracttal não gravou a nota ({e}). Nada foi gravado; tente de novo.") from None
+        with _trava_nota:
+            nota = _no_fracttal(escrever, de)
+        if nota == "sim":
+            _depois_do_fracttal(lambda: AC.comentar(aid, texto, usuario, pode), a["os_folio"])
+            return f"Comentário salvo, também na nota da OS {a['os_folio']}, com a data e a hora."
+        AC.comentar(aid, texto, usuario, pode)
+        return f"Comentário salvo só no Nexus: {nota}."
+    return _resposta_da_gaveta(T._acao(cod, fazer, form="comentar"))

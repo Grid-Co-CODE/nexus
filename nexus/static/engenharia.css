@@ -754,3 +754,7 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .eg-relatorios .eg-fo-rpn--alto{background:var(--papel-crit-suave);color:var(--papel-crit)}
 .eg-relatorios .eg-fo-rpn--medio{background:var(--papel-alerta-suave);color:var(--papel-alerta)}
 .eg-relatorios .eg-fo-rpn--baixo{background:var(--papel-ok-suave);color:var(--papel-ok)}
+
+/* a OS de análise do acompanhamento na gaveta (29/10/2026): o número, o Solicitar OS e o Criar OS */
+.eg-acomp-os{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 8px;font-size:13px}
+.eg-acomp-os-acoes{display:inline-flex;flex-wrap:wrap;gap:6px;margin-left:auto}

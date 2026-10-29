@@ -1003,7 +1003,10 @@ vai preencher o ativo pelo o da OS original, a pessoa pode até mudar o ativo ma
   do card: OS concluída, cancelada ou de várias tarefas não deixa). A linha do motivo do PCM vai pelo mesmo caminho
   (`/os/_nexus/pcm/nota`, `ponte.pcm_nota`, desde 26/10/2026; a regra no `nexus/pcm/CLAUDE.md`, "A nota da OS ao
   escolher o motivo"): rota do Nexus que precisa do login do Fracttal mora em `/os/_nexus`, porque o `os_sessao` só vai
-  para `/os`.
+  para `/os`. Desde 29/10/2026 as ações da gaveta do ativo da Confiabilidade também
+  (`/os/_nexus/engenharia/acompanhamento/pegar`, `/encaminhar`, `/<id>/salvar`, `/<id>/comentar`): o Pegar cria a OS
+  de análise do acompanhamento no nome da pessoa, o encerrar conclui a OS e o comentário vai à nota dela (as regras em
+  `nexus/engenharia/os_analise.py` e no `nexus/torres/engenharia/CLAUDE.md`). Nada disso muda a cópia: só chama o `api`.
 - **Criar OS do zero (25/10/2026):** o mesmo endereço em `/os/tradicional?` (o "Criar OS" da OS do Quadro da equipe;
   Levi: "Fará os mesmos preenchimentos automáticos que já faz na solicitação"): o Passo 1 abre com o cliente, a usina e
   o ativo marcados (a busca mostra o ativo) e a data do incidente no campo; a OS pai vem escolhida no campo do Passo 1,

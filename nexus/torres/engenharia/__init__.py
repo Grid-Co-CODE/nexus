@@ -224,7 +224,22 @@ def _montar_gaveta(gid: str, a: dict, acomp: dict | None, novas: list, anteriore
             "novas": [dict(x, dia=x["quando"].astimezone(BRT).strftime("%d/%m")) for x in novas],
             "anteriores": anteriores,
             "falhas_dias": sorted({x["quando"].astimezone(BRT).strftime("%Y-%m-%d") for x in falhas}),
-            "chamados": list(chamados), "relatorios": list(relatorios)}
+            "chamados": list(chamados), "relatorios": list(relatorios), "os": _links_da_os(acomp, falhas)}
+
+
+def _links_da_os(acomp: dict | None, falhas: list) -> dict:
+    """O Solicitar OS e o Criar OS da OS do acompanhamento, como na página da OS do Quadro da equipe (Levi, 29/10/2026:
+    "Quero também que tenha um botão de criar solicitação e criar OS que nem funciona no quadro da equipe"): o ativo, a
+    OS como OS pai e a data do evento dela (a 2ª falha da janela quando o acompanhamento começou). Sem prefixo: a gaveta
+    põe com o `na_raiz`."""
+    if not (acomp and acomp.get("os_id")):
+        return {}
+    from ...engenharia import os_analise as OA
+    ev = OA.data_do_evento(falhas, acomp["desde"]) if acomp.get("desde") else None
+    sugestao = urlencode({"ativo": acomp["cod"], "os_pai": acomp["os_id"], "os_pai_folio": acomp["os_folio"],
+                          "data": ev.astimezone(BRT).strftime("%Y-%m-%dT%H:%M") if ev else ""})
+    return {"solicitar": "/os/_nexus/ir?" + urlencode({"url": "/os/solicitacao?" + sugestao}),
+            "criar": "/os/_nexus/ir?" + urlencode({"url": "/os/tradicional?" + sugestao})}
 
 
 SITUACAO_CHAMADO = {"aberto": ("Aberto", "alerta"), "verificacao": ("Em verificação", "info"),
@@ -537,7 +552,7 @@ def _agora_do_livro():
 
 
 def _gaveta_de(cod: str, acomp_id: str | None = None, aviso: str = "", erro: str = "", status: int = 200,
-               digitado: dict | None = None):
+               digitado: dict | None = None, entrar: str = ""):
     """A gaveta do ativo como está no banco agora: o acompanhamento `acomp_id` (o que acabou de ser encerrado) ou o
     aberto, e os encerrados dele embaixo."""
     from ...dados.equipamento import canon
@@ -565,7 +580,8 @@ def _gaveta_de(cod: str, acomp_id: str | None = None, aviso: str = "", erro: str
                            pessoas=_pessoas(pode), diags_ativos=[x for x in diags if not x["excluido"]],
                            diag_nome={x["id"]: x["nome"] for x in diags}, meta=C.META_DISP, janela=C.JANELA_DIAS,
                            h=_h, pct=_pct, hoje=datetime.now(BRT).date().isoformat(), piso=AC.PISO.isoformat(),
-                           aviso=aviso, erro=erro, erro_leitura=erro_leitura, digitado=digitado or {}), status
+                           aviso=aviso, erro=erro, erro_leitura=erro_leitura, digitado=digitado or {},
+                           entrar=entrar), status
 
 
 def _acao(cod: str, fazer, aviso: str = "", acomp_id=None, form: str = ""):
@@ -580,7 +596,8 @@ def _acao(cod: str, fazer, aviso: str = "", acomp_id=None, form: str = ""):
     try:
         r = fazer()
     except AC.Recusada as e:
-        return _gaveta_de(cod, erro=str(e), digitado=digitado)
+        # a recusa da ponte sem a sessão do Fracttal leva o login dele (`entrar`), que a gaveta mostra
+        return _gaveta_de(cod, erro=str(e), digitado=digitado, entrar=getattr(e, "entrar", ""))
     except Exception as e:      # noqa: BLE001 — banco fora: a gaveta diz o que aconteceu
         import logging
 
@@ -665,24 +682,27 @@ def acompanhamento_salvar(aid):
     if _de_outro_site():          # antes de qualquer leitura do banco (acabamento da revisão final)
         abort(403)
     cod = request.form.get("cod") or _cod_do(aid)
-    fim = request.form.get("fim", "")
+    return _acao(cod, lambda: _salvar_acompanhamento(aid, cod), form="salvar")
 
-    def fazer():
-        pode, _ = _quem_pode()
-        ev = AC.salvar(aid, request.form.get("inicio", ""), fim, request.form.get("diagnostico", ""),
-                       session.get("usuario"), pode)
-        if ev["evento"] != "encerrou":
-            return "Salvo."
-        # encerrar com falha depois do fim faz o ativo voltar para Ativos com sinal (a regra do Levi, 18/10/2026): só
-        # se ele ainda tem o sinal de 30 dias (acabamento da revisão final)
-        from ...dados.equipamento import canon
-        d = _dados()["dados"]
-        marco = AC._depois_do_fim(AC._dia(ev["data_id_fim_analise"]))
-        tem_sinal = any(canon(s["cod"]) == canon(cod) for s in d["sinais"])
-        volta = tem_sinal and any(x["quando"] >= marco for x in (d.get("falhasEm") or {}).get(canon(cod), []))
-        return ("Encerrado." + (" O ativo volta para Ativos com sinal: teve falha depois do fim." if volta else ""),
-                aid)
-    return _acao(cod, fazer, form="salvar")
+
+def _salvar_acompanhamento(aid: str, cod: str, extra: str = ""):
+    """O salvar do formulário da gaveta (a rota daqui e a da ponte, que antes conclui a OS no Fracttal): o aviso, e no
+    encerrar o acompanhamento mostrado (o encerrado). `extra` = o que a ponte fez no Fracttal."""
+    from ...engenharia import acompanhamento as AC
+    pode, _ = _quem_pode()
+    ev = AC.salvar(aid, request.form.get("inicio", ""), request.form.get("fim", ""), request.form.get("diagnostico", ""),
+                   session.get("usuario"), pode)
+    if ev["evento"] != "encerrou":
+        return "Salvo." + extra
+    # encerrar com falha depois do fim faz o ativo voltar para Ativos com sinal (a regra do Levi, 18/10/2026): só
+    # se ele ainda tem o sinal de 30 dias (acabamento da revisão final)
+    from ...dados.equipamento import canon
+    d = _dados()["dados"]
+    marco = AC._depois_do_fim(AC._dia(ev["data_id_fim_analise"]))
+    tem_sinal = any(canon(s["cod"]) == canon(cod) for s in d["sinais"])
+    volta = tem_sinal and any(x["quando"] >= marco for x in (d.get("falhasEm") or {}).get(canon(cod), []))
+    return ("Encerrado." + (" O ativo volta para Ativos com sinal: teve falha depois do fim." if volta else "") + extra,
+            aid)
 
 
 @bp.route("/confiabilidade/acompanhamento/<aid>/comentar", methods=["POST"])

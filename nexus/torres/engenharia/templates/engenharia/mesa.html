@@ -121,7 +121,7 @@
           </span>
           <span class="eg-item-n"><b>{{ s.nFalha }}</b><span>falha{{ 's' if s.nFalha != 1 }} · {{ s.n30 }} OS</span></span>
         </button>
-        {% if pode %}<div class="eg-item-acoes"><form data-eg-form="pegar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_pegar') }}"><input type="hidden" name="cod" value="{{ s.cod }}"><button type="submit" class="gc-btn gc-btn--primario eg-btn-peq">Pegar para acompanhar</button></form>
+        {% if pode %}<div class="eg-item-acoes"><form data-eg-form="pegar" method="post" action="{{ url_for('os_web_ponte.engenharia_acomp_pegar') }}"><input type="hidden" name="cod" value="{{ s.cod }}"><button type="submit" class="gc-btn gc-btn--primario eg-btn-peq">Pegar para acompanhar</button></form>
           <button type="button" class="gc-btn gc-btn--contorno eg-btn-peq" data-gaveta="{{ s.gid }}" data-eg-abrir-encaminhar>Encaminhar</button></div>{% endif %}
         </article>
       {% else %}<p class="mudo eg-vazio">{{ 'Todo crítico tem dono.' if est.completa else 'Nenhum crítico sem dono nas OS lidas até agora.' }}</p>{% endfor %}</div>{% endif %}
