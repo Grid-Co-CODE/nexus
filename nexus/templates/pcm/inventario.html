@@ -29,6 +29,10 @@
   <p>O técnico conta as peças no App sem ver o saldo do Fracttal. Aqui o PCM compara a contagem com o saldo lido na hora, revisa
     e aprova. A contagem mais nova de cada almoxarifado substitui as mais velhas que ainda não foram gravadas.</p>
 </div>
+{# TEMPORÁRIO (Levi, 29/10/2026): conferir as duas chaves do .env do servidor sem acesso a ele; sai logo depois #}
+<p class="mudo" data-conferir-chaves>Conferência das chaves: gravação no Fracttal
+  <b>{{ 'ligada neste servidor (NEXUS_INVENTARIO_GRAVAR=1)' if (config.get('NEXUS_INVENTARIO_GRAVAR') or '')|trim == '1' else 'desligada' }}</b>
+  · almoxarifado de teste fora das telas: <b>{{ config.get('NEXUS_ALMOX_TESTE_IDS') or 'nenhum' }}</b></p>
 <ol class="inv-fluxo inv-fluxo--guia" aria-label="As etapas de cada contagem">
   <li><b>1 · Contagem</b><span>O técnico conta no App, sem ver o saldo</span></li>
   <li><b>2 · Aprovação</b><span>Sistema × contado, revisar e gravar</span></li>
