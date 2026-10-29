@@ -27,9 +27,19 @@ def _situacao_da_meta(u: dict) -> str:
     return "critico" if a < R.META_ATENCAO else ("alerta" if a < R.META_NA_META else "ok")
 
 
+def _cls_nivel(campo: str, nivel) -> str:
+    """A cor de um nível de sujidade ou de vegetação na régua das Rondas (`visao.criticidade`: o 5 crítico, o 4 atenção;
+    abaixo, sem alerta); sem leitura, neutro."""
+    if nivel is None:
+        return "neutro"
+    itens = visao.criticidade({campo: nivel})[1]
+    return itens[0][1] if itens else "ok"
+
+
 def performance(usinas: list[dict]) -> dict:
     """Todas as usinas pela meta do mês, da pior para a melhor (`ordem_da_meta`; sem meta publicada no fim), na régua da
-    Visão gerencial: abaixo de 90% crítico, abaixo de 97% atenção; com o PR contra o previsto e a disponibilidade."""
+    Visão gerencial: abaixo de 90% crítico, abaixo de 97% atenção; com o PR contra o previsto, a disponibilidade e a
+    última sujidade e vegetação."""
     linhas = []
     for u in sorted(usinas, key=R.ordem_da_meta):
         m, d = u.get("meta") or {}, u.get("disp") or {}
@@ -37,12 +47,20 @@ def performance(usinas: list[dict]) -> dict:
         # contra o previsto, a disponibilidade na régua da tela dona); o card largo do Painel mostra os dois em coluna
         val = (u.get("perf") or {}).get("valores") or {}
         pr_v, disp_v = val.get("pr") or {}, val.get("disp") or {}
+        # a última sujidade e vegetação da usina (Levi, 29/10/2026: "em performance mostre última sujidade e vegetação
+        # de todas as usinas. Pode aparecer depois de disponibilidade"): a leitura que a Visão já tem (`responsaveis.
+        # limpeza`, a conta das Rondas, a última em 90 dias), na régua das Rondas
+        lim = u.get("limpeza") or {}
+        suj, veg = lim.get("sujidade"), lim.get("vegetacao")
         linhas.append({"usina_id": u["usina_id"], "usina": u["usina"], "cliente": u.get("cliente") or "",
                        "atingimento": m.get("atingimento"), "situacao": _situacao_da_meta(u),
                        "anomalia": m.get("anomalia") or "", "pr": m.get("pr"), "pr_meta": m.get("pr_meta"),
                        "pr_abaixo": m.get("pr") is not None and m.get("pr_meta") is not None and m["pr"] < m["pr_meta"],
                        "disp": d.get("disp"), "pr_cls": pr_v.get("cls") or "neutro",
-                       "disp_cls": disp_v.get("cls") or "neutro"})
+                       "disp_cls": disp_v.get("cls") or "neutro",
+                       "sujidade": suj, "sujidade_cls": _cls_nivel("sujidade", suj),
+                       "vegetacao": veg, "vegetacao_cls": _cls_nivel("vegetacao", veg),
+                       "limpeza_data": lim.get("data") or ""})
     cont = collections.Counter(x["situacao"] for x in linhas)
     return {"usinas": len(usinas), "com_meta": len(usinas) - cont["sem_meta"], "abaixo": cont["critico"] + cont["alerta"],
             "criticas": cont["critico"], "na_meta": cont["ok"], "sem_meta": cont["sem_meta"],

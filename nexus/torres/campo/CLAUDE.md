@@ -853,7 +853,10 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
 - **Cada quadro com o total e a lista inteira:**
   - Usinas abaixo da performance: todas as usinas, da pior meta para a melhor, sem meta no fim; em colunas, a meta do
     mês (a barra e o número), o PR contra o previsto e a disponibilidade, com a cor que a Visão já dá na linha da usina
-    (`linha_performance`, nenhuma régua nova). Os números do topo numa linha só, cada um com o rótulo ("tem um espaço
+    (`linha_performance`, nenhuma régua nova); depois da disponibilidade, a **última sujidade e vegetação** (Levi,
+    29/10/2026: "em performance mostre última sujidade e vegetação de todas as usinas. Pode aparecer depois de
+    disponibilidade": a leitura que a Visão já tem, `responsaveis.limpeza`, a conta das Rondas em 90 dias, na régua
+    delas, `visao.criticidade`: o 5 crítico, o 4 atenção; a data da leitura na dica). Os números do topo numa linha só, cada um com o rótulo ("tem um espaço
     grande, dá para fazer o texto caber melhor na parte de performance"): abaixo de 97%, abaixo de 90%, a meta do
     grupo, na meta e sem meta publicada.
   - Chamados abertos **por usina** (2ª rodada, Levi: "pode só botar o nome da UFV uma vez e dizer qual os ativos daquela

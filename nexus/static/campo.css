@@ -1359,10 +1359,10 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
 .pn-rk-seta{min-width:36px;font:600 11px/16px var(--font-mono);color:var(--mudo)}
 .pn-rk-seta--sobe{color:var(--ok)} .pn-rk-seta--desce{color:var(--critico)}
 .pn-vazio{padding:10px 8px;font-size:13px;color:var(--mudo)}
-/* a Performance larga (29/10/2026): por usina, a meta do mês (a barra e o número), o PR contra o previsto e a
-   disponibilidade em colunas, com o rótulo de cada coluna em cima */
-.pn-perf-cab,.pn-it--perf{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(70px,1fr) 56px 140px 110px;
-  align-items:center;gap:12px}
+/* a Performance larga (29/10/2026): por usina, a meta do mês (a barra e o número), o PR contra o previsto, a
+   disponibilidade e a última sujidade e vegetação em colunas, com o rótulo de cada coluna em cima */
+.pn-perf-cab,.pn-it--perf{display:grid;
+  grid-template-columns:minmax(0,1.5fr) minmax(70px,1fr) 56px 140px 110px 76px 80px;align-items:center;gap:12px}
 .pn-perf-cab{margin:0 6px 2px 0;padding:0 8px;font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;
   text-transform:uppercase;color:var(--mudo)}
 .pn-perf-cab span:nth-child(n+4){text-align:right}
