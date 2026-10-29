@@ -56,6 +56,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | Segurança · HSEQ (Mesa da Segurança, desde 24/10/2026, por responsável ou por cliente, com a visão geral: filtros de cliente, UFV e Responsável UFV, a planilha de todas as pendências e o e-mail semanal, que o App de Campo manda; Extintores: por cliente, com o responsável e os técnicos de cada usina, por responsável, o relatório de cada cliente e usina em PDF e Excel, o Status por situação com o filtro, e a Segurança excluindo e editando extintores (o histórico de Excluídos) e pedindo nova ronda da usina; EPI e EPC: as luvas isolantes pela ronda diária, por responsável; APR e PT: as Permissões de trabalho que vieram do Campo, com a PT e a APR, por responsável, com os filtros de cliente, usina e responsável, o histórico inteiro de 20 em 20 e a aba Sem APR ou PT) | `nexus/torres/hseq/CLAUDE.md` |
 | Cadastro (BD_Operações) | `nexus/cadastro/CLAUDE.md` |
 | **Camada de dados: fatos, dimensões, qualidade (PRIORIDADE 0)** | `nexus/dados/CLAUDE.md` |
+| **Design: o visual (as regras, as cores de cada tema, a tipografia, como uma tela se monta, os componentes e como provar)** | `DESIGN.md` |
 | **Desempenho (Nexus lento: como ler o Raio-X, as regras de prova, o que já foi corrigido e a fila do chat de desempenho)** | `DESEMPENHO.md` |
 | Servidor da T.I. | `DEPLOY.md` |
 
