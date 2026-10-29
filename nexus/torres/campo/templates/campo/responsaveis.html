@@ -205,8 +205,13 @@
       {# o número é o das usinas sem ronda há 7 dias ou mais, somadas as que nunca tiveram ronda pelo App (Levi,
          28/10/2026: "o número do KPI deve falar quantas usinas estão sem ronda a 7 dias ou mais"; "Somar as que nunca
          tiveram"); vermelho com uma ou mais, como a Visão marca a usina sem ronda #}
-      <div class="pn-num"><b class="{{ 'cn-t-critico' if rd.sem_7 else 'cn-t-ok' }}">{{ rd.sem_7 }}</b>
-        <span>sem ronda há 7 dias ou mais<small>{% if rd.nunca %}{{ rd.nunca }} nunca teve ronda pelo App · {% endif %}{{ rd.em_dia }} de {{ rd.usinas }} em dia{% if rd.longa %} · {{ rd.longa }} com a longa pendente{% endif %}</small></span></div>
+      {# os outros números como os da Performance, cada um em destaque com o rótulo (Levi, 29/10/2026: "gostei, faça algo
+         parecido com a parte de rondas"); o quadro é estreito: eles vão na linha de baixo #}
+      <div class="pn-num pn-num--linha"><b class="{{ 'cn-t-critico' if rd.sem_7 else 'cn-t-ok' }}">{{ rd.sem_7 }}</b>
+        <span>sem ronda há 7 dias ou mais</span><i class="pn-quebra" aria-hidden="true"></i>
+        {% if rd.nunca %}<span class="pn-st" title="Nunca tiveram ronda pelo App desde a mobilização"><b class="cn-t-critico">{{ rd.nunca }}</b> nunca teve ronda</span>{% endif %}
+        <span class="pn-st"><b class="cn-t-ok">{{ rd.em_dia }}</b> de {{ rd.usinas }} em dia</span>
+        {% if rd.longa %}<span class="pn-st"><b class="cn-t-alerta">{{ rd.longa }}</b> longa pendente</span>{% endif %}</div>
       <ol class="pn-lista" tabindex="0" aria-label="Todas as usinas pela ronda, a que mais pede primeiro">
         {% for x in rd.linhas %}
         {% set cls = {'nunca': 'cn-t-critico', 'sem_ronda': 'cn-t-critico', 'longa_pendente': 'cn-t-alerta', 'em_dia': 'cn-t-ok'}.get(x.situacao, 'mudo') %}

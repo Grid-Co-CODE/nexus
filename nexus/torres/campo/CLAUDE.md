@@ -873,7 +873,8 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
   - Acompanhamento de rondas: todas as usinas, a que mais pede primeiro, as em dia no fim (a barra colorida saiu em
     29/10/2026: "Tire essa barra colorida de acompanhamento de rondas"). O número é o das usinas **sem ronda há 7 dias ou mais, somadas as que nunca tiveram**
     ronda pelo App (2ª rodada: "o número do KPI deve falar quantas usinas estão sem ronda a 7 dias ou mais"; decisão
-    dele: "Somar as que nunca tiveram"); a linha de baixo diz quantas nunca tiveram, as em dia e as longas pendentes.
+    dele: "Somar as que nunca tiveram"); embaixo, no formato dos números da Performance ("gostei, faça algo
+    parecido com a parte de rondas"), as que nunca tiveram ronda, as em dia e as longas pendentes, numa linha.
   - Extintores vencidos (o 6º, Levi no mesmo dia: "quero que mostre também as usinas com extintores vencidos daquele
     supervisor"): só as usinas com vencido, a com mais vencidos primeiro, o pior extintor e os a vencer na linha (a
     conta do HSEQ que a Visão já lê). A linha abre a janela da usina `painel=extintores` (vencidos, a vencer, sem

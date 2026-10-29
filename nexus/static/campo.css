@@ -1309,7 +1309,7 @@ tr.ap-os:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
 .pn-ver:hover{text-decoration:underline}
 .pn-q > .pn-ver{margin:8px 0 0;align-self:flex-start}
 /* o número guarda o lugar de duas linhas em todos os quadros: as listas começam na mesma altura */
-.pn-num{display:flex;align-items:baseline;gap:10px;min-height:48px;margin:6px 0 6px}
+.pn-num{display:flex;flex:none;align-items:baseline;gap:10px;min-height:48px;margin:6px 0 6px}
 .pn-num > b{font:600 28px/32px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .pn-num > span{font-size:13px;color:var(--tinta-2);line-height:1.35}
 .pn-num small{display:block;font-size:12px;color:var(--mudo)}
@@ -1318,6 +1318,9 @@ tr.ap-os:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
 .pn-num--linha{flex-wrap:wrap;align-items:baseline;gap:4px 18px}
 .pn-st{padding-left:18px;font-size:13px;color:var(--tinta-2);border-left:1px solid var(--linha);white-space:nowrap}
 .pn-st b{margin-right:3px;font:700 16px/20px var(--font-sans);font-variant-numeric:tabular-nums}
+/* no quadro estreito (as Rondas), os números vão na linha de baixo: a quebra, e o 1º deles sem o fio */
+.pn-quebra{flex-basis:100%;height:0}
+.pn-quebra + .pn-st{padding-left:0;border-left:0}
 .pn-lista{max-height:calc(6 * var(--pn-linha) + 5 * 2px);flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
   list-style:none;margin:0 -6px 0 0;
   padding:0 6px 0 0;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}

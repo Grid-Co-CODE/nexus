@@ -175,6 +175,10 @@ def test_a_tela_do_painel_do_responsavel(tela, logado):
     i = html.index('id="pn-perf-t"')
     perf = html[i:html.index("</section>", i)]
     assert 'class="pn-num pn-num--linha"' in perf and "meta do grupo no mês</span>" in perf and "na meta</span>" in perf
+    # as Rondas no mesmo formato ("faça algo parecido com a parte de rondas"), os números na linha de baixo
+    i = html.index('id="pn-rd-t"')
+    rondas = html[i:html.index("</section>", i)]
+    assert 'class="pn-num pn-num--linha"' in rondas and 'class="pn-quebra"' in rondas and " em dia</span>" in rondas
     # sem a barra das rondas e sem o aviso do ranking; os números diretos ("só a quantidade de chamados em aberto",
     # "a quantidade de equipes", "6 extintores vencidos e 2 a vencer")
     assert 'class="pn-seg"' not in html and 'class="pn-nota"' not in html
