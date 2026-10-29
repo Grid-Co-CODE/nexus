@@ -689,6 +689,21 @@ button.cr-v--neutro{background:transparent}
 :root[data-tema="claro"] .cr-info > summary:hover,:root[data-tema="claro"] .cr-info[open] > summary{color:var(--verde-texto)}
 .cr-info > summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
 .cr-info > .cn-nota{margin-top:6px}
+/* o "!" ao lado do título do Ranking de pontos (29/10/2026): o mesmo símbolo, e a explicação abre por cima da
+   classificação, até 780 px e nunca mais larga que a tela (390 px), sem empurrar a tela */
+.rk-cab{position:relative}
+.rk-titulo{display:flex;align-items:center;gap:6px}
+.rk-info{margin:6px 0 0}
+.rk-info > .cn-nota{position:absolute;left:0;top:100%;z-index:30;width:min(780px,calc(100vw - 32px));margin-top:8px;
+  max-height:70vh;overflow:auto;box-shadow:0 18px 40px var(--cartao-sombra)}
+/* uma métrica por linha, com um fio entre elas (Levi, 29/10/2026: "separe os tópicos em linhas, acaba que o texto parece
+   estar se misturando") */
+.cr-reguas.rk-metricas{gap:0 18px}          /* vence o gap do .cr-reguas, que vem depois */
+.rk-metricas > dt,.rk-metricas > dd{padding:9px 0;border-top:1px solid var(--linha)}
+.rk-metricas > dt:first-of-type,.rk-metricas > dt:first-of-type + dd{border-top:0}
+@media (max-width:700px){
+  .rk-metricas > dd{border-top:0;padding-top:0}
+}
 .cr-reguas{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:10px 0}
 .cr-reguas dt{color:var(--tinta);font-weight:600}
 .cr-reguas dd{margin:0}

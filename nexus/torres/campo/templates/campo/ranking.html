@@ -10,9 +10,66 @@
    fica, com a explicação da régua do mês no mouse; e "1°, 2° e 3° lugar quero estilo podium das olimpíadas". #}
 {% macro pts(n) %}{{ '{:,}'.format(n or 0).replace(',', '.') }}{% endmacro %}
 {% macro pct(n) %}{{ (n ~ '%') if n is not none else '—' }}{% endmacro %}
+{% if atual %}
+  {% set mes_txt = nome_do_mes(atual.mes) %}
+  {% set g = atual.regua %}
+  {# o "fora do ciclo" do App, explicado pela régua que ele publicou no mês #}
+  {# a regra é a do App (confirmada pela sessão dele em 18/10/2026): vale a primeira que pegar #}
+  {% set dica_fora = 'Fora do ciclo: fica sem posição na classificação de ' ~ mes_txt ~ ' quem tem menos de '
+       ~ (g.get('min_tarefas') if g.get('min_tarefas') is not none else 'o mínimo de')
+       ~ ' tarefas registradas no mês (contam todas, inclusive as devolvidas e as de 0 ponto; ronda não conta) ou, tendo o mínimo, menos de '
+       ~ ((g.get('min_cumprimento') ~ '%') if g.get('min_cumprimento') is not none else 'o mínimo')
+       ~ ' do programado cumprido (concluídas ÷ programadas, só os dias já vencidos; sem nada programado, conta 0%). Os pontos aparecem só para conferir.' %}
+{% endif %}
+{% macro fora_do_ciclo() %}<span class="rk-dica" tabindex="0" title="{{ dica_fora }}">Fora do ciclo</span>{% endmacro %}
+{# o "!" ao lado do título (Levi, 29/10/2026: "tem que ter uma exclamação ao lado de 'Ranking de Pontos' (...)
+   explicando como funciona essas métricas"; ele estranhou "280 rondas" e "2.000 tarefas", que eram pontos, e não entendeu
+   a pontualidade): o "Como o App calcula" que ficava no pé da tela, agora coluna por coluna, com a régua que o App publicou
+   no mês. Fechado ao abrir a tela; abre por cima da classificação. As contas são as do App (`_ciclo_v2` no
+   function_app.py): a tarefa vale `max(0, nota - 60)` com nota no piso e GPS; a pontualidade é o `_foi_pontual` (início
+   até o programado + PONTUAL_GRACE_MIN, 30 min) da 1ª tarefa fechada da OS no dia, só nas OS da programação, e a OS sem
+   horário programado entra como fora do horário (o `bool(None)` do App). Mudou lá, muda aqui. #}
+{% macro como_ler() %}
+  <details class="cr-info rk-info">
+  <summary title="Como o App calcula cada coluna" aria-label="Como o App calcula cada coluna"><i class="ph ph-warning-circle" aria-hidden="true"></i></summary>
+  <div class="cn-nota">
+    <b>Como o App calcula.</b> O placar é de {{ mes_txt }} (o App chama o mês de ciclo): o App calcula e publica aqui de
+    hora em hora, e o Nexus não recalcula.
+    <dl class="cr-reguas rk-metricas">
+      <dt>Total</dt><dd>A soma que define a posição: pontos de tarefas + pontos de rondas + bônus. No empate, fica na
+        frente quem tem mais tarefas contadas.</dd>
+      <dt>Tarefas</dt><dd>Em cima, quantas tarefas a pessoa registrou no mês; embaixo, os pontos e quantas contam. Cada
+        tarefa vale a nota menos 60 (nota 100 = 40 pontos), se a nota chegou ao piso{% if g.get('piso') is not none %}
+        ({{ g.piso }}){% endif %} e houve GPS, com o peso do tipo (religamento e administrativa valem metade). Contam as
+        {% if g.get('teto') is not none %}{{ g.teto }} {% endif %}melhores do mês, e cada tarefa abaixo do piso anula uma
+        das que contavam{% if g.get('anula_max') is not none %} (até {{ g.anula_max }}){% endif %}.</dd>
+      <dt>Rondas</dt><dd>Em cima, quantas rondas no mês; embaixo, os pontos. As rondas somam num balde à parte, pelo tipo
+        de cada uma{% if g.get('ronda_teto') is not none %}, com teto de {{ pts(g.ronda_teto) }} pontos no mês{% endif %}:
+        "no teto" quer dizer que passou do teto e as rondas a mais não somam.</dd>
+      <dt>Bônus</dt><dd>Só nas semanas já encerradas e sem devolução, sobre os pontos de tarefas da semana:
+        {% if g.get('bonus_prog') is not none %}+{{ g.bonus_prog }}% com a programação da semana completa{% else %}um
+        tanto com a programação da semana completa{% endif %}{% if g.get('bonus_prev') is not none %} e até
+        +{{ g.bonus_prev }}% pelas preventivas feitas na própria semana{% endif %}.</dd>
+      <dt>Nota média</dt><dd>A média das notas (de 0 a 100) de todas as tarefas que ele registrou no mês.</dd>
+      <dt>Cumprimento</dt><dd>Concluídas ÷ programadas, só nos dias já vencidos; embaixo, quantas de quantas.</dd>
+      <dt>Pontualidade</dt><dd>Das OS da programação dele, em quantas ele começou a execução até 30 minutos depois do
+        horário programado (começar antes também vale); conta uma vez por OS por dia, pela primeira tarefa fechada.
+        Não soma ponto: é só informação. A OS sem horário na programação conta como fora do horário.</dd>
+      <dt>Sequência</dt><dd>Quantos dias programados seguidos, até hoje, ele terminou no próprio dia tudo o que estava
+        programado. Dia sem programação (folga, fim de semana) não conta nem zera.</dd>
+      <dt>Devolvidas · anuladas</dt><dd>As tarefas devolvidas pelo supervisor (ficam com 0 ponto até serem refeitas e
+        aprovadas) e as anuladas por tarefa abaixo do piso. A linha com alguma abre a lista, com a OS e o motivo.</dd>
+      <dt>Fora do ciclo</dt><dd>{{ (dica_fora[15:16]|upper ~ dica_fora[16:]) if dica_fora else '' }}</dd>
+    </dl>
+    Com uma região escolhida, a posição continua a do mês inteiro: é a que o técnico vê no App.
+  </div>
+  </details>
+{% endmacro %}
 <div class="campo-nativa">
-  <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+  <div class="cn-cab rk-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p>
+      <div class="rk-titulo"><h1 class="cn-titulo">{{ tela.nome }}</h1>{% if atual %}{{ como_ler() }}{% endif %}</div>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">placar do mês do App{% if calculado %}<br><b>calculado em {{ calculado }}</b>{% endif %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
@@ -37,16 +94,6 @@
     veem a pontuação de antes.</div>
   {% endif %}
 
-  {% set mes_txt = nome_do_mes(atual.mes) %}
-  {% set g = atual.regua %}
-  {# o "fora do ciclo" do App, explicado pela régua que ele publicou no mês #}
-  {# a regra é a do App (confirmada pela sessão dele em 18/10/2026): vale a primeira que pegar #}
-  {% set dica_fora = 'Fora do ciclo: fica sem posição na classificação de ' ~ mes_txt ~ ' quem tem menos de '
-       ~ (g.get('min_tarefas') if g.get('min_tarefas') is not none else 'o mínimo de')
-       ~ ' tarefas registradas no mês (contam todas, inclusive as devolvidas e as de 0 ponto; ronda não conta) ou, tendo o mínimo, menos de '
-       ~ ((g.get('min_cumprimento') ~ '%') if g.get('min_cumprimento') is not none else 'o mínimo')
-       ~ ' do programado cumprido (concluídas ÷ programadas, só os dias já vencidos; sem nada programado, conta 0%). Os pontos aparecem só para conferir.' %}
-  {% macro fora_do_ciclo() %}<span class="rk-dica" tabindex="0" title="{{ dica_fora }}">Fora do ciclo</span>{% endmacro %}
   {# a linha aberta: as OS que não pontuaram cheio, como o App listou (devolvida, abaixo do piso, anulada); serve à
      classificação e ao fora do ciclo (no livro de 19/10/2026, 12 dos 17 técnicos de outubro com lista estavam fora).
      A OS vai em verde e abre o card do OS Creator (Levi, 18/10/2026: "ao citar uma OS tem que ficar verde grid") #}
@@ -104,8 +151,10 @@
       {% if abre %}<tr class="cn-linha rk-linha" tabindex="0" aria-expanded="false" title="Ver as OS devolvidas, abaixo do piso e anuladas, com o motivo">{% else %}<tr>{% endif %}
         <td class="m">{{ p.posicao }}º</td><td class="rk-tec">{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td>
         <td><b>{{ pts(p.total) }}</b></td>
-        <td>{{ pts(p.tarefas_pts) }}<span class="det">{{ p.contadas }} de {{ p.tarefas }} tarefa{{ 's' if p.tarefas != 1 }}</span></td>
-        <td>{{ pts(p.rondas_pts) }}<span class="det">{{ p.rondas }} ronda{{ 's' if p.rondas != 1 }}{% if p.rondas_no_teto %} · no teto{% endif %}</span></td>
+        {# a quantidade em cima e os pontos embaixo (Levi, 29/10/2026: "acho bom botar primeiro a quantidade real e
+           abaixo vir os pontos"; os pontos em cima pareciam "280 rondas" e "2.000 tarefas" no mês) #}
+        <td>{{ p.tarefas }}<span class="det">{{ pts(p.tarefas_pts) }} pts · {{ p.contadas }} conta{{ 'm' if p.contadas != 1 }}</span></td>
+        <td>{{ p.rondas }}<span class="det">{{ pts(p.rondas_pts) }} pts{% if p.rondas_no_teto %} · no teto{% endif %}</span></td>
         <td>{{ pts(p.bonus) }}</td>
         <td>{{ p.nota_media if p.nota_media is not none else '—' }}</td>
         <td>{{ pct(p.cumprimento) }}<span class="det">{{ p.concluido }} de {{ p.programado }} programada{{ 's' if p.programado != 1 }}</span></td>
@@ -137,19 +186,6 @@
     sem nome: o código da pessoa não bate com o cadastro do App, e ela aparece como "—".</p>
   {% endif %}
 
-  <div class="cn-nota"><b>Como o App calcula.</b> Cada tarefa pontua pela nota dela, se a nota chegou ao piso
-    {%- if g.get('piso') is not none %} ({{ g.piso }}){% endif %} e houve GPS; contam as
-    {% if g.get('teto') is not none %}{{ g.teto }} {% endif %}melhores do mês, com o peso do tipo (religamento e
-    administrativa valem menos). Cada tarefa com nota abaixo do piso anula uma das boas
-    {%- if g.get('anula_max') is not none %} (até {{ g.anula_max }}){% endif %}. As rondas somam num balde à parte
-    {%- if g.get('ronda_teto') is not none %}, com teto de {{ pts(g.ronda_teto) }} pontos{% endif %}. Nas semanas já
-    encerradas e sem devolução entra o bônus{% if g.get('bonus_prog') is not none %}: +{{ g.bonus_prog }}% com a
-    programação da semana completa{% endif %}{% if g.get('bonus_prev') is not none %} e até +{{ g.bonus_prev }}% pelas
-    preventivas feitas na semana{% endif %}. Fica fora do ciclo quem tem menos
-    {%- if g.get('min_tarefas') is not none %} de {{ g.min_tarefas }}{% endif %} tarefas registradas ou menos
-    {%- if g.get('min_cumprimento') is not none %} de {{ g.min_cumprimento }}%{% endif %} do programado. No empate, vence
-    quem teve mais tarefas contadas. A classificação é do mês (o App chama o mês de ciclo), e a posição é a do mês
-    inteiro, mesmo com uma região escolhida.</div>
   {% endif %}
 </div>
 {% include "oscreator/card_os_abrir.html" %}
@@ -162,6 +198,13 @@
     ev.preventDefault(); ev.stopPropagation();
     NexusOsCard.abrirFolio(b.getAttribute('data-folio'), {status: ''});
   });
+  // o "!" do título fecha no clique fora dele e no Esc (29/10/2026)
+  (function () {
+    var d = document.querySelector('.rk-info');
+    if (!d) { return; }
+    document.addEventListener('click', function (ev) { if (d.open && !d.contains(ev.target)) { d.open = false; } });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && d.open) { d.open = false; } });
+  })();
   // a linha com devolvida, abaixo do piso ou anulada abre a lista do App (Levi, 18/10/2026)
   document.querySelectorAll('tr.rk-linha').forEach(function (tr) {
     function alterna() {

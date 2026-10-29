@@ -269,3 +269,38 @@ def test_a_lista_do_app_esta_no_catalogo_de_dados():
     assert f.dims["pessoa"][0] == "hmac" and f.dims["os"][0] == "cod"
     # a chave do contrato com o App (a sessão do App, 18/10/2026)
     assert f.chave == ("Mês", "Técnico (HMAC)", "OS", "Tarefa", "Situação")
+
+
+# ── 29/10/2026 (Levi): a quantidade em cima e os pontos embaixo; o "!" ao lado do título explica cada métrica ────────
+def _linha_de(html, nome):
+    corpo = html.split("Classificação de outubro de 2026", 1)[1]
+    return next(_texto(tr) for tr in corpo.split("<tr")[1:] if nome in tr)
+
+
+def test_a_quantidade_vem_em_cima_e_os_pontos_embaixo(ranking, logado):
+    # "estou estranhando a quantidade de rondas (...) o cara fez 280 rondas só em outubro? fez 2000 tarefas?": eram os
+    # pontos em cima. Agora em cima vem quantas tarefas e quantas rondas; embaixo, os pontos (e quantas tarefas contam)
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    ana = _linha_de(html, "Ana Souza")
+    assert re.search(r"<b>\s*1\.480\s*</b>|1\.480", ana)                         # o total segue em pontos
+    assert " 40 1.180 pts · 38 contam " in ana, ana                              # 40 tarefas; 1.180 pts; 38 contam
+    assert " 9 200 pts " in ana, ana                                             # 9 rondas; 200 pts
+    assert "38 de 40 tarefas" not in ana and "9 rondas" not in ana               # o formato de antes saiu
+
+
+def test_o_ponto_de_exclamacao_ao_lado_do_titulo_explica_cada_metrica(ranking, logado):
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    cab = html.split('class="rk-titulo"', 1)[1].split("</details>", 1)[0]
+    assert "<h1" in cab and 'class="cr-info rk-info"' in cab and "ph-warning-circle" in cab
+    assert "<details" in cab and " open" not in cab.split(">", 3)[2]              # fechado ao abrir a tela
+    t = _texto(cab)
+    for coluna in ("Total", "Tarefas", "Rondas", "Bônus", "Nota média", "Cumprimento", "Pontualidade", "Sequência",
+                   "Devolvidas · anuladas", "Fora do ciclo"):
+        assert " %s " % coluna in t, coluna
+    # a pontualidade, que ele não entendeu: a regra do App, que não soma ponto, e a OS sem horário
+    pont = t.split(" Pontualidade ", 1)[1].split(" Sequência ", 1)[0]
+    for trecho in ("até 30 minutos depois do horário programado", "uma vez por OS por dia", "Não soma ponto",
+                   "A OS sem horário na programação conta como fora do horário"):
+        assert trecho in pont, trecho
+    assert "nota menos 60 (nota 100 = 40 pontos)" in t and "teto de 250 pontos no mês" in t
+    assert html.count("Como o App calcula.") == 1                                # saiu do pé da tela: está só no "!"
