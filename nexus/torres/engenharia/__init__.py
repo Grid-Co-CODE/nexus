@@ -180,11 +180,13 @@ def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
     for x in sep["encerrado"]:
         anteriores.setdefault(canon(x["acomp"]["cod"]), []).append(x["acomp"])
 
+    chamados = _chamados_por_ativo()
+
     def gaveta(i, a, acomp, novas):
         c = canon(a.get("cod") or (acomp or {}).get("cod"))
         return _montar_gaveta(f"g{i}", a, acomp, novas,
                               [x for x in anteriores.get(c, []) if not acomp or x["id"] != acomp["id"]],
-                              falhas_em.get(c, []) if a.get("nivel") else [])
+                              falhas_em.get(c, []) if a.get("nivel") else [], chamados.get(c, []))
     if aba == "ativos":
         gavetas = [gaveta(i, s, None, []) for i, s in enumerate(sinais)]
     elif aba == "acompanhamento":
@@ -207,15 +209,59 @@ def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
                        "encerrados": "—" if erro_acomp else len(encerrados)}}
 
 
-def _montar_gaveta(gid: str, a: dict, acomp: dict | None, novas: list, anteriores: list, falhas: list) -> dict:
+def _montar_gaveta(gid: str, a: dict, acomp: dict | None, novas: list, anteriores: list, falhas: list,
+                   chamados=()) -> dict:
     """O que a gaveta de um ativo mostra (engenharia/_gaveta.html), na página e na resposta das ações: o ativo, o
-    acompanhamento, as falhas novas com o dia, os encerrados anteriores e o dia de cada falha do ativo (o aviso de que o
-    fim escolhido faz o ativo voltar para Ativos com sinal). `falhas` vazio para o ativo sem o sinal de 30 dias: ele
-    não volta para a lista, e o aviso não vale (acabamento da revisão final)."""
+    acompanhamento, as falhas novas com o dia, os encerrados anteriores, o dia de cada falha do ativo (o aviso de que o
+    fim escolhido faz o ativo voltar para Ativos com sinal) e os chamados de garantia dele (`_chamados_por_ativo`).
+    `falhas` vazio para o ativo sem o sinal de 30 dias: ele não volta para a lista, e o aviso não vale (acabamento da
+    revisão final)."""
     return {"id": gid, "a": a, "acomp": acomp,
             "novas": [dict(x, dia=x["quando"].astimezone(BRT).strftime("%d/%m")) for x in novas],
             "anteriores": anteriores,
-            "falhas_dias": sorted({x["quando"].astimezone(BRT).strftime("%Y-%m-%d") for x in falhas})}
+            "falhas_dias": sorted({x["quando"].astimezone(BRT).strftime("%Y-%m-%d") for x in falhas}),
+            "chamados": list(chamados)}
+
+
+SITUACAO_CHAMADO = {"aberto": ("Aberto", "alerta"), "verificacao": ("Em verificação", "info"),
+                    "concluido": ("Concluído", "neutro")}
+
+
+def _ler_chamados() -> list[dict]:
+    """As OS de acompanhamento de chamado de garantia no banco (`nexus_chamados · fato_chamado`, a etiqueta CHAMADOS do
+    Fracttal; ver nexus/dados/fato_chamado.py): o mesmo dado do quadro de Garantias, sem ler o Fracttal."""
+    from ...campo import visao
+    return visao._livro("nexus_chamados", "fato_chamado")
+
+
+def _chamados_por_ativo() -> dict:
+    """{código canônico: os chamados de garantia do ativo}, o aberto primeiro (Levi, 29/10/2026: "Em confiabildade
+    gostaria também mostrasse as OSs com etiqueta de chamados, caso tenha"). O banco dos chamados fora não derruba a
+    gaveta: ela segue sem o bloco."""
+    import logging
+
+    from ...dados.equipamento import canon
+    try:
+        linhas = _ler_chamados() or []
+    except Exception as e:      # noqa: BLE001
+        logging.warning("confiabilidade: os chamados de garantia não vieram (%s: %s)", type(e).__name__, str(e)[:160])
+        return {}
+    ordem = {"aberto": 0, "verificacao": 1, "concluido": 2}
+    por: dict = {}
+    for r in linhas:
+        c, sit = canon(str(r.get("codigo_ativo") or "").strip()), str(r.get("situacao") or "")
+        os_ = str(r.get("os") or "").split(".")[0]
+        if not c or not os_ or sit not in SITUACAO_CHAMADO:
+            continue
+        dia = str(r.get("data_id_abertura") or "").split(".")[0]
+        por.setdefault(c, []).append({
+            "os": os_, "situacao": sit, "rotulo": SITUACAO_CHAMADO[sit][0], "cor": SITUACAO_CHAMADO[sit][1],
+            "fabricante": str(r.get("fabricante") or "").strip(), "componente": str(r.get("componente") or "").strip(),
+            "status": str(r.get("status") or "").strip(),
+            "desde": f"{dia[6:8]}/{dia[4:6]}/{dia[:4]}" if len(dia) == 8 and dia.isdigit() else ""})
+    for lista in por.values():
+        lista.sort(key=lambda x: (ordem[x["situacao"]], -int(x["os"]) if x["os"].isdigit() else 0))
+    return por
 
 
 def _quem_pode() -> tuple[bool, str | None]:
@@ -388,12 +434,13 @@ def mesa():
     for x in sep["encerrado"]:
         anteriores.setdefault(canon(x["acomp"]["cod"]), []).append(x["acomp"])
     gavetas = []
+    chamados = _chamados_por_ativo()
 
     def gaveta(a, acomp, novas) -> str:
         c = canon(a.get("cod") or (acomp or {}).get("cod"))
         gv = _montar_gaveta(f"g{len(gavetas)}", a, acomp, novas,
                             [x for x in anteriores.get(c, []) if not acomp or x["id"] != acomp["id"]],
-                            falhas_em.get(c, []) if a.get("nivel") else [])
+                            falhas_em.get(c, []) if a.get("nivel") else [], chamados.get(c, []))
         gavetas.append(gv)
         return gv["id"]
     caixa = [dict(x, gid=gaveta(x["a"], x["acomp"], x["novas"])) for x in caixa]
@@ -401,8 +448,10 @@ def mesa():
     sem_dono = [dict(s, gid=gaveta(s, None, [])) for s in sem_dono]
     diags = AC.diagnosticos(lido["diagnosticos"])
     est = os_falhas.estado()
+    pessoa = next((p for p in pessoas if p["hmac"] == alvo), None) if alvo else None
     return render_template(
         "engenharia/mesa.html", torre=TORRE, tela=TORRE.tela("mesa"), alvo=alvo, meu=meu, admin=admin,
+        mesa_os=_os_da_pessoa(pessoa), mesa_etm=_etms_da_pessoa(pessoa),
         nome_alvo=nome_alvo, quem=quem, pessoas=pessoas, caixa=caixa, comigo=comigo, sem_dono=sem_dono,
         gavetas=gavetas, erro_acomp=erro, erro_leitura=bool(erro),
         kpis=_faixa_da_mesa(caixa, comigo, sem_dono, erro, quem=quem, sem_pessoa=not alvo,
@@ -412,6 +461,60 @@ def mesa():
         niveis=C.NIVEIS, meta=C.META_DISP, janela=C.JANELA_DIAS, h=_h, pct=_pct,
         hoje=datetime.now(BRT).date().isoformat(), piso=AC.PISO.isoformat(), est=est,
         sem_cadastro=g.get("sem_cadastro"), lido=datetime.fromtimestamp(g["em"], BRT).strftime("%H:%M"))
+
+
+def _da_pessoa(o: dict, pessoa: dict) -> bool:
+    """A OS é da pessoa da mesa: pelo id do Fracttal quando a lista do setor o traz; sem ele, pelo nome (sem acento nem
+    caixa), como o Fracttal escreve o responsável."""
+    from ...engenharia import os_equipe
+    if pessoa.get("fid"):
+        return str(o.get("pid")) == str(pessoa["fid"])
+    return bool(pessoa.get("nome")) and os_equipe._norm(o.get("pessoa")) == os_equipe._norm(pessoa["nome"])
+
+
+def _os_da_pessoa(pessoa: dict | None) -> dict | None:
+    """As OS da pessoa da mesa no Quadro da equipe (Levi, 29/10/2026: "Quero informações das OSs daquela pessoa"): os
+    quatro números do quadro só com as dela e as abertas, a atrasada primeiro. A leitura é a do Quadro (relida por trás
+    enquanto alguma das telas é usada); sem leitura ainda, a Mesa não espera: diz que está lendo."""
+    if not pessoa:
+        return None
+    from ...engenharia import os_equipe
+    os_equipe.marcar_uso()
+    os_equipe.pedir_releitura()
+    d = os_equipe.dados()
+    if not d["lido"]:
+        return {"lendo": True, "kpis": [], "abertas": [], "erro": d.get("erro") or ""}
+    minhas, erro_eng = _com_a_engenharia([o for o in d["os"] if _da_pessoa(o, pessoa)])
+    hoje = datetime.now(BRT).date()
+    ordem = {"atrasada": 0, "vence": 1}
+    abertas = sorted((o for o in minhas if o["coluna"] in ("fazer", "execucao", "verificacao")),
+                     key=lambda o: (ordem.get(o["prazo"], 2), o["programada_iso"] or "9999", o["os"]))
+    return {"lendo": False, "kpis": faixa_kpis(minhas, hoje, JANELA_CONCLUIDAS, sem_engenharia=bool(erro_eng)),
+            "abertas": abertas, "erro": d.get("erro") or "", "colunas": dict(os_equipe.COLUNAS)}
+
+
+def _etms_da_pessoa(pessoa: dict | None) -> dict | None:
+    """As OS de ETM com a pessoa (Levi, 29/10/2026: "Se a pessoa tiver ETM atrelada, tem que ter uma visão de ETM"): os
+    quatro números da tela ETMs só com as dela e as abertas. Sem ETM, a Mesa não mostra o bloco."""
+    if not pessoa:
+        return None
+    from ...engenharia import etm as ETM
+    from ...engenharia import etm_marcas as M
+    ETM.marcar_uso()
+    ETM.pedir_releitura()
+    d = ETM.dados()
+    minhas = [o for o in d["os"] if _da_pessoa(o, pessoa)]
+    if not minhas:
+        return None
+    lido = M.ler()
+    erro_marcas = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0]
+    est = M.estado(lido["eventos"]) if not erro_marcas else {}
+    oss = [_os_do_planner(o, est.get(str(o.get("wid")))) for o in minhas]
+    hoje = datetime.now(BRT).date()
+    abertas = sorted((o for o in oss if o["coluna"] in ("nao_iniciada", "em_andamento")),
+                     key=lambda o: (o["criada_dia"] or "", o["os"]))
+    return {"kpis": faixa_etm(oss, hoje, sem_marcas=bool(erro_marcas)), "abertas": abertas,
+            "colunas": dict(ETM.COLUNAS)}
 
 
 def _para_gravar(s: dict) -> dict:
@@ -448,7 +551,8 @@ def _gaveta_de(cod: str, acomp_id: str | None = None, aviso: str = "", erro: str
     anteriores = [x["acomp"] for x in sep["encerrado"] if canon(x["acomp"]["cod"]) == c
                   and (not acomp or x["acomp"]["id"] != acomp["id"])]
     gv = _montar_gaveta("g", a, acomp, novas, anteriores,
-                        (d.get("falhasEm") or {}).get(c, []) if a.get("nivel") else [])
+                        (d.get("falhasEm") or {}).get(c, []) if a.get("nivel") else [],
+                        _chamados_por_ativo().get(c, []))
     diags = AC.diagnosticos(lido["diagnosticos"])
     erro_leitura = bool(lido.get("erro") and not lido.get("lido_em"))
     if erro_leitura and not erro:
@@ -589,6 +693,34 @@ def acompanhamento_comentar(aid):
         pode, _ = _quem_pode()
         AC.comentar(aid, request.form.get("texto", ""), session.get("usuario"), pode)
     return _acao(cod, fazer, "Comentário salvo.", form="comentar")
+
+
+@bp.route("/confiabilidade/acompanhamento/<aid>/diagnostico-novo", methods=["POST"])
+def acompanhamento_diagnostico_novo(aid):
+    """O diagnóstico novo pela própria gaveta (Levi, 29/10/2026: "gostaria que abaixo tivesse um botão para adicionar
+    diagnósticos, eu digito, salvo, assim que salvar a lista de diagnósticos se atualiza"): entra no cadastro (o mesmo da
+    aba Diagnósticos) e volta já escolhido no formulário, com as datas que a pessoa tinha digitado. O acompanhamento só
+    muda no Salvar: escolher não é gravar."""
+    import logging
+
+    from ...engenharia import acompanhamento as AC
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    cod = request.form.get("cod") or _cod_do(aid)
+    digitado = dict(request.form.items(), form="salvar")
+    nome = " ".join(request.form.get("novo_diag", "").split())
+    try:
+        pode, _ = _quem_pode()
+        novo = AC.criar_diagnostico(nome, "", session.get("usuario"), pode)
+    except AC.Recusada as e:
+        return _gaveta_de(cod, erro=str(e), digitado=digitado)
+    except Exception as e:      # noqa: BLE001 — banco fora: nada entrou no cadastro
+        logging.exception("confiabilidade: o diagnóstico novo da gaveta não gravou")
+        return _gaveta_de(cod, erro=FALHOU_BANCO.format(type(e).__name__), digitado=digitado)
+    digitado.update(diagnostico=str(novo["diagnostico_id"]), novo_diag="")
+    return _gaveta_de(cod, aviso=f"Diagnóstico {novo['nome']} criado e escolhido: salve para gravar no acompanhamento.",
+                      digitado=digitado)
 
 
 def _cadastro(fazer, aviso: str):

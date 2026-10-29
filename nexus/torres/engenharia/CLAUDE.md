@@ -43,7 +43,16 @@ escolhida (a senha de administrador) os dois números dela são "—". A rota é
   quando a pessoa comenta ou salva (`respondeu` no `acompanhamento.estado`), e o mais antigo vem primeiro. Esses ativos
   não aparecem de novo em "Com você".
 - **Com você:** os outros acompanhamentos abertos da pessoa, com falha nova primeiro, depois o nível.
-- **Críticos sem dono:** os da lista Ativos com sinal com nível crítico, com o Pegar e o Encaminhar ali mesmo.
+- **Críticos sem dono:** os da lista Ativos com sinal com nível crítico, com o Pegar e o Encaminhar ali mesmo. Desde
+  29/10/2026 o cartão é enxuto (Levi: "pode tirar o código do ativo, deixa só ativo e usina"): o nome, a usina embaixo,
+  os critérios do sinal sem a borda ("só a palavra pintada", `eg-tag--sem`) e os botões 30% menores
+  (`eg-mesa-sem-dono`). Nos cartões de Encaminhados e Com você, o código e a usina ficam embaixo do nome.
+- **As OS de <pessoa>** (29/10/2026, Levi: "Quero informações das OSs daquela pessoa"): as do Quadro da equipe com a
+  pessoa da mesa (o `fid` da lista do setor, o id do Fracttal; sem ele, o nome), os cinco números do quadro só com as dela
+  e as abertas (a atrasada primeiro), cada uma abrindo a página da OS. A leitura é a do Quadro, relida por trás; sem
+  leitura ainda, a Mesa não espera: diz que está lendo.
+- **As ETMs de <pessoa>** ("Se a pessoa tiver ETM atrelada, tem que ter uma visão de ETM"): as OS de ETM com ela, os
+  quatro números da tela ETMs e as abertas, abrindo a OS da ETM. Quem não tem ETM não vê o bloco.
 - **A faixa:** Encaminhados para você (âmbar quando há), Com você e Críticos sem dono (vermelho quando há), no modelo do
   Acompanhamento de chamados (`kb-kpis`). Cada número é o da lista de mesmo nome (o encaminhado conta só na caixa: o
   número diferente da lista é antiobjetivo do desenho). Sem ler o livro, os números dizem "—" e as listas dizem que não
@@ -90,7 +99,16 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   volta, e o aviso não vale).
 - **Diagnóstico:** o "A definir" da gaveta manda 0 e limpa o diagnóstico (o Levi, 18/10/2026; o histórico guarda a
   troca); o vazio, que só a API manda, quer dizer "manter". Encerrar exige um diagnóstico escolhido. O nome e a descrição
-  do cadastro vão em claro e recusam e-mail ("@"), como o nome do setor.
+  do cadastro vão em claro e recusam e-mail ("@"), como o nome do setor. **O diagnóstico novo pela própria gaveta**
+  (29/10/2026: "gostaria que abaixo tivesse um botão para adicionar diagnósticos"): o "Novo diagnóstico" embaixo da
+  escolha manda o formulário inteiro (o botão tem o `formaction`) para `/acompanhamento/<id>/diagnostico-novo`, que põe o
+  nome no cadastro e devolve a gaveta com ele escolhido e as datas digitadas; o acompanhamento só muda no Salvar.
+- **Os chamados de garantia do ativo** (29/10/2026: "mostrasse as OSs com etiqueta de chamados, caso tenha"): o bloco
+  da gaveta com as OS de acompanhamento de chamado dele (`nexus_chamados · fato_chamado`, pelo código canônico, o aberto
+  primeiro), cada uma abrindo a página da OS. O banco dos chamados fora tira o bloco, e a gaveta segue.
+- **A gaveta acompanha o nome do ativo** (29/10/2026: "o texto do ativo está quebrando, a barra lateral pode se adaptar"):
+  o `engenharia-gaveta.js` mede o título numa linha só e abre a gaveta até 860 px (no celular, a tela toda); os quatro
+  números dela ficam centrados.
 - **Falha nova** é a do sinal (corretiva e corretiva emergencial, sem o serviço registrado como corretiva): "desde que
   entrou" conta da gravação do Pegar (o início pode ser anterior), e o retorno conta do dia seguinte ao fim.
 - **A gaveta grava sem sair dela:** cada ação é POST (`_de_outro_site` → 403) e responde a própria gaveta relida do banco

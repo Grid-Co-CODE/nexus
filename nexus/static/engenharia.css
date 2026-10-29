@@ -106,7 +106,8 @@
 .eg-gav-cab code{font:600 12px var(--font-mono);color:var(--mudo)}
 .eg-gav-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin:18px 0;background:var(--linha);
   border:1px solid var(--linha);border-radius:10px;overflow:hidden}
-.eg-gav-kpis div{background:var(--superficie-2);padding:10px 12px;display:grid;gap:2px}
+.eg-gav-kpis div{background:var(--superficie-2);padding:10px 12px;display:grid;gap:2px;justify-items:center;
+  text-align:center}
 .eg-gav-kpis .v{font:800 18px/1.1 var(--font-sans);color:var(--tinta)}
 .eg-gav-kpis .n{font-size:11px;color:var(--mudo)}
 .eg-gaveta h3{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);margin:18px 0 8px}
@@ -699,3 +700,46 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .etm-semana-barra span{display:block;height:100%;width:var(--p,0);background:var(--verde);border-radius:999px}
 .etm-semana-n{min-width:2.5ch;text-align:right;font:700 14px/1 var(--font-sans);font-variant-numeric:tabular-nums}
 .etm-semana-corpo{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;padding:2px 14px 14px}
+
+/* ── a gaveta e a Mesa de 29/10/2026 ── */
+/* o diagnóstico novo pela própria gaveta: o link abre o campo e o botão manda o formulário para o cadastro */
+.eg-diag-novo{grid-column:-2/-1;margin-top:-4px}
+/* aberto, o campo e o botão pegam a linha toda */
+.eg-diag-novo[open]{grid-column:1/-1}
+.eg-diag-novo summary{cursor:pointer;font:600 12.5px/18px var(--font-sans);color:var(--verde-texto);width:max-content}
+.eg-diag-novo-linha{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.eg-diag-novo-linha .gc-campo{flex:1;min-width:180px}
+/* os chamados de garantia do ativo (a etiqueta CHAMADOS) */
+.eg-chamados{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.eg-chamados li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;font-size:13px;color:var(--tinta);
+  padding:8px 10px;border:1px solid var(--linha);border-radius:10px;background:var(--superficie-2)}
+.eg-chamados .mudo{font-size:12px}
+/* o código e a usina embaixo do nome do ativo, nos cartões da Mesa */
+.eg-item-sub{display:block;margin-top:2px;font-size:12.5px;line-height:1.35;color:var(--tinta-2)}
+.eg-item-sub code{font:600 11.5px var(--font-mono);color:var(--mudo)}
+/* o critério do sinal sem a borda: só a palavra pintada */
+.eg-tag.eg-tag--sem{border-color:transparent;background:transparent;padding-left:0;padding-right:4px}
+/* os Críticos sem dono enxutos (Levi: "Reduza o tamanho desse card") e os botões 30% menores */
+.eg-mesa-sem-dono .eg-item{padding:10px 14px;gap:4px 10px}
+.eg-mesa-sem-dono .eg-item-tit{font-size:13.5px}
+.eg-mesa-sem-dono .eg-item-n b{font-size:20px}
+.eg-mesa-sem-dono .eg-item-n span{font-size:11px}
+.eg-mesa-sem-dono .eg-item-acoes{padding:0 14px 10px;gap:5px}
+.eg-mesa-sem-dono .eg-btn-peq{padding:4px 9px;font-size:11px;line-height:15px}
+/* as OS e as ETMs da pessoa na Mesa: os quatro números do quadro e as abertas */
+.eg-mesa-os .kb-kpis.eg-mesa-os-kpis{grid-template-columns:repeat(auto-fit,minmax(112px,1fr));row-gap:10px;margin:0;border:0;
+  border-radius:0;border-bottom:1px solid var(--linha);padding:12px 4px}
+.eg-mesa-os .kb-kpi{padding:0 14px}
+.eg-mesa-os .kb-kpi-v{font-size:20px}
+/* na Mesa a faixa é só o número: o detalhe de cada um está na lista logo embaixo */
+.eg-mesa-os .kb-kpi-nota{display:none}
+.eg-mesa-oss{list-style:none;margin:0;padding:6px 10px 10px;display:grid;gap:2px}
+.eg-mesa-oss li.mudo{padding:10px 8px}
+.eg-mesa-oss a{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:8px;border-radius:8px;
+  text-decoration:none;color:var(--tinta);font-size:13px}
+.eg-mesa-oss a:hover{background:var(--superficie-2)}
+.eg-mesa-oss a:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+.eg-mesa-oss b{font:700 12.5px var(--font-mono);color:var(--verde-texto)}
+.eg-mesa-oss .t{flex:1;min-width:160px}
+.eg-mesa-oss .mudo{font-size:12px}
+.eg-mesa-mais{margin:0;padding:0 18px 12px;font-size:12px}

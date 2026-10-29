@@ -36,6 +36,12 @@
     <label><span class="gc-rotulo">Início da análise</span><input class="gc-campo" type="date" name="inicio" required value="{{ dg.get('inicio', '') if em_salvar else (ac.inicio.isoformat() if ac.inicio else '') }}" min="{{ piso }}" max="{{ hoje }}"></label>
     <label><span class="gc-rotulo">Fim da análise</span><input class="gc-campo" type="date" name="fim" value="{{ dg.get('fim', '') if em_salvar else '' }}" min="{{ piso }}" max="{{ hoje }}"></label>
     <label><span class="gc-rotulo">Diagnóstico</span>{% set diag_escolhido = (dg.get('diagnostico')|int(0)) if em_salvar else ac.diagnostico_id %}<select class="gc-campo" name="diagnostico"><option value="0"{% if not diag_escolhido %} selected{% endif %}>A definir</option>{% for x in diags_ativos %}<option value="{{ x.id }}"{% if x.id == diag_escolhido %} selected{% endif %}>{{ x.nome }}</option>{% endfor %}{% if ac.diagnostico_id and ac.diagnostico_id not in diags_ativos|map(attribute='id')|list %}<option value="{{ ac.diagnostico_id }}" selected>{{ diag_nome.get(ac.diagnostico_id, '—') }} (excluído)</option>{% endif %}</select></label>
+    {# o diagnóstico que falta entra daqui mesmo (Levi, 29/10/2026): o botão manda o formulário inteiro para a rota do
+       cadastro, que volta com ele já escolhido e com as datas digitadas #}
+    <details class="eg-diag-novo"><summary>Novo diagnóstico</summary>
+      <span class="eg-diag-novo-linha"><input class="gc-campo" name="novo_diag" maxlength="60" placeholder="Nome do diagnóstico" aria-label="Nome do novo diagnóstico" autocomplete="off">
+        <button type="submit" class="gc-btn gc-btn--contorno eg-btn-peq" formaction="{{ url_for('torre_engenharia.acompanhamento_diagnostico_novo', aid=ac.id) }}" formnovalidate>Salvar diagnóstico</button></span>
+    </details>
     <p class="eg-acomp-dica">Preencher o fim (com o diagnóstico) encerra o acompanhamento: o ativo vai para Encerrados.</p>
     <p class="eg-acomp-volta" data-eg-volta hidden></p>
     <button type="submit" class="gc-btn gc-btn--primario">Salvar</button>
@@ -65,6 +71,14 @@
 <div class="eg-acomp-sem"><span>Ninguém acompanha este ativo.</span>
   {% if pode %}<span class="eg-acomp-acoes"><form data-eg-form="pegar" method="post" action="{{ url_for('torre_engenharia.acompanhamento_pegar') }}"><input type="hidden" name="cod" value="{{ a.get('cod') }}"><button type="submit" class="gc-btn gc-btn--primario">Pegar para acompanhar</button></form>{{ encaminhar(a.get('cod'), '', true) }}</span>{% endif %}
 </div>
+{% endif %}
+
+{% if gv.chamados %}
+{# os chamados de garantia do ativo (a etiqueta CHAMADOS do Fracttal; Levi, 29/10/2026), o aberto primeiro #}
+<h3>Chamados de garantia ({{ gv.chamados|length }})</h3>
+<ul class="eg-chamados">{% for c in gv.chamados %}<li><a class="cn-link m" href="{{ url_for('torre_engenharia.equipe_os', folio=c.os) }}">OS {{ c.os }}</a>
+  <span class="eg-tag eg-tag--{{ c.cor }}">{{ c.rotulo }}</span>
+  <span>{{ [c.fabricante, c.componente]|select|join(' · ') or 'chamado de garantia' }}</span>{% if c.status %}<span class="mudo">{{ c.status }}</span>{% endif %}{% if c.desde %}<span class="mudo">desde {{ c.desde }}</span>{% endif %}</li>{% endfor %}</ul>
 {% endif %}
 
 {% if gv.anteriores %}

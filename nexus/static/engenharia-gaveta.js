@@ -27,7 +27,22 @@
         var gav = document.querySelector('.eg-gaveta'), veu = document.querySelector('.eg-veu');
         if (gav) {
           var corpo = gav.querySelector('.eg-gav-corpo'), ativo = null, mudou = false;
-          function mostra() { gav.hidden = false; veu.hidden = false; gav.querySelector('.eg-gav-fechar').focus(); }
+          function mostra() { gav.hidden = false; veu.hidden = false; gav.querySelector('.eg-gav-fechar').focus(); ajusta(); }
+          // a gaveta acompanha o nome do ativo (Levi, 29/10/2026: "o texto do ativo está quebrando, a barra lateral pode
+          // se adaptar ao tamanho do nome do ativo"): mede o título numa linha só e abre até 820 px; no celular, a tela toda
+          function ajusta() {
+            gav.style.width = '';
+            var h = corpo.querySelector('.eg-gav-cab h2');
+            if (!h) return;
+            // numa linha só, o título empurra o cabeçalho para fora da gaveta: o que passa, mais as folgas da gaveta e do
+            // cabeçalho (o lugar do ×), é o que falta de largura
+            h.style.whiteSpace = 'nowrap';
+            var falta = gav.scrollWidth - gav.clientWidth;
+            h.style.whiteSpace = '';
+            if (falta <= 0) return;
+            var folga = parseFloat(getComputedStyle(gav).paddingRight) + parseFloat(getComputedStyle(h.closest('.eg-gav-cab')).paddingRight);
+            gav.style.width = 'min(' + Math.round(Math.min(860, gav.offsetWidth + falta + folga + 4)) + 'px, 100vw)';
+          }
           function fecha() {
             if (mudou) { location.reload(); return; }
             gav.hidden = true; veu.hidden = true; if (ativo) { ativo.classList.remove('eg-item--on'); ativo.focus(); } ativo = null;
@@ -60,7 +75,10 @@
             var f = ev.target.closest('form[data-eg-form]');
             if (!f) return;
             ev.preventDefault();
-            var b = f.querySelector('[type="submit"]'), cartao = f.closest('.eg-cartao');
+            // o botão que mandou pode ter o próprio endereço (o "Salvar diagnóstico" do formulário de salvar, 29/10/2026)
+            var quem = ev.submitter && f.contains(ev.submitter) ? ev.submitter : null;
+            var b = quem || f.querySelector('[type="submit"]'), cartao = f.closest('.eg-cartao');
+            var destino = (quem && quem.getAttribute('formaction')) || f.action;
             if (b) b.disabled = true;
             // a falha não troca a gaveta: o formulário, com o que foi digitado, continua (o molde das Contestações)
             function falha(msg) {
@@ -76,7 +94,7 @@
               p.textContent = msg;
               if (alvo) alvo.appendChild(p); else corpo.prepend(p);
             }
-            fetch(f.action, {method: 'POST', body: new FormData(f), credentials: 'same-origin'})
+            fetch(destino, {method: 'POST', body: new FormData(f), credentials: 'same-origin'})
               .then(w.egGaveta.resposta)
               .then(function (x) {
                 if (x.acao === 'login') { location.reload(); return; }
@@ -84,7 +102,7 @@
                 corpo.innerHTML = x.html;
                 mudou = true;
                 if (cartao) marca(cartao.querySelector('.eg-item'));
-                if (gav.hidden) mostra();
+                if (gav.hidden) mostra(); else ajusta();
               })
               .catch(function () { falha('Não consegui falar com o Nexus agora. Nada mudou; tente de novo em instantes.'); });
           });

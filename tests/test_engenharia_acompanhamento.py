@@ -242,8 +242,9 @@ def test_pessoas_da_engenharia_pelo_setor_e_o_nome_do_fracttal(banco, monkeypatc
     monkeypatch.setattr(FP, "ler_pessoal", lambda *a, **k: {
         "pessoas": [{"id": 10, "nome": "Ana Lima"}, {"id": 11, "nome": "Beto Souza"}], "erro": ""})
     # 11 é da Performance; 12 saiu do setor no dia seguinte; 13 é da Engenharia sem nome no Fracttal
-    assert A.pessoas_da_engenharia() == [{"hmac": "h10", "nome": "Ana Lima"},
-                                         {"hmac": "h13", "nome": "(sem nome no Fracttal)"}]     # sem nome no fim
+    # o id do Fracttal (`fid`) liga a pessoa às OS dela na Mesa (29/10/2026)
+    assert A.pessoas_da_engenharia() == [{"hmac": "h10", "nome": "Ana Lima", "fid": "10"},
+                                         {"hmac": "h13", "nome": "(sem nome no Fracttal)", "fid": "13"}]  # sem nome no fim
 
 
 # ── Task 4: a separação das abas (acompanhamentos montados à mão, sem banco) ─────────────────────────────────────────
@@ -691,3 +692,65 @@ def test_lista_dos_ativos_com_sinal_sem_os_botoes(tela, cliente):
     assert "Pegar para acompanhar" not in lista and "Encaminhar" not in lista and "eg-item-acoes" not in lista
     gaveta = html.split('<template id="g0">', 1)[1].split("</template>", 1)[0]
     assert "IBI200-INV02" in gaveta and "Pegar para acompanhar" in gaveta and "Encaminhar" in gaveta
+
+
+def _a_de(cod):
+    return next(a for a in A.estado(A.ler(forcar=True)["eventos"]).values() if a["aberto"] and canon(a["cod"]) == canon(cod))
+
+
+# ── a gaveta de 29/10/2026: o diagnóstico novo na própria gaveta e os chamados de garantia do ativo ─────────────────────
+def test_gaveta_cria_diagnostico_novo_e_ja_escolhe(tela, cliente):
+    # Levi, 29/10/2026: "tem diagnóstico porém só tem dois, gostaria que abaixo tivesse um botão para adicionar
+    # diagnósticos, eu digito, salvo, assim que salvar a lista de diagnósticos se atualiza"
+    from datetime import datetime
+    _como(cliente, ANA)
+    aid = _aid_de("IBI200-INVR1.3")
+    hoje = datetime.now(BRT).date().isoformat()
+    html = cliente.get(URL + "?aba=acompanhamento").get_data(as_text=True)
+    assert f'formaction="/t/engenharia/confiabilidade/acompanhamento/{aid}/diagnostico-novo"' in html
+    r = cliente.post(f"{URL}/acompanhamento/{aid}/diagnostico-novo", headers=SAME,
+                     data={"cod": "IBI200-INVR1.3", "novo_diag": "Sujidade  nos módulos", "inicio": hoje, "fim": "",
+                           "diagnostico": "0"})
+    g = r.get_data(as_text=True)
+    assert r.status_code == 200 and '<option value="3" selected>Sujidade nos módulos</option>' in g
+    assert "Diagnóstico Sujidade nos módulos criado" in g
+    assert [x["nome"] for x in A.diagnosticos(A.ler(forcar=True)["diagnosticos"])][-1] == "Sujidade nos módulos"
+    assert _a_de("IBI200-INVR1.3")["diagnostico_id"] is None            # só escolhido: grava no Salvar
+    # nome vazio: a gaveta diz e nada entra no cadastro
+    g = cliente.post(f"{URL}/acompanhamento/{aid}/diagnostico-novo", headers=SAME,
+                     data={"cod": "IBI200-INVR1.3", "novo_diag": "  ", "inicio": hoje}).get_data(as_text=True)
+    assert "eg-acomp-msg--erro" in g and len(A.diagnosticos(A.ler(forcar=True)["diagnosticos"])) == 3
+
+
+def test_diagnostico_novo_de_outro_site_e_recusado(tela, cliente):
+    _como(cliente, ANA)
+    r = cliente.post(f"{URL}/acompanhamento/{_aid_de('IBI200-INVR1.3')}/diagnostico-novo",
+                     headers={"Sec-Fetch-Site": "cross-site"}, data={"cod": "IBI200-INVR1.3", "novo_diag": "X"})
+    assert r.status_code == 403
+
+
+def test_gaveta_mostra_os_chamados_de_garantia_do_ativo(tela, cliente, monkeypatch):
+    # Levi, 29/10/2026: "Em confiabildade gostaria também mostrasse as OSs com etiqueta de chamados, caso tenha" — as OS
+    # de acompanhamento de chamado do banco (`nexus_chamados · fato_chamado`), pelo código canônico do ativo
+    from nexus.torres import engenharia as torre
+    linhas = [{"os": 9001, "codigo_ativo": "ibi200-invr1.3 ", "situacao": "aberto", "fabricante": "Sofar",
+               "componente": "Inversor", "status": "Aguardando ticket", "data_id_abertura": 20261001},
+              {"os": 9003, "codigo_ativo": "IBI200-INVR1.3", "situacao": "concluido", "fabricante": "Sofar",
+               "componente": "Placa", "status": "", "data_id_abertura": 20260901},
+              {"os": 9002, "codigo_ativo": "IBI200-TRK07", "situacao": "aberto", "fabricante": "STI",
+               "componente": "Estrutura Trackers", "status": "", "data_id_abertura": 20261002}]
+    monkeypatch.setattr(torre, "_ler_chamados", lambda: linhas)
+    torre._CACHE.clear()
+    _como(cliente, ANA)
+    html = cliente.get(URL + "?aba=acompanhamento").get_data(as_text=True)
+    gav = next(t for t in html.split("<template id=")[1:] if "<code>IBI200-INVR1.3</code>" in t).split("</template>")[0]
+    bloco = gav.split("Chamados de garantia", 1)[1]
+    assert "OS 9001" in bloco and "Sofar" in bloco and "Aguardando ticket" in bloco and "OS 9003" in bloco
+    assert bloco.index("OS 9001") < bloco.index("OS 9003")             # o aberto antes do concluído
+    assert "OS 9002" not in gav
+    assert 'href="/t/engenharia/equipe/os/9001"' in bloco                # o clique abre a página da OS
+    # o banco dos chamados fora não derruba a gaveta: o bloco some
+    monkeypatch.setattr(torre, "_ler_chamados", lambda: (_ for _ in ()).throw(RuntimeError("banco fora")))
+    torre._CACHE.clear()
+    html = cliente.get(URL + "?aba=acompanhamento").get_data(as_text=True)
+    assert "Chamados de garantia" not in html and "IBI200-INVR1.3" in html

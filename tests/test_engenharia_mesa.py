@@ -26,6 +26,16 @@ def mesa(tela, monkeypatch):
     linhas = ([_os("IBI200-INVR1.3", d) for d in (1, 2, 3, 10)] + [_os("IBI200-TRK07", d) for d in (5, 20)]
               + [_os("IBI200-INV02", d) for d in (1, 4)] + [_os("IBI200-INV05", d) for d in (1, 2, 3, 4)])
     monkeypatch.setattr(os_falhas, "linhas", lambda: linhas)
+    # as OS e as ETMs da pessoa (29/10/2026): o Quadro da equipe e a tela ETMs de mentira, vazios (nada vai à rede)
+    from nexus.engenharia import etm as ETM
+    from nexus.engenharia import os_equipe as OE
+    for mod in (OE, ETM):
+        monkeypatch.setattr(mod, "pedir_releitura", lambda app=None, esperar=False, forcar=False: None)
+        monkeypatch.setattr(mod, "marcar_uso", lambda: None)
+    monkeypatch.setattr(OE, "dados", lambda: {"os": [], "equipe": [], "faltam": [], "lido": 1.0, "lendo": False,
+                                               "erro": ""})
+    monkeypatch.setattr(ETM, "dados", lambda: {"os": [], "usinas": {}, "lido": 1.0, "lendo": False, "erro": "",
+                                                "erro_setores": ""})
     torre._CACHE.clear()
     return tela
 
@@ -112,7 +122,9 @@ def test_mesa_com_o_banco_fora(mesa, cliente, monkeypatch):
     A.limpar()
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
     assert "Não consegui ler os acompanhamentos" in html
-    assert re.findall(r'<b class="kb-kpi-v[^"]*">([^<]+)</b>', html) == ["—", "—", "—"]
+    # os três números do topo (as OS da pessoa, embaixo, vêm do Fracttal e têm a faixa delas)
+    topo = html.split('aria-label="A mesa agora"', 1)[1].split("</section>", 1)[0]
+    assert re.findall(r'<b class="kb-kpi-v[^"]*">([^<]+)</b>', topo) == ["—", "—", "—"]
     assert "Pegar para acompanhar" not in html
 
 
@@ -194,3 +206,69 @@ def test_etiqueta_longa_quebra_dentro_do_cartao_no_celular():
     css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
     assert re.search(r"\.eg-item-corpo\{[^}]*grid-template-columns:minmax\(0,1fr\)", css)
     assert re.search(r"@media \(max-width:480px\)\{[^@]*\.eg-item-tags \.eg-tag\{white-space:normal\}", css)
+
+
+# ── a Mesa de 29/10/2026: o cartão enxuto, as OS e as ETMs da pessoa ────────────────────────────────────────────────────
+def test_criticos_sem_dono_com_o_ativo_e_a_usina_embaixo_sem_o_codigo(mesa, cliente):
+    # Levi, 29/10/2026: "Esse nome cinza ao lado do nome do ativo pode ficar abaixo do ativo" e "pode tirar o código do
+    # ativo, deixa só ativo e usina"; "esses cards de Crit A B e C podem ser sem essa borda, só a palavra pintada"
+    sem_dono = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Críticos sem dono")
+    tit = sem_dono.split('class="eg-item-tit"', 1)[1].split("</span>", 1)[0]
+    assert "<code>" not in tit and "Ibaté 2" not in tit
+    sub = sem_dono.split('class="eg-item-sub"', 1)[1].split("</span>", 1)[0]
+    assert "Ibaté 2 - SP" in sub and "IBI200-INV05" not in sub
+    assert "eg-tag--sem" in sem_dono and "eg-mesa-sem-dono" in sem_dono
+
+
+def test_com_voce_traz_o_codigo_e_a_usina_embaixo_do_nome(mesa, cliente):
+    com = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Com você")
+    sub = com.split('class="eg-item-sub"', 1)[1].split("</span>", 1)[0]
+    assert "IBI200-INVR1.3" in sub and "Ibaté 2 - SP" in sub
+
+
+def _oss_da_ana():
+    """As OS da Ana no Quadro da equipe: a 501 a fazer e atrasada, a 502 em execução, a 503 esperando a verificação e a
+    504 concluída ontem."""
+    from test_engenharia_equipe import AGORA, _w
+
+    from nexus.engenharia import os_equipe as OE
+    ontem = (AGORA - __import__("datetime").timedelta(days=1)).isoformat()
+    linhas = [_w("501", 1, pid=11, prog_dias=-2), _w("502", 1, task="IN_PROGRESS", pid=11),
+              _w("503", 2, task="DONE", pid=11), _w("504", 3, task="DONE", pid=11, fim=ontem)]
+    return OE.montar(linhas, {"id": 11, "nome": "Ana Lima"}, AGORA)
+
+
+def test_as_os_da_pessoa_na_mesa(mesa, cliente, monkeypatch):
+    # Levi, 29/10/2026: "Quero informações das OSs daquela pessoa" — as do Quadro da equipe, pela pessoa da mesa
+    from nexus.engenharia import os_equipe as OE
+    oss = _oss_da_ana()
+    monkeypatch.setattr(OE, "dados", lambda: {"os": oss, "equipe": [{"id": 11, "nome": "Ana Lima"}], "faltam": [],
+                                               "lido": 1.0, "lendo": False, "erro": ""})
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    sec = _secao(html, "As OS de você")
+    for n in ("501", "502", "503"):
+        assert f'href="/t/engenharia/equipe/os/{n}"' in sec, n
+    assert 'href="/t/engenharia/equipe/os/504"' not in sec                 # a concluída conta, mas não vai na lista
+    assert re.findall(r'kb-kpi-rot">([^<]+)<', sec)[:2] == ["Em aberto", "Atrasadas"]
+    # a mesa de quem não tem OS no quadro diz que não tem
+    sec = _secao(_como(cliente, BETO).get(URL).get_data(as_text=True), "As OS de você")
+    assert "Nenhuma OS" in sec
+
+
+def test_as_etms_da_pessoa_na_mesa(mesa, cliente, monkeypatch):
+    # Levi, 29/10/2026: "Se a pessoa tiver ETM atrelada, tem que ter uma visão de ETM"
+    from datetime import date
+
+    from test_engenharia_etm import ETMS, SET, w
+
+    from nexus.engenharia import etm as ETM
+    oss = ETM.montar([w(7001, "Corretiva", resp="Ana Lima", pid=1), w(7002, "Corretiva", resp="Ana Lima", pid=1,
+                                                                         status=3, task="DONE")],
+                     ETMS, SET, date.today())
+    monkeypatch.setattr(ETM, "dados", lambda: {"os": oss, "usinas": {}, "lido": 1.0, "lendo": False, "erro": "",
+                                                "erro_setores": ""})
+    sec = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "As ETMs de você")
+    assert 'href="/t/engenharia/etm/os/7001"' in sec and 'href="/t/engenharia/etm/os/7002"' not in sec
+    assert "Abertas no Fracttal" in sec
+    # quem não tem ETM não vê o bloco
+    assert "As ETMs de você" not in _como(cliente, BETO).get(URL).get_data(as_text=True)

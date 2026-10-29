@@ -9,12 +9,22 @@
    (_gaveta.html e o engenharia-gaveta.js), com as mesmas ações. #}
 {% macro pill(n) %}{% for k, rot, cor in niveis if k == n %}<span class="eg-pill eg-pill--{{ cor }}">{{ rot }}</span>{% endfor %}{% endmacro %}
 {% macro tag(texto, cor) %}<span class="eg-tag eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
+{# os critérios do sinal nos Críticos sem dono, sem a borda: só a palavra pintada (Levi, 29/10/2026) #}
+{% macro sinal(texto, cor) %}<span class="eg-tag eg-tag--sem eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
+{% macro faixa(kpis, rotulo) %}<div class="kb-kpis eg-mesa-os-kpis" aria-label="{{ rotulo }}">{% for k in kpis %}<div class="kb-kpi">
+  <span class="kb-kpi-rot">{{ k.rotulo }}</span>
+  <span class="kb-kpi-linha"><b class="kb-kpi-v{{ ' kb-kpi-v--' ~ k.grav if k.grav }}">{{ k.valor }}</b><span class="kb-kpi-nota">
+    {%- for texto, negrito in k.nota %}{% if negrito %}<b>{{ texto }}</b>{% else %}{{ texto }}{% endif %}{% endfor -%}
+  </span></span>
+</div>{% endfor %}</div>{% endmacro %}
 {% macro cartao(x, na_caixa=false) %}{% set ac = x.acomp %}{% set a = x.a %}
   <article class="eg-cartao">
   <button type="button" class="eg-item" data-gaveta="{{ x.gid }}">
     {% if x.ativo %}{{ pill(x.ativo.nivel) }}{% else %}<span class="eg-pill eg-pill--neutro">Sem sinal agora</span>{% endif %}
     <span class="eg-item-corpo">
-      <span class="eg-item-tit"><b>{{ a.nome }}</b> <code>{{ ac.cod }}</code> <span class="eg-onde">{{ a.usina }}{% if a.uf %} - {{ a.uf }}{% endif %}</span>{% if na_caixa %} <span class="eg-novo">novo</span>{% endif %}</span>
+      {# o código e a usina embaixo do nome (Levi, 29/10/2026: "Esse nome cinza ao lado do nome do ativo pode ficar abaixo do ativo") #}
+      <span class="eg-item-tit"><b>{{ a.nome }}</b>{% if na_caixa %} <span class="eg-novo">novo</span>{% endif %}</span>
+      <span class="eg-item-sub"><code>{{ ac.cod }}</code>{% if a.usina %} · {{ a.usina }}{% if a.uf %} - {{ a.uf }}{% endif %}{% endif %}</span>
       {% if na_caixa %}
       <span class="eg-acomp-quem">Encaminhado por {{ ac.encaminhado_por }} em {{ ac.com_desde.strftime('%d/%m') if ac.com_desde else '—' }} · análise desde {{ ac.inicio.strftime('%d/%m') if ac.inicio else '—' }}</span>
       {% else %}
@@ -72,20 +82,42 @@
         {% else %}<div class="eg-itens">{% for x in comigo %}{{ cartao(x) }}{% else %}<p class="mudo eg-vazio">{{ ('Nenhum outro ativo com ' ~ quem ~ '.') if caixa else ('Nenhum ativo com ' ~ quem ~ ' agora.') }}</p>{% endfor %}</div>{% endif %}
       </section>
       {% endif %}
+      {# as OS da pessoa no Quadro da equipe (Levi, 29/10/2026: "Quero informações das OSs daquela pessoa") #}
+      {% if mesa_os %}
+      <section class="eg-painel eg-mesa-os">
+        <div class="eg-painel-cab"><h2>As OS de {{ quem }}</h2><span>do Quadro da equipe · <a class="cn-link" href="{{ url_for('torre_engenharia.equipe') }}">abrir o quadro</a></span></div>
+        {% if mesa_os.lendo %}<p class="mudo eg-vazio">Lendo as OS no Fracttal pela primeira vez; recarregue em instantes.</p>
+        {% else %}{{ faixa(mesa_os.kpis, 'As OS de ' ~ quem) }}
+        <ul class="eg-mesa-oss">{% for o in mesa_os.abertas[:8] %}<li><a href="{{ url_for('torre_engenharia.equipe_os', folio=o.os) }}"><b>OS {{ o.os }}</b><span class="t">{{ o.titulo }}</span><span class="mudo">{{ mesa_os.colunas.get(o.coluna, o.coluna) }}{% if o.programada %} · programada {{ o.programada[:5] }}{% endif %}</span>{% if o.prazo == 'atrasada' %}{{ tag('atrasada', 'critico') }}{% elif o.parada %}{{ tag('sem atualização', 'alerta') }}{% endif %}</a></li>{% else %}<li class="mudo">Nenhuma OS aberta com {{ quem }}.</li>{% endfor %}</ul>
+        {% if mesa_os.abertas|length > 8 %}<p class="mudo eg-mesa-mais">e mais {{ mesa_os.abertas|length - 8 }} no Quadro da equipe</p>{% endif %}{% endif %}
+      </section>
+      {% endif %}
+      {# as OS de ETM com a pessoa (Levi, 29/10/2026: "Se a pessoa tiver ETM atrelada, tem que ter uma visão de ETM") #}
+      {% if mesa_etm %}
+      <section class="eg-painel eg-mesa-os">
+        <div class="eg-painel-cab"><h2>As ETMs de {{ quem }}</h2><span>da tela ETMs · <a class="cn-link" href="{{ url_for('torre_engenharia.etm') }}">abrir as ETMs</a></span></div>
+        {{ faixa(mesa_etm.kpis, 'As ETMs de ' ~ quem) }}
+        <ul class="eg-mesa-oss">{% for o in mesa_etm.abertas[:8] %}<li><a href="{{ url_for('torre_engenharia.etm_os', folio=o.os) }}"><b>OS {{ o.os }}</b><span class="t">{{ o.titulo }}</span><span class="mudo">{{ o.usina_nome }} · {{ mesa_etm.colunas.get(o.coluna, o.coluna) }}</span>{% if o.diagnostico %}{{ tag(o.diagnostico, 'ok') }}{% endif %}</a></li>{% else %}<li class="mudo">Nenhuma ETM aberta com {{ quem }}.</li>{% endfor %}</ul>
+        {% if mesa_etm.abertas|length > 8 %}<p class="mudo eg-mesa-mais">e mais {{ mesa_etm.abertas|length - 8 }} na tela ETMs</p>{% endif %}
+      </section>
+      {% endif %}
     </div>
     <section class="eg-painel">
       <div class="eg-painel-cab"><h2>Críticos sem dono</h2><span>da Confiabilidade · ninguém pegou</span></div>
       {% if erro_acomp %}<p class="mudo eg-vazio">Não consegui ler os acompanhamentos: não sei quem tem dono.</p>
-      {% else %}<div class="eg-itens">{% for s in sem_dono %}
+      {% else %}<div class="eg-itens eg-mesa-sem-dono">{% for s in sem_dono %}
+        {# o cartão enxuto (Levi, 29/10/2026: "pode tirar o código do ativo, deixa só ativo e usina"): o nome, a usina
+           embaixo e os critérios do sinal sem borda #}
         <article class="eg-cartao">
         <button type="button" class="eg-item" data-gaveta="{{ s.gid }}">
           {{ pill(s.nivel) }}
           <span class="eg-item-corpo">
-            <span class="eg-item-tit"><b>{{ s.nome }}</b> <code>{{ s.cod }}</code> <span class="eg-onde">{{ s.usina }}{% if s.uf %} - {{ s.uf }}{% endif %}</span></span>
+            <span class="eg-item-tit"><b>{{ s.nome }}</b></span>
+            {% if s.usina %}<span class="eg-item-sub">{{ s.usina }}{% if s.uf %} - {{ s.uf }}{% endif %}</span>{% endif %}
             <span class="eg-item-tags"><span class="eg-crit">Crit. {{ s.crit }}</span>
-              {% if s.nFalha >= 3 %}{{ tag('A · ' ~ s.nFalha ~ ' falhas em ' ~ janela ~ 'd', 'critico' if s.nFalha >= 4 else 'alerta') }}{% endif %}
-              {% if s.n7 >= 1 %}{{ tag('B · ' ~ s.n7 ~ ' em 7d', 'critico' if s.n7 >= 3 else ('alerta' if s.n7 >= 2 else 'neutro')) }}{% endif %}
-              {% if s.ja %}{{ tag('já acompanhado · ' ~ diag_nome.get(s.ja.diagnostico_id, 'sem diagnóstico') ~ ' em ' ~ s.ja.fim.strftime('%d/%m'), 'neutro') }}{% endif %}</span>
+              {% if s.nFalha >= 3 %}{{ sinal('A · ' ~ s.nFalha ~ ' falhas em ' ~ janela ~ 'd', 'critico' if s.nFalha >= 4 else 'alerta') }}{% endif %}
+              {% if s.n7 >= 1 %}{{ sinal('B · ' ~ s.n7 ~ ' em 7d', 'critico' if s.n7 >= 3 else ('alerta' if s.n7 >= 2 else 'neutro')) }}{% endif %}
+              {% if s.ja %}{{ sinal('já acompanhado · ' ~ diag_nome.get(s.ja.diagnostico_id, 'sem diagnóstico') ~ ' em ' ~ s.ja.fim.strftime('%d/%m'), 'neutro') }}{% endif %}</span>
           </span>
           <span class="eg-item-n"><b>{{ s.nFalha }}</b><span>falha{{ 's' if s.nFalha != 1 }} · {{ s.n30 }} OS</span></span>
         </button>

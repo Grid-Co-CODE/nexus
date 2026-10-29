@@ -530,9 +530,10 @@ def excluir_diagnostico(diagnostico_id: int, usuario, pode: bool) -> dict:
 
 
 def pessoas_da_engenharia() -> list[dict]:
-    """[{"hmac", "nome"}]: quem é do setor Engenharia hoje (a última decisão de cada pessoa do Fracttal, livro
+    """[{"hmac", "nome", "fid"}]: quem é do setor Engenharia hoje (a última decisão de cada pessoa do Fracttal, livro
     `nexus_setores`), com o código do e-mail; o nome vem do pessoal do Fracttal (guardado 1 h, só na memória e na tela).
-    Os nomes primeiro, em ordem; quem está sem nome no Fracttal, no fim."""
+    O `fid` (o id do Fracttal) liga a pessoa às OS dela na Mesa (29/10/2026). Os nomes primeiro, em ordem; quem está sem
+    nome no Fracttal, no fim."""
     from ..cadastro import fracttal_pessoal as FP
     from ..cadastro import setores as S
     st = S.ler(*_banco())
@@ -543,7 +544,7 @@ def pessoas_da_engenharia() -> list[dict]:
     for d in sorted(st.get("decisoes") or [], key=lambda x: str(x.get("decidida_em") or "")):
         ultima[str(d.get("fracttal_id"))] = d
     nomes = {str(p.get("id")): p.get("nome") for p in (FP.ler_pessoal().get("pessoas") or [])}
-    out = [{"hmac": d["pessoa_hmac"], "nome": nomes.get(fid) or SEM_NOME} for fid, d in ultima.items()
+    out = [{"hmac": d["pessoa_hmac"], "nome": nomes.get(fid) or SEM_NOME, "fid": fid} for fid, d in ultima.items()
            if d.get("setor_id") == sid and d.get("pessoa_hmac")]
     return sorted(out, key=lambda p: (p["nome"] == SEM_NOME, _norm(p["nome"])))
 
