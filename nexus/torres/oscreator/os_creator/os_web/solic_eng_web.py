@@ -361,11 +361,11 @@ def _sem_repetir(nome: str, vistos: set) -> str:
     return novo
 
 
-def anexos(brutos) -> tuple[list, str]:
+def anexos(brutos, nada: str = " Nenhuma OS foi criada.") -> tuple[list, str]:
     """[(nome, bytes)] do formulário → ([{nome, bytes, tamanho}], erro). Erro, e não descarte calado, como nas imagens
-    da Performance: a pessoa anexou porque o arquivo importa, e a rota não cria OS nenhuma enquanto os anexos não passam."""
+    da Performance: a pessoa anexou porque o arquivo importa, e a rota não cria OS nenhuma enquanto os anexos não passam.
+    `nada` fecha cada recusa (a Nova solicitação diz "Nenhuma solicitação foi criada.", 29/10/2026)."""
     brutos = [(n, b) for n, b in (brutos or []) if n or b]
-    nada = " Nenhuma OS foi criada."
     if len(brutos) > MAX_ARQUIVOS:
         return [], "São %d anexos — o limite é %d por criação.%s" % (len(brutos), MAX_ARQUIVOS, nada)
     out, vistos, total = [], set(), 0

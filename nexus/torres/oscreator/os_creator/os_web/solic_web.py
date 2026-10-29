@@ -230,15 +230,16 @@ def subtarefas_do_tema(tema: str, tipo_ativo: str = "") -> list:
 
 
 def observacao(relato: str, tema: str = "", tecnico: str = "", data: str = "",
-               subtarefas: list | None = None, os_pai=None) -> str:
+               subtarefas: list | None = None, os_pai=None, anexos=None) -> str:
     """O relato do supervisor MAIS o bloco [PCM] — é assim que a sugestão chega à fila. A data vai como o app a escreve
     ("21/10/2026 08:00", legível na observação no Fracttal web); a que não dá para ler vai como veio. `os_pai` é o
-    (nº, id) do `os_pai_escolhida`."""
+    (nº, id) do `os_pai_escolhida`; `anexos`, os nomes dos arquivos guardados no Nexus (29/10/2026)."""
     iso = _data_sugerida_iso(data)
     data = dt.datetime.strptime(iso, "%Y-%m-%dT%H:%M").strftime("%d/%m/%Y %H:%M") if iso else (data or "")
     pai = "%s (id %s)" % os_pai if os_pai else ""
     return sp.observacao_com_bloco(relato or "", {"tema": tema or "", "tecnico": tecnico or "",
-                                                  "data": data, "os_pai": pai, "subtarefas": subtarefas or []})
+                                                  "data": data, "os_pai": pai, "anexos": "; ".join(anexos or []),
+                                                  "subtarefas": subtarefas or []})
 
 
 ERRO_OS_PAI = "OS pai inválida: escolha a OS na lista que aparece ao digitar o número."

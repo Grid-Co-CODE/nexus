@@ -1005,6 +1005,10 @@ def create_os_rpc(asset: dict, description: str, task_type: str, subtasks: list,
     if main_id is None:                                   # chamadas antigas (clone): mapeia pelo nome
         main_id = TASK_TYPE_MAIN.get(task_type)
     if main_id is None:
+        # o tipo que a lista fixa não tem, pelo catálogo vivo (29/10/2026: a Fila do PCM oferece os tipos do Fracttal, e
+        # aprovar com "Zeladoria" dava "Tipo de tarefa desconhecido: Zeladoria" — a solicitação 4126 não virava OS)
+        main_id = tipo_main_ao_vivo(task_type)
+    if main_id is None:
         raise FracttalError(f"Tipo de tarefa desconhecido: {task_type}")
     prio = tipo.get("id_priorities")
     if prio is None:
@@ -6122,6 +6126,26 @@ def _classif_ids(nome_c1: str, nome_c2: str) -> dict:
                 out[campo_desc] = str(x.get("description") or "")
                 break
     return out
+
+
+def tipo_main_ao_vivo(nome):
+    """O id do Tipo de tarefa pelo NOME no catálogo vivo do Fracttal (o mesmo que as listas da Fila e do Criar OS
+    mostram) — para o tipo que o TASK_TYPE_MAIN fixo não tem (a Zeladoria, 29/10/2026). Sem caixa nem espaço nas pontas;
+    não achando no catálogo guardado, relê uma vez (tipo criado no Fracttal depois). None se não existir."""
+    global _CLASSIF_CACHE
+    alvo = str(nome or "").strip().lower()
+    if not alvo:
+        return None
+    for reler in (False, True):
+        if reler or not _CLASSIF_CACHE:
+            try:
+                _CLASSIF_CACHE = get_tipos_classif() or {}
+            except Exception:
+                return None
+        for x in (_CLASSIF_CACHE.get("tipos") or []):
+            if str(x.get("description") or "").strip().lower() == alvo and x.get("id") is not None:
+                return x.get("id")
+    return None
 
 
 def create_inspecao_chamado(asset: dict, fabricante: str, id_responsible=None,

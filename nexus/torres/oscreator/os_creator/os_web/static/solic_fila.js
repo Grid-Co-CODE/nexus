@@ -182,6 +182,12 @@
     $('fl_recarregar').href = '/os/solicitacao/atualizar?sel=' + encodeURIComponent(f.id);
     obs.value = f.relato || ''; obsOriginal = f.relato || ''; obs.readOnly = true;
     expandida = false; obs.classList.remove('aberta'); obs.style.height = '';
+    // os anexos da Nova solicitação, guardados no Nexus (29/10/2026): o Aprovar os sobe na tarefa da OS
+    const anx = f.anexos_nexus || [];
+    $('fl_anexos').hidden = !anx.length;
+    $('fl_anexos_lista').innerHTML = anx.map(function (a) {
+      return '<a href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.nome) + '</a> (' + esc(a.tam) + ')';
+    }).join(' · ');
     preSelecionar(f.tecnico);
     // a Data é campo (20/10/2026, como no app): começa na sugerida pelo supervisor e o PCM troca no calendário
     data.value = f.data_sug_iso || '';
@@ -395,8 +401,9 @@
       : (f.data_sug ? ' (a data sugerida "' + f.data_sug + '" não foi entendida e o campo Data está vazio: programada para agora)'
                     : ' (sem data: programada para agora)');
     var filha = paiSel ? ', filha da OS ' + pai.value.trim().split(/\s/)[0] : '';
+    var nAnx = (f.anexos_nexus || []).length, comAnx = nAnx ? ', levando ' + nAnx + ' anexo(s) da solicitação' : '';
     if (!window.confirm('Criar a OS “' + t + '” com ' + n + ' subtarefa(s)' + quando + ', tempo estimado ' + hhmm(tempoMin)
-                        + filha + '?\n\nA API do Fracttal NÃO edita OS já criada — confira as subtarefas antes.')) return;
+                        + filha + comAnx + '?\n\nA API do Fracttal NÃO edita OS já criada — confira as subtarefas antes.')) return;
     ocupado(true, 'criando a OS…');
     SP.pedir('/os/api/solic/' + encodeURIComponent(f.id) + '/aprovar', {
       id_responsible: resp.value, responsavel: resp.options[resp.selectedIndex].text, titulo: t, subtarefas: subs,

@@ -160,14 +160,18 @@ body.os-modal-aberto{overflow:hidden}
 .det-top{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:12px;padding:14px 22px;background:var(--f-bg);border-bottom:1px solid #1a2236}
 .det-ico-round{width:40px;height:40px;border-radius:20px;display:inline-flex;align-items:center;justify-content:center;background:rgba(166,226,46,.14);border:1px solid rgba(166,226,46,.35);flex:none}
 .det-ico-round.s{width:30px;height:30px;border-radius:15px}
-.det-os{font-size:19px;font-weight:700;color:#fff;line-height:1.1}.det-sub{font-size:12px;color:var(--f-muted)}
+.det-os{font-size:19px;font-weight:700;color:#fff;line-height:1.1}.det-num-sub{font-size:12px;color:var(--f-muted)}
 .det-badge{display:inline-flex;align-items:center;height:40px;padding:0 14px;border-radius:8px;border:1px solid rgba(166,226,46,.55);background:rgba(166,226,46,.09);color:var(--f-green);font-weight:600;font-size:13px}
 .det-pill{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:12px;background:var(--f-input);border:1px solid var(--f-border);color:#c4cbdb;font-size:13px}
 .det-pill i{color:var(--f-muted);font-style:italic}
+/* o PDF da OS ao lado da Solicitação (29/10/2026): a seta de baixar, no jeito da pílula */
+.det-pdf{display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 12px;border-radius:12px;background:var(--f-input);border:1px solid var(--f-border);color:#c4cbdb;font:600 13px/1 inherit;cursor:pointer}
+.det-pdf svg{width:16px;height:16px}.det-pdf:hover,.det-pdf:focus-visible{border-color:var(--f-green);color:var(--f-green);outline:none}
+.det-pdf[aria-busy=true]{opacity:.6;cursor:progress}
 /* celular (28/09): o cabeçalho não quebrava linha — a pílula da solicitação alargava a página para 461 px num telefone de
    375, e a galeria de anexos (fixa, centrada na página larga) saía cortada à direita */
 @media (max-width:640px){.det-top{flex-wrap:wrap;gap:10px;padding:12px 14px}.det-top .os-cresce{display:none}
-  .det-pill{height:auto;min-height:36px;padding:6px 12px;flex-wrap:wrap}}
+  .det-pill{height:auto;min-height:36px;padding:6px 12px;flex-wrap:wrap}.det-pdf{height:36px}}
 .det-corpo{display:flex;flex-direction:column;gap:14px;padding:18px 22px 22px}
 .det-card{background:var(--f-card);border:1px solid #222c46;border-radius:13px}
 .det-banner{display:flex;align-items:center;gap:14px;padding:16px 18px}
@@ -657,7 +661,7 @@ html[data-tema="claro"]{
 :where(html[data-tema="claro"]) .det-top{border-bottom:1px solid var(--osc-linha)}
 :where(html[data-tema="claro"]) .det-ico-round{background:var(--osc-lima-suave);border:1px solid var(--osc-musgo-borda)}
 :where(html[data-tema="claro"]) .det-badge{border:1px solid var(--osc-musgo-borda);background:var(--osc-lima-suave)}
-:where(html[data-tema="claro"]) .det-pill,:where(html[data-tema="claro"]) .det-k,:where(html[data-tema="claro"]) .det-mini,:where(html[data-tema="claro"]) .det-box,
+:where(html[data-tema="claro"]) .det-pill,:where(html[data-tema="claro"]) .det-pdf,:where(html[data-tema="claro"]) .det-k,:where(html[data-tema="claro"]) .det-mini,:where(html[data-tema="claro"]) .det-box,
 :where(html[data-tema="claro"]) .det-ghost,:where(html[data-tema="claro"]) .det-tarefa-n,:where(html[data-tema="claro"]) .det-tarefa-c,
 :where(html[data-tema="claro"]) .det-tarefa-info,:where(html[data-tema="claro"]) .det-reg{color:var(--osc-texto-2)}
 :where(html[data-tema="claro"]) .det-card{border:1px solid var(--osc-linha-forte)}
