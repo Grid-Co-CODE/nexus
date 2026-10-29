@@ -37,14 +37,6 @@
     {% if modo == 'painel' and painel %}
     <div><p class="gc-eyebrow">{{ torre.nome }} · {{ tela.nome }}</p><h1 class="cn-titulo">{{ painel.nome }}</h1>
       <p class="cn-pergunta">{{ painel.usinas }} usina{{ 's' if painel.usinas != 1 }}{% if painel.clientes %} · {{ painel.clientes|join(', ') }}{% endif %}{% if painel.equipes %} · {{ painel.equipes|length }} equipe{{ 's' if painel.equipes|length != 1 }}{% endif %}</p></div>
-    {# as PT pendentes viraram o número do cabeçalho (Levi, 29/10/2026: "PTs pendentes pode ficar como um KPI que quando o
-       supervisor clicasse ele veria quais são as PTs"): a cor de antes (parada há mais de 2 h, vermelho; esperando,
-       âmbar; nenhuma, verde) e o clique abre a lista na janela #}
-    {% set pt_kpi = painel.pts %}
-    <button type="button" class="pn-kpi pn-kpi--{{ 'critico' if pt_kpi.paradas else ('alerta' if pt_kpi.aguardando else 'ok') }}" data-pn-pts aria-haspopup="dialog" title="Ver as PT esperando o De acordo">
-      <span class="pn-kpi-ico" aria-hidden="true"><i class="ph ph-file-text"></i></span>
-      <span class="pn-kpi-txt"><small>PTs pendentes</small><span><b>{{ pt_kpi.aguardando }}</b> esperando o De acordo</span></span>
-      <i class="ph ph-caret-right pn-kpi-seta" aria-hidden="true"></i></button>
     {% else %}
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     {% endif %}
@@ -103,6 +95,17 @@
 
   {# a faixa "Parada agora" (18/10/2026; o painel próprio de um supervisor tinha a de "Usinas desligadas"): as OS de
      parada ainda abertas nas usinas do filtro, a mais antiga primeiro (a disponibilidade do Gerencial, do Fracttal) #}
+  {# no Painel, as PT pendentes viraram um número (Levi, 29/10/2026: "PTs pendentes pode ficar como um KPI que quando o
+     supervisor clicasse ele veria quais são as PTs"), à esquerda da faixa "Parada agora" ("faça caber ao lado esquerdo
+     de parado agora"): a cor de antes (parada há mais de 2 h, vermelho; esperando, âmbar; nenhuma, verde) e o clique
+     abre a lista na janela #}
+  {% if modo == 'painel' and painel %}{% set pt_kpi = painel.pts %}
+  <div class="pn-topo">
+    <button type="button" class="pn-kpi pn-kpi--{{ 'critico' if pt_kpi.paradas else ('alerta' if pt_kpi.aguardando else 'ok') }}" data-pn-pts aria-haspopup="dialog" title="Ver as PT esperando o De acordo">
+      <span class="pn-kpi-ico" aria-hidden="true"><i class="ph ph-file-text"></i></span>
+      <span class="pn-kpi-txt"><small>PTs pendentes</small><span><b>{{ pt_kpi.aguardando }}</b> esperando o De acordo</span></span>
+      <i class="ph ph-caret-right pn-kpi-seta" aria-hidden="true"></i></button>
+  {% endif %}
   {% if faixa %}
   <div class="cr-parada" role="status">
     <b>Parada agora</b>
@@ -112,6 +115,7 @@
     {% if faixa|length > faixa_vista|length %}<span class="mudo">e mais {{ faixa|length - faixa_vista|length }}</span>{% endif %}
   </div>
   {% endif %}
+  {% if modo == 'painel' and painel %}</div>{% endif %}
 
   {% if modo == 'painel' and painel %}
   {# O Painel do responsável (Levi, 28/10/2026: "quero uma tela feita mesmo para o responsável que não seja um tabelão

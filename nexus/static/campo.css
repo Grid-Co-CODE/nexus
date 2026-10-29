@@ -1379,7 +1379,11 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
 .pn-kpi--critico .pn-kpi-ico{background:var(--critico-suave);color:var(--critico)} .pn-kpi--critico b{color:var(--critico)}
 .pn-kpi--alerta .pn-kpi-ico{background:var(--alerta-suave);color:var(--alerta)} .pn-kpi--alerta b{color:var(--alerta)}
 .pn-kpi--ok .pn-kpi-ico{background:var(--ok-suave);color:var(--ok)} .pn-kpi--ok b{color:var(--ok)}
-.pn-kpi + .cn-frescor{margin-left:0}
+/* o número das PT à esquerda da faixa "Parada agora", na mesma linha e com a mesma altura (29/10/2026: "faça caber ao
+   lado esquerdo de parado agora"); sem paradas, ele fica sozinho na linha */
+.pn-topo{display:flex;align-items:stretch;gap:14px;margin-top:16px}
+.pn-topo > .pn-kpi{margin-left:0;flex:none}
+.pn-topo > .cr-parada{flex:1;min-width:0;margin-top:0}
 /* a lista das PT na janela: inteira, sem o limite das 6 linhas do quadro */
 .pn-lista--jan{max-height:none;overflow:visible;margin:0;padding:0}
 @media (max-width:1180px){.pn{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -1388,7 +1392,7 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
   .pn-perf-cab{display:none}
   .pn-it--perf{grid-template-columns:minmax(0,1fr) 56px}
   .pn-it--perf .pn-barra,.pn-it--perf .pn-c{display:none}
-  .pn-kpi{margin-left:0}
+  .pn-topo{flex-direction:column}
 }
 /* A tela do chamado de Garantias por cima (28/10/2026): a janela grande, a moldura ocupa tudo embaixo do Fechar. O
    display só com ela aberta (o <dialog> fechado é display:none, e um display aqui o mostraria) */

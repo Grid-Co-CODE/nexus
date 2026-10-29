@@ -166,6 +166,9 @@ def test_a_tela_do_painel_do_responsavel(tela, logado):
     # o botão com o ícone, o rótulo, o número e a seta (29/10/2026: "que botão escroto é esse? melhore o design")
     assert re.search(r'data-pn-pts.*?class="pn-kpi-ico".*?PTs pendentes</small><span><b>\d+</b> esperando o De acordo'
                      r'.*?pn-kpi-seta', html, re.S)
+    # à esquerda da faixa "Parada agora", na mesma linha ("faça caber ao lado esquerdo de parado agora")
+    topo = html[html.index('<div class="pn-topo">'):html.index('<div class="pn">')]
+    assert "data-pn-pts" in topo and html.index("data-pn-pts") < html.index('<div class="pn">')
     assert 'class="pn-q pn-q--largo" aria-labelledby="pn-perf-t"' in html and "PR × previsto" in html
     # sem a barra das rondas e sem o aviso do ranking; os números diretos ("só a quantidade de chamados em aberto",
     # "a quantidade de equipes", "6 extintores vencidos e 2 a vencer")

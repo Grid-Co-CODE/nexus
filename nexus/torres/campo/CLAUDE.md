@@ -839,9 +839,11 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
   da Central (7 dias), a cor da cobertura a das Rondas (80/50, o `cor_pct` do Painel delas) e a nota a do App (85/70).
 - **O desenho (4ª rodada, 29/10/2026):** cinco quadros com a **mesma altura** ("Padronize o tamanho do card para todas
   as modalidades": `--pn-card` fixo, o número guarda o lugar de duas linhas e a lista encolhe e rola se faltar lugar) e
-  as **PT no número do cabeçalho** ("PTs pendentes pode ficar como um KPI que quando o supervisor clicasse ele veria quais
-  são as PTs, não precisa ser algo aberto toda hora": o botão `data-pn-pts`, com a cor de antes, abre a lista
-  `#pn-pts-lista` na janela, e a PT dela abre a decisão ali mesmo). O espaço que as PT deixaram foi para a
+  as **PT num número à esquerda da faixa "Parada agora"** ("PTs pendentes pode ficar como um KPI que quando o
+  supervisor clicasse ele veria quais são as PTs, não precisa ser algo aberto toda hora"; e "faça caber ao lado esquerdo
+  de parado agora"; ao ver o 1º botão, "que botão escroto é esse? melhore o design": o ícone num quadrado com a cor
+  da situação, o rótulo, o número e a seta). O botão `data-pn-pts` (no `.pn-topo`, com a faixa) abre a lista
+  `#pn-pts-lista` na janela, e a PT dela abre a decisão ali mesmo. O espaço que as PT deixaram foi para a
   **Performance, com duas colunas de largura** ("Aproveita o espaço para dar um destaque nas usinas abaixo da
   performance"): 1ª linha, a Performance e os Chamados; 2ª, o Ranking, as Rondas e os Extintores. Os números ficaram
   diretos: "N chamados em aberto", "N equipes", "N extintores vencidos e M a vencer"; saíram a barra das Rondas e o
@@ -857,7 +859,7 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
     o status do chamado": o da tela de Garantias, no fato desde 28/10/2026, ver `nexus/dados/fato_chamado.py`; a troca
     feita na tela depois da última publicação vale por cima, lida de `os_creator · chamados_obs`) e os dias. Concluído
     não entra ("As concluídas não mostra"); os em verificação só na contagem.
-  - PTs pendentes (no número do cabeçalho; a lista na janela): todas; a parada de hoje primeiro, depois as paradas de
+  - PTs pendentes (no número à esquerda da faixa "Parada agora"; a lista na janela): todas; a parada de hoje primeiro, depois as paradas de
     outros dias, depois as que esperam há menos de 2 h. O número diz só "PTs esperando o De acordo" (2ª rodada: "pode
     enxugar o texto").
   - Ranking das Equipes - <mês> (2ª rodada: "sempre o mês vigente"; a conta passou ao mês, ver "O Ranking das

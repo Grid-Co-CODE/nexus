@@ -154,8 +154,8 @@ def extintores(usinas: list[dict]) -> dict:
 
 
 def montar(nome: str, usinas: list[dict], rk: dict | None, hoje=None) -> dict:
-    """O painel de um responsável (ou de todos, sem escolha): o cabeçalho (com o número das PT, desde 29/10/2026) e os
-    cinco quadros."""
+    """O painel de um responsável (ou de todos, sem escolha): o cabeçalho, o número das PT (à esquerda da faixa "Parada
+    agora", desde 29/10/2026) e os cinco quadros."""
     clientes = sorted({u.get("cliente") for u in usinas if u.get("cliente")})
     equipes = sorted({u.get("equipe") for u in usinas if u.get("equipe") and u.get("equipe") != visao.SEM_EQUIPE})
     return {"nome": nome, "usinas": len(usinas), "clientes": clientes, "equipes": equipes,
