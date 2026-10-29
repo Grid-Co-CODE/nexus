@@ -82,11 +82,27 @@ Setting `PLACAR_V2` diz se é ela que o técnico vê), a mesma da aba "Ranking p
   devolvidas e as de 0 ponto; ronda não), ou, tendo o mínimo, cumprimento abaixo do mínimo (só os dias já vencidos; sem
   nada programado, 0%). Régua em `sombra` no App = aviso de que o técnico ainda vê a pontuação de antes.
   Sem o livro, a tela diz que o ranking ainda não chegou.
+- **A quantidade em cima e o "!" do título (29/10/2026).** Levi estranhou "280 rondas" e "2.000 tarefas" no mês:
+  eram os pontos em cima.
+  - **Tarefas e Rondas:** em cima vem quantas (tarefas registradas, rondas); embaixo, os pontos ("2.736 pts · 70
+    contam", "280 pts · no teto"). Pedido dele: "acho bom botar primeiro a quantidade real e abaixo vir os pontos".
+  - **O "!" ao lado do título** (`como_ler()`, `.rk-info`) explica cada coluna com a régua do mês, uma métrica por
+    linha, com um fio entre elas ("separe os tópicos em linhas"). Fechado ao abrir a tela, abre por cima e fecha no
+    clique fora e no Esc. O "Como o App calcula" do pé da tela foi para dentro dele.
+  - **As contas citadas são as do App:**
+    - tarefa = `max(0, nota - 60)` com nota no piso e GPS;
+    - pontualidade = início até o programado + 30 min (`PONTUAL_GRACE_MIN`), uma marca por OS por dia, só nas OS da
+      programação; a OS sem horário na programação conta como fora do horário (o `bool(None)` do App) e não soma
+      ponto.
+    Mudou lá, muda o texto aqui.
+  - **Em aberto:** tirar da pontualidade a OS sem horário programado, que é decisão do Levi (medir antes).
 - **O lado do App é o pacote** `C:\GridcoBuild\app-campo-docs\_propostas\ranking-pontos-nexus\` (`LEIA.md`,
   `aplicar.py --conferir`, o `.diff` contra a v262 que casa também na v263, e o teste do App). Enquanto o App não
   publicar com ele, o livro não existe e a tela diz isso; nada aqui depende da ordem.
-- **Prova:** `tests/test_campo_ranking_pontos.py` (9; 7 mutações pegas, uma delas a coluna com nome errado); no
-  navegador, com o banco falso dos testes: escuro, claro, região e 390 px.
+- **Prova:** `tests/test_campo_ranking_pontos.py` (18 desde 29/10/2026; 7 mutações pegas na 1ª versão, uma delas a
+  coluna com nome errado, e 2 em 29/10: os pontos de volta em cima e o "!" fora do título). No navegador, com o
+  banco falso dos testes: escuro, claro, região e 390 px. A prévia de 29/10 usou os números reais de outubro do
+  livro.
 
 ## Ocorrências com plano de ação (18/10/2026)
 
