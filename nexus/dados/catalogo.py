@@ -534,7 +534,7 @@ FATOS = (
          fontes=("nexus_tempo_real · fato_decisao_cobertura",),
          janela_origem="o Nexus é a fonte (só acrescenta: o vigente é a última decisão de cada fonte e chave)",
          observacao="fonte = a chave da aba do Monitoramento (pv, pg, sunop, axis, solaredge, semp, alveslima, 2capi, "
-                    "greenyellow, salenergia); origem 'migracao' = a foto do dia em que a fonte passou a ser controlada "
+                    "greenyellow, salenergia, apolo); origem 'migracao' = a foto do dia em que a fonte passou a ser controlada "
                     "pela tela, 'tela' = a decisão de um administrador. Quem decidiu fica no log da máquina "
                     "(logs/cobertura.log da plataforma), não no banco (regra 8)"),
     # De-para de equipamentos (11/10/2026, Levi: "quero que o de-para da equipamentos seja feito na plataforma de forma
@@ -556,7 +556,7 @@ FATOS = (
          janela_origem="o Nexus é a fonte (só acrescenta: o vigente é a última decisão de cada fonte, usina e inversor)",
          observacao="fonte = a chave da aba do Monitoramento; a usina liga nas contas da API PV (pv, semp, alveslima, "
                     "2capi) e o inversor na conta principal (pv, desde 12/10/2026), na conta oem@ (semp, alveslima, 2capi) e no scadaGridco (greenyellow, "
-                    "salenergia); o apelido pelo nome, nas fontes que mandam a usina só pelo nome (sunop, axis: "
+                    "salenergia, apolo); o apelido pelo nome, nas fontes que mandam a usina só pelo nome (sunop, axis: "
                     "usina_fonte = o nome exatamente como a fonte escreve). inversor_fonte vazio = a linha é da usina. "
                     "Valor vazio = desfaz (vale o nome da API ou "
                     "o de-para em código). O cadastro entra pela chave de negócio, que a plataforma confere antes de "
