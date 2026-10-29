@@ -70,6 +70,9 @@ ESCURO_DE_SEMPRE = {
     # a folha de papel do One Page do Acompanhamento do PCM (14/10/2026): tokens novos, nenhum valor de antes mudou
     "--papel-tinta": "#1d2433", "--papel-titulo": "#1e2140", "--papel-linha": "#dfe4ea", "--papel-fundo-2": "#f5f6f9",
     "--papel-crit": "#b42318", "--papel-alerta": "#8a5300", "--papel-ok": "#1f7a4d",
+    # a folha do FMEA e da causa raiz da Engenharia (29/10/2026): tokens novos, nenhum valor de antes mudou
+    "--papel-preencher": "#fbfbe8", "--papel-sugerido": "#eaf6dc", "--papel-crit-suave": "#fde2e2",
+    "--papel-alerta-suave": "#fdf0d5", "--papel-ok-suave": "#e3f6ea",
     # as camadas de calor do Mapa de risco (09/10/2026): tokens novos, nenhum valor de antes mudou
     "--calor-risco-1": "#503f2b", "--calor-risco-2": "#724a26", "--calor-risco-3": "#985224", "--calor-risco-4": "#bf582b",
     "--calor-risco-5": "#e75b3c", "--calor-densidade-1": "#5e3420", "--calor-densidade-2": "#8a3c19",

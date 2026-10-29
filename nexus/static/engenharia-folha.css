@@ -1,0 +1,112 @@
+/* A folha do FMEA e da causa raiz da Engenharia (Levi, 29/10/2026: "Tem que ter emitir FEMEA emitir causa raiz do
+   pcm.gridco.com.br use como referência e implemente"). O desenho é o da folha do painel do PCM: papel branco nos dois
+   temas (os tokens --papel-*), o cabeçalho com a linha verde, as seções numeradas, o campo a preencher em amarelo e o
+   sugerido pela biblioteca em verde. "Imprimir / PDF" usa a impressão do navegador: só a folha sai, em A4. */
+.eg-fo{max-width:900px;margin:0 auto}
+.eg-fo-barra{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px}
+.eg-fo-esp{flex:1}
+.eg-fo-dica{margin:0 0 10px;font-size:12.5px}
+.eg-fo-revs{margin:0 0 10px;font-size:12.5px}
+.eg-fo-revs a[aria-current]{font-weight:800;text-decoration:none}
+.eg-folha{display:block;background:var(--papel);color:var(--papel-tinta);border-radius:6px;padding:26px 30px 30px;
+  box-shadow:0 2px 14px var(--sombra);font-size:13px;line-height:1.4}
+.eg-fo-top{display:flex;align-items:flex-start;gap:14px;border-bottom:3px solid var(--verde);padding-bottom:12px;margin-bottom:14px}
+.eg-fo-marca{font-weight:800;font-size:18px;letter-spacing:-.02em;color:var(--papel-titulo)}
+.eg-fo-marca i{font-style:normal;color:var(--papel-link)}
+.eg-fo-tit{flex:1;min-width:0}
+.eg-fo-tit h2{margin:0;font-size:17px;font-weight:800;line-height:1.25;color:var(--papel-titulo)}
+.eg-fo-sub{font-size:11.5px;color:var(--papel-mudo);margin-top:2px;overflow-wrap:anywhere}
+.eg-fo-num{text-align:right;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--papel-mudo)}
+.eg-fo-num b{display:block;font-size:14px;color:var(--papel-titulo)}
+.eg-fo-legenda{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;color:var(--papel-mudo);margin:0 0 6px}
+.eg-fo-legenda span{display:inline-flex;align-items:center;gap:5px}
+.eg-fo-legenda i{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid var(--papel-linha)}
+.eg-fo-leg-medido{background:var(--papel)}
+.eg-fo-leg-sug{background:var(--papel-sugerido)}
+.eg-fo-leg-in{background:var(--papel-preencher)}
+.eg-fo-sec{display:flex;align-items:center;gap:8px;margin:16px 0 7px;font-size:10.5px;font-weight:800;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--papel-mudo)}
+.eg-fo-sec::after{content:"";flex:1;height:1px;background:var(--papel-linha)}
+.eg-fo-sec span{color:var(--papel-link)}
+.eg-fo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:8px 14px}
+.eg-fo-c{border-bottom:1px solid var(--papel-linha);padding:3px 0 5px;min-width:0}
+.eg-fo-c--largo{border-bottom:0}
+.eg-fo-c small{display:flex;align-items:center;gap:6px;font-size:9.5px;color:var(--papel-mudo);text-transform:uppercase;letter-spacing:.04em}
+.eg-fo-c b{font-weight:600;color:var(--papel-titulo);overflow-wrap:anywhere}
+.eg-fo-in,.eg-fo-sel{width:100%;box-sizing:border-box;border:0;border-bottom:1px dashed var(--papel-linha);
+  background:var(--papel-preencher);padding:3px 5px;font:inherit;color:var(--papel-tinta);border-radius:2px}
+.eg-fo-sel{width:auto;min-width:54px;border:1px solid var(--papel-linha);border-radius:4px}
+textarea.eg-fo-in{resize:vertical;min-height:60px}
+.eg-fo-in.eg-fo-sug,.eg-fo-sel.eg-fo-sug{background:var(--papel-sugerido)}
+.eg-fo-in:focus,.eg-fo-sel:focus{outline:2px solid var(--papel-link);background:var(--papel)}
+.eg-fo-in::placeholder{color:var(--papel-mudo)}
+.eg-fo-val{display:block;color:var(--papel-tinta);overflow-wrap:anywhere}
+.eg-fo-longo{margin:0;white-space:pre-wrap}
+.eg-fo-selo{font-size:8.5px;font-weight:800;letter-spacing:.04em;padding:0 5px;border-radius:3px;background:var(--papel-sugerido);
+  color:var(--papel-ok);text-transform:uppercase}
+.eg-fo-rolar{overflow-x:auto}
+.eg-fo-tab{width:100%;border-collapse:collapse;font-size:12px}
+.eg-fo-tab th{background:var(--papel-fundo-2);border:1px solid var(--papel-linha);padding:6px 7px;text-align:left;font-size:9.5px;
+  text-transform:uppercase;letter-spacing:.04em;color:var(--papel-mudo);font-weight:700}
+.eg-fo-tab th small{text-transform:none;letter-spacing:0;font-weight:400}
+.eg-fo-tab td{border:1px solid var(--papel-linha);padding:6px 7px;vertical-align:top;color:var(--papel-tinta)}
+.eg-fo-tab td.eg-fo-n{text-align:center;font-weight:800;font-family:ui-monospace,Consolas,monospace}
+.eg-fo-tab td.eg-fo-n small{display:block;font-weight:400;font-family:inherit;font-size:9.5px;color:var(--papel-mudo);margin-top:3px}
+.eg-fo-tab td.eg-fo-n small.eg-fo-sug-txt{color:var(--papel-ok)}
+.eg-fo-m{font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
+.eg-fo-w7{width:7%}.eg-fo-w9{width:9%}.eg-fo-w12{width:12%}.eg-fo-w14{width:14%}.eg-fo-w18{width:18%}.eg-fo-w33{width:33%}
+.eg-fo-servico{font-size:9px;font-weight:800;text-transform:uppercase;padding:0 5px;border-radius:3px;background:var(--papel-fundo-2);color:var(--papel-mudo)}
+.eg-fo-rpn{display:inline-block;padding:3px 10px;border-radius:5px;font-weight:800;font-family:ui-monospace,Consolas,monospace;font-size:13px;
+  background:var(--papel-fundo-2);color:var(--papel-titulo)}
+.eg-fo-rpn--alto{background:var(--papel-crit-suave);color:var(--papel-crit)}
+.eg-fo-rpn--medio{background:var(--papel-alerta-suave);color:var(--papel-alerta)}
+.eg-fo-rpn--baixo{background:var(--papel-ok-suave);color:var(--papel-ok)}
+.eg-fo-mini{font-size:10.5px;color:var(--papel-mudo);margin:5px 0 0}
+.eg-fo-nota{background:var(--papel-preencher);border-left:3px solid var(--verde);padding:7px 10px;font-size:12px;color:var(--papel-tinta);margin:8px 0}
+.eg-fo-nota .eg-fo-in{background:var(--papel);margin-top:4px}
+.eg-fo-alerta{background:var(--papel-alerta-suave);color:var(--papel-alerta);border-left:3px solid var(--papel-alerta);padding:8px 11px;font-size:12px;margin:0 0 8px}
+.eg-fo-pq{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--papel-linha)}
+.eg-fo-pq-n{flex:0 0 26px;height:26px;border-radius:50%;background:var(--papel-titulo);color:var(--papel);font-weight:800;font-size:11px;
+  display:flex;align-items:center;justify-content:center}
+.eg-fo-pq-w{flex:1;min-width:0}
+.eg-fo-pq-w small{display:flex;align-items:center;gap:6px;font-size:9.5px;color:var(--papel-mudo);text-transform:uppercase;letter-spacing:.04em}
+.eg-fo-ass{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:14px;margin-top:28px}
+.eg-fo-ass div{border-top:1px solid var(--papel-titulo);padding-top:4px;font-size:10.5px;color:var(--papel-mudo)}
+.eg-fo-ass b{display:block;color:var(--papel-titulo);font-size:11.5px}
+.eg-fo-pe{margin-top:16px;font-size:9.5px;color:var(--papel-mudo);border-top:1px solid var(--papel-linha);padding-top:8px;display:flex;
+  justify-content:space-between;flex-wrap:wrap;gap:6px}
+@media (max-width:600px){
+  .eg-folha{padding:16px 14px 20px}
+  .eg-fo-top{flex-wrap:wrap}
+  .eg-fo-num{text-align:left;width:100%}
+}
+
+/* a lista (tela FMEA e causa raiz) */
+.eg-fmea-tipos{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0}
+.eg-fmea-tipo{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;border:1px solid var(--linha-forte);
+  color:var(--tinta-2);text-decoration:none;font-size:13px}
+.eg-fmea-tipo i{font-style:normal;font-weight:700;color:var(--mudo)}
+.eg-fmea-tipo--on{border-color:var(--verde);color:var(--tinta);background:var(--verde-suave)}
+.eg-fmea-busca{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.eg-fmea-busca .gc-campo{min-width:min(240px,100%)}
+.eg-fmea-tab{width:100%;border-collapse:collapse;font-size:13px}
+.eg-fmea-tab th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mudo);padding:7px 8px;
+  border-bottom:1px solid var(--linha-forte);white-space:nowrap}
+.eg-fmea-tab td{padding:8px;border-bottom:1px solid var(--linha);vertical-align:top}
+.eg-fmea-tab code{display:block;font-size:11px;color:var(--mudo)}
+.eg-fmea-num{font-family:ui-monospace,Consolas,monospace;font-weight:700;white-space:nowrap}
+.eg-fmea-r{text-align:right}
+.eg-fmea-vazio{margin-top:14px}
+@media (max-width:600px){.eg-fmea-busca{margin-left:0;width:100%}.eg-fmea-busca .gc-campo{flex:1}}
+
+@media print{
+  body *{visibility:hidden}
+  .eg-folha,.eg-folha *{visibility:visible}
+  .eg-folha{position:absolute;left:0;top:0;width:100%;box-shadow:none;border-radius:0;padding:0;
+    print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .eg-fo-legenda{display:none}
+  .eg-fo-in,.eg-fo-sel{border:0;background:transparent;padding:0}
+  .eg-fo-in::placeholder{color:transparent}
+  .eg-fo-rolar{overflow:visible}
+  @page{size:A4;margin:12mm}
+}

@@ -49,9 +49,13 @@ TORRE = Torre(
         Tela("criticidade", "Matriz de criticidade",
              "Qual ativo, se parar, dói mais?",
              "engenharia.json do painel PCM"),
+        # o FMEA e a causa raiz dos ativos da Confiabilidade (Levi, 29/10/2026: "Tem que ter emitir FEMEA emitir causa
+        # raiz do pcm.gridco.com.br use como referência e implemente"); do setor Engenharia, como a Confiabilidade: o
+        # Emitir da gaveta abre as rotas desta tela, e sem a marca o portão do setor devolvia 403
         Tela("fmea", "FMEA e causa raiz",
              "Por que a falha acontece e o que a elimina?",
-             "Planilha de confiabilidade (a migrar)"),
+             "Relatórios emitidos pela Engenharia (banco), sobre as OS de falha do Fracttal",
+             do_setor="Engenharia"),
         Tela("laudos", "Laudos MPS/MPA",
              "Que laudos estão pendentes ou vencidos?",
              "engenharia.json do painel PCM"),
@@ -180,13 +184,13 @@ def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
     for x in sep["encerrado"]:
         anteriores.setdefault(canon(x["acomp"]["cod"]), []).append(x["acomp"])
 
-    chamados = _chamados_por_ativo()
+    chamados, rels = _chamados_por_ativo(), _relatorios_por_ativo()
 
     def gaveta(i, a, acomp, novas):
         c = canon(a.get("cod") or (acomp or {}).get("cod"))
         return _montar_gaveta(f"g{i}", a, acomp, novas,
                               [x for x in anteriores.get(c, []) if not acomp or x["id"] != acomp["id"]],
-                              falhas_em.get(c, []) if a.get("nivel") else [], chamados.get(c, []))
+                              falhas_em.get(c, []) if a.get("nivel") else [], chamados.get(c, []), rels.get(c, []))
     if aba == "ativos":
         gavetas = [gaveta(i, s, None, []) for i, s in enumerate(sinais)]
     elif aba == "acompanhamento":
@@ -210,17 +214,17 @@ def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
 
 
 def _montar_gaveta(gid: str, a: dict, acomp: dict | None, novas: list, anteriores: list, falhas: list,
-                   chamados=()) -> dict:
+                   chamados=(), relatorios=()) -> dict:
     """O que a gaveta de um ativo mostra (engenharia/_gaveta.html), na página e na resposta das ações: o ativo, o
     acompanhamento, as falhas novas com o dia, os encerrados anteriores, o dia de cada falha do ativo (o aviso de que o
     fim escolhido faz o ativo voltar para Ativos com sinal) e os chamados de garantia dele (`_chamados_por_ativo`).
     `falhas` vazio para o ativo sem o sinal de 30 dias: ele não volta para a lista, e o aviso não vale (acabamento da
-    revisão final)."""
+    revisão final). `relatorios`: o FMEA e a causa raiz emitidos do ativo (29/10/2026)."""
     return {"id": gid, "a": a, "acomp": acomp,
             "novas": [dict(x, dia=x["quando"].astimezone(BRT).strftime("%d/%m")) for x in novas],
             "anteriores": anteriores,
             "falhas_dias": sorted({x["quando"].astimezone(BRT).strftime("%Y-%m-%d") for x in falhas}),
-            "chamados": list(chamados)}
+            "chamados": list(chamados), "relatorios": list(relatorios)}
 
 
 SITUACAO_CHAMADO = {"aberto": ("Aberto", "alerta"), "verificacao": ("Em verificação", "info"),
@@ -434,13 +438,13 @@ def mesa():
     for x in sep["encerrado"]:
         anteriores.setdefault(canon(x["acomp"]["cod"]), []).append(x["acomp"])
     gavetas = []
-    chamados = _chamados_por_ativo()
+    chamados, rels = _chamados_por_ativo(), _relatorios_por_ativo()
 
     def gaveta(a, acomp, novas) -> str:
         c = canon(a.get("cod") or (acomp or {}).get("cod"))
         gv = _montar_gaveta(f"g{len(gavetas)}", a, acomp, novas,
                             [x for x in anteriores.get(c, []) if not acomp or x["id"] != acomp["id"]],
-                            falhas_em.get(c, []) if a.get("nivel") else [], chamados.get(c, []))
+                            falhas_em.get(c, []) if a.get("nivel") else [], chamados.get(c, []), rels.get(c, []))
         gavetas.append(gv)
         return gv["id"]
     caixa = [dict(x, gid=gaveta(x["a"], x["acomp"], x["novas"])) for x in caixa]
@@ -552,7 +556,7 @@ def _gaveta_de(cod: str, acomp_id: str | None = None, aviso: str = "", erro: str
                   and (not acomp or x["acomp"]["id"] != acomp["id"])]
     gv = _montar_gaveta("g", a, acomp, novas, anteriores,
                         (d.get("falhasEm") or {}).get(c, []) if a.get("nivel") else [],
-                        _chamados_por_ativo().get(c, []))
+                        _chamados_por_ativo().get(c, []), _relatorios_por_ativo().get(c, []))
     diags = AC.diagnosticos(lido["diagnosticos"])
     erro_leitura = bool(lido.get("erro") and not lido.get("lido_em"))
     if erro_leitura and not erro:
@@ -1479,3 +1483,262 @@ def equipe():
         faltam=d["faltam"], erro=d["erro"], colunas=os_equipe.COLUNAS, erro_eng=erro_eng,
         hoje=hoje.isoformat(), piso_concluidas=piso, janela=JANELA_CONCLUIDAS, dias_faixa=DIAS_FAIXA,
         lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")
+
+
+# ── FMEA e causa raiz (29/10/2026) ──────────────────────────────────────────────────────────────────────────────────
+# Levi: "Tem que ter emitir FEMEA emitir causa raiz do pcm.gridco.com.br use como referência e implemente". As folhas são
+# as do painel do PCM (o livro e as regras em nexus/engenharia/fmea.py; a biblioteca em biblioteca_falhas.py). Aqui: a
+# folha de emitir (os campos, já com o que o Nexus mede e o que a biblioteca sugere), a página do emitido (só leitura,
+# para imprimir ou salvar em PDF pelo navegador), a lista e o bloco da gaveta. Emite quem pode agir no acompanhamento (o
+# administrador e o setor Engenharia, com login de pessoa); ler, quem vê a tela.
+# as três ações da causa raiz sem padrão da biblioteca: o texto vira a dica do campo e a nota GUT já vem (o PCM)
+SUGESTAO_GUT = (("Corretiva definitiva", 5, 5, 4), ("Bloqueio da recorrência", 4, 4, 4),
+                ("Revisão do plano preventivo", 3, 3, 4))
+
+
+def _ativo_da_conf(cod: str) -> dict | None:
+    """O ativo da Confiabilidade pelo código: o de Ativos com sinal (com as OS da janela) ou o da conta de
+    disponibilidade (sem OS na janela)."""
+    from ...dados.equipamento import canon
+    d = _dados()["dados"]
+    c = canon(cod)
+    if not c:
+        return None
+    return (next((s for s in d["sinais"] if canon(s["cod"]) == c), None)
+            or next((a for a in d["ativos"] if canon(a["cod"]) == c), None))
+
+
+def _ativo_da_revisao(u: dict) -> dict:
+    """O ativo como a revisão anterior o guardou: a nova revisão de um ativo que saiu da janela da Confiabilidade."""
+    return {**(u.get("medido") or {}), **(u.get("ativo") or {}), "cod": u["cod"], "os": u.get("os") or [],
+            "usina_id": u.get("usina_id"), "ligada_por": u.get("usina_ligada_por")}
+
+
+def _sugestoes(tipo: str, a: dict) -> dict:
+    """O que a biblioteca sugere para a folha nova, pelo que reconhece nas OS do ativo (o que a folha pinta de verde).
+    Sem padrão reconhecido, só a nota GUT da causa raiz vem (a do PCM); a severidade e a detecção da criticidade são o
+    valor de partida das listas, não sugestão da biblioteca."""
+    from ...engenharia import biblioteca_falhas as B
+    p = B.pre(a)
+    b = p["padrao"]
+    s: dict = {}
+    if tipo == "fmea":
+        if b:
+            s.update(modo_1=b["modo"], efeito_1=b["efeito"], causa_1=b["causa"], tipo_falha=b["tipo_falha"],
+                     sev=b["sev"], det=b["det"], **{f"acao_{i}": t for i, (t, *_n) in enumerate(b["acoes"], 1)})
+        return s
+    for i, (t, g, u, tt) in enumerate(b["acoes"] if b else SUGESTAO_GUT, 1):
+        s.update({f"g_{i}": g, f"u_{i}": u, f"t_{i}": tt})
+        if b:
+            s[f"acao_{i}"] = t
+    if b:
+        ultima = ((a.get("os") or [{}])[0] or {}).get("d") or ""
+        s.update(descricao=f"{b['modo']}. {p['n_padrao']} ocorrências em 30 dias ({p['fontes']})."
+                           + (f" Última: {ultima}." if ultima else ""),
+                 causa_raiz=b["pq"][4], tipo_falha=b["tipo_falha"], causa=b["causa"], deteccao_metodo=b["det_txt"],
+                 **{f"pq_{i}": t for i, t in enumerate(b["pq"], 1)})
+    return s
+
+
+def _faixa_rpn(r) -> str:
+    return "" if not r else "alto" if r >= 150 else "medio" if r >= 60 else "baixo"
+
+
+def _br(iso) -> str:
+    try:
+        return date.fromisoformat(str(iso)[:10]).strftime("%d/%m/%Y")
+    except ValueError:
+        return str(iso or "")
+
+
+def _nome_do_login() -> str:
+    u = session.get("usuario") or {}
+    return " ".join(str(u.get("nome") or "").split())
+
+
+def _acomp_txt(acomp: dict | None) -> str:
+    if not acomp:
+        return "sem acompanhamento aberto"
+    desde = acomp.get("desde")
+    return (f"com {acomp['responsavel']['nome'] or 'alguém da Engenharia'}"
+            + (f" desde {desde.strftime('%d/%m/%Y')}" if desde else ""))
+
+
+def _folha_ctx(**kw) -> dict:
+    from ...engenharia import fmea as F
+    return dict(torre=TORRE, tela=TORRE.tela("fmea"), TIPOS=F.TIPOS, tipos_falha=F.TIPOS_FALHA,
+                rotulo_falha=dict(F.TIPOS_FALHA), h=_h, pct=_pct, br=_br, faixa_rpn=_faixa_rpn,
+                acoes_ph=[t for t, *_n in SUGESTAO_GUT], **kw)
+
+
+def _folha(tipo: str, a: dict, valores: dict, sug: dict, *, ant: dict | None = None, erro: str = "",
+           status: int = 200):
+    """A folha de emitir. `valores` = o que vai nos campos; `sug` = o que a biblioteca e o Nexus sugerem (o campo que
+    ainda tem a sugestão fica verde); `ant` = o relatório do qual esta é a nova revisão."""
+    from ...engenharia import acompanhamento as AC
+    from ...engenharia import biblioteca_falhas as B
+    pode, _ = _quem_pode()
+    p = B.pre(a)
+    lido = AC.ler()
+    acomp = AC.aberto_de(AC.estado(lido["eventos"]), a["cod"]) if lido.get("lido_em") else None
+    v = {k: ("" if x is None else str(x)) for k, x in valores.items()}
+    marcados = {k for k, x in sug.items() if str(x) == v.get(k, "")}
+    occ = B.ocorrencia(a.get("nFalha"))
+    sev, det = AC._int(v.get("sev")) or p["sev"], AC._int(v.get("det")) or p["det"]
+    n_os = len(a.get("os") or [])
+    if ant:
+        dica = (f"Nova revisão do {ant['numero']}: a folha vem com a {ant['ultima']['rev_txt']}; mude o que for preciso "
+                "e emita. A revisão anterior continua guardada.")
+    elif p["padrao"]:
+        dica = (f"A biblioteca reconheceu o padrão \"{p['padrao']['nome']}\" em {p['n_padrao']} de {n_os} OS "
+                f"({p['fontes']}): os campos verdes vieram dela; os amarelos são da engenharia.")
+    elif p["so_servico"]:
+        dica = "As OS deste ativo são serviço, não falha: a biblioteca não tem o que sugerir."
+    else:
+        dica = (f"A biblioteca não reconheceu padrão nas {n_os} OS deste ativo: preencha à mão (o padrão novo entra na "
+                "biblioteca depois).")
+    proxima = (max(r["revisao"] for r in ant["revisoes"]) + 1) if ant else 0
+    return render_template(
+        "engenharia/fmea_folha.html", **_folha_ctx(
+            editar=True, tipo=tipo, a=a, m=a, oss=a.get("os") or [], p=p, v=v, sug=marcados, pode=pode,
+            numero=ant["numero"] if ant else "", de=ant["numero"] if ant else "", rev_txt=f"R{proxima:02d}",
+            data_txt=datetime.now(BRT).strftime("%d/%m/%Y"), occ=occ, sev=sev, det=det, rpn=occ * sev * det,
+            acomp_txt=_acomp_txt(acomp), funcao=B.funcao(a.get("fam")), dica=dica, erro=erro, aviso="",
+            autor="", revisoes=[], rev=None,
+            volta_endpoint="torre_engenharia.fmea_ver" if ant else "torre_engenharia.confiabilidade",
+            volta_args={"numero": ant["numero"]} if ant else {},
+            volta_texto=ant["numero"] if ant else "Confiabilidade")), status
+
+
+@bp.route("/fmea")
+def fmea():
+    from ...engenharia import fmea as F
+    return _lista_fmea(F)
+
+
+def _lista_fmea(F, erro_ativo: str = "", status: int = 200):
+    lido = F.ler()
+    rels = F.relatorios(lido["linhas"])
+    tipo = request.args.get("tipo") if request.args.get("tipo") in F.TIPOS else ""
+    q = (request.args.get("q") or "").strip().lower()
+
+    def passa(r):
+        u = r["ultima"]
+        texto = f"{r['numero']} {u['cod']} {u['ativo'].get('nome') or ''} {u['ativo'].get('usina') or ''} {u['autor']}"
+        return (not tipo or r["tipo"] == tipo) and (not q or q in texto.lower())
+    pode, _ = _quem_pode()
+    return render_template(
+        "engenharia/fmea.html", torre=TORRE, tela=TORRE.tela("fmea"), lista=[r for r in rels if passa(r)],
+        contas={"todos": len(rels), **{t: sum(r["tipo"] == t for r in rels) for t in F.TIPOS}}, TIPOS=F.TIPOS,
+        tipo=tipo, q=request.args.get("q", ""), pode=pode, url=_url, faixa_rpn=_faixa_rpn, erro_ativo=erro_ativo,
+        erro="" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0],
+        velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else ""), status
+
+
+@bp.route("/fmea/novo")
+def fmea_novo():
+    from ...engenharia import fmea as F
+    pode, _ = _quem_pode()
+    if not pode:
+        abort(403)
+    de, ant = (request.args.get("de") or "").strip(), None
+    if de:
+        ant = F.achar(F.relatorios(F.ler(forcar=True)["linhas"]), de)
+        if not ant:
+            abort(404)
+        tipo, cod = ant["tipo"], ant["ultima"]["cod"]
+    else:
+        tipo, cod = request.args.get("tipo", ""), (request.args.get("ativo") or "").strip()
+        if tipo not in F.TIPOS:
+            abort(404)
+    a = _ativo_da_conf(cod) or (_ativo_da_revisao(ant["ultima"]) if ant else None)
+    if not a:
+        return _lista_fmea(F, erro_ativo=f"O ativo {cod or '(sem código)'} não está na Confiabilidade agora (sem OS de "
+                                         "falha lida): abra o ativo pela Confiabilidade para emitir.", status=404)
+    sug = _sugestoes(tipo, a)
+    # a folha nova já diz quem elabora (o login); a nova revisão vem como a anterior estava
+    valores = dict(ant["ultima"]["campos"]) if ant else dict(sug, **({"elaboracao": _nome_do_login()}
+                                                                    if tipo == "fmea" and _nome_do_login() else {}))
+    return _folha(tipo, a, valores, sug, ant=ant)
+
+
+@bp.route("/fmea/emitir", methods=["POST"])
+def fmea_emitir():
+    import logging
+
+    from ...dados import livros
+    from ...engenharia import acompanhamento as AC
+    from ...engenharia import fmea as F
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    pode, _ = _quem_pode()
+    if not pode:
+        abort(403)
+    form = request.form.to_dict()
+    tipo, cod, de = form.get("tipo", ""), (form.get("cod") or "").strip(), (form.get("de") or "").strip()
+    ant = F.achar(F.relatorios(F.ler(forcar=True)["linhas"]), de) if de else None
+    a = _ativo_da_conf(cod) or (_ativo_da_revisao(ant["ultima"]) if ant else None)
+    if tipo not in F.TIPOS or not a:
+        return _lista_fmea(F, erro_ativo=f"O ativo {cod or '(sem código)'} não está na Confiabilidade agora: nada foi "
+                                         "emitido.", status=404)
+    sug = _sugestoes(tipo, a)
+    lido = AC.ler(forcar=True)
+    acomp = AC.aberto_de(AC.estado(lido["eventos"]), cod) if lido.get("lido_em") else None
+    try:
+        nova = F.emitir(tipo, a, form, session.get("usuario"), pode, acompanhamento_id=(acomp or {}).get("id"),
+                        de=de or None)
+    except F.Recusada as e:
+        return _folha(tipo, a, form, sug, ant=ant, erro=str(e), status=400)
+    except Exception as e:      # noqa: BLE001 — banco fora: a folha volta com o que foi digitado
+        logging.exception("fmea: a emissão do %s de %s não gravou", tipo, cod)
+        recusada = getattr(livros, "GravacaoRecusada", None)
+        if isinstance(e, livros.GravacaoErro) and not (recusada and isinstance(e, recusada)):
+            erro = ("Gravei, mas a conferência do banco não bateu: confira a lista do FMEA e causa raiz antes de emitir "
+                    "de novo, para não emitir duas vezes.")
+        else:
+            erro = FALHOU_BANCO.format(type(e).__name__)
+        return _folha(tipo, a, form, sug, ant=ant, erro=erro, status=503)
+    return redirect(url_for("torre_engenharia.fmea_ver", numero=nova["numero"], emitido=1), 303)
+
+
+@bp.route("/fmea/<numero>")
+def fmea_ver(numero: str):
+    from ...engenharia import acompanhamento as AC
+    from ...engenharia import biblioteca_falhas as B
+    from ...engenharia import fmea as F
+    r = F.achar(F.relatorios(F.ler()["linhas"]), numero)
+    if not r:
+        abort(404)
+    rev = request.args.get("rev", "")
+    u = next((x for x in r["revisoes"] if str(x["revisao"]) == rev), r["ultima"])
+    pode, _ = _quem_pode()
+    a = {**(u["ativo"] or {}), "cod": u["cod"]}
+    acomp = None
+    if u["acompanhamento_id"]:
+        lido = AC.ler()
+        acomp = AC.estado(lido["eventos"]).get(u["acompanhamento_id"]) if lido.get("lido_em") else None
+    aviso = (f"Emitido: {r['numero']} {u['rev_txt']}. Para imprimir ou salvar em PDF, use Imprimir / PDF."
+             if request.args.get("emitido") else "")
+    return render_template(
+        "engenharia/fmea_folha.html", **_folha_ctx(
+            editar=False, tipo=u["tipo"], a=a, m=u["medido"] or {}, oss=u["os"], p=B.pre({**a, "os": u["os"]}),
+            v={k: ("" if x is None else str(x)) for k, x in (u["campos"] or {}).items()}, sug=set(), pode=pode,
+            numero=r["numero"], de="", rev_txt=u["rev_txt"], data_txt=u["data_txt"], occ=u["occ"], sev=u["sev"],
+            det=u["det"], rpn=u["rpn"],
+            acomp_txt=_acomp_txt(acomp) if u["acompanhamento_id"] else "sem acompanhamento aberto na emissão",
+            funcao=B.funcao(a.get("fam")), dica="", erro="", aviso=aviso, autor=u["autor"], revisoes=r["revisoes"],
+            rev=u, volta_endpoint="torre_engenharia.fmea", volta_args={}, volta_texto="FMEA e causa raiz"))
+
+
+def _relatorios_por_ativo() -> dict:
+    """{código canônico: os relatórios do ativo} para a gaveta; o banco fora não derruba a gaveta (fica sem a lista)."""
+    import logging
+
+    from ...engenharia import fmea as F
+    try:
+        return F.por_ativo(F.relatorios(F.ler()["linhas"]))
+    except Exception as e:      # noqa: BLE001
+        logging.warning("confiabilidade: os relatórios de FMEA e causa raiz não vieram (%s: %s)", type(e).__name__,
+                        str(e)[:160])
+        return {}

@@ -302,6 +302,30 @@ FATOS = (
                     "ligado liga ou desliga a etiqueta, o acompanhamento e o finalizado. O estado de agora é o do último "
                     "evento de cada tipo. origem diz de onde veio (nexus ou app_etm) e origem_id a chave de lá. Quem só "
                     "cifrado (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
+    # o FMEA e a causa raiz dos ativos da Confiabilidade (Levi, 29/10/2026: "Tem que ter emitir FEMEA emitir causa raiz
+    # do pcm.gridco.com.br use como referência e implemente"). O Nexus é a FONTE; registrado antes da 1ª gravação
+    Fato("relatorio_falha", "FMEA e causa raiz da Engenharia", "engenharia",
+         "nexus_engenharia_relatorios · fato_relatorio_falha",
+         "1 linha = 1 emissão (uma revisão) de 1 relatório de análise de falha, FMEA ou causa raiz, de 1 ativo",
+         _d(data=("id", "data_id (o dia de Brasília da emissão)"),
+            usina=("id", "usina_id (a ligação da Confiabilidade com o cadastro; usina_ligada_por)"),
+            equipamento=("id", "equipamento_id (o código do ativo)"),
+            pessoa=("cod", "pessoa_hmac (quem emitiu)")),
+         tipo="transacao", chave=("id",),
+         medidas=_m((("falhas_30d_qtd", "qtd", "semi"), ("ocorrencia_nivel", "nivel", "nao"),
+                     ("severidade_nivel", "nivel", "nao"), ("deteccao_nivel", "nivel", "nao"),
+                     ("rpn_pts", "pts", "nao"))),
+         fontes=("nexus_engenharia_relatorios · fato_relatorio_falha",),
+         janela_origem="o Nexus é a fonte",
+         observacao="numero é FMEA-AAAA-NNNN ou RCA-AAAA-NNNN (tipo fmea ou rca) e revisao a revisão dele (0 = R00): "
+                    "vale a maior de cada número, e cada linha traz a folha inteira. acompanhamento_id liga ao "
+                    "acompanhamento aberto do ativo na emissão (nexus_engenharia_acompanhamento). padrao_biblioteca é "
+                    "o padrão de modo de falha que a biblioteca reconheceu nas OS (nexus/engenharia/"
+                    "biblioteca_falhas.py) e tipo_falha a lista fechada (eletrica, mecanica, comunicacao, ambiental, "
+                    "operacao). As notas do RPN (1 a 10) e o rpn_pts (1 a 1000) só no FMEA; a ocorrência é medida "
+                    "pelas falhas de 30 dias. O texto da análise, a equipe, os responsáveis, quem emitiu e a foto do "
+                    "ativo e das OS só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se "
+                    "apaga"),
     Fato("contestacao_cliente", "Contestação do cliente", "contratos", "thopen_contestacoes · contestacoes",
          "1 linha = 1 contestação de 1 cliente sobre 1 dia (ou intervalo) de 1 usina × 1 setor (Performance, COS "
          "ou Zeladoria)",
@@ -1278,6 +1302,12 @@ LIVROS = (
           "nexus/engenharia/etm_marcas.py, pela OS de ETM da tela ETMs", False,
           "registrado em 26/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª marcação. As quatro abas vão juntas a "
           "cada gravação, sobre o livro relido do banco; as três dim são as listas fixas do código",
+          so_cresce=True),
+    Livro("nexus_engenharia_relatorios", ("fato_relatorio_falha",),
+          "a cada FMEA ou causa raiz emitido (e a cada nova revisão) pela Engenharia",
+          "nexus/engenharia/fmea.py, pela tela Engenharia > FMEA e causa raiz (e o Emitir da gaveta da Confiabilidade)",
+          False,
+          "registrado em 29/10/2026 antes da 1ª gravação (regra 10): nasce no 1º relatório emitido",
           so_cresce=True),
     Livro("nexus_observacoes", ("fato_observacao_responsavel",), "a cada observação escrita no Nexus",
           "nexus/campo/observacao_responsavel.py", False,

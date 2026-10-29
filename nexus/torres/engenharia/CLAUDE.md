@@ -2,8 +2,8 @@
 
 Engenharia de manutenção: confiabilidade dos ativos, criticidade, FMEA e causa raiz, laudos. Hoje são telas de verdade
 a **Mesa do engenheiro** (a primeira da torre, 18/10/2026), a **Confiabilidade** (com o **acompanhamento** dos ativos
-com sinal desde 18/10/2026), o **Quadro da equipe** (com a **página da OS** desde 24/10/2026) e as **ETMs**
-(26/10/2026); as outras caem no placeholder da casca.
+com sinal desde 18/10/2026), o **Quadro da equipe** (com a **página da OS** desde 24/10/2026), as **ETMs**
+(26/10/2026) e o **FMEA e causa raiz** (29/10/2026); as outras caem no placeholder da casca.
 
 ## Como entregar (trava da área da Engenharia, desde 27/10/2026)
 
@@ -137,6 +137,55 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   (o livro, as regras, a separação das abas, a tela e as ações, no banco falso; inclusive a API devolvendo tudo como
   texto, o código com caixa e espaço, o comentário com HTML, o banco fora e cada achado da revisão final; o JS da
   resposta, no node). A prova não grava no banco de verdade: o livro é para sempre.
+
+## FMEA e causa raiz (29/10/2026)
+
+Levi: "Tem que ter emitir FEMEA emitir causa raiz do pcm.gridco.com.br use como referência e implemente". A referência é
+o módulo Confiabilidade do painel do PCM (`novo.html` do `gridco-pcm-data`: as funções `fmea(a)`, `rca(a)`, a `BIB` e o
+`pre(a)`); aqui as mesmas duas folhas, na mesma ordem, e o emitido vai para o banco (lá ia para um arquivo do GitHub).
+
+| Peça | Onde |
+|---|---|
+| A biblioteca de modos de falha | `nexus/engenharia/biblioteca_falhas.py` (`BIBLIOTECA`, `pre`, `ocorrencia`, `funcao`) |
+| O livro e as regras | `nexus/engenharia/fmea.py` (`emitir`, `relatorios`, `por_ativo`, `proximo_numero`, `limpar_campos`) |
+| Tela e rotas | `__init__.py` (`fmea`, `fmea_novo`, `fmea_emitir`, `fmea_ver`, `_sugestoes`, `_folha`), `templates/engenharia/fmea.html` (a lista), `fmea_folha.html` (a folha, de emitir e de ver), o bloco "FMEA e causa raiz" do `_gaveta.html`; `nexus/static/engenharia-folha.css` |
+
+- **Onde se emite:** na gaveta do ativo (Confiabilidade e Mesa), "Emitir FMEA" e "Emitir causa raiz" abrem a folha
+  (`/t/engenharia/fmea/novo?tipo=fmea|rca&ativo=<código>`), já com o que o Nexus mede (negrito: as OS da janela, as
+  falhas de 30 dias, MTBF, MTTR, disponibilidade, a ocorrência), o que a biblioteca sugere (verde, com o selo) e o resto
+  a preencher (amarelo). O ativo precisa estar na Confiabilidade (Ativos com sinal ou a conta de disponibilidade); fora
+  dela, a lista diz por quê (404). A tela FMEA e causa raiz é a lista (a última revisão de cada número; Todos, FMEA,
+  Causa raiz e a busca) e é do setor Engenharia (`do_setor`): sem isso, com o portão ligado, o Emitir da gaveta voltava
+  403 (o caso do Pegar da Mesa, 18/10/2026).
+- **As folhas (as do PCM):** FMEA = cabeçalho, ponto da falha (com o tipo de falha, que o PCM não tinha), análise
+  (modo, efeito e causa, duas linhas), avaliação do risco (OCC medida pelas falhas de 30 dias, `ocorrencia`: 5 ou mais
+  = 10, 4 = 8, 3 = 6, 2 = 4, senão 2; SEV e DET de 1 a 10; RPN = OCC x SEV x DET, alto a partir de 150, médio a partir
+  de 60) e três ações com o RPN depois. Causa raiz = evento (com o acompanhamento aberto do ativo no lugar do ticket do
+  PCM), descrição, os cinco porquês, a causa raiz, a classificação (tipo de falha em lista fechada), três ações com a
+  matriz GUT (1 a 5) e a verificação. Sem padrão da biblioteca, a severidade parte da criticidade (A = 8, B = 6, C = 4)
+  e a detecção de 6, como no PCM, sem pintar de verde. A norma no rodapé é a de cada folha (IEC 60812, IEC 62740; o PCM
+  citava a IEC 60300-3-11 nas duas).
+- **A biblioteca:** o padrão é o MAIS FREQUENTE nas falhas do ativo (3 strings sem corrente e 1 religamento é problema de
+  string), casado pela tarefa e pela nota da OS; o serviço registrado como corretiva é a marca da Confiabilidade
+  (`servico`, `soServico`), e a folha avisa "Isto parece não ser falha". O padrão novo entra em `BIBLIOTECA` com o caso.
+  O rascunho por IA do PCM era um exemplo fixo (mockup) e não veio.
+- **Número e revisão:** FMEA-AAAA-NNNN e RCA-AAAA-NNNN, o maior do tipo no ano + 1, sob a trava da gravação. O livro só
+  acrescenta: corrigir é "Nova revisão" (R01, R02...), com a folha da anterior; a revisão de outro tipo ou de outro ativo
+  é recusada. A página do emitido (`/t/engenharia/fmea/<número>`, `?rev=N` para uma anterior) é só leitura; "Imprimir /
+  PDF" é a impressão do navegador (só a folha, em A4).
+- **O livro:** `nexus_engenharia_relatorios` · `fato_relatorio_falha`, 1 linha = 1 emissão (uma revisão), registrado no
+  catálogo antes da 1ª gravação (`so_cresce`). Em claro só os IDs (ativo, usina, quem emitiu, o acompanhamento aberto),
+  o número, o tipo, a revisão, o padrão da biblioteca, o tipo de falha e as notas do RPN; o texto da análise, a equipe e
+  os responsáveis (nomes), quem emitiu e a FOTO do ativo e das OS (sem quem atendeu nem a nota do técnico) só cifrados.
+  A foto é o que a folha mostra depois: a janela de 30 dias anda, e o relatório não muda com ela. Campo que a folha não
+  tem fica fora; texto acima de 300 letras (a descrição, 2.000), data fora de AAAA-MM-DD e nota fora da escala são
+  recusados com o porquê (nada se corta calado).
+- **Quem:** emite quem age no acompanhamento (administrador e setor Engenharia, com login de pessoa: a senha de
+  administrador não diz quem é); lê quem vê a tela.
+- **Como provar:** `python -m pytest -q tests/test_engenharia_fmea.py` (a biblioteca, o livro no banco falso, a
+  numeração, a revisão, as recusas, as telas, a gaveta, o outro site e o portão do setor). Na cópia de prova
+  (`ferramentas/subir_copia_de_prova.py`, banco falso): emitir pela gaveta, conferir a página, a lista, o celular (375
+  px, a tabela rola dentro da folha) e os dois temas (a folha é papel branco nos dois).
 
 ## Quadro da equipe (06/10/2026)
 
@@ -432,9 +481,9 @@ cuidado com `.m` (do campo.css, é fonte de código).
 - **Cancelada não entra** (no PCM entrava nos sinais dos 30 dias, porque ele lia todas as OS).
 - **Indicadores por cliente/usina = mediana dos ativos.** No PCM a disponibilidade agregada somava as falhas da frota
   toda e dava Athon 14% (o próprio site avisava).
-- Ainda não tem: Tickets, Matriz de criticidade (formulário), E-mail automático e Relatórios FMEA/RCA. No PCM, tickets
-  e relatórios gravam num arquivo do GitHub, a matriz é um mockup e o e-mail está sem SMTP (`smtpConfigurado:false`).
-  Aqui, quando vierem, vão para o banco (ler `nexus/dados/CLAUDE.md` antes).
+- Ainda não tem: Tickets, Matriz de criticidade (formulário) e E-mail automático. No PCM, tickets gravam num arquivo
+  do GitHub, a matriz é um mockup e o e-mail está sem SMTP (`smtpConfigurado:false`). Aqui, quando vierem, vão para o
+  banco (ler `nexus/dados/CLAUDE.md` antes). O FMEA e a causa raiz vieram em 29/10/2026 (seção acima).
 
 ### Como provar
 - `python -m pytest -q tests/test_engenharia_confiabilidade.py`

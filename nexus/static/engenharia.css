@@ -743,3 +743,14 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .eg-mesa-oss .t{flex:1;min-width:160px}
 .eg-mesa-oss .mudo{font-size:12px}
 .eg-mesa-mais{margin:0;padding:0 18px 12px;font-size:12px}
+
+/* o FMEA e a causa raiz na gaveta do ativo (29/10/2026): os dois Emitir e os relatórios emitidos; o selo do RPN é o da
+   folha (engenharia-folha.css), repetido aqui porque a gaveta não carrega a folha */
+.eg-gav-emitir{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.eg-relatorios{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px}
+.eg-relatorios li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:12.5px}
+.eg-relatorios .eg-fo-rpn{display:inline-block;padding:1px 7px;border-radius:5px;font-weight:800;font-size:11px;
+  font-family:ui-monospace,Consolas,monospace;background:var(--papel-fundo-2);color:var(--papel-titulo)}
+.eg-relatorios .eg-fo-rpn--alto{background:var(--papel-crit-suave);color:var(--papel-crit)}
+.eg-relatorios .eg-fo-rpn--medio{background:var(--papel-alerta-suave);color:var(--papel-alerta)}
+.eg-relatorios .eg-fo-rpn--baixo{background:var(--papel-ok-suave);color:var(--papel-ok)}

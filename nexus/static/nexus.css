@@ -73,6 +73,10 @@
      iguais nos dois temas (o papel é sempre branco) */
   --papel-tinta:#1d2433; --papel-titulo:#1e2140; --papel-linha:#dfe4ea; --papel-fundo-2:#f5f6f9;
   --papel-crit:#b42318; --papel-alerta:#8a5300; --papel-ok:#1f7a4d;
+  /* a folha do FMEA e da causa raiz da Engenharia (29/10/2026): o campo a preencher (amarelo), o sugerido pela
+     biblioteca (verde) e o fundo do semáforo do RPN, iguais nos dois temas, como o resto do papel */
+  --papel-preencher:#fbfbe8; --papel-sugerido:#eaf6dc;
+  --papel-crit-suave:#fde2e2; --papel-alerta-suave:#fdf0d5; --papel-ok-suave:#e3f6ea;
 }
 :root[data-tema="claro"]{
   /* superfícies e texto (o mudo e o fraco escurecidos até 4,5:1 também no #eceef2 de uma linha em hover) */
@@ -124,6 +128,10 @@
      iguais nos dois temas (o papel é sempre branco) */
   --papel-tinta:#1d2433; --papel-titulo:#1e2140; --papel-linha:#dfe4ea; --papel-fundo-2:#f5f6f9;
   --papel-crit:#b42318; --papel-alerta:#8a5300; --papel-ok:#1f7a4d;
+  /* a folha do FMEA e da causa raiz da Engenharia (29/10/2026): o campo a preencher (amarelo), o sugerido pela
+     biblioteca (verde) e o fundo do semáforo do RPN, iguais nos dois temas, como o resto do papel */
+  --papel-preencher:#fbfbe8; --papel-sugerido:#eaf6dc;
+  --papel-crit-suave:#fde2e2; --papel-alerta-suave:#fdf0d5; --papel-ok-suave:#e3f6ea;
 }
 :root{
   --font-display:"Raleway","Poppins",system-ui,sans-serif;

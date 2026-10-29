@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia-folha.css') }}">
+{# A lista do FMEA e da causa raiz emitidos (29/10/2026): a última revisão de cada número, o mais recente primeiro. Emitir
+   é pela gaveta do ativo na Confiabilidade (o ativo traz as OS e as contas que a folha usa), como no painel do PCM. #}
+<div class="campo-nativa eg-fmea">
+  <h1 class="cn-titulo">{{ tela.nome }}</h1>
+  <p class="cn-sub">Os relatórios de análise de falha emitidos pela Engenharia. Para emitir, abra um ativo na <a class="cn-link" href="{{ url_for('torre_engenharia.confiabilidade') }}">Confiabilidade</a> e use Emitir FMEA ou Emitir causa raiz; cada correção é uma nova revisão do mesmo número.</p>
+  {% if erro_ativo %}<p class="cn-erro" role="alert">{{ erro_ativo }}</p>{% endif %}
+  {% if erro %}<p class="cn-erro" role="status"><b>Não consegui ler os relatórios no banco ({{ erro }}).</b> Recarregue em instantes.</p>
+  {% elif velha_em %}<p class="mudo" role="status">Mostrando a leitura das {{ velha_em }}: o banco não respondeu agora.</p>{% endif %}
+  <nav class="eg-fmea-tipos" aria-label="Tipo de relatório">
+    <a class="eg-fmea-tipo{% if not tipo %} eg-fmea-tipo--on{% endif %}" href="{{ url(tipo='') }}"{% if not tipo %} aria-current="page"{% endif %}>Todos <i>{{ contas.todos }}</i></a>
+    {% for k, t in TIPOS.items() %}<a class="eg-fmea-tipo{% if tipo == k %} eg-fmea-tipo--on{% endif %}" href="{{ url(tipo=k) }}"{% if tipo == k %} aria-current="page"{% endif %}>{{ t[1] }} <i>{{ contas[k] }}</i></a>{% endfor %}
+    <form class="eg-fmea-busca" method="get" role="search">{% if tipo %}<input type="hidden" name="tipo" value="{{ tipo }}">{% endif %}<input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="Número, ativo, usina ou autor" aria-label="Buscar relatório"><button type="submit" class="gc-btn gc-btn--contorno">Buscar</button></form>
+  </nav>
+  {% if lista %}
+  <div class="eg-fo-rolar"><table class="eg-fmea-tab">
+    <thead><tr><th>Nº</th><th>Tipo</th><th>Rev.</th><th>Ativo</th><th>Usina</th><th>Emitido</th><th>Autor</th><th class="eg-fmea-r">RPN</th></tr></thead>
+    <tbody>{% for r in lista %}{% set u = r.ultima %}<tr>
+      <td><a class="cn-link eg-fmea-num" href="{{ url_for('torre_engenharia.fmea_ver', numero=r.numero) }}">{{ r.numero }}</a></td>
+      <td>{{ u.tipo_txt }}</td><td>{{ u.rev_txt }}</td>
+      <td><span class="eg-fmea-ativo">{{ u.ativo.get('nome') or u.cod }}</span><code>{{ u.cod }}</code></td>
+      <td>{{ u.ativo.get('usina') or '—' }}</td><td>{{ u.data_txt }}</td><td>{{ u.autor or '—' }}</td>
+      <td class="eg-fmea-r">{% if u.rpn %}<span class="eg-fo-rpn eg-fo-rpn--{{ faixa_rpn(u.rpn) }}">{{ u.rpn }}</span>{% else %}—{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% elif not erro %}<p class="mudo eg-fmea-vazio">{% if q or tipo %}Nenhum relatório com este filtro.{% else %}Nenhum relatório emitido ainda: abra um ativo na Confiabilidade e clique em Emitir FMEA ou Emitir causa raiz.{% endif %}</p>{% endif %}
+</div>
+{% endblock %}

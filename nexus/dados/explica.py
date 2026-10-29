@@ -26,6 +26,7 @@ RESUMO = {
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
     "acompanhamento_os": "O status, a prioridade e os comentários da Engenharia em cada OS",
     "marcacao_etm": "O diagnóstico e as marcações da Engenharia em cada OS de ETM",
+    "relatorio_falha": "Cada FMEA e cada causa raiz emitidos pela Engenharia, com as revisões",
     "contestacao_cliente": "O que o cliente contestou no Dashboard Thopen, por setor",
     "decisao": "O que o painel do App decidiu: aprovar, tratar ou devolver",
     "zeladoria": "Cada etapa da vistoria de zeladoria feita pelo App",
@@ -144,6 +145,13 @@ PARA_QUE = {
                     "alinhamento com o cliente ou regularizado), as etiquetas, o acompanhamento e o finalizado pela "
                     "Engenharia, com o dia e a hora. Serve para saber o que derruba as ETMs por usina e cliente, quanto "
                     "leva para a Engenharia encerrar e quais seguem em garantia. Quem marcou vai cifrado.",
+    "relatorio_falha": "Guarda cada relatório de análise de falha que a Engenharia emite na Confiabilidade: o FMEA (o "
+                       "modo, o efeito e a causa da falha, e o risco em número, o RPN = ocorrência x severidade x "
+                       "detecção) e a causa raiz (os cinco porquês, a causa e as ações com a matriz GUT), cada um com "
+                       "o número (FMEA-2026-0001) e as revisões. Serve para guardar a análise de cada ativo que "
+                       "falha muito e, com o tempo, ver quais modos de falha e tipos de falha se repetem por família, "
+                       "usina e cliente e se o RPN caiu depois das ações. O texto da análise e quem emitiu vão "
+                       "cifrados; a tela Engenharia → FMEA e causa raiz mostra.",
     "decisao": "Registra as decisões tomadas no painel do App de Campo: a aprovação de uma tarefa, o tratamento de um "
                "alerta da Central de atenção e a devolução de uma tarefa ao técnico. Serve para saber quem decidiu o "
                "quê, quando e sobre qual OS.",

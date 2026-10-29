@@ -73,6 +73,15 @@
 </div>
 {% endif %}
 
+{% if pode or gv.relatorios %}
+{# o FMEA e a causa raiz do ativo (Levi, 29/10/2026: "Tem que ter emitir FEMEA emitir causa raiz"): emitir abre a folha,
+   já com as OS e as contas deste ativo; embaixo, os emitidos (a última revisão de cada número) #}
+<h3>FMEA e causa raiz{% if gv.relatorios %} ({{ gv.relatorios|length }}){% endif %}</h3>
+{% if pode %}<p class="eg-gav-emitir"><a class="gc-btn gc-btn--contorno eg-btn-peq" href="{{ url_for('torre_engenharia.fmea_novo', tipo='fmea', ativo=a.get('cod')) }}">Emitir FMEA</a><a class="gc-btn gc-btn--contorno eg-btn-peq" href="{{ url_for('torre_engenharia.fmea_novo', tipo='rca', ativo=a.get('cod')) }}">Emitir causa raiz</a></p>{% endif %}
+{% if gv.relatorios %}<ul class="eg-relatorios">{% for r in gv.relatorios %}<li><a class="cn-link m" href="{{ url_for('torre_engenharia.fmea_ver', numero=r.numero) }}">{{ r.numero }}</a>
+  <span>{{ r.tipo_txt }} · {{ r.rev_txt }}</span><span class="mudo">{{ r.data_txt }}{% if r.autor %} · {{ r.autor }}{% endif %}</span>{% if r.rpn %}<span class="eg-fo-rpn eg-fo-rpn--{{ 'alto' if r.rpn >= 150 else ('medio' if r.rpn >= 60 else 'baixo') }}">RPN {{ r.rpn }}</span>{% endif %}</li>{% endfor %}</ul>{% endif %}
+{% endif %}
+
 {% if gv.chamados %}
 {# os chamados de garantia do ativo (a etiqueta CHAMADOS do Fracttal; Levi, 29/10/2026), o aberto primeiro #}
 <h3>Chamados de garantia ({{ gv.chamados|length }})</h3>

@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% set T = TIPOS[tipo] %}
+{% block titulo %}{{ (numero ~ ' · ') if numero }}{{ T[1] }} · {{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia-folha.css') }}">
+{# A folha do FMEA e da causa raiz (Levi, 29/10/2026: "Tem que ter emitir FEMEA emitir causa raiz do pcm.gridco.com.br
+   use como referência e implemente"): as seções e a ordem das folhas do painel do PCM. A mesma página emite (`editar`:
+   os campos, com o que o Nexus mede em negrito, o que a biblioteca sugere em verde e o resto em amarelo, a preencher) e
+   mostra o emitido (só leitura, para imprimir ou salvar em PDF). Papel branco nos dois temas (os tokens --papel-*). #}
+{% macro entrada(k, ph='') -%}
+{%- if editar %}<input class="eg-fo-in{% if k in sug %} eg-fo-sug{% endif %}" name="{{ k }}" value="{{ v.get(k, '') }}" placeholder="{{ ph }}" maxlength="300" aria-label="{{ ph or k }}">
+{%- else %}<span class="eg-fo-val">{{ v.get(k) or '—' }}</span>{% endif -%}
+{%- endmacro %}
+{% macro data(k, rot) -%}
+{%- if editar %}<input class="eg-fo-in" type="date" name="{{ k }}" value="{{ v.get(k, '') }}" aria-label="{{ rot }}">
+{%- else %}<span class="eg-fo-val">{{ br(v.get(k)) if v.get(k) else '—' }}</span>{% endif -%}
+{%- endmacro %}
+{% macro nota(k, mn, mx, padrao, rot) -%}
+{%- set escolhido = (v.get(k) or padrao)|string -%}
+{%- if editar %}<select class="eg-fo-sel{% if k in sug %} eg-fo-sug{% endif %}" name="{{ k }}" aria-label="{{ rot }}">{% for n in range(mn, mx + 1) %}<option{% if escolhido == n|string %} selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+{%- else %}{{ v.get(k) or padrao or '—' }}{% endif -%}
+{%- endmacro %}
+{% macro selo(k) %}{% if k in sug %}<span class="eg-fo-selo">biblioteca</span>{% endif %}{% endmacro %}
+{% macro campo(rot, valor) %}<div class="eg-fo-c"><small>{{ rot }}</small><b>{{ valor or '—' }}</b></div>{% endmacro %}
+{% macro campo_in(rot, k, ph='') %}<div class="eg-fo-c"><small>{{ rot }}{{ selo(k) }}</small>{{ entrada(k, ph) }}</div>{% endmacro %}
+{% macro tipo_falha() -%}
+<div class="eg-fo-c"><small>Tipo de falha{{ selo('tipo_falha') }}</small>
+{%- if editar %}<select class="eg-fo-sel{% if 'tipo_falha' in sug %} eg-fo-sug{% endif %}" name="tipo_falha" aria-label="Tipo de falha"><option value="">a escolher</option>{% for k, rot in tipos_falha %}<option value="{{ k }}"{% if v.get('tipo_falha') == k %} selected{% endif %}>{{ rot }}</option>{% endfor %}</select>
+{%- else %}<b>{{ rotulo_falha.get(v.get('tipo_falha'), '—') }}</b>{% endif %}</div>
+{%- endmacro %}
+{% macro tabela_os() -%}
+{% if oss %}<div class="eg-fo-rolar"><table class="eg-fo-tab"><thead><tr><th>OS</th><th>Tarefa</th><th>Tipo</th><th>Data</th><th>Estado</th></tr></thead>
+<tbody>{% for o in oss %}<tr><td class="eg-fo-m">#{{ o.os }}</td><td>{{ o.t }}{% if o.servico %} <span class="eg-fo-servico">serviço</span>{% endif %}</td><td>{{ o.tipo or '—' }}</td><td>{{ o.d }}</td><td>{{ o.st or '—' }}</td></tr>{% endfor %}</tbody></table></div>
+{% else %}<p class="eg-fo-mini">Sem OS de falha na janela de 30 dias da Confiabilidade.</p>{% endif %}
+{%- endmacro %}
+<div class="campo-nativa eg-fo">
+  <div class="eg-fo-barra">
+    <a class="eg-ac-volta" href="{{ url_for(volta_endpoint, **volta_args) }}">← {{ volta_texto }}</a>
+    <span class="eg-fo-esp"></span>
+    {% if editar %}<button type="submit" form="eg-fo-form" class="gc-btn gc-btn--primario" data-eg-emitir>Emitir {{ 'FMEA' if tipo == 'fmea' else 'causa raiz' }}</button>{% endif %}
+    {% if not editar and pode %}<a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_engenharia.fmea_novo', de=numero) }}">Nova revisão</a>{% endif %}
+    <button type="button" class="gc-btn gc-btn--contorno" data-eg-imprimir>Imprimir / PDF</button>
+  </div>
+  {% if editar and dica %}<p class="mudo eg-fo-dica">{{ dica }}</p>{% endif %}
+  {% if revisoes|length > 1 %}<p class="eg-fo-revs">Revisões: {% for x in revisoes %}<a class="cn-link" href="{{ url_for('torre_engenharia.fmea_ver', numero=numero, rev=x.revisao) }}"{% if rev and x.revisao == rev.revisao %} aria-current="page"{% endif %}>{{ x.rev_txt }}</a> <span class="mudo">{{ x.data_txt }}</span>{{ ' · ' if not loop.last }}{% endfor %}</p>{% endif %}
+  {% if aviso %}<p class="eg-acomp-msg eg-acomp-msg--ok" role="status">{{ aviso }}</p>{% endif %}
+  {% if erro %}<p class="eg-acomp-msg eg-acomp-msg--erro" role="alert">{{ erro }}</p>{% endif %}
+  <{{ 'form' if editar else 'article' }} class="eg-folha" id="eg-fo-form"{% if editar %} method="post" action="{{ url_for('torre_engenharia.fmea_emitir') }}"{% endif %}>
+    {% if editar %}<input type="hidden" name="tipo" value="{{ tipo }}"><input type="hidden" name="cod" value="{{ a.cod }}">{% if de %}<input type="hidden" name="de" value="{{ de }}">{% endif %}{% endif %}
+    <header class="eg-fo-top">
+      <div class="eg-fo-marca">Grid <i>Co.</i></div>
+      <div class="eg-fo-tit"><h2>{{ T[2] }}</h2><div class="eg-fo-sub">{{ a.nome or a.cod }} · {{ a.usina or '—' }}{% if a.cliente %} · {{ a.cliente }}{% endif %}</div></div>
+      <div class="eg-fo-num"><b>{{ numero or 'a numerar na emissão' }}</b>Revisão {{ rev_txt }} · {{ data_txt }}</div>
+    </header>
+    {% if editar %}<div class="eg-fo-legenda" aria-hidden="true"><span><i class="eg-fo-leg-medido"></i>medido pelo Nexus</span><span><i class="eg-fo-leg-sug"></i>sugerido pela biblioteca{% if p.padrao %}: {{ p.padrao.nome }} ({{ p.fontes }}){% endif %}</span><span><i class="eg-fo-leg-in"></i>a preencher pela engenharia</span></div>{% endif %}
+    {% if tipo == 'fmea' %}
+    {% if p.so_servico %}<div class="eg-fo-alerta"><b>Isto parece não ser falha.</b> {{ p.n_servico }} de {{ oss|length }} OS são serviço (limpeza, ensaio, revisão) registradas como corretiva. O sinal veio da contagem, não de falha funcional: o caminho é reclassificar no Fracttal; emita só se a engenharia discordar.</div>{% endif %}
+    <h3 class="eg-fo-sec"><span>1</span>Cabeçalho</h3>
+    <div class="eg-fo-grid">
+      {{ campo('Processo', 'Geração fotovoltaica') }}{{ campo('Área', a.usina) }}{{ campo('Sistema', a.circuito or a.fam) }}
+      {{ campo_in('Equipe', 'equipe', 'nomes da equipe') }}{{ campo('Data de início', data_txt) }}
+      {{ campo_in('Responsável pela elaboração', 'elaboracao', 'quem elabora') }}{{ campo_in('Responsável pela revisão', 'revisao_resp', 'quem revisa') }}
+    </div>
+    <h3 class="eg-fo-sec"><span>2</span>Ponto da falha</h3>
+    <div class="eg-fo-grid">
+      {{ campo('Equipamento', (a.nome or a.cod) ~ ' · ' ~ a.cod) }}{{ campo('Função do equipamento', funcao) }}
+      {{ campo_in('Componente', 'componente', 'peça ou subconjunto analisado') }}{{ tipo_falha() }}
+    </div>
+    <h3 class="eg-fo-sec"><span>3</span>Análise da falha</h3>
+    <div class="eg-fo-rolar"><table class="eg-fo-tab"><thead><tr><th class="eg-fo-w33">Modo de falha <small>(sintoma)</small></th><th class="eg-fo-w33">Efeito <small>(consequência)</small></th><th>Causa</th></tr></thead>
+    <tbody>{% for i in (1, 2) %}<tr><td>{{ entrada('modo_' ~ i, 'como a falha se apresentou' if i == 1 else '') }}</td><td>{{ entrada('efeito_' ~ i, 'impacto na geração ou na segurança' if i == 1 else '') }}</td><td>{{ entrada('causa_' ~ i, 'por que ocorreu' if i == 1 else '') }}</td></tr>{% endfor %}</tbody></table></div>
+    <p class="eg-fo-nota">Histórico que motivou a análise: <b>{{ m.nFalha or 0 }} {{ 'falha' if (m.nFalha or 0) == 1 else 'falhas' }} em 30 dias</b>{% if m.mtbf %}, MTBF {{ h(m.mtbf) }}, MTTR {{ h(m.mttr) }}, disponibilidade {{ pct(m.disp) }}{% endif %}.</p>
+    {{ tabela_os() }}
+    <h3 class="eg-fo-sec"><span>4</span>Avaliação do risco</h3>
+    <div class="eg-fo-rolar"><table class="eg-fo-tab"><thead><tr><th>Ocorrência <small>(medida)</small></th><th>Severidade <small>(engenharia)</small></th><th>Detecção <small>(engenharia)</small></th><th>RPN = OCC × SEV × DET</th></tr></thead>
+    <tbody><tr><td class="eg-fo-n" data-occ="{{ occ }}">{{ occ }}<small>{{ m.nFalha or 0 }} em 30 d</small></td>
+      <td class="eg-fo-n">{{ nota('sev', 1, 10, sev, 'Severidade') }}{% if editar and 'sev' in sug and p.padrao %}<small class="eg-fo-sug-txt">sugerida</small>{% endif %}</td>
+      <td class="eg-fo-n">{{ nota('det', 1, 10, det, 'Detecção') }}{% if p.padrao %}<small class="eg-fo-sug-txt">{{ p.padrao.det_txt }}</small>{% endif %}</td>
+      <td class="eg-fo-n"><span class="eg-fo-rpn eg-fo-rpn--{{ faixa_rpn(rpn) }}" data-eg-rpn>{{ rpn or '—' }}</span></td></tr></tbody></table></div>
+    <p class="eg-fo-mini">Desempate: maior severidade primeiro; depois SEV × OCC. Escala de 1 a 10 em cada fator, RPN de 1 a 1000 (alto a partir de 150, médio a partir de 60).</p>
+    <h3 class="eg-fo-sec"><span>5</span>Ação preventiva recomendada</h3>
+    <div class="eg-fo-rolar"><table class="eg-fo-tab"><thead><tr><th>Ação</th><th class="eg-fo-w18">Responsável</th><th class="eg-fo-w14">Prazo</th><th class="eg-fo-w14">RPN após a ação</th></tr></thead>
+    <tbody>{% for i in range(1, 4) %}<tr><td>{{ entrada('acao_' ~ i, 'incluir no plano, mudar a cadência, trocar componente' if i == 1 else '') }}</td><td>{{ entrada('acao_resp_' ~ i) }}</td><td>{{ data('acao_prazo_' ~ i, 'Prazo da ação ' ~ i) }}</td>
+      <td>{% if editar %}<input class="eg-fo-in" type="number" min="1" max="1000" name="acao_rpn_{{ i }}" value="{{ v.get('acao_rpn_' ~ i, '') }}" aria-label="RPN depois da ação {{ i }}">{% else %}<span class="eg-fo-val">{{ v.get('acao_rpn_' ~ i) or '—' }}</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+    {% else %}
+    {% if p.so_servico %}<div class="eg-fo-alerta"><b>Isto parece não ser falha.</b> {{ p.n_servico }} de {{ oss|length }} OS são serviço registradas como corretiva. A causa raiz aqui é de <b>processo</b>: a classificação errada da OS.</div>{% endif %}
+    <h3 class="eg-fo-sec"><span>1</span>Evento</h3>
+    <div class="eg-fo-grid">
+      {{ campo('Equipamento', (a.nome or a.cod) ~ ' · ' ~ a.cod) }}{{ campo('Usina e circuito', (a.usina or '—') ~ ((' · ' ~ a.circuito) if a.circuito else '')) }}{{ campo('Criticidade', ('Classe ' ~ a.crit) if a.crit else '') }}
+      {{ campo('Falhas em 30 dias', (m.nFalha or 0) ~ ((' (P90 da família: ' ~ m.p90 ~ ')') if m.p90 is not none else '')) }}{{ campo('Acompanhamento', acomp_txt) }}{{ campo_in('Equipe da análise', 'equipe', 'nomes da equipe') }}
+    </div>
+    <h3 class="eg-fo-sec"><span>2</span>Descrição da falha</h3>
+    <div class="eg-fo-c eg-fo-c--largo"><small>O que aconteceu{{ selo('descricao') }}</small>{% if editar %}<textarea class="eg-fo-in{% if 'descricao' in sug %} eg-fo-sug{% endif %}" name="descricao" rows="3" maxlength="2000" placeholder="o que aconteceu, quando foi percebido, como foi atendido" aria-label="Descrição da falha">{{ v.get('descricao', '') }}</textarea>{% else %}<p class="eg-fo-val eg-fo-longo">{{ v.get('descricao') or '—' }}</p>{% endif %}</div>
+    {{ tabela_os() }}
+    <h3 class="eg-fo-sec"><span>3</span>Os cinco porquês</h3>
+    {% for i in range(1, 6) %}<div class="eg-fo-pq"><span class="eg-fo-pq-n">{{ i }}</span><div class="eg-fo-pq-w"><small>Por quê?{{ selo('pq_' ~ i) }}</small>{{ entrada('pq_' ~ i, 'por que o equipamento falhou?' if i == 1 else ('a causa que, removida, impede a repetição' if i == 5 else 'não aceite a resposta imediata')) }}</div></div>{% endfor %}
+    <div class="eg-fo-nota"><b>Causa raiz:</b>{{ selo('causa_raiz') }} {{ entrada('causa_raiz', 'a conclusão em uma frase') }}</div>
+    <h3 class="eg-fo-sec"><span>4</span>Classificação</h3>
+    <div class="eg-fo-grid">
+      {{ tipo_falha() }}{{ campo_in('Causa', 'causa', 'a causa, como na lista do Fracttal') }}{{ campo_in('Método de detecção', 'deteccao_metodo', 'inspeção, alarme, cliente, monitoramento') }}
+    </div>
+    <h3 class="eg-fo-sec"><span>5</span>Ações e prioridade (matriz GUT)</h3>
+    <div class="eg-fo-rolar"><table class="eg-fo-tab"><thead><tr><th>Ação</th><th class="eg-fo-w14">Responsável</th><th class="eg-fo-w12">Prazo</th><th class="eg-fo-w7">G</th><th class="eg-fo-w7">U</th><th class="eg-fo-w7">T</th><th class="eg-fo-w9">G×U×T</th></tr></thead>
+    <tbody>{% for i in range(1, 4) %}{% set gut = (v.get('g_' ~ i)|int(0)) * (v.get('u_' ~ i)|int(0)) * (v.get('t_' ~ i)|int(0)) %}<tr><td>{{ entrada('acao_' ~ i, acoes_ph[i - 1] if not p.padrao else '') }}</td><td>{{ entrada('acao_resp_' ~ i) }}</td><td>{{ data('acao_prazo_' ~ i, 'Prazo da ação ' ~ i) }}</td>
+      <td class="eg-fo-n">{{ nota('g_' ~ i, 1, 5, 3, 'Gravidade da ação ' ~ i) }}</td><td class="eg-fo-n">{{ nota('u_' ~ i, 1, 5, 3, 'Urgência da ação ' ~ i) }}</td><td class="eg-fo-n">{{ nota('t_' ~ i, 1, 5, 3, 'Tendência da ação ' ~ i) }}</td>
+      <td class="eg-fo-n" data-eg-gut="{{ i }}">{{ gut or '—' }}</td></tr>{% endfor %}</tbody></table></div>
+    <p class="eg-fo-mini">Gravidade, urgência e tendência de 1 a 5. O maior produto vai primeiro na fila.</p>
+    <h3 class="eg-fo-sec"><span>6</span>Verificação</h3>
+    <div class="eg-fo-grid">
+      {{ campo('Critério de eficácia', 'uma janela de 30 dias sem reincidência no ativo') }}<div class="eg-fo-c"><small>Verificar em</small>{{ data('verificar_em', 'Verificar em') }}</div>{{ campo_in('Resultado', 'resultado', 'o resultado da verificação') }}
+    </div>
+    {% endif %}
+    <div class="eg-fo-ass"><div><b>Elaboração</b>engenharia de manutenção</div><div><b>Revisão</b>coordenação O&amp;M</div><div><b>Aprovação</b>gerência O&amp;M</div></div>
+    <footer class="eg-fo-pe"><span>Emitido pelo Nexus · Grid Co.{% if autor %} · {{ autor }}{% endif %}{% if not editar %} em {{ data_txt }}{% endif %}</span><span>Norma de referência: {{ 'IEC 60812 (FMEA)' if tipo == 'fmea' else 'IEC 62740 (análise de causa raiz)' }}</span></footer>
+  </{{ 'form' if editar else 'article' }}>
+</div>
+<script>
+(function () {
+  // Imprimir / PDF: a impressão do navegador, só com a folha (engenharia-folha.css, @media print)
+  document.querySelectorAll('[data-eg-imprimir]').forEach(function (b) { b.addEventListener('click', function () { window.print(); }); });
+  var f = document.getElementById('eg-fo-form');
+  if (!f || f.tagName !== 'FORM') return;
+  function faixa(r) { return r >= 150 ? 'alto' : r >= 60 ? 'medio' : 'baixo'; }
+  // o RPN e o G×U×T acompanham as notas, na hora (a conta que vale é a do servidor, na emissão)
+  function conta() {
+    var occ = f.querySelector('[data-occ]'), e = f.querySelector('[data-eg-rpn]');
+    if (occ && e && f.elements.sev && f.elements.det) {
+      var r = (+occ.dataset.occ) * (+f.elements.sev.value) * (+f.elements.det.value);
+      e.textContent = r; e.className = 'eg-fo-rpn eg-fo-rpn--' + faixa(r);
+    }
+    f.querySelectorAll('[data-eg-gut]').forEach(function (td) {
+      var i = td.dataset.egGut;
+      td.textContent = (+f.elements['g_' + i].value) * (+f.elements['u_' + i].value) * (+f.elements['t_' + i].value);
+    });
+  }
+  f.addEventListener('change', conta);
+  // o campo sugerido que a pessoa muda deixa de ser verde: passou a ser da engenharia
+  f.addEventListener('input', function (ev) { if (ev.target.classList) ev.target.classList.remove('eg-fo-sug'); });
+  // um clique só: a emissão grava um número novo
+  f.addEventListener('submit', function () {
+    var b = document.querySelector('[data-eg-emitir]');
+    if (b) { b.disabled = true; b.textContent = 'Emitindo...'; }
+  });
+})();
+</script>
+{% endblock %}
