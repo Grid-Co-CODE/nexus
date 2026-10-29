@@ -85,6 +85,17 @@ def _servir(monkeypatch, *respostas):
     return pedidos
 
 
+def _relida(config):
+    """Passado o minuto, a cópia vencida volta na hora e a releitura vai por trás (29/10/2026): espera ela e lê de novo."""
+    NO.ler(config, AGORA)
+    import time as _t
+    fim = _t.perf_counter() + 5
+    while any(st.get("renovando") for st in NO._estado.values()):
+        assert _t.perf_counter() < fim
+        _t.sleep(0.01)
+    return NO.ler(config, AGORA)
+
+
 def _painel(**filtros):
     return NO.painel(AND.Leitura("", {"itens": ITENS, "carregando": False}), AGORA, **filtros)
 
@@ -204,7 +215,7 @@ def test_a_primeira_carga_pagina_e_depois_so_o_que_mudou(ligada, monkeypatch):
     assert NO.ler(ligada.config, AGORA) and len(pedidos) == 2
     # passado o minuto, pergunta pelo cursor, e o mesmo registro que volta SUBSTITUI (não soma)
     monkeypatch.setattr(NO.time, "monotonic", lambda: 10 ** 9)
-    l = NO.ler(ligada.config, AGORA)
+    l = _relida(ligada.config)
     assert pedidos[-1][1] == "c2" and len(l.dados["itens"]) == 6
     assert next(n for n in l.dados["itens"] if n["registro"] == "r1")["os_aberta_no_fracttal"] == ABERTA
 
@@ -227,7 +238,7 @@ def test_a_falha_guarda_o_que_ja_veio_e_explica_o_404(ligada, monkeypatch):
     _servir(monkeypatch, _resp(ITENS), AND.FonteErro("o Andamento não respondeu (TimeoutError)"))
     assert len(NO.ler(ligada.config, AGORA).dados["itens"]) == 6
     monkeypatch.setattr(NO.time, "monotonic", lambda: 10 ** 9)
-    l = NO.ler(ligada.config, AGORA)
+    l = _relida(ligada.config)
     assert l.velha and len(l.dados["itens"]) == 6 and "não respondeu" in l.erro
     NO.limpar()
     _servir(monkeypatch, _resp(ITENS, versao=2))
@@ -272,7 +283,11 @@ def test_a_tela(ligada, logado, monkeypatch):
     html = logado.get("/t/cos/normalizacoes?mes=2026-10").get_data(as_text=True)
     assert 'aria-current="page">Outubro<' in html and 'data-folio="16702"' in html and "Setembro" in html
     html = logado.get("/t/cos/normalizacoes?status=processo").get_data(as_text=True)
-    assert 'data-folio="16702"' in html and 'data-folio="17001"' not in html and "Limpar os filtros" in html
+    # desde 29/10/2026 as linhas do mês vêm todas e as de fora do filtro chegam escondidas (o filtro é da página)
+    def _escondida(folio):
+        i = html.index(f'data-folio="{folio}"')
+        return " hidden" in html[html.rindex("<tr", 0, i):html.index(">", i)]
+    assert not _escondida("16702") and _escondida("17001") and "Limpar os filtros" in html
     # o CSV, com os filtros, e o texto que o Excel leria como fórmula vai com apóstrofo
     _servir(monkeypatch, _resp(ITENS + [_n("rx", os="17009", informe={"resumo": "=HYPERLINK(1)"})]))
     NO.limpar()

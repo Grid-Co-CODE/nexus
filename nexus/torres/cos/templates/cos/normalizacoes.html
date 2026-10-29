@@ -45,53 +45,57 @@
 
   <div class="cn-filtros">
     <div class="cn-seg" aria-label="Mês">
-      {% for k, rot, _i, _f in meses %}<a href="{{ url(mes=k) }}"{% if k == mes %} aria-current="page"{% endif %}>{{ rot }}</a>{% endfor %}
+      {% for k, rot, _i, _f in meses %}<a href="{{ url(mes=k) }}" data-norm-mes="{{ k }}"{% if k == mes %} aria-current="page"{% endif %}>{{ rot }}</a>{% endfor %}
     </div>
   </div>
 
   <div class="cn-numeros">
-    <span><span class="gc-rotulo">Normalizadas</span><span class="v">{{ p.resumo.total }}</span>
+    <span><span class="gc-rotulo">Normalizadas</span><span class="v" data-norm-r="total">{{ p.resumo.total }}</span>
       <span class="d">a usina voltou, pela hora do COS</span></span>
-    <span><span class="gc-rotulo">Com a OS ainda aberta</span><span class="v{% if p.resumo.abertas %} ruim{% endif %}">{{ p.resumo.abertas }}</span>
-      <span class="d">{{ p.resumo.abertas_pct }}% das normalizadas · {{ p.resumo.abertas_7d }} há 7 dias ou mais</span></span>
-    <span><span class="gc-rotulo">Indisponível (mediana)</span><span class="v">{{ p.resumo.mediana }}</span>
+    <span><span class="gc-rotulo">Com a OS ainda aberta</span><span class="v{% if p.resumo.abertas %} ruim{% endif %}" data-norm-r="abertas">{{ p.resumo.abertas }}</span>
+      <span class="d"><span data-norm-r="abertas_pct">{{ p.resumo.abertas_pct }}</span>% das normalizadas · <span data-norm-r="abertas_7d">{{ p.resumo.abertas_7d }}</span> há 7 dias ou mais</span></span>
+    <span><span class="gc-rotulo">Indisponível (mediana)</span><span class="v" data-norm-r="mediana">{{ p.resumo.mediana }}</span>
       <span class="d">do início da falha à volta</span></span>
-    <span><span class="gc-rotulo">Sem hora real da volta</span><span class="v">{{ p.resumo.sem_hora_real }}</span>
+    <span><span class="gc-rotulo">Sem hora real da volta</span><span class="v" data-norm-r="sem_hora_real">{{ p.resumo.sem_hora_real }}</span>
       <span class="d">encerradas sem a hora: fora da mediana</span></span>
   </div>
 
-  <form class="cn-filtros cos-norm-filtros" method="get">
+  {# o filtro é da página desde 29/10/2026 (static/cos/normalizacoes.js): as linhas do mês vêm todas, e escolher um filtro
+     só mostra e esconde, refaz a faixa e troca o endereço, sem ir ao servidor. O mês continua indo ao servidor. #}
+  <form class="cn-filtros cos-norm-filtros" method="get" id="cos-norm-filtros">
     <input type="hidden" name="mes" value="{{ mes }}">
     <label class="cn-filtro-par"><span class="gc-rotulo">Tipo de falha</span>
-    <select class="gc-campo" name="falha" onchange="this.form.submit()">
+    <select class="gc-campo" name="falha">
       <option value="">Todos</option>{% for f, n in p.contagem.falha.items() %}<option value="{{ f }}"{% if f == falha %} selected{% endif %}>{{ f }} ({{ n }})</option>{% endfor %}
     </select></label>
     <label class="cn-filtro-par"><span class="gc-rotulo">Cliente</span>
-    <select class="gc-campo" name="cliente" onchange="this.form.usina.value='';this.form.submit()">
+    <select class="gc-campo" name="cliente">
       <option value="">Todos</option>{% for c, n in p.contagem.cliente.items() %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
     </select></label>
     <label class="cn-filtro-par"><span class="gc-rotulo">Usina</span>
-    <select class="gc-campo" name="usina" onchange="this.form.submit()">
+    <select class="gc-campo" name="usina">
       <option value="">Todas</option>{% for u, n in p.contagem.usina.items() %}<option value="{{ u }}"{% if u == usina %} selected{% endif %}>{{ u }} ({{ n }})</option>{% endfor %}
     </select></label>
     <label class="cn-filtro-par"><span class="gc-rotulo">Criado por</span>
-    <select class="gc-campo" name="criado_por" onchange="this.form.submit()">
+    <select class="gc-campo" name="criado_por">
       <option value="">Todos</option>{% for c, n in p.contagem.operador.items() %}<option value="{{ c }}"{% if c == operador %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
     </select></label>
     <label class="cn-filtro-par"><span class="gc-rotulo">Técnico</span>
-    <select class="gc-campo" name="tecnico" onchange="this.form.submit()">
+    <select class="gc-campo" name="tecnico">
       <option value="">Todos</option>{% for c, n in p.contagem.tecnico.items() %}<option value="{{ c }}"{% if c == tecnico %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
     </select></label>
     <label class="cn-filtro-par"><span class="gc-rotulo">Status Fracttal</span>
-    <select class="gc-campo" name="status" onchange="this.form.submit()">
+    <select class="gc-campo" name="status">
       <option value="">Todos</option>{% for k, rot in status_filtro.items() %}<option value="{{ k }}"{% if k == status %} selected{% endif %}>{{ rot }} ({{ p.contagem.status[k] }})</option>{% endfor %}
     </select></label>
     <input class="gc-campo cos-norm-busca" type="search" name="q" value="{{ busca }}" placeholder="OS, usina, falha, equipamento..." aria-label="Buscar nas normalizações">
-    <a class="gc-btn gc-btn--ui cos-norm-csv" href="{{ url(formato='csv') }}" download><i class="ph ph-download-simple" aria-hidden="true"></i> Exportar CSV</a>
+    <noscript><button class="gc-btn gc-btn--ui" type="submit">Filtrar</button></noscript>
+    <a class="gc-btn gc-btn--ui cos-norm-csv" href="{{ url(formato='csv') }}" data-norm-csv download><i class="ph ph-download-simple" aria-hidden="true"></i> Exportar CSV</a>
   </form>
-  {% if cliente or usina or status or busca or operador or tecnico or falha %}<div class="cn-chips"><a href="{{ url(cliente=None, usina=None, status=None, q=None, criado_por=None, tecnico=None, falha=None) }}">Limpar os filtros</a></div>{% endif %}
+  {% set filtrado = cliente or usina or status or busca or operador or tecnico or falha %}
+  <div class="cn-chips"{% if not filtrado %} hidden{% endif %} data-norm-limpar-caixa><a href="{{ url(cliente=None, usina=None, status=None, q=None, criado_por=None, tecnico=None, falha=None) }}" data-norm-limpar>Limpar os filtros</a></div>
 
-  {% if p.itens %}
+  {% if p.todos %}
   <div class="cn-tab cos-tab"><table>
     <thead><tr><th class="cos-esq">OS</th><th title="Do início da falha até a normalização">Indisp.</th>
       <th class="cos-esq">Início</th><th class="cos-esq">Normalização</th><th class="cos-esq">Cliente</th>
@@ -101,8 +105,13 @@
       <th class="cos-esq" title="O responsável atribuído à OS no Fracttal">Técnico</th><th class="cos-esq">No Fracttal</th>
       <th class="cos-esq" title="A OS do Fracttal contra a normalização do COS">Conferência da OS</th></tr></thead>
     <tbody>
-    {% for n in p.itens %}
-      <tr{% if n.os %} class="cos-os" tabindex="0" data-folio="{{ n.os }}" data-status="{{ n.status_card }}" title="Abrir o card da OS {{ n.os }}"{% endif %}>
+    {% for n in p.todos %}
+      <tr{% if n.os %} class="cos-os" tabindex="0" data-folio="{{ n.os }}" data-status="{{ n.status_card }}" title="Abrir o card da OS {{ n.os }}"{% endif %}
+        data-norm-linha data-f-falha="{{ n.falha }}" data-f-cliente="{{ n.cliente }}" data-f-usina="{{ n.usina }}"
+        data-f-criado_por="{{ n.operador }}" data-f-tecnico="{{ n.tecnico }}" data-f-status="{{ n.status_filtro }}"
+        data-f-busca="{{ n.busca }}" data-os="{{ ([n.os] + n.os_relacionadas)|join('|') }}" data-aberta="{{ 1 if n.aberta else 0 }}"
+        data-dias="{{ n.aberta_ha_dias if n.aberta_ha_dias is not none else '' }}" data-fora="{{ n.fora if n.fora is not none else '' }}"
+        data-hr="{{ 1 if n.hora_real else 0 }}"{% if n.registro not in p.visiveis %} hidden{% endif %}>
         <td class="cos-esq">{% if n.os %}<b class="cos-folio">{{ n.os }}</b>{% else %}<span class="mudo">sem OS</span>{% endif %}
           {% if n.os_relacionadas %}<span class="det">e {{ n.os_relacionadas|join(', ') }}</span>{% endif %}
           {% if n.acao or n.descricao or n.notas %}<button class="cos-det-bt" type="button" aria-expanded="false" aria-controls="cos-det-{{ loop.index }}">Detalhes</button>{% endif %}</td>
@@ -140,12 +149,14 @@
     {% endfor %}
     </tbody>
   </table></div>
-  {% else %}<p class="cn-vazio">{% if cliente or usina or status or busca or operador or tecnico or falha %}Nenhuma normalização com estes filtros.{% else %}Nenhuma normalização neste mês.{% endif %}</p>{% endif %}
+  <p class="cn-vazio" data-norm-vazio{% if p.itens %} hidden{% endif %}>Nenhuma normalização com estes filtros.</p>
+  {% else %}<p class="cn-vazio">Nenhuma normalização neste mês.</p>{% endif %}
   {% if p.desfeitas %}<p class="mudo">{{ p.desfeitas }} {{ 'normalização foi desfeita' if p.desfeitas == 1 else 'normalizações foram desfeitas' }} no mês (a ocorrência voltou a aberta) e {{ 'fica' if p.desfeitas == 1 else 'ficam' }} fora da lista.</p>{% endif %}
   {% endif %}
   {% endif %}
 </div>
 {% include "oscreator/card_os_abrir.html" %}
+<script src="{{ url_for('static', filename='cos/normalizacoes.js') }}" defer></script>
 <script>
   // a linha abre o card da OS do OS Creator por cima, pelo número (a API das normalizações não traz o id interno)
   (function () {

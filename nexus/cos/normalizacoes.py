@@ -70,6 +70,10 @@ _trava_carga = threading.Lock()    # um pedido ao Andamento por vez (a primeira 
 @dataclass
 class Painel:
     itens: list = field(default_factory=list)
+    # todas as do mês (as normalizadas), da mais nova; `visiveis` = os registros da lista filtrada. A tela manda todas e
+    # esconde as de fora do filtro do endereço: o filtro é da página (29/10/2026)
+    todos: list = field(default_factory=list)
+    visiveis: set = field(default_factory=set)
     contagem: dict = field(default_factory=dict)
     resumo: dict = field(default_factory=dict)
     varredura: datetime | None = None
@@ -129,11 +133,38 @@ def _data_da(n: dict) -> datetime | None:
 
 def ler(config, agora: datetime | None = None) -> AND.Leitura:
     """As normalizações guardadas (`dados = {"itens": [...], "carregando": bool}`), postas em dia se a última pergunta
-    tem mais de 1 minuto. Na falha, a memória continua, dita velha."""
+    tem mais de 1 minuto. Na falha, a memória continua, dita velha.
+
+    A cópia completa que venceu volta NA HORA, e a pergunta ao Andamento vai por trás (uma de cada vez; 29/10/2026, Levi:
+    a tela "inventa de carregar sempre que clico"): o clique que caía depois do minuto esperava a Ronda COS responder (com
+    ela a 3 s, o filtro levava 3,2 s), e todos os que abriam a tela esperavam juntos na trava da carga. Sem cópia, ou com
+    a 1ª carga pela metade ("carregando"), a leitura é na hora, como antes."""
     f = AND.fonte(config)
     if not f.ligada:
         return AND.Leitura("", None, erro="a fonte do Andamento não está ligada neste servidor")
     agora = agora or AND.agora()
+    with _trava:
+        st = _estado.get(f.url)
+        if st and st["completo"] and time.monotonic() - st["perguntado"] >= TTL_S:
+            if not st.get("renovando"):
+                st["renovando"] = True
+                threading.Thread(target=_renovar, args=(f,), name="nexus-cos-normalizacoes", daemon=True).start()
+            return _leitura(st)
+    return _buscar(f, agora)
+
+
+def _renovar(f) -> None:
+    """A pergunta ao Andamento por trás da cópia vencida; o estado novo substitui o velho (e com ele a marca)."""
+    try:
+        _buscar(f, AND.agora())
+    finally:
+        with _trava:
+            st = _estado.get(f.url)
+            if st:
+                st.pop("renovando", None)
+
+
+def _buscar(f, agora: datetime) -> AND.Leitura:
     with _trava_carga:
         with _trava:
             st = _estado.get(f.url)
@@ -274,14 +305,18 @@ def _item(n: dict, agora: datetime) -> dict:
     }
 
 
+def alvo_da_busca(i: dict) -> str:
+    """O texto em que a busca procura; a página leva o mesmo em cada linha (`data-f-busca`) e o JS procura igual."""
+    return " ".join([i["os"], *i["os_relacionadas"], i["cliente"], i["usina"], i["usina_codigo"], i["falha"],
+                     *i["equipamentos"], i["operador"], i["tecnico"], i["resumo"], i["status"], i["acao"],
+                     i["descricao"], *i["notas"]]).lower()
+
+
 def _casa(i: dict, q: str) -> bool:
     q = q.lower()
     if q.isdigit() and (i["os"] == q or q in i["os_relacionadas"]):
         return True
-    alvo = " ".join([i["os"], *i["os_relacionadas"], i["cliente"], i["usina"], i["usina_codigo"], i["falha"],
-                     *i["equipamentos"], i["operador"], i["tecnico"], i["resumo"], i["status"], i["acao"],
-                     i["descricao"], *i["notas"]]).lower()
-    return q in alvo
+    return q in alvo_da_busca(i)
 
 
 def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: str = "", status: str = "",
@@ -312,8 +347,13 @@ def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: st
     abertas = [i for i in recorte if i["aberta"]]
     varridas = [i["varrida_em"] for i in todos if i["varrida_em"]]
     do_cliente = [i for i in base if not cliente or i["cliente"] == cliente]
+    todos = sorted(base, key=lambda i: i["data"], reverse=True)
+    for i in todos:
+        i["busca"] = alvo_da_busca(i)
     return Painel(
         itens=lista,
+        todos=todos,
+        visiveis={i["registro"] for i in lista},
         contagem={
             "cliente": dict(sorted(Counter(i["cliente"] for i in base).items())),
             "usina": dict(sorted(Counter(i["usina"] for i in do_cliente).items())),

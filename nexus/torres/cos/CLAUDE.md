@@ -209,7 +209,18 @@ Só lê; nada vai ao banco (decisão do Levi, 27/10/2026: a tela, sem guardar).
   relógio de propósito), e pergunta pelo cursor a cada minuto. A 1ª carga vem em páginas de 500 com 15 s de teto (lá,
   360 itens levam ~2,4 s); no máximo 4 páginas por pedido da tela, e o resto no pedido seguinte, com o aviso "carregando".
   Falhou: a memória continua, dita velha, e a próxima tentativa espera 1 minuto. O processo reiniciado (deploy) carrega
-  de novo. 404 = o Andamento sem a rota.
+  de novo. 404 = o Andamento sem a rota. **A cópia completa que venceu volta na hora e a pergunta vai por trás** (a thread
+  `nexus-cos-normalizacoes`, uma de cada vez; 29/10/2026): o clique depois do minuto esperava a Ronda COS (com ela a 3 s, o
+  filtro levava 3,2 s, e todos os que abriam a tela esperavam juntos na trava da carga). Sem cópia, ou com a 1ª carga pela
+  metade, a leitura segue na hora.
+- **O filtro é da página** (29/10/2026, Levi: "eu carrego a primeira vez e ele inventa de carregar sempre que clico"):
+  cada filtro recarregava a página inteira (1,1 MB com ~1.000 normalizações no mês). As linhas do mês vêm todas, cada uma
+  com o que cada filtro olha (`data-f-*`, a busca em `data-f-busca`, as contas da faixa em `data-aberta`, `data-dias`,
+  `data-fora`, `data-hr`), e `static/cos/normalizacoes.js` só mostra e esconde, refaz a faixa e troca o endereço; a página
+  aberta já filtrada chega com as de fora escondidas. O mês continua indo ao servidor. As contas são as do `painel`, de
+  propósito iguais (as opções contam o mês e não mudam; o % arredonda como o Python): por isso não usa o
+  `filtro-local.js`, que conta em cascata. Conferido no navegador: 10 combinações de filtro, as contas e as linhas iguais
+  às do servidor, as 10 em 0,11 s.
 - **O que é regra de lá:** o que é normalização, a hora da volta (`normalizado_em`, já a corrigida), `fora_min`,
   `hora_real` e a OS aberta no Fracttal (a varredura de 30 em 30 min de lá; `varrida_em`). **Daqui:** **o mês** pela hora
   da volta (o corrente no padrão e os 2 anteriores, `MESES`; os 1, 7 e 30 dias saíram no mesmo dia: "Pode tirar esses
@@ -252,7 +263,8 @@ Só lê; nada vai ao banco (decisão do Levi, 27/10/2026: a tela, sem guardar).
   (senão a fatia aberta seria sempre 100%). A desfeita (`normalizada: false`) sai da lista e é dita à parte; a sem hora
   real fica na lista, marcada, e fora da mediana.
 - **A chave e o endereço** só na tela Base → Chaves (o repositório é público).
-- Testes: `tests/test_cos_normalizacoes.py` (o upsert pelo registro, a paginação que continua, a pausa de 1 min depois
+- Testes: `tests/test_cos_normalizacoes_rapida_29_10.py` (a cópia vencida por trás, uma releitura só, as linhas do mês
+  com os atributos e as de fora escondidas; 7 mutações pegas) e `tests/test_cos_normalizacoes.py` (o upsert pelo registro, a paginação que continua, a pausa de 1 min depois
   da falha e a desfeita fora: mutados, vermelhos; os filtros, as colunas, a Indisp., o operador e o técnico e o CSV).
 
 ## Regras desta torre
