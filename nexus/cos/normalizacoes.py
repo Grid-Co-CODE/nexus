@@ -50,6 +50,17 @@ STATUS_FILTRO = {"processo": "Em processo", "verificacao": "Em verificação", "
 DECLARADA_POR = {"pessoa": "registrada pelo COS", "sistema": "registrada pelo sistema", "fracttal": "pelo Fracttal",
                  "religamento_remoto": "por religamento remoto", "criacao_da_os": "na criação da OS"}
 BUSCA_MAX = 80
+# A conferência da OS (`conferencia_da_os.situacao`, a Ronda COS relê a OS no Fracttal de 10 em 10 min; Levi, 29/10/2026:
+# "quero proteções, geração_parou e conferência da OS na tabela"): o rótulo e o tom da casa. SEM_LEITURA é "ainda não
+# lida", nunca "sem problema" (o guia, seção 9)
+CONFERENCIA = {
+    "AGUARDANDO_TECNICO": ("Aguardando técnico", "info"),
+    "HORA_A_CORRIGIR": ("Hora a corrigir", "alerta"),
+    "HORA_CONFERE": ("Hora confere", "neutro"),
+    "FINALIZADA": ("Finalizada", "ok"),
+    "TRAVADA": ("Travada", "critico"),
+    "SEM_LEITURA": ("Ainda não lida", "neutro"),
+}
 
 _estado: dict[str, dict] = {}
 _trava = threading.Lock()          # a memória
@@ -177,6 +188,28 @@ def duracao(minutos) -> str:
     return f"{h} h {r:02d}" if r else f"{h} h"
 
 
+def _minutos(v):
+    try:
+        return int(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _conferencia(c) -> dict | None:
+    """A conferência da OS para a tela e o CSV; None quando a OS não foi criada pela Ronda COS (ou a normalização foi
+    desfeita): a API manda null."""
+    if not isinstance(c, dict):
+        return None
+    sit = str(c.get("situacao") or "").upper()
+    rot, tom = CONFERENCIA.get(sit, (sit.replace("_", " ").capitalize() or "—", "neutro"))
+    return {"situacao": sit, "rotulo": rot, "tom": tom, "tarefas": _minutos(c.get("tarefas")),
+            "concluidas": _minutos(c.get("concluidas")), "dif_inicio": _minutos(c.get("diferenca_inicio_min")),
+            "dif_fim": _minutos(c.get("diferenca_fim_min")),
+            "inicio_fracttal": AND.instante(c.get("inicio_no_fracttal")),
+            "conclusao_fracttal": AND.instante(c.get("conclusao_no_fracttal")),
+            "finalizada_em": AND.instante(c.get("finalizada_em")), "lida_em": AND.instante(c.get("lida_em"))}
+
+
 def _item(n: dict, agora: datetime) -> dict:
     volta = AND.instante(n.get("normalizado_em"))
     sev = str(n.get("severidade") or "").upper()
@@ -222,6 +255,11 @@ def _item(n: dict, agora: datetime) -> dict:
         "operador": " ".join(str(n.get("os_aberta_por") or "").split()),
         "tecnico": " ".join(str(n.get("tecnico") or "").split()),
         "fora_do_escopo": bool(n.get("fora_do_escopo_oem")),
+        # 29/10/2026: as proteções que atuaram (como o time escreve), a resposta do operador na falha de comunicação
+        # (a geração parou? None nos outros tipos e antes de 28/10) e a OS do Fracttal contra a normalização do COS
+        "protecoes": [" ".join(str(x).split()) for x in n.get("protecoes") or [] if str(x or "").strip()],
+        "geracao_parou": n.get("geracao_parou") if isinstance(n.get("geracao_parou"), bool) else None,
+        "conferencia": _conferencia(n.get("conferencia_da_os")),
     }
 
 
@@ -286,7 +324,10 @@ def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: st
 CSV_COLUNAS = ("OS", "OS relacionadas", "Indisponível (min)", "Início", "Normalização", "Hora real da volta",
                "Hora corrigida", "Registrada", "Cliente", "Código da usina", "Usina", "Falha", "Equipamentos",
                "Severidade", "Aberta por (operador)", "Técnico", "Status no Fracttal", "% concluída", "Dias aberta depois da volta",
-               "Informe", "Fora do escopo O&M")
+               "Informe", "Fora do escopo O&M", "Proteções", "Geração parou", "Conferência da OS",
+               "Tarefas concluídas", "Data do evento no Fracttal", "Diferença do início (min)",
+               "Conclusão no Fracttal", "Diferença da conclusão (min)", "Finalizada no Fracttal em",
+               "Conferência lida em")
 
 
 def csv_linhas(p: Painel) -> list[list]:
@@ -298,4 +339,15 @@ def csv_linhas(p: Painel) -> list[list]:
              i["falha"], ", ".join(i["equipamentos"]), i["severidade"].title(), i["operador"], i["tecnico"],
              i["status"] if i["aberta"] else "Fechada", i["pct"] if i["aberta"] else "",
              "" if i["aberta_ha_dias"] is None else i["aberta_ha_dias"], i["resumo"],
-             "sim" if i["fora_do_escopo"] else "não"] for i in p.itens]
+             "sim" if i["fora_do_escopo"] else "não", ", ".join(i["protecoes"]),
+             {True: "sim", False: "não"}.get(i["geracao_parou"], ""), *_csv_conferencia(i["conferencia"], h)]
+            for i in p.itens]
+
+
+def _csv_conferencia(c, h) -> list:
+    if not c:
+        return [""] * 8
+    tarefas = f"{c['concluidas']}/{c['tarefas']}" if c["tarefas"] is not None and c["concluidas"] is not None else ""
+    return [c["rotulo"], tarefas, h(c["inicio_fracttal"]), "" if c["dif_inicio"] is None else c["dif_inicio"],
+            h(c["conclusao_fracttal"]), "" if c["dif_fim"] is None else c["dif_fim"], h(c["finalizada_em"]),
+            h(c["lida_em"])]

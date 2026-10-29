@@ -38,9 +38,14 @@ ITENS = [
     _n("r1"),                                                                               # hoje, fechada
     _n("r2", volta="2026-10-19T05:53:00-03:00", inicio="2026-10-19T02:00:00-03:00", fora=233, os="16702",
        usina="Usina Exemplo Dois", cliente="CLIENTE B", severidade="CRITICO", os_aberta_por="Ciclano  Operador",
-       tecnico="Tecnica Dois",
+       tecnico="Tecnica Dois", protecoes=["27ABC", " 59C "], geracao_parou=True,
+       conferencia_da_os={"situacao": "HORA_A_CORRIGIR", "status_os": 1, "tarefas": 2, "concluidas": 2,
+                          "inicio_no_fracttal": "2026-10-19T02:00:00-03:00", "diferenca_inicio_min": 0,
+                          "conclusao_no_fracttal": "2026-10-19T07:55:00-03:00", "diferenca_fim_min": 122,
+                          "finalizada_em": None, "lida_em": "2026-10-27T09:50:00-03:00"},
        aberta={"status": 1, "concluida_pct": 40, "varrida_em": "2026-10-27T09:13:00-03:00"}),   # 8 dias, aberta
-    _n("r3", volta="2026-10-26T20:00:00-03:00", fora=30, aberta=ABERTA),                   # ontem, aberta
+    _n("r3", volta="2026-10-26T20:00:00-03:00", fora=30, aberta=ABERTA, geracao_parou=False,
+       conferencia_da_os={"situacao": "AGUARDANDO_TECNICO", "tarefas": 3, "concluidas": 1}),                   # ontem, aberta
     _n("r4", volta="2026-10-26T09:00:00-03:00", hora_real=False, fora=0),                   # sem hora real
     _n("r5", volta="2026-10-25T09:00:00-03:00", normalizada=False, estado="TRATATIVA_REMOTA"),   # desfeita
     _n("r6", volta="2026-10-05T09:00:00-03:00", fora=600, os_aberta_por=None, tecnico=None),   # OS só ligada                                  # 22 dias
@@ -144,6 +149,13 @@ def test_o_csv_leva_a_lista_filtrada_e_o_que_a_tela_resume():
     assert (d["Cliente"], d["Usina"], d["Status no Fracttal"], d["% concluída"]) == (
         "CLIENTE B", "Usina Exemplo Dois", "Em processo", 40)
     assert (d["Aberta por (operador)"], d["Técnico"]) == ("Ciclano Operador", "Tecnica Dois")
+    # 29/10/2026: proteções, geração parou e a conferência da OS (Levi: "quero que seja exportável também")
+    assert (d["Proteções"], d["Geração parou"], d["Conferência da OS"], d["Tarefas concluídas"]) == (
+        "27ABC, 59C", "sim", "Hora a corrigir", "2/2")
+    assert (d["Conclusão no Fracttal"], d["Diferença da conclusão (min)"], d["Diferença do início (min)"]) == (
+        "19/10/2026 07:55", 122, 0)
+    sem = dict(zip(NO.CSV_COLUNAS, NO.csv_linhas(_painel(status="fechada"))[0]))       # a r1: sem os campos novos
+    assert (sem["Proteções"], sem["Geração parou"], sem["Conferência da OS"], sem["Conclusão no Fracttal"]) == ("", "", "", "")
     assert "Criado por" not in NO.CSV_COLUNAS
     assert d["Severidade"] == "Critico" and d["Dias aberta depois da volta"] == 8 and d["Registrada"] == "registrada pelo COS"
 
@@ -231,8 +243,12 @@ def test_a_tela(ligada, logado, monkeypatch):
     # as colunas na ordem pedida, sem a severidade; o "Como se conta" na exclamação ao lado do título
     cab = html.split("<thead>", 1)[1].split("</thead>", 1)[0]
     assert [c.split(">")[-1] for c in cab.split("</th>")[:-1]] == ["OS", "Indisp.", "Início", "Normalização",
-                                                                  "Cliente", "Usina", "Operador", "Técnico",
-                                                                  "No Fracttal"]
+                                                                  "Cliente", "Usina", "Proteções", "Geração parou",
+                                                                  "Operador", "Técnico", "No Fracttal",
+                                                                  "Conferência da OS"]
+    assert ">27ABC, 59C<" in html and 'cn-pill cn-critico">Sim<' in html and 'cn-pill cn-ok">Não<' in html
+    assert 'cn-pill cn-alerta">Hora a corrigir<' in html and "conclusão +122 min no Fracttal" in html
+    assert 'cn-pill cn-info">Aguardando técnico<' in html and "1/3 tarefas concluídas" in html
     assert ">Ciclano Operador<" in html and ">Tecnica Dois<" in html and 'name="criado_por"' in html
     assert "Severidade" not in cab and "Crítico" not in html and 'class="hs-aviso"' in html
     assert "Último dia" not in html and "Últimos 7 dias" not in html
