@@ -141,8 +141,14 @@
   <div class="pn">
     <section class="pn-q pn-q--largo" aria-labelledby="pn-perf-t">
       <header class="pn-cab"><h2 id="pn-perf-t"><i class="ph ph-chart-line-up" aria-hidden="true"></i>Usinas abaixo da performance</h2>{{ ver(modo='geral', filtro='perf.abaixo_meta', bloco=None, equipe=None) }}</header>
-      <div class="pn-num"><b class="{{ 'cn-t-critico' if pf.criticas else ('cn-t-alerta' if pf.abaixo else 'cn-t-ok') }}">{{ pf.abaixo }}</b>
-        <span>de {{ pf.com_meta }} com meta abaixo de {{ limites.meta_ok }}%{% if pf.criticas %} · <b class="cn-t-critico">{{ pf.criticas }}</b> abaixo de {{ limites.meta_atencao }}%{% endif %}<small>meta do grupo no mês {{ pct(pf.meta_grupo, 1) }} · {{ pf.na_meta }} na meta{% if pf.sem_meta %} · {{ pf.sem_meta }} sem meta publicada{% endif %}</small></span></div>
+      {# os números lado a lado, numa linha só (Levi, 29/10/2026, no card largo: "tem um espaço grande, dá para fazer o
+         texto caber melhor na parte de performance"): cada um em destaque com o rótulo, na cor da régua da meta #}
+      <div class="pn-num pn-num--linha"><b class="{{ 'cn-t-critico' if pf.criticas else ('cn-t-alerta' if pf.abaixo else 'cn-t-ok') }}">{{ pf.abaixo }}</b>
+        <span>de {{ pf.com_meta }} com meta abaixo de {{ limites.meta_ok }}%</span>
+        {% if pf.criticas %}<span class="pn-st"><b class="cn-t-critico">{{ pf.criticas }}</b> abaixo de {{ limites.meta_atencao }}%</span>{% endif %}
+        <span class="pn-st"><b class="{{ c_meta(pf.meta_grupo) }}">{{ pct(pf.meta_grupo, 1) }}</b> meta do grupo no mês</span>
+        <span class="pn-st"><b class="cn-t-ok">{{ pf.na_meta }}</b> na meta</span>
+        {% if pf.sem_meta %}<span class="pn-st"><b>{{ pf.sem_meta }}</b> sem meta publicada</span>{% endif %}</div>
       {# o PR e a disponibilidade com a cor que a Visão já dá na linha da usina (`linha_performance`), nenhuma régua nova #}
       <div class="pn-perf-cab" aria-hidden="true"><span>Usina</span><span>Meta do mês</span><span></span><span>PR × previsto</span><span>Disponibilidade</span></div>
       <ol class="pn-lista pn-perf" tabindex="0" aria-label="Todas as usinas pela meta do mês, da pior para a melhor">

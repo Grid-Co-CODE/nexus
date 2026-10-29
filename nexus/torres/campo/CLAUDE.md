@@ -853,7 +853,9 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
 - **Cada quadro com o total e a lista inteira:**
   - Usinas abaixo da performance: todas as usinas, da pior meta para a melhor, sem meta no fim; em colunas, a meta do
     mês (a barra e o número), o PR contra o previsto e a disponibilidade, com a cor que a Visão já dá na linha da usina
-    (`linha_performance`, nenhuma régua nova).
+    (`linha_performance`, nenhuma régua nova). Os números do topo numa linha só, cada um com o rótulo ("tem um espaço
+    grande, dá para fazer o texto caber melhor na parte de performance"): abaixo de 97%, abaixo de 90%, a meta do
+    grupo, na meta e sem meta publicada.
   - Chamados abertos **por usina** (2ª rodada, Levi: "pode só botar o nome da UFV uma vez e dizer qual os ativos daquela
     UFV"): a usina do chamado mais antigo primeiro, o nome dela preso no alto enquanto os ativos rolam; cada ativo sem a
     marca ("Não precisa mostrar a marca do ativo": `responsaveis.nome_do_ativo`, medido nos 184 ativos dos chamados
