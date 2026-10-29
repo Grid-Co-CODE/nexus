@@ -204,3 +204,80 @@ def test_a_tela_pede_os_arquivos_com_a_versao(tela):
         assert re.search(r'/os/static/%s\?v=\d{9,}"' % re.escape(nome), h), nome
     q = c.get("/os/chamados/acompanhamento").get_data(as_text=True)
     assert re.search(r'/os/static/acomp\.js\?v=\d{9,}"', q) and re.search(r'/os/static/chamados\.css\?v=\d{9,}"', q)
+
+
+# ── o histórico importado da OS retroativa também edita e exclui (Levi, 29/10/2026: "não foi viu") ──────────────
+# As linhas "Histórico importado na nota" não são observações do banco: vêm da nota da OS no Fracttal. Editar e excluir
+# ficam no banco do Nexus por cima delas (a linha `edicao`/`exclusao` aponta a chave da linha, `h-...`); a nota no
+# Fracttal não muda.
+NOTA_RETRO = ("[CHAMADO] Acompanhamento — Huawei · Inversor\nOS de abertura: 11001 · OS de campo: 12002 · Ativo: TST-1\n"
+              "Data da ocorrência / abertura do chamado: 21/08/2026\n\nHistórico (importado da Gestão de Chamados V02):\n"
+              "21/08 - Chamado aberto\n22/08 - Fabricante solicitou verificações\n14/10 - Solicitado previsão ao supervisor")
+
+
+def test_a_linha_do_historico_tem_chave_e_o_ajuste_vale_por_cima():
+    pytest.importorskip("PyQt6")
+    from os_web import acomp_web as aw
+    import datetime as dt
+    hoje = dt.datetime(2026, 10, 29, 12, 0)
+    linha = {"id": 1, "folio": "9101", "note": NOTA_RETRO, "data": "2026-10-01T13:00:00", "status_id": 1,
+             "descricao": "[Inversor 1.1] - Acompanhamento de chamado Huawei", "tipo_tarefa": "Administrativa"}
+    c = aw.cartao(linha, "", "", hoje)
+    hist = aw.ler_nota(NOTA_RETRO)["historico"]
+    chaves = [aw.chave_do_historico(h) for h in hist]
+    assert len(set(chaves)) == 3 and all(k.startswith("h-") for k in chaves)
+    ajustes = {chaves[1]: {"tipo": "edicao", "texto": "Fabricante pediu as verificações por e-mail",
+                           "quando": "2026-10-29T10:00:00-03:00", "quem": "Analista Teste"},
+               chaves[2]: {"tipo": "exclusao", "texto": "", "quando": "2026-10-29T10:05:00-03:00", "quem": ""}}
+    tl = aw.linha_do_tempo(c, [], hist, ajustes)
+    textos = [e["texto"] for e in tl]
+    assert "Solicitado previsão ao supervisor" not in textos                      # a excluída sai
+    assert "Fabricante pediu as verificações por e-mail" in textos and "Fabricante solicitou verificações" not in textos
+    editada = next(e for e in tl if e["texto"] == "Fabricante pediu as verificações por e-mail")
+    assert editada["editavel"] and editada["id"] == chaves[1] and "editada 29/10 10:00" in editada["autor"]
+    assert next(e for e in tl if e["texto"] == "Chamado aberto")["id"] == chaves[0]
+
+
+@pytest.fixture
+def retro(tela, monkeypatch):
+    import api
+    c, banco = tela
+    monkeypatch.setattr(api, "list_chamados", lambda **k: [{
+        "id": 1, "folio": "9101", "cliente": "Cliente A", "usina": "Usina A1", "ativo": "Inversor 1.1", "code": "",
+        "tipo": "Inversor", "tipo_tarefa": "Administrativa", "note": NOTA_RETRO, "status_id": 1, "status": "",
+        "descricao": "[Inversor 1.1] - Acompanhamento de chamado Huawei", "data": "2026-10-01T13:00:00",
+        "data_fim": "", "atribuido_a": "Analista Teste", "id_atribuido": None}])
+    monkeypatch.setattr(api, "get_os_detalhes", lambda wid: {"folio": 9101, "notas": NOTA_RETRO, "code": "TST-1",
+                                                              "subtarefas": [], "status_id": 1})
+    monkeypatch.setattr(api, "_wo_id_por_folio", lambda folio: 1)
+    return c, banco
+
+
+def _chave(texto):
+    from os_web import acomp_web as aw
+    return next(aw.chave_do_historico(h) for h in aw.ler_nota(NOTA_RETRO)["historico"] if h["texto"] == texto)
+
+
+def test_o_historico_importado_tem_os_botoes(retro):
+    c, _ = retro
+    tl = _pagina(c).split('id="tl"', 1)[1]
+    k = _chave("Fabricante solicitou verificações")
+    bloco = tl.split('data-obs-id="%s"' % k, 1)[1].split('class="tl-e', 1)[0]
+    assert "data-obs-editar" in bloco and "data-obs-excluir" in bloco
+
+
+def test_editar_e_excluir_o_historico_fica_no_nexus_por_cima_da_nota(retro):
+    c, banco = retro
+    k1, k2 = _chave("Fabricante solicitou verificações"), _chave("Solicitado previsão ao supervisor")
+    r = c.post("/os/api/acomp/9101/obs/%s/editar" % k1, json={"texto": "Fabricante pediu as verificações por e-mail."},
+               environ_overrides=PODE)
+    assert r.status_code == 200 and banco[-1]["tipo"] == "edicao" and banco[-1]["extra"] == {"de": k1}
+    assert c.post("/os/api/acomp/9101/obs/%s/excluir" % k2, json={}, environ_overrides=PODE).status_code == 200
+    tl = _pagina(c).split('id="tl"', 1)[1]
+    assert "Fabricante pediu as verificações por e-mail." in tl and "Fabricante solicitou verificações<" not in tl
+    assert "Solicitado previsão ao supervisor" not in tl and "Chamado aberto" in tl
+    # a excluída não volta a ser editada; a chave que não está na nota não existe
+    assert c.post("/os/api/acomp/9101/obs/%s/editar" % k2, json={"texto": "x"}, environ_overrides=PODE).status_code == 404
+    assert c.post("/os/api/acomp/9101/obs/h-000000000000/excluir", json={}, environ_overrides=PODE).status_code == 404
+    r = c.post("/os/api/acomp/9101/obs/%s/editar" % k1, json={"texto": "y"}, environ_overrides=NAO_PODE)
+    assert r.status_code == 403

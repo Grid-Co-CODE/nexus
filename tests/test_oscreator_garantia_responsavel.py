@@ -79,8 +79,11 @@ def test_a_tela_do_chamado_tem_o_trocar_ao_lado_do_responsavel(cli):
     assert 'data-dlg="responsavel"' in caixa and "Trocar o responsável da OS %d" % FOLIO in caixa
     assert "Hoje está com <b>Técnico Teste</b>." in caixa and "carregando o pessoal…" in caixa and ">Atribuir<" in caixa
     assert '<div class="msg ok" data-msg hidden></div>' in caixa
-    # o script e o estilo das ações do card, nesta tela também
-    assert '<script src="/os/static/os_acoes.js"></script>' in h and '<link rel="stylesheet" href="/os/static/os_acoes.css">' in h
+    # o script e o estilo das ações do card, nesta tela também, com a versão no endereço (29/10/2026: o navegador seguia
+    # com a cópia de antes até o Ctrl+Shift+R; `estatico()` do os_web)
+    import re
+    assert re.search(r'<script src="/os/static/os_acoes\.js\?v=\d+"></script>', h)
+    assert re.search(r'<link rel="stylesheet" href="/os/static/os_acoes\.css\?v=\d+">', h)
 
 
 def test_o_dialogo_e_um_so_nas_duas_telas():

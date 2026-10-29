@@ -1527,7 +1527,10 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   Responsável UFV, o supervisor da usina: o Responsável O&M da ficha da usina no cadastro do Nexus. O OS Creator não
   sabe: a ponte põe em `rotas_acomp.RESPONSAVEL_UFV` a função do Nexus (`nexus/torres/chamados/ufv.py`), que roda no
   app do Nexus (o nome vem do cofre do cadastro), liga a usina pelo nome do Fracttal ou pelo código do ativo (`Ligador`,
-  o código entrou na linha da lista, `api`) e guarda o cadastro 10 min. Sozinho (o oem), sem a função, o filtro não
+  o código entrou na linha da lista, `api`) e guarda o cadastro 10 min. **Nunca na frente do quadro** (29/10/2026: o
+  Raio-X pegou o quadro preso 30 vezes em 24 h, até 40 s, lendo o cadastro dentro do pedido): o cadastro é lido por
+  trás, numa thread no app do Nexus, e o quadro só consulta a memória; sem leitura ainda, sai sem o supervisor; vencida,
+  sai com a de antes e relê. A ponte pede a 1ª leitura ao criar o clone. Sozinho (o oem), sem a função, o filtro não
   aparece. O "Limpar filtros" saiu ("Tire o botão de limpar filtros"); o filtro guardado na aba do navegador continua.
 - **Os avisos numa exclamação** ao lado do título (o "Não consegui ler as observações" e o "N de M no nome de outra
   pessoa"), o desenho do `.hs-aviso` de Segurança > Extintores; o clique fora e o Esc fecham. O erro do Fracttal (o
@@ -1564,6 +1567,11 @@ quem pode: "qualquer um que é ADM ou do setor de chamados".
   a excluída some). O quadro (a última atualização, o pulso), o status e o relatório ao cliente leem a versão em vigor.
 - **Só a observação escrita** muda; ticket, status, finalizado e a chegada da OS, os automáticos, não têm os botões, e a
   rota recusa (400). Editar ou excluir a que já foi excluída: 404.
+- **O histórico importado da retroativa também** (Levi, no mesmo dia: "não foi viu", no clique numa linha "Histórico
+  importado na nota"): a linha vem da nota da OS no Fracttal, que não muda; cada linha tem a chave da data e do texto
+  (`acomp_web.chave_do_historico`, "h-...") e a edição ou a exclusão fica no banco do Nexus por cima dela
+  (`chamados_obs_store.ajustes_do_historico`; `rotas_acomp._mexer_historico` confere que a chave está na nota de agora).
+  Se a nota mudar a linha, a chave muda e o ajuste de antes deixa de valer para ela.
 - **Quem pode** o Nexus decide (`ponte.obs_chamados`: o administrador ou quem é do setor Chamados, a mesma regra da Área
   PCM, `ponte._do_setor_ou_admin`) e põe no pedido (`os_web.obs_chamados`), só na tela de um chamado e nas rotas de
   editar e excluir (`ponte._ROTA_OBS`: o quadro não paga a leitura do setor). Quem não pode não vê os botões e recebe 403

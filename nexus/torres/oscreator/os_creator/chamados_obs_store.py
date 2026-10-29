@@ -143,6 +143,21 @@ def vigentes(lista) -> list:
     return out
 
 
+def ajustes_do_historico(lista, folio) -> dict:
+    """{chave da linha do histórico da nota: {"tipo", "texto", "quando", "quem"}} da última edição ou exclusão de cada
+    linha desta OS (29/10/2026: o histórico importado da retroativa edita e exclui como as observações; a chave é
+    `acomp_web.chave_do_historico`, "h-..."). A exclusão vence a edição."""
+    alvo, out = str(folio).strip(), {}
+    for x in lista:
+        de = str((x.get("extra") or {}).get("de") or "")
+        if x["tipo"] not in ("edicao", "exclusao") or x["os"] != alvo or not de.startswith("h-"):
+            continue
+        if (out.get(de) or {}).get("tipo") == "exclusao":
+            continue
+        out[de] = {"tipo": x["tipo"], "texto": x["texto"], "quando": x["quando"], "quem": x.get("quem") or ""}
+    return out
+
+
 def do_os(folio) -> list:
     alvo = str(folio).strip()
     return [x for x in vigentes(listar()) if x["os"] == alvo]

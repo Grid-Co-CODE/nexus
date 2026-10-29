@@ -231,61 +231,101 @@ def test_exportar_a_tabela_leva_so_as_linhas_filtradas_na_ordem(tela):
     assert [ws.cell(row=i, column=1).value for i in (2, 3)] == [9103, 9101] and ws.max_row == 3
 
 
-# ── 4: o Responsável UFV pelo cadastro do Nexus ─────────────────────────────────────────────────────────────────
-def test_o_nexus_diz_o_responsavel_ufv_pela_usina_do_cadastro(monkeypatch):
-    from nexus.torres.chamados import ufv
+# ── 4: o Responsável UFV pelo cadastro do Nexus, NUNCA na frente do quadro ──────────────────────────────────────
+# 29/10/2026: o Raio-X pegou o GET /os/chamados/acompanhamento preso 30 vezes em 24 h, até 40 s em livros.abas: o
+# cadastro era lido dentro do pedido do quadro. Agora é lido por trás; o quadro só consulta a memória.
+class _Cadastro:
+    """O cadastro de mentira: a usina 7 (Supervisor Um, pelo nome do Fracttal) e a 8 (Supervisor Dois, pelo código)."""
+    por_id = {7: {}, 8: {}, 9: {}}
+    lidos = 0
 
-    class Base:
-        class lig:
-            @staticmethod
-            def usina(texto, codigo):
-                return ({"Usina A1": 7}.get(texto) or {"TST-9": 8}.get(codigo), "x")
-
+    class lig:
         @staticmethod
-        def responsavel_da_usina(uid):
-            return {7: "Supervisor Um", 8: "Supervisor Dois"}[uid]
-    monkeypatch.setattr(ufv, "_base", lambda: Base)
-    ufv._MEMO.clear()
-    cards = [{"folio": "1", "usina": "Usina A1", "code": ""}, {"folio": "2", "usina": "Outra", "code": "TST-9"},
-             {"folio": "3", "usina": "Nenhuma", "code": ""}]
-    assert ufv.responsavel_ufv(cards) == {"1": "Supervisor Um", "2": "Supervisor Dois", "3": ""}
+        def usina(texto, codigo):
+            return ({"Usina A1": 7}.get(texto) or {"TST-9": 8}.get(codigo), "x")
+
+    @staticmethod
+    def responsavel_da_usina(uid):
+        return {7: "Supervisor Um", 8: "Supervisor Dois", 9: "Sem responsável O&M"}[uid]
 
 
-def test_sem_o_cadastro_o_responsavel_ufv_fica_vazio(monkeypatch):
+CARDS = [{"folio": "1", "usina": "Usina A1", "code": ""}, {"folio": "2", "usina": "Outra", "code": "TST-9"},
+         {"folio": "3", "usina": "Nenhuma", "code": ""}]
+
+
+@pytest.fixture
+def ufv_de_mentira(monkeypatch):
     from nexus.torres.chamados import ufv
+    ufv.limpar()
+    fila, lidos = [], {"n": 0}
+
+    def ler():
+        lidos["n"] += 1
+        return _Cadastro
+    monkeypatch.setattr(ufv, "_base", ler)
+    monkeypatch.setattr(ufv, "_sem_responsavel", lambda: "Sem responsável O&M")
+    monkeypatch.setattr(ufv, "_em_segundo_plano", fila.append)
+    yield ufv, fila, lidos
+    ufv.limpar()
+
+
+def test_o_quadro_nao_espera_o_cadastro(ufv_de_mentira):
+    ufv, fila, lidos = ufv_de_mentira
+    assert ufv.responsavel_ufv(CARDS) == {} and lidos["n"] == 0 and len(fila) == 1   # na hora, sem ler o banco
+    assert ufv.responsavel_ufv(CARDS) == {} and len(fila) == 1                      # uma leitura por vez
+    fila.pop()()
+    assert ufv.responsavel_ufv(CARDS) == {"1": "Supervisor Um", "2": "Supervisor Dois", "3": ""}
+    assert lidos["n"] == 1 and not fila
+
+
+def test_vencido_sai_o_de_antes_e_rele_por_tras(ufv_de_mentira):
+    ufv, fila, lidos = ufv_de_mentira
+    ufv.responsavel_ufv(CARDS)
+    fila.pop()()
+    ufv._ESTADO["lido"] -= ufv.TTL + 1
+    assert ufv.responsavel_ufv(CARDS)["1"] == "Supervisor Um" and len(fila) == 1 and lidos["n"] == 1
+
+
+def test_sem_o_cadastro_fica_vazio_e_a_falha_nao_apaga_o_de_antes(ufv_de_mentira, monkeypatch):
+    ufv, fila, _ = ufv_de_mentira
+    ufv.responsavel_ufv(CARDS)
+    fila.pop()()
 
     def falha():
         raise RuntimeError("sem banco")
     monkeypatch.setattr(ufv, "_base", falha)
-    ufv._MEMO.clear()
-    assert ufv.responsavel_ufv([{"folio": "1", "usina": "Usina A1", "code": ""}]) == {}
+    ufv._ESTADO["lido"] -= ufv.TTL + 1
+    ufv.responsavel_ufv(CARDS)
+    fila.pop()()                                                                     # a releitura falha
+    assert ufv.responsavel_ufv(CARDS)["2"] == "Supervisor Dois"
+    ufv.limpar()
+    ufv.responsavel_ufv(CARDS)
+    fila.pop()()
+    assert ufv.responsavel_ufv(CARDS) == {}
 
 
-def test_a_ponte_liga_o_responsavel_ufv_no_clone_rodando_no_app_do_nexus(app, monkeypatch):
-    """O nome vem do cofre do cadastro, com a chave do Nexus: a função roda no app do Nexus, mesmo chamada pelo clone."""
+def test_a_ponte_liga_o_responsavel_ufv_e_le_no_app_do_nexus(app, monkeypatch):
+    """O nome vem do cofre do cadastro, com a chave do Nexus: a leitura por trás roda no app do Nexus. A ponte já pede a
+    1ª leitura ao criar o clone."""
     pytest.importorskip("PyQt6")
     import flask
 
     from nexus.torres.chamados import ufv
-    ponte.clone(app)
-    from os_web import rotas_acomp
+    ufv.limpar()
     visto = {}
 
-    class Base:
-        class lig:
-            @staticmethod
-            def usina(texto, codigo):
-                visto["app"] = flask.current_app._get_current_object()
-                return 7, "x"
-
-        @staticmethod
-        def responsavel_da_usina(uid):
-            return "Supervisor Um"
-    monkeypatch.setattr(ufv, "_base", lambda: Base)
-    ufv._MEMO.clear()
+    def ler():
+        visto["app"] = flask.current_app._get_current_object()
+        return _Cadastro
+    monkeypatch.setattr(ufv, "_base", ler)
+    monkeypatch.setattr(ufv, "_sem_responsavel", lambda: "Sem responsável O&M")
+    monkeypatch.setattr(ufv, "_em_segundo_plano", lambda fn: fn())                 # a thread, aqui mesmo
+    ponte.clone(app)
+    from os_web import rotas_acomp
     assert rotas_acomp.RESPONSAVEL_UFV.nexus is ufv.responsavel_ufv
-    assert rotas_acomp.RESPONSAVEL_UFV([{"folio": "1", "usina": "Usina A1", "code": ""}]) == {"1": "Supervisor Um"}
-    assert visto["app"] is app
+    assert visto["app"] is app                                                       # lida ao ligar, no app do Nexus
+    assert rotas_acomp.RESPONSAVEL_UFV(CARDS[:1]) == {"1": "Supervisor Um"}
+    ufv.limpar()
 
 
 # ── o banco lento das observações ───────────────────────────────────────────────────────────────────────────────

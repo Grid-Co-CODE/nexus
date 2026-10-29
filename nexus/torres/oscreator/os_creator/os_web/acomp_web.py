@@ -519,12 +519,23 @@ def entrada(reg: dict) -> dict:
             "ev": reg.get("tipo") in ("ticket", "finalizado", "status"), "quando": reg.get("quando") or ""}
 
 
-def linha_do_tempo(c: dict, obs, historico=None) -> list:
+def chave_do_historico(h: dict) -> str:
+    """A chave de uma linha do histórico da nota (a data e o texto): é o que a edição e a exclusão apontam (29/10/2026).
+    A linha não mora no banco do Nexus (vem da nota da OS no Fracttal); se a nota mudar a linha, a chave muda e o ajuste
+    de antes deixa de valer para ela."""
+    import hashlib
+    return "h-" + hashlib.sha1(("%s|%s" % (h.get("data") or "", " ".join(str(h.get("texto") or "").split())))
+                               .encode("utf-8")).hexdigest()[:12]
+
+
+def linha_do_tempo(c: dict, obs, historico=None, ajustes=None) -> list:
     """As observações da mais nova para a mais antiga, com a chegada da OS no fim (ela nasceu antes de tudo). O verde é
     EXCLUSIVO da entrada mais recente — "é o que aconteceu por último" (revisão do design do 1B).
 
     Na retroativa (`c["retroativa"]`), a OS não "nasceu sozinha": a entrada diz que ela foi criada à mão e de quando é o
-    chamado, e o `historico` da nota (`ler_nota`) vem depois dela, do mais novo ao mais antigo, com as datas dele."""
+    chamado, e o `historico` da nota (`ler_nota`) vem depois dela, do mais novo ao mais antigo, com as datas dele.
+    `ajustes` = {chave da linha: a última edição ou exclusão dela} (`chamados_obs_store.ajustes_do_historico`, 29/10/2026:
+    o histórico importado edita e exclui como as observações; a nota no Fracttal não muda)."""
     if c.get("retroativa"):
         chegada = {"d": c["criada"][:5], "a": c["criada"][6:10],
                    "texto": "Criada à mão no Fracttal em %s: o chamado é de %s, e o histórico abaixo veio na nota."
@@ -541,9 +552,19 @@ def linha_do_tempo(c: dict, obs, historico=None) -> list:
         # do mais novo ao mais antigo pela data (a do ano escrito ou deduzido); a sem data fica no fim, na ordem da nota
         com_data = [h for h in historico or [] if _data_br(h.get("data"))]
         com_data.sort(key=lambda h: _data_br(h["data"]), reverse=True)
-        antes = [{"d": h["data"][:5], "a": h["data"][6:10], "texto": h["texto"], "autor": "Histórico importado na nota",
-                  "ev": False, "quando": ""}
-                 for h in com_data + [h for h in historico or [] if not _data_br(h.get("data"))]]
+        for h in com_data + [h for h in historico or [] if not _data_br(h.get("data"))]:
+            k = chave_do_historico(h)
+            aj = (ajustes or {}).get(k) or {}
+            if aj.get("tipo") == "exclusao":
+                continue
+            autor, texto = "Histórico importado na nota", h["texto"]
+            if aj.get("tipo") == "edicao":
+                texto = aj.get("texto") or texto
+                q = brt_iso(aj.get("quando"))
+                autor += " · editada %s%s" % (q.strftime("%d/%m %H:%M") if q else "",
+                                                (" por %s" % aj["quem"]) if aj.get("quem") else "")
+            antes.append({"d": h["data"][:5], "a": h["data"][6:10], "texto": texto, "autor": autor, "ev": False,
+                          "quando": "", "id": k, "editavel": True})
     # ordena do mais velho ao mais novo e VIRA: no empate (duas anotações no mesmo segundo — o ticket e a finalização
     # automáticos podem cair assim), a gravada depois fica em cima. `sorted(..., reverse=True)` manteria o empate na
     # ordem de gravação, e a finalização apareceria ABAIXO do ticket (visto na foto da bancada, 27/09).

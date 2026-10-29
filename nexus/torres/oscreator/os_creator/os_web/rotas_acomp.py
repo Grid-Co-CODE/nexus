@@ -678,7 +678,7 @@ def detalhe(folio):
         c["code"] = str(det.get("code") or "").strip()     # o ativo da própria OS, quando a nota não diz
     todos = _cartoes(d, hoje)
     return render_template("acomp_os.html", conta=_conta(), aba="criar", c=c, n=n, wid=wid, item=item,
-                           tl=aw.linha_do_tempo(c, obs, n["historico"]), outros=aw.outros(c, todos),
+                           tl=aw.linha_do_tempo(c, obs, n["historico"], _ajustes_hist(folio)), outros=aw.outros(c, todos),
                            canal=cs.CANAL.get(c["marca"], ""),
                            menos7=aw.menos_7d(n["data_falha"], hoje), copiar=aw.copiar_tudo(n["campos"]),
                            erro_obs=erro_obs, pode_gravar=ga.pode_gravar(), equipe=aw.equipe()[1],
@@ -816,6 +816,8 @@ def _mexer_obs(folio, id_obs, tipo, texto):
     p = _pode_mexer_obs()
     if not p.get("pode", True):
         return _erro(p.get("aviso") or AVISO_OBS, 403)
+    if str(id_obs).startswith("h-"):
+        return _mexer_historico(folio, str(id_obs), tipo, texto)
     try:
         x = _obs_em_vigor(folio, id_obs)
     except Exception as e:                              # noqa: BLE001 — sem o banco, nada muda
@@ -835,6 +837,45 @@ def _mexer_obs(folio, id_obs, tipo, texto):
     except requests.RequestException as e:
         return _erro("O banco da Gridco não respondeu: %s" % str(e)[:160], 502)
     return jsonify({"ok": True})
+
+
+def _mexer_historico(folio, chave, tipo, texto):
+    """Edita ou exclui uma linha do histórico importado na nota da retroativa (29/10/2026, Levi: "não foi viu" no clique
+    numa delas): a linha vem da nota da OS no Fracttal, que não muda; o ajuste fica no banco do Nexus, por cima dela
+    (`chamados_obs_store.ajustes_do_historico`). A chave tem de estar na nota de agora e a linha não pode estar excluída."""
+    try:
+        wid = _wid_ja_lido(folio, _dono()) or api._wo_id_por_folio(folio)
+        det = _detalhe_enxuto(wid) if wid else {}
+    except api.FracttalError as e:
+        if isinstance(e, api.SessionExpired):
+            raise
+        return _erro("Não consegui ler a OS %s no Fracttal: %s" % (folio, str(e)[:160]), 502)
+    if not det or str(det.get("folio") or "") != str(folio):
+        return _erro("Não achei a OS %s no Fracttal." % folio, 404)
+    chaves = {aw.chave_do_historico(h) for h in aw.ler_nota(_nota_da_os(det, None))["historico"]}
+    try:
+        ajustes = obs_store.ajustes_do_historico(obs_store.listar(), folio)
+    except Exception as e:                              # noqa: BLE001 — sem o banco, nada muda
+        return _erro("Não consegui ler as observações no banco da Gridco: %s" % str(e)[:160], 502)
+    if chave not in chaves or (ajustes.get(chave) or {}).get("tipo") == "exclusao":
+        return _erro("Não achei esta linha no histórico da OS %s (já foi excluída?)." % folio, 404)
+    nome, email = _quem()
+    try:
+        obs_store.adicionar(folio, texto, tipo, ativo=det.get("code") or "", quem=nome, email=email, extra={"de": chave})
+    except ValueError as e:
+        return _erro(e)
+    except ga.SemCredencial as e:
+        return _erro(e, 403)
+    except requests.RequestException as e:
+        return _erro("O banco da Gridco não respondeu: %s" % str(e)[:160], 502)
+    return jsonify({"ok": True})
+
+
+def _ajustes_hist(folio) -> dict:
+    try:
+        return obs_store.ajustes_do_historico(obs_store.listar(), folio)
+    except Exception:                                   # noqa: BLE001 — sem o banco, o histórico sai como veio na nota
+        return {}
 
 
 @bp.route("/api/acomp/<int:folio>/obs/<id_obs>/editar", methods=["POST"])
