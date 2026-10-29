@@ -259,7 +259,7 @@ def _atualizacoes():
     historico = versao.historico()
     itens = versao.da_aba(historico)
     return render_template("atualizacoes.html", dias=versao.dias(itens), total=len(itens), tem_git=bool(historico),
-                           janela=versao.JANELA_DIAS, no_ar=versao.local()["sha"],
+                           janela=versao.JANELA_DIAS, no_ar=versao.local()["sha"], conta=versao.contagem,
                            versao=versao.cartao(current_app._get_current_object()), aba="atualizacoes",
                            sug_abertas=_sugestoes_abertas())
 
