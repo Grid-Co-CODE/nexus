@@ -1084,7 +1084,7 @@ massa" do card Plano de tarefas (`pcm.html`, `/os/pcm`), ao lado de Manhã (07:0
 põe 17:00 em todas as linhas marcadas e mantém o dia de cada uma (`pcm.js`, o mesmo `editores` dos outros dois). O app de
 mesa não tem o botão. Prova: `tests/test_oscreator_card_por_ativo_28_10.py::test_a_clonagem_de_planos_tem_a_noite_17h`.
 
-## Nova solicitação: os ativos do cliente numa leitura só, e a Engenharia de 10 em 10 (28/10/2026)
+## Nova solicitação e Criar OS: os ativos do cliente numa leitura só, e a Engenharia de 10 em 10 (28/10/2026)
 
 Levi: "Em solicitação > PCM, quando pesquisa o cliente carrega, quando pesquiso a usina carrega novamente. na minha cabeça
 os ativos devem carregar apenas 1 vez e depois é mais fluido" e "em solicitação > engenharia: tá mostrando todos os ativos
@@ -1094,12 +1094,15 @@ de uma vez, o certo é de 10 em 10".
   todas elas (`tradicional_web.ativos_do_cliente`: os campos do `ativos_de`, mais a `usina`); a usina, o tipo e a busca
   filtram na tela, sem novo pedido nem o círculo de carga. O cliente que já veio fica na memória da página (`porCliente`);
   erro não fica. A resposta vem comprimida (gzip no servidor). A sugestão pelo endereço segue igual (`sugerir` espera as
-  duas etapas). O Criar OS segue com os três pedidos da cascata do app.
+  duas etapas). **O Criar OS faz o mesmo** (Levi, no mesmo dia: "Aplique o mesmo carregamento único dos ativos no Criar
+  OS"): `tradicional.js`, `doCliente` e `porCliente`; o ↻ relê o catálogo e esquece o que já veio; o marcado de outra
+  usina segue marcado (o aviso das usinas de 26/10 não mudou).
 - **Engenharia:** a tabela mostra 10 e o rodapé "Mostrando N de M ativos" com "Mostrar mais 10" e "Mostrar todos (M)", o
   mesmo da Nova solicitação PCM; o marcado fora da tela continua valendo (o rodapé conta), e trocar a usina, o tipo ou a
   busca volta aos 10. "Selecionar todos" marca todos os do filtro, como antes.
 - **Prova:** `tests/test_oscreator_solic_ativos_28_10.py`. No Chrome sem janela (fixture com 2 usinas, 25 ativos na 2ª):
-  na PCM, um pedido só para o cliente, e trocar de usina duas vezes e voltar ao cliente não pediu de novo; na Engenharia,
+  na PCM e no Criar OS, um pedido só para o cliente, e trocar de usina não pediu de novo (no Criar OS o ↻ pediu de novo, e
+  o "Criar OS" da Engenharia abriu com o ativo marcado e a OS pai); na Engenharia,
   10 → 20 → 25, a busca filtra e limpar volta aos 10 com o marcado mantido; a 375 px, no claro, sem rolagem lateral.
 
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)

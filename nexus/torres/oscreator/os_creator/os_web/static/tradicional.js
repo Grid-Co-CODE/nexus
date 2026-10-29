@@ -69,12 +69,21 @@
   function agoraLocal() { const d = new Date(); d.setSeconds(0, 0); return toLocal(d); }
   function amanhaLocal() { const d = new Date(); d.setDate(d.getDate() + 1); d.setSeconds(0, 0); return toLocal(d); }
 
+  // os ativos do cliente vêm UMA vez, com as usinas, e a usina filtra na tela (Levi, 28/10/2026: "Aplique o mesmo
+  // carregamento único dos ativos no Criar OS", o mesmo da Nova solicitação). O cliente que já veio nesta página não é
+  // pedido de novo; o ↻ esquece tudo (relê o catálogo do Fracttal)
+  const porCliente = new Map();
+  async function doCliente(cli) {
+    if (!porCliente.has(cli)) porCliente.set(cli, await getJson('/os/api/tradicional/catalogo?cliente=' + enc(cli) + '&ativos=1'));
+    return porCliente.get(cli);
+  }
   async function onCliente() {
     const cli = cbCli.value;
     cbUsi.innerHTML = '<option value="">— Selecione a usina —</option>'; cbUsi.disabled = true;
     if (cli) {
       try {
-        const j = await getJson('/os/api/tradicional/catalogo?cliente=' + enc(cli));
+        const j = await doCliente(cli);
+        if (cbCli.value !== cli) return;                          // trocou de cliente enquanto lia
         cbUsi.innerHTML += (j.usinas || []).map((u) => '<option value="' + esc(u) + '">' + esc(u) + '</option>').join('');
         cbUsi.disabled = !(j.usinas || []).length;
       } catch (e) { hint.textContent = '⚠ ' + e.message; }
@@ -86,12 +95,13 @@
     const cli = cbCli.value, usi = cbUsi.value;
     cbTipo.innerHTML = '<option value="">Todos os tipos</option>'; cbTipo.disabled = true; assets = [];
     if (usi) {
-      hint.textContent = 'carregando ativos…';
       try {
-        const j = await getJson('/os/api/tradicional/catalogo?cliente=' + enc(cli) + '&usina=' + enc(usi));
-        cbTipo.innerHTML += (j.tipos || []).map((t) => '<option value="' + esc(t) + '">' + esc(t) + '</option>').join('');
-        cbTipo.disabled = !(j.tipos || []).length;
-        assets = j.ativos || []; limite = PAGINA;
+        const j = await doCliente(cli);
+        if (cbUsi.value !== usi) return;
+        assets = (j.ativos || []).filter((a) => a.usina === usi); limite = PAGINA;
+        const tipos = [...new Set(assets.map((a) => a.tipo).filter(Boolean))].sort((x, y) => (x < y ? -1 : x > y ? 1 : 0));
+        cbTipo.innerHTML += tipos.map((t) => '<option value="' + esc(t) + '">' + esc(t) + '</option>').join('');
+        cbTipo.disabled = !tipos.length;
       } catch (e) { hint.textContent = '⚠ ' + e.message; return; }
     }
     refreshAtivos();
@@ -163,6 +173,7 @@
     hint.textContent = 'Recarregando ativos do Fracttal…';
     try {
       const j = await getJson('/os/api/tradicional/catalogo?recarregar=1');
+      porCliente.clear();                                     // o catálogo foi relido: os ativos de cada cliente também
       const cur = cbCli.value;
       cbCli.innerHTML = '<option value="">— Selecione o cliente —</option>' + (j.clientes || []).map((c) => '<option value="' + esc(c) + '"' + (c === cur ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
       await onCliente();

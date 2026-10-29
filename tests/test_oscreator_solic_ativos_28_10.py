@@ -39,3 +39,13 @@ def test_a_engenharia_mostra_os_ativos_de_10_em_10():
     pintar = ENG.split("function pintar()", 1)[1].split("\n  }\n", 1)[0]
     assert "vs.slice(0, limite)" in pintar and "rodapeMais(" in pintar
     assert "data-mais" in ENG and "limite = PAGINA" in ENG.split("async function trocarUsina()", 1)[1]
+
+
+def test_o_criar_os_tambem_pede_os_ativos_uma_vez_por_cliente():
+    """Levi, 28/10/2026: "Aplique o mesmo carregamento único dos ativos no Criar OS". O cliente traz as usinas e os ativos
+    de todas elas; a usina só filtra; o ↻ (que relê o catálogo do Fracttal) esquece o que já veio."""
+    js = (WEB / "static" / "tradicional.js").read_text(encoding="utf-8")
+    cascata = js.split("async function onCliente()", 1)[1].split("function refreshAtivos()", 1)[0]
+    assert "&ativos=1" in js and "&usina=" not in cascata and "porCliente" in js
+    assert "a.usina === usi" in cascata
+    assert "porCliente.clear();" in js.split("$('b_reload').onclick", 1)[1].split("\n  };\n", 1)[0]

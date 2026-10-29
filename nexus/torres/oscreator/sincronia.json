@@ -1,6 +1,6 @@
 {
  "como_ler": "hash de cada arquivo da cópia na última sincronia com o oem (sincronia.py)",
- "atualizado_em": "2026-10-28T17:15:06",
+ "atualizado_em": "2026-10-28T18:45:08",
  "arquivos": {
   "chamado_garantia/README.md": "ebd082efad2568dc",
   "chamado_garantia/__init__.py": "0d87fb4d38a98e72",
@@ -91,7 +91,7 @@
   "os_creator/os_web/static/solic_temas.js": "c1b06569e89337b3",
   "os_creator/os_web/static/sso_bookmarklet.js": "9ec9e1b7bc2d4595",
   "os_creator/os_web/static/tradicional.css": "4db440fa6c1a1dad",
-  "os_creator/os_web/static/tradicional.js": "001a938bcba64c14",
+  "os_creator/os_web/static/tradicional.js": "8eb280fd908f7779",
   "os_creator/os_web/templates/_dlg_responsavel.html": "865f115102d5bae0",
   "os_creator/os_web/templates/_historico_linhas.html": "cde4e00d288d9b8a",
   "os_creator/os_web/templates/_solic_nav.html": "af141820f1b2ea35",
