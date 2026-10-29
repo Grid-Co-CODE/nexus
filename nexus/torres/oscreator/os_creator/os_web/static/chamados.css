@@ -466,3 +466,12 @@ html[data-tema="claro"]{--bg:var(--osc-pagina);--sf:var(--osc-cartao);--sf2:var(
 .ac-dlg-lista{display:grid;gap:9px;margin:14px 0;max-height:50vh;overflow:auto}
 .ac-dlg-lista label{display:flex;gap:9px;align-items:center;font-size:13.5px;cursor:pointer;color:var(--tx)}
 .ac-dlg-acoes{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}
+
+/* editar e excluir a observação escrita na linha do tempo (29/10/2026) */
+.tl-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
+/* os botões só aparecem no clique na observação (Levi, 29/10/2026: "clica no comentário e aparece esses botões") */
+.tl-e[data-obs-id] .tl-acoes{display:none}
+.tl-e[data-obs-id].aberta .tl-acoes{display:flex}
+.tl-e[data-obs-id] .tl-x{cursor:pointer}
+.tl-conf{font-size:12px;color:var(--mu)}
+.tl-x textarea.obs{margin-top:6px;min-height:72px}

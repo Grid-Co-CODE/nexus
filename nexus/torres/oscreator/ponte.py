@@ -346,9 +346,28 @@ def _sem_acento(t: str) -> str:
 
 def area_pcm() -> dict:
     """{"pode": bool, "aviso": str} da sessão do Nexus de agora."""
+    return _do_setor_ou_admin(SETOR_PCM, "PCM", "A Fila do PCM e os Temas são do setor PCM e dos administradores do Nexus.",
+                              "a Área PCM")
+
+
+# Editar e excluir as observações de Garantias (29/10/2026, Levi: "qualquer um que é ADM ou do setor de chamados"): a
+# mesma regra da Área PCM, com o setor Chamados; vai no pedido das telas do Acompanhamento de chamados
+# (`rotas_acomp.OBS_CHAMADOS`)
+OBS_CHAMADOS = "os_web.obs_chamados"
+SETOR_CHAMADOS = "chamados"
+_ROTA_OBS = re.compile(r"chamados/acompanhamento/\d+|api/acomp/\d+/obs/[^/]+/(?:editar|excluir)")
+
+
+def obs_chamados() -> dict:
+    """{"pode": bool, "aviso": str}: quem edita e exclui as observações de Garantias."""
+    return _do_setor_ou_admin(SETOR_CHAMADOS, "Chamados", "Editar e excluir observações em Garantias é do setor Chamados "
+                              "e dos administradores do Nexus.", "as observações de Garantias")
+
+
+def _do_setor_ou_admin(setor_alvo: str, nome: str, regra: str, onde_log: str) -> dict:
+    """O administrador, ou quem é do setor `setor_alvo` (sem acento e sem caixa) no Nexus."""
     if session.get("admin"):
         return {"pode": True, "aviso": ""}
-    regra = "A Fila do PCM e os Temas são do setor PCM e dos administradores do Nexus."
     if not current_app.config.get("NEXUS_PESSOA_HMAC"):
         return {"pode": False, "aviso": regra + " Este Nexus ainda não sabe o setor de cada pessoa (falta a "
                                                 "NEXUS_PESSOA_HMAC no servidor): por enquanto só o administrador entra."}
@@ -358,13 +377,13 @@ def area_pcm() -> dict:
     try:
         setor = setor_telas.setor_da_pessoa(current_app.config, email, *setor_telas._banco())
     except Exception as ex:      # noqa: BLE001 — sem saber o setor, fecha (e diz que é leitura, não falta de setor)
-        logging.warning("OS Creator: não consegui ler o setor para a Área PCM (%s)", type(ex).__name__)
+        logging.warning("OS Creator: não consegui ler o setor para %s (%s)", onde_log, type(ex).__name__)
         return {"pode": False, "aviso": regra + " Não consegui ler o seu setor agora; tente de novo em instantes."}
-    if setor and _sem_acento(setor.get("nome")) == SETOR_PCM:
+    if setor and _sem_acento(setor.get("nome")) == setor_alvo:
         return {"pode": True, "aviso": ""}
     onde = ("Você está no setor %s." % setor["nome"]) if setor else "Você está sem setor no Nexus."
-    return {"pode": False, "aviso": regra + " " + onde + " Quem põe você no setor PCM é o administrador "
-                                                         "(Base → Acessos → Pessoas e setores)."}
+    return {"pode": False, "aviso": regra + " " + onde + " Quem põe você no setor %s é o administrador "
+                                                         "(Base → Acessos → Pessoas e setores)." % nome}
 
 
 @bp_raiz.route("/os/", defaults={"resto": ""}, methods=_METODOS)
@@ -381,6 +400,8 @@ def encaminhar(resto: str):
     environ = dict(request.environ)
     if resto.startswith(("solicitacao", "api/solic")):
         environ[AREA_PCM] = area_pcm()          # a Área PCM é do setor PCM ou do administrador (ver `area_pcm`)
+    if _ROTA_OBS.fullmatch(resto):              # só a tela de um chamado e o editar/excluir: o quadro não lê o setor
+        environ[OBS_CHAMADOS] = obs_chamados()  # editar e excluir as observações (ver `obs_chamados`)
     base = raiz()
     ajusta_js = resto == "static/abas.js"
     # debaixo do prefixo todo .js do clone sai reescrito, e a pergunta "mudou?" vale para a versão reescrita (abaixo)

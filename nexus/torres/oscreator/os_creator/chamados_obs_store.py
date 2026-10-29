@@ -9,8 +9,10 @@ POR QUE NÃO NA NOTA DA OS: a nota da OS 3 é a cópia das respostas do técnico
 caracteres, de onde se abre o ticket no fornecedor). Misturar o diário ali estragaria as duas coisas — e editar a nota
 troca o texto INTEIRO: duas pessoas escrevendo ao mesmo tempo, uma perde o que escreveu.
 
-SÓ POST, NUNCA PUT: observação não se edita nem se apaga pela tela. Linha nova a cada vez é o que torna a escrita
-segura entre duas pessoas (não há linha para uma sobrescrever a da outra) e o que mantém o histórico honesto.
+SÓ POST, NUNCA PUT: linha nova a cada vez é o que torna a escrita segura entre duas pessoas (não há linha para uma
+sobrescrever a da outra) e o que mantém o histórico honesto. Desde 29/10/2026 a tela edita e exclui a observação escrita
+(o administrador do Nexus ou o setor Chamados), também por linha nova (`edicao`, `exclusao`): a original nunca muda, e a
+tela mostra a versão em vigor (`vigentes`).
 
 A DATA É DO SERVIDOR, em Brasília, carimbada na hora em que a linha é gravada — a pessoa não digita data. A planilha de
 chamados tinha 3 datas digitadas no futuro (2027); aqui isso não acontece.
@@ -30,7 +32,12 @@ COLUNAS = ["id", "quando", "os", "ativo", "tipo", "texto", "quem", "email", "ext
 # "status" (27/10/2026): a troca do status do chamado pela tela (Testes em campo, Aguardando retorno do Fabricante...),
 # uma linha por troca, com o status em `extra` e a frase no texto ("Status: Standby"), que o código de antes mostra como
 # observação comum
-TIPOS = ("obs", "ticket", "finalizado", "status")
+TIPOS = ("obs", "ticket", "finalizado", "status", "edicao", "exclusao")
+# Editar e excluir (29/10/2026, Levi: "gostaria de poder excluir a observação e editar a observação"; quem pode, o
+# Nexus decide: o administrador ou o setor Chamados) também só ACRESCENTAM: a linha `edicao` traz o texto novo e a
+# `exclusao` some com a observação, as duas apontando a original em `extra.de`. A original nunca muda no banco; a tela
+# mostra a versão em vigor (`vigentes`). Só a observação escrita muda; os automáticos (ticket, status, finalizado), não.
+EDITAVEIS = ("obs",)
 LIMITE_TEXTO = 2000
 TTL = 60           # s: a leitura da aba inteira vale isto (a própria escrita já entra no cache na hora)
 # Vencida, a leitura de antes sai NA HORA e a aba é relida por trás, uma releitura por vez (28/10/2026: o banco da Gridco
@@ -110,15 +117,41 @@ def _ler() -> list:
     return list(lista)
 
 
+def vigentes(lista) -> list:
+    """As observações como a tela mostra: a editada com o texto da última edição (`editada_em`, `editada_por`; a data dela
+    continua a de quando foi escrita), sem a excluída e sem as linhas de edição e exclusão. Edição ou exclusão que aponta
+    uma automática (ou uma que não existe) não vale."""
+    por_id = {x["id"]: x for x in lista}
+    edicoes, excluidas = {}, set()
+    for x in lista:                                     # da mais antiga à mais nova: a última edição vence
+        if x["tipo"] not in ("edicao", "exclusao"):
+            continue
+        de = str((x.get("extra") or {}).get("de") or "")
+        alvo = por_id.get(de)
+        if not alvo or alvo["tipo"] not in EDITAVEIS:
+            continue
+        if x["tipo"] == "edicao":
+            edicoes[de] = x
+        else:
+            excluidas.add(de)
+    out = []
+    for x in lista:
+        if x["tipo"] in ("edicao", "exclusao") or x["id"] in excluidas:
+            continue
+        e = edicoes.get(x["id"])
+        out.append(dict(x, texto=e["texto"], editada_em=e["quando"], editada_por=e["quem"]) if e else x)
+    return out
+
+
 def do_os(folio) -> list:
     alvo = str(folio).strip()
-    return [x for x in listar() if x["os"] == alvo]
+    return [x for x in vigentes(listar()) if x["os"] == alvo]
 
 
 def ultima_por_os() -> dict:
     """{nº da OS: quando da última entrada} — a régua da cobrança ("há N dias sem atualização")."""
     out = {}
-    for x in listar():
+    for x in vigentes(listar()):
         out[x["os"]] = max(out.get(x["os"], ""), x["quando"])
     return out
 

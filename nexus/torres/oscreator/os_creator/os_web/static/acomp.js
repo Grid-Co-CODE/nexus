@@ -332,6 +332,14 @@
         div.querySelector(".tl-a").textContent = e.a || "";
         div.querySelector(".tl-t").textContent = e.texto || texto;
         div.querySelector(".tl-u").textContent = e.autor || "";
+        if (e.id && e.editavel && tela.dataset.podeObs === "1") {            // a nova também edita e exclui (29/10/2026)
+          div.dataset.obsId = e.id;
+          const ac = document.createElement("div");
+          ac.className = "tl-acoes";
+          ac.innerHTML = '<button type="button" class="det-mini" data-obs-editar>editar</button>' +
+                         '<button type="button" class="det-mini" data-obs-excluir>excluir</button>';
+          div.querySelector(".tl-x").appendChild(ac);
+        }
         tl.insertBefore(div, tl.firstChild);
         contar(document.getElementById("n_obs"), tl.querySelectorAll(".tl-e").length);
         campo.value = "";
@@ -342,6 +350,64 @@
       bObs.disabled = false;
     });
   }
+
+  // editar e excluir a observação escrita (29/10/2026): no lugar, sem janela; gravado, a tela relê (a editada com a marca,
+  // a excluída some). O banco guarda as duas versões (chamados_obs_store.vigentes)
+  const tlObs = document.getElementById("tl");
+  if (tlObs) tlObs.addEventListener("click", async function (ev) {
+    const alvo = ev.target.closest("[data-obs-editar],[data-obs-excluir],[data-obs-salvar],[data-obs-sim],[data-obs-nao]");
+    if (!alvo) {
+      // o clique na observação mostra (ou esconde) o editar e o excluir dela; a outra aberta fecha
+      const aqui = ev.target.closest("[data-obs-id]");
+      if (!aqui || ev.target.closest("textarea") || !aqui.querySelector(".tl-acoes")) return;
+      tlObs.querySelectorAll("[data-obs-id].aberta").forEach(function (x) { if (x !== aqui) x.classList.remove("aberta"); });
+      aqui.classList.toggle("aberta");
+      return;
+    }
+    const ent = alvo.closest("[data-obs-id]");
+    if (!ent) return;
+    const id = ent.dataset.obsId, x = ent.querySelector(".tl-x"), t = ent.querySelector(".tl-t");
+    const acoes = ent.querySelector(".tl-acoes");
+    const aviso = function (texto) {
+      let m = ent.querySelector(".msg");
+      if (!m) { m = document.createElement("div"); x.appendChild(m); }
+      msg(m, texto, "er");
+    };
+    if (alvo.hasAttribute("data-obs-editar")) {
+      if (ent.querySelector("textarea")) return;
+      const campo = document.createElement("textarea");
+      campo.className = "obs";
+      campo.maxLength = 2000;
+      campo.value = t.textContent;
+      t.hidden = true;
+      x.insertBefore(campo, t.nextSibling);
+      acoes.innerHTML = '<button type="button" class="det-mini" data-obs-salvar>salvar</button>' +
+                        '<button type="button" class="det-mini" data-obs-nao>cancelar</button>';
+      campo.focus();
+      return;
+    }
+    if (alvo.hasAttribute("data-obs-excluir")) {
+      acoes.innerHTML = '<span class="tl-conf">Excluir esta observação?</span>' +
+                        '<button type="button" class="det-mini" data-obs-sim>excluir</button>' +
+                        '<button type="button" class="det-mini" data-obs-nao>cancelar</button>';
+      return;
+    }
+    if (alvo.hasAttribute("data-obs-nao")) { location.reload(); return; }
+    alvo.disabled = true;
+    try {
+      if (alvo.hasAttribute("data-obs-salvar")) {
+        const texto = (ent.querySelector("textarea").value || "").trim();
+        if (!texto) { aviso("Escreva a observação antes de salvar."); alvo.disabled = false; return; }
+        await postar("/os/api/acomp/" + folio + "/obs/" + encodeURIComponent(id) + "/editar", {texto: texto});
+      } else {
+        await postar("/os/api/acomp/" + folio + "/obs/" + encodeURIComponent(id) + "/excluir", {});
+      }
+      location.reload();
+    } catch (e) {
+      if (e.message !== "sessão") aviso("Não gravou: " + e.message);
+      alvo.disabled = false;
+    }
+  });
 
   const bFim = document.getElementById("b_finalizar"), conf = document.getElementById("conf_fim");
   if (bFim && conf) {

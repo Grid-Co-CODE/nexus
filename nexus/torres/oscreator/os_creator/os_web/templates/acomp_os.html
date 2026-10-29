@@ -21,7 +21,7 @@
 <button type="button" class="cad-pdf" data-os-pdf="{{ folio }}"{% if wid %} data-wid="{{ wid }}"{% endif %} title="Baixar o PDF da OS {{ folio }}" aria-label="Baixar o PDF da OS {{ folio }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 {%- endmacro %}
 {% set eb = {'chegou': 'u-r', 'ticket': 'u-a', 'fim': 'u-g', '': 'u-m'}[c.col] %}
-<section class="ac" id="acomp-os" data-folio="{{ c.folio }}" data-wid="{{ wid }}" data-ativo="{{ c.code }}">
+<section class="ac" id="acomp-os" data-folio="{{ c.folio }}" data-wid="{{ wid }}" data-ativo="{{ c.code }}" data-pode-obs="{{ '1' if pode_obs else '0' }}">
   <div class="ac-head">
     <div style="min-width:0">
       <div class="ac-tit"><a class="ac-volta" href="/os/chamados/acompanhamento">← Acompanhamento</a>
@@ -168,8 +168,10 @@
         </div>
         <div class="msg" id="msg_obs"></div>
         <div class="tl" id="tl">
-          {% for e in tl %}<div class="tl-e{% if e.novo %} novo{% endif %}{% if e.ev %} ev{% endif %}"><div class="tl-g"><div class="tl-d">{{ e.d }}</div><div class="tl-a">{{ e.a }}</div></div>
-            <div class="tl-b"><div class="tl-x"><div class="tl-t">{{ e.texto }}</div><div class="tl-u">{{ e.autor }}</div></div></div></div>{% endfor %}
+          {# a observação escrita edita e exclui (29/10/2026: o administrador ou o setor Chamados; os automáticos, nunca) #}
+          {% for e in tl %}<div class="tl-e{% if e.novo %} novo{% endif %}{% if e.ev %} ev{% endif %}"{% if e.editavel and e.id %} data-obs-id="{{ e.id }}"{% if pode_obs %} title="Clique para editar ou excluir"{% endif %}{% endif %}><div class="tl-g"><div class="tl-d">{{ e.d }}</div><div class="tl-a">{{ e.a }}</div></div>
+            <div class="tl-b"><div class="tl-x"><div class="tl-t">{{ e.texto }}</div><div class="tl-u">{{ e.autor }}</div>
+            {%- if e.editavel and e.id and pode_obs %}<div class="tl-acoes"><button type="button" class="det-mini" data-obs-editar>editar</button><button type="button" class="det-mini" data-obs-excluir>excluir</button></div>{% endif %}</div></div></div>{% endfor %}
         </div>
       </section>
       <section class="bloco">

@@ -422,7 +422,7 @@ def _cartoes_do_quadro(q: dict) -> list:
 def _ultima_obs() -> dict:
     """{nº: (quando, texto)} da última observação escrita (tipo obs) de cada OS: a "última atualização" do relatório."""
     try:
-        lista = obs_store.listar()
+        lista = obs_store.vigentes(obs_store.listar())  # a editada com o texto novo; a excluída, não
     except Exception:                                   # noqa: BLE001 — sem o banco, o relatório sai sem ela
         return {}
     out = {}
@@ -682,7 +682,7 @@ def detalhe(folio):
                            canal=cs.CANAL.get(c["marca"], ""),
                            menos7=aw.menos_7d(n["data_falha"], hoje), copiar=aw.copiar_tudo(n["campos"]),
                            erro_obs=erro_obs, pode_gravar=ga.pode_gravar(), equipe=aw.equipe()[1],
-                           opcoes_status=aw.STATUS_CHAMADO)
+                           opcoes_status=aw.STATUS_CHAMADO, pode_obs=_pode_mexer_obs().get("pode", True))
 
 
 def _status_trocado(obs):
@@ -792,6 +792,63 @@ def api_status(folio):
     except requests.RequestException as e:
         return _erro("O banco da Gridco não respondeu: %s" % str(e)[:160], 502)
     return jsonify({"ok": True, "status": novo, "mensagem": "Status gravado."})
+
+
+# Quem pode editar e excluir as observações (29/10/2026, Levi: "qualquer um que é ADM ou do setor de chamados"): o
+# Nexus decide e põe no pedido, `request.environ["os_web.obs_chamados"]` = {"pode": bool, "aviso": str}
+# (`ponte.obs_chamados`). Sem a chave (o OS Creator sozinho, o oem), fica aberto, como a Área PCM.
+OBS_CHAMADOS = "os_web.obs_chamados"
+AVISO_OBS = "Editar e excluir observações em Garantias é do setor Chamados e dos administradores do Nexus."
+
+
+def _pode_mexer_obs() -> dict:
+    v = request.environ.get(OBS_CHAMADOS)
+    return v if isinstance(v, dict) else {"pode": True, "aviso": ""}
+
+
+def _obs_em_vigor(folio, id_obs):
+    """A observação desta OS como a tela mostra (a excluída não está), ou None."""
+    lista = obs_store.vigentes(obs_store.listar())
+    return next((x for x in lista if x["id"] == str(id_obs) and x["os"] == str(folio)), None)
+
+
+def _mexer_obs(folio, id_obs, tipo, texto):
+    p = _pode_mexer_obs()
+    if not p.get("pode", True):
+        return _erro(p.get("aviso") or AVISO_OBS, 403)
+    try:
+        x = _obs_em_vigor(folio, id_obs)
+    except Exception as e:                              # noqa: BLE001 — sem o banco, nada muda
+        return _erro("Não consegui ler as observações no banco da Gridco: %s" % str(e)[:160], 502)
+    if x is None:
+        return _erro("Não achei esta observação na OS %s (já foi excluída?)." % folio, 404)
+    if x["tipo"] not in obs_store.EDITAVEIS:
+        return _erro("Só a observação escrita muda; a automática (ticket, status, finalizado) fica como está.")
+    nome, email = _quem()
+    try:
+        obs_store.adicionar(folio, texto, tipo, ativo=x.get("ativo") or "", quem=nome, email=email,
+                            extra={"de": x["id"]})
+    except ValueError as e:
+        return _erro(e)
+    except ga.SemCredencial as e:
+        return _erro(e, 403)
+    except requests.RequestException as e:
+        return _erro("O banco da Gridco não respondeu: %s" % str(e)[:160], 502)
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/acomp/<int:folio>/obs/<id_obs>/editar", methods=["POST"])
+@exige_sessao
+def api_obs_editar(folio, id_obs):
+    """Edita uma observação escrita: uma linha nova (`edicao`); a original fica no banco."""
+    return _mexer_obs(folio, id_obs, "edicao", _corpo().get("texto"))
+
+
+@bp.route("/api/acomp/<int:folio>/obs/<id_obs>/excluir", methods=["POST"])
+@exige_sessao
+def api_obs_excluir(folio, id_obs):
+    """Exclui uma observação escrita da tela: uma linha nova (`exclusao`); a original fica no banco."""
+    return _mexer_obs(folio, id_obs, "exclusao", "Observação excluída")
 
 
 @bp.route("/api/acomp/<int:folio>/obs", methods=["POST"])

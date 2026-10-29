@@ -1552,3 +1552,25 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   node). Na bancada: a exclamação, os filtros (Fabricante, Standby, um supervisor), o diálogo com um checkbox por
   cliente, o relatório (um PDF; dois clientes, um .zip) e a planilha; a 375 px a página não rola para o lado e a caixa
   dos avisos fica na tela.
+
+## Garantias: editar e excluir as observações (29/10/2026)
+
+Levi: "Em garantias > clico na OS > Em observações da OS gostaria de poder excluir a observação e editar a observação";
+quem pode: "qualquer um que é ADM ou do setor de chamados".
+
+- **O banco continua só acrescentando** (`chamados_obs_store`): editar grava uma linha `edicao` com o texto novo e excluir
+  uma `exclusao`, as duas apontando a original em `extra.de`; a original nunca muda. A tela mostra a versão em vigor
+  (`vigentes`: a editada com o texto da última edição e a marca "editada dd/mm HH:MM por …", na data em que foi escrita;
+  a excluída some). O quadro (a última atualização, o pulso), o status e o relatório ao cliente leem a versão em vigor.
+- **Só a observação escrita** muda; ticket, status, finalizado e a chegada da OS, os automáticos, não têm os botões, e a
+  rota recusa (400). Editar ou excluir a que já foi excluída: 404.
+- **Quem pode** o Nexus decide (`ponte.obs_chamados`: o administrador ou quem é do setor Chamados, a mesma regra da Área
+  PCM, `ponte._do_setor_ou_admin`) e põe no pedido (`os_web.obs_chamados`), só na tela de um chamado e nas rotas de
+  editar e excluir (`ponte._ROTA_OBS`: o quadro não paga a leitura do setor). Quem não pode não vê os botões e recebe 403
+  com o aviso. Sem a chave (o oem, sozinho), fica aberto, como a Área PCM.
+- **A tela:** o clique na observação escrita mostra o "editar" e o "excluir" dela (Levi: "clica no comentário e aparece
+  esses botões"; outro clique esconde, e a outra aberta fecha); o editar abre a caixa no lugar (salvar ou cancelar), o
+  excluir pergunta antes; gravado, a tela relê. A observação nova (salva sem recarregar) já vem com os
+  botões.
+- Prova: `tests/test_oscreator_garantias_obs_29_10.py`. Na bancada: editar (o texto novo e a marca "editada") e excluir
+  (some da tela, as duas linhas gravadas no banco falso), a 1440 e a 375 px.

@@ -507,10 +507,15 @@ def outros(c: dict, todos) -> dict:
 
 
 def entrada(reg: dict) -> dict:
-    """Uma observação do banco → uma entrada da linha do tempo."""
+    """Uma observação do banco → uma entrada da linha do tempo. A escrita (tipo obs) leva o id e `editavel` (os botões de
+    editar e excluir, 29/10/2026); a editada diz quando e por quem."""
     q = brt_iso(reg.get("quando"))
+    ed = brt_iso(reg.get("editada_em")) if reg.get("editada_em") else None
+    editada = ("editada %s%s" % (ed.strftime("%d/%m %H:%M"), (" por %s" % reg["editada_por"]) if reg.get("editada_por")
+                                  else "")) if ed else ""
     return {"d": q.strftime("%d/%m") if q else "", "a": q.strftime("%Y") if q else "", "texto": reg.get("texto") or "",
-            "autor": " · ".join(x for x in (reg.get("quem") or "", q.strftime("%d/%m %H:%M") if q else "") if x),
+            "id": reg.get("id") or "", "editavel": reg.get("tipo") == "obs",
+            "autor": " · ".join(x for x in (reg.get("quem") or "", q.strftime("%d/%m %H:%M") if q else "", editada) if x),
             "ev": reg.get("tipo") in ("ticket", "finalizado", "status"), "quando": reg.get("quando") or ""}
 
 
