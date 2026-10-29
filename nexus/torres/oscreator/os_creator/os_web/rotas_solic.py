@@ -33,17 +33,23 @@ import os
 import threading
 import time
 
+import mimetypes
+from urllib.parse import quote
+
 import requests
-from flask import Blueprint, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, url_for
+from werkzeug.exceptions import RequestEntityTooLarge
 
 import api
 import solic_spec as sp
 import temas_store as ts
 
-from . import ativo_curto, sessao
+from . import ativo_curto, sessao, solic_anexos
+from . import solic_eng_web as reg
 from . import solic_web as sw
 from . import tradicional_web as trad
 from .rotas import _MEMO, _MEMO_LOCK, _conta, _memo, exige_sessao
+from .rotas_solic_eng import _abrir_limite, _corpo_e_anexos
 
 bp = Blueprint("os_web_solic", __name__, url_prefix="/os")
 
@@ -271,7 +277,10 @@ def solicitacao():
         temas=sw.temas_para_tela(), pessoas=pessoas, sugestao=trad.sugestao(assets, request.args),
         agora=agora.strftime("%Y-%m-%dT%H:%M"),
         # +2 dias: o mesmo default da data sugerida no app (`SolicitacaoTab.reset`)
-        sugerida=(agora.replace(hour=8, minute=0) + dt.timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"))
+        sugerida=(agora.replace(hour=8, minute=0) + dt.timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"),
+        # os anexos (29/10/2026): os limites e os tipos são os do servidor, que confere tudo de novo ao criar
+        anexo_aceitar=reg.ACEITAR, anexo_max=reg.MAX_ARQUIVOS, anexo_mb=reg.MAX_MB_ARQUIVO,
+        anexo_total_mb=reg.MAX_MB_TOTAL, anexo_tipos=reg.tipos_aceitos())
 
 
 @bp.route("/api/solic/subtarefas")
@@ -287,7 +296,10 @@ def api_subtarefas():
 @bp.route("/api/solic/criar", methods=["POST"])
 @exige_sessao
 def api_criar():
-    corpo = request.get_json(silent=True) or {}
+    # os anexos (29/10/2026) vêm em multipart, no molde da Solicitação de Engenharia: `payload` com o mesmo JSON de sempre
+    # e cada arquivo em `anexos`; sem anexo, o JSON puro de antes. Só esta rota abre o limite do pedido para eles.
+    _abrir_limite()
+    corpo, brutos = _corpo_e_anexos()
     erro = sw.validar_criar(corpo)
     if erro:
         return jsonify({"erro": erro}), 400
@@ -302,9 +314,14 @@ def api_criar():
         os_pai = sw.os_pai_escolhida(corpo.get("os_pai"))
     except ValueError as e:
         return jsonify({"erro": str(e)}), 400
+    # os anexos ANTES de criar, com as regras da Solicitação de Engenharia (tipo, tamanho, conteúdo que bate com a
+    # extensão): anexo recusado = nenhuma solicitação criada
+    anexos, erro = reg.anexos(brutos, nada=" Nenhuma solicitação foi criada.")
+    if erro:
+        return jsonify({"erro": erro}), 400
     obs = sw.observacao(corpo.get("observacao") or "", corpo.get("tema") or "",
                         corpo.get("tecnico") or "", corpo.get("data_sugerida") or "",
-                        corpo.get("subtarefas") or [], os_pai=os_pai)
+                        corpo.get("subtarefas") or [], os_pai=os_pai, anexos=[a["nome"] for a in anexos])
     desc = str(corpo.get("descricao") or "").strip()
     campos = dict(id_type=corpo.get("grupo") or None, id_type_2=corpo.get("classif2") or None,
                   observation=obs, date_incident=sw.data_brt(corpo.get("data")),
@@ -318,7 +335,51 @@ def api_criar():
     for a in escolhidos:
         res += api.create_solicitacoes_bulk([a], sw.titulo_do_ativo(desc, a, frases), corpo.get("classif1"), **campos)
     _esquecer_lista()
-    return jsonify(sw.mensagem_bulk(res))
+    out = sw.mensagem_bulk(res)
+    if anexos:
+        # cada solicitação criada guarda os anexos com o nº dela; vão para a OS quando o PCM aprovar na Fila
+        numeros = [r.get("id_code") for r in res if r.get("ok") and r.get("id_code")]
+        falhou = []
+        for n in numeros:
+            try:
+                solic_anexos.guardar(n, anexos)
+            except OSError as e:
+                falhou.append("%s (%s)" % (n, e))
+        if numeros:
+            out["mensagem"] = (out.get("mensagem") or "") + (
+                "\n%d anexo(s) guardado(s) no Nexus: vão para a OS quando o PCM aprovar na Fila." % len(anexos))
+        if falhou:
+            out["mensagem"] += "\nNão consegui guardar os anexos da(s) solicitação(ões) " + ", ".join(falhou) + "."
+            out["falhas"] = (out.get("falhas") or 0) + len(falhou)
+    return jsonify(out)
+
+
+@bp.errorhandler(RequestEntityTooLarge)
+def _pedido_grande(_e):
+    """A tela confere os anexos antes de enviar; passou do limite mesmo assim, a resposta é JSON legível (e não um 413
+    em HTML), e nada foi criado: o corpo nem chegou a ser lido."""
+    limite = (request.max_content_length or reg.LIMITE_PEDIDO) // reg.MB
+    return jsonify({"erro": "Os anexos passam de %d MB no total. Nenhuma solicitação foi criada." % limite}), 413
+
+
+@bp.route("/api/solic/<id_code>/anexo-guardado")
+@exige_sessao
+def api_anexo_guardado(id_code):
+    """Um anexo guardado da solicitação (o que ainda não foi para a OS), aberto no navegador: o PDF no leitor, a foto
+    na tela. Só um nome que está na pasta da solicitação (`solic_anexos.ler`)."""
+    nome = request.args.get("nome") or ""
+    dados = solic_anexos.ler(id_code, nome)
+    if dados is None:
+        abort(404)
+    tipo = mimetypes.guess_type(nome)[0] or "application/octet-stream"
+    ascii_ = nome.encode("ascii", "ignore").decode().replace('"', "") or "anexo"
+    return Response(dados, mimetype=tipo, headers={
+        "Content-Disposition": "inline; filename=\"%s\"; filename*=UTF-8''%s" % (ascii_, quote(nome, safe="")),
+        "Cache-Control": "private, no-store"})
+
+
+def _link_guardado(id_code, nome) -> str:
+    return "/os/api/solic/%s/anexo-guardado?nome=%s" % (id_code, quote(nome, safe=""))
 
 
 # ── o painel ────────────────────────────────────────────────────────────────────────────────
@@ -368,6 +429,9 @@ def fila():
             sel = ""
     agora = dt.datetime.now(dt.timezone.utc)
     fichas = [_ficha(s, idx, agora) for s in pend]
+    for f in fichas:                     # os anexos da Nova solicitação que vão para a OS ao aprovar (29/10/2026)
+        f["anexos_nexus"] = [dict(a, url=_link_guardado(f["id"], a["nome"]), tam=reg.tamanho_br(a["tamanho"]))
+                               for a in solic_anexos.listar(f["id"])]
     return render_template(
         "solic_fila.html", conta=_conta(), aba="solic", nav="fila", nav_pcm=sw.NAV_PCM,
         fichas=fichas, sel=sel, leitura=leitura,
@@ -458,6 +522,7 @@ def api_aprovar(id_code):
     if out.get("ok"):
         out["programada"] = prog.strftime("%d/%m/%Y %H:%M") if prog else ""
         out["tempo"] = sw.tempo_hhmm(dur or api.DURACAO_OS_AVULSA)
+        out = _levar_anexos(out, s.get("id_code") or id_code)
     if out.get("ok") or (res or {}).get("ok"):
         _esquecer_lista()              # nasceu OS (ou a tarefa): a solicitação saiu da fila para todo mundo
     return (jsonify(out), 200) if out.get("ok") else (jsonify({"erro": out["mensagem"]}), 400)
@@ -535,9 +600,30 @@ def api_historico():
 @bp.route("/api/solic/<id_code>/anexos")
 @exige_sessao
 def api_anexos(id_code):
-    """Os anexos da solicitação (a ficha do Histórico: Imagens × Documentos)."""
-    return jsonify({"anexos": [{"nome": a.get("nome") or "arquivo", "url": a.get("url") or "", "imagem": bool(a.get("is_image"))}
-                               for a in (api.get_solic_anexos(id_code) or [])]})
+    """Os anexos da solicitação (a ficha do Histórico: Imagens × Documentos): os do Fracttal e os guardados no Nexus que
+    ainda não foram para a OS (29/10/2026)."""
+    lista = [{"nome": a.get("nome") or "arquivo", "url": a.get("url") or "", "imagem": bool(a.get("is_image"))}
+             for a in (api.get_solic_anexos(id_code) or [])]
+    lista += [{"nome": a["nome"], "url": _link_guardado(id_code, a["nome"]), "guardado": True,
+               "imagem": reg.TIPOS_ANEXO.get(os.path.splitext(a["nome"])[1].lower(), ("", ""))[1] == "imagem"}
+              for a in solic_anexos.listar(id_code)]
+    return jsonify({"anexos": lista})
+
+
+def _levar_anexos(out: dict, id_code) -> dict:
+    """Os anexos guardados da solicitação sobem na tarefa da OS que acabou de nascer (Levi, 29/10/2026: "quando o PCM
+    gere uma OS pela fila de PCM com aquela solicitação o anexo vá junto!"), pelo caminho dos anexos da Engenharia
+    (`solic_eng_web.anexar`: nenhum erro escapa, a mensagem diz o que subiu e o que não). O que subiu sai do servidor; o
+    que falhou fica guardado."""
+    guardados = solic_anexos.listar(id_code)
+    if not guardados or not out.get("id_work_order"):
+        return out
+    anexos_ok = [dict(g, bytes=solic_anexos.ler(id_code, g["nome"])) for g in guardados]
+    alvos = [{"folio": out.get("folio"), "id_work_order": out["id_work_order"]}]
+    with api._ExecutorComContexto(max_workers=reg.ENVIOS_PARALELOS) as ex:
+        resultados = reg.anexar(alvos, anexos_ok, api.attach_imagem_os, api._ids_tarefas_da_os, mapa=ex.map)
+    solic_anexos.apagar(id_code, [r["nome"] for r in resultados if r["ok"] and not r["falhas"]])
+    return reg.com_anexos(out, resultados, len(anexos_ok))
 
 
 @bp.route("/api/solic/<id_code>/cancelar", methods=["POST"])

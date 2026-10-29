@@ -365,7 +365,10 @@ MARCADOR = "[PCM]"
 # A "OS pai" (24/10/2026, Levi: "quando preenchido e o PCM for criar a OS na fila do PCM já vai vincular aquela OS como
 # OS pai!") vai como "16784 (id 123)": o nº para quem lê no Fracttal web, o id para a Fila mandar no id_parent sem buscar
 # de novo. O app de mesa que lê um bloco com ela ignora a linha (rótulo que ele não conhece).
-_CAMPOS = [("Tema", "tema"), ("Técnico sugerido", "tecnico"), ("Data sugerida", "data"), ("OS pai", "os_pai")]
+# "Anexos no Nexus" (29/10/2026): os arquivos da Nova solicitação ficam no servidor do Nexus até a aprovação na Fila
+# (`os_web/solic_anexos.py`); a linha diz a quem lê a solicitação no Fracttal web que eles existem e onde estão.
+_CAMPOS = [("Tema", "tema"), ("Técnico sugerido", "tecnico"), ("Data sugerida", "data"), ("OS pai", "os_pai"),
+           ("Anexos no Nexus", "anexos")]
 _ALIAS = {"data pretendida": "data"}
 
 # Rotulo legivel de cada tipo de campo da subtarefa. O PCM precisa saber se aquela linha vai

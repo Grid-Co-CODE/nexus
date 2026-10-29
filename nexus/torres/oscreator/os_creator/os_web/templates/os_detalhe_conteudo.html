@@ -8,7 +8,8 @@
 
    As AÇÕES (trocar responsável, etiquetas, Editar notas, Concluir, Cancelar, Fluxo, anexos) vivem em static/os_acoes.js, por
    delegação de eventos — o card chega por innerHTML. Cada QDialog do app virou um <template data-dlg> aqui embaixo, com o
-   MESMO texto, que o JS clona por cima do card. Clonar e Abrir chamado são telas de outros pacotes: links pelo número. #}
+   MESMO texto, que o JS clona por cima do card. O "Clonar esta OS" e o "Abrir chamado" saíram do rodapé em 29/10/2026
+   (Levi: "tire o botão abrir chamado ele não servirá mais"; "Tire o botão clonar esta OS"); a Clonagem segue no menu. #}
 {% set n_sub = d.subtarefas|length %}
 {% set n_feitas = d.subtarefas|selectattr('feito')|list|length %}
 {% set pct = ((100 * n_feitas / n_sub)|round|int) if n_sub else 0 %}
@@ -33,19 +34,25 @@
       <summary><span class="det-chk">{% if s.feito %}✓{% endif %}</span><span class="det-sub-t">{{ s.descricao }}</span>{% if s.tipo %}<span class="det-kind">{{ s.tipo }}</span>{% endif %}<span class="det-chev">›</span></summary>
       <div class="det-ans{% if not s.resposta %} vazia{% endif %}">{{ s.resposta or 'Sem resposta registrada.' }}</div>
     </details>{% endmacro %}
-<section class="det" data-wid="{{ wid }}" data-folio="{{ d.folio }}" data-status="{{ status }}">
+<section class="det" data-wid="{{ wid }}" data-folio="{{ d.folio }}" data-status="{{ status }}" data-pdf-caixa>
   {% if parcial %}<link rel="stylesheet" href="/os/static/os_acoes.css">{% endif %}
   <header class="det-top">
     <span class="det-ico-round">{{ icone('copy', '#A6E22E', 20) }}</span>
-    <div class="det-num"><div class="det-os">OS {{ d.folio }}</div><div class="det-sub">Ordem de serviço</div></div>
+    {# "Ordem de serviço" sem borda (29/10/2026): a classe era a `det-sub`, a mesma da caixa de cada subtarefa, e o texto
+       ganhava a borda e o fundo dela #}
+    <div class="det-num"><div class="det-os">OS {{ d.folio }}</div><div class="det-num-sub">Ordem de serviço</div></div>
     {% if d.tipo %}<span class="det-badge">{{ d.tipo }}</span>{% endif %}
     {% if status %}<span class="os-status" {% if status_cor %}style="color:{{ status_cor }};background:{{ status_cor }}29;border-color:{{ status_cor }}6b"{% endif %}>{{ status }}</span>{% endif %}
     <span class="os-cresce"></span>
+    {# o PDF da OS (Levi, 29/10/2026: "Ao lado esquerdo do card de solicitação tem que ter um símbolo de baixar para pessoa
+       baixar um PDF da OS"): o mesmo PDF da seta da cadeia do chamado (os_acoes.js, [data-os-pdf]) #}
+    <button type="button" class="det-pdf" data-os-pdf="{{ d.folio }}" data-wid="{{ wid }}" title="Baixar o PDF da OS {{ d.folio }}" aria-label="Baixar o PDF da OS {{ d.folio }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>PDF</span></button>
     <span class="det-pill">{{ icone('doc', '#8A93A8', 16) }}<span>Solicitação</span><i>{{ d.solicitacao or 'criada sem solicitação' }}</i></span>
   </header>
 
   <div class="det-corpo">
     <div class="os-resultado acoes-msg" data-msg hidden></div>
+    <div class="os-resultado" data-pdf-msg hidden></div>
     <div class="det-card det-banner">
       <span class="det-ico-sq v">{{ icone('clipboard', '#A6E22E', 22) }}</span>
       {% if por_ativo %}<span class="det-banner-t">{{ ativos_os|length }} ativos: {{ ativos_os|join(' · ') }}</span>
@@ -131,11 +138,7 @@
 
   <footer class="det-foot">
     <span class="det-ajuda">{{ n_sub }} subtarefa(s){% if grupos %} em {{ n_tarefas }} tarefas{% endif %}</span><span class="os-cresce"></span>
-    <a class="det-b verde" href="/os/clonar?folio={{ d.folio }}">{{ icone('copy', '#0B1020', 16) }}Clonar esta OS</a>
     <button type="button" class="det-b verde" data-acao="fluxo" title="Mostra esta OS encadeada com as outras — pais, filhas e todo o histórico do ativo">{{ icone('branch', '#0B1020', 16) }}Fluxo</button>
-    {# o chamado nasce de uma OS de TESTE (29/07): o botão abre a Inspeção de chamados com o ativo, a data do incidente e o
-       responsável DESTA OS, que vira a OS pai da inspeção (Levi, 27/09) #}
-    <a class="det-b ambar" href="/os/chamados/inspecao?pai={{ d.folio }}" title="Abre a Inspeção de chamados com o ativo, a data do incidente e o responsável desta OS">Abrir chamado</a>
     <button type="button" class="det-b ok" data-acao="concluir" title="Fecha a OS no Fracttal (irreversível — precisa de permissão na sua conta)">Concluir OS</button>
     <button type="button" class="det-b perigo" data-acao="cancelar" title="Cancela a OS no Fracttal (precisa de permissão na sua conta)">Cancelar OS</button>
     {% if parcial %}<button type="button" class="det-b ghost" data-fechar>Fechar</button>{% else %}<a class="det-b ghost" href="/os/historico" data-aba-fechar>Fechar</a>{% endif %}

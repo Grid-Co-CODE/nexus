@@ -73,8 +73,8 @@ nesta pasta.
 
   O "Setores" virou um item por setor e entrou "Ativos Fracttal" (Levi, 04/10/2026). Cada setor abre o mesmo
   endereço do card dele na tela inicial do OS Creator. Com `?abrir=/os/...`, a moldura abre nesse endereço (só
-  `/os/...`; o resto cai no destino da tela) e a casca do OS Creator o põe numa aba: é por onde o card da OS aberto em
-  outra torre leva ao "Clonar esta OS" e ao "Abrir chamado" (seção "O card da OS em qualquer torre").
+  `/os/...`; o resto cai no destino da tela) e a casca do OS Creator o põe numa aba: era por onde o card da OS aberto
+  em outra torre levava ao "Clonar esta OS" e ao "Abrir chamado", que saíram do card em 29/10/2026.
 - **Menu lateral → aba nova** (Levi, 04/10: "os botões laterais devem contribuir em adicionar novas abas também na
   tela acima"). Com a casca do OS Creator de pé, o clique no menu não recarrega a página: manda à casca
   `{nexusOs: 1, url, rotulo}` e ela abre a tela numa aba nova (ou reativa a que já existe). A porta é posta no
@@ -501,8 +501,9 @@ aparece quando clicamos em uma OS no histórico do OS Creator Web. Como fazem pa
   é o da assinatura da PT, só do Campo). Até 18/10/2026 o botão ia ao `/entrar` do Nexus, que com a conta Microsoft
   ligada é a porta dela: o Levi clicava em "Entrar com o Fracttal" e caía na Microsoft. Se a sessão do Fracttal vencer
   no meio, a ponte manda o pedido do card para o login, e a moldura diz que venceu.
-- **Links do card** para outras telas do OS Creator ("Clonar esta OS", "Abrir chamado") passam por `/os/_nexus/ir`,
-  que abre a torre OS Creator do Nexus com a tela numa aba (`tela_do_endereco`). Com Ctrl, numa aba nova.
+- **Links do card** para outras telas do OS Creator passam por `/os/_nexus/ir`, que abre a torre OS Creator do Nexus
+  com a tela numa aba (`tela_do_endereco`). Com Ctrl, numa aba nova. O "Clonar esta OS" e o "Abrir chamado" saíram do
+  rodapé em 29/10/2026 (seção "O card sem Abrir chamado e Clonar, com o PDF").
 - **A tela do chamado de Garantias por cima** (28/10/2026, Levi, no Painel do responsável: "Ao clicar no chamado deve
   aparecer a tela que aparece quando clicamos na OS de chamados na parte de garantias. Não deve direcionar, apenas
   sobrepor a tela como uma meio que janela dando um blur de fundo"): `/os/_nexus/chamado/<nº>?de=<a tela>`
@@ -522,7 +523,6 @@ aparece quando clicamos em uma OS no histórico do OS Creator Web. Como fazem pa
   - o diálogo de trocar o responsável tem a busca;
   - o Esc fecha o diálogo e depois o card;
   - concluir (de mentira) relê o quadro;
-  - "Clonar esta OS" abre `/t/os/clonagem` com a aba;
   - sem login, aparece o aviso.
 
   Tudo a 1280 e a 375 px, sem rolagem lateral e sem erro de JavaScript. Falta o olho do Levi com OS de verdade.
@@ -1115,6 +1115,40 @@ criar (`api.TIPO_TAREFA_DO_PLANO` e `api.com_tipo_da_tarefa`, casados pelo trech
 Corretiva" (`/os/api/performance/plano`). O plano do Fracttal não muda (é de outra área e vale para quem cria por fora);
 os outros planos seguem com o tipo deles, e a Clonagem de planos do PCM não passa por aqui. Prova:
 `tests/test_oscreator_perf_tipo_corretiva_29_10.py`. Falta conferir numa OS real.
+
+## O card sem Abrir chamado e Clonar, com o PDF; a Zeladoria na Fila; os anexos da Nova solicitação (29/10/2026)
+
+Levi, no card da OS: "A palavra 'Ordem de serviço' abaixo do número da OS não cabe nas bordas ... pode tirar essa borda";
+"tire o botão abrir chamado ele não servirá mais"; "Ao lado esquerdo do card de solicitação tem que ter um símbolo de
+baixar para pessoa baixar um PDF da OS"; "Tire o botão clonar esta OS". Na Fila: "Não consegui aprovar a solicitação 4126.
+Falha ao criar as tarefas: ?: Tipo de tarefa desconhecido: Zeladoria". Na Solicitação: "quero que seja possível
+adicionar anexos como PDFS e fotos. E quando o PCM gere uma OS pela fila de PCM com aquela solicitação o anexo vá junto!"
+
+- **O card** (`os_detalhe_conteudo.html`): o "Ordem de serviço" usava a classe `det-sub`, a mesma da caixa de cada
+  subtarefa, e herdava a borda e o fundo dela; agora é `det-num-sub`, só o texto. O botão "PDF" (`.det-pdf`, a seta de
+  baixar) fica à esquerda da pílula da Solicitação e usa o mesmo PDF da cadeia do chamado (`[data-os-pdf]` no
+  `os_acoes.js`, `POST /os/api/os/pdf`); o aviso vai para o `[data-pdf-msg]` do card. Saíram do rodapé o "Clonar esta OS"
+  (a Clonagem segue no menu) e o "Abrir chamado".
+- **Os anexos do card** (a pergunta do Levi): `.mp4` e PDF entram em "documentos", com "Abrir" (o vídeo toca e o PDF abre
+  no navegador) e "Baixar" (a rota renova o link do Fracttal); o "Baixar todos" os põe no .zip.
+- **A Zeladoria:** o `create_os_rpc` resolvia o tipo pelo NOME só na lista fixa `TASK_TYPE_MAIN` (Corretiva, Preventiva,
+  Inspeção…), e a Fila do PCM oferece os tipos ao vivo do Fracttal. Agora, fora da lista fixa, procura no catálogo vivo
+  (`api.tipo_main_ao_vivo`, relido uma vez se não achar); só recusa o nome que não existe em lugar nenhum. Vale para a
+  Fila e para qualquer caminho que mande o tipo pelo nome.
+- **Os anexos da Nova solicitação** (o Levi escolheu "No Nexus até aprovar"): nenhuma ferramenta nossa sabe gravar anexo
+  numa solicitação do Fracttal (só ler). Até 5 arquivos (PDF, imagem, planilha, documento; 10 MB cada, 20 MB no total),
+  conferidos como na Solicitação de Engenharia (`solic_eng_web.anexos`, com a frase "Nenhuma solicitação foi criada.");
+  vão em multipart (`payload` + `anexos`) e ficam no servidor, na pasta de dados do OS Creator, com o nº de cada
+  solicitação criada (`os_web/solic_anexos.py`). O bloco [PCM] da observação ganha "Anexos no Nexus: …". A Fila mostra
+  "Anexos que vão para a OS" (com link) e a confirmação diz quantos vão; ao aprovar, cada um sobe na tarefa da OS pelo
+  `solic_eng_web.anexar` (o caminho dos anexos da Engenharia) e o que subiu sai do servidor; o que falhou fica guardado e
+  a mensagem diz. O Histórico de solicitações lista os guardados (`/os/api/solic/<nº>/anexo-guardado`). Na solicitação
+  vista no Fracttal web o arquivo não aparece; quem aprova pelo app de mesa ou pelo Fracttal não leva o anexo.
+- **Prova:** `tests/test_oscreator_card_e_anexos_29_10.py`. No Chrome sem janela, com o fixture: o card a 1280 px e a
+  375 px no claro (o "Ordem de serviço" sem borda, o PDF à esquerda da Solicitação, o rodapé com Fluxo, Concluir, Cancelar
+  e Fechar, 365 de 375 sem rolagem); a Nova solicitação aceitando o PDF e a foto, recusando o .exe com o aviso em âmbar e
+  tirando um anexo; a Fila com os dois anexos e a confirmação "levando 2 anexo(s)". Falta a prova ao vivo (uma
+  solicitação com anexo em TESTE - PA aprovada na Fila, o anexo no card da OS).
 
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 

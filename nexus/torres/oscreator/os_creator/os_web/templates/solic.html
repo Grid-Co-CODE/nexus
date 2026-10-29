@@ -68,6 +68,15 @@
     <div class="os-ajuda" id="hint_titulo"></div>
     <label class="os-cell" style="margin-top:8px"><span class="os-lbl">Relato (observação)</span>
       <textarea id="ed_obs" rows="4" placeholder="o que aconteceu, com o detalhe que o PCM precisa para programar"></textarea></label>
+    {# 29/10/2026, Levi: "quero que seja possível adicionar anexos como PDFS e fotos. E quando o PCM gere uma OS pela fila de
+       PCM com aquela solicitação o anexo vá junto!" — guardados no Nexus com o nº da solicitação (os_web/solic_anexos.py) #}
+    <div class="os-cell" style="margin-top:8px" id="anexos" data-max="{{ anexo_max }}" data-mb="{{ anexo_mb }}" data-total-mb="{{ anexo_total_mb }}">
+      <span class="os-lbl">Anexos <small>(opcional — vão para a OS quando o PCM aprovar na Fila)</small></span>
+      <div><button type="button" class="os-btn secondary" id="b_anexar">Anexar arquivo…</button>
+        <input type="file" id="anexo_in" multiple accept="{{ anexo_aceitar }}" hidden></div>
+      <div id="anexo_lista" class="os-subs"></div>
+      <div class="os-ajuda" id="hint_anexo">Até {{ anexo_max }} arquivos, {{ anexo_mb }} MB cada e {{ anexo_total_mb }} MB no total. Aceitos: {{ anexo_tipos }}.</div>
+    </div>
   </div>
 
   <div class="os-cardf">
@@ -388,6 +397,43 @@
   });
   edPai.addEventListener("blur", function () { setTimeout(function () { paiLista.hidden = true; }, 150); });
 
+  // ── os anexos (29/10/2026): PDF, fotos, planilha e documento, com os limites do servidor; vão com o criar e ficam
+  //    guardados no Nexus até o PCM aprovar na Fila, quando sobem na OS ──
+  var caixaAnexos = document.getElementById("anexos"), anexoIn = document.getElementById("anexo_in"),
+      listaAnexo = document.getElementById("anexo_lista"), hintAnexo = document.getElementById("hint_anexo");
+  var arquivos = [], textoAnexo = hintAnexo.textContent, MB = 1024 * 1024;
+  var ANX_MAX = Number(caixaAnexos.dataset.max) || 5, ANX_MB = Number(caixaAnexos.dataset.mb) || 10,
+      ANX_TOTAL = Number(caixaAnexos.dataset.totalMb) || 20;
+  var ACEITOS = String(anexoIn.getAttribute("accept") || "").split(",").filter(Boolean);
+  function tam(n) { return n < MB ? Math.max(1, Math.ceil(n / 1024)) + " KB" : (Math.ceil(n * 10 / MB) / 10).toString().replace(".", ",") + " MB"; }
+  function pintarAnexos(aviso) {
+    listaAnexo.innerHTML = arquivos.map(function (f, i) {
+      return '<div class="os-sub"><span>' + esc(f.name) + '</span><span class="os-ajuda">' + tam(f.size) + '</span><span></span>'
+        + '<button type="button" class="os-btn secondary s-x" data-tira="' + i + '" title="Tirar este anexo">&times;</button></div>';
+    }).join("");
+    hintAnexo.textContent = aviso || textoAnexo;
+    hintAnexo.classList.toggle("osb-aviso", !!aviso);          // o âmbar da busca comum, pintado nos dois temas
+  }
+  document.getElementById("b_anexar").addEventListener("click", function () { anexoIn.click(); });
+  anexoIn.addEventListener("change", function () {
+    var fora = [];
+    Array.prototype.forEach.call(anexoIn.files || [], function (f) {
+      var ext = (f.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+      var total = arquivos.reduce(function (s, x) { return s + x.size; }, 0) + f.size;
+      if (ACEITOS.indexOf(ext) < 0) fora.push("“" + f.name + "” (tipo não aceito)");
+      else if (f.size > ANX_MB * MB) fora.push("“" + f.name + "” (" + tam(f.size) + "; o limite é " + ANX_MB + " MB)");
+      else if (arquivos.length >= ANX_MAX) fora.push("“" + f.name + "” (o limite é " + ANX_MAX + " arquivos)");
+      else if (total > ANX_TOTAL * MB) fora.push("“" + f.name + "” (passaria de " + ANX_TOTAL + " MB no total)");
+      else arquivos.push(f);
+    });
+    anexoIn.value = "";
+    pintarAnexos(fora.length ? "Não entrou: " + fora.join("; ") + "." : "");
+  });
+  listaAnexo.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-tira]"); if (!b) return;
+    arquivos.splice(Number(b.dataset.tira), 1); pintarAnexos("");
+  });
+
   // ── criar ──
   var btn = document.getElementById("b_criar"), hint = document.getElementById("hint"),
       res = document.getElementById("resultado");
@@ -416,15 +462,21 @@
     }
     if (marcados.size > 1 && !confirm("Vão ser criadas " + marcados.size + " solicitações, uma por ativo, com os mesmos campos. Confirma?")) return;
     btn.disabled = true; hint.textContent = "criando…"; res.hidden = true;
-    OsCarga.buscar("/os/api/solic/criar", {method: "POST", credentials: "same-origin",
-      headers: {"Content-Type": "application/json"}, body: JSON.stringify(corpo)}, "Criando as solicitações no Fracttal…")
+    // sem anexo, o JSON de sempre; com anexo, multipart: `payload` com o mesmo JSON e cada arquivo em `anexos`
+    var envio = {method: "POST", credentials: "same-origin"};
+    if (arquivos.length) {
+      var fd = new FormData(); fd.append("payload", JSON.stringify(corpo));
+      arquivos.forEach(function (f) { fd.append("anexos", f, f.name); });
+      envio.body = fd;
+    } else { envio.headers = {"Content-Type": "application/json"}; envio.body = JSON.stringify(corpo); }
+    OsCarga.buscar("/os/api/solic/criar", envio, "Criando as solicitações no Fracttal…")
       .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, j: j}; }); })
       .then(function (x) {
         btn.disabled = false; hint.textContent = "";
         res.hidden = false;
         res.className = "os-resultado" + (x.ok && !x.j.falhas ? "" : " ruim");
         res.textContent = x.j.erro || x.j.mensagem || "Sem resposta do servidor.";
-        if (x.ok && x.j.ok) { marcados.clear(); pintar(); document.getElementById("ed_desc").value = ""; document.getElementById("ed_obs").value = ""; edPai.value = ""; pai = null; filtrarTemas(); sugerirTitulo(); }
+        if (x.ok && x.j.ok) { marcados.clear(); pintar(); document.getElementById("ed_desc").value = ""; document.getElementById("ed_obs").value = ""; edPai.value = ""; pai = null; arquivos = []; pintarAnexos(""); filtrarTemas(); sugerirTitulo(); }
       })
       .catch(function (e) { btn.disabled = false; hint.textContent = ""; res.hidden = false; res.className = "os-resultado ruim"; res.textContent = "Falhou: " + e; });
   });

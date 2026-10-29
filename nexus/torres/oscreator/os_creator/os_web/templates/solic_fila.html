@@ -41,6 +41,8 @@
             <div class="spc-obs-cab"><span class="spc-rot">Observação</span><button type="button" class="spc-ver" id="fl_ver" hidden>ver inteira</button></div>
             <textarea class="spc-obs" id="fl_obs" placeholder="sem observação — clique para escrever" readonly aria-label="Observação da solicitação"></textarea>
             <p class="spc-dica">Rola aqui dentro e não empurra o resto. Clique no texto para editar.</p>
+            {# os anexos da Nova solicitação guardados no Nexus (29/10/2026): sobem na OS ao aprovar #}
+            <div id="fl_anexos" hidden><span class="spc-rot">Anexos que vão para a OS</span><p class="spc-dica" id="fl_anexos_lista"></p></div>
           </section>
           <section class="spc-box spc-box--decisao">
             <h2 class="spc-rot spc-rot--verde">A decisão</h2>
