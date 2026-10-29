@@ -150,6 +150,18 @@ def cartao(app) -> dict:  # noqa: ARG001 — o app fica na assinatura: é quem c
             "no_ar_desde_txt": _hora(NO_AR_DESDE, agora)}
 
 
+def contagem(itens) -> list[tuple[str, str, int]]:
+    """Quantos de cada tipo, na ordem da aba e só os que têm item: [("feat", "Novidade", 3), ...]. Vai no cabeçalho do
+    dia, que fica recolhido antes de hoje (29/10/2026, Levi: "contando a quantidade de correção, novidade e
+    desempenho")."""
+    out = []
+    for t in TIPOS_NA_ABA:
+        n = sum(1 for x in itens if x.get("tipo_id") == t)
+        if n:
+            out.append((t, TIPOS[t], n))
+    return out
+
+
 def dias(itens) -> list[tuple[str, list]]:
     """Os commits por dia (o mais novo primeiro), com o rótulo do dia: "Hoje", "Ontem" ou "dd/mm"."""
     hoje = datetime.now(_BRT).date()

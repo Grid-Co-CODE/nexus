@@ -18,9 +18,19 @@
 <p class="aviso">Nenhuma novidade, correção ou melhoria de desempenho nos últimos {{ janela }} dias.</p>
 {% else %}
 <div class="atualizacoes">
+  {# os dias antes de hoje vêm recolhidos, com quantos de cada tipo no cabeçalho (29/10/2026, Levi: "gostaria que os dias
+     que fossem anteriores a hoje ficassem recolhidos e contando a quantidade de correção, novidade e desempenho"), e o total na ponta; o
+     "no ar" sobe ao cabeçalho para o clique no cartão da versão achar o dia mesmo recolhido #}
   {% for rotulo, itens in dias %}
-  <section class="atu-dia" aria-label="{{ rotulo }}">
-    <h2 class="ui-kicker">{{ rotulo }}</h2>
+  <details class="atu-dia"{% if rotulo == 'Hoje' %} open{% endif %}>
+    <summary class="atu-dia-cab">
+      <h2 class="ui-kicker">{{ rotulo }}</h2>
+      {% for tipo_id, tipo, n in conta(itens) %}<span class="gc-status gc-status--{{ {'feat': 'ok', 'fix': 'alerta', 'perf': 'info'}.get(tipo_id, 'neutro') }}">{{ tipo }} {{ n }}</span>{% endfor %}
+      {% if no_ar and itens|selectattr('sha', 'equalto', no_ar)|list %}<span class="gc-status gc-status--ok">no ar</span>{% endif %}
+      {# o total do dia na ponta direita, sem fundo (29/10/2026, Levi: "no extremo direito bota o total sem fundo colorido
+         bem sólido mesmo") #}
+      <span class="atu-dia-total" title="{{ itens|length }} {{ 'atualização' if itens|length == 1 else 'atualizações' }} no dia">{{ itens|length }}</span>
+    </summary>
     <ol class="atu-lista">
       {% for x in itens %}
       <li class="atu-item{% if no_ar and x.sha == no_ar %} atu-item--no-ar{% endif %}">
@@ -46,7 +56,7 @@
       </li>
       {% endfor %}
     </ol>
-  </section>
+  </details>
   {% endfor %}
   <p class="mudo atu-rodape">{{ total }} {{ 'atualização' if total == 1 else 'atualizações' }} nos últimos {{ janela }} dias.</p>
 </div>

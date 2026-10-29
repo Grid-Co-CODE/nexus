@@ -397,7 +397,11 @@ atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva pa
   `git log` lê 61 dias (no máximo 3.000 commits), uma vez por processo (o deploy reinicia e a lista nova vem junto); o
   corte dos 60 dias e dos tipos é na hora do pedido (`versao.da_aba`), porque o processo pode ficar dias no ar. Em
   19/10/2026: 427 commits lidos, 304 na aba (207 novidades, 97 correções). Por dia ("Hoje", "Ontem", dd/mm/aaaa), do
-  mais novo; cada um: o tipo, a área (o que vem entre parênteses), o commit, a manchete (o texto antes do " - ") e o
+  mais novo; desde 29/10/2026 só Hoje vem aberto e os dias antes dele recolhidos (Levi: "gostaria que os dias que
+  fossem anteriores a hoje ficassem recolhidos e contando a quantidade de correção, novidade e desempenho"): o
+  cabeçalho do dia diz quantos de cada tipo (`versao.contagem`, só os que têm item), o "no ar", se o dia o tem,
+  e o total do dia na ponta direita, sem fundo ("bota o total sem fundo colorido bem sólido mesmo")
+  (o clique no cartão da versão acha o dia mesmo recolhido); abre com um clique, sem JavaScript (`<details>`). Cada um: o tipo, a área (o que vem entre parênteses), o commit, a manchete (o texto antes do " - ") e o
   resto, e o corpo em tópicos num "O que mudou", sem a prova nem a coautoria. Sem horários. O "no ar" vai no commit EM
   EXECUÇÃO, que pode nem estar na lista (uma documentação, um merge): aí nenhum item leva. Nenhuma novidade nem correção
   no período: a aba diz isso (diferente de "sem git").

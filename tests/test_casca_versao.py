@@ -185,3 +185,48 @@ def test_da_aba_corta_no_dia_do_pedido():
              {"tipo_id": "fix", "em": agora - timedelta(days=60, hours=1)},
              {"tipo_id": "docs", "em": agora}, {"tipo_id": "feat", "em": None}]
     assert versao.da_aba(itens, agora) == [itens[0]]
+
+
+def test_contagem_por_tipo_na_ordem_da_aba():
+    itens = [{"tipo_id": "fix"}, {"tipo_id": "perf"}, {"tipo_id": "fix"}, {"tipo_id": "feat"}]
+    assert versao.contagem(itens) == [("feat", "Novidade", 1), ("fix", "Correção", 2), ("perf", "Desempenho", 1)]
+    assert versao.contagem([{"tipo_id": "fix"}]) == [("fix", "Correção", 1)]       # tipo sem item não aparece
+
+
+def test_os_dias_antes_de_hoje_ficam_recolhidos_com_a_contagem(app, logado, monkeypatch):
+    """29/10/2026, Levi: "gostaria que os dias que fossem anteriores a hoje ficassem recolhidos e contando a quantidade
+    de correção, novidade e desempenho". Hoje aberto; cada dia diz no cabeçalho quantos de cada tipo; o dia que tem o
+    commit no ar diz isso também, recolhido ou não."""
+    no_ar = "9999111222333444555666777888999000ffff"
+    log = ("1111111222333444555666777888999000aaaa\x1f2026-10-29T09:00:00-03:00\x1ffeat(pcm): o quadro de hoje\x1f\x1e"
+           "2222111222333444555666777888999000bbbb\x1f2026-10-28T18:00:00-03:00\x1ffix(campo): a foto da ronda\x1f\x1e"
+           "3333111222333444555666777888999000cccc\x1f2026-10-28T17:00:00-03:00\x1ffix(base): o filtro\x1f\x1e"
+           "4444111222333444555666777888999000dddd\x1f2026-10-28T16:00:00-03:00\x1fperf(casca): mais rapido\x1f\x1e"
+           "5555111222333444555666777888999000eeee\x1f2026-10-28T15:00:00-03:00\x1fdocs(base): fora da aba\x1f\x1e"
+           f"{no_ar}\x1f2026-10-20T10:00:00-03:00\x1ffeat(hseq): os extintores\x1f\x1e")
+    monkeypatch.setattr(versao, "_git", lambda *a, **k: log if a[1] != "-1" else
+                        f"{no_ar}\x1f2026-10-20T10:00:00-03:00\x1ffeat(hseq): os extintores\n")
+    monkeypatch.setattr(casca, "_commit", lambda: no_ar[:7])
+
+    class Dia(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 29, 15, 0, tzinfo=tz)
+    monkeypatch.setattr(versao, "datetime", Dia)
+    versao.local.cache_clear()
+    versao.historico.cache_clear()
+    try:
+        html = logado.get("/?aba=atualizacoes").get_data(as_text=True)
+    finally:
+        versao.local.cache_clear()
+        versao.historico.cache_clear()
+    hoje, ontem, dia20 = html.split('<details class="atu-dia"')[1:]
+    assert hoje.split(">", 1)[0].strip() == "open" and ">Hoje</h2>" in hoje
+    assert "open" not in ontem.split(">", 1)[0] and ">Ontem</h2>" in ontem
+    cab = ontem.split("</summary>", 1)[0]
+    assert ">Correção 2<" in cab and ">Desempenho 1<" in cab and "Novidade" not in cab
+    assert 'class="atu-dia-total" title="3 atualizações no dia">3<' in cab       # o total na ponta (29/10/2026)
+    assert ">Novidade 1<" in hoje.split("</summary>", 1)[0] and 'title="1 atualização no dia">1<' in hoje
+    cab20 = dia20.split("</summary>", 1)[0]
+    assert "open" not in dia20.split(">", 1)[0] and ">20/10/2026</h2>" in cab20 and "no ar</span>" in cab20
+    assert "a foto da ronda" in ontem and "fora da aba" not in html     # o item segue lá dentro, só recolhido
