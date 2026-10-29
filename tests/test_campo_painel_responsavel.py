@@ -163,7 +163,9 @@ def test_a_tela_do_painel_do_responsavel(tela, logado):
     # 29/10/2026: as PT no número do cabeçalho, que abre a lista na janela ("um KPI que quando o supervisor clicasse
     # ele veria quais são as PTs"); a Performance com duas colunas de largura
     assert 'data-pn-pts' in html and 'id="pn-pts-lista"' in html and 'id="pn-pt-t"' not in html
-    assert re.search(r'data-pn-pts[^>]*>\s*<b>\d+</b><span>PTs? esperando o De acordo', html)
+    # o botão com o ícone, o rótulo, o número e a seta (29/10/2026: "que botão escroto é esse? melhore o design")
+    assert re.search(r'data-pn-pts.*?class="pn-kpi-ico".*?PTs pendentes</small><span><b>\d+</b> esperando o De acordo'
+                     r'.*?pn-kpi-seta', html, re.S)
     assert 'class="pn-q pn-q--largo" aria-labelledby="pn-perf-t"' in html and "PR × previsto" in html
     # sem a barra das rondas e sem o aviso do ranking; os números diretos ("só a quantidade de chamados em aberto",
     # "a quantidade de equipes", "6 extintores vencidos e 2 a vencer")

@@ -1363,15 +1363,22 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
 .pn-c small{font:500 11.5px/15px var(--font-sans);color:var(--mudo)}
 /* as PT pendentes no cabeçalho (29/10/2026: "PTs pendentes pode ficar como um KPI que quando o supervisor clicasse ele
    veria quais são as PTs"): o número com a cor de antes, e o clique abre a lista na janela */
-.pn-kpi{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;margin-left:auto;padding:8px 14px;
-  background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);cursor:pointer}
-.pn-kpi:hover{background:var(--superficie-2)}
+/* (29/10/2026, Levi, ao ver o 1º: "que botão escroto é esse? melhore o design"): o ícone num quadrado com a cor da
+   situação, o rótulo, o número em destaque e a seta que diz que abre */
+.pn-kpi{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:12px;margin-left:auto;
+  padding:8px 12px 8px 8px;background:var(--superficie);border:1px solid var(--linha);border-radius:12px;cursor:pointer}
+.pn-kpi:hover{background:var(--superficie-2);border-color:var(--linha-forte)}
 .pn-kpi:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
-.pn-kpi b{font:600 26px/30px var(--font-sans);font-variant-numeric:tabular-nums}
-.pn-kpi span{display:grid;font-size:13px;line-height:1.3;color:var(--tinta-2)}
-.pn-kpi small{font-size:12px;font-weight:600;color:var(--verde-texto)}
-.pn-kpi--critico{border-color:var(--critico-cheio)} .pn-kpi--critico b{color:var(--critico)}
-.pn-kpi--alerta b{color:var(--alerta)} .pn-kpi--ok b{color:var(--ok)}
+.pn-kpi-ico{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:10px;font-size:20px}
+.pn-kpi-txt{display:grid;gap:2px}
+.pn-kpi-txt small{font:700 10.5px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.pn-kpi-txt > span{font-size:13px;line-height:22px;color:var(--tinta-2);white-space:nowrap}
+.pn-kpi-txt b{margin-right:2px;font:700 22px/22px var(--font-sans);font-variant-numeric:tabular-nums}
+.pn-kpi-seta{margin-left:6px;font-size:16px;color:var(--mudo)}
+.pn-kpi:hover .pn-kpi-seta{color:var(--tinta)}
+.pn-kpi--critico .pn-kpi-ico{background:var(--critico-suave);color:var(--critico)} .pn-kpi--critico b{color:var(--critico)}
+.pn-kpi--alerta .pn-kpi-ico{background:var(--alerta-suave);color:var(--alerta)} .pn-kpi--alerta b{color:var(--alerta)}
+.pn-kpi--ok .pn-kpi-ico{background:var(--ok-suave);color:var(--ok)} .pn-kpi--ok b{color:var(--ok)}
 .pn-kpi + .cn-frescor{margin-left:0}
 /* a lista das PT na janela: inteira, sem o limite das 6 linhas do quadro */
 .pn-lista--jan{max-height:none;overflow:visible;margin:0;padding:0}
