@@ -194,7 +194,11 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   Linux, só leitura, quando a página abre): na "Carga da máquina", o processador da máquina inteira e o tempo esperando o
   disco na mesma janela de 1 s; no cartão "Memória da máquina", a memória livre, o swap em uso e se está trocando agora
   (MB/s), o quanto o Nexus ocupa (e dele no swap) e, com a PSI do kernel, o tempo com algo parado esperando memória ou
-  disco. O caso: Raio-X das 10:08 de 20/10, `GET /os/` há 18 s numa cópia de 17 ms com o Nexus a 13% e carga 2,5 a 3,9:
+  disco. **E o teto do Nexus** (`raio_x._teto_nexus`, 29/10/2026), no mesmo cartão: o `MemoryHigh`/`MemoryMax` e o swap
+  permitido pelo grupo do próprio processo (cgroup v2 do systemd ou do contêiner, ou v1), quantas vezes o Linux o
+  apertou (`memory.events`) e onde está posto; "nenhum" quando não há. O caso: em cinco leituras de dois dias o Nexus
+  ficou sempre com ~700 MB na memória e o resto no swap, com 5,7 a 7 GB livres na máquina, e o Levi não tem acesso ao
+  servidor para ler o serviço. Prova: `tests/test_raio_x_teto_memoria_29_10.py`. O caso de antes: Raio-X das 10:08 de 20/10, `GET /os/` há 18 s numa cópia de 17 ms com o Nexus a 13% e carga 2,5 a 3,9:
   a carga do Linux soma quem espera o disco, e a página não dizia qual era o gargalo. Leitura: "esperando o disco" alto
   ou swap trocando = a máquina (disco, memória), não o código; Nexus a ~100% = o processo (o GIL). Prova:
   `tests/test_raio_x_maquina_20_10.py`. **E quem ocupa a memória da máquina** (`raio_x._quem_ocupa`, 20/10/2026), somado

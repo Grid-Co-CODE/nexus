@@ -147,7 +147,64 @@ def _maquina(s0, s1, v0: dict, v1: dict, janela_s: float):
             "tem_swap": swap_total > 0, "swap_gb": _decimal(max(0, swap_total - mem.get("SwapFree", 0)) / gb),
             "trocando_mb_s": _troca_mb_s(v0, v1, janela_s),
             "nexus_mb": round(eu.get("VmRSS", 0) / 1024), "nexus_swap_mb": round(eu.get("VmSwap", 0) / 1024),
-            "pressao_mem": _pressao(_ler_proc("pressure/memory")), "pressao_io": _pressao(_ler_proc("pressure/io"))}
+            "pressao_mem": _pressao(_ler_proc("pressure/memory")), "pressao_io": _pressao(_ler_proc("pressure/io")),
+            "teto": _teto_nexus()}
+
+
+def _ler_arquivo(caminho: str):
+    """O texto de um arquivo do sistema (o cgroup em /sys), ou None onde não há."""
+    try:
+        with open(caminho, encoding="ascii", errors="replace") as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def _mb_do_teto(v):
+    """O valor de um arquivo de teto do cgroup em MB; None = sem teto ("max" no v2, o número gigante do v1)."""
+    if v is None or v == "max" or not v.isdigit() or int(v) >= 1 << 60:
+        return None
+    return round(int(v) / (1024 * 1024))
+
+
+def _teto_nexus():
+    """O teto de memória que o serviço ou o contêiner põe no Nexus (o cgroup do próprio processo); None fora do Linux.
+
+    O caso (29/10/2026): o Nexus ficava SEMPRE com ~700 MB na memória (662, 689, 705, 707 e 710 MB em cinco leituras de
+    dois dias) e o resto no swap, 1,5 a 2,2 GB, com 5,7 a 7 GB livres na máquina: o Linux não troca assim com memória
+    sobrando, a não ser que o grupo do processo tenha teto (`MemoryHigh`/`MemoryMax` do systemd, o `--memory` do
+    Docker). E o Levi não tem acesso ao servidor: o Raio-X diz o teto, quantas vezes o Linux apertou o Nexus por causa
+    dele e onde ele está posto. Só leitura de /proc e /sys."""
+    grupo = _ler_proc("self/cgroup")
+    if not grupo:
+        return None
+    v2 = next((l[3:] for l in grupo.splitlines() if l.startswith("0::")), None)
+    v1 = next((l.split(":", 2)[2] for l in grupo.splitlines() if l.split(":")[1:2] == ["memory"]), None)
+    out = {"onde": v2 or v1 or "/", "conteiner": os.path.exists("/.dockerenv"), "max_mb": None, "high_mb": None,
+           "swap_max_mb": None, "apertos": None, "no_teto": None, "oom": None}
+    if v2 is not None:
+        base = next((b for b in (f"/sys/fs/cgroup{v2.rstrip('/')}", "/sys/fs/cgroup")
+                     if _ler_arquivo(f"{b}/memory.max") is not None), None)
+        if base is None:
+            return out
+        out.update(max_mb=_mb_do_teto(_ler_arquivo(f"{base}/memory.max")),
+                   high_mb=_mb_do_teto(_ler_arquivo(f"{base}/memory.high")),
+                   swap_max_mb=_mb_do_teto(_ler_arquivo(f"{base}/memory.swap.max")))
+        ev = {}
+        for linha in (_ler_arquivo(f"{base}/memory.events") or "").splitlines():
+            par = linha.split()
+            if len(par) == 2 and par[1].isdigit():
+                ev[par[0]] = int(par[1])
+        out.update(apertos=ev.get("high"), no_teto=ev.get("max"), oom=ev.get("oom_kill"))
+    elif v1 is not None:
+        base = next((b for b in (f"/sys/fs/cgroup/memory{v1.rstrip('/')}", "/sys/fs/cgroup/memory")
+                     if _ler_arquivo(f"{b}/memory.limit_in_bytes") is not None), None)
+        if base is not None:
+            out["max_mb"] = _mb_do_teto(_ler_arquivo(f"{base}/memory.limit_in_bytes"))
+            sw = _mb_do_teto(_ler_arquivo(f"{base}/memory.memsw.limit_in_bytes"))
+            if sw is not None and out["max_mb"] is not None:
+                out["swap_max_mb"] = max(0, sw - out["max_mb"])
+    return out
 
 
 def _pids() -> list[int]:
