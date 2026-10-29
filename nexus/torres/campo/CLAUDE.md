@@ -870,7 +870,9 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
     equipes"): todas as equipes das usinas, **pela posição** do ranking de todas (3ª rodada: "O ranking também tem que
     ordenar por posição aqui o 4° lugar está acima do 2°, não faz sentido!": a nota da tela é arredondada, e no empate
     de 98 a 98 o nome punha a 4ª em cima; agora decide o desempate do ranking); as usinas sem equipe no fim.
-  - Acompanhamento de rondas: todas as usinas, a que mais pede primeiro, as em dia no fim (a barra colorida saiu em
+  - Acompanhamento de rondas: todas as usinas na ordem que o Levi pediu (29/10/2026: "priorize a que nunca teve
+    ronda, depois sem ronda a 7 dias ou mais, depois longa pendente depois as em dia"; é a `ordem_da_ronda`, conferida
+    nos 8 responsáveis), a sem ronda com mais dias primeiro, as em dia no fim (a barra colorida saiu em
     29/10/2026: "Tire essa barra colorida de acompanhamento de rondas"). O número é o das usinas **sem ronda há 7 dias ou mais, somadas as que nunca tiveram**
     ronda pelo App (2ª rodada: "o número do KPI deve falar quantas usinas estão sem ronda a 7 dias ou mais"; decisão
     dele: "Somar as que nunca tiveram"); embaixo, no formato dos números da Performance ("gostei, faça algo
