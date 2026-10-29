@@ -7,7 +7,10 @@
 {% macro mwh(v) %}{{ '—' if v is none else ('%.1f'|format(v))|replace('.', ',') }}{% endmacro %}
 {% macro pct(v, casas=0) %}{{ '—' if v is none else ('%.*f'|format(casas, v))|replace('.', ',') ~ '%' }}{% endmacro %}
 <header class="cr-jan-cab">
-  <div><p class="gc-eyebrow">{{ titulo }} · {{ ('últimos ' ~ at.janela ~ ' dias') if painel == 'ativos' and at else ('hoje' if painel == 'extintores' else mes_txt) }}</p><h2>{{ u.usina }}</h2>
+  {# nos extintores, a última ronda de extintores ao lado do nome (Levi, 28/10/2026): a conferência mais recente dos
+     extintores da usina, a "última conferência" do Segurança · HSEQ #}
+  {% set ext = u.extintores or {} %}
+  <div><p class="gc-eyebrow">{{ titulo }} · {{ ('últimos ' ~ at.janela ~ ' dias') if painel == 'ativos' and at else ('hoje' if painel == 'extintores' else mes_txt) }}</p><h2>{{ u.usina }}{% if painel == 'extintores' %} <span class="cr-jan-ronda">{% if ext.get('ultima') %}última ronda de extintores em {{ ext.ultima.strftime('%d/%m/%Y') }}{% if ext.get('dias_ultima') is not none %} · {{ 'hoje' if ext.dias_ultima == 0 else 'há ' ~ ext.dias_ultima ~ (' dia' if ext.dias_ultima == 1 else ' dias') }}{% endif %}{% else %}nenhuma ronda de extintores registrada{% endif %}</span>{% endif %}</h2>
     <p class="mudo">{{ u.cliente or '—' }} · {{ u.equipe or '—' }} · {{ u.cidade or '—' }}{% if u.uf %}/{{ u.uf }}{% endif %}</p></div>
   {% set m = u.meta or {} %}{% set d = u.disp or {} %}
   <div class="cr-jan-resumo">
@@ -137,6 +140,15 @@
   {# os extintores da usina que pedem atenção (28/10/2026, a linha do quadro "Extintores vencidos" do Painel do
      responsável): a conta do Segurança · HSEQ › Extintores que a Visão já leu, o vencido primeiro #}
   {% set e = u.extintores or {} %}
+  {# o relatório da usina, o MESMO do Segurança · HSEQ (Levi, 28/10/2026: "gostaria também que o supervisor conseguisse
+     extrair um relatório em pdf ou em excel que nem acontece na parte de segurança!"): o "Baixar" da linha da usina lá,
+     com todos os extintores dela e as fotos; a usina vai pelo nome e pelo cliente como a Segurança os escreve. Em cima
+     da lista, que numa usina de 36 extintores empurrava os botões para o fim #}
+  {% if e.get('rel_usina') %}
+  <p class="cr-jan-acoes"><span class="gc-rotulo">Relatório da usina</span>
+    <a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_hseq.extintores_relatorio', usina=e.rel_usina, cliente=e.rel_cliente or None, baixar=1) }}">PDF</a>
+    <a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_hseq.extintores_planilha', usina=e.rel_usina, cliente=e.rel_cliente or None) }}">Excel</a></p>
+  {% endif %}
   {% if not e.get('lista') %}
   <p class="cr-jan-vazio">Nenhum extintor desta usina vencido, a vencer ou sem conferência.</p>
   {% else %}

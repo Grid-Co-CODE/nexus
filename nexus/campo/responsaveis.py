@@ -649,13 +649,23 @@ def extintores() -> tuple[dict, dict]:
         raise visao.SemBanco(lei.erro)
     d = lei.dados or {}
     por = collections.defaultdict(lambda: {"total": 0, "vencidos": 0, "a_vencer": 0, "sem_conferir": 0,
-                                           "sem_validade": 0, "lista": []})
+                                           "sem_validade": 0, "lista": [], "ultima": None, "dias_ultima": None,
+                                           "rel_usina": "", "rel_cliente": ""})
     for x in d.get("extintores") or []:
         uid = x.get("usina_id")
         if not uid:
             continue
         e = por[uid]
         e["total"] += 1
+        # a última ronda de extintores da usina (Levi, 28/10/2026, na janela dos extintores do Painel: "acrescentado
+        # última ronda de extintores da UFV ao lado do nome"): a conferência mais recente dos extintores dela, a mesma
+        # "última conferência" do Segurança · HSEQ (`extintores.por_usina`)
+        if x.get("conferencia") and (e["ultima"] is None or x["conferencia"] > e["ultima"]):
+            e["ultima"], e["dias_ultima"] = x["conferencia"], x.get("dias_conferencia")
+        # o relatório da Segurança acha a usina pelo nome e pelo cliente como ELE os escreve (o nome sozinho é de duas
+        # usinas: as duas Linhares 1)
+        if not e["rel_usina"]:
+            e["rel_usina"], e["rel_cliente"] = x.get("usina") or "", E.valor_do_filtro(x, "cliente") or ""
         e["vencidos"] += x["situacao"] == "atrasado"
         e["a_vencer"] += x["situacao"] == "perto"
         e["sem_validade"] += x["situacao"] == "sem_validade"

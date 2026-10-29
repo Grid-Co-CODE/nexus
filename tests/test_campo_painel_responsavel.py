@@ -51,6 +51,11 @@ def test_performance_traz_todas_as_usinas_da_pior_para_a_melhor():
     assert [x["situacao"] for x in p["linhas"]] == ["critico", "critico", "alerta", "ok", "sem_meta"]
     assert (p["usinas"], p["com_meta"], p["abaixo"], p["criticas"], p["na_meta"], p["sem_meta"]) == (5, 4, 3, 2, 1, 1)
     assert p["linhas"][2]["pr_abaixo"] and not p["linhas"][0]["pr_abaixo"]
+    # o PR e a disponibilidade com a cor que a Visão já dá na linha (`linha_performance`); sem ela, neutro
+    assert (p["linhas"][0]["pr_cls"], p["linhas"][0]["disp_cls"]) == ("neutro", "neutro")
+    com_valores = dict(USINAS[1], perf={"nivel": "ok", "valores": {"pr": {"cls": "alerta"}, "disp": {"cls": "ok"}}})
+    linha = P.performance([com_valores])["linhas"][0]
+    assert (linha["pr_cls"], linha["disp_cls"]) == ("alerta", "ok")
 
 
 def test_chamados_por_usina_o_mais_antigo_primeiro_com_o_ativo_e_o_status():
@@ -91,16 +96,28 @@ def test_extintores_so_as_usinas_com_vencido_a_com_mais_primeiro():
     assert e["linhas"][1]["pior"] == "recarga venceu em 12/10" and e["linhas"][1]["pior_ext"] == "EXT-02"
 
 
-def test_ranking_todas_as_equipes_da_maior_nota_para_a_menor_e_o_mes():
-    rk = {"total": 9, "cartoes": [
-        {"equipe": "B", "nota": 70, "sem_equipe": False}, {"equipe": "Sem equipe", "nota": None, "sem_equipe": True},
-        {"equipe": "A", "nota": 93, "sem_equipe": False}, {"equipe": "C", "nota": None, "sem_equipe": False},
-        *({"equipe": f"E{i}", "nota": 50 + i, "sem_equipe": False} for i in range(9))]}
+def test_ranking_todas_as_equipes_pela_posicao_e_o_mes():
+    rk = {"total": 12, "cartoes": [
+        {"equipe": "B", "nota": 70, "posicao": 11, "sem_equipe": False},
+        {"equipe": "Sem equipe", "nota": None, "posicao": None, "sem_equipe": True},
+        {"equipe": "A", "nota": 93, "posicao": 1, "sem_equipe": False},
+        {"equipe": "C", "nota": None, "posicao": None, "sem_equipe": False},
+        *({"equipe": f"E{i}", "nota": 50 + i, "posicao": 12 - i if i else 12, "sem_equipe": False} for i in range(9))]}
     r = P.ranking(rk, date(2026, 10, 28))
     nomes = [c["equipe"] for c in r["equipes"]]
-    assert nomes[:2] == ["A", "B"] and nomes[-2:] == ["C", "Sem equipe"] and len(nomes) == 13    # nada fica de fora
-    # "Ranking das Equipes - Outubro, sempre o mês vigente"
-    assert (r["total"], r["mes"], r["desde"]) == (9, "Outubro", date(2026, 10, 1))
+    assert nomes[:2] == ["A", "E8"] and nomes[-2:] == ["C", "Sem equipe"] and len(nomes) == 13    # nada fica de fora
+    # "Ranking das Equipes - Outubro, sempre o mês vigente"; o número do quadro, as equipes (29/10/2026: "quero a
+    # quantidade de equipes"), sem contar as usinas sem equipe
+    assert (r["total"], r["mes"], r["desde"], r["n_equipes"]) == (12, "Outubro", date(2026, 10, 1), 12)
+
+
+def test_ranking_no_empate_da_nota_vale_a_posicao():
+    """Levi, 28/10/2026: "O ranking também tem que ordenar por posição aqui o 4° lugar está acima do 2°, não faz
+    sentido!" (CE Leste 01 e MG Centro 01 com 98: o desempate do ranking pôs a MG em 2º, e o nome punha a CE em cima)."""
+    rk = {"total": 53, "cartoes": [{"equipe": "CE Leste 01", "nota": 98, "posicao": 4, "sem_equipe": False},
+                                   {"equipe": "MG Centro 01", "nota": 98, "posicao": 2, "sem_equipe": False},
+                                   {"equipe": "CE Leste 02", "nota": 97, "posicao": 5, "sem_equipe": False}]}
+    assert [c["posicao"] for c in P.ranking(rk, date(2026, 10, 28))["equipes"]] == [2, 4, 5]
 
 
 def test_montar_e_o_cabecalho():
@@ -142,11 +159,21 @@ def test_a_tela_do_painel_do_responsavel(tela, logado):
         sec = html[i:html.index("</section>", i)]
         assert "Altair" in sec and "Brodowski 1" in sec and "Coração 1" not in sec
     secoes = re.findall(r'<section class="pn-q.*?</section>', html, re.S)
-    assert len(secoes) == 6 and not any(">e mais " in x for x in secoes)         # nada fica de fora
-    # o texto das PT enxuto (Levi, 28/10/2026): só "esperando o De acordo"
-    i = html.index('id="pn-pt-t"')
-    pt = html[i:html.index("</section>", i)]
-    assert "<span>esperando o De acordo</span>" in pt and "há mais de 2 h" not in pt and "técnico esperando" not in pt
+    assert len(secoes) == 5 and not any(">e mais " in x for x in secoes)         # nada fica de fora
+    # 29/10/2026: as PT no número do cabeçalho, que abre a lista na janela ("um KPI que quando o supervisor clicasse
+    # ele veria quais são as PTs"); a Performance com duas colunas de largura
+    assert 'data-pn-pts' in html and 'id="pn-pts-lista"' in html and 'id="pn-pt-t"' not in html
+    assert re.search(r'data-pn-pts[^>]*>\s*<b>\d+</b><span>PTs? esperando o De acordo', html)
+    assert 'class="pn-q pn-q--largo" aria-labelledby="pn-perf-t"' in html and "PR × previsto" in html
+    # sem a barra das rondas e sem o aviso do ranking; os números diretos ("só a quantidade de chamados em aberto",
+    # "a quantidade de equipes", "6 extintores vencidos e 2 a vencer")
+    assert 'class="pn-seg"' not in html and 'class="pn-nota"' not in html
+    i = html.index('id="pn-ch-t"')
+    assert re.search(r'</b>\s*<span>chamados? em aberto</span>', html[i:html.index("</section>", i)])
+    i = html.index('id="pn-rk-t"')
+    assert re.search(r'<div class="pn-num"><b>\d+</b><span>equipes?</span>', html[i:html.index("</section>", i)])
+    i = html.index('id="pn-ex-t"')
+    assert re.search(r'</b>\s*<span>extintor(es)? vencidos?( e \d+ a vencer)?</span>', html[i:html.index("</section>", i)])
     # o outro nível: o dia a dia da meta, a PT por cima, a equipe e a Visão geral com o filtro do quadro
     assert "/t/campo/responsaveis/usina/1/meta" in html and "/t/campo/responsaveis/pt/PT-1" in html
     assert "/t/campo/responsaveis/equipe" in html and "filtro=perf.abaixo_meta" in html
@@ -154,11 +181,14 @@ def test_a_tela_do_painel_do_responsavel(tela, logado):
     assert "filtro=acomp.ext" in html
     # o chamado abre a tela dele de Garantias por cima (a moldura da ponte), sem sair do Painel
     assert 'id="cr-chamado"' in html and "nexusRota('/os/_nexus/chamado/')" in html
+    # o "← Acompanhamento" da tela do chamado abre o quadro no supervisor do Painel (28/10/2026): o filtro guardado
+    # na aba, que o quadro do OS Creator relê
+    assert 'data-ufv="Ciclano Chefe"' in html and "sessionStorage.setItem('acomp.filtros'" in html
     i = html.index('id="pn-ch-t"')
     ch = html[i:html.index("</section>", i)]
     assert 'data-cr-chamado="' in ch and 'class="pn-grupo"' in ch
-    # as listas rolam por dentro do quadro (a barra de rolagem do Nexus)
-    assert html.count('class="pn-lista') == 6
+    # as listas rolam por dentro do quadro (a barra de rolagem do Nexus); a das PT, na janela, vai inteira
+    assert html.count('class="pn-lista') == 6 and 'class="pn-lista pn-lista--jan"' in html
 
 
 def test_todos_sem_responsavel_segue_nos_cartoes_e_o_painel_de_todos_abre(tela, logado):
@@ -181,6 +211,20 @@ def test_a_janela_dos_extintores_da_usina(tela, logado):
     h = logado.get("/t/campo/responsaveis/usina/1/extintores").get_data(as_text=True)
     assert "Extintores vencidos" in h and ("<th>Extintor</th>" in h or "Nenhum extintor desta usina" in h)
     assert logado.get("/t/campo/responsaveis/usina/1/qualquer").status_code == 404
+    # 28/10/2026: a última ronda de extintores ao lado do nome e o relatório da Segurança (PDF e Excel) da usina
+    assert 'class="cr-jan-ronda"' in h and ("última ronda de extintores em" in h
+                                             or "nenhuma ronda de extintores registrada" in h)
+    if 'class="cr-jan-acoes"' in h:
+        assert "/t/hseq/extintores/relatorio.pdf?usina=" in h and "/t/hseq/extintores/relatorio.xlsx?usina=" in h
+
+
+def test_o_relatorio_dos_extintores_da_janela_e_o_da_seguranca(tela, logado):
+    """O link da janela leva o PDF e o Excel da usina, os mesmos do Segurança · HSEQ (Levi, 28/10/2026: "que nem
+    acontece na parte de segurança")."""
+    h = logado.get("/t/campo/responsaveis/usina/1/extintores").get_data(as_text=True)
+    for href in re.findall(r'href="(/t/hseq/extintores/relatorio\.(?:pdf|xlsx)\?[^"]+)"', h):
+        r = logado.get(href.replace("&amp;", "&"))
+        assert r.status_code in (200, 302), href
 
 
 def test_o_css_da_rolagem_e_da_altura_do_quadro():
@@ -194,6 +238,10 @@ def test_o_css_da_rolagem_e_da_altura_do_quadro():
     # o nome da usina preso no alto dos chamados; a janela do chamado só com display quando aberta
     assert re.search(r"\.pn-grupo-cab\{[^}]*position:sticky", css)
     assert ".cr-modal--chamado[open]{display:flex" in css and not re.search(r"\.cr-modal--chamado\{[^}]*display:", css)
+    # 29/10/2026: "Padronize o tamanho do card para todas as modalidades": a mesma altura em todos os quadros, a lista
+    # que encolhe e rola, e a Performance com duas colunas de largura
+    assert re.search(r"\.pn-q\{[^}]*height:var\(--pn-card\)", css) and re.search(r"\.pn\{[^}]*--pn-card:\d+px", css)
+    assert ".pn-q--largo{grid-column:span 2}" in css and "min-height:0" in lista
 
 
 def test_nenhuma_regua_nova():

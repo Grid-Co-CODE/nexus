@@ -33,11 +33,16 @@ def performance(usinas: list[dict]) -> dict:
     linhas = []
     for u in sorted(usinas, key=R.ordem_da_meta):
         m, d = u.get("meta") or {}, u.get("disp") or {}
+        # o PR e a disponibilidade como a Visão já os escreve e colore na linha da usina (`linha_performance`: o PR
+        # contra o previsto, a disponibilidade na régua da tela dona); o card largo do Painel mostra os dois em coluna
+        val = (u.get("perf") or {}).get("valores") or {}
+        pr_v, disp_v = val.get("pr") or {}, val.get("disp") or {}
         linhas.append({"usina_id": u["usina_id"], "usina": u["usina"], "cliente": u.get("cliente") or "",
                        "atingimento": m.get("atingimento"), "situacao": _situacao_da_meta(u),
                        "anomalia": m.get("anomalia") or "", "pr": m.get("pr"), "pr_meta": m.get("pr_meta"),
                        "pr_abaixo": m.get("pr") is not None and m.get("pr_meta") is not None and m["pr"] < m["pr_meta"],
-                       "disp": d.get("disp")})
+                       "disp": d.get("disp"), "pr_cls": pr_v.get("cls") or "neutro",
+                       "disp_cls": disp_v.get("cls") or "neutro"})
     cont = collections.Counter(x["situacao"] for x in linhas)
     return {"usinas": len(usinas), "com_meta": len(usinas) - cont["sem_meta"], "abaixo": cont["critico"] + cont["alerta"],
             "criticas": cont["critico"], "na_meta": cont["ok"], "sem_meta": cont["sem_meta"],
@@ -83,16 +88,22 @@ def pts(usinas: list[dict]) -> dict:
 
 
 def ranking(rk: dict | None, hoje=None) -> dict:
-    """Todas as equipes das usinas da tela, da maior nota do App para a menor (Levi: "do maior para menor"); a posição é
-    a do ranking de TODAS as equipes (`ranking_equipes.classificar`). Sem nota no fim. As usinas sem equipe no cadastro
+    """Todas as equipes das usinas da tela, pela posição do ranking de TODAS as equipes (`ranking_equipes.classificar`:
+    a maior nota do App primeiro, com o desempate dele; Levi: "do maior para menor"). Sem nota no fim. As usinas sem equipe no cadastro
     vêm por último, como no Ranking (o conserto é no cadastro), para nenhuma usina ficar de fora. O título leva o mês do
     período ("Ranking das Equipes - Outubro, sempre o mês vigente", 28/10/2026)."""
     from . import ranking_equipes
     hoje = hoje or visao._agora().date()
     cartoes = list((rk or {}).get("cartoes") or ())
+    # pela POSIÇÃO do ranking (Levi, 28/10/2026: "O ranking também tem que ordenar por posição aqui o 4° lugar está
+    # acima do 2°, não faz sentido!"): a nota da tela é arredondada, e no empate de 98 a 98 quem decide é o desempate do
+    # ranking (qualidade, cobertura, volume), não o nome da equipe
     eq = sorted((c for c in cartoes if not c.get("sem_equipe")),
-                key=lambda c: (c.get("nota") is None, -(c.get("nota") or 0), c["equipe"]))
-    return {"equipes": eq + [c for c in cartoes if c.get("sem_equipe")], "total": (rk or {}).get("total") or 0,
+                key=lambda c: (c.get("posicao") is None, c.get("posicao") or 0, -(c.get("nota") or 0), c["equipe"]))
+    # o número do quadro é a quantidade de equipes das usinas da tela (Levi, 28/10/2026: "Em ranking das equipes quero
+    # a quantidade de equipes"); as usinas sem equipe no cadastro não são uma equipe
+    return {"equipes": eq + [c for c in cartoes if c.get("sem_equipe")], "n_equipes": len(eq),
+            "total": (rk or {}).get("total") or 0,
             "mes": ranking_equipes.mes(hoje), "desde": ranking_equipes.periodos(hoje)["atual"][0]}
 
 
@@ -143,7 +154,8 @@ def extintores(usinas: list[dict]) -> dict:
 
 
 def montar(nome: str, usinas: list[dict], rk: dict | None, hoje=None) -> dict:
-    """O painel de um responsável (ou de todos, sem escolha): o cabeçalho e os seis quadros."""
+    """O painel de um responsável (ou de todos, sem escolha): o cabeçalho (com o número das PT, desde 29/10/2026) e os
+    cinco quadros."""
     clientes = sorted({u.get("cliente") for u in usinas if u.get("cliente")})
     equipes = sorted({u.get("equipe") for u in usinas if u.get("equipe") and u.get("equipe") != visao.SEM_EQUIPE})
     return {"nome": nome, "usinas": len(usinas), "clientes": clientes, "equipes": equipes,

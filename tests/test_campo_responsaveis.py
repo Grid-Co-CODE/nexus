@@ -952,7 +952,9 @@ def test_o_cartao_abre_o_que_cobrar_com_a_prova(duas_equipes, logado):
 def test_o_que_cobrar_traz_a_pt_e_quem_pediu(duas_equipes, logado):
     jan = logado.get("/t/campo/responsaveis/equipe?equipe=SP+Norte+01").get_data(as_text=True)
     focar = jan[jan.index(">Focar "):jan.index("Nota do App")]
-    assert ">PT parada</b>" in focar and "PT-1 · Altair · pedida por Técnico Silva há 1 d 6 h" in focar
+    # o Focar em tabela (28/10/2026): a área na coluna, a usina na linha e, na célula, a prova sem o nome dela
+    assert '<th scope="col">PT parada</th>' in focar and '<th scope="row">Altair</th>' in focar
+    assert "PT-1 · pedida por Técnico Silva há 1 d 6 h" in focar
 
 
 def test_o_motivo_da_equipe_sem_nota_diz_o_que_falta(tela, logado):
@@ -967,7 +969,7 @@ def test_sem_as_notas_do_app_o_motivo_avisa(tela, logado, monkeypatch):
     visao.limpar()
     jan = logado.get("/t/campo/responsaveis/equipe?equipe=SP+Norte+01").get_data(as_text=True)
     assert "Não consegui ler as notas do App" in jan and "perde " not in jan
-    assert ">PT parada</b>" in jan                          # o "Em quê cobrar" não depende das notas do App
+    assert '<th scope="col">PT parada</th>' in jan          # o "Em quê cobrar" não depende das notas do App
 
 
 # ── A Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas", com os KPIs dos três blocos que

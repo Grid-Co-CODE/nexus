@@ -60,7 +60,8 @@ def marcas_paradas(vigentes: dict, usina_de) -> list[dict]:
 def _vazio() -> dict:
     return {"os_abertas": 0, "em_verificacao": 0, "nao_iniciadas": 0, "em_execucao": 0, "atrasadas": 0,
             "atrasadas_os": 0, "maior_atraso": None,
-            "lista_atrasadas": [], "vencem": 0, "paradas": 0, "motivo_comum": None, "lista_paradas": [],
+            "lista_atrasadas": [], "todas_atrasadas": [], "vencem": 0, "paradas": 0, "motivo_comum": None,
+            "lista_paradas": [], "todas_paradas": [],
             "zeladoria_proxima": None, "zeladoria_vencida": None, "zeladoria_ultima": None}
 
 
@@ -133,16 +134,20 @@ def tarefas_por_usina(tarefas, marcas: list[dict], os_de_chamado: set, hoje: dat
         r["em_execucao"] = len(em_processo) - r["nao_iniciadas"]
         a = atr.get(uid, {})
         r["atrasadas_os"], r["maior_atraso"] = len(a), (max(a.values()) if a else None)
-        r["lista_atrasadas"] = [{"os": o, "wid": wids.get(o), "dias": d, "tipo": tipo_atr.get(o)}
-                                for o, d in sorted(a.items(), key=lambda kv: (-kv[1], kv[0]))[:5]]
+        # a linha da Visão geral mostra as 5 piores; a janela da equipe, todas (Levi, 28/10/2026, sobre o "e mais" do Em
+        # quê cobrar: "tem que dar para expandir esses 'e mais' o supervisor deve saber o que é")
+        r["todas_atrasadas"] = [{"os": o, "wid": wids.get(o), "dias": d, "tipo": tipo_atr.get(o)}
+                                for o, d in sorted(a.items(), key=lambda kv: (-kv[1], kv[0]))]
+        r["lista_atrasadas"] = r["todas_atrasadas"][:5]
         ps = paradas.get(uid, [])
         r["paradas"] = len(ps)
         cont = Counter(m["motivo"] for m in ps if m["motivo"])
         r["motivo_comum"] = sorted(cont.items(), key=lambda kv: (-kv[1], kv[0]))[0][0] if cont else None
         unicas = {(m["os"], m["codigo"], m["chave"]): m for m in ps}
-        r["lista_paradas"] = [{"os": m["os"], "wid": wids.get(m["os"]), "motivo": m["motivo"], "desde": m["desde"],
+        r["todas_paradas"] = [{"os": m["os"], "wid": wids.get(m["os"]), "motivo": m["motivo"], "desde": m["desde"],
                                "quem": m["quem"]}
-                              for m in sorted(unicas.values(), key=lambda m: (m["desde"] or date.max, m["os"]))][:5]
+                              for m in sorted(unicas.values(), key=lambda m: (m["desde"] or date.max, m["os"]))]
+        r["lista_paradas"] = r["todas_paradas"][:5]
     return out
 
 

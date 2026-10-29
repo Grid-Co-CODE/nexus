@@ -609,7 +609,8 @@ def _resp_equipe_montar(equipe: str):
            "regiao_campo": next((u["regiao_campo"] for u in us if u.get("regiao_campo")), ""),
            "sem_regiao": visao.SEM_REGIAO, "info": (d.get("info") or {}).get("ranking") or {}, "dia_curto": _dia_curto,
            "erro": "", "m": None, "responsavel": request.args.get("responsavel") or TODOS,
-           "cob": campo_ranking.cobrar(campo_resp.soma(equipe, us), us), "nomes_tecnicos": []}
+           "cob": campo_ranking.cobrar(campo_resp.soma(equipe, us), us), "mat": campo_ranking.matriz(us),
+           "nomes_tecnicos": []}
     try:
         ctx["nomes_tecnicos"] = campo_resp.tecnicos_da_equipe({u["usina_id"] for u in us})
     except Exception:       # noqa: BLE001 — sem o cadastro agora: a janela diz quantos são

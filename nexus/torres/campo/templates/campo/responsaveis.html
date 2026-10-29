@@ -37,6 +37,12 @@
     {% if modo == 'painel' and painel %}
     <div><p class="gc-eyebrow">{{ torre.nome }} · {{ tela.nome }}</p><h1 class="cn-titulo">{{ painel.nome }}</h1>
       <p class="cn-pergunta">{{ painel.usinas }} usina{{ 's' if painel.usinas != 1 }}{% if painel.clientes %} · {{ painel.clientes|join(', ') }}{% endif %}{% if painel.equipes %} · {{ painel.equipes|length }} equipe{{ 's' if painel.equipes|length != 1 }}{% endif %}</p></div>
+    {# as PT pendentes viraram o número do cabeçalho (Levi, 29/10/2026: "PTs pendentes pode ficar como um KPI que quando o
+       supervisor clicasse ele veria quais são as PTs"): a cor de antes (parada há mais de 2 h, vermelho; esperando,
+       âmbar; nenhuma, verde) e o clique abre a lista na janela #}
+    {% set pt_kpi = painel.pts %}
+    <button type="button" class="pn-kpi pn-kpi--{{ 'critico' if pt_kpi.paradas else ('alerta' if pt_kpi.aguardando else 'ok') }}" data-pn-pts aria-haspopup="dialog">
+      <b>{{ pt_kpi.aguardando }}</b><span>PT{{ 's' if pt_kpi.aguardando != 1 }} esperando o De acordo<small>ver quais</small></span></button>
     {% else %}
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     {% endif %}
@@ -121,25 +127,35 @@
      que todo href passa pelo url()/raiz, o que um destino recebido pronto não deixa conferir #}
   {% macro ver(txt='ver todas') %}<a class="pn-ver" href="{{ url(**kwargs) }}">{{ txt }}</a>{% endmacro %}
   {% macro idade(m) %}{% if m is none %}—{% elif m >= 1440 %}{{ m // 1440 }} d {{ (m % 1440) // 60 }} h{% elif m >= 60 %}{{ m // 60 }} h {{ m % 60 }} min{% else %}{{ m }} min{% endif %}{% endmacro %}
+  {# o desenho de 29/10/2026 (Levi: "Padronize o tamanho do card para todas as modalidades"; "PTs pendentes pode ficar
+     como um KPI que quando o supervisor clicasse ele veria quais são as PTs (...) Aproveita o espaço para dar um destaque
+     nas usinas abaixo da performance"): todos os quadros com a mesma altura, as PT no número do cabeçalho (o clique
+     abre a lista) e a Performance com duas colunas de largura, a meta, o PR contra o previsto e a disponibilidade de
+     cada usina lado a lado #}
   <div class="pn">
-    <section class="pn-q" aria-labelledby="pn-perf-t">
+    <section class="pn-q pn-q--largo" aria-labelledby="pn-perf-t">
       <header class="pn-cab"><h2 id="pn-perf-t"><i class="ph ph-chart-line-up" aria-hidden="true"></i>Usinas abaixo da performance</h2>{{ ver(modo='geral', filtro='perf.abaixo_meta', bloco=None, equipe=None) }}</header>
       <div class="pn-num"><b class="{{ 'cn-t-critico' if pf.criticas else ('cn-t-alerta' if pf.abaixo else 'cn-t-ok') }}">{{ pf.abaixo }}</b>
         <span>de {{ pf.com_meta }} com meta abaixo de {{ limites.meta_ok }}%{% if pf.criticas %} · <b class="cn-t-critico">{{ pf.criticas }}</b> abaixo de {{ limites.meta_atencao }}%{% endif %}<small>meta do grupo no mês {{ pct(pf.meta_grupo, 1) }} · {{ pf.na_meta }} na meta{% if pf.sem_meta %} · {{ pf.sem_meta }} sem meta publicada{% endif %}</small></span></div>
-      <ol class="pn-lista" tabindex="0" aria-label="Todas as usinas pela meta do mês, da pior para a melhor">
+      {# o PR e a disponibilidade com a cor que a Visão já dá na linha da usina (`linha_performance`), nenhuma régua nova #}
+      <div class="pn-perf-cab" aria-hidden="true"><span>Usina</span><span>Meta do mês</span><span></span><span>PR × previsto</span><span>Disponibilidade</span></div>
+      <ol class="pn-lista pn-perf" tabindex="0" aria-label="Todas as usinas pela meta do mês, da pior para a melhor">
         {% for x in pf.linhas %}
-        <li><button type="button" class="pn-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel='meta') }}" title="{{ x.usina }}: ver o dia a dia da meta">
-          <span class="pn-it-nome"><b>{{ x.usina }}</b><small>{% if x.pr_abaixo %}PR {{ pct(x.pr, 1) }}, previsto {{ pct(x.pr_meta, 1) }}{% else %}{{ x.cliente or '—' }}{% endif %}{% if x.disp is not none %} · disp. {{ pct(x.disp, 1) }}{% endif %}{% if x.anomalia %} · anômalo{% endif %}</small></span>
+        <li><button type="button" class="pn-it pn-it--perf cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel='meta') }}" title="{{ x.usina }}: ver o dia a dia da meta">
+          <span class="pn-it-nome"><b>{{ x.usina }}</b><small>{{ x.cliente or '—' }}{% if x.anomalia %} · anômalo{% endif %}</small></span>
           <span class="pn-barra" aria-hidden="true">{% if x.atingimento is not none %}<i class="{{ barra_situ[x.situacao] }}" style="width: {{ [[x.atingimento, 0]|max, 100]|min }}%"></i>{% endif %}</span>
-          <b class="pn-v {{ cor_situ[x.situacao] }}">{{ 'sem meta' if x.atingimento is none else pct(x.atingimento) }}</b></button></li>
+          <b class="pn-v {{ cor_situ[x.situacao] }}">{{ 'sem meta' if x.atingimento is none else pct(x.atingimento) }}</b>
+          <span class="pn-c cn-t-{{ x.pr_cls }}">{% if x.pr is not none %}{{ pct(x.pr, 1) }}{% if x.pr_meta is not none %} <small>de {{ pct(x.pr_meta, 1) }}</small>{% endif %}{% else %}—{% endif %}</span>
+          <span class="pn-c cn-t-{{ x.disp_cls }}">{{ pct(x.disp, 1) }}</span></button></li>
         {% else %}<li class="pn-vazio">Nenhuma usina com esses filtros.</li>{% endfor %}
       </ol>
     </section>
 
     <section class="pn-q" aria-labelledby="pn-ch-t">
       <header class="pn-cab"><h2 id="pn-ch-t"><i class="ph ph-lifebuoy" aria-hidden="true"></i>Chamados abertos</h2>{{ ver(modo='geral', filtro='acomp.chamados', bloco=None, equipe=None) }}</header>
+      {# só a quantidade (Levi, 29/10/2026: "Em chamados abertos quero só a quantidade de chamados em aberto") #}
       <div class="pn-num"><b class="{{ 'cn-t-alerta' if ch.abertos else 'cn-t-ok' }}">{{ ch.abertos }}</b>
-        <span>em aberto com o fabricante{% if ch.abertos %} em {{ ch.usinas }} usina{{ 's' if ch.usinas != 1 }}{% endif %}<small>{{ ch.verificacao }} em verificação{% if ch.mais_antigo is not none %} · o mais antigo há {{ ch.mais_antigo }} dias{% endif %}</small></span></div>
+        <span>chamado{{ 's' if ch.abertos != 1 }} em aberto</span></div>
       {# por usina (Levi, 28/10/2026: "pode só botar o nome da UFV uma vez e dizer qual os ativos daquela UFV"): o nome
          fica preso no alto enquanto os ativos dela rolam; o ativo sem a marca, com o status do chamado, e o clique abre
          a tela do chamado de Garantias por cima, sem sair daqui ("Não deve direcionar, apenas sobrepor a tela") #}
@@ -155,22 +171,11 @@
       </ol>
     </section>
 
-    <section class="pn-q" aria-labelledby="pn-pt-t">
-      <header class="pn-cab"><h2 id="pn-pt-t"><i class="ph ph-file-text" aria-hidden="true"></i>PTs pendentes</h2>{{ ver(modo='geral', filtro='acomp.pts', bloco=None, equipe=None) }}</header>
-      <div class="pn-num"><b class="{{ 'cn-t-critico' if pt.paradas else ('cn-t-alerta' if pt.aguardando else 'cn-t-ok') }}">{{ pt.aguardando }}</b>
-        <span>esperando o De acordo</span></div>
-      <ol class="pn-lista" tabindex="0" aria-label="Todas as PT esperando o De acordo">
-        {% for x in pt.linhas %}
-        <li><button type="button" class="pn-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=x.numero, ativo=x.codigo, volta=request.full_path) }}" title="Abrir a PT {{ x.numero }} para decidir">
-          <span class="pn-it-nome"><b>{{ x.numero }} · {{ x.usina }}</b><small>{{ x.tarefa or '—' }}</small></span>
-          <b class="pn-v {{ 'cn-t-critico' if x.parada else 'cn-t-alerta' }}">{% if x.parada and x.hoje %}agora · {% endif %}{{ idade(x.idade_min) }}</b></button></li>
-        {% else %}<li class="pn-vazio">Nenhuma PT esperando o De acordo.</li>{% endfor %}
-      </ol>
-    </section>
-
     <section class="pn-q" aria-labelledby="pn-rk-t">
       <header class="pn-cab"><h2 id="pn-rk-t"><i class="ph ph-ranking" aria-hidden="true"></i>Ranking das Equipes - {{ rk.mes }}</h2>{{ ver('ver o ranking', modo='ranking', equipe=None, filtro=None, bloco=None) }}</header>
-      <p class="pn-nota">A nota do App desde {{ rk.desde.strftime('%d/%m') }}, da maior para a menor; a posição é a do ranking de todas as {{ rk.total }} equipes.</p>
+      {# a quantidade de equipes, sem o aviso de antes (Levi, 29/10/2026: "Em ranking das equipes quero a quantidade de
+         equipes"; o aviso, "não precisa desse disclaimer") #}
+      <div class="pn-num"><b>{{ rk.n_equipes }}</b><span>equipe{{ 's' if rk.n_equipes != 1 }}</span></div>
       <ol class="pn-lista pn-rk" tabindex="0" aria-label="Todas as equipes, da maior nota para a menor">
         {% for c in rk.equipes %}
         <li>{% if c.sem_equipe %}<a class="pn-rk-it" href="{{ url(modo='geral', equipe=c.equipe, responsavel=responsavel or '*', filtro=None, bloco=None) }}" title="Usinas sem equipe no cadastro: ver na Visão geral">{% else %}<button type="button" class="pn-rk-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_equipe', equipe=c.equipe, responsavel=responsavel or '*') }}" title="{{ c.equipe }}: o motivo da nota, para cobrar">{% endif %}
@@ -190,7 +195,6 @@
          tiveram"); vermelho com uma ou mais, como a Visão marca a usina sem ronda #}
       <div class="pn-num"><b class="{{ 'cn-t-critico' if rd.sem_7 else 'cn-t-ok' }}">{{ rd.sem_7 }}</b>
         <span>sem ronda há 7 dias ou mais<small>{% if rd.nunca %}{{ rd.nunca }} nunca teve ronda pelo App · {% endif %}{{ rd.em_dia }} de {{ rd.usinas }} em dia{% if rd.longa %} · {{ rd.longa }} com a longa pendente{% endif %}</small></span></div>
-      <div class="pn-seg" role="img" aria-label="{{ rd.em_dia }} em dia, {{ rd.longa }} com a longa pendente, {{ rd.sem_ronda }} sem ronda há 7 dias ou mais e {{ rd.nunca }} que nunca tiveram ronda">{% if rd.em_dia %}<span class="o" style="flex: {{ rd.em_dia }}"></span>{% endif %}{% if rd.longa %}<span class="a" style="flex: {{ rd.longa }}"></span>{% endif %}{% if rd.sem_ronda %}<span class="c" style="flex: {{ rd.sem_ronda }}"></span>{% endif %}{% if rd.nunca %}<span class="n" style="flex: {{ rd.nunca }}"></span>{% endif %}</div>
       <ol class="pn-lista" tabindex="0" aria-label="Todas as usinas pela ronda, a que mais pede primeiro">
         {% for x in rd.linhas %}
         {% set cls = {'nunca': 'cn-t-critico', 'sem_ronda': 'cn-t-critico', 'longa_pendente': 'cn-t-alerta', 'em_dia': 'cn-t-ok'}.get(x.situacao, 'mudo') %}
@@ -205,8 +209,9 @@
        conta do HSEQ que a Visão já lê; a linha abre os extintores da usina por cima #}
     <section class="pn-q" aria-labelledby="pn-ex-t">
       <header class="pn-cab"><h2 id="pn-ex-t"><i class="ph ph-fire-extinguisher" aria-hidden="true"></i>Extintores vencidos</h2>{{ ver(modo='geral', filtro='acomp.ext', bloco=None, equipe=None) }}</header>
-      <div class="pn-num"><b class="{{ 'cn-t-critico' if ex.usinas else 'cn-t-ok' }}">{{ ex.usinas }}</b>
-        <span>usina{{ 's' if ex.usinas != 1 }} com extintor vencido<small>{{ ex.vencidos }} extintor{{ 'es' if ex.vencidos != 1 }} vencido{{ 's' if ex.vencidos != 1 }}{% if ex.a_vencer %} · {{ ex.a_vencer }} a vencer{% endif %}</small></span></div>
+      {# direto (Levi, 29/10/2026: 'O certo é "6 extintores vencidos e 2 a vencer". Bem direto e reto') #}
+      <div class="pn-num"><b class="{{ 'cn-t-critico' if ex.vencidos else 'cn-t-ok' }}">{{ ex.vencidos }}</b>
+        <span>extintor{{ 'es' if ex.vencidos != 1 }} vencido{{ 's' if ex.vencidos != 1 }}{% if ex.a_vencer %} e {{ ex.a_vencer }} a vencer{% endif %}</span></div>
       <ol class="pn-lista" tabindex="0" aria-label="As usinas com extintor vencido, a com mais vencidos primeiro">
         {% for x in ex.linhas %}
         <li><button type="button" class="pn-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel='extintores') }}" title="{{ x.usina }}: ver os extintores">
@@ -216,6 +221,19 @@
       </ol>
     </section>
   </div>
+  {# a lista das PT pendentes, que o número do cabeçalho abre na janela (29/10/2026: "um KPI que quando o supervisor
+     clicasse ele veria quais são as PTs, não precisa ser algo aberto toda hora"); cada PT abre a decisão ali mesmo #}
+  <template id="pn-pts-lista">
+    <header class="cr-jan-cab"><div><p class="gc-eyebrow">PTs pendentes</p><h2>{{ painel.nome }}</h2>
+      <p class="mudo">{{ pt.aguardando }} esperando o De acordo{% if pt.paradas %} · {{ pt.paradas }} há mais de 2 h{% endif %}</p></div></header>
+    <ol class="pn-lista pn-lista--jan" aria-label="Todas as PT esperando o De acordo">
+      {% for x in pt.linhas %}
+      <li><button type="button" class="pn-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=x.numero, ativo=x.codigo, volta=request.full_path) }}" title="Abrir a PT {{ x.numero }} para decidir">
+        <span class="pn-it-nome"><b>{{ x.numero }} · {{ x.usina }}</b><small>{{ x.tarefa or '—' }}</small></span>
+        <b class="pn-v {{ 'cn-t-critico' if x.parada else 'cn-t-alerta' }}">{% if x.parada and x.hoje %}agora · {% endif %}{{ idade(x.idade_min) }}</b></button></li>
+      {% else %}<li class="pn-vazio">Nenhuma PT esperando o De acordo.</li>{% endfor %}
+    </ol>
+  </template>
   {% elif modo == 'cartoes' %}
   {# um cartão por Responsável O&M, com os dois blocos: quantas usinas pedem foco, acompanhamento ou podem esperar em
      cada um e os números do grupo; o cartão abre as usinas dele #}
@@ -499,12 +517,25 @@
      que janela dando um blur de fundo"): a MESMA tela do OS Creator, sem cópia, numa moldura (/os/_nexus/chamado/<nº>,
      ponte.chamado_os), com o mesmo fundo desfocado das outras janelas. A moldura nasce no clique, pelo script, como a do
      card da OS: a tela do Campo não traz moldura nenhuma no HTML (05/10/2026: nada do App nem do Azure embutido) #}
-  <dialog class="cr-modal cr-modal--chamado" id="cr-chamado" aria-label="Chamado">
+  <dialog class="cr-modal cr-modal--chamado" id="cr-chamado" aria-label="Chamado" data-ufv="{{ responsavel or '' }}">
     <div class="cr-modal-barra"><button type="button" class="gc-btn gc-btn--contorno cr-modal-fechar">Fechar</button></div>
   </dialog>
 </div>
 {% include "oscreator/card_os_abrir.html" %}
 <script>
+// o número das PT no cabeçalho do Painel abre a lista delas na janela (29/10/2026); a PT da lista abre a decisão na
+// mesma janela, pelo `data-cr-painel` de sempre
+(function () {
+  var b = document.querySelector('[data-pn-pts]'), lista = document.getElementById('pn-pts-lista');
+  var dlg = document.getElementById('cr-modal');
+  if (!b || !lista || !dlg) { return; }
+  b.addEventListener('click', function () {
+    var corpo = dlg.querySelector('.cr-modal-corpo');
+    corpo.innerHTML = '';
+    corpo.appendChild(lista.content.cloneNode(true));
+    if (!dlg.open) { dlg.showModal(); }
+  });
+})();
 // o chamado do Painel abre a tela dele de Garantias por cima (28/10/2026); Esc, o Fechar, o clique fora e o "fechar" que
 // a moldura manda (o Esc dentro dela) fecham, e a moldura sai junto (a tela do chamado não fica viva por trás)
 (function () {
@@ -521,6 +552,15 @@
     if (!os) { return; }
     ev.preventDefault();
     tirar();
+    // o "← Acompanhamento" da tela do chamado abre o quadro já no supervisor do Painel (Levi, 28/10/2026: "gostaria que
+    // já viesse com o supervisor filtrado"): o quadro relê os filtros guardados NESTA aba (`acomp.filtros`, o acomp.js
+    // do OS Creator), e o Responsável UFV dele é o Responsável O&M da ficha da usina, o mesmo do Painel. Com "Todos",
+    // o filtro do supervisor sai; os outros filtros guardados ficam
+    try {
+      var guardados = JSON.parse(sessionStorage.getItem('acomp.filtros') || 'null') || {};
+      guardados.ufv = dlg.getAttribute('data-ufv') || '';
+      sessionStorage.setItem('acomp.filtros', JSON.stringify(guardados));
+    } catch (e) { /* aba anônima: o quadro abre sem o filtro */ }
     var q = new URLSearchParams({de: location.pathname + location.search});
     moldura = document.createElement('iframe');
     moldura.className = 'cr-chamado-moldura';

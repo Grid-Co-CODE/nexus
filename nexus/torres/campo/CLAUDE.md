@@ -837,9 +837,19 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
 - **Nenhum número novo, nenhuma régua nova:** cada quadro reorganiza o que a Visão já calcula por usina (`montar`) e o
   Ranking (`ranking_equipes.cartoes`, sobre as mesmas usinas). A meta é a régua da Visão gerencial (97/90), a ronda a
   da Central (7 dias), a cor da cobertura a das Rondas (80/50, o `cor_pct` do Painel delas) e a nota a do App (85/70).
-- **Os seis quadros, cada um com o total e a lista inteira** (3 × 2):
-  - Usinas abaixo da performance: todas as usinas, da pior meta para a melhor, sem meta no fim; PR contra o previsto e
-    disponibilidade na linha.
+- **O desenho (4ª rodada, 29/10/2026):** cinco quadros com a **mesma altura** ("Padronize o tamanho do card para todas
+  as modalidades": `--pn-card` fixo, o número guarda o lugar de duas linhas e a lista encolhe e rola se faltar lugar) e
+  as **PT no número do cabeçalho** ("PTs pendentes pode ficar como um KPI que quando o supervisor clicasse ele veria quais
+  são as PTs, não precisa ser algo aberto toda hora": o botão `data-pn-pts`, com a cor de antes, abre a lista
+  `#pn-pts-lista` na janela, e a PT dela abre a decisão ali mesmo). O espaço que as PT deixaram foi para a
+  **Performance, com duas colunas de largura** ("Aproveita o espaço para dar um destaque nas usinas abaixo da
+  performance"): 1ª linha, a Performance e os Chamados; 2ª, o Ranking, as Rondas e os Extintores. Os números ficaram
+  diretos: "N chamados em aberto", "N equipes", "N extintores vencidos e M a vencer"; saíram a barra das Rondas e o
+  aviso do Ranking ("os supervisores não são crianças!").
+- **Cada quadro com o total e a lista inteira:**
+  - Usinas abaixo da performance: todas as usinas, da pior meta para a melhor, sem meta no fim; em colunas, a meta do
+    mês (a barra e o número), o PR contra o previsto e a disponibilidade, com a cor que a Visão já dá na linha da usina
+    (`linha_performance`, nenhuma régua nova).
   - Chamados abertos **por usina** (2ª rodada, Levi: "pode só botar o nome da UFV uma vez e dizer qual os ativos daquela
     UFV"): a usina do chamado mais antigo primeiro, o nome dela preso no alto enquanto os ativos rolam; cada ativo sem a
     marca ("Não precisa mostrar a marca do ativo": `responsaveis.nome_do_ativo`, medido nos 184 ativos dos chamados
@@ -847,19 +857,26 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
     o status do chamado": o da tela de Garantias, no fato desde 28/10/2026, ver `nexus/dados/fato_chamado.py`; a troca
     feita na tela depois da última publicação vale por cima, lida de `os_creator · chamados_obs`) e os dias. Concluído
     não entra ("As concluídas não mostra"); os em verificação só na contagem.
-  - PTs pendentes: todas; a parada de hoje primeiro, depois as paradas de outros dias, depois as que esperam há menos
-    de 2 h. O texto do número é só "esperando o De acordo" (2ª rodada: "pode enxugar o texto").
+  - PTs pendentes (no número do cabeçalho; a lista na janela): todas; a parada de hoje primeiro, depois as paradas de
+    outros dias, depois as que esperam há menos de 2 h. O número diz só "PTs esperando o De acordo" (2ª rodada: "pode
+    enxugar o texto").
   - Ranking das Equipes - <mês> (2ª rodada: "sempre o mês vigente"; a conta passou ao mês, ver "O Ranking das
-    equipes"): todas as equipes das usinas, da maior nota para a menor; a posição é a do ranking de todas; as usinas
-    sem equipe no fim.
-  - Acompanhamento de rondas: todas as usinas, a que mais pede primeiro, as em dia no fim, com a barra em dia / longa
-    pendente / sem ronda / nunca. O número é o das usinas **sem ronda há 7 dias ou mais, somadas as que nunca tiveram**
+    equipes"): todas as equipes das usinas, **pela posição** do ranking de todas (3ª rodada: "O ranking também tem que
+    ordenar por posição aqui o 4° lugar está acima do 2°, não faz sentido!": a nota da tela é arredondada, e no empate
+    de 98 a 98 o nome punha a 4ª em cima; agora decide o desempate do ranking); as usinas sem equipe no fim.
+  - Acompanhamento de rondas: todas as usinas, a que mais pede primeiro, as em dia no fim (a barra colorida saiu em
+    29/10/2026: "Tire essa barra colorida de acompanhamento de rondas"). O número é o das usinas **sem ronda há 7 dias ou mais, somadas as que nunca tiveram**
     ronda pelo App (2ª rodada: "o número do KPI deve falar quantas usinas estão sem ronda a 7 dias ou mais"; decisão
     dele: "Somar as que nunca tiveram"); a linha de baixo diz quantas nunca tiveram, as em dia e as longas pendentes.
   - Extintores vencidos (o 6º, Levi no mesmo dia: "quero que mostre também as usinas com extintores vencidos daquele
     supervisor"): só as usinas com vencido, a com mais vencidos primeiro, o pior extintor e os a vencer na linha (a
     conta do HSEQ que a Visão já lê). A linha abre a janela da usina `painel=extintores` (vencidos, a vencer, sem
-    conferência).
+    conferência). Na janela (3ª rodada): a **última ronda de extintores** ao lado do nome da usina ("acrescentado
+    última ronda de extintores da UFV ao lado do nome": a conferência mais recente dos extintores dela, a "última
+    conferência" do HSEQ) e o **relatório da usina em PDF e em Excel, o mesmo do Segurança · HSEQ** ("que nem acontece
+    na parte de segurança": os links levam a `/t/hseq/extintores/relatorio.pdf|.xlsx?usina=&cliente=`, com o nome e o
+    cliente como a Segurança os escreve, guardados em `responsaveis.extintores` como `rel_usina`/`rel_cliente`; o setor
+    Supervisão Campo abre as telas da Segurança, conferido nos Acessos em 28/10). Os botões ficam no alto da janela.
 - **Nada fica de fora, 6 por vez** (Levi, ao ver a 1ª versão com 5 linhas e "e mais N": "poderia ter um scroll para o
   que não cabe no card, scroll alá Nexus (...) Tem que ter todas as usinas e equipes daquele supervisor, não podemos
   deixar nada de fora"; e, ao ver o quadro com a metade da tela: "Ficou mt grande! Limite de 6 em 6 com um scroll"): a
@@ -873,7 +890,12 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
   meio que janela dando um blur de fundo"): o `<dialog id="cr-chamado">` (o mesmo fundo desfocado das outras janelas)
   com a moldura `/os/_nexus/chamado/<nº>` (`ponte.chamado_os`), que traz a MESMA tela do OS Creator numa moldura dentro
   dela (assim ela se vê embutida, sem o cabeçalho e as abas do OS Creator); sem o login do Fracttal, a moldura diz como
-  entrar e volta ao Painel.
+  entrar e volta ao Painel. O **"← Acompanhamento" da tela do chamado abre o quadro no supervisor do Painel** (3ª
+  rodada: "gostaria que já viesse com o supervisor filtrado"): no clique do chamado, o Painel guarda o Responsável UFV
+  nos filtros que o quadro relê NESTA aba (`sessionStorage["acomp.filtros"].ufv`, o `acomp.js` do OS Creator, sem
+  mexer na cópia); o Responsável UFV do quadro é o Responsável O&M da ficha da usina, o mesmo do Painel. Com "Todos",
+  o filtro do supervisor sai. O setor Supervisão Campo tem telas do OS Creator (o portão por setor abre `/os/...` só a
+  quem tem uma: conferido nos Acessos em 28/10).
 - **Prova:** `tests/test_campo_painel_responsavel.py` (a ordem e a completude de cada quadro, o nome do ativo, o número
   das rondas, os extintores, o padrão de quem entra, o "Todos", o CSS das 6 linhas com a rolagem e da janela do
   chamado), `tests/test_dados_fato_chamado_status.py` (o status no fato) e `tests/test_oscreator_chamado_por_cima.py`
@@ -968,6 +990,15 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
     limpeza, meta, semana, zeladoria), o título do alerta da usina; a disponibilidade, a usina e o valor. A OS atrasada
     não tem técnico no banco (o `fato_tarefa_os` não guarda pessoa, regra 8): ela cobra a equipe, cujos técnicos estão
     no topo.
+  - **O Focar em tabela e o "e mais" que abre** (Levi, 28/10/2026, na janela de uma equipe: "ao clicar nas equipes
+    aparece esse 'e mais x' tem que dar para expandir esses 'e mais' o supervisor deve saber o que é. Consegue trazer em
+    um formato melhor? Usinas em linhas e essas linhas em coluna. pelo menos no focar"): o Focar é a tabela de
+    `ranking_equipes.matriz`, as áreas em crítico nas colunas e as usinas com algum alerta delas nas linhas (a com mais
+    áreas em crítico primeiro); a célula traz a prova sem o nome da usina (`_provas(..., com_usina=False)`), 2 à vista
+    e o resto no "e mais" dela, e a usina em crítico naquela área leva a borda vermelha. Com a tabela, a janela fica
+    mais larga (`.cr-modal:has(.cr-rk-j-mat)`). O Acompanhar segue em lista, com o "e mais N" que abre o `resto` ali
+    mesmo. Para abrir TUDO, as atrasadas e as pausadas vêm inteiras (`manutencao`: `todas_atrasadas`/`todas_paradas`;
+    a linha da Visão geral segue com as 5 piores, `lista_*`).
   - **Nota do App** (`ranking_equipes.motivos`): o que ela perde, em pílulas (cobertura, cada critério da nota do App e
     as rondas). A nota perde 100 − nota pontos: a qualidade tira 0,6 × (100 − qualidade), a cobertura o resto; a parte
     da qualidade vai a cada critério (a "Composição da nota" de cada tarefa, no livro cru pela chave do fato: subtarefas

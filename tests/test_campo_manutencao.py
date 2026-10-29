@@ -42,6 +42,14 @@ def test_atrasada_e_a_regua_do_pcm():
     assert [(x["os"], x["dias"], x["wid"]) for x in r["lista_atrasadas"]] == [(100, 11, 50100), (101, 11, 50101)]
 
 
+def test_a_linha_mostra_5_e_a_janela_da_equipe_todas():
+    """A linha da Visão geral fica com as 5 piores; o "e mais" da janela da equipe abre todas (Levi, 28/10/2026: "tem
+    que dar para expandir esses 'e mais' o supervisor deve saber o que é")."""
+    r = _usina([_t(i, 300 + i, prog=20261001 + i) for i in range(7)])
+    assert r["atrasadas_os"] == 7 and len(r["lista_atrasadas"]) == 5 and len(r["todas_atrasadas"]) == 7
+    assert r["lista_atrasadas"] == r["todas_atrasadas"][:5] and r["todas_atrasadas"][0]["os"] == 300   # a mais velha
+
+
 def test_as_exclusoes():
     tarefas = [_t(1, 200, bo=1), _t(2, 201, tipo="zeladoria"), _t(3, 202, tipo="teste"), _t(4, 203),
                _t(5, 204), _t(6, 205), _t(7, 206)]

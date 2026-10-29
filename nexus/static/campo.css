@@ -718,6 +718,9 @@ button.cr-v:hover,button.cr-v:focus-visible{outline:2px solid var(--verde);outli
 .cr-jan-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px;margin-bottom:14px}
 .cr-jan-cab h2{margin:4px 0 2px;font:800 22px/1.2 var(--font-display)}
 .cr-jan-cab .mudo{margin:0;font-size:12.5px}
+/* a última ronda de extintores ao lado do nome da usina (28/10/2026) e a linha do relatório da Segurança */
+.cr-jan-ronda{margin-left:8px;font:600 12.5px/1.3 var(--font-sans);color:var(--tinta-2);white-space:nowrap}
+.cr-jan-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px}
 .cr-jan-resumo{display:grid;justify-items:end;gap:3px}
 .cr-jan-resumo .cr-v{font-size:18px;line-height:28px;padding:0 10px}
 .cr-jan-resumo .mudo{font-size:12px}
@@ -934,6 +937,28 @@ tr.rk-linha[aria-expanded="true"] .rk-seta{transform:rotate(180deg)}
 .cr-rk-j-itens span{overflow-wrap:anywhere}
 .cr-rk-j-cab{font-weight:700}
 .cr-rk-j-itens li:last-child,.cr-rk-j-os li:last-child{border-bottom:0}
+/* o "e mais N" que abre o resto (28/10/2026): o resumo é o botão, as provas aparecem embaixo dele */
+.cr-rk-j-mais{display:grid;gap:2px}
+.cr-rk-j-mais > summary{cursor:pointer;width:max-content;color:var(--verde-texto);font-size:12.5px;font-weight:600;
+  list-style:none}
+.cr-rk-j-mais > summary::-webkit-details-marker{display:none}
+.cr-rk-j-mais[open] > summary{color:var(--mudo)}
+/* o Focar em tabela (28/10/2026, "Usinas em linhas e essas linhas em coluna"): a usina na 1ª coluna, presa ao rolar
+   para o lado; a célula da usina em crítico naquela área com a borda vermelha à esquerda */
+.cr-rk-j-mat{overflow-x:auto;border:1px solid var(--linha);border-radius:var(--raio-md)}
+.cr-rk-j-mat table{width:100%;border-collapse:collapse;font-size:12.5px}
+.cr-rk-j-mat th,.cr-rk-j-mat td{padding:7px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--linha)}
+.cr-rk-j-mat thead th{font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;
+  color:var(--mudo);white-space:nowrap;background:var(--superficie-2)}
+.cr-rk-j-mat tbody th{position:sticky;left:0;z-index:1;min-width:130px;font-weight:700;background:var(--superficie)}
+.cr-rk-j-mat td{min-width:120px}
+.cr-rk-j-mat td > b,.cr-rk-j-mat td > span{display:block;overflow-wrap:anywhere}
+.cr-rk-j-mat tbody tr:last-child > *{border-bottom:0}
+.cr-rk-j-crit{box-shadow:inset 3px 0 0 var(--critico-cheio)}
+/* a prova com OS ("OS 15539 · há 21 d") não quebra no meio; a longa (a PT, o título da meta) quebra como sempre */
+.cr-rk-j-mat .cr-rk-j-pos{white-space:nowrap}
+/* com a tabela do Focar, a janela fica mais larga (7 colunas não cabem nos 1.000 px das outras janelas) */
+.cr-modal:has(.cr-rk-j-mat){width:min(1320px,calc(100vw - 32px))}
 .cr-rk-j-ok,.cr-rk-j-txt{margin:0 0 10px;font-size:13px}
 .cr-rk-j-perdas{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;padding:0;list-style:none}
 .cr-rk-j-perdas li{padding:3px 10px;font-size:12.5px;background:var(--superficie-2);border:1px solid var(--linha);
@@ -1268,22 +1293,27 @@ tr.ap-os:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
    "poderia ter um scroll para o que não cabe no card, scroll alá Nexus (...) não podemos deixar nada de fora"; e, ao ver
    o quadro com a metade da tela: "Ficou mt grande! Limite de 6 em 6 com um scroll"). A linha tem altura fixa
    (`--pn-linha`) para as 6 caberem exatas. */
-/* Seis quadros em 3 × 2 (28/10/2026: o 6º, os extintores vencidos; o Ranking deixou de ocupar duas colunas) */
-.pn{--pn-linha:42px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px;align-items:start}
-.pn-q{display:flex;flex-direction:column;min-width:0;padding:12px 14px 8px;background:var(--superficie);
-  border:1px solid var(--linha);border-radius:var(--raio-md)}
+/* 3 × 2 com o MESMO tamanho em todos os quadros (Levi, 29/10/2026: "Padronize o tamanho do card para todas as
+   modalidades"): a altura é fixa (`--pn-card`, o número com duas linhas e as 6 linhas da lista) e a lista encolhe e
+   rola se faltar lugar. A Performance ocupa duas colunas ("Aproveita o espaço para dar um destaque nas usinas abaixo
+   da performance"): na 1ª linha ela e os chamados; na 2ª o Ranking, as Rondas e os Extintores */
+.pn{--pn-linha:42px;--pn-card:380px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px;
+  align-items:start}
+.pn-q{display:flex;flex-direction:column;min-width:0;height:var(--pn-card);padding:12px 14px 8px;
+  background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.pn-q--largo{grid-column:span 2}
 .pn-cab{display:flex;align-items:center;gap:10px}
 .pn-cab h2{display:flex;align-items:center;gap:8px;margin:0;font:600 14px/20px var(--font-sans);color:var(--tinta)}
 .pn-cab h2 .ph{font-size:17px;color:var(--mudo)}
 .pn-ver{margin-left:auto;font:600 12px/16px var(--font-sans);color:var(--verde-texto);text-decoration:none;white-space:nowrap}
 .pn-ver:hover{text-decoration:underline}
 .pn-q > .pn-ver{margin:8px 0 0;align-self:flex-start}
-.pn-num{display:flex;align-items:baseline;gap:10px;margin:6px 0 6px}
+/* o número guarda o lugar de duas linhas em todos os quadros: as listas começam na mesma altura */
+.pn-num{display:flex;align-items:baseline;gap:10px;min-height:48px;margin:6px 0 6px}
 .pn-num > b{font:600 28px/32px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .pn-num > span{font-size:13px;color:var(--tinta-2);line-height:1.35}
 .pn-num small{display:block;font-size:12px;color:var(--mudo)}
-.pn-nota{margin:6px 0 8px;font-size:12px;color:var(--mudo)}
-.pn-lista{max-height:calc(6 * var(--pn-linha) + 5 * 2px);min-height:0;overflow-y:auto;overscroll-behavior:contain;
+.pn-lista{max-height:calc(6 * var(--pn-linha) + 5 * 2px);flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
   list-style:none;margin:0 -6px 0 0;
   padding:0 6px 0 0;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .pn-lista::-webkit-scrollbar{width:8px}
@@ -1320,12 +1350,38 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
 .pn-it-nome small i{font-style:normal;color:var(--mudo);opacity:.8}
 .pn-rk-seta{min-width:36px;font:600 11px/16px var(--font-mono);color:var(--mudo)}
 .pn-rk-seta--sobe{color:var(--ok)} .pn-rk-seta--desce{color:var(--critico)}
-.pn-seg{display:flex;height:8px;margin:0 0 8px;border-radius:999px;overflow:hidden;background:var(--superficie-3);gap:2px}
-.pn-seg .o{background:var(--ok-cheio)} .pn-seg .a{background:var(--alerta-cheio)}
-.pn-seg .c{background:var(--critico-cheio)} .pn-seg .n{background:var(--critico-cheio);opacity:.55}
 .pn-vazio{padding:10px 8px;font-size:13px;color:var(--mudo)}
+/* a Performance larga (29/10/2026): por usina, a meta do mês (a barra e o número), o PR contra o previsto e a
+   disponibilidade em colunas, com o rótulo de cada coluna em cima */
+.pn-perf-cab,.pn-it--perf{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(70px,1fr) 56px 140px 110px;
+  align-items:center;gap:12px}
+.pn-perf-cab{margin:0 6px 2px 0;padding:0 8px;font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;
+  text-transform:uppercase;color:var(--mudo)}
+.pn-perf-cab span:nth-child(n+4){text-align:right}
+.pn-it--perf .pn-barra{width:100%}
+.pn-c{font:600 13px/18px var(--font-mono);text-align:right;white-space:nowrap}
+.pn-c small{font:500 11.5px/15px var(--font-sans);color:var(--mudo)}
+/* as PT pendentes no cabeçalho (29/10/2026: "PTs pendentes pode ficar como um KPI que quando o supervisor clicasse ele
+   veria quais são as PTs"): o número com a cor de antes, e o clique abre a lista na janela */
+.pn-kpi{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;margin-left:auto;padding:8px 14px;
+  background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);cursor:pointer}
+.pn-kpi:hover{background:var(--superficie-2)}
+.pn-kpi:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.pn-kpi b{font:600 26px/30px var(--font-sans);font-variant-numeric:tabular-nums}
+.pn-kpi span{display:grid;font-size:13px;line-height:1.3;color:var(--tinta-2)}
+.pn-kpi small{font-size:12px;font-weight:600;color:var(--verde-texto)}
+.pn-kpi--critico{border-color:var(--critico-cheio)} .pn-kpi--critico b{color:var(--critico)}
+.pn-kpi--alerta b{color:var(--alerta)} .pn-kpi--ok b{color:var(--ok)}
+.pn-kpi + .cn-frescor{margin-left:0}
+/* a lista das PT na janela: inteira, sem o limite das 6 linhas do quadro */
+.pn-lista--jan{max-height:none;overflow:visible;margin:0;padding:0}
 @media (max-width:1180px){.pn{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.pn{grid-template-columns:minmax(0,1fr)}.pn-barra{flex-basis:56px}
+  .pn-q--largo{grid-column:auto}
+  .pn-perf-cab{display:none}
+  .pn-it--perf{grid-template-columns:minmax(0,1fr) 56px}
+  .pn-it--perf .pn-barra,.pn-it--perf .pn-c{display:none}
+  .pn-kpi{margin-left:0}
 }
 /* A tela do chamado de Garantias por cima (28/10/2026): a janela grande, a moldura ocupa tudo embaixo do Fechar. O
    display só com ela aberta (o <dialog> fechado é display:none, e um display aqui o mostraria) */

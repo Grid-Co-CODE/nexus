@@ -405,6 +405,56 @@ def test_em_que_cobrar_item_a_item_com_a_prova():
     assert [e["cls"] for e in RE.etiquetas({}, [altair, brodowski, coracao])] == [x["nivel"] for x in c]
 
 
+def _tres_usinas():
+    """Altair com três áreas em crítico, Brodowski 1 com a ronda em crítico e as atrasadas em atenção, Coração 1 com a
+    ronda (o mesmo desenho do teste do Em quê cobrar)."""
+    altair = _ua(1, usina="Altair", manut=[("parada", "critico"), ("atrasadas", "critico")], acomp=[("pt", "critico")],
+                 paradas_abertas=[{"os": "13002", "escopo": "Inversor 1", "inicio": "02/10 08:00", "_ini": "2026-10-02T08:00"}],
+                 manutencao={"atrasadas": 5, "atrasadas_os": 2,
+                             "todas_atrasadas": [{"os": "14909", "dias": 12, "wid": 900014909}, {"os": "15403", "dias": 10}],
+                             "lista_atrasadas": [{"os": "14909", "dias": 12, "wid": 900014909}]},
+                 pt={"lista": [{"numero": "PT-1", "solicitante": "Técnico Um", "idade_min": 90, "parada": True, "hoje": True}]})
+    brodowski = _ua(2, usina="Brodowski 1", manut=[("atrasadas", "atencao")], acomp=[("ronda", "critico")],
+                    manutencao={"atrasadas": 4, "atrasadas_os": 3,
+                                "todas_atrasadas": [{"os": "15538", "dias": 11}, {"os": "15600", "dias": 8},
+                                                    {"os": "15601", "dias": 7}]})
+    brodowski["acomp"]["alertas"][0]["titulo"] = "Sem ronda há 9 dias"
+    coracao = _ua(3, usina="Coração 1", acomp=[("ronda", "critico")])
+    coracao["acomp"]["alertas"][0]["titulo"] = "Nunca teve ronda"
+    coracao["ronda"] = {"tipo": "nunca"}
+    return [altair, brodowski, coracao]
+
+
+def test_o_e_mais_abre_o_resto_com_a_lista_inteira():
+    """Levi, 28/10/2026: "tem que dar para expandir esses 'e mais' o supervisor deve saber o que é": as 3 à vista e o
+    resto inteiro (as atrasadas vêm de `todas_atrasadas`, não das 5 da linha da Visão geral)."""
+    atrasadas = next(x for x in RE.cobrar({}, _tres_usinas()) if x["area"] == "atrasadas")
+    assert _ler(atrasadas["provas"]) == ["OS 14909 · Altair · há 12 d", "OS 15538 · Brodowski 1 · há 11 d",
+                                         "OS 15403 · Altair · há 10 d"]
+    assert _ler(atrasadas["resto"]) == ["OS 15600 · Brodowski 1 · há 8 d", "OS 15601 · Brodowski 1 · há 7 d"]
+    assert atrasadas["mais"] == len(atrasadas["resto"]) == 2
+
+
+def test_o_focar_em_tabela_usinas_nas_linhas_e_areas_nas_colunas():
+    """Levi, 28/10/2026: "Usinas em linhas e essas linhas em coluna. pelo menos no focar"."""
+    m = RE.matriz(_tres_usinas())
+    assert [c["rot"] for c in m["colunas"]] == ["Parada agora", "Atrasadas", "PT parada", "Ronda"]   # só as em crítico
+    # a usina com mais áreas em crítico primeiro; no empate, a com mais células
+    assert [l["usina"] for l in m["linhas"]] == ["Altair", "Brodowski 1", "Coração 1"]
+    altair, brodowski, coracao = m["linhas"]
+    assert set(altair["celulas"]) == {"parada", "atrasadas", "pt"}
+    a = altair["celulas"]["atrasadas"]
+    assert a["cabeca"] == "5 tarefas" and _ler(a["provas"]) == ["OS 14909 · há 12 d", "OS 15403 · há 10 d"] and a["critico"]
+    assert _ler(altair["celulas"]["pt"]["provas"]) == ["PT-1 · pedida por Técnico Um há 1 h 30 min"]
+    # Brodowski: as atrasadas em atenção (a célula sem a cor) e a ronda em crítico; a 3ª OS no "e mais" da célula
+    b = brodowski["celulas"]["atrasadas"]
+    assert not b["critico"] and _ler(b["provas"]) == ["OS 15538 · há 11 d", "OS 15600 · há 8 d"]
+    assert _ler(b["resto"]) == ["OS 15601 · há 7 d"]
+    assert _ler(brodowski["celulas"]["ronda"]["provas"]) == ["Sem ronda há 9 dias"] and brodowski["celulas"]["ronda"]["critico"]
+    assert set(coracao["celulas"]) == {"ronda"} and _ler(coracao["celulas"]["ronda"]["provas"]) == ["Nunca teve ronda"]
+    assert RE.matriz([_ua(9, usina="Sem nada", acomp=[("extintores", "atencao")])]) == {"colunas": [], "linhas": []}
+
+
 def test_em_que_cobrar_sem_alerta_fica_vazio():
     assert RE.cobrar({}, [_ua(1, usina="Altair")]) == []
 

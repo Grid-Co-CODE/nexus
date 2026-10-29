@@ -20,16 +20,35 @@
 </header>
 {% set focar = cob|selectattr('nivel', 'equalto', 'critico')|list %}
 {% set acomp = cob|rejectattr('nivel', 'equalto', 'critico')|list %}
-{% for titulo, itens, cls in (('Focar', focar, 'critico'), ('Acompanhar', acomp, 'alerta')) %}{% if itens %}
+{# uma prova: a OS citada vira o botão do card dela #}
+{% macro prova(p) %}<span{% if p.os %} class="cr-rk-j-pos"{% endif %}>{% if p.os %}{{ os_card(p.os, p.wid) }} · {% endif %}{{ p.txt }}</span>{% endmacro %}
+{# o "e mais N" abre o resto ali mesmo (Levi, 28/10/2026: "tem que dar para expandir esses 'e mais' o supervisor deve
+   saber o que é"); o que ficou contado sem detalhe (a OS sem a linha da lista) só diz quantas são #}
+{% macro mais(resto, total=0) %}{% if resto %}<details class="cr-rk-j-mais"><summary>e mais {{ resto|length }}</summary>{% for p in resto %}{{ prova(p) }}{% endfor %}</details>{% endif %}{% if total > resto|length %}<span class="mudo">e mais {{ total - resto|length }} sem o detalhe</span>{% endif %}{% endmacro %}
 {# Focar e Acompanhar abrem expandidos e encolhem no título (Levi, 19/10/2026: "deve ser possível encolher Focar e
-   acompanhar, eles aparecem expandidos que nem estão agora") #}
+   acompanhar, eles aparecem expandidos que nem estão agora"). O Focar em tabela (28/10/2026: "Usinas em linhas e essas
+   linhas em coluna. pelo menos no focar"): as usinas nas linhas e as áreas em crítico nas colunas
+   (`ranking_equipes.matriz`); a célula da usina em crítico naquela área leva a cor. #}
+{% if focar %}
 <details class="cr-rk-j-bloco cr-rk-j-dobra" open>
-  <summary class="cr-rk-j-nivel cn-t-{{ cls }}">{{ titulo }} <span>{{ itens|length }} ite{{ 'ns' if itens|length != 1 else 'm' }}</span></summary>
+  <summary class="cr-rk-j-nivel cn-t-critico">Focar <span>{{ mat.linhas|length }} usina{{ 's' if mat.linhas|length != 1 }} · {{ mat.colunas|length }} área{{ 's' if mat.colunas|length != 1 }}</span></summary>
+  <div class="cr-rk-j-mat"><table>
+    <thead><tr><th scope="col">Usina</th>{% for c in mat.colunas %}<th scope="col">{{ c.rot }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for l in mat.linhas %}
+      <tr><th scope="row">{{ l.usina }}</th>{% for c in mat.colunas %}{% set x = l.celulas.get(c.area) %}
+        <td{% if x and x.critico %} class="cr-rk-j-crit"{% endif %}>{% if x %}{% if x.cabeca %}<b>{{ x.cabeca }}</b>{% endif %}{% for p in x.provas %}{{ prova(p) }}{% endfor %}{{ mais(x.resto) }}{% else %}<span class="mudo">—</span>{% endif %}</td>{% endfor %}</tr>{% endfor %}
+    </tbody>
+  </table></div>
+</details>
+{% endif %}
+{% if acomp %}
+<details class="cr-rk-j-bloco cr-rk-j-dobra" open>
+  <summary class="cr-rk-j-nivel cn-t-alerta">Acompanhar <span>{{ acomp|length }} ite{{ 'ns' if acomp|length != 1 else 'm' }}</span></summary>
   <ul class="cr-rk-j-itens">
-    {% for x in itens %}<li><b>{{ x.rot }}</b><div>{% if x.cabeca %}<span class="cr-rk-j-cab">{{ x.cabeca }}</span>{% endif %}{% for p in x.provas %}<span>{% if p.os %}{{ os_card(p.os, p.wid) }} · {% endif %}{{ p.txt }}</span>{% endfor %}{% if x.mais %}<span class="mudo">e mais {{ x.mais }}</span>{% endif %}</div></li>{% endfor %}
+    {% for x in acomp %}<li><b>{{ x.rot }}</b><div>{% if x.cabeca %}<span class="cr-rk-j-cab">{{ x.cabeca }}</span>{% endif %}{% for p in x.provas %}{{ prova(p) }}{% endfor %}{{ mais(x.resto, x.mais) }}</div></li>{% endfor %}
   </ul>
 </details>
-{% endif %}{% endfor %}
+{% endif %}
 {% if not cob %}<p class="cr-rk-j-ok">Nada a cobrar nos três blocos: o semáforo da equipe está em dia.</p>{% endif %}
 <section class="cr-rk-j-bloco">
   <h3 class="cr-rk-j-nivel">Nota do App{% if m and m.perde %} <b class="cn-t-{{ cor }}">{{ n.nota }}</b><span>perde {{ m.perde }}{% if info.get('atual') %} no mês, de {{ dia_curto(info.atual[0]) }} até {{ dia_curto(info.atual[1]) }}{% endif %}</span>{% endif %}</h3>
