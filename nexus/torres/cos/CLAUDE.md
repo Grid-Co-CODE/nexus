@@ -234,6 +234,17 @@ Só lê; nada vai ao banco (decisão do Levi, 27/10/2026: a tela, sem guardar).
   normalizações lidas antes de 28/10 não voltam sozinhas com os dois campos (a linha só volta quando muda): o Nexus relê
   desde o 1º dia do mês mais antigo a cada reinício, então o deploy os preenche. O "registrada pelo COS" embaixo da
   Normalização é o `declarada_por: pessoa` (até 27/10 dizia "Operador" ali, e confundia).
+- **Proteções, Geração parou e Conferência da OS** (29/10/2026, Levi: "quero proteções, geração_parou e conferência da OS
+  na tabela, quero que seja exportável também"), campos que a API passou a mandar em 29/10: `protecoes` (como o time
+  escreve), `geracao_parou` (só na falha de comunicação, desde 28/10: Sim vermelho, Não verde) e `conferencia_da_os` (a
+  Ronda COS relê a OS no Fracttal de 10 em 10 min: Aguardando técnico, Hora a corrigir (com os minutos da conclusão),
+  Hora confere (falta finalizar), Finalizada, Travada, Ainda não lida; "—" = a OS não foi criada pela Ronda COS).
+  Colunas depois da Usina (as duas primeiras) e no fim (a conferência); no CSV, todas as partes da conferência (tarefas,
+  Data do Evento e conclusão no Fracttal, as duas diferenças em minutos, finalizada e lida em). Filtro **Tipo de falha**
+  (29/10/2026, "quero um filtro para saber se foi falha de comunicação ou desligamento"): pelo rótulo da Ronda COS, com
+  os tipos que existem no mês e quantas cada um (as opções vêm do dado, não de uma lista fixa daqui). Com 12 colunas, cada célula tem 7 px de folga dos lados e a Usina 150 px de mínimo: cabe em 1366 px.
+  `impacto` e `detalhes` (texto livre do time, com nome e telefone às vezes) NÃO entraram; se entrarem, só na tela e no
+  CSV, e nunca texto real em teste (o guia da API, seção 2.3).
 - **As contas:** as opções dos filtros contam o mês, antes dos filtros; a faixa conta a lista filtrada SEM o status
   (senão a fatia aberta seria sempre 100%). A desfeita (`normalizada: false`) sai da lista e é dita à parte; a sem hora
   real fica na lista, marcada, e fora da mediana.

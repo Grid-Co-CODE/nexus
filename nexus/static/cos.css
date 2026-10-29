@@ -93,3 +93,8 @@ tr.cos-os:focus-visible{outline:2px solid var(--verde);outline-offset:-2px}
 .cos-norm{zoom:.8}
 /* a data e a hora numa linha só (com Operador e Técnico, 28/10/2026, a tabela apertou e "27/10 07:00" quebrava) */
 .cos-norm .cn-tab td:nth-child(3),.cos-norm .cn-tab td:nth-child(4){white-space:nowrap}
+/* 12 colunas (29/10/2026: proteções, geração parou e a conferência da OS): menos folga dos lados de cada célula, e a
+   usina com uma largura mínima (sem ela, o nome quebrava letra a letra) */
+.cos-norm .cn-tab th,.cos-norm .cn-tab td{padding-left:7px;padding-right:7px}
+.cos-norm .cn-tab td.cos-usina{min-width:150px}
+.cos-norm .cn-tab td.cos-protecoes{max-width:110px;white-space:normal}
