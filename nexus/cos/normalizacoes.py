@@ -25,11 +25,11 @@ from statistics import median
 from . import andamento as AND
 
 VERSAO = 1
-# Os 30 dias que a memória cobre além dos meses (o 1º dia do mês mais antigo já vem antes deles; fica de piso).
-JANELA_MIN_DIAS = 31
 # Por mês (27/10/2026, Levi: "a única mudança que quero é ver por mês"; e depois "Pode tirar esses filtros de 7, 30 dias
-# ou último dia"): o mês corrente (o padrão) e os anteriores, até MESES no total. A memória guarda desde o 1º dia do mais antigo (em 27/10: desde 01/08), ~1.500 normalizações por mês.
-MESES = 3
+# ou último dia"): o mês corrente (o padrão) e os anteriores, só DESDE outubro de 2026 (29/10/2026: "quero apenas de
+# outubro para frente, não precisa carregar os outros meses"; até ali eram 3 meses, e a 1ª carga trazia agosto e setembro).
+# A memória guarda desde o 1º dia de PRIMEIRO_MES, ~1.500 normalizações por mês.
+PRIMEIRO_MES = (2026, 10)
 MESES_NOME = ("Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro",
               "Novembro", "Dezembro")
 # A cada minuto pergunta o que mudou (o guia: "se `mais` for false, espere 1 minuto").
@@ -93,16 +93,17 @@ def meses(agora: datetime) -> list[tuple[str, str, datetime, datetime]]:
     """(chave "2026-10", rótulo, começo, começo do seguinte), do mês corrente para trás. O ano só no rótulo de mês de
     outro ano."""
     out, ini = [], _mes_de(agora)
-    for _ in range(MESES):
+    while True:                      # o corrente sempre; os de antes, até PRIMEIRO_MES
         rot = MESES_NOME[ini.month - 1] + ("" if ini.year == agora.year else f" de {ini.year}")
         out.append((ini.strftime("%Y-%m"), rot, ini, _mes_seguinte(ini)))
         ini = _mes_de(ini - timedelta(days=1))
-    return out
+        if (ini.year, ini.month) < PRIMEIRO_MES:
+            return out
 
 
 def inicio_da_guarda(agora: datetime) -> datetime:
-    """Desde quando a memória guarda: o 1º dia do mês mais antigo da tela (cobre também os 30 dias)."""
-    return min(meses(agora)[-1][2], agora - timedelta(days=JANELA_MIN_DIAS))
+    """Desde quando a memória guarda: o 1º dia do mês mais antigo da tela."""
+    return meses(agora)[-1][2]
 
 
 def mes_pedido(v, agora: datetime) -> str:

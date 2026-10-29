@@ -182,17 +182,18 @@ def test_o_csv_leva_a_lista_filtrada_e_o_que_a_tela_resume():
 
 
 def test_por_mes_o_mes_inteiro_pela_hora_da_volta():
-    """Levi, 27/10/2026: "a única mudança que quero é ver por mês"."""
-    assert [(k, r) for k, r, _i, _f in NO.meses(AGORA)] == [("2026-10", "Outubro"), ("2026-09", "Setembro"),
-                                                            ("2026-08", "Agosto")]
-    assert [m[0] for m in NO.meses(AND.instante("2026-01-10T10:00:00-03:00"))] == ["2026-01", "2025-12", "2025-11"]
-    assert NO.meses(AND.instante("2026-01-10T10:00:00-03:00"))[1][1] == "Dezembro de 2025"
+    """Levi, 27/10/2026: "a única mudança que quero é ver por mês"; 29/10/2026: "quero apenas de outubro para frente,
+    não precisa carregar os outros meses"."""
+    assert [(k, r) for k, r, _i, _f in NO.meses(AGORA)] == [("2026-10", "Outubro")]
+    jan = NO.meses(AND.instante("2027-01-10T10:00:00-03:00"))
+    assert [m[0] for m in jan] == ["2027-01", "2026-12", "2026-11", "2026-10"] and jan[1][1] == "Dezembro de 2026"
+    assert NO.inicio_da_guarda(AGORA) == AND.instante("2026-10-01T00:00:00-03:00")
     itens = ITENS + [_n("s1", volta="2026-09-30T23:59:00-03:00"), _n("o1", volta="2026-10-01T00:00:00-03:00")]
     p = NO.painel(AND.Leitura("", {"itens": itens}), AGORA, mes="2026-10")
     assert [i["registro"] for i in p.itens] == ["r1", "r3", "r4", "r2", "r6", "o1"]       # o mês todo, sem a desfeita
-    p = NO.painel(AND.Leitura("", {"itens": itens}), AGORA, mes="2026-09")
-    assert [i["registro"] for i in p.itens] == ["s1"] and p.resumo["total"] == 1
-    assert NO.mes_pedido("2026-07", AGORA) == "2026-10" and NO.mes_pedido("2026-09", AGORA) == "2026-09"
+    p = NO.painel(AND.Leitura("", {"itens": itens}), AGORA, mes="2026-09")             # setembro não existe mais: outubro
+    assert "s1" not in [i["registro"] for i in p.itens] and len(p.itens) == 6
+    assert NO.mes_pedido("2026-07", AGORA) == NO.mes_pedido("2026-09", AGORA) == "2026-10"
 
 
 def test_a_indisponibilidade_em_minutos_e_horas():
@@ -208,8 +209,8 @@ def test_a_primeira_carga_pagina_e_depois_so_o_que_mudou(ligada, monkeypatch):
                       _resp([_n("r1", aberta=ABERTA)], "c3"))
     l = NO.ler(ligada.config, AGORA)
     assert len(l.dados["itens"]) == 6 and not l.dados["carregando"]
-    # a 1ª carga desde o 1º dia do mês mais antigo da tela (em 27/10: 01/08), a página seguinte já pelo cursor
-    assert pedidos[0][0] == "/api/normalizacoes" and pedidos[0][1] == "2026-08-01T00:00:00-03:00"
+    # a 1ª carga desde 01/10/2026 (o 1º mês da tela), a página seguinte já pelo cursor
+    assert pedidos[0][0] == "/api/normalizacoes" and pedidos[0][1] == "2026-10-01T00:00:00-03:00"
     assert [p[1] for p in pedidos[1:]] == ["c1"] and pedidos[0][2] == NO.TIMEOUT_S
     # dentro do minuto não pergunta de novo
     assert NO.ler(ligada.config, AGORA) and len(pedidos) == 2
@@ -281,7 +282,7 @@ def test_a_tela(ligada, logado, monkeypatch):
     assert "lendo no Fracttal" not in html
     assert "varredura do Fracttal às <b>09:43</b>" in html
     html = logado.get("/t/cos/normalizacoes?mes=2026-10").get_data(as_text=True)
-    assert 'aria-current="page">Outubro<' in html and 'data-folio="16702"' in html and "Setembro" in html
+    assert 'aria-current="page">Outubro<' in html and 'data-folio="16702"' in html and "Setembro" not in html
     html = logado.get("/t/cos/normalizacoes?status=processo").get_data(as_text=True)
     # desde 29/10/2026 as linhas do mês vêm todas e as de fora do filtro chegam escondidas (o filtro é da página)
     def _escondida(folio):

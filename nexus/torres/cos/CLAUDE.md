@@ -205,7 +205,7 @@ Só lê; nada vai ao banco (decisão do Levi, 27/10/2026: a tela, sem guardar).
 
 - **De onde:** `GET <Andamento>/api/normalizacoes?desde=&limite=` (contrato `versao: 1`, a mesma chave `X-Nexus-Chave`). A
   API é **incremental**: devolve `cursor` e `mais`. O Nexus guarda em memória (`nexus/cos/normalizacoes.py`) desde o
-  1º dia do mês mais antigo da tela (em 27/10: desde 01/08), **por `registro`** (o mesmo registro volta com o estado novo e SUBSTITUI: o cursor fica 2 min atrás do
+  1º dia do mês mais antigo da tela (desde 01/10/2026: `PRIMEIRO_MES`), **por `registro`** (o mesmo registro volta com o estado novo e SUBSTITUI: o cursor fica 2 min atrás do
   relógio de propósito), e pergunta pelo cursor a cada minuto. A 1ª carga vem em páginas de 500 com 15 s de teto (lá,
   360 itens levam ~2,4 s); no máximo 4 páginas por pedido da tela, e o resto no pedido seguinte, com o aviso "carregando".
   Falhou: a memória continua, dita velha, e a próxima tentativa espera 1 minuto. O processo reiniciado (deploy) carrega
@@ -223,7 +223,8 @@ Só lê; nada vai ao banco (decisão do Levi, 27/10/2026: a tela, sem guardar).
   às do servidor, as 10 em 0,11 s.
 - **O que é regra de lá:** o que é normalização, a hora da volta (`normalizado_em`, já a corrigida), `fora_min`,
   `hora_real` e a OS aberta no Fracttal (a varredura de 30 em 30 min de lá; `varrida_em`). **Daqui:** **o mês** pela hora
-  da volta (o corrente no padrão e os 2 anteriores, `MESES`; os 1, 7 e 30 dias saíram no mesmo dia: "Pode tirar esses
+  da volta (o corrente no padrão e os anteriores só até outubro de 2026, `PRIMEIRO_MES`; 29/10/2026: "quero apenas de
+  outubro para frente, não precisa carregar os outros meses", até ali eram 3 meses; os 1, 7 e 30 dias saíram em 27/10: "Pode tirar esses
   filtros de 7, 30 dias ou último dia"), os filtros, a faixa e "há quantos dias da volta a OS segue aberta" (7 dias ou
   mais em vermelho).
 - **A tela, como o Levi pediu (27 e 28/10/2026, da 2ª à 4ª rodada):** as colunas OS, **Indisp.** (do início da falha
