@@ -719,8 +719,8 @@ FATOS = (
     # vontade" e "quero tirar do site de gestão"): o Nexus é a FONTE de quem cobre cada usina; o App de Campo lê daqui o
     # papel executa (as usinas da aba Ronda). Registrado antes da 1ª gravação.
     Fato("decisao_atribuicao_pcm", "Técnicos por usina", "pcm", "nexus_pcm_atribuicoes · fato_decisao_atribuicao",
-         "1 linha = 1 decisão de pôr ou tirar 1 pessoa de 1 usina num papel (executa); vale a última decisão de cada "
-         "usina, pessoa e papel",
+         "1 linha = 1 decisão de pôr ou tirar 1 pessoa de 1 usina num papel (executa ou responsavel); vale a última "
+         "decisão de cada usina, pessoa e papel",
          _d(data=("id", "data_id (o dia de Brasília da decisão; de_data_id e ate_data_id, o período do apoio)"),
             usina=("id", "usina_id (+ usina_fracttal, o nome da usina no Fracttal, por onde o App a acha)"),
             pessoa=("id", "pessoa_id + pessoa_hmac (o código do e-mail, por onde o App acha a pessoa) e "
@@ -734,7 +734,9 @@ FATOS = (
                     "leitura aberta da API e só aplica a linha assinada, quando o interruptor dele "
                     "(NEXUS_ATRIBUICOES) estiver ligado. A observação do PCM vai só cifrada (dados_cifrados, regra 8). "
                     "A carga inicial (origem carga_inicial) é a regra da equipe do cadastro: cada pessoa de campo "
-                    "recebe as usinas da equipe dela"),
+                    "recebe as usinas da equipe dela. responsavel (30/10/2026) = o Responsável UFV da ficha da usina "
+                    "(responsavel_om_id), que o Nexus põe sozinho de hora em hora (origem cadastro, nexus/pcm/responsaveis.py): "
+                    "o App manda a ele o aviso da PT aguardando assinatura e só ele assina a PT da usina"),
     # o almoxarifado (25/10/2026, Levi: "No fractall temos almoxarifado, gostaria de uma visão para a gestão desse
     # almoxarifado na parte de PCM"): a varredura diária do inventário do Fracttal, que o App faz e publica; o livro do
     # App guarda só o último ciclo, e o histórico é o do Nexus (`fato_almoxarifado.py`). O item do inventário segue o

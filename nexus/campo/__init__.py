@@ -36,6 +36,10 @@ def instalar(app):
     # máquina por vez (NEXUS_OS_PUBLICAR=0 desliga). É a fonte do bloco Manutenção da Visão do responsável
     from . import tarefas_os
     tarefas_os.ligar(app)
+    # o Responsável UFV de cada usina no livro de técnicos por usina (30/10/2026, a fase 3): de hora em hora, para o App
+    # mandar e assinar a PT pelo responsável do Nexus (NEXUS_RESPONSAVEIS=0 desliga numa máquina)
+    from ..pcm import responsaveis
+    responsaveis.ligar(app)
     # a última fila boa da Aprovação, do disco, já no boot e em toda máquina: não vai ao Fracttal (13/10/2026)
     threading.Thread(target=lambda: aprovacao.carregar_do_disco(app), daemon=True, name="nexus-fila-disco").start()
     # NEXUS_CAMPO_AQUECER=0 desliga só o que vai ao Fracttal ao subir (a cota é de 200/min para a empresa inteira)
