@@ -185,6 +185,8 @@ QUEM_GRAVA_ORIGEM = (
     ("igual", "thopen_contestacoes", "Dashboard Thopen (5080)"),
     # as senhas do login por pessoa (14/10/2026): o 5080 grava a cada senha definida (thopen/acessos.py)
     ("igual", "thopen_acessos", "Dashboard Thopen (5080)"),
+    # as normalizações da Ronda COS (29/10/2026): o Nexus lê a API do Andamento e grava o fato (nexus/cos/normalizacoes_banco.py)
+    ("igual", "Ronda COS (API de normalizações)", "Ronda COS (o Nexus lê a API de normalizações, só leitura)"),
     ("prefixo", "nexus_", "Nexus"),                              # livro do Nexus fora do LIVROS: viola a regra 10
 )
 A_DECLARAR = "a declarar"

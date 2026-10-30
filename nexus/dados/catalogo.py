@@ -1156,6 +1156,31 @@ FATOS = (
                     "cancelada fica fora. O nome da tarefa vira tarefa_chave (a mesma conta da programação e dos "
                     "motivos); o responsável da OS só vira do_backoffice (1/0, pelo HMAC do nome contra a lista do "
                     "PCM), nunca o nome (regra 8). Leitura do Fracttal incompleta não grava"),
+    # as normalizações da Ronda COS (29/10/2026, Levi: "calcule a disponibilidade por lá usando o de-para como
+    # referência"): o Nexus grava, a plataforma faz a régua da disponibilidade da Thopen (só ela, decisão dele). Os
+    # valores repetem os de nexus/cos/normalizacoes_banco.py (o teste confere): importar o módulo daqui seria circular
+    Fato("normalizacao", "Normalização da Ronda COS", "cos", "fora do banco: API de normalizações da Ronda COS (Andamento)",
+         "1 linha = 1 ocorrência normalizada da Ronda COS (o registro), no estado mais recente",
+         _d(data=("id", "data_id_inicio (o dia de Brasília da falha) e data_id_volta (o da normalização)"),
+            usina=("id", "usina_id (o código do Fracttal da usina contra o código do Registro mestre; só o código de "
+                         "uma usina liga)"),
+            cliente=("cod", "cliente (o nome da Ronda COS: THOPEN, AXIS...)"),
+            equipamento=("cod", "equipamentos_codigos (os códigos do Fracttal, separados por ;; vazio = a usina "
+                                "inteira)"),
+            os=("cod", "os (o nº da OS no Fracttal) e os_relacionadas")),
+         tipo="snapshot_acumulado", chave=("registro",),
+         medidas=_m((("fora_min", "min", "aditiva"), ("equipamentos_qtd", "qtd", "nao"),
+                     ("normalizada", "1/0", "aditiva"), ("hora_real", "1/0", "aditiva"),
+                     ("geracao_parou", "1/0", "aditiva"))),
+         fontes=("Ronda COS (API de normalizações) · normalizacoes",),
+         janela_origem="desde 01/10/2026 (a memória do Nexus; o livro guarda o que já gravou)",
+         estado="conformado", conformado_em="nexus_cos_normalizacoes · fato_normalizacao",
+         observacao="a mesma ocorrência volta da API quando muda (o fim corrigido, a desfeita, a OS no Fracttal): a "
+                    "linha é trocada pelo registro. inicio e normalizado_em em ISO (a hora conta na disponibilidade); "
+                    "fora_min é a conta da Ronda COS. Desfeita (normalizada 0) e sem hora real (hora_real 0) ficam, "
+                    "marcadas: quem conta as tira (o guia da API, seção 8). geracao_parou só na falha de comunicação "
+                    "(vazio nos outros tipos). As proteções em códigos curtos (protecoes, separadas por ;). Os dois "
+                    "nomes de pessoa e o texto livre da API (impacto, detalhes, informe) não entram (regra 8)"),
 )
 POR_ID = {f.id: f for f in FATOS}
 
@@ -1257,6 +1282,13 @@ LIVROS = (
           "nexus/cos/turno.py, pela tela COS > Passagem de turno", False,
           "registrado em 26/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª passagem registrada",
           so_cresce=True),
+    Livro("nexus_cos_normalizacoes", ("fato_normalizacao", "atualizacao"),
+          "de hora em hora (entre :22 e :27), só na máquina que lê a API da Ronda COS (o servidor)",
+          "nexus/cos/normalizacoes_banco.py (laço do app.py e do servir.py; NEXUS_NORMALIZACOES_PUBLICAR=0 desliga)",
+          False,
+          "registrado em 29/10/2026 antes de existir: nasce na 1ª volta do servidor depois do deploy. Grava só com a "
+          "memória das normalizações completa e sem erro e se a última gravação tiver mais de 50 min; troca o livro "
+          "inteiro, com as linhas de antes do que a memória guarda mantidas do banco"),
     Livro("nexus_engenharia_acompanhamento", ("dim_diagnostico", "fato_acompanhamento_ativo"),
           "a cada pegar, encaminhar, salvar, comentário e mudança no cadastro dos diagnósticos (tela Engenharia > "
           "Confiabilidade)",

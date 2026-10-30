@@ -50,6 +50,10 @@ if __name__ == "__main__":
     instalar_campo(app)
     instalar_dados(app)
     instalar_engenharia(app)
+    # as normalizações da Ronda COS no banco, de hora em hora, para a disponibilidade da Thopen (29/10/2026; só grava
+    # onde a chave do Andamento está, o servidor; NEXUS_NORMALIZACOES_PUBLICAR=0 desliga)
+    from nexus.cos import normalizacoes_banco
+    normalizacoes_banco.ligar(app)
     from nexus.pcm.relatorios import agenda as relatorios_pcm
     relatorios_pcm.ligar(app)                # os relatórios do PCM nos horários de lá (14/10/2026; 0 = desliga)
     from nexus.auth import pre_carga
