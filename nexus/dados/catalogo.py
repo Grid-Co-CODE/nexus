@@ -1012,7 +1012,8 @@ FATOS = (
          medidas=_m((("disp_pct", "%", "nao"), ("indisponibilidade_min", "min", "semi"))),
          janela_origem="o mês corrente e o anterior (o índice do Gerencial); mês que sai fica como foi publicado",
          observacao="disp = 100·(1 − h_perdidas/12); o 5080 calcula pelas horas (o disp de 1 casa desviava a média do "
-                    "mês). De 10/2026 em diante só as OS do Fracttal (a geração não entra); setembro para trás, a "
+                    "mês). De 10/2026 em diante só as OS do Fracttal (a geração não entra), e a Thopen, desde "
+                    "29/10/2026, pelas normalizações do COS (nexus_cos_normalizacoes); setembro para trás, a "
                     "Disponibilidade Usina (%) do BD_Thopen, só a Thopen. Um site do Fracttal pode ser de duas usinas "
                     "(Aparecida do Taboado 1 e 2): ligar pelo nome primeiro"),
     Fato("parada_tracker", "Parada de tracker", "performance", "plataforma_series · trk_eventos",
@@ -1545,6 +1546,12 @@ CONHECIDAS = (
               "tracker'"),
     Conhecida("falhas_performance", ("atualizacao",), "controle",
               "o controle da publicação da plataforma: as linhas de cada aba no mês"),
+    # 29/10/2026: a Thopen pelas normalizações do COS vai nas abas de sempre (disponibilidade_dia e _os_dia, com fonte e
+    # protecoes); estas guardam a conta de antes só para o cliente do Dashboard Thopen até o Levi liberar
+    Conhecida("falhas_performance", ("disponibilidade_dia_fracttal", "disponibilidade_os_dia_fracttal"), "apoio",
+              "a disponibilidade de antes da Thopen (só do Fracttal), mesmas colunas da disponibilidade_dia e da "
+              "disponibilidade_os_dia, para o cliente do Dashboard Thopen até a liberação da conta pelas normalizações "
+              "do COS (29/10/2026); na liberação a plataforma para de gravar e elas se aposentam"),
     Conhecida("campo_nexus", ("rondas", "atualizacao"), "aposentada",
               "do coletor do Fracttal do Nexus, desligado em 05/10/2026 (o fato dele se aposentou); fica no banco "
               "porque a API não apaga livro"),
