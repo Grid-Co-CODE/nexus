@@ -380,8 +380,16 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   lida do FIM (a semana em curso está entre as do arquivo do robô, no fim do fato) e a evidência guardada por 10 min:
   3,3 s fria, 0,02 a 0,06 s quente. Visão por técnico. Sem o
   cadastro do banco, a tela abre com o aviso e nada grava.
-- **O App: A1–A3 no ar na v283 (17/10/2026), com o interruptor `NEXUS_ATRIBUICOES` AUSENTE** (a aba Ronda ainda
-  segue a Organização do site de gestão). O contrato: `C:\GridcoBuild\app-campo-docs\_propostas\atribuicoes-nexus\LEIA.md`.
+- **O App: A1–A3 no ar na v283 (17/10/2026). `NEXUS_ATRIBUICOES=ligado` desde 29/10/2026 20:31Z: a regra é o Nexus.**
+  - **A decisão do Levi:** "o app de gestão não vai mandar mais nada para o app de campo, pelo menos no quesito de
+    técnicos".
+  - **O caso:** o Matheus Góis, posto aqui em Colorado 1 e 2, não via as usinas no App.
+  - **1ª passada (20:38Z):** postas 6, tiradas 0, adiadas 158. As pendências desta tela eram 56 sem pessoa e 10 sem
+    usina.
+  - **O que acontece ao zerar as pendências:** o App ENCERRA as ligações que este livro não tem, 158 naquela hora. Entre
+    elas há supervisores com executa para ronda, que o Nexus não reconhecia por e-mail. O PCM e o Levi decidem o "Só no
+    App" antes.
+  - O contrato: `C:\GridcoBuild\app-campo-docs\_propostas\atribuicoes-nexus\LEIA.md`.
   A1: o App publica a foto `organizacao_app_campo · Atribuicoes` aos :25, que a tela compara NO IDIOMA DO APP — a grafia
   da usina e o código que vão na linha, não os IDs do Nexus — e de onde saem as pendências para a troca (inclusive a
   linha que vai sem nome do Fracttal ou sem código). A2: de 5 em 5 min o App lê este livro, confere a assinatura e, com

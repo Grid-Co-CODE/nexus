@@ -201,7 +201,14 @@ no Nexus, logo depois da Passagem de turno (pedido do dono). Só lê.
 normalizações da Ronda COS (o guia `API-NORMALIZACOES.md`, do dono da Ronda COS). Por que importa: o Fracttal só encerra a
 OS quando o técnico fecha, muitas vezes dias depois da volta; na semana até 27/10/2026, 208 de 341 normalizações tinham a
 OS aberta no Fracttal (a OS 16702, de Mandaguaçu, normalizada em 19/10 às 05:53, seguia "em processo" oito dias depois).
-Só lê; nada vai ao banco (decisão do Levi, 27/10/2026: a tela, sem guardar).
+A tela só lê. **Desde 29/10/2026 a memória vai ao banco** para a disponibilidade da Thopen (Levi: "calcule a
+disponibilidade por lá usando o de-para como referência"; as decisões dele: o Nexus grava, vale só para a Thopen, conta
+só o que está nas normalizações): `nexus/cos/normalizacoes_banco.py` grava `nexus_cos_normalizacoes · fato_normalizacao`
+(1 linha = 1 `registro`, a usina ligada pelo código do Fracttal contra o Registro mestre, os dias de Brasília, a hora da
+falha e da volta, o tipo, `geracao_parou` 1/0, as proteções em código) de hora em hora, entre :22 e :27, só onde a chave
+do Andamento está (o servidor) e só com a memória completa e sem erro. Os dois nomes de pessoa e o texto livre não vão.
+A régua (que tipo conta, a janela solar, o kWp) é da plataforma (`plataforma/disponibilidade.py` do PerformancePainel).
+Prova: `tests/test_cos_normalizacoes_banco.py`.
 
 - **De onde:** `GET <Andamento>/api/normalizacoes?desde=&limite=` (contrato `versao: 1`, a mesma chave `X-Nexus-Chave`). A
   API é **incremental**: devolve `cursor` e `mais`. O Nexus guarda em memória (`nexus/cos/normalizacoes.py`) desde o

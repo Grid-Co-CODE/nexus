@@ -23,6 +23,7 @@ RESUMO = {
     "status_sugestao": "Cada mudança de status das sugestões, de Iniciada a Concluída",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
+    "normalizacao": "Quando cada usina voltou pela hora do COS, o tipo e as proteções",
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
     "acompanhamento_os": "O status, a prioridade e os comentários da Engenharia em cada OS",
     "marcacao_etm": "O diagnóstico e as marcações da Engenharia em cada OS de ETM",
@@ -124,6 +125,10 @@ PARA_QUE = {
     "tratamento_contestacao": "Guarda o acompanhamento de cada contestação do cliente: quem pegou a demanda (\"Pegar "
                               "para mim\") e cada atualização que o responsável escreveu, com o dia e a hora. Quem e o "
                               "texto vão cifrados; a tela Contratos e clientes → Contestações mostra.",
+    "normalizacao": "Guarda cada normalização da Ronda COS: quando a falha começou, a hora em que o COS registrou a "
+                    "volta, o tipo de falha, se a geração parou (na falha de comunicação) e as proteções que atuaram. "
+                    "É a base da disponibilidade da Thopen desde 29/10/2026: a hora da volta é a do COS, e não o "
+                    "fechamento da OS no Fracttal, que vem horas ou dias depois.",
     "passagem_turno": "Guarda cada troca de turno do COS (06:00 e 18:00): o que quem saiu escreveu para o próximo turno, "
                       "quantas ocorrências estavam abertas na hora e quem entrou e assumiu, com o dia e a hora. Serve "
                       "para provar que a passagem aconteceu (sem registro, ela não aconteceu) e, com o tempo, ver as "

@@ -13,6 +13,7 @@ import pytest
 from pg_falso import ApiPGFalsa, Resposta
 
 from nexus.campo import decisao_pt, ronda_avulsa
+from nexus.cos import normalizacoes_banco
 from nexus.dados import calendario, carga, catalogo, equipamento, fato_pt, fato_ronda, fatos, geracao, historico, livros
 from nexus.dados import fato_almoxarifado, fato_chamado, fato_inventario, fato_tarefa_os, programacao
 from nexus.dados import telas as telas_dados
@@ -79,7 +80,9 @@ CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt":
         "ciclo_varredura": fato_almoxarifado.CAB_CICLO, "peca_lancada": fato_almoxarifado.CAB_PECA,
         # o livro do inventário do almoxarifado (26/10/2026): o Nexus é a fonte, estado conformado desde o registro
         "evento_inventario": fato_inventario.CAB_EVENTO, "regua_minimo": fato_inventario.CAB_REGUA,
-        "curadoria_inventario": fato_inventario.CAB_CURADORIA}
+        "curadoria_inventario": fato_inventario.CAB_CURADORIA,
+        # as normalizações da Ronda COS (29/10/2026): o Nexus grava, para a disponibilidade da Thopen
+        "normalizacao": normalizacoes_banco.CAB}
 PROIBIDAS = ("nome", "email", "tecnico", "observacao", "comentario", "motivo", "tarefa", "relatorio", "atividades")
 
 
