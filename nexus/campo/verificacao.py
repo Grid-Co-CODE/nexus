@@ -35,7 +35,7 @@ _COS: dict = {"t": 0.0, "v": None}
 
 
 def _norm(s) -> str:
-    """Maiúsculas, sem acento e com um espaço só: o nome do Fracttal vem com espaço no fim ("Davi Damasceno ")."""
+    """Maiúsculas, sem acento e com um espaço só: o nome do Fracttal vem com espaço no fim ("Nome Sobrenome ")."""
     t = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().upper()
     return " ".join(t.split())
 
