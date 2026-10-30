@@ -1215,6 +1215,29 @@ FATOS = (
                     "marcadas: quem conta as tira (o guia da API, seção 8). geracao_parou só na falha de comunicação "
                     "(vazio nos outros tipos). As proteções em códigos curtos (protecoes, separadas por ;). Os dois "
                     "nomes de pessoa e o texto livre da API (impacto, detalhes, informe) não entram (regra 8)"),
+    # as ocorrências ainda abertas da Ronda COS (30/10/2026, Levi: "para as em aberto contar na disponibilidade
+    # precisamos puxar os dados dessa fonte"): o retrato da hora, no mesmo livro das normalizações
+    Fato("ocorrencia_aberta", "Ocorrência aberta da Ronda COS", "cos",
+         "fora do banco: a fotografia do Andamento da Ronda COS (as ocorrências de cada usina)",
+         "1 linha = 1 ocorrência ainda aberta na Ronda COS (o registro), no retrato da última volta",
+         _d(data=("id", "data_id_inicio (o dia de Brasília da falha)"),
+            usina=("id", "usina_id (o código do Fracttal da usina contra o código do Registro mestre; só o código de "
+                         "uma usina liga)"),
+            cliente=("cod", "cliente (THOPEN: só ela, a disponibilidade pelo COS)"),
+            equipamento=("cod", "equipamentos_codigos (as tags do Fracttal, separadas por ;; vazio = sem a tag)"),
+            os=("cod", "os (o nº da OS no Fracttal; vazio enquanto a ocorrência não tem OS)")),
+         tipo="snapshot_periodico", chave=("registro",),
+         medidas=_m((("equipamentos_qtd", "qtd", "nao"), ("dias_aberta_qtd", "dias", "nao"),
+                     ("geracao_parou", "1/0", "aditiva"))),
+         fontes=("Ronda COS (API do Andamento) · ocorrências abertas",),
+         janela_origem="o que está aberto agora (a fotografia é trocada inteira a cada volta)",
+         estado="conformado", conformado_em="nexus_cos_normalizacoes · fato_ocorrencia_aberta",
+         observacao="quando a ocorrência normaliza, sai daqui e entra no fato_normalizacao (a mesma chave); a que já "
+                    "está normalizada na memória do Nexus não entra (conta uma vez). As tags, o código do tipo e o "
+                    "início vêm da fotografia ou, quando ela não manda, da rota das ocorrências de 30 dias "
+                    "(equipamentos_de diz de onde: fotografia, ocorrencias ou vazio). O tipo pelo rótulo vira código "
+                    "pelas normalizações. abertas_em na atualizacao é a hora do retrato: na falha da leitura, o de "
+                    "antes fica. Impacto, falha (texto livre), a última nota e o que se aguarda não entram (regra 8)"),
 )
 POR_ID = {f.id: f for f in FATOS}
 
@@ -1316,13 +1339,14 @@ LIVROS = (
           "nexus/cos/turno.py, pela tela COS > Passagem de turno", False,
           "registrado em 26/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª passagem registrada",
           so_cresce=True),
-    Livro("nexus_cos_normalizacoes", ("fato_normalizacao", "atualizacao"),
+    Livro("nexus_cos_normalizacoes", ("fato_normalizacao", "fato_ocorrencia_aberta", "atualizacao"),
           "de hora em hora (entre :22 e :27), só na máquina que lê a API da Ronda COS (o servidor)",
           "nexus/cos/normalizacoes_banco.py (laço do app.py e do servir.py; NEXUS_NORMALIZACOES_PUBLICAR=0 desliga)",
           False,
           "registrado em 29/10/2026 antes de existir: nasce na 1ª volta do servidor depois do deploy. Grava só com a "
           "memória das normalizações completa e sem erro e se a última gravação tiver mais de 50 min; troca o livro "
-          "inteiro, com as linhas de antes do que a memória guarda mantidas do banco"),
+          "inteiro, com as linhas de antes do que a memória guarda mantidas do banco. A fato_ocorrencia_aberta "
+          "(30/10/2026) é o retrato das abertas da Thopen na mesma volta"),
     Livro("nexus_engenharia_acompanhamento", ("dim_diagnostico", "fato_acompanhamento_ativo"),
           "a cada pegar, encaminhar, salvar, comentário e mudança no cadastro dos diagnósticos (tela Engenharia > "
           "Confiabilidade)",

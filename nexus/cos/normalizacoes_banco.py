@@ -15,6 +15,15 @@ Registro mestre (`equipamento.usina_do_codigo`, a mesma ligação dos fatos do C
 Regra 8: os dois nomes de pessoa da API (`os_aberta_por`, `tecnico`) e o texto livre (`impacto`, `detalhes`,
 `informe`) não entram; as proteções entram como o time as escreve, só os códigos curtos (`PROTECAO`).
 
+**As ocorrências ainda abertas** (30/10/2026, Levi: "para as em aberto contar na disponibilidade precisamos puxar os
+dados dessa fonte"): a parada que o COS ainda não normalizou não está na API de normalizações, e a Thopen só contava
+quando a usina voltava (a OS 16958 de Santarém, inversor parado desde 12/07 aguardando peça, não contava nada). A aba
+`fato_ocorrencia_aberta` é o retrato da hora das abertas da Thopen, pela fotografia do Andamento
+(`GET /api/nexus/<cliente>`, a lista `ocorrencias` de cada usina, a mesma da tela Ronda); as tags dos equipamentos, o
+código do tipo e o início da falha vêm dela ou, quando ela não manda, da rota das ocorrências de 30 dias, pelo registro.
+Quando a ocorrência normaliza, sai daqui e entra no `fato_normalizacao` (a mesma chave, o registro). Na falha da leitura,
+o retrato de antes fica, com a hora dele (`abertas_em` na `atualizacao`): quem conta sabe de quando é.
+
 **Só a máquina que lê a API grava** (regra 12: só o servidor tem a chave do Andamento; no PC a fonte não está ligada e
 a volta não faz nada). Grava só com a memória completa e sem erro (`normalizacoes.ler`), e se a última gravação tiver
 mais de 50 min; a volta acorda num minuto seu entre :22 e :27, longe da carga de dados (:40). A memória guarda desde o
@@ -26,6 +35,8 @@ import random
 import re
 import threading
 import time
+import unicodedata
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 from ..dados import equipamento as EQ
@@ -45,7 +56,20 @@ CAB = ("registro", "os", "os_relacionadas", "cliente", "usina_codigo", "usina_id
        "geracao_parou", "protecoes", "fora_do_escopo_oem", "mudou_em")
 MEDIDAS = (("fora_min", "min", "aditiva"), ("equipamentos_qtd", "qtd", "nao"), ("normalizada", "1/0", "aditiva"),
            ("hora_real", "1/0", "aditiva"), ("geracao_parou", "1/0", "aditiva"))
-CAB_ATUALIZACAO = ("atualizado_em", "linhas_qtd", "desde", "ligadas_qtd")
+CAB_ATUALIZACAO = ("atualizado_em", "linhas_qtd", "desde", "ligadas_qtd", "abertas_em", "abertas_qtd")
+# as ocorrências ainda abertas (30/10/2026): o retrato da hora, trocado inteiro a cada volta
+ABA_ABERTAS = "fato_ocorrencia_aberta"
+TIPO_ABERTAS = "snapshot_periodico"
+GRAO_ABERTAS = "1 linha = 1 ocorrência ainda aberta na Ronda COS (o registro), no retrato da última volta"
+CAB_ABERTA = ("registro", "os", "cliente", "usina_codigo", "usina_id", "usina_ligada_por", "equipamentos_codigos",
+              "equipamentos_qtd", "equipamentos_de", "tipo_falha", "severidade", "etapa", "inicio", "data_id_inicio",
+              "dias_aberta_qtd", "geracao_parou", "protecoes")
+MEDIDAS_ABERTAS = (("equipamentos_qtd", "qtd", "nao"), ("dias_aberta_qtd", "dias", "nao"),
+                   ("geracao_parou", "1/0", "aditiva"))
+# Só a Thopen (a disponibilidade pelo COS é só dela, decisão do Levi em 29/10/2026); o nome é o da rota do Andamento
+CLIENTE_ABERTAS = "Thopen"
+# a rota das ocorrências completa o que a fotografia não manda (as tags, o código do tipo, o início): 30 dias é o teto dela
+DIAS_COMPLEMENTO = 30
 INTERVALO_MIN = 50
 PRIMEIRA_S = 600            # a 1ª volta 10 min depois de subir: a 1ª carga da memória vem em páginas
 MINUTO_DA_HORA = 22
@@ -116,6 +140,95 @@ def fato(itens, usinas) -> tuple[list, dict]:
     return linhas, {"linhas": len(linhas), "ligadas": ligadas, "sem_usina": sem[:30]}
 
 
+def _rotulo(v) -> str:
+    return unicodedata.normalize("NFKD", _txt(v)).encode("ascii", "ignore").decode().upper()
+
+
+def tipos_por_rotulo(normalizacoes) -> dict:
+    """{rótulo sem acento em maiúsculas: código do tipo}, pelas normalizações (a API delas manda os dois): a fotografia
+    do Andamento manda o tipo pelo rótulo ("Desligamento de usina"), e a régua da plataforma lê o código."""
+    out = {}
+    for n in normalizacoes or ():
+        if isinstance(n, dict) and n.get("tipo_falha_rotulo") and n.get("tipo_falha"):
+            out.setdefault(_rotulo(n["tipo_falha_rotulo"]), _txt(n["tipo_falha"]).upper())
+    return out
+
+
+def _tipo_aberta(o: dict, extra: dict, tipos: dict) -> str:
+    cod = _txt(o.get("tipo_falha_codigo") or extra.get("tipo_falha_codigo")).upper()
+    if cod:
+        return cod
+    rot = _rotulo(o.get("tipo_falha") or extra.get("tipo_falha"))
+    # o rótulo que nenhuma normalização trouxe ainda vira código pelo próprio texto ("DESLIGAMENTO_DE_SKID"): a régua
+    # lê "DESLIG" nele, e o tipo fica à vista na aba
+    return tipos.get(rot) or re.sub(r"[^A-Z0-9]+", "_", rot).strip("_")
+
+
+def linha_aberta(u: dict, o: dict, extra: dict, idx, tipos: dict) -> list:
+    """A linha (CAB_ABERTA) de uma ocorrência aberta da fotografia: `u` a usina dela, `extra` a mesma ocorrência na
+    rota de 30 dias ({} quando não está lá)."""
+    cod = _txt(u.get("codigo") or o.get("usina_codigo") or extra.get("usina_codigo"))
+    uid, por = EQ.usina_do_codigo(cod, idx) if cod else (None, EQ.SEM_CODIGO_USINA)
+    equip, de = [], ""
+    for origem, tags in (("fotografia", o.get("ativos")), ("ocorrencias", extra.get("ativos"))):
+        equip = [c for c in (EQ.canon(t) for t in (tags if isinstance(tags, list) else ())) if c]
+        if equip:
+            de = origem
+            break
+    inicio = AND.instante(extra.get("inicio")) or AND.instante(o.get("inicio")) or AND.instante(o.get("abertura"))
+    prot = o.get("protecoes") if isinstance(o.get("protecoes"), list) else [o.get("protecao")]
+    gp = o.get("geracao_parou") if isinstance(o.get("geracao_parou"), bool) else extra.get("geracao_parou")
+    os_ = _txt(o.get("os") or extra.get("os"))
+    try:
+        dias = int(o.get("dias_aberta")) if o.get("dias_aberta") is not None else ""
+    except (TypeError, ValueError):
+        dias = ""
+    return [str(o.get("registro")), os_ if os_.isdigit() else "", CLIENTE_ABERTAS.upper(), cod, uid or "",
+            (por if uid else ""), ";".join(equip), len(equip), de, _tipo_aberta(o, extra, tipos),
+            _txt(o.get("severidade")).upper(), _txt(o.get("etapa")), _iso(inicio), _data_id(inicio), dias,
+            _um_zero(gp), protecoes([*(prot or ()), *(extra.get("protecoes") or ())])]
+
+
+def abertas(fotografia: dict | None, ocorrencias, normalizacoes, usinas) -> tuple[list, dict]:
+    """(linhas, relatório) das ocorrências abertas da fotografia. A que já está normalizada na memória sai (a
+    fotografia pode estar um minuto atrás): a ocorrência conta uma vez, pela normalização. Sem registro não entra."""
+    idx = EQ.IndiceUsinas(usinas)
+    tipos = tipos_por_rotulo(normalizacoes)
+    fechadas = {str(n.get("registro")) for n in normalizacoes or ()
+                if isinstance(n, dict) and n.get("registro") and n.get("normalizada") is not False}
+    extra = {str(o.get("registro")): o for o in ocorrencias or () if isinstance(o, dict) and o.get("registro")}
+    linhas, vistos, ja = [], set(), 0
+    for u in (fotografia or {}).get("usinas") or ():
+        for o in (u.get("ocorrencias") or ()) if isinstance(u, dict) else ():
+            reg = str(o.get("registro") or "") if isinstance(o, dict) else ""
+            if not reg or reg in vistos:
+                continue
+            vistos.add(reg)
+            if reg in fechadas:
+                ja += 1
+                continue
+            linhas.append(linha_aberta(u, o, extra.get(reg, {}), idx, tipos))
+    linhas.sort(key=lambda l: l[0])
+    de = Counter(l[8] or "sem" for l in linhas)
+    return linhas, {"abertas": len(linhas), "abertas_ligadas": sum(1 for l in linhas if l[4]),
+                    "abertas_ja_normalizadas": ja, "abertas_equipamentos_de": dict(de)}
+
+
+def ler_abertas(config, normalizacoes, usinas, agora) -> tuple[list | None, str, dict]:
+    """(linhas, quando a fotografia foi lida, relatório) ou (None, "", relatório com o motivo): a fotografia velha ou
+    que falhou não grava retrato novo. A rota de 30 dias que falhar só deixa de completar (fica no relatório)."""
+    foto = AND.ler(config, CLIENTE_ABERTAS)
+    if foto.velha or not foto.dados:
+        return None, "", {"abertas_mantidas": f"a fotografia do Andamento: {foto.erro or 'sem dados'}"}
+    oc = AND.ler_ocorrencias(config, CLIENTE_ABERTAS, DIAS_COMPLEMENTO)
+    linhas, rel = abertas(foto.dados, (oc.dados or {}).get("ocorrencias") if not oc.velha else None, normalizacoes,
+                          usinas)
+    if oc.velha or not oc.dados:
+        rel["abertas_sem_complemento"] = oc.erro or "sem dados"
+    lida = datetime.fromtimestamp(foto.lido_em, _BRT) if foto.lido_em else agora
+    return linhas, lida.isoformat(timespec="seconds"), rel
+
+
 def _do_banco_antes(linhas_banco, desde_id: int) -> list:
     """As linhas já gravadas de antes do que a memória guarda (pela volta ou, sem ela, pelo início): ficam como estão."""
     out = []
@@ -158,9 +271,10 @@ def memoria_completa(config, agora=None, espera_s: float = 2.0):
     return None, "a 1ª carga das normalizações ainda não terminou"
 
 
-def publicar(config, sessao=None, *, agora=None, forcar=False, leitura=None) -> dict:
-    """Uma volta: confere a última gravação e a memória, monta o fato e grava as duas abas (conferidas depois,
-    `livros.publicar`). Devolve o relatório (só contagens). `leitura` é para os testes."""
+def publicar(config, sessao=None, *, agora=None, forcar=False, leitura=None, abertas_lidas=None) -> dict:
+    """Uma volta: confere a última gravação e a memória, monta os fatos e grava as três abas (conferidas depois,
+    `livros.publicar`). Devolve o relatório (só contagens). `leitura` e `abertas_lidas` ((linhas, quando, relatório),
+    o que `ler_abertas` devolve) são para os testes."""
     import requests
     if not AND.fonte(config).ligada and leitura is None:
         return {"pulou": "a fonte do Andamento não está ligada nesta máquina"}
@@ -194,9 +308,16 @@ def publicar(config, sessao=None, *, agora=None, forcar=False, leitura=None) -> 
         return dict(rel, pulou=pulou)
     todas = sorted(antes + linhas, key=lambda l: str(l[0]))
     rel["antes_mantidas"] = len(antes)
+    ab, ab_em, rel_ab = abertas_lidas or ler_abertas(config, leitura.dados.get("itens"), usinas, agora)
+    rel.update(rel_ab)
+    if ab is None:
+        # a fotografia não veio: o retrato de antes fica, com a hora dele (o livro é trocado inteiro a cada gravação)
+        ab = [[r.get(c, "") for c in CAB_ABERTA] for r in livros.ler(base, s, LIVRO, ABA_ABERTAS) if r.get("registro")]
+        ab_em = next((str(r.get("abertas_em") or "") for r in livros.ler(base, s, LIVRO, "atualizacao")), "")
     atu = [agora.isoformat(timespec="seconds"), len(todas), desde.date().isoformat(), rel["ligadas"] + sum(
-        1 for l in antes if l[5])]
-    rel["gravado"] = livros.publicar(LIVRO, NOME_LIVRO, {ABA: (CAB, todas), "atualizacao": (CAB_ATUALIZACAO, [atu])},
+        1 for l in antes if l[5]), ab_em, len(ab)]
+    rel["gravado"] = livros.publicar(LIVRO, NOME_LIVRO, {ABA: (CAB, todas), ABA_ABERTAS: (CAB_ABERTA, ab),
+                                                         "atualizacao": (CAB_ATUALIZACAO, [atu])},
                                      base=base, token=config["GRIDCO_SQL_TOKEN"], sessao=s)
     return rel
 

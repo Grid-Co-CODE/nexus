@@ -82,7 +82,7 @@ CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt":
         "evento_inventario": fato_inventario.CAB_EVENTO, "regua_minimo": fato_inventario.CAB_REGUA,
         "curadoria_inventario": fato_inventario.CAB_CURADORIA,
         # as normalizações da Ronda COS (29/10/2026): o Nexus grava, para a disponibilidade da Thopen
-        "normalizacao": normalizacoes_banco.CAB}
+        "normalizacao": normalizacoes_banco.CAB, "ocorrencia_aberta": normalizacoes_banco.CAB_ABERTA}
 PROIBIDAS = ("nome", "email", "tecnico", "observacao", "comentario", "motivo", "tarefa", "relatorio", "atividades")
 
 

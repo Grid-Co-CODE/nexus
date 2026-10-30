@@ -24,6 +24,7 @@ RESUMO = {
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
     "normalizacao": "Quando cada usina voltou pela hora do COS, o tipo e as proteções",
+    "ocorrencia_aberta": "As paradas que o COS ainda não normalizou, com o começo e o ativo",
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
     "acompanhamento_os": "O status, a prioridade e os comentários da Engenharia em cada OS",
     "marcacao_etm": "O diagnóstico e as marcações da Engenharia em cada OS de ETM",
@@ -125,6 +126,10 @@ PARA_QUE = {
     "tratamento_contestacao": "Guarda o acompanhamento de cada contestação do cliente: quem pegou a demanda (\"Pegar "
                               "para mim\") e cada atualização que o responsável escreveu, com o dia e a hora. Quem e o "
                               "texto vão cifrados; a tela Contratos e clientes → Contestações mostra.",
+    "ocorrencia_aberta": "Guarda, de hora em hora, as ocorrências da Thopen que a Ronda COS ainda não normalizou: "
+                         "quando a falha começou, o tipo, o equipamento, a etapa (aguardando peça, técnico acionado) e "
+                         "há quantos dias está aberta. É o que faz a parada que segue aberta contar na disponibilidade "
+                         "da Thopen; quando a usina volta, a ocorrência sai daqui e vai para as normalizações.",
     "normalizacao": "Guarda cada normalização da Ronda COS: quando a falha começou, a hora em que o COS registrou a "
                     "volta, o tipo de falha, se a geração parou (na falha de comunicação) e as proteções que atuaram. "
                     "É a base da disponibilidade da Thopen desde 29/10/2026: a hora da volta é a do COS, e não o "

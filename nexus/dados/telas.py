@@ -187,6 +187,8 @@ QUEM_GRAVA_ORIGEM = (
     ("igual", "thopen_acessos", "Dashboard Thopen (5080)"),
     # as normalizações da Ronda COS (29/10/2026): o Nexus lê a API do Andamento e grava o fato (nexus/cos/normalizacoes_banco.py)
     ("igual", "Ronda COS (API de normalizações)", "Ronda COS (o Nexus lê a API de normalizações, só leitura)"),
+    # as ocorrências abertas (30/10/2026): o Nexus lê a fotografia do Andamento e grava o retrato da hora
+    ("igual", "Ronda COS (API do Andamento)", "Ronda COS (o Nexus lê a fotografia do Andamento, só leitura)"),
     ("prefixo", "nexus_", "Nexus"),                              # livro do Nexus fora do LIVROS: viola a regra 10
 )
 A_DECLARAR = "a declarar"

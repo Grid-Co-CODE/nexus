@@ -208,7 +208,14 @@ só o que está nas normalizações): `nexus/cos/normalizacoes_banco.py` grava `
 falha e da volta, o tipo, `geracao_parou` 1/0, as proteções em código) de hora em hora, entre :22 e :27, só onde a chave
 do Andamento está (o servidor) e só com a memória completa e sem erro. Os dois nomes de pessoa e o texto livre não vão.
 A régua (que tipo conta, a janela solar, o kWp) é da plataforma (`plataforma/disponibilidade.py` do PerformancePainel).
-Prova: `tests/test_cos_normalizacoes_banco.py`.
+**Desde 30/10/2026 vão também as ainda abertas** (Levi: "para as em aberto contar na disponibilidade precisamos puxar os
+dados dessa fonte"; a OS 16958 de Santarém, inversor parado desde 12/07 aguardando peça, não contava nada): na mesma volta,
+`fato_ocorrencia_aberta` é o retrato das abertas da Thopen pela fotografia do Andamento (`GET /api/nexus/Thopen`, a lista
+`ocorrencias` de cada usina, a da tela Ronda), completado pela rota das ocorrências de 30 dias quando a fotografia não
+manda as tags, o código do tipo ou o início (`equipamentos_de` diz de onde veio a tag). O tipo pelo rótulo vira código
+pelas normalizações (a API delas manda os dois). A que já está normalizada na memória não entra: conta uma vez, pela
+normalização. Na falha da fotografia, o retrato de antes fica, com a hora dele (`abertas_em` na `atualizacao`). Impacto,
+falha em texto, a última nota e o que se aguarda não vão. Prova: `tests/test_cos_normalizacoes_banco.py`.
 
 - **De onde:** `GET <Andamento>/api/normalizacoes?desde=&limite=` (contrato `versao: 1`, a mesma chave `X-Nexus-Chave`). A
   API é **incremental**: devolve `cursor` e `mais`. O Nexus guarda em memória (`nexus/cos/normalizacoes.py`) desde o

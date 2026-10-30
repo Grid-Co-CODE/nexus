@@ -118,7 +118,7 @@ def test_grava_o_fato_e_a_atualizacao_e_mantem_o_que_a_memoria_nao_guarda(app, b
     with app.app_context():
         rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True,
                           leitura=_leitura([_n("r1"), _n("r2", usina_codigo="TSTE-BBB200")]))
-    assert rel["gravado"] == {NB.ABA: 3, "atualizacao": 1} and rel["antes_mantidas"] == 1
+    assert rel["gravado"] == {NB.ABA: 3, NB.ABA_ABERTAS: 0, "atualizacao": 1} and rel["antes_mantidas"] == 1
     assert [(r["registro"], r["usina_id"]) for r in banco.linhas(NB.LIVRO, NB.ABA)] == [("r0", 1), ("r1", 1), ("r2", 2)]
     a = banco.linhas(NB.LIVRO, "atualizacao")[0]
     assert (a["linhas_qtd"], a["desde"], a["ligadas_qtd"]) == (3, NO.inicio_da_guarda(AGORA).date().isoformat(), 3)
@@ -177,4 +177,103 @@ def test_catalogo_bate_com_o_modulo():
     f = catalogo.POR_ID["normalizacao"]
     assert f.conformado_em == f"{NB.LIVRO} · {NB.ABA}" and f.chave == NB.CHAVE and f.tipo == NB.TIPO
     assert f.grao == NB.GRAO and {(m.coluna, m.unidade, m.soma) for m in f.medidas} == set(NB.MEDIDAS)
-    assert catalogo.LIVRO_POR_NOME[NB.LIVRO].abas == (NB.ABA, "atualizacao")
+    assert catalogo.LIVRO_POR_NOME[NB.LIVRO].abas == (NB.ABA, NB.ABA_ABERTAS, "atualizacao")
+    a = catalogo.POR_ID["ocorrencia_aberta"]
+    assert a.conformado_em == f"{NB.LIVRO} · {NB.ABA_ABERTAS}" and a.chave == NB.CHAVE and a.tipo == NB.TIPO_ABERTAS
+    assert a.grao == NB.GRAO_ABERTAS and {(m.coluna, m.unidade, m.soma) for m in a.medidas} == set(NB.MEDIDAS_ABERTAS)
+
+
+# ── as ocorrências ainda abertas (30/10/2026) ──────────────────────────────────────────────────────────────────────────
+def _oc(registro, **kw):
+    """Uma ocorrência aberta como a fotografia do Andamento manda (o tipo pelo rótulo, os nomes dos equipamentos)."""
+    o = {"os": "16958", "registro": registro, "severidade": "Médio", "severidade_classe": "medio",
+         "tipo_tarefa": "Corretiva", "tipo_falha": "Desligamento de inversor", "problema": "inv",
+         "equipamentos": ["Inversor 2.7"], "falha": "Inversor sem gerar, relato do time", "impacto": "texto livre",
+         "protecao": None, "abertura": "2026-07-12T08:00:00-03:00", "dias_aberta": 110, "etapa": "Aguardando peça",
+         "aguardando": ["peça"], "ultima_nota": {"quando": "2026-10-29T10:00:00-03:00", "texto": "nota do time"}}
+    o.update(kw)
+    return o
+
+
+def _foto(*por_usina):
+    return {"usinas": [{"id": i, "codigo": cod, "nome": "Usina Teste", "ocorrencias": list(ocs)}
+                       for i, (cod, ocs) in enumerate(por_usina)]}
+
+
+def test_aberta_com_o_codigo_do_tipo_pelas_normalizacoes_e_a_usina_pelo_codigo():
+    linhas, rel = NB.abertas(_foto(("TSTE-AAA100", [_oc("a1")])), [], [_n("r1", tipo_falha="DESLIGAMENTO_INVERSOR",
+                                                                         tipo_falha_rotulo="Desligamento de inversor")],
+                             USINAS)
+    l = dict(zip(NB.CAB_ABERTA, linhas[0]))
+    assert (l["registro"], l["os"], l["cliente"], l["usina_id"], l["usina_ligada_por"]) == ("a1", "16958", "THOPEN", 1,
+                                                                                            "código cheio")
+    assert (l["tipo_falha"], l["etapa"], l["dias_aberta_qtd"], l["inicio"], l["data_id_inicio"]) == (
+        "DESLIGAMENTO_INVERSOR", "Aguardando peça", 110, "2026-07-12T08:00:00-03:00", 20260712)
+    # sem a tag na fotografia nem na rota de 30 dias: a régua conta pelo tipo, e a aba diz que veio sem
+    assert (l["equipamentos_codigos"], l["equipamentos_qtd"], l["equipamentos_de"]) == ("", 0, "")
+    assert rel == {"abertas": 1, "abertas_ligadas": 1, "abertas_ja_normalizadas": 0,
+                   "abertas_equipamentos_de": {"sem": 1}}
+
+
+def test_aberta_completa_pela_rota_de_30_dias_e_o_rotulo_sem_normalizacao_vira_codigo():
+    extra = {"registro": "a1", "ativos": ["tste-aaa100-invr2.7"], "tipo_falha_codigo": "INVERSOR_OFFLINE",
+             "inicio": "2026-10-28T02:30:00Z", "protecoes": ["59C"]}
+    l = dict(zip(NB.CAB_ABERTA, NB.abertas(_foto(("TSTE-AAA100", [_oc("a1", protecao="27")])), [extra], [],
+                                           USINAS)[0][0]))
+    assert (l["equipamentos_codigos"], l["equipamentos_de"], l["tipo_falha"]) == ("TSTE-AAA100-INVR2.7", "ocorrencias",
+                                                                                  "INVERSOR_OFFLINE")
+    # o início da falha é o da rota de 30 dias (o dia de Brasília), e as proteções das duas, sem repetir
+    assert (l["inicio"], l["data_id_inicio"], l["protecoes"]) == ("2026-10-27T23:30:00-03:00", 20261027, "27;59C")
+    # a tag da própria fotografia vence; o rótulo que nenhuma normalização trouxe vira código pelo texto
+    l = dict(zip(NB.CAB_ABERTA, NB.abertas(_foto(("TSTE-AAA100", [_oc("a2", ativos=["TSTE-AAA100-CABN1"],
+                                                                      tipo_falha="Desligamento de cabine")])),
+                                           [], [], USINAS)[0][0]))
+    assert (l["equipamentos_codigos"], l["equipamentos_de"], l["tipo_falha"]) == ("TSTE-AAA100-CABN1", "fotografia",
+                                                                                  "DESLIGAMENTO_DE_CABINE")
+
+
+def test_aberta_ja_normalizada_sai_e_a_sem_os_fica_sem_o_codigo_interno():
+    foto = _foto(("TSTE-AAA100", [_oc("r1"), _oc("a2", os="R-abc123"), _oc("a2"), {"sem": "registro"}]),
+                 ("TSTE-ZZZ900", [_oc("a3")]))
+    linhas, rel = NB.abertas(foto, [], [_n("r1")], USINAS)
+    assert [(l[0], l[1], l[4]) for l in linhas] == [("a2", "", 1), ("a3", "16958", "")]
+    assert (rel["abertas"], rel["abertas_ligadas"], rel["abertas_ja_normalizadas"]) == (2, 1, 1)
+    # a normalização desfeita reabre: a ocorrência aberta conta
+    assert [l[0] for l in NB.abertas(foto, [], [_n("r1", normalizada=False)], USINAS)[0]] == ["a2", "a3", "r1"]
+
+
+def test_aberta_sem_nome_nem_texto_livre():
+    l = dict(zip(NB.CAB_ABERTA, NB.abertas(_foto(("TSTE-AAA100", [_oc("a1")])), [], [], USINAS)[0][0]))
+    valores = " ".join(str(v) for v in l.values())
+    for proibido in ("relato", "texto livre", "nota do time", "Usina Teste", "Inversor 2.7"):
+        assert proibido not in valores
+    assert not {"falha", "impacto", "ultima_nota", "aguardando", "equipamentos", "usina"} & set(NB.CAB_ABERTA)
+
+
+def test_grava_as_abertas_e_na_falha_da_fotografia_o_retrato_de_antes_fica(app, banco):
+    ab = NB.abertas(_foto(("TSTE-AAA100", [_oc("a1")])), [], [], USINAS)
+    with app.app_context():
+        rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True, leitura=_leitura([_n("r1")]),
+                          abertas_lidas=(ab[0], "2026-10-29T15:21:00-03:00", ab[1]))
+    assert rel["gravado"] == {NB.ABA: 1, NB.ABA_ABERTAS: 1, "atualizacao": 1}
+    a = banco.linhas(NB.LIVRO, "atualizacao")[0]
+    assert (a["abertas_em"], a["abertas_qtd"]) == ("2026-10-29T15:21:00-03:00", 1)
+    with app.app_context():
+        rel = NB.publicar(app.config, banco, agora=AGORA + timedelta(hours=1), forcar=True,
+                          leitura=_leitura([_n("r1")]), abertas_lidas=(None, "", {"abertas_mantidas": "caiu"}))
+    assert rel["abertas_mantidas"] == "caiu" and [r["registro"] for r in banco.linhas(NB.LIVRO, NB.ABA_ABERTAS)] == ["a1"]
+    a = banco.linhas(NB.LIVRO, "atualizacao")[0]
+    assert (a["abertas_em"], a["abertas_qtd"]) == ("2026-10-29T15:21:00-03:00", 1)
+
+
+def test_ler_abertas_pela_fotografia_e_a_rota_de_30_dias(app, monkeypatch):
+    pedidos = []
+    monkeypatch.setattr(AND, "ler", lambda config, cliente: pedidos.append(cliente) or AND.Leitura(
+        cliente, _foto(("TSTE-AAA100", [_oc("a1")])), lido_em=AGORA.timestamp()))
+    monkeypatch.setattr(AND, "ler_ocorrencias", lambda config, cliente, dias: pedidos.append((cliente, dias)) or
+                        AND.Leitura(cliente, None, erro="caiu"))
+    linhas, em, rel = NB.ler_abertas(app.config, [], USINAS, AGORA)
+    assert pedidos == ["Thopen", ("Thopen", 30)] and len(linhas) == 1 and em == "2026-10-29T15:22:00-03:00"
+    assert rel["abertas_sem_complemento"] == "caiu"
+    monkeypatch.setattr(AND, "ler", lambda config, cliente: AND.Leitura(cliente, {"usinas": []}, erro="x", velha=True))
+    assert NB.ler_abertas(app.config, [], USINAS, AGORA)[0] is None
