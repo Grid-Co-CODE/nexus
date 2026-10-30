@@ -383,7 +383,7 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
 - **O App: A1–A3 no ar na v283 (17/10/2026). `NEXUS_ATRIBUICOES=ligado` desde 29/10/2026 20:31Z: a regra é o Nexus.**
   - **A decisão do Levi:** "o app de gestão não vai mandar mais nada para o app de campo, pelo menos no quesito de
     técnicos".
-  - **O caso:** o Matheus Góis, posto aqui em Colorado 1 e 2, não via as usinas no App.
+  - **O caso:** um técnico, posto aqui em Colorado 1 e 2, não via as usinas no App.
   - **1ª passada (20:38Z):** postas 6, tiradas 0, adiadas 158. As pendências desta tela eram 56 sem pessoa e 10 sem
     usina.
   - **O que acontece ao zerar as pendências:** o App ENCERRA as ligações que este livro não tem, 158 naquela hora. Entre
