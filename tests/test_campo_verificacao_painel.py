@@ -105,13 +105,40 @@ def test_o_numero_chega_depois_e_a_lista_abre_na_janela(tela, logado, fila):
 def test_o_relatorio_em_pdf_e_o_botao_na_linha_dos_filtros(tela, logado, fila):
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
     filtros = html[html.index('<form class="cn-filtros"'):html.index("</form>", html.index('<form class="cn-filtros"'))]
-    url = re.search(r'class="gc-btn gc-btn--contorno pn-exportar" href="([^"]+)"', filtros).group(1).replace("&amp;", "&")
-    r = logado.get(url)
+    assert 'class="gc-btn gc-btn--contorno pn-exportar" data-pn-rel' in filtros
+    # o botão abre a escolha dos temas (30/10/2026: "a pessoa possa marcar o tema que ela quer levar (...) tem que ter a
+    # opção de tirar"): os oito, todos marcados, com os filtros da tela no formulário
+    tpl = html[html.index('<template id="pn-rel-temas">'):html.index("</template>", html.index('id="pn-rel-temas"'))]
+    acao = re.search(r'<form class="pn-rel" method="get" action="([^"]+)"', tpl).group(1)
+    assert re.findall(r'name="tema" value="(\w+)" checked', tpl) == list(painel_relatorio.CHAVES_TEMAS)
+    assert '<input type="hidden" name="responsavel" value="Ciclano Chefe">' in tpl and "Tirar todos" in tpl
+    for t in ("[data-pn-rel-todos]", "Marque pelo menos um tema"):
+        assert t in html
+    r = logado.get(acao + "?responsavel=Ciclano+Chefe")                             # sem tema: todos
     assert r.status_code == 200 and r.mimetype == "application/pdf" and r.data[:5] == b"%PDF-"
     assert "attachment" in r.headers["Content-Disposition"] and "Ciclano%20Chefe" in r.headers["Content-Disposition"]
+    so_dois = logado.get(acao + "?responsavel=Ciclano+Chefe&tema=pts&tema=rondas&tema=xx")
+    assert so_dois.status_code == 200 and so_dois.data[:5] == b"%PDF-" and len(so_dois.data) < len(r.data)
     # fora do Painel, sem o botão
     assert "pn-exportar" not in logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe&modo=geral").get_data(
         as_text=True)
+
+
+def test_os_temas_escolhidos_tiram_do_resumo_e_das_frases():
+    assert painel_relatorio.temas_do_pedido([]) == painel_relatorio.CHAVES_TEMAS
+    assert painel_relatorio.temas_do_pedido(["rondas", "perf", "lixo"]) == ("perf", "rondas")    # na ordem do PDF
+    assert painel_relatorio.temas_do_pedido(["lixo"]) == painel_relatorio.CHAVES_TEMAS
+    p = _painel_falso()
+    faixa = [({"usina": "Altair"}, {"escopo": "Inversor 1", "os": "500", "inicio": "28/10 10:00"})]
+    verif = V.oss(FILA, USINAS, COS, AGORA)
+    temas = ("pts", "rondas")
+    assert [n["tema"] for n in painel_relatorio.resumo(p, faixa, verif, temas)] == ["pts", "rondas"]
+    fr = painel_relatorio.frases(p, faixa, verif, temas)
+    assert len(fr) == 2 and "PT parada" in fr[0] and "sem nenhuma ronda" in fr[1]
+    pdf = painel_relatorio.gerar(p, faixa, verif, filtros=[], gerado_em="x", temas=temas)
+    assert pdf[:5] == b"%PDF-"
+    # um tema só: o resumo com uma caixa (a linha do resumo é completada, a tabela é retangular)
+    assert painel_relatorio.gerar(p, [], None, filtros=[], gerado_em="x", temas=("ranking",))[:5] == b"%PDF-"
 
 
 def _painel_falso():

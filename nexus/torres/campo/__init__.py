@@ -28,6 +28,7 @@ from ...campo import ocorrencias as campo_oc
 from ...campo import responsaveis_graficos as campo_graficos
 from ...campo import triagem as campo_triagem
 from ...campo import verificacao as campo_verif
+from ...campo import painel_relatorio as campo_relatorio
 from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
 from ..modelo import Tela, Torre
@@ -496,6 +497,7 @@ def responsaveis():
     html = render_template("campo/responsaveis.html", **_comum(
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
         equipe=equipe, ranking=ranking, ranking_cor=campo_ranking.cor, sem_regiao=visao.SEM_REGIAO, painel=painel,
+        temas_relatorio=campo_relatorio.TEMAS,
         filtro=filtro, filtros_geral=campo_resp.FILTROS_GERAL, lista_geral=lista_geral, contagem_geral=contagem_geral,
         ocorrencias_abertas=ocorrencias_abertas, cor_ocorrencia=campo_oc.COR_ETIQUETA, ocorrencias_link=ocorrencias_link,
         bloco_sel=bloco_sel, bloco_ordem=bloco_ordem, ver=ver, mapa=mapa, usina_sel=usina_sel, erro_mapa=erro_mapa,
@@ -695,7 +697,8 @@ def responsaveis_relatorio():
     tem focado no que falta para o supervisor, para não ficar tanta informação, terá um resumo no início e depois
     aprofunda!"): o MESMO painel da tela (os filtros dela), a faixa "Parada agora" e as OSs em verificação, no
     nexus/campo/painel_relatorio.py."""
-    from ...campo import painel_relatorio, painel_responsavel as campo_painel
+    from ...campo import painel_responsavel as campo_painel
+    painel_relatorio = campo_relatorio
     d = campo_resp.visao_responsaveis().dados or {}
     limite = campo_resp.limite_do_pedido(request.cookies.get(COOKIE_LIMITE))
     todas = campo_resp.com_manutencao(d.get("usinas") or [], limite)
@@ -705,11 +708,14 @@ def responsaveis_relatorio():
     painel = campo_painel.montar(responsavel or "Todos os responsáveis", usinas, ranking)
     faixa = sorted(((u, p) for u in usinas for p in u.get("paradas_abertas") or ()),
                    key=lambda up: (up[1]["_ini"], up[0]["usina"]))
-    v = _verificacao_das({u.get("usina") for u in usinas})
+    # os temas que a pessoa marcou na janela do Exportar (Levi, 30/10/2026: "a pessoa possa marcar o tema que ela quer
+    # levar"): `tema` repetido no endereço; sem nenhum, todos. As OSs em verificação só são contadas se pedidas
+    temas = painel_relatorio.temas_do_pedido(request.args.getlist("tema"))
+    v = _verificacao_das({u.get("usina") for u in usinas}) if "verif" in temas else {"r": None, "pronta": False}
     filtros = [x for x in (f"cliente {cliente}" if cliente else "", f"busca \"{q}\"" if q else "") if x]
     agora = datetime.now(_BRT)
     pdf = painel_relatorio.gerar(painel, faixa, v["r"] if v["pronta"] else None, filtros=filtros,
-                                 gerado_em=agora.strftime("%d/%m/%Y %H:%M"))
+                                 gerado_em=agora.strftime("%d/%m/%Y %H:%M"), temas=temas)
     nome = f"Painel do responsável - {responsavel or 'todos'} - {agora.strftime('%Y-%m-%d')}.pdf"
     return Response(pdf, mimetype="application/pdf",
                     headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(nome),

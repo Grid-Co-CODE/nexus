@@ -93,8 +93,10 @@
     {% if ver == 'mapa' %}<input type="hidden" name="ver" value="mapa">{% endif %}
     {# o relatório do Painel em PDF (Levi, 29/10/2026: "ao extremo lado direto da mesma linha dos filtros deve ter um botão
        de exportar relatório (...) um resumo no início e depois aprofunda"), com os filtros da tela
-       (nexus/campo/painel_relatorio.py) #}
-    {% if modo == 'painel' and painel %}<a class="gc-btn gc-btn--contorno pn-exportar" href="{{ url_for('torre_campo.responsaveis_relatorio', responsavel=responsavel or '*', cliente=cliente or None, q=q or None) }}" title="Baixar o relatório do Painel em PDF: o resumo no início e, depois, o detalhe do que falta"><i class="ph ph-file-pdf" aria-hidden="true"></i> Exportar relatório</a>{% endif %}
+       (nexus/campo/painel_relatorio.py). O botão abre a escolha dos temas na janela (30/10/2026: "a pessoa possa marcar o
+       tema que ela quer levar, as vezes não quer algo, tem que ter a opção de tirar"; o formulário é o <template
+       id="pn-rel-temas">, fora deste <form>) #}
+    {% if modo == 'painel' and painel %}<button type="button" class="gc-btn gc-btn--contorno pn-exportar" data-pn-rel aria-haspopup="dialog" title="Escolher os temas e baixar o relatório do Painel em PDF"><i class="ph ph-file-pdf" aria-hidden="true"></i> Exportar relatório</button>{% endif %}
   </form>
 
   {# a faixa "Parada agora" (18/10/2026; o painel próprio de um supervisor tinha a de "Usinas desligadas"): as OS de
@@ -266,6 +268,24 @@
         <b class="pn-v {{ 'cn-t-critico' if x.parada else 'cn-t-alerta' }}">{% if x.parada and x.hoje %}agora · {% endif %}{{ idade(x.idade_min) }}</b></button></li>
       {% else %}<li class="pn-vazio">Nenhuma PT esperando o De acordo.</li>{% endfor %}
     </ol>
+  </template>
+  {# a escolha dos temas do relatório, que o Exportar abre na janela (30/10/2026: "a pessoa possa marcar o tema que ela
+     quer levar, as vezes não quer algo, tem que ter a opção de tirar"): todos marcados; o Baixar PDF leva os marcados
+     (`tema` repetido no endereço, os filtros da tela junto) #}
+  <template id="pn-rel-temas">
+    <header class="cr-jan-cab"><div><p class="gc-eyebrow">Exportar relatório</p><h2>{{ painel.nome }}</h2>
+      <p class="mudo">Marque os temas que o PDF leva: o resumo, "O que cobrar primeiro" e o detalhe trazem só os marcados.</p></div></header>
+    <form class="pn-rel" method="get" action="{{ url_for('torre_campo.responsaveis_relatorio') }}" data-pn-rel-form>
+      <input type="hidden" name="responsavel" value="{{ responsavel or '*' }}">
+      {% if cliente %}<input type="hidden" name="cliente" value="{{ cliente }}">{% endif %}
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+      <p class="pn-rel-todos"><button type="button" class="cn-link cr-link-botao" data-pn-rel-todos="1">Marcar todos</button><span aria-hidden="true">·</span><button type="button" class="cn-link cr-link-botao" data-pn-rel-todos="0">Tirar todos</button></p>
+      <ul class="pn-rel-temas" aria-label="Temas do relatório">
+        {% for k, rot in temas_relatorio %}<li><label><input type="checkbox" name="tema" value="{{ k }}" checked> {{ rot }}</label></li>{% endfor %}
+      </ul>
+      <p class="pn-rel-aviso cn-t-alerta" role="status" hidden>Marque pelo menos um tema para baixar.</p>
+      <div class="pn-rel-pe"><button type="submit" class="gc-btn gc-btn--primario"><i class="ph ph-file-pdf" aria-hidden="true"></i> Baixar PDF</button></div>
+    </form>
   </template>
   {% elif modo == 'cartoes' %}
   {# um cartão por Responsável O&M, com os dois blocos: quantas usinas pedem foco, acompanhamento ou podem esperar em
@@ -567,6 +587,43 @@
     corpo.innerHTML = '';
     corpo.appendChild(lista.content.cloneNode(true));
     if (!dlg.open) { dlg.showModal(); }
+  });
+})();
+// o Exportar relatório abre a escolha dos temas na janela (30/10/2026: "a pessoa possa marcar o tema que ela quer levar,
+// as vezes não quer algo, tem que ter a opção de tirar"): todos marcados de início; sem nenhum, o Baixar PDF trava e diz
+// por quê; baixado, a janela fecha (o PDF chega como download, a página fica)
+(function () {
+  var b = document.querySelector('[data-pn-rel]'), tpl = document.getElementById('pn-rel-temas');
+  var dlg = document.getElementById('cr-modal');
+  if (!b || !tpl || !dlg) { return; }
+  b.addEventListener('click', function () {
+    var corpo = dlg.querySelector('.cr-modal-corpo');
+    corpo.innerHTML = '';
+    corpo.appendChild(tpl.content.cloneNode(true));
+    if (!dlg.open) { dlg.showModal(); }
+  });
+  function conferir(f) {
+    var algum = !!f.querySelector('input[name="tema"]:checked');
+    f.querySelector('button[type="submit"]').disabled = !algum;
+    f.querySelector('.pn-rel-aviso').hidden = algum;
+    return algum;
+  }
+  dlg.addEventListener('change', function (ev) {
+    var f = ev.target.closest('[data-pn-rel-form]');
+    if (f) { conferir(f); }
+  });
+  dlg.addEventListener('click', function (ev) {
+    var t = ev.target.closest('[data-pn-rel-todos]');
+    if (!t) { return; }
+    var f = t.closest('[data-pn-rel-form]'), marcar = t.getAttribute('data-pn-rel-todos') === '1';
+    f.querySelectorAll('input[name="tema"]').forEach(function (c) { c.checked = marcar; });
+    conferir(f);
+  });
+  dlg.addEventListener('submit', function (ev) {
+    var f = ev.target.closest('[data-pn-rel-form]');
+    if (!f) { return; }
+    if (!conferir(f)) { ev.preventDefault(); return; }
+    setTimeout(function () { if (dlg.open) { dlg.close(); } }, 400);
   });
 })();
 // as OSs em verificação (29/10/2026): o número chega DEPOIS da página (a fila que a Aprovação de OS guarda, sem ler o

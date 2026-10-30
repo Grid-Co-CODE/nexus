@@ -965,9 +965,15 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
        extintores, OSs, o chamado mais antigo, a equipe de menor nota);
     4. o detalhe de cada quadro, só o que falta: as usinas abaixo da meta, as paradas, as PT, as OSs em verificação,
        os chamados, as rondas que faltam (nunca, 7 dias ou mais, longa pendente), os extintores vencidos e o ranking.
-- **Prova da 6ª rodada:** `tests/test_campo_verificacao_painel.py` (a junção das tarefas, as etiquetas e o COS, a rota do
-  número e da lista, o script do Concluir e do PDF, o PDF do relatório, o placar da equipe, o ativo limpo e as partes da
-  nota com o peso e o que fazer).
+  - **Os temas (7ª rodada, 30/10: "a pessoa possa marcar o tema que ela quer levar, as vezes não quer algo, tem que
+    ter a opção de tirar"):** o Exportar abre uma janela com os 8 temas de `painel_relatorio.TEMAS`, todos marcados,
+    "Marcar todos · Tirar todos" e o Baixar PDF (trava, com o aviso, sem nenhum marcado). Os marcados vão como `tema`
+    repetido no endereço; o tema tirado sai do resumo, de "O que cobrar primeiro" e do detalhe, e o PDF diz no topo
+    quais temas leva. Sem `tema` (ou só valores que não existem) o PDF sai inteiro, como o link antigo. As OSs em
+    verificação só são montadas se o tema estiver marcado.
+- **Prova da 6ª e da 7ª rodada:** `tests/test_campo_verificacao_painel.py` (a junção das tarefas, as etiquetas e o COS,
+  a rota do número e da lista, o script do Concluir e do PDF, o PDF do relatório, o placar da equipe, o ativo limpo, as
+  partes da nota com o peso e o que fazer, e os temas tirados do resumo e das frases).
 - **Prova:** `tests/test_campo_painel_responsavel.py` (a ordem e a completude de cada quadro, o nome do ativo, o número
   das rondas, os extintores, o padrão de quem entra, o "Todos", o CSS das 6 linhas com a rolagem e da janela do
   chamado), `tests/test_dados_fato_chamado_status.py` (o status no fato) e `tests/test_oscreator_chamado_por_cima.py`

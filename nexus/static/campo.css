@@ -1439,6 +1439,19 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
 .pn-kpi--neutro .pn-kpi-ico{background:var(--superficie-2);color:var(--mudo)}
 /* o Exportar relatório na ponta direita da linha dos filtros (29/10/2026) */
 .cn-filtros .pn-exportar{margin-left:auto;white-space:nowrap}
+/* a escolha dos temas do relatório na janela (30/10/2026: "a pessoa possa marcar o tema que ela quer levar"): duas
+   colunas de caixas de marcar, o Marcar todos / Tirar todos em cima e o Baixar PDF embaixo, à direita */
+.cr-modal:has(.pn-rel){width:min(620px,calc(100vw - 32px))}
+.pn-rel-todos{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px}
+.pn-rel-temas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 18px;margin:0 0 14px;padding:0;
+  list-style:none}
+.pn-rel-temas label{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--raio-md);font-size:13.5px;
+  cursor:pointer}
+.pn-rel-temas label:hover{background:var(--superficie-2)}
+.pn-rel-temas input{width:16px;height:16px;accent-color:var(--verde);flex:none}
+.pn-rel-aviso{margin:0 0 10px;font-size:13px}
+.pn-rel-pe{display:flex;justify-content:flex-end}
+@media (max-width:640px){.pn-rel-temas{grid-template-columns:1fr}}
 .cr-modal:has(.pv-tab){width:min(1320px,calc(100vw - 32px))}
 .pv-tab{width:100%;border-collapse:collapse;font-size:12.5px}
 .pv-tab td,.pv-tab tbody th{vertical-align:middle}
