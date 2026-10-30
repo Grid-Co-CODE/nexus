@@ -1144,6 +1144,7 @@ def create_os_rpc(asset: dict, description: str, task_type: str, subtasks: list,
     return {"id_task": data.get("id_task"),
             "id_work_order": data.get("id_work_order"),
             "wo_folio": data.get("wo_folio"),
+            "duracao": dur,                   # o tempo da tarefa: a OS que junta as tarefas soma este
             "raw": result}
 
 
@@ -3550,7 +3551,7 @@ def create_planned_os(asset: dict, plan: dict, id_responsible=None, responsible_
     if to_work_order and id_responsible is not None:      # WO direto (1 ativo) → atribui o responsável
         params["id_assigned_user"] = id_responsible
     body = [{"id": str(uuid.uuid4()), "jsonrpc": "2.0", "method": RPC_METHOD, "params": params}]
-    return _react_insert_post(body)
+    return {**_react_insert_post(body), "duracao": dur}     # o tempo da tarefa: a OS que junta as tarefas soma este
 
 
 # Planos de PERFORMANCE (aparecem SÓ na aba Performance; escondidos no PCM). Casados por trecho
@@ -4232,7 +4233,7 @@ def create_planned_os_multi(selecoes: list, id_responsible, responsible_name: st
     sel = [s for s in (selecoes or []) if isinstance(s.get("asset"), dict) and s.get("id_task")]
     if not sel:
         return {"ok": False, "erro": "Nenhum plano selecionado.", "n_tarefas": 0, "n_criadas": 0}
-    id_tasks, erros = [], []
+    id_tasks, erros, dur_de = [], [], {}
     for s in sel:
         asset, idt = s["asset"], s["id_task"]
         try:
@@ -4244,6 +4245,7 @@ def create_planned_os_multi(selecoes: list, id_responsible, responsible_name: st
                                   duracao=s.get("duracao"))    # o tempo editado na linha da tela
             if r.get("id_task"):
                 id_tasks.append(r["id_task"])
+                dur_de[r["id_task"]] = r.get("duracao")
             else:
                 erros.append(f"{asset.get('code')}: tarefa não criada")
         except FracttalError as e:
@@ -4260,7 +4262,8 @@ def create_planned_os_multi(selecoes: list, id_responsible, responsible_name: st
     if not recs:
         return {"ok": True, "os": {"id_tasks": id_tasks}, "n_tarefas": len(sel), "n_criadas": len(id_tasks),
                 "erros": erros, "aviso": "tarefas criadas, mas não as achei no kanban p/ gerar a OS."}
-    wo = _work_order_insert(recs, id_responsible, responsible_name)
+    wo = _work_order_insert(recs, id_responsible, responsible_name,
+                            duration=_tempo_da_os(dur_de.get(r.get("id_task")) for r in recs))
     return {"ok": True, "n_tarefas": len(sel), "n_criadas": len(id_tasks), "erros": erros,
             "os": {"id_work_order": wo.get("id_work_order"), "wo_folio": wo.get("wo_folio"), "id_tasks": id_tasks}}
 
@@ -4282,12 +4285,13 @@ def create_planned_os_one_wo(assets: list, plan: dict, id_responsible, responsib
         return {"ok": False, "erro": "Plano sem subtarefas (estrutura do tasks_details a confirmar) — "
                 "relogue e/ou me mande a resposta do tasks_details.", "n_tarefas": len(val), "n_criadas": 0}
     # Fase 1 — N tarefas planejadas PENDENTES (1 por ativo)
-    id_tasks, erros = [], []
+    id_tasks, erros, dur_de = [], [], {}
     for asset in val:
         try:
             r = create_planned_os(asset, plan, event_date=event_date, to_work_order=False)
             if r.get("id_task"):
                 id_tasks.append(r["id_task"])
+                dur_de[r["id_task"]] = r.get("duracao")
             else:
                 erros.append(f"{asset.get('code')}: tarefa não criada")
         except FracttalError as e:
@@ -4305,7 +4309,8 @@ def create_planned_os_one_wo(assets: list, plan: dict, id_responsible, responsib
     if not recs:
         return {"ok": True, "os": {"id_tasks": id_tasks}, "n_tarefas": len(val), "n_criadas": len(id_tasks),
                 "erros": erros, "aviso": "tarefas criadas, mas não as achei no kanban p/ gerar a OS."}
-    wo = _work_order_insert(recs, id_responsible, responsible_name)
+    wo = _work_order_insert(recs, id_responsible, responsible_name,
+                            duration=_tempo_da_os(dur_de.get(r.get("id_task")) for r in recs))
     return {"ok": True, "n_tarefas": len(val), "n_criadas": len(id_tasks), "erros": erros,
             "os": {"id_work_order": wo.get("id_work_order"), "wo_folio": wo.get("wo_folio"),
                    "id_tasks": id_tasks}}
@@ -4854,6 +4859,13 @@ def _segundos(v):
     except (TypeError, ValueError):
         return None
     return n if n > 0 else None
+
+
+def _tempo_da_os(duracoes) -> int:
+    """O tempo da OS = a SOMA do tempo das tarefas dela (o PCM, 30/10/2026: "agora criando do zero o tempo na OS continua
+    10 min igual na Fila, só na tarefa que o tempo é o que a gente colocou"). O `_work_order_insert` punha os 600 s de
+    sempre na OS, fosse qual fosse o tempo das tarefas. A tarefa sem tempo conhecido conta os 10 min com que nasce."""
+    return sum(int(d) if d else DURACAO_OS_AVULSA for d in duracoes) or DURACAO_OS_AVULSA
 
 
 def _duracao_do_modelo(evento: dict, id_task, id_item):
@@ -5466,7 +5478,7 @@ def create_work_orders_agrupada(assets: list, description: str, task_type: str, 
         return {"ok": False, "erro": "Nenhum ativo válido.", "n_tarefas": 0, "n_criadas": 0,
                 "erros": erros}
 
-    id_tasks, por_task = [], {}
+    id_tasks, por_task, dur_de = [], {}, {}
     for asset in val:
         ov = (por_ativo or {}).get(asset.get("code")) or {}
         try:
@@ -5477,6 +5489,7 @@ def create_work_orders_agrupada(assets: list, description: str, task_type: str, 
             if r.get("id_task"):
                 id_tasks.append(r["id_task"])
                 por_task[r["id_task"]] = asset.get("code")
+                dur_de[r["id_task"]] = r.get("duracao")
             else:
                 erros.append("%s: tarefa não criada" % asset.get("code"))
         except FracttalError as e:
@@ -5501,7 +5514,8 @@ def create_work_orders_agrupada(assets: list, description: str, task_type: str, 
         saida["aviso"] = "tarefas criadas, mas não as achei no kanban p/ gerar a OS."
         return saida
     try:
-        wo = _work_order_insert(recs, id_responsible, responsible_name)
+        wo = _work_order_insert(recs, id_responsible, responsible_name,
+                                duration=_tempo_da_os(dur_de.get(r.get("id_task")) for r in recs))
     except FracttalError as e:
         saida["aviso"] = "tarefas criadas; a OS não fechou (%s)." % e
         return saida
@@ -6379,7 +6393,7 @@ def create_performance_os_agrupada(itens: list, id_responsible=None, responsible
         return {"ok": False, "erro": "Nenhum ativo selecionado.", "n_tarefas": 0, "n_criadas": 0}
 
     # ── Fase 1: uma tarefa PENDENTE por ativo, cada uma com o SEU título e a SUA observação ──
-    cache, id_tasks, erros, por_task = {}, [], [], {}
+    cache, id_tasks, erros, por_task, dur_de = {}, [], [], {}, {}
     plano_de = {}                    # id(item) → descrição do plano, p/ a Fase 5 saber a aba
     for i, it in enumerate(itens):
         a = it["asset"]
@@ -6399,6 +6413,7 @@ def create_performance_os_agrupada(itens: list, id_responsible=None, responsible
             if idt:
                 id_tasks.append(idt)
                 por_task[idt] = it            # p/ casar as imagens depois, pelo ativo
+                dur_de[idt] = r.get("duracao")
             else:
                 erros.append("%s: tarefa não criada" % (a.get("code") or "?"))
         except SessionExpired:
@@ -6439,7 +6454,7 @@ def create_performance_os_agrupada(itens: list, id_responsible=None, responsible
         except FracttalError:
             id_parent = None
     wo = _work_order_insert(recs, id_responsible, responsible_name, id_parent=id_parent,
-                            note=note_os)
+                            note=note_os, duration=_tempo_da_os(dur_de.get(r.get("id_task")) for r in recs))
     idwo, folio = wo.get("id_work_order"), wo.get("wo_folio")
     avisos = []
     if folio_pai and not id_parent:

@@ -1153,7 +1153,7 @@ adicionar anexos como PDFS e fotos. E quando o PCM gere uma OS pela fila de PCM 
   tirando um anexo; a Fila com os dois anexos e a confirmação "levando 2 anexo(s)". Falta a prova ao vivo (uma
   solicitação com anexo em TESTE - PA aprovada na Fila, o anexo no card da OS).
 
-## O tempo na Clonagem e o tempo da OS da Fila do PCM (30/10/2026)
+## O tempo na Clonagem e o tempo da OS = a soma das tarefas (30/10/2026)
 
 O time do PCM: "quando clonamos uma OS ela está vindo com horário padrão de 10minutos por tarefa... gostaria que o tempo
 que viesse fosse o cadastrado do plano, que seria atualizado no 'Atualizar todas do modelo'" e "nas SSs [Solicitações de
@@ -1167,11 +1167,17 @@ quando criada pela Fila do PCM".
   que tinha). O servidor só aceita de 1 min a 24 h (`clonar_web.preparar_tarefas`); fora disso, os 10 min de sempre.
 - **A OS:** o `_work_order_insert` (a fase que junta as tarefas numa OS numerada) punha `duration=600` fixo. O
   `clonar_os` (a Clonagem e a Fila do PCM) passa a soma do tempo das tarefas criadas; a retomada da Fila (a tarefa que
-  ficou de uma tentativa anterior), o tempo dessa tarefa. Os outros caminhos que juntam tarefas (o PCM, a agrupada, a
-  Performance agrupada) seguem com os 600 s: ninguém pediu, e cada um tem a sua regra de tempo.
+  ficou de uma tentativa anterior), o tempo dessa tarefa. No mesmo dia o PCM voltou: "o clonador deu certo tanto na
+  tarefa como na OS ... agora criando do zero o tempo na OS continua 10 min, só na tarefa que o tempo é o que a gente
+  colocou" (a Clonagem de planos, com o tempo editado na linha). Agora **toda OS que junta tarefas tem a soma do tempo
+  delas** (`_tempo_da_os`): a Clonagem de planos do PCM (`create_planned_os_multi`, e o `create_planned_os_one_wo`), a
+  agrupada do Criar OS do zero e da Engenharia (`create_work_orders_agrupada`) e a agrupada da Performance. O
+  `create_os_rpc` e o `create_planned_os` devolvem o `duracao` com que a tarefa nasceu; a tarefa sem tempo conta os
+  10 min. A OS de uma tarefa só (o Criar OS do zero de uma OS por ativo, as datas, a Performance de uma OS por ativo)
+  já saía com o tempo da tarefa.
 - **Prova:** `tests/test_oscreator_tempo_clonar_e_fila_30_10.py`. No Chrome sem janela, a tela de Clonar com duas
-  tarefas (uma com 1h30, outra sem tempo): 01:30 e 00:10; depois do "Atualizar todas do modelo", 02:00 e 01:00. Falta a
-  prova ao vivo: um clone e uma SS aprovada na Fila, conferindo o tempo da OS no Fracttal.
+  tarefas (uma com 1h30, outra sem tempo): 01:30 e 00:10; depois do "Atualizar todas do modelo", 02:00 e 01:00. Ao vivo,
+  o PCM conferiu o clone (a tarefa e a OS com o tempo total); falta a OS da Clonagem de planos e a de uma SS da Fila.
 
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 

@@ -106,3 +106,80 @@ def test_a_tela_do_clone_mostra_e_aplica_o_tempo():
     html = open(WEB + "/templates/clonar.html", encoding="utf-8").read()
     assert ">Tempo<" in html and 'colspan="5"' in html
     assert "t.duracao = j.duracao" in js and "t.duracao = res.duracao" in js and "hhmm(" in js
+
+
+# A OS que JUNTA tarefas criadas do zero (o PCM, 30/10/2026: "o clonador deu certo tanto na tarefa como na OS ... agora
+# criando do zero o tempo na OS continua 10 min igual na Fila, só na tarefa que o tempo é o que a gente colocou"): a
+# Clonagem de planos do PCM, a OS agrupada do Criar OS do zero e a agrupada da Performance também somam as tarefas.
+
+class _Resposta:
+    status_code, text = 200, ""
+
+    def __init__(self, id_task):
+        self.id_task = id_task
+
+    def json(self):
+        return [{"result": {"success": True, "data": {"id_task": self.id_task}}}]
+
+
+@pytest.fixture
+def insert_de_mentira(monkeypatch):
+    """O POST do Fracttal devolve a tarefa nova; guarda o tempo de cada tarefa e o da OS."""
+    tarefas, wo = [], {}
+
+    def post(url, headers=None, json=None, timeout=None):
+        tarefas.append(json[0]["params"]["duration"])
+        return _Resposta(100 + len(tarefas))
+    monkeypatch.setattr(api.requests, "post", post)
+    monkeypatch.setattr(api, "_rpc_headers", lambda: {})
+    monkeypatch.setattr(api, "_kanban_records", lambda ids: {i: {"id_task": i} for i in ids})
+
+    def inserir(recs, idr, nome="", duration=600, **k):
+        wo["duration"] = duration
+        return {"id_work_order": 9, "wo_folio": 1234}
+    monkeypatch.setattr(api, "_work_order_insert", inserir)
+    monkeypatch.setattr(api, "apply_labels", lambda *a: None)
+    return tarefas, wo
+
+
+ATIVO = {"id": 5, "code": "TST-INV1", "description": "Inversor 1.1", "id_type_item": 1}
+
+
+def test_a_tarefa_devolve_o_tempo_com_que_nasceu(insert_de_mentira):
+    assert api.create_os_rpc(dict(ATIVO), "T", "Corretiva", [], duracao=5400)["duracao"] == 5400
+    assert api.create_os_rpc(dict(ATIVO), "T", "Corretiva", [])["duracao"] == api.DURACAO_OS_AVULSA
+    plano = {"id_task": 9, "description": "Limpeza", "subtasks": [{"description": "a"}], "duration": 3600}
+    assert api.create_planned_os(dict(ATIVO), plano, to_work_order=False)["duracao"] == 3600
+    assert api.create_planned_os(dict(ATIVO), plano, to_work_order=False, duracao=1800)["duracao"] == 1800
+
+
+def test_a_os_do_pcm_soma_o_tempo_das_linhas(insert_de_mentira, monkeypatch):
+    tarefas, wo = insert_de_mentira
+    monkeypatch.setattr(api, "get_plan_details", lambda idt, idi: {"id_task": 9, "description": "Limpeza",
+                                                                   "subtasks": [{"description": "a"}], "duration": 3600})
+    r = api.create_planned_os_multi([{"asset": dict(ATIVO), "id_task": 9, "duracao": 5400},
+                                     {"asset": dict(ATIVO, id=6), "id_task": 9}], 1, "Ana")
+    assert r["ok"] and tarefas == [5400, 3600]
+    assert wo["duration"] == 5400 + 3600                          # antes: 600
+    api.create_planned_os_one_wo([dict(ATIVO), dict(ATIVO, id=6)], {"id_task": 9, "description": "Limpeza",
+                                 "subtasks": [{"description": "a"}], "duration": 1200}, 1, "Ana")
+    assert wo["duration"] == 2400
+
+
+def test_a_os_agrupada_do_zero_soma_as_tarefas(insert_de_mentira):
+    tarefas, wo = insert_de_mentira
+    r = api.create_work_orders_agrupada([dict(ATIVO), dict(ATIVO, id=6)], "T", "Corretiva", [],
+                                        id_responsible=1, responsible_name="Ana")
+    assert r["ok"] and len(tarefas) == 2
+    assert wo["duration"] == 2 * api.DURACAO_OS_AVULSA
+
+
+def test_a_agrupada_da_performance_soma_o_tempo_dos_planos(insert_de_mentira, monkeypatch):
+    _tarefas, wo = insert_de_mentira
+    monkeypatch.setattr(api, "get_plan_details", lambda idt, idi: {"id_task": 9, "description": "Inspeção",
+                                                                   "duration": 2700, "subtasks": [{"description": "a"}]})
+    monkeypatch.setattr(api, "_label_performance_id", lambda: None)
+    monkeypatch.setattr(api, "nascer_ticket", lambda *a, **k: {}, raising=False)
+    itens = [{"asset": dict(ATIVO), "plano_id_task": 9}, {"asset": dict(ATIVO, id=6), "plano_id_task": 9}]
+    api.create_performance_os_agrupada(itens, id_responsible=1, responsible_name="Ana")
+    assert wo["duration"] == 2 * 2700
