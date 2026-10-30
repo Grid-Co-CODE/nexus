@@ -9,6 +9,7 @@ saíram em 08/10/2026 (Levi: "ordens de serviço e imagens da ronda e ranking s�
 à Central.
 """
 import re
+import time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote, urlencode
 
@@ -1047,6 +1048,76 @@ def pt_aprovar(numero):
         entrar=_login_da_pt(p["numero"], p.get("codigo") or "") if p else "",
         idade_min=_idade_min, decisoes=decisao_pt.DECISOES, aviso=session.pop("pt_aviso", ""),
         gravada=request.args.get("gravada") == "1", quando=visao._dt))
+
+
+# a última releitura forçada do livro de PT pelo card: uma por minuto, no máximo (um link velho, de PT que não existe,
+# aberto várias vezes não faz o Nexus reler o livro a cada visita)
+_RELIDA_PT = {"em": 0.0}
+
+
+@bp.route("/pt/<numero>/assinar")
+def pt_assinar(numero):
+    """O card de assinar a PT (Levi, 30/10/2026, pelo chat do App de Campo: "a parte de abrir PT e assinar no e-mail
+    automático deve encaminhar para o Nexus para eles assinarem por lá ... um layout próprio como se fosse um card no
+    meio da tela dando um blur no fundo e o supervisor pode assinar, ao assinar ele vê também se tem mais alguma aberta
+    para alguma usina dele"). É o endereço do botão do e-mail do App (v315), com `?ativo=<Código do ativo>` sempre
+    presente (vazio = a linha sem ativo): a mesma linha e a mesma decisão da tela da PT (`pt_aprovar`), assinada com o
+    login do Fracttal do OS Creator. O formulário volta ao card (`volta`), e o login do Fracttal também (`card=1`).
+    Quem pode assinar é conferido com a pessoa da sessão do Nexus (a mesma conta, no e-mail ou no nome), e o `decidir`
+    confere de novo com a do Fracttal. Sem o formulário (assinada, decidida antes ou sem permissão), o card mostra as
+    outras PTs esperando nas usinas da pessoa (`decisao_pt.assinaveis`): o link do e-mail nunca acaba sem caminho."""
+    ativo = request.args.get("ativo")
+    leitura = visao.pts()
+    linhas = visao.pt_linhas(numero) if not leitura.erro else []
+    if not linhas and not leitura.erro and time.time() - _RELIDA_PT["em"] > 60:
+        # a PT que acabou de nascer: o App publica o livro antes do e-mail (v315), mas a cópia do Nexus é de 5 min
+        _RELIDA_PT["em"] = time.time()
+        visao.esquecer_pt()
+        leitura = visao.pts()
+        linhas = visao.pt_linhas(numero) if not leitura.erro else []
+    p = visao.pt(numero, ativo) if linhas and ativo is not None else None
+    if p is None and len(linhas) == 1:
+        p = linhas[0]                       # uma linha só: não há o que escolher
+    nexus, erro_nexus, recusa_app = None, "", ""
+    if p:
+        try:
+            nexus = decisao_pt.da_pt(p["numero"], p.get("codigo") or "")
+        except Exception as e:      # noqa: BLE001 — sem o livro de decisões, o card abre e diz
+            erro_nexus = f"Não consegui ler as decisões do Nexus ({type(e).__name__})"
+        if nexus and decisao_pt.recusada_pelo_app(p, [nexus]):
+            recusa_app, nexus = p.get("nexus_recusa") or "o App não aplicou a decisão", None
+    u = session.get("usuario") or {}
+    email, nome, admin = u.get("email") or "", u.get("nome") or "", bool(session.get("admin"))
+    pode, porque, achada = False, "", True
+    if p and p["situacao"] == "aguardando" and not nexus and not erro_nexus:
+        try:
+            pode, porque = decisao_pt.pode_decidir(p, email, nome, admin)
+            # sem poder, o Nexus achou a pessoa no cadastro? Medido em 30/10/2026: 6 dos 7 Responsáveis UFV não têm
+            # e-mail na ficha e são achados pelo nome (o do e-mail, fulano.souza@, ou o da conta); quem não é achado lê
+            # o que fazer, não só a lista de quem pode
+            achada = pode or admin or porque == decisao_pt.QUEM_PEDIU or bool(visao.pessoa_do_login(email, nome))
+        except Exception:       # noqa: BLE001 — sem o cadastro, o formulário abre e o `decidir` confere
+            pode = True
+    gravada = bool(p) and session.pop("pt_gravada", "") == p["numero"]
+    outras = None
+    if p and not pode:
+        try:
+            outras = decisao_pt.assinaveis(leitura.dados.get("aguardando") or [], email, nome, admin,
+                                           menos=(p["numero"], p.get("codigo") or ""))
+        except Exception:       # noqa: BLE001 — sem o cadastro, o card só não lista as outras
+            outras = None
+    por_nexus = ""
+    if nexus:
+        por_nexus = visao._nome(visao._quem(), nexus.get("decidida_por_hmac"))
+    volta = f"/t/campo/pt/{quote(str(numero), safe='')}/assinar?ativo={quote(str(p.get('codigo') or ''), safe='')}" \
+        if p else ""
+    return render_template("campo/pt_assinar.html", **_comum(
+        "pt", leitura, p=p, linhas=linhas, escolher=bool(linhas) and p is None, ativo=ativo, numero=numero,
+        nexus=nexus, por_nexus=por_nexus, erro_nexus=erro_nexus, recusa_app=recusa_app, situacoes=SITUACAO_PT,
+        pode=pode, porque=porque, achada=achada, outras=outras, volta=volta, gravada=gravada,
+        aviso=session.pop("pt_aviso", ""),
+        entrar=_login_da_pt(p["numero"], p.get("codigo") or "", card=True) if p else "",
+        idade_min=_idade_min, decisoes=decisao_pt.DECISOES, quando=visao._dt))
 
 
 # ── Rondas e Zeladoria (visão nossa) ─────────────────────────────────────────────────────────────────────────────

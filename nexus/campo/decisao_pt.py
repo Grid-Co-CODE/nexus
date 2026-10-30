@@ -31,6 +31,11 @@ contrato da usina, quem tem o vínculo COS no cadastro de pessoas e um administr
 (`_Base.pessoa_do_login`); sem a chave do cadastro, só o administrador decide. Quem PEDIU a PT nunca a decide, nem sendo
 administrador: é a regra do painel do App desde a 1ª PT real (28/09/2026, aprovada pelo próprio técnico, que também era
 administrador), e a v257 descarta calada a decisão de quem pediu.
+
+O RESPONSÁVEL UFV também decide (30/10/2026, pedido do Levi pelo chat do App de Campo: o e-mail de PT aguardando abre o
+card de assinar no Nexus, `/t/campo/pt/<n>/assinar`): desde a v314 (30/10, 04:39Z) o App manda o aviso e a assinatura
+da PT ao Responsável O&M da ficha da usina no Nexus (`usinas.responsavel_om_id`), e 65 usinas trocaram de quem recebe.
+Sem o papel aqui, quem recebe o e-mail abriria o card e leria "quem pode dar o De acordo: ...", sem ele na lista.
 """
 import re
 import threading
@@ -72,19 +77,23 @@ def mascarar(texto) -> str:
 
 def aprovadores(p: dict, b=None) -> dict:
     """Quem pode dar o De acordo nesta PT: {"ids": {papel: pessoa_id}, "cos": {pessoa_id}, "texto"}. O texto é o que a
-    tela e a recusa dizem ("Supervisor de Campo da Sudeste 03 (Fulana), gestor de contrato Beltrano, alguém do COS ou
-    um administrador")."""
+    tela e a recusa dizem ("O Responsável UFV (Fulano), o Supervisor de Campo da Sudeste 03 (Fulana), o gestor de
+    contrato (Beltrano), alguém do COS ou um administrador")."""
     b = b or visao._Base()
     uid = D._id(p.get("usina_id"))
     rid = b.regiao_da_usina(uid) if uid else None
     r = b.regiao.get(rid) or {}
     u = b.por_id.get(uid) or {}
-    ids = {"supervisor de campo": r.get("supervisor_id"),
+    ids = {"responsável UFV": D._id(u.get("responsavel_om_id")),
+           "supervisor de campo": r.get("supervisor_id"),
            "coordenador de campo": None if r.get("supervisor_id") else r.get("coordenador_id"),
            "gestor de contrato": D._id(u.get("gestor_contrato_id"))}
     cos = {D._id(x.get("pessoa_id")) for x in b.pessoas
            if str(x.get("vinculo") or "").strip() == VINCULO_COS and str(x.get("excluido") or "").lower() != "sim"}
     partes = []
+    # o Responsável UFV primeiro: é a ele que o App manda o aviso da PT desde a v314 (30/10/2026)
+    if ids["responsável UFV"]:
+        partes.append(f"o Responsável UFV ({b.nome_da_pessoa(ids['responsável UFV'], 'Responsável')})")
     if r:
         sup = b.nome_da_pessoa(r.get("supervisor_id"), "Supervisor") if r.get("supervisor_id") else ""
         coord = b.nome_da_pessoa(r.get("coordenador_id"), "Coordenador") if r.get("coordenador_id") else ""
@@ -128,6 +137,31 @@ def pode_decidir(p: dict, email: str, nome: str = "", admin: bool = False, b=Non
     if papel:
         return True, papel
     return False, f"Quem pode dar o De acordo nesta PT: {a['texto'][0].lower()}{a['texto'][1:]}."
+
+
+def assinaveis(aguardando: list, email: str, nome: str = "", admin: bool = False, menos=None, b=None) -> list:
+    """As linhas de PT esperando que esta pessoa pode decidir (`pode_decidir`), da mais antiga para a mais nova, sem a
+    linha `menos` = (número, código do ativo). É o "ao assinar ele vê também se tem mais alguma aberta para alguma usina
+    dele" do card de assinar (Levi, 30/10/2026): as usinas dele são as em que ele é o Responsável UFV, o Supervisor de
+    Campo da região ou o gestor de contrato; para o COS e o administrador, todas. A linha que o Nexus já decidiu (e o App
+    ainda não aplicou) sai, menos a que o App recusou (`recusada_pelo_app`: ela pede decisão de novo): esperando, para quem
+    olha, é só o que ainda pede assinatura."""
+    b = b or visao._Base()
+    ja: dict = {}
+    try:
+        for d in decisoes():
+            ja.setdefault((D._txt(d.get("pt")), D._txt(d.get("codigo_ativo"))), []).append(d)
+    except Exception:       # noqa: BLE001 — sem o livro de decisões, a lista sai sem tirar as já decididas aqui
+        ja = {}
+    fora = (D._txt(menos[0]), D._txt(menos[1])) if menos else None
+    out = []
+    for p in aguardando:
+        chave = (D._txt(p.get("numero")), D._txt(p.get("codigo")))
+        if chave == fora or (chave in ja and not recusada_pelo_app(p, ja[chave])):
+            continue
+        if pode_decidir(p, email, nome, admin, b)[0]:
+            out.append(p)
+    return sorted(out, key=lambda p: (p.get("criada") is None, p.get("criada") or 0))
 
 
 def assinatura(linha: dict, chave: str) -> str:

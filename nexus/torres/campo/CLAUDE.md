@@ -1313,7 +1313,9 @@ o formulário mandava o código dela, por fora da recusa do `decidir`).
   aba `decisoes` de antes (nunca gravada) não é lida.
 - **Quem pode decidir** (Levi, 09/10/2026): o Supervisor de Campo da região da usina (com a vaga aberta, o
   Coordenador), o gestor de contrato da usina, quem tem o vínculo COS no cadastro e um administrador do Nexus
-  (`decisao_pt.aprovadores` / `pode_decidir`, conferido no `decidir`; a recusa diz quem pode). A pessoa é a do login
+  (`decisao_pt.aprovadores` / `pode_decidir`, conferido no `decidir`; a recusa diz quem pode). **Desde 30/10/2026, o
+  Responsável UFV da ficha da usina** (`usinas.responsavel_om_id`, papel "responsável UFV", o 1º da lista de quem
+  pode): é a quem o App manda o aviso e a assinatura da PT desde a v314 (30/10, 04:39Z). A pessoa é a do login
   do Fracttal, achada no cadastro pelo e-mail ou pelo nome de UMA pessoa. **Quem pediu a PT nunca a decide**, nem sendo
   administrador: `pode_decidir` compara o código do e-mail de quem assina com o `solicitante_hmac` da linha e, desde
   11/10/2026, também a pessoa do cadastro (`solicitante_pessoa_id`: quem tem um e-mail no Microsoft e outro no Fracttal
@@ -1335,6 +1337,39 @@ o formulário mandava o código dela, por fora da recusa do `decidir`).
   decisão): decisão gravada que o App descarta trava a linha aqui e deixa o técnico esperando. Até a v257 entrar no ar, a
   tela diz: "O App ainda não lê esta decisão". Falta no App: mandar a PT ao banco na hora em que nasce, não só no timer
   de hora em hora (hoje a PT chega ao Nexus com até 1 h de atraso).
+
+### O card de assinar a PT (30/10/2026)
+
+Pedido do Levi, pelo chat do App de Campo: "a parte de abrir PT e assinar no e-mail automático deve encaminhar para o
+Nexus para eles assinarem por lá ... um layout próprio como se fosse um card no meio da tela dando um blur no fundo e o
+supervisor pode assinar, ao assinar ele vê também se tem mais alguma aberta para alguma usina dele".
+- **O endereço é contrato com o App** (não muda): `/t/campo/pt/<número>/assinar?ativo=<Código do ativo>` (rota
+  `pt_assinar`, template `pt_assinar.html`), o botão do e-mail de PT aguardando da v315, atrás de um interruptor do
+  App. O `ativo` vem sempre (vazio = a linha sem ativo); sem ele, a PT de mais de uma linha só lista os equipamentos,
+  como a tela da PT. Debaixo do `/nexus` também abre (`https://app.gridco.com.br/nexus/t/campo/...`).
+- **O card**: por cima do Nexus desfocado (o véu e o blur da janela da Visão do responsável), uma superfície só, feito
+  para o celular (no estreito o card desce até o fim e o fundo rola; botões e linhas com 44 px). Mostra quem pediu,
+  quando e há quanto espera, a OS, a tarefa, a usina, o ativo, as atividades críticas e os itens marcados NÃO.
+- **Os itens NÃO**: a coluna `Itens NÃO` no fim do `pt_app_campo` (pedida ao App em 30/10: os títulos dos itens
+  respondidos NÃO, separados por "; ", sem texto livre; `visao.pts` → `itens_nao`). Sem ela, a contagem
+  (`Respostas NÃO`), como antes.
+- **A decisão é a de sempre** (`/os/_nexus/pt/<n>/decidir`, o login do Fracttal do OS Creator): o formulário leva
+  `volta` (o card, sem o prefixo) e `card=1`; sem o login do Fracttal, o script troca os botões por "Entrar com o
+  Fracttal para assinar", e o login volta ao card (`assinatura._login(..., card=True)`, `voltar?...&card=1`). O Não
+  autorizo pede o motivo antes (o 1º clique abre a caixa).
+- **Quem pode** é conferido com a pessoa da sessão do Nexus (a conta Microsoft; o e-mail é o mesmo do Fracttal, que o
+  portão de setor já usa), e o `decidir` confere de novo com a do Fracttal. Quem não pode lê o porquê, sem botão; quem
+  o Nexus não acha no cadastro lê também que falta o e-mail na ficha. Medido em 30/10: 6 dos 7 Responsáveis UFV sem
+  e-mail na ficha, achados pelo nome (o do e-mail, fulano.souza@); os 5 que o App passou a avisar na v314 são achados e
+  estão no setor Supervisão Campo, que abre o card.
+- **Depois** (assinada, decidida antes ou sem permissão): "Outras PTs esperando nas suas usinas", da mais antiga para a
+  mais nova, cada uma no próprio card (`decisao_pt.assinaveis`: as linhas esperando que a pessoa pode decidir, sem as
+  que o Nexus já decidiu, menos a que o App recusou). Sem nenhuma: "Nenhuma outra PT esperando nas suas usinas".
+- **A PT que acabou de nascer**: o App publica o livro antes do e-mail (v315), mas a cópia do Nexus é de 5 min; o card
+  que não acha a PT relê o livro na hora, no máximo uma vez por minuto (`_RELIDA_PT`).
+- Prova: `tests/test_campo_pt_assinar.py`. Bancada de 30/10 (dados reais, só leitura, decisão só na memória): 39 PT
+  esperando, 38 com o Responsável UFV na ficha; De acordo e Não autorizo de ponta a ponta, a lista das outras, e o
+  celular a 375 px sem rolagem lateral.
 
 ## As contas copiadas do App (`nexus/campo/regras_app.py`)
 

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block titulo %}{{ numero }} · assinar{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# O card de assinar a PT (Levi, 30/10/2026, pelo chat do App de Campo): o botão do e-mail de PT aguardando abre aqui, no
+   celular quase sempre. "Um layout próprio como se fosse um card no meio da tela dando um blur no fundo": o card fica
+   por cima do Nexus desfocado, com uma superfície só. A decisão é a da tela da PT (`pt_aprovar.html`): a mesma linha
+   (PT × ativo), o login do Fracttal do OS Creator e o livro `nexus_pt_decisoes`. Sem o formulário (assinada, decidida
+   antes ou sem permissão), as outras PTs esperando nas usinas da pessoa, cada uma no próprio card. #}
+{% macro situacao(p, extra='') %}{% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}<span class="cn-st cn-t-{{ s[1] }}{{ ' ' ~ extra if extra }}">{{ s[0] }}</span>{% endmacro %}
+<div class="pa-fundo">
+  <article class="pa-card" aria-labelledby="pa-titulo">
+    <a class="pa-fechar cn-link" href="{{ raiz }}/" aria-label="Fechar e ir para o início do Nexus">Fechar</a>
+    {% if leitura.erro %}
+    <p class="gc-eyebrow">Permissão de trabalho</p>
+    <h1 id="pa-titulo" class="pa-titulo">{{ numero }}</h1>
+    <div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b> Tente de novo em instantes.</div>
+    {% elif not linhas %}
+    <p class="gc-eyebrow">Permissão de trabalho</p>
+    <h1 id="pa-titulo" class="pa-titulo">{{ numero }}</h1>
+    <div class="cn-erro" role="alert"><b>Esta PT ainda não chegou ao Nexus.</b> O App manda a PT quando ela nasce; se o
+      e-mail acabou de chegar, abra o link de novo em 1 minuto.</div>
+    {% elif escolher %}
+    {# a PT de mais de um equipamento sem dizer qual: só a escolha, como a tela da PT (decidir a 1ª calada punha a decisão
+       no equipamento errado; revisão adversarial de 11/10/2026) #}
+    <p class="gc-eyebrow">Permissão de trabalho</p>
+    <h1 id="pa-titulo" class="pa-titulo">{{ linhas[0].numero }}</h1>
+    <p class="pa-onde">{{ linhas[0].usina }}{% if linhas[0].uf %} · {{ linhas[0].uf }}{% endif %}</p>
+    <p class="pa-texto"><b>Esta PT tem {{ linhas|length }} equipamentos, e cada um tem a sua decisão.</b> Escolha o
+      equipamento{% if ativo %} (o link pedia {{ ativo }}, que esta PT não tem){% endif %}.</p>
+    <ul class="pa-lista">{% for l in linhas %}
+      <li><a class="pa-item" href="{{ url_for('torre_campo.pt_assinar', numero=l.numero, ativo=l.codigo) }}">
+        <span class="pa-item-nome">{{ l.ativo or l.codigo or 'sem equipamento' }}</span>{{ situacao(l) }}</a></li>{% endfor %}
+    </ul>
+    {% else %}
+    <header class="pa-cab">
+      <p class="gc-eyebrow">Permissão de trabalho</p>
+      {# assinada aqui e o App ainda não aplicou: o título diz a decisão do Nexus, não o "Aguardando" do livro do App #}
+      <h1 id="pa-titulo" class="pa-titulo">{{ p.numero }} {% if nexus and p.situacao == 'aguardando' %}<span class="cn-st cn-t-{{ 'ok' if nexus.decisao == 'de_acordo' else 'critico' }} cn-st--titulo">{{ decisoes.get(nexus.decisao, nexus.decisao) }} no Nexus</span>{% else %}{{ situacao(p, 'cn-st--titulo') }}{% endif %}</h1>
+      <p class="pa-onde">{{ p.usina }}{% if p.uf %} · {{ p.uf }}{% endif %}</p>
+    </header>
+    {% if aviso %}<div class="cn-erro" role="alert"><b>{{ aviso }}</b></div>{% endif %}
+    {% if gravada and nexus %}<div class="cn-certo" role="status"><b>{{ decisoes.get(nexus.decisao, nexus.decisao) }} salvo.</b>
+      O técnico vê quando o App aplicar a decisão, em até 2 minutos.</div>{% endif %}
+
+    <dl class="pa-dados">
+      <dt>Quem pediu</dt><dd>{{ p.solicitante or '—' }}</dd>
+      <dt>Pedida em</dt><dd>{{ p.criada.strftime('%d/%m às %H:%M') if p.criada else '—' }}{% if p.idade_min is not none %}<span class="pa-det {{ 'cn-t-critico' if p.parada else '' }}">esperando há {{ idade_min(p.idade_min) }}</span>{% endif %}</dd>
+      <dt>OS</dt><dd class="m">{{ p.os or '—' }}</dd>
+      <dt>Tarefa</dt><dd>{{ p.tarefa or '—' }}</dd>
+      <dt>Ativo</dt><dd>{{ p.ativo or p.codigo or 'sem equipamento' }}{% if p.codigo and p.codigo != p.ativo %}<span class="pa-det m">{{ p.codigo }}</span>{% endif %}</dd>
+      {% if p.faltam %}<dt>Falta</dt><dd>{{ p.faltam }}</dd>{% endif %}
+      {% if p.forcada %}<dt>Forçada</dt><dd class="cn-t-alerta">sim</dd>{% endif %}
+    </dl>
+
+    <h2 class="pa-sub">Atividades críticas</h2>
+    {% if p.atividades %}<ul class="pa-ativ">{% for a in p.atividades %}<li>{{ a }}</li>{% endfor %}</ul>
+    {% else %}<p class="pa-texto mudo">Nenhuma atividade crítica marcada.</p>{% endif %}
+
+    <h2 class="pa-sub">Itens marcados NÃO</h2>
+    {% if p.itens_nao %}<ol class="pa-nao">{% for x in p.itens_nao %}<li>{{ x }}</li>{% endfor %}</ol>
+    {% elif p.respostas_nao %}<p class="pa-texto cn-t-alerta">{{ p.respostas_nao }} {{ 'item marcado' if p.respostas_nao == 1 else 'itens marcados' }} NÃO no checklist da PT.</p>
+    {% else %}<p class="pa-texto mudo">Nenhum.</p>{% endif %}
+
+    <section class="pa-decisao" aria-label="Decisão">
+      <h2 class="pa-sub">Decisão</h2>
+      {% if p.situacao != 'aguardando' %}
+      <p class="pa-texto">{{ situacao(p) }} no painel do App{% if p.decidida %}, em {{ p.decidida.strftime('%d/%m às %H:%M') }}{% endif %}{% if p.decidida_por %}, por {{ p.decidida_por }}{% endif %}{% if p.papel %} ({{ p.papel }}){% endif %}.</p>
+      {% if p.motivo %}<p class="pa-texto mudo">Motivo: {{ p.motivo }}</p>{% endif %}
+      {% elif erro_nexus %}
+      <div class="cn-erro" role="alert"><b>{{ erro_nexus }}.</b> Sem saber se ela já foi decidida aqui, a decisão fica fechada.</div>
+      {% elif nexus %}
+      {% set dn = quando(nexus.decidida_em) %}
+      <p class="pa-texto"><span class="cn-st cn-t-{{ 'ok' if nexus.decisao == 'de_acordo' else 'critico' }}">{{ decisoes.get(nexus.decisao, nexus.decisao) }}</span>
+        no Nexus{% if dn %}, em {{ dn.strftime('%d/%m às %H:%M') }}{% endif %}{% if por_nexus %}, por {{ por_nexus }}{% endif %}.</p>
+      {% if nexus.motivo %}<p class="pa-texto mudo">Motivo: {{ nexus.motivo }}</p>{% endif %}
+      {% if not gravada %}<p class="pa-texto mudo">Salva no banco. O técnico vê quando o App aplicar a decisão.</p>{% endif %}
+      {% elif not pode %}
+      <p class="pa-texto"><b>Você não pode assinar esta PT.</b> {{ porque }}</p>
+      {% if not achada %}<p class="pa-texto mudo">O Nexus não achou você no cadastro de pessoas, nem pelo e-mail nem pelo
+        nome. Se você é uma dessas pessoas, peça para pôr o seu e-mail na sua ficha do cadastro de pessoas.</p>{% endif %}
+      {% else %}
+      {% if recusa_app %}<div class="cn-erro" role="alert"><b>O App não aplicou a decisão anterior do Nexus:</b> {{ recusa_app }}. Decida de novo.</div>{% endif %}
+      <form method="post" action="{{ url_for('campo_assinatura.decidir', numero=p.numero) }}" class="pa-form" data-pa-form>
+        {# a linha decidida (o código do ativo vai ao banco e o App acha a linha por ele), a volta ao card depois de gravar e,
+           sem o login do Fracttal, a volta do login também ao card #}
+        <input type="hidden" name="codigo" value="{{ p.codigo or '' }}">
+        <input type="hidden" name="volta" value="{{ volta }}">
+        <input type="hidden" name="card" value="1">
+        <p class="pa-quem" data-pa-quem="{{ url_for('campo_assinatura.quem') }}">Você assina com o seu login do Fracttal (o mesmo do OS Creator).</p>
+        <div class="pa-motivo" hidden>
+          <label class="gc-rotulo" for="pa-motivo">Motivo do Não autorizo <span class="mudo">(o técnico lê)</span></label>
+          <textarea class="gc-campo" id="pa-motivo" name="motivo" rows="3" maxlength="400"></textarea>
+        </div>
+        <div class="pa-botoes">
+          {# o endereço do login (já com o prefixo, `assinatura._login`) vai no data-: o botão só aparece pelo script #}
+          <a class="gc-btn gc-btn--primario" data-pa-entrar="{{ entrar }}" hidden>Entrar com o Fracttal para assinar</a>
+          <button class="gc-btn gc-btn--primario" type="submit" name="decisao" value="de_acordo" data-pa-acordo>De acordo</button>
+          <button class="gc-btn gc-btn--contorno cn-btn-negar" type="submit" name="decisao" value="negada" data-pa-negar>Não autorizo</button>
+        </div>
+        <p class="pa-texto mudo">Vale a primeira decisão, aqui ou no painel do App.</p>
+      </form>
+      <script>
+        // quem assina: a sessão do OS Creator (cookie só em /os). Sem ela, o botão leva ao login do Fracttal e volta a
+        // este card; os de decidir somem até lá. O Não autorizo pede o motivo antes (o 1º clique abre a caixa)
+        (function () {
+          var f = document.querySelector('[data-pa-form]');
+          if (!f) { return; }
+          var quem = f.querySelector('[data-pa-quem]'), entrar = f.querySelector('[data-pa-entrar]');
+          var acordo = f.querySelector('[data-pa-acordo]'), negar = f.querySelector('[data-pa-negar]');
+          var caixa = f.querySelector('.pa-motivo'), motivo = f.querySelector('textarea[name="motivo"]');
+          fetch(quem.getAttribute('data-pa-quem'), {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (q) {
+            if (q.email) { quem.textContent = 'Assinando como ' + q.nome + ' (' + q.email + '), pelo login do Fracttal.'; return; }
+            quem.textContent = 'Para assinar, entre com o seu login do Fracttal (o mesmo do OS Creator). Você volta para este card.';
+            entrar.href = entrar.getAttribute('data-pa-entrar');
+            entrar.hidden = false; acordo.hidden = true; negar.hidden = true;
+          }).catch(function () {});
+          acordo.addEventListener('click', function () { motivo.required = false; });
+          negar.addEventListener('click', function (ev) {
+            if (caixa.hidden) {
+              ev.preventDefault();
+              caixa.hidden = false; motivo.required = true; motivo.focus();
+              negar.textContent = 'Confirmar Não autorizo';
+            }
+          });
+          // um clique só: os botões travam DEPOIS de o formulário levar o botão clicado (travar antes tira a decisão)
+          f.addEventListener('submit', function () {
+            setTimeout(function () { acordo.disabled = true; negar.disabled = true; }, 0);
+          });
+        })();
+      </script>
+      {% endif %}
+    </section>
+
+    {% if outras is not none %}
+    <section class="pa-outras" aria-label="Outras PTs esperando">
+      <h2 class="pa-sub">Outras PTs esperando nas suas usinas{% if outras %} <span class="pa-conta">{{ outras|length }}</span>{% endif %}</h2>
+      {% if outras %}
+      <ul class="pa-lista">{% for o in outras %}
+        <li><a class="pa-item" href="{{ url_for('torre_campo.pt_assinar', numero=o.numero, ativo=o.codigo) }}">
+          <span class="pa-item-nome"><span class="m">{{ o.numero }}</span><span class="pa-det">{{ o.usina }}{% if o.ativo %} · {{ o.ativo }}{% endif %}</span></span>
+          {% if o.idade_min is not none %}<span class="pa-espera {{ 'cn-t-critico' if o.parada else 'cn-t-alerta' }}">há {{ idade_min(o.idade_min) }}</span>{% endif %}</a></li>{% endfor %}
+      </ul>
+      {% else %}<p class="pa-texto mudo">Nenhuma outra PT esperando nas suas usinas.</p>{% endif %}
+    </section>
+    {% endif %}
+    <p class="pa-pe"><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=p.numero, ativo=p.codigo) }}">Ver a PT completa</a>
+      <span class="mudo">(a assinatura do técnico e o PDF)</span></p>
+    {% endif %}
+  </article>
+</div>
+{% endblock %}

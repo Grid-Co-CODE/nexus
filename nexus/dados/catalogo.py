@@ -356,7 +356,9 @@ FATOS = (
          janela_origem=fato_pt.JANELA_ORIGEM, estado="conformado", conformado_em="nexus_fatos · fato_pt",
          observacao="até 08/10: '1 linha = 1 PT', mas eram 233 linhas para 227 números (o App decide por linha). PTs "
                     "= SUM(primeira_linha_da_pt). O decisor liga 0%: as 6 contas Admin estão fora do cadastro "
-                    "(decisão 4). Sem o passo 0, a PT de 28/09 sai do fato em ~27/12"),
+                    "(decisão 4). Sem o passo 0, a PT de 28/09 sai do fato em ~27/12. Desde a v315 do App (30/10/2026), "
+                    "a coluna 'Itens NÃO' no fim do livro (os títulos dos itens respondidos NÃO, separados por '; ', "
+                    "sem texto livre): fica fora do fato, lida crua pelo card de assinar a PT"),
     # o Nexus é a FONTE deste: a decisão da PT assinada no Nexus com o login do Fracttal do OS Creator (05/10/2026);
     # quem aplica no campo é o App (nexus/campo/decisao_pt.py). Decisão 4 do Levi (11/10/2026): POR LINHA, como o App
     # decide (a PT × ativo do pt_app_campo), na aba fato_decisao_pt (era "decisoes", nunca gravada) com o codigo_ativo

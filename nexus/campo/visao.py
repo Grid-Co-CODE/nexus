@@ -1479,6 +1479,9 @@ def pts() -> leitura.Leitura:
                         "efeito": r.get("Efeito") or "",
                         "respostas_nao": D._int(x.get("respostas_nao_qtd")) or 0, "faltam": r.get("Faltam") or "",
                         "atividades": [a.strip() for a in str(r.get("Atividades") or "").split(";") if a.strip()],
+                        # os títulos dos itens marcados NÃO (coluna no fim do livro, pedida ao App em 30/10/2026 para o
+                        # card de assinar); sem ela, o card mostra só a contagem (`respostas_nao`)
+                        "itens_nao": [a.strip() for a in str(r.get("Itens NÃO") or "").split(";") if a.strip()],
                         "forcada": D._int(x.get("forcada")) == 1, "aviso_em": _dt(r.get("1º aviso em")),
                         "aviso_motivo": r.get("1º aviso: motivo") or "",
                         "espera_min": D._int(x.get("espera_min")),
