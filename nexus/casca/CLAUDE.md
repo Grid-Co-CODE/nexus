@@ -197,7 +197,9 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   disco. **E o teto do Nexus** (`raio_x._teto_nexus`, 29/10/2026), no mesmo cartão: o `MemoryHigh`/`MemoryMax` e o swap
   permitido pelo grupo do próprio processo (cgroup v2 do systemd ou do contêiner, ou v1), quantas vezes o Linux o
   apertou (`memory.events`) e onde está posto; "nenhum" quando não há. Desde 30/10/2026 o `deploy/atualizar.sh` tira
-  sozinho o teto abaixo de 4 GB do serviço (DEPLOY.md, seção 8): o cartão é como se confere. O caso: em cinco leituras de dois dias o Nexus
+  sozinho o teto abaixo de 4 GB do serviço (DEPLOY.md, seção 8) e grava o que viu e fez em `.git/nexus-teto`; o
+  cartão mostra (`raio_x._teto_do_deploy`, "o deploy conferiu em ...": tirou, sem teto, só no cgroup ou o erro, com o
+  arquivo onde o teto está escrito). Prova: `tests/test_raio_x_teto_deploy_30_10.py`. O caso: em cinco leituras de dois dias o Nexus
   ficou sempre com ~700 MB na memória e o resto no swap, com 5,7 a 7 GB livres na máquina, e o Levi não tem acesso ao
   servidor para ler o serviço. Prova: `tests/test_raio_x_teto_memoria_29_10.py`. O caso de antes: Raio-X das 10:08 de 20/10, `GET /os/` há 18 s numa cópia de 17 ms com o Nexus a 13% e carga 2,5 a 3,9:
   a carga do Linux soma quem espera o disco, e a página não dizia qual era o gargalo. Leitura: "esperando o disco" alto

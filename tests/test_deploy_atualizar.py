@@ -119,8 +119,11 @@ _FALSOS = {
     "id": 'if [ "${1:-}" = "-u" ]; then echo 0; else echo "uid=0(root)"; fi',
     "stat": 'echo dono',
     "sudo": 'if [ "${1:-}" = "-u" ]; then shift 2; fi; exec "$@"',
-    # o "show" lê o teto de memória do serviço no controle (sem arquivo, "infinity": sem teto) e não entra no log
-    "systemctl": ('if [ "${1:-}" = "show" ]; then cat "$NEXUS_TESTE_CONTROLE/teto_$3" 2>/dev/null || echo infinity; exit 0; fi; '
+    # o "show" lê a propriedade do serviço no controle (show_<propriedade>) e não entra no log; sem o arquivo, o grupo é o
+    # do serviço, os caminhos dos arquivos da unidade vêm vazios e o resto é "infinity" (sem teto)
+    "systemctl": ('if [ "${1:-}" = "show" ]; then cat "$NEXUS_TESTE_CONTROLE/show_$3" 2>/dev/null && exit 0; '
+                  'case "$3" in ControlGroup) echo /system.slice/nexus.service ;; DropInPaths|FragmentPath) echo ;; '
+                  '*) echo infinity ;; esac; exit 0; fi; '
                   'echo "systemctl $*" >> "$NEXUS_TESTE_LOG"; '
                   'if [ "${1:-}" = "set-property" ] && [ -e "$NEXUS_TESTE_CONTROLE/set_falha" ]; then exit 1; fi'),
     "sleep": ':',
@@ -164,6 +167,7 @@ class Servidor:
     def __init__(self, base: Path):
         self.origem, self.clone, self.bin = base / "origem", base / "servidor", base / "bin"
         self.controle, self.log = base / "controle", base / "log.txt"
+        self.systemd, self.cgroup = base / "systemd", base / "cgroup"
         self.controle.mkdir()
         self.origem.mkdir()
         _git(self.origem, "init", "-q", "-b", "main")
@@ -201,6 +205,8 @@ class Servidor:
               **env_extra) -> tuple[int, list[str], str]:
         """(código de saída, o que o script fez nos falsos nesta rodada, saída)."""
         self.log.write_text("")
+        # o systemd e o cgroup do teto de memória (passo 0 do script) numa pasta do teste, nunca os da máquina
+        env_extra = {"NEXUS_SYSTEMD_DIR": self.systemd.as_posix(), "NEXUS_CGROUP_RAIZ": self.cgroup.as_posix(), **env_extra}
         env = dict(os.environ, NEXUS_TESTE_LOG=self.log.as_posix(), NEXUS_TESTE_CONTROLE=self.controle.as_posix(),
                    # os falsos primeiro; depois a pasta do bash (readlink, seq, tee... mesmo sem o Git no PATH)
                    PATH=os.pathsep.join([str(self.bin), str(Path(BASH).parent), os.environ.get("PATH", "")]),

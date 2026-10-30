@@ -582,12 +582,19 @@ O git não toca nos `.env` nem na `dados/`. Dependência nova no `requirements.t
 09/10) o script instala sozinho.
 
 **O teto de memória do serviço sai sozinho (30/10/2026).** Em toda rodada, antes de buscar no GitHub (também na de
-"nada a fazer"), o script lê o `MemoryHigh` e o `MemoryMax` do serviço e põe em `infinity` (`systemctl set-property`,
-que vale na hora, sem restart) o que estiver abaixo do piso de 4 GB (`NEXUS_MEMORIA_PISO_MB`). O caso: o Raio-X mostrou
-o `nexus.service` com MemoryHigh=700M e MemoryMax=1024M, posto no servidor; o Linux apertou o Nexus 132.576 vezes numa
-manhã, com 2,8 GB dele no swap e 6,8 GB livres na máquina, e o "clonar OS" do OS Creator ficou preso 13 min. Teto acima
-do piso é decisão da T.I. e fica; falhou o `set-property`, o deploy segue com um AVISO no log. Quem confere é o Raio-X
-(Base → Raio-X, cartão da memória: "Teto do Nexus: nenhum"). Prova: `tests/test_deploy_teto_memoria_30_10.py`.
+"nada a fazer"), o script confere o `MemoryHigh` e o `MemoryMax` da unidade e o `memory.high`/`memory.max` do cgroup do
+serviço, e o que estiver abaixo do piso de 4 GB (`NEXUS_MEMORIA_PISO_MB`) sai por três caminhos: o drop-in
+`/etc/systemd/system/nexus.service.d/zz-nexus-sem-teto.conf` (`MemoryHigh=infinity`, `MemoryMax=infinity`; o systemd
+aplica os drop-ins em ordem de NOME, de todas as pastas, e o `zz-` fica por último: o `override.conf` do `systemctl edit`
+venceria o `50-MemoryHigh.conf` do set-property no próximo daemon-reload), com o `daemon-reload` só quando ele muda; o
+`systemctl set-property`, que vale na hora; e o `max` escrito direto no cgroup, também quando quem põe o teto não é a
+unidade. O caso: o Raio-X mostrou o `nexus.service` com MemoryHigh=700M e MemoryMax=1024M, posto no servidor; o Linux
+apertou o Nexus 132.576 vezes numa manhã, com 2,8 GB dele no swap e 6,8 GB livres, e o "clonar OS" do OS Creator ficou
+preso 13 min. A 1ª versão (42e506c) só chamava o set-property, e às 15:13 o teto seguia lá com o deploy rodando. Teto
+acima do piso é decisão da T.I. e fica; o que falha vira AVISO e o deploy segue. **O que o script viu e fez vai para
+`.git/nexus-teto`** (os valores, as linhas `Memory*` de cada arquivo da unidade, a ação e o erro), e o Raio-X mostra no
+cartão da memória ("o deploy conferiu em ..."): quem não tem acesso ao servidor nem ao journal vê se tirou, se falhou e
+onde o teto está escrito. Prova: `tests/test_deploy_teto_memoria_30_10.py` e `tests/test_raio_x_teto_deploy_30_10.py`.
 
 **Deploy por push (09/10/2026, Levi: "não dá para subir com o commit?").** O timer `deploy/nexus-atualizar.timer` roda o
 mesmo `atualizar.sh` a cada 2 minutos: push na `main` entra no ar em até ~3 min, sem ninguém rodar nada; sem commit

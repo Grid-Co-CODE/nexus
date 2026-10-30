@@ -45,25 +45,6 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 cd "$RAIZ"
 
-# 0. O teto de memória do serviço (30/10/2026). O Raio-X mostrou o nexus.service com MemoryHigh=700M e MemoryMax=1024M,
-# posto no servidor (o deploy/nexus.service não tem teto): o Linux apertou o Nexus 132.576 vezes numa manhã, com 2,8 GB
-# dele no swap e 6,8 GB livres na máquina, e o "clonar OS" do OS Creator ficou preso 13 min. Em toda rodada, antes de
-# tudo (também na de "nada a fazer" e com o GitHub fora do ar), o teto abaixo do piso vira infinity pelo set-property,
-# que vale na hora, sem restart. Teto acima do piso é decisão da T.I. e fica. DEPLOY.md, seção 8
-PISO_MB="${NEXUS_MEMORIA_PISO_MB:-4096}"
-tirar=()
-for prop in MemoryHigh MemoryMax; do
-  valor="$(systemctl show -p "$prop" --value "$SERVICO" 2>/dev/null || true)"
-  if [[ "$valor" =~ ^[0-9]+$ ]] && [ "$valor" -lt $((PISO_MB * 1024 * 1024)) ]; then
-    tirar+=("$prop=infinity")
-  fi
-done
-if [ "${#tirar[@]}" -gt 0 ]; then
-  echo "O serviço $SERVICO tinha teto de memória abaixo de $PISO_MB MB: tirando (${tirar[*]})."
-  if ! systemctl set-property "$SERVICO" "${tirar[@]}"; then
-    echo "AVISO: não deu para tirar o teto de memória do $SERVICO; o deploy segue." >&2
-  fi
-fi
 
 DONO="$(stat -c %U "$RAIZ")"                   # o clone é do usuário do serviço (DEPLOY.md, passo 3): o git roda como ele
 como() { sudo -u "$DONO" "$@"; }
@@ -72,6 +53,90 @@ no_venv() { sudo -u "$DONO_VENV" "$@"; }
 # o último commit instalado aqui (dependências, boot conferido e restart pedido): dentro do .git, fora da árvore, onde o
 # git não mexe e o git status não mostra
 MARCA="$(como git rev-parse --git-dir)/nexus-instalado"
+
+# 0. O teto de memória do serviço (30/10/2026). O Raio-X mostrou o nexus.service com MemoryHigh=700M e MemoryMax=1024M,
+# posto no servidor (o deploy/nexus.service não tem teto): o Linux apertou o Nexus 132.576 vezes numa manhã, com 2,8 GB
+# dele no swap e 6,8 GB livres na máquina, e o "clonar OS" do OS Creator ficou preso 13 min. A 1ª versão daqui (42e506c)
+# só chamava o set-property, e às 15:13 o teto seguia lá: sem acesso ao servidor, não dá para ver por quê. Em toda rodada,
+# antes de tudo (também na de "nada a fazer" e com o GitHub fora do ar), o teto abaixo do piso sai por três caminhos:
+#   - o drop-in zz-nexus-sem-teto.conf: o systemd aplica os drop-ins em ordem de NOME, de todas as pastas, e o
+#     override.conf do "systemctl edit" vence o 50-MemoryHigh.conf do set-property no próximo daemon-reload; o "zz-" fica
+#     por último. O daemon-reload só quando ele muda;
+#   - o set-property, que vale na hora;
+#   - o "max" escrito direto no cgroup do serviço, também quando quem põe o teto não é a unidade.
+# Teto acima do piso é decisão da T.I. e fica. O que o script viu e fez vai para .git/nexus-teto, que o Raio-X mostra no
+# cartão da memória (o Levi não tem acesso ao servidor nem ao journal). DEPLOY.md, seção 8
+PISO_MB="${NEXUS_MEMORIA_PISO_MB:-4096}"
+PISO_B=$((PISO_MB * 1024 * 1024))
+SYSTEMD_DIR="${NEXUS_SYSTEMD_DIR:-/etc/systemd/system}"
+CGROUP_RAIZ="${NEXUS_CGROUP_RAIZ:-/sys/fs/cgroup}"
+UNIDADE="$SERVICO"
+case "$UNIDADE" in *.service) ;; *) UNIDADE="$UNIDADE.service" ;; esac
+DROPIN="$SYSTEMD_DIR/$UNIDADE.d/zz-nexus-sem-teto.conf"
+propriedade() { systemctl show -p "$1" --value "$UNIDADE" 2>/dev/null || true; }
+abaixo() { [[ "${1:-}" =~ ^[0-9]+$ ]] && [ "$1" -lt "$PISO_B" ]; }
+GRUPO="$(propriedade ControlGroup)"
+no_grupo() { if [ -n "$GRUPO" ]; then cat "$CGROUP_RAIZ$GRUPO/$1" 2>/dev/null || true; fi; }
+p_high="$(propriedade MemoryHigh)"
+p_max="$(propriedade MemoryMax)"
+antes="MemoryHigh=${p_high:-?} MemoryMax=${p_max:-?} memory.high=$(no_grupo memory.high) memory.max=$(no_grupo memory.max)"
+# onde o teto está escrito: as linhas Memory* da unidade e dos drop-ins (os que o systemd lista e os da pasta do serviço)
+fontes=""
+vistos="|"
+ler_fonte() {
+  case "$vistos" in *"|$1|"*) return 0 ;; esac
+  vistos="$vistos$1|"
+  local linhas
+  linhas="$(grep -hE '^[[:space:]]*Memory[A-Za-z]*=' "$1" 2>/dev/null | tr -s '[:space:]' ' ' || true)"
+  if [ -n "$linhas" ]; then
+    fontes="${fontes:+$fontes; }$1: ${linhas% }"
+  fi
+}
+for arq in $(propriedade FragmentPath) $(propriedade DropInPaths); do
+  ler_fonte "$arq"
+done
+for arq in "$SYSTEMD_DIR/$UNIDADE.d"/*.conf; do
+  if [ -f "$arq" ]; then
+    ler_fonte "$arq"
+  fi
+done
+acao="nada"
+erro=""
+if abaixo "$p_high" || abaixo "$p_max"; then
+  acao="tirou"
+  conteudo="$(printf '%s\n' "# Posto pelo deploy do Nexus (deploy/atualizar.sh, 30/10/2026): o serviço sem teto de memória." \
+    "[Service]" "MemoryHigh=infinity" "MemoryMax=infinity")"
+  if [ "$(cat "$DROPIN" 2>/dev/null || true)" != "$conteudo" ]; then
+    if mkdir -p "$(dirname "$DROPIN")" && printf '%s\n' "$conteudo" > "$DROPIN" && systemctl daemon-reload; then
+      echo "Teto de memória no $UNIDADE ($antes): posto o $DROPIN e o systemd relido."
+    else
+      erro="não deu para gravar o $DROPIN ou reler o systemd"
+    fi
+  fi
+  if ! systemctl set-property "$UNIDADE" MemoryHigh=infinity MemoryMax=infinity; then
+    erro="${erro:+$erro; }o set-property falhou"
+  fi
+fi
+for arq in memory.high memory.max; do
+  if abaixo "$(no_grupo "$arq")"; then
+    if [ "$acao" = "nada" ]; then
+      acao="cgroup"
+    fi
+    if ! printf 'max\n' > "$CGROUP_RAIZ$GRUPO/$arq" 2>/dev/null; then
+      erro="${erro:+$erro; }não deu para escrever max no $arq do cgroup"
+    fi
+  fi
+done
+depois="memory.high=$(no_grupo memory.high) memory.max=$(no_grupo memory.max)"
+if [ "$acao" != "nada" ]; then
+  echo "Teto de memória do $UNIDADE tirado ($acao). Antes: $antes. Depois: $depois."
+fi
+if [ -n "$erro" ]; then
+  echo "AVISO: teto de memória do $UNIDADE: $erro; o deploy segue." >&2
+fi
+printf '%s\n' "quando=$(date -Iseconds)" "unidade=$UNIDADE" "grupo=$GRUPO" "piso_mb=$PISO_MB" "antes=$antes" \
+  "fontes=$fontes" "acao=$acao" "erro=$erro" "depois=$depois" \
+  | como tee "$(como git rev-parse --git-dir)/nexus-teto" >/dev/null || true
 
 antes="$(como git rev-parse --short HEAD)"
 instalado="$(cat "$MARCA" 2>/dev/null || true)"

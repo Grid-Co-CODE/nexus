@@ -28,6 +28,7 @@ import sys
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 
 from flask import current_app, render_template, session
 
@@ -148,7 +149,7 @@ def _maquina(s0, s1, v0: dict, v1: dict, janela_s: float):
             "trocando_mb_s": _troca_mb_s(v0, v1, janela_s),
             "nexus_mb": round(eu.get("VmRSS", 0) / 1024), "nexus_swap_mb": round(eu.get("VmSwap", 0) / 1024),
             "pressao_mem": _pressao(_ler_proc("pressure/memory")), "pressao_io": _pressao(_ler_proc("pressure/io")),
-            "teto": _teto_nexus()}
+            "teto": _teto_nexus(), "teto_deploy": _teto_do_deploy()}
 
 
 def _ler_arquivo(caminho: str):
@@ -205,6 +206,38 @@ def _teto_nexus():
             if sw is not None and out["max_mb"] is not None:
                 out["swap_max_mb"] = max(0, sw - out["max_mb"])
     return out
+
+
+# O que o deploy viu e fez com o teto de memória do serviço (30/10/2026): o `deploy/atualizar.sh` grava, a cada rodada, em
+# `.git/nexus-teto` (ao lado da marca do commit instalado). A 1ª versão dele (42e506c) tirava o teto só pelo
+# set-property, e às 15:13 o Raio-X ainda mostrava 700 MB / 1 GB com o deploy rodando a cada 2 min; o Levi não tem acesso
+# ao servidor nem ao journal, e ninguém via se o script tinha tirado, falhado ou se outra coisa punha o teto de volta.
+ARQ_TETO_DEPLOY = Path(__file__).resolve().parents[2] / ".git" / "nexus-teto"
+
+
+def _teto_do_deploy():
+    """{"hora", "texto"}: a última conferência do teto pelo deploy, em português; None sem o arquivo (fora do servidor)."""
+    try:
+        linhas = ARQ_TETO_DEPLOY.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    e = dict(l.split("=", 1) for l in linhas if "=" in l)
+    try:
+        hora = datetime.fromisoformat(e.get("quando", "")).strftime("%d/%m às %H:%M")
+    except ValueError:
+        hora = "?"
+    fontes, acao, erro = e.get("fontes", ""), e.get("acao", ""), e.get("erro", "")
+    if erro:
+        detalhe = "; ".join(x for x in (erro, f"está em {fontes}" if fontes else "", f"agora {e.get('depois', '')}") if x)
+        texto = f"não conseguiu tirar o teto ({detalhe})"
+    elif acao == "tirou":
+        texto = "tirou o teto" + (f" (estava em {fontes})" if fontes else "")
+    elif acao == "cgroup":
+        texto = ("o teto estava só no cgroup, sem estar na unidade do systemd (alguém o escreve direto): escreveu max "
+                 "nele")
+    else:
+        texto = f"sem teto abaixo de {e.get('piso_mb', '?')} MB"
+    return {"hora": hora, "texto": texto}
 
 
 def _pids() -> list[int]:
