@@ -1153,6 +1153,26 @@ adicionar anexos como PDFS e fotos. E quando o PCM gere uma OS pela fila de PCM 
   tirando um anexo; a Fila com os dois anexos e a confirmação "levando 2 anexo(s)". Falta a prova ao vivo (uma
   solicitação com anexo em TESTE - PA aprovada na Fila, o anexo no card da OS).
 
+## O tempo na Clonagem e o tempo da OS da Fila do PCM (30/10/2026)
+
+O time do PCM: "quando clonamos uma OS ela está vindo com horário padrão de 10minutos por tarefa... gostaria que o tempo
+que viesse fosse o cadastrado do plano, que seria atualizado no 'Atualizar todas do modelo'" e "nas SSs [Solicitações de
+Serviço] o tempo que aparece na OS do Fracttal permanece 10 min, porém nas tarefas aparece o tempo que foi solicitado,
+quando criada pela Fila do PCM".
+
+- **A Clonagem:** cada tarefa leva o tempo da tarefa de origem (`get_os_para_clonar` → `duracao`, o `duration` dela),
+  mostrado na coluna Tempo (HH:mm). O "Atualizar do modelo" e o "Atualizar todas do modelo" trazem, junto com as
+  subtarefas, o tempo cadastrado no modelo (`_duracao_do_modelo`: o do evento da lista de modelos; sem ele, o do detalhe
+  do modelo, pelo valor cru, porque o `get_plan_details` põe 900 quando falta; sem tempo no modelo, a tarefa fica com o
+  que tinha). O servidor só aceita de 1 min a 24 h (`clonar_web.preparar_tarefas`); fora disso, os 10 min de sempre.
+- **A OS:** o `_work_order_insert` (a fase que junta as tarefas numa OS numerada) punha `duration=600` fixo. O
+  `clonar_os` (a Clonagem e a Fila do PCM) passa a soma do tempo das tarefas criadas; a retomada da Fila (a tarefa que
+  ficou de uma tentativa anterior), o tempo dessa tarefa. Os outros caminhos que juntam tarefas (o PCM, a agrupada, a
+  Performance agrupada) seguem com os 600 s: ninguém pediu, e cada um tem a sua regra de tempo.
+- **Prova:** `tests/test_oscreator_tempo_clonar_e_fila_30_10.py`. No Chrome sem janela, a tela de Clonar com duas
+  tarefas (uma com 1h30, outra sem tempo): 01:30 e 00:10; depois do "Atualizar todas do modelo", 02:00 e 01:00. Falta a
+  prova ao vivo: um clone e uma SS aprovada na Fila, conferindo o tempo da OS no Fracttal.
+
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 
 Levi, 19/10/2026, em Nexus > Chamados > Garantias: "ao clicar na OS em responsável dê para alterar o responsável da OS que

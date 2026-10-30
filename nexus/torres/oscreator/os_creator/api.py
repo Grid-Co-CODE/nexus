@@ -4778,6 +4778,8 @@ def get_os_para_clonar(id_work_order) -> dict:
             "ativo_nome": (str(t.get("items_description") or "").split("{")[0]).strip()[:60] or code,
             "subtarefas": subt, "notas": "\n".join(notas_t),
             "event_date_orig": t.get("event_date"),        # data programada original (ISO UTC), p/ prefill
+            # o tempo da tarefa de origem (o PCM, 30/10/2026: o clone nascia com os 10 min do `create_os_rpc`)
+            "duracao": _segundos(t.get("duration")),
         })
     etiqueta_ids = []
     try:                                              # etiquetas vêm do cabeçalho da WO
@@ -4831,17 +4833,41 @@ def get_template_subtarefas(asset: dict, task_description: str) -> dict:
                     "id_group_task": asset.get("id_group_task")})
     data = res.get("data") if isinstance(res, dict) else res
     alvo = (task_description or "").strip().lower()
-    id_task = None
+    id_task, evento = None, {}
     for e in (data if isinstance(data, list) else []):
         nome = str(e.get("tasks_description") or e.get("task_description") or "").strip()
         if nome.lower() == alvo:
-            id_task = e.get("id_task")
+            id_task, evento = e.get("id_task"), e
             break
     if not id_task:
         return {"achou": False, "subtarefas": [],
                 "erro": f"Nenhum modelo com o nome “{task_description}” para este ativo."}
     subs = _subtarefas_de_modelo(id_task)
-    return {"achou": True, "subtarefas": subs, "nome": task_description, "id_task": id_task}
+    return {"achou": True, "subtarefas": subs, "nome": task_description, "id_task": id_task,
+            "duracao": _duracao_do_modelo(evento, id_task, id_item)}
+
+
+def _segundos(v):
+    """A duração do Fracttal (segundos) como int, ou None quando falta ou não é número."""
+    try:
+        n = int(float(v))
+    except (TypeError, ValueError):
+        return None
+    return n if n > 0 else None
+
+
+def _duracao_do_modelo(evento: dict, id_task, id_item):
+    """O tempo cadastrado no MODELO de tarefa (o PCM, 30/10/2026: "o tempo que viesse fosse o cadastrado do plano, que
+    seria atualizado no 'Atualizar todas do modelo'"). Do evento da lista de modelos, quando vem; senão do detalhe do
+    modelo (`tasks_details`, um pedido a mais), pelo valor CRU: o `get_plan_details` põe 900 quando falta. None se o
+    modelo não tem tempo (a tarefa fica com o que tinha)."""
+    dur = _segundos((evento or {}).get("duration"))
+    if dur:
+        return dur
+    try:
+        return _segundos((get_plan_details(id_task, id_item).get("raw") or {}).get("duration"))
+    except FracttalError:
+        return None
 
 
 def atualizar_modelos_subtarefas(tarefas: list) -> list:
@@ -4858,7 +4884,7 @@ def atualizar_modelos_subtarefas(tarefas: list) -> list:
         try:
             r = get_template_subtarefas(asset, t.get("descricao") or "")
             out.append({"achou": bool(r.get("achou")), "subtarefas": r.get("subtarefas") or [],
-                        "erro": r.get("erro")})
+                        "duracao": r.get("duracao"), "erro": r.get("erro")})
         except FracttalError as e:
             out.append({"achou": False, "subtarefas": [], "erro": str(e)})
     return out
@@ -4884,6 +4910,7 @@ def clonar_os(tarefas: list, id_responsible, responsible_name: str = "",
     note = (note or "").strip()
     # Fase 1 — cria as tarefas pendentes (uma por tarefa da OS de referência)
     id_tasks, erros = [], []
+    dur_tarefa = {}                    # id da tarefa → o tempo dela (a OS leva a soma)
     for t in val:
         try:
             # a classificação da OS de origem, resolvida no catálogo vivo. Sem isto a OS
@@ -4906,6 +4933,7 @@ def clonar_os(tarefas: list, id_responsible, responsible_name: str = "",
                                 id_parent=id_parent, id_request=id_request)
             if os_.get("id_task"):
                 id_tasks.append(os_["id_task"])
+                dur_tarefa[os_["id_task"]] = t.get("duracao") or DURACAO_OS_AVULSA
             else:
                 erros.append(f"{t.get('code') or '?'}: tarefa não criada")
         except FracttalError as e:
@@ -4930,7 +4958,9 @@ def clonar_os(tarefas: list, id_responsible, responsible_name: str = "",
         return {"ok": True, "os": {"id_tasks": id_tasks},
                 "aviso": "tarefas criadas, mas não as achei no kanban p/ gerar a OS.",
                 "n_tarefas": len(val), "n_criadas": len(id_tasks)}
-    wo = _work_order_insert(recs, id_responsible, responsible_name)
+    # a OS com a SOMA do tempo das tarefas (o PCM, 30/10/2026: "nas SSs o tempo que aparece na OS do Fracttal permanece
+    # 10 min, porém nas tarefas aparece o tempo que foi solicitado"): o `_work_order_insert` punha os 600 s de sempre
+    wo = _work_order_insert(recs, id_responsible, responsible_name, duration=sum(dur_tarefa.values()) or DURACAO_OS_AVULSA)
     idwo = wo.get("id_work_order")
     os_out = {"id_work_order": idwo, "wo_folio": wo.get("wo_folio"), "id_tasks": id_tasks}
     avisos = []
@@ -5019,7 +5049,9 @@ def aprovar_solicitacao(asset: dict, descricao: str, subtarefas: list, id_reques
     if not id_responsible:
         return {"ok": False, "erro": "Escolha o responsavel: sem ele a tarefa nao vira OS numerada.",
                 "n_tarefas": 1, "n_criadas": 0}
-    wo = _work_order_insert([rec], id_responsible, responsible_name)
+    # a OS com o tempo da tarefa que ficou da tentativa anterior (30/10/2026; antes, os 600 s de sempre)
+    wo = _work_order_insert([rec], id_responsible, responsible_name,
+                            duration=_segundos(rec.get("duration")) or duracao or DURACAO_OS_AVULSA)
     idwo = wo.get("id_work_order")
     # na retomada a fase 3 tambem tem de acontecer: a tarefa orfa nunca recebeu etiqueta
     if idwo and etiqueta_ids:

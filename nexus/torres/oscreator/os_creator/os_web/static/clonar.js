@@ -10,6 +10,9 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
   const hoje0800 = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + 'T08:00'; };
   const hint = t => { $('hint').textContent = t || ''; };
+  // o tempo da tarefa em HH:mm (30/10/2026: o clone nascia com os 10 min do create_os_rpc; agora leva o da tarefa de
+  // origem, e o "Atualizar do modelo" traz o cadastrado no modelo). Sem tempo, os 10 min de sempre.
+  const hhmm = s => { const m = Math.round((Number(s) || 600) / 60); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
   function resultado(txt, ok) { const r = $('resultado'); r.hidden = !txt; r.textContent = txt || ''; r.className = 'os-resultado ' + (ok ? 'ok' : 'erro'); }
   async function apiErro(r) { try { const j = await r.json(); return j.erro || ('HTTP ' + r.status); } catch (e) { return 'HTTP ' + r.status; } }
 
@@ -50,6 +53,7 @@
         '<span class="' + (tem ? '' : 'sem') + '">' + esc(nomeDe(t)) + '</span></span></td>' +
         '<td class="' + (tem ? '' : 'sem') + '">' + esc((t.tipo || 'Corretiva') + ' · ' + (t.descricao || '—')) + '</td>' +
         '<td class="c-subt">' + nSub + '</td>' +
+        '<td class="c-subt c-tempo" title="Tempo estimado da tarefa">' + hhmm(t.duracao) + '</td>' +
         '<td>' + (tem ? '<input type="datetime-local" class="dt" value="' + esc(t.event_date || hoje0800()) + '"' + (t._skip ? ' disabled' : '') + '>' : '<span class="sem">ignorada</span>') + '</td>';
       tr.addEventListener('click', e => { if (e.target.closest('input')) return; selecionar(i); });
       const chk = tr.querySelector('.chk-ativo');
@@ -58,7 +62,7 @@
       if (dt) dt.addEventListener('change', () => { t.event_date = dt.value; });
       tb.appendChild(tr);
     });
-    if (!(D.tarefas || []).length) tb.innerHTML = '<tr class="vazio"><td colspan="4">Esta OS não tem tarefas.</td></tr>';
+    if (!(D.tarefas || []).length) tb.innerHTML = '<tr class="vazio"><td colspan="5">Esta OS não tem tarefas.</td></tr>';
   }
 
   function atualizaResumo() {
@@ -141,7 +145,11 @@
     const r = await OsCarga.buscar('/os/api/clonar/modelo', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({asset_id: t.asset.id, descricao: t.descricao || ''})}, 'Carregando o modelo da tarefa…');
     const j = r.ok ? await r.json() : {erro: await apiErro(r)};
     $('b_upd').disabled = false;
-    if (j.achou) { t.subtarefas = j.subtarefas || []; renderSubs(); refreshCount(); hint('subtarefas atualizadas do modelo (' + t.subtarefas.length + ').'); }
+    if (j.achou) {
+      t.subtarefas = j.subtarefas || []; if (j.duracao) t.duracao = j.duracao;
+      const tr = $('tbody').querySelector('tr[data-i="' + sel + '"]'); if (tr) tr.querySelector('.c-tempo').textContent = hhmm(t.duracao);
+      renderSubs(); refreshCount(); hint('subtarefas e tempo atualizados do modelo (' + t.subtarefas.length + ' subtarefas, ' + hhmm(t.duracao) + ').');
+    }
     else { hint(''); resultado(j.erro || 'Não encontrei um modelo com esse nome para o ativo.', false); }
   });
   $('b_upd_all').addEventListener('click', async () => {
@@ -154,7 +162,10 @@
     $('b_upd_all').disabled = false;
     if (!r.ok) { hint(''); resultado(j.erro, false); atualizaResumo(); return; }
     let nOk = 0, falhas = [];
-    (j.resultados || []).forEach((res, i) => { const t = D.tarefas[i]; if (!res) return; if (res.achou) { t.subtarefas = res.subtarefas || []; nOk++; } else falhas.push(t.descricao || t.code || '?'); });
+    (j.resultados || []).forEach((res, i) => {
+      const t = D.tarefas[i]; if (!res) return;
+      if (res.achou) { t.subtarefas = res.subtarefas || []; if (res.duracao) t.duracao = res.duracao; nOk++; } else falhas.push(t.descricao || t.code || '?');
+    });
     renderTabela(); if (sel >= 0) selecionar(sel); atualizaResumo();
     hint(nOk + ' tarefa(s) atualizada(s) do modelo' + (falhas.length ? '; ' + falhas.length + ' sem modelo.' : '.'));
     if (falhas.length) resultado(nOk + ' atualizada(s). Sem modelo correspondente (' + falhas.length + '):\n- ' + falhas.slice(0, 12).join('\n- ') + (falhas.length > 12 ? '\n…' : ''), false);
