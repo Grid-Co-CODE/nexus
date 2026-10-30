@@ -77,38 +77,37 @@
         {% else %}<div class="eg-itens">{% for x in caixa %}{{ cartao(x, true) }}{% else %}<p class="mudo eg-vazio">Nada encaminhado esperando {{ quem }}.</p>{% endfor %}</div>{% endif %}
       </section>
       <section class="eg-painel">
-        <div class="eg-painel-cab"><h2>Com {{ quem }}</h2><span>falha nova primeiro, depois o nível</span></div>
+        {# os críticos que a pessoa pegou (Levi, 30/10/2026: "Ao invés de 'Com fulano de tal' deve ser 'Críticos com o
+           fulano'"): a OS de análise deles conta aqui, e não em As OS #}
+        <div class="eg-painel-cab"><h2>Críticos com {{ quem }}</h2><span>falha nova primeiro, depois o nível</span></div>
         {% if erro_acomp %}<p class="mudo eg-vazio">Não consegui ler os acompanhamentos.</p>
-        {% else %}<div class="eg-itens">{% for x in comigo %}{{ cartao(x) }}{% else %}<p class="mudo eg-vazio">{{ ('Nenhum outro ativo com ' ~ quem ~ '.') if caixa else ('Nenhum ativo com ' ~ quem ~ ' agora.') }}</p>{% endfor %}</div>{% endif %}
+        {% else %}<div class="eg-itens">{% for x in comigo %}{{ cartao(x) }}{% else %}<p class="mudo eg-vazio">{{ ('Nenhum outro crítico com ' ~ quem ~ '.') if caixa else ('Nenhum crítico com ' ~ quem ~ ' agora.') }}</p>{% endfor %}</div>{% endif %}
       </section>
       {% endif %}
       {# as OS da pessoa no Quadro da equipe (Levi, 29/10/2026: "Quero informações das OSs daquela pessoa") #}
       {% if mesa_os %}
       <section class="eg-painel eg-mesa-os">
-        <div class="eg-painel-cab"><h2>As OS de {{ quem }}</h2><span>do Quadro da equipe · <a class="cn-link" href="{{ url_for('torre_engenharia.equipe') }}">abrir o quadro</a></span></div>
+        {# o "abrir o quadro" já filtra na pessoa da mesa (Levi, 30/10/2026) #}
+        <div class="eg-painel-cab"><h2>As OS de {{ quem }}</h2><span>do Quadro da equipe, sem as dos críticos · <a class="cn-link" href="{{ url_for('torre_engenharia.equipe', pessoa=pessoa_fid) if pessoa_fid else url_for('torre_engenharia.equipe') }}">abrir o quadro</a></span></div>
         {% if mesa_os.lendo %}<p class="mudo eg-vazio">Lendo as OS no Fracttal pela primeira vez; recarregue em instantes.</p>
         {% elif mesa_os.fora %}<p class="mudo eg-vazio">{{ quem[:1]|upper ~ quem[1:] }} não está na equipe do Quadro da equipe (os responsáveis que ele lê no Fracttal): sem isso, as OS não entram aqui. O número seria um zero falso.</p>
         {% else %}{{ faixa(mesa_os.kpis, 'As OS de ' ~ quem) }}
-        <ul class="eg-mesa-oss">{% for o in mesa_os.abertas[:8] %}<li><a href="{{ url_for('torre_engenharia.equipe_os', folio=o.os) }}"><b>OS {{ o.os }}</b><span class="t">{{ o.titulo }}</span><span class="mudo">{{ mesa_os.colunas.get(o.coluna, o.coluna) }}{% if o.programada %} · programada {{ o.programada[:5] }}{% endif %}</span>{% if o.prazo == 'atrasada' %}{{ tag('atrasada', 'critico') }}{% elif o.parada %}{{ tag('sem atualização', 'alerta') }}{% endif %}</a></li>{% else %}<li class="mudo">Nenhuma OS aberta com {{ quem }}.</li>{% endfor %}</ul>
-        {% if mesa_os.abertas|length > 8 %}<p class="mudo eg-mesa-mais">e mais {{ mesa_os.abertas|length - 8 }} no Quadro da equipe</p>{% endif %}
+        {# o total em cima e as abertas por tipo de ativo (Levi, 30/10/2026: "conta o total inicialmente e separe por tipo
+           de ativo! Inversor, Tracker, Disjuntor, ETM etc") #}
+        {% for g in mesa_os.grupos %}<h3 class="eg-mesa-tipo">{{ g.tipo }} <i>{{ g.oss|length }}</i></h3>
+        <ul class="eg-mesa-oss">{% for o in g.oss[:6] %}<li><a href="{{ url_for('torre_engenharia.equipe_os', folio=o.os) }}"><b>OS {{ o.os }}</b><span class="t">{{ o.titulo }}</span><span class="mudo">{{ mesa_os.colunas.get(o.coluna, o.coluna) }}{% if o.programada %} · programada {{ o.programada[:5] }}{% endif %}</span>{% if o.prazo == 'atrasada' %}{{ tag('atrasada', 'critico') }}{% elif o.parada %}{{ tag('sem atualização', 'alerta') }}{% endif %}</a></li>{% endfor %}</ul>
+        {% if g.oss|length > 6 %}<p class="mudo eg-mesa-mais">e mais {{ g.oss|length - 6 }} no Quadro da equipe</p>{% endif %}
+        {% else %}<p class="mudo eg-vazio">Nenhuma OS aberta com {{ quem }}{{ ' fora as dos críticos' if mesa_os.criticos }}.</p>{% endfor %}
         {% if mesa_os.velha %}<p class="mudo eg-mesa-mais">Leitura das {{ mesa_os.velha }}: o Fracttal não respondeu agora.</p>{% endif %}{% endif %}
-      </section>
-      {% endif %}
-      {# as OS de ETM com a pessoa (Levi, 29/10/2026: "Se a pessoa tiver ETM atrelada, tem que ter uma visão de ETM") #}
-      {% if mesa_etm %}
-      <section class="eg-painel eg-mesa-os">
-        <div class="eg-painel-cab"><h2>As ETMs de {{ quem }}</h2><span>da tela ETMs · <a class="cn-link" href="{{ url_for('torre_engenharia.etm') }}">abrir as ETMs</a></span></div>
-        {% if mesa_etm.lendo %}<p class="mudo eg-vazio">Lendo as ETMs no Fracttal pela primeira vez; recarregue em instantes.</p>{% else %}
-        {{ faixa(mesa_etm.kpis, 'As ETMs de ' ~ quem) }}
-        <ul class="eg-mesa-oss">{% for o in mesa_etm.abertas[:8] %}<li><a href="{{ url_for('torre_engenharia.etm_os', folio=o.os) }}"><b>OS {{ o.os }}</b><span class="t">{{ o.titulo }}</span><span class="mudo">{{ o.usina_nome }} · {{ mesa_etm.colunas.get(o.coluna, o.coluna) }}</span>{% if o.diagnostico %}{{ tag(o.diagnostico, 'ok') }}{% endif %}</a></li>{% else %}<li class="mudo">Nenhuma ETM aberta com {{ quem }}.</li>{% endfor %}</ul>
-        {% if mesa_etm.abertas|length > 8 %}<p class="mudo eg-mesa-mais">e mais {{ mesa_etm.abertas|length - 8 }} na tela ETMs</p>{% endif %}{% endif %}
       </section>
       {% endif %}
     </div>
     <section class="eg-painel">
       <div class="eg-painel-cab"><h2>Críticos sem dono</h2><span>da Confiabilidade · ninguém pegou</span></div>
       {% if erro_acomp %}<p class="mudo eg-vazio">Não consegui ler os acompanhamentos: não sei quem tem dono.</p>
-      {% else %}<div class="eg-itens eg-mesa-sem-dono">{% for s in sem_dono %}
+      {# 6 à vista e o resto rola (Levi, 30/10/2026: "limitar a 6 críticos cabendo no card, se passa disso vira scroll,
+         para a tela não ficar infinita"); os botões na linha do Crit. #}
+      {% else %}<div class="eg-itens eg-mesa-sem-dono" data-eg-max="6">{% for s in sem_dono %}
         {# o cartão enxuto (Levi, 29/10/2026: "pode tirar o código do ativo, deixa só ativo e usina"): o nome, a usina
            embaixo e os critérios do sinal sem borda #}
         <article class="eg-cartao">
@@ -141,6 +140,22 @@
   <div class="cn-nota"><b>De onde vem.</b> Os acompanhamentos do livro da Engenharia (o banco do Nexus) e os sinais da
     Confiabilidade, pelas OS de falha do Fracttal ({{ est.n }} OS na conta das {{ lido }}).</div>
 </div>
+{% include "oscreator/card_os_abrir.html" %}
+<script src="{{ url_for('static', filename='engenharia-os.js') }}"></script>
 <script src="{{ url_for('static', filename='engenharia-gaveta.js') }}"></script>
+<script>
+(function () {
+  // Críticos sem dono: os 6 primeiros à vista e o resto rola na própria caixa (a altura dos 6, medida)
+  var l = document.querySelector('[data-eg-max]');
+  if (!l) return;
+  function mede() {
+    var max = +l.dataset.egMax, f = l.children;
+    if (f.length <= max) { l.style.maxHeight = ''; l.classList.remove('eg-rola'); return; }
+    var h = 0; for (var i = 0; i < max; i++) h += f[i].offsetHeight;
+    l.style.maxHeight = h + 'px'; l.classList.add('eg-rola');
+  }
+  mede(); window.addEventListener('resize', mede);
+})();
+</script>
 <script>egGaveta.ligar();</script>
 {% endblock %}

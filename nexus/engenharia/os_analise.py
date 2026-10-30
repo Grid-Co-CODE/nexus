@@ -71,12 +71,18 @@ def data_do_evento(falhas: list[dict], agora: datetime) -> datetime | None:
     return j[1]["quando"] if len(j) > 1 else (j[0]["quando"] if j else None)
 
 
-def nota_de_entrada(ativo: dict, quem: str, para: str, quando: datetime, falhas: list[dict]) -> str:
+def nota_de_entrada(ativo: dict, quem: str, para: str, quando: datetime, falhas: list[dict],
+                    desde: datetime | None = None) -> str:
     """A nota da OS na criação (a API do Fracttal não edita a OS depois, só a nota): o dia, quem assumiu (ou quem
-    encaminhou para quem) e as falhas do ativo até aquele momento, como a Confiabilidade contava."""
+    encaminhou para quem) e as falhas do ativo até aquele momento, como a Confiabilidade contava. `desde` = o começo do
+    acompanhamento que ganha a OS depois (o "Gerar OS" de 30/10/2026)."""
     q = quando.astimezone(_BRT)
-    acao = (f"Assumida em {q:%d/%m/%Y às %H:%M} por {quem}." if quem == para
-            else f"Encaminhada em {q:%d/%m/%Y às %H:%M} por {quem} para {para}.")
+    if desde:
+        acao = (f"OS gerada em {q:%d/%m/%Y às %H:%M} por {quem} para a análise que {para} acompanha desde "
+                f"{desde.astimezone(_BRT):%d/%m/%Y}.")
+    else:
+        acao = (f"Assumida em {q:%d/%m/%Y às %H:%M} por {quem}." if quem == para
+                else f"Encaminhada em {q:%d/%m/%Y às %H:%M} por {quem} para {para}.")
     n30, n7 = int(ativo.get("nFalha") or 0), int(ativo.get("n7") or 0)
     linhas = [f"[ENGENHARIA] {TITULO}", acao,
               f"Falhas do ativo até agora: {n30} {'falha' if n30 == 1 else 'falhas'} em 30 dias ({n7} em 7 dias)"
@@ -100,7 +106,8 @@ def _fid(pessoa: dict) -> int:
                      "a OS não sai no nome dela (Base → Acessos → Pessoas e setores)") from None
 
 
-def criar(api, ativo: dict, para: dict, quem: str, agora: datetime, falhas: list[dict], curto) -> dict:
+def criar(api, ativo: dict, para: dict, quem: str, agora: datetime, falhas: list[dict], curto,
+          desde: datetime | None = None) -> dict:
     """Cria a OS de análise do ativo no nome de `para` ({"fid", "nome"}: quem pegou, ou quem recebeu o encaminhado).
     → {"id", "folio", "aviso"}. A etiqueta que não existe no Fracttal não segura a OS (sai sem ela, com o aviso)."""
     fid = _fid(para)
@@ -114,8 +121,8 @@ def criar(api, ativo: dict, para: dict, quem: str, agora: datetime, falhas: list
     res = api.create_work_orders_bulk(
         [ativo["cod"]], titulo(ativo.get("nome") or ativo["cod"], curto), api.TIPO_ANALISE, [SUBTAREFA],
         etiqueta_ids=[lid] if lid else None, id_responsible=fid, responsible_name=para["nome"],
-        note=nota_de_entrada(ativo, quem, para["nome"], agora, falhas), tipo=tipo or None,
-        event_date=data_do_evento(falhas, agora))
+        note=nota_de_entrada(ativo, quem, para["nome"], agora, falhas, desde=desde), tipo=tipo or None,
+        event_date=data_do_evento(falhas, desde or agora))
     r0 = (res or [{}])[0] or {}
     if not r0.get("ok"):
         raise Falhou(f"O Fracttal não criou a OS: {r0.get('erro') or 'sem resposta'}")

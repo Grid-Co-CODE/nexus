@@ -171,7 +171,7 @@
       <section class="eg-bloco">
         <div class="eg-bloco-h"><h2>Comentários</h2><span class="n">{{ (est.eventos or [])|length }}</span></div>
         {% if pode %}
-        <div class="eg-os-coment" data-comentar="{{ comentar_url }}" data-folio="{{ o.os }}" data-de="{{ de_pagina }}">
+        <div class="eg-os-coment" data-comentar="{{ comentar_url }}" data-comentario="{{ comentario_url }}" data-folio="{{ o.os }}" data-de="{{ de_pagina }}">
           <textarea class="eg-tl-obs" maxlength="2000" aria-label="Comentário" placeholder="O que a engenharia viu ou fez? (a data entra sozinha)"></textarea>
           <div class="eg-tl-comp"><span class="eg-dica">Vai para a nota da OS {{ o.os }} no Fracttal, com o seu nome, a data e a hora.</span>
             <button type="button" class="eg-ac-btn eg-ac-btn--g">Salvar comentário</button></div>
@@ -180,7 +180,11 @@
         {% endif %}
         {% if est.eventos %}<div class="eg-tl">
           {% for e in est.eventos %}<div class="eg-tl-e{{ ' novo' if loop.first }}{{ ' ev' if e.evento != 'comentario' }}"><div class="eg-tl-g"><div class="eg-tl-d">{{ e.quando.strftime('%d/%m') if e.quando else '—' }}</div><div class="eg-tl-a">{{ e.quando.strftime('%Y') if e.quando else '' }}</div></div>
-            <div class="eg-tl-b"><div class="eg-tl-x"><div class="eg-tl-t">{% if e.evento == 'comentario' %}{{ e.texto }}{% elif e.evento == 'status' %}Status: {{ nome_status(e.status_id) }}{% elif e.evento == 'prioridade' %}Prioridade: {{ nome_prioridade(e.prioridade_id) }}{% else %}{{ e.rotulo }}{% endif %}</div><div class="eg-tl-u">{{ e.nome or 'alguém' }} · {{ e.quando_txt }}{% if e.evento == 'comentario' and e.nota and e.nota != 'sim' %} · só no Nexus: {{ e.nota }}{% endif %}</div></div></div></div>{% endfor %}
+            <div class="eg-tl-b"><div class="eg-tl-x"><div class="eg-tl-t">{% if e.evento == 'comentario' %}{{ e.texto }}{% elif e.evento == 'status' %}Status: {{ nome_status(e.status_id) }}{% elif e.evento == 'prioridade' %}Prioridade: {{ nome_prioridade(e.prioridade_id) }}{% else %}{{ e.rotulo }}{% endif %}</div><div class="eg-tl-u">{{ e.nome or 'alguém' }} · {{ e.quando_txt }}{% if e.editado %} · editado{% endif %}{% if e.evento == 'comentario' and e.nota and e.nota != 'sim' %} · só no Nexus: {{ e.nota }}{% endif %}</div>
+              {% if pode and e.evento == 'comentario' and e.id and ((meu and e.hmac == meu) or admin) %}<div class="eg-coment-acoes" data-coment-id="{{ e.id }}">
+                <details class="eg-coment-editar"><summary>Editar</summary><textarea class="eg-tl-obs" maxlength="2000" aria-label="O comentário editado">{{ e.texto }}</textarea><button type="button" class="eg-ac-btn eg-ac-btn--g" data-coment-acao="editar">Salvar</button></details>
+                <button type="button" class="eg-coment-apagar" data-coment-acao="apagar">Apagar</button>
+                <p class="eg-os-msg" role="status" hidden></p></div>{% endif %}</div></div></div>{% endfor %}
         </div>
         {% else %}<p class="eg-vazio-l">Nenhum comentário nem mudança da engenharia ainda.</p>{% endif %}
       </section>
@@ -203,41 +207,10 @@
   {% endif %}
   {% endif %}
 </div>
-{% if o %}<script>
+{% if o %}<script src="{{ url_for('static', filename='engenharia-os.js') }}"></script>
+<script>
 (function () {
-  // a seta do PDF de cada OS da cadeia, como a da cadeia do chamado (os_acoes.js do OS Creator): o POST monta o PDF no
-  // servidor do OS Creator (as fotos vêm do Fracttal) e o arquivo baixa pelo link que ele devolve. Sem a sessão do
-  // Fracttal, o aviso traz o login dele, que volta para cá.
-  document.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-os-pdf]'); if (!b) return;
-    e.preventDefault();
-    if (b.getAttribute('aria-busy') === 'true') return;
-    var caixa = b.closest('[data-pdf-caixa]') || document, msg = caixa.querySelector('[data-pdf-msg]');
-    var folio = b.getAttribute('data-os-pdf');
-    function dizer(texto, ruim, link) {
-      if (!msg) return;
-      msg.replaceChildren(document.createTextNode(texto || ''));
-      if (link) { var a = document.createElement('a'); a.href = link; a.textContent = 'Entrar pelo Fracttal'; msg.appendChild(document.createTextNode(' ')); msg.appendChild(a); }
-      msg.hidden = !texto; msg.classList.toggle('eg-os-msg--ruim', !!ruim);
-    }
-    b.setAttribute('aria-busy', 'true'); dizer('Montando o PDF da OS ' + folio + '…');
-    fetch(nexusRota('/os/api/os/pdf'), {method: 'POST', credentials: 'same-origin',
-      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-      body: JSON.stringify({folio: folio, wid: b.getAttribute('data-wid') || ''})})
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); })
-      .then(function (x) {
-        if (x.r.ok && x.j.url) {
-          var a = document.createElement('a');
-          a.href = nexusRota(x.j.url); a.download = x.j.nome || '';
-          document.body.appendChild(a); a.click(); a.remove();
-          dizer(x.j.falhas ? ('PDF da OS ' + folio + ' baixado; ' + x.j.falhas + ' foto(s) não vieram do Fracttal.') : '', !!x.j.falhas);
-        } else if (x.j.sessao_encerrada) { location.href = x.j.entrar || location.href; }
-        else if (x.j.login) { dizer('Para baixar o PDF, entre pelo Fracttal.', true, caixa.getAttribute('data-login-fracttal')); }
-        else { dizer('Não consegui montar o PDF da OS ' + folio + ': ' + (x.j.erro || ('HTTP ' + x.r.status)), true); }
-      })
-      .catch(function () { dizer('Não consegui falar com o Nexus. Tente de novo.', true); })
-      .then(function () { b.removeAttribute('aria-busy'); });
-  });
+  // a seta do PDF de cada OS da cadeia: o engenharia-os.js (o mesmo das últimas OS da gaveta do ativo)
   // os ativos de 5 em 5: "Mostrar mais" revela os próximos 5; "Mostrar todos", o resto
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-mais-ativos]'); if (!b) return;
@@ -350,6 +323,32 @@
         diz(x.j.erro || ('O Nexus não gravou (HTTP ' + x.r.status + '). Nada mudou; tente de novo.'), true);
       })
       .catch(function () { btn.disabled = false; diz('Não consegui falar com o Nexus. Tente de novo.', true); });
+  });
+  // editar e apagar o comentário (30/10/2026): pela ponte, que muda a linha na nota da OS junto; a página volta relida
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-coment-acao]'); if (!b) return;
+    var caixa = b.closest('[data-coment-id]'), m = caixa.querySelector('.eg-os-msg');
+    var acao = b.getAttribute('data-coment-acao'), corpo = {folio: box.dataset.folio, de: box.dataset.de};
+    function falou(texto, link) {
+      m.replaceChildren(document.createTextNode(texto));
+      if (link) { var a = document.createElement('a'); a.href = link; a.textContent = 'Entrar pelo Fracttal'; m.appendChild(document.createTextNode(' ')); m.appendChild(a); }
+      m.hidden = false; m.classList.add('eg-os-msg--ruim');
+    }
+    if (acao === 'editar') {
+      corpo.texto = caixa.querySelector('textarea').value.trim();
+      if (!corpo.texto) { falou('Escreva o comentário antes de salvar.'); return; }
+    } else if (!confirm('Apagar este comentário? Ele sai também da nota da OS no Fracttal.')) { return; }
+    b.disabled = true;
+    fetch(box.dataset.comentario + '/' + encodeURIComponent(caixa.getAttribute('data-coment-id')) + '/' + acao,
+      {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo)})
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); })
+      .then(function (x) {
+        b.disabled = false;
+        if (x.r.ok && x.j.ok) { location.replace(location.pathname + '?' + new URLSearchParams({ok: x.j.mensagem}).toString()); return; }
+        if (x.j.login === true || x.j.sessao_encerrada) { location.href = x.j.entrar || location.href; return; }
+        falou(x.j.erro || ('O Nexus não gravou (HTTP ' + x.r.status + '). Nada mudou; tente de novo.'), x.j.login);
+      })
+      .catch(function () { b.disabled = false; falou('Não consegui falar com o Nexus. Tente de novo.'); });
   });
 })();
 </script>{% endif %}

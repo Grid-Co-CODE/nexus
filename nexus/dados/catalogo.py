@@ -259,7 +259,8 @@ FATOS = (
     # pessoa ver!"). O Nexus é a FONTE; registrado antes da 1ª gravação
     Fato("acompanhamento_ativo", "Acompanhamento dos ativos da Engenharia", "engenharia",
          "nexus_engenharia_acompanhamento · fato_acompanhamento_ativo",
-         "1 linha = 1 evento (pegou, encaminhou, dados, comentario, encerrou) sobre 1 acompanhamento de 1 ativo",
+         "1 linha = 1 evento (pegou, encaminhou, dados, comentario, encerrou, comentario_editado, "
+         "comentario_apagado, gerou_os) sobre 1 acompanhamento de 1 ativo",
          _d(data=("id", "data_id (o dia de Brasília do evento); papéis data_id_inicio_analise e data_id_fim_analise"),
             usina=("id", "usina_id (a ligação da Confiabilidade com o cadastro; usina_ligada_por)"),
             equipamento=("id", "equipamento_id (o código do ativo)"),
@@ -272,12 +273,15 @@ FATOS = (
                     "encaminhou; encerrou leva o fim e o diagnóstico (diagnostico_id aponta a aba dim_diagnostico do "
                     "mesmo livro). As medidas são a foto do sinal na entrada, só no evento que começa (somam entre "
                     "acompanhamentos, não no tempo de um ativo). os_id e os_folio (no fim, desde 29/10/2026) são a "
-                    "OS de análise do Fracttal que o pegou ou o encaminhou do ativo livre criou. Quem, o nome de quem "
-                    "acompanha e o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se "
-                    "apaga"),
+                    "OS de análise do Fracttal que o pegou ou o encaminhou do ativo livre criou (ou o gerou_os, no "
+                    "acompanhamento de antes, desde 30/10/2026). alvo_id (no fim, desde 30/10/2026) é o comentário que "
+                    "o comentario_editado ou o comentario_apagado aponta. Quem, o nome de quem acompanha, o texto e a "
+                    "linha que foi para a nota da OS só cifrados (Cofre, a chave do cadastro). Só acrescenta: editar e "
+                    "apagar um comentário são eventos novos"),
     Fato("acompanhamento_os", "A OS acompanhada pela Engenharia", "engenharia",
          "nexus_engenharia_os · fato_acompanhamento_os",
-         "1 linha = 1 evento (status, prioridade ou comentario) da Engenharia sobre 1 OS do Fracttal",
+         "1 linha = 1 evento (status, prioridade, comentario, comentario_editado ou comentario_apagado) da "
+         "Engenharia sobre 1 OS do Fracttal",
          _d(data=("id", "data_id (o dia de Brasília do evento)"),
             usina=("id", "usina_id (a ligação do Quadro da equipe com o cadastro; usina_ligada_por)"),
             equipamento=("id", "equipamento_id (o código do ativo da OS)"),
@@ -287,8 +291,9 @@ FATOS = (
          observacao="os_id é o id da OS no Fracttal e os_folio o nº; status_id e prioridade_id apontam as abas "
                     "dim_status_os e dim_prioridade_os do mesmo livro (as listas fixas do pedido de 24/10/2026); o "
                     "estado de agora é o do último evento de cada tipo. nota_fracttal diz se o comentário foi para a "
-                    "nota da OS (\"sim\") ou por que não foi. Quem e o texto só cifrados (Cofre, a chave do cadastro). "
-                    "Só acrescenta: nada se edita nem se apaga"),
+                    "nota da OS (\"sim\") ou por que não foi. alvo_id (no fim, desde 30/10/2026) é o comentário que o "
+                    "comentario_editado ou o comentario_apagado aponta. Quem, o texto e a linha da nota só cifrados "
+                    "(Cofre, a chave do cadastro). Só acrescenta: editar e apagar um comentário são eventos novos"),
     Fato("marcacao_etm", "O que a Engenharia marca nas OS de ETM", "engenharia",
          "nexus_engenharia_etm · fato_marcacao_etm",
          "1 linha = 1 marcação (diagnostico, status_pos, etiqueta, acompanhamento ou finalizado) da Engenharia sobre 1 "

@@ -384,7 +384,8 @@ def test_quem_nao_e_da_engenharia_le_sem_botoes(tela, cliente, monkeypatch):
 def test_gaveta_mostra_o_acompanhamento_e_os_anteriores(tela, cliente):
     A.comentar(_aid_de("IBI200-INVR1.3"), "Datalogger perde o link", BETO, True)
     html = _como(cliente, ANA).get("/t/engenharia/confiabilidade?aba=acompanhamento").get_data(as_text=True)
-    assert "Acompanhamento" in html and "Datalogger perde o link" in html and "Salvar comentário" in html
+    # sem a OS, o campo do comentário dá lugar ao Gerar OS (30/10/2026: "só pode comentar com OS criada!")
+    assert "Acompanhamento" in html and "Datalogger perde o link" in html and "Gerar OS" in html
     assert "Início da análise" in html and "Fim da análise" in html and "Beto Souza" in html
     enc = cliente.get("/t/engenharia/confiabilidade?aba=encerrados").get_data(as_text=True)
     assert "Encerrado" in enc and "Salvar comentário" not in enc                     # encerrado fica só para ler
@@ -416,7 +417,7 @@ def test_pegar_pela_gaveta_e_comentar(tela, cliente):
     _como(cliente, BETO)
     r = cliente.post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-INV02"}, headers=SAME)
     g = r.get_data(as_text=True)
-    assert r.status_code == 200 and "Com <b>Beto Souza</b> (você)" in g and "Salvar comentário" in g
+    assert r.status_code == 200 and "Com <b>Beto Souza</b> (você)" in g and "Gerar OS" in g
     assert "Em acompanhamento" in g                                          # o aviso diz para onde o ativo foi
     aid = _aid_de("IBI200-INV02")
     r = cliente.post(f"{URL}/acompanhamento/{aid}/comentar", data={"texto": "Trocar cabo"}, headers=SAME)
@@ -453,7 +454,7 @@ def test_salvar_recusado_responde_a_gaveta_com_o_erro(tela, cliente):
     g = _como(cliente, ANA).post(f"{URL}/acompanhamento/{_aid_de('IBI200-INVR1.3')}/salvar",
                                  data={"inicio": "2026-10-01", "fim": "2026-10-04", "diagnostico": ""},
                                  headers=SAME).get_data(as_text=True)
-    assert "Para encerrar, escolha o diagnóstico" in g and "Salvar comentário" in g      # nada mudou: segue aberto
+    assert "Para encerrar, escolha o diagnóstico" in g and "Gerar OS" in g      # nada mudou: segue aberto
 
 
 def test_acao_de_outro_site_ou_sem_poder_nao_grava(tela, cliente, monkeypatch):
@@ -539,7 +540,9 @@ def test_texto_digitado_nao_se_perde(tela, cliente, monkeypatch):
     monkeypatch.setattr(livros, "publicar", lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError("fora")))
     g = cliente.post(f"{URL}/acompanhamento/{aid}/comentar", data={"texto": "Trocar o cabo de rede"},
                      headers=SAME).get_data(as_text=True)
-    assert "Não consegui gravar no banco" in g and ">Trocar o cabo de rede</textarea>" in g
+    # o texto digitado volta no campo do comentário, que desde 30/10/2026 só existe com a OS (o teste é o
+    # test_engenharia_comentarios::test_o_comentario_digitado_volta_quando_o_livro_falha)
+    assert "Não consegui gravar no banco" in g
 
 
 def test_pegar_de_pagina_velha_diz_com_quem_esta(tela, cliente):
@@ -649,7 +652,7 @@ def test_conferencia_que_falha_depois_de_gravar_nao_diz_nada_mudou(tela, cliente
                         lambda *a, **k: (_ for _ in ()).throw(livros.GravacaoErro("enviei 3 linhas e o banco tem 2")))
     g = cliente.post(f"{URL}/acompanhamento/{aid}/comentar", data={"texto": "Trocar cabo", "cod": "IBI200-INVR1.3"},
                      headers=SAME).get_data(as_text=True)
-    assert "Nada mudou" not in g and "confira" in g.lower() and ">Trocar cabo</textarea>" in g
+    assert "Nada mudou" not in g and "confira" in g.lower()
 
 
 def test_diagnostico_nao_aceita_email(banco):

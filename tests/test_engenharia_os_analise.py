@@ -197,7 +197,7 @@ def _um():
 
 
 def test_as_colunas_da_os_entram_no_fim_do_cabecalho():
-    assert AC.CAB_EVENTO[-2:] == ("os_id", "os_folio") and AC.CAB_EVENTO[:18][-1] == "dados_cifrados"
+    assert AC.CAB_EVENTO[-3:-1] == ("os_id", "os_folio") and AC.CAB_EVENTO[:18][-1] == "dados_cifrados"
 
 
 def test_pegar_com_a_os_guarda_o_id_e_o_numero(banco):
@@ -367,7 +367,8 @@ def test_acompanhamento_de_antes_sem_os_segue_so_no_nexus(fracttal, tela, client
     _pela_microsoft(cliente, ANA)
     aid = _aid_de("IBI200-INVR1.3")
     html = _post(cliente, f"/{aid}/comentar", cod="IBI200-INVR1.3", texto="Sem OS ainda").get_data(as_text=True)
-    assert "Comentário salvo." in html and "Sem OS ainda" in html and fracttal.notas == []
+    # desde 30/10/2026 o comentário só vai com a OS (Levi: "só pode comentar com OS criada!"): a gaveta oferece o Gerar OS
+    assert "gere a OS" in html and "Gerar OS" in html and fracttal.notas == []
 
 
 def test_de_outro_site_a_ponte_nao_faz_nada(fracttal, tela, cliente, app):

@@ -31,10 +31,16 @@ Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusR
 
 ## Mesa do engenheiro (18/10/2026)
 
-- **As OS e as ETMs da pessoa (29/10/2026):** o Quadro da equipe lê só os responsáveis do `.env`
+- **As OS da pessoa (29/10/2026; 30/10/2026 por tipo de ativo):** os números do Quadro só com as dela e as abertas
+  separadas por tipo de ativo (`TIPOS_DE_ATIVO`, pelo nome do ativo: Relé, Disjuntor, Inversor, Tracker, Transformador,
+  Cabine, QGBT, String e módulo, Usina, e a ETM pela lista da tela ETMs; Levi: "conta o total inicialmente e separe por
+  tipo de ativo!"). O bloco separado das ETMs saiu: elas são um dos tipos. A OS de análise de um crítico NÃO conta aqui
+  (conta em "Críticos com <pessoa>", o antigo "Com <pessoa>"; Levi: "Não deve contar duas vezes"). O "abrir o quadro" leva
+  `?pessoa=<id do Fracttal>`, e o Quadro abre filtrado nela. O Quadro lê só os responsáveis do `.env`
   (`OS_WEB_ENGENHARIA_RESPONSAVEIS`), não o setor: quem é do setor e está fora dessa lista vê "não está na equipe do
-  Quadro da equipe" no lugar de um zero falso; a leitura velha (o Fracttal não respondeu) diz a hora; as ETMs ainda sem
-  leitura dizem que estão lendo (o bloco some depois, se a pessoa não tiver ETM).
+  Quadro da equipe" no lugar de um zero falso; a leitura velha (o Fracttal não respondeu) diz a hora.
+- **Críticos sem dono (30/10/2026):** 6 à vista e o resto rola na própria caixa (`data-eg-max`, a altura dos 6 medida
+  no navegador); os botões Pegar e Encaminhar na linha do "Crit." (no celular, embaixo) e o cartão mais baixo.
 
 O Levi escolheu, no rascunho aprovado, a primeira tela da Engenharia ("Sim, a primeira"), do setor Engenharia
 (`Tela.do_setor`: quem é dele a vê sem marcar em Base → Acessos). Cada um vê a sua mesa ("Cada um vê a sua"), e só o
@@ -112,8 +118,23 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   da gaveta com as OS de acompanhamento de chamado dele (`nexus_chamados · fato_chamado`, pelo código canônico, o aberto
   primeiro), cada uma abrindo a página da OS. O banco dos chamados fora tira o bloco, e a gaveta segue.
 - **A gaveta acompanha o nome do ativo** (29/10/2026: "o texto do ativo está quebrando, a barra lateral pode se adaptar"):
-  o `engenharia-gaveta.js` mede o título numa linha só e abre a gaveta até 860 px (no celular, a tela toda); os quatro
-  números dela ficam centrados.
+  o `engenharia-gaveta.js` mede o título numa linha só e abre a gaveta até 860 px (no celular, a tela toda). Os quatro
+  números (30/10/2026: "o texto centralizado na parte de baixo e o valor bem no meio, quero os cantos estilo bevel") são
+  cartões de cantos chanfrados (`clip-path`), com o brilho verde no alto, o valor no meio da altura e o rótulo embaixo.
+- **As últimas OS da gaveta (30/10/2026):** o título no meio; o número abre o card da OS do OS Creator por cima
+  (`NexusOsCard`, o `oscreator/card_os_abrir.html` que a Confiabilidade e a Mesa incluem) e a seta ao lado baixa o PDF da
+  OS (o mesmo da cadeia da página da OS; os dois em `static/engenharia-os.js`). A OS da Confiabilidade leva o `wid`.
+- **Comentário só com OS, o Gerar OS, editar e apagar (30/10/2026):** Levi: "só pode comentar com OS criada! Para as que
+  foram acompanhadas e não tem OS quando a pessoa for comentar deve aparecer 'gerar OS'"; "tem que ter como apagar ou
+  editar esse comentário! tanto aí quanto no quadro da equipe!". No acompanhamento sem OS, o campo do comentário dá lugar
+  ao "Gerar OS" (`/os/_nexus/engenharia/acompanhamento/<id>/gerar-os`: a OS de análise no nome de QUEM ACOMPANHA, com a
+  nota "OS gerada em ... por X para a análise que Y acompanha desde ..." e o evento `gerou_os`), e a ponte recusa o
+  comentário sem OS. Editar e apagar: quem escreveu ou o administrador, no acompanhamento aberto (na gaveta) e na página da
+  OS do Quadro; são eventos novos (`comentario_editado`, `comentario_apagado`, com o `alvo_id`), e a linha da nota da OS
+  muda junto (a editada leva "(editado)" no fim; a apagada sai). A linha é achada pelo que o livro guardou dela
+  (`linha_nota`, cifrada) ou, no comentário de antes, pela data, o nome e o texto; a OS fechada ou a linha que alguém
+  mudou no Fracttal deixam a nota como está, e a tela diz. O "Apagar" pergunta antes. A rota antiga de comentar da
+  Confiabilidade (só a página aberta antes do deploy a usa) segue sem a regra.
 - **Falha nova** é a do sinal (corretiva e corretiva emergencial, sem o serviço registrado como corretiva): "desde que
   entrou" conta da gravação do Pegar (o início pode ser anterior), e o retorno conta do dia seguinte ao fim.
 - **A OS de análise no Fracttal** (29/10/2026: "quando eu clico em pegar para acompanhar criar uma OS para a pessoa que
@@ -297,6 +318,11 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
   máximo uma a cada 5 s).
 
 ## A OS do Quadro da equipe (24/10/2026)
+
+- **O crítico no Quadro (30/10/2026):** a OS de análise de um acompanhamento da Confiabilidade (o `os_id` do livro) leva
+  `critico` no JSON do quadro e o cartão ganha a borda e o fundo quentes (`.kb-card--critico`, o token `--severo`, nos
+  dois temas) e a palavra "crítico" (Levi: "quero que o crítico também tenha um visual diferente no quadro da equipe").
+  O quadro aberto com `?pessoa=<id do Fracttal>` (o "abrir o quadro" da Mesa) já vem filtrado nela.
 
 Levi: "Ao clicar quero uma visão parecida com o que aparece quando clica na OS da parte de CHAMADOS > GARANTIA", com os
 KPIs da engenharia, o status dela no lugar do ticket do fornecedor, a prioridade (média, alta, urgente), todo comentário

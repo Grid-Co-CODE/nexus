@@ -41,9 +41,13 @@ CAB_EVENTO = ("id", "registrado_em", "data_id", "acompanhamento_id", "evento", "
               "dados_cifrados",
               # a OS de análise no Fracttal (29/10/2026: o Pegar e o Encaminhar criam a OS): no fim, como manda a regra das
               # colunas novas; o acompanhamento de antes fica sem ela (o quiz do Levi: "Ficam sem OS")
-              "os_id", "os_folio")
+              "os_id", "os_folio",
+              # o comentário que um evento editou ou apagou (30/10/2026: "tem que ter como apagar ou editar esse
+              # comentário"): o livro só acrescenta, e o evento novo aponta o id do comentário
+              "alvo_id")
 CAB_DIAG = ("diagnostico_id", "nome", "descricao", "criado_em", "alterado_em", "excluido", "alterado_por_hmac")
-EVENTOS = ("pegou", "encaminhou", "dados", "comentario", "encerrou")
+EVENTOS = ("pegou", "encaminhou", "dados", "comentario", "encerrou", "comentario_editado", "comentario_apagado",
+           "gerou_os")
 COMECO = ("pegou", "encaminhou")          # os eventos que começam um acompanhamento (e trocam quem acompanha)
 # a lista que o Levi começou no pedido ("comunicação, disjuntor"); o resto a Engenharia cadastra na tela
 CADASTRO_INICIAL = (("Comunicação", ""), ("Disjuntor", ""))
@@ -237,9 +241,18 @@ def estado(eventos: list[dict]) -> dict[str, dict]:
             # 0 = o "A definir" da tela: limpa o diagnóstico (o Levi, 18/10/2026); vazio = o evento não mexeu nele
             a["diagnostico_id"] = _int(l.get("diagnostico_id")) or None
         if ev == "comentario":
-            a["comentarios"].insert(0, {"quando": q, "quando_txt": q.strftime("%d/%m/%Y às %H:%M") if q else "—",
+            a["comentarios"].insert(0, {"id": _txt(l.get("id")), "quando": q,
+                                        "quando_txt": q.strftime("%d/%m/%Y às %H:%M") if q else "—",
                                         "nome": quem.get("nome") or quem.get("email") or "",
-                                        "texto": dados.get("texto") or ""})
+                                        "texto": dados.get("texto") or "", "hmac": _txt(l.get("pessoa_hmac")),
+                                        "linha_nota": dados.get("linha_nota") or "", "editado": False})
+        elif ev in ("comentario_editado", "comentario_apagado"):
+            alvo = next((c for c in a["comentarios"] if c["id"] == _txt(l.get("alvo_id"))), None)
+            if alvo and ev == "comentario_apagado":
+                a["comentarios"].remove(alvo)
+            elif alvo:
+                alvo.update(texto=dados.get("texto") or alvo["texto"], editado=True,
+                            linha_nota=dados.get("linha_nota") or alvo["linha_nota"])
         elif ev == "encerrou":
             a["fim"], a["aberto"], a["encerrado_em"] = _dia(l.get("data_id_fim_analise")), False, q
     return out
@@ -280,7 +293,8 @@ def _quem(usuario, pode: bool, o_que: str) -> dict:
 
 def _evento(cofre, evento: str, quem: dict, aid: str, ativo: dict, *, responsavel: dict | None = None,
             inicio: date | None = None, fim: date | None = None, diagnostico_id: int | None = None,
-            texto: str = "", entrada: dict | None = None, os: dict | None = None) -> dict:
+            texto: str = "", entrada: dict | None = None, os: dict | None = None, alvo_id: str | None = None,
+            linha_nota: str = "") -> dict:
     """Uma linha do fato. `ativo` = {"cod", "usina_id", "usina_ligada_por"}; `entrada` = a foto do sinal, só no evento
     que começa o acompanhamento ({"nivel", "nFalha", "n7"}); `os` = a OS de análise que o Fracttal acabou de criar
     ({"id", "folio"})."""
@@ -291,6 +305,8 @@ def _evento(cofre, evento: str, quem: dict, aid: str, ativo: dict, *, responsave
         dados["responsavel"] = responsavel["nome"]
     if texto:
         dados["texto"] = texto
+    if linha_nota:
+        dados["linha_nota"] = linha_nota       # a linha que foi para a nota da OS: editar e apagar a acham por ela
     cod = canon(ativo.get("cod"))
     entrada = entrada or {}
     return {"id": eid, "registrado_em": agora.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -302,7 +318,8 @@ def _evento(cofre, evento: str, quem: dict, aid: str, ativo: dict, *, responsave
             "nivel_na_entrada": _txt(entrada.get("nivel")) or None, "falhas_30d_qtd": _int(entrada.get("nFalha")),
             "falhas_7d_qtd": _int(entrada.get("n7")),
             "dados_cifrados": cofre.cifrar(json.dumps(dados, ensure_ascii=False), _ctx(eid)),
-            "os_id": _int((os or {}).get("id")), "os_folio": _txt((os or {}).get("folio")) or None}
+            "os_id": _int((os or {}).get("id")), "os_folio": _txt((os or {}).get("folio")) or None,
+            "alvo_id": alvo_id}
 
 
 def _reler() -> dict:
@@ -465,20 +482,81 @@ def salvar(acompanhamento_id: str, inicio: str, fim: str, diagnostico_id: str, u
     return nova
 
 
-def comentar(acompanhamento_id: str, texto: str, usuario, pode: bool) -> dict:
-    """Um comentário, com a data e a hora de agora e quem escreveu. Qualquer um da Engenharia escreve (o Levi não quis
-    "só quem acompanha escreve", 18/10/2026); nunca se edita nem se apaga."""
-    quem = _quem(usuario, pode, "comenta um acompanhamento")
+def texto_do_comentario(texto) -> str:
     texto = "\n".join(" ".join(l.split()) for l in str(texto or "").strip().splitlines()).strip()
     if not texto:
         raise Recusada("Escreva o comentário antes de salvar")
     if len(texto) > TEXTO_MAX:
         raise Recusada(f"O comentário passou de {TEXTO_MAX} caracteres")
+    return texto
+
+
+def comentar(acompanhamento_id: str, texto: str, usuario, pode: bool, linha_nota: str = "") -> dict:
+    """Um comentário, com a data e a hora de agora e quem escreveu. Qualquer um da Engenharia escreve (o Levi não quis
+    "só quem acompanha escreve", 18/10/2026); desde 30/10/2026 quem escreveu (ou o administrador) edita e apaga, por
+    eventos novos (`editar_comentario`, `apagar_comentario`). `linha_nota` = a linha que foi para a nota da OS."""
+    quem = _quem(usuario, pode, "comenta um acompanhamento")
+    texto = texto_do_comentario(texto)
     cofre = _cofre()
     with _TRAVA:
         lido = _reler()
         a = _do_livro(lido, acompanhamento_id)
-        nova = _evento(cofre, "comentario", quem, a["id"], _ativo_de(a), texto=texto)
+        nova = _evento(cofre, "comentario", quem, a["id"], _ativo_de(a), texto=texto, linha_nota=linha_nota)
+        _publicar(lido["eventos"] + [nova], lido["diagnosticos"])
+    return nova
+
+
+def comentario_para_mudar(acompanhamento_id: str, comentario_id: str, usuario, pode: bool, admin: bool = False,
+                          lido: dict | None = None) -> dict:
+    """O comentário que vai ser editado ou apagado, conferido ANTES de mexer na nota da OS: o acompanhamento aberto, o
+    comentário existe e é de quem pede (ou quem pede é administrador). → o comentário do `estado`."""
+    quem = _quem(usuario, pode, "muda um comentário")
+    lido = lido or ler(forcar=True)
+    a = _do_livro(lido, acompanhamento_id)
+    c = next((c for c in a["comentarios"] if c["id"] == _txt(comentario_id)), None)
+    if not c:
+        raise Recusada("Não achei este comentário (foi apagado?): recarregue a página")
+    if c["hmac"] != quem["hmac"] and not admin:
+        raise Recusada("Só quem escreveu o comentário (ou o administrador) edita ou apaga")
+    return c
+
+
+def _mudar_comentario(evento: str, acompanhamento_id, comentario_id, usuario, pode, admin, texto="",
+                      linha_nota="") -> dict:
+    quem = _quem(usuario, pode, "muda um comentário")
+    cofre = _cofre()
+    with _TRAVA:
+        lido = _reler()
+        comentario_para_mudar(acompanhamento_id, comentario_id, usuario, pode, admin, lido=lido)
+        a = _do_livro(lido, acompanhamento_id)
+        nova = _evento(cofre, evento, quem, a["id"], _ativo_de(a), texto=texto, alvo_id=_txt(comentario_id),
+                       linha_nota=linha_nota)
+        _publicar(lido["eventos"] + [nova], lido["diagnosticos"])
+    return nova
+
+
+def editar_comentario(acompanhamento_id: str, comentario_id: str, texto: str, usuario, pode: bool,
+                      admin: bool = False, linha_nota: str = "") -> dict:
+    return _mudar_comentario("comentario_editado", acompanhamento_id, comentario_id, usuario, pode, admin,
+                             texto=texto_do_comentario(texto), linha_nota=linha_nota)
+
+
+def apagar_comentario(acompanhamento_id: str, comentario_id: str, usuario, pode: bool, admin: bool = False) -> dict:
+    return _mudar_comentario("comentario_apagado", acompanhamento_id, comentario_id, usuario, pode, admin)
+
+
+def gerar_os(acompanhamento_id: str, os: dict, usuario, pode: bool) -> dict:
+    """O acompanhamento aberto antes da OS de análise (os de antes de 29/10/2026) ganha a OS que a ponte acabou de
+    criar no nome de quem acompanha (Levi, 30/10/2026: "Para as que foram acompanhadas e não tem OS quando a pessoa for
+    comentar deve aparecer 'gerar OS'")."""
+    quem = _quem(usuario, pode, "gera a OS de um acompanhamento")
+    cofre = _cofre()
+    with _TRAVA:
+        lido = _reler()
+        a = _do_livro(lido, acompanhamento_id)
+        if a.get("os_id"):
+            raise Recusada(f"Este acompanhamento já tem a OS {a['os_folio']}: recarregue a página")
+        nova = _evento(cofre, "gerou_os", quem, a["id"], _ativo_de(a), os=os)
         _publicar(lido["eventos"] + [nova], lido["diagnosticos"])
     return nova
 

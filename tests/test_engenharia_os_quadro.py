@@ -561,7 +561,11 @@ def test_cadeia_da_os_com_o_numero_e_o_pdf_de_cada_uma(pagina, cliente):
     assert cadeia.index("OS da engenharia") < cadeia.index("16502") < cadeia.index("OS de campo") < cadeia.index("16510")
     for folio in ("16502", "16510", "16511"):
         assert f'data-os-pdf="{folio}"' in cadeia
-    assert "nexusRota('/os/api/os/pdf')" in html                          # o mesmo PDF da cadeia do chamado
+    # o mesmo PDF da cadeia do chamado, no JS da OS da Engenharia (o mesmo das últimas OS da gaveta, 30/10/2026)
+    assert "engenharia-os.js" in html
+    from pathlib import Path
+    js = (Path(__file__).resolve().parent.parent / "nexus/static/engenharia-os.js").read_text(encoding="utf-8")
+    assert "nexusRota('/os/api/os/pdf')" in js
 
 
 def test_comentarios_no_estilo_das_observacoes_do_chamado(pagina, cliente):

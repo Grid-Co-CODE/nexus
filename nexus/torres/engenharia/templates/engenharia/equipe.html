@@ -130,6 +130,8 @@
     cab.appendChild(num);
     cab.appendChild(el('span', 'kb-prazo', prazoTexto(o)));
     c.appendChild(cab);
+    // a OS de análise de um crítico da Confiabilidade (30/10/2026): a cor quente e a palavra
+    if (o.critico) { c.classList.add('kb-card--critico'); cab.appendChild(el('span', 'eg-tag eg-tag--critico', 'crítico')); }
     c.appendChild(el('h4', 'kb-card-tit', o.titulo || '(sem título)'));
     if (o.eng_status || o.eng_prioridade) {
       var eng = el('div', 'kb-eng');
@@ -222,6 +224,10 @@
   document.querySelector('.kb-canceladas').addEventListener('change', function (ev) { estado.canceladas = ev.target.checked; desenha(); });
   // voltou do card com o quadro relido: o ?atualizar=1 sai do endereço, para o F5 não reler de novo
   if (/[?&]atualizar=1(&|$)/.test(location.search)) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* sem history */ } }
+  // o "abrir o quadro" da Mesa traz a pessoa (?pessoa=<id do Fracttal>): o quadro abre filtrado nela (30/10/2026)
+  var pedida = new URLSearchParams(location.search).get('pessoa');
+  var dela = pedida && document.querySelector('.kb-super[data-pid="' + String(pedida).replace(/[^0-9A-Za-z_-]/g, '') + '"]');
+  if (dela) { dela.click(); return; }
   desenha();
 })();
 </script>

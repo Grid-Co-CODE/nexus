@@ -832,7 +832,8 @@ def engenharia_comentar(wid: int):
             return jsonify({"erro": "O Fracttal não respondeu (%s). Nada foi gravado; tente de novo."
                                     % type(e).__name__}), 502
     try:
-        O.registrar_comentario(_os_para_gravar(o), texto, session.get("usuario"), pode, nota)
+        O.registrar_comentario(_os_para_gravar(o), texto, session.get("usuario"), pode, nota,
+                               linha_nota=linha if nota == "sim" else "")
     except Exception as e:                       # noqa: BLE001 — a nota já foi: dizer, sem pedir para repetir
         logging.exception("comentário da OS %s: foi à nota, mas não ao livro do Nexus", wid)
         if nota == "sim":
@@ -1054,7 +1055,7 @@ def _livro_lido(lido: dict, o_que: str) -> None:
                           "instantes")
 
 
-def _os_para(api, cod: str, ativo: dict, para: dict, quem: str, agora, falhas: list, curto) -> dict:
+def _os_para(api, cod: str, ativo: dict, para: dict, quem: str, agora, falhas: list, curto, desde=None) -> dict:
     """A OS de análise do ativo livre no nome de `para`: a que o livro não gravou na tentativa anterior (passada para
     `para`, se era de outra pessoa) ou uma nova. Fica em `_OS_SEM_LIVRO` até o livro gravar."""
     from ...dados.equipamento import canon
@@ -1067,7 +1068,7 @@ def _os_para(api, cod: str, ativo: dict, para: dict, quem: str, agora, falhas: l
             velha = dict(velha, fid=para.get("fid"))
             _OS_SEM_LIVRO[c] = velha
         return dict(velha, aviso="")
-    os_ = OA.criar(api, ativo, para, quem, agora, falhas, curto)
+    os_ = OA.criar(api, ativo, para, quem, agora, falhas, curto, desde=desde)
     _OS_SEM_LIVRO[c] = dict(os_, fid=para.get("fid"))
     return os_
 
@@ -1260,10 +1261,14 @@ def engenharia_acomp_comentar(aid):
         pode, _ = T._quem_pode()
         usuario = session.get("usuario")
         a = AC.estado(AC.ler(forcar=True)["eventos"]).get(aid)
-        if not (a and a["aberto"] and a.get("os_id")):
-            AC.comentar(aid, texto, usuario, pode)
-            return "Comentário salvo."
+        if not (a and a["aberto"]):
+            AC.comentar(aid, texto, usuario, pode)          # as recusas de sempre (não achado, encerrado, sem poder)
         quem = AC._quem(usuario, pode, "comenta um acompanhamento")
+        if not a.get("os_id"):
+            # o comentário vai para a nota da OS (Levi, 30/10/2026: "só pode comentar com OS criada!"): sem ela, a
+            # gaveta oferece o Gerar OS
+            raise AC.Recusada("Este acompanhamento não tem OS: gere a OS da análise para comentar (o comentário vai "
+                              "para a nota dela)")
         linha = O.linha_da_nota(O.texto_do_comentario(texto), quem["nome"], _agora_brt())
 
         def escrever(api, regra, curto):
@@ -1280,9 +1285,245 @@ def engenharia_acomp_comentar(aid):
         with _trava_nota:
             nota = _no_fracttal(escrever, de)
         if nota == "sim":
-            _depois_do_fracttal(lambda: AC.comentar(aid, texto, usuario, pode), a["os_folio"],
+            _depois_do_fracttal(lambda: AC.comentar(aid, texto, usuario, pode, linha_nota=linha), a["os_folio"],
                                 "O comentário já foi para a nota da OS: não repita, para não ir duas vezes.")
             return f"Comentário salvo, também na nota da OS {a['os_folio']}, com a data e a hora."
         AC.comentar(aid, texto, usuario, pode)
         return f"Comentário salvo só no Nexus: {nota}."
     return _resposta_da_gaveta(T._acao(cod, fazer, form="comentar"))
+
+
+# ── os comentários: só com OS, o Gerar OS, editar e apagar (30/10/2026) ──────────────────────────────────────────────
+# Levi: "só pode comentar com OS criada! Para as que foram acompanhadas e não tem OS quando a pessoa for comentar deve
+# aparecer 'gerar OS'. Outro ponto, tem que ter como apagar ou editar esse comentário! tanto aí quanto no quadro da
+# equipe!". O comentário que foi para a nota da OS sai dela (ou muda nela) junto: a linha é achada pelo que o livro
+# guardou dela (`linha_nota`) ou, no comentário de antes, pela data, o nome e o texto. A linha que alguém mudou no
+# Fracttal fica como está, e a tela diz isso. Quem muda: quem escreveu, ou o administrador.
+def _candidatas(c: dict) -> list[str]:
+    """As linhas da nota que podem ser a deste comentário: a guardada, ou a do formato do comentário (a hora pode ter
+    virado o minuto entre a nota e o livro)."""
+    from datetime import timedelta
+
+    from ...engenharia import os_acompanhamento as O
+    if c.get("linha_nota"):
+        return [c["linha_nota"]]
+    q = c.get("quando")
+    if not q:
+        return []
+    return [O.linha_da_nota(c.get("texto") or "", c.get("nome") or "", q - timedelta(minutes=m)) for m in (0, 1)]
+
+
+def _mudar_linha_na_nota(api, regra, wid, candidatas: list[str], nova: str | None) -> str:
+    """Troca (ou tira, com `nova` None) a linha do comentário na nota da OS. → "sim" ou o motivo de a nota ficar como
+    está (a OS fechada, de várias tarefas, ou a linha que não está mais lá)."""
+    from ...engenharia import os_analise as OA
+    sit = OA.situacao(api, wid)
+    if sit:
+        return f"a OS está {'concluída' if sit == 'concluida' else 'cancelada'} no Fracttal"
+    d = api.get_os_detalhes(wid) or {}
+    if not d.get("tarefas"):
+        raise _NotaIncompleta()
+    pode_nota, motivo = regra.nota_pode_editar(regra.status_id_de(None, d), len(d.get("tarefas") or []))
+    if not pode_nota:
+        return motivo
+    linhas = str(d.get("notas") or "").replace("\r\n", "\n").split("\n")
+
+    def _n(x):
+        return " ".join(str(x).split())
+    # o comentário de várias linhas é um bloco de linhas seguidas na nota: casa o bloco inteiro
+    for cand in (x for x in candidatas if x):
+        bloco = [_n(x) for x in str(cand).replace("\r\n", "\n").split("\n")]
+        k = len(bloco)
+        i = next((j for j in range(len(linhas) - k + 1) if [_n(x) for x in linhas[j:j + k]] == bloco), None)
+        if i is None:
+            continue
+        linhas[i:i + k] = str(nova).split("\n") if nova else []
+        r = api.editar_nota_os(wid, "\n".join(linhas).strip("\n"))
+        if not (isinstance(r, dict) and r.get("ok")):
+            raise _NotaNaoGravou((r or {}).get("erro") or "sem resposta")
+        return "sim"
+    return "a linha do comentário não está mais na nota da OS (mudou no Fracttal)"
+
+
+def _na_nota(fazer, de: str):
+    """`_no_fracttal` sob a trava das notas, com as falhas da nota ditas em português."""
+    from ...engenharia import acompanhamento as AC
+    with _trava_nota:
+        try:
+            return _no_fracttal(fazer, de)
+        except _NotaIncompleta:
+            raise AC.Recusada("O Fracttal não devolveu a OS inteira agora. Nada mudou; tente de novo.") from None
+        except _NotaNaoGravou as e:
+            raise AC.Recusada(f"O Fracttal não gravou a nota ({e}). Nada mudou; tente de novo.") from None
+
+
+def _linha_editada(c: dict, texto: str) -> str:
+    from ...engenharia import os_acompanhamento as O
+    return O.linha_da_nota(texto, c.get("nome") or "", c["quando"]) + " (editado)" if c.get("quando") else ""
+
+
+@bp_raiz.route("/os/_nexus/engenharia/acompanhamento/<aid>/gerar-os", methods=["POST"])
+def engenharia_acomp_gerar_os(aid):
+    """A OS de análise do acompanhamento aberto antes dela, no nome de quem acompanha."""
+    from flask import abort, session
+
+    from ...dados.equipamento import canon
+    from ...engenharia import acompanhamento as AC
+    from .. import engenharia as T
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    cod, de = request.form.get("cod") or T._cod_do(aid), _de_volta()
+
+    def fazer():
+        pode, _ = T._quem_pode()
+        usuario = session.get("usuario")
+        quem = AC._quem(usuario, pode, "gera a OS de um acompanhamento")
+        trava = _trava_do_ativo(cod)
+        if not trava.acquire(blocking=False):
+            raise _sem_trava(cod)
+        try:
+            lido = AC.ler(forcar=True)
+            _livro_lido(lido, "criado")
+            a = AC.estado(lido["eventos"]).get(aid)
+            if not (a and a["aberto"]):
+                raise AC.Recusada("Este acompanhamento não está aberto: recarregue a página")
+            if a.get("os_id"):
+                raise AC.Recusada(f"Este acompanhamento já tem a OS {a['os_folio']}: recarregue a página")
+            resp = next((p for p in T._pessoas(pode) if p.get("hmac") == a["responsavel"]["hmac"]), None) or {}
+            para = {"fid": resp.get("fid"), "nome": a["responsavel"]["nome"] or resp.get("nome") or ""}
+            d = T._dados()["dados"]
+            ativo = T._ativo_da_conf(a["cod"]) or {"cod": a["cod"], "nome": a["cod"]}
+            falhas = (d.get("falhasEm") or {}).get(canon(a["cod"]), [])
+            agora = _agora_brt()
+            os_ = _no_fracttal(lambda api, regra, curto: _os_para(api, a["cod"], ativo, para, quem["nome"], agora,
+                                                                  falhas, curto, desde=a.get("desde")), de)
+            _depois_do_fracttal(lambda: AC.gerar_os(aid, os_, usuario, pode), os_["folio"],
+                                f"Tente de novo: o Nexus usa a mesma OS {os_['folio']}, sem criar outra.")
+            _OS_SEM_LIVRO.pop(canon(a["cod"]), None)
+        finally:
+            trava.release()
+        return (f"A OS {os_['folio']} foi criada no Fracttal no nome de {para['nome'] or 'quem acompanha'}: agora os "
+                "comentários vão para a nota dela." + (f" {os_['aviso']}" if os_.get("aviso") else ""))
+    return _resposta_da_gaveta(T._acao(cod, fazer, form="gerar-os"))
+
+
+def _mudar_comentario_do_acomp(aid, cid, editar: bool):
+    from flask import abort, session
+
+    from ...engenharia import acompanhamento as AC
+    from .. import engenharia as T
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    cod, de = request.form.get("cod") or T._cod_do(aid), _de_volta()
+
+    def fazer():
+        pode, _ = T._quem_pode()
+        usuario, admin = session.get("usuario"), bool(session.get("admin"))
+        c = AC.comentario_para_mudar(aid, cid, usuario, pode, admin)
+        texto = AC.texto_do_comentario(request.form.get("texto", "")) if editar else ""
+        a = AC.estado(AC.ler(forcar=True)["eventos"]).get(aid) or {}
+        nova, extra = "", ""
+        candidatas = _candidatas(c)
+        if a.get("os_id") and candidatas:
+            linha = _linha_editada(c, texto) if editar else None
+            nota = _na_nota(lambda api, regra, curto: _mudar_linha_na_nota(api, regra, a["os_id"], candidatas, linha),
+                            de)
+            if nota == "sim":
+                nova = linha or ""
+                extra = f" A nota da OS {a['os_folio']} mudou junto."
+            else:
+                extra = f" A nota da OS ficou como estava: {nota}."
+        if editar:
+            gravar = (lambda: AC.editar_comentario(aid, cid, texto, usuario, pode, admin, linha_nota=nova))
+        else:
+            gravar = (lambda: AC.apagar_comentario(aid, cid, usuario, pode, admin))
+        if "mudou junto" in extra:     # a nota já mudou: se o livro falhar agora, dizer, e não pedir para repetir às cegas
+            _depois_do_fracttal(gravar, a.get("os_folio") or "", "A nota já mudou: recarregue a página antes de repetir.")
+        else:
+            gravar()
+        return ("Comentário editado." if editar else "Comentário apagado.") + extra
+    return _resposta_da_gaveta(T._acao(cod, fazer, form="comentar"))
+
+
+@bp_raiz.route("/os/_nexus/engenharia/acompanhamento/<aid>/comentario/<cid>/editar", methods=["POST"])
+def engenharia_acomp_coment_editar(aid, cid):
+    return _mudar_comentario_do_acomp(aid, cid, editar=True)
+
+
+@bp_raiz.route("/os/_nexus/engenharia/acompanhamento/<aid>/comentario/<cid>/apagar", methods=["POST"])
+def engenharia_acomp_coment_apagar(aid, cid):
+    return _mudar_comentario_do_acomp(aid, cid, editar=False)
+
+
+def _mudar_comentario_da_os(wid: int, cid: str, editar: bool):
+    """Editar ou apagar o comentário da página da OS do Quadro da equipe (JSON, como o comentar dela)."""
+    from urllib.parse import quote, urlencode
+
+    from flask import jsonify, session
+
+    from ...engenharia import acompanhamento as AC
+    from ...engenharia import os_acompanhamento as O
+    from ...engenharia import os_equipe
+    from ..engenharia import _os_para_gravar, _quem_pode
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        return jsonify({"erro": "Pedido de outro site: nada mudou."}), 403
+    c_ = request.get_json(silent=True) or {}
+    pode, _meu = _quem_pode()
+    usuario, admin = session.get("usuario"), bool(session.get("admin"))
+    folio = str(c_.get("folio") or "").strip()
+    de = str(c_.get("de") or "")
+    if not _PAGINA_DA_OS.match(de):
+        de = f"/t/engenharia/equipe/os/{folio}" if folio.isdigit() else "/t/engenharia/equipe"
+    o = os_equipe.ler_os(folio) if folio.isdigit() else None
+    if not o or str(o.get("wid")) != str(wid):
+        return jsonify({"erro": "Não achei esta OS no Fracttal: recarregue a página."}), 404
+    os_ = _os_para_gravar(o)
+    try:
+        c = O.comentario_para_mudar(os_, cid, usuario, pode, admin)
+        texto = O.texto_do_comentario(c_.get("texto")) if editar else ""
+    except O.Recusada as e:
+        return jsonify({"erro": str(e)}), 400
+    nova, nota = "", None
+    candidatas = _candidatas(c) if (c.get("nota") == "sim" or c.get("linha_nota")) else []
+    if candidatas:
+        s = sessao_do_os(current_app._get_current_object())
+        if not s.get("jwt"):
+            login = na_raiz("/os/login") + "?next=" + quote("/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/"),
+                                                         safe="")
+            return jsonify({"erro": "Para mudar a nota da OS, entre pelo Fracttal.", "login": login}), 401
+        linha = _linha_editada(c, texto) if editar else None
+        try:
+            nota = _na_nota(lambda api, regra, curto: _mudar_linha_na_nota(api, regra, wid, candidatas, linha), de)
+        except AC.Recusada as e:
+            return jsonify({"erro": str(e), "login": getattr(e, "entrar", "") and na_raiz(e.entrar)}), 502
+        nova = (linha or "") if nota == "sim" else ""
+    try:
+        if editar:
+            O.editar_comentario(os_, cid, texto, usuario, pode, admin, nota=nota, linha_nota=nova)
+        else:
+            O.apagar_comentario(os_, cid, usuario, pode, admin, nota=nota)
+    except O.Recusada as e:
+        return jsonify({"erro": str(e)}), 400
+    except Exception as e:                       # noqa: BLE001
+        logging.exception("comentário da OS %s: a nota mudou, o livro do Nexus não", wid)
+        return jsonify({"erro": "A nota da OS mudou, mas o Nexus não gravou (%s). Recarregue antes de repetir."
+                                % type(e).__name__}), 502
+    feito = "Comentário editado." if editar else "Comentário apagado."
+    if nota == "sim":
+        feito += f" A nota da OS {o['os']} mudou junto."
+    elif nota:
+        feito += f" A nota da OS ficou como estava: {nota}."
+    return jsonify({"ok": True, "mensagem": feito})
+
+
+@bp_raiz.route("/os/_nexus/engenharia/os/<int:wid>/comentario/<cid>/editar", methods=["POST"])
+def engenharia_os_coment_editar(wid: int, cid: str):
+    return _mudar_comentario_da_os(wid, cid, editar=True)
+
+
+@bp_raiz.route("/os/_nexus/engenharia/os/<int:wid>/comentario/<cid>/apagar", methods=["POST"])
+def engenharia_os_coment_apagar(wid: int, cid: str):
+    return _mudar_comentario_da_os(wid, cid, editar=False)

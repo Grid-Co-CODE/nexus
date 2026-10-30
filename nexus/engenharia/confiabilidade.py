@@ -211,6 +211,7 @@ def calcular(linhas: list[dict], onde, agora: datetime | None = None) -> dict:
             "os": [{"os": str(r.get("wo_folio") or ""), "t": str(r.get("description") or "")[:80],
                     "nota": str(r.get("task_note") or "")[:220],
                     "url": OS_URL.format(id=r["id_work_order"]) if r.get("id_work_order") else "",
+                    "wid": r.get("id_work_order"),
                     "d": r["_cr"].astimezone(timezone(timedelta(hours=-3))).strftime("%d/%m %H:%M"),
                     "tipo": str(r.get("tasks_log_task_type_main") or ""), "st": str(r.get("task_status") or ""),
                     "quem": str(r.get("personnel_description") or r.get("requested_by") or "").strip(),

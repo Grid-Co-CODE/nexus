@@ -346,6 +346,7 @@ def confiabilidade():
         clientes=clientes, usinas=usinas, familias=C.FAMILIAS, niveis=C.NIVEIS, meta=C.META_DISP,
         janela=C.JANELA_DIAS, url=_url, h=_h, pct=_pct, est=os_falhas.estado(), sem_cadastro=g.get("sem_cadastro"),
         lido=datetime.fromtimestamp(g["em"], BRT).strftime("%H:%M"), pode=pode, meu=meu,
+        admin=bool(session.get("admin")), login_fracttal=_login_fracttal(),
         pessoas=_pessoas(pode) if aba in ("ativos", "acompanhamento") else [],
         hoje=datetime.now(BRT).date().isoformat(),
         aviso_dg=session.pop(_AVISO_DG, None), erro_dg=session.pop(_ERRO_DG, None),
@@ -386,7 +387,7 @@ def _faixa_da_mesa(caixa: list, comigo: list, sem_dono: list, erro: str, *, quem
     0; sem pessoa escolhida (a senha de administrador), os dois dela também; com as OS lidas pela metade, o dos críticos
     (revisão final, 18/10/2026: a Mesa dizia "todo crítico tem dono" com 0 na 1ª leitura das OS)."""
     from ...engenharia import confiabilidade as C
-    rotulos = (f"Encaminhados para {quem}", f"Com {quem}", "Críticos sem dono")
+    rotulos = (f"Encaminhados para {quem}", f"Críticos com {quem}", "Críticos sem dono")
     if erro:
         return [{"rotulo": r, "valor": "—", "grav": "", "nota": [("não consegui ler os acompanhamentos", False)]}
                 for r in rotulos]
@@ -470,7 +471,11 @@ def mesa():
     pessoa = next((p for p in pessoas if p["hmac"] == alvo), None) if alvo else None
     return render_template(
         "engenharia/mesa.html", torre=TORRE, tela=TORRE.tela("mesa"), alvo=alvo, meu=meu, admin=admin,
-        mesa_os=_os_da_pessoa(pessoa), mesa_etm=_etms_da_pessoa(pessoa),
+        login_fracttal=_login_fracttal("/t/engenharia/mesa"),
+        # a OS do crítico conta em Críticos com a pessoa, não nas OS dela (Levi, 30/10/2026: "Não deve contar duas
+        # vezes, conta nos críticos e não conta nas OSs, mesmo o crítico tendo OS")
+        mesa_os=_os_da_pessoa(pessoa, fora={str(a["os_id"]) for a in acomps.values() if a.get("os_id")}),
+        pessoa_fid=(pessoa or {}).get("fid") or "",
         nome_alvo=nome_alvo, quem=quem, pessoas=pessoas, caixa=caixa, comigo=comigo, sem_dono=sem_dono,
         gavetas=gavetas, erro_acomp=erro, erro_leitura=bool(erro),
         kpis=_faixa_da_mesa(caixa, comigo, sem_dono, erro, quem=quem, sem_pessoa=not alvo,
@@ -491,9 +496,32 @@ def _da_pessoa(o: dict, pessoa: dict) -> bool:
     return bool(pessoa.get("nome")) and os_equipe._norm(o.get("pessoa")) == os_equipe._norm(pessoa["nome"])
 
 
-def _os_da_pessoa(pessoa: dict | None) -> dict | None:
+# o tipo de ativo das OS da pessoa (Levi, 30/10/2026: "conta o total inicialmente e separe por tipo de ativo! Inversor,
+# Tracker, Disjuntor, ETM etc"): pelo nome do ativo da OS, na ordem (o relé da cabine é relé, não cabine); a ETM pela
+# lista da tela ETMs (ou pelo nome, sem a lista lida)
+TIPOS_DE_ATIVO = (("Relé", r"\brele\b"), ("Disjuntor", r"\bdisjuntor"), ("Inversor", r"\binversor|\binv\b"),
+                  ("Tracker", r"\btracker|\brastreador|\btcu\b"), ("Transformador", r"\btransformador|\btrafo\b"),
+                  ("Cabine", r"\bcabine|\bskid\b"), ("QGBT", r"\bqgbt\b|\bquadro geral"),
+                  ("String e módulo", r"\bstring|\bmodulo"), ("Usina", r"\bufv\b|\busina\b"))
+
+
+def _tipo_do_ativo(o: dict) -> str:
+    import re
+
+    from ...engenharia import os_equipe
+    if _eh_da_etm(o):
+        return "ETM"
+    nome = os_equipe._norm(o.get("ativo") or "")
+    if not nome:
+        m = re.match(r"\s*\[([^\]]+)\]", o.get("titulo") or "")
+        nome = os_equipe._norm(m.group(1)) if m else ""
+    return next((t for t, rx in TIPOS_DE_ATIVO if re.search(rx, nome)), "Outros")
+
+
+def _os_da_pessoa(pessoa: dict | None, fora=frozenset()) -> dict | None:
     """As OS da pessoa da mesa no Quadro da equipe (Levi, 29/10/2026: "Quero informações das OSs daquela pessoa"): os
-    quatro números do quadro só com as dela e as abertas, a atrasada primeiro. A leitura é a do Quadro (relida por trás
+    quatro números do quadro só com as dela e as abertas, a atrasada primeiro, separadas por tipo de ativo (30/10/2026).
+    `fora` = os ids das OS dos críticos (contam em Críticos com a pessoa). A leitura é a do Quadro (relida por trás
     enquanto alguma das telas é usada); sem leitura ainda, a Mesa não espera: diz que está lendo."""
     if not pessoa:
         return None
@@ -510,40 +538,20 @@ def _os_da_pessoa(pessoa: dict | None) -> dict | None:
                or (not pessoa.get("fid") and os_equipe._norm(e.get("nome_fracttal")) == os_equipe._norm(pessoa.get("nome")))
                for e in d.get("equipe") or []):
         return {"lendo": False, "fora": True, "kpis": [], "abertas": [], "erro": "", "velha": velha}
-    minhas, erro_eng = _com_a_engenharia([o for o in d["os"] if _da_pessoa(o, pessoa)])
+    dela = [o for o in d["os"] if _da_pessoa(o, pessoa)]
+    criticos = sum(1 for o in dela if str(o.get("wid")) in fora)
+    minhas, erro_eng = _com_a_engenharia([o for o in dela if str(o.get("wid")) not in fora])
     hoje = datetime.now(BRT).date()
     ordem = {"atrasada": 0, "vence": 1}
     abertas = sorted((o for o in minhas if o["coluna"] in ("fazer", "execucao", "verificacao")),
                      key=lambda o: (ordem.get(o["prazo"], 2), o["programada_iso"] or "9999", o["os"]))
+    por: dict = {}
+    for o in abertas:
+        por.setdefault(_tipo_do_ativo(o), []).append(o)
+    grupos = [{"tipo": t, "oss": l} for t, l in sorted(por.items(), key=lambda x: (-len(x[1]), x[0]))]
     return {"lendo": False, "kpis": faixa_kpis(minhas, hoje, JANELA_CONCLUIDAS, sem_engenharia=bool(erro_eng)),
-            "abertas": abertas, "erro": d.get("erro") or "", "velha": velha, "colunas": dict(os_equipe.COLUNAS)}
-
-
-def _etms_da_pessoa(pessoa: dict | None) -> dict | None:
-    """As OS de ETM com a pessoa (Levi, 29/10/2026: "Se a pessoa tiver ETM atrelada, tem que ter uma visão de ETM"): os
-    quatro números da tela ETMs só com as dela e as abertas. Sem ETM, a Mesa não mostra o bloco."""
-    if not pessoa:
-        return None
-    from ...engenharia import etm as ETM
-    from ...engenharia import etm_marcas as M
-    ETM.marcar_uso()
-    ETM.pedir_releitura()
-    d = ETM.dados()
-    if not d.get("lido"):
-        # sem leitura ainda não se sabe se a pessoa tem ETM: o bloco diz que está lendo (some depois, se não tiver)
-        return {"lendo": True, "kpis": [], "abertas": [], "colunas": {}}
-    minhas = [o for o in d["os"] if _da_pessoa(o, pessoa)]
-    if not minhas:
-        return None
-    lido = M.ler()
-    erro_marcas = "" if lido.get("lido_em") else (lido.get("erro") or "").split(":")[0]
-    est = M.estado(lido["eventos"]) if not erro_marcas else {}
-    oss = [_os_do_planner(o, est.get(str(o.get("wid")))) for o in minhas]
-    hoje = datetime.now(BRT).date()
-    abertas = sorted((o for o in oss if o["coluna"] in ("nao_iniciada", "em_andamento")),
-                     key=lambda o: (o["criada_dia"] or "", o["os"]))
-    return {"kpis": faixa_etm(oss, hoje, sem_marcas=bool(erro_marcas)), "abertas": abertas,
-            "colunas": dict(ETM.COLUNAS)}
+            "abertas": abertas, "grupos": grupos, "criticos": criticos, "erro": d.get("erro") or "", "velha": velha,
+            "colunas": dict(os_equipe.COLUNAS)}
 
 
 def _para_gravar(s: dict) -> dict:
@@ -591,7 +599,9 @@ def _gaveta_de(cod: str, acomp_id: str | None = None, aviso: str = "", erro: str
                            diag_nome={x["id"]: x["nome"] for x in diags}, meta=C.META_DISP, janela=C.JANELA_DIAS,
                            h=_h, pct=_pct, hoje=datetime.now(BRT).date().isoformat(), piso=AC.PISO.isoformat(),
                            aviso=aviso, erro=erro, erro_leitura=erro_leitura, digitado=digitado or {},
-                           entrar=entrar), status
+                           entrar=entrar, admin=bool(session.get("admin")),
+                           login_fracttal=_login_fracttal("/t/engenharia/mesa" if "/t/engenharia/mesa" in
+                                                          (request.referrer or "") else "/t/engenharia/confiabilidade")), status
 
 
 def _acao(cod: str, fazer, aviso: str = "", acomp_id=None, form: str = ""):
@@ -1216,6 +1226,9 @@ def _pagina_da_os(folio: int, tela_id: str):
         login_fracttal=na_raiz("/os/login") + "?next=" + quote(
             "/os/_nexus/card/voltar?" + urlencode({"de": f"/t/engenharia/{tela_id}/os/{o['os']}"}, safe="/"), safe=""),
         comentar_url=na_raiz(f"/os/_nexus/engenharia/os/{o['wid']}/comentar"),
+        # editar e apagar o comentário (30/10/2026): quem escreveu ou o administrador, pela ponte (a nota muda junto)
+        comentario_url=na_raiz(f"/os/_nexus/engenharia/os/{o['wid']}/comentario"), meu=_meu,
+        admin=bool(session.get("admin")),
         # a página de onde o comentário sai, sem o prefixo: o login do Fracttal volta para ela (a ponte confere)
         de_pagina=f"/t/engenharia/{tela_id}/os/{o['os']}", **base)
 
@@ -1523,6 +1536,13 @@ def equipe():
     oss = [dict(o, cor=cor.get(o["pid"], CORES_PESSOA[-1]), iniciais=ini.get(o["pid"]) or _iniciais(o["pessoa"]))
            for o in d["os"]]
     oss, erro_eng = _com_a_engenharia(oss)
+    # a OS de análise de um crítico da Confiabilidade ganha o visual dele (Levi, 30/10/2026: "quero que o crítico também
+    # tenha um visual diferente no quadro da equipe. Pode ser uma cor quente lembrando algo crítico")
+    from ...engenharia import acompanhamento as AC
+    lido_ac = AC.ler()
+    dos_criticos = ({str(a["os_id"]) for a in AC.estado(lido_ac["eventos"]).values() if a.get("os_id")}
+                    if lido_ac.get("lido_em") else set())
+    oss = [dict(o, critico=str(o.get("wid")) in dos_criticos) for o in oss]
     piso = (hoje - timedelta(days=JANELA_CONCLUIDAS)).isoformat()
     return render_template(
         "engenharia/equipe.html", torre=TORRE, tela=TORRE.tela("equipe"), cards=cards, oss=oss,
@@ -1585,6 +1605,14 @@ def _sugestoes(tipo: str, a: dict) -> dict:
                  causa_raiz=b["pq"][4], tipo_falha=b["tipo_falha"], causa=b["causa"], deteccao_metodo=b["det_txt"],
                  **{f"pq_{i}": t for i, t in enumerate(b["pq"], 1)})
     return s
+
+
+def _login_fracttal(de: str = "/t/engenharia/confiabilidade") -> str:
+    """O login do Fracttal do OS Creator, que volta para a tela `de` (o aviso do PDF da OS, sem a sessão dele)."""
+    from urllib.parse import quote
+
+    from ...prefixo import na_raiz
+    return na_raiz("/os/login") + "?next=" + quote("/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/"), safe="")
 
 
 def _faixa_rpn(r) -> str:

@@ -75,6 +75,8 @@
             var f = ev.target.closest('form[data-eg-form]');
             if (!f) return;
             ev.preventDefault();
+            // o Apagar do comentário pergunta antes (30/10/2026): sai também da nota da OS
+            if (f.dataset.egConfirma && !w.confirm(f.dataset.egConfirma)) return;
             enviar(f, f.action, f.querySelector('[type="submit"]'));
           });
           // o botão com o próprio endereço (o "Salvar diagnóstico" do formulário de salvar, 29/10/2026) é type="button":

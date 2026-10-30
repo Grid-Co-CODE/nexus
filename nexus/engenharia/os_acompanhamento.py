@@ -35,14 +35,16 @@ ABA, ABA_STATUS, ABA_PRIORIDADE = "fato_acompanhamento_os", "dim_status_os", "di
 # uma vez, com o id do comentário de lá: trazer de novo não repete)
 CAB = ("id", "registrado_em", "data_id", "evento", "os_id", "os_folio", "codigo_ativo", "equipamento_id", "usina_id",
        "usina_ligada_por", "pessoa_hmac", "status_id", "prioridade_id", "nota_fracttal", "dados_cifrados", "origem",
-       "origem_id")
+       "origem_id",
+       # o comentário que um evento editou ou apagou (30/10/2026): o livro só acrescenta, e o evento aponta o id dele
+       "alvo_id")
 CAB_DIM = ("id", "nome")
 # os oito do anexo do pedido, na ordem dele (o número é o id: nunca reaproveitar nem reordenar)
 STATUS = ((1, "Análise de Solução"), (2, "Atividade em Andamento"), (3, "Diagnóstico em Andamento"),
           (4, "Agendamento de OS"), (5, "Tratativa com Equipe de Campo"), (6, "Validação Final"), (7, "Stand-By"),
           (8, "Diagnóstico Concluído"))
 PRIORIDADES = ((1, "Média"), (2, "Alta"), (3, "Urgente"))
-EVENTOS = ("status", "prioridade", "comentario")
+EVENTOS = ("status", "prioridade", "comentario", "comentario_editado", "comentario_apagado")
 ABERTAS = ("fazer", "execucao", "verificacao")   # as colunas do quadro em que a OS ainda pede atenção
 DIAS_PARADA = 7                                   # "OSs que não tiveram atualizações nos últimos 7 dias" (Levi)
 TEXTO_MAX = AC.TEXTO_MAX
@@ -148,12 +150,24 @@ def estado(eventos: list[dict]) -> dict[str, dict]:
             e["status_id"] = _int(l.get("status_id"))
         if ev == "prioridade" and _int(l.get("prioridade_id")):
             e["prioridade_id"] = _int(l.get("prioridade_id"))
+        if ev in ("comentario_editado", "comentario_apagado"):
+            # a edição e a exclusão mudam o comentário apontado, sem entrar na linha do tempo (30/10/2026)
+            alvo = next((x for x in e["eventos"] if x["evento"] == "comentario" and x["id"] == _txt(l.get("alvo_id"))),
+                        None)
+            if alvo and ev == "comentario_apagado":
+                e["eventos"].remove(alvo)
+            elif alvo:
+                alvo.update(texto=_txt(d.get("texto")) or alvo["texto"], editado=True,
+                            linha_nota=_txt(d.get("linha_nota")) or alvo["linha_nota"])
+            continue
         if q and (e["ultimo"] is None or q > e["ultimo"]):
             e["ultimo"] = q
         e["eventos"].insert(0, {"evento": ev, "quando": q, "quando_txt": q.strftime("%d/%m/%Y %H:%M") if q else "",
                                 "nome": ((d.get("quem") or {}).get("nome")) or "", "texto": _txt(d.get("texto")),
                                 "status_id": _int(l.get("status_id")), "prioridade_id": _int(l.get("prioridade_id")),
-                                "nota": _txt(l.get("nota_fracttal"))})
+                                "nota": _txt(l.get("nota_fracttal")), "id": _txt(l.get("id")),
+                                "hmac": _txt(l.get("pessoa_hmac")), "linha_nota": _txt(d.get("linha_nota")),
+                                "editado": False})
     return out
 
 
@@ -166,20 +180,24 @@ def chave_da_os(v) -> str:
 def comentarios_por_os(eventos: list[dict]) -> dict[str, int]:
     """Quantos comentários cada OS tem, contados pelas linhas, sem abrir a cifra (a lista do Histórico da tela ETMs)."""
     out: dict[str, int] = {}
+    apagados = {_txt(l.get("alvo_id")) for l in eventos if _txt(l.get("evento")) == "comentario_apagado"}
     for l in eventos:
         oid = chave_da_os(l.get("os_id"))
-        if oid and _txt(l.get("evento")) == "comentario":
+        if oid and _txt(l.get("evento")) == "comentario" and _txt(l.get("id")) not in apagados:
             out[oid] = out.get(oid, 0) + 1
     return out
 
 
 def _evento(cofre, evento: str, quem: dict, os_: dict, *, status_id=None, prioridade_id=None, texto: str = "",
-            nota: str | None = None, quando: datetime | None = None, origem: str = "nexus", origem_id=None) -> dict:
+            nota: str | None = None, quando: datetime | None = None, origem: str = "nexus", origem_id=None,
+            alvo_id: str | None = None, linha_nota: str = "") -> dict:
     eid = uuid.uuid4().hex[:12]
     agora = (quando or datetime.now(timezone.utc)).astimezone(timezone.utc)
     dados = {"quem": {"nome": quem["nome"], "email": quem["email"]}}
     if texto:
         dados["texto"] = texto
+    if linha_nota:
+        dados["linha_nota"] = linha_nota       # a linha que foi para a nota da OS: editar e apagar a acham por ela
     cod = canon(os_.get("codigo"))
     return {"id": eid, "registrado_em": agora.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "data_id": int(agora.astimezone(_BRT).strftime("%Y%m%d")), "evento": evento,
@@ -188,7 +206,7 @@ def _evento(cofre, evento: str, quem: dict, os_: dict, *, status_id=None, priori
             "usina_ligada_por": _txt(os_.get("usina_ligada_por")) or None, "pessoa_hmac": quem["hmac"],
             "status_id": status_id, "prioridade_id": prioridade_id, "nota_fracttal": nota,
             "dados_cifrados": cofre.cifrar(json.dumps(dados, ensure_ascii=False), _ctx(eid)), "origem": origem,
-            "origem_id": origem_id}
+            "origem_id": origem_id, "alvo_id": alvo_id}
 
 
 def _reler() -> dict:
@@ -268,8 +286,9 @@ def quem_comenta(usuario, pode: bool) -> dict:
     return AC._quem(usuario, pode, "comenta na OS")
 
 
-def registrar_comentario(os_: dict, texto, usuario, pode: bool, nota: str) -> dict:
-    """O comentário no livro, com `nota` = "sim" (foi para a nota da OS) ou o motivo de não ter ido."""
+def registrar_comentario(os_: dict, texto, usuario, pode: bool, nota: str, linha_nota: str = "") -> dict:
+    """O comentário no livro, com `nota` = "sim" (foi para a nota da OS) ou o motivo de não ter ido, e `linha_nota` = a
+    linha que foi (editar e apagar a acham por ela)."""
     quem = AC._quem(usuario, pode, "comenta na OS")
     t = texto_do_comentario(texto)
     if not _int(os_.get("wid")):
@@ -277,9 +296,47 @@ def registrar_comentario(os_: dict, texto, usuario, pode: bool, nota: str) -> di
     cofre = AC._cofre()
     with _TRAVA:
         lido = _reler()
-        novo = _evento(cofre, "comentario", quem, os_, texto=t, nota=_txt(nota)[:200] or None)
+        novo = _evento(cofre, "comentario", quem, os_, texto=t, nota=_txt(nota)[:200] or None, linha_nota=linha_nota)
         _publicar(lido["eventos"] + [novo])
     return novo
+
+
+def comentario_para_mudar(os_: dict, comentario_id: str, usuario, pode: bool, admin: bool = False,
+                          lido: dict | None = None) -> dict:
+    """O comentário da OS que vai ser editado ou apagado (30/10/2026: "tem que ter como apagar ou editar esse
+    comentário! tanto aí quanto no quadro da equipe"), conferido ANTES de mexer na nota: existe e é de quem pede (ou
+    quem pede é administrador)."""
+    quem = AC._quem(usuario, pode, "muda um comentário")
+    lido = lido or ler(forcar=True)
+    est = estado(lido["eventos"]).get(chave_da_os(os_.get("wid"))) or {"eventos": []}
+    c = next((x for x in est["eventos"] if x["evento"] == "comentario" and x["id"] == _txt(comentario_id)), None)
+    if not c:
+        raise Recusada("Não achei este comentário (foi apagado?): recarregue a página")
+    if c["hmac"] != quem["hmac"] and not admin:
+        raise Recusada("Só quem escreveu o comentário (ou o administrador) edita ou apaga")
+    return c
+
+
+def _mudar_comentario(evento, os_, comentario_id, usuario, pode, admin, texto="", nota=None, linha_nota="") -> dict:
+    quem = AC._quem(usuario, pode, "muda um comentário")
+    cofre = AC._cofre()
+    with _TRAVA:
+        lido = _reler()
+        comentario_para_mudar(os_, comentario_id, usuario, pode, admin, lido=lido)
+        novo = _evento(cofre, evento, quem, os_, texto=texto, nota=_txt(nota)[:200] or None,
+                       alvo_id=_txt(comentario_id), linha_nota=linha_nota)
+        _publicar(lido["eventos"] + [novo])
+    return novo
+
+
+def editar_comentario(os_: dict, comentario_id: str, texto, usuario, pode: bool, admin: bool = False, nota=None,
+                      linha_nota: str = "") -> dict:
+    return _mudar_comentario("comentario_editado", os_, comentario_id, usuario, pode, admin,
+                             texto=texto_do_comentario(texto), nota=nota, linha_nota=linha_nota)
+
+
+def apagar_comentario(os_: dict, comentario_id: str, usuario, pode: bool, admin: bool = False, nota=None) -> dict:
+    return _mudar_comentario("comentario_apagado", os_, comentario_id, usuario, pode, admin, nota=nota)
 
 
 def importar_comentarios(itens: list[dict], origem: str) -> int:

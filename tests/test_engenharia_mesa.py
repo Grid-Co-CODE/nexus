@@ -67,7 +67,7 @@ def test_a_mesa_e_a_primeira_tela_da_engenharia_e_e_do_setor():
 
 def test_mesa_mostra_o_que_e_meu_e_os_criticos_sem_dono(mesa, cliente):
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
-    assert "IBI200-INVR1.3" in _secao(html, "Com você")
+    assert "IBI200-INVR1.3" in _secao(html, "Críticos com você")
     sem_dono = _secao(html, "Críticos sem dono")
     assert "IBI200-INV05" in sem_dono and "Pegar para acompanhar" in sem_dono
     assert "IBI200-INV02" not in sem_dono and "IBI200-INVR1.3" not in sem_dono      # atenção; e o que tem dono
@@ -76,11 +76,11 @@ def test_mesa_mostra_o_que_e_meu_e_os_criticos_sem_dono(mesa, cliente):
 
 def test_cada_um_ve_a_sua_mesa(mesa, cliente):
     html = _como(cliente, BETO).get(URL).get_data(as_text=True)
-    assert "A sua mesa" in html and ">Com você</h2>" in html
-    assert "IBI200-INVR1.3" not in _secao(html, "Com você") and 'name="pessoa"' not in html
+    assert "A sua mesa" in html and ">Críticos com você</h2>" in html
+    assert "IBI200-INVR1.3" not in _secao(html, "Críticos com você") and 'name="pessoa"' not in html
     # quem não é administrador não vê a mesa de outra pessoa pelo endereço
     html = cliente.get(URL + "?pessoa=" + A.codigo(ANA)).get_data(as_text=True)
-    assert "IBI200-INVR1.3" not in _secao(html, "Com você")
+    assert "IBI200-INVR1.3" not in _secao(html, "Críticos com você")
 
 
 def test_encaminhado_fica_ate_eu_mexer(mesa, cliente):
@@ -88,11 +88,11 @@ def test_encaminhado_fica_ate_eu_mexer(mesa, cliente):
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
     caixa = _secao(html, "Encaminhados para você")
     assert "IBI200-INV02" in caixa and "Encaminhado por Beto Souza" in caixa
-    assert "IBI200-INV02" not in _secao(html, "Com você")                       # sem repetir
+    assert "IBI200-INV02" not in _secao(html, "Críticos com você")                       # sem repetir
     A.comentar(_aid_de("IBI200-INV02"), "Vou olhar amanhã", ANA, True)
     html = cliente.get(URL).get_data(as_text=True)
     assert "IBI200-INV02" not in _secao(html, "Encaminhados para você")
-    assert "IBI200-INV02" in _secao(html, "Com você")
+    assert "IBI200-INV02" in _secao(html, "Críticos com você")
 
 
 def test_os_numeros_do_topo(mesa, cliente):
@@ -101,7 +101,7 @@ def test_os_numeros_do_topo(mesa, cliente):
     faixa = html.split('<section class="kb-kpis', 1)[1].split("</section>", 1)[0]
     rotulos = re.findall(r'<span class="kb-kpi-rot">([^<]+)</span>', faixa)
     valores = re.findall(r'<b class="kb-kpi-v[^"]*">([^<]+)</b>', faixa)
-    assert rotulos == ["Encaminhados para você", "Com você", "Críticos sem dono"]
+    assert rotulos == ["Encaminhados para você", "Críticos com você", "Críticos sem dono"]
     assert valores == ["1", "1", "1"]                       # INV02; INVR1.3 (o da lista Com você); INV05
     assert 'kb-kpi-v--alerta">1<' in faixa and 'kb-kpi-v--critico">1<' in faixa
     assert "chegou <b>hoje</b>" in faixa and "há 0 dias" not in faixa                # encaminhado agora
@@ -110,7 +110,7 @@ def test_os_numeros_do_topo(mesa, cliente):
 def test_administrador_escolhe_de_quem_ver(mesa, cliente, app):
     app.config["NEXUS_ADMINS"] = BETO["email"]                       # administrador é o da lista de agora
     html = _como(cliente, BETO, admin=True).get(URL + "?pessoa=" + A.codigo(ANA)).get_data(as_text=True)
-    assert 'name="pessoa"' in html and "IBI200-INVR1.3" in _secao(html, "Com Ana Lima")
+    assert 'name="pessoa"' in html and "IBI200-INVR1.3" in _secao(html, "Críticos com Ana Lima")
     assert "A mesa de Ana Lima" in html
     # a senha de administrador não diz quem é: a Mesa pede para escolher a pessoa
     html = _como(cliente, None, admin=True).get(URL).get_data(as_text=True)
@@ -152,11 +152,11 @@ def test_administrador_fora_da_engenharia_escolhe_e_volta_para_a_sua_mesa(mesa, 
     sel, escolhidas = _escolhidas(html)
     assert escolhidas == ["Ana Lima"] and '<option value="">A sua mesa</option>' in sel
     # a mesa de outra pessoa diz de quem é, nos títulos e nos números
-    assert "IBI200-INVR1.3" in _secao(html, "Com Ana Lima") and _secao(html, "Com você") == ""
+    assert "IBI200-INVR1.3" in _secao(html, "Críticos com Ana Lima") and _secao(html, "Críticos com você") == ""
     assert ">Encaminhados para Ana Lima</h2>" in html and ">Encaminhados para você</h2>" not in html
     faixa = html.split('<section class="kb-kpis', 1)[1].split("</section>", 1)[0]
     assert re.findall(r'<span class="kb-kpi-rot">([^<]+)</span>', faixa) == [
-        "Encaminhados para Ana Lima", "Com Ana Lima", "Críticos sem dono"]
+        "Encaminhados para Ana Lima", "Críticos com Ana Lima", "Críticos sem dono"]
 
 
 def test_sem_pessoa_escolhida_os_numeros_dela_sao_traco(mesa, cliente, app):
@@ -221,7 +221,7 @@ def test_criticos_sem_dono_com_o_ativo_e_a_usina_embaixo_sem_o_codigo(mesa, clie
 
 
 def test_com_voce_traz_o_codigo_e_a_usina_embaixo_do_nome(mesa, cliente):
-    com = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Com você")
+    com = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Críticos com você")
     sub = com.split('class="eg-item-sub"', 1)[1].split("</span>", 1)[0]
     assert "IBI200-INVR1.3" in sub and "Ibaté 2 - SP" in sub
 
@@ -255,25 +255,6 @@ def test_as_os_da_pessoa_na_mesa(mesa, cliente, monkeypatch):
     assert "Nenhuma OS" not in sec and "não está na equipe do Quadro da equipe" in sec
 
 
-def test_as_etms_da_pessoa_na_mesa(mesa, cliente, monkeypatch):
-    # Levi, 29/10/2026: "Se a pessoa tiver ETM atrelada, tem que ter uma visão de ETM"
-    from datetime import date
-
-    from test_engenharia_etm import ETMS, SET, w
-
-    from nexus.engenharia import etm as ETM
-    oss = ETM.montar([w(7001, "Corretiva", resp="Ana Lima", pid=1), w(7002, "Corretiva", resp="Ana Lima", pid=1,
-                                                                         status=3, task="DONE")],
-                     ETMS, SET, date.today())
-    monkeypatch.setattr(ETM, "dados", lambda: {"os": oss, "usinas": {}, "lido": 1.0, "lendo": False, "erro": "",
-                                                "erro_setores": ""})
-    sec = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "As ETMs de você")
-    assert 'href="/t/engenharia/etm/os/7001"' in sec and 'href="/t/engenharia/etm/os/7002"' not in sec
-    assert "Abertas no Fracttal" in sec
-    # quem não tem ETM não vê o bloco
-    assert "As ETMs de você" not in _como(cliente, BETO).get(URL).get_data(as_text=True)
-
-
 def test_a_leitura_velha_do_quadro_diz_que_o_fracttal_nao_respondeu(mesa, cliente, monkeypatch):
     from nexus.engenharia import os_equipe as OE
     oss = _oss_da_ana()
@@ -283,9 +264,67 @@ def test_a_leitura_velha_do_quadro_diz_que_o_fracttal_nao_respondeu(mesa, client
     assert "o Fracttal não respondeu agora" in sec
 
 
-def test_as_etms_sem_leitura_ainda_dizem_que_estao_lendo(mesa, cliente, monkeypatch):
-    from nexus.engenharia import etm as ETM
-    monkeypatch.setattr(ETM, "dados", lambda: {"os": [], "usinas": {}, "lido": 0, "lendo": True, "erro": "",
-                                                "erro_setores": ""})
+# ── a Mesa de 30/10/2026 ────────────────────────────────────────────────────────────────────────────────────────────
+def _oss_de_tipos():
+    """As OS da Ana de vários tipos de ativo: um inversor, um relé, uma ETM e a OS de análise de um crítico."""
+    from test_engenharia_equipe import AGORA, _w
+
+    from nexus.engenharia import os_equipe as OE
+    linhas = [_w("601", 1, pid=11, prog_dias=-1),
+              _w("602", 1, pid=11, items_log_description="Relé da Cabine 2 {X-RELE2}", code="X-RELE2"),
+              _w("603", 1, pid=11, items_log_description="Estação Meteorológica {X-ETM1}", code="X-ETM1"),
+              _w("604", 1, pid=11, items_log_description="Inversor 1.3 {IBI200-INVR1.3}", code="IBI200-INVR1.3",
+                 id_work_order=39001)]
+    return OE.montar(linhas, {"id": 11, "nome": "Ana Lima"}, AGORA)
+
+
+def test_as_os_da_pessoa_por_tipo_de_ativo_sem_as_dos_criticos(mesa, cliente, monkeypatch):
+    # Levi, 30/10/2026: "conta o total inicialmente e separe por tipo de ativo! Inversor, Tracker, Disjuntor, ETM etc";
+    # e a OS do crítico "conta nos críticos e não conta nas OSs"
+    from nexus.engenharia import os_equipe as OE
+    aid = _aid_de("IBI200-INVR1.3")
+    A.gerar_os(aid, {"id": 39001, "folio": "604"}, ANA, True)
+    oss = _oss_de_tipos()
+    monkeypatch.setattr(OE, "dados", lambda: {"os": oss, "equipe": [{"id": 11, "nome": "Ana Lima"}], "faltam": [],
+                                               "lido": 1.0, "lendo": False, "erro": ""})
+    sec = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "As OS de você")
+    assert re.findall(r'class="eg-mesa-tipo">([^<]+)<i>(\d+)</i>', sec) == [("ETM ", "1"), ("Inversor ", "1"),
+                                                                           ("Relé ", "1")]
+    assert 'href="/t/engenharia/equipe/os/604"' not in sec                     # a do crítico está em Críticos com
+    assert re.findall(r'kb-kpi-rot">Em aberto<.*?kb-kpi-v[^>]*>(\d+)<', sec, re.S)[0] == "3"
+    assert "As ETMs de você" not in _como(cliente, ANA).get(URL).get_data(as_text=True)
+
+
+def test_abrir_o_quadro_ja_filtrado_na_pessoa(mesa, cliente, monkeypatch):
+    monkeypatch.setattr(A, "pessoas_da_engenharia", lambda: [{"hmac": A.codigo(ANA), "nome": "Ana Lima", "fid": "11"},
+                                                            {"hmac": A.codigo(BETO), "nome": "Beto Souza", "fid": "12"}])
+    from nexus.engenharia import os_equipe as OE
+    oss = _oss_de_tipos()
+    monkeypatch.setattr(OE, "dados", lambda: {"os": oss, "equipe": [{"id": 11, "nome": "Ana Lima"}], "faltam": [],
+                                               "lido": 1.0, "lendo": False, "erro": ""})
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
-    assert "Lendo as ETMs no Fracttal" in html
+    assert 'href="/t/engenharia/equipe?pessoa=11"' in html
+    quadro = cliente.get("/t/engenharia/equipe?pessoa=11").get_data(as_text=True)
+    assert "searchParams.get('pessoa')" in quadro or "get('pessoa')" in quadro
+
+
+def test_criticos_sem_dono_mostra_seis_e_rola(mesa, cliente):
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    assert 'class="eg-itens eg-mesa-sem-dono" data-eg-max="6"' in html
+
+
+def test_o_quadro_marca_a_os_do_critico(mesa, cliente, monkeypatch):
+    # Levi, 30/10/2026: "quero que o crítico também tenha um visual diferente no quadro da equipe"
+    import json as _json
+
+    from nexus.engenharia import os_equipe as OE
+    aid = _aid_de("IBI200-INVR1.3")
+    A.gerar_os(aid, {"id": 39001, "folio": "604"}, ANA, True)
+    oss = _oss_de_tipos()
+    monkeypatch.setattr(OE, "dados", lambda: {"os": oss, "equipe": [{"id": 11, "nome": "Ana Lima"}], "faltam": [],
+                                               "lido": 1.0, "lendo": False, "erro": ""})
+    html = _como(cliente, ANA).get("/t/engenharia/equipe").get_data(as_text=True)
+    dados = _json.loads(html.split('id="kb-dados">', 1)[1].split("</script>", 1)[0])
+    criticos = {o["os"] for o in dados["oss"] if o.get("critico")}
+    assert criticos == {"604"} and "kb-card--critico" in html
+

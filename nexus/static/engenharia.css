@@ -104,12 +104,19 @@
 .eg-gav-cab h2{margin:0;font:700 18px/1.3 var(--font-sans);color:var(--tinta)}
 .eg-gav-cab p{margin:4px 0 0;font-size:13px;color:var(--tinta-2)}
 .eg-gav-cab code{font:600 12px var(--font-mono);color:var(--mudo)}
-.eg-gav-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin:18px 0;background:var(--linha);
-  border:1px solid var(--linha);border-radius:10px;overflow:hidden}
-.eg-gav-kpis div{background:var(--superficie-2);padding:10px 12px;display:grid;gap:2px;justify-items:center;
-  text-align:center}
-.eg-gav-kpis .v{font:800 18px/1.1 var(--font-sans);color:var(--tinta)}
-.eg-gav-kpis .n{font-size:11px;color:var(--mudo)}
+/* os quatro números da gaveta (Levi, 30/10/2026: "o texto centralizado na parte de baixo e o valor bem no meio, quero
+   os cantos estilo bevel, bota um carinho no visual"): cada número num cartão de cantos chanfrados, com o brilho verde
+   no alto, o valor no meio da altura e o rótulo embaixo */
+.eg-gav-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:18px 0}
+.eg-gav-kpis div{position:relative;display:grid;grid-template-rows:1fr auto;justify-items:center;text-align:center;
+  min-height:92px;padding:14px 8px 10px;
+  background:radial-gradient(120% 70% at 50% 0%,var(--verde-a16),transparent 70%),var(--superficie-2);
+  clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 12px,100% calc(100% - 12px),calc(100% - 12px) 100%,12px 100%,
+                    0 calc(100% - 12px),0 12px)}
+.eg-gav-kpis div::before{content:"";position:absolute;top:0;left:12px;right:12px;height:2px;background:var(--verde-a45)}
+.eg-gav-kpis .v{align-self:center;font:800 22px/1 var(--font-sans);letter-spacing:-.01em;color:var(--tinta)}
+.eg-gav-kpis .n{align-self:end;font-size:10.5px;line-height:1.3;font-weight:700;text-transform:uppercase;
+  letter-spacing:.04em;color:var(--mudo)}
 .eg-gaveta h3{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);margin:18px 0 8px}
 .eg-porque{margin:0;padding-left:18px;font-size:13.5px;color:var(--tinta)}
 .eg-porque li{margin:3px 0}
@@ -118,7 +125,9 @@
 .eg-oss li{display:grid;gap:3px;padding:10px 12px;border:1px solid var(--linha);border-radius:10px;background:var(--superficie-2);font-size:13px}
 .eg-oss li.eg-os-servico{opacity:.7}
 .eg-os-cab{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:12px;color:var(--tinta-2)}
-.eg-oss b{font-weight:600;color:var(--tinta)}
+.eg-oss b{font-weight:600;color:var(--tinta);text-align:center}
+/* o número da OS abre o card (um botão com cara de link) e a seta do PDF fica ao lado (30/10/2026) */
+.eg-os-abrir{background:none;border:0;padding:0;font:inherit;cursor:pointer}
 .eg-oss .mudo{font-size:12px}
 .eg-quem{font-size:12px;color:var(--tinta-2)}
 
@@ -758,3 +767,35 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 /* a OS de análise do acompanhamento na gaveta (29/10/2026): o número, o Solicitar OS e o Criar OS */
 .eg-acomp-os{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 8px;font-size:13px}
 .eg-acomp-os-acoes{display:inline-flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+
+/* editar e apagar o comentário, e o Gerar OS do acompanhamento sem OS (30/10/2026) */
+.eg-coment-acoes{display:flex;flex-wrap:wrap;align-items:flex-start;gap:4px 12px;margin-top:4px;font-size:12px}
+.eg-coment-acoes form{margin:0}
+.eg-coment-editar summary{cursor:pointer;color:var(--verde-texto);list-style:none}
+.eg-coment-editar summary::-webkit-details-marker{display:none}
+.eg-coment-editar[open]{flex-basis:100%}
+.eg-coment-editar textarea{width:100%;margin:6px 0}
+.eg-coment-apagar{background:none;border:0;padding:0;font:inherit;color:var(--erro);cursor:pointer}
+.eg-coment-apagar:hover,.eg-coment-editar summary:hover{text-decoration:underline}
+.eg-acomp-gerar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;
+  padding:10px 12px;border-radius:10px;background:var(--superficie-2);font-size:13px;color:var(--tinta-2)}
+.eg-acomp-gerar form{margin:0}
+
+/* a Mesa de 30/10/2026: os Críticos sem dono mais baixos, com os botões na linha do Crit. (no celular, embaixo) e a
+   lista que rola depois de 6; as OS da pessoa por tipo de ativo */
+.eg-mesa-sem-dono.eg-rola{overflow-y:auto;overscroll-behavior:contain}
+.eg-mesa-sem-dono .eg-item{padding:8px 14px 6px}
+.eg-mesa-sem-dono .eg-item-sub{font-size:12px}
+@media (min-width:640px){
+  .eg-mesa-sem-dono .eg-cartao{position:relative}
+  .eg-mesa-sem-dono .eg-item{padding-bottom:8px}
+  .eg-mesa-sem-dono .eg-item-tags{padding-right:170px}
+  .eg-mesa-sem-dono .eg-item-acoes{position:absolute;right:14px;bottom:7px;padding:0}
+}
+.eg-mesa-tipo{display:flex;align-items:center;gap:8px;margin:12px 18px 2px;font:700 11px/14px var(--font-sans);
+  letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.eg-mesa-tipo i{font-style:normal;color:var(--tinta-2)}
+
+/* o cartão do Quadro da OS de um crítico (30/10/2026): a borda e o fundo quentes, nos dois temas pelos tokens */
+.kb-card.kb-card--critico{border-color:var(--severo);box-shadow:inset 3px 0 0 var(--severo);
+  background:linear-gradient(90deg,var(--severo-suave),transparent 65%),var(--superficie)}

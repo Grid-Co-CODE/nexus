@@ -14,7 +14,15 @@
     <button type="submit" class="gc-btn gc-btn--primario">Encaminhar</button>
   </form>{% else %}<p class="mudo eg-encaminhar-vazio">Ninguém do setor Engenharia para receber agora (o setor de cada pessoa fica em Base → Acessos → Pessoas e setores).</p>{% endif %}
 </details>{% endmacro %}
-{% macro comentarios(lista) %}<ol class="eg-acomp-tl">{% for c in lista %}<li><span class="q">{{ c.quando_txt }} · {{ c.nome or '—' }}</span>{{ c.texto }}</li>{% else %}<li class="mudo">Nenhum comentário ainda.</li>{% endfor %}</ol>{% endmacro %}
+{# editar e apagar (Levi, 30/10/2026: "tem que ter como apagar ou editar esse comentário!"): quem escreveu ou o
+   administrador, no acompanhamento aberto; a linha da nota da OS muda junto, pela ponte #}
+{% macro comentarios(lista, ac=none) %}<ol class="eg-acomp-tl">{% for c in lista %}<li><span class="q">{{ c.quando_txt }} · {{ c.nome or '—' }}{% if c.editado %} · editado{% endif %}</span>{{ c.texto }}
+  {% if ac and ac.aberto and pode and ((meu and c.hmac == meu) or admin) %}<span class="eg-coment-acoes">
+    <details class="eg-coment-editar"><summary>Editar</summary><form data-eg-form="comentario" method="post" action="{{ url_for('os_web_ponte.engenharia_acomp_coment_editar', aid=ac.id, cid=c.id) }}"><input type="hidden" name="cod" value="{{ ac.cod }}">
+      <textarea class="gc-campo" name="texto" rows="2" maxlength="2000" aria-label="O comentário editado">{{ c.texto }}</textarea>
+      <button type="submit" class="gc-btn gc-btn--primario eg-btn-peq">Salvar</button></form></details>
+    <form data-eg-form="comentario" data-eg-confirma="Apagar este comentário?{{ ' Ele sai também da nota da OS ' ~ ac.os_folio ~ '.' if ac.os_folio }}" method="post" action="{{ url_for('os_web_ponte.engenharia_acomp_coment_apagar', aid=ac.id, cid=c.id) }}"><input type="hidden" name="cod" value="{{ ac.cod }}"><button type="submit" class="eg-coment-apagar">Apagar</button></form>
+  </span>{% endif %}</li>{% else %}<li class="mudo">Nenhum comentário ainda.</li>{% endfor %}</ol>{% endmacro %}
 <div class="eg-gav-cab">{% for k, rot, cor in niveis if k == a.get('nivel') %}<span class="eg-pill eg-pill--{{ cor }}">{{ rot }}</span>{% endfor %}<div><h2>{{ a.get('nome') or a.get('cod') }}</h2><p><code>{{ a.get('cod') }}</code>{% if a.get('usina') %} · {{ a.usina }}{% if a.get('uf') %} - {{ a.uf }}{% endif %}{% endif %}{% if a.get('cliente') %} · {{ a.cliente }}{% endif %}</p></div></div>
 {% if aviso %}<p class="eg-acomp-msg eg-acomp-msg--ok" role="status">{{ aviso }}</p>{% endif %}
 {% if erro %}<p class="eg-acomp-msg eg-acomp-msg--erro" role="alert">{{ erro }}{% if entrar %} <a class="cn-link" href="{{ entrar|na_raiz }}">Entrar pelo Fracttal</a>{% endif %}</p>{% endif %}
@@ -56,11 +64,16 @@
     <dt>Diagnóstico</dt><dd>{{ diag_nome.get(ac.diagnostico_id, 'a definir') }}</dd></dl>
   {% endif %}
   <h4 class="eg-acomp-sub">Comentários</h4>
-  {% if pode %}<form class="eg-acomp-coment" data-eg-form="comentar" method="post" action="{{ url_for('os_web_ponte.engenharia_acomp_comentar', aid=ac.id) }}"><input type="hidden" name="cod" value="{{ ac.cod }}">
+  {% if pode and not ac.os_folio %}
+  {# sem a OS, o comentário não tem para onde ir (Levi, 30/10/2026: "só pode comentar com OS criada! Para as que foram
+     acompanhadas e não tem OS quando a pessoa for comentar deve aparecer 'gerar OS'") #}
+  <div class="eg-acomp-gerar"><span>Os comentários vão para a nota da OS da análise, e este acompanhamento ainda não tem OS. A OS sai no nome de {{ ac.responsavel.nome or 'quem acompanha' }}.</span>
+    <form data-eg-form="gerar-os" method="post" action="{{ url_for('os_web_ponte.engenharia_acomp_gerar_os', aid=ac.id) }}"><input type="hidden" name="cod" value="{{ ac.cod }}"><button type="submit" class="gc-btn gc-btn--primario">Gerar OS</button></form></div>
+  {% elif pode %}<form class="eg-acomp-coment" data-eg-form="comentar" method="post" action="{{ url_for('os_web_ponte.engenharia_acomp_comentar', aid=ac.id) }}"><input type="hidden" name="cod" value="{{ ac.cod }}">
     <textarea class="gc-campo" name="texto" rows="3" maxlength="2000" aria-label="Comentário" placeholder="{{ 'Escreva o que viu, o que fez ou o que falta (vai também para a nota da OS)…' if ac.os_folio else 'Escreva o que viu, o que fez ou o que falta…' }}">{{ dg.get('texto', '') if dg.get('form') == 'comentar' else '' }}</textarea>
     <button type="submit" class="gc-btn gc-btn--primario">Salvar comentário</button>
   </form>{% endif %}
-  {{ comentarios(ac.comentarios) }}
+  {{ comentarios(ac.comentarios, ac) }}
 </section>
 {% elif ac %}
 <section class="eg-acomp eg-acomp--fechado">
@@ -109,10 +122,14 @@
   {% if a.get('circuito') %}<dt>Circuito</dt><dd>{{ a.circuito }}</dd>{% endif %}
   {% if a.get('mtbf') %}<dt>λ</dt><dd>{{ '%.1e'|format(1 / a.mtbf) }} falhas/h</dd>{% endif %}
 </dl>{% endif %}
+{# o número abre o card da OS do OS Creator por cima, e a seta baixa o PDF dela (Levi, 30/10/2026: "Ao clicar na OS deve
+   aparecer o card da OS que aparece quando clicamos em uma OS no OS Creator! Também deve ser possível baixar o PDF da OS,
+   bote um botão de download!"; engenharia-os.js) #}
 {% if a.get('os') %}<h3>As últimas OS ({{ a.os|length }} de {{ a.get('n30') }} em {{ janela }} dias)</h3>
+<div data-pdf-caixa data-login-fracttal="{{ login_fracttal }}"><p class="eg-os-msg" data-pdf-msg role="status" hidden></p>
 <ol class="eg-oss">{% for o in a.os %}
   <li class="{{ 'eg-os-servico' if o.servico }}"><span class="eg-os-cab"><span class="m">{{ o.d }}</span>
-    {% if o.url %}<a class="cn-link m" href="{{ (o.url)|na_raiz }}" target="_blank" rel="noopener">OS {{ o.os }}</a>{% else %}<span class="m">OS {{ o.os }}</span>{% endif %}
+    {% if o.wid %}<button type="button" class="cn-link m eg-os-abrir" data-os-card data-wid="{{ o.wid }}" data-folio="{{ o.os }}" title="Abrir a OS {{ o.os }}">OS {{ o.os }}</button><button type="button" class="eg-cad-pdf" data-os-pdf="{{ o.os }}" data-wid="{{ o.wid }}" title="Baixar o PDF da OS {{ o.os }}" aria-label="Baixar o PDF da OS {{ o.os }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>{% elif o.url %}<a class="cn-link m" href="{{ (o.url)|na_raiz }}" target="_blank" rel="noopener">OS {{ o.os }}</a>{% else %}<span class="m">OS {{ o.os }}</span>{% endif %}
     <span>{{ o.tipo }}</span>{% if o.servico %}<span class="eg-tag eg-tag--info">serviço</span>{% endif %}<span class="mudo">{{ o.st }}</span></span>
     <b>{{ o.t }}</b>{% if o.nota %}<span class="mudo">{{ o.nota }}</span>{% endif %}{% if o.quem %}<span class="eg-quem">{{ o.quem }}</span>{% endif %}</li>
-{% endfor %}</ol>{% endif %}
+{% endfor %}</ol></div>{% endif %}
