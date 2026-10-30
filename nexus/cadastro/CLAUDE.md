@@ -272,7 +272,9 @@ e-mails pessoais); filtro Origem e a etiqueta "externo" na linha.
   fica só para ver. O livro nasce com o 1º setor criado (registrado no catálogo antes).
 - **Desenho (12/10, Levi):** sem o título "Pessoal do Fracttal" ("não serve de nada"; os filtros saíram do cartão, como
   na lista de Colaboradores), sem a coluna Código e o "Como liga" virou a dica do (!) ao lado de "Ler o Fracttal de
-  novo" (passar o mouse ou focar; Esc fecha).
+  novo" (passar o mouse ou focar; Esc fecha). O código de cada pessoa (o `code` do Fracttal) segue guardado À PARTE no
+  resultado do `ler_pessoal` (`codigos`, {id: código}), fora da linha da tela: é por ele que as OSs em verificação do
+  Painel do responsável sabem quem do COS criou a OS (`code_create_by`; 29/10/2026, ver `nexus/torres/campo/CLAUDE.md`).
 - **Só administrador** (nome e e-mail de todo o pessoal ficam na tela e na memória, nunca no banco). Prova:
   `tests/test_base_fracttal.py` (a ligação, o setor no banco falso, as recusas, a tela e o catálogo). Conferido em
   12/10 numa cópia com o banco e o Fracttal reais e o livro dos setores num arquivo local (6 setores, 1 pela linha,

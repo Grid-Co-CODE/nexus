@@ -18,13 +18,47 @@
     <span class="mudo">nota do App{% if posicao %} · {{ seta_txt[seta.tipo] }}{{ seta.n if seta.tipo in ('sobe', 'desce') }}{% endif %}{% if antes.nota is not none %} · antes {{ antes.nota }}{% if antes.posicao %} ({{ antes.posicao }}º){% endif %}{% endif %}</span>
   </div>
 </header>
+{# A pontuação do mês (Levi, 29/10/2026: "quero uma explicação da pontuação mensal daquela equipe, pontos por ronda,
+   bonus, quantidade de tarefas etc, um resumo do que temos no ranking das equipes"): a conta da nota da equipe com os
+   números dela (a régua do Ranking das equipes) e, embaixo, o placar do ciclo do App de cada técnico (os pontos de
+   tarefas, de rondas e o bônus, como o App publica) #}
+<section class="cr-rk-j-bloco cr-rk-j-pont">
+  <h3 class="cr-rk-j-nivel">Pontuação do mês{% if info.get('atual') %} <span>de {{ dia_curto(info.atual[0]) }} até {{ dia_curto(info.atual[1]) }}</span>{% endif %}</h3>
+  {% if n.nota is not none %}
+  <p class="cr-rk-j-formula"><b class="cn-t-{{ cor }}">{{ n.nota }}</b> = 60% da qualidade <b>{{ n.qualidade }}</b> + 40% da cobertura <b>{{ n.cobertura }}%</b></p>
+  <ul class="cr-rk-j-fatos">
+    <li><b>Qualidade {{ n.qualidade }}</b><small>a média de {{ n.n_notas }} nota{{ 's' if n.n_notas != 1 }} do App no mês: {{ n.n_os }} tarefa{{ 's' if n.n_os != 1 }} e {{ n.n_ronda }} ronda{{ 's' if n.n_ronda != 1 }}</small></li>
+    <li><b>Cobertura {{ n.cobertura }}%</b><small>{{ n.rondadas }} de {{ n.usinas }} usina{{ 's' if n.usinas != 1 }} com ronda no mês</small></li>
+    <li><b>{% if posicao %}{{ posicao }}º de {{ total }}{% else %}Fora do ranking{% endif %}</b><small>{% if posicao %}{{ seta_txt[seta.tipo] }}{{ seta.n if seta.tipo in ('sobe', 'desce') }}{% if antes.nota is not none %} · antes {{ antes.nota }}{% if antes.posicao %} ({{ antes.posicao }}º){% endif %}{% endif %}{% else %}sem nota do App no mês{% endif %}</small></li>
+  </ul>
+  {% else %}<p class="cr-rk-j-txt">Sem nota do App no mês: a equipe fica fora do ranking até as tarefas e as rondas passarem pelo App.</p>{% endif %}
+  {% if placar and placar.linhas %}{% set g = placar.regua %}
+  <h4 class="cr-rk-j-sub">Pontos do ciclo no App, por técnico</h4>
+  <div class="cr-rk-j-mat"><table class="cr-rk-j-placar">
+    <thead><tr><th scope="col">Técnico</th><th scope="col">Posição</th><th scope="col">Pontos</th><th scope="col">Tarefas</th><th scope="col">Rondas</th><th scope="col">Bônus</th><th scope="col">Devolvidas</th></tr></thead>
+    <tbody>{% for p in placar.linhas %}
+      <tr><th scope="row">{{ p.tecnico }}</th>
+        <td>{% if p.fora %}<span class="mudo">fora do ciclo</span>{% elif p.posicao %}{{ p.posicao }}º de {{ placar.total }}{% else %}—{% endif %}</td>
+        <td><b>{{ p.total }}</b></td>
+        <td>{{ p.tarefas }} registrada{{ 's' if p.tarefas != 1 }}<small>{{ p.tarefas_pts }} pts · {{ p.contadas }} contam{% if p.nota_media is not none %} · nota média {{ p.nota_media }}{% endif %}</small></td>
+        <td>{{ p.rondas }} ronda{{ 's' if p.rondas != 1 }}<small>{{ p.rondas_pts }} pts{% if p.rondas_no_teto %} · no teto{% endif %}</small></td>
+        <td>{{ p.bonus }} pts</td>
+        <td{% if p.devolvidas or p.anuladas %} class="cn-t-alerta"{% endif %}>{{ p.devolvidas }}{% if p.anuladas %}<small>{{ p.anuladas }} anulada{{ 's' if p.anuladas != 1 }}</small>{% endif %}</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <p class="cr-rk-j-txt mudo">Pontos = tarefas + rondas + bônus. Cada tarefa vale a nota menos 60 (nota 100 = 40 pontos) se chegou ao piso{% if g.get('piso') is not none %} ({{ g.piso }}){% endif %} e teve GPS; contam as {% if g.get('teto') is not none %}{{ g.teto }} {% endif %}melhores do mês. As rondas somam à parte{% if g.get('ronda_teto') is not none %}, até {{ g.ronda_teto }} pontos{% endif %}. O bônus vale nas semanas encerradas sem devolução: programação completa{% if g.get('bonus_prog') is not none %} (+{{ g.bonus_prog }}%){% endif %} e preventivas da semana{% if g.get('bonus_prev') is not none %} (até +{{ g.bonus_prev }}%){% endif %}. Quem calcula é o App{% if placar_hora %} (calculado em {{ placar_hora }}){% endif %}.{% if placar.sem_placar %} Sem placar no mês: {{ placar.sem_placar|join(', ') }}.{% endif %}</p>
+  {% endif %}
+</section>
 {% set focar = cob|selectattr('nivel', 'equalto', 'critico')|list %}
 {% set acomp = cob|rejectattr('nivel', 'equalto', 'critico')|list %}
 {# uma prova: a OS citada vira o botão do card dela #}
 {% macro prova(p) %}<span{% if p.os %} class="cr-rk-j-pos"{% endif %}>{% if p.os %}{{ os_card(p.os, p.wid) }} · {% endif %}{{ p.txt }}</span>{% endmacro %}
 {# o "e mais N" abre o resto ali mesmo (Levi, 28/10/2026: "tem que dar para expandir esses 'e mais' o supervisor deve
-   saber o que é"); o que ficou contado sem detalhe (a OS sem a linha da lista) só diz quantas são #}
-{% macro mais(resto, total=0) %}{% if resto %}<details class="cr-rk-j-mais"><summary>e mais {{ resto|length }}</summary>{% for p in resto %}{{ prova(p) }}{% endfor %}</details>{% endif %}{% if total > resto|length %}<span class="mudo">e mais {{ total - resto|length }} sem o detalhe</span>{% endif %}{% endmacro %}
+   saber o que é"); o que ficou contado sem detalhe (a OS sem a linha da lista) só diz quantas são. Aberto, o "e mais"
+   some e cada prova fica na sua linha, como as de cima (29/10/2026: "o e mais 2 não sumiu, os mais dois não quebraram
+   como os demais, vieram juntos numa linha só"): o <details> não arruma os filhos em grade no Chrome, então as provas
+   moram numa lista dentro dele #}
+{% macro mais(resto, total=0) %}{% if resto %}<details class="cr-rk-j-mais"><summary>e mais {{ resto|length }}</summary><div class="cr-rk-j-mais-lista">{% for p in resto %}{{ prova(p) }}{% endfor %}</div></details>{% endif %}{% if total > resto|length %}<span class="mudo">e mais {{ total - resto|length }} sem o detalhe</span>{% endif %}{% endmacro %}
 {# Focar e Acompanhar abrem expandidos e encolhem no título (Levi, 19/10/2026: "deve ser possível encolher Focar e
    acompanhar, eles aparecem expandidos que nem estão agora"). O Focar em tabela (28/10/2026: "Usinas em linhas e essas
    linhas em coluna. pelo menos no focar"): as usinas nas linhas e as áreas em crítico nas colunas
@@ -51,15 +85,19 @@
 {% endif %}
 {% if not cob %}<p class="cr-rk-j-ok">Nada a cobrar nos três blocos: o semáforo da equipe está em dia.</p>{% endif %}
 <section class="cr-rk-j-bloco">
-  <h3 class="cr-rk-j-nivel">Nota do App{% if m and m.perde %} <b class="cn-t-{{ cor }}">{{ n.nota }}</b><span>perde {{ m.perde }}{% if info.get('atual') %} no mês, de {{ dia_curto(info.atual[0]) }} até {{ dia_curto(info.atual[1]) }}{% endif %}</span>{% endif %}</h3>
+  <h3 class="cr-rk-j-nivel">Nota do App{% if m and m.perde %} <b class="cn-t-{{ cor }}">{{ n.nota }}</b><span>perdeu {{ m.perde }} ponto{{ 's' if m.perde != 1 }} de 100 no mês</span>{% endif %}</h3>
   {% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}.</b></div>
   {% elif n.nota is none %}
   <p class="cr-rk-j-txt">Sem nota do App no mês: {% if n.n_ronda %}{{ n.n_ronda }} ronda{{ 's' if n.n_ronda != 1 }} pelo App, nenhuma com nota{% else %}nenhuma OS nem ronda pelo App{% endif %}. O App deixa a equipe fora do ranking; ela entra quando as tarefas e as rondas passam pelo App.{% if m and m.cobertura.sem_ronda %} Sem ronda no mês: {{ m.cobertura.sem_ronda|join(', ') }}{% if m.cobertura.mais_sem_ronda %} e mais {{ m.cobertura.mais_sem_ronda }}{% endif %}.{% endif %}</p>
   {% elif m %}
   {% if m.perde %}
+  {# o "−1" explicado (Levi, 29/10/2026: "-1 oq? -1 ponto? 1 OS anulada? explique melhor e explique o que impacta, o
+     supervisor não tem uma cristal ball"): o ponto é da nota da equipe, de 0 a 100; cada linha diz onde aconteceu, quanto
+     o critério vale em cada tarefa e o que o técnico faz para não perder (`ranking_equipes.COMO_RECUPERA`) #}
+  <p class="cr-rk-j-txt">Cada linha é quanto da nota da equipe (de 0 a 100) saiu naquele ponto; não é OS anulada. A soma dá os {{ m.perde }} ponto{{ 's' if m.perde != 1 }} que faltam para 100.</p>
   <ul class="cr-rk-j-perdas">
-    {% if m.cobertura.perde %}<li>Cobertura <b>−{{ m.cobertura.perde }}</b> <small>{{ m.cobertura.usinas - m.cobertura.com }} de {{ m.cobertura.usinas }} usina{{ 's' if m.cobertura.usinas != 1 }} sem ronda{% if m.cobertura.sem_ronda and not m.cobertura.mais_sem_ronda and m.cobertura.sem_ronda|length <= 3 %}: {{ m.cobertura.sem_ronda|join(', ') }}{% endif %}</small></li>{% endif %}
-    {% for p in m.qualidade.partes %}<li>{{ p.rot }} <b>−{{ p.perde }}</b></li>{% endfor %}
+    {% if m.cobertura.perde %}<li><b class="cr-rk-j-menos">−{{ m.cobertura.perde }} ponto{{ 's' if m.cobertura.perde != 1 }}</b><div><b>Cobertura de rondas</b><small>{{ m.cobertura.usinas - m.cobertura.com }} de {{ m.cobertura.usinas }} usina{{ 's' if m.cobertura.usinas != 1 }} sem ronda no mês{% if m.cobertura.sem_ronda and not m.cobertura.mais_sem_ronda and m.cobertura.sem_ronda|length <= 3 %} ({{ m.cobertura.sem_ronda|join(', ') }}){% endif %} · vale 40% da nota · o que fazer: rondar todas as usinas da equipe no mês</small></div></li>{% endif %}
+    {% for p in m.qualidade.partes %}<li><b class="cr-rk-j-menos">−{{ p.perde }} ponto{{ 's' if p.perde != 1 }}</b><div><b>{{ p.rot }}</b><small>{{ p.det }}{% if p.peso %} · vale {{ p.peso }} de 100 em cada tarefa{% endif %}{% if p.como %} · o que fazer: {{ p.como }}{% endif %}</small></div></li>{% endfor %}
   </ul>
   {% else %}<p class="cr-rk-j-txt">Nota cheia: nada a cobrar na nota do App.</p>{% endif %}
   {% if m.piores %}

@@ -924,6 +924,50 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
   mexer na cópia); o Responsável UFV do quadro é o Responsável O&M da ficha da usina, o mesmo do Painel. Com "Todos",
   o filtro do supervisor sai. O setor Supervisão Campo tem telas do OS Creator (o portão por setor abre `/os/...` só a
   quem tem uma: conferido nos Acessos em 28/10).
+- **OSs em verificação** (6ª rodada, 29/10/2026: "ao lado de PTS PENDENTES quero um 'OSs em verificação' irá contar as
+  OSs em verificação que não tem etiqueta da performance, chamados, engenharia e não foi criada por ninguém do time do
+  COS. Pense em como fazer isso sem pesar todo carregamento"): o número à direita das PT, a lista na janela.
+  - **A regra** (`campo/verificacao.py`):
+    - **A fila:** a da Aprovação de OS, relida em segundo plano e guardada (`regras_app._FILA_CACHE`).
+    - **A usina:** a do cadastro, pelo nome do Fracttal, a MESMA ligação da Aprovação (`visao.usinas_do_fracttal`).
+    - **A OS:** junta as tarefas dela. O título, a criação e o técnico são da OS; os ativos são os `id_item` distintos.
+    - **A espera:** é a da tarefa terminada há mais tempo, como a Aprovação conta (a cor é a régua dela, 7 e 30 dias).
+    - **Ficam de fora:**
+      - as etiquetas PERFORMANCE, CHAMADOS e ENGENHARIA (o `labels`; nomes conferidos na fila de 29/10);
+      - as criadas por alguém do setor COS (`nexus_setores`), pelo código da pessoa no Fracttal (`code_create_by`) ou
+        pelo nome (`created_by`): o código casa 8 de 9, o nome 7.
+    - **O código da pessoa:** vem do `ler_pessoal`, guardado à parte em `codigos`, fora da linha da tela de Pessoas.
+  - **Sem pesar o Painel:**
+    - O número chega por `fetch` depois da página: `/t/campo/responsaveis/verificacao?so=n`, em JSON.
+    - A lista é o pedaço da mesma rota (`_resp_verificacao.html`), aberto pelo `data-cr-painel` de sempre.
+    - Medido na bancada com a fila real (6.550 tarefas): o número em 0,5 s e a lista em 0,1 s.
+    - Fila ainda não lida no servidor: "—", e a página pede de novo em 30 s.
+  - **As colunas** (as do pedido): OS (abre o card do OS Creator), Criação, Título, Ativos, Técnico, Cliente, Usina,
+    Sem conclusão, o Concluir e o PDF, este ao passar o mouse na linha.
+  - **Concluir e PDF:** são os do OS Creator, com a sessão do Fracttal da pessoa.
+    - O Concluir é `POST /os/api/os/<id>/concluir`, irreversível, com a confirmação antes. O PDF é `POST /os/api/os/pdf`
+      e depois o download.
+    - Sem a sessão (401), a janela manda entrar no Fracttal pelo OS Creator.
+    - A OS concluída, ou mudada no card, sai da fila guardada pela conferência da Aprovação
+      (`/t/campo/aprovacao/<id>/conferir`: só sai o que o Fracttal confirma).
+  - **Exemplo:** na bancada, um responsável com 26 usinas tinha 212 esperando; ficaram de fora 69 por etiqueta e 95
+    criadas pelo COS.
+- **O relatório em PDF** (6ª rodada: "Botão de baixar relatório: ao extremo lado direto da mesma linha dos filtros (...)
+  em PDF com basicamente o que tem focado no que falta para o supervisor (...) um resumo no início e depois
+  aprofunda!"). O botão "Exportar relatório" fica na ponta direita dos filtros, só no Painel. A rota é
+  `/t/campo/responsaveis/relatorio.pdf`, com os filtros da tela (`campo/painel_relatorio.py`, reportlab como o relatório
+  dos extintores).
+  - **O dado é o do Painel:** o `montar`, a faixa "Parada agora" e as OSs em verificação. Nada é recalculado.
+  - **A ordem:**
+    1. a faixa com o nome;
+    2. o resumo com os 8 números;
+    3. "O que cobrar primeiro", em frases, nesta ordem: o parado, o vencido, o que falta (abaixo de 90%, sem ronda,
+       extintores, OSs, o chamado mais antigo, a equipe de menor nota);
+    4. o detalhe de cada quadro, só o que falta: as usinas abaixo da meta, as paradas, as PT, as OSs em verificação,
+       os chamados, as rondas que faltam (nunca, 7 dias ou mais, longa pendente), os extintores vencidos e o ranking.
+- **Prova da 6ª rodada:** `tests/test_campo_verificacao_painel.py` (a junção das tarefas, as etiquetas e o COS, a rota do
+  número e da lista, o script do Concluir e do PDF, o PDF do relatório, o placar da equipe, o ativo limpo e as partes da
+  nota com o peso e o que fazer).
 - **Prova:** `tests/test_campo_painel_responsavel.py` (a ordem e a completude de cada quadro, o nome do ativo, o número
   das rondas, os extintores, o padrão de quem entra, o "Todos", o CSS das 6 linhas com a rolagem e da janela do
   chamado), `tests/test_dados_fato_chamado_status.py` (o status no fato) e `tests/test_oscreator_chamado_por_cima.py`
@@ -1027,8 +1071,30 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
     mais larga (`.cr-modal:has(.cr-rk-j-mat)`). O Acompanhar segue em lista, com o "e mais N" que abre o `resto` ali
     mesmo. Para abrir TUDO, as atrasadas e as pausadas vêm inteiras (`manutencao`: `todas_atrasadas`/`todas_paradas`;
     a linha da Visão geral segue com as 5 piores, `lista_*`).
-  - **Nota do App** (`ranking_equipes.motivos`): o que ela perde, em pílulas (cobertura, cada critério da nota do App e
-    as rondas). A nota perde 100 − nota pontos: a qualidade tira 0,6 × (100 − qualidade), a cobertura o resto; a parte
+  - **O "e mais" aberto, em linhas, e o ativo limpo** (6ª rodada).
+    - **O "e mais":** "o e mais 2 não sumiu, os mais dois não quebraram como os demais, vieram juntos numa linha só".
+      Aberto, o resumo some, e as provas ficam numa lista dentro do `<details>` (`.cr-rk-j-mais-lista`): o `<details>`
+      não arruma os filhos em grade no Chrome.
+    - **O ativo:** "o nome do ativo pode aparecer sem nome de fabricante, modelo ou código do ativo. Só o nome limpo".
+      Os chamados e os ativos das provas passam pelo `responsaveis.nome_do_ativo`, o mesmo do quadro de chamados.
+  - **A pontuação do mês** (6ª rodada: "quero uma explicação da pontuação mensal daquela equipe, pontos por ronda, bonus,
+    quantidade de tarefas etc, um resumo do que temos no ranking das equipes"). Fica embaixo do cabeçalho.
+    - **A conta da nota:** "97 = 60% da qualidade 95 + 40% da cobertura 100%".
+    - **Três números:** a qualidade (a média de N notas: tarefas e rondas), a cobertura (usinas com ronda) e a posição
+      com a seta.
+    - **O placar do ciclo do App, por técnico:** sai de `ranking_equipes.placar_da_equipe` sobre o
+      `visao.ranking_pontos` do mês, casado pelo nome do cadastro. As colunas são posição, pontos, tarefas (registradas,
+      pontos, quantas contam, nota média), rondas (pontos, no teto), bônus e devolvidas.
+    - **A régua:** a frase do piso, do teto e do bônus, com os números que o App publicou.
+  - **Nota do App** (`ranking_equipes.motivos`): o que ela perde, uma linha por motivo. Desde a 6ª rodada ("-1 oq? -1
+    ponto? 1 OS anulada? explique melhor e explique o que impacta, o supervisor não tem uma cristal ball"), cada linha
+    diz:
+    - quantos pontos da nota da equipe, de 100;
+    - onde aconteceu ("em 58 de 125 tarefas");
+    - quanto o critério vale em cada tarefa (o peso da composição);
+    - o que o técnico faz para não perder (`ranking_equipes.COMO_RECUPERA`).
+
+    A cobertura diz as usinas sem ronda e que ela vale 40%. A nota perde 100 − nota pontos: a qualidade tira 0,6 × (100 − qualidade), a cobertura o resto; a parte
     da qualidade vai a cada critério (a "Composição da nota" de cada tarefa, no livro cru pela chave do fato: subtarefas
     25, fotos 20, descrição das fotos 10, assinatura 10, observação 15, GPS 20, que somam a nota; medido em 18/10/2026,
     fecha em 3.790 de 3.790 tarefas) e às rondas. Os inteiros são repartidos pelo maior resto e sempre fecham com a nota

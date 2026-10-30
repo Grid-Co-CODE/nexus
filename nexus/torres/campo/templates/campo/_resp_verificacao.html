@@ -1,0 +1,33 @@
+{# As OSs em verificação na janela do Painel do responsável (Levi, 29/10/2026: "ao clicar aparece uma lista dessas OSs
+   com as colunas: OS; Criação; Título; Quantidade de ativos; técnico; cliente; usina; tempo sem conclusão; botão de
+   concluir; ao passar o mouse botão de baixar pdf. ao clicar na OS aparece o card da os do os creator"). A regra está em
+   nexus/campo/verificacao.py; o Concluir e o PDF são os do OS Creator (/os/api/os/<id>/concluir e /os/api/os/pdf, com a
+   sessão do Fracttal da pessoa), e a OS concluída sai da fila guardada pela conferência da Aprovação de OS. O script
+   mora na Visão (responsaveis.html): o que vem num pedaço de página não roda. #}
+<header class="cr-jan-cab">
+  <div><p class="gc-eyebrow">OSs em verificação</p><h2>{{ responsavel or 'Todos os responsáveis' }}</h2>
+    <p class="mudo">{{ r.lista|length }} esperando concluir{% if lida %} · fila do Fracttal lida às {{ lida }}{% endif %}</p></div>
+</header>
+{% if not pronta %}
+<div class="cn-erro cn-aviso" role="status"><b>A fila de verificação do Fracttal ainda não foi lida neste servidor.</b> O Nexus lê em segundo plano; abra de novo em alguns minutos.{% if fila.erro %} Última tentativa: {{ fila.erro[:120] }}.{% endif %}</div>
+{% else %}
+<p class="cr-jan-nota">Fora da lista: as OS com etiqueta PERFORMANCE, CHAMADOS ou ENGENHARIA ({{ r.fora.etiqueta }}) e as criadas por alguém do COS ({{ r.fora.cos }}).{% if erro_cos %} <span class="cn-t-alerta">Quem é do COS não abriu agora ({{ erro_cos[:90] }}): as criadas pelo COS podem aparecer.</span>{% endif %} Concluir é irreversível: a OS sai da verificação no Fracttal.</p>
+<p class="pv-msg" role="status" hidden></p>
+<div class="cr-rk-j-mat pv-tab-caixa"><table class="pv-tab">
+  <thead><tr><th scope="col">OS</th><th scope="col">Criação</th><th scope="col">Título</th><th scope="col">Ativos</th><th scope="col">Técnico</th><th scope="col">Cliente</th><th scope="col">Usina</th><th scope="col">Sem conclusão</th><th scope="col"><span class="pv-oculto">Ações</span></th></tr></thead>
+  <tbody>{% for o in r.lista %}
+    <tr data-pv-wo="{{ o.id_wo }}" data-pv-folio="{{ o.os }}">
+      <th scope="row"><button type="button" class="cn-link cr-link-botao" data-pv-os title="Abrir o card da OS {{ o.os }}">OS {{ o.os }}</button></th>
+      <td>{{ o.criada_txt }}</td>
+      <td class="pv-titulo">{{ o.titulo or '—' }}</td>
+      <td>{{ o.ativos }}</td>
+      <td>{{ o.tecnico or '—' }}</td>
+      <td>{{ o.cliente or '—' }}</td>
+      <td>{{ o.usina }}</td>
+      <td class="cn-t-{{ cor_espera(o.espera_d) }}">{{ o.espera }}</td>
+      <td class="pv-acoes"><button type="button" class="gc-btn gc-btn--contorno pv-pdf" data-pv-pdf title="Baixar o PDF da OS {{ o.os }}"><i class="ph ph-file-pdf" aria-hidden="true"></i> PDF</button><button type="button" class="gc-btn gc-btn--primario pv-concluir" data-pv-concluir title="Concluir a OS {{ o.os }} no Fracttal">Concluir</button></td>
+    </tr>{% else %}
+    <tr><td colspan="9" class="mudo">Nenhuma OS esperando concluir nas usinas da tela.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endif %}

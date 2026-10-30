@@ -27,6 +27,7 @@ from ...campo import observacao_responsavel as campo_obs
 from ...campo import ocorrencias as campo_oc
 from ...campo import responsaveis_graficos as campo_graficos
 from ...campo import triagem as campo_triagem
+from ...campo import verificacao as campo_verif
 from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
 from ..modelo import Tela, Torre
@@ -625,7 +626,94 @@ def _resp_equipe_montar(equipe: str):
             det, ctx["erro"] = None, f"Não consegui ler as notas do App no banco ({type(e).__name__}: {str(e)[:160]})"
         if det is not None:
             ctx["m"] = campo_ranking.motivos(n, det, us, por)
+    # o placar do ciclo do App dos técnicos da equipe (Levi, 29/10/2026: "pontos por ronda, bonus, quantidade de tarefas
+    # etc"): o livro que o App publica de hora em hora; sem ele, a janela segue sem a tabela
+    ctx["placar"], ctx["placar_hora"] = None, ""
+    try:
+        ctx["placar"] = campo_ranking.placar_da_equipe(ctx["nomes_tecnicos"], visao.ranking_pontos().dados or {},
+                                                       date.fromisoformat(d["hoje"]))
+        ctx["placar_hora"] = _hora_brt(ctx["placar"]["calculado_em"]) if ctx["placar"]["calculado_em"] else ""
+    except Exception:       # noqa: BLE001 — o placar do App fora: o resto da janela vale
+        _log_campo.exception("Visão do responsável: o placar do ciclo da equipe não veio")
     return render_template("campo/_resp_equipe.html", **ctx)
+
+
+def _filtros_do_painel(d: dict) -> tuple[str, str, str]:
+    """(responsável, cliente, busca) do pedido, como o Painel lê: sem `responsavel`, o do login; "Todos" vai como "*"."""
+    pedido = request.args.get("responsavel")
+    responsavel = _responsavel_do_login(d) if pedido is None else ("" if pedido == TODOS else pedido)
+    return responsavel, request.args.get("cliente", ""), request.args.get("q", "").strip().lower()
+
+
+def _no_painel(u: dict, responsavel: str, cliente: str, q: str) -> bool:
+    """A usina entra no Painel do pedido? A mesma conta da rota da Visão (`responsaveis`): responsável, cliente e busca."""
+    return ((not responsavel or (u.get("responsavel") or visao.SEM_RESPONSAVEL) == responsavel)
+            and (not cliente or u.get("cliente") == cliente)
+            and (not q or q in " ".join(str(u.get(c) or "") for c in CAMPOS_DA_BUSCA).lower()))
+
+
+def _verificacao_das(nomes: set) -> dict:
+    """As OSs em verificação das usinas `nomes` (nexus/campo/verificacao.py) e o que a tela diz junto: {"r" (a lista e
+    as que ficaram de fora), "lida", "pronta" (a fila já foi lida neste servidor), "cos", "erro_cos"}. A fila é a que a
+    Aprovação de OS relê em segundo plano e guarda: nada aqui lê o Fracttal (o COS usa o pessoal do Fracttal já guardado
+    por 1 h)."""
+    from ...cadastro import fracttal_pessoal
+    por_nome = (visao.usinas_do_fracttal().dados or {}).get("por_nome") or {}
+    alvo = {k: cad for k, cad in por_nome.items() if cad.get("usina") in nomes}
+    campo_aprovacao._pedir_releitura()      # a fila velha (mais de 10 min) é relida em segundo plano, como na Aprovação
+    linhas = regras_app._FILA_CACHE.get("linhas")
+    lida = campo_aprovacao._lida_em()
+    cos, erro_cos = None, ""
+    try:
+        cos = campo_verif.criadores_cos(visao._base(), visao._sessao(), fracttal_pessoal.ler_pessoal)
+        erro_cos = cos.get("erro") or ""
+    except Exception as e:      # noqa: BLE001 — sem o setor COS agora: a lista sai sem esse filtro, e diz
+        _log_campo.exception("Visão do responsável: quem é do COS não veio")
+        erro_cos = f"{type(e).__name__}: {str(e)[:120]}"
+    return {"r": campo_verif.oss(linhas or [], alvo, cos, datetime.now(timezone.utc)), "pronta": linhas is not None,
+            "lida": datetime.fromtimestamp(lida, _BRT).strftime("%d/%m %H:%M") if lida else "", "cos": cos,
+            "erro_cos": erro_cos}
+
+
+@bp.route("/responsaveis/verificacao")
+def responsaveis_verificacao():
+    """As OSs em verificação do Painel do responsável (Levi, 29/10/2026; a regra em nexus/campo/verificacao.py): o
+    número (`so=n`, em JSON), que a tela pede DEPOIS de abrir ("Pense em como fazer isso sem pesar todo carregamento"), e
+    a lista na janela. Os filtros são os do Painel: responsável, cliente e busca."""
+    d = campo_resp.visao_responsaveis().dados or {}
+    responsavel, cliente, q = _filtros_do_painel(d)
+    v = _verificacao_das({u.get("usina") for u in d.get("usinas") or [] if _no_painel(u, responsavel, cliente, q)})
+    if request.args.get("so") == "n":
+        return {"n": len(v["r"]["lista"]), "lida": v["lida"], "pronta": v["pronta"]}
+    return render_template("campo/_resp_verificacao.html", **v, responsavel=responsavel, fila=campo_aprovacao.estado(),
+                           cor_espera=_cor_espera)
+
+
+@bp.route("/responsaveis/relatorio.pdf")
+def responsaveis_relatorio():
+    """O relatório do Painel em PDF (Levi, 29/10/2026: "Botão de baixar relatório (...) será em PDF com basicamente o que
+    tem focado no que falta para o supervisor, para não ficar tanta informação, terá um resumo no início e depois
+    aprofunda!"): o MESMO painel da tela (os filtros dela), a faixa "Parada agora" e as OSs em verificação, no
+    nexus/campo/painel_relatorio.py."""
+    from ...campo import painel_relatorio, painel_responsavel as campo_painel
+    d = campo_resp.visao_responsaveis().dados or {}
+    limite = campo_resp.limite_do_pedido(request.cookies.get(COOKIE_LIMITE))
+    todas = campo_resp.com_manutencao(d.get("usinas") or [], limite)
+    responsavel, cliente, q = _filtros_do_painel(d)
+    usinas = [u for u in todas if _no_painel(u, responsavel, cliente, q)]
+    ranking = campo_ranking.cartoes(todas, d.get("ranking_por_usina") or {}, d.get("tecnicos_por_equipe") or {}, usinas)
+    painel = campo_painel.montar(responsavel or "Todos os responsáveis", usinas, ranking)
+    faixa = sorted(((u, p) for u in usinas for p in u.get("paradas_abertas") or ()),
+                   key=lambda up: (up[1]["_ini"], up[0]["usina"]))
+    v = _verificacao_das({u.get("usina") for u in usinas})
+    filtros = [x for x in (f"cliente {cliente}" if cliente else "", f"busca \"{q}\"" if q else "") if x]
+    agora = datetime.now(_BRT)
+    pdf = painel_relatorio.gerar(painel, faixa, v["r"] if v["pronta"] else None, filtros=filtros,
+                                 gerado_em=agora.strftime("%d/%m/%Y %H:%M"))
+    nome = f"Painel do responsável - {responsavel or 'todos'} - {agora.strftime('%Y-%m-%d')}.pdf"
+    return Response(pdf, mimetype="application/pdf",
+                    headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(nome),
+                             "Cache-Control": "no-store"})
 
 
 def _observacoes(u: dict, d: dict, aviso: str = "", erro: str = "", texto: str = "") -> dict:

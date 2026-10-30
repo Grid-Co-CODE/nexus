@@ -85,8 +85,13 @@ def ler_pessoal(forcar: bool = False, ler=None) -> dict:
             if velho and velho["pessoas"]:
                 return dict(velho, erro=erro, velha=True)
             return {"pessoas": [], "lido_em": None, "erro": erro}
+        # o código de cada pessoa (o `code` do Fracttal) fica à parte, fora da linha da tela (a coluna Código saiu em
+        # 12/10/2026): é por ele que a OS diz quem a criou (`code_create_by`), e o nome dela no `created_by` nem sempre é
+        # o do cadastro de pessoal (Painel do responsável, 29/10/2026: 8 das 9 pessoas do COS casam pelo código, 7 pelo
+        # nome, e o código cobre mais OS)
         g = {"pessoas": sorted((da_api(p) for p in out), key=lambda x: _norm(x["nome"])), "lido_em": time.time(),
-             "erro": ""}
+             "erro": "", "codigos": {p.get("id_personnel"): str(p.get("code") or "").strip() for p in out
+                                     if str(p.get("code") or "").strip()}}
         _CACHE["pessoal"] = g
         return g
 

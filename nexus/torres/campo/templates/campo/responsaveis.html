@@ -91,6 +91,10 @@
     {% if filtro %}<input type="hidden" name="filtro" value="{{ filtro }}">{% endif %}
     {% if bloco_ordem %}<input type="hidden" name="bloco" value="{{ bloco_ordem }}">{% endif %}
     {% if ver == 'mapa' %}<input type="hidden" name="ver" value="mapa">{% endif %}
+    {# o relatório do Painel em PDF (Levi, 29/10/2026: "ao extremo lado direto da mesma linha dos filtros deve ter um botão
+       de exportar relatório (...) um resumo no início e depois aprofunda"), com os filtros da tela
+       (nexus/campo/painel_relatorio.py) #}
+    {% if modo == 'painel' and painel %}<a class="gc-btn gc-btn--contorno pn-exportar" href="{{ url_for('torre_campo.responsaveis_relatorio', responsavel=responsavel or '*', cliente=cliente or None, q=q or None) }}" title="Baixar o relatório do Painel em PDF: o resumo no início e, depois, o detalhe do que falta"><i class="ph ph-file-pdf" aria-hidden="true"></i> Exportar relatório</a>{% endif %}
   </form>
 
   {# a faixa "Parada agora" (18/10/2026; o painel próprio de um supervisor tinha a de "Usinas desligadas"): as OS de
@@ -104,6 +108,14 @@
     <button type="button" class="pn-kpi pn-kpi--{{ 'critico' if pt_kpi.paradas else ('alerta' if pt_kpi.aguardando else 'ok') }}" data-pn-pts aria-haspopup="dialog" title="Ver as PT esperando o De acordo">
       <span class="pn-kpi-ico" aria-hidden="true"><i class="ph ph-file-text"></i></span>
       <span class="pn-kpi-txt"><small>PTs pendentes</small><span><b>{{ pt_kpi.aguardando }}</b> esperando o De acordo</span></span>
+      <i class="ph ph-caret-right pn-kpi-seta" aria-hidden="true"></i></button>
+    {# as OSs em verificação (Levi, 29/10/2026: "ao lado de PTS PENDENTES quero um 'OSs em verificação' (...) Pense em
+       como fazer isso sem pesar todo carregamento"): o número chega depois de a página abrir (o script no fim), da fila
+       que a Aprovação de OS já guarda; o clique abre a lista na janela (nexus/campo/verificacao.py) #}
+    {% set pv_args = {'responsavel': responsavel or '*', 'cliente': cliente or None, 'q': q or None} %}
+    <button type="button" class="pn-kpi pn-kpi--neutro" data-pn-verif data-cr-painel="{{ url_for('torre_campo.responsaveis_verificacao', **pv_args) }}" data-pn-verif-n="{{ url_for('torre_campo.responsaveis_verificacao', so='n', **pv_args) }}" aria-haspopup="dialog" title="Ver as OSs em verificação: concluir, baixar o PDF e abrir o card">
+      <span class="pn-kpi-ico" aria-hidden="true"><i class="ph ph-clipboard-text"></i></span>
+      <span class="pn-kpi-txt"><small>OSs em verificação</small><span><b data-pn-verif-num>…</b> esperando concluir</span></span>
       <i class="ph ph-caret-right pn-kpi-seta" aria-hidden="true"></i></button>
   {% endif %}
   {% if faixa %}
@@ -555,6 +567,89 @@
     corpo.innerHTML = '';
     corpo.appendChild(lista.content.cloneNode(true));
     if (!dlg.open) { dlg.showModal(); }
+  });
+})();
+// as OSs em verificação (29/10/2026): o número chega DEPOIS da página (a fila que a Aprovação de OS guarda, sem ler o
+// Fracttal: "sem pesar todo carregamento"); na lista da janela, a OS abre o card do OS Creator, e o Concluir e o PDF são
+// os do OS Creator, com a sessão do Fracttal da pessoa. A OS concluída sai da fila guardada pela conferência da
+// Aprovação (/aprovacao/<id>/conferir: só sai o que o Fracttal confirma)
+(function () {
+  var kpi = document.querySelector('[data-pn-verif]'), dlg = document.getElementById('cr-modal');
+  if (!kpi || !dlg) { return; }
+  var num = kpi.querySelector('[data-pn-verif-num]');
+  function pintar(n) {
+    num.textContent = n === null ? '—' : String(n);
+    kpi.classList.remove('pn-kpi--neutro', 'pn-kpi--alerta', 'pn-kpi--ok');
+    kpi.classList.add(n === null ? 'pn-kpi--neutro' : (n > 0 ? 'pn-kpi--alerta' : 'pn-kpi--ok'));
+  }
+  function contar() {
+    fetch(kpi.getAttribute('data-pn-verif-n'), {credentials: 'same-origin'}).then(function (r) {
+      if (!r.ok) { throw new Error('HTTP ' + r.status); }
+      return r.json();
+    }).then(function (j) {
+      pintar(j && j.pronta ? j.n : null);
+      if (j && !j.pronta) { setTimeout(contar, 30000); }          // a fila ainda sendo lida neste servidor
+    }).catch(function () { pintar(null); });
+  }
+  contar();
+  function aviso(txt, ruim, html) {
+    var m = dlg.querySelector('.pv-msg');
+    if (!m) { return; }
+    m.hidden = !txt;
+    m.className = 'pv-msg ' + (ruim ? 'cn-t-critico' : 'cn-t-ok');
+    if (html) { m.innerHTML = txt; } else { m.textContent = txt; }      // o texto do servidor nunca vira HTML
+  }
+  var ENTRAR = 'Entre no OS Creator com a sua conta do Fracttal e tente de novo: <a class="cn-link" href="' +
+    nexusRota('/os/login') + '" target="_blank" rel="noopener">entrar no Fracttal</a>.';
+  function pedir(url, corpo) {
+    return fetch(url, {method: 'POST', credentials: 'same-origin', body: JSON.stringify(corpo),
+                                  headers: {'Accept': 'application/json', 'Content-Type': 'application/json'}})
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok, status: r.status, j: j || {}}; });
+      });
+  }
+  function conferir(wo, tr) {
+    fetch(nexusRota('/t/campo/aprovacao/') + wo + '/conferir', {method: 'POST', credentials: 'same-origin'})
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (!(j && j.saiu) || !tr || !tr.parentNode) { return; }
+        tr.remove();
+        var n = parseInt(num.textContent, 10);
+        if (!isNaN(n)) { pintar(Math.max(0, n - 1)); }
+      }).catch(function () { /* sem resposta: a OS sai na releitura de 10 min */ });
+  }
+  dlg.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-pv-os],[data-pv-concluir],[data-pv-pdf]');
+    var tr = b && b.closest('tr[data-pv-wo]');
+    if (!tr) { return; }
+    ev.preventDefault();
+    var wo = tr.getAttribute('data-pv-wo'), folio = tr.getAttribute('data-pv-folio');
+    if (b.hasAttribute('data-pv-os')) {
+      // o <dialog> mora na camada do topo e cobriria o card: fecha, e volta quando o card fecha
+      if (!window.NexusOsCard) { return; }
+      dlg.close();
+      NexusOsCard.abrir(wo, {status: 'Em Verificação', folio: folio, aoFechar: function (mudou) {
+        if (!dlg.open) { dlg.showModal(); }
+        if (mudou) { conferir(wo, tr); }
+      }});
+      return;
+    }
+    if (b.hasAttribute('data-pv-concluir')) {
+      if (!window.confirm('Concluir a OS ' + folio + ' no Fracttal? Não tem volta: ela sai da verificação.')) { return; }
+      var rot = b.textContent;
+      b.disabled = true; b.textContent = 'Concluindo…';
+      pedir(nexusRota('/os/api/os/') + wo + '/concluir', {folio: folio}).then(function (r) {
+        if (r.ok) { aviso('OS ' + folio + ' concluída.' + (r.j.aviso ? ' ' + r.j.aviso : '')); conferir(wo, tr); return; }
+        b.disabled = false; b.textContent = rot;
+        if (r.status === 401) { aviso(ENTRAR, true, true); } else { aviso(r.j.erro || ('Não consegui concluir a OS ' + folio + '.'), true); }
+      }).catch(function (e) { b.disabled = false; b.textContent = rot; aviso('Não consegui falar com o OS Creator (' + e.message + ').', true); });
+      return;
+    }
+    b.disabled = true;
+    pedir(nexusRota('/os/api/os/pdf'), {wid: wo, folio: folio}).then(function (r) {
+      b.disabled = false;
+      if (r.ok && r.j.url) { location.href = nexusRota(r.j.url); return; }
+      if (r.status === 401) { aviso(ENTRAR, true, true); } else { aviso(r.j.erro || ('Não consegui gerar o PDF da OS ' + folio + '.'), true); }
+    }).catch(function (e) { b.disabled = false; aviso('Não consegui gerar o PDF (' + e.message + ').', true); });
   });
 })();
 // o chamado do Painel abre a tela dele de Garantias por cima (28/10/2026); Esc, o Fechar, o clique fora e o "fechar" que
