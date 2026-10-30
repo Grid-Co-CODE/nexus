@@ -1286,7 +1286,12 @@ o formulário mandava o código dela, por fora da recusa do `decidir`).
   certo!"). O OS Creator roda dentro do Nexus com sessão própria (cookie `os_sessao`, só em /os); por isso as rotas de
   assinatura moram em `/os/_nexus/...` (`assinatura.py`): `quem` (o e-mail de quem entrou), `pt/<n>/decidir` (POST) e
   `pt/<n>/voltar` (o OS Creator só devolve para /os depois do login). Token do Fracttal vencido (`exp`) não assina;
-  pedido de outra origem leva 403.
+  pedido de outro site leva 403 ("Origem recusada."), pela régua da moldura da Performance, a mesma dos POST da Base
+  e dos Acessos (`assinatura._de_outro_site`: o `Sec-Fetch-Site` do navegador, só `same-origin`; sem ele, o `Origin`).
+  **Não comparar o `Origin` com o `request.host`**: no servidor da T.I. o Nexus não recebe o endereço público no Host,
+  e até 30/10/2026 toda decisão pelo navegador levava 403 (uma Responsável UFV, no 1º dia do card de assinar; o mesmo
+  POST com `Origin: https://app.gridco.com.br` dava 403 em produção). Prova:
+  `test_a_decisao_passa_atras_do_proxy_que_troca_o_host` (falha com a regra antiga).
 - **A ida e a volta do login levam a linha** (revisão adversarial de 11/10/2026: só com o número no `next`, quem abria
   a linha do 2º equipamento sem a sessão do Fracttal voltava do login para a 1ª, com o código dela no formulário, e o
   clique seguinte decidia o outro equipamento; num Não autorizo, o App pausaria a tarefa errada). `_login(número,

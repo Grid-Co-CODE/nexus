@@ -9,7 +9,7 @@ O portão do Nexus vale antes (quem não entrou no Nexus não chega aqui).
 import base64
 import json
 import time
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 
 from flask import Blueprint, current_app, jsonify, redirect, request, session
 
@@ -174,11 +174,20 @@ def _volta(numero, codigo=None) -> str:
             else _tela(numero, codigo))
 
 
+def _de_outro_site() -> bool:
+    """O pedido não veio de uma página do próprio Nexus: a régua da moldura da Performance, a mesma dos POST da Base e
+    dos Acessos (o `Sec-Fetch-Site` que o navegador manda; sem ele, o `Origin`). Até 30/10/2026 a decisão comparava o
+    `Origin` com o `request.host`, e no servidor da T.I. o Nexus não recebe o endereço público no Host: toda decisão
+    pelo navegador levava "Origem recusada." (uma Responsável UFV, no 1º dia do card de assinar pelo e-mail; o mesmo
+    POST com o Origin certo dava 403 em produção)."""
+    from ..moldura import _de_outro_site as regra
+    return regra()
+
+
 @bp_assinatura.route("/os/_nexus/pt/<numero>/decidir", methods=["POST"])
 def decidir(numero):
     # pedido de outro site não decide PT (o cookie Lax já barra; a origem confere de novo, porque é segurança do campo)
-    origem = request.headers.get("Origin")
-    if origem and urlsplit(origem).netloc != request.host:
+    if _de_outro_site():
         return "Origem recusada.", 403
     # a linha da PT que se decide: o código do ativo dela (o formulário de cada linha manda; "" = a linha sem ativo).
     # Sem o campo (formulário de antes de 11/10/2026), só a PT de uma linha se decide (`decisao_pt._linha`)

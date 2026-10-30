@@ -155,3 +155,33 @@ def test_o_card_cabe_no_celular():
     celular = bloco[bloco.index("@media (max-width:600px)"):]
     assert ".pa-dados{grid-template-columns:minmax(0,1fr)" in celular and ".pa-botoes .gc-btn{flex-basis:100%}" in celular
     assert "min-height:44px" in bloco                               # o dedo acerta os botões e as linhas da lista
+
+
+def test_a_decisao_passa_atras_do_proxy_que_troca_o_host(app, com_responsavel, monkeypatch):
+    """30/10/2026, 1º dia do card: uma Responsável UFV deu o De acordo e leu "Origem recusada." No servidor da T.I. o
+    Nexus não recebe o endereço público no Host, e a decisão comparava o Origin com ele: o mesmo POST com o Origin certo
+    dava 403 em produção. Agora vale a régua da moldura (o Sec-Fetch-Site do navegador; sem ele, o Origin)."""
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s["logado"], s["admin"], s["via"], s["ms_ate"] = True, False, "microsoft", time.time() + 3600
+        s["usuario"] = {"email": RESP, "nome": "Responsável Exemplo", "perfil": ""}
+    _entrar_no_fracttal(app, c, _jwt(email=RESP), RESP, "Responsável Exemplo")
+    form = {"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR1", "volta": CARD_PT1, "card": "1"}
+    # a camada da T.I.: o navegador fala com app.gridco.com.br, e o Nexus recebe outro Host (o pedido chega com os
+    # cookies; só o Host muda no caminho)
+    original = app.wsgi_app
+
+    def proxy_da_ti(environ, start_response):
+        environ["HTTP_HOST"] = "127.0.0.1:5070"
+        return original(environ, start_response)
+    monkeypatch.setattr(app, "wsgi_app", proxy_da_ti)
+    proxy = {}
+    # outro site (o navegador diz cross-site): recusa, nada grava
+    r = c.post("/os/_nexus/pt/PT-1/decidir", data=form, headers={"Origin": "https://app.gridco.com.br",
+                                                                  "Sec-Fetch-Site": "cross-site"}, **proxy)
+    assert r.status_code == 403 and "nexus_pt_decisoes" not in com_responsavel.workbooks
+    # a própria página (same-origin), com o Origin público que o Host não mostra: grava e volta ao card
+    r = c.post("/os/_nexus/pt/PT-1/decidir", data=form, headers={"Origin": "https://app.gridco.com.br",
+                                                                  "Sec-Fetch-Site": "same-origin"}, **proxy)
+    assert r.status_code == 302 and r.headers["Location"].endswith(CARD_PT1)
+    assert [d["decisao"] for d in com_responsavel.linhas("nexus_pt_decisoes", "fato_decisao_pt")] == ["de_acordo"]
