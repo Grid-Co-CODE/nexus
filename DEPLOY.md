@@ -581,6 +581,14 @@ seguinte do novo põe a pasta de volta no commit do `/saude`.
 O git não toca nos `.env` nem na `dados/`. Dependência nova no `requirements.txt` (o `pillow` em 06/10, o `reportlab` em
 09/10) o script instala sozinho.
 
+**O teto de memória do serviço sai sozinho (30/10/2026).** Em toda rodada, antes de buscar no GitHub (também na de
+"nada a fazer"), o script lê o `MemoryHigh` e o `MemoryMax` do serviço e põe em `infinity` (`systemctl set-property`,
+que vale na hora, sem restart) o que estiver abaixo do piso de 4 GB (`NEXUS_MEMORIA_PISO_MB`). O caso: o Raio-X mostrou
+o `nexus.service` com MemoryHigh=700M e MemoryMax=1024M, posto no servidor; o Linux apertou o Nexus 132.576 vezes numa
+manhã, com 2,8 GB dele no swap e 6,8 GB livres na máquina, e o "clonar OS" do OS Creator ficou preso 13 min. Teto acima
+do piso é decisão da T.I. e fica; falhou o `set-property`, o deploy segue com um AVISO no log. Quem confere é o Raio-X
+(Base → Raio-X, cartão da memória: "Teto do Nexus: nenhum"). Prova: `tests/test_deploy_teto_memoria_30_10.py`.
+
 **Deploy por push (09/10/2026, Levi: "não dá para subir com o commit?").** O timer `deploy/nexus-atualizar.timer` roda o
 mesmo `atualizar.sh` a cada 2 minutos: push na `main` entra no ar em até ~3 min, sem ninguém rodar nada; sem commit
 novo (e com o último já instalado), não reinicia. Instala uma vez (o 1º comando já sobe o que estiver no GitHub):

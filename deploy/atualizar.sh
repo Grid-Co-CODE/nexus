@@ -44,6 +44,27 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 cd "$RAIZ"
+
+# 0. O teto de memória do serviço (30/10/2026). O Raio-X mostrou o nexus.service com MemoryHigh=700M e MemoryMax=1024M,
+# posto no servidor (o deploy/nexus.service não tem teto): o Linux apertou o Nexus 132.576 vezes numa manhã, com 2,8 GB
+# dele no swap e 6,8 GB livres na máquina, e o "clonar OS" do OS Creator ficou preso 13 min. Em toda rodada, antes de
+# tudo (também na de "nada a fazer" e com o GitHub fora do ar), o teto abaixo do piso vira infinity pelo set-property,
+# que vale na hora, sem restart. Teto acima do piso é decisão da T.I. e fica. DEPLOY.md, seção 8
+PISO_MB="${NEXUS_MEMORIA_PISO_MB:-4096}"
+tirar=()
+for prop in MemoryHigh MemoryMax; do
+  valor="$(systemctl show -p "$prop" --value "$SERVICO" 2>/dev/null || true)"
+  if [[ "$valor" =~ ^[0-9]+$ ]] && [ "$valor" -lt $((PISO_MB * 1024 * 1024)) ]; then
+    tirar+=("$prop=infinity")
+  fi
+done
+if [ "${#tirar[@]}" -gt 0 ]; then
+  echo "O serviço $SERVICO tinha teto de memória abaixo de $PISO_MB MB: tirando (${tirar[*]})."
+  if ! systemctl set-property "$SERVICO" "${tirar[@]}"; then
+    echo "AVISO: não deu para tirar o teto de memória do $SERVICO; o deploy segue." >&2
+  fi
+fi
+
 DONO="$(stat -c %U "$RAIZ")"                   # o clone é do usuário do serviço (DEPLOY.md, passo 3): o git roda como ele
 como() { sudo -u "$DONO" "$@"; }
 DONO_VENV="$(stat -c %U .venv)"

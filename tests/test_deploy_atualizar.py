@@ -119,7 +119,10 @@ _FALSOS = {
     "id": 'if [ "${1:-}" = "-u" ]; then echo 0; else echo "uid=0(root)"; fi',
     "stat": 'echo dono',
     "sudo": 'if [ "${1:-}" = "-u" ]; then shift 2; fi; exec "$@"',
-    "systemctl": 'echo "systemctl $*" >> "$NEXUS_TESTE_LOG"',
+    # o "show" lê o teto de memória do serviço no controle (sem arquivo, "infinity": sem teto) e não entra no log
+    "systemctl": ('if [ "${1:-}" = "show" ]; then cat "$NEXUS_TESTE_CONTROLE/teto_$3" 2>/dev/null || echo infinity; exit 0; fi; '
+                  'echo "systemctl $*" >> "$NEXUS_TESTE_LOG"; '
+                  'if [ "${1:-}" = "set-property" ] && [ -e "$NEXUS_TESTE_CONTROLE/set_falha" ]; then exit 1; fi'),
     "sleep": ':',
     # o /saude do Nexus que acabou de subir responde com o commit do clone; com o arquivo "saude" no controle, com ele
     # (o processo velho, que segue no ar enquanto a pasta mudou)
