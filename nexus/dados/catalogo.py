@@ -1549,11 +1549,11 @@ CONHECIDAS = (
     Conhecida("falhas_performance", ("atualizacao",), "controle",
               "o controle da publicação da plataforma: as linhas de cada aba no mês"),
     # 29/10/2026: a Thopen pelas normalizações do COS vai nas abas de sempre (disponibilidade_dia e _os_dia, com fonte e
-    # protecoes); estas guardam a conta de antes só para o cliente do Dashboard Thopen até o Levi liberar
-    Conhecida("falhas_performance", ("disponibilidade_dia_fracttal", "disponibilidade_os_dia_fracttal"), "apoio",
-              "a disponibilidade de antes da Thopen (só do Fracttal), mesmas colunas da disponibilidade_dia e da "
-              "disponibilidade_os_dia, para o cliente do Dashboard Thopen até a liberação da conta pelas normalizações "
-              "do COS (29/10/2026); na liberação a plataforma para de gravar e elas se aposentam"),
+    # protecoes); estas guardaram a conta de antes só para o cliente do Dashboard Thopen até o Levi liberar
+    Conhecida("falhas_performance", ("disponibilidade_dia_fracttal", "disponibilidade_os_dia_fracttal"), "aposentada",
+              "a disponibilidade de antes da Thopen (só do Fracttal), para o cliente do Dashboard Thopen até a liberação "
+              "da conta pelas normalizações do COS: gravadas de 29 a 30/10/2026; a plataforma parou de gravar na "
+              "liberação (\"garanta que a única fonte seja a de normalizações\"); ficam no banco porque a API não apaga"),
     Conhecida("campo_nexus", ("rondas", "atualizacao"), "aposentada",
               "do coletor do Fracttal do Nexus, desligado em 05/10/2026 (o fato dele se aposentou); fica no banco "
               "porque a API não apaga livro"),
