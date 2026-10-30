@@ -141,3 +141,6 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
   `historico_store.py`; `rotas_acomp.py`). Regras no `nexus/torres/oscreator/README.md`.
 - Medir uma tela fria: num processo novo, `create_app` com o `.env` do Nexus vivo e uma senha de administrador
   descartável, contando o `requests.Session.request` e recusando o Fracttal (só leitura no banco).
+- A skill `desempenho` (`.claude/skills/desempenho/SKILL.md`, desde 30/10/2026): o gatilho e o atalho `/desempenho`
+  dos chats de lentidão. Só leva a este arquivo, pela versão do `origin/main`; a regra mora aqui, não nela. No teste de
+  30/10, dois agentes sem a skill já chegaram a este arquivo pelo `CLAUDE.md`: ela não é a única guarda.
