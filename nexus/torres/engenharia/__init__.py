@@ -503,13 +503,20 @@ def _os_da_pessoa(pessoa: dict | None) -> dict | None:
     d = os_equipe.dados()
     if not d["lido"]:
         return {"lendo": True, "kpis": [], "abertas": [], "erro": d.get("erro") or ""}
+    velha = (datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d.get("erro") else "")
+    # o Quadro lê só a equipe do .env (OS_WEB_ENGENHARIA_RESPONSAVEIS), não o setor: quem está fora dela teria um zero
+    # falso (revisão de 29/10/2026: "dado pela metade não vai para a tela")
+    if not any(_da_pessoa({"pid": e.get("id"), "pessoa": e.get("nome")}, pessoa)
+               or (not pessoa.get("fid") and os_equipe._norm(e.get("nome_fracttal")) == os_equipe._norm(pessoa.get("nome")))
+               for e in d.get("equipe") or []):
+        return {"lendo": False, "fora": True, "kpis": [], "abertas": [], "erro": "", "velha": velha}
     minhas, erro_eng = _com_a_engenharia([o for o in d["os"] if _da_pessoa(o, pessoa)])
     hoje = datetime.now(BRT).date()
     ordem = {"atrasada": 0, "vence": 1}
     abertas = sorted((o for o in minhas if o["coluna"] in ("fazer", "execucao", "verificacao")),
                      key=lambda o: (ordem.get(o["prazo"], 2), o["programada_iso"] or "9999", o["os"]))
     return {"lendo": False, "kpis": faixa_kpis(minhas, hoje, JANELA_CONCLUIDAS, sem_engenharia=bool(erro_eng)),
-            "abertas": abertas, "erro": d.get("erro") or "", "colunas": dict(os_equipe.COLUNAS)}
+            "abertas": abertas, "erro": d.get("erro") or "", "velha": velha, "colunas": dict(os_equipe.COLUNAS)}
 
 
 def _etms_da_pessoa(pessoa: dict | None) -> dict | None:
@@ -522,6 +529,9 @@ def _etms_da_pessoa(pessoa: dict | None) -> dict | None:
     ETM.marcar_uso()
     ETM.pedir_releitura()
     d = ETM.dados()
+    if not d.get("lido"):
+        # sem leitura ainda não se sabe se a pessoa tem ETM: o bloco diz que está lendo (some depois, se não tiver)
+        return {"lendo": True, "kpis": [], "abertas": [], "colunas": {}}
     minhas = [o for o in d["os"] if _da_pessoa(o, pessoa)]
     if not minhas:
         return None
@@ -660,6 +670,7 @@ def acompanhamento_encaminhar():
         if viu_livre and ab:      # a gaveta viu o ativo livre e alguém o pegou depois (revisão final)
             raise AC.Recusada(f"Este ativo já está com {ab['responsavel']['nome'] or 'outra pessoa'}: recarregue a "
                               "página para encaminhar")
+        _sem_os_ou_recarregue(ab, "encaminhar", "a OS muda de responsável lá")
         if not s and not aberto:
             raise AC.Recusada("Este ativo não está em Ativos com sinal nem em acompanhamento: recarregue a página")
         AC.encaminhar(_para_gravar(s) if s and not aberto else {"cod": cod}, para, session.get("usuario"), pode,
@@ -685,11 +696,25 @@ def acompanhamento_salvar(aid):
     return _acao(cod, lambda: _salvar_acompanhamento(aid, cod), form="salvar")
 
 
-def _salvar_acompanhamento(aid: str, cod: str, extra: str = ""):
+def _sem_os_ou_recarregue(a: dict | None, acao: str, porque: str) -> None:
+    """As rotas daqui não mexem no acompanhamento com OS: a página aberta antes de 29/10/2026 posta nelas, e encerrar,
+    comentar ou encaminhar por aqui deixaria o Fracttal para trás (revisão de 29/10/2026). A gaveta de agora vai pela
+    ponte do OS Creator."""
+    from ...engenharia import acompanhamento as AC
+    if a and a.get("aberto") and a.get("os_id"):
+        raise AC.Recusada(f"Este acompanhamento tem a OS {a['os_folio']} no Fracttal: recarregue a página para {acao} "
+                          f"por ela ({porque})")
+
+
+def _salvar_acompanhamento(aid: str, cod: str, extra: str = "", pela_ponte: bool = False):
     """O salvar do formulário da gaveta (a rota daqui e a da ponte, que antes conclui a OS no Fracttal): o aviso, e no
-    encerrar o acompanhamento mostrado (o encerrado). `extra` = o que a ponte fez no Fracttal."""
+    encerrar o acompanhamento mostrado (o encerrado). `extra` = o que a ponte fez no Fracttal; sem `pela_ponte`, o
+    encerrar de um acompanhamento com OS é recusado (concluir a OS é da ponte)."""
     from ...engenharia import acompanhamento as AC
     pode, _ = _quem_pode()
+    if not pela_ponte and request.form.get("fim"):
+        _sem_os_ou_recarregue(AC.estado(AC.ler(forcar=True)["eventos"]).get(aid), "encerrar",
+                              "encerrar conclui a OS lá")
     ev = AC.salvar(aid, request.form.get("inicio", ""), request.form.get("fim", ""), request.form.get("diagnostico", ""),
                    session.get("usuario"), pode)
     if ev["evento"] != "encerrou":
@@ -715,6 +740,8 @@ def acompanhamento_comentar(aid):
 
     def fazer():
         pode, _ = _quem_pode()
+        _sem_os_ou_recarregue(AC.estado(AC.ler(forcar=True)["eventos"]).get(aid), "comentar",
+                              "o comentário vai também para a nota da OS")
         AC.comentar(aid, request.form.get("texto", ""), session.get("usuario"), pode)
     return _acao(cod, fazer, "Comentário salvo.", form="comentar")
 
@@ -1671,7 +1698,9 @@ def fmea_novo():
         tipo, cod = request.args.get("tipo", ""), (request.args.get("ativo") or "").strip()
         if tipo not in F.TIPOS:
             abort(404)
-    a = _ativo_da_conf(cod) or (_ativo_da_revisao(ant["ultima"]) if ant else None)
+    # a nova revisão corrige a análise sobre o que a anterior mediu (a foto dela): medir de novo trocaria a ocorrência e
+    # o RPN sem ninguém pedir (revisão de 29/10/2026)
+    a = _ativo_da_revisao(ant["ultima"]) if ant else _ativo_da_conf(cod)
     if not a:
         return _lista_fmea(F, erro_ativo=f"O ativo {cod or '(sem código)'} não está na Confiabilidade agora (sem OS de "
                                          "falha lida): abra o ativo pela Confiabilidade para emitir.", status=404)
@@ -1698,7 +1727,7 @@ def fmea_emitir():
     form = request.form.to_dict()
     tipo, cod, de = form.get("tipo", ""), (form.get("cod") or "").strip(), (form.get("de") or "").strip()
     ant = F.achar(F.relatorios(F.ler(forcar=True)["linhas"]), de) if de else None
-    a = _ativo_da_conf(cod) or (_ativo_da_revisao(ant["ultima"]) if ant else None)
+    a = _ativo_da_revisao(ant["ultima"]) if ant else _ativo_da_conf(cod)
     if tipo not in F.TIPOS or not a:
         return _lista_fmea(F, erro_ativo=f"O ativo {cod or '(sem código)'} não está na Confiabilidade agora: nada foi "
                                          "emitido.", status=404)
@@ -1742,7 +1771,8 @@ def fmea_ver(numero: str):
              if request.args.get("emitido") else "")
     return render_template(
         "engenharia/fmea_folha.html", **_folha_ctx(
-            editar=False, tipo=u["tipo"], a=a, m=u["medido"] or {}, oss=u["os"], p=B.pre({**a, "os": u["os"]}),
+            editar=False, tipo=u["tipo"], a=a, m=u["medido"] or {}, oss=u["os"],
+            p=dict(B.pre({**(u["medido"] or {}), **a, "os": u["os"]}), padrao=B.POR_CHAVE.get(u["padrao"])),
             v={k: ("" if x is None else str(x)) for k, x in (u["campos"] or {}).items()}, sug=set(), pode=pode,
             numero=r["numero"], de="", rev_txt=u["rev_txt"], data_txt=u["data_txt"], occ=u["occ"], sev=u["sev"],
             det=u["det"], rpn=u["rpn"],

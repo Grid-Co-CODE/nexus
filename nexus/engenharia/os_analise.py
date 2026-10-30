@@ -25,8 +25,23 @@ JANELA_DIAS = 30                 # a janela do sinal da Confiabilidade (`confiab
 INICIO_DO_DIA, FIM_DO_DIA = time(8, 0), time(18, 0)   # a análise tem só as datas: a execução vai das 8h às 18h
 _BRT = timezone(timedelta(hours=-3))
 NIVEL = {"critico": "Crítico", "atencao": "Atenção", "monitorar": "Monitorar"}
-# o erro do Fracttal para a OS já fechada (`api._ERRO_WO_FECHADA`): o encerrar de antes chegou lá e o Nexus não gravou
-FECHADA = "ERROR_WO_FINISHED"
+# o erro do Fracttal para a OS já fechada (`api._ERRO_WO_FECHADA`, "ERROR_WO_FINISHED_BY_OTHER_USER"); o
+# `registrar_execucao` do clone troca o "_" por espaço na mensagem, e a conta é feita sem os dois (revisão de 29/10/2026)
+FECHADA = "WO FINISHED"
+# o `id_status_work_order` da OS fechada: 3 concluída, 4 cancelada (`os_web.os_acoes_web.nota_pode_editar`)
+CONCLUIDA, CANCELADA = 3, 4
+
+
+def _fechada_no_erro(e) -> bool:
+    return FECHADA in str(e).upper().replace("_", " ")
+
+
+def situacao(api, os_id) -> str:
+    """"concluida", "cancelada" ou "" (aberta ou não sei): lida no Fracttal antes de escrever na OS. A OS que o
+    engenheiro concluiu no próprio Fracttal não aceita mais nota, execução nem troca de responsável (revisão de
+    29/10/2026: sem isto, o acompanhamento travava: não encerrava, não comentava, não encaminhava)."""
+    st = api.status_da_os(os_id)
+    return "concluida" if st == CONCLUIDA else "cancelada" if st == CANCELADA else ""
 
 
 class Falhou(RuntimeError):
@@ -124,25 +139,35 @@ def _execucao(inicio, fim, agora: datetime) -> tuple[datetime, datetime]:
 
 def encerrar(api, os_id, diagnostico: str, inicio, fim, nome: str, agora: datetime | None = None) -> list[str]:
     """Fecha a OS da análise: responde a subtarefa Diagnóstico (a que já tem o mesmo valor não se regrava), lança a
-    execução do início ao fim da análise e conclui a OS (IRREVERSÍVEL). → os passos feitos."""
+    execução do início ao fim da análise e conclui a OS (IRREVERSÍVEL). → os passos feitos. Cada passo confere antes
+    (revisão de 29/10/2026): a OS já concluída ou cancelada no Fracttal não recebe nada ("ja_concluida",
+    "ja_cancelada"); sem a subtarefa Diagnóstico, nada é concluído; a tarefa que já tem execução não ganha outra (a
+    conclusão que o Fracttal recusou, tentada de novo, lançava uma execução a cada vez)."""
     agora = agora or datetime.now(_BRT)
+    sit = situacao(api, os_id)
+    if sit:
+        return ["ja_concluida" if sit == "concluida" else "ja_cancelada"]
     tid = api.id_tarefa_da_os(os_id)
     if not tid:
         raise Falhou("Não achei a tarefa da OS no Fracttal: nada foi encerrado lá")
     feito = []
     item = next((s for s in api.subtarefas_da_tarefa(tid) or [] if _norm(s.get("descricao")) == _norm(SUBTAREFA)), None)
-    if item and diagnostico and str(item.get("valor") or "").strip() != diagnostico:
+    if not item:
+        raise Falhou(f"A OS não tem a subtarefa {SUBTAREFA} no Fracttal: nada foi concluído (responda o diagnóstico e "
+                     "conclua a OS lá; depois encerre aqui)")
+    if diagnostico and str(item.get("valor") or "").strip() != diagnostico:
         api.salvar_subtarefas(os_id, tid, [{"id_form_item": item["id_form_item"], "valor": diagnostico,
                                             "tipo": item.get("tipo") or 1}])
         feito.append("subtarefa")
-    ini, f = _execucao(inicio, fim, agora)
-    try:
-        api.registrar_execucao(tid, ini, f, nome=nome)
-    except Exception as e:      # noqa: BLE001 — a OS que outra tentativa já concluiu: não há o que lançar nem concluir
-        if FECHADA in str(e):
-            return feito + ["ja_concluida"]
-        raise
-    feito.append("execucao")
+    if not any(x.get("done") for x in api.execucoes_da_tarefa(tid) or []):
+        ini, f = _execucao(inicio, fim, agora)
+        try:
+            api.registrar_execucao(tid, ini, f, nome=nome)
+        except Exception as e:  # noqa: BLE001 — a OS que outra tentativa já concluiu: não há o que lançar nem concluir
+            if _fechada_no_erro(e):
+                return feito + ["ja_concluida"]
+            raise
+        feito.append("execucao")
     r = api.concluir_os_analise(os_id, tid)
     if not (isinstance(r, dict) and r.get("ok")):
         raise Falhou("O Fracttal não concluiu a OS: " + str((r or {}).get("erro") or "sem resposta"))

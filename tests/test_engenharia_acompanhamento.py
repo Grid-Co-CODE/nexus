@@ -707,7 +707,8 @@ def test_gaveta_cria_diagnostico_novo_e_ja_escolhe(tela, cliente):
     aid = _aid_de("IBI200-INVR1.3")
     hoje = datetime.now(BRT).date().isoformat()
     html = cliente.get(URL + "?aba=acompanhamento").get_data(as_text=True)
-    assert f'formaction="/t/engenharia/confiabilidade/acompanhamento/{aid}/diagnostico-novo"' in html
+    # o botão manda pelo data-eg-acao (type="button": como botão de enviar, recebia o Enter dos campos; 29/10/2026)
+    assert f'data-eg-acao="/t/engenharia/confiabilidade/acompanhamento/{aid}/diagnostico-novo"' in html
     r = cliente.post(f"{URL}/acompanhamento/{aid}/diagnostico-novo", headers=SAME,
                      data={"cod": "IBI200-INVR1.3", "novo_diag": "Sujidade  nos módulos", "inicio": hoje, "fim": "",
                            "diagnostico": "0"})

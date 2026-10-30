@@ -31,6 +31,11 @@ Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusR
 
 ## Mesa do engenheiro (18/10/2026)
 
+- **As OS e as ETMs da pessoa (29/10/2026):** o Quadro da equipe lê só os responsáveis do `.env`
+  (`OS_WEB_ENGENHARIA_RESPONSAVEIS`), não o setor: quem é do setor e está fora dessa lista vê "não está na equipe do
+  Quadro da equipe" no lugar de um zero falso; a leitura velha (o Fracttal não respondeu) diz a hora; as ETMs ainda sem
+  leitura dizem que estão lendo (o bloco some depois, se a pessoa não tiver ETM).
+
 O Levi escolheu, no rascunho aprovado, a primeira tela da Engenharia ("Sim, a primeira"), do setor Engenharia
 (`Tela.do_setor`: quem é dele a vê sem marcar em Base → Acessos). Cada um vê a sua mesa ("Cada um vê a sua"), e só o
 administrador escolhe de quem ver (`?pessoa=<código>`; para os demais o parâmetro é ignorado). O administrador fora da
@@ -130,7 +135,23 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   recusa não entra no Nexus), e o livro que falha depois diz o número da OS e pede para não repetir. Sem a sessão do
   Fracttal (quem entrou pela Microsoft), a recusa traz o "Entrar pelo Fracttal", que volta à tela; a sessão vencida no
   meio tira do Nexus quem entrou pelo Fracttal (a regra do comentário da OS). O acompanhamento aberto antes de 29/10/2026
-  fica sem OS e segue só no Nexus (o quiz: "Ficam sem OS"). As rotas antigas da Confiabilidade continuam, sem o Fracttal.
+  fica sem OS e segue só no Nexus (o quiz: "Ficam sem OS"). As rotas antigas da Confiabilidade continuam, sem o
+  Fracttal, mas recusam encerrar, comentar e encaminhar um acompanhamento COM OS ("recarregue a página"): a página aberta
+  antes do deploy posta nelas, e o Fracttal ficaria para trás. Da revisão independente de 29/10/2026:
+  - nada vai ao Fracttal sem o livro lido agora (`_livro_lido`: a leitura que falhou ou a cópia velha não confere quem
+    está com o ativo); um ativo por vez (`ponte._trava_do_ativo`, o servidor é um processo só: o segundo ouve "agora
+    mesmo");
+  - a OS criada que o livro não gravou fica em `ponte._OS_SEM_LIVRO`, e a tentativa seguinte (Pegar ou Encaminhar) usa a
+    MESMA, passando o responsável se for outra pessoa: repetir não cria outra OS;
+  - a OS concluída ou cancelada no próprio Fracttal (`os_analise.situacao`, pelo `status_da_os`) não recebe nada: o
+    encerrar, o comentário e o encaminhar seguem só no Nexus e dizem isso; o erro de OS fechada casa com ou sem o "_";
+  - encerrar não lança uma execução a cada tentativa (a tarefa que já tem execução não ganha outra), e sem a subtarefa
+    Diagnóstico nada é concluído; o aviso diz o que de fato foi feito;
+  - o encaminhar da OS nova recusa se o ativo ganhou dono no meio (`acompanhamento.encaminhar` com `os`), e a linha do
+    encaminhar vai à nota sob a mesma trava do comentário;
+  - o "Salvar diagnóstico" é `type="button"` com `data-eg-acao` (o `engenharia-gaveta.js` manda): como botão de enviar,
+    ele recebia o Enter dos campos de data e, no navegador sem `submitter`, o clique ia ao Salvar, que com o fim conclui a
+    OS. O Enter no nome do diagnóstico novo vai a ele, nunca ao Salvar.
   Prova: `tests/test_engenharia_os_analise.py` (o Fracttal falso; o clone de verdade, sem rede).
 - **A gaveta grava sem sair dela:** cada ação é POST (`_de_outro_site` → 403) e responde a própria gaveta relida do banco
   com o aviso ou o erro (`_gaveta.html`, a mesma peça da página); ao fechar depois de gravar, a página recarrega. O Pegar
@@ -192,8 +213,10 @@ o módulo Confiabilidade do painel do PCM (`novo.html` do `gridco-pcm-data`: as 
   (`servico`, `soServico`), e a folha avisa "Isto parece não ser falha". O padrão novo entra em `BIBLIOTECA` com o caso.
   O rascunho por IA do PCM era um exemplo fixo (mockup) e não veio.
 - **Número e revisão:** FMEA-AAAA-NNNN e RCA-AAAA-NNNN, o maior do tipo no ano + 1, sob a trava da gravação. O livro só
-  acrescenta: corrigir é "Nova revisão" (R01, R02...), com a folha da anterior; a revisão de outro tipo ou de outro ativo
-  é recusada. A página do emitido (`/t/engenharia/fmea/<número>`, `?rev=N` para uma anterior) é só leitura; "Imprimir /
+  acrescenta: corrigir é "Nova revisão" (R01, R02...), com a folha da anterior e o que ELA mediu (a foto do ativo e das
+  OS, a ocorrência, o padrão; revisão de 29/10/2026: medir de novo trocava o RPN de quem só corrigia um texto); a revisão
+  de outro tipo ou de outro ativo é recusada. A folha emitida mostra o padrão da biblioteca que foi gravado, não o que
+  ela acharia de novo na foto (que não guarda a nota do técnico). A página do emitido (`/t/engenharia/fmea/<número>`, `?rev=N` para uma anterior) é só leitura; "Imprimir /
   PDF" é a impressão do navegador (só a folha, em A4).
 - **O livro:** `nexus_engenharia_relatorios` · `fato_relatorio_falha`, 1 linha = 1 emissão (uma revisão), registrado no
   catálogo antes da 1ª gravação (`so_cresce`). Em claro só os IDs (ativo, usina, quem emitiu, o acompanhamento aberto),

@@ -21,8 +21,9 @@ class ApiFalsa:
     class FracttalError(Exception):
         pass
 
-    def __init__(self, etiqueta=True, criada=None, subs=None, conclui=None):
+    def __init__(self, etiqueta=True, criada=None, subs=None, conclui=None, status=2, execucoes=None, erro_exec=None):
         self.chamadas, self._etiqueta = [], etiqueta
+        self._status, self._execucoes, self._erro_exec = status, execucoes or [], erro_exec
         self._criada = criada if criada is not None else {"ok": True, "code": ATIVO["cod"],
                                                            "os": {"id_work_order": 39001, "wo_folio": 12345}}
         self._subs = subs if subs is not None else [{"id_form_item": 71, "descricao": "Diagnóstico", "tipo": 1,
@@ -52,8 +53,17 @@ class ApiFalsa:
         return {"ok": True}
 
     def registrar_execucao(self, tid, inicio, fim=None, note="", nome="", validar=True):
+        if self._erro_exec:
+            raise self.FracttalError(self._erro_exec)
         self.chamadas.append(("execucao", tid, inicio, fim, nome))
         return {"ok": True}
+
+    def status_da_os(self, wid):
+        self.chamadas.append(("status", wid))
+        return self._status
+
+    def execucoes_da_tarefa(self, tid):
+        return self._execucoes
 
     def concluir_os_analise(self, wid, tid=None, observacao=""):
         self.chamadas.append(("concluir", wid, tid))
@@ -116,7 +126,7 @@ def test_quem_nao_tem_o_id_do_fracttal_nao_cria():
 def test_encerrar_responde_a_subtarefa_lanca_o_fim_e_conclui():
     api = ApiFalsa()
     feito = OA.encerrar(api, 39001, "Disjuntor", date(2026, 10, 20), date(2026, 10, 28), "Ana Lima", agora=AGORA)
-    assert [c[0] for c in api.chamadas] == ["tarefa", "subtarefa", "execucao", "concluir"]
+    assert [c[0] for c in api.chamadas] == ["status", "tarefa", "subtarefa", "execucao", "concluir"]
     (_, wid, tid, valores), = [c for c in api.chamadas if c[0] == "subtarefa"]
     assert (wid, tid, valores) == (39001, 555, [{"id_form_item": 71, "valor": "Disjuntor", "tipo": 1}])
     (_, _tid, ini, fim, nome), = [c for c in api.chamadas if c[0] == "execucao"]
@@ -231,14 +241,24 @@ def fracttal(tela, app, monkeypatch):
         {"hmac": AC.codigo(BETO), "nome": "Beto Souza", "fid": "12"}])
     falso = ApiFalsa()
     for nome in ("_label_id", "_classif_ids", "create_work_orders_bulk", "id_tarefa_da_os", "subtarefas_da_tarefa",
-                 "salvar_subtarefas", "registrar_execucao", "concluir_os_analise", "mudar_responsavel"):
+                 "salvar_subtarefas", "registrar_execucao", "concluir_os_analise", "mudar_responsavel", "status_da_os",
+                 "execucoes_da_tarefa"):
         monkeypatch.setattr(os_api, nome, getattr(falso, nome))
     notas = []
     monkeypatch.setattr(os_api, "get_os_detalhes", lambda wid: {"notas": "Nota antiga", "tarefas": [{"id": 1}],
                                                                "cancel_motivo": "", "cancel_nota": ""})
-    monkeypatch.setattr(os_api, "editar_nota_os", lambda wid, nota: notas.append((wid, nota)) or {"ok": True})
-    falso.notas = notas
-    return falso
+    from nexus.torres.oscreator import ponte as P
+
+    def editar(wid, nota):
+        # a nota da OS é escrita sob a trava das notas: um comentário junto não apaga o outro (revisão de 29/10/2026)
+        falso.sob_trava.append(P._trava_nota.locked())
+        notas.append((wid, nota))
+        return {"ok": True}
+    monkeypatch.setattr(os_api, "editar_nota_os", editar)
+    falso.notas, falso.sob_trava = notas, []
+    P._OS_SEM_LIVRO.clear()
+    yield falso
+    P._OS_SEM_LIVRO.clear()
 
 
 def _pela_microsoft(cliente, usuario):
@@ -361,3 +381,148 @@ def test_a_gaveta_manda_as_acoes_para_a_ponte(fracttal, tela, cliente):
     html = _como(cliente, ANA).get("/t/engenharia/confiabilidade").get_data(as_text=True)
     assert f'action="{PONTE}/pegar"' in html and f'action="{PONTE}/encaminhar"' in html
 
+
+# ── a revisão independente de 29/10/2026 ────────────────────────────────────────────────────────────────────────────
+def test_encerrar_a_os_ja_concluida_no_fracttal_nao_escreve_la():
+    """O engenheiro concluiu a OS no próprio Fracttal (ou a tentativa de antes concluiu e o livro falhou): o encerrar
+    segue para o Nexus sem escrever lá."""
+    api = ApiFalsa(status=3)
+    feito = OA.encerrar(api, 39001, "Disjuntor", date(2026, 10, 20), date(2026, 10, 28), "Ana Lima", agora=AGORA)
+    assert feito == ["ja_concluida"] and [c[0] for c in api.chamadas] == ["status"]
+    assert OA.encerrar(ApiFalsa(status=4), 39001, "Disjuntor", date(2026, 10, 20), date(2026, 10, 28), "Ana Lima",
+                       agora=AGORA) == ["ja_cancelada"]
+
+
+def test_encerrar_sem_a_subtarefa_diagnostico_falha_antes_de_concluir():
+    api = ApiFalsa(subs=[])
+    with pytest.raises(OA.Falhou, match="Diagnóstico"):
+        OA.encerrar(api, 39001, "Disjuntor", date(2026, 10, 20), date(2026, 10, 28), "Ana Lima", agora=AGORA)
+    assert not [c for c in api.chamadas if c[0] in ("execucao", "concluir")]
+
+
+def test_encerrar_de_novo_nao_lanca_outra_execucao():
+    """A conclusão que o Fracttal recusou (perfil sem permissão, cronômetro de outra pessoa aberto): tentar de novo não
+    lança uma execução a cada vez."""
+    api = ApiFalsa(execucoes=[{"id": 1, "done": True}])
+    feito = OA.encerrar(api, 39001, "Disjuntor", date(2026, 10, 20), date(2026, 10, 28), "Ana Lima", agora=AGORA)
+    assert "execucao" not in [c[0] for c in api.chamadas] and feito == ["subtarefa", "concluida"]
+
+
+def test_o_erro_de_os_fechada_com_espacos_tambem_vale():
+    # o `registrar_execucao` do clone troca o "_" por espaço na mensagem do Fracttal
+    api = ApiFalsa(erro_exec="O Fracttal recusou o registro: ERROR WO FINISHED BY OTHER USER")
+    feito = OA.encerrar(api, 39001, "Disjuntor", date(2026, 10, 20), date(2026, 10, 28), "Ana Lima", agora=AGORA)
+    assert feito[-1] == "ja_concluida" and "concluir" not in [c[0] for c in api.chamadas]
+
+
+def test_encaminhar_com_a_os_nova_recusa_se_o_ativo_ganhou_dono(banco):
+    AC.pegar(SINAL, ANA, True)
+    pessoas = [{"hmac": AC.codigo(BETO), "nome": "Beto Souza", "fid": "12"}]
+    with pytest.raises(AC.Recusada, match="dono"):
+        AC.encaminhar(SINAL, AC.codigo(BETO), ANA, True, pessoas, os={"id": 39002, "folio": "12346"})
+
+
+def _livro_fora(forcar=False):
+    return {"eventos": [], "diagnosticos": [], "lido_em": None, "erro": "ConnectionError: fora"}
+
+
+def test_pegar_com_o_livro_ilegivel_nao_vai_ao_fracttal(fracttal, tela, cliente, app, monkeypatch):
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    monkeypatch.setattr(AC, "ler", _livro_fora)
+    html = _post(cliente, "/pegar", cod="IBI200-INV02").get_data(as_text=True)
+    assert "Não consegui ler os acompanhamentos" in html and _feitas(fracttal, "criar") == []
+
+
+def test_o_livro_que_falha_depois_do_fracttal_nao_cria_outra_os_na_tentativa_seguinte(fracttal, tela, cliente, app,
+                                                                                      monkeypatch):
+    import requests
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    original, vezes = AC.pegar, []
+
+    def pegar(*a, **k):
+        vezes.append(1)
+        if len(vezes) == 1:
+            raise requests.ConnectionError("banco fora")
+        return original(*a, **k)
+    monkeypatch.setattr(AC, "pegar", pegar)
+    html = _post(cliente, "/pegar", cod="IBI200-INV02").get_data(as_text=True)
+    assert "A OS 12345 já está no Fracttal" in html and "a mesma OS" in html
+    html = _post(cliente, "/pegar", cod="IBI200-INV02").get_data(as_text=True)
+    assert "OS 12345" in html and len(_feitas(fracttal, "criar")) == 1
+    a = next(a for a in AC.estado(AC.ler(forcar=True)["eventos"]).values() if a["cod"] == "IBI200-INV02")
+    assert a["os_folio"] == "12345"
+
+
+def test_dois_pegando_o_mesmo_ativo_ao_mesmo_tempo(fracttal, tela, cliente, app):
+    from nexus.torres.oscreator import ponte as P
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    with P._trava_do_ativo("IBI200-INV02"):
+        html = _post(cliente, "/pegar", cod="IBI200-INV02").get_data(as_text=True)
+    assert "agora mesmo" in html and _feitas(fracttal, "criar") == []
+
+
+def test_comentario_e_encaminhar_em_os_concluida_ficam_so_no_nexus(fracttal, tela, cliente, app):
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    _post(cliente, "/pegar", cod="IBI200-INV02")
+    aid = _aid_de("IBI200-INV02")
+    fracttal._status = 3
+    html = _post(cliente, f"/{aid}/comentar", cod="IBI200-INV02", texto="Depois de concluída").get_data(as_text=True)
+    assert "só no Nexus" in html and "concluída no Fracttal" in html and fracttal.notas == []
+    html = _post(cliente, "/encaminhar", cod="IBI200-INV02", para=AC.codigo(BETO)).get_data(as_text=True)
+    assert "Encaminhado para Beto Souza" in html and "concluída no Fracttal" in html
+    assert not _feitas(fracttal, "responsavel")
+
+
+def test_a_linha_do_encaminhar_vai_a_nota_sob_a_trava(fracttal, tela, cliente, app):
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    _post(cliente, "/pegar", cod="IBI200-INV02")
+    _post(cliente, "/encaminhar", cod="IBI200-INV02", para=AC.codigo(BETO))
+    assert fracttal.sob_trava == [True]
+
+
+def test_encerrar_com_o_livro_ilegivel_e_recusado(fracttal, tela, cliente, app, monkeypatch):
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    _post(cliente, "/pegar", cod="IBI200-INV02")
+    aid = _aid_de("IBI200-INV02")
+    monkeypatch.setattr(AC, "ler", _livro_fora)
+    hoje = datetime.now(BRT).date().isoformat()
+    html = _post(cliente, f"/{aid}/salvar", cod="IBI200-INV02", inicio=hoje, fim=hoje, diagnostico="2") \
+        .get_data(as_text=True)
+    assert "Não consegui ler os acompanhamentos" in html and _feitas(fracttal, "concluir") == []
+
+
+def test_a_rota_antiga_nao_mexe_no_acompanhamento_com_os(fracttal, tela, cliente, app):
+    """A página aberta antes do deploy posta nas rotas antigas: com a OS, encerrar, comentar e encaminhar por elas
+    deixariam o Fracttal para trás."""
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    _post(cliente, "/pegar", cod="IBI200-INV02")
+    aid = _aid_de("IBI200-INV02")
+    hoje = datetime.now(BRT).date().isoformat()
+    antiga = "/t/engenharia/confiabilidade/acompanhamento"
+    for caminho, dados in ((f"/{aid}/salvar", {"inicio": hoje, "fim": hoje, "diagnostico": "2"}),
+                           (f"/{aid}/comentar", {"texto": "Pela rota antiga"}),
+                           ("/encaminhar", {"para": AC.codigo(BETO)})):
+        html = cliente.post(antiga + caminho, data=dict(dados, cod="IBI200-INV02"), headers=SAME).get_data(as_text=True)
+        assert "recarregue a página" in html, caminho
+    a = AC.estado(AC.ler(forcar=True)["eventos"])[aid]
+    assert a["aberto"] and a["comentarios"] == [] and a["responsavel"]["nome"] == "Ana Lima"
+    # mudar só o início ou o diagnóstico pela rota antiga segue (não mexe no Fracttal)
+    html = cliente.post(antiga + f"/{aid}/salvar", data={"cod": "IBI200-INV02", "inicio": hoje, "diagnostico": "1"},
+                        headers=SAME).get_data(as_text=True)
+    assert "Salvo." in html
+
+
+def test_salvar_diagnostico_nao_e_botao_de_enviar_o_formulario(fracttal, tela, cliente, app):
+    """Enter num campo de data, ou um navegador sem o `submitter`, mandariam o formulário pelo 1º botão de enviar: o
+    "Salvar diagnóstico" vinha antes do Salvar (e o Salvar com o fim conclui a OS)."""
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    html = _post(cliente, "/pegar", cod="IBI200-INV02").get_data(as_text=True)
+    assert "formaction=" not in html and 'type="button" class="gc-btn gc-btn--contorno eg-btn-peq" data-eg-acao=' in html

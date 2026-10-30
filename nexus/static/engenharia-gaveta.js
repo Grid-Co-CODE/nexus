@@ -75,10 +75,27 @@
             var f = ev.target.closest('form[data-eg-form]');
             if (!f) return;
             ev.preventDefault();
-            // o botão que mandou pode ter o próprio endereço (o "Salvar diagnóstico" do formulário de salvar, 29/10/2026)
-            var quem = ev.submitter && f.contains(ev.submitter) ? ev.submitter : null;
-            var b = quem || f.querySelector('[type="submit"]'), cartao = f.closest('.eg-cartao');
-            var destino = (quem && quem.getAttribute('formaction')) || f.action;
+            enviar(f, f.action, f.querySelector('[type="submit"]'));
+          });
+          // o botão com o próprio endereço (o "Salvar diagnóstico" do formulário de salvar, 29/10/2026) é type="button":
+          // manda o formulário inteiro para o data-eg-acao. Como botão de enviar, ele recebia o Enter dos campos e, no
+          // navegador sem `submitter`, o clique ia para o Salvar, que com o fim conclui a OS (revisão de 29/10/2026)
+          document.addEventListener('click', function (ev) {
+            var b = ev.target.closest('[data-eg-acao]'), f = b && b.closest('form[data-eg-form]');
+            if (!f) return;
+            ev.preventDefault();
+            enviar(f, b.dataset.egAcao, b);
+          });
+          // o Enter no nome do diagnóstico novo é o "Salvar diagnóstico", nunca o Salvar do formulário
+          document.addEventListener('keydown', function (ev) {
+            if (ev.key !== 'Enter' || !ev.target.matches || !ev.target.matches('[name="novo_diag"]')) return;
+            var f = ev.target.closest('form[data-eg-form]'), b = f && f.querySelector('[data-eg-acao]');
+            if (!b) return;
+            ev.preventDefault();
+            enviar(f, b.dataset.egAcao, b);
+          });
+          function enviar(f, destino, b) {
+            var cartao = f.closest('.eg-cartao');
             if (b) b.disabled = true;
             // a falha não troca a gaveta: o formulário, com o que foi digitado, continua (o molde das Contestações)
             function falha(msg) {
@@ -105,7 +122,7 @@
                 if (gav.hidden) mostra(); else ajusta();
               })
               .catch(function () { falha('Não consegui falar com o Nexus agora. Nada mudou; tente de novo em instantes.'); });
-          });
+          }
           // o fim da análise antes de uma falha faz o ativo voltar para Ativos com sinal (a regra do Levi): avisa na hora
           document.addEventListener('input', function (ev) {
             var f = ev.target.closest('form[data-eg-form="salvar"]');

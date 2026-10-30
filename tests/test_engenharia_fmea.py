@@ -308,3 +308,27 @@ def test_a_engenharia_emite_sem_marcar_a_tela_em_acessos(app, monkeypatch):
             assert ST.pode(caminho, telas), caminho
         assert not ST.pode("/t/engenharia/fmea", ST.das_do_setor({"id": 3, "nome": "Performance"}))
 
+
+def test_nova_revisao_guarda_o_medido_da_revisao_anterior(tela, cliente):
+    """Corrigir a R00 20 dias depois não troca a ocorrência medida (revisão de 29/10/2026): a R01 mede o que a R00
+    mediu, e o "RPN caiu depois das ações" segue comparável."""
+    _como(cliente, AC_ANA)
+    r00 = F.emitir("fmea", dict(ATIVO, cod="IBI200-INVR1.3", nFalha=2, os=[_os(7, "Troca de módulo")]), FMEA_OK,
+                   AC_ANA, pode=True)
+    assert r00["ocorrencia_nivel"] == 4
+    r = _emitir(cliente, de=r00["numero"], sev="5", det="4")
+    assert r.status_code == 303
+    (rel,) = F.relatorios(F.ler(forcar=True)["linhas"])
+    u = rel["ultima"]
+    assert u["revisao"] == 1 and u["occ"] == 4 and u["rpn"] == 4 * 5 * 4 and [o["os"] for o in u["os"]] == ["7"]
+
+
+def test_folha_emitida_mostra_o_padrao_gravado(tela, cliente):
+    """A biblioteca casou pela nota do técnico, que a foto não guarda: a folha emitida mostra o padrão gravado, não o
+    que a biblioteca acharia de novo."""
+    _como(cliente, AC_ANA)
+    a = dict(ATIVO, os=[_os(9, "Recomposição", nota="string com corrente nula"),
+                        _os(8, "Recomposição", nota="string com corrente nula")])
+    r = F.emitir("fmea", a, FMEA_OK, AC_ANA, pode=True)
+    html = cliente.get(f"{URL}/{r['numero']}").get_data(as_text=True)
+    assert B.POR_CHAVE["string_corrente"]["det_txt"] in html

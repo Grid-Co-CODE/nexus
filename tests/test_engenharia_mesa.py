@@ -250,9 +250,9 @@ def test_as_os_da_pessoa_na_mesa(mesa, cliente, monkeypatch):
         assert f'href="/t/engenharia/equipe/os/{n}"' in sec, n
     assert 'href="/t/engenharia/equipe/os/504"' not in sec                 # a concluída conta, mas não vai na lista
     assert re.findall(r'kb-kpi-rot">([^<]+)<', sec)[:2] == ["Em aberto", "Atrasadas"]
-    # a mesa de quem não tem OS no quadro diz que não tem
+    # quem é do setor mas não está na equipe que o Quadro lê não vê zero (revisão de 29/10/2026): o número seria falso
     sec = _secao(_como(cliente, BETO).get(URL).get_data(as_text=True), "As OS de você")
-    assert "Nenhuma OS" in sec
+    assert "Nenhuma OS" not in sec and "não está na equipe do Quadro da equipe" in sec
 
 
 def test_as_etms_da_pessoa_na_mesa(mesa, cliente, monkeypatch):
@@ -272,3 +272,20 @@ def test_as_etms_da_pessoa_na_mesa(mesa, cliente, monkeypatch):
     assert "Abertas no Fracttal" in sec
     # quem não tem ETM não vê o bloco
     assert "As ETMs de você" not in _como(cliente, BETO).get(URL).get_data(as_text=True)
+
+
+def test_a_leitura_velha_do_quadro_diz_que_o_fracttal_nao_respondeu(mesa, cliente, monkeypatch):
+    from nexus.engenharia import os_equipe as OE
+    oss = _oss_da_ana()
+    monkeypatch.setattr(OE, "dados", lambda: {"os": oss, "equipe": [{"id": 11, "nome": "Ana Lima"}], "faltam": [],
+                                               "lido": 1.0, "lendo": False, "erro": "HTTPError: 429"})
+    sec = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "As OS de você")
+    assert "o Fracttal não respondeu agora" in sec
+
+
+def test_as_etms_sem_leitura_ainda_dizem_que_estao_lendo(mesa, cliente, monkeypatch):
+    from nexus.engenharia import etm as ETM
+    monkeypatch.setattr(ETM, "dados", lambda: {"os": [], "usinas": {}, "lido": 0, "lendo": True, "erro": "",
+                                                "erro_setores": ""})
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    assert "Lendo as ETMs no Fracttal" in html

@@ -378,6 +378,11 @@ def encaminhar(ativo: dict, para_hmac: str, usuario, pode: bool, pessoas: list[d
         ab = aberto_de(estado(lido["eventos"]), ativo.get("cod"))
         if ab and ab["responsavel"]["hmac"] == resp["hmac"]:
             raise Recusada(f"Este ativo já está com {ab['responsavel']['nome'] or resp['nome']}")
+        if ab and os:
+            # a OS nova foi criada para o ativo LIVRE e ele ganhou dono no meio (revisão de 29/10/2026): passar o
+            # acompanhamento da outra pessoa perderia a OS nova e diria o contrário
+            raise Recusada(f"Este ativo ganhou dono ({ab['responsavel']['nome'] or 'outra pessoa'}) enquanto a OS era "
+                           "criada: recarregue a página")
         if ab:
             nova = _evento(cofre, "encaminhou", quem, ab["id"], _ativo_de(ab), responsavel=resp)
         else:

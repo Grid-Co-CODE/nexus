@@ -40,10 +40,12 @@
     <label><span class="gc-rotulo">Fim da análise</span><input class="gc-campo" type="date" name="fim" value="{{ dg.get('fim', '') if em_salvar else '' }}" min="{{ piso }}" max="{{ hoje }}"></label>
     <label><span class="gc-rotulo">Diagnóstico</span>{% set diag_escolhido = (dg.get('diagnostico')|int(0)) if em_salvar else ac.diagnostico_id %}<select class="gc-campo" name="diagnostico"><option value="0"{% if not diag_escolhido %} selected{% endif %}>A definir</option>{% for x in diags_ativos %}<option value="{{ x.id }}"{% if x.id == diag_escolhido %} selected{% endif %}>{{ x.nome }}</option>{% endfor %}{% if ac.diagnostico_id and ac.diagnostico_id not in diags_ativos|map(attribute='id')|list %}<option value="{{ ac.diagnostico_id }}" selected>{{ diag_nome.get(ac.diagnostico_id, '—') }} (excluído)</option>{% endif %}</select></label>
     {# o diagnóstico que falta entra daqui mesmo (Levi, 29/10/2026): o botão manda o formulário inteiro para a rota do
-       cadastro, que volta com ele já escolhido e com as datas digitadas #}
+       cadastro, que volta com ele já escolhido e com as datas digitadas. É type="button" (o engenharia-gaveta.js manda
+       pelo data-eg-acao): botão de enviar antes do Salvar recebia o Enter dos campos, e no navegador sem `submitter` o
+       clique nele ia ao Salvar, que com o fim conclui a OS (revisão de 29/10/2026) #}
     <details class="eg-diag-novo"><summary>Novo diagnóstico</summary>
       <span class="eg-diag-novo-linha"><input class="gc-campo" name="novo_diag" maxlength="60" placeholder="Nome do diagnóstico" aria-label="Nome do novo diagnóstico" autocomplete="off">
-        <button type="submit" class="gc-btn gc-btn--contorno eg-btn-peq" formaction="{{ url_for('torre_engenharia.acompanhamento_diagnostico_novo', aid=ac.id) }}" formnovalidate>Salvar diagnóstico</button></span>
+        <button type="button" class="gc-btn gc-btn--contorno eg-btn-peq" data-eg-acao="{{ url_for('torre_engenharia.acompanhamento_diagnostico_novo', aid=ac.id) }}">Salvar diagnóstico</button></span>
     </details>
     <p class="eg-acomp-dica">Preencher o fim (com o diagnóstico) encerra o acompanhamento: o ativo vai para Encerrados.{% if ac.os_folio %} A OS {{ ac.os_folio }} é concluída no Fracttal (não volta): o diagnóstico responde a subtarefa e o fim da análise vira o fim da atividade.{% endif %}</p>
     <p class="eg-acomp-volta" data-eg-volta hidden></p>
