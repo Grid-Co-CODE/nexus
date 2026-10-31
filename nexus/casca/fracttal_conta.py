@@ -14,9 +14,10 @@ limitador da etapa 5 vai no mesmo lugar, por isso o embrulho mora aqui e em mais
   casca) ou, sem marca, `fundo:<nome da thread sem o contador de instância>` (`ThreadPoolExecutor-137_0` vira
   `ThreadPoolExecutor`, `waitress-12` vira `waitress`). O método é o `method` do corpo do RPC, o 1º segmento depois de
   `/api/` no REST (`work_orders`), `token` no OAuth e `outro` no que sobrar; corpo que não é JSON conta como `rpc`.
-- **No máximo MAX_ORIGENS (50) origens distintas por hora:** a 51ª e as seguintes da hora entram em `fundo:outros`, e as
-  50 que já existem seguem contando nas suas. Sem o teto, qualquer origem que ganhe nome novo a cada pedido faria a
-  tabela da hora, e o banco, crescerem sem fim.
+- **No máximo MAX_ORIGENS_DE_FUNDO (50) origens de fundo (`fundo:...`) distintas por hora:** a 51ª e as seguintes da hora
+  entram em `fundo:outros`, e as 50 que já existem seguem contando nas suas. Sem o teto, o nome que ganha número novo a
+  cada vez (o de thread) faria a tabela da hora, e o banco, crescerem sem fim. **A rota não tem teto:** quem a marca passa
+  a rota normalizada, e ela é limitada pelo conjunto de rotas do app; também não gasta vaga do fundo.
 - **A marca viaja pelo contexto (`contextvars`), não pela thread**, como o JWT do OS Creator: o `api._ExecutorComContexto`
   copia o contexto do pedido para as tarefas do fan-out (o catálogo de ativos pede ~110 vezes, 6 de uma vez), e esses
   pedidos são da rota que os chamou e somam na conta dela (`pedidos_desta_thread`). Com `threading.local` eles cairiam
@@ -52,8 +53,9 @@ log = logging.getLogger(__name__)
 
 DOMINIO = "fracttal.com"
 RECUSAS = (406, 429)                    # o Fracttal pedindo calma (a cota por minuto)
-MAX_ORIGENS = 50                        # origens distintas por hora; a 51ª e as seguintes dessa hora vão para OUTROS
-OUTROS = "fundo:outros"
+FUNDO = "fundo:"                        # o começo da origem de quem pede por conta própria (laço, thread), não por rota
+MAX_ORIGENS_DE_FUNDO = 50               # origens de fundo distintas por hora; a 51ª e as seguintes vão para OUTROS
+OUTROS = FUNDO + "outros"
 _BRT = timezone(timedelta(hours=-3))
 # o contador de instância no fim do nome da thread (ou antes do " (alvo)" que o Python põe): `-137_0`, `-12`, `3`
 _CONTADOR = re.compile(r"(?:[-_ ]?\d+)+(?=$| \()")
@@ -79,13 +81,13 @@ _marca_atual: contextvars.ContextVar = contextvars.ContextVar("nexus_fracttal_ma
 
 
 class _Hora:
-    """Uma hora de Brasília: uma linha [pedidos, recusas, erros, pico] por (origem, método), as origens que ela já tem
-    (no máximo MAX_ORIGENS) e o pico do total."""
-    __slots__ = ("linhas", "origens", "pico")
+    """Uma hora de Brasília: uma linha [pedidos, recusas, erros, pico] por (origem, método), as origens de fundo que ela
+    já tem (no máximo MAX_ORIGENS_DE_FUNDO; a rota não entra aqui) e o pico do total."""
+    __slots__ = ("linhas", "fundos", "pico")
 
     def __init__(self):
         self.linhas: dict = {}
-        self.origens: set = set()
+        self.fundos: set = set()
         self.pico = 0
 
 
@@ -97,7 +99,7 @@ def _nome_de_fundo(nome: str) -> str:
 
 
 def _origem_de_fundo() -> str:
-    return "fundo:" + _nome_de_fundo(threading.current_thread().name)
+    return FUNDO + _nome_de_fundo(threading.current_thread().name)
 
 
 def _agora() -> float:
@@ -152,11 +154,11 @@ def _registrar(marca: _Marca, metodo: str) -> tuple:
         if hora is None:
             hora = _horas[hora_id] = _Hora()
         quem = marca.nome
-        if quem not in hora.origens:
-            if len(hora.origens) >= MAX_ORIGENS:
-                quem = OUTROS                           # a hora já tem as origens que cabem: a nova entra no balaio
+        if quem.startswith(FUNDO) and quem not in hora.fundos:      # só o fundo tem teto; a rota é limitada pelo app
+            if len(hora.fundos) >= MAX_ORIGENS_DE_FUNDO:
+                quem = OUTROS                           # a hora já tem os de fundo que cabem: o novo entra no balaio
             else:
-                hora.origens.add(quem)
+                hora.fundos.add(quem)
         chave = (quem, metodo)
         linha = hora.linhas.setdefault(chave, [0, 0, 0, 0])
         linha[_PEDIDOS] += 1

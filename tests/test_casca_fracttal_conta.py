@@ -245,32 +245,52 @@ def test_executor_novo_a_cada_rodada_nao_cria_origem_nova(relogio):
         "fundo:ThreadPoolExecutor": 20}
 
 
-def test_teto_de_origens_distintas_por_hora(relogio):
-    assert C.MAX_ORIGENS == 50
-    n = C.MAX_ORIGENS
-    # As 50 primeiras origens da hora têm linha própria; a 51ª e as que vierem (aqui, a 51ª com uma recusa e a 52ª) são
-    # contadas em `fundo:outros`; as 50 que já existem seguem contando nas suas.
+def test_teto_de_origens_de_fundo_por_hora(relogio):
+    assert C.MAX_ORIGENS_DE_FUNDO == 50
+    n = C.MAX_ORIGENS_DE_FUNDO
+    # As 50 primeiras origens de fundo da hora têm linha própria; a 51ª e as que vierem (aqui, a 51ª com uma recusa e a
+    # 52ª) são contadas em `fundo:outros`; as 50 que já existem seguem contando nas suas.
     s, _ = sessao_real(*[(200, None)] * n, (429, None), (200, None), (200, None))
     for i in range(n):
-        with C.origem(f"/os/rota/{i}"):
+        with C.origem(f"fundo:laco-{i}"):
             s.get(_API)
-    with C.origem(f"/os/rota/{n}"):
+    with C.origem(f"fundo:laco-{n}"):
         s.get(_API)
         assert C.pedidos_desta_thread() == 1                    # a conta do pedido não depende de onde a hora o pôs
-    with C.origem("/os/rota/0"):
+    with C.origem("fundo:laco-0"):
         s.get(_API)
-    with C.origem(f"/os/rota/{n + 1}"):
+    with C.origem(f"fundo:laco-{n + 1}"):
         s.get(_API)
     origens = {lin["origem"] for lin in C.instantaneo() if lin["origem"] != "*"}
-    assert len(origens) == n + 1 and "fundo:outros" in origens and f"/os/rota/{n}" not in origens
+    assert len(origens) == n + 1 and "fundo:outros" in origens and f"fundo:laco-{n}" not in origens
     assert _contas("fundo:outros", "work_orders")[:3] == (2, 1, 0)      # a recusa da 51ª foi para a linha em que ela contou
-    assert _contas("/os/rota/0", "work_orders")[0] == 2
+    assert _contas("fundo:laco-0", "work_orders")[0] == 2
     assert _contas("*", "*")[0] == n + 3
-    # a hora seguinte recomeça a conta: a origem que não coube agora tem linha própria
+    # a hora seguinte recomeça a conta: o laço que não coube agora tem linha própria
     relogio.em("2026-10-30T14:00:00+00:00")
-    with C.origem(f"/os/rota/{n}"):
+    with C.origem(f"fundo:laco-{n}"):
         sessao_real((200, None))[0].get(_API)
-    assert _contas(f"/os/rota/{n}", "work_orders", "2026103011")[0] == 1
+    assert _contas(f"fundo:laco-{n}", "work_orders", "2026103011")[0] == 1
+
+
+def test_rota_nao_tem_teto_e_nao_gasta_a_vaga_do_fundo(relogio):
+    # A rota (a origem que o gancho do pedido põe, sem `fundo:`) é limitada pelo conjunto de rotas do app: sem teto, e sem
+    # tirar vaga do fundo. Só o nome que ganha número novo a cada vez (o de thread) precisava de freio.
+    n = C.MAX_ORIGENS_DE_FUNDO
+    s, _ = sessao_real(*[(200, None)] * (60 + n), (200, None))
+    for i in range(60):
+        with C.origem(f"/os/rota/{i}"):
+            s.get(_API)
+    for i in range(n):
+        with C.origem(f"fundo:laco-{i}"):
+            s.get(_API)
+    with C.origem(f"fundo:laco-{n}"):                            # a 51ª de fundo: só ela vai para o balaio
+        s.get(_API)
+    origens = {lin["origem"] for lin in C.instantaneo() if lin["origem"] != "*"}
+    assert all(_contas(f"/os/rota/{i}", "work_orders")[0] == 1 for i in range(60))      # as 60 rotas, cada uma na sua
+    assert {f"fundo:laco-{i}" for i in range(n)} <= origens                              # e as 50 de fundo, inteiras
+    assert _contas("fundo:outros", "work_orders")[0] == 1 and f"fundo:laco-{n}" not in origens
+    assert len(origens) == 60 + n + 1
 
 
 # ── o método ─────────────────────────────────────────────────────────────────────────────────────────────────────────

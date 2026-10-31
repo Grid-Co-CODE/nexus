@@ -260,9 +260,11 @@ memória, sem mudar quem pede. O resto da internet passa sem contar (`notfractta
 - **Origem** = `origem(rota)` (a casca marca o pedido do `/os/*`) e, sem marca, `fundo:<nome da thread SEM o contador de
   instância>`: `ThreadPoolExecutor-137_0` vira `ThreadPoolExecutor`, `waitress-12` vira `waitress` e `Thread-5 (alvo)` vira
   `Thread (alvo)`. O `campo/regras_app._fx_wo_paralelo` abre um executor NOVO a cada chamada, e com o nome cru cada rodada
-  criaria origens novas na tabela da hora, sem fim. **No máximo 50 origens distintas por hora** (`MAX_ORIGENS`, rotas
-  inclusive): a 51ª e as seguintes dessa hora entram em `fundo:outros`, e as 50 que já existem seguem contando nas suas; a
-  hora seguinte recomeça a conta.
+  criaria origens novas na tabela da hora, sem fim. **No máximo 50 origens de FUNDO (`fundo:...`) distintas por hora**
+  (`MAX_ORIGENS_DE_FUNDO`): a 51ª e as seguintes dessa hora entram em `fundo:outros`, e as 50 que já existem seguem
+  contando nas suas; a hora seguinte recomeça a conta. **A rota não tem teto** nem gasta vaga do fundo: quem a marca
+  (o gancho do pedido) passa a rota normalizada, limitada pelo conjunto de rotas do app; só o nome que ganha número novo
+  a cada vez precisava de freio.
   A marca viaja pelo CONTEXTO (`contextvars`, como o JWT do OS Creator), não pela thread: o `api._ExecutorComContexto`
   copia o contexto para as tarefas do fan-out (o catálogo de ativos pede ~110 vezes, 6 de uma vez), que ficam na rota que
   as chamou e somam na conta do pedido (`pedidos_desta_thread()`, a da marca em que a thread está). **A marca só chega às
