@@ -212,7 +212,9 @@ A régua (que tipo conta, a janela solar, o kWp) é da plataforma (`plataforma/d
 dados dessa fonte"; a OS 16958 de Santarém, inversor parado desde 12/07 aguardando peça, não contava nada): na mesma volta,
 `fato_ocorrencia_aberta` é o retrato das abertas da Thopen pela fotografia do Andamento (`GET /api/nexus/Thopen`, a lista
 `ocorrencias` de cada usina, a da tela Ronda), completado pela rota das ocorrências de 30 dias quando a fotografia não
-manda as tags, o código do tipo ou o início (`equipamentos_de` diz de onde veio a tag). O tipo pelo rótulo vira código
+manda as tags, o código do tipo ou o início (`equipamentos_de` diz de onde veio a tag); sem a tag, o equipamento que o
+COS cita pelo nome vai em referência curta (`equipamentos_citados`: "Inversor 2.7" → `INV2.7`; a OS 16958 de Santarém só
+tinha o nome, e a régua contava um inversor médio na usina errada). O tipo pelo rótulo vira código
 pelas normalizações (a API delas manda os dois). A que já está normalizada na memória não entra: conta uma vez, pela
 normalização. Na falha da fotografia, o retrato de antes fica, com a hora dele (`abertas_em` na `atualizacao`). Impacto,
 falha em texto, a última nota e o que se aguarda não vão. Prova: `tests/test_cos_normalizacoes_banco.py`.

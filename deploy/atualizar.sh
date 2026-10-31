@@ -138,6 +138,29 @@ printf '%s\n' "quando=$(date -Iseconds)" "unidade=$UNIDADE" "grupo=$GRUPO" "piso
   "fontes=$fontes" "acao=$acao" "erro=$erro" "depois=$depois" \
   | como tee "$(como git rev-parse --git-dir)/nexus-teto" >/dev/null || true
 
+# 0b. A pasta da plataforma (PerformancePainel) depois da reescrita da main de lá (30/10/2026, Levi: "Faz e confere"): o
+# commit 616284b levou ao repositório público duas cópias de cache do Registro mestre e do de-para, e a main foi reescrita
+# (6a5b14e -> 9622f4f, a MESMA árvore). A pasta do servidor parou no 6a5b14e, que o pull de lá não anda. Só quando ela
+# está exatamente no commit reescrito, vai ao novo pelo reset --keep, como o dono dela (a árvore é a mesma: nenhum
+# arquivo muda, nem os soltos); depois disso o passo não acha nada e não faz nada. Falha aqui nunca para o deploy.
+PLATAFORMA_REESCRITO="6a5b14e045148afcc8877cf8bec09bf88655e4e9"
+PLATAFORMA_NOVO="9622f4f853dac4fa73f4b579ed9400f6512a2755"
+(
+  for cfg in /opt/*/.git/config /opt/*/*/.git/config /srv/*/.git/config /srv/*/*/.git/config /home/*/*/.git/config \
+             /home/*/*/*/.git/config /root/*/.git/config /root/*/*/.git/config; do
+    [ -f "$cfg" ] && grep -q "PerformancePainel" "$cfg" 2>/dev/null || continue
+    pasta="$(dirname "$(dirname "$cfg")")"
+    dono_p="$(stat -c %U "$pasta" 2>/dev/null)" || continue
+    [ "$(sudo -u "$dono_p" git -C "$pasta" rev-parse HEAD 2>/dev/null || true)" = "$PLATAFORMA_REESCRITO" ] || continue
+    if sudo -u "$dono_p" git -C "$pasta" fetch --quiet origin \
+       && sudo -u "$dono_p" git -C "$pasta" reset --quiet --keep "$PLATAFORMA_NOVO"; then
+      echo "Plataforma em $pasta: saiu do commit reescrito para o ${PLATAFORMA_NOVO:0:7}."
+    else
+      echo "Plataforma em $pasta: não saiu do commit reescrito." >&2
+    fi
+  done
+) || true
+
 antes="$(como git rev-parse --short HEAD)"
 instalado="$(cat "$MARCA" 2>/dev/null || true)"
 echo "Nexus em $RAIZ, no commit $antes. Buscando no GitHub..."
