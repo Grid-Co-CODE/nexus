@@ -78,12 +78,13 @@ def _primeiro(linhas: list[dict], coluna: str) -> str:
 
 
 def _do_app() -> dict:
-    """O que se lê do banco: as contagens do App, agrupadas, com a usina ligada e o nome do almoxarifado, e o nome de cada
-    peça (a contagem só traz o ID e o código). Roda dentro do `visao._ler` (cópia de 5 min, renovada por trás)."""
+    """O que se lê do banco: as contagens do App, agrupadas, com a usina ligada e o nome do almoxarifado, e o catálogo do App
+    (`itens`: o nome de cada peça, e o que leva a avariada ao -AV), com `itens_lido` (falso: o livro Itens NÃO se leu agora; o
+    lido e vazio é verdadeiro). Roda dentro do `visao._ler` (cópia de 5 min, renovada por trás)."""
     abas = visao._ciclo(("_abas", A.LIVRO_CONTAGENS),
                         lambda: livros.abas(visao._base(), visao._sessao(), A.LIVRO_CONTAGENS))
     if A.ABA_CONTAGENS not in abas:
-        return {"livro_existe": False, "contagens": [], "itens": {}}
+        return {"livro_existe": False, "contagens": [], "itens": {}, "itens_lido": True}
     linhas = visao._livro(A.LIVRO_CONTAGENS, A.ABA_CONTAGENS)
     lig = Ligador(visao._livro("cadastro_nexus", "usinas"), visao._livro("cadastro_nexus", "de_para"), [], {})
     nome_usina = {_id(u.get("usina_id")): _txt(u.get("nome")) for u in visao._livro("cadastro_nexus", "usinas")}
@@ -91,14 +92,21 @@ def _do_app() -> dict:
     for l in linhas:
         if not _vazio(l.get("ID da contagem")):
             grupos.setdefault(_txt(l.get("ID da contagem")), []).append(l)
-    # o nome do almoxarifado e o das peças só enfeitam a tela: sem esses livros a contagem aparece pelo ID
+    # o nome do almoxarifado só enfeita a tela: sem o livro do saldo a contagem aparece pelo ID
     almox = {}
     for s in _livro_ou_vazio(A.LIVRO_SALDO, A.ABA_SALDO):
         if not _vazio(s.get("ID do almoxarifado")) and not _vazio(s.get("Almoxarifado")):
             almox.setdefault(_id(s.get("ID do almoxarifado")), _txt(s.get("Almoxarifado")))
+    # o catálogo do App NÃO só enfeita desde 30/10/2026: é ele que leva a avariada ao -AV (`avariados.resolver`). A falha não
+    # vira catálogo vazio (ficaria 5 min nesta cópia, e cada avariada que acha o -AV viraria "sem cadastro", com a linha direta
+    # do -AV contando sozinha, sem a trava do dobro): `itens_lido` falso, e a `ler` põe o aviso nas contagens com avariada
+    try:
+        do_livro, itens_lido = visao._livro(A.LIVRO_ITENS, A.ABA_ITENS), True
+    except Exception:       # noqa: BLE001 — o banco que caiu só neste livro: as contagens sem avariada seguem
+        do_livro, itens_lido = [], False
     itens = {_id(i.get("ID do item")): {"codigo": _txt(i.get("Código")), "nome": _txt(i.get("Nome")),
                                          "unidade": _txt(i.get("Unidade")).lower()}
-             for i in _livro_ou_vazio(A.LIVRO_ITENS, A.ABA_ITENS) if not _vazio(i.get("ID do item"))}
+             for i in do_livro if not _vazio(i.get("ID do item"))}
     contagens = []
     for cid, ls in grupos.items():
         id_almox = "" if _vazio(_primeiro(ls, "ID do almoxarifado")) else _id(_primeiro(ls, "ID do almoxarifado"))
@@ -113,10 +121,12 @@ def _do_app() -> dict:
                           # da contagem em que o pedido foi feito. O livro de hoje não tem a coluna: vazio, contagem inteira
                           "recontagem_de": _primeiro(ls, "Recontagem de"),
                           "linhas": ls})
-    return {"livro_existe": True, "contagens": contagens, "itens": itens}
+    return {"livro_existe": True, "contagens": contagens, "itens": itens, "itens_lido": itens_lido}
 
 
 def _livro_ou_vazio(livro: str, aba: str) -> list[dict]:
+    """O livro, ou vazio se não se leu. Só para o que enfeita a tela (o nome do almoxarifado): o catálogo do App, de que a
+    avariada depende, não passa por aqui."""
     try:
         return visao._livro(livro, aba)
     except Exception:       # noqa: BLE001 — só enfeita: a contagem não depende do nome
@@ -222,7 +232,8 @@ def revisao_da(cfg, contagem_id: str, motivos: bool = True) -> dict:
 # ── as contas de cada contagem ─────────────────────────────────────────────────────────────────────────────────────────
 def _conta_as_linhas(linhas: list[dict], curadoria: dict) -> tuple[int, int, int]:
     """(contadas, em branco, na curadoria), pelas linhas depois do dedupe por (ID da contagem, ID da linha), como as contas
-    fazem. Uma linha é de peça se o Tipo existe (e, menos no `fora_do_catalogo`, tem ID do item). Em branco é a linha sem
+    fazem. Uma linha é de peça se o Tipo existe (e, menos no `fora_do_catalogo`, tem ID do item; a avariada sem o ID vale pelo
+    Código da boa, como nas contas). Em branco é a linha sem
     número (o achado em branco inclusive); na curadoria é a linha com número que o PCM ainda precisa decidir (o genérico por
     identificar, o achado fora do catálogo e a avariada sem o -AV no catálogo), e as contadas são as outras com número: os
     três somam as linhas de peça. As linhas já vêm resolvidas (`avariados.resolver`, na `ler`): a avariada que achou o -AV
@@ -230,7 +241,8 @@ def _conta_as_linhas(linhas: list[dict], curadoria: dict) -> tuple[int, int, int
     unicas = contas._unicas(linhas)          # o mesmo dedupe das contas (o mesmo pacote)
     validas = [l for l in unicas
                if _txt(l.get("Tipo")).lower() in A.TIPOS_CONTAGEM
-               and (_txt(l.get("Tipo")).lower() == "fora_do_catalogo" or _id(l.get("ID do item")))]
+               and (_txt(l.get("Tipo")).lower() == "fora_do_catalogo" or _id(l.get("ID do item"))
+                    or (_txt(l.get("Tipo")).lower() == "avariado" and avariados.codigo_da_linha(l)))]
     em_branco = sum(1 for l in validas if A.contado(l.get("Contado")) is None)
     na_curadoria = sum(len(i["pendentes"]) for i in contas.itens_do_lote(unicas, {}, curadoria, {})
                        if i["situacao"] == "curadoria")
@@ -250,6 +262,10 @@ def _motivo_nao_aprovavel(c: dict, agora: datetime) -> str:
         return "contagem sem almoxarifado"
     if any(_vazio(l.get("ID da linha")) for l in c["linhas"]):
         return "linha sem ID da linha"
+    if any(_avariada_sem_peca(l) for l in c["linhas"]):
+        return "avariada sem o ID nem o Código da peça boa"
+    if any(l.get("_sem_catalogo") for l in c["linhas"]):
+        return SEM_CATALOGO
     try:
         contada = instante(c["contada_em"])
     except ValueError:
@@ -259,23 +275,46 @@ def _motivo_nao_aprovavel(c: dict, agora: datetime) -> str:
     return "contada no futuro: o relógio do celular" if contada > instante(agora) else f"mais de {contas.APROVAVEL_DIAS} dias"
 
 
-def _aviso(c: dict) -> str:
-    """O contrato do App violado: a contagem não vai à revisão, e a tela diz o quê. Sem o ID da linha as contas não têm como
-    reconhecer a peça (o "None" do `sync-xlsx` juntaria duas linhas numa e perderia unidades contadas), e sem o almoxarifado
-    não há saldo do sistema para ler."""
+# a contagem com avariada quando o catálogo do App não se leu agora (`avariados.resolver` com o catálogo None, 31/10/2026)
+SEM_CATALOGO = "o catálogo do App não foi lido agora: as avariadas não se resolvem; tente de novo em alguns minutos"
+
+
+def _avariada_sem_peca(l: dict) -> bool:
+    """A avariada sem o ID E sem o Código da peça boa: não há de que peça ela é (o contrato do App violado). Sem só o ID, o
+    Código basta (`avariados.resolver`)."""
+    return _txt(l.get("Tipo")).lower() == "avariado" and _vazio(l.get("ID do item"))         and not avariados.codigo_da_linha(l)
+
+
+def _avisos_do_app(c: dict) -> list[str]:
+    """O contrato do App violado. Sem o ID da linha as contas não têm como reconhecer a peça (o "None" do `sync-xlsx` juntaria
+    duas linhas numa e perderia unidades contadas); sem o almoxarifado não há saldo do sistema para ler; a avariada sem o ID e
+    sem o Código da boa não é de peça nenhuma, e sumir com ela esconderia unidades contadas."""
     avisos = []
     if any(_vazio(l.get("ID da linha")) for l in c["linhas"]):
         avisos.append("o App mandou linha sem ID da linha")
     if not c["id_almox"]:
         avisos.append("o App mandou contagem sem ID do almoxarifado")
+    if any(_avariada_sem_peca(l) for l in c["linhas"]):
+        avisos.append("o App mandou avariada sem o ID nem o Código da peça boa")
+    return avisos
+
+
+def _aviso(c: dict) -> str:
+    """Por que a contagem não vai à revisão, e a tela diz o quê: o contrato do App violado (`_avisos_do_app`) e, sem culpa do
+    App, a avariada com o catálogo do App que não se leu agora (`SEM_CATALOGO`: passa quando o catálogo for lido)."""
+    avisos = _avisos_do_app(c)
+    if any(l.get("_sem_catalogo") for l in c["linhas"]):
+        avisos.append(SEM_CATALOGO)
     return "; ".join(avisos)
 
 
 def _pode_substituir(c: dict, agora: datetime) -> bool:
     """A contagem que pode valer como "a mais nova" de um almoxarifado: dentro do contrato do App e com a data da contagem
     legível e que não passa do relógio adiantado do celular (`contas.RELOGIO_ADIANTADO`). A sem ID da linha, a sem almoxarifado
-    e a do futuro não se aprovam, e uma que não se aprova não pode substituir as que se aprovam."""
-    if c["aviso"]:
+    e a do futuro não se aprovam, e uma que não se aprova não pode substituir as que se aprovam. O catálogo que não se leu
+    agora NÃO tira dela o lugar de mais nova (31/10/2026): é uma falha de leitura que passa, e a velha viraria aprovável por
+    alguns minutos."""
+    if c["aviso_do_app"]:
         return False
     try:
         return instante(c["contada_em"]) - instante(agora) <= contas.RELOGIO_ADIANTADO
@@ -303,11 +342,12 @@ def ler(cfg, *, com_teste: bool = False, app_agora: bool = False) -> dict:
     # cópias: a lista do App é a de todos (5 min), e quem recebe pode mexer na sua. As avariadas da aba Avariados (30/10/2026)
     # vão ao -AV AQUI, uma vez (`avariados.resolver`, que devolve cópias): o lote, a curadoria, a gravação e as contas da lista
     # veem as mesmas linhas resolvidas
-    cs = [dict(c, linhas=avariados.resolver(c["linhas"], app["itens"])) for c in app["contagens"]
+    catalogo = app["itens"] if app.get("itens_lido", True) else None        # None: não se leu agora (não é vazio)
+    cs = [dict(c, linhas=avariados.resolver(c["linhas"], catalogo)) for c in app["contagens"]
           if c["id_almox"] not in teste]
     for c in cs:
         c["estado"] = estado_dos_eventos(eventos.get(c["contagem_id"], []))
-        c["aviso"] = _aviso(c)
+        c["aviso"], c["aviso_do_app"] = _aviso(c), bool(_avisos_do_app(c))
     # a substituição olha só as contagens VIVAS (a recontagem pedida, recusada pelo PCM, não tem número para pôr no lugar
     # das boas) e BOAS (sem o contrato violado e com um "Contada em" legível e que não é do futuro): a mais nova que não se
     # aprova não pode tirar do caminho as que se aprovam, senão o almoxarifado fica sem nenhuma contagem para revisar. E deixa
@@ -338,3 +378,9 @@ def contagens(cfg) -> list[dict]:
 def livro_existe(cfg) -> bool:
     """O App já publicou o livro das contagens? Sem ele, a tela diz que o App ainda não publica (não é "nenhuma contagem")."""
     return ler(cfg)["livro_existe"]
+
+
+def catalogo_lido() -> bool:
+    """O catálogo do App (o livro Itens) se leu na cópia de agora? A curadoria diz na tela por que as avariadas sumiram dela
+    enquanto ele não se lê (31/10/2026). Levanta `fato_inventario.Recusada` como a `ler`, se o livro do App não se leu."""
+    return bool(_app().get("itens_lido", True))

@@ -548,7 +548,8 @@ def test_avariado_entra_no_lote_como_peca_av():
 def test_avariado_nao_resolvido_vai_a_curadoria():
     """Sem o -AV no catálogo, a avariada segue o caminho do achado fora do catálogo: pendência sem `id_item` até a decisão
     da curadoria ("cadastrar" e "é a peça X" levam as unidades à peça da decisão; "descartar" as joga fora). A decisão que não é
-    do tipo da linha não resolve nada. A avariada sem o ID da boa não é de peça nenhuma."""
+    do tipo da linha não resolve nada. A avariada sem o ID da boa vai pelo Código dela; sem o ID E sem o Código não é de peça
+    nenhuma (a leitura põe o aviso do App na contagem: ela não se aprova)."""
     linhas = _resolvidas(_linha(1, 102, "4"), _linha(2, 102, "3", tipo="avariado"))
     itens = C.itens_do_lote(linhas, _sis(s102=4), {}, {})
     assert [(i["id_item"], i["situacao"], i["pendentes"]) for i in itens] == [("102", "sem_alteracao", []),
@@ -558,8 +559,13 @@ def test_avariado_nao_resolvido_vai_a_curadoria():
         assert set(por) == {"102", "777"} and por["777"]["contado"] == 3.0 and por["102"]["contado"] == 4.0
     assert set(_por_peca(C.itens_do_lote(linhas, {}, {"2": {"decisao": "descartar"}}, {}))) == {"102"}
     assert _por_peca(C.itens_do_lote(linhas, {}, {"2": {"decisao": "confirmar", "id_item": "777"}}, {}))[""]["pendentes"] == ["2"]
-    sem_id = _resolvidas(_linha(3, "", "3", tipo="avariado", **{"Código": ""}))
-    assert C.itens_do_lote(sem_id, {}, {}, {}) == [] and C.contado_efetivo(sem_id, {}) == {}
+    for vazio in ("", "None"):
+        sem_nada = _resolvidas(_linha(3, "", "3", tipo="avariado", **{"Código": vazio}))
+        assert C.itens_do_lote(sem_nada, {}, {}, {}) == [] and C.contado_efetivo(sem_nada, {}) == {}
+    so_o_codigo = _resolvidas(_linha(3, "", "3", tipo="avariado", **{"Código": "SP-102"}))
+    assert [(i["id_item"], i["situacao"], i["pendentes"]) for i in C.itens_do_lote(so_o_codigo, {}, {}, {})] == [
+        ("", "curadoria", ["3"])]
+    assert set(_por_peca(C.itens_do_lote(so_o_codigo, {}, {"3": {"decisao": "e_a_peca", "id_item": "777"}}, {}))) == {"777"}
 
 
 def test_avariado_em_dobro_fora_do_lote():

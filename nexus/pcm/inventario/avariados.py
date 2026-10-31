@@ -9,14 +9,19 @@ definição da casa é a `regua.avariada`). Daí:
 - **`resolver`** leva cada linha `avariado` ao `-AV` pelo catálogo do App (`leitura.ler(cfg)["itens"]`, o livro Itens da
   varredura diária): achou UM item com o código `<código da boa>-AV` (sem caixa e sem espaço), a linha vira linha de peça
   (Tipo `item`) desse item, com o ID e o Código dele e a marca `_avariado_de` (o ID da boa). Daí em diante ela é uma peça
-  qualquer da contagem: contagem absoluta, em branco não zera, a não ligada ao almoxarifado a gravação liga. Não achou (ou
-  achou dois com o mesmo código, que seria chutar o ID), a linha fica `avariado` e vai à curadoria como "avariada sem
-  cadastro", levando o que o cadastro precisa: `_codigo_av` (o -AV que falta), `_nome_av` e `_unidade_av` (a unidade da boa,
-  em maiúsculas, como as opções da tela).
+  qualquer da contagem: contagem absoluta, em branco não zera, a não ligada ao almoxarifado a gravação liga. Não achou, a
+  linha fica `avariado` e vai à curadoria como "avariada sem cadastro", levando o que o cadastro precisa: `_codigo_av` (o -AV
+  que falta), `_nome_av` e `_unidade_av` (a unidade da boa, em maiúsculas, como as opções da tela). Achou DOIS com o mesmo
+  código: escolher um seria chutar o ID; a linha fica `avariado` com `_av_repetido`, e a curadoria pede o "é a peça X".
+- **O catálogo que não se leu não é catálogo vazio** (`itens` None, revisão de 31/10/2026): a falha ficaria na cópia de 5 min
+  da leitura, e toda avariada que acha o -AV viraria "sem cadastro", e a linha direta do -AV contaria sozinha, sem a trava do
+  dobro. A avariada fica `avariado` com `_sem_catalogo`: a leitura põe o aviso na contagem dela (não se aprova até o catálogo
+  ser lido), e a curadoria não a oferece.
 - **Roda UMA vez**, na `leitura.ler`, sobre as linhas de cada contagem: o lote, a curadoria, a gravação e as contas da lista
   veem as mesmas linhas resolvidas, e o número não muda de uma tela para a outra.
 - **O código da boa** sai do catálogo pelo ID (o ID é a chave; o Código da linha é a cópia do App, que pode estar velha) e,
-  sem o ID no catálogo, do Código da linha.
+  sem o ID no catálogo (ou sem o ID na linha), do Código da linha (`codigo_da_linha`: o "None" do `sync-xlsx` não é código).
+  Sem o ID E sem o Código a avariada não é de peça nenhuma: é o contrato do App violado, e a leitura põe o aviso na contagem.
 - **Avariado nunca tira do bom:** a contagem da boa é a da linha dela. A avariada só conta para o `-AV`.
 
 **O nome do -AV** (`nome_av`, o que o cadastrar da curadoria propõe): o padrão lido nos -AV do livro Itens do App no banco em
@@ -59,6 +64,13 @@ def nome_av(nome) -> str:
     return n if n.upper().startswith(PREFIXO_DO_NOME.strip().upper()) else PREFIXO_DO_NOME + n
 
 
+def codigo_da_linha(l: dict) -> str:
+    """O "Código" da linha do livro das contagens, aparado; o vazio e o "None" que o `sync-xlsx` escreve no lugar do vazio
+    voltam "" (o "None" viraria o -AV "NONE-AV")."""
+    c = _txt((l or {}).get("Código"))
+    return "" if c.lower() == "none" else c
+
+
 def _por_codigo(itens: dict) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for id_item, v in (itens or {}).items():
@@ -67,10 +79,12 @@ def _por_codigo(itens: dict) -> dict[str, list[str]]:
     return out
 
 
-def resolver(linhas: list[dict], itens: dict[str, dict]) -> list[dict]:
+def resolver(linhas: list[dict], itens: dict[str, dict] | None) -> list[dict]:
     """As linhas de UMA contagem com as avariadas levadas ao `-AV` (ver o cabeçalho). `itens`: `{id_item: {codigo, nome,
-    unidade}}`, o catálogo do App como a `leitura` o monta. Devolve cópias, na mesma ordem; as linhas que não são `avariado`
-    saem iguais (cópias também)."""
+    unidade}}`, o catálogo do App como a `leitura` o monta; None é o catálogo que NÃO se leu agora (a avariada fica marcada
+    `_sem_catalogo`), e {} o lido e vazio. Devolve cópias, na mesma ordem; as linhas que não são `avariado` saem iguais (cópias
+    também)."""
+    sem_catalogo = itens is None
     catalogo = {_id(k): v for k, v in (itens or {}).items() if isinstance(v, dict)}
     por_codigo = _por_codigo(catalogo)
     out = []
@@ -81,9 +95,12 @@ def resolver(linhas: list[dict], itens: dict[str, dict]) -> list[dict]:
         out.append(copia)
         if _txt(l.get("Tipo")).lower() != "avariado":
             continue
+        if sem_catalogo:
+            copia["_sem_catalogo"] = True
+            continue
         id_bom = _id(l.get("ID do item"))
         bom = catalogo.get(id_bom) or {}
-        alvo = codigo_av(bom.get("codigo") or l.get("Código"))
+        alvo = codigo_av(bom.get("codigo") or codigo_da_linha(l))
         achados = por_codigo.get(alvo, []) if alvo else []
         if len(achados) == 1:
             id_av = achados[0]
@@ -91,5 +108,5 @@ def resolver(linhas: list[dict], itens: dict[str, dict]) -> list[dict]:
                           "_avariado_de": id_bom})
         else:
             copia.update({"_codigo_av": alvo, "_nome_av": nome_av(bom.get("nome")),
-                          "_unidade_av": _txt(bom.get("unidade")).upper()})
+                          "_unidade_av": _txt(bom.get("unidade")).upper(), "_av_repetido": len(achados) > 1})
     return out

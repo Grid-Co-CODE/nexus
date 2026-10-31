@@ -13,7 +13,9 @@ pendência, nas contagens que ainda não foram gravadas:
   pode corrigir), diz que **é a peça X** ou **descarta**. O cadastro procura o -AV no Fracttal antes (`achar_peca`): achou
   (outra contagem o cadastrou, ou a resposta do criar se perdeu, e a varredura do App ainda não o viu), grava a decisão
   `e_a_peca` com aquele ID e não cria nada. Sem a reserva de código dos outros cadastros: o código fixo é a chave da nova
-  tentativa.
+  tentativa. A revisão de 31/10/2026: o -AV REPETIDO no catálogo (dois itens com o código) não se cadastra (409; o PCM escolhe
+  pelo "é a peça X"); "é a peça X" com X a própria peça boa é 400 (avariado nunca entra no bom); e sem o catálogo do App lido
+  agora a avariada não pede decisão (503 se pedirem), porque "não está no catálogo" seria falso.
 
 A decisão vai ao livro do inventário (`fato_curadoria_inventario`, mais o evento `curadoria` da auditoria) e a quantidade
 entra no lote pela `contas.contado_efetivo`: "é a peça X" e "cadastrar" somam as achadas ao contado da peça NESSA contagem (o
@@ -68,10 +70,12 @@ from ...dados import fato_inventario as F
 from ...dados import fatos as D
 from ...prefixo import na_raiz
 from .. import telas
+from . import avariados
 from . import contas as C
-from . import erros, quem, travas
+from . import erros, leitura, quem, travas
 from . import estoque as E
 from .erros import Conflito
+from .leitura import SEM_CATALOGO
 from .regua import fmt
 from .travas import Travas
 
@@ -177,10 +181,14 @@ def contagens_abertas(cfg) -> dict[str, list[dict]]:
 def _eh_pendencia(l: dict) -> bool:
     """A linha pede decisão: é do campo `fora_do_catalogo`, `identificar` ou `avariado` (a avariada que a leitura não levou ao
     -AV: a resolvida já chega como `item`), tem "ID da linha" e foi CONTADA (em branco, não há o que decidir: o achado em branco
-    nem entra no lote). A avariada sem o ID da peça boa não é de peça nenhuma, como nas contas."""
+    nem entra no lote). A avariada sem o ID E sem o Código da peça boa não é de peça nenhuma, como nas contas (a leitura põe
+    o aviso do App na contagem). A avariada que não se resolveu porque o catálogo do App NÃO se leu agora (`_sem_catalogo`) não
+    pede decisão enquanto ele não se lê: "não está no catálogo" seria falso, e a decisão vale mesmo depois de a linha se
+    resolver (um "descartar" tomado agora venceria o -AV que existe)."""
     tipo = _txt(l.get("Tipo")).lower()
     return tipo in DECISOES_DO_TIPO and bool(_id(l.get("ID da linha"))) and A.contado(l.get("Contado")) is not None \
-        and (tipo != "avariado" or bool(_id(l.get("ID do item"))))
+        and (tipo != "avariado" or ((bool(_id(l.get("ID do item"))) or bool(avariados.codigo_da_linha(l)))
+                                    and not l.get("_sem_catalogo")))
 
 
 def _decisoes_do_livro(linhas: list[dict]) -> dict:
@@ -277,7 +285,8 @@ def pendencias(cfg) -> list[dict]:
     `contado` já é número. No genérico, o específico que o técnico escolheu vem com o código e o nome do catálogo do App
     (quando o catálogo veio). A `reserva` é o que uma tentativa anterior de cadastrar esta linha reservou (código, sigla, nome,
     unidade), ou None. Na avariada sem cadastro, `codigo_av` (o -AV que falta), `nome_av` e `unidade_av` são o cadastrar já
-    preenchido (as marcas do `avariados.resolver`); nas outras, vazios."""
+    preenchido (as marcas do `avariados.resolver`), e `av_repetido` diz que há mais de um item com aquele código no catálogo
+    (sem cadastrar: o PCM escolhe pelo "é a peça X"); nas outras, vazios."""
     abertas = contagens_abertas(cfg)
     decididas = _decisoes_do_livro(F.ler(cfg)[F.ABA_CURADORIA])
     catalogo = _catalogo() or {}
@@ -302,7 +311,7 @@ def pendencias(cfg) -> list[dict]:
                 "identificado_nome": catalogo.get(como, {}).get("nome", ""),
                 "reserva": reservas.get(chave) if isinstance(reservas.get(chave), dict) else None,
                 "codigo_av": _txt(l.get("_codigo_av")), "nome_av": _txt(l.get("_nome_av")),
-                "unidade_av": _txt(l.get("_unidade_av")).upper(),
+                "unidade_av": _txt(l.get("_unidade_av")), "av_repetido": bool(l.get("_av_repetido")),
                 "decisao": None if d is None else {
                     "decisao": _txt(d.get("decisao")), "id_item": _id(d.get("id_item")),
                     "codigo_criado": _txt(d.get("codigo_criado")), "quando": _txt(d.get("decidida_em")),
@@ -377,6 +386,9 @@ def _achar_a_linha(cfg, contagem_id: str, chave_linha: str) -> dict:
     chave = _id(chave_linha)
     for l in C._unicas(por[cid]):
         if _id(l.get("ID da linha")) == chave:
+            if l.get("_sem_catalogo"):
+                raise F.Recusada(f"{SEM_CATALOGO}. Decidir por esta avariada agora poderia valer contra o -AV que já existe: "
+                                 "nada foi feito.")
             if not _eh_pendencia(l):
                 raise ValueError("Esta linha não pede decisão (é peça da lista, ou ninguém a contou).")
             return l
@@ -488,6 +500,19 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) ->
         raise
 
 
+def _e_a_peca_boa(l: dict, escolhida: str) -> bool:
+    """O "é a peça X" de uma avariada que aponta a PRÓPRIA peça boa: as avariadas somariam ao estoque bom (o desenho: avariado
+    nunca entra no bom). Pelo ID da boa; na linha sem o ID, pelo Código dela contra o código de X no catálogo do App."""
+    bom = _id(l.get("ID do item"))
+    if bom:
+        return _id(escolhida) == bom
+    codigo = avariados.codigo_da_linha(l)
+    if not codigo:
+        return False
+    de_x = ((_catalogo() or {}).get(_id(escolhida)) or {}).get("codigo", "")
+    return "".join(_txt(de_x).split()).upper() == "".join(codigo.split()).upper()
+
+
 def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool]:
     """O -AV da avariada sem cadastro, sem duplicar. Devolve (id do item, código, criou agora).
 
@@ -502,6 +527,10 @@ def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool
     if not codigo:
         raise ValueError("Esta avariada veio sem o código da peça boa: não há o -AV para cadastrar. Diga qual é a peça ou "
                          "descarte.")
+    if l.get("_av_repetido"):
+        # dois itens com o mesmo código no catálogo: o `achar_peca` escolheria um deles, que é o chute que o resolver evitou
+        raise Conflito(f"Há mais de um item com o código {codigo} no catálogo: escolha pelo 'é a peça X'. Nada foi enviado ao "
+                       "Fracttal.")
     nome = " ".join(_txt(nome or l.get("_nome_av")).split())
     if not nome or len(nome) > NOME_MAX:
         raise ValueError(f"Informe o nome da peça (até {NOME_MAX} letras).")
@@ -576,6 +605,9 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
             escolhida = _id(id_item) or (_id(l.get("Identificado como")) if decisao == "confirmar" else "")
             if not escolhida:
                 raise ValueError("Informe qual é a peça: o técnico não disse qual era o específico.")
+            if tipo == "avariado" and _e_a_peca_boa(l, escolhida):
+                raise ValueError("As avariadas não entram na peça boa: escolha o -AV (o código da boa com -AV no fim), ou "
+                                 "cadastre-o.")
             id_final = _peca_do_catalogo(cfg, escolhida, cadastradas)
             texto = ("As unidades saem do genérico e entram na peça escolhida." if decisao == "confirmar"
                      else "As unidades avariadas contam como unidades dessa peça nesta contagem." if tipo == "avariado"
@@ -639,6 +671,10 @@ def _pagina(*, erro: str = "", status: int = 200):
     except (visao.SemBanco, OSError) as ex:
         erro_livro = f"Não consegui ler as contagens no banco ({type(ex).__name__}): tente de novo em instantes."
     catalogo = _catalogo() or {}
+    try:
+        sem_catalogo = not erro_livro and not leitura.catalogo_lido()
+    except (F.Recusada, visao.SemBanco, OSError):
+        sem_catalogo = False            # o erro de leitura do livro do App já está na tela
     aviso = session.pop("pcm_curadoria_aviso", None) if status == 200 else None
     pode = telas.pode_programar()
     if not pode:
@@ -649,7 +685,7 @@ def _pagina(*, erro: str = "", status: int = 200):
     resp = render_template(
         "pcm/inventario_curadoria.html", pendentes=pendentes, decididas=[p for p in lista if p["decisao"] is not None],
         siglas_de=lambda almox: siglas(cfg, almox), unidades=UNIDADES, fmt=fmt, pode=pode, ok=aviso or "",
-        erro=erro, erro_livro=erro_livro,
+        erro=erro, erro_livro=erro_livro, sem_catalogo=sem_catalogo,
         pecas=sorted(((v["codigo"], v["nome"]) for v in catalogo.values() if v["codigo"])))
     return resp, status
 

@@ -8,7 +8,7 @@ import copy
 
 import pytest
 from test_campo_visao import _aba, banco  # noqa: F401  (banco é fixture)
-from test_pcm_inventario_leitura import _linha, _publicar, inv  # noqa: F401  (inv é fixture)
+from test_pcm_inventario_leitura import _iso, _linha, _publicar, inv  # noqa: F401  (inv é fixture)
 
 from nexus.dados import almoxarifado as A
 from nexus.dados import fato_inventario as F
@@ -103,10 +103,36 @@ def test_resolver_pelo_id_da_boa_e_pelo_codigo_da_linha():
 
 
 def test_resolver_com_dois_av_do_mesmo_codigo_nao_escolhe():
-    """Dois itens do catálogo com o mesmo código -AV: escolher um seria chutar o ID. A linha fica para a curadoria."""
+    """Dois itens do catálogo com o mesmo código -AV: escolher um seria chutar o ID. A linha fica para a curadoria, marcada
+    `_av_repetido` (a curadoria diz que o código se repete e não cadastra outro)."""
     cat = dict(CATALOGO, **{"34": {"codigo": "SP-3-AV", "nome": "outro", "unidade": ""}})
     (r,) = AV.resolver([_l("L1")], cat)
-    assert r["Tipo"] == "avariado" and r["_codigo_av"] == "SP-3-AV"
+    assert r["Tipo"] == "avariado" and r["_codigo_av"] == "SP-3-AV" and r["_av_repetido"] is True
+    (r,) = AV.resolver([_l("L1")], {"3": BOM})
+    assert r["_av_repetido"] is False
+
+
+def test_resolver_sem_o_id_da_boa_vai_pelo_codigo():
+    """A avariada sem o ID da boa: o Código da linha acha o -AV; sem o -AV, a curadoria leva o `codigo_av` dele. O "None" que o
+    `sync-xlsx` escreve no lugar do vazio não é código."""
+    (r,) = AV.resolver([_l("L1", id_item="", codigo="SP-5")], CATALOGO)
+    assert (r["Tipo"], r["_codigo_av"], r["_nome_av"]) == ("avariado", "SP-5-AV", "")
+    for vazio in ("", "None", "none"):
+        (r,) = AV.resolver([_l("L2", id_item="", codigo=vazio)], CATALOGO)
+        assert (r["Tipo"], r["_codigo_av"]) == ("avariado", "")
+        assert AV.codigo_da_linha(r) == ""
+    assert AV.codigo_da_linha(_l("L3", codigo=" sp-3 ")) == "sp-3"
+
+
+def test_resolver_sem_o_catalogo_lido():
+    """O catálogo do App que não se leu agora (`itens` None) não é catálogo vazio: a avariada não se resolve e fica marcada
+    `_sem_catalogo` (a leitura põe o aviso na contagem dela, e a curadoria não a oferece); as outras linhas saem iguais."""
+    linhas = [_l("L1"), _l("L2", tipo="item", id_item="5", codigo="SP-5")]
+    a, b = AV.resolver(linhas, None)
+    assert (a["Tipo"], a["_sem_catalogo"], a["ID do item"]) == ("avariado", True, "3") and "_codigo_av" not in a
+    assert b == linhas[1] and "_sem_catalogo" not in b
+    (r,) = AV.resolver([_l("L1")], {})                            # lido e vazio: a curadoria decide
+    assert "_sem_catalogo" not in r and r["_codigo_av"] == "SP-3-AV"
 
 
 def test_o_modulo_e_puro():
@@ -159,6 +185,67 @@ def test_a_leitura_nao_estraga_a_copia_com_a_resolucao(app, inv):  # noqa: F811
     crua = L._app()["contagens"][0]["linhas"][0]
     assert (crua["Tipo"], crua["ID do item"]) == ("avariado", "501") and "_avariado_de" not in crua
     assert L.ler(app.config)["contagens"][0]["linhas"][0]["ID do item"] == "591"
+
+
+def _itens_sem_ler(monkeypatch):
+    """O livro Itens do App que não se lê agora (o banco caiu só nele); os outros livros respondem."""
+    from nexus.campo import visao
+    original = visao._livro
+
+    def livro(nome, aba=None):
+        if nome == A.LIVRO_ITENS:
+            raise ConnectionError("banco fora")
+        return original(nome, aba)
+    monkeypatch.setattr(visao, "_livro", livro)
+    visao.limpar()
+
+
+def test_catalogo_que_nao_leu_trava_so_a_contagem_com_avariada(app, inv, monkeypatch):  # noqa: F811
+    """O catálogo do App que falhou não vira catálogo vazio (a falha ficaria na cópia de 5 min, e cada avariada que acha o -AV
+    viraria "sem cadastro", e a linha direta do -AV contaria sozinha, sem a trava do dobro). A contagem COM avariada ganha o aviso
+    e não se aprova até o catálogo ser lido; a sem avariada segue. O aviso não é do App (não é contrato violado): ela continua
+    valendo como a mais nova do almoxarifado, e a velha segue substituída."""
+    _itens_do_app(inv, ("501", "SP-501", "Fusível"), ("591", "SP-501-AV", "[AVARIADO] Fusível"))
+    _publicar(inv,
+              _linha("C-0", "K1", "501", "4", contada=_iso(dias_atras=2), enviada=_iso(dias_atras=2)),
+              _linha("C-1", "L1", "591", "1"), _linha("C-1", "L2", "501", "2", tipo="avariado"),
+              _linha("C-2", "M1", "501", "3", almox="20"))
+    _itens_sem_ler(monkeypatch)
+    por = {c["contagem_id"]: c for c in L.contagens(app.config)}
+    c1 = por["C-1"]
+    assert "o catálogo do App não foi lido agora" in c1["aviso"] and c1["aviso_do_app"] is False
+    assert not c1["aprovavel"] and "catálogo do App" in c1["motivo_nao_aprovavel"]
+    assert [l.get("_sem_catalogo") for l in c1["linhas"]] == [None, True]
+    assert (por["C-2"]["aviso"], por["C-2"]["aprovavel"]) == ("", True)
+    assert por["C-0"]["estado"] == "substituida"
+    # lido de novo, a avariada se resolve e a contagem volta a se aprovar
+    monkeypatch.undo()
+    from nexus.campo import visao
+    visao.limpar()
+    c1 = next(c for c in L.contagens(app.config) if c["contagem_id"] == "C-1")
+    assert (c1["aviso"], c1["aprovavel"], c1["linhas"][1]["ID do item"]) == ("", True, "591")
+
+
+def test_catalogo_lido_e_vazio_nao_trava(app, inv):  # noqa: F811
+    """O livro Itens lido e vazio (ou que o App ainda não publicou) é catálogo sem o -AV: a avariada vai à curadoria, sem aviso."""
+    _itens_do_app(inv)
+    _publicar(inv, _linha("C-1", "L2", "501", "2", tipo="avariado"))
+    c = L.contagens(app.config)[0]
+    assert (c["aviso"], c["aprovavel"], c["n_curadoria"]) == ("", True, 1)
+
+
+def test_avariada_sem_id_e_sem_codigo_e_contrato_violado(app, inv):  # noqa: F811
+    """A avariada sem o ID da boa vai pelo Código (sem o -AV, a curadoria); sem o ID E sem o Código não é de peça nenhuma, e sumir
+    com ela em silêncio esconderia unidades contadas: a contagem ganha o aviso do App, como a linha sem ID da linha."""
+    _itens_do_app(inv, ("501", "SP-501", "Fusível"))
+    _publicar(inv, _linha("C-1", "L1", "", "2", tipo="avariado", **{"Código": "SP-501"}),
+              _linha("C-2", "M1", "", "2", tipo="avariado", almox="20", **{"Código": "None"}))
+    por = {c["contagem_id"]: c for c in L.contagens(app.config)}
+    assert (por["C-1"]["aviso"], por["C-1"]["aprovavel"], por["C-1"]["n_curadoria"]) == ("", True, 1)
+    assert por["C-1"]["linhas"][0]["_codigo_av"] == "SP-501-AV"
+    c2 = por["C-2"]
+    assert c2["aviso"] == "o App mandou avariada sem o ID nem o Código da peça boa" and c2["aviso_do_app"] is True
+    assert not c2["aprovavel"] and c2["motivo_nao_aprovavel"] == "avariada sem o ID nem o Código da peça boa"
 
 
 @pytest.mark.parametrize("tipo", A.TIPOS_CONTAGEM)

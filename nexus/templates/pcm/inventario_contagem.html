@@ -61,8 +61,12 @@
 </script>
 
 {% if c.aviso %}
-<div class="cn-erro" role="alert">O App mandou esta contagem fora do contrato ({{ c.aviso }}): ela não pode ser revisada, e nenhum
+{# o contrato do App violado (`aviso_do_app`) é com quem cuida do App; o catálogo do App que não se leu agora (a contagem com
+   avariada, 31/10/2026) passa sozinho, e a mensagem não manda avisar ninguém #}
+{% if c.aviso_do_app %}<div class="cn-erro" role="alert">O App mandou esta contagem fora do contrato ({{ c.aviso }}): ela não pode ser revisada, e nenhum
   número é mostrado, para não mostrar conta pela metade. Avise quem cuida do App.</div>
+{% else %}<div class="cn-erro" role="alert">Esta contagem não pode ser revisada agora ({{ c.aviso }}): nenhum número é mostrado,
+  para não mostrar conta pela metade.</div>{% endif %}
 {% else %}
 {% if not c.aprovavel and not gravacao %}<div class="cn-erro cn-aviso" role="status">Esta contagem não se aprova: {{ c.motivo_nao_aprovavel }}.</div>{% endif %}
 

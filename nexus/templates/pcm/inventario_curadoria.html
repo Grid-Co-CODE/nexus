@@ -39,6 +39,10 @@
 {% if ok %}<div class="cn-certo" role="status"><span><b>{{ ok }}</b></span></div>{% endif %}
 {% if erro %}<div class="cn-erro" role="alert"><span><b>{{ erro }}</b></span></div>{% endif %}
 {% if erro_livro %}<div class="cn-erro" role="alert"><span><b>Não consegui ler as contagens.</b> {{ erro_livro }}</span></div>{% endif %}
+{# o catálogo do App que não se leu agora (31/10/2026): as avariadas não se resolvem, e decidir por elas valeria contra o -AV que
+   existe; elas saem da lista até ele ser lido, e a tela diz por quê #}
+{% if sem_catalogo %}<div class="cn-erro cn-aviso" role="status"><span><b>O catálogo do App não foi lido agora:</b> as avariadas
+  das contagens abertas não aparecem aqui até ele ser lido. Tente de novo em alguns minutos.</span></div>{% endif %}
 
 <datalist id="cu-pecas">{% for cod, nome in pecas %}<option value="{{ cod }}">{{ nome }}</option>{% endfor %}</datalist>
 
@@ -58,7 +62,7 @@
     <p class="alm-det">{{ fmt(x.contado) }} unidades · {{ x.usina or 'usina não informada' }} · contada em {{ x.contada_txt or '?' }} · contagem {{ x.contagem_id }}</p>
     {% elif x.tipo == 'avariado' %}
     {# a avariada que a leitura não levou ao -AV: o técnico listou na aba Avariados as unidades avariadas da peça boa #}
-    <p class="cu-tit"><span class="inv-selo inv-selo--alerta">Avariada sem cadastro</span> {% if x.codigo_av %}<span class="alm-cod">{{ x.codigo_av }}</span> não está no catálogo{% else %}a peça boa veio sem código{% endif %}</p>
+    <p class="cu-tit"><span class="inv-selo inv-selo--alerta">Avariada sem cadastro</span> {% if x.av_repetido %}há mais de um item com o código {{ x.codigo_av }} no catálogo: escolha pelo 'é a peça X'{% elif x.codigo_av %}<span class="alm-cod">{{ x.codigo_av }}</span> não está no catálogo{% else %}a peça boa veio sem código{% endif %}</p>
     <p class="alm-det">{{ fmt(x.contado) }} unidades avariadas de <span class="alm-cod">{{ x.codigo or ('peça ' ~ x.id_item) }}</span> · {{ x.usina or 'usina não informada' }} · contada em {{ x.contada_txt or '?' }} · contagem {{ x.contagem_id }}</p>
     {% else %}
     <p class="cu-tit"><span class="inv-selo inv-selo--alerta">Identificar</span> Genérico <span class="alm-cod">{{ x.codigo or x.id_item }}</span> a identificar</p>
@@ -72,7 +76,8 @@
     {% if x.tipo in ('fora_do_catalogo', 'avariado') %}
     {# cadastrar fala com o Fracttal: vai pela ponte do login (ponte_os.py), por fetch (pcm-ponte-inventario.js) #}
     {% if x.tipo == 'avariado' %}
-    {% if x.codigo_av %}
+    {# o -AV repetido no catálogo não se cadastra (o servidor recusa, 409): o PCM escolhe qual é pelo "é a peça X" #}
+    {% if x.codigo_av and not x.av_repetido %}
     {% set un_av = x.unidade_av or 'UNIDADE' %}
     <details class="cu-op"><summary>Cadastrar a {{ x.codigo_av }} no Fracttal</summary>
       <form method="post" action="{{ raiz }}/os/_nexus/inventario/curadoria/cadastrar" data-ponte class="cu-form">
@@ -88,7 +93,7 @@
         <p class="alm-det">Se a {{ x.codigo_av }} já existir no Fracttal, o Nexus usa ela, sem criar outra. A peça é ligada ao almoxarifado e ajustada quando a contagem for gravada.</p>
         <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Cadastrar no Fracttal</button>
       </form></details>
-    {% else %}<p class="alm-det">Sem o código da peça boa não há o -AV para cadastrar: diga qual é a peça ou descarte.</p>{% endif %}
+    {% elif not x.av_repetido %}<p class="alm-det">Sem o código da peça boa não há o -AV para cadastrar: diga qual é a peça ou descarte.</p>{% endif %}
     {% else %}
     <details class="cu-op"><summary>Cadastrar peça nova no Fracttal</summary>
       <form method="post" action="{{ raiz }}/os/_nexus/inventario/curadoria/cadastrar" data-ponte class="cu-form">

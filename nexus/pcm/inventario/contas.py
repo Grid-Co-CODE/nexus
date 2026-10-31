@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from ...dados import almoxarifado as A
+from . import avariados
 from .estoque import instante
 
 # As seis situações de uma peça no lote (a ordem dos grupos da confirmação). Só as três primeiras mexem no estoque; a
@@ -149,7 +150,8 @@ def _ler(linhas, curadoria) -> _Lido:
       da linha não resolve nada: a linha segue pendente e nada é gravado por engano.
     - `avariado` (30/10/2026, a aba Avariados): a que a `leitura.ler` levou ao -AV chega como `item` com a marca
       `_avariado_de` e conta como a linha da própria peça; a que não achou o -AV segue o caminho do achado fora do catálogo
-      (sem o ID da boa não é de peça nenhuma). A que já tem decisão da curadoria segue a decisão mesmo depois de se resolver
+      (sem o ID da boa, pelo Código dela; sem o ID E sem o Código não é de peça nenhuma, e a leitura põe o aviso do App na
+      contagem). A que já tem decisão da curadoria segue a decisão mesmo depois de se resolver
       (o -AV entrou no catálogo do App, criado por outra contagem): o "descartar" do PCM não some em silêncio. O -AV com
       número na linha direta E na da aba é `dobros` (e `invalidos`): somar contaria duas vezes a mesma peça.
     - Linha sem ID do item (nas duas primeiras) ou de um Tipo que não existe não é de peça nenhuma: não entra.
@@ -189,8 +191,8 @@ def _ler(linhas, curadoria) -> _Lido:
                     lido.somar(id_item, 0.0)                # o genérico foi contado: o que achou menos o que saiu dele
                 lido.achadas(destino, n)
         elif tipo in ("fora_do_catalogo", "avariado"):
-            if tipo == "avariado" and not _id(l.get("ID do item")):
-                continue                                    # a avariada sem o ID da boa não é de peça nenhuma
+            if tipo == "avariado" and not _id(l.get("ID do item")) and not avariados.codigo_da_linha(l):
+                continue                                    # sem o ID nem o Código da boa: o contrato violado (a leitura avisa)
             if decisao in ("e_a_peca", "cadastrar") and alvo:
                 lido.achadas(alvo, n, dec.get("codigo"))
             elif decisao != "descartar" and n is not None:

@@ -52,8 +52,8 @@ GRUPOS = {
     "zerar": ("Zerar o estoque", "O técnico digitou 0 em peça com saldo: o estoque dela vai a zero no Fracttal. Confira peça "
                                   "a peça antes de gravar."),
     "sem_alteracao": ("Sem alteração", "O contado é igual ao saldo do sistema: nada é gravado."),
-    "nao_tocada": ("Não será tocada", "Em branco, com contado inválido, tirada do lote ou em recontagem: nada é gravado, e "
-                                      "o saldo do Fracttal fica como está."),
+    "nao_tocada": ("Não será tocada", "Em branco, com contado inválido ou em dobro, tirada do lote ou em recontagem: nada é "
+                                      "gravado, e o saldo do Fracttal fica como está."),
     "curadoria": ("Curadoria", "O que o PCM ainda decide (o genérico por identificar, a peça fora do catálogo e a avariada sem "
                                "cadastro): nada é gravado até decidir."),
 }
@@ -439,7 +439,8 @@ def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, sis
         if A._txt(linha.get("Tipo")).lower() == "avariado":
             # a avariada sem o -AV no catálogo (30/10/2026): a linha traz o -AV que falta (`avariados.resolver`)
             codigo_av = A._txt(linha.get("_codigo_av")) or A._txt(linha.get("Código"))
-            nome = "Avariada sem cadastro" + (f": {codigo_av}" if codigo_av else "")
+            nome = (f"Avariada com o código repetido no catálogo: {codigo_av}" if linha.get("_av_repetido")
+                    else "Avariada sem cadastro" + (f": {codigo_av}" if codigo_av else ""))
         else:
             descricao = A._txt(linha.get("Descrição"))
             nome = "Fora do catálogo" + (f": {descricao}" if descricao else "")
@@ -528,7 +529,9 @@ def montar_lote(cfg, contagem_id: str, ler_sistema, pode: bool = False) -> dict:
     if c is None:
         raise Recusa(404, "Contagem não encontrada: atualize a página.")
     if c["aviso"]:
-        raise Recusa(409, f"O App mandou esta contagem fora do contrato ({c['aviso']}): nada a comparar.")
+        # o catálogo do App que não se leu agora não é culpa do App (31/10/2026): a mensagem não diz "fora do contrato"
+        raise Recusa(409, f"O App mandou esta contagem fora do contrato ({c['aviso']}): nada a comparar." if c["aviso_do_app"]
+                     else f"Esta contagem não se revisa agora ({c['aviso']}): nada a comparar.")
     if not c["aprovavel"]:
         raise Recusa(409, f"Esta contagem não se aprova: {c['motivo_nao_aprovavel']}.")
     sistema, estado, mensagem = _do_sistema(ler_sistema, c["id_almox"])

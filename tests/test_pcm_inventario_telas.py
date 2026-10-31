@@ -830,6 +830,27 @@ def test_avariados_na_aprovacao(app, inv, falso, monkeypatch):
     assert "o -AV veio em dobro (direto e pela aba Avariados); o PCM corrigiu para 3" in l591
 
 
+def test_sem_o_catalogo_lido_a_contagem_com_avariada_espera(app, inv, falso, monkeypatch):
+    """O catálogo do App que não se leu agora: a contagem com avariada não se revisa nem lê o saldo (409 na ponte), e a página
+    diz que é a leitura, não o App fora do contrato (não manda avisar quem cuida do App)."""
+    _cenario(inv)
+    _publicar(inv, _linha("C-1", "L1", "501", "12"), _linha("C-1", "L3", "501", "2", tipo="avariado"))
+    original = visao._livro
+
+    def livro(nome, aba=None):
+        if nome == A.LIVRO_ITENS:
+            raise ConnectionError("banco fora")
+        return original(nome, aba)
+    monkeypatch.setattr(visao, "_livro", livro)
+    visao.limpar()
+    c = _pcm(app, monkeypatch)
+    pagina = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert "o catálogo do App não foi lido agora" in pagina and "não pode ser revisada agora" in pagina
+    assert "Avise quem cuida do App" not in pagina and "fora do contrato" not in pagina
+    assert _lote(c).status_code == 409
+    assert falso.chamadas == []
+
+
 def test_recontagem_parcial_de_peca_ja_pedida_ou_tirada(app, inv, falso, monkeypatch):
     """A peça com a recontagem já pedida nesta contagem já está fora do lote dela: pedir de novo é 409 (a contagem nova é que
     a traz); a peça tirada também; e tirar ou corrigir a peça em recontagem, 409. Tudo ou nada: com uma peça recusada na

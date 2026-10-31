@@ -732,8 +732,8 @@ para o número não mudar de uma tela para a outra. Provado em `tests/test_pcm_i
 - **A avariada (30/10/2026, a aba Avariados do App; item 5 das melhorias)** chega às contas já resolvida pela `leitura.ler`
   (`avariados.resolver`, seção da leitura): a que achou o `-AV` no catálogo do App é linha `item` dele (com a marca
   `_avariado_de`) e conta como a linha da própria peça (contagem absoluta, em branco não zera, o 0 zera); a que não achou segue
-  `avariado` pelo caminho do achado fora do catálogo (pendência sem `id_item` até a decisão; sem o ID da boa não é de peça
-  nenhuma). **A avariada já decidida segue a decisão mesmo depois de se resolver** (o -AV entrou no catálogo do App no dia
+  `avariado` pelo caminho do achado fora do catálogo (pendência sem `id_item` até a decisão; sem o ID da boa, pelo Código
+  dela; sem o ID E sem o Código não é de peça nenhuma, e a leitura põe o aviso do App na contagem). **A avariada já decidida segue a decisão mesmo depois de se resolver** (o -AV entrou no catálogo do App no dia
   seguinte, criado por outra contagem): o "descartar" do PCM não some em silêncio. **Contado em dobro:** o `-AV` com número na
   linha direta E na da aba é `dobro` (com `invalido` junto: o caminho do contado inválido, fora do lote até o PCM corrigir;
   corrigido, entra), porque somar contaria duas vezes a mesma peça; duas linhas da aba somam, e a direta em branco não é dobro.
@@ -796,16 +796,25 @@ contagem"); `ler(cfg)` devolve os dois com o nome de cada peça.
 - **As avariadas são resolvidas AQUI, uma vez** (`avariados.resolver` na `ler`, sobre as linhas de cada contagem, com o
   catálogo do livro Itens do App): o lote, a curadoria, a gravação e as contas da lista veem as mesmas linhas, e o número não
   muda de uma tela para a outra. A avariada que achou UM item de código `<código da boa>-AV` (sem caixa e sem espaço; o código da
-  boa pelo ID no catálogo, e sem ele o da linha) vira linha `item` dele com `_avariado_de`; a que não achou (ou achou dois: seria
-  chutar o ID) fica `avariado` com `_codigo_av`, `_nome_av` (`"[AVARIADO] " + o nome da boa`, o padrão dos -AV do livro Itens em
-  30/10/2026) e `_unidade_av` (a da boa), que a curadoria usa no cadastrar. O resolver devolve cópias: a cópia de 5 min do livro
-  do App não muda.
+  boa pelo ID no catálogo, e sem ele, ou na linha sem o ID, o Código da linha; o "None" do `sync-xlsx` não é código) vira linha
+  `item` dele com `_avariado_de`; a que não achou fica `avariado` com `_codigo_av`, `_nome_av` (`"[AVARIADO] " + o nome da boa`, o
+  padrão dos -AV do livro Itens em 30/10/2026) e `_unidade_av` (a da boa), que a curadoria usa no cadastrar; a que achou DOIS
+  (seria chutar o ID) também, com `_av_repetido`. O resolver devolve cópias: a cópia de 5 min do livro do App não muda.
+  **O catálogo que NÃO se leu não é catálogo vazio** (revisão de 31/10/2026): o `_do_app` diz `itens_lido`, e a falha (que
+  ficaria 5 min na cópia) não vira `{}`; senão toda avariada que acha o -AV viraria "sem cadastro", e a linha direta do -AV
+  contaria sozinha, sem a trava do dobro. A avariada fica `_sem_catalogo`, e a contagem DELA ganha o aviso `SEM_CATALOGO` ("o
+  catálogo do App não foi lido agora: ...; tente de novo em alguns minutos"), não se aprova e não se revisa; a sem avariada
+  segue. Esse aviso não é do App (`aviso_do_app` falso): a página não manda avisar quem cuida do App, e a contagem continua
+  valendo como a mais nova do almoxarifado (`_pode_substituir` olha só o `aviso_do_app`; senão a velha viraria aprovável por
+  alguns minutos). O livro Itens lido e vazio é catálogo sem o -AV: a avariada vai à curadoria, sem aviso.
 - **Contrato violado vira aviso, não número pela metade:** "ID da linha" vazio ou o texto "None" (o `sync-xlsx` escreve o vazio
   assim) junta duas linhas numa nas contas (`contas._unicas`) e perde unidades contadas; contagem sem o ID do almoxarifado não tem
-  saldo do sistema para ler. Os dois dão `aviso` e `aprovavel` falso (a tela não mostra comparação).
+  saldo do sistema para ler; a avariada sem o ID E sem o Código da boa não é de peça nenhuma (sumir com ela esconderia unidades
+  contadas). Os três dão `aviso` (com `aviso_do_app`) e `aprovavel` falso (a tela não mostra comparação).
 - **`motivo_nao_aprovavel`** (a tela mostra o porquê): "já gravada" (gravando, gravada e com conflitos), "substituída",
-  "recontagem pedida", "contagem sem almoxarifado", "linha sem ID da linha", "data da contagem ilegível", "contada no futuro: o
-  relógio do celular" e "mais de 90 dias" (`contas.aprovavel`, `APROVAVEL_DIAS`).
+  "recontagem pedida", "contagem sem almoxarifado", "linha sem ID da linha", "avariada sem o ID nem o Código da peça boa", o
+  `SEM_CATALOGO`, "data da contagem ilegível", "contada no futuro: o relógio do celular" e "mais de 90 dias" (`contas.aprovavel`,
+  `APROVAVEL_DIAS`).
 - **As contas de linhas** contam depois do dedupe da fila offline (mesmo "ID da contagem" e "ID da linha"), e somam as linhas de
   peça: `n_em_branco` (sem número, o achado em branco inclusive), `n_curadoria` (com número e ainda por decidir: o genérico por
   identificar, o achado fora do catálogo e a avariada sem o -AV, descontadas as decisões já gravadas na curadoria) e
@@ -1043,7 +1052,7 @@ foto também é 403 para eles).
 Três pendências, só nas contagens que ainda NÃO foram gravadas: o **achado fora do catálogo** (cadastrar, é a peça X, descartar), o
 **genérico a identificar** (confirmar o específico que o técnico escolheu, ou outro) e, desde 30/10/2026, a **avariada sem
 cadastro** (a avariada da aba Avariados cujo `-AV` não está no catálogo do App: cadastrar, é a peça X, descartar). O achado em
-branco não é pendência, nem a avariada sem o ID da peça boa.
+branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa (a sem o ID vai pelo Código).
 
 - **A avariada sem cadastro** (`avariados.py`, item 5 das melhorias): o cadastrar vem preenchido (o código `<código da boa>-AV`,
   o nome no padrão dos -AV do catálogo, `"[AVARIADO] " + o nome da boa`, e a unidade da boa; o PCM corrige o nome e a unidade, o
@@ -1053,7 +1062,12 @@ branco não é pendência, nem a avariada sem o ID da peça boa.
   grava a decisão `e_a_peca` com aquele ID e não cria nada (o `codigo_criado` fica vazio, porque nada foi criado; o código vai no
   evento da auditoria). O código fixo é a chave da nova tentativa; a trava por código (`_CODIGO_AV`) faz duas contagens com a
   avariada da mesma boa procurarem e criarem uma de cada vez. Na tela, o número do alto "Avariada sem cadastro" e o cartão com o
-  -AV que falta.
+  -AV que falta. **O -AV repetido no catálogo** (dois itens com o mesmo código, `_av_repetido`): o cartão diz "há mais de um item
+  com o código X no catálogo: escolha pelo 'é a peça X'", sem o cadastrar, e o cadastrar é 409 antes do Fracttal (o `achar_peca`
+  escolheria um dos dois, o chute que o resolver evitou). **"É a peça X" com X a própria peça boa é 400** ("as avariadas não
+  entram na peça boa: escolha o -AV"; pelo ID da boa e, na linha sem o ID, pelo Código dela): avariado nunca entra no bom.
+  **Sem o catálogo do App lido agora** (`_sem_catalogo`), a avariada sai das pendências, a decisão por ela é 503 ("tente de novo")
+  e a tela diz por quê: "não está no catálogo" seria falso, e a decisão vale mesmo depois de a linha se resolver.
 - **A decisão é uma linha do livro** (`fato_curadoria_inventario`, chave `contagem_id` + "ID da linha") mais o evento `curadoria` na
   auditoria, e entra no lote pela `contas.contado_efetivo`: "é a peça X" e "cadastrar" SOMAM as achadas ao contado da peça NESSA
   contagem (o total substitui o saldo); o genérico confirmado tira do genérico e põe no específico. `decisoes(cfg, contagem)` devolve

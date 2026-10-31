@@ -21,6 +21,7 @@ from nexus.dados import almoxarifado as A
 from nexus.dados import fato_inventario as F
 from nexus.pcm.inventario import contas as C
 from nexus.pcm.inventario import curadoria as CU
+from nexus.pcm.inventario import erros
 from nexus.pcm.inventario import estoque as E
 from nexus.pcm.inventario.erros import Conflito
 from test_pcm_inventario_estoque import _jwt, _result, api_do_clone, com_o_fracttal  # noqa: F401  (api_do_clone é fixture)
@@ -510,20 +511,25 @@ def test_decisoes_no_formato_das_contas(cur):
 # -AV não está no catálogo do App, a linha fica `avariado` e vem para cá, com o cadastrar já preenchido.
 AVARIADA = _linha("L-6", tipo="avariado", contado="2", **{"ID do item": "3", "Código": "SP-3"})
 AVARIADA_2 = _linha("L-7", tipo="avariado", contado="1", **{"ID do item": "2", "Código": "SP-2"})
-AVARIADA_SEM_ID = _linha("L-8", tipo="avariado", contado="1")
+AVARIADA_SEM_ID = _linha("L-8", tipo="avariado", contado="1")                    # nem o ID nem o Código da boa
+AVARIADA_SO_CODIGO = _linha("L-9", tipo="avariado", contado="1", **{"Código": "SP-1"})   # sem o ID: vai pelo Código
 
 
-def _o_bom_sem_av(app_):
+def _o_bom_sem_av(app_, repetido=False):
     """O catálogo do App com a SP-3 BOA (em metro) e sem a SP-3-AV (no `_semear` o item 3 é a própria SP-3-AV), e a contagem
-    C-1 com as avariadas da SP-3 e da SP-2 (que também não tem -AV). Os mesmos 10 itens, 9 lidos: o ciclo segue inteiro."""
+    C-1 com as avariadas da SP-3, da SP-2 (que também não tem -AV) e da SP-1 (pelo Código, sem o ID). Os mesmos 10 itens, 9
+    lidos: o ciclo segue inteiro. `repetido`: os itens 9 e 10 são DOIS com o código SP-3-AV."""
     from test_pcm_almoxarifado import _item
     nomes = {1: ("SP-1", "Fusível 10A", "UNIDADE"), 2: ("SP-2", "Cabo 6 mm", "METRO"), 3: ("SP-3", "Cabo solar 4 mm", "METRO"),
              4: ("SP-4", "Relé de proteção", "UNIDADE")}
+    if repetido:
+        nomes.update({9: ("SP-3-AV", "[AVARIADO] Cabo solar 4 mm", "METRO"), 10: ("SP-3-AV", "[AVARIADO] Cabo solar", "METRO")})
     itens = [_item(i, *nomes.get(i, (f"SP-{i}", f"Peça {i}", "UNIDADE")), "Teste", lido="Não" if i == 4 else "Sim")
              for i in range(1, 11)]
     api = app_.extensions["nexus_dados_sessao"]
     _aba(api, A.LIVRO_ITENS, A.ABA_ITENS, itens)
-    _aba(api, A.LIVRO_CONTAGENS, A.ABA_CONTAGENS, _contagem(PECA_DA_LISTA, CABO, AVARIADA, AVARIADA_2, AVARIADA_SEM_ID))
+    _aba(api, A.LIVRO_CONTAGENS, A.ABA_CONTAGENS,
+         _contagem(PECA_DA_LISTA, CABO, AVARIADA, AVARIADA_2, AVARIADA_SEM_ID, AVARIADA_SO_CODIGO))
     visao.limpar()
 
 
@@ -535,10 +541,12 @@ def _cartao(html, texto):
 def test_avariada_sem_cadastro_na_lista(cur, monkeypatch):
     """A avariada sem o -AV no catálogo é pendência da curadoria ("avariada sem cadastro"), com o -AV que falta, o nome no
     padrão dos -AV do catálogo ("[AVARIADO] " + o nome da boa) e a unidade da boa: o cadastrar já vem preenchido, com o código
-    fixo (sem a sigla nem o próximo número). A avariada sem o ID da boa não é de peça nenhuma e não vira pendência."""
+    fixo (sem a sigla nem o próximo número). A avariada sem o ID da boa vai pelo Código dela (o nome e a unidade ficam para o
+    PCM); sem o ID nem o Código não é de peça nenhuma e não vira pendência (a leitura põe o aviso do App na contagem)."""
     _o_bom_sem_av(cur)
     p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
-    assert set(p) == {"L-2", "L-6", "L-7"}
+    assert set(p) == {"L-2", "L-6", "L-7", "L-9"}
+    assert (p["L-9"]["codigo_av"], p["L-9"]["nome_av"], p["L-9"]["av_repetido"]) == ("SP-1-AV", "", False)
     a = p["L-6"]
     assert (a["tipo"], a["contado"], a["id_item"], a["codigo"]) == ("avariado", 2, "3", "SP-3")
     assert (a["codigo_av"], a["nome_av"], a["unidade_av"]) == ("SP-3-AV", "[AVARIADO] Cabo solar 4 mm", "METRO")
@@ -555,7 +563,7 @@ def test_avariada_sem_cadastro_na_lista(cur, monkeypatch):
     assert 'name="decisao" value="confirmar"' not in card
     # o número do alto conta a avariada à parte (nem fora do catálogo nem genérico)
     tiles = {r: v for v, r in re.findall(r'<b class="inv-tile-v">(\d+)</b><span class="inv-tile-r">([^<]+)</span>', html)}
-    assert tiles == {"Para decidir": "3", "Fora do catálogo": "1", "Genérico a identificar": "0", "Avariada sem cadastro": "2",
+    assert tiles == {"Para decidir": "4", "Fora do catálogo": "1", "Genérico a identificar": "0", "Avariada sem cadastro": "3",
                      "Já decididas": "0"}
 
 
@@ -627,6 +635,59 @@ def test_a_avariada_aceita_so_as_decisoes_dela(cur):
     r = CU.decidir(cur.config, "C-1", "L-6", "e_a_peca", id_item="1", pessoa=PESSOA)
     assert (r["decisao"], r["id_item"]) == ("e_a_peca", "1") and "avariadas" in r["texto"]
     assert CU.decidir(cur.config, "C-1", "L-7", "descartar", motivo="não está avariada", pessoa=PESSOA)["decisao"] == "descartar"
+
+
+def test_avariada_com_o_av_repetido_no_catalogo(cur, monkeypatch):
+    """Dois itens com o código SP-3-AV no catálogo: o resolver não escolhe (seria chutar o ID), e a curadoria diz que o código
+    se repete, em vez de "não está no catálogo". Cadastrar é recusado (409) antes de falar com o Fracttal: o `achar_peca`
+    escolheria um dos dois do mesmo jeito. O PCM escolhe pelo "é a peça X"."""
+    _o_bom_sem_av(cur, repetido=True)
+    a = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}["L-6"]
+    assert (a["codigo_av"], a["av_repetido"]) == ("SP-3-AV", True)
+    _no_setor(monkeypatch, "PCM")
+    card = _cartao(_pessoa_ms(cur).get(URL).get_data(as_text=True), "SP-3-AV")
+    assert "há mais de um item com o código SP-3-AV no catálogo: escolha pelo 'é a peça X'" in card
+    assert "não está no catálogo" not in card and "/curadoria/cadastrar" not in card
+    assert 'name="decisao" value="e_a_peca"' in card
+    falso = _falso()
+    with pytest.raises(Conflito, match="mais de um item com o código SP-3-AV"):
+        CU.decidir(cur.config, "C-1", "L-6", "cadastrar", estoque=falso, pessoa=PESSOA)
+    assert falso.chamadas == [] and _livro(cur.config, F.ABA_CURADORIA) == []
+    assert CU.decidir(cur.config, "C-1", "L-6", "e_a_peca", id_item="9", pessoa=PESSOA)["id_item"] == "9"
+
+
+def test_a_avariada_nao_entra_na_peca_boa(cur):
+    """"É a peça X" com X a própria peça boa somaria as avariadas ao estoque bom: 400, escolha o -AV. Vale pelo ID da boa e, na
+    linha sem o ID, pelo Código dela."""
+    _o_bom_sem_av(cur)
+    with pytest.raises(ValueError, match="(?i)as avariadas não entram na peça boa: escolha o -AV"):
+        CU.decidir(cur.config, "C-1", "L-6", "e_a_peca", id_item="3", pessoa=PESSOA)
+    with pytest.raises(ValueError, match="peça boa"):
+        CU.decidir(cur.config, "C-1", "L-9", "e_a_peca", id_item="1", pessoa=PESSOA)
+    assert _livro(cur.config, F.ABA_CURADORIA) == []
+    assert erros.resposta(ValueError("x"))[0] == 400
+
+
+def test_sem_o_catalogo_lido_a_curadoria_nao_oferece_a_avariada(cur, monkeypatch):
+    """O catálogo do App que não se leu agora: a avariada não se resolve, e decidir por ela ("não está no catálogo") poderia valer
+    contra um -AV que existe (a decisão vale mesmo depois de a linha se resolver). Ela sai das pendências até o catálogo ser lido,
+    a decisão é recusada (503, tente de novo) e a tela diz por quê; o resto da curadoria segue."""
+    _o_bom_sem_av(cur)
+    original = visao._livro
+
+    def livro(nome, aba=None):
+        if nome == A.LIVRO_ITENS:
+            raise ConnectionError("banco fora")
+        return original(nome, aba)
+    monkeypatch.setattr(visao, "_livro", livro)
+    visao.limpar()
+    assert {x["chave_linha"] for x in CU.pendencias(cur.config)} == {"L-2"}
+    with pytest.raises(F.Recusada, match="catálogo do App não foi lido") as ex:
+        CU.decidir(cur.config, "C-1", "L-6", "descartar", motivo="x", pessoa=PESSOA)
+    assert erros.resposta(ex.value)[0] == 503 and _livro(cur.config, F.ABA_CURADORIA) == []
+    _no_setor(monkeypatch, "PCM")
+    html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
+    assert "O catálogo do App não foi lido agora" in html and "SP-3-AV" not in html and "Cabo azul 6 mm" in html
 
 
 # ── as telas ─────────────────────────────────────────────────────────────────────────────────────────────────────────
