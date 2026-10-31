@@ -7,6 +7,7 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
   const fmtN = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   let TODOS = [], POR_ID = {}, RECENTES = new Set(), FILTRADOS = [];
+  let LEITOR = false;                 // o servidor lê os ativos sozinho: o botão busca só os novos, em segundos (31/10/2026)
   let cliente = '', usina = '', tipo = '', visao = 'lista', selId = null;
 
   // ── carga ──
@@ -19,15 +20,16 @@
   }
   function chegou(ativos, info) {
     TODOS = ativos; POR_ID = {}; TODOS.forEach(a => { if (a.id != null) POR_ID[a.id] = a; });
+    LEITOR = !!(info && info.leitor);
     const usinas = new Set(TODOS.map(a => a.usina));
     $('sub').textContent = fmtN(TODOS.length) + ' ativos  ·  ' + usinas.size + ' usinas' + idadeTxt(info);
     arvore(); aplica();
   }
+  // "ativos de HH:MM" vem pronto do servidor (31/10/2026): a hora de Brasília da última vez que a lista foi comparada com o
+  // Fracttal (a lista inteira, de madrugada, ou os novos do dia), com a data quando é de outro dia
   function idadeTxt(info) {
-    if (!info || !info.ts) return '';
-    const d = new Date(info.ts * 1000);
-    const q = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-    return '  ·  lista de ' + q + (info.expirado ? '  (desatualizada)' : '');
+    if (!info || !info.ativos_de) return '';
+    return '  ·  ' + info.ativos_de + (info.expirado ? '  (desatualizada)' : '');
   }
 
   // ── árvore cliente → usina ──
@@ -128,18 +130,25 @@
   $('busca_usina').addEventListener('input', () => { clearTimeout(t2); t2 = setTimeout(arvore, 200); });
   document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); $('busca').focus(); $('busca').select(); } });
 
-  // ── Atualizar catálogo (ignora o cache de 24 h) ──
+  // ── Atualizar catálogo (31/10/2026): com o leitor do servidor, o botão pede os ativos NOVOS e volta na hora, e a lista
+  //    pedida com ?novos=1 espera essa leitura (segundos); sem ele (o PC), o catálogo inteiro pelo RPC (minutos) ──
   $('b_reload').addEventListener('click', async () => {
-    const b = $('b_reload'); b.disabled = true; b.textContent = 'atualizando…'; $('sub').textContent = 'buscando o catálogo no Fracttal…';
+    const b = $('b_reload'); b.disabled = true; b.textContent = 'atualizando…';
+    $('sub').textContent = LEITOR ? 'buscando os ativos novos no Fracttal…' : 'buscando o catálogo no Fracttal…';
     const antes = TODOS.length;
     try {
-      const r = await OsCarga.buscar('/os/api/ativos/atualizar', {method: 'POST'}, 'Atualizando o catálogo no Fracttal…');
+      const r = await OsCarga.buscar('/os/api/ativos/atualizar', {method: 'POST'},
+        LEITOR ? 'Buscando os ativos novos no Fracttal…' : 'Atualizando o catálogo no Fracttal…');
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
-      const rc = await fetch('/os/api/ativos/catalogo'); const d = await rc.json();
+      const rc = await fetch('/os/api/ativos/catalogo' + (j.novos ? '?novos=1' : '')); const d = await rc.json();
       chegou(d.ativos || [], d.info || j.info || {});
       const delta = TODOS.length - antes;
-      if (delta) $('rodape').textContent = 'catálogo atualizado — ' + (delta > 0 ? '+' : '') + delta + ' ativo(s) em relação à lista anterior';
+      const partes = [delta ? 'catálogo atualizado — ' + (delta > 0 ? '+' : '') + delta + ' ativo(s) em relação à lista anterior'
+                            : (j.novos ? 'nenhum ativo novo no Fracttal' : '')];
+      if (j.recusa) partes.push(j.recusa);         // a leitura do Fracttal que o catálogo não aceitou, e por quê
+      const txt = partes.filter(Boolean).join('  ·  ');
+      if (txt) $('rodape').textContent = txt;
     } catch (e) { $('sub').textContent = 'não consegui atualizar: ' + String(e.message || e).slice(0, 90); }
     b.disabled = false; b.textContent = 'Atualizar ativos';
   });

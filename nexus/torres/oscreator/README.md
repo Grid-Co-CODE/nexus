@@ -1352,7 +1352,7 @@ dele; o `_code_loc` era montado uma vez por processo e nunca refeito (ativo novo
   duas leituras, e a lista inteira nunca seria a mesma.
 - **Os botões levam o motivo:** `POST /os/api/ativos/atualizar` e `GET /os/api/tradicional/catalogo?recarregar=1` respondem com
   `recusa` (texto curto com a hora, ou ""); o link `/os/solicitacao/atualizar`, que navega, leva `recusa` na volta para a Fila.
-  Mostrar na tela é a tarefa 2.3, que refaz os botões.
+  As três telas o mostram (seção "Os botões Atualizar ativos sem esperar o Fracttal", abaixo).
 - **Fresco ou vencido** é decidido por quem usa, por `conferido_em` (`api.catalogo_vencido`, 24 h): vencido, o catálogo serve e é
   renovado por trás pelo RPC, como em 24/10. O que veio da foto do banco está sempre vencido (é o socorro da máquina sem cópia:
   o código da foto é o canônico, e a 1ª leitura do Fracttal a troca). Com o leitor do servidor pronto (seção abaixo),
@@ -1439,6 +1439,32 @@ foto; a paridade que passa e a que falha, que deixa o catálogo pelo RPC, uma ve
 grava quando muda, não grava sobre a leitura curta e só depois que o catálogo aceitou; o encolhimento confirmado, que
 sobrevive ao reinício; a falha do download que vale para quem esperava; só o servidor liga, e sem a credencial não liga).
 
+## Os botões "Atualizar ativos" sem esperar o Fracttal (31/10/2026, tarefa 2.3 do canto central)
+
+Os três botões (OS Creator -> Ativos, o ↻ do Criar OS e o "Recarregar o catálogo de ativos" da ficha da Fila do PCM) baixavam o
+catálogo inteiro pelo RPC NA FRENTE de quem clicou: ~110 pedidos, minutos, e a página parada. Agora, com o leitor do servidor
+pronto (seção acima: ligado pelo `servir.py` e com a leitura REST da noite conferida), eles pedem só os ativos NOVOS
+(`api.load_assets_cached(force=True)` -> `ativos_central.pedir_novos`, por trás) e respondem na hora.
+- **O que a tela recebe:** `ativos_de` ("ativos de HH:MM", Brasília, `api.ativos_de`: a última vez que a lista foi comparada
+  com o Fracttal, a lista inteira de madrugada ou os novos do dia, o mais novo dos dois; de outro dia, "ativos de dd/mm
+  HH:MM", porque à 01:00 "de 02:20" seria lido como a de hoje), `novos` (True quando o leitor foi chamado) e `recusa`.
+- **E a lista seguinte já vem com os novos:** a tela que acabou de apertar o botão pede a lista com `?novos=1`
+  (`/os/api/ativos/catalogo?novos=1`, `/os/api/tradicional/catalogo?novos=1`, e o link volta à Fila com `novos=1`), e essa
+  rota espera a leitura em curso até 6 s (`api.esperar_os_novos`; estourou, segue com o que há). Quem espera é o pedido
+  seguinte, não o botão.
+- **Onde aparece:** na tela de Ativos, a linha de cima ("N ativos · M usinas · ativos de HH:MM"; o rodapé diz quantos
+  entraram, "nenhum ativo novo no Fracttal" ou o motivo da recusa); no Criar OS, ao lado do ↻ (a hora e, se houver, a
+  recusa); na Fila, no aviso do ativo que não se acha ("busca no Fracttal os ativos novos, em segundos; ativos de HH:MM") e,
+  quando o link volta com `recusa`, numa faixa de alerta no alto (a Fila ignorava o parâmetro).
+- **Sem o leitor** (o PC, `app.py`; a paridade que falhou ou que ainda não houve): os botões seguem pelo RPC com a sessão de
+  quem clicou, como antes, para dentro do catálogo central; a tela diz "leva alguns minutos" e mostra a mesma hora. A
+  renovação por trás do catálogo vencido é sempre pelo RPC (`_renovar_catalogo_por_tras` marca o contexto dela, `_POR_TRAS`,
+  e o `load_assets_cached(True)` dela não chama o leitor).
+- O erro do ↻ do Criar OS diz em palavras ("Não consegui recarregar os ativos: ..."), sem o sinal de alerta.
+- **Prova:** `tests/test_oscreator_ativos_botao.py` (os três botões voltam antes de a leitura dos novos acabar, sem o RPC, e
+  a lista com `?novos=1` já traz o ativo novo; "ativos de HH:MM", com a data quando é de outro dia, nas respostas e nas
+  páginas, e a Fila mostrando a recusa; sem o leitor, ou com a paridade que falhou, o RPC com a sessão da pessoa).
+
 ## O catálogo de ativos vencido por trás (24/10/2026)
 
 Em 23/10/2026 às 10:44 o catálogo de ~22 mil ativos passou das 24 h (`api.ASSETS_TTL`) e o 1º a precisar dele o baixou
@@ -1452,9 +1478,10 @@ quando atualizar vai atualizar a lista de todos, não só daquela pessoa".
   (encolheu) conta como conferida, e o retry de 10 em 10 min acabou para ela (31/10/2026, seção do catálogo central).
 - **Espera o novo** só quem precisa dele em dia: `em_dia=True` (resolver o ativo da OS na aprovação,
   `rotas_solic._catalogo_para_aprovar`); e quem não tem catálogo nenhum na máquina.
-- **O botão "Atualizar ativos"** (OS Creator → Ativos, `/os/api/ativos/atualizar`) baixa na hora; o catálogo é um só (desde
-  31/10/2026 o central, seção acima; antes, o arquivo `assets_cache.json`), então vale para todos. Ativo cadastrado hoje que
-  não aparece: é ele.
+- **O botão "Atualizar ativos"** (OS Creator → Ativos, `/os/api/ativos/atualizar`) vale para todos: o catálogo é um só (desde
+  31/10/2026 o central, seção acima; antes, o arquivo `assets_cache.json`). Ativo cadastrado hoje que não aparece: é ele. Com o
+  leitor do servidor (31/10/2026), ele busca só os ativos novos e volta na hora (seção "Os botões Atualizar ativos sem esperar o
+  Fracttal"); sem ele (o PC), baixa o catálogo inteiro na hora, como antes.
 - Prova: `tests/test_oscreator_catalogo_por_tras_24_10.py` (7; 6 falham no código de antes, o outro segura o "sem
   catálogo, espera"); 5 mutações, todas pegas. Desde 31/10/2026 os mesmos cenários rodam sobre o catálogo central (o
   download troca o catálogo da memória e a cópia em disco).

@@ -8,6 +8,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, jsonify, render_template, request
 
 import api
+import ativos_central
 import chamado_insp_spec as ci
 
 from . import ativos_web
@@ -24,13 +25,18 @@ def _todos() -> list:
 @bp.route("/ativos")
 @exige_sessao
 def ativos():
+    # o título do botão diz o que ele faz nesta máquina: com o leitor do servidor, só os novos (segundos); sem ele, tudo (minutos)
     return render_template("ativos.html", conta=_conta(), aba="criar", tipos_chip=ativos_web.TIPOS_CHIP,
-                           limite=ativos_web.LIMITE_TABELA)
+                           limite=ativos_web.LIMITE_TABELA, leitor=ativos_central.leitor_pronto())
 
 
 @bp.route("/api/ativos/catalogo")
 @exige_sessao
 def api_catalogo():
+    # `?novos=1`: a tela acabou de apertar "Atualizar ativos" (que voltou na hora) e espera a leitura dos novos em curso, até
+    # poucos segundos, para a lista já vir com eles
+    if request.args.get("novos") == "1":
+        api.esperar_os_novos()
     return jsonify({"ativos": [ativos_web.enxuto(a) for a in _todos()], "info": api.assets_cache_info()})
 
 
@@ -71,10 +77,13 @@ def api_ativo(aid):
 @bp.route("/api/ativos/atualizar", methods=["POST"])
 @exige_sessao
 def api_atualizar():
-    """Recarrega do Fracttal ignorando o cache de 24 h (Levi, 07/08): quem acabou de cadastrar um ativo precisa dele
-    AGORA. São ~100 páginas de 200 ativos — a tela avisa que demora."""
+    """O botão "Atualizar ativos" (Levi, 07/08: quem acabou de cadastrar um ativo precisa dele AGORA). Com o leitor do
+    servidor pronto (31/10/2026, tarefa 2.3 do canto central), pede os ativos NOVOS por trás e responde na hora (`novos`
+    True: a tela pede a lista com `?novos=1`, que espera essa leitura); sem ele (o PC), baixa o catálogo inteiro pelo RPC com
+    a sessão de quem clicou (~110 pedidos: a tela avisa que demora). `ativos_de`: de quando é a lista; `recusa`: o motivo, se
+    o Fracttal deu uma lista que o catálogo não aceitou (senão "")."""
     antes = len(api.load_assets_cached() or [])
+    novos = ativos_central.leitor_pronto()
     depois = api.load_assets_cached(force=True) or []
-    # `recusa`: o motivo, se o Fracttal deu uma lista que o catálogo não aceitou (senão ""); a tela o mostra na 2.3
     return jsonify({"n": len(depois), "delta": len(depois) - antes, "info": api.assets_cache_info(),
-                    "recusa": api.aviso_da_recusa()})
+                    "recusa": api.aviso_da_recusa(), "ativos_de": api.ativos_de(), "novos": novos})

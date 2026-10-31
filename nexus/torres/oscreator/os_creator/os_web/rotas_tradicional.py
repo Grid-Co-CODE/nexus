@@ -16,6 +16,7 @@ from flask import Blueprint, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
 import api
+import ativos_central
 
 from . import ativo_curto
 from . import tradicional_web as trad
@@ -39,16 +40,23 @@ def tradicional():
                            programada=(agora + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M"),   # default do Step1: amanhã
                            # o "Criar OS" da OS do Quadro da equipe da Engenharia (25/10/2026): o ativo, a OS pai e a data
                            # do incidente pelo endereço, a mesma regra da Nova solicitação
-                           sugestao=trad.sugestao(assets, request.args), subs_padrao=trad.SUBS_PADRAO)
+                           sugestao=trad.sugestao(assets, request.args), subs_padrao=trad.SUBS_PADRAO,
+                           # "ativos de HH:MM" ao lado do ↻ (31/10/2026, tarefa 2.3 do canto central)
+                           ativos_de=api.ativos_de())
 
 
 @bp.route("/api/tradicional/catalogo")
 @exige_sessao
 def api_catalogo():
     """A cascata do Step 1 em três pedidos: sem parâmetro → clientes; ?cliente= → usinas; ?cliente=&usina= → tipos + ativos
-    (o filtro por tipo e a busca são locais, em memória, como no app). ?recarregar=1 é o botão ↻ (load_assets_cached(force)).
+    (o filtro por tipo e a busca são locais, em memória, como no app). ?recarregar=1 é o botão ↻ (load_assets_cached(force):
+    com o leitor do servidor, pede os ativos novos por trás e volta na hora, com `novos` True; sem ele, o RPC inteiro).
+    ?novos=1 → a tela acabou de apertar o ↻ e espera a leitura dos novos em curso (poucos segundos) antes de ler a lista.
     ?cliente=&ativos=1 → as usinas e os ativos de todas elas (a Nova solicitação, numa leitura só)."""
     force = request.args.get("recarregar") == "1"
+    novos = force and ativos_central.leitor_pronto()
+    if not force and request.args.get("novos") == "1":
+        api.esperar_os_novos()
     assets = api.load_assets_cached(True) if force else api.load_assets_cached()
     cliente = (request.args.get("cliente") or "").strip()
     usina = (request.args.get("usina") or "").strip()
@@ -65,7 +73,7 @@ def api_catalogo():
     if cliente:
         return jsonify({"cliente": cliente, "usinas": trad.usinas_de(assets, cliente)})
     return jsonify({"clientes": trad.clientes(assets), "recarregado": force,
-                    "recusa": api.aviso_da_recusa() if force else ""})
+                    "recusa": api.aviso_da_recusa() if force else "", "ativos_de": api.ativos_de(), "novos": novos})
 
 
 @bp.route("/api/tradicional/tipos")

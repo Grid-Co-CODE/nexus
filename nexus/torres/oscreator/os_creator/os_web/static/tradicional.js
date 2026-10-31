@@ -172,12 +172,17 @@
   $('b_reload').onclick = async () => {                       // ↻ → load_assets_cached(force=True)
     hint.textContent = 'Recarregando ativos do Fracttal…';
     try {
-      const j = await getJson('/os/api/tradicional/catalogo?recarregar=1');
+      let j = await getJson('/os/api/tradicional/catalogo?recarregar=1');
+      const recusa = j.recusa;                                // a leitura do Fracttal que o catálogo não aceitou, e por quê
+      // com o leitor do servidor (31/10/2026) o ↻ pediu os ativos NOVOS e voltou na hora: a lista pedida com ?novos=1
+      // espera essa leitura (segundos) e já vem com eles; sem ele (o PC), o ↻ já trouxe o catálogo inteiro pelo RPC
+      if (j.novos) j = await getJson('/os/api/tradicional/catalogo?novos=1');
       porCliente.clear();                                     // o catálogo foi relido: os ativos de cada cliente também
       const cur = cbCli.value;
       cbCli.innerHTML = '<option value="">— Selecione o cliente —</option>' + (j.clientes || []).map((c) => '<option value="' + esc(c) + '"' + (c === cur ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+      $('ativos_de').textContent = [j.ativos_de, recusa].filter(Boolean).join('  ·  ');
       await onCliente();
-    } catch (e) { hint.textContent = '⚠ ' + e.message; }
+    } catch (e) { hint.textContent = 'Não consegui recarregar os ativos: ' + e.message; }
   };
 
   // ═══ Passo 2 — Step2 + TipoTarefaBox ═══

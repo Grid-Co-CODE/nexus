@@ -364,6 +364,10 @@ def fila():
     negado = _sem_area_pcm_pagina("Fila do PCM", "fila")
     if negado:
         return negado
+    if request.args.get("novos") == "1":
+        # a volta do "Recarregar o catálogo de ativos" (que pediu os ativos novos ao leitor do servidor e voltou na hora):
+        # espera a leitura em curso, poucos segundos, para a ficha já achar o ativo cadastrado agora
+        api.esperar_os_novos()
     cat = _indice_ativos()
     forcar = request.args.get("atualizar") == "1"
     lista, pessoas, etiquetas, tipos, status = _ao_mesmo_tempo(lambda: _lista(forcar), _pessoas, _etiquetas, _tipos,
@@ -395,7 +399,11 @@ def fila():
         status=[{"id": i, "cod": cod, "rot": rot} for i, cod, rot in status],
         temas=sw.temas_da_fila(), tipos_sub=sw.TIPOS_SUB, tipo_padrao=sw.TIPO_PADRAO,
         classif1_padrao=sw.CLASSIF1_PADRAO, nenhuma=sw.SEM_CLASSIF, etiqueta_perf=sp.ETIQUETA_PERFORMANCE,
-        tempo_padrao=api.DURACAO_OS_AVULSA)
+        tempo_padrao=api.DURACAO_OS_AVULSA,
+        # de quando é o catálogo de ativos, se o servidor lê os novos sozinho (o link dele demora segundos, não minutos) e o
+        # motivo da leitura do Fracttal que o catálogo não aceitou, que o link do catálogo traz na volta (31/10/2026)
+        ativos_de=api.ativos_de(), leitor=ativos_central.leitor_pronto(),
+        recusa=(request.args.get("recusa") or "").strip()[:300])
 
 
 @bp.route("/api/solic/<id_code>")
@@ -682,20 +690,23 @@ def api_tema_arquivar(chave):
 @exige_sessao
 def atualizar():
     """Recarrega o CATÁLOGO DE ATIVOS e volta à Fila (o aviso "não consegui identificar o ativo" da ficha leva aqui).
-    Existe porque a causa mais comum desse aviso é catálogo velho — um ativo cadastrado hoje de manhã. Se o catálogo já
-    está sendo baixado por trás, espera esse em vez de baixar duas vezes."""
+    Existe porque a causa mais comum desse aviso é catálogo velho — um ativo cadastrado hoje de manhã. Com o leitor do
+    servidor pronto (31/10/2026), pede os ativos NOVOS por trás e volta na hora, com `novos=1` (a Fila espera essa leitura,
+    poucos segundos); sem ele (o PC), baixa o catálogo pelo RPC com a sessão de quem clicou e, se o catálogo já está sendo
+    baixado por trás, espera esse em vez de baixar duas vezes."""
     negado = _sem_area_pcm_pagina("Fila do PCM", "fila")
     if negado:
         return negado
-    # se o catálogo já está sendo baixado por trás, este pedido espera esse download e o usa (o `force` do
+    novos = ativos_central.leitor_pronto()
+    # sem o leitor, se o catálogo já está sendo baixado por trás, este pedido espera esse download e o usa (o `force` do
     # `load_assets_cached` confere se o catálogo foi conferido depois do pedido), em vez de baixar duas vezes
     api.load_assets_cached(True)
     _esquecer_lista()
-    # este botão é um link que navega: não há JSON, então o motivo da recusa (se houve) vai na volta, em `recusa`, para a Fila
-    # mostrar (a tela refeita é da 2.3); a Fila de hoje ignora o parâmetro
+    # este botão é um link que navega: não há JSON, então o motivo da recusa (se houve) vai na volta, em `recusa`, e a Fila o
+    # mostra no alto
     aviso = api.aviso_da_recusa()
     return redirect(url_for("os_web_solic.fila", sel=request.args.get("sel") or "", atualizar=1,
-                            **({"recusa": aviso} if aviso else {})))
+                            **({"novos": 1} if novos else {}), **({"recusa": aviso} if aviso else {})))
 
 
 @bp.route("/api/solic/aquecer", methods=["POST"])
