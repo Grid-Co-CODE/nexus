@@ -37,9 +37,18 @@ def _catalogo_de_ativos_isolado():
     disco, a função do banco e o que ele guarda valem para o processo inteiro. Um teste que cria o clone "fora dos testes"
     (`TESTING` desligado, como o do token do banco) aponta a pasta para a do usuário da máquina (%APPDATA%), e o seguinte, sem
     saber, migraria o arquivo de lá e gravaria nela. Cada teste começa e termina sem catálogo, sem pasta e sem banco. Só age
-    se o módulo já foi importado (o clone do OS Creator no `sys.path`): os demais testes não pagam nada."""
+    se o módulo já foi importado (o clone do OS Creator no `sys.path`): os demais testes não pagam nada. A lista central de
+    OS (`os_creator/os_central.py`, etapa 3) é do mesmo feitio (uma por processo, com a pasta dela) e é limpa junto; a
+    gravação em disco que ficou agendada termina antes (ela roda numa thread à parte)."""
     def limpar():
         mod = sys.modules.get("ativos_central")
+        if mod is not None:
+            mod.reiniciar()
+        mod = sys.modules.get("os_central")
+        if mod is not None:
+            mod.esperar_gravacao(5)
+            mod.reiniciar()
+        mod = sys.modules.get("os_leitor")                 # e o leitor dela, que liga a entrega das abertas no tarefas_os
         if mod is not None:
             mod.reiniciar()
     limpar()

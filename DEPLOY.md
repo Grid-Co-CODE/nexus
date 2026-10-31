@@ -294,7 +294,18 @@ mesma credencial do Campo · App e do motor do PCM (`FRACTTAL_CLIENT_ID` e `FRAC
 vale, troca o catálogo e renova a `nexus_ativos_fracttal · foto_ativos` no banco (só quando o sha das linhas muda); das
 06h às 22h, às :08 e :38, só os ativos novos. É a única máquina que grava a foto (a ferramenta
 `ferramentas/carregar_ativos_fracttal.py` ficou só com a medição). A 1ª noite depois do deploy é a conferência REST x RPC:
-o resultado fica em `ativos_central.estado()["paridade_rest"]` e na `ativos_estado.json` da pasta de dados do OS Creator.
+o resultado fica em `ativos_central.estado()["paridade_rest"]` e na `ativos_estado.json` da pasta de dados do OS Creator, e o
+Raio-X mostra (seção "Uso do OS Creator", bloco "Ativos centrais").
+
+**O histórico de OS central (31/10/2026; nada a fazer no servidor).** O `servir.py` liga também o leitor da lista central de OS
+do OS Creator (`nexus/torres/oscreator/os_creator/os_leitor.py`), com a mesma credencial REST (sem ela não liga): as OS novas
+de 3 em 3 min (06h às 20h de segunda a sexta; de 15 em 15 fora disso), os últimos 7 dias às :00, :21, :30, :41 e :51 (06h às
+20h), as finalizadas às :45, a janela de madrugada às 03:21 (90 dias; no domingo e na 1ª carga, a janela inteira de 365 dias,
+~500 pedidos a 1 por segundo), e as abertas que o laço do `tarefas_os` já lê de hora em hora, entregues sem pedido a mais (sem
+entrega em 70 min, ele as lê no :55). A lista mora na memória e numa cópia na pasta de dados do OS Creator
+(`os_central.json.gz`, ~2,6 MB para 36 mil OS; não vai ao banco nem ao git): o reinício volta por ela sem pedir nada ao
+Fracttal. A 1ª noite depois do deploy é a 1ª carga e a conferência dos campos do REST: o Raio-X mostra (seção "Uso do OS
+Creator", peça "Lista central de OS"). As telas ainda não leem dela (é a tarefa 3.3).
 
 **Na 1ª carga depois da atualização de 08/10/2026** entram no banco, pela primeira vez, o `fato_ronda`, o `fato_pt`, o
 livro `nexus_equipamentos` e a mescla da programação; o histórico de pessoas e usinas passa a começar "desde sempre"

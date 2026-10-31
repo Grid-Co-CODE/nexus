@@ -265,6 +265,17 @@ leitura pula as linhas dela numa borda de página): fica no `faltaram` da qualid
 (`recusou`): sem a `NEXUS_PESSOA_HMAC` ou a lista do backoffice (o `do_backoffice` iria 0 para todas), com a usina ou o
 de-para do cadastro vazios, ou com menos de 90% das tarefas ligadas a uma usina. Grava também a `qualidade` do livro
 (`linha_qualidade`), que a Governança lê.
+**O leitor de OS do Nexus (31/10/2026, etapa 3 do canto central do OS Creator):** o `tarefas_os.py` é O leitor do REST
+`work_orders`, e não nasceu outro. A lista central de OS do OS Creator (`os_creator/os_central.py`, que fica na memória e numa
+cópia no disco do servidor, NUNCA no banco: tem o texto da OS e nomes) é enchida pelas mesmas funções e pela mesma paginação
+(`_paginas`, com o total, a página repetida e a recusa): `ler_abertas` (a leitura das abertas deste fato, extraída do
+`ler_fracttal`), `ler_criadas` (pela criação, da mais nova para trás), `ler_finalizadas` (status 3 pela data de fim, desde um
+piso, parando numa página INTEIRA além dele: a leitura do desenho do PCM de 27/10; o `fato_tarefa_finalizada` NÃO é publicado
+aqui, é do PCM, que vai ler desta função) e `ler_os` (uma OS pelo nº). A volta de hora em hora ENTREGA as abertas que acabou de
+ler inteiras a quem se registrou (`ligar_entrega_das_abertas`; o `os_leitor` do OS Creator, só no servidor): o fato, a qualidade
+e o número de pedidos da volta não mudam (`tests/test_oscreator_os_leitor.py::test_tarefas_os_segue_igual`), e a entrega que
+falha só vai ao log. A volta que pula (a outra máquina gravou há menos de 50 min) não entrega; sem entrega em 70 min, o leitor
+lê as abertas ele mesmo, pela mesma função (README do OS Creator, "A lista central de OS e o leitor em faixas").
 **O radar da usina trocada (20/10/2026):** o programador do PCM viu a OS de "Apolo - Iramaia II - BA" como Ibipeba no
 App e no programador. Os ativos ficam na localização de Iramaia II, mas a Classificação 1 deles (a usina do robô do PCM,
 do App e do `Ligador` daqui, que liga primeiro por ela) dizia Ibipeba: 21 dos 29 ativos de Iramaia II com tarefa, na foto

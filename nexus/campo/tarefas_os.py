@@ -28,6 +28,16 @@ no Fracttal), como os chamados (`chamados_acompanhamento.py`): grava a máquina 
 tiver mais de 50 min, conferido de novo logo antes de gravar (a leitura leva ~2 min); cada máquina acorda num minuto
 seu entre :10 e :20 (revisão de 18/10/2026: no mesmo :10, PC e servidor liam o Fracttal juntos e os dois gravavam).
 `NEXUS_OS_PUBLICAR=0` desliga numa máquina.
+
+O LEITOR DE OS DO NEXUS (31/10/2026, etapa 3 do canto central do OS Creator): este é o leitor do REST `work_orders`, e não
+nasce outro. A lista central de OS do OS Creator (`os_creator/os_central.py`, enchida em faixas pelo `os_leitor.py`, que só
+o servidor liga) lê pelas MESMAS funções e pela mesma paginação (`_paginas`, com o total, a página repetida e a recusa):
+`ler_abertas` (status 1 e 2, a mesma leitura que este fato faz), `ler_criadas` (pela data de criação, da mais nova para trás,
+até a página conhecida ou até uma página INTEIRA mais velha que o piso), `ler_finalizadas` (status 3 pela data de fim, desde
+um piso: a leitura do desenho do PCM de 27/10, `docs/superpowers/specs/2026-10-27-pcm-tarefa-e-executado-design.md`; o fato
+`fato_tarefa_finalizada` NÃO é publicado aqui, é do PCM, que vai ler desta função) e `ler_os` (uma OS pelo nº). E a volta de
+hora em hora ENTREGA as abertas que acabou de ler a quem se registrou (`ligar_entrega_das_abertas`, o `os_leitor` no
+servidor): a lista central não as lê de novo, e o fato e o número de pedidos desta volta não mudam.
 """
 import logging
 import random
@@ -56,6 +66,8 @@ DIAS_ZELADORIA = 90
 TIPO_ZELADORIA_REST = "Zeladoria"   # a grafia do tipo no REST: o ensaio (ferramentas/ensaio_tarefas_os.py) confere
 _BRT = timezone(timedelta(hours=-3))
 _LACO = {"thread": None, "parar": threading.Event(), "ultimo": None, "quando": None}
+# quem recebe as abertas que a volta leu (a lista central de OS do OS Creator, só no servidor: `os_leitor.ligar`)
+_ENTREGA: dict = {"abertas": None}
 log = logging.getLogger("nexus.campo")
 
 
@@ -96,13 +108,19 @@ def _chave(w, i):
     return t if t not in (None, "") else ("sem tarefa", i)
 
 
-def _paginas(ler, path_base: str, para=None, medida=None) -> list:
+def _paginas(ler, path_base: str, para=None, medida=None, *, paginas_max: int | None = None,
+             com_total: bool = True) -> list:
     """As linhas de um filtro, página a página, até a página curta (ou até `para`, que para antes por desenho), conferidas
-    contra o total que o REST informa. `medida["faltaram"]` soma o que faltou dentro da folga."""
-    total = _total(ler, path_base)
+    contra o total que o REST informa. `medida["faltaram"]` soma o que faltou dentro da folga; `medida["parou"]` diz como a
+    leitura acabou ("para" ou "fim"). `paginas_max` (padrão: `PAGINAS_MAX`) é o teto que não corta calado. `com_total=False`
+    pula o pedido do total: só para a leitura que para por desenho (`para`) e não troca nada pela falta do que não leu (as
+    novas da lista central, 1 ou 2 pedidos a cada 3 min, e as finalizadas, que só anotam)."""
+    teto = PAGINAS_MAX if paginas_max is None else paginas_max
+    total = _total(ler, path_base) if com_total else None
     out, vistas, inicio = [], set(), 0
-    for _ in range(PAGINAS_MAX):
-        time.sleep(PAUSA_S)
+    for n in range(teto):
+        if com_total or n:
+            time.sleep(PAUSA_S)
         path = f"{path_base}&limit=100&start={inicio}"
         dados = _resposta(_pagina(ler, path), path).get("data")
         if dados is not None and not isinstance(dados, list):
@@ -114,23 +132,101 @@ def _paginas(ler, path_base: str, para=None, medida=None) -> list:
         vistas |= chaves
         out += pagina
         if para and para(pagina):
+            if medida is not None:
+                medida["parou"] = "para"
             return out
         if len(pagina) < 100:
-            falta = total - len(vistas)
-            if falta > total * FOLGA_MOVIMENTO:
-                raise LeituraIncompleta(f"vieram {len(vistas)} de {total} tarefas ({path_base})")
+            if total is not None:
+                falta = total - len(vistas)
+                if falta > total * FOLGA_MOVIMENTO:
+                    raise LeituraIncompleta(f"vieram {len(vistas)} de {total} tarefas ({path_base})")
+                if medida is not None:
+                    medida["faltaram"] = medida.get("faltaram", 0) + max(falta, 0)
             if medida is not None:
-                medida["faltaram"] = medida.get("faltaram", 0) + max(falta, 0)
+                medida["parou"] = "fim"
             return out
         inicio += 100
-    raise LeituraIncompleta(f"passou de {PAGINAS_MAX} páginas ({path_base}): o teto não corta calado")
+    raise LeituraIncompleta(f"passou de {teto} páginas ({path_base}): o teto não corta calado")
+
+
+def ler_abertas(ler, medida=None) -> list[dict]:
+    """As tarefas das OS em processo (1) e em verificação (2), todas e de todo tipo, cada status conferido contra o total que
+    o REST informa: a leitura do fato e a que a lista central de OS recebe (entregue pela volta, `ligar_entrega_das_abertas`,
+    ou lida pelo `os_leitor` com esta mesma função quando a volta desta máquina pulou)."""
+    rows = []
+    for st in (1, 2):
+        rows += _paginas(ler, f"work_orders?id_status_work_order={st}&sort=creation_date:desc", medida=medida)
+    return rows
+
+
+def ler_criadas(ler, *, piso=None, conhecida=None, medida=None, paginas_max: int | None = None,
+                com_total: bool = True) -> list[dict]:
+    """As tarefas das OS de todo status pela data de criação, da mais nova para trás (`sort=creation_date:desc`), até:
+    - `conhecida(pagina) -> bool`: a 1ª página que ela diz toda conhecida (as novas da lista central);
+    - `piso` (ISO, a data ou a data e hora): a 1ª página INTEIRA criada antes dele (os 7 dias e a noite da lista central). A
+      ordem do REST é só aproximada: a OS do piso numa página nova não para a leitura, a página toda velha para (a técnica da
+      zeladoria)."""
+    p = str(piso)[:19] if piso else None
+
+    def para(pagina):
+        if conhecida is not None and pagina and conhecida(pagina):
+            return True
+        if p is not None:
+            datas = [str(w.get("creation_date"))[:19] for w in pagina if w.get("creation_date")]
+            return not datas or max(datas) < p
+        return False
+    return _paginas(ler, "work_orders?sort=creation_date:desc", para, medida, paginas_max=paginas_max,
+                    com_total=com_total)
+
+
+def ler_finalizadas(ler, desde, medida=None, paginas_max: int | None = None) -> list[dict]:
+    """As tarefas das OS finalizadas (3), de todo tipo, pela data de fim da mais nova para trás (`sort=final_date:desc`), até
+    uma página INTEIRA que passou de `desde` (ISO): a leitura incremental do desenho do PCM de 27/10/2026 (quem chama passa a
+    data de fim mais nova que já conhece menos 2 dias de margem; 1 a 3 páginas por hora). Sem o pedido do total: ela só anota o
+    que leu, e quem precisa do fato inteiro (o PCM, quando publicar o `fato_tarefa_finalizada`) confere à parte. Devolve só as
+    tarefas desde o piso."""
+    piso = str(desde)[:19]
+
+    def passou(pagina):
+        datas = [str(w.get("final_date"))[:19] for w in pagina if w.get("final_date")]
+        return not datas or max(datas) < piso
+    rows = _paginas(ler, "work_orders?id_status_work_order=3&sort=final_date:desc", passou, medida,
+                    paginas_max=paginas_max, com_total=False)
+    return [w for w in rows if str(w.get("final_date") or "")[:19] >= piso]
+
+
+def ler_os(ler, folio) -> list[dict]:
+    """As tarefas de UMA OS pelo nº (o REST filtra por `wo_folio`, medido em 24/10/2026 no quadro da Engenharia): 1 pedido.
+    As linhas de outro nº que o REST devolvesse ficam de fora."""
+    f = str(int(folio))
+    path = f"work_orders?wo_folio={f}&limit=100&start=0"
+    r = _resposta(_pagina(ler, path), path)
+    dados = r.get("data")
+    if dados is not None and not isinstance(dados, list):
+        raise LeituraIncompleta(f"o Fracttal respondeu sem a lista de dados ({path})")
+    return [w for w in (dados or []) if str(w.get("wo_folio")) == f]
+
+
+def ligar_entrega_das_abertas(func) -> None:
+    """`func(linhas, lido_em)` recebe as tarefas de status 1 e 2 que a volta de hora em hora acabou de ler INTEIRAS (a lista
+    central de OS do OS Creator; quem registra é o `os_leitor.ligar`, só no servidor). None desliga. Nada muda na volta: a
+    leitura, o fato e os pedidos são os de sempre, e a entrega que falha só vai ao log."""
+    _ENTREGA["abertas"] = func
+
+
+def _entregar_abertas(rows, lido_em: float) -> None:
+    func = _ENTREGA["abertas"]
+    if func is None:
+        return
+    try:
+        func([w for w in rows if str(w.get("id_status_work_order")).strip() in ("1", "2")], lido_em)
+    except Exception:       # noqa: BLE001 — a entrega nunca derruba a volta do fato
+        log.exception("tarefas das OS: a entrega das abertas à lista central falhou")
 
 
 def ler_fracttal(ler, hoje, medida=None) -> list[dict]:
     """As linhas do REST que entram no fato (a separação fina é do `fato_tarefa_os`)."""
-    rows = []
-    for st in (1, 2):
-        rows += _paginas(ler, f"work_orders?id_status_work_order={st}&sort=creation_date:desc", medida=medida)
+    rows = ler_abertas(ler, medida)
     piso = (hoje - timedelta(days=DIAS_ZELADORIA)).isoformat()
 
     def passou(pagina):
@@ -198,10 +294,13 @@ def publicar(config, sessao=None, *, ler=None, agora=None, forcar=False) -> dict
     def ler_contando(path):
         paginas[0] += 1
         return ler(path)
+    inicio = time.time()
     try:
         rows = ler_fracttal(ler_contando, agora.astimezone(_BRT).date(), medida)
     except LeituraIncompleta as e:
         return {"erro": f"LeituraIncompleta: {e}"[:300], "paginas": paginas[0]}
+    # a leitura veio inteira: as abertas vão também à lista central de OS (no servidor), sem pedido a mais
+    _entregar_abertas(rows, inicio)
     lido_em = datetime.now(_BRT).isoformat(timespec="seconds")
     lin, rf = F.linhas(rows, lig, idx, bo, chave)
     F.conferir_grao(lin)

@@ -8,8 +8,10 @@ texto de ativo, de OS nem nome de pessoa (só contagens, datas e ids).
 O que estes testes seguram:
 - o bloco dos ativos aparece com um estado inventado: a fonte, o lido em, a versão, a prontidão do leitor, a paridade (com
   as coberturas), o REST (a última boa e a última falha), as descrições cortadas (o número e os ids) e o disco;
-- ele não quebra sem o leitor ligado (o PC) nem com o OS Creator ainda não aberto no processo (o módulo nem carregado);
-- a resposta não leva o texto da descrição de nenhum ativo.
+- a peça irmã, a lista central de OS (3.2): quantas OS e quantas abertas, a janela lida inteira, a última entrega de cada
+  faixa (e quem entregou as abertas), as falhas, os campos que o REST trouxe, o disco e a memória;
+- elas não quebram sem o leitor ligado (o PC) nem com o OS Creator ainda não aberto no processo (o módulo nem carregado);
+- a resposta não leva o texto da descrição de nenhum ativo, nem o de uma OS, nem o nome de uma pessoa.
 Nada vai à rede; o catálogo e os estados são inventados (repositório público)."""
 import re
 import sys
@@ -25,6 +27,8 @@ if ponte.RAIZ_CLONE not in sys.path:
 
 import ativos_central as AC  # noqa: E402
 import ativos_leitor as AL  # noqa: E402
+import os_central as OC  # noqa: E402
+import os_leitor as OL  # noqa: E402
 
 from test_oscreator_ativos_leitor import ARVORE, _catalogo_de  # noqa: E402
 
@@ -40,11 +44,12 @@ def _leve(monkeypatch):
     for nome in ("_WORKER", "_WEB", "_MEMORIA", "_THREADS"):
         monkeypatch.setattr(R, nome, {"thread": None, "ultimo": None, "quando": None}, raising=False)
     monkeypatch.setattr(R, "_secao_uso_os", lambda app: {"tem": False, "banco_txt": "", "motivo": "teste"})
-    AC.reiniciar()
-    AL.reiniciar()
+    for m in (AC, AL, OC, OL):
+        m.reiniciar()
     yield
-    AC.reiniciar()
-    AL.reiniciar()
+    OC.esperar_gravacao(5)
+    for m in (AC, AL, OC, OL):
+        m.reiniciar()
 
 
 def _bloco(html: str) -> str:
@@ -122,3 +127,45 @@ def test_o_bloco_sem_cor_fixa_e_sem_estilo(app, logado):
     _catalogo_de(ARVORE)
     bloco = _bloco(_pagina(logado))
     assert 'style="' not in bloco and not re.search(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", bloco)
+
+
+# ── a lista central de OS (3.2) ──────────────────────────────────────────────────────────────────────────────────────────
+def _os(os_id, status=1, dias=1.0, quem="Pessoa Fictícia Sete", desc="Descrição inventada que não pode aparecer"):
+    from datetime import datetime, timedelta, timezone
+    criada = (datetime.now(timezone.utc) - timedelta(days=dias)).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    return {"id_work_orders_tasks": os_id * 10, "id_work_order": os_id, "wo_folio": str(30000 + os_id),
+            "id_status_work_order": str(status), "description": desc, "items_log_description": "Item Inventado { X-1 }",
+            "creation_date": criada, "created_by": quem, "code_create_by": "PF07", "user_assigned": quem,
+            "id_personnel": 707, "tasks_log_task_type_main": "Corretiva", "labels": []}
+
+
+def test_o_bloco_da_lista_de_os_com_um_estado_inventado(app, logado):
+    from datetime import datetime, timedelta, timezone
+    noventa = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+    OC.receber([_os(1), _os(2), _os(3, status=3, dias=4), _os(4, status=2, dias=10)], OC.NOITE, desde=noventa)
+    OC.receber([_os(1), _os(4, status=2, dias=10)], OC.ABERTAS, quem="tarefas_os")         # a 2 fica "a conferir"
+    app.config["NEXUS_PCM_FRACTTAL_TESTE"] = {"FRACTTAL_CLIENT_ID": "id-de-mentira", "FRACTTAL_CLIENT_SECRET": "s"}
+    OL.ligar(app)
+    agora = time.time()
+    OL._ESTADO["faixas"]["sete_dias"] = {"faixa": "sete_dias", "inicio": agora - 60, "fim": agora - 50, "pedidos": 4,
+                                         "os": 0, "resultado": "a leitura não veio inteira: nada mudou",
+                                         "erro": "LeituraIncompleta: a página 200 repetiu as anteriores"}
+    bloco = _bloco(_pagina(logado))
+    txt = _texto(bloco)
+    assert "Lista central de OS" in txt
+    assert "4 OS" in txt and "2 abertas" in txt and "1 a conferir" in txt
+    assert noventa[8:10] + "/" + noventa[5:7] in txt                                       # a janela lida inteira, de 90 dias
+    assert "tarefas_os" in txt and "abertas" in txt                                       # quem entregou as abertas
+    assert "repetiu as anteriores" in txt and "FALHOU" in txt                              # a falha da faixa, com o motivo
+    assert "4 pedidos" in txt and "disco" in txt.lower() and "memória" in txt.lower()
+    assert "Ativos centrais" in txt                                                        # as duas peças, no mesmo bloco
+    # nada de texto de OS nem nome de pessoa
+    assert "Descrição inventada" not in bloco and "Pessoa Fictícia Sete" not in bloco and "Item Inventado" not in bloco
+
+
+def test_o_bloco_da_lista_de_os_sem_o_leitor_e_sem_o_os_creator(app, logado, monkeypatch):
+    txt = _texto(_bloco(_pagina(logado)))
+    assert "Lista central de OS" in txt and "vazia" in txt and "só o servir.py liga o leitor" in txt
+    monkeypatch.delitem(sys.modules, "os_central")
+    txt = _texto(_bloco(_pagina(logado)))
+    assert "Lista central de OS" in txt and "ainda não foi aberto" in txt and "os_central" not in sys.modules

@@ -31,6 +31,10 @@ import threading
 import time
 import zlib
 
+# a troca de uma vez (rascunho ao lado + `os.replace`) é comum às cópias do canto central (`canto_disco.py`, etapa 3); o nome de
+# antes fica, e a chamada vai pelo nome do módulo (um teste o troca para contar as escritas)
+from canto_disco import trocar_de_uma_vez as _trocar_de_uma_vez
+
 log = logging.getLogger("oscreator.ativos_central")
 
 FORMATO = 1                     # o formato dos arquivos; outro número = arquivo de outra versão do código, ignorado
@@ -46,22 +50,6 @@ def caminho(pasta: str | None) -> str | None:
 
 def caminho_estado(pasta: str | None) -> str | None:
     return os.path.join(pasta, NOME_ESTADO) if pasta else None
-
-
-def _trocar_de_uma_vez(destino: str, escrever) -> None:
-    """Escreve num rascunho ao lado e troca de uma vez (os.replace): quem reinicia no meio nunca lê um arquivo pela metade.
-    O rascunho que sobrar de uma falha é apagado. Levanta o erro do disco para quem chama dizer onde."""
-    tmp = "%s.%d.%d.tmp" % (destino, os.getpid(), threading.get_ident())
-    try:
-        os.makedirs(os.path.dirname(destino), exist_ok=True)
-        escrever(tmp)
-        os.replace(tmp, destino)
-    except Exception:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise
 
 
 def no_disco(estado_disco: dict) -> tuple:

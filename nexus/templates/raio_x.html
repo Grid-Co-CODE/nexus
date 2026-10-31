@@ -141,9 +141,9 @@
   {% else %}<p class="cad-pe">Sem corte por setor ainda: ele só existe no servidor, que o guarda no disco dele.</p>{% endif %}
   {% endif %}
 
-  {# O canto central do OS Creator (31/10/2026; item 0 da 3.1+3.2): o estado de cada peça resumido, para conferir de fora a
-     1ª noite do leitor. Só contagens, datas, ids e motivos (nunca texto de ativo, de OS ou nome). As linhas saem prontas de
-     nexus/casca/raio_x.py (`_secao_canto_central`). #}
+  {# O canto central do OS Creator (31/10/2026; item 0 da 3.1+3.2 e a 3.2): o estado de cada peça resumido (os ativos e a lista
+     de OS), para conferir de fora a 1ª noite dos leitores. Só contagens, datas, ids e motivos (nunca texto de ativo, de OS ou
+     nome). As linhas saem prontas de nexus/casca/raio_x.py (`_secao_canto_central`). #}
   {% macro peca(p, titulo) %}
   <h3 class="rx-sub">{{ titulo }}</h3>
   {% if p.linhas %}
@@ -156,6 +156,7 @@
   {% endmacro %}
   <div id="canto-central">
   {{ peca(canto.ativos, "Ativos centrais") }}
+  {{ peca(canto.os, "Lista central de OS") }}
   </div>
 </section>
 {% endblock %}

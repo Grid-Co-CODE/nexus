@@ -74,6 +74,11 @@ if __name__ == "__main__":
     from nexus.torres.oscreator import ponte as ponte_os
     ativos_leitor = ponte_os.modulo_do_clone("ativos_leitor")
     ativos_leitor.ligar(app)
+    # o histórico de OS central lido pelo próprio servidor (31/10/2026, etapa 3 do canto central): as novas de 3 em 3 min, os 7
+    # dias de 10 em 10, as finalizadas de hora em hora, a janela de madrugada (03:21), e as abertas que o laço do tarefas_os
+    # (ligado acima, no instalar_campo) já lê, entregues sem pedido a mais. Só aqui; sem a credencial REST ele não liga
+    os_leitor = ponte_os.modulo_do_clone("os_leitor")
+    os_leitor.ligar(app)
     host = os.environ.get("NEXUS_HOST", "127.0.0.1")
     porta = int(os.environ.get("NEXUS_PORTA", "5070"))
     prefixo = app.config.get("NEXUS_PREFIXO") or "(raiz)"

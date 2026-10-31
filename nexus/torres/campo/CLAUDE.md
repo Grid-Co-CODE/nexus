@@ -1561,7 +1561,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   `os_disponibilidade`); desde 18/10/2026, a Limpeza (`limpeza`), as paradas abertas (`paradas_abertas`) e o bloco
   Manutenção (`manutencao_fonte`, `alertas_manutencao`, `linha_manutencao`, `com_manutencao`, `limite_do_pedido`).
   `manutencao.py`: a conta pura do bloco Manutenção. `tarefas_os.py`: o laço que lê as tarefas das OS do Fracttal e
-  grava o `nexus_os` (acima). `responsaveis_graficos.py`: a geometria dos gráficos das janelas (SVG).
+  grava o `nexus_os` (acima); desde 31/10/2026 é também o leitor de OS que a lista central do OS Creator usa (as mesmas
+  funções e a mesma paginação, e a volta entrega a ela as abertas que leu; regra no `nexus/dados/CLAUDE.md`). `responsaveis_graficos.py`: a geometria dos gráficos das janelas (SVG).
   `chamados_acompanhamento.py`: os chamados de garantia no banco (acima). `ocorrencias.py`: as ocorrências com plano
   de ação (o livro `nexus_ocorrencias`, acima). `zeladoria.py`: a Zeladoria (acima), pura: as leituras, a zeladoria
   do Fracttal pelas três tarefas, as recomendações, a evolução por cliente, a situação, os números e a fila.

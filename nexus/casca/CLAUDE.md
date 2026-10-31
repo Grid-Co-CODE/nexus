@@ -16,6 +16,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/casca/sugestoes.py` + `templates/sugestoes.html` | a aba Sugestões (`/?aba=sugestoes`): o formulário de todos e a lista do administrador, o livro `nexus_sugestoes` e os anexos no disco; seção "Sugestões no Início" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
 | `nexus/casca/fracttal_conta.py` | o contador de pedidos ao Fracttal (31/10/2026): um gancho no `Session.send` que soma, por hora de Brasília × origem × método, os pedidos, as recusas (406/429), os erros e o pico por minuto; seção "Pedidos ao Fracttal" abaixo |
+| `nexus/casca/minutos_ocupados.py` | os minutos de toda hora que já têm dono no Nexus, num lugar só (31/10/2026, etapa 3 do canto central): o laço novo pede o próximo minuto livre (`proximo_livre`); bullet "Os minutos ocupados" na seção do Raio-X abaixo |
 | `nexus/casca/uso_os.py` | o uso das telas do OS Creator (31/10/2026): por hora × rota × automático, os pedidos, as pessoas distintas, a mediana e o p95, os erros, os 503 do teto e os pedidos ao Fracttal; marca a rota de TODO pedido do Flask como origem do contador do Fracttal; e, no servidor, guarda as horas fechadas dos dois contadores no disco a cada hora (:05) e as leva ao banco UMA vez por dia, às 03:45 (`nexus/dados/fato_uso_os.py`); seção "Uso das telas do OS Creator" abaixo |
 | `nexus/auth/__init__.py` | `/entrar` (a porta, a senha de administrador e a ida e a volta da Microsoft), `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/microsoft.py` | o login pela conta Microsoft da Grid (Entra ID), desligado sem as quatro `NEXUS_MS_*` (seção "Entrar com a Microsoft" abaixo) |
@@ -249,11 +250,26 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
 - **No OS Creator** (README da torre, 14/10/2026): a tela inicial não espera mais o selo do Fracttal, e as contagens da
   Performance ficam 6 h na memória.
 - **O leitor dos ativos do OS Creator** (`os_creator/ativos_leitor.py`, 31/10/2026, etapa 2 do canto central; regras no
-  README da torre, "O leitor do servidor"): ligado no servir.py, por último, pelo `ponte.modulo_do_clone` (o MESMO módulo
+  README da torre, "O leitor do servidor"): ligado no servir.py, pelo `ponte.modulo_do_clone` (o MESMO módulo
   que as telas importam; por outro caminho seria um segundo catálogo na memória). Sem a credencial REST do Fracttal não
   liga, e o estado diz por quê. Duas threads: `nexus-ativos-leitor` (o laço: o Fracttal inteiro às 02:15, ~270 pedidos a 1
   por segundo, e os novos às :08 e :38 das 06h às 22h) e `nexus-ativos-novos` (os novos que os botões pedem). No contador
   do Fracttal elas aparecem como `fundo:nexus-ativos-leitor` e `fundo:nexus-ativos-novos`. Nunca o `app.py` nem os testes.
+- **O leitor da lista central de OS do OS Creator** (`os_creator/os_leitor.py`, 31/10/2026, etapa 3; regras no README da
+  torre, "A lista central de OS e o leitor em faixas"): ligado no servir.py, por último, depois do dos ativos e do
+  `instalar_campo` (o laço do `tarefas_os`, que lhe entrega as abertas), pelo `ponte.modulo_do_clone`. Sem a credencial REST
+  não liga, e o estado diz por quê. Uma thread, `nexus-os-leitor`, uma faixa por vez, 1 pedido por segundo: as novas de 3 em
+  3 min (06h às 20h de segunda a sexta; de 15 em 15 fora disso; em qualquer minuto, 1 ou 2 pedidos), os 7 dias às :00, :21,
+  :30, :41 e :51 (06h às 20h, ~12 pedidos), as finalizadas às :45 (1 a 3), a conferência das abertas às :55 (lê ~68 só se o
+  `tarefas_os` não entregou em 70 min) e a noite às 03:21 (90 dias, ~126 pedidos; a janela inteira no domingo e na 1ª carga,
+  ~500). No contador do Fracttal, `fundo:nexus-os-leitor:<faixa>`. A cópia em disco da lista é gravada numa thread de uma
+  vez (`nexus-os-central-disco`, no máximo uma escrita a cada 30 s). Nunca o `app.py` nem os testes.
+- **Os minutos ocupados, num lugar só** (`casca/minutos_ocupados.py`, 31/10/2026, decisão AF da etapa 3): os minutos de toda
+  hora que já têm dono (:08 e :38 os ativos novos, :10 a :20 as tarefas das OS, :22 as normalizações, :25 o sync do App, :32
+  a zeladoria, :40 a carga, :50 os chamados; e os horários dos ativos, 02:15). O laço novo que precisa de um horário fixo pede
+  o próximo minuto livre (`proximo_livre`) em vez de chutar, e quem muda o minuto de um laço muda a lista no mesmo trabalho.
+  Os ativos e a lista de OS tiram os horários dela; os minutos fixos da lista de OS (:00, :21, :30, :41, :45, :51, :55 e
+  03:21) são todos livres nela.
 
 ## Pedidos ao Fracttal: o contador (31/10/2026)
 
@@ -436,7 +452,12 @@ cortou) só se confere pela tela. Depois dos quatro quadros do uso, cada peça d
 (`ativos_central.estado()`): o catálogo (quantos, fonte, lido em, os novos do dia, a versão), se o leitor do servidor está
 ligado e pronto, a paridade do REST (quando, se valeu, as coberturas `cob_ref` e `cob_rest`, e o motivo se não valeu), o REST
 (a última leitura boa e a falha que veio depois dela), as descrições cortadas da última noite (o número e até 5 ids) e a cópia
-em disco. Só contagens, datas, ids e motivos: nunca o texto de um ativo ou de uma OS, nem nome de pessoa. **O Raio-X não
+em disco; e **"Lista central de OS"** (3.2, `os_central.estado(medir_memoria=True)`): quantas OS e quantas abertas, as "a
+conferir" e as pendentes, a janela lida inteira, se o leitor está ligado, a última entrega de cada faixa (com quem entregou as
+abertas: o `tarefas_os` ou o próprio leitor) e a última leitura dela (os pedidos, ou a falha com o motivo), os campos que o
+REST trouxe (a sondagem da 1ª noite), a cópia em disco e a memória (`os_central.memoria_estimada`: cada registro e texto
+contados uma vez; ~0,1 s com 36 mil OS, só ao abrir o Raio-X). Só contagens, datas, ids e motivos: nunca o texto de um ativo ou
+de uma OS, nem nome de pessoa. **O Raio-X não
 importa o OS Creator:** lê o módulo de `sys.modules` (no PC, sem ninguém ter aberto o OS Creator, ele nem está na memória, e
 a peça diz isso), e a peça que quebrar vai ao log e diz que não montou, nunca derruba a página. Prova:
 `tests/test_oscreator_canto_no_raio_x.py`.

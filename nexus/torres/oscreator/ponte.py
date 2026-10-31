@@ -256,10 +256,24 @@ def ligar_catalogo_de_ativos(app) -> None:
     ativos_central.ligar_fonte_do_banco(ativos_banco.leitor(app))
 
 
+def ligar_lista_de_os(app) -> None:
+    """Diz à lista central de OS (`os_creator/os_central.py`, 31/10/2026, etapa 3 do canto central) onde mora a cópia dela em
+    disco (`<pasta de dados do clone>/oscreator/os_central.json.gz`, ao lado da dos ativos). A lista é UMA por processo e nasce
+    da cópia, sem perguntar ao Fracttal. Nas duas máquinas: no PC ela guarda o que as ações do OS Creator mudaram; o leitor em
+    faixas só liga no servidor. Nos testes o disco não (a pasta é a do usuário da máquina): a lista vive só na memória."""
+    if RAIZ_CLONE not in sys.path:
+        sys.path.append(RAIZ_CLONE)
+    import api
+    import os_central
+    if not app.config.get("TESTING"):
+        os_central.configurar(os.path.join(api._data_dir(), "oscreator"))
+
+
 def modulo_do_clone(nome: str):
-    """Um módulo do OS Creator pelo nome com que o clone o importa (`api`, `ativos_central`, `ativos_leitor`), com a pasta do
-    clone no `sys.path`. É o MESMO módulo que as telas usam: importado por outro caminho (como pacote do Nexus) ele seria uma
-    segunda cópia, com um segundo catálogo na memória. Quem usa é o `servir.py`, para ligar o leitor dos ativos ao subir."""
+    """Um módulo do OS Creator pelo nome com que o clone o importa (`api`, `ativos_central`, `ativos_leitor`, `os_leitor`), com a
+    pasta do clone no `sys.path`. É o MESMO módulo que as telas usam: importado por outro caminho (como pacote do Nexus) ele seria
+    uma segunda cópia, com um segundo catálogo (ou uma segunda lista de OS) na memória. Quem usa é o `servir.py`, para ligar os
+    leitores do canto central ao subir."""
     if RAIZ_CLONE not in sys.path:
         sys.path.append(RAIZ_CLONE)
     import importlib
@@ -281,6 +295,10 @@ def _criar_clone(app):
         ligar_catalogo_de_ativos(app)
     except Exception:            # noqa: BLE001 — sem ligar, o catálogo vive só na memória e nasce do Fracttal, como antes
         logging.exception("OS Creator: o catálogo de ativos não foi ligado à pasta de dados nem ao banco")
+    try:
+        ligar_lista_de_os(app)
+    except Exception:            # noqa: BLE001 — sem ligar, a lista de OS vive só na memória (as telas vão ao vivo)
+        logging.exception("OS Creator: a lista central de OS não foi ligada à pasta de dados")
     # o Responsável UFV dos chamados de Garantias, pelo cadastro do Nexus (28/10/2026; nexus/torres/chamados/ufv.py)
     from os_web import rotas_acomp
 

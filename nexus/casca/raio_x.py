@@ -38,7 +38,7 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from flask import current_app, render_template, session
@@ -803,9 +803,104 @@ def _peca(nome_modulo: str, montar) -> dict:
         return {"linhas": [], "motivo": "Não consegui ler o estado desta peça (veja o log do servidor)."}
 
 
+# as faixas da lista de OS na ordem do dia, com o nome que a tela mostra; a faixa `os` da lista é a leitura das `pendentes`
+_FAIXAS_DE_OS = (("novas", "novas", "As novas"), ("sete_dias", "sete_dias", "Os 7 dias"), ("abertas", "abertas", "As abertas"),
+                 ("finalizadas", "finalizadas", "As finalizadas"), ("noite", "noite", "A noite"),
+                 ("os", "pendentes", "As pendentes (pelo nº)"))
+
+
+def _dia_e_hora(iso) -> str:
+    """"31/10 10:00" (Brasília) de um ISO do Fracttal (UTC, sem o fuso), ou "?"."""
+    try:
+        return _quando(datetime.fromisoformat(str(iso)[:19]).replace(tzinfo=timezone.utc).timestamp()) or "?"
+    except ValueError:
+        return "?"
+
+
+def _pedidos(n) -> str:
+    n = int(n or 0)
+    return "%d pedido%s" % (n, "" if n == 1 else "s")
+
+
+def _linhas_da_lista_de_os(e: dict) -> list:
+    """As linhas da peça "Lista central de OS" (3.2), do `os_central.estado(medir_memoria=True)`: só contagens, datas, ids e
+    motivos (nunca o texto de uma OS nem o nome de alguém)."""
+    linhas = []
+    if e.get("n"):
+        linhas.append(("Lista", "%d OS (%d abertas), %d a conferir, %d pendentes de uma ação; versão %s; a última leitura do "
+                                "Fracttal em %s" % (e["n"], e.get("abertas") or 0, e.get("a_conferir") or 0,
+                                                    e.get("pendentes") or 0, e.get("versao"),
+                                                    _quando(e.get("lido_em")) or "?")))
+    else:
+        linhas.append(("Lista", "vazia nesta máquina: ela nasce da cópia em disco, das faixas do leitor e das ações do OS "
+                                "Creator; até lá as telas leem ao vivo"))
+    de, ate = (e.get("janela") or (None, None))[:2]
+    if de and ate:
+        linhas.append(("Janela lida inteira", "as OS criadas de %s/%s/%s até %s; fora dela, as telas leem ao vivo" % (
+            de[8:10], de[5:7], de[:4], _dia_e_hora(ate))))
+    else:
+        linhas.append(("Janela lida inteira", "nenhuma ainda: a 1ª carga é de madrugada (03:21); até lá a lista tem só o que as "
+                                              "faixas do dia trouxeram, e as telas leem ao vivo"))
+    leitor = e.get("leitor")
+    if not leitor:
+        linhas.append(("Leitor do servidor", "não ligado (só o servir.py liga o leitor; no PC a lista guarda só o que as ações "
+                                             "mudaram)"))
+    elif not leitor.get("ligado"):
+        linhas.append(("Leitor do servidor", "não ligado: %s" % (leitor.get("motivo") or leitor.get("erro") or "?")))
+    else:
+        linhas.append(("Leitor do servidor", "ligado%s" % ("; lendo agora" if leitor.get("lendo") else "")))
+    feitas = (leitor or {}).get("faixas") or {}
+    for chave_lista, chave_leitor, rotulo in _FAIXAS_DE_OS:
+        ent = (e.get("faixas") or {}).get(chave_lista)
+        run = feitas.get(chave_leitor)
+        if not ent and not run:
+            continue
+        partes = []
+        if ent:
+            partes.append("entregue em %s%s: %d OS (%d linhas); %d entraram, %d mudaram, %d a conferir, %d saíram" % (
+                _quando(ent.get("em")) or "?", " pelo %s" % ent["quem"] if ent.get("quem") else "", ent.get("os") or 0,
+                ent.get("linhas") or 0, ent.get("entraram") or 0, ent.get("mudaram") or 0, ent.get("a_conferir") or 0,
+                ent.get("sairam") or 0))
+        if run:
+            if run.get("erro"):
+                partes.append("FALHOU em %s, depois de %s: %s" % (
+                    _quando(run.get("inicio")) or "?", _pedidos(run.get("pedidos")), str(run["erro"])[:200]))
+            else:
+                partes.append("a última leitura do leitor em %s: %s%s" % (
+                    _quando(run.get("inicio")) or "?", _pedidos(run.get("pedidos")),
+                    "" if ent and run.get("os") else "; %s" % str(run.get("resultado") or "")[:200]))
+        linhas.append((rotulo, "; ".join(partes)))
+    entregas = (leitor or {}).get("entregas") or {}
+    quem = ((e.get("faixas") or {}).get("abertas") or {}).get("quem")
+    if quem or any(entregas.values()):
+        linhas.append(("Quem entregou as abertas", "a última: %s; do tarefas_os em %s, do próprio leitor em %s" % (
+            quem or "?", _quando(entregas.get("tarefas_os")) or "nunca", _quando(entregas.get("os_leitor")) or "nunca")))
+    c = e.get("campos")
+    if c:
+        linhas.append(("Campos que o REST trouxe", "na faixa %s de %s, %d OS: %s" % (
+            c.get("faixa"), _quando(c.get("em")) or "?", c.get("n") or 0,
+            ", ".join("%s %s" % (k, _pct(v)) for k, v in (c.get("pct") or {}).items()))))
+    d = e.get("disco") or {}
+    if d.get("gravado_em"):
+        txt = "gravada em %s%s" % (_quando(d["gravado_em"]),
+                                   ", %s MB" % ("%.1f" % (d["bytes"] / 2**20)).replace(".", ",") if d.get("bytes") else "")
+    else:
+        txt = "sem gravação neste processo"
+    if d.get("lido"):
+        txt += "; o boot leu a %s" % d["lido"]
+    if d.get("erro"):
+        txt += "; erro: %s" % str(d["erro"])[:200]
+    linhas.append(("Cópia em disco", txt))
+    if e.get("memoria_mb") is not None:
+        linhas.append(("Memória", "~%s MB (cada registro e texto contados uma vez; o orçamento é de 30 MB para 36 mil OS)"
+                       % ("%.1f" % e["memoria_mb"]).replace(".", ",")))
+    return linhas
+
+
 def _secao_canto_central() -> dict:
-    """O bloco do canto central na seção do OS Creator: os ativos (item 0 da 3.1+3.2)."""
-    return {"ativos": _peca("ativos_central", lambda m: _linhas_dos_ativos(m.estado()))}
+    """O bloco do canto central na seção do OS Creator: os ativos (item 0 da 3.1+3.2) e a lista de OS (3.2)."""
+    return {"ativos": _peca("ativos_central", lambda m: _linhas_dos_ativos(m.estado())),
+            "os": _peca("os_central", lambda m: _linhas_da_lista_de_os(m.estado(medir_memoria=True)))}
 
 
 def registrar_raio_x(bp) -> None:

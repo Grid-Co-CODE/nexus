@@ -43,6 +43,7 @@ import requests
 import ativos_central
 import ativos_foto
 from ativos_central import montar_registros
+from nexus.casca import minutos_ocupados as _MO
 
 log = logging.getLogger("oscreator.ativos_leitor")
 
@@ -60,9 +61,11 @@ CAMPOS_MIN_PCT = 99.0            # dos registros, os que têm os campos obrigat�
 COBERTURA_MIN_PCT = 95.0         # dos códigos da leitura, os que o catálogo também tem (toda noite)
 PRIMEIRA_MIN_PCT = 99.0          # na 1ª conferência (a sondagem REST x RPC), nos dois sentidos
 EXEMPLOS = 5                     # quantos códigos que faltam o motivo da paridade mostra
-HORA_COMPLETO = (2, 15)          # a leitura inteira, em Brasília: longe dos laços de hora em hora (:10 a :50) e do campo
+# os horários moram na lista dos minutos ocupados do Nexus, num lugar só (`nexus/casca/minutos_ocupados.py`, etapa 3): a leitura
+# inteira às 02:15 de Brasília, longe dos laços de hora em hora e do campo; os novos às :08 e :38, fora dos minutos ocupados
+HORA_COMPLETO = _MO.ATIVOS_COMPLETO
 NOVOS_DAS, NOVOS_ATE = 6, 22     # os novos, de 30 em 30 min, das 06h às 22h
-NOVOS_MINUTOS = (8, 38)          # fora dos minutos ocupados (tarefas :10 a :20, normalizações :22, App :25, carga :40...)
+NOVOS_MINUTOS = _MO.ATIVOS_NOVOS
 NOVOS_FRESCO_S = 60              # os novos lidos há menos disto servem a quem pede (botão, aprovação): não se lê de novo
 DESFECHO_VALE_S = 2 * NOVOS_FRESCO_S     # o desfecho de uma leitura mais velha que isto não é o "de agora" (o F5 da Fila)
 COMPLETO, NOVOS = "completo", "novos"
