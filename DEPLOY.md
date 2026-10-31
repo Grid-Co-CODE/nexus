@@ -55,9 +55,10 @@ sudo .venv/bin/pip install -r requirements.txt
 O ponto de entrada de produção é o `servir.py`. Não use o `app.py`: ele é só para desenvolvimento (desliga o cookie
 seguro).
 
-O OS Creator embutido importa o PyQt6 (tela de Engenharia). Num servidor sem tela, se o `/os/` acusar falta de
-biblioteca gráfica, instale: `sudo apt install libgl1 libegl1 libxkbcommon0 libfontconfig1`. Sem elas, só o `/os/*`
-fica fora; o resto do Nexus funciona.
+O OS Creator embutido não usa mais o PyQt6 (31/10/2026: o `requirements.txt` não o traz e nada o importa), então o
+servidor sem tela não precisa de biblioteca gráfica (`libgl1`, `libegl1`...). Um `.venv` antigo que ainda o tenha
+instalado não atrapalha; `pip uninstall PyQt6` o tira. Se o `/os/` mostrar "O OS Creator não subiu", o motivo está na
+própria página (quase sempre uma dependência do `requirements.txt`); o resto do Nexus segue funcionando.
 
 ## 2. Conferir antes de subir
 

@@ -23,8 +23,8 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 
-# As do requirements.txt que o Nexus importa. O PyQt6 fica de fora de propósito: sem ele só a tela de Engenharia do OS
-# Creator embutido avisa, e o Nexus sobe (requirements.txt). O pytest é da suíte, não do serviço.
+# As do requirements.txt que o Nexus importa (o PyQt6 saiu dele em 31/10/2026: nada o importa). O pytest é da suíte, não do
+# serviço.
 DEPENDENCIAS = ("flask", "dotenv", "waitress", "openpyxl", "cryptography", "requests", "pandas", "PIL", "reportlab")
 
 

@@ -29,7 +29,8 @@ do oem" ou em manter o clone "idêntico", é o registro daquele tempo.
   - os stores de modelos, observações e temas;
   - `gridco_abas`;
   - os `tickets_*`;
-  - `steps/engenharia` e `steps/ui.py`.
+  - `steps/engenharia` e `steps/ui.py`: o descritor da Engenharia (título, descrição e ícone), que a web usa; o `steps/ui.py`
+    (PyQt6) veio sem a web nunca importá-lo, e saiu em 31/10/2026 (seção "Antes de mexer").
 - O pacote `chamado_garantia`, com o `assets/` (ícone, logo e fontes) e o `requirements.txt`.
 
 ## O que ficou de fora de propósito
@@ -40,6 +41,7 @@ do oem" ou em manter o clone "idêntico", é o registro daquele tempo.
 | `assets_cache.json` | é o catálogo de ativos, dado que já vazou uma vez por instalador público |
 | `tokens.txt`, `gridco_sql_token.txt` | são segredo; o código lê da variável `GRIDCO_SQL_TOKEN` ou de `%APPDATA%` |
 | `app.py`, `main.py`, as outras telas de `steps/` | são o app de desktop (PyQt), e a web não usa |
+| `steps/ui.py`, `steps/engenharia/tela.py`, `assets/chamados.qss`, `assets/fonts/LEIA-ME.txt` | vieram junto e eram só do app de mesa (PyQt6); saíram em 31/10/2026 |
 | `.bat`, `.spec`, documentos | não fazem parte do serviço |
 
 ## Como foi conferido
@@ -120,7 +122,7 @@ nesta pasta.
     vez a cada 5 minutos por token (`vivo_no_fracttal`, o mesmo pedido barato do `api.is_logged_in`; a cota é de 200
     pedidos por minuto para a EMPRESA). Só a resposta "sessão morta" (`SessionExpired`) derruba; 429, rede ou token a 2
     minutos de vencer não decidem nada (o prazo resolve, e perguntar faria o clone tentar renovar o token).
-- **Quando sobe:** o clone só sobe na primeira visita ao `/os/`. Se ele quebrar (faltou PyQt6, por exemplo), o
+- **Quando sobe:** o clone só sobe na primeira visita ao `/os/`. Se ele quebrar (faltou o `requests`, por exemplo), o
   `/os/*` mostra um aviso e o resto do Nexus segue.
 - **Tema do Nexus (escuro e claro):** o OS Creator segue o botão do tema do Nexus, na moldura da torre, no card da OS e
   em qualquer página `/os/` (seção "Tema claro, com o botão do Nexus").
@@ -876,7 +878,15 @@ Depois abra `http://127.0.0.1:5091/os/login`. O login no Fracttal é por pessoa,
 - O `os_creator/.env` (a credencial do Fracttal da máquina) é do `.gitignore`: nunca entra no git.
 - Usa a mesma pasta de dados do OS Creator (`%APPDATA%\CriarOS-Fracttal`). Na mesma máquina, ele divide com o
   supervisório a chave da sessão e o token do banco.
-- Precisa do PyQt6 instalado, porque a tela de Engenharia importa `steps/engenharia`, que puxa `steps/ui.py`.
+- **Não usa PyQt6** (31/10/2026, etapa 1 do canto central). A ponte, o `api` e todo `os_web.*` importam sem ele: o rastro
+  dos imports (estático, com os de dentro de função, e dinâmico, com o PyQt6 bloqueado) mostrou um elo só, o `abrir()` do
+  descritor `steps/engenharia`, que importava a tela de mesa e, por ela, o `steps/ui.py`, e que a web nunca chamou (a rota
+  `/os/engenharia` lê só título, descrição e ícone). Saíram o `steps/ui.py`, o `steps/engenharia/tela.py` e o `abrir()`;
+  o PyQt6 saiu do `requirements.txt`. Os testes do OS Creator abriam com `pytest.importorskip("PyQt6")` por um motivo
+  que não era verdade ("o clone importa o `steps/ui.py` ao montar a tela de Engenharia"), e numa máquina sem PyQt6 a
+  suíte inteira do OS Creator pulava em silêncio; o `importorskip` saiu de todos. Prova: `tests/test_oscreator_sem_pyqt.py`
+  (num subprocesso com o PyQt6 bloqueado, o Nexus e o clone sobem, o login e a Engenharia abrem; nada do repositório
+  importa nem pede PyQt; nenhum `requirements.txt` o traz). Voltou um `import PyQt6`? O teste diz o arquivo e a linha.
 
 ## A tela inicial não espera o Fracttal (14/10/2026)
 

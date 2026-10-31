@@ -17,7 +17,6 @@ O que estes testes seguram:
 - o contraste AA (4,5:1) do texto do claro, regra a regra, com o fundo que a própria regra declara.
 A tela foi conferida no Chrome sem janela (README da torre, seção "Tema claro").
 """
-import importlib.util
 import json
 import re
 import shutil
@@ -117,15 +116,10 @@ def _par_do_claro(parte: str) -> str:
 
 
 # ── a ponte e o card: o tema chega desenhado pelo servidor ──────────────────────────────────────────────────────────
-# o clone importa o steps/ui.py do OS Creator (PyQt6) ao montar a tela de Engenharia; as folhas não precisam dele
-precisa_do_clone = pytest.mark.skipif(importlib.util.find_spec("PyQt6") is None, reason="sem PyQt6 nesta máquina")
-
-
 def _html_abre(h: str) -> str:
     return re.search(r"<html[^>]*>", h).group(0)
 
 
-@precisa_do_clone
 def test_ponte_poe_o_tema_claro_pelo_cookie(logado):
     logado.set_cookie("nexus_tema", "claro")
     h = logado.get("/os/login").get_data(as_text=True)
@@ -137,7 +131,6 @@ def test_ponte_poe_o_tema_claro_pelo_cookie(logado):
     assert 'window.addEventListener("storage"' in cabeca
 
 
-@precisa_do_clone
 @pytest.mark.parametrize("cookie", [None, "escuro", "lilas"])
 def test_ponte_nao_poe_o_atributo_no_escuro(logado, cookie):
     """No escuro (o padrão, o cookie ausente ou desconhecido) o <html> do clone é o de sempre, sem data-tema."""
@@ -148,7 +141,6 @@ def test_ponte_nao_poe_o_atributo_no_escuro(logado, cookie):
     assert _html_abre(h) == '<html lang="pt-BR" data-sem-abas="1">'
 
 
-@precisa_do_clone
 def test_no_escuro_a_resposta_nao_depende_do_cookie(logado):
     """O HTML do escuro é um só (sem cookie, cookie escuro ou cookie estranho), e a ponte não mexe no que não é HTML."""
     sem = logado.get("/os/login").get_data()
@@ -169,7 +161,6 @@ def _login_do_fracttal(app, cliente):
     cliente.set_cookie("os_sessao", valor, path="/os")
 
 
-@precisa_do_clone
 def test_card_da_os_segue_o_tema(app, logado):
     _login_do_fracttal(app, logado)
     url = "/os/_nexus/card/9001?status=Em%20Processo&de=/t/engenharia/equipe"
@@ -357,8 +348,6 @@ def test_toda_cor_de_icone_tem_a_do_claro():
     ficaria o verde-claro (1,6:1) ou o branco no fundo branco."""
     cores = set()
     for arq in _fontes_do_clone():
-        if "steps" in arq.parts:                          # o app de desktop (PyQt): não vai à web
-            continue
         texto = arq.read_text(encoding="utf-8", errors="replace")
         for chamada in re.findall(r"icone\([^)]*\)", texto):
             cores |= {c.lower() for c in re.findall(r"['\"](#[0-9a-fA-F]{3,8})['\"]", chamada)}

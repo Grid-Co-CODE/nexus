@@ -160,7 +160,6 @@ def _login_do_fracttal(app, cliente):
 @pytest.fixture
 def fracttal(app, monkeypatch):
     """O `api` do clone com a OS 6 (id 99) e a nota antiga; o que iria ao Fracttal fica em `gravadas`."""
-    pytest.importorskip("PyQt6")
     from nexus.torres.oscreator import ponte
     ponte.clone(app)
     import api as os_api

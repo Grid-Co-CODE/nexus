@@ -2,10 +2,9 @@
 no chamado deve aparecer a tela que aparece quando clicamos na OS de chamados na parte de garantias. Não deve direcionar,
 apenas sobrepor a tela como uma meio que janela dando um blur de fundo"): a moldura do meio (/os/_nexus/chamado/<nº>,
 `ponte.chamado_os`) com a MESMA tela do clone dentro, ou o aviso de como entrar pelo Fracttal."""
-from test_oscreator_tema_claro import _login_do_fracttal, precisa_do_clone
+from test_oscreator_tema_claro import _login_do_fracttal
 
 
-@precisa_do_clone
 def test_sem_o_login_do_fracttal_a_moldura_diz_como_entrar_e_volta(logado):
     h = logado.get("/os/_nexus/chamado/17311?de=/t/campo/responsaveis").get_data(as_text=True)
     assert "Para abrir o chamado, entre pelo Fracttal" in h and 'id="nx_ch"' not in h
@@ -14,7 +13,6 @@ def test_sem_o_login_do_fracttal_a_moldura_diz_como_entrar_e_volta(logado):
     assert 'target="_top"' in h
 
 
-@precisa_do_clone
 def test_com_o_login_a_tela_do_chamado_vem_na_moldura_de_dentro(app, logado):
     _login_do_fracttal(app, logado)
     h = logado.get("/os/_nexus/chamado/17311?de=/t/campo/responsaveis").get_data(as_text=True)

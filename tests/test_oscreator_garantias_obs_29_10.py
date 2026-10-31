@@ -29,7 +29,6 @@ def _reg(id_, os_, tipo, texto, quando="2026-10-28T10:00:00-03:00", extra=None, 
 
 # ── o banco: a versão em vigor ──────────────────────────────────────────────────────────────────────────────────
 def test_vigentes_aplica_a_edicao_e_tira_a_excluida():
-    pytest.importorskip("PyQt6")
     import chamados_obs_store as obs
     lista = [_reg("a", "9101", "obs", "Primeiro texto"), _reg("b", "9101", "obs", "Vai sumir"),
              _reg("c", "9101", "ticket", "Ticket registrado: SR 1"),
@@ -44,7 +43,6 @@ def test_vigentes_aplica_a_edicao_e_tira_a_excluida():
 
 
 def test_a_edicao_de_um_automatico_nao_vale():
-    pytest.importorskip("PyQt6")
     import chamados_obs_store as obs
     lista = [_reg("c", "9101", "ticket", "Ticket registrado: SR 1"),
              _reg("d", "9101", "edicao", "Outro", extra={"de": "c"}), _reg("e", "9101", "exclusao", "x", extra={"de": "c"})]
@@ -54,7 +52,6 @@ def test_a_edicao_de_um_automatico_nao_vale():
 # ── a tela ─────────────────────────────────────────────────────────────────────────────────────────────────────
 @pytest.fixture
 def tela(monkeypatch):
-    pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
     import api
     import chamados_obs_store as obs_store
     from os_web import criar_app, rotas
@@ -216,7 +213,6 @@ NOTA_RETRO = ("[CHAMADO] Acompanhamento — Huawei · Inversor\nOS de abertura: 
 
 
 def test_a_linha_do_historico_tem_chave_e_o_ajuste_vale_por_cima():
-    pytest.importorskip("PyQt6")
     from os_web import acomp_web as aw
     import datetime as dt
     hoje = dt.datetime(2026, 10, 29, 12, 0)

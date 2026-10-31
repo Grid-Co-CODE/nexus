@@ -15,7 +15,6 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 

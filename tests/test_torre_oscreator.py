@@ -7,12 +7,7 @@ falam com o Fracttal (login, arquivos, redirecionamentos) — nenhum teste aqui 
 import hashlib
 import hmac
 
-import pytest
-
 from nexus.torres import descobrir_torres
-
-# o clone importa o steps/ui.py do OS Creator (PyQt6) ao montar a tela de Engenharia
-pytest.importorskip("PyQt6")
 
 DESTINOS = {"inicio": "/os/", "historico": "/os/historico", "ativos": "/os/ativos", "performance": "/os/performance",
             "cos": "/os/cos", "pcm": "/os/setor/pcm", "chamados": "/os/chamados", "engenharia": "/os/engenharia",
@@ -166,13 +161,13 @@ def test_clone_que_nao_sobe_vira_aviso_e_o_nexus_segue(logado, monkeypatch):
     from nexus.torres.oscreator import ponte
 
     def quebra(_app):
-        raise ImportError("No module named 'PyQt6'")
+        raise ImportError("No module named 'requests'")
 
     monkeypatch.setattr(ponte, "_criar_clone", quebra)
     resp = logado.get("/os/")
     assert resp.status_code == 503
     html = resp.get_data(as_text=True)
-    assert "OS Creator" in html and "PyQt6" in html
+    assert "OS Creator" in html and "requests" in html
     assert logado.get("/").status_code == 200
 
 

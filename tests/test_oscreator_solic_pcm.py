@@ -13,6 +13,7 @@ O que estes testes seguram:
 O api e o banco são dublês: nada vai à rede, nada é criado no Fracttal. Nomes e usinas são de mentira (repositório público)."""
 import json
 import re
+import sys
 import threading
 import time
 from pathlib import Path
@@ -21,8 +22,6 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
-import sys  # noqa: E402
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 

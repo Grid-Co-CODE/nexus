@@ -55,7 +55,6 @@ def test_a_entrada_tambem_leva_o_icone(cliente):
 # ── 3: o Fracttal que recusa o checklist pela permissão da conta ─────────────────────────────────────────────────
 @pytest.fixture
 def api_clone():
-    pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
     if ponte.RAIZ_CLONE not in sys.path:
         sys.path.append(ponte.RAIZ_CLONE)
     import api

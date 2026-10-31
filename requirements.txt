@@ -4,10 +4,9 @@ waitress==3.0.2
 pytest==9.1.0
 openpyxl==3.1.5
 cryptography==48.0.1
-# clone do OS Creator Web (nexus/torres/oscreator): o motor dele fala com o Fracttal por requests, e a tela de
-# Engenharia importa o steps/ui.py do desktop, que é PyQt6. Sem os dois, só o /os/* fica fora; o Nexus sobe.
+# clone do OS Creator Web (nexus/torres/oscreator): o motor dele fala com o Fracttal por requests. Sem ele, só o /os/* fica
+# fora; o Nexus sobe. O PyQt6 saiu em 31/10/2026: nada no repositório o importa (tests/test_oscreator_sem_pyqt.py).
 requests==2.34.2
-PyQt6==6.11.0
 # motor do PCM (nexus/pcm/motor, a programação semanal): roda num subprocesso com este mesmo Python
 pandas==3.0.3
 # miniatura das fotos da ronda (nexus/campo/ronda_fotos.py); sem ele, a miniatura é a foto inteira

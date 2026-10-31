@@ -17,7 +17,6 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 

@@ -232,7 +232,6 @@ PONTE = "/os/_nexus/engenharia/acompanhamento"
 
 @pytest.fixture
 def fracttal(tela, app, monkeypatch):
-    pytest.importorskip("PyQt6")
     from nexus.torres.oscreator import ponte
     ponte.clone(app)
     import api as os_api
