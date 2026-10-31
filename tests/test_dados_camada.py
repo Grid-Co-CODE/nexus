@@ -84,7 +84,8 @@ CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt":
         # as normalizações da Ronda COS (29/10/2026): o Nexus grava, para a disponibilidade da Thopen
         "normalizacao": normalizacoes_banco.CAB, "ocorrencia_aberta": normalizacoes_banco.CAB_ABERTA,
         # o uso das telas do OS Creator e os pedidos ao Fracttal por hora (31/10/2026): o servidor mede e grava
-        "uso_os_hora": fato_uso_os.CAB_USO, "fracttal_hora": fato_uso_os.CAB_FRACTTAL}
+        "uso_os_hora": fato_uso_os.CAB_USO, "fracttal_hora": fato_uso_os.CAB_FRACTTAL,
+        "fracttal_total_hora": fato_uso_os.CAB_FRACTTAL_TOTAL}
 PROIBIDAS = ("nome", "email", "tecnico", "observacao", "comentario", "motivo", "tarefa", "relatorio", "atividades")
 
 

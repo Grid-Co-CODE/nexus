@@ -2,8 +2,8 @@
 
 Em 13 e 14/10/2026 o OS Creator prendeu as threads do Nexus e ninguém soube dizer quais telas as pessoas abrem, a que
 hora, em quantas, quanto cada uma demora e quanto pede ao Fracttal: o Raio-X mostra o momento, o log só o erro. Sem esse
-número o "antes e depois" de cada etapa do canto central seria chute. Daqui saem as linhas por hora que o laço de
-gravação leva ao banco (`drenar`) e que o Raio-X mostra (`instantaneo`).
+número o "antes e depois" de cada etapa do canto central seria chute. Daqui saem as linhas por hora que o laço guarda no
+disco e leva ao banco (`drenar`) e que o Raio-X mostra (`instantaneo`).
 
 - **Uma linha por hora × rota × automático.** A hora é a de Brasília (`AAAAMMDDHH`), a do FIM do pedido, lida DENTRO da
   trava (o balde de uma hora que o `drenar` já tirou nunca renasce). `automatico` separa o clique da pessoa do que a tela pede sozinha (Histórico a cada 10
@@ -38,13 +38,24 @@ gravação leva ao banco (`drenar`) e que o Raio-X mostra (`instantaneo`).
   aberta que não apaga. Fica fora dele o pedido que o teto recusou (não tem sessão).
 - **A memória não cresce:** as horas guardadas têm teto (MAX_HORAS, para o caso de ninguém drenar), como as rotas, os
   setores e o tamanho da rota.
-- **O laço de gravação** (`gravar_no_banco`, 31/10/2026, só com `gravar=True`: o servidor): no minuto :05 de cada hora tira
-  as horas FECHADAS dos dois contadores (`drenar`, com a hora aberta lida antes dos dois) e as leva ao banco, num livro por
-  mês (`dados/fato_uso_os.py`). Deu certo, grava o parcial (o reinício não traz a hora de volta). Deu errado (banco fora,
-  leitura curta do livro, sem a chave), as linhas ficam na memória e a hora seguinte tenta de novo com as novas, no máximo
-  48 horas (as mais velhas saem, com aviso no log). Essas horas à espera só existem na memória: um reinício com o banco fora
-  as perde. O :05 não cai em cima de nenhum laço de hora em hora do Nexus (tarefas :10 a :20, normalizações :22, sync do App
-  :25, zeladoria :32, carga :40, chamados :50).
+- **O laço** (thread `nexus-uso-os-banco`, só com `gravar=True`: o servidor; nunca o PC nem os testes) tem dois passos, e
+  é o Ruling M da controladora (31/10/2026): gravar o livro do mês inteiro no banco custa ~7 s de processador, e o Nexus é
+  UM processo com o servidor já apertado, então não se faz de hora em hora.
+  1. **No :05 de toda hora** (`drenar_para_o_disco`) tira as horas FECHADAS dos dois contadores (`drenar`, com a hora aberta
+     lida UMA vez, antes dos dois) e as guarda no **pendente**, em `casca/uso_os_pendente.json` na pasta de dados
+     (atômico: rascunho + `os.replace`). A memória dos contadores fica limitada, e o Raio-X lê o pendente. Depois do
+     disco, `salvar()`: o parcial sem as horas que acabaram de sair.
+  2. **Às 03:45 de Brasília, uma vez por dia** (`gravar_no_banco`) leva ao banco TUDO o que está pendente, agrupado pelo livro
+     do mês de cada hora (`dados/fato_uso_os.py`: o mês que fechou ganha as últimas horas na primeira gravação depois da
+     virada). Deu certo: anota a hora (`gravou_em`), as linhas gravadas saem do pendente (memória e disco) e `salvar()`
+     roda. Deu errado (banco fora, leitura curta do livro, sem a chave): o pendente fica no disco e a gravação do dia
+     seguinte leva tudo.
+  **O pendente tem teto de 3 dias** (`MAX_HORAS_PENDENTES` = 72 horas, as mais novas; o banco fora por dias não enche o
+  disco): as mais velhas saem, com aviso no log. **Reinício:** o pendente é relido no boot (arquivo quebrado é ignorado,
+  com aviso, e a linha ruim não leva as boas; a mesma chave que o parcial velho traz de volta fica uma só, a mais nova).
+  O que um reinício perde é só o que nunca saiu da memória: **a hora aberta do contador do Fracttal** (ele não guarda
+  parcial em disco) e até 5 min do uso (o parcial é de 5 em 5). 03:45 não cai em cima de nenhum laço de hora em hora do
+  Nexus (tarefas :10 a :20, normalizações :22, sync do App :25, zeladoria :32, carga :40, chamados :50), e o :05 também não.
 
 Quem liga é o `servir.py` (o servidor), junto do `teto_os` e depois dele (é o teto que avisa o 503); o `create_app`, o PC
 e os testes seguem sem isto. Os ganchos do Flask nunca derrubam o pedido: qualquer falha da medição vai ao log em debug.
@@ -80,14 +91,18 @@ SEM_SETOR = "(sem setor)"
 OUTRAS = "(outras)"
 PASSO_S = 300                                   # o instantâneo em disco, de 5 em 5 minutos
 MAX_HORAS = 48                                  # horas na memória sem ninguém drenar (o laço da gravação drena a cada hora)
-GRAVAR_NO_MINUTO = 5                            # o laço de gravação acorda no :05 de cada hora (fora dos minutos dos outros laços)
-MAX_HORAS_PENDENTES = 48                        # horas já tiradas dos contadores que esperam o banco; as mais velhas saem
+DRENAR_NO_MINUTO = 5                            # o laço tira as horas fechadas dos contadores no :05 de cada hora
+GRAVAR_NA_HORA, GRAVAR_NO_MINUTO = 3, 45        # e leva ao banco uma vez por dia, às 03:45 de Brasília (a hora mais parada)
+PASSO_DRENAR, PASSO_GRAVAR = "drenar", "gravar"
+MAX_HORAS_PENDENTES = 72                        # 3 dias de horas já tiradas dos contadores que esperam o banco; as mais velhas saem
 MAX_ROTAS = 200                                 # rotas distintas por hora (e por dia e setor no corte); o resto vai a OUTRAS
 MAX_SETORES = 50                                # setores distintos por dia no corte
 MAX_CARACTERES_DA_ROTA = 160
 DIAS_SETOR = 30
 ARQUIVO_PARCIAL = "uso_os_parcial.json"
 ARQUIVO_SETOR = "uso_os_setor.json"
+ARQUIVO_PENDENTE = "uso_os_pendente.json"       # as linhas que já saíram dos contadores e ainda não estão no banco
+_BRT_S = -3 * 3600                              # Brasília é UTC-3 fixo (sem horário de verão desde 2019)
 BASE = 1.03                                     # cada faixa da duração é 3% mais larga que a anterior
 MAX_FAIXA = 450                                 # 1,03^450 ms = 10 min: o que passa disso cai na última faixa
 _LOG_BASE = math.log(BASE)
@@ -99,10 +114,13 @@ _trava = threading.Lock()                       # a do estado: um pedido toma um
 _trava_disco = threading.Lock()                 # uma gravação em disco de cada vez (o laço e quem chamar `salvar`)
 _horas: dict = {}                               # hora_id -> _Hora
 _setor: dict = {}                               # dia -> setor -> rota -> [cliques, automáticos]
-_estado: dict = {"gravar": False, "pasta": None, "config": None}
+_estado: dict = {"gravar": False, "pasta": None, "config": None, "gravou_em": 0.0}
 _trava_pendentes = threading.Lock()
 _trava_gravacao = threading.Lock()              # uma volta de gravação por vez (o laço e quem mais chamar)
 _pendentes: dict = {"uso": [], "fracttal": []}  # as linhas dos dois contadores que já saíram e ainda não chegaram ao banco
+# a chave de cada linha (a mesma do fato): a que o parcial velho traz de volta depois de um reinício não repete a do pendente
+_CHAVE_DA_LINHA = {"uso": lambda lin: (lin["hora_id"], lin["rota"], lin["automatico"]),
+                   "fracttal": lambda lin: (lin["hora_id"], lin["origem"], lin["metodo"])}
 
 
 def _agora() -> float:
@@ -394,30 +412,48 @@ def limpar() -> None:
         _horas.clear()
         _setor.clear()
         _estado.clear()
-        _estado.update(gravar=False, pasta=None, config=None)
+        _estado.update(gravar=False, pasta=None, config=None, gravou_em=0.0)
     with _trava_pendentes:
         for lista in _pendentes.values():
             lista.clear()
 
 
-# ── a gravação de hora em hora ───────────────────────────────────────────────────────────────────────────────────────
+# ── o que sai dos contadores: para o disco de hora em hora, para o banco uma vez por dia ──────────────────────────────
 def pendentes() -> dict:
-    """As linhas que já saíram dos contadores e esperam o banco: `{"uso", "fracttal", "horas"}`, só contagens."""
+    """O que já saiu dos contadores e ainda não está no banco: `{"uso", "fracttal", "horas"}`, só contagens."""
     with _trava_pendentes:
         horas = {lin["hora_id"] for lista in _pendentes.values() for lin in lista}
         return {"uso": len(_pendentes["uso"]), "fracttal": len(_pendentes["fracttal"]), "horas": len(horas)}
 
 
 def linhas_pendentes() -> dict:
-    """Cópia das linhas que já saíram dos contadores e esperam o banco: `{"uso": [...], "fracttal": [...]}`. O Raio-X as soma
-    ao que mostra (com o banco fora, é nelas que estão as horas que acabaram de fechar)."""
+    """Cópia das linhas que já saíram dos contadores e esperam as 03:45: `{"uso": [...], "fracttal": [...]}` (a do Fracttal
+    ainda com a linha de total `*`, que o `fato_uso_os.separar_total` leva para a aba dela). É o que o disco guarda: o
+    Raio-X as soma ao que o banco tem."""
     with _trava_pendentes:
         return {nome: [dict(lin) for lin in lista] for nome, lista in _pendentes.items()}
 
 
+def gravou_em() -> float:
+    """Quando (relógio de parede) a última gravação no banco deu certo, ou 0 se nenhuma desde que o processo subiu. O Raio-X
+    guarda o banco por 10 min: a leitura que começou antes desta hora não tem o que saiu do pendente, e é lida de novo."""
+    return float(_estado.get("gravou_em") or 0.0)
+
+
+def _juntar_pendentes(novas_uso: list, novas_fracttal: list) -> None:
+    """Com a trava na mão: soma as linhas ao pendente, em ordem. A mesma chave fica uma só, a mais nova (a hora que o
+    parcial velho traz de volta depois de um reinício, e que o pendente já tinha, não vai duas vezes ao banco: o grão
+    quebraria e ninguém mais gravaria)."""
+    for nome, novas in (("uso", novas_uso), ("fracttal", novas_fracttal)):
+        chave = _CHAVE_DA_LINHA[nome]
+        por_chave = {chave(lin): lin for lin in _pendentes[nome]}
+        por_chave.update({chave(lin): lin for lin in novas})
+        _pendentes[nome] = [por_chave[k] for k in sorted(por_chave)]
+
+
 def _cortar_pendentes() -> None:
-    """Com a trava na mão: fica no máximo MAX_HORAS_PENDENTES horas à espera, as mais novas. O banco fora por dias não pode
-    encher a memória do servidor."""
+    """Com a trava na mão: fica no máximo MAX_HORAS_PENDENTES horas (3 dias), as mais novas. O banco fora por dias não pode
+    encher o disco nem a memória do servidor."""
     horas = sorted({lin["hora_id"] for lista in _pendentes.values() for lin in lista})
     if len(horas) <= MAX_HORAS_PENDENTES:
         return
@@ -425,50 +461,117 @@ def _cortar_pendentes() -> None:
     for nome in _pendentes:
         _pendentes[nome] = [lin for lin in _pendentes[nome] if lin["hora_id"] >= corte]
     log.warning("Uso do OS Creator: o banco segue sem receber e descartei %d hora(s) pendente(s), as mais velhas; "
-                "ficam as %d mais novas", len(horas) - MAX_HORAS_PENDENTES, MAX_HORAS_PENDENTES)
+                "ficam as %d mais novas (3 dias)", len(horas) - MAX_HORAS_PENDENTES, MAX_HORAS_PENDENTES)
 
 
-def espera_ate_a_gravacao(agora: float) -> float:
-    """Segundos até o próximo :05 de uma hora cheia (o fuso do Brasil é de horas inteiras: o minuto é o mesmo em qualquer
-    um). Estando no :05 exato, o próximo é o da hora seguinte."""
-    alvo = (agora // 3600) * 3600 + GRAVAR_NO_MINUTO * 60
-    if alvo <= agora:
-        alvo += 3600
-    return alvo - agora
+def _salvar_pendente() -> None:
+    """O pendente no disco (`casca/uso_os_pendente.json`, atômico: rascunho + `os.replace`). A memória é a cópia de trabalho
+    e o arquivo, a durável: falha de disco vai ao log e a memória segue com as linhas (a próxima vez grava de novo). Sem
+    pasta de dados (o teste sem `NEXUS_DADOS`) não faz nada. Quem tira a cópia da memória a tira com a trava do disco na mão,
+    senão duas gravações podiam trocar de ordem e deixar no arquivo a mais velha."""
+    pasta = _estado.get("pasta")
+    if pasta is None:
+        return
+    with _trava_disco:
+        with _trava_pendentes:
+            dados = {"versao": 1, "gravado_em": _agora(),
+                     **{nome: [dict(lin) for lin in lista] for nome, lista in _pendentes.items()}}
+        _gravar(pasta / ARQUIVO_PENDENTE, dados)
+
+
+def _carregar_pendente(arquivo: Path) -> None:
+    """O pendente que ficou no disco antes do reinício volta à memória (o que já saiu dos contadores não se perde). Arquivo
+    quebrado ou fora da forma é ignorado, com aviso no log; a linha ruim é ignorada e as boas ficam, porque uma ruim deixada
+    no meio faria a gravação subir para sempre."""
+    dados = _ler_json(arquivo)
+    if dados is None:
+        return
+    from ..dados import fato_uso_os                     # aqui dentro: a casca não puxa a camada de dados no import
+    boas, ruins = {"uso": [], "fracttal": []}, 0
+    for nome, aba in (("uso", fato_uso_os.ABA_USO), ("fracttal", fato_uso_os.ABA_FRACTTAL)):
+        lista = dados.get(nome)
+        if not isinstance(lista, list):
+            log.warning("Uso do OS Creator: %s não tem a lista \"%s\"; ignoro essa parte", arquivo, nome)
+            continue
+        for d in lista:
+            if fato_uso_os.valida(d, aba):
+                boas[nome].append(d)
+            else:
+                ruins += 1
+    if ruins:
+        log.warning("Uso do OS Creator: %d linha(s) ruim(ns) de %s ignorada(s)", ruins, arquivo)
+    with _trava_pendentes:
+        _juntar_pendentes(boas["uso"], boas["fracttal"])
+        _cortar_pendentes()
+
+
+def proximo_passo(agora: float) -> tuple:
+    """`(segundos, passo)` do próximo compromisso do laço: tirar as horas fechadas dos contadores (`PASSO_DRENAR`, no :05 de
+    toda hora; o fuso do Brasil é de horas inteiras, então o minuto é o mesmo em qualquer um) ou levar o pendente ao banco
+    (`PASSO_GRAVAR`, às 03:45 de Brasília). Estando no instante de um deles, o próximo é o da vez seguinte."""
+    drenar_em = (agora // 3600) * 3600 + DRENAR_NO_MINUTO * 60
+    if drenar_em <= agora:
+        drenar_em += 3600
+    local = agora + _BRT_S                              # o relógio de Brasília, contado como se fosse UTC
+    gravar_em = (local // 86400) * 86400 + GRAVAR_NA_HORA * 3600 + GRAVAR_NO_MINUTO * 60 - _BRT_S
+    if gravar_em <= agora:
+        gravar_em += 86400
+    if gravar_em < drenar_em:
+        return gravar_em - agora, PASSO_GRAVAR
+    return drenar_em - agora, PASSO_DRENAR
+
+
+def drenar_para_o_disco() -> dict:
+    """O passo de TODA hora: tira as horas FECHADAS dos dois contadores e as guarda no pendente em disco (`_salvar_pendente`),
+    de onde o Raio-X as lê e a gravação das 03:45 as leva ao banco. A memória dos contadores fica limitada, e um reinício não
+    perde o que já saiu deles. Depois, `salvar()`: o parcial sem as horas que acabaram de sair (senão o reinício as traria
+    de volta). Nunca vai ao banco.
+
+    A hora aberta (a de agora) é lida UMA vez, antes dos dois `drenar`: o relógio que anda entre os dois não faz o segundo
+    tirar uma hora que ainda não fechou. Devolve só contagens: `{"drenou": {"uso", "fracttal"}, "pendentes": {...}}`."""
+    ate = fracttal_conta.hora_id_de()                   # a hora aberta, lida ANTES dos dois drenar
+    novas_uso, novas_fracttal = drenar(ate), fracttal_conta.drenar(ate)
+    if novas_uso or novas_fracttal:
+        with _trava_pendentes:
+            _juntar_pendentes(novas_uso, novas_fracttal)
+            _cortar_pendentes()
+        _salvar_pendente()
+        try:
+            salvar()
+        except Exception:                               # noqa: BLE001
+            log.warning("Uso do OS Creator: guardei o pendente e não consegui guardar o parcial", exc_info=True)
+    return {"drenou": {"uso": len(novas_uso), "fracttal": len(novas_fracttal)}, "pendentes": pendentes()}
 
 
 def gravar_no_banco(config=None, *, sessao=None) -> dict:
-    """Uma volta do laço de gravação: tira as horas FECHADAS dos dois contadores, soma ao que ficou esperando e leva tudo ao
-    banco (`dados/fato_uso_os.gravar`). Devolve só contagens: o que `gravar` devolve; `{"pulou": ...}` sem nada a gravar; ou
-    `{"erro": ..., "pendentes": ...}`, e então as linhas ficam para a hora seguinte (no máximo MAX_HORAS_PENDENTES horas).
+    """O passo das 03:45: leva ao banco TUDO o que está pendente (o que o :05 guardou desde a última gravação, mais o que
+    fechou depois dele), agrupado pelo livro do mês de cada hora (`dados/fato_uso_os.gravar`). Devolve só contagens: o que
+    `gravar` devolve; `{"pulou": ...}` sem nada a gravar; ou `{"erro": ..., "pendentes": ...}`, e então o pendente fica no
+    disco e a gravação do dia seguinte leva tudo (até o teto de 3 dias).
 
-    A hora aberta (a de agora) é lida UMA vez, antes dos dois `drenar`: o relógio que anda entre os dois não faz o segundo
-    tirar uma hora que ainda não fechou. `sessao` e `config` são para os testes; no servidor vêm do app e do `requests`.
-    Teste sem sessão não tira nada dos contadores e nunca vai à rede."""
+    Deu certo: anota a hora (`gravou_em`), as linhas gravadas saem do pendente (memória e disco) e `salvar()` roda. `sessao` e
+    `config` são para os testes; no servidor vêm do app e do `requests`. Teste sem sessão não tira nada dos contadores e
+    nunca vai à rede."""
     config = config if config is not None else (_estado.get("config") or {})
     if sessao is None and config.get("TESTING"):
         return {"pulou": "teste sem banco: nada foi tirado dos contadores"}
     if not _trava_gravacao.acquire(blocking=False):
         return {"pulou": "outra volta da gravação está em curso"}
     try:
-        return _gravar_horas_fechadas(config, sessao)
+        return _gravar_pendente(config, sessao)
     finally:
         _trava_gravacao.release()
 
 
-def _gravar_horas_fechadas(config, sessao) -> dict:
-    ate = fracttal_conta.hora_id_de()                   # a hora aberta, lida ANTES dos dois drenar
-    novas_uso, novas_fracttal = drenar(ate), fracttal_conta.drenar(ate)
+def _gravar_pendente(config, sessao) -> dict:
+    drenar_para_o_disco()                               # o que fechou desde o último :05 (nada, no horário normal)
     with _trava_pendentes:
-        _pendentes["uso"] += novas_uso
-        _pendentes["fracttal"] += novas_fracttal
-        _cortar_pendentes()
         uso, fracttal = list(_pendentes["uso"]), list(_pendentes["fracttal"])
     if not uso and not fracttal:
-        return {"pulou": "nenhuma hora fechada para gravar"}
+        return {"pulou": "nada pendente para gravar"}
     token = str(config.get("GRIDCO_SQL_TOKEN") or "").strip()
     if not token:
-        return {"erro": "sem GRIDCO_SQL_TOKEN: as linhas ficam na memória", "pendentes": pendentes()}
+        return {"erro": "sem GRIDCO_SQL_TOKEN: o pendente fica no disco do servidor", "pendentes": pendentes()}
     from ..cadastro.ligacoes import BASE_API
     from ..dados import fato_uso_os                     # aqui dentro: a casca não puxa a camada de dados no import
     try:
@@ -477,16 +580,20 @@ def _gravar_horas_fechadas(config, sessao) -> dict:
             sessao = requests.Session()
         rel = fato_uso_os.gravar(uso, fracttal, base=(config.get("GRIDCO_DB_API") or BASE_API).rstrip("/"), token=token,
                                  sessao=sessao)
-    except Exception as ex:                             # noqa: BLE001 - banco fora, leitura curta, conferência: tenta na hora seguinte
-        log.warning("Uso do OS Creator: não gravei no banco (%s); %d linha(s) esperam a hora seguinte", type(ex).__name__,
-                    len(uso) + len(fracttal), exc_info=True)
+    except Exception as ex:                             # noqa: BLE001 - banco fora, leitura curta, conferência: tenta amanhã
+        log.warning("Uso do OS Creator: não gravei no banco (%s); %d linha(s) ficam no disco para a gravação do dia "
+                    "seguinte", type(ex).__name__, len(uso) + len(fracttal), exc_info=True)
         return {"erro": type(ex).__name__, "pendentes": pendentes()}
+    # a hora da gravação ANTES de limpar o pendente: o Raio-X que olhar no meio vê o banco como velho, lê de novo e acha as
+    # linhas nos dois lados (a chave repetida vale a do pendente), nunca num buraco
+    _estado["gravou_em"] = _agora()
     gravadas = {id(lin) for lin in uso} | {id(lin) for lin in fracttal}
     with _trava_pendentes:                              # só sai o que foi gravado: o que chegou durante a gravação fica
         for nome in _pendentes:
             _pendentes[nome] = [lin for lin in _pendentes[nome] if id(lin) not in gravadas]
+    _salvar_pendente()
     try:
-        salvar()                                        # o parcial sem a hora que já está no banco: o reinício não a traz de volta
+        salvar()
     except Exception:                                   # noqa: BLE001
         log.warning("Uso do OS Creator: gravei no banco e não consegui guardar o parcial", exc_info=True)
     return rel
@@ -494,11 +601,13 @@ def _gravar_horas_fechadas(config, sessao) -> dict:
 
 def _laco_gravacao() -> None:
     while True:
-        time.sleep(espera_ate_a_gravacao(_agora()))
+        espera, passo = proximo_passo(_agora())
+        time.sleep(espera)
         try:
-            log.info("Uso do OS Creator no banco: %s", gravar_no_banco())
+            rel = gravar_no_banco() if passo == PASSO_GRAVAR else drenar_para_o_disco()
+            log.info("Uso do OS Creator (%s): %s", passo, rel)
         except Exception:                               # noqa: BLE001 - a medição nunca derruba o Nexus
-            log.exception("Uso do OS Creator: a volta da gravação quebrou")
+            log.exception("Uso do OS Creator: o passo %s do laço quebrou", passo)
 
 
 # ── o disco: o parcial e o corte por setor ───────────────────────────────────────────────────────────────────────────
@@ -652,8 +761,8 @@ def _laco() -> None:
 def ligar(app, *, gravar: bool) -> None:
     """Liga a medição neste app: os ganchos do pedido, o aviso do teto, o parcial e o corte por setor de antes do reinício e
     (fora dos testes) o laço de 5 em 5 minutos. `gravar` diz se este processo leva as horas ao banco (o servidor sim, o PC
-    não): só com ele abre o laço da gravação de hora em hora (`gravar_no_banco`, no :05). Chame DEPOIS do `teto_os.ligar` (é
-    ele que avisa o 503). Ligar de novo no mesmo app não faz nada."""
+    não): só com ele abre o laço (`drenar_para_o_disco` no :05 de toda hora, `gravar_no_banco` às 03:45). O pendente que ficou
+    no disco volta no boot. Chame DEPOIS do `teto_os.ligar` (é ele que avisa o 503). Ligar de novo no mesmo app não faz nada."""
     if CHAVE in app.extensions:
         return
     _estado["gravar"] = bool(gravar)
@@ -668,12 +777,13 @@ def ligar(app, *, gravar: bool) -> None:
     if teto is not None:
         teto.ao_recusar = recusado
     if _estado["pasta"] is not None:
-        for carregar, nome in ((_carregar_parcial, ARQUIVO_PARCIAL), (_carregar_setor, ARQUIVO_SETOR)):
+        for carregar, nome in ((_carregar_parcial, ARQUIVO_PARCIAL), (_carregar_setor, ARQUIVO_SETOR),
+                               (_carregar_pendente, ARQUIVO_PENDENTE)):
             try:
                 carregar(_estado["pasta"] / nome)
             except Exception:                           # noqa: BLE001 - arquivo ruim não impede o Nexus de subir
                 log.exception("Uso do OS Creator: não consegui ler %s; começo do zero", nome)
     if not app.config.get("TESTING"):
         threading.Thread(target=_laco, name="nexus-uso-os", daemon=True).start()
-        if gravar:                                      # a gravação de hora em hora é só do servidor
+        if gravar:                                      # o laço do disco e do banco é só do servidor
             threading.Thread(target=_laco_gravacao, name="nexus-uso-os-banco", daemon=True).start()

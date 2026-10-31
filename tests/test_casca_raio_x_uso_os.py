@@ -3,9 +3,14 @@ pedidas nos últimos 7 dias (os cliques e o que a tela pede sozinha, separados, 
 dia, os pedidos ao Fracttal por hora (o total e o pico por minuto, com a cota de 200 ao lado) e o corte por setor. É ela que
 dá o "antes e depois" de cada etapa seguinte e mostra os horários de pico de verdade.
 
+Rulings M e N da controladora: o dia de ontem para trás vem do BANCO (cópia de 10 min); o que ainda não foi às 03:45 vem do
+PENDENTE no disco do servidor; a hora aberta vem da memória; na mesma chave vale o mais novo (o pendente vence o banco, a
+memória vence o pendente) e ninguém conta duas vezes. O total e o pico por minuto vêm da aba própria do total (1 linha por
+hora), e a aba grande do detalhe do Fracttal nem é lida.
+
 Provas, sem rede: o banco é a `ApiPGFalsa` com 7 dias gravados pelo próprio `fato_uso_os.gravar`; o que o servidor tem na
-memória (a hora aberta, as horas que esperam o banco e o corte por setor) é dublado; o relógio está na mão. A página nunca
-espera o banco: banco fora, vazio, lento, tudo vira "sem medição ainda" ou a cópia de antes, e a página abre."""
+memória e no disco (a hora aberta, o pendente e o corte por setor) é dublado; o relógio está na mão. A página nunca espera o
+banco: banco fora, vazio, lento, tudo vira "sem medição ainda" ou a cópia de antes, e a página abre."""
 import re
 import threading
 import time
@@ -25,6 +30,7 @@ AQUI = Path(__file__).resolve().parent.parent
 HOJE = datetime.fromisoformat("2026-10-30T14:20:00+00:00").timestamp()          # sexta, 11:20 em Brasília
 AGORA = "2026103011"
 SETOR_A, SETOR_B = "Setor Fictício Alfa", "Setor Fictício Beta"
+GRAVOU, EPOCH = [0.0], [1000.0]                 # a hora da última gravação das 03:45 e o relógio de parede da leitura do banco
 
 
 def _uso(hora_id, rota, automatico=0, **kw):
@@ -87,8 +93,10 @@ def _ambiente(monkeypatch):
     monkeypatch.setattr(R, "RELATORIO_WORKER", "/nao/existe/worker.json")
     for nome in ("_WORKER", "_WEB", "_MEMORIA", "_THREADS"):
         monkeypatch.setattr(R, nome, {"thread": None, "ultimo": None, "quando": None}, raising=False)
-    monkeypatch.setattr(R, "_USO", {"thread": None, "dados": None, "lido_em": None, "lido_txt": "", "tentou_em": None,
-                                    "erro": ""})
+    monkeypatch.setattr(R, "_USO", R._uso_novo())
+    GRAVOU[0], EPOCH[0] = 0.0, 1000.0
+    monkeypatch.setattr(U, "gravou_em", lambda: GRAVOU[0])
+    monkeypatch.setattr(R, "_epoch", lambda: EPOCH[0])
     monkeypatch.setattr(C, "_agora", lambda: HOJE)
     monkeypatch.setattr(U, "instantaneo", lambda: {"linhas": [], "setor": {}})
     monkeypatch.setattr(U, "linhas_pendentes", lambda: {"uso": [], "fracttal": []})
@@ -122,13 +130,22 @@ def _texto(html):
 
 
 # ── o que a seção calcula ────────────────────────────────────────────────────────────────────────────────────────────
-def _modelo(banco_dados=None, vivo_dados=None, **kw):
-    banco_dados = banco_dados if banco_dados is not None else {"uso": USO_BANCO, "fracttal": FRACTTAL_BANCO}
-    vivo_dados = vivo_dados if vivo_dados is not None else {"uso": USO_VIVO, "fracttal": FRACTTAL_VIVO, "setor": SETOR}
+def _total(hora_id, **kw):
+    """O total da hora como o banco o guarda na aba própria (sem origem nem método)."""
+    return F.separar_total([_fra(hora_id, **kw)])[1][0]
+
+
+def _totais(linhas):
+    """As linhas `*` que o contador do Fracttal entrega viram o total da hora (a divisão que o `fato_uso_os` faz)."""
+    return F.separar_total(linhas)[1]
+
+
+def _modelo(banco_dados=None, vivo_dados=None):
+    banco_dados = banco_dados if banco_dados is not None else {"uso": USO_BANCO, "total": _totais(FRACTTAL_BANCO)}
+    vivo_dados = vivo_dados if vivo_dados is not None else {"uso": USO_VIVO, "total": _totais(FRACTTAL_VIVO), "setor": SETOR}
     # o banco devolve a hora como inteiro, a memória como texto: a conta tem de aceitar os dois
-    banco_dados = {"uso": [dict(l, hora_id=int(l["hora_id"])) for l in banco_dados["uso"]],
-                   "fracttal": [dict(l, hora_id=int(l["hora_id"])) for l in banco_dados["fracttal"]]}
-    return R.montar_uso_os(AGORA, banco_dados, vivo_dados, **kw)
+    banco_dados = {nome: [dict(l, hora_id=int(l["hora_id"])) for l in linhas] for nome, linhas in banco_dados.items()}
+    return R.montar_uso_os(AGORA, banco_dados, vivo_dados)
 
 
 def test_as_rotas_mais_pedidas_separam_clique_e_automatico():
@@ -157,13 +174,13 @@ def test_mediana_e_p95_das_horas_pesadas_pelos_pedidos_atendidos():
 
 def test_so_as_15_rotas_mais_pedidas():
     uso = [_uso("2026103010", f"/os/tela{i:02d}", 0, pedidos_qtd=100 - i) for i in range(20)]
-    rotas = _modelo({"uso": uso, "fracttal": []}, {"uso": [], "fracttal": [], "setor": {}})["rotas"]
+    rotas = _modelo({"uso": uso, "total": []}, {"uso": [], "total": [], "setor": {}})["rotas"]
     assert len(rotas) == 15 and rotas[0]["rota"] == "/os/tela00" and rotas[-1]["rota"] == "/os/tela14"
 
 
 def test_duracao_vazia_fica_vazia():
     uso = [_uso("2026103010", "/os/api/ocupada", 0, pedidos_qtd=4, ocupado_qtd=4, duracao_p50_ms=None, duracao_p95_ms=None)]
-    r = _modelo({"uso": uso, "fracttal": []}, {"uso": [], "fracttal": [], "setor": {}})["rotas"][0]
+    r = _modelo({"uso": uso, "total": []}, {"uso": [], "total": [], "setor": {}})["rotas"][0]
     assert r["p50_ms"] is None and r["p95_ms"] is None and r["ocupado"] == 4
 
 
@@ -199,11 +216,32 @@ def test_por_dia_para_o_antes_e_o_depois():
 
 
 def test_a_memoria_vence_o_banco_na_mesma_chave_e_a_hora_nao_e_contada_duas_vezes():
-    antes = _modelo(vivo_dados={"uso": [], "fracttal": [], "setor": {}})["rotas"]
+    antes = _modelo(vivo_dados={"uso": [], "total": [], "setor": {}})["rotas"]
     com = _modelo()["rotas"]
     h_antes = next(r for r in antes if r["rota"] == "/os/historico")
     h_com = next(r for r in com if r["rota"] == "/os/historico")
     assert h_antes["cliques"] == 150 and h_com["cliques"] == 160     # 50 virou 55 (a memória vence), e as 5 da hora aberta somam
+
+
+def test_o_pendente_do_disco_vence_o_banco_na_mesma_chave_e_o_total_da_hora_tambem():
+    """Ruling M: de ontem para trás vem do banco; o que ainda não foi às 03:45 vem do disco do servidor. Se a mesma chave está
+    nos dois (o processo morreu entre gravar e limpar o pendente) vale o pendente, que é mais novo, e ninguém conta duas
+    vezes: nem a linha de uso nem o total da hora."""
+    banco_dados = {"uso": [_uso("2026102910", "/os/historico", 0, pedidos_qtd=60)],
+                   "total": [_total("2026102910", pedidos_qtd=100, pico_minuto_qtd=150)]}
+    pendente = {"uso": [_uso("2026102910", "/os/historico", 0, pedidos_qtd=70),
+                        _uso("2026103009", "/os/historico", 0, pedidos_qtd=5)],
+                "total": [_total("2026102910", pedidos_qtd=120, pico_minuto_qtd=190),
+                          _total("2026103009", pedidos_qtd=33, pico_minuto_qtd=44)], "setor": {}}
+    m = _modelo(banco_dados, pendente)
+    historico = next(r for r in m["rotas"] if r["rota"] == "/os/historico")
+    assert historico["cliques"] == 75                                                # 70 (o pendente vence: nunca 130) + 5
+    d29, d30 = m["dias"][5], m["dias"][6]
+    assert (d29["fracttal"], d29["pico"], d29["pico_hora"]) == (120, 190, 10)       # o total da hora também: 120, não 220
+    assert (d30["fracttal"], d30["pico"], d30["pico_hora"]) == (33, 44, 9)
+    # o banco sozinho (o pendente ainda vazio) dá o que o banco tem
+    so_banco = _modelo(banco_dados, {"uso": [], "total": [], "setor": {}})
+    assert so_banco["dias"][5]["fracttal"] == 100 and so_banco["dias"][5]["pico"] == 150
 
 
 def test_o_corte_por_setor_so_vem_da_memoria_e_so_dos_7_dias():
@@ -214,12 +252,12 @@ def test_o_corte_por_setor_so_vem_da_memoria_e_so_dos_7_dias():
     assert a["rotas"][1] == {"rota": "/os/os/<n>", "cliques": 12}
     assert "/os/velha" not in repr(setores)                          # 01/10 está fora dos 7 dias
     # sem a memória do servidor (o PC, o banco que o servidor não cortou) não há corte: o banco nunca o tem
-    assert _modelo(vivo_dados={"uso": [], "fracttal": [], "setor": {}})["setores"] == []
+    assert _modelo(vivo_dados={"uso": [], "total": [], "setor": {}})["setores"] == []
 
 
 def test_sem_nada_nao_tem():
-    assert _modelo({"uso": [], "fracttal": []}, {"uso": [], "fracttal": [], "setor": {}})["tem"] is False
-    assert R.montar_uso_os(AGORA, None, {"uso": [], "fracttal": [], "setor": {}})["tem"] is False
+    assert _modelo({"uso": [], "total": []}, {"uso": [], "total": [], "setor": {}})["tem"] is False
+    assert R.montar_uso_os(AGORA, None, {"uso": [], "total": [], "setor": {}})["tem"] is False
     assert _modelo()["tem"] is True
 
 
@@ -242,6 +280,8 @@ def test_secao_com_dado(app, logado, banco, vivo):
     # o corte por setor, e a nota de que mora no disco do servidor
     assert SETOR_A in sec and SETOR_B in sec and "(sem setor)" in sec
     assert "só no disco do servidor" in txt and "30 dias" in txt
+    # de onde vem: o banco (a cópia de 10 min), o pendente do disco que vai ao banco às 03:45 e a memória
+    assert "03:45" in txt and "disco do servidor" in txt
     # uma só leitura do banco, e a página traz o link para a seção
     assert "#uso-os-creator" in html
 
@@ -356,11 +396,56 @@ def test_banco_com_livro_ainda_inexistente_e_sem_medicao(app, logado):
         app.extensions.pop("nexus_dados_sessao", None)
 
 
-def test_hora_que_espera_o_banco_aparece_na_secao(app, logado, banco, vivo, monkeypatch):
-    espera = {"uso": [_uso("2026103009", "/os/so_na_espera", 0, pedidos_qtd=7)], "fracttal": []}
+def test_a_hora_que_espera_as_3h45_aparece_na_secao_com_o_total_dela(app, logado, banco, vivo, monkeypatch):
+    """O que o laço já tirou dos contadores e guardou no disco, e o banco ainda não tem, entra na seção: a linha de uso e o
+    total da hora (a linha `*` que o contador entrega vira o total antes da conta)."""
+    espera = {"uso": [_uso("2026103009", "/os/so_na_espera", 0, pedidos_qtd=7)],
+              "fracttal": [_fra("2026103009", pedidos_qtd=33, pico_minuto_qtd=44), _fra("2026103009", "/os/x", "get_assets")]}
     monkeypatch.setattr(U, "linhas_pendentes", lambda: espera)
+    monkeypatch.setattr(U, "pendentes", lambda: {"uso": 1, "fracttal": 2, "horas": 1})
     sec = _secao(logado.get("/t/base/raio-x").get_data(as_text=True))
     assert "/os/so_na_espera" in sec
+    modelo = R._secao_uso_os(app)
+    assert modelo["horas"][9]["fracttal"] == 33 and modelo["horas"][9]["pico"] == 44    # só o total, não a soma com o detalhe
+    assert "1 hora(s)" in modelo["banco_txt"] and "03:45" in modelo["banco_txt"]
+
+
+def test_a_gravacao_das_3h45_faz_a_pagina_ler_o_banco_de_novo(app, logado, banco, vivo, monkeypatch):
+    """O que sai do pendente na gravação já está no banco, mas a cópia de 10 min é de antes dela: sem ler de novo, o dia de
+    ontem sumiria da seção por até 10 min. A leitura que começou antes da gravação é velha, mesmo dentro dos 10 min."""
+    listagens = []
+    pega = banco.get
+
+    def conta(url, params=None, headers=None, timeout=None):
+        if url.endswith("/api/sheets"):
+            listagens.append(url)
+        return pega(url, params=params, headers=headers, timeout=timeout)
+    monkeypatch.setattr(banco, "get", conta)
+    EPOCH[0] = 5000.0
+    logado.get("/t/base/raio-x")
+    logado.get("/t/base/raio-x")
+    assert len(listagens) == 1                                                       # a cópia serve
+    GRAVOU[0], EPOCH[0] = 5001.0, 5002.0                                             # o laço gravou depois da leitura
+    logado.get("/t/base/raio-x")
+    assert len(listagens) == 2                                                       # leu de novo, sem esperar os 10 min
+    logado.get("/t/base/raio-x")
+    assert len(listagens) == 2                                                       # a nova leitura é posterior à gravação
+
+
+def test_a_pagina_nao_le_a_aba_grande_do_detalhe_do_fracttal(app, logado, banco, vivo, monkeypatch):
+    """A seção só usa o uso e o total da hora; o detalhe por origem × método é a aba maior do livro e ninguém o mostra."""
+    por_id = {v["id"]: aba for (_livro, aba), v in banco.abas.items()}
+    lidas = []
+    pega = banco.get
+
+    def anota(url, params=None, headers=None, timeout=None):
+        m = re.search(r"/api/sheets/(\d+)/rows$", url)
+        if m:
+            lidas.append(por_id[int(m.group(1))])
+        return pega(url, params=params, headers=headers, timeout=timeout)
+    monkeypatch.setattr(banco, "get", anota)
+    logado.get("/t/base/raio-x")
+    assert set(lidas) == {"fato_uso_hora", "fato_fracttal_total_hora"} and "fato_fracttal_hora" in por_id.values()
 
 
 def test_a_secao_nunca_derruba_a_pagina(app, logado, monkeypatch):

@@ -22,8 +22,9 @@ clique do administrador:
 
 - o uso do OS Creator nos últimos 7 dias (`montar_uso_os`, 31/10/2026, etapa 0 do canto central): as telas mais pedidas (os
   cliques e o que a tela pede sozinha, separados, com a mediana e o p95), os cliques por hora do dia, os pedidos ao
-  Fracttal por hora com o pico por minuto ao lado da cota de 200 e o corte por setor. Vem dos livros do mês no banco (a
-  leitura, numa thread à parte e guardada 10 min, `_uso_do_banco`) com a memória do servidor por cima.
+  Fracttal por hora com o pico por minuto ao lado da cota de 200 e o corte por setor. De ontem para trás vem dos livros
+  do mês no banco (a leitura, numa thread à parte e guardada 10 min, `_uso_do_banco`); o que ainda não foi às 03:45 vem do
+  pendente no disco do servidor (`uso_os.linhas_pendentes`) e a hora aberta, da memória.
 
 Nada é gravado nem vai à rede (a leitura do uso no banco é a exceção, por trás, com prazo); a pilha só sai como rótulo
 (arquivo, linha e função), nunca com dados.
@@ -432,9 +433,10 @@ def _processador(janela_s: float = 1.0) -> dict:
 
 # ── o uso do OS Creator e os pedidos ao Fracttal (31/10/2026, etapa 0 do canto central do OS Creator) ────────────────────
 # Em 13 e 14/10/2026 o OS Creator prendeu as threads do Nexus e ninguém soube dizer quais telas as pessoas abrem, a que hora,
-# em quantas, quanto cada uma demora e quanto pede ao Fracttal. O servidor leva as horas fechadas ao banco (`uso_os`,
-# `dados/fato_uso_os.py`); esta seção as lê, junta a memória por cima (a hora aberta e as que esperam o banco) e mostra o
-# antes e o depois de cada mudança. A página nunca espera o banco: a leitura vai por trás e fica guardada 10 min.
+# em quantas, quanto cada uma demora e quanto pede ao Fracttal. O servidor guarda as horas fechadas no disco dele a cada hora
+# e as leva ao banco às 03:45 (`uso_os`, `dados/fato_uso_os.py`); esta seção lê o banco (de ontem para trás), junta o pendente
+# do disco (o que ainda não foi às 03:45) e a memória (a hora aberta), e mostra o antes e o depois de cada mudança. A página
+# nunca espera o banco: a leitura vai por trás e fica guardada 10 min.
 DIAS_USO = 7                    # a janela da seção
 MAX_ROTAS_USO = 15              # as telas mais pedidas
 CACHE_USO_S = 600               # a leitura do banco vale 10 min
@@ -442,7 +444,16 @@ PRAZO_USO_S = 2.0               # quanto a página espera por ela (a leitura seg
 ESPERA_APOS_FALHA_S = 60        # depois de uma falha, não insiste a cada abertura da página
 PERTO_DA_COTA = 0.8             # pico por minuto a partir de 80% da cota: "perto da cota"
 SEMANA = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
-_USO = {"thread": None, "dados": None, "lido_em": None, "lido_txt": "", "tentou_em": None, "erro": ""}
+
+
+def _uso_novo() -> dict:
+    """O estado da leitura do banco: a thread, a última cópia boa (`dados`), quando ela foi lida (`lido_em`, relógio
+    monotônico; `epoch`, relógio de parede de QUANDO A LEITURA COMEÇOU), a hora dela para a página, quando se tentou por
+    último e o tipo do erro da última tentativa."""
+    return {"thread": None, "dados": None, "lido_em": None, "epoch": None, "lido_txt": "", "tentou_em": None, "erro": ""}
+
+
+_USO = _uso_novo()
 _USO_TRAVA = threading.Lock()
 
 
@@ -451,8 +462,15 @@ def _monotonico() -> float:
     return time.monotonic()
 
 
-def _ler_uso(base: str, sessao, hora_id: str) -> None:
-    """A leitura do banco, numa thread à parte: guarda o que leu (ou só o tipo do erro, que a página mostra)."""
+def _epoch() -> float:
+    """A hora de parede de agora (os testes a trocam): a leitura do banco guarda a de quando COMEÇOU, para saber se a
+    gravação das 03:45 (`uso_os.gravou_em`) veio depois dela."""
+    return time.time()
+
+
+def _ler_uso(base: str, sessao, hora_id: str, epoch: float) -> None:
+    """A leitura do banco, numa thread à parte: guarda o que leu (ou só o tipo do erro, que a página mostra). Só o uso e o
+    total da hora: o detalhe do Fracttal é a aba maior do livro e a seção não o mostra."""
     from ..dados import fato_uso_os
     try:
         dados = fato_uso_os.ler_dias(base, sessao, hora_id, DIAS_USO)
@@ -462,23 +480,29 @@ def _ler_uso(base: str, sessao, hora_id: str) -> None:
             _USO["erro"] = type(ex).__name__
         return
     with _USO_TRAVA:
-        _USO.update(dados=dados, lido_em=_monotonico(), lido_txt=time.strftime("%H:%M"), erro="")
+        _USO.update(dados=dados, lido_em=_monotonico(), epoch=epoch, lido_txt=time.strftime("%H:%M"), erro="")
 
 
 def _uso_do_banco(app, hora_id: str, prazo_s: float | None = None) -> dict:
     """`{"dados", "idade_min", "lido_txt", "erro", "lendo"}`: a leitura dos livros de uso dos últimos 7 dias, guardada 10 min.
     Vencida, uma thread à parte a renova e a página espera no máximo `PRAZO_USO_S` por ela; passou disso, mostra a cópia de
     antes (ou nada) e a próxima abertura encontra a nova. Leitura presa não abre outra; depois de uma falha, só tenta de
-    novo passado `ESPERA_APOS_FALHA_S`. Teste sem a sessão do banco (`nexus_dados_sessao`) nunca vai à rede."""
+    novo passado `ESPERA_APOS_FALHA_S`. Teste sem a sessão do banco (`nexus_dados_sessao`) nunca vai à rede.
+
+    **A gravação das 03:45 vence a cópia:** o que saiu do pendente para o banco não está na cópia de antes dela, e o dia de
+    ontem sumiria da seção por até 10 min; a cópia cuja leitura começou antes da última gravação (`uso_os.gravou_em`) é
+    velha, mesmo dentro dos 10 min."""
     sessao = app.extensions.get("nexus_dados_sessao")
     if sessao is None and app.config.get("TESTING"):
         return {"dados": None, "idade_min": None, "lido_txt": "", "erro": "", "lendo": False, "sem_banco": True}
+    from . import uso_os
     prazo = PRAZO_USO_S if prazo_s is None else prazo_s
-    agora = _monotonico()
+    agora, gravou = _monotonico(), uso_os.gravou_em()
     with _USO_TRAVA:
         t = _USO["thread"]
         presa = t is not None and t.is_alive()
-        velha = _USO["lido_em"] is None or agora - _USO["lido_em"] >= CACHE_USO_S
+        velha = (_USO["lido_em"] is None or agora - _USO["lido_em"] >= CACHE_USO_S
+                 or gravou > (_USO["epoch"] or 0.0))
         esperando = bool(_USO["erro"]) and _USO["tentou_em"] is not None and agora - _USO["tentou_em"] < ESPERA_APOS_FALHA_S
         if velha and not presa and not esperando:
             from ..cadastro.ligacoes import BASE_API
@@ -486,7 +510,8 @@ def _uso_do_banco(app, hora_id: str, prazo_s: float | None = None) -> dict:
                 import requests
                 sessao = requests.Session()
             base = (app.config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
-            t = threading.Thread(target=_ler_uso, args=(base, sessao, hora_id), name="nexus-raio-x-uso", daemon=True)
+            t = threading.Thread(target=_ler_uso, args=(base, sessao, hora_id, _epoch()), name="nexus-raio-x-uso",
+                                 daemon=True)
             _USO.update(thread=t, tentou_em=agora)
             t.start()
     if velha and t is not None:
@@ -538,32 +563,35 @@ def _tom_do_pico(pico: int, cota: int) -> tuple:
 
 
 def montar_uso_os(hora_id_agora: str, banco: dict | None, vivo: dict) -> dict:
-    """A conta da seção, pura: `banco` = `{"uso": [...], "fracttal": [...]}` lido dos livros (ou None); `vivo` = o que o
-    servidor tem na memória agora, `{"uso", "fracttal", "setor"}` (as linhas da hora aberta e das que esperam o banco, e o
-    corte por setor, que mora só no servidor: o arquivo do disco mais o que entrou depois do último salvamento). Janela: os `DIAS_USO` dias de Brasília que terminam no de `hora_id_agora`. Na mesma chave
-    (hora × rota × automático, ou hora × origem × método) a memória vence o banco. Devolve `tem` (há alguma linha na
+    """A conta da seção, pura: `banco` = `{"uso": [...], "total": [...]}` lido dos livros (ou None); `vivo` = o que o servidor
+    guarda fora do banco, `{"uso", "total", "setor"}`: as linhas do pendente do disco (o que ainda não foi às 03:45), as da
+    hora aberta (a memória dos contadores) e o corte por setor (que mora só no servidor: o arquivo do disco mais o que entrou
+    depois do último salvamento). `total` é a linha de 1 por hora (`hora_id`, os pedidos, as recusas, os erros e o pico por
+    minuto): a que o contador entrega como `*` o `fato_uso_os.separar_total` já separou. Janela: os `DIAS_USO` dias de Brasília
+    que terminam no de `hora_id_agora`. Na mesma chave (hora × rota × automático, ou a hora do total) vale o mais novo: o
+    pendente e a memória vencem o banco, e a linha que está nos dois não conta duas vezes. Devolve `tem` (há alguma linha na
     janela), a `cota`, o `resumo`, os `dias`, as 24 `horas`, as `rotas` mais pedidas e os `setores`.
 
     Cliques e automáticos nunca se misturam (o `/os/_nexus/sessao` de cada aba aberta seria a "tela mais clicada"). O total
-    do Fracttal vem só da linha `*` da hora (o detalhe repete o total). A mediana e o p95 de vários dias são aproximados:
-    cada hora guarda só os dela, e juntar é o quantil dos quantis pesado pelos pedidos atendidos (os recusados pelo teto não
-    têm duração)."""
+    do Fracttal e o pico por minuto vêm só do total da hora (o detalhe por origem não entra: repetiria a conta). A mediana e
+    o p95 de vários dias são aproximados: cada hora guarda só os dela, e juntar é o quantil dos quantis pesado pelos pedidos
+    atendidos (os recusados pelo teto não têm duração)."""
     from . import fracttal_conta
     cota = fracttal_conta.COTA_POR_MINUTO
     hoje = datetime.strptime(str(hora_id_agora)[:8], "%Y%m%d")
     datas = [hoje - timedelta(days=i) for i in range(DIAS_USO - 1, -1, -1)]
     ids = [d.strftime("%Y%m%d") for d in datas]
     corte = ids[0] + "00"
-    uso, fracttal = {}, {}
+    uso, total = {}, {}
     for fonte in (banco or {}, vivo or {}):
         for r in fonte.get("uso") or ():
             h = _hora10(r.get("hora_id"))
             if h >= corte and h[:8] in ids:
                 uso[(h, str(r.get("rota")), 1 if _n(r.get("automatico")) else 0)] = r
-        for r in fonte.get("fracttal") or ():
+        for r in fonte.get("total") or ():
             h = _hora10(r.get("hora_id"))
             if h >= corte and h[:8] in ids:
-                fracttal[(h, str(r.get("origem")), str(r.get("metodo")))] = r
+                total[h] = r
     por_dia = {i: {"cliques": 0, "automaticos": 0, "fracttal": 0, "recusas": 0, "pico": 0, "pico_hora": None} for i in ids}
     por_hora = {h: {"cliques": 0, "automaticos": 0, "fracttal": 0, "pico": 0} for h in range(24)}
     por_rota = {}
@@ -582,9 +610,7 @@ def montar_uso_os(hora_id_agora: str, banco: dict | None, vivo: dict) -> dict:
         for chave, campo in (("p50", "duracao_p50_ms"), ("p95", "duracao_p95_ms")):
             if r.get(campo) is not None:
                 p[chave].append((_n(r.get(campo)), atendidos))
-    for (h, origem, metodo), r in fracttal.items():
-        if origem != "*" or metodo != "*":
-            continue                                    # o total da hora; o detalhe repete a mesma conta
+    for h, r in total.items():
         pedidos, pico = _n(r.get("pedidos_qtd")), _n(r.get("pico_minuto_qtd"))
         d = por_dia[h[:8]]
         d["fracttal"] += pedidos
@@ -632,36 +658,37 @@ def montar_uso_os(hora_id_agora: str, banco: dict | None, vivo: dict) -> dict:
     resumo = {"cliques": sum(d["cliques"] for d in dias), "automaticos": sum(d["automaticos"] for d in dias),
               "fracttal": sum(d["fracttal"] for d in dias), "recusas": sum(d["recusas"] for d in dias),
               "pico": pior["pico"], "pico_dia": pior["dia"], "pico_hora": pior["pico_hora"]}
-    return {"tem": bool(uso or fracttal), "cota": cota, "resumo": resumo, "dias": dias, "horas": horas, "rotas": rotas,
+    return {"tem": bool(uso or total), "cota": cota, "resumo": resumo, "dias": dias, "horas": horas, "rotas": rotas,
             "setores": setores}
 
 
 def _de_onde_vem(lido: dict, espera: dict, tem: bool) -> dict:
-    """As frases da seção sobre o banco: `banco_txt` (de onde vêm os números) e, sem dado nenhum, o `motivo`."""
+    """As frases da seção sobre de onde vêm os números: `banco_txt` e, sem dado nenhum, o `motivo`."""
     erro, hora = lido.get("erro"), lido.get("lido_txt")
     if lido.get("dados") is not None:
-        txt = (f"Do banco, lido às {hora} (a cópia vale 10 min), com o que o servidor tem na memória por cima: a hora "
-               "aberta e as que esperam o banco.")
+        txt = (f"De ontem para trás, do banco, lido às {hora} (a cópia vale 10 min). O que ainda não foi ao banco (ele "
+               "recebe tudo uma vez por dia, às 03:45) vem do disco do servidor, e a hora aberta, da memória dele.")
         if erro:
             txt += f" A última tentativa de ler o banco falhou ({erro}); o que está aqui é a cópia das {hora}."
     elif erro:
-        txt = f"O banco não respondeu ({erro}): vale só o que o servidor tem na memória, desde o último reinício."
+        txt = (f"O banco não respondeu ({erro}): vale só o que o servidor guarda, no disco dele (o que ainda não foi às "
+               "03:45) e na memória (a hora aberta).")
     elif lido.get("lendo"):
-        txt = ("Lendo o banco (a página não espera): vale só a memória do servidor até a leitura chegar. Leia de novo em "
-               "instantes.")
+        txt = ("Lendo o banco (a página não espera): até a leitura chegar vale só o que o servidor guarda, no disco (o que "
+               "ainda não foi às 03:45) e na memória. Leia de novo em instantes.")
     else:
-        txt = "Sem o banco nesta máquina: vale só a memória deste processo."
+        txt = "Sem o banco nesta máquina: vale só o que este processo guarda, no disco e na memória."
     if espera.get("horas"):
-        txt += f" {espera['horas']} hora(s) já saíram dos contadores e esperam o banco, só na memória."
+        txt += f" {espera['horas']} hora(s) ainda não foram ao banco (vão às 03:45 e já estão no disco do servidor)."
     if tem:
         return {"banco_txt": txt, "motivo": ""}
     if erro and lido.get("dados") is None:
-        motivo = f"O banco não respondeu ({erro}) e o servidor não tem nada na memória."
+        motivo = f"O banco não respondeu ({erro}) e o servidor ainda não guarda nada, nem no disco nem na memória."
     elif lido.get("lendo") and lido.get("dados") is None:
         motivo = "Lendo o banco: a página não espera, leia de novo em instantes."
     elif lido.get("dados") is not None:
-        motivo = ("Nenhuma hora gravada no banco ainda e nada na memória: o servidor leva a primeira hora fechada ao banco "
-                  "no :05 da hora seguinte.")
+        motivo = ("Nenhuma hora gravada no banco ainda e nada pendente no disco nem na memória: o servidor guarda a primeira "
+                  "hora fechada no :05 da hora seguinte e a leva ao banco às 03:45.")
     else:
         motivo = "Sem o banco nesta máquina e sem o registro do servidor (ele só liga no servidor)."
     return {"banco_txt": txt, "motivo": motivo}
@@ -670,15 +697,19 @@ def _de_onde_vem(lido: dict, espera: dict, tem: bool) -> dict:
 def _secao_uso_os(app) -> dict:
     """A seção inteira para o template. Nunca levanta: a ferramenta da lentidão não pode travar por causa da conta dela."""
     try:
+        from ..dados import fato_uso_os
         from . import fracttal_conta, uso_os
         hora = fracttal_conta.hora_id_de()
         lido = _uso_do_banco(app, hora)
         vivo = uso_os.instantaneo()
         espera = uso_os.linhas_pendentes()
         contagem = uso_os.pendentes()
+        # o contador entrega o total da hora como a linha `*` no meio do detalhe (o do pendente e o da memória): só o total
+        # interessa aqui, e o detalhe por origem não é mostrado
+        total_do_disco = fato_uso_os.separar_total(espera["fracttal"])[1]
+        total_da_memoria = fato_uso_os.separar_total(fracttal_conta.instantaneo())[1]
         conta = montar_uso_os(hora, lido["dados"], {
-            "uso": espera["uso"] + vivo["linhas"], "fracttal": espera["fracttal"] + fracttal_conta.instantaneo(),
-            "setor": vivo["setor"]})
+            "uso": espera["uso"] + vivo["linhas"], "total": total_do_disco + total_da_memoria, "setor": vivo["setor"]})
         return dict(conta, **_de_onde_vem(lido, contagem, conta["tem"]))
     except Exception:                       # noqa: BLE001
         log.exception("Raio-X: não consegui montar a seção do uso do OS Creator")

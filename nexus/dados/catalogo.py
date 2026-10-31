@@ -1252,8 +1252,10 @@ FATOS = (
          tipo=fato_uso_os.TIPO, chave=fato_uso_os.CHAVE_USO, medidas=_m(fato_uso_os.MEDIDAS_USO),
          fontes=(f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_USO}",), janela_origem=fato_uso_os.JANELA_ORIGEM,
          estado="conformado", conformado_em=f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_USO}",
-         observacao="um livro por mês (nexus_oscreator_uso_AAAA_MM, o mês é o do hora_id); só as horas fechadas, no :05 da "
-                    "hora seguinte, e regravar a mesma hora troca a linha (a chave), não a repete. rota é o caminho sem a "
+         observacao="um livro por mês (nexus_oscreator_uso_AAAA_MM, o mês é o do hora_id); só as horas fechadas: o "
+                    "servidor as tira da memória no :05 da hora seguinte, guarda no disco dele e as leva ao banco UMA vez por "
+                    "dia, às 03:45 de Brasília (gravar o livro do mês inteiro custa ~7 s de processador, e o Nexus é um "
+                    "processo só); regravar a mesma hora troca a linha (a chave), não a repete. rota é o caminho sem a "
                     "query, com os números como <n> e os ids opacos como <id>; automatico 1 é o que a tela pede sozinha "
                     "(Histórico, Solicitações, a sessão), 0 é o clique da pessoa. pessoas_qtd conta quem pediu sem dizer "
                     "quem (depois de um reinício do servidor é aproximado); a mediana e o p95 (duracao_p50_ms, "
@@ -1270,10 +1272,24 @@ FATOS = (
          observacao="a cota do Fracttal é de 200 pedidos por minuto para a empresa toda (o OS Creator, o App de Campo e os "
                     "robôs do Nexus); esta é a parte do Nexus, por quem pediu. origem é a rota do pedido (normalizada) ou "
                     "fundo:<nome da thread>, no máximo 50 de fundo por hora; metodo é o method do RPC, o recurso do REST "
-                    "(work_orders), token ou outro. A linha com origem * e metodo * é o TOTAL da hora e o pico por minuto de "
-                    "tudo junto (o pico do total não é a soma dos picos): some só o detalhe (origem diferente de *) ou só "
-                    "ela. recusas_qtd são os 406 e 429 (o Fracttal pedindo calma); erros_qtd, a exceção e o 5xx. Só "
-                    "contagens"),
+                    "(work_orders), token ou outro. O total da hora e o pico por minuto de tudo junto NÃO estão aqui: moram "
+                    "no fato fracttal_total_hora, 1 linha por hora (31/10/2026, Ruling N: um total no meio do detalhe mistura "
+                    "dois grãos, e somar a coluna contaria em dobro). recusas_qtd são os 406 e 429 (o Fracttal pedindo "
+                    "calma); erros_qtd, a exceção e o 5xx. Só contagens; vai ao banco uma vez por dia, às 03:45"),
+    # o total da hora, na aba própria do mesmo livro do mês (Ruling N, 31/10/2026): o contador entrega a linha `*` no meio
+    # do detalhe, e `fato_uso_os.separar_total` a leva para cá
+    Fato("fracttal_total_hora", "Total de pedidos do Nexus ao Fracttal por hora", "os",
+         f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_TOTAL}", fato_uso_os.GRAO_TOTAL,
+         _d(data=("id", "data_id (o dia de Brasília da hora); hora (0 a 23) e hora_id (AAAAMMDDHH)")),
+         tipo=fato_uso_os.TIPO, chave=fato_uso_os.CHAVE_TOTAL, medidas=_m(fato_uso_os.MEDIDAS_TOTAL),
+         fontes=(f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_TOTAL}",), janela_origem=fato_uso_os.JANELA_ORIGEM,
+         estado="conformado", conformado_em=f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_TOTAL}",
+         observacao="1 linha por hora em que o Nexus pediu algo ao Fracttal (sem pedido, sem linha). É o total de TODAS as "
+                    "origens juntas, e o pico por minuto é o maior número de pedidos num mesmo minuto da hora, de tudo junto: "
+                    "não é a soma dos picos de cada origem, por isso não soma. A cota do Fracttal é de 200 pedidos por minuto "
+                    "para a empresa toda (o OS Creator, o App de Campo e os robôs do Nexus): compare o pico com ela. Foi "
+                    "separado do detalhe (fracttal_hora) porque o total dentro dele misturava dois grãos. recusas_qtd são os "
+                    "406 e 429; erros_qtd, a exceção e o 5xx. Só contagens; vai ao banco uma vez por dia, às 03:45"),
 )
 POR_ID = {f.id: f for f in FATOS}
 
@@ -1551,13 +1567,18 @@ LIVROS = (
           so_cresce=True),
     # o uso das telas do OS Creator e os pedidos ao Fracttal, por hora (31/10/2026, etapa 0 do canto central do OS Creator):
     # um livro por mês, só cresce (a gravação relê o mês e troca as linhas de mesma chave)
-    Livro(fato_uso_os.LIVRO_MOLDE, fato_uso_os.ABAS, "de hora em hora (:05), as horas fechadas, só no servidor",
-          "nexus/casca/uso_os.py (laço de gravação, ligado no servir.py) + nexus/dados/fato_uso_os.py", False,
-          "registrado em 31/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª hora fechada que o servidor leva ao "
-          "banco depois do deploy. Um livro por mês (AAAA_MM do hora_id, de Brasília); as duas abas vão juntas a cada "
-          "gravação, sobre o livro do mês relido (leitura curta não grava). O banco fora guarda as linhas na memória, no "
-          "máximo 48 horas, e a hora seguinte tenta de novo. Só contagens: nem pessoa nem setor (o corte por setor fica "
-          "no disco do servidor)",
+    Livro(fato_uso_os.LIVRO_MOLDE, fato_uso_os.ABAS,
+          "de hora em hora (:05) as horas fechadas vão ao disco do servidor; ao banco, uma vez por dia, às 03:45 "
+          "(Brasília), só no servidor",
+          "nexus/casca/uso_os.py (laço, ligado no servir.py) + nexus/dados/fato_uso_os.py", False,
+          "registrado em 31/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª gravação das 03:45 depois do deploy. Um "
+          "livro por mês (AAAA_MM do hora_id, de Brasília) com três abas: o uso por rota, o detalhe do Fracttal por "
+          "origem × método e o total da hora (1 linha por hora; a linha * que o contador entrega vai para ele). As três "
+          "abas vão juntas a cada gravação, sobre o livro do mês relido (leitura curta não grava). Gravar o livro do mês "
+          "inteiro a cada hora custaria ~7 s de processador num processo só (Ruling M): de hora em hora as linhas ficam "
+          "no disco (casca/uso_os_pendente.json, até 3 dias), e o Raio-X lê o banco por cima do pendente. O banco fora "
+          "deixa o pendente onde está e a gravação do dia seguinte leva tudo. Só contagens: nem pessoa nem setor (o corte "
+          "por setor fica no disco do servidor)",
           so_cresce=True),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}

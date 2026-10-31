@@ -58,8 +58,9 @@ if __name__ == "__main__":
     from nexus.casca import teto_os
     teto_os.ligar(app, teto=THREADS // 2)
     # o uso das telas do OS Creator por hora, e a rota de cada pedido como origem do Fracttal (31/10/2026, etapa 0 do canto
-    # central), e, com gravar=True, o laço que leva as horas fechadas dos dois contadores ao banco no :05 de cada hora (só
-    # o servidor): DEPOIS do teto (é ele que avisa o 503 recusado) e antes do registro dos pedidos presos
+    # central), e, com gravar=True, o laço que guarda as horas fechadas dos dois contadores no disco a cada hora (:05) e as
+    # leva ao banco uma vez por dia, às 03:45 (só o servidor): DEPOIS do teto (é ele que avisa o 503 recusado) e antes do
+    # registro dos pedidos presos
     from nexus.casca import uso_os
     uso_os.ligar(app, gravar=True)
     from nexus.casca import presos

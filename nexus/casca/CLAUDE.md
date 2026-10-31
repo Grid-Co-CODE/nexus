@@ -16,7 +16,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/casca/sugestoes.py` + `templates/sugestoes.html` | a aba Sugestões (`/?aba=sugestoes`): o formulário de todos e a lista do administrador, o livro `nexus_sugestoes` e os anexos no disco; seção "Sugestões no Início" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
 | `nexus/casca/fracttal_conta.py` | o contador de pedidos ao Fracttal (31/10/2026): um gancho no `Session.send` que soma, por hora de Brasília × origem × método, os pedidos, as recusas (406/429), os erros e o pico por minuto; seção "Pedidos ao Fracttal" abaixo |
-| `nexus/casca/uso_os.py` | o uso das telas do OS Creator (31/10/2026): por hora × rota × automático, os pedidos, as pessoas distintas, a mediana e o p95, os erros, os 503 do teto e os pedidos ao Fracttal; marca a rota de TODO pedido do Flask como origem do contador do Fracttal; e, no servidor, leva as horas fechadas dos dois contadores ao banco no :05 de cada hora (`nexus/dados/fato_uso_os.py`); seção "Uso das telas do OS Creator" abaixo |
+| `nexus/casca/uso_os.py` | o uso das telas do OS Creator (31/10/2026): por hora × rota × automático, os pedidos, as pessoas distintas, a mediana e o p95, os erros, os 503 do teto e os pedidos ao Fracttal; marca a rota de TODO pedido do Flask como origem do contador do Fracttal; e, no servidor, guarda as horas fechadas dos dois contadores no disco a cada hora (:05) e as leva ao banco UMA vez por dia, às 03:45 (`nexus/dados/fato_uso_os.py`); seção "Uso das telas do OS Creator" abaixo |
 | `nexus/auth/__init__.py` | `/entrar` (a porta, a senha de administrador e a ida e a volta da Microsoft), `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/microsoft.py` | o login pela conta Microsoft da Grid (Entra ID), desligado sem as quatro `NEXUS_MS_*` (seção "Entrar com a Microsoft" abaixo) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
@@ -260,7 +260,8 @@ host `fracttal.com` ou `*.fracttal.com` (o RPC do OS Creator, o REST do `campo/f
 memória, sem mudar quem pede. O resto da internet passa sem contar (`notfracttal.com` também: o domínio começa no ponto).
 - **A linha** é hora × origem × método: `pedidos_qtd`, `recusas_qtd` (406/429), `erros_qtd` (exceção ou 5xx) e
   `pico_minuto_qtd` (o maior número de pedidos num mesmo minuto, o número que se compara com a cota), mais uma linha
-  `*`/`*` por hora com o total e o pico de tudo junto (o pico do total NÃO é a soma dos picos). A hora é a de Brasília,
+  `*`/`*` por hora com o total e o pico de tudo junto (o pico do total NÃO é a soma dos picos; no banco ela vai para a
+  aba própria do total, 1 linha por hora, e o detalhe fica sem ela: `fato_uso_os.separar_total`). A hora é a de Brasília,
   UTC-3 fixo: `hora_id` = `AAAAMMDDHH`, e a virada do dia cai às 03:00 UTC.
 - **Origem** = `origem(rota)` (o `casca/uso_os.py` marca TODO pedido do Flask, não só o `/os/*`, com a rota normalizada:
   o que as telas do Campo, da Engenharia e do PCM pedem ao Fracttal cai na rota delas, e não em `fundo:waitress`) e, sem
@@ -287,7 +288,8 @@ memória, sem mudar quem pede. O resto da internet passa sem contar (`notfractta
   redirecionamento cada salto conta uma vez (o `requests` refaz o pedido pelo mesmo `send`), e a recusa ou o erro é da
   resposta daquele salto, não da final.
 - **Memória:** do minuto só o corrente fica; do resto, uma linha de quatro números por hora, origem e método. Se ninguém
-  drena, as horas se acumulam: quem drena é o laço da gravação de hora em hora, da mesma etapa 0.
+  drena, as horas se acumulam: quem drena é o laço do `uso_os` no :05 de toda hora (para o disco), da mesma etapa 0. **O
+  contador não guarda nada em disco:** um reinício perde a hora aberta dele (o que já saiu para o pendente está salvo).
 - **O limitador da etapa 5 vai no mesmo gancho:** o embrulho do `Session.send` mora só aqui.
 - **Prova:** `tests/test_casca_fracttal_conta.py` (o adaptador falso numa `requests.Session` de verdade, sem rede;
   mutações no gancho pegas uma a uma).
@@ -349,23 +351,34 @@ gravar=True)`); o `create_app`, o PC e os testes seguem sem ele.
   acumular os conjuntos de pessoas), e as rotas, os setores e o tamanho da rota também.
 - **Quem lê:** `instantaneo()` (`{"linhas", "setor"}`, o Raio-X, sem tirar nada) e `drenar(hora_aberta)`, EXCLUSIVO como o
   do contador do Fracttal: devolve e tira as horas anteriores a ela.
-- **A gravação de hora em hora no banco** (`gravar_no_banco`, a thread `nexus-uso-os-banco`, só com `gravar=True`: o servidor;
-  nunca o PC nem os testes). Acorda no **:05** de cada hora (`espera_ate_a_gravacao`; fora dos laços que já existem: tarefas
-  :10 a :20, normalizações :22, sync do App :25, zeladoria :32, carga :40, chamados :50). Lê a hora aberta
-  (`fracttal_conta.hora_id_de()`) UMA vez, antes dos dois `drenar`, e leva as horas fechadas ao livro do mês
-  (`nexus_oscreator_uso_AAAA_MM`, abas `fato_uso_hora` e `fato_fracttal_hora`, registrado no catálogo, `so_cresce`): relê o
-  mês, troca as linhas de mesma chave (regravar a mesma hora não duplica) e publica pelo `livros.publicar`. **Deu certo:**
-  grava o parcial na hora (`salvar()`), senão o reinício traria de volta a hora que já está no banco. **Deu errado** (banco
-  fora, leitura curta do livro, sem a `GRIDCO_SQL_TOKEN`): as linhas ficam na memória (`pendentes()`), a volta seguinte
-  tenta de novo com as novas, no máximo **48 horas** (as mais velhas saem, com aviso no log). **Essas linhas à espera só
-  existem na memória:** um reinício com o banco fora as perde (o parcial só cobre o que ainda não foi tirado dos
-  contadores, e o contador do Fracttal não tem parcial). Teste sem sessão não tira nada dos contadores. No banco entram a
-  rota, a hora e contagens: nunca o e-mail, o nome nem o setor (a rota que traz um `@` no caminho vira `<id>`; o corte
-  por setor fica só no disco, acima). Regras do fato, da chave e da leitura segura: `nexus/dados/CLAUDE.md`, linha "Uso do
-  OS Creator e pedidos ao Fracttal".
+- **O laço: o disco de hora em hora, uma gravação por dia às 03:45** (Ruling M da controladora, 31/10/2026; a thread
+  `nexus-uso-os-banco`, só com `gravar=True`: o servidor; nunca o PC nem os testes). O motivo: gravar o livro do mês inteiro
+  no banco custa ~7 s de processador (medido: o `xlsx` sozinho 5,7 s, no mês cheio), e o Nexus é UM processo com o servidor
+  já apertado: de hora em hora isso travaria os pedidos uma vez por hora. Dois passos (`proximo_passo`):
+  1. **No :05 de toda hora** (`drenar_para_o_disco`) tira as horas FECHADAS dos dois contadores (`drenar`, com a hora aberta
+     lida UMA vez, antes dos dois) e as guarda no **pendente** em disco, `<NEXUS_DADOS>/casca/uso_os_pendente.json`
+     (atômico: rascunho + `os.replace`); depois `salvar()`, para o parcial não trazer essas horas de volta. Nunca vai ao
+     banco. A memória dos contadores fica limitada.
+  2. **Às 03:45 de Brasília, uma vez por dia** (`gravar_no_banco`) leva ao banco TUDO o que está pendente, agrupado pelo
+     livro do mês de cada hora (`nexus_oscreator_uso_AAAA_MM`, **três abas**: `fato_uso_hora`, `fato_fracttal_hora` e
+     `fato_fracttal_total_hora`; registrado no catálogo, `so_cresce`): relê o mês, troca as linhas de mesma chave
+     (regravar a mesma hora não duplica) e publica pelo `livros.publicar`. Na primeira gravação depois da virada do mês, o
+     mês que fechou ganha as últimas horas (o pendente atravessa a virada; os dois livros saem juntos). **Deu certo:** anota
+     `gravou_em`, as linhas gravadas saem do pendente (memória e disco) e `salvar()` roda. **Deu errado** (banco fora,
+     leitura curta do livro, sem a `GRIDCO_SQL_TOKEN`): o pendente fica no disco e a gravação do dia seguinte leva tudo.
+  O 03:45 e o :05 não caem em cima de nenhum laço de hora em hora do Nexus (tarefas :10 a :20, normalizações :22, sync do App
+  :25, zeladoria :32, carga :40, chamados :50). **O pendente tem teto de 3 dias** (`MAX_HORAS_PENDENTES` = 72 horas, as mais
+  novas): as mais velhas saem, com aviso no log. **Reinício:** o pendente é relido no boot (arquivo quebrado é ignorado, com
+  aviso, e a linha ruim é ignorada sem levar as boas; a mesma chave que o parcial velho traz de volta fica uma só, a mais
+  nova: sem isso o grão quebraria e a gravação subiria para sempre). **O que um reinício perde:** só a hora aberta do contador
+  do Fracttal (ele não guarda parcial em disco) e até 5 min do uso (o parcial é de 5 em 5); o que já saiu dos contadores está
+  no disco. Teste sem sessão não tira nada dos contadores. No banco entram a rota, a hora e contagens: nunca o e-mail, o nome
+  nem o setor (a rota que traz um `@` no caminho vira `<id>`; o corte por setor fica só no disco, acima). Regras do fato, da
+  chave e da leitura segura: `nexus/dados/CLAUDE.md`, linha "Uso do OS Creator e pedidos ao Fracttal".
 - **Prova:** `tests/test_casca_uso_os.py` (um Flask de mentira com rotas `/os/...`, o Fracttal falso do `requests`, o relógio
   na mão e, para o JavaScript, o `node` rodando o `enviar` do Histórico, o `pedir` e o `acomp.js` de verdade) e, para a
-  gravação, `tests/test_dados_fato_uso_os.py` (a API do banco de mentira, inclusive a que devolve tudo como texto).
+  gravação e o laço, `tests/test_dados_fato_uso_os.py` (a API do banco de mentira, inclusive a que devolve tudo como texto;
+  o disco de hora em hora, as 03:45, a virada do mês, o pendente que sobrevive ao reinício, quebrado e com teto de 3 dias).
 
 ### A seção "Uso do OS Creator" do Raio-X (31/10/2026)
 
@@ -382,25 +395,33 @@ como o resto do Raio-X). Quatro quadros, todos da janela de 7 dias de Brasília 
   ao Fracttal, os erros e os 503 do teto.
 - **Por setor:** cliques, automáticos e as 3 telas mais clicadas de cada setor.
 
-**De onde vem.** Os 7 dias vêm dos livros do mês no banco (`fato_uso_os.ler_dias`, lê o livro de cada mês que a janela toca,
-dois na virada) e, **por cima, a memória do servidor**: a hora aberta, as horas que já saíram dos contadores e esperam o
-banco (`uso_os.linhas_pendentes()`) e o corte por setor (`uso_os.instantaneo()["setor"]`, que é o arquivo do disco mais o que
-entrou depois do último salvamento; **nunca vem do banco**). Na mesma chave (hora × rota × automático, ou hora × origem ×
-método) a memória vence o banco. **A página nunca espera o banco:** a leitura roda numa thread à parte (`nexus-raio-x-uso`),
+**De onde vem** (três camadas, a mais nova vence): **de ontem para trás, o banco** (`fato_uso_os.ler_dias`, lê o livro de
+cada mês que a janela toca, dois na virada, e só as abas do uso e do total da hora: o detalhe do Fracttal é a aba maior e a
+seção não o mostra); **o que ainda não foi às 03:45, o pendente no disco do servidor** (`uso_os.linhas_pendentes()`, que é o
+arquivo `uso_os_pendente.json` relido no boot); **a hora aberta, a memória dos contadores**. O corte por setor vem de
+`uso_os.instantaneo()["setor"]` (o arquivo do disco mais o que entrou depois do último salvamento; **nunca vem do banco**).
+Na mesma chave (hora × rota × automático, ou a hora do total) o pendente vence o banco e a memória vence o pendente, e a
+linha que está nos dois lados (o processo morreu entre gravar e limpar o pendente) não conta duas vezes. **A gravação das
+03:45 invalida a cópia de 10 min** (`_uso_do_banco`: a leitura que começou antes de `uso_os.gravou_em()` é velha): o que saiu
+do pendente para o banco não estaria na cópia de antes, e o dia de ontem sumiria por até 10 min. **A página nunca espera o
+banco:** a leitura roda numa thread à parte (`nexus-raio-x-uso`),
 **guardada 10 min** (`CACHE_USO_S`); a página espera no máximo 2 s por uma leitura nova (`PRAZO_USO_S`) e, passou disso,
 mostra a cópia de antes (com a hora dela) ou "sem medição ainda, lendo o banco"; leitura presa não abre outra, e depois de uma
 falha só tenta de novo passado 1 min. Banco fora com a memória cheia mostra a memória e diz que é só ela, desde o último
 reinício. Teste sem a sessão do banco (`app.extensions["nexus_dados_sessao"]`) nunca vai à rede.
 
-**A conta.** O total do Fracttal vem só da linha `*` de cada hora (o detalhe repete a mesma conta e somaria em dobro). A
+**A conta.** O total do Fracttal e o pico por minuto vêm da aba do total da hora (1 linha por hora; no pendente e na
+memória é a linha `*` que o contador entrega, separada por `fato_uso_os.separar_total`): o detalhe por origem não entra, e
+somaria em dobro. A
 mediana e o p95 de vários dias são **aproximados**: cada hora guarda só os dela, e juntar horas é o quantil dos quantis,
 pesado pelos pedidos atendidos (os recusados pelo teto não têm duração); a página diz isso. **A hora do reinício** (todo
 deploy) tem os pedidos ao Fracttal só de depois dele: o contador do Fracttal não guarda parcial em disco (o do uso das
 telas guarda), então o total e o pico por minuto dessa hora podem estar abaixo do real. **Sem dado** (o PC sem o
-servidor, o banco fora sem nada na memória, o servidor que ainda não gravou a 1ª hora): "Sem medição ainda", com o
+servidor, o banco fora sem nada no disco nem na memória, o servidor que ainda não guardou a 1ª hora): "Sem medição ainda", com o
 motivo, e a página abre igual; a conta que quebrar vai ao log e a seção diz que não montou, nunca derruba o Raio-X.
-Prova: `tests/test_casca_raio_x_uso_os.py` (7 dias gravados pelo `fato_uso_os.gravar` num banco de mentira, a memória
-dublada, o relógio na mão; cada número da conta, a cópia de 10 min, o banco fora, lento e vazio, e as cores só por token).
+Prova: `tests/test_casca_raio_x_uso_os.py` (7 dias gravados pelo `fato_uso_os.gravar` num banco de mentira, o pendente e a
+memória dublados, o relógio na mão; cada número da conta, o pendente que vence o banco sem contar em dobro, a cópia de 10 min
+e a gravação das 03:45 que a invalida, a aba do detalhe que não se lê, o banco fora, lento e vazio, e as cores só por token).
 
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 

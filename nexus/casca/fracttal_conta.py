@@ -3,7 +3,8 @@
 A cota do Fracttal é de 200 pedidos por minuto para a empresa toda, dividida entre o OS Creator, o App de Campo e os robôs
 do Nexus, e até aqui ninguém sabia quanto o Nexus gasta dela, a que hora nem quem pede: o Raio-X mostra o momento e o
 journal só o erro. Sem esse número, o "antes e depois" de cada etapa e o limitador da etapa 5 seriam chute. Daqui saem as
-linhas por hora que o laço de gravação leva ao banco (`drenar`) e que o Raio-X mostra (`instantaneo`).
+linhas por hora que o laço do `uso_os` guarda no disco e leva ao banco (`drenar`; a linha `*` do total vai para a aba
+própria do total, `fato_uso_os.separar_total`) e que o Raio-X mostra (`instantaneo`).
 
 O gancho é UM só, no `requests.sessions.Session.send`: todo pedido do processo ao Fracttal passa por ele, seja o RPC do OS
 Creator (`/rpc/proxy`), o REST do `campo/fracttal.py` (`/api/<recurso>`) ou o token OAuth, e quem pede não muda uma linha.
