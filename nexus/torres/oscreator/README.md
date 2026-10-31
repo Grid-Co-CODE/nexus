@@ -38,7 +38,7 @@ do oem" ou em manter o clone "idêntico", é o registro daquele tempo.
 | Arquivo | Por quê |
 |---|---|
 | `fracttal_login.txt` | é o login salvo do desktop |
-| `assets_cache.json` | é o catálogo de ativos, dado que já vazou uma vez por instalador público |
+| `assets_cache.json`, `ativos.json.gz` | são o catálogo de ativos (o arquivo antigo e a cópia em disco do catálogo central), dado que já vazou uma vez por instalador público |
 | `tokens.txt`, `gridco_sql_token.txt` | são segredo; o código lê da variável `GRIDCO_SQL_TOKEN` ou de `%APPDATA%` |
 | `app.py`, `main.py`, as outras telas de `steps/` | são o app de desktop (PyQt), e a web não usa |
 | `steps/ui.py`, `steps/engenharia/tela.py`, `assets/chamados.qss`, `assets/fonts/LEIA-ME.txt` | vieram junto e eram só do app de mesa (PyQt6); saíram em 31/10/2026 |
@@ -767,10 +767,10 @@ as 400 de novo. Agora (`rotas_solic.py`):
   `CATALOGO_TTL` (30 min); quem grava (criar, aprovar, status, observação, cancelar, tema) esquece a lista;
 - a carga fria pede tudo ao mesmo tempo (`_ao_mesmo_tempo`, com o executor que leva a sessão do Fracttal para as
   threads): custa a leitura mais lenta, não a soma;
-- o catálogo de ativos VENCIDO (mais de 24 h) não segura mais a página: o nome das solicitações vem do arquivo como
-  estiver e o download dos ~22 mil ativos (mais de cem pedidos, minutos) vai para uma thread (`_indice_ativos`,
-  `_renovar_por_tras`). Quem resolve o ativo da OS na aprovação continua com o catálogo em dia (espera o download que
-  já está em curso, sem começar outro);
+- o catálogo de ativos VENCIDO (mais de 24 h) não segura mais a página: o nome das solicitações vem do catálogo central
+  como estiver e o download dos ~22 mil ativos (mais de cem pedidos, minutos) vai para uma thread (`_indice_ativos` pede ao
+  `api._renovar_catalogo_por_tras`; até 31/10/2026 ele tinha o renovador dele). Quem resolve o ativo da OS na aprovação
+  continua com o catálogo em dia (espera o download que já está em curso, sem começar outro);
 - a página do setor PCM pede a lista ao abrir (`/os/api/solic/aquecer`): a porta escolhida já abre com ela.
 
 Prova: `tests/test_oscreator_solic_pcm.py` (29 testes: as páginas, as gravações, a lista pedida uma vez para as três
@@ -877,7 +877,8 @@ Depois abra `http://127.0.0.1:5091/os/login`. O login no Fracttal é por pessoa,
   "Rodar sozinho", acima, funciona.
 - O `os_creator/.env` (a credencial do Fracttal da máquina) é do `.gitignore`: nunca entra no git.
 - Usa a mesma pasta de dados do OS Creator (`%APPDATA%\CriarOS-Fracttal`). Na mesma máquina, ele divide com o
-  supervisório a chave da sessão e o token do banco.
+  supervisório a chave da sessão e o token do banco. A cópia em disco do catálogo de ativos mora nela, em
+  `oscreator\ativos.json.gz` (o `assets_cache.json` de lá é do supervisório e do oem; o Nexus só o lê, uma vez, para migrar).
 - **Não usa PyQt6** (31/10/2026, etapa 1 do canto central). A ponte, o `api` e todo `os_web.*` importam sem ele: o rastro
   dos imports (estático, com os de dentro de função, e dinâmico, com o PyQt6 bloqueado) mostrou um elo só, o `abrir()` do
   descritor `steps/engenharia`, que importava a tela de mesa e, por ela, o `steps/ui.py`, e que a web nunca chamou (a rota
@@ -1286,6 +1287,81 @@ com as tarefas de 130 OS), repetidos para cada pessoa (a memória era por pessoa
   pessoas, a visão restrita com a dela, a vencida que soma só as novas, a inteira a cada 10 min sem reler as tarefas
   das fechadas, o ↻, três pessoas ao mesmo tempo, o Fracttal fora, as linhas montadas uma vez).
 
+## O catálogo de ativos central: um só para todas as telas (31/10/2026, etapa 2 do canto central)
+
+Levi, 30/10/2026: "para abrir uma solicitação precisamos de ativos, para criar OS é preciso carregar os ativos, para abrir o
+histórico acabamos vendo os ativos [...] a ideia é não ter um carregamento novo por atividade e sim um ecossistema onde as
+coisas se aproveitam e não precisamos ficar fazendo novas requisições sempre!" (desenho:
+`docs/superpowers/specs/2026-10-30-oscreator-canto-central-design.md`; esta é a tarefa 2.1 da etapa 2).
+
+**Antes:** três caminhos sobre o mesmo `assets_cache.json`, cada um com a sua cópia: o `load_assets_cached` copiava a lista
+inteira (~26 mil dicionários, uns 12 MB de lixo) a CADA chamada; o `rotas_solic._indice_ativos` tinha o índice e o renovador
+dele; o `_code_loc` era montado uma vez por processo e nunca refeito (ativo novo sem nome nas OS até o reinício); e o
+`_asset_by_code` percorria uma cópia nova por código. Cada push na `main` (uns 10 por dia útil) reinicia o serviço.
+
+**Agora** (`os_creator/ativos_central.py`): UM `Catalogo` por versão, pronto e imutável, para todas as telas e pessoas.
+- **O que ele guarda:** a lista (tupla, ordenada por cliente, usina e código), os índices por id, por código, por cliente e por
+  cliente + usina, o mapa código -> (cliente, usina curta, tipo) (o antigo `api._code_loc`, que o `api._code_to_loc` devolve) e
+  a contagem por tipo; mais `versao` (o sha das linhas ordenadas), `lido_em` e `fonte` (banco, rest, rpc ou disco). Montado UMA
+  vez quando a versão chega; trocado inteiro (`trocar`), de uma vez, nunca um pedaço.
+- **Quem lê dele:** `api.load_assets_cached` (devolve a MESMA tupla, sem copiar), `_asset_by_code` (uma cópia, pelo índice),
+  `_code_to_loc`, `_read_asset_cache` (a lista como está, sem a trava das 24 h), `assets_cache_info`, o índice da Solicitação
+  (`rotas_solic._indice_ativos`, sem arquivo nem renovador próprios), o "Investigar ativo", o lugar do ativo no PDF da OS, a
+  contagem da tela inicial e a cascata do Criar OS e da Nova solicitação (`tradicional_web`: `usinas_de`, `tipos_de`,
+  `ativos_de`, `ativos_do_cliente` usam o índice por cliente e usina quando a lista é a do catálogo, e varrem como sempre
+  qualquer outra).
+- **O registro é só de leitura.** Cada ativo é o MESMO objeto para todo mundo: `Registro` (um `dict` de verdade para `get`,
+  json e Jinja) levanta `TypeError` em qualquer escrita. A auditoria de todos os chamadores (31/10/2026) não achou nenhum que
+  mexa num registro nem na lista; o guarda existe para o próximo que mexer não corromper o ativo de todas as pessoas, sem erro
+  nenhum. Quem precisa mexer pede a cópia: `ativos_central.registro(codigo)` ou `dict(r)`. A auditoria: leitura de cada ponto
+  de uso e uma rodada do grupo `-k "oscreator or chamados or engenharia or pcm_nota or prefixo"` com todo catálogo de dublê
+  entregue como tupla de `Registro` (31/10/2026: 103 listas congeladas, nenhum `TypeError`).
+- **O boot nunca pergunta ao Fracttal.** Em ordem: (1) a cópia em disco, `<pasta de dados do clone>/oscreator/ativos.json.gz`
+  (gravada ao lado e trocada de uma vez; o formato vai escrito dentro; a ilegível, cortada ou de outro formato é ignorada, e o
+  motivo fica em `estado()["disco"]["erro"]`); (2) o `assets_cache.json` antigo, lido UMA vez como migração se a cópia nova
+  não existe (já grava a nova); (3) a foto dos ativos no banco, `nexus_ativos_fracttal · foto_ativos`, pela função que a
+  `ponte.py` entrega (`ativos_banco.leitor`; o catálogo não conhece a configuração do banco). Sem nenhuma, o catálogo nasce do
+  primeiro download (RPC, com a sessão de quem pediu, como sempre). Quem chega com o boot em curso espera nele: o "feito" só vale
+  depois (um teste de 8 pedidos juntos achou o erro, que mandaria o pedido dos primeiros décimos de segundo baixar os ~22 mil
+  ativos do Fracttal).
+- **A troca recusa** a lista vazia e a que encolhe mais de 5% (`ENCOLHE_MAX`): o download do RPC por páginas perde 200 ativos
+  em silêncio quando uma página vem sem lista. Recusada, fica o catálogo de antes e o motivo vai para `estado()["recusa"]`.
+  A mesma lista lida de novo (mesmo `versao`) só renova o `lido_em` (e regrava o disco se o dele ficou mais de 1 h para trás).
+  Só o que veio do Fracttal (rpc, rest) vai para o disco.
+- **Fresco ou vencido** é decidido por quem usa, pelo `lido_em` (`api.catalogo_vencido`, 24 h): vencido, o catálogo serve e é
+  renovado por trás, como em 24/10. `force=True` e `em_dia=True` seguem como eram (RPC com a sessão da pessoa), e o que
+  baixam entra no catálogo central. O botão "Atualizar ativos" (3 telas) ainda baixa na frente de quem clicou: é a tarefa 2.3.
+- **Medido** (catálogo de 28/10, 26.620 ativos): 30 MB na memória com todos os índices (a lista decodificada sozinha eram 33 MB, e
+  cada chamada copiava mais ~12 MB); subir pela cópia em disco 0,5 s (o arquivo tem 0,9 MB); montar uma versão 0,4 s; achar um
+  código 1,5 µs.
+- **Na ponte:** `ponte.ligar_catalogo_de_ativos(app)`, ao criar o clone, diz onde mora a cópia e de onde ler a foto. Nos testes
+  o disco não é tocado (a pasta é a do usuário da máquina): o catálogo vive só na memória, e o teste que quer o disco passa a
+  pasta de teste (`ativos_central.reiniciar(pasta=...)`).
+
+**A foto do banco ainda não serve de catálogo (o limite medido).** Ela foi carregada do `assets_cache.json` em 11/10/2026, e
+aquele arquivo já tinha jogado fora a raiz de cada cliente (o item sem pai, que o `montar_registros` ignora): das 22.357 linhas,
+15 pais não estão na foto, e nenhuma linha chega à raiz pela cadeia de `pai_item_id`. O nome do cliente (o 1º trecho do
+`parent_description`) só existe na raiz; tirá-lo do prefixo do nome da usina acerta 74% dos ativos (128 das 189 usinas com
+equipamento) e erra 6 dos 16 clientes (a carteira com outro nome), e o Almoxarifado e o "TESTE - PA" (`CLIENTES_OCULTOS`)
+deixariam de ser reconhecidos e apareceriam nas cascatas com nomes inventados. Por isso `registros_da_foto` recusa a foto em
+que mais de 1% das linhas não chega à raiz pela cadeia de pais (`FotoIncompleta`; a de 22/09 não chega em nenhuma): a fonte
+fica ligada, o motivo aparece em `estado()["banco"]`, e ela passa a servir sozinha quando a foto vier com a raiz (a renovação
+pela leitura do Fracttal, tarefa 2.2). Com a raiz, a cadeia monta o MESMO cliente, usina e tipo que o RPC
+dá (o teste compara com registros de caminho conhecido; sobre o catálogo de 28/10 reconstruído com as raízes: cliente 100%,
+usina 99,98%, tipo 100% e o caminho `parent_description` igual ao do RPC em 97,7% dos ativos). O nome de cada item no
+caminho sai da descrição dele, que traz o endereço da usina atrás: na usina o corte é na sigla do estado (acertou as 189 com
+equipamento), nos níveis de dentro tira-se a cauda de endereço da usina ou corta-se no 1º espaço duplo. Da foto não vêm, e
+ficam vazios: `id_type_item` e `id_group_task` (a 2.2 acrescenta o grupo de tarefas). **Cuidado para a 2.2:** só a aprovação
+da Fila espera o catálogo em dia (`em_dia`); as outras telas que criam OS (Criar OS, Performance, COS, Clonar) usam o registro
+como está, e o `create_os_rpc` põe `id_type_item or 1`. Então a foto só pode valer como catálogo quando levar esses dois campos
+(ou quando a criação passar a pedir o catálogo em dia). Só a foto mais nova entra (a de 21/06 que a carga levou junto tem
+códigos que o Fracttal já não tem).
+
+**Prova:** `tests/test_oscreator_ativos_central.py` (35 testes: nenhuma ida ao Fracttal nas telas, nem depois do reinício;
+o boot em ordem, a cópia ilegível, o boot concorrente; o registro só de leitura e a cópia; a busca por índice, sem varrer; a
+troca recusada e a mesma lista; a foto do banco contra o caminho do RPC; a ponte) e os testes de catálogo de 19/10 e 24/10
+sobre o novo dono.
+
 ## O catálogo de ativos vencido por trás (24/10/2026)
 
 Em 23/10/2026 às 10:44 o catálogo de ~22 mil ativos passou das 24 h (`api.ASSETS_TTL`) e o 1º a precisar dele o baixou
@@ -1298,10 +1374,12 @@ quando atualizar vai atualizar a lista de todos, não só daquela pessoa".
   JWT). Uma tentativa a cada `ASSETS_ESPERA_TENTATIVA` (10 min): a que falhou deixa o de ontem.
 - **Espera o novo** só quem precisa dele em dia: `em_dia=True` (resolver o ativo da OS na aprovação,
   `rotas_solic._catalogo_para_aprovar`); e quem não tem catálogo nenhum na máquina.
-- **O botão "Atualizar ativos"** (OS Creator → Ativos, `/os/api/ativos/atualizar`) baixa na hora; o arquivo do catálogo
-  é um só (`assets_cache.json`), então vale para todos. Ativo cadastrado hoje que não aparece: é ele.
+- **O botão "Atualizar ativos"** (OS Creator → Ativos, `/os/api/ativos/atualizar`) baixa na hora; o catálogo é um só (desde
+  31/10/2026 o central, seção acima; antes, o arquivo `assets_cache.json`), então vale para todos. Ativo cadastrado hoje que
+  não aparece: é ele.
 - Prova: `tests/test_oscreator_catalogo_por_tras_24_10.py` (7; 6 falham no código de antes, o outro segura o "sem
-  catálogo, espera"); 5 mutações, todas pegas.
+  catálogo, espera"); 5 mutações, todas pegas. Desde 31/10/2026 os mesmos cenários rodam sobre o catálogo central (o
+  download troca o catálogo da memória e a cópia em disco).
 
 ## Os catálogos e o catálogo de ativos uma vez para todos (19/10/2026)
 
@@ -1317,8 +1395,10 @@ O mesmo superplano (o mapa de cada pedido ao Fracttal, por tela, que a sessão f
 - **O catálogo de ~22 mil ativos** (`api.load_assets_cached`): lido do disco uma vez por versão do arquivo (antes cada
   uma das 26 chamadas decodificava o JSON inteiro, a prévia do COS a cada 120 ms de digitação), entregue em cópia por
   registro; e a recarga do Fracttal (~110 pedidos) é uma por vez: quem acha o catálogo vencido junto espera a mesma. O
-  resumo "N ativos, catálogo de quando" (`api.assets_cache_info`, da tela inicial e da de Ativos) usa o mesmo
-  decodificado (`_catalogo_cru`, 20/10/2026: decodificava o arquivo inteiro, 10,5 MB, a cada chamada).
+  resumo "N ativos, catálogo de quando" (`api.assets_cache_info`, da tela inicial e da de Ativos) usa o mesmo catálogo
+  (20/10/2026: decodificava o arquivo inteiro, 10,5 MB, a cada chamada). **Desde 31/10/2026 é o catálogo central** (seção
+  "O catálogo de ativos central"): na memória uma vez por processo e entregue SEM cópia (os registros são só de leitura); a
+  recarga de uma por vez segue igual, e o `_catalogo_cru` saiu.
 - **`_code_to_loc` sem catálogo não tenta de novo por 10 min**: é chamado por linha do Histórico, e com a recarga
   falhando eram 2.000 tentativas numa lista.
 - **A OS pelo número num pedido só** (`api.os_por_folio`): sem o status, a lista traz os quatro; eram até 4 pedidos em
@@ -1544,7 +1624,7 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   pronta. O período DENTRO dos 30 dias é recortado da lista (pela data de criação, como o Histórico), sem pedido; fora
   deles, a lista daquele período (a régua do Histórico, guardada para quem vier depois), com o aviso na tela e o do teto
   de 2.000 quando a lista corta as mais antigas. O ↻ é o do Histórico.
-- **O ativo, pelo catálogo do disco** (`api._catalogo_cru`, vencido também serve; nunca o Fracttal): o código que a
+- **O ativo, pelo catálogo central** (`ativos_central.atual()`, vencido também serve; nunca o Fracttal): o código que a
   plataforma manda (o gravado no de-para ou o derivado do nome) quando está no catálogo; senão, o inversor da usina com o
   mesmo número (`INVR` + N.M, sem zero à esquerda; 1.1 não casa com 1.10), com o aviso de que o código não existe (o
   derivado erra onde a árvore do Fracttal mudou, a Pharma II); sem inversor, a usina inteira, com o aviso.

@@ -12,6 +12,7 @@ from flask import (Blueprint, abort, current_app, jsonify, redirect, render_temp
                    url_for)
 
 import api
+import ativos_central
 
 from . import ativo_curto, engenharia_web, lancador, oauth_fracttal, perf_web, sessao, sso
 from . import historico_store as HS
@@ -231,12 +232,12 @@ def _rota_existe(rota: str) -> bool:
 
 def _info_catalogo() -> dict:
     """De quando é o catálogo local e quantos ativos ele tem pela MESMA régua da tela de Ativos (só ativo com código):
-    o arquivo tem registro sem código, e a tela inicial dizia 21.639 enquanto a de Ativos dizia 21.635 (27/09).
-    Catálogo vencido (`_read_asset_cache` → None) fica com a conta do arquivo e a marca de desatualizado."""
+    o catálogo tem registro sem código, e a tela inicial dizia 21.639 enquanto a de Ativos dizia 21.635 (27/09). O catálogo
+    vencido segue contado, com a marca de desatualizado (`assets_cache_info`)."""
     info = dict(api.assets_cache_info())
-    ativos = api._read_asset_cache()
-    if ativos is not None:
-        info["n"] = sum(1 for a in ativos if isinstance(a, dict) and a.get("code"))
+    cat = ativos_central.atual()
+    if cat is not None:
+        info["n"] = len(cat.por_codigo)         # um registro por código: o índice já é a conta dos que têm código
     return info
 
 

@@ -17,6 +17,7 @@ if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 
 import api  # noqa: E402 — o api.py do clone
+import ativos_central  # noqa: E402
 from os_web import criar_app, rotas  # noqa: E402
 
 JWT = "aaa.eyJlbWFpbCI6InRlc3RlQGV4ZW1wbG8uaW52YWxpZCIsImV4cCI6OTk5OTk5OTk5OX0.sig"   # de mentira
@@ -88,41 +89,44 @@ def test_o_erro_do_fracttal_nao_fica_guardado(monkeypatch):
 
 @pytest.fixture
 def catalogo(tmp_path, monkeypatch):
-    arq = tmp_path / "assets_cache.json"
-    monkeypatch.setattr(api, "ASSETS_CACHE", str(arq))
-    monkeypatch.setattr(api, "_ASSETS_MEM", {"chave": None, "c": None})
-    monkeypatch.setattr(api, "_seed_cache", lambda: None)
-
+    """O catálogo de que o processo parte, com a cópia em disco numa pasta de teste (o `gravar` é "o processo subiu assim")."""
     def gravar(ativos, ts=None):
-        arq.write_text(json.dumps({"ts": ts or time.time(), "ver": api._CACHE_VER, "assets": ativos}), encoding="utf-8")
-    return gravar
+        ativos_central.reiniciar(pasta=str(tmp_path / "oscreator"))
+        assert ativos_central.trocar(ativos, "rpc", lido_em=ts or time.time())
+    yield gravar
+    ativos_central.reiniciar()
 
 
-def test_o_catalogo_e_lido_do_disco_uma_vez_por_versao_e_entregue_em_copia(catalogo, monkeypatch):
+def test_o_catalogo_vem_do_disco_uma_vez_e_e_entregue_sem_copia(catalogo, tmp_path, monkeypatch):
+    """Antes (19/10/2026) o arquivo era decodificado uma vez por versão e cada chamada entregava uma cópia por registro; desde
+    31/10/2026 o catálogo é o central: decodificado do disco UMA vez por processo, e a lista que todos recebem é a mesma."""
     catalogo([{"id": 1, "code": "TST-INV11", "usina": "Usina", "cliente": "Cliente", "tipo": "Inversor",
                "description": "Usina Inversor"}])
+    ativos_central.reiniciar(pasta=str(tmp_path / "oscreator"))          # o processo sobe de novo: só a cópia em disco
     lidos = []
     original = json.load
-    monkeypatch.setattr(api.json, "load", lambda f: lidos.append(1) or original(f))
-    a = api._read_asset_cache()
-    a[0]["code"] = "MEXIDO"                                       # quem pediu mexe na cópia dele
-    b = api._read_asset_cache()
-    assert b[0]["code"] == "TST-INV11" and lidos == [1]
+    monkeypatch.setattr(ativos_central.json, "load", lambda f: lidos.append(1) or original(f))
+    a = api.load_assets_cached()
+    b = api.load_assets_cached()
+    assert a is b and a[0]["code"] == "TST-INV11" and lidos == [1]
+    with pytest.raises(TypeError):                                       # o registro é o mesmo para todos: não aceita escrita
+        a[0]["code"] = "MEXIDO"
+    assert api._asset_by_code("TST-INV11")["code"] == "TST-INV11"        # quem precisa mexer pede a cópia
 
 
-def test_o_resumo_do_catalogo_nao_decodifica_o_arquivo_de_novo(catalogo, monkeypatch):
+def test_o_resumo_do_catalogo_nao_decodifica_nada_de_novo(catalogo, monkeypatch):
     """A tela inicial e a de Ativos dizem quantos ativos e de quando é o catálogo (`assets_cache_info`): até 20/10/2026
-    ele decodificava o arquivo inteiro (10,5 MB) a cada chamada; agora usa o mesmo decodificado do `_read_asset_cache`."""
+    ele decodificava o arquivo inteiro (10,5 MB) a cada chamada; agora lê o catálogo da memória."""
     catalogo([{"id": i, "code": "TST-%d" % i} for i in range(3)], ts=time.time() - 3600)
     lidos = []
     original = json.load
-    monkeypatch.setattr(api.json, "load", lambda f: lidos.append(1) or original(f))
+    monkeypatch.setattr(ativos_central.json, "load", lambda f: lidos.append(1) or original(f))
     info = api.assets_cache_info()
     assert info["n"] == 3 and not info["expirado"] and 0.9 < info["idade_h"] < 1.1
     api.assets_cache_info()
-    assert len(api._read_asset_cache()) == 3 and lidos == [1]            # uma decodificação para os três
-    catalogo([{"id": 9, "code": "TST-9"}])                               # o arquivo mudou: lido de novo
-    assert api.assets_cache_info()["n"] == 1 and lidos == [1, 1]
+    assert len(api._read_asset_cache()) == 3 and lidos == []             # nada decodificado: já estava na memória
+    catalogo([{"id": 9, "code": "TST-9"}])                               # o processo subiu com outro catálogo
+    assert api.assets_cache_info()["n"] == 1
 
 
 def test_uma_recarga_do_fracttal_por_vez(catalogo, monkeypatch):
@@ -152,7 +156,7 @@ def test_sem_catalogo_o_code_to_loc_nao_tenta_de_novo_a_cada_linha(monkeypatch):
         tentativas.append(1)
         raise api.FracttalError("HTTP 429")
     monkeypatch.setattr(api, "load_assets_cached", falha)
-    monkeypatch.setattr(api, "_code_loc", {})
+    ativos_central.reiniciar()                                    # sem catálogo nenhum nesta máquina
     monkeypatch.setattr(api, "_CODE_LOC_TENTOU", [0.0])
     for _ in range(50):                                           # 50 linhas do Histórico
         assert api._code_to_loc() == {}

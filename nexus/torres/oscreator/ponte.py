@@ -238,6 +238,22 @@ def token_do_banco_para_o_clone(config, ambiente=None) -> bool:
     return True
 
 
+def ligar_catalogo_de_ativos(app) -> None:
+    """Diz ao catálogo de ativos central (`os_creator/ativos_central.py`, 31/10/2026, etapa 2 do canto central) onde mora a
+    cópia dele em disco e de onde ler a foto do banco. O catálogo é UM por processo, para todas as telas; ele nasce, sem
+    perguntar ao Fracttal, da cópia em disco (`<pasta de dados do clone>/oscreator/ativos.json.gz`), do `assets_cache.json`
+    antigo (migrado uma vez, ao lado da cópia nova) ou da foto dos ativos no banco, nesta ordem (`ativos_banco`).
+
+    Nos testes o disco não: a pasta de dados do clone é a do usuário da máquina (%APPDATA%), e um teste não lê nem grava
+    nela (o catálogo vive só na memória)."""
+    import api
+    import ativos_central
+    from . import ativos_banco
+    if not app.config.get("TESTING"):
+        ativos_central.configurar(os.path.join(api._data_dir(), "oscreator"), legado=api.ASSETS_CACHE_LEGADO)
+    ativos_central.ligar_fonte_do_banco(ativos_banco.leitor(app))
+
+
 def _criar_clone(app):
     # append, não insert: o que já está instalado continua vencendo; os nomes do clone (api, steps, tickets_*...)
     # não existem no Nexus nem na biblioteca padrão
@@ -249,6 +265,10 @@ def _criar_clone(app):
     from os_web import criar_app
 
     clone = criar_app(segredo=_segredo(app))
+    try:
+        ligar_catalogo_de_ativos(app)
+    except Exception:            # noqa: BLE001 — sem ligar, o catálogo vive só na memória e nasce do Fracttal, como antes
+        logging.exception("OS Creator: o catálogo de ativos não foi ligado à pasta de dados nem ao banco")
     # o Responsável UFV dos chamados de Garantias, pelo cadastro do Nexus (28/10/2026; nexus/torres/chamados/ufv.py)
     from os_web import rotas_acomp
 

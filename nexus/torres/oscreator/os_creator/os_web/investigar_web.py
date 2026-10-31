@@ -5,7 +5,7 @@ Levi, 26/10/2026: "Gostaria de poder clicar com botão direito do mouse em cima 
 ativo'. Vai aproveitar o pré carregamento de histórico de OS do OS Creator filtrando esse ativo, deve mostrar o período
 filtrado e eu devo conseguir fazer novos filtros e pesquisas pela visão."
 
-- O ATIVO sai do catálogo de ativos que já está no disco (`api._catalogo_cru`), nunca do Fracttal: pelo código que a
+- O ATIVO sai do catálogo de ativos central, o que já está na memória (`ativos_central`), nunca do Fracttal: pelo código que a
   plataforma manda (o gravado no de-para ou o derivado do nome, `_frac_inv_code`) e, sem ele no catálogo, pelo número do
   inversor dentro da usina (a regra do `aplicarSugestao` do perf.js, a mesma do Criar OS). O derivado erra onde a árvore
   do Fracttal mudou (na Pharma II ele dá THPN-PHS200-INVR1.1 e o Fracttal tem THPN-PHS100-INVR2.1): o código que não

@@ -13,6 +13,7 @@ from __future__ import annotations
 import datetime as dt
 
 import api
+import ativos_central
 
 from . import ativo_curto
 from .solic_web import titulo_do_ativo
@@ -54,10 +55,20 @@ def clientes(assets: list) -> list:
     return sorted({a.get("cliente") for a in (assets or []) if a.get("cliente") and not _cliente_oculto(a.get("cliente"))})
 
 
+def _do_cliente(assets, cliente: str, usina: str | None = None):
+    """Os ativos do cliente (e da usina, quando vem) na ordem do catálogo. Se `assets` é a lista do catálogo central (o que o
+    `api.load_assets_cached()` entrega), o índice por cliente e usina dele: a cascata não varre mais os ~26 mil ativos a
+    cada escolha (31/10/2026). Qualquer outra lista (um teste, um recorte) é varrida como sempre."""
+    cat = ativos_central.atual()
+    if cat is not None and assets is cat.lista:
+        return cat.por_cliente.get(cliente, ()) if usina is None else cat.por_cliente_usina.get((cliente, usina), ())
+    return [a for a in (assets or []) if a.get("cliente") == cliente and (usina is None or a.get("usina") == usina)]
+
+
 def usinas_de(assets: list, cliente: str) -> list:
     if not cliente:
         return []
-    return sorted({a.get("usina") for a in (assets or []) if a.get("cliente") == cliente and a.get("usina")})
+    return sorted({a.get("usina") for a in _do_cliente(assets, cliente) if a.get("usina")})
 
 
 def onde_do_ativo(assets: list, code: str) -> dict | None:
@@ -109,7 +120,7 @@ def tipos_de(assets: list, cliente: str, usina: str) -> list:
     """`a["tipo"] in ALLOWED_TIPOS` no app é "qualquer tipo não vazio" (o filtro por tipo foi removido em 01/07)."""
     if not usina:
         return []
-    return sorted({a.get("tipo") for a in (assets or []) if a.get("cliente") == cliente and a.get("usina") == usina and a.get("tipo")})
+    return sorted({a.get("tipo") for a in _do_cliente(assets, cliente, usina) if a.get("tipo")})
 
 
 def ativos_de(assets: list, cliente: str, usina: str, tipo: str | None = None, busca: str = "", frases=None) -> list:
@@ -120,8 +131,8 @@ def ativos_de(assets: list, cliente: str, usina: str, tipo: str | None = None, b
         return []
     txt = (busca or "").strip().lower()
     out = []
-    for a in (assets or []):
-        if a.get("cliente") != cliente or a.get("usina") != usina or not a.get("tipo"):
+    for a in _do_cliente(assets, cliente, usina):
+        if not a.get("tipo"):
             continue
         if tipo and a.get("tipo") != tipo:
             continue
@@ -140,7 +151,7 @@ def ativos_do_cliente(assets: list, cliente: str, frases=None) -> list:
         return []
     return [{"id": a.get("id"), "code": a.get("code"), "label": a.get("label"), "tipo": a.get("tipo"),
              "curto": ativo_curto.do_catalogo(a, frases), "nome_titulo": nome_no_titulo(a, frases), "usina": a.get("usina")}
-            for a in (assets or []) if a.get("cliente") == cliente and a.get("usina") and a.get("tipo")]
+            for a in _do_cliente(assets, cliente) if a.get("usina") and a.get("tipo")]
 
 
 def nome_no_titulo(asset: dict, frases=None) -> str:

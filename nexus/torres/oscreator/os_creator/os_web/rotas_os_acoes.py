@@ -18,6 +18,7 @@ from urllib.parse import quote
 from flask import Blueprint, Response, jsonify, request, send_file, session
 
 import api
+import ativos_central
 
 from . import os_acoes_web as regra
 from . import rotas as _rotas
@@ -263,8 +264,10 @@ def api_os_pdf():
     if not d.get("folio") and not folio:
         return _erro("Não consegui ler a OS no Fracttal.", 502)
     d.setdefault("folio", folio)
-    # o cliente e a usina do ativo, se o catálogo já está na memória (carregá-lo aqui seria ler todos os ativos)
-    local = (getattr(api, "_code_loc", None) or {}).get(str(d.get("code") or ""))
+    # o cliente e a usina do ativo, pelo catálogo central (sem catálogo nesta máquina, o PDF sai sem eles: baixá-lo aqui
+    # seria ler todos os ativos)
+    cat = ativos_central.atual()
+    local = cat.local_por_codigo.get(str(d.get("code") or "")) if cat is not None else None
     m = os_pdf.modelo(d, recursos=recursos, anexos_sub=subs, anexos_os=oss, local=local)
     pasta_fotos = os.path.join(api._data_dir(), "os_pdf_fotos")    # a cópia reduzida de cada foto (os_pdf)
 

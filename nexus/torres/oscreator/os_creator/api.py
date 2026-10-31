@@ -16,7 +16,6 @@ import json
 import time
 import uuid
 import base64
-import shutil
 import hashlib
 import threading
 import requests
@@ -267,55 +266,12 @@ from chamado_garantia.ativos import TIPO_POR_SUFIXO as TYPE_MAP     # noqa: E402
 from chamado_garantia.ativos import tipo_e_sufixo
 
 
-def _tipo_from_code(code: str, eh_usina: bool):
-    """→ (tipo_code, tipo_label). Para o item da usina (sem hierarquia abaixo) → ('','Usina')."""
-    if eh_usina:
-        return "", "Usina"
-    return tipo_e_sufixo(code)
-
-
-def _clean_usina_desc(desc: str) -> str:
-    """Nome de usina a partir da descrição do item-usina, sem o '{ CODE }' do final."""
-    return (desc.split("{")[0]).strip() or desc
-
-
-def _build_records(raw: list) -> list:
-    """Deriva cliente/usina/tipo de cada ativo (2 passadas) — evita a usina duplicada.
-    - Equipamento (parent com ≥2 níveis): usina = 2º nível do parent (nome LIMPO, sem code); tipo pelo code.
-    - Item da própria usina (parent só com o cliente; o code aparece no nome): NÃO vira usina duplicada —
-      entra como ATIVO de tipo 'Usina', anexado à usina limpa (mapa code-base→usina dos equipamentos).
-    - Raiz da organização (sem parent): ignorado no drill-down."""
-    parsed, base2usina = [], {}
-    for a in raw:
-        code = (a.get("code") or "").strip()
-        desc = (a.get("description") or "").strip()
-        segs = [s.strip() for s in (a.get("parent_description") or "").split("/") if s.strip()]
-        parsed.append((a, code, desc, segs))
-        if len(segs) >= 2 and code:                       # equipamento → registra a usina limpa do code-base
-            cparts = code.split("-")
-            base = cparts[-2] if len(cparts) >= 2 else cparts[0]   # penúltimo seg = code-base (CGH100/TIM200)
-            if base and segs[1]:
-                base2usina.setdefault(base, segs[1])
-    out = []
-    for a, code, desc, segs in parsed:
-        if len(segs) >= 2:                                # equipamento
-            cliente, usina = segs[0], segs[1]
-            tipo_code, tipo = _tipo_from_code(code, eh_usina=False)
-        elif len(segs) == 1:                              # item da usina (code no nome) → tipo 'Usina'
-            cliente = segs[0]
-            base = code.split("-")[-1] if "-" in code else code      # ATHN-TIM200 → TIM200
-            usina = base2usina.get(base) or _clean_usina_desc(desc)
-            tipo_code, tipo = "USINA", "Usina"
-        else:                                             # raiz da organização → fora do drill-down
-            continue
-        out.append({"id": a.get("id"), "code": code, "description": desc,
-                    "id_parent": a.get("id_parent"), "id_type_item": a.get("id_type_item"),
-                    "id_group_task": a.get("id_group_task"),
-                    "parent_description": a.get("parent_description"),
-                    "cliente": cliente, "usina": usina, "tipo_code": tipo_code, "tipo": tipo,
-                    "label": f"{code} — {desc}" if code else desc})
-    out.sort(key=lambda x: (x["cliente"].lower(), x["usina"].lower(), x["code"].lower()))
-    return out
+# O formato do registro do catálogo (cliente, usina e tipo derivados do caminho e do código) mora no `ativos_central`, ao lado
+# do catálogo (31/10/2026, etapa 2 do canto central). Aqui ficaram os nomes de sempre: o `get_assets` e a leitura da etapa
+# 2.2 montam com o `_build_records`, e o Histórico e o título "[Ativo] - ..." cortam o nome da usina com o `_usina_curta`.
+import ativos_central                                                               # noqa: E402
+from ativos_central import montar_registros as _build_records                       # noqa: E402,F401
+from ativos_central import usina_curta as _usina_curta                              # noqa: E402,F401
 
 
 RPC_ITEMS = "inventories.items_list"   # ativos (RPC, sessão do usuário) — flat com is_tree=false
@@ -352,138 +308,71 @@ def get_assets() -> list:
     return _build_records(data)
 
 
-# Cache em disco — evita recarregar 16k ativos a cada abertura do app.
-ASSETS_CACHE = os.path.join(_data_dir(), "assets_cache.json")
+# O CATÁLOGO: UM, central, em memória (`ativos_central`; 31/10/2026, etapa 2 do canto central). Até então o `assets_cache.json`
+# era a fonte e cada `load_assets_cached()` entregava uma cópia da lista inteira (~26 mil dicionários) para quem pedia poder
+# mexer à vontade. Agora a lista é UMA, compartilhada (os registros não aceitam escrita), montada com os índices uma vez por
+# versão, e o boot vem da cópia em disco dela própria (ou do arquivo antigo, uma vez, ou da foto do banco): reiniciar o Nexus
+# não pergunta nada ao Fracttal. A ponte do Nexus diz onde a cópia mora (`ativos_central.configurar`, ao criar o clone).
+ASSETS_CACHE_LEGADO = os.path.join(_data_dir(), "assets_cache.json")      # o arquivo antigo: só migrado, uma vez
 ASSETS_TTL   = 24 * 3600
-_CACHE_VER   = 2   # bump quando o formato do registro muda (v2 = + id_parent/id_type_item/id_group_task)
-
-
-def _seed_cache():
-    """1ª execução (sem cache em %APPDATA%): copia o catálogo embutido (seed) → instantâneo no .exe.
-    Seed = ao lado do script (dev) ou dentro do bundle PyInstaller (_MEIPASS)."""
-    if os.path.exists(ASSETS_CACHE):
-        return
-    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    seed = os.path.join(base, "assets_cache.json")
-    if os.path.exists(seed):
-        try:
-            shutil.copy2(seed, ASSETS_CACHE)
-        except OSError:
-            pass
-
-
-# O catálogo lido do disco fica na memória por versão do arquivo (19/10/2026, superplano do OS Creator): cada
-# `load_assets_cached()` relia e decodificava o JSON de ~22 mil ativos (26 lugares chamam, a prévia do COS a cada
-# 120 ms de digitação). Quem pede recebe uma cópia de cada registro (são planos), para mexer à vontade.
-_ASSETS_MEM: dict = {"chave": None, "c": None}
 _ASSETS_RECARGA = threading.Lock()      # uma recarga do Fracttal por vez (~110 pedidos); quem chega espera a dela
 
 
-def _catalogo_cru():
-    """O arquivo do catálogo decodificado UMA vez por versão (mtime e tamanho) e guardado em `_ASSETS_MEM`, sem cópia:
-    quem chama só lê. None se ele não abre."""
-    try:
-        st = os.stat(ASSETS_CACHE)
-        chave = (st.st_mtime_ns, st.st_size)
-        if _ASSETS_MEM["chave"] != chave:
-            with open(ASSETS_CACHE, encoding="utf-8") as f:
-                c = json.load(f)
-            _ASSETS_MEM.update(chave=chave, c=c)
-        c = _ASSETS_MEM["c"]
-    except Exception:
-        return None
-    return c if isinstance(c, dict) else None
+def catalogo_vencido(cat) -> bool:
+    """O catálogo foi conferido com o Fracttal há 24 h ou mais (`ASSETS_TTL`). Vencido ele continua servindo; só se renova."""
+    return time.time() - cat.lido_em >= ASSETS_TTL
 
 
 def _read_asset_cache():
-    """Lê o catálogo de ativos do cache (mesma versão, dentro do TTL). None se ausente/expirado."""
-    c = _catalogo_cru()
-    if c and c.get("assets") and c.get("ver") == _CACHE_VER and (time.time() - c.get("ts", 0)) < ASSETS_TTL:
-        return [dict(a) for a in c["assets"]]
-    return None
-
-
-def _corrigir_itens_usina_estrangeiros(assets: list) -> list:
-    """Conserta o item-usina PENDURADO NA PLANTA ERRADA (cadastro do Fracttal, 28/07).
-
-    Caso real: o item-usina de "Thopen - Ipixuna 1 e 2 - PA" (THPN-IPX100) está registrado como
-    filho da planta "2C - Ipixuna do Pará 1 - PA" — então o campo `usina` dele apontava para a
-    planta da 2C e ele aparecia nas cascatas dela (COS/Performance/Nova análise), como o Levi
-    reportou. Medido no catálogo inteiro: 7 itens nessa situação (esse + 6 lixos de TESTE
-    pendurados em Sarandi), de 16,9 mil.
-
-    Detecção: item tipo "Usina" cuja DESCRIÇÃO não começa com a própria `usina` — a descrição do
-    item-usina legítimo sempre embute o rótulo da planta. Correção: realoca para a usina dos
-    IRMÃOS DE CÓDIGO (THPN-IPX100 → usina dos THPN-IPX100-*); sem irmão, `usina` fica vazia e o
-    item sai das cascatas (melhor sumir do que aparecer na planta errada). Roda na LEITURA, então
-    vale para o cache antigo sem forçar recarga de 17 mil ativos."""
-    ruins = [a for a in assets
-             if a.get("tipo") == "Usina" and a.get("usina") and a.get("description")
-             and not _norm_txt(a["description"]).startswith(_norm_txt(a["usina"]))]
-    if not ruins:
-        return assets
-    for a in ruins:
-        code = str(a.get("code") or "")
-        irmaos = [x.get("usina") for x in assets
-                  if x.get("usina") and str(x.get("code") or "").startswith(code + "-")]
-        if irmaos:
-            a["usina"] = max(set(irmaos), key=irmaos.count)
-            cli = [x.get("cliente") for x in assets
-                   if x.get("usina") == a["usina"] and x.get("cliente")]
-            if cli:
-                a["cliente"] = max(set(cli), key=cli.count)
-        else:
-            a["usina"] = ""
-    return assets
+    """O catálogo central como está, SEM a trava das 24 h e sem ir ao Fracttal (era o arquivo, vencido = None): a lista
+    compartilhada, ou None se esta máquina ainda não tem catálogo nenhum. Para quem só precisa LER o que há (as frases do tipo,
+    a contagem da tela inicial); quem precisa dele de qualquer jeito pede `load_assets_cached()`."""
+    cat = ativos_central.atual()
+    return cat.lista if cat is not None else None
 
 
 def assets_cache_info() -> dict:
-    """Quando o catálogo local foi gravado. → {'ts': epoch|0, 'n': ativos, 'idade_h': float,
-    'expirado': bool}. Serve para a aba Ativos dizer de QUANDO é a lista que está na tela —
-    sem isso, "18.259 ativos" parece um número de agora mesmo quando é de dez dias atrás.
-
-    Pelo catálogo já decodificado (`_catalogo_cru`, 20/10/2026): até então decodificava o arquivo inteiro (10,5 MB, ~28
-    MB na memória) a cada chamada só para a data e a conta; a tela inicial chama a cada 5 min, e no Raio-X das 10:08 o
-    `GET /os/` estava há 18 s no catálogo."""
-    c = _catalogo_cru()
-    if c is None:
+    """De quando é o catálogo e quantos ativos ele tem. → {'ts': epoch|0, 'n': ativos, 'idade_h': float, 'expirado': bool}.
+    Serve para a aba Ativos dizer de QUANDO é a lista que está na tela — sem isso, "18.259 ativos" parece um número de agora
+    mesmo quando é de dez dias atrás. Lê o catálogo da memória (até 20/10/2026 decodificava o arquivo inteiro, 10,5 MB, a cada
+    chamada, e a tela inicial chama a cada 5 min)."""
+    cat = ativos_central.atual()
+    if cat is None:
         return {"ts": 0, "n": 0, "idade_h": 0.0, "expirado": True}
-    ts = float(c.get("ts") or 0)
-    idade = max(0.0, time.time() - ts)
-    return {"ts": ts, "n": len(c.get("assets") or []), "idade_h": idade / 3600.0,
-            "expirado": idade > ASSETS_TTL or c.get("ver") != _CACHE_VER}
+    idade = max(0.0, time.time() - cat.lido_em)
+    return {"ts": cat.lido_em, "n": len(cat.lista), "idade_h": idade / 3600.0, "expirado": idade > ASSETS_TTL}
 
 
-def load_assets_cached(force: bool = False, em_dia: bool = False) -> list:
-    """Ativos do cache (se < 24h e mesma versão) ou recarrega via RPC (sessão do usuário — sem
-    OAuth) e salva. force=True ignora o cache (o botão Atualizar da tela de Ativos: o arquivo é um só, vale para todos).
+def load_assets_cached(force: bool = False, em_dia: bool = False) -> tuple:
+    """Os ativos: a lista COMPARTILHADA do catálogo central (uma tupla de registros só de leitura, sem copiar), ou, sem catálogo
+    nenhum nesta máquina, a recarga via RPC (sessão do usuário — sem OAuth), que entra no catálogo e na cópia em disco.
+    force=True ignora o que há (o botão Atualizar da tela de Ativos: o catálogo é um só, vale para todos).
 
     VENCIDO (24/10/2026): devolve o de ontem na hora e baixa o novo por trás (`_renovar_catalogo_por_tras`). Em 23/10 às
-    10:44 o 1º a precisar do catálogo vencido baixou os ~22 mil ativos DENTRO do pedido: um "Criar OS" da Performance
-    ficou 3 min 51 s em `get_assets` e o Histórico 1 min 52 s esperando o mesmo download. `em_dia=True` (resolver o
-    ativo da OS na aprovação) espera o novo, como antes; sem catálogo nenhum, também."""
+    10:44 o 1º a precisar do catálogo vencido baixou os ~22 mil ativos DENTRO do pedido: um "Criar OS" da Performance ficou 3
+    min 51 s em `get_assets` e o Histórico 1 min 52 s esperando o mesmo download. `em_dia=True` (resolver o ativo da OS na
+    aprovação) espera o novo, como antes; sem catálogo nenhum (nem a cópia em disco, nem o arquivo antigo, nem a foto do
+    banco), também. A recarga que o tamanho recusa (lista vazia, ou menor que a de agora em mais de 5%) não troca nada: fica o
+    catálogo de antes."""
     if not force:
-        _seed_cache()
-        c = _catalogo_cru()
-        if c and c.get("assets") and c.get("ver") == _CACHE_VER:
-            vencido = time.time() - c.get("ts", 0) >= ASSETS_TTL
+        cat = ativos_central.garantir()
+        if cat is not None:
+            vencido = catalogo_vencido(cat)
             if not vencido or not em_dia:
                 if vencido:
                     _renovar_catalogo_por_tras()
-                return _corrigir_itens_usina_estrangeiros([dict(a) for a in c["assets"]])
+                return cat.lista
     pedido = time.time()
     with _ASSETS_RECARGA:
-        # quem esperou a recarga de outro pedido usa a dela: o arquivo foi gravado depois deste pedido
-        cached = _read_asset_cache()
-        if cached and (not force or (_ASSETS_MEM["c"] or {}).get("ts", 0) >= pedido):
-            return _corrigir_itens_usina_estrangeiros(cached)
+        # quem esperou a recarga de outro pedido usa a dela: o catálogo foi conferido depois deste pedido
+        cat = ativos_central.atual()
+        if cat is not None and not catalogo_vencido(cat) and (not force or cat.lido_em >= pedido):
+            return cat.lista
         assets = get_assets()
-        try:
-            with open(ASSETS_CACHE, "w", encoding="utf-8") as f:
-                json.dump({"ts": time.time(), "ver": _CACHE_VER, "assets": assets}, f, ensure_ascii=False)
-        except Exception:
-            pass
-    return _corrigir_itens_usina_estrangeiros(assets)
+        if ativos_central.trocar(assets, "rpc"):
+            return ativos_central.atual().lista
+        cat = ativos_central.atual()
+        return cat.lista if cat is not None else tuple(assets)
 
 
 ASSETS_ESPERA_TENTATIVA = 600     # s: o download por trás que falhou (Fracttal fora, cota) só tenta de novo depois disto
@@ -943,11 +832,17 @@ def _rpc_subtasks(subtasks: list, respostas: list = None) -> list:
 
 
 def _asset_by_code(code: str):
-    """Registro completo do ativo pelo code (a partir do cache de ativos). None se não achar."""
+    """Registro completo do ativo pelo code: uma CÓPIA, pelo índice do catálogo central (até 31/10/2026 percorria uma cópia
+    nova da lista inteira a cada código). None se não achar. Lê do que o `load_assets_cached()` devolve: a lista de outra
+    origem (um dublê de teste, um recorte) é percorrida, como sempre foi."""
     try:
-        for a in load_assets_cached():
+        lista = load_assets_cached()            # garante o catálogo (sem catálogo nenhum, baixa uma vez, como sempre)
+        cat = ativos_central.atual()
+        if cat is not None and lista is cat.lista:
+            return ativos_central.registro(code)
+        for a in lista:
             if a.get("code") == code:
-                return a
+                return dict(a)
     except Exception:
         pass
     return None
@@ -1523,42 +1418,27 @@ def create_solicitacoes_bulk(assets: list, descricao: str, id_type_1, id_type=No
     return out
 
 
-_code_loc = {}
-
-
-def _usina_curta(usina_full: str) -> str:
-    """'Thopen - Ceilândia 1 - DF' (Cliente - Usina - Estado) → 'Ceilândia 1'."""
-    parts = [p.strip() for p in str(usina_full).split(" - ") if p.strip()]
-    if len(parts) <= 1:
-        return usina_full
-    parts = parts[1:]                                          # tira o cliente (1º)
-    if len(parts) > 1 and len(parts[-1]) == 2 and parts[-1].isalpha():
-        parts = parts[:-1]                                     # tira a sigla do estado (último)
-    return " - ".join(parts)
-
-
 _CODE_LOC_TENTOU = [0.0]
 
 
 def _code_to_loc():
-    """{code do ativo: (cliente, usina_curta, tipo)} a partir do catálogo (cacheado).
+    """{code do ativo: (cliente, usina_curta, tipo)} do catálogo central, montado UMA vez por versão dele (o antigo `_code_loc`
+    era montado uma vez por processo e nunca refeito: um ativo novo não aparecia no nome das OS até o próximo reinício).
     `tipo` = rótulo do tipo de ativo (Inversor, Tracker, Cabine, Transformador, Usina…).
     Sem o catálogo (o Fracttal fora na recarga), não tenta de novo por 10 min: quem chama é cada linha do Histórico, e
     2.000 linhas eram 2.000 tentativas de recarregar ~22 mil ativos (19/10/2026)."""
-    if _code_loc:
-        return _code_loc
+    cat = ativos_central.atual()
+    if cat is not None:
+        return cat.local_por_codigo
     if time.time() - _CODE_LOC_TENTOU[0] < 600:
-        return _code_loc
+        return {}
     _CODE_LOC_TENTOU[0] = time.time()
     try:
-        for a in load_assets_cached():
-            c = a.get("code")
-            if c:
-                _code_loc[c] = (a.get("cliente") or "", _usina_curta(a.get("usina") or ""),
-                                a.get("tipo") or "")
+        load_assets_cached()
     except Exception:
         pass
-    return _code_loc
+    cat = ativos_central.atual()
+    return cat.local_por_codigo if cat is not None else {}
 
 
 def _extrai_code(desc: str) -> str:

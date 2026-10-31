@@ -19,6 +19,7 @@ import datetime as dt
 from flask import Blueprint, render_template, request
 
 import api
+import ativos_central
 
 from . import investigar_web as IW
 from . import rotas as R
@@ -32,14 +33,14 @@ COLS = [("Nº", "folio"), ("Tipo de tarefa", "tipo_tarefa"), ("Ativo", "ativo"),
         ("Etiqueta", "etiqueta")]
 
 
-def _catalogo() -> list:
-    """O catálogo de ativos que já está no disco, sem cópia e sem ir ao Fracttal (vencido também serve: o código de um
-    inversor não muda de um dia para o outro). Sem catálogo, a janela diz que não achou o ativo."""
+def _catalogo():
+    """O catálogo central como está, sem cópia e sem ir ao Fracttal (vencido também serve: o código de um inversor não muda de
+    um dia para o outro). Sem catálogo, a janela diz que não achou o ativo."""
     try:
-        c = api._catalogo_cru() or {}
+        cat = ativos_central.atual()
     except Exception:                    # noqa: BLE001 — sem catálogo, o resolver devolve o aviso
-        return []
-    return list(c.get("assets") or [])
+        return ()
+    return cat.lista if cat is not None else ()
 
 
 @bp.route("/historico/ativo")
