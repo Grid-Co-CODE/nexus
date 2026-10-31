@@ -254,6 +254,17 @@ def test_os_marcadores_do_item_0():
     assert "Zona" not in FA.MARCADORES_DE_ENDERECO and "Zona Rural" in FA.MARCADORES_DE_ENDERECO
 
 
+def test_o_padrao_serial_nao_e_rodovia():
+    """Ruling AW (rodada 1 da 3.1+3.2): RS-232, RS-422 e RS-485 são padrões de comunicação serial (o conversor RS-485 é certo em
+    usina solar), não a rodovia estadual do RS. A medida na cópia local do catálogo achou os dois falsos positivos da sigla
+    "RS" no nível da usina, os dois RS-232/422/485. Exemplos inventados."""
+    for texto in ("Conversor RS-485", "Conversor RS-232 Marca X", "Datalogger RS-422 2", "Gateway RS-485/Ethernet"):
+        assert FA.sem_endereco(texto) == (texto, False), texto
+    assert FA.sem_endereco("Skid 4 RS-123") == ("Skid 4", True)                      # a rodovia do RS segue cortada
+    assert FA.sem_endereco("Skid 5 RS-4850") == ("Skid 5 RS-4850", False)            # 4 dígitos nunca foi rodovia
+    assert FA.sem_endereco("Conversor RS-485 Rod. Alfa km 2") == ("Conversor RS-485", True)
+
+
 # ── a contagem das descrições cortadas ──────────────────────────────────────────────────────────────────────────────────
 def test_a_noite_conta_as_descricoes_cortadas_sem_o_texto(app, banco):
     mais = [_it(44, "CAL-ZET100-PORT2", "Portaria 2 Rua Sem Padrao 12    { x }", 40),

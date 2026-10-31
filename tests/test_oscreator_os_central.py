@@ -16,6 +16,7 @@ Fracttal e disco são dublês ou pastas de teste: nada vai à rede. Nomes, códi
 público)."""
 import gzip
 import json
+import logging
 import os
 import sys
 import time
@@ -31,6 +32,7 @@ if ponte.RAIZ_CLONE not in sys.path:
 import api  # noqa: E402 — o api.py do clone
 import os_central as OC  # noqa: E402
 import os_disco as OD  # noqa: E402 — a cópia em disco da lista (Ruling AY)
+import os_registro as OR  # noqa: E402 — o registro e a linha enxuta (Rulings AY e AV)
 from os_web import acomp_web, sessao  # noqa: E402
 
 _UTC = timezone.utc
@@ -413,3 +415,138 @@ def test_a_leitura_nao_desfaz_o_que_mudou_durante_ela():
     # e as abertas lidas antes da ação não marcam a OS que a ação abriu no meio
     OC.receber([_tarefa(2, 2, status=2, criada=_iso(60))], OC.ABERTAS, lido_em=inicio)
     assert 1 not in OC.atual().a_conferir and 50 not in OC.atual().a_conferir
+
+
+# ── rodada 1 da revisão: a trava de encolhimento (Ruling AU) ────────────────────────────────────────────────────────────
+def test_a_trava_de_encolhimento(caplog):
+    """A noite e os 7 dias que tirariam (ou marcariam "a conferir") mais que `ENCOLHE_MAX`% do que cobrem, e mais que
+    `ENCOLHE_MIN_OS`, não trocam nada: o motivo vai ao estado e ao log. A 1ª carga (a lista vazia) não tem o que encolher, e
+    a leitura dentro do limite passa e tira a recusa da faixa do estado."""
+    linhas = [_tarefa(100 + k, 100 + k, criada=_iso(0.1 + 80 * k / 200)) for k in range(200)]   # 200 OS em 80 dias
+    rel = OC.receber(linhas, OC.NOITE, desde=_iso(90)[:10])
+    assert rel["entraram"] == 200 and not rel.get("recusa")
+    antes = OC.atual()
+    # a noite que tiraria 100 das 200: nada muda
+    with caplog.at_level(logging.WARNING, logger="oscreator.os_central"):
+        rel = OC.receber(linhas[:100], OC.NOITE, desde=_iso(90)[:10])
+    assert "encolheria" in rel["recusa"] and "100 das 200" in rel["recusa"] and rel["sairam"] == 0
+    lista = OC.atual()
+    assert (lista.versao, lista.janela, set(lista.por_id)) == (antes.versao, antes.janela, set(antes.por_id))
+    assert OC.estado()["recusas"]["noite"]["motivo"] == rel["recusa"]
+    assert any("encolheria" in r.getMessage() for r in caplog.records)
+    # dentro do limite (10 OS, ou 5% do que a faixa cobre): passa, e a recusa da noite sai do estado
+    rel = OC.receber(linhas[:190], OC.NOITE, desde=_iso(90)[:10])
+    assert not rel.get("recusa") and rel["sairam"] == 10 and "noite" not in OC.estado()["recusas"]
+    # os 7 dias cobrem 18 OS; os que marcariam 13 "a conferir" (mais que 10) são recusados, os que marcariam 8 passam
+    nos_7 = [w for w in linhas[:190] if w["creation_date"] >= _iso(7)]
+    assert len(nos_7) == 18
+    versao = OC.atual().versao
+    rel = OC.receber(nos_7[:5], OC.SETE_DIAS, desde=_iso(7)[:19])
+    assert "encolheriam" in rel["recusa"] and OC.atual().versao == versao and OC.atual().a_conferir == frozenset()
+    assert OC.estado()["recusas"]["sete_dias"]["motivo"] == rel["recusa"]
+    rel = OC.receber(nos_7[:10], OC.SETE_DIAS, desde=_iso(7)[:19])
+    assert not rel.get("recusa") and rel["a_conferir"] == 8 and OC.estado()["recusas"] == {}
+
+
+# ── rodada 1 da revisão: a memória no Raio-X (Minor 3) ──────────────────────────────────────────────────────────────────
+def test_a_memoria_medida_uma_vez_por_versao(monkeypatch, caplog):
+    """A medida percorre a lista inteira (~0,4 s com 36 mil OS): uma vez por versão, e a que falha vai ao log com a pilha."""
+    _carga_inicial()
+    chamadas = []
+    real = OC.memoria_estimada
+    monkeypatch.setattr(OC, "memoria_estimada", lambda lista=None: chamadas.append(1) or real(lista))
+    a = OC.estado(medir_memoria=True)["memoria_mb"]
+    b = OC.estado(medir_memoria=True)["memoria_mb"]
+    assert a is not None and a == b and len(chamadas) == 1
+    OC.receber([_tarefa(5, 5, criada=_iso(0.01))], OC.NOVAS)                       # a versão mudou: mede de novo
+    OC.estado(medir_memoria=True)
+    assert len(chamadas) == 2
+    monkeypatch.setattr(OC, "memoria_estimada", lambda lista=None: 1 / 0)
+    OC.receber([_tarefa(6, 6, criada=_iso(0.01))], OC.NOVAS)
+    with caplog.at_level(logging.WARNING, logger="oscreator.os_central"):
+        e = OC.estado(medir_memoria=True)
+    assert e["memoria_mb"] is None and any("memória" in r.getMessage() and r.exc_info for r in caplog.records)
+
+
+# ── rodada 1 da revisão: a linha enxuta (Ruling AV) ─────────────────────────────────────────────────────────────────────
+def test_a_linha_enxuta_monta_o_mesmo_registro():
+    """A projeção por página (`os_registro.enxuta`) guarda só o que o registro lê: o registro montado da linha cortada é o
+    MESMO da linha inteira. A nota só leva o texto com o bloco do chamado (a da outra tarefa, sem o bloco, fica de fora nos
+    dois caminhos), e a etiqueta só o id e o nome."""
+    marca = "Antes\n" + acomp_web.MARCA_NOTA + "\nMarca: Inventada"
+    linhas = [
+        _tarefa(700, 1, nota=marca, labels=((11, "CHAMADOS"), (12, "ROTINA"))),
+        _tarefa(700, 2, nota="uma nota de outra tarefa, sem o bloco"),
+        _tarefa(701, 3, status=3, fim=_iso(1), nota="só uma nota qualquer"),
+        dict(_tarefa(702, 4), note=api._CHAMADO_MK + "\nStatus: Aberto", trigger_description="NO_SCHEDULE_TASK",
+             labels=[{"id": 13, "name": "OUTRA"}, "não é etiqueta"]),
+        dict(_tarefa(703, 5), labels="nem lista", task_note=None, note="None"),
+        {k: v for k, v in _tarefa(704, 6).items() if k not in ("labels", "task_note", "created_by")},
+    ]
+    enxutas = [OR.enxuta(w) for w in linhas]
+    assert all(set(w) <= set(OR.CAMPOS_REST) for w in enxutas)
+    assert "groups_1_description" not in enxutas[0] and "rating" not in enxutas[0] and "task_note" not in enxutas[1]
+    assert enxutas[0]["labels"] == [{"id": 11, "description": "CHAMADOS"}, {"id": 12, "description": "ROTINA"}]
+    inteiro, cortado = OR.registros_do_rest(linhas), OR.registros_do_rest(enxutas)
+    assert inteiro == cortado and set(inteiro) == {700, 701, 702, 703, 704}
+    assert acomp_web.MARCA_NOTA in inteiro[700].note and "outra tarefa" not in inteiro[700].note
+    assert inteiro[701].note == "" and api._CHAMADO_MK in inteiro[702].note and inteiro[703].note == ""
+
+
+def test_a_troca_no_disco_tenta_de_novo_o_arquivo_preso(tmp_path, monkeypatch):
+    """No Windows (o PC), o antivírus ou o indexador seguram por um instante o arquivo recém-escrito, e o `os.replace` seguinte
+    falha com acesso negado (rodada 1 da revisão: 2 de 8 rodadas do teste das pendentes mortas, com uma gravação colada na
+    outra, e a pendente que saiu da fila voltava no reinício). A troca tenta de novo antes de desistir; a que segue presa
+    levanta, o rascunho sai, e a cópia de antes fica."""
+    import canto_disco
+    destino = str(tmp_path / "copia.json")
+    presas = [PermissionError(13, "Acesso negado"), PermissionError(13, "Acesso negado")]
+    real = canto_disco._replace
+
+    def replace(a, b):
+        if presas:
+            raise presas.pop(0)
+        return real(a, b)
+    monkeypatch.setattr(canto_disco, "_replace", replace)
+    monkeypatch.setattr(canto_disco, "ESPERAS_DA_TROCA", (0, 0, 0))
+    canto_disco.trocar_de_uma_vez(destino, lambda tmp: open(tmp, "w", encoding="utf-8").write("nova"))
+    assert open(destino, encoding="utf-8").read() == "nova" and presas == []
+
+    def sempre_presa(a, b):
+        raise PermissionError(13, "Acesso negado")
+    monkeypatch.setattr(canto_disco, "_replace", sempre_presa)
+    with pytest.raises(PermissionError):
+        canto_disco.trocar_de_uma_vez(destino, lambda tmp: open(tmp, "w", encoding="utf-8").write("outra"))
+    assert open(destino, encoding="utf-8").read() == "nova"
+    assert not [n for n in os.listdir(tmp_path) if n.endswith(".tmp")]
+
+
+def test_esperar_a_gravacao_espera_as_duas(tmp_path, monkeypatch):
+    """Uma gravação lenta (a troca do Windows tentando de novo) e outra agendada durante ela: `esperar_gravacao` espera as
+    DUAS, e o reinício lê a versão de agora (rodada 1 da revisão: com uma bandeira só, a 1ª ao terminar dizia "nenhuma
+    escrevendo" com a 2ª ainda na fila, e o teste das pendentes mortas lia a cópia velha)."""
+    import threading
+    monkeypatch.setattr(OD, "GRAVAR_A_CADA_S", 0)
+    OC.reiniciar(pasta=str(tmp_path))
+    _carga_inicial()
+    assert OC.esperar_gravacao(5)
+    dentro, solta, vezes = threading.Event(), threading.Event(), []
+    real = OD._trocar_de_uma_vez
+
+    def lenta(destino, escrever):
+        vezes.append(1)
+        if len(vezes) == 1:
+            dentro.set()
+            solta.wait(5)                                            # a 1ª, presa na troca
+        else:
+            time.sleep(0.3)                                          # a 2ª, também lenta
+        return real(destino, escrever)
+    monkeypatch.setattr(OD, "_trocar_de_uma_vez", lenta)
+    OC.receber([_tarefa(5, 5, criada=_iso(0.01))], OC.NOVAS)
+    assert dentro.wait(5)
+    OC.receber([_tarefa(6, 6, criada=_iso(0.01))], OC.NOVAS)       # agendada com a 1ª escrevendo
+    versao = OC.atual().versao
+    solta.set()
+    assert OC.esperar_gravacao(5)
+    OC.reiniciar(pasta=str(tmp_path))
+    assert OC.atual().versao == versao and {5, 6} <= set(OC.atual().por_id)

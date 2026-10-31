@@ -77,7 +77,10 @@ COMO_LER = ("1 linha = 1 item do Fracttal com 1 código (fracttal_item_id + codi
 # espaço ("R. Alfa 12"): "R.1" é numeração. A sigla de rodovia vai à parte, em maiúsculas, como se escreve, e só com a sigla
 # de uma das 27 UFs ou do BR, hífen e EXATAMENTE 3 dígitos ("MT-010", "BR-163"; o BR também com espaço, "BR 101"): com
 # qualquer par de letras e 2 ou 3 dígitos, o código de modelo ("DW-125", "CF-22", "SG-250") virava estrada; em minúscula ela
-# é mais modelo de equipamento que estrada.
+# é mais modelo de equipamento que estrada. Os padrões de comunicação serial RS-232, RS-422 e RS-485 (o conversor RS-485 é
+# certo em usina solar) NÃO são a rodovia do RS (Ruling AW, rodada 1 da 3.1+3.2): a medida do detector na cópia local do
+# catálogo do OS Creator (31/10/2026, 26.620 itens, só contagens) achou na sigla "RS" exatamente dois cortes, ambos no nível da
+# usina e ambos RS-232/422/485; "Estr." e as siglas MT, SE e AC não cortaram nenhum nível de dentro, e ficaram.
 # Vale SÓ para a foto do banco: o caminho do catálogo (`ativos_foto.caminhos`, o cliente e a usina das telas) não passa por
 # aqui, e a paridade com o RPC não muda.
 MARCADORES_DE_ENDERECO = ("Rua", "R.", "Av.", "Avenida", "Rod.", "Rodovia", "Estrada", "Estr.", "Km", "CEP", "Fazenda",
@@ -85,7 +88,9 @@ MARCADORES_DE_ENDERECO = ("Rua", "R.", "Av.", "Avenida", "Rod.", "Rodovia", "Est
                           "Distrito", "Localidade", "Comunidade", "Loteamento")
 UFS = ("AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ",
        "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO")
-SIGLA_DE_RODOVIA = r"\b(?:%s)-\d{3}\b|\bBR\s+\d{3}\b" % "|".join(UFS + ("BR",))
+PADROES_SERIAIS = ("RS-232", "RS-422", "RS-485")
+SIGLA_DE_RODOVIA = r"\b(?!(?:%s)\b)(?:%s)-\d{3}\b|\bBR\s+\d{3}\b" % (
+    "|".join(re.escape(p) for p in PADROES_SERIAIS), "|".join(UFS + ("BR",)))
 # a usina isenta do detector tem de terminar na sigla do estado ("... - MT"): a lista do leitor que viesse errada não abre a
 # porta para um endereço depois dela
 _TERMINA_NA_UF = re.compile(r"\s-\s[A-Z]{2}$")

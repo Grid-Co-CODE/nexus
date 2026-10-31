@@ -38,12 +38,19 @@ O que cada faixa cobre e o que ela troca:
   tinha aberta e não veio fica "a conferir";
 - `finalizadas` (status 3, pela data de fim): só ANOTA o status e a data fim nas OS que a lista já tem (a leitura é pela data
   de fim de cada TAREFA, então uma OS pode vir com parte das tarefas);
-- `os`: as OS lidas uma a uma (as pendentes, pelo nº); a que não veio segue "a conferir".
-Leitura que falha no meio não chega aqui (quem lê não chama `receber`): a lista fica como estava. E a leitura só julga o que
-existia quando ELA começou (`lido_em` é o começo): a noite inteira leva minutos, e a ação do OS Creator e a entrega das abertas
-(outra thread) não esperam por ela. A OS que uma ação mexeu depois do começo da leitura não é trocada pelo que a leitura leu
-(o status velho voltaria) nem julgada por ela; a OS criada depois do começo (com `MARGEM_RELOGIO_S` de folga para o relógio
-do Fracttal) não sai nem fica "a conferir" por não ter vindo.
+- `os`: as OS lidas uma a uma (as pendentes, pelo nº): todas saem da fila, e a que não veio (apagada no Fracttal) segue "a
+  conferir" até a noite a tirar.
+Leitura que falha no meio não chega aqui (quem lê não chama `receber`): a lista fica como estava. A TRAVA DE ENCOLHIMENTO
+(Ruling AU, rodada 1 da revisão; o `ENCOLHE_MAX` dos ativos): a noite que tiraria, ou os 7 dias que marcariam "a conferir",
+mais que `ENCOLHE_MAX`% das OS que a leitura cobre, e mais que `ENCOLHE_MIN_OS`, não trocam NADA: o motivo vai ao estado
+(`recusas`), ao log e ao Raio-X (páginas perdidas em silêncio, o REST que devolve só uma parte). Os 5% são dos ativos; o
+mínimo de 10 OS é porque os 7 dias cobrem ~700 OS na escala do AC (5% = 35) e, na lista pequena, 5% seriam uma ou duas OS
+apagadas de verdade. O apagamento de verdade maior que isso passa na faixa mais larga: a noite de 90 dias cobre ~9 mil
+(o limite é ~450), a de domingo, a janela inteira (~1.800); a 1ª carga (a lista vazia) não tem o que encolher. E a leitura
+só julga o que existia quando ELA começou (`lido_em` é o começo): a noite inteira leva minutos, e a ação do OS Creator e a
+entrega das abertas (outra thread) não esperam por ela. A OS que uma ação mexeu depois do começo da leitura não é trocada
+pelo que a leitura leu (o status velho voltaria) nem julgada por ela; a OS criada depois do começo (com `MARGEM_RELOGIO_S`
+de folga para o relógio do Fracttal) não sai nem fica "a conferir" por não ter vindo.
 
 A AÇÃO DO OS CREATOR ENTRA NA HORA (`atualizar_os`): com o registro na mão, na hora; sem ele, dentro de um pedido do OS Creator,
 lê a OS ao vivo pela sessão da pessoa (as tarefas e o cabeçalho, o que o card já lê: 1 a 3 pedidos); fora de um pedido (ou
@@ -92,6 +99,9 @@ CAMPOS_MIN_OS = 50              # a medida dos campos do REST só vale numa leit
 POR_PARTES_MIN = 50             # até tantas OS mudadas (ou 1/10 da lista), os índices se refazem só nelas
 MARGEM_RELOGIO_S = 120          # a OS criada perto do começo de uma leitura (o relógio do Fracttal e o nosso) não é julgada por ela
 TOCADAS_GUARDA_S = 86400        # quanto tempo a lista lembra que uma ação mexeu numa OS (uma leitura nunca dura isso)
+ENCOLHE_MAX = 5                 # % das OS que a noite (os 7 dias) cobre que ela pode tirar (marcar "a conferir") de uma vez
+ENCOLHE_MIN_OS = 10             # ... e sempre pode até tantas (a lista pequena; ver o topo)
+PENDENTE_FALHAS_MAX = 5         # leituras pelo nº que falham até a pendente sair da fila (segue "a conferir")
 ABERTOS = frozenset({1, 2})
 NOVAS, SETE_DIAS, ABERTAS, FINALIZADAS, NOITE, UMA_OS = "novas", "sete_dias", "abertas", "finalizadas", "noite", "os"
 FAIXAS = (NOVAS, SETE_DIAS, ABERTAS, FINALIZADAS, NOITE, UMA_OS)
@@ -223,14 +233,17 @@ _BOOT = {"feito": False}
 _SEQ = {"versao": 0}
 _LEITOR: dict = {"estado": None}
 _TOCADAS: dict = {}                     # {id da OS: quando a ação do OS Creator a pôs na lista} (a leitura não a desfaz)
+_MEMORIA: dict = {"versao": None, "mb": None}   # a medida da memória da última versão medida (o Raio-X mede uma vez por versão)
 
 
 def _estado_limpo() -> dict:
     # `faixas`: a última entrega de cada faixa (quando, quem, quantas OS e linhas, o que entrou, mudou, ficou a conferir e
-    # saiu); `pendentes`: {id da OS: desde quando} que a ação deixou para a próxima faixa; `campos`: a medida dos campos que o
-    # REST trouxe na última leitura grande (a sondagem da 1ª noite, que não pôde ser feita antes de construir)
-    return {"faixas": {}, "pendentes": {}, "campos": None,
-            "disco": {"lido": None, "gravado_em": 0.0, "versao": None, "bytes": None, "erro": None}}
+    # saiu); `pendentes`: {id da OS: desde quando} que a ação deixou para a próxima faixa, e `falhas`: {id: quantas leituras
+    # pelo nº falharam}; `recusas`: {faixa: a última leitura que a trava de encolhimento recusou}, até a faixa passar de novo;
+    # `campos`: a medida dos campos que o REST trouxe na última leitura grande (a sondagem da 1ª noite, que não pôde ser feita
+    # antes de construir); `disco["sujo"]`: a fila das pendentes mudou sem a versão mudar (a cópia em disco é regravada)
+    return {"faixas": {}, "pendentes": {}, "falhas": {}, "recusas": {}, "campos": None,
+            "disco": {"lido": None, "gravado_em": 0.0, "versao": None, "bytes": None, "erro": None, "sujo": False}}
 
 
 _ESTADO: dict = _estado_limpo()
@@ -259,6 +272,7 @@ def reiniciar(pasta: str | None = None) -> None:
         _ESTADO.clear()
         _ESTADO.update(_estado_limpo())
         _TEXTOS.clear()
+        _MEMORIA.update(versao=None, mb=None)
 
 
 def ligar_leitor(estado=None) -> None:
@@ -383,7 +397,7 @@ def receber(linhas_rest, faixa: str, *, desde=None, lido_em: float | None = None
             _TOCADAS.pop(wid, None)
         base = _ATUAL if _ATUAL is not None else _vazia()
         conferir = set(base.a_conferir)
-        pendentes = _ESTADO["pendentes"]
+        sai_da_fila: set = set()                                     # as pendentes que a leitura aceita tira da fila
         if faixa in (SETE_DIAS, NOITE):
             cobre = (lambda r: desde_s <= _s(r) < limite_s) if desde_s is not None else (lambda r: False)
         elif faixa == ABERTAS:
@@ -391,6 +405,7 @@ def receber(linhas_rest, faixa: str, *, desde=None, lido_em: float | None = None
         elif faixa == UMA_OS:
             pedidos = {_int(i) for i in (ids or ())} | set(novos)
             cobre = lambda r: r.id in pedidos                                               # noqa: E731
+            sai_da_fila |= pedidos                                   # a que não veio (apagada) também sai: fica "a conferir"
         else:
             cobre = None
         mudancas: dict = {}
@@ -415,7 +430,7 @@ def receber(linhas_rest, faixa: str, *, desde=None, lido_em: float | None = None
             elif faixa == ABERTAS and velho is None and r.status_id not in ABERTOS:
                 continue
             conferir.discard(wid)
-            pendentes.pop(wid, None)
+            sai_da_fila.add(wid)
             if velho is None:
                 if _fica(r, piso_s, conferir):
                     mudancas[wid] = r
@@ -423,9 +438,13 @@ def receber(linhas_rest, faixa: str, *, desde=None, lido_em: float | None = None
             elif r != velho:
                 mudancas[wid] = r
                 rel["mudaram"] += 1
+        cobertas = 0
         if cobre is not None:
             for wid, r in base.por_id.items():
-                if wid in novos or mexida_depois(wid) or not cobre(r):
+                if not cobre(r):
+                    continue
+                cobertas += 1
+                if wid in novos or mexida_depois(wid):
                     continue
                 if faixa == NOITE:
                     mudancas[wid] = None                             # a noite tira de vez o que não voltou
@@ -434,23 +453,67 @@ def receber(linhas_rest, faixa: str, *, desde=None, lido_em: float | None = None
                 elif wid not in conferir:
                     conferir.add(wid)
                     rel["a_conferir"] += 1
-        if faixa == NOITE:
-            for wid, r in base.por_id.items():
-                r = mudancas.get(wid, r)
-                if r is not None and not _fica(r, piso_s, conferir):
-                    mudancas[wid] = None                             # as fechadas que saíram da janela
-                    conferir.discard(wid)
-                    rel["sairam"] += 1
-        janela = _janela_nova(base.janela, faixa, desde, inicio, agora)
-        mudou = bool(mudancas) or conferir != base.a_conferir or janela[0] != base.janela[0]
-        lista = _instalar(base, mudancas, lido_em=inicio, janela=janela, a_conferir=conferir, mudou=mudou)
-        _ESTADO["faixas"][faixa] = rel
-    if mudou:
+        recusa = _encolheria(faixa, base, cobertas, rel)
+        if recusa is not None:
+            _ESTADO["recusas"][faixa] = recusa
+            rel.update(recusa=recusa["motivo"], entraram=0, mudaram=0, a_conferir=0, sairam=0)
+            lista, mudou, fila_mudou = base, False, False
+        else:
+            if faixa == NOITE:
+                for wid, r in base.por_id.items():
+                    r = mudancas.get(wid, r)
+                    if r is not None and not _fica(r, piso_s, conferir):
+                        mudancas[wid] = None                         # as fechadas que saíram da janela
+                        conferir.discard(wid)
+                        rel["sairam"] += 1
+            janela = _janela_nova(base.janela, faixa, desde, inicio, agora)
+            mudou = bool(mudancas) or conferir != base.a_conferir or janela[0] != base.janela[0]
+            lista = _instalar(base, mudancas, lido_em=inicio, janela=janela, a_conferir=conferir, mudou=mudou)
+            _ESTADO["faixas"][faixa] = rel
+            _ESTADO["recusas"].pop(faixa, None)
+            fila_mudou = _tirar_da_fila(sai_da_fila)
+    if recusa is not None:
+        log.warning("lista central de OS: faixa %s (%s) recusada pela trava de encolhimento: %s", faixa, quem or "-",
+                    recusa["motivo"])
+        return rel
+    if mudou or fila_mudou:
         _agendar_gravacao()
     log.info("lista central de OS: faixa %s (%s): %d OS em %d linhas; %d entraram, %d mudaram, %d a conferir, %d saíram; "
              "a lista tem %d", faixa, quem or "-", rel["os"], rel["linhas"], rel["entraram"], rel["mudaram"],
              rel["a_conferir"], rel["sairam"], len(lista.por_id))
     return rel
+
+
+def _encolheria(faixa: str, base: Lista, cobertas: int, rel: dict) -> dict | None:
+    """A recusa da trava de encolhimento (ver o topo), ou None: a noite que tiraria (os 7 dias que marcariam "a conferir")
+    mais que `ENCOLHE_MAX`% das `cobertas` (as OS da lista que a leitura cobre) e mais que `ENCOLHE_MIN_OS`. Só a noite e os
+    7 dias; a lista vazia (a 1ª carga) não tem o que encolher. Só contagens no motivo."""
+    if faixa not in (SETE_DIAS, NOITE) or not base.por_id:
+        return None
+    saem = rel["sairam"] if faixa == NOITE else rel["a_conferir"]
+    limite = max(ENCOLHE_MIN_OS, cobertas * ENCOLHE_MAX // 100)
+    if saem <= limite:
+        return None
+    if faixa == NOITE:
+        motivo = "a noite encolheria a lista: tiraria %d das %d OS que ela cobre" % (saem, cobertas)
+    else:
+        motivo = "os 7 dias encolheriam a lista: marcariam %d das %d OS que eles cobrem como \"a conferir\"" % (saem, cobertas)
+    motivo += " (o limite é %d: %d%% delas, no mínimo %d OS); nada foi trocado" % (limite, ENCOLHE_MAX, ENCOLHE_MIN_OS)
+    return {"faixa": faixa, "em": time.time(), "inicio": rel["inicio"], "de": cobertas, "sairiam": saem, "limite": limite,
+            "motivo": motivo}
+
+
+def _tirar_da_fila(ids) -> bool:
+    """Tira as OS da fila das pendentes (dentro da `_TRAVA`), com as falhas delas; True se alguma estava lá (a cópia em disco
+    é regravada mesmo sem a versão mudar)."""
+    pend, falhas = _ESTADO["pendentes"], _ESTADO["falhas"]
+    tirou = False
+    for wid in ids:
+        tirou = pend.pop(wid, None) is not None or tirou
+        falhas.pop(wid, None)
+    if tirou:
+        _ESTADO["disco"]["sujo"] = True
+    return tirou
 
 
 # ── a ação do OS Creator ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -489,6 +552,8 @@ def _marcar_pendente(wid: int) -> None:
     with _TRAVA:
         base = _ATUAL if _ATUAL is not None else _vazia()
         _ESTADO["pendentes"][wid] = time.time()
+        _ESTADO["falhas"].pop(wid, None)                             # a ação nova vale uma fila nova
+        _ESTADO["disco"]["sujo"] = True
         if wid in base.por_id and wid not in base.a_conferir:
             _instalar(base, {}, lido_em=base.lido_em, janela=base.janela, a_conferir=set(base.a_conferir) | {wid},
                       mudou=True)
@@ -524,7 +589,7 @@ def atualizar_os(id_work_order, registro=None) -> bool:
         velho = base.por_id.get(wid)
         if not _s(reg):                                              # a criação que a leitura não trouxe: a de antes, ou agora
             reg = reg.com(data=velho.data if velho is not None else _iso(time.time()))
-        _ESTADO["pendentes"].pop(wid, None)
+        _tirar_da_fila((wid,))
         _TOCADAS[wid] = time.time()                                  # a leitura que começou antes não a desfaz
         _instalar(base, {wid: reg}, lido_em=base.lido_em, janela=base.janela,
                   a_conferir=set(base.a_conferir) - {wid}, mudou=True)
@@ -648,6 +713,47 @@ def pendentes() -> dict:
     return dict(_ESTADO["pendentes"])
 
 
+def fila_de_pendentes(n: int) -> list:
+    """[(id, nº)] das pendentes que a lista conhece pelo nº, até `n`, para a leitura pelo nº (`os_leitor.ler_pendentes`): as
+    de menos falhas primeiro, depois as mais velhas na fila (a que derruba a leitura vai para o fim e não segura as outras).
+    A que a lista não conhece (o nº não se sabe) espera a faixa que a traga."""
+    lista = atual()
+    with _TRAVA:
+        pend, falhas = dict(_ESTADO["pendentes"]), dict(_ESTADO["falhas"])
+    alvos = sorted((falhas.get(w, 0), quando, w) for w, quando in pend.items()
+                   if w in lista.por_id and lista.por_id[w].folio)
+    return [(w, lista.por_id[w].folio) for _f, _q, w in alvos[:max(0, int(n))]]
+
+
+def falhou_pendente(id_work_order) -> bool:
+    """Mais uma leitura pelo nº que falhou nesta pendente; na `PENDENTE_FALHAS_MAX`-ésima ela sai da fila (Minor 5 da rodada 1:
+    5 pendentes mortas travavam a fila) e segue "a conferir": a próxima faixa que a cobre a traz. True se saiu."""
+    wid = _int(id_work_order)
+    with _TRAVA:
+        if wid not in _ESTADO["pendentes"]:
+            return False
+        n = _ESTADO["falhas"].get(wid, 0) + 1
+        saiu = n >= PENDENTE_FALHAS_MAX
+        if saiu:
+            _tirar_da_fila((wid,))
+        else:
+            _ESTADO["falhas"][wid] = n
+            _ESTADO["disco"]["sujo"] = True
+    if saiu:
+        log.warning("lista central de OS: a OS %s saiu da fila das pendentes depois de %d leituras pelo nº que falharam; "
+                    "segue \"a conferir\" até a próxima faixa", wid, n)
+    _agendar_gravacao()
+    return saiu
+
+
+def mais_nova_criacao() -> float | None:
+    """A criação mais nova que a lista conhece (segundos), ou None (a lista vazia): o topo que a leitura pela criação tem de
+    alcançar (`os_leitor`, Ruling AU)."""
+    lista = atual()
+    s = _s(lista.ordem[0]) if lista.ordem else 0
+    return float(s + _EPOCA0) if s else None
+
+
 # ── a cópia em disco (os_disco.py): daqui, a pasta, a versão vigente e o estado ──────────────────────────────────────────
 def _caminho() -> str | None:
     return os_disco.caminho(_CONFIG["pasta"])
@@ -660,6 +766,7 @@ def _agendar_gravacao() -> None:
 def _extras_do_disco() -> dict:
     # copiados de uma vez (`list`): a faixa e a ação mexem nesses dicionários em outras threads
     return {"pendentes": {str(k): v for k, v in list(_ESTADO["pendentes"].items())},
+            "falhas_pendentes": {str(k): v for k, v in list(_ESTADO["falhas"].items())},
             "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())}}
 
 
@@ -692,6 +799,8 @@ def _boot() -> None:
                         _ATUAL = lista
                         _SEQ["versao"] = max(_SEQ["versao"], versao)
                         _ESTADO["pendentes"].update({int(k): float(v) for k, v in (cab.get("pendentes") or {}).items()})
+                        _ESTADO["falhas"].update({int(k): int(v) for k, v in (cab.get("falhas_pendentes") or {}).items()
+                                                  if int(k) in _ESTADO["pendentes"]})
                         if isinstance(cab.get("faixas"), dict):
                             _ESTADO["faixas"].update(cab["faixas"])
                         _ESTADO["disco"].update(lido="cópia gravada em %s" % _hora(cab.get("gravado_em")),
@@ -719,8 +828,9 @@ def memoria_estimada(lista: Lista | None = None) -> float:
     """Os MB da lista: cada registro, texto e tupla contados UMA vez (os índices guardam os mesmos registros, e os textos que se
     repetem são um objeto só), mais o esqueleto dos índices. A amostra do "Dentro do Nexus" contaria os mesmos registros em
     cada índice e os textos repetidos em cada registro (o dobro, ou mais). Percorre a lista inteira: ~0,4 s com 36 mil OS; só o
-    Raio-X chama. Perto do tracemalloc (medido com 36 mil OS sintéticas: 25,8 MB aqui, 23,9 MB nele; os índices copiados para
-    medir saem um pouco maiores que os de verdade)."""
+    Raio-X chama, e o `estado()` guarda a medida da versão (uma vez por versão: Minor 3 da rodada 1). Perto do tracemalloc
+    (medido com 36 mil OS sintéticas: 25,8 MB aqui, 23,9 MB nele; os índices copiados para medir saem um pouco maiores que os
+    de verdade)."""
     lista = atual() if lista is None else lista
     vistos: set = set()
     total = 0
@@ -747,8 +857,9 @@ def memoria_estimada(lista: Lista | None = None) -> float:
 def estado(medir_memoria: bool = False) -> dict:
     """O que se sabe da lista, só com contagens, datas e ids (nunca o texto de uma OS nem o nome de alguém): quantas OS, quantas
     abertas (fora as "a conferir", cujo status é velho), "a conferir" e pendentes; a versão, a última leitura e a janela lida
-    inteira; a última entrega de cada faixa; a medida dos campos que o REST trouxe; o disco; com `medir_memoria`, a memória da
-    lista (`memoria_estimada`); e, com o leitor do servidor ligado, o que ele fez."""
+    inteira; a última entrega de cada faixa e a leitura que a trava de encolhimento recusou (`recusas`); a medida dos campos que
+    o REST trouxe; o disco; com `medir_memoria`, a memória da lista (`memoria_estimada`, uma vez por versão); e, com o leitor
+    do servidor ligado, o que ele fez."""
     lista = atual()
     leitor = None
     if _LEITOR["estado"] is not None:
@@ -758,10 +869,14 @@ def estado(medir_memoria: bool = False) -> dict:
             leitor = {"erro": "%s: %s" % (type(e).__name__, str(e)[:120])}
     memoria = None
     if medir_memoria:
-        try:
-            memoria = memoria_estimada(lista)
-        except Exception:                                            # noqa: BLE001 — a medida nunca derruba o estado
-            memoria = None
+        if _MEMORIA["versao"] != lista.versao:                       # percorre a lista inteira: uma vez por versão (Minor 3)
+            try:
+                mb = memoria_estimada(lista)
+            except Exception:                                        # noqa: BLE001 — a medida nunca derruba o estado
+                log.exception("lista central de OS: a medida da memória falhou (versão %s)", lista.versao)
+                mb = None
+            _MEMORIA.update(versao=lista.versao, mb=mb)
+        memoria = _MEMORIA["mb"]
     pend = dict(_ESTADO["pendentes"])
     return {"n": len(lista.por_id),
             "abertas": sum(1 for r in lista.ordem if r.status_id in ABERTOS and r.id not in lista.a_conferir),
@@ -769,5 +884,6 @@ def estado(medir_memoria: bool = False) -> dict:
             "pendentes": len(pend), "pendentes_ids": sorted(pend)[:20], "versao": lista.versao,
             "lido_em": lista.lido_em or None, "janela": lista.janela,
             "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())},
+            "recusas": {k: dict(v) for k, v in list(_ESTADO["recusas"].items())},
             "campos": dict(_ESTADO["campos"]) if _ESTADO["campos"] else None, "disco": dict(_ESTADO["disco"]),
             "memoria_mb": memoria, "leitor": leitor}

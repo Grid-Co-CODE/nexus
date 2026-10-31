@@ -13,7 +13,13 @@ fato `fato_tarefa_os`). O que estes testes seguram, contando cada ida ao Fractta
 - os horários das faixas, fora dos minutos ocupados (uma lista só, que os ativos também usam);
 - o `tarefas_os` segue igual: o mesmo fato e os mesmos pedidos de antes;
 - cada faixa conta no contador do Fracttal com o nome dela; só o servidor liga o leitor.
+Rodada 1 da revisão (Rulings AU e AV): o REST que ignora o `sort` (em ordem crescente ou qualquer) não mexe na lista, e o
+estado diz por quê; a leitura que encolheria a lista vira erro da faixa; cada página chega ao leitor cortada no que a lista lê;
+as pendentes mortas saem da fila; a pausa vem antes de cada OS lida pelo nº; a data fim no futuro não trava as finalizadas;
+o defeito do leitor vai ao log com a pilha; e os minutos das faixas moram na lista única, cruzados com os laços de verdade.
 Fracttal, banco e disco são dublês: nada vai à rede. Nomes e textos são inventados (repositório público)."""
+import logging
+import random
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -37,7 +43,9 @@ if ponte.RAIZ_CLONE not in sys.path:
 
 import ativos_leitor as AL  # noqa: E402
 import os_central as OC  # noqa: E402
+import os_disco as OD  # noqa: E402
 import os_leitor as OL  # noqa: E402
+import os_registro as OR  # noqa: E402
 
 AQUI = Path(__file__).resolve().parent.parent
 _UTC = timezone.utc
@@ -62,11 +70,14 @@ def _linha(os_id, *, tarefa=None, status=1, criada=None, fim=None, folio=None):
 class RestOS:
     """O REST `work_orders` de mentira: filtra pelo status, pelo tipo e pelo nº, ordena pelo campo do `sort` (o desempate é a
     tarefa), pagina pelo `start`/`limit`, dá o `total` do filtro e conta cada pedido. `falha_no`: o n-ésimo pedido vem com
-    `success: false`; `recusa_no`: o n-ésimo levanta a recusa do Fracttal (406/429), sempre; `erro_no`: a conexão cai."""
+    `success: false`; `recusa_no`: o n-ésimo levanta a recusa do Fracttal (406/429), sempre; `erro_no`: a conexão cai.
+    `ordem` (Ruling AU): o REST que ignora o `sort` ("crescente": da mais velha para a mais nova; "embaralhada": numa ordem
+    qualquer, a mesma a cada pedido). `falha_folio`: o nº cuja leitura pela OS (`wo_folio`) derruba a conexão, sempre."""
 
-    def __init__(self, linhas, falha_no=None, recusa_no=None, erro_no=None):
+    def __init__(self, linhas, falha_no=None, recusa_no=None, erro_no=None, ordem=None, falha_folio=None):
         self.linhas, self.pedidos = list(linhas), []
         self.falha_no, self.recusa_no, self.erro_no = falha_no, recusa_no, erro_no
+        self.ordem, self.falha_folio = ordem, falha_folio
 
     def __call__(self, path):
         self.pedidos.append(path)
@@ -84,11 +95,17 @@ class RestOS:
         if "tasks_log_task_type_main" in q:
             rows = [w for w in rows if w["tasks_log_task_type_main"] == unquote(q["tasks_log_task_type_main"][0])]
         if "wo_folio" in q:
+            if self.falha_folio is not None and q["wo_folio"][0] == str(self.falha_folio):
+                raise requests.ConnectionError("a conexão caiu")
             rows = [w for w in rows if str(w["wo_folio"]) == q["wo_folio"][0]]
         if "sort" in q:
             campo, sentido = q["sort"][0].split(":")
-            rows = sorted(rows, key=lambda w: (str(w.get(campo) or ""), w["id_work_orders_tasks"]),
-                          reverse=sentido == "desc")
+            if self.ordem == "embaralhada":
+                rows = sorted(rows, key=lambda w: w["id_work_orders_tasks"])
+                random.Random(7).shuffle(rows)
+            else:
+                rows = sorted(rows, key=lambda w: (str(w.get(campo) or ""), w["id_work_orders_tasks"]),
+                              reverse=sentido == "desc" and self.ordem != "crescente")
         limite, inicio = int(q["limit"][0]), int(q.get("start", ["0"])[0])
         pagina = rows[inicio:inicio + limite]
         return {"success": True, "message": "", "total": len(rows), "data": pagina or None}
@@ -162,8 +179,9 @@ def test_sete_dias_inteiros():
                    for w in base if w["id_work_order"] not in (cinco, quinze)])
     rel = OL.ler_sete_dias(ler=rest)
     assert rel["erro"] == ""
-    # 1 total e as páginas até a 1ª INTEIRA mais velha que o piso: 210 OS em 7 dias = 3 páginas com alguma dentro, e a 4ª
-    assert len(rest.totais()) == 1 and len(rest.paginas()) == 4
+    # sem o total (Ruling AU: o total do `work_orders` sem filtro é o de todas as OS, e a leitura para no piso) e as páginas até
+    # a 1ª INTEIRA mais velha que o piso: 210 OS em 7 dias = 3 páginas com alguma dentro, e a 4ª
+    assert rest.totais() == [] and len(rest.paginas()) == 4
     lista = OC.atual()
     assert lista.por_id[tres].status_id == 2                                                  # a que mudou, em dia
     assert cinco in lista.a_conferir                                                          # a que sumiu, "a conferir"
@@ -274,17 +292,20 @@ def test_horarios_das_faixas():
     s, passo = OL.proximo_passo(_em(27, 10, 9))                                     # o :10 é das tarefas: os 7 dias andam
     assert passo == OL.NOVAS and s == 3 * 60                                        # ... e as novas do :12 vêm antes deles
     assert OL.proximo_passo(_em(27, 10, 19)) == (120, OL.SETE_DIAS)                 # o :21, o próximo minuto livre
-    assert OL.proximo_passo(_em(27, 10, 43)) == (120, OL.FINALIZADAS)               # :45 (vencem as novas do mesmo minuto)
+    assert OL.proximo_passo(_em(27, 10, 45)) == (60, OL.FINALIZADAS)                # :46 (o :45 é do uso_os às 03:45)
+    assert OL.proximo_passo(_em(31, 10, 44)) == (60, OL.NOVAS)                      # sábado: as novas do :45 vêm antes
     assert OL.proximo_passo(_em(27, 10, 54)) == (60, OL.ABERTAS)                    # :55, a conferência das abertas
     assert OL.proximo_passo(_em(31, 10, 1)) == (14 * 60, OL.NOVAS)                  # sábado: de 15 em 15 min
     assert OL.proximo_passo(_em(27, 21, 1)) == (14 * 60, OL.NOVAS)                  # depois das 20h, também
     assert OL.proximo_passo(_em(27, 3, 16)) == (5 * 60, OL.NOITE)                   # 03:20 é das tarefas: 03:21, a noite
     assert OL.proximo_passo(_em(27, 3, 21))[1] != OL.NOITE
-    # os minutos fixos fogem dos minutos ocupados (uma lista só), e as novas, de 1 ou 2 pedidos, podem cair em qualquer um
+    # os minutos fixos são da lista de OS na lista única (Minor 1 da rodada 1: o laço novo que pedir um minuto não cai neles), e
+    # as novas, de 1 ou 2 pedidos, podem cair em qualquer um
     for m in OL.SETE_DIAS_MINUTOS + (OL.FINALIZADAS_MINUTO, OL.ABERTAS_MINUTO):
-        assert MO.livre(m), m
-    assert OL.SETE_DIAS_MINUTOS == (0, 21, 30, 41, 51) and MO.proximo_livre(10) == 21 and MO.proximo_livre(30) == 30
-    assert MO.livre(OL.NOITE_HORA[1]) and not MO.livre(8) and not MO.livre(38) and not MO.livre(15)
+        assert "lista central de OS" in MO.OCUPADOS[m], m
+    assert OL.SETE_DIAS_MINUTOS == (0, 21, 30, 41, 51) and OL.NOITE_HORA == (3, 21)
+    assert MO.proximo_livre(10) == 23 and MO.proximo_livre(30) == 31                 # o :21 e o :30 têm dono agora
+    assert not MO.livre(8) and not MO.livre(38) and not MO.livre(15) and MO.livre(45)
     # a lista é uma só: os ativos tiram os minutos dela, e o `tarefas_os` cabe na faixa que ela reserva
     assert AL.NOVOS_MINUTOS == MO.ATIVOS_NOVOS and AL.HORA_COMPLETO == MO.ATIVOS_COMPLETO
     assert all(not MO.livre(m) for m in range(P.MINUTO_DA_HORA, P.MINUTO_DA_HORA + P.DESENCONTRO_MAX_S // 60 + 1))
@@ -368,3 +389,237 @@ def test_o_servidor_liga_o_leitor_e_o_pc_nao():
     assert texto.index("instalar_campo(app)") < m.start()                      # depois do laço do tarefas_os
     for arquivo in ("app.py", "nexus/__init__.py", "nexus/torres/oscreator/ponte.py"):
         assert not liga.search((AQUI / arquivo).read_text(encoding="utf-8")), arquivo
+
+
+# ── rodada 1 da revisão: o REST que ignora o `sort` (Ruling AU) ─────────────────────────────────────────────────────────────
+def _base_com_lote():
+    """600 OS: 100 concluídas criadas no mesmo minuto há 200 dias (um lote importado: fora dos 90 dias da noite e dentro da
+    janela de 365) e 500 ao longo dos últimos 17 dias (a mais nova há ~1 h)."""
+    lote = [_linha(1000 + k, status=3, criada=_iso(200 + k / 100000), fim=_iso(199)) for k in range(100)]
+    return lote + [_linha(2000 + k, criada=_iso(0.05 + 17 * k / 500)) for k in range(500)]
+
+
+def test_a_ordem_errada_nao_mexe_na_lista():
+    """Com o `sort` ignorado, a leitura que para no piso ou na página conhecida não quer dizer nada: em ordem crescente a noite
+    tiraria de vez as OS dos 90 dias, os 7 dias marcariam a semana inteira "a conferir" e as novas (a 1ª página toda conhecida,
+    o lote velho) levariam o fim da janela até agora sem as OS novas. Nada muda, e o estado diz por quê."""
+    base = _base_com_lote()
+    _lista_de(base, dias=OC.JANELA_DIAS)
+    antes = OC.atual()
+    assert len(antes.por_id) == 600 and antes.a_conferir == frozenset()
+    novas = [_linha(5000 + k, criada=_iso(0.001)) for k in range(3)]
+    for faixa, nome in ((OL.ler_noite, "noite"), (OL.ler_sete_dias, "sete_dias"), (OL.ler_novas, "novas")):
+        for ordem in ("crescente", "embaralhada"):
+            kw = {"inteira": False} if faixa is OL.ler_noite else {}
+            rel = faixa(ler=RestOS(base + novas, ordem=ordem), **kw)
+            assert "pela criação" in rel["erro"] and "nada mudou" in rel["resultado"], (nome, ordem, rel)
+            lista = OC.atual()
+            assert (lista.versao, lista.janela, lista.a_conferir, set(lista.por_id)) == (
+                antes.versao, antes.janela, antes.a_conferir, set(antes.por_id)), (nome, ordem)
+            assert "pela criação" in OL.estado()["faixas"][nome]["erro"]
+
+
+def test_poucas_linhas_fora_do_lugar_passam():
+    """A ordem do REST pode ser só aproximada (o `sort` é da OS e a linha é da tarefa): duas linhas dias mais novas que as
+    vizinhas não derrubam a leitura. A ordem qualquer derruba (o teste acima)."""
+    base = [_linha(1000 + k, criada=_iso(0.05 + 20 * k / 600)) for k in range(600)]
+    _lista_de(base)
+    rest = RestOS(base)
+    fora = {base[150]["id_work_orders_tasks"], base[420]["id_work_orders_tasks"]}
+
+    def ler(path):
+        r = rest(path)
+        if r.get("data"):
+            r = dict(r, data=[dict(w, creation_date=_iso(0.01)) if w["id_work_orders_tasks"] in fora else w
+                              for w in r["data"]])
+        return r
+    rel = OL.ler_noite(ler=ler, inteira=False)
+    assert rel["erro"] == "" and rel["os"] == 600
+
+
+def test_a_leitura_que_encolheria_a_lista_vira_erro_da_faixa():
+    """A trava de encolhimento (Ruling AU): o REST em ordem, mas sem 150 das 250 OS (páginas perdidas em silêncio). A lista
+    recusa, nada muda, e a faixa diz por quê (não é defeito do leitor)."""
+    base = _base(250, dias=30)
+    _lista_de(base)
+    versao = OC.atual().versao
+    rel = OL.ler_noite(ler=RestOS(base[:100]), inteira=False)
+    assert "encolher" in rel["erro"] and "nada mudou" in rel["resultado"] and not rel.get("defeito"), rel
+    assert OC.atual().versao == versao and len(OC.atual().por_id) == 250
+    assert OC.estado()["recusas"]["noite"]["motivo"] in rel["erro"]
+
+
+# ── rodada 1 da revisão: a projeção por página (Ruling AV) ──────────────────────────────────────────────────────────────
+# os campos que o REST `work_orders` traz além dos que a lista lê (os nomes, os vistos no código do Nexus; os valores,
+# inventados): a linha da largura real
+_DO_REST_A_MAIS = {
+    "cal_date_maintenance": "2026-10-01T10:00:00+00:00", "code_wo_related": None, "completed_percentage": 100,
+    "costs_center_description": "Centro de custo inventado", "dependencies": None, "duration": 3600,
+    "execution_type": "INTERNAL", "group_task_description": "Grupo de tarefas inventado",
+    "groups_1_description": "Cliente Alfa - Usina Inventada - SP", "groups_2_description": "Região inventada",
+    "id_item": 880001, "id_parent_wo": None, "id_request": None, "id_status_work_order_task": 3, "id_task": 70001,
+    "id_type_item": 12, "out_of_service_sec": 0, "parent_description": "// Cliente Alfa/ Usina Inventada/ Inversores/ ",
+    "percentage_completed": 100, "priorities_description": "Média", "rating": 3, "real_duration": 3500,
+    "related_items": None, "requested_by": "Pessoa Fictícia Três", "reschedule_causes": None, "review_date": None,
+    "severiry_description": "Baixa", "stop_assets": False, "stop_assets_sec": 0, "task_status": "DONE",
+    "tasks_duration": 3600, "tasks_log_types_2_description": "Subtipo inventado",
+    "tasks_log_types_description": "Tipo inventado", "wo_folio_parent": None, "costs_materials": 0.0,
+    "costs_services": 0.0, "costs_labor": 120.5, "costs_total": 120.5, "latitude": -23.55, "longitude": -46.63,
+}
+
+
+def _larga(os_id, *, nota=None, **kw):
+    """Uma linha do REST na largura real: a de `_linha` mais os campos que a lista joga fora, a nota da tarefa e a etiqueta
+    com cor e estado."""
+    w = dict(_linha(os_id, **kw), **_DO_REST_A_MAIS)
+    w.update(task_note=nota if nota is not None else "Observação inventada da tarefa %d: feito, sem pendência." % os_id,
+             note=None, labels=[{"id": 11, "description": "ROTINA", "color": "8892a6", "enabled": True}],
+             initial_date=w["creation_date"], event_date=w["creation_date"])
+    return w
+
+
+def test_a_projecao_corta_cada_pagina(monkeypatch):
+    permitidos = set(OR.CAMPOS_REST)
+    largas = [_larga(1000 + k, criada=_iso(0.05 + 20 * k / 250)) for k in range(250)]
+    # 1) no `tarefas_os`: cada página é cortada ao chegar, antes do pedido da seguinte, e o que volta só tem o que a lista lê
+    rest = RestOS(largas)
+    eventos = []
+
+    def ler(path):
+        eventos.append("pedido")
+        return rest(path)
+
+    def corta(w):
+        eventos.append("corta")
+        return OR.enxuta(w)
+    linhas = P.ler_criadas(ler, piso=_iso(30)[:19], com_total=False, projetar=corta)
+    assert [e for i, e in enumerate(eventos) if i == 0 or e != eventos[i - 1]] == ["pedido", "corta"] * 3
+    assert len(linhas) == 250 and all(set(w) <= permitidos for w in linhas)
+    # sem a projeção (o fato do `tarefas_os`), a linha inteira, como sempre
+    assert all(set(w) == set(largas[0]) for w in P.ler_criadas(RestOS(largas), piso=_iso(30)[:19], com_total=False))
+    # 2) no leitor: a noite, os 7 dias e as abertas chegam à lista cortados; a nota só fica com o bloco do chamado
+    _lista_de(largas)
+    recebidas = []
+    real = OC.receber
+    monkeypatch.setattr(OC, "receber", lambda linhas, *a, **k: recebidas.append(list(linhas)) or real(linhas, *a, **k))
+    marcada = _larga(4000, criada=_iso(0.02), nota="Antes\n" + OR.MARCAS_DA_NOTA[1] + "\nMarca: Inventada")
+    rest = RestOS(largas + [marcada])
+    rel = OL.ler_noite(ler=rest, inteira=False)
+    assert rel["erro"] == "" and rest.totais() == []                                  # a noite sem o total (Ruling AU)
+    (noite,) = recebidas
+    assert len(noite) == 251 and all(set(w) <= permitidos for w in noite)
+    por_id = {w["id_work_order"]: w for w in noite}
+    assert OR.MARCAS_DA_NOTA[1] in por_id[4000]["task_note"] and OR.MARCAS_DA_NOTA[1] in OC.atual().por_id[4000].note
+    assert "task_note" not in por_id[1000] and "costs_total" not in por_id[1000] and "groups_1_description" not in por_id[1000]
+    assert por_id[1000]["labels"] == [{"id": 11, "description": "ROTINA"}]
+    recebidas.clear()
+    assert OL.ler_sete_dias(ler=RestOS(largas))["erro"] == ""
+    OL.entregar_abertas([_larga(5000, criada=_iso(0.01))], time.time())               # o gancho do `tarefas_os`
+    assert len(recebidas) == 2 and all(set(w) <= permitidos for linhas in recebidas for w in linhas)
+
+
+# ── rodada 1 da revisão: as pendentes (Minors 5 e 6) ────────────────────────────────────────────────────────────────────
+def test_pendentes_mortas_saem_da_fila(tmp_path, monkeypatch):
+    """A OS que o nº não traz mais (apagada no Fracttal) sai da fila e do disco; a que derruba a leitura sai depois de
+    `OC.PENDENTE_FALHAS_MAX` tentativas e nunca segura as outras (as de menos falhas vêm antes)."""
+    monkeypatch.setattr(OD, "GRAVAR_A_CADA_S", 0)
+    OC.reiniciar(pasta=str(tmp_path))
+    base = _base(20)
+    _lista_de(base)
+    apagada, morta, viva = (base[k]["id_work_order"] for k in (2, 3, 4))
+    for wid in (apagada, morta, viva):
+        assert not OC.atualizar_os(wid)                                  # fora de um pedido: pendentes, nessa ordem
+    rest = RestOS([dict(w, id_status_work_order="2") if w["id_work_order"] == viva else w
+                   for w in base if w["id_work_order"] != apagada], falha_folio=20000 + morta)
+    rel = OL.ler_pendentes(ler=rest)
+    # 1ª volta: a apagada sai da fila (e fica "a conferir" até a noite); a morta derruba a leitura, e a volta para nela
+    assert apagada not in OC.pendentes() and apagada in OC.atual().a_conferir
+    assert morta in OC.pendentes() and viva in OC.pendentes() and "falhou" in rel["resultado"]
+    # 2ª volta: a viva, sem falha, vem antes da morta (mais velha na fila)
+    OL.ler_pendentes(ler=rest)
+    assert viva not in OC.pendentes() and OC.atual().por_id[viva].status_id == 2
+    for _ in range(OC.PENDENTE_FALHAS_MAX - 2):
+        assert morta in OC.pendentes()
+        OL.ler_pendentes(ler=rest)
+    assert morta not in OC.pendentes() and morta in OC.atual().a_conferir           # a próxima faixa a traz
+    assert OL.ler_pendentes(ler=rest) is None                                       # a fila andou
+    # e saíram do disco: o processo que sobe de novo não as traz de volta
+    assert OC.esperar_gravacao(5)
+    OC.reiniciar(pasta=str(tmp_path))
+    assert not set(OC.pendentes()) & {apagada, morta, viva}
+
+
+def test_a_pausa_vem_antes_de_cada_os_pelo_numero(monkeypatch):
+    """As pendentes vêm logo depois das novas e dos 7 dias: a pausa de 1 s vem antes de CADA pedido pelo nº, o 1º também
+    (nunca 2 pedidos colados)."""
+    base = _base(20)
+    _lista_de(base)
+    for k in (1, 2, 3):
+        OC.atualizar_os(base[k]["id_work_order"])
+    eventos = []
+    monkeypatch.setattr(P, "PAUSA_S", 1.0)
+    monkeypatch.setattr(OL, "_dormir", lambda s: eventos.append(("pausa", s)))
+    rest = RestOS(base)
+    rel = OL.ler_pendentes(ler=lambda path: eventos.append(("pedido",)) or rest(path))
+    assert rel["erro"] == "" and eventos == [("pausa", 1.0), ("pedido",)] * 3
+
+
+# ── rodada 1 da revisão: o piso das finalizadas (Minor 8) ───────────────────────────────────────────────────────────────
+def test_finalizadas_com_data_fim_no_futuro():
+    """Uma data fim no futuro (dado ruim) não vira o piso: o piso é a mais nova que a lista conhece, nunca depois de agora,
+    menos 2 dias. Sem isso, as concluídas de hoje ficariam de fora até a data ruim passar."""
+    base = ([_linha(900, status=3, criada=_iso(40), fim=_iso(-30))]
+            + [_linha(3000 + k, status=1, criada=_iso(20)) for k in range(50)])
+    _lista_de(base)
+    assert OC.mais_nova_data_fim()[:10] == _iso(-30)[:10]
+    agora = [dict(w, id_status_work_order="3", final_date=_iso(0.1 + (w["id_work_order"] - 3000) / 20),
+                  wo_final_date=_iso(0.1 + (w["id_work_order"] - 3000) / 20))
+             if 3000 <= w["id_work_order"] < 3020 else w for w in base]
+    rel = OL.ler_finalizadas(ler=RestOS(agora))
+    assert rel["erro"] == ""
+    lista = OC.atual()
+    assert all(lista.por_id[3000 + k].status_id == 3 for k in range(20)) and lista.por_id[3020].status_id == 1
+
+
+# ── rodada 1 da revisão: o defeito do leitor (Minor 2) ──────────────────────────────────────────────────────────────────
+def test_rodar_separa_o_defeito(monkeypatch, caplog):
+    """A leitura incompleta, a recusa e a rede são "a leitura não veio inteira"; qualquer outra exceção é defeito do leitor:
+    vai ao log com a pilha, e o estado diz que foi defeito."""
+    base = _base(20)
+    _lista_de(base)
+    for rest in (RestOS(base, falha_no=1), RestOS(base, recusa_no=1), RestOS(base, erro_no=1)):
+        rel = OL.ler_sete_dias(ler=rest)
+        assert rel["erro"] and not rel.get("defeito") and "não veio inteira" in rel["resultado"], rel
+    monkeypatch.setattr(OC, "receber", lambda *a, **k: {}["campo que não existe"])
+    with caplog.at_level(logging.WARNING, logger="oscreator.os_leitor"):
+        rel = OL.ler_sete_dias(ler=RestOS(base))
+    assert rel["defeito"] is True and "KeyError" in rel["erro"] and "defeito" in rel["resultado"]
+    assert OL.estado()["faixas"]["sete_dias"]["defeito"] is True
+    assert any(r.exc_info and r.levelno >= logging.ERROR for r in caplog.records)
+
+
+# ── rodada 1 da revisão: os minutos na lista única (Minor 1) ────────────────────────────────────────────────────────────
+def test_os_minutos_moram_na_lista_unica():
+    """Os minutos fixos da lista de OS moram em `minutos_ocupados` (como os dos ativos), e a lista bate com os laços de
+    verdade: cada `MINUTO_DA_HORA` tem o dono certo, e o diário do uso do OS Creator (03:45) também está lá."""
+    from nexus.campo import chamados_acompanhamento, zeladoria_banco
+    from nexus.casca import uso_os
+    from nexus.cos import normalizacoes_banco
+    from nexus.dados import carga
+    for mod, dono in ((chamados_acompanhamento, "chamados"), (zeladoria_banco, "zeladoria"),
+                      (normalizacoes_banco, "normalizações"), (carga, "carga")):
+        assert dono in MO.OCUPADOS[mod.MINUTO_DA_HORA], mod.__name__
+    for m in range(P.MINUTO_DA_HORA, P.MINUTO_DA_HORA + P.DESENCONTRO_MAX_S // 60 + 1):
+        assert "tarefas" in MO.OCUPADOS[m], m
+    # a lista de OS lê os minutos de lá, e eles são dela
+    assert (OL.SETE_DIAS_MINUTOS, OL.FINALIZADAS_MINUTO, OL.ABERTAS_MINUTO, OL.NOITE_HORA) == (
+        MO.OS_SETE_DIAS, MO.OS_FINALIZADAS, MO.OS_ABERTAS, MO.OS_NOITE)
+    for m in MO.OS_SETE_DIAS + (MO.OS_FINALIZADAS, MO.OS_ABERTAS, MO.OS_NOITE[1]):
+        assert "lista central de OS" in MO.OCUPADOS[m], m
+    # os diários: o uso do OS Creator às 03:45 (as finalizadas do :46 fogem dele), a noite da lista e os ativos inteiros
+    assert (uso_os.GRAVAR_NA_HORA, uso_os.GRAVAR_NO_MINUTO) == MO.USO_OS_BANCO and "uso" in MO.DIARIOS[MO.USO_OS_BANCO]
+    assert "lista central de OS" in MO.DIARIOS[MO.OS_NOITE] and "ativos" in MO.DIARIOS[MO.ATIVOS_COMPLETO]
+    assert not MO.livre(45, hora=3) and MO.livre(45) and (3, MO.OS_FINALIZADAS) not in MO.DIARIOS
+    # dois donos no mesmo minuto não passam: a lista acusa ao montar
+    with pytest.raises(ValueError, match="já é de"):
+        MO._ocupar(dict(MO.OCUPADOS), (MO.OS_FINALIZADAS,), "outro laço")

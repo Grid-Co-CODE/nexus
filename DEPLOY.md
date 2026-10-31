@@ -300,12 +300,16 @@ Raio-X mostra (seção "Uso do OS Creator", bloco "Ativos centrais").
 **O histórico de OS central (31/10/2026; nada a fazer no servidor).** O `servir.py` liga também o leitor da lista central de OS
 do OS Creator (`nexus/torres/oscreator/os_creator/os_leitor.py`), com a mesma credencial REST (sem ela não liga): as OS novas
 de 3 em 3 min (06h às 20h de segunda a sexta; de 15 em 15 fora disso), os últimos 7 dias às :00, :21, :30, :41 e :51 (06h às
-20h), as finalizadas às :45, a janela de madrugada às 03:21 (90 dias; no domingo e na 1ª carga, a janela inteira de 365 dias,
-~500 pedidos a 1 por segundo), e as abertas que o laço do `tarefas_os` já lê de hora em hora, entregues sem pedido a mais (sem
-entrega em 70 min, ele as lê no :55). A lista mora na memória e numa cópia na pasta de dados do OS Creator
-(`os_central.json.gz`, ~2,6 MB para 36 mil OS; não vai ao banco nem ao git): o reinício volta por ela sem pedir nada ao
-Fracttal. A 1ª noite depois do deploy é a 1ª carga e a conferência dos campos do REST: o Raio-X mostra (seção "Uso do OS
-Creator", peça "Lista central de OS"). As telas ainda não leem dela (é a tarefa 3.3).
+20h, ~15 pedidos), as finalizadas às :46, a janela de madrugada às 03:21 (90 dias, ~190 a 210 pedidos; no domingo e na 1ª
+carga, a janela inteira de 365 dias, ~750 a 830 pedidos a 1 por segundo, ~13 min), e as abertas que o laço do `tarefas_os`
+já lê de hora em hora, entregues sem pedido a mais (sem entrega em 70 min, ele as lê no :55, ~98). Os números são da escala do
+AC, ~99 OS criadas por dia (36 mil por ano), medidos pelas funções de verdade num Fracttal de mentira: ~92 a 110 pedidos por
+hora de dia útil, ~1.500 a 1.850 num dia útil. O pico de memória da noite de 365 dias é de ~150 MB, o da de 90 dias ~40 MB (cada página
+cortada no que a lista lê). A lista mora na memória e numa cópia na pasta de dados do OS Creator (`os_central.json.gz`,
+~2,6 MB para 36 mil OS; não vai ao banco nem ao git): o reinício volta por ela sem pedir nada ao Fracttal. A 1ª noite depois
+do deploy é a 1ª carga e a conferência dos campos do REST: o Raio-X mostra (seção "Uso do OS Creator", peça "Lista central de
+OS"), e também a leitura que a lista recusou ("Trava de encolhimento": o REST que devolveu só uma parte) e a faixa que o REST
+não devolveu pela criação. As telas ainda não leem dela (é a tarefa 3.3).
 
 **Na 1ª carga depois da atualização de 08/10/2026** entram no banco, pela primeira vez, o `fato_ronda`, o `fato_pt`, o
 livro `nexus_equipamentos` e a mescla da programação; o histórico de pessoas e usinas passa a começar "desde sempre"

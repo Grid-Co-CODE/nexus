@@ -863,13 +863,19 @@ def _linhas_da_lista_de_os(e: dict) -> list:
                 ent.get("sairam") or 0))
         if run:
             if run.get("erro"):
-                partes.append("FALHOU em %s, depois de %s: %s" % (
+                partes.append("%s em %s, depois de %s: %s" % (
+                    "DEFEITO do leitor (a pilha está no log)" if run.get("defeito") else "FALHOU",
                     _quando(run.get("inicio")) or "?", _pedidos(run.get("pedidos")), str(run["erro"])[:200]))
             else:
                 partes.append("a última leitura do leitor em %s: %s%s" % (
                     _quando(run.get("inicio")) or "?", _pedidos(run.get("pedidos")),
                     "" if ent and run.get("os") else "; %s" % str(run.get("resultado") or "")[:200]))
         linhas.append((rotulo, "; ".join(partes)))
+    # a leitura que a trava de encolhimento recusou (rodada 1 da revisão), até a faixa passar de novo: só contagens
+    rotulos = {chave: rotulo for chave, _l, rotulo in _FAIXAS_DE_OS}
+    for faixa, rec in sorted((e.get("recusas") or {}).items()):
+        linhas.append(("Trava de encolhimento", "%s: a lista recusou a leitura de %s (%s)" % (
+            rotulos.get(faixa, faixa), _quando(rec.get("em")) or "?", str(rec.get("motivo") or "")[:300])))
     entregas = (leitor or {}).get("entregas") or {}
     quem = ((e.get("faixas") or {}).get("abertas") or {}).get("quem")
     if quem or any(entregas.values()):

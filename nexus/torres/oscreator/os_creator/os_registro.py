@@ -15,6 +15,7 @@ em faixas".
 from __future__ import annotations
 
 import struct
+import sys
 import time
 import unicodedata
 from collections.abc import Mapping
@@ -29,6 +30,26 @@ STATUS = {1: "Em Processo", 2: "Em Verificação", 3: "Concluída", 4: "Cancelad
 # de acompanhamento do Garantias); um teste confere que são as mesmas
 MARCAS_DA_NOTA = ("━━━ CHAMADO ━━━", "[CHAMADO] Acompanhamento")
 _FIM_DA_TAREFA = ("final_date", "date_end", "end_date", "real_final_date", "finished_date", "date_finished", "closing_date")
+
+# O QUE A LISTA LÊ DE CADA LINHA DO REST (Ruling AV, rodada 1 da revisão da 3.1+3.2): a noite de 365 dias junta de 75 a 90 mil
+# tarefas antes do `receber`, e a linha do `work_orders` traz ~60 campos (custos, grupos, a nota da tarefa, datas, ids). O
+# leitor corta cada página NA HORA (`enxuta`, o `projetar` do `tarefas_os._paginas`), como o leitor dos ativos (`CAMPOS_REST` e
+# `_enxuto` de lá): só o que `registros_do_rest` e as paradas das faixas leem. As etiquetas ficam só com o id e o nome, e a nota
+# (`task_note`, `note`) só quando traz o bloco do chamado. O registro montado da linha cortada é o MESMO da linha inteira (um
+# teste confere). O fato do `tarefas_os` segue com a linha inteira: sem o `projetar`, nada muda lá.
+# MEDIDO (36 mil OS sintéticas, ~99 por dia, 2,3 tarefas por OS, a linha com 67 campos: 2.371 bytes em JSON, ~4,3 KB na
+# memória): o pico da noite de 365 dias era de 387 MB com as linhas inteiras e 216 MB só com os campos; sem os valores vazios
+# (ausente e None são o mesmo para quem lê, que lê por `.get`: o dicionário cai para a classe de tamanho de baixo) e com os
+# textos de pouca variedade num objeto só por valor (`sys.intern`; o JSON dá um por linha), ver o README.
+CAMPOS_REST = ("id_work_order", "id_work_orders_tasks", "wo_folio", "id_status_work_order", "description",
+               "items_log_description", "code", "tasks_log_task_type_main", "creation_date", "date_maintenance",
+               "initial_date", "event_date", "wo_final_date", "created_by", "code_create_by", "id_created_by",
+               "user_assigned", "personnel_description", "id_personnel", "id_assigned_user", "trigger_description",
+               "labels", "task_note", "note") + _FIM_DA_TAREFA
+_CAMPOS_DA_ETIQUETA = ("id", "id_label", "description", "name")
+# os de pouca variedade (o status, o tipo, as ~150 pessoas, os gatilhos; e o nome da etiqueta): um objeto só por valor
+_POUCA_VARIEDADE = frozenset(("id_status_work_order", "tasks_log_task_type_main", "created_by", "code_create_by",
+                              "user_assigned", "personnel_description", "trigger_description"))
 
 # AS DATAS DE UMA OS EM 20 BYTES: cinco inteiros de 4 bytes, os segundos desde 2000-01-01 (UTC, como o Fracttal grava; até 2068),
 # 0 = vazia. Como texto ("2026-10-31T10:00:00") eram ~60 bytes cada, ~6,7 MB das 36 mil OS sintéticas
@@ -228,11 +249,47 @@ def _gatilho(linhas) -> str:
     return _p(api.decodifica_gatilho(melhor))
 
 
+def _com_o_bloco(t) -> bool:
+    return any(m in t for m in MARCAS_DA_NOTA)
+
+
 def _nota(textos) -> str:
-    """A nota da OS só quando ela traz o bloco do chamado (o Garantias lê a OS de acompanhamento por ele): a de todas as
-    outras não é mostrada pela lista, e guardá-la seria texto à toa na memória."""
-    junta = "\n".join(_distintos(_txt(t) for t in textos if _txt(t).lower() != "none"))
-    return junta[:NOTA_MAX] if any(m in junta for m in MARCAS_DA_NOTA) else ""
+    """A nota da OS só com o bloco do chamado (o Garantias lê a OS de acompanhamento por ele): só os textos (a nota da OS e a
+    de cada tarefa) que trazem a marca, juntos. O texto sem a marca não é mostrado pela lista, e guardá-lo seria texto à toa na
+    memória, mesmo ao lado de um com a marca (rodada 1 da revisão: assim a linha cortada pela página, `enxuta`, monta a mesma
+    nota; e o bloco do chamado não ganha linhas de outra nota que o `api.parse_bloco_chamado` leria como campo)."""
+    return "\n".join(_distintos(t for t in (_txt(x) for x in textos) if t.lower() != "none" and _com_o_bloco(t)))[:NOTA_MAX]
+
+
+def _junto(v):
+    return sys.intern(v) if type(v) is str else v
+
+
+def enxuta(w):
+    """A linha do REST só com o que a lista lê (`CAMPOS_REST`), sem os valores vazios (quem lê, lê por `.get`: ausente e
+    None são o mesmo) e com os textos de pouca variedade num objeto só por valor: as etiquetas só com o id e o nome, a nota só
+    com o bloco do chamado. É o `projetar` de cada página do leitor (Ruling AV). O que não é dicionário passa como veio (quem
+    lê decide)."""
+    if not isinstance(w, dict):
+        return w
+    out = {}
+    for k in CAMPOS_REST:
+        v = w.get(k)
+        if v is None:
+            continue
+        if k == "labels":
+            if not isinstance(v, (list, tuple)):
+                continue                                             # o `_do_rest` não tira etiqueta do que não é lista
+            v = [{c: _junto(e[c]) for c in _CAMPOS_DA_ETIQUETA if e.get(c) is not None} for e in v if isinstance(e, dict)]
+            if not v:
+                continue
+        elif k in ("task_note", "note"):
+            if not _com_o_bloco(str(v)):
+                continue
+        elif k in _POUCA_VARIEDADE:
+            v = _junto(v)
+        out[k] = v
+    return out
 
 
 def _do_rest(wid: int, linhas: list, j) -> RegistroOS:

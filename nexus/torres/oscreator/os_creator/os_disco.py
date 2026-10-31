@@ -37,7 +37,9 @@ FORMATO = 1                     # o formato da cópia em disco; outro número = 
 NOME_ARQUIVO = "os_central.json.gz"
 GRAVAR_A_CADA_S = 30            # no máximo uma escrita da cópia a cada 30 s: as ações seguidas viram uma (decisão AH)
 TRAVA = threading.Lock()        # uma gravação por vez
-_AGENDA = {"pendente": False, "escrevendo": False, "ultima": 0.0, "timer": None}
+# `escrevendo` CONTA as gravações em curso (rodada 1 da revisão): a agendada durante uma lenta espera a trava dela, e com uma
+# bandeira só a 1ª, ao terminar, dizia "nenhuma escrevendo" com a 2ª ainda na fila (o `esperar_gravacao` voltava cedo)
+_AGENDA = {"pendente": False, "escrevendo": 0, "ultima": 0.0, "timer": None}
 _AGENDA_COND = threading.Condition()
 _I_DATAS = RegistroOS._fields.index("datas")
 
@@ -92,19 +94,21 @@ def _gravar_agendada(gravar) -> None:
     with _AGENDA_COND:
         if not _AGENDA["pendente"]:
             return                                                   # cancelada (o reinício dos testes)
-        _AGENDA.update(pendente=False, escrevendo=True, ultima=time.time(), timer=None)
+        _AGENDA.update(pendente=False, ultima=time.time(), timer=None)
+        _AGENDA["escrevendo"] += 1
     try:
         gravar()
     except Exception:                                                # noqa: BLE001 — o disco nunca derruba a lista
         log.exception("lista central de OS: a gravação em disco quebrou")
     finally:
         with _AGENDA_COND:
-            _AGENDA["escrevendo"] = False
+            _AGENDA["escrevendo"] = max(0, _AGENDA["escrevendo"] - 1)
             _AGENDA_COND.notify_all()
 
 
 def esperar_gravacao(teto: float = 60.0) -> bool:
-    """Espera a gravação agendada (e a que está escrevendo) terminar, até `teto` segundos. True se não ficou nenhuma."""
+    """Espera a gravação agendada (e TODAS as que estão escrevendo) terminar, até `teto` segundos. True se não ficou
+    nenhuma."""
     fim = time.monotonic() + max(0.0, float(teto))
     with _AGENDA_COND:
         while _AGENDA["pendente"] or _AGENDA["escrevendo"]:
@@ -116,12 +120,13 @@ def esperar_gravacao(teto: float = 60.0) -> bool:
 
 
 def cancelar() -> None:
-    """Cancela a gravação agendada e esquece a última (o processo recém-subido dos testes)."""
+    """Cancela a gravação agendada e esquece a última (o processo recém-subido dos testes). A que já está escrevendo termina
+    e sai da conta sozinha."""
     with _AGENDA_COND:
         t = _AGENDA["timer"]
         if t is not None:
             t.cancel()
-        _AGENDA.update(pendente=False, escrevendo=False, ultima=0.0, timer=None)
+        _AGENDA.update(pendente=False, ultima=0.0, timer=None)
         _AGENDA_COND.notify_all()
 
 
@@ -129,14 +134,17 @@ def cancelar() -> None:
 def gravar_lista(pasta: str | None, vigente, estado_disco: dict, extras) -> bool:
     """A cópia da versão VIGENTE (`vigente()`, lida dentro da trava do disco), em fluxo: o cabeçalho (com `extras()`, as
     pendentes e as faixas, copiadas de uma vez por quem chama), uma linha JSON por OS e o fecho com a conta. Pula se o disco já
-    tem esta versão. Falha de disco vai ao log e a `estado_disco`; a lista segue na memória. True se gravou."""
+    tem esta versão e nada do cabeçalho mudou (`estado_disco["sujo"]`: a fila das pendentes anda sem a versão mudar, e a
+    pendente que saiu da fila não volta no reinício; Minor 5 da rodada 1). Falha de disco vai ao log e a `estado_disco`; a
+    lista segue na memória. True se gravou."""
     destino = caminho(pasta)
     if destino is None:
         return False
     with TRAVA:
         lista = vigente()
-        if lista is None or estado_disco.get("versao") == lista.versao:
+        if lista is None or (estado_disco.get("versao") == lista.versao and not estado_disco.get("sujo")):
             return False
+        estado_disco["sujo"] = False                                 # o que mudar daqui em diante pede outra gravação
         cab = dict({"formato": FORMATO, "versao": lista.versao, "lido_em": lista.lido_em, "janela": list(lista.janela),
                     "a_conferir": sorted(lista.a_conferir)}, **extras(),
                    n=len(lista.ordem), gravado_em=time.time(), campos=list(RegistroOS._fields))
@@ -150,7 +158,7 @@ def gravar_lista(pasta: str | None, vigente, estado_disco: dict, extras) -> bool
         try:
             _trocar_de_uma_vez(destino, escrever)
         except Exception as e:                                       # noqa: BLE001 — o disco não derruba a lista
-            estado_disco["erro"] = "gravar: %s: %s" % (type(e).__name__, str(e)[:120])
+            estado_disco.update(erro="gravar: %s: %s" % (type(e).__name__, str(e)[:120]), sujo=True)
             log.warning("lista central de OS: não gravei a cópia em disco (%s)", estado_disco["erro"])
             return False
         try:
