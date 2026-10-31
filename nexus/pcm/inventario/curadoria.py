@@ -46,10 +46,10 @@ Regras com o caso que as criou:
 - **A sigla `TST` só no almoxarifado de teste** (`almoxarifado.ids_de_teste`): a prova das gravações é lá, e `SP-TST-NNN` não
   pode nascer no catálogo de um cliente.
 - **A foto** é a do achado, guardada em `<NEXUS_DADOS>/almox_inventario/fotos/<nome_da_foto(chave)>.jpg` e servida pela rota
-  `.../curadoria/foto/<nome>.jpg` (como as dos extintores, que o App envia ao Nexus e ficam em disco: nunca no banco, que a API
-  abre a quem quiser). Sem a foto, a tela diz "sem foto". **Pendente:** falta a rota assinada App→Nexus, como a do extintor
-  (`hseq/fotos.receber`), combinada com a sessão do App; o nome é o SHA-1 da chave (qualquer chave cabe num nome de arquivo). A
-  descrição do técnico e a foto só aparecem para quem decide (`pode_programar`).
+  `.../curadoria/foto/<nome>.jpg` (`?mini=1`, a miniatura de 160 px; como as dos extintores, que o App envia ao Nexus e ficam em
+  disco: nunca no banco, que a API abre a quem quiser). O App as envia pela rota assinada `POST .../pecas/inventario/foto`
+  (`fotos_app.py`, 30/10/2026: a "Foto" da peça e as dos dados), com a chave que pôs no livro; o nome é o SHA-1 da chave
+  (qualquer chave cabe num nome de arquivo). A descrição do técnico e a foto só aparecem para quem decide (`pode_programar`).
 - **Grupo, criticidade e Curva ABC não se gravam pela API** (testado pelo PCM em 09/10): a tela lembra de completar na tela do
   Fracttal.
 """
@@ -61,7 +61,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from flask import Response, abort, current_app, redirect, render_template, request, session
+from flask import Response, abort, current_app, jsonify, redirect, render_template, request, session
 
 from ...campo import visao
 from ...cadastro.ligacoes import pasta_dados
@@ -698,13 +698,28 @@ def registrar(bp) -> None:
     @bp.route("/pecas/inventario/curadoria/foto/<foto_id>.jpg", endpoint="inventario_curadoria_foto")
     def curadoria_foto(foto_id):
         """A foto do achado, só para quem decide (`pode_programar`: administrador e setor PCM; quem só vê a tela não a vê). O portão de
-        login e o da tela valem; não é rota pública."""
+        login e o da tela valem; não é rota pública. `?mini=1` é a miniatura de 160 px do cartão (`fotos_app.mini`); sem ele, a
+        inteira, que a caixa da foto carrega só ao abrir."""
+        from . import fotos_app
         if not telas.pode_programar():
             abort(403)
-        dados = foto(current_app.config, foto_id)
+        dados = (fotos_app.mini if request.args.get("mini") else foto)(current_app.config, foto_id)
         if dados is None:
             abort(404)
         return Response(dados, mimetype="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+    @bp.route("/pecas/inventario/foto", methods=["POST"], endpoint="inventario_foto_receber")
+    def inventario_foto_receber():
+        """O App envia cada foto do inventário (a "Foto" da peça e as do fabricante, do modelo e do número de série; 30/10/2026,
+        `fotos_app.py`). Sem sessão: vale a assinatura HMAC (`fotos_app.receber`), e o portão de login deixa só o POST passar
+        (`auth.ROTAS_PUBLICAS`). Como o precedente do PCM (`telas.motivo_do_app`), sem a régua de origem (`_de_outro_site`) e sem
+        o CSRF das telas: o pedido vem do App, de outra origem e sem cookie, e quem prova que é o App é a assinatura. O arquivo é
+        lido só até 1 byte além dos 8 MB: o maior é recusado sem ser lido inteiro."""
+        from . import fotos_app
+        arq = request.files.get("foto")
+        status, msg = fotos_app.receber(current_app.config, request.form.get("chave"), request.form.get("ts"),
+                                        request.form.get("assinatura"), arq.read(fotos_app.TAMANHO_MAX + 1) if arq else b"")
+        return jsonify({"ok": status == 200, "mensagem": msg}), status
 
     @bp.route("/pecas/inventario/curadoria/decidir", methods=["POST"], endpoint="inventario_curadoria_decidir")
     def curadoria_decidir():

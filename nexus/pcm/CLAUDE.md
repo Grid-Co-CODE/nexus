@@ -63,7 +63,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
 | `responsaveis.py` | **o Responsável UFV no livro** (30/10/2026, fase 3 dos técnicos por usina): de hora em hora, o `responsavel_om_id` da ficha de cada usina vai ao `nexus_pcm_atribuicoes` no papel `responsavel`, para o App mandar e assinar a PT |
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe e a comparação com a foto do App |
-| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; `revisao.py` é a aba Inventário (a lista, a contagem aberta com o Sistema × Contado × Δ e a revisão do PCM), com as rotas em `__init__.py`; `gravacao.py` grava o lote aprovado no Fracttal em segundo plano, por sessão de ajuste; `regua.py` é a régua de mínimo e máximo e `curadoria.py` o fora do catálogo; a auditoria é o `revisao.montar_auditoria`; `ponte_os.py` é a ponte com o login do Fracttal (as rotas de `/os/_nexus/inventario`, a ÚNICA porta de tudo o que lê ou grava no Fracttal: o lote, gravar, continuar, encerrar, a régua acordada, cadastrar a peça); o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo |
+| `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; `revisao.py` é a aba Inventário (a lista, a contagem aberta com o Sistema × Contado × Δ e a revisão do PCM), com as rotas em `__init__.py`; `gravacao.py` grava o lote aprovado no Fracttal em segundo plano, por sessão de ajuste; `regua.py` é a régua de mínimo e máximo e `curadoria.py` o fora do catálogo (com `fotos_app.py`, a rota assinada que recebe as fotos do App); a auditoria é o `revisao.montar_auditoria`; `ponte_os.py` é a ponte com o login do Fracttal (as rotas de `/os/_nexus/inventario`, a ÚNICA porta de tudo o que lê ou grava no Fracttal: o lote, gravar, continuar, encerrar, a régua acordada, cadastrar a peça); o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `cb8239c` (23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina, e o preenchimento dos dias livres respeita o dia fixo da usina e o feriado municipal) |
 
 ## O nome do cliente é o do cadastro do Nexus (`clientes.py`; 18/10/2026)
@@ -619,8 +619,7 @@ script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o liv
   `fora_do_catalogo`.
 
 **Falta:**
-- A foto da curadoria: a rota assinada App→Nexus, como a do extintor (`hseq/fotos.receber`), combinada com a sessão do App (a seção
-  da curadoria).
+- O envio das fotos do inventário pelo App (a rota do Nexus está pronta desde 30/10/2026, `fotos_app.py`; a seção da curadoria).
 - A tela da contagem no App (a sessão do App constrói pelo contrato).
 - O que a prova real de 27/10/2026 no almoxarifado de teste NÃO passou (são os caminhos de defeito; o `EstoqueFalso` os supõe):
   voltar ao modo 0 numa sessão aberta sem finalizar; finalizar uma sessão vazia; repetir o `warehouse_change_mode` no 429; ligar
@@ -1115,11 +1114,20 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
 - **O motivo** (texto livre) só cifrado, em `dados={"motivo": ...}` (o Cofre do cadastro; a API do banco é aberta); descartar o exige.
   A pessoa vai como código (`quem.colunas`); a usina, pela de-para do Fracttal (`usina_ligada_por`).
 - **A foto** fica fora do banco: `<NEXUS_DADOS>/almox_inventario/fotos/<nome_da_foto(chave)>.jpg` (SHA-1 da chave que o App põe em
-  `Foto`; o nome nunca é caminho), servida em `.../curadoria/foto/<nome>.jpg` atrás do login, só para quem `pode_programar`. Sem a
-  foto, a tela diz "sem foto".
-  **Pendente (decisão de 27/10): a foto da curadoria: falta a rota assinada App→Nexus, como a do extintor (`hseq/fotos.receber`),
-  combinada com a sessão do App.** O App ainda não manda as fotos; o transporte (a rota, o rótulo da chave de assinatura e o esquema
-  do nome da foto) é um contrato a fechar com a sessão do App, e o Nexus não tem a rota de recebimento. Até lá, "sem foto".
+  `Foto` ou em "Fotos dos dados"; o nome nunca é caminho) e a miniatura de 160 px em `mini/<nome>.jpg`, servidas em
+  `.../curadoria/foto/<nome>.jpg` (`?mini=1`, a miniatura) atrás do login, só para quem `pode_programar`. Sem a foto, a tela diz
+  "sem foto".
+- **As fotos chegam pela rota assinada** `POST <raiz>/t/pcm/pecas/inventario/foto` (`fotos_app.py`, 30/10/2026; endpoint
+  `torre_pcm.inventario_foto_receber`, em `auth.ROTAS_PUBLICAS`, só POST): multipart com `chave` (a mesma do livro), `ts` (segundos
+  Unix), `assinatura` e o arquivo `foto`. Chave da assinatura = HMAC-SHA256(NEXUS_PESSOA_HMAC, `"nexus:pcm:fotos-inventario"`);
+  assinatura = HMAC-SHA256(chave, `"<chave>|<ts>|<sha256 hex do arquivo>"`) em hex. Janela de 15 min, até 8 MB, a mesma chave
+  reenviada substitui (a fila offline do App); 200 guardada, 400 formato (chave vazia, com mais de 200 caracteres ou caractere de
+  controle; ts; tamanho; não é imagem), 401 assinatura ou janela, 503 sem a chave (ou sem a pasta de dados). Uma rota só para a
+  "Foto" da peça e as dos dados, no molde do extintor (`hseq/fotos.receber`) sem o código em maiúsculas nem o `dia`; como o
+  `motivo_do_app`, sem a régua de origem nem o CSRF (o App é outra origem; quem prova é a assinatura). A foto é sempre regravada
+  (até 1600 px, a orientação do EXIF aplicada e o EXIF fora: a localização do celular não fica no disco) e a miniatura sai no
+  recebimento. O contrato do lado do App é a seção 2 da `REVISAO-2026-10-30.md` da proposta das contagens; o App ainda não envia.
+  Prova: `tests/test_pcm_inventario_fotos.py`.
 - **Lembrete na tela:** grupo, criticidade e Curva ABC da peça nova não se gravam pela API (testado em 09/10): completar na tela do
   Fracttal.
 - **Cadastrar roda na PONTE `/os/_nexus/inventario/curadoria/cadastrar` (`ponte_os.py`), não em `/t/pcm`:** ele cria a peça no Fracttal

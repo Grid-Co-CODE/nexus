@@ -587,10 +587,11 @@ conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no
 - **Endereço do Nexus nunca a partir da raiz** (09/10/2026): `href="/t/..."`, `redirect("/t/...")` ou `fetch("/os/...")`
   crus caem na plataforma debaixo do `/nexus`. Use `{{ raiz }}`, `url_for`, `|na_raiz`, `na_raiz()` e `nexusRota()` (seção
   do prefixo); `tests/test_prefixo.py` pega o esquecimento.
-- **Rota pública é decisão consciente:** só o que está em `ROTAS_PUBLICAS` (entrar, saude, static e as três que o App de
-  Campo chama assinadas com a chave derivada da `NEXUS_PESSOA_HMAC`: a foto do extintor, `torre_hseq.extintores_foto_receber`,
-  o texto da informação adicional da conferência, `torre_hseq.extintores_info_receber` (26/10/2026), e a marca de motivo
-  do técnico, `torre_pcm.motivo_do_app`, 16/10/2026). O teste
+- **Rota pública é decisão consciente:** só o que está em `ROTAS_PUBLICAS` (entrar, saude, static e as quatro que o App de
+  Campo chama assinadas com a chave derivada da `NEXUS_PESSOA_HMAC`, cada uma com o seu rótulo: a foto do extintor,
+  `torre_hseq.extintores_foto_receber`, o texto da informação adicional da conferência, `torre_hseq.extintores_info_receber`
+  (26/10/2026), a marca de motivo do técnico, `torre_pcm.motivo_do_app` (16/10/2026), e as fotos do inventário do
+  almoxarifado, `torre_pcm.inventario_foto_receber` (30/10/2026, `nexus/pcm/inventario/fotos_app.py`)). O teste
   `test_toda_rota_nao_publica_exige_login` pega rota nova esquecida.
 - **Limite de tentativas do Entrar** (auditoria A2 e revisão adversarial da porta única, 10/10/2026). Era 5 erros por
   IP: um colega errando a senha cinco vezes trancava o Entrar da sala inteira por 15 min (o escritório sai por um IP
