@@ -8,7 +8,10 @@ O que estes testes seguram:
 - o detector de endereço, depois do corte do nome no caminho: a usina fora de "Cliente - Usina - UF" com o endereço depois de
   UM espaço, o nível de dentro com o mesmo endereço e o nível com endereço próprio; a linha sem nome vai sem descrição;
 - o detector vale SÓ para o banco: o caminho do catálogo (o cliente e a usina da tela) e a paridade com o RPC não mudam;
-- a noite conta as descrições que o detector cortou, com até 5 ids de exemplo e nunca o texto, e o estado do leitor mostra.
+- a noite conta as descrições que o detector cortou, com até 5 ids de exemplo e nunca o texto, e o estado do leitor mostra;
+- a revisão 3 (Ruling AQ): a usina cujo nome fechou no padrão "Cliente - Usina - UF" não passa pelo detector (a usina de
+  fazenda), inclusive a que saiu; o nível de dentro e a usina fora do padrão seguem por ele; e a foto servindo de catálogo
+  mantém as usinas de fazenda separadas.
 Fracttal e banco são dublês: nada vai à rede. Nomes, códigos, usinas e endereços são de mentira (repositório público)."""
 import json
 import sys
@@ -220,3 +223,50 @@ def test_a_noite_conta_as_descricoes_cortadas_sem_o_texto(app, banco):
     texto = json.dumps(estado, ensure_ascii=False, default=str)
     assert not any(e in texto for e in ("Sem Padrao", "Outra 55", "Rua "))          # nunca o texto cortado
     assert AC.estado()["leitor"]["descricao_cortada"]["n"] == 6                     # e o Raio-X do catálogo vê
+
+
+# ── a usina que fechou no padrão não passa pelo detector (Ruling AQ, revisão 3) ─────────────────────────────────────────
+# usina rural com "Fazenda", "Sítio" ou "Chácara" no nome é comum na carteira: o corte na sigla do estado já fecha o nome, e o
+# detector o cortaria no "Fazenda". O nível de dentro com o nome da fazenda, sob uma usina de outra cauda, segue cortado
+FAZENDAS = [
+    _it(50, "CAL-FOM100", "CL - UFV Fazenda Ômega - MT  Rodovia MT-010 km 5    { CAL-FOM100 }", 1, 1),
+    _it(51, "CAL-FOM100-CABN1", "Cabine 1 Fazenda Ômega    { CAL-FOM100-CABN1 }", 50),
+    _it(52, "CAL-FAL100", "CL - UFV Fazenda Alfa - MT  Estrada Vicinal km 3    { CAL-FAL100 }", 1, 1),
+    _it(53, "CAL-FAL100-INVR1.1", "Inversor 1.1    { CAL-FAL100-INVR1.1 }", 52),
+    _it(54, "CAL-FBE100", "CL - UFV Fazenda Beta - MT  Estrada Vicinal km 7    { CAL-FBE100 }", 1, 1),
+    _it(55, "CAL-FBE100-INVR1.1", "Inversor 1.1    { CAL-FBE100-INVR1.1 }", 54),
+]
+
+
+def test_a_usina_que_fechou_no_padrao_nao_passa_pelo_detector(app, banco):
+    # a foto de 11/10 (a de 22/09 e os códigos de junho) com uma usina de fazenda que saiu do Fracttal: a isenção vale também
+    # para a linha que saiu
+    _semear(banco, [FOTO_DE_11_10[0],
+                    ["56", "CAL-FVE100", "CL - UFV Fazenda Velha - MT  Estrada Vicinal km 9", "1", "USINA", "2026-06-21"]])
+    itens = ARVORE + SEM_PADRAO + FAZENDAS
+    _catalogo_de(itens)
+    rel = AL.ler_completo(app, ler=RestFalso(itens))
+    assert rel["foto"]["gravou"]
+    por = _por_id(banco)
+    assert (por[50]["descricao"], por[52]["descricao"], por[54]["descricao"]) == (
+        "CL - UFV Fazenda Ômega - MT", "CL - UFV Fazenda Alfa - MT", "CL - UFV Fazenda Beta - MT")
+    assert por[56]["descricao"] == "CL - UFV Fazenda Velha - MT" and por[56]["fora_do_fracttal_desde"] == "20260922"
+    # o resto segue pelo detector: o nível de dentro com o nome da fazenda e a usina fora do padrão
+    assert por[51]["descricao"] == "Cabine 1" and por[40]["descricao"] == "Cliente Alfa - Usina Delta"
+    assert rel["foto"]["descricao_cortada_exemplos"] == [40, 41, 42, 43, 51] and rel["foto"]["descricao_cortada"] == 5
+    # e a 2ª noite não muda nada
+    rel = AL.ler_completo(app, ler=RestFalso(itens))
+    assert rel["foto"]["gravou"] is False and _por_id(banco)[56]["descricao"] == "CL - UFV Fazenda Velha - MT"
+
+
+def test_a_foto_como_catalogo_mantem_as_usinas_da_fazenda_separadas(app, banco):
+    """A foto servindo de catálogo (a máquina sem cópia nenhuma) monta a usina pelo nome dela na foto: cortado no "Fazenda",
+    as duas usinas virariam "CL - UFV" e se juntariam na cascata."""
+    itens = ARVORE + FAZENDAS
+    _catalogo_de(itens)
+    AL.ler_completo(app, ler=RestFalso(itens))
+    registros, _ = AC.registros_da_foto(banco.linhas(eq.LIVRO_FOTO, eq.ABA_FOTO))
+    usina = {r["code"]: r["usina"] for r in registros}
+    assert (usina["CAL-FAL100-INVR1.1"], usina["CAL-FBE100-INVR1.1"]) == ("CL - UFV Fazenda Alfa - MT",
+                                                                          "CL - UFV Fazenda Beta - MT")
+    assert usina == {r["code"]: r["usina"] for r in AC.atual().lista}

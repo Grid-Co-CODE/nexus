@@ -117,7 +117,7 @@ def caminhos(nos, alvos=None) -> dict:
     return out
 
 
-def nomes_no_caminho(nos, alvos=None) -> dict:
+def nomes_no_caminho(nos, alvos=None, usinas_no_padrao: set | None = None) -> dict:
     """{id: o nome do item como o Fracttal o põe no caminho} de cada item de `alvos` (padrão: todos de `nos`): a descrição SEM
     o endereço da usina e sem o "{ CÓDIGO }" (`_nome_no_caminho`: na usina, o corte na sigla do estado; nos níveis de dentro,
     sem a cauda de endereço da usina deles; senão, no 1º espaço duplo). É a `descricao` que a foto do banco grava (Ruling AK,
@@ -125,34 +125,41 @@ def nomes_no_caminho(nos, alvos=None) -> dict:
     (04/10/2026, a 1ª carga do Campo · App). O item cuja cadeia não chega à raiz leva o corte no 1º espaço duplo.
     `nos`: {id: (id do pai ou None, descrição)}, como em `caminhos`. A foto ainda passa cada descrição pelo detector de endereço
     (`nexus/dados/foto_ativos.sem_endereco`, Ruling AN): ele NÃO entra aqui, porque este nome também serve ao caminho do
-    catálogo, que segue o do RPC."""
+    catálogo, que segue o do RPC. `usinas_no_padrao` (um conjunto, se vier) recebe os ids das usinas cujo nome fechou no padrão
+    "Cliente - Usina - UF" (`_USINA_NO_NOME`): a foto não as passa pelo detector (Ruling AQ, revisão 3 da 2.2)."""
     caudas: dict = {}
     out: dict = {}
     for i in (nos if alvos is None else alvos):
         if i not in nos:
             continue
         pais, chegou = _ancestrais(i, nos)
-        out[i] = _nome_pelos_pais(nos[i][1], pais, chegou, nos, caudas)
+        out[i], padrao = _nome_pelos_pais(nos[i][1], pais, chegou, nos, caudas)
+        if padrao and usinas_no_padrao is not None:
+            usinas_no_padrao.add(i)
     return out
 
 
-def _nome_pelos_pais(descricao, pais, chegou, nos, caudas) -> str:
-    """O nome de um item pela posição na cadeia: a raiz (0 pais), a usina (1) ou o item solto pelo corte de cada um; os de
-    dentro sem a cauda de endereço da usina deles (`caudas`: {id da usina: cauda}, calculada uma vez)."""
+def _nome_pelos_pais(descricao, pais, chegou, nos, caudas) -> tuple:
+    """(o nome de um item pela posição na cadeia, se ele é uma usina cujo nome fechou no padrão "Cliente - Usina - UF"): a
+    raiz (0 pais), a usina (1) ou o item solto pelo corte de cada um; os de dentro sem a cauda de endereço da usina deles
+    (`caudas`: {id da usina: cauda}, calculada uma vez)."""
     if not chegou or len(pais) <= 1:                                 # a raiz (0), a usina (1) ou o item solto
-        return _nome_no_caminho(descricao, usina=chegou and len(pais) == 1)
+        usina = chegou and len(pais) == 1
+        return (_nome_no_caminho(descricao, usina=usina),
+                usina and _USINA_NO_NOME.match(_limpa(descricao)) is not None)
     u = pais[1]
     if u not in caudas:
         nome_u, d0 = _nome_no_caminho(nos[u][1], usina=True), _limpa(nos[u][1])
         caudas[u] = d0[len(nome_u):].strip() if d0.startswith(nome_u) else ""
-    return _nome_no_caminho(descricao, usina=False, cauda=caudas[u])
+    return _nome_no_caminho(descricao, usina=False, cauda=caudas[u]), False
 
 
-def nome_pelo_pai(nos, pai, descricao, caudas: dict | None = None) -> str:
-    """O nome no caminho de um item que NÃO está em `nos`, pela própria descrição e pelo próprio pai: a linha da foto que não
-    veio na leitura de hoje (o código que saiu do Fracttal; Ruling AN, revisão 2 da 2.2). A cadeia de pais vem de `nos` (os
-    itens lidos hoje e as linhas antigas que também não vieram), e o corte é o mesmo de `nomes_no_caminho`. A descrição é a da
-    própria linha, e não a do item de hoje com o mesmo id (o item recodificado): a linha guarda o nome que tinha."""
+def nome_pelo_pai(nos, pai, descricao, caudas: dict | None = None) -> tuple:
+    """(o nome no caminho, se é uma usina que fechou no padrão "Cliente - Usina - UF") de um item que NÃO está em `nos`, pela
+    própria descrição e pelo próprio pai: a linha da foto que não veio na leitura de hoje (o código que saiu do Fracttal;
+    Ruling AN, revisão 2 da 2.2). A cadeia de pais vem de `nos` (os itens lidos hoje e as linhas antigas que também não
+    vieram), e o corte é o mesmo de `nomes_no_caminho`. A descrição é a da própria linha, e não a do item de hoje com o mesmo
+    id (o item recodificado): a linha guarda o nome que tinha. A usina no padrão não passa pelo detector da foto (Ruling AQ)."""
     if pai is None:
         pais, chegou = [], True                                      # a raiz do cliente
     elif pai in nos:

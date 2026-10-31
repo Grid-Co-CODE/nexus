@@ -533,7 +533,10 @@ def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
             nos = {r["id"]: (r.get("id_parent"), r.get("description") or "") for r in cat.lista}
             for c in fora_do_catalogo:
                 nos.setdefault(c["id"], (c.get("id_parent"), c.get("description") or ""))
-            nomes = ativos_foto.nomes_no_caminho(nos)
+            # a usina cujo nome fechou no padrão "Cliente - Usina - UF" não passa pelo detector da foto (Ruling AQ): usina de
+            # fazenda ("CL - UFV Fazenda X - MT") é comum, e o detector a cortaria no "Fazenda"
+            usinas_no_padrao: set = set()
+            nomes = ativos_foto.nomes_no_caminho(nos, usinas_no_padrao=usinas_no_padrao)
             novas = [foto_ativos.linha_do_item(r, r.get("tipo_code"), nome=nomes.get(r["id"])) for r in cat.lista]
             novas += [foto_ativos.linha_do_item(c, nome=nomes.get(c["id"])) for c in fora_do_catalogo]
             del nomes
@@ -544,7 +547,7 @@ def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
             try:
                 rel["foto"] = foto_ativos.gravar(novas, base=banco[0], token=banco[1], sessao=banco[2],
                                                  maquina="servidor" if os.name != "nt" else "pc", antigas=antigas,
-                                                 de_11_10=de_11_10,
+                                                 de_11_10=de_11_10, usinas_no_padrao=usinas_no_padrao,
                                                  nome_de_quem_saiu=functools.partial(ativos_foto.nome_pelo_pai, grafo,
                                                                                      caudas={}))
                 _ESTADO["descricao_cortada"] = {"n": rel["foto"].get("descricao_cortada", 0),

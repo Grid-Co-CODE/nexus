@@ -1420,9 +1420,12 @@ testes seguem pelo RPC; sem a credencial REST (`FRACTTAL_CLIENT_ID`), não liga 
   endereço (`nexus/dados/foto_ativos.sem_endereco`, regra e marcadores no `nexus/dados/CLAUDE.md`). O detector NÃO entra no
   caminho do catálogo: o cliente e a usina das telas e a paridade com o RPC não mudam. Quantas ele cortou na última foto
   fica no estado do leitor (`ativos_leitor.estado()["descricao_cortada"]`, que o Raio-X vê em
-  `ativos_central.estado()["leitor"]`: até 5 ids, nunca o texto). A foto servindo de catálogo (a máquina sem cópia
-  nenhuma, `registros_da_foto`) traz o nome já cortado: a usina fora do padrão aparece sem o endereço até a 1ª leitura
-  do Fracttal.
+  `ativos_central.estado()["leitor"]`: até 5 ids, nunca o texto). A usina cujo nome fechou no padrão "Cliente - Usina -
+  UF" NÃO passa pelo detector (Ruling AQ, revisão 3): o leitor diz quais (`nomes_no_caminho(..., usinas_no_padrao=)` e o
+  `nome_pelo_pai` da linha que saiu), e a foto só as isenta se o nome termina na sigla do estado. Sem isso, a usina de
+  fazenda ("CL - UFV Fazenda X - MT", comum na carteira) virava "CL - UFV", e a foto servindo de catálogo (a máquina sem
+  cópia nenhuma, `registros_da_foto`) juntava duas usinas de fazenda numa só na cascata. A usina FORA do padrão segue pelo
+  detector, e nessa foto ela aparece sem o endereço até a 1ª leitura do Fracttal.
 - **A conferência** (`conferir_paridade`, contra o catálogo de agora: na 1ª noite o do RPC, a sondagem REST x RPC de verdade;
   depois, a leitura anterior): >= 99% dos códigos em comum com o mesmo cliente e usina, os campos obrigatórios (`id`,
   `id_parent`, `id_type_item`) em >= 99% dos ativos e >= 95% dos códigos da leitura no catálogo. Na 1ª conferência (o REST
@@ -1488,7 +1491,8 @@ revisão 2: o 4xx da 1ª página que diz o que houve e a gravação pendente que
 `tests/test_oscreator_ativos_descricao_no_banco.py` (a revisão 2, Ruling AN: a linha que saiu perde o endereço, a partir de
 uma foto de 11/10 com endereço, e a 2ª noite não muda nada; a linha já marcada também; o detector na usina fora do padrão,
 no nível de dentro e no endereço próprio, e os marcadores um a um; o caminho do catálogo que não passa por ele; a contagem
-sem o texto).
+sem o texto; e a revisão 3, Ruling AQ: a usina de fazenda que fechou no padrão sem passar pelo detector, também a que
+saiu, e a foto servindo de catálogo com as usinas de fazenda separadas).
 
 ## Os botões "Atualizar ativos" sem esperar o Fracttal (31/10/2026, tarefa 2.3 do canto central)
 
@@ -1640,7 +1644,8 @@ fabricantes em chamados > fabricantes apareça atualizado no app".
 - **A marca no nome do ativo** (`spec.marca_do_ativo`, a única: a de `regras` chama esta) vale como palavra inteira e
   pelos apelidos do Fracttal (`APELIDOS_NO_FRACTTAL`). No catálogo de 14/10: +80 Canadian ("CANANDIAN SOLAR"), +169
   Huawei (só o modelo SUN2000), os 131 Axial grudados ("AXIALtracker") seguem Axial, e saem os falsos STI (16
-  cabines, skids e estações pelo endereço "Justiniano"/"Sebastião"; os 43 trackers de Santo Inácio pelo código STI100).
+  cabines, skids e estações pelo "sti" no meio de uma palavra do endereço, como numa "Rua Celestino" ou numa "Rua
+  Faustino", exemplos inventados; os 43 trackers de uma usina pelo código dela, que começa com STI).
 - **Os nomes da tela contra o Fracttal** (o item 4): dos 11 fornecedores, só a Canadian difere, e o erro é do Fracttal
   ("CANANDIAN"): o nome fica certo na tela e a grafia do Fracttal entra como apelido. Hukseflux e Romiotto não
   aparecem no nome de nenhum ativo (o nome da estação é o endereço). O campo de fornecedor novo pede o nome como está no

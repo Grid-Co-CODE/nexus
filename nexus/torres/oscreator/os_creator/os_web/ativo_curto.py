@@ -15,7 +15,7 @@ inteiro (21.639 ativos, 27/09):
     Disjuntor do Inversor 1.1                              → Disjuntor do Inversor 1.1
 
 A REGRA: o nome até o NÚMERO do ativo (inclusive), ou até a primeira marca, código de modelo ou pedaço de endereço.
-Quando nada disso aparece (endereço sem marcador: "Infraestrutura Civil Recanto Beta"), vale a FRASE que os ativos
+Quando nada disso aparece (endereço sem marcador: "Infraestrutura Civil Vale Ômega"), vale a FRASE que os ativos
 do mesmo tipo repetem no catálogo ("Infraestrutura Civil") — é o próprio cadastro dizendo onde o tipo termina.
 
 O nome inteiro continua no `title` da célula, na busca e no CSV: aqui só se decide o que a coluna MOSTRA.
@@ -82,7 +82,7 @@ def _caminhar(s: str) -> list:
 
 def frases(catalogo) -> dict:
     """{tipo: [frases do tipo, da mais longa à mais curta]} — o nome curto que ≥ 3 ativos do mesmo tipo repetem. É o
-    que corta o endereço SEM marcador ("Infraestrutura Civil Recanto Beta" → "Infraestrutura Civil")."""
+    que corta o endereço SEM marcador ("Infraestrutura Civil Vale Ômega" → "Infraestrutura Civil")."""
     cont = collections.defaultdict(collections.Counter)
     for a in catalogo or []:
         if not isinstance(a, dict):

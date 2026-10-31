@@ -126,7 +126,7 @@ def montar_registros(raw: list) -> list:
         parsed.append((a, code, desc, segs))
         if len(segs) >= 2 and code:                       # equipamento → registra a usina limpa do code-base
             cparts = code.split("-")
-            base = cparts[-2] if len(cparts) >= 2 else cparts[0]   # penúltimo seg = code-base (CGH100/TIM200)
+            base = cparts[-2] if len(cparts) >= 2 else cparts[0]   # penúltimo seg = code-base (GAM100/ZET200)
             if base and segs[1]:
                 base2usina.setdefault(base, segs[1])
     out = []
@@ -136,7 +136,7 @@ def montar_registros(raw: list) -> list:
             tipo_code, tipo = _tipo_from_code(code, eh_usina=False)
         elif len(segs) == 1:                              # item da usina (code no nome) → tipo 'Usina'
             cliente = segs[0]
-            base = code.split("-")[-1] if "-" in code else code      # ATHN-TIM200 → TIM200
+            base = code.split("-")[-1] if "-" in code else code      # CAL-ZET200 → ZET200
             usina = base2usina.get(base) or _clean_usina_desc(desc)
             tipo_code, tipo = "USINA", "Usina"
         else:                                             # raiz da organização → fora do drill-down
@@ -152,7 +152,7 @@ def montar_registros(raw: list) -> list:
 
 
 def usina_curta(usina_full: str) -> str:
-    """'Thopen - Ceilândia 1 - DF' (Cliente - Usina - Estado) → 'Ceilândia 1'. Era o `api._usina_curta`."""
+    """'CL - Usina Alfa 1 - DF' (Cliente - Usina - Estado) → 'Usina Alfa 1'. Era o `api._usina_curta`."""
     parts = [p.strip() for p in str(usina_full).split(" - ") if p.strip()]
     if len(parts) <= 1:
         return usina_full
@@ -171,13 +171,13 @@ def corrigir_itens_usina_estrangeiros(assets: list) -> list:
     """Conserta o item-usina PENDURADO NA PLANTA ERRADA (cadastro do Fracttal, 28/07). Muda os dicionários que recebe: quem
     chama passa cópias (o `trocar` passa).
 
-    Caso real: o item-usina de "Thopen - Ipixuna 1 e 2 - PA" (THPN-IPX100) está registrado como filho da planta "2C - Ipixuna
-    do Pará 1 - PA" — então o campo `usina` dele apontava para a planta da 2C e ele aparecia nas cascatas dela (COS/
-    Performance/Nova análise), como o Levi reportou. Medido no catálogo inteiro: 7 itens nessa situação (esse + 6 lixos de
-    TESTE pendurados em Sarandi), de 16,9 mil.
+    Caso real (com nomes inventados): o item-usina de "Cliente Alfa - Usina Gama 1 e 2 - PA" (CAL-GAM100) está registrado
+    como filho da planta "Cliente Beta - Usina Gama do Pará 1 - PA", de OUTRO cliente — então o campo `usina` dele apontava
+    para a planta do outro cliente e ele aparecia nas cascatas dela (COS/Performance/Nova análise), como o Levi reportou.
+    Medido no catálogo inteiro: 7 itens nessa situação (esse + 6 lixos de TESTE pendurados em outra usina), de 16,9 mil.
 
     Detecção: item tipo "Usina" cuja DESCRIÇÃO não começa com a própria `usina` — a descrição do item-usina legítimo sempre
-    embute o rótulo da planta. Correção: realoca para a usina dos IRMÃOS DE CÓDIGO (THPN-IPX100 → usina dos THPN-IPX100-*);
+    embute o rótulo da planta. Correção: realoca para a usina dos IRMÃOS DE CÓDIGO (CAL-GAM100 → usina dos CAL-GAM100-*);
     sem irmão, `usina` fica vazia e o item sai das cascatas (melhor sumir do que aparecer na planta errada). Roda quando a
     versão chega (era a cada leitura do catálogo), então vale para a cópia antiga sem forçar recarga de 26 mil ativos."""
     ruins = [a for a in assets
