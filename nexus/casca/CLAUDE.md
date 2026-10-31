@@ -327,8 +327,10 @@ gravar=True)`); o `create_app`, o PC e os testes seguem sem ele.
   `teardown`: é até a resposta estar montada, não o envio do corpo. O pedido que o teto recusou não tem duração
   (`duracao_p50_ms`/`p95` = `None` num balde sem pedido atendido; quem grava deixa a célula vazia, não zero).
 - **`erros_qtd`** é a resposta 5xx ou a exceção da tela; **`ocupado_qtd`** é o 503 do teto, e os dois entram em
-  `pedidos_qtd` mas não se somam (o recusado não é erro do servidor). A hora é a do FIM do pedido: o balde de uma hora que o
-  laço já tirou nunca renasce.
+  `pedidos_qtd` mas não se somam (o recusado não é erro do servidor). A hora é a do FIM do pedido, lida DENTRO da trava (como
+  no `fracttal_conta`): o balde de uma hora que o laço já tirou nunca renasce. Lida antes da trava, o `drenar` podia
+  passar no meio da conta (achar o setor demora), o pedido recriava a hora com 1 pedido e o próximo `drenar` devolvia a
+  mesma chave com o número errado, que a gravação por chave poria no lugar da linha certa.
 - **`fracttal_qtd`:** os pedidos ao Fracttal que o pedido fez (`pedidos_desta_thread()`, com os das tarefas do fan-out que
   herdam o contexto). A rota é a mesma `origem` do contador do Fracttal: dá para cruzar o uso com a cota.
 - **O reinício não perde a hora:** a cada 5 min (`PASSO_S`; só fora dos testes, thread `nexus-uso-os`) os baldes vão a

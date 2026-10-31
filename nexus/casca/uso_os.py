@@ -5,8 +5,8 @@ hora, em quantas, quanto cada uma demora e quanto pede ao Fracttal: o Raio-X mos
 número o "antes e depois" de cada etapa do canto central seria chute. Daqui saem as linhas por hora que o laço de
 gravação leva ao banco (`drenar`) e que o Raio-X mostra (`instantaneo`).
 
-- **Uma linha por hora × rota × automático.** A hora é a de Brasília (`AAAAMMDDHH`), a do FIM do pedido (o balde de uma
-  hora já tirada nunca renasce). `automatico` separa o clique da pessoa do que a tela pede sozinha (Histórico a cada 10
+- **Uma linha por hora × rota × automático.** A hora é a de Brasília (`AAAAMMDDHH`), a do FIM do pedido, lida DENTRO da
+  trava (o balde de uma hora que o `drenar` já tirou nunca renasce). `automatico` separa o clique da pessoa do que a tela pede sozinha (Histórico a cada 10
   min, Solicitações a cada 15, o `acompanhamento/estado`, a sessão a cada 5): o cabeçalho `X-Nexus-Auto: 1`, o
   `?nx_auto=1` (o formulário do Histórico não manda cabeçalho) ou, para a aba que ainda roda o JavaScript de antes, uma
   das `ROTAS_AUTOMATICAS`.
@@ -300,10 +300,13 @@ def _depois(exc=None) -> None:
 
 def _contar(p: _Pedido, status: int, fracttal: int) -> None:
     ms = (_cronometro() - p.inicio) * 1000.0
-    hora_id = fracttal_conta.hora_id_de(_agora())       # a hora do FIM do pedido: a de uma hora já drenada não renasce
     setor = _setor_da_pessoa() if p.pessoa else SEM_SETOR    # fora da trava: pode ir à cópia do setor
     faixa = _faixa(ms)
     with _trava:
+        # A hora do FIM do pedido, lida AQUI DENTRO e não antes (como o `fracttal_conta._registrar`): lida antes, o `drenar`
+        # podia passar entre o relógio e a trava (achar o setor demora), e o pedido recriaria a hora que o laço já tirou, com
+        # 1 pedido; o próximo `drenar` devolveria a mesma chave com o número errado, e a gravação por chave trocaria a linha certa.
+        hora_id = fracttal_conta.hora_id_de(_agora())
         b = _balde(hora_id, p.rota, p.automatico)
         b.pedidos += 1
         if p.pessoa:
@@ -326,8 +329,8 @@ def recusado(environ) -> None:
         rota = normalizar_rota(environ.get("PATH_INFO", ""))
         no_endereco = next((v for k, v in parse_qsl(environ.get("QUERY_STRING", "") or "") if k == PARAMETRO_AUTO), None)
         automatico = _automatico(rota, environ.get(_AMBIENTE_AUTO), no_endereco)
-        hora_id = fracttal_conta.hora_id_de(_agora())
         with _trava:
+            hora_id = fracttal_conta.hora_id_de(_agora())   # dentro da trava, pelo mesmo motivo do `_contar`
             b = _balde(hora_id, rota, automatico)
             b.pedidos += 1
             b.ocupado += 1

@@ -498,6 +498,63 @@ def test_drenar_tira_so_as_horas_fechadas(tmp_path, relogio):
     assert len(U.drenar("2026103012")) == 1
 
 
+# A hora do pedido é lida DENTRO da trava, como no `fracttal_conta._registrar`. Lida antes, o laço da gravação podia drenar a
+# hora no meio da conta; o pedido a recriava com 1 pedido, o próximo `drenar` devolvia a MESMA chave (hora, rota, automático)
+# com o número errado, e a gravação por chave (Task 0.3) trocaria a linha certa pela dele.
+def test_hora_drenada_enquanto_o_setor_e_achado_nao_renasce(tmp_path, relogio, monkeypatch):
+    app = _app(tmp_path, relogio)
+    U.ligar(app, gravar=True)
+    c = _cliente(app, _UM)
+    c.get("/os/historico")                                               # 10h: um pedido, que vai ser gravado
+    drenado = []
+
+    def setor_que_demora():
+        relogio.passa(3600)                                              # a hora vira no meio da conta deste pedido...
+        drenado.extend(U.drenar(C.hora_id_de()))                         # ...e o laço da gravação drena a 10h, que fechou
+        return U.SEM_SETOR
+    monkeypatch.setattr(U, "_setor_da_pessoa", setor_que_demora)
+    c.get("/os/historico")                                               # começou às 10h, a conta fecha às 11h
+    assert [(lin["hora_id"], lin["pedidos_qtd"]) for lin in drenado] == [(_HORA_10, 1)]      # a 10h saiu como estava
+    assert [(lin["hora_id"], lin["pedidos_qtd"]) for lin in U.instantaneo()["linhas"]] == [(_HORA_11, 1)]   # e ele é da 11h
+    proximo = U.drenar("2026103012")
+    assert [lin["hora_id"] for lin in drenado + proximo] == [_HORA_10, _HORA_11]       # nenhuma chave sai duas vezes
+
+
+class _TravaQueDrena:
+    """A trava do módulo, mas na 1ª vez que alguém vai tomá-la a hora vira e o laço da gravação drena a que fechou: põe a
+    drenagem EXATAMENTE entre o que a conta fez antes da trava e a trava (a janela que o relógio lido dentro dela fecha)."""
+
+    def __init__(self, relogio, drenado):
+        self.real, self.relogio, self.drenado, self.feito = threading.Lock(), relogio, drenado, False
+
+    def __enter__(self):
+        if not self.feito:
+            self.feito = True
+            self.relogio.passa(3600)
+            self.drenado.extend(U.drenar(C.hora_id_de()))                # (o `drenar` toma a trava já pelo caminho normal)
+        self.real.acquire()
+        return self
+
+    def __exit__(self, *exc):
+        self.real.release()
+
+
+@pytest.mark.parametrize("quem", ["atendido", "recusado"])
+def test_hora_drenada_antes_da_trava_nao_renasce(tmp_path, relogio, monkeypatch, quem):
+    app = _app(tmp_path, relogio)
+    U.ligar(app, gravar=True)
+    c = _cliente(app, _UM)
+    c.get("/os/historico")                                               # 10h: um pedido, que vai ser gravado
+    drenado = []
+    monkeypatch.setattr(U, "_trava", _TravaQueDrena(relogio, drenado))
+    if quem == "atendido":
+        c.get("/os/historico")                                           # a conta do pedido que a tela fez às 10h
+    else:
+        U.recusado({"PATH_INFO": "/os/historico", "QUERY_STRING": ""})   # o 503 do teto, que não passa pelo Flask
+    assert [(lin["hora_id"], lin["pedidos_qtd"]) for lin in drenado] == [(_HORA_10, 1)]
+    assert [(lin["hora_id"], lin["pedidos_qtd"]) for lin in U.instantaneo()["linhas"]] == [(_HORA_11, 1)]
+
+
 def test_horas_guardadas_tem_teto(tmp_path, relogio, monkeypatch):
     """Sem o laço da gravação (o PC, ou o banco fora por dias) as horas não podem crescer sem fim: as pessoas de cada
     uma ficam na memória."""
