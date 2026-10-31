@@ -596,6 +596,14 @@ acima do piso é decisão da T.I. e fica; o que falha vira AVISO e o deploy segu
 cartão da memória ("o deploy conferiu em ..."): quem não tem acesso ao servidor nem ao journal vê se tirou, se falhou e
 onde o teto está escrito. Prova: `tests/test_deploy_teto_memoria_30_10.py` e `tests/test_raio_x_teto_deploy_30_10.py`.
 
+**A pasta da plataforma depois da reescrita do PerformancePainel (30/10/2026).** O commit 616284b levou ao repositório
+público duas cópias de cache (o Registro mestre e o de-para), e a main de lá foi reescrita (6a5b14e → 9622f4f, a mesma
+árvore). A pasta da plataforma no servidor parou no commit reescrito, e o pull de lá não anda sozinho. O passo 0b do
+`atualizar.sh` procura o clone do PerformancePainel (`/opt`, `/srv`, `/home`, `/root`) e, só quando ele está exatamente no
+6a5b14e, o leva ao 9622f4f com `reset --keep` como o dono da pasta: nenhum arquivo muda. Depois disso não faz nada, e a
+falha dele nunca para o deploy do Nexus. Sai do script quando a plataforma voltar a andar (o `/versao` com o
+`commit_no_disco` novo).
+
 **Deploy por push (09/10/2026, Levi: "não dá para subir com o commit?").** O timer `deploy/nexus-atualizar.timer` roda o
 mesmo `atualizar.sh` a cada 2 minutos: push na `main` entra no ar em até ~3 min, sem ninguém rodar nada; sem commit
 novo (e com o último já instalado), não reinicia. Instala uma vez (o 1º comando já sobe o que estiver no GitHub):
