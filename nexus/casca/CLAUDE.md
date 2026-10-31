@@ -16,7 +16,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/casca/sugestoes.py` + `templates/sugestoes.html` | a aba Sugestões (`/?aba=sugestoes`): o formulário de todos e a lista do administrador, o livro `nexus_sugestoes` e os anexos no disco; seção "Sugestões no Início" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
 | `nexus/casca/fracttal_conta.py` | o contador de pedidos ao Fracttal (31/10/2026): um gancho no `Session.send` que soma, por hora de Brasília × origem × método, os pedidos, as recusas (406/429), os erros e o pico por minuto; seção "Pedidos ao Fracttal" abaixo |
-| `nexus/casca/uso_os.py` | o uso das telas do OS Creator (31/10/2026): por hora × rota × automático, os pedidos, as pessoas distintas, a mediana e o p95, os erros, os 503 do teto e os pedidos ao Fracttal; marca a rota de TODO pedido do Flask como origem do contador do Fracttal; seção "Uso das telas do OS Creator" abaixo |
+| `nexus/casca/uso_os.py` | o uso das telas do OS Creator (31/10/2026): por hora × rota × automático, os pedidos, as pessoas distintas, a mediana e o p95, os erros, os 503 do teto e os pedidos ao Fracttal; marca a rota de TODO pedido do Flask como origem do contador do Fracttal; e, no servidor, leva as horas fechadas dos dois contadores ao banco no :05 de cada hora (`nexus/dados/fato_uso_os.py`); seção "Uso das telas do OS Creator" abaixo |
 | `nexus/auth/__init__.py` | `/entrar` (a porta, a senha de administrador e a ida e a volta da Microsoft), `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/microsoft.py` | o login pela conta Microsoft da Grid (Entra ID), desligado sem as quatro `NEXUS_MS_*` (seção "Entrar com a Microsoft" abaixo) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
@@ -347,10 +347,24 @@ gravar=True)`); o `create_app`, o PC e os testes seguem sem ele.
 - **A memória não cresce:** as horas guardadas têm teto (`MAX_HORAS` = 48: o PC, ou o banco fora por dias, não pode
   acumular os conjuntos de pessoas), e as rotas, os setores e o tamanho da rota também.
 - **Quem lê:** `instantaneo()` (`{"linhas", "setor"}`, o Raio-X, sem tirar nada) e `drenar(hora_aberta)`, EXCLUSIVO como o
-  do contador do Fracttal: devolve e tira as horas anteriores a ela. A gravação de hora em hora no banco e a seção do
-  Raio-X vêm nas tarefas seguintes da etapa 0.
+  do contador do Fracttal: devolve e tira as horas anteriores a ela.
+- **A gravação de hora em hora no banco** (`gravar_no_banco`, a thread `nexus-uso-os-banco`, só com `gravar=True`: o servidor;
+  nunca o PC nem os testes). Acorda no **:05** de cada hora (`espera_ate_a_gravacao`; fora dos laços que já existem: tarefas
+  :10 a :20, normalizações :22, sync do App :25, zeladoria :32, carga :40, chamados :50). Lê a hora aberta
+  (`fracttal_conta.hora_id_de()`) UMA vez, antes dos dois `drenar`, e leva as horas fechadas ao livro do mês
+  (`nexus_oscreator_uso_AAAA_MM`, abas `fato_uso_hora` e `fato_fracttal_hora`, registrado no catálogo, `so_cresce`): relê o
+  mês, troca as linhas de mesma chave (regravar a mesma hora não duplica) e publica pelo `livros.publicar`. **Deu certo:**
+  grava o parcial na hora (`salvar()`), senão o reinício traria de volta a hora que já está no banco. **Deu errado** (banco
+  fora, leitura curta do livro, sem a `GRIDCO_SQL_TOKEN`): as linhas ficam na memória (`pendentes()`), a volta seguinte
+  tenta de novo com as novas, no máximo **48 horas** (as mais velhas saem, com aviso no log). **Essas linhas à espera só
+  existem na memória:** um reinício com o banco fora as perde (o parcial só cobre o que ainda não foi tirado dos
+  contadores, e o contador do Fracttal não tem parcial). Teste sem sessão não tira nada dos contadores. No banco entram a
+  rota, a hora e contagens: nunca o e-mail, o nome nem o setor (a rota que traz um `@` no caminho vira `<id>`; o corte
+  por setor fica só no disco, acima). Regras do fato, da chave e da leitura segura: `nexus/dados/CLAUDE.md`, linha "Uso do
+  OS Creator e pedidos ao Fracttal".
 - **Prova:** `tests/test_casca_uso_os.py` (um Flask de mentira com rotas `/os/...`, o Fracttal falso do `requests`, o relógio
-  na mão e, para o JavaScript, o `node` rodando o `enviar` do Histórico, o `pedir` e o `acomp.js` de verdade).
+  na mão e, para o JavaScript, o `node` rodando o `enviar` do Histórico, o `pedir` e o `acomp.js` de verdade) e, para a
+  gravação, `tests/test_dados_fato_uso_os.py` (a API do banco de mentira, inclusive a que devolve tudo como texto).
 
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 

@@ -683,6 +683,9 @@ def test_parcial_com_um_balde_ruim_aproveita_os_bons(tmp_path, relogio):
 def test_o_laco_de_cinco_minutos_so_liga_fora_dos_testes(tmp_path, relogio, monkeypatch):
     rodou = threading.Event()
     monkeypatch.setattr(U, "_laco", rodou.set)
+    # o laço da gravação de hora em hora também sai de cena: de verdade ele dormiria até o :05 e, acordando no meio de outro
+    # teste, tiraria as horas dos contadores dele (a prova dele é a de tests/test_dados_fato_uso_os.py)
+    monkeypatch.setattr(U, "_laco_gravacao", lambda: None)
     U.ligar(_app(tmp_path, relogio), gravar=True)                        # TESTING: sem thread
     assert not rodou.wait(0.3)
     U.limpar()

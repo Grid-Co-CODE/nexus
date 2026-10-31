@@ -89,6 +89,9 @@ RESUMO = {
     # ── PCM ──
     "programacao": "A agenda semanal de manutenção montada pelo PCM",
     "tarefa_os": "Cada tarefa das OS abertas no Fracttal e a zeladoria feita",
+    # ── OS Creator ──
+    "uso_os_hora": "O uso de cada tela do OS Creator, hora a hora",
+    "fracttal_hora": "Os pedidos do Nexus ao Fracttal, por hora e por quem pediu",
 }
 
 PARA_QUE = {
@@ -337,4 +340,14 @@ PARA_QUE = {
                  "últimos 90 dias, lidas pelo próprio Nexus de hora em hora: a usina, o equipamento, o tipo, a data "
                  "programada e em que pé está. É de onde a Visão do responsável conta as OS abertas e atrasadas e a "
                  "zeladoria de cada usina.",
+    "uso_os_hora": "Guarda, de hora em hora, quantas vezes cada tela do OS Creator foi aberta, por quantas pessoas "
+                   "diferentes, quanto demorou (a mediana e o p95), quantos erros deu, quantas vezes o Nexus respondeu "
+                   "\"ocupado\" e quantos pedidos fez ao Fracttal, separando o clique da pessoa do que a tela pede "
+                   "sozinha. Serve para saber quais telas pesam e a que horas, e para medir o antes e o depois de cada "
+                   "mudança no OS Creator. Só contagens: nunca quem abriu nem o setor dela.",
+    "fracttal_hora": "Guarda, de hora em hora, quantos pedidos o Nexus fez ao Fracttal, quem pediu (a tela ou a tarefa de "
+                     "fundo) e para quê, quantos o Fracttal recusou por excesso e o maior número de pedidos num minuto. "
+                     "O Fracttal aceita 200 por minuto para a empresa toda, e esta é a parte do Nexus: serve para ver "
+                     "os horários de pico de verdade e se cada mudança alivia a cota. A linha com origem * é o total da "
+                     "hora, e não se soma com as outras.",
 }

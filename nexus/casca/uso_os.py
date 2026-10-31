@@ -38,6 +38,13 @@ gravação leva ao banco (`drenar`) e que o Raio-X mostra (`instantaneo`).
   aberta que não apaga. Fica fora dele o pedido que o teto recusou (não tem sessão).
 - **A memória não cresce:** as horas guardadas têm teto (MAX_HORAS, para o caso de ninguém drenar), como as rotas, os
   setores e o tamanho da rota.
+- **O laço de gravação** (`gravar_no_banco`, 31/10/2026, só com `gravar=True`: o servidor): no minuto :05 de cada hora tira
+  as horas FECHADAS dos dois contadores (`drenar`, com a hora aberta lida antes dos dois) e as leva ao banco, num livro por
+  mês (`dados/fato_uso_os.py`). Deu certo, grava o parcial (o reinício não traz a hora de volta). Deu errado (banco fora,
+  leitura curta do livro, sem a chave), as linhas ficam na memória e a hora seguinte tenta de novo com as novas, no máximo
+  48 horas (as mais velhas saem, com aviso no log). Essas horas à espera só existem na memória: um reinício com o banco fora
+  as perde. O :05 não cai em cima de nenhum laço de hora em hora do Nexus (tarefas :10 a :20, normalizações :22, sync do App
+  :25, zeladoria :32, carga :40, chamados :50).
 
 Quem liga é o `servir.py` (o servidor), junto do `teto_os` e depois dele (é o teto que avisa o 503); o `create_app`, o PC
 e os testes seguem sem isto. Os ganchos do Flask nunca derrubam o pedido: qualquer falha da medição vai ao log em debug.
@@ -73,6 +80,8 @@ SEM_SETOR = "(sem setor)"
 OUTRAS = "(outras)"
 PASSO_S = 300                                   # o instantâneo em disco, de 5 em 5 minutos
 MAX_HORAS = 48                                  # horas na memória sem ninguém drenar (o laço da gravação drena a cada hora)
+GRAVAR_NO_MINUTO = 5                            # o laço de gravação acorda no :05 de cada hora (fora dos minutos dos outros laços)
+MAX_HORAS_PENDENTES = 48                        # horas já tiradas dos contadores que esperam o banco; as mais velhas saem
 MAX_ROTAS = 200                                 # rotas distintas por hora (e por dia e setor no corte); o resto vai a OUTRAS
 MAX_SETORES = 50                                # setores distintos por dia no corte
 MAX_CARACTERES_DA_ROTA = 160
@@ -90,7 +99,10 @@ _trava = threading.Lock()                       # a do estado: um pedido toma um
 _trava_disco = threading.Lock()                 # uma gravação em disco de cada vez (o laço e quem chamar `salvar`)
 _horas: dict = {}                               # hora_id -> _Hora
 _setor: dict = {}                               # dia -> setor -> rota -> [cliques, automáticos]
-_estado: dict = {"gravar": False, "pasta": None}
+_estado: dict = {"gravar": False, "pasta": None, "config": None}
+_trava_pendentes = threading.Lock()
+_trava_gravacao = threading.Lock()              # uma volta de gravação por vez (o laço e quem mais chamar)
+_pendentes: dict = {"uso": [], "fracttal": []}  # as linhas dos dois contadores que já saíram e ainda não chegaram ao banco
 
 
 def _agora() -> float:
@@ -113,6 +125,8 @@ _OPACO = re.compile(r"[A-Za-z0-9_-]{16,}")                      # secrets.token_
 def _segmento(s: str) -> str:
     if not s:
         return s
+    if "@" in s:
+        return "<id>"       # quem digita um e-mail no endereço não o deixa na rota: o banco é de leitura aberta e não apaga
     if _NUMERO.fullmatch(s):
         return "<n>"
     if _UUID.fullmatch(s) or _HEX.fullmatch(s):
@@ -380,7 +394,104 @@ def limpar() -> None:
         _horas.clear()
         _setor.clear()
         _estado.clear()
-        _estado.update(gravar=False, pasta=None)
+        _estado.update(gravar=False, pasta=None, config=None)
+    with _trava_pendentes:
+        for lista in _pendentes.values():
+            lista.clear()
+
+
+# ── a gravação de hora em hora ───────────────────────────────────────────────────────────────────────────────────────
+def pendentes() -> dict:
+    """As linhas que já saíram dos contadores e esperam o banco: `{"uso", "fracttal", "horas"}`, só contagens."""
+    with _trava_pendentes:
+        horas = {lin["hora_id"] for lista in _pendentes.values() for lin in lista}
+        return {"uso": len(_pendentes["uso"]), "fracttal": len(_pendentes["fracttal"]), "horas": len(horas)}
+
+
+def _cortar_pendentes() -> None:
+    """Com a trava na mão: fica no máximo MAX_HORAS_PENDENTES horas à espera, as mais novas. O banco fora por dias não pode
+    encher a memória do servidor."""
+    horas = sorted({lin["hora_id"] for lista in _pendentes.values() for lin in lista})
+    if len(horas) <= MAX_HORAS_PENDENTES:
+        return
+    corte = horas[-MAX_HORAS_PENDENTES]
+    for nome in _pendentes:
+        _pendentes[nome] = [lin for lin in _pendentes[nome] if lin["hora_id"] >= corte]
+    log.warning("Uso do OS Creator: o banco segue sem receber e descartei %d hora(s) pendente(s), as mais velhas; "
+                "ficam as %d mais novas", len(horas) - MAX_HORAS_PENDENTES, MAX_HORAS_PENDENTES)
+
+
+def espera_ate_a_gravacao(agora: float) -> float:
+    """Segundos até o próximo :05 de uma hora cheia (o fuso do Brasil é de horas inteiras: o minuto é o mesmo em qualquer
+    um). Estando no :05 exato, o próximo é o da hora seguinte."""
+    alvo = (agora // 3600) * 3600 + GRAVAR_NO_MINUTO * 60
+    if alvo <= agora:
+        alvo += 3600
+    return alvo - agora
+
+
+def gravar_no_banco(config=None, *, sessao=None) -> dict:
+    """Uma volta do laço de gravação: tira as horas FECHADAS dos dois contadores, soma ao que ficou esperando e leva tudo ao
+    banco (`dados/fato_uso_os.gravar`). Devolve só contagens: o que `gravar` devolve; `{"pulou": ...}` sem nada a gravar; ou
+    `{"erro": ..., "pendentes": ...}`, e então as linhas ficam para a hora seguinte (no máximo MAX_HORAS_PENDENTES horas).
+
+    A hora aberta (a de agora) é lida UMA vez, antes dos dois `drenar`: o relógio que anda entre os dois não faz o segundo
+    tirar uma hora que ainda não fechou. `sessao` e `config` são para os testes; no servidor vêm do app e do `requests`.
+    Teste sem sessão não tira nada dos contadores e nunca vai à rede."""
+    config = config if config is not None else (_estado.get("config") or {})
+    if sessao is None and config.get("TESTING"):
+        return {"pulou": "teste sem banco: nada foi tirado dos contadores"}
+    if not _trava_gravacao.acquire(blocking=False):
+        return {"pulou": "outra volta da gravação está em curso"}
+    try:
+        return _gravar_horas_fechadas(config, sessao)
+    finally:
+        _trava_gravacao.release()
+
+
+def _gravar_horas_fechadas(config, sessao) -> dict:
+    ate = fracttal_conta.hora_id_de()                   # a hora aberta, lida ANTES dos dois drenar
+    novas_uso, novas_fracttal = drenar(ate), fracttal_conta.drenar(ate)
+    with _trava_pendentes:
+        _pendentes["uso"] += novas_uso
+        _pendentes["fracttal"] += novas_fracttal
+        _cortar_pendentes()
+        uso, fracttal = list(_pendentes["uso"]), list(_pendentes["fracttal"])
+    if not uso and not fracttal:
+        return {"pulou": "nenhuma hora fechada para gravar"}
+    token = str(config.get("GRIDCO_SQL_TOKEN") or "").strip()
+    if not token:
+        return {"erro": "sem GRIDCO_SQL_TOKEN: as linhas ficam na memória", "pendentes": pendentes()}
+    from ..cadastro.ligacoes import BASE_API
+    from ..dados import fato_uso_os                     # aqui dentro: a casca não puxa a camada de dados no import
+    try:
+        if sessao is None:
+            import requests
+            sessao = requests.Session()
+        rel = fato_uso_os.gravar(uso, fracttal, base=(config.get("GRIDCO_DB_API") or BASE_API).rstrip("/"), token=token,
+                                 sessao=sessao)
+    except Exception as ex:                             # noqa: BLE001 - banco fora, leitura curta, conferência: tenta na hora seguinte
+        log.warning("Uso do OS Creator: não gravei no banco (%s); %d linha(s) esperam a hora seguinte", type(ex).__name__,
+                    len(uso) + len(fracttal), exc_info=True)
+        return {"erro": type(ex).__name__, "pendentes": pendentes()}
+    gravadas = {id(lin) for lin in uso} | {id(lin) for lin in fracttal}
+    with _trava_pendentes:                              # só sai o que foi gravado: o que chegou durante a gravação fica
+        for nome in _pendentes:
+            _pendentes[nome] = [lin for lin in _pendentes[nome] if id(lin) not in gravadas]
+    try:
+        salvar()                                        # o parcial sem a hora que já está no banco: o reinício não a traz de volta
+    except Exception:                                   # noqa: BLE001
+        log.warning("Uso do OS Creator: gravei no banco e não consegui guardar o parcial", exc_info=True)
+    return rel
+
+
+def _laco_gravacao() -> None:
+    while True:
+        time.sleep(espera_ate_a_gravacao(_agora()))
+        try:
+            log.info("Uso do OS Creator no banco: %s", gravar_no_banco())
+        except Exception:                               # noqa: BLE001 - a medição nunca derruba o Nexus
+            log.exception("Uso do OS Creator: a volta da gravação quebrou")
 
 
 # ── o disco: o parcial e o corte por setor ───────────────────────────────────────────────────────────────────────────
@@ -534,11 +645,12 @@ def _laco() -> None:
 def ligar(app, *, gravar: bool) -> None:
     """Liga a medição neste app: os ganchos do pedido, o aviso do teto, o parcial e o corte por setor de antes do reinício e
     (fora dos testes) o laço de 5 em 5 minutos. `gravar` diz se este processo leva as horas ao banco (o servidor sim, o PC
-    não): o laço da gravação de hora em hora é o que usa. Chame DEPOIS do `teto_os.ligar` (é ele que avisa o 503).
-    Ligar de novo no mesmo app não faz nada."""
+    não): só com ele abre o laço da gravação de hora em hora (`gravar_no_banco`, no :05). Chame DEPOIS do `teto_os.ligar` (é
+    ele que avisa o 503). Ligar de novo no mesmo app não faz nada."""
     if CHAVE in app.extensions:
         return
     _estado["gravar"] = bool(gravar)
+    _estado["config"] = app.config
     _estado["pasta"] = _pasta(app.config)
     app.extensions[CHAVE] = _estado
     # na frente do portão (vê o que ele recusa e mede o tempo dele) e atrás de tudo no depois (vê a resposta que sai)
@@ -556,3 +668,5 @@ def ligar(app, *, gravar: bool) -> None:
                 log.exception("Uso do OS Creator: não consegui ler %s; começo do zero", nome)
     if not app.config.get("TESTING"):
         threading.Thread(target=_laco, name="nexus-uso-os", daemon=True).start()
+        if gravar:                                      # a gravação de hora em hora é só do servidor
+            threading.Thread(target=_laco_gravacao, name="nexus-uso-os-banco", daemon=True).start()

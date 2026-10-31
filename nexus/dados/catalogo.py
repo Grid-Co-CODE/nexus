@@ -33,7 +33,8 @@ Estados de cada fato (`ESTADOS_FATO`):
 import re
 from dataclasses import dataclass
 
-from . import almoxarifado, fato_chamado, fato_inventario, fato_pt, fato_ronda, fato_tarefa_os, fatos, geracao, programacao
+from . import almoxarifado, fato_chamado, fato_inventario, fato_pt, fato_ronda, fato_tarefa_os, fato_uso_os, fatos, geracao
+from . import programacao
 
 ESTADOS = {"id": "ID", "cod": "código", "hmac": "código da pessoa", "nome": "nome", "largo": "em colunas",
            "prop": "cadastro próprio", "nao": "—"}
@@ -48,7 +49,8 @@ TIPO_ROTULO = {"transacao": "transação", "snapshot_periodico": "foto periódic
 # Como a medida soma. aditiva: em qualquer corte. semi: num eixo só (a irradiação soma no tempo de UMA usina, não
 # entre usinas). nao: nunca (nota, percentual, RPN: média, mínimo, máximo).
 SOMA = ("aditiva", "semi", "nao")
-SUFIXOS_UNIDADE = ("_min", "_kwh", "_kwh_m2", "_mm", "_pct", "_qtd", "_pts", "_nivel")
+# `_ms` entrou em 31/10/2026 com o tempo de resposta das telas do OS Creator (fato_uso_os: mediana e p95 em milissegundos)
+SUFIXOS_UNIDADE = ("_min", "_kwh", "_kwh_m2", "_mm", "_pct", "_qtd", "_pts", "_nivel", "_ms")
 
 
 @dataclass(frozen=True)
@@ -1241,6 +1243,37 @@ FATOS = (
                     "o COS cita pelo nome em referência curta (Inversor 2.7 → INV2.7, Cabine 2 → CAB2). O tipo pelo rótulo vira código "
                     "pelas normalizações. abertas_em na atualizacao é a hora do retrato: na falha da leitura, o de "
                     "antes fica. Impacto, falha (texto livre), a última nota e o que se aguarda não entram (regra 8)"),
+    # o uso das telas do OS Creator e os pedidos do Nexus ao Fracttal, por hora (31/10/2026, etapa 0 do canto central do OS
+    # Creator): o servidor mede na memória (casca/uso_os.py e casca/fracttal_conta.py) e leva as horas fechadas ao banco.
+    # O Nexus é a FONTE; registrado antes da 1ª gravação. Só contagens: nada de pessoa nem de setor (regra 8)
+    Fato("uso_os_hora", "Uso das telas do OS Creator por hora", "os", f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_USO}",
+         fato_uso_os.GRAO_USO,
+         _d(data=("id", "data_id (o dia de Brasília da hora); hora (0 a 23) e hora_id (AAAAMMDDHH)")),
+         tipo=fato_uso_os.TIPO, chave=fato_uso_os.CHAVE_USO, medidas=_m(fato_uso_os.MEDIDAS_USO),
+         fontes=(f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_USO}",), janela_origem=fato_uso_os.JANELA_ORIGEM,
+         estado="conformado", conformado_em=f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_USO}",
+         observacao="um livro por mês (nexus_oscreator_uso_AAAA_MM, o mês é o do hora_id); só as horas fechadas, no :05 da "
+                    "hora seguinte, e regravar a mesma hora troca a linha (a chave), não a repete. rota é o caminho sem a "
+                    "query, com os números como <n> e os ids opacos como <id>; automatico 1 é o que a tela pede sozinha "
+                    "(Histórico, Solicitações, a sessão), 0 é o clique da pessoa. pessoas_qtd conta quem pediu sem dizer "
+                    "quem (depois de um reinício do servidor é aproximado); a mediana e o p95 (duracao_p50_ms, "
+                    "duracao_p95_ms) saem de faixas de 3% (erro até 1,5%) e ficam vazios no balde só de pedidos que o teto "
+                    "recusou (ocupado_qtd). Nunca o nome, o e-mail nem o SETOR da pessoa: há setor de uma ou duas pessoas "
+                    "e o banco é de leitura aberta e não apaga; o corte por setor mora só no disco do servidor, por dia, 30 "
+                    "dias, e o Raio-X mostra"),
+    Fato("fracttal_hora", "Pedidos do Nexus ao Fracttal por hora", "os",
+         f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_FRACTTAL}", fato_uso_os.GRAO_FRACTTAL,
+         _d(data=("id", "data_id (o dia de Brasília da hora); hora (0 a 23) e hora_id (AAAAMMDDHH)")),
+         tipo=fato_uso_os.TIPO, chave=fato_uso_os.CHAVE_FRACTTAL, medidas=_m(fato_uso_os.MEDIDAS_FRACTTAL),
+         fontes=(f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_FRACTTAL}",), janela_origem=fato_uso_os.JANELA_ORIGEM,
+         estado="conformado", conformado_em=f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_FRACTTAL}",
+         observacao="a cota do Fracttal é de 200 pedidos por minuto para a empresa toda (o OS Creator, o App de Campo e os "
+                    "robôs do Nexus); esta é a parte do Nexus, por quem pediu. origem é a rota do pedido (normalizada) ou "
+                    "fundo:<nome da thread>, no máximo 50 de fundo por hora; metodo é o method do RPC, o recurso do REST "
+                    "(work_orders), token ou outro. A linha com origem * e metodo * é o TOTAL da hora e o pico por minuto de "
+                    "tudo junto (o pico do total não é a soma dos picos): some só o detalhe (origem diferente de *) ou só "
+                    "ela. recusas_qtd são os 406 e 429 (o Fracttal pedindo calma); erros_qtd, a exceção e o 5xx. Só "
+                    "contagens"),
 )
 POR_ID = {f.id: f for f in FATOS}
 
@@ -1516,11 +1549,22 @@ LIVROS = (
           "registrado em 24/10/2026 antes de existir: nasce com a 1ª decisão. A tela lê com cache de 1 minuto e a "
           "gravação relê o banco antes (troca o livro inteiro, as abas juntas)",
           so_cresce=True),
+    # o uso das telas do OS Creator e os pedidos ao Fracttal, por hora (31/10/2026, etapa 0 do canto central do OS Creator):
+    # um livro por mês, só cresce (a gravação relê o mês e troca as linhas de mesma chave)
+    Livro(fato_uso_os.LIVRO_MOLDE, fato_uso_os.ABAS, "de hora em hora (:05), as horas fechadas, só no servidor",
+          "nexus/casca/uso_os.py (laço de gravação, ligado no servir.py) + nexus/dados/fato_uso_os.py", False,
+          "registrado em 31/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª hora fechada que o servidor leva ao "
+          "banco depois do deploy. Um livro por mês (AAAA_MM do hora_id, de Brasília); as duas abas vão juntas a cada "
+          "gravação, sobre o livro do mês relido (leitura curta não grava). O banco fora guarda as linhas na memória, no "
+          "máximo 48 horas, e a hora seguinte tenta de novo. Só contagens: nem pessoa nem setor (o corte por setor fica "
+          "no disco do servidor)",
+          so_cresce=True),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.
 FAMILIAS = {re.compile(r"^nexus_geracao_inversor_\d{4}_\d{2}$"): "nexus_geracao_inversor_AAAA_MM",
-            re.compile(r"^nexus_almoxarifado_saldo_\d{4}_\d{2}$"): "nexus_almoxarifado_saldo_AAAA_MM"}
+            re.compile(r"^nexus_almoxarifado_saldo_\d{4}_\d{2}$"): "nexus_almoxarifado_saldo_AAAA_MM",
+            re.compile(r"^nexus_oscreator_uso_\d{4}_\d{2}$"): fato_uso_os.LIVRO_MOLDE}
 
 
 def da_familia(livro: str, aba: str) -> bool:
