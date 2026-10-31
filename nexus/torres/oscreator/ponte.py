@@ -246,6 +246,8 @@ def ligar_catalogo_de_ativos(app) -> None:
 
     Nos testes o disco não: a pasta de dados do clone é a do usuário da máquina (%APPDATA%), e um teste não lê nem grava
     nela (o catálogo vive só na memória)."""
+    if RAIZ_CLONE not in sys.path:
+        sys.path.append(RAIZ_CLONE)
     import api
     import ativos_central
     from . import ativos_banco
