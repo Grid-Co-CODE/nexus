@@ -28,13 +28,23 @@ def _epoca(utc: str) -> float:
 
 
 class _Relogio:
-    """O relógio na mão: a hora de Brasília perto da meia-noite UTC não se espera acontecer."""
+    """O relógio na mão: a hora de Brasília perto da meia-noite UTC não se espera acontecer. O porteiro mora no mesmo gancho
+    (etapa 5): a espera dele anda este relógio (e o cronômetro do clique) em vez de dormir, como no test_casca_porteiro.py,
+    então o teste que passa de 90 de fundo no mesmo minuto termina, em vez de esperar para sempre o relógio parado."""
 
     def __init__(self, utc="2026-10-30T13:00:00+00:00"):
         self.t = _epoca(utc)
+        self.mono = 5000.0
 
     def __call__(self) -> float:
         return self.t
+
+    def cronometro(self) -> float:
+        return self.mono
+
+    def esperar(self, cond, segundos: float) -> None:
+        self.t += segundos
+        self.mono += segundos
 
     def em(self, utc: str) -> "_Relogio":
         self.t = _epoca(utc)
@@ -82,6 +92,8 @@ def relogio(monkeypatch):
     C.limpar()
     r = _Relogio()
     monkeypatch.setattr(C, "_agora", r)
+    monkeypatch.setattr(C, "_cronometro", r.cronometro)
+    monkeypatch.setattr(C, "_esperar", r.esperar)
     C.ligar()
     yield r
     C.limpar()
@@ -517,3 +529,16 @@ def test_threads_juntas_nao_perdem_pedido(relogio, monkeypatch):
     assert contaram == [por_thread] * threads                            # cada thread viu só os dela
     assert _contas("/os/api/ativos", "work_orders") == (threads * por_thread, 0, 0, threads * por_thread)
     assert _contas("*", "*")[0] == threads * por_thread
+
+
+# ── o relógio deste arquivo e o porteiro (etapa 5) ───────────────────────────────────────────────────────────────────
+def test_fundo_acima_de_90_no_minuto_parado_nao_trava(relogio):
+    # O porteiro mora no mesmo gancho: com o relógio parado e a espera de verdade, o 91º de fundo no mesmo minuto esperaria
+    # uma janela que nunca anda, e a suíte travaria. A espera deste relógio anda o relógio (como a do test_casca_porteiro):
+    # o teste termina, e o que passa de 90 espera a vez dele no relógio falso
+    s, _ = sessao_real(*[(200, None)] * 91)
+    with C.origem("fundo:laco"):
+        for _ in range(91):
+            s.get(_API)
+    assert _contas("fundo:laco", "work_orders")[0] == 91
+    assert _linha("fundo:laco", "work_orders")["esperas_qtd"] == 1

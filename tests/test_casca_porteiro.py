@@ -130,14 +130,28 @@ def relogio(monkeypatch):
     C.limpar()
 
 
+_PRAZO_DO_PARADO = {"ate": 0.0}         # até quando (no relógio monotônico) a espera de verdade do `parado` vale
+
+
 @pytest.fixture
 def parado(monkeypatch):
     """O relógio de parede parado na mão (a janela só anda quando o teste manda) e a espera de verdade: quem espera a vez
-    dorme na Condition do porteiro, sem a trava. No fim, o `limpar` solta quem tiver ficado esperando."""
+    dorme na Condition do porteiro, sem a trava (os testes com threads precisam disso). A espera tem prazo (20 s, ou o que o
+    teste puser em `_PRAZO_DO_PARADO`): passado ele, ela desiste e o porteiro deixa o pedido sair sem a conta, então o
+    teste que deixou alguém esperando uma janela que nunca anda falha em vez de travar a suíte. O cronômetro do clique é
+    o de verdade: os 2 s do clique são de verdade nos testes com threads, e acabam sozinhos. No fim, o `limpar` solta quem
+    tiver ficado esperando."""
     monkeypatch.setattr(requests.sessions.Session, "send", requests.sessions.Session.send)
     C.limpar()
     parede = [_epoca("2026-10-30T13:00:00+00:00")]
     monkeypatch.setattr(C, "_agora", lambda: parede[0])
+    _PRAZO_DO_PARADO["ate"] = time.monotonic() + 20
+
+    def esperar(cond, segundos):
+        if time.monotonic() > _PRAZO_DO_PARADO["ate"]:
+            raise RuntimeError("o teste deixou um pedido esperando a vez com o relógio parado")
+        cond.wait(min(segundos, 0.05))
+    monkeypatch.setattr(C, "_esperar", esperar)
     C.ligar()
     yield parede
     C.limpar()
@@ -489,30 +503,89 @@ def test_fundo_parado_no_porteiro_nao_segura_as_vagas_do_campo(parado, campo_fra
     assert _linha("/t/campo/aprovacao", "work_orders")["esperas_qtd"] == 0
 
 
-def test_reserva_so_vale_para_o_fundo_declarado_com_o_gancho(relogio, monkeypatch):
+def test_reserva_vale_para_todos_com_o_gancho(relogio, monkeypatch):
     s = _sessao(_Fracttal(relogio))
-    # o clique e a thread sem declaração não reservam nada: passam direto (o clique espera no máximo 2 s lá dentro)
+    # o clique e a thread sem declaração também tiram a vez antes, como clique: contam na janela e não no fundo, e o pedido
+    # dentro da reserva não conta de novo
     for origem in ("/t/campo/aprovacao", ""):
         with C.origem(origem), C.reservar_vez():
-            pass
-    assert C.estado()["ultimo_minuto"] == {"todos": 0, "fundo": 0} and relogio.esperas == []
+            assert s.get(_API).status_code == 200
+    assert C.estado()["ultimo_minuto"] == {"todos": 2, "fundo": 0} and relogio.esperas == []
+
+    def sem_marca():                                            # a thread que ainda não pediu nada: sem marca nenhuma
+        with C.reservar_vez():
+            reservou = C.estado()["ultimo_minuto"]["todos"]
+            assert s.get(_API).status_code == 200
+        return reservou
+    assert contextvars.Context().run(sem_marca) == 3            # a reserva cria a marca inferida, como o 1º pedido faria
+    assert C.estado()["ultimo_minuto"] == {"todos": 3, "fundo": 0}      # e o pedido a usou: contou uma vez só
     # o fundo declarado reserva: conta na janela já na reserva, e o 1º pedido dentro dela não conta de novo
     with C.origem("fundo:laco"), C.reservar_vez():
-        assert C.estado()["ultimo_minuto"] == {"todos": 1, "fundo": 1}
+        assert C.estado()["ultimo_minuto"] == {"todos": 4, "fundo": 1}
         assert s.get(_API).status_code == 200
-        assert C.estado()["ultimo_minuto"] == {"todos": 1, "fundo": 1}
+        assert C.estado()["ultimo_minuto"] == {"todos": 4, "fundo": 1}
         assert s.get(_API).status_code == 200                   # o 2º pedido do bloco já não tem reserva: conta
-    assert C.estado()["ultimo_minuto"] == {"todos": 2, "fundo": 2}
+    assert C.estado()["ultimo_minuto"] == {"todos": 5, "fundo": 2}
     assert _linha("fundo:laco")["pedidos_qtd"] == 2
     # a reserva que sobrou (o pedido nem saiu) morre no fim do bloco: o pedido seguinte espera e conta como sempre
     with C.origem("fundo:laco"):
         with C.reservar_vez():
             pass
         assert s.get(_API).status_code == 200
-    assert C.estado()["ultimo_minuto"] == {"todos": 4, "fundo": 4}
-    # sem o gancho (o PC, os testes): a reserva não espera nem conta, nem com o fundo cheio
-    _pedir(s, "fundo:laco", 86)                                 # 90 de fundo
+    assert C.estado()["ultimo_minuto"] == {"todos": 7, "fundo": 4}
+    # com o minuto cheio, a reserva do clique espera no máximo 2 s, e o pedido dentro dela não espera de novo
+    _pedir(s, "/os/historico", 143)                             # 150
+    antes = relogio.t
+    with C.origem("/t/campo/aprovacao"), C.reservar_vez():
+        assert relogio.t - antes == pytest.approx(C.ESPERA_CLIQUE_MAX_S)
+        assert s.get(_API).status_code == 200
+    assert relogio.t - antes == pytest.approx(C.ESPERA_CLIQUE_MAX_S)        # uma espera só, não duas
+    assert _linha("/t/campo/aprovacao")["esperas_qtd"] == 1
+    # sem o gancho (o PC, os testes): a reserva não espera nem conta, nem com o minuto cheio
     monkeypatch.setattr(requests.sessions.Session, "send", requests.sessions.Session.send.__wrapped__)
     with C.origem("fundo:laco"), C.reservar_vez():
         pass
-    assert relogio.esperas == [] and C.estado()["ultimo_minuto"] == {"todos": 90, "fundo": 90}
+    with C.origem("/t/campo/aprovacao"), C.reservar_vez():
+        pass
+    assert relogio.t - antes == pytest.approx(C.ESPERA_CLIQUE_MAX_S) and C.estado()["ultimo_minuto"]["todos"] == 151
+
+
+def test_cliques_na_fila_das_vagas_nao_somam_as_esperas(parado, campo_fracttal, monkeypatch):
+    # O clique também tira a vez ANTES de uma das 4 vagas do campo/fracttal.py. Com a vaga antes da vez, o clique que esperava
+    # os 2 s dele no porteiro segurava a vaga, e o 5º clique esperava a vaga (os 2 s do da frente) e depois os 2 s dele: com
+    # o minuto cheio, o 12º somava 6 s. Aqui o prazo do clique é 0,5 s, para o teste ser curto.
+    FX = campo_fracttal
+    monkeypatch.setattr(C, "ESPERA_CLIQUE_MAX_S", 0.5)
+    s = _sessao(AdaptadorFalso(*[(200, None)] * 150))
+    _pedir(s, "/os/historico", 150)                             # o minuto cheio
+    n = 3 * FX.SIMULTANEOS                                      # 12 cliques juntos pelo campo/fracttal.py
+    largada, tempos = threading.Barrier(n), []
+
+    def clicar():
+        with C.origem("/t/campo/aprovacao"):
+            largada.wait()
+            comeco = time.monotonic()
+            FX.ler("work_orders?limit=1")
+            tempos.append(time.monotonic() - comeco)
+    threads = [threading.Thread(target=lambda: contextvars.Context().run(clicar), daemon=True) for _ in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+    assert len(tempos) == n
+    assert max(tempos) < 2 * C.ESPERA_CLIQUE_MAX_S              # cada um esperou o dele, nenhum somou o dos da frente
+    lin = _linha("/t/campo/aprovacao", "work_orders")
+    assert (lin["pedidos_qtd"], lin["esperas_qtd"]) == (n, n)
+
+
+def test_parado_falha_em_vez_de_travar(parado):
+    # O relógio parado com a espera de verdade: o 91º de fundo esperaria uma janela que nunca anda, e a suíte travaria. A
+    # espera do `parado` tem prazo: passado ele, o porteiro desiste, o pedido sai sem a conta (como o porteiro quebrado) e
+    # o teste que errou falha em vez de travar
+    _PRAZO_DO_PARADO["ate"] = time.monotonic() + 0.3
+    s = _sessao(AdaptadorFalso(*[(200, None)] * 91))
+    _pedir(s, "fundo:laco", 90)
+    comeco = time.monotonic()
+    _pedir(s, "fundo:laco")
+    assert time.monotonic() - comeco < 2
+    assert _linha("fundo:laco")["pedidos_qtd"] == 90            # o que desistiu da vez saiu sem contar

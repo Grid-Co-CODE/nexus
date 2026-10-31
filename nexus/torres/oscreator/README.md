@@ -1406,6 +1406,11 @@ entra (a de 21/06 que a carga levou junto tem códigos que o Fracttal já não t
 pessoa do dia: o próprio servidor lê os ativos pela credencial da empresa (o REST `items`, o cliente e o ritmo de
 `nexus/campo/fracttal.py`). Só o `servir.py` liga (`ativos_leitor.ligar`, pelo `ponte.modulo_do_clone`); o `app.py` (o PC) e os
 testes seguem pelo RPC; sem a credencial REST (`FRACTTAL_CLIENT_ID`), não liga e o estado diz por quê.
+- **No porteiro do Fracttal (31/10/2026, etapa 5):** o laço `nexus-ativos-leitor` (a noite e os novos das :08 e :38) se
+  declara fundo no alvo da thread (`fracttal_conta.de_fundo`: no máximo 90 pedidos por minuto, e depois do clique); os
+  novos que o botão pede (`nexus-ativos-novos`) seguem clique, porque quem clicou espera por eles. A leitura passa pelo
+  `campo/fracttal.ler`, que tira a vez no porteiro antes de pegar uma das 4 `_VAGAS`. Regras em `nexus/casca/CLAUDE.md`,
+  "Pedidos ao Fracttal: o contador e o porteiro".
 - **De madrugada (02:15 de Brasília), o Fracttal inteiro** (`ler_completo`): ordenado pelo id (`items?sort=id:asc`: o
   deslocamento de cada página só é estável sobre uma ordem declarada), 100 itens por página, 1 pedido por segundo, até o `total`
   que a 1ª página informa (~270 pedidos, ~5 min). O 4xx na 1ª página (o motivo diz qual, revisão 2 da 2.2: o 400 e o 422 são

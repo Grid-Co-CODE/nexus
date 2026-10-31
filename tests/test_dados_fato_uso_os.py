@@ -515,6 +515,10 @@ def relogio(monkeypatch):
     monkeypatch.setattr(U, "_agora", r.agora)
     monkeypatch.setattr(U, "_cronometro", r.cronometro)
     monkeypatch.setattr(C, "_agora", r.agora)
+    # o porteiro do Fracttal mora no mesmo gancho (etapa 5): a espera dele anda este relógio em vez de dormir, e o teste que
+    # passa de 90 de fundo no mesmo minuto termina, em vez de esperar para sempre o relógio parado
+    monkeypatch.setattr(C, "_cronometro", r.cronometro)
+    monkeypatch.setattr(C, "_esperar", lambda cond, segundos: r.passa(segundos))
     C.limpar()
     U.limpar()
     C.ligar()
@@ -904,3 +908,15 @@ def test_ponta_a_ponta_grava_as_3h45_o_que_o_disco_guardou_e_nada_pessoal_vai_ao
     # nem no pendente em disco (só contagens), mas o corte por setor existe no disco do servidor, para o Raio-X
     assert _SETOR not in _arquivo_pendente(tmp_path).read_text(encoding="utf-8")
     assert _SETOR in U.instantaneo()["setor"]["20261030"]
+
+
+# ── o relógio deste arquivo e o porteiro do Fracttal (etapa 5) ───────────────────────────────────────────────────────
+def test_o_relogio_deste_arquivo_nao_trava_o_porteiro(relogio):
+    # o gancho do Fracttal está ligado aqui, e o porteiro mora nele: com o relógio parado e a espera de verdade, o 91º de
+    # fundo no mesmo minuto esperaria para sempre. A espera deste relógio anda o relógio: o teste termina
+    fracttal, _ = sessao_real(*[(200, None)] * 91)
+    with C.origem("fundo:laco"):
+        for _ in range(91):
+            fracttal.get("https://app.fracttal.com/api/work_orders")
+    linha = next(lin for lin in C.instantaneo() if lin["origem"] == "fundo:laco")
+    assert (linha["pedidos_qtd"], linha["esperas_qtd"]) == (91, 1)

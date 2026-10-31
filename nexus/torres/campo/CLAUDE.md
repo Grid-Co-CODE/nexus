@@ -1573,6 +1573,11 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   recarrega a cópia das regras).
 - `pessoas.py`: `identidades.json` e a tabela dos tokens só na partição `cadastro`.
 - `nota_fracttal.py`, `coletor.py`, `banco_campo.py`: o caminho do coletor aposentado.
+- `fracttal.py` e o **porteiro do Fracttal** (31/10/2026): cada pedido do `ler` tira a vez no porteiro do Nexus ANTES de
+  pegar uma das 4 `_VAGAS` (`fracttal_conta.reservar_vez()`), e os laços do Campo que leem o Fracttal por trás se
+  declaram fundo no alvo da thread (`fracttal_conta.de_fundo`: `nexus-tarefas-os-banco`, `nexus-chamados-banco`,
+  `nexus-fila-fracttal` e `nexus-ronda-checklist`); laço novo que lê o Fracttal se declara do mesmo jeito, senão conta
+  como clique. Regras em `nexus/casca/CLAUDE.md`, "Pedidos ao Fracttal: o contador e o porteiro".
 
 Telas: `templates/campo/*.html` + `static/campo.css`; filtros pela URL.
 

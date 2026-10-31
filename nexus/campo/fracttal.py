@@ -100,10 +100,13 @@ def ler(path: str, method: str = "GET", body=None):
             if espera > 0:
                 time.sleep(espera)
             _ULTIMO[0] = time.time()
-        # o fundo declarado espera a vez no porteiro do Nexus ANTES de pegar uma das 4 vagas (31/10/2026): parado lá dentro
-        # com a vaga na mão (a 1ª versão do porteiro), 4 leitores de fundo seguravam o clique que lê por aqui; o clique
-        # passa direto (casca/CLAUDE.md)
+        # a vez no porteiro do Nexus ANTES de uma das 4 vagas (31/10/2026), para ninguém esperar a vez com a vaga na mão: nas
+        # versões de antes, 4 leitores de fundo parados lá dentro prendiam o clique que lê por aqui, e com o minuto cheio
+        # os cliques da fila somavam os 2 s uns dos outros (casca/CLAUDE.md)
         with fracttal_conta.reservar_vez(), _VAGAS:
+            # A reserva vale para o 1º salto: se o Fracttal redirecionar um destes caminhos (o requests segue sozinho), o 2º
+            # salto sai sem ela e espera a vez com a vaga na mão. Ficou só o aviso, sem `allow_redirects=False`: ninguém
+            # conferiu, sem ir ao Fracttal, se algum caminho redireciona, e o False faria essa leitura falhar
             r = requests.get(f"{BASE}/api/{path.lstrip('/')}", timeout=30,
                              headers={"Authorization": "Bearer " + token, "Accept": "application/json"})
         if r.status_code not in (406, 429):

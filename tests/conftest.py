@@ -1,11 +1,32 @@
-"""Fixtures comuns: um app com configuração de teste, sem ler o .env real da máquina."""
+"""Fixtures comuns: um app com configuração de teste, sem ler o .env real da máquina, e nenhum pedido ao Fracttal."""
 import sys
+from urllib.parse import urlsplit
 
 import pytest
+import requests
 
 from nexus import create_app
 
 SENHA_TESTE = "senha-de-teste"
+BLOQUEIO_DO_FRACTTAL = "rede do Fracttal bloqueada nos testes"
+
+
+@pytest.fixture(autouse=True)
+def _sem_a_rede_do_fracttal(monkeypatch):
+    """Nenhum teste fala com o Fracttal de verdade (31/10/2026). Numa outra tarefa, 4 testes antigos mandaram leituras de
+    VERDADE ao Fracttal com um JWT falso: deu 401 e nada foi gravado, mas a cota de 200 pedidos por minuto é da empresa toda
+    e teste não vai à rede. O pedido a um host que termina em `fracttal.com` levanta `ConnectionError` no adaptador do
+    requests (`HTTPAdapter.send`), ABAIXO do `Session.send` que os testes do contador e do porteiro trocam: o adaptador de
+    mentira de cada teste (`sessao_real_sem_rede`, o `HTTPAdapter.send` trocado no próprio teste, que vence este) segue
+    valendo, e o resto (a própria máquina, o banco de mentira) passa como sempre. A suíte não usa `responses` nem
+    `requests_mock` (31/10/2026); quem vier a usar troca o adaptador por cima deste, e o bloqueio volta no fim."""
+    enviar = requests.adapters.HTTPAdapter.send
+
+    def send(self, request, **kwargs):
+        if (urlsplit(request.url).hostname or "").lower().endswith("fracttal.com"):
+            raise requests.ConnectionError(BLOQUEIO_DO_FRACTTAL, request=request)
+        return enviar(self, request, **kwargs)
+    monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", send)
 
 
 @pytest.fixture

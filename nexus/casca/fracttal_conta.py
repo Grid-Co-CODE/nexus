@@ -48,8 +48,8 @@ contado na hora em que sai, dentro deste embrulho:
 - **O fundo espera a vez, sem limite:** passa com menos de 90 de fundo E menos de 150 no total nos últimos 60 s, e cede a
   vaga ao clique que estiver esperando. A leitura dele continua em curso enquanto espera: para quem lê, é só um pedido mais
   lento (o `timeout` do requests nem começa a contar: a espera é antes do adaptador). Quem segura um recurso enquanto pede
-  (as 4 vagas do `campo/fracttal.py`) tira a vez ANTES (`reservar_vez`): o fundo parado no porteiro não segura a vaga de
-  um clique.
+  (as 4 vagas do `campo/fracttal.py`) tira a vez ANTES (`reservar_vez`), o fundo e o clique: ninguém espera a vez com uma
+  vaga na mão.
 - **Ninguém dorme segurando a trava:** a espera é na `threading.Condition` da trava (`_esperar`), com tempo, no máximo
   `PASSO_DA_ESPERA_S` por vez e conferindo de novo; um fundo esperando nunca atrasa um clique.
 - **A conta é deste processo:** o PC (que não liga o gancho) e o App de Campo ficam fora dela; os 50 de folga são deles.
@@ -426,21 +426,27 @@ def de_fundo(nome: str, fn):
 @contextmanager
 def reservar_vez():
     """A vez no porteiro tirada ANTES do pedido, para quem segura um recurso enquanto pede ao Fracttal: as 4 vagas do
-    `campo/fracttal.py` (`with fracttal_conta.reservar_vez(), _VAGAS:`). Na 1ª versão do porteiro (31/10/2026, antes de ir
-    ao ar), 4 leitores de fundo parados no porteiro seguravam as 4 vagas, e o clique que lê pelo mesmo `campo/fracttal.py`
-    esperava por eles, sem limite. O fundo declarado espera a vez aqui, sem a vaga na mão, e já entra na janela; o 1º
-    pedido dele dentro do bloco honra a reserva (não espera nem conta de novo na janela; a hora e a espera vão à linha
-    dele, como sempre). O clique, a thread sem declaração e o processo sem o gancho (o PC, os testes) passam direto: o
-    clique espera no máximo 2 s lá dentro, como sempre. A reserva que sobrou (o pedido que nem saiu) morre no fim do bloco.
-    Nunca levanta: com o porteiro quebrado, segue sem reserva."""
+    `campo/fracttal.py` (`with fracttal_conta.reservar_vez(), _VAGAS:`), para ninguém esperar a vez com uma vaga na mão.
+    Nas versões de antes (31/10/2026, antes de ir ao ar), quem esperava a vez segurava a vaga: 4 leitores de fundo parados
+    no porteiro prendiam, sem limite, o clique que lê pelo mesmo arquivo, e, com o minuto cheio, o 12º clique da fila
+    somava 6 s. Cada um espera a sua vez aqui, sem a vaga, como espera no envio: o fundo declarado sem limite, o resto (o
+    clique, a thread sem declaração) no máximo 2 s. A reserva já entra na
+    janela; o 1º pedido dentro do bloco a honra (não espera nem conta de novo na janela; a hora e a espera vão à linha dele,
+    como sempre). Sem o gancho (o PC, os testes) não faz nada. A reserva que sobrou (o pedido que nem saiu) morre no fim do
+    bloco. Nunca levanta: com o porteiro quebrado, o pedido segue sem reserva."""
     reserva = None
     try:
-        marca = _marca_atual.get()
-        if marca is not None and _e_fundo(marca) and _ligado():
+        if _ligado():
+            marca = _marca_atual.get()
+            if marca is None:                           # como o 1º pedido faria (`_abrir`): o nome da thread, inferido
+                marca = _Marca(_origem_de_fundo())
+                _marca_atual.set(marca)
+            fundo = _e_fundo(marca)
             with _trava:
-                esperou, agora = _vez_de(True)
+                esperou, agora = _vez_de(fundo)
                 _janela.append(agora)
-                _janela_fundo.append(agora)
+                if fundo:
+                    _janela_fundo.append(agora)
             reserva = _Reserva(marca, esperou)
     except Exception:                                   # noqa: BLE001 - o porteiro não derruba o pedido de ninguém
         log.debug("porteiro do Fracttal: não consegui reservar a vez", exc_info=True)
