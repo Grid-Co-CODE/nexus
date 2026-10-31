@@ -14,7 +14,7 @@ from flask import (Blueprint, abort, current_app, jsonify, redirect, render_temp
 import api
 import ativos_central
 
-from . import ativo_curto, engenharia_web, lancador, oauth_fracttal, perf_web, sessao, sso
+from . import ativo_curto, engenharia_web, lancador, lista_central, oauth_fracttal, perf_web, sessao, sso
 from . import historico_store as HS
 from markupsafe import Markup
 
@@ -484,8 +484,10 @@ def api_performance_criar():
         # "Agrupar em UMA OS com várias tarefas" (Levi, 13/10/2026, como no app: `PerfCriar._criar`): o mesmo `itens`,
         # com a OS pai e o título únicos, e a observação da OS inteira
         res = api.create_performance_os_agrupada(itens, note_os=perf_web.obs_da_os(corpo), **kwargs)
+        lista_central.criadas(res)                      # a OS criada entra na lista central na hora (31/10/2026)
         return jsonify(perf_web.mensagem_agrupada(res, corpo.get("frase") or "", bool(corpo.get("gerar_ticket", True))))
     res = api.create_performance_os(itens, **kwargs)
+    lista_central.criadas(res)
     # a frase e a caixa vao junto: e delas que sai o "N tickets criados na aba X" (e o "sem ticket")
     return jsonify(perf_web.mensagem_resultado(res, corpo.get("frase") or "",
                                                bool(corpo.get("gerar_ticket", True))))
@@ -579,6 +581,11 @@ def motivos_cancelamento() -> list:
 
 
 def os_recentes(dias: int) -> list:
+    """A marcação verde dos Ativos: da lista central de OS quando ela cobre os `dias` (31/10/2026, tarefa 3.3: nenhum pedido);
+    senão a de sempre, uma para todos (`api.codigos_os_recentes`, ~17 páginas, 10 min na memória)."""
+    central = lista_central.codigos_recentes(dias)
+    if central is not None:
+        return central
     return list(_memo(("cat", "os_recentes", dias), TTL_CATALOGO, lambda: api.codigos_os_recentes(dias) or [],
                       guardar=bool))
 
@@ -616,11 +623,33 @@ def _catalogo_clientes_usinas() -> dict:
     return m
 
 
-def ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, *, forcar=False, aviso=None):
-    """(a Lista ou None, as linhas, o info, o erro) do Histórico, pela lista guardada e renovada sem repetir o Fracttal
-    (19/10/2026, `historico_store`): a de "Todos" é uma só para quem vê o mesmo total no Fracttal (1 pedido na sessão da
-    pessoa, a cada 30 min); a de cada pessoa segue dela. Saiu de dentro do `historico` em 26/10/2026 para o "Investigar
-    ativo" do Tempo real (`rotas_investigar`) ler a MESMA lista da Visão COS, sem uma busca a mais no Fracttal."""
+def _contas_do_filtro() -> list:
+    """As contas do "Criado por" (o mesmo catálogo que a tela mostra, guardado por pessoa): o nome da conta escolhida."""
+    return (_memo(("pessoas", _quem()), TTL_APOIO, lambda: api.get_pessoas_contas() or {}) or {}).get("pessoas") or []
+
+
+def ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, *, forcar=False, aviso=None, mudou=False, cos=False,
+              central=True):
+    """(a Lista ou None, as linhas, o info, o erro) do Histórico.
+
+    Desde 31/10/2026 (tarefa 3.3 do canto central), da LISTA CENTRAL DE OS primeiro (`lista_central.historico`): quando ela
+    cobre o período, tem os campos que a tela mostra e a pessoa conferiu que vê no Fracttal o mesmo que ela (1 pedido de 1
+    linha na sessão dela, a cada 30 min). Então nenhum pedido a mais: nem a lista inteira, nem as novas, nem a de 10 em 10
+    min. `cos`: a Visão COS (mostra o gatilho, a programação, o início e quem criou). `central=False`: só o caminho de hoje
+    (quem já tentou a lista pelo seu atalho, o Investigar).
+
+    Senão, o CAMINHO DE HOJE, sem mudar: a lista guardada e renovada sem repetir o Fracttal (19/10/2026, `historico_store`):
+    a de "Todos" é uma só para quem vê o mesmo total no Fracttal (1 pedido na sessão da pessoa, a cada 30 min); a de cada
+    pessoa segue dela. `mudou`: o card acabou de mudar uma OS; aqui a lista vem de novo do Fracttal (o que o `atualizar=1`
+    forçado ao fechar o card fazia até 31/10/2026), e na lista central ela já entrou pela ação. Saiu de dentro do `historico`
+    em 26/10/2026 para o "Investigar ativo" do Tempo real (`rotas_investigar`) ler a MESMA lista da Visão COS."""
+    if central:
+        v = lista_central.historico(modo_srv, id_account, id_label, de, ate, status_ids, pessoa=_quem(), forcar=forcar,
+                                    cos=cos, pessoal=responsaveis_fracttal, contas=_contas_do_filtro,
+                                    etiquetas=etiquetas_fracttal)
+        if v is not None:
+            return v, v.linhas, v.info, None
+    forcar = forcar or mudou
     linhas, erro, info, lista = [], None, {}, None
     filtros = (modo_srv, id_account, id_label, de, ate, tuple(status_ids or ()))
     chave = ("hist", _quem()) + filtros
@@ -694,9 +723,11 @@ def historico():
 
     "Pq não funciona como um filtro?" (Levi, 27/09): porque as três visões são três buscas DIFERENTES no Fracttal
     (criadas por mim, atribuídas a mim, a equipe inteira) e a da equipe passa do teto de 2.000 em 30 dias — filtrar as
-    outras a partir dela perderia OS. O que dá para cortar, cortou-se: a lista fica 3 min na memória por pessoa e visão
-    (voltar a uma visão não vai ao Fracttal; o ↻, o F5 e a atualização de 10 min vão, com `atualizar=1`), e a tela
-    deixou de buscar de novo, em 34 lotes sequenciais de 60, o meta que o servidor já tinha mandado."""
+    outras a partir dela perderia OS. O que dá para cortar, cortou-se: a lista guardada e dividida de 19/10/2026
+    (`historico_store`), e a tela deixou de buscar de novo, em 34 lotes sequenciais de 60, o meta que o servidor já tinha
+    mandado. Desde 31/10/2026 (tarefa 3.3 do canto central) as visões são filtros da LISTA CENTRAL DE OS, que o servidor lê
+    em faixas, depois da conferência de cada pessoa (`ler_lista`, `lista_central`); o caminho de 19/10 fica para quem a lista
+    não cobre (o período fora da janela, a visão restrita, o PC sem leitor)."""
     modo = request.args.get("modo") or "criadas"
     if modo not in ("criadas", "atribuidas", "cos"):
         modo = "criadas"
@@ -721,8 +752,11 @@ def historico():
     status_sel = [x for x in request.args.getlist("status") if x in nome_para_id]
     status_ids = [nome_para_id[x] for x in status_sel] or None
     forcar = request.args.get("atualizar") == "1"
+    # `mudou=1`: o card fechou depois de mudar uma OS (31/10/2026: a tela não força mais o atualizar=1; a ação já pôs a OS na
+    # lista central, e no caminho de hoje a lista vem de novo, como vinha)
     lista, linhas, info, erro = ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, forcar=forcar,
-                                          aviso=_progresso_de(request.args.get("p")))
+                                          aviso=_progresso_de(request.args.get("p")),
+                                          mudou=request.args.get("mudou") == "1", cos=modo == "cos")
     # o teto de 2.000 corta as OS MAIS ANTIGAS do período em silêncio — dizer, com o total do servidor e o que CHEGOU (a
     # conta é total − carregadas, antes da busca local; o teto só entra para saber se houve corte)
     total_srv, teto = int(info.get("total") or 0), int(info.get("cap") or 0)
@@ -760,6 +794,7 @@ def historico():
                            cols=cols_v, datas=DATAS, fmt=api.fmt_data_br, linhas_html=linhas_html,
                            lista_de=(dt.datetime.fromtimestamp(lista.criada_em, api._BR_TZ).strftime("%H:%M")
                                      if lista else ""),
+                           da_lista_central=bool(getattr(lista, "central", False)),
                            labels=labels, pessoas=pessoas, pessoa_sel=pessoa_sel, etiqueta_sel=str(id_label or ""),
                            status_opts=list(api.WO_STATUS.values()), status_sel=status_sel, clientes=clientes,
                            usinas=sorted(usina_cli), usina_cli=usina_cli, tipos_ativo=tipos_ativo,
@@ -887,6 +922,20 @@ def _gravou_esquece_preparo(resp):
 def os_preparar(wid):
     modo = "chamado" if request.args.get("modo") == "chamado" else "card"
     return jsonify({"pedido": preparar(_quem(), wid, modo)}), 202
+
+
+@bp.route("/api/os/<int:wid>/previa")
+@exige_sessao
+def os_previa(wid):
+    """A 1ª pintura do card (31/10/2026, tarefa 3.3 do canto central): o que a lista central de OS sabe desta OS (o nº, o tipo,
+    o status, o ativo, as datas, quem criou e com quem está), na hora e sem pedido ao Fracttal, enquanto o card inteiro vem ao
+    vivo (as subtarefas, os anexos, a OS pai e a solicitação, como sempre). 204 quando a lista não pode dizer (a OS que ela não
+    tem, quem não conferiu que vê no Fracttal o mesmo que ela, o PC sem leitor): o card abre como sempre. Fica em /os/api/:
+    sem a sessão, 401 em JSON, e a tela não pinta a página do login por engano."""
+    linha = lista_central.previa(wid)
+    if linha is None:
+        return "", 204
+    return render_template("_os_previa.html", l=linha, fmt=api.fmt_data_br)
 
 
 @bp.route("/os/folio/<int:folio>")

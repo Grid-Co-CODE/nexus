@@ -15,6 +15,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 import api
 
+from . import lista_central
 from . import perf_web
 from . import solic_eng_web as reg
 from . import rotas
@@ -130,6 +131,7 @@ def api_criar():
         res = api.create_work_orders_bulk(ativos, c["descricao"], reg.TIPO_TAREFA, [],
                                           responsible_code=c["responsible_code"], **comum)
         out, oss = reg.mensagem(res, ativos, c["prog_date"]), reg.oss_do_bulk(res)
+    lista_central.criadas(res)         # as OS criadas entram na lista central na hora (31/10/2026, tarefa 3.3)
     if anexos:
         alvos = [o for o in oss if o.get("id_work_order")]
         with api._ExecutorComContexto(max_workers=reg.ENVIOS_PARALELOS) as ex:

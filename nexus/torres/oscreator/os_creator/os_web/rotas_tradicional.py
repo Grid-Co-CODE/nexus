@@ -19,6 +19,7 @@ import api
 import ativos_central
 
 from . import ativo_curto
+from . import lista_central
 from . import tradicional_web as trad
 from . import rotas
 from .rotas import _conta, _memo, exige_sessao
@@ -135,9 +136,14 @@ def api_criar():
     modo, args, kwargs, erro = trad.montar_payload(corpo, api.load_assets_cached(), imagens, frases)
     if erro:
         return jsonify({"erro": erro}), 400
+    # as OS criadas entram na lista central de OS na hora (31/10/2026, tarefa 3.3): o Histórico as mostra sem a próxima volta
     if modo == "agrupada":                                            # app.py:999 — "Agrupar em UMA OS com várias tarefas"
-        return jsonify(trad.mensagem_agrupada(api.create_work_orders_agrupada(*args, **kwargs)))
-    return jsonify(trad.mensagem_bulk(api.create_work_orders_bulk(*args, **kwargs)))   # app.py:1009 — uma OS por ativo
+        res = api.create_work_orders_agrupada(*args, **kwargs)
+        lista_central.criadas(res)
+        return jsonify(trad.mensagem_agrupada(res))
+    res = api.create_work_orders_bulk(*args, **kwargs)                # app.py:1009 — uma OS por ativo
+    lista_central.criadas(res)
+    return jsonify(trad.mensagem_bulk(res))
 
 
 @bp.errorhandler(RequestEntityTooLarge)

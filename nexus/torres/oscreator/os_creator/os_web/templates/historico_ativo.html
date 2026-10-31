@@ -70,7 +70,7 @@
       {% for l in linhas %}
       <tr data-id="{{ l.id }}" data-ativo="{{ '1' if l._do_ativo else '0' }}" data-status="{{ l.status }}" data-tarefa="{{ l.tipo_tarefa or '' }}" data-texto="{{ l._texto }}"{% if escopo == 'ativo' and not l._do_ativo %} hidden{% endif %}>
         {% for rot, chave in cols %}
-        {% if chave == 'folio' %}<td class="k-folio"><a class="os-folio" href="/os/os/{{ l.id }}?status={{ l.status|urlencode }}">{{ l.folio }}</a></td>
+        {% if chave == 'folio' %}<td class="k-folio"><a class="os-folio" href="/os/os/{{ l.id }}?status={{ l.status|urlencode }}">{{ l.folio }}</a>{% if l._a_conferir %} <span class="os-ajuda" title="Uma leitura do Fracttal deveria ter trazido esta OS e não trouxe: o status pode ter mudado. Abra a OS para ver como está agora.">a conferir</span>{% endif %}</td>
         {% elif chave == 'status' %}<td class="k-status">{% if l.status %}<span class="os-status" {% if l._status_cor %}style="color:{{ l._status_cor }};background:{{ l._status_cor }}29;border-color:{{ l._status_cor }}6b"{% endif %}>{{ l.status }}</span>{% endif %}</td>
         {% elif chave == 'etiqueta' %}<td class="k-etiqueta">{{ l._etiqueta }}</td>
         {% elif chave == 'descricao' %}<td class="c-desc k-descricao">{{ l.descricao }}</td>
@@ -105,21 +105,45 @@
     corpo.innerHTML = '<p class="os-ajuda" style="padding:24px">Carregando a OS…</p>';
     modal.hidden = false; document.body.classList.add("os-modal-aberto");
     var sep = url.indexOf("?") >= 0 ? "&" : "?";
+    var chegou = false;                       // o card inteiro chegou: a 1ª pintura não pinta mais por cima dele
+    previa(url, function () { return chegou; });
     OsCarga.buscar(url + sep + "parcial=1", {headers: {"X-Requested-With": "fetch"}, credentials: "same-origin"}, "Abrindo a OS…")
       .then(function (r) { return r.text(); })
       .then(function (h) {
+        chegou = true;
         corpo.innerHTML = h; corpo.scrollTop = 0;
         var det = corpo.querySelector(".det");
         if (window.OsAcoes && det) window.OsAcoes.contagem(det);
       })
-      .catch(function () { corpo.innerHTML = '<p class="os-erro" style="padding:24px">Não consegui carregar a OS aqui.</p>'; });
+      .catch(function () { chegou = true; corpo.innerHTML = '<p class="os-erro" style="padding:24px">Não consegui carregar a OS aqui.</p>'; });
   }
-  // a ação que mudou a OS (concluir, cancelar, responsável, etiquetas, nota) deixa a linha velha: ao fechar, relê
+  // a 1ª pintura do card, da lista central de OS (31/10/2026, tarefa 3.3; a mesma do Histórico: 204 = o "Carregando" de sempre)
+  function previa(url, chegou) {
+    var m = /\/os\/os\/(\d+)/.exec(url);
+    if (!m || !window.fetch) return;
+    fetch("/os/api/os/" + m[1] + "/previa", {credentials: "same-origin", headers: {"X-Nexus-Auto": "1"}})
+      .then(function (r) { return r.status === 200 ? r.text() : ""; })
+      .then(function (h) {
+        if (!h || chegou() || modal.hidden) return;
+        corpo.innerHTML = h; corpo.scrollTop = 0;
+        if (window.OsCarga) window.OsCarga.esconder();
+      })
+      .catch(function () { /* o card inteiro vem de qualquer jeito */ });
+  }
+  // a ação que mudou a OS (concluir, cancelar, responsável, etiquetas, nota) deixa a linha velha: ao fechar, a janela volta
+  // dizendo que a OS mudou (`mudou=1`; até 31/10/2026 era o atualizar=1): a lista central já a tem, e o caminho de hoje relê
   var mudou = false;
   document.addEventListener("os:alterada", function () { mudou = true; });
   function fechar() {
     modal.hidden = true; corpo.innerHTML = ""; document.body.classList.remove("os-modal-aberto");
-    if (mudou) { mudou = false; enviar(true); }
+    if (mudou) {
+      mudou = false;
+      // o campo `mudou` vai só neste envio: o formulário troca a página, e a próxima nasce sem ele
+      var mu = form.querySelector("input[name=mudou]");
+      if (!mu) { mu = document.createElement("input"); mu.type = "hidden"; mu.name = "mudou"; form.appendChild(mu); }
+      mu.value = "1";
+      enviar(false);
+    }
   }
   document.querySelectorAll("#iv_tab a.os-folio").forEach(function (a) {
     a.addEventListener("click", function (e) { e.preventDefault(); abrir(a.getAttribute("href")); });

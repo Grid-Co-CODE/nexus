@@ -464,7 +464,10 @@ conferir" e as pendentes, a janela lida inteira, se o leitor está ligado, a úl
 abertas: o `tarefas_os` ou o próprio leitor) e a última leitura dela (os pedidos, ou a falha com o motivo; "DEFEITO do
 leitor" quando foi exceção que não é de leitura, com a pilha no log), a leitura que a trava de encolhimento recusou ("Trava de
 encolhimento": a faixa, a hora e o motivo, só com contagens, até a faixa passar de novo), os campos que o REST trouxe (a
-sondagem da 1ª noite), a cópia em disco e a memória (`os_central.memoria_estimada`: cada registro e texto contados uma vez;
+sondagem da 1ª noite), as conferências das telas que leem da lista ("Conferências das telas", 3.3, `_conferencias_das_telas`:
+por visão, quantas foram ao Fracttal desde o último reinício, quantas divergiram e falharam, e a última divergência com os dois
+totais; muitas na visão "todos" de quem vê tudo é sinal de lista errada), a cópia em disco e a memória
+(`os_central.memoria_estimada`: cada registro e texto contados uma vez;
 ~0,4 s com 36 mil OS, medida UMA vez por versão da lista, e a falha da medida vai ao log; 25,8 MB contra os 23,9 MB do
 tracemalloc). Só contagens, datas, ids e motivos: nunca o texto de um ativo ou
 de uma OS, nem nome de pessoa. **O Raio-X não

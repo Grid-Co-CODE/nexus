@@ -24,6 +24,7 @@ from flask import Blueprint, jsonify, render_template, request
 import api
 
 from . import cos_web as cw
+from . import lista_central
 from . import sessao
 from .rotas import _conta, exige_sessao
 
@@ -181,4 +182,5 @@ def api_criar():
         raise
     except Exception as e:                              # noqa: BLE001
         return jsonify({"erro": str(e) or e.__class__.__name__}), 502
+    lista_central.criadas(res)                          # as OS criadas entram na lista central na hora (31/10/2026)
     return jsonify(cw.mensagem_resultado(res))

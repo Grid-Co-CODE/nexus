@@ -40,7 +40,7 @@
         <span class="os-hist-auto" id="lbl_auto" title="Com a aba aberta, o histórico se atualiza sozinho a cada 10 minutos.">&#8635; Atualiza a cada 10 min</span>
         <button type="button" class="os-btn secondary" id="b_export" title="Exporta as OS exibidas p/ CSV (abre no Excel).  [Ctrl+E]">Exportar</button>
         <button type="button" class="os-btn secondary" id="b_limpar" title="Limpa Cliente/Usina/Status/Tipos, a busca e a Etiqueta">Limpar filtros</button>
-        <button type="submit" class="os-btn secondary os-btn-ico" id="b_atualizar" title="Atualizar  [F5] — busca de novo no Fracttal">&#8635;</button>
+        <button type="submit" class="os-btn secondary os-btn-ico" id="b_atualizar" title="{% if da_lista_central %}Atualizar  [F5] — confere de novo com o Fracttal e mostra a lista central de OS (o servidor a lê de poucos em poucos minutos){% else %}Atualizar  [F5] — busca de novo no Fracttal{% endif %}">&#8635;</button>
       </div>
     </div>
     {# 4 colunas iguais × 2 linhas, rótulo FORA de todos os controles e a mesma altura em todos (Levi, 27/09). Em
@@ -70,7 +70,7 @@
   <div class="hf-tabela">
     <div class="hf-barra">
       <label class="hf-filtro">{{ icone('search', '#8A93A8', 15) }}<input type="search" name="busca" form="f_hist" id="busca_no" value="{{ busca }}" placeholder="Filtrar por nº, cliente, usina, ativo, descrição, status…" title="Filtra as OS carregadas por nº, cliente, usina, ativo, descrição, status, tipo de tarefa e etiqueta  [Ctrl+F]"></label>
-      <span class="hf-hint" id="hint">{{ linhas|length }} OS no período {{ fmt(de + 'T03:00:00', False) }} a {{ fmt(ate + 'T03:00:00', False) }}.</span>{% if lista_de %}<span class="hf-hint" title="A lista se renova sozinha a cada poucos minutos; o ↻ busca no Fracttal na hora"> Lista das {{ lista_de }}.</span>{% endif %}
+      <span class="hf-hint" id="hint">{{ linhas|length }} OS no período {{ fmt(de + 'T03:00:00', False) }} a {{ fmt(ate + 'T03:00:00', False) }}.</span>{% if lista_de %}<span class="hf-hint" title="{% if da_lista_central %}A lista central de OS do Nexus: o servidor a lê do Fracttal de poucos em poucos minutos (as novas a cada 3 min no horário de trabalho, os últimos 7 dias a cada 10 min, as antigas de madrugada), e o que o OS Creator muda entra na hora. O ↻ confere de novo que você vê o mesmo no Fracttal.{% else %}A lista se renova sozinha a cada poucos minutos; o ↻ busca no Fracttal na hora{% endif %}"> Lista das {{ lista_de }}.</span>{% endif %}
     </div>
   <div class="os-tbl-wrap">
     <table class="os-tbl os-hist" id="tab_hist">
@@ -121,22 +121,50 @@
     corpo.innerHTML = '<p class="os-ajuda" style="padding:24px">Carregando a OS…</p>';
     modal.hidden = false; document.body.classList.add("os-modal-aberto");
     var sep = url.indexOf("?") >= 0 ? "&" : "?";
+    var chegou = false;                       // o card inteiro chegou: a 1ª pintura não pinta mais por cima dele
+    previa(url, function () { return chegou; });
     OsCarga.buscar(url + sep + "parcial=1", {headers: {"X-Requested-With": "fetch"}, credentials: "same-origin"}, "Abrindo a OS…")
       .then(function (r) { return r.text(); })
       .then(function (h) {
+        chegou = true;
         corpo.innerHTML = h; corpo.scrollTop = 0;
         var det = corpo.querySelector(".det");
         if (window.OsAcoes && det) window.OsAcoes.contagem(det); else anexos(corpo);
       })
-      .catch(function () { corpo.innerHTML = '<p class="os-erro" style="padding:24px">Não consegui carregar a OS aqui. <a class="os-link" href="' + url + '">Abrir a página</a></p>'; });
+      .catch(function () { chegou = true; corpo.innerHTML = '<p class="os-erro" style="padding:24px">Não consegui carregar a OS aqui. <a class="os-link" href="' + url + '">Abrir a página</a></p>'; });
   }
-  // uma ação que mudou a OS (concluir, cancelar, responsável, etiquetas, nota) deixa a linha da tabela velha: ao fechar
-  // o card, a lista vem de novo do Fracttal
+  // A 1ª PINTURA do card (31/10/2026, tarefa 3.3 do canto central): o que a lista central de OS sabe da OS chega na hora, sem
+  // pedido ao Fracttal, e fica na tela até o card inteiro vir ao vivo (as subtarefas, os anexos). 204 = a lista não pode dizer
+  // (a OS que ela não tem, quem não conferiu a visão inteira, o PC): o "Carregando" de sempre. É a tela que pede, e não a
+  // pessoa (o clique já contou no card): vai com o X-Nexus-Auto. Com ela na tela, o círculo de carga sai.
+  function previa(url, chegou) {
+    var m = /\/os\/os\/(\d+)/.exec(url);
+    if (!m || !window.fetch) return;
+    fetch("/os/api/os/" + m[1] + "/previa", {credentials: "same-origin", headers: {"X-Nexus-Auto": "1"}})
+      .then(function (r) { return r.status === 200 ? r.text() : ""; })
+      .then(function (h) {
+        if (!h || chegou() || modal.hidden) return;
+        corpo.innerHTML = h; corpo.scrollTop = 0;
+        if (window.OsCarga) window.OsCarga.esconder();
+      })
+      .catch(function () { /* o card inteiro vem de qualquer jeito */ });
+  }
+  // uma ação que mudou a OS (concluir, cancelar, responsável, etiquetas, nota) deixa a linha da tabela velha. Até 31/10/2026
+  // o fechar do card mandava o atualizar=1 (a lista inteira de novo no Fracttal); desde a lista central de OS (tarefa 3.3) a
+  // ação já põe a OS nela, e a tela volta só dizendo que a OS mudou (`mudou=1`): da lista central, sem pedido; no caminho de
+  // hoje (a visão restrita, o PC), o servidor relê como antes
   var mudou = false;
   document.addEventListener("os:alterada", function () { mudou = true; });
   function fechar() {
     modal.hidden = true; corpo.innerHTML = ""; document.body.classList.remove("os-modal-aberto");
-    if (mudou) { mudou = false; enviar(true); }
+    if (mudou) {
+      mudou = false;
+      // o campo `mudou` vai só neste envio: o formulário troca a página, e a próxima nasce sem ele
+      var mu = form.querySelector("input[name=mudou]");
+      if (!mu) { mu = document.createElement("input"); mu.type = "hidden"; mu.name = "mudou"; form.appendChild(mu); }
+      mu.value = "1";
+      enviar(false);
+    }
   }
   document.querySelectorAll("a.os-folio").forEach(function (a) {
     a.addEventListener("click", function (e) { e.preventDefault(); abrir(a.getAttribute("href")); });
@@ -147,9 +175,9 @@
   // ── visoes (botoes, como no app) ──
   var form = document.getElementById("f_hist");
   // TODA busca nova passa por aqui: marca o token do círculo de carga e manda. `forcar` = passa por cima da memória
-  // da visão (o ↻, o F5, a atualização de 10 min e a volta de uma ação no card). `auto` = a tela mandou sozinha (a
-  // atualização de 10 min), e não a pessoa: o servidor a conta à parte (casca/uso_os.py). Um formulário não manda
-  // cabeçalho, então a marca vai no endereço (nx_auto=1) só nesse envio; todo outro envio a tira antes de mandar.
+  // da visão (o ↻ e o F5). `auto` = a tela mandou sozinha (a atualização de 10 min), e não a pessoa: o servidor a conta à
+  // parte (casca/uso_os.py). Um formulário não manda cabeçalho, então a marca vai no endereço (nx_auto=1) só nesse envio;
+  // todo outro envio a tira antes de mandar.
   function enviar(forcar, auto) {
     document.getElementById("atualizar").value = forcar ? "1" : "";
     var t = window.OsCarga ? window.OsCarga.token() : "";

@@ -4205,8 +4205,9 @@ def create_performance_os(itens: list, id_responsible=None, responsible_name: st
                     nok += 1
                 except Exception as e:
                     nerr.append(str(e)[:600])
+            # o id vai junto (31/10/2026): a tela põe a OS criada na lista central de OS (`lista_central.criadas`)
             out.append({"ok": True, "asset": a.get("label") or a.get("code"), "folio": res.get("wo_folio"),
-                        "n_img_ok": nok, "img_erro": nerr, "ticket": tk})
+                        "id_work_order": res.get("id_work_order"), "n_img_ok": nok, "img_erro": nerr, "ticket": tk})
         except SessionExpired:
             raise
         except Exception as e:
@@ -4779,8 +4780,23 @@ def os_por_folio(folio) -> dict:
     return None
 
 
+# O nº da OS → id pela lista central de OS (31/10/2026, tarefa 3.3 do canto central): o id de um nº não muda, e a lista sabe os
+# das OS que ela tem, sem pedido nenhum (eram 1 a 5 pedidos a cada nº, no card, no PDF, no Clonar, no COS, no Garantias). Quem
+# liga o gancho é o `os_web.lista_central` (o atalho só vale para quem conferiu que vê no Fracttal o mesmo que a lista: a pessoa
+# de visão restrita segue lendo pela sessão dela). Sem o gancho, ou sem o nº na lista, a leitura de sempre.
+ID_PELA_LISTA = None
+
+
 def _wo_id_por_folio(folio):
-    """Resolve o nº da OS (wo_folio) → id_work_order. None se não achar."""
+    """Resolve o nº da OS (wo_folio) → id_work_order. None se não achar. Pela lista central quando ela conhece o nº e a pessoa
+    pode (`ID_PELA_LISTA`); senão pela listagem do Fracttal, na sessão da pessoa (`os_por_folio`)."""
+    if ID_PELA_LISTA is not None:
+        try:
+            wid = ID_PELA_LISTA(folio)
+        except Exception:                                   # noqa: BLE001 — o atalho nunca derruba a leitura de sempre
+            wid = None
+        if wid:
+            return wid
     w = os_por_folio(folio)
     return w.get("id") if w else None
 

@@ -10,6 +10,7 @@ from flask import Blueprint, jsonify, render_template, request
 import api
 
 from . import clonar_web
+from . import lista_central
 from . import rotas
 from .rotas import _conta, exige_sessao
 
@@ -104,4 +105,5 @@ def api_criar():
     eids = (corpo.get("etiqueta_ids") or None) if corpo.get("clonar_etiquetas") else None
     note = (corpo.get("note") or "").strip()
     res = api.clonar_os(prontas, idp, nome, eids, note)
+    lista_central.criadas(res)         # a OS clonada entra na lista central na hora (31/10/2026, tarefa 3.3)
     return jsonify(clonar_web.mensagem_resultado(res))

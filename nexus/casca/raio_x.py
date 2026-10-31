@@ -822,6 +822,25 @@ def _pedidos(n) -> str:
     return "%d pedido%s" % (n, "" if n == 1 else "s")
 
 
+def _conferencias_das_telas(conf: dict) -> str:
+    """A guarda da lista pela metade das telas que leem da lista central (decisão BA da 3.3): por visão, quantas conferências
+    de 19/10 foram ao Fracttal desde o último reinício, quantas divergiram (o total que o Fracttal deu à pessoa e o da lista) e
+    quantas falharam. A visão restrita de alguém também diverge (é o que a guarda manda ao vivo); muitas divergências na visão
+    "todos" de quem vê tudo é sinal de lista errada. Só contagens e a hora: nunca quem."""
+    partes = []
+    for visao, c in sorted(conf.items()):
+        n, div, fal = int(c.get("n") or 0), int(c.get("divergiram") or 0), int(c.get("falharam") or 0)
+        txt = "%s: %d conferência%s, %d %s" % (visao, n, "" if n == 1 else "s", div, "divergiu" if div == 1 else "divergiram")
+        if fal:
+            txt += ", %d %s (o Fracttal fora ou a sessão caída)" % (fal, "falhou" if fal == 1 else "falharam")
+        u = c.get("ultima_divergencia") or {}
+        if u:
+            txt += "; a última divergência em %s: Fracttal %s contra %s da lista" % (
+                _quando(u.get("em")) or "?", u.get("fracttal"), u.get("lista"))
+        partes.append(txt)
+    return " · ".join(partes)
+
+
 def _linhas_da_lista_de_os(e: dict) -> list:
     """As linhas da peça "Lista central de OS" (3.2), do `os_central.estado(medir_memoria=True)`: só contagens, datas, ids e
     motivos (nunca o texto de uma OS nem o nome de alguém)."""
@@ -886,6 +905,9 @@ def _linhas_da_lista_de_os(e: dict) -> list:
         linhas.append(("Campos que o REST trouxe", "na faixa %s de %s, %d OS: %s" % (
             c.get("faixa"), _quando(c.get("em")) or "?", c.get("n") or 0,
             ", ".join("%s %s" % (k, _pct(v)) for k, v in (c.get("pct") or {}).items()))))
+    conf = _conferencias_das_telas(e.get("conferencias") or {})
+    if conf:
+        linhas.append(("Conferências das telas", conf))
     d = e.get("disco") or {}
     if d.get("gravado_em"):
         txt = "gravada em %s%s" % (_quando(d["gravado_em"]),

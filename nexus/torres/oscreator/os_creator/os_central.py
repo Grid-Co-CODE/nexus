@@ -241,8 +241,9 @@ def _estado_limpo() -> dict:
     # saiu); `pendentes`: {id da OS: desde quando} que a ação deixou para a próxima faixa, e `falhas`: {id: quantas leituras
     # pelo nº falharam}; `recusas`: {faixa: a última leitura que a trava de encolhimento recusou}, até a faixa passar de novo;
     # `campos`: a medida dos campos que o REST trouxe na última leitura grande (a sondagem da 1ª noite, que não pôde ser feita
-    # antes de construir); `disco["sujo"]`: a fila das pendentes mudou sem a versão mudar (a cópia em disco é regravada)
-    return {"faixas": {}, "pendentes": {}, "falhas": {}, "recusas": {}, "campos": None,
+    # antes de construir); `disco["sujo"]`: a fila das pendentes mudou sem a versão mudar (a cópia em disco é regravada);
+    # `conferencias`: {visão: as conferências de 19/10 das telas contra o `contar` (decisão BA da 3.3), só contagens}
+    return {"faixas": {}, "pendentes": {}, "falhas": {}, "recusas": {}, "campos": None, "conferencias": {},
             "disco": {"lido": None, "gravado_em": 0.0, "versao": None, "bytes": None, "erro": None, "sujo": False}}
 
 
@@ -355,6 +356,8 @@ def _medir_campos(novos: dict, faixa: str, agora: float) -> None:
         return
     n = len(novos)
     rs = novos.values()
+    # a data fim, o início e a nota do chamado entraram na 3.3 (as telas que os mostram vão ao vivo quando a leitura grande
+    # não os trouxe; a nota do chamado é rara numa leitura qualquer, e o Garantias a confere nas OS dele, `lista_central`)
     conta = {"nº": sum(1 for r in rs if r.folio), "criação": sum(1 for r in rs if _s(r)),
              "quem criou": sum(1 for r in rs if r.criado_por),
              "código de quem criou": sum(1 for r in rs if r.cod_criador),
@@ -362,7 +365,8 @@ def _medir_campos(novos: dict, faixa: str, agora: float) -> None:
              "tipo da tarefa": sum(1 for r in rs if r.tipo_tarefa), "código do ativo": sum(1 for r in rs if r.codigos),
              "programada": sum(1 for r in rs if _s(r, 3)), "gatilho": sum(1 for r in rs if r.gatilho),
              "etiqueta com id": sum(1 for r in rs if any(i is not None for i, _ in r.etiquetas)),
-             "com etiqueta": sum(1 for r in rs if r.etiquetas)}
+             "com etiqueta": sum(1 for r in rs if r.etiquetas), "data fim": sum(1 for r in rs if _s(r, 2)),
+             "início": sum(1 for r in rs if _s(r, 4)), "nota do chamado": sum(1 for r in rs if r.note)}
     _ESTADO["campos"] = {"faixa": faixa, "em": agora, "n": n,
                          "pct": {k: round(100.0 * v / n, 1) for k, v in conta.items()}}
 
@@ -695,6 +699,34 @@ def folio_para_id(folio) -> int | None:
     return r.id if r is not None else None
 
 
+def campos_medidos() -> dict | None:
+    """A medida dos campos que o REST trouxe na última leitura grande (`_medir_campos`: {"faixa", "em", "n", "pct"}), ou None
+    se nenhuma leitura grande mediu ainda. É o que a tela confere antes de ler um campo da lista (Ruling AT, decisão BB da
+    3.3); leve, ao contrário do `estado()`, que percorre a lista."""
+    atual()
+    c = _ESTADO["campos"]
+    return dict(c) if c else None
+
+
+def anotar_conferencia(visao: str, bateu, *, fracttal=None, lista=None) -> None:
+    """Uma conferência de 19/10 de uma tela que lê da lista (decisão BA da 3.3): o total que o Fracttal dá à pessoa (1 pedido
+    na sessão dela) contra o `contar` da lista. `bateu` None = a conferência falhou (o Fracttal fora, a sessão caída): não
+    libera nada e conta à parte. Muitas divergências de quem tem a visão inteira é sinal de lista errada: o Raio-X mostra. Só
+    contagens e a hora, nunca quem (o estado vai ao Raio-X)."""
+    agora = time.time()
+    with _TRAVA:
+        c = _ESTADO["conferencias"].setdefault(str(visao), {"n": 0, "divergiram": 0, "falharam": 0, "ultima": None,
+                                                            "ultima_divergencia": None})
+        c["ultima"] = agora
+        if bateu is None:
+            c["falharam"] += 1
+            return
+        c["n"] += 1
+        if not bateu:
+            c["divergiram"] += 1
+            c["ultima_divergencia"] = {"em": agora, "fracttal": _int(fracttal), "lista": _int(lista)}
+
+
 def mais_nova_data_fim() -> str:
     """A data de fim mais nova que a lista conhece entre as concluídas (o piso das finalizadas é ela menos 2 dias), ou ""."""
     return _iso_seg(max((_s(r, 2) for r in atual().ordem if r.status_id == 3), default=0))
@@ -764,10 +796,15 @@ def _agendar_gravacao() -> None:
 
 
 def _extras_do_disco() -> dict:
-    # copiados de uma vez (`list`): a faixa e a ação mexem nesses dicionários em outras threads
+    # copiados de uma vez (`list`): a faixa e a ação mexem nesses dicionários em outras threads. A medida dos campos vai junto
+    # (3.3): as telas só leem da lista o campo que a última leitura grande trouxe, e sem ela, depois de cada deploy, iriam ao
+    # vivo até a próxima leitura grande (os 7 dias, de 10 em 10 min de dia; de noite, só às 03:21). "campos" já é o nome dos
+    # campos do registro no cabeçalho: a medida vai em "campos_rest"
+    c = _ESTADO["campos"]
     return {"pendentes": {str(k): v for k, v in list(_ESTADO["pendentes"].items())},
             "falhas_pendentes": {str(k): v for k, v in list(_ESTADO["falhas"].items())},
-            "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())}}
+            "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())},
+            "campos_rest": dict(c) if c else None}
 
 
 def _gravar_agora() -> bool:
@@ -803,6 +840,8 @@ def _boot() -> None:
                                                   if int(k) in _ESTADO["pendentes"]})
                         if isinstance(cab.get("faixas"), dict):
                             _ESTADO["faixas"].update(cab["faixas"])
+                        if isinstance(cab.get("campos_rest"), dict) and not _ESTADO["campos"]:
+                            _ESTADO["campos"] = cab["campos_rest"]
                         _ESTADO["disco"].update(lido="cópia gravada em %s" % _hora(cab.get("gravado_em")),
                                                 versao=versao, gravado_em=float(cab.get("gravado_em") or 0.0))
                 log.info("lista central de OS: %d OS da cópia em disco", len(lista.por_id))
@@ -886,4 +925,5 @@ def estado(medir_memoria: bool = False) -> dict:
             "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())},
             "recusas": {k: dict(v) for k, v in list(_ESTADO["recusas"].items())},
             "campos": dict(_ESTADO["campos"]) if _ESTADO["campos"] else None, "disco": dict(_ESTADO["disco"]),
+            "conferencias": {k: dict(v) for k, v in list(_ESTADO["conferencias"].items())},
             "memoria_mb": memoria, "leitor": leitor}

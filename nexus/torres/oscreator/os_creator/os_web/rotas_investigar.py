@@ -8,10 +8,12 @@ um blur de fundo que nem quando vamos criar OS."
 
 `/os/historico/ativo?codigo=<código do Fracttal>&usina=<usina>&nome=<inversor>[&de=&ate=]`. A plataforma abre com
 `janela=1` (a ponte do Nexus tira o topo, como no Criar OS). O que vai ao Fracttal: NADA além do que o Histórico já
-faria — a lista é a de "Todos" dos últimos 30 dias, a mesma da Visão COS (`rotas.ler_lista`, guardada para todos); o
-período dentro dela é recortado aqui; fora dela, a lista daquele período (a régua do Histórico). Status, tipo de tarefa,
-a busca e o "este ativo × a usina inteira" são locais (no navegador, sobre as linhas da usina). As regras:
-`investigar_web.py`."""
+faria — desde 31/10/2026 (tarefa 3.3 do canto central) as OS saem da lista central de OS pelo índice por código de ativo
+(`lista_central.investigar`, as do ativo e as dos códigos da usina), depois da conferência da visão inteira no período
+carregado (a mesma da Visão COS: quem abriu uma não confere de novo na outra); onde a lista não cobre, como antes: a lista
+de "Todos" dos últimos 30 dias, a mesma da Visão COS (`rotas.ler_lista`, guardada para todos); o período dentro dela é
+recortado aqui; fora dela, a lista daquele período (a régua do Histórico). Status, tipo de tarefa, a busca e o "este ativo
+× a usina inteira" são locais (no navegador, sobre as linhas da usina). As regras: `investigar_web.py`."""
 from __future__ import annotations
 
 import datetime as dt
@@ -22,6 +24,7 @@ import api
 import ativos_central
 
 from . import investigar_web as IW
+from . import lista_central
 from . import rotas as R
 
 bp = Blueprint("os_web_investigar", __name__, url_prefix="/os")
@@ -58,8 +61,17 @@ def historico_ativo():
     # a lista já carregada (os 30 dias da Visão COS) quando o período cabe nela; senão, a lista daquele período
     carregada = IW.janela_carregada(de, ate, hoje)
     l_de, l_ate = carregada or (de, ate)
-    lista, linhas, info, erro = R.ler_lista("criadas", "TODOS", None, l_de, l_ate, None, forcar=forcar,
-                                            aviso=R._progresso_de(request.args.get("p")))
+    # da lista central de OS primeiro (31/10/2026, tarefa 3.3): as OS do ativo e da usina pelo índice por código, depois da
+    # conferência da visão inteira no período carregado (a da Visão COS); senão, o caminho de hoje (`mudou`: o card mudou uma
+    # OS; lá a lista vem de novo, como o atualizar=1 que o fechar do card mandava)
+    lista = lista_central.investigar(ativo["code"], ativo["usina_curta"], de, ate, l_de, l_ate, pessoa=R._quem(),
+                                     forcar=forcar)
+    if lista is not None:
+        linhas, info, erro = lista.linhas, lista.info, None
+    else:
+        lista, linhas, info, erro = R.ler_lista("criadas", "TODOS", None, l_de, l_ate, None,
+                                                forcar=forcar or request.args.get("mudou") == "1",
+                                                aviso=R._progresso_de(request.args.get("p")), central=False)
     R.preparar_linhas(lista)
     total_srv, teto = int(info.get("total") or 0), int(info.get("cap") or 0)
     # o teto de 2.000 corta as OS MAIS ANTIGAS da lista: dizer (a janela pode mostrar "nenhuma OS" de um ativo que tem)

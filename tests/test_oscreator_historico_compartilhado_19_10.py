@@ -15,6 +15,7 @@ if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 
 import api  # noqa: E402 — o api.py do clone
+import os_central  # noqa: E402 — a lista central de OS (vazia aqui: o caminho de hoje)
 from os_web import criar_app, rotas  # noqa: E402
 from os_web import historico_store as HS  # noqa: E402
 
@@ -81,6 +82,9 @@ def fr(monkeypatch):
     relogio = {"t": 1000.0}
     monkeypatch.setattr(HS, "_relogio", lambda: relogio["t"])
     f.relogio = relogio
+    # a lista central de OS (31/10/2026, tarefa 3.3) fica vazia aqui, como no PC sem leitor (o conftest a limpa): estes testes
+    # provam o caminho de 19/10, o que a tela usa quando a lista central não cobre (`tests/test_oscreator_historico_central.py`)
+    assert not os_central.atual().por_id
     yield f
     HS.limpar()
 

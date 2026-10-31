@@ -17,6 +17,9 @@ Aqui:
 - quem decide a CHAVE é quem chama (a rota): a lista de "Todos" pode ser uma só para quem vê o mesmo universo no
   Fracttal (`mesma_visao`, que também serve o quadro do Acompanhamento de chamados); a de cada pessoa ("criadas por
   mim", "atribuídas a mim") segue por pessoa;
+- desde 31/10/2026 (tarefa 3.3 do canto central) este é o CAMINHO DE HOJE: a tela lê primeiro da lista central de OS
+  (`lista_central.py`), depois da conferência da pessoa (o total dela, guardado aqui por `total_conferido`, a mesma chave), e
+  só vem para cá quando a lista não cobre o período, não tem um campo que a tela mostra, ou a pessoa vê outro total;
 - a lista guarda o HTML das linhas por versão (`html_das_linhas`): as 2.000 linhas são montadas uma vez por versão, e
   não a cada pedido.
 Erro do Fracttal não apaga a lista guardada: a tela segue com ela, com a hora dela.
@@ -176,6 +179,33 @@ def _novas(chave, buscar_novas):
     return _uma_vez(chave, fazer)
 
 
+def total_conferido(pessoa, chave, total_da_pessoa, max_idade=CONFERE_S) -> tuple:
+    """(o total que o Fracttal dá à pessoa nesta `chave`, a idade dele em s, se foi pedido agora): o guardado, se tem menos de
+    `max_idade`; senão `total_da_pessoa()` (1 pedido, na sessão dela), guardado. O erro sobe e não é guardado: quem chama
+    decide, e a conferência que falha nunca libera nada. É o que a `mesma_visao` guarda por pessoa e lista, e a conferência das
+    telas que leem da lista central (`lista_central`, 31/10/2026) usa a MESMA chave: quem conferiu numa não paga o pedido de
+    novo na outra."""
+    agora = _relogio()
+    k = (pessoa, chave)
+    c = _CONFERIDOS.get(k)
+    if c and agora - c[0] < max_idade:
+        return c[1], agora - c[0], False
+    dela = int(total_da_pessoa())
+    with _TRAVA:
+        _CONFERIDOS[k] = (agora, dela)
+        if len(_CONFERIDOS) > 2000:
+            for kk in sorted(_CONFERIDOS, key=lambda x: _CONFERIDOS[x][0])[:len(_CONFERIDOS) - 2000]:
+                _CONFERIDOS.pop(kk, None)
+    return dela, 0.0, True
+
+
+def bate(dela, guardado) -> bool:
+    """O total da pessoa e o da lista são "o mesmo universo": diferença de até 1%, ou 2 OS (as criadas entre uma leitura e
+    a outra)."""
+    dela, guardado = int(dela or 0), int(guardado or 0)
+    return abs(dela - guardado) <= max(2, TOLERANCIA * max(dela, guardado))
+
+
 def mesma_visao(pessoa, chave, total_da_pessoa, guardado=None) -> bool:
     """A pessoa vê no Fracttal o mesmo universo da lista guardada em `chave`? `total_da_pessoa()` é o total que o
     Fracttal dá a ela com os mesmos filtros (1 pedido, na sessão dela). Sem lista guardada: sim (a dela vira a de todos).
@@ -192,23 +222,11 @@ def mesma_visao(pessoa, chave, total_da_pessoa, guardado=None) -> bool:
         if g is None:
             return True
         guardado = g.info.get("total")
-    guardado = int(guardado or 0)
-    agora = _relogio()
-    k = (pessoa, chave)
-    c = _CONFERIDOS.get(k)
-    if c and agora - c[0] < CONFERE_S:
-        dela = c[1]
-    else:
-        try:
-            dela = int(total_da_pessoa())
-        except Exception:       # noqa: BLE001 — sem conferir, ela fica com a lista dela
-            return False
-        with _TRAVA:
-            _CONFERIDOS[k] = (agora, dela)
-            if len(_CONFERIDOS) > 2000:
-                for kk in sorted(_CONFERIDOS, key=lambda x: _CONFERIDOS[x][0])[:len(_CONFERIDOS) - 2000]:
-                    _CONFERIDOS.pop(kk, None)
-    return abs(dela - guardado) <= max(2, TOLERANCIA * max(dela, guardado))
+    try:
+        dela, _idade, _pedido = total_conferido(pessoa, chave, total_da_pessoa)
+    except Exception:           # noqa: BLE001 — sem conferir, ela fica com a lista dela
+        return False
+    return bate(dela, guardado)
 
 
 def anotar_total(pessoa, chave, total) -> None:

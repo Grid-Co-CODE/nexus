@@ -41,7 +41,7 @@ import ativos_central
 import solic_spec as sp
 import temas_store as ts
 
-from . import ativo_curto, sessao, solic_anexos
+from . import ativo_curto, lista_central, sessao, solic_anexos
 from . import solic_eng_web as reg
 from . import solic_web as sw
 from . import tradicional_web as trad
@@ -495,6 +495,7 @@ def api_aprovar(id_code):
         out["programada"] = prog.strftime("%d/%m/%Y %H:%M") if prog else ""
         out["tempo"] = sw.tempo_hhmm(dur or api.DURACAO_OS_AVULSA)
         out = _levar_anexos(out, s.get("id_code") or id_code)
+    lista_central.criadas(res)         # a OS que a aprovação criou entra na lista central na hora (31/10/2026, tarefa 3.3)
     if out.get("ok") or (res or {}).get("ok"):
         _esquecer_lista()              # nasceu OS (ou a tarefa): a solicitação saiu da fila para todo mundo
     return (jsonify(out), 200) if out.get("ok") else (jsonify({"erro": out["mensagem"]}), 400)

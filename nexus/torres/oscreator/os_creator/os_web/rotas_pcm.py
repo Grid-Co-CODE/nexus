@@ -15,6 +15,7 @@ from flask import Blueprint, jsonify, render_template, request
 
 import api
 
+from . import lista_central
 from . import pcm_web as pcm
 from . import sessao
 from .rotas import _conta, exige_sessao
@@ -113,4 +114,6 @@ def api_criar():
     if erro:
         return jsonify({"erro": erro}), 400
     criar = api.create_os_sem_plano if modo == "sem_plano" else api.create_planned_os_multi
-    return jsonify(pcm.mensagem_resultado(criar(*args, **kwargs)))
+    res = criar(*args, **kwargs)
+    lista_central.criadas(res)                          # a OS criada entra na lista central na hora (31/10/2026)
+    return jsonify(pcm.mensagem_resultado(res))

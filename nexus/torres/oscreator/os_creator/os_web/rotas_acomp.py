@@ -30,7 +30,7 @@ import gridco_abas as ga
 
 from . import acomp_web as aw
 from . import historico_store as HS
-from . import rotas, sessao
+from . import lista_central, rotas, sessao
 from .rotas import _conta, exige_sessao
 
 bp = Blueprint("os_web_acomp", __name__, url_prefix="/os")
@@ -128,6 +128,15 @@ def _linhas(forcar: bool = False, pessoa=None) -> dict:
         inicio = time.monotonic()
         hoje = aw.agora_brt()
         de = (dt.date.today() - dt.timedelta(days=DIAS_BUSCA)).isoformat()
+        # da lista central de OS primeiro (31/10/2026, tarefa 3.3 do canto central): as OS da etiqueta, sem pedido nenhum,
+        # quando quem lê confere que vê no Fracttal o mesmo total (a conferência do `_dono`, a mesma chave). A cópia do quadro
+        # segue a de sempre (o dono, os 30 min, os tickets lidos à parte); o total dela é o da lista, que bateu com o dela
+        central = lista_central.garantias(de, _quem_le())
+        if central is not None:
+            linhas = [l for l in central["linhas"] if aw.eh_os3(l)]
+            quando = dt.datetime.fromtimestamp(central["lido_em"], aw.BRT) if central["lido_em"] else hoje
+            return _reaplicar({"linhas": linhas, "quando": quando.strftime("%d/%m/%Y %H:%M"), "total": central["total"]},
+                              inicio)
         inf = {}
         linhas = [l for l in (api.list_chamados(de=de, info=inf, meta_ja=_fechadas_ja_lidas(pessoa or _dono())) or [])
                   if aw.eh_os3(l)]
@@ -925,6 +934,7 @@ def api_finalizar(folio):
     res = api.concluir_os_checado(wid)                           # o Concluir do card (os_detalhe.py:896)
     if isinstance(res, dict) and res.get("ok") is False:
         return _erro(res.get("msg") or "O Fracttal não concluiu a OS.")
+    lista_central.mudou(wid)                    # a OS concluída entra na lista central na hora (31/10/2026; nunca derruba)
     # o quadro guardado leva o status que o Fracttal deu depois de concluir (em verificação ou concluída: 1 pedido, aqui,
     # e não a lista inteira na volta ao quadro); sem ele, o quadro não chuta e sai da memória, como até 20/10/2026
     st = _status_depois_de_concluir(wid)
