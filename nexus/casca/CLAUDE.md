@@ -16,6 +16,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/casca/sugestoes.py` + `templates/sugestoes.html` | a aba Sugestões (`/?aba=sugestoes`): o formulário de todos e a lista do administrador, o livro `nexus_sugestoes` e os anexos no disco; seção "Sugestões no Início" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
 | `nexus/casca/fracttal_conta.py` | o contador de pedidos ao Fracttal (31/10/2026): um gancho no `Session.send` que soma, por hora de Brasília × origem × método, os pedidos, as recusas (406/429), os erros e o pico por minuto; seção "Pedidos ao Fracttal" abaixo |
+| `nexus/casca/uso_os.py` | o uso das telas do OS Creator (31/10/2026): por hora × rota × automático, os pedidos, as pessoas distintas, a mediana e o p95, os erros, os 503 do teto e os pedidos ao Fracttal; marca a rota de TODO pedido do Flask como origem do contador do Fracttal; seção "Uso das telas do OS Creator" abaixo |
 | `nexus/auth/__init__.py` | `/entrar` (a porta, a senha de administrador e a ida e a volta da Microsoft), `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/microsoft.py` | o login pela conta Microsoft da Grid (Entra ID), desligado sem as quatro `NEXUS_MS_*` (seção "Entrar com a Microsoft" abaixo) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
@@ -241,7 +242,9 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   `/os/*` + `/t/os/*` usam no máximo 16 ao mesmo tempo; o seguinte espera 3 s por uma vaga e volta 503 (a tela se
   recarrega em 8 s; o pedido de dados recebe o recado em JSON). Os estáticos do OS Creator e a pré-carga não contam. O
   resto do Nexus nunca fica sem thread por causa dele. Separar o OS Creator num serviço próprio pediria a T.I. (serviço e
-  Caddy); o teto dá o mesmo efeito sem ela.
+  Caddy); o teto dá o mesmo efeito sem ela. O 503 nasce antes do Flask, então o uso das telas (`casca/uso_os.py`) não o vê
+  pelos ganchos do pedido: o `uso_os.ligar` pendura `uso_os.recusado` em `Teto.ao_recusar` (por isso liga DEPOIS do teto), e
+  `teto_os.do_os_creator(environ)` é a régua única de "pedido do OS Creator" (do teto e do uso).
 - **No OS Creator** (README da torre, 14/10/2026): a tela inicial não espera mais o selo do Fracttal, e as contagens da
   Performance ficam 6 h na memória.
 
@@ -250,16 +253,19 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
 Etapa 0 do canto central do OS Creator (`docs/superpowers/specs/2026-10-30-oscreator-canto-central-design.md`). A cota
 do Fracttal é de 200 pedidos por minuto para a empresa toda, e ninguém sabia quanto o Nexus gasta dela, a que hora nem
 quem pede. `casca/fracttal_conta.py` é UM gancho no `requests.sessions.Session.send` (`ligar()`, idempotente; quem liga
-é o `servir.py`, junto do `teto_os`, nunca o `create_app`: o PC e os testes seguem sem ele). Todo pedido do processo a um
+é o `servir.py`, logo depois do `create_app` e antes dos `instalar_*`, que já abrem laços que pedem ao Fracttal ao subir;
+nunca o `create_app`: o PC e os testes seguem sem ele). Todo pedido do processo a um
 host `fracttal.com` ou `*.fracttal.com` (o RPC do OS Creator, o REST do `campo/fracttal.py`, o token) é somado na
 memória, sem mudar quem pede. O resto da internet passa sem contar (`notfracttal.com` também: o domínio começa no ponto).
 - **A linha** é hora × origem × método: `pedidos_qtd`, `recusas_qtd` (406/429), `erros_qtd` (exceção ou 5xx) e
   `pico_minuto_qtd` (o maior número de pedidos num mesmo minuto, o número que se compara com a cota), mais uma linha
   `*`/`*` por hora com o total e o pico de tudo junto (o pico do total NÃO é a soma dos picos). A hora é a de Brasília,
   UTC-3 fixo: `hora_id` = `AAAAMMDDHH`, e a virada do dia cai às 03:00 UTC.
-- **Origem** = `origem(rota)` (a casca marca o pedido do `/os/*`) e, sem marca, `fundo:<nome da thread SEM o contador de
-  instância>`: `ThreadPoolExecutor-137_0` vira `ThreadPoolExecutor`, `waitress-12` vira `waitress` e `Thread-5 (alvo)` vira
-  `Thread (alvo)`. O `campo/regras_app._fx_wo_paralelo` abre um executor NOVO a cada chamada, e com o nome cru cada rodada
+- **Origem** = `origem(rota)` (o `casca/uso_os.py` marca TODO pedido do Flask, não só o `/os/*`, com a rota normalizada:
+  o que as telas do Campo, da Engenharia e do PCM pedem ao Fracttal cai na rota delas, e não em `fundo:waitress`) e, sem
+  marca, `fundo:<nome da thread SEM o contador de instância>`: `ThreadPoolExecutor-137_0` vira `ThreadPoolExecutor`,
+  `waitress-12` vira `waitress` e `Thread-5 (alvo)` vira `Thread (alvo)`. O `campo/regras_app._fx_wo_paralelo` abre um
+  executor NOVO a cada chamada, e com o nome cru cada rodada
   criaria origens novas na tabela da hora, sem fim. **No máximo 50 origens de FUNDO (`fundo:...`) distintas por hora**
   (`MAX_ORIGENS_DE_FUNDO`): a 51ª e as seguintes dessa hora entram em `fundo:outros`, e as 50 que já existem seguem
   contando nas suas; a hora seguinte recomeça a conta. **A rota não tem teto** nem gasta vaga do fundo: quem a marca
@@ -284,6 +290,65 @@ memória, sem mudar quem pede. O resto da internet passa sem contar (`notfractta
 - **O limitador da etapa 5 vai no mesmo gancho:** o embrulho do `Session.send` mora só aqui.
 - **Prova:** `tests/test_casca_fracttal_conta.py` (o adaptador falso numa `requests.Session` de verdade, sem rede;
   mutações no gancho pegas uma a uma).
+
+## Uso das telas do OS Creator por hora (31/10/2026)
+
+Etapa 0 do canto central do OS Creator, a outra metade do contador acima. Em 13 e 14/10/2026 o OS Creator prendeu as
+threads do Nexus e ninguém soube dizer quais telas as pessoas abrem, a que hora, em quantas, quanto cada uma demora nem
+quanto pede ao Fracttal. `casca/uso_os.py` mede isso, na memória, por **hora (de Brasília) × rota × automático**, e é o
+que dá o "antes e depois" de cada etapa seguinte. Liga no `servir.py` DEPOIS do `teto_os` (`uso_os.ligar(app,
+gravar=True)`); o `create_app`, o PC e os testes seguem sem ele.
+- **Os ganchos** (`ligar`): o `before_request` entra na FRENTE do portão (vê também o que ele recusa e mede o tempo dele),
+  o `after_request` na ponta de trás (vê a resposta que sai) e o `teardown_request` fecha a conta, mesmo se o pedido
+  quebrou. O pedido em curso guarda a medição no próprio `environ` (`nexus.uso_os`), não no `g`. Nenhum deles levanta: a
+  falha da medição vai ao log em debug.
+- **Toda rota do Flask marca a origem do contador do Fracttal** (`fracttal_conta.origem(rota normalizada)`), e a marca sai
+  no `teardown`, mesmo se o pedido quebrar (senão a thread do waitress levaria a rota ao pedido seguinte). Já o uso só
+  mede `/os/*` e `/t/os/*` de quem entrou (`teto_os.do_os_creator`: sem os estáticos, a pré-carga e quem não tem sessão).
+- **Rota normalizada** (`normalizar_rota`): sem a query; segmento só de dígitos vira `<n>` (`/os/os/16995` → `/os/os/<n>`)
+  e id opaco (uuid, hex de 8 ou mais, `s` + hex, token de `token_urlsafe` com dígito) vira `<id>`. Palavra de rota não
+  muda: `tests/test_casca_uso_os.py::test_nenhuma_palavra_de_rota_vira_id` varre todo trecho fixo das rotas do Nexus e
+  do clone (um nome de rota novo só com letras de a a f e 8 ou mais caracteres, ou com 16 ou mais caracteres e um dígito,
+  quebra esse teste). No máximo 200 rotas distintas por hora (`MAX_ROTAS`); as seguintes entram em `(outras)`.
+- **Clique ou automático.** Automático é o que a tela pede sozinha: o cabeçalho `X-Nexus-Auto: 1` (a conferência da sessão
+  de 5 min em `_confere_sessao_js.html`, o `acompanhamento/estado` do `acomp.js` e a atualização de 15 min do Histórico de
+  solicitações, `solic_pcm.js`/`solic_hist.js`); ou `?nx_auto=1` no endereço, porque a atualização de 10 min do Histórico
+  de OS é `form.submit()` e um formulário não manda cabeçalho (o `historico.html` põe o campo escondido só nesse envio, o
+  tira em todo outro e apaga a marca do endereço ao carregar, para o recarregar do navegador ser um clique); ou uma das
+  `ROTAS_AUTOMATICAS` (`/os/_nexus/sessao`, `/os/chamados/acompanhamento/estado` e `/os/historico/progresso`), para a aba
+  aberta que ainda roda o JavaScript de antes. O `progresso` é o círculo de carga (`carga.js`) perguntando de 350 em 350
+  ms enquanto o Histórico busca (o `X-Nexus-Auto` também vai nele): fora da lista seria a "rota mais clicada" por uma
+  folga enorme. Só o valor `1` marca. **Tela nova que se renova sozinha põe o cabeçalho**, senão conta como clique.
+- **Pessoas distintas, sem guardar quem:** o HMAC do e-mail da sessão (`codigo_da_pessoa`, com a `NEXUS_PESSOA_HMAC` ou, sem
+  ela, a chave do app) num conjunto SÓ na memória, por balde. Nem o código vai a disco ou ao banco: o parcial leva só a
+  contagem. A senha de administrador não traz pessoa.
+- **Duração:** um histograma de faixas de 3% por balde (só contagens, que somam entre reinícios e cabem no arquivo sem
+  guardar um tempo por pedido); mediana e p95 pelo centro da faixa (erro até 1,5%). Medida do `before_request` ao
+  `teardown`: é até a resposta estar montada, não o envio do corpo. O pedido que o teto recusou não tem duração
+  (`duracao_p50_ms`/`p95` = `None` num balde sem pedido atendido; quem grava deixa a célula vazia, não zero).
+- **`erros_qtd`** é a resposta 5xx ou a exceção da tela; **`ocupado_qtd`** é o 503 do teto, e os dois entram em
+  `pedidos_qtd` mas não se somam (o recusado não é erro do servidor). A hora é a do FIM do pedido: o balde de uma hora que o
+  laço já tirou nunca renasce.
+- **`fracttal_qtd`:** os pedidos ao Fracttal que o pedido fez (`pedidos_desta_thread()`, com os das tarefas do fan-out que
+  herdam o contexto). A rota é a mesma `origem` do contador do Fracttal: dá para cruzar o uso com a cota.
+- **O reinício não perde a hora:** a cada 5 min (`PASSO_S`; só fora dos testes, thread `nexus-uso-os`) os baldes vão a
+  `<NEXUS_DADOS>/casca/uso_os_parcial.json` (atômico: rascunho + `os.replace`) e voltam no boot. Perde-se no máximo os
+  últimos 5 min de um reinício bruto. **`pessoas_qtd` depois de um reinício é aproximado:** soma dos dois lados, no
+  máximo `pedidos_qtd` (quem veio antes e depois conta duas vezes). Arquivo quebrado ou fora da forma é ignorado (aviso no
+  log), um balde ruim não leva os bons, e a gravação seguinte o conserta. Quem drena (`drenar`) chama `salvar()` depois de
+  gravar no banco; sem isso o arquivo parcial ainda tem a hora e um reinício a traz de volta.
+- **O corte por setor** (`<NEXUS_DADOS>/casca/uso_os_setor.json`): pedidos por **dia × setor × rota**, cliques e
+  automáticos, o setor da pessoa como o menu o acha (`setor_telas.acesso()`, que já vem guardado no pedido e relê o banco só
+  pela cópia de 1 min; sem setor ou sem como saber, `(sem setor)`). **Só no disco do servidor e por 30 dias, nunca no
+  banco:** há setor de uma ou duas pessoas, e "hora × rota × setor" diria o que ela fez e quando, num banco de leitura
+  aberta que não apaga. Fica fora dele o pedido que o teto recusou (não tem sessão). Dia, não hora, de propósito.
+- **A memória não cresce:** as horas guardadas têm teto (`MAX_HORAS` = 48: o PC, ou o banco fora por dias, não pode
+  acumular os conjuntos de pessoas), e as rotas, os setores e o tamanho da rota também.
+- **Quem lê:** `instantaneo()` (`{"linhas", "setor"}`, o Raio-X, sem tirar nada) e `drenar(hora_aberta)`, EXCLUSIVO como o
+  do contador do Fracttal: devolve e tira as horas anteriores a ela. A gravação de hora em hora no banco e a seção do
+  Raio-X vêm nas tarefas seguintes da etapa 0.
+- **Prova:** `tests/test_casca_uso_os.py` (um Flask de mentira com rotas `/os/...`, o Fracttal falso do `requests`, o relógio
+  na mão e, para o JavaScript, o `node` rodando o `enviar` do Histórico, o `pedir` e o `acomp.js` de verdade).
 
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 

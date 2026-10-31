@@ -91,8 +91,10 @@
 <script type="application/json" id="hs_dados">{{ {"linhas": linhas}|tojson }}</script>
 {% endblock %}
 
+{# os dois com a versão no endereço (31/10/2026): a atualização de 15 min passou a mandar o X-Nexus-Auto, e sem a versão o
+   navegador seguiria com o arquivo de antes por dias (o /os/static sai sem prazo de cache) #}
 {% block scripts %}
 <script src="/os/static/os_acoes.js"></script>
-<script src="/os/static/solic_pcm.js"></script>
-<script src="/os/static/solic_hist.js"></script>
+<script src="{{ estatico('solic_pcm.js') }}"></script>
+<script src="{{ estatico('solic_hist.js') }}"></script>
 {% endblock %}

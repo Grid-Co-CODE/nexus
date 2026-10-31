@@ -30,6 +30,10 @@ if __name__ == "__main__":
         app = create_app()
     except ConfigErro as erro:
         sys.exit(f"Nexus não subiu: {erro}")
+    # o contador de pedidos ao Fracttal (31/10/2026, etapa 0 do canto central do OS Creator): um gancho no Session.send,
+    # ligado ANTES dos instalar_* abaixo, que já abrem laços que pedem ao Fracttal ao subir
+    from nexus.casca import fracttal_conta
+    fracttal_conta.ligar()
     instalar_campo(app)
     instalar_dados(app)
     instalar_engenharia(app)
@@ -53,6 +57,10 @@ if __name__ == "__main__":
     # antes do registro dos pedidos, que fica por fora e vê todos
     from nexus.casca import teto_os
     teto_os.ligar(app, teto=THREADS // 2)
+    # o uso das telas do OS Creator por hora, e a rota de cada pedido como origem do Fracttal (31/10/2026, etapa 0 do canto
+    # central): DEPOIS do teto (é ele que avisa o 503 recusado) e antes do registro dos pedidos presos
+    from nexus.casca import uso_os
+    uso_os.ligar(app, gravar=True)
     from nexus.casca import presos
     presos.ligar(app, THREADS)
     # o Nexus por dentro no Raio-X (24/10/2026: 2,6 GB, 1,9 no swap, e a página não dizia de quê), a cada 10 min

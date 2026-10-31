@@ -188,7 +188,8 @@ def test_as_linhas_sao_montadas_uma_vez_por_versao(fr, monkeypatch):
 def test_a_atualizacao_automatica_usa_a_lista_guardada(fr):
     html = _hist(_cliente())
     js = html[html.index("setInterval(function () {\n    if (document.hidden"):]
-    assert js.split("}, 10 * 60 * 1000")[0].strip().endswith("enviar(false);")
+    # `false` = sem o atualizar=1 (a lista guardada); o `true` de depois diz que a tela mandou sozinha (casca/uso_os.py)
+    assert js.split("}, 10 * 60 * 1000")[0].strip().endswith("enviar(false, true);")
     assert "Lista das " in html
 
 

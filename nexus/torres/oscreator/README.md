@@ -1660,3 +1660,21 @@ quem pode: "qualquer um que é ADM ou do setor de chamados".
   `acomp.js`, o `chamados.css` e o `os_acoes.*` das telas de Garantias vão com `?v=<a hora em que o arquivo mudou>`. O
   /os/static sai sem prazo de cache e o navegador chutava um: em 29/10/2026 o editar e o excluir subiram e a tela do Levi
   seguiu com o acomp.js de antes até o Ctrl+Shift+R. Tela nova com JavaScript que muda, use `estatico()`.
+
+## O que a tela pede sozinha leva o X-Nexus-Auto (31/10/2026, etapa 0 do canto central)
+
+O Nexus mede o uso das telas do OS Creator por hora (`nexus/casca/uso_os.py`, seção "Uso das telas do OS Creator por hora"
+do `nexus/casca/CLAUDE.md`) e separa o clique da pessoa do que a tela pede sozinha. Quem se renova sozinho avisa:
+- **`acomp.js`** (`esperarANova`, de 5 em 5 s por até 3 min) manda `X-Nexus-Auto: 1` no `fetch` do
+  `/os/chamados/acompanhamento/estado`;
+- **`solic_pcm.js`** `pedir(url, corpo, texto, auto)` põe o cabeçalho só com `auto === true` (um evento de clique repassado
+  sem querer não vale), e o **`solic_hist.js`** chama `recarregar(true)` só na atualização de 15 min; o ↻ é `recarregar(false)`.
+  A página `solic_hist.html` chama os dois arquivos por `estatico()` (com a versão), senão o navegador seguiria com os de antes;
+- **`historico.html`** (a atualização de 10 min é `form.submit()`, e um formulário não manda cabeçalho): `enviar(forcar, auto)`
+  põe o campo escondido `nx_auto=1` só nesse envio e o tira em todo outro; a página carregada apaga o `nx_auto` do endereço
+  (`history.replaceState`), para o recarregar do navegador ou o link copiado serem cliques;
+- **`carga.js`**, o círculo de carga, pergunta o `/os/historico/progresso` de 350 em 350 ms enquanto o Histórico busca: o
+  `fetch` leva o cabeçalho (sem ele seria, por folga, a rota mais clicada);
+- a conferência da sessão de 5 min (`/os/_nexus/sessao`) é do Nexus (`nexus/templates/_confere_sessao_js.html`).
+Se estes arquivos forem levados ao oem (a sincronia), ele ignora o cabeçalho e o campo: nada muda no 5090. Tela nova que
+se renova sozinha põe o cabeçalho; sem ele conta como clique.

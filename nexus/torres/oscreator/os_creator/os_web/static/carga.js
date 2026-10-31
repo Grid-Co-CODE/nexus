@@ -148,8 +148,9 @@
     pintar(0, 0);
     el.querySelector('.carga-txt').textContent = TEXTO_HIST;
     atraso = setTimeout(function () { el.hidden = false; }, 250);
+    // a pergunta de 350 em 350 ms é da tela, não da pessoa: o X-Nexus-Auto a deixa fora da conta de cliques (casca/uso_os.py)
     relogio = setInterval(function () {
-      fetch('/os/historico/progresso?p=' + encodeURIComponent(t), {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+      fetch('/os/historico/progresso?p=' + encodeURIComponent(t), {credentials: 'same-origin', headers: {'Accept': 'application/json', 'X-Nexus-Auto': '1'}})
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (j) {
           if (!j || !el) return;
