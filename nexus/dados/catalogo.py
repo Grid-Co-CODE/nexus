@@ -876,7 +876,8 @@ FATOS = (
     Fato("curadoria_inventario", "Curadoria do inventário do almoxarifado", "pcm",
          f"{fato_inventario.LIVRO} · {fato_inventario.ABA_CURADORIA}",
          "1 linha = 1 decisão do PCM (cadastrar, é a peça X, confirmar ou descartar) sobre 1 linha de 1 contagem que veio "
-         "fora do catálogo ou como genérico a identificar; vale a última de cada contagem e linha",
+         "fora do catálogo, como genérico a identificar ou como avariada sem cadastro (a avariada da aba Avariados do App "
+         "cujo -AV não está no catálogo, desde 30/10/2026); vale a última de cada contagem e linha",
          _d(data=("id", "data_id (o dia de Brasília da decisão; decidida_em, a hora em UTC)"),
             usina=("id", "usina_id + usina_ligada_por (o almoxarifado da contagem, id_almoxarifado, só pela de-para do "
                          "Fracttal; vazio quando não liga)"),

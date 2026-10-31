@@ -499,12 +499,19 @@ def montar(cfg, contagem_id: str, pode: bool = False) -> dict | None:
     ctx = {"c": c, "rotulo": ROTULO_ESTADO[c["estado"]], "tom_estado": TOM_ESTADO[c["estado"]],
            "contada_txt": _hora(c["contada_em"], com_as=True),
            "enviada_txt": _hora(c["enviada_em"], com_as=True), "itens": [], "avisos_curadoria": [], "pode": pode,
-           "so_pcm": SO_PCM, "vai_ler": False, "sem_login": SEM_LOGIN, "pausa": PAUSA, "original": None}
+           "so_pcm": SO_PCM, "vai_ler": False, "sem_login": SEM_LOGIN, "pausa": PAUSA, "original": None,
+           "sem_catalogo": False}
     o = _original(c, todas["contagens"])
     if o:                    # a contagem de recontagem diz de qual é, com o link (a que a lista não tem, pelo ID: o template)
         ctx["original"] = {"contagem_id": o["contagem_id"], "contada_txt": _hora(o["contada_em"], com_as=True)}
     if c["aviso"]:
         return ctx           # o App fora do contrato: nenhum número, que seria pela metade
+    if any(l.get("_sem_catalogo") for l in c["linhas"]):
+        # a contagem que já não se revisa (aprovada, gravada, recusada, substituída) com avariada e o catálogo do App que não se
+        # leu agora: ela não leva o aviso (a etapa Gravação e a Auditoria seguem na tela, 31/10/2026), mas as peças contadas
+        # dependem das avariadas levadas ao -AV, e a lista sem elas seria número pela metade: esperam o catálogo
+        ctx["sem_catalogo"] = True
+        return ctx
     ctx["itens"], lote = _itens(cfg, c, todas, None, pode)
     ctx["avisos_curadoria"] = _avisos_da_curadoria(lote)
     ctx["vai_ler"] = bool(pode and c["aprovavel"])

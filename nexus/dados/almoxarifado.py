@@ -155,6 +155,15 @@ def _id(v) -> str:
     return t[:-2] if t.endswith(".0") else t
 
 
+def id_ou_vazio(v) -> str:
+    """O ID do Fracttal como o `_id`, ou "" quando a célula do livro do App é o vazio: o `sync-xlsx` escreve a célula vazia como
+    "None" (ou "nan"), sem caixa. Caso que criou (revisão final de 31/10/2026): a avariada com o "ID do item" da boa "None" e o
+    Código presente passava por ter ID: a recusa do "é a peça boa" comparava com "None", e a avariada sem o ID nem o Código
+    virava uma pendência da peça "None". A única definição do "ID que não veio" para as linhas do inventário."""
+    t = _id(v)
+    return "" if t.lower() in ("none", "nan") else t
+
+
 def ids_de_teste(config) -> set[str]:
     """Os IDs dos almoxarifados de TESTE (NEXUS_ALMOX_TESTE_IDS, separados por vírgula). A prova das gravações do
     inventário no Fracttal é num almoxarifado de teste, nunca num de usina; ele não conta nas telas do PCM nem no

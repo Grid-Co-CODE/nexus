@@ -51,6 +51,8 @@ ESTADOS = ("nova", "revisada", "recontagem_pedida", "substituida", "gravando", "
 DA_GRAVACAO = ("gravando", "gravada", "gravada_com_conflitos")
 # a contagem que já não está viva: não substitui ninguém e ninguém a substitui
 MORTAS = ("recontagem_pedida", "substituida")
+# a contagem que o PCM ainda revisa (e aprova): as outras não têm o que revisar
+REVISAVEIS = ("nova", "revisada")
 
 CHAVE_APP = ("pcm_inventario_contagens",)
 _NUNCA = datetime(1970, 1, 1, tzinfo=timezone.utc)      # a data que não se leu é a mais velha
@@ -99,7 +101,8 @@ def _do_app() -> dict:
             almox.setdefault(_id(s.get("ID do almoxarifado")), _txt(s.get("Almoxarifado")))
     # o catálogo do App NÃO só enfeita desde 30/10/2026: é ele que leva a avariada ao -AV (`avariados.resolver`). A falha não
     # vira catálogo vazio (ficaria 5 min nesta cópia, e cada avariada que acha o -AV viraria "sem cadastro", com a linha direta
-    # do -AV contando sozinha, sem a trava do dobro): `itens_lido` falso, e a `ler` põe o aviso nas contagens com avariada
+    # do -AV contando sozinha, sem a trava do dobro): `itens_lido` falso, e a `ler` põe o aviso nas contagens com avariada que
+    # ainda se revisam
     try:
         do_livro, itens_lido = visao._livro(A.LIVRO_ITENS, A.ABA_ITENS), True
     except Exception:       # noqa: BLE001 — o banco que caiu só neste livro: as contagens sem avariada seguem
@@ -241,7 +244,7 @@ def _conta_as_linhas(linhas: list[dict], curadoria: dict) -> tuple[int, int, int
     unicas = contas._unicas(linhas)          # o mesmo dedupe das contas (o mesmo pacote)
     validas = [l for l in unicas
                if _txt(l.get("Tipo")).lower() in A.TIPOS_CONTAGEM
-               and (_txt(l.get("Tipo")).lower() == "fora_do_catalogo" or _id(l.get("ID do item"))
+               and (_txt(l.get("Tipo")).lower() == "fora_do_catalogo" or A.id_ou_vazio(l.get("ID do item"))
                     or (_txt(l.get("Tipo")).lower() == "avariado" and avariados.codigo_da_linha(l)))]
     em_branco = sum(1 for l in validas if A.contado(l.get("Contado")) is None)
     na_curadoria = sum(len(i["pendentes"]) for i in contas.itens_do_lote(unicas, {}, curadoria, {})
@@ -282,7 +285,8 @@ SEM_CATALOGO = "o catálogo do App não foi lido agora: as avariadas não se res
 def _avariada_sem_peca(l: dict) -> bool:
     """A avariada sem o ID E sem o Código da peça boa: não há de que peça ela é (o contrato do App violado). Sem só o ID, o
     Código basta (`avariados.resolver`)."""
-    return _txt(l.get("Tipo")).lower() == "avariado" and _vazio(l.get("ID do item"))         and not avariados.codigo_da_linha(l)
+    return _txt(l.get("Tipo")).lower() == "avariado" and not A.id_ou_vazio(l.get("ID do item")) \
+        and not avariados.codigo_da_linha(l)
 
 
 def _avisos_do_app(c: dict) -> list[str]:
@@ -301,9 +305,12 @@ def _avisos_do_app(c: dict) -> list[str]:
 
 def _aviso(c: dict) -> str:
     """Por que a contagem não vai à revisão, e a tela diz o quê: o contrato do App violado (`_avisos_do_app`) e, sem culpa do
-    App, a avariada com o catálogo do App que não se leu agora (`SEM_CATALOGO`: passa quando o catálogo for lido)."""
+    App, a avariada com o catálogo do App que não se leu agora (`SEM_CATALOGO`: passa quando o catálogo for lido). O
+    `SEM_CATALOGO` só na contagem que ainda se revisa (`REVISAVEIS`, com o estado já depois da substituição): a aprovada, a
+    gravada, a recusada e a substituída não têm o que revisar, e o aviso escondia a etapa Gravação (o Continuar e o Encerrar
+    da gravação parada com o almoxarifado travado no Fracttal) e a Auditoria por até 5 min (a revisão final de 31/10/2026)."""
     avisos = _avisos_do_app(c)
-    if any(l.get("_sem_catalogo") for l in c["linhas"]):
+    if c["estado"] in REVISAVEIS and any(l.get("_sem_catalogo") for l in c["linhas"]):
         avisos.append(SEM_CATALOGO)
     return "; ".join(avisos)
 
@@ -347,7 +354,7 @@ def ler(cfg, *, com_teste: bool = False, app_agora: bool = False) -> dict:
           if c["id_almox"] not in teste]
     for c in cs:
         c["estado"] = estado_dos_eventos(eventos.get(c["contagem_id"], []))
-        c["aviso"], c["aviso_do_app"] = _aviso(c), bool(_avisos_do_app(c))
+        c["aviso_do_app"] = bool(_avisos_do_app(c))
     # a substituição olha só as contagens VIVAS (a recontagem pedida, recusada pelo PCM, não tem número para pôr no lugar
     # das boas) e BOAS (sem o contrato violado e com um "Contada em" legível e que não é do futuro): a mais nova que não se
     # aprova não pode tirar do caminho as que se aprovam, senão o almoxarifado fica sem nenhuma contagem para revisar. E deixa
@@ -358,6 +365,7 @@ def ler(cfg, *, com_teste: bool = False, app_agora: bool = False) -> dict:
     for c in cs:
         if c["contagem_id"] in velhas:
             c["estado"] = "substituida"
+        c["aviso"] = _aviso(c)                  # com o estado final: o do catálogo só na que ainda se revisa
         cur = curadoria_da(cfg, c["contagem_id"], curadoria)
         c["n_contadas"], c["n_em_branco"], c["n_curadoria"] = _conta_as_linhas(c["linhas"], cur)
         c["motivo_nao_aprovavel"] = _motivo_nao_aprovavel(c, agora)
@@ -371,7 +379,8 @@ def contagens(cfg) -> list[dict]:
     nome), `usina` (o nome do cadastro, ou o do Fracttal se a usina não liga), `usina_id` (e `usina_ligada_por`),
     `contada_em`, `enviada_em`, `recontagem_de` (o ID da contagem cuja recontagem esta atende; vazio na inteira), `linhas`
     (as do livro do App, com as avariadas resolvidas), `n_contadas`, `n_em_branco`, `n_curadoria`, `estado` (em `ESTADOS`), `aprovavel` e, quando não,
-    `motivo_nao_aprovavel`; `aviso` quando o App violou o contrato."""
+    `motivo_nao_aprovavel`; `aviso` quando o App violou o contrato ou, na contagem que ainda se revisa (`REVISAVEIS`), com
+    avariada e o catálogo do App que não se leu agora (`SEM_CATALOGO`)."""
     return ler(cfg)["contagens"]
 
 

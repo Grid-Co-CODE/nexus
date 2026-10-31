@@ -92,17 +92,22 @@
   <div class="inv-duas">
     <div class="inv-pilha">
       <div class="inv-tiles" aria-label="Resumo da contagem">
-        <div class="inv-tile"><b class="inv-tile-v">{{ c.n_contadas }}</b><span class="inv-tile-r">Contadas</span></div>
+        <div class="inv-tile"><b class="inv-tile-v">{{ '—' if sem_catalogo else c.n_contadas }}</b><span class="inv-tile-r">Contadas</span></div>
         <div class="inv-tile inv-tile--alerta"><b class="inv-tile-v" data-divergentes>—</b><span class="inv-tile-r">Divergentes</span></div>
-        <div class="inv-tile"><b class="inv-tile-v">{{ c.n_em_branco }}</b><span class="inv-tile-r">Em branco</span></div>
-        <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ c.n_curadoria }}</b><span class="inv-tile-r">Curadoria</span></div>
+        <div class="inv-tile"><b class="inv-tile-v">{{ '—' if sem_catalogo else c.n_em_branco }}</b><span class="inv-tile-r">Em branco</span></div>
+        <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ '—' if sem_catalogo else c.n_curadoria }}</b><span class="inv-tile-r">Curadoria</span></div>
       </div>
-      {% if vai_ler %}
+      {# a contagem que já não se revisa, com avariada e o catálogo do App que não se leu agora (31/10/2026): as peças contadas
+         esperam o catálogo (sem as avariadas levadas ao -AV a lista seria pela metade); a Gravação e a Auditoria seguem #}
+      {% if sem_catalogo %}<p class="inv-espera" role="status">O catálogo do App não foi lido agora: as peças contadas voltam a
+        aparecer quando ele for lido (em alguns minutos). As etapas Gravação e Auditoria seguem.</p>
+      {% elif vai_ler %}
       {# a cobertura e as maiores divergências dependem do Sistema: chegam no pedaço da ponte, que a página põe aqui #}
       <div class="inv-pilha" data-ponte-alvo="contagem"><p class="inv-espera" data-lote-msg role="status">lendo o saldo do Fracttal…</p></div>
       {% elif c.aprovavel and not pode %}<p class="inv-espera">{{ so_pcm }}</p>
       {% elif gravacao %}<p class="inv-espera">O saldo do sistema foi lido na aprovação: o que cada peça virou no Fracttal está nas etapas Gravação e Auditoria.</p>
       {% else %}<p class="inv-espera">Sem o saldo do sistema não há divergência: aqui, só o número que o técnico contou.</p>{% endif %}
+      {% if not sem_catalogo %}
       <details class="inv-card inv-contado"{% if not vai_ler %} open{% endif %}>
         <summary class="inv-card-cab"><h3>Peças contadas ({{ itens|length }})</h3><span class="inv-card-nota">o número do App, sem o saldo do sistema</span></summary>
         {% if itens %}
@@ -122,6 +127,7 @@
         </div>
         {% else %}<p class="mudo inv-card-corpo">Nenhuma peça nesta contagem.</p>{% endif %}
       </details>
+      {% endif %}
     </div>
     <aside class="inv-card inv-lado" aria-label="Regras do inventário">
       <div class="inv-card-cab"><h3>Regras</h3></div>

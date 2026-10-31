@@ -851,6 +851,42 @@ def test_sem_o_catalogo_lido_a_contagem_com_avariada_espera(app, inv, falso, mon
     assert falso.chamadas == []
 
 
+def test_sem_o_catalogo_lido_a_gravacao_parada_continua_na_tela(app, inv, falso, monkeypatch, tmp_path):
+    """O aviso do catálogo que não se leu é só da contagem que ainda se revisa (nova ou revisada). A que já foi aprovada (aqui,
+    parada no meio da gravação, com o almoxarifado travado em ajuste no Fracttal) segue com a etapa Gravação, o Continuar e o
+    Encerrar de quem aprovou e a Auditoria: esconder isso por até 5 min deixaria o almoxarifado travado sem caminho na tela.
+    As peças contadas (que dependem das avariadas resolvidas) esperam o catálogo, sem número pela metade."""
+    from nexus.pcm.inventario import gravacao as G
+    _cenario(inv)
+    _publicar(inv, _linha("C-1", "L1", "501", "12"), _linha("C-1", "L3", "501", "2", tipo="avariado"))
+    app.config["NEXUS_DADOS"] = str(tmp_path / "dados")
+    G._gravar_json(G._caminho(app.config, "C-1"), {
+        "contagem_id": "C-1", "id_almox": "10", "estado": "parada", "motivo": "limite do Fracttal",
+        "atualizado_em": "2026-10-26T14:00:00Z", "lotes": [{"n": 1, "estado": "aberto", "itens": ["501"]}],
+        "itens": {"501": {"estado": "pendente", "codigo": "SP-501"}},
+        "aprovador": {"pessoa_hmac": codigo_da_pessoa(app.config.get("NEXUS_PESSOA_HMAC"), EMAIL)}})
+    _gravar(app, {"tipo": "aprovada", "contagem_id": "C-1", "id_almoxarifado": "10", "id_item": "501"})
+    original = visao._livro
+
+    def livro(nome, aba=None):
+        if nome == A.LIVRO_ITENS:
+            raise ConnectionError("banco fora")
+        return original(nome, aba)
+    monkeypatch.setattr(visao, "_livro", livro)
+    visao.limpar()
+    c1 = L.contagens(app.config)[0]
+    assert (c1["estado"], c1["aviso"]) == ("gravando", "") and c1["linhas"][1].get("_sem_catalogo") is True
+    c = _pcm(app, monkeypatch)
+    pagina = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert "não pode ser revisada agora" not in pagina
+    assert re.search(r'<section[^>]*id="inv-tela-gravacao"(?![^>]*hidden)[^>]*>', pagina)       # a etapa aberta
+    assert re.search(r"<button[^>]*data-grav-continuar(?![^>]*hidden)[^>]*>", pagina)
+    assert re.search(r"<button[^>]*data-grav-encerrar(?![^>]*hidden)[^>]*>", pagina)
+    assert 'id="inv-tela-auditoria"' in pagina
+    assert "O catálogo do App não foi lido agora" in pagina and "Nenhuma peça nesta contagem" not in pagina
+    assert falso.chamadas == []
+
+
 def test_recontagem_parcial_de_peca_ja_pedida_ou_tirada(app, inv, falso, monkeypatch):
     """A peça com a recontagem já pedida nesta contagem já está fora do lote dela: pedir de novo é 409 (a contagem nova é que
     a traz); a peça tirada também; e tirar ou corrigir a peça em recontagem, 409. Tudo ou nada: com uma peça recusada na

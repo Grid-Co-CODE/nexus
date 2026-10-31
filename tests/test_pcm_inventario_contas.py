@@ -592,6 +592,39 @@ def test_avariado_em_dobro_fora_do_lote():
     assert (av["dobro"], av["contado"]) == (False, 2.0)
 
 
+def test_avariada_decidida_conta_no_dobro():
+    """A avariada já decidida na curadoria ("é a peça Y", ou o "cadastrar" que achou o -AV, que vai ao livro como "é a peça")
+    leva as unidades a Y como a resolvida: com Y também contada direto na mesma contagem, é `dobro` (fora do lote até o PCM
+    corrigir), e não a soma das duas. Com 0 unidades avariadas a decisão não mexe em Y, e não há dobro; o achado fora do
+    catálogo decidido para Y não é avariada (soma, como sempre)."""
+    linhas = _resolvidas(_linha(1, 777, "1"), _linha(2, 102, "3", tipo="avariado"))
+    for dec in ({"decisao": "e_a_peca", "id_item": "777"}, {"decisao": "cadastrar", "id_item": "777", "codigo": "SP-102-AV"}):
+        y = _por_peca(C.itens_do_lote(linhas, {}, {"2": dec}, {}))["777"]
+        assert (y["dobro"], y["invalido"], y["contado"]) == (True, True, None), dec
+    # a avariada resolvida e depois decidida (o -AV entrou no catálogo): a decisão vale, e o dobro também
+    resolvida = _resolvidas(_linha(1, 777, "1"), _linha(2, 101, "2", tipo="avariado"))
+    y = _por_peca(C.itens_do_lote(resolvida, {}, {"2": {"decisao": "e_a_peca", "id_item": "777"}}, {}))["777"]
+    assert (y["dobro"], y["contado"]) == (True, None)
+    zero = _resolvidas(_linha(1, 777, "1"), _linha(2, 102, "0", tipo="avariado"))
+    y = _por_peca(C.itens_do_lote(zero, {}, {"2": {"decisao": "e_a_peca", "id_item": "777"}}, {}))["777"]
+    assert (y["dobro"], y["contado"]) == (False, 1.0)
+    achado = [_linha(1, 777, "1"), _linha(2, "", "3", tipo="fora_do_catalogo")]
+    y = _por_peca(C.itens_do_lote(achado, {}, {"2": {"decisao": "e_a_peca", "id_item": "777"}}, {}))["777"]
+    assert (y["dobro"], y["contado"]) == (False, 4.0)
+
+
+def test_avariada_com_o_id_none():
+    """O ID da boa "None" (o vazio que o `sync-xlsx` escreve) não é peça: com o Código a avariada vai por ele; sem o Código
+    não é de peça nenhuma e não entra (a leitura põe o aviso do App na contagem)."""
+    for vazio in ("None", "nan", "NONE"):
+        sem_nada = _resolvidas(_linha(3, vazio, "3", tipo="avariado", **{"Código": "None"}))
+        assert C.itens_do_lote(sem_nada, {}, {}, {}) == [] and C.contado_efetivo(sem_nada, {}) == {}
+        so_o_codigo = _resolvidas(_linha(3, vazio, "3", tipo="avariado", **{"Código": "SP-102"}))
+        assert [(i["id_item"], i["pendentes"]) for i in C.itens_do_lote(so_o_codigo, {}, {}, {})] == [("", ["3"])]
+        # a linha de peça com o ID "None" também não vira a peça "None"
+        assert C.contado_efetivo([_linha(4, vazio, "2")], {}) == {}
+
+
 def test_dobro_corrigido_entra():
     """O PCM corrige o número da peça em dobro (o motivo vai à auditoria): ela entra no lote como qualquer outra, com o número
     dele, e segue marcada `dobro` para a nota dizer de onde veio."""

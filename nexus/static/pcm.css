@@ -1381,9 +1381,11 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .cu-dado dd{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-width:0;margin:0;font-size:13px;color:var(--tinta)}
 .cu-dado-v{overflow-wrap:anywhere}
 .cu-sem{font-size:12px}
-.cu-caixa{width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;
+/* o véu na PRÓPRIA caixa (que cobre a tela inteira), e não no ::backdrop: o WebView velho do Android não herda a variável no
+   ::backdrop e deixava a página sem escurecer atrás da foto (31/10/2026); o ::backdrop fica transparente para não dobrar o véu */
+.cu-caixa{width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;background:var(--foto-veu);
   color:var(--foto-tinta)}
-.cu-caixa::backdrop{background:var(--foto-veu)}
+.cu-caixa::backdrop{background:transparent}
 .cu-caixa-in{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;box-sizing:border-box;
   min-height:100%;padding:24px 16px}
 .cu-caixa-fig{display:grid;justify-items:center;gap:8px;max-width:min(1100px,100%);margin:0}

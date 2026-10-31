@@ -152,6 +152,110 @@ def test_maior_que_8mb_400(fotos, app):
     assert FA.receber(app.config, "foto-abc", int(time.time()), "x", b"")[0] == 400     # vazia também
 
 
+def test_corpo_maior_que_o_teto_400(fotos, app):
+    """O teto vale por pedido (`request.max_content_length`, os 8 MB mais 64 KB para os campos e o envelope do multipart): o
+    corpo maior é recusado antes de o multipart ir ao disco, e a resposta é o JSON do contrato (400 formato), não o 413 em HTML."""
+    from nexus.pcm.inventario import fotos_app as FA
+    r = _enviar(app, dados=_jpeg() + b"\0" * (FA.TAMANHO_MAX + 128 * 1024))
+    assert r.status_code == 400 and r.get_json() == {"ok": False, "mensagem": FA.CORPO_GRANDE}
+    assert "8 MB" in FA.CORPO_GRANDE and _arquivos(fotos) == []
+
+
+def test_so_jpeg_ou_png(fotos, app):
+    """Só JPEG ou PNG (o que a câmera do celular dá): GIF, BMP, TIFF e o que mais o Pillow abrir são 400, antes de decodificar."""
+    for formato in ("GIF", "BMP", "TIFF"):
+        buf = io.BytesIO()
+        Image.new("RGB", (60, 40), (40, 160, 90)).save(buf, formato)
+        r = _enviar(app, dados=buf.getvalue())
+        assert r.status_code == 400 and "JPEG ou PNG" in r.get_json()["mensagem"], formato
+    assert _arquivos(fotos) == []
+    buf = io.BytesIO()
+    Image.new("RGB", (60, 40), (40, 160, 90)).save(buf, "PNG")
+    assert _enviar(app, chave="foto-png", dados=buf.getvalue()).status_code == 200
+    # o JPEG de várias imagens que alguns celulares gravam (o Pillow o abre como "MPO") é JPEG: vale, e sai JPEG de uma imagem
+    buf = io.BytesIO()
+    Image.new("RGB", (60, 40), (40, 160, 90)).save(buf, "MPO", save_all=True,
+                                                   append_images=[Image.new("RGB", (60, 40), (9, 9, 9))])
+    assert Image.open(io.BytesIO(buf.getvalue())).format == "MPO"
+    assert _enviar(app, chave="foto-mpo", dados=buf.getvalue()).status_code == 200
+    guardada = Image.open(fotos / f"{CU.nome_da_foto('foto-mpo')}.jpg")
+    assert guardada.format == "JPEG" and getattr(guardada, "n_frames", 1) == 1
+
+
+def _png_de_mentira(largura, altura) -> bytes:
+    """Um PNG de 1 px com o cabeçalho (IHDR) dizendo outro tamanho: o `Image.open` lê só o cabeçalho, e é ali que a rota recusa
+    a foto grande demais, sem decodificar nada (a "bomba" de pixels pequena no disco e enorme na memória)."""
+    import struct
+    import zlib
+    buf = io.BytesIO()
+    Image.new("RGB", (1, 1)).save(buf, "PNG")
+    dados = bytearray(buf.getvalue())
+    ihdr = dados.index(b"IHDR")
+    dados[ihdr + 4:ihdr + 12] = struct.pack(">II", largura, altura)
+    dados[ihdr + 17:ihdr + 21] = struct.pack(">I", zlib.crc32(bytes(dados[ihdr:ihdr + 17])))
+    return bytes(dados)
+
+
+def test_mais_de_50_megapixels_400(fotos, app):
+    from nexus.pcm.inventario import fotos_app as FA
+    assert FA.PIXELS_MAX == 50_000_000
+    r = _enviar(app, dados=_png_de_mentira(8000, 7000))                    # 56 MP
+    assert r.status_code == 400 and "50 megapixels" in r.get_json()["mensagem"]
+    assert _arquivos(fotos) == []
+
+
+def test_o_comentario_do_jpeg_nao_passa(fotos, app):
+    """A foto regravada sai sem nada do arquivo do celular: nem o EXIF nem o comentário do JPEG (que o Pillow levaria adiante pelo
+    `info` da imagem)."""
+    buf = io.BytesIO()
+    Image.new("RGB", (300, 200), (40, 160, 90)).save(buf, "JPEG", comment=b"segredo do celular")
+    assert b"segredo do celular" in buf.getvalue()
+    assert _enviar(app, dados=buf.getvalue()).status_code == 200
+    nome = CU.nome_da_foto("foto-abc")
+    for arq in (fotos / f"{nome}.jpg", fotos / "mini" / f"{nome}.jpg"):
+        assert b"segredo do celular" not in arq.read_bytes() and "comment" not in Image.open(arq).info, arq
+
+
+def test_assinatura_em_maiusculas_vale(fotos, app):
+    """O contrato promete: o hex da assinatura vale em maiúsculas também."""
+    from nexus.pcm.inventario import fotos_app as FA
+    ts, dados = int(time.time()), _jpeg((40, 40))
+    sig = FA.assinatura(FA.chave(app.config), "foto-abc", ts, dados)
+    assert sig != sig.upper()
+    assert _enviar(app, ts=ts, dados=dados, assinatura=sig.upper()).status_code == 200
+
+
+def test_chave_com_barra_vertical_400(fotos, app):
+    """A chave vai à coluna "Fotos dos dados" como `rotulo:chave|...`: com "|" ela partiria a coluna, e a foto ficaria sem
+    dono. 400 (o contrato proíbe o "|" e o ":"; a rota recusa o "|", que quebra a leitura)."""
+    r = _enviar(app, chave="foto|abc")
+    assert r.status_code == 400 and "|" in r.get_json()["mensagem"]
+    assert _arquivos(fotos) == []
+
+
+def test_ts_com_decimal_400(fotos, app):
+    """O `ts` é inteiro (segundos Unix): o decimal é formato errado, não um instante."""
+    assert _enviar(app, ts=f"{int(time.time())}.5", assinatura="0" * 64).status_code == 400
+    assert _enviar(app, ts=f"{int(time.time())}.0", assinatura="0" * 64).status_code == 400
+
+
+def test_o_parcial_leva_o_processo_e_a_thread(tmp_path, monkeypatch):
+    """Dois processos do servidor (ou duas threads) gravando a mesma chave ao mesmo tempo não escrevem no mesmo parcial."""
+    import os
+    import threading
+    from pathlib import Path
+    from nexus.pcm.inventario import fotos_app as FA
+    nomes, original = [], Path.write_bytes
+
+    def grava(self, dados):
+        nomes.append(self.name)
+        return original(self, dados)
+    monkeypatch.setattr(Path, "write_bytes", grava)
+    FA._gravar(tmp_path / "x.jpg", b"1")
+    assert nomes == [f"x.jpg.{os.getpid()}.{threading.get_ident()}.parcial"]
+    assert (tmp_path / "x.jpg").read_bytes() == b"1" and [p.name for p in tmp_path.iterdir()] == ["x.jpg"]
+
+
 def test_chave_vazia_ou_longa_400(fotos, app):
     from nexus.pcm.inventario import fotos_app as FA
     for chave in ("", "   ", "x" * 201):

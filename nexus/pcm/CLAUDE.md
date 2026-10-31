@@ -608,11 +608,9 @@ script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o liv
   `estoque._estoque_do_clone` trocado pelo `EstoqueFalso` e uma rota só da cópia que abre a sessão de uma pessoa do PCM com o cookie
   do Fracttal em `/os` (a cópia recusa todo POST para fora, e o login do Fracttal é um POST).
   A prova de 26/10/2026 achou o `}` do `@media` do fim do inventário perdido no `pcm.css` (a régua e a curadoria sem estilo na
-  tela larga): `test_o_css_do_pcm_fecha_toda_chave`. As nove abas de então cabiam a 1366 px com o menu aberto; com a das Avariadas (30/10/2026) são dez, e na cópia
-  de prova a fila tinha 1341 px de abas para 1068 px de área a 1366 px (a fila rola por dentro, como no celular, onde a
-  aba de agora vem para o meio ao abrir, também na tela principal desde a Task 4): o cartão das Avariadas no alto é o outro
-  caminho para a aba. Prova da Task 4 (30/10/2026) numa cópia de prova com o banco falso dos testes: o "Ver peças" a 1366 e
-  375 px (o cartão aberto na linha inteira e a tabela virando cartão), o erro e o retry do `fetch` e a aba aberta no meio da fila.
+  tela larga): `test_o_css_do_pcm_fecha_toda_chave`. As dez abas do Almoxarifado não cabem a 1366 px com o menu aberto: a fila
+  rola por dentro (como no celular), a aba de agora vem para o meio ao abrir, e o cartão das Avariadas no alto é o outro caminho
+  para a aba.
 - No Fracttal de verdade: a mesma cópia sem o `EstoqueFalso`, com `NEXUS_INVENTARIO_GRAVAR=1` no ambiente dela (sem a chave a
   gravação recusa com 409, seção da gravação), liberando o POST só para `app.fracttal.com` e `one.fracttal.com`, o
   login do Fracttal de quem prova e a contagem de mentira da `SP-TST-001` (contado 3 contra o saldo 5) mais uma linha
@@ -639,8 +637,9 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
 - **Para que serve:** é a ÚNICA porta de leitura e gravação de estoque no Fracttal. A gravação, a régua e a curadoria só
   chamam os métodos do `Estoque` (o contrato; a `EstoqueFracttal` o cumpre, e o `EstoqueFalso` dos testes também); nenhuma
   tela fala `inventories.*` direto. `criar_peca(codigo, nome, unidade, descricao="")` manda a `descricao` no `description` do
-  `item_insert` (o campo que a tela do passo 0 manda vazio; 30/10/2026, para o fabricante, o modelo e a série da peça achada,
-  Task 8). Todo id é texto; `ler` devolve `{id_item: {saldo, minimo, maximo, ligacao, codigo}}`,
+  `item_insert` (o campo que a tela do passo 0 manda vazio), mas **ninguém a usa**: a resposta traz o `description` como
+  `"<nome>    { CODE }"` (um campo de exibição) e não foi provado o que escrevê-lo faz com o catálogo do cliente (revisão final
+  de 31/10/2026). Todo id é texto; `ler` devolve `{id_item: {saldo, minimo, maximo, ligacao, codigo}}`,
   com o que o Fracttal não disse como None, nunca 0. A `criticidade` (27/10/2026, a coluna Crit. da aprovação) é o
   `groups_1_description` da linha de saldo ("1.Crítico", "2.Necessário", "3.Importante"), vazia quando ele não diz. **Não foi
   provada no Fracttal de verdade:** a linha do passo 0 não a lista; se o campo não vier, a coluna mostra "–", nunca um nível.
@@ -736,7 +735,11 @@ para o número não mudar de uma tela para a outra. Provado em `tests/test_pcm_i
   seguinte, criado por outra contagem): o "descartar" do PCM não some em silêncio. **Contado em dobro:** o `-AV` com número na
   linha direta E na da aba é `dobro` (com `invalido` junto: o caminho do contado inválido, fora do lote até o PCM corrigir;
   corrigido, entra), porque somar contaria duas vezes a mesma peça; duas linhas da aba somam, e a direta em branco não é dobro.
-  Avariado nunca tira do bom: a boa vale a linha dela.
+  **A avariada já decidida** ("é a peça Y", ou o "cadastrar", com unidades) conta como a da aba para Y: Y contada direto na
+  mesma contagem é `dobro` (a revisão final de 31/10/2026: antes as duas somavam). Avariado nunca tira do bom: a boa vale a
+  linha dela. O ID "None" ou "nan" que o `sync-xlsx` escreve no vazio é sem ID (`almoxarifado.id_ou_vazio`, a única definição,
+  nas contas, na leitura, no resolver e na curadoria): a avariada com ele vai pelo Código, e a linha de peça com ele não vira a
+  peça "None".
 - **QUEM GRAVA parte do `itens_do_lote` e só leva `not tirada and situacao in MEXEM`, nunca o `contado_efetivo` direto:** ele
   devolve o genérico por identificar como um número (as unidades dele, ainda sem dono), e gravá-lo ajustaria o estoque com
   unidades que talvez sejam de outra peça.
@@ -801,11 +804,16 @@ contagem"); `ler(cfg)` devolve os dois com o nome de cada peça.
   (seria chutar o ID) também, com `_av_repetido`. O resolver devolve cópias: a cópia de 5 min do livro do App não muda.
   **O catálogo que NÃO se leu não é catálogo vazio** (revisão de 31/10/2026): o `_do_app` diz `itens_lido`, e a falha (que
   ficaria 5 min na cópia) não vira `{}`; senão toda avariada que acha o -AV viraria "sem cadastro", e a linha direta do -AV
-  contaria sozinha, sem a trava do dobro. A avariada fica `_sem_catalogo`, e a contagem DELA ganha o aviso `SEM_CATALOGO` ("o
-  catálogo do App não foi lido agora: ...; tente de novo em alguns minutos"), não se aprova e não se revisa; a sem avariada
-  segue. Esse aviso não é do App (`aviso_do_app` falso): a página não manda avisar quem cuida do App, e a contagem continua
-  valendo como a mais nova do almoxarifado (`_pode_substituir` olha só o `aviso_do_app`; senão a velha viraria aprovável por
-  alguns minutos). O livro Itens lido e vazio é catálogo sem o -AV: a avariada vai à curadoria, sem aviso.
+  contaria sozinha, sem a trava do dobro. A avariada fica `_sem_catalogo`, e a contagem DELA, se ainda se revisa (`nova` ou
+  `revisada`, `REVISAVEIS`, com o estado já depois da substituição), ganha o aviso `SEM_CATALOGO` ("o catálogo do App não foi
+  lido agora: ...; tente de novo em alguns minutos"), não se aprova e não se revisa; a sem avariada segue. **A que já não se
+  revisa** (aprovada, gravando, parada, gravada, recusada, substituída) não leva o aviso (a revisão final de 31/10/2026: ele
+  escondia a etapa Gravação, com o Continuar e o Encerrar da gravação parada com o almoxarifado travado, e a Auditoria por até
+  5 min); a página dela mostra as etapas e, no lugar das peças contadas (que dependem das avariadas resolvidas), "o catálogo do
+  App não foi lido agora" (`revisao.montar`, `sem_catalogo`). Esse aviso não é do App (`aviso_do_app` falso): a página não manda
+  avisar quem cuida do App, e a contagem continua valendo como a mais nova do almoxarifado (`_pode_substituir` olha só o
+  `aviso_do_app`; senão a velha viraria aprovável por alguns minutos). O livro Itens lido e vazio é catálogo sem o -AV: a
+  avariada vai à curadoria, sem aviso.
 - **Contrato violado vira aviso, não número pela metade:** "ID da linha" vazio ou o texto "None" (o `sync-xlsx` escreve o vazio
   assim) junta duas linhas numa nas contas (`contas._unicas`) e perde unidades contadas; contagem sem o ID do almoxarifado não tem
   saldo do sistema para ler; a avariada sem o ID E sem o Código da boa não é de peça nenhuma (sumir com ela esconderia unidades
@@ -1064,7 +1072,10 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
   -AV que falta. **O -AV repetido no catálogo** (dois itens com o mesmo código, `_av_repetido`): o cartão diz "há mais de um item
   com o código X no catálogo: escolha pelo 'é a peça X'", sem o cadastrar, e o cadastrar é 409 antes do Fracttal (o `achar_peca`
   escolheria um dos dois, o chute que o resolver evitou). **"É a peça X" com X a própria peça boa é 400** ("as avariadas não
-  entram na peça boa: escolha o -AV"; pelo ID da boa e, na linha sem o ID, pelo Código dela): avariado nunca entra no bom.
+  entram na peça boa: escolha o -AV"; pelo ID da boa e, na linha sem o ID ou com o "None" do `sync-xlsx`, pelo Código dela), **e
+  com X qualquer peça que não é avariada também** ("as avariadas só entram numa peça avariada (-AV)": `regua.avariada`, o código
+  com -AV no fim ou a marca do catálogo; a cadastrada por aqui que a varredura ainda não viu, pelo código criado; revisão final
+  de 31/10/2026): avariado nunca entra no bom.
   **Sem o catálogo do App lido agora** (`_sem_catalogo`), a avariada sai das pendências, a decisão por ela é 503 ("tente de novo")
   e a tela diz por quê: "não está no catálogo" seria falso, e a decisão vale mesmo depois de a linha se resolver.
 - **A decisão é uma linha do livro** (`fato_curadoria_inventario`, chave `contagem_id` + "ID da linha") mais o evento `curadoria` na
@@ -1120,13 +1131,17 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
 - **As fotos chegam pela rota assinada** `POST <raiz>/t/pcm/pecas/inventario/foto` (`fotos_app.py`, 30/10/2026; endpoint
   `torre_pcm.inventario_foto_receber`, em `auth.ROTAS_PUBLICAS`, só POST): multipart com `chave` (a mesma do livro), `ts` (segundos
   Unix), `assinatura` e o arquivo `foto`. Chave da assinatura = HMAC-SHA256(NEXUS_PESSOA_HMAC, `"nexus:pcm:fotos-inventario"`);
-  assinatura = HMAC-SHA256(chave, `"<chave>|<ts>|<sha256 hex do arquivo>"`) em hex. Janela de 15 min, até 8 MB, a mesma chave
-  reenviada substitui (a fila offline do App); 200 guardada, 400 formato (chave vazia, com mais de 200 caracteres ou caractere de
-  controle; ts; tamanho; não é imagem), 401 assinatura ou janela, 503 sem a chave (ou sem a pasta de dados). Uma rota só para a
+  assinatura = HMAC-SHA256(chave, `"<chave>|<ts>|<sha256 hex do arquivo>"`) em hex (maiúsculo também vale). Janela de 15 min no
+  `ts` inteiro, até 8 MB, a mesma chave reenviada substitui (a fila offline do App); 200 guardada, 400 formato (chave vazia, com
+  mais de 200 caracteres, caractere de controle ou "|", que partiria a coluna "Fotos dos dados"; ts que não é inteiro; tamanho;
+  não é imagem; não é JPEG nem PNG, com o MPO, o JPEG de várias imagens de alguns celulares, valendo como JPEG; mais de 50
+  megapixels, pelo cabeçalho, antes de decodificar), 401 assinatura ou janela, 503 sem a chave (ou sem a pasta de dados). O
+  corpo tem teto por pedido (`request.max_content_length`, 8 MB + 64 KB, posto antes de tocar no `request.files`): o maior é
+  recusado sem ser lido, com o JSON do contrato (400), não o 413 em HTML. Uma rota só para a
   "Foto" da peça e as dos dados, no molde do extintor (`hseq/fotos.receber`) sem o código em maiúsculas nem o `dia`; como o
   `motivo_do_app`, sem a régua de origem nem o CSRF (o App é outra origem; quem prova é a assinatura). A foto é sempre regravada
-  (até 1600 px, a orientação do EXIF aplicada e o EXIF fora: a localização do celular não fica no disco) e a miniatura sai no
-  recebimento. O contrato do lado do App é a seção 2 da `REVISAO-2026-10-30.md` da proposta das contagens; o App ainda não envia.
+  (até 1600 px, a orientação do EXIF aplicada e o EXIF fora: a localização do celular não fica no disco; o `info` todo sai antes
+  de gravar, o comentário do JPEG inclusive) e a miniatura sai no recebimento; o parcial leva o processo e a thread no nome. O contrato do lado do App é a seção 2 da `REVISAO-2026-10-30.md` da proposta das contagens; o App ainda não envia.
   Prova: `tests/test_pcm_inventario_fotos.py`.
 - **Fabricante, modelo, número de série e as fotos ampliadas** (30/10/2026, itens 2 e 3; as colunas 15 a 18 do livro das contagens):
   cada pendência traz `fabricante`, `modelo` e `serie` (o "n/a" do técnico, sem caixa, vira **"não tem"**; o vazio e o "None" do
@@ -1137,13 +1152,16 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
   (`?mini=1`, `loading="lazy"`); o clique abre a caixa (`<dialog>` com `showModal`, `static/pcm-fotos.js`) com a foto inteira,
   pedida só ao abrir; Esc fecha, ← → e Anterior/Próxima passam entre as fotos do MESMO achado (o cartão, `data-cu-grupo`), o foco
   fica na caixa e volta à miniatura; o clique no véu também fecha. A caixa usa os tokens `--foto-*` (o véu escuro nos dois temas,
-  como a das rondas do Campo). Os dados e as fotos são de quem decide, como a descrição (quem só olha os recebe vazios). O livro de
-  hoje, sem as colunas novas, mostra o cartão de hoje. **Ao cadastrar** (o achado e a avariada), os três vão na descrição da peça
-  no Fracttal, `"Fabricante: X · Modelo: Y · Série: Z"` sem as partes "n/a" ou vazias (`descricao_dos_dados`; o `item_insert` não
-  tem campo próprio para eles, só o `description`, Task 6); a linha sem eles cadastra como antes, sem descrição (o `criar_peca`
-  só leva a `descricao` quando há). O formulário do cadastrar mostra o texto que vai.
+  como a das rondas do Campo), com o véu na PRÓPRIA caixa, que cobre a tela, e não no `::backdrop` (o WebView velho não herda a
+  variável ali). O endereço de cada foto leva a versão do arquivo (`?v=`, o instante dele): a foto refeita com a mesma chave
+  não fica na cópia de 1 h do navegador (`private, max-age=3600`). Os dados e as fotos são de quem decide, como a descrição (quem só olha os recebe vazios). O livro de
+  hoje, sem as colunas novas, mostra o cartão de hoje. **Os três NÃO vão ao Fracttal pela API** (revisão final de 31/10/2026): o
+  `item_insert` não tem campo próprio para eles, e o `description` dele é o de exibição (`"<nome>    { CODE }"` na resposta do
+  passo 0), sem prova do que escrevê-lo faz no catálogo do cliente. O cadastrar (o achado e a avariada) manda o que mandava
+  antes (código, nome, unidade), e o formulário dele lembra de completar na tela do Fracttal `"Fabricante: X · Modelo: Y ·
+  Série: Z"` (sem as partes "n/a" ou vazias, `descricao_dos_dados`), junto do grupo, da criticidade e da Curva ABC.
 - **Lembrete na tela:** grupo, criticidade e Curva ABC da peça nova não se gravam pela API (testado em 09/10): completar na tela do
-  Fracttal.
+  Fracttal; o fabricante, o modelo e o número de série que a linha trouxer, no cartão dela.
 - **Cadastrar roda na PONTE `/os/_nexus/inventario/curadoria/cadastrar` (`ponte_os.py`), não em `/t/pcm`:** ele cria a peça no Fracttal
   com o login de quem decide, e esse login (o cookie `os_sessao`, `Path=<raiz>/os`) não chega às rotas de `/t/pcm`. A página fica em
   `/t/pcm`, o formulário do cadastro (`data-ponte`) vai por `fetch` (`static/pcm-ponte-inventario.js`) e a ponte responde JSON. As
@@ -1155,7 +1173,8 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
 - **Provar:** `tests/test_pcm_inventario_curadoria.py` (o código novo, as pendências, a avariada sem cadastro e o cadastro do -AV,
   cadastrar com a resposta perdida e com o pedido que nem chegou, a reserva entre linhas, "é a peça X" no lote, o genérico, o motivo cifrado, a linha decidida, a contagem gravada,
   o 403 de quem não é PCM, os status, a foto, os dados da peça com o "não tem", as fotos na ordem, a "foto ainda não chegou", o
-  livro de hoje, a caixa da foto e o cadastrar com a descrição) com mutações em cada regra acima, todas pegas. A revisão de 27/10 acrescentou: a
+  livro de hoje, a caixa da foto, o endereço com a versão e o cadastrar sem a descrição, com o lembrete) com mutações em cada
+  regra acima, todas pegas. A revisão de 27/10 acrescentou: a
   contagem gravada durante o cadastro, a reserva com outros dados, a peça achada com outro nome, as travas (a mesma linha, o cadastro
   lento, a mesma sigla) e a tela de quem só olha sem descrição nem foto.
 

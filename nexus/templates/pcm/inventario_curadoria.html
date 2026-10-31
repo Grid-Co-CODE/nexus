@@ -17,7 +17,10 @@
    (ou "não tem", o "n/a" do técnico), cada um com a miniatura da foto dele, e a foto da peça à esquerda. As miniaturas são
    <button> com a cópia de 160 px (`?mini=1`); o clique abre a caixa (<dialog>, pcm-fotos.js) com a foto inteira, pedida só ao
    abrir, e as setas passam entre as fotos do mesmo achado. A foto que o App ainda não mandou (ela vai depois da linha, pela
-   fila offline) diz "foto ainda não chegou"; o livro de hoje, sem as colunas novas, mostra o cartão de hoje. #}
+   fila offline) diz "foto ainda não chegou"; o livro de hoje, sem as colunas novas, mostra o cartão de hoje. O endereço da
+   foto leva a versão do arquivo (`?v=`): a foto refeita com a mesma chave não fica na cópia de 1 h do navegador. Os três dados
+   NÃO vão ao Fracttal pela API (31/10/2026: o `description` do `item_insert` não foi provado): o cadastrar lembra de completá-
+   los na tela do Fracttal, junto do grupo, da criticidade e da Curva ABC. #}
 <div class="pg alm inv cu">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
 <h1 class="titulo-pagina">Curadoria</h1>
@@ -58,7 +61,7 @@
 <article class="cu-card" aria-label="{{ titulo }}" data-cu-grupo>
   {% if pode %}<div class="cu-foto">
     {% set fp = x.fotos|selectattr('rotulo', 'equalto', 'Peça')|first %}
-    {% if fp and fp.tem %}<button type="button" class="cu-mini cu-mini--peca" data-cu-foto="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ fp.foto_id }}.jpg" data-cu-legenda="Foto da peça · {{ titulo }}" aria-label="Ampliar a foto da peça"><img class="cu-img" loading="lazy" src="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ fp.foto_id }}.jpg?mini=1" alt=""></button>
+    {% if fp and fp.tem %}<button type="button" class="cu-mini cu-mini--peca" data-cu-foto="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ fp.foto_id }}.jpg?v={{ fp.versao }}" data-cu-legenda="Foto da peça · {{ titulo }}" aria-label="Ampliar a foto da peça"><img class="cu-img" loading="lazy" src="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ fp.foto_id }}.jpg?mini=1&amp;v={{ fp.versao }}" alt=""></button>
     {% elif fp %}<span class="cu-sem-foto mudo">foto ainda não chegou</span>
     {% else %}<span class="cu-sem-foto mudo">sem foto</span>{% endif %}
   </div>{% endif %}
@@ -90,7 +93,7 @@
       <div class="cu-dado">
         <dt>{{ rot }}</dt>
         <dd>{% if val == 'não tem' %}<span class="mudo">não tem</span>{% else %}<span class="cu-dado-v">{{ val or '—' }}</span>{% endif %}
-          {% if f and f.tem %}<button type="button" class="cu-mini cu-mini--dado" data-cu-foto="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ f.foto_id }}.jpg" data-cu-legenda="{{ rot }} · {{ val or titulo }}" aria-label="Ampliar a foto: {{ rot }}"><img loading="lazy" src="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ f.foto_id }}.jpg?mini=1" alt=""></button>
+          {% if f and f.tem %}<button type="button" class="cu-mini cu-mini--dado" data-cu-foto="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ f.foto_id }}.jpg?v={{ f.versao }}" data-cu-legenda="{{ rot }} · {{ val or titulo }}" aria-label="Ampliar a foto: {{ rot }}"><img loading="lazy" src="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ f.foto_id }}.jpg?mini=1&amp;v={{ f.versao }}" alt=""></button>
           {% elif f %}<span class="cu-sem mudo">foto ainda não chegou</span>{% endif %}
         </dd>
       </div>
@@ -118,7 +121,7 @@
           {% if un_av not in unidades %}<option value="{{ un_av }}" selected>{{ un_av|lower }}</option>{% endif %}
         </select>
         <p class="alm-det">Se a {{ x.codigo_av }} já existir no Fracttal, o Nexus usa ela, sem criar outra. A peça é ligada ao almoxarifado e ajustada quando a contagem for gravada.</p>
-        {% if x.descricao_cadastro %}<p class="alm-det">Vai na descrição da peça no Fracttal: <b>{{ x.descricao_cadastro }}</b></p>{% endif %}
+        {% if x.lembrar_no_fracttal %}<p class="alm-det cu-lembrar">Depois de cadastrar, complete na tela de Peças e Suprimentos do Fracttal (a API não grava estes dados): <b>{{ x.lembrar_no_fracttal }}</b>, com o grupo, a criticidade e a Curva ABC.</p>{% endif %}
         <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Cadastrar no Fracttal</button>
       </form></details>
     {% elif not x.av_repetido %}<p class="alm-det">Sem o código da peça boa não há o -AV para cadastrar: diga qual é a peça ou descarte.</p>{% endif %}
@@ -139,7 +142,7 @@
         {% if x.reserva %}<p class="alm-det"><b>Uma tentativa anterior desta linha já reservou o código {{ x.reserva.codigo }}</b> (a peça pode já
           estar no Fracttal). Repita com estes mesmos dados: com outros, o Nexus recusa, para não criar uma segunda peça.</p>{% endif %}
         <p class="alm-det">O código é o próximo livre da sigla (SP-sigla-NNN). A peça é ligada ao almoxarifado e ajustada quando a contagem for gravada.</p>
-        {% if x.descricao_cadastro %}<p class="alm-det">Vai na descrição da peça no Fracttal: <b>{{ x.descricao_cadastro }}</b></p>{% endif %}
+        {% if x.lembrar_no_fracttal %}<p class="alm-det cu-lembrar">Depois de cadastrar, complete na tela de Peças e Suprimentos do Fracttal (a API não grava estes dados): <b>{{ x.lembrar_no_fracttal }}</b>, com o grupo, a criticidade e a Curva ABC.</p>{% endif %}
         <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Cadastrar no Fracttal</button>
       </form></details>
     {% endif %}

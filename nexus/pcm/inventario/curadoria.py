@@ -14,8 +14,9 @@ pendência, nas contagens que ainda não foram gravadas:
   (outra contagem o cadastrou, ou a resposta do criar se perdeu, e a varredura do App ainda não o viu), grava a decisão
   `e_a_peca` com aquele ID e não cria nada. Sem a reserva de código dos outros cadastros: o código fixo é a chave da nova
   tentativa. A revisão de 31/10/2026: o -AV REPETIDO no catálogo (dois itens com o código) não se cadastra (409; o PCM escolhe
-  pelo "é a peça X"); "é a peça X" com X a própria peça boa é 400 (avariado nunca entra no bom); e sem o catálogo do App lido
-  agora a avariada não pede decisão (503 se pedirem), porque "não está no catálogo" seria falso.
+  pelo "é a peça X"); "é a peça X" com X a própria peça boa é 400 (avariado nunca entra no bom), e com X qualquer peça que não
+  é avariada também (`regua.avariada`, "as avariadas só entram numa peça avariada (-AV)"); e sem o catálogo do App lido agora a
+  avariada não pede decisão (503 se pedirem), porque "não está no catálogo" seria falso.
 
 A decisão vai ao livro do inventário (`fato_curadoria_inventario`, mais o evento `curadoria` da auditoria) e a quantidade
 entra no lote pela `contas.contado_efetivo`: "é a peça X" e "cadastrar" somam as achadas ao contado da peça NESSA contagem (o
@@ -51,7 +52,10 @@ Regras com o caso que as criou:
   (`fotos_app.py`, 30/10/2026: a "Foto" da peça e as dos dados), com a chave que pôs no livro; o nome é o SHA-1 da chave
   (qualquer chave cabe num nome de arquivo). A descrição do técnico e a foto só aparecem para quem decide (`pode_programar`).
 - **Grupo, criticidade e Curva ABC não se gravam pela API** (testado pelo PCM em 09/10): a tela lembra de completar na tela do
-  Fracttal.
+  Fracttal. **Nem o fabricante, o modelo e o número de série** (revisão final de 31/10/2026): o `item_insert` responde o
+  `description` como "<nome>    { CODE }" (o passo 0), um campo de exibição, e ninguém provou o que escrevê-lo faz com o
+  catálogo do cliente. O cadastrar não os manda (o `criar_peca` guarda o `descricao=""`, sem uso), e o cartão da linha que os
+  tem lembra de completá-los junto do grupo, da criticidade e da Curva ABC (`descricao_dos_dados`).
 """
 from __future__ import annotations
 
@@ -62,6 +66,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from flask import Response, abort, current_app, jsonify, redirect, render_template, request, session
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from ...campo import visao
 from ...cadastro.ligacoes import pasta_dados
@@ -72,7 +77,7 @@ from ...prefixo import na_raiz
 from .. import telas
 from . import avariados
 from . import contas as C
-from . import erros, leitura, quem, travas
+from . import erros, leitura, quem, regua, travas
 from . import estoque as E
 from .erros import Conflito
 from .leitura import SEM_CATALOGO
@@ -184,10 +189,11 @@ def _eh_pendencia(l: dict) -> bool:
     nem entra no lote). A avariada sem o ID E sem o Código da peça boa não é de peça nenhuma, como nas contas (a leitura põe
     o aviso do App na contagem). A avariada que não se resolveu porque o catálogo do App NÃO se leu agora (`_sem_catalogo`) não
     pede decisão enquanto ele não se lê: "não está no catálogo" seria falso, e a decisão vale mesmo depois de a linha se
-    resolver (um "descartar" tomado agora venceria o -AV que existe)."""
+    resolver (um "descartar" tomado agora venceria o -AV que existe). O ID "None" ou "nan" (o vazio do `sync-xlsx`) é sem ID
+    (`almoxarifado.id_ou_vazio`)."""
     tipo = _txt(l.get("Tipo")).lower()
     return tipo in DECISOES_DO_TIPO and bool(_id(l.get("ID da linha"))) and A.contado(l.get("Contado")) is not None \
-        and (tipo != "avariado" or ((bool(_id(l.get("ID do item"))) or bool(avariados.codigo_da_linha(l)))
+        and (tipo != "avariado" or ((bool(A.id_ou_vazio(l.get("ID do item"))) or bool(avariados.codigo_da_linha(l)))
                                     and not l.get("_sem_catalogo")))
 
 
@@ -211,13 +217,15 @@ def decisoes(cfg, contagem_id: str) -> dict[str, dict]:
 
 
 def _catalogo() -> dict[str, dict] | None:
-    """{id_item: {"codigo", "nome"}} do catálogo do App (a varredura diária, a tela do Almoxarifado); None quando o saldo do
-    App não chegou inteiro (número pela metade não vai para a tela, nem vira destino de peça)."""
+    """{id_item: {"codigo", "nome", "avariado"}} do catálogo do App (a varredura diária, a tela do Almoxarifado; `avariado` é a
+    definição da casa, `regua.avariada`: o código -AV ou a marca do catálogo); None quando o saldo do App não chegou inteiro
+    (número pela metade não vai para a tela, nem vira destino de peça)."""
     from .. import almoxarifado
     d = almoxarifado.montar().dados or {}
     if d.get("estado") != "ok":
         return None
-    return {_id(c.get("id")): {"codigo": _txt(c.get("codigo")), "nome": _txt(c.get("nome"))} for c in d.get("catalogo", [])}
+    return {_id(c.get("id")): {"codigo": _txt(c.get("codigo")), "nome": _txt(c.get("nome")), "avariado": bool(c.get("avariado"))}
+            for c in d.get("catalogo", [])}
 
 
 def _usina_id(nome) -> int | None:
@@ -252,13 +260,25 @@ def foto(cfg, foto_id: str) -> bytes | None:
 
 
 def _tem_foto(cfg, chave) -> bool:
+    return bool(_versao_da_foto(cfg, chave))
+
+
+def _versao_da_foto(cfg, chave) -> str:
+    """O instante do arquivo da foto (nanossegundos, em texto), ou "" sem a foto. Vai no endereço da tela (`?v=`): a mesma
+    chave reenviada substitui a foto (o técnico a refez), e sem a versão o navegador mostraria a velha da cópia de 1 h
+    (`Cache-Control: private, max-age=3600`; a revisão final de 31/10/2026)."""
     pasta = _pasta_fotos(cfg)
-    return bool(_txt(chave)) and pasta is not None and (pasta / f"{nome_da_foto(chave)}.jpg").is_file()
+    if not _txt(chave) or pasta is None:
+        return ""
+    try:
+        return str((pasta / f"{nome_da_foto(chave)}.jpg").stat().st_mtime_ns)
+    except OSError:
+        return ""
 
 
 # ── fabricante, modelo e número de série (30/10/2026, itens 2 e 3 das melhorias) ────────────────────────────────────
 # o rótulo da "Fotos dos dados" (`A.ROTULOS_FOTOS_DOS_DADOS`), a coluna do livro (que é também o rótulo da tela e da foto) e o
-# rótulo curto da descrição que vai ao Fracttal; na ordem da tela
+# rótulo curto do lembrete de completar no Fracttal; na ordem da tela
 _DADOS_DA_PECA = (("fabricante", "Fabricante", "Fabricante"), ("modelo", "Modelo", "Modelo"),
                   ("serie", "Número de série", "Série"))
 NAO_TEM = "não tem"
@@ -272,9 +292,10 @@ def _dado(v) -> str:
 
 
 def descricao_dos_dados(l: dict) -> str:
-    """"Fabricante: X · Modelo: Y · Série: Z", a descrição da peça que a curadoria cadastra no Fracttal: o `item_insert` não tem
-    campo próprio para eles (o passo 0; Task 6 de 30/10/2026), só o `description`. O "n/a" e o vazio saem; sem nenhum, vazio (e
-    o cadastro vai sem descrição, como antes)."""
+    """"Fabricante: X · Modelo: Y · Série: Z", o que o cartão lembra de completar na tela do Fracttal depois de cadastrar, junto
+    do grupo, da criticidade e da Curva ABC. NÃO vai ao Fracttal pela API (revisão final de 31/10/2026): o `item_insert` não tem
+    campo próprio para eles, e o `description` que ele tem é o de exibição ("<nome>    { CODE }" na resposta do passo 0), sem
+    prova do que escrevê-lo faz. O "n/a" e o vazio saem; sem nenhum, vazio (e o cartão não lembra nada a mais)."""
     partes = []
     for _, coluna, curto in _DADOS_DA_PECA:
         v = _dado(l.get(coluna))
@@ -286,11 +307,16 @@ def descricao_dos_dados(l: dict) -> str:
 def _fotos_da_linha(cfg, l: dict) -> list[dict]:
     """As fotos do achado na ordem da tela: a da peça ("Foto") e as dos dados ("Fotos dos dados", `A.fotos_dos_dados`), só as que
     o App escreveu na linha (o dado "n/a" não tem foto). `tem`: a foto já chegou ao Nexus (ela vai depois da linha, pela fila
-    offline do App; sem ela, "foto ainda não chegou")."""
+    offline do App; sem ela, "foto ainda não chegou"); `versao`: o instante do arquivo, para o endereço (`_versao_da_foto`)."""
     chaves = [("Peça", A.campo(l.get("Foto")))]
     dos_dados = A.fotos_dos_dados(l.get("Fotos dos dados"))
     chaves += [(coluna, dos_dados.get(rotulo_col, "")) for rotulo_col, coluna, _ in _DADOS_DA_PECA]
-    return [{"rotulo": rotulo, "foto_id": nome_da_foto(c), "tem": _tem_foto(cfg, c)} for rotulo, c in chaves if c]
+    out = []
+    for rotulo, c in chaves:
+        if c:
+            versao = _versao_da_foto(cfg, c)
+            out.append({"rotulo": rotulo, "foto_id": nome_da_foto(c), "tem": bool(versao), "versao": versao})
+    return out
 
 
 # ── as pendências ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -326,8 +352,9 @@ def pendencias(cfg) -> list[dict]:
     (sem cadastrar: o PCM escolhe pelo "é a peça X"); nas outras, vazios.
 
     Desde 30/10/2026 (itens 2 e 3): `fabricante`, `modelo` e `serie` (texto; o "n/a" do técnico vira "não tem"; sem a coluna,
-    vazio), `descricao_cadastro` (o que o cadastrar manda na descrição da peça no Fracttal, `descricao_dos_dados`) e `fotos`, a da
-    peça e as dos dados na ordem da tela: `[{"rotulo": "Peça" | "Fabricante" | "Modelo" | "Número de série", "foto_id", "tem"}]`.
+    vazio), `lembrar_no_fracttal` (o que o cartão lembra de completar na tela do Fracttal, `descricao_dos_dados`: não vai pela
+    API) e `fotos`, a da peça e as dos dados na ordem da tela: `[{"rotulo": "Peça" | "Fabricante" | "Modelo" | "Número de
+    série", "foto_id", "tem", "versao"}]` (`versao`: o instante do arquivo, que vai no endereço como `?v=`).
     O livro de hoje, sem as colunas novas, dá os três vazios e só a foto da peça: a tela de hoje."""
     abertas = contagens_abertas(cfg)
     decididas = _decisoes_do_livro(F.ler(cfg)[F.ABA_CURADORIA])
@@ -348,14 +375,14 @@ def pendencias(cfg) -> list[dict]:
                 "descricao": _txt(l.get("Descrição")), "foto": _txt(l.get("Foto")),
                 "foto_id": nome_da_foto(l.get("Foto")) if _txt(l.get("Foto")) else "",
                 "tem_foto": _tem_foto(cfg, l.get("Foto")),
-                "id_item": _id(l.get("ID do item")), "codigo": _txt(l.get("Código")),
+                "id_item": A.id_ou_vazio(l.get("ID do item")), "codigo": _txt(l.get("Código")),
                 "identificado_como": como, "identificado_codigo": catalogo.get(como, {}).get("codigo", ""),
                 "identificado_nome": catalogo.get(como, {}).get("nome", ""),
                 "reserva": reservas.get(chave) if isinstance(reservas.get(chave), dict) else None,
                 "codigo_av": _txt(l.get("_codigo_av")), "nome_av": _txt(l.get("_nome_av")),
                 "unidade_av": _txt(l.get("_unidade_av")), "av_repetido": bool(l.get("_av_repetido")),
                 "fabricante": _dado(l.get("Fabricante")), "modelo": _dado(l.get("Modelo")),
-                "serie": _dado(l.get("Número de série")), "descricao_cadastro": descricao_dos_dados(l),
+                "serie": _dado(l.get("Número de série")), "lembrar_no_fracttal": descricao_dos_dados(l),
                 "fotos": _fotos_da_linha(cfg, l),
                 "decisao": None if d is None else {
                     "decisao": _txt(d.get("decisao")), "id_item": _id(d.get("id_item")),
@@ -440,9 +467,10 @@ def _achar_a_linha(cfg, contagem_id: str, chave_linha: str) -> dict:
     raise ValueError(f"A linha {chave[:30]!r} não está na contagem {cid[:30]!r}.")
 
 
-def _peca_do_catalogo(cfg, id_item, cadastradas: set[str]) -> str:
+def _peca_do_catalogo(cfg, id_item, cadastradas: dict[str, str]) -> str:
     """O ID de uma peça que o PCM disse: tem de estar no catálogo do App ou ter sido cadastrada por aqui (a varredura diária
-    ainda não a viu). ID chutado não vira peça: as unidades iriam para um item que não existe."""
+    ainda não a viu; `cadastradas` é {id_item: o código criado}). ID chutado não vira peça: as unidades iriam para um item que
+    não existe."""
     alvo = _id(id_item)
     if not alvo:
         raise ValueError("Informe a peça (o código ou o ID dela no Fracttal).")
@@ -494,15 +522,14 @@ def _conferir_o_nome_da_peca(achada: dict, reserva: dict, codigo: str) -> None:
                        "Fracttal.")
 
 
-def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque, descricao: str = "") -> tuple[str, str, bool]:
+def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) -> tuple[str, str, bool]:
     """Cria a peça no Fracttal sem duplicar. Devolve (id do item, código, criou agora).
 
     Linha SEM reserva: escolhe o próximo código da sigla (a lista do Fracttal e as reservas de todas as contagens), RESERVA-O no
     controle (com a sigla, o nome e a unidade pedidos) e só então cria. Linha COM reserva (uma tentativa anterior): confere que os
     dados são os mesmos (`_conferir_a_reserva`); se o código já existe no Fracttal, a peça foi criada e a resposta se perdeu:
     confere o nome (`_conferir_o_nome_da_peca`) e só devolve o ID, sem criar outra; se não existe, cria com o MESMO código.
-    `descricao` (o fabricante, o modelo e a série da linha, `descricao_dos_dados`) vai no `criar_peca` só quando há: sai da linha
-    do livro, e a nova tentativa manda a mesma."""
+    Sem a descrição: o fabricante, o modelo e a série não vão ao Fracttal (ver o cabeçalho)."""
     sigla = _txt(sigla).upper()
     if sigla not in siglas(cfg, almox):
         raise ValueError(f"A sigla {sigla[:10]!r} não é uma das do catálogo ({', '.join(siglas(cfg, almox))}).")
@@ -531,7 +558,7 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque, de
                                    "reservado_em": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
                 _gravar_reservas(arq, reservas)      # ANTES de criar: se a resposta se perder, a nova tentativa sabe qual era
     try:
-        return str(_criar(estoque, codigo, nome, unidade, descricao)), codigo, True
+        return str(estoque.criar_peca(codigo, nome, unidade)), codigo, True
     except E.Recusado:
         # o Fracttal recusou com todas as letras (o `success: false`): nada foi criado. A reserva sai, para a nova tentativa com
         # os dados corrigidos não ficar presa no "repita com os dados da reserva" (a revisão final de 27/10/2026). SÓ o
@@ -549,8 +576,9 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque, de
 
 def _e_a_peca_boa(l: dict, escolhida: str) -> bool:
     """O "é a peça X" de uma avariada que aponta a PRÓPRIA peça boa: as avariadas somariam ao estoque bom (o desenho: avariado
-    nunca entra no bom). Pelo ID da boa; na linha sem o ID, pelo Código dela contra o código de X no catálogo do App."""
-    bom = _id(l.get("ID do item"))
+    nunca entra no bom). Pelo ID da boa; na linha sem o ID (o "None" do `sync-xlsx` inclusive: comparar com "None" deixava
+    passar a boa), pelo Código dela contra o código de X no catálogo do App."""
+    bom = A.id_ou_vazio(l.get("ID do item"))
     if bom:
         return _id(escolhida) == bom
     codigo = avariados.codigo_da_linha(l)
@@ -558,6 +586,17 @@ def _e_a_peca_boa(l: dict, escolhida: str) -> bool:
         return False
     de_x = ((_catalogo() or {}).get(_id(escolhida)) or {}).get("codigo", "")
     return "".join(_txt(de_x).split()).upper() == "".join(codigo.split()).upper()
+
+
+def _e_avariada(id_item: str, cadastradas: dict[str, str]) -> bool:
+    """A peça X do "é a peça X" de uma avariada é avariada (`regua.avariada`: o código com -AV no fim, ou a marca Avariado do
+    catálogo)? Qualquer outra peça boa somaria as avariadas ao estoque bom dela (a revisão final de 31/10/2026: antes só a
+    PRÓPRIA boa era recusada). Pelo catálogo do App ou, na peça cadastrada por aqui que a varredura ainda não viu, pelo código
+    que a curadoria criou."""
+    item = (_catalogo() or {}).get(id_item)
+    if item:
+        return regua.avariada(item.get("codigo"), item.get("avariado"))
+    return regua.avariada(cadastradas.get(id_item, ""))
 
 
 def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool]:
@@ -569,7 +608,7 @@ def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool
     a resposta do criar se perdeu, e a varredura do App ainda não o trouxe). O código fixo é a chave da nova tentativa, então a
     reserva em arquivo dos outros cadastros não é preciso; a trava por código faz duas contagens com a avariada da mesma boa
     procurarem e criarem uma de cada vez. O nome e a unidade são os que o PCM mandou ou, sem eles, os que a tela propõe (o
-    padrão dos -AV e a unidade da boa). Os dados da peça que a linha trouxer vão na descrição, como no outro cadastro."""
+    padrão dos -AV e a unidade da boa). Sem a descrição, como no outro cadastro (ver o cabeçalho)."""
     codigo = _txt(l.get("_codigo_av"))
     if not codigo:
         raise ValueError("Esta avariada veio sem o código da peça boa: não há o -AV para cadastrar. Diga qual é a peça ou "
@@ -588,15 +627,7 @@ def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool
         achada = estoque.achar_peca(codigo)
         if achada:
             return str(achada), codigo, False
-        return str(_criar(estoque, codigo, nome, unidade, descricao_dos_dados(l))), codigo, True
-
-
-def _criar(estoque, codigo, nome, unidade, descricao: str):
-    """O `criar_peca` com a descrição só quando há (30/10/2026): sem os dados da peça, o pedido é o de antes, posicional, e o
-    Fracttal que valia antes (os falsos dos testes inclusive) vale do mesmo jeito."""
-    if descricao:
-        return estoque.criar_peca(codigo, nome, unidade, descricao=descricao)
-    return estoque.criar_peca(codigo, nome, unidade)
+        return str(estoque.criar_peca(codigo, nome, unidade)), codigo, True
 
 
 def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: str | None = None, sigla: str | None = None,
@@ -635,7 +666,7 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
         if decisao == "descartar" and not motivo:
             raise ValueError("Descartar pede o motivo (fica cifrado, na auditoria).")
         almox = _id(l.get("ID do almoxarifado"))
-        cadastradas = {_id(r.get("id_item")) for r in livro[F.ABA_CURADORIA]
+        cadastradas = {_id(r.get("id_item")): _txt(r.get("codigo_criado")) for r in livro[F.ABA_CURADORIA]
                        if _txt(r.get("decisao")) == "cadastrar" and _id(r.get("id_item"))}
         codigo, criada, texto = "", False, ""
         if decisao == "cadastrar" and tipo == "avariado":
@@ -649,8 +680,7 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
                 texto = (f"A peça {codigo} já existe no Fracttal: as unidades avariadas contam nela nesta contagem, sem "
                          "criar outra.")
         elif decisao == "cadastrar":
-            id_final, codigo, criada = _cadastrar(cfg, cid, chave, almox, sigla, nome, unidade, estoque,
-                                                  descricao_dos_dados(l))
+            id_final, codigo, criada = _cadastrar(cfg, cid, chave, almox, sigla, nome, unidade, estoque)
             texto = (f"Peça cadastrada no Fracttal: {codigo}." if criada else
                      f"A peça {codigo} já estava no Fracttal (a tentativa anterior a criou): usei ela, sem criar outra.")
         elif decisao == "descartar":
@@ -665,6 +695,9 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
                 raise ValueError("As avariadas não entram na peça boa: escolha o -AV (o código da boa com -AV no fim), ou "
                                  "cadastre-o.")
             id_final = _peca_do_catalogo(cfg, escolhida, cadastradas)
+            if tipo == "avariado" and not _e_avariada(id_final, cadastradas):
+                raise ValueError("As avariadas só entram numa peça avariada (-AV): escolha o -AV da peça (o código dela com -AV "
+                                 "no fim, ou a marcada como avariada no catálogo), ou cadastre-o.")
             texto = ("As unidades saem do genérico e entram na peça escolhida." if decisao == "confirmar"
                      else "As unidades avariadas contam como unidades dessa peça nesta contagem." if tipo == "avariado"
                      else "As unidades achadas contam como unidades dessa peça nesta contagem.")
@@ -738,7 +771,7 @@ def _pagina(*, erro: str = "", status: int = 200):
         # volta): quem só olha vê que há um achado, a quantidade e a usina. Os dados da peça (fabricante, modelo, série) e as
         # fotos deles também (30/10/2026), como a descrição
         lista = [dict(p, descricao="", foto="", foto_id="", tem_foto=False, reserva=None, fabricante="", modelo="", serie="",
-                      descricao_cadastro="", fotos=[]) for p in lista]
+                      lembrar_no_fracttal="", fotos=[]) for p in lista]
     pendentes = [p for p in lista if p["decisao"] is None]
     resp = render_template(
         "pcm/inventario_curadoria.html", pendentes=pendentes, decididas=[p for p in lista if p["decisao"] is not None],
@@ -771,12 +804,22 @@ def registrar(bp) -> None:
         """O App envia cada foto do inventário (a "Foto" da peça e as do fabricante, do modelo e do número de série; 30/10/2026,
         `fotos_app.py`). Sem sessão: vale a assinatura HMAC (`fotos_app.receber`), e o portão de login deixa só o POST passar
         (`auth.ROTAS_PUBLICAS`). Como o precedente do PCM (`telas.motivo_do_app`), sem a régua de origem (`_de_outro_site`) e sem
-        o CSRF das telas: o pedido vem do App, de outra origem e sem cookie, e quem prova que é o App é a assinatura. O arquivo é
-        lido só até 1 byte além dos 8 MB: o maior é recusado sem ser lido inteiro."""
+        o CSRF das telas: o pedido vem do App, de outra origem e sem cookie, e quem prova que é o App é a assinatura.
+
+        O corpo tem teto POR PEDIDO, posto antes de tocar no `request.files` (`fotos_app.TETO_DO_PEDIDO`: os 8 MB da foto mais 64 KB
+        para os campos e o envelope do multipart; o precedente é a sugestão da casca): o pedido que declara mais é recusado sem
+        ser lido, e o sem tamanho declarado para no teto; os dois viram o JSON do contrato (400), não o 413 em HTML. Dentro do
+        teto, o Werkzeug já pôs o multipart no disco temporário quando a rota lê o arquivo, e o `receber` confere os 8 MB da foto
+        (a revisão final de 31/10/2026: a nota antiga dizia que a foto grande era recusada sem ser lida, e não era)."""
         from . import fotos_app
-        arq = request.files.get("foto")
-        status, msg = fotos_app.receber(current_app.config, request.form.get("chave"), request.form.get("ts"),
-                                        request.form.get("assinatura"), arq.read(fotos_app.TAMANHO_MAX + 1) if arq else b"")
+        request.max_content_length = fotos_app.TETO_DO_PEDIDO
+        try:
+            arq = request.files.get("foto")
+            chave, ts, sig = request.form.get("chave"), request.form.get("ts"), request.form.get("assinatura")
+            dados = arq.read(fotos_app.TAMANHO_MAX + 1) if arq else b""
+        except RequestEntityTooLarge:
+            return jsonify({"ok": False, "mensagem": fotos_app.CORPO_GRANDE}), 400
+        status, msg = fotos_app.receber(current_app.config, chave, ts, sig, dados)
         return jsonify({"ok": status == 200, "mensagem": msg}), status
 
     @bp.route("/pecas/inventario/curadoria/decidir", methods=["POST"], endpoint="inventario_curadoria_decidir")

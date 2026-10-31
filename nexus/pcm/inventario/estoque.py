@@ -282,8 +282,10 @@ class Estoque(abc.ABC):
     @abc.abstractmethod
     def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "") -> str:
         """Cria a peça (tipo 4) no catálogo do Fracttal. Devolve o id do item. `descricao` vai no `description` do
-        `item_insert` (o campo que a tela do passo 0 manda vazio; 30/10/2026, para o fabricante, o modelo e a série da peça
-        achada fora do catálogo, Task 8); sem ela, vazio, como antes."""
+        `item_insert` (o campo que a tela do passo 0 manda vazio); sem ela, vazio. **Ninguém a usa** (revisão final de
+        31/10/2026): a resposta do `item_insert` traz o `description` como "<nome>    { CODE }", um campo de exibição, e não foi
+        provado o que escrevê-lo faz com o catálogo do cliente; a curadoria não manda o fabricante, o modelo e a série por aqui
+        (a tela lembra de completá-los no Fracttal)."""
 
     @abc.abstractmethod
     def codigos(self, sigla: str) -> list[str]:

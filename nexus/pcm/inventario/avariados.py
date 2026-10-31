@@ -20,7 +20,8 @@ definição da casa é a `regua.avariada`). Daí:
 - **Roda UMA vez**, na `leitura.ler`, sobre as linhas de cada contagem: o lote, a curadoria, a gravação e as contas da lista
   veem as mesmas linhas resolvidas, e o número não muda de uma tela para a outra.
 - **O código da boa** sai do catálogo pelo ID (o ID é a chave; o Código da linha é a cópia do App, que pode estar velha) e,
-  sem o ID no catálogo (ou sem o ID na linha), do Código da linha (`codigo_da_linha`: o "None" do `sync-xlsx` não é código).
+  sem o ID no catálogo (ou sem o ID na linha), do Código da linha (`codigo_da_linha`: o "None" do `sync-xlsx` não é código, e
+  o ID "None" ou "nan" não é ID, `almoxarifado.id_ou_vazio`; a marca `_avariado_de` fica vazia).
   Sem o ID E sem o Código a avariada não é de peça nenhuma: é o contrato do App violado, e a leitura põe o aviso na contagem.
 - **Avariado nunca tira do bom:** a contagem da boa é a da linha dela. A avariada só conta para o `-AV`.
 
@@ -98,7 +99,7 @@ def resolver(linhas: list[dict], itens: dict[str, dict] | None) -> list[dict]:
         if sem_catalogo:
             copia["_sem_catalogo"] = True
             continue
-        id_bom = _id(l.get("ID do item"))
+        id_bom = A.id_ou_vazio(l.get("ID do item"))          # o "None" do `sync-xlsx` é o ID que não veio: vale o Código
         bom = catalogo.get(id_bom) or {}
         alvo = codigo_av(bom.get("codigo") or codigo_da_linha(l))
         achados = por_codigo.get(alvo, []) if alvo else []

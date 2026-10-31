@@ -518,13 +518,15 @@ AVARIADA_SO_CODIGO = _linha("L-9", tipo="avariado", contado="1", **{"Código": "
 def _o_bom_sem_av(app_, repetido=False):
     """O catálogo do App com a SP-3 BOA (em metro) e sem a SP-3-AV (no `_semear` o item 3 é a própria SP-3-AV), e a contagem
     C-1 com as avariadas da SP-3, da SP-2 (que também não tem -AV) e da SP-1 (pelo Código, sem o ID). Os mesmos 10 itens, 9
-    lidos: o ciclo segue inteiro. `repetido`: os itens 9 e 10 são DOIS com o código SP-3-AV."""
+    lidos: o ciclo segue inteiro. `repetido`: os itens 9 e 10 são DOIS com o código SP-3-AV. Os destinos de avariada do "é a
+    peça X": o item 5 é a SP-5-AV (avariada pelo código) e o 6 tem a marca Avariado = Sim sem o -AV no código."""
     from test_pcm_almoxarifado import _item
     nomes = {1: ("SP-1", "Fusível 10A", "UNIDADE"), 2: ("SP-2", "Cabo 6 mm", "METRO"), 3: ("SP-3", "Cabo solar 4 mm", "METRO"),
-             4: ("SP-4", "Relé de proteção", "UNIDADE")}
+             4: ("SP-4", "Relé de proteção", "UNIDADE"), 5: ("SP-5-AV", "[AVARIADO] Peça 5", "UNIDADE")}
     if repetido:
         nomes.update({9: ("SP-3-AV", "[AVARIADO] Cabo solar 4 mm", "METRO"), 10: ("SP-3-AV", "[AVARIADO] Cabo solar", "METRO")})
-    itens = [_item(i, *nomes.get(i, (f"SP-{i}", f"Peça {i}", "UNIDADE")), "Teste", lido="Não" if i == 4 else "Sim")
+    itens = [_item(i, *nomes.get(i, (f"SP-{i}", f"Peça {i}", "UNIDADE")), "Teste", av="Sim" if i == 6 else "Não",
+                   lido="Não" if i == 4 else "Sim")
              for i in range(1, 11)]
     api = app_.extensions["nexus_dados_sessao"]
     _aba(api, A.LIVRO_ITENS, A.ABA_ITENS, itens)
@@ -632,9 +634,30 @@ def test_a_avariada_aceita_so_as_decisoes_dela(cur):
         CU.decidir(cur.config, "C-1", "L-6", "confirmar", id_item="1", pessoa=PESSOA)
     with pytest.raises(ValueError):
         CU.decidir(cur.config, "C-1", "L-8", "descartar", motivo="x", pessoa=PESSOA)        # sem o ID da boa: não é pendência
-    r = CU.decidir(cur.config, "C-1", "L-6", "e_a_peca", id_item="1", pessoa=PESSOA)
-    assert (r["decisao"], r["id_item"]) == ("e_a_peca", "1") and "avariadas" in r["texto"]
+    r = CU.decidir(cur.config, "C-1", "L-6", "e_a_peca", id_item="5", pessoa=PESSOA)
+    assert (r["decisao"], r["id_item"]) == ("e_a_peca", "5") and "avariadas" in r["texto"]
     assert CU.decidir(cur.config, "C-1", "L-7", "descartar", motivo="não está avariada", pessoa=PESSOA)["decisao"] == "descartar"
+
+
+def test_a_avariada_so_entra_numa_peca_avariada(cur, monkeypatch):
+    """"É a peça X" de uma avariada só vale com X avariada (`regua.avariada`: o código com -AV no fim, ou a marca Avariado do
+    catálogo); qualquer outra peça boa somaria as avariadas ao estoque bom dela: 400. A peça que a curadoria acabou de cadastrar
+    (a varredura ainda não a viu) vale pelo código criado: o -AV entra, a SP-CAB-NNN não."""
+    _o_bom_sem_av(cur)
+    with pytest.raises(ValueError, match=r"(?i)as avariadas só entram numa peça avariada \(-AV\)"):
+        CU.decidir(cur.config, "C-1", "L-6", "e_a_peca", id_item="2", pessoa=PESSOA)
+    assert _livro(cur.config, F.ABA_CURADORIA) == []
+    _no_setor(monkeypatch, "PCM")
+    r = _pessoa_ms(cur).post(f"{URL}/decidir", data={"contagem": "C-1", "linha": "L-6", "decisao": "e_a_peca", "peca": "SP-2"})
+    assert r.status_code == 400 and "as avariadas só entram numa peça avariada (-av)" in r.get_data(as_text=True).lower()
+    assert CU.decidir(cur.config, "C-1", "L-6", "e_a_peca", id_item="6", pessoa=PESSOA)["id_item"] == "6"    # a marca vale
+    # as cadastradas por aqui: pelo código que a curadoria criou
+    falso = _falso()
+    av = CU.decidir(cur.config, "C-1", "L-7", "cadastrar", estoque=falso, pessoa=PESSOA)          # cria a SP-2-AV
+    cab = _cadastrar(cur.config, falso)                                                            # cria a SP-CAB-013
+    with pytest.raises(ValueError, match="peça avariada"):
+        CU.decidir(cur.config, "C-1", "L-9", "e_a_peca", id_item=cab["id_item"], pessoa=PESSOA)
+    assert CU.decidir(cur.config, "C-1", "L-9", "e_a_peca", id_item=av["id_item"], pessoa=PESSOA)["id_item"] == av["id_item"]
 
 
 def test_avariada_com_o_av_repetido_no_catalogo(cur, monkeypatch):
@@ -666,6 +689,12 @@ def test_a_avariada_nao_entra_na_peca_boa(cur):
         CU.decidir(cur.config, "C-1", "L-9", "e_a_peca", id_item="1", pessoa=PESSOA)
     assert _livro(cur.config, F.ABA_CURADORIA) == []
     assert erros.resposta(ValueError("x"))[0] == 400
+    # o ID da boa "None" (o vazio do `sync-xlsx`) não é ID: vale o Código, e "é a peça" da boa continua recusado
+    _so(cur, PECA_DA_LISTA, AVARIADA, _linha("L-12", tipo="avariado", contado="1", **{"ID do item": "None", "Código": "SP-3"}))
+    assert {x["chave_linha"]: x for x in CU.pendencias(cur.config)}["L-12"]["id_item"] == ""
+    with pytest.raises(ValueError, match="(?i)as avariadas não entram na peça boa"):
+        CU.decidir(cur.config, "C-1", "L-12", "e_a_peca", id_item="3", pessoa=PESSOA)
+    assert _livro(cur.config, F.ABA_CURADORIA) == []
 
 
 def test_sem_o_catalogo_lido_a_curadoria_nao_oferece_a_avariada(cur, monkeypatch):
@@ -1188,7 +1217,7 @@ def test_curadoria_mostra_fabricante_modelo_serie(cur, monkeypatch):
     gen = _cartao(html, "SP-4")
     assert "Outro Fabricante" in gen and "M-20" in gen and "não tem" in gen
     assert "Fabricante" not in _cartao(html, "Conector estanque")                     # sem os dados, o cartão de hoje
-    # o cadastrar diz o que vai na descrição da peça no Fracttal (sem o "n/a")
+    # o cadastrar lembra de completar os dados na tela do Fracttal (sem o "n/a"): não vão pela API
     assert "Fabricante: Fabricante Exemplo · Série: SN-0001" in card
     # os dados da peça são de quem decide, como a descrição e a foto
     monkeypatch.setattr(telas, "pode_programar", lambda: False)
@@ -1224,10 +1253,12 @@ def test_curadoria_fotos_com_rotulo(cur):
     _so(cur, ACHADO_COM_DADOS, fora_de_ordem, CONECTOR)
     _guardar_foto(cur.config, "foto-fab")
     p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
-    assert p["L-10"]["fotos"] == [
+    assert [{k: f[k] for k in ("rotulo", "foto_id", "tem")} for f in p["L-10"]["fotos"]] == [
         {"rotulo": "Peça", "foto_id": CU.nome_da_foto("foto-peca"), "tem": False},
         {"rotulo": "Fabricante", "foto_id": CU.nome_da_foto("foto-fab"), "tem": True},
         {"rotulo": "Número de série", "foto_id": CU.nome_da_foto("foto-ser"), "tem": False}]
+    # a versão (o instante do arquivo) só na que chegou: vai no endereço da tela
+    assert [bool(re.fullmatch(r"\d+", f["versao"])) for f in p["L-10"]["fotos"]] == [False, True, False]
     assert [f["rotulo"] for f in p["L-14"]["fotos"]] == ["Peça", "Fabricante", "Modelo", "Número de série"]
     assert [f["foto_id"] for f in p["L-14"]["fotos"]] == [CU.nome_da_foto(c) for c in
                                                           ("foto-z", "foto-fab-z", "foto-mod-z", "foto-ser-z")]
@@ -1258,7 +1289,7 @@ def test_curadoria_livro_de_hoje(cur, monkeypatch):
     p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
     assert set(p) == {"L-2", "L-3", "L-4"}
     assert all((x["fabricante"], x["modelo"], x["serie"]) == ("", "", "") for x in p.values())
-    assert p["L-2"]["fotos"] == [{"rotulo": "Peça", "foto_id": CU.nome_da_foto("foto-abc"), "tem": False}]
+    assert p["L-2"]["fotos"] == [{"rotulo": "Peça", "foto_id": CU.nome_da_foto("foto-abc"), "tem": False, "versao": ""}]
     foto_id = _guardar_foto(cur.config, "foto-abc")
     _no_setor(monkeypatch, "PCM")
     html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
@@ -1290,28 +1321,66 @@ def test_a_caixa_da_foto(cur, monkeypatch):
     card = _cartao(html, "Disjuntor sem etiqueta")
     assert "data-cu-grupo" in card
     minis = re.findall(r"<button\b[^>]*data-cu-foto=\"([^\"]+)\"[^>]*>\s*<img\b([^>]*)>", card)
-    assert [u for u, _ in minis] == [f"{URL}/foto/{n}.jpg" for n in (peca, fab, ser)]   # na ordem: peça e os dados
+    # na ordem: peça e os dados; o endereço leva a versão do arquivo (`?v=`), para a foto refeita não sair da cópia do navegador
+    assert [u.split("?")[0] for u, _ in minis] == [f"{URL}/foto/{n}.jpg" for n in (peca, fab, ser)]
     for u, atributos in minis:
-        assert f'src="{u}?mini=1"' in atributos and 'loading="lazy"' in atributos
+        assert re.fullmatch(r"[^?]+\.jpg\?v=\d+", u), u
+        assert f'src="{u.replace("?v=", "?mini=1&amp;v=")}"' in atributos and 'loading="lazy"' in atributos
     assert all('aria-label="Ampliar a foto' in b for b in re.findall(r"<button\b[^>]*data-cu-foto[^>]*>", card))
     assert "/static/pcm-fotos.js" in html
     js = (RAIZ / "nexus" / "static" / "pcm-fotos.js").read_text("utf-8")
     for peca_js in ("showModal", "ArrowLeft", "ArrowRight", ".focus(", "'close'", "data-cu-grupo"):
         assert peca_js in js, peca_js
+    # o véu na PRÓPRIA caixa (que cobre a tela inteira): o WebView velho que não herda a variável no ::backdrop ainda escurece
+    css = (RAIZ / "nexus" / "static" / "pcm.css").read_text("utf-8")
+    assert "background:var(--foto-veu)" in re.search(r"\.cu-caixa\{([^}]*)\}", css).group(1)
     # quem só olha não tem a caixa nem as miniaturas
     monkeypatch.setattr(telas, "pode_programar", lambda: False)
     html = c.get(URL).get_data(as_text=True)
     assert "<dialog" not in html and "data-cu-foto" not in html and "pcm-fotos.js" not in html
 
 
-def test_cadastrar_leva_fabricante_modelo_serie(cur):
-    """O Fracttal não tem campo próprio de fabricante, modelo e série no `item_insert` (o passo 0): vão na descrição da peça, sem
-    as partes "n/a" ou vazias. A linha sem os dados cadastra como antes (sem descrição)."""
+def test_a_foto_refeita_muda_o_endereco(cur, monkeypatch):
+    """A mesma chave reenviada substitui a foto (o técnico refez a foto): o endereço da tela muda com ela (`?v=`), e o navegador
+    não mostra a velha da cópia de 1 h. A foto continua `private` (é de quem decide)."""
+    import os
+    import time
+    _so(cur, ACHADO_COM_DADOS)
+    fab = _guardar_foto(cur.config, "foto-fab")
+    _no_setor(monkeypatch, "PCM")
+    c = _pessoa_ms(cur)
+
+    def endereco():
+        card = _cartao(c.get(URL).get_data(as_text=True), "Disjuntor sem etiqueta")
+        return re.search(rf'data-cu-foto="([^"]*/foto/{fab}\.jpg\?v=\d+)"', card).group(1)
+    antes = endereco()
+    _guardar_foto(cur.config, "foto-fab", cor=(200, 20, 20))
+    from nexus.cadastro.ligacoes import pasta_dados
+    futuro = time.time() + 120
+    os.utime(pasta_dados(cur.config) / "almox_inventario" / "fotos" / f"{fab}.jpg", (futuro, futuro))
+    depois = endereco()
+    assert antes != depois and depois.split("?")[0] == antes.split("?")[0]
+    r = c.get(depois)
+    assert r.status_code == 200 and r.headers["Cache-Control"].startswith("private")
+
+
+def test_cadastrar_nao_manda_os_dados_da_peca_e_a_tela_lembra(cur, monkeypatch):
+    """O `item_insert` responde o `description` como "<nome>    { CODE }" (o passo 0): é um campo de exibição, e ninguém provou o
+    que escrever nele faz com o catálogo do cliente. Fabricante, modelo e série NÃO vão ao Fracttal: o cadastrar manda o que
+    mandava antes (código, nome, unidade), e o cartão lembra de completar os três na tela do Fracttal, junto do grupo, da
+    criticidade e da Curva ABC (sem as partes "n/a" ou vazias)."""
     _so(cur, PECA_DA_LISTA, ACHADO_COM_DADOS, CABO, GENERICO_COM_DADOS)
+    _no_setor(monkeypatch, "PCM")
+    html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
+    card = _cartao(html, "Disjuntor sem etiqueta")
+    lembra = re.search(r'<p class="alm-det cu-lembrar">(.*?)</p>', card, re.S).group(1)
+    assert "Fabricante: Fabricante Exemplo · Série: SN-0001" in lembra and "Fracttal" in lembra
+    assert "criticidade" in lembra.lower() and "curva abc" in lembra.lower()
+    assert "Vai na descrição" not in html and "cu-lembrar" not in _cartao(html, "Cabo azul 6 mm")   # sem os dados, nada
     falso = _falso()
     r = CU.decidir(cur.config, "C-1", "L-10", "cadastrar", sigla="CAB", nome="Disjuntor", unidade="UNIDADE", estoque=falso,
                    pessoa=PESSOA)
-    assert falso._catalogo[r["id_item"]]["descricao"] == "Fabricante: Fabricante Exemplo · Série: SN-0001"
+    assert "descricao" not in falso._catalogo[r["id_item"]]
     r2 = _cadastrar(cur.config, falso)                                                  # CABO, sem os dados
     assert "descricao" not in falso._catalogo[r2["id_item"]]
     assert CU.descricao_dos_dados(GENERICO_COM_DADOS) == "Fabricante: Outro Fabricante · Modelo: M-20"
@@ -1319,14 +1388,17 @@ def test_cadastrar_leva_fabricante_modelo_serie(cur):
     assert CU.descricao_dos_dados({k: v for k, v in CABO.items() if k not in NOVAS}) == ""   # o livro de hoje
 
 
-def test_cadastrar_avariado_leva_fabricante_modelo_serie(cur):
+def test_cadastrar_avariado_nao_manda_os_dados_da_peca(cur, monkeypatch):
     _o_bom_sem_av(cur)
     _aba(cur.extensions["nexus_dados_sessao"], A.LIVRO_CONTAGENS, A.ABA_CONTAGENS,
          [PECA_DA_LISTA, dict(AVARIADA, Fabricante="Fabricante Exemplo", Modelo="M-1", **{"Número de série": "n/a"})])
     visao.limpar()
+    _no_setor(monkeypatch, "PCM")
+    card = _cartao(_pessoa_ms(cur).get(URL).get_data(as_text=True), "SP-3-AV")
+    assert re.search(r'<p class="alm-det cu-lembrar">[^<]*<b>Fabricante: Fabricante Exemplo · Modelo: M-1</b>', card)
     falso = _falso()
     r = CU.decidir(cur.config, "C-1", "L-6", "cadastrar", estoque=falso, pessoa=PESSOA)
-    assert falso._catalogo[r["id_item"]]["descricao"] == "Fabricante: Fabricante Exemplo · Modelo: M-1"
+    assert "descricao" not in falso._catalogo[r["id_item"]] and r["codigo"] == "SP-3-AV"
 
 
 def test_sem_cor_fora_de_token_nem_endereco_da_raiz():

@@ -10,22 +10,26 @@ peça já ia no livro das contagens desde 27/10, mas a curadoria mostrava "sem f
 "Fotos dos dados"). `POST <raiz>/t/pcm/pecas/inventario/foto`, multipart com `chave` (a MESMA que o App pôs na coluna), `ts`
 (segundos Unix), `assinatura` e o arquivo em `foto`. Sem sessão: vale a assinatura (a rota está em `auth.ROTAS_PUBLICAS`, e só
 por POST). No molde do extintor (`nexus/hseq/fotos.receber`): HMAC-SHA256 com uma chave DERIVADA da NEXUS_PESSOA_HMAC (outro
-rótulo, `ROTULO_CHAVE`, para a assinatura de uma rota não valer na outra), janela de 15 min no `ts` e até 8 MB. A validação é
-a própria: a chave é texto opaco do App (até 200 caracteres, sem caractere de controle), sem o código em maiúsculas nem o
-`dia` do extintor, e **a mesma chave reenviada substitui** (a fila offline do App reenvia; o técnico pode refazer a foto). A
-chave nunca vira caminho: o arquivo é `curadoria.nome_da_foto(chave)` (o SHA-1).
+rótulo, `ROTULO_CHAVE`, para a assinatura de uma rota não valer na outra), janela de 15 min no `ts` (inteiro) e até 8 MB. A
+validação é a própria: a chave é texto opaco do App (até 200 caracteres, sem caractere de controle e sem o "|", que partiria
+a coluna "Fotos dos dados", `rotulo:chave|...`), sem o código em maiúsculas nem o `dia` do extintor, e **a mesma chave
+reenviada substitui** (a fila offline do App reenvia; o técnico pode refazer a foto). A chave nunca vira caminho: o arquivo é
+`curadoria.nome_da_foto(chave)` (o SHA-1). Só JPEG ou PNG (o que a câmera do celular dá), até 50 megapixels: o tamanho vem do
+cabeçalho, lido antes de decodificar (a "bomba" de pixels, pequena no disco e enorme na memória, para ali).
 
 Guarda em `<NEXUS_DADOS>/almox_inventario/fotos/<nome>.jpg` (regravada em JPEG de até 1600 px) e a miniatura de 160 px em
 `mini/<nome>.jpg`, feita no recebimento: a curadoria mostra as miniaturas de todos os achados, e refazê-las a cada abertura
 leria cada foto inteira (o caso dos extintores, 19/10/2026, `hseq/fotos.mini`). A foto é SEMPRE decodificada e regravada,
 mesmo a pequena: sai sem os metadados do celular (a localização do GPS no EXIF) e já na orientação certa. Nunca no banco
-(a API abre a quem quiser) nem no git. Quem vê é a rota da curadoria, só com login e só a quem `pode_programar`.
+(a API abre a quem quiser) nem no git. Quem vê é a rota da curadoria, só com login e só a quem `pode_programar`. Sai também
+sem o comentário do JPEG e o resto do `info` do arquivo (a revisão final de 31/10/2026: o Pillow levava o comentário adiante).
 """
 from __future__ import annotations
 
 import hashlib
 import hmac
 import io
+import os
 import threading
 import time
 import unicodedata
@@ -37,6 +41,12 @@ from . import curadoria as CU
 ROTULO_CHAVE = b"nexus:pcm:fotos-inventario"   # deriva a chave das fotos do inventário da NEXUS_PESSOA_HMAC
 JANELA_S = 15 * 60
 TAMANHO_MAX = 8 * 1024 * 1024
+# o teto do CORPO do pedido (`request.max_content_length`, na rota): a foto mais os campos e o envelope do multipart
+TETO_DO_PEDIDO = TAMANHO_MAX + 64 * 1024
+CORPO_GRANDE = "foto maior que 8 MB (o pedido passou do teto e não foi lido)"
+PIXELS_MAX = 50_000_000                       # 50 MP: a câmera de celular de hoje dá até uns 12 MP (a de 48 MP sai binada)
+# o MPO é o JPEG de várias imagens que alguns celulares gravam (a 1ª é a foto; o Pillow o abre como "MPO"): é JPEG para o App
+FORMATOS = ("JPEG", "MPO", "PNG")
 LADO_MAX, QUALIDADE = 1600, 82
 MINI_PX, MINI_QUALIDADE = 160, 75             # a miniatura do cartão da curadoria (a tela mostra até 96 px; 160 fica nítido)
 CHAVE_MAX = 200
@@ -56,15 +66,19 @@ def assinatura(k: bytes, chave_foto: str, ts, dados: bytes) -> str:
 
 def _chave_valida(c: str) -> bool:
     """Não vazia, até `CHAVE_MAX` caracteres e sem caractere de controle (C0, DEL, C1: a quebra de linha de uma chave colada
-    no livro não é a mesma chave) nem metade de par substituto (não se codifica para a assinatura)."""
-    return bool(c.strip()) and len(c) <= CHAVE_MAX and not any(unicodedata.category(ch) in ("Cc", "Cs") for ch in c)
+    no livro não é a mesma chave) nem metade de par substituto (não se codifica para a assinatura), nem o "|": a chave vai à
+    coluna "Fotos dos dados" como `rotulo:chave|...`, e o "|" a partiria (a foto ficaria sem dono). O contrato proíbe o ":"
+    também; aqui ele passa, porque a leitura da coluna parte só no primeiro ":" (`almoxarifado.fotos_dos_dados`)."""
+    return bool(c.strip()) and len(c) <= CHAVE_MAX and "|" not in c \
+        and not any(unicodedata.category(ch) in ("Cc", "Cs") for ch in c)
 
 
 def _gravar(arq: Path, dados: bytes) -> None:
-    """Inteiro ou nada: escreve ao lado e troca. O nome do parcial leva a thread, para dois envios da mesma chave ao mesmo
-    tempo (a fila do App reenviando) não escreverem no mesmo arquivo."""
+    """Inteiro ou nada: escreve ao lado e troca. O nome do parcial leva o processo e a thread, para dois envios da mesma chave
+    ao mesmo tempo (a fila do App reenviando) não escreverem no mesmo arquivo, nem em dois processos do servidor (a thread de um
+    pode ter o mesmo número da de outro)."""
     arq.parent.mkdir(parents=True, exist_ok=True)
-    tmp = arq.with_name(f"{arq.name}.{threading.get_ident()}.parcial")
+    tmp = arq.with_name(f"{arq.name}.{os.getpid()}.{threading.get_ident()}.parcial")
     try:
         tmp.write_bytes(dados)
         tmp.replace(arq)
@@ -76,16 +90,31 @@ def _gravar(arq: Path, dados: bytes) -> None:
         raise
 
 
+class _NaoServe(ValueError):
+    """A imagem que se abre, mas não serve (o formato, o tamanho): 400 com o texto."""
+
+
 def _regravar(dados: bytes) -> tuple[bytes, bytes] | None:
-    """(a foto de até 1600 px, a miniatura de 160 px), as duas em JPEG, ou None se não for imagem. O JPEG grande é decodificado
-    já reduzido (`draft`, a escala de 1/2, 1/4 ou 1/8 que ainda cobre 1600 px): a foto de 12 MP do celular cabe em 4x menos
-    memória. A orientação do EXIF é aplicada antes de o EXIF sair (a foto deitada do celular não fica de lado na tela)."""
+    """(a foto de até 1600 px, a miniatura de 160 px), as duas em JPEG, ou None se não for imagem; `_NaoServe` se for, mas não
+    JPEG nem PNG ou com mais de `PIXELS_MAX` (conferidos logo depois do `open`, que só lê o cabeçalho: nada foi decodificado). O
+    JPEG grande é decodificado já reduzido (`draft`, a escala de 1/2, 1/4 ou 1/8 que ainda cobre 1600 px): a foto de 12 MP do
+    celular cabe em 4x menos memória. A orientação do EXIF é aplicada antes de o EXIF sair (a foto deitada do celular não fica
+    de lado na tela), e o `info` (o comentário do JPEG, o perfil, o texto do PNG) sai antes de gravar."""
     try:
         from PIL import Image, ImageOps
         im = Image.open(io.BytesIO(dados))
-        if im.format == "JPEG":
+    except Exception:       # noqa: BLE001 — não é imagem
+        return None
+    if im.format not in FORMATOS:
+        raise _NaoServe("só foto JPEG ou PNG")
+    largura, altura = im.size
+    if largura * altura > PIXELS_MAX:
+        raise _NaoServe(f"foto com mais de {PIXELS_MAX // 1_000_000} megapixels")
+    try:
+        if im.format in ("JPEG", "MPO"):
             im.draft("RGB", (LADO_MAX, LADO_MAX))
         im = ImageOps.exif_transpose(im).convert("RGB")
+        im.info.clear()                     # o comentário do JPEG ia junto: o Pillow o grava de volta pelo `info`
         im.thumbnail((LADO_MAX, LADO_MAX))
         inteira = io.BytesIO()
         im.save(inteira, "JPEG", quality=QUALIDADE, optimize=True)
@@ -98,15 +127,16 @@ def _regravar(dados: bytes) -> tuple[bytes, bytes] | None:
 
 
 def receber(cfg, chave_foto, ts, assinatura_recebida, dados: bytes, agora=None) -> tuple[int, str]:
-    """(status HTTP, mensagem): 200 guardada; 400 formato (chave, ts, tamanho, não é imagem); 401 assinatura ou janela; 503
-    o Nexus sem a chave (ou sem a pasta de dados, ou o disco que não gravou). Confere tudo antes de gravar."""
+    """(status HTTP, mensagem): 200 guardada; 400 formato (chave, ts, tamanho, não é imagem, não é JPEG nem PNG, mais de 50
+    MP); 401 assinatura ou janela; 503 o Nexus sem a chave (ou sem a pasta de dados, ou o disco que não gravou). Confere tudo
+    antes de gravar."""
     k = chave(cfg)
     destino = CU._pasta_fotos(cfg)
     if not k or destino is None:
         return 503, "recebimento das fotos do inventário desligado neste Nexus (sem NEXUS_PESSOA_HMAC)"
     chave_foto = "" if chave_foto is None else str(chave_foto)
     if not _chave_valida(chave_foto):
-        return 400, f"chave da foto vazia, com mais de {CHAVE_MAX} caracteres ou com caractere de controle"
+        return 400, f"chave da foto vazia, com mais de {CHAVE_MAX} caracteres, com caractere de controle ou com \"|\""
     try:
         ts = int(ts)
     except (TypeError, ValueError):
@@ -119,7 +149,10 @@ def receber(cfg, chave_foto, ts, assinatura_recebida, dados: bytes, agora=None) 
     recebida = str(assinatura_recebida or "").strip().lower().encode("utf-8", "replace")
     if not hmac.compare_digest(assinatura(k, chave_foto, ts, dados).encode(), recebida):
         return 401, "assinatura não confere"
-    fotos = _regravar(dados)
+    try:
+        fotos = _regravar(dados)
+    except _NaoServe as ex:
+        return 400, str(ex)
     if fotos is None:
         return 400, "o arquivo não é uma imagem"
     nome = CU.nome_da_foto(chave_foto)

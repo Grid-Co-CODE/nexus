@@ -124,6 +124,17 @@ def test_resolver_sem_o_id_da_boa_vai_pelo_codigo():
     assert AV.codigo_da_linha(_l("L3", codigo=" sp-3 ")) == "sp-3"
 
 
+@pytest.mark.parametrize("vazio", ["None", "none", "NONE", "nan", " None "])
+def test_resolver_com_o_id_none_vai_pelo_codigo(vazio):
+    """O `sync-xlsx` escreve a célula vazia como "None" (ou "nan"): o ID da boa "None" é o ID que não veio, não uma peça. A linha
+    vai pelo Código, e a marca de qual era a boa fica vazia (antes saía "None", um ID que não existe)."""
+    (r,) = AV.resolver([_l("L1", id_item=vazio, codigo="SP-3")], CATALOGO)
+    assert (r["Tipo"], r["ID do item"], r["_avariado_de"]) == ("item", "33", "")
+    (r,) = AV.resolver([_l("L2", id_item=vazio, codigo="SP-5")], CATALOGO)
+    assert (r["Tipo"], r["_codigo_av"], r["_nome_av"]) == ("avariado", "SP-5-AV", "")
+    assert A.id_ou_vazio(vazio) == "" and A.id_ou_vazio("3.0") == "3" and A.id_ou_vazio(" 77 ") == "77"
+
+
 def test_resolver_sem_o_catalogo_lido():
     """O catálogo do App que não se leu agora (`itens` None) não é catálogo vazio: a avariada não se resolve e fica marcada
     `_sem_catalogo` (a leitura põe o aviso na contagem dela, e a curadoria não a oferece); as outras linhas saem iguais."""
@@ -188,7 +199,8 @@ def test_a_leitura_nao_estraga_a_copia_com_a_resolucao(app, inv):  # noqa: F811
 
 
 def _itens_sem_ler(monkeypatch):
-    """O livro Itens do App que não se lê agora (o banco caiu só nele); os outros livros respondem."""
+    """O livro Itens do App que não se lê agora (o banco caiu só nele); os outros livros respondem. Devolve o leitor de
+    verdade, para o teste voltar SÓ ele (o `monkeypatch.undo()` soltaria também o relógio parado da fixture `inv`)."""
     from nexus.campo import visao
     original = visao._livro
 
@@ -198,6 +210,7 @@ def _itens_sem_ler(monkeypatch):
         return original(nome, aba)
     monkeypatch.setattr(visao, "_livro", livro)
     visao.limpar()
+    return original
 
 
 def test_catalogo_que_nao_leu_trava_so_a_contagem_com_avariada(app, inv, monkeypatch):  # noqa: F811
@@ -208,9 +221,10 @@ def test_catalogo_que_nao_leu_trava_so_a_contagem_com_avariada(app, inv, monkeyp
     _itens_do_app(inv, ("501", "SP-501", "Fusível"), ("591", "SP-501-AV", "[AVARIADO] Fusível"))
     _publicar(inv,
               _linha("C-0", "K1", "501", "4", contada=_iso(dias_atras=2), enviada=_iso(dias_atras=2)),
+              _linha("C-0", "K2", "501", "1", tipo="avariado", contada=_iso(dias_atras=2), enviada=_iso(dias_atras=2)),
               _linha("C-1", "L1", "591", "1"), _linha("C-1", "L2", "501", "2", tipo="avariado"),
               _linha("C-2", "M1", "501", "3", almox="20"))
-    _itens_sem_ler(monkeypatch)
+    original = _itens_sem_ler(monkeypatch)
     por = {c["contagem_id"]: c for c in L.contagens(app.config)}
     c1 = por["C-1"]
     assert "o catálogo do App não foi lido agora" in c1["aviso"] and c1["aviso_do_app"] is False
@@ -218,9 +232,11 @@ def test_catalogo_que_nao_leu_trava_so_a_contagem_com_avariada(app, inv, monkeyp
     assert [l.get("_sem_catalogo") for l in c1["linhas"]] == [None, True]
     assert (por["C-2"]["aviso"], por["C-2"]["aprovavel"]) == ("", True)
     assert por["C-0"]["estado"] == "substituida"
-    # lido de novo, a avariada se resolve e a contagem volta a se aprovar
-    monkeypatch.undo()
+    # o aviso é só da contagem que ainda se revisa (nova ou revisada): a substituída não o leva
+    assert por["C-0"]["aviso"] == ""
+    # lido de novo, a avariada se resolve e a contagem volta a se aprovar (só o leitor volta: o relógio segue parado)
     from nexus.campo import visao
+    monkeypatch.setattr(visao, "_livro", original)
     visao.limpar()
     c1 = next(c for c in L.contagens(app.config) if c["contagem_id"] == "C-1")
     assert (c1["aviso"], c1["aprovavel"], c1["linhas"][1]["ID do item"]) == ("", True, "591")
@@ -246,6 +262,23 @@ def test_avariada_sem_id_e_sem_codigo_e_contrato_violado(app, inv):  # noqa: F81
     c2 = por["C-2"]
     assert c2["aviso"] == "o App mandou avariada sem o ID nem o Código da peça boa" and c2["aviso_do_app"] is True
     assert not c2["aprovavel"] and c2["motivo_nao_aprovavel"] == "avariada sem o ID nem o Código da peça boa"
+
+
+def test_avariada_com_o_id_none(app, inv):  # noqa: F811
+    """O ID da boa "None" (o vazio do `sync-xlsx`) é o ID que não veio: com o Código, a linha vai por ele (a curadoria, sem o
+    -AV no catálogo); sem o Código, não é de peça nenhuma, e a lista não a conta (as contas também não: antes ela virava uma
+    pendência da curadoria com a peça "None")."""
+    _itens_do_app(inv, ("501", "SP-501", "Fusível"))
+    _publicar(inv, _linha("C-1", "L1", "None", "2", tipo="avariado", **{"Código": "SP-501"}),
+              _linha("C-2", "M1", "None", "2", tipo="avariado", almox="20", **{"Código": "None"}))
+    por = {c["contagem_id"]: c for c in L.contagens(app.config)}
+    c1 = por["C-1"]
+    assert (c1["aviso"], c1["aprovavel"], c1["n_curadoria"]) == ("", True, 1)
+    assert c1["linhas"][0]["_codigo_av"] == "SP-501-AV"
+    c2 = por["C-2"]
+    assert c2["aviso"] == "o App mandou avariada sem o ID nem o Código da peça boa"
+    assert (c2["n_contadas"], c2["n_em_branco"], c2["n_curadoria"]) == (0, 0, 0)
+    assert contas.itens_do_lote(c2["linhas"], {}, {}, {}) == []
 
 
 @pytest.mark.parametrize("tipo", A.TIPOS_CONTAGEM)

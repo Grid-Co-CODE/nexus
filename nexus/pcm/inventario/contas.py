@@ -21,7 +21,8 @@ e a peça que nunca foi ligada ao almoxarifado no Fracttal não vem na leitura d
   que achou o `-AV` no catálogo é linha `item` do -AV (com a marca `_avariado_de`), e a que não achou segue `avariado`, pelo
   caminho do achado fora do catálogo (a decisão da curadoria a leva a uma peça). **A mesma contagem com o -AV contado direto
   E pela aba é `dobro`** (com `invalido` junto, o caminho do contado inválido: fora do lote até o PCM corrigir), porque somar
-  contaria duas vezes a mesma peça.
+  contaria duas vezes a mesma peça; a avariada levada pela curadoria a uma peça ("é a peça Y", "cadastrar") conta como a da
+  aba para ela.
 
 A chave de uma linha é o "ID da linha" (a 14ª coluna do contrato, `nexus.dados.almoxarifado.COLUNAS_CONTAGENS`), único
 dentro da contagem: a curadoria é `{id_da_linha: {"decisao", "id_item"}}`.
@@ -153,8 +154,10 @@ def _ler(linhas, curadoria) -> _Lido:
       (sem o ID da boa, pelo Código dela; sem o ID E sem o Código não é de peça nenhuma, e a leitura põe o aviso do App na
       contagem). A que já tem decisão da curadoria segue a decisão mesmo depois de se resolver
       (o -AV entrou no catálogo do App, criado por outra contagem): o "descartar" do PCM não some em silêncio. O -AV com
-      número na linha direta E na da aba é `dobros` (e `invalidos`): somar contaria duas vezes a mesma peça.
-    - Linha sem ID do item (nas duas primeiras) ou de um Tipo que não existe não é de peça nenhuma: não entra.
+      número na linha direta E na da aba é `dobros` (e `invalidos`): somar contaria duas vezes a mesma peça. A avariada
+      decidida ("é a peça Y" ou "cadastrar", com unidades) conta como a da aba para Y.
+    - Linha sem ID do item (nas duas primeiras) ou de um Tipo que não existe não é de peça nenhuma: não entra. O ID "None" ou
+      "nan" que o `sync-xlsx` escreve no vazio é sem ID (`almoxarifado.id_ou_vazio`).
     - A mesma linha reenviada conta uma vez (`_unicas`)."""
     lido = _Lido()
     cur = {_id(k): v for k, v in (curadoria or {}).items() if isinstance(v, dict)}
@@ -170,7 +173,7 @@ def _ler(linhas, curadoria) -> _Lido:
         if da_aba and decisao in DECISOES_DO_ACHADO:
             tipo = "avariado"                   # decidida quando o -AV ainda não estava no catálogo: vale a decisão
         if tipo in ("item", "identificar"):
-            id_item = _id(l.get("ID do item"))
+            id_item = A.id_ou_vazio(l.get("ID do item"))        # o "None" do `sync-xlsx` não vira a peça "None"
             if not id_item:
                 continue
             lido.peca(id_item, l.get("Código"))
@@ -191,10 +194,15 @@ def _ler(linhas, curadoria) -> _Lido:
                     lido.somar(id_item, 0.0)                # o genérico foi contado: o que achou menos o que saiu dele
                 lido.achadas(destino, n)
         elif tipo in ("fora_do_catalogo", "avariado"):
-            if tipo == "avariado" and not _id(l.get("ID do item")) and not avariados.codigo_da_linha(l):
+            if tipo == "avariado" and not A.id_ou_vazio(l.get("ID do item")) and not avariados.codigo_da_linha(l):
                 continue                                    # sem o ID nem o Código da boa: o contrato violado (a leitura avisa)
             if decisao in ("e_a_peca", "cadastrar") and alvo:
                 lido.achadas(alvo, n, dec.get("codigo"))
+                if tipo == "avariado" and n:
+                    # a avariada decidida leva as unidades a Y como a resolvida: com Y contada direto também, é o dobro (a
+                    # revisão final de 31/10/2026: sem isso, "é a peça Y" e a linha direta de Y somavam). Com 0 unidades a
+                    # decisão não toca Y (`achadas`), e não há o que dobrar
+                    pela_aba.add(alvo)
             elif decisao != "descartar" and n is not None:
                 lido.ordem.append(("achado", len(lido.achados)))
                 lido.achados.append((chave, n, negativo))
