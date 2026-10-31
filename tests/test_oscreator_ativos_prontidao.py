@@ -12,7 +12,9 @@ O que estes testes seguram:
 - o núcleo concorrente dos novos com as funções de verdade: uma leitura por vez, o frescor de 60 s, a espera da que está em
   curso e a que estoura o teto;
 - o disco fica com a versão vigente, mesmo com as gravações terminando em ordem trocada;
-- com o leitor pronto, o catálogo só vence com 26 h.
+- com o leitor pronto, o catálogo só vence com 26 h;
+- a revisão 2 (Ruling AP): o 4xx da 1ª página diz o que houve (a ordem, a credencial ou o HTTP), e a gravação pendente
+  escreve o catálogo do momento (o objeto trocado por outro da mesma versão não a faz ser pulada).
 Fracttal, banco e disco são dublês ou pastas de teste: nada vai à rede. Nomes, códigos e usinas são de mentira."""
 import sys
 import threading
@@ -262,7 +264,7 @@ def test_nucleo_concorrente_dos_novos(app, monkeypatch):
         assert sum(1 for t in threading.enumerate() if t.name == "nexus-ativos-novos") == 1   # uma leitura só
         assert AL.ler_completo(app, ler=rest)["resultado"] == "já havia uma leitura do Fracttal em curso"
         d = AL.esperar_novos(0.2, so_em_curso=True)                                # estourou a espera
-        assert d == {"terminou": False, "acrescentados": 0, "sem_pai": 0, "muitos": 0, "erro": ""}
+        assert d == {"terminou": False, "acrescentados": 0, "sem_pai": 0, "muitos": 0, "muitos_mais": False, "erro": ""}
     finally:
         solta.set()
     d = AL.esperar_novos(5, so_em_curso=True)
@@ -283,17 +285,16 @@ def test_o_disco_fica_com_a_versao_vigente(tmp_path):
     pasta = str(tmp_path / "oscreator")
     AC.reiniciar(pasta=pasta)
     assert AC.trocar(_lote(10), "rpc")
-    velho = AC.atual()
     assert AC.trocar(_lote(11), "rpc")
     vigente = AC.atual()
-    AC._gravar_disco(velho)                    # a gravação da troca de antes chegando depois (as duas soltam a trava antes)
+    AC._gravar_disco()                         # a gravação da troca de antes chegando depois: grava o vigente
     AC.reiniciar(pasta=pasta)
     assert AC.atual().versao == vigente.versao and len(AC.atual().lista) == 11
     # o mesmo com os novos do dia: a versão de antes deles não volta ao disco
     novos = AC.montar_registros(AL.para_registro(_muitos(2) + [_novo(5000)]))
     assert AC.acrescentar([r for r in novos if r["id"] == 5000], "rest") == 1
     com_novo = AC.atual()
-    AC._gravar_disco(vigente)
+    AC._gravar_disco()
     AC.reiniciar(pasta=pasta)
     assert AC.atual().versao == com_novo.versao and 5000 in AC.atual().por_id
 
@@ -310,3 +311,71 @@ def test_vencido_com_o_leitor_pronto_tolera_26_horas():
     _ligado()
     _conferida()
     assert api.catalogo_vencido(AC.atual())
+
+
+# ── a revisão 2 (Ruling AP) ─────────────────────────────────────────────────────────────────────────────────────────────
+def test_o_erro_da_primeira_pagina_diz_o_que_houve():
+    """Ruling AP (3): só o 400 e o 422 da 1ª página falam do `sort`; o 401 e o 403 são a credencial da empresa recusada; o
+    resto diz o HTTP. Antes, todo 4xx culpava o `sort`, e quem lia o estado ia atrás da coisa errada."""
+    casos = ((400, "sort=id:asc, HTTP 400", "credencial"), (422, "sort=id:asc, HTTP 422", "credencial"),
+             (401, "credencial da empresa (HTTP 401)", "sort"), (403, "credencial da empresa (HTTP 403)", "sort"),
+             (404, "HTTP 404 na 1ª página", "sort"), (409, "HTTP 409 na 1ª página", "sort"))
+    for status, diz, nao_diz in casos:
+        def ler(path, status=status):
+            raise _http(status)
+        with pytest.raises(AL.LeituraIncompleta) as e:
+            AL.ler_todos_rest(ler=ler)
+        motivo = str(e.value)
+        assert diz in motivo and nao_diz not in motivo and motivo.endswith("o catálogo segue pelo RPC"), (status, motivo)
+
+
+def test_a_gravacao_pendente_escreve_o_catalogo_do_momento(tmp_path, monkeypatch):
+    """Ruling AP (4): a gravação em disco escreve o catálogo VIGENTE quando a trava do disco chega, e não o objeto que a pediu.
+    O `acrescentar` sem novos e a troca pela mesma lista põem no lugar outro objeto da MESMA versão; com o `cat is _ATUAL`, a
+    gravação pendente era pulada e o disco ficava uma versão atrás. Ela só pula se o disco já tem o mesmo estado."""
+    import ativos_disco
+    pasta = str(tmp_path / "oscreator")
+    AC.reiniciar(pasta=pasta)
+    assert AC.trocar(_lote(10), "rpc")
+    escritas = []
+    real = ativos_disco._trocar_de_uma_vez
+    monkeypatch.setattr(ativos_disco, "_trocar_de_uma_vez", lambda d, e: escritas.append(d) or real(d, e))
+
+    def esperar(cond):
+        fim = time.monotonic() + 5
+        while not cond():
+            assert time.monotonic() < fim
+            time.sleep(0.01)
+    # 1) a troca instala a versão nova e a gravação dela fica esperando a trava do disco; enquanto isso, os novos do dia sem
+    #    novidade trocam o objeto (a mesma versão, o `novos_em` andou)
+    with ativos_disco.TRAVA:
+        a = threading.Thread(target=AC.trocar, args=(_lote(11), "rpc"))
+        a.start()
+        esperar(lambda: len(AC.atual().lista) == 11)
+        quando = time.time()
+        assert AC.acrescentar([], "rest", lido_em=quando) == 0
+    a.join(5)
+    assert len(escritas) == 1
+    AC.reiniciar(pasta=pasta)
+    assert len(AC.atual().lista) == 11 and AC.atual().novos_em == quando
+    # 2) duas gravações pendentes, terminando em qualquer ordem: a 1ª que pega a trava grava o vigente, a 2ª vê o disco igual
+    #    e pula
+    escritas.clear()
+    novo = [r for r in AC.montar_registros(AL.para_registro(_muitos(2) + [_novo(5000)])) if r["id"] == 5000]
+    with ativos_disco.TRAVA:
+        b = threading.Thread(target=AC.trocar, args=(_lote(12), "rpc"))
+        b.start()
+        esperar(lambda: len(AC.atual().lista) == 12)
+        c = threading.Thread(target=AC.acrescentar, args=(novo, "rest"))
+        c.start()
+        esperar(lambda: 5000 in AC.atual().por_id)
+    b.join(5)
+    c.join(5)
+    vigente = AC.atual()
+    assert len(escritas) == 1
+    AC.reiniciar(pasta=pasta)
+    assert AC.atual().versao == vigente.versao and 5000 in AC.atual().por_id and len(AC.atual().lista) == 13
+    # 3) nada mudou desde a última gravação: não escreve de novo
+    escritas.clear()
+    AC._gravar_disco()
+    assert escritas == []

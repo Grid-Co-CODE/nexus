@@ -391,7 +391,8 @@ def test_a_mesma_lista_nao_troca_so_renova_a_hora(tmp_path, monkeypatch):
     AC.reiniciar(pasta=str(pasta))
     gravadas = []
     original = AC._gravar_disco
-    monkeypatch.setattr(AC, "_gravar_disco", lambda cat: gravadas.append(cat.versao) or original(cat))
+    # a gravação escreve o catálogo do momento (revisão 2 da 2.2): conta-se a versão vigente a cada pedido de gravação
+    monkeypatch.setattr(AC, "_gravar_disco", lambda: gravadas.append(AC.atual().versao) or original())
     t0 = time.time()
     assert AC.trocar(_lote(20), "rpc", lido_em=t0 - 7200)
     um = AC.atual()
@@ -425,7 +426,8 @@ def test_estado_e_a_paridade_do_rest():
     assert AC.estado() == {"fonte": None, "lido_em": None, "novos_em": None, "versao": None, "n": 0, "recusa": None,
                            "encolhimento": None, "falha": None, "paridade_rest": None,
                            "rest": {"bom_em": 0.0, "falha_em": 0.0, "falha": None}, "leitor_pronto": False,
-                           "disco": {"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None}, "banco": None,
+                           "disco": {"lido": None, "gravado_em": 0.0, "versao": None, "lido_em": 0.0, "novos_em": 0.0,
+                                     "erro": None}, "banco": None,
                            "leitor": None}
     AC.trocar(_lote(10), "rpc", lido_em=123.0)
     AC.anotar_paridade_rest({"vale": False, "motivo": "faltou o tipo", "pct": 91.0})

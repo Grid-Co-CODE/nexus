@@ -338,9 +338,11 @@ _LEITOR: dict = {"pedir_novos": None, "esperar_novos": None, "estado": None}
 def _estado_limpo() -> dict:
     # `rest`: a última leitura REST que deu certo e a última que falhou (a dos novos ou a da noite): a falha mais nova que a
     # boa tira a prontidão do leitor, e a próxima boa a devolve (revisão 1 da 2.2)
+    # `disco`: o estado da cópia em disco (a versão, o `lido_em` e o `novos_em` dela), para a gravação pular só o que o disco
+    # já tem (`ativos_disco.gravar_catalogo`, revisão 2 da 2.2)
     return {"recusa": None, "recusa_completa": None, "paridade_rest": None, "banco": None, "encolhimento": None,
             "falha": None, "rest": {"bom_em": 0.0, "falha_em": 0.0, "falha": None},
-            "disco": {"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None}}
+            "disco": {"lido": None, "gravado_em": 0.0, "versao": None, "lido_em": 0.0, "novos_em": 0.0, "erro": None}}
 
 
 _ESTADO: dict = _estado_limpo()
@@ -441,9 +443,10 @@ def pedir_novos() -> bool:
 def esperar_novos(teto: float, so_em_curso: bool = False) -> dict | None:
     """Espera a leitura dos ativos novos até `teto` segundos (`so_em_curso`: só a que já está em curso, a que o botão pediu;
     senão, uma nova se a última já tem mais de um minuto) e devolve o DESFECHO dela: `terminou` (dentro do teto),
-    `acrescentados`, `sem_pai`, `muitos` (mais novos do que a leitura curta lê) e `erro` (o motivo curto, ou ""). None sem o
-    leitor (ou, para uma leitura nova, com ele fora da prontidão). A espera da que está em curso vale mesmo com a prontidão
-    caída: é por ela que a tela sabe que a leitura que o botão pediu falhou."""
+    `acrescentados`, `sem_pai`, `muitos` (mais novos do que a leitura curta lê; `muitos_mais`, se havia mais do que ela viu) e
+    `erro` (o motivo curto, ou ""). None sem o leitor (ou, para uma leitura nova, com ele fora da prontidão) e quando a última
+    leitura terminou há mais de 2 min (`ativos_leitor.DESFECHO_VALE_S`: o desfecho velho não é o de agora). A espera da que
+    está em curso vale mesmo com a prontidão caída: é por ela que a tela sabe que a leitura que o botão pediu falhou."""
     if _LEITOR["esperar_novos"] is None or (not so_em_curso and not leitor_pronto()):
         return None
     try:
@@ -458,10 +461,11 @@ def _caminho() -> str | None:
     return ativos_disco.caminho(_CONFIG["pasta"])
 
 
-def _gravar_disco(cat: Catalogo) -> None:
-    """A cópia em disco deste catálogo, só se ele ainda for o vigente quando a trava do disco chegar (a versão mais nova grava
-    a dela: uma troca e os novos do dia terminando em ordem trocada não deixam a velha no disco)."""
-    ativos_disco.gravar_catalogo(_CONFIG["pasta"], cat, _ESTADO["disco"], lambda: cat is _ATUAL)
+def _gravar_disco() -> None:
+    """A cópia em disco do catálogo VIGENTE quando a trava do disco chegar, e não do que pediu a gravação (revisão 2 da 2.2):
+    uma troca e os novos do dia terminando em ordem trocada não deixam a versão velha no disco, e o objeto trocado por outro
+    da mesma versão (o `acrescentar` sem novos) não faz a gravação pendente ser pulada. Pula só o que o disco já tem."""
+    ativos_disco.gravar_catalogo(_CONFIG["pasta"], lambda: _ATUAL, _ESTADO["disco"])
 
 
 def _ler_disco():
@@ -584,7 +588,7 @@ def _trocar(registros, fonte: str, lido_em: float | None, gravar: bool) -> bool:
     if motivo:
         return False
     if gravar and (mudou or novo.lido_em - _ESTADO["disco"]["lido_em"] >= REGRAVAR_DISCO_S):
-        _gravar_disco(novo)
+        _gravar_disco()
     return True
 
 
@@ -614,7 +618,6 @@ def acrescentar(registros, fonte: str = "rest", *, lido_em: float | None = None)
     if fonte not in ("rest", "rpc"):
         raise ValueError("os novos vêm do Fracttal (rest ou rpc), não de %r" % (fonte,))
     quando = time.time() if lido_em is None else float(lido_em)
-    gravar = None
     with _TRAVA:
         atual = _ATUAL
         if atual is None:
@@ -631,10 +634,9 @@ def acrescentar(registros, fonte: str = "rest", *, lido_em: float | None = None)
             _ATUAL = replace(atual, novos_em=max(atual.novos_em, quando))
             return 0
         copias = _preparar(list(atual.lista) + novos)
-        gravar = _ATUAL = _indexar(copias, _versao(copias), atual.fonte, atual.lido_em,
-                                   novos_em=max(atual.novos_em, quando))
+        _ATUAL = _indexar(copias, _versao(copias), atual.fonte, atual.lido_em, novos_em=max(atual.novos_em, quando))
     log.info("catálogo de ativos: %d ativo(s) novo(s) do Fracttal somados ao catálogo", len(novos))
-    _gravar_disco(gravar)
+    _gravar_disco()
     return len(novos)
 
 
@@ -667,7 +669,9 @@ def _boot_local() -> None:
                         with _TRAVA:
                             _ATUAL = replace(_ATUAL, novos_em=novos_em)
                     log.info("catálogo de ativos: %d ativos da cópia em disco", len(_ATUAL.lista))
-                    _ESTADO["disco"].update(lido="cópia", lido_em=lido_em)
+                    # o que está no disco é o que acabou de entrar: a 1ª gravação depois do boot só escreve se algo mudou
+                    _ESTADO["disco"].update(lido="cópia", versao=_ATUAL.versao, lido_em=_ATUAL.lido_em,
+                                            novos_em=_ATUAL.novos_em)
                     return
             legado = _ler_legado()
             if legado is not None:

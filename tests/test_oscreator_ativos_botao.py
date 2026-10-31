@@ -359,3 +359,57 @@ def test_o_cabecalho_de_ativos_no_celular():
     bloco = css.split("@media (max-width:480px){", 1)[1].split("\n}", 1)[0]
     assert ".at-cab{flex-wrap:wrap" in bloco and ".at-busca{flex:1 1 100%;width:100%}" in bloco
     assert not re.search(r"#[0-9a-fA-F]{3,6}\b|rgba?\(", bloco)
+
+
+# ── a revisão 2 da 2.2+2.3 (Ruling AP) ──────────────────────────────────────────────────────────────────────────────────
+def test_o_desfecho_velho_nao_vale(cli, app, monkeypatch):
+    """Ruling AP (1): o desfecho de uma leitura dos novos que terminou há mais de 120 s (o dobro do frescor de 60 s) não é o
+    de agora. No F5 da Fila com `?novos=1` e na espera da que está em curso sem nenhuma em curso, a tela não diz nada."""
+    import ativos_leitor as AL
+    from test_oscreator_ativos_leitor import _catalogo_de, _muitos
+    _fila_sem_fracttal(monkeypatch)
+    AL.reiniciar()
+    _catalogo_de(_muitos(60))
+    AC.anotar_paridade_rest({"vale": True, "motivo": "conferida", "em": time.time()})
+    app.config["NEXUS_PCM_FRACTTAL_TESTE"] = {"FRACTTAL_CLIENT_ID": "id-de-mentira", "FRACTTAL_CLIENT_SECRET": "s"}
+    AL.ligar(app)
+    try:
+        lida = {"inicio": 0.0, "fim": time.time() - 121, "pedidos": 1, "novos": 0, "acrescentados": 0, "sem_pai": 0,
+                "muitos": 0, "erro": "", "resultado": "0 novo(s), 0 somado(s) ao catálogo"}
+        AL._ESTADO["novos"] = dict(lida)                                # a última leitura, de 2 min atrás
+        assert AL.esperar_novos(1, so_em_curso=True) is None
+        assert cli.get("/os/api/ativos/catalogo?novos=1").get_json()["novos_desfecho"] is None
+        assert cli.get("/os/api/tradicional/catalogo?novos=1").get_json()["novos_desfecho"] is None
+        assert 'id="fl_novos"' not in cli.get("/os/solicitacao/fila?novos=1").get_data(as_text=True)
+        # a de agora vale: a tela diz o desfecho dela
+        AL._ESTADO["novos"] = dict(lida, fim=time.time() - 5)
+        assert AL.esperar_novos(1, so_em_curso=True)["terminou"]
+        h = cli.get("/os/solicitacao/fila?novos=1").get_data(as_text=True)
+        assert 'id="fl_novos">nenhum ativo novo no Fracttal</p>' in h
+        # e a que nunca rodou (o processo recém-subido) também não diz nada
+        AL._ESTADO["novos"] = None
+        assert AL.esperar_novos(1, so_em_curso=True) is None
+    finally:
+        AL.reiniciar()
+
+
+def test_mais_de_n_so_quando_a_leitura_parou_no_teto(monkeypatch):
+    """Ruling AP (2): a leitura dos novos que parou no teto com a última página toda de novos viu só parte deles ("mais de N");
+    a que chegou aos ids conhecidos na última página viu todos (a conta é exata)."""
+    import ativos_leitor as AL
+    from test_oscreator_ativos_leitor import RestFalso, _catalogo_de, _it, _muitos
+    AL.reiniciar()
+    monkeypatch.setattr(AL, "_dormir", lambda s: None)
+    base = _muitos(60)
+    _catalogo_de(base)
+    AC.anotar_paridade_rest({"vale": True, "motivo": "conferida", "em": time.time()})
+    novos = [_it(9000 + k, "CAL-GAM100-NOVO%d" % k, "Novo %d    { x }" % k, 10) for k in range(600)]
+    try:
+        rel = AL.ler_novos(ler=RestFalso(base + novos))                 # 5 páginas inteiras de novos, e havia mais
+        assert rel["muitos"] == 500 and rel["acrescentados"] == 0
+        assert api.texto_dos_novos(AL._desfecho(True)) == "mais de 500 ativos novos ficam para a leitura da noite"
+        rel = AL.ler_novos(ler=RestFalso(base + novos[:450]))           # a 5ª página chegou aos conhecidos
+        assert rel["muitos"] == 450
+        assert api.texto_dos_novos(AL._desfecho(True)) == "450 ativos novos ficam para a leitura da noite"
+    finally:
+        AL.reiniciar()

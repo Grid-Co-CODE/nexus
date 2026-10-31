@@ -14,9 +14,12 @@ O que mora na pasta (`<pasta de dados do clone>/oscreator/`):
   só na memória, cada reinício esqueceria a recusa (e o Fracttal seria relido) e desligaria os ativos novos até a noite.
 - o `assets_cache.json` antigo, ao lado: lido UMA vez, como migração, se a cópia nova não existe.
 
-A ordem das gravações (revisão 1 da 2.2): quem grava a cópia passa a pergunta "este catálogo ainda é o vigente?", feita
-DENTRO da trava do disco. Uma troca pelo RPC e os novos do dia (`acrescentar`) instalam versões em sequência, mas gravam
-depois de soltar a trava do catálogo: sem a pergunta, a versão mais velha podia chegar ao disco por último e voltar no reinício.
+A ordem das gravações (revisões 1 e 2 da 2.2): a gravação escreve o catálogo VIGENTE, lido DENTRO da trava do disco, e não o
+objeto que a pediu. Uma troca pelo RPC e os novos do dia (`acrescentar`) instalam versões em sequência, mas gravam depois de
+soltar a trava do catálogo: gravando o objeto que pediu, a versão mais velha podia chegar ao disco por último e voltar no
+reinício; perguntando só "o que pediu ainda é o vigente?" (a rodada 1), a gravação pendente era pulada quando o vigente era
+outro objeto da MESMA versão (o `acrescentar` sem novos, a troca pela mesma lista) e o disco ficava uma versão atrás. Ela só
+pula se o disco já tem o mesmo estado (versão, `lido_em`, `novos_em`).
 """
 from __future__ import annotations
 
@@ -61,15 +64,24 @@ def _trocar_de_uma_vez(destino: str, escrever) -> None:
         raise
 
 
-def gravar_catalogo(pasta: str | None, cat, estado_disco: dict, ainda_vale) -> bool:
-    """Grava a cópia do catálogo `cat`. `ainda_vale()` é perguntado DENTRO da trava: o catálogo que já não é o vigente não é
-    gravado (a versão mais nova grava a dela). Falha de disco vai ao log e a `estado_disco` (o `estado()["disco"]` do
+def no_disco(estado_disco: dict) -> tuple:
+    """O estado do catálogo que está no disco (versão, `lido_em`, `novos_em`), como a última gravação ou o boot anotou."""
+    return estado_disco.get("versao"), estado_disco.get("lido_em"), estado_disco.get("novos_em")
+
+
+def gravar_catalogo(pasta: str | None, vigente, estado_disco: dict) -> bool:
+    """Grava a cópia do catálogo VIGENTE: `vigente()` é lido DENTRO da trava, e é ele que se grava, e não o objeto que pediu a
+    gravação (revisão 2 da 2.2). Antes se perguntava "o que pediu ainda é o vigente?", e o `acrescentar` sem novos e a troca
+    pela mesma lista, que põem no lugar OUTRO objeto da mesma versão, faziam a gravação pendente ser pulada: o disco ficava uma
+    versão atrás. Pula só se não há catálogo ou se o disco já tem este mesmo estado (`no_disco`: a versão, o `lido_em` e o
+    `novos_em`, anotados a cada gravação e no boot). Falha de disco vai ao log e a `estado_disco` (o `estado()["disco"]` do
     catálogo), e o catálogo segue na memória. True se gravou."""
     destino = caminho(pasta)
     if destino is None:
         return False
     with TRAVA:
-        if not ainda_vale():
+        cat = vigente()
+        if cat is None or no_disco(estado_disco) == (cat.versao, cat.lido_em, cat.novos_em):
             return False
 
         def escrever(tmp):
@@ -79,7 +91,8 @@ def gravar_catalogo(pasta: str | None, cat, estado_disco: dict, ainda_vale) -> b
                 json.dump(carga, f, ensure_ascii=False, separators=(",", ":"))
         try:
             _trocar_de_uma_vez(destino, escrever)
-            estado_disco.update(gravado_em=time.time(), lido_em=cat.lido_em, erro=None)
+            estado_disco.update(gravado_em=time.time(), versao=cat.versao, lido_em=cat.lido_em, novos_em=cat.novos_em,
+                                erro=None)
             return True
         except Exception as e:                                       # noqa: BLE001 — o disco não derruba o catálogo
             estado_disco["erro"] = "gravar: %s: %s" % (type(e).__name__, str(e)[:120])

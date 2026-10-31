@@ -123,23 +123,44 @@ def nomes_no_caminho(nos, alvos=None) -> dict:
     sem a cauda de endereço da usina deles; senão, no 1º espaço duplo). É a `descricao` que a foto do banco grava (Ruling AK,
     revisão 1 da 2.2): a API do banco tem leitura aberta, e o endereço da usina já saiu dela uma vez, no mesmo dia em que entrou
     (04/10/2026, a 1ª carga do Campo · App). O item cuja cadeia não chega à raiz leva o corte no 1º espaço duplo.
-    `nos`: {id: (id do pai ou None, descrição)}, como em `caminhos`."""
+    `nos`: {id: (id do pai ou None, descrição)}, como em `caminhos`. A foto ainda passa cada descrição pelo detector de endereço
+    (`nexus/dados/foto_ativos.sem_endereco`, Ruling AN): ele NÃO entra aqui, porque este nome também serve ao caminho do
+    catálogo, que segue o do RPC."""
     caudas: dict = {}
     out: dict = {}
     for i in (nos if alvos is None else alvos):
         if i not in nos:
             continue
-        descricao = nos[i][1]
         pais, chegou = _ancestrais(i, nos)
-        if not chegou or len(pais) <= 1:                             # a raiz (0), a usina (1) ou o item solto
-            out[i] = _nome_no_caminho(descricao, usina=chegou and len(pais) == 1)
-            continue
-        u = pais[1]
-        if u not in caudas:
-            nome_u, d0 = _nome_no_caminho(nos[u][1], usina=True), _limpa(nos[u][1])
-            caudas[u] = d0[len(nome_u):].strip() if d0.startswith(nome_u) else ""
-        out[i] = _nome_no_caminho(descricao, usina=False, cauda=caudas[u])
+        out[i] = _nome_pelos_pais(nos[i][1], pais, chegou, nos, caudas)
     return out
+
+
+def _nome_pelos_pais(descricao, pais, chegou, nos, caudas) -> str:
+    """O nome de um item pela posição na cadeia: a raiz (0 pais), a usina (1) ou o item solto pelo corte de cada um; os de
+    dentro sem a cauda de endereço da usina deles (`caudas`: {id da usina: cauda}, calculada uma vez)."""
+    if not chegou or len(pais) <= 1:                                 # a raiz (0), a usina (1) ou o item solto
+        return _nome_no_caminho(descricao, usina=chegou and len(pais) == 1)
+    u = pais[1]
+    if u not in caudas:
+        nome_u, d0 = _nome_no_caminho(nos[u][1], usina=True), _limpa(nos[u][1])
+        caudas[u] = d0[len(nome_u):].strip() if d0.startswith(nome_u) else ""
+    return _nome_no_caminho(descricao, usina=False, cauda=caudas[u])
+
+
+def nome_pelo_pai(nos, pai, descricao, caudas: dict | None = None) -> str:
+    """O nome no caminho de um item que NÃO está em `nos`, pela própria descrição e pelo próprio pai: a linha da foto que não
+    veio na leitura de hoje (o código que saiu do Fracttal; Ruling AN, revisão 2 da 2.2). A cadeia de pais vem de `nos` (os
+    itens lidos hoje e as linhas antigas que também não vieram), e o corte é o mesmo de `nomes_no_caminho`. A descrição é a da
+    própria linha, e não a do item de hoje com o mesmo id (o item recodificado): a linha guarda o nome que tinha."""
+    if pai is None:
+        pais, chegou = [], True                                      # a raiz do cliente
+    elif pai in nos:
+        acima, chegou = _ancestrais(pai, nos)
+        pais = acima + [pai]
+    else:
+        pais, chegou = [], False                                     # o pai não está em lugar nenhum: o item solto
+    return _nome_pelos_pais(descricao, pais, chegou, nos, {} if caudas is None else caudas)
 
 
 def registros_da_foto(linhas) -> tuple:

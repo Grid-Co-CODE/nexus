@@ -31,6 +31,7 @@ conferência da 1ª noite, que então falha e diz o campo.
 """
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import threading
@@ -63,6 +64,7 @@ HORA_COMPLETO = (2, 15)          # a leitura inteira, em Brasília: longe dos la
 NOVOS_DAS, NOVOS_ATE = 6, 22     # os novos, de 30 em 30 min, das 06h às 22h
 NOVOS_MINUTOS = (8, 38)          # fora dos minutos ocupados (tarefas :10 a :20, normalizações :22, App :25, carga :40...)
 NOVOS_FRESCO_S = 60              # os novos lidos há menos disto servem a quem pede (botão, aprovação): não se lê de novo
+DESFECHO_VALE_S = 2 * NOVOS_FRESCO_S     # o desfecho de uma leitura mais velha que isto não é o "de agora" (o F5 da Fila)
 COMPLETO, NOVOS = "completo", "novos"
 CHAVE = "oscreator_ativos_leitor"
 _BRT_S = -3 * 3600               # Brasília é UTC-3 fixo
@@ -75,8 +77,10 @@ _APP: dict = {"app": None}
 
 
 def _estado_limpo() -> dict:
+    # `descricao_cortada`: quantas descrições o detector de endereço cortou na última foto renovada, com até 5 ids (nunca o
+    # texto; Ruling AN). É o termômetro do detector: o nome que perde pedaço sem ser endereço aparece aqui
     return {"ligado": False, "motivo": "não ligado (só o servir.py liga o leitor)", "credencial": None,
-            "completo": None, "novos": None}
+            "completo": None, "novos": None, "descricao_cortada": None}
 
 
 _ESTADO: dict = _estado_limpo()
@@ -91,12 +95,13 @@ class ForaDeOrdem(RuntimeError):
 
 
 class MuitosNovos(RuntimeError):
-    """Mais novos do que a leitura curta lê: ficam para a leitura da noite. `n` são os novos que ela chegou a ver. Não é falha
-    do REST (ele respondeu, e em ordem)."""
+    """Mais novos do que a leitura curta lê: ficam para a leitura da noite. `n` são os novos que ela chegou a ver; `exato`,
+    se ela viu todos (a última página já chegava aos ids conhecidos) ou se havia mais além do teto (a última página toda de
+    novos: a tela diz "mais de N"). Não é falha do REST (ele respondeu, e em ordem)."""
 
-    def __init__(self, mensagem: str, n: int = 0):
+    def __init__(self, mensagem: str, n: int = 0, exato: bool = False):
         super().__init__(mensagem)
-        self.n = n
+        self.n, self.exato = n, exato
 
 
 def _int(v):
@@ -159,12 +164,24 @@ def _ler_padrao(ler):
 
 
 # ── as duas leituras ───────────────────────────────────────────────────────────────────────────────────────────────────
+def _motivo_da_1a_pagina(st: int) -> str:
+    """O 4xx da 1ª página em palavras (revisão 2 da 2.2): só o 400 e o 422 são o REST recusando a ordem (o `sort`); o 401 e o
+    403 são a credencial da empresa recusada; o resto, o HTTP. Antes, todo 4xx culpava o `sort`, e quem lia o estado ia
+    atrás da coisa errada."""
+    if st in (400, 422):
+        return "o REST recusou a leitura ordenada pelo id (sort=id:asc, HTTP %d): sem a ordem, as páginas não são estáveis" % st
+    if st in (401, 403):
+        return "o REST recusou a credencial da empresa (HTTP %d)" % st
+    return "o REST respondeu HTTP %d na 1ª página" % st
+
+
 def ler_todos_rest(ler=None, conta: list | None = None) -> list[dict]:
     """Todos os itens do Fracttal pelo REST `items`, ordenados pelo id (`sort=id:asc`: o deslocamento de cada página só é
     estável sobre uma ordem declarada), 100 por página, 1 pedido por segundo, até o `total` que a 1ª página informa (sem total:
-    até a página com menos de 100). Repetido entre páginas conta uma vez (pelo id). Levanta `LeituraIncompleta` se o REST
-    recusa a ordem (4xx na 1ª página: o motivo diz), se uma página vem curta antes do total, se os itens distintos não chegam a
-    ele, ou se não veio nada: leitura incompleta não troca o que existe, e tudo segue pelo RPC. Só os `CAMPOS_REST` ficam."""
+    até a página com menos de 100). Repetido entre páginas conta uma vez (pelo id). Levanta `LeituraIncompleta` se a 1ª página
+    vem com 4xx (o motivo diz qual: a ordem, a credencial ou o HTTP, `_motivo_da_1a_pagina`), se uma página vem curta antes do
+    total, se os itens distintos não chegam a ele, ou se não veio nada: leitura incompleta não troca o que existe, e tudo
+    segue pelo RPC. Só os `CAMPOS_REST` ficam."""
     ler = _ler_padrao(ler)
     conta = conta if conta is not None else [0]
     por_id: dict = {}
@@ -177,8 +194,7 @@ def ler_todos_rest(ler=None, conta: list | None = None) -> list[dict]:
         except requests.HTTPError as e:
             st = getattr(getattr(e, "response", None), "status_code", None)
             if n == 0 and isinstance(st, int) and 400 <= st < 500:
-                raise LeituraIncompleta("o REST recusou a leitura ordenada pelo id (sort=id:asc, HTTP %d): sem a ordem, as "
-                                        "páginas não são estáveis; o catálogo segue pelo RPC" % st) from e
+                raise LeituraIncompleta(_motivo_da_1a_pagina(st) + "; o catálogo segue pelo RPC") from e
             raise
         pagina = _dados(r)
         if total is None:
@@ -228,9 +244,10 @@ def ler_novos_rest(maior_id: int, ler=None, conta: list | None = None) -> list[d
             return list(novos.values())
         anterior = ids[-1]
         inicio += POR_PAGINA
-    # a última página lida ainda trazia novos: só cabem (PAGINAS_NOVOS_MAX - 1) páginas inteiras de novos antes da conhecida
+    # a última página lida ainda trazia novos: só cabem (PAGINAS_NOVOS_MAX - 1) páginas inteiras de novos antes da conhecida.
+    # Se ela já tinha ids conhecidos no fim, a conta dos novos é exata; toda de novos, havia mais do que se viu
     raise MuitosNovos("mais de %d ativos novos desde o último catálogo: ficam para a leitura da noite"
-                      % ((PAGINAS_NOVOS_MAX - 1) * POR_PAGINA), n=len(novos))
+                      % ((PAGINAS_NOVOS_MAX - 1) * POR_PAGINA), n=len(novos), exato=any(i <= maior_id for i in ids))
 
 
 # ── do REST ao registro, e a conferência ───────────────────────────────────────────────────────────────────────────────
@@ -404,6 +421,42 @@ def _motivo(e: BaseException) -> str:
     return "%s: %s" % (type(e).__name__, str(e)[:160])
 
 
+def _grafo_de_quem_saiu(nos: dict, antigas, chaves_de_hoje: set) -> dict:
+    """O grafo que dá o nome das linhas da foto que NÃO vieram na leitura de hoje (Ruling AN, revisão 2 da 2.2): só a cadeia
+    de pais de cada uma, tirada dos itens lidos hoje (`nos`, com a descrição inteira: a cauda de endereço da usina sai igual à
+    das linhas novas) e, para o pai que também não veio, da linha antiga dele (id, pai, descrição velha). Pequeno de propósito
+    (os 719 de junho e os que saírem): o grafo inteiro ficaria vivo até o fim da gravação, num servidor apertado de memória.
+    `antigas`: as linhas de `foto_ativos.ler` (listas na ordem de `CAB_FOTO`) ou dicionários; `chaves_de_hoje`: os pares
+    (id, código) das linhas de hoje."""
+    i_id, i_cod, i_desc, i_pai = (ativos_foto.CAB_FOTO.index(c)
+                                  for c in ("fracttal_item_id", "codigo", "descricao", "pai_item_id"))
+    velhas: dict = {}
+    pais = []
+    for l in antigas or ():
+        if isinstance(l, dict):
+            i, cod, desc, pai = (_int(l.get("fracttal_item_id")), l.get("codigo"), l.get("descricao"),
+                                 _int(l.get("pai_item_id")))
+        else:
+            i, cod, desc, pai = _int(l[i_id]), l[i_cod], l[i_desc], _int(l[i_pai])
+        if i is None:
+            continue
+        if i not in nos:
+            velhas.setdefault(i, (pai, desc or ""))
+        if (i, cod) not in chaves_de_hoje:
+            pais.append(pai)
+    grafo: dict = {}
+    for p in pais:
+        for _ in range(ativos_foto.NIVEIS_MAX):
+            if p is None or p in grafo:
+                break
+            no = nos.get(p) or velhas.get(p)
+            if no is None:
+                break
+            grafo[p] = no
+            p = no[0]
+    return grafo
+
+
 def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
     """A leitura da noite: o Fracttal inteiro pelo REST, a conferência contra o catálogo de agora, a troca do catálogo e, se
     ela entrou, a foto do banco renovada. Cada passo que não dá deixa o de antes e diz no estado (`estado()["completo"]`).
@@ -481,14 +534,21 @@ def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
             for c in fora_do_catalogo:
                 nos.setdefault(c["id"], (c.get("id_parent"), c.get("description") or ""))
             nomes = ativos_foto.nomes_no_caminho(nos)
-            del nos
             novas = [foto_ativos.linha_do_item(r, r.get("tipo_code"), nome=nomes.get(r["id"])) for r in cat.lista]
             novas += [foto_ativos.linha_do_item(c, nome=nomes.get(c["id"])) for c in fora_do_catalogo]
             del nomes
+            # e a linha que não veio hoje (Ruling AN): o nome pela própria descrição e pelo próprio pai, com a cadeia tirada
+            # do que se leu hoje e das linhas antigas que também não vieram; o detector de endereço é da foto
+            grafo = _grafo_de_quem_saiu(nos, antigas, {(l[0], l[1]) for l in novas})
+            del nos
             try:
                 rel["foto"] = foto_ativos.gravar(novas, base=banco[0], token=banco[1], sessao=banco[2],
                                                  maquina="servidor" if os.name != "nt" else "pc", antigas=antigas,
-                                                 de_11_10=de_11_10)
+                                                 de_11_10=de_11_10,
+                                                 nome_de_quem_saiu=functools.partial(ativos_foto.nome_pelo_pai, grafo,
+                                                                                     caudas={}))
+                _ESTADO["descricao_cortada"] = {"n": rel["foto"].get("descricao_cortada", 0),
+                                                "exemplos": list(rel["foto"].get("descricao_cortada_exemplos") or ())}
             except Exception as e:                                   # noqa: BLE001 — recusada, curta, banco fora: fica a de antes
                 rel["foto"] = {"erro": _motivo(e)}
                 log.warning("leitor de ativos: a foto do banco não foi renovada (%s)", rel["foto"]["erro"])
@@ -506,7 +566,7 @@ def ler_novos(app=None, *, ler=None) -> dict:
     erro do cliente não acrescentam nada e são falhas do REST (`erro`, e a prontidão cai até a próxima leitura boa). Devolve
     o relatório (também em `estado()["novos"]`): é dele que sai o desfecho que a tela mostra."""
     rel = {"inicio": time.time(), "fim": None, "pedidos": 0, "novos": 0, "acrescentados": 0, "sem_pai": 0, "muitos": 0,
-           "erro": "", "resultado": ""}
+           "muitos_mais": False, "erro": "", "resultado": ""}
     conta = [0]
     try:
         if ativos_central.paridade_recente() is None:
@@ -524,7 +584,7 @@ def ler_novos(app=None, *, ler=None) -> dict:
             itens = ler_novos_rest(max(ids), ler=ler, conta=conta)
         except MuitosNovos as e:
             ativos_central.anotar_leitura_rest(True)
-            rel.update(muitos=e.n, resultado=str(e))
+            rel.update(muitos=e.n, muitos_mais=not e.exato, resultado=str(e))
             return rel
         except Exception as e:                                       # noqa: BLE001 — fora de ordem, recusa, rede: nada entra
             ativos_central.anotar_leitura_rest(False, "os novos: " + _motivo(e))
@@ -586,23 +646,27 @@ def pedir_novos() -> bool:
     return True
 
 
-def _desfecho(terminou: bool) -> dict:
+def _desfecho(terminou: bool) -> dict | None:
     """O desfecho da última leitura dos novos, para a tela: `terminou` (dentro da espera), `acrescentados`, `sem_pai`,
-    `muitos` (ficam para a noite) e `erro` (o motivo curto, ou ""). Sem ter terminado, só isso: o resto ainda não se sabe."""
+    `muitos` (ficam para a noite), `muitos_mais` (a leitura parou no teto e havia mais) e `erro` (o motivo curto, ou ""). Sem
+    ter terminado, só isso: o resto ainda não se sabe. None se não há leitura de agora: a que terminou há mais de
+    `DESFECHO_VALE_S` (revisão 2 da 2.2: o F5 da Fila com `?novos=1` e a espera da que está em curso sem nenhuma em curso
+    diziam o desfecho de uma leitura antiga como se fosse de agora) ou nenhuma (o processo recém-subido): a tela não diz nada
+    dos novos."""
     if not terminou:
-        return {"terminou": False, "acrescentados": 0, "sem_pai": 0, "muitos": 0, "erro": ""}
+        return {"terminou": False, "acrescentados": 0, "sem_pai": 0, "muitos": 0, "muitos_mais": False, "erro": ""}
     rel = _ESTADO.get("novos")
-    if not rel:
-        return {"terminou": True, "acrescentados": 0, "sem_pai": 0, "muitos": 0,
-                "erro": "a busca dos ativos novos não chegou a rodar"}
+    if not rel or time.time() - float(rel.get("fim") or 0.0) > DESFECHO_VALE_S:
+        return None
     return {"terminou": True, "acrescentados": int(rel.get("acrescentados") or 0), "sem_pai": int(rel.get("sem_pai") or 0),
-            "muitos": int(rel.get("muitos") or 0), "erro": str(rel.get("erro") or "")}
+            "muitos": int(rel.get("muitos") or 0), "muitos_mais": bool(rel.get("muitos_mais")),
+            "erro": str(rel.get("erro") or "")}
 
 
-def esperar_novos(teto: float, so_em_curso: bool = False) -> dict:
+def esperar_novos(teto: float, so_em_curso: bool = False) -> dict | None:
     """Espera a leitura dos novos até `teto` segundos: a que está em curso, ou (sem `so_em_curso`) uma nova se a última já não
     é fresca, e devolve o desfecho dela (`_desfecho`): `terminou` False se estourou (quem chama segue com o que há e a tela diz
-    que a busca ainda não terminou)."""
+    que a busca ainda não terminou); None se a última terminou há mais de `DESFECHO_VALE_S` (não é a de agora)."""
     fim = time.monotonic() + max(0.0, float(teto))
     if not so_em_curso:
         pedir_novos()
@@ -676,7 +740,8 @@ def ligar(app) -> None:
 
 def estado() -> dict:
     """O que o leitor fez, para o Raio-X (`ativos_central.estado()["leitor"]`): se está ligado (e por quê não), a última
-    leitura inteira e a última dos novos (pedidos, quantos itens, o resultado) e se há uma leitura dos novos em curso."""
+    leitura inteira e a última dos novos (pedidos, quantos itens, o resultado), quantas descrições o detector de endereço
+    cortou na última foto renovada (`descricao_cortada`: o número e até 5 ids) e se há uma leitura dos novos em curso."""
     with _COND:
         novos = dict(_NOVOS)
     return dict(_ESTADO, lendo_novos=novos["lendo"], novos_fim_em=novos["fim_em"])

@@ -397,9 +397,11 @@ def texto_dos_novos(desfecho: dict | None) -> str:
     também quando a busca estourava a espera ou falhava):
     - não terminou dentro da espera: a busca ainda não terminou;
     - falhou: não consegui buscar, e o motivo;
-    - deixou ativos para a noite (o novo sem o pai no catálogo, os novos demais): quantos;
+    - deixou ativos para a noite (o novo sem o pai no catálogo, os novos demais): quantos; "mais de N" quando a leitura parou
+      no teto com a última página toda de novos (`muitos_mais`, revisão 2 da 2.2: o N é só o que ela viu);
     - terminou bem sem nada: "nenhum ativo novo no Fracttal";
-    - terminou bem com novos: quantos (a tela de Ativos põe no lugar a conta da lista, o delta)."""
+    - terminou bem com novos: quantos (a tela de Ativos põe no lugar a conta da lista, o delta).
+    Sem desfecho (sem o leitor, ou a última leitura é de mais de 2 min: não é a de agora), nada."""
     if not desfecho:
         return ""
     if not desfecho.get("terminou"):
@@ -410,6 +412,8 @@ def texto_dos_novos(desfecho: dict | None) -> str:
     n = int(desfecho.get("acrescentados") or 0)
     if noite:
         texto = ("%d ativo novo fica" if noite == 1 else "%d ativos novos ficam") % noite + " para a leitura da noite"
+        if desfecho.get("muitos_mais"):
+            texto = "mais de " + texto
         return texto + ("; %d entrou agora" % n if n == 1 else "; %d entraram agora" % n if n else "")
     if not n:
         return "nenhum ativo novo no Fracttal"
@@ -494,7 +498,8 @@ def esperar_os_novos(so_em_curso: bool = True) -> dict | None:
     """Espera a leitura dos ativos novos até `ESPERA_NOVOS_S` e devolve o DESFECHO dela, com o `texto` que a tela mostra
     (`texto_dos_novos`) e `ok` (terminou bem, sem nada para a noite: a tela de Ativos põe no lugar a conta da lista). Com
     `so_em_curso` (o padrão: a tela que acabou de apertar "Atualizar ativos", que voltou na hora com `?novos=1`), a leitura que o
-    botão pediu; sem ele (a aprovação que não achou o ativo), uma nova se a última já não é fresca. None sem o leitor."""
+    botão pediu; sem ele (a aprovação que não achou o ativo), uma nova se a última já não é fresca. None sem o leitor, e quando
+    a última leitura terminou há mais de 2 min sem nenhuma em curso (o F5 da Fila: o desfecho velho não é o de agora)."""
     desfecho = ativos_central.esperar_novos(ESPERA_NOVOS_S, so_em_curso=so_em_curso)
     if not isinstance(desfecho, dict):
         return None

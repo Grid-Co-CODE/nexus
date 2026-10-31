@@ -20,10 +20,20 @@ com três no fim desde 31/10: `id_type_item`, `id_group_task` e `fora_do_fractta
 - A leitura do banco é CONFERIDA (`ler`): a aba que a listagem não traz, ou que vem com menos linhas que o `row_count` dela,
   não grava (gravar por cima de uma leitura curta apagaria os códigos que saíram do Fracttal, que só existem aqui). E o livro
   é `so_cresce` no catálogo: a trava do `livros.publicar` confere de novo antes de trocar.
-- A `descricao` vai SEM o endereço da usina (Ruling AK, revisão 1 da 2.2): o leitor passa a cada linha o nome do item como o
-  Fracttal o põe no caminho (`ativos_foto.nomes_no_caminho`). A API do banco tem leitura aberta, e o endereço da usina já saiu
-  dela uma vez, no mesmo dia em que entrou (04/10/2026, a 1ª carga do Campo · App). A 1ª renovação troca as linhas da carga
-  única de 11/10, que tinham o endereço.
+- A `descricao` vai SEM endereço, em TODA linha (Rulings AK e AN, revisões 1 e 2 da 2.2). A API do banco tem leitura aberta, e
+  o endereço da usina já saiu dela uma vez, no mesmo dia em que entrou (04/10/2026, a 1ª carga do Campo · App). Três passos:
+  1. o leitor passa a cada linha lida hoje o nome do item como o Fracttal o põe no caminho (`ativos_foto.nomes_no_caminho`:
+     sem a cauda de endereço da usina);
+  2. a linha que NÃO veio hoje (o código que saiu do Fracttal, como os 719 de junho) é recalculada aqui pela própria
+     descrição e pelo próprio pai (`nome_de_quem_saiu`, que o leitor monta com o grafo da noite: os itens lidos hoje e as
+     linhas antigas que não vieram). Mudou a descrição, mudou a linha: o `foto_em` vai para o dia, e a marca de fora segue a
+     regra de sempre (a que já tinha marca fica com ela; essas contam em `fora_mudaram`);
+  3. o detector de endereço (`sem_endereco`) confere toda descrição que vai ao banco (a nova, a igual, a que saiu) e corta
+     antes do 1º marcador (`MARCADORES_DE_ENDERECO`): a usina fora de "Cliente - Usina - UF" e o nível com endereço próprio,
+     colado por UM espaço, passavam pelo corte do passo 1. A noite conta quantas ele cortou (`descricao_cortada`, com até 5
+     `fracttal_item_id` de exemplo; nunca o texto).
+  A linha que saiu é repetida pelos passos 2 e 3 até parar: a 2ª noite parte do que a 1ª gravou e não muda nada. A 1ª
+  renovação troca TODAS as linhas da carga única de 11/10, que tinham o endereço, inclusive as que saíram.
 - O nome do livro (`equipamento.NOME_FOTO`) só vale para quem o cria: o livro existe desde 11/10, e o `livros.publicar` não
   troca o nome do que já existe.
 """
@@ -31,6 +41,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 from datetime import date, datetime, timedelta, timezone
 
@@ -44,6 +55,61 @@ CAB_ATUALIZACAO = ["gerado_em", "maquina", "duracao_s", "linhas", "como_ler", "s
 COMO_LER = ("1 linha = 1 item do Fracttal com 1 código (fracttal_item_id + codigo; a raiz do cliente é a linha sem "
             "pai_item_id); foto_em = o dia em que a linha mudou pela última vez; fora_do_fracttal_desde = o dia (data_id) "
             "em que o código deixou de vir na leitura do Fracttal, vazio = está no Fracttal")
+
+# O DETECTOR DE ENDEREÇO (Ruling AN, revisão 2 da 2.2): o que ainda é endereço depois do corte do nome no caminho. A revisão
+# achou dois furos naquele corte, que conhece só a forma "Cliente - Usina - UF" e o endereço da usina repetido atrás do nome:
+# a usina fora dessa forma, com o endereço depois de UM espaço ("Cliente Alfa - Usina Delta Rua Sem Padrao 12", e o nível de
+# dentro com o mesmo endereço), e o nível com endereço PRÓPRIO ("Inversor 1.2 Marca X Rua Outra 55"). Por isso a foto confere
+# TODA descrição antes de gravar e corta antes do 1º destes marcadores. Só os inequívocos, como palavra inteira e sem
+# distinguir maiúsculas: o falso positivo custa um nome de equipamento truncado na dimensão (uma usina chamada "Fazenda
+# Alguma Coisa" perde o resto), e o contador `descricao_cortada` mostra quantos e quais ids. A sigla de rodovia vai à parte,
+# em maiúsculas, como se escreve ("BR-163", "MT-010"): em minúscula ela é mais modelo de equipamento que estrada.
+# Vale SÓ para a foto do banco: o caminho do catálogo (`ativos_foto.caminhos`, o cliente e a usina das telas) não passa por
+# aqui, e a paridade com o RPC não muda. O `os_web/ativo_curto.py` do OS Creator tem outra lista, mais larga ("lote",
+# "bairro", "br"...), para o nome CURTO da coluna do Histórico: é exibição, não governança; não as junte.
+MARCADORES_DE_ENDERECO = ("Rua", "Av.", "Avenida", "Rod.", "Rodovia", "Estrada", "Km", "CEP", "Fazenda", "Sítio", "Sitio",
+                          "Chácara", "Chacara", "Gleba", "Zona Rural", "S/N")
+SIGLA_DE_RODOVIA = r"\b[A-Z]{2}-\d{2,3}\b"
+_SOBRA_NO_FIM = " \t-–—,;:/(|"                  # o separador que fica antes do marcador cortado ("Cabine 2 - Av. Beta")
+VOLTAS_MAX = 5                                  # a linha que saiu, repetida até parar: cada volta só encurta
+
+
+def _marcador(m: str) -> str:
+    """A expressão de um marcador como palavra inteira: nada de letra colada antes e, se ele termina em letra, depois
+    ("Estradas" e "Kmx" não são endereço; "Av." já termina no ponto). O espaço do meio vale qualquer espaço."""
+    corpo = r"\s+".join(re.escape(p) for p in m.split())
+    return r"(?<!\w)" + corpo + (r"(?!\w)" if m[-1].isalnum() else "")
+
+
+_ENDERECO = re.compile("(?i:%s)|%s" % ("|".join(_marcador(m) for m in MARCADORES_DE_ENDERECO), SIGLA_DE_RODOVIA))
+
+
+def sem_endereco(descricao) -> tuple:
+    """(a descrição sem o endereço, se o detector cortou). Corta antes do 1º marcador (`MARCADORES_DE_ENDERECO`, a sigla de
+    rodovia) e tira o separador que sobrar no fim; sem nome antes do marcador, a linha vai sem descrição (None). Cortar o que
+    já foi cortado não muda nada."""
+    texto = _txt(descricao)
+    if not texto:
+        return None, False
+    m = _ENDERECO.search(texto)
+    if m is None:
+        return texto, False
+    return texto[:m.start()].rstrip(_SOBRA_NO_FIM) or None, True
+
+
+def _limpar_quem_saiu(descricao, pai, nome_de_quem_saiu) -> tuple:
+    """(a descrição, se o detector cortou) de uma linha que não veio na leitura de hoje: o nome no caminho pela própria
+    descrição e pelo próprio pai (`nome_de_quem_saiu(pai, descricao)`, do leitor; sem ele, só o detector) e o detector,
+    repetidos até parar. Parar é o que faz a 2ª noite não mudar a linha que a 1ª limpou: ela parte do que a 1ª gravou."""
+    atual, cortou = _txt(descricao) or None, False
+    for _ in range(VOLTAS_MAX):
+        nome = nome_de_quem_saiu(pai, atual) if nome_de_quem_saiu is not None and atual else atual
+        novo, corte = sem_endereco(nome)
+        cortou = cortou or corte
+        if novo == atual:
+            break
+        atual = novo
+    return atual, cortou
 
 
 class LeituraCurta(RuntimeError):
@@ -91,7 +157,8 @@ def linha_do_item(item: dict, tipo_code=None, nome: str | None = None) -> list:
     """A linha de um item lido do Fracttal (o formato cru do RPC que o leitor monta: id, code, description, id_parent,
     id_type_item, id_group_task) com o `tipo_code` do registro do catálogo (o mesmo `tipo_fracttal` da carga de 11/10; a raiz
     do cliente não tem). A `descricao` é o `nome` (o nome do item no caminho, sem o endereço da usina: é o que o leitor da noite
-    passa); sem ele, a descrição sem o "{ CÓDIGO }" do fim. O `foto_em` e a marca de fora são da `renovar`."""
+    passa); sem ele, a descrição sem o "{ CÓDIGO }" do fim. O `foto_em`, a marca de fora e o detector de endereço são da
+    `renovar`."""
     cod = eq.canon(item.get("code"))
     descricao = (_txt(nome) or None) if nome is not None else eq._descricao(item.get("description"), cod)
     return [_int(item.get("id")), cod or None, descricao, _int(item.get("id_parent")),
@@ -108,11 +175,17 @@ def _de_11_10(linhas) -> bool:
     return bool(ricas) and not any("fora_do_fracttal_desde" in d for d in ricas)
 
 
-def renovar(antigas, novas, hoje: date, *, de_11_10: bool | None = None) -> tuple[list, dict]:
+def renovar(antigas, novas, hoje: date, *, de_11_10: bool | None = None, nome_de_quem_saiu=None) -> tuple[list, dict]:
     """(as linhas da foto renovada, em ordem; o relatório só com contagens). PURA: `antigas` são as linhas lidas do banco
     (dicionários, ou as listas de `ler`, com `de_11_10` dito), `novas` as do Fracttal de agora (`linha_do_item`). Ver o topo
-    do módulo: o código que saiu fica marcado, o que voltou perde a marca, e o `foto_em` só muda na linha que mudou."""
+    do módulo: o código que saiu fica marcado, o que voltou perde a marca, e o `foto_em` só muda na linha que mudou.
+    A descrição de TODA linha passa pelo detector de endereço (`sem_endereco`) antes de comparar; a da linha que não veio hoje
+    é recalculada antes (`_limpar_quem_saiu`, com o `nome_de_quem_saiu(pai, descricao)` do leitor). A linha que saiu e muda
+    só a descrição ganha o dia (`foto_em`) e conta em `fora_mudaram`; a que sai hoje conta em `sairam`, como sempre. O
+    relatório traz `descricao_cortada` (quantas o detector cortou) e `descricao_cortada_exemplos` (até 5 ids, nunca o
+    texto)."""
     hoje_iso, hoje_id = hoje.isoformat(), _data_id(hoje)
+    cortadas: list = []
     # a foto da carga única (sem a coluna da marca): a linha de uma foto mais velha que a última já tinha saído do Fracttal
     # no dia da última
     de_11_10 = _de_11_10(antigas) if de_11_10 is None else de_11_10
@@ -130,7 +203,7 @@ def renovar(antigas, novas, hoje: date, *, de_11_10: bool | None = None) -> tupl
         else:
             por_chave[_chave(l)] = l
     rel = {"lidas_do_fracttal": 0, "iguais": 0, "mudaram": 0, "entraram": 0, "voltaram": 0, "sairam": 0,
-           "fora_do_fracttal": 0}
+           "fora_mudaram": 0, "fora_do_fracttal": 0}
     out, vistas = [], set()
     for nova in novas:
         nova = list(nova)
@@ -138,6 +211,9 @@ def renovar(antigas, novas, hoje: date, *, de_11_10: bool | None = None) -> tupl
             continue
         vistas.add(_chave(nova))
         rel["lidas_do_fracttal"] += 1
+        nova[_I["descricao"]], cortou = sem_endereco(nova[_I["descricao"]])
+        if cortou:
+            cortadas.append(nova[_I["fracttal_item_id"]])
         velha = por_chave.get(_chave(nova))
         if velha is not None and _conteudo(velha) == _conteudo(nova):
             nova[_I["foto_em"]] = velha[_I["foto_em"]] or hoje_iso
@@ -151,20 +227,31 @@ def renovar(antigas, novas, hoje: date, *, de_11_10: bool | None = None) -> tupl
             else:
                 rel["mudaram"] += 1
         out.append(nova)
-    for chave, velha in por_chave.items():
+    # a linha que não veio hoje (e a chave repetida no banco, que também fica): a descrição recalculada e conferida, e o resto
+    # pelas regras de sempre
+    for chave, velha in list(por_chave.items()) + [(None, l) for l in sobras]:
         if chave in vistas:
             continue
-        velha = list(velha)
-        if not velha[_I["fora_do_fracttal_desde"]]:
+        linha = list(velha)
+        linha[_I["descricao"]], cortou = _limpar_quem_saiu(velha[_I["descricao"]], velha[_I["pai_item_id"]],
+                                                           nome_de_quem_saiu)
+        if cortou:
+            cortadas.append(linha[_I["fracttal_item_id"]])
+        mudou = linha[_I["descricao"]] != velha[_I["descricao"]]
+        if chave is not None and not linha[_I["fora_do_fracttal_desde"]]:
             antiga = saiu_antes is not None and (velha[_I["foto_em"]] or "") < ultima
-            velha[_I["fora_do_fracttal_desde"]] = saiu_antes if antiga else hoje_id
-            velha[_I["foto_em"]] = hoje_iso
+            linha[_I["fora_do_fracttal_desde"]] = saiu_antes if antiga else hoje_id
+            linha[_I["foto_em"]] = hoje_iso
             rel["sairam"] += 1
-        out.append(velha)
-    out.extend(sobras)
+        elif mudou:
+            linha[_I["foto_em"]] = hoje_iso
+            rel["fora_mudaram" if linha[_I["fora_do_fracttal_desde"]] else "mudaram"] += 1
+        out.append(linha)
     out.sort(key=_ordem)
     rel["fora_do_fracttal"] = sum(1 for l in out if l[_I["fora_do_fracttal_desde"]])
     rel["linhas"] = len(out)
+    rel["descricao_cortada"] = len(cortadas)
+    rel["descricao_cortada_exemplos"] = sorted(i for i in cortadas if i is not None)[:5]
     return out, rel
 
 
@@ -216,18 +303,19 @@ def ler(base: str, sessao) -> tuple[list, bool]:
 
 
 def gravar(novas, *, base: str, token: str, sessao, maquina: str, antigas=None, de_11_10: bool = False,
-           hoje: date | None = None) -> dict:
+           hoje: date | None = None, nome_de_quem_saiu=None) -> dict:
     """Renova a foto com as linhas do Fracttal de agora (`linha_do_item`): lê a do banco (conferida; `antigas` e `de_11_10` se
-    quem chama já leu, pela mesma `ler`), junta (`renovar`) e grava SÓ se o sha das linhas mudou, pelo `livros.publicar` (que
-    confere a trava `so_cresce` antes e cada aba depois). Devolve o relatório (contagens, `gravou`, o sha). Levanta
-    `LeituraCurta`, `livros.GravacaoRecusada` e o erro do banco: quem chama (o leitor da noite) os guarda no estado."""
+    quem chama já leu, pela mesma `ler`), junta (`renovar`, com o `nome_de_quem_saiu` do leitor para a linha que não veio) e
+    grava SÓ se o sha das linhas mudou, pelo `livros.publicar` (que confere a trava `so_cresce` antes e cada aba depois).
+    Devolve o relatório (contagens, `gravou`, o sha). Levanta `LeituraCurta`, `livros.GravacaoRecusada` e o erro do banco:
+    quem chama (o leitor da noite) os guarda no estado."""
     t0 = time.time()
     if not token:
         raise RuntimeError("sem o GRIDCO_SQL_TOKEN: a foto dos ativos não é gravada")
     hoje = hoje or datetime.now(_BRT).date()
     if antigas is None:
         antigas, de_11_10 = ler(base, sessao)
-    linhas, rel = renovar(antigas, novas, hoje, de_11_10=de_11_10)
+    linhas, rel = renovar(antigas, novas, hoje, de_11_10=de_11_10, nome_de_quem_saiu=nome_de_quem_saiu)
     novo, velho = sha(linhas), sha([_canon_linha(d) for d in antigas])
     rel["sha_linhas"] = novo
     if novo == velho:
