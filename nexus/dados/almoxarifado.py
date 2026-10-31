@@ -87,6 +87,14 @@ def _txt(v) -> str:
     return "" if v is None else str(v).strip()
 
 
+def campo(v) -> str:
+    """O texto de um campo do cadastro da peça no Fracttal (a criticidade): o vazio que o `sync-xlsx` do App escreve como
+    "None" (ou o "nan") é vazio, não a palavra. A criticidade "None" na tela seria um nível que o Fracttal não deu, e gravada
+    na dimensão do histórico ficaria para sempre. A única definição do "vazio de verdade": a carga e a tela usam esta."""
+    t = _txt(v)
+    return "" if t.lower() in ("none", "nan") else t
+
+
 def numero(v) -> float | None:
     """O número da API (que pode devolver tudo como texto; o Fracttal manda "10.00"). Vazio ou texto = None, nunca 0:
     o mínimo vazio é "não sabemos", o 0 é "sem mínimo cadastrado"."""

@@ -893,7 +893,7 @@ def test_sem_login_a_tela_manda_entrar(app, inv, falso):
 
 
 # ── a aba no Almoxarifado ────────────────────────────────────────────────────────────────────────────────────────────────
-def test_a_aba_inventario_ao_lado_das_cinco(app, inv, falso, monkeypatch):
+def test_a_aba_inventario_ao_lado_das_seis(app, inv, falso, monkeypatch):
     """A aba Inventário fica depois das seis que já existem (a das Avariadas desde 30/10/2026), com quantas contagens
     esperam o PCM; da tela do inventário cada uma das seis volta à aba dela."""
     _semear_almox(inv)

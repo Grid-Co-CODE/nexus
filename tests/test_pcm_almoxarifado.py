@@ -39,13 +39,14 @@ def _p(lid, item, almox, situacao, motivo=""):
 
 
 def _semear(api, saldo_inicio=INICIO, inicio=INICIO, total=10, nao_lidos=(4,), itens_faltando=0, saldo_extra=(),
-            novas=None, custo=None, avariados=(), codigos=None):
+            novas=None, custo=None, avariados=(), codigos=None, so_colunas=None):
     """Os 4 livros do App coerentes: `total` itens na lista (1 a 4 com nome; os outros sem saldo), os de `nao_lidos`
     com Lido = Não (o 4, por padrão: 9 de 10 lidos, acima dos 90%). `novas` (30/10/2026) é o App com as colunas novas:
     {id do item: (criticidade, curva)} vai para Criticidade e Curva ABC do Itens (o item fora do dicionário leva vazio),
     e `custo` {(id do item, id do almoxarifado): custo} para o Custo unitário do Saldo. Sem `novas`, o livro de hoje,
     SEM as três colunas (coluna ausente não é coluna vazia). `avariados`: os itens com a marca Avariado = Sim; `codigos`:
-    {id do item: código} para trocar o código do catálogo (o "-AV" sem marca, o "SP-AVR-001" que não é avariada)."""
+    {id do item: código} para trocar o código do catálogo (o "-AV" sem marca, o "SP-AVR-001" que não é avariada).
+    `so_colunas` (com `novas`): o App que manda só uma das duas colunas do Itens, ("Curva ABC",) ou ("Criticidade",)."""
     nomes = {1: ("SP-1", "Fusível 10A", "UNIDADE", "Proteção", "Não"), 2: ("SP-2", "Cabo 6 mm", "METRO", "Cabos", "Não"),
              3: ("SP-3-AV", "[AVARIADO] Disjuntor", "UNIDADE", "Proteção", "Sim"),
              4: ("SP-4", "Relé de proteção", "UNIDADE", "Proteção", "Não")}
@@ -69,6 +70,11 @@ def _semear(api, saldo_inicio=INICIO, inicio=INICIO, total=10, nao_lidos=(4,), i
             it["Criticidade"], it["Curva ABC"] = novas.get(int(it["ID do item"]), ("", ""))
         for sl in saldo:
             sl["Custo unitário"] = (custo or {}).get((int(sl["ID do item"]), int(sl["ID do almoxarifado"])), "")
+        if so_colunas is not None:
+            for it in itens:
+                for col in ("Criticidade", "Curva ABC"):
+                    if col not in so_colunas:
+                        del it[col]
     _aba(api, A.LIVRO_CICLO, A.ABA_CICLO, [{"Início do ciclo": inicio, "Fim do ciclo": FIM,
                                              "Itens na lista do Fracttal": total,
                                              "Itens lidos": total - len([i for i in nao_lidos if i <= total]),
@@ -371,9 +377,10 @@ def test_reserva_com_e_sem_as_colunas_novas(app, almox, monkeypatch):
 
 # ── 30/10/2026, item 6: a aba Avariadas, parada há quanto tempo ──────────────────────────────────────────────────────────
 
-def _historico(api, ciclos, codigo="SP-3-AV", item="3", almox="20"):
+def _historico(api, ciclos, codigo="SP-3-AV", item="3", almox="20", sem_foto=()):
     """O histórico do Nexus montado à mão: `ciclos` = [(início "AAAA-MM-DD", saldo da peça no almoxarifado, anulado)], todos
-    aplicados, cada um com a sua foto do Saldo no livro do mês. `saldo` None = a peça não está na foto do ciclo."""
+    aplicados, cada um com a sua foto do Saldo no livro do mês. `saldo` None = a peça não está na foto do ciclo. `sem_foto`:
+    os dias cujo ciclo foi aplicado mas o livro do mês NÃO trouxe nenhuma linha dele (o livro que não veio)."""
     from nexus.dados import fato_almoxarifado as F
     cab_ciclo, por_mes = [], {}
     for dia, saldo, anulado in ciclos:
@@ -382,7 +389,9 @@ def _historico(api, ciclos, codigo="SP-3-AV", item="3", almox="20"):
                                                 1 if anulado else 0, f"{dia}T04:00:00Z", 1])))
         foto = [dict(zip(F.CAB_SALDO, [f"s{data_id}{i}", inicio, data_id, str(i), f"SP-{i}", "10", 1, "de-para do Fracttal",
                                        5, 3, ""])) for i in (1, 2)]               # duas peças que nunca saem do lugar
-        if saldo is not None:
+        if dia in sem_foto:
+            foto = []
+        elif saldo is not None:
             foto.append(dict(zip(F.CAB_SALDO, [f"s{data_id}x", inicio, data_id, item, codigo, almox, None, None, saldo, 0,
                                                ""])))
         por_mes.setdefault(F.livro_do_mes(data_id), []).extend(foto)
@@ -495,3 +504,269 @@ def test_valor_da_avariada_so_com_custo(app, almox, monkeypatch):
     a = _dados()["avariadas"][0]
     assert a["valor"] is None and a["custo"] is None
     assert "R$ 0" not in _abrir(app, monkeypatch).get_data(as_text=True)
+
+
+def test_avariada_parada_ha_um_dia_e_desde_hoje(app, almox, monkeypatch):
+    """O plural: "há 1 dia" (não "1 dias"), com e sem o "pelo menos", e o dia 0 é "desde hoje"."""
+    _historico(almox, [("2026-10-20", 0, False), ("2026-10-29", 2, False)])
+    _hoje(monkeypatch, 30)
+    a = _dados()["avariadas"][0]
+    assert (a["dias"], a["pelo_menos"], a["desde"]) == (1, False, "29/10/2026")
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "há 1 dia<" in html and "1 dias" not in html and "desde 29/10/2026" in html
+    _historico(almox, [("2026-10-29", 2, False)])                      # sem ciclo antes: o "pelo menos"
+    visao.limpar()
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "há pelo menos 1 dia<" in html and "1 dias" not in html
+    _historico(almox, [("2026-10-20", 0, False), ("2026-10-29", 2, False)])
+    _hoje(monkeypatch, 29)                                             # o ciclo é de hoje
+    a = _dados()["avariadas"][0]
+    assert (a["dias"], a["pelo_menos"]) == (0, False)
+    assert "desde hoje" in _abrir(app, monkeypatch).get_data(as_text=True)
+
+
+def test_ciclo_aplicado_sem_linha_no_livro_do_mes_e_pulado(app, almox, monkeypatch):
+    """O ciclo aplicado cujo livro do mês não trouxe nenhuma linha (o livro que não veio) não interrompe a parada nem vale
+    como o começo do histórico: o que não foi medido não vira "saldo zero"."""
+    _historico(almox, [("2026-10-01", 2, False), ("2026-10-15", 2, False), ("2026-10-29", 2, False)],
+               sem_foto=("2026-10-15",))
+    _hoje(monkeypatch, 30)
+    a = _dados()["avariadas"][0]
+    assert (a["desde"], a["dias"], a["pelo_menos"]) == ("01/10/2026", 29, True)          # o 15/10 não interrompeu
+    _historico(almox, [("2026-10-01", 2, False), ("2026-10-15", 2, False), ("2026-10-29", 2, False)],
+               sem_foto=("2026-10-01",))
+    _hoje(monkeypatch, 30)
+    a = _dados()["avariadas"][0]
+    assert (a["desde"], a["pelo_menos"], a["inicio"]) == ("15/10/2026", True, "15/10/2026")   # o histórico começa no 15/10
+
+
+def test_saldo_unitario_vem_fechado(app, almox, monkeypatch):
+    """O `<details>` do saldo unitário não leva `open`: fechado por padrão (a peça de uma unidade não esconde o resto)."""
+    _semear(almox, saldo_extra=[_s(5, 10, ALT, 1, 1)])
+    visao.limpar()
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert '<details class="alm-unit">' in html and 'class="alm-unit" open' not in html
+
+
+def _celula(html, rotulo, depois=0):
+    """O texto de uma célula `data-r="rotulo"` da Reposição (a `depois`-ésima a partir da 1ª)."""
+    achados = re.findall(r'<td data-r="%s"[^>]*><span class="alm-v">(.*?)</span></td>' % re.escape(rotulo), html, re.S)
+    return achados[depois]
+
+
+def test_crit_e_curva_sem_coluna_mostram_traco(app, almox, monkeypatch):
+    """O livro de hoje não tem as colunas: "–" nas duas, e o `title` diz que é o App que ainda não traz (não que a peça
+    esteja sem no Fracttal)."""
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    crit, curva = _celula(html, "Crit."), _celula(html, "Curva")
+    assert "–" in crit and "o App ainda não traz a criticidade" in crit and "inv-crit" not in crit
+    assert "–" in curva and "o App ainda não traz a curva" in curva and "alm-curva" not in curva
+    # com as colunas e a peça sem valor: a causa é outra, e o `title` diz
+    _semear(almox, novas={})
+    visao.limpar()
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "sem criticidade no Fracttal" in _celula(html, "Crit.") and "sem curva no Fracttal" in _celula(html, "Curva")
+
+
+def test_ajuda_da_reposicao_diz_qual_coluna_o_app_nao_traz(app, almox, monkeypatch):
+    """Uma linha visível por coluna ausente (e não só no `title` do traço): as duas, só a criticidade ou só a curva."""
+    def ajuda():
+        return re.search(r'data-painel="reposicao".*?</p>', _abrir(app, monkeypatch).get_data(as_text=True), re.S).group(0)
+    assert "O App ainda não traz a criticidade nem a curva" in ajuda()
+    _semear(almox, novas={1: ("1.Crítico", "A")}, so_colunas=("Criticidade",))
+    visao.limpar()
+    h = ajuda()
+    assert "O App ainda não traz a curva:" in h and "ainda não traz a criticidade" not in h
+    _semear(almox, novas={1: ("1.Crítico", "A")}, so_colunas=("Curva ABC",))
+    visao.limpar()
+    h = ajuda()
+    assert "O App ainda não traz a criticidade:" in h and "ainda não traz a curva" not in h
+    _semear(almox, novas={1: ("1.Crítico", "A")})
+    visao.limpar()
+    assert "O App ainda não traz" not in ajuda()
+
+
+# ── 30/10/2026, itens 1 e 9: abrir um almoxarifado mostra as peças, a última contagem gravada e o valor por curva ─────────
+
+def _cartao(html, nome):
+    """O `<article>` do cartão do almoxarifado `nome` na aba Por almoxarifado."""
+    achados = [a.split("</article>")[0] for a in html.split('<article class="alm-card')[1:]
+               if f"<h3>{nome}</h3>" in a.split("</article>")[0]]
+    assert achados, f"sem cartão de {nome}"
+    return achados[0]
+
+
+def _codigos(html):
+    return re.findall(r'<td data-r="Código" class="alm-cod"><span class="alm-v">(.*?)</span>', html)
+
+
+def _pecas(app, monkeypatch, id_almox="10"):
+    _no_setor(monkeypatch, "PCM")
+    return _pessoa(app).get(f"/t/pcm/pecas/almox/{id_almox}")
+
+
+def test_ver_pecas_do_almoxarifado(app, almox, monkeypatch):
+    """A rota devolve só as peças daquele almoxarifado, abaixo → no limite → saldo unitário → sem mínimo → ok → sem saldo
+    informado e, dentro de cada grupo, a criticidade (1.Crítico primeiro) e a curva. A mesma `montar()` da tela."""
+    extra = [_s(5, 10, ALT, 1, 1),            # saldo unitário
+             _s(6, 10, ALT, 4, 0),            # sem mínimo
+             _s(7, 10, ALT, 9, 2),            # ok
+             _s(8, 10, ALT, 0, 2),            # abaixo, falta 2: crítico
+             _s(9, 10, ALT, "", 2),           # o Fracttal não deu o saldo
+             _s(10, 10, ALT, 3, 3)]           # no limite: crítico
+    _semear(almox, saldo_extra=extra, novas={1: ("2.Necessário", "B"), 8: ("1.Crítico", "C"), 10: ("1.Crítico", "A"),
+                                             2: ("", "A")})
+    visao.limpar()
+    r = _pecas(app, monkeypatch)
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and "<html" not in html                       # o pedaço, não a página
+    assert _codigos(html) == ["SP-8", "SP-1", "SP-10", "SP-2", "SP-5", "SP-6", "SP-7", "SP-9"]
+    assert "SP-3-AV" not in html                                              # a peça do outro almoxarifado
+    for rotulo in ("Código", "Peça", "Crit.", "Curva", "Saldo", "Mínimo", "Situação"):
+        assert f'data-r="{rotulo}"' in html                                   # o cartão de 375 px
+    assert "saldo não informado" in html and "abaixo do mínimo" in html and "saldo unitário" in html
+    assert 'class="inv-crit inv-crit--1"' in html and '<b class="alm-curva">A</b>' in html
+    outro = _pecas(app, monkeypatch, "20").get_data(as_text=True)
+    assert "SP-3-AV" in outro and "SP-8" not in outro
+
+
+def test_ver_pecas_almox_desconhecido_404(app, almox, monkeypatch):
+    assert _pecas(app, monkeypatch, "999").status_code == 404
+    assert _pecas(app, monkeypatch, "10.0").status_code == 200                # o ID como a API às vezes o põe
+
+
+def test_ver_pecas_sem_livro_e_com_a_fonte_caida(app, banco, monkeypatch):
+    """Sem o livro do App a tela nem tem cartão para abrir (404); com a fonte caída agora, o 503 (o `fetch` mostra "não consegui
+    abrir as peças agora" nos dois)."""
+    from nexus.pcm import almoxarifado as T
+    assert _pecas(app, monkeypatch).status_code == 404
+
+    def cair(*a, **k):
+        raise ConnectionError("banco fora")
+    monkeypatch.setattr(T, "_abas", cair)
+    visao.limpar()
+    assert _pecas(app, monkeypatch).status_code == 503
+
+
+def test_ver_pecas_so_do_setor_pcm(app, almox, setores):  # noqa: F811
+    assert _como(app, ANA).get("/t/pcm/pecas/almox/10").status_code == 403    # a Ana é da Performance
+
+
+def test_ver_pecas_usa_a_conta_guardada(app, almox, monkeypatch):
+    """A rota desenha o pedaço da MESMA conta de 5 min da tela: aquecida a conta, abrir as peças não relê livro nenhum (a
+    página não engorda e o Fracttal nem é tocado)."""
+    from nexus.pcm import almoxarifado as T
+    T.montar()                                                                # a tela já aqueceu a conta
+
+    def nao_ler(*a, **k):
+        raise AssertionError("leu o banco")
+    monkeypatch.setattr(visao, "_livro", nao_ler)
+    monkeypatch.setattr(T, "_abas", nao_ler)
+    assert _pecas(app, monkeypatch).status_code == 200
+
+
+def test_cartao_tem_o_botao_ver_pecas(app, almox, monkeypatch):
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    cartao = _cartao(html, "Almoxarifado 10")
+    assert 'aria-expanded="false"' in cartao and 'aria-controls="alm-pecas-10"' in cartao and "Ver peças" in cartao
+    assert 'id="alm-pecas-10"' in cartao and "/t/pcm/pecas/almox/10" in cartao
+    assert "lendo…" in html and "não consegui abrir as peças agora" in html and "nexusRota" in html
+
+
+def _contagens(app, api, *cs):
+    """Contagens do inventário no almoxarifado: (id, almoxarifado, "Contada em" UTC, como acabou, "Recontagem de"), com o
+    `como` em nova | gravando | gravada | conflito. Cada uma conta as peças 501 e 502, e os eventos são os da gravação."""
+    from test_pcm_inventario_leitura import _ev, _gravar, _linha, _publicar
+    linhas, eventos = [], []
+    for cid, almox, contada, fim, *resto in cs:
+        mais = {"Recontagem de": resto[0]} if resto else {}
+        linhas += [_linha(cid, f"L{i}", str(i), "3", almox=almox, contada=contada, enviada=contada, **mais)
+                   for i in (501, 502)]
+        if fim == "nova":
+            continue
+        eventos += [_ev(cid, "aprovada", i, almox=almox) for i in (501, 502)] + [_ev(cid, "peca_gravada", 501, almox=almox)]
+        if fim != "gravando":
+            eventos.append(_ev(cid, "peca_gravada" if fim == "gravada" else "conflito", 502, almox=almox))
+    _publicar(api, *linhas)
+    _gravar(app, *eventos)
+    visao.limpar()
+
+
+@pytest.fixture
+def inventario(app, almox, tmp_path):
+    """O livro do inventário num arquivo, para os eventos das contagens dos cartões; o relógio segue o do `almox`."""
+    from nexus.dados import fato_inventario as F
+    app.config.update(NEXUS_ALMOX_INVENTARIO_ARQUIVO=str(tmp_path / "inventario.json"))
+    F.limpar()
+    yield almox
+    F.limpar()
+
+
+def test_cartao_ultima_contagem_gravada(app, inventario, monkeypatch):
+    """A data da contagem gravada mais nova do almoxarifado: a de 25/10 ainda não foi aprovada e não conta."""
+    _contagens(app, inventario, ("C-1", "10", "2026-10-05T15:00:00Z", "gravada"),
+               ("C-2", "10", "2026-10-20T15:00:00Z", "gravada"), ("C-3", "10", "2026-10-25T11:00:00Z", "nova"))
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    cartao = _cartao(html, "Almoxarifado 10")
+    assert "Última contagem gravada" in cartao and "20/10/2026" in cartao and "25/10/2026" not in cartao
+    assert "nunca contado" in _cartao(html, "Almoxarifado 20")               # o outro almoxarifado nunca foi contado
+
+
+def test_cartao_ultima_contagem_conta_conflito_e_recontagem(app, inventario, monkeypatch):
+    """A gravada com conflito também é uma contagem gravada, e a recontagem gravada é uma contagem real daquelas peças
+    (vale a mais nova de qualquer tipo); a que ainda está gravando, não."""
+    _contagens(app, inventario, ("C-1", "10", "2026-10-05T15:00:00Z", "gravada"),
+               ("C-2", "10", "2026-10-20T15:00:00Z", "gravada"),
+               ("C-4", "10", "2026-10-22T15:00:00Z", "gravada", "C-2"),
+               ("C-5", "10", "2026-10-24T15:00:00Z", "gravando"),
+               ("C-6", "20", "2026-10-12T15:00:00Z", "conflito"), ("C-7", "20", "2026-10-23T15:00:00Z", "gravando"))
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "22/10/2026" in _cartao(html, "Almoxarifado 10") and "24/10/2026" not in _cartao(html, "Almoxarifado 10")
+    assert "12/10/2026" in _cartao(html, "Almoxarifado 20")
+
+
+def test_cartao_nunca_contado(app, almox, monkeypatch):
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "nunca contado pelo inventário" in _cartao(html, "Almoxarifado 10")
+
+
+def test_cartao_inventario_nao_leu(app, almox, monkeypatch):
+    """O livro do inventário que não abriu não é "nunca contado": a linha some do cartão (e a tela segue)."""
+    from nexus.dados import fato_inventario as F
+    from nexus.pcm.inventario import leitura as L
+
+    def cair(cfg):
+        raise F.Recusada("o livro do inventário não abriu")
+    monkeypatch.setattr(L, "contagens", cair)
+    visao.limpar()
+    r = _abrir(app, monkeypatch)
+    cartao = _cartao(r.get_data(as_text=True), "Almoxarifado 10")
+    assert r.status_code == 200 and "contagem gravada" not in cartao and "nunca contado" not in cartao
+
+
+def test_valor_por_curva(app, almox, monkeypatch):
+    """Saldo × custo unitário, por curva: A 2 × 10, sem curva 1 × 5 e uma peça com saldo e sem custo (fora da soma, e o
+    cartão diz quantas)."""
+    from nexus.pcm import almoxarifado as T
+    _semear(almox, saldo_extra=[_s(5, 30, ALT, 2, 1), _s(6, 30, ALT, 1, 1), _s(7, 30, ALT, 4, 1), _s(8, 30, ALT, 0, 1)],
+            novas={5: ("", "A"), 7: ("", "B")}, custo={(5, 30): 10, (6, 30): 5, (8, 30): 7})
+    visao.limpar()
+    cards = {c["id"]: c for c in T.montar().dados["por_almoxarifado"]}
+    c = cards["30"]
+    assert c["valor"] == {"total": 25.0, "A": 20.0, "B": 0.0, "C": 0.0, "sem_curva": 5.0}
+    assert c["sem_custo"] == 1                                               # o 7, com saldo 4; o 8 tem saldo 0 e não conta
+    cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 30")
+    assert "Valor em estoque" in cartao and "R$ 25,00" in cartao and "A R$ 20,00" in cartao
+    assert "sem curva R$ 5,00" in cartao and "1 peça sem custo no Fracttal" in cartao
+    # o almoxarifado em que o Fracttal não deu custo a nenhuma peça com saldo: nunca "R$ 0,00"
+    assert cards["10"]["sem_custo"] == 2 and cards["10"]["valor"]["total"] == 0.0
+    cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 10")
+    assert "R$ 0,00" not in cartao and "2 peças sem custo no Fracttal" in cartao
+
+
+def test_sem_coluna_custo_nao_mostra_valor(app, almox, monkeypatch):
+    """O App de hoje não traz o custo: sem valor e sem cobrança (a coluna ausente não é a peça sem custo)."""
+    from nexus.pcm import almoxarifado as T
+    assert all(c["valor"] is None and c["sem_custo"] == 0 for c in T.montar().dados["por_almoxarifado"])
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "Valor em estoque" not in html and "sem custo no Fracttal" not in html

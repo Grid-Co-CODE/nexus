@@ -457,14 +457,15 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   `nexus/dados/almoxarifado.py`, os MESMOS da carga do histórico (`nexus/dados/CLAUDE.md`, linha Almoxarifado).
 - **O que a tela mostra:** 6 números (almoxarifados, peças com saldo, abaixo do mínimo com "e N no limite (+M de saldo
   unitário)" na nota, sem mínimo, avariadas com saldo, que é um botão para a aba delas, lançadas pelo App com as recusadas) e 6 abas: Reposição, Por almoxarifado, Catálogo e saldo, Consumo nas OS
-  (tudo desde o início, Levi 25/10/2026), Avariadas (30/10/2026) e Cadastro a corrigir. Desde 26/10/2026, as quatro partes do inventário (Inventário, Mínimo e máximo, Curadoria e Auditoria) vêm logo depois, juntas, como links para outras páginas (as seções do inventário, abaixo). Filtro na própria página (`filtro-local.js`).
+  (tudo desde o início, Levi 25/10/2026), Avariadas (30/10/2026) e Cadastro a corrigir. Desde 26/10/2026, as quatro partes do inventário (Inventário, Mínimo e máximo, Curadoria e Auditoria) vêm logo depois, juntas, como links para outras páginas (as seções do inventário, abaixo). Filtro na própria página (`filtro-local.js`). **São dez abas e, a 1366 px com o menu aberto, não cabem** (1341 px de abas para 1068 px de área): a fila rola por dentro e o script da página traz a aba aberta para o meio dela ao carregar e a cada troca (`scrollIntoView({block:'nearest', inline:'center'})`; as páginas do inventário fazem o mesmo em `pcm/_almox_abas.html`). Apertar o `padding` das abas não adiantaria: cortaria 40 px dos 270 que faltam.
 - **O filtro conta a aba à vista (30/10/2026, item 7):** o script das abas disparava `input` no formulário, que o
   `filtro-local.js` não escuta (ele ouve o `change` dos `select` e o `input` do campo de texto): as opções ficavam com os
   números da aba anterior. A troca de aba chama `FiltroLocal['alm-f'].aplicar()` (o filtro se aplica sozinho ao carregar,
   e o script das abas roda antes dele) e a barra (`data-alm-filtro`) some nas abas sem tabela (Por almoxarifado, Cadastro
   a corrigir). **Armadilha:** o `.cn-filtros{display:flex}` da casa vence o `[hidden]` do navegador; o `.alm-filtros[hidden]`
   do `pcm.css` é que esconde. Cada tabela leva um `data-fl-nome` próprio, senão a linha "Nenhuma peça com esses filtros"
-  nunca acende (a Reposição, o saldo unitário e as Avariadas têm; o Catálogo e o Consumo ainda não).
+  nunca acende (a Reposição, o saldo unitário e as Avariadas têm; o Catálogo e o Consumo ainda não). A tabela das peças de um
+  almoxarifado aberto (Por almoxarifado, abaixo) NÃO leva `data-fl-*`: o filtro da página não a conta, e a barra some nessa aba.
 - **As contas:** abaixo = mínimo > 0 e saldo < mínimo; **no limite** = saldo igual ao mínimo, separado porque o Fracttal
   costuma ter o mínimo igual ao saldo (25/10: 0 abaixo, 54 no limite); sem mínimo = mínimo 0; zerada = saldo 0.
   **Saldo unitário (30/10/2026, item 8)** = saldo 1 e mínimo 1: sai do "no limite" e vai para um grupo fechado (`<details>`)
@@ -478,11 +479,35 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   calcula curva, `nexus/dados/almoxarifado.py`); sem valor, "–". **Coluna ausente não é coluna vazia:** o livro do App de
   antes não tem Criticidade, Curva ABC nem Custo unitário (`d["tem_criticidade"]`, `["tem_curva"]`, `["tem_custo"]`), e aí a
   ordem é a de antes, as colunas mostram "–" e o Cadastro a corrigir não cobra nada; com a coluna, a peça COM saldo e sem
-  curva (ou sem criticidade) dá a linha "N peças com saldo sem Curva ABC no Fracttal" (completar é no Fracttal). Na
+  curva (ou sem criticidade) dá a linha "N peças com saldo sem Curva ABC no Fracttal" (completar é no Fracttal). O "–" tem duas
+  causas que só o `title` distingue ("sem curva no Fracttal": o PCM completa lá; "o App ainda não traz a curva": nada a cobrar), e
+  por isso a ajuda da Reposição diz em UMA FRASE VISÍVEL qual coluna o App ainda não traz (a criticidade, a curva ou as duas, e o
+  que a ordem usa então). As células Crit. e Curva são macros de `pcm/_almox_celulas.html`, as mesmas da Reposição e das peças
+  de um almoxarifado aberto. Na
   reserva (o último ciclo aplicado) a chave da coluna não prova que o App a mandou (a carga a grava vazia): "tem" é ao
-  menos uma peça com valor no histórico. A criticidade "None" do `sync-xlsx` é vazio (`_campo`).
+  menos uma peça com valor no histórico (`_campo(...) != ""`). A criticidade "None" (ou "nan") do `sync-xlsx` é vazio
+  (`almoxarifado.campo`, a mesma definição da carga: a dimensão do histórico também não grava mais a palavra).
+- **Por almoxarifado (30/10/2026, itens 1 e 9):** cada cartão mostra a **última contagem gravada** do inventário (a data, em
+  Brasília, da contagem mais nova do almoxarifado em estado `gravada` ou `gravada_com_conflitos`, de qualquer tipo: a recontagem
+  gravada também conta, é uma contagem real daquelas peças; a que ainda está `gravando` não; "nunca contado pelo inventário"
+  sem nenhuma; e, se o inventário não deu para ler, a linha NÃO aparece: dizer "nunca contado" seria falso) e o **valor em
+  estoque por curva** (`_valor`: saldo × custo unitário que o Fracttal deu, somado por Curva ABC do cadastro da peça, "R$ total
+  (A · B · C · sem curva)"; a peça COM saldo e sem custo fica fora da soma e o cartão diz "N peças sem custo no Fracttal", porque
+  a soma pela metade avisa e não esconde; sem a coluna de custo no livro, sem valor e sem cobrança; total zero com peças sem custo
+  é "–", nunca "R$ 0,00"). A última contagem vem de FORA da conta de 5 min, da mesma leitura que dá o número da aba Inventário
+  (`revisao._resumo`, uma só passada pelas contagens para os dois, pela cópia de 5 min do `visao._ler`), e o `valor`
+  e o `sem_custo` saem da conta guardada (`_partes`). **"Ver peças"** (botão com `aria-expanded` e `aria-controls`): as peças
+  chegam no 1º clique, por `fetch(nexusRota(...))`, de `GET /t/pcm/pecas/almox/<id_almox>` (`pecas_almox`, o pedaço
+  `pcm/_almox_pecas.html`), que filtra as linhas da MESMA `montar()` (nenhuma leitura de livro nem do Fracttal; a página não
+  engorda com centenas de linhas por almoxarifado). Sub-rota da tela: o portão de setor olha o prefixo `/t/pcm/pecas`, então
+  quem não vê o Almoxarifado não vê as peças. Ordem (`_pecas_do_almox`): o grupo de gravidade (abaixo, no limite, saldo
+  unitário, sem mínimo, em dia, sem saldo informado) e, dentro dele, a `_ordem` da Reposição (criticidade e curva). Saldo e mínimo
+  vazios são "–" (o Fracttal não deu o número), nunca 0. Falha: "não consegui abrir as peças agora", e o clique seguinte tenta de
+  novo; o cartão aberto ocupa a linha inteira da grade; abaixo de 640 px a tabela vira cartão (`data-r`). ID desconhecido: 404;
+  a fonte caída: 503.
 - **A aba Avariadas (30/10/2026, item 6):** a avariada COM saldo não é erro de cadastro, é peça esperando destino; saiu do
-  Cadastro a corrigir e tem aba própria, com a parada de cada uma. **Avariada é uma definição só, a do `regua.avariada`** (a
+  Cadastro a corrigir e tem aba própria, com a parada de cada uma. Cada linha da conta traz `avariado` (a marca crua do App) e
+  `avariada` (a definição da tela): **use sempre `avariada`**, senão o "SP-3-AV" sem a marca vira "não avariada". **Avariada é uma definição só, a do `regua.avariada`** (a
   marca Avariado do catálogo OU o código terminado em `-AV`; o `SP-AVR-001` não): vale na aba, no número do alto (peça ×
   almoxarifado com saldo, nota "com saldo"; antes contava o catálogo inteiro) e na etiqueta do Catálogo. **"Parada"** (`_paradas`)
   = há quantos dias o saldo dela naquele almoxarifado está acima de zero SEM interrupção, pelos ciclos aplicados do
@@ -513,8 +538,9 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   (lançadas e recusadas). Prova: `tests/test_pcm_inventario_contrato.py`. O contrato do livro das contagens do
   inventário (`almoxarifado_contagens_app_campo`, 19 colunas: as 14 de 26/10, a 14ª o `ID da linha`, a chave da linha
   junto da contagem, e as 5 de 30/10/2026 no fim) mora em `nexus/dados/almoxarifado.py` (`COLUNAS_CONTAGENS`, `contado`).
-- **Como provar:** `tests/test_pcm_almoxarifado.py` (o `_semear(novas=..., custo=...)` monta o App com as colunas novas; sem
-  elas é o livro de hoje); no navegador, a cópia de prova com os 4 livros montados na memória
+- **Como provar:** `tests/test_pcm_almoxarifado.py` (o `_semear(novas=..., custo=..., so_colunas=...)` monta o App com as
+  colunas novas, ou só com uma delas; sem elas é o livro de hoje; o `_contagens` põe contagens do inventário gravadas, em
+  conflito ou ainda gravando para o cartão); no navegador, a cópia de prova com os 4 livros montados na memória
   a partir de uma cópia da tabela do App (fora do repositório) e o cadastro real por GET (25/10: 12 almoxarifados, 218
   peças com saldo, 54 no limite, 22 sem mínimo, 5 avariadas, 3 lançadas e 13 recusadas).
 
@@ -577,7 +603,9 @@ script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o liv
   A prova de 26/10/2026 achou o `}` do `@media` do fim do inventário perdido no `pcm.css` (a régua e a curadoria sem estilo na
   tela larga): `test_o_css_do_pcm_fecha_toda_chave`. As nove abas de então cabiam a 1366 px com o menu aberto; com a das Avariadas (30/10/2026) são dez, e na cópia
   de prova a fila tinha 1341 px de abas para 1068 px de área a 1366 px (a fila rola por dentro, como no celular, onde a
-  aba de agora vem para o meio ao abrir): o cartão das Avariadas no alto é o outro caminho para a aba.
+  aba de agora vem para o meio ao abrir, também na tela principal desde a Task 4): o cartão das Avariadas no alto é o outro
+  caminho para a aba. Prova da Task 4 (30/10/2026) numa cópia de prova com o banco falso dos testes: o "Ver peças" a 1366 e
+  375 px (o cartão aberto na linha inteira e a tabela virando cartão), o erro e o retry do `fetch` e a aba aberta no meio da fila.
 - No Fracttal de verdade: a mesma cópia sem o `EstoqueFalso`, com `NEXUS_INVENTARIO_GRAVAR=1` no ambiente dela (sem a chave a
   gravação recusa com 409, seção da gravação), liberando o POST só para `app.fracttal.com` e `one.fracttal.com`, o
   login do Fracttal de quem prova e a contagem de mentira da `SP-TST-001` (contado 3 contra o saldo 5) mais uma linha

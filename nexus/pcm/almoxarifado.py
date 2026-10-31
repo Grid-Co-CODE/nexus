@@ -27,7 +27,7 @@ aba diz há quanto tempo (`_paradas`, pelos ciclos aplicados do histórico).
 """
 from datetime import datetime, timedelta, timezone
 
-from flask import current_app, render_template
+from flask import abort, current_app, render_template
 
 from ..cadastro.tipos import exibir
 from ..campo import visao
@@ -49,11 +49,9 @@ def _num(v) -> float:
     return A.numero(v) or 0.0
 
 
-def _campo(v) -> str:
-    """O texto de um campo do cadastro da peça: o vazio que o `sync-xlsx` do App escreve como "None" (ou o "nan") é
-    vazio, não a palavra. A criticidade "None" na tela seria um nível que o Fracttal não deu."""
-    t = _txt(v)
-    return "" if t.lower() in ("none", "nan") else t
+# o texto de um campo do cadastro da peça, com o "None" (ou "nan") do `sync-xlsx` como o vazio que é: a mesma definição da
+# carga do histórico, que não grava mais a palavra na dimensão do item (`nexus/dados/almoxarifado.py`)
+_campo = A.campo
 
 
 # o ID sem o ".0" que a API às vezes põe ("7.0" é o 7): o mesmo da dimensão de dados, que a carga e o filtro do teste usam
@@ -127,7 +125,7 @@ def _do_nexus(ult: dict, abas_nx: dict, teste: frozenset | set = frozenset()) ->
     # uma peça trazer valor: o histórico em que nenhuma peça jamais teve curva (ou custo) é o App que não a manda, e
     # cobrar "todas as peças sem Curva ABC" no Cadastro a corrigir seria cobrar o que o Fracttal nem foi perguntado
     def tem(linhas: list[dict], chave: str) -> bool:
-        return any(_txt(l.get(chave)) not in ("", "None", "nan") for l in linhas)
+        return any(_campo(l.get(chave)) != "" for l in linhas)
 
     return {"inicio": inicio, "fim": _txt(ult.get("fim")), "lidos": ult.get("itens_lidos_qtd"),
             "total": ult.get("itens_lista_qtd"), "itens": its, "linhas": linhas,
@@ -163,6 +161,29 @@ def _ordem(x: dict) -> tuple:
     return base + ((-x["falta"],) if x["situacao"] == "abaixo" else (x["almox"], x["codigo"]))
 
 
+def _valor(linhas: list[dict], tem_custo: bool) -> tuple[dict | None, int]:
+    """O valor em estoque de um almoxarifado, por curva (item 9 das melhorias de 30/10/2026): saldo × custo unitário que o
+    Fracttal deu, somado por Curva ABC do cadastro da peça. `({"total", "A", "B", "C", "sem_curva"}, peças sem custo)`.
+
+    A peça COM saldo e sem custo fica fora da soma e é CONTADA à parte (o cartão diz "N peças sem custo no Fracttal"): somar
+    como se valesse zero seria inventar o número, e esconder a soma pela metade, enganar (o desenho: "soma pela metade avisa,
+    não esconde"). A peça de saldo zero ou não informado não precisa de custo e não conta. O livro sem a coluna de custo (o App
+    de antes) é `(None, 0)`: não há o que somar nem o que cobrar, e coluna ausente não é peça sem custo."""
+    if not tem_custo:
+        return None, 0
+    v, sem_custo = {"total": 0.0, "A": 0.0, "B": 0.0, "C": 0.0, "sem_curva": 0.0}, 0
+    for x in linhas:
+        if not (x["saldo"] or 0) > 0:
+            continue
+        if x["custo"] is None:
+            sem_custo += 1
+            continue
+        parcela = x["saldo"] * x["custo"]
+        v["total"] += parcela
+        v[x["curva"] or "sem_curva"] += parcela
+    return {k: round(n, 2) for k, n in v.items()}, sem_custo
+
+
 def _partes(fonte: dict, b) -> dict:
     its, out = fonte["itens"], []
     for l in fonte["linhas"]:
@@ -173,6 +194,9 @@ def _partes(fonte: dict, b) -> dict:
         cod, nome = i.get("codigo") or l["id_item"], i.get("nome", "")
         crit_n, crit_nome = revisao._criticidade(i.get("criticidade"))
         out.append(dict(l, codigo=cod, nome=nome, familia=i.get("familia", ""), unidade=(i.get("unidade") or "").lower(),
+                        # `avariado` é a marca crua do App (a coluna Avariado do livro Itens); `avariada` é a definição da
+                        # tela (a marca OU o código -AV, `regua.avariada`). A aba, o número do alto e o valor usam SEMPRE a
+                        # `avariada`: a peça "SP-3-AV" sem a marca no Fracttal é avariada e `avariado` diria que não
                         avariado=i.get("avariado", False), avariada=regua.avariada(cod, i.get("avariado", False)),
                         situacao=sit, usina=_usina(b, l["usina_id"]),
                         falta=max((l["minimo"] or 0) - l["saldo"], 0) if l["saldo"] is not None else 0,
@@ -184,8 +208,9 @@ def _partes(fonte: dict, b) -> dict:
     unitario = sorted((x for x in out if x["situacao"] == "saldo_unitario"), key=_ordem)
     for x in abaixo + limite + unitario:
         x["pct"] = min(100, round(100 * x["saldo"] / x["minimo"])) if x["minimo"] else 0
-    cards = {}
+    cards, do_almox = {}, {}
     for x in out:
+        do_almox.setdefault(x["id_almox"], []).append(x)
         c = cards.setdefault(x["id_almox"], {"id": x["id_almox"], "nome": x["almox"], "usina": x["usina"], "pecas": 0,
                                              "abaixo": 0, "no_limite": 0, "saldo_unitario": 0, "sem_minimo": 0,
                                              "zeradas": 0, "ok": 0, "nao_informado": 0})
@@ -199,6 +224,8 @@ def _partes(fonte: dict, b) -> dict:
         c["nao_informado"] += x["situacao"] == "nao_informado"
     for c in cards.values():
         c["pct_ok"] = round(100 * c["ok"] / c["pecas"]) if c["pecas"] else 0
+        c["valor"], c["sem_custo"] = _valor(do_almox[c["id"]], fonte.get("tem_custo", False))
+        c["valor_txt"] = {k: exibir("moeda", v) for k, v in c["valor"].items()} if c["valor"] else None
     catalogo = []
     for iid, i in its.items():
         onde = [x for x in out if x["id_item"] == iid and (x["saldo"] or 0) > 0]
@@ -390,12 +417,50 @@ def montar():
     return visao._ler(("pcm_almoxarifado",), calcular)
 
 
+# a ordem das peças de um almoxarifado aberto: o grupo de gravidade vem antes (como na Reposição: abaixo do mínimo, no limite,
+# saldo unitário) e depois as sem mínimo (a zerada sem mínimo é uma delas), as em dia e, por último, as sem saldo informado
+_GRUPO = {"abaixo": 0, "no_limite": 1, "saldo_unitario": 2, "sem_minimo": 3, "zerada": 3, "ok": 4, "nao_informado": 5}
+
+
+def _pecas_do_almox(linhas: list[dict], id_almox: str) -> list[dict]:
+    """As peças de UM almoxarifado, do grupo mais grave ao em dia e, dentro dele, na ordem da Reposição (`_ordem`: a
+    criticidade, a curva e o resto). Filtra as linhas da conta guardada (`montar`): abrir as peças não lê o Fracttal."""
+    return sorted((x for x in linhas if x["id_almox"] == id_almox), key=lambda x: (_GRUPO[x["situacao"]], _ordem(x)))
+
+
+def _cartoes(d: dict, ultimas: dict | None) -> list[dict]:
+    """Os cartões da aba Por almoxarifado com a última contagem gravada do inventário: "dd/mm/aaaa", "" se o almoxarifado nunca
+    foi contado e None se o inventário não deu para ler (a linha não aparece). Ela vem de fora da conta de 5 min, como o número
+    da aba Inventário: o estado das contagens muda a cada gravação. Cópias: a conta guardada é de todos."""
+    return [dict(c, ultima_contagem=None if ultimas is None else ultimas.get(c["id"], ""))
+            for c in d.get("por_almoxarifado", [])]
+
+
 def registrar(bp) -> None:
     @bp.route(f"/{TELA}", endpoint=TELA)
     def tela():
         g = montar()
-        # quantas contagens do inventário esperam o PCM (o número da aba Inventário); fora da conta guardada de 5 min, porque o
-        # estado vem dos eventos e muda a cada revisão. Sem ler o livro, a aba segue sem número
-        return render_template("pcm/almoxarifado.html", d=g.dados or {}, erro=g.erro,
-                               inventario_a_revisar=revisao.a_revisar(current_app.config))
+        d = g.dados or {}
+        # quantas contagens do inventário esperam o PCM (o número da aba Inventário) e a última contagem gravada de cada
+        # almoxarifado; fora da conta guardada de 5 min, porque o estado vem dos eventos e muda a cada revisão (uma leitura só
+        # das contagens para os dois, `revisao._resumo`). Sem ler o livro, a aba segue sem número e o cartão sem a linha
+        cfg = current_app.config
+        return render_template("pcm/almoxarifado.html", d=d, erro=g.erro, inventario_a_revisar=revisao.a_revisar(cfg),
+                               cartoes=_cartoes(d, revisao.ultimas_gravadas(cfg)))
+
+    @bp.route(f"/{TELA}/almox/<id_almox>", endpoint="pecas_almox")
+    def pecas_almox(id_almox):
+        """O pedaço HTML com as peças de um almoxarifado (item 1 das melhorias de 30/10/2026): o botão "Ver peças" do cartão o
+        busca no 1º clique. Sai da MESMA conta guardada de 5 min da tela (`montar`), sem ler o Fracttal nem o banco de novo:
+        a página não engorda com as peças de todos os almoxarifados, que são centenas de linhas. Sub-rota da tela: quem não
+        vê o Almoxarifado (outro setor) não vê as peças (o portão de setor olha o prefixo `/t/pcm/pecas`)."""
+        g = montar()
+        d = g.dados or {}
+        if d.get("estado") != "ok":
+            abort(503 if g.erro else 404)          # a fonte caiu agora, ou a tela nem tem cartão para abrir
+        pecas = _pecas_do_almox(d["linhas"], _id(id_almox))
+        if not pecas:
+            abort(404)
+        return render_template("pcm/_almox_pecas.html", pecas=pecas, tem_criticidade=d["tem_criticidade"],
+                               tem_curva=d["tem_curva"])
 

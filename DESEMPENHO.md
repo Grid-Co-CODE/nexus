@@ -130,6 +130,9 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
    a da chegada, não a do técnico. Proposta: o App manda a hora em que o técnico justificou (a `ts` do evento, que ele
    já usa na linha da nota) e o Nexus decide o "mesmo dia" por ela. Das 7 de 22/10, 2 da OS 13473 voltaram "sem
    mudança" e ficaram sem a nota e a etiqueta; as outras 5 estão nos aparelhos.
+7. **PCM → Almoxarifado, aba Avariadas** (30/10/2026): o `_paradas` (`nexus/pcm/almoxarifado.py`) lê o Saldo de TODOS os meses do
+   histórico a cada recálculo de 5 min; cresce ~30 ciclos por mês. Corrigir quando aparecer no Raio-X: ler do ciclo mais novo para
+   trás e parar quando todas as chaves já tiverem quebrado a corrida.
 
 ## Onde está cada peça
 

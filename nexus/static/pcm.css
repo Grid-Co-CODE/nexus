@@ -975,8 +975,9 @@ html.pgp-aberto{overflow:hidden}
   .alm-kpis .kb-kpi:nth-child(3n+1){padding-left:0;border-left:0}}
 @media (max-width:900px){.alm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .alm-vazio{margin-top:18px}
-/* nove abas desde o inventário (26/10/2026): com o menu aberto, a 1366 px a fila passava 40 px da largura e a Auditoria
-   ficava cortada atrás da rolagem; com 10 px de lado e 2 px entre elas, cabe. Abaixo disso a fila rola por dentro */
+/* dez abas desde a das Avariadas (30/10/2026; eram nove desde o inventário, 26/10): com o menu aberto, a 1366 px a fila NÃO
+   cabe, e rola por dentro (`overflow-x:auto`). Quem abre uma aba lá no fim não a vê: o script da página (e o de
+   pcm/_almox_abas.html, nas páginas do inventário) traz a aba aberta para o meio da fila ao carregar e a cada troca */
 .alm-abas{display:flex;gap:2px;margin-top:20px;border-bottom:1px solid var(--linha);overflow-x:auto}
 .alm-aba{background:none;border:0;border-bottom:2px solid transparent;color:var(--mudo);font:600 13px var(--font-sans);
   padding:10px 10px;cursor:pointer;white-space:nowrap}
@@ -1022,6 +1023,20 @@ table.alm-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--tinta
 .alm-card-n .alm-ruim b{color:var(--critico)}
 .alm-card-n .alm-aviso{font-size:12.5px}
 .alm-card-n .alm-aviso b{color:var(--alerta)}
+/* a última contagem gravada e o valor em estoque por curva (30/10/2026): duas linhas curtas entre os números e a barra */
+.alm-card-info{margin-top:10px;font-size:12.5px;color:var(--tinta-2)}
+.alm-card-info p{margin:3px 0}
+.alm-card-info b{color:var(--tinta)}
+.alm-card-info .alm-aviso{font-size:12.5px}
+/* "Ver peças": o botão do cartão e o painel que ele abre. O cartão aberto ocupa a linha inteira da grade (a tabela de sete
+   colunas não cabe em 260 px); abaixo de 640 px a grade já é de uma coluna e a tabela vira cartão (a regra `.alm-t`) */
+.alm-ver{margin-top:12px}
+.alm-ver::after{content:"";width:6px;height:6px;margin:-3px 0 0 2px;border:solid currentColor;border-width:0 2px 2px 0;
+  transform:rotate(45deg);transition:transform .15s}
+.alm-ver[aria-expanded=true]::after{margin-top:3px;transform:rotate(-135deg)}
+.alm-card--aberto{grid-column:1 / -1}
+.alm-pecas{margin-top:12px}
+.alm-pecas-msg{margin:0;font-size:13px;color:var(--mudo)}
 .alm-lista{margin:0;padding-left:18px;font-size:13px;line-height:1.8;color:var(--tinta)}
 @media (max-width:640px){
   .alm-t thead{display:none}

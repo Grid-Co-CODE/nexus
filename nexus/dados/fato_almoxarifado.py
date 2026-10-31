@@ -101,10 +101,12 @@ def saldo_do_ciclo(saldo: list[dict], lig) -> list[list]:
 def dim_itens(itens: list[dict]) -> list[list]:
     """A dimensão do item. A criticidade vai como o Fracttal a dá ("1.Crítico"...) e a curva só como A, B ou C
     (`almoxarifado.curva_abc`); o livro Itens de antes do App novo não tem as colunas, e a peça sem elas fica com as duas
-    vazias: "sem curva" é a verdade, e "C" ou "comum" seriam inventados."""
+    vazias: "sem curva" é a verdade, e "C" ou "comum" seriam inventados. O vazio que o `sync-xlsx` escreve como "None" (ou
+    "nan") também fica vazio (`almoxarifado.campo`): a palavra gravada seria uma criticidade que o Fracttal nunca deu, e a
+    dimensão só cresce."""
     return sorted(([_txt(i.get("ID do item")), _txt(i.get("Código")), _txt(i.get("Nome")), _txt(i.get("Unidade")),
                     _txt(i.get("Família")), _sim(i.get("Avariado")), _sim(i.get("Ferramenta")),
-                    _txt(i.get("Criticidade")), A.curva_abc(i.get("Curva ABC"))]
+                    A.campo(i.get("Criticidade")), A.curva_abc(i.get("Curva ABC"))]
                    for i in itens if _txt(i.get("ID do item"))), key=lambda l: _chave_id(l[0]))
 
 

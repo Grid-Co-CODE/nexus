@@ -246,6 +246,19 @@ def test_historico_leva_criticidade_e_curva():
     assert (por["3"]["criticidade"], por["3"]["curva_abc"]) == ("", "")           # o que não é A, B ou C não vira C
 
 
+def test_historico_nao_grava_a_palavra_none_na_criticidade_e_na_curva():
+    """O `sync-xlsx` do App escreve o vazio como "None" (ou "nan") no livro: a dimensão do item não pode guardar a PALAVRA
+    como se fosse uma criticidade que o Fracttal deu (o "None" na Reposição seria um nível inventado, e o histórico só cresce)."""
+    from nexus.dados import fato_almoxarifado as F
+    base = {"Código": "A", "Nome": "Fusível", "Unidade": "UNIDADE", "Família": "F", "Avariado": "Não", "Ferramenta": "Não"}
+    itens = [dict(base, **{"ID do item": "1", "Criticidade": "None", "Curva ABC": "None"}),
+             dict(base, **{"ID do item": "2", "Criticidade": "nan", "Curva ABC": "nan"}),
+             dict(base, **{"ID do item": "3", "Criticidade": " NONE ", "Curva ABC": "Curva B"}),
+             dict(base, **{"ID do item": "4", "Criticidade": "1.Crítico", "Curva ABC": "a"})]
+    por = {l[0]: dict(zip(F.CAB_DIM_ITEM, l)) for l in F.dim_itens(itens)}
+    assert [(por[i]["criticidade"], por[i]["curva_abc"]) for i in "1234"] ==         [("", ""), ("", ""), ("", "B"), ("1.Crítico", "A")]
+
+
 def test_saldo_do_ciclo_leva_custo():
     from nexus.dados import fato_almoxarifado as F
     assert F.CAB_SALDO[-1] == "custo_unitario_brl"

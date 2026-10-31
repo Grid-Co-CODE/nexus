@@ -182,14 +182,44 @@ def _recontagem_de(c: dict, contagens: list[dict]) -> str:
     return f"recontagem da contagem de {_hora(o['contada_em'])}" if o else f"recontagem da contagem {de}"
 
 
+def _resumo(cfg) -> dict | None:
+    """Os dois números que a tela principal do Almoxarifado pede ao inventário, de UMA leitura das contagens (30/10/2026): quantas
+    esperam o PCM (`n`, o número da aba Inventário) e a data da última contagem gravada de cada almoxarifado (`ultimas`,
+    no cartão da aba Por almoxarifado). Pela cópia de 5 min do `visao._ler`, renovada por trás: os dois são só enfeite, e a leitura do
+    livro do inventário (2 min, no pedido) não pode segurar a tela principal quando o banco está lento (a lista do Inventário,
+    essa sim, mostra o estado de agora). Duas contas guardadas leriam as contagens duas vezes a cada 5 min. None se não deu para
+    ler: nenhum dos dois aparece (nunca "0 a revisar" nem "nunca contado" no lugar do que não se leu)."""
+    def contar() -> dict:
+        cs = leitura.contagens(cfg)
+        ultimas: dict[str, tuple] = {}
+        for c in cs:
+            # a recontagem gravada também conta (é uma contagem real daquelas peças); a que ainda está gravando, não
+            if c["estado"] not in ("gravada", "gravada_com_conflitos") or not c["id_almox"]:
+                continue
+            try:
+                quando = instante(c["contada_em"])
+            except ValueError:
+                continue                  # sem data legível não há o que mostrar (e a que não se lê nem se aprova)
+            if c["id_almox"] not in ultimas or quando > ultimas[c["id_almox"]][0]:
+                ultimas[c["id_almox"]] = (quando, quando.astimezone(_BRT).strftime("%d/%m/%Y"))
+        return {"n": sum(1 for c in cs if c["aprovavel"]), "ultimas": {a: dia for a, (_, dia) in ultimas.items()}}
+    g = visao._ler(("pcm_inventario_resumo",), contar)
+    return None if g.erro or not g.dados else g.dados
+
+
 def a_revisar(cfg) -> int | None:
     """Quantas contagens esperam o PCM (o número da aba Inventário na tela principal do Almoxarifado); None se não deu para
-    ler: a aba segue sem número. Pela cópia de 5 min do `visao._ler`, renovada por trás: o número é só um enfeite, e a leitura do
-    livro do inventário (2 min, no pedido) não pode segurar a tela principal quando o banco está lento (a lista do Inventário,
-    essa sim, mostra o estado de agora)."""
-    g = visao._ler(("pcm_inventario_a_revisar",),
-                   lambda: {"n": sum(1 for c in leitura.contagens(cfg) if c["aprovavel"])})
-    return None if g.erro or not g.dados else g.dados["n"]
+    ler: a aba segue sem número. Ver `_resumo`."""
+    r = _resumo(cfg)
+    return None if r is None else r["n"]
+
+
+def ultimas_gravadas(cfg) -> dict[str, str] | None:
+    """`{id do almoxarifado: "dd/mm/aaaa"}`: o dia (Brasília) da contagem gravada mais nova de cada almoxarifado, em estado
+    `gravada` ou `gravada_com_conflitos`; o almoxarifado que nunca teve uma fica fora (a tela diz "nunca contado pelo
+    inventário"). None se não deu para ler o inventário: aí a tela não diz nada, e "nunca contado" seria falso. Ver `_resumo`."""
+    r = _resumo(cfg)
+    return None if r is None else r["ultimas"]
 
 
 # ── a auditoria ──────────────────────────────────────────────────────────────────────────────────────────────────────────
