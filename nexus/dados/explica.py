@@ -348,12 +348,14 @@ PARA_QUE = {
                    "sozinha. Serve para saber quais telas pesam e a que horas, e para medir o antes e o depois de cada "
                    "mudança no OS Creator. Só contagens: nunca quem abriu nem o setor dela.",
     "fracttal_hora": "Guarda, hora a hora, quantos pedidos o Nexus fez ao Fracttal, quem pediu (a tela ou a tarefa de "
-                     "fundo) e para quê, quantos o Fracttal recusou por excesso e quantos deram erro. Serve para achar "
-                     "quem mais gasta a cota do Fracttal (200 por minuto para a empresa toda) e se cada mudança alivia "
-                     "essa conta. O total da hora, somando todos, fica na tabela ao lado.",
+                     "fundo) e para quê, quantos o Fracttal recusou por excesso, quantos deram erro e quantos esperaram "
+                     "a vez no porteiro do Nexus. Serve para achar quem mais gasta a cota do Fracttal (200 por minuto "
+                     "para a empresa toda) e se cada mudança alivia essa conta. O total da hora, somando todos, fica na "
+                     "tabela ao lado.",
     "fracttal_total_hora": "Guarda, hora a hora, o total de pedidos que o Nexus fez ao Fracttal (todas as telas e tarefas "
-                           "juntas), quantos o Fracttal recusou por excesso e o maior número de pedidos num único "
-                           "minuto da hora. O Fracttal aceita 200 por minuto para a empresa toda: o pico mostra os "
-                           "horários de aperto de verdade e se cada mudança alivia a cota. O pico não se soma: o de "
-                           "uma hora não é a soma dos de cada tela.",
+                           "juntas), quantos o Fracttal recusou por excesso, quantos esperaram a vez no porteiro do "
+                           "Nexus (que segura o Nexus em 150 por minuto) e o maior número de pedidos num único minuto da "
+                           "hora. O Fracttal aceita 200 por minuto para a empresa toda: o pico mostra os horários de "
+                           "aperto de verdade e se cada mudança alivia a cota. O pico não se soma: o de uma hora não é a "
+                           "soma dos de cada tela.",
 }

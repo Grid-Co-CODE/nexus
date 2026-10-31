@@ -1,15 +1,14 @@
-"""O contador de pedidos ao Fracttal (31/10/2026, etapa 0 do canto central do OS Creator).
+"""O contador de pedidos ao Fracttal e o porteiro do Nexus (31/10/2026, etapas 0 e 5 do canto central do OS Creator).
 
 A cota do Fracttal é de 200 pedidos por minuto para a empresa toda, dividida entre o OS Creator, o App de Campo e os robôs
-do Nexus, e até aqui ninguém sabia quanto o Nexus gasta dela, a que hora nem quem pede: o Raio-X mostra o momento e o
-journal só o erro. Sem esse número, o "antes e depois" de cada etapa e o limitador da etapa 5 seriam chute. Daqui saem as
-linhas por hora que o laço do `uso_os` guarda no disco e leva ao banco (`drenar`; a linha `*` do total vai para a aba
-própria do total, `fato_uso_os.separar_total`) e que o Raio-X mostra (`instantaneo`).
+do Nexus, e até a etapa 0 ninguém sabia quanto o Nexus gasta dela, a que hora nem quem pede: o Raio-X mostrava o momento e
+o journal só o erro. Daqui saem as linhas por hora que o laço do `uso_os` guarda no disco e leva ao banco (`drenar`; a
+linha `*` do total vai para a aba própria do total, `fato_uso_os.separar_total`) e que o Raio-X mostra (`instantaneo`).
 
 O gancho é UM só, no `requests.sessions.Session.send`: todo pedido do processo ao Fracttal passa por ele, seja o RPC do OS
 Creator (`/rpc/proxy`), o REST do `campo/fracttal.py` (`/api/<recurso>`) ou o token OAuth, e quem pede não muda uma linha.
-Conta só o host `fracttal.com` (e os `*.fracttal.com`): o S3 pré-assinado e o resto da internet passam sem contar. O
-limitador da etapa 5 vai no mesmo lugar, por isso o embrulho mora aqui e em mais nenhum.
+Conta só o host `fracttal.com` (e os `*.fracttal.com`): o S3 pré-assinado e o resto da internet passam sem contar e sem
+porteiro. O porteiro (abaixo) vive no mesmo embrulho, por isso o embrulho mora aqui e em mais nenhum.
 
 - **Uma linha por hora × origem × método.** A origem é quem pediu: a rota do pedido do Nexus (`origem(...)`, marcada pela
   casca) ou, sem marca, `fundo:<nome da thread sem o contador de instância>` (`ThreadPoolExecutor-137_0` vira
@@ -31,12 +30,30 @@ limitador da etapa 5 vai no mesmo lugar, por isso o embrulho mora aqui e em mais
   guardou o resto), então a memória não cresce com o tempo.
 - **A hora é a de Brasília** (UTC-3 fixo, sem horário de verão desde 2019): `hora_id` = `AAAAMMDDHH`. A virada do dia cai
   às 03:00 UTC, e é aí que um erro de fuso apareceria.
-- **O contador nunca derruba o pedido:** qualquer falha dele vai ao log em debug, e a resposta (ou a exceção) do pedido
-  volta como veio.
+- **O contador nunca derruba o pedido:** qualquer falha dele (e do porteiro) vai ao log em debug, e a resposta (ou a
+  exceção) do pedido volta como veio.
+
+**O porteiro (etapa 5).** Estourar a cota derruba o App de Campo, que vive dela: o desenho do canto central chama isso de
+fracasso, mesmo com tudo funcionando. Todo pedido do processo ao Fracttal entra numa conta deslizante de 60 s (`JANELA_S`),
+contado na hora em que sai, dentro deste embrulho:
+- **Teto do Nexus: 150 por minuto** (`TETO_POR_MINUTO`): sobram 50 dos 200 para o App de Campo e os robôs. **O fundo, até
+  90** (`TETO_FUNDO_POR_MINUTO`): fundo é a origem `fundo:` (os laços, e a thread sem marca); os outros 60 são de quem clica.
+- **Quem clica nunca é recusado:** clique é toda origem que não é `fundo:` (a rota do pedido, inclusive o que a tela pede
+  sozinha, com o `X-Nexus-Auto`). Com o minuto cheio ele espera até 2 s (`ESPERA_CLIQUE_MAX_S`) e segue: nenhuma thread do
+  waitress fica presa aqui.
+- **O fundo espera a vez, sem limite:** passa com menos de 90 de fundo E menos de 150 no total nos últimos 60 s, e cede a
+  vaga ao clique que estiver esperando. A leitura dele continua em curso enquanto espera: para quem lê, é só um pedido mais
+  lento (o `timeout` do requests nem começa a contar: a espera é antes do adaptador).
+- **Ninguém dorme segurando a trava:** a espera é na `threading.Condition` da trava (`_esperar`), com tempo, no máximo
+  `PASSO_DA_ESPERA_S` por vez e conferindo de novo; um fundo esperando nunca atrasa um clique.
+- **A conta é deste processo:** o PC (que não liga o gancho) e o App de Campo ficam fora dela; os 50 de folga são deles.
+- O pedido que esperou conta na linha dele (`esperas_qtd`, na hora em que SAIU), e `estado()` diz as esperas de cada hora,
+  de clique e de fundo, o que saiu no último minuto e quem espera agora.
 
 `ligar()` é chamado só pelo servidor (`servir.py`, junto do `teto_os`), nunca pelo `create_app`: o PC e os testes seguem
 sem o gancho.
 """
+import collections
 import contextvars
 import functools
 import json
@@ -54,6 +71,11 @@ log = logging.getLogger(__name__)
 
 DOMINIO = "fracttal.com"
 COTA_POR_MINUTO = 200                   # a cota do Fracttal: 200 pedidos por minuto para a empresa toda (página "Limites de Requests")
+TETO_POR_MINUTO = 150                   # o Nexus inteiro: sobram 50 da cota para o App de Campo e os robôs
+TETO_FUNDO_POR_MINUTO = 90              # o fundo (origem `fundo:`): os outros 60 do teto são de quem clica
+ESPERA_CLIQUE_MAX_S = 2.0               # o clique nunca é recusado: com o minuto cheio espera até isto e segue
+JANELA_S = 60.0                         # a conta deslizante: a cota do Fracttal é por minuto
+PASSO_DA_ESPERA_S = 1.0                 # quem espera a vez confere de novo ao menos a cada segundo (o relógio que pulou)
 RECUSAS = (406, 429)                    # o Fracttal pedindo calma (a cota por minuto)
 FUNDO = "fundo:"                        # o começo da origem de quem pede por conta própria (laço, thread), não por rota
 MAX_ORIGENS_DE_FUNDO = 50               # origens de fundo distintas por hora; a 51ª e as seguintes vão para OUTROS
@@ -62,11 +84,18 @@ _BRT = timezone(timedelta(hours=-3))
 # o contador de instância no fim do nome da thread (ou antes do " (alvo)" que o Python põe): `-137_0`, `-12`, `3`
 _CONTADOR = re.compile(r"(?:[-_ ]?\d+)+(?=$| \()")
 _EMBRULHO = "_nexus_fracttal_conta"     # no `send` embrulhado: ligar de novo não embrulha o embrulho
-_PEDIDOS, _RECUSADOS, _ERROS, _PICO = range(4)      # as posições da lista de cada linha
+_PEDIDOS, _RECUSADOS, _ERROS, _PICO, _ESPERAS = range(5)    # as posições da lista de cada linha
 
 _trava = threading.Lock()               # a única: o gancho roda em todas as threads e a conta é de dicionário pequeno
+# quem espera a vez no porteiro dorme aqui, SEM a trava: a `Condition.wait` a solta enquanto dorme e a pega de volta
+_vez = threading.Condition(_trava)
 _horas: dict = {}                       # hora_id -> _Hora
 _minuto = {"id": None, "total": 0, "chaves": {}}    # o minuto corrente e o que já se pediu nele (o resto virou pico)
+# a janela do porteiro: quando saiu cada pedido dos últimos 60 s, em ordem (todos, e só os do fundo). Do tamanho do que de
+# fato saiu no minuto: o fundo não passa de 90 e o clique que passa sem vaga já esperou os 2 s dele
+_janela: collections.deque = collections.deque()
+_janela_fundo: collections.deque = collections.deque()
+_esperando = {"clique": 0, "fundo": 0}  # quantos esperam a vez agora (o fundo cede a vaga ao clique que espera)
 
 
 class _Marca:
@@ -83,8 +112,8 @@ _marca_atual: contextvars.ContextVar = contextvars.ContextVar("nexus_fracttal_ma
 
 
 class _Hora:
-    """Uma hora de Brasília: uma linha [pedidos, recusas, erros, pico] por (origem, método), as origens de fundo que ela
-    já tem (no máximo MAX_ORIGENS_DE_FUNDO; a rota não entra aqui) e o pico do total."""
+    """Uma hora de Brasília: uma linha [pedidos, recusas, erros, pico, esperas] por (origem, método), as origens de fundo
+    que ela já tem (no máximo MAX_ORIGENS_DE_FUNDO; a rota não entra aqui) e o pico do total."""
     __slots__ = ("linhas", "fundos", "pico")
 
     def __init__(self):
@@ -105,8 +134,21 @@ def _origem_de_fundo() -> str:
 
 
 def _agora() -> float:
-    """O relógio (os testes o trocam: a hora de Brasília perto da meia-noite UTC não se espera acontecer)."""
+    """O relógio (os testes o trocam: a hora de Brasília perto da meia-noite UTC não se espera acontecer). É ele que conta a
+    hora, o minuto do pico e a janela do porteiro."""
     return time.time()
+
+
+def _cronometro() -> float:
+    """O relógio do prazo de 2 s do clique: monotônico, para o relógio de parede que o NTP acerta não esticar a espera de
+    quem clica (os testes o trocam)."""
+    return time.monotonic()
+
+
+def _esperar(cond: threading.Condition, segundos: float) -> None:
+    """Dorme até `segundos`, ou até um aviso, SOLTANDO a trava (`Condition.wait`). Os testes trocam: o relógio falso anda,
+    e um minuto de espera leva um instante."""
+    cond.wait(segundos)
 
 
 def hora_id_de(epoch: float | None = None) -> str:
@@ -146,12 +188,75 @@ def _metodo(request) -> str | None:
     return "outro"
 
 
+# ── o porteiro ───────────────────────────────────────────────────────────────────────────────────────────────────────
+def _podar(agora: float) -> None:
+    """Com a trava na mão: tira da janela o que saiu há 60 s ou mais. Se o relógio de parede voltou (o NTP acertou para
+    trás), o que ficou "no futuro" passa a ser de agora: segue contando, e a janela não fica presa num minuto que não acaba."""
+    corte = agora - JANELA_S
+    for fila in (_janela, _janela_fundo):
+        while fila and fila[0] <= corte:
+            fila.popleft()
+        futuros = 0
+        while fila and fila[-1] > agora:
+            fila.pop()
+            futuros += 1
+        fila.extend([agora] * futuros)
+
+
+def _falta(fila, teto: int, agora: float) -> float:
+    """Segundos até a `fila` ter menos de `teto` pedidos nos últimos 60 s (0: já tem). Quem precisa sair da janela para
+    abrir a vaga é o pedido de posição `len - teto`, contando do mais velho."""
+    excesso = len(fila) - teto
+    return 0.0 if excesso < 0 else max(fila[excesso] + JANELA_S - agora, 0.0)
+
+
+def _vez_de(fundo: bool) -> tuple:
+    """Com a trava na mão: espera a vez do pedido que vai sair e devolve `(esperou, agora)`, com `agora` o instante em que
+    ele sai. O clique passa com menos de 150 no último minuto e, sem vaga, espera até 2 s e passa assim mesmo: nunca é
+    recusado. O fundo passa com menos de 150 no total, menos de 90 de fundo e nenhum clique esperando a vez; senão espera,
+    sem limite. A espera solta a trava (`_esperar`, a Condition): os outros pedidos, a conta e o Raio-X andam enquanto isso."""
+    tipo = "fundo" if fundo else "clique"
+    prazo = None if fundo else _cronometro() + ESPERA_CLIQUE_MAX_S
+    esperou = False
+    try:
+        while True:
+            agora = _agora()
+            _podar(agora)
+            falta = _falta(_janela, TETO_POR_MINUTO, agora)
+            if fundo:
+                falta = max(falta, _falta(_janela_fundo, TETO_FUNDO_POR_MINUTO, agora))
+                if not falta and _esperando["clique"]:
+                    falta = PASSO_DA_ESPERA_S           # a vaga é do clique que espera: ele avisa quando passar
+            if not falta:
+                return esperou, agora
+            if prazo is not None:
+                resta = prazo - _cronometro()
+                if resta <= 0:
+                    return esperou, agora               # os 2 s acabaram: o clique segue sem vaga, nunca é recusado
+                falta = min(falta, resta)
+            if not esperou:
+                esperou = True
+                _esperando[tipo] += 1
+            _esperar(_vez, min(falta, PASSO_DA_ESPERA_S))
+    finally:
+        if esperou:
+            _esperando[tipo] -= 1
+            if not fundo:
+                _vez.notify_all()                       # o fundo que cedeu a vaga a este clique confere de novo
+
+
 # ── a conta ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 def _registrar(marca: _Marca, metodo: str) -> tuple:
-    """Soma o pedido que vai sair na hora e no minuto de agora; devolve onde somou, para a resposta fechar a conta."""
+    """Espera a vez no porteiro e soma o pedido na hora e no minuto em que ele sai; devolve onde somou, para a resposta
+    fechar a conta."""
     with _trava:
-        agora = _agora()                                # dentro da trava: a ordem das horas é a ordem dos pedidos
-        hora_id = hora_id_de(agora)
+        fundo = marca.nome.startswith(FUNDO)
+        # pode soltar a trava enquanto espera (a Condition) e volta com ela na mão; dali até somar, ninguém mais entra
+        esperou, agora = _vez_de(fundo)
+        _janela.append(agora)                           # no mesmo passo da vez: duas threads nunca pegam a mesma vaga
+        if fundo:
+            _janela_fundo.append(agora)
+        hora_id = hora_id_de(agora)                     # dentro da trava: a ordem das horas é a ordem dos pedidos
         hora = _horas.get(hora_id)
         if hora is None:
             hora = _horas[hora_id] = _Hora()
@@ -162,8 +267,10 @@ def _registrar(marca: _Marca, metodo: str) -> tuple:
             else:
                 hora.fundos.add(quem)
         chave = (quem, metodo)
-        linha = hora.linhas.setdefault(chave, [0, 0, 0, 0])
+        linha = hora.linhas.setdefault(chave, [0, 0, 0, 0, 0])
         linha[_PEDIDOS] += 1
+        if esperou:
+            linha[_ESPERAS] += 1                        # na hora em que saiu, junto com o pedido
         minuto = int(agora // 60)                       # o fuso é de horas inteiras: o minuto nunca racha uma hora
         if _minuto["id"] != minuto:
             _minuto.update(id=minuto, total=0, chaves={})
@@ -176,7 +283,8 @@ def _registrar(marca: _Marca, metodo: str) -> tuple:
 
 
 def _abrir(request) -> tuple | None:
-    """Conta o pedido que vai sair, se for do Fracttal. Nunca levanta: sem conta, o pedido sai do mesmo jeito."""
+    """Passa o pedido que vai sair pelo porteiro e o conta, se for do Fracttal (o resto da internet nem para aqui). Nunca
+    levanta: com o porteiro ou a conta quebrados, o pedido sai do mesmo jeito, sem esperar e sem contar."""
     try:
         metodo = _metodo(request)
         if metodo is None:
@@ -271,13 +379,15 @@ def zerar_desta_thread() -> None:
 # ── o que saiu ───────────────────────────────────────────────────────────────────────────────────────────────────────
 def _linha(hora_id: str, quem: str, metodo: str, v: list) -> dict:
     return {"hora_id": hora_id, "origem": quem, "metodo": metodo, "pedidos_qtd": v[_PEDIDOS],
-            "recusas_qtd": v[_RECUSADOS], "erros_qtd": v[_ERROS], "pico_minuto_qtd": v[_PICO]}
+            "recusas_qtd": v[_RECUSADOS], "erros_qtd": v[_ERROS], "pico_minuto_qtd": v[_PICO],
+            "esperas_qtd": v[_ESPERAS]}
 
 
 def _linhas_da_hora(hora_id: str, hora: _Hora) -> list:
     """As linhas de uma hora: a do total (`*`, com o pico de tudo junto) primeiro, depois uma por (origem, método)."""
-    soma = [sum(v[i] for v in hora.linhas.values()) for i in (_PEDIDOS, _RECUSADOS, _ERROS)]
-    return [_linha(hora_id, "*", "*", soma + [hora.pico])] + [
+    total = [sum(v[i] for v in hora.linhas.values()) for i in range(_ESPERAS + 1)]
+    total[_PICO] = hora.pico                            # o pico do total não é a soma dos picos: é o de tudo junto
+    return [_linha(hora_id, "*", "*", total)] + [
         _linha(hora_id, o, m, v) for (o, m), v in sorted(hora.linhas.items())]
 
 
@@ -296,9 +406,37 @@ def drenar(ate_hora_id: str) -> list:
     return [linha for h, hora in fechadas for linha in _linhas_da_hora(h, hora)]
 
 
+def estado() -> dict:
+    """O porteiro agora, só contagens: se o gancho está ligado neste processo (só o servidor liga), os tetos, quantos
+    pedidos saíram nos últimos 60 s (`ultimo_minuto`: todos e os do fundo), quantos esperam a vez neste instante
+    (`esperando`: clique e fundo) e as esperas de cada hora que o contador ainda guarda (`esperas_por_hora`, da mais antiga
+    à mais nova: a aberta e a que o laço do :05 ainda não tirou), de clique e de fundo. Somadas por hora, são as mesmas
+    que vão ao banco por linha, como `esperas_qtd`."""
+    with _trava:
+        _podar(_agora())
+        horas = []
+        for hora_id in sorted(_horas):
+            clique = fundo = 0
+            for (quem, _metodo), v in _horas[hora_id].linhas.items():
+                if quem.startswith(FUNDO):              # o balaio `fundo:outros` também é fundo
+                    fundo += v[_ESPERAS]
+                else:
+                    clique += v[_ESPERAS]
+            horas.append({"hora_id": hora_id, "clique": clique, "fundo": fundo})
+        return {"ligado": bool(getattr(requests.sessions.Session.send, _EMBRULHO, False)),
+                "teto_por_minuto": TETO_POR_MINUTO, "teto_fundo_por_minuto": TETO_FUNDO_POR_MINUTO,
+                "espera_clique_max_s": ESPERA_CLIQUE_MAX_S,
+                "ultimo_minuto": {"todos": len(_janela), "fundo": len(_janela_fundo)},
+                "esperando": dict(_esperando), "esperas_por_hora": horas}
+
+
 def limpar() -> None:
-    """Esquece tudo o que contou (os testes; nada no servidor chama)."""
+    """Esquece tudo o que contou, e a janela do porteiro (os testes; nada no servidor chama). Quem esperava a vez confere
+    de novo: a janela vazia o deixa passar."""
     with _trava:
         _horas.clear()
         _minuto.update(id=None, total=0, chaves={})
+        _janela.clear()
+        _janela_fundo.clear()
+        _vez.notify_all()
     zerar_desta_thread()

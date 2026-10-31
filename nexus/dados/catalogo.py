@@ -1286,7 +1286,10 @@ FATOS = (
                     "(work_orders), token ou outro. O total da hora e o pico por minuto de tudo junto NÃO estão aqui: moram "
                     "no fato fracttal_total_hora, 1 linha por hora (31/10/2026, Ruling N: um total no meio do detalhe mistura "
                     "dois grãos, e somar a coluna contaria em dobro). recusas_qtd são os 406 e 429 (o Fracttal pedindo "
-                    "calma); erros_qtd, a exceção e o 5xx. Só contagens; vai ao banco uma vez por dia, às 03:45"),
+                    "calma); erros_qtd, a exceção e o 5xx. esperas_qtd (a última coluna, desde 31/10/2026, etapa 5) são os "
+                    "pedidos que esperaram a vez no porteiro do Nexus (no máximo 150 por minuto, 90 deles de fundo; a origem "
+                    "fundo: é o fundo, o resto é clique, que espera no máximo 2 s e nunca é recusado), contados na hora em "
+                    "que saíram; vazia na hora de antes do porteiro. Só contagens; vai ao banco uma vez por dia, às 03:45"),
     # o total da hora, na aba própria do mesmo livro do mês (Ruling N, 31/10/2026): o contador entrega a linha `*` no meio
     # do detalhe, e `fato_uso_os.separar_total` a leva para cá
     Fato("fracttal_total_hora", "Total de pedidos do Nexus ao Fracttal por hora", "os",
@@ -1300,7 +1303,9 @@ FATOS = (
                     "não é a soma dos picos de cada origem, por isso não soma. A cota do Fracttal é de 200 pedidos por minuto "
                     "para a empresa toda (o OS Creator, o App de Campo e os robôs do Nexus): compare o pico com ela. Foi "
                     "separado do detalhe (fracttal_hora) porque o total dentro dele misturava dois grãos. recusas_qtd são os "
-                    "406 e 429; erros_qtd, a exceção e o 5xx. Só contagens; vai ao banco uma vez por dia, às 03:45"),
+                    "406 e 429; erros_qtd, a exceção e o 5xx; esperas_qtd (a última coluna, desde 31/10/2026, etapa 5), os "
+                    "pedidos da hora que esperaram a vez no porteiro do Nexus (150 por minuto, 90 deles de fundo), vazia na "
+                    "hora de antes do porteiro. Só contagens; vai ao banco uma vez por dia, às 03:45"),
 )
 POR_ID = {f.id: f for f in FATOS}
 

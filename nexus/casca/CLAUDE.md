@@ -15,7 +15,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar) e a aba Atualizações (`/?aba=atualizacoes`, só novidade, correção e desempenho dos últimos 60 dias, por dia); seção "Versão no ar e Atualizações" abaixo |
 | `nexus/casca/sugestoes.py` + `templates/sugestoes.html` | a aba Sugestões (`/?aba=sugestoes`): o formulário de todos e a lista do administrador, o livro `nexus_sugestoes` e os anexos no disco; seção "Sugestões no Início" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
-| `nexus/casca/fracttal_conta.py` | o contador de pedidos ao Fracttal (31/10/2026): um gancho no `Session.send` que soma, por hora de Brasília × origem × método, os pedidos, as recusas (406/429), os erros e o pico por minuto; seção "Pedidos ao Fracttal" abaixo |
+| `nexus/casca/fracttal_conta.py` | o contador de pedidos ao Fracttal (31/10/2026): um gancho no `Session.send` que soma, por hora de Brasília × origem × método, os pedidos, as recusas (406/429), os erros, o pico por minuto e as esperas; e, no mesmo gancho, o porteiro (etapa 5): o Nexus até 150 pedidos por minuto, o fundo até 90; seção "Pedidos ao Fracttal" abaixo |
 | `nexus/casca/minutos_ocupados.py` | os minutos de toda hora que já têm dono no Nexus, num lugar só (31/10/2026, etapa 3 do canto central), e os de uma vez por dia (`DIARIOS`): o laço novo pede o próximo minuto livre (`proximo_livre`); bullet "Os minutos ocupados" na seção do Raio-X abaixo |
 | `nexus/casca/uso_os.py` | o uso das telas do OS Creator (31/10/2026): por hora × rota × automático, os pedidos, as pessoas distintas, a mediana e o p95, os erros, os 503 do teto e os pedidos ao Fracttal; marca a rota de TODO pedido do Flask como origem do contador do Fracttal; e, no servidor, guarda as horas fechadas dos dois contadores no disco a cada hora (:05) e as leva ao banco UMA vez por dia, às 03:45 (`nexus/dados/fato_uso_os.py`); seção "Uso das telas do OS Creator" abaixo |
 | `nexus/auth/__init__.py` | `/entrar` (a porta, a senha de administrador e a ida e a volta da Microsoft), `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
@@ -278,7 +278,7 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   `tests/test_oscreator_os_leitor.py::test_os_minutos_moram_na_lista_unica` cruza cada um com a lista (rodada 1 da revisão
   da 3.1+3.2: as finalizadas saíram do :45, que às 03:45 é do `uso_os`).
 
-## Pedidos ao Fracttal: o contador (31/10/2026)
+## Pedidos ao Fracttal: o contador e o porteiro (31/10/2026)
 
 Etapa 0 do canto central do OS Creator (`docs/superpowers/specs/2026-10-30-oscreator-canto-central-design.md`). A cota
 do Fracttal é de 200 pedidos por minuto para a empresa toda, e ninguém sabia quanto o Nexus gasta dela, a que hora nem
@@ -287,8 +287,9 @@ quem pede. `casca/fracttal_conta.py` é UM gancho no `requests.sessions.Session.
 nunca o `create_app`: o PC e os testes seguem sem ele). Todo pedido do processo a um
 host `fracttal.com` ou `*.fracttal.com` (o RPC do OS Creator, o REST do `campo/fracttal.py`, o token) é somado na
 memória, sem mudar quem pede. O resto da internet passa sem contar (`notfracttal.com` também: o domínio começa no ponto).
-- **A linha** é hora × origem × método: `pedidos_qtd`, `recusas_qtd` (406/429), `erros_qtd` (exceção ou 5xx) e
-  `pico_minuto_qtd` (o maior número de pedidos num mesmo minuto, o número que se compara com a cota), mais uma linha
+- **A linha** é hora × origem × método: `pedidos_qtd`, `recusas_qtd` (406/429), `erros_qtd` (exceção ou 5xx),
+  `pico_minuto_qtd` (o maior número de pedidos num mesmo minuto, o número que se compara com a cota) e `esperas_qtd` (os
+  que esperaram a vez no porteiro, abaixo), mais uma linha
   `*`/`*` por hora com o total e o pico de tudo junto (o pico do total NÃO é a soma dos picos; no banco ela vai para a
   aba própria do total, 1 linha por hora, e o detalhe fica sem ela: `fato_uso_os.separar_total`). A hora é a de Brasília,
   UTC-3 fixo: `hora_id` = `AAAAMMDDHH`, e a virada do dia cai às 03:00 UTC.
@@ -316,12 +317,41 @@ memória, sem mudar quem pede. O resto da internet passa sem contar (`notfractta
 - **Nunca derruba o pedido:** a falha do contador vai ao log em debug e a resposta, ou a exceção, volta como veio. Com
   redirecionamento cada salto conta uma vez (o `requests` refaz o pedido pelo mesmo `send`), e a recusa ou o erro é da
   resposta daquele salto, não da final.
-- **Memória:** do minuto só o corrente fica; do resto, uma linha de quatro números por hora, origem e método. Se ninguém
-  drena, as horas se acumulam: quem drena é o laço do `uso_os` no :05 de toda hora (para o disco), da mesma etapa 0. **O
-  contador não guarda nada em disco:** um reinício perde a hora aberta dele (o que já saiu para o pendente está salvo).
-- **O limitador da etapa 5 vai no mesmo gancho:** o embrulho do `Session.send` mora só aqui.
+- **Memória:** do minuto só o corrente fica; do resto, uma linha de cinco números por hora, origem e método, e a janela do
+  porteiro guarda só o último minuto. Se ninguém drena, as horas se acumulam: quem drena é o laço do `uso_os` no :05 de
+  toda hora (para o disco), da mesma etapa 0. **O contador não guarda nada em disco:** um reinício perde a hora aberta
+  dele (o que já saiu para o pendente está salvo).
+- **O porteiro (etapa 5), no mesmo gancho** (o embrulho do `Session.send` mora só aqui). Estourar a cota derruba o App de
+  Campo, que vive dela: o desenho do canto central chama isso de fracasso, mesmo com tudo funcionando. Todo pedido do
+  processo ao Fracttal (RPC e REST, toda origem) entra numa conta deslizante de 60 s, contado na hora em que sai: **o
+  Nexus até 150 por minuto** (`TETO_POR_MINUTO`: sobram 50 dos 200 para o App de Campo e os robôs) e **o fundo até 90**
+  (`TETO_FUNDO_POR_MINUTO`). Outro domínio não passa por ele.
+  - **Clique ou fundo, pela origem:** fundo é a origem `fundo:` (os laços e a thread sem marca); todo o resto é clique, a
+    rota do pedido, inclusive o que a tela pede sozinha (`X-Nexus-Auto`).
+  - **O clique nunca é recusado:** com 150 no último minuto, espera até 2 s (`ESPERA_CLIQUE_MAX_S`, medidos no relógio
+    monotônico) e segue assim mesmo. Nenhuma thread do waitress fica presa no porteiro.
+  - **O fundo espera a vez, sem limite:** passa só com menos de 90 de fundo E menos de 150 no total, e cede a vaga ao
+    clique que estiver esperando. A leitura dele segue em curso (é só um pedido mais lento; o `timeout` do requests nem
+    começa, porque a espera é antes do adaptador).
+  - **Ninguém dorme segurando a trava:** a espera é na `Condition` da trava (`_esperar`), no máximo 1 s por vez
+    (`PASSO_DA_ESPERA_S`) e conferindo de novo; o clique que sai acorda o fundo que cedeu a vaga a ele. O relógio de
+    parede que volta (o NTP) não prende a janela: o que ficou "no futuro" passa a ser de agora.
+  - **A conta é deste processo:** o PC não liga o gancho e o App de Campo é outro sistema; a folga de 50 é deles.
+  - **As esperas:** o pedido que esperou soma `esperas_qtd` na linha dele, na hora em que SAIU; a coluna vai ao banco no
+    fim das duas abas do Fracttal (`nexus/dados/CLAUDE.md`), e o Raio-X a mostra por dia e por hora (seção "Uso do OS
+    Creator"). `estado()` diz o que saiu no último minuto, quem espera agora e as esperas de cada hora guardada, de
+    clique e de fundo.
+  - **Trabalho que um clique espera não pode correr como fundo.** A tarefa de um `ThreadPoolExecutor` comum ou de uma
+    thread aberta à mão começa sem a marca do pedido e vira `fundo:<thread>`, que espera a vez sem limite: se o pedido
+    espera o resultado dela, o clique espera junto. Copie o contexto (`api._ExecutorComContexto`) ou ponha a origem da
+    rota dentro da tarefa. Casos conhecidos em 31/10/2026, a resolver por quem cuida de cada um: as páginas da fila da
+    Aprovação (`campo/regras_app._fx_wo_paralelo`, cópia fiel do App), o detalhe do card que o OS Creator lê por trás
+    (`os-web-preparo`; o `preparado` espera até 45 s) e as 4 vagas do `campo/fracttal.py` (`_VAGAS`), que o pedido segura
+    enquanto espera a vez: o fundo parado no porteiro ocupa a vaga de um clique.
 - **Prova:** `tests/test_casca_fracttal_conta.py` (o adaptador falso numa `requests.Session` de verdade, sem rede;
-  mutações no gancho pegas uma a uma).
+  mutações no gancho pegas uma a uma) e `tests/test_casca_porteiro.py` (o relógio na mão, e a espera anda o relógio em
+  vez de dormir: um minuto de espera leva um instante; dois testes com threads e a `Condition` de verdade; as onze
+  mutações do porteiro pegas uma a uma).
 
 ## Uso das telas do OS Creator por hora (31/10/2026)
 
@@ -414,11 +444,14 @@ gravar=True)`); o `create_app`, o PC e os testes seguem sem ele.
 O antes e o depois de cada etapa do canto central do OS Creator, e os horários de pico de verdade (`raio_x.montar_uso_os`,
 `_uso_do_banco`, `_secao_uso_os`; `templates/raio_x.html`, âncora `#uso-os-creator`, link no alto da página; só administrador,
 como o resto do Raio-X). Quatro quadros, todos da janela de 7 dias de Brasília que termina hoje:
-- **Por dia:** cliques, pedidos que as telas fazem sozinhas, pedidos ao Fracttal, recusados (406/429) e o maior pico por
-  minuto, com a hora dele. É o quadro do "antes e depois": o mesmo dia da semana, antes e depois de uma mudança.
-- **Por hora do dia** (a soma dos 7 dias): cliques (com barra), automáticos, pedidos ao Fracttal e o maior pico por minuto
-  **ao lado da cota de 200** (`fracttal_conta.COTA_POR_MINUTO`, a mesma que o limitador da etapa 5 vai usar): a partir de
-  80% a palavra é "perto da cota" (amarelo), a partir de 100% "na cota" (vermelho), sempre palavra e cor por token.
+- **Por dia:** cliques, pedidos que as telas fazem sozinhas, pedidos ao Fracttal, recusados (406/429), os que esperaram a
+  vez no porteiro (etapa 5) e o maior pico por minuto, com a hora dele. É o quadro do "antes e depois": o mesmo dia da
+  semana, antes e depois de uma mudança.
+- **Por hora do dia** (a soma dos 7 dias): cliques (com barra), automáticos, pedidos ao Fracttal, os que esperaram a vez e
+  o maior pico por minuto **ao lado da cota de 200** (`fracttal_conta.COTA_POR_MINUTO`; o porteiro segura o Nexus em 150,
+  `TETO_POR_MINUTO`): a partir de 80% a palavra é "perto da cota" (amarelo), a partir de 100% "na cota" (vermelho), sempre
+  palavra e cor por token. As esperas vêm do mesmo total da hora que os pedidos (`esperas_qtd`); a hora de antes do
+  porteiro, com a célula vazia no banco, conta 0 (ninguém esperava), e o resumo só fala delas quando houve alguma.
 - **As 15 telas mais pedidas** (por pedidos, cliques mais automáticos): cliques e automáticos em colunas separadas (sem
   isso a "tela mais clicada" seria o `/os/_nexus/sessao` de cada aba aberta), a mediana e o p95, os pedidos que a tela faz
   ao Fracttal, os erros e os 503 do teto.

@@ -30,8 +30,9 @@ if __name__ == "__main__":
         app = create_app()
     except ConfigErro as erro:
         sys.exit(f"Nexus não subiu: {erro}")
-    # o contador de pedidos ao Fracttal (31/10/2026, etapa 0 do canto central do OS Creator): um gancho no Session.send,
-    # ligado ANTES dos instalar_* abaixo, que já abrem laços que pedem ao Fracttal ao subir
+    # o contador de pedidos ao Fracttal (31/10/2026, etapa 0 do canto central do OS Creator) e, no mesmo gancho do
+    # Session.send, o porteiro (etapa 5: o Nexus até 150 pedidos por minuto, o fundo até 90, o clique nunca recusado),
+    # ligados ANTES dos instalar_* abaixo, que já abrem laços que pedem ao Fracttal ao subir
     from nexus.casca import fracttal_conta
     fracttal_conta.ligar()
     instalar_campo(app)

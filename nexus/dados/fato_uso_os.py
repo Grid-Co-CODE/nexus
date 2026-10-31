@@ -29,8 +29,10 @@ Foto periódica da hora que fechou, nas três.
 - **Uma vez por dia, não de hora em hora** (Ruling M): gravar o livro do mês inteiro custa ~7 s de processador no mês cheio
   (medido em 31/10/2026: o `xlsx` sozinho, 5,7 s), e o Nexus é UM processo com o servidor já apertado. Às 03:45, a hora mais
   parada, o custo é o mesmo e não trava ninguém; o pendente do disco cobre o resto do dia (e o Raio-X o lê de lá).
-- **Medidas** (catálogo): as contagens de pedidos, recusas e erros somam; as pessoas distintas, a mediana e o p95 em ms e o
-  pico por minuto não somam em corte nenhum.
+- **Medidas** (catálogo): as contagens de pedidos, recusas, erros e esperas somam; as pessoas distintas, a mediana e o p95
+  em ms e o pico por minuto não somam em corte nenhum. `esperas_qtd` (etapa 5) são os pedidos que esperaram a vez no porteiro
+  do Nexus (`casca/fracttal_conta.py`: 150 por minuto, 90 deles de fundo); é a última coluna das duas abas do Fracttal, e a
+  hora de antes do porteiro fica vazia.
 """
 from datetime import datetime, timedelta
 
@@ -47,9 +49,12 @@ TOTAL = "*"                                  # a origem e o método da linha de 
 
 CAB_USO = ["hora_id", "data_id", "hora", "rota", "automatico", "pedidos_qtd", "pessoas_qtd", "duracao_p50_ms",
            "duracao_p95_ms", "erros_qtd", "ocupado_qtd", "fracttal_qtd"]
+# `esperas_qtd` (31/10/2026, etapa 5: o porteiro do Fracttal) é a última coluna das duas abas do Fracttal, de propósito: o
+# livro que já existe ganha a coluna no fim, e a hora de antes do porteiro fica com a célula vazia (ninguém media)
 CAB_FRACTTAL = ["hora_id", "data_id", "hora", "origem", "metodo", "pedidos_qtd", "recusas_qtd", "erros_qtd",
-                "pico_minuto_qtd"]
-CAB_FRACTTAL_TOTAL = ["hora_id", "data_id", "hora", "pedidos_qtd", "recusas_qtd", "erros_qtd", "pico_minuto_qtd"]
+                "pico_minuto_qtd", "esperas_qtd"]
+CAB_FRACTTAL_TOTAL = ["hora_id", "data_id", "hora", "pedidos_qtd", "recusas_qtd", "erros_qtd", "pico_minuto_qtd",
+                      "esperas_qtd"]
 CABS = {ABA_USO: CAB_USO, ABA_FRACTTAL: CAB_FRACTTAL, ABA_TOTAL: CAB_FRACTTAL_TOTAL}
 CHAVE_USO = ("hora_id", "rota", "automatico")
 CHAVE_FRACTTAL = ("hora_id", "origem", "metodo")
@@ -65,24 +70,28 @@ GRAO_FRACTTAL = ("1 linha = 1 origem × 1 método × 1 hora de Brasília dos ped
 GRAO_TOTAL = ("1 linha = 1 hora de Brasília: o total dos pedidos do Nexus ao Fracttal, de todas as origens juntas, e o maior "
               "número de pedidos num único minuto da hora")
 # (coluna, unidade, soma) para o `catalogo.Medida`. Contagem de pedidos soma; pessoas distintas, o tempo e o pico por minuto não.
+# As esperas no porteiro são pedidos contados (os que esperaram a vez): somam como os pedidos.
 MEDIDAS_USO = (("pedidos_qtd", "qtd", "aditiva"), ("pessoas_qtd", "qtd", "nao"), ("duracao_p50_ms", "ms", "nao"),
                ("duracao_p95_ms", "ms", "nao"), ("erros_qtd", "qtd", "aditiva"), ("ocupado_qtd", "qtd", "aditiva"),
                ("fracttal_qtd", "qtd", "aditiva"))
 MEDIDAS_FRACTTAL = (("pedidos_qtd", "qtd", "aditiva"), ("recusas_qtd", "qtd", "aditiva"), ("erros_qtd", "qtd", "aditiva"),
-                    ("pico_minuto_qtd", "qtd", "nao"))
-MEDIDAS_TOTAL = MEDIDAS_FRACTTAL                  # as mesmas quatro: o total soma como o detalhe, e o pico não soma
+                    ("pico_minuto_qtd", "qtd", "nao"), ("esperas_qtd", "qtd", "aditiva"))
+MEDIDAS_TOTAL = MEDIDAS_FRACTTAL                  # as mesmas cinco: o total soma como o detalhe, e o pico não soma
 JANELA_ORIGEM = ("o Nexus é a fonte (a memória do servidor, guardada no disco de hora em hora e levada ao banco uma vez "
                  "por dia, às 03:45 de Brasília)")
 
 # Cada coluna depois do tempo: "t" texto da chave, "b" 1 ou 0, "n" número inteiro de 0 para cima, "n?" o mesmo ou vazio
-# (o balde só de pedidos que o teto recusou não tem duração: célula vazia, nunca 0).
+# (o balde só de pedidos que o teto recusou não tem duração: célula vazia, nunca 0). As esperas são "n?": a linha que o
+# contador de antes do porteiro guardou no pendente em disco não tem a coluna, e vai ao banco com a célula vazia (ninguém
+# media), em vez de ser jogada fora como linha ruim ou de ganhar um 0 inventado.
 _ESQUEMA = {ABA_USO: (("rota", "t"), ("automatico", "b"), ("pedidos_qtd", "n"), ("pessoas_qtd", "n"),
                       ("duracao_p50_ms", "n?"), ("duracao_p95_ms", "n?"), ("erros_qtd", "n"), ("ocupado_qtd", "n"),
                       ("fracttal_qtd", "n")),
             ABA_FRACTTAL: (("origem", "t"), ("metodo", "t"), ("pedidos_qtd", "n"), ("recusas_qtd", "n"),
-                           ("erros_qtd", "n"), ("pico_minuto_qtd", "n")),
-            ABA_TOTAL: (("pedidos_qtd", "n"), ("recusas_qtd", "n"), ("erros_qtd", "n"), ("pico_minuto_qtd", "n"))}
-_MEDIDAS_DO_TOTAL = ("pedidos_qtd", "recusas_qtd", "erros_qtd", "pico_minuto_qtd")
+                           ("erros_qtd", "n"), ("pico_minuto_qtd", "n"), ("esperas_qtd", "n?")),
+            ABA_TOTAL: (("pedidos_qtd", "n"), ("recusas_qtd", "n"), ("erros_qtd", "n"), ("pico_minuto_qtd", "n"),
+                        ("esperas_qtd", "n?"))}
+_MEDIDAS_DO_TOTAL = ("pedidos_qtd", "recusas_qtd", "erros_qtd", "pico_minuto_qtd", "esperas_qtd")
 
 
 class LeituraIncompleta(RuntimeError):
@@ -186,13 +195,14 @@ def valida(d, aba: str) -> bool:
 
 def separar_total(linhas) -> tuple:
     """`(o detalhe, os totais)` das linhas do contador do Fracttal. A linha de origem `*` e método `*` é o TOTAL da hora e vira
-    uma linha de 1 por hora (`hora_id` e as quatro medidas); as outras são o detalhe, como vieram. Um `*` só na origem ou só
-    no método é defeito de quem chama (ValueError): somaria o que não é total."""
+    uma linha de 1 por hora (`hora_id` e as medidas que ela traz); as outras são o detalhe, como vieram. Um `*` só na origem
+    ou só no método é defeito de quem chama (ValueError): somaria o que não é total. A medida que a linha não traz fica de
+    fora (a do pendente de antes do porteiro não tem `esperas_qtd`); quem grava a confere (`_linha`)."""
     detalhe, totais = [], []
     for d in linhas or ():
         origem, metodo = _txt(d.get("origem")), _txt(d.get("metodo"))
         if origem == TOTAL and metodo == TOTAL:
-            totais.append({c: d.get(c) for c in ("hora_id",) + _MEDIDAS_DO_TOTAL})
+            totais.append({c: d[c] for c in ("hora_id",) + _MEDIDAS_DO_TOTAL if c in d})
         elif TOTAL in (origem, metodo):
             raise ValueError(f"linha do Fracttal com {TOTAL} só na origem ou só no método: {origem!r} e {metodo!r}")
         else:

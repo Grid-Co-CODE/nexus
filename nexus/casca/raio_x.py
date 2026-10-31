@@ -573,7 +573,9 @@ def montar_uso_os(hora_id_agora: str, banco: dict | None, vivo: dict) -> dict:
     minuto): a que o contador entrega como `*` o `fato_uso_os.separar_total` já separou. Janela: os `DIAS_USO` dias de Brasília
     que terminam no de `hora_id_agora`. Na mesma chave (hora × rota × automático, ou a hora do total) vale o mais novo: o
     pendente e a memória vencem o banco, e a linha que está nos dois não conta duas vezes. Devolve `tem` (há alguma linha na
-    janela), a `cota`, o `resumo`, os `dias`, as 24 `horas`, as `rotas` mais pedidas e os `setores`.
+    janela), a `cota`, o `teto` e o `teto_fundo` do porteiro, o `resumo`, os `dias`, as 24 `horas`, as `rotas` mais pedidas e
+    os `setores`. As esperas no porteiro (etapa 5) vêm do mesmo total da hora (`esperas_qtd`); a hora de antes dele, com a
+    célula vazia, conta 0 (ninguém esperava).
 
     Cliques e automáticos nunca se misturam (o `/os/_nexus/sessao` de cada aba aberta seria a "tela mais clicada"). O total
     do Fracttal e o pico por minuto vêm só do total da hora (o detalhe por origem não entra: repetiria a conta). A mediana e
@@ -595,8 +597,9 @@ def montar_uso_os(hora_id_agora: str, banco: dict | None, vivo: dict) -> dict:
             h = _hora10(r.get("hora_id"))
             if h >= corte and h[:8] in ids:
                 total[h] = r
-    por_dia = {i: {"cliques": 0, "automaticos": 0, "fracttal": 0, "recusas": 0, "pico": 0, "pico_hora": None} for i in ids}
-    por_hora = {h: {"cliques": 0, "automaticos": 0, "fracttal": 0, "pico": 0} for h in range(24)}
+    por_dia = {i: {"cliques": 0, "automaticos": 0, "fracttal": 0, "recusas": 0, "esperas": 0, "pico": 0, "pico_hora": None}
+               for i in ids}
+    por_hora = {h: {"cliques": 0, "automaticos": 0, "fracttal": 0, "esperas": 0, "pico": 0} for h in range(24)}
     por_rota = {}
     for (h, rota, auto), r in uso.items():
         pedidos, ocupado = _n(r.get("pedidos_qtd")), _n(r.get("ocupado_qtd"))
@@ -614,14 +617,16 @@ def montar_uso_os(hora_id_agora: str, banco: dict | None, vivo: dict) -> dict:
             if r.get(campo) is not None:
                 p[chave].append((_n(r.get(campo)), atendidos))
     for h, r in total.items():
-        pedidos, pico = _n(r.get("pedidos_qtd")), _n(r.get("pico_minuto_qtd"))
+        pedidos, pico, esperas = _n(r.get("pedidos_qtd")), _n(r.get("pico_minuto_qtd")), _n(r.get("esperas_qtd"))
         d = por_dia[h[:8]]
         d["fracttal"] += pedidos
         d["recusas"] += _n(r.get("recusas_qtd"))
+        d["esperas"] += esperas
         if pico > d["pico"]:
             d["pico"], d["pico_hora"] = pico, int(h[8:])
         hh = por_hora[int(h[8:])]
         hh["fracttal"] += pedidos
+        hh["esperas"] += esperas
         hh["pico"] = max(hh["pico"], pico)
 
     escala = max((v["cliques"] for v in por_hora.values()), default=0) or 1
@@ -660,9 +665,11 @@ def montar_uso_os(hora_id_agora: str, banco: dict | None, vivo: dict) -> dict:
     pior = max(dias, key=lambda d: (d["pico"], d["dia"]))
     resumo = {"cliques": sum(d["cliques"] for d in dias), "automaticos": sum(d["automaticos"] for d in dias),
               "fracttal": sum(d["fracttal"] for d in dias), "recusas": sum(d["recusas"] for d in dias),
+              "esperas": sum(d["esperas"] for d in dias),
               "pico": pior["pico"], "pico_dia": pior["dia"], "pico_hora": pior["pico_hora"]}
-    return {"tem": bool(uso or total), "cota": cota, "resumo": resumo, "dias": dias, "horas": horas, "rotas": rotas,
-            "setores": setores}
+    return {"tem": bool(uso or total), "cota": cota, "teto": fracttal_conta.TETO_POR_MINUTO,
+            "teto_fundo": fracttal_conta.TETO_FUNDO_POR_MINUTO, "resumo": resumo, "dias": dias, "horas": horas,
+            "rotas": rotas, "setores": setores}
 
 
 def _de_onde_vem(lido: dict, espera: dict, tem: bool) -> dict:

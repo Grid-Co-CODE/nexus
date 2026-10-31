@@ -20,7 +20,7 @@ from sessao_real_sem_rede import AdaptadorFalso, sessao_real
 _API = "https://app.fracttal.com/api/work_orders?limit=100"
 _RPC = "https://app.fracttal.com/rpc/proxy"
 _HORA_10 = "2026103010"                 # 13:00Z de 30/10/2026 = 10:00 em Brasília (UTC-3, sem horário de verão)
-_COLUNAS = {"hora_id", "origem", "metodo", "pedidos_qtd", "recusas_qtd", "erros_qtd", "pico_minuto_qtd"}
+_COLUNAS = {"hora_id", "origem", "metodo", "pedidos_qtd", "recusas_qtd", "erros_qtd", "pico_minuto_qtd", "esperas_qtd"}
 
 
 def _epoca(utc: str) -> float:
@@ -493,7 +493,10 @@ def test_redirecionamento_conta_cada_salto_uma_vez(relogio):
     assert _contas("*", "*")[:3] == (2, 1, 0)
 
 
-def test_threads_juntas_nao_perdem_pedido(relogio):
+def test_threads_juntas_nao_perdem_pedido(relogio, monkeypatch):
+    # 400 cliques no mesmo minuto (o relógio está parado): o porteiro seguraria cada um depois do 150º por 2 s DE VERDADE
+    # (100 s de teste). Aqui a prova é a conta com threads juntas; a do porteiro mora em tests/test_casca_porteiro.py
+    monkeypatch.setattr(C, "TETO_POR_MINUTO", 10_000)
     threads, por_thread = 8, 50
     largada = threading.Barrier(threads)
     contaram = []

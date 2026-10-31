@@ -410,6 +410,35 @@ def test_a_hora_que_espera_as_3h45_aparece_na_secao_com_o_total_dela(app, logado
     assert "1 hora(s)" in modelo["banco_txt"] and "03:45" in modelo["banco_txt"]
 
 
+def test_esperas_no_porteiro_por_dia_e_por_hora():
+    """O porteiro do Fracttal (etapa 5, `casca/fracttal_conta.py`) conta os pedidos que esperaram a vez: a seção os mostra ao
+    lado dos pedidos ao Fracttal, por dia, por hora do dia e no resumo, tirados do mesmo total da hora (o banco, o pendente e
+    a memória; na mesma hora vale o mais novo). A hora de antes do porteiro, com a célula vazia no banco, conta 0: ninguém
+    esperava."""
+    banco_dados = {"uso": [], "total": [_total("2026102914", pedidos_qtd=900, esperas_qtd=7),
+                                        _total("2026102810", pedidos_qtd=150)]}               # 28/10: antes do porteiro
+    vivo_dados = {"uso": [], "setor": {}, "total": [_total("2026103011", pedidos_qtd=50, esperas_qtd=3),
+                                                    _total("2026102914", pedidos_qtd=905, esperas_qtd=8)]}
+    m = _modelo(banco_dados, vivo_dados)
+    d28, d29, d30 = m["dias"][4], m["dias"][5], m["dias"][6]
+    assert (d28["esperas"], d29["esperas"], d30["esperas"]) == (0, 8, 3)        # o pendente vence o banco: 8, não 15
+    horas = {h["hora"]: h for h in m["horas"]}
+    assert (horas[14]["esperas"], horas[11]["esperas"], horas[10]["esperas"]) == (8, 3, 0)
+    assert m["resumo"]["esperas"] == 11
+    assert (m["teto"], m["teto_fundo"]) == (C.TETO_POR_MINUTO, C.TETO_FUNDO_POR_MINUTO) == (150, 90)
+
+
+def test_secao_mostra_as_esperas_do_porteiro(app, logado, banco, monkeypatch):
+    monkeypatch.setattr(U, "instantaneo", lambda: {"linhas": USO_VIVO, "setor": SETOR})
+    monkeypatch.setattr(C, "instantaneo", lambda: FRACTTAL_VIVO)
+    txt = _texto(_secao(logado.get("/t/base/raio-x").get_data(as_text=True)))
+    assert txt.count("Esperaram a vez") == 2                                    # a coluna, por dia e por hora do dia
+    assert "esperaram a vez no porteiro" not in txt                             # sem espera nenhuma, o resumo não fala nela
+    monkeypatch.setattr(C, "instantaneo", lambda: [_fra("2026103011", pedidos_qtd=50, pico_minuto_qtd=30, esperas_qtd=12)])
+    txt = _texto(_secao(logado.get("/t/base/raio-x").get_data(as_text=True)))
+    assert "12 esperaram a vez no porteiro do Nexus (até 150 por minuto, 90 deles de fundo)" in txt
+
+
 def test_a_gravacao_das_3h45_faz_a_pagina_ler_o_banco_de_novo(app, logado, banco, vivo, monkeypatch):
     """O que sai do pendente na gravação já está no banco, mas a cópia de 10 min é de antes dela: sem ler de novo, o dia de
     ontem sumiria da seção por até 10 min. A leitura que começou antes da gravação é velha, mesmo dentro dos 10 min."""

@@ -93,25 +93,25 @@
   <p class="cad-pe"><strong>Sem medição ainda.</strong> {{ uso.motivo }}</p>
   {% else %}
   <p class="cad-pe">{{ uso.banco_txt }}</p>
-  <p class="cad-pe">Em 7 dias: {{ n(uso.resumo.cliques) }} cliques e {{ n(uso.resumo.automaticos) }} pedidos das telas sozinhas; {{ n(uso.resumo.fracttal) }} pedidos ao Fracttal{% if uso.resumo.recusas %}, {{ n(uso.resumo.recusas) }} recusados por excesso (406/429){% endif %}; o maior pico foi de <strong{% if uso.resumo.pico >= uso.cota %} class="rx-tom--critico"{% elif uso.resumo.pico >= 0.8 * uso.cota %} class="rx-tom--alerta"{% endif %}>{{ uso.resumo.pico }} por minuto</strong>{% if uso.resumo.pico %} (dia {{ uso.resumo.pico_dia }}{% if uso.resumo.pico_hora is not none %}, às {{ "%02d"|format(uso.resumo.pico_hora) }}h{% endif %}){% endif %}, contra a cota de {{ uso.cota }} por minuto para a empresa toda (o OS Creator, o App de Campo e os robôs do Nexus).</p>
+  <p class="cad-pe">Em 7 dias: {{ n(uso.resumo.cliques) }} cliques e {{ n(uso.resumo.automaticos) }} pedidos das telas sozinhas; {{ n(uso.resumo.fracttal) }} pedidos ao Fracttal{% if uso.resumo.recusas %}, {{ n(uso.resumo.recusas) }} recusados por excesso (406/429){% endif %}{% if uso.resumo.esperas %}, {{ n(uso.resumo.esperas) }} esperaram a vez no porteiro do Nexus (até {{ uso.teto }} por minuto, {{ uso.teto_fundo }} deles de fundo){% endif %}; o maior pico foi de <strong{% if uso.resumo.pico >= uso.cota %} class="rx-tom--critico"{% elif uso.resumo.pico >= 0.8 * uso.cota %} class="rx-tom--alerta"{% endif %}>{{ uso.resumo.pico }} por minuto</strong>{% if uso.resumo.pico %} (dia {{ uso.resumo.pico_dia }}{% if uso.resumo.pico_hora is not none %}, às {{ "%02d"|format(uso.resumo.pico_hora) }}h{% endif %}){% endif %}, contra a cota de {{ uso.cota }} por minuto para a empresa toda (o OS Creator, o App de Campo e os robôs do Nexus).</p>
 
   <h3 class="rx-sub">Por dia</h3>
   <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
-    <thead><tr><th>Dia</th><th>Cliques</th><th>Automáticos</th><th>Pedidos ao Fracttal</th><th>Recusados (406/429)</th><th>Maior pico por minuto</th></tr></thead>
+    <thead><tr><th>Dia</th><th>Cliques</th><th>Automáticos</th><th>Pedidos ao Fracttal</th><th>Recusados (406/429)</th><th>Esperaram a vez (porteiro)</th><th>Maior pico por minuto</th></tr></thead>
     <tbody>{% for d in uso.dias %}
       <tr><td class="gc-num rx-nowrap">{{ d.semana }} {{ d.dia }}{% if d.hoje %} <span class="mudo">(hoje, até agora)</span>{% endif %}</td>
-        <td class="num">{{ n(d.cliques) }}</td><td class="num">{{ n(d.automaticos) }}</td><td class="num">{{ n(d.fracttal) }}</td><td class="num">{{ n(d.recusas) }}</td>
+        <td class="num">{{ n(d.cliques) }}</td><td class="num">{{ n(d.automaticos) }}</td><td class="num">{{ n(d.fracttal) }}</td><td class="num">{{ n(d.recusas) }}</td><td class="num">{{ n(d.esperas) }}</td>
         <td class="num">{% if d.pico %}<span{% if d.tom %} class="rx-tom--{{ d.tom }}"{% endif %}>{{ d.pico }} de {{ uso.cota }}{% if d.pico_hora is not none %} às {{ "%02d"|format(d.pico_hora) }}h{% endif %}{% if d.situacao %}, {{ d.situacao }}{% endif %}</span>{% else %}—{% endif %}</td></tr>
     {% endfor %}</tbody>
   </table></div>
 
   <h3 class="rx-sub">Por hora do dia (a soma dos 7 dias, hora de Brasília)</h3>
   <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela rx-horas">
-    <thead><tr><th>Hora</th><th>Cliques</th><th>Automáticos</th><th>Pedidos ao Fracttal</th><th>Maior pico por minuto (cota {{ uso.cota }})</th></tr></thead>
+    <thead><tr><th>Hora</th><th>Cliques</th><th>Automáticos</th><th>Pedidos ao Fracttal</th><th>Esperaram a vez</th><th>Maior pico por minuto (cota {{ uso.cota }})</th></tr></thead>
     <tbody>{% for h in uso.horas %}
       <tr><td class="gc-num rx-nowrap">{{ h.rotulo }}</td>
         <td class="rx-c"><span class="rx-barra" aria-hidden="true"><i style="width:{{ h.pct_cliques }}%"></i></span><span class="rx-n">{{ n(h.cliques) }}</span></td>
-        <td class="num">{{ n(h.automaticos) }}</td><td class="num">{{ n(h.fracttal) }}</td>
+        <td class="num">{{ n(h.automaticos) }}</td><td class="num">{{ n(h.fracttal) }}</td><td class="num">{{ n(h.esperas) }}</td>
         <td class="rx-c"><span class="rx-barra rx-barra--cota{% if h.tom %} rx-barra--{{ h.tom }}{% endif %}" aria-hidden="true"><i style="width:{{ h.pct_cota }}%"></i></span><span class="rx-n{% if h.tom %} rx-tom--{{ h.tom }}{% endif %}">{{ h.pico }}</span>{% if h.situacao %} <span class="{{ 'rx-tom--' ~ h.tom }}">{{ h.situacao }}</span>{% endif %}</td></tr>
     {% endfor %}</tbody>
   </table></div>

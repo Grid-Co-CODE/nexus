@@ -105,7 +105,7 @@ def _uso(hora_id, rota="/os/historico", automatico=0, **kw):
 
 def _fra(hora_id, origem="/os/historico", metodo="work_orders", **kw):
     d = {"hora_id": hora_id, "origem": origem, "metodo": metodo, "pedidos_qtd": 4, "recusas_qtd": 0, "erros_qtd": 0,
-         "pico_minuto_qtd": 2}
+         "pico_minuto_qtd": 2, "esperas_qtd": 0}
     d.update(kw)
     return d
 
@@ -180,7 +180,8 @@ def test_total_fora_da_forma_e_erro_de_quem_chama_e_nada_se_grava(api, ruim):
 def test_separar_total_tira_a_linha_asterisco_do_detalhe():
     detalhe, totais = F.separar_total([_total(H10, pedidos_qtd=9, pico_minuto_qtd=5), _fra(H10), _fra(H10, "x", "y")])
     assert [(d["origem"], d["metodo"]) for d in detalhe] == [("/os/historico", "work_orders"), ("x", "y")]
-    assert totais == [{"hora_id": H10, "pedidos_qtd": 9, "recusas_qtd": 0, "erros_qtd": 0, "pico_minuto_qtd": 5}]
+    assert totais == [{"hora_id": H10, "pedidos_qtd": 9, "recusas_qtd": 0, "erros_qtd": 0, "pico_minuto_qtd": 5,
+                       "esperas_qtd": 0}]
     assert F.separar_total([]) == ([], []) and F.separar_total(None) == ([], [])
 
 
@@ -211,6 +212,42 @@ def test_so_o_total_tambem_grava(api):
     """A hora em que só houve a linha de total (sem detalhe) e o livro que ainda não tem a aba do detalhe."""
     _gravar(api, [], [_total(H10)])
     assert len(api.linhas(LIVRO_OUT, ABA_TOT)) == 1 and api.linhas(LIVRO_OUT, ABA_FRA) == []
+
+
+# ── as esperas no porteiro (etapa 5): a coluna no fim das duas abas do Fracttal ───────────────────────────────────────
+def test_esperas_do_porteiro_vao_as_duas_abas_e_a_hora_de_antes_fica_vazia(api):
+    """O porteiro do Fracttal (`casca/fracttal_conta.py`, etapa 5) conta, por linha, os pedidos que esperaram a vez: vão ao
+    detalhe e ao total da hora como `esperas_qtd`, a última coluna. A linha que o contador de antes do porteiro deixou no
+    pendente em disco não tem a coluna: vale (não é a linha ruim que o pendente joga fora) e vai com a célula vazia, nunca
+    com um 0 inventado."""
+    def sem_esperas(d):
+        return {k: v for k, v in d.items() if k != "esperas_qtd"}
+    velha, velho_total = sem_esperas(_fra(H11, "/os/os/<n>", "get_assets")), sem_esperas(_total(H11, pedidos_qtd=4))
+    assert F.valida(velha, ABA_FRA) and F.valida(velho_total, ABA_FRA)
+    _gravar(api, [], [_total(H10, pedidos_qtd=9, esperas_qtd=3), _fra(H10, "/os/os/<n>", "get_assets", esperas_qtd=2),
+                      _fra(H10, "fundo:nexus-os-leitor:noite", "work_orders", esperas_qtd=1), velho_total, velha])
+    assert list(api.linhas(LIVRO_OUT, ABA_FRA)[0])[-1] == "esperas_qtd"            # a coluna nova é a última das duas
+    assert list(api.linhas(LIVRO_OUT, ABA_TOT)[0])[-1] == "esperas_qtd"
+
+    def lidas():
+        detalhe = {(_int(l["hora_id"]), l["origem"]): l["esperas_qtd"] for l in api.linhas(LIVRO_OUT, ABA_FRA)}
+        total = {_int(l["hora_id"]): l["esperas_qtd"] for l in api.linhas(LIVRO_OUT, ABA_TOT)}
+        return detalhe, total
+    detalhe, total = lidas()
+    assert _int(detalhe[(2026103010, "/os/os/<n>")]) == 2 and _int(detalhe[(2026103010, "fundo:nexus-os-leitor:noite")]) == 1
+    assert _int(total[2026103010]) == 3
+    assert detalhe[(2026103011, "/os/os/<n>")] is None and total[2026103011] is None      # antes do porteiro: vazia
+    _gravar(api, [_uso(H12)], [])                     # a gravação seguinte relê o mês: o vazio não vira 0, o 3 fica 3
+    assert lidas() == (detalhe, total)
+
+
+@pytest.mark.parametrize("ruim", [{"esperas_qtd": -1}, {"esperas_qtd": "2"}, {"esperas_qtd": 1.5}])
+def test_esperas_fora_da_forma_e_erro_de_quem_chama(api, ruim):
+    with pytest.raises(ValueError):
+        _gravar(api, [], [_total(H10), dict(_fra(H10), **ruim)])
+    with pytest.raises(ValueError):
+        _gravar(api, [], [dict(_total(H11), **ruim)])
+    assert not api.workbooks and api.syncs == 0
 
 
 # ── gravar, regravar e o mês ─────────────────────────────────────────────────────────────────────────────────────────
@@ -387,9 +424,9 @@ def test_nada_pessoal_nas_colunas(api):
     assert F.CAB_USO == ["hora_id", "data_id", "hora", "rota", "automatico", "pedidos_qtd", "pessoas_qtd",
                          "duracao_p50_ms", "duracao_p95_ms", "erros_qtd", "ocupado_qtd", "fracttal_qtd"]
     assert F.CAB_FRACTTAL == ["hora_id", "data_id", "hora", "origem", "metodo", "pedidos_qtd", "recusas_qtd", "erros_qtd",
-                              "pico_minuto_qtd"]
+                              "pico_minuto_qtd", "esperas_qtd"]
     assert F.CAB_FRACTTAL_TOTAL == ["hora_id", "data_id", "hora", "pedidos_qtd", "recusas_qtd", "erros_qtd",
-                                    "pico_minuto_qtd"]
+                                    "pico_minuto_qtd", "esperas_qtd"]
     # a coluna que o lote traz a mais (um setor, uma pessoa) não vai ao banco: o livro só tem as colunas do contrato
     _gravar(api, [dict(_uso(H10), setor="Setor Fictício", pessoa="alguem@exemplo.invalid")],
             [dict(_fra(H10), quem="x"), dict(_total(H10), quem="y")])
@@ -439,6 +476,9 @@ def test_catalogo_registra_o_livro_e_os_fatos():
         fra = {m.coluna: m for m in catalogo.POR_ID[fid].medidas}
         assert fra["pedidos_qtd"].soma == fra["recusas_qtd"].soma == fra["erros_qtd"].soma == "aditiva", fid
         assert fra["pico_minuto_qtd"].soma == "nao", fid
+        # as esperas no porteiro (etapa 5) são pedidos contados: somam, e o catálogo diz o que são
+        assert fra["esperas_qtd"].soma == "aditiva" and fra["esperas_qtd"].unidade == "qtd", fid
+        assert "porteiro" in catalogo.POR_ID[fid].observacao, fid
     # Ruling N: o total não mora no detalhe. O grão do detalhe não o cita, e o do total é 1 linha por hora
     assert "origem * e método *" not in catalogo.POR_ID["fracttal_hora"].grao
     assert catalogo.POR_ID["fracttal_total_hora"].grao.startswith("1 linha = 1 hora")
