@@ -733,12 +733,13 @@ def receber(linhas_rest, faixa: str, *, desde=None, lido_em: float | None = None
            "os": len(novos), "entraram": 0, "mudaram": 0, "a_conferir": 0, "sairam": 0, "fora": 0}
     # o que mudou depois do começo da leitura não é julgado por ela (ver o topo): a OS que a ação mexeu, e a criada no meio
     limite_s = int(inicio) - _EPOCA0 - MARGEM_RELOGIO_S
-    for wid in [w for w, quando in _TOCADAS.items() if agora - quando > TOCADAS_GUARDA_S]:
-        _TOCADAS.pop(wid, None)
 
     def mexida_depois(wid) -> bool:
         return _TOCADAS.get(wid, 0.0) >= inicio
     with _TRAVA:
+        # os dicionários que outras threads mexem são percorridos só dentro da trava, ou pela cópia (`list`, de uma vez só)
+        for wid in [w for w, quando in list(_TOCADAS.items()) if agora - quando > TOCADAS_GUARDA_S]:
+            _TOCADAS.pop(wid, None)
         base = _ATUAL if _ATUAL is not None else _vazia()
         conferir = set(base.a_conferir)
         pendentes = _ESTADO["pendentes"]
@@ -1065,10 +1066,12 @@ def _gravar_agora() -> bool:
         lista = _ATUAL
         if lista is None or _ESTADO["disco"].get("versao") == lista.versao:
             return False
+        # as cópias de uma vez só (`list`, `dict`): a faixa e a ação mexem nesses dicionários em outras threads
         cab = {"formato": FORMATO, "versao": lista.versao, "lido_em": lista.lido_em, "janela": list(lista.janela),
-               "a_conferir": sorted(lista.a_conferir), "pendentes": {str(k): v for k, v in _ESTADO["pendentes"].items()},
-               "faixas": _ESTADO["faixas"], "n": len(lista.ordem), "gravado_em": time.time(),
-               "campos": list(RegistroOS._fields)}
+               "a_conferir": sorted(lista.a_conferir),
+               "pendentes": {str(k): v for k, v in list(_ESTADO["pendentes"].items())},
+               "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())}, "n": len(lista.ordem),
+               "gravado_em": time.time(), "campos": list(RegistroOS._fields)}
 
         def escrever(tmp):
             with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=5, newline="\n") as f:
@@ -1169,8 +1172,9 @@ def _hora(ts) -> str:
 def memoria_estimada(lista: Lista | None = None) -> float:
     """Os MB da lista: cada registro, texto e tupla contados UMA vez (os índices guardam os mesmos registros, e os textos que se
     repetem são um objeto só), mais o esqueleto dos índices. A amostra do "Dentro do Nexus" contaria os mesmos registros em
-    cada índice e os textos repetidos em cada registro (o dobro, ou mais). Percorre a lista inteira: ~0,1 s com 36 mil OS; só o
-    Raio-X chama. Fica abaixo do tracemalloc (o cabeçalho de cada objeto do coletor não entra)."""
+    cada índice e os textos repetidos em cada registro (o dobro, ou mais). Percorre a lista inteira: ~0,4 s com 36 mil OS; só o
+    Raio-X chama. Perto do tracemalloc (medido com 36 mil OS sintéticas: 25,8 MB aqui, 23,9 MB nele; os índices copiados para
+    medir saem um pouco maiores que os de verdade)."""
     lista = atual() if lista is None else lista
     vistos: set = set()
     total = 0
@@ -1212,12 +1216,12 @@ def estado(medir_memoria: bool = False) -> dict:
             memoria = memoria_estimada(lista)
         except Exception:                                            # noqa: BLE001 — a medida nunca derruba o estado
             memoria = None
-    pend = _ESTADO["pendentes"]
+    pend = dict(_ESTADO["pendentes"])
     return {"n": len(lista.por_id),
             "abertas": sum(1 for r in lista.ordem if r.status_id in ABERTOS and r.id not in lista.a_conferir),
             "a_conferir": len(lista.a_conferir), "a_conferir_ids": sorted(lista.a_conferir)[:20],
             "pendentes": len(pend), "pendentes_ids": sorted(pend)[:20], "versao": lista.versao,
             "lido_em": lista.lido_em or None, "janela": lista.janela,
-            "faixas": {k: dict(v) for k, v in _ESTADO["faixas"].items()},
+            "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())},
             "campos": dict(_ESTADO["campos"]) if _ESTADO["campos"] else None, "disco": dict(_ESTADO["disco"]),
             "memoria_mb": memoria, "leitor": leitor}

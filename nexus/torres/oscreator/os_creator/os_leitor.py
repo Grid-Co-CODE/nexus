@@ -365,7 +365,7 @@ def estado() -> dict:
     cada faixa (pedidos, OS, o resultado e o erro), quando chegaram as abertas por último (do `tarefas_os` e daqui) e se há uma
     leitura em curso. Só contagens, datas e motivos."""
     return {"ligado": _ESTADO["ligado"], "motivo": _ESTADO["motivo"], "credencial": _ESTADO["credencial"],
-            "faixas": {k: dict(v) for k, v in _ESTADO["faixas"].items()}, "entregas": dict(_ESTADO["entregas"]),
+            "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())}, "entregas": dict(_ESTADO["entregas"]),
             "lendo": _TRAVA.locked()}
 
 

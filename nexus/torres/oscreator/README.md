@@ -1629,8 +1629,10 @@ num lugar só, que os ativos também usam): o horário que cai num deles anda pa
 - **Pedidos** (medidos pelas funções de verdade, num Fracttal de mentira com ~67 OS por dia, 2,1 tarefas por OS, um ano e ~3.150
   abertas): as novas 1 ou 2; os 7 dias ~12; as finalizadas 1 a 3 por hora; a noite de 90 dias ~126, a da janela inteira ~507;
   as abertas, 0 (entregues), ou ~68 quando o leitor as lê. **Por hora:** em dia útil das 06h às 20h, ~75 a 95 (15 novas, 5 vezes
-  os 7 dias, as finalizadas), e ~68 a mais na hora em que as abertas não chegam; fora disso ~5 a 10 (às 03h, mais a noite). O
-  pico por minuto é o da leitura dos 7 dias: ~12 pedidos em ~12 s (1 por segundo), longe da cota de 200 por minuto da empresa.
+  os 7 dias, as finalizadas); no fim de semana das 06h às 20h, ~65 a 70 (as novas de 15 em 15 min); das 20h às 06h, ~5 a 10
+  (às 03h, mais a noite); e ~68 a mais na hora em que as abertas não chegam do `tarefas_os`. **O pico por minuto** é 60 (1 por
+  segundo) nas leituras longas, a noite (03:21) e as abertas lidas aqui (:55), como a volta do próprio `tarefas_os`; de dia,
+  a dos 7 dias faz ~12 em ~12 s. A cota é de 200 por minuto para a empresa toda.
 - **Onde se vê** (o Levi não tem acesso ao servidor): Raio-X → seção "Uso do OS Creator" → o bloco do canto central, peça
   **"Lista central de OS"**: quantas OS e quantas abertas, a janela lida inteira, a última entrega de cada faixa (e quem entregou
   as abertas), as falhas, os campos que o REST trouxe, o disco e a memória (`raio_x._linhas_da_lista_de_os`).

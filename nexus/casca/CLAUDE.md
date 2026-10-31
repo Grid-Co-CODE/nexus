@@ -456,7 +456,7 @@ em disco; e **"Lista central de OS"** (3.2, `os_central.estado(medir_memoria=Tru
 conferir" e as pendentes, a janela lida inteira, se o leitor está ligado, a última entrega de cada faixa (com quem entregou as
 abertas: o `tarefas_os` ou o próprio leitor) e a última leitura dela (os pedidos, ou a falha com o motivo), os campos que o
 REST trouxe (a sondagem da 1ª noite), a cópia em disco e a memória (`os_central.memoria_estimada`: cada registro e texto
-contados uma vez; ~0,1 s com 36 mil OS, só ao abrir o Raio-X). Só contagens, datas, ids e motivos: nunca o texto de um ativo ou
+contados uma vez; ~0,4 s com 36 mil OS, só ao abrir o Raio-X; 25,8 MB contra os 23,9 MB do tracemalloc). Só contagens, datas, ids e motivos: nunca o texto de um ativo ou
 de uma OS, nem nome de pessoa. **O Raio-X não
 importa o OS Creator:** lê o módulo de `sys.modules` (no PC, sem ninguém ter aberto o OS Creator, ele nem está na memória, e
 a peça diz isso), e a peça que quebrar vai ao log e diz que não montou, nunca derruba a página. Prova:
