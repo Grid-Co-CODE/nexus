@@ -153,6 +153,9 @@ def test_o_bloco_da_lista_de_os_com_um_estado_inventado(app, logado):
     # a leitura que a lista recusou (a trava de encolhimento, rodada 1): a faixa e o motivo, só com contagens
     OC._ESTADO["recusas"]["noite"] = {"faixa": "noite", "em": agora - 30, "de": 250, "sairiam": 150, "limite": 12,
                                       "motivo": "a noite encolheria a lista: tiraria 150 das 250 OS que ela cobre"}
+    # e a que passou na 2ª leitura igual (o apagamento de verdade, rodada 2)
+    OC._ESTADO["confirmadas"]["sete_dias"] = {"faixa": "sete_dias", "em": agora - 20, "de": 40, "sairam": 13,
+                                              "motivo": "aceita na 2ª leitura: os 7 dias marcaram 13 das 40 OS"}
     bloco = _bloco(_pagina(logado))
     txt = _texto(bloco)
     assert "Lista central de OS" in txt
@@ -162,6 +165,7 @@ def test_o_bloco_da_lista_de_os_com_um_estado_inventado(app, logado):
     assert "repetiu as anteriores" in txt and "FALHOU" in txt                              # a falha da faixa, com o motivo
     assert "4 pedidos" in txt and "disco" in txt.lower() and "memória" in txt.lower()
     assert "recusou" in txt and "tiraria 150 das 250 OS" in txt                            # a trava de encolhimento
+    assert "aceita na 2ª leitura" in txt and "marcaram 13 das 40 OS" in txt
     assert "Ativos centrais" in txt                                                        # as duas peças, no mesmo bloco
     # nada de texto de OS nem nome de pessoa
     assert "Descrição inventada" not in bloco and "Pessoa Fictícia Sete" not in bloco and "Item Inventado" not in bloco

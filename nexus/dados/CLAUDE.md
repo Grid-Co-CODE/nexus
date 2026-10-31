@@ -280,9 +280,13 @@ rodada 1 da revisão (Rulings AU e AV), duas coisas a mais, só para quem as ped
 `projetar` do `_paginas` (e das quatro funções) corta cada linha assim que a página chega (a lista guarda ~18 dos 67 campos:
 a noite de 365 dias não junta 83 mil linhas inteiras; o pico caiu de ~390 para ~150 MB), e o `ler_criadas` CONFERE A ORDEM
 (`ForaDeOrdem`, uma `LeituraIncompleta`): a 1ª página tem de chegar ao `topo_minimo` que quem chama dá (o REST que devolve da
-mais velha para a mais nova), e mais que 5 linhas, ou 1% das lidas, criadas mais de 1 h depois da anterior derrubam a leitura
-(a ordem qualquer inverte metade delas; a folga deixa passar a linha fora do lugar, como a ordem só aproximada das
-finalizadas, `coletor.py`). Com o `sort` ignorado, a noite da lista tiraria de vez as OS de 90 dias.
+mais velha para a mais nova; com o piso ou a página conhecida ele é obrigatório, ValueError antes de qualquer pedido), e mais
+linhas que o maior dos dois, 5 ou 1% das lidas, criadas mais de 1 h depois da anterior derrubam a leitura (a ordem qualquer
+inverte metade delas; a folga deixa passar a linha fora do lugar, como a ordem só aproximada das finalizadas, `coletor.py`).
+Com o `sort` ignorado, a noite da lista tiraria de vez as OS de 90 dias. E (rodada 2) a leitura sem o total no começo que
+acaba ANTES do que a faria parar, na página curta ou vazia, pede o total ali e confere (`_paginas(total_no_fim=True)`, que os
+7 dias e a noite da lista passam): o Fracttal já devolveu 0 registros calado (a rodada do robô do PCM de 26/10, acima), e na
+1ª carga o pedaço lido viraria os 365 dias inteiros. A página vazia é o fim, não "a página toda velha".
 **O radar da usina trocada (20/10/2026):** o programador do PCM viu a OS de "Apolo - Iramaia II - BA" como Ibipeba no
 App e no programador. Os ativos ficam na localização de Iramaia II, mas a Classificação 1 deles (a usina do robô do PCM,
 do App e do `Ligador` daqui, que liga primeiro por ela) dizia Ibipeba: 21 dos 29 ativos de Iramaia II com tarefa, na foto

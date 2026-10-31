@@ -72,12 +72,14 @@ class RestOS:
     tarefa), pagina pelo `start`/`limit`, dá o `total` do filtro e conta cada pedido. `falha_no`: o n-ésimo pedido vem com
     `success: false`; `recusa_no`: o n-ésimo levanta a recusa do Fracttal (406/429), sempre; `erro_no`: a conexão cai.
     `ordem` (Ruling AU): o REST que ignora o `sort` ("crescente": da mais velha para a mais nova; "embaralhada": numa ordem
-    qualquer, a mesma a cada pedido). `falha_folio`: o nº cuja leitura pela OS (`wo_folio`) derruba a conexão, sempre."""
+    qualquer, a mesma a cada pedido). `falha_folio`: o nº cuja leitura pela OS (`wo_folio`) derruba a conexão, sempre.
+    `corta_em` (rodada 2): o REST com um teto no `start`, que devolve as linhas só até a de índice `corta_em` e depois a
+    página curta ou vazia com `success: true` (o Fracttal já devolveu 0 registros calado); o total segue o de verdade."""
 
-    def __init__(self, linhas, falha_no=None, recusa_no=None, erro_no=None, ordem=None, falha_folio=None):
+    def __init__(self, linhas, falha_no=None, recusa_no=None, erro_no=None, ordem=None, falha_folio=None, corta_em=None):
         self.linhas, self.pedidos = list(linhas), []
         self.falha_no, self.recusa_no, self.erro_no = falha_no, recusa_no, erro_no
-        self.ordem, self.falha_folio = ordem, falha_folio
+        self.ordem, self.falha_folio, self.corta_em = ordem, falha_folio, corta_em
 
     def __call__(self, path):
         self.pedidos.append(path)
@@ -107,7 +109,8 @@ class RestOS:
                 rows = sorted(rows, key=lambda w: (str(w.get(campo) or ""), w["id_work_orders_tasks"]),
                               reverse=sentido == "desc" and self.ordem != "crescente")
         limite, inicio = int(q["limit"][0]), int(q.get("start", ["0"])[0])
-        pagina = rows[inicio:inicio + limite]
+        fim = inicio + limite if self.corta_em is None or limite == 1 else min(inicio + limite, self.corta_em)
+        pagina = rows[inicio:max(inicio, fim)]
         return {"success": True, "message": "", "total": len(rows), "data": pagina or None}
 
     def paginas(self):
@@ -492,22 +495,26 @@ def test_a_projecao_corta_cada_pagina(monkeypatch):
     def corta(w):
         eventos.append("corta")
         return OR.enxuta(w)
-    linhas = P.ler_criadas(ler, piso=_iso(30)[:19], com_total=False, projetar=corta)
+    linhas = P.ler_criadas(ler, piso=_iso(30)[:19], topo_minimo=_iso(3)[:19], com_total=False, projetar=corta)
     assert [e for i, e in enumerate(eventos) if i == 0 or e != eventos[i - 1]] == ["pedido", "corta"] * 3
     assert len(linhas) == 250 and all(set(w) <= permitidos for w in linhas)
     # sem a projeção (o fato do `tarefas_os`), a linha inteira, como sempre
-    assert all(set(w) == set(largas[0]) for w in P.ler_criadas(RestOS(largas), piso=_iso(30)[:19], com_total=False))
+    assert all(set(w) == set(largas[0])
+               for w in P.ler_criadas(RestOS(largas), piso=_iso(30)[:19], topo_minimo=_iso(3)[:19], com_total=False))
     # 2) no leitor: a noite, os 7 dias e as abertas chegam à lista cortados; a nota só fica com o bloco do chamado
     _lista_de(largas)
     recebidas = []
     real = OC.receber
     monkeypatch.setattr(OC, "receber", lambda linhas, *a, **k: recebidas.append(list(linhas)) or real(linhas, *a, **k))
     marcada = _larga(4000, criada=_iso(0.02), nota="Antes\n" + OR.MARCAS_DA_NOTA[1] + "\nMarca: Inventada")
-    rest = RestOS(largas + [marcada])
+    # 100 OS de 4 meses atrás: a noite de 90 dias chega ao piso, como em produção, e não pede o total (Ruling AU; rodada 2: a
+    # que acaba antes do piso pede, `test_a_leitura_que_acaba_antes_do_piso_nao_passa_calada`)
+    velhas = [_larga(8000 + k, criada=_iso(120 + k / 100)) for k in range(100)]
+    rest = RestOS(largas + [marcada] + velhas)
     rel = OL.ler_noite(ler=rest, inteira=False)
-    assert rel["erro"] == "" and rest.totais() == []                                  # a noite sem o total (Ruling AU)
+    assert rel["erro"] == "" and rest.totais() == []
     (noite,) = recebidas
-    assert len(noite) == 251 and all(set(w) <= permitidos for w in noite)
+    assert len(noite) == 351 and all(set(w) <= permitidos for w in noite)
     por_id = {w["id_work_order"]: w for w in noite}
     assert OR.MARCAS_DA_NOTA[1] in por_id[4000]["task_note"] and OR.MARCAS_DA_NOTA[1] in OC.atual().por_id[4000].note
     assert "task_note" not in por_id[1000] and "costs_total" not in por_id[1000] and "groups_1_description" not in por_id[1000]
@@ -623,3 +630,40 @@ def test_os_minutos_moram_na_lista_unica():
     # dois donos no mesmo minuto não passam: a lista acusa ao montar
     with pytest.raises(ValueError, match="já é de"):
         MO._ocupar(dict(MO.OCUPADOS), (MO.OS_FINALIZADAS,), "outro laço")
+
+
+# ── rodada 2 da revisão: a leitura que acaba antes do piso ──────────────────────────────────────────────────────────────
+def test_a_leitura_que_acaba_antes_do_piso_nao_passa_calada():
+    """Sem o total no começo (o do `work_orders` sem filtro é o de todas as OS), a leitura pela criação que acabava ANTES do
+    piso (a página vazia com `success: true`, ou a curta, de um REST com teto no `start`) não conferia nada: na 1ª carga, com a
+    lista vazia, a noite instalava o pedaço lido e declarava os 365 dias lidos inteiros. Agora ela pede o total no fim e confere
+    ("vieram X de N"); a leitura que chega ao piso, a de produção, não pede nada a mais."""
+    base = [_linha(1000 + k, criada=_iso(0.05 + 20 * k / 600)) for k in range(600)]      # 600 OS em 20 dias
+    for corta_em in (200, 250):                                                          # a página vazia; a curta
+        OC.reiniciar()
+        rest = RestOS(base, corta_em=corta_em)
+        rel = OL.ler_noite(ler=rest, inteira=True)
+        assert "vieram %d de 600" % corta_em in rel["erro"] and "nada mudou" in rel["resultado"], (corta_em, rel)
+        assert len(rest.totais()) == 1                                                    # o total, só no fim
+        lista = OC.atual()
+        assert len(lista.por_id) == 0 and lista.janela == (None, None)
+    # os 7 dias também, com a lista cheia: as 210 OS da semana cortadas em 150
+    _lista_de(base)
+    antes = OC.atual()
+    rel = OL.ler_sete_dias(ler=RestOS(base, corta_em=150))
+    assert "vieram 150 de 600" in rel["erro"]
+    assert (OC.atual().versao, OC.atual().a_conferir, OC.atual().janela) == (antes.versao, antes.a_conferir, antes.janela)
+    # a leitura que chega ao piso não pede o total
+    rest = RestOS(base)
+    assert OL.ler_sete_dias(ler=rest)["erro"] == "" and rest.totais() == []
+
+
+def test_topo_minimo_e_obrigatorio_com_piso_ou_conhecida():
+    """Sem o topo, a guarda da ordem perdia a 1ª regra calada (o REST em ordem crescente passaria): quem lê pelo piso ou pela
+    página conhecida tem de dar o `topo_minimo`, e esquecê-lo é erro de quem chama, antes de qualquer pedido (rodada 2)."""
+    rest = RestOS([_linha(1000, criada=_iso(1))])
+    for kw in ({"piso": _iso(7)[:19]}, {"conhecida": lambda pagina: True}):
+        with pytest.raises(ValueError, match="topo_minimo"):
+            P.ler_criadas(rest, com_total=False, **kw)
+    assert rest.pedidos == []
+    assert len(P.ler_criadas(rest, piso=_iso(7)[:19], topo_minimo=_iso(3)[:19], com_total=False)) == 1

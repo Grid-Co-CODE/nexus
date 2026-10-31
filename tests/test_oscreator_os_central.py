@@ -550,3 +550,56 @@ def test_esperar_a_gravacao_espera_as_duas(tmp_path, monkeypatch):
     assert OC.esperar_gravacao(5)
     OC.reiniciar(pasta=str(tmp_path))
     assert OC.atual().versao == versao and {5, 6} <= set(OC.atual().por_id)
+
+
+# ── rodada 2 da revisão: o apagamento confirmado ────────────────────────────────────────────────────────────────────────
+def test_o_apagamento_confirmado_na_2a_leitura_passa():
+    """A saída da trava de encolhimento, como a dupla confirmação dos ativos: a recusa que se repete IGUAL na leitura seguinte
+    da mesma faixa (os mesmos ids saindo, ou ao menos 90% deles) é o apagamento de verdade e passa, e o estado diz "aceita na
+    2ª leitura". A 2ª diferente é recusada de novo e vira a recusa que a 3ª confere. Sem isso, o apagamento de verdade acima
+    de 5% seria recusado toda noite, para sempre."""
+    linhas = [_tarefa(100 + k, 100 + k, criada=_iso(0.1 + 80 * k / 200)) for k in range(200)]   # 200 OS em 80 dias
+    OC.receber(linhas, OC.NOITE, desde=_iso(90)[:10])
+    # 1ª: saem as 100 mais velhas, recusada
+    rel = OC.receber(linhas[:100], OC.NOITE, desde=_iso(90)[:10])
+    assert rel["recusa"] and len(OC.atual().por_id) == 200
+    # 2ª diferente (saem as 100 mais novas): recusada de novo
+    rel = OC.receber(linhas[100:], OC.NOITE, desde=_iso(90)[:10])
+    assert rel["recusa"] and len(OC.atual().por_id) == 200 and not OC.estado()["confirmadas"]
+    # 3ª: 95 das mesmas 100 da 2ª saem (5 voltaram): 95% dos ids, aceita
+    rel = OC.receber(linhas[100:] + linhas[:5], OC.NOITE, desde=_iso(90)[:10])
+    assert not rel.get("recusa") and rel["sairam"] == 95 and "2ª leitura" in rel["confirmada"]
+    e = OC.estado()
+    assert len(OC.atual().por_id) == 105 and "noite" not in e["recusas"]
+    assert "aceita na 2ª leitura" in e["confirmadas"]["noite"]["motivo"] and e["confirmadas"]["noite"]["sairam"] == 95
+    assert "_ids" not in e["confirmadas"]["noite"]                                 # só contagens no estado
+    # os 7 dias: a mesma leitura recusada duas vezes seguidas passa na 2ª
+    OC.reiniciar()
+    OC.receber(linhas, OC.NOITE, desde=_iso(90)[:10])
+    nos_7 = [w for w in linhas if w["creation_date"] >= _iso(7)]
+    assert OC.receber(nos_7[:5], OC.SETE_DIAS, desde=_iso(7)[:19])["recusa"]
+    assert "_ids" not in OC.estado()["recusas"]["sete_dias"]
+    rel = OC.receber(nos_7[:5], OC.SETE_DIAS, desde=_iso(7)[:19])
+    assert not rel.get("recusa") and rel["a_conferir"] == len(nos_7) - 5 and "2ª leitura" in rel["confirmada"]
+    assert len(OC.atual().a_conferir) == len(nos_7) - 5
+
+
+def test_a_recusa_sobrevive_ao_reinicio(tmp_path, monkeypatch):
+    """O servidor reinicia a cada push na main (~10 vezes por dia útil) e a noite roda uma vez por dia: a recusa só na memória
+    sumiria entre duas noites, e o apagamento de verdade seria recusado em toda noite de dia útil. Ela vai à cópia em disco
+    (com os ids, que só a lista lê), a 2ª leitura igual depois do reinício passa, e a confirmação também fica para o Raio-X."""
+    monkeypatch.setattr(OD, "GRAVAR_A_CADA_S", 0)
+    OC.reiniciar(pasta=str(tmp_path))
+    linhas = [_tarefa(100 + k, 100 + k, criada=_iso(0.1 + 80 * k / 200)) for k in range(200)]
+    OC.receber(linhas, OC.NOITE, desde=_iso(90)[:10])
+    assert OC.receber(linhas[:100], OC.NOITE, desde=_iso(90)[:10])["recusa"]
+    assert OC.esperar_gravacao(5)
+    OC.reiniciar(pasta=str(tmp_path))                                             # o deploy entre as duas noites
+    rec = OC.estado()["recusas"]["noite"]
+    assert rec["sairiam"] == 100 and "_ids" not in rec
+    rel = OC.receber(linhas[:100], OC.NOITE, desde=_iso(90)[:10])
+    assert not rel.get("recusa") and "2ª leitura" in rel["confirmada"] and len(OC.atual().por_id) == 100
+    assert OC.esperar_gravacao(5)
+    OC.reiniciar(pasta=str(tmp_path))
+    e = OC.estado()
+    assert "aceita na 2ª leitura" in e["confirmadas"]["noite"]["motivo"] and e["recusas"] == {}

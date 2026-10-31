@@ -45,12 +45,16 @@ Leitura que falha no meio não chega aqui (quem lê não chama `receber`): a lis
 mais que `ENCOLHE_MAX`% das OS que a leitura cobre, e mais que `ENCOLHE_MIN_OS`, não trocam NADA: o motivo vai ao estado
 (`recusas`), ao log e ao Raio-X (páginas perdidas em silêncio, o REST que devolve só uma parte). Os 5% são dos ativos; o
 mínimo de 10 OS é porque os 7 dias cobrem ~700 OS na escala do AC (5% = 35) e, na lista pequena, 5% seriam uma ou duas OS
-apagadas de verdade. O apagamento de verdade maior que isso passa na faixa mais larga: a noite de 90 dias cobre ~9 mil
-(o limite é ~450), a de domingo, a janela inteira (~1.800); a 1ª carga (a lista vazia) não tem o que encolher. E a leitura
-só julga o que existia quando ELA começou (`lido_em` é o começo): a noite inteira leva minutos, e a ação do OS Creator e a
-entrega das abertas (outra thread) não esperam por ela. A OS que uma ação mexeu depois do começo da leitura não é trocada
-pelo que a leitura leu (o status velho voltaria) nem julgada por ela; a OS criada depois do começo (com `MARGEM_RELOGIO_S`
-de folga para o relógio do Fracttal) não sai nem fica "a conferir" por não ter vindo.
+apagadas de verdade. A SAÍDA (rodada 2, a dupla confirmação dos ativos): a recusa que se repete IGUAL na leitura seguinte da
+mesma faixa (os mesmos ids saindo, ou ao menos `MESMO_ENCOLHIMENTO_PCT`% deles: a interseção sobre a união das duas) é o
+apagamento de verdade, e passa; o estado guarda "aceita na 2ª leitura" (`confirmadas`). Uma leitura só que encolhe pode ser
+página perdida; duas iguais seguidas são o Fracttal de verdade. A recusa (com os ids) e a confirmação vão à cópia em disco:
+o servidor reinicia a cada push na `main` e a noite roda uma vez por dia, e só na memória a recusa sumiria entre duas noites.
+A 1ª carga (a lista vazia) não tem o que encolher. E a
+leitura só julga o que existia quando ELA começou (`lido_em` é o começo): a noite inteira leva minutos, e a ação do OS
+Creator e a entrega das abertas (outra thread) não esperam por ela. A OS que uma ação mexeu depois do começo da leitura não
+é trocada pelo que a leitura leu (o status velho voltaria) nem julgada por ela; a OS criada depois do começo (com
+`MARGEM_RELOGIO_S` de folga para o relógio do Fracttal) não sai nem fica "a conferir" por não ter vindo.
 
 A AÇÃO DO OS CREATOR ENTRA NA HORA (`atualizar_os`): com o registro na mão, na hora; sem ele, dentro de um pedido do OS Creator,
 lê a OS ao vivo pela sessão da pessoa (as tarefas e o cabeçalho, o que o card já lê: 1 a 3 pedidos); fora de um pedido (ou
@@ -102,6 +106,7 @@ TOCADAS_GUARDA_S = 86400        # quanto tempo a lista lembra que uma ação mex
 ENCOLHE_MAX = 5                 # % das OS que a noite (os 7 dias) cobre que ela pode tirar (marcar "a conferir") de uma vez
 ENCOLHE_MIN_OS = 10             # ... e sempre pode até tantas (a lista pequena; ver o topo)
 PENDENTE_FALHAS_MAX = 5         # leituras pelo nº que falham até a pendente sair da fila (segue "a conferir")
+MESMO_ENCOLHIMENTO_PCT = 90     # a 2ª recusa "igual" à 1ª: ao menos tantos % de ids em comum (a interseção sobre a união)
 ABERTOS = frozenset({1, 2})
 NOVAS, SETE_DIAS, ABERTAS, FINALIZADAS, NOITE, UMA_OS = "novas", "sete_dias", "abertas", "finalizadas", "noite", "os"
 FAIXAS = (NOVAS, SETE_DIAS, ABERTAS, FINALIZADAS, NOITE, UMA_OS)
@@ -239,11 +244,14 @@ _MEMORIA: dict = {"versao": None, "mb": None}   # a medida da memória da últim
 def _estado_limpo() -> dict:
     # `faixas`: a última entrega de cada faixa (quando, quem, quantas OS e linhas, o que entrou, mudou, ficou a conferir e
     # saiu); `pendentes`: {id da OS: desde quando} que a ação deixou para a próxima faixa, e `falhas`: {id: quantas leituras
-    # pelo nº falharam}; `recusas`: {faixa: a última leitura que a trava de encolhimento recusou}, até a faixa passar de novo;
+    # pelo nº falharam}; `recusas`: {faixa: a última leitura que a trava de encolhimento recusou}, até a faixa passar de novo
+    # (com os ids que sairiam em `_ids`, que vão à cópia em disco e nunca ao estado); `confirmadas`: {faixa: a última recusa
+    # aceita na 2ª leitura igual};
     # `campos`: a medida dos campos que o REST trouxe na última leitura grande (a sondagem da 1ª noite, que não pôde ser feita
     # antes de construir); `disco["sujo"]`: a fila das pendentes mudou sem a versão mudar (a cópia em disco é regravada);
     # `conferencias`: {visão: as conferências de 19/10 das telas contra o `contar` (decisão BA da 3.3), só contagens}
-    return {"faixas": {}, "pendentes": {}, "falhas": {}, "recusas": {}, "campos": None, "conferencias": {},
+    return {"faixas": {}, "pendentes": {}, "falhas": {}, "recusas": {}, "confirmadas": {}, "campos": None,
+            "conferencias": {},
             "disco": {"lido": None, "gravado_em": 0.0, "versao": None, "bytes": None, "erro": None, "sujo": False}}
 
 
@@ -443,6 +451,7 @@ def receber(linhas_rest, faixa: str, *, desde=None, lido_em: float | None = None
                 mudancas[wid] = r
                 rel["mudaram"] += 1
         cobertas = 0
+        saindo: set = set()                                          # o que a leitura tira (ou marca): a trava confere
         if cobre is not None:
             for wid, r in base.por_id.items():
                 if not cobre(r):
@@ -454,14 +463,22 @@ def receber(linhas_rest, faixa: str, *, desde=None, lido_em: float | None = None
                     mudancas[wid] = None                             # a noite tira de vez o que não voltou
                     conferir.discard(wid)
                     rel["sairam"] += 1
+                    saindo.add(wid)
                 elif wid not in conferir:
                     conferir.add(wid)
                     rel["a_conferir"] += 1
-        recusa = _encolheria(faixa, base, cobertas, rel)
+                    saindo.add(wid)
+        recusa = _encolheria(faixa, base, cobertas, rel, saindo)
+        confirmada = None
+        if recusa is not None:
+            anterior = _ESTADO["recusas"].get(faixa)
+            if anterior is not None and _mesmo_encolhimento(anterior.get("_ids"), recusa["_ids"]):
+                confirmada, recusa = _confirmacao(faixa, anterior, recusa), None
         if recusa is not None:
             _ESTADO["recusas"][faixa] = recusa
+            _ESTADO["disco"]["sujo"] = True                          # a recusa sobrevive ao reinício (a noite seguinte confere)
             rel.update(recusa=recusa["motivo"], entraram=0, mudaram=0, a_conferir=0, sairam=0)
-            lista, mudou, fila_mudou = base, False, False
+            lista, mudou, cabecalho_mudou = base, False, False
         else:
             if faixa == NOITE:
                 for wid, r in base.por_id.items():
@@ -474,13 +491,24 @@ def receber(linhas_rest, faixa: str, *, desde=None, lido_em: float | None = None
             mudou = bool(mudancas) or conferir != base.a_conferir or janela[0] != base.janela[0]
             lista = _instalar(base, mudancas, lido_em=inicio, janela=janela, a_conferir=conferir, mudou=mudou)
             _ESTADO["faixas"][faixa] = rel
-            _ESTADO["recusas"].pop(faixa, None)
-            fila_mudou = _tirar_da_fila(sai_da_fila)
+            # a recusa que sai, a confirmação e a fila das pendentes vão no cabeçalho da cópia em disco: regravado mesmo sem a
+            # versão mudar
+            cabecalho_mudou = _ESTADO["recusas"].pop(faixa, None) is not None
+            if confirmada is not None:
+                _ESTADO["confirmadas"][faixa] = confirmada
+                rel["confirmada"] = confirmada["motivo"]
+                cabecalho_mudou = True
+            if cabecalho_mudou:
+                _ESTADO["disco"]["sujo"] = True
+            cabecalho_mudou = _tirar_da_fila(sai_da_fila) or cabecalho_mudou
     if recusa is not None:
         log.warning("lista central de OS: faixa %s (%s) recusada pela trava de encolhimento: %s", faixa, quem or "-",
                     recusa["motivo"])
+        _agendar_gravacao()
         return rel
-    if mudou or fila_mudou:
+    if confirmada is not None:
+        log.warning("lista central de OS: faixa %s (%s): %s", faixa, quem or "-", confirmada["motivo"])
+    if mudou or cabecalho_mudou:
         _agendar_gravacao()
     log.info("lista central de OS: faixa %s (%s): %d OS em %d linhas; %d entraram, %d mudaram, %d a conferir, %d saíram; "
              "a lista tem %d", faixa, quem or "-", rel["os"], rel["linhas"], rel["entraram"], rel["mudaram"],
@@ -488,10 +516,11 @@ def receber(linhas_rest, faixa: str, *, desde=None, lido_em: float | None = None
     return rel
 
 
-def _encolheria(faixa: str, base: Lista, cobertas: int, rel: dict) -> dict | None:
+def _encolheria(faixa: str, base: Lista, cobertas: int, rel: dict, saindo) -> dict | None:
     """A recusa da trava de encolhimento (ver o topo), ou None: a noite que tiraria (os 7 dias que marcariam "a conferir")
     mais que `ENCOLHE_MAX`% das `cobertas` (as OS da lista que a leitura cobre) e mais que `ENCOLHE_MIN_OS`. Só a noite e os
-    7 dias; a lista vazia (a 1ª carga) não tem o que encolher. Só contagens no motivo."""
+    7 dias; a lista vazia (a 1ª carga) não tem o que encolher. Só contagens no motivo; os ids que sairiam (`saindo`) vão em
+    `_ids`, para a leitura seguinte conferir se é a mesma (a saída da trava), e nunca ao `estado()`."""
     if faixa not in (SETE_DIAS, NOITE) or not base.por_id:
         return None
     saem = rel["sairam"] if faixa == NOITE else rel["a_conferir"]
@@ -504,7 +533,24 @@ def _encolheria(faixa: str, base: Lista, cobertas: int, rel: dict) -> dict | Non
         motivo = "os 7 dias encolheriam a lista: marcariam %d das %d OS que eles cobrem como \"a conferir\"" % (saem, cobertas)
     motivo += " (o limite é %d: %d%% delas, no mínimo %d OS); nada foi trocado" % (limite, ENCOLHE_MAX, ENCOLHE_MIN_OS)
     return {"faixa": faixa, "em": time.time(), "inicio": rel["inicio"], "de": cobertas, "sairiam": saem, "limite": limite,
-            "motivo": motivo}
+            "motivo": motivo, "_ids": frozenset(saindo)}
+
+
+def _mesmo_encolhimento(a, b) -> bool:
+    """As duas recusas tiram (ou marcam) as mesmas OS: ao menos `MESMO_ENCOLHIMENTO_PCT`% em comum, a interseção sobre a união
+    (as duas direções: a 2ª que perde muito mais OS é outra falha, não a mesma)."""
+    return bool(a) and bool(b) and len(a & b) * 100 >= MESMO_ENCOLHIMENTO_PCT * len(a | b)
+
+
+def _confirmacao(faixa: str, anterior: dict, recusa: dict) -> dict:
+    """O registro da recusa aceita na 2ª leitura igual (o apagamento de verdade), só com contagens."""
+    if faixa == NOITE:
+        feito = "a noite tirou %d das %d OS que ela cobre" % (recusa["sairiam"], recusa["de"])
+    else:
+        feito = "os 7 dias marcaram %d das %d OS que eles cobrem como \"a conferir\"" % (recusa["sairiam"], recusa["de"])
+    return {"faixa": faixa, "em": time.time(), "de": recusa["de"], "sairam": recusa["sairiam"], "recusada_em": anterior["em"],
+            "motivo": "aceita na 2ª leitura: %s, as mesmas da recusa de %s (o apagamento de verdade)" % (
+                feito, _hora(anterior["em"]))}
 
 
 def _tirar_da_fila(ids) -> bool:
@@ -804,7 +850,10 @@ def _extras_do_disco() -> dict:
     return {"pendentes": {str(k): v for k, v in list(_ESTADO["pendentes"].items())},
             "falhas_pendentes": {str(k): v for k, v in list(_ESTADO["falhas"].items())},
             "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())},
-            "campos_rest": dict(c) if c else None}
+            "campos_rest": dict(c) if c else None,
+            "recusas": {k: dict({ch: x for ch, x in v.items() if ch != "_ids"}, ids=sorted(v.get("_ids") or ()))
+                        for k, v in list(_ESTADO["recusas"].items())},
+            "confirmadas": {k: dict(v) for k, v in list(_ESTADO["confirmadas"].items())}}
 
 
 def _gravar_agora() -> bool:
@@ -842,6 +891,12 @@ def _boot() -> None:
                             _ESTADO["faixas"].update(cab["faixas"])
                         if isinstance(cab.get("campos_rest"), dict) and not _ESTADO["campos"]:
                             _ESTADO["campos"] = cab["campos_rest"]
+                        for faixa, rec in (cab.get("recusas") or {}).items():
+                            if faixa in (SETE_DIAS, NOITE) and isinstance(rec, dict):
+                                rec = dict(rec)
+                                _ESTADO["recusas"][faixa] = dict(rec, _ids=frozenset(int(i) for i in rec.pop("ids", ())))
+                        if isinstance(cab.get("confirmadas"), dict):
+                            _ESTADO["confirmadas"].update(cab["confirmadas"])
                         _ESTADO["disco"].update(lido="cópia gravada em %s" % _hora(cab.get("gravado_em")),
                                                 versao=versao, gravado_em=float(cab.get("gravado_em") or 0.0))
                 log.info("lista central de OS: %d OS da cópia em disco", len(lista.por_id))
@@ -896,9 +951,9 @@ def memoria_estimada(lista: Lista | None = None) -> float:
 def estado(medir_memoria: bool = False) -> dict:
     """O que se sabe da lista, só com contagens, datas e ids (nunca o texto de uma OS nem o nome de alguém): quantas OS, quantas
     abertas (fora as "a conferir", cujo status é velho), "a conferir" e pendentes; a versão, a última leitura e a janela lida
-    inteira; a última entrega de cada faixa e a leitura que a trava de encolhimento recusou (`recusas`); a medida dos campos que
-    o REST trouxe; o disco; com `medir_memoria`, a memória da lista (`memoria_estimada`, uma vez por versão); e, com o leitor
-    do servidor ligado, o que ele fez."""
+    inteira; a última entrega de cada faixa, a leitura que a trava de encolhimento recusou (`recusas`, sem os ids) e a que ela
+    aceitou na 2ª leitura igual (`confirmadas`); a medida dos campos que o REST trouxe; o disco; com `medir_memoria`, a memória
+    da lista (`memoria_estimada`, uma vez por versão); e, com o leitor do servidor ligado, o que ele fez."""
     lista = atual()
     leitor = None
     if _LEITOR["estado"] is not None:
@@ -923,7 +978,8 @@ def estado(medir_memoria: bool = False) -> dict:
             "pendentes": len(pend), "pendentes_ids": sorted(pend)[:20], "versao": lista.versao,
             "lido_em": lista.lido_em or None, "janela": lista.janela,
             "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())},
-            "recusas": {k: dict(v) for k, v in list(_ESTADO["recusas"].items())},
+            "recusas": {k: {c: x for c, x in v.items() if c != "_ids"} for k, v in list(_ESTADO["recusas"].items())},
+            "confirmadas": {k: dict(v) for k, v in list(_ESTADO["confirmadas"].items())},
             "campos": dict(_ESTADO["campos"]) if _ESTADO["campos"] else None, "disco": dict(_ESTADO["disco"]),
             "conferencias": {k: dict(v) for k, v in list(_ESTADO["conferencias"].items())},
             "memoria_mb": memoria, "leitor": leitor}

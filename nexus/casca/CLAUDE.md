@@ -463,7 +463,8 @@ em disco; e **"Lista central de OS"** (3.2, `os_central.estado(medir_memoria=Tru
 conferir" e as pendentes, a janela lida inteira, se o leitor está ligado, a última entrega de cada faixa (com quem entregou as
 abertas: o `tarefas_os` ou o próprio leitor) e a última leitura dela (os pedidos, ou a falha com o motivo; "DEFEITO do
 leitor" quando foi exceção que não é de leitura, com a pilha no log), a leitura que a trava de encolhimento recusou ("Trava de
-encolhimento": a faixa, a hora e o motivo, só com contagens, até a faixa passar de novo), os campos que o REST trouxe (a
+encolhimento": a faixa, a hora e o motivo, só com contagens, até a faixa passar de novo) e a última que ela aceitou na 2ª
+leitura igual ("aceita na 2ª leitura": o apagamento de verdade, rodada 2), os campos que o REST trouxe (a
 sondagem da 1ª noite), as conferências das telas que leem da lista ("Conferências das telas", 3.3, `_conferencias_das_telas`:
 por visão, quantas foram ao Fracttal desde o último reinício, quantas divergiram e falharam, e a última divergência com os dois
 totais; muitas na visão "todos" de quem vê tudo é sinal de lista errada), a cópia em disco e a memória

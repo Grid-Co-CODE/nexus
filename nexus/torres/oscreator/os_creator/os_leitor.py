@@ -10,8 +10,9 @@ MESMAS funções e pela mesma paginação do `nexus/campo/tarefas_os.py` (o leit
   qualquer minuto: são 1 ou 2 pedidos). Mais de 4 páginas de novas: nada entra, ficam para os 7 dias. A lista sem uma leitura
   até o topo (a máquina sem cópia) espera os 7 dias ou a noite;
 - OS 7 DIAS (`ler_sete_dias`): as criadas nos últimos 7 dias relidas inteiras (até uma página INTEIRA mais velha que o piso;
-  sem o pedido do total, que no `work_orders` sem filtro é o de todas as OS), a cada 10 min das 06:00 às 20:00 (:00, :21, :30,
-  :41 e :51: o :10, o :20, o :40 e o :50 têm dono);
+  sem o pedido do total no começo, que no `work_orders` sem filtro é o de todas as OS; a leitura que acaba ANTES do piso, na
+  página curta ou vazia, pede o total ali e confere, rodada 2), a cada 10 min das 06:00 às 20:00 (:00, :21, :30, :41 e :51: o
+  :10, o :20, o :40 e o :50 têm dono);
 - AS ABERTAS (status 1 e 2): ENTREGUES pela volta de hora em hora do `tarefas_os`, que já as lê para o fato (`entregar_abertas`,
   sem pedido a mais). Ela só lê na máquina que vai gravar (pula se a outra gravou há menos de 50 min): sem entrega em 70 min,
   este leitor as lê ele mesmo pela mesma função (`tarefas_os.ler_abertas`), no máximo uma vez por hora (:55). Custo: ~98
@@ -22,7 +23,8 @@ MESMAS funções e pela mesma paginação do `nexus/campo/tarefas_os.py` (o leit
   publicado aqui). A lista sem nenhuma concluída espera a noite;
 - A NOITE (`ler_noite`, 03:21: o :20 é das tarefas): os últimos 90 dias inteiros; no domingo, ou sem a janela lida inteira (a
   1ª carga, a cópia com janela menor), a janela toda (365 dias). As antigas mudam sem data de alteração: é a noite que as põe
-  em dia e tira o que sumiu;
+  em dia e tira o que sumiu. Como os 7 dias, ela confere o total quando acaba antes do piso (rodada 2: na 1ª carga, com a
+  lista vazia, o pedaço lido de um REST que parou calado seria instalado como os 365 dias inteiros);
 - AS PENDENTES (`ler_pendentes`, depois das novas e dos 7 dias): a OS que uma ação do OS Creator mexeu fora de um pedido, pelo
   nº, até 5 por vez (1 pedido cada, cada um depois da pausa de 1 s). A apagada no Fracttal sai da fila; a que derruba a
   leitura sai depois de 5 falhas, e as de menos falhas vêm antes (rodada 1 da revisão).
@@ -32,7 +34,8 @@ vai ao log com a pilha, e o estado diz `defeito`. Cada faixa conta no contador d
 (`fundo:nexus-os-leitor:<faixa>`, `nexus/casca/fracttal_conta.py`).
 AS GUARDAS (Rulings AU e AV, rodada 1 da revisão da 3.1+3.2): as três faixas pela criação conferem a ordem do REST
 (`tarefas_os.ler_criadas`, com o topo: a criação mais nova que a lista conhece menos 3 dias); a noite e os 7 dias que
-encolheriam a lista são recusados por ela (`os_central`, a trava de encolhimento), e a faixa diz por quê; e cada página
+encolheriam a lista são recusados por ela (`os_central`, a trava de encolhimento; a recusa que se repete igual na leitura
+seguinte passa, a dupla confirmação dos ativos), e a faixa diz por quê; e cada página
 chega cortada no que a lista lê (`os_registro.enxuta`), as abertas entregues pelo `tarefas_os` também: a noite de 365 dias não
 junta 90 mil linhas inteiras na memória.
 
@@ -183,8 +186,9 @@ def _receber(rel: dict, linhas, faixa: str, **kw) -> dict:
     if r.get("recusa"):
         raise ListaRecusou(r["recusa"])
     rel.update(os=r["os"], linhas=r["linhas"],
-               resultado="%d OS: %d entraram, %d mudaram, %d a conferir, %d saíram" % (
-                   r["os"], r["entraram"], r["mudaram"], r["a_conferir"], r["sairam"]))
+               resultado="%d OS: %d entraram, %d mudaram, %d a conferir, %d saíram%s" % (
+                   r["os"], r["entraram"], r["mudaram"], r["a_conferir"], r["sairam"],
+                   " (%s)" % r["confirmada"] if r.get("confirmada") else ""))
     return r
 
 
@@ -226,7 +230,7 @@ def ler_sete_dias(ler=None) -> dict:
         inicio = time.time()
         piso = _iso_utc(inicio - DIAS_SETE * 86400)
         linhas = tarefas_os.ler_criadas(ler, piso=piso, topo_minimo=_topo_minimo(inicio), paginas_max=PAGINAS_SETE_MAX,
-                                        com_total=False, projetar=os_registro.enxuta)
+                                        com_total=False, total_no_fim=True, projetar=os_registro.enxuta)
         _receber(rel, linhas, os_central.SETE_DIAS, desde=piso, lido_em=inicio)
     return _rodar(SETE_DIAS, ler, fazer)
 
@@ -252,7 +256,7 @@ def ler_noite(ler=None, inteira: bool | None = None) -> dict:
                  - timedelta(days=os_central.JANELA_DIAS if toda else DIAS_NOITE)).strftime("%Y-%m-%d")
         rel["janela_inteira"] = toda
         linhas = tarefas_os.ler_criadas(ler, piso=desde, topo_minimo=_topo_minimo(inicio), paginas_max=PAGINAS_NOITE_MAX,
-                                        com_total=False, projetar=os_registro.enxuta)
+                                        com_total=False, total_no_fim=True, projetar=os_registro.enxuta)
         _receber(rel, linhas, os_central.NOITE, desde=desde, lido_em=inicio)
     return _rodar(NOITE, ler, fazer)
 

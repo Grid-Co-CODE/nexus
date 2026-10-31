@@ -308,8 +308,9 @@ hora de dia útil, ~1.500 a 1.850 num dia útil. O pico de memória da noite de 
 cortada no que a lista lê). A lista mora na memória e numa cópia na pasta de dados do OS Creator (`os_central.json.gz`,
 ~2,6 MB para 36 mil OS; não vai ao banco nem ao git): o reinício volta por ela sem pedir nada ao Fracttal. A 1ª noite depois
 do deploy é a 1ª carga e a conferência dos campos do REST: o Raio-X mostra (seção "Uso do OS Creator", peça "Lista central de
-OS"), e também a leitura que a lista recusou ("Trava de encolhimento": o REST que devolveu só uma parte) e a faixa que o REST
-não devolveu pela criação. As telas ainda não leem dela (é a tarefa 3.3).
+OS"), e também a leitura que a lista recusou ("Trava de encolhimento": o REST que devolveu só uma parte; a recusa que se repete
+igual na leitura seguinte passa, "aceita na 2ª leitura": o apagamento de verdade) e a faixa que o REST não devolveu pela
+criação. As telas ainda não leem dela (é a tarefa 3.3).
 
 **Na 1ª carga depois da atualização de 08/10/2026** entram no banco, pela primeira vez, o `fato_ronda`, o `fato_pt`, o
 livro `nexus_equipamentos` e a mescla da programação; o histórico de pessoas e usinas passa a começar "desde sempre"

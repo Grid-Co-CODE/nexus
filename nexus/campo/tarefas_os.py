@@ -40,7 +40,7 @@ hora em hora ENTREGA as abertas que acabou de ler a quem se registrou (`ligar_en
 servidor): a lista central não as lê de novo, e o fato e o número de pedidos desta volta não mudam. Para a lista (rodada 1 da
 revisão, Rulings AU e AV; com os padrões, nada muda para o fato): o `projetar` corta cada linha assim que a página chega, e o
 `ler_criadas` confere a ordem pela criação (`ForaDeOrdem`): com o `sort` ignorado, a página "conhecida" ou "toda velha" não
-diria nada.
+diria nada. E a leitura sem o total no começo que acaba ANTES do piso pede o total no fim (`total_no_fim`, rodada 2).
 """
 import logging
 import random
@@ -67,8 +67,8 @@ ESPERA_RECUSA_S = 60        # a cota do Fracttal é uma janela de 1 minuto da em
 TENTATIVAS = 3
 DIAS_ZELADORIA = 90
 TIPO_ZELADORIA_REST = "Zeladoria"   # a grafia do tipo no REST: o ensaio (ferramentas/ensaio_tarefas_os.py) confere
-# a ordem pela criação conferida (`ler_criadas`, Ruling AU): a linha pode vir até 1 h mais nova que a anterior, e até 1% das
-# linhas lidas (no mínimo 5) além disso; a ordem qualquer inverte metade delas
+# a ordem pela criação conferida (`ler_criadas`, Ruling AU): a linha pode vir até 1 h mais nova que a anterior, e, além disso,
+# até o maior dos dois, 5 linhas ou 1% das lidas; a ordem qualquer inverte metade delas
 FOLGA_ORDEM_S = 3600
 FORA_DE_ORDEM_MIN = 5
 FORA_DE_ORDEM_PCT = 1
@@ -137,14 +137,18 @@ def _chave(w, i):
 
 
 def _paginas(ler, path_base: str, para=None, medida=None, *, paginas_max: int | None = None,
-             com_total: bool = True, projetar=None) -> list:
+             com_total: bool = True, projetar=None, total_no_fim: bool = False) -> list:
     """As linhas de um filtro, página a página, até a página curta (ou até `para`, que para antes por desenho), conferidas
     contra o total que o REST informa. `medida["faltaram"]` soma o que faltou dentro da folga; `medida["parou"]` diz como a
     leitura acabou ("para" ou "fim"). `paginas_max` (padrão: `PAGINAS_MAX`) é o teto que não corta calado. `com_total=False`
     pula o pedido do total: só para a leitura que para por desenho (`para`) e não troca nada pela falta do que não leu (as
     faixas da lista central de OS, que param no piso ou na página conhecida, e as finalizadas, que só anotam).
     `projetar(linha)` corta cada linha ASSIM que a página chega, antes da seguinte (a lista central de OS guarda ~18 dos 67
-    campos: a noite de 365 dias não junta 83 mil linhas inteiras, Ruling AV); sem ele (o fato), a linha inteira, como sempre."""
+    campos: a noite de 365 dias não junta 83 mil linhas inteiras, Ruling AV); sem ele (o fato), a linha inteira, como sempre.
+    `total_no_fim` (rodada 2 da revisão da lista central): sem o total no começo, a leitura que acaba na página curta ou vazia
+    ANTES do que a faria parar (`para`) pede o total ali e confere como sempre ("vieram X de N"). Sem isso, um REST que devolve
+    a página vazia com `success: true` (o Fracttal já devolveu 0 registros calado: a rodada do robô do PCM de 26/10, no
+    `nexus/dados/CLAUDE.md`) ou que tem um teto no `start` passava calado. A leitura que para no `para` não pede nada a mais."""
     teto = PAGINAS_MAX if paginas_max is None else paginas_max
     total = _total(ler, path_base) if com_total else None
     out, vistas, inicio = [], set(), 0
@@ -168,6 +172,9 @@ def _paginas(ler, path_base: str, para=None, medida=None, *, paginas_max: int | 
                 medida["parou"] = "para"
             return out
         if len(pagina) < 100:
+            if total is None and total_no_fim:
+                time.sleep(PAUSA_S)
+                total = _total(ler, path_base)
             if total is not None:
                 falta = total - len(vistas)
                 if falta > total * FOLGA_MOVIMENTO:
@@ -193,22 +200,27 @@ def ler_abertas(ler, medida=None, projetar=None) -> list[dict]:
 
 
 def ler_criadas(ler, *, piso=None, conhecida=None, topo_minimo=None, medida=None, paginas_max: int | None = None,
-                com_total: bool = True, projetar=None) -> list[dict]:
+                com_total: bool = True, projetar=None, total_no_fim: bool = False) -> list[dict]:
     """As tarefas das OS de todo status pela data de criação, da mais nova para trás (`sort=creation_date:desc`), até:
     - `conhecida(pagina) -> bool`: a 1ª página que ela diz toda conhecida (as novas da lista central);
     - `piso` (ISO, a data ou a data e hora): a 1ª página INTEIRA criada antes dele (os 7 dias e a noite da lista central). A
       ordem do REST pode ser só aproximada: a OS do piso numa página nova não para a leitura, a página toda velha para (a
-      técnica da zeladoria).
+      técnica da zeladoria). A página vazia, ou sem datas, não é "toda velha": é o fim, e com `total_no_fim` o total confere
+      que a leitura veio inteira (rodada 2).
     A ORDEM É CONFERIDA (Ruling AU, rodada 1 da revisão da lista central): com o `sort` ignorado ou mal aplicado, "a página
     conhecida" e "a página toda velha" não querem dizer nada (a noite tiraria de vez as OS da janela, os 7 dias marcariam a
     semana "a conferir", as novas levariam a janela até agora sem as OS novas). Levanta `ForaDeOrdem`, e quem chama não troca
     nada, quando:
     - a 1ª página não chega a `topo_minimo` (ISO; quem chama dá a criação mais nova que conhece menos uma margem): o REST que
-      devolve da mais velha para a mais nova;
-    - mais que `FORA_DE_ORDEM_MIN` linhas (ou `FORA_DE_ORDEM_PCT`% das lidas) vêm criadas mais de `FOLGA_ORDEM_S` depois da
-      linha anterior: a ordem qualquer inverte metade delas. A folga e a conta deixam passar a linha fora do lugar que o REST
-      pode trazer (o `sort` é da OS e a linha é da tarefa; a ordem das finalizadas já se mostrou só aproximada,
-      `coletor.py`)."""
+      devolve da mais velha para a mais nova. Com `piso` ou `conhecida`, o `topo_minimo` é OBRIGATÓRIO (ValueError antes de
+      qualquer pedido, rodada 2): sem ele, esta regra sumia calada;
+    - mais linhas que o maior dos dois, `FORA_DE_ORDEM_MIN` ou `FORA_DE_ORDEM_PCT`% das lidas, vêm criadas mais de
+      `FOLGA_ORDEM_S` depois da linha anterior: a ordem qualquer inverte metade delas. A folga e a conta deixam passar a linha
+      fora do lugar que o REST pode trazer (o `sort` é da OS e a linha é da tarefa; a ordem das finalizadas já se mostrou só
+      aproximada, `coletor.py`)."""
+    if (piso is not None or conhecida is not None) and not topo_minimo:
+        raise ValueError("ler_criadas: o topo_minimo é obrigatório com o piso ou a página conhecida (sem ele, a guarda da "
+                         "ordem perde a 1ª regra calada)")
     p = str(piso)[:19] if piso else None
     topo = _segundos(topo_minimo) if topo_minimo else None
     vista = {"paginas": 0, "linhas": 0, "fora": 0, "anterior": None}
@@ -234,10 +246,10 @@ def ler_criadas(ler, *, piso=None, conhecida=None, topo_minimo=None, medida=None
             return True
         if p is not None:
             datas = [str(w.get("creation_date"))[:19] for w in pagina if w.get("creation_date")]
-            return not datas or max(datas) < p
+            return bool(datas) and max(datas) < p                    # a página vazia é o fim, não o piso
         return False
     return _paginas(ler, "work_orders?sort=creation_date:desc", para, medida, paginas_max=paginas_max,
-                    com_total=com_total, projetar=projetar)
+                    com_total=com_total, projetar=projetar, total_no_fim=total_no_fim)
 
 
 def ler_finalizadas(ler, desde, medida=None, paginas_max: int | None = None, projetar=None) -> list[dict]:

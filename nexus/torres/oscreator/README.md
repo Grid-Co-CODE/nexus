@@ -1594,9 +1594,15 @@ construíram a lista UMA, de todas as OS, e quem a enche; as telas leem dela des
   que marcariam "a conferir", mais que 5% das OS que a leitura cobre e mais que 10 OS, não trocam NADA (páginas perdidas em
   silêncio, o REST que devolve só uma parte). O motivo vai a `estado()["recusas"]`, ao log, à faixa do leitor (o erro dela) e
   ao Raio-X ("Trava de encolhimento"), até a faixa passar de novo. Os 5% são os dos ativos; o mínimo de 10 é porque os 7 dias
-  cobrem ~700 OS na escala do AC, e na lista pequena 5% seriam uma ou duas OS apagadas de verdade. O apagamento de verdade maior
-  que isso passa na faixa mais larga: a noite de 90 dias cobre ~9 mil OS (o limite fica em ~450) e a de domingo, a janela
-  inteira (~1.800). A 1ª carga (a lista vazia) não tem o que encolher.
+  cobrem ~700 OS na escala do AC, e na lista pequena 5% seriam uma ou duas OS apagadas de verdade. **A saída** (rodada 2, a
+  dupla confirmação dos ativos, `ativos_central._confirma`): a recusa que se repete IGUAL na leitura seguinte da mesma faixa (os
+  mesmos ids saindo, ou ao menos 90% deles: a interseção sobre a união das duas) é o apagamento de verdade e passa, e o estado
+  guarda "aceita na 2ª leitura" (`estado()["confirmadas"]`, também no Raio-X). Uma leitura só que encolhe pode ser página
+  perdida; duas iguais seguidas são o Fracttal de verdade. Sem a saída, o apagamento de verdade acima de 5% seria recusado
+  toda noite, para sempre; a 2ª leitura diferente é recusada de novo e vira a recusa que a 3ª confere. A recusa (com os ids,
+  que só a lista lê) e a confirmação vão ao cabeçalho da cópia em disco: o servidor reinicia a cada push na `main` e a noite
+  roda uma vez por dia, e só na memória a recusa sumiria entre duas noites de dia útil. A 1ª carga (a lista vazia) não tem o
+  que encolher.
 - **A ação entra na hora** (`atualizar_os(id, registro=None)`): com o registro (as linhas do REST, a linha do Histórico ou a
   linha crua do RPC), na hora; sem ele, dentro de um pedido do OS Creator, lê a OS pela sessão da pessoa com o que o card já lê
   (as tarefas, `_leitura_da_os`, e o cabeçalho: 1 a 3 pedidos); fora de um pedido, ou com o Fracttal recusando, a OS fica "a
@@ -1613,7 +1619,8 @@ construíram a lista UMA, de todas as OS, e quem a enche; as telas leem dela des
   o fecho (a escrita e a leitura em fluxo, nunca o arquivo inteiro na memória), trocado de uma vez (`canto_disco.py`, a mesma
   troca da cópia dos ativos; no Windows, o arquivo que o antivírus segura por um instante é tentado de novo antes de desistir,
   `ESPERAS_DA_TROCA`, rodada 1 da revisão), no máximo uma escrita a cada 30 s (as ações seguidas viram uma; a última chega em
-  até 30 s; a fila das pendentes que anda sem a versão mudar também regrava a cópia, e a pendente que saiu não volta). O
+  até 30 s; a fila das pendentes, a recusa da trava e a confirmação, que mudam sem a versão mudar, também regravam a cópia:
+  a pendente que saiu não volta, e a recusa sobrevive ao reinício). O
   boot só lê o disco; a cópia ilegível, cortada ou de outro formato é ignorada, e a lista começa vazia (as telas vão ao vivo).
   `ponte.ligar_lista_de_os` diz a pasta (nas duas máquinas; nos testes, não). É cache do Fracttal, com texto de OS e nomes:
   nunca vai ao banco nem ao git.
@@ -1640,24 +1647,32 @@ Cada página chega cortada no que a lista lê (`os_registro.enxuta`), e as abert
 - **As novas:** da criação mais nova para trás até a 1ª página inteira de OS conhecidas, sem o pedido do total (1 pedido sem
   novidade, 2 com), a cada 3 min das 06:00 às 20:00 de segunda a sexta e a cada 15 fora disso, em qualquer minuto. Mais de 4
   páginas de novas: nada entra, ficam para os 7 dias. A lista sem uma leitura até o topo espera os 7 dias ou a noite.
-- **Os 7 dias:** relidos inteiros (até uma página INTEIRA mais velha que o piso; sem o pedido do total, que no `work_orders`
-  sem filtro é o de todas as OS) a cada 10 min das 06:00 às 20:00, nos minutos :00, :21, :30, :41 e :51 (o :10, o :20, o :40
-  e o :50 têm dono).
+- **Os 7 dias:** relidos inteiros (até uma página INTEIRA mais velha que o piso; sem o pedido do total no começo, que no
+  `work_orders` sem filtro é o de todas as OS) a cada 10 min das 06:00 às 20:00, nos minutos :00, :21, :30, :41 e :51 (o :10, o
+  :20, o :40 e o :50 têm dono).
 - **As abertas:** entregues pela volta de hora em hora do `tarefas_os` (`ligar_entrega_das_abertas`; o fato e os pedidos dela
   não mudam). Ela só lê na máquina que vai gravar: sem entrega em 70 min, o leitor as lê pela mesma função, no máximo uma vez
   por hora, no :55.
 - **As finalizadas:** status 3 pela data de fim, desde a mais nova que a lista conhece (nunca depois de agora: a data fim no
   futuro, dado ruim, travaria a faixa até passar) menos 2 dias, parando numa página INTEIRA além do piso, no :46 de toda hora
   (o :45 é do `uso_os` às 03:45; o desenho do PCM de 27/10; o `fato_tarefa_finalizada` não é publicado aqui).
-- **A noite (03:21; o 03:20 do desenho é minuto das tarefas):** os últimos 90 dias inteiros, sem o pedido do total; no domingo,
-  ou sem a janela lida inteira (a 1ª carga, a cópia de janela menor), a janela toda. As antigas mudam sem data de alteração: é
-  ela que as põe em dia.
+- **A noite (03:21; o 03:20 do desenho é minuto das tarefas):** os últimos 90 dias inteiros, sem o pedido do total no começo;
+  no domingo, ou sem a janela lida inteira (a 1ª carga, a cópia de janela menor), a janela toda. As antigas mudam sem data de
+  alteração: é ela que as põe em dia.
+- **A leitura que acaba ANTES do piso pede o total no fim** (rodada 2; `tarefas_os._paginas(total_no_fim=True)`, que os 7 dias
+  e a noite passam): a página curta ou vazia antes do piso confere o total do REST ("vieram X de N") e, faltando mais que a
+  folga de 1%, a faixa falha e nada muda. Sem isso, um REST que devolve a página vazia com `success: true` (o Fracttal já
+  devolveu 0 registros calado: a rodada do robô do PCM de 26/10, no `nexus/dados/CLAUDE.md`) ou que tem um teto no `start`
+  passava calado, e na 1ª carga, com a lista vazia (a trava não tem o que encolher), o pedaço lido seria instalado como os
+  365 dias lidos inteiros. A página vazia é o fim, não "a página toda velha". Em produção a leitura acaba no piso: zero
+  pedido a mais (a conta de pedidos abaixo não mudou).
 - **A ordem do REST é conferida** (Ruling AU, rodada 1 da revisão; `tarefas_os.ler_criadas`, como o `ForaDeOrdem` dos ativos):
   com o `sort=creation_date:desc` ignorado (sem filtro de status ninguém o conferiu) ou mal aplicado, "a página conhecida" e "a
   página toda velha" não querem dizer nada: em ordem crescente a noite tiraria de vez as OS dos 90 dias, os 7 dias marcariam a
   semana "a conferir" e as novas levariam o fim da janela até agora sem as OS novas. As três faixas pela criação levantam
   `ForaDeOrdem` e não trocam nada quando a 1ª página não chega à criação mais nova que a lista conhece menos 3 dias (a lista
-  vazia: o próprio começo menos 3 dias; o Fracttal da empresa cria ~99 OS por dia) ou quando mais que 5 linhas, ou 1% das
+  vazia: o próprio começo menos 3 dias; o Fracttal da empresa cria ~99 OS por dia; o `topo_minimo` é obrigatório com o piso
+  ou a página conhecida, rodada 2: sem ele a regra sumia calada) ou quando mais linhas que o maior dos dois, 5 ou 1% das
   lidas, vêm criadas mais de 1 h depois da linha anterior (a ordem qualquer inverte metade delas). A folga de 1 h e a conta
   deixam passar a linha fora do lugar que o REST pode trazer (o `sort` é da OS e a linha é da tarefa; a ordem das finalizadas
   já se mostrou só aproximada, `nexus/campo/coletor.py`): duas linhas dias fora do lugar passam, um teste prova.
@@ -1691,12 +1706,14 @@ cobre e a noite que tira o que não voltou; a ação na hora, com o registro, ao
 pedido; os filtros das visões e o que vai ao vivo; o disco atômico, em fluxo, uma escrita por vez, e o corrompido; a cópia para
 quem muda; os índices por partes iguais aos inteiros; a leitura que não desfaz o que mudou durante ela; e, da rodada 1 da
 revisão, a trava de encolhimento, a memória medida uma vez por versão, a linha enxuta que monta o mesmo registro, a troca
-no disco que tenta de novo o arquivo preso e a espera das duas gravações que se sobrepõem),
+no disco que tenta de novo o arquivo preso e a espera das duas gravações que se sobrepõem; da rodada 2, o apagamento confirmado
+na 2ª leitura),
 `tests/test_oscreator_os_leitor.py` (a 3.2: cada faixa contando os
 pedidos, a falha no meio que não troca nada, os horários, o `tarefas_os` igual, o contador por faixa, as pendentes pelo nº, só
 o servidor liga; e, da rodada 1, o REST que ignora o `sort` em ordem crescente e qualquer, as linhas fora do lugar que passam,
 a leitura que encolheria a lista, a projeção por página, as pendentes mortas, a pausa antes de cada OS pelo nº, a data fim no
-futuro, o defeito separado da falha e os minutos na lista única) e `tests/test_oscreator_canto_no_raio_x.py` (as duas peças no
+futuro, o defeito separado da falha e os minutos na lista única; da rodada 2, a leitura que acaba antes do piso e o topo
+obrigatório) e `tests/test_oscreator_canto_no_raio_x.py` (as duas peças no
 Raio-X, sem texto de OS nem nome).
 
 ## As telas leem da lista central de OS (31/10/2026, tarefa 3.3 do canto central)

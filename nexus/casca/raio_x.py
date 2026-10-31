@@ -895,6 +895,10 @@ def _linhas_da_lista_de_os(e: dict) -> list:
     for faixa, rec in sorted((e.get("recusas") or {}).items()):
         linhas.append(("Trava de encolhimento", "%s: a lista recusou a leitura de %s (%s)" % (
             rotulos.get(faixa, faixa), _quando(rec.get("em")) or "?", str(rec.get("motivo") or "")[:300])))
+    # e a recusa que se repetiu igual e passou (o apagamento de verdade, rodada 2): a última de cada faixa
+    for faixa, conf in sorted((e.get("confirmadas") or {}).items()):
+        linhas.append(("Trava de encolhimento", "%s: %s (em %s)" % (
+            rotulos.get(faixa, faixa), str(conf.get("motivo") or "")[:300], _quando(conf.get("em")) or "?")))
     entregas = (leitor or {}).get("entregas") or {}
     quem = ((e.get("faixas") or {}).get("abertas") or {}).get("quem")
     if quem or any(entregas.values()):
