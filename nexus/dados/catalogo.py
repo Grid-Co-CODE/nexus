@@ -48,13 +48,13 @@ TIPO_ROTULO = {"transacao": "transação", "snapshot_periodico": "foto periódic
 # Como a medida soma. aditiva: em qualquer corte. semi: num eixo só (a irradiação soma no tempo de UMA usina, não
 # entre usinas). nao: nunca (nota, percentual, RPN: média, mínimo, máximo).
 SOMA = ("aditiva", "semi", "nao")
-SUFIXOS_UNIDADE = ("_min", "_kwh", "_kwh_m2", "_mm", "_pct", "_qtd", "_pts", "_nivel")
+SUFIXOS_UNIDADE = ("_min", "_kwh", "_kwh_m2", "_mm", "_pct", "_qtd", "_pts", "_nivel", "_brl")
 
 
 @dataclass(frozen=True)
 class Medida:
     coluna: str     # com a unidade no nome (SUFIXOS_UNIDADE); indicador sem sufixo, só 1/0
-    unidade: str    # "min", "kWh", "kWh/m²", "mm", "%", "qtd", "pts", "nível 1-5", "1/0"
+    unidade: str    # "min", "kWh", "kWh/m²", "mm", "%", "qtd", "pts", "nível 1-5", "R$", "1/0"
     soma: str       # SOMA
 
 
@@ -752,12 +752,18 @@ FATOS = (
             equipamento=("prop", "id_item (o item do inventário, cadastro próprio: nexus_almoxarifado · dim_item_almox)")),
          tipo="snapshot_periodico", chave=("saldo_id",), estado="montado",
          conformado_em="nexus_almoxarifado_saldo_AAAA_MM · fato_saldo_almox",
-         medidas=_m((("saldo_qtd", "a do item", "semi"), ("minimo_qtd", "a do item", "semi"))),
+         medidas=_m((("saldo_qtd", "a do item", "semi"), ("minimo_qtd", "a do item", "semi"),
+                     ("custo_unitario_brl", "R$", "nao"))),
          fontes=(f"{almoxarifado.LIVRO_SALDO} · {almoxarifado.ABA_SALDO}",),
          janela_origem="o último ciclo completo (App)",
          observacao="o saldo soma entre almoxarifados do MESMO item, nunca no tempo nem entre itens (a unidade é a do "
                     "item: UNIDADE, METRO, MASSA). Mínimo 0 = sem mínimo cadastrado. O dia sem ciclo fica sem foto "
-                    "(\"não medido\" não vira \"não mudou\"). Até o App publicar, o livro não existe"),
+                    "(\"não medido\" não vira \"não mudou\"). Até o App publicar, o livro não existe. 30/10/2026: o "
+                    "custo_unitario_brl é o custo da peça naquele almoxarifado como o Fracttal deu no ciclo (preço não "
+                    "se soma: o valor em estoque é saldo × custo, feito na conta); vazio = o Fracttal não deu, nunca 0 "
+                    "(as fotos de antes da coluna ficam vazias). O grão não mudou. A criticidade e a Curva ABC da peça, "
+                    "as do cadastro dela no Fracttal, vão na dimensão do item (nexus_almoxarifado · dim_item_almox: "
+                    "criticidade e curva_abc, esta A, B ou C; vazio = sem curva, nunca C: o Nexus não calcula curva)"),
     Fato("ciclo_varredura", "Ciclo da varredura do almoxarifado", "pcm",
          f"{almoxarifado.LIVRO_CICLO} · {almoxarifado.ABA_CICLO}",
          "1 linha = 1 ciclo da varredura que o Nexus viu (aplicado ou recusado, e a marca de anulado)",
@@ -802,9 +808,12 @@ FATOS = (
          medidas=_m((("contado_qtd", "a do item", "semi"),)),
          fontes=(f"{almoxarifado.LIVRO_CONTAGENS} · {almoxarifado.ABA_CONTAGENS}",), janela_origem="90 dias (App)",
          observacao="colunas ID da contagem, Enviada em e Contada em (UTC), ID do almoxarifado, Usina, Tipo (item, "
-                    "identificar, fora_do_catalogo), ID do item, Código, Contado, Identificado como, Descrição, Foto, "
-                    "Contou (HMAC) e ID da linha. Contado vazio é \"não contei\", nunca 0 (o 0 digitado é \"zerar\"; a "
-                    "API devolve texto, e o \"None\" do sync-xlsx também é vazio: almoxarifado.contado). A linha é a "
+                    "identificar, fora_do_catalogo, avariado), ID do item, Código, Contado, Identificado como, "
+                    "Descrição, Foto, Contou (HMAC), ID da linha e, desde 30/10/2026 e só no fim, Fabricante, Modelo, "
+                    "Número de série (texto, ou n/a quando a peça não tem o dado), Fotos dos dados (as chaves das fotos "
+                    "deles) e Recontagem de (o ID da contagem em que o PCM pediu para recontar). Contado vazio é "
+                    "\"não contei\", nunca 0 (o 0 digitado é \"zerar\"; a API devolve texto, e o \"None\" do "
+                    "sync-xlsx também é vazio: almoxarifado.contado). A linha é a "
                     "contagem × o ID da linha (um por peça contada, gerado pelo App, único dentro da contagem: duas "
                     "peças fora do catálogo com a mesma descrição não podem ter a mesma chave). A soma é entre "
                     "almoxarifados do MESMO item, nunca entre itens. Sem nome nem e-mail (quem contou, só o HMAC); a "
@@ -1587,7 +1596,8 @@ CONHECIDAS = (
     # nexus_almoxarifado · dim_item_almox
     Conhecida(almoxarifado.LIVRO_ITENS, (almoxarifado.ABA_ITENS,), "dimensao",
               "os itens do inventário do Fracttal (peças e insumos) que estavam na lista no último ciclo da varredura do "
-              "App: código, nome, unidade, família, avariado; a fonte da dimensão do item do almoxarifado"),
+              "App: código, nome, unidade, família, avariado e, desde 30/10/2026, a criticidade e a Curva ABC do "
+              "cadastro da peça no Fracttal; a fonte da dimensão do item do almoxarifado"),
     Conhecida("gemeo_digital", ("usina", "equipamento", "alias", "modelo"), "apoio",
               "o cadastro próprio do gêmeo digital: as 25 usinas, os equipamentos, os apelidos e os modelos dele"),
     Conhecida("gemeo_digital", ("cascata_dia", "evento"), "candidata",

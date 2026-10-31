@@ -19,6 +19,11 @@ as peças no App e o livro das contagens (`LIVRO_CONTAGENS`, o 5º livro do App)
 Fracttal. O contrato dele mora aqui, do mesmo jeito dos outros: `COLUNAS_CONTAGENS` na ordem, coluna nova só no FIM, dos
 dois lados. O almoxarifado de TESTE (a prova das gravações no Fracttal) fica fora das contas e das telas pelo ID
 (`ids_de_teste`, da `NEXUS_ALMOX_TESTE_IDS`).
+
+As nove melhorias (30/10/2026, docs/superpowers/specs/2026-10-30-almoxarifado-melhorias-design.md): o App passa a trazer,
+do cadastro da peça no Fracttal, a criticidade e a Curva ABC (no Itens) e o custo (no Saldo), e a contagem ganha os dados
+da peça achada, as fotos deles, a recontagem e o tipo `avariado`. O Nexus sobe ANTES do App, então tudo aqui aguenta o
+livro sem a coluna nova: o que falta é vazio ("sem curva", "sem custo"), nunca 0 nem "C" (`curva_abc`, `custo`).
 """
 import math
 import re
@@ -33,9 +38,15 @@ COLUNAS_CICLO = ("Início do ciclo", "Fim do ciclo", "Itens na lista do Fracttal
                  # a revisão de 25/10/2026: quantas linhas o Saldo tem, para conferir que ele chegou inteiro
                  "Linhas de saldo")
 COLUNAS_ITENS = ("ID do item", "Código", "Nome", "Unidade", "Família", "Avariado", "Ferramenta", "Início do ciclo",
-                 "Lido")
+                 "Lido",
+                 # 30/10/2026: os campos do cadastro da peça no Fracttal (a criticidade é a "1.Crítico",
+                 # "2.Necessário"...; a Curva ABC o PCM preenche à mão lá); vazio se a peça não tem. O Nexus não
+                 # calcula curva
+                 "Criticidade", "Curva ABC")
 COLUNAS_SALDO = ("ID do item", "Código", "ID do almoxarifado", "Almoxarifado", "Local do almoxarifado", "Saldo",
-                 "Mínimo", "Início do ciclo")
+                 "Mínimo", "Início do ciclo",
+                 # 30/10/2026: o custo da peça naquele almoxarifado, como o Fracttal dá; vazio se não der, nunca 0
+                 "Custo unitário")
 COLUNAS_PECAS = ("ID do lançamento", "Recebido em", "Usada em", "OS", "Tarefa", "Código do ativo", "ID do item",
                  "Código", "ID do almoxarifado", "Quantidade", "Unidade", "Situação", "Motivo da recusa",
                  "Lançado por (HMAC)")
@@ -49,15 +60,27 @@ INICIO = "Início do ciclo"
 # peças "fora do catálogo" com a mesma descrição na mesma contagem teriam a mesma chave.
 LIVRO_CONTAGENS, ABA_CONTAGENS = "almoxarifado_contagens_app_campo", "Contagens"
 COLUNAS_CONTAGENS = ("ID da contagem", "Enviada em", "Contada em", "ID do almoxarifado", "Usina", "Tipo", "ID do item",
-                     "Código", "Contado", "Identificado como", "Descrição", "Foto", "Contou (HMAC)", "ID da linha")
-# peça do catálogo; genérico com saldo que o técnico identifica; peça que não está no catálogo (vai à curadoria)
-TIPOS_CONTAGEM = ("item", "identificar", "fora_do_catalogo")
+                     "Código", "Contado", "Identificado como", "Descrição", "Foto", "Contou (HMAC)", "ID da linha",
+                     # 30/10/2026 (itens 2, 3, 4 e 5 das melhorias): os dados da peça achada fora do catálogo (texto, ou
+                     # "n/a" quando o técnico marca que a peça não tem), as chaves das fotos deles
+                     # ("fabricante:<chave>|modelo:<chave>|serie:<chave>", só das que existem; a "Foto" continua sendo a
+                     # da peça) e, na contagem de recontagem, o ID da contagem em que o PCM pediu para recontar
+                     "Fabricante", "Modelo", "Número de série", "Fotos dos dados", "Recontagem de")
+# peça do catálogo; genérico com saldo que o técnico identifica; peça que não está no catálogo (vai à curadoria); e o
+# avariado (30/10/2026): as unidades avariadas de uma peça BOM, que o Nexus acha pelo código `<código do bom>-AV`
+TIPOS_CONTAGEM = ("item", "identificar", "fora_do_catalogo", "avariado")
+# o que o técnico escreve quando a peça não tem o dado (fabricante, modelo ou número de série): não é vazio, é "não tem"
+NA = "n/a"
+# os rótulos da coluna "Fotos dos dados", na ordem em que a tela mostra
+ROTULOS_FOTOS_DOS_DADOS = ("fabricante", "modelo", "serie")
 
 COMPLETUDE_MIN = 0.9        # lidos ÷ itens na lista: abaixo disso o ciclo é recusado (fica no último bom)
 CICLO_VELHO_H = 36          # a varredura é diária: mais de 36 h sem ciclo novo é o App parado
 
 # "Cliente - Usina - UF": o pedaço do caminho do Fracttal que é a usina (o mesmo do `ligacoes.usina_do_caminho`)
 _LOCAL = re.compile(r"\s*(.+?\s+-\s+.+?\s+-\s+[A-Z]{2})\s*")
+# a letra da curva, isolada ("A", "Curva B", "c - baixo giro"); "AB", "Curva ABC" e "Baixo" não são curva
+_CURVA = re.compile(r"(?:curva\s*)?([abc])(?:\b|\s|-|$)", re.IGNORECASE)
 
 
 def _txt(v) -> str:
@@ -75,6 +98,36 @@ def numero(v) -> float | None:
         return float(_txt(v).replace(",", "."))
     except ValueError:
         return None
+
+
+def curva_abc(v) -> str:
+    """A Curva ABC do cadastro da peça no Fracttal como "A", "B" ou "C"; vazio se não for uma delas. O PCM a preenche
+    à mão no Fracttal ("A", "Curva B", "C - baixo giro"): vale a letra isolada, com ou sem o "Curva" na frente. Peça sem
+    curva fica vazia ("sem curva" na tela), NUNCA "C": o Nexus não calcula curva (Levi, 30/10/2026: o histórico de
+    peças lançadas é curto e quase tudo sairia C), e "C" inventado esconderia a peça que ninguém classificou."""
+    m = _CURVA.match(_txt(v))
+    return m.group(1).upper() if m else ""
+
+
+def custo(v) -> float | None:
+    """O custo unitário que o Fracttal deu: número finito e MAIOR que zero; senão None. O custo que ele não deu (vazio,
+    "None" do `sync-xlsx`, texto, "nan") ou deu 0 não é "a peça vale 0": a soma do estoque pela metade avisa quantas
+    peças ficaram sem custo, em vez de contá-las como grátis."""
+    n = numero(v)
+    return n if n is not None and math.isfinite(n) and n > 0 else None
+
+
+def fotos_dos_dados(v) -> dict[str, str]:
+    """A coluna "Fotos dos dados" (`fabricante:<chave>|modelo:<chave>|serie:<chave>`) como {rótulo: chave}, só dos três
+    rótulos e só dos que têm chave: a foto que o técnico não tirou (porque o dado é "n/a") não vem escrita, e um rótulo
+    desconhecido não vira foto. A chave é tudo depois do primeiro ":"."""
+    out = {}
+    for parte in _txt(v).split("|"):
+        rotulo, _, chave = parte.partition(":")
+        rotulo, chave = rotulo.strip().lower(), chave.strip()
+        if rotulo in ROTULOS_FOTOS_DOS_DADOS and chave:
+            out[rotulo] = chave
+    return out
 
 
 def contado(v) -> float | None:

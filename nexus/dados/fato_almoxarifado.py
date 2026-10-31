@@ -33,14 +33,19 @@ LIVRO_SALDO_MOLDE = "nexus_almoxarifado_saldo_{:04d}_{:02d}"
 LIGADA_DE_PARA = "de-para do Fracttal"
 
 CAB_SALDO = ["saldo_id", "ciclo_inicio", "data_id", "id_item", "codigo", "id_almoxarifado", "usina_id",
-             "usina_ligada_por", "saldo_qtd", "minimo_qtd"]
+             "usina_ligada_por", "saldo_qtd", "minimo_qtd",
+             # 30/10/2026: o custo unitário da peça naquele almoxarifado, como o Fracttal deu naquele ciclo (vazio se não
+             # deu, nunca 0); a foto antiga do mês, gravada antes da coluna, segue com ela vazia
+             "custo_unitario_brl"]
 CAB_CICLO = ["ciclo_inicio", "data_id", "fim", "itens_lista_qtd", "itens_lidos_qtd", "erros_qtd", "origem",
              "situacao", "porque", "anulado", "visto_em",
              # a revisão de 25/10/2026: quantos itens da lista não foram lidos no ciclo (Lido = Não no livro do App)
              "nao_lidos_qtd"]
 CAB_PECA = ["lancamento_id", "data_id", "data_id_recebida", "os", "codigo_ativo", "tarefa_chave", "id_item", "codigo",
             "id_almoxarifado", "usina_id", "usina_ligada_por", "pessoa_id", "quantidade_qtd", "lancada", "recusa"]
-CAB_DIM_ITEM = ["id_item", "codigo", "nome", "unidade", "familia", "avariado", "ferramenta"]
+CAB_DIM_ITEM = ["id_item", "codigo", "nome", "unidade", "familia", "avariado", "ferramenta",
+                # 30/10/2026: os campos do cadastro da peça no Fracttal (a curva é A, B ou C; vazio = sem curva)
+                "criticidade", "curva_abc"]
 CAB_DIM_ALMOX = ["id_almoxarifado", "nome", "local", "usina_id", "usina_ligada_por"]
 CAB_ATUALIZACAO = ["gerado_em", "maquina", "duracao_s", "linhas", "como_ler", "ciclo_inicio", "sha_pecas"]
 LIVRO_ORIGEM = {"saldo_almox": f"{A.LIVRO_SALDO} · {A.ABA_SALDO}", "ciclo_varredura": f"{A.LIVRO_CICLO} · {A.ABA_CICLO}",
@@ -87,14 +92,19 @@ def saldo_do_ciclo(saldo: list[dict], lig) -> list[list]:
         inicio, item, almox = _txt(s.get(A.INICIO)), _txt(s.get("ID do item")), _txt(s.get("ID do almoxarifado"))
         uid, por = _usina(lig, s.get("Local do almoxarifado"))
         sid = hashlib.sha1(f"{inicio}|{item}|{almox}".encode("utf-8")).hexdigest()[:20]
+        c = A.custo(s.get("Custo unitário"))          # o livro Saldo de antes do App novo não tem a coluna: vazio
         out.append([sid, inicio, _dia(inicio), item, _txt(s.get("Código")), almox, uid, por,
-                    A.numero(s.get("Saldo")), A.numero(s.get("Mínimo"))])
+                    A.numero(s.get("Saldo")), A.numero(s.get("Mínimo")), "" if c is None else c])
     return sorted(out, key=lambda l: (l[1], _chave_id(l[3]), _chave_id(l[5])))
 
 
 def dim_itens(itens: list[dict]) -> list[list]:
+    """A dimensão do item. A criticidade vai como o Fracttal a dá ("1.Crítico"...) e a curva só como A, B ou C
+    (`almoxarifado.curva_abc`); o livro Itens de antes do App novo não tem as colunas, e a peça sem elas fica com as duas
+    vazias: "sem curva" é a verdade, e "C" ou "comum" seriam inventados."""
     return sorted(([_txt(i.get("ID do item")), _txt(i.get("Código")), _txt(i.get("Nome")), _txt(i.get("Unidade")),
-                    _txt(i.get("Família")), _sim(i.get("Avariado")), _sim(i.get("Ferramenta"))]
+                    _txt(i.get("Família")), _sim(i.get("Avariado")), _sim(i.get("Ferramenta")),
+                    _txt(i.get("Criticidade")), A.curva_abc(i.get("Curva ABC"))]
                    for i in itens if _txt(i.get("ID do item"))), key=lambda l: _chave_id(l[0]))
 
 

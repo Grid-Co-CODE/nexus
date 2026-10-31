@@ -476,8 +476,8 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   `Linhas de saldo` do livro inteiro, as do teste incluídas). **O consumo (`_consumo`, o livro Peças) NÃO é filtrado:** o
   almoxarifado de teste é só para ajuste de inventário, e uma peça lançada nele por uma OS entraria nas contas
   (lançadas e recusadas). Prova: `tests/test_pcm_inventario_contrato.py`. O contrato do livro das contagens do
-  inventário (`almoxarifado_contagens_app_campo`, 14 colunas, a última o `ID da linha`, a chave da linha junto da
-  contagem) mora em `nexus/dados/almoxarifado.py` (`COLUNAS_CONTAGENS`, `contado`).
+  inventário (`almoxarifado_contagens_app_campo`, 19 colunas: as 14 de 26/10, a 14ª o `ID da linha`, a chave da linha
+  junto da contagem, e as 5 de 30/10/2026 no fim) mora em `nexus/dados/almoxarifado.py` (`COLUNAS_CONTAGENS`, `contado`).
 - **Como provar:** `tests/test_pcm_almoxarifado.py`; no navegador, a cópia de prova com os 4 livros montados na memória
   a partir de uma cópia da tabela do App (fora do repositório) e o cadastro real por GET (25/10: 12 almoxarifados, 218
   peças com saldo, 54 no limite, 22 sem mínimo, 5 avariadas, 3 lançadas e 13 recusadas).
@@ -489,7 +489,7 @@ Fracttal, no login de quem aprova. Desenho: `docs/superpowers/specs/2026-10-26-i
 Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaixo; aqui, o caminho inteiro.
 
 **O fluxo:**
-1. **O App** (a sessão do App, pelo contrato de 14 colunas): o técnico conta às cegas (sem ver o saldo) e o App publica
+1. **O App** (a sessão do App, pelo contrato de 19 colunas): o técnico conta às cegas (sem ver o saldo) e o App publica
    `almoxarifado_contagens_app_campo`. O que ele acha fora do catálogo e o genérico que identifica vão como linhas próprias.
 2. **Inventário** (`/t/pcm/pecas/inventario`): a lista das contagens, com o estado de cada uma pelos eventos do livro. Abrir uma
    é a contagem nas quatro etapas (Contagem, Aprovação, Gravação, Auditoria; a seção da aba Inventário, "O visual"); o Sistema
@@ -671,7 +671,7 @@ para o número não mudar de uma tela para a outra. Provado em `tests/test_pcm_i
 ## Inventário do almoxarifado: as contagens e o estado de cada uma (`inventario/leitura.py`; 26/10/2026)
 
 `leitura.contagens(cfg)` é a lista que a tela do PCM mostra: uma contagem por "ID da contagem" do livro que o App publica
-(`almoxarifado_contagens_app_campo`, o contrato de 14 colunas), da mais nova para a mais velha, sem o almoxarifado de teste.
+(`almoxarifado_contagens_app_campo`, o contrato de 19 colunas), da mais nova para a mais velha, sem o almoxarifado de teste.
 Cada uma traz `contagem_id`, `id_almox` e `almox` (o nome), `usina`/`usina_id` (o nome do cadastro quando a de-para do Fracttal
 liga; senão o do Fracttal e `usina_id` None), `contada_em`, `enviada_em`, `linhas` (as do App), `n_contadas`, `n_em_branco`,
 `n_curadoria`, `estado`, `aprovavel`, `motivo_nao_aprovavel` e `aviso`. `livro_existe(cfg)` diz se o App já publicou o livro (sem

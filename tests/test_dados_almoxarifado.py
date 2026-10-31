@@ -55,9 +55,44 @@ def test_ciclo_comum():
 def test_contrato_e_dominio():
     assert A.COLUNAS_CICLO == ("Início do ciclo", "Fim do ciclo", "Itens na lista do Fracttal", "Itens lidos", "Erros",
                                "Origem", "Linhas de saldo")
-    assert A.COLUNAS_SALDO[-1] == "Início do ciclo" and "Local do almoxarifado" in A.COLUNAS_SALDO
+    assert "Início do ciclo" in A.COLUNAS_SALDO and "Local do almoxarifado" in A.COLUNAS_SALDO
     assert "Lançado por (HMAC)" in A.COLUNAS_PECAS and not any("e-mail" in c.lower() for c in A.COLUNAS_PECAS)
     assert dominios.RECUSA_PECA == ("chave recusada pelo Fracttal", "sem permissão", "outro")
+
+
+def test_colunas_novas_no_fim():
+    """30/10/2026 (as nove melhorias do Almoxarifado): coluna nova só no FIM, dos dois lados. O Nexus sobe antes do App,
+    então os livros de hoje não têm nenhuma destas; o que falta é vazio, nunca um valor inventado."""
+    assert A.COLUNAS_ITENS[-2:] == ("Criticidade", "Curva ABC")
+    assert A.COLUNAS_SALDO[-1] == "Custo unitário"
+    assert A.COLUNAS_CONTAGENS[13] == "ID da linha"
+    assert A.COLUNAS_CONTAGENS[14:] == ("Fabricante", "Modelo", "Número de série", "Fotos dos dados", "Recontagem de")
+    assert A.TIPOS_CONTAGEM[-1] == "avariado" and A.TIPOS_CONTAGEM[:3] == ("item", "identificar", "fora_do_catalogo")
+    assert A.NA == "n/a"
+
+
+def test_curva_abc_normaliza():
+    """A curva é a que o PCM preenche no cadastro da peça no Fracttal; o Nexus não calcula. Só A, B ou C: o que não
+    é uma delas fica vazio ("sem curva"), nunca vira C."""
+    assert [A.curva_abc(v) for v in ("A", "b", " Curva C ", "c - baixo giro")] == ["A", "B", "C", "C"]
+    assert [A.curva_abc(v) for v in ("", None, "X", "AB", "1")] == ["", "", "", "", ""]
+    assert [A.curva_abc(v) for v in ("Curva ABC", "curva", "Baixo", 3, True)] == [""] * 5
+
+
+def test_custo_so_positivo():
+    """O custo que o Fracttal não deu (vazio, 0, texto, "nan") é None: virar 0 faria a peça valer nada na soma."""
+    assert A.custo("12,5") == 12.5 and A.custo(3) == 3.0 and A.custo("15.50") == 15.5
+    assert [A.custo(v) for v in ("0", "-3", "", None, "nan", "abc")] == [None] * 6
+    assert [A.custo(v) for v in ("inf", "None", True, 0, 0.0)] == [None] * 5
+
+
+def test_fotos_dos_dados():
+    assert A.fotos_dos_dados("fabricante:k1|modelo:k2|serie:k3") == {"fabricante": "k1", "modelo": "k2", "serie": "k3"}
+    assert A.fotos_dos_dados("modelo:k2|outro:k9|serie:") == {"modelo": "k2"}
+    assert A.fotos_dos_dados("") == {} and A.fotos_dos_dados(None) == {}
+    # a chave é tudo depois do primeiro ":" (a do App pode ter outros), e os espaços em volta não contam
+    assert A.fotos_dos_dados(" serie : a:b | fabricante:k1 ") == {"serie": "a:b", "fabricante": "k1"}
+    assert A.fotos_dos_dados("sem-dois-pontos|modelo") == {}
 
 
 # ── catálogo ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -72,6 +107,7 @@ def test_almoxarifado_no_catalogo():
     assert s.dims["equipamento"][0] == "prop" and s.dims["usina"][0] == "id" and p.dims["pessoa"][0] == "id"
     med = {m.coluna: m for m in s.medidas}
     assert med["saldo_qtd"].soma == med["minimo_qtd"].soma == "semi"
+    assert med["custo_unitario_brl"].soma == "nao" and med["custo_unitario_brl"].unidade == "R$"   # preço não se soma
     assert all(catalogo.medida_valida(m) for f in (s, c, p) for m in f.medidas)
     assert A.LIVRO_SALDO + " · " + A.ABA_SALDO in s.fontes and A.LIVRO_PECAS + " · " + A.ABA_PECAS in p.fontes
     assert catalogo.LIVRO_POR_NOME["nexus_almoxarifado"].so_cresce
@@ -172,10 +208,12 @@ def test_dim_nao_encolhe():
     from nexus.dados import fato_almoxarifado as F
     banco = [{"id_item": "1", "codigo": "A", "nome": "Fusível", "unidade": "UNIDADE", "familia": "F", "avariado": 0,
               "ferramenta": 0}]
-    novas = [["2", "B", "Cabo", "METRO", "C", 0, 0], ["1", "A", "Fusível 10A", "UNIDADE", "F", 0, 0]]
+    novas = [["2", "B", "Cabo", "METRO", "C", 0, 0, "", ""],
+             ["1", "A", "Fusível 10A", "UNIDADE", "F", 0, 0, "1.Crítico", "A"]]
     out = F.mesclar_dim(banco, novas, "id_item", F.CAB_DIM_ITEM)
-    assert [l[0] for l in out] == ["1", "2"] and out[0][2] == "Fusível 10A"
-    assert F.mesclar_dim(banco, [], "id_item", F.CAB_DIM_ITEM) == [["1", "A", "Fusível", "UNIDADE", "F", 0, 0]]
+    assert [l[0] for l in out] == ["1", "2"] and out[0][2] == "Fusível 10A" and out[0][-2:] == ["1.Crítico", "A"]
+    # a linha do banco gravada antes das colunas novas segue inteira: as duas ficam vazias (None), não inventadas
+    assert F.mesclar_dim(banco, [], "id_item", F.CAB_DIM_ITEM) == [["1", "A", "Fusível", "UNIDADE", "F", 0, 0, None, None]]
 
 
 def test_dims_do_ciclo():
@@ -184,11 +222,40 @@ def test_dims_do_ciclo():
               "Avariado": "Não", "Ferramenta": "Não", "Início do ciclo": INICIO, "Lido": "Sim"},
              {"ID do item": "2", "Código": "B-AV", "Nome": "[AVARIADO] Cabo", "Unidade": "METRO", "Família": "C",
               "Avariado": "Sim", "Ferramenta": "Não", "Início do ciclo": INICIO, "Lido": "Não"}]
-    assert F.dim_itens(itens) == [["1", "A", "Fusível", "UNIDADE", "F", 0, 0],
-                                  ["2", "B-AV", "[AVARIADO] Cabo", "METRO", "C", 1, 0]]
+    assert F.dim_itens(itens) == [["1", "A", "Fusível", "UNIDADE", "F", 0, 0, "", ""],
+                                  ["2", "B-AV", "[AVARIADO] Cabo", "METRO", "C", 1, 0, "", ""]]
     al = F.dim_almoxarifados([_saldo(1, 5, IRC, 1, 1), _saldo(2, 5, IRC, 1, 1), _saldo(1, 6, NOB, 1, 1)], _lig())
     assert al == [["5", "Almox 5", "Greenyellow - Irecê 1 - BA", 7, "de-para do Fracttal"],
                   ["6", "Almox 6", "RenoGrid - Nobres 1 - MT", None, None]]
+
+
+def test_historico_leva_criticidade_e_curva():
+    """A criticidade e a Curva ABC são as do cadastro da peça no Fracttal (a varredura do App as traz): vão na dimensão
+    do item, no fim. O livro Itens de hoje não as tem, e a peça sem curva fica vazia, nunca "C"."""
+    from nexus.dados import fato_almoxarifado as F
+    assert F.CAB_DIM_ITEM[-2:] == ["criticidade", "curva_abc"]
+    itens = [{"ID do item": "1", "Código": "A", "Nome": "Fusível", "Unidade": "UNIDADE", "Família": "F", "Avariado": "Não",
+              "Ferramenta": "Não", "Criticidade": "1.Crítico", "Curva ABC": "a"},
+             {"ID do item": "2", "Código": "B", "Nome": "Cabo", "Unidade": "METRO", "Família": "C", "Avariado": "Não",
+              "Ferramenta": "Não"},
+             {"ID do item": "3", "Código": "C", "Nome": "Terminal", "Unidade": "UNIDADE", "Família": "C",
+              "Avariado": "Não", "Ferramenta": "Não", "Criticidade": None, "Curva ABC": "sem curva"}]
+    por = {l[0]: dict(zip(F.CAB_DIM_ITEM, l)) for l in F.dim_itens(itens)}
+    assert (por["1"]["criticidade"], por["1"]["curva_abc"]) == ("1.Crítico", "A")
+    assert (por["2"]["criticidade"], por["2"]["curva_abc"]) == ("", "")           # o livro velho: sem as colunas
+    assert (por["3"]["criticidade"], por["3"]["curva_abc"]) == ("", "")           # o que não é A, B ou C não vira C
+
+
+def test_saldo_do_ciclo_leva_custo():
+    from nexus.dados import fato_almoxarifado as F
+    assert F.CAB_SALDO[-1] == "custo_unitario_brl"
+    linhas = F.saldo_do_ciclo([_saldo(1, 5, IRC, 2, 1, **{"Custo unitário": "15,5"}),
+                               _saldo(2, 5, IRC, 2, 1, **{"Custo unitário": "0"}),
+                               _saldo(3, 5, IRC, 2, 1, **{"Custo unitário": ""}),
+                               _saldo(4, 5, IRC, 2, 1)], _lig())
+    custo = {l[F.CAB_SALDO.index("id_item")]: l[F.CAB_SALDO.index("custo_unitario_brl")] for l in linhas}
+    assert custo == {"1": 15.5, "2": "", "3": "", "4": ""}       # o custo que o Fracttal não deu fica vazio, nunca 0
+    assert all(len(l) == len(F.CAB_SALDO) for l in linhas)
 
 
 def test_linha_do_ciclo_e_qualidade_no_cab_da_casa():
@@ -225,10 +292,12 @@ DE_PARA_IRC = [{"usina_id": 7, "sistema": "Fracttal · Classificação 1", "chav
 
 
 def _semear(api, inicio=INICIO, lidos=None, total=2, saldo_inicio=None, pecas=None, txt=False, de_para=None,
-            itens_faltando=0, saldo_extra=(), linhas_saldo=None):
+            itens_faltando=0, saldo_extra=(), linhas_saldo=None, colunas_novas=False):
     """Os 4 livros do App e o cadastro, no banco de mentira, coerentes entre si: `total` itens na lista (o 1 e o 2 com
     saldo), os `lidos` primeiros com Lido = Sim. `txt`: tudo como texto (a API pode devolver assim);
-    `itens_faltando`: o livro Itens chega sem as últimas linhas; `saldo_extra`: linhas a mais no Saldo."""
+    `itens_faltando`: o livro Itens chega sem as últimas linhas; `saldo_extra`: linhas a mais no Saldo;
+    `colunas_novas`: o App de depois de 30/10/2026, com a Criticidade e a Curva ABC nos Itens (só o item 1 as tem) e o
+    Custo unitário no Saldo (só o item 1 no almoxarifado 123021 tem custo)."""
     from test_campo_visao import _aba
     lidos = total if lidos is None else lidos
     t = (lambda v: None if v is None else str(v)) if txt else (lambda v: v)
@@ -245,6 +314,12 @@ def _semear(api, inicio=INICIO, lidos=None, total=2, saldo_inicio=None, pecas=No
     saldo = [_saldo(1, 123021, IRC, 4, 2, inicio=saldo_inicio or inicio),
              _saldo(2, 123021, IRC, 0, 0, inicio=saldo_inicio or inicio),
              _saldo(1, 123675, NOB, 1, 1, inicio=saldo_inicio or inicio)] + list(saldo_extra)
+    if colunas_novas:
+        for i in itens:
+            i.update({"Criticidade": "1.Crítico" if i["ID do item"] == "1" else "",
+                      "Curva ABC": "a" if i["ID do item"] == "1" else ""})
+        for s in saldo:
+            s["Custo unitário"] = "15,5" if (s["ID do item"], s["ID do almoxarifado"]) == ("1", "123021") else ""
     c = dict(_ciclo(lidos, total, inicio), **{"Linhas de saldo": len(saldo) if linhas_saldo is None else linhas_saldo})
     _aba(api, A.LIVRO_CICLO, A.ABA_CICLO, conv([c]))
     _aba(api, A.LIVRO_ITENS, A.ABA_ITENS, conv(itens[:len(itens) - itens_faltando]))
@@ -285,6 +360,47 @@ def test_grava_o_mes_e_a_marca_e_na_mesma_hora_pula():
     assert len(api.linhas(ALMOX_LIVRO, "dim_almoxarifado")) == 2 and len(api.linhas(ALMOX_LIVRO, "qualidade")) == 3
     syncs = api.syncs
     assert "pulou" in carga.gerar_almoxarifado(CFG, api) and api.syncs == syncs
+
+
+def _sem_as_colunas(api, livro, aba, n):
+    """Deixa a aba do banco de mentira como estava ANTES das colunas novas: tira as `n` últimas colunas de cada linha."""
+    a = api.abas[(livro, aba)]
+    a["linhas"] = [{"headers": l["headers"][:-n], "values": l["values"][:-n]} for l in a["linhas"]]
+
+
+def test_historico_aceita_o_livro_do_app_sem_as_colunas_novas():
+    """O Nexus sobe antes do App (30/10/2026): com os livros de hoje, sem Criticidade, Curva ABC nem Custo unitário, a
+    carga grava as colunas novas VAZIAS (nada de 0 nem de C), e nada mais muda."""
+    from nexus.dados import carga
+    api = _api()
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert "nao_aplica" not in r and set(r["gravado"]) == {MES, ALMOX_LIVRO}, r
+    saldo, itens = api.linhas(MES, "fato_saldo_almox"), api.linhas(ALMOX_LIVRO, "dim_item_almox")
+    assert len(saldo) == 3 and all("custo_unitario_brl" in l and l["custo_unitario_brl"] is None for l in saldo)
+    assert len(itens) == 2 and all(l["criticidade"] is None and l["curva_abc"] is None for l in itens)
+
+
+def test_linha_velha_sem_a_coluna_convive_com_a_nova_no_historico():
+    """O livro é republicado inteiro (`livros.publicar`): a foto do mês e a dimensão que já estão no banco SEM as colunas
+    novas voltam com elas vazias, e a foto do ciclo novo traz o custo, a criticidade e a curva do Fracttal."""
+    from nexus.dados import carga
+    api = _api()
+    carga.gerar_almoxarifado(CFG, api)                                    # o ciclo de 25/10, do App de antes
+    _sem_as_colunas(api, MES, "fato_saldo_almox", 1)                      # e o banco como estava: sem o custo
+    _sem_as_colunas(api, ALMOX_LIVRO, "dim_item_almox", 2)                # nem a criticidade e a curva
+    assert "custo_unitario_brl" not in api.linhas(MES, "fato_saldo_almox")[0]
+    _semear(api, inicio="2026-10-26T03:00:12Z", colunas_novas=True)       # o ciclo seguinte, do App de depois
+    r = carga.gerar_almoxarifado(CFG, api)
+    assert "nao_aplica" not in r and set(r["gravado"]) == {MES, ALMOX_LIVRO}, r
+    saldo = api.linhas(MES, "fato_saldo_almox")
+    assert len(saldo) == 6 and all("custo_unitario_brl" in l for l in saldo)
+    velhas = [l for l in saldo if l["ciclo_inicio"] == INICIO]
+    novas = {(l["id_item"], l["id_almoxarifado"]): l["custo_unitario_brl"] for l in saldo if l["ciclo_inicio"] != INICIO}
+    assert len(velhas) == 3 and all(l["custo_unitario_brl"] is None for l in velhas)
+    assert novas == {("1", "123021"): 15.5, ("2", "123021"): None, ("1", "123675"): None}
+    itens = {l["id_item"]: l for l in api.linhas(ALMOX_LIVRO, "dim_item_almox")}
+    assert (itens["1"]["criticidade"], itens["1"]["curva_abc"]) == ("1.Crítico", "A")
+    assert (itens["2"]["criticidade"], itens["2"]["curva_abc"]) == (None, None)
 
 
 def test_peca_nova_sem_ciclo_novo_grava_so_o_livro_do_nexus():

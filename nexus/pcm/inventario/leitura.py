@@ -2,7 +2,7 @@
 `docs/superpowers/specs/2026-10-26-inventario-almoxarifado-design.md`, seção 4.2.
 
 De onde vem cada parte:
-- **as contagens**, do livro que o App de Campo publica (`almoxarifado_contagens_app_campo`, o contrato de 14 colunas em
+- **as contagens**, do livro que o App de Campo publica (`almoxarifado_contagens_app_campo`, o contrato de 19 colunas em
   `nexus/dados/almoxarifado.py`): uma linha por peça contada, agrupadas pelo "ID da contagem". Vêm pela cópia de 5 min do
   `visao._ler`, como os outros livros do App (lê o banco e liga a usina pela de-para do Fracttal uma vez, não a cada abertura
   da tela);

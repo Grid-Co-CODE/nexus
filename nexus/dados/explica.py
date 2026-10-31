@@ -238,9 +238,9 @@ PARA_QUE = {
                               "usina, fixo ou de apoio (com as datas). É a lista de quem vê e pode rondar cada usina no "
                               "App de Campo: o App lê daqui. A observação vai cifrada.",
     "saldo_almox": "Guarda, a cada varredura diária do App, quanto de cada peça há em cada almoxarifado do "
-                   "Fracttal e o mínimo cadastrado. É o histórico que o Fracttal não mostra: dá para ver quando "
-                   "uma peça ficou abaixo do mínimo e, mais adiante, prever a reposição. O dia sem varredura fica "
-                   "sem foto, sem inventar que nada mudou.",
+                   "Fracttal, o mínimo cadastrado e o custo unitário que o Fracttal deu. É o histórico que o "
+                   "Fracttal não mostra: dá para ver quando uma peça ficou abaixo do mínimo e, mais adiante, prever a "
+                   "reposição. O dia sem varredura fica sem foto, sem inventar que nada mudou.",
     "ciclo_varredura": "Guarda cada varredura do almoxarifado que o App fez: quantos itens o Fracttal listou, "
                        "quantos foram lidos e se o Nexus aplicou o ciclo (só com 90% lidos). É por ele que se "
                        "sabe se o saldo de um dia é confiável.",
