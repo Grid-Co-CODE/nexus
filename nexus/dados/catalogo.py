@@ -1237,7 +1237,8 @@ FATOS = (
          observacao="quando a ocorrência normaliza, sai daqui e entra no fato_normalizacao (a mesma chave); a que já "
                     "está normalizada na memória do Nexus não entra (conta uma vez). As tags, o código do tipo e o "
                     "início vêm da fotografia ou, quando ela não manda, da rota das ocorrências de 30 dias "
-                    "(equipamentos_de diz de onde: fotografia, ocorrencias ou vazio). O tipo pelo rótulo vira código "
+                    "(equipamentos_de diz de onde: fotografia, ocorrencias ou vazio); sem a tag, equipamentos_citados guarda o que "
+                    "o COS cita pelo nome em referência curta (Inversor 2.7 → INV2.7, Cabine 2 → CAB2). O tipo pelo rótulo vira código "
                     "pelas normalizações. abertas_em na atualizacao é a hora do retrato: na falha da leitura, o de "
                     "antes fica. Impacto, falha (texto livre), a última nota e o que se aguarda não entram (regra 8)"),
 )

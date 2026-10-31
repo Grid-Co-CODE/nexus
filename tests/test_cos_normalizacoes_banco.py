@@ -209,8 +209,9 @@ def test_aberta_com_o_codigo_do_tipo_pelas_normalizacoes_e_a_usina_pelo_codigo()
                                                                                             "código cheio")
     assert (l["tipo_falha"], l["etapa"], l["dias_aberta_qtd"], l["inicio"], l["data_id_inicio"]) == (
         "DESLIGAMENTO_INVERSOR", "Aguardando peça", 110, "2026-07-12T08:00:00-03:00", 20260712)
-    # sem a tag na fotografia nem na rota de 30 dias: a régua conta pelo tipo, e a aba diz que veio sem
+    # sem a tag na fotografia nem na rota de 30 dias: a referência do que o COS cita ("Inversor 2.7"), sem o nome
     assert (l["equipamentos_codigos"], l["equipamentos_qtd"], l["equipamentos_de"]) == ("", 0, "")
+    assert l["equipamentos_citados"] == "INV2.7"
     assert rel == {"abertas": 1, "abertas_ligadas": 1, "abertas_ja_normalizadas": 0,
                    "abertas_equipamentos_de": {"sem": 1}}
 
@@ -277,3 +278,9 @@ def test_ler_abertas_pela_fotografia_e_a_rota_de_30_dias(app, monkeypatch):
     assert rel["abertas_sem_complemento"] == "caiu"
     monkeypatch.setattr(AND, "ler", lambda config, cliente: AND.Leitura(cliente, {"usinas": []}, erro="x", velha=True))
     assert NB.ler_abertas(app.config, [], USINAS, AGORA)[0] is None
+
+
+def test_os_equipamentos_citados_pelo_nome_viram_referencia_curta():
+    assert NB.citados(["Inversor 2.7", "inv 1.10", "Cabine 2", "SKID 3", "QGBT 1", "Inversor 2.7", "Relé 1"]) == (
+        "INV2.7;INV1.10;CAB2;CAB3;CAB1")
+    assert NB.citados(None) == "" and NB.citados(["Datalogger"]) == ""

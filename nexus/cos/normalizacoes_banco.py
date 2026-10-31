@@ -62,7 +62,8 @@ ABA_ABERTAS = "fato_ocorrencia_aberta"
 TIPO_ABERTAS = "snapshot_periodico"
 GRAO_ABERTAS = "1 linha = 1 ocorrência ainda aberta na Ronda COS (o registro), no retrato da última volta"
 CAB_ABERTA = ("registro", "os", "cliente", "usina_codigo", "usina_id", "usina_ligada_por", "equipamentos_codigos",
-              "equipamentos_qtd", "equipamentos_de", "tipo_falha", "severidade", "etapa", "inicio", "data_id_inicio",
+              "equipamentos_qtd", "equipamentos_de", "equipamentos_citados", "tipo_falha", "severidade", "etapa", "inicio",
+              "data_id_inicio",
               "dias_aberta_qtd", "geracao_parou", "protecoes")
 MEDIDAS_ABERTAS = (("equipamentos_qtd", "qtd", "nao"), ("dias_aberta_qtd", "dias", "nao"),
                    ("geracao_parou", "1/0", "aditiva"))
@@ -70,6 +71,11 @@ MEDIDAS_ABERTAS = (("equipamentos_qtd", "qtd", "nao"), ("dias_aberta_qtd", "dias
 CLIENTE_ABERTAS = "Thopen"
 # a rota das ocorrências completa o que a fotografia não manda (as tags, o código do tipo, o início): 30 dias é o teto dela
 DIAS_COMPLEMENTO = 30
+# O equipamento que o COS cita pelo nome, em referência curta (30/10/2026: a OS 16958 de Santarém vem só com "Inversor
+# 2.7", sem a tag, e é mais velha que os 30 dias da rota que manda a tag; sem a referência, a régua contava um inversor de
+# potência média na usina errada). "Inversor 2.7" → INV2.7, "Cabine 2"/"Skid 2"/"QGBT 2" → CAB2; o nome não vai ao banco
+CITADO = ((re.compile(r"\binv(?:ersor)?\.?\s*(\d+(?:\.\d+)?)\b", re.I), "INV"),
+          (re.compile(r"\b(?:cabine|skid|qgbt)\s*(\d+)\b", re.I), "CAB"))
 INTERVALO_MIN = 50
 PRIMEIRA_S = 600            # a 1ª volta 10 min depois de subir: a 1ª carga da memória vem em páginas
 MINUTO_DA_HORA = 22
@@ -164,6 +170,18 @@ def _tipo_aberta(o: dict, extra: dict, tipos: dict) -> str:
     return tipos.get(rot) or re.sub(r"[^A-Z0-9]+", "_", rot).strip("_")
 
 
+def citados(nomes) -> str:
+    """As referências curtas dos equipamentos que o COS cita pelo nome, sem repetir, separadas por ";"."""
+    out = []
+    for n in nomes if isinstance(nomes, list) else ():
+        for rx, pref in CITADO:
+            m = rx.search(_txt(n))
+            if m and pref + m.group(1) not in out:
+                out.append(pref + m.group(1))
+                break
+    return ";".join(out)
+
+
 def linha_aberta(u: dict, o: dict, extra: dict, idx, tipos: dict) -> list:
     """A linha (CAB_ABERTA) de uma ocorrência aberta da fotografia: `u` a usina dela, `extra` a mesma ocorrência na
     rota de 30 dias ({} quando não está lá)."""
@@ -184,7 +202,9 @@ def linha_aberta(u: dict, o: dict, extra: dict, idx, tipos: dict) -> list:
     except (TypeError, ValueError):
         dias = ""
     return [str(o.get("registro")), os_ if os_.isdigit() else "", CLIENTE_ABERTAS.upper(), cod, uid or "",
-            (por if uid else ""), ";".join(equip), len(equip), de, _tipo_aberta(o, extra, tipos),
+            (por if uid else ""), ";".join(equip), len(equip), de,
+            citados(o.get("equipamentos") if isinstance(o.get("equipamentos"), list) else extra.get("equipamentos")),
+            _tipo_aberta(o, extra, tipos),
             _txt(o.get("severidade")).upper(), _txt(o.get("etapa")), _iso(inicio), _data_id(inicio), dias,
             _um_zero(gp), protecoes([*(prot or ()), *(extra.get("protecoes") or ())])]
 
