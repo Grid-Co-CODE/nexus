@@ -66,9 +66,8 @@ total da hora (1 linha por hora), e o pico do total não é a soma dos picos de 
 3. Mutação: desfazer cada parte da correção derruba o teste dela.
 4. Medir antes e depois e dizer o número (num processo novo, com o mesmo dado). Mudou a leitura de um dado: comparar
    valor a valor (confiabilidade de dado é a prioridade 1).
-5. Suíte inteira (`python -m pytest -q`) antes do push. No OS Creator: `python ferramentas/sincronizar_oscreator.py
-   --aplicar` só quando o "vai para o oem" lista só os seus arquivos, e a suíte do oem na pasta dele (`cd
-   C:\GridcoBuild\oem` e `python -m pytest -rN tests`).
+5. Suíte inteira (`python -m pytest -q`) antes do push. No OS Creator, a prova é a suíte do Nexus: desde 31/10/2026 ele
+   é a casa do OS Creator Web, não há mais sincronia com o oem e a pasta do oem não se toca.
 6. Push é deploy: conferir o `/saude` com o commit. Juntar as correções do dia num push quando der (cada push esfria o
    servidor).
 7. O `.md` da área tocada é atualizado no mesmo commit, e este arquivo também.

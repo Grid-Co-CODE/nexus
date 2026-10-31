@@ -9,7 +9,7 @@ O que estes testes seguram:
 - o contraste AA (4,5:1) das combinações de texto do tema claro.
 
 Fora da varredura, de propósito:
-- `nexus/torres/oscreator/os_creator/**`: a cópia do OS Creator do oem (o README de lá), com as cores fixas dele; o claro
+- `nexus/torres/oscreator/os_creator/**`: o OS Creator embutido (o README de lá), com as cores fixas dele; o claro
   dele mora no par html[data-tema="claro"] de cada folha do clone, e quem cobra é o tests/test_oscreator_tema_claro.py;
 - as cores de DADO que o servidor manda (a cor de cada pessoa no Quadro da equipe, a cor da etiqueta do Fracttal): são as
   mesmas nos dois temas, com texto escuro por cima;

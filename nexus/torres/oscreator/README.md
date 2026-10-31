@@ -1,8 +1,15 @@
-# OS Creator Web — clone dentro da torre OS Creator
+# OS Creator Web — dentro da torre OS Creator
 
-Cópia do OS Creator Web que roda no supervisório de O&M: o serviço `os_creator/os_web` do repositório `oem`,
-na porta 5090, publicado em `/os/*` pela plataforma. Foi trazida para cá em 30/09/2026, a pedido do Levi: "clone o
-OS Creator Web que está no meu supervisório de OEM para a pasta do OS Creator do Nexus".
+O OS Creator Web nasceu no supervisório de O&M: o serviço `os_creator/os_web` do repositório `oem`, na porta 5090,
+publicado em `/os/*` pela plataforma. Foi trazido para cá em 30/09/2026, a pedido do Levi: "clone o OS Creator Web que
+está no meu supervisório de OEM para a pasta do OS Creator do Nexus".
+
+**Desde 31/10/2026 o Nexus é a casa dele** (etapa 1 do canto central,
+`docs/superpowers/specs/2026-10-30-oscreator-canto-central-design.md`). De 06/10 a 30/10/2026 o clone era mantido
+idêntico ao do oem por uma ferramenta de sincronia; ela saiu (`ferramentas/sincronizar_oscreator.py`, o `sincronia.py` e
+o `sincronia.json`), e o oem (`C:\GridcoBuild\oem`) ficou **congelado** como estava: segue servindo o 5090 com a cópia
+dele, sem novidades, e ninguém escreve nele. Onde esta página fala em "levar ao oem", "sincronia", "`--aplicar`", "suíte
+do oem" ou em manter o clone "idêntico", é o registro daquele tempo.
 
 ## De onde veio
 
@@ -89,12 +96,11 @@ nesta pasta.
   moldura. Até então abria em tela cheia, porque o clone usa `window.top` para saber se é a casca. Numa moldura, isso
   quebrava duas coisas: as abas dele não ligavam, e o login dele tomava a janela. A ponte troca, na resposta,
   `window.top` por `window.__osTopo()`, que é a janela mais alta que ainda é do OS Creator. Fora do Nexus, essa
-  janela é o próprio `window.top`, então nada muda no supervisório. Se o oem mudar esses trechos, os testes da
-  moldura acusam.
+  janela é o próprio `window.top`, então nada muda no supervisório.
 - **Topo do OS Creator no Nexus** (Levi, 04/10): sem o "← Plataforma" (o menu lateral já leva a qualquer lugar) e sem
   o símbolo e o "Grid Co." (o topo do Nexus já tem); fica só o "Sistema de Ordens de Serviço", centralizado. As
-  páginas do Nexus também saem de qualquer moldura. A troca é feita na resposta, pela ponte, para o clone continuar
-  idêntico ao do oem.
+  páginas do Nexus também saem de qualquer moldura. A troca é feita na resposta, pela ponte, e o arquivo do clone não
+  muda.
 - **Sincronizado com o oem em 04/10:** `os_web/templates/solic_fila.html` (a Fila do PCM dava 500: pedia
   `p.id_account`, campo que a lista de responsáveis não tem; o oem corrigiu em 02/10 para `id_personnel`). Era o
   único arquivo diferente entre o clone e o oem.
@@ -610,10 +616,11 @@ Nexus no claro, as telas do OS Creator continuavam navy. O escuro ficou exatamen
     cujo endereço é `/os/`, moldura dentro de moldura (a da torre, a casca e as abas dela; o card do Quadro da equipe).
     A página da Plataforma no Tempo real (outro sistema) e moldura de outra origem ficam como estão. Página do OS
     Creator aberta depois já nasce no tema novo: o cookie já mudou.
-- **Onde mora a cor: no clone**, e vai ao oem com a sincronia. Cada `.css` do `os_web/static` ganhou no fim o par do
+- **Onde mora a cor: no clone.** Cada `.css` do `os_web/static` ganhou no fim o par do
   claro de cada cor do escuro, em `:where(html[data-tema="claro"]) <o mesmo seletor>`; o bloco TEMA CLARO do fim do
   `os.css` tem a paleta, `--osc-*`, que é a do tema claro do Nexus (`nexus.css`), e as variáveis de cada folha no claro.
-  No oem sozinho (5090) ninguém põe o atributo: nada disso vale, e a tela é a de sempre.
+  Sem o Nexus em cima (a página aberta sozinha, como no 5090 do oem congelado) ninguém põe o atributo: nada disso vale, e
+  a tela é a de sempre.
   - `:where()` não soma especificidade: o par do claro vence o escuro só por vir depois, e o estado mais específico do
     escuro (`.on`, `.sel`, `:hover`, `:focus`) continua vencendo. Com `html[data-tema="claro"] .x` solto, o `.x` do
     claro passaria por cima do `.x.on` e do `:focus` (a borda de foco do campo sumia). Hover reescrito no claro leva
@@ -680,10 +687,10 @@ Nexus no claro, as telas do OS Creator continuavam navy. O escuro ficou exatamen
   da tela: `os_web/rotas_tickets.py` (as 10 rotas `/tickets` e `/api/tickets/...`; o registro automático das telas não
   acha mais o arquivo), `os_web/tickets_web.py`, `os_web/tickets_painel.py`, `tickets_calc.py`, `templates/tickets.html`
   e `tickets_painel.html`, `static/tickets_painel.js` e `.css`; e, no Nexus, o item Chamados → Tickets de performance
-  (`ATALHOS`). A sincronia lista os 8 como "apagado no Nexus" e não os apaga no oem: o 5090 segue com a tela.
-- **A cópia segue igual à do oem nos arquivos que ficaram**: o `lancador.py`, o `performance.html` e o `os.css` do oem
-  ainda desenham o card "Tickets" da Performance, a pílula dele no card do setor (Início) e as regras `tk-*`. Os links
-  saem na ponte, na resposta (`_SEM_TICKETS`: todo `<a href="/os/tickets...">`); as regras `tk-*` ficam sem uso.
+  (`ATALHOS`). O oem não perde a tela: o 5090 segue com ela.
+- **Os arquivos que ficaram não mudaram**: o `lancador.py`, o `performance.html` e o `os.css` ainda desenham o card
+  "Tickets" da Performance, a pílula dele no card do setor (Início) e as regras `tk-*`. Os links saem na ponte, na
+  resposta (`_SEM_TICKETS`: todo `<a href="/os/tickets...">`); as regras `tk-*` ficam sem uso.
 - **Fica** a linha de ticket que nasce junto da OS da Performance (a caixa "Gerar ticket", `api.nascer_ticket` →
   `tickets_nasce`, que usa `tickets_api`, `tickets_diario`, `tickets_escrita` e `tickets_spec`): é da criação de OS, não
   da tela. O `/os/api/acomp/<folio>/ticket` é o nº do chamado no fabricante (Acompanhamento de chamados) e também fica.
@@ -692,8 +699,8 @@ Nexus no claro, as telas do OS Creator continuavam navy. O escuro ficou exatamen
   unidade!"). A ponte põe `.os-tabs{display:none}` no `_ESTILO_NEXUS` (some a faixa da casca e a da tela aberta
   sozinha); a casca continua guardando cada tela aberta, viva, e o menu lateral acende a de cada item já carregada. Sem
   o X de fechar, a ponte põe um teto no `abas.js` (`_ABAS_MAX` = 12 além do Início: os 9 itens da torre e mais três): ao
-  abrir a 13ª, sai a acesa há mais tempo, nunca a ativa. Tudo na ponte: a cópia segue igual à do oem, e no 5090 a faixa
-  continua. Prova: `test_dentro_do_nexus_sem_a_faixa_de_abas_e_as_telas_seguem_vivas`.
+  abrir a 13ª, sai a acesa há mais tempo, nunca a ativa. Tudo na ponte: o arquivo do clone não muda, e no 5090 (o oem) a
+  faixa continua. Prova: `test_dentro_do_nexus_sem_a_faixa_de_abas_e_as_telas_seguem_vivas`.
 
 ## A Área PCM como no app: Painel, Fila, Histórico e Temas (13/10/2026)
 
@@ -820,8 +827,8 @@ chegado, então o catálogo de ativos não era a espera daquele clique.
 
 Levi: "a partir de segunda quero o Nexus como link principal". O servidor serviu o Nexus em `app.gridco.com.br/nexus` até a
 fase 4 (hoje na raiz; `NEXUS_PREFIXO=/nexus` é a volta, `nexus/casca/CLAUDE.md`), e o clone escreve `/os/...` a partir da raiz em ~220 lugares
-(templates, `.js` e o JSON das rotas): ao pé da letra, levavam ao `/os/` da PLATAFORMA. O clone continua idêntico ao do
-oem (roda sozinho na raiz, no 5090); quem põe o prefixo é a ponte, na resposta, só quando há prefixo:
+(templates, `.js` e o JSON das rotas): ao pé da letra, levavam ao `/os/` da PLATAFORMA. O arquivo do clone não muda
+(roda sozinho na raiz, no 5090 do oem); quem põe o prefixo é a ponte, na resposta, só quando há prefixo:
 
 - o clone recebe o `SCRIPT_NAME` do Nexus: o `url_for` dele já sai com `/nexus`, e o cookie dele fica em `/nexus/os`
   (`_SessaoDoClone`, que troca o `/os` fixo do `criar_app`);
@@ -856,31 +863,17 @@ Depois abra `http://127.0.0.1:5091/os/login`. O login no Fracttal é por pessoa,
 
 ## Antes de mexer
 
-- **O Nexus é a referência; o oem acompanha** (Levi, 06/10/2026: "sincronize a ferramenta usando o do nexus como
-  referência"). Mudança no OS Creator: faça aqui, na cópia, prove aqui, e leve ao oem (o 5090 do supervisório):
-
-  ```
-  python ferramentas/sincronizar_oscreator.py              mostra o que mudou
-  python ferramentas/sincronizar_oscreator.py --aplicar    leva ao oem o que mudou só no Nexus
-  python ferramentas/sincronizar_oscreator.py --trazer     traz ao Nexus o que mudou só no oem
-  ```
-
-  A regra é de três lados (`sincronia.py`, com o hash de cada arquivo na última sincronia em `sincronia.json`): o que
-  mudou só no Nexus vai; o que mudou só no oem não é atropelado (aparece na lista); o que mudou nos dois é conflito e
-  fica para resolver à mão. O que o destino tinha antes vai para `<pasta de dados>/oscreator_backup/`. Só vão os
-  arquivos da cópia que estão no git (o `os_creator/.env`, com a credencial do Fracttal, fica fora sempre). Copiar
-  não reinicia o 5090 nem faz commit no oem (público: commit lá é decisão do Levi). Depois, commit do
-  `sincronia.json` no Nexus. Sincronia inicial (06/10, 15:58): 120 arquivos, todos iguais.
-- **Levar só os seus arquivos.** O `--aplicar` leva tudo o que está em "levar". Com outra sessão mexendo na cópia ao
-  mesmo tempo, ele levaria o trabalho dela pela metade ao 5090. Foi o caso de 08/10: o card da OS com várias tarefas
-  estava em andamento em `api.py`, `os_acoes_web.py` e `os_detalhe_conteudo.html`, enquanto a Engenharia ia ao oem.
-  O mesmo vale para um arquivo novo, que ainda não está no git do Nexus. Nesses casos:
-  - confira com `S.estado` que os seus estão em "levar";
-  - rode `S.importa_o_nexus` e copie com `S._copiar`, guardando o de antes em `<pasta de dados>/oscreator_backup/`;
-  - grave no `sincronia.json` o hash **só desses arquivos** (`S._hash`), para os outros continuarem em "levar".
-- **O que é só do Nexus vai na `ponte.py`, nunca na cópia** (a cópia vai para o supervisório, que não tem o Nexus):
-  a cópia não pode importar o pacote `nexus`, e a ferramenta recusa se importar. O
-  `tests/test_torre_oscreator.py` acusa quando a cópia e o oem divergem (só na máquina que tem o oem).
+- **O Nexus é a casa do OS Creator Web** (31/10/2026, etapa 1 do canto central; de 06/10 a 30/10 ele era a referência e o
+  oem acompanhava, por uma ferramenta de sincronia). Mudança no OS Creator: faça aqui, na cópia, e prove aqui, com a
+  suíte do Nexus (`python -m pytest -q -k oscreator`). Não há o que levar ao oem, e não se escreve em
+  `C:\GridcoBuild\oem`: ele fica congelado como estava, servindo o 5090. O custo do jeito de antes apareceu em 30/10/2026:
+  a cópia já passava do oem (os arquivos do cabeçalho de pedido automático não tinham sido levados) e o teste que cobrava
+  a igualdade estava vermelho nesta máquina.
+- **O que é só do Nexus (o portão, o topo, a moldura, o menu lateral, o tema, o prefixo) vai na `ponte.py`, na resposta**,
+  e não nos arquivos do clone: segue assim. A regra "a cópia não importa o pacote `nexus`" era para o supervisório não
+  quebrar ao receber a cópia, e saiu com a sincronia; hoje nenhum arquivo do clone importa o `nexus`, e é por isso que o
+  "Rodar sozinho", acima, funciona.
+- O `os_creator/.env` (a credencial do Fracttal da máquina) é do `.gitignore`: nunca entra no git.
 - Usa a mesma pasta de dados do OS Creator (`%APPDATA%\CriarOS-Fracttal`). Na mesma máquina, ele divide com o
   supervisório a chave da sessão e o token do banco.
 - Precisa do PyQt6 instalado, porque a tela de Engenharia importa `steps/engenharia`, que puxa `steps/ui.py`.
@@ -1381,7 +1374,8 @@ ele escolhe o fabricante o app já filtra se é inversor, cabine etc 4 - Se a li
 fabricantes tiver nome diferentes do fractall altere o nome em fabricante!" e "quando a singrid adicione novos
 fabricantes em chamados > fabricantes apareça atualizado no app".
 
-- **A regra mora no pacote** `chamado_garantia` (o mesmo no OS Creator, no oem e no App): `registro.py` põe a aba
+- **A regra mora no pacote** `chamado_garantia` (o do OS Creator; o App de Campo carrega a sua cópia, e a do oem ficou
+  congelada): `registro.py` põe a aba
   `os_creator · chamado_modelos` (a que a tela Fabricantes grava) por cima do código. O `chamado_modelos_store` do OS
   Creator passou a chamar o pacote (o canal de abertura continua só aqui); os nomes públicos dele não mudaram.
 - **A marca no nome do ativo** (`spec.marca_do_ativo`, a única: a de `regras` chama esta) vale como palavra inteira e
@@ -1676,5 +1670,5 @@ do `nexus/casca/CLAUDE.md`) e separa o clique da pessoa do que a tela pede sozin
 - **`carga.js`**, o círculo de carga, pergunta o `/os/historico/progresso` de 350 em 350 ms enquanto o Histórico busca: o
   `fetch` leva o cabeçalho (sem ele seria, por folga, a rota mais clicada);
 - a conferência da sessão de 5 min (`/os/_nexus/sessao`) é do Nexus (`nexus/templates/_confere_sessao_js.html`).
-Se estes arquivos forem levados ao oem (a sincronia), ele ignora o cabeçalho e o campo: nada muda no 5090. Tela nova que
+O oem (congelado) não recebe estes arquivos: nada muda no 5090. Tela nova que
 se renova sozinha põe o cabeçalho; sem ele conta como clique.

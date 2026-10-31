@@ -7,12 +7,12 @@ O que estes testes seguram:
 - o card da OS (card_os.html) segue o mesmo cookie;
 - o botão do tema do Nexus troca as molduras do /os/ abertas, moldura dentro de moldura, e só elas (a função do base.html,
   rodada no node sobre um DOM falso);
-- o clone não importa o nexus (vai para o oem, que não tem o Nexus);
+- o front do clone (templates, scripts e folhas) não conhece nada do Nexus além do atributo data-tema;
 - a COBERTURA, que pega o esquecimento: toda cor fixa do escuro de cada .css do clone tem o par do claro (o mesmo seletor e a
   mesma propriedade), toda variável de cor tem o valor do claro, toda cor de traço de ícone tem a do claro e toda cor escrita
   num template (ou montada no JS) do clone tem o gancho do claro;
 - o claro só existe sob html[data-tema="claro"], em :where() (não soma especificidade: o estado .on/:hover/:focus do escuro
-  continua vencendo); fora dele (o oem sozinho) nada muda;
+  continua vencendo); fora dele (a página aberta sem o Nexus em cima) nada muda;
 - a paleta --osc-* do clone é a do tema claro do Nexus;
 - o contraste AA (4,5:1) do texto do claro, regra a regra, com o fundo que a própria regra declara.
 A tela foi conferida no Chrome sem janela (README da torre, seção "Tema claro").
@@ -233,13 +233,11 @@ console.log(JSON.stringify({r1, r2}));
     assert out["r2"] == ["escuro", "escuro", "escuro", None]
 
 
-# ── o clone continua sem o Nexus ────────────────────────────────────────────────────────────────────────────────────
-def test_clone_nao_importa_o_nexus():
-    """Toda .py da cópia (inclusive a que ainda não está no git): o tema claro mora no CSS do clone e na ponte."""
-    from nexus.torres.oscreator import sincronia as S
-    pys = [p.relative_to(S.AQUI).as_posix() for pasta in S.PASTAS for p in (S.AQUI / pasta).rglob("*.py")]
-    assert pys and S.importa_o_nexus(S.AQUI, pys) == []
-    # e nenhum template, script ou folha do clone carrega coisa do Nexus (o clone só conhece o atributo data-tema)
+# ── o front do clone só conhece o atributo ──────────────────────────────────────────────────────────────────────────
+def test_o_front_do_clone_so_conhece_o_atributo_do_tema():
+    """O tema claro mora no CSS do clone e na ponte: nenhum template, script ou folha do clone carrega coisa do Nexus (ele
+    só conhece o atributo data-tema, que a ponte põe). Até 31/10/2026 o Python da cópia também era cobrado aqui (não
+    importar o `nexus`), para o oem não quebrar ao receber a cópia; com o oem congelado, essa regra saiu."""
     for arq in list(WEB.rglob("*.html")) + list(WEB.rglob("*.js")) + list(WEB.rglob("*.css")):
         texto = _sem_comentarios(arq.read_text(encoding="utf-8"))
         assert not re.search(r"(?:href|src)=[\"']/static/|@import|NexusTema|NexusOsCard|nexus_tema", texto), arq.name
@@ -289,9 +287,9 @@ def test_cada_variavel_de_cor_tem_o_valor_do_claro(arq):
 
 
 def test_o_claro_so_existe_sob_o_atributo_e_sem_somar_especificidade():
-    """O claro mora todo sob html[data-tema="claro"]: no oem sozinho (sem o atributo) nada dele vale. As regras vão em
-    :where(), que não soma especificidade (o ".x" do claro não pode passar por cima do ".x.on" e do ":focus" do escuro);
-    só os blocos de variáveis ficam em html[data-tema="claro"], para vencer o :root."""
+    """O claro mora todo sob html[data-tema="claro"]: sem o atributo (a página aberta sozinha, como no oem) nada dele
+    vale. As regras vão em :where(), que não soma especificidade (o ".x" do claro não pode passar por cima do ".x.on" e do
+    ":focus" do escuro); só os blocos de variáveis ficam em html[data-tema="claro"], para vencer o :root."""
     erros = []
     for arq in _css_do_clone():
         for partes, decls in _tudo(arq):

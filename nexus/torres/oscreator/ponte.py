@@ -12,7 +12,8 @@ uma aba dentro de outra casca) e o login dele fugia da moldura e tomava a janela
 `window.top` por `window.__osTopo()`: a janela mais alta que ainda é do OS Creator. Fora do Nexus ela é o próprio
 `window.top`, então o comportamento no supervisório é o mesmo.
 
-O clone fica IDÊNTICO ao do oem (sincronizar = copiar de novo): todo ajuste é feito aqui, na resposta.
+Os ajustes do Nexus são feitos aqui, na resposta, e não nos arquivos do clone: até 31/10/2026 o clone era mantido idêntico
+ao do oem (o app de mesa, hoje congelado), e o desenho ficou como estava.
 """
 import hashlib
 import hmac
@@ -56,9 +57,8 @@ DESTINOS = {
 _VOLTAR_DE = (b'<a class="os-topo-voltar" href="/" title="Voltar para a Plataforma de Performance">'
               b'&larr; Plataforma</a>')
 # Tickets de performance saiu do Nexus (Levi, 12/10/2026: "pode excluir essa seção e o código dela!" e "Isso você não
-# levará para o oem"): a tela foi apagada da cópia (a sincronia só lista o apagado, não apaga no oem), e os links que o
-# código do oem ainda desenha para ela (o card "Tickets" da Performance e a pílula no card do setor, no Início) saem
-# aqui, na resposta, para a cópia continuar igual à do oem.
+# levará para o oem"): a tela foi apagada da cópia, e os links que os arquivos do clone ainda desenham para ela (o card
+# "Tickets" da Performance e a pílula no card do setor, no Início) saem aqui, na resposta.
 # Garantias sem o "← Chamados" no Nexus (Levi, 28/10/2026: "Em garantias tire esse botão de voltar para chamados"): o
 # Nexus chega ao quadro pelo menu (Chamados > Garantias); no oem, sozinho, a volta ao card de Chamados fica. Só o voltar
 # do quadro (para /os/chamados); o "← Acompanhamento" da tela de um chamado fica.
@@ -92,7 +92,7 @@ _ESTILO_NEXUS = (b'<style>.os-n2--nexus{font-size:13px;line-height:1;align-self:
 # OS só aparece a notificação de criação!"): a plataforma abre a tela de criação com ?janela=1 num iframe que cobre a tela.
 # Aqui ela sai sem o topo (a marca os-no-nexus) e avisa a página de baixo quando o POST da criação responde ok
 # (`{gc: "os-criada", mensagem, detalhes}`), para a janela fechar e a notificação aparecer. O código do OS Creator não
-# muda (a cópia segue igual à do oem): quem embrulha o fetch é esta resposta.
+# muda: quem embrulha o fetch é esta resposta.
 _JANELA_OS = (rb'<script>document.documentElement.classList.add("os-no-nexus","os-janela");'
               rb'(function(){var f=window.fetch;if(!f)return;window.fetch=function(u,o){var p=f.apply(this,arguments);'
               rb'try{if(/\/os\/api\/[a-z_-]+\/criar(\?|$)/.test(String(u))&&o&&String(o.method||"").toUpperCase()==="POST"){'
@@ -142,8 +142,8 @@ _TROCAS_ABAS = [(b"if (window.parent === window) casca();", b"if (window.__osTop
 # Tema claro (Levi, 09/10/2026: "faltou o tema claro do OS Creator Web, não está sincronizando com o botão do Nexus"). O
 # clone não lê o cookie do Nexus: quem decide é a ponte, pelo mesmo casca.tema_do_pedido das páginas do Nexus.
 # - No claro, o <html> da página já sai com data-tema="claro": o servidor desenha, e a página nasce clara, sem piscar o navy.
-#   As cores moram no próprio clone (o par :where(html[data-tema="claro"]) no fim de cada .css do os_web/static), que
-#   vão ao oem junto: lá ninguém põe o atributo e nada muda.
+#   As cores moram no próprio clone (o par :where(html[data-tema="claro"]) no fim de cada .css do os_web/static); sem o
+#   atributo (a página aberta sozinha, como no oem) nada muda.
 # - No escuro (o padrão, cookie ausente ou desconhecido) o atributo NÃO entra: o HTML do escuro é o de sempre.
 # - Em toda página, o oscreator/_tema_os.html (o _tema_cabeca.html do Nexus) refaz a conta antes de pintar e ouve a troca
 #   feita em outra aba. A troca na mesma aba chega pelo botão do Nexus (base.html), moldura por moldura.
@@ -170,8 +170,8 @@ def _trocar(corpo: bytes, de: bytes, para: bytes) -> bytes:
 # ── o prefixo do Nexus no OS Creator embutido (09/10/2026, porta única) ───────────────────────────────────────────
 # Levi: "a partir de segunda quero o Nexus como link principal". No servidor o Nexus mora em /nexus (NEXUS_PREFIXO), e o
 # clone escreve /os/... na raiz em ~220 lugares (templates, .js e o JSON das rotas): seguidos ao pé da letra, eles levavam
-# à PLATAFORMA (que tem o próprio /os/). O clone fica IDÊNTICO ao do oem (ele roda sozinho na raiz, no 5090); quem põe o
-# prefixo é a ponte, na resposta, como já fazia com o resto:
+# à PLATAFORMA (que tem o próprio /os/). O clone escreve /os na raiz (ele roda sozinho na raiz, no 5090 do oem); quem põe
+# o prefixo é a ponte, na resposta, como já fazia com o resto:
 # - HTML, JavaScript e JSON: "/os, '/os, `/os e (/os ganham o prefixo (um caminho do clone começa sempre logo depois de
 #   aspas ou parêntese). Fica de fora o value="/os/...": é o `next` do formulário de login, que o clone só aceita sem o
 #   prefixo (`_destino_local`). O `next=/os/...` dentro de um endereço também fica (vem depois de "=").

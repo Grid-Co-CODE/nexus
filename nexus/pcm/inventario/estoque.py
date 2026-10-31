@@ -619,8 +619,8 @@ class _SessaoDoClone:
         # "details" ou "load_"; o resto é gravação de OS) e, a cada "gravação", limpa a memória das leituras de OS do
         # processo inteiro. `warehouses_items_stock` e toda gravação de estoque caem nesse "resto": cada pedido do
         # adaptador esvaziaria o cache de card do OS Creator de todo mundo (o card voltaria a ler o Fracttal). Nenhum
-        # pedido daqui toca numa OS, e é o mesmo POST e os mesmos erros, sem essa limpeza. O `api.py` não se edita (o
-        # clone fica idêntico ao do oem). Buscado a cada pedido: o teste troca o que quiser.
+        # pedido daqui toca numa OS, e é o mesmo POST e os mesmos erros, sem essa limpeza. O `api.py` não é editado para
+        # isso. Buscado a cada pedido: o teste troca o que quiser.
         with self._sessao.contexto(self._jwt, self._email):
             try:
                 return self._api._rpc_chamar(metodo, params, TIMEOUT_S)

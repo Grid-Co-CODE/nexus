@@ -42,8 +42,8 @@ de CHAMADOS > GARANTIA", com as diferenças:
 - **O pulso:** a sombra em camadas do Levi com a cor por token (`--pulso`, em H S L, nos dois temas), numa camada por
   cima do cartão cuja opacidade vai de 0,5 a 1 e volta; com "reduzir movimento", fica parada em 1.
 - **Solicitar OS:** abre `/os/solicitacao?ativo=<código>&os_pai=<id>&os_pai_folio=<nº>`; a Nova solicitação do OS
-  Creator passa a aceitar a sugestão (cliente, usina e o ativo marcado; a OS pai escolhida). Vai ao oem pela
-  `sincronizar_oscreator` com o OK do Levi.
+  Creator passa a aceitar a sugestão (cliente, usina e o ativo marcado; a OS pai escolhida). Foi ao oem pela sincronização
+  de então (24/10/2026, com o OK do Levi); ela saiu em 31/10/2026, e o oem está congelado.
 - **Demais respostas do técnico:** as OS filhas (o REST filtra por `id_parent_wo`, medido em 24/10) e, de cada uma, a
   resposta de "Descreva a atividade realizada" (`work_orders_subtasks`). Sem filha: o aviso de usar o Solicitar OS.
 - **Quem mexe:** o setor Engenharia e o administrador, com login de pessoa (como no acompanhamento dos ativos); os demais

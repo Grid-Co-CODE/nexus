@@ -112,10 +112,11 @@ PerformancePainel.
 - `nexus/torres/<torre>/__init__.py` — uma pasta por torre. Declara `TORRE` e `bp`; é descoberta sozinha.
   **Para construir uma tela**, crie uma view no `bp` da torre com a mesma rota da tela
   (`@bp.route("/mesa")`); ela vence o placeholder. Templates da torre em `nexus/torres/<torre>/templates/<torre>/`.
-- `nexus/torres/oscreator/` — além da torre, traz o **clone do OS Creator Web** (cópia do `oem`) e a ponte
-  `/os/*` (`ponte.py`), fora de `/t/<torre>` porque o cookie do login do Fracttal só chega em `/os` (a ponte do inventário
-  do PCM, `nexus/pcm/inventario/ponte_os.py`, mora em `/os/_nexus/inventario` pelo mesmo motivo). Leia o `README.md` de lá
-  antes de mexer: o clone fica idêntico ao do oem de propósito.
+- `nexus/torres/oscreator/` — além da torre, traz o **OS Creator Web** (nasceu como cópia do `oem`; desde 31/10/2026 o
+  Nexus é a casa dele e o oem, o app de mesa, está congelado) e a ponte `/os/*` (`ponte.py`), fora de `/t/<torre>` porque o
+  cookie do login do Fracttal só chega em `/os` (a ponte do inventário do PCM, `nexus/pcm/inventario/ponte_os.py`, mora em
+  `/os/_nexus/inventario` pelo mesmo motivo). Leia o `README.md` de lá antes de mexer. Não há mais sincronia com o oem:
+  nada se leva para lá, e não se escreve em `C:\GridcoBuild\oem`.
 - `nexus/auth/` — o portão de login. Toda rota exige sessão, exceto as de `ROTAS_PUBLICAS`.
   Rota pública nova entra ali, conscientemente; o teste `test_toda_rota_nao_publica_exige_login` pega o esquecimento.
 - `nexus/casca/` — Início, troca de tema, `/saude`, contexto dos templates (menu, setor, tema). A cadeira saiu em

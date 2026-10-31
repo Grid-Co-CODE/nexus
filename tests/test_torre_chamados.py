@@ -39,10 +39,9 @@ def test_sem_login_vai_para_a_entrada(cliente):
 
 def test_tickets_de_performance_saiu_com_a_tela_do_os_creator(app, logado):
     """Levi, 12/10/2026: "Chamados > Tickets de Performance -> pode excluir essa seção e o código dela!" e "Isso você não
-    levará para o oem". Sai o item da torre e a tela de Tickets da cópia do OS Creator (as rotas e o painel; a sincronia
-    só lista o apagado). Os links que o código do oem ainda desenha (o card da Performance e a pílula do setor no Início)
-    saem na ponte, e a cópia segue igual à do oem. A linha de ticket que nasce junto da OS da Performance (a caixa "Gerar
-    ticket") é da criação de OS e fica."""
+    levará para o oem". Sai o item da torre e a tela de Tickets da cópia do OS Creator (as rotas e o painel). Os links que
+    os arquivos do clone ainda desenham (o card da Performance e a pílula do setor no Início) saem na ponte, na resposta.
+    A linha de ticket que nasce junto da OS da Performance (a caixa "Gerar ticket") é da criação de OS e fica."""
     html = logado.get("/t/chamados/fabricantes").get_data(as_text=True)
     assert "/t/chamados/tickets" not in html and "Tickets de performance" not in html
     assert logado.get("/t/chamados/tickets").status_code == 404
@@ -52,10 +51,10 @@ def test_tickets_de_performance_saiu_com_a_tela_do_os_creator(app, logado):
     clone = ponte.clone(app)
     # (o /os/api/acomp/<folio>/ticket é o nº do chamado no fabricante, do Acompanhamento de chamados: fica)
     assert not [r.rule for r in clone.url_map.iter_rules() if "/tickets" in r.rule]
-    # os links para a tela que saiu: o card da Performance (o template da cópia, igual ao do oem) e a pílula do Início
+    # os links para a tela que saiu: o card da Performance (o template do clone) e a pílula do Início
     from pathlib import Path
     perf = Path(ponte.RAIZ_CLONE, "os_web", "templates", "performance.html").read_bytes()
-    assert b'href="/os/tickets"' in perf                                     # a cópia não mudou
+    assert b'href="/os/tickets"' in perf                                     # o arquivo não mudou: a ponte é que tira
     limpo = ponte._SEM_TICKETS.sub(b"", perf)
     assert b"/os/tickets" not in limpo and limpo.count(b'class="os-plano"') == perf.count(b'class="os-plano"') - 1
     pilulas = (b'<div class="portas"><a href="/os/performance/criar?frase=x">String</a><a href="/os/tickets">Tickets</a>'

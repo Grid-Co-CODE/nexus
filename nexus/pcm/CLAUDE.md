@@ -603,8 +603,8 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
   do Fracttal de quem está no pedido (`ponte.sessao_do_os`; sem ele, `SemLogin`: quem entra pela senha não grava estoque); o
   JWT e o e-mail vivem só na memória da instância, que roda cada pedido dentro de `os_web.sessao.contexto` e guarda o token
   que o `api` renovar no meio, para um trabalho de minutos não renovar a cada pedido. Chamar dentro do pedido; a instância
-  pode seguir numa thread. **Chama o `api._rpc_chamar`, não o `_rpc_call`** (o `api.py` não se edita: o clone fica idêntico
-  ao do oem): o `_rpc_call` trata como "gravação de OS" todo método que não é "_list", "get", "details" ou "load_" e limpa o
+  pode seguir numa thread. **Chama o `api._rpc_chamar`, não o `_rpc_call`** (o `api.py` não é editado para isso): o
+  `_rpc_call` trata como "gravação de OS" todo método que não é "_list", "get", "details" ou "load_" e limpa o
   cache de leituras de OS do processo inteiro a cada um; `warehouses_items_stock` e toda gravação de estoque caem aí, e cada
   pedido do adaptador esvaziaria o cache dos cards de todo mundo. Nenhum pedido daqui toca numa OS.
 - **Nome de gente não entra:** o `responsible_description` do histórico de movimentos é nome de pessoa; o adaptador projeta
