@@ -753,10 +753,12 @@ def historico():
     status_ids = [nome_para_id[x] for x in status_sel] or None
     forcar = request.args.get("atualizar") == "1"
     # `mudou=1`: o card fechou depois de mudar uma OS (31/10/2026: a tela não força mais o atualizar=1; a ação já pôs a OS na
-    # lista central, e no caminho de hoje a lista vem de novo, como vinha)
+    # lista central, e no caminho de hoje a lista vem de novo, como vinha). O período inválido (o "de" depois do "até", a data
+    # torta) vai ao caminho de hoje: o invertido dava 0 OS na lista e 0 no Fracttal, e a conferência "batia" (rodada 1 da 3.3)
     lista, linhas, info, erro = ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, forcar=forcar,
                                           aviso=_progresso_de(request.args.get("p")),
-                                          mudou=request.args.get("mudou") == "1", cos=modo == "cos")
+                                          mudou=request.args.get("mudou") == "1", cos=modo == "cos",
+                                          central=lista_central.periodo_valido(de, ate))
     # o teto de 2.000 corta as OS MAIS ANTIGAS do período em silêncio — dizer, com o total do servidor e o que CHEGOU (a
     # conta é total − carregadas, antes da busca local; o teto só entra para saber se houve corte)
     total_srv, teto = int(info.get("total") or 0), int(info.get("cap") or 0)

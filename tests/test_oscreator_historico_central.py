@@ -17,7 +17,11 @@ O Fracttal é de mentira e conta cada ida; nada sai da máquina. Nomes, códigos
 repositório é público)."""
 import datetime as dt
 import logging
+import re
 import sys
+import threading
+import time
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -137,8 +141,10 @@ class _Fracttal:
 
     def __init__(self):
         self.pedidos = []
+        self.universo = [dict(o) for o in UNIVERSO]      # as OS que o Fracttal tem (o teste soma as que ele criou)
         self.visao = {RESTRITA: {o["id"] for o in UNIVERSO if o["beta"]}}
         self.fora = False
+        self.inesperados = []                             # o pedido que o teste não previu (conferido no fim do teste)
 
     @staticmethod
     def _quem():
@@ -146,7 +152,7 @@ class _Fracttal:
 
     def _vistas(self):
         ids = self.visao.get(self._quem())
-        return [o for o in UNIVERSO if ids is None or o["id"] in ids]
+        return [o for o in self.universo if ids is None or o["id"] in ids]
 
     def _filtrar(self, modo, id_account, id_label, de, ate, status_ids):
         idp, idacc, _nome = PESSOAS.get(self._quem(), (None, None, ""))
@@ -217,15 +223,19 @@ class _Fracttal:
 @pytest.fixture
 def fr(monkeypatch):
     import requests
+    f = _Fracttal()
 
+    # o pedido que o teste não previu não vai a lugar nenhum, e fica ANOTADO: o código que o faz costuma engolir a exceção
+    # (`except Exception`, a ação que nunca derruba a tela), e o teste o confere no fim (rodada 1 da 3.3, Minor 4)
     def sem_rede(*a, **k):                    # a cota do Fracttal é da empresa: aqui nada sai da máquina
+        f.inesperados.append(("rede", str(a[1:3])))
         raise AssertionError("o teste tentou ir à rede")
     monkeypatch.setattr(requests.Session, "request", sem_rede)
 
-    def sem_fracttal(metodo, *a, **k):        # o que o teste não previu não vai a lugar nenhum
+    def sem_fracttal(metodo, *a, **k):
+        f.inesperados.append(("fracttal", metodo))
         raise AssertionError("um pedido ao Fracttal que o teste não previu: %s" % metodo)
     monkeypatch.setattr(api, "_rpc_call", sem_fracttal)
-    f = _Fracttal()
     monkeypatch.setattr(api, "list_minhas_os", f.list_minhas_os)
     monkeypatch.setattr(api, "list_minhas_os_pagina", f.pagina)
     monkeypatch.setattr(api, "total_chamados", f.total_chamados)
@@ -255,11 +265,13 @@ def fr(monkeypatch):
     with rotas._MEMO_LOCK:
         rotas._MEMO.clear()
     yield f
+    LC.esperar_releituras(5)                  # a releitura da ação que passou do prazo termina antes da limpeza
     HS.limpar()
     LC.limpar()
     with rotas._MEMO_LOCK:
         rotas._MEMO.clear()
     ativos_central.reiniciar()
+    assert not f.inesperados, "pedidos que o teste não previu: %r" % (f.inesperados,)
 
 
 def _encher(linhas=None) -> None:
@@ -313,12 +325,16 @@ def test_historico_sem_pedido_ao_fracttal(fr):
     b = _cliente(OUTRA)
     assert _central(_hist(b, "modo=cos"), 2)
     assert fr.n("lista") == 0 and fr.n("total", OUTRA) == 1
-    # a OS nova que o leitor trouxe aparece sem pedido nenhum (a conferência guardada ainda bate: 61 contra 60)
+    # a OS nova que o leitor trouxe: a lista passa a ter MAIS OS que o total guardado dela (61 contra 60), e a lista nunca
+    # mostra mais do que o Fracttal deu à pessoa (a regra de uma mão, Ruling BQ): 1 pedido para conferir de novo, e ela vem
     nova = dict(POR_ID[1], id=61, folio="10061", criada=_iso(0.01), descricao="")
+    fr.universo.append(nova)
     OC.receber([_rest(nova)], OC.NOVAS)
-    assert _central(_hist(a, "modo=cos"), 61) and fr.n("total") == 2 and fr.n("lista") == 0
+    assert _central(_hist(a, "modo=cos"), 61) and fr.n("total") == 3 and fr.n("lista") == 0
+    _hist(a, "modo=cos")
+    assert fr.n("total") == 3                                   # o total novo dela ficou guardado
     e = OC.estado()["conferencias"]["todos"]
-    assert e["n"] == 2 and e["divergiram"] == 0
+    assert e["n"] == 3 and e["divergiram"] == 0
 
 
 def test_visao_restrita_segue_com_a_dela(fr):
@@ -509,6 +525,7 @@ def test_as_acoes_entram_na_lista_e_a_falha_nao_derruba(fr, ao_vivo, monkeypatch
     # a OS criada (Criar OS do zero, uma por ativo) entra na hora, e a Visão COS a mostra sem reler o Fracttal
     nova = dict(POR_ID[1], id=62, folio="10062", criada=_iso(0.001), descricao="")
     os_[62] = nova
+    fr.universo.append(nova)                                    # o Fracttal tem a OS que acabou de criar
     monkeypatch.setattr(trad, "montar_payload", lambda corpo, assets, imagens, frases: ("bulk", ([],), {}, None))
     monkeypatch.setattr(api, "load_assets_cached", lambda *a, **k: [])
     monkeypatch.setattr(api, "create_work_orders_bulk", lambda *a, **k: [
@@ -580,3 +597,298 @@ def test_as_conferencias_no_raio_x(fr):
     txt = linhas["Conferências das telas"]
     assert "2 conferências" in txt and "1 divergiu" in txt and "Fracttal 30 contra 60 da lista" in txt
     assert "@" not in txt and "Pessoa" not in txt                # só contagens: nunca quem
+
+
+# ── rodada 1 de correções da 3.3: a lista central só aparece para quem o Fracttal mostra tudo ──────────────────────────
+# Rulings BP e BQ. A sonda da revisão liberou a pessoa de visão restrita por um período estreito (invertido, um dia quieto,
+# um dia em que todas as OS são dela, o Investigar fora dos 30 dias) e mostrou a ela, com a folga de 2 OS, uma OS que o
+# Fracttal esconde dela ("Criado por" outra pessoa num dia). Os casos da sonda viraram os testes abaixo.
+def _liberou(c, email, wid=1) -> bool:
+    """A pessoa ficou liberada, ou ganhou a 1ª pintura do card de uma OS (a OS 1 é da Usina Alfa, que a restrita não vê)."""
+    return LC.liberado(email) or c.get("/os/api/os/%d/previa" % wid).status_code == 200
+
+
+def test_periodo_invertido_nao_libera(fr):
+    _encher()
+    r = _cliente(RESTRITA)
+    de, ate = HOJE - dt.timedelta(days=2), HOJE - dt.timedelta(days=5)          # o "de" depois do "até"
+    assert r.get("/os/historico?modo=cos&de=%s&ate=%s" % (de, ate)).status_code == 200
+    assert not _liberou(r, RESTRITA) and fr.n("total", RESTRITA) == 0     # o período inválido vai ao caminho de hoje, sem conferir
+    with sessao.contexto(JWT, RESTRITA):
+        assert api._wo_id_por_folio("10001") is None             # o Fracttal decide: ela não vê a OS 1
+    assert fr.n("folio", RESTRITA) == 1
+
+
+def test_dia_quieto_nao_libera(fr):
+    _encher()
+    r = _cliente(RESTRITA)
+    d = HOJE - dt.timedelta(days=25)                             # nenhuma OS: 0 contra 0
+    _hist(r, "modo=cos&de=%s&ate=%s" % (d, d))
+    assert not _liberou(r, RESTRITA)
+
+
+def test_dia_com_todas_as_os_dela_nao_libera(fr):
+    _encher()
+    dias = defaultdict(list)
+    for o in UNIVERSO:
+        dias[o["criada"][:10]].append(o)
+    d = next(k for k, v in sorted(dias.items()) if len(v) >= 2 and all(o["beta"] for o in v))
+    r = _cliente(RESTRITA)
+    h = _hist(r, "modo=cos&de=%s&ate=%s" % (d, d))
+    # o que ela vê no dia é o que a lista tem (as OS da Usina Beta): a lista pode mostrar; liberar o resto, não
+    assert all(">%s</a>" % o["folio"] in h for o in dias[d])
+    assert not _liberou(r, RESTRITA)
+
+
+def test_investigar_fora_dos_30_dias_nao_libera(fr):
+    _encher()
+    r = _cliente(RESTRITA)
+    de, ate = HOJE - dt.timedelta(days=60), HOJE - dt.timedelta(days=40)
+    assert r.get("/os/historico/ativo?codigo=CAF-UBE200-INVR1.1&usina=" + BETA.replace(" ", "%20")
+                 + "&nome=Inversor%201.1&de=" + str(de) + "&ate=" + str(ate)).status_code == 200
+    assert not _liberou(r, RESTRITA)
+
+
+def test_so_os_30_dias_padrao_liberam(fr):
+    """Só a "Todos" sem etiqueta nem status nos 30 dias padrão até hoje libera (Ruling BP), mesmo para quem vê tudo e com
+    muitas OS no período: outro período, uma etiqueta ou um status, não."""
+    _encher()
+    a = _cliente(TODA)
+    assert _central(_hist(a, "modo=cos&de=%s&ate=%s" % (HOJE - dt.timedelta(days=25), HOJE)), 1)   # 60 OS, e bate
+    assert _central(_hist(a, "modo=criadas&pessoa=TODOS&status=Em+Processo"), 1)
+    assert not LC.liberado(TODA)
+    _hist(a, "modo=cos")                                         # os 30 dias padrão
+    assert LC.liberado(TODA)
+
+
+def test_escopo_com_menos_de_20_os_nao_libera(fr):
+    # 10 OS nos 30 dias padrão e as outras 50 mais velhas (a medida dos campos precisa de uma leitura de 50 OS)
+    fr.universo = ([o for o in fr.universo if o["id"] <= 10]
+                   + [dict(o, criada=_iso(40 + o["id"] % 30 + o["id"] / 1000.0)) for o in fr.universo if o["id"] > 10])
+    _encher([_rest(o) for o in fr.universo])
+    a = _cliente(TODA)
+    assert _central(_hist(a, "modo=cos"), 1)                     # a lista vale para ela (a conferência bateu: 10 e 10)
+    assert not _liberou(a, TODA, wid=2)                                # mas 10 OS não bastam para dizer que ela vê tudo
+
+
+def test_previa_e_numero_de_os_antiga_vao_ao_vivo_mesmo_liberada(fr):
+    _encher()
+    antiga = dict(POR_ID[1], id=70, folio="10070", criada=_iso(45), descricao="")
+    fr.universo.append(antiga)
+    OC.receber([_rest(antiga)], OC.NOVAS)
+    a = _cliente(TODA)
+    _hist(a, "modo=cos")
+    assert LC.liberado(TODA) and a.get("/os/api/os/7/previa").status_code == 200
+    # a OS criada antes dos 30 dias conferidos: fora do escopo que liberou, o Fracttal decide
+    assert a.get("/os/api/os/70/previa").status_code == 204
+    with sessao.contexto(JWT, TODA):
+        assert api._wo_id_por_folio("10070") == 70 and api._wo_id_por_folio("10007") == 7
+    assert fr.n("folio", TODA) == 1                              # só a antiga foi ao Fracttal
+
+
+def test_criado_por_outra_pessoa_nao_mostra_a_os_escondida(fr):
+    """A sonda C: "Criado por" a Pessoa Um num dia em que ela criou só a OS 1 (Usina Alfa). A restrita não a vê no Fracttal
+    (0), a lista tem 1: a folga de 2 OS a mostrava. A lista nunca tem mais que o Fracttal dá à pessoa."""
+    _encher()
+    d1 = POR_ID[1]["criada"][:10]
+    assert OC.contar("criadas", {"id_account": 4001, "codigo": "PF01", "nome": "Pessoa Fictícia Um"}, d1, d1) >= 1
+    r = _cliente(RESTRITA)
+    h = _hist(r, "modo=criadas&pessoa=4001&de=%s&ate=%s" % (d1, d1))
+    assert "OS central 1</td>" not in h and "OS ao vivo 1</td>" not in h and ">10001</a>" not in h
+    assert fr.n("lista", RESTRITA) == 1                          # ao vivo, pela sessão dela
+
+
+def test_visao_por_pessoa_com_uma_os_a_menos_vai_ao_vivo(fr):
+    _encher([_rest(o) for o in UNIVERSO if o["id"] != 7])        # a lista ainda não tem a OS 7 dela
+    a = _cliente(TODA)
+    h = _hist(a, "modo=criadas")                                 # as criadas por mim: 10 no Fracttal, 9 na lista
+    assert _ao_vivo(h, 7) and "OS central" not in h and fr.n("lista", TODA) == 1
+
+
+def test_atualizar_com_uma_os_a_menos_vai_ao_vivo(fr):
+    _encher([_rest(o) for o in UNIVERSO if o["id"] != 7])
+    a = _cliente(TODA)
+    assert _central(_hist(a, "modo=cos"), 1)                     # sem o ↻, "Todos" aceita o atraso de 1 OS nova (60 e 59)
+    h = _hist(a, "modo=cos&atualizar=1")                         # o ↻: igual, ou ao vivo
+    assert _ao_vivo(h, 7) and "OS central" not in h and fr.n("lista", TODA) == 1
+
+
+def test_todos_com_o_fracttal_dando_uma_a_mais_passa(fr):
+    _encher([_rest(o) for o in UNIVERSO if o["id"] != 60])       # a nova que a faixa ainda não trouxe
+    a = _cliente(TODA)
+    h = _hist(a, "modo=cos")
+    assert _central(h, 1) and not _central(h, 60) and fr.n("lista") == 0
+
+
+def test_todos_com_a_lista_tendo_uma_a_mais_vai_ao_vivo(fr):
+    _encher()
+    fr.visao[TODA] = {o["id"] for o in UNIVERSO if o["id"] != 7}   # o Fracttal não mostra a OS 7 a ela
+    a = _cliente(TODA)
+    h = _hist(a, "modo=cos")
+    assert "OS central" not in h and ">10007</a>" not in h and fr.n("lista", TODA) == 1
+    assert not LC.liberado(TODA)
+
+
+def test_campos_mostrados_vem_da_medida(fr):
+    """A descrição, o ativo, a equipe, o atribuído e o status também são medidos (Important 1): sem a descrição, o Histórico vai
+    ao vivo; sem a equipe e o atribuído, a Visão COS e o Garantias vão, e o Histórico Geral segue da lista."""
+    _encher([dict(_rest(o), description=None) for o in UNIVERSO])
+    assert OC.campos_medidos()["pct"]["descrição"] == 0
+    a = _cliente(TODA)
+    assert _ao_vivo(_hist(a, "modo=criadas&pessoa=TODOS"), 1) and fr.n("lista") == 1
+    OC.reiniciar()
+    HS.limpar()
+    _encher([dict(_rest(o), personnel_description=None, user_assigned=None) for o in UNIVERSO])
+    pct = OC.campos_medidos()["pct"]
+    assert pct["equipe"] == 0 and pct["atribuído a"] == 0 and pct["status"] == 100 and pct["ativo"] == 100
+    b = _cliente(OUTRA)
+    assert _ao_vivo(_hist(b, "modo=cos"), 1)
+    assert _central(_hist(b, "modo=criadas&pessoa=TODOS"), 1)
+    n = fr.n("chamados")
+    b.get("/os/chamados/acompanhamento")
+    assert fr.n("chamados") == n + 1
+
+
+def _nota_retroativa(linhas_de_historico: int) -> str:
+    """A nota de uma OS 3 retroativa com o histórico importado: uma linha por dia, a última de ontem (o "parado há N dias" sai
+    dela, do FIM da nota)."""
+    abertura = (HOJE - dt.timedelta(days=linhas_de_historico + 10)).strftime("%d/%m/%Y")
+    corpo = [aw.MARCA_NOTA + " — Marca Inventada · Inversor",
+             "OS de abertura: 10001 · OS de campo: 10002 · Ativo: CAF-UAL100-INVR1.1",
+             "Data da ocorrência / abertura do chamado: %s" % abertura, "Histórico (importado da planilha):"]
+    for k in range(linhas_de_historico):
+        dia = HOJE - dt.timedelta(days=linhas_de_historico - k)
+        corpo.append("%s - Conversa com o fornecedor inventado sobre a troca do equipamento, o envio da peça e o prazo "
+                     "combinado com a equipe de campo, registro %03d de um texto longo de propósito." % (
+                         dia.strftime("%d/%m/%Y"), k))
+    return "\n".join(corpo)
+
+
+def _cartao(h, folio) -> str:
+    m = re.search(r'class="card([^"]*)" href="/os/chamados/acompanhamento/%s"' % folio, h)
+    assert m, "o cartão da OS %s não está no quadro" % folio
+    return m.group(1)
+
+
+def test_nota_longa_do_chamado_nao_mostra_parado_errado(fr):
+    """O "parado há N dias" do Garantias sai das linhas do histórico, no FIM da nota (Important 2, Ruling BR). A nota de ~10 mil
+    caracteres passava do teto de 4.000 e era cortada sem marca: o quadro via a última atualização de um mês atrás e pulsava."""
+    longa = _nota_retroativa(50)
+    assert 4000 < len(longa) < OC.NOTA_MAX
+    fr.universo[50] = dict(fr.universo[50], nota=longa)          # a OS 51, de acompanhamento, aberta e sem ticket
+    _encher([_rest(o) for o in fr.universo])
+    assert not OC.atual().por_id[51].nota_cortada
+    a = _cliente(TODA)
+    h = a.get("/os/chamados/acompanhamento").get_data(as_text=True)
+    assert fr.n("chamados") == 0 and "parada" not in _cartao(h, "10051")
+    # a que passa do teto fica marcada, e o quadro vai ao vivo (não mostra a nota pela metade como inteira)
+    maior = _nota_retroativa(120)
+    assert len(maior) > OC.NOTA_MAX
+    fr.universo[51] = dict(fr.universo[51], nota=maior)
+    OC.reiniciar()
+    _encher([_rest(o) for o in fr.universo])
+    assert OC.atual().por_id[52].nota_cortada
+    h = a.get("/os/chamados/acompanhamento?atualizar=1").get_data(as_text=True)
+    assert fr.n("chamados") == 1 and "parada" not in _cartao(h, "10052")
+
+
+def test_criadas_alem_das_tres_ficam_para_a_faixa(fr, ao_vivo):
+    """As OS criadas além das 3 primeiras não são lidas por trás (Minor 1): a faixa das novas (até 3 min) as traz."""
+    os_, lidas = ao_vivo
+    _encher()
+    novas = [dict(POR_ID[1], id=80 + k, folio=str(10080 + k), criada=_iso(0.001), descricao="") for k in range(5)]
+    for o in novas:
+        os_[o["id"]] = o
+    with sessao.contexto(JWT, TODA):
+        n = LC.criadas([{"ok": True, "os": {"id_work_order": o["id"]}} for o in novas])
+    assert n == 3 and sorted(lidas) == [80, 81, 82]
+    assert not [t for t in threading.enumerate() if t.name == "os-web-lista-central"]
+    time.sleep(0.3)
+    assert sorted(lidas) == [80, 81, 82] and 83 not in OC.atual().por_id
+
+
+def test_a_releitura_da_acao_tem_prazo(fr, ao_vivo, monkeypatch):
+    """A releitura da OS depois da ação tem prazo (Minor 2): passou dele, a resposta sai, a OS fica pendente para a faixa, e a
+    leitura que termina depois ainda a põe na lista."""
+    os_, lidas = ao_vivo
+    _encher()
+    a = _cliente(TODA)
+    _hist(a, "modo=cos")
+    monkeypatch.setattr(LC, "RELEITURA_MAX_S", 0.2)
+    solta = threading.Event()
+    lenta = api._leitura_da_os
+
+    def demora(metodo, wid, params, usar_guardada=True):
+        solta.wait(2)
+        return lenta(metodo, wid, params, usar_guardada)
+    monkeypatch.setattr(api, "_leitura_da_os", demora)
+    monkeypatch.setattr(api, "cancel_os", lambda wid, idm, note="": None)
+    os_[2]["status"] = 4
+    t0 = time.monotonic()
+    r = a.post("/os/api/os/2/cancelar", json={"id_status_custom": 9, "folio": "10002"})
+    assert r.get_json()["ok"] and time.monotonic() - t0 < 1.5
+    assert 2 in OC.estado()["pendentes_ids"]
+    solta.set()
+    assert LC.esperar_releituras(5)
+    assert OC.atual().por_id[2].status_id == 4 and 2 not in OC.estado()["pendentes_ids"]
+
+
+def test_quem_diverge_fica_ao_vivo_30_min_sem_reconferir(fr):
+    """A pessoa que diverge não é conferida de novo a cada visita (Minor 3): o resultado fica guardado 30 min, e o Raio-X a
+    conta uma vez por janela."""
+    _encher()
+    r = _cliente(RESTRITA)
+    for _ in range(3):
+        _hist(r, "modo=cos")
+        fr.relogio["t"] += 120
+    assert fr.n("total", RESTRITA) == 1 and OC.estado()["conferencias"]["todos"]["divergiram"] == 1
+    fr.relogio["t"] += HS.CONFERE_S
+    _hist(r, "modo=cos")
+    assert fr.n("total", RESTRITA) == 2
+
+
+def test_a_visao_so_e_refeita_quando_a_versao_muda(fr, monkeypatch):
+    """As linhas da visão só são montadas de novo quando a VERSÃO da lista muda (Minor 5); a hora dela ("Lista das HH:MM")
+    acompanha a última leitura."""
+    montadas = []
+    original = HS.html_das_linhas
+
+    def contar(lista, chave, montar):
+        return original(lista, chave, lambda: montadas.append(chave) or montar())
+    monkeypatch.setattr(HS, "html_das_linhas", contar)
+    _encher()
+    a = _cliente(TODA)
+    _hist(a, "modo=cos")
+    depois = time.time() + 180
+    OC.receber([], OC.NOVAS, lido_em=depois)                     # a leitura que não trouxe nada: a mesma versão
+    h = _hist(a, "modo=cos")
+    assert montadas == [("cos", "")]
+    assert "Lista das %s" % datetime.fromtimestamp(depois, api._BR_TZ).strftime("%H:%M") in h
+
+
+def test_finalizar_e_executar_sem_pedido_a_toa(fr, ao_vivo, monkeypatch):
+    """O finalizar do Garantias usa o status da releitura que pôs a OS na lista (sem reler o cabeçalho), e o "fazer a tarefa"
+    só relê a OS quando o registro de execução foi confirmado (Minor 6)."""
+    os_, lidas = ao_vivo
+    _encher()
+    a = _cliente(TODA)
+    _hist(a, "modo=cos")
+    cabecalhos = []
+    ler_cabecalho = api._cabecalho_os
+    monkeypatch.setattr(api, "_cabecalho_os", lambda wid: cabecalhos.append(wid) or ler_cabecalho(wid))
+    monkeypatch.setattr(api, "get_os_detalhes", lambda wid: {"folio": POR_ID[wid]["folio"], "subtarefas": [], "notas": ""})
+    monkeypatch.setattr(api, "concluir_os_checado", lambda wid: {"ok": True, "data_fim": {}})
+    monkeypatch.setattr(obs_store, "adicionar", lambda *a, **k: {})
+    os_[51]["status"] = 2
+    j = a.post("/os/api/acomp/10051/finalizar", json={"wid": 51}).get_json()
+    assert j["ok"] and cabecalhos == [51] and OC.atual().por_id[51].status_id == 2
+    monkeypatch.setattr(api, "subtarefas_da_tarefa", lambda tid: [])
+    monkeypatch.setattr(api, "registrar_execucao", lambda *a, **k: {"ok": True, "confirmado": False})
+    lidas.clear()
+    corpo = {"valores": {}, "inicio": "2026-10-31T09:00"}
+    assert a.post("/os/api/os/5/tarefa/9005/executar", json=corpo).get_json()["ok"]
+    assert lidas == []                                           # sem o registro confirmado, nada a reler
+    monkeypatch.setattr(api, "registrar_execucao", lambda *a, **k: {"ok": True, "confirmado": True,
+                                                                   "inicio": "2026-10-31T12:00:00Z"})
+    assert a.post("/os/api/os/5/tarefa/9005/executar", json=corpo).get_json()["ok"]
+    assert lidas == [5]

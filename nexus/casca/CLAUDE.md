@@ -467,7 +467,8 @@ encolhimento": a faixa, a hora e o motivo, só com contagens, até a faixa passa
 leitura igual ("aceita na 2ª leitura": o apagamento de verdade, rodada 2), os campos que o REST trouxe (a
 sondagem da 1ª noite), as conferências das telas que leem da lista ("Conferências das telas", 3.3, `_conferencias_das_telas`:
 por visão, quantas foram ao Fracttal desde o último reinício, quantas divergiram e falharam, e a última divergência com os dois
-totais; muitas na visão "todos" de quem vê tudo é sinal de lista errada), a cópia em disco e a memória
+totais; a conferência é de uma mão só, e quem diverge não é conferido de novo por 30 min, então cada pessoa conta uma vez por
+janela; muitas na visão "todos" de quem vê tudo é sinal de lista errada), a cópia em disco e a memória
 (`os_central.memoria_estimada`: cada registro e texto contados uma vez;
 ~0,4 s com 36 mil OS, medida UMA vez por versão da lista, e a falha da medida vai ao log; 25,8 MB contra os 23,9 MB do
 tracemalloc). Só contagens, datas, ids e motivos: nunca o texto de um ativo ou

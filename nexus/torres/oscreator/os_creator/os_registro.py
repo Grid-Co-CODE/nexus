@@ -24,7 +24,10 @@ from typing import NamedTuple
 
 DESCRICAO_MAX = 90              # como o `api._shape_wo_row` entrega ao Histórico
 ATIVO_MAX = 60
-NOTA_MAX = 4000                 # a nota com o bloco do chamado (o Garantias a lê); a OS sem ele não guarda nota
+# a nota com o bloco do chamado (o Garantias a lê); a OS sem ele não guarda nota. Era 4.000 até a rodada 1 da 3.3 (Ruling BR):
+# o "parado há N dias" do quadro sai das linhas do histórico da retroativa, que ficam no FIM da nota, e a de ~10 mil caracteres
+# perdia o fim sem aviso. A que ainda passa do teto fica marcada (`RegistroOS.nota_cortada`), e o quadro vai ao vivo
+NOTA_MAX = 16000
 STATUS = {1: "Em Processo", 2: "Em Verificação", 3: "Concluída", 4: "Cancelada"}     # o `api.WO_STATUS` (um teste confere)
 # as marcas do bloco do chamado na nota da OS: a do `api._CHAMADO_MK` (o bloco do chamado) e a do `acomp_web.MARCA_NOTA` (a OS
 # de acompanhamento do Garantias); um teste confere que são as mesmas
@@ -142,6 +145,12 @@ class RegistroOS(NamedTuple):
     def code(self) -> str:
         return self.codigos[-1] if self.codigos else ""
 
+    @property
+    def nota_cortada(self) -> bool:
+        """A nota do chamado passou do teto e perdeu o fim (o histórico mais novo da retroativa): quem a lê para contar dias
+        não a usa como inteira. A de exatamente `NOTA_MAX` caracteres também conta (o lado seguro)."""
+        return len(self.note) >= NOTA_MAX
+
     def get(self, chave, padrao=None):
         return getattr(self, chave) if chave in _LEGIVEIS else padrao
 
@@ -177,7 +186,7 @@ class RegistroOS(NamedTuple):
                 "status": self.status, "tipo_tarefa": self.tipo_tarefa, "note": self.note}
 
 
-_LEGIVEIS = frozenset(RegistroOS._fields) | frozenset(_DATAS) | {"status", "code"}
+_LEGIVEIS = frozenset(RegistroOS._fields) | frozenset(_DATAS) | {"status", "code", "nota_cortada"}
 # um objeto só para os textos de POUCA variedade, que se repetem em milhares de OS (as ~150 pessoas, os tipos, os gatilhos,
 # as etiquetas): é uma tabela pequena e guardada. Os de muita variedade que se repetem (o código e o nome do ativo, a descrição
 # de um plano) se juntam só dentro de cada leitura (`_Juntar`): guardar a tabela deles custava mais que a repetição (medido:

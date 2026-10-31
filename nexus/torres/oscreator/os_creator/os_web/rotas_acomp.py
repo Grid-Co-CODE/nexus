@@ -129,9 +129,10 @@ def _linhas(forcar: bool = False, pessoa=None) -> dict:
         hoje = aw.agora_brt()
         de = (dt.date.today() - dt.timedelta(days=DIAS_BUSCA)).isoformat()
         # da lista central de OS primeiro (31/10/2026, tarefa 3.3 do canto central): as OS da etiqueta, sem pedido nenhum,
-        # quando quem lê confere que vê no Fracttal o mesmo total (a conferência do `_dono`, a mesma chave). A cópia do quadro
-        # segue a de sempre (o dono, os 30 min, os tickets lidos à parte); o total dela é o da lista, que bateu com o dela
-        central = lista_central.garantias(de, _quem_le())
+        # quando quem lê confere que vê no Fracttal ao menos o que a lista tem (a conferência do `_dono`, a mesma chave; no
+        # Atualizar e na releitura por trás, o mesmo número). A cópia do quadro segue a de sempre (o dono, os 30 min, os
+        # tickets lidos à parte); o total dela é o da lista, que passou na conferência dela
+        central = lista_central.garantias(de, _quem_le(), forcar=forcar)
         if central is not None:
             linhas = [l for l in central["linhas"] if aw.eh_os3(l)]
             quando = dt.datetime.fromtimestamp(central["lido_em"], aw.BRT) if central["lido_em"] else hoje
@@ -934,10 +935,12 @@ def api_finalizar(folio):
     res = api.concluir_os_checado(wid)                           # o Concluir do card (os_detalhe.py:896)
     if isinstance(res, dict) and res.get("ok") is False:
         return _erro(res.get("msg") or "O Fracttal não concluiu a OS.")
-    lista_central.mudou(wid)                    # a OS concluída entra na lista central na hora (31/10/2026; nunca derruba)
-    # o quadro guardado leva o status que o Fracttal deu depois de concluir (em verificação ou concluída: 1 pedido, aqui,
-    # e não a lista inteira na volta ao quadro); sem ele, o quadro não chuta e sai da memória, como até 20/10/2026
-    st = _status_depois_de_concluir(wid)
+    reg = lista_central.mudou(wid)              # a OS concluída entra na lista central na hora (31/10/2026; nunca derruba)
+    # o quadro guardado leva o status que o Fracttal deu depois de concluir (em verificação ou concluída): o da releitura que
+    # acabou de pôr a OS na lista central (o cabeçalho, lido agora), sem outro pedido; sem ela (a lista fora de uso, a releitura
+    # que falhou ou passou do prazo), 1 pedido, aqui, e não a lista inteira na volta ao quadro. Sem status nenhum, o quadro não
+    # chuta e sai da memória, como até 20/10/2026
+    st = reg.status_id if reg is not None else _status_depois_de_concluir(wid)
     if st in (2, 3):
         _ajustar(wid, {"status_id": st, "status": api.WO_STATUS.get(st, "")})
     else:

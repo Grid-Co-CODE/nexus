@@ -365,8 +365,13 @@ def _medir_campos(novos: dict, faixa: str, agora: float) -> None:
     n = len(novos)
     rs = novos.values()
     # a data fim, o início e a nota do chamado entraram na 3.3 (as telas que os mostram vão ao vivo quando a leitura grande
-    # não os trouxe; a nota do chamado é rara numa leitura qualquer, e o Garantias a confere nas OS dele, `lista_central`)
+    # não os trouxe; a nota do chamado é rara numa leitura qualquer, e o Garantias a confere nas OS dele, `lista_central`); a
+    # descrição, o ativo escrito, a equipe, o "atribuído a" e o status, na rodada 1 da 3.3 (Important 1: as telas os mostravam
+    # sem medida, dados como presentes porque vêm das mesmas colunas que o nº e o código)
     conta = {"nº": sum(1 for r in rs if r.folio), "criação": sum(1 for r in rs if _s(r)),
+             "descrição": sum(1 for r in rs if r.descricao), "ativo": sum(1 for r in rs if r.ativo),
+             "equipe": sum(1 for r in rs if r.equipe), "atribuído a": sum(1 for r in rs if r.atribuido_a),
+             "status": sum(1 for r in rs if r.status_id is not None),
              "quem criou": sum(1 for r in rs if r.criado_por),
              "código de quem criou": sum(1 for r in rs if r.cod_criador),
              "responsável (id)": sum(1 for r in rs if r.id_atribuido is not None),
@@ -608,6 +613,16 @@ def _marcar_pendente(wid: int) -> None:
             _instalar(base, {}, lido_em=base.lido_em, janela=base.janela, a_conferir=set(base.a_conferir) | {wid},
                       mudou=True)
     _agendar_gravacao()
+
+
+def marcar_pendente(id_work_order) -> None:
+    """A OS que uma ação mudou e que não deu para reler a tempo (a releitura da tela passou do prazo, rodada 1 da 3.3): "a
+    conferir" e pendente, como a ação fora de um pedido; a faixa das pendentes a lê pelo nº, e a releitura que terminar depois
+    a põe na lista do mesmo jeito (e a tira da fila)."""
+    wid = _int(id_work_order)
+    if wid is not None:
+        atual()
+        _marcar_pendente(wid)
 
 
 def atualizar_os(id_work_order, registro=None) -> bool:
