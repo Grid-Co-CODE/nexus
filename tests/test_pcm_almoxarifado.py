@@ -38,9 +38,13 @@ def _p(lid, item, almox, situacao, motivo=""):
             "Unidade": "UNIDADE", "Situação": situacao, "Motivo da recusa": motivo, "Lançado por (HMAC)": ""}
 
 
-def _semear(api, saldo_inicio=INICIO, inicio=INICIO, total=10, nao_lidos=(4,), itens_faltando=0, saldo_extra=()):
+def _semear(api, saldo_inicio=INICIO, inicio=INICIO, total=10, nao_lidos=(4,), itens_faltando=0, saldo_extra=(),
+            novas=None, custo=None):
     """Os 4 livros do App coerentes: `total` itens na lista (1 a 4 com nome; os outros sem saldo), os de `nao_lidos`
-    com Lido = Não (o 4, por padrão: 9 de 10 lidos, acima dos 90%)."""
+    com Lido = Não (o 4, por padrão: 9 de 10 lidos, acima dos 90%). `novas` (30/10/2026) é o App com as colunas novas:
+    {id do item: (criticidade, curva)} vai para Criticidade e Curva ABC do Itens (o item fora do dicionário leva vazio),
+    e `custo` {(id do item, id do almoxarifado): custo} para o Custo unitário do Saldo. Sem `novas`, o livro de hoje,
+    SEM as três colunas (coluna ausente não é coluna vazia)."""
     nomes = {1: ("SP-1", "Fusível 10A", "UNIDADE", "Proteção", "Não"), 2: ("SP-2", "Cabo 6 mm", "METRO", "Cabos", "Não"),
              3: ("SP-3-AV", "[AVARIADO] Disjuntor", "UNIDADE", "Proteção", "Sim"),
              4: ("SP-4", "Relé de proteção", "UNIDADE", "Proteção", "Não")}
@@ -54,6 +58,11 @@ def _semear(api, saldo_inicio=INICIO, inicio=INICIO, total=10, nao_lidos=(4,), i
              _s(1, 20, SEM, 4, 0, saldo_inicio),          # sem mínimo
              _s(3, 20, SEM, 2, 1, saldo_inicio),          # avariada com saldo
              _s(2, 20, SEM, 0, 0, saldo_inicio)] + list(saldo_extra)        # zerada
+    if novas is not None:
+        for it in itens:
+            it["Criticidade"], it["Curva ABC"] = novas.get(int(it["ID do item"]), ("", ""))
+        for sl in saldo:
+            sl["Custo unitário"] = (custo or {}).get((int(sl["ID do item"]), int(sl["ID do almoxarifado"])), "")
     _aba(api, A.LIVRO_CICLO, A.ABA_CICLO, [{"Início do ciclo": inicio, "Fim do ciclo": FIM,
                                              "Itens na lista do Fracttal": total,
                                              "Itens lidos": total - len([i for i in nao_lidos if i <= total]),
@@ -248,3 +257,107 @@ def test_rev_i6_ciclo_anulado_sai_da_tela(app, almox, monkeypatch):
     visao.limpar()
     d = T.montar().dados
     assert d["estado"] == "incoerente" and "anulado" in d["aviso"]
+
+
+# ── 30/10/2026, itens 7 e 8: o filtro conta a aba à vista, o saldo unitário e a Reposição por criticidade e curva ─────
+
+def test_saldo_unitario_sai_do_limite(app, almox, monkeypatch):
+    """Mínimo 1 e saldo 1 é o ruído do "no limite" (a próxima saída zera, mas não é pedido de compra por si): vai para o
+    grupo próprio. O saldo 2 e mínimo 2 segue no limite."""
+    from nexus.pcm import almoxarifado as T
+    _semear(almox, saldo_extra=[_s(5, 10, ALT, 1, 1), _s(6, 10, ALT, 2, 2)])
+    visao.limpar()
+    d = T.montar().dados
+    sit = {l["codigo"]: l["situacao"] for l in d["linhas"]}
+    assert sit["SP-5"] == "saldo_unitario" and sit["SP-6"] == "no_limite"
+    assert [r["codigo"] for r in d["reposicao"]] == ["SP-1", "SP-2", "SP-6"]
+    assert [r["codigo"] for r in d["saldo_unitario"]] == ["SP-5"]
+    k = d["kpis"]
+    assert (k["abaixo"], k["no_limite"], k["saldo_unitario"]) == (1, 2, 1)
+    assert {c["id"]: c for c in d["por_almoxarifado"]}["10"]["saldo_unitario"] == 1
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "+1 de saldo unitário" in html
+    assert "uma peça e mínimo 1: a próxima saída zera, mas não é pedido de compra por si" in html
+
+
+def test_reposicao_ordena_dentro_do_grupo(app, almox, monkeypatch):
+    """O grupo vem antes (abaixo, no limite, saldo unitário); dentro dele a criticidade (1.Crítico primeiro), a curva (A,
+    B, C e sem curva por último) e, por fim, a falta. Um crítico no limite não passa à frente de um comum abaixo."""
+    from nexus.pcm import almoxarifado as T
+    novas = {5: ("1.Crítico", "B"), 6: ("1.Crítico", "A"), 7: ("1.Crítico", ""), 8: ("", "A"), 9: ("1.Crítico", "A"),
+             10: ("1.Crítico", "A")}
+    extra = [_s(5, 10, ALT, 4, 5),        # abaixo, falta 1: crítico, curva B
+             _s(6, 10, ALT, 4, 5),        # abaixo, falta 1: crítico, curva A
+             _s(7, 10, ALT, 0, 9),        # abaixo, falta 9: crítico, sem curva
+             _s(8, 10, ALT, 0, 5),        # abaixo, falta 5: comum, curva A
+             _s(9, 10, ALT, 0, 3),        # abaixo, falta 3: crítico, curva A (a falta desempata com o SP-6)
+             _s(10, 10, ALT, 3, 3)]       # no limite: crítico, curva A
+    _semear(almox, saldo_extra=extra, novas=novas)
+    visao.limpar()
+    d = T.montar().dados
+    assert [r["codigo"] for r in d["reposicao"]] == ["SP-9", "SP-6", "SP-5", "SP-7", "SP-8", "SP-1", "SP-10", "SP-2"]
+    l9 = next(l for l in d["linhas"] if l["codigo"] == "SP-9")
+    assert (l9["criticidade"], l9["crit_n"], l9["curva"]) == ("1.Crítico", 1, "A")
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert 'class="inv-crit inv-crit--1"' in html           # o quadradinho que a Aprovação do inventário já usa
+
+
+def test_livro_de_hoje_sem_colunas_novas(app, almox, monkeypatch):
+    """O Nexus sobe antes do App: sem as colunas, a ordem é a de hoje, as colunas mostram "–" e nada é inventado (nem
+    "C" nem custo 0). Coluna ausente não é coluna vazia: o Cadastro a corrigir não cobra o que o App ainda não traz."""
+    from nexus.pcm import almoxarifado as T
+    d = T.montar().dados
+    assert all(l["criticidade"] == "" and l["curva"] == "" and l["custo"] is None and l["crit_n"] is None
+               for l in d["linhas"])
+    assert (d["tem_criticidade"], d["tem_curva"], d["tem_custo"]) == (False, False, False)
+    assert [r["codigo"] for r in d["reposicao"]] == ["SP-1", "SP-2"]
+    assert d["cadastro"]["sem_curva"] is None and d["cadastro"]["sem_criticidade"] is None
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "com saldo sem Curva ABC" not in html and "com saldo sem criticidade" not in html
+
+
+def test_cadastro_sem_curva_e_sem_criticidade(app, almox, monkeypatch):
+    """Com as colunas, a peça COM saldo e sem curva (ou sem criticidade) pede o cadastro no Fracttal: completar é lá."""
+    from nexus.pcm import almoxarifado as T
+    _semear(almox, novas={1: ("1.Crítico", ""), 3: ("2.Necessário", "A")})      # o 2 não tem nada; o 4 não tem saldo
+    visao.limpar()
+    d = T.montar().dados
+    assert (d["tem_criticidade"], d["tem_curva"], d["tem_custo"]) == (True, True, True)
+    assert d["cadastro"]["sem_curva"] == 2 and d["cadastro"]["sem_criticidade"] == 1
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "2 peças com saldo sem Curva ABC no Fracttal" in html
+    assert "1 peça com saldo sem criticidade no Fracttal" in html
+
+
+def test_a_troca_de_aba_refaz_o_filtro(app, almox, monkeypatch):
+    """O script das abas disparava `input` no formulário, que o filtro-local.js não escuta (ele ouve o `change` dos select
+    e o `input` do campo de texto): os números do filtro ficavam os da aba anterior. A troca chama o `aplicar` e a barra
+    some nas abas sem tabela."""
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "FiltroLocal['alm-f'].aplicar" in html and "data-alm-filtro" in html
+    assert "dispatchEvent(new Event('input'" not in html
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "pcm.css").read_text("utf-8")
+    assert ".alm-filtros[hidden]" in css          # o `.cn-filtros{display:flex}` vence o [hidden] do navegador
+
+
+def test_reserva_com_e_sem_as_colunas_novas(app, almox, monkeypatch):
+    """Na reserva (o último ciclo aplicado no Nexus) a chave da coluna não diz se o App a mandou: a carga grava as colunas
+    novas, vazias, mesmo com o livro do App de antes. "Tem" é ao menos uma peça com valor no histórico."""
+    from nexus.pcm import almoxarifado as T
+    _guardar_ciclo(almox)                                                  # o histórico de hoje, sem as colunas
+    _semear(almox, saldo_inicio="2026-10-26T03:00:05Z")                    # o App com livros de ciclos diferentes
+    visao.limpar()
+    d = T.montar().dados
+    assert d["estado"] == "ok" and (d["tem_criticidade"], d["tem_curva"], d["tem_custo"]) == (False, False, False)
+    assert all(l["curva"] == "" and l["custo"] is None for l in d["linhas"])
+    assert d["cadastro"]["sem_curva"] is None
+    nova = "2026-10-25T18:00:00Z"                                          # outro ciclo, agora com as colunas novas
+    _semear(almox, inicio=nova, saldo_inicio=nova, novas={3: ("2.Necessário", "A")}, custo={(3, 20): 12.5})
+    _guardar_ciclo(almox)
+    _semear(almox, inicio=nova, saldo_inicio="2026-10-26T03:00:05Z", novas={3: ("2.Necessário", "A")})
+    visao.limpar()
+    d = T.montar().dados
+    l3 = next(l for l in d["linhas"] if l["codigo"] == "SP-3-AV")
+    assert d["estado"] == "ok" and (d["tem_criticidade"], d["tem_curva"], d["tem_custo"]) == (True, True, True)
+    assert (l3["criticidade"], l3["crit_n"], l3["curva"], l3["custo"]) == ("2.Necessário", 2, "A", 12.5)
+    assert d["cadastro"]["sem_curva"] == 2          # o SP-1 e o SP-2 têm saldo e o Fracttal não deu curva

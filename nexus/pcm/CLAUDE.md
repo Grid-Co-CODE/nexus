@@ -455,11 +455,32 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   varredura uma vez por dia, a partir de 00:00 de Brasília, e publica 4 livros (o pacote
   `app-campo-docs/_propostas/almoxarifado-nexus`). O Nexus não chama o Fracttal. As contas e o contrato estão em
   `nexus/dados/almoxarifado.py`, os MESMOS da carga do histórico (`nexus/dados/CLAUDE.md`, linha Almoxarifado).
-- **O que a tela mostra:** 6 números (almoxarifados, peças com saldo, abaixo do mínimo e no limite, sem mínimo,
-  avariadas, lançadas pelo App com as recusadas) e 5 abas: Reposição, Por almoxarifado, Catálogo e saldo, Consumo nas OS
+- **O que a tela mostra:** 6 números (almoxarifados, peças com saldo, abaixo do mínimo com "e N no limite (+M de saldo
+  unitário)" na nota, sem mínimo, avariadas, lançadas pelo App com as recusadas) e 5 abas: Reposição, Por almoxarifado, Catálogo e saldo, Consumo nas OS
   (tudo desde o início, Levi 25/10/2026) e Cadastro a corrigir. Desde 26/10/2026, as quatro partes do inventário (Inventário, Mínimo e máximo, Curadoria e Auditoria) vêm logo depois, juntas, como links para outras páginas (as seções do inventário, abaixo). Filtro na própria página (`filtro-local.js`).
+- **O filtro conta a aba à vista (30/10/2026, item 7):** o script das abas disparava `input` no formulário, que o
+  `filtro-local.js` não escuta (ele ouve o `change` dos `select` e o `input` do campo de texto): as opções ficavam com os
+  números da aba anterior. A troca de aba chama `FiltroLocal['alm-f'].aplicar()` (o filtro se aplica sozinho ao carregar,
+  e o script das abas roda antes dele) e a barra (`data-alm-filtro`) some nas abas sem tabela (Por almoxarifado, Cadastro
+  a corrigir). **Armadilha:** o `.cn-filtros{display:flex}` da casa vence o `[hidden]` do navegador; o `.alm-filtros[hidden]`
+  do `pcm.css` é que esconde. Cada tabela leva um `data-fl-nome` próprio, senão a linha "Nenhuma peça com esses filtros"
+  nunca acende (a Reposição e o saldo unitário têm; o Catálogo e o Consumo ainda não).
 - **As contas:** abaixo = mínimo > 0 e saldo < mínimo; **no limite** = saldo igual ao mínimo, separado porque o Fracttal
   costuma ter o mínimo igual ao saldo (25/10: 0 abaixo, 54 no limite); sem mínimo = mínimo 0; zerada = saldo 0.
+  **Saldo unitário (30/10/2026, item 8)** = saldo 1 e mínimo 1: sai do "no limite" e vai para um grupo fechado (`<details>`)
+  logo abaixo da Reposição, na MESMA `data-fl-grupo` (o filtro conta as duas tabelas); a próxima saída zera, mas não é
+  pedido de compra por si, e misturado escondia as peças que estão no limite de verdade (saldo 2 e mínimo 2 segue no
+  limite). A `A.situacao` do `nexus/dados` não muda (o histórico a usa): é a `_situacao` do `almoxarifado.py` que separa.
+- **A Reposição por criticidade e curva (30/10/2026, item 8):** o grupo vem antes (abaixo do mínimo, depois no limite, depois
+  saldo unitário: um crítico no limite não passa à frente de uma peça comum abaixo) e, DENTRO dele, a criticidade
+  (1.Crítico primeiro; sem número por último), a Curva ABC (A, B, C; sem curva por último) e a falta (`_ordem`). Crit. é o
+  quadradinho `.inv-crit` da Aprovação do inventário e Curva a letra, as do cadastro da peça no Fracttal (o Nexus não
+  calcula curva, `nexus/dados/almoxarifado.py`); sem valor, "–". **Coluna ausente não é coluna vazia:** o livro do App de
+  antes não tem Criticidade, Curva ABC nem Custo unitário (`d["tem_criticidade"]`, `["tem_curva"]`, `["tem_custo"]`), e aí a
+  ordem é a de antes, as colunas mostram "–" e o Cadastro a corrigir não cobra nada; com a coluna, a peça COM saldo e sem
+  curva (ou sem criticidade) dá a linha "N peças com saldo sem Curva ABC no Fracttal" (completar é no Fracttal). Na
+  reserva (o último ciclo aplicado) a chave da coluna não prova que o App a mandou (a carga a grava vazia): "tem" é ao
+  menos uma peça com valor no histórico. A criticidade "None" do `sync-xlsx` é vazio (`_campo`).
 - **Número pela metade não vai:** o saldo é o do ciclo mais novo do App só com Ciclo, Itens e Saldo do mesmo ciclo e 90%
   da lista lidos; senão, o último ciclo aplicado no histórico do Nexus, com o aviso; sem ele (o ensaio), só o aviso.
   Ciclo com mais de 36 h: o aviso com a data. Item com Lido = Não: "não lido neste ciclo", nunca "sem saldo". O consumo
@@ -478,7 +499,8 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   (lançadas e recusadas). Prova: `tests/test_pcm_inventario_contrato.py`. O contrato do livro das contagens do
   inventário (`almoxarifado_contagens_app_campo`, 19 colunas: as 14 de 26/10, a 14ª o `ID da linha`, a chave da linha
   junto da contagem, e as 5 de 30/10/2026 no fim) mora em `nexus/dados/almoxarifado.py` (`COLUNAS_CONTAGENS`, `contado`).
-- **Como provar:** `tests/test_pcm_almoxarifado.py`; no navegador, a cópia de prova com os 4 livros montados na memória
+- **Como provar:** `tests/test_pcm_almoxarifado.py` (o `_semear(novas=..., custo=...)` monta o App com as colunas novas; sem
+  elas é o livro de hoje); no navegador, a cópia de prova com os 4 livros montados na memória
   a partir de uma cópia da tabela do App (fora do repositório) e o cadastro real por GET (25/10: 12 almoxarifados, 218
   peças com saldo, 54 no limite, 22 sem mínimo, 5 avariadas, 3 lançadas e 13 recusadas).
 

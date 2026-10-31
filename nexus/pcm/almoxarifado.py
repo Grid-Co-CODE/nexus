@@ -15,6 +15,11 @@ De onde vem cada parte:
   do teste nas "Linhas de saldo"), senão todo ciclo com o teste viraria "chegou pela metade";
 - o consumo, do `fato_peca_lancada` do Nexus (tudo desde o início, Levi, 25/10/2026); enquanto ele não existe, do livro
   Peças do App (90 dias), com a nota.
+
+As melhorias de 30/10/2026 (docs/superpowers/specs/2026-10-30-almoxarifado-melhorias-design.md): a criticidade e a Curva
+ABC do cadastro da peça no Fracttal (e o custo) vêm do App no fim dos livros Itens e Saldo. O Nexus sobe antes do App, então
+"a coluna não existe no livro" (`tem_curva`, `tem_criticidade`, `tem_custo`) é diferente de "o Fracttal não deu o valor":
+o primeiro não cobra nada, o segundo vai para o Cadastro a corrigir. O que o Fracttal não deu fica vazio, nunca "C" nem 0.
 """
 from datetime import timedelta, timezone
 
@@ -37,6 +42,13 @@ def _txt(v) -> str:
 
 def _num(v) -> float:
     return A.numero(v) or 0.0
+
+
+def _campo(v) -> str:
+    """O texto de um campo do cadastro da peça: o vazio que o `sync-xlsx` do App escreve como "None" (ou o "nan") é
+    vazio, não a palavra. A criticidade "None" na tela seria um nível que o Fracttal não deu."""
+    t = _txt(v)
+    return "" if t.lower() in ("none", "nan") else t
 
 
 # o ID sem o ".0" que a API às vezes põe ("7.0" é o 7): o mesmo da dimensão de dados, que a carga e o filtro do teste usam
@@ -63,14 +75,20 @@ def _do_app(ciclo: dict, itens: list[dict], saldo: list[dict], b) -> dict:
     its = {_id(i.get("ID do item")): {"codigo": _txt(i.get("Código")), "nome": _txt(i.get("Nome")),
                                        "unidade": _txt(i.get("Unidade")), "familia": _txt(i.get("Família")),
                                        "avariado": _txt(i.get("Avariado")).lower() == "sim",
-                                       "nao_lido": _txt(i.get("Lido")).lower() == "não"} for i in itens}
+                                       "nao_lido": _txt(i.get("Lido")).lower() == "não",
+                                       "criticidade": _campo(i.get("Criticidade")),
+                                       "curva": A.curva_abc(i.get("Curva ABC"))} for i in itens}
     linhas = [{"id_item": _id(s.get("ID do item")), "id_almox": _id(s.get("ID do almoxarifado")),
                "almox": _txt(s.get("Almoxarifado")), "usina_id": b.lig.usina_do_fracttal(
                    A.chave_do_local(s.get("Local do almoxarifado")) or ""),
-               "saldo": A.numero(s.get("Saldo")), "minimo": A.numero(s.get("Mínimo"))} for s in saldo]
+               "saldo": A.numero(s.get("Saldo")), "minimo": A.numero(s.get("Mínimo")),
+               "custo": A.custo(s.get("Custo unitário"))} for s in saldo]
+    # "tem" é a coluna existir no livro (o App de antes não a manda), e não ela ter valor: o livro sem a coluna não é
+    # cobrado no Cadastro a corrigir, o com a coluna e a peça sem valor é
     return {"inicio": _txt(ciclo.get(A.INICIO)), "fim": _txt(ciclo.get("Fim do ciclo")),
             "lidos": ciclo.get("Itens lidos"), "total": ciclo.get("Itens na lista do Fracttal"), "itens": its,
-            "linhas": linhas}
+            "linhas": linhas, "tem_criticidade": bool(itens) and "Criticidade" in itens[0],
+            "tem_curva": bool(itens) and "Curva ABC" in itens[0], "tem_custo": bool(saldo) and "Custo unitário" in saldo[0]}
 
 
 def _do_nexus(ult: dict, abas_nx: dict, teste: frozenset | set = frozenset()) -> dict | None:
@@ -87,17 +105,29 @@ def _do_nexus(ult: dict, abas_nx: dict, teste: frozenset | set = frozenset()) ->
     # só os itens que estão na foto (a revisão de 25/10/2026): a dimensão guarda todo item já visto, inclusive os
     # desativados há meses, e o item não lido no ciclo apareceria como "sem saldo em nenhum almoxarifado"
     na_foto = {_id(l.get("id_item")) for l in foto}
+    dim = visao._livro(F.LIVRO, F.ABA_DIM_ITEM) if F.ABA_DIM_ITEM in abas_nx else []
     its = {_id(i.get("id_item")): {"codigo": _txt(i.get("codigo")), "nome": _txt(i.get("nome")),
                                     "unidade": _txt(i.get("unidade")), "familia": _txt(i.get("familia")),
-                                    "avariado": _txt(i.get("avariado")) in ("1", "1.0"), "nao_lido": False}
-           for i in (visao._livro(F.LIVRO, F.ABA_DIM_ITEM) if F.ABA_DIM_ITEM in abas_nx else [])
-           if _id(i.get("id_item")) in na_foto}
+                                    "avariado": _txt(i.get("avariado")) in ("1", "1.0"), "nao_lido": False,
+                                    "criticidade": _campo(i.get("criticidade")),
+                                    "curva": A.curva_abc(i.get("curva_abc"))}
+           for i in dim if _id(i.get("id_item")) in na_foto}
     linhas = [{"id_item": _id(l.get("id_item")), "id_almox": _id(l.get("id_almoxarifado")),
                "almox": almox.get(_id(l.get("id_almoxarifado")), _id(l.get("id_almoxarifado"))),
                "usina_id": int(float(_id(l.get("usina_id")))) if _id(l.get("usina_id")) else None,
-               "saldo": A.numero(l.get("saldo_qtd")), "minimo": A.numero(l.get("minimo_qtd"))} for l in foto]
+               "saldo": A.numero(l.get("saldo_qtd")), "minimo": A.numero(l.get("minimo_qtd")),
+               "custo": A.custo(l.get("custo_unitario_brl"))} for l in foto]
+    # No histórico a chave da coluna não diz se o App a mandou: a carga grava as colunas novas (vazias) mesmo com o livro
+    # do App de antes, e a dimensão e o livro do mês as têm desde o Nexus novo. Então "tem" é a chave existir E ao menos
+    # uma peça trazer valor: o histórico em que nenhuma peça jamais teve curva (ou custo) é o App que não a manda, e
+    # cobrar "todas as peças sem Curva ABC" no Cadastro a corrigir seria cobrar o que o Fracttal nem foi perguntado
+    def tem(linhas: list[dict], chave: str) -> bool:
+        return any(_txt(l.get(chave)) not in ("", "None", "nan") for l in linhas)
+
     return {"inicio": inicio, "fim": _txt(ult.get("fim")), "lidos": ult.get("itens_lidos_qtd"),
-            "total": ult.get("itens_lista_qtd"), "itens": its, "linhas": linhas}
+            "total": ult.get("itens_lista_qtd"), "itens": its, "linhas": linhas,
+            "tem_criticidade": tem(dim, "criticidade"), "tem_curva": tem(dim, "curva_abc"),
+            "tem_custo": tem(foto, "custo_unitario_brl")}
 
 
 # ── as partes da tela ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -107,30 +137,56 @@ def _usina(b, uid) -> str | None:
     return _txt(u.get("nome")) if u else None
 
 
+def _situacao(saldo, minimo) -> str:
+    """A situação de uma peça num almoxarifado, na tela: a `A.situacao` (que o histórico também usa e não muda) com o
+    SALDO UNITÁRIO separado do "no limite" (Levi, 30/10/2026). Mínimo 1 e saldo 1 é quase todo o "no limite" (a peça que
+    ninguém pediu para repor): a próxima saída zera, mas não é pedido de compra por si, e misturada escondia as que
+    estão no limite de verdade (saldo 2 e mínimo 2 continua no limite)."""
+    sit = A.situacao(saldo, minimo)
+    return "saldo_unitario" if sit == "no_limite" and A.numero(saldo) == 1 else sit
+
+
+_CURVA_N = {"A": 0, "B": 1, "C": 2}
+
+
+def _ordem(x: dict) -> tuple:
+    """A ordem DENTRO de um grupo da Reposição (o grupo vem antes: abaixo do mínimo, no limite, saldo unitário; um crítico
+    no limite não passa à frente de uma peça comum abaixo): a criticidade (1.Crítico primeiro; sem número por último), a
+    curva (A, B, C; sem curva por último) e, depois, a chave de sempre do grupo (abaixo: a mais longe do mínimo; os
+    outros: almoxarifado e código). Sem criticidade nem curva no livro, é a ordem de antes."""
+    base = (x["crit_n"] or 99, _CURVA_N.get(x["curva"], 3))
+    return base + ((-x["falta"],) if x["situacao"] == "abaixo" else (x["almox"], x["codigo"]))
+
+
 def _partes(fonte: dict, b) -> dict:
     its, out = fonte["itens"], []
     for l in fonte["linhas"]:
         i = its.get(l["id_item"], {})
-        sit = A.situacao(l["saldo"], l["minimo"])
+        sit = _situacao(l["saldo"], l["minimo"])
         # saldo vazio (o Fracttal não deu o número) é "não informado": fora da Reposição e das contas (a revisão de
         # 25/10/2026: virava "abaixo, falta 2" e uma "zerada" no cartão)
         cod, nome = i.get("codigo") or l["id_item"], i.get("nome", "")
+        crit_n, crit_nome = revisao._criticidade(i.get("criticidade"))
         out.append(dict(l, codigo=cod, nome=nome, familia=i.get("familia", ""), unidade=(i.get("unidade") or "").lower(),
                         avariado=i.get("avariado", False), situacao=sit, usina=_usina(b, l["usina_id"]),
                         falta=max((l["minimo"] or 0) - l["saldo"], 0) if l["saldo"] is not None else 0,
-                        busca=norm(f"{cod} {nome}")))
-    abaixo = sorted((x for x in out if x["situacao"] == "abaixo"), key=lambda x: -x["falta"])
-    limite = sorted((x for x in out if x["situacao"] == "no_limite"), key=lambda x: (x["almox"], x["codigo"]))
-    for x in abaixo + limite:
+                        busca=norm(f"{cod} {nome}"), criticidade=i.get("criticidade", ""), crit_n=crit_n,
+                        crit_nome=crit_nome, crit_nivel=min(crit_n, 4) if crit_n else None, curva=i.get("curva", ""),
+                        custo=l.get("custo")))
+    abaixo = sorted((x for x in out if x["situacao"] == "abaixo"), key=_ordem)
+    limite = sorted((x for x in out if x["situacao"] == "no_limite"), key=_ordem)
+    unitario = sorted((x for x in out if x["situacao"] == "saldo_unitario"), key=_ordem)
+    for x in abaixo + limite + unitario:
         x["pct"] = min(100, round(100 * x["saldo"] / x["minimo"])) if x["minimo"] else 0
     cards = {}
     for x in out:
         c = cards.setdefault(x["id_almox"], {"id": x["id_almox"], "nome": x["almox"], "usina": x["usina"], "pecas": 0,
-                                             "abaixo": 0, "no_limite": 0, "sem_minimo": 0, "zeradas": 0, "ok": 0,
-                                             "nao_informado": 0})
+                                             "abaixo": 0, "no_limite": 0, "saldo_unitario": 0, "sem_minimo": 0,
+                                             "zeradas": 0, "ok": 0, "nao_informado": 0})
         c["pecas"] += 1
         c["abaixo"] += x["situacao"] == "abaixo"
         c["no_limite"] += x["situacao"] == "no_limite"
+        c["saldo_unitario"] += x["situacao"] == "saldo_unitario"
         c["sem_minimo"] += not (x["minimo"] and x["minimo"] > 0)
         c["zeradas"] += x["saldo"] == 0
         c["ok"] += x["situacao"] == "ok"
@@ -148,12 +204,23 @@ def _partes(fonte: dict, b) -> dict:
     for x in out:
         if not (x["minimo"] and x["minimo"] > 0) and x["situacao"] != "nao_informado":
             sem_min[x["almox"]] = sem_min.get(x["almox"], 0) + 1
-    kpis = {"almoxarifados": len(cards), "com_saldo": len({x["id_item"] for x in out if (x["saldo"] or 0) > 0}),
-            "abaixo": len(abaixo), "no_limite": len(limite), "sem_minimo": sum(sem_min.values()),
-            "avariadas": sum(1 for i in its.values() if i.get("avariado"))}
-    return {"kpis": kpis, "reposicao": abaixo + limite, "linhas": out,
+    # as peças COM saldo sem curva (ou sem criticidade) no Fracttal: completar é lá. None = o livro nem traz a coluna
+    # ainda (o App de antes), e aí não há o que cobrar
+    com_saldo = {x["id_item"] for x in out if (x["saldo"] or 0) > 0}
+
+    def sem(campo: str, tem) -> int | None:
+        return sum(1 for iid in com_saldo if not its.get(iid, {}).get(campo)) if tem else None
+
+    kpis = {"almoxarifados": len(cards), "com_saldo": len(com_saldo),
+            "abaixo": len(abaixo), "no_limite": len(limite), "saldo_unitario": len(unitario),
+            "sem_minimo": sum(sem_min.values()), "avariadas": sum(1 for i in its.values() if i.get("avariado"))}
+    return {"kpis": kpis, "reposicao": abaixo + limite, "saldo_unitario": unitario, "linhas": out,
             "por_almoxarifado": sorted(cards.values(), key=lambda c: c["nome"]), "catalogo": catalogo,
+            "tem_criticidade": fonte.get("tem_criticidade", False), "tem_curva": fonte.get("tem_curva", False),
+            "tem_custo": fonte.get("tem_custo", False),
             "cadastro": {"sem_minimo": [{"almoxarifado": a, "n": n} for a, n in sorted(sem_min.items())],
+                         "sem_curva": sem("curva", fonte.get("tem_curva")),
+                         "sem_criticidade": sem("criticidade", fonte.get("tem_criticidade")),
                          "avariadas": [x for x in out if x["avariado"] and (x["saldo"] or 0) > 0]}}
 
 

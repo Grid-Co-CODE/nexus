@@ -7,7 +7,10 @@
 {# PCM → Almoxarifado (25/10/2026, a prévia aprovada pelo Levi): o saldo de cada peça em cada almoxarifado do Fracttal,
    pela varredura diária do App de Campo. As contas estão em nexus/dados/almoxarifado.py (as mesmas da carga do
    histórico) e a montagem em nexus/pcm/almoxarifado.py. O filtro é na própria página (filtro-local.js): escolher não
-   recarrega a tela. Abaixo de 640 px as tabelas viram cartões (o data-r é o rótulo de cada valor). #}
+   recarrega a tela. Abaixo de 640 px as tabelas viram cartões (o data-r é o rótulo de cada valor).
+   30/10/2026 (as melhorias do Almoxarifado, docs/superpowers/specs/2026-10-30-almoxarifado-melhorias-design.md): o filtro
+   conta a aba que está à vista (a troca de aba chama o `aplicar` do filtro-local.js), o saldo unitário sai do "no limite"
+   para um grupo fechado, e a Reposição leva a criticidade e a Curva ABC do Fracttal. #}
 <div class="pg alm">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
 <h1 class="titulo-pagina">Almoxarifado</h1>
@@ -24,7 +27,7 @@
 {% set k = d.kpis %}
 <p class="pcm-sub">O saldo do Fracttal de {{ d.ciclo.fim }} ({{ d.ciclo.lidos }} de {{ d.ciclo.total }} itens lidos), pela
   varredura diária do App de Campo. Abaixo do mínimo: o saldo é menor que o mínimo cadastrado. No limite: o saldo é o
-  mínimo, e a próxima saída já fica abaixo.</p>
+  mínimo, e a próxima saída já fica abaixo. O saldo 1 com mínimo 1 fica à parte, em Saldo unitário.</p>
 {% if d.aviso %}<div class="cn-erro cn-aviso" role="status">{{ d.aviso }}</div>{% endif %}
 
 <section class="kb-kpis alm-kpis" aria-label="Resumo do almoxarifado">
@@ -34,7 +37,7 @@
     <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.com_saldo }}</b><span class="kb-kpi-nota">em algum almoxarifado</span></div></div>
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Abaixo do mínimo</span>
     <div class="kb-kpi-linha"><b class="kb-kpi-v{% if k.abaixo %} kb-kpi-v--critico{% elif k.no_limite %} kb-kpi-v--alerta{% endif %}">{{ k.abaixo }}</b>
-      <span class="kb-kpi-nota">e <b>{{ k.no_limite }}</b> no limite</span></div></div>
+      <span class="kb-kpi-nota">e <b>{{ k.no_limite }}</b> no limite{% if k.saldo_unitario %} (+{{ k.saldo_unitario }} de saldo unitário){% endif %}</span></div></div>
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Sem mínimo</span>
     <div class="kb-kpi-linha"><b class="kb-kpi-v{% if k.sem_minimo %} kb-kpi-v--alerta{% endif %}">{{ k.sem_minimo }}</b><span class="kb-kpi-nota">peça × almoxarifado</span></div></div>
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Avariadas</span>
@@ -57,7 +60,7 @@
   <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/inventario/auditoria">Auditoria</a>
 </nav>
 
-<form class="cn-filtros alm-filtros" method="get" id="alm-f" data-filtro-local>
+<form class="cn-filtros alm-filtros" method="get" id="alm-f" data-filtro-local data-alm-filtro>
   <label class="gc-rotulo" for="f-almox">Almoxarifado</label>
   <select id="f-almox" name="almox" class="gc-campo" data-fl>
     <option value="">Todos</option>
@@ -75,27 +78,45 @@
 
 {% macro filtro(almox, familia, busca) %} data-fl-linha data-f-almox="{{ almox }}" data-f-familia="{{ familia }}" data-f-busca="{{ busca }}"{% endmacro %}
 
-<section class="alm-painel" data-painel="reposicao">
-  <h2>Peças abaixo do mínimo e no limite</h2>
-  <p class="alm-ajuda">A falta é o que repõe até o mínimo. Ordem: a mais longe do mínimo primeiro, depois as no limite.</p>
-  {% if d.reposicao %}
-  <table class="alm-t" data-fl-grupo="alm-f">
-    <thead><tr><th>Almoxarifado</th><th>Peça</th><th>Família</th><th class="num">Saldo</th><th class="num">Mínimo</th><th class="num">Falta</th></tr></thead>
+{# a tabela da Reposição, a mesma para os grupos "abaixo e no limite" e "saldo unitário" (o mesmo data-fl-grupo: o filtro
+   conta as duas, mesmo com a segunda fechada); `nome` é o data-fl-nome de cada uma, que acende o "nenhuma peça" #}
+{% macro tabela_reposicao(lista, nome, d) %}
+  <table class="alm-t" data-fl-grupo="alm-f" data-fl-nome="{{ nome }}">
+    <thead><tr><th>Almoxarifado</th><th>Peça</th><th>Família</th><th>Crit.</th><th>Curva</th><th class="num">Saldo</th><th class="num">Mínimo</th><th class="num">Falta</th></tr></thead>
     <tbody>
-    {% for x in d.reposicao %}
+    {% for x in lista %}
     <tr{{ filtro(x.almox, x.familia, x.busca) }}>
       <td data-r="Almoxarifado"><span class="alm-v">{{ x.almox }}{% if x.usina %}<span class="alm-det">{{ x.usina }}</span>{% endif %}</span></td>
       <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ x.codigo }}</span> {{ x.nome }}</span></td>
       <td data-r="Família"><span class="alm-v">{{ x.familia }}</span></td>
+      {# o mesmo quadradinho da Aprovação do inventário (pcm.css, .inv-crit); sem número, "–" e nunca um nível chutado #}
+      <td data-r="Crit."><span class="alm-v">{% if x.crit_n %}<span class="inv-crit inv-crit--{{ x.crit_nivel }}" title="{{ x.crit_nome }}">{{ x.crit_n }}<span class="inv-so-leitor"> {{ x.crit_nome }}</span></span>{% else %}<span class="mudo" title="{{ x.criticidade or ('sem criticidade no Fracttal' if d.tem_criticidade else 'o App ainda não traz a criticidade') }}">–</span>{% endif %}</span></td>
+      <td data-r="Curva"><span class="alm-v">{% if x.curva %}<b class="alm-curva">{{ x.curva }}</b>{% else %}<span class="mudo" title="{{ 'sem curva no Fracttal' if d.tem_curva else 'o App ainda não traz a curva' }}">–</span>{% endif %}</span></td>
       <td data-r="Saldo" class="num"><span class="alm-v">{{ '%g'|format(x.saldo) }} <span class="alm-barra" aria-hidden="true"><i style="width:{{ x.pct }}%"></i></span></span></td>
       <td data-r="Mínimo" class="num"><span class="alm-v">{{ '%g'|format(x.minimo) }}</span></td>
-      <td data-r="Falta" class="num"><span class="alm-v">{% if x.situacao == 'abaixo' %}<b class="alm-falta">{{ '%g'|format(x.falta) }}</b> {{ x.unidade }}{% else %}<span class="alm-limite">no limite</span>{% endif %}</span></td>
+      <td data-r="Falta" class="num"><span class="alm-v">{% if x.situacao == 'abaixo' %}<b class="alm-falta">{{ '%g'|format(x.falta) }}</b> {{ x.unidade }}{% elif x.situacao == 'saldo_unitario' %}<span class="alm-limite">saldo unitário</span>{% else %}<span class="alm-limite">no limite</span>{% endif %}</span></td>
     </tr>
     {% endfor %}
-    <tr data-fl-vazio="alm-f" hidden><td colspan="6" class="mudo">Nenhuma peça com esses filtros.</td></tr>
+    <tr data-fl-vazio="{{ nome }}" hidden><td colspan="8" class="mudo">Nenhuma peça com esses filtros.</td></tr>
     </tbody>
   </table>
+{% endmacro %}
+
+<section class="alm-painel" data-painel="reposicao">
+  <h2>Peças abaixo do mínimo e no limite</h2>
+  <p class="alm-ajuda">A falta é o que repõe até o mínimo. Ordem: primeiro as abaixo do mínimo, depois as no limite; dentro de
+    cada grupo, a criticidade (1.Crítico primeiro), a Curva ABC (A, B, C) e a falta. Crit. e Curva são as do cadastro da peça
+    no Fracttal.{% if not (d.tem_criticidade or d.tem_curva) %} O App ainda não traz a criticidade nem a curva: por
+    enquanto a ordem é só a falta.{% endif %}</p>
+  {% if d.reposicao %}{{ tabela_reposicao(d.reposicao, 'alm-rep', d) }}
   {% else %}<p class="mudo">Nenhuma peça abaixo do mínimo nem no limite.</p>{% endif %}
+  {% if d.saldo_unitario %}
+  {# fechado por padrão: a peça de uma unidade e mínimo 1 é quase todo o "no limite" e escondia as que estão no limite de verdade #}
+  <details class="alm-unit">
+    <summary><b>Saldo unitário ({{ d.saldo_unitario|length }})</b> <span class="mudo">uma peça e mínimo 1: a próxima saída zera, mas não é pedido de compra por si</span></summary>
+    {{ tabela_reposicao(d.saldo_unitario, 'alm-unit', d) }}
+  </details>
+  {% endif %}
 </section>
 
 <section class="alm-painel" data-painel="almoxarifados" hidden>
@@ -111,6 +132,7 @@
         <span{% if c.abaixo %} class="alm-ruim"{% endif %}><b>{{ c.abaixo }}</b> abaixo · <b>{{ c.no_limite }}</b> no limite</span>
         <span{% if c.sem_minimo %} class="alm-aviso"{% endif %}><b>{{ c.sem_minimo }}</b> sem mínimo</span>
         <span><b>{{ c.zeradas }}</b> zeradas</span>
+        {% if c.saldo_unitario %}<span><b>{{ c.saldo_unitario }}</b> de saldo unitário</span>{% endif %}
         {% if c.nao_informado %}<span class="alm-aviso"><b>{{ c.nao_informado }}</b> sem saldo informado</span>{% endif %}
       </div>
       <span class="alm-barra alm-barra--larga" title="{{ c.pct_ok }}% acima do mínimo"><i style="width:{{ c.pct_ok }}%"></i></span>
@@ -163,25 +185,36 @@
 
 <section class="alm-painel" data-painel="cadastro" hidden>
   <h2>Cadastro a corrigir no Fracttal</h2>
-  <p class="alm-ajuda">Quem corrige é o PCM, no Fracttal; o Nexus só lê. Sem o mínimo, a peça nunca aparece na Reposição.</p>
+  <p class="alm-ajuda">Quem corrige é o PCM, no Fracttal; o Nexus só lê. Sem o mínimo, a peça nunca aparece na Reposição.{% if d.tem_curva or d.tem_criticidade %}
+    A peça sem curva ou sem criticidade vai para o fim da ordem da Reposição.{% endif %}</p>
   <ul class="alm-lista">
     {% for s in d.cadastro.sem_minimo %}<li><b>{{ s.n }}</b> peça(s) sem mínimo em {{ s.almoxarifado }}</li>{% endfor %}
+    {# só com a coluna no livro (o App de antes não a traz): o texto é inteiro, sem tag no meio, para ler e buscar como frase #}
+    {% if d.cadastro.sem_curva %}<li>{{ d.cadastro.sem_curva }} peça{{ 's' if d.cadastro.sem_curva != 1 else '' }} com saldo sem Curva ABC no Fracttal</li>{% endif %}
+    {% if d.cadastro.sem_criticidade %}<li>{{ d.cadastro.sem_criticidade }} peça{{ 's' if d.cadastro.sem_criticidade != 1 else '' }} com saldo sem criticidade no Fracttal</li>{% endif %}
     {% for a in d.cadastro.avariadas %}<li><span class="alm-cod">{{ a.codigo }}</span> {{ a.nome }}: avariada com saldo {{ '%g'|format(a.saldo) }} em {{ a.almox }}</li>{% endfor %}
     {% for r in d.cadastro.recusadas %}<li><span class="alm-ruim">corrigir no Fracttal</span>: a peça <span class="alm-cod">{{ r.codigo }}</span> da OS {{ r.os }} foi recusada{% if r.recusa %} ({{ r.recusa }}){% endif %} e não saiu do saldo</li>{% endfor %}
-    {% if not (d.cadastro.sem_minimo or d.cadastro.avariadas or d.cadastro.recusadas) %}<li class="mudo">Nada a corrigir.</li>{% endif %}
+    {% if not (d.cadastro.sem_minimo or d.cadastro.sem_curva or d.cadastro.sem_criticidade or d.cadastro.avariadas or d.cadastro.recusadas) %}<li class="mudo">Nada a corrigir.</li>{% endif %}
   </ul>
 </section>
 <script>
-  // as abas: mostrar uma esconde as outras (a tabela escondida não conta no filtro) e o endereço guarda qual está aberta
+  // as abas: mostrar uma esconde as outras (a tabela escondida não conta no filtro) e o endereço guarda qual está aberta.
+  // A barra do filtro só aparece onde há tabela para filtrar, e a troca de aba REFAZ as contas do filtro: o script de antes
+  // disparava um `input` no formulário, que o filtro-local.js não escuta (ele ouve o `change` dos select e o `input` do
+  // campo de texto), e as opções ficavam com os números da aba anterior (30/10/2026)
   (function () {
     var abas = Array.prototype.slice.call(document.querySelectorAll('.alm-aba[data-aba]'));
     var paineis = Array.prototype.slice.call(document.querySelectorAll('[data-painel]'));
+    var filtro = document.querySelector('[data-alm-filtro]');
     function abrir(nome) {
       if (!abas.some(function (b) { return b.dataset.aba === nome; })) nome = 'reposicao';
       abas.forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.aba === nome)); });
       paineis.forEach(function (p) { p.hidden = p.dataset.painel !== nome; });
+      var painel = paineis.filter(function (p) { return p.dataset.painel === nome; })[0];
+      if (filtro) filtro.hidden = !(painel && painel.querySelector('[data-fl-grupo="alm-f"]'));
       var u = new URL(location.href); u.searchParams.set('aba', nome); history.replaceState(null, '', u);
-      var f = document.getElementById('alm-f'); if (f) f.dispatchEvent(new Event('input', {bubbles: true}));
+      // o filtro-local.js carrega DEPOIS deste script e se aplica sozinho ao carregar; daí em diante é aqui
+      if (window.FiltroLocal && FiltroLocal['alm-f']) FiltroLocal['alm-f'].aplicar();
     }
     abas.forEach(function (b) { b.addEventListener('click', function () { abrir(b.dataset.aba); }); });
     abrir(new URL(location.href).searchParams.get('aba') || 'reposicao');
