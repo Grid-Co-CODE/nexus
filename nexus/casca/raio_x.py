@@ -20,19 +20,28 @@ clique do administrador:
   7,1 GB e 3,2 GB no swap, com o Nexus em só 690 MB; o PDF das 13:45 ficou 1 min "trabalhando" no desenho do logo, e
   daqui não se via de quem eram os outros ~6 GB.
 
-Nada é gravado nem vai à rede; a pilha só sai como rótulo (arquivo, linha e função), nunca com dados.
+- o uso do OS Creator nos últimos 7 dias (`montar_uso_os`, 31/10/2026, etapa 0 do canto central): as telas mais pedidas (os
+  cliques e o que a tela pede sozinha, separados, com a mediana e o p95), os cliques por hora do dia, os pedidos ao
+  Fracttal por hora com o pico por minuto ao lado da cota de 200 e o corte por setor. Vem dos livros do mês no banco (a
+  leitura, numa thread à parte e guardada 10 min, `_uso_do_banco`) com a memória do servidor por cima.
+
+Nada é gravado nem vai à rede (a leitura do uso no banco é a exceção, por trás, com prazo); a pilha só sai como rótulo
+(arquivo, linha e função), nunca com dados.
 """
 import json
+import logging
 import os
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from flask import current_app, render_template, session
 
 from . import presos as P
+
+log = logging.getLogger(__name__)
 
 
 def _threads(estado) -> tuple[list, list]:
@@ -421,6 +430,261 @@ def _processador(janela_s: float = 1.0) -> dict:
             "maquina": _maquina(s0, s1, v0, v1, janela)}
 
 
+# ── o uso do OS Creator e os pedidos ao Fracttal (31/10/2026, etapa 0 do canto central do OS Creator) ────────────────────
+# Em 13 e 14/10/2026 o OS Creator prendeu as threads do Nexus e ninguém soube dizer quais telas as pessoas abrem, a que hora,
+# em quantas, quanto cada uma demora e quanto pede ao Fracttal. O servidor leva as horas fechadas ao banco (`uso_os`,
+# `dados/fato_uso_os.py`); esta seção as lê, junta a memória por cima (a hora aberta e as que esperam o banco) e mostra o
+# antes e o depois de cada mudança. A página nunca espera o banco: a leitura vai por trás e fica guardada 10 min.
+DIAS_USO = 7                    # a janela da seção
+MAX_ROTAS_USO = 15              # as telas mais pedidas
+CACHE_USO_S = 600               # a leitura do banco vale 10 min
+PRAZO_USO_S = 2.0               # quanto a página espera por ela (a leitura segue por trás e a próxima abertura a encontra)
+ESPERA_APOS_FALHA_S = 60        # depois de uma falha, não insiste a cada abertura da página
+PERTO_DA_COTA = 0.8             # pico por minuto a partir de 80% da cota: "perto da cota"
+SEMANA = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
+_USO = {"thread": None, "dados": None, "lido_em": None, "lido_txt": "", "tentou_em": None, "erro": ""}
+_USO_TRAVA = threading.Lock()
+
+
+def _monotonico() -> float:
+    """O relógio da cópia de 10 min (os testes o trocam)."""
+    return time.monotonic()
+
+
+def _ler_uso(base: str, sessao, hora_id: str) -> None:
+    """A leitura do banco, numa thread à parte: guarda o que leu (ou só o tipo do erro, que a página mostra)."""
+    from ..dados import fato_uso_os
+    try:
+        dados = fato_uso_os.ler_dias(base, sessao, hora_id, DIAS_USO)
+    except Exception as ex:                 # noqa: BLE001 - banco fora, leitura curta, livro estranho: a página diz o motivo
+        log.warning("Raio-X: não li o uso do OS Creator no banco (%s)", type(ex).__name__, exc_info=True)
+        with _USO_TRAVA:
+            _USO["erro"] = type(ex).__name__
+        return
+    with _USO_TRAVA:
+        _USO.update(dados=dados, lido_em=_monotonico(), lido_txt=time.strftime("%H:%M"), erro="")
+
+
+def _uso_do_banco(app, hora_id: str, prazo_s: float | None = None) -> dict:
+    """`{"dados", "idade_min", "lido_txt", "erro", "lendo"}`: a leitura dos livros de uso dos últimos 7 dias, guardada 10 min.
+    Vencida, uma thread à parte a renova e a página espera no máximo `PRAZO_USO_S` por ela; passou disso, mostra a cópia de
+    antes (ou nada) e a próxima abertura encontra a nova. Leitura presa não abre outra; depois de uma falha, só tenta de
+    novo passado `ESPERA_APOS_FALHA_S`. Teste sem a sessão do banco (`nexus_dados_sessao`) nunca vai à rede."""
+    sessao = app.extensions.get("nexus_dados_sessao")
+    if sessao is None and app.config.get("TESTING"):
+        return {"dados": None, "idade_min": None, "lido_txt": "", "erro": "", "lendo": False, "sem_banco": True}
+    prazo = PRAZO_USO_S if prazo_s is None else prazo_s
+    agora = _monotonico()
+    with _USO_TRAVA:
+        t = _USO["thread"]
+        presa = t is not None and t.is_alive()
+        velha = _USO["lido_em"] is None or agora - _USO["lido_em"] >= CACHE_USO_S
+        esperando = bool(_USO["erro"]) and _USO["tentou_em"] is not None and agora - _USO["tentou_em"] < ESPERA_APOS_FALHA_S
+        if velha and not presa and not esperando:
+            from ..cadastro.ligacoes import BASE_API
+            if sessao is None:
+                import requests
+                sessao = requests.Session()
+            base = (app.config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
+            t = threading.Thread(target=_ler_uso, args=(base, sessao, hora_id), name="nexus-raio-x-uso", daemon=True)
+            _USO.update(thread=t, tentou_em=agora)
+            t.start()
+    if velha and t is not None:
+        t.join(prazo)
+    with _USO_TRAVA:
+        s = dict(_USO)
+    idade = None if s["lido_em"] is None else int((_monotonico() - s["lido_em"]) // 60)
+    return {"dados": s["dados"], "idade_min": idade, "lido_txt": s["lido_txt"], "erro": s["erro"],
+            "lendo": s["thread"] is not None and s["thread"].is_alive(), "sem_banco": False}
+
+
+def _n(v) -> int:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _hora10(v) -> str:
+    """`AAAAMMDDHH` com dez algarismos (o banco devolve o inteiro; a memória, o texto), ou "" se não for isso."""
+    try:
+        return f"{int(float(v)):010d}"
+    except (TypeError, ValueError):
+        return ""
+
+
+def _quantil_ponderado(pares, q: float):
+    """O quantil `q` de valores com peso: o primeiro valor, em ordem, em que o peso acumulado chega a `q` do total. None sem
+    nenhum valor com peso."""
+    pares = sorted(p for p in pares if p[0] is not None and p[1] > 0)
+    total = sum(w for _, w in pares)
+    if not total:
+        return None
+    alvo, soma = q * total - 1e-9, 0
+    for valor, peso in pares:
+        soma += peso
+        if soma >= alvo:
+            return valor
+    return pares[-1][0]
+
+
+def _tom_do_pico(pico: int, cota: int) -> tuple:
+    """(a palavra, o tom) do pico por minuto contra a cota: severidade por palavra e cor, nunca só pela cor."""
+    if pico >= cota:
+        return "na cota", "critico"
+    if pico >= PERTO_DA_COTA * cota:
+        return "perto da cota", "alerta"
+    return "", ""
+
+
+def montar_uso_os(hora_id_agora: str, banco: dict | None, vivo: dict) -> dict:
+    """A conta da seção, pura: `banco` = `{"uso": [...], "fracttal": [...]}` lido dos livros (ou None); `vivo` = o que o
+    servidor tem na memória agora, `{"uso", "fracttal", "setor"}` (as linhas da hora aberta e das que esperam o banco, e o
+    corte por setor, que mora só no servidor: o arquivo do disco mais o que entrou depois do último salvamento). Janela: os `DIAS_USO` dias de Brasília que terminam no de `hora_id_agora`. Na mesma chave
+    (hora × rota × automático, ou hora × origem × método) a memória vence o banco. Devolve `tem` (há alguma linha na
+    janela), a `cota`, o `resumo`, os `dias`, as 24 `horas`, as `rotas` mais pedidas e os `setores`.
+
+    Cliques e automáticos nunca se misturam (o `/os/_nexus/sessao` de cada aba aberta seria a "tela mais clicada"). O total
+    do Fracttal vem só da linha `*` da hora (o detalhe repete o total). A mediana e o p95 de vários dias são aproximados:
+    cada hora guarda só os dela, e juntar é o quantil dos quantis pesado pelos pedidos atendidos (os recusados pelo teto não
+    têm duração)."""
+    from . import fracttal_conta
+    cota = fracttal_conta.COTA_POR_MINUTO
+    hoje = datetime.strptime(str(hora_id_agora)[:8], "%Y%m%d")
+    datas = [hoje - timedelta(days=i) for i in range(DIAS_USO - 1, -1, -1)]
+    ids = [d.strftime("%Y%m%d") for d in datas]
+    corte = ids[0] + "00"
+    uso, fracttal = {}, {}
+    for fonte in (banco or {}, vivo or {}):
+        for r in fonte.get("uso") or ():
+            h = _hora10(r.get("hora_id"))
+            if h >= corte and h[:8] in ids:
+                uso[(h, str(r.get("rota")), 1 if _n(r.get("automatico")) else 0)] = r
+        for r in fonte.get("fracttal") or ():
+            h = _hora10(r.get("hora_id"))
+            if h >= corte and h[:8] in ids:
+                fracttal[(h, str(r.get("origem")), str(r.get("metodo")))] = r
+    por_dia = {i: {"cliques": 0, "automaticos": 0, "fracttal": 0, "recusas": 0, "pico": 0, "pico_hora": None} for i in ids}
+    por_hora = {h: {"cliques": 0, "automaticos": 0, "fracttal": 0, "pico": 0} for h in range(24)}
+    por_rota = {}
+    for (h, rota, auto), r in uso.items():
+        pedidos, ocupado = _n(r.get("pedidos_qtd")), _n(r.get("ocupado_qtd"))
+        coluna = "automaticos" if auto else "cliques"
+        por_dia[h[:8]][coluna] += pedidos
+        por_hora[int(h[8:])][coluna] += pedidos
+        p = por_rota.setdefault(rota, {"rota": rota, "cliques": 0, "automaticos": 0, "fracttal": 0, "erros": 0,
+                                       "ocupado": 0, "p50": [], "p95": []})
+        p[coluna] += pedidos
+        p["fracttal"] += _n(r.get("fracttal_qtd"))
+        p["erros"] += _n(r.get("erros_qtd"))
+        p["ocupado"] += ocupado
+        atendidos = max(1, pedidos - ocupado)
+        for chave, campo in (("p50", "duracao_p50_ms"), ("p95", "duracao_p95_ms")):
+            if r.get(campo) is not None:
+                p[chave].append((_n(r.get(campo)), atendidos))
+    for (h, origem, metodo), r in fracttal.items():
+        if origem != "*" or metodo != "*":
+            continue                                    # o total da hora; o detalhe repete a mesma conta
+        pedidos, pico = _n(r.get("pedidos_qtd")), _n(r.get("pico_minuto_qtd"))
+        d = por_dia[h[:8]]
+        d["fracttal"] += pedidos
+        d["recusas"] += _n(r.get("recusas_qtd"))
+        if pico > d["pico"]:
+            d["pico"], d["pico_hora"] = pico, int(h[8:])
+        hh = por_hora[int(h[8:])]
+        hh["fracttal"] += pedidos
+        hh["pico"] = max(hh["pico"], pico)
+
+    escala = max((v["cliques"] for v in por_hora.values()), default=0) or 1
+    horas = []
+    for h, v in sorted(por_hora.items()):
+        palavra, tom = _tom_do_pico(v["pico"], cota)
+        horas.append(dict(v, hora=h, rotulo=f"{h:02d}h", pct_cliques=round(100 * v["cliques"] / escala),
+                          pct_cota=min(100, round(100 * v["pico"] / cota)), situacao=palavra, tom=tom))
+    dias = []
+    for d, i in zip(datas, ids):
+        v = por_dia[i]
+        palavra, tom = _tom_do_pico(v["pico"], cota)
+        dias.append(dict(v, dia=d.strftime("%d/%m"), semana=SEMANA[d.weekday()], hoje=i == ids[-1], situacao=palavra,
+                         tom=tom))
+    rotas = []
+    for p in sorted(por_rota.values(), key=lambda p: (-(p["cliques"] + p["automaticos"]), p["rota"]))[:MAX_ROTAS_USO]:
+        rotas.append({"rota": p["rota"], "cliques": p["cliques"], "automaticos": p["automaticos"],
+                      "p50_ms": _quantil_ponderado(p["p50"], 0.5), "p95_ms": _quantil_ponderado(p["p95"], 0.95),
+                      "fracttal": p["fracttal"], "erros": p["erros"], "ocupado": p["ocupado"]})
+    por_setor = {}
+    for dia, setores in ((vivo or {}).get("setor") or {}).items():
+        if dia not in por_dia or not isinstance(setores, dict):
+            continue
+        for setor, telas in setores.items():
+            s = por_setor.setdefault(setor, {"setor": setor, "cliques": 0, "automaticos": 0, "rotas": {}})
+            for rota, v in (telas or {}).items():
+                c, a = _n(v.get("cliques")), _n(v.get("automaticos"))
+                s["cliques"] += c
+                s["automaticos"] += a
+                s["rotas"][rota] = s["rotas"].get(rota, 0) + c
+    setores = []
+    for s in sorted(por_setor.values(), key=lambda s: (-s["cliques"], -s["automaticos"], s["setor"])):
+        top = sorted(((r, c) for r, c in s["rotas"].items() if c), key=lambda rc: (-rc[1], rc[0]))[:3]
+        setores.append({"setor": s["setor"], "cliques": s["cliques"], "automaticos": s["automaticos"],
+                        "rotas": [{"rota": r, "cliques": c} for r, c in top]})
+    pior = max(dias, key=lambda d: (d["pico"], d["dia"]))
+    resumo = {"cliques": sum(d["cliques"] for d in dias), "automaticos": sum(d["automaticos"] for d in dias),
+              "fracttal": sum(d["fracttal"] for d in dias), "recusas": sum(d["recusas"] for d in dias),
+              "pico": pior["pico"], "pico_dia": pior["dia"], "pico_hora": pior["pico_hora"]}
+    return {"tem": bool(uso or fracttal), "cota": cota, "resumo": resumo, "dias": dias, "horas": horas, "rotas": rotas,
+            "setores": setores}
+
+
+def _de_onde_vem(lido: dict, espera: dict, tem: bool) -> dict:
+    """As frases da seção sobre o banco: `banco_txt` (de onde vêm os números) e, sem dado nenhum, o `motivo`."""
+    erro, hora = lido.get("erro"), lido.get("lido_txt")
+    if lido.get("dados") is not None:
+        txt = (f"Do banco, lido às {hora} (a cópia vale 10 min), com o que o servidor tem na memória por cima: a hora "
+               "aberta e as que esperam o banco.")
+        if erro:
+            txt += f" A última tentativa de ler o banco falhou ({erro}); o que está aqui é a cópia das {hora}."
+    elif erro:
+        txt = f"O banco não respondeu ({erro}): vale só o que o servidor tem na memória, desde o último reinício."
+    elif lido.get("lendo"):
+        txt = ("Lendo o banco (a página não espera): vale só a memória do servidor até a leitura chegar. Leia de novo em "
+               "instantes.")
+    else:
+        txt = "Sem o banco nesta máquina: vale só a memória deste processo."
+    if espera.get("horas"):
+        txt += f" {espera['horas']} hora(s) já saíram dos contadores e esperam o banco, só na memória."
+    if tem:
+        return {"banco_txt": txt, "motivo": ""}
+    if erro and lido.get("dados") is None:
+        motivo = f"O banco não respondeu ({erro}) e o servidor não tem nada na memória."
+    elif lido.get("lendo") and lido.get("dados") is None:
+        motivo = "Lendo o banco: a página não espera, leia de novo em instantes."
+    elif lido.get("dados") is not None:
+        motivo = ("Nenhuma hora gravada no banco ainda e nada na memória: o servidor leva a primeira hora fechada ao banco "
+                  "no :05 da hora seguinte.")
+    else:
+        motivo = "Sem o banco nesta máquina e sem o registro do servidor (ele só liga no servidor)."
+    return {"banco_txt": txt, "motivo": motivo}
+
+
+def _secao_uso_os(app) -> dict:
+    """A seção inteira para o template. Nunca levanta: a ferramenta da lentidão não pode travar por causa da conta dela."""
+    try:
+        from . import fracttal_conta, uso_os
+        hora = fracttal_conta.hora_id_de()
+        lido = _uso_do_banco(app, hora)
+        vivo = uso_os.instantaneo()
+        espera = uso_os.linhas_pendentes()
+        contagem = uso_os.pendentes()
+        conta = montar_uso_os(hora, lido["dados"], {
+            "uso": espera["uso"] + vivo["linhas"], "fracttal": espera["fracttal"] + fracttal_conta.instantaneo(),
+            "setor": vivo["setor"]})
+        return dict(conta, **_de_onde_vem(lido, contagem, conta["tem"]))
+    except Exception:                       # noqa: BLE001
+        log.exception("Raio-X: não consegui montar a seção do uso do OS Creator")
+        return {"tem": False, "banco_txt": "", "motivo": "Não consegui montar a seção (veja o log do servidor)."}
+
+
 def registrar_raio_x(bp) -> None:
     @bp.route("/raio-x")
     def raio_x():
@@ -439,7 +703,7 @@ def registrar_raio_x(bp) -> None:
         return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None, teto=teto,
                                threads=getattr(estado, "threads", 0), cpu=_processador(), quem=_memoria_por_programa(),
                                worker=_worker_plataforma(), web=_web_plataforma(), prazo_memoria=PRAZO_MEMORIA_S,
-                               nexus=_dentro_do_nexus(app),
+                               nexus=_dentro_do_nexus(app), uso=_secao_uso_os(app),
                                threads_atrasado=threads_atrasado,
                                threads_quando=lista.get("anterior_quando") if threads_atrasado else None,
                                travamentos=P.cartao(app) if estado is not None else None,

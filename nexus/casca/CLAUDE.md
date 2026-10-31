@@ -191,7 +191,8 @@ Levi, 14/10/2026 às 09:20: "O nexus está muito lento"; "quando clico no OS Cre
 s), a plataforma e a API do banco, no mesmo servidor, em 0,2 s: as threads do waitress presas esperando o Fracttal pelo
 OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
 - **Raio-X** (`/t/base/raio-x`, `casca/raio_x.py`; só administrador, sem item no menu): os pedidos em andamento e onde
-  cada um espera, as tarefas de fundo, o processador, a carga da máquina, o teto do OS Creator e os travamentos de 24 h.
+  cada um espera, as tarefas de fundo, o processador, a carga da máquina, o teto do OS Creator e os travamentos de 24 h
+  e, desde 31/10/2026, **o uso do OS Creator nos últimos 7 dias** (a seção "Uso do OS Creator", mais abaixo).
   Nexus lento de novo = pedir o print dele na hora. **Desde 20/10/2026 diz também onde a MÁQUINA engasga** (pelo /proc do
   Linux, só leitura, quando a página abre): na "Carga da máquina", o processador da máquina inteira e o tempo esperando o
   disco na mesma janela de 1 s; no cartão "Memória da máquina", a memória livre, o swap em uso e se está trocando agora
@@ -365,6 +366,41 @@ gravar=True)`); o `create_app`, o PC e os testes seguem sem ele.
 - **Prova:** `tests/test_casca_uso_os.py` (um Flask de mentira com rotas `/os/...`, o Fracttal falso do `requests`, o relógio
   na mão e, para o JavaScript, o `node` rodando o `enviar` do Histórico, o `pedir` e o `acomp.js` de verdade) e, para a
   gravação, `tests/test_dados_fato_uso_os.py` (a API do banco de mentira, inclusive a que devolve tudo como texto).
+
+### A seção "Uso do OS Creator" do Raio-X (31/10/2026)
+
+O antes e o depois de cada etapa do canto central do OS Creator, e os horários de pico de verdade (`raio_x.montar_uso_os`,
+`_uso_do_banco`, `_secao_uso_os`; `templates/raio_x.html`, âncora `#uso-os-creator`, link no alto da página; só administrador,
+como o resto do Raio-X). Quatro quadros, todos da janela de 7 dias de Brasília que termina hoje:
+- **Por dia:** cliques, pedidos que as telas fazem sozinhas, pedidos ao Fracttal, recusados (406/429) e o maior pico por
+  minuto, com a hora dele. É o quadro do "antes e depois": o mesmo dia da semana, antes e depois de uma mudança.
+- **Por hora do dia** (a soma dos 7 dias): cliques (com barra), automáticos, pedidos ao Fracttal e o maior pico por minuto
+  **ao lado da cota de 200** (`fracttal_conta.COTA_POR_MINUTO`, a mesma que o limitador da etapa 5 vai usar): a partir de
+  80% a palavra é "perto da cota" (amarelo), a partir de 100% "na cota" (vermelho), sempre palavra e cor por token.
+- **As 15 telas mais pedidas** (por pedidos, cliques mais automáticos): cliques e automáticos em colunas separadas (sem
+  isso a "tela mais clicada" seria o `/os/_nexus/sessao` de cada aba aberta), a mediana e o p95, os pedidos que a tela faz
+  ao Fracttal, os erros e os 503 do teto.
+- **Por setor:** cliques, automáticos e as 3 telas mais clicadas de cada setor.
+
+**De onde vem.** Os 7 dias vêm dos livros do mês no banco (`fato_uso_os.ler_dias`, lê o livro de cada mês que a janela toca,
+dois na virada) e, **por cima, a memória do servidor**: a hora aberta, as horas que já saíram dos contadores e esperam o
+banco (`uso_os.linhas_pendentes()`) e o corte por setor (`uso_os.instantaneo()["setor"]`, que é o arquivo do disco mais o que
+entrou depois do último salvamento; **nunca vem do banco**). Na mesma chave (hora × rota × automático, ou hora × origem ×
+método) a memória vence o banco. **A página nunca espera o banco:** a leitura roda numa thread à parte (`nexus-raio-x-uso`),
+**guardada 10 min** (`CACHE_USO_S`); a página espera no máximo 2 s por uma leitura nova (`PRAZO_USO_S`) e, passou disso,
+mostra a cópia de antes (com a hora dela) ou "sem medição ainda, lendo o banco"; leitura presa não abre outra, e depois de uma
+falha só tenta de novo passado 1 min. Banco fora com a memória cheia mostra a memória e diz que é só ela, desde o último
+reinício. Teste sem a sessão do banco (`app.extensions["nexus_dados_sessao"]`) nunca vai à rede.
+
+**A conta.** O total do Fracttal vem só da linha `*` de cada hora (o detalhe repete a mesma conta e somaria em dobro). A
+mediana e o p95 de vários dias são **aproximados**: cada hora guarda só os dela, e juntar horas é o quantil dos quantis,
+pesado pelos pedidos atendidos (os recusados pelo teto não têm duração); a página diz isso. **A hora do reinício** (todo
+deploy) tem os pedidos ao Fracttal só de depois dele: o contador do Fracttal não guarda parcial em disco (o do uso das
+telas guarda), então o total e o pico por minuto dessa hora podem estar abaixo do real. **Sem dado** (o PC sem o
+servidor, o banco fora sem nada na memória, o servidor que ainda não gravou a 1ª hora): "Sem medição ainda", com o
+motivo, e a página abre igual; a conta que quebrar vai ao log e a seção diz que não montou, nunca derruba o Raio-X.
+Prova: `tests/test_casca_raio_x_uso_os.py` (7 dias gravados pelo `fato_uso_os.gravar` num banco de mentira, a memória
+dublada, o relógio na mão; cada número da conta, a cópia de 10 min, o banco fora, lento e vazio, e as cores só por token).
 
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 

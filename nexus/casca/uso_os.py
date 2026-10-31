@@ -408,6 +408,13 @@ def pendentes() -> dict:
         return {"uso": len(_pendentes["uso"]), "fracttal": len(_pendentes["fracttal"]), "horas": len(horas)}
 
 
+def linhas_pendentes() -> dict:
+    """Cópia das linhas que já saíram dos contadores e esperam o banco: `{"uso": [...], "fracttal": [...]}`. O Raio-X as soma
+    ao que mostra (com o banco fora, é nelas que estão as horas que acabaram de fechar)."""
+    with _trava_pendentes:
+        return {nome: [dict(lin) for lin in lista] for nome, lista in _pendentes.items()}
+
+
 def _cortar_pendentes() -> None:
     """Com a trava na mão: fica no máximo MAX_HORAS_PENDENTES horas à espera, as mais novas. O banco fora por dias não pode
     encher a memória do servidor."""

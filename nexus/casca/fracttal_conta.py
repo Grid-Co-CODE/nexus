@@ -52,6 +52,7 @@ import requests
 log = logging.getLogger(__name__)
 
 DOMINIO = "fracttal.com"
+COTA_POR_MINUTO = 200                   # a cota do Fracttal: 200 pedidos por minuto para a empresa toda (página "Limites de Requests")
 RECUSAS = (406, 429)                    # o Fracttal pedindo calma (a cota por minuto)
 FUNDO = "fundo:"                        # o começo da origem de quem pede por conta própria (laço, thread), não por rota
 MAX_ORIGENS_DE_FUNDO = 50               # origens de fundo distintas por hora; a 51ª e as seguintes vão para OUTROS
