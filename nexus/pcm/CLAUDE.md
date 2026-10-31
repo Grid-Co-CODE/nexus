@@ -1128,6 +1128,20 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
   (até 1600 px, a orientação do EXIF aplicada e o EXIF fora: a localização do celular não fica no disco) e a miniatura sai no
   recebimento. O contrato do lado do App é a seção 2 da `REVISAO-2026-10-30.md` da proposta das contagens; o App ainda não envia.
   Prova: `tests/test_pcm_inventario_fotos.py`.
+- **Fabricante, modelo, número de série e as fotos ampliadas** (30/10/2026, itens 2 e 3; as colunas 15 a 18 do livro das contagens):
+  cada pendência traz `fabricante`, `modelo` e `serie` (o "n/a" do técnico, sem caixa, vira **"não tem"**; o vazio e o "None" do
+  `sync-xlsx` são vazio) e `fotos`, a da peça ("Foto") e as dos dados ("Fotos dos dados"), na ordem Peça, Fabricante, Modelo, Número
+  de série, só as que o App escreveu, cada uma com `tem` (já chegou ao Nexus). No cartão: a foto da peça à esquerda e a lista dos
+  três dados, cada um com a miniatura da foto dele; a foto que o App ainda não mandou (ela vai depois da linha, pela fila
+  offline) diz **"foto ainda não chegou"**, e sem chave nenhuma, "sem foto". As miniaturas são `<button>` com a cópia de 160 px
+  (`?mini=1`, `loading="lazy"`); o clique abre a caixa (`<dialog>` com `showModal`, `static/pcm-fotos.js`) com a foto inteira,
+  pedida só ao abrir; Esc fecha, ← → e Anterior/Próxima passam entre as fotos do MESMO achado (o cartão, `data-cu-grupo`), o foco
+  fica na caixa e volta à miniatura; o clique no véu também fecha. A caixa usa os tokens `--foto-*` (o véu escuro nos dois temas,
+  como a das rondas do Campo). Os dados e as fotos são de quem decide, como a descrição (quem só olha os recebe vazios). O livro de
+  hoje, sem as colunas novas, mostra o cartão de hoje. **Ao cadastrar** (o achado e a avariada), os três vão na descrição da peça
+  no Fracttal, `"Fabricante: X · Modelo: Y · Série: Z"` sem as partes "n/a" ou vazias (`descricao_dos_dados`; o `item_insert` não
+  tem campo próprio para eles, só o `description`, Task 6); a linha sem eles cadastra como antes, sem descrição (o `criar_peca`
+  só leva a `descricao` quando há). O formulário do cadastrar mostra o texto que vai.
 - **Lembrete na tela:** grupo, criticidade e Curva ABC da peça nova não se gravam pela API (testado em 09/10): completar na tela do
   Fracttal.
 - **Cadastrar roda na PONTE `/os/_nexus/inventario/curadoria/cadastrar` (`ponte_os.py`), não em `/t/pcm`:** ele cria a peça no Fracttal
@@ -1140,7 +1154,8 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
   cookie com `Path=/os`: `test_o_login_do_fracttal_so_chega_na_ponte` (régua e curadoria).
 - **Provar:** `tests/test_pcm_inventario_curadoria.py` (o código novo, as pendências, a avariada sem cadastro e o cadastro do -AV,
   cadastrar com a resposta perdida e com o pedido que nem chegou, a reserva entre linhas, "é a peça X" no lote, o genérico, o motivo cifrado, a linha decidida, a contagem gravada,
-  o 403 de quem não é PCM, os status, a foto) com mutações em cada regra acima, todas pegas. A revisão de 27/10 acrescentou: a
+  o 403 de quem não é PCM, os status, a foto, os dados da peça com o "não tem", as fotos na ordem, a "foto ainda não chegou", o
+  livro de hoje, a caixa da foto e o cadastrar com a descrição) com mutações em cada regra acima, todas pegas. A revisão de 27/10 acrescentou: a
   contagem gravada durante o cadastro, a reserva com outros dados, a peça achada com outro nome, as travas (a mesma linha, o cadastro
   lento, a mesma sigla) e a tela de quem só olha sem descrição nem foto.
 

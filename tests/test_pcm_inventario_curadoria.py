@@ -1143,10 +1143,198 @@ def test_a_trava_de_uma_chave_e_so_dela():
     assert t.de(("C-1", "L-2")) is t.de(("C-1", "L-2")) and t.de(("C-1", "L-2")) is not t.de(("C-1", "L-3"))
 
 
+# ── fabricante, modelo, número de série e as fotos ampliadas (30/10/2026, itens 2 e 3 das melhorias) ──────────────────
+# O App passa a mandar, na peça achada fora do catálogo e no genérico a identificar, o fabricante, o modelo e o número de série
+# (cada um com "n/a" quando a peça não tem) e a foto de cada um que não é "n/a" ("Fotos dos dados"); a "Foto" continua sendo a da
+# peça. As fotos chegam depois da linha, pela rota assinada (`fotos_app.py`). O livro de hoje não tem as colunas: a tela é a de hoje.
+DADOS = {"Fabricante": "Fabricante Exemplo", "Modelo": "n/a", "Número de série": "SN-0001",
+         "Fotos dos dados": "fabricante:foto-fab|serie:foto-ser"}
+ACHADO_COM_DADOS = _linha("L-10", Descrição="Disjuntor sem etiqueta", Foto="foto-peca", contado="1", **DADOS)
+GENERICO_COM_DADOS = _linha("L-11", tipo="identificar", contado="2", **{
+    "ID do item": "4", "Código": "SP-4", "Identificado como": "2", "Fabricante": "Outro Fabricante", "Modelo": "M-20",
+    "Número de série": "N/A", "Fotos dos dados": "modelo:foto-mod-11"})
+NOVAS = A.COLUNAS_CONTAGENS[A.COLUNAS_CONTAGENS.index("Fabricante"):]
+
+
+def _so(app_, *linhas):
+    """O livro das contagens só com estas linhas."""
+    _aba(app_.extensions["nexus_dados_sessao"], A.LIVRO_CONTAGENS, A.ABA_CONTAGENS, list(linhas))
+    visao.limpar()
+
+
+def _guardar_foto(cfg, chave, cor=(40, 160, 90)) -> str:
+    """A foto que o App já mandou (o que a rota `fotos_app.receber` grava), e o nome dela."""
+    from PIL import Image
+    from nexus.cadastro.ligacoes import pasta_dados
+    destino = pasta_dados(cfg) / "almox_inventario" / "fotos"
+    destino.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (400, 300), cor).save(destino / f"{CU.nome_da_foto(chave)}.jpg", "JPEG")
+    return CU.nome_da_foto(chave)
+
+
+def test_curadoria_mostra_fabricante_modelo_serie(cur, monkeypatch):
+    from nexus.pcm import telas
+    _so(cur, PECA_DA_LISTA, ACHADO_COM_DADOS, GENERICO_COM_DADOS, CONECTOR)
+    p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
+    assert (p["L-10"]["fabricante"], p["L-10"]["modelo"], p["L-10"]["serie"]) == ("Fabricante Exemplo", "não tem", "SN-0001")
+    assert (p["L-11"]["fabricante"], p["L-11"]["modelo"], p["L-11"]["serie"]) == ("Outro Fabricante", "M-20", "não tem")
+    assert (p["L-3"]["fabricante"], p["L-3"]["modelo"], p["L-3"]["serie"]) == ("", "", "")      # a coluna vazia: nada
+    _no_setor(monkeypatch, "PCM")
+    c = _pessoa_ms(cur)
+    html = c.get(URL).get_data(as_text=True)
+    card = _cartao(html, "Disjuntor sem etiqueta")
+    for texto in ("Fabricante", "Fabricante Exemplo", "Modelo", "não tem", "Número de série", "SN-0001"):
+        assert texto in card, texto
+    gen = _cartao(html, "SP-4")
+    assert "Outro Fabricante" in gen and "M-20" in gen and "não tem" in gen
+    assert "Fabricante" not in _cartao(html, "Conector estanque")                     # sem os dados, o cartão de hoje
+    # o cadastrar diz o que vai na descrição da peça no Fracttal (sem o "n/a")
+    assert "Fabricante: Fabricante Exemplo · Série: SN-0001" in card
+    # os dados da peça são de quem decide, como a descrição e a foto
+    monkeypatch.setattr(telas, "pode_programar", lambda: False)
+    html = c.get(URL).get_data(as_text=True)
+    assert "Fabricante Exemplo" not in html and "SN-0001" not in html and "Número de série" not in html
+
+
+def test_curadoria_mostra_os_dados_da_avariada(cur):
+    """A avariada sem cadastro também mostra os dados quando a linha os traz (o App manda nos tipos que vão à curadoria)."""
+    _o_bom_sem_av(cur)
+    _aba(cur.extensions["nexus_dados_sessao"], A.LIVRO_CONTAGENS, A.ABA_CONTAGENS,
+         [PECA_DA_LISTA, dict(AVARIADA, Fabricante="Fabricante Exemplo", **{"Número de série": "n/a"})])
+    visao.limpar()
+    a = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}["L-6"]
+    assert (a["tipo"], a["fabricante"], a["modelo"], a["serie"]) == ("avariado", "Fabricante Exemplo", "", "não tem")
+
+
+def test_curadoria_na_vira_nao_tem(cur):
+    """O "n/a" do técnico (sem caixa nem espaço a mais) é "não tem", e não vazio: ele olhou e a peça não tem. O vazio que o
+    `sync-xlsx` escreve como "None" é vazio (não se sabe), nunca a palavra."""
+    _so(cur, _linha("L-12", Descrição="Peça X", Fabricante=" N/A ", Modelo="None", **{"Número de série": "n/a"}),
+        _linha("L-13", Descrição="Peça Y", Fabricante="nan", Modelo="na", **{"Número de série": "n/a-77"}))
+    p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
+    assert (p["L-12"]["fabricante"], p["L-12"]["modelo"], p["L-12"]["serie"]) == ("não tem", "", "não tem")
+    assert (p["L-13"]["fabricante"], p["L-13"]["modelo"], p["L-13"]["serie"]) == ("", "na", "n/a-77")   # só o "n/a" exato
+
+
+def test_curadoria_fotos_com_rotulo(cur):
+    """A "Foto" e as três dos dados, na ordem Peça, Fabricante, Modelo, Número de série (a ordem da coluna não importa); só as
+    que o App escreveu na linha (o "n/a" não tem foto); `tem` diz se ela já chegou ao Nexus."""
+    fora_de_ordem = _linha("L-14", Descrição="Peça Z", Foto="foto-z",
+                           **{"Fotos dos dados": "serie:foto-ser-z|fabricante:foto-fab-z|modelo:foto-mod-z|outra:x"})
+    _so(cur, ACHADO_COM_DADOS, fora_de_ordem, CONECTOR)
+    _guardar_foto(cur.config, "foto-fab")
+    p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
+    assert p["L-10"]["fotos"] == [
+        {"rotulo": "Peça", "foto_id": CU.nome_da_foto("foto-peca"), "tem": False},
+        {"rotulo": "Fabricante", "foto_id": CU.nome_da_foto("foto-fab"), "tem": True},
+        {"rotulo": "Número de série", "foto_id": CU.nome_da_foto("foto-ser"), "tem": False}]
+    assert [f["rotulo"] for f in p["L-14"]["fotos"]] == ["Peça", "Fabricante", "Modelo", "Número de série"]
+    assert [f["foto_id"] for f in p["L-14"]["fotos"]] == [CU.nome_da_foto(c) for c in
+                                                          ("foto-z", "foto-fab-z", "foto-mod-z", "foto-ser-z")]
+    assert p["L-3"]["fotos"] == []                                                      # nem a da peça
+
+
+def test_curadoria_foto_que_nao_chegou(cur, monkeypatch):
+    """A foto vai depois da linha (a fila offline do App): a chave já está no livro e o arquivo ainda não está no Nexus. O cartão
+    diz "foto ainda não chegou"; sem chave nenhuma, "sem foto", como hoje."""
+    _so(cur, ACHADO_COM_DADOS, CONECTOR)
+    _no_setor(monkeypatch, "PCM")
+    c = _pessoa_ms(cur)
+    html = c.get(URL).get_data(as_text=True)
+    card = _cartao(html, "Disjuntor sem etiqueta")
+    assert card.count("foto ainda não chegou") == 3 and "<img" not in card and "data-cu-foto" not in card
+    assert "sem foto" in _cartao(html, "Conector estanque")
+    fab = _guardar_foto(cur.config, "foto-fab")
+    card = _cartao(c.get(URL).get_data(as_text=True), "Disjuntor sem etiqueta")
+    assert card.count("foto ainda não chegou") == 2 and f"{URL}/foto/{fab}.jpg?mini=1" in card
+
+
+def test_curadoria_livro_de_hoje(cur, monkeypatch):
+    """O Nexus sobe antes do App: o livro das contagens de hoje não tem as cinco colunas novas, e a curadoria é a de hoje (sem os
+    dados da peça; a foto da peça como antes)."""
+    hoje = [{k: v for k, v in l.items() if k not in NOVAS} for l in (PECA_DA_LISTA, CABO, CONECTOR, GENERICO)]
+    assert all("Fabricante" not in l for l in hoje)
+    _so(cur, *hoje)
+    p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
+    assert set(p) == {"L-2", "L-3", "L-4"}
+    assert all((x["fabricante"], x["modelo"], x["serie"]) == ("", "", "") for x in p.values())
+    assert p["L-2"]["fotos"] == [{"rotulo": "Peça", "foto_id": CU.nome_da_foto("foto-abc"), "tem": False}]
+    foto_id = _guardar_foto(cur.config, "foto-abc")
+    _no_setor(monkeypatch, "PCM")
+    html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
+    assert "Fabricante" not in html and "Número de série" not in html and 'class="cu-dados"' not in html
+    card = _cartao(html, "Cabo azul 6 mm")
+    assert f"{URL}/foto/{foto_id}.jpg?mini=1" in card and card.count("data-cu-foto=") == 1
+    assert "sem foto" in _cartao(html, "Conector estanque")
+
+
+def test_a_caixa_da_foto(cur, monkeypatch):
+    """A foto amplia por cima da tela (Levi, 30/10/2026): um <dialog> com a imagem, a legenda, "Anterior", "Próxima" e "Fechar"
+    (cada um com `aria-label`); as miniaturas são <button> (o teclado as abre) com a de 160 px (`?mini=1`, `loading="lazy"`), e a
+    imagem grande só é pedida ao abrir (o <img> da caixa nasce sem `src`)."""
+    from nexus.pcm import telas
+    _so(cur, ACHADO_COM_DADOS)
+    peca, fab, ser = (_guardar_foto(cur.config, c) for c in ("foto-peca", "foto-fab", "foto-ser"))
+    _no_setor(monkeypatch, "PCM")
+    c = _pessoa_ms(cur)
+    html = c.get(URL).get_data(as_text=True)
+    caixa = re.search(r"<dialog\b[^>]*>(.*?)</dialog>", html, re.S)
+    assert caixa and 'id="cu-caixa"' in caixa.group(0)
+    dentro = caixa.group(1)
+    img = re.search(r"<img\b[^>]*>", dentro).group(0)
+    assert "src=" not in img                                                   # a grande só ao abrir
+    assert "<figcaption" in dentro
+    for texto in ("Anterior", "Próxima", "Fechar"):
+        bt = re.search(rf"<button\b[^>]*>\s*{texto}\s*</button>", dentro)
+        assert bt and "aria-label=" in bt.group(0), texto
+    card = _cartao(html, "Disjuntor sem etiqueta")
+    assert "data-cu-grupo" in card
+    minis = re.findall(r"<button\b[^>]*data-cu-foto=\"([^\"]+)\"[^>]*>\s*<img\b([^>]*)>", card)
+    assert [u for u, _ in minis] == [f"{URL}/foto/{n}.jpg" for n in (peca, fab, ser)]   # na ordem: peça e os dados
+    for u, atributos in minis:
+        assert f'src="{u}?mini=1"' in atributos and 'loading="lazy"' in atributos
+    assert all('aria-label="Ampliar a foto' in b for b in re.findall(r"<button\b[^>]*data-cu-foto[^>]*>", card))
+    assert "/static/pcm-fotos.js" in html
+    js = (RAIZ / "nexus" / "static" / "pcm-fotos.js").read_text("utf-8")
+    for peca_js in ("showModal", "ArrowLeft", "ArrowRight", ".focus(", "'close'", "data-cu-grupo"):
+        assert peca_js in js, peca_js
+    # quem só olha não tem a caixa nem as miniaturas
+    monkeypatch.setattr(telas, "pode_programar", lambda: False)
+    html = c.get(URL).get_data(as_text=True)
+    assert "<dialog" not in html and "data-cu-foto" not in html and "pcm-fotos.js" not in html
+
+
+def test_cadastrar_leva_fabricante_modelo_serie(cur):
+    """O Fracttal não tem campo próprio de fabricante, modelo e série no `item_insert` (o passo 0): vão na descrição da peça, sem
+    as partes "n/a" ou vazias. A linha sem os dados cadastra como antes (sem descrição)."""
+    _so(cur, PECA_DA_LISTA, ACHADO_COM_DADOS, CABO, GENERICO_COM_DADOS)
+    falso = _falso()
+    r = CU.decidir(cur.config, "C-1", "L-10", "cadastrar", sigla="CAB", nome="Disjuntor", unidade="UNIDADE", estoque=falso,
+                   pessoa=PESSOA)
+    assert falso._catalogo[r["id_item"]]["descricao"] == "Fabricante: Fabricante Exemplo · Série: SN-0001"
+    r2 = _cadastrar(cur.config, falso)                                                  # CABO, sem os dados
+    assert "descricao" not in falso._catalogo[r2["id_item"]]
+    assert CU.descricao_dos_dados(GENERICO_COM_DADOS) == "Fabricante: Outro Fabricante · Modelo: M-20"
+    assert CU.descricao_dos_dados(_linha("x", Fabricante="n/a", Modelo=" ", **{"Número de série": "None"})) == ""
+    assert CU.descricao_dos_dados({k: v for k, v in CABO.items() if k not in NOVAS}) == ""   # o livro de hoje
+
+
+def test_cadastrar_avariado_leva_fabricante_modelo_serie(cur):
+    _o_bom_sem_av(cur)
+    _aba(cur.extensions["nexus_dados_sessao"], A.LIVRO_CONTAGENS, A.ABA_CONTAGENS,
+         [PECA_DA_LISTA, dict(AVARIADA, Fabricante="Fabricante Exemplo", Modelo="M-1", **{"Número de série": "n/a"})])
+    visao.limpar()
+    falso = _falso()
+    r = CU.decidir(cur.config, "C-1", "L-6", "cadastrar", estoque=falso, pessoa=PESSOA)
+    assert falso._catalogo[r["id_item"]]["descricao"] == "Fabricante: Fabricante Exemplo · Modelo: M-1"
+
+
 def test_sem_cor_fora_de_token_nem_endereco_da_raiz():
     t = (RAIZ / "nexus" / "templates" / "pcm" / "inventario_curadoria.html").read_text("utf-8")
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b", t) and "rgba(" not in t
     assert not re.search(r"""(href|action|src)="/""", t)
+    js = (RAIZ / "nexus" / "static" / "pcm-fotos.js").read_text("utf-8")
+    assert not re.search(r"#[0-9a-fA-F]{3,8}\b", js) and "rgba(" not in js and "'/t/" not in js
     css = (RAIZ / "nexus" / "static" / "pcm.css").read_text("utf-8")
     bloco = css[css.index("/* ── Curadoria do inventário"):]
     proximo = bloco.find("/* ── ", 10)

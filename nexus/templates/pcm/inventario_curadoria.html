@@ -12,7 +12,12 @@
    Spare Parts, no design do Nexus): os números do alto, os cartões, o selo do tipo e da decisão; a estrutura é a mesma.
    A avariada sem cadastro (30/10/2026, a aba Avariados do App; nexus/pcm/inventario/avariados.py): o cadastrar vem preenchido
    com o código -AV FIXO (sem sigla nem número), o nome no padrão dos -AV e a unidade da peça boa; "é a peça X" e descartar
-   como no achado fora do catálogo. #}
+   como no achado fora do catálogo.
+   Os dados da peça e as fotos ampliadas (30/10/2026, itens 2 e 3 das melhorias): o fabricante, o modelo e o número de série
+   (ou "não tem", o "n/a" do técnico), cada um com a miniatura da foto dele, e a foto da peça à esquerda. As miniaturas são
+   <button> com a cópia de 160 px (`?mini=1`); o clique abre a caixa (<dialog>, pcm-fotos.js) com a foto inteira, pedida só ao
+   abrir, e as setas passam entre as fotos do mesmo achado. A foto que o App ainda não mandou (ela vai depois da linha, pela
+   fila offline) diz "foto ainda não chegou"; o livro de hoje, sem as colunas novas, mostra o cartão de hoje. #}
 <div class="pg alm inv cu">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
 <h1 class="titulo-pagina">Curadoria</h1>
@@ -49,10 +54,12 @@
 <h3 class="rg-sub">Para decidir ({{ pendentes|length }})</h3>
 {% for x in pendentes %}
 {% set n = loop.index %}
-<article class="cu-card" aria-label="{{ ('avariada sem cadastro ' ~ (x.codigo_av or x.codigo))|trim if x.tipo == 'avariado' else (x.descricao or x.codigo or 'achado fora do catálogo') }}">
+{% set titulo = ('avariada sem cadastro ' ~ (x.codigo_av or x.codigo))|trim if x.tipo == 'avariado' else (x.descricao or x.codigo or 'achado fora do catálogo') %}
+<article class="cu-card" aria-label="{{ titulo }}" data-cu-grupo>
   {% if pode %}<div class="cu-foto">
-    {% if x.tem_foto %}<a href="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ x.foto_id }}.jpg" target="_blank" rel="noopener">
-      <img class="cu-img" loading="lazy" src="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ x.foto_id }}.jpg" alt="Foto do que o técnico achou"></a>
+    {% set fp = x.fotos|selectattr('rotulo', 'equalto', 'Peça')|first %}
+    {% if fp and fp.tem %}<button type="button" class="cu-mini cu-mini--peca" data-cu-foto="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ fp.foto_id }}.jpg" data-cu-legenda="Foto da peça · {{ titulo }}" aria-label="Ampliar a foto da peça"><img class="cu-img" loading="lazy" src="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ fp.foto_id }}.jpg?mini=1" alt=""></button>
+    {% elif fp %}<span class="cu-sem-foto mudo">foto ainda não chegou</span>
     {% else %}<span class="cu-sem-foto mudo">sem foto</span>{% endif %}
   </div>{% endif %}
   <div class="cu-corpo">
@@ -70,6 +77,26 @@
     <p class="cu-escolha">O técnico escolheu:
       {% if x.identificado_como %}<b>{{ x.identificado_codigo or ('peça ' ~ x.identificado_como) }}</b>{% if x.identificado_nome %} · {{ x.identificado_nome }}{% endif %}
       {% else %}<span class="mudo">não soube dizer</span>{% endif %}</p>
+    {% endif %}
+
+    {# o fabricante, o modelo e o número de série que o técnico leu na peça (o "n/a" dele é "não tem"), cada um com a foto da
+       placa ou da etiqueta; só para quem decide (`pode`: a tela de quem só olha os recebe vazios) #}
+    {% set fotos_dados = x.fotos|rejectattr('rotulo', 'equalto', 'Peça')|list %}
+    {% if x.fabricante or x.modelo or x.serie or fotos_dados %}
+    <dl class="cu-dados">
+      {% for rot, val in [('Fabricante', x.fabricante), ('Modelo', x.modelo), ('Número de série', x.serie)] %}
+      {% set f = fotos_dados|selectattr('rotulo', 'equalto', rot)|first %}
+      {% if val or f %}
+      <div class="cu-dado">
+        <dt>{{ rot }}</dt>
+        <dd>{% if val == 'não tem' %}<span class="mudo">não tem</span>{% else %}<span class="cu-dado-v">{{ val or '—' }}</span>{% endif %}
+          {% if f and f.tem %}<button type="button" class="cu-mini cu-mini--dado" data-cu-foto="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ f.foto_id }}.jpg" data-cu-legenda="{{ rot }} · {{ val or titulo }}" aria-label="Ampliar a foto: {{ rot }}"><img loading="lazy" src="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ f.foto_id }}.jpg?mini=1" alt=""></button>
+          {% elif f %}<span class="cu-sem mudo">foto ainda não chegou</span>{% endif %}
+        </dd>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </dl>
     {% endif %}
 
     {% if pode %}
@@ -91,6 +118,7 @@
           {% if un_av not in unidades %}<option value="{{ un_av }}" selected>{{ un_av|lower }}</option>{% endif %}
         </select>
         <p class="alm-det">Se a {{ x.codigo_av }} já existir no Fracttal, o Nexus usa ela, sem criar outra. A peça é ligada ao almoxarifado e ajustada quando a contagem for gravada.</p>
+        {% if x.descricao_cadastro %}<p class="alm-det">Vai na descrição da peça no Fracttal: <b>{{ x.descricao_cadastro }}</b></p>{% endif %}
         <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Cadastrar no Fracttal</button>
       </form></details>
     {% elif not x.av_repetido %}<p class="alm-det">Sem o código da peça boa não há o -AV para cadastrar: diga qual é a peça ou descarte.</p>{% endif %}
@@ -111,6 +139,7 @@
         {% if x.reserva %}<p class="alm-det"><b>Uma tentativa anterior desta linha já reservou o código {{ x.reserva.codigo }}</b> (a peça pode já
           estar no Fracttal). Repita com estes mesmos dados: com outros, o Nexus recusa, para não criar uma segunda peça.</p>{% endif %}
         <p class="alm-det">O código é o próximo livre da sigla (SP-sigla-NNN). A peça é ligada ao almoxarifado e ajustada quando a contagem for gravada.</p>
+        {% if x.descricao_cadastro %}<p class="alm-det">Vai na descrição da peça no Fracttal: <b>{{ x.descricao_cadastro }}</b></p>{% endif %}
         <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Cadastrar no Fracttal</button>
       </form></details>
     {% endif %}
@@ -171,6 +200,24 @@
 </div>
 </section>
 {% endif %}
+{% if pode %}
+{# a caixa da foto (30/10/2026): uma só para a página; o <img> nasce sem src, e a foto inteira só é pedida ao abrir #}
+<dialog class="cu-caixa" id="cu-caixa" aria-labelledby="cu-caixa-legenda">
+  <div class="cu-caixa-in">
+    <figure class="cu-caixa-fig">
+      <img class="cu-caixa-img" id="cu-caixa-img" alt="">
+      <figcaption class="cu-caixa-legenda" id="cu-caixa-legenda"></figcaption>
+    </figure>
+    <div class="cu-caixa-acoes">
+      <button type="button" class="cu-caixa-bt" data-cu-anterior aria-label="Foto anterior do mesmo achado">Anterior</button>
+      <span class="cu-caixa-conta" id="cu-caixa-conta" aria-live="polite"></span>
+      <button type="button" class="cu-caixa-bt" data-cu-proxima aria-label="Próxima foto do mesmo achado">Próxima</button>
+      <button type="button" class="cu-caixa-bt" data-cu-fechar aria-label="Fechar a foto" autofocus>Fechar</button>
+    </div>
+  </div>
+</dialog>
+{% endif %}
 </div>
 <script src="{{ url_for('static', filename='pcm-ponte-inventario.js') }}"></script>
+{% if pode %}<script src="{{ url_for('static', filename='pcm-fotos.js') }}"></script>{% endif %}
 {% endblock %}

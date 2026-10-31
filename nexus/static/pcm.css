@@ -1362,11 +1362,48 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .cu-op .cu-form{margin-top:0;padding:0 12px 12px}
 .cu-form .gc-campo{width:100%;box-sizing:border-box}
 .cu-form button{align-self:flex-start;margin-top:4px}
+/* Os dados da peça e as fotos ampliadas (30/10/2026, itens 2 e 3 das melhorias): o fabricante, o modelo e o número de série
+   numa lista de rótulo e valor, cada um com a miniatura da foto dele (40 px), e a da peça à esquerda (96 px). A miniatura é
+   um <button> sem a cara de botão (a foto é o botão; o foco é o anel do Nexus). A caixa (<dialog>, pcm-fotos.js) usa o véu e
+   a tinta das fotos (`--foto-*`, os mesmos nos dois temas: foto se olha no escuro, como a caixa das rondas do Campo). No
+   celular a foto da peça fica em 96 px (a miniatura tem 160 px: esticada à largura da tela, borraria; a inteira é o clique). */
+.cu-mini{display:block;flex:none;padding:0;overflow:hidden;background:var(--superficie-3);border:1px solid var(--linha);
+  border-radius:8px;cursor:zoom-in}
+.cu-mini:hover{border-color:var(--verde-texto)}
+.cu-mini img{display:block;width:100%;height:100%;object-fit:cover}
+.cu-mini--peca{width:96px;height:96px}
+.cu-mini--peca .cu-img{border:0;border-radius:0}
+.cu-mini--dado{width:40px;height:40px}
+.cu-dados{display:grid;gap:6px;margin:10px 0 0;padding:8px 10px;background:var(--superficie-2);border:1px solid var(--linha);
+  border-radius:10px}
+.cu-dado{display:flex;align-items:center;gap:10px;min-width:0;min-height:40px}
+.cu-dado dt{flex:none;width:118px;font:600 12px var(--font-sans);color:var(--mudo)}
+.cu-dado dd{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-width:0;margin:0;font-size:13px;color:var(--tinta)}
+.cu-dado-v{overflow-wrap:anywhere}
+.cu-sem{font-size:12px}
+.cu-caixa{width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;
+  color:var(--foto-tinta)}
+.cu-caixa::backdrop{background:var(--foto-veu)}
+.cu-caixa-in{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;box-sizing:border-box;
+  min-height:100%;padding:24px 16px}
+.cu-caixa-fig{display:grid;justify-items:center;gap:8px;max-width:min(1100px,100%);margin:0}
+.cu-caixa-img{display:block;max-width:100%;max-height:calc(100vh - 170px);border-radius:8px;object-fit:contain}
+.cu-caixa-img:not([src]){display:none}
+.cu-caixa-legenda{max-width:640px;color:var(--foto-legenda);font:13px var(--font-sans);text-align:center;overflow-wrap:anywhere}
+.cu-caixa-acoes{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px}
+.cu-caixa-bt{min-width:44px;height:40px;padding:0 14px;background:transparent;border:1px solid var(--foto-borda);
+  border-radius:8px;color:var(--foto-tinta);font:600 13px var(--font-sans);cursor:pointer}
+.cu-caixa-bt:hover{border-color:var(--foto-borda-hover)}
+.cu-caixa-bt:focus-visible{outline:2px solid var(--foto-borda-hover);outline-offset:2px}
+.cu-caixa-conta{min-width:52px;color:var(--foto-legenda);font:12px var(--font-sans);text-align:center}
+.cu-caixa--uma [data-cu-anterior],.cu-caixa--uma [data-cu-proxima],.cu-caixa--uma .cu-caixa-conta{display:none}
 @media (max-width:640px){
   .cu-card{flex-direction:column}
-  .cu-foto,.cu-img,.cu-sem-foto{width:100%}
-  .cu-img{height:auto;max-height:260px}
-  .cu-sem-foto{height:64px}
+  .cu-foto{width:100%}
+  .cu-sem-foto{width:100%;height:64px}
+  .cu-dado{align-items:flex-start}
+  .cu-dado dt{width:96px;padding-top:2px}
+  .cu-caixa-img{max-height:calc(100vh - 190px)}
 }
 
 /* ── O topo, os filtros, o cartão e as colunas do Quadro (27/10/2026, Levi, num protótipo em quatro rodadas) ──────────

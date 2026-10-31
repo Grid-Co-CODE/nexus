@@ -256,6 +256,43 @@ def _tem_foto(cfg, chave) -> bool:
     return bool(_txt(chave)) and pasta is not None and (pasta / f"{nome_da_foto(chave)}.jpg").is_file()
 
 
+# ── fabricante, modelo e número de série (30/10/2026, itens 2 e 3 das melhorias) ────────────────────────────────────
+# o rótulo da "Fotos dos dados" (`A.ROTULOS_FOTOS_DOS_DADOS`), a coluna do livro (que é também o rótulo da tela e da foto) e o
+# rótulo curto da descrição que vai ao Fracttal; na ordem da tela
+_DADOS_DA_PECA = (("fabricante", "Fabricante", "Fabricante"), ("modelo", "Modelo", "Modelo"),
+                  ("serie", "Número de série", "Série"))
+NAO_TEM = "não tem"
+
+
+def _dado(v) -> str:
+    """O fabricante, o modelo ou o número de série como a tela os diz: o "n/a" do técnico (sem caixa) é "não tem" (ele olhou, e a
+    peça não tem); o vazio e o "None" que o `sync-xlsx` escreve no vazio são vazio (o livro de hoje, sem a coluna, também)."""
+    t = A.campo(v)
+    return NAO_TEM if t.lower() == A.NA else t
+
+
+def descricao_dos_dados(l: dict) -> str:
+    """"Fabricante: X · Modelo: Y · Série: Z", a descrição da peça que a curadoria cadastra no Fracttal: o `item_insert` não tem
+    campo próprio para eles (o passo 0; Task 6 de 30/10/2026), só o `description`. O "n/a" e o vazio saem; sem nenhum, vazio (e
+    o cadastro vai sem descrição, como antes)."""
+    partes = []
+    for _, coluna, curto in _DADOS_DA_PECA:
+        v = _dado(l.get(coluna))
+        if v and v != NAO_TEM:
+            partes.append(f"{curto}: {' '.join(v.split())}")
+    return " · ".join(partes)
+
+
+def _fotos_da_linha(cfg, l: dict) -> list[dict]:
+    """As fotos do achado na ordem da tela: a da peça ("Foto") e as dos dados ("Fotos dos dados", `A.fotos_dos_dados`), só as que
+    o App escreveu na linha (o dado "n/a" não tem foto). `tem`: a foto já chegou ao Nexus (ela vai depois da linha, pela fila
+    offline do App; sem ela, "foto ainda não chegou")."""
+    chaves = [("Peça", A.campo(l.get("Foto")))]
+    dos_dados = A.fotos_dos_dados(l.get("Fotos dos dados"))
+    chaves += [(coluna, dos_dados.get(rotulo_col, "")) for rotulo_col, coluna, _ in _DADOS_DA_PECA]
+    return [{"rotulo": rotulo, "foto_id": nome_da_foto(c), "tem": _tem_foto(cfg, c)} for rotulo, c in chaves if c]
+
+
 # ── as pendências ────────────────────────────────────────────────────────────────────────────────────────────────────
 _BRT = timezone(timedelta(hours=-3))
 
@@ -286,7 +323,12 @@ def pendencias(cfg) -> list[dict]:
     (quando o catálogo veio). A `reserva` é o que uma tentativa anterior de cadastrar esta linha reservou (código, sigla, nome,
     unidade), ou None. Na avariada sem cadastro, `codigo_av` (o -AV que falta), `nome_av` e `unidade_av` são o cadastrar já
     preenchido (as marcas do `avariados.resolver`), e `av_repetido` diz que há mais de um item com aquele código no catálogo
-    (sem cadastrar: o PCM escolhe pelo "é a peça X"); nas outras, vazios."""
+    (sem cadastrar: o PCM escolhe pelo "é a peça X"); nas outras, vazios.
+
+    Desde 30/10/2026 (itens 2 e 3): `fabricante`, `modelo` e `serie` (texto; o "n/a" do técnico vira "não tem"; sem a coluna,
+    vazio), `descricao_cadastro` (o que o cadastrar manda na descrição da peça no Fracttal, `descricao_dos_dados`) e `fotos`, a da
+    peça e as dos dados na ordem da tela: `[{"rotulo": "Peça" | "Fabricante" | "Modelo" | "Número de série", "foto_id", "tem"}]`.
+    O livro de hoje, sem as colunas novas, dá os três vazios e só a foto da peça: a tela de hoje."""
     abertas = contagens_abertas(cfg)
     decididas = _decisoes_do_livro(F.ler(cfg)[F.ABA_CURADORIA])
     catalogo = _catalogo() or {}
@@ -312,6 +354,9 @@ def pendencias(cfg) -> list[dict]:
                 "reserva": reservas.get(chave) if isinstance(reservas.get(chave), dict) else None,
                 "codigo_av": _txt(l.get("_codigo_av")), "nome_av": _txt(l.get("_nome_av")),
                 "unidade_av": _txt(l.get("_unidade_av")), "av_repetido": bool(l.get("_av_repetido")),
+                "fabricante": _dado(l.get("Fabricante")), "modelo": _dado(l.get("Modelo")),
+                "serie": _dado(l.get("Número de série")), "descricao_cadastro": descricao_dos_dados(l),
+                "fotos": _fotos_da_linha(cfg, l),
                 "decisao": None if d is None else {
                     "decisao": _txt(d.get("decisao")), "id_item": _id(d.get("id_item")),
                     "codigo_criado": _txt(d.get("codigo_criado")), "quando": _txt(d.get("decidida_em")),
@@ -449,13 +494,15 @@ def _conferir_o_nome_da_peca(achada: dict, reserva: dict, codigo: str) -> None:
                        "Fracttal.")
 
 
-def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) -> tuple[str, str, bool]:
+def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque, descricao: str = "") -> tuple[str, str, bool]:
     """Cria a peça no Fracttal sem duplicar. Devolve (id do item, código, criou agora).
 
     Linha SEM reserva: escolhe o próximo código da sigla (a lista do Fracttal e as reservas de todas as contagens), RESERVA-O no
     controle (com a sigla, o nome e a unidade pedidos) e só então cria. Linha COM reserva (uma tentativa anterior): confere que os
     dados são os mesmos (`_conferir_a_reserva`); se o código já existe no Fracttal, a peça foi criada e a resposta se perdeu:
-    confere o nome (`_conferir_o_nome_da_peca`) e só devolve o ID, sem criar outra; se não existe, cria com o MESMO código."""
+    confere o nome (`_conferir_o_nome_da_peca`) e só devolve o ID, sem criar outra; se não existe, cria com o MESMO código.
+    `descricao` (o fabricante, o modelo e a série da linha, `descricao_dos_dados`) vai no `criar_peca` só quando há: sai da linha
+    do livro, e a nova tentativa manda a mesma."""
     sigla = _txt(sigla).upper()
     if sigla not in siglas(cfg, almox):
         raise ValueError(f"A sigla {sigla[:10]!r} não é uma das do catálogo ({', '.join(siglas(cfg, almox))}).")
@@ -484,7 +531,7 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) ->
                                    "reservado_em": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
                 _gravar_reservas(arq, reservas)      # ANTES de criar: se a resposta se perder, a nova tentativa sabe qual era
     try:
-        return str(estoque.criar_peca(codigo, nome, unidade)), codigo, True
+        return str(_criar(estoque, codigo, nome, unidade, descricao)), codigo, True
     except E.Recusado:
         # o Fracttal recusou com todas as letras (o `success: false`): nada foi criado. A reserva sai, para a nova tentativa com
         # os dados corrigidos não ficar presa no "repita com os dados da reserva" (a revisão final de 27/10/2026). SÓ o
@@ -522,7 +569,7 @@ def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool
     a resposta do criar se perdeu, e a varredura do App ainda não o trouxe). O código fixo é a chave da nova tentativa, então a
     reserva em arquivo dos outros cadastros não é preciso; a trava por código faz duas contagens com a avariada da mesma boa
     procurarem e criarem uma de cada vez. O nome e a unidade são os que o PCM mandou ou, sem eles, os que a tela propõe (o
-    padrão dos -AV e a unidade da boa)."""
+    padrão dos -AV e a unidade da boa). Os dados da peça que a linha trouxer vão na descrição, como no outro cadastro."""
     codigo = _txt(l.get("_codigo_av"))
     if not codigo:
         raise ValueError("Esta avariada veio sem o código da peça boa: não há o -AV para cadastrar. Diga qual é a peça ou "
@@ -541,7 +588,15 @@ def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool
         achada = estoque.achar_peca(codigo)
         if achada:
             return str(achada), codigo, False
-        return str(estoque.criar_peca(codigo, nome, unidade)), codigo, True
+        return str(_criar(estoque, codigo, nome, unidade, descricao_dos_dados(l))), codigo, True
+
+
+def _criar(estoque, codigo, nome, unidade, descricao: str):
+    """O `criar_peca` com a descrição só quando há (30/10/2026): sem os dados da peça, o pedido é o de antes, posicional, e o
+    Fracttal que valia antes (os falsos dos testes inclusive) vale do mesmo jeito."""
+    if descricao:
+        return estoque.criar_peca(codigo, nome, unidade, descricao=descricao)
+    return estoque.criar_peca(codigo, nome, unidade)
 
 
 def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: str | None = None, sigla: str | None = None,
@@ -594,7 +649,8 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
                 texto = (f"A peça {codigo} já existe no Fracttal: as unidades avariadas contam nela nesta contagem, sem "
                          "criar outra.")
         elif decisao == "cadastrar":
-            id_final, codigo, criada = _cadastrar(cfg, cid, chave, almox, sigla, nome, unidade, estoque)
+            id_final, codigo, criada = _cadastrar(cfg, cid, chave, almox, sigla, nome, unidade, estoque,
+                                                  descricao_dos_dados(l))
             texto = (f"Peça cadastrada no Fracttal: {codigo}." if criada else
                      f"A peça {codigo} já estava no Fracttal (a tentativa anterior a criou): usei ela, sem criar outra.")
         elif decisao == "descartar":
@@ -679,8 +735,10 @@ def _pagina(*, erro: str = "", status: int = 200):
     pode = telas.pode_programar()
     if not pode:
         # o que o técnico escreveu e a foto dele são de quem decide (podem mostrar gente, placa de equipamento, o que estiver à
-        # volta): quem só olha vê que há um achado, a quantidade e a usina
-        lista = [dict(p, descricao="", foto="", foto_id="", tem_foto=False, reserva=None) for p in lista]
+        # volta): quem só olha vê que há um achado, a quantidade e a usina. Os dados da peça (fabricante, modelo, série) e as
+        # fotos deles também (30/10/2026), como a descrição
+        lista = [dict(p, descricao="", foto="", foto_id="", tem_foto=False, reserva=None, fabricante="", modelo="", serie="",
+                      descricao_cadastro="", fotos=[]) for p in lista]
     pendentes = [p for p in lista if p["decisao"] is None]
     resp = render_template(
         "pcm/inventario_curadoria.html", pendentes=pendentes, decididas=[p for p in lista if p["decisao"] is not None],
