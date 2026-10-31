@@ -1324,16 +1324,31 @@ dele; o `_code_loc` era montado uma vez por processo e nunca refeito (ativo novo
   primeiro download (RPC, com a sessão de quem pediu, como sempre). Quem chega com o boot em curso espera nele: o "feito" só vale
   depois (um teste de 8 pedidos juntos achou o erro, que mandaria o pedido dos primeiros décimos de segundo baixar os ~22 mil
   ativos do Fracttal).
-- **A troca recusa** a lista vazia e a que encolhe mais de 5% (`ENCOLHE_MAX`): o download do RPC por páginas perde 200 ativos
-  em silêncio quando uma página vem sem lista. Recusada, fica o catálogo de antes e o motivo vai para `estado()["recusa"]`.
-  A mesma lista lida de novo (mesmo `versao`) só renova o `lido_em` (e regrava o disco se o dele ficou mais de 1 h para trás).
-  Só o que veio do Fracttal (rpc, rest) vai para o disco.
-- **Fresco ou vencido** é decidido por quem usa, pelo `lido_em` (`api.catalogo_vencido`, 24 h): vencido, o catálogo serve e é
+- **A troca recusa** a lista vazia, a que encolhe mais de 5% (`ENCOLHE_MAX`) e a leitura mais velha que o catálogo de agora com
+  outro conteúdo (a foto do banco de ontem não vence o RPC de agora): o download do RPC por páginas perde 200 ativos em
+  silêncio quando uma página vem sem lista. Recusada, fica o catálogo de antes e o motivo (com a hora) vai para
+  `estado()["recusa"]`. A versão (o sha das linhas) sai ANTES de montar qualquer coisa: a mesma lista lida de novo (a renovação
+  diária) só renova o `lido_em` (e regrava o disco se o dele ficou mais de 1 h para trás), e a recusada não monta nada. Só o
+  que veio do Fracttal (rpc, rest) vai para o disco.
+- **A recusa é lembrada** (revisão 1 da tarefa 2.1). A leitura completa que o catálogo recusou por ter encolhido foi uma ida de
+  ~110 pedidos ao Fracttal: `ativos_central.conferido_em(cat)` é o mais novo entre o `lido_em` e essa leitura, e o
+  `api.catalogo_vencido` decide por ele. Então duas aprovações da Fila seguidas, depois das 24 h, baixam UMA vez (antes, cada uma
+  baixava os ~110 pedidos, minutos na frente de quem aprovava, e o download por trás repetia de 10 em 10 min); quem esperou a vez
+  na trava usa a leitura de quem baixou, entrando ou não; o botão "Atualizar ativos" (`force`) dentro de
+  `ASSETS_ESPERA_TENTATIVA` (10 min) depois de uma recusa devolve o catálogo de agora sem baixar; passadas as 24 h da recusa, tenta
+  de novo. A lista vazia NÃO entra (não é leitura completa, custa 1 pedido). A recusa fica só na memória: um reinício a esquece,
+  e o catálogo velho relê uma vez na 1ª visita.
+- **Os botões levam o motivo:** `POST /os/api/ativos/atualizar` e `GET /os/api/tradicional/catalogo?recarregar=1` respondem com
+  `recusa` (texto curto com a hora, ou ""); o link `/os/solicitacao/atualizar`, que navega, leva `recusa` na volta para a Fila.
+  Mostrar na tela é a tarefa 2.3, que refaz os botões.
+- **Fresco ou vencido** é decidido por quem usa, por `conferido_em` (`api.catalogo_vencido`, 24 h): vencido, o catálogo serve e é
   renovado por trás, como em 24/10. `force=True` e `em_dia=True` seguem como eram (RPC com a sessão da pessoa), e o que
   baixam entra no catálogo central. O botão "Atualizar ativos" (3 telas) ainda baixa na frente de quem clicou: é a tarefa 2.3.
+  O "desatualizado" da tela inicial segue pelo `lido_em` (o dado é de ontem, mesmo conferido hoje).
 - **Medido** (catálogo de 28/10, 26.620 ativos): 30 MB na memória com todos os índices (a lista decodificada sozinha eram 33 MB, e
-  cada chamada copiava mais ~12 MB); subir pela cópia em disco 0,5 s (o arquivo tem 0,9 MB); montar uma versão 0,4 s; achar um
-  código 1,5 µs.
+  cada chamada copiava mais ~12 MB); subir pela cópia em disco 0,5 s (o arquivo tem 0,9 MB); montar uma versão 0,4 s; trocar pela
+  MESMA lista (a renovação diária) 0,35 s e pico de 15 MB (eram 0,45 s e 44 MB: montava tudo para depois ver que era igual); achar
+  um código 1,5 µs.
 - **Na ponte:** `ponte.ligar_catalogo_de_ativos(app)`, ao criar o clone, diz onde mora a cópia e de onde ler a foto. Nos testes
   o disco não é tocado (a pasta é a do usuário da máquina): o catálogo vive só na memória, e o teste que quer o disco passa a
   pasta de teste (`ativos_central.reiniciar(pasta=...)`).
@@ -1357,10 +1372,12 @@ como está, e o `create_os_rpc` põe `id_type_item or 1`. Então a foto só pode
 (ou quando a criação passar a pedir o catálogo em dia). Só a foto mais nova entra (a de 21/06 que a carga levou junto tem
 códigos que o Fracttal já não tem).
 
-**Prova:** `tests/test_oscreator_ativos_central.py` (35 testes: nenhuma ida ao Fracttal nas telas, nem depois do reinício;
-o boot em ordem, a cópia ilegível, o boot concorrente; o registro só de leitura e a cópia; a busca por índice, sem varrer; a
-troca recusada e a mesma lista; a foto do banco contra o caminho do RPC; a ponte) e os testes de catálogo de 19/10 e 24/10
-sobre o novo dono.
+**Prova:** `tests/test_oscreator_ativos_central.py` (47 testes: nenhuma ida ao Fracttal nas telas, nem depois do reinício;
+o boot em ordem, a cópia ilegível, o boot concorrente (8 pedidos juntos, com o leitor lento); o registro só de leitura e a
+cópia; a busca por índice, sem varrer; a troca recusada, a mesma lista sem montar nada e a leitura mais velha; a recusa lembrada
+(duas aprovações e cinco pedidos juntos baixam uma vez, o botão na janela não baixa e leva o motivo, passadas as 24 h tenta de
+novo); a conta de códigos igual nas duas telas; a foto do banco contra o caminho do RPC; a ponte) e os testes de catálogo de
+19/10 e 24/10 sobre o novo dono.
 
 ## O catálogo de ativos vencido por trás (24/10/2026)
 
@@ -1371,7 +1388,8 @@ quando atualizar vai atualizar a lista de todos, não só daquela pessoa".
 
 - **Vencido, o de ontem volta na hora** (`api.load_assets_cached`) e o novo é baixado por trás
   (`_renovar_catalogo_por_tras`, a thread `os-catalogo-por-tras`), com a sessão de quem pediu (a cópia do contexto leva o
-  JWT). Uma tentativa a cada `ASSETS_ESPERA_TENTATIVA` (10 min): a que falhou deixa o de ontem.
+  JWT). Uma tentativa a cada `ASSETS_ESPERA_TENTATIVA` (10 min): a que falhou deixa o de ontem. A que veio e foi recusada
+  (encolheu) conta como conferida, e o retry de 10 em 10 min acabou para ela (31/10/2026, seção do catálogo central).
 - **Espera o novo** só quem precisa dele em dia: `em_dia=True` (resolver o ativo da OS na aprovação,
   `rotas_solic._catalogo_para_aprovar`); e quem não tem catálogo nenhum na máquina.
 - **O botão "Atualizar ativos"** (OS Creator → Ativos, `/os/api/ativos/atualizar`) baixa na hora; o catálogo é um só (desde

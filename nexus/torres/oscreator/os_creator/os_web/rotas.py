@@ -237,7 +237,7 @@ def _info_catalogo() -> dict:
     info = dict(api.assets_cache_info())
     cat = ativos_central.atual()
     if cat is not None:
-        info["n"] = len(cat.por_codigo)         # um registro por código: o índice já é a conta dos que têm código
+        info["n"] = cat.n_com_codigo            # os registros com código, repetidos inclusive: a conta da tela de Ativos
     return info
 
 

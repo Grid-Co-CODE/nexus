@@ -319,8 +319,22 @@ _ASSETS_RECARGA = threading.Lock()      # uma recarga do Fracttal por vez (~110 
 
 
 def catalogo_vencido(cat) -> bool:
-    """O catálogo foi conferido com o Fracttal há 24 h ou mais (`ASSETS_TTL`). Vencido ele continua servindo; só se renova."""
-    return time.time() - cat.lido_em >= ASSETS_TTL
+    """O catálogo foi conferido com o Fracttal há 24 h ou mais (`ASSETS_TTL`). Conferido é o `lido_em` dele OU a leitura
+    completa que ele recusou depois (`ativos_central.conferido_em`): a recusa também foi uma ida de ~110 pedidos ao Fracttal, e
+    repeti-la a cada aprovação da Fila (e de 10 em 10 min por trás) só trazia o mesmo resultado, minutos depois. Vencido, o
+    catálogo continua servindo; só se renova."""
+    return time.time() - ativos_central.conferido_em(cat) >= ASSETS_TTL
+
+
+def aviso_da_recusa() -> str:
+    """O motivo da última leitura completa do Fracttal que o catálogo recusou, em texto curto com a hora, enquanto nenhuma
+    leitura aceita veio depois dela; senão "". Os três botões "Atualizar ativos" levam isto na resposta (campo `recusa`): a
+    pessoa clicava, o número não mudava (`delta` 0) e ninguém dizia por quê."""
+    r = ativos_central.recusa_vigente()
+    if not r:
+        return ""
+    quando = datetime.fromtimestamp(r["lido_em"], _BR_TZ).strftime("%d/%m %H:%M")
+    return "A leitura do Fracttal de %s não entrou: %s. Ficou o catálogo de antes." % (quando, r["motivo"])
 
 
 def _read_asset_cache():
@@ -352,8 +366,13 @@ def load_assets_cached(force: bool = False, em_dia: bool = False) -> tuple:
     10:44 o 1º a precisar do catálogo vencido baixou os ~22 mil ativos DENTRO do pedido: um "Criar OS" da Performance ficou 3
     min 51 s em `get_assets` e o Histórico 1 min 52 s esperando o mesmo download. `em_dia=True` (resolver o ativo da OS na
     aprovação) espera o novo, como antes; sem catálogo nenhum (nem a cópia em disco, nem o arquivo antigo, nem a foto do
-    banco), também. A recarga que o tamanho recusa (lista vazia, ou menor que a de agora em mais de 5%) não troca nada: fica o
-    catálogo de antes."""
+    banco), também.
+
+    A RECUSA É LEMBRADA (revisão 1 da tarefa 2.1). A recarga que o tamanho recusa (menor que a de agora em mais de 5%: o RPC que
+    perde páginas em silêncio) não troca nada, mas conta como conferida: o catálogo só vence 24 h depois dela, quem esperou a vez
+    usa a leitura de quem baixou (entrando ou não) e o `force` (o botão) dentro de `ASSETS_ESPERA_TENTATIVA` depois dela devolve
+    o catálogo de agora, sem baixar de novo. Antes, cada aprovação da Fila, depois das 24 h, baixava os ~110 pedidos de novo, e
+    o download por trás repetia de 10 em 10 min. O motivo vai a `estado()["recusa"]` e aos botões (`aviso_da_recusa`)."""
     if not force:
         cat = ativos_central.garantir()
         if cat is not None:
@@ -364,18 +383,23 @@ def load_assets_cached(force: bool = False, em_dia: bool = False) -> tuple:
                 return cat.lista
     pedido = time.time()
     with _ASSETS_RECARGA:
-        # quem esperou a recarga de outro pedido usa a dela: o catálogo foi conferido depois deste pedido
         cat = ativos_central.atual()
-        if cat is not None and not catalogo_vencido(cat) and (not force or cat.lido_em >= pedido):
-            return cat.lista
+        if cat is not None:
+            # quem esperou a recarga de outro pedido usa a dela: o Fracttal foi lido depois deste pedido (e a leitura entrou
+            # no catálogo ou foi recusada, tanto faz: baixar de novo traria o mesmo)
+            if ativos_central.conferido_em(cat) >= pedido or (not force and not catalogo_vencido(cat)):
+                return cat.lista
+            recusa = ativos_central.recusa_vigente(cat) if force else None
+            if recusa is not None and time.time() - recusa["lido_em"] < ASSETS_ESPERA_TENTATIVA:
+                return cat.lista            # o botão logo depois de uma recusa: o Fracttal deu a mesma lista, não se baixa de novo
         assets = get_assets()
-        if ativos_central.trocar(assets, "rpc"):
-            return ativos_central.atual().lista
+        ativos_central.trocar(assets, "rpc")        # entra, ou é recusada (fica em estado()["recusa"] e conta como conferida)
         cat = ativos_central.atual()
         return cat.lista if cat is not None else tuple(assets)
 
 
-ASSETS_ESPERA_TENTATIVA = 600     # s: o download por trás que falhou (Fracttal fora, cota) só tenta de novo depois disto
+ASSETS_ESPERA_TENTATIVA = 600     # s: o download por trás que falhou (Fracttal fora, cota) só tenta de novo depois disto, e o
+#                                   botão "Atualizar ativos" logo depois de uma leitura recusada não baixa de novo
 _ASSETS_RENOVA = {"tentou": 0.0}
 _ASSETS_RENOVA_TRAVA = threading.Lock()
 

@@ -12,6 +12,7 @@ O que estes testes seguram (o módulo é `os_creator/ativos_central.py`):
 Fracttal, banco e disco são dublês ou pastas de teste: nada vai à rede. Nomes, códigos e usinas são de mentira (repositório
 público)."""
 import json
+import re
 import sys
 import threading
 import time
@@ -174,20 +175,33 @@ def test_o_disco_vale_mais_que_o_arquivo_antigo(tmp_path):
 
 
 def test_boot_com_varios_pedidos_juntos_le_o_disco_uma_vez(tmp_path, monkeypatch):
+    """Os 8 pedidos largam juntos (a barreira) e o leitor do disco demora 0,2 s: todos chegam com o boot em curso. Se o "boot
+    feito" fosse marcado no começo, o pedido que chega no meio veria "sem catálogo" e baixaria os ~22 mil ativos do Fracttal;
+    com o defeito antigo este teste cai (7 dos 8 recebem None)."""
     pasta = str(tmp_path / "oscreator")
     AC.reiniciar(pasta=pasta)
     AC.trocar(_lote(50), "rpc")
     AC.reiniciar(pasta=pasta)
     lidos = []
     original = json.load
-    monkeypatch.setattr(AC.json, "load", lambda f: lidos.append(1) or original(f))
+
+    def lento(f):
+        lidos.append(1)
+        time.sleep(0.2)
+        return original(f)
+    monkeypatch.setattr(AC.json, "load", lento)
+    largada = threading.Barrier(8)
     saidas = []
-    ts = [threading.Thread(target=lambda: saidas.append(AC.atual())) for _ in range(8)]
+
+    def pedido():
+        largada.wait(5)
+        saidas.append(AC.atual())
+    ts = [threading.Thread(target=pedido) for _ in range(8)]
     for t in ts:
         t.start()
     for t in ts:
         t.join()
-    assert lidos == [1] and len({id(s) for s in saidas}) == 1 and saidas[0] is not None
+    assert lidos == [1] and len(saidas) == 8 and all(s is not None for s in saidas) and len({id(s) for s in saidas}) == 1
 
 
 def test_disco_corrompido_ignorado(tmp_path):
@@ -453,6 +467,189 @@ def test_vencido_e_pelas_24_horas_do_lido_em():
     assert not api.catalogo_vencido(AC.atual()) and not api.assets_cache_info()["expirado"]
 
 
+# ── a recusa é lembrada (a revisão 1 da tarefa 2.1) ─────────────────────────────────────────────────────────────────────
+def _de_ontem_e_o_fracttal_manda_80(monkeypatch, demora=0.0):
+    """O catálogo de 100 ativos conferido há mais de 24 h, e o download que devolve só 80 (o RPC que perdeu páginas em
+    silêncio: a troca é recusada). Devolve a lista das vezes que o download foi pedido."""
+    AC.trocar(_lote(100), "rpc", lido_em=time.time() - api.ASSETS_TTL - 3600)
+    baixou = []
+
+    def get_assets():
+        baixou.append(1)
+        time.sleep(demora)
+        return _lote(80)
+    monkeypatch.setattr(api, "get_assets", get_assets)
+    monkeypatch.setattr(api, "_ASSETS_RENOVA", {"tentou": 0.0})
+    return baixou
+
+
+def _clone():
+    c = criar_app(segredo="teste", testing=True).test_client()
+    with c.session_transaction() as s:
+        s["jwt"] = JWT
+        s["conta"] = {"nome": "Pessoa Teste", "email": "teste@exemplo.invalid", "perfil": "ADMINISTRATOR"}
+    return c
+
+
+def _amanha(monkeypatch, segundos):
+    real = time.time
+    monkeypatch.setattr(time, "time", lambda: real() + segundos)
+
+
+def test_a_recusa_e_lembrada_duas_aprovacoes_seguidas_baixam_uma_vez(monkeypatch):
+    """Antes, recusada a troca, o `lido_em` não andava: cada aprovação da Fila achava o catálogo vencido e baixava os ~110
+    pedidos de novo (minutos na frente de quem aprovava), e o download por trás repetia de 10 em 10 min."""
+    baixou = _de_ontem_e_o_fracttal_manda_80(monkeypatch)
+    primeira = api.load_assets_cached(em_dia=True)                  # a aprovação da Fila
+    assert len(primeira) == 100 and baixou == [1] and AC.estado()["recusa"]["n_novo"] == 80
+    assert not api.catalogo_vencido(AC.atual())                     # a leitura recusada conta como conferida
+    segunda = api.load_assets_cached(em_dia=True)
+    assert segunda is primeira and baixou == [1]
+    assert api.assets_cache_info()["expirado"]                      # mas o dado segue de ontem, e a tela continua dizendo
+    api.load_assets_cached()                                        # nem a renovação por trás insiste
+    assert not any(t.name == "os-catalogo-por-tras" for t in threading.enumerate()) and baixou == [1]
+
+
+def test_a_recusa_vale_para_quem_esperava_a_vez(monkeypatch):
+    baixou = _de_ontem_e_o_fracttal_manda_80(monkeypatch, demora=0.3)
+    largada = threading.Barrier(5)
+    saidas = []
+
+    def pedido(**kw):
+        largada.wait(5)
+        saidas.append(api.load_assets_cached(**kw))
+    ts = [threading.Thread(target=pedido, kwargs=kw) for kw in ({"em_dia": True},) * 3 + ({"force": True},) * 2]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    assert baixou == [1] and len(saidas) == 5 and all(len(x) == 100 for x in saidas)       # um download para os cinco
+
+
+def test_o_botao_logo_depois_da_recusa_nao_baixa_e_leva_o_motivo(monkeypatch):
+    baixou = _de_ontem_e_o_fracttal_manda_80(monkeypatch)
+    api.load_assets_cached(em_dia=True)                             # a recusa
+    assert baixou == [1] and len(api.load_assets_cached(True)) == 100 and baixou == [1]      # o force na janela: nada
+    c = _clone()
+    r = c.post("/os/api/ativos/atualizar")                          # OS Creator -> Ativos
+    j = r.get_json()
+    assert r.status_code == 200 and (j["n"], j["delta"]) == (100, 0) and baixou == [1]
+    assert "encolheu de 100 para 80" in j["recusa"] and re.search(r"\d\d/\d\d \d\d:\d\d", j["recusa"])
+    j = c.get("/os/api/tradicional/catalogo?recarregar=1").get_json()          # o ↻ do Criar OS
+    assert baixou == [1] and "encolheu de 100 para 80" in j["recusa"] and j["recarregado"] is True
+    r = c.get("/os/solicitacao/atualizar?sel=5001")                 # o link da Fila do PCM: volta com o motivo na volta
+    assert r.status_code == 302 and baixou == [1] and "recusa=" in r.headers["Location"]
+    assert "sel=5001" in r.headers["Location"] and "atualizar=1" in r.headers["Location"]
+
+
+def test_sem_recusa_os_botoes_nao_trazem_motivo(monkeypatch):
+    AC.trocar(_lote(100), "rpc")
+    monkeypatch.setattr(api, "get_assets", lambda: _lote(100))
+    c = _clone()
+    assert c.post("/os/api/ativos/atualizar").get_json()["recusa"] == ""
+    assert c.get("/os/api/tradicional/catalogo?recarregar=1").get_json()["recusa"] == ""
+    assert "recusa=" not in c.get("/os/solicitacao/atualizar").headers["Location"]
+
+
+def test_passadas_24_horas_da_recusa_tenta_de_novo(monkeypatch):
+    baixou = _de_ontem_e_o_fracttal_manda_80(monkeypatch)
+    api.load_assets_cached(em_dia=True)
+    assert baixou == [1]
+    _amanha(monkeypatch, api.ASSETS_TTL - 600)                      # 10 min antes das 24 h: ainda conferido
+    assert not api.catalogo_vencido(AC.atual()) and len(api.load_assets_cached(em_dia=True)) == 100 and baixou == [1]
+    _amanha(monkeypatch, api.ASSETS_TTL + 60)                       # passadas as 24 h
+    assert api.catalogo_vencido(AC.atual())
+    api.load_assets_cached(em_dia=True)
+    assert baixou == [1, 1]                                         # o Fracttal ainda manda 80: recusa de novo, e lembrada
+    api.load_assets_cached(em_dia=True)
+    assert baixou == [1, 1]
+
+
+def test_o_botao_baixa_de_novo_passada_a_janela_e_a_leitura_boa_apaga_o_motivo(monkeypatch):
+    baixou = _de_ontem_e_o_fracttal_manda_80(monkeypatch)
+    api.load_assets_cached(em_dia=True)
+    assert AC.recusa_vigente() is not None
+    monkeypatch.setattr(api, "get_assets", lambda: baixou.append(2) or _lote(110))          # agora o Fracttal dá a lista boa
+    _amanha(monkeypatch, api.ASSETS_ESPERA_TENTATIVA + 60)
+    assert len(api.load_assets_cached(True)) == 110 and baixou == [1, 2]
+    assert AC.recusa_vigente() is None and api.aviso_da_recusa() == ""         # entrou: o motivo de antes não vale mais
+
+
+def test_a_leitura_vazia_nao_conta_como_conferida(monkeypatch):
+    """Lista vazia não é leitura completa (sessão sem permissão, Fracttal mudo): custa 1 pedido e tenta de novo na próxima."""
+    AC.trocar(_lote(100), "rpc", lido_em=time.time() - api.ASSETS_TTL - 3600)
+    baixou = []
+    monkeypatch.setattr(api, "get_assets", lambda: baixou.append(1) or [])
+    monkeypatch.setattr(api, "_ASSETS_RENOVA", {"tentou": 0.0})
+    assert len(api.load_assets_cached(em_dia=True)) == 100 and len(api.load_assets_cached(em_dia=True)) == 100
+    assert baixou == [1, 1] and AC.estado()["recusa"]["motivo"] == "a lista veio vazia" and AC.recusa_vigente() is None
+    assert api.catalogo_vencido(AC.atual()) and api.aviso_da_recusa() == ""
+
+
+def test_uma_leitura_vazia_depois_da_recusa_nao_apaga_a_recusa_lembrada(monkeypatch):
+    baixou = _de_ontem_e_o_fracttal_manda_80(monkeypatch)
+    api.load_assets_cached(em_dia=True)                                        # a recusa por encolher: lembrada
+    assert AC.trocar([], "rpc") is False                                       # e uma leitura vazia depois (sessão sem permissão)
+    assert AC.estado()["recusa"]["tipo"] == "vazia"                            # o último motivo, em `estado()`, é o da vazia
+    assert AC.recusa_vigente()["n_novo"] == 80 and not api.catalogo_vencido(AC.atual())
+    api.load_assets_cached(em_dia=True)
+    assert baixou == [1]                                                       # e a aprovação seguinte não baixa de novo
+
+
+def test_conferido_em_e_o_mais_novo_entre_a_leitura_aceita_e_a_recusada():
+    t0 = time.time()
+    AC.trocar(_lote(100), "rpc", lido_em=t0 - 90000)
+    assert AC.conferido_em(AC.atual()) == t0 - 90000
+    assert AC.trocar(_lote(80), "rpc", lido_em=t0 - 100) is False
+    assert AC.conferido_em(AC.atual()) == t0 - 100 and AC.recusa_vigente()["n_novo"] == 80
+    assert AC.trocar(_lote(101), "rpc", lido_em=t0)                  # entrou uma boa depois: a recusa de antes não vale
+    assert AC.conferido_em(AC.atual()) == t0 and AC.recusa_vigente() is None
+    assert AC.estado()["recusa"]["n_novo"] == 80                     # mas o motivo da última recusa segue em `estado()`
+    AC.reiniciar()
+    assert AC.trocar(_lote(100), "banco", lido_em=t0 - 5000) and AC.trocar(_lote(10), "banco", lido_em=t0) is False
+    assert AC.recusa_vigente() is None                               # só o que veio do Fracttal (rpc, rest) conta como conferido
+
+
+# ── a revisão 1: a mesma lista não monta nada, a leitura mais velha não troca, a conta de códigos ────────────────────────
+def test_a_mesma_lista_nao_monta_nada_de_novo(monkeypatch):
+    AC.trocar(_lote(50), "rpc", lido_em=time.time() - 100)
+    montou = []
+    original = AC._indexar
+    monkeypatch.setattr(AC, "_indexar", lambda *a, **k: montou.append(1) or original(*a, **k))
+    antes = AC.atual()
+    assert AC.trocar(_lote(50), "rpc") and AC.atual().lista is antes.lista and montou == []     # só renovou a hora
+    assert AC.atual().lido_em > antes.lido_em
+    assert AC.trocar(_lote(40), "rpc") is False and montou == []                                 # recusada: também não monta
+    assert AC.trocar([], "rpc") is False and montou == []
+    assert AC.trocar(_lote(60), "rpc") and montou == [1] and len(AC.atual().lista) == 60         # lista nova: monta uma vez
+
+
+def test_leitura_mais_velha_com_conteudo_diferente_nao_troca():
+    """A foto do banco (de ontem) que chegasse depois de um download do RPC (de agora) não pode vencê-lo."""
+    t0 = time.time()
+    assert AC.trocar(_lote(20), "rpc", lido_em=t0)
+    antes = AC.atual()
+    assert AC.trocar(_lote(22), "banco", lido_em=t0 - 3600) is False
+    assert AC.atual() is antes
+    r = AC.estado()["recusa"]
+    assert "mais velha" in r["motivo"] and r["fonte"] == "banco" and r["n_novo"] == 22
+    assert AC.recusa_vigente() is None                                # a leitura mais velha nunca vale como conferida
+    # a MESMA lista lida mais cedo é só a hora, que não volta no tempo, e a fonte fica a da leitura mais nova
+    assert AC.trocar(_lote(20), "banco", lido_em=t0 - 3600) is True
+    assert AC.atual().lido_em == t0 and AC.atual().fonte == "rpc"
+
+
+def test_a_tela_inicial_e_a_de_ativos_contam_igual():
+    """27/09: a tela inicial dizia 21.639 e a de Ativos 21.635. Dois registros com o mesmo código e um sem código: as duas
+    telas contam os registros COM código, os duplicados inclusive."""
+    from os_web import rotas, rotas_ativos
+    lote = _lote(6) + [_reg(2000 + i, "CAL-GAM100-INVR0.1") for i in range(2)] + [_reg(3000, "")]
+    assert AC.trocar(lote, "rpc")
+    cat = AC.atual()
+    assert len(cat.lista) == 9 and len(cat.por_codigo) == 6 and cat.n_com_codigo == 8
+    assert len(rotas_ativos._todos()) == 8 == rotas._info_catalogo()["n"]
+
+
 # ── a foto do banco como catálogo ───────────────────────────────────────────────────────────────────────────────────────
 def _linha_foto(i, codigo, descricao, pai, tipo, dia="2026-09-22", **mais):
     r = {"fracttal_item_id": i, "codigo": codigo, "descricao": descricao, "pai_item_id": pai, "tipo_fracttal": tipo,
@@ -555,7 +752,7 @@ def test_a_foto_de_verdade_sem_a_raiz_e_recusada_com_o_motivo():
 def test_a_cadeia_quebrada_la_em_cima_tambem_e_recusada():
     """O pai imediato existe, mas o avô (a raiz) não: com a conta só pelo pai imediato, o cliente sairia como a usina."""
     foto = [l for l in ARVORE if l["fracttal_item_id"] != 1]             # só a raiz do Cliente Alfa sai
-    foto = [l for l in foto if l["fracttal_item_id"] not in (2, 11, 32)] + [dict(l) for l in ()]
+    foto = [l for l in foto if l["fracttal_item_id"] not in (2, 11, 32)]
     assert sum(1 for l in foto if l["pai_item_id"] == 10) >= 4          # as linhas de dentro da usina têm o pai (a usina)
     with pytest.raises(AC.FotoIncompleta, match="raiz"):
         AC.registros_da_foto(foto)

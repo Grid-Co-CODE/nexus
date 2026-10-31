@@ -64,7 +64,8 @@ def api_catalogo():
                         "ativos": trad.ativos_do_cliente(assets, cliente, frases)})
     if cliente:
         return jsonify({"cliente": cliente, "usinas": trad.usinas_de(assets, cliente)})
-    return jsonify({"clientes": trad.clientes(assets), "recarregado": force})
+    return jsonify({"clientes": trad.clientes(assets), "recarregado": force,
+                    "recusa": api.aviso_da_recusa() if force else ""})
 
 
 @bp.route("/api/tradicional/tipos")

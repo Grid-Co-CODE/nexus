@@ -691,7 +691,11 @@ def atualizar():
     # `load_assets_cached` confere se o catálogo foi conferido depois do pedido), em vez de baixar duas vezes
     api.load_assets_cached(True)
     _esquecer_lista()
-    return redirect(url_for("os_web_solic.fila", sel=request.args.get("sel") or "", atualizar=1))
+    # este botão é um link que navega: não há JSON, então o motivo da recusa (se houve) vai na volta, em `recusa`, para a Fila
+    # mostrar (a tela refeita é da 2.3); a Fila de hoje ignora o parâmetro
+    aviso = api.aviso_da_recusa()
+    return redirect(url_for("os_web_solic.fila", sel=request.args.get("sel") or "", atualizar=1,
+                            **({"recusa": aviso} if aviso else {})))
 
 
 @bp.route("/api/solic/aquecer", methods=["POST"])

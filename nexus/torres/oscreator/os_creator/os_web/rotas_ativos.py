@@ -75,4 +75,6 @@ def api_atualizar():
     AGORA. São ~100 páginas de 200 ativos — a tela avisa que demora."""
     antes = len(api.load_assets_cached() or [])
     depois = api.load_assets_cached(force=True) or []
-    return jsonify({"n": len(depois), "delta": len(depois) - antes, "info": api.assets_cache_info()})
+    # `recusa`: o motivo, se o Fracttal deu uma lista que o catálogo não aceitou (senão ""); a tela o mostra na 2.3
+    return jsonify({"n": len(depois), "delta": len(depois) - antes, "info": api.assets_cache_info(),
+                    "recusa": api.aviso_da_recusa()})

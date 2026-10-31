@@ -24,10 +24,15 @@ COMO É AGORA:
   lido UMA vez como migração se a cópia nova não existe (e já grava a nova); (3) a foto dos ativos no banco
   (`nexus_ativos_fracttal · foto_ativos`), se o Nexus ligou uma função que a lê (`ligar_fonte_do_banco`; este módulo não
   conhece a configuração do banco). Sem nenhuma das três, o catálogo nasce do primeiro download (`trocar(..., "rpc")`).
-- A troca recusa a lista vazia e a que encolhe mais de 5% (`ENCOLHE_MAX`) contra a de agora: o download do RPC pelas páginas
-  perde 200 ativos em silêncio quando uma página vem sem lista, e "número pela metade não vai para a tela". O motivo da última
-  recusa fica em `estado()`.
-- Cada versão tem um sha das linhas ordenadas (`versao`): a mesma lista lida de novo não troca nada, só renova o `lido_em`.
+- A troca recusa a lista vazia, a que encolhe mais de 5% (`ENCOLHE_MAX`) contra a de agora e a leitura mais velha que o
+  catálogo de agora com conteúdo diferente: o download do RPC pelas páginas perde 200 ativos em silêncio quando uma página vem
+  sem lista, e "número pela metade não vai para a tela". O motivo da última recusa fica em `estado()`.
+- A RECUSA É LEMBRADA (revisão 1 da tarefa 2.1): a leitura completa que o Fracttal deu e o catálogo recusou (a que encolheu)
+  também foi uma ida ao Fracttal, de ~110 pedidos. `conferido_em(cat)` é o mais novo entre o `lido_em` do catálogo e essa
+  leitura, e é por ele que o `api` decide se o catálogo venceu: sem isso, passadas as 24 h, cada aprovação da Fila baixava tudo
+  de novo (minutos na frente de quem aprovava) e o download por trás repetia de 10 em 10 min, com o mesmo resultado.
+- Cada versão tem um sha das linhas ordenadas (`versao`), calculado ANTES de montar qualquer coisa: a mesma lista lida de novo
+  (o caso comum da renovação diária) não monta nada, só renova o `lido_em`.
 
 O FRESCOR (`lido_em`, quando a lista foi conferida com a fonte) é decidido por quem usa: o `api.load_assets_cached` serve o
 que há e renova por trás o que passou de 24 h. Este módulo só guarda e entrega.
@@ -214,8 +219,9 @@ class Catalogo:
     usina e código, como o `montar_registros` sempre deixou); os índices guardam os MESMOS registros (nada é copiado):
     `por_id` e `por_codigo` (o 1º de cada), `por_cliente` e `por_cliente_usina` (tuplas na ordem da lista),
     `local_por_codigo` ({código: (cliente, usina curta, tipo)}, o antigo `api._code_loc`) e `tipos` ([(tipo, n)] do mais
-    comum ao menos). `versao` é o sha das linhas ordenadas; `lido_em`, quando a lista foi conferida com a fonte dela;
-    `fonte`, de onde veio (banco, rest, rpc ou disco)."""
+    comum ao menos); `n_com_codigo` é quantos registros têm código, os repetidos inclusive (a conta da tela de Ativos e da
+    inicial; `len(por_codigo)` são os códigos distintos). `versao` é o sha das linhas ordenadas; `lido_em`, quando a lista foi
+    conferida com a fonte dela; `fonte`, de onde veio (banco, rest, rpc ou disco)."""
     lista: tuple
     por_id: Mapping
     por_codigo: Mapping
@@ -223,6 +229,7 @@ class Catalogo:
     por_cliente_usina: Mapping
     local_por_codigo: Mapping
     tipos: tuple
+    n_com_codigo: int
     versao: str
     lido_em: float
     fonte: str
@@ -232,37 +239,42 @@ def _ordem(r) -> tuple:
     return (str(r.get("cliente") or "").lower(), str(r.get("usina") or "").lower(), str(r.get("code") or "").lower())
 
 
-def _normalizar(registros) -> list:
-    """Cópias dos registros, com o item-usina da planta errada consertado, na ordem do catálogo e com uma string só para cada
-    cliente, usina, tipo e caminho. O que o chamador passou não é tocado."""
+def _preparar(registros) -> list:
+    """Cópias planas dos registros, com o item-usina da planta errada consertado: é daqui que saem a versão (o sha) e o
+    catálogo. O que o chamador passou não é tocado."""
     copias = [dict(r) for r in registros if isinstance(r, dict)]
     corrigir_itens_usina_estrangeiros(copias)
+    return copias
+
+
+def _versao(copias) -> str:
+    """O sha das linhas ordenadas: a mesma lista, em qualquer ordem e vinda de qualquer fonte, dá a mesma versão. Cada linha
+    entra pelo próprio sha (guardar as ~26 mil linhas em texto para ordená-las eram uns 12 MB só para somar)."""
+    h = hashlib.sha256()
+    for d in sorted(hashlib.sha256(json.dumps(r, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+                                              default=str).encode("utf-8")).digest() for r in copias):
+        h.update(d)
+    return h.hexdigest()
+
+
+def _indexar(copias, versao: str, fonte: str, lido_em: float) -> Catalogo:
+    """O catálogo pronto a partir das cópias já consertadas: na ordem do catálogo, uma string só para cada cliente, usina,
+    tipo e caminho, cada registro só de leitura e os índices. CONSOME a lista que recebe (cada cópia vira `Registro` no lugar
+    dela, para as duas não existirem juntas)."""
     copias.sort(key=_ordem)
     pool: dict = {}
-    for r in copias:
+    for i, r in enumerate(copias):
         for campo in _CAMPOS_REPETIDOS:
             v = r.get(campo)
             if isinstance(v, str):
                 r[campo] = pool.setdefault(v, v)
-    return [Registro(r) for r in copias]
-
-
-def _versao(lista) -> str:
-    """O sha das linhas ordenadas: a mesma lista, em qualquer ordem e vinda de qualquer fonte, dá a mesma versão."""
-    h = hashlib.sha256()
-    for linha in sorted(json.dumps(r, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
-                        for r in lista):
-        h.update(linha.encode("utf-8"))
-        h.update(b"\n")
-    return h.hexdigest()
-
-
-def _montar(registros, fonte: str, lido_em: float) -> Catalogo:
-    lista = _normalizar(registros)
+        copias[i] = Registro(r)
+    lista = copias
     por_id, por_codigo, local = {}, {}, {}
     por_cliente: dict = {}
     por_cu: dict = {}
     n_tipo: Counter = Counter()
+    n_com_codigo = 0
     curta: dict = {}
     for r in lista:
         i = r.get("id")
@@ -275,6 +287,7 @@ def _montar(registros, fonte: str, lido_em: float) -> Catalogo:
         if tipo:
             n_tipo[tipo] += 1
         if code:
+            n_com_codigo += 1
             por_codigo.setdefault(code, r)
             if isinstance(code, str) and code != code.strip():       # o pedido costuma vir aparado
                 por_codigo.setdefault(code.strip(), r)
@@ -286,8 +299,13 @@ def _montar(registros, fonte: str, lido_em: float) -> Catalogo:
         lista=tuple(lista), por_id=MappingProxyType(por_id), por_codigo=MappingProxyType(por_codigo),
         por_cliente=MappingProxyType({k: tuple(v) for k, v in por_cliente.items()}),
         por_cliente_usina=MappingProxyType({k: tuple(v) for k, v in por_cu.items()}),
-        local_por_codigo=MappingProxyType(local), tipos=tuple(n_tipo.most_common()),
-        versao=_versao(lista), lido_em=float(lido_em), fonte=fonte)
+        local_por_codigo=MappingProxyType(local), tipos=tuple(n_tipo.most_common()), n_com_codigo=n_com_codigo,
+        versao=versao, lido_em=float(lido_em), fonte=fonte)
+
+
+def _montar(registros, fonte: str, lido_em: float) -> Catalogo:
+    copias = _preparar(registros)
+    return _indexar(copias, _versao(copias), fonte, lido_em)
 
 
 VAZIO = _montar([], "disco", 0.0)       # o "catálogo de ninguém": para quem lê sem catálogo e não quer testar None
@@ -303,8 +321,8 @@ _CONFIG: dict = {"pasta": None, "legado": None}
 _BOOT = {"local": False}
 _FONTE_BANCO: dict = {"func": None}
 _BANCO = {"tentou": 0.0}
-_ESTADO: dict = {"recusa": None, "paridade_rest": None, "banco": None, "disco": {"lido": None, "gravado_em": 0.0,
-                                                                               "lido_em": 0.0, "erro": None}}
+_ESTADO: dict = {"recusa": None, "recusa_completa": None, "paridade_rest": None, "banco": None,
+                 "disco": {"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None}}
 
 
 def configurar(pasta: str | None, legado: str | None = None) -> None:
@@ -332,7 +350,7 @@ def reiniciar(pasta: str | None = None, legado: str | None = None) -> None:
         _BOOT["local"] = False
         _FONTE_BANCO["func"] = None
         _BANCO["tentou"] = 0.0
-        _ESTADO.update(recusa=None, paridade_rest=None, banco=None,
+        _ESTADO.update(recusa=None, recusa_completa=None, paridade_rest=None, banco=None,
                        disco={"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None})
 
 
@@ -408,31 +426,48 @@ def _ler_legado():
 
 
 # ── a troca ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+def _hora(ts: float) -> str:
+    return datetime.fromtimestamp(ts, _BRT).strftime("%d/%m %H:%M:%S")
+
+
 def _trocar(registros, fonte: str, lido_em: float | None, gravar: bool) -> bool:
     global _ATUAL
     if fonte not in FONTES:
         raise ValueError("fonte desconhecida: %r (as válidas: %s)" % (fonte, ", ".join(FONTES)))
     lido_em = time.time() if lido_em is None else float(lido_em)
-    novo = _montar(registros or [], fonte, lido_em)
-    n_novo = len(novo.lista)
+    # a versão ANTES de montar qualquer coisa: a lista igual à de agora (a renovação diária) e a recusada não montam nada
+    copias = _preparar(registros or [])
+    n_novo = len(copias)
+    versao = _versao(copias) if n_novo else ""
     mudou = True
     with _TRAVA:
         atual = _ATUAL
-        motivo = None
+        motivo = tipo = None
         if n_novo == 0:
-            motivo = "a lista veio vazia"
+            tipo, motivo = "vazia", "a lista veio vazia"
         elif atual is not None and n_novo * 100 < len(atual.lista) * (100 - ENCOLHE_MAX):
-            motivo = "a lista encolheu de %d para %d ativos (mais que os %d%% permitidos)" % (len(atual.lista), n_novo,
-                                                                                               ENCOLHE_MAX)
+            tipo, motivo = "encolheu", "a lista encolheu de %d para %d ativos (mais que os %d%% permitidos)" % (
+                len(atual.lista), n_novo, ENCOLHE_MAX)
+        elif atual is not None and atual.versao != versao and lido_em < atual.lido_em:
+            tipo, motivo = "velha", "a leitura de %s é mais velha que o catálogo de agora (de %s) e tem outro conteúdo" % (
+                _hora(lido_em), _hora(atual.lido_em))
         if motivo:
-            _ESTADO["recusa"] = {"motivo": motivo, "em": time.time(), "fonte": fonte, "n_novo": n_novo,
-                                 "n_atual": len(atual.lista) if atual is not None else 0}
+            recusa = {"motivo": motivo, "tipo": tipo, "em": time.time(), "lido_em": lido_em, "fonte": fonte,
+                      "n_novo": n_novo, "n_atual": len(atual.lista) if atual is not None else 0}
+            _ESTADO["recusa"] = recusa
+            if tipo == "encolheu" and fonte in ("rest", "rpc"):
+                # a leitura completa do Fracttal que não entrou: fica lembrada à parte, para uma lista vazia ou uma leitura
+                # mais velha que vier depois (e vira o `motivo` de `estado()`) não apagá-la
+                _ESTADO["recusa_completa"] = recusa
             log.warning("catálogo de ativos: troca recusada (fonte %s): %s", fonte, motivo)
             return False
-        if atual is not None and atual.versao == novo.versao:
-            # a mesma lista, conferida de novo: nada muda, só a hora e a fonte (e a cópia de agora é reaproveitada)
+        if atual is not None and atual.versao == versao:
+            # a mesma lista, conferida de novo: nada se monta, só a hora (que não volta no tempo) e a fonte da leitura mais nova
             mudou = False
-            novo = replace(atual, lido_em=max(atual.lido_em, novo.lido_em), fonte=fonte)
+            novo = replace(atual, lido_em=max(atual.lido_em, lido_em),
+                           fonte=fonte if lido_em >= atual.lido_em else atual.fonte)
+        else:
+            novo = _indexar(copias, versao, fonte, lido_em)
         _ATUAL = novo
     if gravar and (mudou or novo.lido_em - _ESTADO["disco"]["lido_em"] >= REGRAVAR_DISCO_S):
         _gravar_disco(novo)
@@ -537,9 +572,31 @@ def registro(codigo) -> dict | None:
     return dict(r) if r is not None else None
 
 
+def recusa_vigente(cat: Catalogo | None = None) -> dict | None:
+    """A última leitura COMPLETA que o Fracttal deu (rest, rpc) e o catálogo recusou por ter encolhido, se ela é mais nova que
+    o catálogo (nenhuma leitura aceita depois dela); senão None. Uma cópia do registro de `estado()["recusa"]` (que guarda a
+    última recusa de qualquer tipo; esta fica à parte). A lista vazia não entra: não é leitura completa (sessão sem permissão,
+    Fracttal mudo), a próxima tentativa custa um pedido só, e esperar 24 h por ela deixaria o catálogo velho à toa. A leitura
+    mais velha que o catálogo (outra fonte, download atrasado) também não."""
+    cat = _ATUAL if cat is None else cat
+    r = _ESTADO["recusa_completa"]
+    if cat is None or r is None or r["lido_em"] <= cat.lido_em:
+        return None
+    return dict(r)
+
+
+def conferido_em(cat: Catalogo) -> float:
+    """A última vez que o Fracttal foi lido por inteiro para este catálogo: o `lido_em` dele ou a leitura completa que ele
+    recusou depois, a mais nova das duas. O `api` decide por aqui se o catálogo venceu, e se um pedido que esperou a vez já
+    tem a leitura de que precisa (alguém leu enquanto ele esperava, a leitura entrando ou não)."""
+    r = recusa_vigente(cat)
+    return max(cat.lido_em, r["lido_em"]) if r else cat.lido_em
+
+
 def estado() -> dict:
-    """O que se sabe do catálogo, para o Raio-X: a fonte, o `lido_em`, a versão, quantos ativos, o motivo da última troca
-    recusada, a paridade do REST (a leitura que a etapa 2.2 confere contra o RPC) e a situação do disco e da foto do banco."""
+    """O que se sabe do catálogo, para o Raio-X: a fonte, o `lido_em`, a versão, quantos ativos, a última troca recusada
+    (motivo, hora, fonte e tamanhos), a paridade do REST (a leitura que a etapa 2.2 confere contra o RPC) e a situação do disco
+    e da foto do banco."""
     cat = _ATUAL
     tem = cat is not None
     return {"fonte": cat.fonte if tem else None, "lido_em": cat.lido_em if tem else None,
