@@ -24,11 +24,14 @@ def test_contrato_das_contagens():
     assert A.LIVRO_CONTAGENS == "almoxarifado_contagens_app_campo" and A.ABA_CONTAGENS == "Contagens"
     assert A.COLUNAS_CONTAGENS == ("ID da contagem", "Enviada em", "Contada em", "ID do almoxarifado", "Usina", "Tipo",
                                    "ID do item", "Código", "Contado", "Identificado como", "Descrição", "Foto",
-                                   "Contou (HMAC)", "ID da linha")
-    assert "Contou (HMAC)" in A.COLUNAS_CONTAGENS and len(A.COLUNAS_CONTAGENS) == 14
-    assert A.COLUNAS_CONTAGENS[-1] == "ID da linha"      # coluna nova só no FIM, dos dois lados
+                                   "Contou (HMAC)", "ID da linha",
+                                   # 30/10/2026 (as nove melhorias): os dados da peça achada, as fotos deles e a recontagem
+                                   "Fabricante", "Modelo", "Número de série", "Fotos dos dados", "Recontagem de")
+    assert "Contou (HMAC)" in A.COLUNAS_CONTAGENS and len(A.COLUNAS_CONTAGENS) == 19
+    assert A.COLUNAS_CONTAGENS[:14][-1] == "ID da linha"     # as 14 de 26/10 não mudam de lugar: coluna nova só no FIM
+    assert A.COLUNAS_CONTAGENS[-1] == "Recontagem de"
     assert not any("e-mail" in c.lower() or "email" in c.lower() for c in A.COLUNAS_CONTAGENS)
-    assert A.TIPOS_CONTAGEM == ("item", "identificar", "fora_do_catalogo")
+    assert A.TIPOS_CONTAGEM == ("item", "identificar", "fora_do_catalogo", "avariado")
 
 
 def test_contado_vazio_nao_e_zero():

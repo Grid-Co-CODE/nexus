@@ -1,0 +1,32 @@
+{% from "pcm/_almox_celulas.html" import crit, curva %}
+{# As peças de UM almoxarifado (item 1 das melhorias do Almoxarifado, 30/10/2026): o pedaço que o botão "Ver peças" do cartão da
+   aba Por almoxarifado busca no 1º clique (nexus/pcm/almoxarifado.py, `pecas_almox`), da mesma conta de 5 min da tela. A ordem
+   já vem da rota: o grupo mais grave primeiro (abaixo do mínimo, no limite, saldo unitário, sem mínimo, em dia, sem saldo
+   informado) e, dentro dele, a criticidade e a curva. A tabela é a `.alm-t` das outras abas (abaixo de 640 px vira cartão, o
+   data-r é o rótulo de cada valor) e NÃO leva `data-fl-*`: o filtro da página não conta estas linhas (a barra some nesta aba). #}
+<p class="alm-ajuda">{{ pecas|length }} peça{{ 's' if pecas|length != 1 else '' }} deste almoxarifado, das que mais pedem atenção às que estão em dia; dentro de cada grupo, a criticidade e a Curva ABC do Fracttal.</p>
+<table class="alm-t alm-t--pecas">
+  <thead><tr><th>Código</th><th>Peça</th><th>Crit.</th><th>Curva</th><th class="num">Saldo</th><th class="num">Mínimo</th><th>Situação</th></tr></thead>
+  <tbody>
+  {% for x in pecas %}
+  <tr>
+    <td data-r="Código" class="alm-cod"><span class="alm-v">{{ x.codigo }}</span></td>
+    <td data-r="Peça"><span class="alm-v">{{ x.nome }}{% if x.avariada %} <span class="alm-aviso">avariada</span>{% endif %}</span></td>
+    <td data-r="Crit.">{{ crit(x, tem_criticidade) }}</td>
+    <td data-r="Curva">{{ curva(x, tem_curva) }}</td>
+    {# saldo e mínimo vazios são "não informado" (o Fracttal não deu o número), nunca 0: o traço #}
+    <td data-r="Saldo" class="num"><span class="alm-v">{% if x.saldo is none %}<span class="mudo">–</span>{% else %}{{ '%g'|format(x.saldo) }} <span class="alm-un">{{ x.unidade }}</span>{% endif %}</span></td>
+    <td data-r="Mínimo" class="num"><span class="alm-v">{% if x.minimo is none %}<span class="mudo">–</span>{% else %}{{ '%g'|format(x.minimo) }}{% endif %}</span></td>
+    <td data-r="Situação"><span class="alm-v">
+      {%- if x.situacao == 'abaixo' %}<b class="alm-falta">abaixo do mínimo</b><span class="alm-det">falta {{ '%g'|format(x.falta) }} {{ x.unidade }}</span>
+      {%- elif x.situacao == 'no_limite' %}<span class="alm-limite">no limite</span>
+      {%- elif x.situacao == 'saldo_unitario' %}<span class="alm-limite">saldo unitário</span>
+      {%- elif x.situacao == 'sem_minimo' %}<span class="alm-aviso">sem mínimo</span>
+      {%- elif x.situacao == 'zerada' %}<span class="alm-aviso">sem mínimo</span><span class="alm-det">zerada</span>
+      {%- elif x.situacao == 'nao_informado' %}<span class="mudo">saldo não informado</span>
+      {%- else %}<span class="alm-ok">em dia</span>{% endif -%}
+    </span></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>

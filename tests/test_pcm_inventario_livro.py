@@ -94,7 +94,9 @@ def test_contrato_do_livro():
                             "id_item", "codigo", "de_qtd", "para_qtd", "contado_qtd", "movimento_fracttal", "situacao",
                             "lote", "pessoa_id", "pessoa_hmac", "dados_cifrados", "usina_ligada_por"]
     assert F.TIPOS_EVENTO == ("contagem_recebida", "aprovada", "peca_gravada", "conflito", "erro", "peca_tirada",
-                              "recontagem_pedida", "numero_corrigido", "substituida", "curadoria", "regua_gravada")
+                              "recontagem_pedida", "numero_corrigido", "substituida", "curadoria", "regua_gravada",
+                              # a recontagem só das peças marcadas (30/10/2026): no fim, um evento por peça
+                              "recontagem_item_pedida")
     assert F.CAB_REGUA == ["decidida_em", "data_id", "id_almoxarifado", "usina_id", "id_item", "codigo",
                            "sugestao_min_qtd", "sugestao_max_qtd", "recomendado_min_qtd", "recomendado_max_qtd",
                            "acordado_min_qtd", "acordado_max_qtd", "gravado_fracttal", "pessoa_id", "pessoa_hmac",

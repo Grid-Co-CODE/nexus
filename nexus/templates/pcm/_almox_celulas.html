@@ -1,0 +1,12 @@
+{# As células Crit. e Curva do Almoxarifado, as MESMAS na Reposição (almoxarifado.html) e nas peças de um almoxarifado aberto
+   (_almox_pecas.html): um lugar só para o "–" e para o que o `title` diz dele (30/10/2026). O "–" tem duas causas, e só o
+   `title` as distingue: a peça sem o dado no Fracttal ("sem curva no Fracttal": o PCM completa lá) e o App que ainda não traz a
+   coluna ("o App ainda não traz a curva": nada a cobrar). Sem número, nunca um nível chutado nem a letra C. `x` é a linha da
+   conta (crit_n, crit_nivel, crit_nome, criticidade, curva); o texto entra no `<td>` de quem chama. #}
+{% macro crit(x, tem_criticidade) -%}
+<span class="alm-v">{% if x.crit_n %}<span class="inv-crit inv-crit--{{ x.crit_nivel }}" title="{{ x.crit_nome }}">{{ x.crit_n }}<span class="inv-so-leitor"> {{ x.crit_nome }}</span></span>{% else %}<span class="mudo" title="{{ x.criticidade or ('sem criticidade no Fracttal' if tem_criticidade else 'o App ainda não traz a criticidade') }}">–</span>{% endif %}</span>
+{%- endmacro %}
+
+{% macro curva(x, tem_curva) -%}
+<span class="alm-v">{% if x.curva %}<b class="alm-curva">{{ x.curva }}</b>{% else %}<span class="mudo" title="{{ 'sem curva no Fracttal' if tem_curva else 'o App ainda não traz a curva' }}">–</span>{% endif %}</span>
+{%- endmacro %}

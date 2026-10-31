@@ -123,6 +123,12 @@ releitura e na tela do Fracttal. Depois, pela tela do Fracttal, as duas peças d
 "custom_fields": []}` → `data: {"id": 53248312, "description": "<nome>    { SP-TST-001 }"}`. As unidades vêm de
 `companies.units_list` (`UNIDADE` = 362334, a das peças do catálogo).
 
+**O `description` do pedido não foi provado e não é usado** (revisão final de 31/10/2026). A tela o manda vazio, e o que volta
+nele é o texto de exibição da peça (`"<nome>    { CODE }"`): ninguém testou o que escrever um texto ali faz com o catálogo do
+cliente (se troca o nome mostrado, se aparece nas listas). O adaptador aceita `descricao=""` (`EstoqueFracttal.criar_peca`),
+mas a curadoria não manda nada nele: o fabricante, o modelo e o número de série da peça achada ficam no lembrete da tela, para
+o PCM completar na tela de Peças e Suprimentos do Fracttal. Usar o campo pede antes a prova no almoxarifado de teste.
+
 ### Desativar a peça — `inventories.item_update`
 
 `{"id": 53248312, "active": false, ...}` → com saldo, `success: false`, `message: "ASSET_CANNOT_BE_DESABLED_STOCK"`.

@@ -27,7 +27,8 @@
 <div class="inv-tela-cab">
   <h2>Inventário</h2>
   <p>O técnico conta as peças no App sem ver o saldo do Fracttal. Aqui o PCM compara a contagem com o saldo lido na hora, revisa
-    e aprova. A contagem mais nova de cada almoxarifado substitui as mais velhas que ainda não foram gravadas.</p>
+    e aprova. A contagem mais nova de cada almoxarifado substitui as mais velhas que ainda não foram gravadas; a recontagem só
+    de algumas peças não substitui ninguém, e a contagem em que ela foi pedida segue com as outras.</p>
 </div>
 <ol class="inv-fluxo inv-fluxo--guia" aria-label="As etapas de cada contagem">
   <li><b>1 · Contagem</b><span>O técnico conta no App, sem ver o saldo</span></li>
@@ -58,7 +59,7 @@
     <tbody>
     {% for c in contagens %}
     <tr>
-      <td data-r="Almoxarifado"><span class="alm-v"><a class="inv-abrir" href="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}">{{ c.almox or 'sem almoxarifado' }}</a>{% if c.usina %}<span class="alm-det">{{ c.usina }}</span>{% endif %}</span></td>
+      <td data-r="Almoxarifado"><span class="alm-v"><a class="inv-abrir" href="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}">{{ c.almox or 'sem almoxarifado' }}</a>{% if c.usina %}<span class="alm-det">{{ c.usina }}</span>{% endif %}{% if c.recontagem_txt %}<span class="alm-det">{{ c.recontagem_txt }}</span>{% endif %}</span></td>
       <td data-r="Contada em"><span class="alm-v inv-quando">{{ c.contada_txt }}</span></td>
       <td data-r="Enviada em"><span class="alm-v inv-quando">{{ c.enviada_txt }}</span></td>
       <td data-r="Contadas" class="num"><span class="alm-v">{{ c.n_contadas }}</span></td>
