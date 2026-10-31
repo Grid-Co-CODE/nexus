@@ -72,6 +72,9 @@ def _catalogo_de_ativos_isolado():
         mod = sys.modules.get("os_leitor")                 # e o leitor dela, que liga a entrega das abertas no tarefas_os
         if mod is not None:
             mod.reiniciar()
+        mod = sys.modules.get("catalogos")                 # e os catálogos pequenos (etapa 4): o pessoal de mentira de um
+        if mod is not None:                                # teste não pode aparecer no seguinte, nem a pasta de um em outro
+            mod.reiniciar()
     limpar()
     yield
     limpar()

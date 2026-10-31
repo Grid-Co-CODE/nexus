@@ -312,6 +312,14 @@ OS"), e também a leitura que a lista recusou ("Trava de encolhimento": o REST q
 igual na leitura seguinte passa, "aceita na 2ª leitura": o apagamento de verdade) e a faixa que o REST não devolveu pela
 criação. As telas ainda não leem dela (é a tarefa 3.3).
 
+**Os catálogos pequenos do OS Creator (31/10/2026; nada a fazer no servidor).** O `servir.py` liga também o laço das pessoas
+dos catálogos (`nexus/torres/oscreator/os_creator/catalogos.py`), com a mesma credencial REST (sem ela não liga, e as pessoas
+seguem pela sessão de quem usa): o `personnel` do Fracttal às 05h, 11h, 17h e 23h no :04, 2 pedidos a 1 por segundo, só aceito
+se trouxer os campos que as telas usam. Os catálogos (pessoas, etiquetas, tipos, falhas, status, motivos e os planos da
+Performance) moram na memória e numa cópia na pasta de dados do OS Creator (`oscreator/catalogos/`, um arquivo por catálogo,
+sem e-mail; não vai ao banco nem ao git): o reinício volta por ela sem pedir nada ao Fracttal. O Raio-X mostra (seção "Uso do
+OS Creator", peça "Catálogos pequenos"), inclusive o campo que o REST não trouxe.
+
 **Na 1ª carga depois da atualização de 08/10/2026** entram no banco, pela primeira vez, o `fato_ronda`, o `fato_pt`, o
 livro `nexus_equipamentos` e a mescla da programação; o histórico de pessoas e usinas passa a começar "desde sempre"
 (`inicio_presumido = 1` na 1ª versão de cada uma). Conferir em Base → Governança de dados, uma hora depois do restart:

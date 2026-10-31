@@ -86,7 +86,7 @@ def cli(monkeypatch):
             return valor() if callable(valor) else valor
         return f
     monkeypatch.setattr(api, "list_minhas_solicitacoes", conta("lista", lambda: [dict(x) for x in LINHAS]))
-    monkeypatch.setattr(api, "get_responsaveis", conta("pessoas", [{"name": "Bruno Souza", "id_personnel": 2},
+    monkeypatch.setattr(api, "ler_pessoal", conta("pessoas", [{"name": "Bruno Souza", "id_personnel": 2},
                                                                     {"name": "Ana Teste Silva", "id_personnel": 1},
                                                                     {"name": "Sem Id", "id_personnel": None}]))
     monkeypatch.setattr(api, "get_labels", conta("etiquetas", [{"id": 7, "description": "PERFORMANCE"},
@@ -196,7 +196,7 @@ def test_a_carga_fria_e_paralela(cli, monkeypatch):
         return f
     monkeypatch.setattr(api, "list_minhas_solicitacoes", lento("lista", [dict(x) for x in LINHAS]))
     # catálogos com conteúdo: o vazio não fica guardado (20/10/2026) e seria lido de novo
-    monkeypatch.setattr(api, "get_responsaveis", lento("pessoas", [{"id": 1, "name": "Ana Teste Silva"}]))
+    monkeypatch.setattr(api, "ler_pessoal", lento("pessoas", [{"id": 1, "name": "Ana Teste Silva"}]))
     monkeypatch.setattr(api, "get_labels", lento("etiquetas", [{"id": 7, "description": "Etiqueta Teste"}]))
     monkeypatch.setattr(api, "get_tipos_classif", lento("tipos", {"tipos": [{"id": 1, "description": "Corretiva"}]}))
     monkeypatch.setattr(api, "status_solicitacao_catalogo", lento("status", list(api.STATUS_SOLICITACAO)))

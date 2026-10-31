@@ -267,16 +267,26 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   uma vez (`nexus-os-central-disco`, no máximo uma escrita a cada 30 s). O pico de memória da noite de 365 dias é de ~150 MB
   (a leitura cortada por página, guardada até o fim; eram ~390 MB com as linhas inteiras), e o da de 90 dias, ~40 MB
   (README da torre, "O pico da noite"). Nunca o `app.py` nem os testes.
+- **O laço das pessoas dos catálogos pequenos do OS Creator** (`os_creator/catalogos.py`, 31/10/2026, etapa 4; regras no
+  README da torre, "Os catálogos pequenos num lugar só"): ligado no servir.py, por último, pelo `ponte.modulo_do_clone`. Sem a
+  credencial REST não liga, e o estado diz por quê. Uma thread, `nexus-catalogos`: o REST `personnel` do cadastro
+  (`cadastro/fracttal_pessoal.ler_paginas`), 2 pedidos a 1 por segundo, às 05h, 11h, 17h e 23h no :04
+  (`CATALOGOS_PESSOAS`), só aceito com os campos que as telas usam. No contador do Fracttal,
+  `fundo:nexus-catalogos:pessoas`. Os outros catálogos (etiquetas, tipos, falhas, status, motivos, planos da Performance) não
+  têm leitor da empresa: a 1ª sessão que os acha vencidos os renova por trás, uma vez para todos, e esses pedidos contam na
+  rota dela. Nunca o `app.py` nem os testes (no PC, as pessoas também seguem pela sessão).
 - **Os minutos ocupados, num lugar só** (`casca/minutos_ocupados.py`, 31/10/2026, decisão AF da etapa 3): os minutos de toda
-  hora que já têm dono (:08 e :38 os ativos novos, :10 a :20 as tarefas das OS, :22 as normalizações, :25 o sync do App, :32
-  a zeladoria, :40 a carga, :50 os chamados; e os da lista central de OS: :00, :21, :30, :41 e :51 os 7 dias, :46 as
-  finalizadas, :55 a conferência das abertas), e os de uma vez por dia (`DIARIOS`: os ativos inteiros às 02:15, a noite da
-  lista de OS às 03:21 e o uso do OS Creator no banco às 03:45). O laço novo que precisa de um horário fixo pede o próximo
-  minuto livre (`proximo_livre`; `livre(minuto, hora)` olha os diários também) em vez de chutar, e quem muda o minuto de um
-  laço muda a lista no mesmo trabalho: dois donos no mesmo minuto não passam (`_ocupar` acusa ao montar). Os ativos e a lista
-  de OS leem os horários dela (`ATIVOS_*`, `OS_*`); os outros laços têm o `MINUTO_DA_HORA` deles, e
+  hora que já têm dono (:04 as pessoas dos catálogos pequenos do OS Creator, às 05h, 11h, 17h e 23h; :08 e :38 os ativos
+  novos, :10 a :20 as tarefas das OS, :22 as normalizações, :25 o sync do App, :32 a zeladoria, :40 a carga, :50 os chamados;
+  e os da lista central de OS: :00, :21, :30, :41 e :51 os 7 dias, :46 as finalizadas, :55 a conferência das abertas), e os
+  de uma vez por dia (`DIARIOS`: os ativos inteiros às 02:15, a noite da lista de OS às 03:21 e o uso do OS Creator no banco
+  às 03:45). O laço novo que precisa de um horário fixo pede o próximo minuto livre (`proximo_livre`; `livre(minuto, hora)`
+  olha os diários também) em vez de chutar, e quem muda o minuto de um laço muda a lista no mesmo trabalho: dois donos no
+  mesmo minuto não passam (`_ocupar` acusa ao montar). Os ativos, a lista de OS e as pessoas dos catálogos leem os horários
+  dela (`ATIVOS_*`, `OS_*`, `CATALOGOS_PESSOAS`); os outros laços têm o `MINUTO_DA_HORA` deles, e
   `tests/test_oscreator_os_leitor.py::test_os_minutos_moram_na_lista_unica` cruza cada um com a lista (rodada 1 da revisão
-  da 3.1+3.2: as finalizadas saíram do :45, que às 03:45 é do `uso_os`).
+  da 3.1+3.2: as finalizadas saíram do :45, que às 03:45 é do `uso_os`; o das pessoas,
+  `tests/test_oscreator_catalogos.py::test_o_minuto_das_pessoas_mora_na_lista_unica`).
 
 ## Pedidos ao Fracttal: o contador e o porteiro (31/10/2026)
 
@@ -542,11 +552,17 @@ cada pessoa restrita conta uma vez por janela; muitas divergências de quem vê 
 resposta", de que a página não basta), a cópia em disco e a memória
 (`os_central.memoria_estimada`: cada registro e texto contados uma vez;
 ~0,4 s com 36 mil OS, medida UMA vez por versão da lista, e a falha da medida vai ao log; 25,8 MB contra os 23,9 MB do
-tracemalloc). Só contagens, datas, ids e motivos: nunca o texto de um ativo ou
-de uma OS, nem nome de pessoa. **O Raio-X não
+tracemalloc); e **"Catálogos pequenos"** (4.1, `catalogos.estado()`, `raio_x._linhas_dos_catalogos`): uma linha por catálogo
+(pessoas, etiquetas, tipos e classificações da OS, grupo e classificações da solicitação, falhas do COS, status da
+solicitação, motivos de cancelamento) com quantos itens, de onde veio (o REST da empresa ou o RPC pela sessão de quem usa),
+quando foi lido, a idade contra o prazo, VENCIDO e se está renovando, a última falha, as leituras do Fracttal neste processo e
+a cópia em disco (o que o boot leu, quando gravou, o erro); a linha **"Pessoas pelo REST"** (o laço do servidor: ligado ou
+por que não, a próxima leitura, se está valendo, a última boa e a falha depois dela, com o campo que o REST não trouxe); e a
+**"Planos da Performance"** (quantos ativos com os planos guardados, os vencidos, os detalhes, a falha e o disco). Só
+contagens, datas, ids e motivos: nunca o texto de um ativo ou de uma OS, nem nome nem e-mail de pessoa. **O Raio-X não
 importa o OS Creator:** lê o módulo de `sys.modules` (no PC, sem ninguém ter aberto o OS Creator, ele nem está na memória, e
 a peça diz isso), e a peça que quebrar vai ao log e diz que não montou, nunca derruba a página. Prova:
-`tests/test_oscreator_canto_no_raio_x.py`.
+`tests/test_oscreator_canto_no_raio_x.py` e, para os catálogos, `tests/test_oscreator_catalogos.py::test_os_catalogos_no_raio_x`.
 
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 

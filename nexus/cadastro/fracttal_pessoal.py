@@ -58,6 +58,24 @@ def da_api(p: dict) -> dict:
             "dominio": dominio, "origem": ORIGENS[0] if dominio in DOMINIOS_GRID else ORIGENS[1]}
 
 
+def ler_paginas(ler=None) -> list:
+    """O `personnel` do Fracttal como o REST o devolve, de 100 em 100 (o cliente de `nexus.campo.fracttal`, GET; `ler` troca
+    o cliente). Levanta o erro do cliente. Também é por aqui que o catálogo de pessoas do OS Creator lê o pessoal pela
+    credencial da empresa (`os_creator/catalogos.py`, 31/10/2026): um leitor do REST do pessoal só."""
+    if ler is None:
+        from ..campo import fracttal
+        ler = fracttal.ler
+    out, inicio = [], 0
+    while True:
+        r = ler(f"personnel?x=1&limit=100&start={inicio}")
+        d = (r.get("data") if isinstance(r, dict) else r) or []
+        out += d
+        if len(d) < 100:
+            break
+        inicio += 100
+    return out
+
+
 def ler_pessoal(forcar: bool = False, ler=None) -> dict:
     """{"pessoas": [...], "lido_em": epoch, "erro": ""}: o pessoal do Fracttal, guardado por 1 hora. `ler` troca o
     cliente (testes)."""
@@ -65,18 +83,9 @@ def ler_pessoal(forcar: bool = False, ler=None) -> dict:
         g = _CACHE.get("pessoal")
         if g and not forcar and time.time() - g["lido_em"] < TTL_S and not g["erro"]:
             return g
-    if ler is None:
-        from ..campo import fracttal
-        ler = fracttal.ler
-    out, inicio, erro = [], 0, ""
+    out, erro = [], ""
     try:
-        while True:
-            r = ler(f"personnel?x=1&limit=100&start={inicio}")
-            d = (r.get("data") if isinstance(r, dict) else r) or []
-            out += d
-            if len(d) < 100:
-                break
-            inicio += 100
+        out = ler_paginas(ler)
     except Exception as ex:      # noqa: BLE001 — Fracttal fora, sem credencial, cota: a tela diz e mostra a última boa
         erro = f"{type(ex).__name__}: {str(ex)[:160]}"
     with _TRAVA:

@@ -64,7 +64,7 @@ def test_o_pessoal_e_as_os_recentes_uma_vez_para_todos(monkeypatch):
     def recentes(dias):
         lidos["recentes"] += 1
         return ["TST-INV11"]
-    monkeypatch.setattr(api, "get_responsaveis", pessoal)
+    monkeypatch.setattr(api, "ler_pessoal", pessoal)
     monkeypatch.setattr(api, "codigos_os_recentes", recentes)
     for e in ("a@exemplo.invalid", "b@exemplo.invalid"):
         c = _cliente(e)
@@ -81,7 +81,7 @@ def test_o_erro_do_fracttal_nao_fica_guardado(monkeypatch):
         if len(vezes) == 1:
             raise api.FracttalError("HTTP 429")
         return [{"code": "1", "name": "Ana", "id_personnel": 1}]
-    monkeypatch.setattr(api, "get_responsaveis", pessoal)
+    monkeypatch.setattr(api, "ler_pessoal", pessoal)
     with pytest.raises(api.FracttalError):
         rotas.responsaveis_fracttal()
     assert rotas.responsaveis_fracttal()[0]["name"] == "Ana" and len(vezes) == 2
@@ -198,7 +198,7 @@ def test_os_tipos_da_fila_e_as_classificacoes_da_solicitacao_nao_se_misturam(mon
                                                            "classif1": [{"id": 9, "description": "Classe Teste"}],
                                                            "classif2": []})
     monkeypatch.setattr(api, "load_assets_cached", lambda force=False: [])
-    monkeypatch.setattr(api, "get_responsaveis", lambda: [])
+    monkeypatch.setattr(api, "ler_pessoal", lambda: [])
     c = _cliente("pcm@exemplo.invalid")
     with c.application.test_request_context():
         assert RS._tipos()["c1"]                                         # a Fila abriu primeiro
@@ -219,7 +219,7 @@ def test_a_classificacao_vazia_nao_fica_guardada(monkeypatch):
                 "classif2": []}
     monkeypatch.setattr(api, "get_request_types", tipos)
     monkeypatch.setattr(api, "load_assets_cached", lambda force=False: [])
-    monkeypatch.setattr(api, "get_responsaveis", lambda: [])
+    monkeypatch.setattr(api, "ler_pessoal", lambda: [])
     c = _cliente("pcm@exemplo.invalid")
     assert "Classe Teste" not in c.get("/os/solicitacao").get_data(as_text=True)
     assert "Classe Teste" in c.get("/os/solicitacao").get_data(as_text=True)

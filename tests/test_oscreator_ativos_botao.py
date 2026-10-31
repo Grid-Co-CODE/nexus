@@ -147,7 +147,7 @@ def test_tela_diz_ativos_de_hhmm(cli, monkeypatch):
     esperado = api.ativos_de()
     assert esperado in cli.get("/os/tradicional").get_data(as_text=True)
     monkeypatch.setattr(api, "list_minhas_solicitacoes", lambda *a, **k: [])
-    for nome in ("get_responsaveis", "get_labels"):
+    for nome in ("ler_pessoal", "get_labels"):
         monkeypatch.setattr(api, nome, lambda *a, **k: [{"id": 1, "name": "Pessoa Teste", "description": "Etiqueta"}])
     monkeypatch.setattr(api, "get_tipos_classif", lambda *a, **k: {"tipos": [{"id": 1, "description": "Corretiva"}]})
     monkeypatch.setattr(api, "status_solicitacao_catalogo", lambda *a, **k: list(api.STATUS_SOLICITACAO))
@@ -194,7 +194,7 @@ def test_pc_usa_a_sessao_da_pessoa(cli, monkeypatch):
 def _fila_sem_fracttal(monkeypatch):
     """A Fila do PCM sem pedir nada ao Fracttal: a lista de solicitações vazia e os catálogos de mentira."""
     monkeypatch.setattr(api, "list_minhas_solicitacoes", lambda *a, **k: [])
-    for nome in ("get_responsaveis", "get_labels"):
+    for nome in ("ler_pessoal", "get_labels"):
         monkeypatch.setattr(api, nome, lambda *a, **k: [{"id": 1, "name": "Pessoa Teste", "description": "Etiqueta"}])
     monkeypatch.setattr(api, "get_tipos_classif", lambda *a, **k: {"tipos": [{"id": 1, "description": "Corretiva"}]})
     monkeypatch.setattr(api, "status_solicitacao_catalogo", lambda *a, **k: list(api.STATUS_SOLICITACAO))

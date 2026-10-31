@@ -52,7 +52,8 @@ HOMONIMA = "homonima@exemplo.invalid"      # o nome dela é o de duas pessoas qu
 # (id_personnel, id_account, nome) de cada pessoa no Fracttal (o `api._current_user_info`)
 PESSOAS = {TODA: (601, 4001, "Pessoa Fictícia Um"), RESTRITA: (602, 4002, "Pessoa Fictícia Dois"),
            HOMONIMA: (603, 4003, "Pessoa Fictícia Três"), OUTRA: (604, 4004, "Pessoa Fictícia Quatro")}
-# o pessoal do Fracttal (`api.get_responsaveis`): o código de cada pessoa; a homônima não está nele
+# o pessoal do Fracttal (`api.ler_pessoal`, o leitor do catálogo de pessoas): o código de cada pessoa; a homônima
+# não está nele
 RESPONSAVEIS = [{"code": "PF01", "name": "Pessoa Fictícia Um", "id_personnel": 601},
                 {"code": "PF02", "name": "Pessoa Fictícia Dois", "id_personnel": 602},
                 {"code": "PF04", "name": "Pessoa Fictícia Quatro", "id_personnel": 604}]
@@ -256,7 +257,7 @@ def fr(monkeypatch):
     monkeypatch.setattr(api, "codigos_os_recentes", f.codigos_os_recentes)
     monkeypatch.setattr(api, "os_por_folio", f.os_por_folio)
     monkeypatch.setattr(api, "_current_user_info", lambda: PESSOAS.get(sessao.email_atual(), (None, None, "")))
-    monkeypatch.setattr(api, "get_responsaveis", lambda: [dict(p) for p in RESPONSAVEIS])
+    monkeypatch.setattr(api, "ler_pessoal", lambda: [dict(p) for p in RESPONSAVEIS])
     monkeypatch.setattr(api, "get_labels", lambda: [{"id": 11, "description": "CHAMADOS"},
                                                     {"id": 12, "description": "ENGENHARIA"}])
     monkeypatch.setattr(api, "get_pessoas_contas", lambda: {

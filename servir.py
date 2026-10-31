@@ -80,6 +80,11 @@ if __name__ == "__main__":
     # (ligado acima, no instalar_campo) já lê, entregues sem pedido a mais. Só aqui; sem a credencial REST ele não liga
     os_leitor = ponte_os.modulo_do_clone("os_leitor")
     os_leitor.ligar(app)
+    # os catálogos pequenos do OS Creator (31/10/2026, etapa 4 do canto central): a cópia em disco de cada um (o reinício não
+    # pede nada) e as pessoas pelo REST da empresa às 05h, 11h, 17h e 23h, no minuto que a lista de minutos ocupados lhes dá.
+    # Só aqui; sem a credencial REST não liga, e as pessoas seguem pelo RPC, com a sessão de quem usa (como no app.py)
+    catalogos = ponte_os.modulo_do_clone("catalogos")
+    catalogos.ligar(app)
     host = os.environ.get("NEXUS_HOST", "127.0.0.1")
     porta = int(os.environ.get("NEXUS_PORTA", "5070"))
     prefixo = app.config.get("NEXUS_PREFIXO") or "(raiz)"

@@ -269,11 +269,33 @@ def ligar_lista_de_os(app) -> None:
         os_central.configurar(os.path.join(api._data_dir(), "oscreator"))
 
 
+def chave_dos_catalogos(app) -> bytes:
+    """A chave do HMAC do e-mail no catálogo de pessoas do OS Creator (`os_creator/catalogos.py`), derivada da do Nexus como
+    a do cookie do clone (`_segredo`), mas para outro uso: o pessoal vai ao disco sem o e-mail, e a pessoa logada é achada pelo
+    HMAC dele. Trocar a NEXUS_SECRET_KEY só faz a cópia de antes ser ignorada e o pessoal ser relido uma vez."""
+    return hmac.new(str(app.config["SECRET_KEY"]).encode(), b"nexus/oscreator/catalogos/email", hashlib.sha256).digest()
+
+
+def ligar_catalogos(app) -> None:
+    """Diz aos catálogos pequenos do OS Creator (`os_creator/catalogos.py`, 31/10/2026, etapa 4 do canto central: as pessoas,
+    as etiquetas, os tipos, as falhas, os status, os motivos e os planos da Performance) onde mora a cópia em disco deles
+    (`<pasta de dados do clone>/oscreator/catalogos/`) e a chave do e-mail, e os aquece por trás (só o disco, nunca o
+    Fracttal). Nas duas máquinas; o laço das pessoas pelo REST só o `servir.py` liga (`catalogos.ligar`). Nos testes o disco
+    não (a pasta é a do usuário da máquina): os catálogos vivem só na memória."""
+    if RAIZ_CLONE not in sys.path:
+        sys.path.append(RAIZ_CLONE)
+    import api
+    import catalogos
+    if not app.config.get("TESTING"):
+        catalogos.configurar(os.path.join(api._data_dir(), "oscreator", "catalogos"), chave=chave_dos_catalogos(app))
+        catalogos.aquecer()
+
+
 def modulo_do_clone(nome: str):
-    """Um módulo do OS Creator pelo nome com que o clone o importa (`api`, `ativos_central`, `ativos_leitor`, `os_leitor`), com a
-    pasta do clone no `sys.path`. É o MESMO módulo que as telas usam: importado por outro caminho (como pacote do Nexus) ele seria
-    uma segunda cópia, com um segundo catálogo (ou uma segunda lista de OS) na memória. Quem usa é o `servir.py`, para ligar os
-    leitores do canto central ao subir."""
+    """Um módulo do OS Creator pelo nome com que o clone o importa (`api`, `ativos_central`, `ativos_leitor`, `os_leitor`,
+    `catalogos`), com a pasta do clone no `sys.path`. É o MESMO módulo que as telas usam: importado por outro caminho (como
+    pacote do Nexus) ele seria uma segunda cópia, com um segundo catálogo (ou uma segunda lista de OS) na memória. Quem usa é o
+    `servir.py`, para ligar os leitores do canto central ao subir."""
     if RAIZ_CLONE not in sys.path:
         sys.path.append(RAIZ_CLONE)
     import importlib
@@ -299,6 +321,10 @@ def _criar_clone(app):
         ligar_lista_de_os(app)
     except Exception:            # noqa: BLE001 — sem ligar, a lista de OS vive só na memória (as telas vão ao vivo)
         logging.exception("OS Creator: a lista central de OS não foi ligada à pasta de dados")
+    try:
+        ligar_catalogos(app)
+    except Exception:            # noqa: BLE001 — sem ligar, os catálogos vivem só na memória (o reinício relê do Fracttal)
+        logging.exception("OS Creator: os catálogos pequenos não foram ligados à pasta de dados")
     # o Responsável UFV dos chamados de Garantias, pelo cadastro do Nexus (28/10/2026; nexus/torres/chamados/ufv.py)
     from os_web import rotas_acomp
 

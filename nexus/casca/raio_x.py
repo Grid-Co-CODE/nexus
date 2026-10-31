@@ -26,8 +26,9 @@ clique do administrador:
   do mês no banco (a leitura, numa thread à parte e guardada 10 min, `_uso_do_banco`); o que ainda não foi às 03:45 vem do
   pendente no disco do servidor (`uso_os.linhas_pendentes`) e a hora aberta, da memória;
 - na mesma seção, o canto central do OS Creator (`_secao_canto_central`, item 0 da 3.1+3.2): o estado dos ativos centrais
-  (o catálogo, o leitor do servidor, a paridade do REST, as descrições cortadas da foto, o disco), só com contagens, datas e
-  ids, para conferir de fora a 1ª noite do leitor.
+  (o catálogo, o leitor do servidor, a paridade do REST, as descrições cortadas da foto, o disco), o da lista central de OS
+  (3.2) e o dos catálogos pequenos (4.1: uma linha por catálogo, as pessoas pelo REST e os planos da Performance), só com
+  contagens, datas e ids, para conferir de fora a 1ª noite do leitor.
 
 Nada é gravado nem vai à rede (a leitura do uso no banco é a exceção, por trás, com prazo); a pilha só sai como rótulo
 (arquivo, linha e função), nunca com dados.
@@ -943,10 +944,72 @@ def _linhas_da_lista_de_os(e: dict) -> list:
     return linhas
 
 
+def _idade(s) -> str:
+    """"há 2 h 05 min" de uns segundos, ou "?"."""
+    if not isinstance(s, (int, float)) or s < 0:
+        return "?"
+    m = int(s // 60)
+    return "há %d min" % m if m < 60 else "há %d h %02d min" % (m // 60, m % 60)
+
+
+def _linhas_dos_catalogos(e: dict) -> list:
+    """As linhas da peça "Catálogos pequenos" (a etapa 4, `catalogos.estado()`): uma por catálogo (de onde veio, quando foi
+    lido, a idade contra o prazo, a última falha e a cópia em disco), as pessoas pelo REST e os planos da Performance. Só
+    contagens, datas e motivos: nunca um nome nem um e-mail."""
+    linhas = []
+    for a in e.get("assuntos") or []:
+        if not a.get("n"):
+            txt = "vazio nesta máquina: a 1ª tela lê do Fracttal, com a sessão de quem abrir"
+        else:
+            txt = "%d %s, %s, lido em %s (%s; vence com %d h)%s" % (
+                a["n"], "itens" if a["n"] != 1 else "item",
+                "do REST (credencial da empresa)" if a.get("fonte") == "rest" else "do RPC (sessão de quem usa)",
+                _quando(a.get("lido_em")) or "?", _idade(a.get("idade_s")), int((a.get("prazo_s") or 0) // 3600),
+                "; VENCIDO" + (", renovando por trás" if a.get("renovando") else ", a renovar na próxima tela")
+                if a.get("vencido") else "")
+        if a.get("erro"):
+            txt += "; a última falha em %s: %s" % (_quando(a.get("erro_em")) or "?", str(a["erro"])[:200])
+        if a.get("leituras"):
+            txt += "; %d %s do Fracttal neste processo" % (a["leituras"], "leituras" if a["leituras"] != 1 else "leitura")
+        d = a.get("disco") or {}
+        if d.get("lido"):
+            txt += "; o boot leu a %s" % d["lido"]
+        if d.get("gravado_em"):
+            txt += "; cópia em disco gravada em %s" % _quando(d["gravado_em"])
+        if d.get("erro"):
+            txt += "; erro do disco: %s" % str(d["erro"])[:200]
+        linhas.append((a.get("rotulo") or a.get("nome") or "?", txt))
+    r = e.get("rest") or {}
+    if not r.get("ligado"):
+        txt = "não ligado: %s" % (r.get("motivo") or "?")
+    else:
+        txt = "ligado; a próxima leitura em %s" % (_quando(r.get("proxima")) or "?")
+        txt += "; valendo" if r.get("valendo") else "; NÃO está valendo (as pessoas vencidas seguem pelo RPC)"
+    if r.get("bom_em"):
+        txt += "; a última boa em %s" % _quando(r["bom_em"])
+    if (r.get("falha_em") or 0) > (r.get("bom_em") or 0):
+        txt += "; FALHOU depois dela, em %s: %s" % (_quando(r.get("falha_em")), str(r.get("falha") or "")[:300])
+    linhas.append(("Pessoas pelo REST", txt))
+    p, d = e.get("planos") or {}, e.get("detalhes") or {}
+    txt = "%d ativos com os planos guardados (%d vencidos), %d detalhes de plano" % (p.get("n") or 0, p.get("vencidos") or 0,
+                                                                                   d.get("n") or 0)
+    if p.get("mais_velho"):
+        txt += "; o mais velho de %s" % _quando(p["mais_velho"])
+    for nome, x in (("planos", p), ("detalhes", d)):
+        if x.get("erro"):
+            txt += "; a última falha dos %s em %s: %s" % (nome, _quando(x.get("erro_em")) or "?", str(x["erro"])[:200])
+        if (x.get("disco") or {}).get("erro"):
+            txt += "; erro do disco dos %s: %s" % (nome, str(x["disco"]["erro"])[:200])
+    linhas.append(("Planos da Performance", txt))
+    return linhas
+
+
 def _secao_canto_central() -> dict:
-    """O bloco do canto central na seção do OS Creator: os ativos (item 0 da 3.1+3.2) e a lista de OS (3.2)."""
+    """O bloco do canto central na seção do OS Creator: os ativos (item 0 da 3.1+3.2), a lista de OS (3.2) e os catálogos
+    pequenos (4.1)."""
     return {"ativos": _peca("ativos_central", lambda m: _linhas_dos_ativos(m.estado())),
-            "os": _peca("os_central", lambda m: _linhas_da_lista_de_os(m.estado(medir_memoria=True)))}
+            "os": _peca("os_central", lambda m: _linhas_da_lista_de_os(m.estado(medir_memoria=True))),
+            "catalogos": _peca("catalogos", lambda m: _linhas_dos_catalogos(m.estado()))}
 
 
 def registrar_raio_x(bp) -> None:

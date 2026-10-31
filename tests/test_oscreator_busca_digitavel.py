@@ -115,7 +115,7 @@ def cli(monkeypatch):
     monkeypatch.setattr(requests.Session, "request", sem_rede)
     monkeypatch.setenv(solic_eng_web.ENV_RESPONSAVEIS, "Ana Teste;Bruno")
     monkeypatch.setattr(api, "load_assets_cached", lambda *a, **k: [dict(x) for x in CATALOGO])
-    monkeypatch.setattr(api, "get_responsaveis", lambda *a, **k: [dict(p) for p in PESSOAS])
+    monkeypatch.setattr(api, "ler_pessoal", lambda *a, **k: [dict(p) for p in PESSOAS])
     monkeypatch.setattr(api, "get_labels", lambda *a, **k: [{"id": 7, "description": "PERFORMANCE"}])
     monkeypatch.setattr(api, "get_pessoas_contas", lambda *a, **k: {"pessoas": [{"id_account": 11, "nome": "Ana Teste Silva"}],
                                                                     "eu": 11})

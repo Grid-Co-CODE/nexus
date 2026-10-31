@@ -13,6 +13,7 @@ from flask import (Blueprint, abort, current_app, jsonify, redirect, render_temp
 
 import api
 import ativos_central
+import catalogos
 
 from . import ativo_curto, engenharia_web, lancador, lista_central, oauth_fracttal, perf_web, sessao, sso
 from . import historico_store as HS
@@ -436,8 +437,9 @@ def api_alvo(aid):
 @bp.route("/api/performance/plano")
 @exige_sessao
 def api_plano():
-    # o tipo de tarefa que a OS vai levar (a Inspeção Geral do Inversor sai Corretiva, 29/10/2026), e não o do plano
-    plan = api.com_tipo_da_tarefa(api.get_plan_details(request.args.get("id_task"), request.args.get("id_item")))
+    # o tipo de tarefa que a OS vai levar (a Inspeção Geral do Inversor sai Corretiva, 29/10/2026), e não o do plano. O plano
+    # vem do catálogo dos planos (31/10/2026, etapa 4 do canto central): a 2ª escolha da mesma usina não pede nada
+    plan = api.com_tipo_da_tarefa(catalogos.detalhe_do_plano(request.args.get("id_task"), request.args.get("id_item")))
     return jsonify({"resumo": perf_web.resumo_plano(plan)})
 
 
@@ -500,7 +502,6 @@ def api_performance_criar():
 # por que não funciona como um filtro?"), é não repetir a busca: cada visão fica guardada alguns minutos por pessoa, e
 # voltar a ela é instantâneo. O botão de atualizar (e a atualização de 10 em 10 min) passam por cima da memória.
 TTL_HISTORICO = 180          # s — a lista de uma visão; o botão ↻ busca de novo na hora
-TTL_APOIO = 600              # s — etiquetas e pessoas, que quase não mudam
 _MEMO: dict = {}
 _MEMO_LOCK = threading.Lock()
 # o 1º elemento das chaves que o teto da memória tira POR ÚLTIMO (quem guarda por muito tempo se registra aqui). Caso: o
@@ -561,23 +562,24 @@ def _progresso_de(token):
     return _aviso
 
 
-# Os catálogos do Fracttal iguais para todos (19/10/2026, superplano do OS Creator): o pessoal ativo (2 pedidos), as
-# etiquetas, os motivos de cancelamento e as OS recentes da tinta dos Ativos eram relidos a cada tela e a cada clique,
-# por cada pessoa. Ficam TTL_CATALOGO na memória, um para todos; o erro não é guardado (a próxima tela tenta de novo).
+# Os catálogos do Fracttal iguais para todos: o pessoal ativo, as etiquetas e os motivos de cancelamento eram relidos a cada
+# tela e a cada clique, por cada pessoa, até 19/10/2026 (superplano do OS Creator: 10 min na memória, um para todos). Desde
+# 31/10/2026 (etapa 4 do canto central) o dono de cada um é o `catalogos.py`: um prazo por assunto, a cópia em disco (o
+# reinício não pede nada) e a renovação por trás. As OS recentes da tinta dos Ativos seguem aqui (`os_recentes`), quando a
+# lista central de OS não cobre o período.
 TTL_CATALOGO = 600
 
 
 def responsaveis_fracttal() -> list:
-    return [dict(p) for p in _memo(("cat", "responsaveis"), TTL_CATALOGO, lambda: api.get_responsaveis() or [],
-                                   guardar=bool)]
+    return catalogos.pessoas()
 
 
 def etiquetas_fracttal() -> list:
-    return [dict(e) for e in _memo(("cat", "etiquetas"), TTL_CATALOGO, lambda: api.get_labels() or [], guardar=bool)]
+    return catalogos.etiquetas()
 
 
 def motivos_cancelamento() -> list:
-    return list(_memo(("cat", "cancel_motivos"), TTL_CATALOGO, lambda: api.get_cancel_motivos() or [], guardar=bool))
+    return catalogos.motivos()
 
 
 def os_recentes(dias: int) -> list:
@@ -624,8 +626,9 @@ def _catalogo_clientes_usinas() -> dict:
 
 
 def _contas_do_filtro() -> list:
-    """As contas do "Criado por" (o mesmo catálogo que a tela mostra, guardado por pessoa): o nome da conta escolhida."""
-    return (_memo(("pessoas", _quem()), TTL_APOIO, lambda: api.get_pessoas_contas() or {}) or {}).get("pessoas") or []
+    """As contas do "Criado por" (o mesmo catálogo que a tela mostra, o de pessoas: `catalogos.contas`, pelo
+    `api.get_pessoas_contas`): o nome da conta escolhida."""
+    return (api.get_pessoas_contas() or {}).get("pessoas") or []
 
 
 def ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, *, forcar=False, aviso=None, mudou=False, cos=False,
@@ -772,13 +775,14 @@ def historico():
         b = busca.lower()
         linhas = [l for l in linhas if b in " ".join(str(l.get(k) or "") for k in ("folio", "usina", "ativo", "descricao", "cliente", "status")).lower()]
     labels, pessoas, eu = [], [], None
-    # etiquetas e pessoas quase não mudam: o ↻ não as busca de novo (2 pedidos a menos a cada ↻; 10 min na memória)
+    # etiquetas e pessoas quase não mudam: o ↻ não as busca de novo; vêm dos catálogos (`catalogos.py`, 31/10/2026): as
+    # contas e o "eu" saem do catálogo de pessoas, que era relido por pessoa a cada 10 min
     try:
         labels = sorted(etiquetas_fracttal(), key=lambda x: (x.get("description") or "").lower())
     except Exception:                                    # noqa: BLE001 — sem etiquetas o filtro fica em 'Todas'
         pass
     try:
-        r = _memo(("pessoas", _quem()), TTL_APOIO, lambda: api.get_pessoas_contas() or {})
+        r = api.get_pessoas_contas() or {}
         pessoas, eu = (r.get("pessoas") or []), r.get("eu")
     except Exception:                                    # noqa: BLE001 — idem
         pass

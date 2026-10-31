@@ -16,9 +16,10 @@ barra de cima é a da `SolicPcmTab` ("‹ PCM", Nova solicitação, Painel, Fila
 A LISTA É UMA SÓ, E FICA NA MEMÓRIA (o mesmo pedido: "Também está demorando demais para carregar!"). Cada abertura da
 Fila fazia de 7 a 10 pedidos ao Fracttal, um depois do outro e sem memória nenhuma — as 400 solicitações, o pessoal de
 100 em 100, as etiquetas, o catálogo de status —, e o Histórico baixava as mesmas 400 de novo. Agora Painel, Fila e
-Histórico leem a MESMA lista, guardada por LISTA_TTL; os catálogos, por CATALOGO_TTL; a carga fria pede tudo ao mesmo
-tempo (`_ao_mesmo_tempo`); e quem grava (criar, aprovar, status, observação, cancelar) esquece a lista: a próxima página
-já a lê do Fracttal. O "Atualizar" de cada página força a releitura. A página do setor PCM pede a lista ao abrir
+Histórico leem a MESMA lista, guardada por LISTA_TTL; os catálogos, pelo dono deles (`catalogos.py`, desde 31/10/2026); a
+carga fria pede tudo ao mesmo tempo (`_ao_mesmo_tempo`); e quem grava (criar, aprovar, status, observação, cancelar)
+esquece a lista: a próxima página já a lê do Fracttal. O "Atualizar" de cada página força a releitura (a lista, não os
+catálogos). A página do setor PCM pede a lista ao abrir
 (`api_aquecer`), e a porta escolhida abre com ela pronta.
 
 O CATÁLOGO DE ATIVOS NÃO VEM DO NAVEGADOR. O ativo da OS é resolvido no servidor por id_item/código
@@ -38,6 +39,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 import api
 import ativos_central
+import catalogos
 import solic_spec as sp
 import temas_store as ts
 
@@ -52,7 +54,6 @@ bp = Blueprint("os_web_solic", __name__, url_prefix="/os")
 
 LIMITE = 400            # o mesmo do painel do app (steps/solic_pcm.py: list_minhas_solicitacoes("TODOS", 400))
 LISTA_TTL = 120         # s: a lista vale isto entre Painel, Fila e Histórico; quem grava a esquece antes
-CATALOGO_TTL = 1800     # s: pessoal, etiquetas, status e tipos de tarefa — mudam de mês em mês
 _LISTA = "solic_lista"
 
 
@@ -114,12 +115,12 @@ def _esquecer_lista() -> None:
             _MEMO.pop(k, None)
 
 
-def _catalogo(nome: str, fn, padrao, guardar=bool):
-    """Um catálogo do Fracttal, guardado por CATALOGO_TTL. O erro não derruba a página (a Fila abre sem a lista de
-    etiquetas, como no app) e não é guardado: a próxima página tenta de novo; o catálogo vazio também não (20/10/2026).
-    Sessão caída sobe — é o login."""
+def _catalogo(fn, padrao):
+    """Um catálogo do Fracttal pelo dono dele (`catalogos.py`, 31/10/2026, etapa 4 do canto central: até então uma cópia de
+    30 min daqui, ao lado das outras telas). O erro não derruba a página (a Fila abre sem a lista de etiquetas, como no app) e
+    não é guardado: a próxima página tenta de novo; o catálogo vazio também não (20/10/2026). Sessão caída sobe — é o login."""
     try:
-        return _memo(("solic_cat", nome), CATALOGO_TTL, fn, guardar=guardar)
+        return fn()
     except api.SessionExpired:
         raise
     except Exception:                                       # noqa: BLE001
@@ -127,28 +128,25 @@ def _catalogo(nome: str, fn, padrao, guardar=bool):
 
 
 def _pessoas() -> list:
-    return _catalogo("pessoas", lambda: sorted(api.get_responsaveis() or [],
-                                               key=lambda x: (x.get("name") or "").lower()), [])
+    return _catalogo(catalogos.pessoas, [])
 
 
 def _etiquetas() -> list:
-    return _catalogo("etiquetas", lambda: api.get_labels() or [], [])
+    return _catalogo(catalogos.etiquetas, [])
 
 
 def _tipos() -> dict:
-    """O Tipo de tarefa e as Classificações da OS (a decisão da Fila). A Solicitação tem outro catálogo, o
-    `get_request_types`, na chave dela (`solicitacao`): os dois na mesma chave se apagavam (20/10/2026)."""
-    return _catalogo("tipos", lambda: api.get_tipos_classif() or {}, {},
-                     guardar=lambda t: bool(t.get("tipos") or t.get("c1")))
+    """O Tipo de tarefa e as Classificações da OS (a decisão da Fila). A Solicitação tem outro catálogo, o Grupo e as
+    Classificações da SOLICITAÇÃO (`catalogos.tipos_solicitacao`): os dois na mesma chave se apagavam (20/10/2026)."""
+    return _catalogo(catalogos.tipos_classif, {})
 
 
 def _status_cat() -> list:
     """[(id, código, rótulo)] do que o Fracttal aceita — sem os dois que a fila não deve oferecer.
 
     "Aberta" e "Pendente" são o estado de quem ESTÁ na fila; oferecê-los como ação só produziria
-    uma mudança de status que não muda nada."""
-    cat = _catalogo("status", lambda: api.status_solicitacao_catalogo() or [], list(api.STATUS_SOLICITACAO))
-    return [t for t in cat if t[1] not in ("OPEN_STATUS", "REQUEST_TODO")]
+    uma mudança de status que não muda nada. Sem o Fracttal, a lista local (`catalogos.status`)."""
+    return [t for t in catalogos.status() if t[1] not in ("OPEN_STATUS", "REQUEST_TODO")]
 
 
 def _ao_mesmo_tempo(*fns) -> list:
@@ -220,13 +218,12 @@ def solicitacao():
     """O formulário. A cascata (cliente→usina→ativo) usa o catálogo cacheado, como o app."""
     assets = api.load_assets_cached()
     try:
-        # o Grupo e as Classificações da SOLICITAÇÃO, na chave dela: até 20/10/2026 ficavam em ("solic_cat", "tipos"),
-        # a mesma do Tipo de tarefa e das Classificações da OS da Fila (`_tipos`). Quem abria a Fila primeiro deixava
+        # o Grupo e as Classificações da SOLICITAÇÃO, no catálogo dele (`catalogos.tipos_solicitacao`): até 20/10/2026 ficavam
+        # na mesma chave do Tipo de tarefa e das Classificações da OS da Fila (`_tipos`). Quem abria a Fila primeiro deixava
         # a Classificação 1 daqui sem opção ("não consigo solicitar pelo nexus porque a classificação 1 não abre opção
         # de preencher", o programador do PCM), e o contrário esvaziava a Fila. A lista sem a Classificação 1 não fica
         # guardada.
-        tipos = _memo(("solic_cat", "tipos_solicitacao"), CATALOGO_TTL, lambda: api.get_request_types() or {},
-                      guardar=lambda t: bool(t.get("classif1")))
+        tipos = catalogos.tipos_solicitacao()
     except api.FracttalError:                       # a tela abre mesmo sem o catálogo de classificação:
         tipos = {}                                  # a pessoa recarrega, em vez de levar um erro na cara
     pessoas = _pessoas()                            # "técnico sugerido" é opcional: sem a lista, a tela abre

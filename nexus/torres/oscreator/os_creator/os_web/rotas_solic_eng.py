@@ -14,6 +14,7 @@ from flask import Blueprint, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
 import api
+import catalogos
 
 from . import lista_central
 from . import perf_web
@@ -100,9 +101,13 @@ def api_criar():
     _abrir_limite()
     corpo, brutos = _corpo_e_anexos()
     por_id = {str(a.get("id")): a for a in (api.load_assets_cached() or []) if isinstance(a, dict)}
-    # o responsável é conferido de novo AQUI: a lista da tela é só a primeira barreira
-    # na criação (uma gravação), o pessoal e as etiquetas vêm do Fracttal na hora, sem a cópia de 10 min
-    permitidos, _ = reg.responsaveis(api.get_responsaveis() or [], reg.nomes_configurados())
+    # o responsável é conferido de novo AQUI: a lista da tela é só a primeira barreira. Até 31/10/2026 a criação (uma gravação)
+    # lia o pessoal e as etiquetas do Fracttal na hora; desde a etapa 4 do canto central lê os catálogos (`catalogos.py`) e
+    # só relê, com a sessão de quem cria, o que a tela mostrou e o catálogo não tem: a pessoa que entrou no Fracttal depois
+    permitidos, _ = reg.responsaveis(catalogos.pessoas(), reg.nomes_configurados())
+    resp = corpo.get("responsavel") if isinstance(corpo.get("responsavel"), dict) else {}
+    if resp.get("id_personnel") and not any(str(p.get("id_personnel")) == str(resp["id_personnel"]) for p in permitidos):
+        permitidos, _ = reg.responsaveis(catalogos.pessoas(reler=True), reg.nomes_configurados())
     ativos, c, erro = reg.montar(corpo, por_id, permitidos, _agora(), api.perf_os_nome)
     if erro:
         return jsonify({"erro": erro}), 400
@@ -112,8 +117,11 @@ def api_criar():
         erro = reg.erro_envios(anexos, 1 if c["agrupar"] else len(ativos))
     if erro:
         return jsonify({"erro": erro}), 400
-    # a etiqueta ANTES de criar: a ENGENHARIA sempre, e só ela — faltando no Fracttal, nenhuma OS sai
-    etiquetas, faltam = reg.etiquetas(api.get_labels() or [])
+    # a etiqueta ANTES de criar: a ENGENHARIA sempre, e só ela — faltando no Fracttal, nenhuma OS sai (faltando no catálogo,
+    # relê uma vez antes de dizer que falta)
+    etiquetas, faltam = reg.etiquetas(catalogos.etiquetas())
+    if faltam:
+        etiquetas, faltam = reg.etiquetas(catalogos.etiquetas(reler=True))
     if faltam:
         return jsonify({"erro": reg.erro_etiquetas(faltam)}), 400
     # só a Classificação 1, pelo NOME (como a OS de análise): nome que não existir no catálogo apenas não entra

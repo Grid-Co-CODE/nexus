@@ -2,8 +2,8 @@
 """Card Tradicional na web — Criar OS do zero, passo a passo: o wizard do `app.py` (Step1 → Step2 → Step3 → ResponsavelDialog)
 numa página só, com os quatro passos como cards numerados (o 4º é o diálogo do responsável, como no app).
 
-O motor é o mesmo do desktop: `api.load_assets_cached` (catálogo), `api.get_tipos_classif` (tipo/classificações),
-`api.get_labels` (etiquetas), `api.buscar_os_pai` (OS pai) e, na escrita, `api.create_work_orders_bulk` (uma OS por ativo)
+O motor é o mesmo do desktop: `api.load_assets_cached` (catálogo), os catálogos de tipos/classificações e de etiquetas
+(`catalogos.py`, 31/10/2026), `api.buscar_os_pai` (OS pai) e, na escrita, `api.create_work_orders_bulk` (uma OS por ativo)
 ou `api.create_work_orders_agrupada` (uma OS com várias tarefas) — com o payload montado por `tradicional_web.montar_payload`
 nos mesmos argumentos do `ResponsavelDialog._gerar`. O responsável vem de `/os/api/responsaveis` (rotas.py), a mesma lista
 que a Performance já usa. As imagens por ativo chegam em multipart e são repassadas em bytes, como o app manda em
@@ -17,6 +17,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 import api
 import ativos_central
+import catalogos
 
 from . import ativo_curto
 from . import lista_central
@@ -83,8 +84,10 @@ def api_catalogo():
 @bp.route("/api/tradicional/tipos")
 @exige_sessao
 def api_tipos():
-    """Tipo de tarefa + Classificação 1/2 AO VIVO (TipoTarefaBox) e a criticidade fixa (5 níveis, default Médio)."""
-    d = api.get_tipos_classif() or {}
+    """Tipo de tarefa + Classificação 1/2 (TipoTarefaBox), do catálogo dos tipos (`catalogos.tipos_classif`, o do Fracttal,
+    24 h e em disco, 31/10/2026; era uma cópia por processo que nunca vencia), e a criticidade fixa (5 níveis, default
+    Médio)."""
+    d = catalogos.tipos_classif() or {}
     return jsonify({"tipos": d.get("tipos") or [], "c1": d.get("c1") or [], "c2": d.get("c2") or [],
                     "criticidades": [{"id": i, "description": n} for n, i in api.CRITICIDADES],
                     "crit_default": api.CRITICIDADE_DEFAULT, "nenhuma": trad.NENHUMA})

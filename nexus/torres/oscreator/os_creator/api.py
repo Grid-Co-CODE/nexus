@@ -583,10 +583,12 @@ def _renovar_catalogo_por_tras() -> None:
     threading.Thread(target=rodar, name="os-catalogo-por-tras", daemon=True).start()
 
 
-def get_responsaveis() -> list:
-    """TODO o pessoal ATIVO via RPC personnel.personnel_list (sessão do usuário — sem OAuth),
-    ordenado por nome. → [{'code','name','id_personnel'}] onde id_personnel = campo `id`
-    (= id_responsible da WO; confirmado: Levi id=1414413)."""
+def ler_pessoal() -> list:
+    """TODO o pessoal do Fracttal, ativo ou não, numa paginação só do RPC personnel.personnel_list (sessão do usuário, 100 por
+    página), com o que o OS Creator usa de cada pessoa: [{'id_personnel','code','name','active','id_account','nome_conta',
+    'email'}] (o RPC chama o id_personnel de `id`, que é o id_responsible da WO; `nome_conta` é o do "Criado por", com o e-mail
+    de quem não tem nome; `email` é o da conta, em minúsculas). É o leitor do catálogo de pessoas (`catalogos.py`, 31/10/2026,
+    etapa 4 do canto central): antes, sete caminhos liam esta mesma lista, cada um com a sua cópia."""
     allp, start = [], 0
     while True:
         res = _rpc_call(RPC_PERSONNEL, {"page": start // 100 + 1, "limit": 100, "start": start,
@@ -597,13 +599,20 @@ def get_responsaveis() -> list:
         start += 100
         if len(data) < 100:
             break
-    out = []
-    for p in allp:
-        full = (p.get("full_name") or p.get("name") or "").strip()
-        if full and p.get("active") is not False:
-            out.append({"code": p.get("code"), "name": full, "id_personnel": p.get("id")})
-    out.sort(key=lambda x: x["name"].lower())
-    return out
+    return [{"id_personnel": p.get("id"), "code": p.get("code"),
+             "name": (p.get("full_name") or p.get("name") or "").strip(), "active": p.get("active"),
+             "id_account": p.get("id_account"),
+             "nome_conta": (p.get("full_name") or p.get("name") or p.get("account_email") or "").strip(),
+             "email": (p.get("account_email") or p.get("email") or "").strip().lower()}
+            for p in allp if isinstance(p, dict)]
+
+
+def get_responsaveis() -> list:
+    """TODO o pessoal ATIVO, ordenado por nome. → [{'code','name','id_personnel'}] onde id_personnel = campo `id` do RPC
+    (= id_responsible da WO; confirmado: Levi id=1414413). Desde 31/10/2026 (etapa 4 do canto central) vem do catálogo de
+    pessoas, um para todas as telas (`catalogos.pessoas`), e não mais do Fracttal a cada chamada."""
+    import catalogos
+    return catalogos.pessoas()
 
 
 # ── Escrita: OS de verdade via RPC interno (tasks_noscheduled_react_insert) ────
@@ -1460,33 +1469,17 @@ def status_da_os(id_work_order):
     d = d[0] if isinstance(d, list) and d else (d if isinstance(d, dict) else {})
     st = (d or {}).get("id_status_work_order")
     return int(st) if st is not None else None
-_user_ids_cache = {}   # email -> (id_personnel, id_account, nome)
 
 
 def _current_user_info():
-    """(id_personnel, id_account, nome) do usuário logado — achados no personnel pelo e-mail. Cacheado."""
+    """(id_personnel, id_account, nome) do usuário logado — achados no pessoal pelo e-mail. Desde 31/10/2026 (etapa 4 do
+    canto central) no catálogo de pessoas (`catalogos.da_pessoa`, pelo HMAC do e-mail): antes, a 1ª tela de cada pessoa em
+    cada processo relia o pessoal do Fracttal para achá-la, e o "não achei" ficava até o reinício."""
     email = (current_user() or "").strip().lower()
     if not email:
         return (None, None, "")
-    if email in _user_ids_cache:
-        return _user_ids_cache[email]
-    info = (None, None, "")
-    start = 0
-    while True:
-        res = _rpc_call(RPC_PERSONNEL, {"page": start // 100 + 1, "limit": 100, "start": start,
-                                        "append": True, "filter": [], "sort": []})
-        data = res.get("data") if isinstance(res, dict) else res
-        data = data if isinstance(data, list) else []
-        for p in data:
-            if (p.get("account_email") or p.get("email") or "").strip().lower() == email:
-                info = (p.get("id"), p.get("id_account"),
-                        (p.get("full_name") or p.get("name") or "").strip())
-                break
-        start += 100
-        if info[0] is not None or len(data) < 100:
-            break
-    _user_ids_cache[email] = info
-    return info
+    import catalogos
+    return catalogos.da_pessoa(email)
 
 
 def _current_user_ids():
@@ -2143,20 +2136,15 @@ def _form_item_resposta(it: dict) -> str:
     return ""                                         # Texto/outros sem valor → frontend mostra "(sem resposta)"
 
 
-_personnel_name_cache = {}   # id_personnel -> nome (preenchido sob demanda, p/ resolver o atribuído)
-
-
 def _personnel_nome_por_id() -> dict:
-    """Mapa {id_personnel: nome} de TODO o pessoal (cacheado p/ a sessão)."""
-    if not _personnel_name_cache:
-        try:
-            m = {p["id_personnel"]: p["name"] for p in get_responsaveis()
-                 if p.get("id_personnel") is not None}
-            if m:
-                _personnel_name_cache.update(m)
-        except FracttalError:
-            pass
-    return _personnel_name_cache
+    """Mapa {id_personnel: nome} do pessoal ativo, para resolver o atribuído no card. Desde 31/10/2026 (etapa 4 do canto
+    central) do catálogo de pessoas (`catalogos.nome_por_id`): a cópia de antes nunca vencia, e a pessoa nova não tinha nome
+    no card até o reinício. Sem o catálogo (o Fracttal fora), o mapa vazio, como antes."""
+    import catalogos
+    try:
+        return catalogos.nome_por_id()
+    except FracttalError:
+        return {}
 
 
 # campos de NOME do atribuído/responsável que a resposta do Fracttal pode trazer (shape variável)
@@ -2450,14 +2438,17 @@ def get_os_detalhes_por_folio(folio) -> dict:
 def _label_id(nome: str):
     """id da etiqueta pelo nome (case-insensitive). None se não existir no Fracttal.
 
-    Sem cópia guardada DE PROPÓSITO (08/10/2026): nas listas por etiqueta (Acompanhamento de chamados, Performance)
-    é este o primeiro pedido, e é ele que acusa a sessão morta. Até 21/10/2026 a listagem engolia o erro de cada página
-    (`_fetch_page`), e com o id guardado a sessão morta virava um quadro vazio em vez de voltar ao login (hoje a página
-    que falha derruba a busca inteira, `_lista_pela_metade`)."""
+    Do catálogo de etiquetas (`catalogos.etiquetas`, 31/10/2026, etapa 4 do canto central). Até então era relido a cada
+    lista DE PROPÓSITO (08/10/2026): nas listas por etiqueta era o primeiro pedido, e era ele que acusava a sessão morta,
+    porque a listagem engolia o erro de cada página e a sessão morta virava um quadro vazio. Desde 21/10/2026 a página que
+    falha derruba a busca inteira (`_lista_pela_metade`): a lista acusa sozinha, e o id não precisa ir ao Fracttal. O nome
+    que o catálogo não tem (a etiqueta criada agora) relê uma vez, com a sessão de quem pediu."""
+    import catalogos
     alvo = str(nome or "").strip().lower()
-    for l in (get_labels() or []):
-        if str(l.get("description") or "").strip().lower() == alvo:
-            return l.get("id")
+    for reler in (False, True):
+        for l in (catalogos.etiquetas(reler=reler) or []):
+            if str(l.get("description") or "").strip().lower() == alvo:
+                return l.get("id")
     return None
 
 
@@ -3184,14 +3175,11 @@ RPC_FALHA_DETEC  = "tasks.failures_detection_methods_list"
 FALHA_SEVERIDADES = [("Muito baixo", "1"), ("Baixo", "2"), ("Médio", "3"), ("Alto", "4"), ("Muito alto", "5")]
 FALHA_DANOS = [("Nenhum", 1), ("Dano ao meio ambiente", 2), ("Danos nas Instalações", 3),
                ("Lesões ao pessoal interno", 4), ("Lesões a Terceiros", 5), ("Outros", 6)]
-_falha_listas_cache = {}
 
 
 def get_falha_listas() -> dict:
-    """{tipos, causas, metodos} p/ o bloco 'O ativo falhou?' — cada um [{'id','description'}]. Cacheado."""
-    if _falha_listas_cache:
-        return _falha_listas_cache
-
+    """{tipos, causas, metodos} p/ o bloco 'O ativo falhou?' — cada um [{'id','description'}], lidos do Fracttal. Quem guarda
+    é o catálogo das falhas (`catalogos.falhas`, 24 h e em disco, 31/10/2026); a cópia que ficava aqui nunca vencia."""
     def _lst(metodo, extra=None):
         p = {"sort": [{"property": "description", "direction": "asc"}], "page": 1, "limit": 200,
              "start": 0, "is_tree": False, "node": None}
@@ -3203,22 +3191,16 @@ def get_falha_listas() -> dict:
                     for d in (r.get("data") or []) if d.get("id") is not None]
         except FracttalError:
             return []
-    d = {"tipos": _lst(RPC_FALHA_TIPOS),
-         "causas": _lst(RPC_FALHA_CAUSAS, {"id_failure_type": None}),
-         "metodos": _lst(RPC_FALHA_DETEC, {"id_failure_cause": None})}
-    if d["tipos"]:
-        _falha_listas_cache.update(d)
-    return d
+    return {"tipos": _lst(RPC_FALHA_TIPOS),
+            "causas": _lst(RPC_FALHA_CAUSAS, {"id_failure_type": None}),
+            "metodos": _lst(RPC_FALHA_DETEC, {"id_failure_cause": None})}
 
 
 # ── Tipo de tarefa + Classificação 1/2 (listas ao vivo p/ os dropdowns de criação) ──
-_TIPOS_CACHE = {}                              # {key: [{'id','description'}]} — 1 fetch por sessão
-
-
+# Quem guarda é o catálogo dos tipos (`catalogos.tipos_classif`, 24 h e em disco, 31/10/2026). A cópia que ficava aqui
+# (`_TIPOS_CACHE`, uma leitura por processo) nunca vencia: o tipo criado no Fracttal só aparecia no reinício.
 def _lista_tipos(metodo: str, key: str) -> list:
-    """Busca uma lista de tipos/classificações (id+description), ordenada por descrição. Cacheia."""
-    if _TIPOS_CACHE.get(key) is not None:
-        return _TIPOS_CACHE[key]
+    """Busca uma lista de tipos/classificações (id+description), ordenada por descrição, no Fracttal."""
     r = _rpc_call(metodo, {"sort": [{"property": "description", "direction": "asc"}],
                            "page": 1, "limit": 300, "start": 0, "is_tree": False, "node": None})
     data = r.get("data") if isinstance(r, dict) else r
@@ -3231,7 +3213,6 @@ def _lista_tipos(metodo: str, key: str) -> list:
                     idv = d.get(k); break
         if idv is not None:
             out.append({"id": idv, "description": str(d.get("description") or "?")})
-    _TIPOS_CACHE[key] = out
     return out
 
 
@@ -3251,7 +3232,8 @@ def get_classif2() -> list:
 
 
 def get_tipos_classif() -> dict:
-    """Tipo de tarefa + Classif 1 + Classif 2 numa chamada só (p/ a UI carregar tudo em 1 worker)."""
+    """Tipo de tarefa + Classif 1 + Classif 2 numa chamada só (p/ a UI carregar tudo em 1 worker), lidos do Fracttal: é o
+    leitor do catálogo dos tipos. As telas leem o catálogo (`catalogos.tipos_classif`)."""
     return {"tipos": get_task_types(), "c1": get_classif1(), "c2": get_classif2()}
 
 
@@ -3746,29 +3728,48 @@ def _plan_family(desc) -> str:
     return m.group(0) if m else None
 
 
-def get_plans_for_assets(assets: list) -> list:
+def ler_planos_do_ativo(id_item, id_group_task=None) -> list:
+    """Os planos de tarefa de UM ativo (1 task_events_list) → [{id_task, description}]. Levanta o erro do Fracttal. É o
+    leitor do catálogo dos planos da Performance (`catalogos.planos_dos_ativos`, 31/10/2026)."""
+    r = _rpc_call(RPC_TASK_EVENTS, {"filter": [], "sort": [], "page": 1, "limit": 300, "start": 0,
+                                    "is_tree": False, "node": None, "id_item": id_item, "id_group_task": id_group_task})
+    data = r.get("data") if isinstance(r, dict) else r
+    res = []
+    for d in (data if isinstance(data, list) else []):
+        if not isinstance(d, dict):
+            continue
+        idt = d.get("id_task") if d.get("id_task") is not None else d.get("id")
+        desc = d.get("task_description") or d.get("tasks_description") or d.get("description") or ""
+        if idt is not None:
+            res.append({"id_task": idt, "description": str(desc).strip()})
+    return res
+
+
+def get_plans_for_assets(assets: list, guardados: bool = False) -> list:
     """Planos de tarefa de VÁRIOS ativos (1 task_events_list por ativo, em paralelo). Cada plano vem
-    com o ATIVO e a FAMÍLIA (parseada da descrição). → [{id_task, description, family, asset, asset_label}]."""
+    com o ATIVO e a FAMÍLIA (parseada da descrição). → [{id_task, description, family, asset, asset_label}].
+
+    `guardados` (a Performance, 31/10/2026, etapa 4 do canto central): os planos do catálogo dos planos, por ativo
+    (`catalogos.planos_dos_ativos`): a 2ª escolha da mesma usina não pede nada; o vencido (24 h) volta e é relido por trás.
+    Sem ele (a Clonagem de planos do PCM, que mexe nos planos e os quer como estão agora), ao vivo, como sempre."""
     alist = [a for a in (assets or []) if isinstance(a, dict) and a.get("id")]
+
+    def _decorar(a, planos):
+        return [{"id_task": p["id_task"], "description": p["description"], "family": _plan_family(p["description"]),
+                 "asset": a, "asset_label": a.get("label") or a.get("code") or "?"} for p in (planos or [])]
+    if guardados:
+        import catalogos
+        por_ativo = catalogos.planos_dos_ativos(alist)
+        out = []
+        for a in alist:
+            out.extend(_decorar(a, por_ativo.get(catalogos.chave_plano(a.get("id"), a.get("id_group_task")))))
+        return out
 
     def _one(a):
         try:
-            r = _rpc_call(RPC_TASK_EVENTS, {"filter": [], "sort": [], "page": 1, "limit": 300, "start": 0,
-                "is_tree": False, "node": None, "id_item": a.get("id"), "id_group_task": a.get("id_group_task")})
+            return _decorar(a, ler_planos_do_ativo(a.get("id"), a.get("id_group_task")))
         except FracttalError:
             return []
-        data = r.get("data") if isinstance(r, dict) else r
-        res = []
-        for d in (data if isinstance(data, list) else []):
-            if not isinstance(d, dict):
-                continue
-            idt = d.get("id_task") if d.get("id_task") is not None else d.get("id")
-            desc = d.get("task_description") or d.get("tasks_description") or d.get("description") or ""
-            if idt is not None:
-                res.append({"id_task": idt, "description": str(desc).strip(),
-                            "family": _plan_family(desc), "asset": a,
-                            "asset_label": a.get("label") or a.get("code") or "?"})
-        return res
     out = []
     with _ExecutorComContexto(max_workers=8) as ex:
         for r in ex.map(_one, alist):
@@ -3868,14 +3869,16 @@ def _eh_tracker_generalizado(a: dict) -> bool:
 def get_performance_alvos(assets_usina: list, card_frase: str) -> dict:
     """Ativos selecionáveis de UMA usina p/ o card (ex.: 'recomposicao de string'). Inversor/Estação: cada
     ativo com o SEU plano. Tracker: plano do GENERALIZADO aplicado aos individuais (não-linkado).
-    → {'is_tracker', 'ativos':[{asset, plano_id_task, plano_id_item, linkar}], 'base', 'erro'?}."""
+    → {'is_tracker', 'ativos':[{asset, plano_id_task, plano_id_item, linkar}], 'base', 'erro'?}.
+    Os planos vêm do catálogo dos planos, por ativo (`get_plans_for_assets(..., guardados=True)`, 31/10/2026): até então
+    cada usina escolhida relia o plano de cada inversor."""
     frase = _norm_txt(card_frase)
     uativos = [a for a in (assets_usina or []) if isinstance(a, dict) and a.get("tipo") in PERF_TIPOS]
     if "tracker" in frase:
         gen = next((a for a in uativos if _eh_tracker_generalizado(a)), None)
         if not gen:
             return {"is_tracker": True, "ativos": [], "erro": "Não achei a Estrutura Trackers desta usina."}
-        planos = [p for p in get_plans_for_assets([gen]) if frase in _norm_txt(p.get("description"))]
+        planos = [p for p in get_plans_for_assets([gen], guardados=True) if frase in _norm_txt(p.get("description"))]
         if not planos:
             return {"is_tracker": True, "ativos": [], "erro": "A Estrutura Trackers não tem esse plano."}
         pt, pi = planos[0]["id_task"], gen.get("id")
@@ -3897,7 +3900,7 @@ def get_performance_alvos(assets_usina: list, card_frase: str) -> dict:
                            for a in ([gen] + conj + indiv)]}
     # inversor / estação: cada ativo com o SEU plano
     cands = [a for a in uativos if a.get("tipo") in ("Inversor", "Estação Meteorológica")]
-    planos = [p for p in get_plans_for_assets(cands) if frase in _norm_txt(p.get("description"))]
+    planos = [p for p in get_plans_for_assets(cands, guardados=True) if frase in _norm_txt(p.get("description"))]
     base = plano_base_nome(planos[0].get("description")) if planos else card_frase
     alvos = [{"asset": p["asset"], "plano_id_task": p["id_task"],
               "plano_id_item": p["asset"].get("id"), "linkar": True} for p in planos]
@@ -4063,24 +4066,24 @@ def attach_imagem_os(id_work_order, id_work_order_task, data_bytes: bytes, filen
     return {"ok": True, "value": nome_s3}
 
 
-_LABEL_IDS = {}            # cache {nome normalizado: id} — 0 = procurou e não achou
-
-
 def label_id_por_nome(nome: str):
-    """id de uma etiqueta pelo NOME (casa exato, senão por trecho); cacheia. None se não existir no
-    catálogo — quem chama segue sem a etiqueta em vez de derrubar a criação da OS."""
+    """id de uma etiqueta pelo NOME (casa exato, senão por trecho), do catálogo de etiquetas (`catalogos.etiquetas`; até
+    31/10/2026 numa cópia própria que lembrava o "não existe" até o reinício). None se não existir no catálogo — quem chama
+    segue sem a etiqueta em vez de derrubar a criação da OS. O nome que o catálogo não tem relê uma vez."""
+    import catalogos
     n = _norm_txt(nome)
     if not n:
         return None
-    if n not in _LABEL_IDS:
+    for reler in (False, True):
         try:
-            labels = get_labels()
-            exata = next((l for l in labels if _norm_txt(l.get("description")) == n), None)
-            parcial = next((l for l in labels if n in _norm_txt(l.get("description"))), None)
-            _LABEL_IDS[n] = (exata or parcial or {}).get("id") or 0
+            labels = catalogos.etiquetas(reler=reler) or []
         except Exception:
             return None                                  # falha de rede não vira "não existe"
-    return _LABEL_IDS[n] or None
+        exata = next((l for l in labels if _norm_txt(l.get("description")) == n), None)
+        parcial = next((l for l in labels if n in _norm_txt(l.get("description"))), None)
+        if (exata or parcial or {}).get("id"):
+            return (exata or parcial)["id"]
+    return None
 
 
 def _label_performance_id():
@@ -5319,17 +5322,21 @@ STATUS_SOLICITACAO = [
 ]
 
 
-def status_solicitacao_catalogo() -> list:
+def status_solicitacao_catalogo(levantar: bool = False) -> list:
     """[(id, código, rótulo)] do que o Fracttal aceita HOJE, cruzado com a lista curta acima.
 
     Vai à API para não oferecer um id que aquela conta não tenha; se a chamada falhar, devolve a
-    lista local — perder a rede não pode impedir a pessoa de cancelar uma solicitação."""
+    lista local — perder a rede não pode impedir a pessoa de cancelar uma solicitação. `levantar`: o erro sobe em vez da
+    lista local (o catálogo dos status, `catalogos.status`, 31/10/2026: a lista local guardada 24 h passaria pelo que o
+    Fracttal aceita; lá ela volta sem ficar guardada)."""
     try:
         res = _rpc_call(RPC_REQ_STATUS_LIST, {"filter": [], "sort": [], "page": 1,
                                               "limit": 100, "start": 0})
         vivos = {s.get("id") for s in ((res.get("data") if isinstance(res, dict) else res) or [])
                  if isinstance(s, dict)}
     except Exception:                                # noqa: BLE001
+        if levantar:
+            raise
         return list(STATUS_SOLICITACAO)
     return [t for t in STATUS_SOLICITACAO if not vivos or t[0] in vivos]
 
@@ -5395,31 +5402,12 @@ def cancelar_solicitacao(id_request, note: str = "") -> dict:
 
 def get_pessoas_contas() -> dict:
     """Contas (quem cria OS/solicitação) p/ o filtro de 'criado por' + a conta do usuário logado.
-    Acha o 'eu' (id_account do logado) na MESMA paginação do pessoal — uma passada só.
-    → {"pessoas": [{"id_account","nome"}] (ordenado por nome), "eu": id_account_logado}."""
+    → {"pessoas": [{"id_account","nome"}] (ordenado por nome), "eu": id_account_logado}. Desde 31/10/2026 (etapa 4 do canto
+    central) do catálogo de pessoas (`catalogos.contas` e `catalogos.da_pessoa`): o Histórico relia o pessoal inteiro por
+    pessoa, a cada 10 min."""
+    import catalogos
     email = (current_user() or "").strip().lower()
-    eu = None
-    vistos = {}
-    start = 0
-    while True:
-        res = _rpc_call(RPC_PERSONNEL, {"page": start // 100 + 1, "limit": 100, "start": start,
-                                        "append": True, "filter": [], "sort": []})
-        data = res.get("data") if isinstance(res, dict) else res
-        data = data if isinstance(data, list) else []
-        for p in data:
-            ida = p.get("id_account")
-            if ida is not None and ida not in vistos:
-                nome = (p.get("full_name") or p.get("name") or p.get("account_email") or "").strip()
-                if nome:
-                    vistos[ida] = nome
-            if eu is None and email and (p.get("account_email") or p.get("email") or "").strip().lower() == email:
-                eu = ida
-        start += 100
-        if len(data) < 100:
-            break
-    pessoas = sorted(({"id_account": k, "nome": v} for k, v in vistos.items()),
-                     key=lambda x: x["nome"].lower())
-    return {"pessoas": pessoas, "eu": eu}
+    return {"pessoas": catalogos.contas(), "eu": catalogos.da_pessoa(email)[1] if email else None}
 
 
 def _anexa_imagens_bulk(fase1, imagens_por_ativo):
@@ -6229,25 +6217,22 @@ def respostas_inspecao(id_work_order) -> dict:
     return out
 
 
-_CLASSIF_CACHE = {}
-
-
 def _classif_ids(nome_c1: str, nome_c2: str) -> dict:
     """{'id_task_type','tasks_types_description','id_task_type_2','tasks_types_2_description'} a
     partir dos NOMES. Resolve no catálogo do Fracttal (editável lá dentro, então id fixo quebraria).
-    Nome que não existir simplesmente não entra — melhor OS sem classificação que com a errada."""
-    global _CLASSIF_CACHE
-    if not _CLASSIF_CACHE:
-        try:
-            _CLASSIF_CACHE = get_tipos_classif() or {}
-        except Exception:
-            return {}
+    Nome que não existir simplesmente não entra — melhor OS sem classificação que com a errada.
+    O catálogo é o dos tipos (`catalogos.tipos_classif`, 31/10/2026); a cópia daqui (`_CLASSIF_CACHE`) nunca vencia."""
+    import catalogos
+    try:
+        classif = catalogos.tipos_classif() or {}
+    except Exception:
+        return {}
     out = {}
     for chave, nome, campo_id, campo_desc in (
             ("c1", nome_c1, "id_task_type", "tasks_types_description"),
             ("c2", nome_c2, "id_task_type_2", "tasks_types_2_description")):
         alvo = str(nome or "").strip().lower()
-        for x in (_CLASSIF_CACHE.get(chave) or []):
+        for x in (classif.get(chave) or []):
             if str(x.get("description") or "").strip().lower() == alvo:
                 out[campo_id] = x.get("id")
                 out[campo_desc] = str(x.get("description") or "")
@@ -6258,18 +6243,18 @@ def _classif_ids(nome_c1: str, nome_c2: str) -> dict:
 def tipo_main_ao_vivo(nome):
     """O id do Tipo de tarefa pelo NOME no catálogo vivo do Fracttal (o mesmo que as listas da Fila e do Criar OS
     mostram) — para o tipo que o TASK_TYPE_MAIN fixo não tem (a Zeladoria, 29/10/2026). Sem caixa nem espaço nas pontas;
-    não achando no catálogo guardado, relê uma vez (tipo criado no Fracttal depois). None se não existir."""
-    global _CLASSIF_CACHE
+    não achando no catálogo dos tipos (`catalogos.tipos_classif`), relê uma vez (tipo criado no Fracttal depois; no máximo
+    uma vez por minuto, `catalogos.RELER_NA_FALTA_S`). None se não existir."""
+    import catalogos
     alvo = str(nome or "").strip().lower()
     if not alvo:
         return None
     for reler in (False, True):
-        if reler or not _CLASSIF_CACHE:
-            try:
-                _CLASSIF_CACHE = get_tipos_classif() or {}
-            except Exception:
-                return None
-        for x in (_CLASSIF_CACHE.get("tipos") or []):
+        try:
+            tipos = (catalogos.tipos_classif(reler=reler) or {}).get("tipos") or []
+        except Exception:
+            return None
+        for x in tipos:
             if str(x.get("description") or "").strip().lower() == alvo and x.get("id") is not None:
                 return x.get("id")
     return None
