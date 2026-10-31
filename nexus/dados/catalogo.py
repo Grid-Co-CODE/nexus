@@ -1287,9 +1287,12 @@ FATOS = (
                     "no fato fracttal_total_hora, 1 linha por hora (31/10/2026, Ruling N: um total no meio do detalhe mistura "
                     "dois grãos, e somar a coluna contaria em dobro). recusas_qtd são os 406 e 429 (o Fracttal pedindo "
                     "calma); erros_qtd, a exceção e o 5xx. esperas_qtd (a última coluna, desde 31/10/2026, etapa 5) são os "
-                    "pedidos que esperaram a vez no porteiro do Nexus (no máximo 150 por minuto, 90 deles de fundo; a origem "
-                    "fundo: é o fundo, o resto é clique, que espera no máximo 2 s e nunca é recusado), contados na hora em "
-                    "que saíram; vazia na hora de antes do porteiro. Só contagens; vai ao banco uma vez por dia, às 03:45"),
+                    "pedidos que esperaram a vez no porteiro do Nexus (no máximo 150 por minuto, 90 deles de fundo; fundo é "
+                    "só a origem fundo: que o laço do servidor declara, e o resto é clique, que espera no máximo 2 s e nunca "
+                    "é recusado; a fundo:<thread> que ninguém declarou, um pool ou a releitura por trás de uma tela, o "
+                    "porteiro trata como clique, e o nome não diz qual: a lista dos laços que declaram está no "
+                    "nexus/casca/CLAUDE.md), contados na hora em que saíram; vazia na hora de antes do porteiro. Só "
+                    "contagens; vai ao banco uma vez por dia, às 03:45"),
     # o total da hora, na aba própria do mesmo livro do mês (Ruling N, 31/10/2026): o contador entrega a linha `*` no meio
     # do detalhe, e `fato_uso_os.separar_total` a leva para cá
     Fato("fracttal_total_hora", "Total de pedidos do Nexus ao Fracttal por hora", "os",

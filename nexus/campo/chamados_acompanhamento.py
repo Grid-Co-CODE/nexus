@@ -148,5 +148,7 @@ def ligar(app):
                     log.exception("chamados no banco")
             espera = _espera_s()
 
-    _LACO["thread"] = threading.Thread(target=laco, name="nexus-chamados-banco", daemon=True)
+    from ..casca import fracttal_conta              # o laço declara o fundo: só o declarado tem o teto de 90 do porteiro
+    _LACO["thread"] = threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-chamados-banco", laco),
+                                       name="nexus-chamados-banco", daemon=True)
     _LACO["thread"].start()

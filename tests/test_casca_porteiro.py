@@ -2,18 +2,22 @@
 minuto para a EMPRESA toda, dividida com o App de Campo e os robôs, e estourá-la derruba o App de Campo (o desenho do canto
 central chama isso de fracasso, mesmo com tudo funcionando). O porteiro mora no mesmo gancho do contador da etapa 0
 (`casca/fracttal_conta.py`, o `Session.send`) e põe todo pedido do Nexus ao Fracttal numa conta deslizante de 60 s: no
-máximo 150 por minuto (sobram 50 para o App de Campo e os robôs), e o fundo (origem `fundo:`, os laços) no máximo 90 deles.
-Quem clica nunca é recusado: com o minuto cheio espera até 2 s e segue. O fundo espera a vez sem limite, sem segurar a
-trava, e cede a vez ao clique que espera.
+máximo 150 por minuto (sobram 50 para o App de Campo e os robôs), e o fundo no máximo 90 deles. Fundo é só a origem
+DECLARADA `fundo:` (o laço do servidor que se declara); a thread sem declaração (o pool, a releitura por trás de uma tela)
+é tratada como clique. Quem clica nunca é recusado: com o minuto cheio espera até 2 s e segue. O fundo espera a vez sem
+limite, sem segurar a trava nem uma das 4 vagas do `campo/fracttal.py`, e cede a vez ao clique que espera.
 
 Provas, sem rede (a `requests.Session` de verdade com um Fracttal de mentira) e com o relógio na mão: a espera do porteiro
-anda o relógio em vez de dormir, então um minuto de espera leva um instante. Os dois testes com threads usam a espera de
-verdade (a Condition) com o relógio de parede parado: a janela só anda quando o teste manda."""
+anda o relógio em vez de dormir, então um minuto de espera leva um instante. Os testes com threads usam a espera de verdade
+(a Condition) com o relógio de parede parado: a janela só anda quando o teste manda."""
 import contextvars
+import inspect
 import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 import requests
@@ -22,6 +26,7 @@ from nexus.casca import fracttal_conta as C
 from nexus.dados import fato_uso_os as F
 from sessao_real_sem_rede import AdaptadorFalso
 
+AQUI = Path(__file__).resolve().parent.parent
 _API = "https://app.fracttal.com/api/work_orders?limit=100"
 _RPC = "https://app.fracttal.com/rpc/proxy"
 _HORA_10 = "2026103010"                 # 13:00Z de 30/10/2026 = 10:00 em Brasília (UTC-3)
@@ -340,3 +345,174 @@ def test_porteiro_quebrado_nao_segura_o_pedido(relogio, monkeypatch, caplog):
     assert _linha("fundo:laco")["pedidos_qtd"] == 90            # sem a conta (só o debug sabe), como no contador
     assert C.estado()["esperando"] == {"clique": 0, "fundo": 0}  # quem saiu pela exceção não ficou "esperando"
     assert [r.levelno for r in caplog.records if r.name == C.log.name] == [logging.DEBUG]
+
+
+# ── só a origem DECLARADA é fundo (rodada de correção da 5.2) ─────────────────────────────────────────────────────────
+# A tarefa de um pool comum e a thread aberta à mão começam sem a marca de quem as abriu: o contador lhes dá o nome da thread
+# (`fundo:ThreadPoolExecutor`, `fundo:os-web-preparo`), e a 1ª versão do porteiro (antes de ir ao ar) as tratava como fundo,
+# que espera a vez sem limite: o clique da Aprovação esperaria as páginas do pool, e o card do OS Creator, o detalhe lido
+# por trás. Agora só é fundo quem se declara (`origem` ou `de_fundo`); o nome que vai ao fato não muda.
+def test_thread_sem_declaracao_e_clique_no_porteiro(relogio):
+    s = _sessao(_Fracttal(relogio))
+    _pedir(s, "fundo:laco", 90)                                 # o fundo cheio
+
+    def pedir(_):
+        return _sessao(AdaptadorFalso((200, None))).get(_API).status_code       # sem origem: a marca é inferida
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        assert list(ex.map(pedir, range(4))) == [200] * 4
+    assert relogio.esperas == []                                # com o fundo em 90, o pool passou na hora: é clique
+    lin = _linha("fundo:ThreadPoolExecutor")                    # e o nome no fato é o de sempre
+    assert (lin["pedidos_qtd"], lin["esperas_qtd"]) == (4, 0)
+    # com o minuto cheio (150), espera como o clique espera: no máximo 2 s, e segue
+    _pedir(s, "/os/historico", 56)
+    antes = relogio.t
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        assert ex.submit(pedir, 0).result() == 200
+    assert relogio.t - antes == pytest.approx(C.ESPERA_CLIQUE_MAX_S)
+    assert _linha("fundo:ThreadPoolExecutor")["esperas_qtd"] == 1
+    assert C.estado()["esperas_por_hora"] == [{"hora_id": _HORA_10, "clique": 1, "fundo": 0}]   # o estado diz clique
+
+
+def test_de_fundo_declara_a_origem_e_nao_vaza(relogio):
+    s = _sessao(_Fracttal(relogio))
+    _pedir(s, "fundo:laco", 90)
+    t0 = relogio.t
+
+    def ler():
+        assert s.get(_API).status_code == 200
+        return C.pedidos_desta_thread()
+    assert C.de_fundo("fundo:nexus-teste-laco", ler)() == 1     # o alvo da thread do laço, declarado: é fundo
+    assert relogio.t - t0 == pytest.approx(60)                  # e esperou a vez do fundo (os 90 saírem da janela)
+    lin = _linha("fundo:nexus-teste-laco")
+    assert (lin["pedidos_qtd"], lin["esperas_qtd"]) == (1, 1)
+    # fora do embrulho a declaração não ficou na thread: o pedido sem origem volta a ser inferido (clique)
+    _pedir(s, "fundo:laco", 89)                                 # o fundo cheio de novo (89 + o do laço)
+    t1 = relogio.t
+    assert s.get(_API).status_code == 200
+    assert relogio.t == t1
+    with pytest.raises(ValueError):
+        C.de_fundo("/os/historico", ler)                        # só se declara fundo com um nome de fundo
+
+
+# Os laços do servidor que pedem ao Fracttal e até aqui só caíam na marca inferida: declaram o fundo no alvo da thread deles
+# (não dentro da função, que um clique também chama na hora, como o `pedir_releitura(esperar=True)` da Engenharia), com o
+# nome que o fato já mostrava (o da thread, sem contador). (arquivo, thread, quantas vezes a thread é aberta ali)
+LACOS = [
+    ("nexus/campo/tarefas_os.py", "nexus-tarefas-os-banco", 1),
+    ("nexus/campo/chamados_acompanhamento.py", "nexus-chamados-banco", 1),
+    ("nexus/campo/aprovacao.py", "nexus-fila-fracttal", 2),
+    ("nexus/campo/ronda_checklist.py", "nexus-ronda-checklist", 1),
+    ("nexus/engenharia/os_falhas.py", "nexus-os-falhas", 1),
+    ("nexus/engenharia/os_equipe.py", "nexus-os-equipe", 1),
+    ("nexus/engenharia/etm.py", "nexus-etm", 1),
+    ("nexus/torres/oscreator/os_creator/ativos_leitor.py", "nexus-ativos-leitor", 1),
+]
+
+
+@pytest.mark.parametrize("arquivo, thread, vezes", LACOS)
+def test_lacos_do_servidor_declaram_o_fundo(arquivo, thread, vezes):
+    texto = (AQUI / arquivo).read_text(encoding="utf-8")
+    assert texto.count(f'de_fundo("fundo:{thread}", ') == vezes, arquivo
+    assert C._nome_de_fundo(thread) == thread                   # o mesmo nome que o fato já mostrava
+
+
+def test_quem_um_clique_chama_na_hora_nao_se_declara_fundo():
+    # a releitura da Engenharia roda na thread do clique com `esperar=True`, e os `em_segundo_plano` do Campo também abrem
+    # as fotos da ronda (que a pessoa espera): declarar ali faria o clique esperar como fundo
+    from nexus.campo import aprovacao, ronda_checklist
+    from nexus.engenharia import etm, os_equipe, os_falhas
+    for f in (os_equipe._reler, etm._reler, os_falhas._reler, aprovacao.em_segundo_plano, ronda_checklist.em_segundo_plano):
+        fonte = inspect.getsource(f)
+        assert "de_fundo" not in fonte and "origem(" not in fonte, f.__qualname__
+
+
+# ── as 4 vagas do campo/fracttal.py: o fundo espera a vez ANTES de pegar uma ─────────────────────────────────────────
+@pytest.fixture
+def campo_fracttal(monkeypatch):
+    """O `campo/fracttal.py` de verdade com o Fracttal de mentira no adaptador do requests (ele chama `requests.get`), o
+    token já na mão, vagas novas e sem o ritmo de 4 por segundo (não é ele que se prova aqui)."""
+    from nexus.campo import fracttal as FX
+
+    def adaptador(self, request, **kwargs):
+        r = requests.Response()
+        r.status_code, r.url, r.request, r._content = 200, request.url, request, b"{}"
+        r.headers["Content-Type"] = "application/json"
+        return r
+    monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", adaptador)
+    monkeypatch.setattr(FX, "_FORNECEDOR", None)
+    monkeypatch.setattr(FX, "_TOKEN", {"v": "token-de-teste", "exp": time.time() + 3600})
+    monkeypatch.setattr(FX, "_VAGAS", threading.BoundedSemaphore(FX.SIMULTANEOS))
+    monkeypatch.setattr(FX, "_ULTIMO", [0.0])
+    monkeypatch.setattr(FX, "INTERVALO_S", 0.0)
+    return FX
+
+
+def test_fundo_parado_no_porteiro_nao_segura_as_vagas_do_campo(parado, campo_fracttal):
+    FX = campo_fracttal
+    s = _sessao(AdaptadorFalso(*[(200, None)] * 100))
+    _pedir(s, "fundo:laco", 90)                                 # o fundo cheio
+    saidas, threads = [], []
+
+    def pedir(origem, saiu):
+        with C.origem(origem):
+            FX.ler("work_orders?limit=1")
+        saiu.set()
+
+    def abrir(origem, nome):
+        saiu = threading.Event()
+        t = threading.Thread(target=lambda: contextvars.Context().run(pedir, origem, saiu), name=nome, daemon=True)
+        t.start()
+        saidas.append(saiu)
+        threads.append(t)
+        return saiu
+    try:
+        for i in range(FX.SIMULTANEOS):                         # 4 leitores de fundo parados no porteiro
+            abrir(f"fundo:laco-{i}", f"fundo-{i}")
+        assert _ate(lambda: C.estado()["esperando"]["fundo"] == FX.SIMULTANEOS)
+        comeco = time.monotonic()
+        clique = abrir("/t/campo/aprovacao", "clique")          # o clique pelo campo/fracttal.py: as vagas estão livres
+        assert clique.wait(C.ESPERA_CLIQUE_MAX_S)
+        assert time.monotonic() - comeco < C.ESPERA_CLIQUE_MAX_S
+        assert not any(e.is_set() for e in saidas[:FX.SIMULTANEOS])      # e os 4 seguem esperando a vez deles
+        parado[0] += 61                                         # o minuto andou: os 4 passam
+        assert all(e.wait(5) for e in saidas)
+        # a reserva já contou cada um na janela: o envio dentro dela não conta de novo (4, não 8)
+        assert C.estado()["ultimo_minuto"] == {"todos": 4, "fundo": 4}
+    finally:
+        if not all(e.is_set() for e in saidas):
+            parado[0] += 61                                     # o teste que falhou no meio solta quem ficou esperando
+        for t in threads:
+            t.join(5)
+    for i in range(FX.SIMULTANEOS):
+        lin = _linha(f"fundo:laco-{i}", "work_orders")
+        assert (lin["pedidos_qtd"], lin["esperas_qtd"]) == (1, 1)            # contado uma vez, com a espera
+    assert _linha("/t/campo/aprovacao", "work_orders")["esperas_qtd"] == 0
+
+
+def test_reserva_so_vale_para_o_fundo_declarado_com_o_gancho(relogio, monkeypatch):
+    s = _sessao(_Fracttal(relogio))
+    # o clique e a thread sem declaração não reservam nada: passam direto (o clique espera no máximo 2 s lá dentro)
+    for origem in ("/t/campo/aprovacao", ""):
+        with C.origem(origem), C.reservar_vez():
+            pass
+    assert C.estado()["ultimo_minuto"] == {"todos": 0, "fundo": 0} and relogio.esperas == []
+    # o fundo declarado reserva: conta na janela já na reserva, e o 1º pedido dentro dela não conta de novo
+    with C.origem("fundo:laco"), C.reservar_vez():
+        assert C.estado()["ultimo_minuto"] == {"todos": 1, "fundo": 1}
+        assert s.get(_API).status_code == 200
+        assert C.estado()["ultimo_minuto"] == {"todos": 1, "fundo": 1}
+        assert s.get(_API).status_code == 200                   # o 2º pedido do bloco já não tem reserva: conta
+    assert C.estado()["ultimo_minuto"] == {"todos": 2, "fundo": 2}
+    assert _linha("fundo:laco")["pedidos_qtd"] == 2
+    # a reserva que sobrou (o pedido nem saiu) morre no fim do bloco: o pedido seguinte espera e conta como sempre
+    with C.origem("fundo:laco"):
+        with C.reservar_vez():
+            pass
+        assert s.get(_API).status_code == 200
+    assert C.estado()["ultimo_minuto"] == {"todos": 4, "fundo": 4}
+    # sem o gancho (o PC, os testes): a reserva não espera nem conta, nem com o fundo cheio
+    _pedir(s, "fundo:laco", 86)                                 # 90 de fundo
+    monkeypatch.setattr(requests.sessions.Session, "send", requests.sessions.Session.send.__wrapped__)
+    with C.origem("fundo:laco"), C.reservar_vez():
+        pass
+    assert relogio.esperas == [] and C.estado()["ultimo_minuto"] == {"todos": 90, "fundo": 90}

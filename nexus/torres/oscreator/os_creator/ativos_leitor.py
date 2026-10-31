@@ -749,7 +749,11 @@ def ligar(app) -> None:
     _ESTADO.update(ligado=True, motivo="", credencial=cred.onde)
     ativos_central.ligar_leitor(pedir_novos=pedir_novos, esperar_novos=esperar_novos, estado=estado)
     if not app.config.get("TESTING"):
-        threading.Thread(target=_laco, name="nexus-ativos-leitor", daemon=True).start()
+        # o laço (a noite e os novos das :08 e :38) declara o fundo: o teto de 90 do porteiro. Os novos que o botão pede
+        # (`nexus-ativos-novos`) seguem clique: quem clicou espera por eles (`esperar_novos`)
+        from nexus.casca import fracttal_conta
+        threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-ativos-leitor", _laco), name="nexus-ativos-leitor",
+                         daemon=True).start()
 
 
 def estado() -> dict:

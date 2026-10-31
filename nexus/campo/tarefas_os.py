@@ -436,5 +436,7 @@ def ligar(app):
                 _LACO["quando"] = datetime.now(_BRT).isoformat(timespec="minutes")
             espera = _espera_s(desencontro_s=desencontro)
 
-    _LACO["thread"] = threading.Thread(target=laco, name="nexus-tarefas-os-banco", daemon=True)
+    from ..casca import fracttal_conta              # o laço declara o fundo: só o declarado tem o teto de 90 do porteiro
+    _LACO["thread"] = threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-tarefas-os-banco", laco),
+                                       name="nexus-tarefas-os-banco", daemon=True)
     _LACO["thread"].start()

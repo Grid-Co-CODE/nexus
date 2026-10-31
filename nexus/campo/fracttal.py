@@ -91,6 +91,7 @@ def ler(path: str, method: str = "GET", body=None):
     if _FORNECEDOR is not None:
         return _FORNECEDOR(path)
     import requests
+    from ..casca import fracttal_conta
     token = _token()
     esperas = () if has_request_context() else ESPERAS_RECUSA_S
     for tentativa in range(len(esperas) + 1):
@@ -99,7 +100,10 @@ def ler(path: str, method: str = "GET", body=None):
             if espera > 0:
                 time.sleep(espera)
             _ULTIMO[0] = time.time()
-        with _VAGAS:
+        # o fundo declarado espera a vez no porteiro do Nexus ANTES de pegar uma das 4 vagas (31/10/2026): parado lá dentro
+        # com a vaga na mão (a 1ª versão do porteiro), 4 leitores de fundo seguravam o clique que lê por aqui; o clique
+        # passa direto (casca/CLAUDE.md)
+        with fracttal_conta.reservar_vez(), _VAGAS:
             r = requests.get(f"{BASE}/api/{path.lstrip('/')}", timeout=30,
                              headers={"Authorization": "Bearer " + token, "Accept": "application/json"})
         if r.status_code not in (406, 429):

@@ -326,13 +326,24 @@ memória, sem mudar quem pede. O resto da internet passa sem contar (`notfractta
   processo ao Fracttal (RPC e REST, toda origem) entra numa conta deslizante de 60 s, contado na hora em que sai: **o
   Nexus até 150 por minuto** (`TETO_POR_MINUTO`: sobram 50 dos 200 para o App de Campo e os robôs) e **o fundo até 90**
   (`TETO_FUNDO_POR_MINUTO`). Outro domínio não passa por ele.
-  - **Clique ou fundo, pela origem:** fundo é a origem `fundo:` (os laços e a thread sem marca); todo o resto é clique, a
-    rota do pedido, inclusive o que a tela pede sozinha (`X-Nexus-Auto`).
+  - **Clique ou fundo: só a origem DECLARADA é fundo.** Fundo é a `fundo:` que o laço declara: `origem("fundo:...")` ou,
+    no alvo da thread, `de_fundo("fundo:<a thread>", fn)` (a declaração vale só dentro de `fn`). Todo o resto é clique: a
+    rota do pedido, inclusive o que a tela pede sozinha (`X-Nexus-Auto`), e a thread sem declaração (a tarefa do pool
+    comum, a thread aberta à mão por uma tela), que leva ao fato o nome de sempre, `fundo:<thread>` (`_Marca.declarada`).
+    O caso que criou a regra (a revisão da 1ª versão do porteiro, 31/10/2026, antes de ir ao ar): como fundo, a pessoa
+    esperaria a vez do fundo, sem limite, no card do OS Creator (o detalhe lido por trás, `os-web-preparo`) e na
+    Aprovação (as páginas da fila num pool).
   - **O clique nunca é recusado:** com 150 no último minuto, espera até 2 s (`ESPERA_CLIQUE_MAX_S`, medidos no relógio
     monotônico) e segue assim mesmo. Nenhuma thread do waitress fica presa no porteiro.
   - **O fundo espera a vez, sem limite:** passa só com menos de 90 de fundo E menos de 150 no total, e cede a vaga ao
     clique que estiver esperando. A leitura dele segue em curso (é só um pedido mais lento; o `timeout` do requests nem
     começa, porque a espera é antes do adaptador).
+  - **Quem segura um recurso enquanto pede tira a vez antes** (`reservar_vez()`): no `campo/fracttal.py`,
+    `with fracttal_conta.reservar_vez(), _VAGAS:`. O fundo declarado espera a vez ali, sem uma das 4 vagas na mão, e já
+    entra na janela; o 1º pedido dele dentro do bloco não espera nem conta de novo (a hora e a espera vão à linha dele).
+    Na 1ª versão do porteiro, 4 leitores de fundo parados nele seguravam as 4 vagas, e o clique que lê pelo mesmo
+    arquivo esperava por eles. O clique, a thread sem declaração e o processo sem o gancho passam direto; a reserva que
+    sobrou morre no fim do bloco.
   - **Ninguém dorme segurando a trava:** a espera é na `Condition` da trava (`_esperar`), no máximo 1 s por vez
     (`PASSO_DA_ESPERA_S`) e conferindo de novo; o clique que sai acorda o fundo que cedeu a vaga a ele. O relógio de
     parede que volta (o NTP) não prende a janela: o que ficou "no futuro" passa a ser de agora.
@@ -340,18 +351,28 @@ memória, sem mudar quem pede. O resto da internet passa sem contar (`notfractta
   - **As esperas:** o pedido que esperou soma `esperas_qtd` na linha dele, na hora em que SAIU; a coluna vai ao banco no
     fim das duas abas do Fracttal (`nexus/dados/CLAUDE.md`), e o Raio-X a mostra por dia e por hora (seção "Uso do OS
     Creator"). `estado()` diz o que saiu no último minuto, quem espera agora e as esperas de cada hora guardada, de
-    clique e de fundo.
-  - **Trabalho que um clique espera não pode correr como fundo.** A tarefa de um `ThreadPoolExecutor` comum ou de uma
-    thread aberta à mão começa sem a marca do pedido e vira `fundo:<thread>`, que espera a vez sem limite: se o pedido
-    espera o resultado dela, o clique espera junto. Copie o contexto (`api._ExecutorComContexto`) ou ponha a origem da
-    rota dentro da tarefa. Casos conhecidos em 31/10/2026, a resolver por quem cuida de cada um: as páginas da fila da
-    Aprovação (`campo/regras_app._fx_wo_paralelo`, cópia fiel do App), o detalhe do card que o OS Creator lê por trás
-    (`os-web-preparo`; o `preparado` espera até 45 s) e as 4 vagas do `campo/fracttal.py` (`_VAGAS`), que o pedido segura
-    enquanto espera a vez: o fundo parado no porteiro ocupa a vaga de um clique.
+    clique e de fundo como o porteiro as tratou (no fato, o nome `fundo:<thread>` não diz se a thread se declarou).
+  - **Os laços do servidor que pedem ao Fracttal declaram o fundo** (31/10/2026), no ALVO da thread deles e com o nome que
+    o fato já mostrava: `fundo:nexus-os-leitor:<faixa>` (o `os_leitor`, que já declarava, por `origem`),
+    `fundo:nexus-ativos-leitor` (o laço da noite e dos novos das :08 e :38), `fundo:nexus-tarefas-os-banco`,
+    `fundo:nexus-chamados-banco`, `fundo:nexus-fila-fracttal` (a releitura da Aprovação por trás),
+    `fundo:nexus-ronda-checklist` (no `pedir_releitura`, não no `em_segundo_plano`, que também abre as fotos da ronda),
+    `fundo:nexus-os-falhas`, `fundo:nexus-os-equipe` e `fundo:nexus-etm` (só a thread por trás: com `esperar=True` a
+    releitura roda na thread do clique e segue clique). A zeladoria, as normalizações, a carga, os responsáveis e os
+    relatórios do PCM não pedem ao Fracttal na thread deles (a zeladoria pede as releituras acima). **Laço novo que pede
+    ao Fracttal declara o fundo do mesmo jeito**, senão ele é clique: sem o teto de 90 e na frente do fundo.
+  - **O que segue clique sem ser clique, de propósito (31/10/2026):** a cópia do catálogo de ativos que o OS Creator baixa
+    por trás (`os-catalogo-por-tras`, no `api.py` do clone) leva a cópia do contexto do pedido, então conta como a rota
+    que a pediu: o clone não importa o nexus para se declarar, e o teto de 150 do Nexus já a segura. Também as páginas da
+    releitura da Aprovação, num pool comum do `campo/regras_app._fx_wo_paralelo` (cópia fiel do App, não se mexe: só o
+    1º pedido, o do total, sai na thread declarada), e os novos de ativos que o botão pede (`nexus-ativos-novos`: quem
+    clicou espera por eles). Todos ficam no teto de 150. Fora da conta e do porteiro, como o PC e o App de Campo: a
+    geração do PCM, que roda o motor num processo à parte (`pcm/geracao._executar`, `subprocess`).
 - **Prova:** `tests/test_casca_fracttal_conta.py` (o adaptador falso numa `requests.Session` de verdade, sem rede;
   mutações no gancho pegas uma a uma) e `tests/test_casca_porteiro.py` (o relógio na mão, e a espera anda o relógio em
-  vez de dormir: um minuto de espera leva um instante; dois testes com threads e a `Condition` de verdade; as onze
-  mutações do porteiro pegas uma a uma).
+  vez de dormir: um minuto de espera leva um instante; os testes com threads e a `Condition` de verdade, inclusive o
+  clique pelo `campo/fracttal.py` com 4 fundos parados no porteiro; a lista dos laços que declaram; as 23 mutações do
+  porteiro pegas uma a uma).
 
 ## Uso das telas do OS Creator por hora (31/10/2026)
 

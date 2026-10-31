@@ -37,13 +37,19 @@ porteiro. O porteiro (abaixo) vive no mesmo embrulho, por isso o embrulho mora a
 fracasso, mesmo com tudo funcionando. Todo pedido do processo ao Fracttal entra numa conta deslizante de 60 s (`JANELA_S`),
 contado na hora em que sai, dentro deste embrulho:
 - **Teto do Nexus: 150 por minuto** (`TETO_POR_MINUTO`): sobram 50 dos 200 para o App de Campo e os robôs. **O fundo, até
-  90** (`TETO_FUNDO_POR_MINUTO`): fundo é a origem `fundo:` (os laços, e a thread sem marca); os outros 60 são de quem clica.
-- **Quem clica nunca é recusado:** clique é toda origem que não é `fundo:` (a rota do pedido, inclusive o que a tela pede
-  sozinha, com o `X-Nexus-Auto`). Com o minuto cheio ele espera até 2 s (`ESPERA_CLIQUE_MAX_S`) e segue: nenhuma thread do
-  waitress fica presa aqui.
+  90** (`TETO_FUNDO_POR_MINUTO`); os outros 60 são de quem clica.
+- **Fundo é só a origem `fundo:` DECLARADA** (`origem(...)` ou, no alvo da thread do laço, `de_fundo(...)`). A marca que o
+  contador infere do nome da thread (o pool comum, a thread aberta à mão por uma tela) leva ao fato o nome de sempre,
+  `fundo:<thread>`, e o porteiro a trata como clique: o card do OS Creator espera o detalhe lido por trás (`os-web-preparo`)
+  e a Aprovação espera as páginas do pool, e como fundo a pessoa esperaria a vez dele, sem limite.
+- **Quem clica nunca é recusado:** clique é toda origem que não é fundo declarado (a rota do pedido, inclusive o que a tela
+  pede sozinha, com o `X-Nexus-Auto`). Com o minuto cheio ele espera até 2 s (`ESPERA_CLIQUE_MAX_S`) e segue: nenhuma
+  thread do waitress fica presa aqui.
 - **O fundo espera a vez, sem limite:** passa com menos de 90 de fundo E menos de 150 no total nos últimos 60 s, e cede a
   vaga ao clique que estiver esperando. A leitura dele continua em curso enquanto espera: para quem lê, é só um pedido mais
-  lento (o `timeout` do requests nem começa a contar: a espera é antes do adaptador).
+  lento (o `timeout` do requests nem começa a contar: a espera é antes do adaptador). Quem segura um recurso enquanto pede
+  (as 4 vagas do `campo/fracttal.py`) tira a vez ANTES (`reservar_vez`): o fundo parado no porteiro não segura a vaga de
+  um clique.
 - **Ninguém dorme segurando a trava:** a espera é na `threading.Condition` da trava (`_esperar`), com tempo, no máximo
   `PASSO_DA_ESPERA_S` por vez e conferindo de novo; um fundo esperando nunca atrasa um clique.
 - **A conta é deste processo:** o PC (que não liga o gancho) e o App de Campo ficam fora dela; os 50 de folga são deles.
@@ -99,27 +105,40 @@ _esperando = {"clique": 0, "fundo": 0}  # quantos esperam a vez agora (o fundo c
 
 
 class _Marca:
-    """Quem está pedindo: o nome da origem e quantos pedidos ao Fracttal ela já fez (a conta do pedido em curso)."""
-    __slots__ = ("nome", "pedidos")
+    """Quem está pedindo: o nome da origem, se ela foi DECLARADA (por `origem`/`de_fundo`; a que o contador infere do nome
+    da thread não foi: para o porteiro, só a `fundo:` declarada é fundo) e quantos pedidos ao Fracttal ela já fez (a conta
+    do pedido em curso)."""
+    __slots__ = ("nome", "pedidos", "declarada")
 
-    def __init__(self, nome: str):
-        self.nome, self.pedidos = nome, 0
+    def __init__(self, nome: str, declarada: bool = False):
+        self.nome, self.pedidos, self.declarada = nome, 0, declarada
+
+
+class _Reserva:
+    """A vez que o fundo declarado tirou antes do pedido (`reservar_vez`): de quem é, se esperou e se o pedido já a usou."""
+    __slots__ = ("marca", "esperou", "usada")
+
+    def __init__(self, marca: _Marca, esperou: bool):
+        self.marca, self.esperou, self.usada = marca, esperou, False
 
 
 # O objeto é COMPARTILHADO entre os contextos copiados (a cópia leva a referência): as tarefas do fan-out somam na
 # mesma conta. Sem marca no contexto, o 1º pedido cria a do fundo, com o nome da thread.
 _marca_atual: contextvars.ContextVar = contextvars.ContextVar("nexus_fracttal_marca", default=None)
+_reserva: contextvars.ContextVar = contextvars.ContextVar("nexus_fracttal_reserva", default=None)
 
 
 class _Hora:
     """Uma hora de Brasília: uma linha [pedidos, recusas, erros, pico, esperas] por (origem, método), as origens de fundo
-    que ela já tem (no máximo MAX_ORIGENS_DE_FUNDO; a rota não entra aqui) e o pico do total."""
-    __slots__ = ("linhas", "fundos", "pico")
+    que ela já tem (no máximo MAX_ORIGENS_DE_FUNDO; a rota não entra aqui), o pico do total e as esperas da hora como o
+    porteiro as tratou, de clique e de fundo (o nome `fundo:<thread>` no fato não diz: a thread sem declaração é clique)."""
+    __slots__ = ("linhas", "fundos", "pico", "esperas_clique", "esperas_fundo")
 
     def __init__(self):
         self.linhas: dict = {}
         self.fundos: set = set()
         self.pico = 0
+        self.esperas_clique = self.esperas_fundo = 0
 
 
 def _nome_de_fundo(nome: str) -> str:
@@ -189,6 +208,20 @@ def _metodo(request) -> str | None:
 
 
 # ── o porteiro ───────────────────────────────────────────────────────────────────────────────────────────────────────
+def _e_fundo(marca: _Marca) -> bool:
+    """Para o porteiro, fundo é só a origem `fundo:` DECLARADA (o laço que se declara: `origem`, `de_fundo`). A marca que o
+    contador infere do nome da thread (o pool comum, a thread aberta à mão) é clique. A revisão da 1ª versão do porteiro
+    (31/10/2026, antes de ir ao ar) achou o card do OS Creator, que espera até 45 s o detalhe lido por trás
+    (`os-web-preparo`), e a Aprovação, que espera as páginas do pool: como fundo, a pessoa esperaria a vez do fundo, sem
+    limite. O nome que vai ao fato não muda."""
+    return marca.declarada and marca.nome.startswith(FUNDO)
+
+
+def _ligado() -> bool:
+    """O gancho está no `Session.send` deste processo (só o servidor liga): sem ele não há porteiro."""
+    return bool(getattr(requests.sessions.Session.send, _EMBRULHO, False))
+
+
 def _podar(agora: float) -> None:
     """Com a trava na mão: tira da janela o que saiu há 60 s ou mais. Se o relógio de parede voltou (o NTP acertou para
     trás), o que ficou "no futuro" passa a ser de agora: segue contando, e a janela não fica presa num minuto que não acaba."""
@@ -248,14 +281,19 @@ def _vez_de(fundo: bool) -> tuple:
 # ── a conta ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 def _registrar(marca: _Marca, metodo: str) -> tuple:
     """Espera a vez no porteiro e soma o pedido na hora e no minuto em que ele sai; devolve onde somou, para a resposta
-    fechar a conta."""
+    fechar a conta. O pedido com a vez já reservada (`reservar_vez`) não espera nem entra na janela de novo."""
     with _trava:
-        fundo = marca.nome.startswith(FUNDO)
-        # pode soltar a trava enquanto espera (a Condition) e volta com ela na mão; dali até somar, ninguém mais entra
-        esperou, agora = _vez_de(fundo)
-        _janela.append(agora)                           # no mesmo passo da vez: duas threads nunca pegam a mesma vaga
-        if fundo:
-            _janela_fundo.append(agora)
+        fundo = _e_fundo(marca)
+        reserva = _reserva.get()
+        if reserva is not None and reserva.marca is marca and not reserva.usada:
+            reserva.usada = True                        # a vez foi tirada antes da vaga do `campo/fracttal.py`, e já contou
+            esperou, agora = reserva.esperou, _agora()
+        else:
+            # pode soltar a trava enquanto espera (a Condition) e volta com ela na mão; dali até somar, ninguém mais entra
+            esperou, agora = _vez_de(fundo)
+            _janela.append(agora)                       # no mesmo passo da vez: duas threads nunca pegam a mesma vaga
+            if fundo:
+                _janela_fundo.append(agora)
         hora_id = hora_id_de(agora)                     # dentro da trava: a ordem das horas é a ordem dos pedidos
         hora = _horas.get(hora_id)
         if hora is None:
@@ -271,6 +309,10 @@ def _registrar(marca: _Marca, metodo: str) -> tuple:
         linha[_PEDIDOS] += 1
         if esperou:
             linha[_ESPERAS] += 1                        # na hora em que saiu, junto com o pedido
+            if fundo:
+                hora.esperas_fundo += 1
+            else:
+                hora.esperas_clique += 1
         minuto = int(agora // 60)                       # o fuso é de horas inteiras: o minuto nunca racha uma hora
         if _minuto["id"] != minuto:
             _minuto.update(id=minuto, total=0, chaves={})
@@ -290,7 +332,7 @@ def _abrir(request) -> tuple | None:
         if metodo is None:
             return None
         marca = _marca_atual.get()
-        if marca is None:                               # sem `origem`: é o fundo, com o nome da thread
+        if marca is None:                               # sem `origem`: o nome da thread, inferido (o porteiro: clique)
             marca = _Marca(_origem_de_fundo())
             _marca_atual.set(marca)
         return _registrar(marca, metodo)
@@ -351,16 +393,62 @@ def ligar() -> None:
 # ── quem pediu ───────────────────────────────────────────────────────────────────────────────────────────────────────
 @contextmanager
 def origem(nome: str):
-    """Marca esta thread: o que ela pedir ao Fracttal dentro do bloco é de `nome` (a rota do pedido, ou `fundo:<nome>`).
-    Sem marca, a origem é `fundo:<nome da thread sem o contador de instância>`. A marca vai no contexto: as tarefas que
-    copiam o contexto (o `api._ExecutorComContexto`) herdam; a thread aberta à mão e a tarefa do `ThreadPoolExecutor`
-    comum começam sem contexto e não (ponha o `origem` dentro da tarefa). Ao sair, volta a de antes."""
+    """Marca esta thread: o que ela pedir ao Fracttal dentro do bloco é de `nome` (a rota do pedido, ou `fundo:<nome>`), e a
+    marca é DECLARADA: a `fundo:` declarada é o fundo do porteiro. Sem marca (ou com o nome vazio), a origem é inferida,
+    `fundo:<nome da thread sem o contador de instância>`, e o porteiro a trata como clique. A marca vai no contexto: as
+    tarefas que copiam o contexto (o `api._ExecutorComContexto`) herdam; a thread aberta à mão e a tarefa do
+    `ThreadPoolExecutor` comum começam sem contexto e não (ponha o `origem` dentro da tarefa, ou o `de_fundo` no alvo da
+    thread). Ao sair, volta a de antes."""
     antes = _marca_atual.get()
-    _marca_atual.set(_Marca(nome or _origem_de_fundo()))
+    _marca_atual.set(_Marca(nome or _origem_de_fundo(), declarada=bool(nome)))
     try:
         yield
     finally:
         _marca_atual.set(antes)
+
+
+def de_fundo(nome: str, fn):
+    """`fn` rodando com a origem de fundo DECLARADA `nome`, para o ALVO da thread de um laço do servidor ou de uma releitura
+    por trás: `threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-tarefas-os-banco", laco), ...)`, numa linha. A
+    declaração vale só dentro de `fn` (sai junto com ela) e mantém o nome que o fato já mostrava, o da thread. Nunca na
+    função que um clique também roda na hora (a releitura da Engenharia com `esperar=True` roda na thread do pedido): ali o
+    clique passaria a esperar a vez do fundo."""
+    if not str(nome).startswith(FUNDO):
+        raise ValueError(f"a origem de fundo começa com {FUNDO!r}: {nome!r}")
+
+    @functools.wraps(fn)
+    def declarado(*args, **kwargs):
+        with origem(nome):
+            return fn(*args, **kwargs)
+    return declarado
+
+
+@contextmanager
+def reservar_vez():
+    """A vez no porteiro tirada ANTES do pedido, para quem segura um recurso enquanto pede ao Fracttal: as 4 vagas do
+    `campo/fracttal.py` (`with fracttal_conta.reservar_vez(), _VAGAS:`). Na 1ª versão do porteiro (31/10/2026, antes de ir
+    ao ar), 4 leitores de fundo parados no porteiro seguravam as 4 vagas, e o clique que lê pelo mesmo `campo/fracttal.py`
+    esperava por eles, sem limite. O fundo declarado espera a vez aqui, sem a vaga na mão, e já entra na janela; o 1º
+    pedido dele dentro do bloco honra a reserva (não espera nem conta de novo na janela; a hora e a espera vão à linha
+    dele, como sempre). O clique, a thread sem declaração e o processo sem o gancho (o PC, os testes) passam direto: o
+    clique espera no máximo 2 s lá dentro, como sempre. A reserva que sobrou (o pedido que nem saiu) morre no fim do bloco.
+    Nunca levanta: com o porteiro quebrado, segue sem reserva."""
+    reserva = None
+    try:
+        marca = _marca_atual.get()
+        if marca is not None and _e_fundo(marca) and _ligado():
+            with _trava:
+                esperou, agora = _vez_de(True)
+                _janela.append(agora)
+                _janela_fundo.append(agora)
+            reserva = _Reserva(marca, esperou)
+    except Exception:                                   # noqa: BLE001 - o porteiro não derruba o pedido de ninguém
+        log.debug("porteiro do Fracttal: não consegui reservar a vez", exc_info=True)
+    token = _reserva.set(reserva)
+    try:
+        yield
+    finally:
+        _reserva.reset(token)
 
 
 def pedidos_desta_thread() -> int:
@@ -410,20 +498,14 @@ def estado() -> dict:
     """O porteiro agora, só contagens: se o gancho está ligado neste processo (só o servidor liga), os tetos, quantos
     pedidos saíram nos últimos 60 s (`ultimo_minuto`: todos e os do fundo), quantos esperam a vez neste instante
     (`esperando`: clique e fundo) e as esperas de cada hora que o contador ainda guarda (`esperas_por_hora`, da mais antiga
-    à mais nova: a aberta e a que o laço do :05 ainda não tirou), de clique e de fundo. Somadas por hora, são as mesmas
-    que vão ao banco por linha, como `esperas_qtd`."""
+    à mais nova: a aberta e a que o laço do :05 ainda não tirou), de clique e de fundo como o porteiro as tratou (a thread
+    sem declaração é clique, mesmo com o nome `fundo:<thread>` no fato). Somadas por hora, são as mesmas que vão ao banco
+    por linha, como `esperas_qtd`."""
     with _trava:
         _podar(_agora())
-        horas = []
-        for hora_id in sorted(_horas):
-            clique = fundo = 0
-            for (quem, _metodo), v in _horas[hora_id].linhas.items():
-                if quem.startswith(FUNDO):              # o balaio `fundo:outros` também é fundo
-                    fundo += v[_ESPERAS]
-                else:
-                    clique += v[_ESPERAS]
-            horas.append({"hora_id": hora_id, "clique": clique, "fundo": fundo})
-        return {"ligado": bool(getattr(requests.sessions.Session.send, _EMBRULHO, False)),
+        horas = [{"hora_id": h, "clique": _horas[h].esperas_clique, "fundo": _horas[h].esperas_fundo}
+                 for h in sorted(_horas)]
+        return {"ligado": _ligado(),
                 "teto_por_minuto": TETO_POR_MINUTO, "teto_fundo_por_minuto": TETO_FUNDO_POR_MINUTO,
                 "espera_clique_max_s": ESPERA_CLIQUE_MAX_S,
                 "ultimo_minuto": {"todos": len(_janela), "fundo": len(_janela_fundo)},

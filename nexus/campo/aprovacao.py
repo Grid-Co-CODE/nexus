@@ -129,7 +129,8 @@ def _pedir_releitura():
             return
         _ESTADO["lendo"] = True
     app = current_app._get_current_object() if has_app_context() else None
-    em_segundo_plano(lambda: _reler(app))
+    from ..casca import fracttal_conta              # a releitura por trás declara o fundo (o teto de 90 do porteiro)
+    em_segundo_plano(fracttal_conta.de_fundo("fundo:nexus-fila-fracttal", lambda: _reler(app)))
 
 
 def estado() -> dict:
@@ -205,7 +206,9 @@ def aquecer(app):
         if _ESTADO["lendo"]:
             return
         _ESTADO["lendo"] = True
-    threading.Thread(target=lambda: _reler(app), daemon=True, name="nexus-fila-fracttal").start()
+    from ..casca import fracttal_conta              # a releitura por trás declara o fundo (o teto de 90 do porteiro)
+    threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-fila-fracttal", lambda: _reler(app)), daemon=True,
+                     name="nexus-fila-fracttal").start()
 
 
 def _preparar(app):
