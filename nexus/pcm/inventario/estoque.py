@@ -280,8 +280,10 @@ class Estoque(abc.ABC):
         saldo nem gera movimento."""
 
     @abc.abstractmethod
-    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE") -> str:
-        """Cria a peça (tipo 4) no catálogo do Fracttal. Devolve o id do item."""
+    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "") -> str:
+        """Cria a peça (tipo 4) no catálogo do Fracttal. Devolve o id do item. `descricao` vai no `description` do
+        `item_insert` (o campo que a tela do passo 0 manda vazio; 30/10/2026, para o fabricante, o modelo e a série da peça
+        achada fora do catálogo, Task 8); sem ela, vazio, como antes."""
 
     @abc.abstractmethod
     def codigos(self, sigla: str) -> list[str]:
@@ -561,14 +563,14 @@ class EstoqueFracttal(Estoque):
             raise ErroFracttal(f"a unidade {nome!r} não existe no Fracttal", UNIDADES)
         return achada
 
-    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE") -> str:
-        codigo, nome = str(codigo or "").strip(), str(nome or "").strip()
+    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "") -> str:
+        codigo, nome, descricao = str(codigo or "").strip(), str(nome or "").strip(), str(descricao or "").strip()
         if not codigo or not nome:
             raise ValueError("a peça precisa de código e de nome")
         id_unit, descricao_da_unidade = self._unidade(unidade)
         r = self._rpc(CRIAR, {
             "id_type_item": TIPO_PECA, "field_1": nome, "code": codigo, "id_unit": id_unit,
-            "units_description": descricao_da_unidade, "active": True, "description": "", "is_serial_control": False,
+            "units_description": descricao_da_unidade, "active": True, "description": descricao, "is_serial_control": False,
             "is_lot_control": False, "visible_to_all": False, "ids_batch": [], "associate_warehouses": [],
             "associate_third_parties": [], "attached": [], "files": [], "custom_fields": []})
         return self._id_do_dado(r, CRIAR)

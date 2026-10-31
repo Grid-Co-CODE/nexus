@@ -775,12 +775,59 @@ def test_recontagem_parcial_sai_do_gravar(app, inv, falso, monkeypatch):
     ({"acao": PARCIAL, "itens": ["L8"], "motivo": "x"}, 400),                 # nem pela linha dele
     ({"acao": PARCIAL, "itens": [None], "motivo": "x"}, 400),
     ({"acao": PARCIAL, "itens": ["501", "507"], "motivo": "x"}, 409),         # o genérico por identificar: decide a curadoria
+    ({"acao": PARCIAL, "itens": ["501"] * 11, "motivo": "x"}, 400),           # mais peças que as 10 linhas da contagem
 ])
 def test_recontagem_parcial_recusa_o_que_nao_vale(app, inv, falso, monkeypatch, corpo, status):
     _cenario(inv)
     r = _revisar(_pcm(app, monkeypatch), corpo)
     assert r.status_code == status and r.get_json()["ok"] is False and r.get_json()["erro"], r.get_json()
     assert _eventos(app) == []
+
+
+def test_recontagem_parcial_marca_a_em_branco_e_a_que_bate(app, inv, falso, monkeypatch):
+    """A em branco (505) e a que bate com o sistema (504) também se marcam (recontar o duvidoso inclui o que ninguém contou e o
+    que parece certo), e o servidor aceita as duas."""
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    tabela = _lote(c).get_data(as_text=True).split('id="inv-lote-f"')[1].split("</table>")[0]
+    assert {"504", "505"} <= set(re.findall(r'data-marcar="(\d+)"', tabela))
+    r = _revisar(c, {"acao": PARCIAL, "itens": ["504", "505"], "motivo": "conferir"})
+    assert r.status_code == 200 and r.get_json()["n"] == 2, r.get_json()
+    assert [e["id_item"] for e in _eventos(app)] == ["504", "505"]
+
+
+def test_o_marcar_todas_acompanha_cada_filtragem():
+    """O "marcar todas" se refaz no evento "filtro-local" que o filtro-local.js manda depois de CADA filtragem (a busca, o
+    filtro e o "Limpar"), e não num tempo depois da digitação: o "Limpar" não é digitação, e deixava o estado velho."""
+    pagina = (RAIZ / "nexus" / "templates" / "pcm" / "inventario_contagem.html").read_text("utf-8")
+    assert "addEventListener('filtro-local'" in pagina and "f.id === 'inv-lote-f'" in pagina
+    assert "setTimeout(contar" not in pagina
+    assert 'dispatchEvent(new CustomEvent("filtro-local"' in (RAIZ / "nexus" / "static" / "filtro-local.js").read_text("utf-8")
+
+
+def test_avariados_na_aprovacao(app, inv, falso, monkeypatch):
+    """A aba Avariados do App (30/10/2026, item 5): a avariada da 501 com a SP-501-AV no catálogo conta nela; contada também
+    direto, é "contado em dobro" (fora do lote até o PCM corrigir, com o botão de corrigir); a avariada da 502, sem o -AV no
+    catálogo, fica na curadoria como "avariada sem cadastro", com o -AV que falta."""
+    _cenario(inv)
+    _aba(inv, A.LIVRO_ITENS, A.ABA_ITENS, [
+        {"ID do item": i, "Código": cod, "Nome": nome, "Unidade": "UNIDADE", "Família": "Teste", "Avariado": "Não",
+         "Ferramenta": "Não", "Início do ciclo": "x", "Lido": "Sim"}
+        for i, cod, nome in (("501", "SP-501", "Fusível 10A"), ("502", "SP-502", "Cabo 6 mm"),
+                             ("591", "SP-501-AV", "[AVARIADO] Fusível 10A"))])
+    _publicar(inv, _linha("C-1", "L1", "501", "12"), _linha("C-1", "L2", "591", "1"),
+              _linha("C-1", "L3", "501", "2", tipo="avariado"), _linha("C-1", "L4", "502", "3", tipo="avariado"))
+    c = _pcm(app, monkeypatch)
+    html = _lote(c).get_data(as_text=True)
+    l591 = re.search(r'<tr[^>]*data-item="591".*?</tr>', html, re.S).group(0)
+    assert "contado em dobro: o -AV veio direto e pela aba Avariados" in l591 and "inválido" not in l591
+    assert 'data-rev="corrigir" data-item="591"' in html
+    assert "Avariada sem cadastro: SP-502-AV" in html and "Fora do catálogo" not in html
+    # corrigido, entra no lote com a nota de onde veio
+    assert _revisar(c, {"acao": "corrigir", "id_item": "591", "valor": "3", "motivo": "a mesma caixa"}).status_code == 200
+    html = _lote(c).get_data(as_text=True)
+    l591 = re.search(r'<tr[^>]*data-item="591".*?</tr>', html, re.S).group(0)
+    assert "o -AV veio em dobro (direto e pela aba Avariados); o PCM corrigiu para 3" in l591
 
 
 def test_recontagem_parcial_de_peca_ja_pedida_ou_tirada(app, inv, falso, monkeypatch):

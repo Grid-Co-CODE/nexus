@@ -11,7 +11,7 @@
    acima dos cartões) e o botão "Pedir recontagem das marcadas (N)", que abre o mesmo painel de motivo das outras ações
    (data-rev="recontagem_itens"); o N e o ligar do botão são do script da página. #}
 {% set cob = cobertura %}
-{% set marcar = pode and c.aprovavel and itens|selectattr('marcavel')|list %}
+{% set marcar = itens|selectattr('marcavel')|list %}{# o `marcavel` já traz o `pode` e o `c.aprovavel` (revisao._enriquecer) #}
 <div class="inv-pilha" data-ponte-para="contagem" data-divergentes="{{ cob.diverge }}">
   <section class="inv-card">
     <div class="inv-card-cab"><h3>Cobertura do inventário</h3><span class="inv-selo inv-selo--neutro">{{ cob.pct_contado }}% contado</span></div>

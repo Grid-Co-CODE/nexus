@@ -505,6 +505,130 @@ def test_decisoes_no_formato_das_contas(cur):
     assert CU.decisoes(cur.config, "C-OUTRA") == {}
 
 
+# ── a avariada sem cadastro (30/10/2026, item 5 das melhorias) ───────────────────────────────────────────────────────
+# O técnico lista na aba Avariados do App as unidades avariadas de uma peça BOA; o Nexus as leva ao `<código>-AV`. Quando o
+# -AV não está no catálogo do App, a linha fica `avariado` e vem para cá, com o cadastrar já preenchido.
+AVARIADA = _linha("L-6", tipo="avariado", contado="2", **{"ID do item": "3", "Código": "SP-3"})
+AVARIADA_2 = _linha("L-7", tipo="avariado", contado="1", **{"ID do item": "2", "Código": "SP-2"})
+AVARIADA_SEM_ID = _linha("L-8", tipo="avariado", contado="1")
+
+
+def _o_bom_sem_av(app_):
+    """O catálogo do App com a SP-3 BOA (em metro) e sem a SP-3-AV (no `_semear` o item 3 é a própria SP-3-AV), e a contagem
+    C-1 com as avariadas da SP-3 e da SP-2 (que também não tem -AV). Os mesmos 10 itens, 9 lidos: o ciclo segue inteiro."""
+    from test_pcm_almoxarifado import _item
+    nomes = {1: ("SP-1", "Fusível 10A", "UNIDADE"), 2: ("SP-2", "Cabo 6 mm", "METRO"), 3: ("SP-3", "Cabo solar 4 mm", "METRO"),
+             4: ("SP-4", "Relé de proteção", "UNIDADE")}
+    itens = [_item(i, *nomes.get(i, (f"SP-{i}", f"Peça {i}", "UNIDADE")), "Teste", lido="Não" if i == 4 else "Sim")
+             for i in range(1, 11)]
+    api = app_.extensions["nexus_dados_sessao"]
+    _aba(api, A.LIVRO_ITENS, A.ABA_ITENS, itens)
+    _aba(api, A.LIVRO_CONTAGENS, A.ABA_CONTAGENS, _contagem(PECA_DA_LISTA, CABO, AVARIADA, AVARIADA_2, AVARIADA_SEM_ID))
+    visao.limpar()
+
+
+def _cartao(html, texto):
+    """O <article> da pendência que tem o texto."""
+    return next(a for a in html.split("<article")[1:] if texto in a)
+
+
+def test_avariada_sem_cadastro_na_lista(cur, monkeypatch):
+    """A avariada sem o -AV no catálogo é pendência da curadoria ("avariada sem cadastro"), com o -AV que falta, o nome no
+    padrão dos -AV do catálogo ("[AVARIADO] " + o nome da boa) e a unidade da boa: o cadastrar já vem preenchido, com o código
+    fixo (sem a sigla nem o próximo número). A avariada sem o ID da boa não é de peça nenhuma e não vira pendência."""
+    _o_bom_sem_av(cur)
+    p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
+    assert set(p) == {"L-2", "L-6", "L-7"}
+    a = p["L-6"]
+    assert (a["tipo"], a["contado"], a["id_item"], a["codigo"]) == ("avariado", 2, "3", "SP-3")
+    assert (a["codigo_av"], a["nome_av"], a["unidade_av"]) == ("SP-3-AV", "[AVARIADO] Cabo solar 4 mm", "METRO")
+    assert (p["L-2"]["codigo_av"], p["L-2"]["nome_av"], p["L-2"]["unidade_av"]) == ("", "", "")
+    _no_setor(monkeypatch, "PCM")
+    html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
+    assert "Avariada sem cadastro" in html
+    card = _cartao(html, "SP-3-AV")
+    assert "Avariada sem cadastro" in card and "SP-3" in card
+    assert 'value="[AVARIADO] Cabo solar 4 mm"' in card and '<option value="METRO" selected>' in card
+    assert 'name="sigla"' not in card and "SP-sigla-NNN" not in card            # o código é fixo: nem sigla nem número
+    assert 'action="/os/_nexus/inventario/curadoria/cadastrar"' in card          # pela ponte do login do Fracttal
+    assert 'name="decisao" value="e_a_peca"' in card and 'name="decisao" value="descartar"' in card
+    assert 'name="decisao" value="confirmar"' not in card
+    # o número do alto conta a avariada à parte (nem fora do catálogo nem genérico)
+    tiles = {r: v for v, r in re.findall(r'<b class="inv-tile-v">(\d+)</b><span class="inv-tile-r">([^<]+)</span>', html)}
+    assert tiles == {"Para decidir": "3", "Fora do catálogo": "1", "Genérico a identificar": "0", "Avariada sem cadastro": "2",
+                     "Já decididas": "0"}
+
+
+def test_cadastrar_avariado_usa_o_codigo_av(cur):
+    """Cadastrar a avariada cria no Fracttal a peça de código `SP-3-AV` (nunca um `SP-<sigla>-NNN`: nem lê os códigos da
+    sigla), com o nome no padrão dos -AV e a unidade da boa, depois de conferir que ela ainda não existe (`achar_peca`). A
+    decisão vai ao livro como qualquer cadastro, e as unidades avariadas entram no lote na peça nova. Sem a reserva de código:
+    o código fixo já é a chave da nova tentativa. O nome e a unidade que o PCM corrige valem; a sigla não."""
+    from nexus.cadastro.ligacoes import pasta_dados
+    from nexus.pcm.inventario import leitura as LE
+    _o_bom_sem_av(cur)
+    falso = _falso()
+    r = CU.decidir(cur.config, "C-1", "L-6", "cadastrar", estoque=falso, pessoa=PESSOA)
+    assert (r["decisao"], r["codigo"], r["criada"]) == ("cadastrar", "SP-3-AV", True) and r["id_item"]
+    assert falso._catalogo[r["id_item"]] == {"codigo": "SP-3-AV", "nome": "[AVARIADO] Cabo solar 4 mm", "unidade": "METRO"}
+    assert falso.chamadas == ["achar_peca", "criar_peca"]
+    assert not re.fullmatch(r"SP-[A-Z]{3}-\d{3,}", r["codigo"])
+    assert "SP-3-AV" in r["texto"]
+    d = _livro(cur.config, F.ABA_CURADORIA)
+    assert [(x["chave_linha"], x["decisao"], x["id_item"], x["codigo_criado"]) for x in d] == [
+        ("L-6", "cadastrar", r["id_item"], "SP-3-AV")]
+    assert not list((pasta_dados(cur.config) / "almox_inventario").glob("curadoria_*.json"))
+    c = next(x for x in LE.ler(cur.config)["contagens"] if x["contagem_id"] == "C-1")
+    nova = {i["id_item"]: i for i in C.itens_do_lote(c["linhas"], {}, CU.decisoes(cur.config, "C-1"), {})}[r["id_item"]]
+    assert (nova["codigo"], nova["contado"], nova["ligada"], nova["situacao"]) == ("SP-3-AV", 2.0, False, "para_cima")
+    # o PCM corrige o nome e a unidade; a sigla que viesse não muda o código
+    r2 = CU.decidir(cur.config, "C-1", "L-7", "cadastrar", sigla="CAB", nome="Cabo 6 mm queimado", unidade="unidade",
+                    estoque=falso, pessoa=PESSOA)
+    assert r2["codigo"] == "SP-2-AV"
+    assert falso._catalogo[r2["id_item"]] == {"codigo": "SP-2-AV", "nome": "Cabo 6 mm queimado", "unidade": "UNIDADE"}
+
+
+def test_cadastrar_avariado_que_ja_existe_no_fracttal_liga(cur):
+    """A SP-3-AV já existe no Fracttal (outra contagem a cadastrou, e a varredura do App ainda não a viu): não cria outra. A
+    decisão vai ao livro como "é a peça" com aquele ID, sem código criado; a auditoria guarda o código."""
+    _o_bom_sem_av(cur)
+    falso = EstoqueFalso({"20": {"77": {"saldo": 1, "codigo": "SP-3-AV"}}})
+    r = CU.decidir(cur.config, "C-1", "L-6", "cadastrar", estoque=falso, pessoa=PESSOA)
+    assert (r["decisao"], r["id_item"], r["codigo"], r["criada"]) == ("e_a_peca", "77", "SP-3-AV", False)
+    assert "criar_peca" not in falso.chamadas and "SP-3-AV" in r["texto"]
+    d = _livro(cur.config, F.ABA_CURADORIA)
+    assert [(x["decisao"], x["id_item"], x["codigo_criado"] or "") for x in d] == [("e_a_peca", "77", "")]
+    ev = [e for e in _livro(cur.config, F.ABA_EVENTO) if e["tipo"] == "curadoria"]
+    assert [(e["id_item"], e["codigo"]) for e in ev] == [("77", "SP-3-AV")]
+    assert CU.decisoes(cur.config, "C-1")["L-6"] == {"decisao": "e_a_peca", "id_item": "77", "codigo": ""}
+
+
+def test_cadastrar_avariado_com_resposta_perdida_nao_duplica(cur):
+    """O Fracttal criou a SP-3-AV e a resposta se perdeu: a nova tentativa a acha pelo código fixo e só liga."""
+    _o_bom_sem_av(cur)
+    falso = _falso(perder_resposta={"criar_peca"})
+    with pytest.raises(ConnectionError):
+        CU.decidir(cur.config, "C-1", "L-6", "cadastrar", estoque=falso, pessoa=PESSOA)
+    assert _livro(cur.config, F.ABA_CURADORIA) == []
+    r = CU.decidir(cur.config, "C-1", "L-6", "cadastrar", estoque=falso, pessoa=PESSOA)
+    criada = [i for i, v in falso._catalogo.items() if v["codigo"] == "SP-3-AV"]
+    assert falso.chamadas.count("criar_peca") == 1 and len(criada) == 1
+    assert (r["decisao"], r["id_item"], r["criada"]) == ("e_a_peca", criada[0], False)
+
+
+def test_a_avariada_aceita_so_as_decisoes_dela(cur):
+    """Cadastrar, "é a peça X" e descartar; confirmar é do genérico. "É a peça X" leva as avariadas à peça que o PCM disse."""
+    assert CU.DECISOES_DO_TIPO["avariado"] == ("cadastrar", "e_a_peca", "descartar")
+    _o_bom_sem_av(cur)
+    with pytest.raises(ValueError, match="avariada"):
+        CU.decidir(cur.config, "C-1", "L-6", "confirmar", id_item="1", pessoa=PESSOA)
+    with pytest.raises(ValueError):
+        CU.decidir(cur.config, "C-1", "L-8", "descartar", motivo="x", pessoa=PESSOA)        # sem o ID da boa: não é pendência
+    r = CU.decidir(cur.config, "C-1", "L-6", "e_a_peca", id_item="1", pessoa=PESSOA)
+    assert (r["decisao"], r["id_item"]) == ("e_a_peca", "1") and "avariadas" in r["texto"]
+    assert CU.decidir(cur.config, "C-1", "L-7", "descartar", motivo="não está avariada", pessoa=PESSOA)["decisao"] == "descartar"
+
+
 # ── as telas ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 URL = "/t/pcm/pecas/inventario/curadoria"

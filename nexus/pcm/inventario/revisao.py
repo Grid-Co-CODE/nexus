@@ -54,8 +54,8 @@ GRUPOS = {
     "sem_alteracao": ("Sem alteração", "O contado é igual ao saldo do sistema: nada é gravado."),
     "nao_tocada": ("Não será tocada", "Em branco, com contado inválido, tirada do lote ou em recontagem: nada é gravado, e "
                                       "o saldo do Fracttal fica como está."),
-    "curadoria": ("Curadoria", "O que o PCM ainda decide (o genérico por identificar e a peça fora do catálogo): nada é "
-                               "gravado até decidir."),
+    "curadoria": ("Curadoria", "O que o PCM ainda decide (o genérico por identificar, a peça fora do catálogo e a avariada sem "
+                               "cadastro): nada é gravado até decidir."),
 }
 # a cor de cada situação (o tom do selo, do número do alto e da barra; a palavra vem sempre junto) e o selo do grupo na
 # confirmação (o que acontece no Fracttal). O desenho é o do mockup do Spare Parts (Levi, 27/10/2026): para cima verde, para
@@ -407,7 +407,9 @@ def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, sis
     elif tirada:
         notas.append("tirada do lote" + (f": {motivo_tirada}" if motivo_tirada else ""))
     elif i["invalido"] and not i["corrigido"] and sit != "curadoria":
-        notas.append("contado inválido (negativo): a peça não será gravada")
+        # o -AV contado direto e pela aba Avariados (30/10/2026) segue o caminho do contado inválido: o PCM corrige o número
+        notas.append("contado em dobro: o -AV veio direto e pela aba Avariados" if i.get("dobro")
+                     else "contado inválido (negativo): a peça não será gravada")
     elif sit == "nao_tocada":
         notas.append("em branco: o técnico não contou")
     if i["corrigido"]:
@@ -417,7 +419,8 @@ def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, sis
             notas.append("corrigida pelo PCM")
         else:
             agora = _num(i["contado"])
-            texto = (f"o técnico contou um valor inválido; o PCM corrigiu para {agora}" if i["invalido"]
+            texto = (f"o -AV veio em dobro (direto e pela aba Avariados); o PCM corrigiu para {agora}" if i.get("dobro")
+                     else f"o técnico contou um valor inválido; o PCM corrigiu para {agora}" if i["invalido"]
                      else f"o técnico deixou em branco; o PCM informou {agora}" if i["contado_campo"] is None
                      else f"o técnico contou {_num(i['contado_campo'])}; o PCM corrigiu para {agora}")
             notas.append(texto + (f" ({motivo_correcao})" if motivo_correcao else ""))
@@ -433,8 +436,13 @@ def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, sis
     nome, descricao = meta.get("nome", ""), ""
     if sit == "curadoria" and not i["id_item"]:
         linha = achados.get(i["pendentes"][0] if i["pendentes"] else "", {})
-        descricao = A._txt(linha.get("Descrição"))
-        nome = "Fora do catálogo" + (f": {descricao}" if descricao else "")
+        if A._txt(linha.get("Tipo")).lower() == "avariado":
+            # a avariada sem o -AV no catálogo (30/10/2026): a linha traz o -AV que falta (`avariados.resolver`)
+            codigo_av = A._txt(linha.get("_codigo_av")) or A._txt(linha.get("Código"))
+            nome = "Avariada sem cadastro" + (f": {codigo_av}" if codigo_av else "")
+        else:
+            descricao = A._txt(linha.get("Descrição"))
+            nome = "Fora do catálogo" + (f": {descricao}" if descricao else "")
     mexe = sit in contas.MEXEM and not tirada
     # sem Δ onde não há conta a fazer: a peça que não se toca, a da curadoria (as unidades ainda não têm dono: o Δ de um
     # genérico com 4 unidades por identificar contra o saldo 20 diria "-16", e não é isso) e a de saldo não informado (o Δ
@@ -671,16 +679,17 @@ def _a_recontar(cfg, contagem_id: str, c: dict, bruto) -> list[dict]:
     PCM não ficar com metade das marcadas fora do lote sem saber quais. Só se marca o que aceita ação (a peça com o ID do item,
     ainda no lote e fora da curadoria): o achado fora do catálogo não tem ID, e o genérico por identificar decide a curadoria.
     A peça repetida na lista vale uma vez. A que já tem a recontagem pedida nesta contagem já está fora do lote: 409 (quem a
-    traz é a contagem nova do App)."""
+    traz é a contagem nova do App). A lista maior que as linhas da contagem não é a tela marcando peças: 400 antes de
+    conferir qualquer uma (a conferência é por peça, e uma lista sem teto seria trabalho sem fim no pedido)."""
     if not isinstance(bruto, list) or not bruto:
         raise Recusa(400, "Marque ao menos uma peça para recontar.")
-    ids: list[str] = []
-    for x in bruto:
-        i = A._id(x) if isinstance(x, (str, int)) and not isinstance(x, bool) else ""
-        if not i.isdigit():
-            raise Recusa(400, "Diga as peças pelo ID do item (o achado fora do catálogo não tem: ele segue na curadoria).")
-        if i not in ids:
-            ids.append(i)
+    if len(bruto) > len(c["linhas"]):
+        raise Recusa(400, f"A lista tem mais peças ({len(bruto)}) que as linhas da contagem ({len(c['linhas'])}): recarregue "
+                          "a página e marque de novo.")
+    marcadas = [A._id(x) if isinstance(x, (str, int)) and not isinstance(x, bool) else "" for x in bruto]
+    if not all(i.isdigit() for i in marcadas):
+        raise Recusa(400, "Diga as peças pelo ID do item (o achado fora do catálogo não tem: ele segue na curadoria).")
+    ids = list(dict.fromkeys(marcadas))             # a repetida vale uma vez, na ordem em que veio
     lote = _lote_sem_sistema(cfg, contagem_id, c)
     escolhidas = []
     for i in ids:

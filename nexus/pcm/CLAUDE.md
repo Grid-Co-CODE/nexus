@@ -552,7 +552,8 @@ Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaix
 
 **O fluxo:**
 1. **O App** (a sessão do App, pelo contrato de 19 colunas): o técnico conta às cegas (sem ver o saldo) e o App publica
-   `almoxarifado_contagens_app_campo`. O que ele acha fora do catálogo e o genérico que identifica vão como linhas próprias.
+   `almoxarifado_contagens_app_campo`. O que ele acha fora do catálogo, o genérico que identifica e as avariadas de uma peça
+   boa (a aba Avariados, 30/10/2026: o Nexus as leva ao `<código>-AV`, `inventario/avariados.py`) vão como linhas próprias.
 2. **Inventário** (`/t/pcm/pecas/inventario`): a lista das contagens, com o estado de cada uma pelos eventos do livro. Abrir uma
    é a contagem nas quatro etapas (Contagem, Aprovação, Gravação, Auditoria; a seção da aba Inventário, "O visual"); o Sistema
    (lido NA HORA no Fracttal), o Δ, a situação e os seis grupos chegam pela ponte (`GET /os/_nexus/inventario/<id>/lote`), com o
@@ -560,8 +561,9 @@ Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaix
 3. **Revisão:** tirar uma peça do lote, corrigir o número, pedir a recontagem só das peças marcadas (desde 30/10/2026: elas
    saem deste lote e o resto da contagem segue; o App reconta só elas e manda uma contagem com o "Recontagem de") ou a da
    contagem inteira, sempre com o motivo (cifrado). Só grava no livro do inventário. **Curadoria** (`.../curadoria`): o achado
-   fora do catálogo (cadastrar no Fracttal pela ponte, é a peça X, descartar) e o genérico (confirmar o específico); a
-   quantidade entra no lote da contagem.
+   fora do catálogo (cadastrar no Fracttal pela ponte, é a peça X, descartar), o genérico (confirmar o específico) e a avariada
+   sem cadastro (o `-AV` que não está no catálogo: cadastrar com o código fixo, é a peça X, descartar); a quantidade entra no
+   lote da contagem.
 4. **Gravar:** a ponte confere o N e a assinatura do lote que a tela mostrou, relê o saldo e começa a gravação em segundo plano,
    por sessão de ajuste do almoxarifado (lotes de 50; a peça que se moveu depois da contagem vira conflito e não grava). A etapa
    Gravação acompanha pelo `estado.json` (os números, uma linha por lote e o que aconteceu); a parada mostra o "Continuar" a quem aprovou (e o aviso forte se o almoxarifado ficou travado),
@@ -632,7 +634,9 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
 
 - **Para que serve:** é a ÚNICA porta de leitura e gravação de estoque no Fracttal. A gravação, a régua e a curadoria só
   chamam os métodos do `Estoque` (o contrato; a `EstoqueFracttal` o cumpre, e o `EstoqueFalso` dos testes também); nenhuma
-  tela fala `inventories.*` direto. Todo id é texto; `ler` devolve `{id_item: {saldo, minimo, maximo, ligacao, codigo}}`,
+  tela fala `inventories.*` direto. `criar_peca(codigo, nome, unidade, descricao="")` manda a `descricao` no `description` do
+  `item_insert` (o campo que a tela do passo 0 manda vazio; 30/10/2026, para o fabricante, o modelo e a série da peça achada,
+  Task 8). Todo id é texto; `ler` devolve `{id_item: {saldo, minimo, maximo, ligacao, codigo}}`,
   com o que o Fracttal não disse como None, nunca 0. A `criticidade` (27/10/2026, a coluna Crit. da aprovação) é o
   `groups_1_description` da linha de saldo ("1.Crítico", "2.Necessário", "3.Importante"), vazia quando ele não diz. **Não foi
   provada no Fracttal de verdade:** a linha do passo 0 não a lista; se o campo não vier, a coluna mostra "–", nunca um nível.
@@ -720,14 +724,24 @@ para o número não mudar de uma tela para a outra. Provado em `tests/test_pcm_i
   (o genérico em branco é `nao_tocada` e o achado em branco nem entra no lote). O genérico entra só como linhas
   `identificar`: se o App mandar também uma linha `item` dele, as duas somam. A mesma linha reenviada pela fila offline do
   App (mesmo "ID da contagem" e "ID da linha") conta uma vez, vale a última.
+- **A avariada (30/10/2026, a aba Avariados do App; item 5 das melhorias)** chega às contas já resolvida pela `leitura.ler`
+  (`avariados.resolver`, seção da leitura): a que achou o `-AV` no catálogo do App é linha `item` dele (com a marca
+  `_avariado_de`) e conta como a linha da própria peça (contagem absoluta, em branco não zera, o 0 zera); a que não achou segue
+  `avariado` pelo caminho do achado fora do catálogo (pendência sem `id_item` até a decisão; sem o ID da boa não é de peça
+  nenhuma). **A avariada já decidida segue a decisão mesmo depois de se resolver** (o -AV entrou no catálogo do App no dia
+  seguinte, criado por outra contagem): o "descartar" do PCM não some em silêncio. **Contado em dobro:** o `-AV` com número na
+  linha direta E na da aba é `dobro` (com `invalido` junto: o caminho do contado inválido, fora do lote até o PCM corrigir;
+  corrigido, entra), porque somar contaria duas vezes a mesma peça; duas linhas da aba somam, e a direta em branco não é dobro.
+  Avariado nunca tira do bom: a boa vale a linha dela.
 - **QUEM GRAVA parte do `itens_do_lote` e só leva `not tirada and situacao in MEXEM`, nunca o `contado_efetivo` direto:** ele
   devolve o genérico por identificar como um número (as unidades dele, ainda sem dono), e gravá-lo ajustaria o estoque com
   unidades que talvez sejam de outra peça.
 - **`itens_do_lote`:** uma entrada por peça, na ordem do livro (`contado_campo` é o do campo já com a curadoria; `contado`, o
   que vai ao Fracttal, é o corrigido pelo PCM quando há; `tirada` fica de fora da gravação mas mantém a situação; `recontar`,
   a peça com a recontagem pedida nesta contagem, vem com `tirada` junto, para todo caminho que já deixa a tirada de fora, a
-  gravação e a assinatura do lote inclusive, deixar a recontada de fora sem conhecer a regra). O achado fora do catálogo por
-  decidir é uma entrada à parte, sem `id_item`, na `curadoria`, com a linha em `pendentes`.
+  gravação e a assinatura do lote inclusive, deixar a recontada de fora sem conhecer a regra; `dobro`, o -AV contado em dobro,
+  vem com `invalido` pelo mesmo motivo). O achado fora do catálogo (e a avariada sem o -AV) por decidir é uma entrada à parte,
+  sem `id_item`, na `curadoria`, com a linha em `pendentes`.
 - **`substituidas`:** por almoxarifado vale a contagem INTEIRA mais nova pelo "Contada em" (o instante: -03:00 e Z se comparam);
   as velhas não gravadas ficam substituídas. **A recontagem só das marcadas (`recontagem_de` preenchido, 30/10/2026) não
   substitui ninguém:** ela traz só as peças pedidas, e como "a mais nova" tiraria do caminho a original inteira, cujas outras
@@ -774,6 +788,13 @@ contagem"); `ler(cfg)` devolve os dois com o nome de cada peça.
   ficava sem nenhuma contagem para revisar), e, como `gravadas`, as em `gravando`, `gravada` e `gravada_com_conflitos`. O evento
   `substituida`, se alguém o gravar, também vale. A contagem de recontagem e a original seguem vivas juntas (a regra está nas
   `contas.substituidas`); uma inteira mais nova substitui as duas.
+- **As avariadas são resolvidas AQUI, uma vez** (`avariados.resolver` na `ler`, sobre as linhas de cada contagem, com o
+  catálogo do livro Itens do App): o lote, a curadoria, a gravação e as contas da lista veem as mesmas linhas, e o número não
+  muda de uma tela para a outra. A avariada que achou UM item de código `<código da boa>-AV` (sem caixa e sem espaço; o código da
+  boa pelo ID no catálogo, e sem ele o da linha) vira linha `item` dele com `_avariado_de`; a que não achou (ou achou dois: seria
+  chutar o ID) fica `avariado` com `_codigo_av`, `_nome_av` (`"[AVARIADO] " + o nome da boa`, o padrão dos -AV do livro Itens em
+  30/10/2026) e `_unidade_av` (a da boa), que a curadoria usa no cadastrar. O resolver devolve cópias: a cópia de 5 min do livro
+  do App não muda.
 - **Contrato violado vira aviso, não número pela metade:** "ID da linha" vazio ou o texto "None" (o `sync-xlsx` escreve o vazio
   assim) junta duas linhas numa nas contas (`contas._unicas`) e perde unidades contadas; contagem sem o ID do almoxarifado não tem
   saldo do sistema para ler. Os dois dão `aviso` e `aprovavel` falso (a tela não mostra comparação).
@@ -782,7 +803,8 @@ contagem"); `ler(cfg)` devolve os dois com o nome de cada peça.
   relógio do celular" e "mais de 90 dias" (`contas.aprovavel`, `APROVAVEL_DIAS`).
 - **As contas de linhas** contam depois do dedupe da fila offline (mesmo "ID da contagem" e "ID da linha"), e somam as linhas de
   peça: `n_em_branco` (sem número, o achado em branco inclusive), `n_curadoria` (com número e ainda por decidir: o genérico por
-  identificar e o achado fora do catálogo, descontadas as decisões já gravadas na curadoria) e `n_contadas` (o resto).
+  identificar, o achado fora do catálogo e a avariada sem o -AV, descontadas as decisões já gravadas na curadoria) e
+  `n_contadas` (o resto, a avariada resolvida inclusive).
 - **O que o PCM já fez** (`revisao_da`, `curadoria_da`) vem na forma que as contas pedem: `tiradas` {id_item: motivo},
   `corrigidos` {id_item: número} (vale a última), `recontar` {id_item: motivo} com `recontar_em` {id_item: a hora do pedido}
   (vale o primeiro pedido; pedir de novo é recusado) e as decisões da curadoria `{ID da linha: {decisao, id_item, codigo}}` (vale a
@@ -854,7 +876,9 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   tocada" também abre aberto (é o que fica como está). A peça tirada do lote vai a "não será tocada" com o motivo, e a peça com a
   recontagem pedida também, com o selo "Em recontagem" e a nota "recontagem pedida em dd/mm" (o dia de Brasília do pedido); a de contado negativo
   também, com "contado inválido" até o PCM corrigir (corrigida, ela entra no lote e a nota diz "o técnico contou um valor inválido;
-  o PCM corrigiu para X"). A peça nunca ligada ao almoxarifado mostra no Sistema "não ligada (0)" e a nota "será ligada ao gravar";
+  o PCM corrigiu para X"); a do -AV em dobro (30/10/2026), com "contado em dobro: o -AV veio direto e pela aba Avariados" (e,
+  corrigida, "o -AV veio em dobro (direto e pela aba Avariados); o PCM corrigiu para X"). A avariada sem o -AV no catálogo
+  aparece na curadoria do lote como "Avariada sem cadastro: SP-X-AV". A peça nunca ligada ao almoxarifado mostra no Sistema "não ligada (0)" e a nota "será ligada ao gravar";
   a ligada com o saldo vazio, "não informado", sem Δ (um "+5" contra um 0 que o Fracttal não disse seria inventado; a nota diz que
   vale 0 na conta, e contar 0 nela não é zerar). **O botão "Gravar N alterações"** vem no pedaço da ponte, com o N e a assinatura
   do lote que ele mostra, e chama a ponte do Fracttal (a seção da gravação, abaixo).
@@ -870,7 +894,9 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   curadoria), a de "marcar todas" (marca as marcáveis À VISTA, sob a busca e o filtro, como a aba Pessoas e setores; no celular o
   cabeçalho some e ela fica numa linha acima dos cartões) e o "Pedir recontagem das marcadas (N)" (o N conta todas as marcadas,
   à vista ou não: é o que vai ao servidor), que abre o mesmo painel de motivo. As caixas chegam no pedaço da ponte; quem as ouve
-  é o script da página.
+  é o script da página. O estado do "marcar todas" se refaz no evento `filtro-local` que o `filtro-local.js` manda no
+  `document` depois de CADA filtragem (a busca, o filtro e o "Limpar"; um tempo depois da digitação deixava o "Limpar" de
+  fora).
 - **A hora na tela é a da janela de aprovação:** `revisao._hora` usa o `estoque.instante` (um texto sem fuso é UTC, como o App
   grava) e escreve "contada em 26/10/2026 às 09:00 (Brasília)". Antes lia pelo `visao._dt` (sem fuso = Brasília) e mostrava 12:00
   onde a janela contava 09:00.
@@ -879,8 +905,8 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   (administrador e setor PCM) e de uma página deste mesmo endereço, senão 403. O motivo é OBRIGATÓRIO em todas (o desenho: "cada
   um com o motivo, na auditoria") e vai só cifrado (`dados={"motivo": ...}`; a API do banco é aberta). **`recontagem_itens`**
   (`itens`: a lista dos `id_item` marcados) confere TODAS antes de gravar qualquer uma (tudo ou nada) e grava um evento
-  `recontagem_item_pedida` por peça, de uma vez: lista vazia ou que não é lista, ID que não é dígito (o achado fora do catálogo
-  não tem) e peça que não é da contagem, 400; peça com a recontagem já pedida nesta contagem (ela já saiu deste lote; quem a
+  `recontagem_item_pedida` por peça, de uma vez: lista vazia ou que não é lista, maior que as linhas da contagem, ID que não é
+  dígito (o achado fora do catálogo não tem) e peça que não é da contagem, 400; peça com a recontagem já pedida nesta contagem (ela já saiu deste lote; quem a
   traz é a contagem nova), peça tirada e genérico por identificar, 409. Tirar ou corrigir a peça em recontagem, 409. A
   `recontagem` (a da contagem inteira, o botão "Recontar a contagem inteira") continua matando a contagem. `corrigir` aceita número de zero para cima, com vírgula ou ponto (o 0 vale: a peça acabou; negativo, vazio, texto e
   notação científica, 400). **O exagero pede confirmação:** número acima de 10 vezes o maior entre o contado e o saldo do sistema (e
@@ -908,9 +934,9 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   as quatro etapas, a lista, a Auditoria geral, a régua e a curadoria, a 1366 e 375 px, escuro e claro, a troca de etapa, a busca e
   o filtro, o "Revisar lote", o "Gravar" e o "Continuar" de ponta a ponta. A recontagem das marcadas (30/10/2026), na mesma cópia
   com uma contagem de recontagem a mais: marcar, o "marcar todas" sob a busca, o painel, o "Gravar" de 5 para 3, a nota e o selo,
-  a página e a lista com o "recontagem da contagem de", a 1366 e 375 px, escuro e claro (o vão do `.gc-btn`, que é flex, separava
-  o "( 8 )" do botão: o texto inteiro é reescrito pelo script, sem `<span>` no número). Testes: os `test_recontagem_parcial_*`,
-  `test_a_aprovacao_tem_as_caixas`, `test_a_lista_diz_recontagem_de` e o `test_gravar_sem_as_pecas_em_recontagem`.
+  a página e a lista com o "recontagem da contagem de", a 1366 e 375 px, escuro e claro. Testes: os `test_recontagem_parcial_*`,
+  `test_a_aprovacao_tem_as_caixas`, `test_o_marcar_todas_acompanha_cada_filtragem`, `test_a_lista_diz_recontagem_de` e o
+  `test_gravar_sem_as_pecas_em_recontagem`; os avariados na Aprovação, `test_avariados_na_aprovacao`.
 
 ## Inventário do almoxarifado: o livro (`nexus/dados/fato_inventario.py`; 26/10/2026)
 
@@ -1009,9 +1035,20 @@ Levi, 26/10/2026: a peça que o técnico acha fora do catálogo vira pendência;
 PCM. Tela `/t/pcm/pecas/inventario/curadoria` (decide só quem `pode_programar`: administrador e setor PCM; **os outros veem só a
 lista, com "achado fora do catálogo", a quantidade e a usina: o que o técnico escreveu e a foto dele são de quem decide**, e a rota da
 foto também é 403 para eles).
-Duas pendências, só nas contagens que ainda NÃO foram gravadas: o **achado fora do catálogo** (cadastrar, é a peça X, descartar) e o
-**genérico a identificar** (confirmar o específico que o técnico escolheu, ou outro). O achado em branco não é pendência.
+Três pendências, só nas contagens que ainda NÃO foram gravadas: o **achado fora do catálogo** (cadastrar, é a peça X, descartar), o
+**genérico a identificar** (confirmar o específico que o técnico escolheu, ou outro) e, desde 30/10/2026, a **avariada sem
+cadastro** (a avariada da aba Avariados cujo `-AV` não está no catálogo do App: cadastrar, é a peça X, descartar). O achado em
+branco não é pendência, nem a avariada sem o ID da peça boa.
 
+- **A avariada sem cadastro** (`avariados.py`, item 5 das melhorias): o cadastrar vem preenchido (o código `<código da boa>-AV`,
+  o nome no padrão dos -AV do catálogo, `"[AVARIADO] " + o nome da boa`, e a unidade da boa; o PCM corrige o nome e a unidade, o
+  código não) e roda pela mesma ponte. **O código é FIXO, nunca um `SP-<sigla>-NNN`** (a casa reconhece a avariada pelo código,
+  `regua.avariada`): nem lê os códigos da sigla, nem usa a reserva em arquivo. Antes de criar procura o -AV no Fracttal
+  (`achar_peca`): **achou** (outra contagem o cadastrou, ou o criar perdeu a resposta, e a varredura do App ainda não o trouxe),
+  grava a decisão `e_a_peca` com aquele ID e não cria nada (o `codigo_criado` fica vazio, porque nada foi criado; o código vai no
+  evento da auditoria). O código fixo é a chave da nova tentativa; a trava por código (`_CODIGO_AV`) faz duas contagens com a
+  avariada da mesma boa procurarem e criarem uma de cada vez. Na tela, o número do alto "Avariada sem cadastro" e o cartão com o
+  -AV que falta.
 - **A decisão é uma linha do livro** (`fato_curadoria_inventario`, chave `contagem_id` + "ID da linha") mais o evento `curadoria` na
   auditoria, e entra no lote pela `contas.contado_efetivo`: "é a peça X" e "cadastrar" SOMAM as achadas ao contado da peça NESSA
   contagem (o total substitui o saldo); o genérico confirmado tira do genérico e põe no específico. `decisoes(cfg, contagem)` devolve
@@ -1074,8 +1111,8 @@ Duas pendências, só nas contagens que ainda NÃO foram gravadas: o **achado fo
   Fracttal do cookie que não é a pessoa da sessão, 409; sem o cookie, 401 com o link do login do Fracttal. 429 do Fracttal e rede que cai também têm texto (`erros.resposta(ex, ao="cadastro")`: o código ficou reservado, repetir
   com os mesmos dados não cria outra peça; não diz "é o mesmo número", que é da régua). Prova com o `estoque_da_sessao` DE VERDADE e o
   cookie com `Path=/os`: `test_o_login_do_fracttal_so_chega_na_ponte` (régua e curadoria).
-- **Provar:** `tests/test_pcm_inventario_curadoria.py` (o código novo, as pendências, cadastrar com a resposta perdida e com o pedido
-  que nem chegou, a reserva entre linhas, "é a peça X" no lote, o genérico, o motivo cifrado, a linha decidida, a contagem gravada,
+- **Provar:** `tests/test_pcm_inventario_curadoria.py` (o código novo, as pendências, a avariada sem cadastro e o cadastro do -AV,
+  cadastrar com a resposta perdida e com o pedido que nem chegou, a reserva entre linhas, "é a peça X" no lote, o genérico, o motivo cifrado, a linha decidida, a contagem gravada,
   o 403 de quem não é PCM, os status, a foto) com mutações em cada regra acima, todas pegas. A revisão de 27/10 acrescentou: a
   contagem gravada durante o cadastro, a reserva com outros dados, a peça achada com outro nome, as travas (a mesma linha, o cadastro
   lento, a mesma sigla) e a tela de quem só olha sem descrição nem foto.

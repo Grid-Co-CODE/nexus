@@ -215,8 +215,13 @@
           contar();
         } else if (ev.target.matches('[data-marcar]')) contar();
       });
-      // a busca muda o que está à vista (o filtro-local espera 150 ms antes de aplicar): o "marcar todas" acompanha
-      document.addEventListener('input', function (ev) { if (ev.target.closest('#inv-lote-f')) setTimeout(contar, 200); });
+      // a busca, o filtro e o "Limpar" mudam o que está à vista: o filtro-local avisa no document depois de cada filtragem (o
+      // evento "filtro-local"), e o "marcar todas" acompanha. Até 31/10/2026 era um setTimeout no 'input' da busca, e o
+      // "Limpar" (que não é 'input') deixava o "marcar todas" com o estado das linhas que estavam à vista antes
+      document.addEventListener('filtro-local', function (ev) {
+        var f = ev.detail && ev.detail.form;
+        if (f && f.id === 'inv-lote-f') contar();
+      });
 
       function abrir(b) {
         // o saldo do sistema que a página mostrou vai junto: o servidor não lê o Fracttal ao revisar, e com ele confere o número

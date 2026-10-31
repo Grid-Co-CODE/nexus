@@ -1,12 +1,19 @@
 """A curadoria do inventário do almoxarifado (PCM → Almoxarifado → Curadoria; 26/10/2026).
 
 Levi, 26/10/2026: a peça que o técnico acha fora do catálogo vira pendência: o campo descreve, fotografa e conta, e quem
-decide é o PCM. Desenho: `docs/superpowers/specs/2026-10-26-inventario-almoxarifado-design.md`, seção 4.5. Duas fontes de
+decide é o PCM. Desenho: `docs/superpowers/specs/2026-10-26-inventario-almoxarifado-design.md`, seção 4.5. Três fontes de
 pendência, nas contagens que ainda não foram gravadas:
 
 - `fora_do_catalogo` (a descrição, a foto e a quantidade): o PCM **cadastra** a peça no Fracttal (código `SP-<sigla>-NNN`, o
   próximo livre da sigla, nome e unidade), diz que **é a peça X** (do catálogo) ou **descarta** (com o motivo);
-- `identificar` (o genérico com saldo, um por específico): o PCM **confirma** o específico que o técnico escolheu (ou outro).
+- `identificar` (o genérico com saldo, um por específico): o PCM **confirma** o específico que o técnico escolheu (ou outro);
+- `avariado` (30/10/2026, a aba Avariados do App; `avariados.py`): a avariada de uma peça boa cujo `<código>-AV` não está no
+  catálogo do App, a **"avariada sem cadastro"**. O PCM **cadastra** o -AV (o código é FIXO, `avariados.codigo_av`, nunca um
+  `SP-<sigla>-NNN`; o nome no padrão dos -AV, `"[AVARIADO] " + o nome da boa`, e a unidade da boa, que a tela já traz e o PCM
+  pode corrigir), diz que **é a peça X** ou **descarta**. O cadastro procura o -AV no Fracttal antes (`achar_peca`): achou
+  (outra contagem o cadastrou, ou a resposta do criar se perdeu, e a varredura do App ainda não o viu), grava a decisão
+  `e_a_peca` com aquele ID e não cria nada. Sem a reserva de código dos outros cadastros: o código fixo é a chave da nova
+  tentativa.
 
 A decisão vai ao livro do inventário (`fato_curadoria_inventario`, mais o evento `curadoria` da auditoria) e a quantidade
 entra no lote pela `contas.contado_efetivo`: "é a peça X" e "cadastrar" somam as achadas ao contado da peça NESSA contagem (o
@@ -71,17 +78,22 @@ from .travas import Travas
 # as siglas do catálogo de peças (design 3.8); a do teste só no almoxarifado de teste
 SIGLAS = ("PEL", "PME", "CAB", "SEN", "CTR", "COM", "INS", "ARM", "EAX", "HSE", "CSM", "GER")
 SIGLA_DE_TESTE = "TST"
-DECISOES_DO_TIPO = {"fora_do_catalogo": ("cadastrar", "e_a_peca", "descartar"), "identificar": ("confirmar",)}
+DECISOES_DO_TIPO = {"fora_do_catalogo": C.DECISOES_DO_ACHADO, "identificar": ("confirmar",),
+                    "avariado": C.DECISOES_DO_ACHADO}
+_O_QUE_E = {"fora_do_catalogo": "o achado fora do catálogo", "identificar": "o genérico a identificar",
+            "avariado": "a avariada sem cadastro"}
 UNIDADES = ("UNIDADE", "METRO", "MASSA")        # as que o catálogo de peças tem (as opções da tela)
 NOME_MAX, MOTIVO_MAX = 120, 300
 _FOTO_ID = re.compile(r"[0-9a-f]{24}")
 # Uma trava por chave, nunca uma do módulo inteiro (o `criar_peca` e as páginas do catálogo levam segundos, e todo o PCM esperaria):
 # - `_LINHA`, por (contagem, linha): ler, conferir e escrever a decisão (a mesma linha por dois ao mesmo tempo: um ganha, o outro 409);
 # - `_SIGLA`, por sigla: escolher o próximo código e reservá-lo (duas linhas da mesma sigla não escolhem o mesmo número);
-# - `_ARQUIVO`, por arquivo de controle: ler e regravar as reservas de uma contagem (linhas de siglas diferentes dividem o arquivo).
-# A ordem é sempre essa (linha, sigla, arquivo), para uma não esperar pela outra em círculo; a da contagem (`travas.CONTAGEM`, a
-# vez contra a aprovação) vem por último, só em volta da conferência final e da escrita, com a do arquivo e a da sigla já soltas.
-_LINHA, _SIGLA, _ARQUIVO = Travas(), Travas(), Travas()
+# - `_ARQUIVO`, por arquivo de controle: ler e regravar as reservas de uma contagem (linhas de siglas diferentes dividem o arquivo);
+# - `_CODIGO_AV`, pelo código -AV: procurar e criar a avariada (duas contagens com a avariada da mesma peça boa não criam o -AV
+#   duas vezes), no lugar da sigla e do arquivo, que a avariada não usa.
+# A ordem é sempre essa (linha, sigla ou código -AV, arquivo), para uma não esperar pela outra em círculo; a da contagem
+# (`travas.CONTAGEM`, a vez contra a aprovação) vem por último, só em volta da conferência final e da escrita, com as outras soltas.
+_LINHA, _SIGLA, _ARQUIVO, _CODIGO_AV = Travas(), Travas(), Travas(), Travas()
 _txt, _id = A._txt, A._id
 
 
@@ -163,10 +175,12 @@ def contagens_abertas(cfg) -> dict[str, list[dict]]:
 
 
 def _eh_pendencia(l: dict) -> bool:
-    """A linha pede decisão: é do campo `fora_do_catalogo` ou `identificar`, tem "ID da linha" e foi CONTADA (em branco, não
-    há o que decidir: o achado em branco nem entra no lote)."""
-    return _txt(l.get("Tipo")).lower() in DECISOES_DO_TIPO and bool(_id(l.get("ID da linha"))) \
-        and A.contado(l.get("Contado")) is not None
+    """A linha pede decisão: é do campo `fora_do_catalogo`, `identificar` ou `avariado` (a avariada que a leitura não levou ao
+    -AV: a resolvida já chega como `item`), tem "ID da linha" e foi CONTADA (em branco, não há o que decidir: o achado em branco
+    nem entra no lote). A avariada sem o ID da peça boa não é de peça nenhuma, como nas contas."""
+    tipo = _txt(l.get("Tipo")).lower()
+    return tipo in DECISOES_DO_TIPO and bool(_id(l.get("ID da linha"))) and A.contado(l.get("Contado")) is not None \
+        and (tipo != "avariado" or bool(_id(l.get("ID do item"))))
 
 
 def _decisoes_do_livro(linhas: list[dict]) -> dict:
@@ -258,10 +272,12 @@ def _reservas_da_contagem(cfg, cid: str) -> dict:
 
 
 def pendencias(cfg) -> list[dict]:
-    """As linhas `fora_do_catalogo` e `identificar` das contagens que não foram gravadas, na ordem em que a contagem as trouxe
-    (a mais antiga primeiro), cada uma com a foto e a decisão que já tem (`decisao`: None se pende). `contado` já é número.
-    No genérico, o específico que o técnico escolheu vem com o código e o nome do catálogo do App (quando o catálogo veio). A
-    `reserva` é o que uma tentativa anterior de cadastrar esta linha reservou (código, sigla, nome, unidade), ou None."""
+    """As linhas `fora_do_catalogo`, `identificar` e `avariado` das contagens que não foram gravadas, na ordem em que a
+    contagem as trouxe (a mais antiga primeiro), cada uma com a foto e a decisão que já tem (`decisao`: None se pende).
+    `contado` já é número. No genérico, o específico que o técnico escolheu vem com o código e o nome do catálogo do App
+    (quando o catálogo veio). A `reserva` é o que uma tentativa anterior de cadastrar esta linha reservou (código, sigla, nome,
+    unidade), ou None. Na avariada sem cadastro, `codigo_av` (o -AV que falta), `nome_av` e `unidade_av` são o cadastrar já
+    preenchido (as marcas do `avariados.resolver`); nas outras, vazios."""
     abertas = contagens_abertas(cfg)
     decididas = _decisoes_do_livro(F.ler(cfg)[F.ABA_CURADORIA])
     catalogo = _catalogo() or {}
@@ -285,6 +301,8 @@ def pendencias(cfg) -> list[dict]:
                 "identificado_como": como, "identificado_codigo": catalogo.get(como, {}).get("codigo", ""),
                 "identificado_nome": catalogo.get(como, {}).get("nome", ""),
                 "reserva": reservas.get(chave) if isinstance(reservas.get(chave), dict) else None,
+                "codigo_av": _txt(l.get("_codigo_av")), "nome_av": _txt(l.get("_nome_av")),
+                "unidade_av": _txt(l.get("_unidade_av")).upper(),
                 "decisao": None if d is None else {
                     "decisao": _txt(d.get("decisao")), "id_item": _id(d.get("id_item")),
                     "codigo_criado": _txt(d.get("codigo_criado")), "quando": _txt(d.get("decidida_em")),
@@ -470,14 +488,43 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) ->
         raise
 
 
+def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool]:
+    """O -AV da avariada sem cadastro, sem duplicar. Devolve (id do item, código, criou agora).
+
+    O código é FIXO (`avariados.codigo_av` da peça boa, que o `resolver` deixou na linha): nunca o próximo `SP-<sigla>-NNN` (o
+    que o cadastro do achado fora do catálogo escolhe), porque a casa reconhece a avariada pelo código (`regua.avariada`). Antes
+    de criar, procura o código no Fracttal (`achar_peca`): achou, devolve o ID dele e não cria (outra contagem o cadastrou, ou
+    a resposta do criar se perdeu, e a varredura do App ainda não o trouxe). O código fixo é a chave da nova tentativa, então a
+    reserva em arquivo dos outros cadastros não é preciso; a trava por código faz duas contagens com a avariada da mesma boa
+    procurarem e criarem uma de cada vez. O nome e a unidade são os que o PCM mandou ou, sem eles, os que a tela propõe (o
+    padrão dos -AV e a unidade da boa)."""
+    codigo = _txt(l.get("_codigo_av"))
+    if not codigo:
+        raise ValueError("Esta avariada veio sem o código da peça boa: não há o -AV para cadastrar. Diga qual é a peça ou "
+                         "descarte.")
+    nome = " ".join(_txt(nome or l.get("_nome_av")).split())
+    if not nome or len(nome) > NOME_MAX:
+        raise ValueError(f"Informe o nome da peça (até {NOME_MAX} letras).")
+    unidade = (_txt(unidade) or _txt(l.get("_unidade_av"))).upper() or "UNIDADE"
+    if estoque is None:
+        raise ValueError("Cadastrar fala com o Fracttal: é preciso o login do Fracttal de quem decide.")
+    with _CODIGO_AV.de(codigo.upper()):
+        achada = estoque.achar_peca(codigo)
+        if achada:
+            return str(achada), codigo, False
+        return str(estoque.criar_peca(codigo, nome, unidade)), codigo, True
+
+
 def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: str | None = None, sigla: str | None = None,
             nome: str | None = None, unidade: str | None = None, motivo: str | None = None,
             estoque: E.Estoque | None = None, pessoa: dict | None) -> dict:
     """Registra a decisão do PCM sobre uma linha da contagem e devolve `{"decisao", "id_item", "codigo", "criada", "texto"}`.
 
     - `cadastrar` (achado fora do catálogo): cria a peça (`estoque.criar_peca`, no login de quem decide) com `sigla`, `nome` e
-      `unidade`, e grava a decisão com o ID e o código criados;
-    - `e_a_peca` (achado): `id_item` é a peça do catálogo a que as unidades pertencem;
+      `unidade`, e grava a decisão com o ID e o código criados. Na avariada sem cadastro, o código é o -AV fixo (a `sigla` não
+      conta; `nome` e `unidade` vazios são os que a tela propõe), e o -AV que já existe no Fracttal vira `e_a_peca` com o ID
+      dele, sem criar (`_cadastrar_avariado`);
+    - `e_a_peca` (achado e avariada): `id_item` é a peça do catálogo a que as unidades pertencem;
     - `confirmar` (genérico): `id_item` é o específico (sem ele, o que o técnico escolheu);
     - `descartar` (achado): `motivo` obrigatório, cifrado.
     `motivo` também vai (cifrado) nas outras decisões, quando vem.
@@ -495,7 +542,7 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
         l = _achar_a_linha(cfg, cid, chave)
         tipo = _txt(l.get("Tipo")).lower()
         if decisao not in DECISOES_DO_TIPO[tipo]:
-            raise ValueError(f"A decisão {decisao!r} não é para esta linha ({'o genérico a identificar' if tipo == 'identificar' else 'o achado fora do catálogo'}): "
+            raise ValueError(f"A decisão {decisao!r} não é para esta linha ({_O_QUE_E[tipo]}): "
                              f"aqui vale {' ou '.join(DECISOES_DO_TIPO[tipo])}.")
         livro = F.ler(cfg, forcar=True)
         if (cid, chave) in _decisoes_do_livro(livro[F.ABA_CURADORIA]):
@@ -507,18 +554,31 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
         cadastradas = {_id(r.get("id_item")) for r in livro[F.ABA_CURADORIA]
                        if _txt(r.get("decisao")) == "cadastrar" and _id(r.get("id_item"))}
         codigo, criada, texto = "", False, ""
-        if decisao == "cadastrar":
+        if decisao == "cadastrar" and tipo == "avariado":
+            id_final, codigo, criada = _cadastrar_avariado(l, nome, unidade, estoque)
+            if criada:
+                texto = f"Peça avariada cadastrada no Fracttal: {codigo}. As unidades avariadas contam nela nesta contagem."
+            else:
+                # o -AV já existia (outra contagem o cadastrou, ou o criar perdeu a resposta): nada foi criado agora, e a
+                # decisão é "é a peça" com aquele ID; o código vai só para a auditoria (`codigo_criado` é o que se criou)
+                decisao = "e_a_peca"
+                texto = (f"A peça {codigo} já existe no Fracttal: as unidades avariadas contam nela nesta contagem, sem "
+                         "criar outra.")
+        elif decisao == "cadastrar":
             id_final, codigo, criada = _cadastrar(cfg, cid, chave, almox, sigla, nome, unidade, estoque)
             texto = (f"Peça cadastrada no Fracttal: {codigo}." if criada else
                      f"A peça {codigo} já estava no Fracttal (a tentativa anterior a criou): usei ela, sem criar outra.")
         elif decisao == "descartar":
-            id_final, texto = "", "Achado descartado: não entra na contagem."
+            id_final = ""
+            texto = ("Avariadas descartadas: não entram na contagem." if tipo == "avariado"
+                     else "Achado descartado: não entra na contagem.")
         else:
             escolhida = _id(id_item) or (_id(l.get("Identificado como")) if decisao == "confirmar" else "")
             if not escolhida:
                 raise ValueError("Informe qual é a peça: o técnico não disse qual era o específico.")
             id_final = _peca_do_catalogo(cfg, escolhida, cadastradas)
             texto = ("As unidades saem do genérico e entram na peça escolhida." if decisao == "confirmar"
+                     else "As unidades avariadas contam como unidades dessa peça nesta contagem." if tipo == "avariado"
                      else "As unidades achadas contam como unidades dessa peça nesta contagem.")
         usina = _usina_id(_txt(l.get("Usina")))
         quem_ = quem.colunas(cfg, pessoa)
@@ -533,12 +593,18 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
             if estado_agora != "aberta":
                 ja = _PORQUE.get(estado_agora, ("deixou de estar aberta", "já tinha deixado de estar aberta"))[1]
                 if decisao == "cadastrar" and codigo:
+                    # a avariada não reserva código: o -AV é fixo, e a nova contagem o acha pelo código no Fracttal
+                    guarda = ("a próxima avariada desta peça o acha pelo código, sem criar outro" if tipo == "avariado"
+                              else "o código continua reservado nesta linha")
                     raise Conflito(f"A peça {codigo} foi criada no Fracttal, mas a contagem {ja}: a decisão não foi registrada, "
-                                   "e o código continua reservado nesta linha. Faça uma nova contagem.")
+                                   f"e {guarda}. Faça uma nova contagem.")
                 raise Conflito(f"Esta contagem {ja} enquanto você decidia: a decisão não foi registrada. Faça uma nova "
                                "contagem.")
+            # `codigo_criado` é o que esta decisão criou no Fracttal; o -AV achado (a avariada que virou "é a peça") vai só no
+            # `codigo` do evento da auditoria
             linha = {"contagem_id": cid, "chave_linha": chave, "decisao": decisao, "id_item": id_final or None,
-                     "codigo_criado": codigo or None, "id_almoxarifado": almox, "usina_id": usina,
+                     "codigo_criado": (codigo or None) if decisao == "cadastrar" else None, "id_almoxarifado": almox,
+                     "usina_id": usina,
                      "usina_ligada_por": F.USINA_LIGADA_POR[0] if usina else None, **quem_}
             if motivo:
                 linha["dados"] = {"motivo": motivo}

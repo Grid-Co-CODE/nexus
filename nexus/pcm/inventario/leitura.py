@@ -42,7 +42,7 @@ from ...dados import fato_inventario as F
 from ...dados import livros
 from ...dados.fato_almoxarifado import LIGADA_DE_PARA
 from ...dados.fatos import Ligador
-from . import contas
+from . import avariados, contas
 from .estoque import instante
 
 ESTADOS = ("nova", "revisada", "recontagem_pedida", "substituida", "gravando", "gravada", "gravada_com_conflitos")
@@ -222,9 +222,11 @@ def revisao_da(cfg, contagem_id: str, motivos: bool = True) -> dict:
 # ── as contas de cada contagem ─────────────────────────────────────────────────────────────────────────────────────────
 def _conta_as_linhas(linhas: list[dict], curadoria: dict) -> tuple[int, int, int]:
     """(contadas, em branco, na curadoria), pelas linhas depois do dedupe por (ID da contagem, ID da linha), como as contas
-    fazem. Uma linha é de peça se o Tipo existe (e, em `item` e `identificar`, tem ID do item). Em branco é a linha sem número
-    (o achado em branco inclusive); na curadoria é a linha com número que o PCM ainda precisa decidir (o genérico por
-    identificar e o achado fora do catálogo), e as contadas são as outras com número: os três somam as linhas de peça."""
+    fazem. Uma linha é de peça se o Tipo existe (e, menos no `fora_do_catalogo`, tem ID do item). Em branco é a linha sem
+    número (o achado em branco inclusive); na curadoria é a linha com número que o PCM ainda precisa decidir (o genérico por
+    identificar, o achado fora do catálogo e a avariada sem o -AV no catálogo), e as contadas são as outras com número: os
+    três somam as linhas de peça. As linhas já vêm resolvidas (`avariados.resolver`, na `ler`): a avariada que achou o -AV
+    é uma linha `item` dele."""
     unicas = contas._unicas(linhas)          # o mesmo dedupe das contas (o mesmo pacote)
     validas = [l for l in unicas
                if _txt(l.get("Tipo")).lower() in A.TIPOS_CONTAGEM
@@ -283,8 +285,10 @@ def _pode_substituir(c: dict, agora: datetime) -> bool:
 
 def ler(cfg, *, com_teste: bool = False, app_agora: bool = False) -> dict:
     """`{"livro_existe", "contagens", "itens"}`: as contagens do App com o estado de cada uma (a lista de `contagens`) e o
-    nome de cada peça (`itens`: `{id_item: {codigo, nome, unidade}}`). Levanta `fato_inventario.Recusada` se não leu o
-    livro do App ou o do inventário (nunca devolve vazio no lugar do que não leu).
+    nome de cada peça (`itens`: `{id_item: {codigo, nome, unidade}}`). As `linhas` de cada contagem saem com as avariadas
+    já levadas ao -AV pelo catálogo (`avariados.resolver`): é a única porta das linhas para o lote, a curadoria e a gravação.
+    Levanta `fato_inventario.Recusada` se não leu o livro do App ou o do inventário (nunca devolve vazio no lugar do que não
+    leu).
 
     `com_teste`: com as contagens do almoxarifado de teste (a curadoria, o único lugar em que ele vale; elas só se substituem
     entre si, porque a substituição é por almoxarifado). `app_agora`: o livro do App relido agora, sem a cópia de 5 min (a
@@ -296,8 +300,11 @@ def ler(cfg, *, com_teste: bool = False, app_agora: bool = False) -> dict:
     do_livro = F.ler(cfg)
     eventos, curadoria = _por_contagem(do_livro[F.ABA_EVENTO]), do_livro[F.ABA_CURADORIA]
     agora = visao._agora()
-    # cópias: a lista do App é a de todos (5 min), e quem recebe pode mexer na sua
-    cs = [dict(c, linhas=[dict(l) for l in c["linhas"]]) for c in app["contagens"] if c["id_almox"] not in teste]
+    # cópias: a lista do App é a de todos (5 min), e quem recebe pode mexer na sua. As avariadas da aba Avariados (30/10/2026)
+    # vão ao -AV AQUI, uma vez (`avariados.resolver`, que devolve cópias): o lote, a curadoria, a gravação e as contas da lista
+    # veem as mesmas linhas resolvidas
+    cs = [dict(c, linhas=avariados.resolver(c["linhas"], app["itens"])) for c in app["contagens"]
+          if c["id_almox"] not in teste]
     for c in cs:
         c["estado"] = estado_dos_eventos(eventos.get(c["contagem_id"], []))
         c["aviso"] = _aviso(c)
@@ -323,7 +330,7 @@ def contagens(cfg) -> list[dict]:
     """Uma por contagem, da mais nova para a mais velha, sem o almoxarifado de teste: `contagem_id`, `id_almox`, `almox` (o
     nome), `usina` (o nome do cadastro, ou o do Fracttal se a usina não liga), `usina_id` (e `usina_ligada_por`),
     `contada_em`, `enviada_em`, `recontagem_de` (o ID da contagem cuja recontagem esta atende; vazio na inteira), `linhas`
-    (as do livro do App), `n_contadas`, `n_em_branco`, `n_curadoria`, `estado` (em `ESTADOS`), `aprovavel` e, quando não,
+    (as do livro do App, com as avariadas resolvidas), `n_contadas`, `n_em_branco`, `n_curadoria`, `estado` (em `ESTADOS`), `aprovavel` e, quando não,
     `motivo_nao_aprovavel`; `aviso` quando o App violou o contrato."""
     return ler(cfg)["contagens"]
 
