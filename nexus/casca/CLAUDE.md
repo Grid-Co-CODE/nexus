@@ -15,6 +15,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar) e a aba Atualizações (`/?aba=atualizacoes`, só novidade, correção e desempenho dos últimos 60 dias, por dia); seção "Versão no ar e Atualizações" abaixo |
 | `nexus/casca/sugestoes.py` + `templates/sugestoes.html` | a aba Sugestões (`/?aba=sugestoes`): o formulário de todos e a lista do administrador, o livro `nexus_sugestoes` e os anexos no disco; seção "Sugestões no Início" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
+| `nexus/casca/fracttal_conta.py` | o contador de pedidos ao Fracttal (31/10/2026): um gancho no `Session.send` que soma, por hora de Brasília × origem × método, os pedidos, as recusas (406/429), os erros e o pico por minuto; seção "Pedidos ao Fracttal" abaixo |
 | `nexus/auth/__init__.py` | `/entrar` (a porta, a senha de administrador e a ida e a volta da Microsoft), `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/microsoft.py` | o login pela conta Microsoft da Grid (Entra ID), desligado sem as quatro `NEXUS_MS_*` (seção "Entrar com a Microsoft" abaixo) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
@@ -243,6 +244,38 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   Caddy); o teto dá o mesmo efeito sem ela.
 - **No OS Creator** (README da torre, 14/10/2026): a tela inicial não espera mais o selo do Fracttal, e as contagens da
   Performance ficam 6 h na memória.
+
+## Pedidos ao Fracttal: o contador (31/10/2026)
+
+Etapa 0 do canto central do OS Creator (`docs/superpowers/specs/2026-10-30-oscreator-canto-central-design.md`). A cota
+do Fracttal é de 200 pedidos por minuto para a empresa toda, e ninguém sabia quanto o Nexus gasta dela, a que hora nem
+quem pede. `casca/fracttal_conta.py` é UM gancho no `requests.sessions.Session.send` (`ligar()`, idempotente; quem liga
+é o `servir.py`, junto do `teto_os`, nunca o `create_app`: o PC e os testes seguem sem ele). Todo pedido do processo a um
+host `fracttal.com` ou `*.fracttal.com` (o RPC do OS Creator, o REST do `campo/fracttal.py`, o token) é somado na
+memória, sem mudar quem pede. O resto da internet passa sem contar (`notfracttal.com` também: o domínio começa no ponto).
+- **A linha** é hora × origem × método: `pedidos_qtd`, `recusas_qtd` (406/429), `erros_qtd` (exceção ou 5xx) e
+  `pico_minuto_qtd` (o maior número de pedidos num mesmo minuto, o número que se compara com a cota), mais uma linha
+  `*`/`*` por hora com o total e o pico de tudo junto (o pico do total NÃO é a soma dos picos). A hora é a de Brasília,
+  UTC-3 fixo: `hora_id` = `AAAAMMDDHH`, e a virada do dia cai às 03:00 UTC.
+- **Origem** = `origem(rota)` (a casca marca o pedido do `/os/*`) e, sem marca, `fundo:<nome da thread>`. A marca viaja
+  pelo CONTEXTO (`contextvars`, como o JWT do OS Creator), não pela thread: o `api._ExecutorComContexto` copia o contexto
+  para as tarefas do fan-out (o catálogo de ativos pede ~110 vezes, 6 de uma vez), que ficam na rota que as chamou e
+  somam na conta do pedido (`pedidos_desta_thread()`, a da marca em que a thread está). A thread aberta à mão e o
+  `ThreadPoolExecutor` comum começam sem contexto e caem em `fundo:` com o nome deles: quem faz trabalho de fundo com
+  fan-out marca o laço (`origem("fundo:<nome>")`) para as tarefas não virarem `fundo:ThreadPoolExecutor-N`.
+  **Método** = o `method` do corpo do RPC (em lista vale o 1º que traz um; corpo que não é JSON = `rpc`), o 1º segmento
+  depois de `/api/` no REST (`work_orders`), `token` no OAuth e na renovação do JWT, e `outro` no resto.
+- **Quem lê:** `instantaneo()` (o Raio-X, sem tirar nada) e `drenar(hora_aberta)`, que devolve e TIRA as linhas das
+  horas ANTERIORES a ela (passe a hora de agora, `hora_id_de()`). A gravação regrava a mesma chave trocando a linha,
+  então a resposta que volta depois da hora drenada não a recria (uma linha de 0 pedidos e 1 recusa apagaria a certa).
+- **Nunca derruba o pedido:** a falha do contador vai ao log em debug e a resposta, ou a exceção, volta como veio. Com
+  redirecionamento cada salto conta uma vez (o `requests` refaz o pedido pelo mesmo `send`), e a recusa ou o erro é da
+  resposta daquele salto, não da final.
+- **Memória:** do minuto só o corrente fica; do resto, uma linha de quatro números por hora, origem e método. Se ninguém
+  drena, as horas se acumulam: quem drena é o laço da gravação de hora em hora, da mesma etapa 0.
+- **O limitador da etapa 5 vai no mesmo gancho:** o embrulho do `Session.send` mora só aqui.
+- **Prova:** `tests/test_casca_fracttal_conta.py` (o adaptador falso numa `requests.Session` de verdade, sem rede;
+  mutações no gancho pegas uma a uma).
 
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 
