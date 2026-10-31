@@ -147,8 +147,10 @@
         {% if c.nao_informado %}<span class="alm-aviso"><b>{{ c.nao_informado }}</b> sem saldo informado</span>{% endif %}
       </div>
       <div class="alm-card-info">
-        {# None = o inventário não deu para ler agora: a linha some (dizer "nunca contado" seria falso); "" = nunca teve uma gravada #}
-        {% if c.ultima_contagem is not none %}<p>Última contagem gravada: {% if c.ultima_contagem %}<b>{{ c.ultima_contagem }}</b>{% else %}<span class="mudo">nunca contado pelo inventário</span>{% endif %}</p>{% endif %}
+        {# None = o inventário não deu para ler agora, ou o App ainda não publica o livro das contagens: a linha some. "" = o livro
+           foi lido e não tem uma gravada deste almoxarifado: o livro do App é uma janela que anda, e "nunca contado" diria mais
+           do que se sabe #}
+        {% if c.ultima_contagem is not none %}<p>Última contagem gravada: {% if c.ultima_contagem %}<b>{{ c.ultima_contagem }}</b>{% else %}<span class="mudo">sem contagem gravada na janela lida</span>{% endif %}</p>{% endif %}
         {# sem a coluna de custo no livro (o App de antes) não há valor nem cobrança; com ela, a soma pela metade AVISA #}
         {% if c.valor %}
         <p>Valor em estoque: {% if c.valor.total or not c.sem_custo %}<b>{{ c.valor_txt.total }}</b>{% else %}<span class="mudo">–</span>{% endif %}
@@ -161,7 +163,12 @@
       {# as peças chegam no 1º clique (um fetch do pedaço _almox_pecas.html), não na página: são centenas de linhas por almoxarifado.
          O botão guarda o endereço e o estado (aria-expanded); o painel é o que ele controla #}
       <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno alm-ver" data-ver-pecas aria-expanded="false" aria-controls="alm-pecas-{{ c.id }}" data-url="{{ raiz }}/t/pcm/pecas/almox/{{ c.id|urlencode }}">Ver peças</button>
-      <div class="alm-pecas" id="alm-pecas-{{ c.id }}" role="region" aria-label="Peças de {{ c.nome }}" aria-live="polite" hidden></div>
+      {# o `aria-live` fica só na mensagem ("lendo…" e o erro), que já existe antes do texto: no painel inteiro o leitor de tela leria as
+         centenas de linhas que chegam #}
+      <div class="alm-pecas" id="alm-pecas-{{ c.id }}" role="region" aria-label="Peças de {{ c.nome }}" hidden>
+        <p class="alm-pecas-msg" data-pecas-msg aria-live="polite"></p>
+        <div data-pecas-corpo></div>
+      </div>
     </article>
   {% endfor %}
   </div>
@@ -289,12 +296,10 @@
   // o que já chegou só reaparece; se falhar, o próximo clique tenta de novo. O cartão aberto ocupa a linha inteira do painel
   (function () {
     var rota = window.nexusRota || String;
+    // a mensagem ("lendo…", o erro) e as peças são dois lugares do painel: a mensagem é o único `aria-live`
     function dizer(painel, texto) {
-      var p = document.createElement('p');
-      p.className = 'alm-pecas-msg';
-      p.textContent = texto;
-      painel.textContent = '';
-      painel.appendChild(p);
+      painel.querySelector('[data-pecas-msg]').textContent = texto;
+      painel.querySelector('[data-pecas-corpo]').textContent = '';
     }
     Array.prototype.slice.call(document.querySelectorAll('[data-ver-pecas]')).forEach(function (botao) {
       var painel = document.getElementById(botao.getAttribute('aria-controls'));
@@ -309,7 +314,11 @@
           // DENTRO do cartão; recarregar leva a página inteira ao login, com a volta para cá
           if (r.redirected) { window.location.reload(); return; }
           if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.text().then(function (html) { painel.innerHTML = html; estado = 'pronto'; });
+          return r.text().then(function (html) {
+            painel.querySelector('[data-pecas-msg]').textContent = '';
+            painel.querySelector('[data-pecas-corpo]').innerHTML = html;
+            estado = 'pronto';
+          });
         }).catch(function () {
           estado = '';
           dizer(painel, 'não consegui abrir as peças agora');

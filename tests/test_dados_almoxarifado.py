@@ -256,7 +256,8 @@ def test_historico_nao_grava_a_palavra_none_na_criticidade_e_na_curva():
              dict(base, **{"ID do item": "3", "Criticidade": " NONE ", "Curva ABC": "Curva B"}),
              dict(base, **{"ID do item": "4", "Criticidade": "1.Crítico", "Curva ABC": "a"})]
     por = {l[0]: dict(zip(F.CAB_DIM_ITEM, l)) for l in F.dim_itens(itens)}
-    assert [(por[i]["criticidade"], por[i]["curva_abc"]) for i in "1234"] ==         [("", ""), ("", ""), ("", "B"), ("1.Crítico", "A")]
+    assert [(por[i]["criticidade"], por[i]["curva_abc"]) for i in "1234"] == \
+        [("", ""), ("", ""), ("", "B"), ("1.Crítico", "A")]
 
 
 def test_saldo_do_ciclo_leva_custo():

@@ -489,15 +489,20 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   (`almoxarifado.campo`, a mesma definição da carga: a dimensão do histórico também não grava mais a palavra).
 - **Por almoxarifado (30/10/2026, itens 1 e 9):** cada cartão mostra a **última contagem gravada** do inventário (a data, em
   Brasília, da contagem mais nova do almoxarifado em estado `gravada` ou `gravada_com_conflitos`, de qualquer tipo: a recontagem
-  gravada também conta, é uma contagem real daquelas peças; a que ainda está `gravando` não; "nunca contado pelo inventário"
-  sem nenhuma; e, se o inventário não deu para ler, a linha NÃO aparece: dizer "nunca contado" seria falso) e o **valor em
+  gravada também conta, é uma contagem real daquelas peças; a que ainda está `gravando` não; "sem contagem gravada na janela
+  lida" quando o livro foi lido e não tem nenhuma gravada dali, porque o livro das contagens do App é uma janela que anda e
+  "nunca contado" diria mais do que se sabe; e, se o inventário não deu para ler OU o App ainda não publica o livro, a linha NÃO
+  aparece: dizer "nunca contado" seria falso) e o **valor em
   estoque por curva** (`_valor`: saldo × custo unitário que o Fracttal deu, somado por Curva ABC do cadastro da peça, "R$ total
   (A · B · C · sem curva)"; a peça COM saldo e sem custo fica fora da soma e o cartão diz "N peças sem custo no Fracttal", porque
   a soma pela metade avisa e não esconde; sem a coluna de custo no livro, sem valor e sem cobrança; total zero com peças sem custo
   é "–", nunca "R$ 0,00"). A última contagem vem de FORA da conta de 5 min, da mesma leitura que dá o número da aba Inventário
-  (`revisao._resumo`, uma só passada pelas contagens para os dois, pela cópia de 5 min do `visao._ler`), e o `valor`
+  (`revisao.resumo`, uma só passada pelas contagens para os dois, pela cópia de 5 min do `visao._ler`; **a tela chama o
+  `resumo` UMA vez por abertura e tira os dois valores dele**: a falha de leitura não fica guardada, e duas chamadas leriam o
+  livro duas vezes justo com o banco ruim, `test_a_tela_le_o_inventario_uma_vez_por_abertura`; o `a_revisar` segue como o
+  invólucro `int | None` das outras páginas), e o `valor`
   e o `sem_custo` saem da conta guardada (`_partes`). **"Ver peças"** (botão com `aria-expanded` e `aria-controls`): as peças
-  chegam no 1º clique, por `fetch(nexusRota(...))`, de `GET /t/pcm/pecas/almox/<id_almox>` (`pecas_almox`, o pedaço
+  chegam no 1º clique (o `aria-live` fica só na mensagem "lendo…"/erro, não no painel), por `fetch(nexusRota(...))`, de `GET /t/pcm/pecas/almox/<id_almox>` (`pecas_almox`, o pedaço
   `pcm/_almox_pecas.html`), que filtra as linhas da MESMA `montar()` (nenhuma leitura de livro nem do Fracttal; a página não
   engorda com centenas de linhas por almoxarifado). Sub-rota da tela: o portão de setor olha o prefixo `/t/pcm/pecas`, então
   quem não vê o Almoxarifado não vê as peças. Ordem (`_pecas_do_almox`): o grupo de gravidade (abaixo, no limite, saldo

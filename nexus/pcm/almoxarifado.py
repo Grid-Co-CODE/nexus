@@ -429,9 +429,10 @@ def _pecas_do_almox(linhas: list[dict], id_almox: str) -> list[dict]:
 
 
 def _cartoes(d: dict, ultimas: dict | None) -> list[dict]:
-    """Os cartões da aba Por almoxarifado com a última contagem gravada do inventário: "dd/mm/aaaa", "" se o almoxarifado nunca
-    foi contado e None se o inventário não deu para ler (a linha não aparece). Ela vem de fora da conta de 5 min, como o número
-    da aba Inventário: o estado das contagens muda a cada gravação. Cópias: a conta guardada é de todos."""
+    """Os cartões da aba Por almoxarifado com a última contagem gravada do inventário: "dd/mm/aaaa"; "" se o livro foi lido e
+    não tem nenhuma gravada daquele almoxarifado ("sem contagem gravada na janela lida"); e None se o inventário não deu para ler
+    ou o App ainda não publica o livro (a linha não aparece). Ela vem de fora da conta de 5 min, como o número da aba Inventário:
+    o estado das contagens muda a cada gravação. Cópias: a conta guardada é de todos."""
     return [dict(c, ultima_contagem=None if ultimas is None else ultimas.get(c["id"], ""))
             for c in d.get("por_almoxarifado", [])]
 
@@ -442,11 +443,13 @@ def registrar(bp) -> None:
         g = montar()
         d = g.dados or {}
         # quantas contagens do inventário esperam o PCM (o número da aba Inventário) e a última contagem gravada de cada
-        # almoxarifado; fora da conta guardada de 5 min, porque o estado vem dos eventos e muda a cada revisão (uma leitura só
-        # das contagens para os dois, `revisao._resumo`). Sem ler o livro, a aba segue sem número e o cartão sem a linha
-        cfg = current_app.config
-        return render_template("pcm/almoxarifado.html", d=d, erro=g.erro, inventario_a_revisar=revisao.a_revisar(cfg),
-                               cartoes=_cartoes(d, revisao.ultimas_gravadas(cfg)))
+        # almoxarifado; fora da conta guardada de 5 min, porque o estado vem dos eventos e muda a cada revisão. UMA chamada ao
+        # `revisao.resumo` por abertura: a falha de leitura não fica guardada, e duas chamadas leriam o livro duas vezes justo
+        # quando o banco está ruim. Sem ler o livro, a aba segue sem número e o cartão sem a linha
+        r = revisao.resumo(current_app.config)
+        return render_template("pcm/almoxarifado.html", d=d, erro=g.erro,
+                               inventario_a_revisar=None if r is None else r["n"],
+                               cartoes=_cartoes(d, None if r is None else r["ultimas"]))
 
     @bp.route(f"/{TELA}/almox/<id_almox>", endpoint="pecas_almox")
     def pecas_almox(id_almox):

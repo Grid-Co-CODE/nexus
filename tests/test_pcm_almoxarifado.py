@@ -673,6 +673,16 @@ def test_cartao_tem_o_botao_ver_pecas(app, almox, monkeypatch):
     assert "lendo…" in html and "não consegui abrir as peças agora" in html and "nexusRota" in html
 
 
+def test_aria_live_so_na_mensagem_das_pecas(app, almox, monkeypatch):
+    """O `aria-live` no painel inteiro faria o leitor de tela ler as centenas de linhas que chegam: ele fica só na mensagem
+    ("lendo…" e o erro), um elemento que já existe antes do texto (senão o anúncio se perde)."""
+    cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 10")
+    painel = re.search(r'<div class="alm-pecas"[^>]*>', cartao).group(0)
+    assert "aria-live" not in painel and 'role="region"' in painel
+    assert re.search(r'<p class="alm-pecas-msg" data-pecas-msg aria-live="polite"></p>', cartao)
+    assert "data-pecas-corpo" in cartao and cartao.count("aria-live") == 1
+
+
 def _contagens(app, api, *cs):
     """Contagens do inventário no almoxarifado: (id, almoxarifado, "Contada em" UTC, como acabou, "Recontagem de"), com o
     `como` em nova | gravando | gravada | conflito. Cada uma conta as peças 501 e 502, e os eventos são os da gravação."""
@@ -709,7 +719,7 @@ def test_cartao_ultima_contagem_gravada(app, inventario, monkeypatch):
     html = _abrir(app, monkeypatch).get_data(as_text=True)
     cartao = _cartao(html, "Almoxarifado 10")
     assert "Última contagem gravada" in cartao and "20/10/2026" in cartao and "25/10/2026" not in cartao
-    assert "nunca contado" in _cartao(html, "Almoxarifado 20")               # o outro almoxarifado nunca foi contado
+    assert "sem contagem gravada na janela lida" in _cartao(html, "Almoxarifado 20")      # o outro, nenhuma gravada no livro
 
 
 def test_cartao_ultima_contagem_conta_conflito_e_recontagem(app, inventario, monkeypatch):
@@ -725,9 +735,23 @@ def test_cartao_ultima_contagem_conta_conflito_e_recontagem(app, inventario, mon
     assert "12/10/2026" in _cartao(html, "Almoxarifado 20")
 
 
-def test_cartao_nunca_contado(app, almox, monkeypatch):
-    html = _abrir(app, monkeypatch).get_data(as_text=True)
-    assert "nunca contado pelo inventário" in _cartao(html, "Almoxarifado 10")
+def test_cartao_sem_contagem_gravada_na_janela_lida(app, inventario, monkeypatch):
+    """O livro das contagens do App é uma janela que anda: "nunca contado" seria mais do que se sabe. Com o livro lido e nenhuma
+    gravada naquele almoxarifado (só uma nova), o cartão diz "sem contagem gravada na janela lida"."""
+    _contagens(app, inventario, ("C-3", "10", "2026-10-25T11:00:00Z", "nova"))
+    cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 10")
+    assert "Última contagem gravada" in cartao and "sem contagem gravada na janela lida" in cartao
+    assert "nunca contado" not in cartao
+
+
+def test_cartao_sem_o_livro_das_contagens_nao_diz_nada(app, almox, monkeypatch):
+    """O App que ainda não publica o livro das contagens (`livro_existe` falso) é "não leu": a linha some do cartão, em vez
+    de todo almoxarifado dizer que nunca foi contado."""
+    from nexus.pcm.inventario import revisao as R
+    visao.limpar()
+    assert R.resumo(app.config)["ultimas"] is None
+    cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 10")
+    assert "contagem gravada" not in cartao and "nunca contado" not in cartao
 
 
 def test_cartao_inventario_nao_leu(app, almox, monkeypatch):
@@ -735,13 +759,60 @@ def test_cartao_inventario_nao_leu(app, almox, monkeypatch):
     from nexus.dados import fato_inventario as F
     from nexus.pcm.inventario import leitura as L
 
-    def cair(cfg):
+    def cair(cfg, **k):
         raise F.Recusada("o livro do inventário não abriu")
-    monkeypatch.setattr(L, "contagens", cair)
+    monkeypatch.setattr(L, "ler", cair)
     visao.limpar()
     r = _abrir(app, monkeypatch)
     cartao = _cartao(r.get_data(as_text=True), "Almoxarifado 10")
     assert r.status_code == 200 and "contagem gravada" not in cartao and "nunca contado" not in cartao
+    assert "Inventário</a>" in r.get_data(as_text=True)                       # a aba segue, sem o número
+
+
+def test_a_tela_le_o_inventario_uma_vez_por_abertura(app, inventario, monkeypatch):
+    """O número da aba Inventário e a última contagem saem de UMA leitura por abertura (`revisao.resumo`). A falha não fica
+    guardada (o `visao._calcular` não guarda erro), então duas leituras por abertura dobrariam o custo justo quando o banco está
+    ruim: com o livro falhando, 1 por abertura; com o livro bom, 1 na primeira e nenhuma enquanto a cópia de 5 min vale."""
+    from nexus.dados import fato_inventario as F
+    from nexus.pcm.inventario import leitura as L
+    from nexus.pcm.inventario import revisao as R
+    chamadas = []
+    original = L.ler
+
+    def cair(cfg, **k):
+        chamadas.append(1)
+        raise F.Recusada("o livro do inventário não abriu")
+    monkeypatch.setattr(L, "ler", cair)
+    visao.limpar()
+    for aberturas in (1, 2, 3):
+        assert _abrir(app, monkeypatch).status_code == 200
+        assert len(chamadas) == aberturas
+    assert R.a_revisar(app.config) is None and len(chamadas) == 4               # o contrato público do a_revisar segue
+    chamadas.clear()
+
+    def contar(cfg, **k):
+        chamadas.append(1)
+        return original(cfg, **k)
+    monkeypatch.setattr(L, "ler", contar)
+    visao.limpar()
+    _contagens(app, inventario, ("C-1", "10", "2026-10-20T15:00:00Z", "gravada"))
+    chamadas.clear()
+    for _ in range(3):
+        assert _abrir(app, monkeypatch).status_code == 200
+    assert len(chamadas) == 1 and R.a_revisar(app.config) == 0
+
+
+def test_a_data_da_ultima_contagem_e_a_de_brasilia(app, inventario, monkeypatch):
+    """"Contada em" é UTC: 01:30Z de 21/10 são 22:30 de 20/10 em Brasília, e o cartão mostra o dia de Brasília."""
+    _contagens(app, inventario, ("C-1", "10", "2026-10-21T01:30:00Z", "gravada"))
+    cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 10")
+    assert "20/10/2026" in cartao and "21/10/2026" not in cartao
+
+
+def test_o_vao_do_alm_det_e_so_do_cartao():
+    """O `.alm-det{margin:2px 0 8px}` do cartão pegava também o "falta N" e o "zerada" da tabela das peças que abre dentro dele."""
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "pcm.css").read_text("utf-8")
+    assert ".alm-card > .alm-det{" in css and ".alm-card .alm-det{" not in css
 
 
 def test_valor_por_curva(app, almox, monkeypatch):

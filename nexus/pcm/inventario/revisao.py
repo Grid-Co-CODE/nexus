@@ -182,15 +182,22 @@ def _recontagem_de(c: dict, contagens: list[dict]) -> str:
     return f"recontagem da contagem de {_hora(o['contada_em'])}" if o else f"recontagem da contagem {de}"
 
 
-def _resumo(cfg) -> dict | None:
-    """Os dois números que a tela principal do Almoxarifado pede ao inventário, de UMA leitura das contagens (30/10/2026): quantas
-    esperam o PCM (`n`, o número da aba Inventário) e a data da última contagem gravada de cada almoxarifado (`ultimas`,
-    no cartão da aba Por almoxarifado). Pela cópia de 5 min do `visao._ler`, renovada por trás: os dois são só enfeite, e a leitura do
-    livro do inventário (2 min, no pedido) não pode segurar a tela principal quando o banco está lento (a lista do Inventário,
-    essa sim, mostra o estado de agora). Duas contas guardadas leriam as contagens duas vezes a cada 5 min. None se não deu para
-    ler: nenhum dos dois aparece (nunca "0 a revisar" nem "nunca contado" no lugar do que não se leu)."""
+def resumo(cfg) -> dict | None:
+    """O que a tela principal do Almoxarifado pede ao inventário, de UMA leitura das contagens (30/10/2026): `{"n": quantas
+    esperam o PCM (o número da aba Inventário), "ultimas": {id do almoxarifado: "dd/mm/aaaa"} ou None}`. `ultimas` é o dia
+    (Brasília) da contagem gravada mais nova de cada almoxarifado, em estado `gravada` ou `gravada_com_conflitos`; o
+    almoxarifado sem nenhuma fica fora do dicionário (a tela diz "sem contagem gravada na janela lida": o livro do App é uma janela
+    que anda, e "nunca contado" seria mais do que se sabe); e `None` quando o App ainda não publica o livro das contagens
+    (`livro_existe` falso): não leu, a tela não diz nada. O retorno `None` é o inventário que não deu para ler.
+
+    **Quem abre a tela chama isto UMA vez por abertura e tira os dois valores daqui.** A falha de leitura não fica guardada (o
+    `visao._calcular` só guarda o que deu certo): chamar `a_revisar` e depois uma segunda função pelo mesmo caminho lia o livro
+    duas vezes por abertura justo quando o banco está ruim (a revisão de 30/10/2026). Pela cópia de 5 min do `visao._ler`, renovada
+    por trás: os dois são só enfeite, e a leitura do livro do inventário (2 min, no pedido) não pode segurar a tela principal quando
+    o banco está lento (a lista do Inventário, essa sim, mostra o estado de agora)."""
     def contar() -> dict:
-        cs = leitura.contagens(cfg)
+        d = leitura.ler(cfg)
+        cs = d["contagens"]
         ultimas: dict[str, tuple] = {}
         for c in cs:
             # a recontagem gravada também conta (é uma contagem real daquelas peças); a que ainda está gravando, não
@@ -202,24 +209,17 @@ def _resumo(cfg) -> dict | None:
                 continue                  # sem data legível não há o que mostrar (e a que não se lê nem se aprova)
             if c["id_almox"] not in ultimas or quando > ultimas[c["id_almox"]][0]:
                 ultimas[c["id_almox"]] = (quando, quando.astimezone(_BRT).strftime("%d/%m/%Y"))
-        return {"n": sum(1 for c in cs if c["aprovavel"]), "ultimas": {a: dia for a, (_, dia) in ultimas.items()}}
+        return {"n": sum(1 for c in cs if c["aprovavel"]),
+                "ultimas": {a: dia for a, (_, dia) in ultimas.items()} if d["livro_existe"] else None}
     g = visao._ler(("pcm_inventario_resumo",), contar)
     return None if g.erro or not g.dados else g.dados
 
 
 def a_revisar(cfg) -> int | None:
-    """Quantas contagens esperam o PCM (o número da aba Inventário na tela principal do Almoxarifado); None se não deu para
-    ler: a aba segue sem número. Ver `_resumo`."""
-    r = _resumo(cfg)
+    """Quantas contagens esperam o PCM (o número da aba Inventário nas outras páginas do Almoxarifado); None se não deu para
+    ler: a aba segue sem número. A tela principal usa o `resumo` inteiro (uma leitura só), não esta função mais outra."""
+    r = resumo(cfg)
     return None if r is None else r["n"]
-
-
-def ultimas_gravadas(cfg) -> dict[str, str] | None:
-    """`{id do almoxarifado: "dd/mm/aaaa"}`: o dia (Brasília) da contagem gravada mais nova de cada almoxarifado, em estado
-    `gravada` ou `gravada_com_conflitos`; o almoxarifado que nunca teve uma fica fora (a tela diz "nunca contado pelo
-    inventário"). None se não deu para ler o inventário: aí a tela não diz nada, e "nunca contado" seria falso. Ver `_resumo`."""
-    r = _resumo(cfg)
-    return None if r is None else r["ultimas"]
 
 
 # ── a auditoria ──────────────────────────────────────────────────────────────────────────────────────────────────────────
