@@ -23,6 +23,7 @@
     LEITOR = !!(info && info.leitor);
     const usinas = new Set(TODOS.map(a => a.usina));
     $('sub').textContent = fmtN(TODOS.length) + ' ativos  ·  ' + usinas.size + ' usinas' + idadeTxt(info);
+    $('sub').title = (info && info.ativos_de_titulo) || '';       // as duas horas: a lista completa e os novos (Ruling AL)
     arvore(); aplica();
   }
   // "ativos de HH:MM" vem pronto do servidor (31/10/2026): a hora de Brasília da última vez que a lista foi comparada com o
@@ -144,9 +145,14 @@
       const rc = await fetch('/os/api/ativos/catalogo' + (j.novos ? '?novos=1' : '')); const d = await rc.json();
       chegou(d.ativos || [], d.info || j.info || {});
       const delta = TODOS.length - antes;
-      const partes = [delta ? 'catálogo atualizado — ' + (delta > 0 ? '+' : '') + delta + ' ativo(s) em relação à lista anterior'
-                            : (j.novos ? 'nenhum ativo novo no Fracttal' : '')];
+      const deltaTxt = delta
+        ? 'catálogo atualizado — ' + (delta > 0 ? '+' : '') + delta + ' ativo(s) em relação à lista anterior' : '';
+      // o desfecho da busca dos novos (revisão 1 da 2.2): o servidor diz se ela não terminou, falhou ou deixou ativos para a
+      // noite; "nenhum ativo novo no Fracttal" só quando ela terminou bem sem nada; terminou bem com novos, a conta da lista
+      const dn = d.novos_desfecho;
+      const partes = [dn ? ((dn.ok && delta) ? deltaTxt : dn.texto) : deltaTxt];
       if (j.recusa) partes.push(j.recusa);         // a leitura do Fracttal que o catálogo não aceitou, e por quê
+      if (j.falha) partes.push(j.falha);           // o download que falhou há pouco: a lista é a de antes
       const txt = partes.filter(Boolean).join('  ·  ');
       if (txt) $('rodape').textContent = txt;
     } catch (e) { $('sub').textContent = 'não consegui atualizar: ' + String(e.message || e).slice(0, 90); }

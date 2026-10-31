@@ -3,27 +3,29 @@ canto central; desenho `docs/superpowers/specs/2026-10-30-oscreator-canto-centra
 
 Até aqui o catálogo de ativos do OS Creator só se renovava pelo RPC (`api.get_assets`), com a sessão da 1ª pessoa que o achava
 vencido: ~110 pedidos de 200 ativos, e o botão "Atualizar ativos" fazia a pessoa esperar minutos. Agora:
-- DE MADRUGADA (02:15 de Brasília, `ler_completo`): o REST `items` inteiro, 100 por página e 1 pedido por segundo (~270
-  pedidos, ~5 min, longe do campo e da cota da empresa: 200 por minuto, dividida com o App de Campo). A leitura que não chega ao
-  total que o Fracttal informa não troca nada (`LeituraIncompleta`). A que chega é CONFERIDA contra o catálogo de agora
-  (`conferir_paridade`: na 1ª noite ele é o do RPC, e a conferência é REST x RPC de verdade; depois, a leitura anterior) e só
-  então vai ao catálogo (`ativos_central.trocar`, que ainda recusa a que encolhe) e, aceita, à foto do banco
-  (`nexus/dados/foto_ativos.py`; uma guarda só).
+- DE MADRUGADA (02:15 de Brasília, `ler_completo`): o REST `items` inteiro, ordenado pelo id, 100 por página e 1 pedido por
+  segundo (~270 pedidos, ~5 min, longe do campo e da cota da empresa: 200 por minuto, dividida com o App de Campo). A leitura
+  que não chega ao total que o Fracttal informa, ou que ele recusa, não troca nada (`LeituraIncompleta`). A que chega é
+  CONFERIDA contra o catálogo de agora (`conferir_paridade`: na 1ª noite ele é o do RPC, e a conferência é REST x RPC de
+  verdade; depois, a leitura anterior) e só então vai ao catálogo (`ativos_central.trocar`, que ainda recusa a que encolhe)
+  e, aceita, à foto do banco (`nexus/dados/foto_ativos.py`; uma guarda só).
 - DE DIA, SÓ OS NOVOS (de 30 em 30 min, das 06:08 às 21:38, `ler_novos`): ordenados do maior id para o menor, até uma página
   inteira de ids que o catálogo já tem (1 pedido sem novidade, 2 com). Somam-se ao catálogo (`ativos_central.acrescentar`),
-  sem mexer no `lido_em` da lista inteira. Os três botões "Atualizar ativos" e a aprovação da Fila pedem esta leitura
-  (`pedir_novos`, `esperar_novos`), por trás.
-- A PARIDADE QUE FALHOU (ou que ainda não houve) deixa tudo como era: o REST não troca nem soma nada, o motivo fica no estado,
-  o catálogo vence nas 24 h de sempre e a 1ª sessão do dia o renova pelo RPC (o renovador de antes, uma vez por dia, para
-  todos). A sondagem que o desenho pedia (o REST dá os mesmos campos do RPC?) não pôde ser feita antes de construir: é esta
-  conferência, toda noite, que a faz.
+  sem mexer no `lido_em` da lista inteira. Os três botões "Atualizar ativos" e a aprovação da Fila que não acha o ativo pedem
+  esta leitura (`pedir_novos`, `esperar_novos`, que diz o desfecho: terminou, falhou, ficou para a noite), por trás.
+- A PARIDADE QUE FALHOU (ou que ainda não houve, ou que passou de 30 h) deixa tudo como era: o REST não troca nem soma nada, o
+  motivo fica no estado, o catálogo vence no prazo de sempre e a 1ª sessão do dia o renova pelo RPC (o renovador de antes, uma
+  vez por dia, para todos). A leitura REST que FALHA (a da noite ou a dos novos) também tira a prontidão do leitor até a
+  próxima boa (`ativos_central.anotar_leitura_rest`): os botões voltam ao RPC (revisão 1 da 2.2). A sondagem que o desenho
+  pedia (o REST dá os mesmos campos do RPC?) não pôde ser feita antes de construir: é esta conferência, toda noite, que a faz.
 
 Só o `servir.py` liga (`ligar`); o `app.py` (o PC) e os testes seguem sem ele, como o `nexus/casca/teto_os.py`. Sem a
 credencial REST (o PC, a worktree sem `FRACTTAL_CLIENT_ID`) ele não liga, o estado diz por quê, e nada quebra.
 
 O cliente HTTP e o ritmo são os que já existem (`nexus/campo/fracttal.py`, como `nexus/engenharia/os_falhas.py` pagina): 1 s
 entre as páginas; o 406/429 o próprio cliente espera (5 s e 10 s) e, se ele desistir, este espera o castigo de 1 min do
-Fracttal (medido em 19/08 no robô do PCM) e tenta a mesma página de novo, duas vezes. Os campos do `items` que se guardam
+Fracttal (medido em 19/08 no robô do PCM) e tenta a mesma página de novo, duas vezes; a conexão que caiu, o tempo esgotado e o
+5xx também; o resto (400, 401, 403, 404) falha na hora (`_transitorio`). Os campos do `items` que se guardam
 (`CAMPOS_REST`) são os do registro do RPC: o REST não foi sondado antes de construir (31/10/2026), e o que faltar aparece na
 conferência da 1ª noite, que então falha e diz o campo.
 """
@@ -47,14 +49,16 @@ POR_PAGINA = 100                 # o REST do Fracttal dá no máximo 100 por ped
 PAUSA_S = 1.0                    # 1 pedido por segundo, como o robô do PCM no Actions e o `os_falhas`
 ESPERAS_RECUSA_S = (62, 62)      # depois que o cliente desiste do 406/429: o castigo de 1 min, e a mesma página de novo
 PAGINAS_MAX = 600                # 60 mil itens: um filtro ignorado não vira um laço sem fim
-PAGINAS_NOVOS_MAX = 5            # mais de 400 ativos novos num dia: ficam para a leitura da noite
+PAGINAS_NOVOS_MAX = 5            # mais de 400 ativos novos num dia (a 5ª página tem de ser toda conhecida): ficam para a noite
 # os campos do `items` que o catálogo usa (os do registro do RPC, `inventories.items_list`); o resto do item (coordenadas,
 # campos livres) sai assim que a página chega: são ~27 mil itens, e o servidor já anda apertado de memória
 CAMPOS_REST = ("id", "code", "description", "id_parent", "parent_description", "id_type_item", "id_group_task")
 OBRIGATORIOS = ("id", "id_parent", "id_type_item")       # sem eles a criação de OS e o drill-down da tela de Ativos quebram
 PARIDADE_MIN_PCT = 99.0          # dos códigos em comum, os que dão o mesmo cliente e usina
 CAMPOS_MIN_PCT = 99.0            # dos registros, os que têm os campos obrigatórios
-COBERTURA_MIN_PCT = 95.0         # dos códigos de cada lado, os que o outro também tem
+COBERTURA_MIN_PCT = 95.0         # dos códigos da leitura, os que o catálogo também tem (toda noite)
+PRIMEIRA_MIN_PCT = 99.0          # na 1ª conferência (a sondagem REST x RPC), nos dois sentidos
+EXEMPLOS = 5                     # quantos códigos que faltam o motivo da paridade mostra
 HORA_COMPLETO = (2, 15)          # a leitura inteira, em Brasília: longe dos laços de hora em hora (:10 a :50) e do campo
 NOVOS_DAS, NOVOS_ATE = 6, 22     # os novos, de 30 em 30 min, das 06h às 22h
 NOVOS_MINUTOS = (8, 38)          # fora dos minutos ocupados (tarefas :10 a :20, normalizações :22, App :25, carga :40...)
@@ -87,7 +91,12 @@ class ForaDeOrdem(RuntimeError):
 
 
 class MuitosNovos(RuntimeError):
-    """Mais novos do que `PAGINAS_NOVOS_MAX` páginas: ficam para a leitura da noite."""
+    """Mais novos do que a leitura curta lê: ficam para a leitura da noite. `n` são os novos que ela chegou a ver. Não é falha
+    do REST (ele respondeu, e em ordem)."""
+
+    def __init__(self, mensagem: str, n: int = 0):
+        super().__init__(mensagem)
+        self.n = n
 
 
 def _int(v):
@@ -114,17 +123,30 @@ def _enxuto(it: dict) -> dict:
     return {k: it[k] for k in CAMPOS_REST if k in it}
 
 
-def _pedir(ler, path: str, conta: list):
-    """Um pedido, com a 2ª chance depois da recusa: o cliente já esperou 5 s e 10 s no 406/429; aqui, o castigo de 1 min."""
+def _transitorio(e: BaseException) -> bool:
+    """Vale pedir a mesma página de novo: a recusa por excesso (o cliente já esperou 5 s e 10 s), a conexão que caiu, o tempo
+    esgotado e o erro do lado do Fracttal (5xx). O resto (400, 401, 403, 404, a resposta que não é JSON) daria o mesmo na
+    próxima vez: falha na hora, em vez de esperar 1 min duas vezes à toa (revisão 1 da 2.2)."""
     from nexus.campo import fracttal
+    if isinstance(e, (fracttal.Recusado, requests.ConnectionError, requests.Timeout)):
+        return True
+    if isinstance(e, requests.HTTPError):
+        st = getattr(getattr(e, "response", None), "status_code", None)
+        return isinstance(st, int) and st >= 500
+    return False
+
+
+def _pedir(ler, path: str, conta: list):
+    """Um pedido, com a 2ª chance só para o erro de passagem (`_transitorio`): o castigo de 1 min do 406/429, e a mesma
+    página de novo, duas vezes."""
     for tentativa in range(len(ESPERAS_RECUSA_S) + 1):
         conta[0] += 1
         try:
             return ler(path)
-        except (fracttal.Recusado, requests.RequestException) as e:
-            if tentativa >= len(ESPERAS_RECUSA_S):
+        except Exception as e:
+            if not _transitorio(e) or tentativa >= len(ESPERAS_RECUSA_S):
                 raise
-            log.warning("leitor de ativos: o Fracttal recusou %s (%s); espero %d s e tento de novo", path.split("?")[0],
+            log.warning("leitor de ativos: o Fracttal não deu %s (%s); espero %d s e tento de novo", path.split("?")[0],
                         str(e)[:120], ESPERAS_RECUSA_S[tentativa])
             _dormir(ESPERAS_RECUSA_S[tentativa])
 
@@ -138,10 +160,11 @@ def _ler_padrao(ler):
 
 # ── as duas leituras ───────────────────────────────────────────────────────────────────────────────────────────────────
 def ler_todos_rest(ler=None, conta: list | None = None) -> list[dict]:
-    """Todos os itens do Fracttal pelo REST `items`: 100 por página, 1 pedido por segundo, até o `total` que a 1ª página
-    informa (sem total: até a página com menos de 100). Repetido entre páginas conta uma vez (pelo id). Levanta
-    `LeituraIncompleta` se uma página vem curta antes do total, se os itens distintos não chegam a ele, ou se não veio nada:
-    leitura incompleta não troca o que existe. Só os `CAMPOS_REST` de cada item ficam."""
+    """Todos os itens do Fracttal pelo REST `items`, ordenados pelo id (`sort=id:asc`: o deslocamento de cada página só é
+    estável sobre uma ordem declarada), 100 por página, 1 pedido por segundo, até o `total` que a 1ª página informa (sem total:
+    até a página com menos de 100). Repetido entre páginas conta uma vez (pelo id). Levanta `LeituraIncompleta` se o REST
+    recusa a ordem (4xx na 1ª página: o motivo diz), se uma página vem curta antes do total, se os itens distintos não chegam a
+    ele, ou se não veio nada: leitura incompleta não troca o que existe, e tudo segue pelo RPC. Só os `CAMPOS_REST` ficam."""
     ler = _ler_padrao(ler)
     conta = conta if conta is not None else [0]
     por_id: dict = {}
@@ -149,7 +172,14 @@ def ler_todos_rest(ler=None, conta: list | None = None) -> list[dict]:
     for n in range(PAGINAS_MAX):
         if n:
             _dormir(PAUSA_S)
-        r = _pedir(ler, "items?limit=%d&start=%d" % (POR_PAGINA, inicio), conta)
+        try:
+            r = _pedir(ler, "items?sort=id:asc&limit=%d&start=%d" % (POR_PAGINA, inicio), conta)
+        except requests.HTTPError as e:
+            st = getattr(getattr(e, "response", None), "status_code", None)
+            if n == 0 and isinstance(st, int) and 400 <= st < 500:
+                raise LeituraIncompleta("o REST recusou a leitura ordenada pelo id (sort=id:asc, HTTP %d): sem a ordem, as "
+                                        "páginas não são estáveis; o catálogo segue pelo RPC" % st) from e
+            raise
         pagina = _dados(r)
         if total is None:
             total = _total(r)
@@ -198,8 +228,9 @@ def ler_novos_rest(maior_id: int, ler=None, conta: list | None = None) -> list[d
             return list(novos.values())
         anterior = ids[-1]
         inicio += POR_PAGINA
+    # a última página lida ainda trazia novos: só cabem (PAGINAS_NOVOS_MAX - 1) páginas inteiras de novos antes da conhecida
     raise MuitosNovos("mais de %d ativos novos desde o último catálogo: ficam para a leitura da noite"
-                      % (PAGINAS_NOVOS_MAX * POR_PAGINA))
+                      % ((PAGINAS_NOVOS_MAX - 1) * POR_PAGINA), n=len(novos))
 
 
 # ── do REST ao registro, e a conferência ───────────────────────────────────────────────────────────────────────────────
@@ -273,17 +304,27 @@ def para_registro(itens_rest, *, catalogo=None, foto=None, pais_do_catalogo: boo
     return out
 
 
-def conferir_paridade(registros, referencia_por_codigo, *, primeira: bool = False) -> tuple[bool, str, float]:
+def _exemplos(codigos) -> str:
+    """Até `EXEMPLOS` códigos, em ordem, para o motivo dizer QUAIS (o código do ativo não é dado pessoal)."""
+    lista = sorted(codigos)
+    return ", ".join(lista[:EXEMPLOS]) + (" e mais %d" % (len(lista) - EXEMPLOS) if len(lista) > EXEMPLOS else "")
+
+
+def conferir_paridade(registros, referencia_por_codigo, *, primeira: bool = False,
+                      medidas: dict | None = None) -> tuple[bool, str, float]:
     """(vale, motivo, % dos códigos em comum com o mesmo cliente e usina). A leitura REST vale contra o catálogo de agora
     (`ativos_central.atual().por_codigo`) se:
     - dos códigos em comum, >= 99% dão o mesmo cliente e a mesma usina;
     - >= 99% dos registros têm os campos obrigatórios (`OBRIGATORIOS`: id, id_parent, id_type_item);
     - >= 95% dos códigos da leitura estão no catálogo (o REST que trouxesse o que o RPC não traz, como os inativos, não vale só
       porque os em comum batem);
-    - na `primeira` conferência (o REST ainda não valeu nenhuma vez, ou a última falhou: é a sondagem REST x RPC), também
-      >= 95% dos códigos do catálogo na leitura. Depois dela, a leitura que encolhe passa daqui e vai ao `ativos_central.trocar`,
-      que a recusa e só a aceita confirmada por duas leituras (o encolhimento de verdade); na primeira, um REST que desse
-      sempre um pedaço do Fracttal seria confirmado por ele mesmo na noite seguinte, e a lista pela metade iria para a tela.
+    - na `primeira` conferência (o REST ainda não valeu, ou a última que valeu passou de 30 h: é a sondagem REST x RPC),
+      >= 99% nos DOIS sentidos, e o motivo diz até 5 códigos dos que faltam de cada lado (revisão 1 da 2.2: com 95%, até 5% dos
+      códigos do RPC podiam faltar no REST, saíam do catálogo e a foto do banco os marcava "fora do Fracttal" sem estarem).
+      Depois dela, a leitura que encolhe passa daqui e vai ao `ativos_central.trocar`, que a recusa e só a aceita confirmada
+      por duas leituras (o encolhimento de verdade).
+    `medidas` (opcional) recebe as coberturas de toda noite, para o estado: `cob_ref` (% dos códigos do catálogo na leitura),
+    `cob_rest` (% dos da leitura no catálogo), `comuns`, `n_ref` e `n_rest`.
     Os 7 itens-usina pendurados na planta errada (`corrigir_itens_usina_estrangeiros`) chegam aqui sem o conserto e contam
     como diferentes: 7 em 27 mil não mexem nos 99%."""
     ref = referencia_por_codigo or {}
@@ -303,14 +344,23 @@ def conferir_paridade(registros, referencia_por_codigo, *, primeira: bool = Fals
     for r in registros:
         if r.get("code"):
             por_codigo.setdefault(r["code"], r)
-    n_ref = len({id(r) for r in ref.values()})
+    # o catálogo pode ter o mesmo registro em duas chaves (o código e ele aparado): conta-se o registro, uma vez
+    do_ref: dict = {}
+    for c, r in ref.items():
+        do_ref.setdefault(id(r), c)
+    n_ref = len(do_ref)
     comuns = [c for c in por_codigo if c in ref]
+    vistos = {id(ref[c]) for c in comuns}
+    cob_ref = 100.0 * len(vistos) / max(n_ref, 1)
+    cob_rest = 100.0 * len(comuns) / max(len(por_codigo), 1)
+    if medidas is not None:
+        medidas.update(cob_ref=round(cob_ref, 2), cob_rest=round(cob_rest, 2), comuns=len(comuns), n_ref=n_ref,
+                       n_rest=len(por_codigo))
     if not comuns:
         return False, "nenhum código da leitura está no catálogo de agora", 0.0
     iguais = sum(1 for c in comuns if (por_codigo[c].get("cliente"), por_codigo[c].get("usina"))
                  == (ref[c].get("cliente"), ref[c].get("usina")))
     pct = round(100.0 * iguais / len(comuns), 2)
-    cob_ref, cob_rest = 100.0 * len(comuns) / max(n_ref, 1), 100.0 * len(comuns) / len(por_codigo)
     problemas = []
     if pct < PARIDADE_MIN_PCT:
         problemas.append("só %.2f%% dos %d códigos em comum dão o mesmo cliente e usina (o mínimo é %.0f%%)"
@@ -318,15 +368,20 @@ def conferir_paridade(registros, referencia_por_codigo, *, primeira: bool = Fals
     if pct_campos < CAMPOS_MIN_PCT:
         problemas.append("faltam campos obrigatórios em %d de %d ativos (%s)" % (
             sem, len(registros), ", ".join("%s: %d" % kv for kv in sorted(faltam.items()))))
-    if primeira and cob_ref < COBERTURA_MIN_PCT:
-        problemas.append("na 1ª conferência, a leitura não tem %d dos %d códigos do catálogo" % (n_ref - len(comuns), n_ref))
-    if cob_rest < COBERTURA_MIN_PCT:
-        problemas.append("a leitura traz %d códigos que o catálogo não tem, de %d" % (len(por_codigo) - len(comuns),
-                                                                                       len(por_codigo)))
+    minimo = PRIMEIRA_MIN_PCT if primeira else COBERTURA_MIN_PCT
+    if primeira and cob_ref < PRIMEIRA_MIN_PCT:
+        so_ref = [c for i, c in do_ref.items() if i not in vistos]
+        problemas.append("na 1ª conferência, a leitura não tem %d dos %d códigos do catálogo (%.2f%%; o mínimo é %.0f%%), "
+                         "por exemplo %s" % (len(so_ref), n_ref, cob_ref, PRIMEIRA_MIN_PCT, _exemplos(so_ref)))
+    if cob_rest < minimo:
+        so_rest = [c for c in por_codigo if c not in ref]
+        problemas.append("a leitura traz %d códigos que o catálogo não tem, de %d (%.2f%%; o mínimo é %.0f%%), por exemplo %s"
+                         % (len(so_rest), len(por_codigo), cob_rest, minimo, _exemplos(so_rest)))
     if problemas:
         return False, "; ".join(problemas), pct
-    return True, ("%d códigos em comum, %.2f%% com o mesmo cliente e usina; os campos obrigatórios em %.2f%% dos ativos"
-                  % (len(comuns), pct, pct_campos)), pct
+    return True, ("%d códigos em comum, %.2f%% com o mesmo cliente e usina; os campos obrigatórios em %.2f%% dos ativos; "
+                  "a leitura tem %.2f%% dos códigos do catálogo e o catálogo, %.2f%% dos dela"
+                  % (len(comuns), pct, pct_campos, cob_ref, cob_rest)), pct
 
 
 # ── a leitura da noite e a dos novos ───────────────────────────────────────────────────────────────────────────────────
@@ -345,9 +400,15 @@ def _banco(app):
     return (app.config.get("GRIDCO_DB_API") or BASE_API).rstrip("/"), app.config.get("GRIDCO_SQL_TOKEN") or "", sessao
 
 
+def _motivo(e: BaseException) -> str:
+    return "%s: %s" % (type(e).__name__, str(e)[:160])
+
+
 def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
     """A leitura da noite: o Fracttal inteiro pelo REST, a conferência contra o catálogo de agora, a troca do catálogo e, se
     ela entrou, a foto do banco renovada. Cada passo que não dá deixa o de antes e diz no estado (`estado()["completo"]`).
+    A leitura que não vem inteira (ou que o Fracttal recusa) é uma falha do REST: tira a prontidão do leitor
+    (`ativos_central.anotar_leitura_rest`); a que vem inteira é uma leitura boa, valha a conferência ou não.
     Uma leitura do Fracttal por vez: a dos novos pula enquanto esta corre; esta espera a dos novos até `esperar_s`."""
     rel = {"inicio": time.time(), "fim": None, "pedidos": 0, "itens": 0, "registros": 0, "sem_pai": 0,
            "resultado": "", "foto": None}
@@ -360,9 +421,11 @@ def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
         try:
             itens = ler_todos_rest(ler=ler, conta=conta)
         except Exception as e:                                       # noqa: BLE001 — incompleta, recusada, rede: nada troca
-            rel["resultado"] = "a leitura não veio inteira (%s: %s): nada mudou" % (type(e).__name__, str(e)[:160])
+            rel["resultado"] = "a leitura não veio inteira (%s): nada mudou, e o catálogo segue pelo RPC" % _motivo(e)
+            ativos_central.anotar_leitura_rest(False, "a leitura da noite: " + _motivo(e))
             log.warning("leitor de ativos: %s", rel["resultado"])
             return rel
+        ativos_central.anotar_leitura_rest(True)
         lido_em = time.time()
         rel["itens"] = len(itens)
         banco = _banco(app)
@@ -372,22 +435,27 @@ def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
                 from nexus.dados import foto_ativos
                 antigas, de_11_10 = foto_ativos.ler(banco[0], banco[2])
             except Exception as e:                                   # noqa: BLE001 — o catálogo anda; a foto, não
-                rel["foto"] = {"erro": "não li a foto do banco (%s: %s)" % (type(e).__name__, str(e)[:160])}
+                rel["foto"] = {"erro": "não li a foto do banco (%s)" % _motivo(e)}
         ref = ativos_central.atual()
         sem_pai: list = []
         cru = para_registro(itens, catalogo=ref, foto=antigas, sem_pai=sem_pai)
         # cada passo larga o que já serviu: tudo junto, o pico da noite media ~72 MB, num servidor já apertado de memória
         del itens
         registros = montar_registros(cru)
-        fora_do_catalogo = [c for c in cru if not c["parent_description"]]    # as raízes e os sem pai: a foto os guarda
-        del cru
+        # o que a foto guarda e o catálogo não tem (as raízes dos clientes, os itens sem o pai, o caminho sem trecho): pela
+        # diferença de ids, e não por repetir aqui a regra do `montar_registros`
+        no_catalogo = {r["id"] for r in registros}
+        fora_do_catalogo = [c for c in cru if c["id"] not in no_catalogo]
+        del cru, no_catalogo
         rel.update(registros=len(registros), sem_pai=len(sem_pai))
-        primeira = not (ativos_central.paridade_rest() or {}).get("vale")
-        vale, motivo, pct = conferir_paridade(registros, ref.por_codigo if ref is not None else {}, primeira=primeira)
-        ativos_central.anotar_paridade_rest({
-            "vale": vale, "motivo": motivo, "pct": pct, "em": time.time(), "lido_em": lido_em, "n": len(registros),
-            "primeira": primeira,
-            "contra": ref.fonte if ref is not None else None, "contra_lido_em": ref.lido_em if ref is not None else None})
+        primeira = ativos_central.paridade_recente() is None
+        medidas: dict = {}
+        vale, motivo, pct = conferir_paridade(registros, ref.por_codigo if ref is not None else {}, primeira=primeira,
+                                              medidas=medidas)
+        ativos_central.anotar_paridade_rest(dict(
+            medidas, vale=vale, motivo=motivo, pct=pct, em=time.time(), lido_em=lido_em, n=len(registros),
+            primeira=primeira, contra=ref.fonte if ref is not None else None,
+            contra_lido_em=ref.lido_em if ref is not None else None))
         if not vale:
             rel["resultado"] = ("a leitura não bate com o catálogo de agora (%s, de %s): nada mudou, e o catálogo segue pelo "
                                 "RPC" % (ref.fonte if ref is not None else "nenhum", _hora(ref.lido_em if ref else 0))
@@ -402,19 +470,27 @@ def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
         cat = ativos_central.atual()
         rel["resultado"] = "a mesma lista de antes (só a hora renovada)" if cat.versao == versao_antes else "trocou"
         # a foto do banco: só depois que o catálogo aceitou (a mesma guarda vale para os dois). As linhas saem do catálogo que
-        # acabou de entrar (os mesmos itens, com o tipo) e das raízes e dos sem pai, que ele não tem
+        # acabou de entrar (os mesmos itens, com o tipo) e dos que ele não tem
         if banco is None:
             rel["foto"] = {"erro": "teste sem banco"}
         elif antigas is not None:
             from nexus.dados import foto_ativos
-            novas = [foto_ativos.linha_do_item(r, r.get("tipo_code")) for r in cat.lista]
-            novas += [foto_ativos.linha_do_item(c) for c in fora_do_catalogo]
+            # a descrição SEM o endereço da usina (Ruling AK): o mesmo corte do nome do item no caminho. A API do banco tem
+            # leitura aberta, e o endereço da usina já saiu dela uma vez, no mesmo dia (04/10/2026, a 1ª carga do Campo · App)
+            nos = {r["id"]: (r.get("id_parent"), r.get("description") or "") for r in cat.lista}
+            for c in fora_do_catalogo:
+                nos.setdefault(c["id"], (c.get("id_parent"), c.get("description") or ""))
+            nomes = ativos_foto.nomes_no_caminho(nos)
+            del nos
+            novas = [foto_ativos.linha_do_item(r, r.get("tipo_code"), nome=nomes.get(r["id"])) for r in cat.lista]
+            novas += [foto_ativos.linha_do_item(c, nome=nomes.get(c["id"])) for c in fora_do_catalogo]
+            del nomes
             try:
                 rel["foto"] = foto_ativos.gravar(novas, base=banco[0], token=banco[1], sessao=banco[2],
                                                  maquina="servidor" if os.name != "nt" else "pc", antigas=antigas,
                                                  de_11_10=de_11_10)
             except Exception as e:                                   # noqa: BLE001 — recusada, curta, banco fora: fica a de antes
-                rel["foto"] = {"erro": "%s: %s" % (type(e).__name__, str(e)[:200])}
+                rel["foto"] = {"erro": _motivo(e)}
                 log.warning("leitor de ativos: a foto do banco não foi renovada (%s)", rel["foto"]["erro"])
         return rel
     finally:
@@ -423,45 +499,56 @@ def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
         _TRAVA_LEITURA.release()
 
 
-def _rest_conferido() -> bool:
-    p = ativos_central.paridade_rest()
-    return bool(p and p.get("vale"))
-
-
 def ler_novos(app=None, *, ler=None) -> dict:
     """Os ativos criados depois do maior id do catálogo, somados a ele (`ativos_central.acrescentar`). Só com a leitura REST
-    conferida (a paridade da última noite valeu): sem ela, o REST não acrescenta nada. O novo cujo pai não se acha fica para a
-    noite; a página fora de ordem não acrescenta nada. Devolve o relatório (também em `estado()["novos"]`)."""
-    rel = {"inicio": time.time(), "pedidos": 0, "novos": 0, "acrescentados": 0, "sem_pai": 0, "resultado": ""}
+    conferida (a paridade que valeu, de no máximo 30 h): sem ela, o REST não acrescenta nada. O novo cujo pai não se acha fica
+    para a noite (`sem_pai`), e os novos demais também (`muitos`: o REST respondeu, não é falha); a página fora de ordem e o
+    erro do cliente não acrescentam nada e são falhas do REST (`erro`, e a prontidão cai até a próxima leitura boa). Devolve
+    o relatório (também em `estado()["novos"]`): é dele que sai o desfecho que a tela mostra."""
+    rel = {"inicio": time.time(), "fim": None, "pedidos": 0, "novos": 0, "acrescentados": 0, "sem_pai": 0, "muitos": 0,
+           "erro": "", "resultado": ""}
     conta = [0]
     try:
-        if not _rest_conferido():
-            rel["resultado"] = "a leitura REST não está conferida (paridade): os novos não entram"
+        if ativos_central.paridade_recente() is None:
+            rel["erro"] = rel["resultado"] = "a leitura REST não está conferida (a paridade da noite): os novos não entram"
             return rel
         cat = ativos_central.atual()
         ids = [i for i in (cat.por_id if cat is not None else ()) if isinstance(i, int)]
         if not ids:
-            rel["resultado"] = "sem catálogo: os novos não têm a que se somar"
+            rel["erro"] = rel["resultado"] = "sem catálogo: os novos não têm a que se somar"
             return rel
         if not _TRAVA_LEITURA.acquire(blocking=False):
-            rel["resultado"] = "a leitura inteira está em curso: os novos vêm com ela"
+            rel["erro"] = rel["resultado"] = "a leitura inteira da noite está em curso: os novos vêm com ela"
             return rel
         try:
             itens = ler_novos_rest(max(ids), ler=ler, conta=conta)
-            lido_em = time.time()
-            sem_pai: list = []
-            registros = montar_registros(para_registro(itens, catalogo=cat, pais_do_catalogo=True, sem_pai=sem_pai))
-            n = ativos_central.acrescentar(registros, "rest", lido_em=lido_em)      # sem novos, só a hora da conferência
-            rel.update(novos=len(itens), acrescentados=n, sem_pai=len(sem_pai),
-                       resultado="%d novo(s), %d somado(s) ao catálogo" % (len(itens), n)
-                       + ("; %d sem o pai no catálogo, para a leitura da noite" % len(sem_pai) if sem_pai else ""))
+        except MuitosNovos as e:
+            ativos_central.anotar_leitura_rest(True)
+            rel.update(muitos=e.n, resultado=str(e))
+            return rel
+        except Exception as e:                                       # noqa: BLE001 — fora de ordem, recusa, rede: nada entra
+            ativos_central.anotar_leitura_rest(False, "os novos: " + _motivo(e))
+            rel["erro"] = ("a página não veio do maior id para o menor (o REST ignorou a ordem)"
+                           if isinstance(e, ForaDeOrdem) else _motivo(e))
+            rel["resultado"] = "nada entrou: " + rel["erro"]
+            log.warning("leitor de ativos: os novos: %s", rel["resultado"])
+            return rel
         finally:
             _TRAVA_LEITURA.release()
-    except Exception as e:                                           # noqa: BLE001 — fora de ordem, recusa, rede: nada entra
-        rel["resultado"] = "nada entrou (%s: %s)" % (type(e).__name__, str(e)[:160])
-        log.warning("leitor de ativos: os novos: %s", rel["resultado"])
+        ativos_central.anotar_leitura_rest(True)
+        lido_em = time.time()
+        sem_pai: list = []
+        registros = montar_registros(para_registro(itens, catalogo=cat, pais_do_catalogo=True, sem_pai=sem_pai))
+        n = ativos_central.acrescentar(registros, "rest", lido_em=lido_em)      # sem novos, só a hora da conferência
+        rel.update(novos=len(itens), acrescentados=n, sem_pai=len(sem_pai),
+                   resultado="%d novo(s), %d somado(s) ao catálogo" % (len(itens), n)
+                   + ("; %d sem o pai no catálogo, para a leitura da noite" % len(sem_pai) if sem_pai else ""))
+    except Exception as e:                                           # noqa: BLE001 — o que sobrar não derruba ninguém
+        rel["erro"] = _motivo(e)
+        rel["resultado"] = "nada entrou: " + rel["erro"]
+        log.exception("leitor de ativos: os novos quebraram")
     finally:
-        rel["pedidos"] = conta[0]
+        rel.update(pedidos=conta[0], fim=time.time())
         _ESTADO["novos"] = rel
     return rel
 
@@ -499,9 +586,23 @@ def pedir_novos() -> bool:
     return True
 
 
-def esperar_novos(teto: float, so_em_curso: bool = False) -> bool:
+def _desfecho(terminou: bool) -> dict:
+    """O desfecho da última leitura dos novos, para a tela: `terminou` (dentro da espera), `acrescentados`, `sem_pai`,
+    `muitos` (ficam para a noite) e `erro` (o motivo curto, ou ""). Sem ter terminado, só isso: o resto ainda não se sabe."""
+    if not terminou:
+        return {"terminou": False, "acrescentados": 0, "sem_pai": 0, "muitos": 0, "erro": ""}
+    rel = _ESTADO.get("novos")
+    if not rel:
+        return {"terminou": True, "acrescentados": 0, "sem_pai": 0, "muitos": 0,
+                "erro": "a busca dos ativos novos não chegou a rodar"}
+    return {"terminou": True, "acrescentados": int(rel.get("acrescentados") or 0), "sem_pai": int(rel.get("sem_pai") or 0),
+            "muitos": int(rel.get("muitos") or 0), "erro": str(rel.get("erro") or "")}
+
+
+def esperar_novos(teto: float, so_em_curso: bool = False) -> dict:
     """Espera a leitura dos novos até `teto` segundos: a que está em curso, ou (sem `so_em_curso`) uma nova se a última já não
-    é fresca. True se terminou dentro do teto (ou nem precisou); False se estourou (segue com o que há)."""
+    é fresca, e devolve o desfecho dela (`_desfecho`): `terminou` False se estourou (quem chama segue com o que há e a tela diz
+    que a busca ainda não terminou)."""
     fim = time.monotonic() + max(0.0, float(teto))
     if not so_em_curso:
         pedir_novos()
@@ -509,9 +610,9 @@ def esperar_novos(teto: float, so_em_curso: bool = False) -> bool:
         while _NOVOS["lendo"]:
             resta = fim - time.monotonic()
             if resta <= 0:
-                return False
+                return _desfecho(False)
             _COND.wait(resta)
-    return True
+    return _desfecho(True)
 
 
 # ── o laço do servidor ─────────────────────────────────────────────────────────────────────────────────────────────────

@@ -34,10 +34,10 @@ def ativos():
 @exige_sessao
 def api_catalogo():
     # `?novos=1`: a tela acabou de apertar "Atualizar ativos" (que voltou na hora) e espera a leitura dos novos em curso, até
-    # poucos segundos, para a lista já vir com eles
-    if request.args.get("novos") == "1":
-        api.esperar_os_novos()
-    return jsonify({"ativos": [ativos_web.enxuto(a) for a in _todos()], "info": api.assets_cache_info()})
+    # poucos segundos, para a lista já vir com eles; o desfecho dela (terminou, falhou, ficou para a noite) vai junto
+    desfecho = api.esperar_os_novos() if request.args.get("novos") == "1" else None
+    return jsonify({"ativos": [ativos_web.enxuto(a) for a in _todos()], "info": api.assets_cache_info(),
+                    "novos_desfecho": desfecho})
 
 
 @bp.route("/api/ativos/recentes")
@@ -81,9 +81,11 @@ def api_atualizar():
     servidor pronto (31/10/2026, tarefa 2.3 do canto central), pede os ativos NOVOS por trás e responde na hora (`novos`
     True: a tela pede a lista com `?novos=1`, que espera essa leitura); sem ele (o PC), baixa o catálogo inteiro pelo RPC com
     a sessão de quem clicou (~110 pedidos: a tela avisa que demora). `ativos_de`: de quando é a lista; `recusa`: o motivo, se
-    o Fracttal deu uma lista que o catálogo não aceitou (senão "")."""
+    o Fracttal deu uma lista que o catálogo não aceitou (senão ""); `falha`: o download que falhou há pouco e por quê (dentro
+    da janela, o botão devolve a lista de antes sem tentar de novo)."""
     antes = len(api.load_assets_cached() or [])
     novos = ativos_central.leitor_pronto()
     depois = api.load_assets_cached(force=True) or []
     return jsonify({"n": len(depois), "delta": len(depois) - antes, "info": api.assets_cache_info(),
-                    "recusa": api.aviso_da_recusa(), "ativos_de": api.ativos_de(), "novos": novos})
+                    "recusa": api.aviso_da_recusa(), "falha": api.aviso_da_falha(), "ativos_de": api.ativos_de(),
+                    "novos": novos})

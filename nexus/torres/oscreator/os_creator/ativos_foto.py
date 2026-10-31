@@ -51,8 +51,8 @@ def _limpa(descricao) -> str:
 
 def _nome_no_caminho(descricao, usina: bool, cauda: str = "") -> str:
     """O nome de um item como o Fracttal o põe no caminho (`parent_description`). A descrição do item traz atrás do nome o
-    ENDEREÇO da usina e o "{ CÓDIGO }" (a foto já tirou o código quando ele repete o do item): "2C - Araputanga 1 - MT  Zona
-    Rural km 4" é o item, "2C - Araputanga 1 - MT" é o nome no caminho.
+    ENDEREÇO da usina e o "{ CÓDIGO }" (a foto já tirou o código quando ele repete o do item): "CL - Usina Alfa 1 - MT  Estrada
+    Vicinal km 9" (exemplo inventado) é o item, "CL - Usina Alfa 1 - MT" é o nome no caminho.
     - A usina (o 2º trecho) tem a forma "Cliente - Usina - UF", com o endereço colado depois de UM espaço ou de dois: o corte é
       na sigla do estado (medido nas 189 usinas com equipamento do catálogo de 28/10/2026: acerta as 189).
     - Os outros níveis (Cabine 1, Inversor 1.1) trazem o MESMO endereço da usina atrás do nome (`cauda`, o que sobra da
@@ -114,6 +114,31 @@ def caminhos(nos, alvos=None) -> dict:
                 nomes[p] = _nome_no_caminho(nos[p][1], usina=(n == 1), cauda=cauda if n > 1 else "")
             trechos.append(nomes[p])
         out[i] = "// " + "/ ".join(trechos) + "/ "
+    return out
+
+
+def nomes_no_caminho(nos, alvos=None) -> dict:
+    """{id: o nome do item como o Fracttal o põe no caminho} de cada item de `alvos` (padrão: todos de `nos`): a descrição SEM
+    o endereço da usina e sem o "{ CÓDIGO }" (`_nome_no_caminho`: na usina, o corte na sigla do estado; nos níveis de dentro,
+    sem a cauda de endereço da usina deles; senão, no 1º espaço duplo). É a `descricao` que a foto do banco grava (Ruling AK,
+    revisão 1 da 2.2): a API do banco tem leitura aberta, e o endereço da usina já saiu dela uma vez, no mesmo dia em que entrou
+    (04/10/2026, a 1ª carga do Campo · App). O item cuja cadeia não chega à raiz leva o corte no 1º espaço duplo.
+    `nos`: {id: (id do pai ou None, descrição)}, como em `caminhos`."""
+    caudas: dict = {}
+    out: dict = {}
+    for i in (nos if alvos is None else alvos):
+        if i not in nos:
+            continue
+        descricao = nos[i][1]
+        pais, chegou = _ancestrais(i, nos)
+        if not chegou or len(pais) <= 1:                             # a raiz (0), a usina (1) ou o item solto
+            out[i] = _nome_no_caminho(descricao, usina=chegou and len(pais) == 1)
+            continue
+        u = pais[1]
+        if u not in caudas:
+            nome_u, d0 = _nome_no_caminho(nos[u][1], usina=True), _limpa(nos[u][1])
+            caudas[u] = d0[len(nome_u):].strip() if d0.startswith(nome_u) else ""
+        out[i] = _nome_no_caminho(descricao, usina=False, cauda=caudas[u])
     return out
 
 

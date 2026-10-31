@@ -51,6 +51,15 @@
 .at-menu a:hover{background:rgba(166,226,46,.14)}
 .at-menu .sep{height:1px;background:var(--f-border);margin:4px 8px}
 @media (max-width:1100px){.at-corpo{grid-template-columns:1fr}.at-busca{width:100%}}
+/* no celular (31/10/2026): a 375 px o cabeçalho espremia "54 ativos · 6 usinas · ativos de HH:MM" em 4 linhas entre o Voltar,
+   o botão e a busca, e a busca cortava em "códi". Abaixo de 480 px a busca desce para a linha de baixo, inteira, e o título
+   fica com o espaço entre o Voltar e o botão */
+@media (max-width:480px){
+  .at-cab{flex-wrap:wrap;gap:10px}
+  .at-cab .os-cresce{display:none}
+  .at-titulo{flex:1 1 0;min-width:0}
+  .at-busca{flex:1 1 100%;width:100%}
+}
 
 /* ── tema claro (Nexus, 09/10/2026): a regra e a paleta --osc-* estão no bloco TEMA CLARO do fim do os.css ── */
 :where(html[data-tema="claro"]) .at-h1,:where(html[data-tema="claro"]) .at-cli,:where(html[data-tema="claro"]) .at-tbl,

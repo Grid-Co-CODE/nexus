@@ -48,6 +48,7 @@ from ..cadastro.banco import codigo_do_equipamento, sufixo_codigo
 _BRT = timezone(timedelta(hours=-3))
 
 LIVRO_FOTO, ABA_FOTO = "nexus_ativos_fracttal", "foto_ativos"
+# o nome só vale para quem CRIA o livro (o `livros.publicar` não renomeia o que existe): o de 11/10 segue com o nome de então
 NOME_FOTO = "Nexus · foto dos ativos do Fracttal (renovada toda noite pelo leitor do servidor)"
 LIVRO, NOME = "nexus_equipamentos", "Nexus · dimensão de equipamento (código do ativo do Fracttal) e apelidos"
 
@@ -239,11 +240,11 @@ def membros(foto, codigos_por_fonte: dict, usinas) -> list[list]:
     ativo no OS Creator): não é equipamento, não vira membro nem é o pai de ninguém aqui, e a dimensão fica a mesma de antes
     delas (a foto de 11/10 não tinha nenhuma linha sem pai)."""
     idx = usinas if isinstance(usinas, IndiceUsinas) else IndiceUsinas(usinas)
-    # o código que está no Fracttal antes do que saiu dele (o mesmo item renomeado, o código reaproveitado por outro item); depois
-    # a foto mais nova; no empate, o menor item
+    # o código que está no Fracttal antes do que saiu dele (o mesmo item renomeado, o código reaproveitado por outro item); entre
+    # eles, o menor item, como antes. O `foto_em` não entra (revisão 1 da 2.2): na foto renovada ele é o dia em que a LINHA mudou,
+    # e desempatar por ele trocaria o membro de um código toda vez que a outra linha mudasse (e regravaria a dimensão)
     fotos = sorted((f for f in _como_dict(foto, CAB_FOTO) if _int(f.get("pai_item_id"))), reverse=True,
-                   key=lambda f: (not _txt(f.get("fora_do_fracttal_desde")), _txt(f.get("foto_em")),
-                                  -(_int(f.get("fracttal_item_id")) or 0)))
+                   key=lambda f: (not _txt(f.get("fora_do_fracttal_desde")), -(_int(f.get("fracttal_item_id")) or 0)))
     por_codigo, codigo_do_item = {}, {}
     for f in fotos:
         c, item = canon(f.get("codigo")), _int(f.get("fracttal_item_id"))

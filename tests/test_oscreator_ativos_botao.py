@@ -77,11 +77,12 @@ class LeitorFalso:
     def esperar(self, teto, so_em_curso=False):
         if self.thread is not None:
             self.thread.join(teto)
-        return True
+        terminou = self.thread is None or not self.thread.is_alive()
+        return {"terminou": terminou, "acrescentados": 1 if terminou else 0, "sem_pai": 0, "muitos": 0, "erro": ""}
 
     def ligar(self):
         AC.ligar_leitor(pedir_novos=self.pedir, esperar_novos=self.esperar, estado=lambda: {"ligado": True})
-        AC.anotar_paridade_rest({"vale": True, "motivo": "conferida"})
+        AC.anotar_paridade_rest({"vale": True, "motivo": "conferida", "em": time.time()})
         return self
 
 
@@ -150,9 +151,8 @@ def test_tela_diz_ativos_de_hhmm(cli, monkeypatch):
         monkeypatch.setattr(api, nome, lambda *a, **k: [{"id": 1, "name": "Pessoa Teste", "description": "Etiqueta"}])
     monkeypatch.setattr(api, "get_tipos_classif", lambda *a, **k: {"tipos": [{"id": 1, "description": "Corretiva"}]})
     monkeypatch.setattr(api, "status_solicitacao_catalogo", lambda *a, **k: list(api.STATUS_SOLICITACAO))
-    h = cli.get("/os/solicitacao/fila?recusa=A%20leitura%20do%20Fracttal%20de%2031/10%2002:20%20n%C3%A3o%20entrou").get_data(
-        as_text=True)
-    assert esperado in h and "A leitura do Fracttal de 31/10 02:20 não entrou" in h       # a Fila mostra o motivo da volta
+    h = cli.get("/os/solicitacao/fila").get_data(as_text=True)
+    assert esperado in h and 'title="%s"' % api.ativos_de_titulo() in h
 
     # o JavaScript das duas telas usa o que o servidor diz (sem montar a hora no navegador), e pede `?novos=1` depois do botão
     ativos_js = (WEB / "static" / "ativos.js").read_text(encoding="utf-8")
@@ -188,3 +188,174 @@ def test_pc_usa_a_sessao_da_pessoa(cli, monkeypatch):
     assert j["novos"] is False and quem == [JWT, JWT] and pediu == []
     r = cli.get("/os/solicitacao/atualizar")
     assert r.status_code == 302 and "novos=1" not in r.headers["Location"] and quem == [JWT, JWT, JWT]
+
+
+# ── a revisão 1 da 2.2+2.3 ──────────────────────────────────────────────────────────────────────────────────────────────
+def _fila_sem_fracttal(monkeypatch):
+    """A Fila do PCM sem pedir nada ao Fracttal: a lista de solicitações vazia e os catálogos de mentira."""
+    monkeypatch.setattr(api, "list_minhas_solicitacoes", lambda *a, **k: [])
+    for nome in ("get_responsaveis", "get_labels"):
+        monkeypatch.setattr(api, nome, lambda *a, **k: [{"id": 1, "name": "Pessoa Teste", "description": "Etiqueta"}])
+    monkeypatch.setattr(api, "get_tipos_classif", lambda *a, **k: {"tipos": [{"id": 1, "description": "Corretiva"}]})
+    monkeypatch.setattr(api, "status_solicitacao_catalogo", lambda *a, **k: list(api.STATUS_SOLICITACAO))
+
+
+def test_o_desfecho_dos_novos_na_tela(cli, app, monkeypatch):
+    """Important 1: "nenhum ativo novo no Fracttal" só quando a busca terminou bem sem nada; a que não terminou, a que falhou
+    e a que deixou ativos para a noite dizem o que houve. Com o leitor de verdade (as funções do `ativos_leitor`) e o REST de
+    mentira no `fracttal.ler`."""
+    import ativos_leitor as AL
+    from nexus.campo import fracttal
+    from test_oscreator_ativos_leitor import RestFalso, _catalogo_de, _it, _muitos
+    AL.reiniciar()
+    monkeypatch.setattr(AL, "_dormir", lambda s: None)
+    base = _muitos(60)
+    _catalogo_de(base)
+    AC.anotar_paridade_rest({"vale": True, "motivo": "conferida", "em": time.time()})
+    app.config["NEXUS_PCM_FRACTTAL_TESTE"] = {"FRACTTAL_CLIENT_ID": "id-de-mentira", "FRACTTAL_CLIENT_SECRET": "s"}
+    AL.ligar(app)
+    fonte = {"ler": RestFalso(base)}
+    monkeypatch.setattr(fracttal, "ler", lambda path: fonte["ler"](path))
+
+    def apertar(url="/os/api/ativos/catalogo?novos=1"):
+        AL._NOVOS["fim_em"] = 0.0                                       # cada caso, uma leitura nova (sem o frescor de 60 s)
+        assert cli.post("/os/api/ativos/atualizar").get_json()["novos"] is True
+        return cli.get(url).get_json()["novos_desfecho"]
+
+    def novo(i, pai=10):
+        return _it(i, "CAL-GAM100-INVR9%d.1" % (i - 5000), "Inversor novo %d    { x }" % i, pai)
+    try:
+        d = apertar()                                                   # terminou bem, sem nada
+        assert d["terminou"] and d["ok"] and d["texto"] == "nenhum ativo novo no Fracttal"
+        fonte["ler"] = RestFalso(base + [novo(5000), novo(5001)])       # terminou bem, com 2
+        d = apertar("/os/api/tradicional/catalogo?novos=1")
+        assert d["ok"] and d["acrescentados"] == 2 and d["texto"] == "2 ativos novos do Fracttal na lista"
+        fonte["ler"] = RestFalso(base + [novo(5000), novo(5001), novo(5002, pai=4242)])     # um sem o pai no catálogo
+        d = apertar()
+        assert not d["ok"] and d["sem_pai"] == 1 and d["texto"] == "1 ativo novo fica para a leitura da noite"
+        solta = threading.Event()                                        # não terminou dentro da espera
+
+        def lento(path):
+            solta.wait(5)
+            return RestFalso(base + [novo(5000), novo(5001)])(path)
+        fonte["ler"] = lento
+        monkeypatch.setattr(api, "ESPERA_NOVOS_S", 0.2)
+        d = apertar()
+        assert not d["terminou"] and d["texto"].startswith("a busca no Fracttal ainda não terminou")
+        solta.set()
+        AL.esperar_novos(5, so_em_curso=True)
+        monkeypatch.setattr(api, "ESPERA_NOVOS_S", 6)
+        fonte["ler"] = RestFalso(base + [novo(5003)], ignora_sort=True)  # falhou (o REST ignorou a ordem)
+        d = apertar()
+        assert not d["ok"] and d["texto"].startswith("não consegui buscar os ativos novos no Fracttal: a página não veio")
+        assert not AC.leitor_pronto()                                   # e o botão seguinte já vai pelo RPC
+        monkeypatch.setattr(api, "get_assets", lambda: [dict(r) for r in AC.atual().lista])
+        assert cli.post("/os/api/ativos/atualizar").get_json()["novos"] is False
+    finally:
+        AL.reiniciar()
+    js = (WEB / "static" / "ativos.js").read_text(encoding="utf-8")
+    assert "d.novos_desfecho" in js and "dn.ok && delta" in js and "dn.texto" in js
+    assert "j.novos_desfecho" in (WEB / "static" / "tradicional.js").read_text(encoding="utf-8")
+
+
+def test_a_fila_mostra_o_desfecho_dos_novos(cli, monkeypatch):
+    _fila_sem_fracttal(monkeypatch)
+    AC.trocar(LOTE, "rpc", lido_em=time.time() - 3600)
+    AC.ligar_leitor(pedir_novos=lambda: True, estado=lambda: {},
+                    esperar_novos=lambda teto, so: {"terminou": True, "acrescentados": 0, "sem_pai": 0, "muitos": 0, "erro": ""})
+    AC.anotar_paridade_rest({"vale": True, "em": time.time()})
+    r = cli.get("/os/solicitacao/atualizar?sel=5001")
+    assert "novos=1" in r.headers["Location"]
+    h = cli.get(r.headers["Location"]).get_data(as_text=True)
+    assert 'id="fl_novos">nenhum ativo novo no Fracttal</p>' in h
+
+
+def test_a_falha_lembrada_vai_aos_botoes_e_a_sessao_de_uma_pessoa_nao(cli, monkeypatch):
+    """Minor 4: dentro da janela da falha, os botões devolvem a lista de antes e dizem por quê; a sessão recusada de UMA pessoa
+    (401/403) não segura o download de mais ninguém."""
+    _fila_sem_fracttal(monkeypatch)
+    AC.trocar(LOTE, "rpc", lido_em=time.time() - api.ASSETS_TTL - 60)     # vencido, sem o leitor
+    tentou = []
+
+    def fora():
+        tentou.append("fora")
+        raise api.FracttalError("RPC inventories.items_list HTTP 503 (indisponível)")
+    monkeypatch.setattr(api, "get_assets", fora)
+    with pytest.raises(api.FracttalError):
+        api.load_assets_cached(True)                                    # a 1ª: falha (a tela já mostrava o erro)
+    j = cli.post("/os/api/ativos/atualizar").get_json()
+    assert tentou == ["fora"] and j["n"] == len(LOTE) and "O Fracttal não deu os ativos" in j["falha"] and "503" in j["falha"]
+    assert "503" in cli.get("/os/api/tradicional/catalogo?recarregar=1").get_json()["falha"] and tentou == ["fora"]
+    r = cli.get("/os/solicitacao/atualizar?sel=5001")
+    assert "falha=1" in r.headers["Location"] and "indispon" not in r.headers["Location"]
+    assert "HTTP 503" in cli.get(r.headers["Location"]).get_data(as_text=True)
+    # a sessão de uma pessoa que caiu: não vira falha de todos, e o próximo tenta
+    AC.anotar_falha("rpc", None)
+
+    def expirou():
+        tentou.append("sessao")
+        raise api.SessionExpired("Login recusado (HTTP 401): faça login de novo no app.")
+    monkeypatch.setattr(api, "get_assets", expirou)
+    with pytest.raises(api.SessionExpired):
+        api.load_assets_cached(True)
+    assert AC.falha() is None and api.aviso_da_falha() == ""
+    monkeypatch.setattr(api, "get_assets", lambda: tentou.append("ok") or [dict(r) for r in LOTE])
+    api.load_assets_cached(True)
+    assert tentou == ["fora", "sessao", "ok"]
+
+
+def test_a_fila_nao_ecoa_texto_da_url(cli, monkeypatch):
+    """Minor 11: a URL só traz o sinal (`?recusa=1`, `?falha=1`); o texto é o do servidor, e nada escrito na URL vai à tela."""
+    _fila_sem_fracttal(monkeypatch)
+    AC.trocar(LOTE, "rpc", lido_em=time.time() - 3600)
+    h = cli.get("/os/solicitacao/fila?recusa=Clique%20aqui%20para%20ganhar&falha=Outro%20texto%20de%20fora").get_data(
+        as_text=True)
+    assert "Clique aqui para ganhar" not in h and "Outro texto de fora" not in h and 'id="fl_recusa"' not in h
+    assert not AC.trocar(LOTE[:5], "rpc")                               # uma leitura recusada de verdade (encolheu)
+    AC.anotar_falha("rpc", api.FracttalError("HTTP 502"))
+    h = cli.get("/os/solicitacao/fila?recusa=1&falha=1").get_data(as_text=True)
+    assert api.aviso_da_recusa() in h and "encolheu de 20 para 5" in h and "HTTP 502" in h
+
+
+def test_a_aprovacao_espera_os_novos_so_sem_o_ativo():
+    """Minor 13: a aprovação que acha o ativo no catálogo não espera nada; a que não acha espera os novos e procura de novo."""
+    from os_web import rotas_solic as rs
+    AC.trocar(LOTE, "rpc", lido_em=time.time() - 3600)
+    esperas = []
+
+    def esperar(teto, so_em_curso):
+        esperas.append(so_em_curso)
+        AC.acrescentar([NOVO], "rest")
+        return {"terminou": True, "acrescentados": 1, "sem_pai": 0, "muitos": 0, "erro": ""}
+    AC.ligar_leitor(pedir_novos=lambda: True, esperar_novos=esperar, estado=lambda: {})
+    AC.anotar_paridade_rest({"vale": True, "em": time.time()})
+    assert rs._ativo_para_aprovar({"id_item": 1003, "code": LOTE[3]["code"]})["id"] == 1003 and esperas == []
+    assert rs._ativo_para_aprovar({"id_item": 5000, "code": NOVO["code"]})["id"] == 5000 and esperas == [False]
+    # sem o leitor pronto, como sempre: não espera nada (e quem não acha, não acha)
+    AC.anotar_paridade_rest(None)
+    assert rs._ativo_para_aprovar({"id_item": 7777, "code": "NAO-EXISTE"}) is None and esperas == [False]
+
+
+def test_o_titulo_diz_as_duas_horas(cli):
+    """Ruling AL: "ativos de HH:MM" segue pela mais nova das duas horas; o `title` diz as duas."""
+    hoje = datetime(2026, 10, 31, 14, 30, tzinfo=_BRT).timestamp()
+    AC.trocar(LOTE, "rpc", lido_em=datetime(2026, 10, 31, 2, 20, tzinfo=_BRT).timestamp())
+    assert api.ativos_de_titulo(agora=hoje) == "lista completa de 31/10 02:20"
+    AC.acrescentar([NOVO], "rest", lido_em=datetime(2026, 10, 31, 14, 8, tzinfo=_BRT).timestamp())
+    assert api.ativos_de_titulo(agora=hoje) == "lista completa de 31/10 02:20; novos até 14:08"
+    assert api.ativos_de(agora=hoje) == "ativos de 14:08"
+    assert api.ativos_de_titulo(agora=datetime(2026, 11, 1, 9, 0, tzinfo=_BRT).timestamp()) == (
+        "lista completa de 31/10 02:20; novos até 31/10 14:08")
+    titulo = api.ativos_de_titulo()
+    assert cli.get("/os/api/ativos/catalogo").get_json()["info"]["ativos_de_titulo"] == titulo
+    assert 'title="%s"' % titulo in cli.get("/os/tradicional").get_data(as_text=True)
+    assert "info.ativos_de_titulo" in (WEB / "static" / "ativos.js").read_text(encoding="utf-8")
+
+
+def test_o_cabecalho_de_ativos_no_celular():
+    """A bancada a 375 px: o cabeçalho espremia o subtítulo em 4 linhas e a busca cortava em "códi". Abaixo de 480 px a busca
+    desce para a linha de baixo, inteira; só CSS, sem cor nova."""
+    css = (WEB / "static" / "ativos.css").read_text(encoding="utf-8")
+    bloco = css.split("@media (max-width:480px){", 1)[1].split("\n}", 1)[0]
+    assert ".at-cab{flex-wrap:wrap" in bloco and ".at-busca{flex:1 1 100%;width:100%}" in bloco
+    assert not re.search(r"#[0-9a-fA-F]{3,6}\b|rgba?\(", bloco)

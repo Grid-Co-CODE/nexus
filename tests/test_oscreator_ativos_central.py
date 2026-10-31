@@ -424,6 +424,7 @@ def test_a_versao_e_o_sha_das_linhas_e_muda_com_o_conteudo():
 def test_estado_e_a_paridade_do_rest():
     assert AC.estado() == {"fonte": None, "lido_em": None, "novos_em": None, "versao": None, "n": 0, "recusa": None,
                            "encolhimento": None, "falha": None, "paridade_rest": None,
+                           "rest": {"bom_em": 0.0, "falha_em": 0.0, "falha": None}, "leitor_pronto": False,
                            "disco": {"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None}, "banco": None,
                            "leitor": None}
     AC.trocar(_lote(10), "rpc", lido_em=123.0)

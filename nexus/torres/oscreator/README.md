@@ -1319,8 +1319,10 @@ dele; o `_code_loc` era montado uma vez por processo e nunca refeito (ativo novo
   de uso e uma rodada do grupo `-k "oscreator or chamados or engenharia or pcm_nota or prefixo"` com todo catálogo de dublê
   entregue como tupla de `Registro` (31/10/2026: 103 listas congeladas, nenhum `TypeError`).
 - **O boot nunca pergunta ao Fracttal.** Em ordem: (1) a cópia em disco, `<pasta de dados do clone>/oscreator/ativos.json.gz`
-  (gravada ao lado e trocada de uma vez; o formato vai escrito dentro; a ilegível, cortada ou de outro formato é ignorada, e o
-  motivo fica em `estado()["disco"]["erro"]`); (2) o `assets_cache.json` antigo, lido UMA vez como migração se a cópia nova
+  (gravada ao lado e trocada de uma vez, só se o catálogo ainda for o vigente quando a trava do disco chega: uma troca e os
+  novos do dia terminando em ordem trocada não deixam a versão velha no disco; o formato vai escrito dentro; a ilegível, cortada
+  ou de outro formato é ignorada, e o motivo fica em `estado()["disco"]["erro"]`; a cópia, o `ativos_estado.json` e a leitura
+  do arquivo antigo moram em `os_creator/ativos_disco.py` desde a revisão 1 da 2.2); (2) o `assets_cache.json` antigo, lido UMA vez como migração se a cópia nova
   não existe (já grava a nova); (3) a foto dos ativos no banco, `nexus_ativos_fracttal · foto_ativos`, pela função que a
   `ponte.py` entrega (`ativos_banco.leitor`; o catálogo não conhece a configuração do banco). Sem nenhuma, o catálogo nasce do
   primeiro download (RPC, com a sessão de quem pediu, como sempre). Quem chega com o boot em curso espera nele: o "feito" só vale
@@ -1343,22 +1345,27 @@ dele; o `_code_loc` era montado uma vez por processo e nunca refeito (ativo novo
   (`ativos_estado.json`, ao lado da cópia em disco, com a última paridade do REST): o servidor reinicia ~10 vezes por dia, e
   só na memória cada deploy releria o Fracttal uma vez e a confirmação abaixo nunca chegaria. A falha do download (exceção:
   Fracttal fora, cota estourada) também é lembrada (`ativos_central.anotar_falha`): quem esperava a vez na trava não tenta de
-  novo em fila, e o `force` e o `em_dia` dentro de `ASSETS_ESPERA_TENTATIVA` devolvem o catálogo de agora (a renovação por trás
-  tem a janela dela).
+  novo em fila, e o `force` e o `em_dia` dentro de `ASSETS_ESPERA_TENTATIVA` devolvem o catálogo de agora e os botões dizem por
+  quê (`api.aviso_da_falha`, campo `falha`; a renovação por trás tem a janela dela). A sessão recusada de UMA pessoa
+  (`SessionExpired`: 401/403, o login que caiu) não é falha do Fracttal e não segura o download de mais ninguém.
 - **O encolhimento confirmado** (2.2): o Fracttal que perdeu ativos de verdade (uma usina que saiu da carteira) seria recusado
   para sempre. A troca que encolhe passa quando o MESMO conjunto de ativos sai do catálogo em duas leituras completas, de
   caminhos diferentes (REST e RPC) ou do mesmo com 20 h ou mais entre elas, sem leitura aceita no meio; o
   `estado()["encolhimento"]` diz. O conjunto é o que SAI, e não a lista inteira: os novos do dia entram no catálogo entre as
   duas leituras, e a lista inteira nunca seria a mesma.
 - **Os botões levam o motivo:** `POST /os/api/ativos/atualizar` e `GET /os/api/tradicional/catalogo?recarregar=1` respondem com
-  `recusa` (texto curto com a hora, ou ""); o link `/os/solicitacao/atualizar`, que navega, leva `recusa` na volta para a Fila.
-  As três telas o mostram (seção "Os botões Atualizar ativos sem esperar o Fracttal", abaixo).
-- **Fresco ou vencido** é decidido por quem usa, por `conferido_em` (`api.catalogo_vencido`, 24 h): vencido, o catálogo serve e é
-  renovado por trás pelo RPC, como em 24/10. O que veio da foto do banco está sempre vencido (é o socorro da máquina sem cópia:
-  o código da foto é o canônico, e a 1ª leitura do Fracttal a troca). Com o leitor do servidor pronto (seção abaixo),
-  `force=True` pede só os ativos novos, por trás, e volta na hora, e `em_dia=True` espera essa leitura curta (6 s no máximo)
-  em vez do RPC inteiro; sem ele (o PC, os testes, a paridade que falhou), os dois seguem como eram (RPC com a sessão da
-  pessoa), e o que baixam entra no catálogo central. O "desatualizado" da tela inicial segue pelo `lido_em` (o dado é de
+  `recusa` (texto curto com a hora, ou "") e `falha`; o link `/os/solicitacao/atualizar`, que navega, volta à Fila só com o
+  SINAL (`recusa=1`, `falha=1`), e a Fila mostra o texto do servidor (`api.aviso_da_recusa`, `api.aviso_da_falha`): nada escrito
+  na URL vai à tela (revisão 1 da 2.2: qualquer link punha qualquer frase na faixa). As três telas o mostram (seção "Os botões
+  Atualizar ativos sem esperar o Fracttal", abaixo).
+- **Fresco ou vencido** é decidido por quem usa, por `conferido_em` (`api.catalogo_vencido`: 24 h; com o leitor do servidor
+  pronto, 26 h, para a leitura da noite de ontem não vencer em cima da de hoje e um pedido nesse minuto não disparar o RPC junto
+  com o REST): vencido, o catálogo serve e é renovado por trás pelo RPC, como em 24/10. O que veio da foto do banco está sempre
+  vencido (é o socorro da máquina sem cópia: o código da foto é o canônico, e a 1ª leitura do Fracttal a troca). Com o leitor
+  pronto (seção abaixo), `force=True` pede só os ativos novos, por trás, e volta na hora, e `em_dia=True` volta com o catálogo
+  como está: a aprovação da Fila que NÃO acha o ativo da solicitação nele espera os novos (6 s no máximo) e procura de novo
+  (`rotas_solic._ativo_para_aprovar`); a que acha não espera nada. Sem ele (o PC, os testes, o leitor fora da prontidão), os
+  dois seguem como eram (RPC com a sessão da pessoa), e o que baixam entra no catálogo central. O "desatualizado" da tela inicial segue pelo `lido_em` (o dado é de
   ontem, mesmo conferido hoje).
 - **Medido** (catálogo de 28/10, 26.620 ativos): 30 MB na memória com todos os índices (a lista decodificada sozinha eram 33 MB, e
   cada chamada copiava mais ~12 MB); subir pela cópia em disco 0,5 s (o arquivo tem 0,9 MB); montar uma versão 0,4 s; trocar pela
@@ -1390,38 +1397,59 @@ entra (a de 21/06 que a carga levou junto tem códigos que o Fracttal já não t
 pessoa do dia: o próprio servidor lê os ativos pela credencial da empresa (o REST `items`, o cliente e o ritmo de
 `nexus/campo/fracttal.py`). Só o `servir.py` liga (`ativos_leitor.ligar`, pelo `ponte.modulo_do_clone`); o `app.py` (o PC) e os
 testes seguem pelo RPC; sem a credencial REST (`FRACTTAL_CLIENT_ID`), não liga e o estado diz por quê.
-- **De madrugada (02:15 de Brasília), o Fracttal inteiro** (`ler_completo`): 100 itens por página, 1 pedido por segundo, até o
-  `total` que a 1ª página informa (~270 pedidos, ~5 min). Página curta antes do total, itens distintos a menos ou nada:
-  `LeituraIncompleta`, e nada muda. 406/429: o cliente espera 5 s e 10 s; se ele desistir, o leitor espera o castigo de 1 min
-  do Fracttal e pede a mesma página de novo (duas vezes). Só os campos do registro ficam (`CAMPOS_REST`).
+- **De madrugada (02:15 de Brasília), o Fracttal inteiro** (`ler_completo`): ordenado pelo id (`items?sort=id:asc`: o
+  deslocamento de cada página só é estável sobre uma ordem declarada), 100 itens por página, 1 pedido por segundo, até o `total`
+  que a 1ª página informa (~270 pedidos, ~5 min). O REST que recusa a ordem (4xx na 1ª página), a página curta antes do total,
+  os itens distintos a menos ou nada: `LeituraIncompleta`, com o motivo, e nada muda (tudo segue pelo RPC). Só o erro de
+  passagem se repete (`_transitorio`: o 406/429 que o cliente já esperou 5 s e 10 s, a conexão que caiu, o tempo esgotado e o
+  5xx): o leitor espera o castigo de 1 min do Fracttal e pede a mesma página de novo, duas vezes; o 400, o 401, o 403 e o 404
+  falham na hora. Só os campos do registro ficam (`CAMPOS_REST`).
 - **Do REST ao registro** (`para_registro`): o formato cru do RPC. O `parent_description` é o do item, se o REST o der; senão,
   montado pela cadeia de `id_parent` (`ativos_foto.caminhos`, o mesmo da foto). O `id_group_task` é o do item; senão o do
   catálogo de antes pelo mesmo id (na 1ª noite, o do RPC); senão o da foto; senão vazio. O item cujo pai não se acha fica de
-  fora do catálogo (a leitura seguinte o traz), e a foto o guarda.
+  fora do catálogo (a leitura seguinte o traz), e a foto o guarda: a foto leva o catálogo que entrou e, pela DIFERENÇA de ids, o
+  que ele não tem (as raízes dos clientes, os sem pai, o caminho sem trecho como "// / "), sem repetir a regra do
+  `montar_registros`. A `descricao` da foto vai SEM o endereço da usina (Ruling AK): o nome do item no caminho
+  (`ativos_foto.nomes_no_caminho`), porque a API do banco tem leitura aberta e o endereço da usina já saiu dela uma vez, no
+  mesmo dia em que entrou (04/10/2026).
 - **A conferência** (`conferir_paridade`, contra o catálogo de agora: na 1ª noite o do RPC, a sondagem REST x RPC de verdade;
   depois, a leitura anterior): >= 99% dos códigos em comum com o mesmo cliente e usina, os campos obrigatórios (`id`,
-  `id_parent`, `id_type_item`) em >= 99% dos ativos, >= 95% dos códigos da leitura no catálogo e, na 1ª conferência, também
-  >= 95% dos do catálogo na leitura (um REST que desse sempre um pedaço do Fracttal seria confirmado por ele mesmo na noite
-  seguinte). O resultado vai a `estado()["paridade_rest"]` e ao `ativos_estado.json`, dizendo contra qual fonte e de quando.
+  `id_parent`, `id_type_item`) em >= 99% dos ativos e >= 95% dos códigos da leitura no catálogo. Na 1ª conferência (o REST
+  ainda não valeu, ou a última que valeu passou de 30 h), >= 99% nos DOIS sentidos, e o motivo diz até 5 códigos dos que
+  faltam de cada lado (revisão 1 da 2.2: com 95%, até 5% dos códigos do RPC podiam faltar no REST, saíam do catálogo e a foto os
+  marcava "fora do Fracttal" sem estarem). O resultado vai a `estado()["paridade_rest"]` e ao `ativos_estado.json`, dizendo
+  contra qual fonte e de quando, com as coberturas de toda noite (`cob_ref`: % dos códigos do catálogo na leitura; `cob_rest`:
+  % dos da leitura no catálogo).
   **Falhou:** nada troca, nada se acrescenta pelo REST, e o catálogo vence nas 24 h de sempre: a 1ª sessão do dia o renova
   pelo RPC, por trás, uma vez para todos (o renovador de antes). **Valeu:** `ativos_central.trocar(..., "rest", lido_em=` o
   fim da leitura `)`, que ainda recusa a que encolhe; aceita, a foto do banco é renovada (`nexus/dados/foto_ativos.py`: só
   quando o sha das linhas muda; o código que saiu do Fracttal fica marcado). Uma guarda só para os dois.
-- **De dia, só os novos** (às :08 e :38 das 06h às 22h, `ler_novos`, só com a paridade valendo): `items?sort=id:desc`, do maior
-  id para o menor, até a 1ª página INTEIRA de ids que o catálogo já tem (1 pedido sem novidade, 2 com). A página fora de
-  ordem (o `sort` ignorado) não acrescenta nada; mais de 400 novos ficam para a noite; o novo cujo pai não está no catálogo
-  nem nos novos também. O caminho dos novos sai do catálogo, e a raiz do cliente do próprio catálogo (o item-usina, com um
+- **De dia, só os novos** (às :08 e :38 das 06h às 22h, `ler_novos`, só com a paridade valendo e de no máximo 30 h):
+  `items?sort=id:desc`, do maior id para o menor, até a 1ª página INTEIRA de ids que o catálogo já tem (1 pedido sem novidade,
+  2 com). A página fora de ordem (o `sort` ignorado) não acrescenta nada e é falha do REST; mais de 400 novos ficam para a noite
+  (não é falha: o REST respondeu); o novo cujo pai não está no catálogo nem nos novos também. O caminho dos novos sai do catálogo, e a raiz do cliente do próprio catálogo (o item-usina, com um
   trecho só no caminho, é filho dela). Eles entram por `ativos_central.acrescentar`, sem mexer no `lido_em` da lista inteira
   (o catálogo vence pelas 24 h dela, e a confirmação do encolhimento segue valendo); anda o `novos_em`, e a tela diz "ativos
   de HH:MM" pelo mais novo dos dois (`visto_em`).
 - **Quem pede os novos:** `pedir_novos` (por trás; a leitura de menos de 1 min serve, e dez cliques são um pedido) e
-  `esperar_novos` (a aprovação da Fila; teto de 6 s). Uma leitura do Fracttal por vez: os novos pulam enquanto a noite corre.
+  `esperar_novos` (a tela que volta com `?novos=1` e a aprovação que não achou o ativo; teto de 6 s), que devolve o DESFECHO
+  da leitura: `terminou` (dentro da espera), `acrescentados`, `sem_pai`, `muitos` e `erro`. Uma leitura do Fracttal por vez: os
+  novos pulam enquanto a noite corre.
+- **A prontidão expira** (`ativos_central.leitor_pronto`, revisão 1 da 2.2): o leitor só está pronto (os botões pedem os novos
+  a ele) com a conferência da leitura REST que VALEU há no máximo 30 h (`paridade_recente`) e nenhuma leitura REST falhando
+  depois da última boa (`anotar_leitura_rest`: a dos novos ou a da noite; a exceção do cliente, a leitura incompleta e a página
+  fora de ordem são falha; os novos demais, não). A prontidão que nunca expirava deixava os botões no REST com toda leitura
+  falhando, sem o socorro do RPC, e a Fila sem o ativo de hoje por um dia. Fora dela, `force` e `em_dia` voltam ao caminho do
+  PC (o RPC com a sessão da pessoa); a leitura boa seguinte a devolve; a última boa e a última falha vão ao
+  `ativos_estado.json` (o reinício não esquece) e ao `estado()["rest"]`.
 - **Medido** (27 mil itens sintéticos com a forma da árvore do Fracttal: 16 clientes, 190 usinas, cabines e inversores):
   `para_registro` + `montar_registros` 0,25 a 0,3 s; a noite inteira sem a rede (a leitura, a foto de 27 mil linhas do banco
-  devolvida como texto, a conferência, a troca e a foto) ~7 s e pico de ~53 MB a mais (eram 72 MB antes de cada passo largar o
+  devolvida como texto, a conferência, a troca e a foto sem mudança) 7 a 9 s e pico de ~53 MB a mais (eram 72 MB antes de cada passo largar o
   que já serviu e de a foto do banco virar listas logo depois de lida; o maior pedaço é o `montar_registros`, com a lista crua
-  e os registros juntos); os novos (30, pelo catálogo de 27 mil) 0,1 s mais 0,4 s para somar. Pedidos: a noite, 1 por página
-  de 100 (~270); os novos, 1 ou 2.
+  e os registros juntos; o nome sem endereço de cada item, da revisão 1, vem depois dele e não sobe o pico); os novos (30, pelo
+  catálogo de 27 mil) 0,1 s mais 0,4 s para somar. A noite em que a foto MUDA (a 1ª renovação, que troca todas as linhas de
+  11/10) grava as 27 mil linhas pelo `livros.publicar`, e o xlsx dele pesa mais que tudo isso: olhar o Raio-X nessa noite.
+  Pedidos: a noite, 1 por página de 100 (~270); os novos, 1 ou 2.
 - **Os campos do REST que o leitor supõe** (a sondagem do `items` não pôde ser feita antes de construir): `id`, `code`,
   `description`, `id_parent`, `id_type_item`, `id_group_task` e, se vier, `parent_description` (os nomes do RPC
   `inventories.items_list`, que o `get_assets` usa), e o envelope `{"data", "total"}` (o do `fonte_bd_api` do PCM, com o
@@ -1437,7 +1465,11 @@ os pedidos; a incompleta não troca; a recusa espera e tenta; os novos param na 
 sem pai fica para a noite e os novos voltam do disco; o caminho pelos pais igual ao do RPC e o grupo que cai no catálogo e na
 foto; a paridade que passa e a que falha, que deixa o catálogo pelo RPC, uma vez; a foto que guarda o código que saiu, só
 grava quando muda, não grava sobre a leitura curta e só depois que o catálogo aceitou; o encolhimento confirmado, que
-sobrevive ao reinício; a falha do download que vale para quem esperava; só o servidor liga, e sem a credencial não liga).
+sobrevive ao reinício; a falha do download que vale para quem esperava; só o servidor liga, e sem a credencial não liga) e
+`tests/test_oscreator_ativos_prontidao.py` (a revisão 1: a prontidão que expira pela idade e pela falha e volta com a leitura
+boa, também depois do reinício; a noite que falha derruba; a 1ª conferência com 99% nos dois sentidos e os códigos que faltam;
+só o erro de passagem se repete; a noite ordenada pelo id e o `sort` recusado; a foto pela diferença de ids e sem o endereço
+da usina; o núcleo concorrente dos novos com as funções de verdade; o disco com a versão vigente; as 26 h com o leitor).
 
 ## Os botões "Atualizar ativos" sem esperar o Fracttal (31/10/2026, tarefa 2.3 do canto central)
 
@@ -1446,24 +1478,35 @@ catálogo inteiro pelo RPC NA FRENTE de quem clicou: ~110 pedidos, minutos, e a 
 pronto (seção acima: ligado pelo `servir.py` e com a leitura REST da noite conferida), eles pedem só os ativos NOVOS
 (`api.load_assets_cached(force=True)` -> `ativos_central.pedir_novos`, por trás) e respondem na hora.
 - **O que a tela recebe:** `ativos_de` ("ativos de HH:MM", Brasília, `api.ativos_de`: a última vez que a lista foi comparada
-  com o Fracttal, a lista inteira de madrugada ou os novos do dia, o mais novo dos dois; de outro dia, "ativos de dd/mm
-  HH:MM", porque à 01:00 "de 02:20" seria lido como a de hoje), `novos` (True quando o leitor foi chamado) e `recusa`.
+  com o Fracttal, a lista inteira de madrugada ou os novos do dia, o mais novo dos dois, Ruling AL; de outro dia, "ativos de
+  dd/mm HH:MM", porque à 01:00 "de 02:20" seria lido como a de hoje), com as duas horas no `title` (`api.ativos_de_titulo`:
+  "lista completa de dd/mm HH:MM; novos até HH:MM"; sem novos, só a primeira), `novos` (True quando o leitor foi chamado),
+  `recusa` e `falha`.
 - **E a lista seguinte já vem com os novos:** a tela que acabou de apertar o botão pede a lista com `?novos=1`
   (`/os/api/ativos/catalogo?novos=1`, `/os/api/tradicional/catalogo?novos=1`, e o link volta à Fila com `novos=1`), e essa
-  rota espera a leitura em curso até 6 s (`api.esperar_os_novos`; estourou, segue com o que há). Quem espera é o pedido
-  seguinte, não o botão.
-- **Onde aparece:** na tela de Ativos, a linha de cima ("N ativos · M usinas · ativos de HH:MM"; o rodapé diz quantos
-  entraram, "nenhum ativo novo no Fracttal" ou o motivo da recusa); no Criar OS, ao lado do ↻ (a hora e, se houver, a
-  recusa); na Fila, no aviso do ativo que não se acha ("busca no Fracttal os ativos novos, em segundos; ativos de HH:MM") e,
-  quando o link volta com `recusa`, numa faixa de alerta no alto (a Fila ignorava o parâmetro).
-- **Sem o leitor** (o PC, `app.py`; a paridade que falhou ou que ainda não houve): os botões seguem pelo RPC com a sessão de
+  rota espera a leitura em curso até 6 s (`api.esperar_os_novos`; estourou, segue com o que há) e devolve o desfecho dela
+  (`novos_desfecho`, com o `texto` de `api.texto_dos_novos`). Quem espera é o pedido seguinte, não o botão. A tela diz, nesta
+  ordem: não terminou ("a busca no Fracttal ainda não terminou: os ativos novos aparecem em instantes"); falhou ("não consegui
+  buscar os ativos novos no Fracttal: o motivo"); deixou ativos para a noite ("N ativos novos ficam para a leitura da noite");
+  terminou bem sem nada ("nenhum ativo novo no Fracttal", e só então); terminou bem com N (na tela de Ativos, a conta da lista).
+  Revisão 1 da 2.2: a frase "nenhum ativo novo" saía de qualquer conta igual, também quando a busca estourava ou falhava.
+- **Onde aparece:** na tela de Ativos, a linha de cima ("N ativos · M usinas · ativos de HH:MM"; o rodapé diz o desfecho, a
+  recusa e a falha; abaixo de 480 px a busca desce para a linha de baixo, inteira: a 375 px a linha espremia o subtítulo em 4
+  linhas e a busca cortava em "códi"); no Criar OS, ao lado do ↻ (a hora, o desfecho e, se houver, a recusa e a falha); na
+  Fila, no aviso do ativo que não se acha ("busca no Fracttal os ativos novos, em segundos; ativos de HH:MM") e, na volta do
+  link, em faixas de alerta no alto (o desfecho, a recusa e a falha, com o texto do servidor).
+- **Sem o leitor pronto** (o PC, `app.py`; a paridade que falhou, envelheceu ou ainda não houve; o REST falhando): os botões
+  seguem pelo RPC com a sessão de
   quem clicou, como antes, para dentro do catálogo central; a tela diz "leva alguns minutos" e mostra a mesma hora. A
   renovação por trás do catálogo vencido é sempre pelo RPC (`_renovar_catalogo_por_tras` marca o contexto dela, `_POR_TRAS`,
   e o `load_assets_cached(True)` dela não chama o leitor).
 - O erro do ↻ do Criar OS diz em palavras ("Não consegui recarregar os ativos: ..."), sem o sinal de alerta.
 - **Prova:** `tests/test_oscreator_ativos_botao.py` (os três botões voltam antes de a leitura dos novos acabar, sem o RPC, e
   a lista com `?novos=1` já traz o ativo novo; "ativos de HH:MM", com a data quando é de outro dia, nas respostas e nas
-  páginas, e a Fila mostrando a recusa; sem o leitor, ou com a paridade que falhou, o RPC com a sessão da pessoa).
+  páginas; sem o leitor, ou com a paridade que falhou, o RPC com a sessão da pessoa; e a revisão 1: o desfecho dos novos
+  (terminou bem sem nada e com N, sem o pai, não terminou e falhou) com o leitor de verdade, a Fila com o desfecho, a falha
+  lembrada nos botões e a sessão de uma pessoa que não é falha de todos, a Fila que não ecoa a URL, a aprovação que só espera
+  sem o ativo, o `title` com as duas horas e o cabeçalho a 375 px).
 
 ## O catálogo de ativos vencido por trás (24/10/2026)
 

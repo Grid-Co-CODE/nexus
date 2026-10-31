@@ -189,6 +189,17 @@ def test_o_codigo_que_esta_no_fracttal_vence_o_que_saiu():
     assert (d["XYZ-DEF100-INVR11.1"]["fracttal_item_id"], d["XYZ-DEF100-INVR11.1"]["descricao"]) == (90, "Novo")
 
 
+def test_o_desempate_do_codigo_e_o_menor_item_e_nao_o_dia_da_linha():
+    """Na foto renovada o `foto_em` é o dia em que a LINHA mudou: desempatar por ele trocaria o membro do código (o item e a
+    descrição) toda vez que a outra linha mudasse, e regravaria a dimensão. Entre as linhas que estão no Fracttal, o menor
+    item, como antes (revisão 1 da 2.2)."""
+    foto = [f for f in _foto() if f["codigo"] != "ABC100-INVR2.4"]
+    foto += [dict(zip(eq.CAB_FOTO, [12, "ABC100-INVR2.4", "Antigo", 13, "INVR", "2026-10-01", None, None, None])),
+             dict(zip(eq.CAB_FOTO, [40, "ABC100-INVR2.4", "Mudou ontem", 13, "INVR", "2026-10-31", None, None, None]))]
+    d = {m[1]: dict(zip(eq.CAB_DIM, m)) for m in eq.membros(foto, {}, USINAS)}
+    assert (d["ABC100-INVR2.4"]["fracttal_item_id"], d["ABC100-INVR2.4"]["descricao"]) == (12, "Antigo")
+
+
 def test_membros_sem_a_foto_no_banco_ficam_so_os_codigos_das_fontes():
     tab, rel = eq.montar([], FONTES, USINAS, [], [], [], agora="t", maquina="pc")
     assert {l[1] for l in tab["dim_equipamento"][1]} == {"ABC100-INVR2.4", "ABC100-INVR3.1", "XYZ-DEF100-INVR11.1"}

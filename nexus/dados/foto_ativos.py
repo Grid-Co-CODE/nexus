@@ -20,6 +20,12 @@ com três no fim desde 31/10: `id_type_item`, `id_group_task` e `fora_do_fractta
 - A leitura do banco é CONFERIDA (`ler`): a aba que a listagem não traz, ou que vem com menos linhas que o `row_count` dela,
   não grava (gravar por cima de uma leitura curta apagaria os códigos que saíram do Fracttal, que só existem aqui). E o livro
   é `so_cresce` no catálogo: a trava do `livros.publicar` confere de novo antes de trocar.
+- A `descricao` vai SEM o endereço da usina (Ruling AK, revisão 1 da 2.2): o leitor passa a cada linha o nome do item como o
+  Fracttal o põe no caminho (`ativos_foto.nomes_no_caminho`). A API do banco tem leitura aberta, e o endereço da usina já saiu
+  dela uma vez, no mesmo dia em que entrou (04/10/2026, a 1ª carga do Campo · App). A 1ª renovação troca as linhas da carga
+  única de 11/10, que tinham o endereço.
+- O nome do livro (`equipamento.NOME_FOTO`) só vale para quem o cria: o livro existe desde 11/10, e o `livros.publicar` não
+  troca o nome do que já existe.
 """
 from __future__ import annotations
 
@@ -81,12 +87,14 @@ def _ordem(l) -> tuple:
     return (l[0] or 0, l[1] or "", json.dumps(l, ensure_ascii=False, default=str))
 
 
-def linha_do_item(item: dict, tipo_code=None) -> list:
+def linha_do_item(item: dict, tipo_code=None, nome: str | None = None) -> list:
     """A linha de um item lido do Fracttal (o formato cru do RPC que o leitor monta: id, code, description, id_parent,
     id_type_item, id_group_task) com o `tipo_code` do registro do catálogo (o mesmo `tipo_fracttal` da carga de 11/10; a raiz
-    do cliente não tem). O `foto_em` e a marca de fora são da `renovar`."""
+    do cliente não tem). A `descricao` é o `nome` (o nome do item no caminho, sem o endereço da usina: é o que o leitor da noite
+    passa); sem ele, a descrição sem o "{ CÓDIGO }" do fim. O `foto_em` e a marca de fora são da `renovar`."""
     cod = eq.canon(item.get("code"))
-    return [_int(item.get("id")), cod or None, eq._descricao(item.get("description"), cod), _int(item.get("id_parent")),
+    descricao = (_txt(nome) or None) if nome is not None else eq._descricao(item.get("description"), cod)
+    return [_int(item.get("id")), cod or None, descricao, _int(item.get("id_parent")),
             _txt(tipo_code) or None, None, _int(item.get("id_type_item")), _int(item.get("id_group_task")), None]
 
 

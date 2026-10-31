@@ -186,6 +186,17 @@ def _catalogo_para_aprovar():
     return api.load_assets_cached(em_dia=True)
 
 
+def _ativo_para_aprovar(s: dict):
+    """O ativo da solicitação no catálogo em dia (`sw.asset_da`). Com o leitor do servidor pronto, quem NÃO acha o ativo espera
+    os ativos novos do Fracttal (até poucos segundos: o ativo cadastrado agora) e procura de novo; quem acha não espera nada
+    (revisão 1 da 2.2: cada aprovação esperava a leitura dos novos, mesmo com o ativo já no catálogo)."""
+    asset = sw.asset_da(s, _catalogo_para_aprovar())
+    if asset is None and ativos_central.leitor_pronto():
+        api.esperar_os_novos(so_em_curso=False)
+        asset = sw.asset_da(s, api.load_assets_cached())
+    return asset
+
+
 def _tipo_do_ativo(s: dict, cat):
     """O tipo do ativo da solicitação no catálogo — ou None quando não há certeza. Só id e código, como o `asset_da`."""
     if s.get("id_item") is not None:
@@ -364,10 +375,9 @@ def fila():
     negado = _sem_area_pcm_pagina("Fila do PCM", "fila")
     if negado:
         return negado
-    if request.args.get("novos") == "1":
-        # a volta do "Recarregar o catálogo de ativos" (que pediu os ativos novos ao leitor do servidor e voltou na hora):
-        # espera a leitura em curso, poucos segundos, para a ficha já achar o ativo cadastrado agora
-        api.esperar_os_novos()
+    # a volta do "Recarregar o catálogo de ativos" (que pediu os ativos novos ao leitor do servidor e voltou na hora): espera a
+    # leitura em curso, poucos segundos, para a ficha já achar o ativo cadastrado agora, e a tela diz como ela terminou
+    desfecho = api.esperar_os_novos() if request.args.get("novos") == "1" else None
     cat = _indice_ativos()
     forcar = request.args.get("atualizar") == "1"
     lista, pessoas, etiquetas, tipos, status = _ao_mesmo_tempo(lambda: _lista(forcar), _pessoas, _etiquetas, _tipos,
@@ -400,10 +410,14 @@ def fila():
         temas=sw.temas_da_fila(), tipos_sub=sw.TIPOS_SUB, tipo_padrao=sw.TIPO_PADRAO,
         classif1_padrao=sw.CLASSIF1_PADRAO, nenhuma=sw.SEM_CLASSIF, etiqueta_perf=sp.ETIQUETA_PERFORMANCE,
         tempo_padrao=api.DURACAO_OS_AVULSA,
-        # de quando é o catálogo de ativos, se o servidor lê os novos sozinho (o link dele demora segundos, não minutos) e o
-        # motivo da leitura do Fracttal que o catálogo não aceitou, que o link do catálogo traz na volta (31/10/2026)
-        ativos_de=api.ativos_de(), leitor=ativos_central.leitor_pronto(),
-        recusa=(request.args.get("recusa") or "").strip()[:300])
+        # de quando é o catálogo de ativos (as duas horas no `title`, Ruling AL) e se o servidor lê os novos sozinho (o link
+        # dele demora segundos, não minutos); na volta do link do catálogo, o desfecho da busca dos novos, e a leitura recusada
+        # ou o download que falhou, com o texto do SERVIDOR: a URL só traz o sinal (`?recusa=1`, `?falha=1`), e nenhum texto
+        # dela vai à tela (revisão 1 da 2.2: qualquer link punha qualquer frase na faixa)
+        ativos_de=api.ativos_de(), ativos_de_titulo=api.ativos_de_titulo(), leitor=ativos_central.leitor_pronto(),
+        novos_txt=(desfecho or {}).get("texto") or "",
+        recusa=api.aviso_da_recusa() if request.args.get("recusa") else "",
+        falha=api.aviso_da_falha() if request.args.get("falha") else "")
 
 
 @bp.route("/api/solic/<id_code>")
@@ -440,7 +454,7 @@ def api_aprovar(id_code):
     if not row:
         return jsonify({"erro": "Não achei a solicitação nº %s." % id_code}), 404
     s = sw.linha(api._req_row_to_d(row, api._code_to_loc()))
-    asset = sw.asset_da(s, _catalogo_para_aprovar())
+    asset = _ativo_para_aprovar(s)
     if not asset:
         return jsonify({"erro": sw.ERRO_SEM_ASSET}), 400
     # a lista da TELA (o PCM pode ter editado); a tela que esvaziou a lista leva a base, como o app
@@ -702,11 +716,11 @@ def atualizar():
     # `load_assets_cached` confere se o catálogo foi conferido depois do pedido), em vez de baixar duas vezes
     api.load_assets_cached(True)
     _esquecer_lista()
-    # este botão é um link que navega: não há JSON, então o motivo da recusa (se houve) vai na volta, em `recusa`, e a Fila o
-    # mostra no alto
-    aviso = api.aviso_da_recusa()
-    return redirect(url_for("os_web_solic.fila", sel=request.args.get("sel") or "", atualizar=1,
-                            **({"novos": 1} if novos else {}), **({"recusa": aviso} if aviso else {})))
+    # este botão é um link que navega: não há JSON, então a volta leva só o SINAL da recusa e da falha (`recusa=1`, `falha=1`),
+    # e a Fila mostra o texto do servidor no alto
+    sinais = {k: 1 for k, texto in (("novos", novos), ("recusa", api.aviso_da_recusa()), ("falha", api.aviso_da_falha()))
+              if texto}
+    return redirect(url_for("os_web_solic.fila", sel=request.args.get("sel") or "", atualizar=1, **sinais))
 
 
 @bp.route("/api/solic/aquecer", methods=["POST"])

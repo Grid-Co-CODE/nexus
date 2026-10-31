@@ -215,9 +215,9 @@ def test_novos_param_na_pagina_conhecida(dormidas):
     # quem soma ao catálogo: sem a leitura REST conferida (paridade), nada entra
     rel = AL.ler_novos(ler=RestFalso(base + novos))
     assert rel["acrescentados"] == 0 and "paridade" in rel["resultado"] and len(AC.atual().lista) == len(cat.lista)
-    AC.anotar_paridade_rest({"vale": True, "motivo": "conferida"})
+    AC.anotar_paridade_rest({"vale": True, "motivo": "conferida", "em": time.time()})
     rel = AL.ler_novos(ler=RestFalso(base + novos, ignora_sort=True))                # fora de ordem: nada entra
-    assert rel["acrescentados"] == 0 and "ForaDeOrdem" in rel["resultado"] and AC.atual() is cat
+    assert rel["acrescentados"] == 0 and "maior id para o menor" in rel["erro"] and AC.atual() is cat
     rel = AL.ler_novos(ler=RestFalso(base + novos))
     agora = AC.atual()
     assert rel["acrescentados"] == 3 and len(agora.lista) == len(cat.lista) + 3 and rel["pedidos"] == 2
@@ -231,7 +231,7 @@ def test_novos_sem_pai_ficam_para_a_noite_e_vao_ao_disco(tmp_path):
     pasta = tmp_path / "oscreator"
     AC.reiniciar(pasta=str(pasta))
     cat = _catalogo_de(_muitos(120))
-    AC.anotar_paridade_rest({"vale": True})
+    AC.anotar_paridade_rest({"vale": True, "em": time.time()})
     novos = [_it(5000, "CAL-GAM100-INVR90.1", "Inversor 90.1    { x }", 10),
              _it(5001, "CAL-XYZ-INVR1.1", "Inversor solto    { x }", 4242)]           # o pai não está em lugar nenhum
     rel = AL.ler_novos(ler=RestFalso(_muitos(120) + novos))
@@ -361,7 +361,7 @@ def test_a_noite_que_vale_troca_o_catalogo_e_renova_a_foto(banco, app):
 
 def test_a_foto_so_grava_depois_que_o_catalogo_aceita(banco, app):
     _catalogo_de(_muitos(300))
-    AC.anotar_paridade_rest({"vale": True})
+    AC.anotar_paridade_rest({"vale": True, "em": time.time()})
     # a leitura que encolhe mais de 5% (inteira e coerente, mas com 40 ativos a menos): a paridade passa e o catálogo recusa
     rel = AL.ler_completo(app, ler=RestFalso(_muitos(260)))
     assert "recusou" in rel["resultado"] and "encolheu" in rel["resultado"] and AC.paridade_rest()["vale"]
@@ -563,7 +563,7 @@ def test_com_credencial_liga_sem_laco_nos_testes(app):
     AL.ligar(app)                                                              # de novo: nada
     assert AL.estado()["ligado"] and AL.estado()["credencial"] == "teste"
     assert not AC.leitor_pronto()                                              # sem a paridade da 1ª noite, não está pronto
-    AC.anotar_paridade_rest({"vale": True})
+    AC.anotar_paridade_rest({"vale": True, "em": time.time()})
     assert AC.leitor_pronto()
     assert not any(t.name == "nexus-ativos-leitor" for t in threading.enumerate())
 

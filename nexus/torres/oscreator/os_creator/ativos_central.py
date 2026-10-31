@@ -20,7 +20,8 @@ COMO É AGORA:
   pessoas: um chamador que mexesse num deles mudaria o ativo para todo mundo até a próxima troca, e sem erro nenhum. Quem
   precisa mexer pede a cópia (`registro(codigo)` ou `dict(r)`).
 - O boot NUNCA pergunta ao Fracttal. Em ordem: (1) a cópia desta tabela em disco, `<pasta>/ativos.json.gz` (gravada ao lado,
-  de uma vez só, com o formato escrito dentro; a ilegível ou de outro formato é ignorada); (2) o `assets_cache.json` antigo,
+  de uma vez só, com o formato escrito dentro, e só se o catálogo ainda for o vigente; a ilegível ou de outro formato é
+  ignorada; as gravações e as leituras do disco moram em `ativos_disco.py`); (2) o `assets_cache.json` antigo,
   lido UMA vez como migração se a cópia nova não existe (e já grava a nova); (3) a foto dos ativos no banco
   (`nexus_ativos_fracttal · foto_ativos`), se o Nexus ligou uma função que a lê (`ligar_fonte_do_banco`; este módulo não
   conhece a configuração do banco). Sem nenhuma das três, o catálogo nasce do primeiro download (`trocar(..., "rpc")`).
@@ -56,7 +57,6 @@ da foto de 22/09, sem a raiz de cada cliente, está no topo de lá); daqui só s
 """
 from __future__ import annotations
 
-import gzip
 import hashlib
 import json
 import logging
@@ -65,7 +65,6 @@ import sys
 import threading
 import time
 import unicodedata
-import zlib
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -79,18 +78,19 @@ if _RAIZ_REPO not in sys.path:
     sys.path.append(_RAIZ_REPO)
 from chamado_garantia.ativos import tipo_e_sufixo  # noqa: E402
 from ativos_foto import CAB_FOTO, FotoIncompleta, registros_da_foto  # noqa: E402,F401 — a foto como catálogo (o api e os testes)
+import ativos_disco  # noqa: E402 — a cópia em disco e o estado que sobrevive ao reinício
+from ativos_disco import FORMATO, FORMATO_LEGADO, NOME_ARQUIVO, NOME_ESTADO  # noqa: E402,F401 — os nomes de sempre
 
 log = logging.getLogger("oscreator.ativos_central")
 
-FORMATO = 1                     # o formato do arquivo em disco; outro número = arquivo de outra versão do código, ignorado
-FORMATO_LEGADO = 2              # o "ver" do assets_cache.json antigo (v2 = + id_parent/id_type_item/id_group_task)
-NOME_ARQUIVO = "ativos.json.gz"
-NOME_ESTADO = "ativos_estado.json"   # a recusa lembrada e a última paridade do REST, ao lado da cópia (sobrevivem ao reinício)
 FONTES = ("banco", "rest", "rpc", "disco")
 ENCOLHE_MAX = 5                 # % que a lista nova pode ser menor que a de agora; mais que isto, a troca é recusada
 CONFIRMA_MESMO_CAMINHO_S = 20 * 3600   # o encolhimento lido duas vezes pelo MESMO caminho só vale com isto entre as leituras
 ESPERA_BANCO_S = 600            # a foto do banco que falhou ou veio incompleta só é lida de novo depois disto
 REGRAVAR_DISCO_S = 3600         # a mesma lista lida de novo regrava o disco (o `lido_em` dele não fica para trás) a cada hora
+# o leitor do servidor só está pronto (os botões pedem os novos a ele) com a conferência da leitura REST de no máximo 30 h:
+# a da noite de ontem com folga para a de hoje atrasar; passou disso, a última noite boa ficou para trás e o socorro é o RPC
+PARIDADE_VALE_S = 30 * 3600
 _BRT = timezone(timedelta(hours=-3))
 
 # Os campos de texto que se repetem em milhares de registros (17 clientes, ~190 usinas, ~60 tipos): uma string só para cada
@@ -327,7 +327,6 @@ _ATUAL: Catalogo | None = None
 _TRAVA = threading.Lock()               # a troca da versão (comparar com a de agora e instalar)
 _TRAVA_BOOT = threading.Lock()          # o boot local (disco e arquivo antigo) uma vez só, mesmo com vários pedidos juntos
 _TRAVA_BANCO = threading.Lock()         # uma leitura da foto do banco por vez
-_TRAVA_DISCO = threading.Lock()         # uma gravação da cópia em disco por vez
 _CONFIG: dict = {"pasta": None, "legado": None}
 _BOOT = {"local": False}
 _FONTE_BANCO: dict = {"func": None}
@@ -337,8 +336,11 @@ _LEITOR: dict = {"pedir_novos": None, "esperar_novos": None, "estado": None}
 
 
 def _estado_limpo() -> dict:
+    # `rest`: a última leitura REST que deu certo e a última que falhou (a dos novos ou a da noite): a falha mais nova que a
+    # boa tira a prontidão do leitor, e a próxima boa a devolve (revisão 1 da 2.2)
     return {"recusa": None, "recusa_completa": None, "paridade_rest": None, "banco": None, "encolhimento": None,
-            "falha": None, "disco": {"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None}}
+            "falha": None, "rest": {"bom_em": 0.0, "falha_em": 0.0, "falha": None},
+            "disco": {"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None}}
 
 
 _ESTADO: dict = _estado_limpo()
@@ -377,20 +379,52 @@ def reiniciar(pasta: str | None = None, legado: str | None = None) -> None:
 # ── o leitor do servidor ───────────────────────────────────────────────────────────────────────────────────────────────
 def ligar_leitor(*, pedir_novos=None, esperar_novos=None, estado=None) -> None:
     """O leitor dos ativos do servidor (`ativos_leitor.ligar`) se registra aqui: `pedir_novos()` lê os ativos novos por trás e
-    volta na hora; `esperar_novos(teto, so_em_curso)` espera a leitura deles até `teto` segundos; `estado()` diz o que ele fez.
-    Sem a credencial do Fracttal ele registra só o `estado` (para o motivo aparecer) e as telas seguem pelo RPC."""
+    volta na hora; `esperar_novos(teto, so_em_curso)` espera a leitura deles até `teto` segundos e diz o desfecho; `estado()`
+    diz o que ele fez. Sem a credencial do Fracttal ele registra só o `estado` (para o motivo aparecer) e as telas seguem pelo
+    RPC."""
     _LEITOR.update(pedir_novos=pedir_novos, esperar_novos=esperar_novos, estado=estado)
 
 
+def paridade_recente(agora: float | None = None) -> dict | None:
+    """A última conferência da leitura REST, se ela VALEU e tem no máximo `PARIDADE_VALE_S` (30 h); senão None. A noite que
+    falha (o REST fora, a credencial, o `sort` recusado) não renova a conferência: passadas as 30 h da última boa, o REST deixa de
+    somar os novos e os botões voltam ao RPC, até uma noite boa."""
+    atual()                                                         # o boot local traz a de antes do reinício
+    p = _ESTADO["paridade_rest"]
+    em = p.get("em") if p else None
+    if not p or not p.get("vale") or not isinstance(em, (int, float)):
+        return None
+    if (time.time() if agora is None else agora) - em > PARIDADE_VALE_S:
+        return None
+    return dict(p)
+
+
+def anotar_leitura_rest(ok: bool, motivo: str | None = None) -> None:
+    """Uma leitura REST do Fracttal (a dos novos ou a da noite) que deu certo (`ok`) ou que falhou (a exceção do cliente, a
+    leitura incompleta, a página fora de ordem; os novos demais NÃO são falha: o REST respondeu, e eles ficam para a noite). A
+    falha mais nova que a última boa tira a prontidão do leitor; a próxima boa a devolve. Vai ao `ativos_estado.json`: o
+    reinício não esquece que o REST está falhando."""
+    agora = time.time()
+    if ok:
+        _ESTADO["rest"].update(bom_em=agora)
+    else:
+        _ESTADO["rest"].update(falha_em=agora, falha=str(motivo or "")[:200])
+    _gravar_estado()
+
+
+def _rest_falhando() -> bool:
+    r = _ESTADO["rest"]
+    return float(r.get("falha_em") or 0.0) > float(r.get("bom_em") or 0.0)
+
+
 def leitor_pronto() -> bool:
-    """O leitor está ligado E a última conferência do REST contra o catálogo valeu (`anotar_paridade_rest`). Sem paridade
-    nenhuma ainda (a 1ª noite não chegou) ou com a que falhou, o REST não acrescenta nada ao catálogo: as telas seguem pelo RPC,
-    com a sessão da pessoa, como antes do leitor."""
+    """O leitor está ligado, a última conferência da leitura REST valeu e tem no máximo 30 h (`paridade_recente`), e nenhuma
+    leitura REST falhou depois da última que deu certo (revisão 1 da 2.2: a prontidão que nunca expirava deixava os botões no
+    REST mesmo com toda leitura falhando, sem o socorro do RPC, e a Fila sem o ativo de hoje por um dia). Fora da prontidão, o
+    REST não acrescenta nada e as telas seguem pelo RPC, com a sessão da pessoa, como antes do leitor."""
     if _LEITOR["pedir_novos"] is None:
         return False
-    atual()                                                         # o boot local traz a paridade de antes do reinício
-    p = _ESTADO["paridade_rest"]
-    return bool(p and p.get("vale"))
+    return paridade_recente() is not None and not _rest_falhando()
 
 
 def pedir_novos() -> bool:
@@ -404,132 +438,57 @@ def pedir_novos() -> bool:
         return False
 
 
-def esperar_novos(teto: float, so_em_curso: bool = False) -> bool:
-    """Espera a leitura dos ativos novos até `teto` segundos (a de agora, ou uma nova se a última já tem mais de um minuto;
-    `so_em_curso`: só a que já está em curso). Estourou, segue com o que há. False se o leitor não está pronto."""
-    if not leitor_pronto() or _LEITOR["esperar_novos"] is None:
-        return False
+def esperar_novos(teto: float, so_em_curso: bool = False) -> dict | None:
+    """Espera a leitura dos ativos novos até `teto` segundos (`so_em_curso`: só a que já está em curso, a que o botão pediu;
+    senão, uma nova se a última já tem mais de um minuto) e devolve o DESFECHO dela: `terminou` (dentro do teto),
+    `acrescentados`, `sem_pai`, `muitos` (mais novos do que a leitura curta lê) e `erro` (o motivo curto, ou ""). None sem o
+    leitor (ou, para uma leitura nova, com ele fora da prontidão). A espera da que está em curso vale mesmo com a prontidão
+    caída: é por ela que a tela sabe que a leitura que o botão pediu falhou."""
+    if _LEITOR["esperar_novos"] is None or (not so_em_curso and not leitor_pronto()):
+        return None
     try:
-        return bool(_LEITOR["esperar_novos"](teto, so_em_curso))
+        return _LEITOR["esperar_novos"](teto, so_em_curso)
     except Exception:                                               # noqa: BLE001
         log.exception("catálogo de ativos: a espera dos ativos novos falhou")
-        return False
+        return None
 
 
-# ── a cópia em disco ───────────────────────────────────────────────────────────────────────────────────────────────────
+# ── a cópia em disco e o estado que sobrevive ao reinício: em `ativos_disco.py` (Ruling AM); aqui, só quem passa a pasta ────
 def _caminho() -> str | None:
-    return os.path.join(_CONFIG["pasta"], NOME_ARQUIVO) if _CONFIG["pasta"] else None
+    return ativos_disco.caminho(_CONFIG["pasta"])
 
 
 def _gravar_disco(cat: Catalogo) -> None:
-    """Grava a cópia ao lado e troca de uma vez (os.replace): quem reinicia no meio nunca lê um arquivo pela metade. Falha de
-    disco vai ao log e a `estado()`, e o catálogo segue na memória."""
-    destino = _caminho()
-    if destino is None:
-        return
-    with _TRAVA_DISCO:
-        tmp = "%s.%d.%d.tmp" % (destino, os.getpid(), threading.get_ident())
-        try:
-            os.makedirs(os.path.dirname(destino), exist_ok=True)
-            carga = {"formato": FORMATO, "fonte": cat.fonte, "lido_em": cat.lido_em, "versao": cat.versao,
-                     "novos_em": cat.novos_em, "registros": cat.lista}
-            with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=5) as f:
-                json.dump(carga, f, ensure_ascii=False, separators=(",", ":"))
-            os.replace(tmp, destino)
-            _ESTADO["disco"].update(gravado_em=time.time(), lido_em=cat.lido_em, erro=None)
-        except Exception as e:                                       # noqa: BLE001 — o disco não derruba o catálogo
-            _ESTADO["disco"]["erro"] = "gravar: %s: %s" % (type(e).__name__, str(e)[:120])
-            log.warning("catálogo de ativos: não consegui gravar a cópia em disco (%s)", _ESTADO["disco"]["erro"])
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
+    """A cópia em disco deste catálogo, só se ele ainda for o vigente quando a trava do disco chegar (a versão mais nova grava
+    a dela: uma troca e os novos do dia terminando em ordem trocada não deixam a velha no disco)."""
+    ativos_disco.gravar_catalogo(_CONFIG["pasta"], cat, _ESTADO["disco"], lambda: cat is _ATUAL)
 
 
 def _ler_disco():
-    """(registros, lido_em, novos_em) da cópia em disco, ou None: sem arquivo, ilegível, de outro formato ou com a lista vazia
-    (o motivo, se houve, fica em `estado()`). Nunca levanta."""
-    caminho = _caminho()
-    if caminho is None or not os.path.exists(caminho):
-        return None
-    try:
-        with gzip.open(caminho, "rt", encoding="utf-8") as f:
-            carga = json.load(f)
-        if not isinstance(carga, dict) or carga.get("formato") != FORMATO:
-            raise ValueError("formato %r, o esperado é %d" % (carga.get("formato") if isinstance(carga, dict) else None,
-                                                              FORMATO))
-        registros = carga.get("registros")
-        if not isinstance(registros, list) or not registros or not all(isinstance(r, dict) for r in registros):
-            raise ValueError("sem a lista de registros")
-        return registros, float(carga.get("lido_em") or 0.0), float(carga.get("novos_em") or 0.0)
-    except (OSError, EOFError, ValueError, TypeError, zlib.error) as e:        # UnicodeError e JSONDecodeError são ValueError
-        _ESTADO["disco"]["erro"] = "ler: %s: %s" % (type(e).__name__, str(e)[:120])
-        log.warning("catálogo de ativos: ignorei a cópia em disco (%s)", _ESTADO["disco"]["erro"])
-        return None
-
-
-def _caminho_estado() -> str | None:
-    return os.path.join(_CONFIG["pasta"], NOME_ESTADO) if _CONFIG["pasta"] else None
+    return ativos_disco.ler_catalogo(_CONFIG["pasta"], _ESTADO["disco"])
 
 
 def _gravar_estado() -> None:
-    """A recusa lembrada e a última paridade do REST, ao lado da cópia (gravadas de uma vez, como ela). Sem pasta (os testes),
-    nada; falha de disco vai ao log e o estado segue na memória."""
-    destino = _caminho_estado()
-    if destino is None:
-        return
-    with _TRAVA_DISCO:
-        tmp = "%s.%d.%d.tmp" % (destino, os.getpid(), threading.get_ident())
-        try:
-            os.makedirs(os.path.dirname(destino), exist_ok=True)
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"formato": FORMATO, "recusa_completa": _ESTADO["recusa_completa"],
-                           "paridade_rest": _ESTADO["paridade_rest"]}, f, ensure_ascii=False)
-            os.replace(tmp, destino)
-        except (OSError, TypeError, ValueError) as e:
-            log.warning("catálogo de ativos: não gravei o %s (%s: %s)", NOME_ESTADO, type(e).__name__, str(e)[:120])
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
+    ativos_disco.gravar_estado(_CONFIG["pasta"], {"recusa_completa": _ESTADO["recusa_completa"],
+                                                  "paridade_rest": _ESTADO["paridade_rest"], "rest": _ESTADO["rest"]})
 
 
 def _ler_estado() -> None:
-    """O `ativos_estado.json` de antes do reinício: a recusa lembrada e a paridade voltam à memória. O ilegível é ignorado."""
-    caminho = _caminho_estado()
-    if caminho is None or not os.path.exists(caminho):
+    """O `ativos_estado.json` de antes do reinício: a recusa lembrada, a paridade e a prontidão do REST voltam à memória."""
+    d = ativos_disco.ler_estado(_CONFIG["pasta"])
+    if not d:
         return
-    try:
-        with open(caminho, encoding="utf-8") as f:
-            d = json.load(f)
-        if not isinstance(d, dict) or d.get("formato") != FORMATO:
-            raise ValueError("formato %r" % (d.get("formato") if isinstance(d, dict) else None))
-        r, p = d.get("recusa_completa"), d.get("paridade_rest")
-        if isinstance(r, dict) and isinstance(r.get("lido_em"), (int, float)):
-            _ESTADO["recusa_completa"] = r
-        if isinstance(p, dict):
-            _ESTADO["paridade_rest"] = p
-    except (OSError, ValueError, TypeError) as e:
-        log.warning("catálogo de ativos: ignorei o %s (%s: %s)", NOME_ESTADO, type(e).__name__, str(e)[:120])
+    r, p, rest = d.get("recusa_completa"), d.get("paridade_rest"), d.get("rest")
+    if isinstance(r, dict) and isinstance(r.get("lido_em"), (int, float)):
+        _ESTADO["recusa_completa"] = r
+    if isinstance(p, dict):
+        _ESTADO["paridade_rest"] = p
+    if isinstance(rest, dict):
+        _ESTADO["rest"].update({k: rest.get(k) for k in ("bom_em", "falha_em", "falha") if k in rest})
 
 
 def _ler_legado():
-    """(registros, ts) do `assets_cache.json` antigo (versão 2), ou None. Lido uma vez só, como migração."""
-    caminho = _CONFIG["legado"]
-    if not caminho or not os.path.exists(caminho):
-        return None
-    try:
-        with open(caminho, encoding="utf-8") as f:
-            c = json.load(f)
-        if not isinstance(c, dict) or c.get("ver") != FORMATO_LEGADO:
-            raise ValueError("versão %r, a esperada é %d" % (c.get("ver") if isinstance(c, dict) else None, FORMATO_LEGADO))
-        ativos = c.get("assets")
-        if not isinstance(ativos, list) or not ativos:
-            raise ValueError("sem ativos")
-        return ativos, float(c.get("ts") or 0.0)
-    except (OSError, ValueError, TypeError) as e:
-        log.warning("catálogo de ativos: ignorei o assets_cache.json antigo (%s: %s)", type(e).__name__, str(e)[:120])
-        return None
+    return ativos_disco.ler_legado(_CONFIG["legado"])
 
 
 # ── a troca ────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -805,8 +764,9 @@ def visto_em(cat: Catalogo) -> float:
 def estado() -> dict:
     """O que se sabe do catálogo, para o Raio-X: a fonte, o `lido_em`, o `novos_em`, a versão, quantos ativos, a última troca
     recusada (motivo, hora, fonte e tamanhos), o último encolhimento confirmado, a última falha do download pelo RPC, a paridade
-    do REST (a leitura da noite conferida contra o catálogo de antes), a situação do disco e da foto do banco e, com o leitor do
-    servidor ligado, o que ele fez (ou por que não ligou)."""
+    do REST (a leitura da noite conferida contra o catálogo de antes, com as coberturas dos dois lados), a última leitura REST
+    boa e a última que falhou, se o leitor está pronto, a situação do disco e da foto do banco e, com o leitor do servidor
+    ligado, o que ele fez (ou por que não ligou)."""
     cat = _ATUAL
     tem = cat is not None
     leitor = None
@@ -821,8 +781,9 @@ def estado() -> dict:
             "recusa": dict(_ESTADO["recusa"]) if _ESTADO["recusa"] else None,
             "encolhimento": dict(_ESTADO["encolhimento"]) if _ESTADO["encolhimento"] else None,
             "falha": dict(_ESTADO["falha"]) if _ESTADO["falha"] else None,
-            "paridade_rest": _ESTADO["paridade_rest"], "disco": dict(_ESTADO["disco"]),
-            "banco": dict(_ESTADO["banco"]) if _ESTADO["banco"] else None, "leitor": leitor}
+            "paridade_rest": _ESTADO["paridade_rest"], "rest": dict(_ESTADO["rest"]), "leitor_pronto": leitor_pronto(),
+            "disco": dict(_ESTADO["disco"]), "banco": dict(_ESTADO["banco"]) if _ESTADO["banco"] else None,
+            "leitor": leitor}
 
 
 def anotar_paridade_rest(resultado: dict | None) -> None:
