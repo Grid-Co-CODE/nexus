@@ -717,8 +717,8 @@ def test_sem_login_a_tela_manda_entrar(app, inv, falso):
 
 # ── a aba no Almoxarifado ────────────────────────────────────────────────────────────────────────────────────────────────
 def test_a_aba_inventario_ao_lado_das_cinco(app, inv, falso, monkeypatch):
-    """A aba Inventário fica depois das cinco que já existem, com quantas contagens esperam o PCM; da tela do inventário
-    cada uma das cinco volta à aba dela."""
+    """A aba Inventário fica depois das seis que já existem (a das Avariadas desde 30/10/2026), com quantas contagens
+    esperam o PCM; da tela do inventário cada uma das seis volta à aba dela."""
     _semear_almox(inv)
     _publicar(inv, _linha("C-1", "L1", "501", "3"))
     c = _pcm(app, monkeypatch)
@@ -727,13 +727,13 @@ def test_a_aba_inventario_ao_lado_das_cinco(app, inv, falso, monkeypatch):
     assert [re.sub(r"\s+", " ", a).split(" (")[0].strip() for a in abas] == ABAS
     assert re.search(r'<a[^>]*href="/t/pcm/pecas/inventario"[^>]*>\s*Inventário \(1\)', html)
     pagina = c.get(LISTA).get_data(as_text=True)
-    for aba in ("reposicao", "almoxarifados", "catalogo", "consumo", "cadastro"):
+    for aba in ("reposicao", "almoxarifados", "catalogo", "consumo", "avariadas", "cadastro"):
         assert f'href="/t/pcm/pecas?aba={aba}"' in pagina
     assert re.search(r'aria-selected="true"[^>]*href="/t/pcm/pecas/inventario"|href="/t/pcm/pecas/inventario"[^>]*aria-selected="true"', pagina)
 
 
-ABAS = ["Reposição", "Por almoxarifado", "Catálogo e saldo", "Consumo nas OS", "Cadastro a corrigir", "Inventário",
-        "Mínimo e máximo", "Curadoria", "Auditoria"]
+ABAS = ["Reposição", "Por almoxarifado", "Catálogo e saldo", "Consumo nas OS", "Avariadas", "Cadastro a corrigir",
+        "Inventário", "Mínimo e máximo", "Curadoria", "Auditoria"]
 
 
 def test_as_abas_do_inventario_ficam_juntas(app, inv, falso, monkeypatch):

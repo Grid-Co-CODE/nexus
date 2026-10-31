@@ -986,6 +986,11 @@ html.pgp-aberto{overflow:hidden}
    vence o [hidden] do navegador, então o atributo sozinho não esconderia (30/10/2026) */
 .alm-filtros[hidden]{display:none}
 .alm-curva{font:700 12.5px var(--font-mono);color:var(--tinta)}
+/* o cartão das Avariadas é um botão que abre a aba (30/10/2026): a mesma aparência dos outros números, sem a caixa do botão. O
+   recuo e o filete vêm do .kb-kpi (e das regras de 2 colunas, que têm mais peso e seguem valendo) */
+.alm-kpi-ir{display:block;width:100%;background:none;border-style:solid;border-color:var(--linha);border-width:0 0 0 1px;border-radius:0;
+  text-align:left;font:inherit;color:inherit;cursor:pointer}
+.alm-kpi-ir:hover .kb-kpi-rot{color:var(--tinta)}
 /* o saldo unitário: um grupo fechado logo abaixo da Reposição (30/10/2026) */
 .alm-unit{margin-top:14px;padding-top:10px;border-top:1px solid var(--linha)}
 .alm-unit>summary{cursor:pointer;font-size:13px;color:var(--tinta)}

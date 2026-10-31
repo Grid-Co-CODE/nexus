@@ -456,15 +456,15 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   `app-campo-docs/_propostas/almoxarifado-nexus`). O Nexus não chama o Fracttal. As contas e o contrato estão em
   `nexus/dados/almoxarifado.py`, os MESMOS da carga do histórico (`nexus/dados/CLAUDE.md`, linha Almoxarifado).
 - **O que a tela mostra:** 6 números (almoxarifados, peças com saldo, abaixo do mínimo com "e N no limite (+M de saldo
-  unitário)" na nota, sem mínimo, avariadas, lançadas pelo App com as recusadas) e 5 abas: Reposição, Por almoxarifado, Catálogo e saldo, Consumo nas OS
-  (tudo desde o início, Levi 25/10/2026) e Cadastro a corrigir. Desde 26/10/2026, as quatro partes do inventário (Inventário, Mínimo e máximo, Curadoria e Auditoria) vêm logo depois, juntas, como links para outras páginas (as seções do inventário, abaixo). Filtro na própria página (`filtro-local.js`).
+  unitário)" na nota, sem mínimo, avariadas com saldo, que é um botão para a aba delas, lançadas pelo App com as recusadas) e 6 abas: Reposição, Por almoxarifado, Catálogo e saldo, Consumo nas OS
+  (tudo desde o início, Levi 25/10/2026), Avariadas (30/10/2026) e Cadastro a corrigir. Desde 26/10/2026, as quatro partes do inventário (Inventário, Mínimo e máximo, Curadoria e Auditoria) vêm logo depois, juntas, como links para outras páginas (as seções do inventário, abaixo). Filtro na própria página (`filtro-local.js`).
 - **O filtro conta a aba à vista (30/10/2026, item 7):** o script das abas disparava `input` no formulário, que o
   `filtro-local.js` não escuta (ele ouve o `change` dos `select` e o `input` do campo de texto): as opções ficavam com os
   números da aba anterior. A troca de aba chama `FiltroLocal['alm-f'].aplicar()` (o filtro se aplica sozinho ao carregar,
   e o script das abas roda antes dele) e a barra (`data-alm-filtro`) some nas abas sem tabela (Por almoxarifado, Cadastro
   a corrigir). **Armadilha:** o `.cn-filtros{display:flex}` da casa vence o `[hidden]` do navegador; o `.alm-filtros[hidden]`
   do `pcm.css` é que esconde. Cada tabela leva um `data-fl-nome` próprio, senão a linha "Nenhuma peça com esses filtros"
-  nunca acende (a Reposição e o saldo unitário têm; o Catálogo e o Consumo ainda não).
+  nunca acende (a Reposição, o saldo unitário e as Avariadas têm; o Catálogo e o Consumo ainda não).
 - **As contas:** abaixo = mínimo > 0 e saldo < mínimo; **no limite** = saldo igual ao mínimo, separado porque o Fracttal
   costuma ter o mínimo igual ao saldo (25/10: 0 abaixo, 54 no limite); sem mínimo = mínimo 0; zerada = saldo 0.
   **Saldo unitário (30/10/2026, item 8)** = saldo 1 e mínimo 1: sai do "no limite" e vai para um grupo fechado (`<details>`)
@@ -481,6 +481,20 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   curva (ou sem criticidade) dá a linha "N peças com saldo sem Curva ABC no Fracttal" (completar é no Fracttal). Na
   reserva (o último ciclo aplicado) a chave da coluna não prova que o App a mandou (a carga a grava vazia): "tem" é ao
   menos uma peça com valor no histórico. A criticidade "None" do `sync-xlsx` é vazio (`_campo`).
+- **A aba Avariadas (30/10/2026, item 6):** a avariada COM saldo não é erro de cadastro, é peça esperando destino; saiu do
+  Cadastro a corrigir e tem aba própria, com a parada de cada uma. **Avariada é uma definição só, a do `regua.avariada`** (a
+  marca Avariado do catálogo OU o código terminado em `-AV`; o `SP-AVR-001` não): vale na aba, no número do alto (peça ×
+  almoxarifado com saldo, nota "com saldo"; antes contava o catálogo inteiro) e na etiqueta do Catálogo. **"Parada"** (`_paradas`)
+  = há quantos dias o saldo dela naquele almoxarifado está acima de zero SEM interrupção, pelos ciclos aplicados do
+  histórico (`nexus_almoxarifado`: a foto do Saldo de cada ciclo, um livro por mês): anda do ciclo mais novo para trás
+  enquanto o saldo for maior que zero, e o primeiro ciclo dessa corrida é o "desde". O ciclo anulado não conta nem
+  interrompe (nem vale como começo do histórico); saldo zero, vazio ou a peça fora da foto interrompem (o que não foi
+  medido não vira "continuou com saldo"). **Nunca se inventa a entrada:** com saldo desde o primeiro ciclo do histórico, a
+  tela diz "há pelo menos N dias (o histórico começa em dd/mm/aaaa)"; sem corrida no histórico (ensaio, ou o saldo de hoje
+  ainda não foi aplicado), "sem histórico ainda" e `dias` None. A mais parada primeiro, sem histórico por último. O valor é
+  saldo × custo unitário, só com a coluna de custo no livro e o Fracttal tendo dado o custo; senão "–", nunca 0. Roda dentro
+  do `montar()` (a cópia de 5 min). A aba também está na fila das páginas do inventário (`pcm/_almox_abas.html`), e o teste
+  `test_pcm_inventario_telas.py` confere a fila inteira (`ABAS`).
 - **Número pela metade não vai:** o saldo é o do ciclo mais novo do App só com Ciclo, Itens e Saldo do mesmo ciclo e 90%
   da lista lidos; senão, o último ciclo aplicado no histórico do Nexus, com o aviso; sem ele (o ensaio), só o aviso.
   Ciclo com mais de 36 h: o aviso com a data. Item com Lido = Não: "não lido neste ciclo", nunca "sem saldo". O consumo
@@ -559,8 +573,9 @@ script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o liv
   `estoque._estoque_do_clone` trocado pelo `EstoqueFalso` e uma rota só da cópia que abre a sessão de uma pessoa do PCM com o cookie
   do Fracttal em `/os` (a cópia recusa todo POST para fora, e o login do Fracttal é um POST).
   A prova de 26/10/2026 achou o `}` do `@media` do fim do inventário perdido no `pcm.css` (a régua e a curadoria sem estilo na
-  tela larga): `test_o_css_do_pcm_fecha_toda_chave`. As nove abas cabem a 1366 px com o menu aberto; no celular a fila rola por
-  dentro e a aba de agora vem para o meio ao abrir.
+  tela larga): `test_o_css_do_pcm_fecha_toda_chave`. As nove abas de então cabiam a 1366 px com o menu aberto; com a das Avariadas (30/10/2026) são dez, e na cópia
+  de prova a fila tinha 1341 px de abas para 1068 px de área a 1366 px (a fila rola por dentro, como no celular, onde a
+  aba de agora vem para o meio ao abrir): o cartão das Avariadas no alto é o outro caminho para a aba.
 - No Fracttal de verdade: a mesma cópia sem o `EstoqueFalso`, com `NEXUS_INVENTARIO_GRAVAR=1` no ambiente dela (sem a chave a
   gravação recusa com 409, seção da gravação), liberando o POST só para `app.fracttal.com` e `one.fracttal.com`, o
   login do Fracttal de quem prova e a contagem de mentira da `SP-TST-001` (contado 3 contra o saldo 5) mais uma linha
@@ -739,9 +754,9 @@ ele a tela diz que o App ainda não publica, e não "nenhuma contagem"); `ler(cf
 ## Inventário do almoxarifado: a aba Inventário (`inventario/revisao.py`, `ponte_os.py` e as rotas em `inventario/__init__.py`; 26/10/2026)
 
 Levi, 26/10/2026: o técnico conta no App e o PCM revisa e aprova no Nexus. A aba é um LINK na fila das abas do Almoxarifado (depois
-das cinco), com quantas contagens esperam o PCM; é outra página, `pcm/inventario.html` (a lista) e `pcm/inventario_contagem.html`
+das seis), com quantas contagens esperam o PCM; é outra página, `pcm/inventario.html` (a lista) e `pcm/inventario_contagem.html`
 (a contagem aberta). **As quatro partes do inventário ficam juntas na fila das abas** (Inventário, Mínimo e máximo, Curadoria e
-Auditoria): as páginas delas incluem `pcm/_almox_abas.html` (as cinco voltam à tela principal, em `?aba=`; a de agora é a
+Auditoria): as páginas delas incluem `pcm/_almox_abas.html` (as seis voltam à tela principal, em `?aba=`; a de agora é a
 `aba_inventario` que a página põe antes de incluir), e a tela principal as põe como links. A régua e a curadoria tinham um menu
 próprio, que saiu. As páginas são sub-rotas
 da tela `pecas`, que é do setor PCM (outros, pela marca em Base → Acessos): `GET /t/pcm/pecas/inventario`, `GET .../<contagem_id>` e

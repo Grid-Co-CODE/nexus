@@ -20,17 +20,22 @@ As melhorias de 30/10/2026 (docs/superpowers/specs/2026-10-30-almoxarifado-melho
 ABC do cadastro da peça no Fracttal (e o custo) vêm do App no fim dos livros Itens e Saldo. O Nexus sobe antes do App, então
 "a coluna não existe no livro" (`tem_curva`, `tem_criticidade`, `tem_custo`) é diferente de "o Fracttal não deu o valor":
 o primeiro não cobra nada, o segundo vai para o Cadastro a corrigir. O que o Fracttal não deu fica vazio, nunca "C" nem 0.
+
+Avariada é UMA definição, a do `regua.avariada` (a marca Avariado do catálogo OU o código terminado em -AV): vale na aba
+Avariadas, no número do alto e na etiqueta do Catálogo. A avariada com saldo não é erro de cadastro (a peça espera destino): a
+aba diz há quanto tempo (`_paradas`, pelos ciclos aplicados do histórico).
 """
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import current_app, render_template
 
+from ..cadastro.tipos import exibir
 from ..campo import visao
 from ..dados import almoxarifado as A
 from ..dados import fato_almoxarifado as F
 from ..dados import livros
 from ..dados.dominios import norm
-from .inventario import revisao
+from .inventario import regua, revisao
 
 TELA = "pecas"
 _RECUSA = "recusada"
@@ -168,7 +173,8 @@ def _partes(fonte: dict, b) -> dict:
         cod, nome = i.get("codigo") or l["id_item"], i.get("nome", "")
         crit_n, crit_nome = revisao._criticidade(i.get("criticidade"))
         out.append(dict(l, codigo=cod, nome=nome, familia=i.get("familia", ""), unidade=(i.get("unidade") or "").lower(),
-                        avariado=i.get("avariado", False), situacao=sit, usina=_usina(b, l["usina_id"]),
+                        avariado=i.get("avariado", False), avariada=regua.avariada(cod, i.get("avariado", False)),
+                        situacao=sit, usina=_usina(b, l["usina_id"]),
                         falta=max((l["minimo"] or 0) - l["saldo"], 0) if l["saldo"] is not None else 0,
                         busca=norm(f"{cod} {nome}"), criticidade=i.get("criticidade", ""), crit_n=crit_n,
                         crit_nome=crit_nome, crit_nivel=min(crit_n, 4) if crit_n else None, curva=i.get("curva", ""),
@@ -196,7 +202,8 @@ def _partes(fonte: dict, b) -> dict:
     catalogo = []
     for iid, i in its.items():
         onde = [x for x in out if x["id_item"] == iid and (x["saldo"] or 0) > 0]
-        catalogo.append(dict(i, id=iid, total=sum(x["saldo"] for x in onde), almoxes=[x["almox"] for x in onde],
+        catalogo.append(dict(i, id=iid, avariado=regua.avariada(i.get("codigo") or iid, i.get("avariado", False)),
+                             total=sum(x["saldo"] for x in onde), almoxes=[x["almox"] for x in onde],
                              onde=[f"{x['almox']}: {x['saldo']:g}" for x in onde],
                              busca=norm(f"{i.get('codigo', '')} {i.get('nome', '')}")))
     catalogo.sort(key=lambda c: (c["familia"], c["codigo"]))
@@ -213,15 +220,82 @@ def _partes(fonte: dict, b) -> dict:
 
     kpis = {"almoxarifados": len(cards), "com_saldo": len(com_saldo),
             "abaixo": len(abaixo), "no_limite": len(limite), "saldo_unitario": len(unitario),
-            "sem_minimo": sum(sem_min.values()), "avariadas": sum(1 for i in its.values() if i.get("avariado"))}
+            "sem_minimo": sum(sem_min.values())}      # as avariadas (peça × almoxarifado com saldo) são contadas em `_avariadas`
     return {"kpis": kpis, "reposicao": abaixo + limite, "saldo_unitario": unitario, "linhas": out,
             "por_almoxarifado": sorted(cards.values(), key=lambda c: c["nome"]), "catalogo": catalogo,
             "tem_criticidade": fonte.get("tem_criticidade", False), "tem_curva": fonte.get("tem_curva", False),
             "tem_custo": fonte.get("tem_custo", False),
             "cadastro": {"sem_minimo": [{"almoxarifado": a, "n": n} for a, n in sorted(sem_min.items())],
                          "sem_curva": sem("curva", fonte.get("tem_curva")),
-                         "sem_criticidade": sem("criticidade", fonte.get("tem_criticidade")),
-                         "avariadas": [x for x in out if x["avariado"] and (x["saldo"] or 0) > 0]}}
+                         "sem_criticidade": sem("criticidade", fonte.get("tem_criticidade"))}}
+
+
+def _paradas(chaves: set, hoje) -> dict:
+    """Há quanto tempo cada (id_item, id_almox) está com saldo, SEM interrupção, pelos ciclos aplicados do histórico do Nexus
+    (`nexus_almoxarifado`: a foto do Saldo de cada ciclo, um livro por mês). Anda do ciclo mais novo para trás enquanto o
+    saldo da peça ali for maior que zero; o primeiro ciclo dessa corrida é o `desde`. `hoje` é a data (BRT) do cálculo.
+
+    O que NUNCA se inventa é a data de entrada: a foto é de um ciclo por dia, não de cada saída. Se o saldo já era maior que
+    zero no primeiro ciclo do histórico, a parada é "há pelo menos N dias" (`pelo_menos`, com o `inicio` do histórico), porque
+    antes dele não se sabe. Saldo zero, vazio ou a peça fora da foto de um ciclo interrompe a corrida (o que não foi medido não
+    vira "continuou com saldo"); o ciclo anulado não conta nem interrompe, nem vale como começo do histórico; o ciclo aplicado
+    SEM nenhuma linha no livro do mês (livro que não veio) também é pulado, e não interrompe.
+
+    Chave que não deu corrida (sem ciclo aplicado, ou o saldo de hoje ainda não está no histórico) fica fora do resultado:
+    a tela diz "sem histórico ainda" em vez de chutar uma data. Sai: {chave: {"desde", "dias", "pelo_menos", "inicio"}}."""
+    if not chaves or F.ABA_CICLO not in _abas(F.LIVRO):
+        return {}
+    bons = {_txt(c.get("ciclo_inicio")): _id(c.get("data_id")) for c in visao._livro(F.LIVRO, F.ABA_CICLO)
+            if _txt(c.get("situacao")) == "aplicado" and _id(c.get("anulado")) != "1" and _id(c.get("data_id"))}
+    fotos = {}
+    for mes in sorted({F.livro_do_mes(int(float(d))) for d in bons.values()}):
+        if F.ABA_SALDO not in _abas(mes):
+            continue
+        for l in visao._livro(mes, F.ABA_SALDO):
+            inicio = _txt(l.get("ciclo_inicio"))
+            if inicio not in bons:
+                continue
+            foto = fotos.setdefault(inicio, {})
+            chave = (_id(l.get("id_item")), _id(l.get("id_almoxarifado")))
+            if chave in chaves:
+                foto[chave] = A.numero(l.get("saldo_qtd"))
+    ordem = sorted(fotos)                  # o início é um ISO com o mesmo formato: a ordem do texto é a do tempo
+    if not ordem:
+        return {}
+    out = {}
+    for chave in chaves:
+        corrida = []
+        for inicio in reversed(ordem):
+            saldo = fotos[inicio].get(chave)
+            if saldo is None or saldo <= 0:
+                break
+            corrida.append(inicio)
+        if corrida:
+            primeiro = corrida[-1]
+            dia = datetime.strptime(bons[primeiro], "%Y%m%d").date()
+            out[chave] = {"desde": _dia(bons[primeiro]), "dias": max((hoje - dia).days, 0),
+                          "pelo_menos": primeiro == ordem[0], "inicio": _dia(bons[ordem[0]])}
+    return out
+
+
+def _avariadas(linhas: list[dict], tem_custo: bool, hoje) -> list[dict]:
+    """A aba Avariadas: cada peça avariada (a definição do `regua.avariada`) COM saldo, num almoxarifado, e há quanto tempo
+    ela está parada ali; a mais parada primeiro (sem histórico por último). O valor é saldo × custo unitário só quando o livro
+    traz o custo e o Fracttal o deu: sem ele, vazio, nunca 0."""
+    av = [x for x in linhas if x["avariada"] and (x["saldo"] or 0) > 0]
+    paradas = _paradas({(x["id_item"], x["id_almox"]) for x in av}, hoje)
+    out = []
+    for x in av:
+        p = paradas.get((x["id_item"], x["id_almox"]), {})
+        valor = round(x["saldo"] * x["custo"], 2) if tem_custo and x["custo"] is not None else None
+        out.append({"id_item": x["id_item"], "id_almox": x["id_almox"], "codigo": x["codigo"], "nome": x["nome"],
+                    "familia": x["familia"], "unidade": x["unidade"], "almox": x["almox"], "usina": x["usina"],
+                    "saldo": x["saldo"], "custo": x["custo"], "valor": valor,
+                    "valor_txt": exibir("moeda", valor) if valor is not None else "", "busca": x["busca"],
+                    "dias": p.get("dias"), "desde": p.get("desde", ""), "pelo_menos": p.get("pelo_menos", False),
+                    "inicio": p.get("inicio", "")})
+    out.sort(key=lambda a: (a["dias"] is None, -(a["dias"] or 0), a["codigo"], a["almox"]))
+    return out
 
 
 def _consumo(pecas_nx: list[dict] | None, pecas_app: list[dict], fonte: dict) -> tuple[list[dict], str]:
@@ -300,6 +374,8 @@ def montar():
             aviso = (aviso + " " if aviso else "") + (f"Saldo de {_quando(fonte['fim'] or fonte['inicio'])}: a "
                                                        "varredura do App não publicou desde então.")
         d = _partes(fonte, b)
+        d["avariadas"] = _avariadas(d["linhas"], d["tem_custo"], visao._agora().date())
+        d["kpis"]["avariadas"] = len(d["avariadas"])
         pecas_nx = visao._livro(F.LIVRO, F.ABA_PECA) if F.ABA_PECA in abas_nx else None
         d["consumo"], d["consumo_fonte"] = _consumo(pecas_nx, pecas_app, fonte)
         d["kpis"]["lancadas"] = sum(1 for c in d["consumo"] if c["situacao"] == "lançada")

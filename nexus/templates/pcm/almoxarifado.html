@@ -10,7 +10,8 @@
    recarrega a tela. Abaixo de 640 px as tabelas viram cartões (o data-r é o rótulo de cada valor).
    30/10/2026 (as melhorias do Almoxarifado, docs/superpowers/specs/2026-10-30-almoxarifado-melhorias-design.md): o filtro
    conta a aba que está à vista (a troca de aba chama o `aplicar` do filtro-local.js), o saldo unitário sai do "no limite"
-   para um grupo fechado, e a Reposição leva a criticidade e a Curva ABC do Fracttal. #}
+   para um grupo fechado, a Reposição leva a criticidade e a Curva ABC do Fracttal, e as avariadas com saldo ganham a
+   aba Avariadas (há quanto tempo cada uma está parada, pelo histórico). #}
 <div class="pg alm">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
 <h1 class="titulo-pagina">Almoxarifado</h1>
@@ -40,8 +41,9 @@
       <span class="kb-kpi-nota">e <b>{{ k.no_limite }}</b> no limite{% if k.saldo_unitario %} (+{{ k.saldo_unitario }} de saldo unitário){% endif %}</span></div></div>
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Sem mínimo</span>
     <div class="kb-kpi-linha"><b class="kb-kpi-v{% if k.sem_minimo %} kb-kpi-v--alerta{% endif %}">{{ k.sem_minimo }}</b><span class="kb-kpi-nota">peça × almoxarifado</span></div></div>
-  <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Avariadas</span>
-    <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.avariadas }}</b><span class="kb-kpi-nota">no catálogo</span></div></div>
+  {# o número é o que a aba Avariadas lista (peça × almoxarifado com saldo), e o cartão leva a ela; botão, então só texto dentro #}
+  <button type="button" class="kb-kpi alm-kpi-ir" data-alm-kpi data-aba="avariadas" title="Abrir a aba Avariadas"><span class="kb-kpi-rot">Avariadas</span>
+    <span class="kb-kpi-linha"><b class="kb-kpi-v{% if k.avariadas %} kb-kpi-v--alerta{% endif %}">{{ k.avariadas }}</b><span class="kb-kpi-nota">com saldo</span></span></button>
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Lançadas pelo App</span>
     <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.lancadas }}</b><span class="kb-kpi-nota"><b{% if k.recusadas %} class="alm-ruim"{% endif %}>{{ k.recusadas }}</b> recusadas</span></div></div>
 </section>
@@ -51,6 +53,7 @@
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="almoxarifados">Por almoxarifado ({{ k.almoxarifados }})</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="catalogo">Catálogo e saldo ({{ d.catalogo|length }})</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="consumo">Consumo nas OS ({{ d.consumo|length }})</button>
+  <button class="alm-aba" role="tab" aria-selected="false" data-aba="avariadas">Avariadas ({{ k.avariadas }})</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="cadastro">Cadastro a corrigir</button>
   {# as quatro partes do inventário (26/10/2026) são OUTRAS páginas: links na fila das abas, juntas (o Inventário com quantas
      contagens esperam o PCM), as mesmas do pcm/_almox_abas.html das páginas do inventário #}
@@ -183,6 +186,32 @@
   </table>
 </section>
 
+<section class="alm-painel" data-painel="avariadas" hidden>
+  <h2>Peças avariadas com saldo</h2>
+  <p class="alm-ajuda">Avariada é a peça com a marca Avariado no Fracttal ou com o código terminado em -AV. A que tem saldo não é
+    erro de cadastro: espera um destino. A parada é há quantos dias o saldo dela naquele almoxarifado está acima de zero sem
+    interrupção, pelos ciclos do histórico do Nexus; a mais parada primeiro. Se já tinha saldo no primeiro ciclo do histórico,
+    a entrada não se sabe: "há pelo menos".{% if d.tem_custo %} O valor é o saldo vezes o custo unitário do Fracttal; sem o
+    custo, "–".{% endif %}</p>
+  {% if d.avariadas %}
+  <table class="alm-t" data-fl-grupo="alm-f" data-fl-nome="alm-ava">
+    <thead><tr><th>Almoxarifado</th><th>Peça</th><th class="num">Saldo</th><th>Parada</th>{% if d.tem_custo %}<th class="num">Valor</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for x in d.avariadas %}
+    <tr{{ filtro(x.almox, x.familia, x.busca) }}>
+      <td data-r="Almoxarifado"><span class="alm-v">{{ x.almox }}{% if x.usina %}<span class="alm-det">{{ x.usina }}</span>{% endif %}</span></td>
+      <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ x.codigo }}</span> {{ x.nome }}</span></td>
+      <td data-r="Saldo" class="num"><span class="alm-v">{{ '%g'|format(x.saldo) }} {{ x.unidade }}</span></td>
+      <td data-r="Parada"><span class="alm-v">{% if x.dias is none %}<span class="mudo">sem histórico ainda</span>{% elif x.dias == 0 %}desde hoje{% if x.pelo_menos %}<span class="alm-det">o histórico começa hoje</span>{% endif %}{% elif x.pelo_menos %}há pelo menos {{ x.dias }} dia{{ 's' if x.dias != 1 }}<span class="alm-det">o histórico começa em {{ x.inicio }}</span>{% else %}há {{ x.dias }} dia{{ 's' if x.dias != 1 }}<span class="alm-det">desde {{ x.desde }}</span>{% endif %}</span></td>
+      {% if d.tem_custo %}<td data-r="Valor" class="num"><span class="alm-v">{% if x.valor is none %}<span class="mudo" title="o Fracttal não deu o custo desta peça">–</span>{% else %}{{ x.valor_txt }}{% endif %}</span></td>{% endif %}
+    </tr>
+    {% endfor %}
+    <tr data-fl-vazio="alm-ava" hidden><td colspan="{{ 5 if d.tem_custo else 4 }}" class="mudo">Nenhuma peça com esses filtros.</td></tr>
+    </tbody>
+  </table>
+  {% else %}<p class="mudo">Nenhuma peça avariada com saldo.</p>{% endif %}
+</section>
+
 <section class="alm-painel" data-painel="cadastro" hidden>
   <h2>Cadastro a corrigir no Fracttal</h2>
   <p class="alm-ajuda">Quem corrige é o PCM, no Fracttal; o Nexus só lê. Sem o mínimo, a peça nunca aparece na Reposição.{% if d.tem_curva or d.tem_criticidade %}
@@ -192,9 +221,8 @@
     {# só com a coluna no livro (o App de antes não a traz): o texto é inteiro, sem tag no meio, para ler e buscar como frase #}
     {% if d.cadastro.sem_curva %}<li>{{ d.cadastro.sem_curva }} peça{{ 's' if d.cadastro.sem_curva != 1 else '' }} com saldo sem Curva ABC no Fracttal</li>{% endif %}
     {% if d.cadastro.sem_criticidade %}<li>{{ d.cadastro.sem_criticidade }} peça{{ 's' if d.cadastro.sem_criticidade != 1 else '' }} com saldo sem criticidade no Fracttal</li>{% endif %}
-    {% for a in d.cadastro.avariadas %}<li><span class="alm-cod">{{ a.codigo }}</span> {{ a.nome }}: avariada com saldo {{ '%g'|format(a.saldo) }} em {{ a.almox }}</li>{% endfor %}
     {% for r in d.cadastro.recusadas %}<li><span class="alm-ruim">corrigir no Fracttal</span>: a peça <span class="alm-cod">{{ r.codigo }}</span> da OS {{ r.os }} foi recusada{% if r.recusa %} ({{ r.recusa }}){% endif %} e não saiu do saldo</li>{% endfor %}
-    {% if not (d.cadastro.sem_minimo or d.cadastro.sem_curva or d.cadastro.sem_criticidade or d.cadastro.avariadas or d.cadastro.recusadas) %}<li class="mudo">Nada a corrigir.</li>{% endif %}
+    {% if not (d.cadastro.sem_minimo or d.cadastro.sem_curva or d.cadastro.sem_criticidade or d.cadastro.recusadas) %}<li class="mudo">Nada a corrigir.</li>{% endif %}
   </ul>
 </section>
 <script>
@@ -206,6 +234,8 @@
     var abas = Array.prototype.slice.call(document.querySelectorAll('.alm-aba[data-aba]'));
     var paineis = Array.prototype.slice.call(document.querySelectorAll('[data-painel]'));
     var filtro = document.querySelector('[data-alm-filtro]');
+    // quem abre uma aba: as abas e o cartão das avariadas (o `aria-selected` fica só nas abas)
+    var gatilhos = Array.prototype.slice.call(document.querySelectorAll('[data-aba]'));
     function abrir(nome) {
       if (!abas.some(function (b) { return b.dataset.aba === nome; })) nome = 'reposicao';
       abas.forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.aba === nome)); });
@@ -216,7 +246,7 @@
       // o filtro-local.js carrega DEPOIS deste script e se aplica sozinho ao carregar; daí em diante é aqui
       if (window.FiltroLocal && FiltroLocal['alm-f']) FiltroLocal['alm-f'].aplicar();
     }
-    abas.forEach(function (b) { b.addEventListener('click', function () { abrir(b.dataset.aba); }); });
+    gatilhos.forEach(function (b) { b.addEventListener('click', function () { abrir(b.dataset.aba); }); });
     abrir(new URL(location.href).searchParams.get('aba') || 'reposicao');
   })();
 </script>
