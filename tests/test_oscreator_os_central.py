@@ -30,6 +30,7 @@ if ponte.RAIZ_CLONE not in sys.path:
 
 import api  # noqa: E402 — o api.py do clone
 import os_central as OC  # noqa: E402
+import os_disco as OD  # noqa: E402 — a cópia em disco da lista (Ruling AY)
 from os_web import acomp_web, sessao  # noqa: E402
 
 _UTC = timezone.utc
@@ -286,7 +287,7 @@ def test_filtros_das_visoes():
 # ── a cópia em disco ────────────────────────────────────────────────────────────────────────────────────────────────────
 def test_disco_atomico_e_corrompido(tmp_path, monkeypatch):
     pasta = str(tmp_path / "oscreator")
-    monkeypatch.setattr(OC, "GRAVAR_A_CADA_S", 0.3)
+    monkeypatch.setattr(OD, "GRAVAR_A_CADA_S", 0.3)
     OC.reiniciar(pasta=pasta)
     _carga_inicial()
     OC.receber([_tarefa(1, 1, criada=_iso(2))], OC.ABERTAS)
@@ -307,8 +308,8 @@ def test_disco_atomico_e_corrompido(tmp_path, monkeypatch):
     OC.atualizar_os(99, [_tarefa(99, 99, criada=_iso(0.1))])
     assert OC.esperar_gravacao(5)
     escritas = []
-    real = OC._trocar_de_uma_vez
-    monkeypatch.setattr(OC, "_trocar_de_uma_vez", lambda d, e: escritas.append(d) or real(d, e))
+    real = OD._trocar_de_uma_vez
+    monkeypatch.setattr(OD, "_trocar_de_uma_vez", lambda d, e: escritas.append(d) or real(d, e))
     for i in range(5):
         OC.atualizar_os(100 + i, [_tarefa(100 + i, 200 + i, criada=_iso(0.1))])
     assert OC.esperar_gravacao(5) and len(escritas) == 1
@@ -320,7 +321,7 @@ def test_disco_atomico_e_corrompido(tmp_path, monkeypatch):
         escrever(tmp)
         os.remove(tmp)
         raise OSError("disco cheio")
-    monkeypatch.setattr(OC, "_trocar_de_uma_vez", quebra)
+    monkeypatch.setattr(OD, "_trocar_de_uma_vez", quebra)
     OC.atualizar_os(300, [_tarefa(300, 300, criada=_iso(0.1))])
     OC.esperar_gravacao(5)
     assert "disco cheio" in (OC.estado()["disco"]["erro"] or "")

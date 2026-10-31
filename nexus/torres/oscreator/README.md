@@ -1547,7 +1547,7 @@ Levi, 30/10/2026: "o histórico de OS pega só os mais recentes, atualizando os 
 dele (365 dias), a marcação verde dos Ativos relê 30 dias e o nº da OS vira id com 1 a 5 pedidos. A 3.1 e a 3.2 constroem a
 lista UMA, de todas as OS, e quem a enche; as telas passam a ler dela na 3.3 (até lá, nada nelas mudou).
 
-**A lista (`os_creator/os_central.py`).**
+**A lista (`os_creator/os_central.py`; o registro e quem o monta em `os_registro.py`, a cópia em disco em `os_disco.py`).**
 - **O que guarda (decisão AC):** as OS CRIADAS nos últimos 365 dias (`JANELA_DIAS`: o Garantias lê 365 e o REST não filtra pela
   etiqueta) mais toda OS aberta (status 1 e 2) de qualquer idade. Um registro por OS (`RegistroOS`, uma tupla com nome, só
   leitura, a mesma para todas as telas; `linha()` dá o dicionário novo, no formato do `api.list_minhas_os`, com o cliente, a
