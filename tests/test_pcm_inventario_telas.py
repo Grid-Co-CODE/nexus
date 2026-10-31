@@ -5,6 +5,7 @@ docs/superpowers/specs/2026-10-26-inventario-almoxarifado-design.md (seção 4.2
 inventário é um arquivo local e o Fracttal é o `EstoqueFalso`: nada vai à rede. Dado de mentira, sem nome de gente."""
 import re
 import time
+from datetime import timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -168,7 +169,8 @@ def test_o_lote_no_desenho_do_mockup(app, inv, monkeypatch):
     assert 'title="sem criticidade no Fracttal">–<' in linha["504"] and "inv-crit" not in linha["504"]
     # as colunas na ordem do mockup, e cada linha com o que o filtro olha
     cab = re.findall(r"<th[^>]*>(.*?)</th>", html.split('id="inv-lote-f"')[1].split("</thead>")[0])
-    assert [re.sub(r"<[^>]+>", "", x) for x in cab] == ["Código", "Peça", "Crit.", "Sistema", "Contado", "Δ", "Situação"]
+    # a 1ª é a caixa de "marcar todas" (a recontagem só das marcadas, 30/10/2026), sem texto: o nome dela é o aria-label
+    assert [re.sub(r"<[^>]+>", "", x) for x in cab] == ["", "Código", "Peça", "Crit.", "Sistema", "Contado", "Δ", "Situação"]
     assert 'data-f-situacao="para_cima"' in linha["501"] and 'data-f-situacao="zerar"' in linha["503"]
     assert 'data-f-busca="sp-501 fusivel 10a para cima critico"' in linha["501"]
     assert re.search(r'<form[^>]*id="inv-lote-f"[^>]*data-filtro-local', html) and 'name="situacao"' in html
@@ -584,8 +586,10 @@ def test_contagem_que_nao_se_aprova_nao_se_revisa(app, inv, falso, monkeypatch):
     c = _pcm(app, monkeypatch)
     antes = len(_eventos(app))
     for cid, motivo in (("C-1", "recontagem pedida"), ("C-2", "mais de 90 dias"), ("C-3", "já gravada")):
-        r = _revisar(c, {"acao": "tirar", "id_item": "501", "motivo": "x"}, contagem=cid)
-        assert r.status_code == 409 and motivo in r.get_json()["erro"], (cid, r.get_json())
+        for corpo in ({"acao": "tirar", "id_item": "501", "motivo": "x"},
+                      {"acao": "recontagem_itens", "itens": ["501"], "motivo": "x"}):
+            r = _revisar(c, corpo, contagem=cid)
+            assert r.status_code == 409 and motivo in r.get_json()["erro"], (cid, corpo, r.get_json())
     assert len(_eventos(app)) == antes
 
 
@@ -601,7 +605,8 @@ def test_a_revisao_depois_do_controle_da_gravacao_e_recusada(app, inv, falso, mo
     G._gravar_json(G._caminho(app.config, "C-1"), {"contagem_id": "C-1", "id_almox": "10", "estado": "parada",
                                                      "lotes": [], "itens": {}})
     for corpo in ({"acao": "tirar", "id_item": "502", "motivo": "x"}, {"acao": "recontagem", "motivo": "x"},
-                  {"acao": "corrigir", "id_item": "501", "valor": "11", "motivo": "x"}):
+                  {"acao": "corrigir", "id_item": "501", "valor": "11", "motivo": "x"},
+                  {"acao": "recontagem_itens", "itens": ["501", "502"], "motivo": "x"}):
         r = _revisar(c, corpo)
         assert r.status_code == 409 and "já foi para a gravação" in r.get_json()["erro"], corpo
     G._caminho(app.config, "C-1").write_text("{não é json", encoding="utf-8")
@@ -696,6 +701,178 @@ def test_pedido_de_outro_site_nao_revisa(app, inv, falso, monkeypatch):
     c = _pcm(app, monkeypatch)
     r = c.post(f"{LISTA}/C-1/revisar", json={"acao": "recontagem", "motivo": "x"}, headers={"Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 403 and _eventos(app) == []
+
+
+# ── a recontagem só das peças marcadas (item 4 das melhorias de 30/10/2026) ──────────────────────────────────────────────
+PARCIAL = "recontagem_itens"
+
+
+def _dia_do_evento(e):
+    """O dia/mês de Brasília da hora do evento (a nota "recontagem pedida em dd/mm" da tela)."""
+    return E.instante(e["quando"]).astimezone(timezone(timedelta(hours=-3))).strftime("%d/%m")
+
+
+def test_recontagem_parcial_um_evento_por_peca(app, inv, falso, monkeypatch, tmp_path):
+    """Um evento `recontagem_item_pedida` por peça marcada, todos de uma vez, na contagem em que o PCM pediu: com o ID e o código
+    da peça, o almoxarifado, a usina pela de-para, quem pediu (`pessoa_hmac` e `pessoa_id`) e o motivo SÓ cifrado. A peça
+    repetida na lista vale uma vez. A contagem segue viva (revisada, e se aprova), e nada fala com o Fracttal."""
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    r = _revisar(c, {"acao": PARCIAL, "itens": ["501", "505", 501], "motivo": "caixas lacradas na prateleira de cima"})
+    assert r.status_code == 200 and r.get_json()["ok"] is True and r.get_json()["n"] == 2, r.get_json()
+    ev = _eventos(app)
+    assert [e["tipo"] for e in ev] == ["recontagem_item_pedida"] * 2 and [e["id_item"] for e in ev] == ["501", "505"]
+    assert len({e["evento_id"] for e in ev}) == 2
+    for e in ev:
+        assert (e["contagem_id"], e["id_almoxarifado"], e["codigo"]) == ("C-1", "10", f"SP-{e['id_item']}")
+        assert str(e["usina_id"]) in ("1", "1.0") and e["usina_ligada_por"] == "de-para do Fracttal"
+        assert e["pessoa_hmac"] == codigo_da_pessoa(CHAVE, EMAIL) and str(e["pessoa_id"]) in ("92", "92.0")
+        assert F.decifrar(app.config, F.ABA_EVENTO, e) == {"motivo": "caixas lacradas na prateleira de cima"}
+    cru = (tmp_path / "inventario.json").read_text("utf-8")
+    assert "caixas lacradas" not in cru and "supervisora" not in cru
+    est = L.contagens(app.config)[0]
+    assert est["estado"] == "revisada" and est["aprovavel"]
+    assert falso.chamadas == []
+
+
+def test_recontagem_parcial_sai_do_gravar(app, inv, falso, monkeypatch):
+    """As peças marcadas saem do lote desta contagem: vão para "não será tocada" com a nota "recontagem pedida em dd/mm" (e o
+    motivo, só para o PCM), saem do N do "Gravar", perdem a caixa e os botões de tirar e corrigir, e o selo diz "Em
+    recontagem". O resto da contagem segue: o lote ainda se lê e grava as outras."""
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    assert "Gravar 5 alterações" in _lote(c).get_data(as_text=True)
+    assert _revisar(c, {"acao": PARCIAL, "itens": ["501", "502"], "motivo": "conferir as caixas"}).status_code == 200
+    dia = _dia_do_evento(_eventos(app)[0])
+    r = _lote(c)
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and "Gravar 3 alterações" in html
+    g = _grupos(html)
+    assert (g["para_cima"], g["para_baixo"], g["nao_tocada"]) == (2, 0, 4)
+    nao = html.split('data-grupo="nao_tocada"')[1].split("</details>")[0]
+    assert f"recontagem pedida em {dia}: conferir as caixas" in nao and nao.count("recontagem pedida em") == 2
+    l501 = re.search(r'<tr[^>]*data-item="501".*?</tr>', html, re.S).group(0)
+    assert ">Em recontagem<" in l501 and "data-marcar=" not in l501 and f"recontagem pedida em {dia}" in l501
+    assert 'class="inv-tirada"' in l501
+    for acao in ("tirar", "corrigir"):
+        assert f'data-rev="{acao}" data-item="501"' not in html and f'data-rev="{acao}" data-item="502"' not in html
+    # a página (sem o Fracttal) diz o mesmo; o outro setor lê a nota sem o motivo (texto livre, pode citar gente)
+    assert f"recontagem pedida em {dia}: conferir as caixas" in c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    outro = _pcm(app, monkeypatch, setor="Performance").get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert f"recontagem pedida em {dia}" in outro and "conferir as caixas" not in outro
+
+
+@pytest.mark.parametrize("corpo, status", [
+    ({"acao": PARCIAL, "itens": [], "motivo": "x"}, 400),                     # nenhuma peça marcada
+    ({"acao": PARCIAL, "motivo": "x"}, 400),
+    ({"acao": PARCIAL, "itens": "501", "motivo": "x"}, 400),                  # a lista, não um texto
+    ({"acao": PARCIAL, "itens": ["501"], "motivo": ""}, 400),                 # o motivo é obrigatório
+    ({"acao": PARCIAL, "itens": ["501"]}, 400),
+    ({"acao": PARCIAL, "itens": ["501"], "motivo": "x" * 1001}, 400),
+    ({"acao": PARCIAL, "itens": ["999"], "motivo": "x"}, 400),                # peça que não está na contagem
+    ({"acao": PARCIAL, "itens": ["501", "999"], "motivo": "x"}, 400),         # tudo ou nada: a 501 também não entra
+    ({"acao": PARCIAL, "itens": [""], "motivo": "x"}, 400),                   # o achado fora do catálogo não tem ID do item
+    ({"acao": PARCIAL, "itens": ["L8"], "motivo": "x"}, 400),                 # nem pela linha dele
+    ({"acao": PARCIAL, "itens": [None], "motivo": "x"}, 400),
+    ({"acao": PARCIAL, "itens": ["501", "507"], "motivo": "x"}, 409),         # o genérico por identificar: decide a curadoria
+])
+def test_recontagem_parcial_recusa_o_que_nao_vale(app, inv, falso, monkeypatch, corpo, status):
+    _cenario(inv)
+    r = _revisar(_pcm(app, monkeypatch), corpo)
+    assert r.status_code == status and r.get_json()["ok"] is False and r.get_json()["erro"], r.get_json()
+    assert _eventos(app) == []
+
+
+def test_recontagem_parcial_de_peca_ja_pedida_ou_tirada(app, inv, falso, monkeypatch):
+    """A peça com a recontagem já pedida nesta contagem já está fora do lote dela: pedir de novo é 409 (a contagem nova é que
+    a traz); a peça tirada também; e tirar ou corrigir a peça em recontagem, 409. Tudo ou nada: com uma peça recusada na
+    lista, nenhuma entra."""
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    assert _revisar(c, {"acao": "tirar", "id_item": "502", "motivo": "x"}).status_code == 200
+    assert _revisar(c, {"acao": PARCIAL, "itens": ["501"], "motivo": "x"}).status_code == 200
+    antes = len(_eventos(app))
+    for corpo, texto in (({"acao": PARCIAL, "itens": ["501"], "motivo": "x"}, "já foi pedida"),
+                         ({"acao": PARCIAL, "itens": ["503", "501"], "motivo": "x"}, "já foi pedida"),
+                         ({"acao": PARCIAL, "itens": ["502"], "motivo": "x"}, "fora do lote"),
+                         ({"acao": "corrigir", "id_item": "501", "valor": "4", "motivo": "x"}, "em recontagem"),
+                         ({"acao": "tirar", "id_item": "501", "motivo": "x"}, "em recontagem")):
+        r = _revisar(c, corpo)
+        assert r.status_code == 409 and texto in r.get_json()["erro"], (corpo, r.get_json())
+    assert len(_eventos(app)) == antes
+
+
+def test_recontagem_parcial_so_do_pcm(app, inv, falso, monkeypatch):
+    """Como as outras ações: outro setor e outro site, 403; a senha de administrador (não é uma pessoa), 409."""
+    _cenario(inv)
+    corpo = {"acao": PARCIAL, "itens": ["501"], "motivo": "x"}
+    assert _revisar(_pcm(app, monkeypatch, setor="Performance"), corpo).status_code == 403
+    c = _pcm(app, monkeypatch)
+    assert c.post(f"{LISTA}/C-1/revisar", json=corpo, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    admin = app.test_client()
+    with admin.session_transaction() as s:
+        s["logado"], s["admin"] = True, True
+    assert _revisar(admin, corpo).status_code == 409
+    assert _eventos(app) == []
+
+
+def test_recontagem_inteira_continua(app, inv, falso, monkeypatch):
+    """A recontagem da contagem INTEIRA de hoje (`recontagem_pedida`, o botão "Recontar a contagem inteira") continua: depois de
+    uma parcial ela ainda recusa a contagem toda, e nada dela é gravado."""
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    assert _revisar(c, {"acao": PARCIAL, "itens": ["501"], "motivo": "x"}).status_code == 200
+    r = _revisar(c, {"acao": "recontagem", "motivo": "as fotos estão ilegíveis"})
+    assert r.status_code == 200 and "nada será gravado" in r.get_json()["mensagem"]
+    assert [e["tipo"] for e in _eventos(app)] == ["recontagem_item_pedida", "recontagem_pedida"]
+    assert L.contagens(app.config)[0]["estado"] == "recontagem_pedida"
+    assert _lote(c).status_code == 409
+
+
+def test_a_aprovacao_tem_as_caixas(app, inv, falso, monkeypatch):
+    """Na Aprovação, uma caixa de marcar por peça marcável (a que aceita ação: com o ID do item e fora da curadoria; o genérico
+    507 e o achado fora do catálogo ficam na curadoria, e a em branco, a de contado inválido e a que bate também se marcam), a
+    de "marcar todas" e o botão "Pedir recontagem das marcadas (N)", que só liga com alguma marcada e abre o mesmo painel de
+    motivo das outras ações. O botão da contagem inteira passa a se chamar "Recontar a contagem inteira"."""
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    html = _lote(c).get_data(as_text=True)
+    tabela = html.split('id="inv-lote-f"')[1].split("</table>")[0]
+    assert sorted(re.findall(r'<input type="checkbox"[^>]*\bdata-marcar="(\d+)"', tabela)) == [
+        "501", "502", "503", "504", "505", "506", "508", "509"]
+    caixa = re.search(r'<input[^>]*data-marcar="501"[^>]*>', tabela).group(0)
+    assert 'aria-label="Marcar SP-501 Fusível 10A para recontar"' in caixa
+    assert re.search(r'<th class="inv-marca"><input type="checkbox"[^>]*\bdata-marcar-todas\b[^>]*aria-label="[^"]+"', tabela)
+    assert 'colspan="8"' in tabela                                          # a linha do "nenhuma peça" com a coluna nova
+    assert re.search(r'<button type="button"[^>]*data-rev="recontagem_itens"[^>]*disabled[^>]*>\s*Pedir recontagem das '
+                     r'marcadas \(0\)</button>', html)
+    pagina = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert re.search(r'<button[^>]*data-rev="recontagem"[^>]*>Recontar a contagem inteira</button>', pagina)
+    assert ">Pedir recontagem<" not in pagina
+    # o painel de revisão da página conhece a ação nova (o mesmo motivo, a mesma rota) e as caixas que chegam pela ponte
+    assert "recontagem_itens: [" in pagina and "corpo.itens = atual.itens" in pagina and "[data-marcar-todas]" in pagina
+    # pedida a recontagem, a peça sai das marcáveis
+    assert _revisar(c, {"acao": PARCIAL, "itens": ["501"], "motivo": "x"}).status_code == 200
+    tabela = _lote(c).get_data(as_text=True).split('id="inv-lote-f"')[1].split("</table>")[0]
+    assert "501" not in re.findall(r'data-marcar="(\d+)"', tabela) and len(re.findall(r'data-marcar="', tabela)) == 7
+
+
+def test_a_lista_diz_recontagem_de(app, inv, falso, monkeypatch):
+    """A contagem que veio de uma recontagem diz de qual contagem é, na lista e na página (com o link para a original); a
+    original segue como contagem inteira. A original que a lista não tem (fora da janela, ou de outro lugar) aparece pelo ID."""
+    _publicar(inv, _linha("C-ORIG", "L1", "501", "3", contada="2026-10-26T12:00:00Z"),
+              _linha("C-ORIG", "L2", "502", "4", contada="2026-10-26T12:00:00Z"),
+              _linha("C-REC", "L1", "501", "5", contada="2026-10-26T14:00:00Z", **{"Recontagem de": "C-ORIG"}),
+              _linha("C-SO", "L1", "501", "5", almox="11", contada="2026-10-26T14:00:00Z", **{"Recontagem de": "C-SUMIU"}))
+    c = _pcm(app, monkeypatch)
+    html = c.get(LISTA).get_data(as_text=True)
+    linhas = {cid: tr for tr in re.findall(r"<tr>.*?</tr>", html, re.S)
+              for cid in ("C-ORIG", "C-REC", "C-SO") if f"/inventario/{cid}\"" in tr}
+    assert "recontagem da contagem de 26/10/2026 09:00" in linhas["C-REC"]
+    assert "recontagem da contagem C-SUMIU" in linhas["C-SO"] and "recontagem" not in linhas["C-ORIG"].lower()
+    assert linhas["C-ORIG"].count(">Nova<") == 1 and linhas["C-REC"].count(">Nova<") == 1
+    pagina = c.get(f"{LISTA}/C-REC").get_data(as_text=True)
+    assert re.search(r'recontagem da <a href="/t/pcm/pecas/inventario/C-ORIG">contagem de 26/10/2026 às 09:00</a>', pagina)
 
 
 def test_a_tela_e_do_setor_pcm(app, inv, falso, setores):  # noqa: F811

@@ -18,7 +18,7 @@ ALMOX = "900"
 
 
 def _linha(id_linha, id_item="", contado="", tipo="item", **mais):
-    """Uma linha do livro das contagens do jeito que a API a devolve: as 14 colunas, tudo como texto."""
+    """Uma linha do livro das contagens do jeito que a API a devolve: as 19 colunas, tudo como texto."""
     l = dict.fromkeys(COLUNAS_CONTAGENS, "")
     l.update({"ID da contagem": "C-1", "Enviada em": "2026-10-26T10:00:00Z", "Contada em": "2026-10-26T09:00:00Z",
               "ID do almoxarifado": ALMOX, "Usina": "Cliente Teste - Usina Alfa - BA", "Tipo": tipo,
@@ -443,6 +443,77 @@ def test_contada_em_ilegivel_e_a_mais_velha():
     ruim, boa = _contagem("ruim", "ontem de manhã"), _contagem("boa", "2026-10-24T09:00:00Z")
     assert C.substituidas([ruim, boa], set()) == {"ruim"}
     assert C.substituidas([ruim], set()) == set()
+
+
+# ── a recontagem só das peças marcadas (item 4 das melhorias de 30/10/2026) ──────────────────────────────────────────────
+def _recontagem(cid, contada_em, de, almox=ALMOX):
+    """A contagem que o App manda quando o PCM pede a recontagem de algumas peças: o "Recontagem de" é o ID da contagem em que
+    o pedido foi feito."""
+    return dict(_contagem(cid, contada_em, almox), recontagem_de=de)
+
+
+def test_recontagem_nao_substitui_a_original():
+    """A original (10:00) espera o PCM, que pediu a recontagem de duas peças; a recontagem chega (12:00) só com elas. Pela
+    regra de antes ela seria "a mais nova" e substituiria a original inteira, e as outras peças perderiam a contagem (o
+    desenho chama isso de falha mesmo funcionando). As duas ficam vivas, em qualquer ordem da lista."""
+    original = _contagem("original", "2026-10-26T10:00:00Z")
+    rec = _recontagem("rec", "2026-10-26T12:00:00Z", "original")
+    assert C.substituidas([original, rec], set()) == set()
+    assert C.substituidas([rec, original], set()) == set()
+
+
+def test_original_mais_velha_nao_substitui_a_recontagem():
+    """A recontagem fica fora da escolha da nova: a original, mais velha, não a substitui, a recontagem da recontagem (a R2
+    aponta para a R1) também não, e a inteira mais nova segue substituindo as inteiras velhas como sempre. Gravada a
+    original, a recontagem continua viva."""
+    antiga = _contagem("antiga", "2026-10-25T09:00:00Z")
+    original = _contagem("original", "2026-10-26T10:00:00Z")
+    rec = _recontagem("rec", "2026-10-26T12:00:00Z", "original")
+    rec2 = _recontagem("rec2", "2026-10-26T15:00:00Z", "rec")
+    todas = [rec2, antiga, rec, original]
+    assert C.substituidas(todas, set()) == {"antiga"}
+    assert C.substituidas(todas, {"original"}) == {"antiga"}
+    assert C.substituidas([rec, rec2], set()) == set()               # só recontagens: nenhuma é "a mais nova"
+
+
+def test_inteira_nova_substitui_a_recontagem():
+    """Uma contagem INTEIRA com "Contada em" depois da recontagem substitui a recontagem (e a original, como sempre). A inteira
+    que veio entre a original e a recontagem substitui a original, mas não a recontagem, contada depois dela; e a inteira de
+    outro almoxarifado não mexe em nada."""
+    original = _contagem("original", "2026-10-26T10:00:00Z")
+    rec = _recontagem("rec", "2026-10-26T12:00:00Z", "original")
+    assert C.substituidas([original, rec, _contagem("nova", "2026-10-26T14:00:00Z")], set()) == {"original", "rec"}
+    assert C.substituidas([original, rec, _contagem("meio", "2026-10-26T11:00:00Z")], set()) == {"original"}
+    assert C.substituidas([original, rec, _contagem("outra", "2026-10-26T14:00:00Z", almox="901")], set()) == set()
+
+
+def test_recontagem_gravada_fica():
+    """A recontagem já gravada (ou gravando) fica como está quando a inteira nova chega: o que está no Fracttal não se desfaz."""
+    original = _contagem("original", "2026-10-26T10:00:00Z")
+    rec = _recontagem("rec", "2026-10-26T12:00:00Z", "original")
+    nova = _contagem("nova", "2026-10-26T14:00:00Z")
+    assert C.substituidas([original, rec, nova], {"rec"}) == {"original"}
+    assert C.substituidas([original, rec, nova], {"rec", "original"}) == set()
+
+
+def test_recontar_tira_do_lote():
+    """A peça com a recontagem pedida sai do lote desta contagem (`recontar`, e `tirada` junto: todo caminho de hoje que deixa
+    a tirada de fora, a gravação inclusive, deixa a recontada de fora) e guarda a situação que teria; as outras seguem."""
+    linhas = [_linha(1, 101, "3"), _linha(2, 9, "8"), _linha(3, 103, ""), _linha(4, tipo="fora_do_catalogo", contado="1")]
+    sis = _sis(s101=5, s9=5, s103=2)
+    itens = C.itens_do_lote(linhas, sis, {}, {"recontar": {"9": "m"}})
+    por = _por_peca(itens)
+    assert (por["9"]["recontar"], por["9"]["tirada"], por["9"]["situacao"]) == (True, True, "para_cima")
+    assert (por["101"]["recontar"], por["101"]["tirada"]) == (False, False)
+    assert por["103"]["recontar"] is False
+    assert all("recontar" in i for i in itens) and por[""]["recontar"] is False          # o achado fora do catálogo também
+    # o que vai ao Fracttal (o filtro da gravação): a 101, que desce de 5 para 3; a 9 ficou de fora
+    assert [i["id_item"] for i in itens if not i["tirada"] and i["situacao"] in C.MEXEM] == ["101"]
+    # o ID com ".0" acha a peça, e a recontada e a tirada podem ser a mesma
+    por = _por_peca(C.itens_do_lote(linhas, sis, {}, {"recontar": {"9.0": ""}, "tiradas": {"9": "x"}}))
+    assert por["9"]["recontar"] and por["9"]["tirada"]
+    for vazia in (None, {}, {"recontar": None}):
+        assert not any(i["recontar"] for i in C.itens_do_lote(linhas, sis, {}, vazia))
 
 
 # ── a janela de aprovação ───────────────────────────────────────────────────────────────────────────────────────────────

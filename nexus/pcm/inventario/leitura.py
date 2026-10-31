@@ -16,7 +16,7 @@ O que a leitura pede dos eventos que a gravação (Task 7) escreve, e o que ela 
 | Eventos da contagem | Estado |
 |---|---|
 | nenhum que mude o estado | `nova` |
-| `peca_tirada` ou `numero_corrigido` | `revisada` |
+| `peca_tirada`, `numero_corrigido` ou `recontagem_item_pedida` (a recontagem só de algumas peças) | `revisada` |
 | `recontagem_pedida` | `recontagem_pedida` (nunca se aprova) |
 | `substituida` (ou a conta das `contas.substituidas`) | `substituida` |
 | `aprovada`, e o lote ainda sem o fim | `gravando` |
@@ -109,6 +109,9 @@ def _do_app() -> dict:
                           "usina": (nome_usina.get(_id(uid)) or fracttal) if uid else fracttal,
                           "usina_id": int(uid) if uid else None, "usina_ligada_por": LIGADA_DE_PARA if uid else None,
                           "contada_em": _primeiro(ls, "Contada em"), "enviada_em": _primeiro(ls, "Enviada em"),
+                          # a contagem que o App manda quando o PCM pede a recontagem de algumas peças (30/10/2026): o ID
+                          # da contagem em que o pedido foi feito. O livro de hoje não tem a coluna: vazio, contagem inteira
+                          "recontagem_de": _primeiro(ls, "Recontagem de"),
                           "linhas": ls})
     return {"livro_existe": True, "contagens": contagens, "itens": itens}
 
@@ -165,7 +168,8 @@ def estado_dos_eventos(eventos: list[dict]) -> str:
         return "recontagem_pedida"
     if "substituida" in tipos:
         return "substituida"
-    if tipos & {"peca_tirada", "numero_corrigido"}:
+    # a recontagem só de algumas peças (30/10/2026) não mata a contagem: o resto dela segue para aprovar e gravar
+    if tipos & {"peca_tirada", "numero_corrigido", "recontagem_item_pedida"}:
         return "revisada"
     return "nova"
 
@@ -188,22 +192,31 @@ def curadoria_da(cfg, contagem_id: str, linhas_da_curadoria: list[dict] | None =
 
 def revisao_da(cfg, contagem_id: str, motivos: bool = True) -> dict:
     """O que o PCM já fez na revisão desta contagem, na forma que as contas pedem (`contas.itens_do_lote`): `tiradas`
-    {id_item: motivo} e `corrigidos` {id_item: número}, com `motivos_corrigidos` {id_item: motivo}. Vale a última correção
-    de cada peça. O motivo só existe cifrado no livro; é aqui que se abre (a tela do PCM o mostra, a auditoria não). `motivos`
-    falso não decifra nada (quem não vai mostrar o texto não o abre: os outros setores leem só "tirada do lote")."""
-    tiradas, corrigidos, texto = {}, {}, {}
+    {id_item: motivo}, `corrigidos` {id_item: número}, com `motivos_corrigidos` {id_item: motivo}, e `recontar` {id_item:
+    motivo}, as peças com a recontagem pedida nesta contagem (30/10/2026), com `recontar_em` {id_item: a hora do pedido, UTC}
+    para a nota "recontagem pedida em dd/mm". Vale a última correção de cada peça e o primeiro pedido de recontagem (a peça
+    sai do lote nele; pedir de novo é recusado). O motivo só existe cifrado no livro; é aqui que se abre (a tela do PCM o
+    mostra, a auditoria não). `motivos` falso não decifra nada (quem não vai mostrar o texto não o abre: os outros setores
+    leem só "tirada do lote")."""
+    tiradas, corrigidos, texto, recontar, recontar_em = {}, {}, {}, {}, {}
+
+    def motivo(e) -> str:
+        return _txt(F.decifrar(cfg, F.ABA_EVENTO, e).get("motivo")) if motivos else ""
     for e in F.ler(cfg)[F.ABA_EVENTO]:
         if _txt(e.get("contagem_id")) != _txt(contagem_id) or not _txt(e.get("id_item")):
             continue
         item = _id(e.get("id_item"))
         if e.get("tipo") == "peca_tirada":
-            tiradas[item] = _txt(F.decifrar(cfg, F.ABA_EVENTO, e).get("motivo")) if motivos else ""
+            tiradas[item] = motivo(e)
         elif e.get("tipo") == "numero_corrigido":
             valor = A.contado(e.get("para_qtd"))
             if valor is not None:
                 corrigidos[item] = valor
-                texto[item] = _txt(F.decifrar(cfg, F.ABA_EVENTO, e).get("motivo")) if motivos else ""
-    return {"tiradas": tiradas, "corrigidos": corrigidos, "motivos_corrigidos": texto}
+                texto[item] = motivo(e)
+        elif e.get("tipo") == "recontagem_item_pedida" and item not in recontar:
+            recontar[item], recontar_em[item] = motivo(e), _txt(e.get("quando"))
+    return {"tiradas": tiradas, "corrigidos": corrigidos, "motivos_corrigidos": texto, "recontar": recontar,
+            "recontar_em": recontar_em}
 
 
 # ── as contas de cada contagem ─────────────────────────────────────────────────────────────────────────────────────────
@@ -291,7 +304,8 @@ def ler(cfg, *, com_teste: bool = False, app_agora: bool = False) -> dict:
     # a substituição olha só as contagens VIVAS (a recontagem pedida, recusada pelo PCM, não tem número para pôr no lugar
     # das boas) e BOAS (sem o contrato violado e com um "Contada em" legível e que não é do futuro): a mais nova que não se
     # aprova não pode tirar do caminho as que se aprovam, senão o almoxarifado fica sem nenhuma contagem para revisar. E deixa
-    # em paz as que já gravaram ou estão gravando
+    # em paz as que já gravaram ou estão gravando. A contagem de recontagem (o `recontagem_de` de cada uma, 30/10/2026) não
+    # substitui ninguém: a conta é das `contas.substituidas`
     vivas = [c for c in cs if c["estado"] not in MORTAS and _pode_substituir(c, agora)]
     velhas = contas.substituidas(vivas, {c["contagem_id"] for c in cs if c["estado"] in DA_GRAVACAO})
     for c in cs:
@@ -308,8 +322,9 @@ def ler(cfg, *, com_teste: bool = False, app_agora: bool = False) -> dict:
 def contagens(cfg) -> list[dict]:
     """Uma por contagem, da mais nova para a mais velha, sem o almoxarifado de teste: `contagem_id`, `id_almox`, `almox` (o
     nome), `usina` (o nome do cadastro, ou o do Fracttal se a usina não liga), `usina_id` (e `usina_ligada_por`),
-    `contada_em`, `enviada_em`, `linhas` (as do livro do App), `n_contadas`, `n_em_branco`, `n_curadoria`, `estado` (em
-    `ESTADOS`), `aprovavel` e, quando não, `motivo_nao_aprovavel`; `aviso` quando o App violou o contrato."""
+    `contada_em`, `enviada_em`, `recontagem_de` (o ID da contagem cuja recontagem esta atende; vazio na inteira), `linhas`
+    (as do livro do App), `n_contadas`, `n_em_branco`, `n_curadoria`, `estado` (em `ESTADOS`), `aprovavel` e, quando não,
+    `motivo_nao_aprovavel`; `aviso` quando o App violou o contrato."""
     return ler(cfg)["contagens"]
 
 

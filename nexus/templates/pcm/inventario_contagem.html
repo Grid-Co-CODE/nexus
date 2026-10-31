@@ -45,7 +45,10 @@
 <div class="cn-erro" role="alert">{{ erro }}</div>
 {% else %}
 <p class="pcm-sub inv-sub">{% if c.usina %}{{ c.usina }} · {% endif %}contada em {{ contada_txt }} (Brasília), enviada em {{ enviada_txt }} (Brasília).
-  <span class="inv-selo inv-selo--{{ tom_estado }}">{{ rotulo }}</span></p>
+  <span class="inv-selo inv-selo--{{ tom_estado }}">{{ rotulo }}</span>
+  {# a contagem que veio de uma recontagem só de algumas peças (30/10/2026): de qual contagem ela é, com o link; a original
+     que a lista não tem (fora da janela de 90 dias) aparece pelo ID #}
+  {% if c.recontagem_de %}<span class="alm-det inv-recontagem-de">recontagem {% if original %}da <a href="{{ raiz }}/t/pcm/pecas/inventario/{{ original.contagem_id|urlencode }}">contagem de {{ original.contada_txt }}</a>{% else %}da contagem {{ c.recontagem_de }}{% endif %}: só as peças que o PCM pediu para recontar.</span>{% endif %}</p>
 
 <script>
   // a resposta 401 da ponte: o portão encerrou a sessão do Nexus junto com a do Fracttal (`sessao_encerrada`: o `login` é um true,
@@ -148,8 +151,9 @@
 
   {% if pode and c.aprovavel %}
   <div class="inv-rodape inv-rodape--fim">
-    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="recontagem">Pedir recontagem</button>
-    <span class="alm-ajuda">Recusa a contagem inteira: nada é gravado, e o técnico conta de novo no App.</span>
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="recontagem">Recontar a contagem inteira</button>
+    <span class="alm-ajuda">Recusa a contagem inteira: nada é gravado, e o técnico conta tudo de novo no App. Para recontar só
+      algumas peças, marque-as na tabela e peça a recontagem das marcadas.</span>
   </div>
 
   <dialog class="q-det" id="inv-rev" aria-label="Revisar a contagem" data-url="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}/revisar">
@@ -171,9 +175,10 @@
     </div>
   </dialog>
   <script>
-    // a revisão: UM painel só, montado a cada clique (tirar, corrigir ou recontagem). O servidor confere tudo de novo; ao dar
-    // certo a página recarrega, e o Sistema é lido outra vez, com a revisão já valendo. Os botões de tirar e corrigir chegam
-    // depois, dentro do pedaço que a ponte devolve: por isso o clique é ouvido no documento
+    // a revisão: UM painel só, montado a cada clique (tirar, corrigir, a recontagem das marcadas ou a da contagem inteira). O
+    // servidor confere tudo de novo; ao dar certo a página recarrega, e o Sistema é lido outra vez, com a revisão já valendo. Os
+    // botões de tirar e corrigir e as caixas de marcar chegam depois, dentro do pedaço que a ponte devolve: por isso o clique e
+    // a troca das caixas são ouvidos no documento
     (function () {
       var dlg = document.getElementById('inv-rev');
       if (!dlg) return;
@@ -185,16 +190,43 @@
       var TEXTOS = {
         tirar: ['Tirar do lote', 'A peça não será gravada no Fracttal, e fica na auditoria com o motivo. As outras peças seguem.', 'Tirar do lote'],
         corrigir: ['Corrigir o número', 'O Fracttal recebe este número no lugar do que o técnico contou. A auditoria guarda os dois e o motivo.', 'Corrigir'],
-        recontagem: ['Pedir recontagem', 'Recusa a contagem inteira: nada é gravado e o técnico pode contar de novo no App. O motivo fica na auditoria.', 'Pedir recontagem']
+        recontagem_itens: ['Pedir recontagem das marcadas', 'Só as peças marcadas voltam ao técnico no App: saem deste lote (ficam em "não será tocada") e o resto da contagem segue para aprovar e gravar. O motivo vale para todas e fica na auditoria.', 'Pedir recontagem'],
+        recontagem: ['Recontar a contagem inteira', 'Recusa a contagem inteira: nada é gravado e o técnico conta tudo de novo no App. Para recontar só algumas peças, marque-as na tabela. O motivo fica na auditoria.', 'Recontar a contagem inteira']
       };
       var atual = null;
       function mostrar(msg) { erro.textContent = msg || ''; erro.hidden = !msg; }
+
+      // a recontagem só das marcadas (30/10/2026): "marcar todas" marca as marcáveis À VISTA (sob a busca e o filtro da tabela,
+      // como a aba Pessoas e setores), e o N do botão conta todas as marcadas, à vista ou não, porque é isso que vai ao servidor
+      function caixas() { return Array.prototype.slice.call(document.querySelectorAll('[data-marcar]')); }
+      function marcadas() { return caixas().filter(function (x) { return x.checked; }); }
+      function aVista() { return caixas().filter(function (x) { return !x.closest('tr').hidden; }); }
+      function contar() {
+        var n = marcadas().length, vis = aVista(), nv = vis.filter(function (x) { return x.checked; }).length;
+        var b = document.querySelector('[data-rev="recontagem_itens"]'), todas = document.querySelector('[data-marcar-todas]');
+        // o texto inteiro, e não um <span> com o número: o .gc-btn é flex, e o vão dele separava "( 8 )"
+        if (b) { b.disabled = n === 0; b.textContent = 'Pedir recontagem das marcadas (' + n + ')'; }
+        if (todas) { todas.checked = nv > 0 && nv === vis.length; todas.indeterminate = nv > 0 && nv < vis.length; }
+      }
+      document.addEventListener('change', function (ev) {
+        if (ev.target.matches('[data-marcar-todas]')) {
+          var sim = ev.target.checked;
+          aVista().forEach(function (x) { x.checked = sim; });
+          contar();
+        } else if (ev.target.matches('[data-marcar]')) contar();
+      });
+      // a busca muda o que está à vista (o filtro-local espera 150 ms antes de aplicar): o "marcar todas" acompanha
+      document.addEventListener('input', function (ev) { if (ev.target.closest('#inv-lote-f')) setTimeout(contar, 200); });
+
       function abrir(b) {
         // o saldo do sistema que a página mostrou vai junto: o servidor não lê o Fracttal ao revisar, e com ele confere o número
         // que passa muito do contado e do saldo (um zero a mais)
-        atual = {acao: b.dataset.rev, id_item: b.dataset.item || '', sistema: b.dataset.sistema || '', confirmo: false};
+        var itens = b.dataset.rev === 'recontagem_itens' ? marcadas().map(function (x) { return x.dataset.marcar; }) : null;
+        if (itens && !itens.length) return;
+        atual = {acao: b.dataset.rev, id_item: b.dataset.item || '', sistema: b.dataset.sistema || '', confirmo: false, itens: itens};
         var t = TEXTOS[atual.acao];
-        titulo.textContent = t[0] + (b.dataset.peca ? ': ' + b.dataset.peca : '');
+        titulo.textContent = t[0] + (itens ? ' (' + itens.length + (itens.length === 1 ? ' peça)' : ' peças)')
+                                    : b.dataset.peca ? ': ' + b.dataset.peca : '');
         ajuda.textContent = t[1];
         enviar.textContent = t[2];
         caixaValor.hidden = atual.acao !== 'corrigir';
@@ -220,6 +252,7 @@
         if (!atual) return;
         var corpo = {acao: atual.acao, motivo: motivo.value};
         if (atual.id_item) corpo.id_item = atual.id_item;
+        if (atual.itens) corpo.itens = atual.itens;
         if (atual.acao === 'corrigir') {
           corpo.valor = valor.value;
           if (atual.sistema) corpo.sistema = atual.sistema;

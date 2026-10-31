@@ -33,7 +33,7 @@ USINA = "Thopen - Altair 1 - SP"                # a de-para do `banco` liga a Al
 
 
 def _linha(id_linha, tipo="fora_do_catalogo", contado="2", contagem="C-1", almox=ALMOX, **mais):
-    """Uma linha do livro das contagens do jeito que a API a devolve: as 14 colunas."""
+    """Uma linha do livro das contagens do jeito que a API a devolve: as 19 colunas."""
     l = dict.fromkeys(A.COLUNAS_CONTAGENS, "")
     l.update({"ID da contagem": contagem, "Enviada em": "2026-10-25T11:00:00Z", "Contada em": "2026-10-25T10:00:00Z",
               "ID do almoxarifado": almox, "Usina": USINA, "Tipo": tipo, "Contado": contado, "ID da linha": id_linha})

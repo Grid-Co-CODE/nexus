@@ -252,7 +252,8 @@ PARA_QUE = {
                            "entrada do inventário: o PCM compara com o saldo do Fracttal antes de gravar qualquer ajuste.",
     "evento_inventario": "Guarda cada acontecimento do inventário do almoxarifado, na ordem em que aconteceu: a contagem "
                          "que chegou do App, a aprovação do PCM, cada peça gravada no Fracttal (de quanto para quanto e o "
-                         "número do movimento), os conflitos e erros, a peça tirada do lote, a recontagem pedida, o "
+                         "número do movimento), os conflitos e erros, a peça tirada do lote, a recontagem pedida (da "
+                         "contagem inteira ou só de algumas peças), o "
                          "número corrigido e a contagem trocada por outra mais nova. Nunca muda: é a auditoria de quem "
                          "mexeu no estoque, quando e por quê (o motivo vai cifrado).",
     "regua_minimo": "Guarda cada decisão do PCM sobre o mínimo e o máximo de uma peça num almoxarifado: a sugestão do "

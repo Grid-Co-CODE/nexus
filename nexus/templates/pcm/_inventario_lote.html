@@ -5,8 +5,13 @@
    Código · Peça · Crit. · Sistema · Contado · Δ · Situação com a busca e o filtro (filtro-local.js), e o "Revisar lote", que abre
    a confirmação nos seis grupos (só os três primeiros gravam; o zerar e o "não será tocada" abrem abertos) com o "Gravar N
    alterações". Os botões só levam data-* (o único endereço é o do gravar, na ponte, pela {{ raiz }}); o painel de revisão e os
-   scripts estão na página. #}
+   scripts estão na página.
+   A recontagem só das marcadas (30/10/2026, item 4 das melhorias): uma caixa por peça marcável (`x.marcavel`: com o ID do item,
+   ainda no lote e fora da curadoria), a de "marcar todas" (as marcáveis à vista, sob a busca e o filtro; no celular, uma linha
+   acima dos cartões) e o botão "Pedir recontagem das marcadas (N)", que abre o mesmo painel de motivo das outras ações
+   (data-rev="recontagem_itens"); o N e o ligar do botão são do script da página. #}
 {% set cob = cobertura %}
+{% set marcar = pode and c.aprovavel and itens|selectattr('marcavel')|list %}
 <div class="inv-pilha" data-ponte-para="contagem" data-divergentes="{{ cob.diverge }}">
   <section class="inv-card">
     <div class="inv-card-cab"><h3>Cobertura do inventário</h3><span class="inv-selo inv-selo--neutro">{{ cob.pct_contado }}% contado</span></div>
@@ -54,13 +59,20 @@
       {% if pode and c.aprovavel %}<button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-revisar-lote aria-expanded="false" aria-controls="inv-confirma">Revisar lote</button>{% endif %}
     </form>
   </div>
+  {% if marcar %}
+  <div class="inv-recontar" data-recontar>
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="recontagem_itens" disabled aria-describedby="inv-recontar-ajuda">Pedir recontagem das marcadas (0)</button>
+    <span class="alm-ajuda" id="inv-recontar-ajuda">Marque as peças duvidosas: só elas voltam ao técnico no App e saem deste lote; o resto da contagem segue para aprovar e gravar.</span>
+  </div>
+  {% endif %}
   {% if itens %}
   <div class="inv-tw">
-  <table class="alm-t inv-t" data-fl-grupo="inv-lote-f" data-fl-nome="inv-lote-f">
-    <thead><tr><th>Código</th><th>Peça</th><th><abbr title="Criticidade da peça no Fracttal">Crit.</abbr></th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Δ</th><th>Situação</th></tr></thead>
+  <table class="alm-t inv-t{% if marcar %} inv-t--marcar{% endif %}" data-fl-grupo="inv-lote-f" data-fl-nome="inv-lote-f">
+    <thead><tr>{% if marcar %}<th class="inv-marca"><input type="checkbox" data-marcar-todas aria-label="Marcar todas as peças à vista que podem ser recontadas"></th>{% endif %}<th>Código</th><th>Peça</th><th><abbr title="Criticidade da peça no Fracttal">Crit.</abbr></th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Δ</th><th>Situação</th></tr></thead>
     <tbody>
     {% for x in itens %}
     <tr{% if x.id_item %} data-item="{{ x.id_item }}"{% endif %} data-fl-linha data-f-situacao="{{ x.grupo }}" data-f-busca="{{ x.busca }}"{% if x.tirada %} class="inv-tirada"{% endif %}>
+      {% if marcar %}<td class="inv-marca" data-r="Recontar">{% if x.marcavel %}<input type="checkbox" data-marcar="{{ x.id_item }}" aria-label="Marcar {{ (x.codigo ~ ' ' ~ x.nome)|trim }} para recontar">{% endif %}</td>{% endif %}
       <td data-r="Código"><span class="alm-v">{% if x.codigo %}<span class="alm-cod">{{ x.codigo }}</span>{% else %}—{% endif %}</span></td>
       <td data-r="Peça"><span class="alm-v">{{ x.nome }}{% if x.unidade and x.unidade|upper != 'UNIDADE' %} <span class="alm-un">· {{ x.unidade|lower }}</span>{% endif %}{% for n in x.notas %}<span class="alm-det">{{ n }}</span>{% endfor %}</span></td>
       <td data-r="Crit."><span class="alm-v">{% if x.crit %}<span class="inv-crit inv-crit--{{ x.crit_nivel }}" title="{{ x.crit_nome }}">{{ x.crit }}<span class="inv-so-leitor"> {{ x.crit_nome }}</span></span>{% else %}<span class="mudo" title="sem criticidade no Fracttal">–</span>{% endif %}</span></td>
@@ -70,7 +82,7 @@
       <td data-r="Situação"><span class="alm-v"><span class="inv-selo inv-selo--{{ x.tom }}">{{ x.rotulo }}</span></span></td>
     </tr>
     {% endfor %}
-    <tr data-fl-vazio="inv-lote-f" hidden><td colspan="7" class="mudo">Nenhuma peça com esses filtros.</td></tr>
+    <tr data-fl-vazio="inv-lote-f" hidden><td colspan="{{ 8 if marcar else 7 }}" class="mudo">Nenhuma peça com esses filtros.</td></tr>
     </tbody>
   </table>
   </div>

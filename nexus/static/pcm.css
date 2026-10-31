@@ -1046,6 +1046,8 @@ a.alm-aba{display:inline-block;text-decoration:none}
 .inv-voltar a{color:var(--mudo)}
 .inv-voltar a:hover{color:var(--tinta)}
 .inv-sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:6px}
+.inv-recontagem-de{flex-basis:100%}          /* "recontagem da contagem de ..." numa linha só, debaixo da hora */
+.inv-recontagem-de a{color:var(--verde-texto);font-weight:600}
 .inv-abrir{color:var(--verde-texto);font-weight:600;text-decoration:none}
 .inv-abrir:hover{text-decoration:underline}
 .inv-so-leitor{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
@@ -1132,6 +1134,13 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .inv-t-acao{width:1%;text-align:right}
 .inv-btn-p{padding:5px 12px;font-size:12px}
 .inv-tirada .alm-v{color:var(--mudo)}
+/* a recontagem só das marcadas (30/10/2026, item 4 das melhorias): a caixa de cada peça marcável na Aprovação e a barra do
+   "Pedir recontagem das marcadas (N)" acima da tabela, como a caixa da aba Pessoas e setores (`.fr-marca`) */
+.inv-marca{width:34px;text-align:center}
+.inv-marca input{accent-color:var(--verde);width:16px;height:16px;margin:0;cursor:pointer;vertical-align:middle}
+.inv-recontar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 14px;border-bottom:1px solid var(--linha)}
+.inv-recontar .alm-ajuda{margin:0;flex:1 1 280px}
+.inv-recontar .gc-btn[disabled]{opacity:.55;cursor:not-allowed}
 
 /* o selo (o `.pill` do mockup): a palavra no tom, com o ponto na frente, como o gc-status da casa */
 .inv-selo{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font:600 11.5px/16px var(--font-sans);
@@ -1272,6 +1281,16 @@ details.inv-card:not([open])>summary{border-bottom:0}
   .inv-t td{padding:4px 0}
   .inv-t-acao{width:auto}
   .alm-t td.inv-t-acao::before{content:none}
+  /* no cartão, a caixa é uma linha "Recontar" com a caixa à direita; a peça que não se marca não ganha a linha vazia. O
+     cabeçalho some no cartão, mas a caixa de "marcar todas" fica, numa linha só acima dos cartões (conferido a 375 px) */
+  .inv-marca{width:auto}
+  .alm-t td.inv-marca:empty{display:none}
+  .alm-t.inv-t--marcar thead{display:block}
+  .alm-t.inv-t--marcar thead tr{margin:8px 10px 0;padding:0;border:0}
+  .alm-t.inv-t--marcar thead th{display:none}
+  .alm-t.inv-t--marcar thead th.inv-marca{display:flex;align-items:center;gap:8px;padding:4px 0;background:none;border:0;
+    font-size:12.5px;font-weight:500;color:var(--tinta-2);white-space:normal}
+  .alm-t.inv-t--marcar thead th.inv-marca::after{content:"Marcar todas à vista"}
   .inv-item-n{flex:1 1 100%}
   .inv-grupo>summary{grid-template-columns:auto minmax(0,1fr);gap:8px 10px}
   .inv-grupo-selo{grid-column:2;justify-self:start}

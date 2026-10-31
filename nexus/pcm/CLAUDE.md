@@ -531,9 +531,11 @@ Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaix
    é a contagem nas quatro etapas (Contagem, Aprovação, Gravação, Auditoria; a seção da aba Inventário, "O visual"); o Sistema
    (lido NA HORA no Fracttal), o Δ, a situação e os seis grupos chegam pela ponte (`GET /os/_nexus/inventario/<id>/lote`), com o
    botão "Gravar N alterações".
-3. **Revisão:** tirar uma peça do lote, corrigir o número ou pedir a recontagem, sempre com o motivo (cifrado). Só grava no
-   livro do inventário. **Curadoria** (`.../curadoria`): o achado fora do catálogo (cadastrar no Fracttal pela ponte, é a peça X,
-   descartar) e o genérico (confirmar o específico); a quantidade entra no lote da contagem.
+3. **Revisão:** tirar uma peça do lote, corrigir o número, pedir a recontagem só das peças marcadas (desde 30/10/2026: elas
+   saem deste lote e o resto da contagem segue; o App reconta só elas e manda uma contagem com o "Recontagem de") ou a da
+   contagem inteira, sempre com o motivo (cifrado). Só grava no livro do inventário. **Curadoria** (`.../curadoria`): o achado
+   fora do catálogo (cadastrar no Fracttal pela ponte, é a peça X, descartar) e o genérico (confirmar o específico); a
+   quantidade entra no lote da contagem.
 4. **Gravar:** a ponte confere o N e a assinatura do lote que a tela mostrou, relê o saldo e começa a gravação em segundo plano,
    por sessão de ajuste do almoxarifado (lotes de 50; a peça que se moveu depois da contagem vira conflito e não grava). A etapa
    Gravação acompanha pelo `estado.json` (os números, uma linha por lote e o que aconteceu); a parada mostra o "Continuar" a quem aprovou (e o aviso forte se o almoxarifado ficou travado),
@@ -694,12 +696,18 @@ para o número não mudar de uma tela para a outra. Provado em `tests/test_pcm_i
   devolve o genérico por identificar como um número (as unidades dele, ainda sem dono), e gravá-lo ajustaria o estoque com
   unidades que talvez sejam de outra peça.
 - **`itens_do_lote`:** uma entrada por peça, na ordem do livro (`contado_campo` é o do campo já com a curadoria; `contado`, o
-  que vai ao Fracttal, é o corrigido pelo PCM quando há; `tirada` fica de fora da gravação mas mantém a situação). O achado
-  fora do catálogo por decidir é uma entrada à parte, sem `id_item`, na `curadoria`, com a linha em `pendentes`.
-- **`substituidas`:** por almoxarifado vale a contagem mais nova pelo "Contada em" (o instante: -03:00 e Z se comparam); as
-  velhas não gravadas ficam substituídas. Quem chama passa só as contagens VIVAS (nem a `recontagem pedida` nem a
-  `substituída`: uma recontagem recusada como "a mais nova" substituiria as boas sem número para gravar no lugar); a que
-  vem sem almoxarifado não entra. **`aprovavel`: 90 dias, não 7.** Os 7 dias do desenho valiam enquanto não houvesse
+  que vai ao Fracttal, é o corrigido pelo PCM quando há; `tirada` fica de fora da gravação mas mantém a situação; `recontar`,
+  a peça com a recontagem pedida nesta contagem, vem com `tirada` junto, para todo caminho que já deixa a tirada de fora, a
+  gravação e a assinatura do lote inclusive, deixar a recontada de fora sem conhecer a regra). O achado fora do catálogo por
+  decidir é uma entrada à parte, sem `id_item`, na `curadoria`, com a linha em `pendentes`.
+- **`substituidas`:** por almoxarifado vale a contagem INTEIRA mais nova pelo "Contada em" (o instante: -03:00 e Z se comparam);
+  as velhas não gravadas ficam substituídas. **A recontagem só das marcadas (`recontagem_de` preenchido, 30/10/2026) não
+  substitui ninguém:** ela traz só as peças pedidas, e como "a mais nova" tiraria do caminho a original inteira, cujas outras
+  peças seguem para aprovar e gravar. Ela fica fora da escolha da nova, a original mais velha também não a substitui, e ela só
+  fica velha quando uma contagem INTEIRA do almoxarifado é mais nova que ela (a gravada fica). Quem chama passa só as contagens
+  VIVAS (nem a `recontagem pedida` nem a `substituída`: uma recontagem recusada como "a mais nova" substituiria as boas sem
+  número para gravar no lugar), cada uma com o `recontagem_de`; a que vem sem almoxarifado não entra. **`aprovavel`: 90 dias,
+  não 7.** Os 7 dias do desenho valiam enquanto não houvesse
   jeito de saber o que se moveu depois da contagem; o passo 0 achou o histórico do almoxarifado (`mexidas_desde`) e o conflito
   sai dele, peça a peça, na gravação. Os 90 dias (`APROVAVEL_DIAS`) são só o teto: a janela do livro do App e do histórico a
   ler (que gasta da cota do Fracttal, de toda a empresa). Data ilegível ou do futuro (relógio do celular adiantado além de 1
@@ -710,9 +718,11 @@ para o número não mudar de uma tela para a outra. Provado em `tests/test_pcm_i
 `leitura.contagens(cfg)` é a lista que a tela do PCM mostra: uma contagem por "ID da contagem" do livro que o App publica
 (`almoxarifado_contagens_app_campo`, o contrato de 19 colunas), da mais nova para a mais velha, sem o almoxarifado de teste.
 Cada uma traz `contagem_id`, `id_almox` e `almox` (o nome), `usina`/`usina_id` (o nome do cadastro quando a de-para do Fracttal
-liga; senão o do Fracttal e `usina_id` None), `contada_em`, `enviada_em`, `linhas` (as do App), `n_contadas`, `n_em_branco`,
-`n_curadoria`, `estado`, `aprovavel`, `motivo_nao_aprovavel` e `aviso`. `livro_existe(cfg)` diz se o App já publicou o livro (sem
-ele a tela diz que o App ainda não publica, e não "nenhuma contagem"); `ler(cfg)` devolve os dois com o nome de cada peça.
+liga; senão o do Fracttal e `usina_id` None), `contada_em`, `enviada_em`, `recontagem_de` (a 19ª coluna, "Recontagem de": o ID
+da contagem em que o PCM pediu a recontagem que esta atende; vazio na inteira e no livro do App sem a coluna), `linhas` (as do
+App), `n_contadas`, `n_em_branco`, `n_curadoria`, `estado`, `aprovavel`, `motivo_nao_aprovavel` e `aviso`.
+`livro_existe(cfg)` diz se o App já publicou o livro (sem ele a tela diz que o App ainda não publica, e não "nenhuma
+contagem"); `ler(cfg)` devolve os dois com o nome de cada peça.
 
 - **Duas fontes, dois relógios:** o livro do App vem pela cópia de 5 min do `visao._ler` (lê e liga a usina uma vez), menos na
   aprovação (`ler(cfg, app_agora=True)`: relido no pedido, e a cópia renovada com ele; a contagem mais nova que acabou de chegar
@@ -722,8 +732,9 @@ ele a tela diz que o App ainda não publica, e não "nenhuma contagem"); `ler(cf
   recontagem pedida na hora (com o estado guardado 5 min, o PCM a pediria de novo). **Falha de leitura (do App ou do livro do
   inventário) levanta `fato_inventario.Recusada`:** nunca devolve lista vazia nem contagem `nova`, senão a já gravada
   apareceria como a aprovar.
-- **Os estados** (`ESTADOS`): `nova` (nenhum evento que mude o estado), `revisada` (`peca_tirada` ou `numero_corrigido`),
-  `recontagem_pedida`, `substituida`, `gravando`, `gravada`, `gravada_com_conflitos`. **O lote é o conjunto de `id_item` dos
+- **Os estados** (`ESTADOS`): `nova` (nenhum evento que mude o estado), `revisada` (`peca_tirada`, `numero_corrigido` ou
+  `recontagem_item_pedida`: a recontagem só de algumas peças não mata a contagem), `recontagem_pedida` (a da contagem inteira),
+  `substituida`, `gravando`, `gravada`, `gravada_com_conflitos`. **O lote é o conjunto de `id_item` dos
   eventos `aprovada`: a gravação (`gravacao.py`) grava UM `aprovada` por peça do lote.** Sem as peças a leitura não sabe o que falta e
   fica em `gravando`; só vira `gravada` quando toda peça do lote tem `peca_gravada`, e `gravada_com_conflitos` quando alguma tem
   `conflito` no lugar. O `erro` não encerra a peça. O `gravando` daqui é "aprovada e sem o fim nos eventos"; a gravação refina
@@ -733,7 +744,8 @@ ele a tela diz que o App ainda não publica, e não "nenhuma contagem"); `ler(cf
   no lugar) e BOAS (sem `aviso` e com um "Contada em" legível e que não passa do relógio adiantado, `_pode_substituir`: a mais nova
   que não se aprova, por contrato violado ou por relógio de celular no futuro, tirava do caminho as que se aprovam, e o almoxarifado
   ficava sem nenhuma contagem para revisar), e, como `gravadas`, as em `gravando`, `gravada` e `gravada_com_conflitos`. O evento
-  `substituida`, se alguém o gravar, também vale.
+  `substituida`, se alguém o gravar, também vale. A contagem de recontagem e a original seguem vivas juntas (a regra está nas
+  `contas.substituidas`); uma inteira mais nova substitui as duas.
 - **Contrato violado vira aviso, não número pela metade:** "ID da linha" vazio ou o texto "None" (o `sync-xlsx` escreve o vazio
   assim) junta duas linhas numa nas contas (`contas._unicas`) e perde unidades contadas; contagem sem o ID do almoxarifado não tem
   saldo do sistema para ler. Os dois dão `aviso` e `aprovavel` falso (a tela não mostra comparação).
@@ -744,7 +756,8 @@ ele a tela diz que o App ainda não publica, e não "nenhuma contagem"); `ler(cf
   peça: `n_em_branco` (sem número, o achado em branco inclusive), `n_curadoria` (com número e ainda por decidir: o genérico por
   identificar e o achado fora do catálogo, descontadas as decisões já gravadas na curadoria) e `n_contadas` (o resto).
 - **O que o PCM já fez** (`revisao_da`, `curadoria_da`) vem na forma que as contas pedem: `tiradas` {id_item: motivo},
-  `corrigidos` {id_item: número} (vale a última) e as decisões da curadoria `{ID da linha: {decisao, id_item, codigo}}` (vale a
+  `corrigidos` {id_item: número} (vale a última), `recontar` {id_item: motivo} com `recontar_em` {id_item: a hora do pedido}
+  (vale o primeiro pedido; pedir de novo é recusado) e as decisões da curadoria `{ID da linha: {decisao, id_item, codigo}}` (vale a
   última). O motivo só existe cifrado no livro; é aqui que se abre, e só quando `motivos=True` (quem não vai mostrar o texto não o
   decifra).
 - **Provar:** `tests/test_pcm_inventario_leitura.py` (os estados, a substituição, o livro que não existe e o que não lê, a janela de
@@ -788,8 +801,9 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   do mockup é o App e não entra. A lista, a Auditoria geral, a régua e a curadoria usam os mesmos componentes (`.inv-*` no
   `pcm.css`: os números do alto, o cartão com cabeçalho, a faixa da tabela, o selo). Abaixo de 640 px as tabelas viram cartões e a
   barra das etapas rola na horizontal. Prova: `test_o_lote_no_desenho_do_mockup` e `test_a_contagem_nas_quatro_etapas`.
-- **A página e o lote.** A PÁGINA (`revisao.montar`) mostra o que o técnico contou, o estado, os avisos, o "Pedir recontagem" e o
-  painel de revisão, e NÃO lê o Fracttal. O que depende dele (`revisao.montar_lote`, desenhado pelo parcial
+- **A página e o lote.** A PÁGINA (`revisao.montar`) mostra o que o técnico contou, o estado, os avisos, o "Recontar a contagem
+  inteira" e o painel de revisão, e NÃO lê o Fracttal; a contagem que veio de uma recontagem diz de qual é ("recontagem da
+  contagem de dd/mm/aaaa às hh:mm", com o link; a original que a lista não tem, pelo ID), e a lista também. O que depende dele (`revisao.montar_lote`, desenhado pelo parcial
   `pcm/_inventario_lote.html`: a cobertura e as divergências da etapa 1 no bloco `data-ponte-para="contagem"`, e a etapa 2 inteira)
   a página busca por `fetch(nexusRota(...))` em **`GET /os/_nexus/inventario/<id>/lote`** (HTML pronto, `Cache-Control: no-store`),
   dizendo "lendo o saldo do Fracttal…" enquanto espera, e distribui entre as duas etapas (o `filtro-local.js` carrega depois que o
@@ -809,7 +823,8 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   só os três primeiros mexem no estoque, e o botão "Gravar N alterações" conta só eles, sem a peça tirada. Ficam atrás do "Revisar
   lote" (escondidos até ele; a revisão que recarrega a página volta com eles abertos), cada um com o selo do que vai ao Fracttal
   ("grava", "grava · atenção", "não grava"). **O zerar abre aberto e destacado** (é a única ação que apaga estoque), e o "não será
-  tocada" também abre aberto (é o que fica como está). A peça tirada do lote vai a "não será tocada" com o motivo; a de contado negativo
+  tocada" também abre aberto (é o que fica como está). A peça tirada do lote vai a "não será tocada" com o motivo, e a peça com a
+  recontagem pedida também, com o selo "Em recontagem" e a nota "recontagem pedida em dd/mm" (o dia de Brasília do pedido); a de contado negativo
   também, com "contado inválido" até o PCM corrigir (corrigida, ela entra no lote e a nota diz "o técnico contou um valor inválido;
   o PCM corrigiu para X"). A peça nunca ligada ao almoxarifado mostra no Sistema "não ligada (0)" e a nota "será ligada ao gravar";
   a ligada com o saldo vazio, "não informado", sem Δ (um "+5" contra um 0 que o Fracttal não disse seria inventado; a nota diz que
@@ -818,16 +833,28 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
 - **Curadoria aberta avisa e não bloqueia:** "N achados por decidir na curadoria; decidir depois soma ao contado da peça escolhida" (e o
   mesmo, dizendo o genérico, quando ele tem unidades ainda por identificar). O genérico por identificar e o achado não têm Δ: as
   unidades ainda não têm dono.
-- **O motivo do PCM só vai a quem pode revisar** (`pode_programar`): a nota da peça tirada e do número corrigido leva o texto para o
-  PCM e, para os outros setores, só "tirada do lote" e "corrigida pelo PCM" (o motivo é texto livre e pode citar gente; nem o
-  decifra para eles, `revisao_da(motivos=False)`).
+- **O motivo do PCM só vai a quem pode revisar** (`pode_programar`): a nota da peça tirada, do número corrigido e da recontagem
+  pedida leva o texto para o PCM e, para os outros setores, só "tirada do lote", "corrigida pelo PCM" e "recontagem pedida em
+  dd/mm" (o motivo é texto livre e pode citar gente; nem o decifra para eles, `revisao_da(motivos=False)`).
+- **A recontagem só das marcadas** (Levi, 30/10/2026, item 4 das melhorias; o resto da contagem segue): na Aprovação, uma caixa
+  por peça marcável (`marcavel`: o que o servidor aceita, a peça com o ID do item, ainda no lote e fora da curadoria; a em branco
+  e a que bate também, porque recontar o duvidoso inclui o que ninguém contou; o achado e o genérico por identificar seguem na
+  curadoria), a de "marcar todas" (marca as marcáveis À VISTA, sob a busca e o filtro, como a aba Pessoas e setores; no celular o
+  cabeçalho some e ela fica numa linha acima dos cartões) e o "Pedir recontagem das marcadas (N)" (o N conta todas as marcadas,
+  à vista ou não: é o que vai ao servidor), que abre o mesmo painel de motivo. As caixas chegam no pedaço da ponte; quem as ouve
+  é o script da página.
 - **A hora na tela é a da janela de aprovação:** `revisao._hora` usa o `estoque.instante` (um texto sem fuso é UTC, como o App
   grava) e escreve "contada em 26/10/2026 às 09:00 (Brasília)". Antes lia pelo `visao._dt` (sem fuso = Brasília) e mostrava 12:00
   onde a janela contava 09:00.
-- **Revisar** (`POST .../revisar`, `{"acao": "tirar" | "corrigir" | "recontagem", "id_item", "valor", "motivo", "sistema"?,
-  "confirmo"?}`): só quem `telas.pode_programar()` (administrador e setor PCM) e de uma página deste mesmo endereço, senão 403. O
-  motivo é OBRIGATÓRIO nas três (o desenho: "cada um com o motivo, na auditoria") e vai só cifrado (`dados={"motivo": ...}`; a API do
-  banco é aberta). `corrigir` aceita número de zero para cima, com vírgula ou ponto (o 0 vale: a peça acabou; negativo, vazio, texto e
+- **Revisar** (`POST .../revisar`, `{"acao": "tirar" | "corrigir" | "recontagem_itens" | "recontagem", "id_item", "itens",
+  "valor", "motivo", "sistema"?, "confirmo"?}` → `{"ok", "n", "mensagem", "estado"}`): só quem `telas.pode_programar()`
+  (administrador e setor PCM) e de uma página deste mesmo endereço, senão 403. O motivo é OBRIGATÓRIO em todas (o desenho: "cada
+  um com o motivo, na auditoria") e vai só cifrado (`dados={"motivo": ...}`; a API do banco é aberta). **`recontagem_itens`**
+  (`itens`: a lista dos `id_item` marcados) confere TODAS antes de gravar qualquer uma (tudo ou nada) e grava um evento
+  `recontagem_item_pedida` por peça, de uma vez: lista vazia ou que não é lista, ID que não é dígito (o achado fora do catálogo
+  não tem) e peça que não é da contagem, 400; peça com a recontagem já pedida nesta contagem (ela já saiu deste lote; quem a
+  traz é a contagem nova), peça tirada e genérico por identificar, 409. Tirar ou corrigir a peça em recontagem, 409. A
+  `recontagem` (a da contagem inteira, o botão "Recontar a contagem inteira") continua matando a contagem. `corrigir` aceita número de zero para cima, com vírgula ou ponto (o 0 vale: a peça acabou; negativo, vazio, texto e
   notação científica, 400). **O exagero pede confirmação:** número acima de 10 vezes o maior entre o contado e o saldo do sistema (e
   de 1000) é quase sempre um zero a mais e iria ao estoque da empresa: 400 com `confirmar: true`, e o `"confirmo": true` do corpo
   aceita (o saldo do sistema é o que a página mostrou e vai no corpo como `sistema`, porque revisar não lê o Fracttal: é uma trava
@@ -835,8 +862,9 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   (`gravacao.existe`, mesmo com os eventos ainda em "nova": o registro da aprovação que falhou no meio deixa o lote congelado),
   409 "a contagem já foi para a gravação"; peça que não é da
   contagem, 400; peça já tirada, 409; corrigir peça com unidades por identificar, 409 (decide a curadoria antes). **Nada disso fala
-  com o Fracttal:** grava UM evento no livro do inventário (`peca_tirada`, `numero_corrigido` com `de_qtd` = o do campo, `para_qtd` = o
-  corrigido e `contado_qtd` = o do campo, ou `recontagem_pedida`), com a usina pela de-para do Fracttal (`usina_id` +
+  com o Fracttal:** grava o evento no livro do inventário (`peca_tirada`, `numero_corrigido` com `de_qtd` = o do campo, `para_qtd` = o
+  corrigido e `contado_qtd` = o do campo, `recontagem_item_pedida` com o `id_item`, o `codigo` e o `contado_qtd` de cada peça, ou
+  `recontagem_pedida`), com a usina pela de-para do Fracttal (`usina_id` +
   `usina_ligada_por`) e a pessoa como `pessoa_hmac` (o código do e-mail) e `pessoa_id` (quando a ficha do cadastro a acha). **Quem
   entrou pela senha de administrador não revisa** (409 "entre com o seu login do Fracttal"): não é uma pessoa, e a revisão ficaria
   sem dono na auditoria; e com a `NEXUS_PESSOA_HMAC` faltando no servidor o 409 diz que o servidor não está configurado e manda
@@ -850,7 +878,11 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   fluxo, "Como provar"), a 1366 e 375 px, escuro e claro: o lote pela ponte, o painel de revisão, a correção que muda a situação. O
   visual de 27/10/2026, na mesma cópia com uma contagem em cada estado (nova; gravando com o lote 2 parado; gravada com um conflito):
   as quatro etapas, a lista, a Auditoria geral, a régua e a curadoria, a 1366 e 375 px, escuro e claro, a troca de etapa, a busca e
-  o filtro, o "Revisar lote", o "Gravar" e o "Continuar" de ponta a ponta.
+  o filtro, o "Revisar lote", o "Gravar" e o "Continuar" de ponta a ponta. A recontagem das marcadas (30/10/2026), na mesma cópia
+  com uma contagem de recontagem a mais: marcar, o "marcar todas" sob a busca, o painel, o "Gravar" de 5 para 3, a nota e o selo,
+  a página e a lista com o "recontagem da contagem de", a 1366 e 375 px, escuro e claro (o vão do `.gc-btn`, que é flex, separava
+  o "( 8 )" do botão: o texto inteiro é reescrito pelo script, sem `<span>` no número). Testes: os `test_recontagem_parcial_*`,
+  `test_a_aprovacao_tem_as_caixas`, `test_a_lista_diz_recontagem_de` e o `test_gravar_sem_as_pecas_em_recontagem`.
 
 ## Inventário do almoxarifado: o livro (`nexus/dados/fato_inventario.py`; 26/10/2026)
 

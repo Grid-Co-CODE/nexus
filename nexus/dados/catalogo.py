@@ -826,7 +826,8 @@ FATOS = (
     Fato("evento_inventario", "Evento do inventário do almoxarifado", "pcm",
          f"{fato_inventario.LIVRO} · {fato_inventario.ABA_EVENTO}",
          "1 linha = 1 evento do inventário de 1 contagem (recebida, aprovada, peça gravada, conflito, erro, peça tirada do "
-         "lote, recontagem pedida, número corrigido, contagem substituída, curadoria ou régua gravada); nunca muda",
+         "lote, recontagem pedida, número corrigido, contagem substituída, curadoria, régua gravada ou recontagem de "
+         "uma peça pedida); nunca muda",
          _d(data=("id", "data_id (o dia de Brasília do evento; quando, a hora em UTC)"),
             usina=("id", "usina_id + usina_ligada_por (o almoxarifado da contagem, só pela de-para do Fracttal; vazio "
                          "quando não liga)"),

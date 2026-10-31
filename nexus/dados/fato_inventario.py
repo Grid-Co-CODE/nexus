@@ -8,7 +8,8 @@ Nexus grava o número contado no Fracttal. Desenho: `docs/superpowers/specs/2026
 seguintes (`nexus/pcm/inventario/`), que gravam POR AQUI:
 
 - `fato_evento_inventario`: 1 linha = 1 evento da auditoria (contagem recebida, aprovada, peça gravada, conflito, erro,
-  peça tirada do lote, recontagem pedida, número corrigido, contagem substituída, curadoria decidida, régua gravada).
+  peça tirada do lote, recontagem pedida, número corrigido, contagem substituída, curadoria decidida, régua gravada,
+  recontagem de uma peça pedida).
   Transação: nunca muda, só acrescenta, e o estado de cada contagem sai dos eventos na ordem da gravação;
 - `fato_regua_minimo`: 1 linha = 1 decisão do PCM sobre o recomendado (a Grid) ou o acordado (o cliente) de uma peça num
   almoxarifado; vale a última de cada almoxarifado e peça. Só o acordado vai ao Fracttal;
@@ -66,8 +67,12 @@ FATO_DA_ABA = {ABA_EVENTO: "evento_inventario", ABA_REGUA: "regua_minimo", ABA_C
 CAB_EVENTO = ["evento_id", "quando", "data_id", "contagem_id", "tipo", "id_almoxarifado", "usina_id", "id_item",
               "codigo", "de_qtd", "para_qtd", "contado_qtd", "movimento_fracttal", "situacao", "lote", "pessoa_id",
               "pessoa_hmac", "dados_cifrados", "usina_ligada_por"]
+# `recontagem_item_pedida` (30/10/2026, item 4 das melhorias do Almoxarifado): o PCM pede a recontagem só das peças que
+# marcou, um evento por peça, e o resto da contagem segue; o `recontagem_pedida` recusa a contagem inteira. Tipo novo entra
+# no fim da lista
 TIPOS_EVENTO = ("contagem_recebida", "aprovada", "peca_gravada", "conflito", "erro", "peca_tirada",
-                "recontagem_pedida", "numero_corrigido", "substituida", "curadoria", "regua_gravada")
+                "recontagem_pedida", "numero_corrigido", "substituida", "curadoria", "regua_gravada",
+                "recontagem_item_pedida")
 CAB_REGUA = ["decidida_em", "data_id", "id_almoxarifado", "usina_id", "id_item", "codigo", "sugestao_min_qtd",
              "sugestao_max_qtd", "recomendado_min_qtd", "recomendado_max_qtd", "acordado_min_qtd", "acordado_max_qtd",
              "gravado_fracttal", "pessoa_id", "pessoa_hmac", "usina_ligada_por"]

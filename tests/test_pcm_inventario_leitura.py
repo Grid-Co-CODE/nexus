@@ -1,6 +1,6 @@
 """As contagens do inventário do almoxarifado e o estado de cada uma (26/10/2026, Levi): o livro das contagens que o App de
-Campo publica (14 colunas, a última o "ID da linha") lido pela cópia de 5 min, e o estado de cada contagem tirado dos
-eventos do livro do inventário (`nexus_almoxarifado_inventario`). Desenho:
+Campo publica (19 colunas, a 14ª o "ID da linha" e a última o "Recontagem de") lido pela cópia de 5 min, e o estado de
+cada contagem tirado dos eventos do livro do inventário (`nexus_almoxarifado_inventario`). Desenho:
 docs/superpowers/specs/2026-10-26-inventario-almoxarifado-design.md (seção 4.2). Aqui o banco é o falso do Campo e o
 livro do inventário é o arquivo local (`NEXUS_ALMOX_INVENTARIO_ARQUIVO`). Dado de mentira: usina, códigos e IDs
 inventados, sem nome de gente."""
@@ -27,7 +27,7 @@ def _iso(dias_atras=0.0, horas=0.0):
 
 def _linha(contagem, id_linha, id_item="", contado="", tipo="item", almox="10", contada=None, enviada=None,
            usina=USINA, **mais):
-    """Uma linha do livro das contagens do jeito que a API a devolve: as 14 colunas, tudo como texto."""
+    """Uma linha do livro das contagens do jeito que a API a devolve: as 19 colunas, tudo como texto."""
     l = dict.fromkeys(A.COLUNAS_CONTAGENS, "")
     l.update({"ID da contagem": contagem, "Enviada em": enviada or _iso(horas=2), "Contada em": contada or _iso(horas=3),
               "ID do almoxarifado": str(almox), "Usina": usina, "Tipo": tipo, "ID do item": str(id_item),
@@ -395,6 +395,55 @@ def test_a_revisao_da_contagem(app, inv):
     lote = contas.itens_do_lote([_linha("C-1", "L1", "501", "3"), _linha("C-1", "L2", "502", "4")], {}, {}, r)
     por = {i["id_item"]: i for i in lote}
     assert por["501"]["tirada"] and por["502"]["corrigido"] and por["502"]["contado"] == 6.0
+
+
+# ── a recontagem só das peças marcadas (item 4 das melhorias de 30/10/2026) ──────────────────────────────────────────────
+def test_evento_recontagem_item_deixa_revisada(app, inv):
+    """Pedir a recontagem de algumas peças não mata a contagem (o resto dela segue, e se aprova e grava): ela fica
+    `revisada`, como com a peça tirada. Só a recontagem da contagem inteira (`recontagem_pedida`) a recusa."""
+    _publicar(inv, _linha("C-1", "L1", "501", "3"), _linha("C-1", "L2", "502", "4"))
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 501, dados={"motivo": "caixa lacrada, conferir"}))
+    c = _por_id(app)["C-1"]
+    assert c["estado"] == "revisada" and c["aprovavel"] and c["motivo_nao_aprovavel"] == ""
+    assert L.estado_dos_eventos([{"tipo": "recontagem_item_pedida"}]) == "revisada"
+    assert L.estado_dos_eventos([{"tipo": "recontagem_item_pedida"}, {"tipo": "recontagem_pedida"}]) == "recontagem_pedida"
+
+
+def test_revisao_da_recontar(app, inv):
+    """As peças com a recontagem pedida, na forma que as contas pedem (`recontar` {id_item: motivo}), e a hora de cada pedido
+    (`recontar_em`, para a nota "recontagem pedida em dd/mm"). O motivo só existe cifrado e só se abre com `motivos`."""
+    _publicar(inv, _linha("C-1", "L1", "501", "3"), _linha("C-1", "L2", "502", "4"), _linha("C-1", "L3", "503", "5"))
+    _gravar(app,
+            _ev("C-1", "recontagem_item_pedida", 501, dados={"motivo": "caixa lacrada"}, quando="2026-10-26T13:30:00Z"),
+            _ev("C-1", "recontagem_item_pedida", 502, dados={"motivo": "caixa lacrada"}, quando="2026-10-26T13:30:00Z"),
+            _ev("C-9", "recontagem_item_pedida", 503, dados={"motivo": "de outra contagem"}))
+    r = L.revisao_da(app.config, "C-1")
+    assert r["recontar"] == {"501": "caixa lacrada", "502": "caixa lacrada"}
+    assert r["recontar_em"] == {"501": "2026-10-26T13:30:00Z", "502": "2026-10-26T13:30:00Z"}
+    assert r["tiradas"] == {} and r["corrigidos"] == {}
+    assert L.revisao_da(app.config, "C-1", motivos=False)["recontar"] == {"501": "", "502": ""}
+    lote = {i["id_item"]: i for i in contas.itens_do_lote(_por_id(app)["C-1"]["linhas"], {}, {}, r)}
+    assert lote["501"]["recontar"] and lote["501"]["tirada"] and not lote["503"]["recontar"]
+
+
+def test_a_recontagem_chega_e_as_duas_ficam_vivas(app, inv):
+    """A contagem de recontagem traz o "Recontagem de" (a 19ª coluna, no fim) e não substitui a original: as duas se aprovam.
+    Uma contagem inteira mais nova substitui as duas. O livro de hoje do App, sem a coluna, é lido como contagem inteira."""
+    orig = [_linha("C-ORIG", "L1", "501", "3", contada=_iso(horas=6)), _linha("C-ORIG", "L2", "502", "4", contada=_iso(horas=6))]
+    rec = _linha("C-REC", "L1", "501", "5", contada=_iso(horas=2), **{"Recontagem de": "C-ORIG"})
+    _publicar(inv, *orig, rec)
+    por = _por_id(app)
+    assert (por["C-REC"]["recontagem_de"], por["C-ORIG"]["recontagem_de"]) == ("C-ORIG", "")
+    assert (por["C-ORIG"]["estado"], por["C-REC"]["estado"]) == ("nova", "nova")
+    assert por["C-ORIG"]["aprovavel"] and por["C-REC"]["aprovavel"]
+    _publicar(inv, *orig, rec, _linha("C-NOVA", "L1", "501", "6", contada=_iso(horas=1)))
+    por = _por_id(app)
+    assert (por["C-ORIG"]["estado"], por["C-REC"]["estado"], por["C-NOVA"]["estado"]) == ("substituida", "substituida", "nova")
+    # sem a coluna (o livro do App de hoje) ou com o "None" do sync-xlsx: inteira
+    sem = _linha("C-SEM", "L1", "501", "3", almox="11")
+    del sem["Recontagem de"]
+    _publicar(inv, sem, _linha("C-NONE", "L1", "501", "3", almox="12", **{"Recontagem de": "None"}))
+    assert {i: c["recontagem_de"] for i, c in _por_id(app).items()} == {"C-SEM": "", "C-NONE": ""}
 
 
 def test_a_curadoria_da_contagem_vale_a_ultima_decisao_de_cada_linha(app, inv):

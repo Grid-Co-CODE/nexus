@@ -194,10 +194,12 @@ def contado_efetivo(linhas: list[dict], curadoria: dict[str, dict]) -> dict[str,
 
 
 # ── o lote ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
-def _entrada(*, id_item, codigo, sistema, campo, contado, ligada, sit, corrigido, tirada, invalido, pendentes) -> dict:
+def _entrada(*, id_item, codigo, sistema, campo, contado, ligada, sit, corrigido, tirada, invalido, pendentes,
+             recontar=False) -> dict:
     return {"id_item": id_item, "codigo": codigo, "sistema": sistema, "contado": contado, "contado_campo": campo,
             "delta": None if contado is None else _limpo(contado - (sistema or 0.0)), "situacao": sit,
-            "ligada": ligada, "corrigido": corrigido, "tirada": tirada, "invalido": invalido, "pendentes": pendentes}
+            "ligada": ligada, "corrigido": corrigido, "tirada": tirada, "invalido": invalido, "pendentes": pendentes,
+            "recontar": recontar}
 
 
 def itens_do_lote(contagem: list[dict], sistema: dict[str, dict], curadoria: dict, revisao: dict) -> list[dict]:
@@ -205,13 +207,15 @@ def itens_do_lote(contagem: list[dict], sistema: dict[str, dict], curadoria: dic
 
     `contagem`: as linhas do App. `sistema`: o que o `Estoque.ler` devolveu (`{id_item: {"saldo", "codigo", ...}}`; a peça
     fora dele não está ligada ao almoxarifado). `curadoria`: ver `contado_efetivo`. `revisao`: `{"tiradas": {id_item:
-    motivo}, "corrigidos": {id_item: número}}` (a correção ilegível ou negativa não vale; a que vale também resolve a
-    peça `invalido`: é o PCM, com o motivo na auditoria, dizendo o número).
+    motivo}, "corrigidos": {id_item: número}, "recontar": {id_item: motivo}}` (a correção ilegível ou negativa não vale; a
+    que vale também resolve a peça `invalido`: é o PCM, com o motivo na auditoria, dizendo o número).
 
     Cada entrada: `id_item`, `codigo`, `sistema` (o saldo do Fracttal; 0 se não ligada; None se o Fracttal não o disse),
     `contado_campo` (o número do campo já com a curadoria), `contado` (o que vai ao Fracttal: o do campo, ou o corrigido
     pelo PCM), `delta`, `situacao`, `ligada`, `corrigido`, `tirada` (fica de fora da gravação, mas guarda a situação que
-    teria), `invalido` e `pendentes` (os "ID da linha" do genérico por identificar).
+    teria), `invalido`, `pendentes` (os "ID da linha" do genérico por identificar) e `recontar` (a recontagem da peça foi
+    pedida nesta contagem, 30/10/2026: ela vem `tirada` também, para todo caminho que já deixa a tirada de fora, a gravação
+    e a assinatura do lote inclusive, deixar a recontada de fora sem conhecer a regra nova).
 
     A peça com genérico por identificar fica na `curadoria` (não grava: as unidades ainda não têm dono). O achado fora do
     catálogo por decidir é uma entrada à parte, sem `id_item` (""), na `curadoria` também, com a linha em `pendentes`
@@ -221,6 +225,7 @@ def itens_do_lote(contagem: list[dict], sistema: dict[str, dict], curadoria: dic
     estoque = {_id(k): v for k, v in (sistema or {}).items() if isinstance(v, dict)}
     revisao = revisao or {}
     tiradas = {_id(k) for k in (revisao.get("tiradas") or {})}
+    recontar = {_id(k) for k in (revisao.get("recontar") or {})}
     corrigidos = {_id(k): v for k, v in (revisao.get("corrigidos") or {}).items()}
     itens = []
     for tipo, ref in lido.ordem:
@@ -245,7 +250,8 @@ def itens_do_lote(contagem: list[dict], sistema: dict[str, dict], curadoria: dic
         codigo = lido.codigos.get(id_item) or (_txt(no_estoque.get("codigo")) if ligada else "")
         itens.append(_entrada(id_item=id_item, codigo=codigo, sistema=saldo, campo=campo, contado=contado, ligada=ligada,
                               sit="curadoria" if pendentes else situacao(saldo, contado), corrigido=corrigido,
-                              tirada=id_item in tiradas, invalido=id_item in lido.invalidos, pendentes=pendentes))
+                              tirada=id_item in tiradas or id_item in recontar, invalido=id_item in lido.invalidos,
+                              pendentes=pendentes, recontar=id_item in recontar))
     return itens
 
 
@@ -265,22 +271,30 @@ def substituidas(contagens: list[dict], gravadas: set[str]) -> set[str]:
     os `contagem_id` com gravação feita ou começada) fica como está. Data ilegível é a mais velha: sem como ordenar, ela
     não pode ser a que vale. Contagem sem `contagem_id` ou sem `id_almox` não entra (sem o almoxarifado não há de quem
     ser a mais nova, e juntar todas num "almoxarifado vazio" faria uma substituir as outras sem motivo). Cada contagem:
-    `contagem_id`, `id_almox`, `contada_em`, `enviada_em`.
+    `contagem_id`, `id_almox`, `contada_em`, `enviada_em` e `recontagem_de` (vazio na contagem inteira).
+
+    **A recontagem só das peças marcadas não substitui ninguém** (30/10/2026, item 4 das melhorias): ela traz só as peças
+    que o PCM pediu, e como "a mais nova" tiraria do caminho a original inteira, cujas outras peças seguem para aprovar e
+    gravar (o desenho chama isso de falha mesmo funcionando). A recontagem (`recontagem_de` preenchido) fica fora da escolha
+    da nova, e a original, mais velha, também não a substitui: ela só fica velha quando uma contagem INTEIRA do mesmo
+    almoxarifado é mais nova que ela (pela mesma chave), e a já gravada fica como está.
 
     Quem chama passa só as contagens VIVAS: nem a `recontagem pedida` (recusada pelo PCM) nem a `substituída` entram aqui.
     Uma recontagem pedida que contasse como "a mais nova" substituiria as boas anteriores sem ter número nenhum para
     gravar no lugar delas."""
     gravadas = {_txt(g) for g in (gravadas or ())}
-    por_almox: dict[str, list] = {}
+    inteiras: dict[str, list] = {}
+    recontagens: dict[str, list] = {}
     for c in contagens or []:
         cid, almox = _txt(c.get("contagem_id")), _id(c.get("id_almox"))
         if cid and almox:
-            por_almox.setdefault(almox, []).append(
-                ((_quando(c.get("contada_em")), _quando(c.get("enviada_em")), cid), cid))
+            chave = (_quando(c.get("contada_em")), _quando(c.get("enviada_em")), cid)
+            (recontagens if _txt(c.get("recontagem_de")) else inteiras).setdefault(almox, []).append((chave, cid))
     velhas: set[str] = set()
-    for lista in por_almox.values():
-        nova = max(lista)[1]
-        velhas |= {cid for _, cid in lista if cid != nova and cid not in gravadas}
+    for almox, lista in inteiras.items():
+        nova = max(lista)
+        velhas |= {cid for _, cid in lista if cid != nova[1] and cid not in gravadas}
+        velhas |= {cid for chave, cid in recontagens.get(almox, []) if chave < nova[0] and cid not in gravadas}
     return velhas
 
 
