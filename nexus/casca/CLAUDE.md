@@ -257,12 +257,18 @@ memória, sem mudar quem pede. O resto da internet passa sem contar (`notfractta
   `pico_minuto_qtd` (o maior número de pedidos num mesmo minuto, o número que se compara com a cota), mais uma linha
   `*`/`*` por hora com o total e o pico de tudo junto (o pico do total NÃO é a soma dos picos). A hora é a de Brasília,
   UTC-3 fixo: `hora_id` = `AAAAMMDDHH`, e a virada do dia cai às 03:00 UTC.
-- **Origem** = `origem(rota)` (a casca marca o pedido do `/os/*`) e, sem marca, `fundo:<nome da thread>`. A marca viaja
-  pelo CONTEXTO (`contextvars`, como o JWT do OS Creator), não pela thread: o `api._ExecutorComContexto` copia o contexto
-  para as tarefas do fan-out (o catálogo de ativos pede ~110 vezes, 6 de uma vez), que ficam na rota que as chamou e
-  somam na conta do pedido (`pedidos_desta_thread()`, a da marca em que a thread está). A thread aberta à mão e o
-  `ThreadPoolExecutor` comum começam sem contexto e caem em `fundo:` com o nome deles: quem faz trabalho de fundo com
-  fan-out marca o laço (`origem("fundo:<nome>")`) para as tarefas não virarem `fundo:ThreadPoolExecutor-N`.
+- **Origem** = `origem(rota)` (a casca marca o pedido do `/os/*`) e, sem marca, `fundo:<nome da thread SEM o contador de
+  instância>`: `ThreadPoolExecutor-137_0` vira `ThreadPoolExecutor`, `waitress-12` vira `waitress` e `Thread-5 (alvo)` vira
+  `Thread (alvo)`. O `campo/regras_app._fx_wo_paralelo` abre um executor NOVO a cada chamada, e com o nome cru cada rodada
+  criaria origens novas na tabela da hora, sem fim. **No máximo 50 origens distintas por hora** (`MAX_ORIGENS`, rotas
+  inclusive): a 51ª e as seguintes dessa hora entram em `fundo:outros`, e as 50 que já existem seguem contando nas suas; a
+  hora seguinte recomeça a conta.
+  A marca viaja pelo CONTEXTO (`contextvars`, como o JWT do OS Creator), não pela thread: o `api._ExecutorComContexto`
+  copia o contexto para as tarefas do fan-out (o catálogo de ativos pede ~110 vezes, 6 de uma vez), que ficam na rota que
+  as chamou e somam na conta do pedido (`pedidos_desta_thread()`, a da marca em que a thread está). **A marca só chega às
+  tarefas de um executor que COPIA o contexto:** no `ThreadPoolExecutor` comum e na thread aberta à mão a tarefa começa
+  sem contexto, a marca de quem a abriu NÃO chega lá, e a origem tem de ser posta dentro da tarefa (`with origem(...)` na
+  função que vai ao executor); sem isso ela é `fundo:ThreadPoolExecutor`.
   **Método** = o `method` do corpo do RPC (em lista vale o 1º que traz um; corpo que não é JSON = `rpc`), o 1º segmento
   depois de `/api/` no REST (`work_orders`), `token` no OAuth e na renovação do JWT, e `outro` no resto.
 - **Quem lê:** `instantaneo()` (o Raio-X, sem tirar nada) e `drenar(hora_aberta)`, que devolve e TIRA as linhas das
@@ -536,7 +542,9 @@ fila. De fora não se vê ESPERANDO O QUÊ. O `casca/presos.py` vê de dentro:
   `quem` (a linha NOSSA mais de dentro: Fracttal (OS Creator) no `os_creator/api.py`, Fracttal (Campo), fotos das
   rondas, login do Fracttal, ou `arquivo:função`), `como` (a linha mais de dentro de todas: esperando a rede, outra
   thread, o banco, em pausa, trabalhando) e `onde` (`arquivo:linha função`). Vai ao log (WARNING `Pedido preso há N s:
-  GET /caminho - quem, como (onde)`) quando prende e quando o rótulo muda.
+  GET /caminho - quem, como (onde)`) quando prende e quando o rótulo muda. **O gancho do contador de pedidos ao Fracttal
+  (`contado`, em `casca/fracttal_conta.py`) fica ENTRE quem pede e o requests e `_nossa` o ignora** (`_GANCHOS`): sem isso o
+  `quem` de todo pedido esperando o Fracttal virava `nexus/casca/fracttal_conta.py:contado`, no log e no Raio-X.
 - **episódio:** do 1º preso até 15 s sem nenhum; começa no início do preso mais antigo. Guarda o máximo de presos
   juntos, se a fila encheu (ocupadas >= threads) e os 40 pedidos que mais esperaram. Os últimos 30 ficam em
   `dados/casca/pedidos_presos.json`, gravado também a cada 30 s DURANTE o episódio: se o processo cair no meio, o boot
@@ -549,7 +557,7 @@ fila. De fora não se vê ESPERANDO O QUÊ. O `casca/presos.py` vê de dentro:
 - **O próprio waitress avisa a fila:** `waitress.queue WARNING Task queue depth is N` no log quando há pedido esperando
   thread. No servidor, `journalctl -u nexus | grep "queue depth"` diz se um travamento antigo (de antes deste registro)
   foi fila cheia.
-- **Prova:** `tests/test_casca_presos.py` (10; 7 mutações pegas) e, de ponta a ponta, um Nexus descartável com 4
+- **Prova:** `tests/test_casca_presos.py` (11; 7 mutações pegas) e, de ponta a ponta, um Nexus descartável com 4
   threads e o RPC do Fracttal apontado para um servidor que aceita e nunca responde: 4 `GET /os/api/performance/contagens`
   com o catálogo de ativos vencido ficaram 45 s presos no `_rpc_call`, o `/saude` ficou sem resposta dos 7 s aos 42 s, a
   ronda escreveu "Fracttal (OS Creator), esperando a rede (nexus/torres/oscreator/os_creator/api.py:1093 _rpc_call)" e

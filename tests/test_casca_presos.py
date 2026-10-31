@@ -10,7 +10,7 @@ import traceback
 
 import pytest
 
-from nexus.casca import presos
+from nexus.casca import fracttal_conta, presos
 
 RAIZ = presos._RAIZ
 
@@ -87,6 +87,30 @@ def test_o_rotulo_diz_quem_e_como_pela_pilha():
     assert presos.rotulo([_quadro(RAIZ + "nexus/campo/visao.py", "montar", "x = juntar()")] + venv) == {
         "quem": "nexus/campo/visao.py:montar", "como": "trabalhando", "onde": "nexus/campo/visao.py:10 montar"}
     assert presos.rotulo([])["quem"] == "?"
+
+
+def test_o_gancho_do_contador_de_pedidos_nao_rouba_o_rotulo():
+    # O contador de pedidos ao Fracttal embrulha o `Session.send`: o `contado` de casca/fracttal_conta.py fica ENTRE quem
+    # pede e o requests. Sendo arquivo nosso, virava a "linha nossa mais de dentro" de todo pedido esperando o Fracttal, e o
+    # log dos presos e o Raio-X diziam "nexus/casca/fracttal_conta.py:contado" em vez de "Fracttal (Campo)" ou
+    # "Fracttal (OS Creator)". O quadro do gancho leva o arquivo de verdade, para o teste seguir se ele mudar de lugar.
+    venv = "/opt/nexus/.venv/lib/python3.12/site-packages/"
+    gancho = _quadro(fracttal_conta.__file__, "contado", "resposta = enviar(self, request, **kwargs)")
+    por_dentro = [_quadro(venv + "requests/sessions.py", "send"), _quadro(venv + "requests/adapters.py", "send"),
+                  _quadro("/usr/lib/python3.12/ssl.py", "recv_into")]
+
+    def pilha_de(quem_pede, chamada):
+        return [_quadro(venv + "waitress/task.py", "service"), quem_pede, _quadro(venv + "requests/api.py", chamada),
+                _quadro(venv + "requests/sessions.py", "request"), gancho, *por_dentro]
+
+    campo = _quadro(RAIZ + "nexus/campo/fracttal.py", "ler", "r = requests.get(url, headers=h, timeout=30)")
+    assert presos.rotulo(pilha_de(campo, "get")) == {
+        "quem": "Fracttal (Campo)", "como": "esperando a rede", "onde": "nexus/campo/fracttal.py:10 ler"}
+    os_creator = _quadro(RAIZ + "nexus/torres/oscreator/os_creator/api.py", "_rpc_chamar",
+                         "r = requests.post(RPC_PROXY_URL, headers=_rpc_headers(), json=body, timeout=timeout)")
+    assert presos.rotulo(pilha_de(os_creator, "post")) == {
+        "quem": "Fracttal (OS Creator)", "como": "esperando a rede",
+        "onde": "nexus/torres/oscreator/os_creator/api.py:10 _rpc_chamar"}
 
 
 # ── a ronda e o episódio ────────────────────────────────────────────────────────────────────────────────────────────

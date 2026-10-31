@@ -11,14 +11,18 @@ Conta só o host `fracttal.com` (e os `*.fracttal.com`): o S3 pré-assinado e o 
 limitador da etapa 5 vai no mesmo lugar, por isso o embrulho mora aqui e em mais nenhum.
 
 - **Uma linha por hora × origem × método.** A origem é quem pediu: a rota do pedido do Nexus (`origem(...)`, marcada pela
-  casca) ou, sem marca, `fundo:<nome da thread>` (o laço que lê sozinho). O método é o `method` do corpo do RPC, o 1º
-  segmento depois de `/api/` no REST (`work_orders`), `token` no OAuth e `outro` no que sobrar; corpo que não é JSON
-  conta como `rpc`.
+  casca) ou, sem marca, `fundo:<nome da thread sem o contador de instância>` (`ThreadPoolExecutor-137_0` vira
+  `ThreadPoolExecutor`, `waitress-12` vira `waitress`). O método é o `method` do corpo do RPC, o 1º segmento depois de
+  `/api/` no REST (`work_orders`), `token` no OAuth e `outro` no que sobrar; corpo que não é JSON conta como `rpc`.
+- **No máximo MAX_ORIGENS (50) origens distintas por hora:** a 51ª e as seguintes da hora entram em `fundo:outros`, e as
+  50 que já existem seguem contando nas suas. Sem o teto, qualquer origem que ganhe nome novo a cada pedido faria a
+  tabela da hora, e o banco, crescerem sem fim.
 - **A marca viaja pelo contexto (`contextvars`), não pela thread**, como o JWT do OS Creator: o `api._ExecutorComContexto`
   copia o contexto do pedido para as tarefas do fan-out (o catálogo de ativos pede ~110 vezes, 6 de uma vez), e esses
   pedidos são da rota que os chamou e somam na conta dela (`pedidos_desta_thread`). Com `threading.local` eles cairiam
-  em `fundo:ThreadPoolExecutor-N`, e justo as rotas mais pesadas ficariam com a conta vazia. Thread aberta à mão começa
-  sem contexto e é `fundo:<nome dela>`.
+  em `fundo:ThreadPoolExecutor`, e justo as rotas mais pesadas ficariam com a conta vazia. A marca só chega às tarefas de
+  um executor que COPIA o contexto: no `ThreadPoolExecutor` comum e na thread aberta à mão a tarefa começa sem contexto
+  (a marca de quem a abriu NÃO chega lá), e a origem tem de ser posta dentro da tarefa, senão ela é `fundo:<nome>`.
 - **Recusa e erro à parte.** 406 e 429 são o Fracttal pedindo calma (`recusas_qtd`); exceção ou 5xx é `erros_qtd`.
 - **O pico por minuto** (`pico_minuto_qtd`) é o maior número de pedidos num mesmo minuto, da linha e, na linha `*` de
   cada hora, de tudo junto: é o número que se compara com a cota. Só o minuto corrente é guardado (o pico da hora já
@@ -35,6 +39,7 @@ import contextvars
 import functools
 import json
 import logging
+import re
 import threading
 import time
 from contextlib import contextmanager
@@ -47,7 +52,11 @@ log = logging.getLogger(__name__)
 
 DOMINIO = "fracttal.com"
 RECUSAS = (406, 429)                    # o Fracttal pedindo calma (a cota por minuto)
+MAX_ORIGENS = 50                        # origens distintas por hora; a 51ª e as seguintes dessa hora vão para OUTROS
+OUTROS = "fundo:outros"
 _BRT = timezone(timedelta(hours=-3))
+# o contador de instância no fim do nome da thread (ou antes do " (alvo)" que o Python põe): `-137_0`, `-12`, `3`
+_CONTADOR = re.compile(r"(?:[-_ ]?\d+)+(?=$| \()")
 _EMBRULHO = "_nexus_fracttal_conta"     # no `send` embrulhado: ligar de novo não embrulha o embrulho
 _PEDIDOS, _RECUSADOS, _ERROS, _PICO = range(4)      # as posições da lista de cada linha
 
@@ -70,12 +79,25 @@ _marca_atual: contextvars.ContextVar = contextvars.ContextVar("nexus_fracttal_ma
 
 
 class _Hora:
-    """Uma hora de Brasília: uma linha [pedidos, recusas, erros, pico] por (origem, método) e o pico do total."""
-    __slots__ = ("linhas", "pico")
+    """Uma hora de Brasília: uma linha [pedidos, recusas, erros, pico] por (origem, método), as origens que ela já tem
+    (no máximo MAX_ORIGENS) e o pico do total."""
+    __slots__ = ("linhas", "origens", "pico")
 
     def __init__(self):
         self.linhas: dict = {}
+        self.origens: set = set()
         self.pico = 0
+
+
+def _nome_de_fundo(nome: str) -> str:
+    """O nome da thread sem o contador de instância: `ThreadPoolExecutor-137_0` vira `ThreadPoolExecutor`, `waitress-12`
+    vira `waitress` e `Thread-5 (alvo)` vira `Thread (alvo)`. O `campo/regras_app._fx_wo_paralelo` abre um executor NOVO
+    a cada chamada; com o nome cru, cada rodada criaria origens novas na tabela da hora, sem fim."""
+    return _CONTADOR.sub("", nome) or nome
+
+
+def _origem_de_fundo() -> str:
+    return "fundo:" + _nome_de_fundo(threading.current_thread().name)
 
 
 def _agora() -> float:
@@ -123,13 +145,19 @@ def _metodo(request) -> str | None:
 # ── a conta ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 def _registrar(marca: _Marca, metodo: str) -> tuple:
     """Soma o pedido que vai sair na hora e no minuto de agora; devolve onde somou, para a resposta fechar a conta."""
-    chave = (marca.nome, metodo)
     with _trava:
         agora = _agora()                                # dentro da trava: a ordem das horas é a ordem dos pedidos
         hora_id = hora_id_de(agora)
         hora = _horas.get(hora_id)
         if hora is None:
             hora = _horas[hora_id] = _Hora()
+        quem = marca.nome
+        if quem not in hora.origens:
+            if len(hora.origens) >= MAX_ORIGENS:
+                quem = OUTROS                           # a hora já tem as origens que cabem: a nova entra no balaio
+            else:
+                hora.origens.add(quem)
+        chave = (quem, metodo)
         linha = hora.linhas.setdefault(chave, [0, 0, 0, 0])
         linha[_PEDIDOS] += 1
         minuto = int(agora // 60)                       # o fuso é de horas inteiras: o minuto nunca racha uma hora
@@ -151,7 +179,7 @@ def _abrir(request) -> tuple | None:
             return None
         marca = _marca_atual.get()
         if marca is None:                               # sem `origem`: é o fundo, com o nome da thread
-            marca = _Marca("fundo:" + threading.current_thread().name)
+            marca = _Marca(_origem_de_fundo())
             _marca_atual.set(marca)
         return _registrar(marca, metodo)
     except Exception:                                   # noqa: BLE001 - o contador não derruba o pedido de ninguém
@@ -212,11 +240,11 @@ def ligar() -> None:
 @contextmanager
 def origem(nome: str):
     """Marca esta thread: o que ela pedir ao Fracttal dentro do bloco é de `nome` (a rota do pedido, ou `fundo:<nome>`).
-    Sem marca, a origem é `fundo:<nome da thread>`. A marca vai no contexto: as tarefas que copiam o contexto (o
-    `api._ExecutorComContexto`) herdam, e a thread aberta à mão, que começa sem contexto, não. Ao sair, volta a de
-    antes."""
+    Sem marca, a origem é `fundo:<nome da thread sem o contador de instância>`. A marca vai no contexto: as tarefas que
+    copiam o contexto (o `api._ExecutorComContexto`) herdam; a thread aberta à mão e a tarefa do `ThreadPoolExecutor`
+    comum começam sem contexto e não (ponha o `origem` dentro da tarefa). Ao sair, volta a de antes."""
     antes = _marca_atual.get()
-    _marca_atual.set(_Marca(nome or "fundo:" + threading.current_thread().name))
+    _marca_atual.set(_Marca(nome or _origem_de_fundo()))
     try:
         yield
     finally:

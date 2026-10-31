@@ -67,6 +67,13 @@ class _Drena(AdaptadorFalso):
         return super().send(request, **kwargs)
 
 
+def _em_thread_nova(nome, alvo):
+    """Roda `alvo` numa thread de nome `nome`, com o contexto vazio (como a aberta à mão), e espera ela acabar."""
+    t = threading.Thread(target=lambda: contextvars.Context().run(alvo), name=nome)
+    t.start()
+    t.join()
+
+
 @pytest.fixture
 def relogio(monkeypatch):
     """O contador ligado e zerado, com o relógio na mão (10:00 de Brasília); o `Session.send` volta ao que era no fim."""
@@ -174,8 +181,7 @@ def test_tarefas_que_copiam_o_contexto_herdam_a_origem_e_a_conta(relogio):
             list(ex.map(pedir, range(2)))
         assert C.pedidos_desta_thread() == 12
     quem = {lin["origem"]: lin["pedidos_qtd"] for lin in C.instantaneo() if lin["origem"] != "*"}
-    assert quem.pop("/os/api/ativos") == 12
-    assert sum(quem.values()) == 2 and all(o.startswith("fundo:ThreadPoolExecutor-") for o in quem)
+    assert quem == {"/os/api/ativos": 12, "fundo:ThreadPoolExecutor": 2}      # sem o -N_M do executor
 
 
 def test_origem_sem_nome_vale_como_sem_marca(relogio):
@@ -183,6 +189,88 @@ def test_origem_sem_nome_vale_como_sem_marca(relogio):
     with C.origem(""):
         s.get(_API)
     assert _linha(f"fundo:{threading.current_thread().name}", "work_orders")["pedidos_qtd"] == 1
+
+    def vazia():
+        with C.origem(""):                                      # a thread de nome com contador: o mesmo `fundo:` sem ele
+            s2, _ = sessao_real((200, None))
+            s2.get(_API)
+
+    _em_thread_nova("waitress-7", vazia)
+    assert _linha("fundo:waitress", "work_orders")["pedidos_qtd"] == 1
+
+
+# ── o fundo sem contador e o teto de origens ─────────────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize("nome, esperado", [
+    ("ThreadPoolExecutor-137_0", "ThreadPoolExecutor"),       # o do `regras_app._fx_wo_paralelo`: um executor por chamada
+    ("ThreadPoolExecutor-0_12", "ThreadPoolExecutor"),
+    ("waitress-12", "waitress"),
+    ("waitress-0", "waitress"),
+    ("Thread-5 (alvo)", "Thread (alvo)"),                     # o nome que o Python dá à thread aberta sem nome
+    ("Thread-12", "Thread"),
+    ("Dummy-3", "Dummy"),
+    ("worker3", "worker"),                                    # contador colado no fim
+    ("nexus-setor-2", "nexus-setor"),
+    ("Thread-5 (rodar_2)", "Thread (rodar_2)"),               # o número do nome da função não é contador
+    ("nexus-memoria", "nexus-memoria"),                       # o que não tem contador fica como está
+    ("nexus-pre-carga-boot", "nexus-pre-carga-boot"),
+    ("MainThread", "MainThread"),
+    ("7", "7"),                                               # só número: não deixa a origem sem nome
+])
+def test_nome_da_thread_sem_o_contador(nome, esperado):
+    assert C._nome_de_fundo(nome) == esperado
+
+
+def test_thread_com_contador_no_nome_vira_uma_origem_de_fundo_so(relogio):
+    s, _ = sessao_real(*[(200, None)] * 3)
+
+    def pedir():
+        s.get(_API)
+
+    for nome in ("waitress-12", "waitress-13", "Thread-5 (alvo)"):
+        _em_thread_nova(nome, pedir)
+    assert {lin["origem"]: lin["pedidos_qtd"] for lin in C.instantaneo() if lin["origem"] != "*"} == {
+        "fundo:waitress": 2, "fundo:Thread (alvo)": 1}
+
+
+def test_executor_novo_a_cada_rodada_nao_cria_origem_nova(relogio):
+    # O `campo/regras_app._fx_wo_paralelo` abre um ThreadPoolExecutor NOVO a cada chamada, e o nome das threads dele leva o
+    # contador da instância (`ThreadPoolExecutor-137_0`): com o nome cru cada rodada criaria origens novas na tabela da hora.
+    def pedir(_):
+        sessao_real((200, None))[0].get(_API)
+
+    for _ in range(5):
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            list(ex.map(pedir, range(4)))
+    assert {lin["origem"]: lin["pedidos_qtd"] for lin in C.instantaneo() if lin["origem"] != "*"} == {
+        "fundo:ThreadPoolExecutor": 20}
+
+
+def test_teto_de_origens_distintas_por_hora(relogio):
+    assert C.MAX_ORIGENS == 50
+    n = C.MAX_ORIGENS
+    # As 50 primeiras origens da hora têm linha própria; a 51ª e as que vierem (aqui, a 51ª com uma recusa e a 52ª) são
+    # contadas em `fundo:outros`; as 50 que já existem seguem contando nas suas.
+    s, _ = sessao_real(*[(200, None)] * n, (429, None), (200, None), (200, None))
+    for i in range(n):
+        with C.origem(f"/os/rota/{i}"):
+            s.get(_API)
+    with C.origem(f"/os/rota/{n}"):
+        s.get(_API)
+        assert C.pedidos_desta_thread() == 1                    # a conta do pedido não depende de onde a hora o pôs
+    with C.origem("/os/rota/0"):
+        s.get(_API)
+    with C.origem(f"/os/rota/{n + 1}"):
+        s.get(_API)
+    origens = {lin["origem"] for lin in C.instantaneo() if lin["origem"] != "*"}
+    assert len(origens) == n + 1 and "fundo:outros" in origens and f"/os/rota/{n}" not in origens
+    assert _contas("fundo:outros", "work_orders")[:3] == (2, 1, 0)      # a recusa da 51ª foi para a linha em que ela contou
+    assert _contas("/os/rota/0", "work_orders")[0] == 2
+    assert _contas("*", "*")[0] == n + 3
+    # a hora seguinte recomeça a conta: a origem que não coube agora tem linha própria
+    relogio.em("2026-10-30T14:00:00+00:00")
+    with C.origem(f"/os/rota/{n}"):
+        sessao_real((200, None))[0].get(_API)
+    assert _contas(f"/os/rota/{n}", "work_orders", "2026103011")[0] == 1
 
 
 # ── o método ─────────────────────────────────────────────────────────────────────────────────────────────────────────

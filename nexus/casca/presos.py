@@ -63,6 +63,13 @@ _QUEM = (
 )
 
 
+# Arquivos nossos que só ficam NO MEIO do caminho de quem pede, e nunca são quem está pedindo. O contador de pedidos ao
+# Fracttal embrulha o `Session.send` do requests (`contado`): sem tirá-lo da conta ele era a linha nossa mais de dentro
+# de todo pedido esperando o Fracttal, e o rótulo (log e Raio-X) virava "nexus/casca/fracttal_conta.py:contado" em vez de
+# "Fracttal (Campo)" ou "Fracttal (OS Creator)".
+_GANCHOS = ("/nexus/casca/fracttal_conta.py",)
+
+
 def _arq(f) -> str:
     return _norm(f.filename)
 
@@ -70,7 +77,7 @@ def _arq(f) -> str:
 def _nossa(f) -> bool:
     arq = _arq(f)
     # no servidor o .venv mora dentro da pasta do Nexus (/opt/nexus/.venv): os pacotes dele não são linha nossa
-    return arq.startswith(_RAIZ) and "/site-packages/" not in arq
+    return arq.startswith(_RAIZ) and "/site-packages/" not in arq and not arq.endswith(_GANCHOS)
 
 
 def _como(f) -> str:
