@@ -77,10 +77,10 @@ _APP: dict = {"app": None}
 
 
 def _estado_limpo() -> dict:
-    # `descricao_cortada`: quantas descrições o detector de endereço cortou na última foto renovada, com até 5 ids (nunca o
-    # texto; Ruling AN). É o termômetro do detector: o nome que perde pedaço sem ser endereço aparece aqui
+    # as descrições que o detector de endereço cortou na última foto (o termômetro do detector, Ruling AN) moram no
+    # `ativos_central` desde o item 0 da 3.1+3.2: vão ao `ativos_estado.json` e sobrevivem ao reinício; `estado()` as mostra
     return {"ligado": False, "motivo": "não ligado (só o servir.py liga o leitor)", "credencial": None,
-            "completo": None, "novos": None, "descricao_cortada": None}
+            "completo": None, "novos": None}
 
 
 _ESTADO: dict = _estado_limpo()
@@ -550,8 +550,16 @@ def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
                                                  de_11_10=de_11_10, usinas_no_padrao=usinas_no_padrao,
                                                  nome_de_quem_saiu=functools.partial(ativos_foto.nome_pelo_pai, grafo,
                                                                                      caudas={}))
-                _ESTADO["descricao_cortada"] = {"n": rel["foto"].get("descricao_cortada", 0),
-                                                "exemplos": list(rel["foto"].get("descricao_cortada_exemplos") or ())}
+                f = rel["foto"]
+                ativos_central.anotar_descricao_cortada({"n": f.get("descricao_cortada", 0),
+                                                         "exemplos": list(f.get("descricao_cortada_exemplos") or ())})
+                # a 1ª noite só se confere de fora (o Levi não tem acesso ao servidor): uma linha com as contagens e os ids,
+                # nunca o texto de uma descrição
+                log.info("leitor de ativos: a foto da noite: %d linhas, %d mudaram, %d entraram, %d saíram, %d descrições "
+                         "cortadas (ids %s)%s", f.get("linhas", 0), f.get("mudaram", 0), f.get("entraram", 0),
+                         f.get("sairam", 0), f.get("descricao_cortada", 0),
+                         ", ".join(str(i) for i in f.get("descricao_cortada_exemplos") or ()) or "nenhum",
+                         "" if f.get("gravou") else "; nada gravado (o banco já tinha as mesmas linhas)")
             except Exception as e:                                   # noqa: BLE001 — recusada, curta, banco fora: fica a de antes
                 rel["foto"] = {"erro": _motivo(e)}
                 log.warning("leitor de ativos: a foto do banco não foi renovada (%s)", rel["foto"]["erro"])
@@ -744,10 +752,12 @@ def ligar(app) -> None:
 def estado() -> dict:
     """O que o leitor fez, para o Raio-X (`ativos_central.estado()["leitor"]`): se está ligado (e por quê não), a última
     leitura inteira e a última dos novos (pedidos, quantos itens, o resultado), quantas descrições o detector de endereço
-    cortou na última foto renovada (`descricao_cortada`: o número e até 5 ids) e se há uma leitura dos novos em curso."""
+    cortou na última foto renovada (`descricao_cortada`: o número, até 5 ids e a hora, guardados no `ativos_central`, que os
+    leva ao disco) e se há uma leitura dos novos em curso."""
     with _COND:
         novos = dict(_NOVOS)
-    return dict(_ESTADO, lendo_novos=novos["lendo"], novos_fim_em=novos["fim_em"])
+    return dict(_ESTADO, lendo_novos=novos["lendo"], novos_fim_em=novos["fim_em"],
+                descricao_cortada=ativos_central.descricao_cortada())
 
 
 def reiniciar() -> None:

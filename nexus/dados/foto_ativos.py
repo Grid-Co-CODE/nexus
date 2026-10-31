@@ -67,14 +67,25 @@ COMO_LER = ("1 linha = 1 item do Fracttal com 1 código (fracttal_item_id + codi
 # TODA descrição antes de gravar e corta antes do 1º destes marcadores. Só os inequívocos, como palavra inteira e sem
 # distinguir maiúsculas: o falso positivo custa um nome de equipamento truncado na dimensão (um nível chamado "Cabine
 # Fazenda Alguma Coisa" perde o resto), e o contador `descricao_cortada` mostra quantos e quais ids. A usina que fechou no
-# padrão "Cliente - Usina - UF" fica de fora (`_TERMINA_NA_UF`, Ruling AQ). A sigla de rodovia vai à parte,
-# em maiúsculas, como se escreve ("BR-163", "MT-010"): em minúscula ela é mais modelo de equipamento que estrada.
+# padrão "Cliente - Usina - UF" fica de fora (`_TERMINA_NA_UF`, Ruling AQ).
+# DE ONDE VEIO A LISTA (item 0 da 3.1+3.2, a re-revisão das rodadas 2 e 3 da 2.2): os marcadores do 1º desenho e as abreviações
+# que o `os_web/ativo_curto.ENDERECO` do OS Creator já viu no dado real ("Faz.", "FZ.", "Estr.", "R.", "Povoado", "Bairro",
+# "Distrito", "Localidade", "Comunidade", "Loteamento"; o `ativo_curto` corta o nome CURTO da coluna do Histórico, e foi no
+# catálogo inteiro que ele achou cada uma). FICARAM DE FORA, por darem falso positivo em equipamento: "Lote" sozinho e "Zona"
+# sozinha ("Inversor Lote 2", "Cabine Zona 1"; "Zona Rural" continua) e o "S/N", que em equipamento é número de série
+# ("Medidor ... S/N 123456"): o endereço que o tem já é pego pela rua. A abreviação de uma letra só ("R.") vale seguida de
+# espaço ("R. Alfa 12"): "R.1" é numeração. A sigla de rodovia vai à parte, em maiúsculas, como se escreve, e só com a sigla
+# de uma das 27 UFs ou do BR, hífen e EXATAMENTE 3 dígitos ("MT-010", "BR-163"; o BR também com espaço, "BR 101"): com
+# qualquer par de letras e 2 ou 3 dígitos, o código de modelo ("DW-125", "CF-22", "SG-250") virava estrada; em minúscula ela
+# é mais modelo de equipamento que estrada.
 # Vale SÓ para a foto do banco: o caminho do catálogo (`ativos_foto.caminhos`, o cliente e a usina das telas) não passa por
-# aqui, e a paridade com o RPC não muda. O `os_web/ativo_curto.py` do OS Creator tem outra lista, mais larga ("lote",
-# "bairro", "br"...), para o nome CURTO da coluna do Histórico: é exibição, não governança; não as junte.
-MARCADORES_DE_ENDERECO = ("Rua", "Av.", "Avenida", "Rod.", "Rodovia", "Estrada", "Km", "CEP", "Fazenda", "Sítio", "Sitio",
-                          "Chácara", "Chacara", "Gleba", "Zona Rural", "S/N")
-SIGLA_DE_RODOVIA = r"\b[A-Z]{2}-\d{2,3}\b"
+# aqui, e a paridade com o RPC não muda.
+MARCADORES_DE_ENDERECO = ("Rua", "R.", "Av.", "Avenida", "Rod.", "Rodovia", "Estrada", "Estr.", "Km", "CEP", "Fazenda",
+                          "Faz.", "FZ.", "Sítio", "Sitio", "Chácara", "Chacara", "Gleba", "Zona Rural", "Povoado", "Bairro",
+                          "Distrito", "Localidade", "Comunidade", "Loteamento")
+UFS = ("AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ",
+       "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO")
+SIGLA_DE_RODOVIA = r"\b(?:%s)-\d{3}\b|\bBR\s+\d{3}\b" % "|".join(UFS + ("BR",))
 # a usina isenta do detector tem de terminar na sigla do estado ("... - MT"): a lista do leitor que viesse errada não abre a
 # porta para um endereço depois dela
 _TERMINA_NA_UF = re.compile(r"\s-\s[A-Z]{2}$")
@@ -84,9 +95,16 @@ VOLTAS_MAX = 5                                  # a linha que saiu, repetida at�
 
 def _marcador(m: str) -> str:
     """A expressão de um marcador como palavra inteira: nada de letra colada antes e, se ele termina em letra, depois
-    ("Estradas" e "Kmx" não são endereço; "Av." já termina no ponto). O espaço do meio vale qualquer espaço."""
+    ("Estradas" e "Kmx" não são endereço; "Av." já termina no ponto). A abreviação de uma letra só ("R.") pede um espaço
+    depois: "R. Alfa 12" é rua, "R.1" é numeração de equipamento. O espaço do meio vale qualquer espaço."""
     corpo = r"\s+".join(re.escape(p) for p in m.split())
-    return r"(?<!\w)" + corpo + (r"(?!\w)" if m[-1].isalnum() else "")
+    if m[-1].isalnum():
+        fim = r"(?!\w)"
+    elif len(m) <= 2:
+        fim = r"(?=\s)"
+    else:
+        fim = ""
+    return r"(?<!\w)" + corpo + fim
 
 
 _ENDERECO = re.compile("(?i:%s)|%s" % ("|".join(_marcador(m) for m in MARCADORES_DE_ENDERECO), SIGLA_DE_RODOVIA))

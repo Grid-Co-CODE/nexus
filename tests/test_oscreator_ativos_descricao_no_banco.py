@@ -192,7 +192,8 @@ def test_os_marcadores_do_detector():
         "Sala 5 chacara Gama": "Sala 5",
         "Galpão 1 Gleba 7": "Galpão 1",
         "Galpão 2 zona  rural": "Galpão 2",
-        "Portaria S/N": "Portaria",
+        # o S/N saiu (item 0 da 3.1+3.2): em equipamento é número de série, e o endereço que o tem já cai pela rua
+        "Portaria S/N": "Portaria S/N",
         "Rua Sem Padrao 12": None,                                     # só endereço: sem descrição
         # palavra inteira: o marcador dentro de outra palavra não corta; a sigla de rodovia é em maiúsculas
         "Inversor 2.1 Kmx": "Inversor 2.1 Kmx",
@@ -209,6 +210,50 @@ def test_os_marcadores_do_detector():
     assert all(FA.sem_endereco(e)[0] == e for e in casos.values() if e)
 
 
+def test_os_marcadores_do_item_0():
+    """Item 0 da 3.1+3.2 (a re-revisão das rodadas 2 e 3 da 2.2): o detector dava falso positivo em código de modelo e em
+    número de série, e não conhecia as abreviações que o dado real usa (as do `os_web/ativo_curto.ENDERECO`). Exemplos
+    inventados."""
+    passam = (
+        "Disjuntor DW-125",                          # a sigla de rodovia só com a UF (ou o BR) e 3 dígitos
+        "Camera CF-22 PTZ",
+        "Inversor 1.2 Marca SG-250 Rev B",
+        "Medidor ION 8650 S/N 123456",               # S/N é número de série
+        "Inversor 3.3 Lote 2",                       # "Lote" sozinho não é endereço
+        "Cabine Zona 1",                             # nem "Zona" sozinha
+        "Inversor 4.1 MT-99",                        # a UF com 2 dígitos não é rodovia
+        "Inversor 4.2 MT-9999",                      # nem com 4
+        "Inversor 4.3 mt-999",                       # nem em minúscula
+        "Inversor 4.4 XX-999",                       # nem a sigla que não é UF
+        "Relé R.1",                                  # o "R." colado num número é numeração, não rua
+        "Inversor 5.1 Brasil 2",
+    )
+    for texto in passam:
+        assert FA.sem_endereco(texto) == (texto, False), texto
+    cortados = {
+        "Cabine 2 Faz. Ômega": "Cabine 2",
+        "Trafo 1 BR 999 km 3": "Trafo 1",
+        "Skid 1 MT-999": "Skid 1",
+        "Skid 2 BR-999": "Skid 2",
+        "Skid 3 SP-123 km 4": "Skid 3",
+        "Sala 1 FZ. Alfa Verde": "Sala 1",
+        "Sala 2 fz. Alfa": "Sala 2",
+        "Sala 3 Estr. Beta": "Sala 3",
+        "Sala 4 R. Gama 12": "Sala 4",
+        "Sala 5 Povoado Delta": "Sala 5",
+        "Sala 6 bairro Delta": "Sala 6",
+        "Sala 7 Distrito de Delta": "Sala 7",
+        "Sala 8 LOCALIDADE Delta": "Sala 8",
+        "Sala 9 Comunidade Delta": "Sala 9",
+        "Sala 10 Loteamento Delta": "Sala 10",
+        "Galpão 3 Zona Rural": "Galpão 3",            # "Zona Rural" continua
+    }
+    for texto, esperado in cortados.items():
+        assert FA.sem_endereco(texto) == (esperado, True), texto
+    assert "S/N" not in FA.MARCADORES_DE_ENDERECO and "Lote" not in FA.MARCADORES_DE_ENDERECO
+    assert "Zona" not in FA.MARCADORES_DE_ENDERECO and "Zona Rural" in FA.MARCADORES_DE_ENDERECO
+
+
 # ── a contagem das descrições cortadas ──────────────────────────────────────────────────────────────────────────────────
 def test_a_noite_conta_as_descricoes_cortadas_sem_o_texto(app, banco):
     mais = [_it(44, "CAL-ZET100-PORT2", "Portaria 2 Rua Sem Padrao 12    { x }", 40),
@@ -219,10 +264,35 @@ def test_a_noite_conta_as_descricoes_cortadas_sem_o_texto(app, banco):
     rel = AL.ler_completo(app, ler=RestFalso(itens))
     assert rel["foto"]["descricao_cortada"] == 6 and rel["foto"]["descricao_cortada_exemplos"] == [40, 41, 42, 43, 44]
     estado = AL.estado()
-    assert estado["descricao_cortada"] == {"n": 6, "exemplos": [40, 41, 42, 43, 44]}
+    assert {k: estado["descricao_cortada"][k] for k in ("n", "exemplos")} == {"n": 6, "exemplos": [40, 41, 42, 43, 44]}
     texto = json.dumps(estado, ensure_ascii=False, default=str)
     assert not any(e in texto for e in ("Sem Padrao", "Outra 55", "Rua "))          # nunca o texto cortado
     assert AC.estado()["leitor"]["descricao_cortada"]["n"] == 6                     # e o Raio-X do catálogo vê
+
+
+def test_as_cortadas_sobrevivem_ao_reinicio_e_vao_ao_log(app, banco, tmp_path, caplog):
+    """Item 0 da 3.1+3.2 (b): o Levi não tem acesso ao servidor, e a 1ª noite do leitor só se confere pela tela. As cortadas
+    vão ao `ativos_estado.json` (sobrevivem ao deploy, que acontece várias vezes por dia) e a uma linha de log no fim da
+    noite, só com contagens e ids."""
+    pasta = str(tmp_path / "oscreator")
+    AC.reiniciar(pasta=pasta)
+    itens = ARVORE + SEM_PADRAO
+    _catalogo_de(itens)
+    with caplog.at_level("INFO", logger="oscreator.ativos_leitor"):
+        rel = AL.ler_completo(app, ler=RestFalso(itens))
+    assert rel["foto"]["descricao_cortada"] == 4
+    linha = [r.getMessage() for r in caplog.records if "a foto da noite" in r.getMessage()]
+    assert len(linha) == 1 and "4 descrições cortadas" in linha[0] and "40, 41, 42, 43" in linha[0]
+    assert "linhas" in linha[0] and "mudaram" in linha[0] and "saíram" in linha[0]
+    assert not any(e in linha[0] for e in ("Sem Padrao", "Outra 55", "Rua ", "Inversor", "Cabine"))
+    em = AC.estado()["descricao_cortada"]["em"]
+    AC.reiniciar(pasta=pasta)                                          # o reinício (um deploy)
+    AL.reiniciar()
+    depois = AC.estado()["descricao_cortada"]
+    assert depois == {"n": 4, "exemplos": [40, 41, 42, 43], "em": em}
+    assert AL.estado()["descricao_cortada"] == depois                  # o estado do leitor também a vê de novo
+    with open(tmp_path / "oscreator" / "ativos_estado.json", encoding="utf-8") as f:
+        assert not any(e in f.read() for e in ("Sem Padrao", "Outra 55"))
 
 
 # ── a usina que fechou no padrão não passa pelo detector (Ruling AQ, revisão 3) ─────────────────────────────────────────

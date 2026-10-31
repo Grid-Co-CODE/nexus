@@ -429,6 +429,18 @@ Prova: `tests/test_casca_raio_x_uso_os.py` (7 dias gravados pelo `fato_uso_os.gr
 memória dublados, o relógio na mão; cada número da conta, o pendente que vence o banco sem contar em dobro, a cópia de 10 min
 e a gravação das 03:45 que a invalida, a aba do detalhe que não se lê, o banco fora, lento e vazio, e as cores só por token).
 
+**O canto central na mesma seção (31/10/2026, item 0 da 3.1+3.2; âncora `#canto-central`, link no alto).** O Levi não tem
+acesso ao servidor: a 1ª noite do leitor dos ativos do OS Creator (a paridade REST x RPC, as descrições que o detector da foto
+cortou) só se confere pela tela. Depois dos quatro quadros do uso, cada peça do canto central diz o seu estado em linhas
+(rótulo e frase, montadas em `raio_x._secao_canto_central`; a macro `peca` do template só as lista): **"Ativos centrais"**
+(`ativos_central.estado()`): o catálogo (quantos, fonte, lido em, os novos do dia, a versão), se o leitor do servidor está
+ligado e pronto, a paridade do REST (quando, se valeu, as coberturas `cob_ref` e `cob_rest`, e o motivo se não valeu), o REST
+(a última leitura boa e a falha que veio depois dela), as descrições cortadas da última noite (o número e até 5 ids) e a cópia
+em disco. Só contagens, datas, ids e motivos: nunca o texto de um ativo ou de uma OS, nem nome de pessoa. **O Raio-X não
+importa o OS Creator:** lê o módulo de `sys.modules` (no PC, sem ninguém ter aberto o OS Creator, ele nem está na memória, e
+a peça diz isso), e a peça que quebrar vai ao log e diz que não montou, nunca derruba a página. Prova:
+`tests/test_oscreator_canto_no_raio_x.py`.
+
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 
 Levi, sobre pôr a chave das contestações no servidor pela T.I.: "Se precisa de TI então vou ter que mandar um arquivo novo

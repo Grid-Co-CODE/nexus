@@ -1419,8 +1419,14 @@ testes seguem pelo RPC; sem a credencial REST (`FRACTTAL_CLIENT_ID`), não liga 
   dela no que se leu hoje e nas linhas antigas que também não vieram); e a foto passa toda descrição pelo detector de
   endereço (`nexus/dados/foto_ativos.sem_endereco`, regra e marcadores no `nexus/dados/CLAUDE.md`). O detector NÃO entra no
   caminho do catálogo: o cliente e a usina das telas e a paridade com o RPC não mudam. Quantas ele cortou na última foto
-  fica no estado do leitor (`ativos_leitor.estado()["descricao_cortada"]`, que o Raio-X vê em
-  `ativos_central.estado()["leitor"]`: até 5 ids, nunca o texto). A usina cujo nome fechou no padrão "Cliente - Usina -
+  (o número, até 5 ids e a hora, nunca o texto) fica no `ativos_central` (`anotar_descricao_cortada`, e no `estado()`) e
+  no `ativos_estado.json`, para sobreviver ao deploy (item 0 da 3.1+3.2), e vai a uma linha de log no fim da
+  noite ("a foto da noite: N linhas, N mudaram, N entraram, N saíram, N descrições cortadas (ids ...)"). **Onde se vê** (o
+  Levi não tem acesso ao servidor, e a 1ª noite só se confere pela tela): Raio-X (Base → Raio-X, só administrador) → a seção
+  "Uso do OS Creator" → o bloco **"Ativos centrais"** (`nexus/casca/raio_x.py`, `_secao_canto_central`): o catálogo (fonte,
+  lido em, versão), se o leitor está pronto, a paridade (quando, as coberturas `cob_ref`/`cob_rest`, se valeu), o REST (a
+  última leitura boa e a última falha), as descrições cortadas (o número e os ids) e a cópia em disco. A usina cujo nome
+  fechou no padrão "Cliente - Usina -
   UF" NÃO passa pelo detector (Ruling AQ, revisão 3): o leitor diz quais (`nomes_no_caminho(..., usinas_no_padrao=)` e o
   `nome_pelo_pai` da linha que saiu), e a foto só as isenta se o nome termina na sigla do estado. Sem isso, a usina de
   fazenda ("CL - UFV Fazenda X - MT", comum na carteira) virava "CL - UFV", e a foto servindo de catálogo (a máquina sem

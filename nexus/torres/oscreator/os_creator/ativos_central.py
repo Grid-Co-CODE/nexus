@@ -20,8 +20,9 @@ COMO É AGORA:
   pessoas: um chamador que mexesse num deles mudaria o ativo para todo mundo até a próxima troca, e sem erro nenhum. Quem
   precisa mexer pede a cópia (`registro(codigo)` ou `dict(r)`).
 - O boot NUNCA pergunta ao Fracttal. Em ordem: (1) a cópia desta tabela em disco, `<pasta>/ativos.json.gz` (gravada ao lado,
-  de uma vez só, com o formato escrito dentro, e só se o catálogo ainda for o vigente; a ilegível ou de outro formato é
-  ignorada; as gravações e as leituras do disco moram em `ativos_disco.py`); (2) o `assets_cache.json` antigo,
+  de uma vez só, com o formato escrito dentro; a gravação escreve o catálogo VIGENTE, lido dentro da trava do disco, e só
+  pula se o disco já tem o mesmo (versão, `lido_em`, `novos_em`); a ilegível ou de outro formato é ignorada; as gravações e
+  as leituras do disco moram em `ativos_disco.py`); (2) o `assets_cache.json` antigo,
   lido UMA vez como migração se a cópia nova não existe (e já grava a nova); (3) a foto dos ativos no banco
   (`nexus_ativos_fracttal · foto_ativos`), se o Nexus ligou uma função que a lê (`ligar_fonte_do_banco`; este módulo não
   conhece a configuração do banco). Sem nenhuma das três, o catálogo nasce do primeiro download (`trocar(..., "rpc")`).
@@ -340,8 +341,11 @@ def _estado_limpo() -> dict:
     # boa tira a prontidão do leitor, e a próxima boa a devolve (revisão 1 da 2.2)
     # `disco`: o estado da cópia em disco (a versão, o `lido_em` e o `novos_em` dela), para a gravação pular só o que o disco
     # já tem (`ativos_disco.gravar_catalogo`, revisão 2 da 2.2)
+    # `descricao_cortada`: quantas descrições o detector de endereço da foto do banco cortou na última noite, com até 5 ids e a
+    # hora (nunca o texto; Ruling AN). Mora aqui, e não no leitor, para ir ao `ativos_estado.json`: o Levi não tem acesso ao
+    # servidor e confere a 1ª noite pelo Raio-X, e o deploy de várias vezes por dia apagaria o número da memória
     return {"recusa": None, "recusa_completa": None, "paridade_rest": None, "banco": None, "encolhimento": None,
-            "falha": None, "rest": {"bom_em": 0.0, "falha_em": 0.0, "falha": None},
+            "falha": None, "rest": {"bom_em": 0.0, "falha_em": 0.0, "falha": None}, "descricao_cortada": None,
             "disco": {"lido": None, "gravado_em": 0.0, "versao": None, "lido_em": 0.0, "novos_em": 0.0, "erro": None}}
 
 
@@ -474,11 +478,13 @@ def _ler_disco():
 
 def _gravar_estado() -> None:
     ativos_disco.gravar_estado(_CONFIG["pasta"], {"recusa_completa": _ESTADO["recusa_completa"],
-                                                  "paridade_rest": _ESTADO["paridade_rest"], "rest": _ESTADO["rest"]})
+                                                  "paridade_rest": _ESTADO["paridade_rest"], "rest": _ESTADO["rest"],
+                                                  "descricao_cortada": _ESTADO["descricao_cortada"]})
 
 
 def _ler_estado() -> None:
-    """O `ativos_estado.json` de antes do reinício: a recusa lembrada, a paridade e a prontidão do REST voltam à memória."""
+    """O `ativos_estado.json` de antes do reinício: a recusa lembrada, a paridade, a prontidão do REST e as descrições
+    cortadas da última noite voltam à memória."""
     d = ativos_disco.ler_estado(_CONFIG["pasta"])
     if not d:
         return
@@ -489,6 +495,9 @@ def _ler_estado() -> None:
         _ESTADO["paridade_rest"] = p
     if isinstance(rest, dict):
         _ESTADO["rest"].update({k: rest.get(k) for k in ("bom_em", "falha_em", "falha") if k in rest})
+    c = d.get("descricao_cortada")
+    if isinstance(c, dict) and isinstance(c.get("n"), int):
+        _ESTADO["descricao_cortada"] = _cortadas(c)
 
 
 def _ler_legado():
@@ -769,9 +778,11 @@ def estado() -> dict:
     """O que se sabe do catálogo, para o Raio-X: a fonte, o `lido_em`, o `novos_em`, a versão, quantos ativos, a última troca
     recusada (motivo, hora, fonte e tamanhos), o último encolhimento confirmado, a última falha do download pelo RPC, a paridade
     do REST (a leitura da noite conferida contra o catálogo de antes, com as coberturas dos dois lados), a última leitura REST
-    boa e a última que falhou, se o leitor está pronto, a situação do disco e da foto do banco e, com o leitor do servidor
-    ligado, o que ele fez (ou por que não ligou)."""
-    cat = _ATUAL
+    boa e a última que falhou, se o leitor está pronto, as descrições que o detector da foto cortou na última noite (o número,
+    até 5 ids e a hora; nunca o texto), a situação do disco e da foto do banco e, com o leitor do servidor ligado, o que ele fez
+    (ou por que não ligou). Faz o boot local, se ainda não houve: o que estava no `ativos_estado.json` antes do reinício (a
+    paridade, as cortadas) é justamente o que o Raio-X quer ver depois de um deploy."""
+    cat = atual()
     tem = cat is not None
     leitor = None
     if _LEITOR["estado"] is not None:
@@ -786,8 +797,37 @@ def estado() -> dict:
             "encolhimento": dict(_ESTADO["encolhimento"]) if _ESTADO["encolhimento"] else None,
             "falha": dict(_ESTADO["falha"]) if _ESTADO["falha"] else None,
             "paridade_rest": _ESTADO["paridade_rest"], "rest": dict(_ESTADO["rest"]), "leitor_pronto": leitor_pronto(),
+            "descricao_cortada": descricao_cortada(),
             "disco": dict(_ESTADO["disco"]), "banco": dict(_ESTADO["banco"]) if _ESTADO["banco"] else None,
             "leitor": leitor}
+
+
+def _cortadas(d: dict) -> dict:
+    """O registro das descrições cortadas só com o que pode ir ao disco e à tela: o número, até 5 ids e a hora (nunca o
+    texto)."""
+    exemplos = [i for i in (d.get("exemplos") or ()) if isinstance(i, int)][:5]
+    em = d.get("em")
+    return {"n": int(d.get("n") or 0), "exemplos": exemplos, "em": float(em) if isinstance(em, (int, float)) else None}
+
+
+def anotar_descricao_cortada(d: dict | None) -> None:
+    """As descrições que o detector de endereço da foto cortou na noite (`{"n", "exemplos"}`, do relatório da foto;
+    `ativos_leitor.ler_completo`), com a hora de agora se não vier. Vai ao `ativos_estado.json`: sobrevive ao reinício."""
+    if d is None:
+        _ESTADO["descricao_cortada"] = None
+    else:
+        c = _cortadas(d)
+        if c["em"] is None:
+            c["em"] = time.time()
+        _ESTADO["descricao_cortada"] = c
+    _gravar_estado()
+
+
+def descricao_cortada() -> dict | None:
+    """As descrições cortadas na última noite (`anotar_descricao_cortada`), ou None se ainda não houve noite com a foto."""
+    atual()                                                         # o boot local traz a de antes do reinício
+    c = _ESTADO["descricao_cortada"]
+    return dict(c, exemplos=list(c["exemplos"])) if c else None
 
 
 def anotar_paridade_rest(resultado: dict | None) -> None:

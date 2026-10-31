@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
 <p class="gc-eyebrow">Base · Raio-X</p>
 <h1 class="titulo-pagina">Raio-X do Nexus</h1>
-<p class="cad-sub">O que este processo está fazendo agora ({{ quando }}). <a href="{{ url_for('torre_base.raio_x') }}">Ler de novo</a> · <a href="#uso-os-creator">Uso do OS Creator</a></p>
+<p class="cad-sub">O que este processo está fazendo agora ({{ quando }}). <a href="{{ url_for('torre_base.raio_x') }}">Ler de novo</a> · <a href="#uso-os-creator">Uso do OS Creator</a> · <a href="#canto-central">Canto central</a></p>
 
 <div class="cad-numeros">
   <div><div class="r">Pedidos em andamento</div><div class="v gc-num">{{ pedidos|length }}{% if threads %} de {{ threads }}{% endif %}</div><div class="d">{% if threads and pedidos|length >= threads %}todas as threads ocupadas: a fila espera{% else %}threads do waitress{% endif %}</div></div>
@@ -140,5 +140,22 @@
   <p class="cad-pe">O corte por setor mora só no disco do servidor, por dia, e fica 30 dias (aqui, os últimos 7): nunca vai ao banco, porque há setor de uma ou duas pessoas e o banco é de leitura aberta e não apaga. O pedido que o teto recusou não tem sessão e fica fora dele.</p>
   {% else %}<p class="cad-pe">Sem corte por setor ainda: ele só existe no servidor, que o guarda no disco dele.</p>{% endif %}
   {% endif %}
+
+  {# O canto central do OS Creator (31/10/2026; item 0 da 3.1+3.2): o estado de cada peça resumido, para conferir de fora a
+     1ª noite do leitor. Só contagens, datas, ids e motivos (nunca texto de ativo, de OS ou nome). As linhas saem prontas de
+     nexus/casca/raio_x.py (`_secao_canto_central`). #}
+  {% macro peca(p, titulo) %}
+  <h3 class="rx-sub">{{ titulo }}</h3>
+  {% if p.linhas %}
+  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
+    <tbody>{% for rotulo, frase in p.linhas %}
+      <tr><td>{{ rotulo }}</td><td>{{ frase }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="cad-pe">{{ p.motivo }}</p>{% endif %}
+  {% endmacro %}
+  <div id="canto-central">
+  {{ peca(canto.ativos, "Ativos centrais") }}
+  </div>
 </section>
 {% endblock %}

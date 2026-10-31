@@ -24,7 +24,10 @@ clique do administrador:
   cliques e o que a tela pede sozinha, separados, com a mediana e o p95), os cliques por hora do dia, os pedidos ao
   Fracttal por hora com o pico por minuto ao lado da cota de 200 e o corte por setor. De ontem para trás vem dos livros
   do mês no banco (a leitura, numa thread à parte e guardada 10 min, `_uso_do_banco`); o que ainda não foi às 03:45 vem do
-  pendente no disco do servidor (`uso_os.linhas_pendentes`) e a hora aberta, da memória.
+  pendente no disco do servidor (`uso_os.linhas_pendentes`) e a hora aberta, da memória;
+- na mesma seção, o canto central do OS Creator (`_secao_canto_central`, item 0 da 3.1+3.2): o estado dos ativos centrais
+  (o catálogo, o leitor do servidor, a paridade do REST, as descrições cortadas da foto, o disco), só com contagens, datas e
+  ids, para conferir de fora a 1ª noite do leitor.
 
 Nada é gravado nem vai à rede (a leitura do uso no banco é a exceção, por trás, com prazo); a pilha só sai como rótulo
 (arquivo, linha e função), nunca com dados.
@@ -716,6 +719,95 @@ def _secao_uso_os(app) -> dict:
         return {"tem": False, "banco_txt": "", "motivo": "Não consegui montar a seção (veja o log do servidor)."}
 
 
+# ── o canto central do OS Creator (31/10/2026; item 0 da 3.1+3.2 para os ativos, a 3.2 para a lista de OS) ──────────────
+# O Levi não tem acesso ao servidor: a 1ª noite do leitor dos ativos (a paridade REST x RPC, as descrições que o detector da
+# foto cortou) e a 1ª carga da lista de OS só se conferem por aqui. Cada peça diz o estado dela resumido, em linhas (rótulo,
+# frase), só com contagens, datas, ids e motivos: nada de texto de ativo, de OS nem nome de pessoa. O Raio-X NÃO importa os
+# módulos do OS Creator (`sys.modules`): no PC, sem ninguém ter aberto o OS Creator, eles nem estão na memória, e importá-los
+# aqui faria o boot da cópia em disco só para mostrar o quadro.
+def _quando(ts) -> str:
+    """"31/10 02:15" (Brasília) de um epoch, ou "" sem ele."""
+    if not isinstance(ts, (int, float)) or not ts:
+        return ""
+    return time.strftime("%d/%m %H:%M", time.gmtime(ts - 3 * 3600))
+
+
+def _pct(v) -> str:
+    return ("%.1f%%" % float(v)).replace(".", ",") if isinstance(v, (int, float)) else "?"
+
+
+def _linhas_dos_ativos(e: dict) -> list:
+    """As linhas do bloco "Ativos centrais", do `ativos_central.estado()`."""
+    linhas = []
+    if e.get("n"):
+        linhas.append(("Catálogo", "%d ativos, fonte %s, lista inteira conferida em %s%s; versão %s" % (
+            e["n"], e.get("fonte") or "?", _quando(e.get("lido_em")) or "?",
+            ", os novos do dia em %s" % _quando(e["novos_em"]) if e.get("novos_em") else "",
+            str(e.get("versao") or "")[:10])))
+    else:
+        linhas.append(("Catálogo", "sem catálogo nesta máquina (ele nasce da cópia em disco, da foto do banco ou do 1º "
+                                   "download pelo RPC)"))
+    leitor = e.get("leitor")
+    if not leitor:
+        txt = "não ligado (só o servir.py liga o leitor; no PC o catálogo segue pelo RPC, com a sessão de quem usa)"
+    elif not leitor.get("ligado"):
+        txt = "não ligado: %s" % (leitor.get("motivo") or leitor.get("erro") or "?")
+    elif e.get("leitor_pronto"):
+        txt = "pronto: os botões \"Atualizar ativos\" pedem os novos a ele"
+    else:
+        txt = ("ligado, mas não está pronto (sem a paridade da noite valendo, ou com uma leitura REST falhando depois da "
+               "última boa): os botões seguem pelo RPC")
+    linhas.append(("Leitor do servidor", txt))
+    p = e.get("paridade_rest")
+    if not p:
+        linhas.append(("Paridade do REST", "ainda não houve (a 1ª noite do leitor é a conferência REST x RPC)"))
+    else:
+        linhas.append(("Paridade do REST", "%s em %s, contra o catálogo do %s: a leitura tem %s dos códigos do catálogo e o "
+                       "catálogo, %s dos dela%s" % (
+                           "valeu" if p.get("vale") else "NÃO valeu", _quando(p.get("em")) or "?", p.get("contra") or "?",
+                           _pct(p.get("cob_ref")), _pct(p.get("cob_rest")),
+                           "" if p.get("vale") else ". Motivo: %s" % str(p.get("motivo") or "")[:300])))
+    r = e.get("rest") or {}
+    txt = "a última leitura boa em %s" % (_quando(r.get("bom_em")) or "nenhuma")
+    if (r.get("falha_em") or 0) > (r.get("bom_em") or 0):
+        txt += "; FALHOU depois dela, em %s: %s" % (_quando(r.get("falha_em")), str(r.get("falha") or "")[:200])
+    elif r.get("falha_em"):
+        txt += "; a última falha, antes dela, em %s" % _quando(r.get("falha_em"))
+    linhas.append(("REST do Fracttal", txt))
+    c = e.get("descricao_cortada")
+    if c:
+        linhas.append(("Descrições cortadas", "%d descrições na foto da noite de %s%s" % (
+            c.get("n") or 0, _quando(c.get("em")) or "?",
+            ": ids %s" % ", ".join(str(i) for i in c.get("exemplos") or ()) if c.get("exemplos") else "")))
+    else:
+        linhas.append(("Descrições cortadas", "nenhuma noite com a foto do banco ainda"))
+    d = e.get("disco") or {}
+    txt = "gravada em %s" % _quando(d.get("gravado_em")) if d.get("gravado_em") else "sem gravação neste processo"
+    if d.get("lido"):
+        txt += "; o boot leu a %s" % d["lido"]
+    if d.get("erro"):
+        txt += "; erro: %s" % str(d["erro"])[:200]
+    linhas.append(("Cópia em disco", txt))
+    return linhas
+
+
+def _peca(nome_modulo: str, montar) -> dict:
+    """Uma peça do canto central: `{"linhas"}`, ou `{"motivo"}` quando o módulo não está carregado ou o estado falhou."""
+    mod = sys.modules.get(nome_modulo)
+    if mod is None:
+        return {"linhas": [], "motivo": "O OS Creator ainda não foi aberto neste processo: a peça não está na memória."}
+    try:
+        return {"linhas": montar(mod), "motivo": ""}
+    except Exception:                       # noqa: BLE001 - o quadro nunca derruba a página
+        log.exception("Raio-X: não consegui montar a peça %s do canto central", nome_modulo)
+        return {"linhas": [], "motivo": "Não consegui ler o estado desta peça (veja o log do servidor)."}
+
+
+def _secao_canto_central() -> dict:
+    """O bloco do canto central na seção do OS Creator: os ativos (item 0 da 3.1+3.2)."""
+    return {"ativos": _peca("ativos_central", lambda m: _linhas_dos_ativos(m.estado()))}
+
+
 def registrar_raio_x(bp) -> None:
     @bp.route("/raio-x")
     def raio_x():
@@ -734,7 +826,7 @@ def registrar_raio_x(bp) -> None:
         return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None, teto=teto,
                                threads=getattr(estado, "threads", 0), cpu=_processador(), quem=_memoria_por_programa(),
                                worker=_worker_plataforma(), web=_web_plataforma(), prazo_memoria=PRAZO_MEMORIA_S,
-                               nexus=_dentro_do_nexus(app), uso=_secao_uso_os(app),
+                               nexus=_dentro_do_nexus(app), uso=_secao_uso_os(app), canto=_secao_canto_central(),
                                threads_atrasado=threads_atrasado,
                                threads_quando=lista.get("anterior_quando") if threads_atrasado else None,
                                travamentos=P.cartao(app) if estado is not None else None,
