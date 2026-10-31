@@ -30,7 +30,8 @@ planilha de gestão de chamados, com a "Data da ocorrência / abertura do chamad
 chamado abre nessa data ("A abertura do chamado"), e não no dia em que a OS entrou no Fracttal; a 1ª, de 21/08, contaria
 0 dias. A data da nota vale quando é uma data de verdade e não depois da criação da OS; a duração conta dela (o dia, 00:00
 em Brasília: a nota não traz a hora). `abertura_por` diz de onde veio (regra 5, linhagem): `nota` ou `os` (a criação).
-A mesma leitura da tela está em `acomp_web.ler_nota` e `acomp_web.abertura_valida` (o OS Creator não importa o Nexus).
+A mesma leitura da tela está em `acomp_web.ler_nota` e `acomp_web.abertura_valida` (a camada de dados não importa o
+clone do OS Creator, que a ponte carrega à parte, na 1ª visita a /os).
 O STATUS DO CHAMADO (28/10/2026): Levi, no Painel do responsável: "Seria bom mostrar o status do chamado". É o da tela de
 Garantias (`acomp_web.status_atual`): a última troca pela tela (`os_creator · chamados_obs`, tipo "status") ou, sem
 troca, o "Status atual" da nota da retroativa. Só os valores da lista da analista (`dominios.STATUS_CHAMADO`; fora dela =

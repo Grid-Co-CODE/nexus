@@ -68,6 +68,12 @@ if __name__ == "__main__":
     # o Nexus por dentro no Raio-X (24/10/2026: 2,6 GB, 1,9 no swap, e a página não dizia de quê), a cada 10 min
     from nexus.casca import memoria_nexus
     memoria_nexus.ligar(app)
+    # os ativos do Fracttal lidos pelo próprio servidor (31/10/2026, etapa 2 do canto central do OS Creator): o Fracttal
+    # inteiro às 02:15 e os novos de 30 em 30 min, pela credencial da empresa, e a foto dos ativos no banco renovada toda
+    # noite. Só aqui (o app.py e os testes seguem pelo RPC); sem a credencial REST ele não liga, e o estado diz por quê
+    from nexus.torres.oscreator import ponte as ponte_os
+    ativos_leitor = ponte_os.modulo_do_clone("ativos_leitor")
+    ativos_leitor.ligar(app)
     host = os.environ.get("NEXUS_HOST", "127.0.0.1")
     porta = int(os.environ.get("NEXUS_PORTA", "5070"))
     prefixo = app.config.get("NEXUS_PREFIXO") or "(raiz)"

@@ -422,8 +422,10 @@ def test_a_versao_e_o_sha_das_linhas_e_muda_com_o_conteudo():
 
 
 def test_estado_e_a_paridade_do_rest():
-    assert AC.estado() == {"fonte": None, "lido_em": None, "versao": None, "n": 0, "recusa": None, "paridade_rest": None,
-                           "disco": {"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None}, "banco": None}
+    assert AC.estado() == {"fonte": None, "lido_em": None, "novos_em": None, "versao": None, "n": 0, "recusa": None,
+                           "encolhimento": None, "falha": None, "paridade_rest": None,
+                           "disco": {"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None}, "banco": None,
+                           "leitor": None}
     AC.trocar(_lote(10), "rpc", lido_em=123.0)
     AC.anotar_paridade_rest({"vale": False, "motivo": "faltou o tipo", "pct": 91.0})
     e = AC.estado()
@@ -491,9 +493,13 @@ def _clone():
     return c
 
 
+_RELOGIO_REAL = time.time
+
+
 def _amanha(monkeypatch, segundos):
-    real = time.time
-    monkeypatch.setattr(time, "time", lambda: real() + segundos)
+    """O relógio `segundos` à frente do de VERDADE (e não do que outro `_amanha` deste teste já adiantou: as duas chamadas
+    seguidas não se somam)."""
+    monkeypatch.setattr(time, "time", lambda: _RELOGIO_REAL() + segundos)
 
 
 def test_a_recusa_e_lembrada_duas_aprovacoes_seguidas_baixam_uma_vez(monkeypatch):
@@ -506,8 +512,8 @@ def test_a_recusa_e_lembrada_duas_aprovacoes_seguidas_baixam_uma_vez(monkeypatch
     segunda = api.load_assets_cached(em_dia=True)
     assert segunda is primeira and baixou == [1]
     assert api.assets_cache_info()["expirado"]                      # mas o dado segue de ontem, e a tela continua dizendo
-    api.load_assets_cached()                                        # nem a renovação por trás insiste
-    assert not any(t.name == "os-catalogo-por-tras" for t in threading.enumerate()) and baixou == [1]
+    api.load_assets_cached()                                        # nem a renovação por trás insiste: nem chega a tentar
+    assert api._ASSETS_RENOVA["tentou"] == 0.0 and baixou == [1]
 
 
 def test_a_recusa_vale_para_quem_esperava_a_vez(monkeypatch):
@@ -829,7 +835,7 @@ def test_a_ponte_diz_onde_mora_a_copia_e_de_onde_ler_a_foto(tmp_path, monkeypatc
         ativos_banco.leitor(Fake(True))()
     pg = ApiPGFalsa()
     pg._id("nexus_ativos_fracttal", "foto_ativos")["linhas"] = [
-        {"headers": list(AC.CAB_FOTO), "values": [l[c] for c in AC.CAB_FOTO]} for l in FOTO_COM_RAIZ]
+        {"headers": list(AC.CAB_FOTO), "values": [l.get(c) for c in AC.CAB_FOTO]} for l in FOTO_COM_RAIZ]
     app = Fake(True)
     app.extensions["nexus_dados_sessao"] = pg
     linhas = ativos_banco.leitor(app)()

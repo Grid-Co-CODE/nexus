@@ -1,16 +1,18 @@
-"""Carga ÚNICA da foto de ativos do Fracttal para o banco (passo 6a do Kimball, 08/10/2026).
+"""MEDE a foto de ativos do Fracttal contra a dimensão de equipamento (passo 6a do Kimball, 08/10/2026). Não grava.
 
 A dimensão de equipamento (`nexus/dados/equipamento.py`) só pode nascer do que as duas máquinas leem igual, o banco. A
-lista completa de ativos do Fracttal só existe no cache que o OS Creator guardou em arquivo (o `assets_cache.json`, uma
-foto por leitura). Este script põe essa foto UMA vez em `nexus_ativos_fracttal · foto_ativos`; a carga de hora em hora
-lê dali e nunca o arquivo (o servidor tem outro, ou nenhum). Renovar a foto exige ler o Fracttal (a cota é da empresa):
-fica para fora do horário de campo, por decisão do Levi.
+lista completa de ativos do Fracttal existia só no cache que o OS Creator guardava em arquivo (o `assets_cache.json`, uma
+foto por leitura), e este script a pôs UMA vez em `nexus_ativos_fracttal · foto_ativos` (11/10/2026, com `--gravar`).
 
-Sem `--gravar`, só mede: monta a foto, lê o banco (GET) e o PCM público, monta a dimensão em memória e imprime
-contagens. Com `--gravar` (quem grava é o Levi), publica o livro da foto e confere a contagem relida.
+Desde 31/10/2026 a foto é renovada toda noite pelo leitor dos ativos do servidor (`nexus/torres/oscreator/os_creator/
+ativos_leitor.py`, a montagem e a gravação em `nexus/dados/foto_ativos.py`): uma máquina grava (regra 11 do
+`nexus/dados/CLAUDE.md`), e é o servidor. O `--gravar` saiu daqui por isso: gravar do PC por cima da renovação da noite
+trocaria a foto por um arquivo de outra máquina e apagaria a marca dos códigos que saíram do Fracttal.
+
+Ficou a medição: monta a foto dos arquivos, lê o banco (GET) e o PCM público, monta a dimensão em memória e imprime as
+contagens, ao lado das da foto que está no banco agora.
 
     python ferramentas/carregar_ativos_fracttal.py <foto_nova.json> [<foto_antiga.json>]
-    python ferramentas/carregar_ativos_fracttal.py <foto_nova.json> [<foto_antiga.json>] --gravar
 
 A foto antiga é opcional: dela entram só os códigos que a nova não tem (renomeados ou baixados), para o código antigo
 que um fato ainda carrega continuar sendo membro.
@@ -27,9 +29,8 @@ import requests  # noqa: E402
 
 from nexus.cadastro.ligacoes import BASE_API  # noqa: E402
 from nexus.dados import equipamento as eq  # noqa: E402
+from nexus.dados import foto_ativos  # noqa: E402
 from nexus.dados import livros  # noqa: E402
-
-CAB_ATUALIZACAO = ["gerado_em", "maquina", "duracao_s", "linhas", "como_ler"]
 
 
 def _ler_foto(caminho) -> dict:
@@ -60,35 +61,24 @@ def ensaio(base, sessao, foto: list[list]) -> dict:
 
 
 def main():
+    if "--gravar" in sys.argv:
+        raise SystemExit("o --gravar saiu (31/10/2026): a foto é renovada toda noite pelo leitor do servidor, e uma máquina "
+                         "grava (regra 11 do nexus/dados/CLAUDE.md). Este script só mede.")
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not args:
         raise SystemExit(__doc__)
     nova = _ler_foto(args[0])
     antiga = _ler_foto(args[1]) if len(args) > 1 else None
     foto = eq.foto_linhas(nova, antiga)
-    rel = {"foto_ativos": len(foto), "sem_codigo": sum(1 for l in foto if not l[1]),
-           "por_foto": {d: sum(1 for l in foto if l[5] == d) for d in sorted({l[5] for l in foto if l[5]})}}
+    rel = foto_ativos.contar(foto)
     s = requests.Session()
     base = (os.environ.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
-    if "--gravar" not in sys.argv:
-        rel["dimensao_em_ensaio"] = ensaio(base, s, foto)
-        rel["ensaio"] = "montado com o dado real; nada gravado"
-        print(json.dumps(rel, ensure_ascii=False, indent=1))
-        return
-    from nexus import create_app
-    config = create_app().config
-    base = (config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
-    ja = livros.ler(base, s, eq.LIVRO_FOTO, eq.ABA_FOTO)
-    if len(ja) > len(foto) and "--substituir" not in sys.argv:
-        # a gravação troca o livro inteiro: rodar de novo com uma foto só apagaria os códigos antigos
-        raise SystemExit(f"o banco já tem {len(ja)} linhas e esta foto tem {len(foto)}; nada gravado "
-                         "(use --substituir se for de propósito)")
-    agora = datetime.now(timezone(timedelta(hours=-3))).isoformat(timespec="seconds")
-    tabelas = {eq.ABA_FOTO: (eq.CAB_FOTO, foto),
-               "atualizacao": (CAB_ATUALIZACAO, [[agora, "pc", None, len(foto),
-                                                  "carga única; foto_em = o dia da leitura do Fracttal"]])}
-    rel["gravado"] = livros.publicar(eq.LIVRO_FOTO, eq.NOME_FOTO, tabelas, base=base,
-                                     token=config["GRIDCO_SQL_TOKEN"], sessao=s)
+    try:
+        rel["no_banco"] = foto_ativos.contar(foto_ativos.ler(base, s)[0])
+    except Exception as e:                                   # noqa: BLE001 — a medição segue sem a do banco
+        rel["no_banco"] = f"não li a foto do banco: {type(e).__name__}: {str(e)[:120]}"
+    rel["dimensao_em_ensaio"] = ensaio(base, s, foto)
+    rel["ensaio"] = "montado com o dado real; nada gravado"
     print(json.dumps(rel, ensure_ascii=False, indent=1))
 
 

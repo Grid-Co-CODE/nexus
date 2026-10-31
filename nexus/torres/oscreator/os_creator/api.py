@@ -321,9 +321,10 @@ _ASSETS_RECARGA = threading.Lock()      # uma recarga do Fracttal por vez (~110 
 def catalogo_vencido(cat) -> bool:
     """O catálogo foi conferido com o Fracttal há 24 h ou mais (`ASSETS_TTL`). Conferido é o `lido_em` dele OU a leitura
     completa que ele recusou depois (`ativos_central.conferido_em`): a recusa também foi uma ida de ~110 pedidos ao Fracttal, e
-    repeti-la a cada aprovação da Fila (e de 10 em 10 min por trás) só trazia o mesmo resultado, minutos depois. Vencido, o
-    catálogo continua servindo; só se renova."""
-    return time.time() - ativos_central.conferido_em(cat) >= ASSETS_TTL
+    repeti-la a cada aprovação da Fila (e de 10 em 10 min por trás) só trazia o mesmo resultado, minutos depois. O catálogo
+    que veio da foto do banco está SEMPRE vencido (o código da foto é o canônico, sem espaço, e ela é o socorro da máquina sem
+    cópia nenhuma: a 1ª leitura do Fracttal a troca). Vencido, o catálogo continua servindo; só se renova."""
+    return cat.fonte == "banco" or time.time() - ativos_central.conferido_em(cat) >= ASSETS_TTL
 
 
 def aviso_da_recusa() -> str:
@@ -337,6 +338,21 @@ def aviso_da_recusa() -> str:
     return "A leitura do Fracttal de %s não entrou: %s. Ficou o catálogo de antes." % (quando, r["motivo"])
 
 
+def ativos_de(cat=None, agora: float | None = None) -> str:
+    """"ativos de HH:MM" (Brasília) pela última vez que a lista foi comparada com o Fracttal (`ativos_central.visto_em`: a
+    lista inteira ou os novos do dia, a mais nova); de outro dia, "ativos de dd/mm HH:MM" (à 01:00, "de 02:20" seria lido
+    como a de hoje, que ainda não houve). Sem catálogo, "". É o que os três botões "Atualizar ativos" respondem na hora."""
+    cat = ativos_central.atual() if cat is None else cat
+    if cat is None:
+        return ""
+    visto = ativos_central.visto_em(cat)
+    if not visto:
+        return ""
+    quando = datetime.fromtimestamp(visto, _BR_TZ)
+    hoje = datetime.fromtimestamp(time.time() if agora is None else agora, _BR_TZ).date()
+    return "ativos de " + quando.strftime("%H:%M" if quando.date() == hoje else "%d/%m %H:%M")
+
+
 def _read_asset_cache():
     """O catálogo central como está, SEM a trava das 24 h e sem ir ao Fracttal (era o arquivo, vencido = None): a lista
     compartilhada, ou None se esta máquina ainda não tem catálogo nenhum. Para quem só precisa LER o que há (as frases do tipo,
@@ -346,44 +362,100 @@ def _read_asset_cache():
 
 
 def assets_cache_info() -> dict:
-    """De quando é o catálogo e quantos ativos ele tem. → {'ts': epoch|0, 'n': ativos, 'idade_h': float, 'expirado': bool}.
-    Serve para a aba Ativos dizer de QUANDO é a lista que está na tela — sem isso, "18.259 ativos" parece um número de agora
-    mesmo quando é de dez dias atrás. Lê o catálogo da memória (até 20/10/2026 decodificava o arquivo inteiro, 10,5 MB, a cada
-    chamada, e a tela inicial chama a cada 5 min)."""
+    """De quando é o catálogo e quantos ativos ele tem. → {'ts': epoch|0, 'n': ativos, 'idade_h': float, 'expirado': bool,
+    'ativos_de': "ativos de HH:MM", 'leitor': bool}. Serve para a aba Ativos dizer de QUANDO é a lista que está na tela — sem
+    isso, "18.259 ativos" parece um número de agora mesmo quando é de dez dias atrás. Lê o catálogo da memória (até 20/10/2026
+    decodificava o arquivo inteiro, 10,5 MB, a cada chamada, e a tela inicial chama a cada 5 min). O `ts` e o `expirado` são da
+    lista inteira (o "desatualizado" da tela inicial); o `ativos_de` conta também os novos do dia; `leitor` diz se o servidor
+    lê os ativos sozinho (os botões pedem só os novos)."""
     cat = ativos_central.atual()
     if cat is None:
-        return {"ts": 0, "n": 0, "idade_h": 0.0, "expirado": True}
+        return {"ts": 0, "n": 0, "idade_h": 0.0, "expirado": True, "ativos_de": "", "leitor": False}
     idade = max(0.0, time.time() - cat.lido_em)
-    return {"ts": cat.lido_em, "n": len(cat.lista), "idade_h": idade / 3600.0, "expirado": idade > ASSETS_TTL}
+    return {"ts": cat.lido_em, "n": len(cat.lista), "idade_h": idade / 3600.0,
+            "expirado": idade > ASSETS_TTL or cat.fonte == "banco", "ativos_de": ativos_de(cat),
+            "leitor": ativos_central.leitor_pronto()}
+
+
+ESPERA_NOVOS_S = 6     # s: quem espera os ativos novos do leitor do servidor (a aprovação da Fila, o "?novos=1" das telas)
 
 
 def load_assets_cached(force: bool = False, em_dia: bool = False) -> tuple:
     """Os ativos: a lista COMPARTILHADA do catálogo central (uma tupla de registros só de leitura, sem copiar), ou, sem catálogo
     nenhum nesta máquina, a recarga via RPC (sessão do usuário — sem OAuth), que entra no catálogo e na cópia em disco.
-    force=True ignora o que há (o botão Atualizar da tela de Ativos: o catálogo é um só, vale para todos).
 
-    VENCIDO (24/10/2026): devolve o de ontem na hora e baixa o novo por trás (`_renovar_catalogo_por_tras`). Em 23/10 às
-    10:44 o 1º a precisar do catálogo vencido baixou os ~22 mil ativos DENTRO do pedido: um "Criar OS" da Performance ficou 3
-    min 51 s em `get_assets` e o Histórico 1 min 52 s esperando o mesmo download. `em_dia=True` (resolver o ativo da OS na
-    aprovação) espera o novo, como antes; sem catálogo nenhum (nem a cópia em disco, nem o arquivo antigo, nem a foto do
-    banco), também.
+    COM O LEITOR DO SERVIDOR (31/10/2026, tarefa 2.2 do canto central; `ativos_leitor.py`, que só o `servir.py` liga, e só com a
+    leitura REST da noite conferida contra o catálogo): ninguém mais espera o Fracttal inteiro. `force=True` (os três botões
+    "Atualizar ativos") pede ao leitor os ativos NOVOS por trás e volta na hora com o catálogo de agora; `em_dia=True` (a
+    aprovação da Fila) espera essa leitura curta até `ESPERA_NOVOS_S` (estourou, segue com o que tem) em vez do RPC completo.
+    Vencido (a leitura da noite falhou ou foi recusada), o catálogo ainda é renovado por trás pelo RPC, uma vez, com a sessão de
+    quem pediu: o socorro de sempre.
 
-    A RECUSA É LEMBRADA (revisão 1 da tarefa 2.1). A recarga que o tamanho recusa (menor que a de agora em mais de 5%: o RPC que
-    perde páginas em silêncio) não troca nada, mas conta como conferida: o catálogo só vence 24 h depois dela, quem esperou a vez
-    usa a leitura de quem baixou (entrando ou não) e o `force` (o botão) dentro de `ASSETS_ESPERA_TENTATIVA` depois dela devolve
-    o catálogo de agora, sem baixar de novo. Antes, cada aprovação da Fila, depois das 24 h, baixava os ~110 pedidos de novo, e
-    o download por trás repetia de 10 em 10 min. O motivo vai a `estado()["recusa"]` e aos botões (`aviso_da_recusa`)."""
+    SEM O LEITOR (o PC, os testes, a paridade que falhou): como era. force=True ignora o que há e baixa (o catálogo é um só, vale
+    para todos). VENCIDO (24/10/2026): devolve o de ontem na hora e baixa o novo por trás (`_renovar_catalogo_por_tras`). Em
+    23/10 às 10:44 o 1º a precisar do catálogo vencido baixou os ~22 mil ativos DENTRO do pedido: um "Criar OS" da Performance
+    ficou 3 min 51 s em `get_assets` e o Histórico 1 min 52 s esperando o mesmo download. `em_dia=True` espera o novo, como
+    antes; sem catálogo nenhum (nem a cópia em disco, nem o arquivo antigo, nem a foto do banco), também.
+
+    A RECUSA E A FALHA SÃO LEMBRADAS: ver `_baixar_pelo_rpc`."""
+    cat = ativos_central.atual()            # o boot local (o disco), que traz também a paridade de antes do reinício
+    por_tras = _POR_TRAS.get()
+    if not por_tras and ativos_central.leitor_pronto():
+        cat = cat or ativos_central.garantir()
+        if cat is not None:
+            if force:
+                ativos_central.pedir_novos()
+            elif em_dia:
+                ativos_central.esperar_novos(ESPERA_NOVOS_S)
+                cat = ativos_central.atual() or cat
+            if catalogo_vencido(cat):
+                _renovar_catalogo_por_tras()
+            return cat.lista
     if not force:
-        cat = ativos_central.garantir()
+        cat = cat or ativos_central.garantir()
         if cat is not None:
             vencido = catalogo_vencido(cat)
             if not vencido or not em_dia:
                 if vencido:
                     _renovar_catalogo_por_tras()
                 return cat.lista
+    return _baixar_pelo_rpc(force, por_tras=por_tras)
+
+
+# a thread da renovação por trás (`_renovar_catalogo_por_tras`) marca o contexto dela: o download dela é o RPC (o socorro), e
+# não os novos do leitor, e ela tem a janela própria de tentativas (a falha lembrada não a segura)
+_POR_TRAS = contextvars.ContextVar("api_catalogo_por_tras", default=False)
+
+
+def esperar_os_novos() -> bool:
+    """A tela que acabou de pedir os novos ("Atualizar ativos", e volta com `?novos=1`) espera a leitura que está em curso, até
+    `ESPERA_NOVOS_S`, antes de ler o catálogo: o botão respondeu na hora, e a lista seguinte já vem com os novos."""
+    return ativos_central.esperar_novos(ESPERA_NOVOS_S, so_em_curso=True)
+
+
+def _baixar_pelo_rpc(force: bool = False, por_tras: bool = False) -> tuple:
+    """O download do catálogo pelo RPC, um por vez (`_ASSETS_RECARGA`).
+
+    A RECUSA É LEMBRADA (revisão 1 da tarefa 2.1). A recarga que o tamanho recusa (menor que a de agora em mais de 5%: o RPC que
+    perde páginas em silêncio) não troca nada, mas conta como conferida: o catálogo só vence 24 h depois dela, quem esperou a vez
+    usa a leitura de quem baixou (entrando ou não) e o `force` (o botão) dentro de `ASSETS_ESPERA_TENTATIVA` depois dela devolve
+    o catálogo de agora, sem baixar de novo. Antes, cada aprovação da Fila, depois das 24 h, baixava os ~110 pedidos de novo, e
+    o download por trás repetia de 10 em 10 min. O motivo vai a `estado()["recusa"]` e aos botões (`aviso_da_recusa`).
+
+    A FALHA TAMBÉM (2.2): o download que levantou (Fracttal fora, cota estourada) fica anotado (`ativos_central.anotar_falha`).
+    Quem esperava a vez na trava enquanto ele falhava não tenta de novo em fila (N aprovações juntas não viram N leituras), e o
+    `force` e o `em_dia` que chegarem dentro de `ASSETS_ESPERA_TENTATIVA` depois dela devolvem o catálogo de agora (sem
+    catálogo nenhum, o erro). A renovação por trás (`por_tras`) tem a janela dela (`_ASSETS_RENOVA`) e não olha esta."""
     pedido = time.time()
     with _ASSETS_RECARGA:
         cat = ativos_central.atual()
+        falhou = ativos_central.falha()
+        if falhou and falhou.get("fonte") == "rpc" and (
+                falhou["em"] >= pedido or (not por_tras and time.time() - falhou["em"] < ASSETS_ESPERA_TENTATIVA)):
+            if cat is not None:
+                return cat.lista
+            raise FracttalError("O Fracttal não deu os ativos há pouco (%s); tente de novo em alguns minutos."
+                                % falhou.get("erro"))
         if cat is not None:
             # quem esperou a recarga de outro pedido usa a dela: o Fracttal foi lido depois deste pedido (e a leitura entrou
             # no catálogo ou foi recusada, tanto faz: baixar de novo traria o mesmo)
@@ -392,31 +464,41 @@ def load_assets_cached(force: bool = False, em_dia: bool = False) -> tuple:
             recusa = ativos_central.recusa_vigente(cat) if force else None
             if recusa is not None and time.time() - recusa["lido_em"] < ASSETS_ESPERA_TENTATIVA:
                 return cat.lista            # o botão logo depois de uma recusa: o Fracttal deu a mesma lista, não se baixa de novo
-        assets = get_assets()
+        try:
+            assets = get_assets()
+        except Exception as e:
+            ativos_central.anotar_falha("rpc", e)
+            raise
+        ativos_central.anotar_falha("rpc", None)
         ativos_central.trocar(assets, "rpc")        # entra, ou é recusada (fica em estado()["recusa"] e conta como conferida)
         cat = ativos_central.atual()
         return cat.lista if cat is not None else tuple(assets)
 
 
 ASSETS_ESPERA_TENTATIVA = 600     # s: o download por trás que falhou (Fracttal fora, cota) só tenta de novo depois disto, e o
-#                                   botão "Atualizar ativos" logo depois de uma leitura recusada não baixa de novo
+#                                   botão "Atualizar ativos" logo depois de uma leitura recusada (ou que falhou) não baixa de novo
 _ASSETS_RENOVA = {"tentou": 0.0}
 _ASSETS_RENOVA_TRAVA = threading.Lock()
 
 
 def _renovar_catalogo_por_tras() -> None:
-    """Baixa o catálogo vencido numa thread, com a sessão de quem pediu (a cópia do contexto leva o JWT). Uma thread por
-    ASSETS_ESPERA_TENTATIVA (a que achar outro download em curso espera a vez e usa o dele: `load_assets_cached`), e a
-    que falhou só tenta de novo depois disso."""
+    """Baixa o catálogo vencido pelo RPC numa thread, com a sessão de quem pediu (a cópia do contexto leva o JWT). Uma thread por
+    ASSETS_ESPERA_TENTATIVA (a que achar outro download em curso espera a vez e usa o dele: `_baixar_pelo_rpc`), e a que falhou
+    só tenta de novo depois disso. Com o leitor do servidor ligado, é o socorro da noite que não entrou: a marca `_POR_TRAS`
+    no contexto da thread faz o `load_assets_cached(True)` dela ir ao RPC, e não pedir os novos ao leitor."""
     with _ASSETS_RENOVA_TRAVA:
         if time.time() - _ASSETS_RENOVA["tentou"] < ASSETS_ESPERA_TENTATIVA:
             return
         _ASSETS_RENOVA["tentou"] = time.time()
     ctx = contextvars.copy_context()
 
+    def baixar():
+        _POR_TRAS.set(True)
+        return load_assets_cached(True)
+
     def rodar():
         try:
-            ctx.run(load_assets_cached, True)
+            ctx.run(baixar)
         except Exception:                               # noqa: BLE001 — fica o de ontem; o próximo pedido tenta depois
             pass
     threading.Thread(target=rodar, name="os-catalogo-por-tras", daemon=True).start()

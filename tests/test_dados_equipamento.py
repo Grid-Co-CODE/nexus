@@ -25,13 +25,16 @@ USINAS = [{"usina_id": 1, "codigo": "XYZ-DEF100"}, {"usina_id": 2, "codigo": "AB
 TS_SET, TS_JUN = 1790080133.0, 1782094111.0
 
 
-def _a(i, code, pai=0, tipo=None, desc=None):
+def _a(i, code, pai=1, tipo=None, desc=None):
     return {"id": i, "code": code, "id_parent": pai, "tipo_code": tipo,
             "description": desc if desc is not None else f"Item {i}    {{ {code} }}"}
 
 
+# como no Fracttal, todo item tem pai, menos a raiz do cliente (o item 1): a foto renovada toda noite a traz, e ela não é
+# equipamento (`membros` a pula; a dimensão é a mesma de quando a foto não a tinha)
+RAIZ = _a(1, "CLI", pai=None, desc="Cliente Exemplo")
 FOTO_SET = {"ts": TS_SET, "assets": [
-    _a(10, "XYZ-DEF100", tipo="USINA"), _a(11, "XYZ-DEF100-INVR11.1", 10, "INVR"),
+    RAIZ, _a(10, "XYZ-DEF100", tipo="USINA"), _a(11, "XYZ-DEF100-INVR11.1", 10, "INVR"),
     _a(12, "ABC100-INVR2.4", 13, "INVR"), _a(13, "ABC100-SKID2", tipo="SKID"), _a(14, "Transformador 2", tipo="TRFR"),
     _a(15, "340", tipo="USINA"), _a(16, "", desc="sem código"), _a(17, "GHI100-ETKR1.1", tipo="ETKR"),
     _a(18, "XYZ-JKL100-ETKR1.1", tipo="ETKR")]}
@@ -146,8 +149,9 @@ def test_foto_nova_inteira_mais_os_codigos_que_so_a_velha_tem():
 def test_membros_pai_familia_e_o_codigo_so_das_fontes():
     d = _dim()
     assert "GRID" not in d and "" not in d                                    # não é equipamento
-    assert set(d) == {eq.canon(a["code"]) for f in (FOTO_SET, FOTO_JUN) for a in f["assets"] if a["code"]} | {
-        "ABC100-INVR3.1"}
+    assert set(d) == {eq.canon(a["code"]) for f in (FOTO_SET, FOTO_JUN) for a in f["assets"]
+                      if a["code"] and a["id_parent"]} | {"ABC100-INVR3.1"}
+    assert "CLI" not in d                                                     # a raiz do cliente não é equipamento
     inv = d["XYZ-DEF100-INVR11.1"]
     assert (inv["usina_id"], inv["usina_ligada_por"], inv["motivo_sem_usina"]) == (1, "código cheio", None)
     assert (inv["familia"], inv["tipo_fracttal"], inv["fracttal_item_id"]) == ("INVR", "INVR", 11)
@@ -161,6 +165,28 @@ def test_membros_pai_familia_e_o_codigo_so_das_fontes():
         11, "2026-06-21", eq.equipamento_id("XYZ-DEF100"))
     assert (d["GHI100-ETKR1.1"]["usina_id"], d["GHI100-ETKR1.1"]["motivo_sem_usina"]) == (None, "código de 2+ usinas")
     assert d["340"]["pai_id"] is None and d["340"]["familia"] is None
+
+
+def test_a_raiz_do_cliente_nao_e_membro_e_a_dimensao_nao_muda():
+    """A foto renovada (31/10/2026) traz a raiz de cada cliente (a linha sem pai) e as colunas novas no fim; a de 11/10 não
+    tinha nenhuma linha sem pai. A raiz não vira membro nem é o pai de ninguém: a dimensão (e o sha dela) fica igual."""
+    sem_raiz = [f for f in _foto() if f["pai_item_id"]]
+    com_raiz = _foto() + [dict(zip(eq.CAB_FOTO, [2, "OUTRO", "Outro Cliente", None, None, "2026-10-31", 1, None, None]))]
+    assert len(com_raiz) == len(sem_raiz) + 2
+    assert eq.membros(com_raiz, FONTES, USINAS) == eq.membros(sem_raiz, FONTES, USINAS)
+    args = (FONTES, USINAS, TRACKERS, GEMEO, COLUNAS)
+    assert (eq.montar(com_raiz, *args, agora="t", maquina="pc")[1]["sha_linhas"]
+            == eq.montar(sem_raiz, *args, agora="t", maquina="pc")[1]["sha_linhas"])
+
+
+def test_o_codigo_que_esta_no_fracttal_vence_o_que_saiu():
+    """O mesmo código em duas linhas (o item 11 renomeado e o código reaproveitado por outro item): o membro é o da linha que
+    está no Fracttal, mesmo com o `foto_em` igual e o item maior."""
+    foto = [f for f in _foto() if f["codigo"] != "XYZ-DEF100-INVR11.1"]
+    foto += [dict(zip(eq.CAB_FOTO, [5, "XYZ-DEF100-INVR11.1", "Velho", 10, "INVR", "2026-10-31", None, None, 20261031])),
+             dict(zip(eq.CAB_FOTO, [90, "XYZ-DEF100-INVR11.1", "Novo", 10, "INVR", "2026-10-31", 2, None, None]))]
+    d = {m[1]: dict(zip(eq.CAB_DIM, m)) for m in eq.membros(foto, {}, USINAS)}
+    assert (d["XYZ-DEF100-INVR11.1"]["fracttal_item_id"], d["XYZ-DEF100-INVR11.1"]["descricao"]) == (90, "Novo")
 
 
 def test_membros_sem_a_foto_no_banco_ficam_so_os_codigos_das_fontes():

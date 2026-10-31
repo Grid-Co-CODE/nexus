@@ -44,7 +44,7 @@ disco e da memória do servidor, e amanhã, depois das 03:45, está no banco.
 | **Por hora do dia:** os cliques e o pico por minuto de cada hora (soma dos 7 dias, hora de Brasília) | a forma do dia: as horas em que o OS Creator pesa e as em que a cota aperta | trocar um horário de carga ou de varredura para fora da hora de pico; o :05 da gravação do próprio uso já está fora dos laços de hora em hora do Nexus |
 | **As 15 telas:** muitos "Automáticos" e poucos "Cliques" | a tela pede sozinha (a sessão a cada 5 min, o Histórico a cada 10, as Solicitações a cada 15), e cada aba aberta soma | é custo fixo de quem deixa a aba aberta, não de quem usa: não conta como uso, e o que reduz é pedir menos vezes ou só com a aba à frente |
 | **As 15 telas:** mediana baixa e p95 muito mais alto | a tela é rápida quando o Fracttal responde e lenta quando ele demora ou recusa | cruzar com "Ocupado (503)" (o teto de 16 threads recusou) e com os recusados do dia |
-| **As 15 telas:** "Pedidos ao Fracttal" alto para poucos cliques | uma abertura da tela faz muitos pedidos (o catálogo de ativos pede ~110) | é o candidato à cópia guardada e à releitura por trás (as etapas seguintes do canto central) |
+| **As 15 telas:** "Pedidos ao Fracttal" alto para poucos cliques | uma abertura da tela faz muitos pedidos (o catálogo de ativos pedia ~110 pelo RPC) | é o candidato à cópia guardada e à releitura por trás (as etapas seguintes do canto central). O catálogo de ativos já é (31/10/2026): o servidor o lê às 02:15 (`fundo:nexus-ativos-leitor`, ~270 pedidos a 1 por segundo) e os novos de 30 em 30 min; um RPC de ~110 pedidos numa tela depois disso é a noite que não entrou (README do OS Creator, "O leitor do servidor") |
 | **Antes e depois:** o mesmo dia da semana, comparando o total de pedidos ao Fracttal e o maior pico | se a mudança aliviou a cota de verdade, em número e não em sensação | anotar o dia do deploy; a etapa 0 dá o antes |
 | "Sem medição ainda" | o servidor ainda não guardou a 1ª hora (ela chega ao disco no :05 da hora seguinte ao deploy, e ao banco às 03:45), o banco não respondeu ou é o PC (que não mede) | a frase diz qual; com o banco fora, a seção mostra só o que o servidor guarda, o disco e a memória |
 
@@ -173,7 +173,8 @@ total da hora (1 linha por hora), e o pico do total não é a soma dos picos de 
   fria por chave; `VAGAS_BANCO`; `manter_quente`; `carregar`: a pré-leitura).
 - Pré-carga `nexus/auth/pre_carga.py`; portão e acessos `nexus/auth/__init__.py` e `nexus/auth/acessos.py`.
 - OS Creator: `nexus/torres/oscreator/os_creator/` (`api.py` fala com o Fracttal; `os_web/rotas.py` e o `_memo`;
-  `historico_store.py`; `rotas_acomp.py`). Regras no `nexus/torres/oscreator/README.md`.
+  `historico_store.py`; `rotas_acomp.py`; o catálogo de ativos central `ativos_central.py` e o leitor do servidor
+  `ativos_leitor.py`, que lê os ativos de madrugada). Regras no `nexus/torres/oscreator/README.md`.
 - Medir uma tela fria: num processo novo, `create_app` com o `.env` do Nexus vivo e uma senha de administrador
   descartável, contando o `requests.Session.request` e recusando o Fracttal (só leitura no banco).
 - A skill `desempenho` (`.claude/skills/desempenho/SKILL.md`, desde 30/10/2026): o gatilho e o atalho `/desempenho`

@@ -248,6 +248,12 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   `teto_os.do_os_creator(environ)` é a régua única de "pedido do OS Creator" (do teto e do uso).
 - **No OS Creator** (README da torre, 14/10/2026): a tela inicial não espera mais o selo do Fracttal, e as contagens da
   Performance ficam 6 h na memória.
+- **O leitor dos ativos do OS Creator** (`os_creator/ativos_leitor.py`, 31/10/2026, etapa 2 do canto central; regras no
+  README da torre, "O leitor do servidor"): ligado no servir.py, por último, pelo `ponte.modulo_do_clone` (o MESMO módulo
+  que as telas importam; por outro caminho seria um segundo catálogo na memória). Sem a credencial REST do Fracttal não
+  liga, e o estado diz por quê. Duas threads: `nexus-ativos-leitor` (o laço: o Fracttal inteiro às 02:15, ~270 pedidos a 1
+  por segundo, e os novos às :08 e :38 das 06h às 22h) e `nexus-ativos-novos` (os novos que os botões pedem). No contador
+  do Fracttal elas aparecem como `fundo:nexus-ativos-leitor` e `fundo:nexus-ativos-novos`. Nunca o `app.py` nem os testes.
 
 ## Pedidos ao Fracttal: o contador (31/10/2026)
 
@@ -367,7 +373,7 @@ gravar=True)`); o `create_app`, o PC e os testes seguem sem ele.
      `gravou_em`, as linhas gravadas saem do pendente (memória e disco) e `salvar()` roda. **Deu errado** (banco fora,
      leitura curta do livro, sem a `GRIDCO_SQL_TOKEN`): o pendente fica no disco e a gravação do dia seguinte leva tudo.
   O 03:45 e o :05 não caem em cima de nenhum laço de hora em hora do Nexus (tarefas :10 a :20, normalizações :22, sync do App
-  :25, zeladoria :32, carga :40, chamados :50). **O pendente tem teto de 3 dias** (`MAX_HORAS_PENDENTES` = 72 horas, as mais
+  :25, zeladoria :32, carga :40, chamados :50; os ativos do OS Creator às :08 e :38 das 06h às 22h e às 02:15). **O pendente tem teto de 3 dias** (`MAX_HORAS_PENDENTES` = 72 horas, as mais
   novas): as mais velhas saem, com aviso no log. **Reinício:** o pendente é relido no boot (arquivo quebrado é ignorado, com
   aviso, e a linha ruim é ignorada sem levar as boas; a mesma chave que o parcial velho traz de volta fica uma só, a mais
   nova: sem isso o grão quebraria e a gravação subiria para sempre). **O que um reinício perde:** só a hora aberta do contador

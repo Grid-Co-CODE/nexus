@@ -287,6 +287,15 @@ semana que o arquivo do PCM ainda traz é trocada, as antigas ficam). Liga sozin
 (o pacote tem). Precisa também da `NEXUS_CHAVE_CADASTRO` (sem ela o técnico e o responsável da programação saem vazios)
 e da `NEXUS_PESSOA_HMAC` (sem ela a pessoa dos fatos do App não liga).
 
+**Os ativos do Fracttal, de madrugada (31/10/2026; nada a fazer no servidor).** O `servir.py` liga o leitor dos ativos do
+OS Creator (`nexus/torres/oscreator/os_creator/ativos_leitor.py`): às 02:15 ele lê o Fracttal inteiro pelo REST, com a
+mesma credencial do Campo · App e do motor do PCM (`FRACTTAL_CLIENT_ID` e `FRACTTAL_CLIENT_SECRET`, no ambiente ou no
+`.env`; sem ela o leitor não liga e tudo segue como antes), confere a leitura contra o catálogo do OS Creator e, se ela
+vale, troca o catálogo e renova a `nexus_ativos_fracttal · foto_ativos` no banco (só quando o sha das linhas muda); das
+06h às 22h, às :08 e :38, só os ativos novos. É a única máquina que grava a foto (a ferramenta
+`ferramentas/carregar_ativos_fracttal.py` ficou só com a medição). A 1ª noite depois do deploy é a conferência REST x RPC:
+o resultado fica em `ativos_central.estado()["paridade_rest"]` e na `ativos_estado.json` da pasta de dados do OS Creator.
+
 **Na 1ª carga depois da atualização de 08/10/2026** entram no banco, pela primeira vez, o `fato_ronda`, o `fato_pt`, o
 livro `nexus_equipamentos` e a mescla da programação; o histórico de pessoas e usinas passa a começar "desde sempre"
 (`inicio_presumido = 1` na 1ª versão de cada uma). Conferir em Base → Governança de dados, uma hora depois do restart:

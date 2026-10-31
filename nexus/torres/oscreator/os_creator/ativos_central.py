@@ -24,27 +24,35 @@ COMO É AGORA:
   lido UMA vez como migração se a cópia nova não existe (e já grava a nova); (3) a foto dos ativos no banco
   (`nexus_ativos_fracttal · foto_ativos`), se o Nexus ligou uma função que a lê (`ligar_fonte_do_banco`; este módulo não
   conhece a configuração do banco). Sem nenhuma das três, o catálogo nasce do primeiro download (`trocar(..., "rpc")`).
-- A troca recusa a lista vazia, a que encolhe mais de 5% (`ENCOLHE_MAX`) contra a de agora e a leitura mais velha que o
-  catálogo de agora com conteúdo diferente: o download do RPC pelas páginas perde 200 ativos em silêncio quando uma página vem
-  sem lista, e "número pela metade não vai para a tela". O motivo da última recusa fica em `estado()`.
+- A troca recusa a lista vazia, a que encolhe mais de 5% (`ENCOLHE_MAX`) contra a de agora e, só da foto do banco e do disco
+  (o `lido_em` veio escrito), a leitura mais velha que o catálogo de agora com conteúdo diferente: o download do RPC pelas
+  páginas perde 200 ativos em silêncio quando uma página vem sem lista, e "número pela metade não vai para a tela". O motivo da
+  última recusa fica em `estado()`.
 - A RECUSA É LEMBRADA (revisão 1 da tarefa 2.1): a leitura completa que o Fracttal deu e o catálogo recusou (a que encolheu)
-  também foi uma ida ao Fracttal, de ~110 pedidos. `conferido_em(cat)` é o mais novo entre o `lido_em` do catálogo e essa
-  leitura, e é por ele que o `api` decide se o catálogo venceu: sem isso, passadas as 24 h, cada aprovação da Fila baixava tudo
-  de novo (minutos na frente de quem aprovava) e o download por trás repetia de 10 em 10 min, com o mesmo resultado.
+  também foi uma ida ao Fracttal, de ~110 a ~270 pedidos. `conferido_em(cat)` é o mais novo entre o `lido_em` do catálogo e
+  essa leitura, e é por ele que o `api` decide se o catálogo venceu: sem isso, passadas as 24 h, cada aprovação da Fila baixava
+  tudo de novo (minutos na frente de quem aprovava) e o download por trás repetia de 10 em 10 min, com o mesmo resultado. Desde
+  a 2.2 ela sobrevive ao reinício (`ativos_estado.json`, ao lado da cópia em disco, com a última paridade do REST): o servidor
+  reinicia ~10 vezes por dia e, só na memória, cada deploy releria o Fracttal uma vez e a confirmação abaixo nunca chegaria.
+- O ENCOLHIMENTO CONFIRMADO (2.2): o Fracttal que perdeu ativos de verdade (uma usina que saiu da carteira) seria recusado para
+  sempre. A troca que encolhe passa quando o MESMO conjunto de ativos sai do catálogo em duas leituras completas de caminhos
+  diferentes (REST e RPC) ou do mesmo caminho com 20 h ou mais entre elas, sem leitura aceita no meio (o conjunto é o que SAI,
+  e não a lista inteira: os novos do dia entrariam entre as duas e a confirmação nunca viria); `estado()["encolhimento"]` diz.
+  No servidor fecha sozinho: a leitura REST da noite seguinte (24 h depois) é o mesmo caminho com mais de 20 h; com o leitor
+  desligado ou recusado, o catálogo vence em 24 h e a 1ª sessão do dia lê pelo RPC (o outro caminho).
 - Cada versão tem um sha das linhas ordenadas (`versao`), calculado ANTES de montar qualquer coisa: a mesma lista lida de novo
   (o caso comum da renovação diária) não monta nada, só renova o `lido_em`.
+- OS NOVOS DO DIA (`acrescentar`, 2.2): o leitor do servidor lê de 30 em 30 min só os ativos criados depois do maior id do
+  catálogo e os soma ao catálogo de agora, trocado inteiro como sempre. O `lido_em` NÃO anda com eles (não é a lista inteira
+  conferida: o que saiu ou mudou só a leitura da noite vê); anda o `novos_em`, e a tela diz "ativos de HH:MM" pelo mais novo dos
+  dois (`visto_em`).
 
 O FRESCOR (`lido_em`, quando a lista foi conferida com a fonte) é decidido por quem usa: o `api.load_assets_cached` serve o
-que há e renova por trás o que passou de 24 h. Este módulo só guarda e entrega.
+que há e renova por trás o que passou de 24 h. Este módulo só guarda e entrega. O leitor do servidor (`ativos_leitor.py`, que só
+o `servir.py` liga) se registra aqui (`ligar_leitor`), e o `api` o chama sem importá-lo: o PC e os testes seguem sem ele.
 
-A FOTO DO BANCO COMO CATÁLOGO (a 3ª fonte) tem um limite real, medido em 31/10/2026 na foto de 22/09: ela foi carregada do
-`assets_cache.json`, que já tinha jogado fora a raiz de cada cliente (o item sem pai, que o `montar_registros` ignora), então
-nenhuma linha dela chega à raiz pela cadeia de pais, e o nome do cliente (o 1º trecho do `parent_description`) só existe na
-raiz. Tirar o cliente do prefixo do nome da usina acerta 74% dos ativos (128 das 189 usinas com equipamento) e erra 6 dos 16
-clientes (a carteira com outro nome); e o "Almoxarifado" e o "TESTE - PA" (`CLIENTES_OCULTOS`) deixariam de ser reconhecidos e
-apareceriam nas cascatas com nomes inventados. Por isso `registros_da_foto` RECUSA a foto cujas linhas não chegam à raiz
-(`FotoIncompleta`): a fonte fica ligada, o motivo aparece em `estado()["banco"]`, e ela passa a servir sozinha quando a foto
-vier com a raiz (a renovação pela leitura do Fracttal, etapa 2.2 do mesmo plano).
+A FOTO DO BANCO COMO CATÁLOGO (a 3ª fonte) e o caminho montado pela cadeia de pais moram em `ativos_foto.py` (o limite medido
+da foto de 22/09, sem a raiz de cada cliente, está no topo de lá); daqui só se lê `registros_da_foto` e `FotoIncompleta`.
 """
 from __future__ import annotations
 
@@ -53,7 +61,6 @@ import hashlib
 import json
 import logging
 import os
-import re
 import sys
 import threading
 import time
@@ -71,17 +78,19 @@ _RAIZ_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _RAIZ_REPO not in sys.path:
     sys.path.append(_RAIZ_REPO)
 from chamado_garantia.ativos import tipo_e_sufixo  # noqa: E402
+from ativos_foto import CAB_FOTO, FotoIncompleta, registros_da_foto  # noqa: E402,F401 — a foto como catálogo (o api e os testes)
 
 log = logging.getLogger("oscreator.ativos_central")
 
 FORMATO = 1                     # o formato do arquivo em disco; outro número = arquivo de outra versão do código, ignorado
 FORMATO_LEGADO = 2              # o "ver" do assets_cache.json antigo (v2 = + id_parent/id_type_item/id_group_task)
 NOME_ARQUIVO = "ativos.json.gz"
+NOME_ESTADO = "ativos_estado.json"   # a recusa lembrada e a última paridade do REST, ao lado da cópia (sobrevivem ao reinício)
 FONTES = ("banco", "rest", "rpc", "disco")
 ENCOLHE_MAX = 5                 # % que a lista nova pode ser menor que a de agora; mais que isto, a troca é recusada
+CONFIRMA_MESMO_CAMINHO_S = 20 * 3600   # o encolhimento lido duas vezes pelo MESMO caminho só vale com isto entre as leituras
 ESPERA_BANCO_S = 600            # a foto do banco que falhou ou veio incompleta só é lida de novo depois disto
 REGRAVAR_DISCO_S = 3600         # a mesma lista lida de novo regrava o disco (o `lido_em` dele não fica para trás) a cada hora
-ORFAOS_MAX_PCT = 1.0            # % das linhas da foto que podem apontar para um pai ausente (dado torto) sem recusar a foto
 _BRT = timezone(timedelta(hours=-3))
 
 # Os campos de texto que se repetem em milhares de registros (17 clientes, ~190 usinas, ~60 tipos): uma string só para cada
@@ -220,8 +229,9 @@ class Catalogo:
     `por_id` e `por_codigo` (o 1º de cada), `por_cliente` e `por_cliente_usina` (tuplas na ordem da lista),
     `local_por_codigo` ({código: (cliente, usina curta, tipo)}, o antigo `api._code_loc`) e `tipos` ([(tipo, n)] do mais
     comum ao menos); `n_com_codigo` é quantos registros têm código, os repetidos inclusive (a conta da tela de Ativos e da
-    inicial; `len(por_codigo)` são os códigos distintos). `versao` é o sha das linhas ordenadas; `lido_em`, quando a lista foi
-    conferida com a fonte dela; `fonte`, de onde veio (banco, rest, rpc ou disco)."""
+    inicial; `len(por_codigo)` são os códigos distintos). `versao` é o sha das linhas ordenadas; `lido_em`, quando a lista
+    INTEIRA foi conferida com a fonte dela; `fonte`, de onde veio (banco, rest, rpc ou disco); `novos_em`, a última leitura dos
+    ativos novos do dia (`acrescentar`; 0 = nenhuma desde a lista inteira)."""
     lista: tuple
     por_id: Mapping
     por_codigo: Mapping
@@ -233,6 +243,7 @@ class Catalogo:
     versao: str
     lido_em: float
     fonte: str
+    novos_em: float = 0.0
 
 
 def _ordem(r) -> tuple:
@@ -257,7 +268,7 @@ def _versao(copias) -> str:
     return h.hexdigest()
 
 
-def _indexar(copias, versao: str, fonte: str, lido_em: float) -> Catalogo:
+def _indexar(copias, versao: str, fonte: str, lido_em: float, novos_em: float = 0.0) -> Catalogo:
     """O catálogo pronto a partir das cópias já consertadas: na ordem do catálogo, uma string só para cada cliente, usina,
     tipo e caminho, cada registro só de leitura e os índices. CONSOME a lista que recebe (cada cópia vira `Registro` no lugar
     dela, para as duas não existirem juntas)."""
@@ -300,7 +311,7 @@ def _indexar(copias, versao: str, fonte: str, lido_em: float) -> Catalogo:
         por_cliente=MappingProxyType({k: tuple(v) for k, v in por_cliente.items()}),
         por_cliente_usina=MappingProxyType({k: tuple(v) for k, v in por_cu.items()}),
         local_por_codigo=MappingProxyType(local), tipos=tuple(n_tipo.most_common()), n_com_codigo=n_com_codigo,
-        versao=versao, lido_em=float(lido_em), fonte=fonte)
+        versao=versao, lido_em=float(lido_em), fonte=fonte, novos_em=float(novos_em))
 
 
 def _montar(registros, fonte: str, lido_em: float) -> Catalogo:
@@ -321,8 +332,16 @@ _CONFIG: dict = {"pasta": None, "legado": None}
 _BOOT = {"local": False}
 _FONTE_BANCO: dict = {"func": None}
 _BANCO = {"tentou": 0.0}
-_ESTADO: dict = {"recusa": None, "recusa_completa": None, "paridade_rest": None, "banco": None,
-                 "disco": {"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None}}
+# o leitor do servidor (`ativos_leitor.ligar`, só pelo servir.py): as funções dele, que o `api` chama por aqui sem importá-lo
+_LEITOR: dict = {"pedir_novos": None, "esperar_novos": None, "estado": None}
+
+
+def _estado_limpo() -> dict:
+    return {"recusa": None, "recusa_completa": None, "paridade_rest": None, "banco": None, "encolhimento": None,
+            "falha": None, "disco": {"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None}}
+
+
+_ESTADO: dict = _estado_limpo()
 
 
 def configurar(pasta: str | None, legado: str | None = None) -> None:
@@ -342,7 +361,7 @@ def ligar_fonte_do_banco(func) -> None:
 
 def reiniciar(pasta: str | None = None, legado: str | None = None) -> None:
     """Volta ao estado de um processo recém-subido (para os testes e para quem reconfigura): sem catálogo, sem recusa, sem a
-    fonte do banco, e com a pasta e o arquivo antigo que vierem."""
+    fonte do banco, sem o leitor, e com a pasta e o arquivo antigo que vierem."""
     global _ATUAL
     with _TRAVA:
         _ATUAL = None
@@ -350,8 +369,51 @@ def reiniciar(pasta: str | None = None, legado: str | None = None) -> None:
         _BOOT["local"] = False
         _FONTE_BANCO["func"] = None
         _BANCO["tentou"] = 0.0
-        _ESTADO.update(recusa=None, recusa_completa=None, paridade_rest=None, banco=None,
-                       disco={"lido": None, "gravado_em": 0.0, "lido_em": 0.0, "erro": None})
+        _LEITOR.update(pedir_novos=None, esperar_novos=None, estado=None)
+        _ESTADO.clear()
+        _ESTADO.update(_estado_limpo())
+
+
+# ── o leitor do servidor ───────────────────────────────────────────────────────────────────────────────────────────────
+def ligar_leitor(*, pedir_novos=None, esperar_novos=None, estado=None) -> None:
+    """O leitor dos ativos do servidor (`ativos_leitor.ligar`) se registra aqui: `pedir_novos()` lê os ativos novos por trás e
+    volta na hora; `esperar_novos(teto, so_em_curso)` espera a leitura deles até `teto` segundos; `estado()` diz o que ele fez.
+    Sem a credencial do Fracttal ele registra só o `estado` (para o motivo aparecer) e as telas seguem pelo RPC."""
+    _LEITOR.update(pedir_novos=pedir_novos, esperar_novos=esperar_novos, estado=estado)
+
+
+def leitor_pronto() -> bool:
+    """O leitor está ligado E a última conferência do REST contra o catálogo valeu (`anotar_paridade_rest`). Sem paridade
+    nenhuma ainda (a 1ª noite não chegou) ou com a que falhou, o REST não acrescenta nada ao catálogo: as telas seguem pelo RPC,
+    com a sessão da pessoa, como antes do leitor."""
+    if _LEITOR["pedir_novos"] is None:
+        return False
+    atual()                                                         # o boot local traz a paridade de antes do reinício
+    p = _ESTADO["paridade_rest"]
+    return bool(p and p.get("vale"))
+
+
+def pedir_novos() -> bool:
+    """Pede ao leitor os ativos novos, por trás (quem chama não espera). False se o leitor não está pronto."""
+    if not leitor_pronto():
+        return False
+    try:
+        return bool(_LEITOR["pedir_novos"]())
+    except Exception:                                               # noqa: BLE001 — o pedido nunca derruba a tela
+        log.exception("catálogo de ativos: o pedido dos ativos novos falhou")
+        return False
+
+
+def esperar_novos(teto: float, so_em_curso: bool = False) -> bool:
+    """Espera a leitura dos ativos novos até `teto` segundos (a de agora, ou uma nova se a última já tem mais de um minuto;
+    `so_em_curso`: só a que já está em curso). Estourou, segue com o que há. False se o leitor não está pronto."""
+    if not leitor_pronto() or _LEITOR["esperar_novos"] is None:
+        return False
+    try:
+        return bool(_LEITOR["esperar_novos"](teto, so_em_curso))
+    except Exception:                                               # noqa: BLE001
+        log.exception("catálogo de ativos: a espera dos ativos novos falhou")
+        return False
 
 
 # ── a cópia em disco ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -370,7 +432,7 @@ def _gravar_disco(cat: Catalogo) -> None:
         try:
             os.makedirs(os.path.dirname(destino), exist_ok=True)
             carga = {"formato": FORMATO, "fonte": cat.fonte, "lido_em": cat.lido_em, "versao": cat.versao,
-                     "registros": cat.lista}
+                     "novos_em": cat.novos_em, "registros": cat.lista}
             with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=5) as f:
                 json.dump(carga, f, ensure_ascii=False, separators=(",", ":"))
             os.replace(tmp, destino)
@@ -385,8 +447,8 @@ def _gravar_disco(cat: Catalogo) -> None:
 
 
 def _ler_disco():
-    """(registros, lido_em) da cópia em disco, ou None: sem arquivo, ilegível, de outro formato ou com a lista vazia (o
-    motivo, se houve, fica em `estado()`). Nunca levanta."""
+    """(registros, lido_em, novos_em) da cópia em disco, ou None: sem arquivo, ilegível, de outro formato ou com a lista vazia
+    (o motivo, se houve, fica em `estado()`). Nunca levanta."""
     caminho = _caminho()
     if caminho is None or not os.path.exists(caminho):
         return None
@@ -399,11 +461,56 @@ def _ler_disco():
         registros = carga.get("registros")
         if not isinstance(registros, list) or not registros or not all(isinstance(r, dict) for r in registros):
             raise ValueError("sem a lista de registros")
-        return registros, float(carga.get("lido_em") or 0.0)
+        return registros, float(carga.get("lido_em") or 0.0), float(carga.get("novos_em") or 0.0)
     except (OSError, EOFError, ValueError, TypeError, zlib.error) as e:        # UnicodeError e JSONDecodeError são ValueError
         _ESTADO["disco"]["erro"] = "ler: %s: %s" % (type(e).__name__, str(e)[:120])
         log.warning("catálogo de ativos: ignorei a cópia em disco (%s)", _ESTADO["disco"]["erro"])
         return None
+
+
+def _caminho_estado() -> str | None:
+    return os.path.join(_CONFIG["pasta"], NOME_ESTADO) if _CONFIG["pasta"] else None
+
+
+def _gravar_estado() -> None:
+    """A recusa lembrada e a última paridade do REST, ao lado da cópia (gravadas de uma vez, como ela). Sem pasta (os testes),
+    nada; falha de disco vai ao log e o estado segue na memória."""
+    destino = _caminho_estado()
+    if destino is None:
+        return
+    with _TRAVA_DISCO:
+        tmp = "%s.%d.%d.tmp" % (destino, os.getpid(), threading.get_ident())
+        try:
+            os.makedirs(os.path.dirname(destino), exist_ok=True)
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"formato": FORMATO, "recusa_completa": _ESTADO["recusa_completa"],
+                           "paridade_rest": _ESTADO["paridade_rest"]}, f, ensure_ascii=False)
+            os.replace(tmp, destino)
+        except (OSError, TypeError, ValueError) as e:
+            log.warning("catálogo de ativos: não gravei o %s (%s: %s)", NOME_ESTADO, type(e).__name__, str(e)[:120])
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
+def _ler_estado() -> None:
+    """O `ativos_estado.json` de antes do reinício: a recusa lembrada e a paridade voltam à memória. O ilegível é ignorado."""
+    caminho = _caminho_estado()
+    if caminho is None or not os.path.exists(caminho):
+        return
+    try:
+        with open(caminho, encoding="utf-8") as f:
+            d = json.load(f)
+        if not isinstance(d, dict) or d.get("formato") != FORMATO:
+            raise ValueError("formato %r" % (d.get("formato") if isinstance(d, dict) else None))
+        r, p = d.get("recusa_completa"), d.get("paridade_rest")
+        if isinstance(r, dict) and isinstance(r.get("lido_em"), (int, float)):
+            _ESTADO["recusa_completa"] = r
+        if isinstance(p, dict):
+            _ESTADO["paridade_rest"] = p
+    except (OSError, ValueError, TypeError) as e:
+        log.warning("catálogo de ativos: ignorei o %s (%s: %s)", NOME_ESTADO, type(e).__name__, str(e)[:120])
 
 
 def _ler_legado():
@@ -430,6 +537,31 @@ def _hora(ts: float) -> str:
     return datetime.fromtimestamp(ts, _BRT).strftime("%d/%m %H:%M:%S")
 
 
+def _chave_do_ativo(r) -> str:
+    return "i:%s" % r.get("id") if r.get("id") is not None else "c:%s" % (r.get("code") or "")
+
+
+def _conjunto(atual: Catalogo, copias) -> str:
+    """O sha do CONJUNTO de ativos que a leitura tira do catálogo (os ids que ele tem e ela não; sem id, o código): é por ele
+    que duas leituras completas que encolheram igual se reconhecem, mesmo vindas de caminhos (REST e RPC) que escrevem o caminho
+    ou o grupo diferente. É o conjunto que SAIU, e não a lista inteira, porque os ativos novos do dia (que o catálogo ganha de
+    30 em 30 min) mudariam a lista entre a 1ª e a 2ª leitura, e a confirmação nunca chegaria."""
+    vem = {_chave_do_ativo(r) for r in copias}
+    saiu = sorted({_chave_do_ativo(r) for r in atual.lista} - vem)
+    return hashlib.sha256("\n".join(saiu).encode("utf-8")).hexdigest()
+
+
+def _confirma(anterior: dict | None, conjunto: str, fonte: str, lido_em: float) -> bool:
+    """A leitura que encolheu confirma a recusa lembrada: o mesmo conjunto, de outro caminho (rest x rpc) ou do mesmo com
+    `CONFIRMA_MESMO_CAMINHO_S` entre as duas. Uma leitura só que encolhe pode ser página perdida; duas, por caminhos ou dias
+    diferentes, são o Fracttal de verdade."""
+    if not anterior or anterior.get("conjunto") != conjunto:
+        return False
+    if anterior.get("fonte") != fonte:
+        return True
+    return lido_em - float(anterior.get("lido_em") or 0.0) >= CONFIRMA_MESMO_CAMINHO_S
+
+
 def _trocar(registros, fonte: str, lido_em: float | None, gravar: bool) -> bool:
     global _ATUAL
     if fonte not in FONTES:
@@ -440,35 +572,58 @@ def _trocar(registros, fonte: str, lido_em: float | None, gravar: bool) -> bool:
     n_novo = len(copias)
     versao = _versao(copias) if n_novo else ""
     mudou = True
+    lembrar = False
     with _TRAVA:
         atual = _ATUAL
-        motivo = tipo = None
+        motivo = tipo = conjunto = None
+        confirmado = None
         if n_novo == 0:
             tipo, motivo = "vazia", "a lista veio vazia"
         elif atual is not None and n_novo * 100 < len(atual.lista) * (100 - ENCOLHE_MAX):
-            tipo, motivo = "encolheu", "a lista encolheu de %d para %d ativos (mais que os %d%% permitidos)" % (
-                len(atual.lista), n_novo, ENCOLHE_MAX)
-        elif atual is not None and atual.versao != versao and lido_em < atual.lido_em:
+            conjunto = _conjunto(atual, copias)
+            anterior = recusa_vigente(atual)
+            if fonte in ("rest", "rpc") and _confirma(anterior, conjunto, fonte, lido_em):
+                confirmado = {"motivo": "encolhimento confirmado: os mesmos ativos saíram na leitura %s de %s e na %s de %s "
+                                        "(eram %d, ficaram %d)" % (anterior["fonte"], _hora(anterior["lido_em"]), fonte,
+                                                                   _hora(lido_em), len(atual.lista), n_novo),
+                              "em": time.time(), "de": len(atual.lista), "para": n_novo,
+                              "leituras": [{"fonte": anterior["fonte"], "lido_em": anterior["lido_em"]},
+                                           {"fonte": fonte, "lido_em": lido_em}]}
+            else:
+                tipo, motivo = "encolheu", "a lista encolheu de %d para %d ativos (mais que os %d%% permitidos)" % (
+                    len(atual.lista), n_novo, ENCOLHE_MAX)
+        elif (fonte in ("banco", "disco") and atual is not None and atual.versao != versao
+              and lido_em < atual.lido_em):
+            # só a leitura com a data escrita (a foto do banco, o disco): a rest e a rpc são feitas agora e nunca são
+            # "velhas" (com o relógio de parede, um download que terminou um segundo depois de outro perderia dele)
             tipo, motivo = "velha", "a leitura de %s é mais velha que o catálogo de agora (de %s) e tem outro conteúdo" % (
                 _hora(lido_em), _hora(atual.lido_em))
         if motivo:
             recusa = {"motivo": motivo, "tipo": tipo, "em": time.time(), "lido_em": lido_em, "fonte": fonte,
-                      "n_novo": n_novo, "n_atual": len(atual.lista) if atual is not None else 0}
+                      "n_novo": n_novo, "n_atual": len(atual.lista) if atual is not None else 0, "conjunto": conjunto}
             _ESTADO["recusa"] = recusa
             if tipo == "encolheu" and fonte in ("rest", "rpc"):
-                # a leitura completa do Fracttal que não entrou: fica lembrada à parte, para uma lista vazia ou uma leitura
-                # mais velha que vier depois (e vira o `motivo` de `estado()`) não apagá-la
+                # a leitura completa do Fracttal que não entrou: fica lembrada à parte (e no disco, para o reinício), para uma
+                # lista vazia ou uma leitura mais velha que vier depois (e vira o `motivo` de `estado()`) não apagá-la
                 _ESTADO["recusa_completa"] = recusa
+                lembrar = True
             log.warning("catálogo de ativos: troca recusada (fonte %s): %s", fonte, motivo)
-            return False
-        if atual is not None and atual.versao == versao:
-            # a mesma lista, conferida de novo: nada se monta, só a hora (que não volta no tempo) e a fonte da leitura mais nova
-            mudou = False
-            novo = replace(atual, lido_em=max(atual.lido_em, lido_em),
-                           fonte=fonte if lido_em >= atual.lido_em else atual.fonte)
         else:
-            novo = _indexar(copias, versao, fonte, lido_em)
-        _ATUAL = novo
+            if atual is not None and atual.versao == versao:
+                # a mesma lista, conferida de novo: nada se monta, só a hora (que não volta no tempo) e a fonte da mais nova
+                mudou = False
+                novo = replace(atual, lido_em=max(atual.lido_em, lido_em),
+                               fonte=fonte if lido_em >= atual.lido_em else atual.fonte)
+            else:
+                novo = _indexar(copias, versao, fonte, lido_em)
+            _ATUAL = novo
+            if confirmado:
+                _ESTADO["encolhimento"] = confirmado
+                log.warning("catálogo de ativos: %s", confirmado["motivo"])
+    if lembrar:
+        _gravar_estado()
+    if motivo:
+        return False
     if gravar and (mudou or novo.lido_em - _ESTADO["disco"]["lido_em"] >= REGRAVAR_DISCO_S):
         _gravar_disco(novo)
     return True
@@ -476,10 +631,52 @@ def _trocar(registros, fonte: str, lido_em: float | None, gravar: bool) -> bool:
 
 def trocar(registros: list, fonte: str, *, lido_em: float | None = None) -> bool:
     """Troca o catálogo INTEIRO por `registros` (os dicionários do `montar_registros`: cópias são tiradas, o que o chamador
-    passou não é tocado). True se trocou; False se recusou (lista vazia, ou menor que a de agora em mais de 5%): fica a de
-    agora e o motivo vai para `estado()["recusa"]`. `fonte` é banco, rest ou rpc (`disco` é do boot). `lido_em`: quando a
-    lista foi lida da fonte (padrão: agora). O que veio do Fracttal (rest, rpc) também vai para a cópia em disco."""
+    passou não é tocado). True se trocou; False se recusou, e então fica a de agora e o motivo vai para `estado()["recusa"]`.
+    As três recusas:
+    1. a lista vazia (sessão sem permissão, Fracttal mudo: não é leitura completa, e não fica lembrada);
+    2. a que encolhe mais de `ENCOLHE_MAX` (5%) contra a de agora (o RPC que perde páginas em silêncio). A de rest e rpc fica
+       lembrada (`recusa_vigente`, e no disco); a leitura seguinte que tira o MESMO conjunto de ativos, por outro caminho ou
+       pelo mesmo com 20 h entre as duas, passa ("encolhimento confirmado", em `estado()["encolhimento"]`);
+    3. só da foto do banco e do disco (a data veio escrita), a leitura mais velha que o catálogo de agora com outro conteúdo.
+    `fonte` é banco, rest ou rpc (`disco` é do boot). `lido_em`: quando a lista foi lida da fonte (padrão: agora; o leitor REST
+    passa o FIM da leitura, e é por ele que quem esperou a vez sabe que a leitura veio depois do pedido). O que veio do
+    Fracttal (rest, rpc) também vai para a cópia em disco."""
     return _trocar(registros, fonte, lido_em, gravar=fonte in ("rest", "rpc"))
+
+
+def acrescentar(registros, fonte: str = "rest", *, lido_em: float | None = None) -> int:
+    """Soma ao catálogo de agora os registros (do `montar_registros`) cujo id ele ainda não tem: os ativos novos do dia, que o
+    leitor do servidor lê de 30 em 30 min (`ativos_leitor.ler_novos`). O catálogo é trocado inteiro, como sempre (quem está
+    lendo a versão de antes termina com ela), e vai para o disco. O `lido_em` e a `fonte` NÃO mudam: os novos não conferem a
+    lista inteira (o que saiu ou mudou só a leitura da noite vê), então o catálogo vence pelas 24 h da última lista inteira e a
+    renovação de sempre continua valendo; muda o `novos_em` (`lido_em` desta leitura; padrão: agora), que a tela usa no
+    "ativos de HH:MM". Sem catálogo nenhum, não há a que somar: 0. Devolve quantos entraram."""
+    global _ATUAL
+    if fonte not in ("rest", "rpc"):
+        raise ValueError("os novos vêm do Fracttal (rest ou rpc), não de %r" % (fonte,))
+    quando = time.time() if lido_em is None else float(lido_em)
+    gravar = None
+    with _TRAVA:
+        atual = _ATUAL
+        if atual is None:
+            return 0
+        vistos: set = set()
+        novos = []
+        for r in registros or ():
+            i = r.get("id") if isinstance(r, dict) else None
+            if i is None or i in atual.por_id or i in vistos:
+                continue
+            vistos.add(i)
+            novos.append(r)
+        if not novos:
+            _ATUAL = replace(atual, novos_em=max(atual.novos_em, quando))
+            return 0
+        copias = _preparar(list(atual.lista) + novos)
+        gravar = _ATUAL = _indexar(copias, _versao(copias), atual.fonte, atual.lido_em,
+                                   novos_em=max(atual.novos_em, quando))
+    log.info("catálogo de ativos: %d ativo(s) novo(s) do Fracttal somados ao catálogo", len(novos))
+    _gravar_disco(gravar)
+    return len(novos)
 
 
 # ── a leitura ──────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -496,15 +693,20 @@ def _boot_local() -> None:
     """A cópia em disco e, se não há, o arquivo antigo. Quem chega com o boot em curso ESPERA nele (a trava): o "feito" só vale
     depois do boot, senão o pedido que chegasse nos primeiros décimos de segundo depois de subir veria "sem catálogo" e
     baixaria os ~22 mil ativos do Fracttal (achado pelo teste dos 8 pedidos juntos)."""
+    global _ATUAL
     with _TRAVA_BOOT:
         if _BOOT["local"] or _ATUAL is not None:
             _BOOT["local"] = True
             return
         try:
+            _ler_estado()                                           # a recusa lembrada e a paridade de antes do reinício
             carga = _ler_disco()
             if carga is not None:
-                registros, lido_em = carga
+                registros, lido_em, novos_em = carga
                 if _trocar(registros, "disco", lido_em, gravar=False):
+                    if novos_em:
+                        with _TRAVA:
+                            _ATUAL = replace(_ATUAL, novos_em=novos_em)
                     log.info("catálogo de ativos: %d ativos da cópia em disco", len(_ATUAL.lista))
                     _ESTADO["disco"].update(lido="cópia", lido_em=lido_em)
                     return
@@ -578,7 +780,7 @@ def recusa_vigente(cat: Catalogo | None = None) -> dict | None:
     última recusa de qualquer tipo; esta fica à parte). A lista vazia não entra: não é leitura completa (sessão sem permissão,
     Fracttal mudo), a próxima tentativa custa um pedido só, e esperar 24 h por ela deixaria o catálogo velho à toa. A leitura
     mais velha que o catálogo (outra fonte, download atrasado) também não."""
-    cat = _ATUAL if cat is None else cat
+    cat = atual() if cat is None else cat                           # o boot local traz a recusa de antes do reinício
     r = _ESTADO["recusa_completa"]
     if cat is None or r is None or r["lido_em"] <= cat.lido_em:
         return None
@@ -593,131 +795,58 @@ def conferido_em(cat: Catalogo) -> float:
     return max(cat.lido_em, r["lido_em"]) if r else cat.lido_em
 
 
+def visto_em(cat: Catalogo) -> float:
+    """A última vez que esta lista foi comparada com o Fracttal, de qualquer jeito: a lista inteira (`lido_em`) ou a leitura dos
+    ativos novos do dia (`novos_em`), a mais nova das duas. É a hora do "ativos de HH:MM" das telas; quem decide se o catálogo
+    venceu continua sendo o `conferido_em` (a lista inteira)."""
+    return max(cat.lido_em, cat.novos_em)
+
+
 def estado() -> dict:
-    """O que se sabe do catálogo, para o Raio-X: a fonte, o `lido_em`, a versão, quantos ativos, a última troca recusada
-    (motivo, hora, fonte e tamanhos), a paridade do REST (a leitura que a etapa 2.2 confere contra o RPC) e a situação do disco
-    e da foto do banco."""
+    """O que se sabe do catálogo, para o Raio-X: a fonte, o `lido_em`, o `novos_em`, a versão, quantos ativos, a última troca
+    recusada (motivo, hora, fonte e tamanhos), o último encolhimento confirmado, a última falha do download pelo RPC, a paridade
+    do REST (a leitura da noite conferida contra o catálogo de antes), a situação do disco e da foto do banco e, com o leitor do
+    servidor ligado, o que ele fez (ou por que não ligou)."""
     cat = _ATUAL
     tem = cat is not None
+    leitor = None
+    if _LEITOR["estado"] is not None:
+        try:
+            leitor = _LEITOR["estado"]()
+        except Exception as e:                                      # noqa: BLE001 — o estado nunca derruba quem o lê
+            leitor = {"erro": "%s: %s" % (type(e).__name__, str(e)[:120])}
     return {"fonte": cat.fonte if tem else None, "lido_em": cat.lido_em if tem else None,
+            "novos_em": cat.novos_em if tem else None,
             "versao": cat.versao if tem else None, "n": len(cat.lista) if tem else 0,
             "recusa": dict(_ESTADO["recusa"]) if _ESTADO["recusa"] else None,
+            "encolhimento": dict(_ESTADO["encolhimento"]) if _ESTADO["encolhimento"] else None,
+            "falha": dict(_ESTADO["falha"]) if _ESTADO["falha"] else None,
             "paridade_rest": _ESTADO["paridade_rest"], "disco": dict(_ESTADO["disco"]),
-            "banco": dict(_ESTADO["banco"]) if _ESTADO["banco"] else None}
+            "banco": dict(_ESTADO["banco"]) if _ESTADO["banco"] else None, "leitor": leitor}
 
 
 def anotar_paridade_rest(resultado: dict | None) -> None:
-    """Guarda o resultado da conferência REST x RPC (quem confere é a leitura da etapa 2.2) para `estado()` mostrar."""
+    """Guarda o resultado da conferência da leitura REST contra o catálogo (quem confere é o leitor da noite,
+    `ativos_leitor.conferir_paridade`) para `estado()` mostrar e para `leitor_pronto()` decidir. Vai ao disco junto da recusa
+    lembrada: sem isso, cada reinício (~10 por dia) desligaria os ativos novos do dia até a noite seguinte."""
     _ESTADO["paridade_rest"] = dict(resultado) if resultado else None
+    _gravar_estado()
 
 
-# ── a foto do banco como catálogo (a 3ª fonte do boot) ─────────────────────────────────────────────────────────────────
-# As colunas de `nexus_ativos_fracttal · foto_ativos` (`nexus/dados/equipamento.py:CAB_FOTO`; um teste confere que não mudaram)
-CAB_FOTO = ("fracttal_item_id", "codigo", "descricao", "pai_item_id", "tipo_fracttal", "foto_em")
-_USINA_NO_NOME = re.compile(r"^(.+? - .+? - [A-Z]{2})(?=\s|$)")
+def paridade_rest() -> dict | None:
+    """A última conferência da leitura REST (`anotar_paridade_rest`), ou None se ainda não houve nenhuma."""
+    atual()                                                         # o boot local traz a de antes do reinício
+    return dict(_ESTADO["paridade_rest"]) if _ESTADO["paridade_rest"] else None
 
 
-class FotoIncompleta(ValueError):
-    """A foto não serve de catálogo: as linhas dela não chegam à raiz (o cliente), então o caminho não se monta."""
+def anotar_falha(fonte: str, erro) -> None:
+    """A leitura do Fracttal que FALHOU (exceção: Fracttal fora, cota estourada), para quem esperava a vez não tentar de novo em
+    fila (`api.load_assets_cached`) e para o Raio-X. `erro` None apaga (a leitura seguinte deu certo)."""
+    _ESTADO["falha"] = None if erro is None else {"fonte": fonte, "em": time.time(),
+                                                  "erro": ("%s: %s" % (type(erro).__name__, str(erro)[:160])
+                                                           if isinstance(erro, BaseException) else str(erro)[:200])}
 
 
-def _int(v):
-    try:
-        return int(round(float(v)))
-    except (TypeError, ValueError, OverflowError):
-        return None
-
-
-def _limpa(descricao) -> str:
-    return str(descricao or "").split("{")[0].strip()
-
-
-def _nome_no_caminho(descricao, usina: bool, cauda: str = "") -> str:
-    """O nome de um item como o Fracttal o põe no caminho (`parent_description`). A descrição do item traz atrás do nome o
-    ENDEREÇO da usina e o "{ CÓDIGO }" (a foto já tirou o código quando ele repete o do item): "2C - Araputanga 1 - MT  Zona
-    Rural km 4" é o item, "2C - Araputanga 1 - MT" é o nome no caminho.
-    - A usina (o 2º trecho) tem a forma "Cliente - Usina - UF", com o endereço colado depois de UM espaço ou de dois: o corte é
-      na sigla do estado (medido nas 189 usinas com equipamento do catálogo de 28/10/2026: acerta as 189).
-    - Os outros níveis (Cabine 1, Inversor 1.1) trazem o MESMO endereço da usina atrás do nome (`cauda`, o que sobra da
-      descrição da usina depois do nome dela): tira-se a cauda (97% dos 35 mil níveis do catálogo de 28/10) ou, sem ela, corta-se
-      no 1º espaço duplo. O que sobrar de endereço só enfeita o texto: o cliente e a usina, que o `montar_registros` lê, são o
-      1º e o 2º trechos."""
-    d = _limpa(descricao)
-    if usina:
-        m = _USINA_NO_NOME.match(d)
-        if m:
-            return m.group(1)
-    if cauda and d.endswith(cauda) and len(d) > len(cauda):
-        return d[:-len(cauda)].rstrip()
-    return re.split(r"\s{2,}", d)[0].strip()
-
-
-def registros_da_foto(linhas) -> tuple:
-    """(registros, lido_em) a partir das linhas da foto (`CAB_FOTO`), no formato que o `montar_registros` entrega: o
-    `parent_description` montado pela cadeia de `pai_item_id` ("// Cliente/ Usina/ Cabine 1/ ", a forma do Fracttal), o
-    cliente e a usina dele, o tipo pelo código.
-
-    Só a foto mais nova entra (a de 21/06 que a carga única de 11/10 levou junto tem os 719 códigos que o Fracttal já não
-    tem). Não vêm da foto, e ficam None: `id_type_item` e `id_group_task` (a etapa 2.2 acrescenta o `id_group_task`).
-    ATENÇÃO: a criação de OS usa o registro do catálogo (`api.create_os_rpc` põe `id_type_item or 1`) e só a aprovação da Fila
-    espera o catálogo em dia (`em_dia`): antes de a foto valer como catálogo, ela tem de levar os dois campos. A descrição sai
-    sem o "{ CÓDIGO }" do fim (a foto o tirou).
-
-    Levanta `FotoIncompleta` se mais de 1% das linhas não chega à raiz (o item sem pai) pela cadeia de pais; a foto de 22/09
-    não chega: ver o topo do módulo."""
-    rows = [dict(l) for l in (linhas or ()) if isinstance(l, dict) and not l.get("fora_do_fracttal_desde")]
-    if not rows:
-        raise FotoIncompleta("a foto veio vazia")
-    ultima = max(str(r.get("foto_em") or "") for r in rows)
-    rows = [r for r in rows if str(r.get("foto_em") or "") == ultima]
-    por_id = {}
-    for r in rows:
-        i = _int(r.get("fracttal_item_id"))
-        if i is not None:
-            por_id.setdefault(i, r)
-
-    def ancestrais(r):
-        """(os pais da linha, da raiz até o pai imediato; se a cadeia chegou à raiz, a linha sem pai). Pai que não está na
-        foto, ciclo e cadeia de mais de 30 níveis não chegam."""
-        pais, atual_, visto = [], _int(r.get("pai_item_id")), set()
-        while atual_ is not None:
-            pai = por_id.get(atual_)
-            if pai is None or atual_ in visto or len(pais) >= 30:
-                return pais, False
-            visto.add(atual_)
-            pais.append(pai)
-            atual_ = _int(pai.get("pai_item_id"))
-        pais.reverse()
-        return pais, True
-    cadeias = [(r,) + ancestrais(r) for r in rows]
-    nomes: dict = {}                                                 # o nome no caminho de cada item (um ancestral serve a milhares)
-    sem_raiz = sum(1 for _r, _pais, chegou in cadeias if not chegou)
-    if sem_raiz * 100 > len(rows) * ORFAOS_MAX_PCT:
-        raise FotoIncompleta(
-            "%d de %d linhas não chegam à raiz (o cliente) pela cadeia de pais: sem ele o caminho do ativo e o cliente não "
-            "se montam, e inventá-los faria o Almoxarifado e o TESTE - PA aparecerem com nomes inventados"
-            % (sem_raiz, len(rows)))
-    cru = []
-    for r, pais, chegou in cadeias:
-        if not chegou:
-            continue                                                 # o dado torto fica de fora (até 1%)
-        cauda = ""
-        if len(pais) > 1:                                            # o endereço da usina, que os itens de dentro repetem
-            usina, d0 = pais[1], _limpa(pais[1].get("descricao"))
-            nome_usina = nomes.setdefault(id(usina), _nome_no_caminho(usina.get("descricao"), usina=True))
-            cauda = d0[len(nome_usina):].strip() if d0.startswith(nome_usina) else ""
-        caminho = []
-        for n, p in enumerate(pais):
-            if id(p) not in nomes:
-                nomes[id(p)] = _nome_no_caminho(p.get("descricao"), usina=(n == 1), cauda=cauda if n > 1 else "")
-            caminho.append(nomes[id(p)])
-        cru.append({"id": _int(r.get("fracttal_item_id")), "code": str(r.get("codigo") or ""),
-                    "description": str(r.get("descricao") or ""), "id_parent": _int(r.get("pai_item_id")),
-                    "id_type_item": None, "id_group_task": _int(r.get("id_group_task")),
-                    "parent_description": ("// " + "/ ".join(caminho) + "/ ") if caminho else ""})
-    registros = montar_registros(cru)
-    try:
-        lido_em = datetime.fromisoformat(ultima[:10]).replace(tzinfo=_BRT).timestamp()
-    except ValueError:
-        lido_em = 0.0
-    return registros, lido_em
+def falha() -> dict | None:
+    """A última falha anotada (`anotar_falha`), ou None."""
+    return dict(_ESTADO["falha"]) if _ESTADO["falha"] else None

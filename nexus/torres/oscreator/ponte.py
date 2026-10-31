@@ -256,6 +256,16 @@ def ligar_catalogo_de_ativos(app) -> None:
     ativos_central.ligar_fonte_do_banco(ativos_banco.leitor(app))
 
 
+def modulo_do_clone(nome: str):
+    """Um módulo do OS Creator pelo nome com que o clone o importa (`api`, `ativos_central`, `ativos_leitor`), com a pasta do
+    clone no `sys.path`. É o MESMO módulo que as telas usam: importado por outro caminho (como pacote do Nexus) ele seria uma
+    segunda cópia, com um segundo catálogo na memória. Quem usa é o `servir.py`, para ligar o leitor dos ativos ao subir."""
+    if RAIZ_CLONE not in sys.path:
+        sys.path.append(RAIZ_CLONE)
+    import importlib
+    return importlib.import_module(nome)
+
+
 def _criar_clone(app):
     # append, não insert: o que já está instalado continua vencendo; os nomes do clone (api, steps, tickets_*...)
     # não existem no Nexus nem na biblioteca padrão

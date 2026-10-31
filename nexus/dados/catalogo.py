@@ -1329,10 +1329,19 @@ LIVROS = (
                 "20:42, antes da foto_ativos): só os códigos dos livros do banco e do PCM. Com a foto gravada (21:06), "
                 "a carga seguinte lê a foto do banco e a dimensão cresce (medido em 08/10 com as fotos locais: "
                 "22.356)"),
-    Livro("nexus_ativos_fracttal", ("foto_ativos", "atualizacao"), "carga única (quem grava é o Levi)",
-          "ferramentas/carregar_ativos_fracttal.py --gravar", True,
-          "gravada em 11/10/2026 (GET: foto_ativos 22.357 linhas, última gravação às 21:06). Renovar a foto exige "
-          "ler o Fracttal: fora do horário de campo"),
+    # 31/10/2026 (tarefa 2.2 do canto central do OS Creator): deixou de ser carga única. Registrado ANTES da 1ª renovação:
+    # as três colunas novas no fim, o grão e o novo sentido do foto_em; só cresce (o código que sai do Fracttal fica marcado)
+    Livro("nexus_ativos_fracttal", ("foto_ativos", "atualizacao"),
+          "toda noite (02:15 de Brasília), depois que o catálogo do OS Creator aceitou a leitura; grava só quando o sha "
+          "das linhas muda",
+          "nexus/torres/oscreator/os_creator/ativos_leitor.py + nexus/dados/foto_ativos.py (só o servidor)", True,
+          "gravada em 11/10/2026 pela carga única (GET: foto_ativos 22.357 linhas, às 21:06); desde 31/10/2026 renovada "
+          "toda noite pelo leitor REST do servidor (credencial da empresa, 1 pedido por segundo). 1 linha = 1 item do "
+          "Fracttal com 1 código (fracttal_item_id + codigo), a raiz de cada cliente inclusive (a linha sem pai_item_id). "
+          "Colunas novas no fim: id_type_item e id_group_task (os do Fracttal; o grupo cai no catálogo e na foto de antes "
+          "quando o REST não o dá) e fora_do_fracttal_desde (data_id em que o código deixou de vir; o código fica). "
+          "foto_em = o dia em que a linha mudou pela última vez. A leitura do banco curta não grava",
+          so_cresce=True),
     Livro("nexus_programacao", ("fato_programacao", "qualidade", "atualizacao"),
           "de hora em hora (:40), pela mescla por semana; grava só quando o sha das linhas muda",
           "nexus/dados/carga.py + programacao.py (o histórico: ferramentas/carregar_programacao_historica.py)", True,
@@ -1599,7 +1608,9 @@ ABAS_FORA_DA_REGRA = {
     "feriados_locais": "a lista de feriados estaduais e municipais (a dim_data só tem os nacionais)",
     "qualidade_historico": "a qualidade do histórico (SCD2): sobreposição, buraco e membro sem vigente",
     "equipamento_apelido": "o que cada sistema chama de cada equipamento (o modelo do de_para das usinas)",
-    "foto_ativos": "a foto dos ativos do Fracttal: insumo da dimensão de equipamento, carga única",
+    "foto_ativos": "a foto dos ativos do Fracttal, renovada toda noite pelo leitor do servidor (1 linha = 1 item com 1 "
+                   "código; o que saiu do Fracttal fica, com fora_do_fracttal_desde): insumo da dimensão de equipamento e "
+                   "do catálogo de ativos do OS Creator na máquina sem cópia",
     "meses": "a lista dos livros do mês do inversor × dia, com o sha de cada um (a geração regrava só o mês que mudou)",
     "aba_equipamentos": "a visão da estrutura das usinas no formato da aba Equipamentos do bd_performance (as mesmas "
                         "colunas, com os IDs no fim), só das chaves marcadas \"no lugar da aba\": é o que deixa cada "
