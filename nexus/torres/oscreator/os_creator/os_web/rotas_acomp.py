@@ -129,9 +129,10 @@ def _linhas(forcar: bool = False, pessoa=None) -> dict:
         hoje = aw.agora_brt()
         de = (dt.date.today() - dt.timedelta(days=DIAS_BUSCA)).isoformat()
         # da lista central de OS primeiro (31/10/2026, tarefa 3.3 do canto central): as OS da etiqueta, sem pedido nenhum,
-        # quando quem lê confere que vê no Fracttal ao menos o que a lista tem (a conferência do `_dono`, a mesma chave; no
-        # Atualizar e na releitura por trás, o mesmo número). A cópia do quadro segue a de sempre (o dono, os 30 min, os
-        # tickets lidos à parte); o total dela é o da lista, que passou na conferência dela
+        # quando quem lê passou na conferência dos 365 dias que o quadro lê (o "Todos" dela até a marca d'água da lista, sem a
+        # etiqueta: rodada 2 da 3.3; no Atualizar e na releitura por trás, medida de novo), e só as que ela provou. A cópia do
+        # quadro segue a de sempre (o dono, os 30 min, os tickets lidos à parte; a regra de 19/10 do `_dono` não muda); o
+        # total dela é o da lista
         central = lista_central.garantias(de, _quem_le(), forcar=forcar)
         if central is not None:
             linhas = [l for l in central["linhas"] if aw.eh_os3(l)]

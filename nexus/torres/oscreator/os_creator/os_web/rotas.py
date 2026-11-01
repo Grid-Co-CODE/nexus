@@ -633,16 +633,21 @@ def ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, *, forcar=Fal
     """(a Lista ou None, as linhas, o info, o erro) do Histórico.
 
     Desde 31/10/2026 (tarefa 3.3 do canto central), da LISTA CENTRAL DE OS primeiro (`lista_central.historico`): quando ela
-    cobre o período, tem os campos que a tela mostra e a pessoa conferiu que vê no Fracttal o mesmo que ela (1 pedido de 1
-    linha na sessão dela, a cada 30 min). Então nenhum pedido a mais: nem a lista inteira, nem as novas, nem a de 10 em 10
+    cobre o período, tem os campos que a tela mostra e a pessoa passou na conferência do período (o "Todos" dela no Fracttal
+    contado até a marca d'água da lista, igual ao da lista: 1 pedido de uma página na sessão dela, a cada 30 min ou quando a
+    lista ganha OS que ela ainda não provou). Então nenhum pedido a mais: nem a lista inteira, nem as novas, nem a de 10 em 10
     min. `cos`: a Visão COS (mostra o gatilho, a programação, o início e quem criou). `central=False`: só o caminho de hoje
     (quem já tentou a lista pelo seu atalho, o Investigar).
 
-    Senão, o CAMINHO DE HOJE, sem mudar: a lista guardada e renovada sem repetir o Fracttal (19/10/2026, `historico_store`):
-    a de "Todos" é uma só para quem vê o mesmo total no Fracttal (1 pedido na sessão da pessoa, a cada 30 min); a de cada
-    pessoa segue dela. `mudou`: o card acabou de mudar uma OS; aqui a lista vem de novo do Fracttal (o que o `atualizar=1`
-    forçado ao fechar o card fazia até 31/10/2026), e na lista central ela já entrou pela ação. Saiu de dentro do `historico`
-    em 26/10/2026 para o "Investigar ativo" do Tempo real (`rotas_investigar`) ler a MESMA lista da Visão COS."""
+    Senão, o CAMINHO DE HOJE: a lista guardada e renovada sem repetir o Fracttal (19/10/2026, `historico_store`). A de "Todos"
+    é uma só para quem vê o mesmo total no Fracttal (1 pedido na sessão da pessoa, a cada 30 min) SÓ quando a lista central
+    não cobre o período (o PC, a lista vazia, o período fora da janela); quando cobre, cada pessoa que chega aqui segue com a
+    DELA (Ruling BU da rodada 2 da 3.3): quem vê tudo lê da lista central e nunca ancorava a "Todos" dividida, a 1ª pessoa
+    restrita que não passava a achava vazia e a lista dela virava a de todos, e outra restrita com o mesmo total a herdava (a
+    sonda mostrou as 30 OS de uma usina para quem só vê a outra). A de cada pessoa segue dela. `mudou`: o card acabou de mudar
+    uma OS; aqui a lista vem de novo do Fracttal (o que o `atualizar=1` forçado ao fechar o card fazia até 31/10/2026), e na
+    lista central ela já entrou pela ação. Saiu de dentro do `historico` em 26/10/2026 para o "Investigar ativo" do Tempo
+    real (`rotas_investigar`) ler a MESMA lista da Visão COS."""
     if central:
         v = lista_central.historico(modo_srv, id_account, id_label, de, ate, status_ids, pessoa=_quem(), forcar=forcar,
                                     cos=cos, pessoal=responsaveis_fracttal, contas=_contas_do_filtro,
@@ -653,7 +658,7 @@ def ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, *, forcar=Fal
     linhas, erro, info, lista = [], None, {}, None
     filtros = (modo_srv, id_account, id_label, de, ate, tuple(status_ids or ()))
     chave = ("hist", _quem()) + filtros
-    if id_account == "TODOS":
+    if id_account == "TODOS" and not lista_central.cobre(de, ate):
         comum = ("hist", "TODOS") + filtros
         if HS.mesma_visao(_quem(), comum, lambda: (api.list_minhas_os_pagina(
                 modo_srv, "TODOS", id_label, de, ate, status_ids, "", 1, 1) or {}).get("total") or 0):

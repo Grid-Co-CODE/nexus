@@ -527,15 +527,19 @@ cortou) só se confere pela tela. Depois dos quatro quadros do uso, cada peça d
 ligado e pronto, a paridade do REST (quando, se valeu, as coberturas `cob_ref` e `cob_rest`, e o motivo se não valeu), o REST
 (a última leitura boa e a falha que veio depois dela), as descrições cortadas da última noite (o número e até 5 ids) e a cópia
 em disco; e **"Lista central de OS"** (3.2, `os_central.estado(medir_memoria=True)`): quantas OS e quantas abertas, as "a
-conferir" e as pendentes, a janela lida inteira, se o leitor está ligado, a última entrega de cada faixa (com quem entregou as
+conferir" e as pendentes, a janela lida inteira e a marca d'água (a criação mais nova lida até o topo: até onde as telas
+conferem, rodada 2 da 3.3), se o leitor está ligado, a última entrega de cada faixa (com quem entregou as
 abertas: o `tarefas_os` ou o próprio leitor) e a última leitura dela (os pedidos, ou a falha com o motivo; "DEFEITO do
 leitor" quando foi exceção que não é de leitura, com a pilha no log), a leitura que a trava de encolhimento recusou ("Trava de
 encolhimento": a faixa, a hora e o motivo, só com contagens, até a faixa passar de novo) e a última que ela aceitou na 2ª
 leitura igual ("aceita na 2ª leitura": o apagamento de verdade, rodada 2), os campos que o REST trouxe (a
 sondagem da 1ª noite), as conferências das telas que leem da lista ("Conferências das telas", 3.3, `_conferencias_das_telas`:
-por visão, quantas foram ao Fracttal desde o último reinício, quantas divergiram e falharam, e a última divergência com os dois
-totais; a conferência é de uma mão só, e quem diverge não é conferido de novo por 30 min, então cada pessoa conta uma vez por
-janela; muitas na visão "todos" de quem vê tudo é sinal de lista errada), a cópia em disco e a memória
+por tela, histórico, garantias e investigar, quantas foram ao Fracttal desde o último reinício, quantas divergiram, falharam e
+ficaram "sem resposta pela página" (mais OS depois da marca do que a página da conferência traz, ou fora da ordem da
+criação), e a última divergência com as duas contas até a marca; desde a rodada 2 a conferência é UMA por pessoa e período,
+sem visão, status nem etiqueta, e exata; quem diverge com a lista tendo MAIS que ela não é conferido de novo por 30 min, então
+cada pessoa restrita conta uma vez por janela; muitas divergências de quem vê tudo é sinal de lista errada, e muitas "sem
+resposta", de que a página não basta), a cópia em disco e a memória
 (`os_central.memoria_estimada`: cada registro e texto contados uma vez;
 ~0,4 s com 36 mil OS, medida UMA vez por versão da lista, e a falha da medida vai ao log; 25,8 MB contra os 23,9 MB do
 tracemalloc). Só contagens, datas, ids e motivos: nunca o texto de um ativo ou

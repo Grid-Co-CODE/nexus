@@ -18,8 +18,9 @@ Aqui:
   Fracttal (`mesma_visao`, que também serve o quadro do Acompanhamento de chamados); a de cada pessoa ("criadas por
   mim", "atribuídas a mim") segue por pessoa;
 - desde 31/10/2026 (tarefa 3.3 do canto central) este é o CAMINHO DE HOJE: a tela lê primeiro da lista central de OS
-  (`lista_central.py`), depois da conferência da pessoa (o total dela, guardado aqui por `total_conferido`, a mesma chave), e
-  só vem para cá quando a lista não cobre o período, não tem um campo que a tela mostra, ou a pessoa vê outro total;
+  (`lista_central.py`, com a conferência dela, que não passa por aqui) e só vem para cá quando a lista não cobre o período,
+  não tem um campo que a tela mostra, ou a pessoa não passou. Com a lista central cobrindo o período, a "Todos" não é
+  dividida (a rota usa a chave da pessoa: Ruling BU da rodada 2 da 3.3, a lista de uma restrita herdada por outra);
 - a lista guarda o HTML das linhas por versão (`html_das_linhas`): as 2.000 linhas são montadas uma vez por versão, e
   não a cada pedido.
 Erro do Fracttal não apaga a lista guardada: a tela segue com ela, com a hora dela.
@@ -182,9 +183,8 @@ def _novas(chave, buscar_novas):
 def total_conferido(pessoa, chave, total_da_pessoa, max_idade=CONFERE_S) -> tuple:
     """(o total que o Fracttal dá à pessoa nesta `chave`, a idade dele em s, se foi pedido agora): o guardado, se tem menos de
     `max_idade`; senão `total_da_pessoa()` (1 pedido, na sessão dela), guardado. O erro sobe e não é guardado: quem chama
-    decide, e a conferência que falha nunca libera nada. É o que a `mesma_visao` guarda por pessoa e lista, e a conferência das
-    telas que leem da lista central (`lista_central`, 31/10/2026) usa a MESMA chave: quem conferiu numa não paga o pedido de
-    novo na outra."""
+    decide, e a conferência que falha nunca libera nada. É o que a `mesma_visao` guarda por pessoa e lista (a conferência das
+    telas que leem da lista central guarda a dela à parte, `lista_central._MEDIDAS`, desde a rodada 2 da 3.3)."""
     agora = _relogio()
     k = (pessoa, chave)
     c = _CONFERIDOS.get(k)

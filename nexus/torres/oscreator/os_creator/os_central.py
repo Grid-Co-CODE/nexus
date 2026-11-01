@@ -65,6 +65,15 @@ A JANELA (`Lista.janela`, decisão AC): as datas de criação que a lista leu IN
 leitura de cima para baixo (os 7 dias, a noite) emendada com a seguinte, e `até` é o começo da última leitura que chegou ao
 topo (as novas que pararam numa página conhecida também). A tela que pede um período fora dela vai ao vivo (`cobre`).
 
+A MARCA D'ÁGUA (`Lista.marca`, Ruling BU da rodada 2 da 3.3): a criação da OS mais nova que a lista leu numa leitura que chegou
+ao topo (as mesmas da janela: os 7 dias e a noite sempre, as novas só emendadas). Toda OS criada ANTES dela está na lista: a
+leitura veio da mais nova para trás, e o que foi criado antes da mais nova que ela trouxe já existia quando ela passou. É o que
+faz da conferência de cada pessoa uma prova de conjunto (`lista_central`): as duas contas, a da lista e a do Fracttal na sessão
+dela, param na marca, e o que vem depois (as novas que a faixa ainda não trouxe, a OS que a ação pôs) fica de fora das duas.
+Nunca anda para trás (a mais nova apagada no Fracttal não a devolve), não anda com as abertas, as finalizadas, as pendentes nem
+a ação, e a criação depois do começo da leitura mais a margem do relógio (a data no futuro, dado ruim) não conta. Vai na cópia
+em disco; a cópia de antes dela volta sem marca, e as telas vão ao vivo até a próxima leitura até o topo.
+
 O DISCO (decisão AH; `os_disco.py`): `<pasta>/os_central.json.gz`, escrita em fluxo (uma linha JSON por OS, com o cabeçalho
 na 1ª e o fecho na última: nem a escrita nem a leitura montam o arquivo inteiro na memória), trocada de uma vez (`canto_disco`),
 no máximo uma escrita a cada `os_disco.GRAVAR_A_CADA_S` (as ações seguidas viram uma). O boot só lê o disco: nenhum pedido ao
@@ -130,7 +139,8 @@ class Lista:
     copiado); `ordem` são os registros pela criação, da mais nova para a mais velha; `nomes_criadores` é {nome normalizado de
     quem criou: os códigos de pessoa vistos com ele} (o homônimo de `filtrar`). `lido_em` é a última leitura do Fracttal que
     chegou aqui (qualquer faixa); `janela` = (de, até) das datas de criação lidas INTEIRAS (ver o topo); `a_conferir`, as OS
-    que uma faixa deveria ter trazido e não trouxe; `versao` muda a cada troca de conteúdo."""
+    que uma faixa deveria ter trazido e não trouxe; `versao` muda a cada troca de conteúdo; `marca`, a marca d'água (ver o
+    topo: a criação, em ISO UTC, da OS mais nova de uma leitura até o topo; "" antes da 1ª)."""
     por_id: Mapping
     por_folio: Mapping
     por_codigo_ativo: Mapping
@@ -140,6 +150,7 @@ class Lista:
     janela: tuple
     versao: int
     a_conferir: frozenset
+    marca: str = ""
 
     def cobre(self, de=None, ate=None, agora: float | None = None) -> bool:
         """A lista responde por este período de criação (`de` e `ate` em 'AAAA-MM-DD', como as telas pedem)? Só se ele está
@@ -162,7 +173,33 @@ def _chave(r: RegistroOS) -> tuple:
     return (-_s(r), -r.id)
 
 
-def _indexar(por_id: dict, *, lido_em: float, janela: tuple, versao: int, a_conferir) -> Lista:
+def periodo_em_segundos(de, ate) -> tuple:
+    """(de, até) do período de criação de uma tela ('AAAA-MM-DD', o fim do dia incluído) em segundos, a régua de `_s`: a mesma
+    conta do `filtrar` e do filtro do RPC (`creation_date <= até + "T23:59:59"`)."""
+    return (_seg(str(de)[:10]) if de else 1 - 2**31,
+            _seg(str(ate)[:10] + "T23:59:59") if ate else 2**31 - 1)
+
+
+def criadas_entre(lista: Lista, de_s: int, ate_s: int) -> tuple:
+    """As OS da lista criadas de `de_s` a `ate_s` (segundos, os dois incluídos), da mais nova para a mais velha, pelo `bisect`
+    na `ordem` (sem percorrer a lista: o Garantias confere 365 dias). A OS sem data de criação (0) só entra com `de_s` <= 0."""
+    if ate_s < de_s:
+        return ()
+    ini = bisect.bisect_left(lista.ordem, (-ate_s, -2**63), key=_chave)
+    fim = bisect.bisect_left(lista.ordem, (1 - de_s, -2**63), key=_chave)
+    return lista.ordem[ini:fim]
+
+
+def contar_criadas(lista: Lista, de_s: int, ate_s: int) -> int:
+    """Quantas OS `criadas_entre` daria, sem montar a fatia: o lado da lista na conferência (`lista_central`)."""
+    if ate_s < de_s:
+        return 0
+    ini = bisect.bisect_left(lista.ordem, (-ate_s, -2**63), key=_chave)
+    fim = bisect.bisect_left(lista.ordem, (1 - de_s, -2**63), key=_chave)
+    return max(0, fim - ini)
+
+
+def _indexar(por_id: dict, *, lido_em: float, janela: tuple, versao: int, a_conferir, marca: str = "") -> Lista:
     """A versão pronta, com todos os índices montados de novo: CONSOME o dicionário `por_id` (ele vira o índice, sem cópia)."""
     ordem = sorted(por_id.values(), key=_chave)
     por_folio: dict = {}
@@ -178,10 +215,11 @@ def _indexar(por_id: dict, *, lido_em: float, janela: tuple, versao: int, a_conf
     return Lista(por_id=MappingProxyType(por_id), por_folio=MappingProxyType(por_folio),
                  por_codigo_ativo=MappingProxyType({c: tuple(v) for c, v in por_cod.items()}), ordem=tuple(ordem),
                  nomes_criadores=MappingProxyType({n: frozenset(c) for n, c in nomes.items()}), lido_em=float(lido_em),
-                 janela=tuple(janela), versao=int(versao), a_conferir=frozenset(a_conferir))
+                 janela=tuple(janela), versao=int(versao), a_conferir=frozenset(a_conferir), marca=str(marca or ""))
 
 
-def _aplicar(base: Lista, mudancas: dict, *, lido_em: float, janela: tuple, versao: int, a_conferir) -> Lista:
+def _aplicar(base: Lista, mudancas: dict, *, lido_em: float, janela: tuple, versao: int, a_conferir,
+             marca: str | None = None) -> Lista:
     """A versão nova com POUCAS OS mudadas (`mudancas`: {id: o registro novo, ou None para tirar}), refazendo nos índices só
     os pedaços delas: a ação do OS Creator, que roda dentro do pedido de alguém, não espera a lista inteira ser montada de novo
     (medido com 36 mil OS: ~0,25 s inteira). O resultado é o mesmo do `_indexar` (um teste confere), menos os
@@ -222,7 +260,8 @@ def _aplicar(base: Lista, mudancas: dict, *, lido_em: float, janela: tuple, vers
             nomes[n] = nomes.get(n, frozenset()) | {_cod(r.cod_criador)}
     return Lista(por_id=MappingProxyType(por_id), por_folio=MappingProxyType(por_folio),
                  por_codigo_ativo=MappingProxyType(por_cod), ordem=tuple(ordem), nomes_criadores=MappingProxyType(nomes),
-                 lido_em=float(lido_em), janela=tuple(janela), versao=int(versao), a_conferir=frozenset(a_conferir))
+                 lido_em=float(lido_em), janela=tuple(janela), versao=int(versao), a_conferir=frozenset(a_conferir),
+                 marca=base.marca if marca is None else str(marca or ""))
 
 
 def _vazia() -> Lista:
@@ -249,7 +288,7 @@ def _estado_limpo() -> dict:
     # aceita na 2ª leitura igual};
     # `campos`: a medida dos campos que o REST trouxe na última leitura grande (a sondagem da 1ª noite, que não pôde ser feita
     # antes de construir); `disco["sujo"]`: a fila das pendentes mudou sem a versão mudar (a cópia em disco é regravada);
-    # `conferencias`: {visão: as conferências de 19/10 das telas contra o `contar` (decisão BA da 3.3), só contagens}
+    # `conferencias`: {tela: as conferências das telas que leem da lista (decisão BA e Ruling BU da 3.3), só contagens}
     return {"faixas": {}, "pendentes": {}, "falhas": {}, "recusas": {}, "confirmadas": {}, "campos": None,
             "conferencias": {},
             "disco": {"lido": None, "gravado_em": 0.0, "versao": None, "bytes": None, "erro": None, "sujo": False}}
@@ -297,21 +336,24 @@ def atual() -> Lista:
     return _ATUAL if _ATUAL is not None else _vazia()
 
 
-def _instalar(base: Lista, mudancas: dict, *, lido_em: float, janela: tuple, a_conferir, mudou: bool) -> Lista:
-    """Põe a versão nova no lugar (dentro da `_TRAVA`). Sem mudança de conteúdo: a mesma versão com a hora e o fim da janela
-    trocados, sem índice nenhum montado e sem regravar o disco (eles vão junto da próxima mudança). Só o "a conferir" mudou:
-    os mesmos índices. Poucas OS mudadas: os pedaços delas (`_aplicar`); muitas: tudo (`_indexar`)."""
+def _instalar(base: Lista, mudancas: dict, *, lido_em: float, janela: tuple, a_conferir, mudou: bool,
+              marca: str | None = None) -> Lista:
+    """Põe a versão nova no lugar (dentro da `_TRAVA`). Sem mudança de conteúdo: a mesma versão com a hora, o fim da janela e
+    a marca d'água trocados, sem índice nenhum montado e sem regravar o disco (eles vão junto da próxima mudança). Só o "a
+    conferir" mudou: os mesmos índices. Poucas OS mudadas: os pedaços delas (`_aplicar`); muitas: tudo (`_indexar`). `marca`
+    None: a de antes (a ação, a pendente)."""
     global _ATUAL
     lido_em = max(base.lido_em, lido_em)
+    marca = base.marca if marca is None else marca
     if not mudou:
-        _ATUAL = replace(base, lido_em=lido_em, janela=janela)
+        _ATUAL = replace(base, lido_em=lido_em, janela=janela, marca=marca)
         return _ATUAL
     _SEQ["versao"] += 1
     versao = _SEQ["versao"]
     if not mudancas:
-        _ATUAL = replace(base, lido_em=lido_em, janela=janela, versao=versao, a_conferir=frozenset(a_conferir))
+        _ATUAL = replace(base, lido_em=lido_em, janela=janela, versao=versao, a_conferir=frozenset(a_conferir), marca=marca)
     elif len(mudancas) <= max(POR_PARTES_MIN, len(base.por_id) // 10):
-        _ATUAL = _aplicar(base, mudancas, lido_em=lido_em, janela=janela, versao=versao, a_conferir=a_conferir)
+        _ATUAL = _aplicar(base, mudancas, lido_em=lido_em, janela=janela, versao=versao, a_conferir=a_conferir, marca=marca)
     else:
         por_id = dict(base.por_id)
         for wid, r in mudancas.items():
@@ -319,12 +361,18 @@ def _instalar(base: Lista, mudancas: dict, *, lido_em: float, janela: tuple, a_c
                 por_id.pop(wid, None)
             else:
                 por_id[wid] = r
-        _ATUAL = _indexar(por_id, lido_em=lido_em, janela=janela, versao=versao, a_conferir=a_conferir)
+        _ATUAL = _indexar(por_id, lido_em=lido_em, janela=janela, versao=versao, a_conferir=a_conferir, marca=marca)
     return _ATUAL
 
 
 def _piso_da_janela(agora: float) -> str:
-    return (datetime.fromtimestamp(agora, timezone.utc) - timedelta(days=JANELA_DIAS)).strftime("%Y-%m-%d")
+    """O 1º dia da janela, `JANELA_DIAS` antes de HOJE PELA DATA LOCAL do servidor (a das telas: o `de` do Garantias e do
+    Histórico é `date.today()` menos os dias), sem passar dos 365 dias UTC. O filtro do Fracttal e o `filtrar` tomam a data como
+    o dia UTC dela (o caminho ao vivo não muda); a janela pela data UTC começava, das 21:00 à meia-noite de Brasília (a data
+    UTC já é a de amanhã), um dia depois do `de` que a tela pede, e o quadro ia ao vivo sem precisar (rodada 2 da 3.3)."""
+    local = datetime.fromtimestamp(agora).date() - timedelta(days=JANELA_DIAS)
+    utc = datetime.fromtimestamp(agora, timezone.utc).date() - timedelta(days=JANELA_DIAS)
+    return min(local, utc).isoformat()
 
 
 def _dia_inteiro(desde) -> str:
@@ -350,6 +398,21 @@ def _janela_nova(janela: tuple, faixa: str, desde, inicio: float, agora: float) 
     if faixa == NOVAS and desde and jde and jate and _txt(desde)[:19] <= jate:
         return jde, max(ate, jate)
     return janela
+
+
+def _marca_nova(base: Lista, faixa: str, desde, novos: dict, inicio: float) -> str:
+    """A marca d'água depois de uma leitura (ver o topo): só a leitura que chegou ao topo e emendou a mexe, com as regras do fim
+    da janela (`_janela_nova`: os 7 dias e a noite com o piso; as novas emendadas com o que a lista já leu inteiro). Ela vira a
+    criação mais nova que a leitura trouxe, nunca para trás; a criação depois do começo da leitura mais `MARGEM_RELOGIO_S` é a
+    data no futuro (dado ruim): com ela, a marca diria que a lista tem o que ainda nem foi criado."""
+    jde, jate = base.janela
+    chegou = ((faixa in (SETE_DIAS, NOITE) and bool(desde))
+              or (faixa == NOVAS and bool(desde and jde and jate) and _txt(desde)[:19] <= jate))
+    if not chegou:
+        return base.marca
+    teto = int(inicio) - _EPOCA0 + MARGEM_RELOGIO_S
+    s = max((_s(r) for r in novos.values() if 0 < _s(r) <= teto), default=0)
+    return max(base.marca or "", _iso_seg(s)) if s else base.marca
 
 
 def _fica(r: RegistroOS, piso_s: int, a_conferir) -> bool:
@@ -493,8 +556,9 @@ def receber(linhas_rest, faixa: str, *, desde=None, lido_em: float | None = None
                         conferir.discard(wid)
                         rel["sairam"] += 1
             janela = _janela_nova(base.janela, faixa, desde, inicio, agora)
+            marca = _marca_nova(base, faixa, desde, novos, inicio)
             mudou = bool(mudancas) or conferir != base.a_conferir or janela[0] != base.janela[0]
-            lista = _instalar(base, mudancas, lido_em=inicio, janela=janela, a_conferir=conferir, mudou=mudou)
+            lista = _instalar(base, mudancas, lido_em=inicio, janela=janela, a_conferir=conferir, mudou=mudou, marca=marca)
             _ESTADO["faixas"][faixa] = rel
             # a recusa que sai, a confirmação e a fila das pendentes vão no cabeçalho da cópia em disco: regravado mesmo sem a
             # versão mudar
@@ -769,16 +833,20 @@ def campos_medidos() -> dict | None:
     return dict(c) if c else None
 
 
-def anotar_conferencia(visao: str, bateu, *, fracttal=None, lista=None) -> None:
-    """Uma conferência de 19/10 de uma tela que lê da lista (decisão BA da 3.3): o total que o Fracttal dá à pessoa (1 pedido
-    na sessão dela) contra o `contar` da lista. `bateu` None = a conferência falhou (o Fracttal fora, a sessão caída): não
-    libera nada e conta à parte. Muitas divergências de quem tem a visão inteira é sinal de lista errada: o Raio-X mostra. Só
-    contagens e a hora, nunca quem (o estado vai ao Raio-X)."""
+def anotar_conferencia(visao: str, bateu, *, fracttal=None, lista=None, incerta: bool = False) -> None:
+    """Uma conferência de uma tela que lê da lista (decisão BA e Ruling BU da 3.3), por tela (`visao`): as OS que o Fracttal dá
+    à pessoa no período até a marca d'água (1 pedido na sessão dela) contra as da lista. `bateu` None = a conferência falhou (o
+    Fracttal fora, a sessão caída): não libera nada e conta à parte; `incerta`: a página da conferência não deu para saber
+    (mais OS depois da marca do que ela traz, ou fora da ordem da criação), e conta à parte também. Muitas divergências de quem
+    tem a visão inteira é sinal de lista errada: o Raio-X mostra. Só contagens e a hora, nunca quem (o estado vai ao Raio-X)."""
     agora = time.time()
     with _TRAVA:
-        c = _ESTADO["conferencias"].setdefault(str(visao), {"n": 0, "divergiram": 0, "falharam": 0, "ultima": None,
-                                                            "ultima_divergencia": None})
+        c = _ESTADO["conferencias"].setdefault(str(visao), {"n": 0, "divergiram": 0, "falharam": 0, "incertas": 0,
+                                                            "ultima": None, "ultima_divergencia": None})
         c["ultima"] = agora
+        if incerta:
+            c["incertas"] = c.get("incertas", 0) + 1
+            return
         if bateu is None:
             c["falharam"] += 1
             return
@@ -894,7 +962,8 @@ def _boot() -> None:
                 ids = set(por_id)
                 lista = _indexar(por_id, lido_em=float(cab.get("lido_em") or 0.0),
                                  janela=tuple((cab.get("janela") or [None, None])[:2]), versao=versao,
-                                 a_conferir={i for i in (cab.get("a_conferir") or ()) if i in ids})
+                                 a_conferir={i for i in (cab.get("a_conferir") or ()) if i in ids},
+                                 marca=str(cab.get("marca") or ""))
                 with _TRAVA:
                     if _ATUAL is None or not _ATUAL.por_id:
                         _ATUAL = lista
@@ -991,7 +1060,7 @@ def estado(medir_memoria: bool = False) -> dict:
             "abertas": sum(1 for r in lista.ordem if r.status_id in ABERTOS and r.id not in lista.a_conferir),
             "a_conferir": len(lista.a_conferir), "a_conferir_ids": sorted(lista.a_conferir)[:20],
             "pendentes": len(pend), "pendentes_ids": sorted(pend)[:20], "versao": lista.versao,
-            "lido_em": lista.lido_em or None, "janela": lista.janela,
+            "lido_em": lista.lido_em or None, "janela": lista.janela, "marca": lista.marca or None,
             "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())},
             "recusas": {k: {c: x for c, x in v.items() if c != "_ids"} for k, v in list(_ESTADO["recusas"].items())},
             "confirmadas": {k: dict(v) for k, v in list(_ESTADO["confirmadas"].items())},

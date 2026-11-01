@@ -5,12 +5,12 @@ molde do `ativos_disco.py`: a lista guarda e entrega; daqui saem a gravação (a
 vigente, o estado do disco e o que vai no cabeçalho quem dá é o `os_central`, a cada chamada (os testes trocam a pasta por
 `os_central.reiniciar(pasta=...)`, e a lista continua uma só por processo).
 
-O arquivo (decisão AH): `<pasta>/os_central.json.gz`, em linhas JSON: o cabeçalho na 1ª (o formato, a versão, a janela, as "a
-conferir", as pendentes, a última entrega de cada faixa e os nomes dos campos do registro), uma OS por linha (os campos na ordem
-do registro; as datas, os cinco inteiros) e o fecho na última, com a conta. A escrita e a leitura vão em fluxo: nunca o arquivo
-inteiro na memória. A troca é de uma vez (`canto_disco.trocar_de_uma_vez`, a mesma da cópia dos ativos). A cópia sem o fecho,
-com outra conta, de outro formato ou com outros campos foi cortada no meio ou é de outra versão do código: é ignorada, e o motivo
-vai ao estado do disco.
+O arquivo (decisão AH): `<pasta>/os_central.json.gz`, em linhas JSON: o cabeçalho na 1ª (o formato, a versão, a janela, a marca
+d'água, as "a conferir", as pendentes, a última entrega de cada faixa e os nomes dos campos do registro), uma OS por linha (os
+campos na ordem do registro; as datas, os cinco inteiros) e o fecho na última, com a conta. A escrita e a leitura vão em fluxo:
+nunca o arquivo inteiro na memória. A troca é de uma vez (`canto_disco.trocar_de_uma_vez`, a mesma da cópia dos ativos). A cópia
+sem o fecho, com outra conta, de outro formato ou com outros campos foi cortada no meio ou é de outra versão do código: é
+ignorada, e o motivo vai ao estado do disco.
 
 A AGENDA: no máximo uma escrita a cada `GRAVAR_A_CADA_S`, numa thread à parte (`nexus-os-central-disco`). A gravação agendada
 escreve a versão do momento em que ela roda: as mudanças seguidas viram uma escrita só, e a última chega ao disco em até 30 s
@@ -145,8 +145,10 @@ def gravar_lista(pasta: str | None, vigente, estado_disco: dict, extras) -> bool
         if lista is None or (estado_disco.get("versao") == lista.versao and not estado_disco.get("sujo")):
             return False
         estado_disco["sujo"] = False                                 # o que mudar daqui em diante pede outra gravação
+        # a marca d'água vai com a janela (rodada 2 da 3.3): sem ela, depois de cada deploy as telas iriam ao vivo até a
+        # próxima leitura até o topo
         cab = dict({"formato": FORMATO, "versao": lista.versao, "lido_em": lista.lido_em, "janela": list(lista.janela),
-                    "a_conferir": sorted(lista.a_conferir)}, **extras(),
+                    "marca": getattr(lista, "marca", ""), "a_conferir": sorted(lista.a_conferir)}, **extras(),
                    n=len(lista.ordem), gravado_em=time.time(), campos=list(RegistroOS._fields))
 
         def escrever(tmp):

@@ -460,9 +460,11 @@ def api_executar(wid, tid):
         n = (api.salvar_subtarefas(wid, tid, a_gravar) or {}).get("n") or 0
     res = api.registrar_execucao(tid, ini, fim, note=str(c.get("nota") or "").strip())
     if (res or {}).get("confirmado"):
-        # o início e o fim da tarefa (as colunas da Visão COS) só mudam com o registro confirmado: sem ele, reler a OS seria 2
-        # pedidos à toa (rodada 1 da 3.3), e a faixa dos 7 dias traz o que tiver ficado
         lista_central.mudou(wid)
+    else:
+        # sem o registro confirmado, reler a OS seriam 2 pedidos que nada provam (rodada 1 da 3.3): ela fica "a conferir" e
+        # pendente, e a faixa das pendentes a lê pelo nº (Minor 3 da rodada 2: o início e o fim da Visão COS podem ter mudado)
+        lista_central.pendente(wid)
     texto, aviso = regra.mensagem_execucao(n, res, lambda x: api.fmt_data_br(x) or "—")
     return jsonify({"ok": True, "mensagem": texto, "aviso": aviso, "n": n,
                     "confirmado": bool(res.get("confirmado"))})

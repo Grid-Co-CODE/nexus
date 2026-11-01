@@ -830,16 +830,21 @@ def _pedidos(n) -> str:
 
 
 def _conferencias_das_telas(conf: dict) -> str:
-    """A guarda da lista pela metade das telas que leem da lista central (decisão BA da 3.3): por visão, quantas conferências
-    de 19/10 foram ao Fracttal desde o último reinício, quantas divergiram (o total que o Fracttal deu à pessoa e o da lista) e
-    quantas falharam. A visão restrita de alguém também diverge (é o que a guarda manda ao vivo); muitas divergências na visão
-    "todos" de quem vê tudo é sinal de lista errada. Só contagens e a hora: nunca quem."""
+    """A guarda das telas que leem da lista central (decisão BA e Ruling BU da 3.3): por tela, quantas conferências foram ao
+    Fracttal desde o último reinício, quantas divergiram (as OS que o Fracttal deu à pessoa no período até a marca d'água e as
+    da lista), quantas falharam e quantas não deram para saber (a página da conferência com mais OS depois da marca do que ela
+    traz, ou fora da ordem da criação). A visão restrita de alguém também diverge (é o que a guarda manda ao vivo); muitas
+    divergências de quem vê tudo é sinal de lista errada, e muitas incertas, de que a página não basta. Só contagens e a hora:
+    nunca quem."""
     partes = []
     for visao, c in sorted(conf.items()):
         n, div, fal = int(c.get("n") or 0), int(c.get("divergiram") or 0), int(c.get("falharam") or 0)
         txt = "%s: %d conferência%s, %d %s" % (visao, n, "" if n == 1 else "s", div, "divergiu" if div == 1 else "divergiram")
         if fal:
             txt += ", %d %s (o Fracttal fora ou a sessão caída)" % (fal, "falhou" if fal == 1 else "falharam")
+        inc = int(c.get("incertas") or 0)
+        if inc:
+            txt += ", %d sem resposta pela página (mais OS depois da marca d'água do que ela traz, ou fora da ordem)" % inc
         u = c.get("ultima_divergencia") or {}
         if u:
             txt += "; a última divergência em %s: Fracttal %s contra %s da lista" % (
@@ -862,8 +867,10 @@ def _linhas_da_lista_de_os(e: dict) -> list:
                                 "Creator; até lá as telas leem ao vivo"))
     de, ate = (e.get("janela") or (None, None))[:2]
     if de and ate:
-        linhas.append(("Janela lida inteira", "as OS criadas de %s/%s/%s até %s; fora dela, as telas leem ao vivo" % (
-            de[8:10], de[5:7], de[:4], _dia_e_hora(ate))))
+        # a marca d'água (rodada 2 da 3.3): até onde a conferência das telas conta (a criação mais nova lida até o topo)
+        linhas.append(("Janela lida inteira", "as OS criadas de %s/%s/%s até %s; fora dela, as telas leem ao vivo; a marca "
+                                              "d'água (a criação mais nova lida até o topo, até onde as telas conferem): %s" % (
+            de[8:10], de[5:7], de[:4], _dia_e_hora(ate), _dia_e_hora(e["marca"]) if e.get("marca") else "nenhuma ainda")))
     else:
         linhas.append(("Janela lida inteira", "nenhuma ainda: a 1ª carga é de madrugada (03:21); até lá a lista tem só o que as "
                                               "faixas do dia trouxeram, e as telas leem ao vivo"))

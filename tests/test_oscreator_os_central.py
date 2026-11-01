@@ -369,8 +369,10 @@ def test_lista_e_copia_para_quem_muda():
 
 def test_indice_por_partes_igual_ao_inteiro():
     """A ação refaz nos índices só os pedaços da OS dela (`_aplicar`), para não montar a lista inteira dentro do pedido de
-    alguém (medido com 36 mil OS: ~0,2 s inteira, ~25 ms por partes); o resultado tem de ser o mesmo da montagem inteira."""
-    linhas = [_tarefa(i, i, criada=_iso(i % 40, "%02d:00" % (i % 24)), code="CAL-GAM100-INVR%d.1" % (i % 7),
+    alguém (medido com 36 mil OS: ~0,2 s inteira, ~25 ms por partes); o resultado tem de ser o mesmo da montagem inteira.
+    As criações são todas de ontem para trás: com a hora trocada no dia de hoje, das 21:00 de Brasília em diante (o dia UTC
+    novo) a OS das 16:00 ficava no futuro, e a que a ação mudou para 14 min atrás não era a mais nova (rodada 2 da 3.3)."""
+    linhas = [_tarefa(i, i, criada=_iso(1 + i % 40, "%02d:00" % (i % 24)), code="CAL-GAM100-INVR%d.1" % (i % 7),
                       status=1 + i % 4, cod_criador="PF%02d" % (i % 3)) for i in range(1, 120)]
     OC.receber(linhas, OC.NOITE, desde=_iso(90)[:10])
     base = OC.atual()
