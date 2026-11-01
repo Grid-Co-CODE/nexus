@@ -1804,9 +1804,11 @@ o Ruling BU da rodada 2 de correções, que fecharam os vazamentos para a visão
   peça "Lista central de OS", linha "Conferências das telas" (a marca d'água vai na linha "Janela lida inteira"). A visão
   restrita de alguém também diverge (é ela que a guarda manda ao vivo); muitas divergências de quem vê tudo é sinal de lista
   errada, e muitas "sem resposta", de que a página não basta.
-- **Os campos que o REST não trouxe (Ruling AT).** A tela só lê da lista os campos que a última leitura grande trouxe
-  (`os_central.campos_medidos`; a medida vai também na cópia em disco, em `campos_rest`, para o deploy não mandar as telas ao
-  vivo até a próxima leitura grande). A 3.3 acrescentou a data fim, o início e a nota do chamado, a rodada 1 a descrição, o
+- **Os campos que o REST não trouxe (Ruling AT).** A tela só lê da lista os campos que a última leitura do período inteiro
+  trouxe (`os_central.campos_medidos`; a medida vai também na cópia em disco, em `campos_rest`, para o deploy não mandar as
+  telas ao vivo até a próxima). Só os 7 dias e a noite medem (rodada 3): a entrega das abertas, de hora em hora e com centenas
+  de OS, media a data fim em 0% (OS aberta não tem data fim), e as telas iam ao vivo até a próxima leitura dos 7 dias ou das
+  finalizadas; as finalizadas, as novas, as pendentes e as ações também não medem. A 3.3 acrescentou a data fim, o início e a nota do chamado, a rodada 1 a descrição, o
   ativo escrito, a equipe, o "atribuído a" e o status, e a rodada 2 a programada (a data do evento cai nela) no Histórico e no
   Investigar e a data fim, com quem está, quem criou e o tipo na 1ª pintura (as telas os mostravam sem medida). Com 0% (ou sem
   medida) num campo que a tela mostra ou filtra, a tela vai ao vivo:

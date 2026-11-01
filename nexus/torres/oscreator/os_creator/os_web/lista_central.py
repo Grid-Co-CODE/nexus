@@ -45,8 +45,9 @@ e o Ruling BU da rodada 2 de correções, que fecharam os vazamentos para a vis�
 - A GUARDA DA LISTA PELA METADE (BA, a decisão AI da 3.1): a mesma conferência. Cada uma que foi ao Fracttal conta no estado da
   lista, por tela (`os_central.anotar_conferencia`: quantas, quantas divergiram, falharam e não deram para saber, e a última
   divergência), e o Raio-X mostra: muitas divergências de quem tem a visão inteira é sinal de lista errada.
-- OS CAMPOS QUE O REST NÃO TRAZ (BB, Ruling AT): a tela só lê da lista os campos que a última leitura grande trouxe
-  (`os_central.campos_medidos`); com 0% (ou sem medida nenhuma) num campo que a tela MOSTRA ou FILTRA, ela vai ao vivo, ou
+- OS CAMPOS QUE O REST NÃO TRAZ (BB, Ruling AT): a tela só lê da lista os campos que a última leitura do período inteiro
+  trouxe (os 7 dias ou a noite: `os_central.campos_medidos`; a entrega das abertas não mexe na medida, rodada 3); com 0% (ou
+  sem medida nenhuma) num campo que a tela MOSTRA ou FILTRA, ela vai ao vivo, ou
   aquele filtro troca de jeito (a etiqueta por id vira pelo nome). As listas de cada tela estão em `CAMPOS_*`; a nota do
   chamado, rara numa leitura qualquer, o Garantias confere nas OS dele (sem nenhuma nota entre as de etiqueta CHAMADOS, o
   REST não a trouxe), e a nota cortada no teto (`nota_cortada`, Ruling BR) também o leva ao vivo. O card completa ao vivo o
@@ -183,7 +184,7 @@ def _escopo_padrao(de, ate) -> bool:
 
 # ── as guardas ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 def _medidos(campos, nomes) -> bool:
-    """Todos os `nomes` vieram na última leitura grande (mais que 0%). Sem medida nenhuma, não: a tela vai ao vivo."""
+    """Todos os `nomes` vieram na última leitura do período inteiro (mais que 0%). Sem medida nenhuma, não: ao vivo."""
     pct = (campos or {}).get("pct") or {}
     return all((pct.get(n) or 0) > 0 for n in nomes)
 

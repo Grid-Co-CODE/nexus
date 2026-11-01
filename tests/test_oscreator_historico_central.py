@@ -1243,3 +1243,33 @@ def test_os_antiga_que_a_lista_nao_tem_nao_compensa(fr):
     h = _hist(c, "modo=cos")
     assert ">10059</a>" not in h and "OS central" not in h and fr.n("lista", R2) == 1
     assert not LC.liberado(R2)
+
+
+# ── rodada 3 da 3.3: a medida dos campos só pelas leituras do período inteiro ───────────────────────────────────────────────
+def test_a_entrega_das_abertas_nao_mexe_na_medida_dos_campos(fr):
+    """A medida dos campos é só das leituras que trazem a população inteira do período, os 7 dias e a noite (rodada 3 da 3.3).
+    A entrega das abertas, de hora em hora e com 50 OS ou mais, media de novo, e a "data fim" ia a 0% (OS aberta não tem data
+    fim): o Histórico, o Investigar, o Garantias e a 1ª pintura iam ao vivo até a próxima leitura dos 7 dias ou das
+    finalizadas. As finalizadas (só as concluídas) e as novas também não mexem nela."""
+    _encher()
+    medida = OC.campos_medidos()
+    fr.universo += [_nova(80 + k) for k in range(5)]
+    abertas = [_rest(o) for o in fr.universo if o["status"] == 1]
+    assert len(abertas) >= OC.CAMPOS_MIN_OS
+    OC.receber(abertas, OC.ABERTAS)                              # as abertas, com as 5 novas
+    OC.receber([_rest(o) for o in fr.universo], OC.FINALIZADAS, desde=_iso(30))
+    assert OC.campos_medidos() == medida
+    a = _cliente(TODA)
+    h = _hist(a, "modo=cos")
+    assert _central(h, 1) and _central(h, 80) and fr.n("lista") == 0
+    assert _central(_hist(a, "modo=criadas&pessoa=TODOS"), 1) and fr.n("lista") == 0
+    assert a.get("/os/api/os/7/previa").status_code == 200
+    h = a.get("/os/chamados/acompanhamento").get_data(as_text=True)
+    assert 'data-folio="10051"' in h and fr.n("chamados") == 0
+    # os 7 dias, sim: a população inteira do período (a sondagem que a tela confere)
+    sete = [dict(_rest(o), trigger_description=None) for o in fr.universo if o["criada"] >= _iso(7)]
+    assert len(sete) < OC.CAMPOS_MIN_OS                           # a leitura pequena não mede (o mínimo de 50 OS)
+    OC.receber(sete, OC.SETE_DIAS, desde=_iso(7))
+    assert OC.campos_medidos() == medida
+    OC.receber([dict(_rest(o), trigger_description=None) for o in fr.universo], OC.NOITE, desde=_iso(400)[:10])
+    assert OC.campos_medidos()["faixa"] == OC.NOITE and OC.campos_medidos()["pct"]["gatilho"] == 0

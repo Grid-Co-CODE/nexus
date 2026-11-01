@@ -119,6 +119,7 @@ MESMO_ENCOLHIMENTO_PCT = 90     # a 2ª recusa "igual" à 1ª: ao menos tantos %
 ABERTOS = frozenset({1, 2})
 NOVAS, SETE_DIAS, ABERTAS, FINALIZADAS, NOITE, UMA_OS = "novas", "sete_dias", "abertas", "finalizadas", "noite", "os"
 FAIXAS = (NOVAS, SETE_DIAS, ABERTAS, FINALIZADAS, NOITE, UMA_OS)
+MEDEM_OS_CAMPOS = (SETE_DIAS, NOITE)     # as leituras do período inteiro: só elas mexem na medida (rodada 3 da 3.3)
 VISOES = ("todos", "criadas", "atribuidas")
 # ── a lista (imutável por versão) ──────────────────────────────────────────────────────────────────────────────────────
 def _epoca(iso) -> float:
@@ -286,7 +287,8 @@ def _estado_limpo() -> dict:
     # pelo nº falharam}; `recusas`: {faixa: a última leitura que a trava de encolhimento recusou}, até a faixa passar de novo
     # (com os ids que sairiam em `_ids`, que vão à cópia em disco e nunca ao estado); `confirmadas`: {faixa: a última recusa
     # aceita na 2ª leitura igual};
-    # `campos`: a medida dos campos que o REST trouxe na última leitura grande (a sondagem da 1ª noite, que não pôde ser feita
+    # `campos`: a medida dos campos que o REST trouxe na última leitura do período inteiro, os 7 dias ou a noite (a sondagem da
+    # 1ª noite, que não pôde ser feita
     # antes de construir); `disco["sujo"]`: a fila das pendentes mudou sem a versão mudar (a cópia em disco é regravada);
     # `conferencias`: {tela: as conferências das telas que leem da lista (decisão BA e Ruling BU da 3.3), só contagens}
     return {"faixas": {}, "pendentes": {}, "falhas": {}, "recusas": {}, "confirmadas": {}, "campos": None,
@@ -422,8 +424,12 @@ def _fica(r: RegistroOS, piso_s: int, a_conferir) -> bool:
 
 def _medir_campos(novos: dict, faixa: str, agora: float) -> None:
     """Quantas OS da leitura trouxeram cada campo que as telas usam (só contagens): é a sondagem do REST que não pôde ser
-    feita antes de construir; o Raio-X mostra."""
-    if len(novos) < CAMPOS_MIN_OS:
+    feita antes de construir; o Raio-X mostra. Só as leituras que trazem a população inteira do período medem
+    (`MEDEM_OS_CAMPOS`: os 7 dias e a noite). As outras trazem um pedaço escolhido, e o pedaço muda a conta: a entrega das
+    abertas, de hora em hora e com centenas de OS, media a "data fim" em 0% (OS aberta não tem data fim), e o Histórico, o
+    Investigar, o Garantias e a 1ª pintura iam ao vivo até a próxima leitura dos 7 dias ou das finalizadas (rodada 3 da 3.3).
+    As finalizadas (só as concluídas), as novas, as pendentes e as ações também não medem."""
+    if faixa not in MEDEM_OS_CAMPOS or len(novos) < CAMPOS_MIN_OS:
         return
     n = len(novos)
     rs = novos.values()
@@ -825,8 +831,8 @@ def folio_para_id(folio) -> int | None:
 
 
 def campos_medidos() -> dict | None:
-    """A medida dos campos que o REST trouxe na última leitura grande (`_medir_campos`: {"faixa", "em", "n", "pct"}), ou None
-    se nenhuma leitura grande mediu ainda. É o que a tela confere antes de ler um campo da lista (Ruling AT, decisão BB da
+    """A medida dos campos que o REST trouxe na última leitura do período inteiro (os 7 dias ou a noite, `_medir_campos`:
+    {"faixa", "em", "n", "pct"}), ou None se nenhuma mediu ainda. É o que a tela confere antes de ler um campo da lista (Ruling AT, decisão BB da
     3.3); leve, ao contrário do `estado()`, que percorre a lista."""
     atual()
     c = _ESTADO["campos"]
