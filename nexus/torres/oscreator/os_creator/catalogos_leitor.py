@@ -72,9 +72,7 @@ def de_rest(p: dict) -> dict:
     """Uma pessoa do REST no formato do `api.ler_pessoal` (o do RPC chama o id de `id`; o REST, de `id_personnel`)."""
     nome = str(p.get("full_name") or p.get("name") or "").strip()
     return {"id_personnel": p.get("id_personnel"), "code": p.get("code"), "name": nome, "active": p.get("active"),
-            "id_account": p.get("id_account"),
-            "nome_conta": str(p.get("full_name") or p.get("name") or p.get("account_email") or "").strip(),
-            "email": str(p.get("account_email") or p.get("email") or "").strip().lower()}
+            "id_account": p.get("id_account"), "email": str(p.get("account_email") or p.get("email") or "").strip().lower()}
 
 
 def _ids_responsaveis(linhas) -> set:
@@ -83,9 +81,11 @@ def _ids_responsaveis(linhas) -> set:
 
 def _confere(novas: list) -> str:
     """O motivo de a leitura REST não servir, ou "". Encolheu demais contra o catálogo de agora (página perdida); ou é a 1ª
-    contra um catálogo do RPC e a lista de responsáveis não bate com a dele (o mesmo campo com outro sentido mudaria quem as
-    telas mostram). A 1ª leitura REST que já valeu precisa desse catálogo para conferir (a 1ª noite dos ativos, REST x RPC):
-    sem ele (a máquina nova, sem cópia), espera a 1ª tela que o lê pela sessão de alguém."""
+    contra um catálogo do RPC e não bate com ele: a lista de responsáveis (o mesmo campo com outro sentido mudaria quem as
+    telas mostram), e, das pessoas em comum, a conta e o e-mail (o mesmo id com outra conta muda o dono do "criadas por mim";
+    com outro e-mail, quem a pessoa logada é; revisão da 4.1). A 1ª leitura REST que já valeu precisa desse catálogo para
+    conferir (a 1ª noite dos ativos, REST x RPC): sem ele (a máquina nova, sem cópia), espera a 1ª tela que o lê pela sessão
+    de alguém."""
     atual, fonte = catalogos.pessoas_guardadas()
     if not atual:
         if not catalogos.rest_bom_em():
@@ -98,10 +98,18 @@ def _confere(novas: list) -> str:
         return ""
     r, n = _ids_responsaveis(atual), _ids_responsaveis(novas)
     comum = len(r & n)
-    if r and n and comum * 100 >= len(r) * PARIDADE_MIN_PCT and comum * 100 >= len(n) * PARIDADE_MIN_PCT:
-        return ""
-    return ("o pessoal ativo do REST (%d) não bate com o do RPC (%d): %d em comum, abaixo de %d%% nos dois sentidos" % (
-        len(n), len(r), comum, PARIDADE_MIN_PCT))
+    if not (r and n and comum * 100 >= len(r) * PARIDADE_MIN_PCT and comum * 100 >= len(n) * PARIDADE_MIN_PCT):
+        return ("o pessoal ativo do REST (%d) não bate com o do RPC (%d): %d em comum, abaixo de %d%% nos dois sentidos" % (
+            len(n), len(r), comum, PARIDADE_MIN_PCT))
+    antes = {p.get("id_personnel"): p for p in atual if p.get("id_personnel") is not None}
+    depois = {p.get("id_personnel"): p for p in novas if p.get("id_personnel") is not None}
+    ids = antes.keys() & depois.keys()
+    for campo, rotulo in (("id_account", "a conta (id_account)"), ("email_h", "o e-mail")):
+        iguais = sum(1 for i in ids if antes[i].get(campo) == depois[i].get(campo))
+        if iguais * 100 < len(ids) * PARIDADE_MIN_PCT:
+            return "%s do REST não bate com o do RPC: %d de %d pessoas em comum iguais, abaixo de %d%%" % (
+                rotulo, iguais, len(ids), PARIDADE_MIN_PCT)
+    return ""
 
 
 # ── a leitura ──────────────────────────────────────────────────────────────────────────────────────────────────────────

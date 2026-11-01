@@ -577,18 +577,29 @@ def _renovar_catalogo_por_tras() -> None:
 
     def rodar():
         try:
-            ctx.run(baixar)
+            ctx.run(_na_sessao_propria, baixar)
         except Exception:                               # noqa: BLE001 — fica o de ontem; o próximo pedido tenta depois
             pass
     threading.Thread(target=rodar, name="os-catalogo-por-tras", daemon=True).start()
 
 
+# A renovação por trás (o catálogo de ativos, acima, e os catálogos pequenos, `catalogos.renovar_por_tras`) roda numa thread
+# com a cópia do contexto de quem pediu, e a cópia leva o MESMO dicionário de estado da sessão web dele: um 401 por trás
+# marcava a sessão dela como morta, e o pedido dela, se ainda corria, saía para o login (revisão da 4.1, 31/10/2026). O
+# `os_web.sessao.instalar` troca isto pelo `sessao.propria` (a mesma pessoa, com estado próprio); fora da web, nada a separar.
+_sessao_propria = contextlib.nullcontext
+
+
+def _na_sessao_propria(fn, *args):
+    with _sessao_propria():
+        return fn(*args)
+
+
 def ler_pessoal() -> list:
     """TODO o pessoal do Fracttal, ativo ou não, numa paginação só do RPC personnel.personnel_list (sessão do usuário, 100 por
-    página), com o que o OS Creator usa de cada pessoa: [{'id_personnel','code','name','active','id_account','nome_conta',
-    'email'}] (o RPC chama o id_personnel de `id`, que é o id_responsible da WO; `nome_conta` é o do "Criado por", com o e-mail
-    de quem não tem nome; `email` é o da conta, em minúsculas). É o leitor do catálogo de pessoas (`catalogos.py`, 31/10/2026,
-    etapa 4 do canto central): antes, sete caminhos liam esta mesma lista, cada um com a sua cópia."""
+    página), com o que o OS Creator usa de cada pessoa: [{'id_personnel','code','name','active','id_account','email'}] (o RPC
+    chama o id_personnel de `id`, que é o id_responsible da WO; `email` é o da conta, em minúsculas). É o leitor do catálogo de
+    pessoas (`catalogos.py`, 31/10/2026, etapa 4 do canto central) e o da criação da Engenharia (`responsaveis_ao_vivo`)."""
     allp, start = [], 0
     while True:
         res = _rpc_call(RPC_PERSONNEL, {"page": start // 100 + 1, "limit": 100, "start": start,
@@ -601,9 +612,7 @@ def ler_pessoal() -> list:
             break
     return [{"id_personnel": p.get("id"), "code": p.get("code"),
              "name": (p.get("full_name") or p.get("name") or "").strip(), "active": p.get("active"),
-             "id_account": p.get("id_account"),
-             "nome_conta": (p.get("full_name") or p.get("name") or p.get("account_email") or "").strip(),
-             "email": (p.get("account_email") or p.get("email") or "").strip().lower()}
+             "id_account": p.get("id_account"), "email": (p.get("account_email") or p.get("email") or "").strip().lower()}
             for p in allp if isinstance(p, dict)]
 
 
@@ -613,6 +622,14 @@ def get_responsaveis() -> list:
     pessoas, um para todas as telas (`catalogos.pessoas`), e não mais do Fracttal a cada chamada."""
     import catalogos
     return catalogos.pessoas()
+
+
+def responsaveis_ao_vivo() -> list:
+    """O mesmo pessoal ATIVO do `get_responsaveis`, lido do Fracttal AGORA, com a sessão de quem pede (uma leitura). É o da
+    criação da Engenharia: a regra de 19/10/2026 é que, faltando a pessoa no Fracttal, nenhuma OS sai, e a pessoa desligada
+    nas últimas horas seguiria no catálogo até a renovação (revisão da 4.1). A sessão morta levanta aqui, antes de gravar."""
+    import catalogos
+    return catalogos.ativas(ler_pessoal())
 
 
 # ── Escrita: OS de verdade via RPC interno (tasks_noscheduled_react_insert) ────
@@ -3177,9 +3194,11 @@ FALHA_DANOS = [("Nenhum", 1), ("Dano ao meio ambiente", 2), ("Danos nas Instala�
                ("Lesões ao pessoal interno", 4), ("Lesões a Terceiros", 5), ("Outros", 6)]
 
 
-def get_falha_listas() -> dict:
+def get_falha_listas(levantar: bool = False) -> dict:
     """{tipos, causas, metodos} p/ o bloco 'O ativo falhou?' — cada um [{'id','description'}], lidos do Fracttal. Quem guarda
-    é o catálogo das falhas (`catalogos.falhas`, 24 h e em disco, 31/10/2026); a cópia que ficava aqui nunca vencia."""
+    é o catálogo das falhas (`catalogos.falhas`, 24 h e em disco, 31/10/2026); a cópia que ficava aqui nunca vencia.
+    `levantar`: o erro de uma lista sobe, em vez de virar a lista vazia (o catálogo: a leitura pela metade não troca a
+    completa, e o erro de verdade, a cota ou a sessão, vai ao estado e à tela; revisão da 4.1)."""
     def _lst(metodo, extra=None):
         p = {"sort": [{"property": "description", "direction": "asc"}], "page": 1, "limit": 200,
              "start": 0, "is_tree": False, "node": None}
@@ -3190,6 +3209,8 @@ def get_falha_listas() -> dict:
             return [{"id": d.get("id"), "description": d.get("description")}
                     for d in (r.get("data") or []) if d.get("id") is not None]
         except FracttalError:
+            if levantar:
+                raise
             return []
     return {"tipos": _lst(RPC_FALHA_TIPOS),
             "causas": _lst(RPC_FALHA_CAUSAS, {"id_failure_type": None}),
@@ -5327,8 +5348,8 @@ def status_solicitacao_catalogo(levantar: bool = False) -> list:
 
     Vai à API para não oferecer um id que aquela conta não tenha; se a chamada falhar, devolve a
     lista local — perder a rede não pode impedir a pessoa de cancelar uma solicitação. `levantar`: o erro sobe em vez da
-    lista local (o catálogo dos status, `catalogos.status`, 31/10/2026: a lista local guardada 24 h passaria pelo que o
-    Fracttal aceita; lá ela volta sem ficar guardada)."""
+    lista local, e a resposta VAZIA do Fracttal dá a lista vazia (o catálogo dos status, `catalogos.status`, 31/10/2026: a
+    lista local guardada 24 h passaria pelo que o Fracttal aceita; lá ela volta sem ficar guardada; revisão da 4.1)."""
     try:
         res = _rpc_call(RPC_REQ_STATUS_LIST, {"filter": [], "sort": [], "page": 1,
                                               "limit": 100, "start": 0})
@@ -5338,6 +5359,8 @@ def status_solicitacao_catalogo(levantar: bool = False) -> list:
         if levantar:
             raise
         return list(STATUS_SOLICITACAO)
+    if levantar and not vivos:
+        return []
     return [t for t in STATUS_SOLICITACAO if not vivos or t[0] in vivos]
 
 
@@ -5402,12 +5425,35 @@ def cancelar_solicitacao(id_request, note: str = "") -> dict:
 
 def get_pessoas_contas() -> dict:
     """Contas (quem cria OS/solicitação) p/ o filtro de 'criado por' + a conta do usuário logado.
-    → {"pessoas": [{"id_account","nome"}] (ordenado por nome), "eu": id_account_logado}. Desde 31/10/2026 (etapa 4 do canto
-    central) do catálogo de pessoas (`catalogos.contas` e `catalogos.da_pessoa`): o Histórico relia o pessoal inteiro por
-    pessoa, a cada 10 min."""
-    import catalogos
+    Acha o 'eu' (id_account do logado) na MESMA paginação do pessoal — uma passada só.
+    → {"pessoas": [{"id_account","nome"}] (ordenado por nome), "eu": id_account_logado}.
+
+    Lido POR PESSOA, com a sessão dela (o Histórico guarda 10 min para cada uma, `rotas._memo(("pessoas", pessoa))`), e NÃO do
+    catálogo comum de pessoas: quem não tem a permissão de pessoal no Fracttal recebe a lista vazia, e não as contas da
+    empresa (revisão da 4.1, 31/10/2026: a etapa 4 o tinha posto no catálogo, e voltou)."""
     email = (current_user() or "").strip().lower()
-    return {"pessoas": catalogos.contas(), "eu": catalogos.da_pessoa(email)[1] if email else None}
+    eu = None
+    vistos = {}
+    start = 0
+    while True:
+        res = _rpc_call(RPC_PERSONNEL, {"page": start // 100 + 1, "limit": 100, "start": start,
+                                        "append": True, "filter": [], "sort": []})
+        data = res.get("data") if isinstance(res, dict) else res
+        data = data if isinstance(data, list) else []
+        for p in data:
+            ida = p.get("id_account")
+            if ida is not None and ida not in vistos:
+                nome = (p.get("full_name") or p.get("name") or p.get("account_email") or "").strip()
+                if nome:
+                    vistos[ida] = nome
+            if eu is None and email and (p.get("account_email") or p.get("email") or "").strip().lower() == email:
+                eu = ida
+        start += 100
+        if len(data) < 100:
+            break
+    pessoas = sorted(({"id_account": k, "nome": v} for k, v in vistos.items()),
+                     key=lambda x: x["nome"].lower())
+    return {"pessoas": pessoas, "eu": eu}
 
 
 def _anexa_imagens_bulk(fase1, imagens_por_ativo):

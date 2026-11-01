@@ -41,6 +41,10 @@ def _por_chave_limpo() -> dict:
 _PLANOS: dict = _por_chave_limpo()      # {"<id_item>:<id_group_task>": {"lido_em", "planos": [{id_task, description}]}}
 _DETALHES: dict = _por_chave_limpo()    # {"<id_task>:<id_item>": {"lido_em", "detalhe": o get_plan_details sem o raw}}
 _TRAVA_PLANOS = threading.Lock()
+# uma gravação por vez em cada cópia, e a cópia montada DENTRO da vez: duas gravações juntas (a 1ª escolha de duas usinas, ou
+# uma escolha e a renovação por trás) montavam a cópia na trava e escreviam fora dela, e a montada antes podia escrever depois
+# e cobrir a nova (revisão da 4.1)
+_TRAVA_DISCO = {"planos": threading.Lock(), "planos_detalhe": threading.Lock()}
 _TEXTOS: dict = {}
 
 
@@ -100,27 +104,31 @@ def _boot_por_chave(store: dict, nome: str, campo: str) -> None:
 
 
 def _gravar_por_chave(store: dict, nome: str, maximo: int) -> None:
-    """A cópia em disco dos planos (ou dos detalhes): os mais recentes até `maximo`, sem os de mais de 7 dias."""
+    """A cópia em disco dos planos (ou dos detalhes): os mais recentes até `maximo`, sem os de mais de 7 dias. Montada e escrita
+    na vez da cópia (`_TRAVA_DISCO`): a última a escrever é sempre a mais nova."""
     destino = _c.arquivo(nome)
-    agora = _c.relogio()
-    with _TRAVA_PLANOS:
-        vivos = sorted(((k, v) for k, v in store["itens"].items() if agora - v["lido_em"] <= GUARDA_S),
-                       key=lambda kv: kv[1]["lido_em"], reverse=True)[:maximo]
-        store["itens"] = dict(vivos)
-        carga = {"formato": _c.FORMATO, "nome": nome, "gravado_em": agora, "itens": dict(vivos)}
-    if destino is None:
-        return
-    try:
-        _c.escrever_json(destino, carga)
-        store["disco"].update(gravado_em=agora, erro=None)
-    except Exception as e:                                          # noqa: BLE001
-        store["disco"]["erro"] = "gravar: %s: %s" % (type(e).__name__, str(e)[:120])
-        log.warning("catálogos: não gravei a cópia de %s (%s)", nome, store["disco"]["erro"])
+    with _TRAVA_DISCO[nome]:
+        agora = _c.relogio()
+        with _TRAVA_PLANOS:
+            vivos = sorted(((k, v) for k, v in store["itens"].items() if agora - v["lido_em"] <= GUARDA_S),
+                           key=lambda kv: kv[1]["lido_em"], reverse=True)[:maximo]
+            store["itens"] = dict(vivos)
+            carga = {"formato": _c.FORMATO, "nome": nome, "gravado_em": agora, "itens": dict(vivos)}
+        if destino is None:
+            return
+        try:
+            _c.escrever_json(destino, carga)
+            store["disco"].update(gravado_em=agora, erro=None)
+        except Exception as e:                                      # noqa: BLE001
+            store["disco"]["erro"] = "gravar: %s: %s" % (type(e).__name__, str(e)[:120])
+            log.warning("catálogos: não gravei a cópia de %s (%s)", nome, store["disco"]["erro"])
 
 
 def _renovar_planos_por_tras(ativos: list) -> None:
     """Os planos vencidos destes ativos, relidos por trás com a sessão de quem os pediu (`catalogos.renovar_por_tras`), um ativo
-    depois do outro; quem os pedir enquanto isso recebe os de antes. O que falha espera `ESPERA_TENTATIVA_S`."""
+    depois do outro, 1 por segundo; quem os pedir enquanto isso recebe os de antes. O que falha espera `ESPERA_TENTATIVA_S`; a
+    cota (406/429) espera e tenta o mesmo ativo de novo, e a sessão que caiu para a renovação (a revisão da 4.1: antes ela
+    seguia, sem pausa, depois das duas)."""
     import api
     por_chave = {chave_plano(a.get("id"), a.get("id_group_task")): a for a in ativos}
     mudou = [False]
@@ -129,10 +137,10 @@ def _renovar_planos_por_tras(ativos: list) -> None:
         a = por_chave[ch]
         try:
             planos = api.ler_planos_do_ativo(a.get("id"), a.get("id_group_task"))
-        except Exception as e:                                       # noqa: BLE001 — fica o de antes
+        except Exception as e:                                       # fica o de antes; quem decide é a renovação comum
             with _TRAVA_PLANOS:
                 _PLANOS["erro"], _PLANOS["erro_em"] = _c.motivo_do_erro(e), _c.relogio()
-            return
+            raise
         with _TRAVA_PLANOS:
             if ger != _c.geracao():
                 return
@@ -209,9 +217,10 @@ def _renovar_detalhe_por_tras(ch: str, id_task, id_item) -> None:
     def ler_uma(_ch, ger):
         try:
             _ler_detalhe(ch, id_task, id_item, ger)
-        except Exception as e:                                       # noqa: BLE001 — fica o de antes
+        except Exception as e:                                       # fica o de antes; quem decide é a renovação comum
             with _TRAVA_PLANOS:
                 _DETALHES["erro"], _DETALHES["erro_em"] = _c.motivo_do_erro(e), _c.relogio()
+            raise
     _c.renovar_por_tras(_DETALHES, [ch], ler_uma, trava=_TRAVA_PLANOS)
 
 

@@ -15,8 +15,13 @@ proibida; nomes e e-mails são inventados):
 - `test_prazo_vencido_renova_por_tras`: o vencido volta na hora e é renovado por trás, uma vez para todos, com a sessão de quem
   o achou vencido;
 - e o resto do contrato: o erro e a lista vazia não ficam guardados, as pessoas pelo REST da empresa (com os campos que a tela
-  usa, ou o RPC), o laço só no servidor e no seu minuto, o e-mail fora do disco, a releitura do que falta na criação e o
-  Raio-X com uma linha por catálogo."""
+  usa, ou o RPC), o laço só no servidor e no seu minuto, o e-mail fora do disco e o Raio-X com uma linha por catálogo.
+
+A rodada 1 da revisão (31/10/2026) segura o que o catálogo NÃO faz: a leitura das falhas pela metade não troca a completa; a
+criação da Engenharia confere a pessoa e a etiqueta ao vivo (a regra de 19/10); o "Criado por" do Histórico segue por pessoa;
+o REST que dá outra conta ou outro e-mail às mesmas pessoas não entra; a renovação por trás tem estado de sessão próprio, ritmo
+(1 por segundo, a cota, a sessão que caiu); a conta nova é achada mesmo com o REST valendo; o nome que é um e-mail não vai ao
+disco; o status vazio não guarda a lista local; e a cópia dos planos em disco não volta atrás."""
 import base64
 import json
 import os
@@ -91,13 +96,19 @@ class Fracttal:
                             api.RPC_REQ_TYPES_2: [{"id": 43, "description": "Subclasse Teste"}]}
         self.motivos = [{"id": 51, "description": "Duplicada"}]
         self.erro = None
+        # o "Criado por" do Histórico (P2) lê o pessoal POR PESSOA, com a sessão dela, e não é caminho do catálogo: os pedidos
+        # dele contam aqui, à parte (`fr` marca quem está dentro dele)
+        self.pedidos_p2, self.p2 = [], threading.local()
+        self.sem_permissao = set()               # os e-mails cuja sessão não tem a permissão de pessoal: o RPC dá a lista vazia
 
     def rpc(self, metodo, params, timeout=45):
         with self.trava:
-            self.pedidos.append((metodo, dict(params or {})))
+            (self.pedidos_p2 if getattr(self.p2, "dentro", False) else self.pedidos).append((metodo, dict(params or {})))
         if self.erro is not None:
             raise self.erro
         if metodo == api.RPC_PERSONNEL:
+            if sessao.email_do_jwt(sessao.jwt_atual()) in self.sem_permissao:
+                return {"data": []}
             ini = int(params.get("start") or 0)
             return {"data": [dict(p) for p in self.pessoal[ini:ini + 100]]}
         if metodo == api.RPC_LABELS_LIST:
@@ -158,10 +169,20 @@ def fr(monkeypatch):
     ativos_central.trocar([dict(a) for a in ATIVOS], "rpc")
     try:                                         # o dono dos catálogos (a etapa 4): a renovação por trás, na mão do teste
         ct = _catalogos()
-        f.por_tras = []
+        f.por_tras, f.dormiu = [], []
         monkeypatch.setattr(ct, "_em_segundo_plano", lambda fn: f.por_tras.append(fn))
+        monkeypatch.setattr(ct, "_dormir", lambda s: f.dormiu.append(s))  # as pausas do trabalho por trás: anotadas
     except ImportError:
         pass
+    contas = api.get_pessoas_contas
+
+    def contas_da_pessoa():                      # o "Criado por" (P2): os pedidos dele vão ao `pedidos_p2`
+        f.p2.dentro = True
+        try:
+            return contas()
+        finally:
+            f.p2.dentro = False
+    monkeypatch.setattr(api, "get_pessoas_contas", contas_da_pessoa)
     yield f
     with rotas._MEMO_LOCK:
         rotas._MEMO.clear()
@@ -205,13 +226,14 @@ def _ok(r, *codigos):
 # cada catálogo: os métodos do RPC dele, os pedidos de UMA leitura e os caminhos que o usam
 def _caminhos_pessoas(c):
     _ok(c.get("/os/api/responsaveis"))                                   # 1. rotas.responsaveis_fracttal
-    _ok(c.get("/os/historico?modo=criadas"))                             # 2. o "Criado por" e o "eu" do Histórico
+    _ok(c.get("/os/historico?modo=criadas"))                             # 2. o Histórico das criadas por mim
     _ok(c.get("/os/solicitacao"))                                        # 3. o técnico sugerido (rotas_solic._pessoas)
     _no_pedido(c, api._current_user_info)                                # 4. "criadas por mim" e "atribuídas a mim"
     _no_pedido(c, api._personnel_nome_por_id)                            # 5. o nome do responsável no card
     _ok(c.get("/os/api/cos/listas?so=responsaveis"))                     # 6. o Requerido por do COS
-    _ok(c.post("/os/api/solicitacao/engenharia/criar", json={}), 400)    # 7. a criação da Engenharia confere o responsável
     _ok(c.get("/os/clonar"))                                             # (o mesmo do 1, na Clonagem)
+    # o "Criado por" do 2 lê por pessoa (os pedidos dele contam à parte, `pedidos_p2`), e a criação da Engenharia (o 7 de
+    # antes) confere ao vivo: nenhum dos dois é do catálogo (`test_o_criado_por_e_de_cada_pessoa`, `test_a_criacao_da_...`)
 
 
 def _caminhos_etiquetas(c):
@@ -379,7 +401,7 @@ def test_reinicio_sem_pedido(fr, tmp_path):
     ct._relogio = lambda: monkey_relogio
     try:
         ct.aquecer(esperar=True)                                         # o aquecimento do boot: o disco, por trás
-        for email in EMAILS:
+        for email in EMAILS[:2]:                 # (a 3ª não está no pessoal: relê uma vez, `test_a_conta_nova_...`)
             c = _cliente(email)
             _tudo(c)
             _escolher_usina(c)
@@ -561,34 +583,269 @@ def test_quem_chega_junto_na_primeira_leitura_espera_a_mesma(fr, monkeypatch):
     assert saidas == [2] * 6 and fr.n(*M_PESSOAS) == 1
 
 
-# ── a criação relê o que falta ──────────────────────────────────────────────────────────────────────────────────────────
+# ── a criação da Engenharia confere ao vivo ─────────────────────────────────────────────────────────────────────────────
 def _corpo_eng(pid=501):
     return {"ativos": [ATIVOS[0]["id"]], "descricao": "Avaliar", "problema": "Desarma", "responsavel": {"id_personnel": pid}}
 
 
-def test_a_criacao_da_engenharia_rele_o_que_o_catalogo_nao_tem(fr, monkeypatch):
-    """Até 31/10/2026 a criação da Engenharia lia o pessoal e as etiquetas na hora (uma gravação). Agora lê do catálogo, e
-    só relê (uma vez, com a sessão de quem cria) o que a tela mostrou e o catálogo não tem: a pessoa que entrou depois."""
-    ct = _catalogos()
-    agora = {"t": time.time()}
-    monkeypatch.setattr(ct, "_relogio", lambda: agora["t"])
+def test_a_criacao_da_engenharia_confere_ao_vivo(fr, monkeypatch):
+    """A regra de 19/10/2026: faltando no Fracttal a pessoa ou a etiqueta ENGENHARIA, nenhuma OS sai. A criação confere as duas
+    AO VIVO, uma leitura de cada por gravação, com a sessão de quem cria: o catálogo serve à TELA, e a pessoa desligada ou a
+    etiqueta apagada nas últimas horas seguiriam nele até a renovação (revisão da 4.1, Important 2). A sessão morta é acusada
+    antes da gravação (401 e o login), e não com um "Relogue" por ativo."""
     criadas = []
     monkeypatch.setattr(api, "create_work_orders_bulk", lambda assets, *a, **k: criadas.append(k) or [
         {"code": x["code"], "ok": True, "os": {"wo_folio": 15000, "id_work_order": 9000}} for x in assets])
     monkeypatch.setenv(reg.ENV_RESPONSAVEIS, "Ana Teste;Eva Nova")
     c = _cliente("ana@exemplo.invalid")
+    _ok(c.get("/os/api/solicitacao/engenharia/responsaveis"))            # a tela: o catálogo
+    _ok(c.get("/os/api/tradicional/tipos"))                              # (a Classificação 1 vem do catálogo dos tipos)
+    antes = (fr.n(*M_PESSOAS), fr.n(*M_ETIQUETAS))
     assert _ok(c.post("/os/api/solicitacao/engenharia/criar", json=_corpo_eng(501))).get_json()["ok"]
-    assert fr.n(*M_PESSOAS) == 1 and fr.n(*M_ETIQUETAS) == 1 and criadas[-1]["etiqueta_ids"] == [900]
-    _ok(c.post("/os/api/solicitacao/engenharia/criar", json=_corpo_eng(501)))
-    assert fr.n(*M_PESSOAS) == 1 and fr.n(*M_ETIQUETAS) == 1                         # a 2ª criação não lê nada
+    assert criadas[-1]["etiqueta_ids"] == [900]
+    assert (fr.n(*M_PESSOAS), fr.n(*M_ETIQUETAS)) == (antes[0] + 1, antes[1] + 1)    # uma leitura de cada, ao vivo
+    # a pessoa que entrou no Fracttal agora sai na hora, sem esperar o catálogo
     fr.pessoal.append({"id": 504, "code": "E5", "full_name": "Eva Nova", "active": True, "id_account": 15,
                        "account_email": "eva@exemplo.invalid"})
-    agora["t"] += 120
     assert _ok(c.post("/os/api/solicitacao/engenharia/criar", json=_corpo_eng(504))).get_json()["ok"]
-    assert fr.n(*M_PESSOAS) == 2 and criadas[-1]["id_responsible"] == 504
-    # quem não está nem depois de reler segue recusado, sem reler de novo no mesmo minuto
-    r = _ok(c.post("/os/api/solicitacao/engenharia/criar", json=_corpo_eng(999)), 400)
-    assert "Engenharia" in r.get_json()["erro"] and fr.n(*M_PESSOAS) == 2
+    assert criadas[-1]["id_responsible"] == 504
+    n = len(criadas)
+    # a etiqueta ENGENHARIA apagada no Fracttal: nenhuma OS sai, mesmo com ela no catálogo
+    fr.etiquetas = [e for e in fr.etiquetas if e["description"] != "ENGENHARIA"]
+    r = _ok(c.post("/os/api/solicitacao/engenharia/criar", json=_corpo_eng(501)), 400)
+    assert "ENGENHARIA" in r.get_json()["erro"] and len(criadas) == n
+    # a pessoa desligada no Fracttal: idem
+    fr.etiquetas.append({"id": 900, "description": "ENGENHARIA"})
+    for p in fr.pessoal:
+        if p["id"] == 501:
+            p["active"] = False
+    r = _ok(c.post("/os/api/solicitacao/engenharia/criar", json=_corpo_eng(501)), 400)
+    assert "Engenharia" in r.get_json()["erro"] and len(criadas) == n
+    # a sessão morta: 401 com o login, antes de gravar
+    monkeypatch.setattr(api, "_rpc_call", _morre)
+    r = _ok(c.post("/os/api/solicitacao/engenharia/criar", json=_corpo_eng(504)), 401)
+    assert r.get_json().get("login") and len(criadas) == n
+
+
+# ── o que o catálogo não faz (a rodada 1 da revisão da 4.1) ─────────────────────────────────────────────────────────────
+def _morre(metodo, params, timeout=45):
+    """O 401 do Fracttal como o `_rpc_chamar` o trata: limpa a sessão (a do contexto) e levanta."""
+    api._clear_jwt()
+    raise api.SessionExpired("RPC %s HTTP 401 — a sessão do Fracttal expirou" % metodo)
+
+
+def test_as_falhas_pela_metade_nao_trocam_as_completas(fr, monkeypatch):
+    """Important 1: o `get_falha_listas` engolia o erro de cada lista, e o catálogo guardava a leitura que só tinha os tipos.
+    Um 429 nas causas trocava as listas completas por `{"causas": []}` por 24 h, e o COS recusava toda OS de falha."""
+    ct = _catalogos()
+    agora = {"t": time.time()}
+    monkeypatch.setattr(ct, "_relogio", lambda: agora["t"])
+    c = _cliente("ana@exemplo.invalid")
+    completas = _no_pedido(c, rotas_cos._falhas_para_criar)
+    assert all(completas[k] for k in ("tipos", "causas", "metodos"))
+    original = fr.rpc
+
+    def cota_nas_causas(metodo, params, timeout=45):
+        r = original(metodo, params, timeout)
+        if metodo == api.RPC_FALHA_CAUSAS:
+            raise api.FracttalError("RPC %s HTTP 429 — muitas requisições" % metodo)
+        return r
+    monkeypatch.setattr(api, "_rpc_call", cota_nas_causas)
+    agora["t"] += ct.PRAZO_S["falhas"] + 1
+    assert _no_pedido(c, rotas_cos._falhas_para_criar) == completas      # vencidas: as de antes, e a renovação por trás
+    fr.por_tras.pop()()
+    assert _no_pedido(c, rotas_cos._falhas_para_criar) == completas      # a leitura pela metade não trocou nada
+    assert "429" in ({x["nome"]: x for x in ct.estado()["assuntos"]}["falhas"]["erro"] or "")
+    # sem cópia nenhuma: a leitura pela metade não fica, e a tela diz o erro
+    ct.reiniciar()
+    j = c.get("/os/api/cos/listas?so=falhas").get_json()
+    assert "429" in (j["erros"].get("falhas") or "")
+    assert {x["nome"]: x for x in ct.estado()["assuntos"]}["falhas"]["n"] == 0
+
+
+def test_o_criado_por_e_de_cada_pessoa(fr):
+    """Important 3: o "Criado por" do Histórico (as contas e o "eu") é lido POR PESSOA, com a sessão dela, e guardado 10 min
+    para ela, como até 31/10. Quem não tem a permissão de pessoal no Fracttal recebe a lista vazia, e não as contas da empresa
+    que o catálogo comum tem (o catálogo segue para a lista de responsáveis e a pessoa logada)."""
+    fr.sem_permissao.add("dora@exemplo.invalid")
+    a, d = _cliente("ana@exemplo.invalid"), _cliente("dora@exemplo.invalid")
+    a.get("/os/api/responsaveis")                                        # o catálogo comum, pela sessão da Ana
+    assert _no_pedido(d, api.get_pessoas_contas) == {"pessoas": [], "eu": None}
+    assert [p["id_account"] for p in _no_pedido(a, api.get_pessoas_contas)["pessoas"]] == [11, 12, 13]
+
+    def criado_por(c):
+        html = _ok(c.get("/os/historico?modo=criadas")).get_data(as_text=True)
+        ini = html.index('<select name="pessoa">')
+        return html[ini:html.index("</select>", ini)]
+    assert "Ana Teste Silva" in criado_por(a) and "Ana Teste Silva" not in criado_por(d)
+    n = len(fr.pedidos_p2)
+    for c in (a, d, a, d):                                               # guardado 10 min para cada uma
+        criado_por(c)
+    assert len(fr.pedidos_p2) == n
+
+
+def test_o_rest_com_a_conta_ou_o_email_trocados_nao_troca(fr):
+    """Important 4: a conferência REST x RPC olhava só os ids da lista de responsáveis. O mesmo id com outra conta
+    (`id_account`: o "criadas por mim") ou outro e-mail (a pessoa logada) passava, e mudava o dono das OS sem ninguém ver."""
+    ct, cl = _catalogos(), _leitor()
+    c = _cliente("ana@exemplo.invalid")
+    c.get("/os/api/responsaveis")                                        # o catálogo pelo RPC
+    rel = cl.ler_pessoas_rest(ler=_rest([_rest_completo(dict(p, id_account=p["id_account"] + 1000)) for p in PESSOAL]))
+    assert "id_account" in rel["erro"]
+    rel = cl.ler_pessoas_rest(ler=_rest([_rest_completo(dict(p, account_email="x" + p["account_email"])) for p in PESSOAL]))
+    assert "e-mail" in rel["erro"]
+    assert {x["nome"]: x for x in ct.estado()["assuntos"]}["pessoas"]["fonte"] == "rpc"
+    assert _no_pedido(c, api._current_user_info) == (501, 11, "Ana Teste Silva")
+
+
+def test_a_renovacao_por_tras_nao_derruba_a_sessao_de_quem_pediu(fr, monkeypatch):
+    """Minor 1: a thread da renovação levava a cópia do contexto de quem pediu, e a cópia leva o MESMO estado da sessão. Um 401
+    lá marcava a sessão dela como morta, e o pedido dela, se ainda corria, saía para o login."""
+    ct = _catalogos()
+    agora = {"t": time.time()}
+    monkeypatch.setattr(ct, "_relogio", lambda: agora["t"])
+    _cliente("ana@exemplo.invalid").get("/os/api/tradicional/etiquetas")
+    agora["t"] += ct.PRAZO_S["etiquetas"] + 1
+    b = _cliente("bruno@exemplo.invalid")
+    with b.application.test_request_context(), sessao.contexto(b.jwt, b.email):
+        assert ct.etiquetas()                                            # a vencida, na hora; a renovação fica com o teste
+        monkeypatch.setattr(api, "_rpc_call", _morre)
+        t = threading.Thread(target=fr.por_tras.pop())
+        t.start()
+        t.join(5)
+        assert sessao.morta() is False
+
+
+def test_a_renovacao_dos_ativos_por_tras_nao_derruba_a_sessao(monkeypatch):
+    """Minor 1, o mesmo no catálogo de ativos (`api._renovar_catalogo_por_tras`)."""
+    criar_app(segredo="teste", testing=True)                             # a sessão por pessoa instalada no `api`
+    monkeypatch.setitem(api._ASSETS_RENOVA, "tentou", 0.0)
+    monkeypatch.setattr(api, "load_assets_cached", lambda *a, **k: _morre("inventories.items_list", {}))
+    with sessao.contexto(_jwt("bruno@exemplo.invalid"), "bruno@exemplo.invalid"):
+        api._renovar_catalogo_por_tras()
+        for t in [t for t in threading.enumerate() if t.name == "os-catalogo-por-tras"]:
+            t.join(5)
+        assert sessao.morta() is False
+
+
+def test_a_conta_nova_com_o_rest_valendo_e_achada_pelo_rpc(fr, monkeypatch):
+    """Minor 2: com o REST valendo, a renovação das pessoas é do laço do servidor (05h, 11h, 17h e 23h), e a conta nova no
+    Fracttal ficava até 6 h sem "criadas por mim". Quem não está no catálogo relê pelo RPC, com a sessão DELA, uma vez por
+    pessoa a cada 10 min (e não com o catálogo recém-lido)."""
+    ct, cl = _catalogos(), _leitor()
+    agora = {"t": time.time()}
+    monkeypatch.setattr(ct, "_relogio", lambda: agora["t"])
+    ct.ligar_leitor(ligado=True)                                         # o laço do servidor
+    c = _cliente("ana@exemplo.invalid")
+    c.get("/os/api/responsaveis")
+    assert cl.ler_pessoas_rest(ler=_rest([_rest_completo(p) for p in PESSOAL]))["erro"] == ""
+    fr.pessoal.append({"id": 504, "code": "E5", "full_name": "Eva Nova", "active": True, "id_account": 15,
+                       "account_email": "eva@exemplo.invalid"})            # a conta nova no Fracttal
+    agora["t"] += 2 * 3600
+    assert _no_pedido(_cliente("eva@exemplo.invalid"), api._current_user_info) == (504, 15, "Eva Nova")
+    assert fr.n(*M_PESSOAS) == 2 and fr.por_tras == []
+    agora["t"] += 120
+    d = _cliente("dora@exemplo.invalid")                                 # quem não está nem assim: uma vez a cada 10 min
+    for _ in range(3):
+        assert _no_pedido(d, api._current_user_info) == (None, None, "")
+    assert fr.n(*M_PESSOAS) == 3
+    agora["t"] += ct.ESPERA_TENTATIVA_S
+    _no_pedido(d, api._current_user_info)
+    assert fr.n(*M_PESSOAS) == 4
+
+
+def test_o_nome_que_e_um_email_nao_vai_ao_disco(fr, tmp_path):
+    """Minor 3: a pessoa sem nome no Fracttal aparece pelo e-mail (o `full_name` dela é o e-mail). A tela mostra como sempre
+    mostrou, e o disco não guarda o e-mail em claro."""
+    ct = _catalogos()
+    pasta = str(tmp_path / "catalogos")
+    ct.reiniciar(pasta=pasta, chave=CHAVE)
+    fr.pessoal.append({"id": 505, "code": "F6", "full_name": "integracao@exemplo.invalid", "active": True, "id_account": 16,
+                       "account_email": "integracao@exemplo.invalid"})
+    c = _cliente("ana@exemplo.invalid")
+    assert "integracao@exemplo.invalid" in [p["name"] for p in c.get("/os/api/responsaveis").get_json()["pessoas"]]
+    with open(os.path.join(pasta, "pessoas.json"), encoding="utf-8") as f:
+        texto = f.read()
+    assert "@" not in texto and "exemplo.invalid" not in texto
+
+
+def test_a_renovacao_dos_planos_por_tras_tem_ritmo(fr, monkeypatch):
+    """Minor 4: a renovação dos planos vencidos relia os inversores um atrás do outro, sem pausa, e seguia depois da cota e da
+    sessão que caiu. Agora: 1 pedido por segundo, o 406/429 espera (5 s e 10 s) e tenta o mesmo ativo de novo, e a sessão que
+    caiu para a renovação; o ativo que faltou fica para a próxima sessão, já."""
+    ct = _catalogos()
+    agora = {"t": time.time()}
+    monkeypatch.setattr(ct, "_relogio", lambda: agora["t"])
+    a = _cliente("ana@exemplo.invalid")
+    _escolher_usina(a)
+    agora["t"] += ct.PRAZO_S["planos"] + 1
+    original, vez = fr.rpc, {"n": 0}
+
+    def rpc(metodo, params, timeout=45):
+        if metodo == api.RPC_TASK_EVENTS:
+            vez["n"] += 1
+            if vez["n"] == 2:                                            # o 2º inversor: a cota, uma vez
+                raise api.FracttalError("RPC %s HTTP 429 — muitas requisições" % metodo)
+            if vez["n"] == 4:                                            # o 3º: a sessão caiu
+                raise api.SessionExpired("RPC %s HTTP 401 — a sessão do Fracttal expirou" % metodo)
+        return original(metodo, params, timeout)
+    monkeypatch.setattr(api, "_rpc_call", rpc)
+    _escolher_usina(a)                                                   # os de ontem, e a renovação por trás
+    renovar = fr.por_tras[0]                                             # (a dos planos; a 2ª é a do detalhe)
+    fr.por_tras.clear()
+    fr.dormiu.clear()
+    renovar()
+    assert vez["n"] == 4 and fr.dormiu == [ct.PAUSA_S, ct.ESPERAS_COTA_S[0], ct.PAUSA_S]
+    _escolher_usina(_cliente("bruno@exemplo.invalid"))                   # o 3º volta a ser de quem chegar, sem os 10 min
+    assert len(fr.por_tras) == 1
+    fr.por_tras.pop()()
+    assert vez["n"] == 5
+
+
+def test_o_status_com_o_rpc_vazio_e_a_lista_local_e_nao_fica(fr, monkeypatch):
+    """Minor 5: o Fracttal que respondeu a lista de status VAZIA fazia o `status_solicitacao_catalogo` devolver a lista local,
+    e o catálogo a guardava 24 h como se fosse o que o Fracttal aceita."""
+    ct = _catalogos()
+    agora = {"t": time.time()}
+    monkeypatch.setattr(ct, "_relogio", lambda: agora["t"])
+    c = _cliente("ana@exemplo.invalid")
+    fr.status = []
+    local = [t for t in api.STATUS_SOLICITACAO if t[1] not in ("OPEN_STATUS", "REQUEST_TODO")]
+    assert _no_pedido(c, rotas_solic._status_cat) == local
+    fr.status = [{"id": 5}]
+    agora["t"] += ct.ESPERA_TENTATIVA_S + 1
+    assert [t[0] for t in _no_pedido(c, rotas_solic._status_cat)] == [5]  # a lista local não ficou guardada
+
+
+def test_a_copia_dos_planos_em_disco_nao_volta_atras(fr, tmp_path, monkeypatch):
+    """Minor 6: duas gravações dos planos juntas (a 1ª escolha de duas usinas, ou uma escolha e a renovação por trás) montavam
+    a cópia dentro da trava e escreviam fora dela: a montada antes podia escrever depois, e cobrir a nova."""
+    import catalogos_planos as cp
+    ct = _catalogos()
+    pasta = str(tmp_path / "catalogos")
+    ct.reiniciar(pasta=pasta, chave=CHAVE)
+    escrever, solta, primeira = ct.escrever_json, threading.Event(), [True]
+
+    def lenta(destino, carga):
+        if primeira[0] and destino.endswith("planos.json"):
+            primeira[0] = False
+            solta.wait(5)                                                # a 1ª gravação demora (o disco, o antivírus)
+        escrever(destino, carga)
+    monkeypatch.setattr(ct, "escrever_json", lenta)
+    agora = time.time()
+    cp._PLANOS["itens"]["601:77"] = {"lido_em": agora, "planos": [{"id_task": 701, "description": "a"}]}
+    t1 = threading.Thread(target=cp._gravar_por_chave, args=(cp._PLANOS, "planos", cp.PLANOS_MAX))
+    t1.start()
+    time.sleep(0.1)                                                      # a 1ª montou a cópia e espera no disco
+    cp._PLANOS["itens"]["602:77"] = {"lido_em": agora, "planos": [{"id_task": 702, "description": "b"}]}
+    t2 = threading.Thread(target=cp._gravar_por_chave, args=(cp._PLANOS, "planos", cp.PLANOS_MAX))
+    t2.start()
+    t2.join(0.3)                                                         # a 2ª, com o ativo novo, escreve antes se puder
+    solta.set()
+    t1.join(5)
+    t2.join(5)
+    with open(os.path.join(pasta, "planos.json"), encoding="utf-8") as f:
+        assert sorted(json.load(f)["itens"]) == ["601:77", "602:77"]
 
 
 # ── as pessoas pelo REST da empresa (só o servidor) ─────────────────────────────────────────────────────────────────────

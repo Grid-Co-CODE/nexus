@@ -1970,25 +1970,38 @@ guarda e entrega; o leitor, que importa o `nexus`, só o servidor liga).
   `os_web/sessao.py`): a 1ª sessão que acha o catálogo vencido o renova POR TRÁS, uma vez para todos, com a cópia do contexto
   (o JWT dela e a rota dela no contador do Fracttal), como o `api._renovar_catalogo_por_tras` dos ativos (uma função só para
   os assuntos, os planos e os detalhes: `catalogos.renovar_por_tras`); quem chega com a renovação em curso usa a cópia velha e
-  não espera; a renovação que falhou espera 10 min (`ESPERA_TENTATIVA_S`), e a sessão
-  caída de UMA pessoa não segura ninguém. Sem cópia nenhuma (a máquina nova, o disco ilegível), a 1ª tela lê na hora, e quem
+  não espera; a renovação que falhou espera 10 min (`ESPERA_TENTATIVA_S`), e a sessão caída de UMA pessoa não segura ninguém.
+  A renovação por trás roda com um estado de sessão PRÓPRIO (`os_web.sessao.propria`, pelo `api._na_sessao_propria`, também no
+  catálogo de ativos): a cópia do contexto levava o mesmo estado do pedido de quem pediu, e um 401 por trás o mandava ao
+  login. E tem ritmo: 1 pedido por segundo entre as chaves (`PAUSA_S`), o 406/429 espera 5 s e 10 s e tenta a mesma chave de
+  novo (`ESPERAS_COTA_S`), a cota que não voltou para a renovação, e a sessão que caiu também (as chaves que faltaram voltam a
+  ser de quem chegar, já). Sem cópia nenhuma (a máquina nova, o disco ilegível), a 1ª tela lê na hora, e quem
   chega junto espera a MESMA leitura (uma trava por assunto: a carga fria da Fila segue paralela).
 - **O erro e o vazio não ficam guardados** (a regra de 20/10/2026): a lista vazia da sessão de alguém sem a permissão esvaziaria
-  a tela de todo mundo pelo prazo inteiro. Os status sem o Fracttal voltam a lista local, que NÃO fica guardada (até 31/10 ela
-  ficava 30 min na cópia da Fila como se fosse o que o Fracttal aceita); sem catálogo nenhum, a falha só é tentada de novo
-  depois de 10 min (cada Fila aberta com o Fracttal fora não vira um pedido).
+  a tela de todo mundo pelo prazo inteiro. **Nem a leitura pela metade**: as falhas do COS só valem com as três listas (o
+  `get_falha_listas(levantar=True)` sobe o erro de cada uma; antes, um 429 nas causas guardava `{"causas": []}` por 24 h e o
+  COS recusava toda OS de falha), e o erro de verdade vai ao estado e à tela. Os status sem o Fracttal, ou com o Fracttal
+  respondendo a lista vazia, voltam a lista local, que NÃO fica guardada (até 31/10 ela ficava 30 min na cópia da Fila como se
+  fosse o que o Fracttal aceita); sem catálogo nenhum, a falha só é tentada de novo depois de 10 min (cada Fila aberta com o
+  Fracttal fora não vira um pedido).
 - **Quem não acha o que procura relê** (`reler=True`, no máximo uma vez por minuto, `RELER_NA_FALTA_S`, com a sessão de quem
   pediu): o tipo de tarefa pelo nome (`api.tipo_main_ao_vivo`, a Zeladoria criada hoje), a etiqueta pelo nome (`api._label_id`,
-  `api.label_id_por_nome`) e a criação da Engenharia (o responsável que a tela mostrou e o catálogo não tem; a etiqueta
-  ENGENHARIA). Até 31/10 a criação da Engenharia lia o pessoal e as etiquetas na hora; agora lê o catálogo e só relê o que falta.
-  O que o catálogo tem e o Fracttal tirou nas últimas horas (a etiqueta apagada, a pessoa desligada) segue na tela até a
-  renovação: a gravação no Fracttal é quem recusa.
+  `api.label_id_por_nome`) e a pessoa logada que não está no catálogo (`da_pessoa`, abaixo).
+- **A gravação não confia no catálogo.** O que o catálogo tem e o Fracttal tirou nas últimas horas (a etiqueta apagada, a pessoa
+  desligada) segue na TELA até a renovação. A criação da Engenharia confere a pessoa e a etiqueta ENGENHARIA AO VIVO, uma
+  leitura de cada por gravação, com a sessão de quem cria (`api.responsaveis_ao_vivo`, `api.get_labels`): a regra de 19/10 é
+  que, faltando uma delas no Fracttal, nenhuma OS sai, e a sessão morta é acusada ali, antes de gravar (401 e o login, e não
+  um "Relogue" por ativo). A etapa 4 a tinha posto no catálogo e a revisão da 4.1 a tirou. Nas outras gravações que levam um
+  id do catálogo (a etiqueta da criação da Performance, o tipo pelo nome) o que o Fracttal faz com o id que deixou de valer não
+  foi medido: não se presume que ele recuse.
 - **A pessoa logada sem o e-mail.** `catalogos.da_pessoa(email)` acha (id_personnel, id_account, nome) pelo HMAC do e-mail
   (`email_h`, com a chave que a ponte deriva da do Nexus: `ponte.chave_dos_catalogos`); nem a memória nem o disco guardam o
   e-mail. A cópia feita com outra chave (a `NEXUS_SECRET_KEY` trocou) não acharia ninguém: é ignorada, com o motivo no estado, e
-  o pessoal é relido uma vez. O nome da conta de quem não tem nome no
-  Fracttal (o "Criado por" mostra o e-mail dela) não vai ao disco: depois de um reinício ela some do filtro até a próxima
-  leitura. A pessoa que não está num catálogo de mais de 1 h pede a renovação por trás (a conta nova).
+  o pessoal é relido uma vez. A pessoa sem nome no Fracttal aparece nas telas pelo e-mail (o `full_name` dela é o e-mail):
+  esse nome não vai ao disco em claro, e depois de um reinício ela some das listas até a próxima leitura. A pessoa logada que
+  não está no catálogo (a conta nova no Fracttal) relê o pessoal pelo RPC, com a sessão DELA, na hora, uma vez por pessoa a
+  cada 10 min, e não com o catálogo recém-lido: com o REST valendo a renovação das pessoas é só do laço do servidor, e a conta
+  nova ficava até 6 h sem "criadas por mim".
 - **O `_label_id` não vai mais ao Fracttal.** Ele era relido a cada lista de propósito (08/10/2026): era o 1º pedido das listas
   por etiqueta e acusava a sessão morta, porque a listagem engolia o erro das páginas. Desde 21/10/2026 a página que falha
   derruba a busca inteira (`_lista_pela_metade`): a lista acusa sozinha. A conferência do Garantias (`total_chamados`) passou
@@ -1999,17 +2012,17 @@ guarda e entrega; o leitor, que importa o `nexus`, só o servidor liga).
 | Caminho | Antes | Agora |
 |---|---|---|
 | Pessoas 1. `rotas.responsaveis_fracttal` (`/os/api/responsaveis`: Performance, PCM, Tradicional; Clonagem, Inspeção, a Engenharia na tela) | `_memo(("cat", "responsaveis"))`, 10 min, sobre `api.get_responsaveis` (RPC) | `catalogos.pessoas()` |
-| Pessoas 2. o "Criado por" e o "eu" do Histórico (`rotas.historico`, `_contas_do_filtro`) | `_memo(("pessoas", pessoa))`, 10 min POR PESSOA, sobre `api.get_pessoas_contas` (RPC) | `api.get_pessoas_contas()` → `catalogos.contas()` e `da_pessoa` |
+| Pessoas 2. o "Criado por" e o "eu" do Histórico (`rotas.historico`, `_contas_do_filtro`) | `_memo(("pessoas", pessoa))`, 10 min POR PESSOA, sobre `api.get_pessoas_contas` (RPC) | o mesmo, POR PESSOA (`rotas._contas_da_pessoa`): não é do catálogo, ver "Visibilidade" |
 | Pessoas 3. o técnico sugerido da Solicitação e da Fila (`rotas_solic._pessoas`) | `_memo(("solic_cat", "pessoas"))`, 30 min (RPC) | `catalogos.pessoas()` |
 | Pessoas 4. a pessoa logada (`api._current_user_info`: "criadas por mim", "atribuídas", a lista central) | `_user_ids_cache` por e-mail, até o reinício, relendo o pessoal até achá-la (RPC) | `catalogos.da_pessoa(email)` |
 | Pessoas 5. o nome do responsável no card (`api._personnel_nome_por_id`) | `_personnel_name_cache`, até o reinício (RPC) | `catalogos.nome_por_id()` |
 | Pessoas 6. o Requerido por do COS (`rotas_cos.api_listas`) | `api.get_responsaveis` a cada abertura (RPC) | `catalogos.pessoas()` |
-| Pessoas 7. a criação da Engenharia (`rotas_solic_eng.api_criar`) | `api.get_responsaveis` a cada criação (RPC) | `catalogos.pessoas()`, e `reler=True` para quem falta |
+| Pessoas 7. a criação da Engenharia (`rotas_solic_eng.api_criar`) | `api.get_responsaveis` a cada criação (RPC) | ao vivo, uma leitura por gravação (`api.responsaveis_ao_vivo`): não é do catálogo |
 | Etiquetas 1. `rotas.etiquetas_fracttal` (Histórico, card, Criar OS, a lista central) | `_memo(("cat", "etiquetas"))`, 10 min | `catalogos.etiquetas()` |
 | Etiquetas 2. a Fila e a Solicitação (`rotas_solic._etiquetas`) | `_memo(("solic_cat", "etiquetas"))`, 30 min | `catalogos.etiquetas()` |
 | Etiquetas 3. o id pelo nome (`api.label_id_por_nome`: a criação da Performance, a OS em execução) | `_LABEL_IDS`, com o "não existe" até o reinício | `catalogos.etiquetas()`, e `reler=True` para quem falta |
 | Etiquetas 4. o id das listas por etiqueta (`api._label_id`: Garantias, Performance, a análise da Engenharia) | `api.get_labels` a cada lista (RPC) | `catalogos.etiquetas()`, e `reler=True` para quem falta |
-| Etiquetas (a criação da Engenharia) | `api.get_labels` a cada criação | `catalogos.etiquetas()`, e `reler=True` se falta a ENGENHARIA |
+| Etiquetas (a criação da Engenharia) | `api.get_labels` a cada criação | ao vivo, uma por gravação (`api.get_labels`): não é do catálogo |
 | Tipos 1. `api._lista_tipos` (o COS, o Criar OS, a Fila) | `_TIPOS_CACHE`, uma vez por processo, nunca vencia | `catalogos.tipos_classif()` (o `api.get_tipos_classif` é só o leitor) |
 | Tipos 2. a Fila (`rotas_solic._tipos`) | `_memo(("solic_cat", "tipos"))`, 30 min | `catalogos.tipos_classif()` |
 | Tipos 3. a classificação e o tipo pelo nome (`api._classif_ids`, `api.tipo_main_ao_vivo`) | `_CLASSIF_CACHE`, nunca vencia (o vazio também) | `catalogos.tipos_classif()`, e `reler=True` no tipo que falta |
@@ -2029,7 +2042,8 @@ guarda e entrega; o leitor, que importa o `nexus`, só o servidor liga).
   amostra um ativo por tipo só para contar subtarefas. Guardar por grupo poderia oferecer a um ativo um plano que ele não tem.
   O detalhe do plano (o resumo da tela) fica por plano e ativo, SEM o `raw` (o resumo não o usa e ele repetiria as subtarefas);
   até `PLANOS_MAX` ativos e `DETALHES_MAX` detalhes, os de 7 dias sem uso saem. A lista vazia não fica (pode ser a sessão sem a
-  permissão; o ativo sem plano é relido a cada escolha). **Medido** (`tracemalloc`, dados sintéticos na forma do RPC): a
+  permissão; o ativo sem plano é relido a cada escolha). A cópia em disco é montada e escrita uma por vez (`_TRAVA_DISCO`):
+  duas gravações juntas montavam a cópia na trava e escreviam fora dela, e a montada antes podia cobrir a nova. **Medido** (`tracemalloc`, dados sintéticos na forma do RPC): a
   carteira inteira (~2.850 inversores e estações, 8 planos cada) 5,7 MB na memória com um objeto só para cada nome de plano
   (7,4 MB sem isso) e 1,7 MB em disco; um detalhe com 30 subtarefas ~25 KB (150 detalhes, 3,6 MB). Os outros catálogos são
   de dezenas a ~150 linhas.
@@ -2039,20 +2053,25 @@ guarda e entrega; o leitor, que importa o `nexus`, só o servidor liga).
   `active` e o `id_account` nunca foram vistos no REST, e este computador não lê o Fracttal com a credencial da empresa: a
   sondagem é a conferência de cada leitura (`campos_que_faltam`: cada campo em >= 99% das linhas). Faltou um, nada muda, o
   estado diz qual, e as pessoas seguem pelo RPC. A 1ª leitura REST contra um catálogo do RPC confere ainda a lista de
-  responsáveis (>= 95% em comum nos dois sentidos: o mesmo campo com outro sentido mudaria quem as telas mostram); a 1ª que
+  responsáveis (>= 95% em comum nos dois sentidos: o mesmo campo com outro sentido mudaria quem as telas mostram) e, das
+  pessoas em comum, a conta (`id_account`: o dono do "criadas por mim") e o e-mail (`email_h`: quem a pessoa logada é), >= 95%
+  iguais cada um (revisão da 4.1: o mesmo id com outra conta passava); a 1ª que
   vale PRECISA desse catálogo (a 1ª noite dos ativos, REST x RPC: na máquina sem cópia, espera a 1ª tela que o lê pela
   sessão de alguém); e nenhuma leitura REST que encolhe mais de 10% troca o catálogo.
 - **Visibilidade.** Nenhum destes catálogos depende de quem pergunta no código: eles já eram um para todos desde 19/10/2026
   (`("cat", ...)`, `("solic_cat", ...)`) ou por processo (`_TIPOS_CACHE`, `_falha_listas_cache`, `_CLASSIF_CACHE`). O único sinal
-  de diferença por pessoa é a lista VAZIA de quem não tem a permissão, que não é guardada. O que é de cada pessoa (o "eu", a
-  pessoa logada) sai por pessoa do catálogo comum.
+  de diferença por pessoa é a lista VAZIA de quem não tem a permissão, que não é guardada. A pessoa logada sai por pessoa do
+  catálogo comum (`da_pessoa`, pelo HMAC do e-mail dela). O "Criado por" do Histórico (as contas e o "eu") NÃO: ele era por
+  pessoa, com a sessão dela, e segue assim (`rotas._contas_da_pessoa`, 10 min para cada uma, sobre `api.get_pessoas_contas`):
+  quem não tem a permissão de pessoal no Fracttal recebe a lista vazia, e no catálogo comum veria as contas da empresa (a
+  etapa 4 o tinha posto no catálogo, e a revisão da 4.1 o devolveu).
 
 **Pedidos ao Fracttal** (pela conta do código e pelos testes; o pessoal tem ~150 pessoas, 2 páginas de 100):
 
 | Catálogo | Antes | Agora: a 1ª abertura do dia | Agora: as seguintes, de qualquer pessoa |
 |---|---|---|---|
-| Pessoas | 2 por tela a cada 10 min, POR PESSOA no Histórico, a cada abertura do COS e criação da Engenharia, e 1 ou 2 por pessoa a cada reinício (no teste, 3 pessoas pelos 7 caminhos: 15) | 0 na tela; 2 por trás se a cópia passou das 6 h (ou 0: o REST das 05h) | 0 (no teste: 1 leitura para os 7 caminhos e 3 pessoas) |
-| Etiquetas | 1 a cada 10 min e a cada 30 min nas telas, 1 a cada lista por etiqueta e a cada criação da Engenharia (no teste: 6) | 0 na tela; 1 por trás se passou das 6 h | 0 (no teste: 1) |
+| Pessoas | 2 por tela a cada 10 min, POR PESSOA no Histórico, a cada abertura do COS e criação da Engenharia, e 1 ou 2 por pessoa a cada reinício (no teste, 3 pessoas pelos 7 caminhos: 15) | 0 na tela; 2 por trás se a cópia passou das 6 h (ou 0: o REST das 05h) | 0 nos caminhos do catálogo (no teste: 1 leitura para os 5 caminhos e 3 pessoas); fora dele, como antes: o "Criado por", 2 por pessoa a cada 10 min no Histórico, e a criação da Engenharia, 2 por gravação |
+| Etiquetas | 1 a cada 10 min e a cada 30 min nas telas, 1 a cada lista por etiqueta e a cada criação da Engenharia (no teste: 6) | 0 na tela; 1 por trás se passou das 6 h | 0 (no teste: 1); a criação da Engenharia, 1 por gravação, como antes |
 | Tipos e classificações | 3 a cada reinício (~10 por dia útil), e nunca mais | 0 na tela; 3 por trás se passou das 24 h | 0 |
 | Falhas do COS | 3 a cada reinício, e nunca mais | 0; 3 por trás passadas as 24 h | 0 |
 | Status, grupo e classificações da solicitação, motivos | 1, 3 e 1 a cada 30, 30 e 10 min de uso | 0; 1, 3 e 1 por trás passadas as 24 h | 0 |
@@ -2064,14 +2083,19 @@ catálogo (quantos, a fonte, lido em, a idade contra o prazo, VENCIDO e se está
 Fracttal neste processo, o disco), a linha "Pessoas pelo REST" (o laço: ligado, a próxima, se vale, a última boa e a falha com
 o campo que faltou) e a "Planos da Performance" (`raio_x._linhas_dos_catalogos`). Nunca nome nem e-mail.
 
-**Prova:** `tests/test_oscreator_catalogos.py` (`test_um_pedido_para_todas_as_telas` por catálogo, os 7 caminhos das pessoas, os
+**Prova:** `tests/test_oscreator_catalogos.py` (`test_um_pedido_para_todas_as_telas` por catálogo, os caminhos das pessoas que são do catálogo, os
 das etiquetas, dos tipos, das falhas, do status, do grupo da solicitação e dos motivos, com 3 pessoas: uma leitura;
 `test_as_telas_veem_o_mesmo_de_antes`; `test_reinicio_sem_pedido`, com a cópia vencida; `test_disco_corrompido` por catálogo e
 os planos corrompidos; `test_performance_segunda_vez_sem_pedido` e a vencida que volta e renova por trás;
 `test_prazo_vencido_renova_por_tras`, uma vez para duas pessoas, com o JWT de quem achou; o erro e o vazio que não ficam; o
-status local que não fica; quem chega junto na 1ª leitura; a criação da Engenharia que relê o que falta; o e-mail fora do
-disco; as pessoas pelo REST com os campos, sem eles, sem bater com o RPC e valendo; só o servidor liga; o minuto na lista única;
-a ponte; o Raio-X). Os testes de antes que injetavam o pessoal pelo `api.get_responsaveis` passaram a injetá-lo pelo leitor
+status local que não fica; quem chega junto na 1ª leitura; o e-mail fora do disco; as pessoas pelo REST com os campos, sem
+eles, sem bater com o RPC e valendo; só o servidor liga; o minuto na lista única; a ponte; o Raio-X). A rodada 1 da revisão
+(31/10/2026), um teste vermelho para cada achado: `test_a_criacao_da_engenharia_confere_ao_vivo`,
+`test_as_falhas_pela_metade_nao_trocam_as_completas`, `test_o_criado_por_e_de_cada_pessoa`,
+`test_o_rest_com_a_conta_ou_o_email_trocados_nao_troca`, `test_a_renovacao_por_tras_nao_derruba_a_sessao_de_quem_pediu` (e o
+dos ativos), `test_a_conta_nova_com_o_rest_valendo_e_achada_pelo_rpc`, `test_o_nome_que_e_um_email_nao_vai_ao_disco`,
+`test_a_renovacao_dos_planos_por_tras_tem_ritmo`, `test_o_status_com_o_rpc_vazio_e_a_lista_local_e_nao_fica` e
+`test_a_copia_dos_planos_em_disco_nao_volta_atras`. Os testes de antes que injetavam o pessoal pelo `api.get_responsaveis` passaram a injetá-lo pelo leitor
 (`api.ler_pessoal`); o `test_oscreator_card_e_anexos_29_10` não zera mais o `_CLASSIF_CACHE`, que saiu.
 
 ## O catálogo de ativos vencido por trás (24/10/2026)
@@ -2106,8 +2130,9 @@ O mesmo superplano (o mapa de cada pedido ao Fracttal, por tela, que a sessão f
   todos; o erro não fica guardado, e o catálogo vazio também não (`_memo(..., guardar=)`, 20/10/2026: a lista vazia da
   sessão de alguém sem a permissão esvaziaria a tela de todo mundo pelo TTL). **Desde 31/10/2026 o pessoal, as etiquetas, os
   motivos e os tipos da solicitação têm um dono só** (`catalogos.py`, seção "Os catálogos pequenos num lugar só", acima: o
-  prazo de cada um, a cópia em disco, a renovação por trás; a mesma regra do erro e do vazio), e a criação da Engenharia lê o
-  catálogo e só relê o que falta. As OS recentes seguem aqui, quando a lista central de OS não cobre o período.
+  prazo de cada um, a cópia em disco, a renovação por trás; a mesma regra do erro e do vazio). A criação da Engenharia segue
+  lendo o pessoal e as etiquetas AO VIVO, uma leitura de cada por gravação (a gravação não confia no catálogo), e o "Criado
+  por" do Histórico segue por pessoa. As OS recentes seguem aqui, quando a lista central de OS não cobre o período.
 - **O catálogo de ~22 mil ativos** (`api.load_assets_cached`): lido do disco uma vez por versão do arquivo (antes cada
   uma das 26 chamadas decodificava o JSON inteiro, a prévia do COS a cada 120 ms de digitação), entregue em cópia por
   registro; e a recarga do Fracttal (~110 pedidos) é uma por vez: quem acha o catálogo vencido junto espera a mesma. O

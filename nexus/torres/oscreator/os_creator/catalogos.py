@@ -25,17 +25,22 @@ pessoas pelo REST da empresa, a única parte que importa o `nexus`, em `catalogo
   23h no minuto `minutos_ocupados.CATALOGOS_PESSOAS`; só o `servir.py` liga), quando ele trouxer os campos que as telas usam e
   bater com o RPC. O resto (e as pessoas sem o REST valendo: o PC, a credencial que falta, o REST sem os campos) não tem leitor
   da empresa: o RPC exige a sessão de uma pessoa (`os_web/sessao.py`). Então a 1ª sessão que acha o catálogo vencido o renova
-  POR TRÁS, uma vez para todos, com a cópia do contexto (que leva o JWT dela), como o `api._renovar_catalogo_por_tras` dos
-  ativos; quem chega com a renovação em curso usa a cópia velha e não espera (`renovar_por_tras`, a mesma para os assuntos, os
-  planos e os detalhes). Sem cópia nenhuma (a máquina nova, o disco ilegível), a 1ª tela lê na hora, e quem chega junto espera a
-  MESMA leitura (`_Assunto.trava`).
+  POR TRÁS, uma vez para todos, com a cópia do contexto (que leva o JWT dela) e um estado de sessão próprio, como o
+  `api._renovar_catalogo_por_tras` dos ativos; quem chega com a renovação em curso usa a cópia velha e não espera
+  (`renovar_por_tras`, a mesma para os assuntos, os planos e os detalhes, com 1 pedido por segundo, a cota e a sessão que caiu).
+  Sem cópia nenhuma (a máquina nova, o disco ilegível), a 1ª tela lê na hora, e quem chega junto espera a MESMA leitura
+  (`_Assunto.trava`).
 - O ERRO E O VAZIO NÃO FICAM GUARDADOS (a regra de 20/10/2026 dos catálogos de tela): a lista vazia da sessão de alguém sem a
-  permissão no Fracttal esvaziaria a tela de todo mundo pelo prazo inteiro.
-- QUEM RELÊ NA HORA: só quem não achou o que procura (`reler=True`, o tipo da Zeladoria criado hoje, a pessoa nova que a tela
-  da Engenharia mostrou, a etiqueta da lista), uma vez por `RELER_NA_FALTA_S`, com a sessão de quem pediu.
+  permissão no Fracttal esvaziaria a tela de todo mundo pelo prazo inteiro. A leitura PELA METADE também não (as falhas do COS
+  só valem com as três listas).
+- QUEM RELÊ NA HORA: só quem não achou o que procura (`reler=True`, o tipo da Zeladoria criado hoje, a etiqueta da lista, a
+  pessoa logada que não está no catálogo), uma vez por `RELER_NA_FALTA_S`, com a sessão de quem pediu.
+- O QUE NÃO É DO CATÁLOGO (revisão da 4.1): a GRAVAÇÃO não confia nele (a criação da Engenharia confere a pessoa e a etiqueta
+  ao vivo, a regra de 19/10), e o "Criado por" do Histórico segue POR PESSOA (`api.get_pessoas_contas`, com a sessão dela:
+  quem não tem a permissão de pessoal no Fracttal não vê as contas da empresa).
 - AS PESSOAS sem o e-mail: em disco e na memória vai o HMAC do e-mail (`email_h`, com a chave que a ponte deriva da do Nexus),
-  e a pessoa logada é achada por ele (`da_pessoa`). O nome, o código e os ids são os que a lista de OS em disco já guarda. A
-  cópia feita com outra chave é ignorada (ninguém seria achado) e o pessoal é relido uma vez.
+  e a pessoa logada é achada por ele (`da_pessoa`). O nome, o código e os ids são os que a lista de OS em disco já guarda (o
+  nome que é um e-mail não vai). A cópia feita com outra chave é ignorada (ninguém seria achado) e o pessoal é relido uma vez.
 
 Este módulo não importa o `api` ao carregar (o `api` o importa): os leitores são chamados pelo nome, no `api`, na hora da
 leitura (os testes trocam o `api.<leitor>` e o catálogo lê o dublê).
@@ -49,6 +54,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -65,9 +71,12 @@ PRAZO_S = {"pessoas": 6 * _H, "etiquetas": 6 * _H, "tipos": 24 * _H, "tipos_soli
            "status": 24 * _H, "motivos": 24 * _H, "planos": 24 * _H, "detalhes": 24 * _H}
 ESPERA_TENTATIVA_S = 600        # a renovação por trás que falhou só tenta de novo depois disto (o ASSETS_ESPERA_TENTATIVA)
 RELER_NA_FALTA_S = 60           # quem não achou o que procura relê se o catálogo tem mais que isto (uma vez por minuto)
-FALTA_PESSOA_S = _H             # a pessoa logada que não está no catálogo pede a renovação por trás se ele tem mais que isto
 FOLGA_REST_S = _H               # com o REST valendo, as pessoas só vencem 1 h depois do prazo: o laço das :MM pode atrasar
 PAUSA_S = 1.0                   # em segundo plano, 1 pedido por segundo (como os leitores dos ativos e da lista de OS)
+# o 406/429 do Fracttal (a cota) na renovação por trás: espera e tenta a mesma chave de novo, como o cliente REST do Nexus
+# (`nexus/campo/fracttal.ler`, 5 s e 10 s); a cota que não voltou para a renovação, e o que faltou espera a janela
+ESPERAS_COTA_S = (5, 10)
+_COTA = re.compile(r"\bHTTP (406|429)\b")
 NOME_ESTADO = "estado.json"     # o REST das pessoas (a última boa, a última falha), que sobrevive ao reinício
 _BRT = timezone(timedelta(hours=-3))
 
@@ -159,12 +168,10 @@ def _hash_email(email: str) -> str:
 
 def _pessoa(p: dict) -> dict:
     """A linha guardada de uma pessoa (a do `api.ler_pessoal` ou a do REST, já no mesmo formato): o id, o código, o nome, se
-    está ativa, a conta (quem cria OS) e o nome da conta no "Criado por" (o nome, ou o e-mail de quem não tem nome, como o
-    `get_pessoas_contas` sempre mostrou), e o HMAC do e-mail no lugar dele."""
-    nome = str(p.get("name") or "").strip()
-    return {"id_personnel": p.get("id_personnel"), "code": p.get("code"), "name": nome, "active": p.get("active"),
-            "id_account": p.get("id_account"), "nome_conta": str(p.get("nome_conta") or nome).strip(),
-            "email_h": _hash_email(p.get("email"))}
+    está ativa, a conta (quem cria OS: "criadas por mim") e o HMAC do e-mail no lugar dele. O nome da conta do "Criado por"
+    não mora aqui: o Histórico o lê por pessoa (`api.get_pessoas_contas`, revisão da 4.1)."""
+    return {"id_personnel": p.get("id_personnel"), "code": p.get("code"), "name": str(p.get("name") or "").strip(),
+            "active": p.get("active"), "id_account": p.get("id_account"), "email_h": _hash_email(p.get("email"))}
 
 
 def preparar_pessoas(linhas) -> list:
@@ -172,13 +179,29 @@ def preparar_pessoas(linhas) -> list:
     return [_pessoa(p) for p in (linhas or []) if isinstance(p, dict)]
 
 
+def ativas(linhas) -> list:
+    """O pessoal ATIVO, por nome, na forma das telas: [{'code','name','id_personnel'}]. Das linhas do catálogo (`pessoas`) ou
+    das do `api.ler_pessoal` (a criação da Engenharia, que confere ao vivo: `api.responsaveis_ao_vivo`)."""
+    out = [{"code": p.get("code"), "name": str(p.get("name") or "").strip(), "id_personnel": p.get("id_personnel")}
+           for p in (linhas or []) if str(p.get("name") or "").strip() and p.get("active") is not False]
+    out.sort(key=lambda x: x["name"].lower())
+    return out
+
+
 def _pessoas_para_disco(v) -> list:
-    """O pessoal como vai ao disco: sem e-mail nenhum. O nome da conta de quem não tem nome no Fracttal (o "Criado por" mostra
-    o e-mail dela) não vai: depois de um reinício ela some do filtro até a próxima leitura. E, sem a chave da ponte, sem o
-    HMAC (o de agora não valeria no próximo processo)."""
+    """O pessoal como vai ao disco: sem e-mail nenhum. A pessoa sem nome no Fracttal aparece nas telas pelo e-mail (o
+    `full_name` dela é o e-mail): esse nome não vai ao disco em claro, e depois de um reinício ela some das listas até a
+    próxima leitura (revisão da 4.1). E, sem a chave da ponte, sem o HMAC (o de agora não valeria no próximo processo)."""
     chave = bool(_CHAVE_EMAIL["v"])
     return [dict(p, email_h=p.get("email_h") if chave else "",
-                 nome_conta=p.get("nome_conta") if "@" not in str(p.get("nome_conta") or "") else "") for p in v]
+                 name=p.get("name") if "@" not in str(p.get("name") or "") else "") for p in v]
+
+
+def _falhas_completas(d) -> bool:
+    """As três listas do "O ativo falhou?": sem uma delas o COS recusa toda OS de falha. A leitura com uma lista vazia (a cota
+    no meio, a sessão sem a permissão) não troca a cópia completa (revisão da 4.1: um 429 nas causas guardava `{"causas": []}`
+    por 24 h)."""
+    return isinstance(d, dict) and all(d.get(k) for k in ("tipos", "causas", "metodos"))
 
 
 ASSUNTOS = {a.nome: a for a in (
@@ -191,8 +214,10 @@ ASSUNTOS = {a.nome: a for a in (
     _Assunto("tipos_solicitacao", "Grupo e classificações da solicitação", "get_request_types",
              lambda t: isinstance(t, dict) and bool(t.get("classif1")), _listas("grupo", "classif1", "classif2"),
              contar=_contar_listas),
-    _Assunto("falhas", "Falhas (COS)", "get_falha_listas", lambda d: isinstance(d, dict) and bool(d.get("tipos")),
-             _listas("tipos", "causas", "metodos"), contar=_contar_listas),
+    # o `get_falha_listas` engole o erro de cada lista (a tela de antes seguia com o que veio); aqui ele levanta, e o erro de
+    # verdade (a cota, a sessão) fica no estado e na tela
+    _Assunto("falhas", "Falhas (COS)", "get_falha_listas", _falhas_completas, _listas("tipos", "causas", "metodos"),
+             kwargs={"levantar": True}, contar=_contar_listas),
     # o `status_solicitacao_catalogo` devolve a lista local quando o Fracttal falha (cancelar não pode depender da rede): aqui
     # ele levanta, para a lista local não ficar guardada 24 h como se fosse o que o Fracttal aceita (`status` a devolve sem guardar)
     _Assunto("status", "Status da solicitação", "status_solicitacao_catalogo", bool, _status_forma,
@@ -209,6 +234,9 @@ _VEZ: dict = {"renovando": set(), "tentou": {}}
 _REST: dict = {"bom_em": 0.0, "falha_em": 0.0, "falha": None}
 # o leitor do servidor (`catalogos_leitor.ligar`, só pelo servir.py) se registra aqui: se está ligado e o estado dele
 _LEITOR: dict = {"ligado": False, "estado": None}
+# {HMAC do e-mail: quando}: a pessoa logada que não estava no catálogo e o fez reler pelo RPC (`da_pessoa`, uma vez a cada
+# `ESPERA_TENTATIVA_S`)
+_FALTOU: dict = {}
 
 
 def configurar(pasta: str | None, chave: bytes | None = None) -> None:
@@ -221,6 +249,7 @@ def configurar(pasta: str | None, chave: bytes | None = None) -> None:
             # o HMAC de quem já está na memória foi feito com a chave de antes: com ele ninguém seria achado nem iria certo
             # ao disco (a ponte liga antes de qualquer tela, então isto é só a defesa)
             ASSUNTOS["pessoas"].limpar()
+            _FALTOU.clear()
         _CHAVE_EMAIL["v"] = chave
         for a in ASSUNTOS.values():
             if a.valor is None:
@@ -242,6 +271,7 @@ def reiniciar(pasta: str | None = None, chave: bytes | None = None) -> None:
             a.limpar()
         _VEZ["renovando"].clear()
         _VEZ["tentou"].clear()
+        _FALTOU.clear()
         _REST.update(bom_em=0.0, falha_em=0.0, falha=None)
         _LEITOR.update(ligado=False, estado=None)
     for nome in ("catalogos_planos", "catalogos_leitor"):              # os companheiros, se já carregados
@@ -430,13 +460,50 @@ def esquecer_tentativas(vez: dict, agora: float) -> None:
         del vez["tentou"][k]
 
 
+def _cota(e: BaseException) -> bool:
+    return bool(_COTA.search(str(e)))
+
+
+def _na_sessao_propria(fn, *args):
+    """`fn` com um estado de sessão PRÓPRIO, na cópia do contexto de quem pediu (o mesmo JWT e o mesmo e-mail): a cópia leva o
+    MESMO dicionário de estado do pedido dela, e um 401 por trás o marcava como morto, e o pedido dela, se ainda corria, saía
+    para o login (revisão da 4.1). Quem separa é o `api._na_sessao_propria` (o `os_web.sessao.propria`, que a web instala)."""
+    import api
+    return api._na_sessao_propria(fn, *args)
+
+
+def _renovar_uma(ctx, vez, alvos, i, ler_uma, ger, trava) -> bool:
+    """Uma chave da renovação por trás, na cópia do contexto e com a sessão própria. False: a renovação para (a sessão de quem
+    pediu caiu, ou a cota do Fracttal não voltou)."""
+    for espera in ESPERAS_COTA_S + (None,):
+        try:
+            ctx.run(_na_sessao_propria, ler_uma, alvos[i], ger)
+            return True
+        except Exception as e:                                       # noqa: BLE001 — fica a cópia de antes, e o erro anotado
+            if sessao_de_uma_pessoa(e):
+                # a sessão de UMA pessoa não é falha do Fracttal: esta chave e as que faltavam voltam a ser de quem chegar
+                with trava:
+                    for ch in alvos[i:]:
+                        vez["tentou"].pop(ch, None)
+                return False
+            if not _cota(e):
+                return True                                          # outra falha: fica a cópia de antes desta, e segue
+            if espera is None:
+                return False                                         # a cota não voltou: o que falta espera a janela
+            _dormir(espera)
+    return False
+
+
 def renovar_por_tras(vez: dict, chaves, ler_uma, *, trava, depois=None) -> list:
     """A renovação por trás de algumas chaves (um assunto, os planos de alguns ativos, um detalhe de plano), numa thread, com a
-    cópia do contexto de quem as achou vencidas (o JWT dela e a rota dela no contador do Fracttal), uma por vez: quem chega com
-    a renovação em curso usa a cópia velha e não espera. `vez` = {"renovando": set, "tentou": {chave: quando}}: cada chave uma
-    vez por `ESPERA_TENTATIVA_S` (a que falhou espera), e a sessão caída de UMA pessoa solta a vez da chave (outra sessão tenta
-    já). `ler_uma(chave, ger)` lê e guarda uma chave; `depois()` roda no fim (a gravação dos planos). Devolve as chaves que
-    começou (vazio: nada a fazer)."""
+    cópia do contexto de quem as achou vencidas (o JWT dela e a rota dela no contador do Fracttal) e um estado de sessão
+    próprio (`_na_sessao_propria`), uma por vez: quem chega com a renovação em curso usa a cópia velha e não espera. `vez` =
+    {"renovando": set, "tentou": {chave: quando}}: cada chave uma vez por `ESPERA_TENTATIVA_S` (a que falhou espera).
+    O RITMO (revisão da 4.1): 1 pedido por segundo entre as chaves (`PAUSA_S`, como os leitores do servidor); o 406/429
+    espera `ESPERAS_COTA_S` e tenta a mesma chave de novo, e a cota que não voltou para a renovação; a sessão caída de UMA
+    pessoa para a renovação e solta a vez da chave e das que faltavam (outra sessão tenta já). `ler_uma(chave, ger)` lê e
+    guarda uma chave, e levanta o erro; `depois()` roda no fim, também depois de parar (a gravação dos planos). Devolve as
+    chaves que começou (vazio: nada a fazer)."""
     agora = _relogio()
     with trava:
         esquecer_tentativas(vez, agora)
@@ -451,15 +518,13 @@ def renovar_por_tras(vez: dict, chaves, ler_uma, *, trava, depois=None) -> list:
 
     def rodar():
         try:
-            for ch in alvos:
+            for i in range(len(alvos)):
                 if ger != _GERACAO[0]:
                     return
-                try:
-                    ctx.run(ler_uma, ch, ger)
-                except Exception as e:                               # noqa: BLE001 — fica a cópia de antes, e o erro anotado
-                    if sessao_de_uma_pessoa(e):
-                        with trava:
-                            vez["tentou"].pop(ch, None)
+                if i:
+                    _dormir(PAUSA_S)
+                if not _renovar_uma(ctx, vez, alvos, i, ler_uma, ger, trava):
+                    break
             if depois is not None and ger == _GERACAO[0]:
                 depois()
         finally:
@@ -507,39 +572,39 @@ def _obter(nome: str, reler: bool = False):
 # ── o que as telas leem (a mesma forma do `api` de antes, em cópia) ─────────────────────────────────────────────────────────
 def pessoas(reler: bool = False) -> list:
     """O pessoal ATIVO, por nome: [{'code','name','id_personnel'}] (o `api.get_responsaveis` de antes)."""
-    out = [{"code": p.get("code"), "name": p["name"], "id_personnel": p.get("id_personnel")}
-           for p in _obter("pessoas", reler) if p.get("name") and p.get("active") is not False]
-    out.sort(key=lambda x: x["name"].lower())
-    return out
+    return ativas(_obter("pessoas", reler))
 
 
-def contas() -> list:
-    """Quem cria OS e solicitação, para o "Criado por": [{'id_account','nome'}] por nome, com quem está desligado (o
-    `api.get_pessoas_contas()["pessoas"]` de antes)."""
-    vistos: dict = {}
-    for p in _obter("pessoas"):
-        ida = p.get("id_account")
-        if ida is not None and ida not in vistos:
-            nome = str(p.get("nome_conta") or "").strip()
-            if nome:
-                vistos[ida] = nome
-    return sorted(({"id_account": k, "nome": v} for k, v in vistos.items()), key=lambda x: x["nome"].lower())
+def _achar(linhas, h: str):
+    for p in linhas or []:
+        if p.get("email_h") == h:
+            return (p.get("id_personnel"), p.get("id_account"), p.get("name") or "")
+    return None
 
 
 def da_pessoa(email) -> tuple:
     """(id_personnel, id_account, nome) de quem tem este e-mail no Fracttal, ou (None, None, "") (o `api._current_user_info`
-    de antes, que relia o pessoal uma vez por pessoa e por processo). A pessoa que não está num catálogo de mais de 1 h pede a
-    renovação por trás (a conta nova no Fracttal)."""
+    de antes, que relia o pessoal uma vez por pessoa e por processo).
+    A PESSOA QUE NÃO ESTÁ NO CATÁLOGO (a conta nova no Fracttal) relê o pessoal pelo RPC, com a sessão DELA, na hora, uma vez
+    por pessoa a cada `ESPERA_TENTATIVA_S`, e não com o catálogo recém-lido (`RELER_NA_FALTA_S`). Com o REST valendo, a
+    renovação das pessoas é só do laço do servidor (05h, 11h, 17h e 23h): até a revisão da 4.1 a conta nova ficava até 6 h sem
+    "criadas por mim"."""
     h = _hash_email(email)
     if not h:
         return (None, None, "")
-    for p in _obter("pessoas"):
-        if p.get("email_h") == h:
-            return (p.get("id_personnel"), p.get("id_account"), p.get("name") or "")
-    a = ASSUNTOS["pessoas"]
-    if a.valor is not None and _relogio() - a.lido_em > FALTA_PESSOA_S:
-        _renovar_por_tras(a)
-    return (None, None, "")
+    achou = _achar(_obter("pessoas"), h)
+    if achou is not None:
+        return achou
+    agora, a = _relogio(), ASSUNTOS["pessoas"]
+    if a.valor is None or agora - a.lido_em <= RELER_NA_FALTA_S:
+        return (None, None, "")                                  # o pessoal acabou de ser lido: ela não está no Fracttal
+    with _TRAVA:
+        for k in [k for k, t in _FALTOU.items() if agora - t >= ESPERA_TENTATIVA_S]:
+            del _FALTOU[k]
+        if h in _FALTOU:
+            return (None, None, "")
+        _FALTOU[h] = agora
+    return _achar(_obter("pessoas", reler=True), h) or (None, None, "")
 
 
 def nome_por_id() -> dict:
@@ -577,21 +642,23 @@ def falhas() -> dict:
 
 def status() -> list:
     """[(id, código, rótulo)] do que o Fracttal aceita na solicitação (o `api.status_solicitacao_catalogo`). Sem conseguir
-    ler, a lista local, que NÃO fica guardada como catálogo: perder a rede não pode impedir a pessoa de cancelar uma
-    solicitação. Até 31/10/2026 a lista local ficava 30 min na cópia da Fila; agora, sem catálogo nenhum, a falha só faz o
-    Fracttal ser tentado de novo depois de `ESPERA_TENTATIVA_S` (cada Fila aberta com o Fracttal fora não vira um pedido)."""
+    ler, ou com o Fracttal respondendo a lista vazia, a lista local, que NÃO fica guardada como catálogo: perder a rede não
+    pode impedir a pessoa de cancelar uma solicitação. Até 31/10/2026 a lista local ficava 30 min na cópia da Fila; agora, sem
+    catálogo nenhum, a falha (ou o vazio) só faz o Fracttal ser tentado de novo depois de `ESPERA_TENTATIVA_S` (cada Fila
+    aberta com o Fracttal fora não vira um pedido)."""
     import api
     a = ASSUNTOS["status"]
     _boot(a)
     if a.valor is None and a.erro_em and _relogio() - a.erro_em < ESPERA_TENTATIVA_S:
         return list(api.STATUS_SOLICITACAO)
     try:
-        return list(_obter("status"))
+        v = _obter("status")
     except Exception as e:                                          # noqa: BLE001 — como antes: a lista local
         if sessao_de_uma_pessoa(e):
             with _TRAVA:
                 a.erro_em = 0.0                                     # a sessão caída de uma pessoa não segura as outras
         return list(api.STATUS_SOLICITACAO)
+    return list(v) if v else list(api.STATUS_SOLICITACAO)
 
 
 def motivos() -> list:

@@ -504,6 +504,7 @@ def api_performance_criar():
 # por que não funciona como um filtro?"), é não repetir a busca: cada visão fica guardada alguns minutos por pessoa, e
 # voltar a ela é instantâneo. O botão de atualizar (e a atualização de 10 em 10 min) passam por cima da memória.
 TTL_HISTORICO = 180          # s — a lista de uma visão; o botão ↻ busca de novo na hora
+TTL_APOIO = 600              # s — o "Criado por" de cada pessoa (as contas e o "eu"), que quase não muda
 _MEMO: dict = {}
 _MEMO_LOCK = threading.Lock()
 # o 1º elemento das chaves que o teto da memória tira POR ÚLTIMO (quem guarda por muito tempo se registra aqui). Caso: o
@@ -628,9 +629,16 @@ def _catalogo_clientes_usinas() -> dict:
 
 
 def _contas_do_filtro() -> list:
-    """As contas do "Criado por" (o mesmo catálogo que a tela mostra, o de pessoas: `catalogos.contas`, pelo
-    `api.get_pessoas_contas`): o nome da conta escolhida."""
-    return (api.get_pessoas_contas() or {}).get("pessoas") or []
+    """As contas do "Criado por" (o mesmo que a tela mostra, guardado POR PESSOA: `_contas_da_pessoa`): o nome da conta
+    escolhida."""
+    return (_contas_da_pessoa() or {}).get("pessoas") or []
+
+
+def _contas_da_pessoa() -> dict:
+    """O "Criado por" do Histórico (as contas e o "eu"), lido com a sessão de quem abre e guardado 10 min para ela. Não é do
+    catálogo comum de pessoas (`catalogos.py`): quem não tem a permissão de pessoal no Fracttal recebe a lista vazia, e não
+    as contas da empresa (revisão da 4.1, 31/10/2026: a etapa 4 o tinha posto no catálogo, e voltou a ser como antes)."""
+    return _memo(("pessoas", _quem()), TTL_APOIO, lambda: api.get_pessoas_contas() or {})
 
 
 def ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, *, forcar=False, aviso=None, mudou=False, cos=False,
@@ -777,14 +785,14 @@ def historico():
         b = busca.lower()
         linhas = [l for l in linhas if b in " ".join(str(l.get(k) or "") for k in ("folio", "usina", "ativo", "descricao", "cliente", "status")).lower()]
     labels, pessoas, eu = [], [], None
-    # etiquetas e pessoas quase não mudam: o ↻ não as busca de novo; vêm dos catálogos (`catalogos.py`, 31/10/2026): as
-    # contas e o "eu" saem do catálogo de pessoas, que era relido por pessoa a cada 10 min
+    # etiquetas e pessoas quase não mudam: o ↻ não as busca de novo. As etiquetas vêm do catálogo (`catalogos.py`,
+    # 31/10/2026); as contas e o "eu" do "Criado por", da pessoa, guardados 10 min para ela (`_contas_da_pessoa`)
     try:
         labels = sorted(etiquetas_fracttal(), key=lambda x: (x.get("description") or "").lower())
     except Exception:                                    # noqa: BLE001 — sem etiquetas o filtro fica em 'Todas'
         pass
     try:
-        r = api.get_pessoas_contas() or {}
+        r = _contas_da_pessoa() or {}
         pessoas, eu = (r.get("pessoas") or []), r.get("eu")
     except Exception:                                    # noqa: BLE001 — idem
         pass

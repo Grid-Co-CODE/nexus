@@ -67,6 +67,19 @@ def contexto(jwt: str, email: str = ""):
         fechar(tokens)
 
 
+@contextlib.contextmanager
+def propria():
+    """A mesma pessoa do contexto (o JWT e o e-mail) com um estado de sessão PRÓPRIO. A renovação por trás (o catálogo de
+    ativos, os catálogos pequenos) roda numa thread com a cópia do contexto de quem pediu, e a cópia leva o MESMO dicionário
+    de estado: um 401 lá marcava a sessão de quem pediu como morta, e o pedido dela, se ainda corria, saía para o login
+    (revisão da 4.1, 31/10/2026). O token renovado lá dentro também fica lá (o cookie é do pedido). Fora de requisição, nada."""
+    if not em_requisicao():
+        yield
+        return
+    with contexto(jwt_atual(), email_atual()):
+        yield
+
+
 def _definir(jwt: str) -> None:
     _JWT.set(jwt or "")
     est = _ESTADO.get()
@@ -158,6 +171,7 @@ def instalar(api) -> None:
     api._read_jwt, api._save_jwt = _read_jwt, _save_jwt
     api._clear_jwt, api._rpc_try_refresh = _clear_jwt, _rpc_try_refresh
     api.current_user = current_user
+    api._sessao_propria = propria            # a renovação por trás com estado de sessão próprio (`api._na_sessao_propria`)
     api._os_web_sessao_instalada = True
 
 
