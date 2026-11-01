@@ -1448,7 +1448,10 @@ testes seguem pelo RPC; sem a credencial REST (`FRACTTAL_CLIENT_ID`), não liga 
   Levi não tem acesso ao servidor, e a 1ª noite só se confere pela tela): Raio-X (Base → Raio-X, só administrador) → a seção
   "Uso do OS Creator" → o bloco **"Ativos centrais"** (`nexus/casca/raio_x.py`, `_secao_canto_central`): o catálogo (fonte,
   lido em, versão), se o leitor está pronto, a paridade (quando, as coberturas `cob_ref`/`cob_rest`, se valeu), o REST (a
-  última leitura boa e a última falha), as descrições cortadas (o número e os ids) e a cópia em disco. A usina cujo nome
+  última leitura boa e a última falha), **a última noite** (a hora, quanto levou, se o catálogo aceitou, os pedidos, as
+  contagens e a foto do banco: gravou, linhas, mudaram, entraram, saíram, o erro; guardada no `ativos_estado.json` por
+  `ativos_central.anotar_noite`, para sobreviver ao reinício), a troca recusada, as descrições cortadas (o número e os ids) e a
+  cópia em disco. A usina cujo nome
   fechou no padrão "Cliente - Usina -
   UF" NÃO passa pelo detector (Ruling AQ, revisão 3): o leitor diz quais (`nomes_no_caminho(..., usinas_no_padrao=)` e o
   `nome_pelo_pai` da linha que saiu), e a foto só as isenta se o nome termina na sigla do estado. Sem isso, a usina de
@@ -1673,7 +1676,7 @@ Cada página chega cortada no que a lista lê (`os_registro.enxuta`), e as abert
   por hora, no :55.
 - **As finalizadas:** status 3 pela data de fim, desde a mais nova que a lista conhece (nunca depois de agora: a data fim no
   futuro, dado ruim, travaria a faixa até passar) menos 2 dias, parando numa página INTEIRA além do piso, no :46 de toda hora
-  (o :45 é do `uso_os` às 03:45; o desenho do PCM de 27/10; o `fato_tarefa_finalizada` não é publicado aqui).
+  (o :45 é do `uso_os` às 04:45; o desenho do PCM de 27/10; o `fato_tarefa_finalizada` não é publicado aqui).
 - **A noite (03:21; o 03:20 do desenho é minuto das tarefas):** os últimos 90 dias inteiros, sem o pedido do total no começo;
   no domingo, ou sem a janela lida inteira (a 1ª carga, a cópia de janela menor), a janela toda. As antigas mudam sem data de
   alteração: é ela que as põe em dia.
@@ -1711,13 +1714,21 @@ Cada página chega cortada no que a lista lê (`os_registro.enxuta`), e as abert
   às 20h, ~92 a 110 (16 vezes as novas, 5 vezes os 7 dias, as finalizadas); no fim de semana das 06h às 20h, ~78 a 82 (as
   novas de 15 em 15 min, 2 delas fora dos minutos dos 7 dias); das 20h às 06h, ~5 a 11 (às 03h, mais a noite); e ~98 a mais na
   hora em que as abertas não chegam do `tarefas_os`. Num dia útil, ~1.500 a 1.850. **O pico por minuto** é 60 (1 por segundo) nas
-  leituras longas, a noite (03:21; ~3 min, no domingo ~13) e as abertas lidas aqui (:55), como a volta do próprio `tarefas_os`;
+  leituras longas, a noite (03:21; ~3 min, no domingo 19 a 29: ~830 páginas a ~1,35 s, a medida do ensaio de 18/10/2026 do
+  `tarefas_os`) e as abertas lidas aqui (:55), como a volta do próprio `tarefas_os`;
   de dia, a dos 7 dias faz ~15 em ~15 s. A cota é de 200 por minuto para a empresa toda.
 - **Onde se vê** (o Levi não tem acesso ao servidor): Raio-X → seção "Uso do OS Creator" → o bloco do canto central, peça
   **"Lista central de OS"**: quantas OS e quantas abertas, a janela lida inteira, a última entrega de cada faixa (e quem entregou
   as abertas), as falhas (e o defeito), a leitura que a trava de encolhimento recusou, os campos que o REST trouxe, as
   conferências das telas (3.3), o disco e a memória (medida uma vez por versão; a falha da medida vai ao log)
-  (`raio_x._linhas_da_lista_de_os`).
+  (`raio_x._linhas_da_lista_de_os`). **Depois de um reinício** (revisão final): a última leitura de cada faixa, ok ou falha
+  (a hora, os pedidos, o resultado e o erro; `os_central.anotar_leitura`, no cabeçalho da cópia em disco, em `leituras`)
+  volta do disco: a noite que falhou deixa de sumir com o deploy. A leitura da noite e a que muda de situação (a 1ª falha de uma
+  faixa, a 1ª boa depois de uma falha) regravam o cabeçalho; as de rotina (as novas) e a falha que se repete vão junto da
+  próxima gravação. **O leitor que não ligou**: o `servir.py`
+  liga cada leitor num try (`ponte.ligar_leitor_do_clone`); o clone que quebrou ao importar deixa o Nexus no ar, sem o leitor, e a
+  peça diz "NÃO LIGOU, o clone quebrou ao subir" com o erro (o portão do deploy, `deploy/conferir_boot.py`, importa os mesmos
+  módulos antes do restart).
 
 **Prova:** `tests/test_oscreator_os_central.py` (a 3.1: as tarefas juntadas por OS e os índices; a faixa que troca só o que
 cobre e a noite que tira o que não voltou; a ação na hora, com o registro, ao vivo pela sessão e fora de um pedido; o nº sem
@@ -1756,9 +1767,16 @@ sondas das revisões):
     `ponte.lista_central`), e o `lista_central.liberada` a lê; a releitura do quadro de Garantias por trás leva a de quem a
     abriu (`lista_central.liberacao`). Sem a marca (o OS Creator servido sozinho, o PC, os testes, a ponte que não disse):
     ninguém está liberado. Sem saber o setor (o banco fora, o Nexus sem a NEXUS_PESSOA_HMAC, a pessoa sem setor): não.
-  - Quem não está liberado não lê da lista em tela nenhuma (o Histórico e as visões, o Garantias, o Investigar, a marcação
-    verde dos Ativos, a 1ª pintura e o nº → id), nem paga a conferência: segue pelo caminho de hoje, com a sessão dela. As
-    ações dela seguem pondo na lista a OS que ela mudou (é escrita, não leitura).
+  - Quem não está liberado não MONTA nada da lista em tela nenhuma (o Histórico e as visões, o Garantias, o Investigar, a
+    marcação verde dos Ativos, a 1ª pintura e o nº → id), nem paga a conferência: segue pelo caminho de hoje, com a sessão dela.
+    As ações dela seguem pondo na lista a OS que ela mudou (é escrita, não leitura).
+  - **A exceção é o Garantias, e já era de 19/10:** quem não foi liberado pode RECEBER a cópia "TODOS" do quadro que um liberado
+    montou da lista (`rotas_acomp._dono`: o Fracttal lhe dá o mesmo total de OS com a etiqueta CHAMADOS, com a folga de 1% ou 2
+    OS, e ela fica na cópia dividida). É a exposição de 19/10 (a cópia dividida entre quem vê o mesmo total, "quebre essa
+    regra"), e a lista central não a piora: a cópia só tem as OS que a conferência de quem a montou provou, o total dela é o do
+    Fracttal de quem a monta, pedido a CADA montagem (`HS.total_conferido(..., max_idade=0)`, 1 pedido; a sonda V1b da revisão
+    final: o total guardado por 30 min era o de quando a cópia anterior foi montada, e a restrita com 3 OS visíveis ficava a 2 da
+    cópia de 5 e caía nela, com as 4 que o Fracttal esconde dela), e a restrita fora dessa folga segue com a dela.
 - **A visibilidade não muda (fail-closed).** A tela que mostrava as OS pela sessão da pessoa só lê da lista depois da
   conferência DELA (`lista_central.conferir`), UMA por pessoa e período, sem visão, status nem etiqueta (Ruling BU): o "Todos"
   do período da tela; no Garantias, os 365 dias que ele lê (até amanhã: o "até" é a data local, e a criação é em UTC).
@@ -1796,14 +1814,18 @@ sondas das revisões):
     conta uma vez por janela. Com a lista tendo MENOS (atrasada), a visita seguinte confere de novo (Minor 2 da rodada 2).
   - A que falha (o Fracttal fora, a sessão caída) não passa; a medida guardada que provava segue provando. A sessão sem e-mail
     ("?") nunca passa (Minor 6).
-- **A lista "Todos" dividida de 19/10 sem herança entre pessoas** (Rulings BU e BX). Com a lista central EM USO (o servidor),
-  coberta ou vencida, a "Todos" dividida do caminho de hoje só é dividida entre quem passou há pouco na conferência do período
-  (`lista_central.divide_a_todos`); os outros (quem não passou, quem não foi liberado) seguem com a lista DELES,
+- **A lista "Todos" dividida de 19/10 sem herança entre pessoas** (Rulings BU e BX). Com a lista central EM USO PARA O PERÍODO
+  (o servidor, e a janela lida inteira começa no dia do início do período ou antes: `lista_central.em_uso(de)`, `janela[0] <=
+  de`), coberta ou vencida, a "Todos" dividida do caminho de hoje só é dividida entre quem passou há pouco na conferência do
+  período (`lista_central.divide_a_todos`); os outros (quem não passou, quem não foi liberado) seguem com a lista DELES,
   `("hist", pessoa)`, no Histórico e no Investigar (`rotas.ler_lista`). Quem vê tudo lê da lista central e não ancorava a
   dividida; a 1ª restrita que não passava a achava vazia, e a lista dela virava a de todos: a sonda mostrou outra restrita,
   com o mesmo total (30) e outro conjunto, vendo as 30 OS da usina que o Fracttal esconde dela; e a lista vencida (a última
-  leitura até o topo passou dos 30 min) a devolvia (a sonda T3). Sem a lista em uso (o PC, a lista vazia), a regra de 19/10
-  fica como estava. A cópia dividida do Garantias (o `_dono`) também, e o total dela é o do Fracttal de quem a monta (o
+  leitura até o topo passou dos 30 min) a devolvia (a sonda T3). Sem a lista em uso PARA O PERÍODO (o PC, a lista vazia, e a
+  janela que começa depois do período, como a de 7 dias do dia do deploy, que nunca serve o Histórico de 30), a regra de 19/10
+  fica como estava: a "Todos" dividida entre quem vê o mesmo total, e não uma lista de ~26 pedidos por pessoa (revisão final).
+  A ação (`mudou`, `pendente`, `criadas`) também só lê a OS com a lista em uso, para o período padrão do Histórico (os 30 dias).
+  A cópia dividida do Garantias (o `_dono`) também, e o total dela é o do Fracttal de quem a monta (o
   `total_chamados`, na chave do `_dono`), como no caminho de hoje: o da lista não tinha as OS de chamado novas, e a restrita
   com 2 a menos caía na cópia TODOS pela folga de 19/10 (a sonda V1).
 - **O período tem de ser válido** (Ruling BP): duas datas 'AAAA-MM-DD' com o início até o fim (`periodo_valido`, na rota do
@@ -1908,12 +1930,22 @@ sondas das revisões):
 - **A 1ª pintura do card** (`/os/api/os/<id>/previa`, `_os_previa.html`): o Histórico e o Investigar pedem, junto com o card, o
   que a lista sabe da OS (o nº, o tipo, o status, o ativo, as datas, com quem está, quem criou, o título), e a pintam até o card
   inteiro chegar, sem o círculo de carga. 204 = o "Carregando" de sempre. Vai com o `X-Nexus-Auto` (o clique já contou no card).
-- **O que sobra (rodada 4).** A contagem é a 2ª barreira; os buracos que ela ainda tem, para quem foi liberado:
-  - uma OS de 90 a 365 dias inserida no Fracttal depois da leitura, antes de uma noite de dia útil (que relê só 90 dias) e
-    além das 200 linhas da página da pessoa: até a noite de domingo (a janela inteira), a lista não a tem, e ela compensaria
-    uma escondida;
+- **O que sobra (rodada 4, corrigido na revisão final).** A contagem é a 2ª barreira; os buracos que ela ainda tem, para quem
+  foi liberado:
+  - uma OS criada há mais de 7 dias (fora da faixa dos 7 dias, que relê a semana a cada 10 min), inserida no Fracttal depois da
+    leitura (o App offline, uma importação) e além das 200 linhas da página da pessoa: a lista não a tem até a faixa que a
+    traz, e ela compensaria uma escondida. O buraco vale para TODA OS fora dos 7 dias, e não só para as de 90 a 365 dias: no pior
+    caso, até a noite que relê o dia dela (a de dia útil, às 03:21, relê os últimos 90 dias; a de domingo, a janela inteira: a
+    de 90 a 365 dias espera o domingo). As faixas das abertas e das finalizadas (de hora em hora) podem trazê-la antes, quando
+    o status ajuda;
   - a premissa de que o id do Fracttal cresce com a criação: a página confere a ordem nas linhas que traz e o menor id dela
-    contra a lista, não o resto.
+    contra a lista, não o resto;
+  - **a troca com a conta igual:** a medida da pessoa e o `liberado` comparam a CONTA da lista no período (`Medida.lista_n`) e as
+    OS da página dela, não o conjunto inteiro. Para uma pessoa liberada (medida há menos de 30 min), uma OS apagada no Fracttal e
+    uma inserção tardia (a OS antiga que entrou depois e que ela não vê) trocadas pela MESMA noite deixam a conta igual; se a
+    apagada está além das 200 linhas da página dela, nada denuncia a troca, e a medida segue valendo, com a OS escondida na
+    lista, até os 30 min. Precisa de tudo junto: uma pessoa liberada medida nos 30 min antes da noite (03:21), um apagamento e
+    uma inserção tardia nessa mesma leitura. É raro.
   - O custo de uma OS apagada no Fracttal e ainda na lista: quem vê tudo vai ao vivo naquele período até a noite a tirar (a
     lista tem uma a mais); no Garantias (365 dias), até a noite das 03:21.
 - **Pedidos ao Fracttal, medidos** (o Fracttal de mentira no nível do `api._rpc_call`, 3 mil OS em 30 dias, ~99 por dia; as
@@ -1945,8 +1977,10 @@ sondas das revisões):
   (`VISOES_GUARDADAS`), e só são montadas de novo quando a versão muda (a leitura que não trouxe nada não muda a versão; a hora
   "Lista das HH:MM" acompanha a última leitura). Medido com 36 mil OS (tracemalloc, o retido): a Visão COS de 30 dias 7,3 MB (o
   caminho de hoje, 7,1 MB), o Histórico Geral de Todos depois dela 4,5 MB (4,5), as criadas por mim 0,3 MB (0,4); o caminho de
-  hoje guarda as listas do `historico_store` por pessoa e período sem teto, e a lista central não cria nenhuma. As medidas das
-  pessoas são poucas e pequenas (a marca, a conta e até 50 ids; no máximo 4.000).
+  hoje guarda as listas do `historico_store` por pessoa e período, e a que ninguém lê há 30 min sai quando outra é lida
+  (`LISTA_VIDA_S`, revisão final: sem isso elas cresciam até o reinício, ~10 por dia; a que está sendo lida fica, mesmo velha),
+  e a lista central não cria nenhuma. As medidas das pessoas são poucas e pequenas (a marca, a conta e até 50 ids; no máximo
+  4.000).
 - **Prova:** `tests/test_oscreator_historico_central.py`:
   - a 3.3: a página sem pedido depois da conferência; a visão restrita com a dela, a divergência no estado, a conferência que
     falha; "criadas por mim", "atribuídas" e o homônimo; a virada do dia; o campo que o REST não trouxe; o Garantias, os Ativos
@@ -1973,7 +2007,12 @@ sondas das revisões):
     os outros; de ponta a ponta no Nexus, o setor não liberado vai ao vivo e o liberado e o administrador leem da lista; e as
     sondas Q1 e Q2 (a OS antiga além da página), R1 (o id baixo com a criação depois da marca), S2 (a medida com a lista
     mudada), U1 (o liberado com a lista mudada), T3 (a lista vencida e a "Todos" dividida) e V1 (o total da cópia TODOS),
-    e o nº que não abre sem mostrar o id.
+    e o nº que não abre sem mostrar o id;
+  - a revisão final: a V1b (a cópia TODOS remontada 10 min depois pede o total de novo, e a restrita com 3 visíveis não vê as
+    escondidas); a guarda `liberada()` da prévia e do nº com a pessoa liberada há pouco e um pedido da mesma conta sem a marca
+    (204, e o nº vai ao vivo; sem a guarda, a medida sozinha abria as duas); a janela de 7 dias do dia do deploy, que deixa a
+    regra de 19/10 e não lê a OS da ação; a lista do Histórico que ninguém lê há 30 min sai; o arquivo estático sem a leitura
+    do setor; o gancho do nº só na cópia do clone; e a `HOJE` por teste.
 
   Os testes de 19/10 (`test_oscreator_historico_compartilhado_19_10.py`) e de 21/10 (`test_oscreator_lista_pela_metade_21_10.py`)
   seguem provando o caminho de hoje (a lista central vazia, como no PC: a montagem deles diz isso). O universo dos testes tem o
@@ -2243,8 +2282,12 @@ Os módulos que as etapas 1 a 4 criaram (`ativos_central`, `ativos_leitor`, `ati
   pelo nome local, e passa sem testar nada. Só as outras constantes (os nomes dos métodos do RPC) e o estado do próprio módulo são
   usados direto. Um módulo novo, ou uma função nova num módulo, segue a mesma regra, e o teste da fachada acusa a chamada pelo nome
   local.
-- **Todo módulo termina com `import api`**, e o `api` o importa no fim do arquivo (a fachada): o círculo se fecha na hora de
-  carregar e as funções só usam o `api` na hora da chamada. Qualquer módulo pode ser importado antes do `api`.
+- **Os 14 módulos que o `api` reexporta terminam com `import api`**, e o `api` os importa no fim do arquivo (a fachada): o
+  círculo se fecha na hora de carregar e as funções só usam o `api` na hora da chamada. Qualquer módulo pode ser importado
+  antes do `api`. As duas exceções: o `fracttal_erro` não importa nada do OS Creator, e o `os_juntar` não é importado pelo `api`
+  (é o `os_criar` que o importa) e chama o `api` na hora, por uma função (`_api()`), que o importa dentro. Toda função que um
+  módulo importa de OUTRO módulo do clone (o `montar_registros` do `ativos_central`, que o `ativos_carga` chamava como
+  `_build_records`) também vai pelo `api.`, e o teste da fachada acusa a que fica pelo nome local.
 - **O que o Python executa na hora de definir** (o valor padrão de um argumento, uma constante calculada) não pode usar o `api.`;
   por isso o `HISTORICO_CAP` usado como padrão fica sem o prefixo, e o que depende de `_data_dir()` na hora de carregar
   (`ASSETS_CACHE_LEGADO`, `DASH_CONFIG_FILE`) ficou no `api`.
@@ -2252,8 +2295,11 @@ Os módulos que as etapas 1 a 4 criaram (`ativos_central`, `ativos_leitor`, `ati
 **O que ficou no `api.py`, e por quê**
 - **Quem fala com a rede direto** (`_get_token`, `_req`, `fracttal_login`, `_rpc_try_refresh`, `_rpc_chamar`, `create_os_rpc`,
   `_react_insert_post`, `s3_get_url`, `baixar_imagem`, o S3 e o `attach_imagem_os`): o Raio-X rotula o pedido preso pelo arquivo da
-  linha NOSSA mais de dentro (`nexus/casca/presos.py`: `os_creator/api.py` = "Fracttal (OS Creator)", o resto da pasta = "OS Creator").
-  Se saíssem, um pedido preso criando OS passaria a aparecer como "OS Creator", e o `onde` do episódio mudaria de arquivo.
+  linha NOSSA mais de dentro (`nexus/casca/presos.py`: `os_creator/api.py` e os módulos que saíram dele nas etapas 5.1 e 5.3,
+  os 14 de `_MOVIDOS_DO_API`, = "Fracttal (OS Creator)"; o `dash_os`, que fala com o dashboard, e o resto da pasta = "OS Creator").
+  Antes de a revisão final pôr os módulos movidos na regra, a espera de uma thread em código que saiu do `api.py` (o `get_assets`
+  esperando as 6 threads dele, agora no `ativos_carga`) passou a ser rotulada "OS Creator", e o Raio-X e o log deixaram de dizer
+  "Fracttal (OS Creator)". Se os pedidos à rede saíssem do `api.py`, o `onde` do episódio mudaria de arquivo.
 - **A sessão** (`_save_jwt`, `_read_jwt`, `_clear_jwt`, `current_user`, `_sessao_propria`...): o `os_web.sessao.instalar` troca essas
   funções do `api` por outras, por nome, uma vez por processo.
 - **O RPC e o cache das leituras de uma OS** (`_rpc_call`, `_leitura_da_os`, `_LEITURAS_OS`): os testes trocam o `_rpc_call` em 25

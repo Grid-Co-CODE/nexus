@@ -3,7 +3,7 @@ pedidas nos últimos 7 dias (os cliques e o que a tela pede sozinha, separados, 
 dia, os pedidos ao Fracttal por hora (o total e o pico por minuto, com a cota de 200 ao lado) e o corte por setor. É ela que
 dá o "antes e depois" de cada etapa seguinte e mostra os horários de pico de verdade.
 
-Rulings M e N da controladora: o dia de ontem para trás vem do BANCO (cópia de 10 min); o que ainda não foi às 03:45 vem do
+Rulings M e N da controladora: o dia de ontem para trás vem do BANCO (cópia de 10 min); o que ainda não foi às 04:45 vem do
 PENDENTE no disco do servidor; a hora aberta vem da memória; na mesma chave vale o mais novo (o pendente vence o banco, a
 memória vence o pendente) e ninguém conta duas vezes. O total e o pico por minuto vêm da aba própria do total (1 linha por
 hora), e a aba grande do detalhe do Fracttal nem é lida.
@@ -30,7 +30,7 @@ AQUI = Path(__file__).resolve().parent.parent
 HOJE = datetime.fromisoformat("2026-10-30T14:20:00+00:00").timestamp()          # sexta, 11:20 em Brasília
 AGORA = "2026103011"
 SETOR_A, SETOR_B = "Setor Fictício Alfa", "Setor Fictício Beta"
-GRAVOU, EPOCH = [0.0], [1000.0]                 # a hora da última gravação das 03:45 e o relógio de parede da leitura do banco
+GRAVOU, EPOCH = [0.0], [1000.0]                 # a hora da última gravação das 04:45 e o relógio de parede da leitura do banco
 
 
 def _uso(hora_id, rota, automatico=0, **kw):
@@ -224,7 +224,7 @@ def test_a_memoria_vence_o_banco_na_mesma_chave_e_a_hora_nao_e_contada_duas_veze
 
 
 def test_o_pendente_do_disco_vence_o_banco_na_mesma_chave_e_o_total_da_hora_tambem():
-    """Ruling M: de ontem para trás vem do banco; o que ainda não foi às 03:45 vem do disco do servidor. Se a mesma chave está
+    """Ruling M: de ontem para trás vem do banco; o que ainda não foi às 04:45 vem do disco do servidor. Se a mesma chave está
     nos dois (o processo morreu entre gravar e limpar o pendente) vale o pendente, que é mais novo, e ninguém conta duas
     vezes: nem a linha de uso nem o total da hora."""
     banco_dados = {"uso": [_uso("2026102910", "/os/historico", 0, pedidos_qtd=60)],
@@ -280,8 +280,8 @@ def test_secao_com_dado(app, logado, banco, vivo):
     # o corte por setor, e a nota de que mora no disco do servidor
     assert SETOR_A in sec and SETOR_B in sec and "(sem setor)" in sec
     assert "só no disco do servidor" in txt and "30 dias" in txt
-    # de onde vem: o banco (a cópia de 10 min), o pendente do disco que vai ao banco às 03:45 e a memória
-    assert "03:45" in txt and "disco do servidor" in txt
+    # de onde vem: o banco (a cópia de 10 min), o pendente do disco que vai ao banco às 04:45 e a memória
+    assert "04:45" in txt and "disco do servidor" in txt
     # uma só leitura do banco, e a página traz o link para a seção
     assert "#uso-os-creator" in html
 
@@ -396,7 +396,7 @@ def test_banco_com_livro_ainda_inexistente_e_sem_medicao(app, logado):
         app.extensions.pop("nexus_dados_sessao", None)
 
 
-def test_a_hora_que_espera_as_3h45_aparece_na_secao_com_o_total_dela(app, logado, banco, vivo, monkeypatch):
+def test_a_hora_que_espera_as_4h45_aparece_na_secao_com_o_total_dela(app, logado, banco, vivo, monkeypatch):
     """O que o laço já tirou dos contadores e guardou no disco, e o banco ainda não tem, entra na seção: a linha de uso e o
     total da hora (a linha `*` que o contador entrega vira o total antes da conta)."""
     espera = {"uso": [_uso("2026103009", "/os/so_na_espera", 0, pedidos_qtd=7)],
@@ -407,7 +407,7 @@ def test_a_hora_que_espera_as_3h45_aparece_na_secao_com_o_total_dela(app, logado
     assert "/os/so_na_espera" in sec
     modelo = R._secao_uso_os(app)
     assert modelo["horas"][9]["fracttal"] == 33 and modelo["horas"][9]["pico"] == 44    # só o total, não a soma com o detalhe
-    assert "1 hora(s)" in modelo["banco_txt"] and "03:45" in modelo["banco_txt"]
+    assert "1 hora(s)" in modelo["banco_txt"] and "04:45" in modelo["banco_txt"]
 
 
 def test_esperas_no_porteiro_por_dia_e_por_hora():
@@ -439,7 +439,7 @@ def test_secao_mostra_as_esperas_do_porteiro(app, logado, banco, monkeypatch):
     assert "12 esperaram a vez no porteiro do Nexus (até 150 por minuto, 90 deles de fundo)" in txt
 
 
-def test_a_gravacao_das_3h45_faz_a_pagina_ler_o_banco_de_novo(app, logado, banco, vivo, monkeypatch):
+def test_a_gravacao_das_4h45_faz_a_pagina_ler_o_banco_de_novo(app, logado, banco, vivo, monkeypatch):
     """O que sai do pendente na gravação já está no banco, mas a cópia de 10 min é de antes dela: sem ler de novo, o dia de
     ontem sumiria da seção por até 10 min. A leitura que começou antes da gravação é velha, mesmo dentro dos 10 min."""
     listagens = []

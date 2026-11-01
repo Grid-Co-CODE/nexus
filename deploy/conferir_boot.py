@@ -18,7 +18,9 @@ Uso (o atualizar.sh chama assim, com o Python do .venv):  .venv/bin/python -B <p
 À mão, para conferir a pasta do serviço:                   .venv/bin/python -B deploy/conferir_boot.py
 """
 import importlib
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -39,18 +41,32 @@ def main() -> int:
     if faltam:
         print("ERRO: o Python do serviço não importa: " + "; ".join(faltam), file=sys.stderr)
         return 1
+    # o clone do OS Creator, ao ser importado, cria a pasta de dados dele (`api._data_dir`, em APPDATA ou no HOME): aqui ela é uma
+    # pasta temporária, e a conferência não grava nada fora dela
+    pasta = tempfile.TemporaryDirectory(prefix="conferir-boot-")
+    os.environ["APPDATA"] = os.environ["XDG_DATA_HOME"] = pasta.name
     try:
         from nexus import create_app
         # o que o servir.py importa além do create_app
         from nexus.campo import instalar as _campo                # noqa: F401
         from nexus.dados import instalar as _dados                # noqa: F401
         from nexus.engenharia import instalar as _engenharia      # noqa: F401
+        # e o que o servir.py liga ao subir: o contador do Fracttal e o uso do OS Creator, e os três leitores do clone (por eles o
+        # `ativos_central`, a `os_central`, o `catalogos`, o `api`...). Antes o clone só carregava no 1º pedido ao /os/; agora o
+        # `servir.py` o importa na subida, e um clone quebrado que o portão não pegasse deixaria o serviço caindo em laço. Só
+        # importa, sem ligar: nenhum laço abre aqui (31/10/2026, revisão final)
+        from nexus.casca import fracttal_conta, uso_os            # noqa: F401
+        from nexus.torres.oscreator import ponte
+        for nome_do_leitor in ponte.LEITORES_DO_CLONE:
+            ponte.modulo_do_clone(nome_do_leitor)
         app = create_app({"NEXUS_SECRET_KEY": "conferencia-do-deploy", "NEXUS_SENHA_ADMIN": "conferencia-do-deploy"})
     except Exception as e:                       # noqa: BLE001 — qualquer erro no boot para o deploy antes do restart
         print(f"ERRO: o Nexus não monta: {type(e).__name__}: {e}", file=sys.stderr)
+        pasta.cleanup()
         return 1
-    print(f"Boot conferido: {len(DEPENDENCIAS)} dependências, {len(app.extensions['nexus_torres'])} torres e "
-          f"{len(list(app.url_map.iter_rules()))} rotas.")
+    print(f"Boot conferido: {len(DEPENDENCIAS)} dependências, {len(app.extensions['nexus_torres'])} torres, "
+          f"{len(list(app.url_map.iter_rules()))} rotas e os {len(ponte.LEITORES_DO_CLONE)} leitores do OS Creator importados.")
+    pasta.cleanup()
     return 0
 
 

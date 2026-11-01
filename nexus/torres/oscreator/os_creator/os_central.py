@@ -290,9 +290,12 @@ def _estado_limpo() -> dict:
     # `campos`: a medida dos campos que o REST trouxe na última leitura do período inteiro, os 7 dias ou a noite (a sondagem da
     # 1ª noite, que não pôde ser feita
     # antes de construir); `disco["sujo"]`: a fila das pendentes mudou sem a versão mudar (a cópia em disco é regravada);
-    # `conferencias`: {tela: as conferências das telas que leem da lista (decisão BA e Ruling BU da 3.3), só contagens}
+    # `conferencias`: {tela: as conferências das telas que leem da lista (decisão BA e Ruling BU da 3.3), só contagens};
+    # `leituras`: {faixa: a última leitura que o leitor FEZ, ok ou falha, com a hora, os pedidos e o motivo} (revisão final): a
+    # `faixas` só guarda a entrega que deu certo, e o relatório do leitor vive na memória dele; a noite que falhou, num servidor
+    # recém-reiniciado, não deixava rastro nenhum para o Raio-X. Vai ao cabeçalho da cópia em disco, como as `recusas`
     return {"faixas": {}, "pendentes": {}, "falhas": {}, "recusas": {}, "confirmadas": {}, "campos": None,
-            "conferencias": {},
+            "conferencias": {}, "leituras": {},
             "disco": {"lido": None, "gravado_em": 0.0, "versao": None, "bytes": None, "erro": None, "sujo": False}}
 
 
@@ -862,6 +865,40 @@ def anotar_conferencia(visao: str, bateu, *, fracttal=None, lista=None, incerta:
             c["ultima_divergencia"] = {"em": agora, "fracttal": _int(fracttal), "lista": _int(lista)}
 
 
+def _leitura(rel: dict) -> dict:
+    """O relatório de uma leitura só com o que pode ir ao disco e ao Raio-X: as horas, as contagens, o resultado e o erro (cortados)
+    e se foi defeito do leitor. Nunca o texto de uma OS."""
+    def n(v):
+        return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0
+
+    def hora(v):
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+    return {"inicio": hora(rel.get("inicio")), "fim": hora(rel.get("fim")), "pedidos": n(rel.get("pedidos")),
+            "os": n(rel.get("os")), "linhas": n(rel.get("linhas")), "resultado": str(rel.get("resultado") or "")[:300],
+            "erro": str(rel.get("erro") or "")[:200], "defeito": bool(rel.get("defeito"))}
+
+
+def anotar_leitura(faixa: str, rel: dict) -> None:
+    """A leitura que o leitor do servidor acabou de FAZER numa faixa (`os_leitor._rodar`), ok ou falha: a hora, os pedidos, o
+    resultado e o erro. Fica no estado e no cabeçalho da cópia em disco, e sobrevive ao reinício. O Levi não tem acesso ao
+    servidor e confere a 1ª noite pelo Raio-X; o relatório do leitor só vive na memória dele, e a noite que falhou deixava a lista
+    como estava e nenhum rastro depois de um deploy. A leitura da noite e a que MUDA de situação (a 1ª falha de uma faixa, ou a 1ª
+    boa depois de uma falha) regravam o cabeçalho na hora (agendado, no máximo a cada 30 s); as de rotina (as novas, de 3 em 3 min,
+    e a falha que se repete) vão junto da próxima gravação, que a lista que mudou já pede: gravar o arquivo inteiro (~2,6 MB) por
+    elas seria gravar à toa, a cada 3 min, com o Fracttal fora."""
+    atual()                                                          # o boot pelo disco antes (sem ele, a cópia se perderia)
+    faixa = str(faixa)[:20]
+    reg = _leitura(rel)
+    with _TRAVA:
+        antes = _ESTADO["leituras"].get(faixa)
+        _ESTADO["leituras"][faixa] = reg
+        grava = faixa == NOITE or bool(reg["erro"]) != bool(antes and antes.get("erro"))
+        if grava:
+            _ESTADO["disco"]["sujo"] = True
+    if grava:
+        _agendar_gravacao()
+
+
 def mais_nova_data_fim() -> str:
     """A data de fim mais nova que a lista conhece entre as concluídas (o piso das finalizadas é ela menos 2 dias), ou ""."""
     return _iso_seg(max((_s(r, 2) for r in atual().ordem if r.status_id == 3), default=0))
@@ -942,7 +979,8 @@ def _extras_do_disco() -> dict:
             "campos_rest": dict(c) if c else None,
             "recusas": {k: dict({ch: x for ch, x in v.items() if ch != "_ids"}, ids=sorted(v.get("_ids") or ()))
                         for k, v in list(_ESTADO["recusas"].items())},
-            "confirmadas": {k: dict(v) for k, v in list(_ESTADO["confirmadas"].items())}}
+            "confirmadas": {k: dict(v) for k, v in list(_ESTADO["confirmadas"].items())},
+            "leituras": {k: dict(v) for k, v in list(_ESTADO["leituras"].items())}}
 
 
 def _gravar_agora() -> bool:
@@ -987,6 +1025,9 @@ def _boot() -> None:
                                 _ESTADO["recusas"][faixa] = dict(rec, _ids=frozenset(int(i) for i in rec.pop("ids", ())))
                         if isinstance(cab.get("confirmadas"), dict):
                             _ESTADO["confirmadas"].update(cab["confirmadas"])
+                        for faixa, leitura in (cab.get("leituras") or {}).items():
+                            if isinstance(leitura, dict) and isinstance(leitura.get("inicio"), (int, float)):
+                                _ESTADO["leituras"].setdefault(str(faixa)[:20], _leitura(leitura))   # a de agora vence a do disco
                         _ESTADO["disco"].update(lido="cópia gravada em %s" % _hora(cab.get("gravado_em")),
                                                 versao=versao, gravado_em=float(cab.get("gravado_em") or 0.0))
                 log.info("lista central de OS: %d OS da cópia em disco", len(lista.por_id))
@@ -1070,6 +1111,7 @@ def estado(medir_memoria: bool = False) -> dict:
             "faixas": {k: dict(v) for k, v in list(_ESTADO["faixas"].items())},
             "recusas": {k: {c: x for c, x in v.items() if c != "_ids"} for k, v in list(_ESTADO["recusas"].items())},
             "confirmadas": {k: dict(v) for k, v in list(_ESTADO["confirmadas"].items())},
+            "leituras": {k: dict(v) for k, v in list(_ESTADO["leituras"].items())},
             "campos": dict(_ESTADO["campos"]) if _ESTADO["campos"] else None, "disco": dict(_ESTADO["disco"]),
             "conferencias": {k: dict(v) for k, v in list(_ESTADO["conferencias"].items())},
             "memoria_mb": memoria, "leitor": leitor}

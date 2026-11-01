@@ -22,7 +22,9 @@ Aqui:
   não tem um campo que a tela mostra, ou a pessoa não passou. Com a lista central cobrindo o período, a "Todos" não é
   dividida (a rota usa a chave da pessoa: Ruling BU da rodada 2 da 3.3, a lista de uma restrita herdada por outra);
 - a lista guarda o HTML das linhas por versão (`html_das_linhas`): as 2.000 linhas são montadas uma vez por versão, e
-  não a cada pedido.
+  não a cada pedido;
+- a lista que ninguém lê há `LISTA_VIDA_S` (30 min) sai da memória quando outra é lida (`_varrer`; revisão final de
+  31/10/2026): são uma por pessoa e filtro, e cresciam até o reinício. A que está sendo lida fica, mesmo velha.
 Erro do Fracttal não apaga a lista guardada: a tela segue com ela, com a hora dela.
 """
 import itertools
@@ -38,6 +40,8 @@ ESPERA_S = 120             # quem chega com a busca inteira em andamento espera 
 CONFERE_S = 30 * 60        # a conferência de "mesma visão" de uma pessoa vale isto
 TOLERANCIA = 0.01          # a mesma visão: o total que o Fracttal dá à pessoa difere do guardado em até 1% (ou 2 OS:
                            # as criadas entre a lista guardada e a conferência)
+LISTA_VIDA_S = 30 * 60     # a lista que ninguém lê há isto sai da memória (revisão final, 31/10/2026: uma por pessoa e filtro,
+                           # cada uma de até 2.000 linhas e o HTML delas, crescendo até o reinício, ~10 por dia)
 
 _LISTAS: dict = {}         # chave -> Lista
 _EM_CURSO: dict = {}       # chave -> {"pronto": Event, "lista": Lista | None, "erro": Exception | None}
@@ -56,6 +60,7 @@ class Lista:
         self.versao = next(_VERSOES)
         self.html: dict = {}
         self.criada_em = time.time()      # a hora (do relógio) desta versão, que a tela mostra
+        self.lida_em = _relogio()         # a última vez que alguém a pediu (`ler`): a que ninguém lê há LISTA_VIDA_S sai
 
 
 def limpar() -> None:
@@ -79,6 +84,9 @@ def ler(chave, buscar_inteira, buscar_novas, *, forcar=False, por_tras=None):
     renovação não acontece por trás (a próxima visita vencida tenta de novo)."""
     agora = _relogio()
     g = _LISTAS.get(chave)
+    if g is not None:
+        g.lida_em = agora                 # a que está sendo lida fica, mesmo velha: a tela abre com ela e ela se renova por trás
+    _varrer(agora)
     if g is None:
         return _inteira(chave, buscar_inteira), "inteira"
     if forcar:
@@ -91,6 +99,15 @@ def ler(chave, buscar_inteira, buscar_novas, *, forcar=False, por_tras=None):
         else:
             por_tras(lambda: _por_tras(_novas, chave, buscar_novas))
     return g, "memoria"
+
+
+def _varrer(agora) -> None:
+    """Tira da memória as listas que ninguém lê há `LISTA_VIDA_S` (nem a que uma busca inteira está montando). Roda a cada
+    `ler`: são dezenas de entradas. Sem isto, cada pessoa e filtro que alguma vez abriu o Histórico pelo caminho de 19/10
+    deixava uma lista de até 2.000 linhas (e o HTML dela) na memória do Nexus até o reinício."""
+    with _TRAVA:
+        for chave in [c for c, g in _LISTAS.items() if agora - g.lida_em >= LISTA_VIDA_S and c not in _EM_CURSO]:
+            _LISTAS.pop(chave, None)
 
 
 def _por_tras(fn, chave, buscar):

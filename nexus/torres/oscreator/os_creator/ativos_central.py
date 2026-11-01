@@ -344,8 +344,11 @@ def _estado_limpo() -> dict:
     # `descricao_cortada`: quantas descrições o detector de endereço da foto do banco cortou na última noite, com até 5 ids e a
     # hora (nunca o texto; Ruling AN). Mora aqui, e não no leitor, para ir ao `ativos_estado.json`: o Levi não tem acesso ao
     # servidor e confere a 1ª noite pelo Raio-X, e o deploy de várias vezes por dia apagaria o número da memória
+    # `noite`: o resultado da última leitura inteira (a hora, se o catálogo trocou ou por que não, e a foto do banco: gravou,
+    # linhas, mudaram, entraram, saíram, erro), só contagens, horas e motivos. Também vai ao `ativos_estado.json`: sem isso um
+    # deploy no meio da manhã apagava, da memória do leitor, o único resultado que o Levi tem para conferir a 1ª noite
     return {"recusa": None, "recusa_completa": None, "paridade_rest": None, "banco": None, "encolhimento": None,
-            "falha": None, "rest": {"bom_em": 0.0, "falha_em": 0.0, "falha": None}, "descricao_cortada": None,
+            "falha": None, "rest": {"bom_em": 0.0, "falha_em": 0.0, "falha": None}, "descricao_cortada": None, "noite": None,
             "disco": {"lido": None, "gravado_em": 0.0, "versao": None, "lido_em": 0.0, "novos_em": 0.0, "erro": None}}
 
 
@@ -479,7 +482,8 @@ def _ler_disco():
 def _gravar_estado() -> None:
     ativos_disco.gravar_estado(_CONFIG["pasta"], {"recusa_completa": _ESTADO["recusa_completa"],
                                                   "paridade_rest": _ESTADO["paridade_rest"], "rest": _ESTADO["rest"],
-                                                  "descricao_cortada": _ESTADO["descricao_cortada"]})
+                                                  "descricao_cortada": _ESTADO["descricao_cortada"],
+                                                  "noite": _ESTADO["noite"]})
 
 
 def _ler_estado() -> None:
@@ -498,6 +502,9 @@ def _ler_estado() -> None:
     c = d.get("descricao_cortada")
     if isinstance(c, dict) and isinstance(c.get("n"), int):
         _ESTADO["descricao_cortada"] = _cortadas(c)
+    n = d.get("noite")
+    if isinstance(n, dict) and isinstance(n.get("inicio"), (int, float)):
+        _ESTADO["noite"] = _noite(n)
 
 
 def _ler_legado():
@@ -797,7 +804,7 @@ def estado() -> dict:
             "encolhimento": dict(_ESTADO["encolhimento"]) if _ESTADO["encolhimento"] else None,
             "falha": dict(_ESTADO["falha"]) if _ESTADO["falha"] else None,
             "paridade_rest": _ESTADO["paridade_rest"], "rest": dict(_ESTADO["rest"]), "leitor_pronto": leitor_pronto(),
-            "descricao_cortada": descricao_cortada(),
+            "descricao_cortada": descricao_cortada(), "noite": noite(),
             "disco": dict(_ESTADO["disco"]), "banco": dict(_ESTADO["banco"]) if _ESTADO["banco"] else None,
             "leitor": leitor}
 
@@ -808,6 +815,48 @@ def _cortadas(d: dict) -> dict:
     exemplos = [i for i in (d.get("exemplos") or ()) if isinstance(i, int)][:5]
     em = d.get("em")
     return {"n": int(d.get("n") or 0), "exemplos": exemplos, "em": float(em) if isinstance(em, (int, float)) else None}
+
+
+def _num(v):
+    """O número como inteiro, ou None (o `bool` não é número aqui)."""
+    return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def _noite(rel: dict) -> dict:
+    """O relatório da leitura inteira só com o que pode ir ao disco e à tela: as horas, as contagens, se o catálogo trocou (`ok`), o
+    resultado (o motivo, cortado) e a foto do banco (gravou, as contagens e o erro). Nunca o texto de um ativo."""
+    foto = rel.get("foto")
+    f = None
+    if isinstance(foto, dict):
+        f = {k: _num(foto.get(k)) for k in ("linhas", "mudaram", "entraram", "sairam", "descricao_cortada")
+             if _num(foto.get(k)) is not None}
+        if isinstance(foto.get("gravou"), bool):
+            f["gravou"] = foto["gravou"]
+        for k in ("erro", "motivo"):
+            if foto.get(k):
+                f[k] = str(foto[k])[:200]
+    ini, fim = rel.get("inicio"), rel.get("fim")
+    return {"inicio": float(ini) if isinstance(ini, (int, float)) else None,
+            "fim": float(fim) if isinstance(fim, (int, float)) else None, "ok": bool(rel.get("ok")),
+            "pedidos": _num(rel.get("pedidos")) or 0, "itens": _num(rel.get("itens")) or 0,
+            "registros": _num(rel.get("registros")) or 0, "sem_pai": _num(rel.get("sem_pai")) or 0,
+            "resultado": str(rel.get("resultado") or "")[:300], "foto": f}
+
+
+def anotar_noite(rel: dict) -> None:
+    """O resultado da leitura inteira que acabou de terminar (`ativos_leitor.ler_completo`), ok ou falha, com a hora: vai ao
+    `ativos_estado.json` e sobrevive ao reinício. O Levi não tem acesso ao servidor e confere a 1ª noite pelo Raio-X; o
+    relatório do leitor só vive na memória dele, e o deploy de várias vezes por dia a apagava antes de ele olhar."""
+    atual()                                                         # o boot local antes: gravar o estado sem ele apagaria a paridade
+    _ESTADO["noite"] = _noite(rel)
+    _gravar_estado()
+
+
+def noite() -> dict | None:
+    """O resultado da última leitura inteira (`anotar_noite`), ou None se esta máquina ainda não teve nenhuma."""
+    atual()                                                         # o boot local traz a de antes do reinício
+    n = _ESTADO["noite"]
+    return dict(n, foto=dict(n["foto"]) if n.get("foto") else None) if n else None
 
 
 def anotar_descricao_cortada(d: dict | None) -> None:

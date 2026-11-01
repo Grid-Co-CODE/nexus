@@ -467,7 +467,7 @@ def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
     (`ativos_central.anotar_leitura_rest`); a que vem inteira é uma leitura boa, valha a conferência ou não.
     Uma leitura do Fracttal por vez: a dos novos pula enquanto esta corre; esta espera a dos novos até `esperar_s`."""
     rel = {"inicio": time.time(), "fim": None, "pedidos": 0, "itens": 0, "registros": 0, "sem_pai": 0,
-           "resultado": "", "foto": None}
+           "resultado": "", "foto": None, "ok": False}
     pegou = _TRAVA_LEITURA.acquire(timeout=esperar_s) if esperar_s > 0 else _TRAVA_LEITURA.acquire(blocking=False)
     if not pegou:
         rel["resultado"] = "já havia uma leitura do Fracttal em curso"
@@ -525,6 +525,7 @@ def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
         del registros
         cat = ativos_central.atual()
         rel["resultado"] = "a mesma lista de antes (só a hora renovada)" if cat.versao == versao_antes else "trocou"
+        rel["ok"] = True                                             # o catálogo aceitou a leitura (a foto do banco é à parte)
         # a foto do banco: só depois que o catálogo aceitou (a mesma guarda vale para os dois). As linhas saem do catálogo que
         # acabou de entrar (os mesmos itens, com o tipo) e dos que ele não tem
         if banco is None:
@@ -570,6 +571,10 @@ def ler_completo(app, *, ler=None, esperar_s: float = 0) -> dict:
     finally:
         rel.update(pedidos=conta[0], fim=time.time())
         _ESTADO["completo"] = rel
+        try:
+            ativos_central.anotar_noite(rel)                         # no disco: o reinício não apaga o resultado da noite
+        except Exception:                                            # noqa: BLE001 — a leitura já valeu; o resultado só deixa de ir ao disco
+            log.exception("leitor de ativos: não guardei o resultado da noite no disco")
         _TRAVA_LEITURA.release()
 
 

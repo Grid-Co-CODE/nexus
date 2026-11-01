@@ -19,15 +19,17 @@ from __future__ import annotations
 ATIVOS_NOVOS = (8, 38)
 ATIVOS_COMPLETO = (2, 15)
 # a lista central de OS do OS Creator (`os_creator/os_leitor.py`): os 7 dias de 10 em 10 min das 06h às 20h nos minutos livres
-# (o :10, o :20, o :40 e o :50 têm dono), as finalizadas no :46 de toda hora (o :45 é do `uso_os` às 03:45: Minor 1 da rodada
+# (o :10, o :20, o :40 e o :50 têm dono), as finalizadas no :46 de toda hora (o :45 é do `uso_os` às 04:45: Minor 1 da rodada
 # 1), a conferência das abertas no :55 e a noite às 03:21 (o :20 é das tarefas). As novas, de 1 ou 2 pedidos, cabem em
 # qualquer minuto e não ocupam nenhum
 OS_SETE_DIAS = (0, 21, 30, 41, 51)
 OS_FINALIZADAS = 46
 OS_ABERTAS = 55
 OS_NOITE = (3, 21)
-# o uso do OS Creator levado ao banco (`nexus/casca/uso_os.py`, `GRAVAR_NA_HORA` e `GRAVAR_NO_MINUTO`), uma vez por dia
-USO_OS_BANCO = (3, 45)
+# o uso do OS Creator levado ao banco (`nexus/casca/uso_os.py`, `GRAVAR_NA_HORA` e `GRAVAR_NO_MINUTO`), uma vez por dia. Às 04:45, e
+# não mais às 03:45 (revisão final, 31/10/2026): a noite de domingo da lista de OS começa às 03:21 e lê os 365 dias, ~830 páginas a
+# 1 por segundo (19 a 29 min), e podia passar das 03:45; a gravação do uso (~7 s de processador) não se soma a uma noite longa
+USO_OS_BANCO = (4, 45)
 # os catálogos pequenos do OS Creator (`os_creator/catalogos.py`, etapa 4): as pessoas pelo REST da empresa às 05h, 11h, 17h e
 # 23h (2 pedidos, 1 por segundo) no :04, o primeiro minuto livre depois do :00 dos 7 dias (~15 s de leitura) e antes do :08
 # dos ativos novos (o :05 do `uso_os` só grava no disco local)

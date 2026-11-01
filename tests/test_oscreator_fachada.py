@@ -10,9 +10,13 @@ troca não valeria, e o teste passaria sem testar nada. O que estes testes segur
 - nenhuma função de módulo chama outra função do mesmo arquivo pelo nome local: vai pelo `api.`, como o teste a troca;
 - todo `api.X` escrito nos módulos existe de verdade (um `api.` posto na frente de uma variável local quebraria só na hora de
   rodar aquele caminho);
-- qualquer módulo pode ser importado antes do `api` (cada um termina com `import api`).
+- toda função que um módulo importa de OUTRO módulo do clone (o `montar_registros` do `ativos_central`) também vai pelo `api.`;
+- qualquer módulo pode ser importado antes do `api` (os 14 que o `api` reexporta terminam com `import api`; o `os_juntar` chama o
+  `api` na hora, pelo `_api()`, e o `fracttal_erro` não o importa).
 Nada aqui vai à rede."""
 import ast
+import importlib
+import inspect
 import json
 import subprocess
 import sys
@@ -102,9 +106,53 @@ def test_todo_api_x_dos_modulos_existe():
 
 
 @pytest.mark.parametrize("modulo", MODULOS)
+def test_funcao_importada_de_outro_modulo_do_clone_tambem_vai_pelo_api(modulo):
+    """Revisão final da etapa 5: o `ativos_carga` importava o `montar_registros` do `ativos_central` (`as _build_records`) e o
+    chamava pelo nome local; o `api._build_records` é o mesmo objeto, mas o teste que o trocasse no `api` não era visto por ele.
+    Toda função importada com `from <outro módulo do clone> import ...` e chamada de dentro de uma função vai pelo `api.` (as
+    classes, como `FracttalError` do `except`, e a biblioteca padrão ficam de fora: não são trocadas por teste nenhum)."""
+    codigo = (CLONE / (modulo + ".py")).read_text(encoding="utf-8")
+    do_clone = {p.stem for p in CLONE.glob("*.py")}
+    importados = {a.asname or a.name for n in ast.parse(codigo).body
+                  if isinstance(n, ast.ImportFrom) and n.module in do_clone for a in n.names}
+    carregado = importlib.import_module(modulo)
+    funcoes = {nome for nome in importados if inspect.isfunction(getattr(carregado, nome, None))}
+    pelo_nome_local = sorted(_globais_chamadas_em_funcao(codigo) & funcoes)
+    assert pelo_nome_local == [], "função de outro módulo chamada pelo nome local em %s: %s (use `api.<nome>`)" % (
+        modulo, pelo_nome_local)
+
+
+def test_o_cache_dos_motivos_de_pausa_vale_pelo_apelido_do_api(monkeypatch):
+    """O `motivos_pausa` religava o cache com `global` (`_PAUSA_CACHE = [...]`), e o apelido `api._PAUSA_CACHE`, a lista de
+    antes, ficava vazio para sempre. O cache é UMA lista: o `motivos_pausa` muda o conteúdo dela, e o `api` a enxerga."""
+    import os_execucao
+    monkeypatch.setattr(os_execucao, "_PAUSA_CACHE", os_execucao._PAUSA_CACHE)      # o desfazer devolve o nome ao que era
+    lista = api._PAUSA_CACHE
+    lista.clear()
+    pedidos = []
+
+    def rpc(metodo, params, **k):
+        pedidos.append(metodo)
+        return {"data": [{"id": 1, "description": " Almoço "}, {"id": 2, "description": "Banheiro"},
+                         {"id": None, "description": "sem id"}]}
+    monkeypatch.setattr(api, "_rpc_call", rpc)
+    try:
+        motivos = api.motivos_pausa()
+        assert motivos == [{"id": 1, "descricao": "Almoço"}, {"id": 2, "descricao": "Banheiro"}]
+        assert api._PAUSA_CACHE == motivos and api._PAUSA_CACHE is os_execucao._PAUSA_CACHE is lista
+        assert api.motivos_pausa() == motivos and len(pedidos) == 1              # a 2ª vez sai do cache, sem pedido
+        api._PAUSA_CACHE.clear()                                                  # quem limpa pelo apelido limpa o cache de verdade
+        api.motivos_pausa()
+        assert len(pedidos) == 2
+    finally:
+        lista.clear()
+
+
+@pytest.mark.parametrize("modulo", MODULOS)
 def test_o_modulo_importa_antes_do_api(modulo):
-    """Cada módulo termina com `import api` (o `api` o importa no fim do arquivo, a fachada): importado primeiro, o círculo se
-    fecha sem erro, e o `api` sai inteiro. Num interpretador limpo, para ninguém ter carregado o `api` antes."""
+    """Os módulos que o `api` reexporta terminam com `import api` (ele os importa no fim do arquivo, a fachada); o `os_juntar`
+    (o `os_criar` o importa) chama o `api` na hora, pelo `_api()`, e o `fracttal_erro` não o importa. Importado primeiro, o círculo
+    se fecha sem erro, e o `api` sai inteiro. Num interpretador limpo, para ninguém ter carregado o `api` antes."""
     codigo = ("import sys\nsys.path.append(%r)\nimport %s\nimport api\nassert api.FracttalError.__name__ == 'FracttalError'\n"
               "assert callable(api._rpc_call) and hasattr(api, 'clonar_os')\n" % (str(CLONE), modulo))
     r = subprocess.run([sys.executable, "-c", codigo], capture_output=True, text=True, cwd=str(CLONE.parents[3]))

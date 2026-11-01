@@ -60,7 +60,7 @@ if __name__ == "__main__":
     teto_os.ligar(app, teto=THREADS // 2)
     # o uso das telas do OS Creator por hora, e a rota de cada pedido como origem do Fracttal (31/10/2026, etapa 0 do canto
     # central), e, com gravar=True, o laço que guarda as horas fechadas dos dois contadores no disco a cada hora (:05) e as
-    # leva ao banco uma vez por dia, às 03:45 (só o servidor): DEPOIS do teto (é ele que avisa o 503 recusado) e antes do
+    # leva ao banco uma vez por dia, às 04:45 (só o servidor): DEPOIS do teto (é ele que avisa o 503 recusado) e antes do
     # registro dos pedidos presos
     from nexus.casca import uso_os
     uso_os.ligar(app, gravar=True)
@@ -72,19 +72,19 @@ if __name__ == "__main__":
     # os ativos do Fracttal lidos pelo próprio servidor (31/10/2026, etapa 2 do canto central do OS Creator): o Fracttal
     # inteiro às 02:15 e os novos de 30 em 30 min, pela credencial da empresa, e a foto dos ativos no banco renovada toda
     # noite. Só aqui (o app.py e os testes seguem pelo RPC); sem a credencial REST ele não liga, e o estado diz por quê
+    # Cada leitor liga dentro de um try (`ligar_leitor_do_clone`): importar o leitor é importar o clone, e o clone quebrado não
+    # derruba o Nexus (31/10/2026, revisão final: antes o clone só carregava no 1º pedido ao /os/, dentro de um try). O Nexus
+    # sobe sem o leitor, o log tem a pilha e o Raio-X diz que ele não ligou; o portão do deploy pega o clone quebrado antes
     from nexus.torres.oscreator import ponte as ponte_os
-    ativos_leitor = ponte_os.modulo_do_clone("ativos_leitor")
-    ativos_leitor.ligar(app)
+    ponte_os.ligar_leitor_do_clone(app, "ativos_leitor")
     # o histórico de OS central lido pelo próprio servidor (31/10/2026, etapa 3 do canto central): as novas de 3 em 3 min, os 7
     # dias de 10 em 10, as finalizadas de hora em hora, a janela de madrugada (03:21), e as abertas que o laço do tarefas_os
     # (ligado acima, no instalar_campo) já lê, entregues sem pedido a mais. Só aqui; sem a credencial REST ele não liga
-    os_leitor = ponte_os.modulo_do_clone("os_leitor")
-    os_leitor.ligar(app)
+    ponte_os.ligar_leitor_do_clone(app, "os_leitor")
     # os catálogos pequenos do OS Creator (31/10/2026, etapa 4 do canto central): a cópia em disco de cada um (o reinício não
     # pede nada) e as pessoas pelo REST da empresa às 05h, 11h, 17h e 23h, no minuto que a lista de minutos ocupados lhes dá.
     # Só aqui; sem a credencial REST não liga, e as pessoas seguem pelo RPC, com a sessão de quem usa (como no app.py)
-    catalogos_leitor = ponte_os.modulo_do_clone("catalogos_leitor")
-    catalogos_leitor.ligar(app)
+    ponte_os.ligar_leitor_do_clone(app, "catalogos_leitor")
     host = os.environ.get("NEXUS_HOST", "127.0.0.1")
     porta = int(os.environ.get("NEXUS_PORTA", "5070"))
     prefixo = app.config.get("NEXUS_PREFIXO") or "(raiz)"

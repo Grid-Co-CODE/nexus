@@ -17,7 +17,7 @@ MESMAS funções e pela mesma paginação do `nexus/campo/tarefas_os.py` (o leit
   sem pedido a mais). Ela só lê na máquina que vai gravar (pula se a outra gravou há menos de 50 min): sem entrega em 70 min,
   este leitor as lê ele mesmo pela mesma função (`tarefas_os.ler_abertas`), no máximo uma vez por hora (:55). Custo: ~98
   pedidos na escala do AC (~99 OS por dia) numa hora em que o PC gravou;
-- AS FINALIZADAS (`ler_finalizadas`, :46 de toda hora: o :45 é do `uso_os` às 03:45): status 3 pela data de fim, desde a mais
+- AS FINALIZADAS (`ler_finalizadas`, :46 de toda hora: o :45 é do `uso_os` às 04:45): status 3 pela data de fim, desde a mais
   nova que a lista conhece (nunca depois de agora: a data fim no futuro, dado ruim, não trava a faixa) menos 2 dias, parando
   quando uma página INTEIRA passa do piso (a leitura do desenho do PCM de 27/10; o fato `fato_tarefa_finalizada` não é
   publicado aqui). A lista sem nenhuma concluída espera a noite;
@@ -64,7 +64,7 @@ DIA_UTIL_DAS, DIA_UTIL_ATE = 6, 20            # o horário de trabalho: as novas
 NOVAS_DIA_MIN, NOVAS_FORA_MIN = 3, 15
 SETE_DIAS_DAS, SETE_DIAS_ATE = 6, 20          # os 7 dias, de 10 em 10 min, todos os dias
 # os minutos fixos moram na lista única dos minutos ocupados (Minor 1 da rodada 1): os 7 dias nos minutos livres de 10 em 10, as
-# finalizadas no :46 (o :45 é do `uso_os` às 03:45), a conferência das abertas no :55 e a noite às 03:21 (o :20 é das tarefas)
+# finalizadas no :46 (o :45 é do `uso_os` às 04:45), a conferência das abertas no :55 e a noite às 03:21 (o :20 é das tarefas)
 SETE_DIAS_MINUTOS = MO.OS_SETE_DIAS
 FINALIZADAS_MINUTO = MO.OS_FINALIZADAS
 ABERTAS_MINUTO = MO.OS_ABERTAS
@@ -177,6 +177,10 @@ def _rodar(faixa: str, ler, fazer) -> dict:
     finally:
         rel.update(pedidos=conta[0], fim=time.time())
         _ESTADO["faixas"][faixa] = rel
+        try:
+            os_central.anotar_leitura(faixa, rel)                    # no cabeçalho da cópia em disco: o reinício não apaga o resultado
+        except Exception:                                            # noqa: BLE001 — a leitura já valeu; só deixa de ir ao disco
+            log.exception("leitor de OS: não guardei o resultado da faixa %s", faixa)
         _TRAVA.release()
     return rel
 

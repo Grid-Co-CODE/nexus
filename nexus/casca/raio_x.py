@@ -23,12 +23,13 @@ clique do administrador:
 - o uso do OS Creator nos últimos 7 dias (`montar_uso_os`, 31/10/2026, etapa 0 do canto central): as telas mais pedidas (os
   cliques e o que a tela pede sozinha, separados, com a mediana e o p95), os cliques por hora do dia, os pedidos ao
   Fracttal por hora com o pico por minuto ao lado da cota de 200 e o corte por setor. De ontem para trás vem dos livros
-  do mês no banco (a leitura, numa thread à parte e guardada 10 min, `_uso_do_banco`); o que ainda não foi às 03:45 vem do
+  do mês no banco (a leitura, numa thread à parte e guardada 10 min, `_uso_do_banco`); o que ainda não foi às 04:45 vem do
   pendente no disco do servidor (`uso_os.linhas_pendentes`) e a hora aberta, da memória;
 - na mesma seção, o canto central do OS Creator (`_secao_canto_central`, item 0 da 3.1+3.2): o estado dos ativos centrais
-  (o catálogo, o leitor do servidor, a paridade do REST, as descrições cortadas da foto, o disco), o da lista central de OS
-  (3.2) e o dos catálogos pequenos (4.1: uma linha por catálogo, as pessoas pelo REST e os planos da Performance), só com
-  contagens, datas e ids, para conferir de fora a 1ª noite do leitor.
+  (o catálogo, o leitor do servidor, a paridade do REST, a última noite com a foto do banco, a troca recusada, as descrições
+  cortadas da foto, o disco), o da lista central de OS (3.2, com a última leitura de cada faixa, que volta do disco depois do
+  reinício) e o dos catálogos pequenos (4.1: uma linha por catálogo, as pessoas pelo REST e os planos da Performance), só com
+  contagens, datas e ids, para conferir de fora a 1ª noite do leitor; o leitor que quebrou na subida diz "NÃO LIGOU" na peça dele.
 
 Nada é gravado nem vai à rede (a leitura do uso no banco é a exceção, por trás, com prazo); a pilha só sai como rótulo
 (arquivo, linha e função), nunca com dados.
@@ -438,8 +439,8 @@ def _processador(janela_s: float = 1.0) -> dict:
 # ── o uso do OS Creator e os pedidos ao Fracttal (31/10/2026, etapa 0 do canto central do OS Creator) ────────────────────
 # Em 13 e 14/10/2026 o OS Creator prendeu as threads do Nexus e ninguém soube dizer quais telas as pessoas abrem, a que hora,
 # em quantas, quanto cada uma demora e quanto pede ao Fracttal. O servidor guarda as horas fechadas no disco dele a cada hora
-# e as leva ao banco às 03:45 (`uso_os`, `dados/fato_uso_os.py`); esta seção lê o banco (de ontem para trás), junta o pendente
-# do disco (o que ainda não foi às 03:45) e a memória (a hora aberta), e mostra o antes e o depois de cada mudança. A página
+# e as leva ao banco às 04:45 (`uso_os`, `dados/fato_uso_os.py`); esta seção lê o banco (de ontem para trás), junta o pendente
+# do disco (o que ainda não foi às 04:45) e a memória (a hora aberta), e mostra o antes e o depois de cada mudança. A página
 # nunca espera o banco: a leitura vai por trás e fica guardada 10 min.
 DIAS_USO = 7                    # a janela da seção
 MAX_ROTAS_USO = 15              # as telas mais pedidas
@@ -468,7 +469,7 @@ def _monotonico() -> float:
 
 def _epoch() -> float:
     """A hora de parede de agora (os testes a trocam): a leitura do banco guarda a de quando COMEÇOU, para saber se a
-    gravação das 03:45 (`uso_os.gravou_em`) veio depois dela."""
+    gravação das 04:45 (`uso_os.gravou_em`) veio depois dela."""
     return time.time()
 
 
@@ -493,7 +494,7 @@ def _uso_do_banco(app, hora_id: str, prazo_s: float | None = None) -> dict:
     antes (ou nada) e a próxima abertura encontra a nova. Leitura presa não abre outra; depois de uma falha, só tenta de
     novo passado `ESPERA_APOS_FALHA_S`. Teste sem a sessão do banco (`nexus_dados_sessao`) nunca vai à rede.
 
-    **A gravação das 03:45 vence a cópia:** o que saiu do pendente para o banco não está na cópia de antes dela, e o dia de
+    **A gravação das 04:45 vence a cópia:** o que saiu do pendente para o banco não está na cópia de antes dela, e o dia de
     ontem sumiria da seção por até 10 min; a cópia cuja leitura começou antes da última gravação (`uso_os.gravou_em`) é
     velha, mesmo dentro dos 10 min."""
     sessao = app.extensions.get("nexus_dados_sessao")
@@ -568,7 +569,7 @@ def _tom_do_pico(pico: int, cota: int) -> tuple:
 
 def montar_uso_os(hora_id_agora: str, banco: dict | None, vivo: dict) -> dict:
     """A conta da seção, pura: `banco` = `{"uso": [...], "total": [...]}` lido dos livros (ou None); `vivo` = o que o servidor
-    guarda fora do banco, `{"uso", "total", "setor"}`: as linhas do pendente do disco (o que ainda não foi às 03:45), as da
+    guarda fora do banco, `{"uso", "total", "setor"}`: as linhas do pendente do disco (o que ainda não foi às 04:45), as da
     hora aberta (a memória dos contadores) e o corte por setor (que mora só no servidor: o arquivo do disco mais o que entrou
     depois do último salvamento). `total` é a linha de 1 por hora (`hora_id`, os pedidos, as recusas, os erros e o pico por
     minuto): a que o contador entrega como `*` o `fato_uso_os.separar_total` já separou. Janela: os `DIAS_USO` dias de Brasília
@@ -678,19 +679,19 @@ def _de_onde_vem(lido: dict, espera: dict, tem: bool) -> dict:
     erro, hora = lido.get("erro"), lido.get("lido_txt")
     if lido.get("dados") is not None:
         txt = (f"De ontem para trás, do banco, lido às {hora} (a cópia vale 10 min). O que ainda não foi ao banco (ele "
-               "recebe tudo uma vez por dia, às 03:45) vem do disco do servidor, e a hora aberta, da memória dele.")
+               "recebe tudo uma vez por dia, às 04:45) vem do disco do servidor, e a hora aberta, da memória dele.")
         if erro:
             txt += f" A última tentativa de ler o banco falhou ({erro}); o que está aqui é a cópia das {hora}."
     elif erro:
         txt = (f"O banco não respondeu ({erro}): vale só o que o servidor guarda, no disco dele (o que ainda não foi às "
-               "03:45) e na memória (a hora aberta).")
+               "04:45) e na memória (a hora aberta).")
     elif lido.get("lendo"):
         txt = ("Lendo o banco (a página não espera): até a leitura chegar vale só o que o servidor guarda, no disco (o que "
-               "ainda não foi às 03:45) e na memória. Leia de novo em instantes.")
+               "ainda não foi às 04:45) e na memória. Leia de novo em instantes.")
     else:
         txt = "Sem o banco nesta máquina: vale só o que este processo guarda, no disco e na memória."
     if espera.get("horas"):
-        txt += f" {espera['horas']} hora(s) ainda não foram ao banco (vão às 03:45 e já estão no disco do servidor)."
+        txt += f" {espera['horas']} hora(s) ainda não foram ao banco (vão às 04:45 e já estão no disco do servidor)."
     if tem:
         return {"banco_txt": txt, "motivo": ""}
     if erro and lido.get("dados") is None:
@@ -699,7 +700,7 @@ def _de_onde_vem(lido: dict, espera: dict, tem: bool) -> dict:
         motivo = "Lendo o banco: a página não espera, leia de novo em instantes."
     elif lido.get("dados") is not None:
         motivo = ("Nenhuma hora gravada no banco ainda e nada pendente no disco nem na memória: o servidor guarda a primeira "
-                  "hora fechada no :05 da hora seguinte e a leva ao banco às 03:45.")
+                  "hora fechada no :05 da hora seguinte e a leva ao banco às 04:45.")
     else:
         motivo = "Sem o banco nesta máquina e sem o registro do servidor (ele só liga no servidor)."
     return {"banco_txt": txt, "motivo": motivo}
@@ -744,6 +745,32 @@ def _pct(v) -> str:
     return ("%.1f%%" % float(v)).replace(".", ",") if isinstance(v, (int, float)) else "?"
 
 
+def _noite_dos_ativos(n: dict) -> str:
+    """A última leitura inteira dos ativos (`ativos_leitor.ler_completo`, guardada no `ativos_estado.json`) em uma frase: a hora e
+    quanto levou, se o catálogo aceitou, os pedidos e as contagens, o resultado e a foto do banco (gravou, linhas, mudaram,
+    entraram, saíram, o erro). Só contagens, horas e motivos: nunca o texto de um ativo."""
+    inicio, fim = n.get("inicio"), n.get("fim")
+    levou = (" (levou %d min)" % max(1, round((fim - inicio) / 60))) if isinstance(inicio, (int, float)) and isinstance(
+        fim, (int, float)) and fim >= inicio else ""
+    partes = ["%s%s: %s" % (_quando(inicio) or "?", levou, "o catálogo aceitou a leitura" if n.get("ok") else
+                            "NÃO TROCOU O CATÁLOGO"),
+              "%d pedidos, %d itens, %d registros, %d sem o pai" % (n.get("pedidos") or 0, n.get("itens") or 0,
+                                                                    n.get("registros") or 0, n.get("sem_pai") or 0)]
+    if n.get("resultado"):
+        partes.append("resultado: %s" % str(n["resultado"])[:300])
+    f = n.get("foto")
+    if not f:
+        partes.append("foto do banco: não renovada nesta noite")
+    elif f.get("erro"):
+        partes.append("foto do banco: ERRO: %s" % str(f["erro"])[:200])
+    else:
+        partes.append("foto do banco: %s, %d linhas, %d mudaram, %d entraram, %d saíram, %d descrições cortadas%s" % (
+            "gravou" if f.get("gravou") else "nada gravado (o banco já tinha as mesmas linhas)", f.get("linhas") or 0,
+            f.get("mudaram") or 0, f.get("entraram") or 0, f.get("sairam") or 0, f.get("descricao_cortada") or 0,
+            "; " + str(f["motivo"])[:200] if f.get("motivo") and not f.get("gravou") else ""))
+    return "; ".join(partes)
+
+
 def _linhas_dos_ativos(e: dict) -> list:
     """As linhas do bloco "Ativos centrais", do `ativos_central.estado()`."""
     linhas = []
@@ -782,6 +809,17 @@ def _linhas_dos_ativos(e: dict) -> list:
     elif r.get("falha_em"):
         txt += "; a última falha, antes dela, em %s" % _quando(r.get("falha_em"))
     linhas.append(("REST do Fracttal", txt))
+    # a 1ª noite só se confere por aqui (o Levi não tem acesso ao servidor): o resultado da última leitura inteira vem do
+    # `ativos_estado.json`, e sobrevive ao reinício (o relatório do leitor só vive na memória dele)
+    if e.get("noite"):
+        linhas.append(("Última noite (leitura inteira)", _noite_dos_ativos(e["noite"])))
+    else:
+        linhas.append(("Última noite (leitura inteira)", "ainda não houve neste servidor (a 1ª é às 02:15 depois do deploy)"))
+    rec = e.get("recusa")
+    if rec:
+        linhas.append(("Troca recusada", "%s em %s (fonte %s): %s; o catálogo tinha %s ativos e a leitura trouxe %s" % (
+            rec.get("tipo") or "?", _quando(rec.get("em")) or "?", rec.get("fonte") or "?", str(rec.get("motivo") or "")[:300],
+            rec.get("n_atual", "?"), rec.get("n_novo", "?"))))
     c = e.get("descricao_cortada")
     if c:
         linhas.append(("Descrições cortadas", "%d descrições na foto da noite de %s%s" % (
@@ -884,9 +922,12 @@ def _linhas_da_lista_de_os(e: dict) -> list:
     else:
         linhas.append(("Leitor do servidor", "ligado%s" % ("; lendo agora" if leitor.get("lendo") else "")))
     feitas = (leitor or {}).get("faixas") or {}
+    # a leitura que o leitor fez antes do último reinício vem da cópia em disco (`leituras`, no cabeçalho): sem ela a noite que
+    # FALHOU não deixava rastro depois de um deploy, e o Levi, sem acesso ao servidor, não tinha como conferir a 1ª noite
+    guardadas = e.get("leituras") or {}
     for chave_lista, chave_leitor, rotulo in _FAIXAS_DE_OS:
         ent = (e.get("faixas") or {}).get(chave_lista)
-        run = feitas.get(chave_leitor)
+        run = feitas.get(chave_leitor) or guardadas.get(chave_leitor)
         if not ent and not run:
             continue
         partes = []
@@ -1004,12 +1045,31 @@ def _linhas_dos_catalogos(e: dict) -> list:
     return linhas
 
 
-def _secao_canto_central() -> dict:
+# o leitor do servidor de cada peça (`ponte.LEITORES_DO_CLONE`): o que o `servir.py` liga ao subir
+_LEITOR_DA_PECA = {"ativos": "ativos_leitor", "os": "os_leitor", "catalogos": "catalogos_leitor"}
+
+
+def _com_o_leitor_que_nao_ligou(peca: dict, erro: str) -> dict:
+    """A peça com a linha "Leitor do servidor" dizendo que o leitor NÃO LIGOU (o import ou o `ligar` levantou, e o Nexus subiu sem
+    ele: `ponte.ligar_leitor_do_clone`). Sem isto a peça dizia "não ligado (só o servir.py liga o leitor)", como se fosse o PC, e a
+    pessoa sem acesso ao servidor não saberia que o clone quebrou. A pilha está no log do servidor."""
+    linhas = [("Leitor do servidor", "NÃO LIGOU, o clone quebrou ao subir: %s. O Nexus subiu sem ele e as telas leem ao vivo; a "
+                                     "pilha está no log do servidor" % str(erro)[:200])]
+    linhas += [l for l in peca.get("linhas") or () if l[0] != "Leitor do servidor"]
+    return {"linhas": linhas, "motivo": ""}
+
+
+def _secao_canto_central(app=None) -> dict:
     """O bloco do canto central na seção do OS Creator: os ativos (item 0 da 3.1+3.2), a lista de OS (3.2) e os catálogos
-    pequenos (4.1)."""
-    return {"ativos": _peca("ativos_central", lambda m: _linhas_dos_ativos(m.estado())),
-            "os": _peca("os_central", lambda m: _linhas_da_lista_de_os(m.estado(medir_memoria=True))),
-            "catalogos": _peca("catalogos", lambda m: _linhas_dos_catalogos(m.estado()))}
+    pequenos (4.1). `app`: o leitor que não ligou na subida (`ponte.FALHOS`) é dito na peça dele."""
+    pecas = {"ativos": _peca("ativos_central", lambda m: _linhas_dos_ativos(m.estado())),
+             "os": _peca("os_central", lambda m: _linhas_da_lista_de_os(m.estado(medir_memoria=True))),
+             "catalogos": _peca("catalogos", lambda m: _linhas_dos_catalogos(m.estado()))}
+    falhos = (app.extensions.get("nexus_leitores_do_clone_falhos") or {}) if app is not None else {}
+    for chave, leitor in _LEITOR_DA_PECA.items():
+        if leitor in falhos:
+            pecas[chave] = _com_o_leitor_que_nao_ligou(pecas[chave], falhos[leitor])
+    return pecas
 
 
 def registrar_raio_x(bp) -> None:
@@ -1030,7 +1090,7 @@ def registrar_raio_x(bp) -> None:
         return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None, teto=teto,
                                threads=getattr(estado, "threads", 0), cpu=_processador(), quem=_memoria_por_programa(),
                                worker=_worker_plataforma(), web=_web_plataforma(), prazo_memoria=PRAZO_MEMORIA_S,
-                               nexus=_dentro_do_nexus(app), uso=_secao_uso_os(app), canto=_secao_canto_central(),
+                               nexus=_dentro_do_nexus(app), uso=_secao_uso_os(app), canto=_secao_canto_central(app),
                                threads_atrasado=threads_atrasado,
                                threads_quando=lista.get("anterior_quando") if threads_atrasado else None,
                                travamentos=P.cartao(app) if estado is not None else None,

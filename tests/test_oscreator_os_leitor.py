@@ -295,7 +295,7 @@ def test_horarios_das_faixas():
     s, passo = OL.proximo_passo(_em(27, 10, 9))                                     # o :10 é das tarefas: os 7 dias andam
     assert passo == OL.NOVAS and s == 3 * 60                                        # ... e as novas do :12 vêm antes deles
     assert OL.proximo_passo(_em(27, 10, 19)) == (120, OL.SETE_DIAS)                 # o :21, o próximo minuto livre
-    assert OL.proximo_passo(_em(27, 10, 45)) == (60, OL.FINALIZADAS)                # :46 (o :45 é do uso_os às 03:45)
+    assert OL.proximo_passo(_em(27, 10, 45)) == (60, OL.FINALIZADAS)                # :46 (o :45 é do uso_os às 04:45)
     assert OL.proximo_passo(_em(31, 10, 44)) == (60, OL.NOVAS)                      # sábado: as novas do :45 vêm antes
     assert OL.proximo_passo(_em(27, 10, 54)) == (60, OL.ABERTAS)                    # :55, a conferência das abertas
     assert OL.proximo_passo(_em(31, 10, 1)) == (14 * 60, OL.NOVAS)                  # sábado: de 15 em 15 min
@@ -386,8 +386,8 @@ def test_o_servidor_liga_o_leitor_e_o_pc_nao():
     import re
     liga = re.compile(r"(?<![\w])os_leitor\.ligar\(")                 # o `ativos_leitor.ligar(` não conta
     texto = (AQUI / "servir.py").read_text(encoding="utf-8")
-    m = liga.search(texto)
-    assert m and 'modulo_do_clone("os_leitor")' in texto
+    m = re.search(r'ligar_leitor_do_clone\(app, "os_leitor"\)', texto)       # o servir.py liga pelo try (`ponte.ligar_leitor_do_clone`)
+    assert m and not liga.search(texto)
     assert texto.index("fracttal_conta.ligar()") < m.start()
     assert texto.index("instalar_campo(app)") < m.start()                      # depois do laço do tarefas_os
     for arquivo in ("app.py", "nexus/__init__.py", "nexus/torres/oscreator/ponte.py"):
@@ -556,6 +556,52 @@ def test_pendentes_mortas_saem_da_fila(tmp_path, monkeypatch):
     assert not set(OC.pendentes()) & {apagada, morta, viva}
 
 
+def test_a_noite_que_falhou_deixa_rastro_depois_do_reinicio(tmp_path, monkeypatch):
+    """Revisão final: o relatório do leitor vive na memória dele, e a `faixas` do `os_central` só guarda a entrega que deu certo. A
+    noite que FALHOU (o REST que não veio inteiro) deixava a lista como estava e, depois de um deploy, nenhum rastro: o Levi não tem
+    acesso ao servidor e confere a 1ª noite pelo Raio-X. Agora a última leitura de cada faixa, ok ou falha, vai ao cabeçalho da
+    cópia em disco (`leituras`), e a noite seguinte que deu certo apaga a falha do disco também."""
+    monkeypatch.setattr(OD, "GRAVAR_A_CADA_S", 0)
+    OC.reiniciar(pasta=str(tmp_path))
+    base = _base()
+    _lista_de(base)
+    rel = OL.ler_noite(ler=RestOS(base, falha_no=2))
+    assert rel["erro"] and "nada mudou" in rel["resultado"]
+    assert OC.esperar_gravacao(5)
+    OC.reiniciar(pasta=str(tmp_path))                                    # o reinício (um deploy): o leitor perde a memória
+    OL.reiniciar()
+    assert OL.estado()["faixas"] == {}
+    guardada = OC.estado()["leituras"]["noite"]
+    assert guardada["erro"] == rel["erro"] and guardada["pedidos"] == rel["pedidos"] and guardada["inicio"] == rel["inicio"]
+    assert "nada mudou" in guardada["resultado"] and guardada["defeito"] is False and set(guardada) == {
+        "inicio", "fim", "pedidos", "os", "linhas", "resultado", "erro", "defeito"}                  # só contagens, horas e motivos
+    # a noite seguinte, boa, vira a guardada (e sem erro)
+    rel = OL.ler_noite(ler=RestOS(base))
+    assert not rel["erro"]
+    assert OC.esperar_gravacao(5)
+    OC.reiniciar(pasta=str(tmp_path))
+    OL.reiniciar()
+    assert not OC.estado()["leituras"]["noite"]["erro"] and OC.estado()["leituras"]["noite"]["os"] == len(base)
+    # a leitura de rotina que deu certo não pede regravar o arquivo inteiro (as novas, de 3 em 3 min): fica na memória
+    OC.esperar_gravacao(5)
+    gravado = OC.estado()["disco"]["gravado_em"]
+    OL.ler_novas(ler=RestOS(base))
+    assert OC.esperar_gravacao(5) and OC.estado()["disco"]["gravado_em"] == gravado and "novas" in OC.estado()["leituras"]
+    # a 1ª falha de uma faixa regrava o cabeçalho; a que se repete (o Fracttal fora, de 3 em 3 min) não regrava
+    time.sleep(0.05)
+    rel = OL.ler_novas(ler=RestOS(base, falha_no=1))
+    assert rel["erro"] and OC.esperar_gravacao(5)
+    com_falha = OC.estado()["disco"]["gravado_em"]
+    assert com_falha > gravado and OC.estado()["leituras"]["novas"]["erro"]
+    time.sleep(0.05)
+    OL.ler_novas(ler=RestOS(base, falha_no=1))
+    assert OC.esperar_gravacao(5) and OC.estado()["disco"]["gravado_em"] == com_falha
+    time.sleep(0.05)
+    OL.ler_novas(ler=RestOS(base))                                       # a 1ª boa depois da falha regrava: a falha sai do disco
+    assert OC.esperar_gravacao(5) and OC.estado()["disco"]["gravado_em"] > com_falha
+    assert not OC.estado()["leituras"]["novas"]["erro"]
+
+
 def test_a_pausa_vem_antes_de_cada_os_pelo_numero(monkeypatch):
     """As pendentes vêm logo depois das novas e dos 7 dias: a pausa de 1 s vem antes de CADA pedido pelo nº, o 1º também
     (nunca 2 pedidos colados)."""
@@ -608,7 +654,7 @@ def test_rodar_separa_o_defeito(monkeypatch, caplog):
 # ── rodada 1 da revisão: os minutos na lista única (Minor 1) ────────────────────────────────────────────────────────────
 def test_os_minutos_moram_na_lista_unica():
     """Os minutos fixos da lista de OS moram em `minutos_ocupados` (como os dos ativos), e a lista bate com os laços de
-    verdade: cada `MINUTO_DA_HORA` tem o dono certo, e o diário do uso do OS Creator (03:45) também está lá."""
+    verdade: cada `MINUTO_DA_HORA` tem o dono certo, e o diário do uso do OS Creator (04:45) também está lá."""
     from nexus.campo import chamados_acompanhamento, zeladoria_banco
     from nexus.casca import uso_os
     from nexus.cos import normalizacoes_banco
@@ -623,13 +669,22 @@ def test_os_minutos_moram_na_lista_unica():
         MO.OS_SETE_DIAS, MO.OS_FINALIZADAS, MO.OS_ABERTAS, MO.OS_NOITE)
     for m in MO.OS_SETE_DIAS + (MO.OS_FINALIZADAS, MO.OS_ABERTAS, MO.OS_NOITE[1]):
         assert "lista central de OS" in MO.OCUPADOS[m], m
-    # os diários: o uso do OS Creator às 03:45 (as finalizadas do :46 fogem dele), a noite da lista e os ativos inteiros
+    # os diários: o uso do OS Creator às 04:45 (as finalizadas do :46 fogem dele), a noite da lista e os ativos inteiros
     assert (uso_os.GRAVAR_NA_HORA, uso_os.GRAVAR_NO_MINUTO) == MO.USO_OS_BANCO and "uso" in MO.DIARIOS[MO.USO_OS_BANCO]
     assert "lista central de OS" in MO.DIARIOS[MO.OS_NOITE] and "ativos" in MO.DIARIOS[MO.ATIVOS_COMPLETO]
-    assert not MO.livre(45, hora=3) and MO.livre(45) and (3, MO.OS_FINALIZADAS) not in MO.DIARIOS
+    assert not MO.livre(45, hora=4) and MO.livre(45, hora=3) and MO.livre(45) and (4, MO.OS_FINALIZADAS) not in MO.DIARIOS
     # dois donos no mesmo minuto não passam: a lista acusa ao montar
     with pytest.raises(ValueError, match="já é de"):
         MO._ocupar(dict(MO.OCUPADOS), (MO.OS_FINALIZADAS,), "outro laço")
+
+
+def test_a_noite_de_domingo_acaba_antes_da_gravacao_do_uso_no_banco():
+    """Revisão final: a noite de domingo da lista de OS começa às 03:21 e lê os 365 dias, ~830 páginas a ~1 por segundo (1,35 s
+    cada no ensaio de 18/10/2026 do `tarefas_os`): de 19 a 29 min, até depois das 03:45, onde estava a gravação diária do uso do
+    OS Creator no banco (~7 s de processador). Mesmo no pior caso (29 min) a noite acaba antes da gravação."""
+    noite = MO.OS_NOITE[0] * 60 + MO.OS_NOITE[1]
+    gravacao = MO.USO_OS_BANCO[0] * 60 + MO.USO_OS_BANCO[1]
+    assert noite + 29 < gravacao
 
 
 # ── rodada 2 da revisão: a leitura que acaba antes do piso ──────────────────────────────────────────────────────────────

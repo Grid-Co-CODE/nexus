@@ -45,7 +45,7 @@ disco e leva ao banco (`drenar`) e que o Raio-X mostra (`instantaneo`).
      lida UMA vez, antes dos dois) e as guarda no **pendente**, em `casca/uso_os_pendente.json` na pasta de dados
      (atômico: rascunho + `os.replace`). A memória dos contadores fica limitada, e o Raio-X lê o pendente. Depois do
      disco, `salvar()`: o parcial sem as horas que acabaram de sair.
-  2. **Às 03:45 de Brasília, uma vez por dia** (`gravar_no_banco`) leva ao banco TUDO o que está pendente, agrupado pelo livro
+  2. **Às 04:45 de Brasília, uma vez por dia** (`gravar_no_banco`) leva ao banco TUDO o que está pendente, agrupado pelo livro
      do mês de cada hora (`dados/fato_uso_os.py`: o mês que fechou ganha as últimas horas na primeira gravação depois da
      virada). Deu certo: anota a hora (`gravou_em`), as linhas gravadas saem do pendente (memória e disco) e `salvar()`
      roda. Deu errado (banco fora, leitura curta do livro, sem a chave): o pendente fica no disco e a gravação do dia
@@ -54,7 +54,7 @@ disco e leva ao banco (`drenar`) e que o Raio-X mostra (`instantaneo`).
   disco): as mais velhas saem, com aviso no log. **Reinício:** o pendente é relido no boot (arquivo quebrado é ignorado,
   com aviso, e a linha ruim não leva as boas; a mesma chave que o parcial velho traz de volta fica uma só, a mais nova).
   O que um reinício perde é só o que nunca saiu da memória: **a hora aberta do contador do Fracttal** (ele não guarda
-  parcial em disco) e até 5 min do uso (o parcial é de 5 em 5). 03:45 não cai em cima de nenhum laço de hora em hora do
+  parcial em disco) e até 5 min do uso (o parcial é de 5 em 5). 04:45 não cai em cima de nenhum laço de hora em hora do
   Nexus (tarefas :10 a :20, normalizações :22, sync do App :25, zeladoria :32, carga :40, chamados :50), e o :05 também não.
 
 Quem liga é o `servir.py` (o servidor), junto do `teto_os` e depois dele (é o teto que avisa o 503); o `create_app`, o PC
@@ -92,7 +92,10 @@ OUTRAS = "(outras)"
 PASSO_S = 300                                   # o instantâneo em disco, de 5 em 5 minutos
 MAX_HORAS = 48                                  # horas na memória sem ninguém drenar (o laço da gravação drena a cada hora)
 DRENAR_NO_MINUTO = 5                            # o laço tira as horas fechadas dos contadores no :05 de cada hora
-GRAVAR_NA_HORA, GRAVAR_NO_MINUTO = 3, 45        # e leva ao banco uma vez por dia, às 03:45 de Brasília (a hora mais parada)
+# e leva ao banco uma vez por dia, às 04:45 de Brasília (a hora mais parada). Era 03:45 até a revisão final de 31/10/2026: a
+# noite de domingo da lista de OS (03:21, os 365 dias, 19 a 29 min) podia passar dela. Mora em `minutos_ocupados.USO_OS_BANCO`
+# (um teste cruza as duas)
+GRAVAR_NA_HORA, GRAVAR_NO_MINUTO = 4, 45
 PASSO_DRENAR, PASSO_GRAVAR = "drenar", "gravar"
 MAX_HORAS_PENDENTES = 72                        # 3 dias de horas já tiradas dos contadores que esperam o banco; as mais velhas saem
 MAX_ROTAS = 200                                 # rotas distintas por hora (e por dia e setor no corte); o resto vai a OUTRAS
@@ -427,7 +430,7 @@ def pendentes() -> dict:
 
 
 def linhas_pendentes() -> dict:
-    """Cópia das linhas que já saíram dos contadores e esperam as 03:45: `{"uso": [...], "fracttal": [...]}` (a do Fracttal
+    """Cópia das linhas que já saíram dos contadores e esperam as 04:45: `{"uso": [...], "fracttal": [...]}` (a do Fracttal
     ainda com a linha de total `*`, que o `fato_uso_os.separar_total` leva para a aba dela). É o que o disco guarda: o
     Raio-X as soma ao que o banco tem."""
     with _trava_pendentes:
@@ -508,7 +511,7 @@ def _carregar_pendente(arquivo: Path) -> None:
 def proximo_passo(agora: float) -> tuple:
     """`(segundos, passo)` do próximo compromisso do laço: tirar as horas fechadas dos contadores (`PASSO_DRENAR`, no :05 de
     toda hora; o fuso do Brasil é de horas inteiras, então o minuto é o mesmo em qualquer um) ou levar o pendente ao banco
-    (`PASSO_GRAVAR`, às 03:45 de Brasília). Estando no instante de um deles, o próximo é o da vez seguinte."""
+    (`PASSO_GRAVAR`, às 04:45 de Brasília). Estando no instante de um deles, o próximo é o da vez seguinte."""
     drenar_em = (agora // 3600) * 3600 + DRENAR_NO_MINUTO * 60
     if drenar_em <= agora:
         drenar_em += 3600
@@ -523,7 +526,7 @@ def proximo_passo(agora: float) -> tuple:
 
 def drenar_para_o_disco() -> dict:
     """O passo de TODA hora: tira as horas FECHADAS dos dois contadores e as guarda no pendente em disco (`_salvar_pendente`),
-    de onde o Raio-X as lê e a gravação das 03:45 as leva ao banco. A memória dos contadores fica limitada, e um reinício não
+    de onde o Raio-X as lê e a gravação das 04:45 as leva ao banco. A memória dos contadores fica limitada, e um reinício não
     perde o que já saiu deles. Depois, `salvar()`: o parcial sem as horas que acabaram de sair (senão o reinício as traria
     de volta). Nunca vai ao banco.
 
@@ -544,7 +547,7 @@ def drenar_para_o_disco() -> dict:
 
 
 def gravar_no_banco(config=None, *, sessao=None) -> dict:
-    """O passo das 03:45: leva ao banco TUDO o que está pendente (o que o :05 guardou desde a última gravação, mais o que
+    """O passo das 04:45: leva ao banco TUDO o que está pendente (o que o :05 guardou desde a última gravação, mais o que
     fechou depois dele), agrupado pelo livro do mês de cada hora (`dados/fato_uso_os.gravar`). Devolve só contagens: o que
     `gravar` devolve; `{"pulou": ...}` sem nada a gravar; ou `{"erro": ..., "pendentes": ...}`, e então o pendente fica no
     disco e a gravação do dia seguinte leva tudo (até o teto de 3 dias).
@@ -761,7 +764,7 @@ def _laco() -> None:
 def ligar(app, *, gravar: bool) -> None:
     """Liga a medição neste app: os ganchos do pedido, o aviso do teto, o parcial e o corte por setor de antes do reinício e
     (fora dos testes) o laço de 5 em 5 minutos. `gravar` diz se este processo leva as horas ao banco (o servidor sim, o PC
-    não): só com ele abre o laço (`drenar_para_o_disco` no :05 de toda hora, `gravar_no_banco` às 03:45). O pendente que ficou
+    não): só com ele abre o laço (`drenar_para_o_disco` no :05 de toda hora, `gravar_no_banco` às 04:45). O pendente que ficou
     no disco volta no boot. Chame DEPOIS do `teto_os.ligar` (é ele que avisa o 503). Ligar de novo no mesmo app não faz nada."""
     if CHAVE in app.extensions:
         return

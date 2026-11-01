@@ -236,12 +236,13 @@ RPC_EXEC_GET = "tasks.wo_task_get_execution"
 RPC_EXEC_LIST = "tasks.wo_tasks_execution_list"
 RPC_EXEC_TYPES = "tasks.wo_tasks_execution_types_list"
 
-_PAUSA_CACHE = []
+_PAUSA_CACHE = []       # UMA lista, que nunca é religada: o `api._PAUSA_CACHE` é este mesmo objeto (o `motivos_pausa` muda o conteúdo)
 
 
 def motivos_pausa() -> list:
-    """Catálogo de motivos de pausa → [{'id','descricao'}]. Cacheado: não muda no meio do dia."""
-    global _PAUSA_CACHE
+    """Catálogo de motivos de pausa → [{'id','descricao'}]. Cacheado: não muda no meio do dia. O cache é mudado no lugar
+    (`[:] =`) e não religado com `global`: o `api._PAUSA_CACHE` (a fachada) é este objeto, e religar o nome o deixava vazio para
+    sempre, enquanto quem limpasse o apelido não limparia o cache de verdade (revisão final da etapa 5)."""
     if _PAUSA_CACHE:
         return _PAUSA_CACHE
     res = api._rpc_call(RPC_EXEC_TYPES, {"filter": [], "sort": [{"property": "description",
@@ -249,8 +250,8 @@ def motivos_pausa() -> list:
                                      "page": 1, "limit": 200, "start": 0,
                                      "is_tree": False, "node": None})
     data = res.get("data") if isinstance(res, dict) else res
-    _PAUSA_CACHE = [{"id": d.get("id"), "descricao": str(d.get("description") or "").strip()}
-                    for d in (data if isinstance(data, list) else []) if d.get("id")]
+    _PAUSA_CACHE[:] = [{"id": d.get("id"), "descricao": str(d.get("description") or "").strip()}
+                       for d in (data if isinstance(data, list) else []) if d.get("id")]
     return _PAUSA_CACHE
 
 

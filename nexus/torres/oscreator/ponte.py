@@ -302,6 +302,30 @@ def modulo_do_clone(nome: str):
     return importlib.import_module(nome)
 
 
+# Os leitores do canto central que o servidor liga ao subir (`servir.py`): os ativos, a lista de OS e os catálogos pequenos.
+LEITORES_DO_CLONE = ("ativos_leitor", "os_leitor", "catalogos_leitor")
+FALHOS = "nexus_leitores_do_clone_falhos"      # app.extensions: {nome do leitor: o erro curto}, para o Raio-X dizer que não ligou
+
+
+def ligar_leitor_do_clone(app, nome: str) -> bool:
+    """Liga o leitor `nome` do OS Creator (um de `LEITORES_DO_CLONE`) neste app. Quem chama é o `servir.py`, ao subir.
+
+    Importar o leitor é importar o clone (o `ativos_central`, a `os_central`, o `catalogos`, o `api`...), e isso agora acontece NA
+    SUBIDA do Nexus: antes (até a revisão final de 31/10/2026) o clone só carregava no 1º pedido ao /os/, dentro de um `try`
+    (`clone`), e um clone quebrado deixava o Nexus no ar, com o OS Creator fora. Um erro de import ou do `ligar` aqui derrubaria o
+    Nexus inteiro, e o `Restart=always` o deixaria caindo em laço. Por isso o erro vai ao log com a pilha, o Nexus sobe sem o
+    leitor (as telas leem ao vivo), e o Raio-X diz que ele não ligou (`FALHOS`). O portão do deploy (`deploy/conferir_boot.py`)
+    importa os mesmos módulos antes do restart e pega o clone quebrado de antemão. True se ligou."""
+    try:
+        modulo_do_clone(nome).ligar(app)
+        app.extensions.get(FALHOS, {}).pop(nome, None)
+        return True
+    except Exception as e:                  # noqa: BLE001 — SyntaxError, ImportError, o que o ligar levantar: o Nexus sobe
+        logging.exception("OS Creator: o leitor %s não ligou; o Nexus sobe sem ele e as telas leem ao vivo", nome)
+        app.extensions.setdefault(FALHOS, {})[nome] = "%s: %s" % (type(e).__name__, str(e)[:200])
+        return False
+
+
 def _criar_clone(app):
     # append, não insert: o que já está instalado continua vencendo; os nomes do clone (api, steps, tickets_*...)
     # não existem no Nexus nem na biblioteca padrão
@@ -345,7 +369,8 @@ class _SessaoDoClone(SecureCookieSessionInterface):
 
 def clone(app):
     """O app do clone, criado na primeira vez que alguém abre /os/ (e não na subida do Nexus): quem não usa o
-    OS Creator não paga o import dele, e um clone quebrado não impede o Nexus de subir."""
+    OS Creator não paga o app dele, e um clone quebrado não impede o Nexus de subir. Os MÓDULOS do clone o `servir.py` já
+    importa na subida, ao ligar os leitores do canto central, cada um num try (`ligar_leitor_do_clone`)."""
     ext = app.extensions
     if "os_web_clone" not in ext:
         with _trava:
@@ -507,7 +532,8 @@ def encaminhar(resto: str):
     # cópia do environ: o clone monta o request dele sem mexer no do Nexus. O SCRIPT_NAME vai junto: debaixo do prefixo,
     # o url_for do clone já sai com ele, e o cookie dele fica no /os do Nexus (_SessaoDoClone)
     environ = dict(request.environ)
-    environ[LISTA_CENTRAL] = lista_central()    # quem lê a lista central de OS (ver `lista_central`): sem a marca, fecha
+    if not resto.startswith("static/"):         # o arquivo estático não lê a lista (e a marca lê o setor no banco, por pedido)
+        environ[LISTA_CENTRAL] = lista_central()    # quem lê a lista central de OS (ver `lista_central`): sem a marca, fecha
     if resto.startswith(("solicitacao", "api/solic")):
         environ[AREA_PCM] = area_pcm()          # a Área PCM é do setor PCM ou do administrador (ver `area_pcm`)
     if _ROTA_OBS.fullmatch(resto):              # só a tela de um chamado e o editar/excluir: o quadro não lê o setor

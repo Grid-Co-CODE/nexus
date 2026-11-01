@@ -6,6 +6,11 @@ falam com o Fracttal (login, arquivos, redirecionamentos) — nenhum teste aqui 
 """
 import hashlib
 import hmac
+import logging
+import types
+from pathlib import Path
+
+import pytest
 
 from nexus.torres import descobrir_torres
 
@@ -230,8 +235,12 @@ def test_a_volta_do_login_do_fracttal_cai_na_tela_de_origem(app, logado):
     assert r.status_code == 302 and r.headers["Location"] == "/t/pcm/gestao?modo=plano"
     assert logado.get("/os/_nexus/card/voltar?de=//exemplo.invalid/x").headers["Location"] == "/"
     from nexus.torres.oscreator import ponte
-    from nexus.torres.oscreator.os_creator.os_web import rotas
-    with ponte.clone(app).test_request_context():
+    clone = ponte.clone(app)
+    # o módulo do CLONE (`os_web`, depois de o `ponte.clone` pôr a pasta dele no sys.path): importar pelo pacote do Nexus
+    # (`nexus.torres.oscreator.os_creator.os_web`) carrega uma 2ª cópia de todo o `os_web.*`, e a 2ª `lista_central` religava
+    # o `api.ID_PELA_LISTA` à cópia dela (5 testes da lista central falhavam na ordem inversa; revisão final)
+    from os_web import rotas
+    with clone.test_request_context():
         assert rotas._destino_local("/os/_nexus/card/voltar?de=/t/pcm/gestao") == "/os/_nexus/card/voltar?de=/t/pcm/gestao"
 
 
@@ -263,3 +272,46 @@ def test_link_do_card_abre_a_torre_os_creator_com_a_tela_numa_aba(logado):
     assert logado.get("/os/_nexus/ir?url=https://exemplo.invalid").headers["Location"].endswith("/t/os/inicio?abrir=%2Fos%2F")
     h = logado.get("/t/os/inicio?abrir=//exemplo.invalid").get_data(as_text=True)
     assert '<iframe class="os-moldura" src="/os/"' in h
+
+
+# ── os leitores do canto central ligam na subida do Nexus, e o clone quebrado não o derruba (revisão final, 31/10/2026) ──────
+@pytest.mark.parametrize("quebra", [SyntaxError("o clone quebrou"), ImportError("No module named 'x'"), RuntimeError("o ligar quebrou")])
+def test_um_leitor_que_levanta_no_import_ou_no_ligar_nao_derruba_o_nexus(app, monkeypatch, caplog, quebra):
+    """O `servir.py` importa os leitores do clone (e por eles o `ativos_central`, a `os_central`, o `catalogos`...) ao subir; antes o
+    clone só carregava no 1º pedido ao /os/, dentro de um try. Um erro ali derrubaria o Nexus inteiro, com o `Restart=always` o
+    deixando caindo em laço. Agora cada leitor liga num try (`ligar_leitor_do_clone`): o log tem a pilha, os outros ligam e o
+    Raio-X lê a falha em `app.extensions`."""
+    from nexus.torres.oscreator import ponte
+    ligados = []
+
+    def modulo(nome):
+        if nome == "os_leitor" and isinstance(quebra, (SyntaxError, ImportError)):
+            raise quebra                                         # o import do leitor (ou do clone por ele)
+
+        def ligar(a):
+            if nome == "os_leitor":
+                raise quebra                                     # o `ligar` que levanta
+            ligados.append(nome)
+        return types.SimpleNamespace(ligar=ligar)
+    monkeypatch.setattr(ponte, "modulo_do_clone", modulo)
+    with caplog.at_level(logging.ERROR):
+        resultado = {n: ponte.ligar_leitor_do_clone(app, n) for n in ponte.LEITORES_DO_CLONE}
+    assert resultado == {"ativos_leitor": True, "os_leitor": False, "catalogos_leitor": True}
+    assert ligados == ["ativos_leitor", "catalogos_leitor"]      # os outros dois ligaram
+    assert app.extensions[ponte.FALHOS] == {"os_leitor": "%s: %s" % (type(quebra).__name__, quebra)}
+    assert any(r.exc_info and "os_leitor" in r.getMessage() for r in caplog.records)    # a pilha foi ao log
+    monkeypatch.setattr(ponte, "modulo_do_clone", lambda nome: types.SimpleNamespace(ligar=lambda a: None))
+    assert ponte.ligar_leitor_do_clone(app, "os_leitor") and ponte.FALHOS in app.extensions and not app.extensions[ponte.FALHOS]
+
+
+def test_o_servir_liga_cada_leitor_do_clone_pelo_try_e_o_portao_do_deploy_importa_o_clone():
+    """O `servir.py` não chama `modulo_do_clone(...).ligar(app)` solto (fora de try); e o portão do deploy
+    (`deploy/conferir_boot.py`, que roda antes do restart) importa o que o `servir.py` importa ao subir: o contador do Fracttal, o uso
+    do OS Creator e os três leitores do clone, só importa, sem ligar."""
+    raiz = Path(__file__).resolve().parent.parent
+    servir = (raiz / "servir.py").read_text(encoding="utf-8")
+    assert servir.count("ligar_leitor_do_clone(app, ") == 3 and "modulo_do_clone(" not in servir
+    boot = (raiz / "deploy" / "conferir_boot.py").read_text(encoding="utf-8")
+    for pedaco in ("fracttal_conta", "uso_os", "LEITORES_DO_CLONE", "modulo_do_clone"):
+        assert pedaco in boot, pedaco
+    assert ".ligar(" not in boot                                 # o portão só importa: não liga laço nenhum

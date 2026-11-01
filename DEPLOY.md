@@ -242,6 +242,37 @@ já não traz `/nexus/` (a reescrita da T.I. saiu). A data exata da virada não 
    do `.env` do OS Creator (06/10/2026; o Levi manda a linha, os nomes não vão ao GitHub). Menu vazio = falta a linha.
    O envio com anexos aceita até 21 MB: o Nexus aceita 25 MB por pedido e o Caddy não limita; outro proxy na frente
    precisa de pelo menos 25 MB de corpo.
+9. **Depois de subir o canto central do OS Creator (31/10/2026)** (os leitores dos ativos, da lista de OS e dos catálogos
+   pequenos; seções 7a e seguintes e `nexus/torres/oscreator/README.md`):
+   1. **Nada novo no `.env`.** Os leitores usam a `FRACTTAL_CLIENT_ID`/`FRACTTAL_CLIENT_SECRET` do Campo (a credencial REST da
+      empresa) e a `NEXUS_PESSOA_HMAC` que já está lá. Conferir no Raio-X (Base → Raio-X, só administrador), seção "Uso do OS
+      Creator", bloco do canto central: **"Leitor do servidor: ligado"** nas três peças, **Ativos centrais**, **Lista central de
+      OS** e **Catálogos pequenos** (nos ativos, "ligado, mas não está pronto" até a 1ª noite valer, e "pronto" depois). "Não
+      ligado: sem a credencial REST" = falta a credencial no `.env`; **"NÃO LIGOU, o clone quebrou ao subir"** = o import do clone falhou (o Nexus sobe sem o leitor, a pilha está no log do serviço, e as telas leem
+      ao vivo; o portão do deploy, `deploy/conferir_boot.py`, deveria ter barrado o commit antes).
+   2. **Subir de manhã, num dia útil, e na 1ª noite não dar push entre 02:10 e 03:50.** Cada push reinicia o serviço em ~2 min
+      (`atualizar.sh`), e a 1ª noite é a conferência de verdade: às 02:15 os ativos (a paridade REST x RPC, a foto do banco) e às
+      03:21 a lista de OS (90 dias; no domingo e na 1ª carga, a janela de 365 dias, de 19 a 29 min). O reinício no meio dela a
+      perde: a leitura é refeita só na noite seguinte. O resultado de cada uma fica gravado e aparece no Raio-X depois do reinício.
+   3. **Na 1ª manhã, olhar o Raio-X ANTES de qualquer push.** O resultado de cada noite fica no disco e volta depois do
+      reinício, mas o que é só da memória (as conferências das telas, os pedidos por hora, a leitura em curso) zera a cada push.
+      Em cada bloco:
+      - **Ativos centrais:** "Última noite (leitura inteira)" com a hora (~02:15) e "o catálogo aceitou a leitura" (se disser
+        "NÃO TROCOU O CATÁLOGO", o motivo está na frase); "Paridade do REST" = "valeu" (a 1ª noite é a sondagem REST x RPC, com 99%
+        dos códigos nos dois sentidos; "NÃO valeu" traz o motivo); a foto do banco: "gravou", as linhas, quantas mudaram e quantas
+        descrições o detector cortou; "Troca recusada" só aparece se o catálogo recusou uma leitura;
+      - **Lista central de OS:** "Janela lida inteira" começando a ~365 dias atrás; "A noite" com a hora (~03:21) e a entrega
+        ("N OS, N linhas") ou "FALHOU em ..., depois de N pedidos: o motivo"; "Trava de encolhimento" só se a lista recusou uma
+        leitura; "Campos que o REST trouxe" com todos acima de 0% (um campo em 0% manda a tela que o usa ao vivo); "Conferências
+        das telas" (quantas divergiram: a visão restrita diverge, e é esperado);
+      - **Catálogos pequenos:** cada catálogo com a fonte e a hora; "Pessoas pelo REST" ligado e a última leitura boa.
+   4. **Liberar os setores por commit** em `ponte.SETORES_COM_LISTA_CENTRAL` (`nexus/torres/oscreator/ponte.py`), o nome do setor de
+      Base → Acessos → Pessoas e setores, sem acento nem caixa. **Só setores em que todos veem todas as OS no Fracttal:** a lista é
+      lida pela credencial da empresa e vê tudo, e a pessoa de visão restrita só é protegida pela 2ª barreira (a contagem). A lista
+      nasce vazia: até o commit, só os administradores leem dela.
+   5. **Base → Governança de dados:** o livro `nexus_oscreator_uso_AAAA_MM` (o uso do OS Creator e os pedidos ao Fracttal, que
+      o Nexus grava no banco uma vez por dia, às 04:45) tem de aparecer com dono no catálogo, e o radar de tabelas novas não pode
+      listá-lo como "sem dono". Ele só existe depois da primeira gravação (a manhã seguinte ao deploy).
 
 ## 7. Campo · App: o Nexus lê o que o App grava
 
@@ -301,7 +332,8 @@ Raio-X mostra (seção "Uso do OS Creator", bloco "Ativos centrais").
 do OS Creator (`nexus/torres/oscreator/os_creator/os_leitor.py`), com a mesma credencial REST (sem ela não liga): as OS novas
 de 3 em 3 min (06h às 20h de segunda a sexta; de 15 em 15 fora disso), os últimos 7 dias às :00, :21, :30, :41 e :51 (06h às
 20h, ~15 pedidos), as finalizadas às :46, a janela de madrugada às 03:21 (90 dias, ~190 a 210 pedidos; no domingo e na 1ª
-carga, a janela inteira de 365 dias, ~750 a 830 pedidos a 1 por segundo, ~13 min), e as abertas que o laço do `tarefas_os`
+carga, a janela inteira de 365 dias, ~750 a 830 pedidos a 1 por segundo: de 19 a 29 min, ~830 páginas a ~1,35 s pelo ensaio de
+18/10/2026 do `tarefas_os`, e por isso o uso do OS Creator vai ao banco às 04:45 e não às 03:45), e as abertas que o laço do `tarefas_os`
 já lê de hora em hora, entregues sem pedido a mais (sem entrega em 70 min, ele as lê no :55, ~98). Os números são da escala do
 AC, ~99 OS criadas por dia (36 mil por ano), medidos pelas funções de verdade num Fracttal de mentira: ~92 a 110 pedidos por
 hora de dia útil, ~1.500 a 1.850 num dia útil. O pico de memória da noite de 365 dias é de ~150 MB, o da de 90 dias ~40 MB (cada página
@@ -310,7 +342,10 @@ cortada no que a lista lê). A lista mora na memória e numa cópia na pasta de 
 do deploy é a 1ª carga e a conferência dos campos do REST: o Raio-X mostra (seção "Uso do OS Creator", peça "Lista central de
 OS"), e também a leitura que a lista recusou ("Trava de encolhimento": o REST que devolveu só uma parte; a recusa que se repete
 igual na leitura seguinte passa, "aceita na 2ª leitura": o apagamento de verdade) e a faixa que o REST não devolveu pela
-criação. As telas ainda não leem dela (é a tarefa 3.3).
+criação. As telas leem dela desde a tarefa 3.3 (31/10/2026), mas só para quem o Nexus liberou: o administrador, sempre, e os
+setores de `ponte.SETORES_COM_LISTA_CENTRAL` (nasce vazia, ver o passo 9 da seção 6); os outros seguem pelo caminho de antes, com a
+sessão deles no Fracttal. A lista central só vale para o período que a janela dela cobre: no dia do deploy, com só os 7 dias lidos,
+as telas de 30 dias seguem como antes até a primeira noite.
 
 **Os catálogos pequenos do OS Creator (31/10/2026; nada a fazer no servidor).** O `servir.py` liga também o laço das pessoas
 dos catálogos (`nexus/torres/oscreator/os_creator/catalogos_leitor.py`, o par do `catalogos.py`), com a mesma credencial REST (sem ela não liga, e as pessoas

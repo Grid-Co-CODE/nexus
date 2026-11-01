@@ -177,3 +177,72 @@ def test_o_bloco_da_lista_de_os_sem_o_leitor_e_sem_o_os_creator(app, logado, mon
     monkeypatch.delitem(sys.modules, "os_central")
     txt = _texto(_bloco(_pagina(logado)))
     assert "Lista central de OS" in txt and "ainda não foi aberto" in txt and "os_central" not in sys.modules
+
+
+def test_o_leitor_que_nao_ligou_na_subida_aparece_no_raio_x(app, logado):
+    """O `servir.py` sobe o Nexus sem o leitor que quebrou (`ponte.ligar_leitor_do_clone`); a peça dele diz NÃO LIGOU e o erro, e
+    não a frase de quem está no PC ("só o servir.py liga o leitor"). Quem não quebrou segue como era."""
+    app.extensions[ponte.FALHOS] = {"os_leitor": "ImportError: No module named 'x'", "ativos_leitor": "SyntaxError: o clone quebrou"}
+    txt = _texto(_bloco(_pagina(logado)))
+    assert txt.count("NÃO LIGOU") == 2 and "ImportError: No module named" in txt and "SyntaxError: o clone quebrou" in txt
+    assert "a pilha está no log do servidor" in txt
+    assert "Catálogos pequenos" in txt                                         # a terceira peça segue como era (sem o aviso)
+
+
+def test_a_ultima_noite_dos_ativos_e_a_recusa_aparecem_no_raio_x(app, logado, tmp_path):
+    """Revisão final: a 1ª noite só se confere pelo Raio-X (o Levi não tem acesso ao servidor). O bloco dos ativos mostra o resultado
+    da última leitura inteira (a hora, se o catálogo trocou, os pedidos, a foto do banco: gravou, linhas, mudaram, erro) e a
+    troca recusada, e depois do reinício eles voltam do `ativos_estado.json`."""
+    from datetime import datetime, timedelta, timezone
+    brt = timezone(timedelta(hours=-3))
+    inicio = datetime(2026, 11, 1, 2, 15, tzinfo=brt).timestamp()
+    pasta = str(tmp_path / "ativos")
+    AC.reiniciar(pasta=pasta)
+    _catalogo_de(ARVORE)
+    AC.anotar_noite({"inicio": inicio, "fim": inicio + 17 * 60, "ok": True, "pedidos": 830, "itens": 27100, "registros": 27050,
+                     "sem_pai": 3, "resultado": "trocou",
+                     "foto": {"gravou": True, "linhas": 27050, "mudaram": 12, "entraram": 3, "sairam": 1, "descricao_cortada": 2}})
+    AC.reiniciar(pasta=pasta)                                            # o reinício: a memória se vai; a noite volta do disco
+    AL.reiniciar()
+    assert AC.estado()["noite"]["pedidos"] == 830                        # o 1º `atual()` do processo faz o boot local
+    _catalogo_de(ARVORE)
+    txt = _texto(_bloco(_pagina(logado)))
+    assert "Última noite" in txt and "01/11 02:15" in txt and "levou 17 min" in txt
+    assert "o catálogo aceitou a leitura" in txt and "830 pedidos, 27100 itens, 27050 registros, 3 sem o pai" in txt
+    assert "foto do banco: gravou, 27050 linhas, 12 mudaram, 3 entraram, 1 saíram, 2 descrições cortadas" in txt
+    # a noite que não trocou o catálogo e a foto que deu erro
+    AC.anotar_noite({"inicio": inicio, "fim": inicio + 60, "ok": False, "pedidos": 4, "itens": 0, "registros": 0, "sem_pai": 0,
+                     "resultado": "a leitura não veio inteira (LeituraIncompleta: vieram 300 de 27100): nada mudou",
+                     "foto": {"erro": "o banco recusou a gravação (HTTP 500)"}})
+    txt = _texto(_bloco(_pagina(logado)))
+    assert "NÃO TROCOU O CATÁLOGO" in txt and "vieram 300 de 27100" in txt and "foto do banco: ERRO: o banco recusou" in txt
+    # a troca recusada (a lista vazia) é dita, com a hora e os tamanhos
+    AC.trocar([], "rest")
+    txt = _texto(_bloco(_pagina(logado)))
+    assert "Troca recusada" in txt and "a lista veio vazia" in txt
+    # sem noite nenhuma: diz que ainda não houve
+    AC.reiniciar()
+    _catalogo_de(ARVORE)
+    assert "ainda não houve neste servidor" in _texto(_bloco(_pagina(logado)))
+
+
+def test_a_noite_da_lista_que_falhou_aparece_no_raio_x_depois_do_reinicio(app, logado, tmp_path):
+    """A leitura da noite da lista de OS que falhou antes do reinício aparece na faixa "A noite" (FALHOU, quando, depois de quantos
+    pedidos e o motivo), vinda do cabeçalho da cópia em disco; sem texto de OS nem nome."""
+    from datetime import datetime, timedelta, timezone
+
+    import os_disco as OD
+    inicio = datetime(2026, 11, 1, 3, 21, tzinfo=timezone(timedelta(hours=-3))).timestamp()
+    antes, OD.GRAVAR_A_CADA_S = OD.GRAVAR_A_CADA_S, 0
+    try:
+        OC.reiniciar(pasta=str(tmp_path / "os"))
+        OC.anotar_leitura("noite", {"faixa": "noite", "inicio": inicio, "fim": inicio + 90, "pedidos": 12, "os": 0, "linhas": 0,
+                                   "resultado": "a leitura não veio inteira (LeituraIncompleta: a página 8 veio curta): nada mudou",
+                                   "erro": "LeituraIncompleta: a página 8 veio curta"})
+        assert OC.esperar_gravacao(5)
+        OC.reiniciar(pasta=str(tmp_path / "os"))                          # o reinício (um deploy)
+        OL.reiniciar()
+        txt = _texto(_bloco(_pagina(logado)))
+    finally:
+        OD.GRAVAR_A_CADA_S = antes
+    assert "A noite" in txt and "FALHOU em 01/11 03:21, depois de 12 pedidos: LeituraIncompleta: a página 8 veio curta" in txt

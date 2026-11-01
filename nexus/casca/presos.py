@@ -53,9 +53,18 @@ def _norm(caminho: str) -> str:
 
 _RAIZ = _norm(str(Path(__file__).resolve().parents[2])) + "/"
 
+# Os módulos que saíram do `api.py` do OS Creator na etapa 5.3 do canto central (31/10/2026) e que falam com o Fracttal pelo `api.X`.
+# Enquanto moravam no `api.py` o pedido preso neles era "Fracttal (OS Creator)" (o catálogo de ativos esperando as 6 threads dele,
+# `get_assets`, estava no `api.py`); depois da divisão a linha nossa mais de dentro passou a ser o módulo novo, e o Raio-X e o log
+# diziam "OS Creator". Estão aqui na mesma regra do `api.py` para o rótulo ser o de antes. Fora a `dash_os`, que fala com o
+# dashboard de O&M e não com o Fracttal (e o `fracttal_erro`, que não pede nada a ninguém).
+_MOVIDOS_DO_API = ("os_historico", "os_detalhe", "os_anexos", "os_planos", "os_execucao", "os_chamados", "ativos_carga",
+                   "os_criar", "os_estado", "os_solicitacoes", "perf_alvos", "catalogos_rpc", "os_juntar", "os_tempo")
+
 # quem: a linha NOSSA mais de dentro da pilha (o 1º trecho que casar)
 _QUEM = (
     ("/os_creator/api.py", "Fracttal (OS Creator)"),
+    *(("/os_creator/%s.py" % modulo, "Fracttal (OS Creator)") for modulo in _MOVIDOS_DO_API),
     ("/os_creator/", "OS Creator"),
     ("/nexus/campo/fracttal.py", "Fracttal (Campo)"),
     ("/nexus/campo/ronda_fotos.py", "fotos das rondas"),

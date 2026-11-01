@@ -212,6 +212,26 @@ def cobre(de, ate) -> bool:
         return True
 
 
+def em_uso(de=None) -> bool:
+    """A lista central está EM USO para um período que começa em `de` ('AAAA-MM-DD'): o servidor já leu uma janela inteira dela
+    (pela cópia em disco ou pelas faixas) e essa janela começa no dia `de` ou antes (`janela[0] <= de`, o mesmo teste do
+    `Lista.cobre`). Sem `de` (as ações, que não têm período), o começo do período padrão do Histórico, os `ESCOPO_DIAS`
+    até hoje. A lista fora de uso é a do PC, a recém-subida sem cópia e a de uma janela que nunca serve o período.
+
+    Antes (revisão final, 31/10/2026) valia QUALQUER janela lida. No dia do deploy a 1ª leitura são os 7 dias, que abrem uma
+    janela de 7 dias; o Histórico de 30 dias nunca é servido por ela, e a lista "em uso" mandava cada pessoa que não passou na
+    conferência (ninguém passa: o período não é coberto) para a lista DELA, uns 26 pedidos cada, em vez de dividir a "Todos"
+    como em 19/10. A ação (`mudou`, `pendente`, `criadas`) também lia a OS (1 a 3 pedidos) para uma lista que nenhuma tela
+    padrão lia. Agora o período que a janela não alcança segue a regra de 19/10, e a de cada um com a dela (Ruling BX) vale só
+    onde a lista cobre."""
+    jde = os_central.atual().janela[0]
+    if not jde:
+        return False
+    if de is None:
+        de = (dt.date.today() - dt.timedelta(days=ESCOPO_DIAS)).isoformat()
+    return str(de)[:10] >= jde
+
+
 def _escopo_padrao(de, ate) -> bool:
     """[de, ate] é o escopo fixo que libera (Ruling BP): os 30 dias padrão do Histórico até hoje, as mesmas datas que a rota
     põe quando a pessoa não escolhe outras."""
@@ -388,13 +408,14 @@ def aprovada(pessoa, de, ate) -> bool:
 
 
 def divide_a_todos(pessoa, de, ate) -> bool:
-    """A "Todos" dividida de 19/10 do caminho de hoje (`rotas.ler_lista`) vale para esta pessoa? Sem a lista central em uso
-    (o PC, a lista vazia): sim, a regra de 19/10 como sempre. Com ela em uso, coberta ou VENCIDA, só para quem tem uma
-    conferência aprovada recente do período (Ruling BX, a sonda T3): quem vê tudo lê da lista e não a ancora; a lista vencida
-    (a última leitura até o topo passou dos 30 min) devolvia a dividida vazia à 1ª pessoa restrita, e outra com o mesmo total
-    a herdava. Os outros seguem com a lista deles. Na dúvida (a lista quebrou), não."""
+    """A "Todos" dividida de 19/10 do caminho de hoje (`rotas.ler_lista`) vale para esta pessoa? Sem a lista central em uso PARA O
+    PERÍODO (`em_uso(de)`: o PC, a lista vazia, a janela que começa depois do `de`, como a de 7 dias do dia do deploy): sim, a
+    regra de 19/10 como sempre. Com ela em uso, coberta ou VENCIDA, só para quem tem uma conferência aprovada recente do período
+    (Ruling BX, a sonda T3): quem vê tudo lê da lista e não a ancora; a lista vencida (a última leitura até o topo passou dos 30
+    min) devolvia a dividida vazia à 1ª pessoa restrita, e outra com o mesmo total a herdava. Os outros seguem com a lista deles.
+    Na dúvida (a lista quebrou), não."""
     try:
-        if not os_central.atual().janela[0]:
+        if not em_uso(de):
             return True
         return aprovada(pessoa, de, ate)
     except Exception:                                                # noqa: BLE001 — na dúvida, a lista de cada pessoa
@@ -801,13 +822,14 @@ def mudou(wid):
     (`os_central.atualizar_os`, o que o card já lê), com o prazo de `_reler`. O registro como entrou (o `api_finalizar` usa o
     status dele, sem reler o cabeçalho), ou None. A falha da lista nunca derruba a ação: vai ao log, e a próxima faixa a traz.
 
-    Só com a lista EM USO (uma leitura do leitor já disse a janela que ela cobre: o servidor, pela cópia em disco ou pelas
-    faixas). Sem ela (o PC sem leitor, a máquina recém-subida sem cópia), nenhuma tela lê da lista, e a leitura da OS seriam 1
-    a 3 pedidos à toa a cada ação. Caso que criou a regra (31/10/2026, na 1ª rodada dos testes da 3.3): sem esta guarda, a
-    ação lia a OS mesmo onde ninguém lê a lista, e nos testes antigos do quadro, que não trocam o `_rpc_call`, a leitura saiu
-    da máquina (recusada com 401, o JWT de mentira) e a sessão recusada derrubou o login da pessoa no pedido seguinte."""
+    Só com a lista EM USO (`em_uso()`: o servidor já leu uma janela inteira, pela cópia em disco ou pelas faixas, e ela cobre
+    o período padrão do Histórico, os 30 dias). Sem ela (o PC sem leitor, a máquina recém-subida sem cópia, a janela de 7 dias
+    do dia do deploy), nenhuma tela padrão lê da lista, e a leitura da OS seriam 1 a 3 pedidos à toa a cada ação. Caso que
+    criou a regra (31/10/2026, na 1ª rodada dos testes da 3.3): sem esta guarda, a ação lia a OS mesmo onde ninguém lê a lista,
+    e nos testes antigos do quadro, que não trocam o `_rpc_call`, a leitura saiu da máquina (recusada com 401, o JWT de
+    mentira) e a sessão recusada derrubou o login da pessoa no pedido seguinte."""
     try:
-        if not os_central.atual().janela[0]:
+        if not em_uso():
             return None
         return _reler([wid]).get(wid)
     except Exception:                                                # noqa: BLE001 — a ação já valeu no Fracttal
@@ -821,7 +843,7 @@ def pendente(wid) -> None:
     sem reler (2 pedidos que nada provam), ela fica "a conferir" e pendente, e a faixa das pendentes a lê pelo nº. Só com a
     lista em uso (ver `mudou`); nunca derruba a ação."""
     try:
-        if os_central.atual().janela[0]:
+        if em_uso():
             os_central.marcar_pendente(wid)
     except Exception:                                                # noqa: BLE001 — a ação já respondeu
         log.exception("lista central de OS: a OS %s não ficou pendente depois da ação (a próxima faixa a traz)", wid)
@@ -857,7 +879,7 @@ def criadas(resultado) -> int:
     numa criação de 50 OS do COS). Quantas entraram na hora."""
     try:
         ids = ids_criados(resultado)
-        if not ids or not os_central.atual().janela[0]:              # a lista fora de uso: nada a ler (ver `mudou`)
+        if not ids or not em_uso():                                  # a lista fora de uso: nada a ler (ver `mudou`)
             return 0
         agora, depois = ids[:CRIADAS_NA_HORA], ids[CRIADAS_NA_HORA:]
         if depois:
@@ -869,5 +891,8 @@ def criadas(resultado) -> int:
         return 0
 
 
-# o nº → id do `api` passa por aqui (sem o gancho, o oem e o desktop seguem com a leitura de sempre)
-api.ID_PELA_LISTA = id_por_folio
+# o nº → id do `api` passa por aqui (sem o gancho, o oem e o desktop seguem com a leitura de sempre). Só a cópia que o CLONE importa
+# (`os_web.lista_central`) o instala: o mesmo arquivo importado por outro caminho (como pacote do Nexus, `nexus.torres.oscreator.
+# os_creator.os_web.lista_central`) é uma 2ª cópia, com o estado dela (os liberados, as medidas), e religava o gancho a ela
+if __name__ == "os_web.lista_central":
+    api.ID_PELA_LISTA = id_por_folio

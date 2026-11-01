@@ -654,7 +654,8 @@ def ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, *, forcar=Fal
 
     Senão, o CAMINHO DE HOJE: a lista guardada e renovada sem repetir o Fracttal (19/10/2026, `historico_store`). A de "Todos"
     é uma só para quem vê o mesmo total no Fracttal (1 pedido na sessão da pessoa, a cada 30 min) quando a lista central não
-    está em uso (o PC, a lista vazia); com ela em uso, coberta ou vencida, só para quem passou há pouco na conferência do
+    está em uso PARA O PERÍODO (o PC, a lista vazia, a janela que começa depois do começo dele: a de 7 dias do dia do deploy);
+    com ela em uso, coberta ou vencida, só para quem passou há pouco na conferência do
     período (`lista_central.divide_a_todos`), e cada outra pessoa que chega aqui segue com a DELA (Rulings BU e BX da 3.3):
     quem vê tudo lê da lista central e não ancorava a "Todos" dividida, a 1ª pessoa restrita a achava vazia e a lista dela
     virava a de todos, e outra restrita com o mesmo total a herdava (a sonda mostrou as 30 OS de uma usina para quem só vê a

@@ -1,6 +1,6 @@
 """O uso das telas do OS Creator e os pedidos ao Fracttal, por hora, no banco (31/10/2026, etapa 0 do canto central do OS
 Creator). Quem mede é a casca, na memória (`casca/uso_os.py` e `casca/fracttal_conta.py`): de hora em hora tira as horas
-fechadas dos contadores para o DISCO do servidor e, UMA vez por dia (03:45 de Brasília), as leva ao banco. Aqui mora só o
+fechadas dos contadores para o DISCO do servidor e, UMA vez por dia (04:45 de Brasília), as leva ao banco. Aqui mora só o
 fato: as colunas, o grão, a chave, a gravação e a leitura. Módulo puro: nada de Flask, e a rede só pela sessão que o
 chamador passa.
 
@@ -27,7 +27,7 @@ Foto periódica da hora que fechou, nas três.
   última linha daria um livro menor, e a gravação de UMA linha o levaria de volta ao tamanho que o `so_cresce` aceita,
   apagando as últimas (a lição do livro do inventário, 26/10/2026).
 - **Uma vez por dia, não de hora em hora** (Ruling M): gravar o livro do mês inteiro custa ~7 s de processador no mês cheio
-  (medido em 31/10/2026: o `xlsx` sozinho, 5,7 s), e o Nexus é UM processo com o servidor já apertado. Às 03:45, a hora mais
+  (medido em 31/10/2026: o `xlsx` sozinho, 5,7 s), e o Nexus é UM processo com o servidor já apertado. Às 04:45, a hora mais
   parada, o custo é o mesmo e não trava ninguém; o pendente do disco cobre o resto do dia (e o Raio-X o lê de lá).
 - **Medidas** (catálogo): as contagens de pedidos, recusas, erros e esperas somam; as pessoas distintas, a mediana e o p95
   em ms e o pico por minuto não somam em corte nenhum. `esperas_qtd` (etapa 5) são os pedidos que esperaram a vez no porteiro
@@ -78,7 +78,7 @@ MEDIDAS_FRACTTAL = (("pedidos_qtd", "qtd", "aditiva"), ("recusas_qtd", "qtd", "a
                     ("pico_minuto_qtd", "qtd", "nao"), ("esperas_qtd", "qtd", "aditiva"))
 MEDIDAS_TOTAL = MEDIDAS_FRACTTAL                  # as mesmas cinco: o total soma como o detalhe, e o pico não soma
 JANELA_ORIGEM = ("o Nexus é a fonte (a memória do servidor, guardada no disco de hora em hora e levada ao banco uma vez "
-                 "por dia, às 03:45 de Brasília)")
+                 "por dia, às 04:45 de Brasília)")
 
 # Cada coluna depois do tempo: "t" texto da chave, "b" 1 ou 0, "n" número inteiro de 0 para cima, "n?" o mesmo ou vazio
 # (o balde só de pedidos que o teto recusou não tem duração: célula vazia, nunca 0). As esperas são "n?": a linha que o

@@ -134,12 +134,15 @@ def _linhas(forcar: bool = False, pessoa=None) -> dict:
         # quadro segue a de sempre (o dono, os 30 min, os tickets lidos à parte; a regra de 19/10 do `_dono` não muda). O total
         # da cópia é o do FRACTTAL de quem a monta (`total_chamados`, na chave do `_dono`), como no caminho de hoje, e não o da
         # lista (a sonda V1 da rodada 4: o da lista não tinha as OS de chamado novas que a faixa ainda não trouxe, e a restrita
-        # com 2 a menos que ele, e 4 escondidas, caía na cópia "TODOS" pela folga de 19/10). Sem ele, o caminho de hoje
+        # com 2 a menos que ele, e 4 escondidas, caía na cópia "TODOS" pela folga de 19/10). Sem ele, o caminho de hoje.
+        # O total é pedido a CADA montagem (`max_idade=0`, 1 pedido; a sonda V1b da revisão final): o guardado de 30 min era o de
+        # quando a cópia anterior foi montada, e 10 min depois as OS de chamado novas já estavam no Fracttal e não no guardado
+        # (5 em vez de 7); a restrita com 3 visíveis ficava a 2 da cópia e a folga de 19/10 a punha nela, com as 4 escondidas
         central = lista_central.garantias(de, _quem_le(), forcar=forcar)
         if central is not None:
             try:
                 total, _idade, _pedido = HS.total_conferido(_quem_le(), ("acomp", "TODOS"), lambda: api.total_chamados(de),
-                                                            0 if forcar else HS.CONFERE_S)
+                                                            max_idade=0)
             except Exception:           # noqa: BLE001 — sem o total do Fracttal, a cópia vem ao vivo (com o total dela)
                 central = None
         if central is not None:

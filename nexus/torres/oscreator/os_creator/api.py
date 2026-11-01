@@ -13,7 +13,8 @@ O QUE FICOU AQUI (etapa 5.3 do canto central, 31/10/2026; o mapa completo está 
 login e a sessão (o JWT, a renovação, `_rpc_headers`), o RPC (`_rpc_call`, `_rpc_chamar`, o cache das leituras de uma OS), a
 tarefa que nasce (`create_os_rpc`, `_react_insert_post`), o S3 (`attach_imagem_os`, `s3_get_url`, `baixar_imagem`) e a
 configuração. Quem fala com a rede direto fica neste arquivo, porque o Raio-X rotula o pedido preso pelo arquivo
-(`nexus/casca/presos.py`: "Fracttal (OS Creator)"). Tudo o mais mora no módulo do assunto (`os_criar`, `os_historico`,
+(`nexus/casca/presos.py`: "Fracttal (OS Creator)" para este e para os módulos que saíram dele, `_MOVIDOS_DO_API`). Tudo o mais
+mora no módulo do assunto (`os_criar`, `os_historico`,
 `os_detalhe`, `os_estado`, `os_anexos`, `os_execucao`, `os_planos`, `os_solicitacoes`, `os_chamados`, `perf_alvos`,
 `ativos_carga`, `catalogos_rpc`, `os_tempo`, `dash_os`), e este arquivo termina com a FACHADA: os mesmos nomes de sempre
 (`api.X`), porque a ponte, as rotas e os testes chamam e TROCAM `api.X` pelo nome.
@@ -1167,7 +1168,8 @@ DASH_CONFIG_FILE = os.path.join(_data_dir(), "dash_config.json")
 # ── A FACHADA (31/10/2026, etapa 5.3 do canto central) ─────────────────────────────────────────────────
 # O que saiu deste arquivo para o módulo do assunto segue acessível como `api.X`: a ponte, as rotas e os testes
 # chamam e TROCAM `api.X` pelo nome, e o código que mudou de lugar chama tudo o que não é dele pelo `api.`, para
-# enxergar a troca. No FIM do arquivo porque cada módulo termina com `import api`.
+# enxergar a troca. No FIM do arquivo porque cada módulo daqui termina com `import api` (o `os_juntar`, que o `os_criar` importa,
+# chama o `api` na hora, e o `fracttal_erro` não o importa).
 from os_tempo import (  # noqa: E402,F401
     _BR_TZ, _iso_z, _parse_iso, _segundos, _tempo_da_os, duracao_os, duracao_solar, fmt_data_br, horas_solares)
 from os_anexos import (  # noqa: E402,F401

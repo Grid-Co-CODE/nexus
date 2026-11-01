@@ -27,8 +27,9 @@ AS FRASES. O que a tela diz quando algo falha mudou de caminho para caminho com 
 mudar o que as telas mostram não é desta etapa: o padrão é o do Criar OS e da Clonagem de planos, e cada chamador que dizia
 outra coisa passa a sua em `frases` (`FRASES_CLONAR`, `FRASES_PERFORMANCE`, `FRASES_UMA_POR_TAREFA`).
 
-Este módulo não importa o `api` ao carregar (o `api` o importa): as funções do `api` são chamadas pelo nome, na hora, e os testes
-que trocam o `api._kanban_records`, o `api._work_order_insert` ou o `api.apply_labels` valem aqui."""
+Este módulo não importa o `api` ao carregar (quem o importa é o `os_criar`, e o `api` importa o `os_criar` no fim do arquivo, a
+fachada; o `api` não o importa mais): as funções do `api` são chamadas pelo nome, na hora (`_api()`), e os testes que trocam o
+`api._kanban_records`, o `api._work_order_insert` ou o `api.apply_labels` valem aqui."""
 from __future__ import annotations
 
 # O que cada tela diz quando a fase 2 não sai inteira. {erro} = o texto do erro, {n} = quantas tarefas foram criadas, {folio} = o
@@ -59,7 +60,7 @@ _CHAVES_DA_OS = ("id_work_order", "wo_folio", "id_tasks", "etiquetas")
 
 
 def _api():
-    import api                                      # aqui dentro: o api importa este módulo
+    import api                                      # na hora da chamada: o `os_criar` importa este módulo, e o `api` importa o `os_criar`
     return api
 
 

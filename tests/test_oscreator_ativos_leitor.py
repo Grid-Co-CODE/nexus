@@ -570,8 +570,8 @@ def test_com_credencial_liga_sem_laco_nos_testes(app):
 
 def test_o_servidor_liga_o_leitor_e_o_pc_nao():
     texto = (AQUI / "servir.py").read_text(encoding="utf-8")
-    assert "ativos_leitor.ligar(app)" in texto
-    assert texto.index("fracttal_conta.ligar()") < texto.index("ativos_leitor.ligar(app)")    # o contador vê os pedidos
+    assert 'ligar_leitor_do_clone(app, "ativos_leitor")' in texto and "ativos_leitor.ligar(" not in texto
+    assert texto.index("fracttal_conta.ligar()") < texto.index('ligar_leitor_do_clone(app, "ativos_leitor")')   # o contador vê os pedidos
     for arquivo in ("app.py", "nexus/__init__.py", "nexus/torres/oscreator/ponte.py"):
         assert "ativos_leitor.ligar(" not in (AQUI / arquivo).read_text(encoding="utf-8"), arquivo
 
@@ -583,3 +583,39 @@ def test_proximo_passo_noite_e_dia():
     assert AL.proximo_passo(em(2, 15)) == (3 * 3600 + 53 * 60, AL.NOVOS)        # depois dele, 06:08
     assert AL.proximo_passo(em(6, 8)) == (30 * 60, AL.NOVOS)                    # 06:38
     assert AL.proximo_passo(em(21, 38)) == (4 * 3600 + 37 * 60, AL.COMPLETO)    # depois das 21:38, as 02:15 do outro dia
+
+
+def test_o_resultado_da_noite_sobrevive_ao_reinicio(banco, app, tmp_path):
+    """Revisão final: o relatório da leitura inteira (`estado()["completo"]`) só vive na memória do leitor, e o deploy de várias
+    vezes por dia o apagava antes de o Levi, que não tem acesso ao servidor, olhar o Raio-X. O resultado (a hora, se o catálogo
+    trocou, os pedidos, a foto do banco) vai ao `ativos_estado.json`; só contagens, horas e motivos."""
+    pasta = str(tmp_path / "oscreator")
+    AC.reiniciar(pasta=pasta)
+    AC.trocar(AC.montar_registros(_rpc()), "rpc", lido_em=time.time() - 7200)
+    rel = AL.ler_completo(app, ler=RestFalso(ARVORE))
+    noite = AC.estado()["noite"]
+    assert noite["ok"] and noite["pedidos"] == 1 and noite["itens"] == len(ARVORE) and noite["registros"] == len(AC.atual().lista)
+    assert noite["inicio"] == rel["inicio"] and noite["fim"] == rel["fim"] and noite["resultado"].startswith("a mesma lista")
+    assert noite["foto"]["gravou"] is True and noite["foto"]["linhas"] == len(ARVORE) and "erro" not in noite["foto"]
+    # o reinício (um deploy): a memória do leitor se vai, o resultado volta do disco
+    AC.reiniciar(pasta=pasta)
+    AL.reiniciar()
+    assert AL.estado()["completo"] is None
+    assert AC.estado()["noite"] == noite
+    # a noite que não trocou nada (a paridade falha) também fica, com o motivo
+    sem_tipo = [{k: v for k, v in i.items() if k != "id_type_item"} for i in ARVORE]
+    AC.trocar(AC.montar_registros(_rpc()), "rpc", lido_em=time.time() - 7200)
+    AL.ler_completo(app, ler=RestFalso(sem_tipo))
+    AC.reiniciar(pasta=pasta)
+    AL.reiniciar()
+    falhou = AC.estado()["noite"]
+    assert not falhou["ok"] and "id_type_item" in falhou["resultado"] and falhou["foto"] is None
+    # a leitura que não veio inteira: nada mudou, e o motivo fica
+    AC.trocar(AC.montar_registros(_rpc()), "rpc", lido_em=time.time() - 7200)
+    AL.ler_completo(app, ler=RestFalso(_muitos(250), curta_em=100))
+    AC.reiniciar(pasta=pasta)
+    assert not AC.estado()["noite"]["ok"] and "não veio inteira" in AC.estado()["noite"]["resultado"]
+    # nada de texto de ativo no arquivo
+    import json
+    texto = (tmp_path / "oscreator" / "ativos_estado.json").read_text(encoding="utf-8")
+    assert "noite" in json.loads(texto) and "Inversor 1.1" not in texto and "Cliente Alfa" not in texto

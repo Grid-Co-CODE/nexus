@@ -995,7 +995,7 @@ def test_so_o_servidor_liga_o_laco(app, monkeypatch):
     raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     servir = open(os.path.join(raiz, "servir.py"), encoding="utf-8").read()
     pc = open(os.path.join(raiz, "app.py"), encoding="utf-8").read()
-    assert 'modulo_do_clone("catalogos_leitor")' in servir and "catalogos_leitor.ligar(app)" in servir
+    assert 'ligar_leitor_do_clone(app, "catalogos_leitor")' in servir and "catalogos_leitor.ligar(" not in servir
     assert "catalogos" not in pc
 
 

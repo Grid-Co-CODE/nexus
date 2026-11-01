@@ -44,7 +44,6 @@ from os_web import tradicional_web as trad  # noqa: E402
 
 JWT = "aaa.eyJlbWFpbCI6InRlc3RlQGV4ZW1wbG8uaW52YWxpZCIsImV4cCI6OTk5OTk5OTk5OX0.sig"   # de mentira
 _UTC = timezone.utc
-HOJE = dt.date.today()
 TODA = "toda@exemplo.invalid"              # vê no Fracttal todas as OS: a mesma visão da lista central
 OUTRA = "outra@exemplo.invalid"            # também vê todas
 RESTRITA = "restrita@exemplo.invalid"      # visão restrita no Fracttal: só as OS da Usina Beta (as de id par)
@@ -71,6 +70,12 @@ CATALOGO = [
 NOTA_CHAMADO = (aw.MARCA_NOTA + " — Marca Inventada · Inversor\n"
                 "OS de campo: 10001 · Inspeção: 10002 · Ativo: CAF-UAL100-INVR1.1\n"
                 "Data da falha: 10/10/2026 13:28 · Menos de 7 dias: Sim")
+
+
+def _hoje() -> dt.date:
+    """A data de hoje NA HORA do teste (e não a do import do arquivo: a suíte inteira passa da meia-noite, e a OS "de hoje" e o
+    período padrão da tela, que a rota calcula na hora, deixavam de bater)."""
+    return dt.date.today()
 
 
 def _iso(dias_atras: float) -> str:
@@ -409,8 +414,8 @@ def test_criadas_por_mim_pela_lista_central(fr):
 
 def test_virada_do_dia_nao_rele_tudo(fr):
     _encher()
-    d1 = "de=%s&ate=%s" % (HOJE - dt.timedelta(days=30), HOJE)
-    d2 = "de=%s&ate=%s" % (HOJE - dt.timedelta(days=29), HOJE + dt.timedelta(days=1))
+    d1 = "de=%s&ate=%s" % (_hoje() - dt.timedelta(days=30), _hoje())
+    d2 = "de=%s&ate=%s" % (_hoje() - dt.timedelta(days=29), _hoje() + dt.timedelta(days=1))
     a = _cliente(TODA)
     _hist(a, "modo=cos&" + d1)
     _hist(a, "modo=cos&" + d2)
@@ -637,7 +642,7 @@ def _liberou(c, email, wid=1) -> bool:
 def test_periodo_invertido_nao_libera(fr):
     _encher()
     r = _cliente(RESTRITA)
-    de, ate = HOJE - dt.timedelta(days=2), HOJE - dt.timedelta(days=5)          # o "de" depois do "até"
+    de, ate = _hoje() - dt.timedelta(days=2), _hoje() - dt.timedelta(days=5)          # o "de" depois do "até"
     assert r.get("/os/historico?modo=cos&de=%s&ate=%s" % (de, ate)).status_code == 200
     assert not _liberou(r, RESTRITA) and fr.n("total", RESTRITA) == 0     # o período inválido vai ao caminho de hoje, sem conferir
     with sessao.contexto(JWT, RESTRITA):
@@ -648,7 +653,7 @@ def test_periodo_invertido_nao_libera(fr):
 def test_dia_quieto_nao_libera(fr):
     _encher()
     r = _cliente(RESTRITA)
-    d = HOJE - dt.timedelta(days=25)                             # nenhuma OS: 0 contra 0
+    d = _hoje() - dt.timedelta(days=25)                             # nenhuma OS: 0 contra 0
     _hist(r, "modo=cos&de=%s&ate=%s" % (d, d))
     assert not _liberou(r, RESTRITA)
 
@@ -674,7 +679,7 @@ def test_dia_com_todas_as_os_dela_nao_libera(fr):
 def test_investigar_fora_dos_30_dias_nao_libera(fr):
     _encher()
     r = _cliente(RESTRITA)
-    de, ate = HOJE - dt.timedelta(days=60), HOJE - dt.timedelta(days=40)
+    de, ate = _hoje() - dt.timedelta(days=60), _hoje() - dt.timedelta(days=40)
     assert r.get("/os/historico/ativo?codigo=CAF-UBE200-INVR1.1&usina=" + BETA.replace(" ", "%20")
                  + "&nome=Inversor%201.1&de=" + str(de) + "&ate=" + str(ate)).status_code == 200
     assert not _liberou(r, RESTRITA)
@@ -686,7 +691,7 @@ def test_so_os_30_dias_padrao_liberam(fr):
     30 dias padrão libera, porque a conferência é a mesma."""
     _encher()
     a = _cliente(TODA)
-    assert _central(_hist(a, "modo=cos&de=%s&ate=%s" % (HOJE - dt.timedelta(days=25), HOJE)), 1)   # 60 OS, e bate
+    assert _central(_hist(a, "modo=cos&de=%s&ate=%s" % (_hoje() - dt.timedelta(days=25), _hoje())), 1)   # 60 OS, e bate
     assert not LC.liberado(TODA)
     assert _central(_hist(a, "modo=criadas&pessoa=TODOS&status=Em+Processo"), 1)                     # os 30 dias padrão
     assert LC.liberado(TODA)
@@ -786,12 +791,12 @@ def test_campos_mostrados_vem_da_medida(fr):
 def _nota_retroativa(linhas_de_historico: int) -> str:
     """A nota de uma OS 3 retroativa com o histórico importado: uma linha por dia, a última de ontem (o "parado há N dias" sai
     dela, do FIM da nota)."""
-    abertura = (HOJE - dt.timedelta(days=linhas_de_historico + 10)).strftime("%d/%m/%Y")
+    abertura = (_hoje() - dt.timedelta(days=linhas_de_historico + 10)).strftime("%d/%m/%Y")
     corpo = [aw.MARCA_NOTA + " — Marca Inventada · Inversor",
              "OS de abertura: 10001 · OS de campo: 10002 · Ativo: CAF-UAL100-INVR1.1",
              "Data da ocorrência / abertura do chamado: %s" % abertura, "Histórico (importado da planilha):"]
     for k in range(linhas_de_historico):
-        dia = HOJE - dt.timedelta(days=linhas_de_historico - k)
+        dia = _hoje() - dt.timedelta(days=linhas_de_historico - k)
         corpo.append("%s - Conversa com o fornecedor inventado sobre a troca do equipamento, o envio da peça e o prazo "
                      "combinado com a equipe de campo, registro %03d de um texto longo de propósito." % (
                          dia.strftime("%d/%m/%Y"), k))
@@ -1335,6 +1340,37 @@ def test_sem_a_marca_no_pedido_a_lista_fica_fechada(fr):
     assert a.get("/os/api/os/7/previa").status_code == 204
 
 
+@pytest.mark.parametrize("marca", [None, False])
+def test_a_previa_sem_a_marca_do_pedido_vai_ao_vivo_mesmo_com_a_pessoa_liberada_ha_pouco(fr, marca):
+    """A guarda `liberada()` da 1ª pintura (revisão final): os testes de cima usam uma pessoa que NUNCA foi medida, e ela não
+    passa pelo `liberado(pessoa)` de qualquer jeito, então tirar a guarda deixava tudo verde. Aqui a pessoa passou na
+    conferência há pouco (a medida de 30 min vale, é a MESMA conta) e um pedido dela chega SEM a marca (o OS Creator servido
+    sozinho, a ponte que não disse): a prévia dá 204, e quem tem a marca segue recebendo a linha da lista."""
+    _encher()
+    com_marca = _cliente(TODA)
+    _hist(com_marca, "modo=cos")                                 # os 30 dias padrão, todas as OS dela: liberada
+    assert LC.liberado(TODA) and com_marca.get("/os/api/os/7/previa").status_code == 200
+    sem_marca = _cliente(TODA, liberada=marca)
+    assert LC.liberado(TODA) and sem_marca.get("/os/api/os/7/previa").status_code == 204
+
+
+@pytest.mark.parametrize("marca", [None, False])
+def test_o_numero_sem_a_marca_do_pedido_vai_ao_vivo_mesmo_com_a_pessoa_liberada_ha_pouco(fr, marca, monkeypatch):
+    """A guarda `liberada()` do nº → id, a mesma da prévia: a pessoa liberada há pouco, o pedido da mesma conta sem a marca, o
+    nº vai ao Fracttal pela sessão dela (1 pedido); com a marca, o id sai da lista (nenhum pedido)."""
+    _encher()
+    monkeypatch.setattr(api, "get_os_detalhes", lambda wid: {})
+    com_marca = _cliente(TODA)
+    _hist(com_marca, "modo=cos")
+    assert LC.liberado(TODA)
+    com_marca.get("/os/os/folio/10007")
+    assert fr.n("folio") == 0                                    # com a marca: o id veio da lista, sem pedido
+    sem_marca = _cliente(TODA, liberada=marca)
+    assert LC.liberado(TODA)
+    sem_marca.get("/os/os/folio/10007")
+    assert fr.n("folio", TODA) == 1                              # sem a marca: ao vivo, pela sessão dela
+
+
 @pytest.fixture
 def setor_de_mentira(app, monkeypatch):
     """O setor da pessoa do login sem ir ao banco: `valor` é o que o cadastro devolveria (ou a exceção da leitura)."""
@@ -1414,6 +1450,19 @@ def test_pela_ponte_so_o_administrador_e_o_setor_liberado_leem_da_lista(app, fr,
     monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset())
     h = _pela_ponte(app, TODA, admin=True).get("/os/historico?modo=cos").get_data(as_text=True)
     assert _central(h, 1)
+
+
+def test_o_arquivo_estatico_nao_paga_a_leitura_do_setor(app, setor_de_mentira, monkeypatch):
+    """A marca da lista central (`ponte.lista_central`) lê o setor da pessoa no banco, e rodava em TODO pedido ao /os/*, os
+    estáticos incluídos (uma tela carrega uma dúzia de .js e .css). O arquivo estático não lê a lista: a ponte nem pergunta."""
+    from nexus.torres.oscreator import ponte as P
+    monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset({"cos"}))
+    setor_de_mentira["valor"] = {"id": 3, "nome": "COS"}
+    c = _pela_ponte(app, TODA)
+    r = c.get("/os/static/os.css")
+    assert r.status_code == 200 and setor_de_mentira["lidos"] == []
+    c.get("/os/historico?modo=cos")                              # a tela, sim: lê o setor (1 vez no pedido)
+    assert setor_de_mentira["lidos"] == [TODA]
 
 
 def test_os_antiga_alem_da_pagina_nao_compensa_no_historico(fr):
@@ -1514,7 +1563,7 @@ def test_a_lista_vencida_nao_devolve_a_todos_dividida(fr, monkeypatch):
     r = _cliente(RESTRITA)
     _hist(r, "modo=cos")
     _vencer(monkeypatch)
-    assert not LC.cobre(HOJE - dt.timedelta(days=30), HOJE)
+    assert not LC.cobre(_hoje() - dt.timedelta(days=30), _hoje())
     _hist(r, "modo=cos")
     h = _hist(_cliente(R4), "modo=cos")
     assert [o["id"] for o in UNIVERSO if o["beta"] and ">%s</a>" % o["folio"] in h] == []
@@ -1533,6 +1582,111 @@ def test_a_copia_todos_do_garantias_guarda_o_total_do_fracttal(fr):
     assert 'data-folio="10051"' in h and fr.n("chamados", TODA) == 0
     h = _cliente(RV).get("/os/chamados/acompanhamento").get_data(as_text=True)
     assert [i for i in (51, 52, 53, 54) if 'data-folio="%d"' % (10000 + i) in h] == []
+
+
+def test_a_copia_todos_remontada_confere_o_total_do_fracttal_de_novo(fr):
+    """A sonda V1b: TODA monta a cópia "TODOS" pela lista central (o total do Fracttal dela, 5, fica guardado pelos 30 min da
+    conferência). 10 min depois, com 2 OS de chamado novas no Fracttal que a faixa ainda não trouxe, um ticket gravado tira o
+    quadro da memória e a cópia é remontada. O total saía do guardado (5, e o do Fracttal já era 7): a restrita RV, que não vê 4
+    das 5 da lista e vê as 2 novas (3), ficava a |3 - 5| = 2 da cópia, e a folga de 19/10 a punha na cópia TODOS, com as 4 OS
+    que o Fracttal esconde dela. A remontagem pela lista pede o total de novo (1 pedido por montagem): 7, e RV fica com a dela."""
+    _encher()
+    toda = _cliente(TODA)
+    assert 'data-folio="10051"' in toda.get("/os/chamados/acompanhamento").get_data(as_text=True)
+    assert fr.n("total_chamados", TODA) == 1                     # o total do Fracttal de quem monta (5), guardado
+    fr.universo += [dict(POR_ID[52], id=91 + k, folio=str(10091 + k), criada=_iso(RECENTE)) for k in range(2)]
+    fr.visao[RV] = {o["id"] for o in fr.universo if o["id"] not in (51, 52, 53, 54)}
+    fr.relogio["t"] += 600                                       # 10 min depois: a conferência de 30 min ainda vale
+    rotas_acomp._esquecer()                                      # o ticket gravado tira o quadro da memória
+    assert 'data-folio="10051"' in toda.get("/os/chamados/acompanhamento").get_data(as_text=True)
+    assert fr.n("total_chamados", TODA) == 2                     # a remontagem pediu o total de novo, e não o guardado
+    h = _cliente(RV).get("/os/chamados/acompanhamento").get_data(as_text=True)
+    assert [i for i in (51, 52, 53, 54) if 'data-folio="%d"' % (10000 + i) in h] == []
+    assert fr.n("chamados", RV) == 1                             # a dela, ao vivo, pela sessão dela
+
+
+def test_a_segunda_copia_do_modulo_nao_religa_o_gancho_do_numero():
+    """Importar o `lista_central` pelo pacote do Nexus (`nexus.torres.oscreator.os_creator.os_web...`, como o
+    `test_torre_oscreator` fazia) executa o arquivo uma 2ª vez, com o estado dela (os liberados, as medidas) separado do estado do
+    clone; a 2ª cópia religava o `api.ID_PELA_LISTA` a ela, e o nº → id das telas passava a perguntar à cópia errada (5 testes
+    deste arquivo falhavam na ordem inversa). O gancho é só da cópia que o clone importa (`os_web.lista_central`)."""
+    import importlib
+    antes = api.ID_PELA_LISTA
+    assert antes is LC.id_por_folio
+    try:
+        copia = importlib.import_module("nexus.torres.oscreator.os_creator.os_web.lista_central")
+        assert copia is not LC and copia.__name__ != LC.__name__
+        assert api.ID_PELA_LISTA is antes and api.ID_PELA_LISTA is LC.id_por_folio
+    finally:
+        api.ID_PELA_LISTA = antes
+
+
+def _so_os_7_dias() -> None:
+    """A lista como fica no dia do deploy: a 1ª leitura do leitor são os 7 dias, e a janela lida inteira tem só 7 dias (a noite,
+    que abre os 365, ainda não correu)."""
+    OC.receber([_rest(o) for o in UNIVERSO if o["id"] >= 42], OC.SETE_DIAS, desde=_iso(7))
+    assert OC.atual().janela[0] and OC.atual().janela[0] > (_hoje() - dt.timedelta(days=30)).isoformat()
+
+
+def test_a_janela_que_nao_cobre_o_inicio_do_periodo_deixa_a_regra_de_19_10(fr):
+    """Revisão final: a "lista em uso" era QUALQUER janela lida. No dia do deploy a 1ª leitura, os 7 dias, abre uma janela de 7
+    dias que nunca serve o Histórico de 30; com a lista "em uso", cada pessoa que não passou na conferência (e ninguém passa:
+    o período não é coberto) lia a lista DELA, uns 26 pedidos cada, em vez de dividir a "Todos" como em 19/10. Agora a lista só
+    está em uso para o período se a janela começa nele ou antes; a regra de cada um com a dela (Ruling BX) vale só no período
+    coberto."""
+    _so_os_7_dias()
+    de30, hoje = (_hoje() - dt.timedelta(days=30)).isoformat(), _hoje().isoformat()
+    assert not OC.atual().cobre(de30, hoje) and LC.divide_a_todos(OUTRA, de30, hoje)
+    assert _ao_vivo(_hist(_cliente(TODA), "modo=cos"), 60) and fr.n("lista") == 1
+    assert _ao_vivo(_hist(_cliente(OUTRA), "modo=cos"), 60)
+    assert fr.n("lista", OUTRA) == 0 and fr.n("total", OUTRA) == 1       # a "Todos" da 1ª; só o total dela, como em 19/10
+    # o período de 7 dias SIM é coberto por essa janela: ali a lista está em uso, e quem não passou fica com a dela
+    de7 = (_hoje() - dt.timedelta(days=6)).isoformat()
+    assert OC.atual().janela[0] <= de7 and not LC.divide_a_todos(OUTRA, de7, hoje)
+    _encher()                                                    # a noite correu: os 365 dias cobrem os 30
+    assert not LC.divide_a_todos(OUTRA, de30, hoje)
+
+
+def test_a_acao_nao_le_a_os_para_uma_lista_que_nao_serve_o_periodo_padrao(fr, ao_vivo, monkeypatch):
+    """A ação (cancelar, criar) só põe a OS na lista onde alguma tela a lê (`mudou`, `pendente`, `criadas`: sem isso eram 1 a 3
+    pedidos à toa por ação). Com a janela de 7 dias, nem o Histórico padrão (30 dias) nem o Garantias (365) leem dela: a ação não
+    lê a OS; quando a noite abre a janela, lê."""
+    os_, lidas = ao_vivo
+    _so_os_7_dias()
+    a = _cliente(TODA)
+    monkeypatch.setattr(api, "cancel_os", lambda wid, idm, note="": None)
+    os_[2]["status"] = 4
+    assert a.post("/os/api/os/2/cancelar", json={"id_status_custom": 9, "folio": "10002"}).get_json()["ok"]
+    assert lidas == [] and 2 not in OC.atual().por_id
+    assert LC.criadas({"ok": True, "id_work_order": 3}) == 0 and lidas == []
+    LC.pendente(5)
+    assert OC.estado()["pendentes"] == 0
+    _encher()
+    os_[3]["status"] = 4
+    assert a.post("/os/api/os/3/cancelar", json={"id_status_custom": 9, "folio": "10003"}).get_json()["ok"]
+    assert lidas == [3] and OC.atual().por_id[3].status_id == 4
+    LC.pendente(5)
+    assert OC.estado()["pendentes"] == 1
+
+
+def test_a_lista_do_historico_que_ninguem_le_ha_30_min_sai(fr):
+    """As listas do caminho de 19/10 (`historico_store._LISTAS`, uma por pessoa e filtro) cresciam até o reinício (~10 por dia).
+    A que ninguém lê há 30 min sai quando outra é lida; a que está sendo lida fica, mesmo velha (a tela abre com ela e a renova
+    por trás)."""
+    def ler(chave):
+        return HS.ler(chave, lambda: ([{"id": 1, "data": "2026-10-01T00:00:00"}], {"total": 1}), lambda desde: ([], {}))
+    a, b, c = ("hist", "a@exemplo.invalid"), ("hist", "b@exemplo.invalid"), ("hist", "c@exemplo.invalid")
+    ler(a)
+    fr.relogio["t"] += 20 * 60
+    ler(b)
+    assert HS.guardada(a) is not None and HS.guardada(b) is not None     # 20 min sem ninguém ler a "a": ainda está
+    fr.relogio["t"] += 11 * 60
+    ler(b)                                                       # a "a" completa 31 min sem leitura: sai; a "b" foi lida agora
+    assert HS.guardada(a) is None and HS.guardada(b) is not None
+    fr.relogio["t"] += 45 * 60
+    assert ler(b)[1] == "memoria" and HS.guardada(b) is not None         # a que está sendo lida fica, mesmo sem leitura há 45 min
+    ler(c)
+    assert HS.guardada(c) is not None
 
 
 def test_o_numero_que_nao_abre_nao_mostra_o_id(fr, monkeypatch):

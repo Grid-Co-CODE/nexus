@@ -16,7 +16,6 @@ import threading
 import time
 from concurrent.futures import as_completed
 from datetime import datetime
-from ativos_central import montar_registros as _build_records
 from fracttal_erro import FracttalError, SessionExpired
 import ativos_central
 
@@ -52,7 +51,7 @@ def get_assets() -> list:
                 res[futs[f]] = f.result()
         for s in starts:
             data.extend(res.get(s, []))
-    return _build_records(data)
+    return api._build_records(data)          # pelo `api.`: o `montar_registros` do `ativos_central`, que o teste pode trocar
 
 
 ASSETS_TTL   = 24 * 3600

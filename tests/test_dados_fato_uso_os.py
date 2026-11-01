@@ -2,7 +2,7 @@
 tarefa 0.3, com os Rulings M e N da controladora). Até aqui os dois contadores só viviam na memória do processo: um deploy ou
 um reinício apagava a história, e o "antes e depois" de cada etapa seguinte seria chute. Agora o servidor tira as horas
 fechadas dos contadores de hora em hora (no :05) e as guarda no DISCO dele (`casca/uso_os_pendente.json`); ao BANCO elas vão
-UMA vez por dia, às 03:45 de Brasília, num livro por mês (`nexus_oscreator_uso_AAAA_MM`, três abas: o uso, o detalhe do
+UMA vez por dia, às 04:45 de Brasília, num livro por mês (`nexus_oscreator_uso_AAAA_MM`, três abas: o uso, o detalhe do
 Fracttal e o total da hora). Reescrever o livro do mês inteiro a cada hora custaria ~7 s de processador no GIL do único
 processo do Nexus (medido em 31/10/2026); uma vez por dia, no horário mais parado, custa o mesmo e não trava ninguém.
 
@@ -10,7 +10,7 @@ Provas, sem rede (a API do banco é a `ApiPGFalsa`, inclusive com `como_texto=Tr
 devolve a célula vazia como o texto "None", como o `sync-xlsx` real; o Flask é de mentira, o Fracttal é um adaptador falso do
 `requests` e o relógio está na mão): o grão e a chave das três abas; o total da hora na aba dele e o detalhe sem a linha `*`;
 a mesma hora regravada que não duplica; a virada do mês e do ano que vai a dois livros; nada de pessoa, setor nem e-mail no
-banco; o catálogo e a trava `so_cresce`; o que o laço faz de hora em hora (disco, nunca o banco) e às 03:45 (o banco); o
+banco; o catálogo e a trava `so_cresce`; o que o laço faz de hora em hora (disco, nunca o banco) e às 04:45 (o banco); o
 pendente que sobrevive ao reinício, que vem quebrado, que tem teto de 3 dias; a leitura curta do livro que não grava por
 cima; e a ponta a ponta com os contadores de verdade."""
 import json
@@ -449,7 +449,7 @@ def test_catalogo_registra_o_livro_e_os_fatos():
     assert F.LIVRO_MOLDE == "nexus_oscreator_uso_AAAA_MM" and lv.abas == (ABA_USO, ABA_FRA, ABA_TOT)
     assert lv.so_cresce == lv.abas and lv.no_banco is False        # as três abas só crescem; registrado antes de existir
     assert "uso_os.py" in lv.quem_grava and "servidor" in lv.cadencia + lv.observacao
-    assert "03:45" in lv.cadencia and "disco" in lv.cadencia         # no disco de hora em hora, no banco uma vez por dia
+    assert "04:45" in lv.cadencia and "disco" in lv.cadencia         # no disco de hora em hora, no banco uma vez por dia
     # a família: o livro de cada mês casa pelo padrão, acha a trava do molde e a aba é da família (o radar não a acha "nova")
     assert any(p.match("nexus_oscreator_uso_2026_10") for p in catalogo.FAMILIAS)
     assert not any(p.match(n) for p in catalogo.FAMILIAS for n in
@@ -465,7 +465,7 @@ def test_catalogo_registra_o_livro_e_os_fatos():
         assert f.tipo == "snapshot_periodico" and f.chave == chave and f.area == "os" and f.grao.startswith("1 linha")
         assert f.dims["data"][0] == "id" and all(f.dims[d][0] == "nao" for d in catalogo.DIM_IDS if d != "data")
         assert f.medidas and all(m.coluna in cab and catalogo.medida_valida(m) for m in f.medidas)
-        assert "o Nexus é a fonte" in f.janela_origem and "03:45" in f.janela_origem
+        assert "o Nexus é a fonte" in f.janela_origem and "04:45" in f.janela_origem
         assert fid in explica.RESUMO and fid in explica.PARA_QUE        # a camada cobra o texto amigável
     # a soma de cada medida: a contagem de pedidos soma; pessoas distintas, tempo e o pico por minuto, nunca
     uso = {m.coluna: m for m in catalogo.POR_ID["uso_os_hora"].medidas}
@@ -483,10 +483,10 @@ def test_catalogo_registra_o_livro_e_os_fatos():
     assert "origem * e método *" not in catalogo.POR_ID["fracttal_hora"].grao
     assert catalogo.POR_ID["fracttal_total_hora"].grao.startswith("1 linha = 1 hora")
     assert "fracttal_total_hora" in catalogo.POR_ID["fracttal_hora"].observacao
-    assert "03:45" in catalogo.POR_ID["uso_os_hora"].observacao
+    assert "04:45" in catalogo.POR_ID["uso_os_hora"].observacao
 
 
-# ── o laço: de hora em hora para o disco, às 03:45 para o banco ──────────────────────────────────────────────────────
+# ── o laço: de hora em hora para o disco, às 04:45 para o banco ──────────────────────────────────────────────────────
 class _Relogio:
     """O relógio na mão (a hora de Brasília e o cronômetro do pedido andam só quando o teste manda)."""
 
@@ -597,18 +597,20 @@ def _um_dia_de_uso(app, relogio):
     ("2026-10-30T13:04:59+00:00", 1, "drenar"),
     ("2026-10-30T13:05:00+00:00", 3600, "drenar"),      # já é :05: o seguinte é o da hora seguinte
     ("2026-10-30T23:59:00+00:00", 360, "drenar"),
-    ("2026-10-30T02:30:00+00:00", 2100, "drenar"),      # 23:30 BRT de 29/10: o 03:45 ainda está longe
-    ("2026-10-30T06:00:00+00:00", 300, "drenar"),       # 03:00 BRT: o :05 vem antes do 03:45
-    ("2026-10-30T06:05:00+00:00", 2400, "gravar"),      # 03:05 BRT: o 03:45 vem antes do :05 de 04:00
-    ("2026-10-30T06:30:00+00:00", 900, "gravar"),
-    ("2026-10-30T06:44:00+00:00", 60, "gravar"),
-    ("2026-10-30T06:45:00+00:00", 1200, "drenar"),      # 03:45 em ponto: já passou, a próxima gravação é amanhã
-    ("2026-10-30T06:46:00+00:00", 1140, "drenar"),
+    ("2026-10-30T02:30:00+00:00", 2100, "drenar"),      # 23:30 BRT de 29/10: o 04:45 ainda está longe
+    ("2026-10-30T06:00:00+00:00", 300, "drenar"),       # 03:00 BRT: o :05 vem antes do 04:45
+    ("2026-10-30T06:05:00+00:00", 3600, "drenar"),      # 03:05 BRT: o :05 de 04:00 vem antes do 04:45 (até 31/10 a gravação era às 03:45)
+    ("2026-10-30T06:44:00+00:00", 1260, "drenar"),
+    ("2026-10-30T07:05:00+00:00", 2400, "gravar"),      # 04:05 BRT: o 04:45 vem antes do :05 de 05:00
+    ("2026-10-30T07:30:00+00:00", 900, "gravar"),
+    ("2026-10-30T07:44:00+00:00", 60, "gravar"),
+    ("2026-10-30T07:45:00+00:00", 1200, "drenar"),      # 04:45 em ponto: já passou, a próxima gravação é amanhã
+    ("2026-10-30T07:46:00+00:00", 1140, "drenar"),
     ("2026-10-30T05:59:59+00:00", 301, "drenar")])
-def test_o_laco_acorda_no_5_de_toda_hora_e_grava_as_3h45(utc, esperado, passo):
+def test_o_laco_acorda_no_5_de_toda_hora_e_grava_as_4h45(utc, esperado, passo):
     espera, quem = U.proximo_passo(datetime.fromisoformat(utc).timestamp())
     assert (round(espera, 6), quem) == (esperado, passo)
-    assert (U.DRENAR_NO_MINUTO, U.GRAVAR_NA_HORA, U.GRAVAR_NO_MINUTO) == (5, 3, 45)
+    assert (U.DRENAR_NO_MINUTO, U.GRAVAR_NA_HORA, U.GRAVAR_NO_MINUTO) == (5, 4, 45)
 
 
 def test_de_hora_em_hora_o_laco_guarda_no_disco_e_nunca_vai_ao_banco(mini, relogio, tmp_path, monkeypatch):
@@ -652,11 +654,11 @@ def test_o_laco_tira_so_as_horas_fechadas_e_a_hora_aberta_e_lida_antes_dos_dois(
     assert vistos == [("uso", H11), ("fracttal", H11)]
 
 
-def test_as_3h45_gravam_o_que_esta_no_disco_e_o_pendente_esvazia(mini, relogio, tmp_path):
+def test_as_4h45_gravam_o_que_esta_no_disco_e_o_pendente_esvazia(mini, relogio, tmp_path):
     _um_dia_de_uso(mini, relogio)
     banco = ApiPGFalsa()
     assert not banco.workbooks and U.pendentes()["horas"] == 3                    # as 10h, as 11h e a 01h, só no disco
-    relogio.em("2026-10-31T06:45:00+00:00")                                       # 03:45 de 31/10
+    relogio.em("2026-10-31T07:45:00+00:00")                                       # 04:45 de 31/10
     rel = U.gravar_no_banco(mini.config, sessao=banco)
     # as 11h só tiveram um clique que não pediu nada ao Fracttal: o detalhe e o total têm a hora 10 e a 01 de 31/10
     assert rel["gravado"] == {LIVRO_OUT: {ABA_USO: 3, ABA_FRA: 2, ABA_TOT: 2}}
@@ -673,7 +675,7 @@ def test_as_3h45_gravam_o_que_esta_no_disco_e_o_pendente_esvazia(mini, relogio, 
     assert U.gravar_no_banco(mini.config, sessao=banco).get("pulou") and banco.syncs == syncs
 
 
-def test_a_virada_do_mes_no_pendente_grava_os_dois_livros_as_3h45(mini, relogio, tmp_path):
+def test_a_virada_do_mes_no_pendente_grava_os_dois_livros_as_4h45(mini, relogio, tmp_path):
     _clica(mini, "/os/os/1", "2026-11-01T02:10:00+00:00", relogio)                # 31/10 23:10 de Brasília
     relogio.em("2026-11-01T03:05:00+00:00")
     U.drenar_para_o_disco()                                                       # 00:05 de 01/11
@@ -683,7 +685,7 @@ def test_a_virada_do_mes_no_pendente_grava_os_dois_livros_as_3h45(mini, relogio,
     horas = {l["hora_id"] for l in _pendente_em_disco(tmp_path)["uso"]}
     assert horas == {"2026103123", "2026110100"}                                  # o pendente atravessa a virada do mês
     banco = ApiPGFalsa()
-    relogio.em("2026-11-01T06:45:00+00:00")                                       # 03:45 de 01/11
+    relogio.em("2026-11-01T07:45:00+00:00")                                       # 04:45 de 01/11
     rel = U.gravar_no_banco(mini.config, sessao=banco)
     assert set(rel["gravado"]) == {LIVRO_OUT, LIVRO_NOV}                          # o mês que fechou ganha as últimas horas
     assert [_int(l["hora_id"]) for l in banco.linhas(LIVRO_OUT, ABA_USO)] == [2026103123]
@@ -692,48 +694,48 @@ def test_a_virada_do_mes_no_pendente_grava_os_dois_livros_as_3h45(mini, relogio,
     assert U.pendentes()["horas"] == 0
 
 
-def test_o_banco_fora_as_3h45_deixa_tudo_no_disco_e_a_gravacao_do_dia_seguinte_leva(mini, relogio, tmp_path):
+def test_o_banco_fora_as_4h45_deixa_tudo_no_disco_e_a_gravacao_do_dia_seguinte_leva(mini, relogio, tmp_path):
     _um_dia_de_uso(mini, relogio)
-    relogio.em("2026-10-31T06:45:00+00:00")
+    relogio.em("2026-10-31T07:45:00+00:00")
     caiu = ApiQueFalha(cai=1)
     rel = U.gravar_no_banco(mini.config, sessao=caiu)
     assert "erro" in rel and not caiu.workbooks and rel["pendentes"]["horas"] == 3
     assert len(_pendente_em_disco(tmp_path)["uso"]) == 3 and U.gravou_em() == 0   # nada saiu, e ninguém anota gravação que não houve
-    # o dia seguinte: mais uma hora no disco (a das 10h de 31/10) e, às 03:45 de 01/11, o banco volta
+    # o dia seguinte: mais uma hora no disco (a das 10h de 31/10) e, às 04:45 de 01/11, o banco volta
     _clica(mini, "/os/historico", "2026-10-31T13:10:00+00:00", relogio)
     relogio.em("2026-10-31T14:05:00+00:00")
     U.drenar_para_o_disco()
     banco = ApiPGFalsa()
-    relogio.em("2026-11-01T06:45:00+00:00")
+    relogio.em("2026-11-01T07:45:00+00:00")
     rel = U.gravar_no_banco(mini.config, sessao=banco)
     assert "erro" not in rel and len(banco.linhas(LIVRO_OUT, ABA_USO)) == 4
     assert U.pendentes() == {"uso": 0, "fracttal": 0, "horas": 0}
 
 
-def test_a_leitura_curta_do_livro_nas_3h45_nao_grava_e_o_pendente_fica(mini, relogio, tmp_path):
+def test_a_leitura_curta_do_livro_nas_4h45_nao_grava_e_o_pendente_fica(mini, relogio, tmp_path):
     _clica(mini, "/os/historico", "2026-10-30T13:10:00+00:00", relogio)
     relogio.em("2026-10-30T14:05:00+00:00")
     U.drenar_para_o_disco()
     banco = ApiComLeituraCurta()
-    relogio.em("2026-10-31T06:45:00+00:00")
+    relogio.em("2026-10-31T07:45:00+00:00")
     U.gravar_no_banco(mini.config, sessao=banco)                                 # cria o livro com a hora 10
     _clica(mini, "/os/historico", "2026-10-31T13:30:00+00:00", relogio)
     relogio.em("2026-10-31T15:05:00+00:00")
     U.drenar_para_o_disco()
     banco.curta = True
-    relogio.em("2026-11-01T06:45:00+00:00")
+    relogio.em("2026-11-01T07:45:00+00:00")
     rel = U.gravar_no_banco(mini.config, sessao=banco)                           # a leitura curta recusa
     assert "erro" in rel and U.pendentes()["uso"] == 1 and len(banco.linhas(LIVRO_OUT, ABA_USO)) == 1
     assert len(_pendente_em_disco(tmp_path)["uso"]) == 1
     banco.curta = False
-    relogio.em("2026-11-02T06:45:00+00:00")
+    relogio.em("2026-11-02T07:45:00+00:00")
     U.gravar_no_banco(mini.config, sessao=banco)
     assert len(banco.linhas(LIVRO_OUT, ABA_USO)) == 2 and U.pendentes()["uso"] == 0
 
 
 def test_sem_o_token_nao_grava_e_o_pendente_fica_no_disco(mini, relogio, tmp_path):
     _clica(mini, "/os/historico", "2026-10-30T13:10:00+00:00", relogio)
-    relogio.em("2026-10-31T06:45:00+00:00")
+    relogio.em("2026-10-31T07:45:00+00:00")
     banco = ApiPGFalsa()
     rel = U.gravar_no_banco(dict(mini.config, GRIDCO_SQL_TOKEN=""), sessao=banco)
     assert "GRIDCO_SQL_TOKEN" in rel["erro"] and not banco.workbooks and banco.syncs == 0
@@ -745,7 +747,7 @@ def test_em_teste_sem_sessao_nunca_vai_a_rede_nem_tira_dos_contadores(mini, relo
         raise AssertionError("o teste foi à rede")
     monkeypatch.setattr(requests, "Session", sem_rede)
     _clica(mini, "/os/historico", "2026-10-30T13:10:00+00:00", relogio)
-    relogio.em("2026-10-31T06:45:00+00:00")
+    relogio.em("2026-10-31T07:45:00+00:00")
     assert "teste" in U.gravar_no_banco(mini.config)["pulou"]
     assert [l["hora_id"] for l in U.instantaneo()["linhas"]] == [H10] and U.pendentes()["horas"] == 0
 
@@ -765,8 +767,8 @@ def test_o_pendente_sobrevive_ao_reinicio_e_o_parcial_nao_traz_a_hora_de_volta(m
     assert not [l for l in U.instantaneo()["linhas"] if l["hora_id"] == H10]      # a hora não volta aos contadores
     assert U.linhas_pendentes() == antes and U.pendentes() == {"uso": 1, "fracttal": 2, "horas": 1}
     banco = ApiPGFalsa()
-    relogio.em("2026-10-31T06:45:00+00:00")
-    rel = U.gravar_no_banco(app2.config, sessao=banco)                            # e as 03:45 levam o que veio do disco
+    relogio.em("2026-10-31T07:45:00+00:00")
+    rel = U.gravar_no_banco(app2.config, sessao=banco)                            # e as 04:45 levam o que veio do disco
     assert rel["gravado"][LIVRO_OUT][ABA_USO] == 1 and rel["gravado"][LIVRO_OUT][ABA_TOT] == 1
 
 
@@ -789,7 +791,7 @@ def test_a_hora_que_o_parcial_antigo_traz_de_volta_nao_repete_a_chave_do_pendent
     assert U.pendentes() == {"uso": 1, "fracttal": 2, "horas": 1}                 # a chave repetida ficou uma só
     assert len({(l["hora_id"], l["rota"], l["automatico"]) for l in U.linhas_pendentes()["uso"]}) == 1
     banco = ApiPGFalsa()
-    relogio.em("2026-10-31T06:45:00+00:00")
+    relogio.em("2026-10-31T07:45:00+00:00")
     assert "erro" not in U.gravar_no_banco(app2.config, sessao=banco)
     assert len(banco.linhas(LIVRO_OUT, ABA_USO)) == 1
 
@@ -838,7 +840,7 @@ def test_o_pendente_tem_teto_de_3_dias(mini, relogio, tmp_path, caplog):
     assert len(horas) == 72 and horas[0] == "2026103013" and horas[-1] == "2026110212"      # as 72 mais novas
     assert sorted({l["hora_id"] for l in _pendente_em_disco(tmp_path)["uso"]}) == horas        # o disco diz o mesmo
     banco = ApiPGFalsa()
-    relogio.em("2026-11-03T06:45:00+00:00")                                       # o 03:45 seguinte à última hora tirada
+    relogio.em("2026-11-03T07:45:00+00:00")                                       # o 04:45 seguinte à última hora tirada
     U.gravar_no_banco(mini.config, sessao=banco)
     gravadas = {_int(l["hora_id"]) for livro in (LIVRO_OUT, LIVRO_NOV) for l in banco.linhas(livro, ABA_USO)}
     assert len(gravadas) == 72 and U.pendentes()["horas"] == 0 and len(banco.workbooks) == 2
@@ -878,7 +880,7 @@ def test_o_laco_so_liga_no_servidor(tmp_path, relogio, monkeypatch):
 
 
 # ── a ponta a ponta, com os contadores de verdade ────────────────────────────────────────────────────────────────────
-def test_ponta_a_ponta_grava_as_3h45_o_que_o_disco_guardou_e_nada_pessoal_vai_ao_banco(mini, relogio, tmp_path):
+def test_ponta_a_ponta_grava_as_4h45_o_que_o_disco_guardou_e_nada_pessoal_vai_ao_banco(mini, relogio, tmp_path):
     relogio.em("2026-10-30T13:10:00+00:00")                                       # 10:10
     _clica(mini, "/os/os/16995")
     _clica(mini, "/os/os/16996")
@@ -889,9 +891,9 @@ def test_ponta_a_ponta_grava_as_3h45_o_que_o_disco_guardou_e_nada_pessoal_vai_ao
     U.drenar_para_o_disco()
     assert [l["hora_id"] for l in U.instantaneo()["linhas"]] == [H11]             # a hora aberta fica nos contadores
     banco = ApiPGFalsa()
-    relogio.em("2026-10-31T06:45:00+00:00")                                       # 03:45 do dia seguinte
+    relogio.em("2026-10-31T07:45:00+00:00")                                       # 04:45 do dia seguinte
     rel = U.gravar_no_banco(mini.config, sessao=banco)
-    # a hora 11 ficou aberta até o :05 que o laço tiraria; a gravação de 03:45 também tira o que fechou desde então
+    # a hora 11 ficou aberta até o :05 que o laço tiraria; a gravação de 04:45 também tira o que fechou desde então
     assert rel["gravado"][LIVRO_OUT][ABA_USO] == 3 and rel["uso_qtd"] == 3
     uso = {(l["hora_id"], l["rota"]): l for l in banco.linhas(LIVRO_OUT, ABA_USO)}
     assert set(uso) == {(2026103010, "/os/os/<n>"), (2026103010, "/os/historico"), (2026103011, "/os/historico")}

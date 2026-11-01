@@ -1265,7 +1265,7 @@ FATOS = (
          estado="conformado", conformado_em=f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_USO}",
          observacao="um livro por mês (nexus_oscreator_uso_AAAA_MM, o mês é o do hora_id); só as horas fechadas: o "
                     "servidor as tira da memória no :05 da hora seguinte, guarda no disco dele e as leva ao banco UMA vez por "
-                    "dia, às 03:45 de Brasília (gravar o livro do mês inteiro custa ~7 s de processador, e o Nexus é um "
+                    "dia, às 04:45 de Brasília (gravar o livro do mês inteiro custa ~7 s de processador, e o Nexus é um "
                     "processo só); regravar a mesma hora troca a linha (a chave), não a repete. rota é o caminho sem a "
                     "query, com os números como <n> e os ids opacos como <id>; automatico 1 é o que a tela pede sozinha "
                     "(Histórico, Solicitações, a sessão), 0 é o clique da pessoa. pessoas_qtd conta quem pediu sem dizer "
@@ -1292,7 +1292,7 @@ FATOS = (
                     "é recusado; a fundo:<thread> que ninguém declarou, um pool ou a releitura por trás de uma tela, o "
                     "porteiro trata como clique, e o nome não diz qual: a lista dos laços que declaram está no "
                     "nexus/casca/CLAUDE.md), contados na hora em que saíram; vazia na hora de antes do porteiro. Só "
-                    "contagens; vai ao banco uma vez por dia, às 03:45"),
+                    "contagens; vai ao banco uma vez por dia, às 04:45"),
     # o total da hora, na aba própria do mesmo livro do mês (Ruling N, 31/10/2026): o contador entrega a linha `*` no meio
     # do detalhe, e `fato_uso_os.separar_total` a leva para cá
     Fato("fracttal_total_hora", "Total de pedidos do Nexus ao Fracttal por hora", "os",
@@ -1308,7 +1308,7 @@ FATOS = (
                     "separado do detalhe (fracttal_hora) porque o total dentro dele misturava dois grãos. recusas_qtd são os "
                     "406 e 429; erros_qtd, a exceção e o 5xx; esperas_qtd (a última coluna, desde 31/10/2026, etapa 5), os "
                     "pedidos da hora que esperaram a vez no porteiro do Nexus (150 por minuto, 90 deles de fundo), vazia na "
-                    "hora de antes do porteiro. Só contagens; vai ao banco uma vez por dia, às 03:45"),
+                    "hora de antes do porteiro. Só contagens; vai ao banco uma vez por dia, às 04:45"),
 )
 POR_ID = {f.id: f for f in FATOS}
 
@@ -1596,10 +1596,10 @@ LIVROS = (
     # o uso das telas do OS Creator e os pedidos ao Fracttal, por hora (31/10/2026, etapa 0 do canto central do OS Creator):
     # um livro por mês, só cresce (a gravação relê o mês e troca as linhas de mesma chave)
     Livro(fato_uso_os.LIVRO_MOLDE, fato_uso_os.ABAS,
-          "de hora em hora (:05) as horas fechadas vão ao disco do servidor; ao banco, uma vez por dia, às 03:45 "
+          "de hora em hora (:05) as horas fechadas vão ao disco do servidor; ao banco, uma vez por dia, às 04:45 "
           "(Brasília), só no servidor",
           "nexus/casca/uso_os.py (laço, ligado no servir.py) + nexus/dados/fato_uso_os.py", False,
-          "registrado em 31/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª gravação das 03:45 depois do deploy. Um "
+          "registrado em 31/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª gravação das 04:45 depois do deploy. Um "
           "livro por mês (AAAA_MM do hora_id, de Brasília) com três abas: o uso por rota, o detalhe do Fracttal por "
           "origem × método e o total da hora (1 linha por hora; a linha * que o contador entrega vai para ele). As três "
           "abas vão juntas a cada gravação, sobre o livro do mês relido (leitura curta não grava). Gravar o livro do mês "
