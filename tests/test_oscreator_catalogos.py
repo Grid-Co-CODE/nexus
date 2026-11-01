@@ -9,7 +9,8 @@ cada usina escolhida. E só na memória: cada push na `main` reinicia o serviço
 O que estes testes seguram (o Fracttal é de mentira, no nível do `api._rpc_call`, contando cada pedido por método; a rede fica
 proibida; nomes e e-mails são inventados):
 - `test_um_pedido_para_todas_as_telas`, por catálogo: todos os caminhos que usam o catálogo, de três pessoas, pedem UMA leitura;
-- `test_reinicio_sem_pedido`: o reinício sobe pela cópia em disco e não pede nada, nem com a cópia vencida;
+- `test_reinicio_sem_pedido`: o reinício sobe pela cópia em disco e não pede nada, nem com a cópia vencida (menos a 1ª tela
+  de quem não está no pessoal, que relê o pessoal uma vez, como a conta nova);
 - `test_disco_corrompido`: a cópia ilegível é ignorada, o motivo vai ao estado e o catálogo é lido de novo, uma vez;
 - `test_performance_segunda_vez_sem_pedido`: a 2ª escolha da mesma usina na Performance não pede nada;
 - `test_prazo_vencido_renova_por_tras`: o vencido volta na hora e é renovado por trás, uma vez para todos, com a sessão de quem
@@ -401,11 +402,15 @@ def test_reinicio_sem_pedido(fr, tmp_path):
     ct._relogio = lambda: monkey_relogio
     try:
         ct.aquecer(esperar=True)                                         # o aquecimento do boot: o disco, por trás
-        for email in EMAILS[:2]:                 # (a 3ª não está no pessoal: relê uma vez, `test_a_conta_nova_...`)
+        for email in EMAILS[:2]:                                         # as duas pessoas que estão no pessoal
             c = _cliente(email)
             _tudo(c)
             _escolher_usina(c)
         assert fr.pedidos == []                                          # nem um pedido: as telas leem a cópia
+        # menos para quem NÃO está no pessoal (a 3ª): a 1ª tela dela depois de cada reinício relê o pessoal, como a conta
+        # nova (`catalogos.da_pessoa`). Uma leitura: 1 pedido aqui, 2 com as ~150 pessoas de verdade (duas páginas de 100)
+        _no_pedido(_cliente(EMAILS[2]), api._current_user_info)
+        assert [m for m, _p in fr.pedidos] == [api.RPC_PERSONNEL]
         # vencida, ela é renovada por trás (a regra do prazo), e não no boot
         assert fr.por_tras, "o vencido não pediu a renovação por trás"
         assert _no_pedido(_cliente("ana@exemplo.invalid"), api._current_user_info) == (501, 11, "Ana Teste Silva")
@@ -754,6 +759,37 @@ def test_a_conta_nova_com_o_rest_valendo_e_achada_pelo_rpc(fr, monkeypatch):
     assert fr.n(*M_PESSOAS) == 4
 
 
+def test_a_conta_nova_em_duas_telas_juntas_espera_a_mesma_leitura(fr, monkeypatch):
+    """Re-revisão da 4.1 (Minor a): duas telas da conta nova ao mesmo tempo (a lista e o card, duas abas). A 1ª relia o
+    pessoal, e a 2ª, que chegava com a releitura em curso, saía com `(None, None, "")`: "criadas por mim" vazio naquela tela.
+    A 2ª espera a mesma leitura, e o pessoal é lido uma vez só."""
+    ct = _catalogos()
+    agora = {"t": time.time()}
+    monkeypatch.setattr(ct, "_relogio", lambda: agora["t"])
+    _cliente("ana@exemplo.invalid").get("/os/api/responsaveis")          # o catálogo, ainda sem a conta nova
+    fr.pessoal.append({"id": 504, "code": "E5", "full_name": "Eva Nova", "active": True, "id_account": 15,
+                       "account_email": "eva@exemplo.invalid"})
+    agora["t"] += 120
+    original = fr.rpc
+
+    def lento(metodo, params, timeout=45):
+        if metodo == api.RPC_PERSONNEL:
+            time.sleep(0.3)                                              # a releitura demora: a 2ª tela chega no meio
+        return original(metodo, params, timeout)
+    monkeypatch.setattr(api, "_rpc_call", lento)
+    eva, saidas = _cliente("eva@exemplo.invalid"), []
+
+    def tela():
+        saidas.append(_no_pedido(eva, api._current_user_info))
+    telas = [threading.Thread(target=tela) for _ in range(2)]
+    for t in telas:
+        t.start()
+        time.sleep(0.05)
+    for t in telas:
+        t.join(5)
+    assert saidas == [(504, 15, "Eva Nova")] * 2 and fr.n(*M_PESSOAS) == 2
+
+
 def test_o_nome_que_e_um_email_nao_vai_ao_disco(fr, tmp_path):
     """Minor 3: a pessoa sem nome no Fracttal aparece pelo e-mail (o `full_name` dela é o e-mail). A tela mostra como sempre
     mostrou, e o disco não guarda o e-mail em claro."""
@@ -795,7 +831,10 @@ def test_a_renovacao_dos_planos_por_tras_tem_ritmo(fr, monkeypatch):
     fr.por_tras.clear()
     fr.dormiu.clear()
     renovar()
-    assert vez["n"] == 4 and fr.dormiu == [ct.PAUSA_S, ct.ESPERAS_COTA_S[0], ct.PAUSA_S]
+    # os números do contrato, e não as constantes do módulo (que mudariam junto com o erro): 1 s entre os inversores, e a cota
+    # espera 5 s e depois 10 s
+    assert ct.ESPERAS_COTA_S == (5, 10)
+    assert vez["n"] == 4 and fr.dormiu == [1.0, 5, 1.0]
     _escolher_usina(_cliente("bruno@exemplo.invalid"))                   # o 3º volta a ser de quem chegar, sem os 10 min
     assert len(fr.por_tras) == 1
     fr.por_tras.pop()()

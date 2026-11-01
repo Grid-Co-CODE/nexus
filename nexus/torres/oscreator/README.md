@@ -2051,7 +2051,10 @@ guarda e entrega; o leitor, que importa o `nexus`, só o servidor liga).
   esse nome não vai ao disco em claro, e depois de um reinício ela some das listas até a próxima leitura. A pessoa logada que
   não está no catálogo (a conta nova no Fracttal) relê o pessoal pelo RPC, com a sessão DELA, na hora, uma vez por pessoa a
   cada 10 min, e não com o catálogo recém-lido: com o REST valendo a renovação das pessoas é só do laço do servidor, e a conta
-  nova ficava até 6 h sem "criadas por mim".
+  nova ficava até 6 h sem "criadas por mim". A 2ª tela dela que chega com a releitura em curso (duas abas) espera a mesma
+  leitura: a vez de 10 min é marcada depois dela. A conta que NUNCA está no pessoal (quem cria OS sem ser cadastrado como
+  pessoa) paga essa releitura também na 1ª tela depois de cada reinício (a vez de 10 min é da memória): 2 pedidos, as ~150
+  pessoas em duas páginas, que renovam o catálogo para todos.
 - **O `_label_id` não vai mais ao Fracttal.** Ele era relido a cada lista de propósito (08/10/2026): era o 1º pedido das listas
   por etiqueta e acusava a sessão morta, porque a listagem engolia o erro das páginas. Desde 21/10/2026 a página que falha
   derruba a busca inteira (`_lista_pela_metade`): a lista acusa sozinha. A conferência do Garantias (`total_chamados`) passou
@@ -2126,7 +2129,7 @@ guarda e entrega; o leitor, que importa o `nexus`, só o servidor liga).
 | Falhas do COS | 3 a cada reinício, e nunca mais | 0; 3 por trás passadas as 24 h | 0 |
 | Status, grupo e classificações da solicitação, motivos | 1, 3 e 1 a cada 30, 30 e 10 min de uso | 0; 1, 3 e 1 por trás passadas as 24 h | 0 |
 | Planos da Performance | N eventos (um por inversor e estação) + 1 detalhe a CADA usina escolhida | a 1ª escolha de cada usina: N + 1 | 0 (e, vencidos, 0 na tela e N + 1 por trás) |
-| O reinício (cada push) | relia os tipos, as falhas, a pessoa de cada um, o nome do card | 0 (a cópia em disco) | 0 |
+| O reinício (cada push) | relia os tipos, as falhas, a pessoa de cada um, o nome do card | 0 (a cópia em disco), menos para quem não está no pessoal: 2 na 1ª tela dela depois de cada reinício (a releitura da conta nova, `da_pessoa`, que renova o pessoal para todos) | 0 |
 
 **Onde se vê:** Raio-X → seção "Uso do OS Creator" → o bloco do canto central, peça **"Catálogos pequenos"**: uma linha por
 catálogo (quantos, a fonte, lido em, a idade contra o prazo, VENCIDO e se está renovando, a última falha, as leituras do
@@ -2135,7 +2138,8 @@ o campo que faltou) e a "Planos da Performance" (`raio_x._linhas_dos_catalogos`)
 
 **Prova:** `tests/test_oscreator_catalogos.py` (`test_um_pedido_para_todas_as_telas` por catálogo, os caminhos das pessoas que são do catálogo, os
 das etiquetas, dos tipos, das falhas, do status, do grupo da solicitação e dos motivos, com 3 pessoas: uma leitura;
-`test_as_telas_veem_o_mesmo_de_antes`; `test_reinicio_sem_pedido`, com a cópia vencida; `test_disco_corrompido` por catálogo e
+`test_as_telas_veem_o_mesmo_de_antes`; `test_reinicio_sem_pedido`, com a cópia vencida (e a releitura de quem não está no
+pessoal); `test_disco_corrompido` por catálogo e
 os planos corrompidos; `test_performance_segunda_vez_sem_pedido` e a vencida que volta e renova por trás;
 `test_prazo_vencido_renova_por_tras`, uma vez para duas pessoas, com o JWT de quem achou; o erro e o vazio que não ficam; o
 status local que não fica; quem chega junto na 1ª leitura; o e-mail fora do disco; as pessoas pelo REST com os campos, sem
@@ -2145,7 +2149,8 @@ eles, sem bater com o RPC e valendo; só o servidor liga; o minuto na lista úni
 `test_o_rest_com_a_conta_ou_o_email_trocados_nao_troca`, `test_a_renovacao_por_tras_nao_derruba_a_sessao_de_quem_pediu` (e o
 dos ativos), `test_a_conta_nova_com_o_rest_valendo_e_achada_pelo_rpc`, `test_o_nome_que_e_um_email_nao_vai_ao_disco`,
 `test_a_renovacao_dos_planos_por_tras_tem_ritmo`, `test_o_status_com_o_rpc_vazio_e_a_lista_local_e_nao_fica` e
-`test_a_copia_dos_planos_em_disco_nao_volta_atras`. Os testes de antes que injetavam o pessoal pelo `api.get_responsaveis` passaram a injetá-lo pelo leitor
+`test_a_copia_dos_planos_em_disco_nao_volta_atras`; e, da re-revisão, `test_a_conta_nova_em_duas_telas_juntas_espera_a_mesma_leitura`.
+Os testes de antes que injetavam o pessoal pelo `api.get_responsaveis` passaram a injetá-lo pelo leitor
 (`api.ler_pessoal`); o `test_oscreator_card_e_anexos_29_10` não zera mais o `_CLASSIF_CACHE`, que saiu.
 
 ## Um caminho só para juntar as tarefas numa OS (31/10/2026, etapa 5.1 do canto central)

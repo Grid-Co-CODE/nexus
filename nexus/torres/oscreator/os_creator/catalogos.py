@@ -588,7 +588,9 @@ def da_pessoa(email) -> tuple:
     A PESSOA QUE NÃO ESTÁ NO CATÁLOGO (a conta nova no Fracttal) relê o pessoal pelo RPC, com a sessão DELA, na hora, uma vez
     por pessoa a cada `ESPERA_TENTATIVA_S`, e não com o catálogo recém-lido (`RELER_NA_FALTA_S`). Com o REST valendo, a
     renovação das pessoas é só do laço do servidor (05h, 11h, 17h e 23h): até a revisão da 4.1 a conta nova ficava até 6 h sem
-    "criadas por mim"."""
+    "criadas por mim". O `_FALTOU` é marcado DEPOIS da releitura: a 2ª tela que chega com ela em curso entra no `_obter` e
+    espera a MESMA leitura (a trava do assunto), em vez de sair sem achar (re-revisão da 4.1: duas abas da conta nova, e uma
+    ficava sem "criadas por mim"); o pessoal segue lido uma vez só."""
     h = _hash_email(email)
     if not h:
         return (None, None, "")
@@ -603,8 +605,11 @@ def da_pessoa(email) -> tuple:
             del _FALTOU[k]
         if h in _FALTOU:
             return (None, None, "")
-        _FALTOU[h] = agora
-    return _achar(_obter("pessoas", reler=True), h) or (None, None, "")
+    try:
+        return _achar(_obter("pessoas", reler=True), h) or (None, None, "")
+    finally:
+        with _TRAVA:
+            _FALTOU[h] = _relogio()
 
 
 def nome_por_id() -> dict:

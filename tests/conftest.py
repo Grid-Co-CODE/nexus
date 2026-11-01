@@ -76,6 +76,13 @@ def _catalogo_de_ativos_isolado():
         if mod is not None:                                # teste não pode aparecer no seguinte, nem a pasta de um em outro
                                                            # (o `reiniciar` limpa junto os planos e o leitor das pessoas)
             mod.reiniciar()
+        # e as listas do Histórico guardadas por visão (`os_web/historico_store.py`, uma por processo). Caso (31/10/2026): os
+        # testes dos catálogos abrem o Histórico e deixavam guardada a lista "Todos" do Fracttal de mentira deles (vazia,
+        # total 0). No teste seguinte cada pessoa conferia o total dela (5) contra essa lista, não batia, e cada uma buscava a
+        # sua (`test_a_lista_de_todos_e_uma_so_para_quem_ve_o_mesmo`, que só quebrava na suíte, com os catálogos antes)
+        mod = sys.modules.get("os_web.historico_store")
+        if mod is not None:
+            mod.limpar()
     limpar()
     yield
     limpar()
