@@ -378,7 +378,7 @@ memória, sem mudar quem pede. O resto da internet passa sem contar (`notfractta
     relatórios do PCM não pedem ao Fracttal na thread deles (a zeladoria pede as releituras acima). **Laço novo que pede
     ao Fracttal declara o fundo do mesmo jeito**, senão ele é clique: sem o teto de 90 e na frente do fundo.
   - **O que segue clique sem ser clique, de propósito (31/10/2026):** a cópia do catálogo de ativos que o OS Creator baixa
-    por trás pelo RPC (`os-catalogo-por-tras`, no `api.py` do clone) leva a cópia do contexto do pedido e conta como a
+    por trás pelo RPC (`os-catalogo-por-tras`, no `ativos_carga.py` do clone desde a 5.3) leva a cópia do contexto do pedido e conta como a
     rota que a pediu: com o leitor do servidor ligado ela só roda como socorro da noite que não entrou (o catálogo
     vencido), então fica como está. Também as páginas da releitura da Aprovação, num pool comum do
     `campo/regras_app._fx_wo_paralelo` (cópia fiel do App, não se mexe: só o 1º pedido, o do total, sai na thread

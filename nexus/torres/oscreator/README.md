@@ -884,6 +884,9 @@ Depois abra `http://127.0.0.1:5091/os/login`. O login no Fracttal é por pessoa,
   são o mesmo par: o `catalogos.py` e o `catalogos_planos.py` seguem sem o `nexus` (servidos sozinhos, pela sessão de quem
   usa), e o laço das pessoas pelo REST mora no `catalogos_leitor.py` (o cadastro, o cliente REST, a credencial, o contador e
   o minuto da lista de minutos ocupados), que só o `servir.py` carrega e que se registra em `catalogos.ligar_leitor`.
+- **Onde está cada função** (31/10/2026, etapa 5.3): o `api.py` é só o cliente do Fracttal e a fachada; cada assunto mora no
+  módulo dele (seção "O mapa dos módulos"). Código novo vai no módulo do assunto; o que ele chama vai pelo `api.`, e o teste
+  troca `api.X`. O `tests/test_oscreator_fachada.py` acusa a chamada pelo nome local.
 - O `os_creator/.env` (a credencial do Fracttal da máquina) é do `.gitignore`: nunca entra no git.
 - Usa a mesma pasta de dados do OS Creator (`%APPDATA%\CriarOS-Fracttal`). Na mesma máquina, ele divide com o
   supervisório a chave da sessão e o token do banco. A cópia em disco do catálogo de ativos mora nela, em
@@ -2131,8 +2134,8 @@ fotos). Agora a fase 2 é uma só: `os_creator/os_juntar.py`.
   `lista_central.criadas`, que tem a guarda de "lista em uso" e o limite por pedido (3.3), e chamar daqui a pularia. E não
   confere a pessoa nem a etiqueta ao vivo: a criação da Engenharia faz isso na rota, ANTES da primeira tarefa
   (`api.responsaveis_ao_vivo` e `api.get_labels`, a regra de 19/10/2026), e continua assim. As fotos da Performance agrupada
-  seguem no `api`, casadas pelo ativo (`id_item`) com as tarefas relidas da OS: o juntar casa pela ordem, e mudar a Performance
-  para ela mudaria o que ela lê e como casa.
+  seguem na `create_performance_os_agrupada` (`os_criar.py`), casadas pelo ativo (`id_item`) com as tarefas relidas da OS: o juntar
+  casa pela ordem, e mudar a Performance para ela mudaria o que ela lê e como casa.
 - **O que mudou de verdade (dois casos de borda, os dois com teste):** (1) a OS da Clonagem de OS somava o tempo das tarefas
   CRIADAS, mesmo as que o kanban não trouxe e que portanto não estão nela; agora soma as que entraram (como já faziam as outras
   quatro). (2) A foto do Criar OS agrupado era casada pela ordem das tarefas criadas: se o kanban não trazia a 1ª, a foto do ativo 1
@@ -2147,6 +2150,75 @@ fotos). Agora a fase 2 é uma só: `os_creator/os_juntar.py`.
   pessoa e a etiqueta ao vivo antes do primeiro pedido de gravação e chega pelo juntar, e a lista central que ele não toca. Doze
   mutações do `os_juntar.py` (tempo fixo, a nota que some, o kanban lido por OS, a OS pai procurada antes do kanban, a etiqueta que
   derruba...) são pegas.
+
+## O mapa dos módulos: o que sobra do api.py (31/10/2026, etapa 5.3 do canto central)
+
+O `api.py` chegou à etapa 5 com 6.631 linhas (6.504 depois da 5.1) e uns quinze assuntos dentro: criar OS, o Histórico, o card, as
+solicitações, o cronômetro, os planos, os chamados... Cada assunto foi para o módulo do dono dele, e o `api.py` ficou com 1.239
+linhas (uns 60 de fachada). **Só o lugar mudou**: nenhuma linha de código, só o prefixo `api.` (as regras, abaixo). Prova: a árvore de cada
+uma das 292 funções, classes e constantes que saíram foi comparada com a do `api.py` de antes (o 4133f34, no git), e a única
+diferença era o `api.` na frente dos nomes; os 406 nomes que o `api` tinha seguem nele, com os mesmos tipos.
+
+| Módulo | Linhas | O que mora nele | Quem chama de fora |
+|---|---:|---|---|
+| `api.py` | 1.239 | o cliente do Fracttal: login e sessão, o RPC (`_rpc_call`, `_rpc_chamar`, o cache das leituras de uma OS), a tarefa que nasce (`create_os_rpc`, `_react_insert_post`), o S3 (`attach_imagem_os`, `s3_get_url`, `baixar_imagem`), a configuração e a fachada | tudo |
+| `fracttal_erro.py` | 15 | `FracttalError` e `SessionExpired` (o `api` os reexporta: o MESMO objeto) | todos os módulos |
+| `os_juntar.py` | 184 | a fase 2 de todo caminho que junta tarefas numa OS (seção anterior) | `os_criar` |
+| `os_criar.py` | 1.070 | os caminhos que CRIAM OS: a Clonagem de planos e de OS, a OS sem plano, o Criar OS do zero (por ativo, agrupada, por data), a Performance, a OS de análise e as do chamado; a leitura do kanban e a inserção da OS (`_kanban_records`, `_work_order_insert`), `apply_labels`, `nascer_ticket` | as rotas de Criar OS, COS, Clonagem, PCM, Performance e Engenharia (`nexus/engenharia/os_analise.py`) |
+| `os_historico.py` | 563 | a lista de OS: a linha de cada OS (`_shape_wo_row`), a leitura por período e por página, a meta de cada tarefa, o "Criado por" (`get_pessoas_contas`) | o Histórico, o COS, Garantias, Investigar ativo e a lista central de OS (`os_central`, `lista_central`) |
+| `os_detalhe.py` | 421 | a OS aberta no card: cabeçalho, tarefas, subtarefas com respostas, solicitação de origem, OS pai (`buscar_os_pai`), a OS para clonar | o card, o PDF, a Clonagem, o `os_registro` |
+| `os_estado.py` | 471 | cancelar, trocar o responsável, a nota, o status, concluir, o fluxo da OS, achar a OS pelo número (`os_por_folio`, `_wo_id_por_folio`) | o card, Garantias, a Engenharia |
+| `os_anexos.py` | 331 | LER as fotos e os arquivos: imagens, recursos, anexos por tarefa e por subtarefa, os da solicitação, `_ids_tarefas_da_os` | o card, o PDF, a Nova solicitação |
+| `os_execucao.py` | 573 | o cronômetro (iniciar, pausar, retomar, finalizar, o motivo de pausa, o tempo trabalhado) e o checklist da tarefa (subtarefas, respostas, validação de segurança) | o card, a Engenharia, Garantias |
+| `os_planos.py` | 416 | os planos (modelos de tarefa): por ativo e o detalhe, os da Performance, as subtarefas que o app acrescenta, a contagem e o tempo de cada plano, os modelos da Clonagem | o PCM, a Performance, a Clonagem, `catalogos_planos` |
+| `perf_alvos.py` | 167 | os tipos de ativo da Performance, o nome curto do ativo e da usina para o título, `get_performance_alvos` | a Performance, o COS, a Engenharia |
+| `os_chamados.py` | 377 | o bloco "CHAMADO" da observação, a lista de chamados, o status em massa, a OS 3 (tickets), as últimas OS de um ativo, as respostas da inspeção | Chamados, Garantias |
+| `os_solicitacoes.py` | 431 | as solicitações de serviço: criar, listar, status, observação, cancelar e APROVAR em OS numerada (`aprovar_solicitacao`) | a Nova solicitação, a Fila do PCM |
+| `ativos_carga.py` | 344 | a cola do `api` com o catálogo central de ativos (`load_assets_cached`, a recarga pelo RPC, a renovação por trás, os textos dos três "Atualizar ativos") | toda tela que lista ativos |
+| `catalogos_rpc.py` | 226 | os leitores dos catálogos pequenos pelo RPC (`ler_pessoal`, `get_labels`, os tipos, as falhas, `_classif_ids`) que o `catalogos.py` chama pelo nome | `catalogos`, a criação da Engenharia (que confere ao vivo), o COS |
+| `os_tempo.py` | 126 | a data do Fracttal em Brasília, o tempo entre datas, as horas de sol, `_tempo_da_os` | tudo que formata data |
+| `dash_os.py` | 80 | a fila de OS sugeridas do dashboard de O&M (a configuração mora no `api`: `DASH_CONFIG_FILE`) | `tickets_escrita` |
+
+Os módulos que as etapas 1 a 4 criaram (`ativos_central`, `ativos_leitor`, `ativos_disco`, `ativos_foto`, `os_central`, `os_leitor`,
+`os_registro`, `os_disco`, `catalogos`, `catalogos_leitor`, `catalogos_planos`, `canto_disco`) não mudaram.
+
+**As regras do código que mudou de lugar** (`tests/test_oscreator_fachada.py` confere):
+- **`api.X` é a fachada.** Todo nome de antes segue no `api` (no fim do arquivo, um `from <módulo> import (...)` por módulo), e é
+  por ele que a ponte, as rotas, os outros setores (`nexus/pcm`, `nexus/engenharia`, `nexus/auth`) e os testes chamam e TROCAM as
+  funções (`monkeypatch.setattr(api, "_rpc_call", ...)`). Onde este README diz "no `api.py`" para uma função que a tabela leva a
+  outro módulo, o endereço `api.X` segue valendo; o código mora no módulo.
+- **Toda função que um módulo chama vai pelo `api.`**, a dele e a dos outros (`api._rpc_call(...)`, `api.get_os_detalhes(...)`), e
+  também o número ajustável (um prazo, um teto: `api.ESPERA_NOVOS_S`). Senão o teste que troca `api.X` não é visto por quem chama
+  pelo nome local, e passa sem testar nada. Só as outras constantes (os nomes dos métodos do RPC) e o estado do próprio módulo são
+  usados direto. Um módulo novo, ou uma função nova num módulo, segue a mesma regra, e o teste da fachada acusa a chamada pelo nome
+  local.
+- **Todo módulo termina com `import api`**, e o `api` o importa no fim do arquivo (a fachada): o círculo se fecha na hora de
+  carregar e as funções só usam o `api` na hora da chamada. Qualquer módulo pode ser importado antes do `api`.
+- **O que o Python executa na hora de definir** (o valor padrão de um argumento, uma constante calculada) não pode usar o `api.`;
+  por isso o `HISTORICO_CAP` usado como padrão fica sem o prefixo, e o que depende de `_data_dir()` na hora de carregar
+  (`ASSETS_CACHE_LEGADO`, `DASH_CONFIG_FILE`) ficou no `api`.
+
+**O que ficou no `api.py`, e por quê**
+- **Quem fala com a rede direto** (`_get_token`, `_req`, `fracttal_login`, `_rpc_try_refresh`, `_rpc_chamar`, `create_os_rpc`,
+  `_react_insert_post`, `s3_get_url`, `baixar_imagem`, o S3 e o `attach_imagem_os`): o Raio-X rotula o pedido preso pelo arquivo da
+  linha NOSSA mais de dentro (`nexus/casca/presos.py`: `os_creator/api.py` = "Fracttal (OS Creator)", o resto da pasta = "OS Creator").
+  Se saíssem, um pedido preso criando OS passaria a aparecer como "OS Creator", e o `onde` do episódio mudaria de arquivo.
+- **A sessão** (`_save_jwt`, `_read_jwt`, `_clear_jwt`, `current_user`, `_sessao_propria`...): o `os_web.sessao.instalar` troca essas
+  funções do `api` por outras, por nome, uma vez por processo.
+- **O RPC e o cache das leituras de uma OS** (`_rpc_call`, `_leitura_da_os`, `_LEITURAS_OS`): os testes trocam o `_rpc_call` em 25
+  lugares, e o cache é estado global que se zera quando ele é trocado.
+- **O que é trocado de fora**: `ID_PELA_LISTA` (a lista central de OS o instala no `api`), `_CODE_LOC_TENTOU`,
+  `_current_user_info`, `_current_user_ids`.
+
+**Dois acertos no caminho:** os erros foram para o `fracttal_erro.py` (os módulos novos dizem `except FracttalError` e não podem
+importar o `api` ao carregar), e o `import os_juntar` do `api` saiu (quem o usa é o `os_criar`).
+
+**Como foi conferido:** (1) o AST de cada função, classe e constante movida contra o `api.py` de antes; (2) nenhum nome indefinido
+nos módulos (um `api.` esquecido ou um nome local que ficou para trás); (3) os 461 `api.X` escritos nos módulos existem no `api`;
+(4) cada módulo importado primeiro, num interpretador limpo; (5) `test_payload_igual_ao_de_antes` (a seção anterior) e o recorte da suíte
+`oscreator or cos or solic or casca or cadastro or historico or garantia or acomp or prefixo or engenharia or pcm` (3.133 testes, que
+trocam o `api.X` de dezenas de funções). Quatro mutações do `test_oscreator_fachada.py` (chamada pelo nome
+local, nome fora da fachada, `api.X` que não existe, módulo sem o `import api`) são pegas.
 
 ## O catálogo de ativos vencido por trás (24/10/2026)
 
