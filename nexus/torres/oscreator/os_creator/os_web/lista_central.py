@@ -9,18 +9,23 @@ Garantias (`rotas_acomp._linhas`), a marcação verde dos Ativos (`rotas.os_rece
 código), o nº da OS → id (`api._wo_id_por_folio`) e a 1ª pintura do card; e as ações que criam ou mudam OS põem a OS nela
 (`mudou`, `criadas`).
 
-A lista é lida pela credencial da EMPRESA e vê TODAS as OS. As guardas (decisões AZ a BF da 3.3, os Rulings BP a BR da rodada 1
-e o Ruling BU da rodada 2 de correções, que fecharam os vazamentos para a visão restrita que as sondas das revisões provaram):
+A lista é lida pela credencial da EMPRESA e vê TODAS as OS. As guardas (decisões AZ a BF da 3.3, os Rulings BP a BR da rodada 1,
+o Ruling BU da rodada 2 e o BX da rodada 4 de correções, que fecharam os vazamentos para a visão restrita que as sondas das
+revisões provaram):
+- A 1ª BARREIRA É A GOVERNANÇA (Ruling BX): a lista só vale para quem o Nexus liberou (`liberada`: a marca que a ponte põe no
+  pedido, `ponte.lista_central`: o administrador e os setores de `ponte.SETORES_COM_LISTA_CENTRAL`, mudados por commit). Sem a
+  marca, fechado; quem não foi liberado segue pelo caminho de hoje em toda tela, sem conferência. Provar o conjunto por contagem
+  teve buracos raros a cada rodada de sonda: a contagem abaixo é a 2ª barreira.
 - A VISIBILIDADE DE CADA TELA NÃO MUDA (AZ, fail-closed). A tela que mostra as OS pela sessão da pessoa (a visão dela no
   Fracttal) só lê da lista depois da conferência DELA (`conferir`), que é UMA por pessoa e período, sem visão, status nem
   etiqueta (Ruling BU): o "Todos" do período da tela (no Garantias, os 365 dias que ele lê). As duas contas param na MARCA
   D'ÁGUA da lista (`os_central.Lista.marca`: toda OS criada antes dela está na lista): a da lista, pelo índice da criação; a da
   pessoa, pelo total que o Fracttal dá a ela no período (1 pedido, na sessão dela) menos as OS dela criadas na marca ou depois,
-  que a página desse mesmo pedido traz (`CONFERE_LINHAS`, pelo id da mais nova para trás: o `list_minhas_os_pagina` não aceita
-  data e hora no "até", que ganha "T23:59:59"). Como toda OS de antes da marca está na lista, a pessoa só vê um pedaço do que a
-  lista tem: as contas iguais (igualdade EXATA, sem folga) dizem que ela vê todas. A regra de uma mão da rodada 1 comparava
-  números: a sonda mostrou a pessoa com H OS escondidas empatando com X ≥ H OS novas que a lista ainda não lera, ou com a
-  mudança de status ou de etiqueta não lida quando a conferência levava o filtro da tela. A visibilidade no Fracttal não
+  que a página desse mesmo pedido traz (`CONFERE_LINHAS`, 200, pelo id da mais nova para trás: o `list_minhas_os_pagina` não
+  aceita data e hora no "até", que ganha "T23:59:59"). Como toda OS de antes da marca está na lista, a pessoa só vê um pedaço
+  do que a lista tem: as contas iguais (igualdade EXATA, sem folga) dizem que ela vê todas. A regra de uma mão da rodada 1
+  comparava números: a sonda mostrou a pessoa com H OS escondidas empatando com X ≥ H OS novas que a lista ainda não lera, ou
+  com a mudança de status ou de etiqueta não lida quando a conferência levava o filtro da tela. A visibilidade no Fracttal não
   depende de status nem de etiqueta: passou, a visão, o "criado por", as atribuídas, o status e a etiqueta são filtros DA
   LISTA. Quando a página não dá para saber (mais OS depois da marca do que ela traz, a criação fora da ordem do id, a página
   torta), a tela vai ao vivo; e toda OS da página de antes da marca tem de estar na lista (a criada antes e inserida no Fracttal
@@ -65,6 +70,8 @@ None, e a tela segue pelo caminho de hoje.
 from __future__ import annotations
 
 import concurrent.futures as cf
+import contextlib
+import contextvars
 import datetime as dt
 import logging
 import re
@@ -77,6 +84,7 @@ from typing import NamedTuple
 
 import api
 import os_central
+from flask import has_request_context, request
 from os_registro import _s, _seg
 
 from . import historico_store as HS
@@ -102,7 +110,9 @@ CAMPOS_ATIVOS = (CRIACAO, CODIGO)
 CAMPOS_PREVIA = (NO, CRIACAO, DESCRICAO, ATIVO, STATUS, FIM, ATRIBUIDO, QUEM_CRIOU, TIPO)
 ETIQUETA_CHAMADOS = "CHAMADOS"             # o Garantias filtra pelo nome (o id custaria o catálogo de etiquetas, e não é guardado)
 TELA_HISTORICO, TELA_GARANTIAS, TELA_INVESTIGAR = "histórico", "garantias", "investigar"   # o rótulo no estado (Raio-X)
-CONFERE_LINHAS = 50                        # a página da conferência: as OS da pessoa depois da marca d'água têm de caber nela
+CONFERE_LINHAS = 200                       # a página da conferência (as OS da pessoa depois da marca d'água têm de caber nela):
+                                           # do tamanho das do `list_minhas_os`; era 50 até a rodada 4 (a sonda Q)
+LIBERACAO = "os_web.lista_central"         # a marca que o Nexus põe no pedido: a pessoa foi liberada (`ponte.lista_central`)
 ESCOPO_DIAS = 30                           # o escopo que libera o nº → id e a 1ª pintura: os 30 dias padrão do Histórico
 LIBERA_MIN_OS = 20                         # ... com pelo menos tantas OS na lista (o período quieto não diz que a pessoa vê tudo)
 LIBERA_S = HS.CONFERE_S                    # a medida da pessoa vale isto (o nº → id e a 1ª pintura também)
@@ -113,7 +123,9 @@ CRIADAS_NA_HORA = 3                        # as OS criadas lidas dentro do pedid
 RELEITURA_MAX_S = 5.0                      # o prazo da releitura da OS depois da ação, além da gravação (Minor 2 da rodada 1)
 
 _TRAVA = threading.Lock()
-_LIBERADOS: dict = {}                      # {pessoa: (quando foi medida, de, até, a marca) do escopo que a conferência liberou}
+_LIBERADOS: dict = {}                      # {pessoa: (quando foi medida, de, até, a marca, a conta da lista)} do escopo
+_APROVADAS: dict = {}                      # {(pessoa, de, até): quando foi medida a conferência que passou} ("Todos" dividida)
+_LIBERADA = contextvars.ContextVar("os_web_lista_central", default=False)   # a marca do pedido, numa thread sem o pedido
 _DIVERGIU: dict = {}                       # {(pessoa, de, até): quando a lista teve mais que ela, numa medida pedida agora}
 _MEDIDAS: dict = {}                        # {(pessoa, de, até): a `Medida` do lado dela, pedida na sessão dela}
 _VISOES: OrderedDict = OrderedDict()       # {chave: (o catálogo da linha, VisaoCentral)}, as mais usadas por último
@@ -125,9 +137,34 @@ def limpar() -> None:
     """Esquece quem está liberado, as medidas, as divergências e as visões prontas (os testes; o processo novo começa assim)."""
     with _TRAVA:
         _LIBERADOS.clear()
+        _APROVADAS.clear()
         _DIVERGIU.clear()
         _MEDIDAS.clear()
         _VISOES.clear()
+
+
+# ── a 1ª barreira: a governança (Ruling BX, rodada 4) ──────────────────────────────────────────────────────────────────
+def liberada() -> bool:
+    """A pessoa do pedido foi liberada para a lista central pelo Nexus: a marca do pedido (`request.environ[LIBERACAO]`, que
+    a ponte põe: o administrador e os setores de `ponte.SETORES_COM_LISTA_CENTRAL`) ou, numa thread que não leva o pedido, a
+    que quem a abriu passou (`liberacao`). Sem a marca (o OS Creator servido sozinho, o PC, os testes, a ponte que não
+    disse): não. Nenhuma tela lê da lista sem ela, nem a 1ª pintura nem o nº → id, mesmo passando na contagem."""
+    try:
+        if has_request_context():
+            return request.environ.get(LIBERACAO) is True
+    except Exception:                                                # noqa: BLE001 — sem saber, fecha
+        return False
+    return _LIBERADA.get() is True
+
+
+@contextlib.contextmanager
+def liberacao(valor: bool):
+    """A marca do pedido levada a uma thread que não leva o pedido (a releitura do quadro de Garantias por trás)."""
+    token = _LIBERADA.set(bool(valor))
+    try:
+        yield
+    finally:
+        _LIBERADA.reset(token)
 
 
 def _int(v):
@@ -190,15 +227,15 @@ def _medidos(campos, nomes) -> bool:
 
 
 def _escopo_liberado(pessoa):
-    """(de, até, a marca d'água em segundos) do escopo que a conferência liberou para a pessoa, medido há menos de `LIBERA_S`,
-    ou None."""
+    """(de, até, a marca d'água em segundos, a conta da lista no escopo antes dela) do escopo que a conferência liberou para a
+    pessoa, medido há menos de `LIBERA_S`, ou None."""
     if not pessoa or pessoa == "?":
         return None
     with _TRAVA:
         v = _LIBERADOS.get(pessoa)
     if v is None or HS._relogio() - v[0] >= LIBERA_S:
         return None
-    return v[1], v[2], v[3]
+    return v[1], v[2], v[3], v[4]
 
 
 def liberado(pessoa) -> bool:
@@ -207,25 +244,36 @@ def liberado(pessoa) -> bool:
     return _escopo_liberado(pessoa) is not None
 
 
-def _no_escopo(pessoa, r) -> bool:
+def _no_escopo(pessoa, r, lista=None) -> bool:
     """A OS foi criada dentro do escopo que liberou a pessoa e ANTES da marca d'água da conferência (a data de criação, em UTC,
-    como o `filtrar`): a de depois não estava na conta, e o Fracttal decide."""
+    como o `filtrar`), e a lista tem no escopo antes da marca a MESMA conta de quando a liberou (a sonda U1: a OS de 3 dias que
+    entrou no Fracttal depois, escondida da pessoa, chegou pelos 7 dias e saía na 1ª pintura): a de depois, ou com a lista
+    mudada, vai ao vivo, e o Fracttal decide."""
     esc = _escopo_liberado(pessoa)
-    return esc is not None and r is not None and esc[0] <= r.data[:10] <= esc[1] and 0 < _s(r) < esc[2]
+    if esc is None or r is None or not (esc[0] <= r.data[:10] <= esc[1] and 0 < _s(r) < esc[2]):
+        return False
+    lista = os_central.atual() if lista is None else lista
+    de_s, ate_s = os_central.periodo_em_segundos(esc[0], esc[1])
+    return os_central.contar_criadas(lista, de_s, min(ate_s, esc[2] - 1)) == esc[3]
 
 
 class Medida(NamedTuple):
     """O lado da pessoa na conferência do período (Ruling BU), pedido na sessão dela: `quando` (o relógio do 19/10, antes do
     pedido), `marca` (a marca d'água da lista no pedido, em segundos), `antes` (as OS que o Fracttal dá a ela no período criadas
     antes da marca; None quando a página não deu para saber), `depois` (os ids das dela criadas na marca ou depois, da página,
-    mais as que a ação dela leu na sessão dela), `motivo` (por que não deu para saber) e `vistas_antes` (os ids da página
-    criados antes da marca: a lista tem de ter todos)."""
+    mais as que a ação dela leu na sessão dela), `motivo` (por que não deu para saber), `vistas_antes` (os ids da página
+    criados antes da marca: a lista tem de ter todos), `id_min` e `inteira` (o menor id da página, e se ela trouxe todas as OS
+    da pessoa no período) e `lista_n` (a conta da lista no período antes da marca quando a medida foi pedida: a lista que
+    muda depois tira a prova da medida, a sonda S2)."""
     quando: float
     marca: int
     antes: int | None
     depois: frozenset
     motivo: str = ""
     vistas_antes: frozenset = frozenset()
+    id_min: int | None = None
+    inteira: bool = True
+    lista_n: int | None = None
 
 
 class Prova(NamedTuple):
@@ -262,7 +310,8 @@ def _medir(de, ate, marca: int) -> Medida:
     if len(depois) == len(linhas) and total > len(linhas):
         return Medida(quando, marca, None, frozenset(), "mais OS depois da marca d'água do que a página traz")
     return Medida(quando, marca, total - len(depois), depois,
-                  vistas_antes=frozenset(i for i, s in zip(ids, datas) if s < marca))
+                  vistas_antes=frozenset(i for i, s in zip(ids, datas) if s < marca), id_min=min(ids) if ids else None,
+                  inteira=total <= len(linhas))
 
 
 def _veredito(m: Medida, lista, de_s: int, ate_s: int, marca: int) -> tuple:
@@ -270,15 +319,24 @@ def _veredito(m: Medida, lista, de_s: int, ate_s: int, marca: int) -> tuple:
     pedido. Passa com a conta exata (a lista tem tudo de antes da marca; a pessoa, um pedaço: igual, ela vê tudo) e com a lista
     tendo cada OS da página de antes da marca: a OS que entrou no Fracttal depois da leitura com a criação antiga (o App
     offline, a importação) a lista não tem, e ela compensaria uma escondida sem tirar a página da ordem (o teste da OS antiga).
-    Mede de novo: a medida sem resposta quando a marca andou; a que não bate (a lista mudou debaixo dela, ou a pessoa); a que
-    bate, quando a marca chegou a uma OS da lista que a página dela não trouxe (a faixa leu OS novas: quem as vê, vê)."""
+    Mede de novo: a medida sem resposta quando a marca andou; a que não bate (a lista mudou debaixo dela, ou a pessoa); a
+    medida de quando a lista tinha outra conta (`lista_n`: a OS que a pessoa via, apagada e tirada pela noite, empatava a conta
+    com a escondida dela, a sonda S2); a que bate, quando a marca chegou a uma OS da lista que a página dela não trouxe (a
+    faixa leu OS novas: quem as vê, vê). Não dá para saber, e não adianta medir de novo com a mesma marca, quando a página não
+    trouxe todas e a lista tem uma OS do período depois da marca com o id abaixo do menor dela (a criação fora da ordem do id:
+    a OS do App offline com o relógio adiantado, a sonda R1; a pessoa a conta, e a página não a traz)."""
     if m.marca > marca:
         return False, None, True                                     # a lista voltou atrás (o reinício): a medida não vale
     if m.antes is None:
         return False, None, m.marca != marca
     lc = os_central.contar_criadas(lista, de_s, min(ate_s, m.marca - 1))
+    if lc != m.lista_n:
+        return False, lc, True
     if lc != m.antes or any(i not in lista.por_id for i in m.vistas_antes):
         return False, lc, True
+    if not m.inteira and m.id_min is not None and any(
+            r.id < m.id_min for r in os_central.criadas_entre(lista, max(de_s, m.marca), ate_s)):
+        return False, lc, m.marca != marca
     novas = any(r.id not in m.depois for r in os_central.criadas_entre(lista, max(de_s, m.marca), min(ate_s, marca)))
     return True, lc, novas
 
@@ -312,6 +370,38 @@ def _medir_ou_none(de, ate, marca, tela):
         return None
 
 
+def _com_a_lista(m, lista, de_s, ate_s):
+    """A medida com a conta da lista no período antes da marca dela, de quando foi pedida (`Medida.lista_n`)."""
+    if m is None or m.antes is None:
+        return m
+    return m._replace(lista_n=os_central.contar_criadas(lista, de_s, min(ate_s, m.marca - 1)))
+
+
+def aprovada(pessoa, de, ate) -> bool:
+    """A pessoa passou na conferência deste período, medida há menos de `LIBERA_S` (a "Todos" dividida de 19/10 com a lista
+    em uso, `divide_a_todos`)."""
+    if not pessoa or pessoa == "?":
+        return False
+    with _TRAVA:
+        q = _APROVADAS.get((pessoa, str(de), str(ate)))
+    return q is not None and HS._relogio() - q < LIBERA_S
+
+
+def divide_a_todos(pessoa, de, ate) -> bool:
+    """A "Todos" dividida de 19/10 do caminho de hoje (`rotas.ler_lista`) vale para esta pessoa? Sem a lista central em uso
+    (o PC, a lista vazia): sim, a regra de 19/10 como sempre. Com ela em uso, coberta ou VENCIDA, só para quem tem uma
+    conferência aprovada recente do período (Ruling BX, a sonda T3): quem vê tudo lê da lista e não a ancora; a lista vencida
+    (a última leitura até o topo passou dos 30 min) devolvia a dividida vazia à 1ª pessoa restrita, e outra com o mesmo total
+    a herdava. Os outros seguem com a lista deles. Na dúvida (a lista quebrou), não."""
+    try:
+        if not os_central.atual().janela[0]:
+            return True
+        return aprovada(pessoa, de, ate)
+    except Exception:                                                # noqa: BLE001 — na dúvida, a lista de cada pessoa
+        log.exception("lista central de OS: não deu para saber se a \"Todos\" dividida vale; cada pessoa segue com a dela")
+        return False
+
+
 def conferir(pessoa, de, ate, tela: str, *, forcar: bool = False, libera: bool = False) -> Prova | None:
     """A conferência da pessoa no período [de, ate] (Ruling BU; ver o topo): a `Prova` do que ela vê, ou None (a tela vai ao
     vivo). A medida dela (`_medir`, 1 pedido) fica 30 min e é conferida contra a lista de agora a cada visita (`_veredito`); o
@@ -336,13 +426,13 @@ def conferir(pessoa, de, ate, tela: str, *, forcar: bool = False, libera: bool =
     divergiu_ha_pouco = not forcar and q is not None and agora - q < DIVERGIU_S
     pedido = False
     if m is None:
-        m = _medir_ou_none(de, ate, marca, tela)
+        m = _com_a_lista(_medir_ou_none(de, ate, marca, tela), lista, de_s, ate_s)
         if m is None:
             return None
         pedido = True
     ok, lc, de_novo = _veredito(m, lista, de_s, ate_s, marca)
     if de_novo and not pedido and (ok or not divergiu_ha_pouco):
-        nova = _medir_ou_none(de, ate, marca, tela)
+        nova = _com_a_lista(_medir_ou_none(de, ate, marca, tela), lista, de_s, ate_s)
         if nova is not None:
             m, pedido = nova, True
             ok, lc, _ = _veredito(m, lista, de_s, ate_s, marca)
@@ -357,14 +447,20 @@ def conferir(pessoa, de, ate, tela: str, *, forcar: bool = False, libera: bool =
     with _TRAVA:
         if ok:
             _DIVERGIU.pop(k, None)
-        elif pedido and lc is not None and m.antes is not None and lc > m.antes:
+            _APROVADAS[k] = m.quando
+            if len(_APROVADAS) > GUARDADAS_MAX:
+                for x in sorted(_APROVADAS, key=_APROVADAS.get)[:len(_APROVADAS) - GUARDADAS_MAX]:
+                    _APROVADAS.pop(x, None)
+        else:
+            _APROVADAS.pop(k, None)
+        if not ok and pedido and lc is not None and m.antes is not None and lc > m.antes:
             _DIVERGIU[k] = agora                                     # a lista com MAIS que ela: a visão restrita
             if len(_DIVERGIU) > GUARDADAS_MAX:
                 for x in sorted(_DIVERGIU, key=_DIVERGIU.get)[:len(_DIVERGIU) - GUARDADAS_MAX]:
                     _DIVERGIU.pop(x, None)
         if libera:
             if ok and lc >= LIBERA_MIN_OS:
-                _LIBERADOS[pessoa] = (m.quando, str(de), str(ate), m.marca)
+                _LIBERADOS[pessoa] = (m.quando, str(de), str(ate), m.marca, lc)
                 if len(_LIBERADOS) > GUARDADAS_MAX // 2:
                     for x in sorted(_LIBERADOS, key=lambda p: _LIBERADOS[p][0])[:len(_LIBERADOS) - GUARDADAS_MAX // 2]:
                         _LIBERADOS.pop(x, None)
@@ -474,9 +570,10 @@ def historico(modo_srv, id_account, id_label, de, ate, status_ids, *, pessoa, fo
     `pessoal`, `contas` e `etiquetas`, os catálogos da rota (guardados lá: sem pedido a mais na maioria das vezes). A ordem:
     o período é válido e a lista o cobre, tem os campos da tela, sabe quem é a pessoa e responde (`filtrar`); só então a
     conferência do período (a mesma para toda visão e filtro: 1 pedido na 1ª vez), e só com ela a lista vale, e só para o que
-    ela provou. A dos 30 dias padrão, com pelo menos `LIBERA_MIN_OS` OS, libera o nº → id."""
+    ela provou. A dos 30 dias padrão, com pelo menos `LIBERA_MIN_OS` OS, libera o nº → id. Antes de tudo, a pessoa tem de ter
+    sido liberada pelo Nexus (`liberada`)."""
     try:
-        if not periodo_valido(de, ate):
+        if not liberada() or not periodo_valido(de, ate):
             return None
         lista = os_central.atual()
         if not lista.cobre(de, ate):
@@ -516,9 +613,9 @@ def investigar(code, usina_curta, de, ate, conf_de, conf_ate, *, pessoa, forcar=
     (`conf_de`, `conf_ate`: os 30 dias da Visão COS quando o período cabe neles, como hoje; a MESMA medida da Visão COS: quem
     abriu uma não confere de novo na outra), e [de, ate] tem de caber nele; só a dos 30 dias padrão libera o nº → id. Volta uma
     `VisaoCentral` com as OS que têm o código do ativo ou um código da usina (pelo catálogo de ativos), só as que a conferência
-    provou: quem chama recorta como sempre (`investigar_web`)."""
+    provou: quem chama recorta como sempre (`investigar_web`). Só para quem o Nexus liberou (`liberada`)."""
     try:
-        if not (periodo_valido(de, ate) and periodo_valido(conf_de, conf_ate)):
+        if not (liberada() and periodo_valido(de, ate) and periodo_valido(conf_de, conf_ate)):
             return None
         if not (str(conf_de) <= str(de) and str(ate) <= str(conf_ate)):
             return None                                              # a prova é do período conferido
@@ -557,10 +654,11 @@ def garantias(de, pessoa, forcar=False) -> dict | None:
     - com uma OS do quadro "a conferir": a coluna dela sai do status, e o quadro não tem como dizer que ele pode ser velho (o
       Histórico diz, ao lado do nº); a faixa que a traz de volta (as finalizadas, de hora em hora) devolve o quadro à lista;
     - com uma nota cortada no teto (`nota_cortada`, Ruling BR): o "parado há N dias" sai do FIM da nota (o histórico da
-      retroativa), e a nota pela metade não vai ao quadro como inteira."""
+      retroativa), e a nota pela metade não vai ao quadro como inteira.
+    Só para quem o Nexus liberou (`liberada`)."""
     try:
         ate = (dt.date.today() + dt.timedelta(days=1)).isoformat()
-        if not periodo_valido(de, ate):
+        if not liberada() or not periodo_valido(de, ate):
             return None
         lista = os_central.atual()
         if not lista.cobre(de, ate) or not _medidos(os_central.campos_medidos(), CAMPOS_GARANTIAS):
@@ -582,8 +680,10 @@ def garantias(de, pessoa, forcar=False) -> dict | None:
 def codigos_recentes(dias) -> list | None:
     """Os códigos dos ativos com OS criada nos últimos `dias` (a marcação verde dos Ativos, `api.codigos_os_recentes`), da
     lista central, ou None (o caminho de hoje). Sem conferência: a de hoje já é uma só para todos (`("cat", "os_recentes")`,
-    lida pela sessão de quem chegou primeiro), e segue dividida (decisão AZ)."""
+    lida pela sessão de quem chegou primeiro), e segue dividida (decisão AZ). Só para quem o Nexus liberou (`liberada`)."""
     try:
+        if not liberada():
+            return None
         de = (datetime.now(timezone.utc) - timedelta(days=max(1, int(dias)))).strftime("%Y-%m-%d")
         lista = os_central.atual()
         if not lista.cobre(de, None) or not _medidos(os_central.campos_medidos(), CAMPOS_ATIVOS):
@@ -598,15 +698,16 @@ def codigos_recentes(dias) -> list | None:
 def id_por_folio(folio) -> int | None:
     """O id da OS pelo nº, da lista central (sem pedido), para quem está liberado e só para a OS criada no escopo que o liberou
     (Ruling BP); senão None, e o `api._wo_id_por_folio` lê ao vivo, pela sessão da pessoa, como sempre. É o gancho
-    `api.ID_PELA_LISTA`."""
+    `api.ID_PELA_LISTA`. Só para quem o Nexus liberou (`liberada`)."""
     try:
         pessoa = quem()
-        if not liberado(pessoa) or not _medidos(os_central.campos_medidos(), (NO, CRIACAO)):
+        if not liberada() or not liberado(pessoa) or not _medidos(os_central.campos_medidos(), (NO, CRIACAO)):
             return None
         wid = os_central.folio_para_id(folio)
         if wid is None:
             return None
-        return wid if _no_escopo(pessoa, os_central.atual().por_id.get(wid)) else None
+        lista = os_central.atual()
+        return wid if _no_escopo(pessoa, lista.por_id.get(wid), lista) else None
     except Exception:                                                # noqa: BLE001 — o nº segue ao vivo
         log.exception("lista central de OS: o nº %s não foi achado pela lista (segue ao vivo)", folio)
         return None
@@ -615,14 +716,15 @@ def id_por_folio(folio) -> int | None:
 def previa(wid) -> dict | None:
     """A linha da OS para a 1ª pintura do card (o nº, o tipo, o status, o ativo, as datas, quem criou e com quem está), da
     lista central, ou None: o card abre como sempre, só com a leitura ao vivo. Só para quem está liberado, e só da OS criada no
-    escopo que o liberou (Ruling BP): o card é aberto pelo id, que pode vir de qualquer tela."""
+    escopo que o liberou (Ruling BP): o card é aberto pelo id, que pode vir de qualquer tela. Só para quem o Nexus liberou
+    (`liberada`)."""
     try:
         pessoa = quem()
-        if not liberado(pessoa) or not _medidos(os_central.campos_medidos(), CAMPOS_PREVIA):
+        if not liberada() or not liberado(pessoa) or not _medidos(os_central.campos_medidos(), CAMPOS_PREVIA):
             return None
         lista = os_central.atual()
         r = lista.por_id.get(_int(wid))
-        return None if not _no_escopo(pessoa, r) else _linhas(lista, [r], api._code_to_loc())[0]
+        return None if not _no_escopo(pessoa, r, lista) else _linhas(lista, [r], api._code_to_loc())[0]
     except Exception:                                                # noqa: BLE001 — o card abre como sempre
         log.exception("lista central de OS: a 1ª pintura do card da OS %s não saiu da lista", wid)
         return None

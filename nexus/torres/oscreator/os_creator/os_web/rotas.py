@@ -653,11 +653,12 @@ def ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, *, forcar=Fal
     (quem já tentou a lista pelo seu atalho, o Investigar).
 
     Senão, o CAMINHO DE HOJE: a lista guardada e renovada sem repetir o Fracttal (19/10/2026, `historico_store`). A de "Todos"
-    é uma só para quem vê o mesmo total no Fracttal (1 pedido na sessão da pessoa, a cada 30 min) SÓ quando a lista central
-    não cobre o período (o PC, a lista vazia, o período fora da janela); quando cobre, cada pessoa que chega aqui segue com a
-    DELA (Ruling BU da rodada 2 da 3.3): quem vê tudo lê da lista central e nunca ancorava a "Todos" dividida, a 1ª pessoa
-    restrita que não passava a achava vazia e a lista dela virava a de todos, e outra restrita com o mesmo total a herdava (a
-    sonda mostrou as 30 OS de uma usina para quem só vê a outra). A de cada pessoa segue dela. `mudou`: o card acabou de mudar
+    é uma só para quem vê o mesmo total no Fracttal (1 pedido na sessão da pessoa, a cada 30 min) quando a lista central não
+    está em uso (o PC, a lista vazia); com ela em uso, coberta ou vencida, só para quem passou há pouco na conferência do
+    período (`lista_central.divide_a_todos`), e cada outra pessoa que chega aqui segue com a DELA (Rulings BU e BX da 3.3):
+    quem vê tudo lê da lista central e não ancorava a "Todos" dividida, a 1ª pessoa restrita a achava vazia e a lista dela
+    virava a de todos, e outra restrita com o mesmo total a herdava (a sonda mostrou as 30 OS de uma usina para quem só vê a
+    outra; e a lista vencida a devolvia). A de cada pessoa segue dela. `mudou`: o card acabou de mudar
     uma OS; aqui a lista vem de novo do Fracttal (o que o `atualizar=1` forçado ao fechar o card fazia até 31/10/2026), e na
     lista central ela já entrou pela ação. Saiu de dentro do `historico` em 26/10/2026 para o "Investigar ativo" do Tempo
     real (`rotas_investigar`) ler a MESMA lista da Visão COS."""
@@ -671,7 +672,7 @@ def ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, *, forcar=Fal
     linhas, erro, info, lista = [], None, {}, None
     filtros = (modo_srv, id_account, id_label, de, ate, tuple(status_ids or ()))
     chave = ("hist", _quem()) + filtros
-    if id_account == "TODOS" and not lista_central.cobre(de, ate):
+    if id_account == "TODOS" and lista_central.divide_a_todos(_quem(), de, ate):
         comum = ("hist", "TODOS") + filtros
         if HS.mesma_visao(_quem(), comum, lambda: (api.list_minhas_os_pagina(
                 modo_srv, "TODOS", id_label, de, ate, status_ids, "", 1, 1) or {}).get("total") or 0):
@@ -969,20 +970,24 @@ def os_detalhe_por_folio(folio):
         if request.args.get("parcial") or request.headers.get("X-Requested-With") == "fetch":
             return f'<p class="os-erro" style="padding:24px">{msg}</p>', 404
         return render_template("erro.html", conta=_conta(), aba="hist", mensagem=msg), 404
-    return os_detalhe(wid)
+    return os_detalhe(wid, folio=folio)
 
 
 @bp.route("/os/<int:wid>")
 @exige_sessao
-def os_detalhe(wid):
+def os_detalhe(wid, folio=None):
     # o Historico abre a OS num card sobreposto (Levi, 13/09): ?parcial=1 (ou fetch) devolve so o fragmento do detalhe,
     # sem o cabecalho/abas, para injetar no card. Sem isso, e a pagina cheia de sempre (fallback quando o JS nao roda).
     parcial = bool(request.args.get("parcial")) or request.headers.get("X-Requested-With") == "fetch"
     det = preparado(wid) or api.get_os_detalhes(wid) or {}      # o que o mouse parado no cartão já pediu (09/10/2026)
     if not det.get("folio"):
+        # aberta pelo nº, o recado diz o nº: o id pode ter vindo da lista central de OS, de uma OS que o Fracttal não mostra à
+        # pessoa, e não sai na tela (rodada 4 da 3.3)
+        msg = (f"Não achei nenhuma OS com o nº {folio}." if folio is not None
+               else f"Não achei a OS de id {wid} no Fracttal.")
         if parcial:
-            return f'<p class="os-erro" style="padding:24px">Não achei a OS de id {wid} no Fracttal.</p>', 404
-        return render_template("erro.html", conta=_conta(), aba="hist", mensagem=f"Não achei a OS de id {wid} no Fracttal."), 404
+            return f'<p class="os-erro" style="padding:24px">{msg}</p>', 404
+        return render_template("erro.html", conta=_conta(), aba="hist", mensagem=msg), 404
     status = request.args.get("status") or ""
     template = "os_detalhe_conteudo.html" if parcial else "os_detalhe.html"
     return render_template(template, conta=_conta(), aba="hist", d=det, wid=wid, status=status, parcial=parcial,

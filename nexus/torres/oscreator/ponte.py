@@ -462,6 +462,39 @@ def _do_setor_ou_admin(setor_alvo: str, nome: str, regra: str, onde_log: str) ->
                                                          "(Base → Acessos → Pessoas e setores)." % nome}
 
 
+# ── a lista central de OS só para quem o Levi liberou (Ruling BX, rodada 4 da 3.3) ─────────────────────────────────────
+# As telas do OS Creator que leem da lista central de OS do servidor (o Histórico e as visões dele, o Garantias, o Investigar
+# ativo, a marcação verde dos Ativos, a 1ª pintura do card e o nº → id: `os_web/lista_central.py`) só a leem para quem foi
+# LIBERADO: o administrador do Nexus, sempre, e quem é de um setor desta lista (o nome do setor de Base → Acessos → Pessoas e
+# setores, sem acento nem caixa). Os outros seguem pelo caminho de hoje, com a sessão deles no Fracttal. Por quê: a lista é
+# lida pela credencial da empresa e vê TODAS as OS, e provar por contagem que a pessoa vê o mesmo que ela teve buracos raros a
+# cada rodada de sonda (as rodadas 1 a 3 da 3.3); a contagem fica como 2ª barreira, e a 1ª é uma decisão de governança.
+# A lista muda por COMMIT (a trilha fica no git), e não por Base → Acessos: lá cada item é uma tela do menu (abre uma página,
+# conta no "vê N de M telas", entra no "Marcar tudo" e no "Copiar de", e a tela "por dentro" libera a de fora), e uma
+# liberação que não é tela não cabe nele de forma limpa. Ela nasce vazia: só os administradores, até o Levi liberar os setores.
+LISTA_CENTRAL = "os_web.lista_central"
+SETORES_COM_LISTA_CENTRAL: frozenset = frozenset()
+
+
+def lista_central() -> bool:
+    """A pessoa do pedido pode ler a lista central de OS (ver acima): o administrador do Nexus, sem ler o setor; quem é de um
+    setor de `SETORES_COM_LISTA_CENTRAL`. Sem saber o setor (o Nexus sem a NEXUS_PESSOA_HMAC, o banco que não respondeu, a
+    pessoa sem setor): não. É a marca que vai no pedido ao clone (`encaminhar`); sem ela, o clone fecha."""
+    if session.get("admin"):
+        return True
+    if not SETORES_COM_LISTA_CENTRAL or not current_app.config.get("NEXUS_PESSOA_HMAC"):
+        return False
+    from ...auth import setor_telas
+    u = session.get("usuario")
+    email = str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
+    try:
+        setor = setor_telas.setor_da_pessoa(current_app.config, email, *setor_telas._banco())
+    except Exception as ex:      # noqa: BLE001 — sem saber o setor, fecha: a pessoa segue pelo caminho de hoje
+        logging.warning("OS Creator: não consegui ler o setor para a lista central de OS (%s)", type(ex).__name__)
+        return False
+    return bool(setor) and _sem_acento(setor.get("nome")) in {_sem_acento(s) for s in SETORES_COM_LISTA_CENTRAL}
+
+
 @bp_raiz.route("/os/", defaults={"resto": ""}, methods=_METODOS)
 @bp_raiz.route("/os/<path:resto>", methods=_METODOS)
 def encaminhar(resto: str):
@@ -474,6 +507,7 @@ def encaminhar(resto: str):
     # cópia do environ: o clone monta o request dele sem mexer no do Nexus. O SCRIPT_NAME vai junto: debaixo do prefixo,
     # o url_for do clone já sai com ele, e o cookie dele fica no /os do Nexus (_SessaoDoClone)
     environ = dict(request.environ)
+    environ[LISTA_CENTRAL] = lista_central()    # quem lê a lista central de OS (ver `lista_central`): sem a marca, fecha
     if resto.startswith(("solicitacao", "api/solic")):
         environ[AREA_PCM] = area_pcm()          # a Área PCM é do setor PCM ou do administrador (ver `area_pcm`)
     if _ROTA_OBS.fullmatch(resto):              # só a tela de um chamado e o editar/excluir: o quadro não lê o setor

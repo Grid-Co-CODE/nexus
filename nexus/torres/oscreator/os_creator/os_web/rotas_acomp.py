@@ -131,13 +131,21 @@ def _linhas(forcar: bool = False, pessoa=None) -> dict:
         # da lista central de OS primeiro (31/10/2026, tarefa 3.3 do canto central): as OS da etiqueta, sem pedido nenhum,
         # quando quem lê passou na conferência dos 365 dias que o quadro lê (o "Todos" dela até a marca d'água da lista, sem a
         # etiqueta: rodada 2 da 3.3; no Atualizar e na releitura por trás, medida de novo), e só as que ela provou. A cópia do
-        # quadro segue a de sempre (o dono, os 30 min, os tickets lidos à parte; a regra de 19/10 do `_dono` não muda); o
-        # total dela é o da lista
+        # quadro segue a de sempre (o dono, os 30 min, os tickets lidos à parte; a regra de 19/10 do `_dono` não muda). O total
+        # da cópia é o do FRACTTAL de quem a monta (`total_chamados`, na chave do `_dono`), como no caminho de hoje, e não o da
+        # lista (a sonda V1 da rodada 4: o da lista não tinha as OS de chamado novas que a faixa ainda não trouxe, e a restrita
+        # com 2 a menos que ele, e 4 escondidas, caía na cópia "TODOS" pela folga de 19/10). Sem ele, o caminho de hoje
         central = lista_central.garantias(de, _quem_le(), forcar=forcar)
+        if central is not None:
+            try:
+                total, _idade, _pedido = HS.total_conferido(_quem_le(), ("acomp", "TODOS"), lambda: api.total_chamados(de),
+                                                            0 if forcar else HS.CONFERE_S)
+            except Exception:           # noqa: BLE001 — sem o total do Fracttal, a cópia vem ao vivo (com o total dela)
+                central = None
         if central is not None:
             linhas = [l for l in central["linhas"] if aw.eh_os3(l)]
             quando = dt.datetime.fromtimestamp(central["lido_em"], aw.BRT) if central["lido_em"] else hoje
-            return _reaplicar({"linhas": linhas, "quando": quando.strftime("%d/%m/%Y %H:%M"), "total": central["total"]},
+            return _reaplicar({"linhas": linhas, "quando": quando.strftime("%d/%m/%Y %H:%M"), "total": int(total or 0)},
                               inicio)
         inf = {}
         linhas = [l for l in (api.list_chamados(de=de, info=inf, meta_ja=_fechadas_ja_lidas(pessoa or _dono())) or [])
@@ -329,11 +337,12 @@ def _renovar_por_tras(pessoa) -> None:
             return
         _RENOVANDO.add(pessoa)
     jwt, email = sessao.jwt_atual(), sessao.email_atual()
+    liberada = lista_central.liberada()             # a marca do pedido (a lista central de OS), que a thread não leva
 
     def rodar():
         inicio = time.monotonic()
         try:
-            with sessao.contexto(jwt, email):
+            with sessao.contexto(jwt, email), lista_central.liberacao(liberada):
                 _dados(forcar=True, pessoa=pessoa)
             if _ESQUECIDO["em"] >= inicio:
                 _esquecer_pessoa(pessoa)

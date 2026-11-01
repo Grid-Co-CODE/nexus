@@ -294,11 +294,18 @@ def _encher(linhas=None) -> None:
     OC.receber(linhas if linhas is not None else [_rest(o) for o in UNIVERSO], OC.NOITE, desde=_iso(400)[:10])
 
 
-def _cliente(email=TODA):
+# a marca que a ponte do Nexus põe em todo pedido ao OS Creator (`ponte.lista_central`, rodada 4 da 3.3): a pessoa está
+# liberada para a lista central. Os testes do clone a põem por padrão; sem ela (None), o pedido vai sem a marca
+LIBERACAO = "os_web.lista_central"
+
+
+def _cliente(email=TODA, liberada=True):
     c = criar_app(segredo="teste", testing=False).test_client()
     with c.session_transaction() as s:
         s["jwt"] = JWT
         s["conta"] = {"nome": "Pessoa Teste", "email": email, "perfil": "ADMINISTRATOR"}
+    if liberada is not None:
+        c.environ_base[LIBERACAO] = liberada
     return c
 
 
@@ -440,7 +447,8 @@ def test_garantias_e_ativos_e_investigar_da_mesma_lista(fr):
     assert all('data-folio="%d"' % (10000 + i) in h for i in range(51, 56))       # as 5 OS de acompanhamento, da lista
     assert 'data-folio="10050"' not in h                                           # a que não é de chamado não entra
     assert fr.n("chamados") == 0 and fr.n("total") == 1        # a conferência dos 365 dias do quadro, na sessão dela
-    assert fr.n("total_chamados") == 0                           # sem cópia dividida ainda: o `_dono` não confere
+    # o total da cópia é o do Fracttal de quem a monta (o `total_chamados` dela, a chave do `_dono`: rodada 4, a sonda V1)
+    assert fr.n("total_chamados") == 1
     # a OS do quadro que a lista sabe velha ("a conferir": as abertas não a trouxeram) leva o quadro ao vivo no Atualizar
     OC.receber([_rest(o) for o in UNIVERSO if o["status"] == 1 and o["id"] != 51], OC.ABERTAS)
     assert 51 in OC.atual().a_conferir
@@ -460,8 +468,8 @@ def test_garantias_e_ativos_e_investigar_da_mesma_lista(fr):
     assert all(">%d</a>" % (10000 + i) in h for i in da_usina) and ">10002</a>" not in h
     assert "Este ativo <b>%d</b>" % len(meus) in h and "A usina inteira <b>%d</b>" % len(da_usina) in h
     assert fr.n("lista") == 0 and fr.n("total") == n
-    # o nº da OS vira o id sem pedido nenhum, para quem conferiu e vê tudo
-    with sessao.contexto(JWT, TODA):
+    # o nº da OS vira o id sem pedido nenhum, para quem conferiu e vê tudo (e foi liberada: a marca do pedido, aqui fora dele)
+    with sessao.contexto(JWT, TODA), LC.liberacao(True):
         assert api._wo_id_por_folio("10007") == 7 and api._wo_id_por_folio("99999") is None
     assert fr.n("folio", TODA) == 1                             # o nº que a lista não conhece vai ao vivo
 
@@ -704,7 +712,7 @@ def test_previa_e_numero_de_os_antiga_vao_ao_vivo_mesmo_liberada(fr):
     assert LC.liberado(TODA) and a.get("/os/api/os/7/previa").status_code == 200
     # a OS criada antes dos 30 dias conferidos: fora do escopo que liberou, o Fracttal decide
     assert a.get("/os/api/os/70/previa").status_code == 204
-    with sessao.contexto(JWT, TODA):
+    with sessao.contexto(JWT, TODA), LC.liberacao(True):
         assert api._wo_id_por_folio("10070") == 70 and api._wo_id_por_folio("10007") == 7
     assert fr.n("folio", TODA) == 1                              # só a antiga foi ao Fracttal
 
@@ -1020,10 +1028,12 @@ def test_quem_ve_tudo_com_novas_depois_da_marca_passa(fr):
     assert fr.n("lista") == 0 and fr.n("total") == 1 and LC.liberado(TODA)
 
 
-def test_mais_os_depois_da_marca_do_que_a_pagina_vai_ao_vivo(fr):
+def test_mais_os_depois_da_marca_do_que_a_pagina_vai_ao_vivo(fr, monkeypatch):
     """A página da conferência (`CONFERE_LINHAS`) inteira depois da marca d'água, e o Fracttal com mais: não dá para saber
     quantas OS dela são de antes da marca, e a tela vai ao vivo. As 55 novas estão na lista (as ações do OS Creator as
-    puseram, sem a marca andar): pela conta, as duas empatavam."""
+    puseram, sem a marca andar): pela conta, as duas empatavam. (A página de 50, para caber no universo pequeno: a de
+    verdade é de 200 desde a rodada 4.)"""
+    monkeypatch.setattr(LC, "CONFERE_LINHAS", 50)
     _encher()
     novas = [_nova(100 + k) for k in range(55)]
     fr.universo += novas
@@ -1072,7 +1082,7 @@ def test_o_liberado_so_serve_a_os_de_antes_da_marca(fr):
     a = _cliente(TODA)
     assert _central(_hist(a, "modo=cos"), 61) and LC.liberado(TODA)
     assert a.get("/os/api/os/7/previa").status_code == 200 and a.get("/os/api/os/61/previa").status_code == 204
-    with sessao.contexto(JWT, TODA):
+    with sessao.contexto(JWT, TODA), LC.liberacao(True):
         assert api._wo_id_por_folio("10007") == 7 and api._wo_id_por_folio("10061") == 61
     assert fr.n("folio", TODA) == 1                              # só a 61 foi ao Fracttal
 
@@ -1118,8 +1128,8 @@ def test_releitura_que_passou_do_prazo_sem_comecar_sai_da_fila(fr, ao_vivo, monk
 
 def test_lista_com_menos_que_a_pessoa_nao_prende_30_min(fr):
     """O `_DIVERGIU` só quando a LISTA tem mais que a pessoa, o sinal da visão restrita (Minor 2 da rodada 2): a lista atrasada
-    (sem a OS 7) manda ao vivo, mas a visita seguinte confere de novo; e quando a noite traz a OS, a medida dela (de 2 min)
-    volta a valer, sem pedido."""
+    (sem a OS 7) manda ao vivo, mas a visita seguinte confere de novo; e quando a noite traz a OS, a lista mudou, e a medida
+    dela é pedida de novo (desde a rodada 4 a medida guarda a conta da lista de quando foi pedida, a sonda S2): passa."""
     _encher([_rest(o) for o in UNIVERSO if o["id"] != 7])
     a = _cliente(TODA)
     assert _ao_vivo(_hist(a, "modo=criadas"), 7) and fr.n("total", TODA) == 1
@@ -1127,7 +1137,7 @@ def test_lista_com_menos_que_a_pessoa_nao_prende_30_min(fr):
     assert _ao_vivo(_hist(a, "modo=criadas"), 7) and fr.n("total", TODA) == 2
     _encher()                                                    # a noite traz a OS 7
     fr.relogio["t"] += 120
-    assert _central(_hist(a, "modo=criadas"), 7) and fr.n("total", TODA) == 2
+    assert _central(_hist(a, "modo=criadas"), 7) and fr.n("total", TODA) == 3
 
 
 def test_executar_sem_confirmacao_fica_pendente(fr, ao_vivo, monkeypatch):
@@ -1274,3 +1284,265 @@ def test_a_entrega_das_abertas_nao_mexe_na_medida_dos_campos(fr):
     assert OC.campos_medidos() == medida
     OC.receber([dict(_rest(o), trigger_description=None) for o in fr.universo], OC.NOITE, desde=_iso(400)[:10])
     assert OC.campos_medidos()["faixa"] == OC.NOITE and OC.campos_medidos()["pct"]["gatilho"] == 0
+
+
+# ── rodada 4 da 3.3: a lista central só para quem foi liberado (Ruling BX) ─────────────────────────────────────────────────
+# Provar o conjunto por contagem teve buracos raros a cada volta (as sondas das rodadas 2 e 3 acharam vetores novos). A lista
+# central passa a valer só para quem o Levi liberou: os administradores do Nexus, sempre, e os setores de
+# `ponte.SETORES_COM_LISTA_CENTRAL` (mudados por commit), pela marca que a ponte põe no pedido; sem a marca, fechado. A
+# contagem fica como 2ª barreira, sem os buracos achados: a OS antiga além da página (a página de 200), a criação fora da ordem
+# do id (o menor id da página), a medida e o liberado que não viam a lista mudar, a lista vencida que devolvia a "Todos"
+# dividida, e a cópia TODOS do Garantias com o total da lista. As sondas da re-revisão viraram os testes abaixo (os nomes são
+# inventados).
+RQ = "restrita.q@exemplo.invalid"          # vê tudo menos UMA OS
+RV = "restrita.v@exemplo.invalid"          # não vê 4 das 5 OS de chamado da lista
+
+
+def _escalado() -> list:
+    """O universo de sempre com os ids vezes 10 (a criação segue o id: a 60 é a 600): sobra lugar para um id entre dois."""
+    return [dict(o, id=o["id"] * 10) for o in UNIVERSO]
+
+
+def test_quem_nao_foi_liberado_nunca_le_da_lista(fr, monkeypatch):
+    """A pessoa que o Nexus não liberou (a marca do pedido falsa) vê tudo e passaria na contagem, mas nenhuma tela lê da lista:
+    o Histórico e as visões, o Garantias, o Investigar, a marcação verde dos Ativos, a 1ª pintura e o nº → id. Nem a
+    conferência vai ao Fracttal."""
+    _encher()
+    monkeypatch.setattr(api, "get_os_detalhes", lambda wid: {})
+    a = _cliente(TODA, liberada=False)
+    h = _hist(a, "modo=cos")
+    assert _ao_vivo(h, 1) and "OS central" not in h and fr.n("lista") == 1
+    assert _ao_vivo(_hist(a, "modo=criadas"), 1)
+    a.get("/os/chamados/acompanhamento")
+    assert fr.n("chamados") == 1
+    h = a.get("/os/historico/ativo?codigo=CAF-UAL100-INVR1.1&usina=" + ALFA.replace(" ", "%20")
+              + "&nome=Inversor%201.1").get_data(as_text=True)
+    assert "OS central" not in h and ">10001</a>" in h
+    a.get("/os/api/ativos/recentes?dias=30")
+    assert fr.n("recentes") == 1
+    assert a.get("/os/api/os/7/previa").status_code == 204
+    a.get("/os/os/folio/10007")
+    assert fr.n("folio") == 1                                    # o nº → id ao vivo, pela sessão dela
+    assert fr.n("total") == 0 and not LC.liberado(TODA)
+
+
+def test_sem_a_marca_no_pedido_a_lista_fica_fechada(fr):
+    """O OS Creator servido sozinho, o PC, a ponte que não disse: sem a marca no pedido, ninguém está liberado."""
+    _encher()
+    a = _cliente(TODA, liberada=None)
+    h = _hist(a, "modo=cos")
+    assert _ao_vivo(h, 1) and "OS central" not in h and fr.n("total") == 0
+    assert a.get("/os/api/os/7/previa").status_code == 204
+
+
+@pytest.fixture
+def setor_de_mentira(app, monkeypatch):
+    """O setor da pessoa do login sem ir ao banco: `valor` é o que o cadastro devolveria (ou a exceção da leitura)."""
+    from nexus.auth import setor_telas
+    app.config["NEXUS_PESSOA_HMAC"] = "chave-de-teste"
+    monkeypatch.setattr(setor_telas, "_banco", lambda: (None, None))
+    caixa = {"valor": None, "lidos": []}
+
+    def da_pessoa(cfg, email, base, sessao_banco):
+        caixa["lidos"].append(email)
+        if isinstance(caixa["valor"], Exception):
+            raise caixa["valor"]
+        return caixa["valor"]
+    monkeypatch.setattr(setor_telas, "setor_da_pessoa", da_pessoa)
+    return caixa
+
+
+def test_a_ponte_libera_o_administrador_e_os_setores_da_lista(app, setor_de_mentira, monkeypatch):
+    """Quem a ponte libera (`ponte.lista_central`): o administrador do Nexus, sempre, sem ler o setor; quem é de um setor de
+    `SETORES_COM_LISTA_CENTRAL` (pelo nome, sem acento nem caixa), que nasce vazia. O resto, o sem setor, o setor que não deu
+    para ler e o Nexus sem a NEXUS_PESSOA_HMAC: não."""
+    from flask import session
+
+    from nexus.torres.oscreator import ponte as P
+    with app.test_request_context("/os/historico"):
+        session["logado"], session["admin"] = True, True
+        assert P.lista_central() is True and setor_de_mentira["lidos"] == []
+        session["admin"] = False
+        session["usuario"] = {"email": "Pessoa.Teste@exemplo.test", "nome": "Pessoa Teste", "perfil": ""}
+        setor_de_mentira["valor"] = {"id": 3, "nome": "COS"}
+        assert P.lista_central() is False                        # a lista de setores nasce vazia
+        monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset({"cos"}))
+        for nome in ("COS", "cos", " Cós "):
+            setor_de_mentira["valor"] = {"id": 3, "nome": nome}
+            assert P.lista_central() is True, nome
+        assert setor_de_mentira["lidos"][-1] == "pessoa.teste@exemplo.test"
+        setor_de_mentira["valor"] = {"id": 2, "nome": "Performance"}
+        assert P.lista_central() is False
+        setor_de_mentira["valor"] = None
+        assert P.lista_central() is False
+        setor_de_mentira["valor"] = RuntimeError("setores ilegíveis no banco")
+        assert P.lista_central() is False
+        app.config["NEXUS_PESSOA_HMAC"] = ""
+        setor_de_mentira["valor"] = {"id": 3, "nome": "COS"}
+        assert P.lista_central() is False
+
+
+def _pela_ponte(app, email, admin=False):
+    """Um login do Nexus e o cookie do OS Creator com o JWT de mentira: o pedido passa pela ponte. O administrador é o da senha
+    de administrador (a sessão sem pessoa: o administrador por e-mail o Nexus confere na lista dele a cada pedido); os outros,
+    o login pelo Fracttal."""
+    from nexus.torres.oscreator import ponte as P
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s["logado"], s["admin"] = True, admin
+        if not admin:
+            s["usuario"] = {"email": email, "nome": "Pessoa Teste", "perfil": ""}
+    alvo = P.clone(app)
+    valor = alvo.session_interface.get_signing_serializer(alvo).dumps(
+        {"jwt": JWT, "conta": {"nome": "Pessoa Teste", "email": email, "perfil": "ADMINISTRATOR"}})
+    c.set_cookie("os_sessao", valor, path="/os")
+    return c
+
+
+def test_pela_ponte_so_o_administrador_e_o_setor_liberado_leem_da_lista(app, fr, setor_de_mentira, monkeypatch):
+    """De ponta a ponta no Nexus: o setor não liberado vai ao vivo (e nem confere), o setor liberado e o administrador leem da
+    lista."""
+    from nexus.torres.oscreator import ponte as P
+    _encher()
+    monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset({"cos"}))
+    setor_de_mentira["valor"] = {"id": 2, "nome": "Performance"}
+    h = _pela_ponte(app, TODA).get("/os/historico?modo=cos").get_data(as_text=True)
+    assert _ao_vivo(h, 1) and "OS central" not in h and fr.n("total") == 0
+    setor_de_mentira["valor"] = {"id": 3, "nome": "COS"}
+    h = _pela_ponte(app, OUTRA).get("/os/historico?modo=cos").get_data(as_text=True)
+    assert _central(h, 1) and fr.n("lista", OUTRA) == 0
+    monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset())
+    h = _pela_ponte(app, TODA, admin=True).get("/os/historico?modo=cos").get_data(as_text=True)
+    assert _central(h, 1)
+
+
+def test_os_antiga_alem_da_pagina_nao_compensa_no_historico(fr):
+    """A sonda Q1: a OS X, criada há 25 dias (fora dos 7 dias: a noite seguinte a traria), entrou no Fracttal DEPOIS da
+    leitura, com o id entre os de outras duas (o App offline, uma importação); RQ a vê e não vê a OS 1. Com a página de 50 pelo
+    id, a X ficava fora dela e as contas empatavam (59 e 59): a OS 1 aparecia. A página é de 200 (`CONFERE_LINHAS`), o mesmo
+    pedido."""
+    uni = _escalado()
+    fr.universo = uni
+    _encher([_rest(o) for o in uni])
+    fr.universo.append(dict(UNIVERSO[1], id=105, folio="10099", criada=_iso(25.0), descricao=""))
+    fr.visao[RQ] = {o["id"] for o in fr.universo if o["id"] != 10}
+    c = _cliente(RQ)
+    h = _hist(c, "modo=cos")
+    assert ">10001</a>" not in h and "OS central" not in h and not LC.liberado(RQ)
+    assert c.get("/os/api/os/10/previa").status_code == 204
+
+
+def test_os_antiga_alem_da_pagina_nao_compensa_no_garantias(fr):
+    """A sonda Q2: o mesmo no quadro de Garantias (os 365 dias); RQ não vê a OS 51 (de chamado)."""
+    uni = _escalado()
+    fr.universo = uni
+    _encher([_rest(o) for o in uni])
+    fr.universo.append(dict(UNIVERSO[1], id=95, folio="10099", criada=_iso(25.0), descricao=""))
+    fr.visao[RQ] = {o["id"] for o in fr.universo if o["id"] != 510}
+    h = _cliente(RQ).get("/os/chamados/acompanhamento").get_data(as_text=True)
+    assert 'data-folio="10051"' not in h and fr.n("chamados", RQ) == 1
+
+
+def test_os_de_id_baixo_com_a_criacao_depois_da_marca(fr, monkeypatch):
+    """A sonda R1, a premissa ao contrário: a F (id 95, entre a 9 e a 10) tem a criação daqui a 2 h (o relógio do celular
+    adiantado, no App offline). A lista a tem (a noite a leu), mas a marca não anda por ela (a data no futuro). O total de RQ a
+    conta, e a página, pelo id, não a traz: as de antes da marca dela ficavam 1 a mais, e a escondida (a 51) aparecia. A medida
+    guarda o menor id da página: com uma OS do período na lista depois da marca e de id abaixo dele, não dá para saber. (A
+    página de 50, para caber no universo pequeno.)"""
+    monkeypatch.setattr(LC, "CONFERE_LINHAS", 50)
+    f = dict(UNIVERSO[1], id=95, folio="10099", descricao="",
+             criada=(datetime.now(_UTC) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S"))
+    fr.universo = _escalado() + [f]
+    _encher([_rest(o) for o in fr.universo])
+    assert OC.atual().marca == POR_ID[60]["criada"] and 95 in OC.atual().por_id
+    fr.visao[RQ] = {o["id"] for o in fr.universo if o["id"] != 510}
+    h = _cliente(RQ).get("/os/chamados/acompanhamento").get_data(as_text=True)
+    assert 'data-folio="10051"' not in h and fr.n("chamados", RQ) == 1
+
+
+def test_a_medida_guardada_nao_vale_com_a_lista_mudada(fr, monkeypatch):
+    """A sonda S2: RQ não vê a OS 1 e diverge (59 na lista, 58 dela antes da marca). Dentro dos 30 min, a OS 4 (que RQ via, fora
+    da página dela) é apagada no Fracttal e a noite a tira da lista: 58 e 58. A medida guardada de RQ, de antes do apagamento,
+    "batia", e a OS 1 aparecia. A medida guarda a conta da lista de quando foi pedida: com a lista mudada, ela não prova nada.
+    (A página de 50, para a OS 4 ficar fora dela.)"""
+    monkeypatch.setattr(LC, "CONFERE_LINHAS", 50)
+    _encher()
+    fr.visao[RQ] = {o["id"] for o in fr.universo if o["id"] != 1}
+    c = _cliente(RQ)
+    assert "OS central" not in _hist(c, "modo=cos")
+    fr.universo = [o for o in fr.universo if o["id"] != 4]
+    _encher([_rest(o) for o in fr.universo])                     # a noite tira a 4
+    assert 4 not in OC.atual().por_id
+    fr.relogio["t"] += 60
+    h = _hist(c, "modo=cos")
+    assert ">10001</a>" not in h and "OS central" not in h
+
+
+def test_o_liberado_nao_vale_com_a_lista_mudada_no_escopo(fr, monkeypatch):
+    """A sonda U1: RQ vê tudo menos a Y, criada há 3 dias e inserida agora (o App offline), que a lista ainda não tem. RQ passa
+    (a lista não tem a Y) e fica liberada. Os 7 dias trazem a Y: a 1ª pintura e o nº → id da Y saíam da lista. O liberado
+    guarda a conta do escopo antes da marca e só serve com a mesma; e o Histórico confere de novo."""
+    _encher()
+    monkeypatch.setattr(api, "get_os_detalhes", lambda wid: {})
+    fr.universo.append(dict(UNIVERSO[0], id=70, folio="10070", criada=_iso(3.0), descricao=""))
+    fr.visao[RQ] = {o["id"] for o in fr.universo if o["id"] != 70}
+    c = _cliente(RQ)
+    assert _central(_hist(c, "modo=cos"), 1) and LC.liberado(RQ)
+    OC.receber([_rest(o) for o in fr.universo if o["criada"] >= _iso(7)], OC.SETE_DIAS, desde=_iso(7))
+    assert 70 in OC.atual().por_id
+    assert c.get("/os/api/os/70/previa").status_code == 204
+    c.get("/os/os/folio/10070")
+    assert fr.n("folio", RQ) == 1                                # o nº → id foi ao vivo: o Fracttal decide
+    assert ">10070</a>" not in _hist(c, "modo=cos")
+
+
+def _vencer(monkeypatch):
+    """A lista central vence: o fim da janela (o começo da última leitura até o topo) 4 h atrás, e o FRESCA_S é de 30 min."""
+    import dataclasses
+    la = OC.atual()
+    monkeypatch.setattr(OC, "_ATUAL", dataclasses.replace(la, janela=(la.janela[0], _iso(4 / 24.0))))
+
+
+def test_a_lista_vencida_nao_devolve_a_todos_dividida(fr, monkeypatch):
+    """A sonda T3: TODA lê da lista (não ancora a "Todos" dividida de 19/10); a restrita abre e diverge (a lista dela). A lista
+    vence (a última leitura até o topo passou dos 30 min) e o período deixa de ser coberto: a restrita abria de novo, achava a
+    dividida vazia, e a lista dela virava a de todos; R4 (só a Usina Alfa, o mesmo total) a herdava. Com a lista em uso, mesmo
+    vencida, a dividida é só de quem tem uma medida aprovada recente."""
+    _encher()
+    fr.visao[R4] = {o["id"] for o in fr.universo if not o["beta"]}
+    _hist(_cliente(TODA), "modo=cos")
+    r = _cliente(RESTRITA)
+    _hist(r, "modo=cos")
+    _vencer(monkeypatch)
+    assert not LC.cobre(HOJE - dt.timedelta(days=30), HOJE)
+    _hist(r, "modo=cos")
+    h = _hist(_cliente(R4), "modo=cos")
+    assert [o["id"] for o in UNIVERSO if o["beta"] and ">%s</a>" % o["folio"] in h] == []
+    assert fr.n("lista", R4) == 1
+
+
+def test_a_copia_todos_do_garantias_guarda_o_total_do_fracttal(fr):
+    """A sonda V1: TODA monta a cópia "TODOS" do quadro pela lista central, com 2 OS de chamado novas no Fracttal que a faixa
+    ainda não trouxe. O total guardado era o da lista (5); a restrita RV não vê 4 das 5 da lista e vê as 2 novas (3): |3 - 5|
+    = 2, e o `_dono` (a folga de 19/10) a punha na cópia TODOS, com as 4 que o Fracttal esconde dela. A cópia guarda o total do
+    Fracttal de quem a montou (7: o `total_chamados` dela, na chave do `_dono`), como antes da 3.3: |3 - 7| = 4, a dela."""
+    _encher()
+    fr.universo += [dict(POR_ID[52], id=91 + k, folio=str(10091 + k), criada=_iso(RECENTE)) for k in range(2)]
+    fr.visao[RV] = {o["id"] for o in fr.universo if o["id"] not in (51, 52, 53, 54)}
+    h = _cliente(TODA).get("/os/chamados/acompanhamento").get_data(as_text=True)
+    assert 'data-folio="10051"' in h and fr.n("chamados", TODA) == 0
+    h = _cliente(RV).get("/os/chamados/acompanhamento").get_data(as_text=True)
+    assert [i for i in (51, 52, 53, 54) if 'data-folio="%d"' % (10000 + i) in h] == []
+
+
+def test_o_numero_que_nao_abre_nao_mostra_o_id(fr, monkeypatch):
+    """O /os/os/folio/<nº> resolve o id pela lista (a pessoa liberada) e abre o detalhe ao vivo; o detalhe que não vem (o
+    Fracttal não mostra a OS a ela) dizia "Não achei a OS de id X", e o id de uma OS que ela talvez não veja saía na tela.
+    Agora diz o nº, que foi o que ela digitou."""
+    _encher()
+    monkeypatch.setattr(api, "get_os_detalhes", lambda wid: {})
+    a = _cliente(TODA)
+    _hist(a, "modo=cos")                                         # liberada: o nº → id pela lista
+    r = a.get("/os/os/folio/10007")
+    corpo = r.get_data(as_text=True)
+    assert r.status_code == 404 and "10007" in corpo and "de id 7" not in corpo and fr.n("folio") == 0

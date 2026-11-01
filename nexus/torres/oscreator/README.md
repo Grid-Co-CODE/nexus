@@ -1738,9 +1738,27 @@ Raio-X, sem texto de OS nem nome).
 
 O Histórico (todas as visões), o Garantias, a marcação verde dos Ativos, o Investigar ativo, o nº da OS → id e a 1ª pintura do
 card leem da lista central (`os_web/lista_central.py`), e o que o OS Creator cria ou muda entra nela na hora. A lista é lida
-pela credencial da EMPRESA e vê TODAS as OS; o que guarda cada tela (decisões AZ a BG da 3.3, os Rulings BP a BR da rodada 1 e
-o Ruling BU da rodada 2 de correções, que fecharam os vazamentos para a visão restrita provados pelas sondas das revisões):
+pela credencial da EMPRESA e vê TODAS as OS; o que guarda cada tela (decisões AZ a BG da 3.3, os Rulings BP a BR da rodada 1,
+o Ruling BU da rodada 2 e o Ruling BX da rodada 4 de correções, que fecharam os vazamentos para a visão restrita provados pelas
+sondas das revisões):
 
+- **A 1ª barreira: a lista central só para quem o Levi liberou** (Ruling BX, rodada 4). Provar por contagem que a pessoa vê o
+  mesmo que a lista teve buracos raros a cada rodada de sonda; a segurança passa a depender de uma decisão de governança, e a
+  contagem fica como 2ª barreira (e como a guarda da lista pela metade).
+  - Quem está liberado: o administrador do Nexus (a NEXUS_ADMINS, a lista de Base → Acessos, a senha de administrador),
+    sempre; e quem é de um setor de `ponte.SETORES_COM_LISTA_CENTRAL` (o nome do setor de Base → Acessos → Pessoas e
+    setores, sem acento nem caixa). A lista nasce VAZIA: no começo, só os administradores.
+  - Como liberar um setor: um commit que põe o nome dele na `SETORES_COM_LISTA_CENTRAL` (`nexus/torres/oscreator/ponte.py`); a
+    trilha fica no git. Não é uma caixa de Base → Acessos: lá cada item é uma tela do menu (abre uma página, conta no "vê N de
+    M telas", entra no "Marcar tudo" e no "Copiar de", e a tela "por dentro" libera a de fora), e uma liberação que não é tela
+    não cabe nele de forma limpa (o plano B do Ruling BX).
+  - Como o clone sabe: a ponte põe a marca em todo pedido ao OS Creator (`request.environ["os_web.lista_central"]`,
+    `ponte.lista_central`), e o `lista_central.liberada` a lê; a releitura do quadro de Garantias por trás leva a de quem a
+    abriu (`lista_central.liberacao`). Sem a marca (o OS Creator servido sozinho, o PC, os testes, a ponte que não disse):
+    ninguém está liberado. Sem saber o setor (o banco fora, o Nexus sem a NEXUS_PESSOA_HMAC, a pessoa sem setor): não.
+  - Quem não está liberado não lê da lista em tela nenhuma (o Histórico e as visões, o Garantias, o Investigar, a marcação
+    verde dos Ativos, a 1ª pintura e o nº → id), nem paga a conferência: segue pelo caminho de hoje, com a sessão dela. As
+    ações dela seguem pondo na lista a OS que ela mudou (é escrita, não leitura).
 - **A visibilidade não muda (fail-closed).** A tela que mostrava as OS pela sessão da pessoa só lê da lista depois da
   conferência DELA (`lista_central.conferir`), UMA por pessoa e período, sem visão, status nem etiqueta (Ruling BU): o "Todos"
   do período da tela; no Garantias, os 365 dias que ele lê (até amanhã: o "até" é a data local, e a criação é em UTC).
@@ -1750,13 +1768,16 @@ o Ruling BU da rodada 2 de correções, que fecharam os vazamentos para a visão
   antes dela está na lista: a pessoa vê um pedaço do que a lista tem antes da marca, e as contas iguais dizem que ela vê todas.
   - O lado da lista: as OS do período criadas antes da marca, pelo índice da criação (`os_central.contar_criadas`, sem
     percorrer a lista: o Garantias são 365 dias).
-  - O lado da pessoa: 1 pedido na sessão dela, `api.list_minhas_os_pagina("criadas", "TODOS", ...)`, com a página das 50 mais
-    novas (`CONFERE_LINHAS`): o total, menos as OS da página criadas na marca ou depois. O RPC ordena pelo id; o "até" dele
+  - O lado da pessoa: 1 pedido na sessão dela, `api.list_minhas_os_pagina("criadas", "TODOS", ...)`, com a página das 200
+    mais novas (`CONFERE_LINHAS`, do tamanho das do `list_minhas_os`; era 50 até a rodada 4, e a OS antiga inserida depois
+    ficava fora dela, a sonda Q): o total, menos as OS da página criadas na marca ou depois. O RPC ordena pelo id; o "até" dele
     ganha "T23:59:59" (não aceita data e hora), e o "de" vai como veio (a data e hora no "de" não foi provada no Fracttal, e
     seriam 2 pedidos): por isso a página. Ela tem de vir da criação mais nova para trás (o id do Fracttal cresce com a
     criação) e tem de chegar a uma OS de antes da marca, ou trazer todas; senão não dá para saber, e a tela vai ao vivo. E toda
     OS da página de antes da marca tem de estar na lista: a criada antes e inserida no Fracttal depois da leitura (o App
-    offline, uma importação) a lista não tem, e ela compensaria uma escondida sem tirar a página da ordem.
+    offline, uma importação) a lista não tem, e ela compensaria uma escondida sem tirar a página da ordem. E, quando a página
+    não traz todas, a lista não pode ter uma OS do período depois da marca com o id abaixo do menor da página (`Medida.id_min`):
+    a criação fora da ordem do id (a OS do App offline com o relógio adiantado, a sonda R1) a pessoa conta, e a página não traz.
   - A regra é a IGUALDADE EXATA, em toda tela, com ou sem o ↻. A regra de uma mão da rodada 1 comparava números: a sonda
     mostrou a pessoa com H OS escondidas empatando com X ≥ H OS novas que a lista ainda não lera, ou com a mudança de status
     ou de etiqueta não lida quando a conferência levava o filtro da tela (no "Todos" padrão, no "Criado por", no Garantias e
@@ -1766,19 +1787,25 @@ o Ruling BU da rodada 2 de correções, que fecharam os vazamentos para a visão
   e as que a ação dela leu na sessão dela (`_vistas`: a OS que ela acabou de criar aparece na hora). A OS que entrou na lista
   depois da marca por outro caminho (a ação de outra pessoa, as abertas) só aparece a quem a página a trouxe.
 - **A medida da pessoa fica 30 min por pessoa e período** (`_MEDIDAS`) e é conferida contra a lista de agora a cada visita, sem
-  pedido. É pedida de novo: no ↻; quando a conta não bate mais (a lista mudou debaixo dela); quando a marca chega a uma OS que
-  a página dela não trouxe (a faixa das novas leu OS novas: 1 pedido, e quem as vê, vê).
+  pedido. Ela guarda a conta da lista de quando foi pedida (`Medida.lista_n`, rodada 4): a lista que mudou depois tira a prova
+  dela (a sonda S2: a OS que a pessoa via, apagada no Fracttal e tirada pela noite, empatava a conta com a escondida). É pedida
+  de novo: no ↻; quando a lista mudou; quando a marca chega a uma OS que a página dela não trouxe (a faixa das novas leu OS
+  novas: 1 pedido, e quem as vê, vê).
   - Quem não passa vai ao vivo em TODAS as visões daquele período.
   - Com a lista tendo MAIS que ela (o sinal da visão restrita), não é conferida de novo por 30 min (`_DIVERGIU`); o Raio-X a
     conta uma vez por janela. Com a lista tendo MENOS (atrasada), a visita seguinte confere de novo (Minor 2 da rodada 2).
   - A que falha (o Fracttal fora, a sessão caída) não passa; a medida guardada que provava segue provando. A sessão sem e-mail
     ("?") nunca passa (Minor 6).
-- **A lista "Todos" dividida de 19/10 sem herança entre pessoas** (Ruling BU, parte 2). Quando a lista central cobre o período
-  (`lista_central.cobre`), quem chega ao caminho de hoje (não passou, ou a tela não lê da lista) segue com a lista DELA,
-  `("hist", pessoa)`, no Histórico e no Investigar (`rotas.ler_lista`). Quem vê tudo lê da lista central e nunca ancorava a
+- **A lista "Todos" dividida de 19/10 sem herança entre pessoas** (Rulings BU e BX). Com a lista central EM USO (o servidor),
+  coberta ou vencida, a "Todos" dividida do caminho de hoje só é dividida entre quem passou há pouco na conferência do período
+  (`lista_central.divide_a_todos`); os outros (quem não passou, quem não foi liberado) seguem com a lista DELES,
+  `("hist", pessoa)`, no Histórico e no Investigar (`rotas.ler_lista`). Quem vê tudo lê da lista central e não ancorava a
   dividida; a 1ª restrita que não passava a achava vazia, e a lista dela virava a de todos: a sonda mostrou outra restrita,
-  com o mesmo total (30) e outro conjunto, vendo as 30 OS da usina que o Fracttal esconde dela. Fora do período coberto (o
-  PC, a lista vazia), a regra de 19/10 fica como estava; a cópia dividida do Garantias (o `_dono`) também.
+  com o mesmo total (30) e outro conjunto, vendo as 30 OS da usina que o Fracttal esconde dela; e a lista vencida (a última
+  leitura até o topo passou dos 30 min) a devolvia (a sonda T3). Sem a lista em uso (o PC, a lista vazia), a regra de 19/10
+  fica como estava. A cópia dividida do Garantias (o `_dono`) também, e o total dela é o do Fracttal de quem a monta (o
+  `total_chamados`, na chave do `_dono`), como no caminho de hoje: o da lista não tinha as OS de chamado novas, e a restrita
+  com 2 a menos caía na cópia TODOS pela folga de 19/10 (a sonda V1).
 - **O período tem de ser válido** (Ruling BP): duas datas 'AAAA-MM-DD' com o início até o fim (`periodo_valido`, na rota do
   Histórico e dentro da lista). O invertido dava 0 OS na lista e 0 no Fracttal, e a conferência "batia": vai ao caminho de hoje.
 - **O dia de cada período é o do caminho ao vivo, e a janela começa pela data local** (rodada 2). O Fracttal toma a data da
@@ -1790,9 +1817,11 @@ o Ruling BU da rodada 2 de correções, que fecharam os vazamentos para a visão
 - **O nº → id e a 1ª pintura do card só para quem conferiu tudo, e só dentro do que conferiu** (Ruling BP e o item 4 do BU). Os
   dois abrem uma OS qualquer pelo id, sem filtro para conferir. Só valem para quem passou na conferência dos 30 dias padrão até
   hoje (qualquer tela desse período, com filtro ou sem, ou o Investigar dentro dele), com pelo menos 20 OS na lista antes da
-  marca (`liberado`, 30 min da medida), e só para a OS CRIADA nesses 30 dias e ANTES da marca: a mais velha e a mais nova vão
-  ao vivo, e o Fracttal decide. A sonda liberava a pessoa restrita por um período invertido, por um dia quieto (0 e 0), por
-  um dia em que todas as OS eram dela e pelo Investigar fora dos 30 dias.
+  marca (`liberado`, 30 min da medida), e só para a OS CRIADA nesses 30 dias e ANTES da marca, com a lista tendo no escopo a
+  mesma conta de quando liberou (a sonda U1: a OS de 3 dias inserida depois, escondida, chegava pelos 7 dias e saía na 1ª
+  pintura): a mais velha, a mais nova e a da lista mudada vão ao vivo, e o Fracttal decide. O "Buscar OS pelo nº"
+  (`/os/os/folio/<nº>`) que não abre diz o nº, e não o id que a lista deu. A sonda liberava a pessoa restrita por um período
+  invertido, por um dia quieto (0 e 0), por um dia em que todas as OS eram dela e pelo Investigar fora dos 30 dias.
 - Tela por tela:
 
   | Tela | Antes | Agora | A conferência | O que libera o nº → id |
@@ -1879,17 +1908,25 @@ o Ruling BU da rodada 2 de correções, que fecharam os vazamentos para a visão
 - **A 1ª pintura do card** (`/os/api/os/<id>/previa`, `_os_previa.html`): o Histórico e o Investigar pedem, junto com o card, o
   que a lista sabe da OS (o nº, o tipo, o status, o ativo, as datas, com quem está, quem criou, o título), e a pintam até o card
   inteiro chegar, sem o círculo de carga. 204 = o "Carregando" de sempre. Vai com o `X-Nexus-Auto` (o clique já contou no card).
+- **O que sobra (rodada 4).** A contagem é a 2ª barreira; os buracos que ela ainda tem, para quem foi liberado:
+  - uma OS de 90 a 365 dias inserida no Fracttal depois da leitura, antes de uma noite de dia útil (que relê só 90 dias) e
+    além das 200 linhas da página da pessoa: até a noite de domingo (a janela inteira), a lista não a tem, e ela compensaria
+    uma escondida;
+  - a premissa de que o id do Fracttal cresce com a criação: a página confere a ordem nas linhas que traz e o menor id dela
+    contra a lista, não o resto.
+  - O custo de uma OS apagada no Fracttal e ainda na lista: quem vê tudo vai ao vivo naquele período até a noite a tirar (a
+    lista tem uma a mais); no Garantias (365 dias), até a noite das 03:21.
 - **Pedidos ao Fracttal, medidos** (o Fracttal de mentira no nível do `api._rpc_call`, 3 mil OS em 30 dias, ~99 por dia; as
   páginas de 200 e os lotes de tarefas de 130; a lista central cheia):
 
-  | Tela | Antes da 3.3 | Rodada 1 | Agora (rodada 2) |
+  | Tela | Antes da 3.3 | Rodada 1 | Agora (rodadas 2 a 4, quem foi liberado) |
   |---|---|---|---|
   | Visão COS, 1ª visita da pessoa | 26 (10 páginas, 16 lotes) | 1 (a conferência) | 1 (a conferência do período) |
   | Visão COS, de novo / 3 min depois sem OS nova / a de 10 min | 1 / 2 (as novas) / 21 (a inteira) | 0 / 0 / 0 | 0 / 0 / 0 |
   | Visão COS depois de a faixa das novas trazer 1 OS | — | 1 (a lista com mais que o total guardado) | 1 (a marca chegou a uma OS que a página dela não trouxe) |
   | No mesmo período: "criadas por mim", "Criado por" alguém, atribuídas, a Visão COS com um status, com uma etiqueta | a lista de cada um (2 a 26) | 1 cada (a conferência era por visão e filtros) | 0 (a conferência é do período) |
   | Visão COS, o ↻ / a volta do card que mudou uma OS / a virada do dia | 21 / 21 / 26 | 1 / 0 / 1 | 1 / 0 / 1 |
-  | Garantias, 1ª visita / o Atualizar | 3 + os tickets / 3 + os tickets | 2 (o `total_chamados`, que o `_dono` também usava) + os tickets / 2 + os tickets | 1 (a página dos 365 dias) + os tickets / 3 (a página e o `total_chamados` do `_dono`, que não divide mais a chave) + os tickets |
+  | Garantias, 1ª visita / o Atualizar | 3 + os tickets / 3 + os tickets | 2 (o `total_chamados`, que o `_dono` também usava) + os tickets / 2 + os tickets | 3 (a página dos 365 dias e o `total_chamados` de quem monta a cópia, o total dela: rodada 4) + os tickets / 3 (o Atualizar pede os dois de novo) + os tickets |
   | Marcação verde dos Ativos (30 dias) / Investigar ativo (depois da Visão COS) | 31 páginas / 0 a 2 | 0 / 0 | 0 / 0 |
   | Nº → id / a 1ª pintura do card | 1 a 5 / — | 0 / 0 (a pessoa liberada) | 0 / 0 (a pessoa liberada, a OS de antes da marca) |
   | Ação do card (concluir, cancelar...) | a gravação + o card (5) + a lista na volta (21 ou 2) | a gravação + 2 (a OS na lista) + o card (5) | o mesmo |
@@ -1899,7 +1936,10 @@ o Ruling BU da rodada 2 de correções, que fecharam os vazamentos para a visão
   só"): no caminho ao vivo, o "criadas por mim" e o Garantias deixaram de pagar 1 a 2 pedidos a mais por leitura.
 
   Medido com o relógio das 18:00: das 21:00 à meia-noite, até a rodada 2, o Garantias ia ao vivo (a janela pelo dia UTC; ver
-  acima). A conferência pede 50 linhas em vez de 1: o mesmo pedido, um pouco maior.
+  acima). A conferência pede 200 linhas em vez de 1: o mesmo pedido, maior. Quem não foi liberado (rodada 4) paga o caminho de
+  hoje, como antes da 3.3; com a lista em uso, a "Todos" dele é a lista dele (a dividida só entre quem passou na conferência),
+  como a visão restrita da última linha: 26 na 1ª visita do período (medido), as novas depois (0 a 2), e a marcação verde dos
+  Ativos, o Garantias e o nº → id ao vivo, como antes.
 
 - **Memória.** As visões prontas (as até 2.000 linhas e o HTML delas) ficam só para a VERSÃO de agora da lista, no máximo 8
   (`VISOES_GUARDADAS`), e só são montadas de novo quando a versão muda (a leitura que não trouxe nada não muda a versão; a hora
@@ -1927,7 +1967,13 @@ o Ruling BU da rodada 2 de correções, que fecharam os vazamentos para a visão
     restritas com o mesmo total não trocam de lista (o Histórico e o Investigar); a fila da releitura sem começar sai; a lista
     com menos não prende 30 min; o "fazer a tarefa" sem confirmação fica pendente; a programada e os campos da prévia
     medidos; a sessão sem e-mail não passa; a marca d'água (as faixas que a mexem, a que não, a data no futuro, nunca para
-    trás, a cópia em disco); e o relógio congelado às 22:00 de Brasília, com o Histórico e o Garantias lendo da lista.
+    trás, a cópia em disco); e o relógio congelado às 22:00 de Brasília, com o Histórico e o Garantias lendo da lista;
+  - a rodada 4: quem não foi liberado nunca lê da lista (o Histórico, o Garantias, o Investigar, os Ativos, a 1ª pintura e o
+    nº → id), mesmo vendo tudo; sem a marca no pedido, fechado; a ponte libera o administrador e os setores da lista, e não
+    os outros; de ponta a ponta no Nexus, o setor não liberado vai ao vivo e o liberado e o administrador leem da lista; e as
+    sondas Q1 e Q2 (a OS antiga além da página), R1 (o id baixo com a criação depois da marca), S2 (a medida com a lista
+    mudada), U1 (o liberado com a lista mudada), T3 (a lista vencida e a "Todos" dividida) e V1 (o total da cópia TODOS),
+    e o nº que não abre sem mostrar o id.
 
   Os testes de 19/10 (`test_oscreator_historico_compartilhado_19_10.py`) e de 21/10 (`test_oscreator_lista_pela_metade_21_10.py`)
   seguem provando o caminho de hoje (a lista central vazia, como no PC: a montagem deles diz isso). O universo dos testes tem o
