@@ -131,6 +131,12 @@ def _catalogos():
     return catalogos
 
 
+def _leitor():
+    """O laço das pessoas pelo REST da empresa (`catalogos_leitor.py`, o par do `catalogos.py`; só o servidor liga)."""
+    import catalogos_leitor
+    return catalogos_leitor
+
+
 @pytest.fixture
 def fr(monkeypatch):
     import requests
@@ -615,12 +621,12 @@ def test_pessoas_pelo_rest_com_os_campos_da_tela(fr, monkeypatch):
     fr.pessoal += [{"id": 600 + i, "code": "X%d" % i, "full_name": "Pessoa %03d" % i, "active": True, "id_account": 700 + i,
                     "account_email": "p%d@exemplo.invalid" % i} for i in range(120)]
     # a 1ª leitura REST só vale conferida contra um catálogo do RPC (a 1ª noite dos ativos, REST x RPC): sem ele, espera
-    assert "RPC" in ct.ler_pessoas_rest(ler=_rest([_rest_completo(p) for p in fr.pessoal]))["erro"]
+    assert "RPC" in _leitor().ler_pessoas_rest(ler=_rest([_rest_completo(p) for p in fr.pessoal]))["erro"]
     c = _cliente("ana@exemplo.invalid")
     assert len(c.get("/os/api/responsaveis").get_json()["pessoas"]) == 122 and fr.n(*M_PESSOAS) == 2   # a 1ª tela, pelo RPC
     dormiu.clear()
     ler = _rest([_rest_completo(p) for p in fr.pessoal])
-    rel = ct.ler_pessoas_rest(ler=ler)
+    rel = _leitor().ler_pessoas_rest(ler=ler)
     assert rel["erro"] == "" and rel["pedidos"] == 2 and dormiu == [ct.PAUSA_S]           # 1 por segundo
     assert {o for _p, o, _t in ler.pedidos} == {"fundo:nexus-catalogos:pessoas"}         # a origem no contador
     assert len(c.get("/os/api/responsaveis").get_json()["pessoas"]) == 122
@@ -638,7 +644,7 @@ def test_pessoas_pelo_rest_sem_os_campos_seguem_pelo_rpc(fr, monkeypatch):
     monkeypatch.setattr(ct, "_dormir", lambda s: None)
     linhas = [{"id_personnel": p["id"], "code": p["code"], "full_name": p["full_name"], "email": p["account_email"],
                "groups_permissions_description": "Leitura", "account_active": True} for p in PESSOAL]
-    rel = ct.ler_pessoas_rest(ler=_rest(linhas))
+    rel = _leitor().ler_pessoas_rest(ler=_rest(linhas))
     assert "active" in rel["erro"] and "id_account" in rel["erro"]
     e = ct.estado()
     assert e["rest"]["falha"] and "id_account" in e["rest"]["falha"] and not e["rest"]["bom_em"]
@@ -652,10 +658,10 @@ def test_o_rest_que_nao_bate_com_o_rpc_nao_troca(fr, monkeypatch):
     c = _cliente("ana@exemplo.invalid")
     c.get("/os/api/responsaveis")                                        # o catálogo pelo RPC
     linhas = [_rest_completo(dict(p, active=not p["active"])) for p in PESSOAL]   # o `active` com outro sentido
-    rel = ct.ler_pessoas_rest(ler=_rest(linhas))
+    rel = _leitor().ler_pessoas_rest(ler=_rest(linhas))
     assert rel["erro"] and "RPC" in rel["erro"]
     assert [p["name"] for p in c.get("/os/api/responsaveis").get_json()["pessoas"]] == ["Ana Teste Silva", "Bruno Exemplo"]
-    rel = ct.ler_pessoas_rest(ler=_rest([_rest_completo(p) for p in PESSOAL]))        # o que bate entra
+    rel = _leitor().ler_pessoas_rest(ler=_rest([_rest_completo(p) for p in PESSOAL]))        # o que bate entra
     assert rel["erro"] == "" and {x["nome"]: x for x in ct.estado()["assuntos"]}["pessoas"]["fonte"] == "rest"
 
 
@@ -664,10 +670,10 @@ def test_com_o_rest_valendo_o_rpc_nao_renova_as_pessoas(fr, monkeypatch):
     agora = {"t": time.time()}
     monkeypatch.setattr(ct, "_relogio", lambda: agora["t"])
     monkeypatch.setattr(ct, "_dormir", lambda s: None)
-    ct._REST.update(ligado=True)
+    ct.ligar_leitor(ligado=True)                                         # o laço do servidor
     c = _cliente("ana@exemplo.invalid")
     c.get("/os/api/responsaveis")                                        # o catálogo do RPC, que confere a 1ª leitura REST
-    assert ct.ler_pessoas_rest(ler=_rest([_rest_completo(p) for p in PESSOAL]))["erro"] == ""
+    assert _leitor().ler_pessoas_rest(ler=_rest([_rest_completo(p) for p in PESSOAL]))["erro"] == ""
     agora["t"] += ct.PRAZO_S["pessoas"] + 600                            # o laço das :04 atrasou: ainda vale (a folga)
     c.get("/os/api/responsaveis")
     assert fr.por_tras == [] and fr.n(*M_PESSOAS) == 1
@@ -679,20 +685,21 @@ def test_com_o_rest_valendo_o_rpc_nao_renova_as_pessoas(fr, monkeypatch):
 def test_so_o_servidor_liga_o_laco(app, monkeypatch):
     ct = _catalogos()
     ligou = []
-    monkeypatch.setattr(ct, "_laco", lambda: ligou.append(1))            # o laço, se abrisse, diria
-    ct.ligar(app)                                                        # sem a credencial REST: não liga
+    cl = _leitor()
+    monkeypatch.setattr(cl, "_laco", lambda: ligou.append(1))            # o laço, se abrisse, diria
+    cl.ligar(app)                                                        # sem a credencial REST: não liga
     assert not ct.estado()["rest"]["ligado"] and "credencial" in ct.estado()["rest"]["motivo"]
-    app.extensions.pop(ct.CHAVE, None)
+    app.extensions.pop(cl.CHAVE, None)
     app.config["NEXUS_PCM_FRACTTAL_TESTE"] = {"FRACTTAL_CLIENT_ID": "id-de-mentira", "FRACTTAL_CLIENT_SECRET": "s"}
-    ct.ligar(app)
+    cl.ligar(app)
     time.sleep(0.05)
     assert ct.estado()["rest"]["ligado"] and ligou == []                 # nos testes, o laço não abre
-    ct.ligar(app)                                                        # ligar de novo no mesmo app não faz nada
+    cl.ligar(app)                                                        # ligar de novo no mesmo app não faz nada
     assert ligou == []
     raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     servir = open(os.path.join(raiz, "servir.py"), encoding="utf-8").read()
     pc = open(os.path.join(raiz, "app.py"), encoding="utf-8").read()
-    assert 'modulo_do_clone("catalogos")' in servir and "catalogos.ligar(app)" in servir
+    assert 'modulo_do_clone("catalogos_leitor")' in servir and "catalogos_leitor.ligar(app)" in servir
     assert "catalogos" not in pc
 
 
@@ -700,18 +707,18 @@ def test_o_minuto_das_pessoas_mora_na_lista_unica():
     from datetime import datetime, timedelta, timezone
 
     from nexus.casca import minutos_ocupados as MO
-    ct = _catalogos()
-    assert ct.MINUTO == MO.CATALOGOS_PESSOAS and "catálogos" in MO.OCUPADOS[MO.CATALOGOS_PESSOAS]
+    cl = _leitor()
+    assert cl.MINUTO == MO.CATALOGOS_PESSOAS and "catálogos" in MO.OCUPADOS[MO.CATALOGOS_PESSOAS]
     brt = timezone(timedelta(hours=-3))
     vistos = []
     t = datetime(2026, 11, 2, 0, 0, tzinfo=brt).timestamp()
     for _ in range(5):
-        espera = ct.proximo_passo(t)
+        espera = cl.proximo_passo(t)
         t += espera
         vistos.append(datetime.fromtimestamp(t, brt).strftime("%H:%M"))
     m = "%02d" % MO.CATALOGOS_PESSOAS
     assert vistos == ["05:" + m, "11:" + m, "17:" + m, "23:" + m, "05:" + m]
-    for h in ct.HORAS:
+    for h in cl.HORAS:
         assert MO.livre(MO.CATALOGOS_PESSOAS, hora=h) is False
 
 

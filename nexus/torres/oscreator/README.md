@@ -880,10 +880,10 @@ Depois abra `http://127.0.0.1:5091/os/login`. O login no Fracttal é por pessoa,
   `nexus.campo.fracttal`, os minutos ocupados e o contador `nexus.casca.fracttal_conta`). Só o `servir.py` os carrega (o
   catálogo, a lista de OS e as telas os chamam pelo que eles registram em `ativos_central.ligar_leitor` e
   `os_central.ligar_leitor`, sem importá-los); o resto do clone, a lista de OS inclusive (`os_central.py`, `os_registro.py`,
-  `os_disco.py`), segue sem o `nexus`, e é por isso que o "Rodar sozinho", acima, funciona. Os catálogos pequenos
-  (`catalogos.py`, etapa 4) importam o `nexus` só dentro das funções do laço das pessoas pelo REST (o cadastro, o cliente REST,
-  a credencial, o contador) e o minuto da lista de minutos ocupados ao carregar, com a volta para o :04 sem ele: servidos
-  sozinhos, seguem pela sessão de quem usa.
+  `os_disco.py`), segue sem o `nexus`, e é por isso que o "Rodar sozinho", acima, funciona. Os catálogos pequenos (etapa 4)
+  são o mesmo par: o `catalogos.py` e o `catalogos_planos.py` seguem sem o `nexus` (servidos sozinhos, pela sessão de quem
+  usa), e o laço das pessoas pelo REST mora no `catalogos_leitor.py` (o cadastro, o cliente REST, a credencial, o contador e
+  o minuto da lista de minutos ocupados), que só o `servir.py` carrega e que se registra em `catalogos.ligar_leitor`.
 - O `os_creator/.env` (a credencial do Fracttal da máquina) é do `.gitignore`: nunca entra no git.
 - Usa a mesma pasta de dados do OS Creator (`%APPDATA%\CriarOS-Fracttal`). Na mesma máquina, ele divide com o
   supervisório a chave da sessão e o token do banco. A cópia em disco do catálogo de ativos mora nela, em
@@ -1942,7 +1942,9 @@ as falhas do COS numa cópia que nunca vencia, e os planos da Performance eram r
 escolhida. Tudo só na memória: cada push na `main` reinicia o serviço e cada tela pagava de novo.
 
 **Agora** (`os_creator/catalogos.py`): UM dono por assunto, com prazo próprio (`PRAZO_S`), uma cópia em disco e a MESMA forma de
-antes para as telas (as funções devolvem cópias, no formato do `api` de antes).
+antes para as telas (as funções devolvem cópias, no formato do `api` de antes). Os planos da Performance moram ao lado, em
+`catalogos_planos.py` (por ativo), e o laço das pessoas pelo REST em `catalogos_leitor.py` (o par como o dos ativos: o catálogo
+guarda e entrega; o leitor, que importa o `nexus`, só o servidor liga).
 
 | Assunto | Prazo | Quem lê do Fracttal | Arquivo em `<dados>/oscreator/catalogos/` |
 |---|---|---|---|
@@ -1962,12 +1964,13 @@ antes para as telas (as funções devolvem cópias, no formato do `api` de antes
   a leitura que o disco já tem (um contador de leituras, não o `lido_em`).
 - **Quem renova.** As pessoas têm o leitor da empresa: o REST `personnel` do cadastro (`cadastro/fracttal_pessoal.ler_paginas`),
   pela credencial da empresa, 1 pedido por segundo, às 05h, 11h, 17h e 23h no :04 (`minutos_ocupados.CATALOGOS_PESSOAS`; só o
-  `servir.py` liga, `catalogos.ligar`; no contador do Fracttal, `fundo:nexus-catalogos:pessoas`). Com o REST valendo, as pessoas
+  `servir.py` liga, `catalogos_leitor.ligar`; no contador do Fracttal, `fundo:nexus-catalogos:pessoas`). Com o REST valendo, as pessoas
   vencem 1 h depois do prazo (`FOLGA_REST_S`: o laço pode atrasar) e o RPC não as renova; o laço que parou ou o REST falhando
   devolvem as pessoas ao socorro pelo RPC. O resto não tem leitor da empresa (o RPC exige a sessão de uma pessoa,
   `os_web/sessao.py`): a 1ª sessão que acha o catálogo vencido o renova POR TRÁS, uma vez para todos, com a cópia do contexto
-  (o JWT dela e a rota dela no contador do Fracttal), como o `api._renovar_catalogo_por_tras` dos ativos; quem chega com a
-  renovação em curso usa a cópia velha e não espera; a renovação que falhou espera 10 min (`ESPERA_TENTATIVA_S`), e a sessão
+  (o JWT dela e a rota dela no contador do Fracttal), como o `api._renovar_catalogo_por_tras` dos ativos (uma função só para
+  os assuntos, os planos e os detalhes: `catalogos.renovar_por_tras`); quem chega com a renovação em curso usa a cópia velha e
+  não espera; a renovação que falhou espera 10 min (`ESPERA_TENTATIVA_S`), e a sessão
   caída de UMA pessoa não segura ninguém. Sem cópia nenhuma (a máquina nova, o disco ilegível), a 1ª tela lê na hora, e quem
   chega junto espera a MESMA leitura (uma trava por assunto: a carga fria da Fila segue paralela).
 - **O erro e o vazio não ficam guardados** (a regra de 20/10/2026): a lista vazia da sessão de alguém sem a permissão esvaziaria
@@ -2014,7 +2017,7 @@ antes para as telas (as funções devolvem cópias, no formato do `api` de antes
 | Status da solicitação (`rotas_solic._status_cat`) | `_memo(("solic_cat", "status"))`, 30 min, com a lista local guardada quando falhava | `catalogos.status()` (a lista local não fica) |
 | Grupo e classificações da solicitação (`rotas_solic.solicitacao`) | `_memo(("solic_cat", "tipos_solicitacao"))`, 30 min | `catalogos.tipos_solicitacao()` |
 | Motivos de cancelamento (`rotas.motivos_cancelamento`, o card) | `_memo(("cat", "cancel_motivos"))`, 10 min | `catalogos.motivos()` |
-| Planos da Performance (`api.get_performance_alvos`, `rotas.api_plano`) | `task_events_list` por ativo e `tasks_details` a cada usina escolhida | `get_plans_for_assets(..., guardados=True)` → `catalogos.planos_dos_ativos`; `catalogos.detalhe_do_plano` |
+| Planos da Performance (`api.get_performance_alvos`, `rotas.api_plano`) | `task_events_list` por ativo e `tasks_details` a cada usina escolhida | `get_plans_for_assets(..., guardados=True)` → `catalogos_planos.planos_dos_ativos`; `catalogos_planos.detalhe_do_plano` |
 
   Fica de fora de propósito: o login (`oauth_fracttal._pessoa_no_personnel`), que acha a pessoa pelo token e precisa do e-mail
   em claro (o catálogo não o guarda); a Clonagem de planos do PCM (`get_plans_for_assets` sem `guardados`), que mexe nos planos e

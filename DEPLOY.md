@@ -313,7 +313,7 @@ igual na leitura seguinte passa, "aceita na 2ª leitura": o apagamento de verdad
 criação. As telas ainda não leem dela (é a tarefa 3.3).
 
 **Os catálogos pequenos do OS Creator (31/10/2026; nada a fazer no servidor).** O `servir.py` liga também o laço das pessoas
-dos catálogos (`nexus/torres/oscreator/os_creator/catalogos.py`), com a mesma credencial REST (sem ela não liga, e as pessoas
+dos catálogos (`nexus/torres/oscreator/os_creator/catalogos_leitor.py`, o par do `catalogos.py`), com a mesma credencial REST (sem ela não liga, e as pessoas
 seguem pela sessão de quem usa): o `personnel` do Fracttal às 05h, 11h, 17h e 23h no :04, 2 pedidos a 1 por segundo, só aceito
 se trouxer os campos que as telas usam. Os catálogos (pessoas, etiquetas, tipos, falhas, status, motivos e os planos da
 Performance) moram na memória e numa cópia na pasta de dados do OS Creator (`oscreator/catalogos/`, um arquivo por catálogo,

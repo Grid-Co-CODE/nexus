@@ -3730,7 +3730,7 @@ def _plan_family(desc) -> str:
 
 def ler_planos_do_ativo(id_item, id_group_task=None) -> list:
     """Os planos de tarefa de UM ativo (1 task_events_list) → [{id_task, description}]. Levanta o erro do Fracttal. É o
-    leitor do catálogo dos planos da Performance (`catalogos.planos_dos_ativos`, 31/10/2026)."""
+    leitor do catálogo dos planos da Performance (`catalogos_planos.planos_dos_ativos`, 31/10/2026)."""
     r = _rpc_call(RPC_TASK_EVENTS, {"filter": [], "sort": [], "page": 1, "limit": 300, "start": 0,
                                     "is_tree": False, "node": None, "id_item": id_item, "id_group_task": id_group_task})
     data = r.get("data") if isinstance(r, dict) else r
@@ -3750,7 +3750,7 @@ def get_plans_for_assets(assets: list, guardados: bool = False) -> list:
     com o ATIVO e a FAMÍLIA (parseada da descrição). → [{id_task, description, family, asset, asset_label}].
 
     `guardados` (a Performance, 31/10/2026, etapa 4 do canto central): os planos do catálogo dos planos, por ativo
-    (`catalogos.planos_dos_ativos`): a 2ª escolha da mesma usina não pede nada; o vencido (24 h) volta e é relido por trás.
+    (`catalogos_planos.planos_dos_ativos`): a 2ª escolha da mesma usina não pede nada; o vencido (24 h) volta e é relido por trás.
     Sem ele (a Clonagem de planos do PCM, que mexe nos planos e os quer como estão agora), ao vivo, como sempre."""
     alist = [a for a in (assets or []) if isinstance(a, dict) and a.get("id")]
 
@@ -3758,11 +3758,11 @@ def get_plans_for_assets(assets: list, guardados: bool = False) -> list:
         return [{"id_task": p["id_task"], "description": p["description"], "family": _plan_family(p["description"]),
                  "asset": a, "asset_label": a.get("label") or a.get("code") or "?"} for p in (planos or [])]
     if guardados:
-        import catalogos
-        por_ativo = catalogos.planos_dos_ativos(alist)
+        import catalogos_planos
+        por_ativo = catalogos_planos.planos_dos_ativos(alist)
         out = []
         for a in alist:
-            out.extend(_decorar(a, por_ativo.get(catalogos.chave_plano(a.get("id"), a.get("id_group_task")))))
+            out.extend(_decorar(a, por_ativo.get(catalogos_planos.chave_plano(a.get("id"), a.get("id_group_task")))))
         return out
 
     def _one(a):

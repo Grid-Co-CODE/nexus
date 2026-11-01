@@ -14,6 +14,7 @@ from flask import (Blueprint, abort, current_app, jsonify, redirect, render_temp
 import api
 import ativos_central
 import catalogos
+import catalogos_planos
 
 from . import ativo_curto, engenharia_web, lancador, lista_central, oauth_fracttal, perf_web, sessao, sso
 from . import historico_store as HS
@@ -438,8 +439,9 @@ def api_alvo(aid):
 @exige_sessao
 def api_plano():
     # o tipo de tarefa que a OS vai levar (a Inspeção Geral do Inversor sai Corretiva, 29/10/2026), e não o do plano. O plano
-    # vem do catálogo dos planos (31/10/2026, etapa 4 do canto central): a 2ª escolha da mesma usina não pede nada
-    plan = api.com_tipo_da_tarefa(catalogos.detalhe_do_plano(request.args.get("id_task"), request.args.get("id_item")))
+    # vem do catálogo dos planos (`catalogos_planos`, 31/10/2026, etapa 4 do canto central): a 2ª escolha da mesma usina não
+    # pede nada
+    plan = api.com_tipo_da_tarefa(catalogos_planos.detalhe_do_plano(request.args.get("id_task"), request.args.get("id_item")))
     return jsonify({"resumo": perf_web.resumo_plano(plan)})
 
 

@@ -74,6 +74,7 @@ def _catalogo_de_ativos_isolado():
             mod.reiniciar()
         mod = sys.modules.get("catalogos")                 # e os catálogos pequenos (etapa 4): o pessoal de mentira de um
         if mod is not None:                                # teste não pode aparecer no seguinte, nem a pasta de um em outro
+                                                           # (o `reiniciar` limpa junto os planos e o leitor das pessoas)
             mod.reiniciar()
     limpar()
     yield

@@ -280,7 +280,7 @@ def ligar_catalogos(app) -> None:
     """Diz aos catálogos pequenos do OS Creator (`os_creator/catalogos.py`, 31/10/2026, etapa 4 do canto central: as pessoas,
     as etiquetas, os tipos, as falhas, os status, os motivos e os planos da Performance) onde mora a cópia em disco deles
     (`<pasta de dados do clone>/oscreator/catalogos/`) e a chave do e-mail, e os aquece por trás (só o disco, nunca o
-    Fracttal). Nas duas máquinas; o laço das pessoas pelo REST só o `servir.py` liga (`catalogos.ligar`). Nos testes o disco
+    Fracttal). Nas duas máquinas; o laço das pessoas pelo REST só o `servir.py` liga (`catalogos_leitor.ligar`). Nos testes o disco
     não (a pasta é a do usuário da máquina): os catálogos vivem só na memória."""
     if RAIZ_CLONE not in sys.path:
         sys.path.append(RAIZ_CLONE)
@@ -293,7 +293,7 @@ def ligar_catalogos(app) -> None:
 
 def modulo_do_clone(nome: str):
     """Um módulo do OS Creator pelo nome com que o clone o importa (`api`, `ativos_central`, `ativos_leitor`, `os_leitor`,
-    `catalogos`), com a pasta do clone no `sys.path`. É o MESMO módulo que as telas usam: importado por outro caminho (como
+    `catalogos`, `catalogos_leitor`), com a pasta do clone no `sys.path`. É o MESMO módulo que as telas usam: importado por outro caminho (como
     pacote do Nexus) ele seria uma segunda cópia, com um segundo catálogo (ou uma segunda lista de OS) na memória. Quem usa é o
     `servir.py`, para ligar os leitores do canto central ao subir."""
     if RAIZ_CLONE not in sys.path:

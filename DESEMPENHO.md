@@ -182,7 +182,8 @@ total da hora (1 linha por hora), e o pico do total não é a soma dos picos de 
   `historico_store.py`; `rotas_acomp.py`; o catálogo de ativos central `ativos_central.py` e o leitor do servidor
   `ativos_leitor.py`, que lê os ativos de madrugada; a lista central de OS `os_central.py`, o leitor em faixas `os_leitor.py` e
   as telas que leem dela `os_web/lista_central.py`; os catálogos pequenos `catalogos.py`, o pessoal, as etiquetas, os tipos,
-  as falhas, os status, os motivos e os planos da Performance, um dono para cada; com o estado dos três no Raio-X, seção "Uso
+  as falhas, os status e os motivos, um dono para cada, com os planos da Performance em `catalogos_planos.py` e o laço das
+  pessoas pelo REST em `catalogos_leitor.py`; com o estado dos três no Raio-X, seção "Uso
   do OS Creator"). Regras no `nexus/torres/oscreator/README.md`. Os minutos de
   hora em hora que já têm dono: `nexus/casca/minutos_ocupados.py` (o laço novo pede o próximo livre).
 - Medir uma tela fria: num processo novo, `create_app` com o `.env` do Nexus vivo e uma senha de administrador

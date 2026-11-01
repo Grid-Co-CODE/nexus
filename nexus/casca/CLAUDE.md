@@ -267,7 +267,8 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
   uma vez (`nexus-os-central-disco`, no máximo uma escrita a cada 30 s). O pico de memória da noite de 365 dias é de ~150 MB
   (a leitura cortada por página, guardada até o fim; eram ~390 MB com as linhas inteiras), e o da de 90 dias, ~40 MB
   (README da torre, "O pico da noite"). Nunca o `app.py` nem os testes.
-- **O laço das pessoas dos catálogos pequenos do OS Creator** (`os_creator/catalogos.py`, 31/10/2026, etapa 4; regras no
+- **O laço das pessoas dos catálogos pequenos do OS Creator** (`os_creator/catalogos_leitor.py`, o par do `catalogos.py`,
+  31/10/2026, etapa 4; regras no
   README da torre, "Os catálogos pequenos num lugar só"): ligado no servir.py, por último, pelo `ponte.modulo_do_clone`. Sem a
   credencial REST não liga, e o estado diz por quê. Uma thread, `nexus-catalogos`: o REST `personnel` do cadastro
   (`cadastro/fracttal_pessoal.ler_paginas`), 2 pedidos a 1 por segundo, às 05h, 11h, 17h e 23h no :04
