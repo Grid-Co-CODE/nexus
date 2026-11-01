@@ -1188,7 +1188,8 @@ quando criada pela Fila do PCM".
   agrupada do Criar OS do zero e da Engenharia (`create_work_orders_agrupada`) e a agrupada da Performance. O
   `create_os_rpc` e o `create_planned_os` devolvem o `duracao` com que a tarefa nasceu; a tarefa sem tempo conta os
   10 min. A OS de uma tarefa só (o Criar OS do zero de uma OS por ativo, as datas, a Performance de uma OS por ativo)
-  já saía com o tempo da tarefa.
+  já saía com o tempo da tarefa. **A conta mora em UM lugar desde 31/10/2026**, no `os_juntar.juntar_em_os` (seção "Um
+  caminho só para juntar as tarefas numa OS"): os caminhos acima só criam as tarefas e o entregam.
 - **Prova:** `tests/test_oscreator_tempo_clonar_e_fila_30_10.py`. No Chrome sem janela, a tela de Clonar com duas
   tarefas (uma com 1h30, outra sem tempo): 01:30 e 00:10; depois do "Atualizar todas do modelo", 02:00 e 01:00. Ao vivo,
   o PCM conferiu o clone (a tarefa e a OS com o tempo total); falta a OS da Clonagem de planos e a de uma SS da Fila.
@@ -2097,6 +2098,55 @@ dos ativos), `test_a_conta_nova_com_o_rest_valendo_e_achada_pelo_rpc`, `test_o_n
 `test_a_renovacao_dos_planos_por_tras_tem_ritmo`, `test_o_status_com_o_rpc_vazio_e_a_lista_local_e_nao_fica` e
 `test_a_copia_dos_planos_em_disco_nao_volta_atras`. Os testes de antes que injetavam o pessoal pelo `api.get_responsaveis` passaram a injetá-lo pelo leitor
 (`api.ler_pessoal`); o `test_oscreator_card_e_anexos_29_10` não zera mais o `_CLASSIF_CACHE`, que saiu.
+
+## Um caminho só para juntar as tarefas numa OS (31/10/2026, etapa 5.1 do canto central)
+
+O desenho (`docs/superpowers/specs/2026-10-30-oscreator-canto-central-design.md`, "Etapa 5"): "hoje são vários [caminhos de
+criação], cada um com a sua regra: o tempo da OS de 30/10/2026 (10 min fixos em quatro caminhos) foi esse erro". Todo caminho
+que junta tarefas numa OS numerada tinha a sua cópia da **fase 2** (ler o kanban, inserir a OS, pôr as etiquetas, anexar as
+fotos). Agora a fase 2 é uma só: `os_creator/os_juntar.py`.
+
+- **`juntar_em_os(id_tasks, duracoes, id_responsible, responsible_name, *, id_parent, note, etiqueta_ids, imagens, registros,
+  frases)`**: o registro de cada tarefa no kanban (`_kanban_records`; o que o chamador já leu vai em `registros` e não é lido de
+  novo) → a OS (`_work_order_insert`) com o tempo igual à **soma do tempo das tarefas que ENTRARAM nela** (`_tempo_da_os`) →
+  as etiquetas → as fotos, cada uma na tarefa do ativo dela. Devolve `{id_tasks, id_work_order, wo_folio, nao_entraram[,
+  etiquetas][, aviso][, n_img_ok, img_erro]}`; **sem `id_work_order` a OS NÃO saiu** (o kanban caiu, ou não trouxe nenhuma
+  tarefa): as tarefas ficam pendentes no Fracttal e o `aviso` diz o que fazer. A OS que não fecha (`work_order_insert`
+  recusado) sobe como `FracttalError`: o Criar OS agrupado a transforma em aviso ("a OS não fechou"), os outros mostram o erro.
+- **`uma_os_por_tarefa(fase1, ...)`**: a fase 2 de "uma OS por ativo" e "por data" (`create_work_orders_bulk` e
+  `create_work_orders_datas`, que tinham o mesmo bloco copiado): o kanban é lido UMA vez para todas (50 OS do COS não são 50
+  leituras) e cada OS sai pelo `juntar_em_os` com o registro já lido.
+- **Quem passa por ele** (oito caminhos): a Clonagem de planos do PCM (`create_planned_os_multi`) e o um-plano-vários-ativos
+  (`create_planned_os_one_wo`); o Criar OS agrupado e a Engenharia agrupada (`create_work_orders_agrupada`); a Performance
+  agrupada (`create_performance_os_agrupada`); a Clonagem de OS (`clonar_os`) e, por ela, a Fila do PCM (`aprovar_solicitacao`) e a
+  OS sem plano (`create_os_sem_plano`); a **retomada** da Fila (a tarefa que ficou de uma tentativa que parou no meio; o registro
+  dela já veio da busca, sem ler o kanban de novo); e o Criar OS de uma OS por ativo / por data, o COS e a Engenharia
+  (`uma_os_por_tarefa`). O `convert_task_to_wo`, que punha os 600 s fixos, saiu: ninguém o chamava mais.
+- **O que cada chamador ainda é dono de**: criar as tarefas pendentes (a fase 1, que muda de caminho para caminho: o plano, a
+  clonagem, o título por ativo), conferir o responsável (sem ele as tarefas ficam pendentes e nem o kanban é lido), o formato do
+  resultado que a tela lê e **as frases dos avisos**. A mesma falha era dita de quatro jeitos (o "não gerei" / "não consegui gerar"
+  a OS, a etiqueta de um jeito em cada tela), e mudar o que as telas mostram não é desta etapa: o padrão (`FRASES`) é o do Criar OS e
+  da Clonagem de planos, e a Clonagem de OS, a Performance e o uma-OS-por-tarefa passam as suas em `frases`.
+- **O que ele NÃO faz.** Não põe a OS na lista central de OS (`os_central.atualizar_os`): as telas de criar chamam
+  `lista_central.criadas`, que tem a guarda de "lista em uso" e o limite por pedido (3.3), e chamar daqui a pularia. E não
+  confere a pessoa nem a etiqueta ao vivo: a criação da Engenharia faz isso na rota, ANTES da primeira tarefa
+  (`api.responsaveis_ao_vivo` e `api.get_labels`, a regra de 19/10/2026), e continua assim. As fotos da Performance agrupada
+  seguem no `api`, casadas pelo ativo (`id_item`) com as tarefas relidas da OS: o juntar casa pela ordem, e mudar a Performance
+  para ela mudaria o que ela lê e como casa.
+- **O que mudou de verdade (dois casos de borda, os dois com teste):** (1) a OS da Clonagem de OS somava o tempo das tarefas
+  CRIADAS, mesmo as que o kanban não trouxe e que portanto não estão nela; agora soma as que entraram (como já faziam as outras
+  quatro). (2) A foto do Criar OS agrupado era casada pela ordem das tarefas criadas: se o kanban não trazia a 1ª, a foto do ativo 1
+  ia para a tarefa do ativo 2; agora é casada com a ordem das que entraram. O resto é igual ao de antes, pedido por pedido.
+- **Prova:** `tests/test_oscreator_os_juntar.py`. O Fracttal é de mentira no nível do HTTP (cada pedido ao rpc/proxy fica guardado,
+  na ordem), e `test_payload_igual_ao_de_antes` compara 41 cenários (os oito caminhos, e para cada um a falha do kanban, a tarefa
+  não achada, a etiqueta que falha, a OS que não fecha, a tarefa que não nasceu) com o que o código de ANTES mandou e devolveu
+  (`oscreator_payloads_antes_da_5_1.json`, gravado no d18ce7b, com o SHA-1 do corpo de cada pedido). Mais:
+  `test_todos_os_caminhos_passam_pelo_juntar` (e o pedido que insere a OS só sai de dentro dele),
+  `test_so_o_juntar_chama_o_insert_da_os` (nenhum arquivo do OS Creator chama o `_work_order_insert` fora do `os_juntar.py`),
+  `test_tempo_e_a_soma_em_todos`, `test_avisos_de_hoje`, o kanban lido uma vez para as N OS, a criação da Engenharia que confere a
+  pessoa e a etiqueta ao vivo antes do primeiro pedido de gravação e chega pelo juntar, e a lista central que ele não toca. Doze
+  mutações do `os_juntar.py` (tempo fixo, a nota que some, o kanban lido por OS, a OS pai procurada antes do kanban, a etiqueta que
+  derruba...) são pegas.
 
 ## O catálogo de ativos vencido por trás (24/10/2026)
 

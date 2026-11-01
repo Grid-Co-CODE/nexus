@@ -272,6 +272,9 @@ from chamado_garantia.ativos import tipo_e_sufixo
 import ativos_central                                                               # noqa: E402
 from ativos_central import montar_registros as _build_records                       # noqa: E402,F401
 from ativos_central import usina_curta as _usina_curta                              # noqa: E402,F401
+# A fase 2 de TODO caminho que junta tarefas numa OS (ler o kanban, inserir a OS com a soma do tempo, etiquetas, fotos): uma só,
+# em `os_juntar.py` (31/10/2026, etapa 5.1). Os caminhos de criação daqui só criam as tarefas pendentes e a entregam a ele.
+import os_juntar                                                                    # noqa: E402
 
 
 RPC_ITEMS = "inventories.items_list"   # ativos (RPC, sessão do usuário) — flat com is_tree=false
@@ -1429,13 +1432,6 @@ def _work_order_insert(kanban_recs: list, id_responsible, responsible_name: str 
     return {"id_work_order": data.get("id") or data.get("id_work_order"),
             "wo_folio": data.get("wo_folio") or data.get("code"),
             "id_transaction": data.get("id_transaction"), "raw": res}
-
-
-def convert_task_to_wo(kanban_rec: dict, id_responsible, responsible_name: str = "",
-                       duration: int = 600) -> dict:
-    """Fase 2 (1 tarefa): converte UMA tarefa pendente (registro do kanban) em WO numerada e
-    atribui o responsável (id_responsible = id_personnel)."""
-    return _work_order_insert([kanban_rec], id_responsible, responsible_name, duration)
 
 
 # ── Fase 3: etiquetas (work_order_labels) — catálogo + aplicar numa WO ─────────
@@ -4343,19 +4339,11 @@ def create_planned_os_multi(selecoes: list, id_responsible, responsible_name: st
     if not id_tasks:
         return {"ok": False, "erro": "Falha ao criar as tarefas: " + "; ".join(erros[:3]),
                 "n_tarefas": len(sel), "n_criadas": 0}
-    try:
-        recs_map = _kanban_records(set(id_tasks))
-    except FracttalError as e:
-        return {"ok": True, "os": {"id_tasks": id_tasks}, "n_tarefas": len(sel), "n_criadas": len(id_tasks),
-                "erros": erros, "aviso": f"tarefas criadas; não gerei a OS numerada ({e})."}
-    recs = [recs_map[i] for i in id_tasks if i in recs_map]
-    if not recs:
-        return {"ok": True, "os": {"id_tasks": id_tasks}, "n_tarefas": len(sel), "n_criadas": len(id_tasks),
-                "erros": erros, "aviso": "tarefas criadas, mas não as achei no kanban p/ gerar a OS."}
-    wo = _work_order_insert(recs, id_responsible, responsible_name,
-                            duration=_tempo_da_os(dur_de.get(r.get("id_task")) for r in recs))
-    return {"ok": True, "n_tarefas": len(sel), "n_criadas": len(id_tasks), "erros": erros,
-            "os": {"id_work_order": wo.get("id_work_order"), "wo_folio": wo.get("wo_folio"), "id_tasks": id_tasks}}
+    jun = os_juntar.juntar_em_os(id_tasks, dur_de, id_responsible, responsible_name)       # a fase 2, a mesma de todos
+    saida = {"ok": True, "n_tarefas": len(sel), "n_criadas": len(id_tasks), "erros": erros, "os": os_juntar.da_os(jun)}
+    if jun.get("aviso"):
+        saida["aviso"] = jun["aviso"]
+    return saida
 
 
 def create_planned_os_one_wo(assets: list, plan: dict, id_responsible, responsible_name: str = "",
@@ -4389,21 +4377,12 @@ def create_planned_os_one_wo(assets: list, plan: dict, id_responsible, responsib
     if not id_tasks:
         return {"ok": False, "erro": "Falha ao criar as tarefas: " + "; ".join(erros[:3]),
                 "n_tarefas": len(val), "n_criadas": 0}
-    # Fase 2 — junta os registros do kanban e cria 1 WO com TODAS as tarefas
-    try:
-        recs_map = _kanban_records(set(id_tasks))
-    except FracttalError as e:
-        return {"ok": True, "os": {"id_tasks": id_tasks}, "n_tarefas": len(val), "n_criadas": len(id_tasks),
-                "erros": erros, "aviso": f"tarefas criadas; não gerei a OS numerada ({e})."}
-    recs = [recs_map[i] for i in id_tasks if i in recs_map]
-    if not recs:
-        return {"ok": True, "os": {"id_tasks": id_tasks}, "n_tarefas": len(val), "n_criadas": len(id_tasks),
-                "erros": erros, "aviso": "tarefas criadas, mas não as achei no kanban p/ gerar a OS."}
-    wo = _work_order_insert(recs, id_responsible, responsible_name,
-                            duration=_tempo_da_os(dur_de.get(r.get("id_task")) for r in recs))
-    return {"ok": True, "n_tarefas": len(val), "n_criadas": len(id_tasks), "erros": erros,
-            "os": {"id_work_order": wo.get("id_work_order"), "wo_folio": wo.get("wo_folio"),
-                   "id_tasks": id_tasks}}
+    # Fase 2 — junta os registros do kanban e cria 1 WO com TODAS as tarefas (a mesma de todos os caminhos)
+    jun = os_juntar.juntar_em_os(id_tasks, dur_de, id_responsible, responsible_name)
+    saida = {"ok": True, "n_tarefas": len(val), "n_criadas": len(id_tasks), "erros": erros, "os": os_juntar.da_os(jun)}
+    if jun.get("aviso"):
+        saida["aviso"] = jun["aviso"]
+    return saida
 
 
 def cancel_os(id_work_order, id_status_custom, note: str = "", cancellation_type: int = 1,
@@ -5063,34 +5042,19 @@ def clonar_os(tarefas: list, id_responsible, responsible_name: str = "",
         return {"ok": True, "os": {"id_tasks": id_tasks, "wo_folio": None},
                 "aviso": "tarefas criadas como pendentes (escolha um responsável p/ gerar a OS numerada).",
                 "n_tarefas": len(val), "n_criadas": len(id_tasks)}
-    # Fase 2 — junta os registros do kanban e cria 1 WO com TODAS as tarefas
-    try:
-        recs_map = _kanban_records(set(id_tasks))
-    except FracttalError as e:
-        return {"ok": True, "os": {"id_tasks": id_tasks},
-                "aviso": f"tarefas criadas; não consegui gerar a OS numerada ({e}).",
+    # Fase 2 — junta os registros do kanban e cria 1 WO com TODAS as tarefas, com a SOMA do tempo das tarefas (o PCM, 30/10/2026:
+    # "nas SSs o tempo que aparece na OS do Fracttal permanece 10 min, porém nas tarefas aparece o tempo que foi solicitado") e as
+    # etiquetas: a mesma de todos os caminhos (`os_juntar`), com as frases desta tela
+    jun = os_juntar.juntar_em_os(id_tasks, dur_tarefa, id_responsible, responsible_name, etiqueta_ids=etiqueta_ids,
+                                 frases=os_juntar.FRASES_CLONAR)
+    if "id_work_order" not in jun:                       # a OS não saiu: as tarefas ficam pendentes no Fracttal
+        return {"ok": True, "os": os_juntar.da_os(jun), "aviso": jun["aviso"],
                 "n_tarefas": len(val), "n_criadas": len(id_tasks)}
-    recs = [recs_map[i] for i in id_tasks if i in recs_map]   # preserva a ordem
-    if not recs:
-        return {"ok": True, "os": {"id_tasks": id_tasks},
-                "aviso": "tarefas criadas, mas não as achei no kanban p/ gerar a OS.",
-                "n_tarefas": len(val), "n_criadas": len(id_tasks)}
-    # a OS com a SOMA do tempo das tarefas (o PCM, 30/10/2026: "nas SSs o tempo que aparece na OS do Fracttal permanece
-    # 10 min, porém nas tarefas aparece o tempo que foi solicitado"): o `_work_order_insert` punha os 600 s de sempre
-    wo = _work_order_insert(recs, id_responsible, responsible_name, duration=sum(dur_tarefa.values()) or DURACAO_OS_AVULSA)
-    idwo = wo.get("id_work_order")
-    os_out = {"id_work_order": idwo, "wo_folio": wo.get("wo_folio"), "id_tasks": id_tasks}
-    avisos = []
-    if idwo and etiqueta_ids:
-        try:
-            apply_labels(idwo, etiqueta_ids)
-            os_out["etiquetas"] = list(etiqueta_ids)
-        except FracttalError as e:
-            avisos.append(f"etiqueta falhou: {e}")
+    avisos = [jun["aviso"]] if jun.get("aviso") else []
     if erros:
         avisos.append(f"{len(erros)} tarefa(s) não criadas: " + "; ".join(erros[:2]))
-    return {"ok": True, "os": os_out, "aviso": " | ".join(avisos) or None,
-            "n_tarefas": len(val), "n_criadas": len(recs)}
+    return {"ok": True, "os": os_juntar.da_os(jun), "aviso": " | ".join(avisos) or None,
+            "n_tarefas": len(val), "n_criadas": len(id_tasks) - jun["nao_entraram"]}
 
 
 def _solicitacao_row(id_code):
@@ -5166,18 +5130,16 @@ def aprovar_solicitacao(asset: dict, descricao: str, subtarefas: list, id_reques
     if not id_responsible:
         return {"ok": False, "erro": "Escolha o responsavel: sem ele a tarefa nao vira OS numerada.",
                 "n_tarefas": 1, "n_criadas": 0}
-    # a OS com o tempo da tarefa que ficou da tentativa anterior (30/10/2026; antes, os 600 s de sempre)
-    wo = _work_order_insert([rec], id_responsible, responsible_name,
-                            duration=_segundos(rec.get("duration")) or duracao or DURACAO_OS_AVULSA)
-    idwo = wo.get("id_work_order")
-    # na retomada a fase 3 tambem tem de acontecer: a tarefa orfa nunca recebeu etiqueta
-    if idwo and etiqueta_ids:
-        try:
-            apply_labels(idwo, etiqueta_ids)
-        except FracttalError:
-            pass                       # a OS existe; a etiqueta o PCM poe no Fracttal se faltar
+    # a OS com o tempo da tarefa que ficou da tentativa anterior (30/10/2026; antes, os 600 s de sempre), pela fase 2 de todos os
+    # caminhos (`os_juntar`) e sem ler o kanban de novo: o registro da tarefa já veio da busca de cima. Na retomada a fase 3
+    # tambem tem de acontecer (a tarefa orfa nunca recebeu etiqueta); a que falhar nao vira aviso: a OS existe, e a etiqueta o
+    # PCM poe no Fracttal se faltar
+    idt = rec.get("id_task")
+    jun = os_juntar.juntar_em_os([idt], {idt: _segundos(rec.get("duration")) or duracao or DURACAO_OS_AVULSA}, id_responsible,
+                                 responsible_name, etiqueta_ids=etiqueta_ids, registros={idt: rec})
+    idwo = jun.get("id_work_order")
     return {"ok": bool(idwo),
-            "os": {"id_work_order": idwo, "wo_folio": wo.get("wo_folio"),
+            "os": {"id_work_order": idwo, "wo_folio": jun.get("wo_folio"),
                    "id_tasks": [rec.get("id_task")]} if idwo else None,
             "erro": None if idwo else "A tarefa existe mas o Fracttal nao gerou a OS numerada.",
             "aviso": "a tarefa desta solicitacao ja existia (tentativa anterior); "
@@ -5531,35 +5493,9 @@ def create_work_orders_bulk(assets: list, description: str, task_type: str, subt
         _anexa_imagens_bulk(fase1, imagens_por_ativo)
         return fase1
 
-    # Fase 2 — converter em WO + responsável (só se um responsável foi escolhido)
-    pend = [r for r in fase1 if r.get("ok") and r["os"].get("id_task")]
-    if id_responsible and pend:
-        try:
-            recs = _kanban_records({r["os"]["id_task"] for r in pend})
-        except FracttalError as e:
-            recs = {}
-            for r in pend:
-                r["os"]["aviso"] = f"tarefa criada; não converti em WO ({e})."
-        for r in pend:
-            if "aviso" in r["os"]:
-                continue
-            rec = recs.get(r["os"]["id_task"])
-            if not rec:
-                r["os"]["aviso"] = "tarefa criada, mas não a achei no kanban p/ virar WO."
-                continue
-            try:
-                wo = convert_task_to_wo(rec, id_responsible, responsible_name)
-                idwo = wo.get("id_work_order")
-                r["os"]["id_work_order"] = idwo or r["os"].get("id_work_order")
-                r["os"]["wo_folio"] = wo.get("wo_folio") or r["os"].get("wo_folio")
-                if idwo and etiqueta_ids:                       # Fase 3 — etiquetas na WO
-                    try:
-                        apply_labels(idwo, etiqueta_ids)
-                        r["os"]["etiquetas"] = list(etiqueta_ids)
-                    except FracttalError as e:
-                        r["os"]["aviso"] = f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}"
-            except FracttalError as e:
-                r["os"]["aviso"] = f"tarefa criada, mas falhou virar WO: {e}"
+    # Fase 2 e 3 — converter cada tarefa em WO + responsável + etiquetas (só se um responsável foi escolhido): o kanban é lido
+    # uma vez para todas, e cada OS sai pela fase 2 de todos os caminhos (`os_juntar`)
+    os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids)
     _anexa_imagens_bulk(fase1, imagens_por_ativo)
     return fase1
 
@@ -5619,42 +5555,17 @@ def create_work_orders_agrupada(assets: list, description: str, task_type: str, 
         saida["aviso"] = ("tarefas criadas e pendentes no kanban — sem responsável não gerei a "
                           "OS numerada.")
         return saida
+    # as imagens de CADA ativo vão para a tarefa daquele ativo, dentro da OS única (`os_juntar` as anexa)
+    imagens = {idt: imagens_por_ativo.get(por_task[idt]) or [] for idt in id_tasks} if imagens_por_ativo else None
     try:
-        recs_map = _kanban_records(set(id_tasks))
-    except FracttalError as e:
-        saida["aviso"] = "tarefas criadas; não gerei a OS numerada (%s)." % e
-        return saida
-    recs = [recs_map[i] for i in id_tasks if i in recs_map]
-    if not recs:
-        saida["aviso"] = "tarefas criadas, mas não as achei no kanban p/ gerar a OS."
-        return saida
-    try:
-        wo = _work_order_insert(recs, id_responsible, responsible_name,
-                                duration=_tempo_da_os(dur_de.get(r.get("id_task")) for r in recs))
+        jun = os_juntar.juntar_em_os(id_tasks, dur_de, id_responsible, responsible_name, etiqueta_ids=etiqueta_ids,
+                                     imagens=imagens)
     except FracttalError as e:
         saida["aviso"] = "tarefas criadas; a OS não fechou (%s)." % e
         return saida
-    idwo = wo.get("id_work_order")
-    saida["os"].update({"id_work_order": idwo, "wo_folio": wo.get("wo_folio")})
-    if idwo and etiqueta_ids:
-        try:
-            apply_labels(idwo, etiqueta_ids)
-            saida["os"]["etiquetas"] = list(etiqueta_ids)
-        except FracttalError as e:
-            saida["aviso"] = "OS %s criada, mas a etiqueta falhou: %s" % (wo.get("wo_folio"), e)
-    # as imagens de CADA ativo vão para a tarefa daquele ativo, dentro da OS única
-    if idwo and imagens_por_ativo:
-        try:
-            tarefas = _ids_tarefas_da_os(idwo)
-        except Exception:
-            tarefas = []
-        for i, tid in enumerate(tarefas):
-            code = por_task.get(id_tasks[i]) if i < len(id_tasks) else None
-            for im in (imagens_por_ativo.get(code) or []):
-                try:
-                    attach_imagem_os(idwo, tid, im.get("bytes"), im.get("nome") or "imagem.png")
-                except Exception:
-                    pass
+    saida["os"] = os_juntar.da_os(jun)
+    if jun.get("aviso"):
+        saida["aviso"] = jun["aviso"]
     return saida
 
 
@@ -5695,34 +5606,7 @@ def create_work_orders_datas(asset: dict, description: str, task_type: str, subt
                     r["os"]["aviso"] = f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}"
         return fase1
 
-    pend = [r for r in fase1 if r.get("ok") and r["os"].get("id_task")]
-    if id_responsible and pend:
-        try:
-            recs = _kanban_records({r["os"]["id_task"] for r in pend})
-        except FracttalError as e:
-            recs = {}
-            for r in pend:
-                r["os"]["aviso"] = f"tarefa criada; não converti em WO ({e})."
-        for r in pend:
-            if "aviso" in r["os"]:
-                continue
-            rec = recs.get(r["os"]["id_task"])
-            if not rec:
-                r["os"]["aviso"] = "tarefa criada, mas não a achei no kanban p/ virar WO."
-                continue
-            try:
-                wo = convert_task_to_wo(rec, id_responsible, responsible_name)
-                idwo = wo.get("id_work_order")
-                r["os"]["id_work_order"] = idwo or r["os"].get("id_work_order")
-                r["os"]["wo_folio"] = wo.get("wo_folio") or r["os"].get("wo_folio")
-                if idwo and etiqueta_ids:
-                    try:
-                        apply_labels(idwo, etiqueta_ids)
-                        r["os"]["etiquetas"] = list(etiqueta_ids)
-                    except FracttalError as e:
-                        r["os"]["aviso"] = f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}"
-            except FracttalError as e:
-                r["os"]["aviso"] = f"tarefa criada, mas falhou virar WO: {e}"
+    os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids)     # a mesma do uma-OS-por-ativo
     return fase1
 
 
@@ -6539,49 +6423,38 @@ def create_performance_os_agrupada(itens: list, id_responsible=None, responsible
         return {"ok": False, "erro": "Nenhuma tarefa criada: " + "; ".join(erros[:3]),
                 "n_tarefas": len(itens), "n_criadas": 0, "erros": erros}
 
-    # ── Fase 2: junta TODAS numa OS só ──
-    try:
-        recs_map = _kanban_records(set(id_tasks))
-    except FracttalError as e:
-        return {"ok": True, "folio": None, "n_tarefas": len(itens), "n_criadas": len(id_tasks),
-                "erros": erros,
-                "aviso": "as %d tarefas foram criadas, mas não consegui juntá-las numa OS (%s). "
-                         "Elas estão pendentes no kanban do Fracttal." % (len(id_tasks), e)}
-    recs = [recs_map[i] for i in id_tasks if i in recs_map]
-    if not recs:
-        return {"ok": True, "folio": None, "n_tarefas": len(itens), "n_criadas": len(id_tasks),
-                "erros": erros,
-                "aviso": "as %d tarefas foram criadas mas não as achei no kanban para gerar a OS "
-                         "numerada." % len(id_tasks)}
+    # ── Fase 2: junta TODAS numa OS só (a fase 2 de todos os caminhos, `os_juntar`), com as etiquetas (Performance + as extras) ──
     # OS pai: UMA para a OS inteira (no agrupado não existe pai por ativo). Pega o 1º `os_pai`
-    # preenchido — a tela manda o mesmo valor em todos os itens.
-    id_parent = None
+    # preenchido — a tela manda o mesmo valor em todos os itens. A busca pelo número só vai depois de o kanban trazer as
+    # tarefas, na hora de inserir a OS (o `id_parent` do juntar é uma função): com o kanban fora a OS nem sai.
     folio_pai = next((str(it.get("os_pai") or "").strip() for it in itens
                       if str(it.get("os_pai") or "").strip()), "")
-    if folio_pai:
+    pai: dict = {}
+
+    def _procurar_pai():
         try:
             for c in buscar_os_pai(folio_pai, limit=20):
                 if str(c.get("folio")).strip() == folio_pai:
-                    id_parent = c.get("id"); break
+                    pai["id"] = c.get("id"); break
         except FracttalError:
-            id_parent = None
-    wo = _work_order_insert(recs, id_responsible, responsible_name, id_parent=id_parent,
-                            note=note_os, duration=_tempo_da_os(dur_de.get(r.get("id_task")) for r in recs))
-    idwo, folio = wo.get("id_work_order"), wo.get("wo_folio")
-    avisos = []
-    if folio_pai and not id_parent:
-        avisos.append("não achei a OS pai %s — a OS foi criada sem vínculo" % folio_pai)
-    if len(recs) < len(id_tasks):
-        avisos.append("%d tarefa(s) não entraram na OS" % (len(id_tasks) - len(recs)))
-
-    # ── Fase 3: etiquetas (Performance + as extras) ──
+            pai["id"] = None
+        return pai.get("id")
     lbls = [l for l in [_label_performance_id()] +
             [label_id_por_nome(n) for n in (etiquetas_extra or [])] if l]
-    if idwo and lbls:
-        try:
-            apply_labels(idwo, lbls)
-        except Exception as e:
-            avisos.append("etiqueta falhou: %s" % str(e)[:80])
+    jun = os_juntar.juntar_em_os(id_tasks, dur_de, id_responsible, responsible_name,
+                                 id_parent=_procurar_pai if folio_pai else None, note=note_os,
+                                 etiqueta_ids=lbls or None, frases=os_juntar.FRASES_PERFORMANCE)
+    if "id_work_order" not in jun:                       # a OS não saiu: as tarefas ficam pendentes no kanban do Fracttal
+        return {"ok": True, "folio": None, "n_tarefas": len(itens), "n_criadas": len(id_tasks),
+                "erros": erros, "aviso": jun["aviso"]}
+    idwo, folio = jun["id_work_order"], jun["wo_folio"]
+    avisos = []
+    if folio_pai and not pai.get("id"):
+        avisos.append("não achei a OS pai %s — a OS foi criada sem vínculo" % folio_pai)
+    if jun["nao_entraram"]:
+        avisos.append("%d tarefa(s) não entraram na OS" % jun["nao_entraram"])
+    if jun.get("aviso"):                                 # a etiqueta que falhou
+        avisos.append(jun["aviso"])
 
     # ── Fase 4: imagens. O work_order_insert devolve só o id da OS, não o de cada tarefa — então
     # releio as tarefas e caso pelo ATIVO (id_item), que é o único elo confiável. ──
@@ -6626,6 +6499,6 @@ def create_performance_os_agrupada(itens: list, id_responsible=None, responsible
     if erros:
         avisos.append("%d ativo(s) falharam: %s" % (len(erros), "; ".join(erros[:2])))
     return {"ok": True, "folio": folio, "id_work_order": idwo,
-            "n_tarefas": len(itens), "n_criadas": len(recs), "erros": erros,
+            "n_tarefas": len(itens), "n_criadas": len(id_tasks) - jun["nao_entraram"], "erros": erros,
             "n_img_ok": n_img_ok, "img_erro": img_erro, "tickets": tickets,
             "aviso": " · ".join(avisos) or None}
