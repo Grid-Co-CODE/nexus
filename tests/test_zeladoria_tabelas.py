@@ -42,21 +42,55 @@ def test_view_vira_aba():
         T.aba_da_view("cotacoes")          # sem o rf_ não é view do Radar
 
 
-@pytest.mark.parametrize("aba, coluna", [
-    ("fornecedores", "empresa"), ("fornecedores", "pix"), ("usinas", "contato_email"), ("usinas", "responsavel_om"),
-    ("cotacoes", "obs"), ("perfis", "email"), ("log", "quem"), ("fin_cenario", "criado_por"),
-    ("fracttal_rondas", "tecnico"), ("colaboradores", "nome"), ("config", "valor"), ("cronograma_publico", "dados"),
-])
-def test_coluna_pessoal_e_cifrada(aba, coluna):
-    assert T.coluna_cifrada(aba, coluna)
+# o RADAR (fixture): as 33 tabelas de nome fixo e as seis da equipe primarizada com um primeiro nome fictício
+RADAR = [a for a in T.TABELAS if a != "fracttal_ultimas" and not a.endswith(("_equipe", "_equipe_semanal"))] + [
+    "tipos_gasto_fulano", "gastos_fulano", "orcamento_fulano", "orcamento_fulano_semanal", "simulacao_repasse_fulano",
+    "rota_fulano"]
 
 
-@pytest.mark.parametrize("aba, coluna", [
-    ("cotacoes", "valor"), ("colaboradores", "id"), ("colaboradores", "fornecedor_id"), ("usinas", "potencia"),
-    ("config", "chave"), ("financeiro_parcelas", "valor"),
+def test_mapa_de_tabelas_aceita_o_radar():
+    m = T.mapa_de_tabelas(RADAR)
+    assert len(m) == 39 and sorted(m.values()) == sorted(a for a in T.TABELAS if a != "fracttal_ultimas")
+    assert m["gastos_fulano"] == "gastos_equipe" and m["cotacoes"] == "cotacoes"
+
+
+@pytest.mark.parametrize("troca", [
+    ("rota_fulano", "rota_otimizada"),          # outro "nome": não é a mesma equipe
+    (None, "gastos_fornecedor"),                # tabela nova que cairia calada em cima de gastos_equipe
 ])
-def test_coluna_de_negocio_fica_em_claro(aba, coluna):
-    assert not T.coluna_cifrada(aba, coluna)
+def test_mapa_recusa_tabela_parecida(troca):
+    velho, novo = troca
+    nomes = [n for n in RADAR if n != velho] + [novo]
+    with pytest.raises(T.TabelaDesconhecida):
+        T.mapa_de_tabelas(nomes)
+
+
+@pytest.mark.parametrize("aba, coluna, tipo", [
+    ("fornecedores", "empresa", "text"), ("fornecedores", "pix", "text"), ("usinas", "contato_tecnico", "text"),
+    ("usinas", "responsavel_om", "text"), ("cotacoes", "obs", "text"), ("perfis", "email", "text"),
+    ("log", "quem", "text"), ("fin_cenario", "criado_por", "text"), ("fracttal_rondas", "tecnico", "text"),
+    ("colaboradores", "nome", "text"), ("config", "valor", "text"), ("cronograma_publico", "dados", "jsonb"),
+    # cifrado por padrão: o texto que ninguém listou (revisão final de 03/11/2026)
+    ("ordens_servico", "justificativa", "text"), ("danos_modulos", "causa_detalhe", "text"),
+    ("usinas", "dados_extra", "jsonb"), ("fin_fornecedor_alias", "nome_norm", "text"),
+    ("cotacoes", "avaliacao_comentario", "text"), ("financeiro_historico", "campos", "jsonb"),
+    ("contratos_anuais", "nome", "text"), ("log", "alvo", None),
+])
+def test_coluna_pessoal_e_cifrada(aba, coluna, tipo):
+    assert T.coluna_cifrada(aba, coluna, tipo)
+
+
+@pytest.mark.parametrize("aba, coluna, tipo", [
+    ("cotacoes", "valor", "numeric"), ("colaboradores", "id", "text"), ("colaboradores", "fornecedor_id", "text"),
+    ("colaboradores", "fornecedor_ids", "jsonb"), ("colaboradores", "excluido", "boolean"),
+    ("cotacoes", "excluido_em", "timestamp with time zone"), ("usinas", "potencia_real_mwp", "numeric"),
+    ("usinas", "cliente", "text"), ("usinas", "usina", "text"), ("cotacoes", "status_head", "text"),
+    ("cotacoes", "data_head", "text"), ("cotacoes", "servico", "text"), ("config", "chave", "text"),
+    ("fracttal_rondas", "usina_chave", "text"), ("financeiro_parcelas", "valor", "numeric"),
+    ("cronograma_alteracoes", "de_inicio", "text"),
+])
+def test_coluna_de_negocio_fica_em_claro(aba, coluna, tipo):
+    assert not T.coluna_cifrada(aba, coluna, tipo)
 
 
 def test_livros_no_catalogo():
