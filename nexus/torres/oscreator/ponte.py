@@ -291,6 +291,18 @@ def ligar_catalogos(app) -> None:
         catalogos.aquecer()
 
 
+def ligar_garantias(app) -> None:
+    """Diz ao Garantias (o Acompanhamento de chamados, `os_web/rotas_acomp.py`) onde mora a cópia em disco do quadro
+    dividido e dos tickets das concluídas (`<pasta de dados do clone>/oscreator/garantias/`, 03/11/2026), para o reinício
+    do servidor não esvaziar a tela. Nos testes o disco não (a pasta é a do usuário da máquina): só a memória."""
+    if RAIZ_CLONE not in sys.path:
+        sys.path.append(RAIZ_CLONE)
+    import api
+    from os_web import rotas_acomp
+    if not app.config.get("TESTING"):
+        rotas_acomp.configurar_disco(os.path.join(api._data_dir(), "oscreator", "garantias"))
+
+
 def modulo_do_clone(nome: str):
     """Um módulo do OS Creator pelo nome com que o clone o importa (`api`, `ativos_central`, `ativos_leitor`, `os_leitor`,
     `catalogos`, `catalogos_leitor`), com a pasta do clone no `sys.path`. É o MESMO módulo que as telas usam: importado por outro caminho (como
@@ -349,6 +361,10 @@ def _criar_clone(app):
         ligar_catalogos(app)
     except Exception:            # noqa: BLE001 — sem ligar, os catálogos vivem só na memória (o reinício relê do Fracttal)
         logging.exception("OS Creator: os catálogos pequenos não foram ligados à pasta de dados")
+    try:
+        ligar_garantias(app)
+    except Exception:            # noqa: BLE001 — sem ligar, o Garantias vive só na memória (o reinício relê do Fracttal)
+        logging.exception("OS Creator: o Garantias não foi ligado à pasta de dados")
     # o Responsável UFV dos chamados de Garantias, pelo cadastro do Nexus (28/10/2026; nexus/torres/chamados/ufv.py)
     from os_web import rotas_acomp
 

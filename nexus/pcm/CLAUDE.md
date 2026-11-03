@@ -422,7 +422,9 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   - **Provar:** `tests/test_pcm_responsaveis.py`, 15 testes; 12 mutações, todas pegas
     (`scratchpad/v301/mut_nx_responsaveis.py`).
 - **Provar:** `tests/test_pcm_atribuicoes.py` (o livro: vigência, dia de Brasília, mesma decisão, assinatura),
-  `tests/test_pcm_tecnicos_usina.py` (a visão: regra da equipe, evidência, avisos, cascata, foto do App) e
+  `tests/test_pcm_tecnicos_usina.py` (a visão: regra da equipe, evidência, avisos, cascata, foto do App; o relógio da
+  gravação dublado em 17/10/2026, o mesmo `HOJE` da tela: com o dia de verdade, o apoio "até 31/10" virou passado em
+  01/11 e a regra o recusou) e
   `tests/test_pcm_tecnicos_tela.py` (quem vê e edita, carga inicial, reenviar, tirar, banco fora); 11 mutações, todas
   pegas. A tela: renderizar com o banco de mentira dos testes e servir a pasta (1366 e 375 px, escuro e claro).
 

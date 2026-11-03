@@ -15,6 +15,9 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import json
+import logging
+import os
 import threading
 import time
 import zipfile
@@ -24,6 +27,7 @@ from flask import (Blueprint, has_request_context, jsonify, redirect, render_tem
                    url_for)
 
 import api
+import canto_disco
 import chamado_spec as cs
 import chamados_obs_store as obs_store
 import gridco_abas as ga
@@ -41,7 +45,10 @@ bp = Blueprint("os_web_acomp", __name__, url_prefix="/os")
 # própria tela grava (ticket, finalizar, responsável) ajusta a cópia em vez de apagá-la (`_ajustar`). O Atualizar relê.
 TTL_QUADRO = 30 * 60
 DIAS_BUSCA = 365          # a primeira OS de acompanhamento é de ago/2026; um ano cobre as abertas com folga
-TTL_TICKET_FIM = 1800     # s: o ticket de OS CONCLUÍDA (ver `_tickets`)
+# s: o ticket de OS CONCLUÍDA (ver `_tickets`), lido uma vez enquanto ela aparece no quadro (os DIAS_FINALIZADOS). Era 30 min
+# até 03/11/2026, e cada releitura pedia de novo o ticket de todas as concluídas dos últimos 90 dias; concluída não volta e o
+# Fracttal não aceita mais editar, e a que reabre sai das concluídas e é lida de novo (`fechadas` em `_tickets`)
+TTL_TICKET_FIM = (aw.DIAS_FINALIZADOS + 1) * 86400
 # Passados os 30 min, o quadro abre NA HORA com a leitura anterior e relê o Fracttal por trás, com a sessão da pessoa
 # (Levi, 09/10/2026: "teria como utilizarmos essas requisições de forma mais inteligente?"): até então, quadro vencido
 # era a tela esperando o Fracttal na frente de quem abriu. Mais velha que VELHA_MAX, a tela de um chamado espera a leitura
@@ -66,6 +73,112 @@ VELHA_MAX = 2 * 3600      # s
 #   `api.editar_nota_os`: ERROR_WO_FINISHED_BY_OTHER_USER), então o ticket dela não muda: vale 30 min. O "Atualizar"
 #   relê a lista, as abertas e as em verificação.
 # Tudo na memória do rotas (`rotas._MEMO`, com o teto dela): quem limpa a memória limpa tudo.
+
+# ── a cópia em disco (03/11/2026) ────────────────────────────────────────────────────────────────────────────────────
+# Levi, 03/11/2026: "Nexus > Chamados > Garantias demora muito para carregar na 1ª vez e ele é 99% Fracttal" e "tem que ser
+# como no OS Creator... pega a informação de um canto centralizado e mitiga essas perdas por reinício". O servidor reinicia a
+# cada push na `main` (5 só nesse dia), a memória voltava vazia, e a 1ª pessoa esperava a leitura inteira (p95 de 94 s no
+# Raio-X). Agora as cópias DIVIDIDAS (o dono "TODOS": o quadro, a lista e os tickets das concluídas) também moram no disco
+# do servidor (`<pasta de dados do clone>/oscreator/garantias/`, que a ponte liga, como a dos catálogos), escritas ao lado
+# e trocadas de uma vez (`canto_disco`), e voltam à memória no 1º uso depois do reinício com a idade que tinham. Daí em
+# diante valem as regras de sempre: a recente abre direto; a vencida abre e relê por trás; e quem vê outro total no Fracttal
+# não recebe a dividida (`_dono`, `_mesma_visao_da_velha`). A cópia de uma pessoa só (a visão restrita) fica só na memória.
+# Sem pasta (os testes, o oem), só a memória, como antes.
+_DISCO = {"pasta": None, "lido": False}
+_DISCO_TRAVA = threading.Lock()
+FORMATO_DISCO = 1
+NO_DISCO = ("acomp", "acomp_linhas", "acomp_tk")
+log = logging.getLogger(__name__)
+
+
+def configurar_disco(pasta) -> None:
+    """Onde mora a cópia em disco (`ponte.ligar_garantias`); None = só a memória."""
+    with _DISCO_TRAVA:
+        _DISCO.update(pasta=pasta or None, lido=False)
+
+
+def _id(i):
+    """A chave de OS que o JSON virou texto volta a número (os tickets são procurados pelo id da linha)."""
+    try:
+        return int(i)
+    except (TypeError, ValueError):
+        return i
+
+
+def _para_o_disco(nome: str, v: dict, idade: float) -> dict:
+    """A carga do arquivo. Os tickets das concluídas guardam a hora do relógio, não a do `monotonic` (que recomeça no
+    reinício); o que é montado a cada tela (as chaves com `_`, como os `_cartoes`) não vai."""
+    agora_m, agora = time.monotonic(), time.time()
+    if nome == "acomp_tk":
+        valor = {str(i): [agora - (agora_m - q), t] for i, (q, t) in list(v.items())}
+    else:
+        valor = {k: x for k, x in list(v.items()) if not str(k).startswith("_")}
+        if isinstance(valor.get("tickets"), dict):
+            valor["tickets"] = {str(i): t for i, t in valor["tickets"].items()}
+    return {"formato": FORMATO_DISCO, "nome": nome, "salvo_em": agora - idade, "valor": valor}
+
+
+def _do_disco(nome: str, carga) -> tuple:
+    """(idade em s, valor como a memória guarda) de uma cópia lida. ValueError se ela não serve."""
+    if not isinstance(carga, dict) or carga.get("formato") != FORMATO_DISCO or carga.get("nome") != nome:
+        raise ValueError("a cópia não é a %s do formato %d" % (nome, FORMATO_DISCO))
+    agora_m, agora = time.monotonic(), time.time()
+    v = carga.get("valor")
+    if not isinstance(v, dict):
+        raise ValueError("a cópia %s não tem valor" % nome)
+    if nome == "acomp_tk":
+        v = {_id(i): (agora_m - max(0.0, agora - float(q)), t) for i, (q, t) in v.items()}
+    elif isinstance(v.get("tickets"), dict):
+        v = dict(v, tickets={_id(i): t for i, t in v["tickets"].items()})
+    return max(0.0, agora - float(carga["salvo_em"])), v
+
+
+def _carregar_disco() -> None:
+    """No 1º uso depois do reinício, as cópias do disco voltam à memória (a que a memória já tem fica)."""
+    if _DISCO["lido"] or not _DISCO["pasta"]:
+        return
+    with _DISCO_TRAVA:
+        if _DISCO["lido"] or not _DISCO["pasta"]:
+            return
+        _DISCO["lido"] = True
+        for nome in NO_DISCO:
+            try:
+                with open(os.path.join(_DISCO["pasta"], nome + ".json"), encoding="utf-8") as f:
+                    idade, v = _do_disco(nome, json.load(f))
+            except FileNotFoundError:
+                continue
+            except Exception:                           # noqa: BLE001 — a cópia que não serve fica de fora; a tela lê
+                log.exception("Garantias: a cópia em disco %s não serve", nome)
+                continue
+            with rotas._MEMO_LOCK:
+                rotas._MEMO.setdefault((nome, "TODOS"), (time.monotonic() - idade, v))
+
+
+def _gravar_disco(*nomes) -> None:
+    """As cópias (nome, "TODOS") que a memória tem agora vão ao disco; a que saiu da memória (`_esquecer`) sai do disco.
+    Falha de disco vai ao log: a tela segue com a memória."""
+    if not _DISCO["pasta"]:
+        return
+    with _DISCO_TRAVA:
+        for nome in nomes:
+            destino = os.path.join(_DISCO["pasta"], nome + ".json")
+            try:
+                with rotas._MEMO_LOCK:
+                    v = rotas._MEMO.get((nome, "TODOS"))
+                    carga = (_para_o_disco(nome, v[1], time.monotonic() - v[0]) if v and isinstance(v[1], dict)
+                             else None)
+                if carga is None:
+                    if os.path.exists(destino):
+                        os.remove(destino)
+                    continue
+                texto = json.dumps(carga, ensure_ascii=False, separators=(",", ":"), default=str)
+
+                def escrever(tmp, texto=texto):
+                    with open(tmp, "w", encoding="utf-8") as f:
+                        f.write(texto)
+                canto_disco.trocar_de_uma_vez(destino, escrever)
+            except Exception:                           # noqa: BLE001
+                log.exception("Garantias: a cópia em disco %s não foi gravada", nome)
 
 
 def _quem() -> tuple:
@@ -99,6 +212,7 @@ def _quem_le() -> str:
 def _guardado(chave, ttl: float = None):
     """O que a memória do rotas tem nesta chave, sem buscar nada. Com `ttl`, só se ainda vale; sem, mesmo vencido (só
     para o que não muda, como o id de um nº de OS). None se nada."""
+    _carregar_disco()
     with rotas._MEMO_LOCK:
         v = rotas._MEMO.get(chave)
     if not v or (ttl is not None and time.monotonic() - v[0] >= ttl):
@@ -157,7 +271,17 @@ def _linhas(forcar: bool = False, pessoa=None) -> dict:
         total = int(inf.get("total") or 0)
         HS.anotar_total(_quem_le(), ("acomp", "TODOS"), total)
         return _reaplicar({"linhas": linhas, "quando": hoje.strftime("%d/%m/%Y %H:%M"), "total": total}, inicio)
-    return rotas._memo(("acomp_linhas", pessoa or _dono()), TTL_QUADRO, _buscar, forcar)
+    _carregar_disco()
+    dono, leu = pessoa or _dono(), []
+
+    def _ler():
+        r = _buscar()
+        leu.append(True)
+        return r
+    r = rotas._memo(("acomp_linhas", dono), TTL_QUADRO, _ler, forcar)
+    if leu and dono == "TODOS":
+        _gravar_disco("acomp_linhas")
+    return r
 
 
 _META = ("status_id", "tipo_tarefa", "event_date", "data_fim", "note", "inicio", "gatilho")
@@ -178,6 +302,7 @@ def _tickets(linhas, hoje) -> dict:
     """{id: ticket} das OS que o quadro mostra (`aw.precisa_ticket`). O das concluídas sai de ("acomp_tk", "TODOS")
     quando lido há menos de 30 min (o ticket é da OS: o mesmo para todos, e cada um só pede o das OS da lista que vê);
     o resto vai ao Fracttal (8 de cada vez, `api.tickets_os3_em_massa`). None = não li: não é guardado."""
+    _carregar_disco()
     ids = [l.get("id") for l in linhas if aw.precisa_ticket(l, hoje)]
     if not ids:
         return {}
@@ -194,6 +319,8 @@ def _tickets(linhas, hoje) -> dict:
         meus = {k: x for k, x in (v[1] if v and isinstance(v[1], dict) else {}).items() if agora - x[0] < TTL_TICKET_FIM}
         meus.update({i: (agora, t) for i, t in lidos.items() if i in fechadas and t is not None})
         rotas._MEMO[chave] = (agora, meus)
+    if any(i in fechadas and t is not None for i, t in lidos.items()):
+        _gravar_disco("acomp_tk")
     out = dict(lidos)
     out.update(prontos)
     return out
@@ -202,6 +329,7 @@ def _tickets(linhas, hoje) -> dict:
 def _dados(forcar: bool = False, pessoa=None) -> dict:
     """A lista das OS de acompanhamento + o ticket de cada uma, na memória por TTL_QUADRO, na cópia do dono (`_dono`).
     A lista é a de `_linhas`: se a tela de um chamado acabou de lê-la, o quadro só busca os tickets."""
+    _carregar_disco()
     pessoa = pessoa or _dono()
 
     def _buscar():
@@ -212,7 +340,16 @@ def _dados(forcar: bool = False, pessoa=None) -> dict:
         tickets = _tickets(lv["linhas"], hoje)
         _conferir_sessao()
         return _reaplicar({"linhas": lv["linhas"], "tickets": tickets, "quando": lv["quando"]}, inicio)
-    return rotas._memo(("acomp", pessoa), TTL_QUADRO, _buscar, forcar)
+    leu = []
+
+    def _ler():
+        r = _buscar()
+        leu.append(True)
+        return r
+    r = rotas._memo(("acomp", pessoa), TTL_QUADRO, _ler, forcar)
+    if leu and pessoa == "TODOS":
+        _gravar_disco("acomp", "acomp_linhas")
+    return r
 
 
 # ── a gravação ajusta o quadro guardado (20/10/2026) ──────────────────────────────────────────────────────────────
@@ -240,7 +377,8 @@ def _com_ajuste(v: dict, wid, campos: dict, ticket):
 
 
 def _ajustar(wid, campos=None, ticket=None) -> bool:
-    """Põe a gravação na cópia guardada de todo mundo; True se a OS estava em alguma."""
+    """Põe a gravação na cópia guardada de todo mundo (e na do disco); True se a OS estava em alguma."""
+    _carregar_disco()
     campos, achou = dict(campos or {}), False
     with rotas._MEMO_LOCK:
         _AJUSTES.append((time.monotonic(), wid, campos, ticket))
@@ -255,6 +393,7 @@ def _ajustar(wid, campos=None, ticket=None) -> bool:
                     achou = True
             elif k[0] == "acomp_tk":
                 v.pop(wid, None)
+    _gravar_disco(*NO_DISCO)
     rotas._esquecer_preparo(wid)            # o detalhe lido antes da gravação (o mouse parado no cartão) também sai
     return achou
 
@@ -270,7 +409,8 @@ def _reaplicar(r: dict, inicio: float) -> dict:
 
 def _esquecer(wid=None):
     """Depois de gravar ticket ou finalizar: a próxima leitura do quadro vai ao Fracttal (de todo mundo), e o ticket
-    guardado desta OS sai."""
+    guardado desta OS sai (da memória e do disco)."""
+    _carregar_disco()
     with rotas._MEMO_LOCK:
         for k in [k for k in rotas._MEMO if isinstance(k, tuple) and k and k[0] in ("acomp", "acomp_linhas")]:
             rotas._MEMO.pop(k, None)
@@ -279,6 +419,7 @@ def _esquecer(wid=None):
                 if isinstance(k, tuple) and k and k[0] == "acomp_tk" and isinstance(v, dict):
                     v.pop(wid, None)
         _ESQUECIDO["em"] = time.monotonic()
+    _gravar_disco(*NO_DISCO)
     if wid:
         rotas._esquecer_preparo(wid)        # o detalhe lido antes da gravação (o mouse parado no cartão) também sai
 
@@ -296,6 +437,7 @@ def _em_segundo_plano(fn):
 
 def _guardado_com_idade(chave) -> tuple:
     """(idade em s, o que a memória guarda nesta chave), sem buscar nada. (None, None) se nada."""
+    _carregar_disco()
     with rotas._MEMO_LOCK:
         v = rotas._MEMO.get(chave)
     return (time.monotonic() - v[0], v[1]) if v else (None, None)

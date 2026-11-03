@@ -2549,6 +2549,21 @@ na nota entra a OS mãe do Fracttal; no banco, o chamado abre na data da nota.
   igual, a idade, a linha do tempo, a OS mãe, a tela e o fato). Conferido numa bancada local com o Fracttal falso, a 1440
   e a 375 px.
 
+## O Garantias sobrevive ao reinício (03/11/2026)
+
+Levi, 03/11/2026: "Nexus > Chamados > Garantias demora muito para carregar na 1ª vez e ele é 99% Fracttal" e "tem que ser
+como no OS Creator... pega a informação de um canto centralizado e mitiga essas perdas por reinício". O servidor reinicia a
+cada push na `main`, e a 1ª pessoa depois dele esperava a leitura inteira (p95 de 94 s).
+- **As cópias divididas vão ao disco** (`rotas_acomp`, dono "TODOS": o quadro, a lista e os tickets das concluídas), em
+  `<pasta de dados do clone>/oscreator/garantias/`, que a `ponte.ligar_garantias` liga (não nos testes), escritas ao lado e
+  trocadas de uma vez (`canto_disco`). Voltam no 1º uso depois do reinício com a idade que tinham, e valem as regras de
+  sempre: a recente abre direto, a vencida abre e relê por trás, e quem vê outro total no Fracttal lê a dele. A cópia de uma
+  pessoa só (a visão restrita) fica só na memória. Gravar nesta tela atualiza o disco; o `_esquecer` o apaga.
+- **O ticket da OS concluída é lido uma vez** (`TTL_TICKET_FIM`, os 90 dias em que ela aparece, mais 1; era 30 min): concluída
+  não volta e o Fracttal não aceita mais editar, e a que reabre é lida de novo.
+- A lista das OS vem da lista central quando ela cobre os 365 dias (a 1ª noite depois do deploy lê a janela inteira); até lá,
+  ao vivo. Prova: `tests/test_oscreator_garantias_disco.py`.
+
 ## Uma leitura só por chave, e a releitura do quadro como fundo (03/11/2026)
 
 O Raio-X de 03/11 mostrou 828 pedidos ao Fracttal num minuto às 10h, com a cota em 200 para a empresa toda, e o
