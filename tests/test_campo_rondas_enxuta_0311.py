@@ -127,9 +127,12 @@ def test_a_linha_abre_a_barra_lateral_com_tudo_da_ronda(banco, logado, monkeypat
     monkeypatch.setattr(ronda_checklist, "respostas", lambda: {"500": {"sujidade": 4, "vegetacao": 2, "vala": "Parcial",
                                                                        "sensores_sujos": ["IPOA"]}})
     det = logado.get(f"/t/campo/rondas/usina/1/ronda?os=500&data={_dia(1)}").get_data(as_text=True)
-    for txt in ("Altair", "Fulano Souza", "07:00 às 08:00", "Sujidade dos módulos", "cn-nivel-txt--4", "Parcial",
-                "IPOA sujo", "ronda longa pendente", "item sem foto de evidência", 'data-fotos-url="/t/campo/rondas/os/500/fotos"'):
+    for txt in ("Altair", "Fulano Souza", "07:00–08:00", "<dt>Sujidade</dt>", "<dt>Vegetação</dt>", "<dt>Vala de drenagem</dt>",
+                "<dt>Sensores</dt>", "cn-nivel-txt--4", "Parcial", "IPOA sujo", "ronda longa pendente",
+                "item sem foto de evidência", 'data-fotos-url="/t/campo/rondas/os/500/fotos"'):
         assert txt in det, txt
+    # enxuta (03/11/2026: "Checklist pode ficar mais simples"; o "Ver o histórico da usina" saiu: a barra é completa)
+    assert "Sujidade dos módulos" not in det and "Ver o histórico da usina" not in det and 'class="rg-check"' in det
     # sem OS: pelo dia e pela hora do início; a que não existe diz isso
     assert "as fotos ficam só no App" in logado.get(f"/t/campo/rondas/usina/2/ronda?data={_dia(2)}&ini=07:00").get_data(as_text=True)
     assert "Não achei esta ronda" in logado.get("/t/campo/rondas/usina/1/ronda?os=999&data=2026-01-01").get_data(as_text=True)

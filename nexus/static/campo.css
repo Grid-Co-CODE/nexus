@@ -1639,20 +1639,29 @@ tr.rd-linha:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
 tr.rd-linha--ativa td{background:var(--verde-suave)}
 .rd-gaveta{position:fixed;z-index:60;top:0;right:0;bottom:0;display:flex;flex-direction:column;width:33.333vw;min-width:380px;
   border-left:1px solid var(--linha-forte);background:var(--superficie);box-shadow:-24px 0 60px var(--sombra)}
-.rd-gaveta-topo{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--linha)}
-.rd-gaveta-corpo{flex:1;overflow-y:auto;padding:18px 22px 28px}
-.rg-cab h2{margin:4px 0 2px;font:700 20px/1.25 var(--font-sans)}
-.rg-cab p{margin:0;font-size:13px}
-.rg-dados{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px;margin:16px 0 4px;font-size:13.5px}
-.rg-dados dt{color:var(--mudo)}
-.rg-dados dd{margin:0;overflow-wrap:anywhere}
-.rg-dados .det{display:block;color:var(--mudo);font-size:12px}
-.rg-sub{margin:20px 0 6px;padding-top:14px;border-top:1px solid var(--linha);font:600 11.5px/1.3 var(--font-sans);
-  letter-spacing:.06em;text-transform:uppercase;color:var(--tinta-2)}
-.rg-pend{margin:0;padding-left:18px;font-size:13px;line-height:1.5}
-.rg-pe{margin:20px 0 0;font-size:13px}
+.rd-gaveta-fechar{position:absolute;z-index:1;top:10px;right:12px}
+.rd-gaveta-corpo{flex:1;overflow-y:auto;padding:16px 20px 24px}
+.rg-cab{padding-right:36px}
+.rg-cab h2{margin:2px 0 1px;font:700 19px/1.25 var(--font-sans)}
+.rg-cab p{margin:0;font-size:12.5px}
+/* os dados em grade (o rótulo em cima, o valor embaixo) e o checklist numa linha de quatro: menos altura, mais foto
+   (03/11/2026: "aproveite mais o espaço para ter mais espaço vertical e melhor aproveitamento horizontal") */
+.rg-grade,.rg-check{display:grid;gap:10px 14px;margin:14px 0 0;font-size:13px}
+.rg-grade{grid-template-columns:repeat(3,minmax(0,1fr))}
+.rg-grade .rg-larga{grid-column:span 2}
+.rg-check{grid-template-columns:repeat(4,minmax(0,1fr));padding:10px 12px;border:1px solid var(--linha);border-radius:var(--raio-md)}
+.rg-grade dt,.rg-check dt{margin-bottom:3px;font:600 10.5px/1.2 var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.rg-grade dd,.rg-check dd{margin:0;overflow-wrap:anywhere}
+.rg-check dd b{font-size:15px}
+.rg-nota{margin:12px 0 0;font-size:12.5px}
+.rg-pend{margin:12px 0 0;padding-left:18px;font-size:12.5px;line-height:1.5}
+/* as fotos com o resto do espaço (03/11/2026: "focar nas imagens"): miniaturas maiores, a grade enche a largura */
+.rg-fotos{margin-top:16px}
+.rg-fotos .cn-fotos-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
+.rg-fotos .cn-foto{width:auto;height:auto;aspect-ratio:1}
 .rg-vazio{color:var(--mudo)}
 @media (max-width:900px){.rd-gaveta{width:100vw;min-width:0}}
+@media (max-width:480px){.rg-grade{grid-template-columns:repeat(2,minmax(0,1fr))}.rg-check{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* o "Tentar de novo" das fotos na barra lateral, no desenho do botão das fotos das outras telas */
 .rg-fotos .cn-bt-tentar{margin-left:6px;font:600 12px var(--font-sans);color:var(--verde-texto);background:transparent;
   border:1px solid var(--linha);border-radius:7px;padding:3px 10px;cursor:pointer}

@@ -355,8 +355,13 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     direita (a tela inteira abaixo de 900 px), sem véu (a tabela segue clicável; a linha aberta fica marcada), Esc ou ×
     fecha. Ela busca o pedaço `_ronda_detalhe.html` (rota `rondas_detalhe`, `/rondas/usina/<id>/ronda?os=&data=&ini=`: a
     ronda pela OS e, sem OS, pelo dia e pela hora do início, no `historico_usina`): quem fez, quando (início e fim em
-    Brasília, duração), nota, veredito, OS, trackers, o checklist (sujidade, vegetação, vala, sombreamento, sensores), as
-    pendências e as fotos, que vêm depois pela rota das fotos da OS (o 429 do Fracttal tenta sozinho em 1 minuto). A
+    Brasília, duração), nota, veredito, OS, trackers, o checklist, as pendências e as fotos, que vêm depois pela rota das
+    fotos da OS (o 429 do Fracttal tenta sozinho em 1 minuto). **Enxuta no mesmo dia** ("Checklist pode ficar mais
+    simples. Sujidade, Vegetação, Vala de Drenagem, Sensores. Tente aproveitar melhor o espaço e focar nas imagens";
+    "aproveite mais o espaço para ter mais espaço vertical e melhor aproveitamento horizontal"): sem a faixa de cima (o ×
+    no canto), os dados em grade de três colunas (rótulo em cima, valor embaixo), o checklist numa linha de quatro e as
+    fotos com o resto do espaço (miniaturas de ~130 px que enchem a largura, só na barra: a grade das outras telas não
+    muda); o "Ver o histórico da usina" saiu ("deixe completo"). A
     coluna Fotos e a linha que abria embaixo saíram dos Registros e do histórico da usina; a caixa que amplia a foto
     (`_ronda_fotos_caixa.html`) segue, com o botão, na Zeladoria, no EPI e nos Extintores. **A duração e a pendência se escolhem no cabeçalho** (03/11/2026:
     "ao clicar em 'Duração' no cabeçalho, aí vai ter essas opções ou 'ordenar'"): o menu da Duração ordena (mais longa
