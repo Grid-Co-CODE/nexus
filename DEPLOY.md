@@ -354,7 +354,9 @@ seguem pela sessão de quem usa): o `personnel` do Fracttal às 05h, 11h, 17h e 
 se trouxer os campos que as telas usam. Os catálogos (pessoas, etiquetas, tipos, falhas, status, motivos e os planos da
 Performance) moram na memória e numa cópia na pasta de dados do OS Creator (`oscreator/catalogos/`, um arquivo por catálogo,
 sem e-mail; não vai ao banco nem ao git): o reinício volta por ela sem pedir nada ao Fracttal. O Raio-X mostra (seção "Uso do
-OS Creator", peça "Catálogos pequenos"), inclusive o campo que o REST não trouxe.
+OS Creator", peça "Catálogos pequenos"), inclusive o campo que o REST não trouxe. O Garantias (Chamados, o Acompanhamento de
+chamados do OS Creator) guarda do mesmo jeito o quadro dividido e os tickets das OS concluídas em `oscreator/garantias/`
+(03/11/2026; não vai ao banco nem ao git): depois do reinício a tela abre com a última cópia e relê por trás.
 
 **Na 1ª carga depois da atualização de 08/10/2026** entram no banco, pela primeira vez, o `fato_ronda`, o `fato_pt`, o
 livro `nexus_equipamentos` e a mescla da programação; o histórico de pessoas e usinas passa a começar "desde sempre"
