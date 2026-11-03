@@ -16,6 +16,7 @@ from pathlib import Path
 
 from flask import Response, abort, current_app, jsonify, render_template, request, session, url_for
 
+from ...casca import tema_do_pedido
 from ...prefixo import na_raiz
 from ...zeladoria import leitura
 from ...zeladoria.tabelas import TabelaDesconhecida
@@ -95,12 +96,20 @@ def app_radar():
     if aba not in ABAS.values():
         aba = "overview"
     cfg = {"api": na_raiz("/t/zeladoria/api"), "somenteLeitura": True, "sair": na_raiz("/sair")}
-    config = (f"<script>window.ZELADORIA = {json.dumps(cfg)}; window.ZELADORIA_ABA = {json.dumps(aba)};</script>\n"
+    # o tema do Nexus (o escuro é o padrão; o claro, o cookie do botão do topo) vira o data-theme do clone, que a paleta
+    # da Zeladoria usa; o botão do topo grava `nexus.tema` no navegador, e o clone muda junto, sem recarregar
+    tema = "light" if tema_do_pedido() == "claro" else "dark"
+    config = (f"<script>window.ZELADORIA = {json.dumps(cfg)}; window.ZELADORIA_ABA = {json.dumps(aba)}; "
+              f"window.ZELADORIA_TEMA = {json.dumps(tema)};\n"
+              "window.addEventListener('storage', function (e) { if (e.key === 'nexus.tema' && e.newValue) "
+              "document.documentElement.setAttribute('data-theme', e.newValue === 'claro' ? 'light' : 'dark'); });"
+              "</script>\n"
               # o menu é o do Nexus: a barra lateral do clone some (o #app dele é flex, o conteúdo ocupa a largura)
               "<style>.sidebar{display:none !important}</style>")
     ponte = (f'<script src="{url_for("static", filename="zeladoria/ponte.js")}"></script>\n'
              "<script>iniciarRadarApp();</script>")
-    html = _CLONE["texto"].replace("<!--ZELADORIA:CONFIG-->", config).replace("<!--ZELADORIA:PONTE-->", ponte)
+    html = (_CLONE["texto"].replace('<html lang="pt-BR">', f'<html lang="pt-BR" data-theme="{tema}">', 1)
+            .replace("<!--ZELADORIA:CONFIG-->", config).replace("<!--ZELADORIA:PONTE-->", ponte))
     return Response(html, mimetype="text/html", headers={"Cache-Control": "no-store"})
 
 
