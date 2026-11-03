@@ -1799,6 +1799,10 @@ CONHECIDAS = (
     Conhecida("thopen_acessos", ("senhas",), "apoio",
               "as senhas do login por pessoa do Dashboard Thopen (14/10/2026): o 5080 grava 1 linha a cada senha "
               "definida pelo link (o hash scrypt, cifrado com a chave dele); o Nexus lê só quando cada conta definiu"),
+    Conhecida("thopen_pedidos", ("atualizacao",), "controle",
+              "o pedido do Atualizar do Dashboard Thopen (03/11/2026): o 5080 grava 1 linha a cada clique da conta da "
+              "Grid (só a hora, sem quem pediu); o Nexus confere de minuto em minuto e grava as normalizações do COS na "
+              "hora (nexus/cos/normalizacoes_banco.py)"),
     Conhecida("organizacao_app_campo", ("Atribuicoes",), "apoio",
               "a foto das atribuições do App de Campo (usina × pessoa em HMAC × papel), publicada pelo App para o PCM "
               "comparar na tela Técnicos por usina antes de o App passar a ler o nexus_pcm_atribuicoes (17/10/2026); "

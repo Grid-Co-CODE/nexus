@@ -217,7 +217,13 @@ COS cita pelo nome vai em referência curta (`equipamentos_citados`: "Inversor 2
 tinha o nome, e a régua contava um inversor médio na usina errada). O tipo pelo rótulo vira código
 pelas normalizações (a API delas manda os dois). A que já está normalizada na memória não entra: conta uma vez, pela
 normalização. Na falha da fotografia, o retrato de antes fica, com a hora dele (`abertas_em` na `atualizacao`). Impacto,
-falha em texto, a última nota e o que se aguarda não vão. Prova: `tests/test_cos_normalizacoes_banco.py`.
+falha em texto, a última nota e o que se aguarda não vão. **O Atualizar do Dashboard Thopen (03/11/2026**, Levi: "fiz
+umas alterações nas normalizações e precisava trazer"): a correção feita no Andamento esperava a volta da hora. O 5080
+grava o pedido em `thopen_pedidos · atualizacao` (1 linha por clique da conta da Grid, só a hora) e o laço confere de
+minuto em minuto pela versão do livro (uma leitura da listagem): o pedido mais novo que a última gravação faz a volta na
+hora (`forcar`), no máximo uma a cada 2 min; a volta que não grava (a memória ainda carregando) tenta de novo. A
+plataforma vê a gravação nova e refaz a conta da Thopen (o `CLAUDE.md` da plataforma). Prova:
+`tests/test_cos_normalizacoes_banco.py`.
 
 - **De onde:** `GET <Andamento>/api/normalizacoes?desde=&limite=` (contrato `versao: 1`, a mesma chave `X-Nexus-Chave`). A
   API é **incremental**: devolve `cursor` e `mais`. O Nexus guarda em memória (`nexus/cos/normalizacoes.py`) desde o
