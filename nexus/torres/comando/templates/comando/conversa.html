@@ -9,7 +9,7 @@
 <div class="campo-nativa conv-pagina">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">Conversa · {{ tipo_nome }}</p><h1 class="cn-titulo">{{ titulo }}</h1>
-      <p class="cn-pergunta"><a class="conv-volta" href="{{ raiz }}/t/comando/caixa-de-entrada">Voltar à Caixa de entrada</a>{% if link %} · <a class="conv-volta" href="{{ link }}">Abrir o insight</a>{% endif %}</p></div>
+      <p class="cn-pergunta"><a class="conv-volta" href="{{ raiz }}/t/comando/caixa-de-entrada">Voltar à Caixa de entrada</a>{% if link %} · <a class="conv-volta" href="{{ link|na_raiz }}">Abrir o insight</a>{% endif %}</p></div>
   </div>
   {% if aviso %}<div class="cn-erro{% if aviso[0] == 'ok' %} ins-ok{% endif %}" role="{{ 'status' if aviso[0] == 'ok' else 'alert' }}"><b>{{ aviso[1] }}</b></div>{% endif %}
   {% if erro_conversa %}<div class="cn-erro cn-aviso" role="status"><b>Não li as conversas agora ({{ erro_conversa }}).</b></div>{% endif %}

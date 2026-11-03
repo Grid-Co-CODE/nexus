@@ -18,7 +18,8 @@ TELAS = ["cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/aprovacao", "campo/
          "performance/gerencial"]
 # a Ana é da Performance: além das marcadas, a Central de emissão, que os relatórios DO setor dela trazem (Tela.do_setor,
 # 13/10/2026); os relatórios são molduras da plataforma e não entram na pré-carga
-QUENTES = {"cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/rondas", "relatorios/central"}
+QUENTES = {"cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/rondas", "relatorios/central",
+           "comando/caixa-de-entrada"}   # a Caixa é de todo setor (03/11/2026)
 
 
 @pytest.fixture
@@ -49,9 +50,10 @@ def test_o_primeiro_clique_de_quem_tem_setor_aquece_as_telas_dele(ligada):
     e = _estado(ligada)
     assert set(e["aquecida_em"]) == QUENTES
     assert all(status == 200 for status, _ in e["ultimo"].values())
-    assert e["ultima_volta"]["telas"] == 5 and not e["ultima_volta"]["erros"] and not e["trabalhando"]
+    assert e["ultima_volta"]["telas"] == 6 and not e["ultima_volta"]["erros"] and not e["trabalhando"]
     # a 1ª tela de cada torre primeiro (onde o cartão do Início leva), depois o resto na ordem do menu
-    assert list(e["ultimo"]) == ["cos/mesa", "pcm/quadro", "relatorios/central", "campo/rondas", "cos/ocorrencias"]
+    assert list(e["ultimo"]) == ["comando/caixa-de-entrada", "cos/mesa", "pcm/quadro", "relatorios/central",
+                                 "campo/rondas", "cos/ocorrencias"]
 
 
 def test_uma_vez_por_minuto_e_so_o_que_esfriou(ligada):
@@ -139,4 +141,4 @@ def test_acessos_mostra_a_ultima_volta(ligada, logado):
     assert "nenhuma volta desde que o Nexus subiu" in html
     _como(ligada, ANA).get("/")
     html = logado.get(URL).get_data(as_text=True)
-    assert re.search(r"última volta em \d\d/\d\d \d\d:\d\d: 5 telas em [\d,]+ s", html)
+    assert re.search(r"última volta em \d\d/\d\d \d\d:\d\d: 6 telas em [\d,]+ s", html)

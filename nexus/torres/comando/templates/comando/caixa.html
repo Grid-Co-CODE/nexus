@@ -33,11 +33,11 @@
     <li class="ins-item"><div class="ins-linha ins-linha--mencao">
       <span class="ins-sev ins-sev--info">{{ 'Seu setor' if x.por_area else 'Você' }}</span>
       <span class="ins-o-que">
-        <a class="ins-titulo" href="{{ x.conversa }}">{{ x.titulo }}</a>
+        <a class="ins-titulo" href="{{ x.conversa|na_raiz }}">{{ x.titulo }}</a>
         <span class="ins-meta">{{ x.mensagem.por or 'Alguém' }}, {{ x.mensagem.quando_txt }}: "{{ x.mensagem.texto|truncate(140) }}"{% if x.n > 1 %} · {{ x.n }} menções sem ler{% endif %}{% if x.por_area %} · para {{ x.por_area_nomes|join(', ') }}{% endif %}</span>
       </span>
       <span class="ins-com-quem">
-        <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ x.conversa }}">Responder</a>
+        <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ x.conversa|na_raiz }}">Responder</a>
         {% if tem_login %}<form method="post" action="{{ raiz }}/t/comando/conversa/acao">
           <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="objeto" value="{{ x.objeto }}"><input type="hidden" name="voltar" value="{{ voltar }}">
           <button class="gc-btn gc-btn--ui gc-btn--fantasma" name="acao" value="leu" type="submit">Marcar como lida</button>
