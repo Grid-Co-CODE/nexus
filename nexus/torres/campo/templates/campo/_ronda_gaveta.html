@@ -48,6 +48,9 @@
     document.addEventListener('click', function (ev) {
       var t = ev.target.closest && ev.target.closest('.rd-gaveta .cn-bt-tentar');
       if (t) { var l = corpo.querySelector('[data-fotos-url]'); if (l) fotos(l); return; }
+      // a OS abre o card do OS Creator por cima da barra (03/11/2026: "quero que a OS seja clicável"); a barra fica
+      var os = ev.target.closest && ev.target.closest('.rd-gaveta [data-rg-os]');
+      if (os) { if (window.NexusOsCard) NexusOsCard.abrirFolio(os.getAttribute('data-rg-os'), {status: ''}); return; }
       var tr = ev.target.closest && ev.target.closest('tr[data-detalhe]');
       // o link da usina, o menu do cabeçalho e o que mais for clicável na linha seguem o caminho deles
       if (!tr || ev.target.closest('a, button, summary, details')) return;
@@ -56,9 +59,11 @@
     document.addEventListener('keydown', function (ev) {
       var tr = ev.target.closest && ev.target.closest('tr[data-detalhe]');
       if (tr && (ev.key === 'Enter' || ev.key === ' ') && ev.target === tr) { ev.preventDefault(); abre(tr); return; }
+      // com o card da OS aberto, o Esc fecha só o card: este ouvinte vem antes do dele (o card é incluído abaixo)
       var caixa = document.querySelector('.cn-caixa-foto');
-      if (ev.key === 'Escape' && !gaveta.hidden && (!caixa || caixa.hidden)) fecha();
+      if (ev.key === 'Escape' && !gaveta.hidden && (!caixa || caixa.hidden) && !document.querySelector('.nexus-card-os')) fecha();
     });
     gaveta.querySelector('[data-rg-fechar]').addEventListener('click', fecha);
   })();
 </script>
+{% include "oscreator/card_os_abrir.html" %}

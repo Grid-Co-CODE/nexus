@@ -20,7 +20,9 @@
   <div><dt>Quando</dt><dd>{{ r.ini_hm or '—' }}–{{ r.fim_hm or '—' }} <span class="mudo">· {{ duracao(r.dur_min) }}</span></dd></div>
   <div><dt>Qualidade</dt><dd>{% if r.nota is not none %}<b class="cn-t-{{ 'ok' if r.nota >= 95 else ('alerta' if r.nota >= 85 else 'critico') }}">{{ r.nota }}%</b>{% else %}—{% endif %}</dd></div>
   <div><dt>Veredito</dt><dd><span class="cn-selo cn-selo--{{ v[0] }}">{{ v[1] }}</span></dd></div>
-  <div><dt>OS</dt><dd class="m">{% if r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">avulsa</span>{% elif r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</dd></div>
+  {# o número abre o card da OS do OS Creator por cima (03/11/2026: "quero que a OS seja clicável"), como na Visão do
+     responsável e no Ranking: pelo número, o clone acha o id (`_ronda_gaveta.html`) #}
+  <div><dt>OS</dt><dd class="m">{% if r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">avulsa</span>{% elif r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% elif r.os %}<button type="button" class="cn-link cr-link-botao rg-os" data-rg-os="{{ r.os }}" title="Abrir o card da OS {{ r.os }}">{{ r.os }}</button>{% else %}—{% endif %}</dd></div>
   {% if r.trk_apontados %}<div><dt>Trackers</dt><dd>{{ r.trk_respondidos }} de {{ r.trk_apontados }}</dd></div>{% endif %}
 </dl>
 {# o checklist numa linha de quatro (Levi: "Sujidade, Vegetação, Vala de Drenagem, Sensores") #}
