@@ -17,6 +17,7 @@ from flask import abort, current_app, redirect, render_template, request, sessio
 
 from ...comando import estado as ES
 from ...comando import motor as MO
+from ...comando import pedidos as PD
 from ...comando import regras as RG
 from ...prefixo import na_raiz
 from ..modelo import Tela, Torre
@@ -41,6 +42,9 @@ TORRE = Torre(
         Tela("insights", "Nexus Insights",
              "Que regra cruzou as fontes e apontou um problema com dono?",
              "Regras R01 a R13 do motor de correlação"),
+        Tela("tempo-de-resposta", "Tempo de resposta",
+             "Que área responde no prazo, e quais pedidos estão atrasados?",
+             "Pedidos entre áreas, com prazo (nexus_pedidos)"),
         Tela("usinas", "Usinas",
              "Qual é o prontuário de cada usina, com todos os apelidos?",
              "Registro mestre (BD_Performance, BD_Thopen e de-para, via API)"),
@@ -82,24 +86,36 @@ def _areas() -> list[tuple[str, str]]:
             if t.id not in FORA_DE_NOTIFICAR]
 
 
-def _com_estado(insights: list[dict], est: dict, meu: str, minhas: set | None, convs: dict | None = None) -> list[dict]:
-    """Cada insight com o dono (novo, assumido por quem, concluído), se é meu, as áreas notificadas com o retorno de
-    cada uma, os pedidos para as minhas áreas que esperam a minha resposta e a conversa dele (Fase 2)."""
-    nomes, out, convs = _nomes_das_torres(), [], convs or {}
+def _com_pedidos(lista: list[dict], minhas: set | None, meu: str = "") -> list[dict]:
+    """Os pedidos para a tela: o nome da área, o status do retorno (rótulo e tom), o prazo em palavras, se a área é
+    minha (respondo por ela) e se fui eu que pedi."""
+    nomes, out = _nomes_das_torres(), []
+    for p in lista:
+        rot, tom = ES.RETORNOS[p["status"]]
+        out.append(dict(p, nome=nomes.get(p["torre"], p["torre"]), rotulo=rot, tom=tom,
+                        minha=minhas is None or p["torre"] in minhas, eu_pedi=bool(meu) and p["pedido_hmac"] == meu,
+                        pedido_em_txt=p["pedido_em"].strftime("%d/%m às %H:%M"),
+                        retorno_em_txt=p["retorno_em"].strftime("%d/%m às %H:%M") if p["retorno_em"] else "",
+                        prazo_txt=p["prazo"].strftime("%d/%m") if p["prazo"] else ""))
+    return out
+
+
+def _com_estado(insights: list[dict], est: dict, meu: str, minhas: set | None, convs: dict | None = None,
+                peds: dict | None = None) -> list[dict]:
+    """Cada insight com o dono (novo, assumido por quem, concluído), se é meu, os pedidos às áreas com o prazo e o retorno
+    de cada uma (Fase 3), os pedidos para as minhas áreas que esperam a minha resposta e a conversa dele (Fase 2)."""
+    out, convs, peds = [], convs or {}, peds if peds is not None else PD.por_objeto(PD.atual())
     for i in insights:
         e = est.get(i["id"]) or {}
         ev = e.get("evento") if e.get("evento") != "reabriu" else ""
-        pedidos = []
-        for t, p in (e.get("pedidos") or {}).items():
-            rot, tom = ES.RETORNOS[p["status"]]
-            pedidos.append(dict(p, torre=t, nome=nomes.get(t, t), rotulo=rot, tom=tom,
-                                minha=minhas is None or t in minhas))
+        pedidos = _com_pedidos(peds.get("insight:" + i["id"]) or [], minhas, meu)
         out.append(dict(i, estado=ev or "novo", por=e.get("por", ""), quando_txt=e.get("quando_txt", ""),
                         meu=bool(meu) and e.get("pessoa_hmac") == meu and ev == "assumiu",
                         sev_rot=RG.SEVERIDADES[i["sev"]][0], sev_tom=RG.SEVERIDADES[i["sev"]][1],
                         regra_nome=RG.REGRAS[i["regra"]]["nome"], avisar=RG.REGRAS[i["regra"]].get("avisar") or [],
                         pedidos=pedidos, resolvidos=sum(1 for p in pedidos if p["status"] == "resolvido"),
                         para_mim=[p for p in pedidos if p["minha"] and p["status"] != "resolvido"],
+                        atrasados=sum(1 for p in pedidos if p["situacao"] == "atrasado"),
                         ob="insight:" + i["id"], conv=_com_conversa(convs.get("insight:" + i["id"]), meu)))
     return out
 
@@ -116,7 +132,7 @@ def _leitura():
 
 def _contexto(**kw) -> dict:
     return dict(kw, nomes_torres=_nomes_das_torres(), areas=_areas(), codigo=_codigo(), aviso=session.pop(_AVISO, None),
-                abrir=request.args.get("abrir") or "",
+                abrir=request.args.get("abrir") or "", hoje=PD.hoje().isoformat(),
                 tem_login=bool(_meu_hmac()), voltar=request.full_path.rstrip("?"), retornos=ES.RETORNOS)
 
 
@@ -138,6 +154,7 @@ def insights():
     contas = {k: sum(1 for i in vivos if i["sev"] == k) for k in RG.SEVERIDADES}
     contas["notificados"] = sum(1 for i in vivos if i["pedidos"])
     contas["aguardando"] = sum(1 for i in vivos for p in i["pedidos"] if p["status"] == "pendente")
+    contas["atrasados"] = sum(i["atrasados"] for i in vivos)
     catalogo = [dict(RG.REGRAS[r], id=r, **(status.get(r) or {"n": 0, "erro": ""})) for r in RG.REGRAS]
     return render_template("comando/insights.html", **_contexto(
         torre=TORRE, tela=TORRE.tela("insights"), lei=lei, itens=filtrada, contas=contas, catalogo=catalogo,
@@ -148,12 +165,15 @@ def insights():
 
 @bp.route("/caixa-de-entrada")
 def caixa_de_entrada():
-    """Caixa de entrada: os pedidos que outras áreas mandaram para o setor da pessoa (esperando o retorno dele); o que
-    ela assumiu; e os insights das torres do setor sem dono e com outra pessoa. Sem os concluídos."""
+    """Caixa de entrada: os pedidos que outras áreas mandaram para o setor da pessoa, o mais atrasado primeiro (Fase 3:
+    com o prazo, sobre insight, OS ou usina); os que ela pediu e ainda estão abertos; as menções (Fase 2); o que ela
+    assumiu; e os insights das torres do setor sem dono e com outra pessoa. Sem os concluídos."""
     from ...comando import conversa as CV
     lei, todos, status, gerado = _leitura()
     torres, meu, convs = MO.torres_da_pessoa(), _meu_hmac(), CV.atual()
-    lista = [i for i in _com_estado(todos, ES.atual(), meu, torres, convs) if i["estado"] != "concluiu"]
+    todos_peds = PD.atual()
+    lista = [i for i in _com_estado(todos, ES.atual(), meu, torres, convs, PD.por_objeto(todos_peds))
+             if i["estado"] != "concluiu"]
     # as menções que ainda não li (Fase 2): a pessoa pelo código do e-mail, ou uma área que o setor dela vê
     usinas, mencoes = _usinas(), []
     for x in CV.para_mim(convs, meu, torres):
@@ -161,14 +181,19 @@ def caixa_de_entrada():
         mencoes.append(dict(x, titulo=titulo, link=link, conversa=na_raiz(
             "/t/comando/conversa/" + x["objeto"].replace(":", "/", 1)),
             por_area_nomes=[_nomes_das_torres().get(a, a) for a in x["por_area"]]))
-    pedidos = [i for i in lista if i["para_mim"]]
+    abertos = sorted((p for p in todos_peds.values() if p["status"] != "resolvido"), key=PD.ordem)
+    pedidos = [dict(p, titulo=t, link=k) for p in _com_pedidos(abertos, torres, meu) if p["minha"]
+               for t, k in [_titulo_e_link(p["objeto"], todos, usinas)]]
+    feitos = [dict(p, titulo=t, link=k) for p in _com_pedidos(abertos, torres, meu) if p["eu_pedi"]
+              for t, k in [_titulo_e_link(p["objeto"], todos, usinas)]]
     das_minhas = MO.das_torres(lista, torres)
     meus = [i for i in das_minhas if i["meu"]]
     sem_dono = [i for i in das_minhas if not i["meu"] and i["estado"] == "novo"]
     com_dono = [i for i in das_minhas if not i["meu"] and i["estado"] == "assumiu"]
     nomes = _nomes_das_torres()
     return render_template("comando/caixa.html", **_contexto(
-        torre=TORRE, tela=TORRE.tela("caixa-de-entrada"), lei=lei, pedidos=pedidos, meus=meus, sem_dono=sem_dono,
+        torre=TORRE, tela=TORRE.tela("caixa-de-entrada"), lei=lei, pedidos=pedidos, feitos=feitos, meus=meus,
+        sem_dono=sem_dono, erro_pedidos=PD.ler()["erro"],
         com_dono=com_dono, gerado=gerado, mencoes=mencoes, usinas_lista=sorted(usinas.items(), key=lambda u: u[1]),
         erro_conversa=CV.ler()["erro"], calculando=lei is None,
         minhas_torres=sorted(nomes.get(t, t) for t in torres if t not in FORA_DE_NOTIFICAR) if torres is not None else None,
@@ -196,6 +221,7 @@ def insights_corpo():
     # sem o `_contexto`: ele tira o aviso da sessão, que é da página
     return render_template("comando/_corpo.html", i=i, nomes_torres=_nomes_das_torres(), areas=_areas(),
                            codigo=_codigo(), tem_login=bool(_meu_hmac()), retornos=ES.RETORNOS,
+                           hoje=PD.hoje().isoformat(),
                            voltar=voltar if voltar.startswith("/t/comando/") else "/t/comando/insights")
 
 
@@ -206,29 +232,39 @@ def _ve_o_insight(i: dict) -> bool:
     if a["tudo"] or setor_telas.chave("comando", "insights") in a["telas"]:
         return True
     torres = MO.torres_da_pessoa() or set()
-    return i["torre"] in torres or any(t in torres for t in ((ES.atual().get(i["id"]) or {}).get("pedidos") or {}))
+    return i["torre"] in torres or any(p["torre"] in torres for p in PD.atual().values()
+                                       if p["objeto"] == "insight:" + i["id"])
 
 
-@bp.route("/insight/acao", methods=["POST"])
-@bp.route("/insights/acao", methods=["POST"])
-def insights_acao():
-    """Assumir, Concluir, Reabrir, Notificar áreas ou Responder (pela área notificada) um insight que o motor aponta
-    agora. Volta à tela de onde veio."""
-    voltar = request.form.get("voltar") or ""
-    destino = na_raiz(voltar) if voltar.startswith("/t/comando/") else na_raiz("/t/comando/caixa-de-entrada")
+def _form_venceu(destino: str):
+    """O formulário de outro site ou de outra sessão não grava: devolve o redirecionamento com o aviso, ou None."""
     certo = session.get(_CODIGO) or ""
     enviado = request.form.get("codigo") or ""
     if _de_outro_site() or not certo or not hmac.compare_digest(enviado.encode(), certo.encode()):
         session[_AVISO] = ("erro", "O formulário venceu (a sessão mudou desde que a tela abriu): abra a tela de novo. "
                                    "Nada foi gravado.")
         return redirect(destino, code=303)
-    acao = request.form.get("acao") or ""
-    evento = {"assumir": "assumiu", "concluir": "concluiu", "reabrir": "reabriu", "notificar": "notificou",
-              "responder": "respondeu"}.get(acao)
+    return None
+
+
+def _destino() -> str:
+    voltar = request.form.get("voltar") or ""
+    return na_raiz(voltar) if voltar.startswith("/t/comando/") else na_raiz("/t/comando/caixa-de-entrada")
+
+
+@bp.route("/insight/acao", methods=["POST"])
+@bp.route("/insights/acao", methods=["POST"])
+def insights_acao():
+    """Assumir, Concluir ou Reabrir um insight que o motor aponta agora. Volta à tela de onde veio. (Notificar as áreas e
+    o retorno delas são pedidos com prazo: `/pedido/acao`.)"""
+    destino = _destino()
+    venceu = _form_venceu(destino)
+    if venceu:
+        return venceu
+    evento = {"assumir": "assumiu", "concluir": "concluiu", "reabrir": "reabriu"}.get(request.form.get("acao") or "")
     iid = request.form.get("insight") or ""
     _lei, todos, _st, _g = _leitura()
     alvo = next((i for i in todos if i["id"] == iid), None)
-    nomes = _nomes_das_torres()
     try:
         if not evento:
             raise ES.Recusada("Ação desconhecida")
@@ -237,28 +273,89 @@ def insights_acao():
                               "meio minuto")
         if alvo is None:
             raise ES.Recusada("Este insight não está mais na lista (a regra parou de apontar): recarregue a página")
-        para, status = [], ""
-        if evento == "notificou":
-            para = [t for t in request.form.getlist("para") if t in nomes and t not in FORA_DE_NOTIFICAR]
-        if evento == "respondeu":
-            para, status = [request.form.get("area") or ""], request.form.get("status") or ""
-            minhas = MO.torres_da_pessoa()
-            if minhas is not None and para[0] not in minhas:
-                raise ES.Recusada("Só quem é da área notificada responde por ela")
-        feito = ES.registrar(alvo, evento, session.get("usuario"), request.form.get("nota") or "", para, status)
-        if evento == "notificou":
-            msg = (f"Notificado: {', '.join(nomes.get(t, t) for t in (feito.get('para') or '').split(',') if t)}. "
-                   "O retorno de cada área aparece no insight.") if feito else "Essas áreas já estavam notificadas."
-        else:
-            msg = {"assumiu": "Assumido: agora é seu.", "concluiu": "Concluído: saiu da Caixa de entrada.",
-                   "reabriu": "Reaberto.", "respondeu": "Retorno enviado: quem notificou já vê."}[evento]
-        session[_AVISO] = ("ok", msg)
+        ES.registrar(alvo, evento, session.get("usuario"), request.form.get("nota") or "")
+        session[_AVISO] = ("ok", {"assumiu": "Assumido: agora é seu.", "concluiu": "Concluído: saiu da Caixa de entrada.",
+                                  "reabriu": "Reaberto."}[evento])
     except ES.Recusada as ex:
         session[_AVISO] = ("erro", f"{ex}. Nada foi gravado.")
     except Exception as ex:      # noqa: BLE001 — banco fora: a pessoa sabe que não foi
         current_app.logger.exception("insight: o evento não gravou")
         session[_AVISO] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi gravado.")
     return redirect(destino + f"#ins-{iid.replace(':', '-')}", code=303)
+
+
+# ── o pedido entre áreas com prazo (Fase 3, 03/11/2026) ──────────────────────────────────────────────────────────────
+@bp.route("/pedido/acao", methods=["POST"])
+def pedido_acao():
+    """Pedir retorno a áreas sobre um insight, uma OS ou uma usina, com o prazo que quem pede escolhe (Levi, 03/11/2026:
+    "Quem pede sempre escolhe"); ou a área pedida responder. Volta à tela de onde veio, no objeto."""
+    destino = _destino()
+    venceu = _form_venceu(destino)
+    if venceu:
+        return venceu
+    from ...comando import conversa as CV
+    acao = request.form.get("acao") or ""
+    ob = CV.objeto(*(request.form.get("objeto") or "").partition(":")[::2]) or ""
+    nomes = _nomes_das_torres()
+    try:
+        if acao == "pedir":
+            if not ob:
+                raise PD.Recusada("Não achei este objeto: recarregue a página")
+            if ob.startswith("insight:"):
+                lei, todos, _st, _g = _leitura()
+                if lei is None:
+                    raise PD.Recusada("A conta dos insights está sendo feita agora (o Nexus acabou de subir): tente de "
+                                      "novo em meio minuto")
+                if not any(i["id"] == ob.split(":", 1)[1] for i in todos):
+                    raise PD.Recusada("Este insight não está mais na lista (a regra parou de apontar): recarregue a "
+                                      "página")
+            para = [t for t in request.form.getlist("para") if t in nomes and t not in FORA_DE_NOTIFICAR]
+            feito = PD.pedir(ob, para, request.form.get("prazo") or "", session.get("usuario"),
+                             request.form.get("nota") or "")
+            if feito:
+                prazo = PD._dia(feito[0]["prazo"])
+                areas = ", ".join(nomes.get(l["torre"], l["torre"]) for l in feito)
+                session[_AVISO] = ("ok", f"Pedido enviado a {areas}, com prazo até {prazo.strftime('%d/%m')}. O retorno "
+                                         "aparece aqui e no Tempo de resposta.")
+            else:
+                session[_AVISO] = ("ok", "Essas áreas já tinham pedido aberto sobre isto.")
+        elif acao == "responder":
+            PD.responder(request.form.get("pedido") or "", request.form.get("status") or "", session.get("usuario"),
+                         request.form.get("nota") or "", MO.torres_da_pessoa())
+            session[_AVISO] = ("ok", "Retorno enviado: quem pediu já vê.")
+        else:
+            raise PD.Recusada("Ação desconhecida")
+    except PD.Recusada as ex:
+        session[_AVISO] = ("erro", f"{ex}. Nada foi gravado.")
+    except Exception as ex:      # noqa: BLE001 — banco fora: a pessoa sabe que não foi
+        current_app.logger.exception("pedido: o evento não gravou")
+        session[_AVISO] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi gravado.")
+    ancora = ""
+    if ob.startswith("insight:") and "/conversa/" not in destino:
+        ancora = "#ins-" + ob.split(":", 1)[1].replace(":", "-")
+    return redirect(destino + ancora, code=303)
+
+
+@bp.route("/tempo-de-resposta")
+def tempo_de_resposta():
+    """Tempo de resposta: por área pedida, quantos pedidos, abertos, atrasados agora, resolvidos no prazo, e a mediana
+    das horas até a 1ª resposta e até resolver; e a lista dos atrasados, o mais velho primeiro."""
+    _lei, todos, _st, _g = _leitura()
+    peds, nomes = PD.atual(), _nomes_das_torres()
+    linhas = [dict(x, nome=nomes.get(x["torre"], x["torre"]), resposta_txt=PD.duracao(x["h_resposta"]),
+                   resolver_txt=PD.duracao(x["h_resolver"])) for x in PD.painel(peds)]
+    usinas = _usinas()
+    atrasados = [dict(p, titulo=t, link=k)
+                 for p in _com_pedidos(sorted((p for p in peds.values() if p["situacao"] == "atrasado"), key=PD.ordem),
+                                       MO.torres_da_pessoa(), _meu_hmac())
+                 for t, k in [_titulo_e_link(p["objeto"], todos, usinas)]]
+    total = {"pedidos": len(peds), "abertos": sum(x["abertos"] for x in linhas),
+             "atrasados": sum(x["atrasados"] for x in linhas), "resolvidos": sum(x["resolvidos"] for x in linhas),
+             "no_prazo": sum(x["no_prazo"] for x in linhas)}
+    total["pct_no_prazo"] = round(100 * total["no_prazo"] / total["resolvidos"]) if total["resolvidos"] else None
+    return render_template("comando/tempo_de_resposta.html", **_contexto(
+        torre=TORRE, tela=TORRE.tela("tempo-de-resposta"), linhas=linhas, atrasados=atrasados, total=total,
+        erro_pedidos=PD.ler()["erro"]))
 
 
 # ── a conversa com @menção (Fase 2, 03/11/2026) ──────────────────────────────────────────────────────────────────────
@@ -285,6 +382,12 @@ def _titulo(ob: str, insights: list[dict], usinas: dict) -> tuple[str, str]:
     return f"Usina {usinas.get(int(oid)) or oid}", ""
 
 
+def _titulo_e_link(ob: str, insights: list[dict], usinas: dict) -> tuple[str, str]:
+    """(o título do objeto, a página da conversa dele): é ela que mostra os pedidos e a conversa de qualquer objeto, e
+    abre para quem só tem a Caixa de entrada."""
+    return _titulo(ob, insights, usinas)[0], na_raiz("/t/comando/conversa/" + ob.replace(":", "/", 1))
+
+
 def _com_conversa(c: dict | None, meu: str) -> dict:
     """A conversa para a tela: as mensagens com os nomes das áreas e das pessoas mencionadas (o nome sai de quem já
     escreveu na conversa; a pessoa nunca vista fica "uma pessoa")."""
@@ -299,7 +402,8 @@ def _com_conversa(c: dict | None, meu: str) -> dict:
 
 @bp.route("/conversa/<tipo>/<path:oid>")
 def conversa(tipo, oid):
-    """A conversa de um objeto (insight, OS ou usina), com o formulário e as menções."""
+    """A página de um objeto (insight, OS ou usina): os pedidos às áreas com prazo e retorno (Fase 3) e a conversa com as
+    menções (Fase 2)."""
     from ...comando import conversa as CV
     ob = CV.objeto(tipo, oid)
     if not ob:
@@ -310,7 +414,9 @@ def conversa(tipo, oid):
     lido = CV.ler()
     return render_template("comando/conversa.html", **_contexto(
         torre=TORRE, tela=TORRE.tela("caixa-de-entrada"), ob=ob, tipo_nome=CV.TIPOS[tipo], titulo=titulo, link=link,
-        conv=_com_conversa(CV.atual().get(ob), meu), erro_conversa=lido["erro"]))
+        conv=_com_conversa(CV.atual().get(ob), meu), erro_conversa=lido["erro"],
+        pedidos=_com_pedidos(PD.por_objeto(PD.atual()).get(ob) or [], MO.torres_da_pessoa(), meu),
+        erro_pedidos=PD.ler()["erro"]))
 
 
 @bp.route("/conversa/pessoas")

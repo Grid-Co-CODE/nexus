@@ -1,0 +1,44 @@
+{# Os pedidos às áreas sobre um objeto (Fase 3, 03/11/2026): cada área com o prazo (atrasado, vence hoje, vence dd/mm), o
+   status do retorno e o texto; quem é da área responde ali; e o formulário de pedir, com o prazo que quem pede escolhe
+   (Levi: "Quem pede sempre escolhe", sem prazo padrão). Vale no insight, na OS e na usina (`pedidos.py`). #}
+{% macro bloco(ob, pedidos, areas, codigo, voltar, tem_login, hoje, retornos, sugeridas=[], titulo='Pedidos às áreas') %}
+{% set ancora = 'ped-' ~ ob|replace(':', '-') %}
+<section class="ped" id="{{ ancora }}" aria-label="{{ titulo }}">
+  <p class="ins-rot">{{ titulo }}</p>
+  {% if pedidos %}<ul class="ins-retornos">
+    {% for p in pedidos %}<li>
+      <div class="ins-ret-cab"><b>{{ p.nome }}</b>
+        <span class="ped-selos">{% if p.status != 'resolvido' %}<span class="cn-pill cn-{{ p.sit_tom }}">{{ p.sit_rotulo }}</span>{% endif %}<span class="cn-pill cn-{{ p.tom if p.status != 'resolvido' else p.sit_tom }}">{{ p.rotulo if p.status != 'resolvido' else p.sit_rotulo }}</span></span></div>
+      <p class="mudo ins-ret-sub">Pedido{% if p.pedido_por %} por {{ 'você' if p.eu_pedi else p.pedido_por }}{% endif %} em {{ p.pedido_em_txt }}{% if p.prazo_txt %}, prazo até {{ p.prazo_txt }}{% endif %}{% if p.mensagem %}: "{{ p.mensagem }}"{% endif %}</p>
+      {% if p.retorno or p.retorno_em %}<p class="ins-ret-txt">{{ p.retorno or 'Sem texto' }}<span class="mudo"> · {{ p.retorno_por }}{% if p.retorno_em_txt %}, {{ p.retorno_em_txt }}{% endif %}</span></p>{% endif %}
+      {% if tem_login and p.minha and p.status != 'resolvido' %}
+      <form class="ins-responder" method="post" action="{{ raiz }}/t/comando/pedido/acao">
+        <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="objeto" value="{{ ob }}"><input type="hidden" name="voltar" value="{{ voltar }}">
+        <input type="hidden" name="acao" value="responder"><input type="hidden" name="pedido" value="{{ p.id }}">
+        <label class="gc-rotulo" for="st-{{ p.id }}">Responder por {{ p.nome }}</label>
+        <div class="ins-resp-linha">
+          <select class="gc-campo" id="st-{{ p.id }}" name="status">{% for k, r in retornos.items() if k != 'pendente' %}<option value="{{ k }}"{% if k == p.status %} selected{% endif %}>{{ r[0] }}</option>{% endfor %}</select>
+          <input class="gc-campo" name="nota" maxlength="500" placeholder="O que foi feito ou o que falta" aria-label="Texto do retorno">
+          <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Responder</button>
+        </div>
+      </form>{% endif %}
+    </li>{% endfor %}
+  </ul>{% else %}<p class="mudo ins-nota">Nenhuma área foi chamada ainda.</p>{% endif %}
+  {% if tem_login %}
+  {% set ja = pedidos|rejectattr('status', 'equalto', 'resolvido')|map(attribute='torre')|list %}
+  <details class="ins-outras ped-pedir"{% if sugeridas and not pedidos %} open{% endif %}>
+    <summary>Pedir retorno a uma área</summary>
+    <form method="post" action="{{ raiz }}/t/comando/pedido/acao">
+      <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="objeto" value="{{ ob }}"><input type="hidden" name="voltar" value="{{ voltar }}">
+      <input type="hidden" name="acao" value="pedir">
+      <div class="ins-chk">{% for t, nome in areas %}<label{% if t in ja %} class="ins-chk--ja" title="Já tem pedido aberto"{% endif %}><input type="checkbox" name="para" value="{{ t }}"{% if t in ja %} disabled{% elif t in sugeridas %} checked{% endif %}> {{ nome }}</label>{% endfor %}</div>
+      <div class="ped-linha">
+        <label class="cn-filtro-par"><span class="gc-rotulo">Prazo</span><input class="gc-campo" type="date" name="prazo" min="{{ hoje }}" required></label>
+        <input class="gc-campo" name="nota" maxlength="500" placeholder="O que você precisa da área" aria-label="O que você precisa da área">
+        <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Pedir retorno</button>
+      </div>
+    </form>
+  </details>
+  {% endif %}
+</section>
+{% endmacro %}

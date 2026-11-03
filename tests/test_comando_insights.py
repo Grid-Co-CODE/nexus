@@ -126,9 +126,10 @@ INSIGHT = {"id": "N01:16702", "regra": "N01", "torre": "cos"}
 @pytest.fixture
 def limpo():
     from nexus.comando import conversa as CV
-    ES.limpar(); CV.limpar()
+    from nexus.comando import pedidos as PD
+    ES.limpar(); CV.limpar(); PD.limpar()
     yield
-    ES.limpar(); CV.limpar()
+    ES.limpar(); CV.limpar(); PD.limpar()
 
 
 def test_assumir_e_concluir_gravam_cifrados_e_nao_repetem(app, banco, limpo):
@@ -242,63 +243,7 @@ def test_sem_a_copia_do_motor_o_topo_abre_sem_o_sino(app, logado, monkeypatch):
 
 
 
-# ── notificar as áreas e o retorno de cada uma (Levi, 03/11/2026) ────────────────────────────────────────────────────
-def test_notificar_e_responder_no_estado(app, banco, limpo):
-    """"o manager quer algo como notificar as áreas e saber como está e receber retornos dessas áreas"."""
-    R07 = {"id": "R07:1", "regra": "R07", "torre": "hseq"}
-    ES.registrar(R07, "notificou", PESSOA, "Trocar até sexta", ["hseq", "campo"])
-    ES.registrar(R07, "notificou", PESSOA, "", ["hseq"])               # já avisada e sem resposta: não grava outra
-    ES.registrar(R07, "respondeu", {"email": "seg@exemplo.test", "nome": "Ciclana da Segurança"}, "Recarga marcada",
-                 ["hseq"], "andamento")
-    ES.registrar(R07, "respondeu", {"email": "seg@exemplo.test", "nome": "Ciclana da Segurança"}, "Recarga marcada",
-                 ["hseq"], "andamento")                                 # o mesmo retorno de novo: não grava
-    linhas = banco.linhas(ES.LIVRO, ES.ABA)
-    assert [(l["evento"], l["para"], l["status_retorno"]) for l in linhas] == [
-        ("notificou", "hseq,campo", None), ("respondeu", "hseq", "andamento")]
-    assert "Recarga" not in str(linhas) and "Ciclana" not in str(linhas)   # o retorno e o nome só cifrados
-    ped = ES.atual()["R07:1"]["pedidos"]
-    assert (ped["hseq"]["status"], ped["hseq"]["retorno"], ped["hseq"]["retorno_por"]) == (
-        "andamento", "Recarga marcada", "Ciclana da Segurança")
-    assert (ped["campo"]["status"], ped["campo"]["mensagem"]) == ("pendente", "Trocar até sexta")
-    with pytest.raises(ES.Recusada):
-        ES.registrar(R07, "respondeu", PESSOA, "", ["pcm"], "resolvido")    # área que não foi notificada
-    with pytest.raises(ES.Recusada):
-        ES.registrar(R07, "notificou", PESSOA, "", [])
-
-
-def test_a_tela_notifica_a_area_de_costume_e_a_area_responde(app, banco, limpo, motor_dublado, monkeypatch):
-    c = _cliente(app)
-    html = _aberta(c, "/t/comando/insights")
-    # a ação de costume da regra: o extintor avisa a Segurança e o Campo; a normalização, o Campo
-    assert "Notificar Segurança · HSEQ e Campo · App" in html and "Notificar outras áreas" in html
-    c.post("/t/comando/insights/acao", data={"codigo": _codigo(c), "insight": "R07:1", "acao": "notificar",
-                                             "para": ["hseq", "campo"], "voltar": "/t/comando/insights"})
-    assert [l["para"] for l in banco.linhas(ES.LIVRO, ES.ABA)] == ["hseq,campo"]
-    ES.ler(forcar=True)
-    html = _aberta(c, "/t/comando/insights")
-    assert "Notificado: Segurança · HSEQ, Campo · App." in html and "Aguardando retorno" in html
-    # a pessoa do setor da Segurança vê o pedido na Caixa, responde, e quem notificou vê o retorno
-    monkeypatch.setattr(MO, "torres_da_pessoa", lambda: {"hseq"})
-    seg = app.test_client()
-    with seg.session_transaction() as s:
-        s.update(logado=True, admin=False, usuario={"email": "seg@exemplo.test", "nome": "Ciclana da Segurança"})
-    caixa = _aberta(seg, "/t/comando/caixa-de-entrada")
-    assert "Pedidos para o seu setor" in caixa and "Responder por Segurança · HSEQ" in caixa
-    assert "Responder por Campo · App" not in caixa                          # só responde pela própria área
-    sino = caixa.split('class="sino-topo"', 1)[1].split("</details>", 1)[0]
-    assert "extintores vencidos" in sino                                   # o pedido pendente acende o sino dela
-    seg.post("/t/comando/insights/acao", data={"codigo": _codigo(seg, "/t/comando/caixa-de-entrada"),
-                                               "insight": "R07:1", "acao": "responder", "area": "hseq",
-                                               "status": "resolvido", "nota": "Extintores trocados",
-                                               "voltar": "/t/comando/caixa-de-entrada"})
-    seg.post("/t/comando/insights/acao", data={"codigo": _codigo(seg, "/t/comando/caixa-de-entrada"),
-                                               "insight": "R07:1", "acao": "responder", "area": "campo",
-                                               "status": "resolvido", "voltar": "/t/comando/caixa-de-entrada"})
-    assert [l["status_retorno"] for l in banco.linhas(ES.LIVRO, ES.ABA)] == [None, "resolvido"]
-    ES.ler(forcar=True)
-    monkeypatch.setattr(MO, "torres_da_pessoa", lambda: None)
-    html = _aberta(c, "/t/comando/insights")
-    assert "Extintores trocados" in html and "Ciclana da Segurança" in html
+# notificar as áreas e o retorno de cada uma viraram pedidos com prazo (Fase 3): tests/test_comando_pedidos.py
 
 
 def test_a_lista_vem_leve_e_o_miolo_quando_abre(app, banco, limpo, motor_dublado):

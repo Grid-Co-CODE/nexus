@@ -7,8 +7,8 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 
 ## As fases (uma de cada vez, mostrada ao Levi antes de seguir)
 1. **Insights + sino + Caixa de entrada** (esta pasta + `nexus/torres/comando/`): NO AR 03/11/2026 (3cd7564).
-2. **Conversa com @menção em cada insight, OS e usina** (`conversa.py`): ver a seção abaixo.
-3. Pedidos entre setores com prazo e o painel de tempo de resposta.
+2. **Conversa com @menção em cada insight, OS e usina** (`conversa.py`): NO AR 03/11/2026 (b01a060).
+3. **Pedidos às áreas com prazo + Tempo de resposta** (`pedidos.py`): ver a seção abaixo.
 4. O Início novo ("Pede você agora", paleta preto #030407, azul #1558c9, lima #D4FF24): decidir antes se a paleta vale
    para o Nexus inteiro.
 
@@ -20,6 +20,8 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `estado.py` | Quem assumiu, concluiu ou reabriu, as áreas notificadas e o retorno de cada uma: o livro `nexus_insights · fato_evento_insight` |
 | `../torres/comando/__init__.py` | As telas Comando → Insights e Caixa de entrada, o miolo de um insight (`GET /t/comando/insight/corpo`) e o POST `/t/comando/insight/acao` (os endereços antigos `/insights/...` seguem valendo) |
 | `../torres/comando/templates/comando/_insight.html` + `static/comando/insights.js` | A linha do insight (`cartao`) e o miolo (`corpo`), que vem só ao abrir |
+| `pedidos.py` | O pedido a uma área com prazo e o retorno: o livro `nexus_pedidos · fato_pedido_area`, o prazo (`situacao`), a ordem do mais urgente e o painel do Tempo de resposta (`painel`) |
+| `../torres/comando/templates/comando/_pedidos.html` + `tempo_de_resposta.html` | O bloco dos pedidos (no insight e na página do objeto) e a tela do painel; `POST /t/comando/pedido/acao` |
 | `conversa.py` | A conversa presa ao objeto com @menção: o livro `nexus_conversas · fato_mensagem`, as menções não lidas (`para_mim`) e a lista do @ (`pessoas_mencionaveis`) |
 | `../torres/comando/templates/comando/_conversa.html` + `static/comando/conversa.js` | O componente da conversa (dentro de cada insight e na página da OS e da usina) e o @ |
 | `../casca/__init__.py` (`_sino`) + `base.html` | O sino do topo |
@@ -41,18 +43,29 @@ R02, R04 e R08 (pedem ajuste), a R06 completa (falta a vigência da garantia: ne
 R12 (sem fonte). **Nenhuma regra lê o Fracttal, a SunOp ou a PV Operation**: as OS e os chamados são os livros que o
 Nexus publica de hora em hora.
 
-## Notificar as áreas e o retorno de cada uma (03/11/2026)
+## Pedidos às áreas, com prazo, e o Tempo de resposta (Fases 1 e 3, 03/11/2026)
 Levi: "religamentos em 30 dias e etc é coisa da engenharia, já está com eles... pode aparecer tipo 'notificar
-engenharia'"; "extintores pode ser tanto equipe de segurança quanto supervisor o manager quer algo como notificar as
-áreas e saber como está e receber retornos dessas áreas".
-- Cada regra tem `avisar` (`regras.REGRAS`): as áreas que o botão "Notificar ..." já traz (R03 → Engenharia; R07 →
-  Segurança e Campo; R11 → Campo e PCM...). "Notificar outras áreas" escolhe qualquer torre de operação (fora o Comando
-  e o OS Creator), com uma mensagem.
-- A área avisada vê o pedido na Caixa de entrada ("Pedidos para o seu setor") e no sino, e responde: Recebido, Em
-  andamento ou Resolvido, com o texto. Só quem é da área (o setor vê a torre) responde por ela. Quem notificou vê o
-  retorno de cada área no insight; resolvida, a área pode ser notificada de novo.
-- Se a regra para de apontar (a condição sumiu), o insight sai da lista, e os pedidos dele junto: está resolvido na
-  fonte.
+engenharia'"; "o manager quer algo como notificar as áreas e saber como está e receber retornos dessas áreas"; e, na
+Fase 3: o prazo, "Quem pede sempre escolhe" (sem prazo padrão), e o pedido vale para o insight, a OS e a usina.
+- **O livro é `nexus_pedidos · fato_pedido_area`** (`pedidos.py`): `pediu` e `respondeu`, um `pedido_id` por área (quem
+  pede a três áreas grava três; cada área responde e é medida sozinha). O notificar e o responder moravam no livro dos
+  insights até 03/11/2026, que nunca gravou nenhum (conferido no banco antes da troca): não há o que migrar.
+- **Pedir:** dentro do insight, na página da OS e na da usina (`_pedidos.html`, "Pedir retorno a uma área"): as áreas
+  (as torres de operação, fora o Comando e o OS Creator; no insight, as de `regras.REGRAS[...]["avisar"]` já marcadas:
+  R03 → Engenharia, R07 → Segurança e Campo...), o **prazo obrigatório** (de hoje a um ano) e o que precisa. A área com
+  pedido aberto sobre o mesmo objeto não ganha outro; resolvida, pode.
+- **Responder:** só quem é da área (o setor vê a torre; `MO.torres_da_pessoa`): Recebido, Em andamento ou Resolvido, com
+  o texto. Vale o último; o tempo até a 1ª resposta é o do 1º `respondeu`, e até resolver, o do 1º `resolvido`.
+- **Prazo:** atrasado = aberto depois do dia do prazo; vence hoje; no prazo = resolvido até o fim do dia do prazo
+  (Brasília). A cor diz isso (crítico, alerta, info) e a palavra também.
+- **Onde aparece:** a Caixa ("Pedidos para o seu setor", o atrasado primeiro, e "Pedidos que você fez"); o sino (o pedido
+  sem resposta ou atrasado para as áreas da pessoa; o atrasado conta como crítico); a linha do insight (a área com
+  "Atrasado" ou "Vence hoje"); e Comando → **Tempo de resposta** (por área: pedidos, abertos, sem resposta, atrasados, %
+  no prazo e as medianas; e a lista dos atrasados). Sem filtro de período e sem meta de % por enquanto: perguntar ao Levi
+  antes de pôr.
+- O link de todo pedido é a página do objeto (`/t/comando/conversa/<tipo>/<id>`), que mostra os pedidos e a conversa e
+  abre para quem só tem a Caixa. O pedido sobre um insight que a regra parou de apontar continua (o título diz "a regra
+  não aponta mais"): a área ainda responde.
 
 ## A conversa com @menção (Fase 2, 03/11/2026)
 Levi: "pode seguir para a fase 2". A conversa mora NO objeto (`tipo:id`: `insight:R07:2`, `os:16702`, `usina:12`),
@@ -107,3 +120,6 @@ fazer, as áreas e os retornos, e as ações.
 sem repetir; a Caixa só das torres do setor; o sino sem dono e sem cópia; a lista leve com o miolo ao abrir; a tela
 sem cópia que não espera; a Caixa de todo setor). Os testes da torre (`test_torres.py`,
 `test_casca_inicio.py`) passaram a esperar o Comando com a Caixa de entrada e os Insights prontos.
+`tests/test_comando_pedidos.py` (Fase 3: um pedido por área com prazo obrigatório, só a área responde, o prazo
+(atrasado, vence hoje, no prazo) e as medianas do painel com linhas inventadas, a Caixa, o sino, a página da OS e o
+Tempo de resposta); `tests/test_comando_conversa.py` (Fase 2).

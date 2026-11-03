@@ -574,6 +574,7 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .sino-sev--critico{color:var(--critico);background:var(--critico-suave)}
 .sino-sev--atencao{color:var(--alerta);background:var(--alerta-suave)}
 .sino-sev--mencao{color:var(--info);background:var(--info-suave)}
+.sino-sev--pedido{color:var(--alerta);background:var(--alerta-suave)}
 .sino-vazio{margin:0 0 12px;color:var(--mudo);font-size:13px}
 .sino-todos{width:100%;justify-content:center}
 @media (max-width:640px){.sino-caixa{position:fixed;left:16px;right:16px;top:64px;width:auto}}

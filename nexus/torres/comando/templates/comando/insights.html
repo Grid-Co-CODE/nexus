@@ -21,7 +21,7 @@
     {% for k, s in severidades.items() %}
     <a href="?sev={{ k }}"{% if sev == k %} aria-current="page"{% endif %}><span class="gc-rotulo">{{ s[0] }}s</span><span class="v">{{ contas[k] }}</span><span class="d">{{ s[2] }}</span></a>
     {% endfor %}
-    <span><span class="gc-rotulo">Áreas avisadas</span><span class="v">{{ contas.notificados }}</span><span class="d">{{ contas.aguardando }} {{ 'retorno pendente' if contas.aguardando == 1 else 'retornos pendentes' }}</span></span>
+    <span><span class="gc-rotulo">Áreas avisadas</span><span class="v">{{ contas.notificados }}</span><span class="d">{{ contas.aguardando }} sem resposta{% if contas.atrasados %} · {{ contas.atrasados }} {{ 'atrasado' if contas.atrasados == 1 else 'atrasados' }}{% endif %}</span></span>
   </div>
 
   <form class="cn-filtros" method="get">
@@ -38,7 +38,7 @@
   </form>
 
   {% if itens %}
-  <ol class="ins-lista">{% for i in itens %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, i.id == abrir) }}{% endfor %}</ol>
+  <ol class="ins-lista">{% for i in itens %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, i.id == abrir, hoje) }}{% endfor %}</ol>
   {% else %}<p class="cn-vazio">{% if calculando %}A lista aparece assim que a conta terminar.{% elif sev or regra or torre_f %}Nenhum insight com estes filtros.{% else %}Nenhuma regra apontou problema agora. A conta se refaz a cada 5 minutos.{% endif %}</p>{% endif %}
 
   <h2 class="ins-sub">As regras</h2>

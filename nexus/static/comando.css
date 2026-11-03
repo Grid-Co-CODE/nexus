@@ -120,3 +120,13 @@
 .conv-sobre{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0}
 a.ins-titulo{color:inherit;text-decoration:none}
 a.ins-titulo:hover{color:var(--verde-texto)}
+
+/* os pedidos às áreas com prazo (Fase 3, 03/11/2026) */
+.ins-area--atrasado em{color:var(--critico)}
+.ins-area--hoje em{color:var(--alerta)}
+.ped-selos{display:inline-flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.ped-pedir form{display:grid;gap:10px;margin-top:10px}
+.ped-linha{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px}
+.ped-linha input[name=nota]{flex:1 1 220px;min-width:0}
+.ped-pagina{margin-bottom:22px}
+.tr-tab td.num,.tr-tab th.num{text-align:right;font-variant-numeric:tabular-nums}

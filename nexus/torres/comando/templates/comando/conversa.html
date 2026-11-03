@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% from "comando/_conversa.html" import fio %}
+{% from "comando/_pedidos.html" import bloco %}
 {% block titulo %}{{ titulo }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
-{# A conversa de um objeto (Fase 2, 03/11/2026): a OS e a usina têm a página dela; o insight também (e a mesma conversa
-   aparece dentro dele na lista). Quem foi mencionado chega aqui pela Caixa de entrada e marca como lido. #}
+{# A página de um objeto (Fases 2 e 3, 03/11/2026): os pedidos às áreas, com prazo e retorno, e a conversa. A OS e a
+   usina têm a página dela; o insight também (e o mesmo aparece dentro dele na lista). Quem foi mencionado ou recebeu um
+   pedido chega aqui pela Caixa de entrada. #}
 <div class="campo-nativa conv-pagina">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">Conversa · {{ tipo_nome }}</p><h1 class="cn-titulo">{{ titulo }}</h1>
@@ -14,6 +16,8 @@
   {% if aviso %}<div class="cn-erro{% if aviso[0] == 'ok' %} ins-ok{% endif %}" role="{{ 'status' if aviso[0] == 'ok' else 'alert' }}"><b>{{ aviso[1] }}</b></div>{% endif %}
   {% if erro_conversa %}<div class="cn-erro cn-aviso" role="status"><b>Não li as conversas agora ({{ erro_conversa }}).</b></div>{% endif %}
   {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para escrever: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
+  {% if erro_pedidos %}<div class="cn-erro cn-aviso" role="status"><b>Não li os pedidos agora ({{ erro_pedidos }}).</b></div>{% endif %}
+  <div class="ped-pagina">{{ bloco(ob, pedidos, areas, codigo, voltar, tem_login, hoje, retornos) }}</div>
   {{ fio(ob, conv, codigo, voltar, tem_login, areas, 'Mensagens') }}
   {% if tem_login and conv.n %}<form class="conv-lida" method="post" action="{{ raiz }}/t/comando/conversa/acao">
     <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="objeto" value="{{ ob }}"><input type="hidden" name="voltar" value="{{ voltar }}">
