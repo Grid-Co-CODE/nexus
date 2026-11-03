@@ -23,8 +23,41 @@ da fila sai e entra uma linha em "O que já foi feito", no mesmo commit.
 | "trabalhando" e o Processador do Nexus perto de 100% | o processo segura o GIL: um laço Python | a tarefa "trabalhando" (pré-carga, PDF, renovar) e o laço dela |
 | "trabalhando" com o Nexus baixo e, no Raio-X, esperando o disco alto, swap trocando ou memória parada | a MÁQUINA (disco, memória), não o código | a seção "Quem ocupa a memória da máquina" do Raio-X diz de quem é a memória; sendo a máquina mesmo, os números vão ao Levi para a T.I. Caso de 20/10: o PDF das 13:45 ficou 1 min "trabalhando" no desenho do logo (milissegundos) com a máquina no swap |
 | Lento só nos ~5 min depois de um push | conta fria pós-deploy | a fila, item "Conta fria pós-deploy" |
+| Seção **Uso do OS Creator** (últimos 7 dias; só no servidor, que é quem grava) | o que as pessoas abrem, a que hora e quanto isso pede ao Fracttal: o ANTES e o DEPOIS de cada mudança do canto central do OS Creator (desde 31/10/2026) | veja abaixo, "Como ler o Uso do OS Creator" |
 
 O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexus lento".
+
+### Como ler o Uso do OS Creator (a seção do Raio-X, desde 31/10/2026)
+
+Os números vêm de duas medidas que o servidor faz na memória (`nexus/casca/CLAUDE.md`, "Uso das telas do OS Creator por
+hora"): quantas vezes cada tela foi aberta, quanto demorou e quanto pediu ao Fracttal, e quantos pedidos o Nexus fez ao
+Fracttal por minuto contra a cota de 200 para a empresa toda. **De hora em hora (:05) as horas fechadas vão para o disco do
+servidor, e ao banco elas vão em uma gravação por dia às 04:45** (gravar o livro do mês inteiro custa ~7 s de processador, e o
+Nexus é um processo só). O banco guarda 1 hora por linha, num livro por mês (`nexus_oscreator_uso_AAAA_MM`, três abas: o uso por
+tela, o detalhe do Fracttal por origem e método e o total da hora). A seção lê de ontem para trás do banco (cópia de 10 min),
+põe por cima o pendente do disco (o que ainda não foi às 04:45) e a memória (a hora aberta): o que você vê de hoje é do
+disco e da memória do servidor, e amanhã, depois das 04:45, está no banco.
+
+| O que aparece | Quer dizer | O que fazer |
+|---|---|---|
+| **Por dia:** "maior pico por minuto" com "perto da cota" (amarelo, a partir de 160) ou "na cota" (vermelho, 200 ou mais) e recusados (406/429) acima de zero | naquele minuto o Nexus sozinho encostou na cota do Fracttal, e o App de Campo e os robôs ainda dividem os mesmos 200: o Fracttal passou a recusar | olhar a hora do pico em "Por hora do dia" e as telas dela em "As 15 telas": quem faz a rajada é a tela com mais pedidos ao Fracttal por clique (pedidos ao Fracttal ÷ cliques) |
+| **Por hora do dia:** os cliques e o pico por minuto de cada hora (soma dos 7 dias, hora de Brasília) | a forma do dia: as horas em que o OS Creator pesa e as em que a cota aperta | trocar um horário de carga ou de varredura para fora da hora de pico; o :05 da gravação do próprio uso já está fora dos laços de hora em hora do Nexus |
+| **Por dia e por hora do dia:** "Esperaram a vez" acima de zero | o porteiro do Nexus (`casca/fracttal_conta.py`, desde a etapa 5) segurou pedidos ao Fracttal: o Nexus chegou a 150 no último minuto (sobram 50 dos 200 para o App de Campo e os robôs) ou o fundo a 90. O clique espera no máximo 2 s e segue; o fundo espera a vez, sem limite | ver a hora em "Por hora do dia" e quem esperou no banco (`fato_fracttal_hora`, por origem: fundo é só o laço que se declara, os da lista do `nexus/casca/CLAUDE.md`; a `fundo:<thread>` fora dela, um pool ou a releitura por trás de uma tela, foi tratada como clique). Espera de fundo é o porteiro trabalhando (a leitura só demora mais); espera de clique em hora de trabalho é lentidão que a pessoa sente: tirar laço ou leitura daquela hora |
+| **As 15 telas:** muitos "Automáticos" e poucos "Cliques" | a tela pede sozinha (a sessão a cada 5 min, o Histórico a cada 10, as Solicitações a cada 15), e cada aba aberta soma | é custo fixo de quem deixa a aba aberta, não de quem usa: não conta como uso, e o que reduz é pedir menos vezes ou só com a aba à frente |
+| **As 15 telas:** mediana baixa e p95 muito mais alto | a tela é rápida quando o Fracttal responde e lenta quando ele demora ou recusa | cruzar com "Ocupado (503)" (o teto de 16 threads recusou) e com os recusados do dia |
+| **As 15 telas:** "Pedidos ao Fracttal" alto para poucos cliques | uma abertura da tela faz muitos pedidos (o catálogo de ativos pedia ~110 pelo RPC) | é o candidato à cópia guardada e à releitura por trás (as etapas seguintes do canto central). O catálogo de ativos já é (31/10/2026): o servidor o lê às 02:15 (`fundo:nexus-ativos-leitor`, ~270 pedidos a 1 por segundo) e os novos de 30 em 30 min; um RPC de ~110 pedidos numa tela depois disso é a noite que não entrou (README do OS Creator, "O leitor do servidor"). O histórico de OS também se lê sozinho desde 31/10/2026, em faixas (`fundo:nexus-os-leitor:<faixa>`: novas, sete_dias, abertas, finalizadas, noite, pendentes; na escala do AC, ~99 OS por dia: ~92 a 110 pedidos por hora de dia útil, a noite às 03:21 com ~190 a 210, no domingo ~750 a 830; o pico de memória da noite de domingo ~150 MB, o da de todo dia ~40 MB, com cada página cortada no que a lista lê), e as telas leem dele desde a 3.3 (o Histórico e as visões, o Garantias, a marcação verde dos Ativos, o Investigar, o nº → id e a 1ª pintura do card: a Visão COS de 26 pedidos na 1ª visita para 1, a conferência de cada pessoa; README do OS Creator, "As telas leem da lista central de OS"). Um Histórico que volta a pedir a lista inteira é a pessoa que o Raio-X conta como divergência ou "sem resposta pela página" ("Conferências das telas"; a conferência é uma por pessoa e período, até a marca d'água da lista), a lista que não cobre o período, ou o campo que o REST não trouxe. A faixa que o Raio-X diz "recusada" (a trava de encolhimento) ou "não devolveu pela criação" não mexeu na lista: as telas seguem como estavam; a recusa que se repete igual na leitura seguinte passa ("aceita na 2ª leitura", o apagamento de verdade) |
+| **Antes e depois:** o mesmo dia da semana, comparando o total de pedidos ao Fracttal e o maior pico | se a mudança aliviou a cota de verdade, em número e não em sensação | anotar o dia do deploy; a etapa 0 dá o antes |
+| "Sem medição ainda" | o servidor ainda não guardou a 1ª hora (ela chega ao disco no :05 da hora seguinte ao deploy, e ao banco às 04:45), o banco não respondeu ou é o PC (que não mede) | a frase diz qual; com o banco fora, a seção mostra só o que o servidor guarda, o disco e a memória |
+
+Limites: a mediana e o p95 de vários dias são aproximados (cada hora guarda só os dela; a seção junta pelo quantil dos
+quantis, pesado pelos pedidos atendidos). O corte por setor vem da memória do servidor e só mostra os 7 dias (o disco dele
+guarda 30); nunca está no banco. **O que ainda não foi às 04:45 está só no disco do servidor** (`casca/uso_os_pendente.json`,
+até 3 dias): sobrevive ao reinício, mas não a perder o disco, e se o banco ficar fora por mais de 3 dias as horas mais
+velhas saem do pendente (aviso no log). **O que um reinício perde** é só a hora aberta do contador do Fracttal (ele não
+guarda parcial em disco; o do uso das telas guarda, de 5 em 5 min): **a hora em que o servidor reiniciou** (todo deploy)
+tem os pedidos ao Fracttal só de depois do reinício, o total e o pico por minuto dessa hora podem estar abaixo do real, e o
+"antes e depois" deve comparar dias inteiros, não a hora do deploy. O total do Fracttal e o pico por minuto são da aba do
+total da hora (1 linha por hora), e o pico do total não é a soma dos picos de cada tela.
 
 ## Regras de prova de toda correção
 
@@ -34,9 +67,8 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
 3. Mutação: desfazer cada parte da correção derruba o teste dela.
 4. Medir antes e depois e dizer o número (num processo novo, com o mesmo dado). Mudou a leitura de um dado: comparar
    valor a valor (confiabilidade de dado é a prioridade 1).
-5. Suíte inteira (`python -m pytest -q`) antes do push. No OS Creator: `python ferramentas/sincronizar_oscreator.py
-   --aplicar` só quando o "vai para o oem" lista só os seus arquivos, e a suíte do oem na pasta dele (`cd
-   C:\GridcoBuild\oem` e `python -m pytest -rN tests`).
+5. Suíte inteira (`python -m pytest -q`) antes do push. No OS Creator, a prova é a suíte do Nexus: desde 31/10/2026 ele
+   é a casa do OS Creator Web, não há mais sincronia com o oem e a pasta do oem não se toca.
 6. Push é deploy: conferir o `/saude` com o commit. Juntar as correções do dia num push quando der (cada push esfria o
    servidor).
 7. O `.md` da área tocada é atualizado no mesmo commit, e este arquivo também.
@@ -96,8 +128,11 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
 | 23/10 | Raio-X das 08:41: a 1ª abertura do dia do Acompanhamento de chamados 42 s | a cópia passava de 2 h (`VELHA_MAX`) e a tela esperava a leitura nova do Fracttal | abre com a de ontem (a hora à vista) para quem vê o mesmo total no Fracttal, relê por trás e troca sozinha quando a nova chega | `4c027f3` |
 | 29/10 | COS > Normalizações "carrega sempre que clico": cada filtro recarregava a página inteira (1,1 MB com ~1.000 no mês) e, passado o minuto da cópia, o clique esperava a Ronda COS (a 3 s, o filtro levava 3,2 s, todos juntos na trava) | o filtro no servidor e a releitura dentro do clique | o filtro na própria página (`static/cos/normalizacoes.js`, as contas iguais às do servidor) e a cópia vencida na hora, com a releitura por trás: 3,2 s → 0,15 s no clique que caía no minuto, e o filtro sem ir ao servidor | este |
 | 29/10 | Raio-X das 10:53: o Nexus com 707 MB na memória e 1.481 MB no swap (930 MB às 09:59), 7,0 GB livres na máquina, trocando 10,6 MB/s, a API do banco em 502 às 09:51 e Normalizações do COS 1 min 19 s; em cinco leituras de dois dias o Nexus sempre em ~700 MB | com memória sobrando o Linux só troca assim se o grupo do processo tiver teto, e ninguém de fora via o serviço | o cartão da memória diz o teto do Nexus pelo cgroup do próprio processo (o limite, o swap permitido, quantas vezes apertou, onde) | este |
+| 30/10 | Raio-X das 10:48: o Nexus com 671 MB na memória e 2.847 MB no swap, 6,8 GB livres, "o Linux apertou o Nexus 132.576 vezes" (51.280 às 08:55), o "clonar OS" do OS Creator 13 min 43 s preso; às 15:13, com a 1ª correção no ar (42e506c, só o set-property), o teto seguia lá (18.802 apertos desde o restart das 14:38) | o `nexus.service` com MemoryHigh=700M e MemoryMax=1024M, posto no servidor (não no `deploy/nexus.service`), e ninguém via o que o deploy fazia com ele | o `deploy/atualizar.sh` (root, a cada 2 min) tira o teto abaixo de 4 GB pelo drop-in `zz-` com daemon-reload, pelo set-property e pelo `max` direto no cgroup, e grava o que viu em `.git/nexus-teto`, que o Raio-X mostra; teto acima do piso fica (é da T.I.) | este |
 | 24/10 | Raio-X das 12:05 (máquina nova, 16 GB): o Nexus com 682 MB e 1.917 MB no swap, sem saber de quê | o Raio-X media por dentro só a plataforma | "Dentro do Nexus": as variáveis e as extensões do app, por amostra, a cada 10 min (`casca/memoria_nexus.py`) | `4c027f3` |
 | 25/10 | Base → Integração Fracttal: cada busca e cada filtro recarregavam a página (319 KB com 180 pessoas) e a 1ª abertura fria levava ~2,4 s | o filtro ia ao servidor, o campo Setor de cada linha levava a lista toda e o Fracttal ligado às fichas era refeito quando a cópia vencia | a tela virou a aba Pessoas e setores de Acessos; filtro na página, o campo Setor enche ao tocar, a ligação guardada 2 min e renovada por trás; no celular, o filtro dos Cadastros não fica mais com 140 px de altura | este |
+| 31/10 | os três "Atualizar ativos" do OS Creator (Ativos, o ↻ do Criar OS, o "Recarregar o catálogo" da Fila) seguravam quem clicou por minutos, e o catálogo só se renovava com a sessão da 1ª pessoa do dia (etapa 2 do canto central) | o catálogo inteiro (~110 pedidos ao Fracttal) baixado pelo RPC dentro do pedido, pela sessão de quem clicou | o servidor lê os ativos sozinho às 02:15 (REST, ~270 pedidos a 1 por segundo, conferido contra o catálogo) e os novos às :08 e :38 (1 ou 2 pedidos); o botão pede só os novos por trás e volta na hora com "ativos de HH:MM", e a lista seguinte espera essa leitura (até 6 s); sem o leitor (o PC), como antes | este |
+| 03/11 | Raio-X: às 10h o Nexus chegou a 828 pedidos ao Fracttal num minuto (a cota é 200 para a empresa toda) e o Fracttal recusou 310 no dia; o Acompanhamento de chamados fez 1.851 pedidos em 49 cliques | o deploy esvazia a memória, e cada pessoa que abria o quadro antes de a 1ª leitura terminar lia tudo de novo; e a releitura de 30 em 30 min, numa thread sem declaração, passava pelo porteiro como clique, sem teto | uma leitura só por chave na memória do OS Creator (`rotas._memo`: quem chega espera a leitura em curso); a releitura do quadro declarada `fundo:os-web-acomp-renovar` (até 90 por minuto, cedendo a vez a quem clica) | este |
 
 ## A fila
 
@@ -129,15 +164,31 @@ O Raio-X e o que cada número quer dizer: `nexus/casca/CLAUDE.md`, seção "Nexu
    a da chegada, não a do técnico. Proposta: o App manda a hora em que o técnico justificou (a `ts` do evento, que ele
    já usa na linha da nota) e o Nexus decide o "mesmo dia" por ela. Das 7 de 22/10, 2 da OS 13473 voltaram "sem
    mudança" e ficaram sem a nota e a etiqueta; as outras 5 estão nos aparelhos.
+7. **PCM → Almoxarifado, aba Avariadas** (30/10/2026): o `_paradas` (`nexus/pcm/almoxarifado.py`) lê o Saldo de TODOS os meses do
+   histórico a cada recálculo de 5 min; cresce ~30 ciclos por mês. Corrigir quando aparecer no Raio-X: ler do ciclo mais novo para
+   trás e parar quando todas as chaves já tiverem quebrado a corrida.
 
 ## Onde está cada peça
 
 - Raio-X `nexus/casca/raio_x.py` e `nexus/templates/raio_x.html`; pedidos presos `nexus/casca/presos.py`; teto do OS
   Creator `nexus/casca/teto_os.py`. Regras em `nexus/casca/CLAUDE.md`.
+- O uso do OS Creator e os pedidos ao Fracttal por hora: o contador `nexus/casca/fracttal_conta.py` (e, no mesmo gancho, o
+  porteiro: o Nexus até 150 pedidos por minuto, o fundo até 90, o clique nunca recusado), a medida das telas e o
+  laço (o disco no :05, o banco às 04:45) `nexus/casca/uso_os.py`, o fato e o livro `nexus/dados/fato_uso_os.py` (regras em
+  `nexus/dados/CLAUDE.md`), e a seção do Raio-X em `raio_x.py` (`montar_uso_os`).
 - Contas do Campo: `nexus/campo/visao.py` (`_ler`: a cópia de 5 min sai na hora e se refaz por trás; `_fria`: uma conta
   fria por chave; `VAGAS_BANCO`; `manter_quente`; `carregar`: a pré-leitura).
 - Pré-carga `nexus/auth/pre_carga.py`; portão e acessos `nexus/auth/__init__.py` e `nexus/auth/acessos.py`.
 - OS Creator: `nexus/torres/oscreator/os_creator/` (`api.py` fala com o Fracttal; `os_web/rotas.py` e o `_memo`;
-  `historico_store.py`; `rotas_acomp.py`). Regras no `nexus/torres/oscreator/README.md`.
+  `historico_store.py`; `rotas_acomp.py`; o catálogo de ativos central `ativos_central.py` e o leitor do servidor
+  `ativos_leitor.py`, que lê os ativos de madrugada; a lista central de OS `os_central.py`, o leitor em faixas `os_leitor.py` e
+  as telas que leem dela `os_web/lista_central.py`; os catálogos pequenos `catalogos.py`, o pessoal, as etiquetas, os tipos,
+  as falhas, os status e os motivos, um dono para cada, com os planos da Performance em `catalogos_planos.py` e o laço das
+  pessoas pelo REST em `catalogos_leitor.py`; com o estado dos três no Raio-X, seção "Uso
+  do OS Creator"). Regras no `nexus/torres/oscreator/README.md`. Os minutos de
+  hora em hora que já têm dono: `nexus/casca/minutos_ocupados.py` (o laço novo pede o próximo livre).
 - Medir uma tela fria: num processo novo, `create_app` com o `.env` do Nexus vivo e uma senha de administrador
   descartável, contando o `requests.Session.request` e recusando o Fracttal (só leitura no banco).
+- A skill `desempenho` (`.claude/skills/desempenho/SKILL.md`, desde 30/10/2026): o gatilho e o atalho `/desempenho`
+  dos chats de lentidão. Só leva a este arquivo, pela versão do `origin/main`; a regra mora aqui, não nela. No teste de
+  30/10, dois agentes sem a skill já chegaram a este arquivo pelo `CLAUDE.md`: ela não é a única guarda.

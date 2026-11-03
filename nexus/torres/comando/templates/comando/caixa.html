@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "comando/_insight.html" import cartao %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
+{# Caixa de entrada (03/11/2026): primeiro os pedidos de retorno que outras áreas mandaram para o setor da pessoa; depois
+   o que ela assumiu, o que está sem dono e o que outra pessoa assumiu, das torres que o setor vê (Base → Acessos). #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">{% if minhas_torres is none %}todas as torres{% else %}das torres do seu setor: {{ minhas_torres|join(', ') }}{% endif %}{% if gerado %}<br>conta das <b>{{ gerado.strftime('%H:%M') }}</b>{% endif %}</div>
+  </div>
+  {% if aviso %}<div class="cn-erro{% if aviso[0] == 'ok' %} ins-ok{% endif %}" role="{{ 'status' if aviso[0] == 'ok' else 'alert' }}"><b>{{ aviso[1] }}</b></div>{% endif %}
+  {% if lei.erro %}<div class="cn-erro" role="alert"><b>{{ lei.erro }}.</b></div>{% endif %}
+  {% if falhas %}<div class="cn-erro cn-aviso" role="status">{{ falhas|length }} {{ 'regra não leu' if falhas|length == 1 else 'regras não leram' }} a fonte agora: o que elas apontariam pode faltar. <a href="{{ raiz }}/t/comando/insights">Ver as regras</a></div>{% endif %}
+  {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para notificar, responder e assumir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Pedidos para você</span><span class="v">{{ pedidos|length }}</span><span class="d">esperam o retorno do seu setor</span></span>
+    <span><span class="gc-rotulo">Com você</span><span class="v">{{ meus|length }}</span><span class="d">o que você assumiu</span></span>
+    <span><span class="gc-rotulo">Sem dono</span><span class="v">{{ sem_dono|length }}</span><span class="d">{{ sem_dono|selectattr('sev', 'equalto', 'critico')|list|length }} críticos</span></span>
+    <span><span class="gc-rotulo">Com outra pessoa</span><span class="v">{{ com_dono|length }}</span><span class="d">já assumidos</span></span>
+  </div>
+
+  {% for titulo, lista, vazio, aberto in [('Pedidos para o seu setor', pedidos, 'Nenhuma área pediu retorno ao seu setor.', true), ('Com você', meus, 'Nada assumido por você.', false), ('Sem dono', sem_dono, 'Nada sem dono nas torres do seu setor.', false), ('Com outra pessoa', com_dono, '', false)] %}
+  {% if lista or vazio %}
+  <h2 class="ins-sub">{{ titulo }}{% if lista %} <span class="ins-sub-n">{{ lista|length }}</span>{% endif %}</h2>
+  {% if lista %}<ol class="ins-lista">{% for i in lista %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, aberto) }}{% endfor %}</ol>
+  {% else %}<p class="cn-vazio">{{ vazio }}</p>{% endif %}
+  {% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

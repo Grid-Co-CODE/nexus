@@ -57,8 +57,8 @@ def _linha(chave, **valor):
     ("Tracker 1.100 STI-H250", "STI"),
     ("Tracker 133.100 Trina Vanguard 1P", "Trina"),
     # o "STI" como pedaço de palavra era marca até 20/10 (16 cabines, skids e estações)
-    ("Cabine 1 Sítio Araponga, S/N, Distrito de Justiniano de Serpa", ""),
-    ("SKID 1 FAZENDA SÃO SEBASTIÃO, ZONA RURAL", ""),
+    ("Cabine 1 Sítio Alfa, S/N, Distrito de Celestino", ""),                # exemplos de endereço inventados
+    ("SKID 1 FAZENDA FAUSTINO ALFA, ZONA RURAL", ""),
     ("Estação Meteorológica Rua das Plásticas Elásticas", ""),
     ("Cabine 1 Rede coaxial", ""),
     ("NCU 1", ""),
@@ -69,8 +69,8 @@ def test_a_marca_vale_como_palavra_inteira_e_pelos_apelidos_do_fracttal(desc, ma
 
 
 def test_o_codigo_da_usina_nao_e_marca():
-    """Santo Inácio é STI100 no Fracttal: o código não faz os trackers dela virarem STI."""
-    assert sp.marca_do_ativo(_ativo("Tracker 1.100", "STI100-ETKR1.100")) == ""
+    """O código de uma usina que começa com STI (inventado aqui: STI900) não faz os trackers dela virarem STI."""
+    assert sp.marca_do_ativo(_ativo("Tracker 1.100", "STI900-ETKR1.100")) == ""
 
 
 # ── 2. NCU e RSU pela marca dos trackers da mesma usina ────────────────────────────────────────────────────────

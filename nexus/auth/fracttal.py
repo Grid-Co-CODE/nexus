@@ -62,8 +62,8 @@ class SessaoNaoVeio(LoginRecusado):
 # O que o `api.fracttal_login` do clone monta quando a senha NÃO foi conferida. Ele não devolve o status HTTP, só a
 # mensagem: "Erro de conexão no login: <erro do requests>" (rede, tempo esgotado) ou "Login falhou: <message do Fracttal,
 # ou HTTP nnn quando ela não vem>". Um 5xx que traga uma mensagem própria fora desta lista conta como recusa (do lado
-# seguro: só se deixa de contar o que se sabe que não conferiu a senha). O clone fica idêntico ao do oem
-# (`nexus/torres/oscreator/README.md`), por isso a leitura é aqui, e não lá.
+# seguro: só se deixa de contar o que se sabe que não conferiu a senha). A leitura é feita aqui, sobre a mensagem que o
+# clone devolve.
 _NAO_CONFERIU = re.compile(r"erro de conex|\bhttp (?:406|408|425|429|5\d\d)\b|too.?many|rate.?limit|limit.?exceeded"
                            r"|bad gateway|service unavailable|gateway time|timed? ?out", re.I)
 

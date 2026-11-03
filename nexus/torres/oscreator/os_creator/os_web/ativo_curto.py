@@ -8,14 +8,14 @@ inteiro (21.639 ativos, 27/09):
 
     Inversor 1.10 Sungrow SG125HV                          → Inversor 1.10
     Tracker 35.100 AXIALtracker                            → Tracker 35.100
-    Cabine 1  Araputanga  Mato Grosso Brasil               → Cabine 1           o endereço vem depois de DOIS espaços…
-    Sala de O&M FZ. Pau da Imbira, S/N, Zona Rural …       → Sala de O&M        …ou depois de um marcador de endereço
+    Cabine 1  Vila Alfa  Mato Grosso Brasil                → Cabine 1           o endereço vem depois de DOIS espaços…
+    Sala de O&M FZ. Alfa Verde, S/N, Zona Rural …          → Sala de O&M        …ou depois de um marcador de endereço
     Módulo Fotovoltaico Risen RSM132-8-700 725BHDG         → Módulo Fotovoltaico  marca conhecida ou código de modelo
     Disjuntor circuito auxiliar - Ub 115 V In 6A Icu 5 kA  → Disjuntor circuito auxiliar   " - " abre a ficha técnica
     Disjuntor do Inversor 1.1                              → Disjuntor do Inversor 1.1
 
 A REGRA: o nome até o NÚMERO do ativo (inclusive), ou até a primeira marca, código de modelo ou pedaço de endereço.
-Quando nada disso aparece (endereço sem marcador: "Infraestrutura Civil Recanto do Ratinho"), vale a FRASE que os ativos
+Quando nada disso aparece (endereço sem marcador: "Infraestrutura Civil Vale Ômega"), vale a FRASE que os ativos
 do mesmo tipo repetem no catálogo ("Infraestrutura Civil") — é o próprio cadastro dizendo onde o tipo termina.
 
 O nome inteiro continua no `title` da célula, na busca e no CSV: aqui só se decide o que a coluna MOSTRA.
@@ -36,7 +36,7 @@ MARCAS = {
     "apsystems", "phb", "intelbras", "hikvision", "moxa", "ubiquiti", "mikrotik", "dell", "lenovo", "positivo",
     "schweitzer", "woodward", "treetech", "arteche", "novus", "hitachi", "toshiba", "eaton", "steck", "clamper",
 }
-# o que abre endereço no meio do nome ("Sala de O&M FZ. Pau da Imbira", "Sistema Supervisório SITIO SANTA MARIA")
+# o que abre endereço no meio do nome ("Sala de O&M FZ. Alfa Verde", "Sistema Supervisório SITIO ALFA")
 ENDERECO = {"rua", "r.", "av", "av.", "avenida", "estrada", "estr.", "est.", "rodovia", "rod.", "sitio", "fazenda",
             "faz.", "fz.", "zona", "chacara", "lote", "loteamento", "gleba", "km", "cep", "cep:", "s/n", "povoado",
             "distrito", "bairro", "localidade", "comunidade", "br"}   # "BR 101 KM 80": rodovia federal
@@ -82,7 +82,7 @@ def _caminhar(s: str) -> list:
 
 def frases(catalogo) -> dict:
     """{tipo: [frases do tipo, da mais longa à mais curta]} — o nome curto que ≥ 3 ativos do mesmo tipo repetem. É o
-    que corta o endereço SEM marcador ("Infraestrutura Civil Recanto do Ratinho" → "Infraestrutura Civil")."""
+    que corta o endereço SEM marcador ("Infraestrutura Civil Vale Ômega" → "Infraestrutura Civil")."""
     cont = collections.defaultdict(collections.Counter)
     for a in catalogo or []:
         if not isinstance(a, dict):

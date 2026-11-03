@@ -293,7 +293,8 @@ def test_validacao_vale_no_lugar_da_ronda_do_mesmo_dia(banco, logado, monkeypatc
     assert (alt["sujidade"], alt["vegetacao"], alt["validada"], alt["data"]) == (5, 4, True, _dia(1))
     assert alt["tecnico"] == "Validadora Teste" and alt["os"] == "500"          # em nome de quem validou
     assert ("Vala obstruída", "critico") in alt["status"]
-    html = logado.get("/t/campo/rondas?aba=sujidade").get_data(as_text=True)
+    # a aba Sujidade saiu das Rondas (03/11/2026): a validação aparece no histórico da usina, com o selo e o porquê
+    html = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
     assert 'class="cn-validada"' in html and "Validada por foto" in html and "Não é ronda nova" in html
     # o histórico: a linha validada (com o selo) e a ronda do técnico marcada como revisada; a evolução usa o validado
     h = visao.historico_usina(d["todas"], ronda_checklist.respostas(), 1, d["validacoes"])

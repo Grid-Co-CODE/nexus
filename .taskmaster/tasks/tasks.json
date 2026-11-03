@@ -1,0 +1,102 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Motor de insights (Fase 1)",
+        "description": "nexus/comando/regras.py (regras puras) e nexus/comando/motor.py (lê as fontes que o Nexus já lê, em segundo plano).",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "details": "Regras R03, R05, R06*, R07, R09, R11, R13 e N01, cada uma uma função pura sobre listas já lidas, devolvendo insights {id estável regra:objeto, regra, sev, titulo, evid, acao, torre, usina, link}. O motor junta as fontes (religamentos, normalizacoes_banco abertas, fato_tarefa_os x fato_chamado, extintores + decisoes, PCM banco_dados, visao.rondas, responsaveis.chamados, normalizacoes) por visao._ler (5 min, renovação por trás). Fonte que falha vira aviso da regra.",
+        "testStrategy": "Testes unitários por regra com dados inventados (controle positivo: a regra mutada fica vermelha); o motor com uma fonte quebrada segue com as outras.",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Livro nexus_insights (assumir e concluir)",
+        "description": "nexus/comando/estado.py: fato_evento_insight, só acrescenta, quem cifrado; catálogo e explica antes da 1ª gravação.",
+        "status": "done",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "details": "Eventos assumiu/concluiu/reabriu por insight_id; vale o último. Mesma trava e releitura das Sugestões (casca/sugestoes.py).",
+        "testStrategy": "Gravação cifrada no banco falso, o 2º clique não grava outra linha, o catálogo e o organograma aceitam o fato.",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Telas Comando → Insights e Caixa de entrada",
+        "description": "As duas telas que hoje são placeholder, com filtros por gravidade, regra e torre; Assumir e Concluir.",
+        "status": "done",
+        "dependencies": [
+          1,
+          2
+        ],
+        "priority": "high",
+        "details": "A Caixa mostra os insights das torres que o setor da pessoa vê (setor_telas.acesso) e os assumidos por ela.",
+        "testStrategy": "Tela com o motor dublado: insights na ordem, filtros, o POST de assumir grava e volta; pessoa de outro setor não vê.",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Sino no topo",
+        "description": "Contador dos críticos e de atenção sem dono nas torres da pessoa, pela cópia do motor; a lista curta abre a Caixa.",
+        "status": "done",
+        "dependencies": [
+          1,
+          2
+        ],
+        "priority": "medium",
+        "details": "No base.html, perto do topo_acoes, com o ícone ph-bell (sem svg no topo). Nunca calcula na página: sem cópia, sem número.",
+        "testStrategy": "Contagem certa por setor; sem o motor pronto o topo abre sem número e sem esperar.",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Fase 2: conversa com @menção nos objetos",
+        "description": "Linha do tempo de mensagens por insight, OS e usina, com @pessoa e @setor gerando notificação.",
+        "status": "deferred",
+        "dependencies": [
+          4
+        ],
+        "priority": "medium",
+        "details": "Livro nexus_conversas (mensagem cifrada); notificação no sino; o urgente no Nexus Field.",
+        "testStrategy": "A definir na Fase 2.",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Fase 3: pedidos entre setores com prazo",
+        "description": "Pedido com setor de origem e destino, prazo, aceite e conclusão; painel de tempo de resposta por setor.",
+        "status": "deferred",
+        "dependencies": [
+          5
+        ],
+        "priority": "medium",
+        "details": "A definir na Fase 3.",
+        "testStrategy": "A definir na Fase 3.",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Fase 4: o Início novo",
+        "description": "\"Pede você agora\" alimentado pelo motor, pulso da operação, conversas; a paleta preta, azul e lima.",
+        "status": "deferred",
+        "dependencies": [
+          3,
+          4
+        ],
+        "priority": "low",
+        "details": "Prévia aprovada em conversa de 03/11/2026 (scratchpad inicio_redesign). Decidir antes se a paleta vale para o Nexus inteiro.",
+        "testStrategy": "A definir na Fase 4.",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2026-11-03",
+      "description": "Nexus: os setores conversando (PRD em .taskmaster/docs/prd.txt)"
+    }
+  }
+}

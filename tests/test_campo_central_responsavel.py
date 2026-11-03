@@ -119,7 +119,7 @@ def test_pt_por_responsavel_e_o_cartao_leva_a_tabela_dele(com_responsavel, logad
     cartoes = html[html.index('class="cn-equipes"'):html.index('class="cn-nota"')]
     # a PT-1 (parada) e a PT-2 são da Altair, do Ciclano Chefe; o Beltrano não tem PT esperando: sem cartão
     assert "<b>Ciclano Chefe</b>" in cartoes and "Beltrano Supervisor" not in cartoes and "Responsável UFV" in cartoes
-    assert '2</span><span class="d">PT esperando o De acordo' in cartoes and "1 parada há mais de 2 h" in cartoes
+    assert "<b>2</b><span>PT esperando o De acordo" in cartoes and "1 parada há mais de 2 h" in cartoes
     href = re.search(r'<a class="cn-equipe[^"]*" href="([^"]*)"', cartoes).group(1).replace("&amp;", "&")
     assert "modo=tabela" in href and "responsavel=Ciclano+Chefe" in href and "vista=pt" in href
     tabela = logado.get("/t/campo/atencao" + href).get_data(as_text=True)

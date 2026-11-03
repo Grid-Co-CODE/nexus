@@ -6,13 +6,13 @@ falam com o Fracttal (login, arquivos, redirecionamentos) — nenhum teste aqui 
 """
 import hashlib
 import hmac
+import logging
+import types
+from pathlib import Path
 
 import pytest
 
 from nexus.torres import descobrir_torres
-
-# o clone importa o steps/ui.py do OS Creator (PyQt6) ao montar a tela de Engenharia
-pytest.importorskip("PyQt6")
 
 DESTINOS = {"inicio": "/os/", "historico": "/os/historico", "ativos": "/os/ativos", "performance": "/os/performance",
             "cos": "/os/cos", "pcm": "/os/setor/pcm", "chamados": "/os/chamados", "engenharia": "/os/engenharia",
@@ -89,7 +89,8 @@ def test_dentro_do_nexus_sem_a_faixa_de_abas_e_as_telas_seguem_vivas(logado):
     """Levi, 12/10/2026: "quero que mantenha esse carregamento mas tire a visão de abas da parte de cima pois como já
     temos as abas laterais, fica redundante ... quero passar a impressão de unidade!". A ponte esconde as duas faixas
     (.os-tabs: a da casca e a da tela aberta sozinha) só no Nexus; a casca continua guardando cada tela aberta, e sem o X
-    de fechar ela guarda no máximo _ABAS_MAX (a acesa há mais tempo sai, nunca a ativa). O clone fica igual ao do oem."""
+    de fechar ela guarda no máximo _ABAS_MAX (a acesa há mais tempo sai, nunca a ativa). O arquivo do clone não muda: o
+    ajuste é da ponte, na resposta."""
     from nexus.torres.oscreator import ponte
     html = logado.get("/os/login").get_data(as_text=True)
     assert ".os-tabs{display:none!important}" in html
@@ -98,7 +99,7 @@ def test_dentro_do_nexus_sem_a_faixa_de_abas_e_as_telas_seguem_vivas(logado):
     # o teto entra antes de a aba nova nascer (no abrir) e a ativa nunca é a que sai
     assert abas.index(f"if (abas.length >= {ponte._ABAS_MAX})") < abas.index("seq += 1;")
     assert "return b.id !== ativa;" in abas
-    # o arquivo do clone continua o do oem: tudo isso é da ponte
+    # o arquivo do clone segue sem nada disso: é tudo da ponte, na resposta
     from pathlib import Path
     original = (Path(ponte.RAIZ_CLONE) / "os_web" / "static" / "abas.js").read_text(encoding="utf-8")
     assert "relogio" not in original and "os-tabs{display:none" not in original
@@ -165,13 +166,13 @@ def test_clone_que_nao_sobe_vira_aviso_e_o_nexus_segue(logado, monkeypatch):
     from nexus.torres.oscreator import ponte
 
     def quebra(_app):
-        raise ImportError("No module named 'PyQt6'")
+        raise ImportError("No module named 'requests'")
 
     monkeypatch.setattr(ponte, "_criar_clone", quebra)
     resp = logado.get("/os/")
     assert resp.status_code == 503
     html = resp.get_data(as_text=True)
-    assert "OS Creator" in html and "PyQt6" in html
+    assert "OS Creator" in html and "requests" in html
     assert logado.get("/").status_code == 200
 
 
@@ -234,8 +235,12 @@ def test_a_volta_do_login_do_fracttal_cai_na_tela_de_origem(app, logado):
     assert r.status_code == 302 and r.headers["Location"] == "/t/pcm/gestao?modo=plano"
     assert logado.get("/os/_nexus/card/voltar?de=//exemplo.invalid/x").headers["Location"] == "/"
     from nexus.torres.oscreator import ponte
-    from nexus.torres.oscreator.os_creator.os_web import rotas
-    with ponte.clone(app).test_request_context():
+    clone = ponte.clone(app)
+    # o módulo do CLONE (`os_web`, depois de o `ponte.clone` pôr a pasta dele no sys.path): importar pelo pacote do Nexus
+    # (`nexus.torres.oscreator.os_creator.os_web`) carrega uma 2ª cópia de todo o `os_web.*`, e a 2ª `lista_central` religava
+    # o `api.ID_PELA_LISTA` à cópia dela (5 testes da lista central falhavam na ordem inversa; revisão final)
+    from os_web import rotas
+    with clone.test_request_context():
         assert rotas._destino_local("/os/_nexus/card/voltar?de=/t/pcm/gestao") == "/os/_nexus/card/voltar?de=/t/pcm/gestao"
 
 
@@ -269,71 +274,44 @@ def test_link_do_card_abre_a_torre_os_creator_com_a_tela_numa_aba(logado):
     assert '<iframe class="os-moldura" src="/os/"' in h
 
 
-# ── sincronia com o oem: o Nexus é a referência (Levi, 06/10/2026) ──────────────────────────────────────────────────
-def _arvore(raiz, arquivos):
-    for rel, texto in arquivos.items():
-        p = raiz / rel
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(texto, encoding="utf-8")
+# ── os leitores do canto central ligam na subida do Nexus, e o clone quebrado não o derruba (revisão final, 31/10/2026) ──────
+@pytest.mark.parametrize("quebra", [SyntaxError("o clone quebrou"), ImportError("No module named 'x'"), RuntimeError("o ligar quebrou")])
+def test_um_leitor_que_levanta_no_import_ou_no_ligar_nao_derruba_o_nexus(app, monkeypatch, caplog, quebra):
+    """O `servir.py` importa os leitores do clone (e por eles o `ativos_central`, a `os_central`, o `catalogos`...) ao subir; antes o
+    clone só carregava no 1º pedido ao /os/, dentro de um try. Um erro ali derrubaria o Nexus inteiro, com o `Restart=always` o
+    deixando caindo em laço. Agora cada leitor liga num try (`ligar_leitor_do_clone`): o log tem a pilha, os outros ligam e o
+    Raio-X lê a falha em `app.extensions`."""
+    from nexus.torres.oscreator import ponte
+    ligados = []
+
+    def modulo(nome):
+        if nome == "os_leitor" and isinstance(quebra, (SyntaxError, ImportError)):
+            raise quebra                                         # o import do leitor (ou do clone por ele)
+
+        def ligar(a):
+            if nome == "os_leitor":
+                raise quebra                                     # o `ligar` que levanta
+            ligados.append(nome)
+        return types.SimpleNamespace(ligar=ligar)
+    monkeypatch.setattr(ponte, "modulo_do_clone", modulo)
+    with caplog.at_level(logging.ERROR):
+        resultado = {n: ponte.ligar_leitor_do_clone(app, n) for n in ponte.LEITORES_DO_CLONE}
+    assert resultado == {"ativos_leitor": True, "os_leitor": False, "catalogos_leitor": True}
+    assert ligados == ["ativos_leitor", "catalogos_leitor"]      # os outros dois ligaram
+    assert app.extensions[ponte.FALHOS] == {"os_leitor": "%s: %s" % (type(quebra).__name__, quebra)}
+    assert any(r.exc_info and "os_leitor" in r.getMessage() for r in caplog.records)    # a pilha foi ao log
+    monkeypatch.setattr(ponte, "modulo_do_clone", lambda nome: types.SimpleNamespace(ligar=lambda a: None))
+    assert ponte.ligar_leitor_do_clone(app, "os_leitor") and ponte.FALHOS in app.extensions and not app.extensions[ponte.FALHOS]
 
 
-def test_sincronia_leva_o_que_mudou_no_nexus_e_nao_atropela_o_oem(tmp_path):
-    from nexus.torres.oscreator import sincronia as S
-    nexus, oem, backup = tmp_path / "nexus", tmp_path / "oem", tmp_path / "backup"
-    comum = {"os_creator/a.py": "a = 1\n", "os_creator/b.py": "b = 1\n", "os_creator/c.py": "c = 1\n",
-             "os_creator/d.py": "d = 1\n"}
-    _arvore(nexus, comum)
-    _arvore(oem, comum)
-    base = {rel: S._hash(nexus / rel) for rel in comum}
-    _arvore(nexus, {"os_creator/b.py": "b = 2\n", "os_creator/d.py": "d = 2\n", "os_creator/os_web/e.html": "novo"})
-    _arvore(oem, {"os_creator/c.py": "c = 9\n", "os_creator/d.py": "d = 9\n"})
-    lista = sorted(list(comum) + ["os_creator/os_web/e.html"])
-    st = S.estado(nexus, oem, lista, base)
-    assert (st["igual"], st["levar"], st["trazer"], st["conflito"]) == (
-        ["os_creator/a.py"], ["os_creator/b.py", "os_creator/os_web/e.html"], ["os_creator/c.py"], ["os_creator/d.py"])
-    feitos, nova = S.aplicar(nexus, oem, lista, base, backup)
-    assert feitos == ["os_creator/b.py", "os_creator/os_web/e.html"]
-    assert (oem / "os_creator/b.py").read_text(encoding="utf-8") == "b = 2\n"
-    assert (backup / "os_creator/b.py").read_text(encoding="utf-8") == "b = 1\n"                 # o do oem guardado
-    assert (oem / "os_creator/c.py").read_text(encoding="utf-8") == "c = 9\n"                    # não atropela o oem
-    assert (oem / "os_creator/d.py").read_text(encoding="utf-8") == "d = 9\n"                    # conflito fica
-    st = S.estado(nexus, oem, lista, nova)
-    assert (st["levar"], st["trazer"], st["conflito"]) == ([], ["os_creator/c.py"], ["os_creator/d.py"])
-    feitos, nova = S.trazer(nexus, oem, lista, nova, backup)
-    assert feitos == ["os_creator/c.py"] and (nexus / "os_creator/c.py").read_text(encoding="utf-8") == "c = 9\n"
-    assert S.estado(nexus, oem, lista, nova)["conflito"] == ["os_creator/d.py"]
-
-
-def test_sincronia_recusa_copia_que_importa_o_nexus(tmp_path):
-    from nexus.torres.oscreator import sincronia as S
-    _arvore(tmp_path / "n", {"os_creator/x.py": "from nexus.config import algo\n"})
-    with pytest.raises(RuntimeError, match="importa o pacote nexus"):
-        S.aplicar(tmp_path / "n", tmp_path / "o", ["os_creator/x.py"], {}, tmp_path / "b")
-
-
-def test_copia_do_os_creator_vai_sem_o_env_e_sem_importar_o_nexus():
-    """O .env da cópia tem a credencial do Fracttal: nunca entra na lista. E a cópia não importa o nexus."""
-    from nexus.torres.oscreator import sincronia as S
-    lista = S.arquivos()
-    assert len(lista) > 100 and not any(rel.endswith(".env") for rel in lista)
-    assert S.importa_o_nexus(S.AQUI, lista) == []
-
-
-@pytest.mark.skipif(not (__import__("nexus.torres.oscreator.sincronia", fromlist=["x"]).OEM_PADRAO / "os_creator").is_dir(),
-                    reason="o oem não está nesta máquina")
-def test_copia_do_os_creator_igual_ao_oem():
-    """O Nexus é a referência: mudou aqui, rode `python ferramentas/sincronizar_oscreator.py --aplicar` para levar ao
-    oem (o 5090 do supervisório). Mudou só no oem, ou nos dois: a ferramenta lista, e nada é atropelado."""
-    from nexus.torres.oscreator import sincronia as S
-    st = S.estado(S.AQUI, S.OEM_PADRAO, S.arquivos(), S.ler_manifesto())
-    assert not (st["levar"] or st["trazer"] or st["conflito"]), {k: st[k][:10] for k in ("levar", "trazer", "conflito")}
-
-
-def test_sincronia_nao_conta_o_fim_de_linha(tmp_path):
-    """Clone do Windows (CRLF) contra o oem (LF): o mesmo conteúdo é igual, e nada é copiado."""
-    from nexus.torres.oscreator import sincronia as S
-    (tmp_path / "n/os_creator").mkdir(parents=True)
-    (tmp_path / "o/os_creator").mkdir(parents=True)
-    (tmp_path / "n/os_creator/a.py").write_bytes(b"x = 1\r\ny = 2\r\n")
-    (tmp_path / "o/os_creator/a.py").write_bytes(b"x = 1\ny = 2\n")
-    assert S.estado(tmp_path / "n", tmp_path / "o", ["os_creator/a.py"], {})["igual"] == ["os_creator/a.py"]
+def test_o_servir_liga_cada_leitor_do_clone_pelo_try_e_o_portao_do_deploy_importa_o_clone():
+    """O `servir.py` não chama `modulo_do_clone(...).ligar(app)` solto (fora de try); e o portão do deploy
+    (`deploy/conferir_boot.py`, que roda antes do restart) importa o que o `servir.py` importa ao subir: o contador do Fracttal, o uso
+    do OS Creator e os três leitores do clone, só importa, sem ligar."""
+    raiz = Path(__file__).resolve().parent.parent
+    servir = (raiz / "servir.py").read_text(encoding="utf-8")
+    assert servir.count("ligar_leitor_do_clone(app, ") == 3 and "modulo_do_clone(" not in servir
+    boot = (raiz / "deploy" / "conferir_boot.py").read_text(encoding="utf-8")
+    for pedaco in ("fracttal_conta", "uso_os", "LEITORES_DO_CLONE", "modulo_do_clone"):
+        assert pedaco in boot, pedaco
+    assert ".ligar(" not in boot                                 # o portão só importa: não liga laço nenhum

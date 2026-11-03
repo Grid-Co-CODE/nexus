@@ -1,8 +1,15 @@
-# OS Creator Web — clone dentro da torre OS Creator
+# OS Creator Web — dentro da torre OS Creator
 
-Cópia do OS Creator Web que roda no supervisório de O&M: o serviço `os_creator/os_web` do repositório `oem`,
-na porta 5090, publicado em `/os/*` pela plataforma. Foi trazida para cá em 30/09/2026, a pedido do Levi: "clone o
-OS Creator Web que está no meu supervisório de OEM para a pasta do OS Creator do Nexus".
+O OS Creator Web nasceu no supervisório de O&M: o serviço `os_creator/os_web` do repositório `oem`, na porta 5090,
+publicado em `/os/*` pela plataforma. Foi trazido para cá em 30/09/2026, a pedido do Levi: "clone o OS Creator Web que
+está no meu supervisório de OEM para a pasta do OS Creator do Nexus".
+
+**Desde 31/10/2026 o Nexus é a casa dele** (etapa 1 do canto central,
+`docs/superpowers/specs/2026-10-30-oscreator-canto-central-design.md`). De 06/10 a 30/10/2026 o clone era mantido
+idêntico ao do oem por uma ferramenta de sincronia; ela saiu (`ferramentas/sincronizar_oscreator.py`, o `sincronia.py` e
+o `sincronia.json`), e o oem (`C:\GridcoBuild\oem`) ficou **congelado** como estava: segue servindo o 5090 com a cópia
+dele, sem novidades, e ninguém escreve nele. Onde esta página fala em "levar ao oem", "sincronia", "`--aplicar`", "suíte
+do oem" ou em manter o clone "idêntico", é o registro daquele tempo.
 
 ## De onde veio
 
@@ -22,7 +29,8 @@ OS Creator Web que está no meu supervisório de OEM para a pasta do OS Creator 
   - os stores de modelos, observações e temas;
   - `gridco_abas`;
   - os `tickets_*`;
-  - `steps/engenharia` e `steps/ui.py`.
+  - `steps/engenharia` e `steps/ui.py`: o descritor da Engenharia (título, descrição e ícone), que a web usa; o `steps/ui.py`
+    (PyQt6) veio sem a web nunca importá-lo, e saiu em 31/10/2026 (seção "Antes de mexer").
 - O pacote `chamado_garantia`, com o `assets/` (ícone, logo e fontes) e o `requirements.txt`.
 
 ## O que ficou de fora de propósito
@@ -30,9 +38,10 @@ OS Creator Web que está no meu supervisório de OEM para a pasta do OS Creator 
 | Arquivo | Por quê |
 |---|---|
 | `fracttal_login.txt` | é o login salvo do desktop |
-| `assets_cache.json` | é o catálogo de ativos, dado que já vazou uma vez por instalador público |
+| `assets_cache.json`, `ativos.json.gz` | são o catálogo de ativos (o arquivo antigo e a cópia em disco do catálogo central), dado que já vazou uma vez por instalador público |
 | `tokens.txt`, `gridco_sql_token.txt` | são segredo; o código lê da variável `GRIDCO_SQL_TOKEN` ou de `%APPDATA%` |
 | `app.py`, `main.py`, as outras telas de `steps/` | são o app de desktop (PyQt), e a web não usa |
+| `steps/ui.py`, `steps/engenharia/tela.py`, `assets/chamados.qss`, `assets/fonts/LEIA-ME.txt` | vieram junto e eram só do app de mesa (PyQt6); saíram em 31/10/2026 |
 | `.bat`, `.spec`, documentos | não fazem parte do serviço |
 
 ## Como foi conferido
@@ -89,12 +98,11 @@ nesta pasta.
   moldura. Até então abria em tela cheia, porque o clone usa `window.top` para saber se é a casca. Numa moldura, isso
   quebrava duas coisas: as abas dele não ligavam, e o login dele tomava a janela. A ponte troca, na resposta,
   `window.top` por `window.__osTopo()`, que é a janela mais alta que ainda é do OS Creator. Fora do Nexus, essa
-  janela é o próprio `window.top`, então nada muda no supervisório. Se o oem mudar esses trechos, os testes da
-  moldura acusam.
+  janela é o próprio `window.top`, então nada muda no supervisório.
 - **Topo do OS Creator no Nexus** (Levi, 04/10): sem o "← Plataforma" (o menu lateral já leva a qualquer lugar) e sem
   o símbolo e o "Grid Co." (o topo do Nexus já tem); fica só o "Sistema de Ordens de Serviço", centralizado. As
-  páginas do Nexus também saem de qualquer moldura. A troca é feita na resposta, pela ponte, para o clone continuar
-  idêntico ao do oem.
+  páginas do Nexus também saem de qualquer moldura. A troca é feita na resposta, pela ponte, e o arquivo do clone não
+  muda.
 - **Sincronizado com o oem em 04/10:** `os_web/templates/solic_fila.html` (a Fila do PCM dava 500: pedia
   `p.id_account`, campo que a lista de responsáveis não tem; o oem corrigiu em 02/10 para `id_personnel`). Era o
   único arquivo diferente entre o clone e o oem.
@@ -114,7 +122,7 @@ nesta pasta.
     vez a cada 5 minutos por token (`vivo_no_fracttal`, o mesmo pedido barato do `api.is_logged_in`; a cota é de 200
     pedidos por minuto para a EMPRESA). Só a resposta "sessão morta" (`SessionExpired`) derruba; 429, rede ou token a 2
     minutos de vencer não decidem nada (o prazo resolve, e perguntar faria o clone tentar renovar o token).
-- **Quando sobe:** o clone só sobe na primeira visita ao `/os/`. Se ele quebrar (faltou PyQt6, por exemplo), o
+- **Quando sobe:** o clone só sobe na primeira visita ao `/os/`. Se ele quebrar (faltou o `requests`, por exemplo), o
   `/os/*` mostra um aviso e o resto do Nexus segue.
 - **Tema do Nexus (escuro e claro):** o OS Creator segue o botão do tema do Nexus, na moldura da torre, no card da OS e
   em qualquer página `/os/` (seção "Tema claro, com o botão do Nexus").
@@ -279,6 +287,17 @@ Inversor, Recomposição de String, Tracker parado) criava sempre uma OS por ati
   o 3º ativo não religa; religada, o Criar chama a agrupada com os 3 títulos iguais, a OS pai e a observação da OS.
   **Falta a prova ao vivo** numa usina de `TESTE - PA` (criar e cancelar). O 5090 só pega no próximo reinício.
 
+## A OS de Performance criada vira comentário na usina (03/11/2026)
+
+Levi: "quando eu crio uma OS de performance já vira um comentário automático: '<Levi> criou uma OS de <String> para o
+<inversor X>' + 'Observação da OS'". A resposta do `/os/api/performance/criar` leva `comentario` =
+`perf_web.criadas_para_comentario` (`{tipo, criadas: [{folio, ativo, observacao}]}`, só as que saíram COM nº; a agrupada
+é uma OS, com os ativos juntos e a observação da OS), e o `perf.js` (`comentarNaPlataforma`) manda isso à Plataforma de
+Performance (`POST /api/state/comment/os`, por URL completa, mesma origem no servidor) com a chave da conversa que o Tempo
+real pôs no link (`?comentario=pv:22854`). O texto, o autor (a sessão da plataforma) e o "um por nº" são de lá
+(`plataforma/CLAUDE.md`, seção "Comentários das usinas"). Sem nº, nada vai; sem a plataforma, a OS segue criada e só não
+comenta. Prova: `tests/test_oscreator_perf_comentario.py`.
+
 ## Digitar para achar: responsável e usina (08/10/2026)
 
 O pedido do Levi, de 08/10: "Conseguir digitar no responsável na criação de OS" e "Conseguir digitar o nome da usina no
@@ -310,13 +329,15 @@ filtro do histórico".
     o Esc da busca aberta). O `<select>` escondido sai do Tab, e o clique no rótulo cai na busca;
   - código da tela que faz `sel.value = x` (sugestão do deep link, reset) atualiza o texto, mesmo sem o `change`;
   - a opção vazia ("— selecione —", "carregando…") vira o texto de fundo, apagado, e a caixa fica livre para digitar.
-- **Histórico:** toda lista de marcar com 6 opções ou mais ganha a caixa no topo. A de Usina tem sempre, porque o
-  macro `multi` a marca com `data-busca="1"` (sem a marca, catálogo fora do ar e período curto a deixariam sem busca).
-  Lista curta fica sem ela.
+- **Histórico:** desde 03/11/2026 **toda** lista do painel de filtros ganha a caixa no topo (Levi: "todas as opções do filtro
+  digitáveis"): o macro `multi` marca todas com `data-busca="1"`, mesmo a de 2 ou 3 opções (até então só a de Usina, e as de 6 ou
+  mais). Criado por e Etiqueta (um valor só) usam a mesma lista, com um botão de escolha por linha (seção "Os filtros do Histórico só
+  valem no Aplicar").
   - Esconde o que não casa pela classe `osm-fora`, **nunca** por `[hidden]`. O hidden é a cascata cliente → usina, e o
     resumo e o filtro do Histórico ignoram o que está hidden. Assim, a usina marcada continua valendo mesmo fora da
     busca.
-  - Enter marca ou desmarca a linha em destaque; Esc limpa a busca, o segundo Esc fecha; fechar a lista limpa a busca.
+  - Enter marca ou desmarca a linha em destaque (ou escolhe, na lista de um valor só); Esc limpa a busca, o segundo Esc fecha
+    (dentro de um `[data-esc-fecha]`, como o painel do Histórico, um Esc só já fecha); fechar a lista limpa a busca.
   - A caixa não tem `name`: não vai no formulário. No celular, ela não toma o foco ao abrir a lista: o teclado cobriria
     metade dela.
 - **Performance:** o rótulo "Responsável" aponta para o campo (`for="cb_resp"`). Sem isso, o primeiro controle
@@ -610,10 +631,11 @@ Nexus no claro, as telas do OS Creator continuavam navy. O escuro ficou exatamen
     cujo endereço é `/os/`, moldura dentro de moldura (a da torre, a casca e as abas dela; o card do Quadro da equipe).
     A página da Plataforma no Tempo real (outro sistema) e moldura de outra origem ficam como estão. Página do OS
     Creator aberta depois já nasce no tema novo: o cookie já mudou.
-- **Onde mora a cor: no clone**, e vai ao oem com a sincronia. Cada `.css` do `os_web/static` ganhou no fim o par do
+- **Onde mora a cor: no clone.** Cada `.css` do `os_web/static` ganhou no fim o par do
   claro de cada cor do escuro, em `:where(html[data-tema="claro"]) <o mesmo seletor>`; o bloco TEMA CLARO do fim do
   `os.css` tem a paleta, `--osc-*`, que é a do tema claro do Nexus (`nexus.css`), e as variáveis de cada folha no claro.
-  No oem sozinho (5090) ninguém põe o atributo: nada disso vale, e a tela é a de sempre.
+  Sem o Nexus em cima (a página aberta sozinha, como no 5090 do oem congelado) ninguém põe o atributo: nada disso vale, e
+  a tela é a de sempre.
   - `:where()` não soma especificidade: o par do claro vence o escuro só por vir depois, e o estado mais específico do
     escuro (`.on`, `.sel`, `:hover`, `:focus`) continua vencendo. Com `html[data-tema="claro"] .x` solto, o `.x` do
     claro passaria por cima do `.x.on` e do `:focus` (a borda de foco do campo sumia). Hover reescrito no claro leva
@@ -680,10 +702,10 @@ Nexus no claro, as telas do OS Creator continuavam navy. O escuro ficou exatamen
   da tela: `os_web/rotas_tickets.py` (as 10 rotas `/tickets` e `/api/tickets/...`; o registro automático das telas não
   acha mais o arquivo), `os_web/tickets_web.py`, `os_web/tickets_painel.py`, `tickets_calc.py`, `templates/tickets.html`
   e `tickets_painel.html`, `static/tickets_painel.js` e `.css`; e, no Nexus, o item Chamados → Tickets de performance
-  (`ATALHOS`). A sincronia lista os 8 como "apagado no Nexus" e não os apaga no oem: o 5090 segue com a tela.
-- **A cópia segue igual à do oem nos arquivos que ficaram**: o `lancador.py`, o `performance.html` e o `os.css` do oem
-  ainda desenham o card "Tickets" da Performance, a pílula dele no card do setor (Início) e as regras `tk-*`. Os links
-  saem na ponte, na resposta (`_SEM_TICKETS`: todo `<a href="/os/tickets...">`); as regras `tk-*` ficam sem uso.
+  (`ATALHOS`). O oem não perde a tela: o 5090 segue com ela.
+- **Os arquivos que ficaram não mudaram**: o `lancador.py`, o `performance.html` e o `os.css` ainda desenham o card
+  "Tickets" da Performance, a pílula dele no card do setor (Início) e as regras `tk-*`. Os links saem na ponte, na
+  resposta (`_SEM_TICKETS`: todo `<a href="/os/tickets...">`); as regras `tk-*` ficam sem uso.
 - **Fica** a linha de ticket que nasce junto da OS da Performance (a caixa "Gerar ticket", `api.nascer_ticket` →
   `tickets_nasce`, que usa `tickets_api`, `tickets_diario`, `tickets_escrita` e `tickets_spec`): é da criação de OS, não
   da tela. O `/os/api/acomp/<folio>/ticket` é o nº do chamado no fabricante (Acompanhamento de chamados) e também fica.
@@ -692,8 +714,8 @@ Nexus no claro, as telas do OS Creator continuavam navy. O escuro ficou exatamen
   unidade!"). A ponte põe `.os-tabs{display:none}` no `_ESTILO_NEXUS` (some a faixa da casca e a da tela aberta
   sozinha); a casca continua guardando cada tela aberta, viva, e o menu lateral acende a de cada item já carregada. Sem
   o X de fechar, a ponte põe um teto no `abas.js` (`_ABAS_MAX` = 12 além do Início: os 9 itens da torre e mais três): ao
-  abrir a 13ª, sai a acesa há mais tempo, nunca a ativa. Tudo na ponte: a cópia segue igual à do oem, e no 5090 a faixa
-  continua. Prova: `test_dentro_do_nexus_sem_a_faixa_de_abas_e_as_telas_seguem_vivas`.
+  abrir a 13ª, sai a acesa há mais tempo, nunca a ativa. Tudo na ponte: o arquivo do clone não muda, e no 5090 (o oem) a
+  faixa continua. Prova: `test_dentro_do_nexus_sem_a_faixa_de_abas_e_as_telas_seguem_vivas`.
 
 ## A Área PCM como no app: Painel, Fila, Histórico e Temas (13/10/2026)
 
@@ -754,14 +776,15 @@ chave no pedido (o OS Creator sozinho, o 5090), a área fica aberta como sempre 
 **A velocidade** (o "demorando demais"): cada abertura da Fila fazia de 7 a 10 pedidos ao Fracttal, um depois do outro
 e sem memória (as 400 solicitações, o pessoal de 100 em 100, as etiquetas, o catálogo de status), e o Histórico baixava
 as 400 de novo. Agora (`rotas_solic.py`):
-- Painel, Fila e Histórico leem a MESMA lista, guardada por `LISTA_TTL` (120 s) por pessoa; os catálogos por
-  `CATALOGO_TTL` (30 min); quem grava (criar, aprovar, status, observação, cancelar, tema) esquece a lista;
+- Painel, Fila e Histórico leem a MESMA lista, guardada por `LISTA_TTL` (120 s) por pessoa; os catálogos pelo dono deles
+  (`catalogos.py`, desde 31/10/2026; eram 30 min aqui, `CATALOGO_TTL`); quem grava (criar, aprovar, status, observação,
+  cancelar, tema) esquece a lista;
 - a carga fria pede tudo ao mesmo tempo (`_ao_mesmo_tempo`, com o executor que leva a sessão do Fracttal para as
   threads): custa a leitura mais lenta, não a soma;
-- o catálogo de ativos VENCIDO (mais de 24 h) não segura mais a página: o nome das solicitações vem do arquivo como
-  estiver e o download dos ~22 mil ativos (mais de cem pedidos, minutos) vai para uma thread (`_indice_ativos`,
-  `_renovar_por_tras`). Quem resolve o ativo da OS na aprovação continua com o catálogo em dia (espera o download que
-  já está em curso, sem começar outro);
+- o catálogo de ativos VENCIDO (mais de 24 h) não segura mais a página: o nome das solicitações vem do catálogo central
+  como estiver e o download dos ~22 mil ativos (mais de cem pedidos, minutos) vai para uma thread (`_indice_ativos` pede ao
+  `api._renovar_catalogo_por_tras`; até 31/10/2026 ele tinha o renovador dele). Quem resolve o ativo da OS na aprovação
+  continua com o catálogo em dia (espera o download que já está em curso, sem começar outro);
 - a página do setor PCM pede a lista ao abrir (`/os/api/solic/aquecer`): a porta escolhida já abre com ela.
 
 Prova: `tests/test_oscreator_solic_pcm.py` (29 testes: as páginas, as gravações, a lista pedida uma vez para as três
@@ -820,8 +843,8 @@ chegado, então o catálogo de ativos não era a espera daquele clique.
 
 Levi: "a partir de segunda quero o Nexus como link principal". O servidor serviu o Nexus em `app.gridco.com.br/nexus` até a
 fase 4 (hoje na raiz; `NEXUS_PREFIXO=/nexus` é a volta, `nexus/casca/CLAUDE.md`), e o clone escreve `/os/...` a partir da raiz em ~220 lugares
-(templates, `.js` e o JSON das rotas): ao pé da letra, levavam ao `/os/` da PLATAFORMA. O clone continua idêntico ao do
-oem (roda sozinho na raiz, no 5090); quem põe o prefixo é a ponte, na resposta, só quando há prefixo:
+(templates, `.js` e o JSON das rotas): ao pé da letra, levavam ao `/os/` da PLATAFORMA. O arquivo do clone não muda
+(roda sozinho na raiz, no 5090 do oem); quem põe o prefixo é a ponte, na resposta, só quando há prefixo:
 
 - o clone recebe o `SCRIPT_NAME` do Nexus: o `url_for` dele já sai com `/nexus`, e o cookie dele fica em `/nexus/os`
   (`_SessaoDoClone`, que troca o `/os` fixo do `criar_app`);
@@ -856,34 +879,41 @@ Depois abra `http://127.0.0.1:5091/os/login`. O login no Fracttal é por pessoa,
 
 ## Antes de mexer
 
-- **O Nexus é a referência; o oem acompanha** (Levi, 06/10/2026: "sincronize a ferramenta usando o do nexus como
-  referência"). Mudança no OS Creator: faça aqui, na cópia, prove aqui, e leve ao oem (o 5090 do supervisório):
-
-  ```
-  python ferramentas/sincronizar_oscreator.py              mostra o que mudou
-  python ferramentas/sincronizar_oscreator.py --aplicar    leva ao oem o que mudou só no Nexus
-  python ferramentas/sincronizar_oscreator.py --trazer     traz ao Nexus o que mudou só no oem
-  ```
-
-  A regra é de três lados (`sincronia.py`, com o hash de cada arquivo na última sincronia em `sincronia.json`): o que
-  mudou só no Nexus vai; o que mudou só no oem não é atropelado (aparece na lista); o que mudou nos dois é conflito e
-  fica para resolver à mão. O que o destino tinha antes vai para `<pasta de dados>/oscreator_backup/`. Só vão os
-  arquivos da cópia que estão no git (o `os_creator/.env`, com a credencial do Fracttal, fica fora sempre). Copiar
-  não reinicia o 5090 nem faz commit no oem (público: commit lá é decisão do Levi). Depois, commit do
-  `sincronia.json` no Nexus. Sincronia inicial (06/10, 15:58): 120 arquivos, todos iguais.
-- **Levar só os seus arquivos.** O `--aplicar` leva tudo o que está em "levar". Com outra sessão mexendo na cópia ao
-  mesmo tempo, ele levaria o trabalho dela pela metade ao 5090. Foi o caso de 08/10: o card da OS com várias tarefas
-  estava em andamento em `api.py`, `os_acoes_web.py` e `os_detalhe_conteudo.html`, enquanto a Engenharia ia ao oem.
-  O mesmo vale para um arquivo novo, que ainda não está no git do Nexus. Nesses casos:
-  - confira com `S.estado` que os seus estão em "levar";
-  - rode `S.importa_o_nexus` e copie com `S._copiar`, guardando o de antes em `<pasta de dados>/oscreator_backup/`;
-  - grave no `sincronia.json` o hash **só desses arquivos** (`S._hash`), para os outros continuarem em "levar".
-- **O que é só do Nexus vai na `ponte.py`, nunca na cópia** (a cópia vai para o supervisório, que não tem o Nexus):
-  a cópia não pode importar o pacote `nexus`, e a ferramenta recusa se importar. O
-  `tests/test_torre_oscreator.py` acusa quando a cópia e o oem divergem (só na máquina que tem o oem).
+- **O Nexus é a casa do OS Creator Web** (31/10/2026, etapa 1 do canto central; de 06/10 a 30/10 ele era a referência e o
+  oem acompanhava, por uma ferramenta de sincronia). Mudança no OS Creator: faça aqui, na cópia, e prove aqui, com a
+  suíte do Nexus (`python -m pytest -q -k oscreator`). Não há o que levar ao oem, e não se escreve em
+  `C:\GridcoBuild\oem`: ele fica congelado como estava, servindo o 5090. O custo do jeito de antes apareceu em 30/10/2026:
+  a cópia já passava do oem (os arquivos do cabeçalho de pedido automático não tinham sido levados) e o teste que cobrava
+  a igualdade estava vermelho nesta máquina.
+- **O que é só do Nexus (o portão, o topo, a moldura, o menu lateral, o tema, o prefixo) vai na `ponte.py`, na resposta**,
+  e não nos arquivos do clone: segue assim. A regra "a cópia não importa o pacote `nexus`" era para o supervisório não
+  quebrar ao receber a cópia, e saiu com a sincronia. Só os dois leitores do servidor importam o `nexus` (31/10/2026): o dos
+  ativos (`os_creator/ativos_leitor.py`: o cliente REST do Fracttal, a credencial, a foto do banco e os minutos ocupados,
+  `nexus.casca.minutos_ocupados`) e o das OS (`os_creator/os_leitor.py`: o leitor de OS do Nexus, `nexus.campo.tarefas_os`, o
+  `nexus.campo.fracttal`, os minutos ocupados e o contador `nexus.casca.fracttal_conta`). Só o `servir.py` os carrega (o
+  catálogo, a lista de OS e as telas os chamam pelo que eles registram em `ativos_central.ligar_leitor` e
+  `os_central.ligar_leitor`, sem importá-los); o resto do clone, a lista de OS inclusive (`os_central.py`, `os_registro.py`,
+  `os_disco.py`), segue sem o `nexus`, e é por isso que o "Rodar sozinho", acima, funciona. Os catálogos pequenos (etapa 4)
+  são o mesmo par: o `catalogos.py` e o `catalogos_planos.py` seguem sem o `nexus` (servidos sozinhos, pela sessão de quem
+  usa), e o laço das pessoas pelo REST mora no `catalogos_leitor.py` (o cadastro, o cliente REST, a credencial, o contador e
+  o minuto da lista de minutos ocupados), que só o `servir.py` carrega e que se registra em `catalogos.ligar_leitor`.
+- **Onde está cada função** (31/10/2026, etapa 5.3): o `api.py` é só o cliente do Fracttal e a fachada; cada assunto mora no
+  módulo dele (seção "O mapa dos módulos"). Código novo vai no módulo do assunto; o que ele chama vai pelo `api.`, e o teste
+  troca `api.X`. O `tests/test_oscreator_fachada.py` acusa a chamada pelo nome local.
+- O `os_creator/.env` (a credencial do Fracttal da máquina) é do `.gitignore`: nunca entra no git.
 - Usa a mesma pasta de dados do OS Creator (`%APPDATA%\CriarOS-Fracttal`). Na mesma máquina, ele divide com o
-  supervisório a chave da sessão e o token do banco.
-- Precisa do PyQt6 instalado, porque a tela de Engenharia importa `steps/engenharia`, que puxa `steps/ui.py`.
+  supervisório a chave da sessão e o token do banco. A cópia em disco do catálogo de ativos mora nela, em
+  `oscreator\ativos.json.gz` (o `assets_cache.json` de lá é do supervisório e do oem; o Nexus só o lê, uma vez, para migrar), e
+  a dos catálogos pequenos em `oscreator\catalogos\` (um arquivo por catálogo, sem e-mail).
+- **Não usa PyQt6** (31/10/2026, etapa 1 do canto central). A ponte, o `api` e todo `os_web.*` importam sem ele: o rastro
+  dos imports (estático, com os de dentro de função, e dinâmico, com o PyQt6 bloqueado) mostrou um elo só, o `abrir()` do
+  descritor `steps/engenharia`, que importava a tela de mesa e, por ela, o `steps/ui.py`, e que a web nunca chamou (a rota
+  `/os/engenharia` lê só título, descrição e ícone). Saíram o `steps/ui.py`, o `steps/engenharia/tela.py` e o `abrir()`;
+  o PyQt6 saiu do `requirements.txt`. Os testes do OS Creator abriam com `pytest.importorskip("PyQt6")` por um motivo
+  que não era verdade ("o clone importa o `steps/ui.py` ao montar a tela de Engenharia"), e numa máquina sem PyQt6 a
+  suíte inteira do OS Creator pulava em silêncio; o `importorskip` saiu de todos. Prova: `tests/test_oscreator_sem_pyqt.py`
+  (num subprocesso com o PyQt6 bloqueado, o Nexus e o clone sobem, o login e a Engenharia abrem; nada do repositório
+  importa nem pede PyQt; nenhum `requirements.txt` o traz). Voltou um `import PyQt6`? O teste diz o arquivo e a linha.
 
 ## A tela inicial não espera o Fracttal (14/10/2026)
 
@@ -1153,6 +1183,33 @@ adicionar anexos como PDFS e fotos. E quando o PCM gere uma OS pela fila de PCM 
   tirando um anexo; a Fila com os dois anexos e a confirmação "levando 2 anexo(s)". Falta a prova ao vivo (uma
   solicitação com anexo em TESTE - PA aprovada na Fila, o anexo no card da OS).
 
+## O tempo na Clonagem e o tempo da OS = a soma das tarefas (30/10/2026)
+
+O time do PCM: "quando clonamos uma OS ela está vindo com horário padrão de 10minutos por tarefa... gostaria que o tempo
+que viesse fosse o cadastrado do plano, que seria atualizado no 'Atualizar todas do modelo'" e "nas SSs [Solicitações de
+Serviço] o tempo que aparece na OS do Fracttal permanece 10 min, porém nas tarefas aparece o tempo que foi solicitado,
+quando criada pela Fila do PCM".
+
+- **A Clonagem:** cada tarefa leva o tempo da tarefa de origem (`get_os_para_clonar` → `duracao`, o `duration` dela),
+  mostrado na coluna Tempo (HH:mm). O "Atualizar do modelo" e o "Atualizar todas do modelo" trazem, junto com as
+  subtarefas, o tempo cadastrado no modelo (`_duracao_do_modelo`: o do evento da lista de modelos; sem ele, o do detalhe
+  do modelo, pelo valor cru, porque o `get_plan_details` põe 900 quando falta; sem tempo no modelo, a tarefa fica com o
+  que tinha). O servidor só aceita de 1 min a 24 h (`clonar_web.preparar_tarefas`); fora disso, os 10 min de sempre.
+- **A OS:** o `_work_order_insert` (a fase que junta as tarefas numa OS numerada) punha `duration=600` fixo. O
+  `clonar_os` (a Clonagem e a Fila do PCM) passa a soma do tempo das tarefas criadas; a retomada da Fila (a tarefa que
+  ficou de uma tentativa anterior), o tempo dessa tarefa. No mesmo dia o PCM voltou: "o clonador deu certo tanto na
+  tarefa como na OS ... agora criando do zero o tempo na OS continua 10 min, só na tarefa que o tempo é o que a gente
+  colocou" (a Clonagem de planos, com o tempo editado na linha). Agora **toda OS que junta tarefas tem a soma do tempo
+  delas** (`_tempo_da_os`): a Clonagem de planos do PCM (`create_planned_os_multi`, e o `create_planned_os_one_wo`), a
+  agrupada do Criar OS do zero e da Engenharia (`create_work_orders_agrupada`) e a agrupada da Performance. O
+  `create_os_rpc` e o `create_planned_os` devolvem o `duracao` com que a tarefa nasceu; a tarefa sem tempo conta os
+  10 min. A OS de uma tarefa só (o Criar OS do zero de uma OS por ativo, as datas, a Performance de uma OS por ativo)
+  já saía com o tempo da tarefa. **A conta mora em UM lugar desde 31/10/2026**, no `os_juntar.juntar_em_os` (seção "Um
+  caminho só para juntar as tarefas numa OS"): os caminhos acima só criam as tarefas e o entregam.
+- **Prova:** `tests/test_oscreator_tempo_clonar_e_fila_30_10.py`. No Chrome sem janela, a tela de Clonar com duas
+  tarefas (uma com 1h30, outra sem tempo): 01:30 e 00:10; depois do "Atualizar todas do modelo", 02:00 e 01:00. Ao vivo,
+  o PCM conferiu o clone (a tarefa e a OS com o tempo total); falta a OS da Clonagem de planos e a de uma SS da Fila.
+
 ## Trocar o responsável na tela do chamado (Garantias, 19/10/2026)
 
 Levi, 19/10/2026, em Nexus > Chamados > Garantias: "ao clicar na OS em responsável dê para alterar o responsável da OS que
@@ -1236,6 +1293,12 @@ de todos os criadores em 30 dias, que passam de 2.000: cada carga eram ~26 pedid
 com as tarefas de 130 OS), repetidos para cada pessoa (a memória era por pessoa), a cada atualização automática de
 10 min de cada aba (que passava por cima da memória) e a cada ↻; e as 2.000 linhas eram montadas a cada pedido.
 
+- **Desde 31/10/2026 este é o CAMINHO DE HOJE** (tarefa 3.3 do canto central, seção "As telas leem da lista central de
+  OS"): as visões leem primeiro da lista central, depois da conferência da pessoa no período (a dela, exata, até a marca
+  d'água), e vêm para cá quando ela não cobre o período, não tem um campo que a tela mostra, ou a pessoa não passou (e no PC,
+  sem leitor). Com a lista central cobrindo o período, a "Todos" de baixo não é dividida: quem chega aqui segue com a lista
+  DELA (Ruling BU da rodada 2 da 3.3: quem vê tudo lê da lista central e não ancorava a dividida, e a lista da 1ª restrita
+  virava a de todos, herdada por outra restrita com o mesmo total).
 - **Uma lista para quem vê o mesmo** (`os_web/historico_store.py`): a de "Todos" é uma só; a 1ª visita de cada pessoa
   confere, com 1 pedido de 1 linha na sessão DELA, se o Fracttal dá a ela o mesmo total (±1%, ou 2 OS); quem vê outro
   total (visão restrita no Fracttal) segue com a lista dela. As listas de cada pessoa ("criadas por mim", "atribuídas
@@ -1257,6 +1320,1078 @@ com as tarefas de 130 OS), repetidos para cada pessoa (a memória era por pessoa
   pessoas, a visão restrita com a dela, a vencida que soma só as novas, a inteira a cada 10 min sem reler as tarefas
   das fechadas, o ↻, três pessoas ao mesmo tempo, o Fracttal fora, as linhas montadas uma vez).
 
+## Os filtros do Histórico só valem no Aplicar (03/11/2026)
+
+Levi, 03/11/2026: "quero que consigamos selecionar os filtros sem carregar a cada filtro, pode aparecer um botão discreto de
+Aplicar sempre que selecionar algum filtro, aí só filtra mesmo se aplicar". Antes, Criado por, Etiqueta e Período buscavam no
+servidor a cada troca, e Status, Cliente, Usina e Tipos filtravam a tabela na hora: montar três filtros custava três buscas.
+No mesmo dia ele pediu o visual: "refaz esse modelo de filtros [...] algo minimalista e moderno ao mesmo tempo", "use as cores
+Black: 030407, Blue: 1558c9, lime: D4FF24", "opção A, suspenso com um botão de aplicar no final" e "quero que todas as opções do
+filtro sejam digitáveis para facilitar encontrar o que quero". A maquete aprovada é o **modelo A**, e a tela é ela
+(`templates/historico.html`; o CSS na seção "os filtros no modelo A" do `static/os.css`; a busca no `static/os_busca.js`).
+- **A barra, numa linha só** (no celular quebra em linhas curtas: as abas, as duas buscas, e o período com o Filtros e os
+  ícones): as abas Histórico Geral, Atribuídas a mim e Visão COS (controle segmentado, a ativa em azul); a busca por texto (filtra
+  enquanto se digita, sem Aplicar); o "Buscar OS" pelo nº, compacto (abre a OS direto); o botão do **período**, que mostra o aplicado
+  ("04/10 – 03/11") e abre o painel; o botão **Filtros**, com a contagem em lima dos filtros aplicados (o período não conta); e os
+  ícones de Exportar (Ctrl+E) e Atualizar (F5), só ícone, com `title`. O "Lista das HH:MM · atualiza a cada 10 min" ficou em texto
+  apagado na linha do resumo da tabela.
+- **As etiquetas**, abaixo da barra: uma azul por filtro aplicado ("Status Em Processo", "Usina 3 selecionadas", "Criado por …").
+  O × tira aquele filtro e **aplica na hora** (pelo mesmo caminho do Aplicar: o da tabela sem pedido, o do servidor com a busca).
+  O "Limpar tudo" faz o que o Limpar filtros de antes fazia: sai o resto e a busca, e ficam a visão, o Criado por e o período (a
+  tela volta pelo endereço limpo). Ele só aparece quando há o que limpar. Sem filtro aplicado, a linha não existe. O Criado por vira
+  etiqueta sempre que não é "Todos os usuários": no Histórico Geral o padrão é a própria pessoa, e a etiqueta já está lá (a lista é
+  mesmo só das OS dela).
+- **O painel suspenso**, preso ao botão do período ou ao Filtros (o mesmo painel): o período primeiro (os atalhos 7 dias, 30 dias e
+  Este mês só **preenchem as duas datas** e esperam o Aplicar; "7 dias" é de 7 dias atrás até hoje, como os 30 do padrão da tela) e
+  depois Criado por, Etiqueta, Status, Cliente, Usina, Tipo de ativo e Tipo de tarefa, em 2 colunas (1 no celular). O campo que mudou
+  em relação ao aplicado ganha um ponto lima. No rodapé: **Limpar** (zera Etiqueta, Status, Cliente, Usina e os Tipos e espera o
+  Aplicar; Criado por e o período são o escopo da lista e ficam, como no Limpar de antes), "N alterações" e o **Aplicar** em lima,
+  apagado sem alteração. Com menos de 640 px o painel vira uma folha de baixo para cima, na largura toda, com o rodapé fixo, um véu
+  atrás e as listas no fluxo (solta por cima, a lista seria cortada pela rolagem da folha).
+- **Fechar sem aplicar descarta** (Esc, clique fora, o botão de novo ou o × da folha): os campos voltam ao aplicado. O clique fora
+  vale na captura, antes de qualquer outro clique da página: o que manda o formulário (as abas da visão, o ↻, o F5, o × de uma
+  etiqueta, o Limpar tudo) descarta o que estava no painel antes de mandar. Enter numa data é o Aplicar; nos outros campos do painel
+  não manda nada (o Enter solto mandaria o formulário pelo 1º botão de envio, o ↻, que busca tudo de novo e levaria as escolhas sem
+  o Aplicar). A atualização de 10 min espera com o painel aberto. Período sem as duas datas, ou com a inicial depois da final, não
+  aplica e avisa dentro do painel.
+- **A regra do Aplicar** não mudou: Criado por, Etiqueta e Período buscam no servidor; o resto (Cliente, Usina, os Tipos e o Status)
+  só filtra a tabela que já está na tela, sem pedido. Os filtros da tabela que não vão ao servidor atravessam a busca guardados no
+  `sessionStorage` da aba e remarcados ao chegar (o Aplicar que muda o período e a usina juntos não perde a usina, e a atualização de
+  10 min não zera os filtros da tabela); a troca de aba da visão e o Limpar tudo os zeram. **Exceção, achada ao fazer o ×:** a
+  página que chegou com Status no endereço já veio CORTADA pelo servidor (ele filtra por status), então nela o Status conta como
+  campo do servidor; só pela tabela, tirar a etiqueta mostraria as mesmas OS e diria que são todas.
+- **Tudo digitável.** Abrir um campo mostra a lista com a caixa de busca no topo (no PC já com o cursor; no celular não, porque o
+  teclado cobriria metade da lista): digitar filtra sem distinguir acento nem caixa ("sao" acha "São"), as setas andam, Enter marca
+  (as de vários valores: Status, Cliente, Usina e os Tipos, com o resumo "3 selecionadas", no feminino da Usina) ou escolhe (as de um
+  valor só, Criado por e Etiqueta, que fecham ao escolher), e o Esc fecha só a lista, de uma vez, com o texto digitado saindo
+  junto (com a lista fechada, o Esc fecha o painel; o painel marca isso com `data-esc-fecha`: nas outras telas o 1º Esc continua
+  limpando a busca e o 2º fecha). O `<select name="pessoa">` e o `<select name="etiqueta">` seguem no formulário, escondidos
+  (`display:none` dentro do `.fl-cel[data-campo-proprio]`, e é ele que o servidor lê); a lista que a pessoa vê é um `<details
+  class="os-multi fl-uni">` com um botão de escolha por linha, e o `os_busca.js` a trata como as outras (a caixa de busca, o teclado)
+  e deixa o `<select>` em paz. A cascata Cliente → Usina continua, e o descartar devolve o que ela desmarcou.
+- **Cores só por token** (`--fl-*`, no `:root` do `os.css`): o lima `#D4FF24` (a ação: o Aplicar, a contagem e o ponto do que mudou),
+  o azul `#1558c9` (o que está escolhido) e o preto `#030407` (o texto sobre o lima), com os "suaves" e as "bordas" em rgba. O par do
+  claro está no bloco de variáveis que já existia: o texto azul é o próprio `#1558c9`, o botão lima segue lima com texto escuro, e o
+  ponto lima vira o musgo. O fundo da página e o resto do OS Creator não mudaram. O botão Aplicar de hoje de manhã tinha `hidden` e
+  aparecia sempre (o `.os-btn{display:inline-flex}` vence o `hidden` do navegador): os controles novos que nascem escondidos
+  dizem `[hidden]{display:none}` no CSS.
+- **Prova:** `tests/test_oscreator_historico_aplicar.py` roda a página de verdade no node (`tests/historico_pagina_falsa.js`: o HTML
+  que o servidor monta é lido por um DOM de mentira que executa o script dela e o `os_busca.js`), com a troca que não filtra, o
+  descartar, o × que aplica, o atalho do período, a busca sem acento e o Enter que escolhe. A tela foi conferida no navegador, nos
+  dois temas, a 1280 e a 375 px, sobre a bancada do clone com dados inventados.
+
+## O catálogo de ativos central: um só para todas as telas (31/10/2026, etapa 2 do canto central)
+
+Levi, 30/10/2026: "para abrir uma solicitação precisamos de ativos, para criar OS é preciso carregar os ativos, para abrir o
+histórico acabamos vendo os ativos [...] a ideia é não ter um carregamento novo por atividade e sim um ecossistema onde as
+coisas se aproveitam e não precisamos ficar fazendo novas requisições sempre!" (desenho:
+`docs/superpowers/specs/2026-10-30-oscreator-canto-central-design.md`; esta é a tarefa 2.1 da etapa 2).
+
+**Antes:** três caminhos sobre o mesmo `assets_cache.json`, cada um com a sua cópia: o `load_assets_cached` copiava a lista
+inteira (~26 mil dicionários, uns 12 MB de lixo) a CADA chamada; o `rotas_solic._indice_ativos` tinha o índice e o renovador
+dele; o `_code_loc` era montado uma vez por processo e nunca refeito (ativo novo sem nome nas OS até o reinício); e o
+`_asset_by_code` percorria uma cópia nova por código. Cada push na `main` (uns 10 por dia útil) reinicia o serviço.
+
+**Agora** (`os_creator/ativos_central.py`): UM `Catalogo` por versão, pronto e imutável, para todas as telas e pessoas.
+- **O que ele guarda:** a lista (tupla, ordenada por cliente, usina e código), os índices por id, por código, por cliente e por
+  cliente + usina, o mapa código -> (cliente, usina curta, tipo) (o antigo `api._code_loc`, que o `api._code_to_loc` devolve) e
+  a contagem por tipo; mais `versao` (o sha das linhas ordenadas), `lido_em` e `fonte` (banco, rest, rpc ou disco). Montado UMA
+  vez quando a versão chega; trocado inteiro (`trocar`), de uma vez, nunca um pedaço.
+- **Quem lê dele:** `api.load_assets_cached` (devolve a MESMA tupla, sem copiar), `_asset_by_code` (uma cópia, pelo índice),
+  `_code_to_loc`, `_read_asset_cache` (a lista como está, sem a trava das 24 h), `assets_cache_info`, o índice da Solicitação
+  (`rotas_solic._indice_ativos`, sem arquivo nem renovador próprios), o "Investigar ativo", o lugar do ativo no PDF da OS, a
+  contagem da tela inicial e a cascata do Criar OS e da Nova solicitação (`tradicional_web`: `usinas_de`, `tipos_de`,
+  `ativos_de`, `ativos_do_cliente` usam o índice por cliente e usina quando a lista é a do catálogo, e varrem como sempre
+  qualquer outra).
+- **O registro é só de leitura.** Cada ativo é o MESMO objeto para todo mundo: `Registro` (um `dict` de verdade para `get`,
+  json e Jinja) levanta `TypeError` em qualquer escrita. A auditoria de todos os chamadores (31/10/2026) não achou nenhum que
+  mexa num registro nem na lista; o guarda existe para o próximo que mexer não corromper o ativo de todas as pessoas, sem erro
+  nenhum. Quem precisa mexer pede a cópia: `ativos_central.registro(codigo)` ou `dict(r)`. A auditoria: leitura de cada ponto
+  de uso e uma rodada do grupo `-k "oscreator or chamados or engenharia or pcm_nota or prefixo"` com todo catálogo de dublê
+  entregue como tupla de `Registro` (31/10/2026: 103 listas congeladas, nenhum `TypeError`).
+- **O boot nunca pergunta ao Fracttal.** Em ordem: (1) a cópia em disco, `<pasta de dados do clone>/oscreator/ativos.json.gz`
+  (gravada ao lado e trocada de uma vez; a gravação escreve o catálogo VIGENTE quando a trava do disco chega, e não o que a
+  pediu, e só pula o que o disco já tem, a mesma versão, `lido_em` e `novos_em`: uma troca e os novos do dia terminando em
+  ordem trocada não deixam a versão velha no disco, e o `acrescentar` sem novos, que põe no lugar outro objeto da mesma
+  versão, não faz a gravação pendente ser pulada (revisão 2 da 2.2); o formato vai escrito dentro; a ilegível, cortada
+  ou de outro formato é ignorada, e o motivo fica em `estado()["disco"]["erro"]`; a cópia, o `ativos_estado.json` e a leitura
+  do arquivo antigo moram em `os_creator/ativos_disco.py` desde a revisão 1 da 2.2); (2) o `assets_cache.json` antigo, lido UMA vez como migração se a cópia nova
+  não existe (já grava a nova); (3) a foto dos ativos no banco, `nexus_ativos_fracttal · foto_ativos`, pela função que a
+  `ponte.py` entrega (`ativos_banco.leitor`; o catálogo não conhece a configuração do banco). Sem nenhuma, o catálogo nasce do
+  primeiro download (RPC, com a sessão de quem pediu, como sempre). Quem chega com o boot em curso espera nele: o "feito" só vale
+  depois (um teste de 8 pedidos juntos achou o erro, que mandaria o pedido dos primeiros décimos de segundo baixar os ~22 mil
+  ativos do Fracttal).
+- **A troca recusa** a lista vazia, a que encolhe mais de 5% (`ENCOLHE_MAX`) e, só da foto do banco e do disco (a data veio
+  escrita), a leitura mais velha que o catálogo de agora com outro conteúdo (a foto do banco de ontem não vence o RPC de agora;
+  a leitura rest ou rpc é feita agora e nunca é "velha": pelo relógio de parede, um download que terminou um segundo depois de
+  outro perderia dele): o download do RPC por páginas perde 200 ativos em silêncio quando uma página vem sem lista. Recusada,
+  fica o catálogo de antes e o motivo (com a hora) vai para `estado()["recusa"]`. A versão (o sha das linhas) sai ANTES de montar qualquer coisa: a mesma lista lida de novo (a renovação
+  diária) só renova o `lido_em` (e regrava o disco se o dele ficou mais de 1 h para trás), e a recusada não monta nada. Só o
+  que veio do Fracttal (rpc, rest) vai para o disco.
+- **A recusa é lembrada** (revisão 1 da tarefa 2.1). A leitura completa que o catálogo recusou por ter encolhido foi uma ida de
+  ~110 pedidos ao Fracttal: `ativos_central.conferido_em(cat)` é o mais novo entre o `lido_em` e essa leitura, e o
+  `api.catalogo_vencido` decide por ele. Então duas aprovações da Fila seguidas, depois das 24 h, baixam UMA vez (antes, cada uma
+  baixava os ~110 pedidos, minutos na frente de quem aprovava, e o download por trás repetia de 10 em 10 min); quem esperou a vez
+  na trava usa a leitura de quem baixou, entrando ou não; o botão "Atualizar ativos" (`force`) dentro de
+  `ASSETS_ESPERA_TENTATIVA` (10 min) depois de uma recusa devolve o catálogo de agora sem baixar; passadas as 24 h da recusa, tenta
+  de novo. A lista vazia NÃO entra (não é leitura completa, custa 1 pedido). Desde a 2.2 a recusa sobrevive ao reinício
+  (`ativos_estado.json`, ao lado da cópia em disco, com a última paridade do REST): o servidor reinicia ~10 vezes por dia, e
+  só na memória cada deploy releria o Fracttal uma vez e a confirmação abaixo nunca chegaria. A falha do download (exceção:
+  Fracttal fora, cota estourada) também é lembrada (`ativos_central.anotar_falha`): quem esperava a vez na trava não tenta de
+  novo em fila, e o `force` e o `em_dia` dentro de `ASSETS_ESPERA_TENTATIVA` devolvem o catálogo de agora e os botões dizem por
+  quê (`api.aviso_da_falha`, campo `falha`; a renovação por trás tem a janela dela). A sessão recusada de UMA pessoa
+  (`SessionExpired`: 401/403, o login que caiu) não é falha do Fracttal e não segura o download de mais ninguém.
+- **O encolhimento confirmado** (2.2): o Fracttal que perdeu ativos de verdade (uma usina que saiu da carteira) seria recusado
+  para sempre. A troca que encolhe passa quando o MESMO conjunto de ativos sai do catálogo em duas leituras completas, de
+  caminhos diferentes (REST e RPC) ou do mesmo com 20 h ou mais entre elas, sem leitura aceita no meio; o
+  `estado()["encolhimento"]` diz. O conjunto é o que SAI, e não a lista inteira: os novos do dia entram no catálogo entre as
+  duas leituras, e a lista inteira nunca seria a mesma.
+- **Os botões levam o motivo:** `POST /os/api/ativos/atualizar` e `GET /os/api/tradicional/catalogo?recarregar=1` respondem com
+  `recusa` (texto curto com a hora, ou "") e `falha`; o link `/os/solicitacao/atualizar`, que navega, volta à Fila só com o
+  SINAL (`recusa=1`, `falha=1`), e a Fila mostra o texto do servidor (`api.aviso_da_recusa`, `api.aviso_da_falha`): nada escrito
+  na URL vai à tela (revisão 1 da 2.2: qualquer link punha qualquer frase na faixa). As três telas o mostram (seção "Os botões
+  Atualizar ativos sem esperar o Fracttal", abaixo).
+- **Fresco ou vencido** é decidido por quem usa, por `conferido_em` (`api.catalogo_vencido`: 24 h; com o leitor do servidor
+  pronto, 26 h, para a leitura da noite de ontem não vencer em cima da de hoje e um pedido nesse minuto não disparar o RPC junto
+  com o REST): vencido, o catálogo serve e é renovado por trás pelo RPC, como em 24/10. O que veio da foto do banco está sempre
+  vencido (é o socorro da máquina sem cópia: o código da foto é o canônico, e a 1ª leitura do Fracttal a troca). Com o leitor
+  pronto (seção abaixo), `force=True` pede só os ativos novos, por trás, e volta na hora, e `em_dia=True` volta com o catálogo
+  como está: a aprovação da Fila que NÃO acha o ativo da solicitação nele espera os novos (6 s no máximo) e procura de novo
+  (`rotas_solic._ativo_para_aprovar`); a que acha não espera nada. Sem ele (o PC, os testes, o leitor fora da prontidão), os
+  dois seguem como eram (RPC com a sessão da pessoa), e o que baixam entra no catálogo central. O "desatualizado" da tela inicial segue pelo `lido_em` (o dado é de
+  ontem, mesmo conferido hoje).
+- **Medido** (catálogo de 28/10, 26.620 ativos): 30 MB na memória com todos os índices (a lista decodificada sozinha eram 33 MB, e
+  cada chamada copiava mais ~12 MB); subir pela cópia em disco 0,5 s (o arquivo tem 0,9 MB); montar uma versão 0,4 s; trocar pela
+  MESMA lista (a renovação diária) 0,35 s e pico de 15 MB (eram 0,45 s e 44 MB: montava tudo para depois ver que era igual); achar
+  um código 1,5 µs.
+- **Na ponte:** `ponte.ligar_catalogo_de_ativos(app)`, ao criar o clone, diz onde mora a cópia e de onde ler a foto. Nos testes
+  o disco não é tocado (a pasta é a do usuário da máquina): o catálogo vive só na memória, e o teste que quer o disco passa a
+  pasta de teste (`ativos_central.reiniciar(pasta=...)`).
+
+**A foto do banco como catálogo** (a conversão e o caminho pela cadeia de pais moram em `os_creator/ativos_foto.py` desde a
+2.2). A da carga única não servia (o limite medido): ela foi carregada do `assets_cache.json` em 11/10/2026, e aquele arquivo
+já tinha jogado fora a raiz de cada cliente (o item sem pai, que o `montar_registros` ignora): das 22.357 linhas, 15 pais não
+estão na foto, e nenhuma linha chega à raiz pela cadeia de `pai_item_id`. O nome do cliente (o 1º trecho do
+`parent_description`) só existe na raiz; tirá-lo do prefixo do nome da usina acerta 74% dos ativos (128 das 189 usinas com
+equipamento) e erra 6 dos 16 clientes (a carteira com outro nome), e o Almoxarifado e o "TESTE - PA" (`CLIENTES_OCULTOS`)
+deixariam de ser reconhecidos e apareceriam nas cascatas com nomes inventados. Por isso `registros_da_foto` recusa a foto em
+que mais de 1% das linhas não chega à raiz pela cadeia de pais (`FotoIncompleta`; a de 22/09 não chega em nenhuma): a fonte
+fica ligada, o motivo aparece em `estado()["banco"]`, e a foto renovada toda noite pelo leitor do servidor (2.2), com as raízes
+e as colunas novas, passa a servir sozinha. Com a raiz, a cadeia monta o MESMO cliente, usina e tipo que o RPC
+dá (o teste compara com registros de caminho conhecido; sobre o catálogo de 28/10 reconstruído com as raízes: cliente 100%,
+usina 99,98%, tipo 100% e o caminho `parent_description` igual ao do RPC em 97,7% dos ativos). O nome de cada item no
+caminho sai da descrição dele, que traz o endereço da usina atrás: na usina o corte é na sigla do estado (acertou as 189 com
+equipamento), nos níveis de dentro tira-se a cauda de endereço da usina ou corta-se no 1º espaço duplo. Da foto renovada vêm o
+`id_type_item` e o `id_group_task` (as colunas novas; a criação de OS usa os dois, e o `create_os_rpc` poria `id_type_item or 1`
+sem eles); a linha marcada `fora_do_fracttal_desde` não entra; e, na foto de 11/10 (sem essas colunas), só a foto mais nova
+entra (a de 21/06 que a carga levou junto tem códigos que o Fracttal já não tem).
+
+**O leitor do servidor (tarefa 2.2, 31/10/2026; `os_creator/ativos_leitor.py`).** O catálogo deixa de depender da sessão da 1ª
+pessoa do dia: o próprio servidor lê os ativos pela credencial da empresa (o REST `items`, o cliente e o ritmo de
+`nexus/campo/fracttal.py`). Só o `servir.py` liga (`ativos_leitor.ligar`, pelo `ponte.modulo_do_clone`); o `app.py` (o PC) e os
+testes seguem pelo RPC; sem a credencial REST (`FRACTTAL_CLIENT_ID`), não liga e o estado diz por quê.
+- **No porteiro do Fracttal (31/10/2026, etapa 5):** o laço `nexus-ativos-leitor` (a noite e os novos das :08 e :38) se
+  declara fundo no alvo da thread (`fracttal_conta.de_fundo`: no máximo 90 pedidos por minuto, e depois do clique); os
+  novos que o botão pede (`nexus-ativos-novos`) seguem clique, porque quem clicou espera por eles. A leitura passa pelo
+  `campo/fracttal.ler`, que tira a vez no porteiro antes de pegar uma das 4 `_VAGAS`. Regras em `nexus/casca/CLAUDE.md`,
+  "Pedidos ao Fracttal: o contador e o porteiro".
+- **De madrugada (02:15 de Brasília), o Fracttal inteiro** (`ler_completo`): ordenado pelo id (`items?sort=id:asc`: o
+  deslocamento de cada página só é estável sobre uma ordem declarada), 100 itens por página, 1 pedido por segundo, até o `total`
+  que a 1ª página informa (~270 pedidos, ~5 min). O 4xx na 1ª página (o motivo diz qual, revisão 2 da 2.2: o 400 e o 422 são
+  a ordem recusada; o 401 e o 403, a credencial da empresa; o resto, o HTTP), a página curta antes do total, os itens
+  distintos a menos ou nada: `LeituraIncompleta`, com o motivo, e nada muda (tudo segue pelo RPC). Só o erro de
+  passagem se repete (`_transitorio`: o 406/429 que o cliente já esperou 5 s e 10 s, a conexão que caiu, o tempo esgotado e o
+  5xx): o leitor espera o castigo de 1 min do Fracttal e pede a mesma página de novo, duas vezes; o 400, o 401, o 403 e o 404
+  falham na hora. Só os campos do registro ficam (`CAMPOS_REST`).
+- **Do REST ao registro** (`para_registro`): o formato cru do RPC. O `parent_description` é o do item, se o REST o der; senão,
+  montado pela cadeia de `id_parent` (`ativos_foto.caminhos`, o mesmo da foto). O `id_group_task` é o do item; senão o do
+  catálogo de antes pelo mesmo id (na 1ª noite, o do RPC); senão o da foto; senão vazio. O item cujo pai não se acha fica de
+  fora do catálogo (a leitura seguinte o traz), e a foto o guarda: a foto leva o catálogo que entrou e, pela DIFERENÇA de ids, o
+  que ele não tem (as raízes dos clientes, os sem pai, o caminho sem trecho como "// / "), sem repetir a regra do
+  `montar_registros`. A `descricao` da foto vai SEM endereço, em toda linha (Rulings AK e AN), porque a API do banco tem
+  leitura aberta e o endereço da usina já saiu dela uma vez, no mesmo dia em que entrou (04/10/2026): a linha lida hoje
+  leva o nome do item no caminho (`ativos_foto.nomes_no_caminho`); a que não veio (o código que saiu do Fracttal) é
+  recalculada pela própria descrição e pelo próprio pai (`ativos_foto.nome_pelo_pai`, sobre `_grafo_de_quem_saiu`: a cadeia
+  dela no que se leu hoje e nas linhas antigas que também não vieram); e a foto passa toda descrição pelo detector de
+  endereço (`nexus/dados/foto_ativos.sem_endereco`, regra e marcadores no `nexus/dados/CLAUDE.md`). O detector NÃO entra no
+  caminho do catálogo: o cliente e a usina das telas e a paridade com o RPC não mudam. Quantas ele cortou na última foto
+  (o número, até 5 ids e a hora, nunca o texto) fica no `ativos_central` (`anotar_descricao_cortada`, e no `estado()`) e
+  no `ativos_estado.json`, para sobreviver ao deploy (item 0 da 3.1+3.2), e vai a uma linha de log no fim da
+  noite ("a foto da noite: N linhas, N mudaram, N entraram, N saíram, N descrições cortadas (ids ...)"). **Onde se vê** (o
+  Levi não tem acesso ao servidor, e a 1ª noite só se confere pela tela): Raio-X (Base → Raio-X, só administrador) → a seção
+  "Uso do OS Creator" → o bloco **"Ativos centrais"** (`nexus/casca/raio_x.py`, `_secao_canto_central`): o catálogo (fonte,
+  lido em, versão), se o leitor está pronto, a paridade (quando, as coberturas `cob_ref`/`cob_rest`, se valeu), o REST (a
+  última leitura boa e a última falha), **a última noite** (a hora, quanto levou, se o catálogo aceitou, os pedidos, as
+  contagens e a foto do banco: gravou, linhas, mudaram, entraram, saíram, o erro; guardada no `ativos_estado.json` por
+  `ativos_central.anotar_noite`, para sobreviver ao reinício), a troca recusada, as descrições cortadas (o número e os ids) e a
+  cópia em disco. A usina cujo nome
+  fechou no padrão "Cliente - Usina -
+  UF" NÃO passa pelo detector (Ruling AQ, revisão 3): o leitor diz quais (`nomes_no_caminho(..., usinas_no_padrao=)` e o
+  `nome_pelo_pai` da linha que saiu), e a foto só as isenta se o nome termina na sigla do estado. Sem isso, a usina de
+  fazenda ("CL - UFV Fazenda X - MT", comum na carteira) virava "CL - UFV", e a foto servindo de catálogo (a máquina sem
+  cópia nenhuma, `registros_da_foto`) juntava duas usinas de fazenda numa só na cascata. A usina FORA do padrão segue pelo
+  detector, e nessa foto ela aparece sem o endereço até a 1ª leitura do Fracttal.
+- **A conferência** (`conferir_paridade`, contra o catálogo de agora: na 1ª noite o do RPC, a sondagem REST x RPC de verdade;
+  depois, a leitura anterior): >= 99% dos códigos em comum com o mesmo cliente e usina, os campos obrigatórios (`id`,
+  `id_parent`, `id_type_item`) em >= 99% dos ativos e >= 95% dos códigos da leitura no catálogo. Na 1ª conferência (o REST
+  ainda não valeu, ou a última que valeu passou de 30 h), >= 99% nos DOIS sentidos, e o motivo diz até 5 códigos dos que
+  faltam de cada lado (revisão 1 da 2.2: com 95%, até 5% dos códigos do RPC podiam faltar no REST, saíam do catálogo e a foto os
+  marcava "fora do Fracttal" sem estarem). O resultado vai a `estado()["paridade_rest"]` e ao `ativos_estado.json`, dizendo
+  contra qual fonte e de quando, com as coberturas de toda noite (`cob_ref`: % dos códigos do catálogo na leitura; `cob_rest`:
+  % dos da leitura no catálogo).
+  **Falhou:** nada troca, nada se acrescenta pelo REST, e o catálogo vence nas 24 h de sempre: a 1ª sessão do dia o renova
+  pelo RPC, por trás, uma vez para todos (o renovador de antes). **Valeu:** `ativos_central.trocar(..., "rest", lido_em=` o
+  fim da leitura `)`, que ainda recusa a que encolhe; aceita, a foto do banco é renovada (`nexus/dados/foto_ativos.py`: só
+  quando o sha das linhas muda; o código que saiu do Fracttal fica marcado). Uma guarda só para os dois.
+- **De dia, só os novos** (às :08 e :38 das 06h às 22h, `ler_novos`, só com a paridade valendo e de no máximo 30 h):
+  `items?sort=id:desc`, do maior id para o menor, até a 1ª página INTEIRA de ids que o catálogo já tem (1 pedido sem novidade,
+  2 com). A página fora de ordem (o `sort` ignorado) não acrescenta nada e é falha do REST; mais de 400 novos ficam para a noite
+  (não é falha: o REST respondeu); o novo cujo pai não está no catálogo nem nos novos também. O caminho dos novos sai do catálogo, e a raiz do cliente do próprio catálogo (o item-usina, com um
+  trecho só no caminho, é filho dela). Eles entram por `ativos_central.acrescentar`, sem mexer no `lido_em` da lista inteira
+  (o catálogo vence pelas 24 h dela, e a confirmação do encolhimento segue valendo); anda o `novos_em`, e a tela diz "ativos
+  de HH:MM" pelo mais novo dos dois (`visto_em`).
+- **Quem pede os novos:** `pedir_novos` (por trás; a leitura de menos de 1 min serve, e dez cliques são um pedido) e
+  `esperar_novos` (a tela que volta com `?novos=1` e a aprovação que não achou o ativo; teto de 6 s), que devolve o DESFECHO
+  da leitura: `terminou` (dentro da espera), `acrescentados`, `sem_pai`, `muitos`, `muitos_mais` (a leitura parou no teto com
+  a última página toda de novos: havia mais do que ela viu) e `erro`. O desfecho de leitura que terminou há mais de 2 min
+  (`DESFECHO_VALE_S`, o dobro do frescor) não é o de agora: None, e a tela não diz nada dos novos (revisão 2 da 2.2: o F5 da
+  Fila com `?novos=1` repetia o de uma leitura antiga). Uma leitura do Fracttal por vez: os novos pulam enquanto a noite
+  corre.
+- **A prontidão expira** (`ativos_central.leitor_pronto`, revisão 1 da 2.2): o leitor só está pronto (os botões pedem os novos
+  a ele) com a conferência da leitura REST que VALEU há no máximo 30 h (`paridade_recente`) e nenhuma leitura REST falhando
+  depois da última boa (`anotar_leitura_rest`: a dos novos ou a da noite; a exceção do cliente, a leitura incompleta e a página
+  fora de ordem são falha; os novos demais, não). A prontidão que nunca expirava deixava os botões no REST com toda leitura
+  falhando, sem o socorro do RPC, e a Fila sem o ativo de hoje por um dia. Fora dela, `force` e `em_dia` voltam ao caminho do
+  PC (o RPC com a sessão da pessoa); a leitura boa seguinte a devolve; a última boa e a última falha vão ao
+  `ativos_estado.json` (o reinício não esquece) e ao `estado()["rest"]`.
+- **Medido** (27 mil itens sintéticos com a forma da árvore do Fracttal: 16 clientes, 190 usinas, cabines e inversores):
+  `para_registro` + `montar_registros` 0,25 a 0,3 s; a noite inteira sem a rede (a leitura, a foto de 27 mil linhas do banco
+  devolvida como texto, a conferência, a troca e a foto sem mudança) 7 a 9 s e pico de ~53 MB a mais (eram 72 MB antes de cada passo largar o
+  que já serviu e de a foto do banco virar listas logo depois de lida; o maior pedaço é o `montar_registros`, com a lista crua
+  e os registros juntos; o nome sem endereço de cada item, da revisão 1, vem depois dele e não sobe o pico); os novos (30, pelo
+  catálogo de 27 mil) 0,1 s mais 0,4 s para somar. A noite em que a foto MUDA (a 1ª renovação, que troca todas as linhas de
+  11/10) grava as 27 mil linhas pelo `livros.publicar`, e o xlsx dele pesa mais que tudo isso: olhar o Raio-X nessa noite.
+  Pedidos: a noite, 1 por página de 100 (~270); os novos, 1 ou 2.
+- **Os campos do REST que o leitor supõe** (a sondagem do `items` não pôde ser feita antes de construir): `id`, `code`,
+  `description`, `id_parent`, `id_type_item`, `id_group_task` e, se vier, `parent_description` (os nomes do RPC
+  `inventories.items_list`, que o `get_assets` usa), e o envelope `{"data", "total"}` (o do `fonte_bd_api` do PCM, com o
+  `total` às vezes em texto). O que faltar aparece na conferência da 1ª noite, que então falha e diz o campo.
+
+**Prova:** `tests/test_oscreator_ativos_central.py` (47 testes: nenhuma ida ao Fracttal nas telas, nem depois do reinício;
+o boot em ordem, a cópia ilegível, o boot concorrente (8 pedidos juntos, com o leitor lento); o registro só de leitura e a
+cópia; a busca por índice, sem varrer; a troca recusada, a mesma lista sem montar nada e a leitura mais velha; a recusa lembrada
+(duas aprovações e cinco pedidos juntos baixam uma vez, o botão na janela não baixa e leva o motivo, passadas as 24 h tenta de
+novo); a conta de códigos igual nas duas telas; a foto do banco contra o caminho do RPC; a ponte), os testes de catálogo de
+19/10 e 24/10 sobre o novo dono e `tests/test_oscreator_ativos_leitor.py` (a 2.2: a leitura inteira para no total, com 1 s entre
+os pedidos; a incompleta não troca; a recusa espera e tenta; os novos param na página conhecida, a fora de ordem não entra, o
+sem pai fica para a noite e os novos voltam do disco; o caminho pelos pais igual ao do RPC e o grupo que cai no catálogo e na
+foto; a paridade que passa e a que falha, que deixa o catálogo pelo RPC, uma vez; a foto que guarda o código que saiu, só
+grava quando muda, não grava sobre a leitura curta e só depois que o catálogo aceitou; o encolhimento confirmado, que
+sobrevive ao reinício; a falha do download que vale para quem esperava; só o servidor liga, e sem a credencial não liga) e
+`tests/test_oscreator_ativos_prontidao.py` (a revisão 1: a prontidão que expira pela idade e pela falha e volta com a leitura
+boa, também depois do reinício; a noite que falha derruba; a 1ª conferência com 99% nos dois sentidos e os códigos que faltam;
+só o erro de passagem se repete; a noite ordenada pelo id e o `sort` recusado; a foto pela diferença de ids e sem o endereço
+da usina; o núcleo concorrente dos novos com as funções de verdade; o disco com a versão vigente; as 26 h com o leitor; e a
+revisão 2: o 4xx da 1ª página que diz o que houve e a gravação pendente que escreve o vigente) e
+`tests/test_oscreator_ativos_descricao_no_banco.py` (a revisão 2, Ruling AN: a linha que saiu perde o endereço, a partir de
+uma foto de 11/10 com endereço, e a 2ª noite não muda nada; a linha já marcada também; o detector na usina fora do padrão,
+no nível de dentro e no endereço próprio, e os marcadores um a um; o caminho do catálogo que não passa por ele; a contagem
+sem o texto; e a revisão 3, Ruling AQ: a usina de fazenda que fechou no padrão sem passar pelo detector, também a que
+saiu, e a foto servindo de catálogo com as usinas de fazenda separadas).
+
+## Os botões "Atualizar ativos" sem esperar o Fracttal (31/10/2026, tarefa 2.3 do canto central)
+
+Os três botões (OS Creator -> Ativos, o ↻ do Criar OS e o "Recarregar o catálogo de ativos" da ficha da Fila do PCM) baixavam o
+catálogo inteiro pelo RPC NA FRENTE de quem clicou: ~110 pedidos, minutos, e a página parada. Agora, com o leitor do servidor
+pronto (seção acima: ligado pelo `servir.py` e com a leitura REST da noite conferida), eles pedem só os ativos NOVOS
+(`api.load_assets_cached(force=True)` -> `ativos_central.pedir_novos`, por trás) e respondem na hora.
+- **O que a tela recebe:** `ativos_de` ("ativos de HH:MM", Brasília, `api.ativos_de`: a última vez que a lista foi comparada
+  com o Fracttal, a lista inteira de madrugada ou os novos do dia, o mais novo dos dois, Ruling AL; de outro dia, "ativos de
+  dd/mm HH:MM", porque à 01:00 "de 02:20" seria lido como a de hoje), com as duas horas no `title` (`api.ativos_de_titulo`:
+  "lista completa de dd/mm HH:MM; novos até HH:MM"; sem novos, só a primeira), `novos` (True quando o leitor foi chamado),
+  `recusa` e `falha`.
+- **E a lista seguinte já vem com os novos:** a tela que acabou de apertar o botão pede a lista com `?novos=1`
+  (`/os/api/ativos/catalogo?novos=1`, `/os/api/tradicional/catalogo?novos=1`, e o link volta à Fila com `novos=1`), e essa
+  rota espera a leitura em curso até 6 s (`api.esperar_os_novos`; estourou, segue com o que há) e devolve o desfecho dela
+  (`novos_desfecho`, com o `texto` de `api.texto_dos_novos`). Quem espera é o pedido seguinte, não o botão. A tela diz, nesta
+  ordem: não terminou ("a busca no Fracttal ainda não terminou: os ativos novos aparecem em instantes"); falhou ("não consegui
+  buscar os ativos novos no Fracttal: o motivo"); deixou ativos para a noite ("N ativos novos ficam para a leitura da noite";
+  "mais de N" quando a leitura parou no teto e havia mais); terminou bem sem nada ("nenhum ativo novo no Fracttal", e só
+  então); terminou bem com N (na tela de Ativos, a conta da lista). Revisão 1 da 2.2: a frase "nenhum ativo novo" saía de
+  qualquer conta igual, também quando a busca estourava ou falhava. Revisão 2: o desfecho de mais de 2 min não aparece.
+- **Onde aparece:** na tela de Ativos, a linha de cima ("N ativos · M usinas · ativos de HH:MM"; o rodapé diz o desfecho, a
+  recusa e a falha; abaixo de 480 px a busca desce para a linha de baixo, inteira: a 375 px a linha espremia o subtítulo em 4
+  linhas e a busca cortava em "códi"); no Criar OS, ao lado do ↻ (a hora, o desfecho e, se houver, a recusa e a falha); na
+  Fila, no aviso do ativo que não se acha ("busca no Fracttal os ativos novos, em segundos; ativos de HH:MM") e, na volta do
+  link, em faixas de alerta no alto (o desfecho, a recusa e a falha, com o texto do servidor).
+- **Sem o leitor pronto** (o PC, `app.py`; a paridade que falhou, envelheceu ou ainda não houve; o REST falhando): os botões
+  seguem pelo RPC com a sessão de
+  quem clicou, como antes, para dentro do catálogo central; a tela diz "leva alguns minutos" e mostra a mesma hora. A
+  renovação por trás do catálogo vencido é sempre pelo RPC (`_renovar_catalogo_por_tras` marca o contexto dela, `_POR_TRAS`,
+  e o `load_assets_cached(True)` dela não chama o leitor).
+- O erro do ↻ do Criar OS diz em palavras ("Não consegui recarregar os ativos: ..."), sem o sinal de alerta.
+- **Prova:** `tests/test_oscreator_ativos_botao.py` (os três botões voltam antes de a leitura dos novos acabar, sem o RPC, e
+  a lista com `?novos=1` já traz o ativo novo; "ativos de HH:MM", com a data quando é de outro dia, nas respostas e nas
+  páginas; sem o leitor, ou com a paridade que falhou, o RPC com a sessão da pessoa; e a revisão 1: o desfecho dos novos
+  (terminou bem sem nada e com N, sem o pai, não terminou e falhou) com o leitor de verdade, a Fila com o desfecho, a falha
+  lembrada nos botões e a sessão de uma pessoa que não é falha de todos, a Fila que não ecoa a URL, a aprovação que só espera
+  sem o ativo, o `title` com as duas horas e o cabeçalho a 375 px; e a revisão 2: o desfecho de mais de 2 min que não
+  aparece e o "mais de N" só quando a leitura parou no teto).
+
+## A lista central de OS e o leitor em faixas (31/10/2026, tarefas 3.1 e 3.2 do canto central)
+
+Levi, 30/10/2026: "o histórico de OS pega só os mais recentes, atualizando os mais antigos 1 vez por dia pela noite" (desenho:
+`docs/superpowers/specs/2026-10-30-oscreator-canto-central-design.md`, "Etapa 3"). Até a 3.3 cada visão do Histórico era uma
+lista no `historico_store` (a de "Todos" por quem vê o mesmo; "criadas por mim" e "atribuídas a mim" por pessoa), o Garantias
+tinha a dele (365 dias), a marcação verde dos Ativos relia 30 dias e o nº da OS virava id com 1 a 5 pedidos. A 3.1 e a 3.2
+construíram a lista UMA, de todas as OS, e quem a enche; as telas leem dela desde a 3.3 (a seção seguinte).
+
+**A lista (`os_creator/os_central.py`; o registro e quem o monta em `os_registro.py`, a cópia em disco em `os_disco.py`).**
+- **O que guarda (decisão AC):** as OS CRIADAS nos últimos 365 dias (`JANELA_DIAS`: o Garantias lê 365 e o REST não filtra pela
+  etiqueta) mais toda OS aberta (status 1 e 2) de qualquer idade. Um registro por OS (`RegistroOS`, uma tupla com nome, só
+  leitura, a mesma para todas as telas; `linha()` dá o dicionário novo, no formato do `api.list_minhas_os`, com o cliente, a
+  usina e o tipo tirados do catálogo de ativos na hora). Os índices por id, por nº (`por_folio`) e por código de ativo
+  (`por_codigo_ativo`), a ordem pela criação, e a janela lida inteira (`janela`, decisão AC: a tela que pede um período fora
+  dela vai ao vivo, `Lista.cobre`; o 1º dia dela é a data LOCAL menos 365 dias, a das telas, desde a rodada 2 da 3.3). A
+  marca d'água (`marca`, rodada 2 da 3.3): a criação da OS mais nova de uma leitura até o topo; toda OS criada antes dela está
+  na lista, e é até ela que as telas conferem. Troca-se a versão inteira; a ação refaz só os pedaços da OS dela nos índices
+  (`_aplicar`, o mesmo resultado da montagem inteira, um teste confere).
+- **Os campos e de onde vêm.** Das linhas do REST `work_orders` (uma por TAREFA, juntadas pelo `id_work_order`, a tarefa
+  repetida uma vez só): `wo_folio` (nº), `description` (a descrição, as das tarefas juntas e cortadas em 90, como o
+  `_shape_wo_row`), `items_log_description` (o ativo, cortado em 60, e os códigos entre chaves; sem chaves, o `code`),
+  `created_by` e `code_create_by` (quem criou e o código da pessoa no Fracttal), `user_assigned`/`personnel_description` e
+  `id_personnel` (o responsável), `labels` (as etiquetas, id e nome), `creation_date`, `date_maintenance` (programada, a mais
+  cedo), `event_date` (a mais cedo; sem ela, a programada), `initial_date` (o início, o mais cedo), `wo_final_date` (senão a
+  data fim mais nova das tarefas), `tasks_log_task_type_main` (o tipo, "A / B" como o meta das tarefas),
+  `id_status_work_order`, e `task_note`/`note` só no texto que traz o bloco do chamado (o Garantias lê a OS de acompanhamento
+  por ele; o texto sem o bloco não fica na memória, nem ao lado de um com o bloco: assim o `api.parse_bloco_chamado` não lê
+  linha de outra nota como campo). Os outros campos que o Nexus já lê do REST servem à montagem e não ficam
+  (`id_work_order`, `id_work_orders_tasks`, `code`) ou não são mostrados pela lista (`parent_description`: o cliente e a usina
+  saem do catálogo pelo código; `id_parent_wo`, `tasks_duration` e `id_task`: o card lê ao vivo). **O que a tela usa e o REST
+  não traz** (fica vazio na lista; o card lê ao vivo):
+  o gatilho (`trigger_description`: nenhum leitor do REST no Nexus o lê hoje, e não se sabe se o `work_orders` o traz; se
+  vier, entra), o id da CONTA de
+  quem criou (o `id_created_by` do RPC: a lista guarda o código da pessoa, e "criadas por mim" casa por ele), a nota das OS
+  sem o bloco do chamado, as subtarefas, os anexos, a OS pai e a solicitação. A 1ª noite no servidor diz quanto de cada campo
+  o REST trouxe (o estado da lista, "Campos que o REST trouxe" no Raio-X): é a sondagem que não pôde ser feita antes de
+  construir (o auto-mode desta máquina não lê o Fracttal com a credencial).
+- **A faixa que sai.** Cada leitura diz o que cobre (`receber(linhas, faixa)`): a OS que a lista tinha dentro da faixa e que não
+  veio nela mudou (de status, ou sumiu) e fica **"a conferir"** (`Lista.a_conferir`: a tela diz e o card lê ao vivo; o filtro
+  por status não a conta, porque o status dela é velho) até uma faixa trazê-la de novo; a noite tira de vez o que não voltou.
+  As novas só somam (as conhecidas da página que encerra podem vir pela metade); os 7 dias e a noite trocam as criadas desde o
+  piso (a linha mais velha que ele, da página da borda, não entra); as abertas trocam as que vieram e marcam a aberta que não
+  veio; as finalizadas só anotam o status e a data fim nas OS que a lista já tem (a leitura é pela data de fim de cada TAREFA).
+  E a leitura só julga o que existia quando ELA começou (a noite inteira leva minutos, e a ação e a entrega das abertas não
+  esperam por ela): a OS que a ação mexeu depois do começo não volta ao status velho que a leitura leu, e a criada depois do
+  começo (com 2 min de folga para o relógio do Fracttal) não sai nem fica "a conferir" por não ter vindo.
+- **A trava de encolhimento** (Ruling AU, rodada 1 da revisão; o `ENCOLHE_MAX` dos ativos): a noite que tiraria, ou os 7 dias
+  que marcariam "a conferir", mais que 5% das OS que a leitura cobre e mais que 10 OS, não trocam NADA (páginas perdidas em
+  silêncio, o REST que devolve só uma parte). O motivo vai a `estado()["recusas"]`, ao log, à faixa do leitor (o erro dela) e
+  ao Raio-X ("Trava de encolhimento"), até a faixa passar de novo. Os 5% são os dos ativos; o mínimo de 10 é porque os 7 dias
+  cobrem ~700 OS na escala do AC, e na lista pequena 5% seriam uma ou duas OS apagadas de verdade. **A saída** (rodada 2, a
+  dupla confirmação dos ativos, `ativos_central._confirma`): a recusa que se repete IGUAL na leitura seguinte da mesma faixa (os
+  mesmos ids saindo, ou ao menos 90% deles: a interseção sobre a união das duas) é o apagamento de verdade e passa, e o estado
+  guarda "aceita na 2ª leitura" (`estado()["confirmadas"]`, também no Raio-X). Uma leitura só que encolhe pode ser página
+  perdida; duas iguais seguidas são o Fracttal de verdade. Sem a saída, o apagamento de verdade acima de 5% seria recusado
+  toda noite, para sempre; a 2ª leitura diferente é recusada de novo e vira a recusa que a 3ª confere. A recusa (com os ids,
+  que só a lista lê) e a confirmação vão ao cabeçalho da cópia em disco: o servidor reinicia a cada push na `main` e a noite
+  roda uma vez por dia, e só na memória a recusa sumiria entre duas noites de dia útil. A 1ª carga (a lista vazia) não tem o
+  que encolher.
+- **A ação entra na hora** (`atualizar_os(id, registro=None)`): com o registro (as linhas do REST, a linha do Histórico ou a
+  linha crua do RPC), na hora; sem ele, dentro de um pedido do OS Creator, lê a OS pela sessão da pessoa com o que o card já lê
+  (as tarefas, `_leitura_da_os`, e o cabeçalho: 1 a 3 pedidos); fora de um pedido, ou com o Fracttal recusando, a OS fica "a
+  conferir" e pendente, e o leitor a relê pelo nº na próxima faixa (a que o nº não traz mais, apagada no Fracttal, sai da
+  fila e segue "a conferir" até a noite a tirar; a que derruba a leitura sai depois de 5 falhas). As ações do OS Creator a
+  chamam desde a 3.3 (criar, clonar, aprovar, cancelar, finalizar, responsável, etiquetas, nota, fazer a tarefa:
+  `lista_central.mudou` e `criadas`, só com a lista em uso); a 5.1 faz o caminho único de criar OS.
+- **As visões viram filtros** (`filtrar(visao, pessoa, de, ate, etiqueta=, status=)`, `contar(...)`; a conferência da 3.3
+  conta pelo índice da criação, `contar_criadas`): "todos"; "atribuidas" pelo `id_personnel`; "criadas" pelo
+  id da conta quando os dois lados o têm, senão pelo código da pessoa, senão pelo nome sem homônimo. None quando a lista não
+  responde e a tela vai ao vivo: o período fora da janela, a pessoa sem o que a identifique, o nome com dois códigos, o nome
+  que não casou com nada. `folio_para_id(nº)` sem pedido nenhum.
+- **O disco (decisão AH):** `<pasta de dados do clone>/oscreator/os_central.json.gz`, uma linha JSON por OS entre o cabeçalho e
+  o fecho (a escrita e a leitura em fluxo, nunca o arquivo inteiro na memória), trocado de uma vez (`canto_disco.py`, a mesma
+  troca da cópia dos ativos; no Windows, o arquivo que o antivírus segura por um instante é tentado de novo antes de desistir,
+  `ESPERAS_DA_TROCA`, rodada 1 da revisão), no máximo uma escrita a cada 30 s (as ações seguidas viram uma; a última chega em
+  até 30 s; a fila das pendentes, a recusa da trava e a confirmação, que mudam sem a versão mudar, também regravam a cópia:
+  a pendente que saiu não volta, e a recusa sobrevive ao reinício). O
+  boot só lê o disco; a cópia ilegível, cortada ou de outro formato é ignorada, e a lista começa vazia (as telas vão ao vivo).
+  `ponte.ligar_lista_de_os` diz a pasta (nas duas máquinas; nos testes, não). É cache do Fracttal, com texto de OS e nomes:
+  nunca vai ao banco nem ao git.
+- **Medido** (36 mil OS sintéticas com a forma real: ~150 pessoas, 190 usinas com 130 ativos cada, os tipos, as etiquetas, 2,3
+  tarefas por OS, descrições de 60 a 200 caracteres; `tracemalloc`): **23,9 MB na memória (695 bytes por OS)**, 26,8 MB depois
+  de subir pelo disco, dentro do orçamento de 30 MB (a 1ª versão, com as datas em texto e uma tabela de textos para tudo, deu
+  49,5 MB: as cinco datas de cada OS foram para 20 bytes e a tabela guardada ficou só com os textos de pouca variedade). O
+  `receber` da noite inteira (81 mil tarefas) 1,5 s; os 7 dias (683 OS, todas mudadas) 0,08 s; as abertas (7.534 OS) 0,3 s; a
+  ação (`atualizar_os`) 25 ms; montar os índices das 36 mil 0,2 s; `filtrar` 30 dias 2 ms; a cópia em disco 2,6 MB (76 bytes por
+  OS), gravada em 0,4 s e lida no boot em 0,5 s.
+- **O pico da noite** (Ruling AV, rodada 1 da revisão; medido com 36 mil OS sintéticas, ~99 por dia, 2,3 tarefas por OS, e a
+  linha do REST na LARGURA REAL: 67 campos, os que a lista lê e os que ela joga fora, custos, grupos, a nota da tarefa, datas e
+  ids; 2.371 bytes em JSON e ~4,3 KB na memória cada; `tracemalloc` na leitura inteira, a junção e o `receber`): a noite de 365
+  dias (a 1ª carga e o domingo, 83 mil tarefas) juntava as linhas inteiras antes do `receber`, **387 MB** de pico; com cada
+  página cortada ao chegar no que a lista lê (`os_registro.enxuta`, o `projetar` do `tarefas_os._paginas`: 18,5 campos, sem os
+  vazios e com os textos de pouca variedade num objeto só, ~1,3 KB), **152 MB**. A noite de 90 dias (a de todo dia, com a
+  lista cheia), de 98 para **39 MB**. O que sobra é a leitura cortada guardada até o fim (a faixa só julga com ela inteira).
+
+**O leitor em faixas (`os_creator/os_leitor.py`, só o `servir.py` liga).** Pela credencial da empresa, 1 pedido por segundo, pelas
+MESMAS funções e pela mesma paginação do `nexus/campo/tarefas_os.py` (`ler_criadas`, `ler_abertas`, `ler_finalizadas`, `ler_os`;
+não nasceu outro leitor de OS). Os minutos fixos moram na lista dos minutos ocupados do Nexus (`nexus/casca/minutos_ocupados.py`,
+as constantes `OS_*`, como as `ATIVOS_*` dos ativos; um teste cruza a lista com o `MINUTO_DA_HORA` de cada laço de verdade).
+Cada página chega cortada no que a lista lê (`os_registro.enxuta`), e as abertas entregues pelo `tarefas_os` também.
+- **As novas:** da criação mais nova para trás até a 1ª página inteira de OS conhecidas, sem o pedido do total (1 pedido sem
+  novidade, 2 com), a cada 3 min das 06:00 às 20:00 de segunda a sexta e a cada 15 fora disso, em qualquer minuto. Mais de 4
+  páginas de novas: nada entra, ficam para os 7 dias. A lista sem uma leitura até o topo espera os 7 dias ou a noite.
+- **Os 7 dias:** relidos inteiros (até uma página INTEIRA mais velha que o piso; sem o pedido do total no começo, que no
+  `work_orders` sem filtro é o de todas as OS) a cada 10 min das 06:00 às 20:00, nos minutos :00, :21, :30, :41 e :51 (o :10, o
+  :20, o :40 e o :50 têm dono).
+- **As abertas:** entregues pela volta de hora em hora do `tarefas_os` (`ligar_entrega_das_abertas`; o fato e os pedidos dela
+  não mudam). Ela só lê na máquina que vai gravar: sem entrega em 70 min, o leitor as lê pela mesma função, no máximo uma vez
+  por hora, no :55.
+- **As finalizadas:** status 3 pela data de fim, desde a mais nova que a lista conhece (nunca depois de agora: a data fim no
+  futuro, dado ruim, travaria a faixa até passar) menos 2 dias, parando numa página INTEIRA além do piso, no :46 de toda hora
+  (o :45 é do `uso_os` às 04:45; o desenho do PCM de 27/10; o `fato_tarefa_finalizada` não é publicado aqui).
+- **A noite (03:21; o 03:20 do desenho é minuto das tarefas):** os últimos 90 dias inteiros, sem o pedido do total no começo;
+  no domingo, ou sem a janela lida inteira (a 1ª carga, a cópia de janela menor), a janela toda. As antigas mudam sem data de
+  alteração: é ela que as põe em dia.
+- **A leitura que acaba ANTES do piso pede o total no fim** (rodada 2; `tarefas_os._paginas(total_no_fim=True)`, que os 7 dias
+  e a noite passam): a página curta ou vazia antes do piso confere o total do REST ("vieram X de N") e, faltando mais que a
+  folga de 1%, a faixa falha e nada muda. Sem isso, um REST que devolve a página vazia com `success: true` (o Fracttal já
+  devolveu 0 registros calado: a rodada do robô do PCM de 26/10, no `nexus/dados/CLAUDE.md`) ou que tem um teto no `start`
+  passava calado, e na 1ª carga, com a lista vazia (a trava não tem o que encolher), o pedaço lido seria instalado como os
+  365 dias lidos inteiros. A página vazia é o fim, não "a página toda velha". Em produção a leitura acaba no piso: zero
+  pedido a mais (a conta de pedidos abaixo não mudou).
+- **A ordem do REST é conferida** (Ruling AU, rodada 1 da revisão; `tarefas_os.ler_criadas`, como o `ForaDeOrdem` dos ativos):
+  com o `sort=creation_date:desc` ignorado (sem filtro de status ninguém o conferiu) ou mal aplicado, "a página conhecida" e "a
+  página toda velha" não querem dizer nada: em ordem crescente a noite tiraria de vez as OS dos 90 dias, os 7 dias marcariam a
+  semana "a conferir" e as novas levariam o fim da janela até agora sem as OS novas. As três faixas pela criação levantam
+  `ForaDeOrdem` e não trocam nada quando a 1ª página não chega à criação mais nova que a lista conhece menos 3 dias (a lista
+  vazia: o próprio começo menos 3 dias; o Fracttal da empresa cria ~99 OS por dia; o `topo_minimo` é obrigatório com o piso
+  ou a página conhecida, rodada 2: sem ele a regra sumia calada) ou quando mais linhas que o maior dos dois, 5 ou 1% das
+  lidas, vêm criadas mais de 1 h depois da linha anterior (a ordem qualquer inverte metade delas). A folga de 1 h e a conta
+  deixam passar a linha fora do lugar que o REST pode trazer (o `sort` é da OS e a linha é da tarefa; a ordem das finalizadas
+  já se mostrou só aproximada, `nexus/campo/coletor.py`): duas linhas dias fora do lugar passam, um teste prova.
+- **As pendentes:** a OS que a ação deixou para a próxima faixa, pelo nº (até 5 por vez, as de menos falhas primeiro), depois
+  das novas e dos 7 dias, cada pedido depois da pausa de 1 s (o 1º também: nunca 2 pedidos colados). A que o nº não traz mais
+  (apagada no Fracttal) sai da fila e do disco e segue "a conferir" até a noite; a leitura que falha conta uma falha para
+  aquela OS e encerra a volta (a rede caída não vira cinco esperas seguidas), e na 5ª ela sai da fila (segue "a conferir": a
+  próxima faixa que a cobre a traz). Assim as pendentes mortas não travam a fila.
+- **Leitura que falha no meio não chama o `receber`** (a `LeituraIncompleta` do `tarefas_os`, a fora de ordem, a recusa três
+  vezes, a conexão que cai), e a leitura que a trava de encolhimento recusa não troca nada: a lista fica como estava, e o
+  estado diz a faixa e o motivo. Qualquer outra exceção é **defeito do leitor**: vai ao log com a pilha, e a faixa diz
+  `defeito` (o Raio-X escreve "DEFEITO do leitor"). Cada faixa conta no contador do Fracttal com o nome dela
+  (`fundo:nexus-os-leitor:<faixa>`).
+- **Pedidos** (medidos pelas funções de verdade, num Fracttal de mentira na escala do AC: ~99 OS criadas por dia, 36 mil por
+  ano, 2,1 a 2,3 tarefas por OS, ~4.600 abertas; rodada 1 da revisão, a 1ª medida foi com 67 por dia): as novas 1 ou 2; os 7
+  dias ~15; as finalizadas 1 a 3 por hora; a noite de 90 dias ~190 a 210, a da janela inteira ~750 a 830; as abertas, 0
+  (entregues), ou ~98 quando o leitor as lê. **Por hora** (os compromissos contados pelo `proximo_passo`): em dia útil das 06h
+  às 20h, ~92 a 110 (16 vezes as novas, 5 vezes os 7 dias, as finalizadas); no fim de semana das 06h às 20h, ~78 a 82 (as
+  novas de 15 em 15 min, 2 delas fora dos minutos dos 7 dias); das 20h às 06h, ~5 a 11 (às 03h, mais a noite); e ~98 a mais na
+  hora em que as abertas não chegam do `tarefas_os`. Num dia útil, ~1.500 a 1.850. **O pico por minuto** é 60 (1 por segundo) nas
+  leituras longas, a noite (03:21; ~3 min, no domingo 19 a 29: ~830 páginas a ~1,35 s, a medida do ensaio de 18/10/2026 do
+  `tarefas_os`) e as abertas lidas aqui (:55), como a volta do próprio `tarefas_os`;
+  de dia, a dos 7 dias faz ~15 em ~15 s. A cota é de 200 por minuto para a empresa toda.
+- **Onde se vê** (o Levi não tem acesso ao servidor): Raio-X → seção "Uso do OS Creator" → o bloco do canto central, peça
+  **"Lista central de OS"**: quantas OS e quantas abertas, a janela lida inteira, a última entrega de cada faixa (e quem entregou
+  as abertas), as falhas (e o defeito), a leitura que a trava de encolhimento recusou, os campos que o REST trouxe, as
+  conferências das telas (3.3), o disco e a memória (medida uma vez por versão; a falha da medida vai ao log)
+  (`raio_x._linhas_da_lista_de_os`). **Depois de um reinício** (revisão final): a última leitura de cada faixa, ok ou falha
+  (a hora, os pedidos, o resultado e o erro; `os_central.anotar_leitura`, no cabeçalho da cópia em disco, em `leituras`)
+  volta do disco: a noite que falhou deixa de sumir com o deploy. A leitura da noite e a que muda de situação (a 1ª falha de uma
+  faixa, a 1ª boa depois de uma falha) regravam o cabeçalho; as de rotina (as novas) e a falha que se repete vão junto da
+  próxima gravação. **O leitor que não ligou**: o `servir.py`
+  liga cada leitor num try (`ponte.ligar_leitor_do_clone`); o clone que quebrou ao importar deixa o Nexus no ar, sem o leitor, e a
+  peça diz "NÃO LIGOU, o clone quebrou ao subir" com o erro (o portão do deploy, `deploy/conferir_boot.py`, importa os mesmos
+  módulos antes do restart).
+
+**Prova:** `tests/test_oscreator_os_central.py` (a 3.1: as tarefas juntadas por OS e os índices; a faixa que troca só o que
+cobre e a noite que tira o que não voltou; a ação na hora, com o registro, ao vivo pela sessão e fora de um pedido; o nº sem
+pedido; os filtros das visões e o que vai ao vivo; o disco atômico, em fluxo, uma escrita por vez, e o corrompido; a cópia para
+quem muda; os índices por partes iguais aos inteiros; a leitura que não desfaz o que mudou durante ela; e, da rodada 1 da
+revisão, a trava de encolhimento, a memória medida uma vez por versão, a linha enxuta que monta o mesmo registro, a troca
+no disco que tenta de novo o arquivo preso e a espera das duas gravações que se sobrepõem; da rodada 2, o apagamento confirmado
+na 2ª leitura),
+`tests/test_oscreator_os_leitor.py` (a 3.2: cada faixa contando os
+pedidos, a falha no meio que não troca nada, os horários, o `tarefas_os` igual, o contador por faixa, as pendentes pelo nº, só
+o servidor liga; e, da rodada 1, o REST que ignora o `sort` em ordem crescente e qualquer, as linhas fora do lugar que passam,
+a leitura que encolheria a lista, a projeção por página, as pendentes mortas, a pausa antes de cada OS pelo nº, a data fim no
+futuro, o defeito separado da falha e os minutos na lista única; da rodada 2, a leitura que acaba antes do piso e o topo
+obrigatório) e `tests/test_oscreator_canto_no_raio_x.py` (as duas peças no
+Raio-X, sem texto de OS nem nome).
+
+## As telas leem da lista central de OS (31/10/2026, tarefa 3.3 do canto central)
+
+O Histórico (todas as visões), o Garantias, a marcação verde dos Ativos, o Investigar ativo, o nº da OS → id e a 1ª pintura do
+card leem da lista central (`os_web/lista_central.py`), e o que o OS Creator cria ou muda entra nela na hora. A lista é lida
+pela credencial da EMPRESA e vê TODAS as OS; o que guarda cada tela (decisões AZ a BG da 3.3, os Rulings BP a BR da rodada 1,
+o Ruling BU da rodada 2 e o Ruling BX da rodada 4 de correções, que fecharam os vazamentos para a visão restrita provados pelas
+sondas das revisões):
+
+- **A 1ª barreira: a lista central só para quem o Levi liberou** (Ruling BX, rodada 4). Provar por contagem que a pessoa vê o
+  mesmo que a lista teve buracos raros a cada rodada de sonda; a segurança passa a depender de uma decisão de governança, e a
+  contagem fica como 2ª barreira (e como a guarda da lista pela metade).
+  - Quem está liberado: o administrador do Nexus (a NEXUS_ADMINS, a lista de Base → Acessos, a senha de administrador),
+    sempre; e quem é de um setor de `ponte.SETORES_COM_LISTA_CENTRAL` (o nome do setor de Base → Acessos → Pessoas e
+    setores, sem acento nem caixa). Nasceu VAZIA (só os administradores); desde 03/11/2026 vale o `TODOS_OS_SETORES` ("*"):
+    o Levi liberou todos ("Todos os setores veem todas as OSs" no Fracttal), e qualquer pessoa com setor no Nexus lê. A pessoa
+    sem setor segue fechada.
+  - Como mudar: um commit na `SETORES_COM_LISTA_CENTRAL` (`nexus/torres/oscreator/ponte.py`), com "*" para todos ou os nomes
+    dos setores; a trilha fica no git. Não é uma caixa de Base → Acessos: lá cada item é uma tela do menu (abre uma página, conta no "vê N de
+    M telas", entra no "Marcar tudo" e no "Copiar de", e a tela "por dentro" libera a de fora), e uma liberação que não é tela
+    não cabe nele de forma limpa (o plano B do Ruling BX).
+  - Como o clone sabe: a ponte põe a marca em todo pedido ao OS Creator (`request.environ["os_web.lista_central"]`,
+    `ponte.lista_central`), e o `lista_central.liberada` a lê; a releitura do quadro de Garantias por trás leva a de quem a
+    abriu (`lista_central.liberacao`). Sem a marca (o OS Creator servido sozinho, o PC, os testes, a ponte que não disse):
+    ninguém está liberado. Sem saber o setor (o banco fora, o Nexus sem a NEXUS_PESSOA_HMAC, a pessoa sem setor): não.
+  - Quem não está liberado não MONTA nada da lista em tela nenhuma (o Histórico e as visões, o Garantias, o Investigar, a
+    marcação verde dos Ativos, a 1ª pintura e o nº → id), nem paga a conferência: segue pelo caminho de hoje, com a sessão dela.
+    As ações dela seguem pondo na lista a OS que ela mudou (é escrita, não leitura).
+  - **A exceção é o Garantias, e já era de 19/10:** quem não foi liberado pode RECEBER a cópia "TODOS" do quadro que um liberado
+    montou da lista (`rotas_acomp._dono`: o Fracttal lhe dá o mesmo total de OS com a etiqueta CHAMADOS, com a folga de 1% ou 2
+    OS, e ela fica na cópia dividida). É a exposição de 19/10 (a cópia dividida entre quem vê o mesmo total, "quebre essa
+    regra"), e a lista central não a piora: a cópia só tem as OS que a conferência de quem a montou provou, o total dela é o do
+    Fracttal de quem a monta, pedido a CADA montagem (`HS.total_conferido(..., max_idade=0)`, 1 pedido; a sonda V1b da revisão
+    final: o total guardado por 30 min era o de quando a cópia anterior foi montada, e a restrita com 3 OS visíveis ficava a 2 da
+    cópia de 5 e caía nela, com as 4 que o Fracttal esconde dela), e a restrita fora dessa folga segue com a dela.
+- **A visibilidade não muda (fail-closed).** A tela que mostrava as OS pela sessão da pessoa só lê da lista depois da
+  conferência DELA (`lista_central.conferir`), UMA por pessoa e período, sem visão, status nem etiqueta (Ruling BU): o "Todos"
+  do período da tela; no Garantias, os 365 dias que ele lê (até amanhã: o "até" é a data local, e a criação é em UTC).
+- **A conferência prova o CONJUNTO, não o número.** As duas contas param na **marca d'água** da lista
+  (`os_central.Lista.marca`): a criação da OS mais nova que uma leitura até o topo trouxe (os 7 dias e a noite; as novas, só
+  emendadas com o que a lista já leu; nunca para trás; a data no futuro não conta; vai na cópia em disco). Toda OS criada
+  antes dela está na lista: a pessoa vê um pedaço do que a lista tem antes da marca, e as contas iguais dizem que ela vê todas.
+  - O lado da lista: as OS do período criadas antes da marca, pelo índice da criação (`os_central.contar_criadas`, sem
+    percorrer a lista: o Garantias são 365 dias).
+  - O lado da pessoa: 1 pedido na sessão dela, `api.list_minhas_os_pagina("criadas", "TODOS", ...)`, com a página das 200
+    mais novas (`CONFERE_LINHAS`, do tamanho das do `list_minhas_os`; era 50 até a rodada 4, e a OS antiga inserida depois
+    ficava fora dela, a sonda Q): o total, menos as OS da página criadas na marca ou depois. O RPC ordena pelo id; o "até" dele
+    ganha "T23:59:59" (não aceita data e hora), e o "de" vai como veio (a data e hora no "de" não foi provada no Fracttal, e
+    seriam 2 pedidos): por isso a página. Ela tem de vir da criação mais nova para trás (o id do Fracttal cresce com a
+    criação) e tem de chegar a uma OS de antes da marca, ou trazer todas; senão não dá para saber, e a tela vai ao vivo. E toda
+    OS da página de antes da marca tem de estar na lista: a criada antes e inserida no Fracttal depois da leitura (o App
+    offline, uma importação) a lista não tem, e ela compensaria uma escondida sem tirar a página da ordem. E, quando a página
+    não traz todas, a lista não pode ter uma OS do período depois da marca com o id abaixo do menor da página (`Medida.id_min`):
+    a criação fora da ordem do id (a OS do App offline com o relógio adiantado, a sonda R1) a pessoa conta, e a página não traz.
+  - A regra é a IGUALDADE EXATA, em toda tela, com ou sem o ↻. A regra de uma mão da rodada 1 comparava números: a sonda
+    mostrou a pessoa com H OS escondidas empatando com X ≥ H OS novas que a lista ainda não lera, ou com a mudança de status
+    ou de etiqueta não lida quando a conferência levava o filtro da tela (no "Todos" padrão, no "Criado por", no Garantias e
+    com status e etiqueta). A visibilidade no Fracttal não depende de status nem de etiqueta: passou, a visão, o "criado por",
+    as atribuídas, o status e a etiqueta são filtros DA LISTA.
+- **A tela mostra só o que a conferência provou** (`Prova`): as OS criadas antes da marca, as da página dela depois da marca,
+  e as que a ação dela leu na sessão dela (`_vistas`: a OS que ela acabou de criar aparece na hora). A OS que entrou na lista
+  depois da marca por outro caminho (a ação de outra pessoa, as abertas) só aparece a quem a página a trouxe.
+- **A medida da pessoa fica 30 min por pessoa e período** (`_MEDIDAS`) e é conferida contra a lista de agora a cada visita, sem
+  pedido. Ela guarda a conta da lista de quando foi pedida (`Medida.lista_n`, rodada 4): a lista que mudou depois tira a prova
+  dela (a sonda S2: a OS que a pessoa via, apagada no Fracttal e tirada pela noite, empatava a conta com a escondida). É pedida
+  de novo: no ↻; quando a lista mudou; quando a marca chega a uma OS que a página dela não trouxe (a faixa das novas leu OS
+  novas: 1 pedido, e quem as vê, vê).
+  - Quem não passa vai ao vivo em TODAS as visões daquele período.
+  - Com a lista tendo MAIS que ela (o sinal da visão restrita), não é conferida de novo por 30 min (`_DIVERGIU`); o Raio-X a
+    conta uma vez por janela. Com a lista tendo MENOS (atrasada), a visita seguinte confere de novo (Minor 2 da rodada 2).
+  - A que falha (o Fracttal fora, a sessão caída) não passa; a medida guardada que provava segue provando. A sessão sem e-mail
+    ("?") nunca passa (Minor 6).
+- **A lista "Todos" dividida de 19/10 sem herança entre pessoas** (Rulings BU e BX). Com a lista central EM USO PARA O PERÍODO
+  (o servidor, e a janela lida inteira começa no dia do início do período ou antes: `lista_central.em_uso(de)`, `janela[0] <=
+  de`), coberta ou vencida, a "Todos" dividida do caminho de hoje só é dividida entre quem passou há pouco na conferência do
+  período (`lista_central.divide_a_todos`); os outros (quem não passou, quem não foi liberado) seguem com a lista DELES,
+  `("hist", pessoa)`, no Histórico e no Investigar (`rotas.ler_lista`). Quem vê tudo lê da lista central e não ancorava a
+  dividida; a 1ª restrita que não passava a achava vazia, e a lista dela virava a de todos: a sonda mostrou outra restrita,
+  com o mesmo total (30) e outro conjunto, vendo as 30 OS da usina que o Fracttal esconde dela; e a lista vencida (a última
+  leitura até o topo passou dos 30 min) a devolvia (a sonda T3). Sem a lista em uso PARA O PERÍODO (o PC, a lista vazia, e a
+  janela que começa depois do período, como a de 7 dias do dia do deploy, que nunca serve o Histórico de 30), a regra de 19/10
+  fica como estava: a "Todos" dividida entre quem vê o mesmo total, e não uma lista de ~26 pedidos por pessoa (revisão final).
+  A ação (`mudou`, `pendente`, `criadas`) também só lê a OS com a lista em uso, para o período padrão do Histórico (os 30 dias).
+  A cópia dividida do Garantias (o `_dono`) também, e o total dela é o do Fracttal de quem a monta (o
+  `total_chamados`, na chave do `_dono`), como no caminho de hoje: o da lista não tinha as OS de chamado novas, e a restrita
+  com 2 a menos caía na cópia TODOS pela folga de 19/10 (a sonda V1).
+- **O período tem de ser válido** (Ruling BP): duas datas 'AAAA-MM-DD' com o início até o fim (`periodo_valido`, na rota do
+  Histórico e dentro da lista). O invertido dava 0 OS na lista e 0 no Fracttal, e a conferência "batia": vai ao caminho de hoje.
+- **O dia de cada período é o do caminho ao vivo, e a janela começa pela data local** (rodada 2). O Fracttal toma a data da
+  tela como o dia UTC dela (`creation_date >= de`, `<= até + "T23:59:59"`), e o `filtrar` também: a OS criada depois das
+  21:00 de Brasília já é do dia seguinte, nas duas. O 1º dia da janela (`os_central._piso_da_janela`) é o da data LOCAL do
+  servidor menos 365 dias, a das telas, e não o da data UTC: das 21:00 à meia-noite a data UTC já é a de amanhã, a janela
+  começava um dia depois do `de` do Garantias, e o quadro ia ao vivo sem precisar (os testes falhavam nessa hora; um deles
+  congela o relógio às 22:00 de Brasília).
+- **O nº → id e a 1ª pintura do card só para quem conferiu tudo, e só dentro do que conferiu** (Ruling BP e o item 4 do BU). Os
+  dois abrem uma OS qualquer pelo id, sem filtro para conferir. Só valem para quem passou na conferência dos 30 dias padrão até
+  hoje (qualquer tela desse período, com filtro ou sem, ou o Investigar dentro dele), com pelo menos 20 OS na lista antes da
+  marca (`liberado`, 30 min da medida), e só para a OS CRIADA nesses 30 dias e ANTES da marca, com a lista tendo no escopo a
+  mesma conta de quando liberou (a sonda U1: a OS de 3 dias inserida depois, escondida, chegava pelos 7 dias e saía na 1ª
+  pintura): a mais velha, a mais nova e a da lista mudada vão ao vivo, e o Fracttal decide. O "Buscar OS pelo nº"
+  (`/os/os/folio/<nº>`) que não abre diz o nº, e não o id que a lista deu. A sonda liberava a pessoa restrita por um período
+  invertido, por um dia quieto (0 e 0), por um dia em que todas as OS eram dela e pelo Investigar fora dos 30 dias.
+- Tela por tela:
+
+  | Tela | Antes | Agora | A conferência | O que libera o nº → id |
+  |---|---|---|---|---|
+  | Histórico, "Todos" (Visão COS, "Criado por: Todos") | a lista de "Todos" do `historico_store`, dividida por quem dá o mesmo total | a lista central | a do período (o "Todos" dela até a marca, exata) | os 30 dias padrão, com 20 OS ou mais antes da marca |
+  | Histórico, "criadas por mim" e "Criado por" alguém | a lista dela, pela sessão dela | a lista central, pela conta, o código no pessoal e o nome | a mesma do período (o homônimo e quem não se identifica vão ao vivo sem conferir) | a mesma |
+  | Histórico, "atribuídas a mim" | a lista dela | a lista central, pelo id da pessoa | a mesma do período | a mesma |
+  | Histórico com status ou etiqueta | a lista daquele filtro | a lista central, o filtro na lista | a mesma do período | a mesma |
+  | Garantias | a cópia "TODOS" (ou a dela), pela sessão de quem a montou | a mesma cópia, montada da lista central | a dos 365 dias de quem monta a cópia; o Atualizar e a releitura por trás medem de novo | nunca |
+  | Investigar ativo | a lista de "Todos" do Histórico | a lista central, pelo índice por código de ativo | a do período carregado (a mesma medida da Visão COS) | os 30 dias padrão |
+  | Marcação verde dos Ativos | uma para todos (`("cat", "os_recentes")`), pela sessão de quem chegou 1º | a lista central | nenhuma: já era dividida e segue dividida | — |
+  | Nº da OS → id (`api._wo_id_por_folio`) | 1 a 5 pedidos pela sessão da pessoa | o índice por nº, sem pedido | — | a pessoa liberada, e só a OS dos 30 dias e de antes da marca |
+  | 1ª pintura do card | (não havia: "Carregando a OS…") | a linha da lista, na hora | — | a mesma do nº → id; o card inteiro segue ao vivo |
+
+- **A guarda da lista pela metade.** A mesma conferência. Cada uma que foi ao Fracttal conta no estado da lista, por tela
+  ("histórico", "garantias", "investigar": `os_central.anotar_conferencia`, em `estado()["conferencias"]`: quantas, quantas
+  divergiram, falharam e ficaram sem resposta pela página, e a última divergência com as duas contas até a marca) e no Raio-X,
+  peça "Lista central de OS", linha "Conferências das telas" (a marca d'água vai na linha "Janela lida inteira"). A visão
+  restrita de alguém também diverge (é ela que a guarda manda ao vivo); muitas divergências de quem vê tudo é sinal de lista
+  errada, e muitas "sem resposta", de que a página não basta.
+- **Os campos que o REST não trouxe (Ruling AT).** A tela só lê da lista os campos que a última leitura do período inteiro
+  trouxe (`os_central.campos_medidos`; a medida vai também na cópia em disco, em `campos_rest`, para o deploy não mandar as
+  telas ao vivo até a próxima). Só os 7 dias e a noite medem (rodada 3): a entrega das abertas, de hora em hora e com centenas
+  de OS, media a data fim em 0% (OS aberta não tem data fim), e as telas iam ao vivo até a próxima leitura dos 7 dias ou das
+  finalizadas; as finalizadas, as novas, as pendentes e as ações também não medem. A 3.3 acrescentou a data fim, o início e a nota do chamado, a rodada 1 a descrição, o
+  ativo escrito, a equipe, o "atribuído a" e o status, e a rodada 2 a programada (a data do evento cai nela) no Histórico e no
+  Investigar e a data fim, com quem está, quem criou e o tipo na 1ª pintura (as telas os mostravam sem medida). Com 0% (ou sem
+  medida) num campo que a tela mostra ou filtra, a tela vai ao vivo:
+
+  | Tela | Os campos que ela usa | Com 0% |
+  |---|---|---|
+  | Histórico Geral, Atribuídas | nº, criação, código do ativo (cliente, usina e tipo), ativo, descrição, status, tipo da tarefa (o filtro local), com etiqueta, data fim, programada (a data do evento) | a tela ao vivo |
+  | Visão COS | os do Histórico, mais início, gatilho, equipe e quem criou | a Visão COS ao vivo (o Histórico Geral segue da lista) |
+  | "criadas" | quem criou ou o código de quem criou | ao vivo sem os dois |
+  | "atribuídas" | responsável (id) | ao vivo |
+  | O filtro de etiqueta | etiqueta com id | pelo nome (o catálogo de etiquetas), se veio ao menos o nome; senão ao vivo |
+  | Garantias | nº, criação, código do ativo, tipo da tarefa, com etiqueta, data fim, responsável (id), atribuído a, descrição, status, e a nota do chamado (conferida nas OS da etiqueta: nenhuma com a nota = o REST não a trouxe; uma cortada no teto também) | o quadro ao vivo |
+  | Marcação dos Ativos | criação, código do ativo | ao vivo |
+  | Investigar | os do Histórico | ao vivo |
+  | Nº → id | nº e criação | ao vivo |
+  | 1ª pintura | nº, criação, descrição, ativo, status, data fim, atribuído a, quem criou, tipo da tarefa | o "Carregando" de sempre |
+
+  O card completa ao vivo o que a lista não tem (as subtarefas, os anexos, a OS pai, a solicitação, as notas), como sempre.
+- **A nota do chamado com teto de 16.000 caracteres** (Ruling BR; era 4.000, `os_registro.NOTA_MAX`). O "parado há N dias" do
+  Garantias sai das linhas do histórico da retroativa, que ficam no FIM da nota, e a de ~10 mil caracteres perdia o fim sem aviso:
+  o quadro via a última atualização de um mês atrás e pulsava. A que ainda passa do teto fica marcada (`RegistroOS.nota_cortada`;
+  a de exatamente 16.000 também, o lado seguro), e o quadro vai ao vivo. Medido (`sys.getsizeof`; a nota tem "—", e o texto
+  fica com 2 bytes por caractere): 300 notas do App de ~1.500 caracteres, 0,87 MB; com 30 retroativas de 10.000 entre elas,
+  1,36 MB (com o teto de 4.000 eram 1,02 MB, e as 30 saíam cortadas); 300 notas no teto, 9,17 MB (2,31 MB com o de 4.000). O
+  pior caso é a nota com um caractere fora do BMP (um emoji no texto do App): o Python guarda a string INTEIRA com 4 bytes por
+  caractere, ~18 MB para 300 notas no teto (Minor 5 da rodada 2). São poucas centenas de OS com a marca.
+- **Onde a lista não cobre, tudo segue como hoje** (BC): o período inválido ou fora da janela lida inteira, a lista sem marca
+  d'água (a cópia em disco de antes da rodada 2, até a 1ª leitura até o topo), o `filtrar` que dá None, o PC sem leitor (a
+  lista vazia) — o `historico_store`, o `list_minhas_os` com o `meta_ja`, o `list_chamados`, o `codigos_os_recentes`, o
+  `os_por_folio`, sem mudança nenhuma. A ordem: o período é válido, a lista o cobre, tem os campos e responde; só então a
+  conferência (no PC e nos testes antigos, nenhum pedido a mais).
+- **"a conferir".** A OS que uma faixa deveria ter trazido e não trouxe (o status pode ser velho) diz "a conferir" ao lado do
+  nº no Histórico e no Investigar, e na 1ª pintura do card (o Exportar sai sem a marca); o card lê na hora. O filtro de status
+  não a mostra (o status dela pode ser velho); a conferência a conta (o "Todos" não depende do status). O quadro do Garantias,
+  que põe cada OS numa coluna pelo status, vai ao vivo enquanto uma OS dele estiver "a conferir".
+- **As ações entram na lista** (BD): o Concluir, o Cancelar, o responsável, as etiquetas, a nota e o "fazer a tarefa" do card
+  (`rotas_os_acoes`), o finalizar do Garantias, e as telas de criar (Criar OS do zero, Performance, Clonar, COS, a Área PCM, a
+  aprovação da Fila do PCM, a Nova solicitação da Engenharia, a Inspeção de chamados) chamam `lista_central.mudou(id)` /
+  `criadas(resultado)` DEPOIS de o Fracttal confirmar: a OS é lida pela sessão da pessoa (`os_central.atualizar_os`: as tarefas
+  e o cabeçalho, 2 pedidos) e entra na lista, e na prova dela (`_vistas`).
+  - Das criadas, as 3 primeiras dentro do pedido, juntas; as outras, a faixa das novas traz (até 3 min, 1 ou 2 pedidos). Até a
+    rodada 1 elas eram lidas por trás, 2 pedidos cada, sem origem declarada (~94 pedidos numa criação de 50 OS do COS).
+  - O "fazer a tarefa" sem o registro de execução confirmado não relê (seriam 2 pedidos que nada provam): a OS fica "a
+    conferir" e pendente para a faixa das pendentes (`lista_central.pendente`, Minor 3 da rodada 2).
+  - A releitura tem prazo: no máximo 5 s além da gravação (`RELEITURA_MAX_S`). O prazo é por fora (as releituras correm numa
+    thread com a sessão copiada), porque as leituras do card (`_leitura_da_os`, `_cabecalho_os`) não recebem um: o `_rpc_call`
+    aceita o `timeout`, elas não o passam. Passou do prazo: a resposta sai, a OS fica "a conferir" e pendente
+    (`os_central.marcar_pendente`) para a faixa das pendentes; a releitura que já lia termina depois e a põe na lista do mesmo
+    jeito, e a que nem começou (as 4 threads ocupadas) sai da fila (`cancel`, Minor 1 da rodada 2).
+  - O finalizar do Garantias usa o status dessa releitura (sem reler o cabeçalho de novo).
+  - A falha da lista nunca derruba a ação (vai ao log; a próxima faixa traz a OS). Só com a lista EM USO (a janela já lida: o
+    servidor): no PC sem leitor a ação não gasta a leitura (caso que criou a regra: na 1ª rodada dos testes da 3.3, a leitura
+    saiu da máquina nos testes antigos do quadro, que não trocam o `_rpc_call`, e a recusa derrubou o login).
+- **O card não força mais o `atualizar=1`.** Ao fechar o card que mudou a OS, o Histórico e o Investigar voltam com `mudou=1`:
+  da lista central, a linha já está lá (nenhum pedido); no caminho de hoje, a lista vem de novo, como vinha.
+- **O ↻** mede de novo (1 pedido, a página) e mostra a lista central. A OS mudada fora do OS Creator aparece na faixa que a traz
+  (os últimos 7 dias de 10 em 10 min de dia; as abertas de hora em hora; as antigas de madrugada). A tela diz de onde veio
+  ("Lista das HH:MM", com o título da lista central).
+- **A 1ª pintura do card** (`/os/api/os/<id>/previa`, `_os_previa.html`): o Histórico e o Investigar pedem, junto com o card, o
+  que a lista sabe da OS (o nº, o tipo, o status, o ativo, as datas, com quem está, quem criou, o título), e a pintam até o card
+  inteiro chegar, sem o círculo de carga. 204 = o "Carregando" de sempre. Vai com o `X-Nexus-Auto` (o clique já contou no card).
+- **O que sobra (rodada 4, corrigido na revisão final).** A contagem é a 2ª barreira; os buracos que ela ainda tem, para quem
+  foi liberado:
+  - uma OS criada há mais de 7 dias (fora da faixa dos 7 dias, que relê a semana a cada 10 min), inserida no Fracttal depois da
+    leitura (o App offline, uma importação) e além das 200 linhas da página da pessoa: a lista não a tem até a faixa que a
+    traz, e ela compensaria uma escondida. O buraco vale para TODA OS fora dos 7 dias, e não só para as de 90 a 365 dias: no pior
+    caso, até a noite que relê o dia dela (a de dia útil, às 03:21, relê os últimos 90 dias; a de domingo, a janela inteira: a
+    de 90 a 365 dias espera o domingo). As faixas das abertas e das finalizadas (de hora em hora) podem trazê-la antes, quando
+    o status ajuda;
+  - a premissa de que o id do Fracttal cresce com a criação: a página confere a ordem nas linhas que traz e o menor id dela
+    contra a lista, não o resto;
+  - **a troca com a conta igual:** a medida da pessoa e o `liberado` comparam a CONTA da lista no período (`Medida.lista_n`) e as
+    OS da página dela, não o conjunto inteiro. Para uma pessoa liberada (medida há menos de 30 min), uma OS apagada no Fracttal e
+    uma inserção tardia (a OS antiga que entrou depois e que ela não vê) trocadas pela MESMA noite deixam a conta igual; se a
+    apagada está além das 200 linhas da página dela, nada denuncia a troca, e a medida segue valendo, com a OS escondida na
+    lista, até os 30 min. Precisa de tudo junto: uma pessoa liberada medida nos 30 min antes da noite (03:21), um apagamento e
+    uma inserção tardia nessa mesma leitura. É raro.
+  - O custo de uma OS apagada no Fracttal e ainda na lista: quem vê tudo vai ao vivo naquele período até a noite a tirar (a
+    lista tem uma a mais); no Garantias (365 dias), até a noite das 03:21.
+- **Pedidos ao Fracttal, medidos** (o Fracttal de mentira no nível do `api._rpc_call`, 3 mil OS em 30 dias, ~99 por dia; as
+  páginas de 200 e os lotes de tarefas de 130; a lista central cheia):
+
+  | Tela | Antes da 3.3 | Rodada 1 | Agora (rodadas 2 a 4, quem foi liberado) |
+  |---|---|---|---|
+  | Visão COS, 1ª visita da pessoa | 26 (10 páginas, 16 lotes) | 1 (a conferência) | 1 (a conferência do período) |
+  | Visão COS, de novo / 3 min depois sem OS nova / a de 10 min | 1 / 2 (as novas) / 21 (a inteira) | 0 / 0 / 0 | 0 / 0 / 0 |
+  | Visão COS depois de a faixa das novas trazer 1 OS | — | 1 (a lista com mais que o total guardado) | 1 (a marca chegou a uma OS que a página dela não trouxe) |
+  | No mesmo período: "criadas por mim", "Criado por" alguém, atribuídas, a Visão COS com um status, com uma etiqueta | a lista de cada um (2 a 26) | 1 cada (a conferência era por visão e filtros) | 0 (a conferência é do período) |
+  | Visão COS, o ↻ / a volta do card que mudou uma OS / a virada do dia | 21 / 21 / 26 | 1 / 0 / 1 | 1 / 0 / 1 |
+  | Garantias, 1ª visita / o Atualizar | 3 + os tickets / 3 + os tickets | 2 (o `total_chamados`, que o `_dono` também usava) + os tickets / 2 + os tickets | 3 (a página dos 365 dias e o `total_chamados` de quem monta a cópia, o total dela: rodada 4) + os tickets / 3 (o Atualizar pede os dois de novo) + os tickets |
+  | Marcação verde dos Ativos (30 dias) / Investigar ativo (depois da Visão COS) | 31 páginas / 0 a 2 | 0 / 0 | 0 / 0 |
+  | Nº → id / a 1ª pintura do card | 1 a 5 / — | 0 / 0 (a pessoa liberada) | 0 / 0 (a pessoa liberada, a OS de antes da marca) |
+  | Ação do card (concluir, cancelar...) | a gravação + o card (5) + a lista na volta (21 ou 2) | a gravação + 2 (a OS na lista) + o card (5) | o mesmo |
+  | A visão restrita: a 1ª visita / 2 min depois / o "Criado por" alguém do mesmo período / a Visão COS com um status | 26 / 0 / 2 / 26 (a lista dela) | 27 (a conferência e a lista dela) / 0 / 3 / 27 (a conferência daquela visão e a lista dela) | 27 / 0 / 2 / 26 (só a lista dela: a conferência do período já divergiu) |
+
+  Desde a etapa 4 o pessoal e o id da etiqueta vêm dos catálogos (`catalogos.py`, seção "Os catálogos pequenos num lugar
+  só"): no caminho ao vivo, o "criadas por mim" e o Garantias deixaram de pagar 1 a 2 pedidos a mais por leitura.
+
+  Medido com o relógio das 18:00: das 21:00 à meia-noite, até a rodada 2, o Garantias ia ao vivo (a janela pelo dia UTC; ver
+  acima). A conferência pede 200 linhas em vez de 1: o mesmo pedido, maior. Quem não foi liberado (rodada 4) paga o caminho de
+  hoje, como antes da 3.3; com a lista em uso, a "Todos" dele é a lista dele (a dividida só entre quem passou na conferência),
+  como a visão restrita da última linha: 26 na 1ª visita do período (medido), as novas depois (0 a 2), e a marcação verde dos
+  Ativos, o Garantias e o nº → id ao vivo, como antes.
+
+- **Memória.** As visões prontas (as até 2.000 linhas e o HTML delas) ficam só para a VERSÃO de agora da lista, no máximo 8
+  (`VISOES_GUARDADAS`), e só são montadas de novo quando a versão muda (a leitura que não trouxe nada não muda a versão; a hora
+  "Lista das HH:MM" acompanha a última leitura). Medido com 36 mil OS (tracemalloc, o retido): a Visão COS de 30 dias 7,3 MB (o
+  caminho de hoje, 7,1 MB), o Histórico Geral de Todos depois dela 4,5 MB (4,5), as criadas por mim 0,3 MB (0,4); o caminho de
+  hoje guarda as listas do `historico_store` por pessoa e período, e a que ninguém lê há 30 min sai quando outra é lida
+  (`LISTA_VIDA_S`, revisão final: sem isso elas cresciam até o reinício, ~10 por dia; a que está sendo lida fica, mesmo velha),
+  e a lista central não cria nenhuma. As medidas das pessoas são poucas e pequenas (a marca, a conta e até 50 ids; no máximo
+  4.000).
+- **Prova:** `tests/test_oscreator_historico_central.py`:
+  - a 3.3: a página sem pedido depois da conferência; a visão restrita com a dela, a divergência no estado, a conferência que
+    falha; "criadas por mim", "atribuídas" e o homônimo; a virada do dia; o campo que o REST não trouxe; o Garantias, os Ativos
+    e o Investigar da mesma lista, e o quadro com a OS "a conferir"; a 1ª pintura; a ação do card sem releitura; as ações e a
+    criação que entram na lista, e a falha que não derruba; o PC ao vivo, e a ação que não lê a OS para a lista fora de uso; a
+    medida dos campos na cópia em disco; as conferências no Raio-X;
+  - a rodada 1, com os casos da sonda: o período invertido, o dia quieto, o dia em que todas as OS são dela e o Investigar fora
+    dos 30 dias não liberam; só os 30 dias padrão liberam; o escopo com menos de 20 OS não libera; a prévia e o nº de uma OS de
+    mais de 30 dias vão ao vivo mesmo liberada; o "Criado por" outra pessoa não mostra a OS escondida; a visão por pessoa e o ↻
+    com 1 OS a menos vão ao vivo; a "Todos" com o Fracttal dando 1 a mais passa e com a lista tendo 1 a mais vai ao vivo; os
+    campos novos na medida; a nota longa do chamado sem o "parado" errado, e a cortada ao vivo; as criadas além das 3 sem a
+    thread; o prazo da releitura; quem diverge sem reconferir por 30 min; a visão refeita só por versão; o finalizar e o "fazer
+    a tarefa" sem pedido a toa;
+  - a rodada 2, com as sondas da re-revisão: a "Todos", o "Criado por" e o Garantias com (H, X) = (1, 1), (2, 2), (2, 4) e
+    (1, 3) não mostram a OS escondida nem liberam; o status e a etiqueta com a mudança não lida; quem vê tudo com 4 OS novas
+    depois da marca passa; a página toda depois da marca, a página fora da ordem da criação e a OS antiga que a lista não tem
+    vão ao vivo; a OS que entrou depois da marca só para quem a página trouxe; o nº e a prévia só antes da marca; duas
+    restritas com o mesmo total não trocam de lista (o Histórico e o Investigar); a fila da releitura sem começar sai; a lista
+    com menos não prende 30 min; o "fazer a tarefa" sem confirmação fica pendente; a programada e os campos da prévia
+    medidos; a sessão sem e-mail não passa; a marca d'água (as faixas que a mexem, a que não, a data no futuro, nunca para
+    trás, a cópia em disco); e o relógio congelado às 22:00 de Brasília, com o Histórico e o Garantias lendo da lista;
+  - a rodada 4: quem não foi liberado nunca lê da lista (o Histórico, o Garantias, o Investigar, os Ativos, a 1ª pintura e o
+    nº → id), mesmo vendo tudo; sem a marca no pedido, fechado; a ponte libera o administrador e os setores da lista, e não
+    os outros; de ponta a ponta no Nexus, o setor não liberado vai ao vivo e o liberado e o administrador leem da lista; e as
+    sondas Q1 e Q2 (a OS antiga além da página), R1 (o id baixo com a criação depois da marca), S2 (a medida com a lista
+    mudada), U1 (o liberado com a lista mudada), T3 (a lista vencida e a "Todos" dividida) e V1 (o total da cópia TODOS),
+    e o nº que não abre sem mostrar o id;
+  - a revisão final: a V1b (a cópia TODOS remontada 10 min depois pede o total de novo, e a restrita com 3 visíveis não vê as
+    escondidas); a guarda `liberada()` da prévia e do nº com a pessoa liberada há pouco e um pedido da mesma conta sem a marca
+    (204, e o nº vai ao vivo; sem a guarda, a medida sozinha abria as duas); a janela de 7 dias do dia do deploy, que deixa a
+    regra de 19/10 e não lê a OS da ação; a lista do Histórico que ninguém lê há 30 min sai; o arquivo estático sem a leitura
+    do setor; o gancho do nº só na cópia do clone; e a `HOJE` por teste.
+
+  Os testes de 19/10 (`test_oscreator_historico_compartilhado_19_10.py`) e de 21/10 (`test_oscreator_lista_pela_metade_21_10.py`)
+  seguem provando o caminho de hoje (a lista central vazia, como no PC: a montagem deles diz isso). O universo dos testes tem o
+  id crescendo com a criação, como no Fracttal, e nenhum depende da hora em que roda: a OS "nova" é de 6 h atrás (a de 1 min,
+  depois das 21:00, é do dia UTC seguinte e fica fora do período padrão, nos dois caminhos).
+
+## Os catálogos pequenos num lugar só (31/10/2026, etapa 4 do canto central)
+
+Levi, 30/10/2026: "a ideia é não ter um carregamento novo por atividade e sim um ecossistema onde as coisas se aproveitam e não
+precisamos ficar fazendo novas requisições sempre!" (desenho: `docs/superpowers/specs/2026-10-30-oscreator-canto-central-design.md`,
+"Etapa 4"; tarefa 4.1).
+
+**Antes:** o pessoal era lido por 7 caminhos, as etiquetas por 4, os tipos e as classificações por 3 (duas cópias que NUNCA
+venciam: o tipo novo do Fracttal só aparecia no reinício, e o conjunto vazio de quem não tinha a permissão ficava para sempre),
+as falhas do COS numa cópia que nunca vencia, e os planos da Performance eram relidos inversor por inversor a cada usina
+escolhida. Tudo só na memória: cada push na `main` reinicia o serviço e cada tela pagava de novo.
+
+**Agora** (`os_creator/catalogos.py`): UM dono por assunto, com prazo próprio (`PRAZO_S`), uma cópia em disco e a MESMA forma de
+antes para as telas (as funções devolvem cópias, no formato do `api` de antes). Os planos da Performance moram ao lado, em
+`catalogos_planos.py` (por ativo), e o laço das pessoas pelo REST em `catalogos_leitor.py` (o par como o dos ativos: o catálogo
+guarda e entrega; o leitor, que importa o `nexus`, só o servidor liga).
+
+| Assunto | Prazo | Quem lê do Fracttal | Arquivo em `<dados>/oscreator/catalogos/` |
+|---|---|---|---|
+| Pessoas | 6 h | o REST da empresa no servidor (se trouxer os campos) ou o RPC pela sessão (`api.ler_pessoal`) | `pessoas.json` (sem e-mail) |
+| Etiquetas | 6 h | RPC (`api.get_labels`) | `etiquetas.json` |
+| Tipos e classificações da OS | 24 h | RPC (`api.get_tipos_classif`) | `tipos.json` |
+| Grupo e classificações da solicitação | 24 h | RPC (`api.get_request_types`) | `tipos_solicitacao.json` |
+| Falhas do COS | 24 h | RPC (`api.get_falha_listas`) | `falhas.json` |
+| Status da solicitação | 24 h | RPC (`api.status_solicitacao_catalogo(levantar=True)`) | `status.json` |
+| Motivos de cancelamento | 24 h | RPC (`api.get_cancel_motivos`) | `motivos.json` |
+| Planos da Performance, por ativo | 24 h | RPC (`api.ler_planos_do_ativo`, `api.get_plan_details`) | `planos.json`, `planos_detalhe.json` |
+
+- **O boot só lê o disco**, nunca o Fracttal, nem com a cópia vencida (`aquecer`, por trás, quando a ponte liga:
+  `ponte.ligar_catalogos`, nas duas máquinas; e a 1ª leitura de cada assunto, se o aquecimento ainda não chegou). A cópia é
+  escrita ao lado e trocada de uma vez (`canto_disco`), com o formato e o nome dentro; a ilegível, cortada, de outro formato,
+  de outra forma ou vazia é ignorada, e o motivo vai a `estado()` (e ao Raio-X). A gravação escreve o valor VIGENTE e pula só
+  a leitura que o disco já tem (um contador de leituras, não o `lido_em`).
+- **Quem renova.** As pessoas têm o leitor da empresa: o REST `personnel` do cadastro (`cadastro/fracttal_pessoal.ler_paginas`),
+  pela credencial da empresa, 1 pedido por segundo, às 05h, 11h, 17h e 23h no :04 (`minutos_ocupados.CATALOGOS_PESSOAS`; só o
+  `servir.py` liga, `catalogos_leitor.ligar`; no contador do Fracttal, `fundo:nexus-catalogos:pessoas`). Com o REST valendo, as pessoas
+  vencem 1 h depois do prazo (`FOLGA_REST_S`: o laço pode atrasar) e o RPC não as renova; o laço que parou ou o REST falhando
+  devolvem as pessoas ao socorro pelo RPC. O resto não tem leitor da empresa (o RPC exige a sessão de uma pessoa,
+  `os_web/sessao.py`): a 1ª sessão que acha o catálogo vencido o renova POR TRÁS, uma vez para todos, com a cópia do contexto
+  (o JWT dela e a rota dela no contador do Fracttal), como o `api._renovar_catalogo_por_tras` dos ativos (uma função só para
+  os assuntos, os planos e os detalhes: `catalogos.renovar_por_tras`); quem chega com a renovação em curso usa a cópia velha e
+  não espera; a renovação que falhou espera 10 min (`ESPERA_TENTATIVA_S`), e a sessão caída de UMA pessoa não segura ninguém.
+  A renovação por trás roda com um estado de sessão PRÓPRIO (`os_web.sessao.propria`, pelo `api._na_sessao_propria`, também no
+  catálogo de ativos): a cópia do contexto levava o mesmo estado do pedido de quem pediu, e um 401 por trás o mandava ao
+  login. E tem ritmo: 1 pedido por segundo entre as chaves (`PAUSA_S`), o 406/429 espera 5 s e 10 s e tenta a mesma chave de
+  novo (`ESPERAS_COTA_S`), a cota que não voltou para a renovação, e a sessão que caiu também (as chaves que faltaram voltam a
+  ser de quem chegar, já). Sem cópia nenhuma (a máquina nova, o disco ilegível), a 1ª tela lê na hora, e quem
+  chega junto espera a MESMA leitura (uma trava por assunto: a carga fria da Fila segue paralela).
+- **O erro e o vazio não ficam guardados** (a regra de 20/10/2026): a lista vazia da sessão de alguém sem a permissão esvaziaria
+  a tela de todo mundo pelo prazo inteiro. **Nem a leitura pela metade**: as falhas do COS só valem com as três listas (o
+  `get_falha_listas(levantar=True)` sobe o erro de cada uma; antes, um 429 nas causas guardava `{"causas": []}` por 24 h e o
+  COS recusava toda OS de falha), e o erro de verdade vai ao estado e à tela. Os status sem o Fracttal, ou com o Fracttal
+  respondendo a lista vazia, voltam a lista local, que NÃO fica guardada (até 31/10 ela ficava 30 min na cópia da Fila como se
+  fosse o que o Fracttal aceita); sem catálogo nenhum, a falha só é tentada de novo depois de 10 min (cada Fila aberta com o
+  Fracttal fora não vira um pedido).
+- **Quem não acha o que procura relê** (`reler=True`, no máximo uma vez por minuto, `RELER_NA_FALTA_S`, com a sessão de quem
+  pediu): o tipo de tarefa pelo nome (`api.tipo_main_ao_vivo`, a Zeladoria criada hoje), a etiqueta pelo nome (`api._label_id`,
+  `api.label_id_por_nome`) e a pessoa logada que não está no catálogo (`da_pessoa`, abaixo).
+- **A gravação não confia no catálogo.** O que o catálogo tem e o Fracttal tirou nas últimas horas (a etiqueta apagada, a pessoa
+  desligada) segue na TELA até a renovação. A criação da Engenharia confere a pessoa e a etiqueta ENGENHARIA AO VIVO, uma
+  leitura de cada por gravação, com a sessão de quem cria (`api.responsaveis_ao_vivo`, `api.get_labels`): a regra de 19/10 é
+  que, faltando uma delas no Fracttal, nenhuma OS sai, e a sessão morta é acusada ali, antes de gravar (401 e o login, e não
+  um "Relogue" por ativo). A etapa 4 a tinha posto no catálogo e a revisão da 4.1 a tirou. Nas outras gravações que levam um
+  id do catálogo (a etiqueta da criação da Performance, o tipo pelo nome) o que o Fracttal faz com o id que deixou de valer não
+  foi medido: não se presume que ele recuse.
+- **A pessoa logada sem o e-mail.** `catalogos.da_pessoa(email)` acha (id_personnel, id_account, nome) pelo HMAC do e-mail
+  (`email_h`, com a chave que a ponte deriva da do Nexus: `ponte.chave_dos_catalogos`); nem a memória nem o disco guardam o
+  e-mail. A cópia feita com outra chave (a `NEXUS_SECRET_KEY` trocou) não acharia ninguém: é ignorada, com o motivo no estado, e
+  o pessoal é relido uma vez. A pessoa sem nome no Fracttal aparece nas telas pelo e-mail (o `full_name` dela é o e-mail):
+  esse nome não vai ao disco em claro, e depois de um reinício ela some das listas até a próxima leitura. A pessoa logada que
+  não está no catálogo (a conta nova no Fracttal) relê o pessoal pelo RPC, com a sessão DELA, na hora, uma vez por pessoa a
+  cada 10 min, e não com o catálogo recém-lido: com o REST valendo a renovação das pessoas é só do laço do servidor, e a conta
+  nova ficava até 6 h sem "criadas por mim". A 2ª tela dela que chega com a releitura em curso (duas abas) espera a mesma
+  leitura: a vez de 10 min é marcada depois dela. A conta que NUNCA está no pessoal (quem cria OS sem ser cadastrado como
+  pessoa) paga essa releitura também na 1ª tela depois de cada reinício (a vez de 10 min é da memória): 2 pedidos, as ~150
+  pessoas em duas páginas, que renovam o catálogo para todos.
+- **O `_label_id` não vai mais ao Fracttal.** Ele era relido a cada lista de propósito (08/10/2026): era o 1º pedido das listas
+  por etiqueta e acusava a sessão morta, porque a listagem engolia o erro das páginas. Desde 21/10/2026 a página que falha
+  derruba a busca inteira (`_lista_pela_metade`): a lista acusa sozinha. A conferência do Garantias (`total_chamados`) passou
+  de 2 pedidos para 1.
+
+**Os caminhos, de onde liam e de onde leem** (a forma que a tela recebe não mudou em nenhum):
+
+| Caminho | Antes | Agora |
+|---|---|---|
+| Pessoas 1. `rotas.responsaveis_fracttal` (`/os/api/responsaveis`: Performance, PCM, Tradicional; Clonagem, Inspeção, a Engenharia na tela) | `_memo(("cat", "responsaveis"))`, 10 min, sobre `api.get_responsaveis` (RPC) | `catalogos.pessoas()` |
+| Pessoas 2. o "Criado por" e o "eu" do Histórico (`rotas.historico`, `_contas_do_filtro`) | `_memo(("pessoas", pessoa))`, 10 min POR PESSOA, sobre `api.get_pessoas_contas` (RPC) | o mesmo, POR PESSOA (`rotas._contas_da_pessoa`): não é do catálogo, ver "Visibilidade" |
+| Pessoas 3. o técnico sugerido da Solicitação e da Fila (`rotas_solic._pessoas`) | `_memo(("solic_cat", "pessoas"))`, 30 min (RPC) | `catalogos.pessoas()` |
+| Pessoas 4. a pessoa logada (`api._current_user_info`: "criadas por mim", "atribuídas", a lista central) | `_user_ids_cache` por e-mail, até o reinício, relendo o pessoal até achá-la (RPC) | `catalogos.da_pessoa(email)` |
+| Pessoas 5. o nome do responsável no card (`api._personnel_nome_por_id`) | `_personnel_name_cache`, até o reinício (RPC) | `catalogos.nome_por_id()` |
+| Pessoas 6. o Requerido por do COS (`rotas_cos.api_listas`) | `api.get_responsaveis` a cada abertura (RPC) | `catalogos.pessoas()` |
+| Pessoas 7. a criação da Engenharia (`rotas_solic_eng.api_criar`) | `api.get_responsaveis` a cada criação (RPC) | ao vivo, uma leitura por gravação (`api.responsaveis_ao_vivo`): não é do catálogo |
+| Etiquetas 1. `rotas.etiquetas_fracttal` (Histórico, card, Criar OS, a lista central) | `_memo(("cat", "etiquetas"))`, 10 min | `catalogos.etiquetas()` |
+| Etiquetas 2. a Fila e a Solicitação (`rotas_solic._etiquetas`) | `_memo(("solic_cat", "etiquetas"))`, 30 min | `catalogos.etiquetas()` |
+| Etiquetas 3. o id pelo nome (`api.label_id_por_nome`: a criação da Performance, a OS em execução) | `_LABEL_IDS`, com o "não existe" até o reinício | `catalogos.etiquetas()`, e `reler=True` para quem falta |
+| Etiquetas 4. o id das listas por etiqueta (`api._label_id`: Garantias, Performance, a análise da Engenharia) | `api.get_labels` a cada lista (RPC) | `catalogos.etiquetas()`, e `reler=True` para quem falta |
+| Etiquetas (a criação da Engenharia) | `api.get_labels` a cada criação | ao vivo, uma por gravação (`api.get_labels`): não é do catálogo |
+| Tipos 1. `api._lista_tipos` (o COS, o Criar OS, a Fila) | `_TIPOS_CACHE`, uma vez por processo, nunca vencia | `catalogos.tipos_classif()` (o `api.get_tipos_classif` é só o leitor) |
+| Tipos 2. a Fila (`rotas_solic._tipos`) | `_memo(("solic_cat", "tipos"))`, 30 min | `catalogos.tipos_classif()` |
+| Tipos 3. a classificação e o tipo pelo nome (`api._classif_ids`, `api.tipo_main_ao_vivo`) | `_CLASSIF_CACHE`, nunca vencia (o vazio também) | `catalogos.tipos_classif()`, e `reler=True` no tipo que falta |
+| Falhas do COS (`rotas_cos.api_listas`, `_falhas_para_criar`) | `_falha_listas_cache`, nunca vencia | `catalogos.falhas()` |
+| Status da solicitação (`rotas_solic._status_cat`) | `_memo(("solic_cat", "status"))`, 30 min, com a lista local guardada quando falhava | `catalogos.status()` (a lista local não fica) |
+| Grupo e classificações da solicitação (`rotas_solic.solicitacao`) | `_memo(("solic_cat", "tipos_solicitacao"))`, 30 min | `catalogos.tipos_solicitacao()` |
+| Motivos de cancelamento (`rotas.motivos_cancelamento`, o card) | `_memo(("cat", "cancel_motivos"))`, 10 min | `catalogos.motivos()` |
+| Planos da Performance (`api.get_performance_alvos`, `rotas.api_plano`) | `task_events_list` por ativo e `tasks_details` a cada usina escolhida | `get_plans_for_assets(..., guardados=True)` → `catalogos_planos.planos_dos_ativos`; `catalogos_planos.detalhe_do_plano` |
+
+  Fica de fora de propósito: o login (`oauth_fracttal._pessoa_no_personnel`), que acha a pessoa pelo token e precisa do e-mail
+  em claro (o catálogo não o guarda); a Clonagem de planos do PCM (`get_plans_for_assets` sem `guardados`), que mexe nos planos e
+  os quer como estão agora; e a criação de OS pelos planos (`get_plan_details` ao vivo, a cada criação).
+
+- **Os planos da Performance ficam por ATIVO**, e não por grupo de tarefas (`id_group_task`): o RPC é perguntado por `id_item`
+  (os eventos são do ativo), o plano do tracker mora só no generalizado (`get_performance_alvos`), a estação tem planos que o
+  inversor não tem, e nada no código mostra dois ativos do mesmo grupo respondendo o mesmo; o `perf_web.contar_subtarefas`
+  amostra um ativo por tipo só para contar subtarefas. Guardar por grupo poderia oferecer a um ativo um plano que ele não tem.
+  O detalhe do plano (o resumo da tela) fica por plano e ativo, SEM o `raw` (o resumo não o usa e ele repetiria as subtarefas);
+  até `PLANOS_MAX` ativos e `DETALHES_MAX` detalhes, os de 7 dias sem uso saem. A lista vazia não fica (pode ser a sessão sem a
+  permissão; o ativo sem plano é relido a cada escolha). A cópia em disco é montada e escrita uma por vez (`_TRAVA_DISCO`):
+  duas gravações juntas montavam a cópia na trava e escreviam fora dela, e a montada antes podia cobrir a nova. **Medido** (`tracemalloc`, dados sintéticos na forma do RPC): a
+  carteira inteira (~2.850 inversores e estações, 8 planos cada) 5,7 MB na memória com um objeto só para cada nome de plano
+  (7,4 MB sem isso) e 1,7 MB em disco; um detalhe com 30 subtarefas ~25 KB (150 detalhes, 3,6 MB). Os outros catálogos são
+  de dezenas a ~150 linhas.
+- **As pessoas pelo REST, os campos.** O cadastro conhece do REST `personnel` o `id_personnel`, o `code`, o `full_name`/`name`, o
+  `email`, o `groups_permissions_description` e o `account_active` (`fracttal_pessoal.da_api`). As telas do OS Creator usam o id,
+  o código, o nome, o `active` (o pessoal ATIVO: a conta ativa é outra coisa), o `id_account` (quem criou a OS) e o e-mail. O
+  `active` e o `id_account` nunca foram vistos no REST, e este computador não lê o Fracttal com a credencial da empresa: a
+  sondagem é a conferência de cada leitura (`campos_que_faltam`: cada campo em >= 99% das linhas). Faltou um, nada muda, o
+  estado diz qual, e as pessoas seguem pelo RPC. A 1ª leitura REST contra um catálogo do RPC confere ainda a lista de
+  responsáveis (>= 95% em comum nos dois sentidos: o mesmo campo com outro sentido mudaria quem as telas mostram) e, das
+  pessoas em comum, a conta (`id_account`: o dono do "criadas por mim") e o e-mail (`email_h`: quem a pessoa logada é), >= 95%
+  iguais cada um (revisão da 4.1: o mesmo id com outra conta passava); a 1ª que
+  vale PRECISA desse catálogo (a 1ª noite dos ativos, REST x RPC: na máquina sem cópia, espera a 1ª tela que o lê pela
+  sessão de alguém); e nenhuma leitura REST que encolhe mais de 10% troca o catálogo.
+- **Visibilidade.** Nenhum destes catálogos depende de quem pergunta no código: eles já eram um para todos desde 19/10/2026
+  (`("cat", ...)`, `("solic_cat", ...)`) ou por processo (`_TIPOS_CACHE`, `_falha_listas_cache`, `_CLASSIF_CACHE`). O único sinal
+  de diferença por pessoa é a lista VAZIA de quem não tem a permissão, que não é guardada. A pessoa logada sai por pessoa do
+  catálogo comum (`da_pessoa`, pelo HMAC do e-mail dela). O "Criado por" do Histórico (as contas e o "eu") NÃO: ele era por
+  pessoa, com a sessão dela, e segue assim (`rotas._contas_da_pessoa`, 10 min para cada uma, sobre `api.get_pessoas_contas`):
+  quem não tem a permissão de pessoal no Fracttal recebe a lista vazia, e no catálogo comum veria as contas da empresa (a
+  etapa 4 o tinha posto no catálogo, e a revisão da 4.1 o devolveu).
+
+**Pedidos ao Fracttal** (pela conta do código e pelos testes; o pessoal tem ~150 pessoas, 2 páginas de 100):
+
+| Catálogo | Antes | Agora: a 1ª abertura do dia | Agora: as seguintes, de qualquer pessoa |
+|---|---|---|---|
+| Pessoas | 2 por tela a cada 10 min, POR PESSOA no Histórico, a cada abertura do COS e criação da Engenharia, e 1 ou 2 por pessoa a cada reinício (no teste, 3 pessoas pelos 7 caminhos: 15) | 0 na tela; 2 por trás se a cópia passou das 6 h (ou 0: o REST das 05h) | 0 nos caminhos do catálogo (no teste: 1 leitura para os 5 caminhos e 3 pessoas); fora dele, como antes: o "Criado por", 2 por pessoa a cada 10 min no Histórico, e a criação da Engenharia, 2 por gravação |
+| Etiquetas | 1 a cada 10 min e a cada 30 min nas telas, 1 a cada lista por etiqueta e a cada criação da Engenharia (no teste: 6) | 0 na tela; 1 por trás se passou das 6 h | 0 (no teste: 1); a criação da Engenharia, 1 por gravação, como antes |
+| Tipos e classificações | 3 a cada reinício (~10 por dia útil), e nunca mais | 0 na tela; 3 por trás se passou das 24 h | 0 |
+| Falhas do COS | 3 a cada reinício, e nunca mais | 0; 3 por trás passadas as 24 h | 0 |
+| Status, grupo e classificações da solicitação, motivos | 1, 3 e 1 a cada 30, 30 e 10 min de uso | 0; 1, 3 e 1 por trás passadas as 24 h | 0 |
+| Planos da Performance | N eventos (um por inversor e estação) + 1 detalhe a CADA usina escolhida | a 1ª escolha de cada usina: N + 1 | 0 (e, vencidos, 0 na tela e N + 1 por trás) |
+| O reinício (cada push) | relia os tipos, as falhas, a pessoa de cada um, o nome do card | 0 (a cópia em disco), menos para quem não está no pessoal: 2 na 1ª tela dela depois de cada reinício (a releitura da conta nova, `da_pessoa`, que renova o pessoal para todos) | 0 |
+
+**Onde se vê:** Raio-X → seção "Uso do OS Creator" → o bloco do canto central, peça **"Catálogos pequenos"**: uma linha por
+catálogo (quantos, a fonte, lido em, a idade contra o prazo, VENCIDO e se está renovando, a última falha, as leituras do
+Fracttal neste processo, o disco), a linha "Pessoas pelo REST" (o laço: ligado, a próxima, se vale, a última boa e a falha com
+o campo que faltou) e a "Planos da Performance" (`raio_x._linhas_dos_catalogos`). Nunca nome nem e-mail.
+
+**Prova:** `tests/test_oscreator_catalogos.py` (`test_um_pedido_para_todas_as_telas` por catálogo, os caminhos das pessoas que são do catálogo, os
+das etiquetas, dos tipos, das falhas, do status, do grupo da solicitação e dos motivos, com 3 pessoas: uma leitura;
+`test_as_telas_veem_o_mesmo_de_antes`; `test_reinicio_sem_pedido`, com a cópia vencida (e a releitura de quem não está no
+pessoal); `test_disco_corrompido` por catálogo e
+os planos corrompidos; `test_performance_segunda_vez_sem_pedido` e a vencida que volta e renova por trás;
+`test_prazo_vencido_renova_por_tras`, uma vez para duas pessoas, com o JWT de quem achou; o erro e o vazio que não ficam; o
+status local que não fica; quem chega junto na 1ª leitura; o e-mail fora do disco; as pessoas pelo REST com os campos, sem
+eles, sem bater com o RPC e valendo; só o servidor liga; o minuto na lista única; a ponte; o Raio-X). A rodada 1 da revisão
+(31/10/2026), um teste vermelho para cada achado: `test_a_criacao_da_engenharia_confere_ao_vivo`,
+`test_as_falhas_pela_metade_nao_trocam_as_completas`, `test_o_criado_por_e_de_cada_pessoa`,
+`test_o_rest_com_a_conta_ou_o_email_trocados_nao_troca`, `test_a_renovacao_por_tras_nao_derruba_a_sessao_de_quem_pediu` (e o
+dos ativos), `test_a_conta_nova_com_o_rest_valendo_e_achada_pelo_rpc`, `test_o_nome_que_e_um_email_nao_vai_ao_disco`,
+`test_a_renovacao_dos_planos_por_tras_tem_ritmo`, `test_o_status_com_o_rpc_vazio_e_a_lista_local_e_nao_fica` e
+`test_a_copia_dos_planos_em_disco_nao_volta_atras`; e, da re-revisão, `test_a_conta_nova_em_duas_telas_juntas_espera_a_mesma_leitura`.
+Os testes de antes que injetavam o pessoal pelo `api.get_responsaveis` passaram a injetá-lo pelo leitor
+(`api.ler_pessoal`); o `test_oscreator_card_e_anexos_29_10` não zera mais o `_CLASSIF_CACHE`, que saiu.
+
+## Um caminho só para juntar as tarefas numa OS (31/10/2026, etapa 5.1 do canto central)
+
+O desenho (`docs/superpowers/specs/2026-10-30-oscreator-canto-central-design.md`, "Etapa 5"): "hoje são vários [caminhos de
+criação], cada um com a sua regra: o tempo da OS de 30/10/2026 (10 min fixos em quatro caminhos) foi esse erro". Todo caminho
+que junta tarefas numa OS numerada tinha a sua cópia da **fase 2** (ler o kanban, inserir a OS, pôr as etiquetas, anexar as
+fotos). Agora a fase 2 é uma só: `os_creator/os_juntar.py`.
+
+- **`juntar_em_os(id_tasks, duracoes, id_responsible, responsible_name, *, id_parent, note, etiqueta_ids, imagens, registros,
+  frases)`**: o registro de cada tarefa no kanban (`_kanban_records`; o que o chamador já leu vai em `registros` e não é lido de
+  novo) → a OS (`_work_order_insert`) com o tempo igual à **soma do tempo das tarefas que ENTRARAM nela** (`_tempo_da_os`) →
+  as etiquetas → as fotos, cada uma na tarefa do ativo dela. Devolve `{id_tasks, id_work_order, wo_folio, nao_entraram[,
+  etiquetas][, aviso][, n_img_ok, img_erro]}`; **sem `id_work_order` a OS NÃO saiu** (o kanban caiu, ou não trouxe nenhuma
+  tarefa): as tarefas ficam pendentes no Fracttal e o `aviso` diz o que fazer. A OS que não fecha (`work_order_insert`
+  recusado) sobe como `FracttalError`: o Criar OS agrupado a transforma em aviso ("a OS não fechou"), os outros mostram o erro.
+- **`uma_os_por_tarefa(fase1, ...)`**: a fase 2 de "uma OS por ativo" e "por data" (`create_work_orders_bulk` e
+  `create_work_orders_datas`, que tinham o mesmo bloco copiado): o kanban é lido UMA vez para todas (50 OS do COS não são 50
+  leituras) e cada OS sai pelo `juntar_em_os` com o registro já lido.
+- **Quem passa por ele** (oito caminhos): a Clonagem de planos do PCM (`create_planned_os_multi`) e o um-plano-vários-ativos
+  (`create_planned_os_one_wo`); o Criar OS agrupado e a Engenharia agrupada (`create_work_orders_agrupada`); a Performance
+  agrupada (`create_performance_os_agrupada`); a Clonagem de OS (`clonar_os`) e, por ela, a Fila do PCM (`aprovar_solicitacao`) e a
+  OS sem plano (`create_os_sem_plano`); a **retomada** da Fila (a tarefa que ficou de uma tentativa que parou no meio; o registro
+  dela já veio da busca, sem ler o kanban de novo); e o Criar OS de uma OS por ativo / por data, o COS e a Engenharia
+  (`uma_os_por_tarefa`). O `convert_task_to_wo`, que punha os 600 s fixos, saiu: ninguém o chamava mais.
+- **O que cada chamador ainda é dono de**: criar as tarefas pendentes (a fase 1, que muda de caminho para caminho: o plano, a
+  clonagem, o título por ativo), conferir o responsável (sem ele as tarefas ficam pendentes e nem o kanban é lido), o formato do
+  resultado que a tela lê e **as frases dos avisos**. A mesma falha era dita de quatro jeitos (o "não gerei" / "não consegui gerar"
+  a OS, a etiqueta de um jeito em cada tela), e mudar o que as telas mostram não é desta etapa: o padrão (`FRASES`) é o do Criar OS e
+  da Clonagem de planos, e a Clonagem de OS, a Performance e o uma-OS-por-tarefa passam as suas em `frases`.
+- **O que ele NÃO faz.** Não põe a OS na lista central de OS (`os_central.atualizar_os`): as telas de criar chamam
+  `lista_central.criadas`, que tem a guarda de "lista em uso" e o limite por pedido (3.3), e chamar daqui a pularia. E não
+  confere a pessoa nem a etiqueta ao vivo: a criação da Engenharia faz isso na rota, ANTES da primeira tarefa
+  (`api.responsaveis_ao_vivo` e `api.get_labels`, a regra de 19/10/2026), e continua assim. As fotos da Performance agrupada
+  seguem na `create_performance_os_agrupada` (`os_criar.py`), casadas pelo ativo (`id_item`) com as tarefas relidas da OS: o juntar
+  casa pela ordem, e mudar a Performance para ela mudaria o que ela lê e como casa.
+- **O que mudou de verdade (dois casos de borda, os dois com teste):** (1) a OS da Clonagem de OS somava o tempo das tarefas
+  CRIADAS, mesmo as que o kanban não trouxe e que portanto não estão nela; agora soma as que entraram (como já faziam as outras
+  quatro). (2) A foto do Criar OS agrupado era casada pela ordem das tarefas criadas: se o kanban não trazia a 1ª, a foto do ativo 1
+  ia para a tarefa do ativo 2; agora é casada com a ordem das que entraram. O resto é igual ao de antes, pedido por pedido.
+- **Prova:** `tests/test_oscreator_os_juntar.py`. O Fracttal é de mentira no nível do HTTP (cada pedido ao rpc/proxy fica guardado,
+  na ordem), e `test_payload_igual_ao_de_antes` compara 41 cenários (os oito caminhos, e para cada um a falha do kanban, a tarefa
+  não achada, a etiqueta que falha, a OS que não fecha, a tarefa que não nasceu) com o que o código de ANTES mandou e devolveu
+  (`oscreator_payloads_antes_da_5_1.json`, gravado no d18ce7b, com o SHA-1 do corpo de cada pedido). Mais:
+  `test_todos_os_caminhos_passam_pelo_juntar` (e o pedido que insere a OS só sai de dentro dele),
+  `test_so_o_juntar_chama_o_insert_da_os` (nenhum arquivo do OS Creator chama o `_work_order_insert` fora do `os_juntar.py`),
+  `test_tempo_e_a_soma_em_todos`, `test_avisos_de_hoje`, o kanban lido uma vez para as N OS, a criação da Engenharia que confere a
+  pessoa e a etiqueta ao vivo antes do primeiro pedido de gravação e chega pelo juntar, e a lista central que ele não toca. Doze
+  mutações do `os_juntar.py` (tempo fixo, a nota que some, o kanban lido por OS, a OS pai procurada antes do kanban, a etiqueta que
+  derruba...) são pegas.
+
+## O mapa dos módulos: o que sobra do api.py (31/10/2026, etapa 5.3 do canto central)
+
+O `api.py` chegou à etapa 5 com 6.631 linhas (6.504 depois da 5.1) e uns quinze assuntos dentro: criar OS, o Histórico, o card, as
+solicitações, o cronômetro, os planos, os chamados... Cada assunto foi para o módulo do dono dele, e o `api.py` ficou com 1.239
+linhas (uns 60 de fachada). **Só o lugar mudou**: nenhuma linha de código, só o prefixo `api.` (as regras, abaixo). Prova: a árvore de cada
+uma das 292 funções, classes e constantes que saíram foi comparada com a do `api.py` de antes (o 4133f34, no git), e a única
+diferença era o `api.` na frente dos nomes; os 406 nomes que o `api` tinha seguem nele, com os mesmos tipos.
+
+| Módulo | Linhas | O que mora nele | Quem chama de fora |
+|---|---:|---|---|
+| `api.py` | 1.239 | o cliente do Fracttal: login e sessão, o RPC (`_rpc_call`, `_rpc_chamar`, o cache das leituras de uma OS), a tarefa que nasce (`create_os_rpc`, `_react_insert_post`), o S3 (`attach_imagem_os`, `s3_get_url`, `baixar_imagem`), a configuração e a fachada | tudo |
+| `fracttal_erro.py` | 15 | `FracttalError` e `SessionExpired` (o `api` os reexporta: o MESMO objeto) | todos os módulos |
+| `os_juntar.py` | 184 | a fase 2 de todo caminho que junta tarefas numa OS (seção anterior) | `os_criar` |
+| `os_criar.py` | 1.070 | os caminhos que CRIAM OS: a Clonagem de planos e de OS, a OS sem plano, o Criar OS do zero (por ativo, agrupada, por data), a Performance, a OS de análise e as do chamado; a leitura do kanban e a inserção da OS (`_kanban_records`, `_work_order_insert`), `apply_labels`, `nascer_ticket` | as rotas de Criar OS, COS, Clonagem, PCM, Performance e Engenharia (`nexus/engenharia/os_analise.py`) |
+| `os_historico.py` | 563 | a lista de OS: a linha de cada OS (`_shape_wo_row`), a leitura por período e por página, a meta de cada tarefa, o "Criado por" (`get_pessoas_contas`) | o Histórico, o COS, Garantias, Investigar ativo e a lista central de OS (`os_central`, `lista_central`) |
+| `os_detalhe.py` | 421 | a OS aberta no card: cabeçalho, tarefas, subtarefas com respostas, solicitação de origem, OS pai (`buscar_os_pai`), a OS para clonar | o card, o PDF, a Clonagem, o `os_registro` |
+| `os_estado.py` | 471 | cancelar, trocar o responsável, a nota, o status, concluir, o fluxo da OS, achar a OS pelo número (`os_por_folio`, `_wo_id_por_folio`) | o card, Garantias, a Engenharia |
+| `os_anexos.py` | 331 | LER as fotos e os arquivos: imagens, recursos, anexos por tarefa e por subtarefa, os da solicitação, `_ids_tarefas_da_os` | o card, o PDF, a Nova solicitação |
+| `os_execucao.py` | 573 | o cronômetro (iniciar, pausar, retomar, finalizar, o motivo de pausa, o tempo trabalhado) e o checklist da tarefa (subtarefas, respostas, validação de segurança) | o card, a Engenharia, Garantias |
+| `os_planos.py` | 416 | os planos (modelos de tarefa): por ativo e o detalhe, os da Performance, as subtarefas que o app acrescenta, a contagem e o tempo de cada plano, os modelos da Clonagem | o PCM, a Performance, a Clonagem, `catalogos_planos` |
+| `perf_alvos.py` | 167 | os tipos de ativo da Performance, o nome curto do ativo e da usina para o título, `get_performance_alvos` | a Performance, o COS, a Engenharia |
+| `os_chamados.py` | 377 | o bloco "CHAMADO" da observação, a lista de chamados, o status em massa, a OS 3 (tickets), as últimas OS de um ativo, as respostas da inspeção | Chamados, Garantias |
+| `os_solicitacoes.py` | 431 | as solicitações de serviço: criar, listar, status, observação, cancelar e APROVAR em OS numerada (`aprovar_solicitacao`) | a Nova solicitação, a Fila do PCM |
+| `ativos_carga.py` | 344 | a cola do `api` com o catálogo central de ativos (`load_assets_cached`, a recarga pelo RPC, a renovação por trás, os textos dos três "Atualizar ativos") | toda tela que lista ativos |
+| `catalogos_rpc.py` | 226 | os leitores dos catálogos pequenos pelo RPC (`ler_pessoal`, `get_labels`, os tipos, as falhas, `_classif_ids`) que o `catalogos.py` chama pelo nome | `catalogos`, a criação da Engenharia (que confere ao vivo), o COS |
+| `os_tempo.py` | 126 | a data do Fracttal em Brasília, o tempo entre datas, as horas de sol, `_tempo_da_os` | tudo que formata data |
+| `dash_os.py` | 80 | a fila de OS sugeridas do dashboard de O&M (a configuração mora no `api`: `DASH_CONFIG_FILE`) | `tickets_escrita` |
+
+Os módulos que as etapas 1 a 4 criaram (`ativos_central`, `ativos_leitor`, `ativos_disco`, `ativos_foto`, `os_central`, `os_leitor`,
+`os_registro`, `os_disco`, `catalogos`, `catalogos_leitor`, `catalogos_planos`, `canto_disco`) não mudaram.
+
+**As regras do código que mudou de lugar** (`tests/test_oscreator_fachada.py` confere):
+- **`api.X` é a fachada.** Todo nome de antes segue no `api` (no fim do arquivo, um `from <módulo> import (...)` por módulo), e é
+  por ele que a ponte, as rotas, os outros setores (`nexus/pcm`, `nexus/engenharia`, `nexus/auth`) e os testes chamam e TROCAM as
+  funções (`monkeypatch.setattr(api, "_rpc_call", ...)`). Onde este README diz "no `api.py`" para uma função que a tabela leva a
+  outro módulo, o endereço `api.X` segue valendo; o código mora no módulo.
+- **Toda função que um módulo chama vai pelo `api.`**, a dele e a dos outros (`api._rpc_call(...)`, `api.get_os_detalhes(...)`), e
+  também o número ajustável (um prazo, um teto: `api.ESPERA_NOVOS_S`). Senão o teste que troca `api.X` não é visto por quem chama
+  pelo nome local, e passa sem testar nada. Só as outras constantes (os nomes dos métodos do RPC) e o estado do próprio módulo são
+  usados direto. Um módulo novo, ou uma função nova num módulo, segue a mesma regra, e o teste da fachada acusa a chamada pelo nome
+  local.
+- **Os 14 módulos que o `api` reexporta terminam com `import api`**, e o `api` os importa no fim do arquivo (a fachada): o
+  círculo se fecha na hora de carregar e as funções só usam o `api` na hora da chamada. Qualquer módulo pode ser importado
+  antes do `api`. As duas exceções: o `fracttal_erro` não importa nada do OS Creator, e o `os_juntar` não é importado pelo `api`
+  (é o `os_criar` que o importa) e chama o `api` na hora, por uma função (`_api()`), que o importa dentro. Toda função que um
+  módulo importa de OUTRO módulo do clone (o `montar_registros` do `ativos_central`, que o `ativos_carga` chamava como
+  `_build_records`) também vai pelo `api.`, e o teste da fachada acusa a que fica pelo nome local.
+- **O que o Python executa na hora de definir** (o valor padrão de um argumento, uma constante calculada) não pode usar o `api.`;
+  por isso o `HISTORICO_CAP` usado como padrão fica sem o prefixo, e o que depende de `_data_dir()` na hora de carregar
+  (`ASSETS_CACHE_LEGADO`, `DASH_CONFIG_FILE`) ficou no `api`.
+
+**O que ficou no `api.py`, e por quê**
+- **Quem fala com a rede direto** (`_get_token`, `_req`, `fracttal_login`, `_rpc_try_refresh`, `_rpc_chamar`, `create_os_rpc`,
+  `_react_insert_post`, `s3_get_url`, `baixar_imagem`, o S3 e o `attach_imagem_os`): o Raio-X rotula o pedido preso pelo arquivo da
+  linha NOSSA mais de dentro (`nexus/casca/presos.py`: `os_creator/api.py` e os módulos que saíram dele nas etapas 5.1 e 5.3,
+  os 14 de `_MOVIDOS_DO_API`, = "Fracttal (OS Creator)"; o `dash_os`, que fala com o dashboard, e o resto da pasta = "OS Creator").
+  Antes de a revisão final pôr os módulos movidos na regra, a espera de uma thread em código que saiu do `api.py` (o `get_assets`
+  esperando as 6 threads dele, agora no `ativos_carga`) passou a ser rotulada "OS Creator", e o Raio-X e o log deixaram de dizer
+  "Fracttal (OS Creator)". Se os pedidos à rede saíssem do `api.py`, o `onde` do episódio mudaria de arquivo.
+- **A sessão** (`_save_jwt`, `_read_jwt`, `_clear_jwt`, `current_user`, `_sessao_propria`...): o `os_web.sessao.instalar` troca essas
+  funções do `api` por outras, por nome, uma vez por processo.
+- **O RPC e o cache das leituras de uma OS** (`_rpc_call`, `_leitura_da_os`, `_LEITURAS_OS`): os testes trocam o `_rpc_call` em 25
+  lugares, e o cache é estado global que se zera quando ele é trocado.
+- **O que é trocado de fora**: `ID_PELA_LISTA` (a lista central de OS o instala no `api`), `_CODE_LOC_TENTOU`,
+  `_current_user_info`, `_current_user_ids`.
+
+**Dois acertos no caminho:** os erros foram para o `fracttal_erro.py` (os módulos novos dizem `except FracttalError` e não podem
+importar o `api` ao carregar), e o `import os_juntar` do `api` saiu (quem o usa é o `os_criar`).
+
+**Como foi conferido:** (1) o AST de cada função, classe e constante movida contra o `api.py` de antes; (2) nenhum nome indefinido
+nos módulos (um `api.` esquecido ou um nome local que ficou para trás); (3) os 461 `api.X` escritos nos módulos existem no `api`;
+(4) cada módulo importado primeiro, num interpretador limpo; (5) `test_payload_igual_ao_de_antes` (a seção anterior) e o recorte da suíte
+`oscreator or cos or solic or casca or cadastro or historico or garantia or acomp or prefixo or engenharia or pcm` (3.133 testes, que
+trocam o `api.X` de dezenas de funções). Quatro mutações do `test_oscreator_fachada.py` (chamada pelo nome
+local, nome fora da fachada, `api.X` que não existe, módulo sem o `import api`) são pegas.
+
 ## O catálogo de ativos vencido por trás (24/10/2026)
 
 Em 23/10/2026 às 10:44 o catálogo de ~22 mil ativos passou das 24 h (`api.ASSETS_TTL`) e o 1º a precisar dele o baixou
@@ -1266,13 +2401,17 @@ quando atualizar vai atualizar a lista de todos, não só daquela pessoa".
 
 - **Vencido, o de ontem volta na hora** (`api.load_assets_cached`) e o novo é baixado por trás
   (`_renovar_catalogo_por_tras`, a thread `os-catalogo-por-tras`), com a sessão de quem pediu (a cópia do contexto leva o
-  JWT). Uma tentativa a cada `ASSETS_ESPERA_TENTATIVA` (10 min): a que falhou deixa o de ontem.
+  JWT). Uma tentativa a cada `ASSETS_ESPERA_TENTATIVA` (10 min): a que falhou deixa o de ontem. A que veio e foi recusada
+  (encolheu) conta como conferida, e o retry de 10 em 10 min acabou para ela (31/10/2026, seção do catálogo central).
 - **Espera o novo** só quem precisa dele em dia: `em_dia=True` (resolver o ativo da OS na aprovação,
   `rotas_solic._catalogo_para_aprovar`); e quem não tem catálogo nenhum na máquina.
-- **O botão "Atualizar ativos"** (OS Creator → Ativos, `/os/api/ativos/atualizar`) baixa na hora; o arquivo do catálogo
-  é um só (`assets_cache.json`), então vale para todos. Ativo cadastrado hoje que não aparece: é ele.
+- **O botão "Atualizar ativos"** (OS Creator → Ativos, `/os/api/ativos/atualizar`) vale para todos: o catálogo é um só (desde
+  31/10/2026 o central, seção acima; antes, o arquivo `assets_cache.json`). Ativo cadastrado hoje que não aparece: é ele. Com o
+  leitor do servidor (31/10/2026), ele busca só os ativos novos e volta na hora (seção "Os botões Atualizar ativos sem esperar o
+  Fracttal"); sem ele (o PC), baixa o catálogo inteiro na hora, como antes.
 - Prova: `tests/test_oscreator_catalogo_por_tras_24_10.py` (7; 6 falham no código de antes, o outro segura o "sem
-  catálogo, espera"); 5 mutações, todas pegas.
+  catálogo, espera"); 5 mutações, todas pegas. Desde 31/10/2026 os mesmos cenários rodam sobre o catálogo central (o
+  download troca o catálogo da memória e a cópia em disco).
 
 ## Os catálogos e o catálogo de ativos uma vez para todos (19/10/2026)
 
@@ -1281,15 +2420,20 @@ O mesmo superplano (o mapa de cada pedido ao Fracttal, por tela, que a sessão f
 - **Pessoal ativo, etiquetas, motivos de cancelamento, tipos de solicitação e as OS recentes da tinta dos Ativos**
   (`rotas.responsaveis_fracttal`, `etiquetas_fracttal`, `motivos_cancelamento`, `os_recentes`; os tipos da
   solicitação no `("solic_cat", "tipos_solicitacao")`): iguais para todos, eram relidos a cada tela e a cada clique, por cada pessoa (o pessoal são
-  2 pedidos; as OS recentes, 17 a 40 pedidos em sequência a cada visita aos Ativos). Agora 10 min na memória, um para
+  2 pedidos; as OS recentes, 17 a 40 pedidos em sequência a cada visita aos Ativos). Ficaram 10 min na memória, um para
   todos; o erro não fica guardado, e o catálogo vazio também não (`_memo(..., guardar=)`, 20/10/2026: a lista vazia da
-  sessão de alguém sem a permissão esvaziaria a tela de todo mundo pelo TTL). Na CRIAÇÃO (uma gravação) o pessoal e as etiquetas seguem lidos na hora
-  (`rotas_solic_eng.criar`).
+  sessão de alguém sem a permissão esvaziaria a tela de todo mundo pelo TTL). **Desde 31/10/2026 o pessoal, as etiquetas, os
+  motivos e os tipos da solicitação têm um dono só** (`catalogos.py`, seção "Os catálogos pequenos num lugar só", acima: o
+  prazo de cada um, a cópia em disco, a renovação por trás; a mesma regra do erro e do vazio). A criação da Engenharia segue
+  lendo o pessoal e as etiquetas AO VIVO, uma leitura de cada por gravação (a gravação não confia no catálogo), e o "Criado
+  por" do Histórico segue por pessoa. As OS recentes seguem aqui, quando a lista central de OS não cobre o período.
 - **O catálogo de ~22 mil ativos** (`api.load_assets_cached`): lido do disco uma vez por versão do arquivo (antes cada
   uma das 26 chamadas decodificava o JSON inteiro, a prévia do COS a cada 120 ms de digitação), entregue em cópia por
   registro; e a recarga do Fracttal (~110 pedidos) é uma por vez: quem acha o catálogo vencido junto espera a mesma. O
-  resumo "N ativos, catálogo de quando" (`api.assets_cache_info`, da tela inicial e da de Ativos) usa o mesmo
-  decodificado (`_catalogo_cru`, 20/10/2026: decodificava o arquivo inteiro, 10,5 MB, a cada chamada).
+  resumo "N ativos, catálogo de quando" (`api.assets_cache_info`, da tela inicial e da de Ativos) usa o mesmo catálogo
+  (20/10/2026: decodificava o arquivo inteiro, 10,5 MB, a cada chamada). **Desde 31/10/2026 é o catálogo central** (seção
+  "O catálogo de ativos central"): na memória uma vez por processo e entregue SEM cópia (os registros são só de leitura); a
+  recarga de uma por vez segue igual, e o `_catalogo_cru` saiu.
 - **`_code_to_loc` sem catálogo não tenta de novo por 10 min**: é chamado por linha do Histórico, e com a recarga
   falhando eram 2.000 tentativas numa lista.
 - **A OS pelo número num pedido só** (`api.os_por_folio`): sem o status, a lista traz os quatro; eram até 4 pedidos em
@@ -1355,13 +2499,15 @@ ele escolhe o fabricante o app já filtra se é inversor, cabine etc 4 - Se a li
 fabricantes tiver nome diferentes do fractall altere o nome em fabricante!" e "quando a singrid adicione novos
 fabricantes em chamados > fabricantes apareça atualizado no app".
 
-- **A regra mora no pacote** `chamado_garantia` (o mesmo no OS Creator, no oem e no App): `registro.py` põe a aba
+- **A regra mora no pacote** `chamado_garantia` (o do OS Creator; o App de Campo carrega a sua cópia, e a do oem ficou
+  congelada): `registro.py` põe a aba
   `os_creator · chamado_modelos` (a que a tela Fabricantes grava) por cima do código. O `chamado_modelos_store` do OS
   Creator passou a chamar o pacote (o canal de abertura continua só aqui); os nomes públicos dele não mudaram.
 - **A marca no nome do ativo** (`spec.marca_do_ativo`, a única: a de `regras` chama esta) vale como palavra inteira e
   pelos apelidos do Fracttal (`APELIDOS_NO_FRACTTAL`). No catálogo de 14/10: +80 Canadian ("CANANDIAN SOLAR"), +169
   Huawei (só o modelo SUN2000), os 131 Axial grudados ("AXIALtracker") seguem Axial, e saem os falsos STI (16
-  cabines, skids e estações pelo endereço "Justiniano"/"Sebastião"; os 43 trackers de Santo Inácio pelo código STI100).
+  cabines, skids e estações pelo "sti" no meio de uma palavra do endereço, como numa "Rua Celestino" ou numa "Rua
+  Faustino", exemplos inventados; os 43 trackers de uma usina pelo código dela, que começa com STI).
 - **Os nomes da tela contra o Fracttal** (o item 4): dos 11 fornecedores, só a Canadian difere, e o erro é do Fracttal
   ("CANANDIAN"): o nome fica certo na tela e a grafia do Fracttal entra como apelido. Hukseflux e Romiotto não
   aparecem no nome de nenhum ativo (o nome da estação é o endereço). O campo de fornecedor novo pede o nome como está no
@@ -1402,6 +2548,18 @@ na nota entra a OS mãe do Fracttal; no banco, o chamado abre na data da nota.
 - Prova: `tests/test_oscreator_chamado_retroativo.py` (a nota dela com nomes e números de mentira, a nota do App lida
   igual, a idade, a linha do tempo, a OS mãe, a tela e o fato). Conferido numa bancada local com o Fracttal falso, a 1440
   e a 375 px.
+
+## Uma leitura só por chave, e a releitura do quadro como fundo (03/11/2026)
+
+O Raio-X de 03/11 mostrou 828 pedidos ao Fracttal num minuto às 10h, com a cota em 200 para a empresa toda, e o
+Acompanhamento de chamados com 1.851 pedidos em 49 cliques. Desde então:
+- **`rotas._memo` lê uma vez por chave:** quem chega com a leitura da mesma chave em curso (o quadro logo depois de um
+  deploy, que esvazia a memória) espera por ela e leva o mesmo resultado. A leitura que falha, ou que o `guardar` não guarda,
+  não serve a quem esperou: ele lê com a sessão dele. O `forcar` (o Atualizar) lê sempre.
+- **A releitura de 30 em 30 min do quadro é fundo declarado** (`fundo:os-web-acomp-renovar`): espera a vez do fundo no
+  porteiro do Nexus e cede a vaga a quem clica; ninguém a espera, porque a tela mostra a cópia anterior.
+- Até a lista central cobrir os 365 dias que o quadro lê (a 1ª noite depois do deploy lê a janela inteira), o quadro segue
+  lendo a lista ao vivo. Prova: `tests/test_oscreator_memo_uma_leitura.py` e `tests/test_oscreator_acomp_renovar.py`.
 
 ## O quadro só relê no Atualizar ou a cada 30 min, com 6 cartões à vista (Garantias, 20/10/2026)
 
@@ -1455,6 +2613,10 @@ não lê as tarefas.
   engolida, sem conferir as páginas, sem conferir o meta, lote engolido, sessão caída como erro comum, Histórico e
   quadro sem a lista anterior) derrubam cada uma o seu teste. Na bancada (o clone sozinho, Fracttal falso, sem rede),
   a 1280 e a 375 px: o aviso, a lista anterior com a hora dela no Histórico e no quadro.
+- Na lista central de OS (31/10/2026, tarefa 3.3) a mesma regra vale de outro jeito: a leitura do servidor que falha no meio não
+  troca a lista (o `os_leitor`), e cada tela confere o "Todos" que o Fracttal dá à pessoa no período, até a marca d'água,
+  contra o da lista antes de mostrá-la (seção "As telas leem da lista central de OS"); a diferença manda a tela ao vivo e conta
+  no Raio-X.
 
 ## O filtro do quadro fica na volta, e o checklist sem permissão diz o que fazer (Garantias, 24/10/2026)
 
@@ -1507,14 +2669,19 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   guarda o `janela` e o pedido a cada nova busca. Fica debaixo do `/os/`: o portão do Nexus pede uma tela da torre OS
   (`setor_telas.pode`), e o Caddy já manda o `/os/*` ao Nexus. Sem a sessão do Fracttal, o login do OS Creator, como
   em qualquer tela (`exige_sessao`).
-- **De onde vem o histórico (nenhuma busca a mais no Fracttal):** a lista de "Todos" dos últimos 30 dias, a MESMA da
+- **De onde vem o histórico (nenhuma busca a mais no Fracttal):** desde 31/10/2026 (tarefa 3.3), da lista central de OS pelo
+  índice por código de ativo (`lista_central.investigar`: as OS do código do ativo e as dos códigos da usina, pelo catálogo,
+  no período), depois da conferência do período carregado (a MESMA medida da Visão COS: quem abriu uma não confere de novo na
+  outra), e só as que ela provou; o recorte, o "este ativo" e o "da usina" seguem as regras de baixo. Quem não passou segue
+  com a lista DELA (Ruling BU da rodada 2 da 3.3). Onde a lista não cobre, como antes: a lista de "Todos" dos últimos 30 dias,
+  a MESMA da
   Visão COS e do "Criado por: Todos" (`rotas.ler_lista`, que saiu de dentro do `historico` para as duas usarem a mesma
   leitura: a chave `("hist", "TODOS", "criadas", "TODOS", None, de, ate, ())` do `historico_store`, a conferência da
   mesma visão e a renovação por trás). Quem abriu a Visão COS deixa a janela pronta; a 1ª janela deixa a Visão COS
   pronta. O período DENTRO dos 30 dias é recortado da lista (pela data de criação, como o Histórico), sem pedido; fora
   deles, a lista daquele período (a régua do Histórico, guardada para quem vier depois), com o aviso na tela e o do teto
   de 2.000 quando a lista corta as mais antigas. O ↻ é o do Histórico.
-- **O ativo, pelo catálogo do disco** (`api._catalogo_cru`, vencido também serve; nunca o Fracttal): o código que a
+- **O ativo, pelo catálogo central** (`ativos_central.atual()`, vencido também serve; nunca o Fracttal): o código que a
   plataforma manda (o gravado no de-para ou o derivado do nome) quando está no catálogo; senão, o inversor da usina com o
   mesmo número (`INVR` + N.M, sem zero à esquerda; 1.1 não casa com 1.10), com o aviso de que o código não existe (o
   derivado erra onde a árvore do Fracttal mudou, a Pharma II); sem inversor, a usina inteira, com o aviso.
@@ -1523,7 +2690,8 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   inversores aparece nos dois. "Da usina", pelo nome curto, o do Histórico (inclui as do item da usina: religamento).
 - **Os filtros da janela:** "Este ativo N | A usina inteira N", Status e Tipo de tarefa (as opções que existem nas OS da
   usina no período) e a busca por texto são locais, sobre as linhas da usina que vieram; o período re-lê no servidor. O
-  nº abre o card da OS do Histórico (o mesmo `os_acoes.js`); a ação que muda a OS relê ao fechar. O Esc sem card aberto
+  nº abre o card da OS do Histórico (o mesmo `os_acoes.js`, com a 1ª pintura da lista central); a ação que muda a OS volta
+  com `mudou=1` ao fechar (da lista central, sem pedido; no caminho de hoje, relê). O Esc sem card aberto
   fecha a janela do Tempo real (`{gc: "depara-fechar"}` à página de baixo).
 - **Prova:** `tests/test_oscreator_investigar_ativo_26_10.py` (14: o catálogo, o número, os códigos dos itens, o
   período, a janela sem busca a mais depois da Visão COS e o contrário, o recorte, o período fora, os campos guardados,
@@ -1634,3 +2802,21 @@ quem pode: "qualquer um que é ADM ou do setor de chamados".
   `acomp.js`, o `chamados.css` e o `os_acoes.*` das telas de Garantias vão com `?v=<a hora em que o arquivo mudou>`. O
   /os/static sai sem prazo de cache e o navegador chutava um: em 29/10/2026 o editar e o excluir subiram e a tela do Levi
   seguiu com o acomp.js de antes até o Ctrl+Shift+R. Tela nova com JavaScript que muda, use `estatico()`.
+
+## O que a tela pede sozinha leva o X-Nexus-Auto (31/10/2026, etapa 0 do canto central)
+
+O Nexus mede o uso das telas do OS Creator por hora (`nexus/casca/uso_os.py`, seção "Uso das telas do OS Creator por hora"
+do `nexus/casca/CLAUDE.md`) e separa o clique da pessoa do que a tela pede sozinha. Quem se renova sozinho avisa:
+- **`acomp.js`** (`esperarANova`, de 5 em 5 s por até 3 min) manda `X-Nexus-Auto: 1` no `fetch` do
+  `/os/chamados/acompanhamento/estado`;
+- **`solic_pcm.js`** `pedir(url, corpo, texto, auto)` põe o cabeçalho só com `auto === true` (um evento de clique repassado
+  sem querer não vale), e o **`solic_hist.js`** chama `recarregar(true)` só na atualização de 15 min; o ↻ é `recarregar(false)`.
+  A página `solic_hist.html` chama os dois arquivos por `estatico()` (com a versão), senão o navegador seguiria com os de antes;
+- **`historico.html`** (a atualização de 10 min é `form.submit()`, e um formulário não manda cabeçalho): `enviar(forcar, auto)`
+  põe o campo escondido `nx_auto=1` só nesse envio e o tira em todo outro; a página carregada apaga o `nx_auto` do endereço
+  (`history.replaceState`), para o recarregar do navegador ou o link copiado serem cliques;
+- **`carga.js`**, o círculo de carga, pergunta o `/os/historico/progresso` de 350 em 350 ms enquanto o Histórico busca: o
+  `fetch` leva o cabeçalho (sem ele seria, por folga, a rota mais clicada);
+- a conferência da sessão de 5 min (`/os/_nexus/sessao`) é do Nexus (`nexus/templates/_confere_sessao_js.html`).
+O oem (congelado) não recebe estes arquivos: nada muda no 5090. Tela nova que
+se renova sozinha põe o cabeçalho; sem ele conta como clique.

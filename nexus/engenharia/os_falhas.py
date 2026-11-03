@@ -198,7 +198,9 @@ def pedir_releitura(app=None):
     if app.config.get("TESTING"):
         rodar()
     else:
-        threading.Thread(target=rodar, daemon=True, name="nexus-os-falhas").start()
+        from ..casca import fracttal_conta          # a releitura por trás declara o fundo (o teto de 90 do porteiro)
+        threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-os-falhas", rodar), daemon=True,
+                         name="nexus-os-falhas").start()
 
 
 def linhas() -> list[dict]:

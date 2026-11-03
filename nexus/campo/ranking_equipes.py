@@ -20,6 +20,7 @@ Puro: recebe as linhas e devolve números; quem lê o banco é `responsaveis.ran
 Desenho: docs/superpowers/specs/2026-10-18-visao-responsavel-ranking-equipes-design.md.
 """
 import collections
+import unicodedata
 from datetime import date, timedelta
 
 from ..dados import fatos as D
@@ -281,7 +282,7 @@ def _provas(area: str, us: list[dict], com_usina: bool = True) -> tuple[str, lis
     sem lista própria (ronda, limpeza, meta, disponibilidade, semana, zeladoria) usa o título do alerta da usina, o mesmo
     texto da Visão. `com_usina` falso tira o nome da usina do texto (a tabela do Focar: a linha já diz qual é). As
     atrasadas e as pausadas vêm inteiras (`todas_*`), para o "e mais" abrir tudo."""
-    from .responsaveis import _dm, _duracao
+    from .responsaveis import _dm, _duracao, nome_do_ativo
 
     def nome(u) -> str:
         return u["usina"] if com_usina else ""
@@ -313,14 +314,17 @@ def _provas(area: str, us: list[dict], com_usina: bool = True) -> tuple[str, lis
         ps = [((x.get("ordem", 2), x.get("ext") or ""), _prova(junto(f"Extintor {x.get('ext')}", nome(u), x.get("txt"))))
               for u in us for x in (u.get("extintores") or {}).get("lista") or ()]
         return "", ps, len(ps)
+    # o ativo limpo, sem a marca, o modelo, o código nem o endereço (Levi, 29/10/2026, na janela da equipe: "o nome do
+    # ativo pode aparecer sem nome de fabricante, modelo ou código do ativo. Só o nome limpo"): o `nome_do_ativo` do
+    # quadro de chamados do Painel ("Inversor 2.4 Huawei SUN2000-215KTL-H3" → "Inversor 2.4")
     if area == "chamados":
-        ps = [(-(x.get("dias") or 0), _prova(junto(nome(u), x.get("equip"), x.get("fabricante"),
+        ps = [(-(x.get("dias") or 0), _prova(junto(nome(u), x.get("ativo") or nome_do_ativo(x.get("equip")),
                                                    f"há {x['dias']} d" if x.get("dias") is not None else ""), x.get("os")))
               for u in us for x in (u.get("chamados") or {}).get("lista") or () if x.get("situacao") == "aberto"]
         return "", ps, len(ps)
     if area == "ativos":
         ps = [((0 if x.get("nivel") == "critico" else 1, -(x.get("falhas") or 0)),
-               _prova(junto(x.get("nome"), nome(u), x.get("porque"))))
+               _prova(junto(nome_do_ativo(x.get("nome"), x.get("cod")), nome(u), x.get("porque"))))
               for u in us for x in (u.get("ativos") or {}).get("lista") or () if x.get("nivel") in ("critico", "atencao")]
         return "", ps, len(ps)
     if area == "paradas":
@@ -482,6 +486,20 @@ def cartoes(usinas: list[dict], por_usina: dict, tecnicos: dict, filtradas: list
 PARTE_RONDAS = "Rondas"
 PARTE_SEM_COMPOSICAO = "Sem a composição da nota"
 MAX_PIORES, MAX_TECNICOS, MAX_SEM_RONDA = 5, 6, 8
+# o que o técnico faz para não perder cada parte (Levi, 29/10/2026, sobre os "−1" da nota do App na janela da equipe:
+# "-1 oq? -1 ponto? 1 OS anulada? explique melhor e explique o que impacta, o supervisor não tem uma cristal ball"): os
+# seis critérios da "Composição da nota" do App (regras_app._qualidade_os, que somam 100 em cada tarefa; o peso vem da
+# própria composição), as rondas e as notas sem o detalhe
+COMO_RECUPERA = {
+    "Subtarefas obrigatórias": "responder todas as subtarefas obrigatórias no App",
+    "Fotos": "tirar ao menos 3 fotos na tarefa",
+    "Fotos com descrição": "escrever a descrição de cada foto",
+    "Assinatura": "assinar no fim da folha",
+    "Observações": "escrever na observação o que foi feito ou achado (20 caracteres dão o total)",
+    "GPS no fechamento": "concluir a tarefa com a localização do celular ligada",
+    PARTE_RONDAS: "fechar a ronda inteira, sem pendência",
+    PARTE_SEM_COMPOSICAO: "nada a cobrar do técnico: o App não guardou o detalhe dessas notas",
+}
 
 
 def _repartir(total: int, partes: list[float]) -> list[int]:
@@ -555,13 +573,15 @@ def motivos(n: dict, det: dict, usinas: list[dict], por_usina: dict) -> dict:
                 sem_comp.append(t)
             continue
         for i, it in enumerate(itens):
-            c = crit.setdefault(str(it.get("rot") or "?"), {"soma": 0.0, "n": 0, "ordem": i})
+            c = crit.setdefault(str(it.get("rot") or "?"), {"soma": 0.0, "n": 0, "ordem": i, "peso": None})
+            if c["peso"] is None and it.get("peso") not in (None, ""):
+                c["peso"] = _num(it.get("peso"))
             if _perdeu(it) > 0.05:
                 c["soma"] += _perdeu(it)
                 c["n"] += 1
     for rot, c in crit.items():
         if c["soma"] > 0:
-            partes.append({"rot": rot, "exato": c["soma"], "ordem": c["ordem"],
+            partes.append({"rot": rot, "exato": c["soma"], "ordem": c["ordem"], "peso": c["peso"],
                            "det": f"em {c['n']} de {_pl(len(tarefas), 'tarefa', 'tarefas')}"})
     if sem_comp:
         partes.append({"rot": PARTE_SEM_COMPOSICAO, "exato": float(sum(100 - t["nota"] for t in sem_comp)), "ordem": 99,
@@ -569,7 +589,10 @@ def motivos(n: dict, det: dict, usinas: list[dict], por_usina: dict) -> dict:
     partes.sort(key=lambda x: (-x["exato"], x["ordem"]))
     for x, v in zip(partes, _repartir(perde_q, [x["exato"] for x in partes])):
         x["perde"] = v
-    partes = [{k: x[k] for k in ("rot", "perde", "det")} for x in partes if x["perde"] > 0]
+    # cada parte leva quanto ela vale em cada tarefa (o peso da composição; a ronda vale a nota inteira) e o que o
+    # técnico faz para não perder (`COMO_RECUPERA`): a janela diz isso em vez do "−1" solto
+    partes = [{"rot": x["rot"], "perde": x["perde"], "det": x["det"], "peso": x.get("peso"),
+               "como": COMO_RECUPERA.get(x["rot"], "")} for x in partes if x["perde"] > 0]
     # as notas mais baixas: a menor primeiro e, na mesma nota, a mais nova
     regs = [{"nota": t["nota"], "dia": t.get("dia") or "", "usina": nome.get(t.get("usina_id"), ""),
              "tecnico": t.get("tecnico") or "",
@@ -614,3 +637,27 @@ def motivos(n: dict, det: dict, usinas: list[dict], por_usina: dict) -> dict:
             "cobertura": {**cob, "perde": perde - perde_q}, "piores": regs[:MAX_PIORES],
             "mais_piores": sum(x["vezes"] for x in regs[MAX_PIORES:]), "tecnicos": tecs[:MAX_TECNICOS],
             "mais_tecnicos": max(0, len(tecs) - MAX_TECNICOS)}
+
+
+# ── A pontuação do mês da equipe (Levi, 29/10/2026, na janela da equipe: "quero uma explicação da pontuação mensal
+# daquela equipe, pontos por ronda, bonus, quantidade de tarefas etc, um resumo do que temos no ranking das equipes") ──
+def _chave_nome(s) -> str:
+    t = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
+    return " ".join(t.split())
+
+
+def placar_da_equipe(tecnicos: list[str], ranking: dict, hoje: date) -> dict:
+    """O placar do ciclo de pontos do App (por técnico) do mês de `hoje`, só dos técnicos da equipe: as linhas do
+    `visao.ranking_pontos` casadas pelo nome do cadastro (os dois lados saem dele). Quem não está no placar do mês fica
+    em `sem_placar`. `regua` = a régua do mês, como o App publicou (piso, teto, teto das rondas, bônus)."""
+    mes = hoje.strftime("%Y-%m")
+    m = next((x for x in (ranking or {}).get("meses") or [] if x.get("mes") == mes), None)
+    if not m:
+        return {"mes": mes, "linhas": [], "sem_placar": list(tecnicos), "regua": {}, "calculado_em": "", "total": 0}
+    quer = {_chave_nome(t): t for t in tecnicos if t}
+    linhas = [dict(p, fora=False) for p in m.get("classificacao") or [] if _chave_nome(p.get("tecnico")) in quer]
+    linhas += [dict(p, fora=True) for p in m.get("fora") or [] if _chave_nome(p.get("tecnico")) in quer]
+    achados = {_chave_nome(p.get("tecnico")) for p in linhas}
+    return {"mes": mes, "linhas": linhas, "sem_placar": [t for k, t in quer.items() if k not in achados],
+            "regua": m.get("regua") or {}, "calculado_em": m.get("calculado_em") or "",
+            "total": len(m.get("classificacao") or [])}

@@ -410,7 +410,7 @@ def test_o_rastreador_pega_o_endereco_esquecido():
     assert ("/nexus/", "href", "/t/z") in rs.ruins and ("/nexus/t/y", "Location", "/t/w") in rs.ruins
 
 
-# ── o OS Creator embutido debaixo do prefixo (a ponte reescreve; o clone fica igual ao do oem) ─────────────────────────
+# ── o OS Creator embutido debaixo do prefixo (a ponte reescreve; o arquivo do clone não muda) ───────────────────────────
 def _clone_js():
     from nexus.torres.oscreator import ponte
     return sorted(p.name for p in (Path(ponte.RAIZ_CLONE) / "os_web" / "static").glob("*.js"))
@@ -611,7 +611,7 @@ def test_com_a_reescrita_do_servidor_ligada_nada_sai_com_o_prefixo_dobrado(tmp_p
 
 # ── o varredor estático: o que o rastreador não alcança (telas que só desenham o link com dado do banco) ─────────────
 _PASTAS = [RAIZ / "nexus"]
-_FORA = ("os_creator",)                                # o clone do oem: a ponte reescreve (testes acima)
+_FORA = ("os_creator",)                                # o clone do OS Creator: a ponte reescreve (testes acima)
 
 
 def _arquivos(sufixo):

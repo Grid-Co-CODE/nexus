@@ -1,0 +1,46 @@
+{# Tudo da ronda, na barra lateral da direita (Levi, 03/11/2026: "Tira esse botão 'Fotos' ao clicar na linha já abre uma
+   barra lateral mostrando tudo da ronda"). Pedaço que a barra (`_ronda_gaveta.html`) busca no clique da linha, nos
+   Registros e no histórico da usina; as fotos vêm depois, pela rota das fotos da OS (o lugar delas é o
+   `data-fotos-url`). O texto que vem do livro do App entra escapado pelo Jinja. #}
+{% macro nivel(n) %}{% if n is none %}<span class="mudo">—</span>{% else %}<b class="cn-nivel-txt cn-nivel-txt--{{ n }}">{{ n }}</b>{% endif %}{% endmacro %}
+{% if not r %}
+<p class="rg-vazio">Não achei esta ronda no livro de rondas do App (ele guarda 90 dias). Feche e abra a usina de novo.</p>
+{% else %}{% set v = r.veredito %}
+<header class="rg-cab">
+  <p class="gc-eyebrow">Ronda {{ r.tipo or '' }}{% if r.avulsa %} avulsa{% endif %} · {{ r.data[8:10] }}/{{ r.data[5:7] }}/{{ r.data[:4] }}</p>
+  <h2 id="rg-titulo">{{ r.usina or (usina.usina if usina else '') }}</h2>
+  {% if usina %}<p class="mudo">{{ usina.cliente or '—' }}{% if usina.cidade %} · {{ usina.cidade }}{% if usina.uf %}/{{ usina.uf }}{% endif %}{% endif %}{% if r.equipe %} · {{ r.equipe }}{% endif %}</p>{% endif %}
+</header>
+<dl class="rg-dados">
+  <dt>Técnico</dt><dd class="cn-pessoa"><span class="cn-avatar">{{ iniciais(r.tecnico) }}</span>{{ r.tecnico or '—' }}</dd>
+  <dt>Quando</dt><dd>{{ r.ini_hm or '—' }} às {{ r.fim_hm or '—' }} <span class="mudo">(Brasília)</span><span class="det">duração {{ duracao(r.dur_min) }}</span></dd>
+  <dt>Qualidade</dt><dd>{% if r.nota is not none %}<b class="cn-t-{{ 'ok' if r.nota >= 95 else ('alerta' if r.nota >= 85 else 'critico') }}">{{ r.nota }}%</b>{% else %}—{% endif %}</dd>
+  <dt>Veredito</dt><dd><span class="cn-selo cn-selo--{{ v[0] }}">{{ v[1] }}</span></dd>
+  <dt>OS</dt><dd class="m">{% if r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">avulsa, sem OS</span>{% elif r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</dd>
+  {% if r.trk_apontados %}<dt>Trackers</dt><dd>{{ r.trk_respondidos }} de {{ r.trk_apontados }} respondidos</dd>{% endif %}
+</dl>
+<h3 class="rg-sub">Checklist</h3>
+{% if r.lida %}
+<dl class="rg-dados">
+  <dt>Sujidade dos módulos</dt><dd>{{ nivel(r.sujidade) }}</dd>
+  <dt>Altura da vegetação</dt><dd>{{ nivel(r.vegetacao) }}</dd>
+  <dt>Vala de drenagem</dt><dd>{{ r.vala or '—' }}</dd>
+  {% if r.sombreamento %}<dt>Sombreamento</dt><dd>{{ r.sombreamento }}</dd>{% endif %}
+  <dt>Sensores</dt><dd>{% if r.sensores_sujos %}<span class="cn-t-alerta">{{ r.sensores_sujos|join(', ') }} sujo{{ 's' if r.sensores_sujos|length != 1 }}</span>{% else %}limpos{% endif %}</dd>
+</dl>
+{% elif r.os and not r.sem_os %}<p class="mudo">A OS {{ r.os }} ainda não foi lida no Fracttal: as respostas do checklist aparecem quando o Nexus a ler.</p>
+{% else %}<p class="mudo">Ronda sem OS: as respostas do checklist ficam só no App.</p>{% endif %}
+{% if r.falhas or r.pendencia or (r.avulsa and r.comentario) %}
+<h3 class="rg-sub">Pendências</h3>
+<ul class="rg-pend">
+  {% for f in (r.falhas or '').split(';') if f.strip() %}<li class="cn-t-alerta">{{ f.strip() }}</li>{% endfor %}
+  {% if r.pendencia and r.pend_obs not in (r.falhas or '') %}<li class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</li>{% endif %}
+  {% if r.avulsa and r.comentario %}<li class="mudo">{{ r.comentario }}</li>{% endif %}
+</ul>
+{% endif %}
+<h3 class="rg-sub">Fotos</h3>
+{% if r.os and not r.sem_os %}<div class="rg-fotos" data-fotos-url="{{ url_for('torre_campo.ronda_fotos_os', os_=r.os|int) }}"><p class="mudo">Buscando as fotos da OS no Fracttal…</p></div>
+{% elif r.avulsa %}<p class="mudo">{{ explicacao_avulsa }}</p>
+{% else %}<p class="mudo">Ronda sem OS no Fracttal: as fotos ficam só no App.</p>{% endif %}
+<p class="rg-pe"><a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=usina_id) }}">Ver o histórico da usina</a></p>
+{% endif %}

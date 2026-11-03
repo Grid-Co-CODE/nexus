@@ -2,7 +2,8 @@
 Responsável UFV que é o supervisor da UFV"): o Responsável O&M da ficha da usina no cadastro do Nexus, o mesmo da Mesa da
 Segurança e da Central de atenção (`nexus/campo/visao.py`, `_Base.responsavel_da_usina`).
 
-O quadro mora no clone do OS Creator, que não importa o Nexus: a ponte põe aqui a função ao criar o clone
+O quadro mora no clone do OS Creator, que não conhece o app do Nexus (o cadastro, o cofre, o banco): a ponte põe aqui
+a função ao criar o clone
 (`ponte._criar_clone`, `rotas_acomp.RESPONSAVEL_UFV`). A usina do chamado sai do nome da usina do Fracttal (o de-para) ou
 do código do ativo, como no fato do chamado (`Ligador.usina`).
 

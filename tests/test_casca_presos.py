@@ -7,10 +7,11 @@ import logging
 import threading
 import time
 import traceback
+from pathlib import Path
 
 import pytest
 
-from nexus.casca import presos
+from nexus.casca import fracttal_conta, presos
 
 RAIZ = presos._RAIZ
 
@@ -75,11 +76,13 @@ def test_o_rotulo_diz_quem_e_como_pela_pilha():
             _quadro("/usr/lib/python3.12/ssl.py", "recv_into")]
     assert presos.rotulo(rede) == {"quem": "Fracttal (OS Creator)", "como": "esperando a rede",
                                    "onde": "nexus/torres/oscreator/os_creator/api.py:10 _rpc_call"}
-    # o catálogo de ativos esperando as 6 threads dele
-    futuros = [_quadro(api, "get_assets", "for f in as_completed(futs):"),
+    # o catálogo de ativos esperando as 6 threads dele (o `get_assets` mora no `ativos_carga.py` desde a etapa 5.3 do canto central,
+    # e o rótulo é o de antes, Fracttal (OS Creator): ver `test_o_codigo_que_saiu_do_api_segue_rotulado_...` abaixo)
+    futuros = [_quadro(RAIZ + "nexus/torres/oscreator/os_creator/ativos_carga.py", "get_assets", "for f in as_completed(futs):"),
                _quadro("/usr/lib/python3.12/concurrent/futures/_base.py", "as_completed"),
                _quadro("/usr/lib/python3.12/threading.py", "wait")]
     assert presos.rotulo(futuros)["como"] == "esperando outra thread"
+    assert presos.rotulo(futuros)["quem"] == "Fracttal (OS Creator)"
     pausa = [_quadro(RAIZ + "nexus/campo/fracttal.py", "ler", "time.sleep(esperas[tentativa])")]
     assert presos.rotulo(pausa)[("quem")] == "Fracttal (Campo)" and presos.rotulo(pausa)["como"] == "em pausa"
     # o .venv mora dentro da pasta do Nexus no servidor (/opt/nexus/.venv): os pacotes dele não são linha nossa
@@ -87,6 +90,57 @@ def test_o_rotulo_diz_quem_e_como_pela_pilha():
     assert presos.rotulo([_quadro(RAIZ + "nexus/campo/visao.py", "montar", "x = juntar()")] + venv) == {
         "quem": "nexus/campo/visao.py:montar", "como": "trabalhando", "onde": "nexus/campo/visao.py:10 montar"}
     assert presos.rotulo([])["quem"] == "?"
+
+
+# Os módulos que saíram do `api.py` na etapa 5.3 do canto central (31/10/2026): o pedido preso esperando em código deles (o
+# `get_assets` esperando as 6 threads, uma criação de OS esperando o Fracttal por um `api.X` que ainda não chamou a rede) tinha o
+# rótulo "Fracttal (OS Creator)" enquanto morava no `api.py`, e depois da divisão virou "OS Creator". O `dash_os` fala com o
+# dashboard de O&M, e não com o Fracttal: continua "OS Creator".
+MOVIDOS_DO_API = ("os_historico", "os_detalhe", "os_anexos", "os_planos", "os_execucao", "os_chamados", "ativos_carga", "os_criar",
+                  "os_estado", "os_solicitacoes", "perf_alvos", "catalogos_rpc", "os_juntar", "os_tempo")
+
+
+@pytest.mark.parametrize("modulo", MOVIDOS_DO_API)
+def test_o_codigo_que_saiu_do_api_segue_rotulado_como_o_fracttal_do_os_creator(modulo):
+    arquivo = "nexus/torres/oscreator/os_creator/%s.py" % modulo
+    assert (Path(RAIZ) / arquivo).is_file()                       # o módulo mudou de nome? o teste acusa
+    espera = [_quadro(RAIZ + arquivo, "funcao", "for f in as_completed(futs):"),
+              _quadro("/usr/lib/python3.12/concurrent/futures/_base.py", "as_completed"),
+              _quadro("/usr/lib/python3.12/threading.py", "wait")]
+    assert presos.rotulo(espera) == {"quem": "Fracttal (OS Creator)", "como": "esperando outra thread",
+                                     "onde": arquivo + ":10 funcao"}
+
+
+def test_o_dash_os_e_o_resto_da_pasta_seguem_como_os_creator():
+    espera = [_quadro(RAIZ + "nexus/torres/oscreator/os_creator/dash_os.py", "fetch_os_sugeridas", "r = requests.get(url)"),
+              _quadro("/usr/lib/python3.12/ssl.py", "recv_into")]
+    assert presos.rotulo(espera)["quem"] == "OS Creator"
+    web = [_quadro(RAIZ + "nexus/torres/oscreator/os_creator/os_web/rotas.py", "historico", "x = lista()")]
+    assert presos.rotulo(web)["quem"] == "OS Creator"
+
+
+def test_o_gancho_do_contador_de_pedidos_nao_rouba_o_rotulo():
+    # O contador de pedidos ao Fracttal embrulha o `Session.send`: o `contado` de casca/fracttal_conta.py fica ENTRE quem
+    # pede e o requests. Sendo arquivo nosso, virava a "linha nossa mais de dentro" de todo pedido esperando o Fracttal, e o
+    # log dos presos e o Raio-X diziam "nexus/casca/fracttal_conta.py:contado" em vez de "Fracttal (Campo)" ou
+    # "Fracttal (OS Creator)". O quadro do gancho leva o arquivo de verdade, para o teste seguir se ele mudar de lugar.
+    venv = "/opt/nexus/.venv/lib/python3.12/site-packages/"
+    gancho = _quadro(fracttal_conta.__file__, "contado", "resposta = enviar(self, request, **kwargs)")
+    por_dentro = [_quadro(venv + "requests/sessions.py", "send"), _quadro(venv + "requests/adapters.py", "send"),
+                  _quadro("/usr/lib/python3.12/ssl.py", "recv_into")]
+
+    def pilha_de(quem_pede, chamada):
+        return [_quadro(venv + "waitress/task.py", "service"), quem_pede, _quadro(venv + "requests/api.py", chamada),
+                _quadro(venv + "requests/sessions.py", "request"), gancho, *por_dentro]
+
+    campo = _quadro(RAIZ + "nexus/campo/fracttal.py", "ler", "r = requests.get(url, headers=h, timeout=30)")
+    assert presos.rotulo(pilha_de(campo, "get")) == {
+        "quem": "Fracttal (Campo)", "como": "esperando a rede", "onde": "nexus/campo/fracttal.py:10 ler"}
+    os_creator = _quadro(RAIZ + "nexus/torres/oscreator/os_creator/api.py", "_rpc_chamar",
+                         "r = requests.post(RPC_PROXY_URL, headers=_rpc_headers(), json=body, timeout=timeout)")
+    assert presos.rotulo(pilha_de(os_creator, "post")) == {
+        "quem": "Fracttal (OS Creator)", "como": "esperando a rede",
+        "onde": "nexus/torres/oscreator/os_creator/api.py:10 _rpc_chamar"}
 
 
 # ── a ronda e o episódio ────────────────────────────────────────────────────────────────────────────────────────────

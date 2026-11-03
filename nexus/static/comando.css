@@ -1,0 +1,80 @@
+/* Comando → Insights e Caixa de entrada (03/11/2026). Uma lista numa superfície só, uma linha por insight que abre ao
+   clicar. Sem faixa nem borda colorida (Levi: "não sou muito fã dessa barra lateral em vermelho, temos muito dela"): a
+   gravidade é um selo pequeno, com ponto e palavra; a cor fica no selo e nas áreas avisadas, não na linha. */
+.ins-lista{list-style:none;margin:10px 0 0;padding:0;max-width:1160px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio-md);overflow:hidden}
+.ins-item + .ins-item{border-top:1px solid var(--linha)}
+.ins-item.ins-concluido{opacity:.65}
+.ins-dobra > summary{list-style:none;cursor:pointer}
+.ins-dobra > summary::-webkit-details-marker{display:none}
+.ins-linha{display:grid;grid-template-columns:96px minmax(0,1fr) minmax(0,auto) 18px;gap:14px;align-items:center;padding:12px 16px}
+.ins-linha:hover{background:var(--superficie-2)}
+.ins-dobra[open] > .ins-linha{background:var(--superficie-2)}
+.ins-linha:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+
+/* o selo da gravidade: ponto + palavra */
+.ins-sev{display:inline-flex;align-items:center;gap:6px;font:600 12px/1 var(--font-sans);color:var(--tinta-2);white-space:nowrap}
+.ins-sev::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--mudo);flex:none}
+.ins-sev--critico::before{background:var(--critico)}
+.ins-sev--critico{color:var(--critico)}
+.ins-sev--alerta::before{background:var(--alerta)}
+.ins-sev--info::before{background:var(--info)}
+
+.ins-o-que{display:grid;gap:2px;min-width:0}
+.ins-titulo{font-weight:600;color:var(--tinta);font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.ins-meta{font-size:12px;color:var(--mudo)}
+.ins-com-quem{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;max-width:360px}
+.ins-area{display:inline-flex;align-items:center;gap:6px;font:600 11.5px/1 var(--font-sans);color:var(--tinta-2);
+  padding:5px 8px;border-radius:999px;background:var(--superficie-2);border:1px solid var(--linha-forte);white-space:nowrap}
+.ins-area em{font-style:normal;font-weight:500;color:var(--mudo)}
+.ins-area--pendente em{color:var(--alerta)}
+.ins-area--resolvido em{color:var(--ok)}
+.ins-area--andamento em,.ins-area--recebido em{color:var(--info)}
+.ins-dono{font-size:12px;color:var(--tinta-2);white-space:nowrap}
+.ins-dono--livre{color:var(--mudo)}
+.ins-seta{width:8px;height:8px;border-right:2px solid var(--mudo);border-bottom:2px solid var(--mudo);transform:rotate(45deg);justify-self:center}
+.ins-dobra[open] .ins-seta{transform:rotate(-135deg)}
+
+/* aberto: o que a regra viu e o que fazer | as áreas e os retornos */
+.ins-corpo{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px 28px;padding:4px 16px 16px 126px}
+.ins-rot{margin:12px 0 4px;font:700 11px/14px var(--font-sans);letter-spacing:.04em;text-transform:uppercase;color:var(--mudo)}
+.ins-evid{margin:0;padding-left:18px;color:var(--tinta-2);font-size:13px;line-height:1.5}
+.ins-acao{margin:0;color:var(--tinta);font-size:13.5px;line-height:1.5}
+.ins-nota{margin:8px 0 0;font-size:12.5px}
+.ins-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px}
+.ins-acoes form,.ins-notificar{display:flex;gap:8px;margin:0}
+.ins-notificar{margin-top:12px}
+.ins-retornos{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.ins-retornos > li{background:var(--superficie-2);border:1px solid var(--linha);border-radius:var(--raio-md);padding:10px 12px}
+.ins-ret-cab{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ins-ret-sub{margin:4px 0 0;font-size:12px}
+.ins-ret-txt{margin:6px 0 0;font-size:13px;color:var(--tinta);line-height:1.45}
+.ins-responder{margin-top:10px;display:grid;gap:6px}
+.ins-resp-linha{display:flex;flex-wrap:wrap;gap:8px}
+.ins-resp-linha select{flex:0 0 150px}
+.ins-resp-linha input{flex:1 1 180px;min-width:0}
+.ins-outras{margin-top:10px}
+.ins-outras > summary{cursor:pointer;font-size:13px;color:var(--verde-texto)}
+.ins-outras form{display:grid;gap:8px;margin-top:8px}
+.ins-chk{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--tinta-2)}
+.ins-chk label{display:inline-flex;align-items:center;gap:6px}
+.ins-chk--ja{opacity:.5}
+
+.ins-sub{display:flex;align-items:center;gap:8px;margin:26px 0 0;font:700 13px/18px var(--font-sans);letter-spacing:.04em;
+  text-transform:uppercase;color:var(--mudo)}
+.ins-sub-n{font:600 12px/1 var(--font-sans);letter-spacing:0;color:var(--tinta-2);background:var(--superficie-2);
+  border:1px solid var(--linha);border-radius:999px;padding:3px 8px}
+.ins-check{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--tinta-2)}
+.ins-limpar{font-size:13px;color:var(--verde-texto)}
+.ins-ok{background:var(--ok-suave);border-color:var(--ok)}
+.cn-tab td.ins-esq,.cn-tab th.ins-esq{text-align:left}
+.cn-tab td.ins-esq .det{display:block}
+.ins-fora{margin-top:10px;font-size:12.5px}
+@media (max-width:900px){
+  .ins-linha{grid-template-columns:minmax(0,1fr) 18px;gap:6px 10px}
+  .ins-sev{grid-column:1}
+  .ins-o-que{grid-column:1}
+  .ins-com-quem{grid-column:1;justify-content:flex-start;max-width:none}
+  .ins-seta{grid-column:2;grid-row:1}
+  .ins-corpo{grid-template-columns:minmax(0,1fr);padding:4px 16px 16px}
+}

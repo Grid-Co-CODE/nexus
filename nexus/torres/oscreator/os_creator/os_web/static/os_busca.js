@@ -25,6 +25,15 @@
 //  - a lista de marcar (Cliente, Usina, Tipo... do Histórico) esconde o que não casa por CLASSE (osm-fora), nunca por
 //    [hidden]: o hidden é a cascata cliente → usina do Histórico, e o que está marcado continua valendo no filtro mesmo
 //    fora da busca.
+//
+// Levi, 03/11/2026 ("quero que todas as opções do filtro sejam digitáveis"): o painel de filtros do Histórico (modelo A) usa a
+// MESMA lista com a caixa de busca no topo para os campos de UM valor só (Criado por, Etiqueta). Esses campos são um <details
+// class="os-multi fl-uni"> com um botão de escolha (<input type="radio">) por linha, que a tela monta ao lado do <select> de
+// verdade (escondido, e é ele que o formulário manda). Daí:
+//  - o Enter da lista também escolhe um botão de escolha (antes só marcava caixa), e quem ouve é o `click` dele;
+//  - o <select> que mora num [data-campo-proprio] não vira o combobox de cima: o campo que a pessoa vê é o da tela;
+//  - o nome do campo para o leitor de tela também vem do .fl-cel / .fl-rot do painel;
+//  - dentro de um [data-esc-fecha] (o painel) o Esc fecha a lista de uma vez, sem passar antes por limpar o texto digitado.
 (function () {
   'use strict';
   const MIN_OPC = 6;              // abaixo disso o nativo já resolve, e a caixa extra só atrapalha
@@ -48,8 +57,8 @@
   // o nome do campo para quem usa leitor de tela: o aria-label, ou o rótulo visível ao lado
   function rotuloDe(el) {
     if (el.getAttribute('aria-label')) return el.getAttribute('aria-label');
-    const caixa = el.closest('label, .os-campo, .os-cell, .hf-cel, .fcampo');
-    const r = caixa && caixa.querySelector('.os-lbl, .hf-lbl, .flbl');
+    const caixa = el.closest('label, .os-campo, .os-cell, .hf-cel, .fcampo, .fl-cel');
+    const r = caixa && caixa.querySelector('.os-lbl, .hf-lbl, .flbl, .fl-rot');
     if (!r) return '';
     const c = r.cloneNode(true);                         // só o nome: sem o "*", a dica "(digite…)" e o botão ↻
     c.querySelectorAll('small, button, i').forEach((x) => x.remove());
@@ -328,12 +337,14 @@
       } else if (e.key === 'Enter') {
         e.preventDefault();                              // o Enter marca/desmarca e nunca envia o formulário
         const l = visiveis()[marcado];
-        const c = l && l.querySelector('input[type=checkbox]');
-        if (c) c.click();                                // o click dispara o change que a tela escuta
+        const c = l && l.querySelector('input[type=checkbox], input[type=radio]');
+        if (c) c.click();                                // o click dispara o change (caixa) e o click (escolha) que a tela escuta
       } else if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
-        if (inp.value) { inp.value = ''; filtrar(); }
+        // o 1º Esc limpa o que foi digitado e o 2º fecha; num contêiner [data-esc-fecha] (o painel de filtros do Histórico, Levi,
+        // 03/11/2026: "Esc fecha só a lista") um Esc só fecha a lista, e o texto sai com ela (o `toggle` abaixo o limpa)
+        if (inp.value && !det.closest('[data-esc-fecha]')) { inp.value = ''; filtrar(); }
         else { det.open = false; const s = det.querySelector('summary'); if (s) s.focus(); }
       }
     });
@@ -349,7 +360,8 @@
     });
   }
 
-  const querSelect = (s) => s.dataset.busca === '1' || s.options.length >= MIN_OPC;
+  // o <select> de um campo que a tela desenha (Criado por e Etiqueta do Histórico) fica escondido guardando o valor: sem o combobox
+  const querSelect = (s) => !s.closest('[data-campo-proprio]') && (s.dataset.busca === '1' || s.options.length >= MIN_OPC);
   const querMulti = (d) => d.dataset.busca === '1' || d.querySelectorAll('.os-multi-lista label').length >= MIN_OPC;
 
   function aplicar(raiz) {

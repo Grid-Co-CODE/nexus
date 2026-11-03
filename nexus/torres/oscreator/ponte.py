@@ -12,7 +12,8 @@ uma aba dentro de outra casca) e o login dele fugia da moldura e tomava a janela
 `window.top` por `window.__osTopo()`: a janela mais alta que ainda é do OS Creator. Fora do Nexus ela é o próprio
 `window.top`, então o comportamento no supervisório é o mesmo.
 
-O clone fica IDÊNTICO ao do oem (sincronizar = copiar de novo): todo ajuste é feito aqui, na resposta.
+Os ajustes do Nexus são feitos aqui, na resposta, e não nos arquivos do clone: até 31/10/2026 o clone era mantido idêntico
+ao do oem (o app de mesa, hoje congelado), e o desenho ficou como estava.
 """
 import hashlib
 import hmac
@@ -56,9 +57,8 @@ DESTINOS = {
 _VOLTAR_DE = (b'<a class="os-topo-voltar" href="/" title="Voltar para a Plataforma de Performance">'
               b'&larr; Plataforma</a>')
 # Tickets de performance saiu do Nexus (Levi, 12/10/2026: "pode excluir essa seção e o código dela!" e "Isso você não
-# levará para o oem"): a tela foi apagada da cópia (a sincronia só lista o apagado, não apaga no oem), e os links que o
-# código do oem ainda desenha para ela (o card "Tickets" da Performance e a pílula no card do setor, no Início) saem
-# aqui, na resposta, para a cópia continuar igual à do oem.
+# levará para o oem"): a tela foi apagada da cópia, e os links que os arquivos do clone ainda desenham para ela (o card
+# "Tickets" da Performance e a pílula no card do setor, no Início) saem aqui, na resposta.
 # Garantias sem o "← Chamados" no Nexus (Levi, 28/10/2026: "Em garantias tire esse botão de voltar para chamados"): o
 # Nexus chega ao quadro pelo menu (Chamados > Garantias); no oem, sozinho, a volta ao card de Chamados fica. Só o voltar
 # do quadro (para /os/chamados); o "← Acompanhamento" da tela de um chamado fica.
@@ -92,7 +92,7 @@ _ESTILO_NEXUS = (b'<style>.os-n2--nexus{font-size:13px;line-height:1;align-self:
 # OS só aparece a notificação de criação!"): a plataforma abre a tela de criação com ?janela=1 num iframe que cobre a tela.
 # Aqui ela sai sem o topo (a marca os-no-nexus) e avisa a página de baixo quando o POST da criação responde ok
 # (`{gc: "os-criada", mensagem, detalhes}`), para a janela fechar e a notificação aparecer. O código do OS Creator não
-# muda (a cópia segue igual à do oem): quem embrulha o fetch é esta resposta.
+# muda: quem embrulha o fetch é esta resposta.
 _JANELA_OS = (rb'<script>document.documentElement.classList.add("os-no-nexus","os-janela");'
               rb'(function(){var f=window.fetch;if(!f)return;window.fetch=function(u,o){var p=f.apply(this,arguments);'
               rb'try{if(/\/os\/api\/[a-z_-]+\/criar(\?|$)/.test(String(u))&&o&&String(o.method||"").toUpperCase()==="POST"){'
@@ -142,8 +142,8 @@ _TROCAS_ABAS = [(b"if (window.parent === window) casca();", b"if (window.__osTop
 # Tema claro (Levi, 09/10/2026: "faltou o tema claro do OS Creator Web, não está sincronizando com o botão do Nexus"). O
 # clone não lê o cookie do Nexus: quem decide é a ponte, pelo mesmo casca.tema_do_pedido das páginas do Nexus.
 # - No claro, o <html> da página já sai com data-tema="claro": o servidor desenha, e a página nasce clara, sem piscar o navy.
-#   As cores moram no próprio clone (o par :where(html[data-tema="claro"]) no fim de cada .css do os_web/static), que
-#   vão ao oem junto: lá ninguém põe o atributo e nada muda.
+#   As cores moram no próprio clone (o par :where(html[data-tema="claro"]) no fim de cada .css do os_web/static); sem o
+#   atributo (a página aberta sozinha, como no oem) nada muda.
 # - No escuro (o padrão, cookie ausente ou desconhecido) o atributo NÃO entra: o HTML do escuro é o de sempre.
 # - Em toda página, o oscreator/_tema_os.html (o _tema_cabeca.html do Nexus) refaz a conta antes de pintar e ouve a troca
 #   feita em outra aba. A troca na mesma aba chega pelo botão do Nexus (base.html), moldura por moldura.
@@ -170,8 +170,8 @@ def _trocar(corpo: bytes, de: bytes, para: bytes) -> bytes:
 # ── o prefixo do Nexus no OS Creator embutido (09/10/2026, porta única) ───────────────────────────────────────────
 # Levi: "a partir de segunda quero o Nexus como link principal". No servidor o Nexus mora em /nexus (NEXUS_PREFIXO), e o
 # clone escreve /os/... na raiz em ~220 lugares (templates, .js e o JSON das rotas): seguidos ao pé da letra, eles levavam
-# à PLATAFORMA (que tem o próprio /os/). O clone fica IDÊNTICO ao do oem (ele roda sozinho na raiz, no 5090); quem põe o
-# prefixo é a ponte, na resposta, como já fazia com o resto:
+# à PLATAFORMA (que tem o próprio /os/). O clone escreve /os na raiz (ele roda sozinho na raiz, no 5090 do oem); quem põe
+# o prefixo é a ponte, na resposta, como já fazia com o resto:
 # - HTML, JavaScript e JSON: "/os, '/os, `/os e (/os ganham o prefixo (um caminho do clone começa sempre logo depois de
 #   aspas ou parêntese). Fica de fora o value="/os/...": é o `next` do formulário de login, que o clone só aceita sem o
 #   prefixo (`_destino_local`). O `next=/os/...` dentro de um endereço também fica (vem depois de "=").
@@ -238,6 +238,94 @@ def token_do_banco_para_o_clone(config, ambiente=None) -> bool:
     return True
 
 
+def ligar_catalogo_de_ativos(app) -> None:
+    """Diz ao catálogo de ativos central (`os_creator/ativos_central.py`, 31/10/2026, etapa 2 do canto central) onde mora a
+    cópia dele em disco e de onde ler a foto do banco. O catálogo é UM por processo, para todas as telas; ele nasce, sem
+    perguntar ao Fracttal, da cópia em disco (`<pasta de dados do clone>/oscreator/ativos.json.gz`), do `assets_cache.json`
+    antigo (migrado uma vez, ao lado da cópia nova) ou da foto dos ativos no banco, nesta ordem (`ativos_banco`).
+
+    Nos testes o disco não: a pasta de dados do clone é a do usuário da máquina (%APPDATA%), e um teste não lê nem grava
+    nela (o catálogo vive só na memória)."""
+    if RAIZ_CLONE not in sys.path:
+        sys.path.append(RAIZ_CLONE)
+    import api
+    import ativos_central
+    from . import ativos_banco
+    if not app.config.get("TESTING"):
+        ativos_central.configurar(os.path.join(api._data_dir(), "oscreator"), legado=api.ASSETS_CACHE_LEGADO)
+    ativos_central.ligar_fonte_do_banco(ativos_banco.leitor(app))
+
+
+def ligar_lista_de_os(app) -> None:
+    """Diz à lista central de OS (`os_creator/os_central.py`, 31/10/2026, etapa 3 do canto central) onde mora a cópia dela em
+    disco (`<pasta de dados do clone>/oscreator/os_central.json.gz`, ao lado da dos ativos). A lista é UMA por processo e nasce
+    da cópia, sem perguntar ao Fracttal. Nas duas máquinas: no PC ela guarda o que as ações do OS Creator mudaram; o leitor em
+    faixas só liga no servidor. Nos testes o disco não (a pasta é a do usuário da máquina): a lista vive só na memória."""
+    if RAIZ_CLONE not in sys.path:
+        sys.path.append(RAIZ_CLONE)
+    import api
+    import os_central
+    if not app.config.get("TESTING"):
+        os_central.configurar(os.path.join(api._data_dir(), "oscreator"))
+
+
+def chave_dos_catalogos(app) -> bytes:
+    """A chave do HMAC do e-mail no catálogo de pessoas do OS Creator (`os_creator/catalogos.py`), derivada da do Nexus como
+    a do cookie do clone (`_segredo`), mas para outro uso: o pessoal vai ao disco sem o e-mail, e a pessoa logada é achada pelo
+    HMAC dele. Trocar a NEXUS_SECRET_KEY só faz a cópia de antes ser ignorada e o pessoal ser relido uma vez."""
+    return hmac.new(str(app.config["SECRET_KEY"]).encode(), b"nexus/oscreator/catalogos/email", hashlib.sha256).digest()
+
+
+def ligar_catalogos(app) -> None:
+    """Diz aos catálogos pequenos do OS Creator (`os_creator/catalogos.py`, 31/10/2026, etapa 4 do canto central: as pessoas,
+    as etiquetas, os tipos, as falhas, os status, os motivos e os planos da Performance) onde mora a cópia em disco deles
+    (`<pasta de dados do clone>/oscreator/catalogos/`) e a chave do e-mail, e os aquece por trás (só o disco, nunca o
+    Fracttal). Nas duas máquinas; o laço das pessoas pelo REST só o `servir.py` liga (`catalogos_leitor.ligar`). Nos testes o disco
+    não (a pasta é a do usuário da máquina): os catálogos vivem só na memória."""
+    if RAIZ_CLONE not in sys.path:
+        sys.path.append(RAIZ_CLONE)
+    import api
+    import catalogos
+    if not app.config.get("TESTING"):
+        catalogos.configurar(os.path.join(api._data_dir(), "oscreator", "catalogos"), chave=chave_dos_catalogos(app))
+        catalogos.aquecer()
+
+
+def modulo_do_clone(nome: str):
+    """Um módulo do OS Creator pelo nome com que o clone o importa (`api`, `ativos_central`, `ativos_leitor`, `os_leitor`,
+    `catalogos`, `catalogos_leitor`), com a pasta do clone no `sys.path`. É o MESMO módulo que as telas usam: importado por outro caminho (como
+    pacote do Nexus) ele seria uma segunda cópia, com um segundo catálogo (ou uma segunda lista de OS) na memória. Quem usa é o
+    `servir.py`, para ligar os leitores do canto central ao subir."""
+    if RAIZ_CLONE not in sys.path:
+        sys.path.append(RAIZ_CLONE)
+    import importlib
+    return importlib.import_module(nome)
+
+
+# Os leitores do canto central que o servidor liga ao subir (`servir.py`): os ativos, a lista de OS e os catálogos pequenos.
+LEITORES_DO_CLONE = ("ativos_leitor", "os_leitor", "catalogos_leitor")
+FALHOS = "nexus_leitores_do_clone_falhos"      # app.extensions: {nome do leitor: o erro curto}, para o Raio-X dizer que não ligou
+
+
+def ligar_leitor_do_clone(app, nome: str) -> bool:
+    """Liga o leitor `nome` do OS Creator (um de `LEITORES_DO_CLONE`) neste app. Quem chama é o `servir.py`, ao subir.
+
+    Importar o leitor é importar o clone (o `ativos_central`, a `os_central`, o `catalogos`, o `api`...), e isso agora acontece NA
+    SUBIDA do Nexus: antes (até a revisão final de 31/10/2026) o clone só carregava no 1º pedido ao /os/, dentro de um `try`
+    (`clone`), e um clone quebrado deixava o Nexus no ar, com o OS Creator fora. Um erro de import ou do `ligar` aqui derrubaria o
+    Nexus inteiro, e o `Restart=always` o deixaria caindo em laço. Por isso o erro vai ao log com a pilha, o Nexus sobe sem o
+    leitor (as telas leem ao vivo), e o Raio-X diz que ele não ligou (`FALHOS`). O portão do deploy (`deploy/conferir_boot.py`)
+    importa os mesmos módulos antes do restart e pega o clone quebrado de antemão. True se ligou."""
+    try:
+        modulo_do_clone(nome).ligar(app)
+        app.extensions.get(FALHOS, {}).pop(nome, None)
+        return True
+    except Exception as e:                  # noqa: BLE001 — SyntaxError, ImportError, o que o ligar levantar: o Nexus sobe
+        logging.exception("OS Creator: o leitor %s não ligou; o Nexus sobe sem ele e as telas leem ao vivo", nome)
+        app.extensions.setdefault(FALHOS, {})[nome] = "%s: %s" % (type(e).__name__, str(e)[:200])
+        return False
+
+
 def _criar_clone(app):
     # append, não insert: o que já está instalado continua vencendo; os nomes do clone (api, steps, tickets_*...)
     # não existem no Nexus nem na biblioteca padrão
@@ -249,6 +337,18 @@ def _criar_clone(app):
     from os_web import criar_app
 
     clone = criar_app(segredo=_segredo(app))
+    try:
+        ligar_catalogo_de_ativos(app)
+    except Exception:            # noqa: BLE001 — sem ligar, o catálogo vive só na memória e nasce do Fracttal, como antes
+        logging.exception("OS Creator: o catálogo de ativos não foi ligado à pasta de dados nem ao banco")
+    try:
+        ligar_lista_de_os(app)
+    except Exception:            # noqa: BLE001 — sem ligar, a lista de OS vive só na memória (as telas vão ao vivo)
+        logging.exception("OS Creator: a lista central de OS não foi ligada à pasta de dados")
+    try:
+        ligar_catalogos(app)
+    except Exception:            # noqa: BLE001 — sem ligar, os catálogos vivem só na memória (o reinício relê do Fracttal)
+        logging.exception("OS Creator: os catálogos pequenos não foram ligados à pasta de dados")
     # o Responsável UFV dos chamados de Garantias, pelo cadastro do Nexus (28/10/2026; nexus/torres/chamados/ufv.py)
     from os_web import rotas_acomp
 
@@ -269,7 +369,8 @@ class _SessaoDoClone(SecureCookieSessionInterface):
 
 def clone(app):
     """O app do clone, criado na primeira vez que alguém abre /os/ (e não na subida do Nexus): quem não usa o
-    OS Creator não paga o import dele, e um clone quebrado não impede o Nexus de subir."""
+    OS Creator não paga o app dele, e um clone quebrado não impede o Nexus de subir. Os MÓDULOS do clone o `servir.py` já
+    importa na subida, ao ligar os leitores do canto central, cada um num try (`ligar_leitor_do_clone`)."""
     ext = app.extensions
     if "os_web_clone" not in ext:
         with _trava:
@@ -386,6 +487,48 @@ def _do_setor_ou_admin(setor_alvo: str, nome: str, regra: str, onde_log: str) ->
                                                          "(Base → Acessos → Pessoas e setores)." % nome}
 
 
+# ── a lista central de OS só para quem o Levi liberou (Ruling BX, rodada 4 da 3.3) ─────────────────────────────────────
+# As telas do OS Creator que leem da lista central de OS do servidor (o Histórico e as visões dele, o Garantias, o Investigar
+# ativo, a marcação verde dos Ativos, a 1ª pintura do card e o nº → id: `os_web/lista_central.py`) só a leem para quem foi
+# LIBERADO: o administrador do Nexus, sempre, e quem é de um setor desta lista (o nome do setor de Base → Acessos → Pessoas e
+# setores, sem acento nem caixa). Os outros seguem pelo caminho de hoje, com a sessão deles no Fracttal. Por quê: a lista é
+# lida pela credencial da empresa e vê TODAS as OS, e provar por contagem que a pessoa vê o mesmo que ela teve buracos raros a
+# cada rodada de sonda (as rodadas 1 a 3 da 3.3); a contagem fica como 2ª barreira, e a 1ª é uma decisão de governança.
+# A lista muda por COMMIT (a trilha fica no git), e não por Base → Acessos: lá cada item é uma tela do menu (abre uma página,
+# conta no "vê N de M telas", entra no "Marcar tudo" e no "Copiar de", e a tela "por dentro" libera a de fora), e uma
+# liberação que não é tela não cabe nele de forma limpa. Nasceu vazia (só os administradores) e, em 03/11/2026, o Levi liberou
+# todos ("Todos os setores veem todas as OSs" no Fracttal): `TODOS_OS_SETORES` vale para quem tem QUALQUER setor no Nexus. A
+# pessoa sem setor, o setor que não deu para ler e o Nexus sem a NEXUS_PESSOA_HMAC seguem fechados: sem saber quem é, não libera.
+# Para voltar a liberar só alguns, troque o "*" pelos nomes dos setores.
+LISTA_CENTRAL = "os_web.lista_central"
+TODOS_OS_SETORES = "*"
+SETORES_COM_LISTA_CENTRAL: frozenset = frozenset({TODOS_OS_SETORES})
+
+
+def lista_central() -> bool:
+    """A pessoa do pedido pode ler a lista central de OS (ver acima): o administrador do Nexus, sem ler o setor; quem é de um
+    setor de `SETORES_COM_LISTA_CENTRAL` (com o `TODOS_OS_SETORES`, qualquer setor). Sem saber o setor (o Nexus sem a
+    NEXUS_PESSOA_HMAC, o banco que não respondeu, a pessoa sem setor): não. É a marca que vai no pedido ao clone
+    (`encaminhar`); sem ela, o clone fecha."""
+    if session.get("admin"):
+        return True
+    if not SETORES_COM_LISTA_CENTRAL or not current_app.config.get("NEXUS_PESSOA_HMAC"):
+        return False
+    from ...auth import setor_telas
+    u = session.get("usuario")
+    email = str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
+    try:
+        setor = setor_telas.setor_da_pessoa(current_app.config, email, *setor_telas._banco())
+    except Exception as ex:      # noqa: BLE001 — sem saber o setor, fecha: a pessoa segue pelo caminho de hoje
+        logging.warning("OS Creator: não consegui ler o setor para a lista central de OS (%s)", type(ex).__name__)
+        return False
+    if not setor:
+        return False
+    if TODOS_OS_SETORES in SETORES_COM_LISTA_CENTRAL:
+        return True
+    return _sem_acento(setor.get("nome")) in {_sem_acento(s) for s in SETORES_COM_LISTA_CENTRAL}
+
+
 @bp_raiz.route("/os/", defaults={"resto": ""}, methods=_METODOS)
 @bp_raiz.route("/os/<path:resto>", methods=_METODOS)
 def encaminhar(resto: str):
@@ -398,6 +541,8 @@ def encaminhar(resto: str):
     # cópia do environ: o clone monta o request dele sem mexer no do Nexus. O SCRIPT_NAME vai junto: debaixo do prefixo,
     # o url_for do clone já sai com ele, e o cookie dele fica no /os do Nexus (_SessaoDoClone)
     environ = dict(request.environ)
+    if not resto.startswith("static/"):         # o arquivo estático não lê a lista (e a marca lê o setor no banco, por pedido)
+        environ[LISTA_CENTRAL] = lista_central()    # quem lê a lista central de OS (ver `lista_central`): sem a marca, fecha
     if resto.startswith(("solicitacao", "api/solic")):
         environ[AREA_PCM] = area_pcm()          # a Área PCM é do setor PCM ou do administrador (ver `area_pcm`)
     if _ROTA_OBS.fullmatch(resto):              # só a tela de um chamado e o editar/excluir: o quadro não lê o setor

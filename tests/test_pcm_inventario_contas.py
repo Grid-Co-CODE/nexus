@@ -18,7 +18,7 @@ ALMOX = "900"
 
 
 def _linha(id_linha, id_item="", contado="", tipo="item", **mais):
-    """Uma linha do livro das contagens do jeito que a API a devolve: as 14 colunas, tudo como texto."""
+    """Uma linha do livro das contagens do jeito que a API a devolve: as 19 colunas, tudo como texto."""
     l = dict.fromkeys(COLUNAS_CONTAGENS, "")
     l.update({"ID da contagem": "C-1", "Enviada em": "2026-10-26T10:00:00Z", "Contada em": "2026-10-26T09:00:00Z",
               "ID do almoxarifado": ALMOX, "Usina": "Cliente Teste - Usina Alfa - BA", "Tipo": tipo,
@@ -443,6 +443,217 @@ def test_contada_em_ilegivel_e_a_mais_velha():
     ruim, boa = _contagem("ruim", "ontem de manhã"), _contagem("boa", "2026-10-24T09:00:00Z")
     assert C.substituidas([ruim, boa], set()) == {"ruim"}
     assert C.substituidas([ruim], set()) == set()
+
+
+# ── a recontagem só das peças marcadas (item 4 das melhorias de 30/10/2026) ──────────────────────────────────────────────
+def _recontagem(cid, contada_em, de, almox=ALMOX):
+    """A contagem que o App manda quando o PCM pede a recontagem de algumas peças: o "Recontagem de" é o ID da contagem em que
+    o pedido foi feito."""
+    return dict(_contagem(cid, contada_em, almox), recontagem_de=de)
+
+
+def test_recontagem_nao_substitui_a_original():
+    """A original (10:00) espera o PCM, que pediu a recontagem de duas peças; a recontagem chega (12:00) só com elas. Pela
+    regra de antes ela seria "a mais nova" e substituiria a original inteira, e as outras peças perderiam a contagem (o
+    desenho chama isso de falha mesmo funcionando). As duas ficam vivas, em qualquer ordem da lista."""
+    original = _contagem("original", "2026-10-26T10:00:00Z")
+    rec = _recontagem("rec", "2026-10-26T12:00:00Z", "original")
+    assert C.substituidas([original, rec], set()) == set()
+    assert C.substituidas([rec, original], set()) == set()
+
+
+def test_original_mais_velha_nao_substitui_a_recontagem():
+    """A recontagem fica fora da escolha da nova: a original, mais velha, não a substitui, a recontagem da recontagem (a R2
+    aponta para a R1) também não, e a inteira mais nova segue substituindo as inteiras velhas como sempre. Gravada a
+    original, a recontagem continua viva."""
+    antiga = _contagem("antiga", "2026-10-25T09:00:00Z")
+    original = _contagem("original", "2026-10-26T10:00:00Z")
+    rec = _recontagem("rec", "2026-10-26T12:00:00Z", "original")
+    rec2 = _recontagem("rec2", "2026-10-26T15:00:00Z", "rec")
+    todas = [rec2, antiga, rec, original]
+    assert C.substituidas(todas, set()) == {"antiga"}
+    assert C.substituidas(todas, {"original"}) == {"antiga"}
+    assert C.substituidas([rec, rec2], set()) == set()               # só recontagens: nenhuma é "a mais nova"
+
+
+def test_inteira_nova_substitui_a_recontagem():
+    """Uma contagem INTEIRA com "Contada em" depois da recontagem substitui a recontagem (e a original, como sempre). A inteira
+    que veio entre a original e a recontagem substitui a original, mas não a recontagem, contada depois dela; e a inteira de
+    outro almoxarifado não mexe em nada."""
+    original = _contagem("original", "2026-10-26T10:00:00Z")
+    rec = _recontagem("rec", "2026-10-26T12:00:00Z", "original")
+    assert C.substituidas([original, rec, _contagem("nova", "2026-10-26T14:00:00Z")], set()) == {"original", "rec"}
+    assert C.substituidas([original, rec, _contagem("meio", "2026-10-26T11:00:00Z")], set()) == {"original"}
+    assert C.substituidas([original, rec, _contagem("outra", "2026-10-26T14:00:00Z", almox="901")], set()) == set()
+
+
+def test_recontagem_gravada_fica():
+    """A recontagem já gravada (ou gravando) fica como está quando a inteira nova chega: o que está no Fracttal não se desfaz."""
+    original = _contagem("original", "2026-10-26T10:00:00Z")
+    rec = _recontagem("rec", "2026-10-26T12:00:00Z", "original")
+    nova = _contagem("nova", "2026-10-26T14:00:00Z")
+    assert C.substituidas([original, rec, nova], {"rec"}) == {"original"}
+    assert C.substituidas([original, rec, nova], {"rec", "original"}) == set()
+
+
+def test_recontar_tira_do_lote():
+    """A peça com a recontagem pedida sai do lote desta contagem (`recontar`, e `tirada` junto: todo caminho de hoje que deixa
+    a tirada de fora, a gravação inclusive, deixa a recontada de fora) e guarda a situação que teria; as outras seguem."""
+    linhas = [_linha(1, 101, "3"), _linha(2, 9, "8"), _linha(3, 103, ""), _linha(4, tipo="fora_do_catalogo", contado="1")]
+    sis = _sis(s101=5, s9=5, s103=2)
+    itens = C.itens_do_lote(linhas, sis, {}, {"recontar": {"9": "m"}})
+    por = _por_peca(itens)
+    assert (por["9"]["recontar"], por["9"]["tirada"], por["9"]["situacao"]) == (True, True, "para_cima")
+    assert (por["101"]["recontar"], por["101"]["tirada"]) == (False, False)
+    assert por["103"]["recontar"] is False
+    assert all("recontar" in i for i in itens) and por[""]["recontar"] is False          # o achado fora do catálogo também
+    # o que vai ao Fracttal (o filtro da gravação): a 101, que desce de 5 para 3; a 9 ficou de fora
+    assert [i["id_item"] for i in itens if not i["tirada"] and i["situacao"] in C.MEXEM] == ["101"]
+    # o ID com ".0" acha a peça, e a recontada e a tirada podem ser a mesma
+    por = _por_peca(C.itens_do_lote(linhas, sis, {}, {"recontar": {"9.0": ""}, "tiradas": {"9": "x"}}))
+    assert por["9"]["recontar"] and por["9"]["tirada"]
+    for vazia in (None, {}, {"recontar": None}):
+        assert not any(i["recontar"] for i in C.itens_do_lote(linhas, sis, {}, vazia))
+
+
+# ── os avariados (30/10/2026, item 5 das melhorias): a aba Avariados do App, pelo código -AV ─────────────────────────────
+# O catálogo do App com a boa SP-101 e a SP-101-AV (o item 901); a 102 não tem -AV. As linhas chegam às contas já resolvidas
+# pela `leitura.ler` (o `avariados.resolver`), e é assim que os testes as passam.
+CATALOGO_AV = {"101": {"codigo": "SP-101", "nome": "Fusível", "unidade": "unidade"},
+               "901": {"codigo": "SP-101-AV", "nome": "[AVARIADO] Fusível", "unidade": "unidade"},
+               "102": {"codigo": "SP-102", "nome": "Relé", "unidade": "unidade"}}
+
+
+def _resolvidas(*linhas):
+    from nexus.pcm.inventario import avariados
+    return avariados.resolver(list(linhas), CATALOGO_AV)
+
+
+def test_avariado_entra_no_lote_como_peca_av():
+    """A avariada da SP-101 conta para a SP-101-AV como uma peça qualquer da contagem (contagem absoluta; a não ligada ao
+    almoxarifado entra com o sistema 0 e a gravação a liga). A boa fica com a linha dela: avariado nunca tira do bom."""
+    linhas = _resolvidas(_linha(1, 101, "5"), _linha(2, 101, "2", tipo="avariado"))
+    por = _por_peca(C.itens_do_lote(linhas, _sis(s101=6, s901=3), {}, {}))
+    assert (por["101"]["contado"], por["101"]["situacao"]) == (5.0, "para_baixo")
+    av = por["901"]
+    assert (av["codigo"], av["contado"], av["sistema"], av["situacao"], av["ligada"]) == ("SP-101-AV", 2.0, 3, "para_baixo", True)
+    assert (av["dobro"], av["invalido"], av["tirada"]) == (False, False, False)
+    av = _por_peca(C.itens_do_lote(linhas, _sis(s101=6), {}, {}))["901"]
+    assert (av["ligada"], av["sistema"], av["situacao"]) == (False, 0.0, "para_cima")
+    assert all("dobro" in i for i in C.itens_do_lote(linhas, {}, {}, {}))
+    # a avariada sozinha (sem a linha da boa): a boa nem entra no lote
+    assert [i["id_item"] for i in C.itens_do_lote(_resolvidas(_linha(2, 101, "2", tipo="avariado")), {}, {}, {})] == ["901"]
+
+
+def test_avariado_nao_resolvido_vai_a_curadoria():
+    """Sem o -AV no catálogo, a avariada segue o caminho do achado fora do catálogo: pendência sem `id_item` até a decisão
+    da curadoria ("cadastrar" e "é a peça X" levam as unidades à peça da decisão; "descartar" as joga fora). A decisão que não é
+    do tipo da linha não resolve nada. A avariada sem o ID da boa vai pelo Código dela; sem o ID E sem o Código não é de peça
+    nenhuma (a leitura põe o aviso do App na contagem: ela não se aprova)."""
+    linhas = _resolvidas(_linha(1, 102, "4"), _linha(2, 102, "3", tipo="avariado"))
+    itens = C.itens_do_lote(linhas, _sis(s102=4), {}, {})
+    assert [(i["id_item"], i["situacao"], i["pendentes"]) for i in itens] == [("102", "sem_alteracao", []),
+                                                                                ("", "curadoria", ["2"])]
+    for dec in ({"decisao": "cadastrar", "id_item": "777", "codigo": "SP-102-AV"}, {"decisao": "e_a_peca", "id_item": "777"}):
+        por = _por_peca(C.itens_do_lote(linhas, _sis(s102=4), {"2": dec}, {}))
+        assert set(por) == {"102", "777"} and por["777"]["contado"] == 3.0 and por["102"]["contado"] == 4.0
+    assert set(_por_peca(C.itens_do_lote(linhas, {}, {"2": {"decisao": "descartar"}}, {}))) == {"102"}
+    assert _por_peca(C.itens_do_lote(linhas, {}, {"2": {"decisao": "confirmar", "id_item": "777"}}, {}))[""]["pendentes"] == ["2"]
+    for vazio in ("", "None"):
+        sem_nada = _resolvidas(_linha(3, "", "3", tipo="avariado", **{"Código": vazio}))
+        assert C.itens_do_lote(sem_nada, {}, {}, {}) == [] and C.contado_efetivo(sem_nada, {}) == {}
+    so_o_codigo = _resolvidas(_linha(3, "", "3", tipo="avariado", **{"Código": "SP-102"}))
+    assert [(i["id_item"], i["situacao"], i["pendentes"]) for i in C.itens_do_lote(so_o_codigo, {}, {}, {})] == [
+        ("", "curadoria", ["3"])]
+    assert set(_por_peca(C.itens_do_lote(so_o_codigo, {}, {"3": {"decisao": "e_a_peca", "id_item": "777"}}, {}))) == {"777"}
+
+
+def test_avariado_em_dobro_fora_do_lote():
+    """A mesma contagem com a SP-101-AV contada direto (Tipo `item`) E pela aba Avariados: somar contaria duas vezes a mesma
+    peça. A peça fica `dobro`, com `invalido` junto (o caminho do contado inválido de hoje): não contada, fora do N do gravar
+    até o PCM corrigir. A boa não é afetada."""
+    linhas = _resolvidas(_linha(1, 101, "5"), _linha(2, 901, "3"), _linha(3, 101, "2", tipo="avariado"))
+    itens = C.itens_do_lote(linhas, _sis(s101=5, s901=1), {}, {})
+    av = _por_peca(itens)["901"]
+    assert (av["dobro"], av["invalido"], av["contado"], av["contado_campo"], av["situacao"]) == (
+        True, True, None, None, "nao_tocada")
+    assert _por_peca(itens)["101"]["dobro"] is False
+    assert [i["id_item"] for i in itens if i["id_item"] and not i["tirada"] and i["situacao"] in C.MEXEM] == []
+    assert C.contado_efetivo(linhas, {})["901"] is None
+    # a ordem das linhas não importa, e duas linhas da aba (sem a direta) somam, como duas linhas da mesma peça
+    invertidas = _resolvidas(_linha(3, 101, "2", tipo="avariado"), _linha(2, 901, "3"))
+    assert _por_peca(C.itens_do_lote(invertidas, {}, {}, {}))["901"]["dobro"] is True
+    duas_da_aba = _resolvidas(_linha(3, 101, "2", tipo="avariado"), _linha(4, 101, "1", tipo="avariado"))
+    av = _por_peca(C.itens_do_lote(duas_da_aba, {}, {}, {}))["901"]
+    assert (av["dobro"], av["contado"]) == (False, 3.0)
+    # contado em dobro é com número dos dois lados: a direta em branco não conta duas vezes nada
+    uma_em_branco = _resolvidas(_linha(2, 901, ""), _linha(3, 101, "2", tipo="avariado"))
+    av = _por_peca(C.itens_do_lote(uma_em_branco, {}, {}, {}))["901"]
+    assert (av["dobro"], av["contado"]) == (False, 2.0)
+
+
+def test_avariada_decidida_conta_no_dobro():
+    """A avariada já decidida na curadoria ("é a peça Y", ou o "cadastrar" que achou o -AV, que vai ao livro como "é a peça")
+    leva as unidades a Y como a resolvida: com Y também contada direto na mesma contagem, é `dobro` (fora do lote até o PCM
+    corrigir), e não a soma das duas. Com 0 unidades avariadas a decisão não mexe em Y, e não há dobro; o achado fora do
+    catálogo decidido para Y não é avariada (soma, como sempre)."""
+    linhas = _resolvidas(_linha(1, 777, "1"), _linha(2, 102, "3", tipo="avariado"))
+    for dec in ({"decisao": "e_a_peca", "id_item": "777"}, {"decisao": "cadastrar", "id_item": "777", "codigo": "SP-102-AV"}):
+        y = _por_peca(C.itens_do_lote(linhas, {}, {"2": dec}, {}))["777"]
+        assert (y["dobro"], y["invalido"], y["contado"]) == (True, True, None), dec
+    # a avariada resolvida e depois decidida (o -AV entrou no catálogo): a decisão vale, e o dobro também
+    resolvida = _resolvidas(_linha(1, 777, "1"), _linha(2, 101, "2", tipo="avariado"))
+    y = _por_peca(C.itens_do_lote(resolvida, {}, {"2": {"decisao": "e_a_peca", "id_item": "777"}}, {}))["777"]
+    assert (y["dobro"], y["contado"]) == (True, None)
+    zero = _resolvidas(_linha(1, 777, "1"), _linha(2, 102, "0", tipo="avariado"))
+    y = _por_peca(C.itens_do_lote(zero, {}, {"2": {"decisao": "e_a_peca", "id_item": "777"}}, {}))["777"]
+    assert (y["dobro"], y["contado"]) == (False, 1.0)
+    achado = [_linha(1, 777, "1"), _linha(2, "", "3", tipo="fora_do_catalogo")]
+    y = _por_peca(C.itens_do_lote(achado, {}, {"2": {"decisao": "e_a_peca", "id_item": "777"}}, {}))["777"]
+    assert (y["dobro"], y["contado"]) == (False, 4.0)
+
+
+def test_avariada_com_o_id_none():
+    """O ID da boa "None" (o vazio que o `sync-xlsx` escreve) não é peça: com o Código a avariada vai por ele; sem o Código
+    não é de peça nenhuma e não entra (a leitura põe o aviso do App na contagem)."""
+    for vazio in ("None", "nan", "NONE"):
+        sem_nada = _resolvidas(_linha(3, vazio, "3", tipo="avariado", **{"Código": "None"}))
+        assert C.itens_do_lote(sem_nada, {}, {}, {}) == [] and C.contado_efetivo(sem_nada, {}) == {}
+        so_o_codigo = _resolvidas(_linha(3, vazio, "3", tipo="avariado", **{"Código": "SP-102"}))
+        assert [(i["id_item"], i["pendentes"]) for i in C.itens_do_lote(so_o_codigo, {}, {}, {})] == [("", ["3"])]
+        # a linha de peça com o ID "None" também não vira a peça "None"
+        assert C.contado_efetivo([_linha(4, vazio, "2")], {}) == {}
+
+
+def test_dobro_corrigido_entra():
+    """O PCM corrige o número da peça em dobro (o motivo vai à auditoria): ela entra no lote como qualquer outra, com o número
+    dele, e segue marcada `dobro` para a nota dizer de onde veio."""
+    linhas = _resolvidas(_linha(2, 901, "3"), _linha(3, 101, "2", tipo="avariado"))
+    av = _por_peca(C.itens_do_lote(linhas, _sis(s901=1), {}, {"corrigidos": {"901": "2"}}))["901"]
+    assert (av["dobro"], av["corrigido"], av["contado"], av["situacao"]) == (True, True, 2.0, "para_cima")
+    assert av["contado_campo"] is None
+
+
+def test_avariado_em_branco_nao_zera():
+    """A avariada em branco é "não contei": a SP-101-AV com saldo 4 não é zerada; e a sem -AV em branco nem vira pendência."""
+    av = _por_peca(C.itens_do_lote(_resolvidas(_linha(2, 101, "", tipo="avariado")), _sis(s901=4), {}, {}))["901"]
+    assert (av["contado"], av["situacao"]) == (None, "nao_tocada")
+    assert C.itens_do_lote(_resolvidas(_linha(2, 102, "", tipo="avariado")), {}, {}, {}) == []
+    # o 0 digitado na aba é zerar o -AV (contagem absoluta, como a linha da própria peça)
+    av = _por_peca(C.itens_do_lote(_resolvidas(_linha(2, 101, "0", tipo="avariado")), _sis(s901=4), {}, {}))["901"]
+    assert (av["contado"], av["situacao"]) == (0.0, "zerar")
+
+
+def test_a_decisao_da_curadoria_vence_a_resolucao():
+    """A avariada decidida quando o -AV ainda não estava no catálogo do App (descartada, ou levada a uma peça) e que depois
+    passa a se resolver (a varredura do dia seguinte trouxe o -AV, criado por outra contagem): vale a decisão do PCM. Sem isso o
+    "descartar" sumia em silêncio, e as unidades descartadas iam ao Fracttal."""
+    linhas = _resolvidas(_linha(2, 101, "2", tipo="avariado"))
+    assert C.itens_do_lote(linhas, {}, {"2": {"decisao": "descartar"}}, {}) == []
+    por = _por_peca(C.itens_do_lote(linhas, {}, {"2": {"decisao": "e_a_peca", "id_item": "777"}}, {}))
+    assert set(por) == {"777"} and por["777"]["contado"] == 2.0
+    # a decisão de outro tipo (o confirmar é do genérico) não é da avariada: a resolução vale
+    assert set(_por_peca(C.itens_do_lote(linhas, {}, {"2": {"decisao": "confirmar", "id_item": "777"}}, {}))) == {"901"}
 
 
 # ── a janela de aprovação ───────────────────────────────────────────────────────────────────────────────────────────────

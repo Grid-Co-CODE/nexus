@@ -9,7 +9,7 @@ O portão do Nexus vale antes (quem não entrou no Nexus não chega aqui).
 import base64
 import json
 import time
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 
 from flask import Blueprint, current_app, jsonify, redirect, request, session
 
@@ -80,16 +80,25 @@ def _tela(numero, codigo=None) -> str:
     return url if codigo is None else url + "?ativo=" + quote(str(codigo), safe="")
 
 
-def _login(numero, codigo=None) -> str:
+def _card(numero, codigo=None) -> str:
+    """O card de assinar a PT (30/10/2026, o link do e-mail do App), na mesma linha (`codigo`, como em `_tela`)."""
+    url = na_raiz(f"/t/campo/pt/{quote(str(numero), safe='')}/assinar")
+    return url if codigo is None else url + "?ativo=" + quote(str(codigo), safe="")
+
+
+def _login(numero, codigo=None, card=False) -> str:
     """O login do Fracttal do OS Creator, voltando à MESMA linha da PT (`codigo`: o código do ativo dela; "" = a linha
     sem ativo; None = quem pediu não disse a linha). Revisão adversarial de 11/10/2026: com só o número no `next`, a
-    volta abria a 1ª linha com o código DELA no formulário, e o clique seguinte decidia o outro equipamento da PT."""
+    volta abria a 1ª linha com o código DELA no formulário, e o clique seguinte decidia o outro equipamento da PT. Com
+    `card`, a volta cai no card de assinar (30/10/2026: quem veio pelo e-mail, no celular, não sai do card)."""
     # o OS Creator só devolve para /os/...: a volta passa por /os/_nexus/pt/<n>/voltar, com a linha na consulta (o
     # `_destino_local` do clone aceita /os... com consulta). O `next` vai SEM o prefixo (é o caminho que o clone
     # entende); o endereço do login, com ele (é o navegador que o pede)
     volta = f"/os/_nexus/pt/{quote(str(numero), safe='')}/voltar"
     if codigo is not None:
         volta += "?ativo=" + quote(str(codigo), safe="")
+    if card:
+        volta += ("&" if "?" in volta else "?") + "card=1"
     return na_raiz("/os/login") + "?next=" + quote(volta, safe="")
 
 
@@ -148,8 +157,10 @@ def voltar_para():
 
 @bp_assinatura.route("/os/_nexus/pt/<numero>/voltar")
 def voltar(numero):
-    # a linha que foi ao login (o `?ativo=` do `_login`); sem ela, a tela da PT de mais de uma linha só deixa escolher
-    return redirect(_tela(numero, request.args.get("ativo")))
+    # a linha que foi ao login (o `?ativo=` do `_login`); sem ela, a tela da PT de mais de uma linha só deixa escolher.
+    # Do card de assinar (`card=1`), de volta ao card
+    destino = _card if request.args.get("card") == "1" else _tela
+    return redirect(destino(numero, request.args.get("ativo")))
 
 
 def _volta(numero, codigo=None) -> str:
@@ -163,19 +174,29 @@ def _volta(numero, codigo=None) -> str:
             else _tela(numero, codigo))
 
 
+def _de_outro_site() -> bool:
+    """O pedido não veio de uma página do próprio Nexus: a régua da moldura da Performance, a mesma dos POST da Base e
+    dos Acessos (o `Sec-Fetch-Site` que o navegador manda; sem ele, o `Origin`). Até 30/10/2026 a decisão comparava o
+    `Origin` com o `request.host`, e no servidor da T.I. o Nexus não recebe o endereço público no Host: toda decisão
+    pelo navegador levava "Origem recusada." (uma Responsável UFV, no 1º dia do card de assinar pelo e-mail; o mesmo
+    POST com o Origin certo dava 403 em produção)."""
+    from ..moldura import _de_outro_site as regra
+    return regra()
+
+
 @bp_assinatura.route("/os/_nexus/pt/<numero>/decidir", methods=["POST"])
 def decidir(numero):
     # pedido de outro site não decide PT (o cookie Lax já barra; a origem confere de novo, porque é segurança do campo)
-    origem = request.headers.get("Origin")
-    if origem and urlsplit(origem).netloc != request.host:
+    if _de_outro_site():
         return "Origem recusada.", 403
     # a linha da PT que se decide: o código do ativo dela (o formulário de cada linha manda; "" = a linha sem ativo).
     # Sem o campo (formulário de antes de 11/10/2026), só a PT de uma linha se decide (`decisao_pt._linha`)
     codigo = request.form.get("codigo")
     q = quem_assina()
     if not q:
-        # sem o login do Fracttal: vai ao login e volta para a MESMA linha (revisão adversarial de 11/10/2026)
-        return redirect(_login(numero, codigo))
+        # sem o login do Fracttal: vai ao login e volta para a MESMA linha (revisão adversarial de 11/10/2026); o
+        # formulário do card de assinar volta ao card (`card=1`)
+        return redirect(_login(numero, codigo, card=request.form.get("card") == "1"))
     volta, tela = _volta(numero, codigo), _tela(numero, codigo)
     try:
         decisao_pt.decidir(numero, request.form.get("decisao", ""), request.form.get("motivo", ""), q["email"],

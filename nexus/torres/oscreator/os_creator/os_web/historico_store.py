@@ -17,8 +17,14 @@ Aqui:
 - quem decide a CHAVE é quem chama (a rota): a lista de "Todos" pode ser uma só para quem vê o mesmo universo no
   Fracttal (`mesma_visao`, que também serve o quadro do Acompanhamento de chamados); a de cada pessoa ("criadas por
   mim", "atribuídas a mim") segue por pessoa;
+- desde 31/10/2026 (tarefa 3.3 do canto central) este é o CAMINHO DE HOJE: a tela lê primeiro da lista central de OS
+  (`lista_central.py`, com a conferência dela, que não passa por aqui) e só vem para cá quando a lista não cobre o período,
+  não tem um campo que a tela mostra, ou a pessoa não passou. Com a lista central cobrindo o período, a "Todos" não é
+  dividida (a rota usa a chave da pessoa: Ruling BU da rodada 2 da 3.3, a lista de uma restrita herdada por outra);
 - a lista guarda o HTML das linhas por versão (`html_das_linhas`): as 2.000 linhas são montadas uma vez por versão, e
-  não a cada pedido.
+  não a cada pedido;
+- a lista que ninguém lê há `LISTA_VIDA_S` (30 min) sai da memória quando outra é lida (`_varrer`; revisão final de
+  31/10/2026): são uma por pessoa e filtro, e cresciam até o reinício. A que está sendo lida fica, mesmo velha.
 Erro do Fracttal não apaga a lista guardada: a tela segue com ela, com a hora dela.
 """
 import itertools
@@ -34,6 +40,8 @@ ESPERA_S = 120             # quem chega com a busca inteira em andamento espera 
 CONFERE_S = 30 * 60        # a conferência de "mesma visão" de uma pessoa vale isto
 TOLERANCIA = 0.01          # a mesma visão: o total que o Fracttal dá à pessoa difere do guardado em até 1% (ou 2 OS:
                            # as criadas entre a lista guardada e a conferência)
+LISTA_VIDA_S = 30 * 60     # a lista que ninguém lê há isto sai da memória (revisão final, 31/10/2026: uma por pessoa e filtro,
+                           # cada uma de até 2.000 linhas e o HTML delas, crescendo até o reinício, ~10 por dia)
 
 _LISTAS: dict = {}         # chave -> Lista
 _EM_CURSO: dict = {}       # chave -> {"pronto": Event, "lista": Lista | None, "erro": Exception | None}
@@ -52,6 +60,7 @@ class Lista:
         self.versao = next(_VERSOES)
         self.html: dict = {}
         self.criada_em = time.time()      # a hora (do relógio) desta versão, que a tela mostra
+        self.lida_em = _relogio()         # a última vez que alguém a pediu (`ler`): a que ninguém lê há LISTA_VIDA_S sai
 
 
 def limpar() -> None:
@@ -75,6 +84,9 @@ def ler(chave, buscar_inteira, buscar_novas, *, forcar=False, por_tras=None):
     renovação não acontece por trás (a próxima visita vencida tenta de novo)."""
     agora = _relogio()
     g = _LISTAS.get(chave)
+    if g is not None:
+        g.lida_em = agora                 # a que está sendo lida fica, mesmo velha: a tela abre com ela e ela se renova por trás
+    _varrer(agora)
     if g is None:
         return _inteira(chave, buscar_inteira), "inteira"
     if forcar:
@@ -87,6 +99,15 @@ def ler(chave, buscar_inteira, buscar_novas, *, forcar=False, por_tras=None):
         else:
             por_tras(lambda: _por_tras(_novas, chave, buscar_novas))
     return g, "memoria"
+
+
+def _varrer(agora) -> None:
+    """Tira da memória as listas que ninguém lê há `LISTA_VIDA_S` (nem a que uma busca inteira está montando). Roda a cada
+    `ler`: são dezenas de entradas. Sem isto, cada pessoa e filtro que alguma vez abriu o Histórico pelo caminho de 19/10
+    deixava uma lista de até 2.000 linhas (e o HTML dela) na memória do Nexus até o reinício."""
+    with _TRAVA:
+        for chave in [c for c, g in _LISTAS.items() if agora - g.lida_em >= LISTA_VIDA_S and c not in _EM_CURSO]:
+            _LISTAS.pop(chave, None)
 
 
 def _por_tras(fn, chave, buscar):
@@ -176,6 +197,32 @@ def _novas(chave, buscar_novas):
     return _uma_vez(chave, fazer)
 
 
+def total_conferido(pessoa, chave, total_da_pessoa, max_idade=CONFERE_S) -> tuple:
+    """(o total que o Fracttal dá à pessoa nesta `chave`, a idade dele em s, se foi pedido agora): o guardado, se tem menos de
+    `max_idade`; senão `total_da_pessoa()` (1 pedido, na sessão dela), guardado. O erro sobe e não é guardado: quem chama
+    decide, e a conferência que falha nunca libera nada. É o que a `mesma_visao` guarda por pessoa e lista (a conferência das
+    telas que leem da lista central guarda a dela à parte, `lista_central._MEDIDAS`, desde a rodada 2 da 3.3)."""
+    agora = _relogio()
+    k = (pessoa, chave)
+    c = _CONFERIDOS.get(k)
+    if c and agora - c[0] < max_idade:
+        return c[1], agora - c[0], False
+    dela = int(total_da_pessoa())
+    with _TRAVA:
+        _CONFERIDOS[k] = (agora, dela)
+        if len(_CONFERIDOS) > 2000:
+            for kk in sorted(_CONFERIDOS, key=lambda x: _CONFERIDOS[x][0])[:len(_CONFERIDOS) - 2000]:
+                _CONFERIDOS.pop(kk, None)
+    return dela, 0.0, True
+
+
+def bate(dela, guardado) -> bool:
+    """O total da pessoa e o da lista são "o mesmo universo": diferença de até 1%, ou 2 OS (as criadas entre uma leitura e
+    a outra)."""
+    dela, guardado = int(dela or 0), int(guardado or 0)
+    return abs(dela - guardado) <= max(2, TOLERANCIA * max(dela, guardado))
+
+
 def mesma_visao(pessoa, chave, total_da_pessoa, guardado=None) -> bool:
     """A pessoa vê no Fracttal o mesmo universo da lista guardada em `chave`? `total_da_pessoa()` é o total que o
     Fracttal dá a ela com os mesmos filtros (1 pedido, na sessão dela). Sem lista guardada: sim (a dela vira a de todos).
@@ -192,23 +239,11 @@ def mesma_visao(pessoa, chave, total_da_pessoa, guardado=None) -> bool:
         if g is None:
             return True
         guardado = g.info.get("total")
-    guardado = int(guardado or 0)
-    agora = _relogio()
-    k = (pessoa, chave)
-    c = _CONFERIDOS.get(k)
-    if c and agora - c[0] < CONFERE_S:
-        dela = c[1]
-    else:
-        try:
-            dela = int(total_da_pessoa())
-        except Exception:       # noqa: BLE001 — sem conferir, ela fica com a lista dela
-            return False
-        with _TRAVA:
-            _CONFERIDOS[k] = (agora, dela)
-            if len(_CONFERIDOS) > 2000:
-                for kk in sorted(_CONFERIDOS, key=lambda x: _CONFERIDOS[x][0])[:len(_CONFERIDOS) - 2000]:
-                    _CONFERIDOS.pop(kk, None)
-    return abs(dela - guardado) <= max(2, TOLERANCIA * max(dela, guardado))
+    try:
+        dela, _idade, _pedido = total_conferido(pessoa, chave, total_da_pessoa)
+    except Exception:           # noqa: BLE001 — sem conferir, ela fica com a lista dela
+        return False
+    return bate(dela, guardado)
 
 
 def anotar_total(pessoa, chave, total) -> None:

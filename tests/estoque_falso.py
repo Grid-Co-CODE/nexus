@@ -264,14 +264,16 @@ class EstoqueFalso(Estoque):
             item["maximo"] = mx
 
     @_operacao
-    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE") -> str:
-        codigo, nome = str(codigo or "").strip(), str(nome or "").strip()
+    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "") -> str:
+        codigo, nome, descricao = str(codigo or "").strip(), str(nome or "").strip(), str(descricao or "").strip()
         if not codigo or not nome:
             raise ValueError("a peça precisa de código e de nome")
         if codigo.upper() in {c.upper() for c in self._todos_os_codigos()}:
             raise Recusado("já existe peça com esse código", "criar_peca")
         self._n_item += 1
-        self._catalogo[str(self._n_item)] = {"codigo": codigo, "nome": nome, "unidade": unidade}
+        # a descrição só entra quando vem (30/10/2026): a peça de antes, sem ela, fica com as mesmas três chaves
+        self._catalogo[str(self._n_item)] = {"codigo": codigo, "nome": nome, "unidade": unidade,
+                                             **({"descricao": descricao} if descricao else {})}
         return str(self._n_item)
 
     @_operacao

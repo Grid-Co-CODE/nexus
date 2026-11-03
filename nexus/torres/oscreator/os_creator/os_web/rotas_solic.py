@@ -16,9 +16,10 @@ barra de cima é a da `SolicPcmTab` ("‹ PCM", Nova solicitação, Painel, Fila
 A LISTA É UMA SÓ, E FICA NA MEMÓRIA (o mesmo pedido: "Também está demorando demais para carregar!"). Cada abertura da
 Fila fazia de 7 a 10 pedidos ao Fracttal, um depois do outro e sem memória nenhuma — as 400 solicitações, o pessoal de
 100 em 100, as etiquetas, o catálogo de status —, e o Histórico baixava as mesmas 400 de novo. Agora Painel, Fila e
-Histórico leem a MESMA lista, guardada por LISTA_TTL; os catálogos, por CATALOGO_TTL; a carga fria pede tudo ao mesmo
-tempo (`_ao_mesmo_tempo`); e quem grava (criar, aprovar, status, observação, cancelar) esquece a lista: a próxima página
-já a lê do Fracttal. O "Atualizar" de cada página força a releitura. A página do setor PCM pede a lista ao abrir
+Histórico leem a MESMA lista, guardada por LISTA_TTL; os catálogos, pelo dono deles (`catalogos.py`, desde 31/10/2026); a
+carga fria pede tudo ao mesmo tempo (`_ao_mesmo_tempo`); e quem grava (criar, aprovar, status, observação, cancelar)
+esquece a lista: a próxima página já a lê do Fracttal. O "Atualizar" de cada página força a releitura (a lista, não os
+catálogos). A página do setor PCM pede a lista ao abrir
 (`api_aquecer`), e a porta escolhida abre com ela pronta.
 
 O CATÁLOGO DE ATIVOS NÃO VEM DO NAVEGADOR. O ativo da OS é resolvido no servidor por id_item/código
@@ -26,12 +27,8 @@ O CATÁLOGO DE ATIVOS NÃO VEM DO NAVEGADOR. O ativo da OS é resolvido no servi
 nome já escolheu o ativo de outro cliente uma vez (solicitação 3534, em 02/09).
 """
 from __future__ import annotations
-import contextvars
 import datetime as dt
-import json
 import os
-import threading
-import time
 
 import mimetypes
 from urllib.parse import quote
@@ -41,10 +38,12 @@ from flask import Blueprint, Response, abort, jsonify, redirect, render_template
 from werkzeug.exceptions import RequestEntityTooLarge
 
 import api
+import ativos_central
+import catalogos
 import solic_spec as sp
 import temas_store as ts
 
-from . import ativo_curto, sessao, solic_anexos
+from . import ativo_curto, lista_central, sessao, solic_anexos
 from . import solic_eng_web as reg
 from . import solic_web as sw
 from . import tradicional_web as trad
@@ -55,7 +54,6 @@ bp = Blueprint("os_web_solic", __name__, url_prefix="/os")
 
 LIMITE = 400            # o mesmo do painel do app (steps/solic_pcm.py: list_minhas_solicitacoes("TODOS", 400))
 LISTA_TTL = 120         # s: a lista vale isto entre Painel, Fila e Histórico; quem grava a esquece antes
-CATALOGO_TTL = 1800     # s: pessoal, etiquetas, status e tipos de tarefa — mudam de mês em mês
 _LISTA = "solic_lista"
 
 
@@ -117,12 +115,12 @@ def _esquecer_lista() -> None:
             _MEMO.pop(k, None)
 
 
-def _catalogo(nome: str, fn, padrao, guardar=bool):
-    """Um catálogo do Fracttal, guardado por CATALOGO_TTL. O erro não derruba a página (a Fila abre sem a lista de
-    etiquetas, como no app) e não é guardado: a próxima página tenta de novo; o catálogo vazio também não (20/10/2026).
-    Sessão caída sobe — é o login."""
+def _catalogo(fn, padrao):
+    """Um catálogo do Fracttal pelo dono dele (`catalogos.py`, 31/10/2026, etapa 4 do canto central: até então uma cópia de
+    30 min daqui, ao lado das outras telas). O erro não derruba a página (a Fila abre sem a lista de etiquetas, como no app) e
+    não é guardado: a próxima página tenta de novo; o catálogo vazio também não (20/10/2026). Sessão caída sobe — é o login."""
     try:
-        return _memo(("solic_cat", nome), CATALOGO_TTL, fn, guardar=guardar)
+        return fn()
     except api.SessionExpired:
         raise
     except Exception:                                       # noqa: BLE001
@@ -130,28 +128,25 @@ def _catalogo(nome: str, fn, padrao, guardar=bool):
 
 
 def _pessoas() -> list:
-    return _catalogo("pessoas", lambda: sorted(api.get_responsaveis() or [],
-                                               key=lambda x: (x.get("name") or "").lower()), [])
+    return _catalogo(catalogos.pessoas, [])
 
 
 def _etiquetas() -> list:
-    return _catalogo("etiquetas", lambda: api.get_labels() or [], [])
+    return _catalogo(catalogos.etiquetas, [])
 
 
 def _tipos() -> dict:
-    """O Tipo de tarefa e as Classificações da OS (a decisão da Fila). A Solicitação tem outro catálogo, o
-    `get_request_types`, na chave dela (`solicitacao`): os dois na mesma chave se apagavam (20/10/2026)."""
-    return _catalogo("tipos", lambda: api.get_tipos_classif() or {}, {},
-                     guardar=lambda t: bool(t.get("tipos") or t.get("c1")))
+    """O Tipo de tarefa e as Classificações da OS (a decisão da Fila). A Solicitação tem outro catálogo, o Grupo e as
+    Classificações da SOLICITAÇÃO (`catalogos.tipos_solicitacao`): os dois na mesma chave se apagavam (20/10/2026)."""
+    return _catalogo(catalogos.tipos_classif, {})
 
 
 def _status_cat() -> list:
     """[(id, código, rótulo)] do que o Fracttal aceita — sem os dois que a fila não deve oferecer.
 
     "Aberta" e "Pendente" são o estado de quem ESTÁ na fila; oferecê-los como ação só produziria
-    uma mudança de status que não muda nada."""
-    cat = _catalogo("status", lambda: api.status_solicitacao_catalogo() or [], list(api.STATUS_SOLICITACAO))
-    return [t for t in cat if t[1] not in ("OPEN_STATUS", "REQUEST_TODO")]
+    uma mudança de status que não muda nada. Sem o Fracttal, a lista local (`catalogos.status`)."""
+    return [t for t in catalogos.status() if t[1] not in ("OPEN_STATUS", "REQUEST_TODO")]
 
 
 def _ao_mesmo_tempo(*fns) -> list:
@@ -162,93 +157,57 @@ def _ao_mesmo_tempo(*fns) -> list:
     return [f.result() for f in futuros]
 
 
-# ── o catálogo de ativos do disco, sem esperar ──────────────────────────────────────────────────────────────────────
-_DISCO = {"mtime": None, "idx": None, "vence": 0.0}
-_DISCO_LOCK = threading.Lock()
-_RENOVANDO = threading.Lock()
-_TENTOU = {"quando": 0.0}
-_ESPERA_TENTATIVA = 600          # s entre duas renovações por trás que falharam (sessão caída, rede fora)
+# ── o catálogo de ativos das páginas do PCM, sem esperar ────────────────────────────────────────────────────────────
+def _indice_ativos():
+    """O catálogo central COMO ESTIVER — mesmo vencido (as 24 h do `api.ASSETS_TTL`) —, para o que as páginas do PCM precisam: o
+    tipo de cada ativo por id e por código (a ficha da Fila: o ativo existe? as subtarefas do tema mudam com o tipo) e a
+    contagem por tipo (o combo dos Temas), pelos índices que o `ativos_central` monta uma vez por versão. O mesmo catálogo dá
+    nome às solicitações (`api._code_to_loc`, que a lista usa) antes de a lista ser pedida.
+
+    Por que não o `api.load_assets_cached()` com o ativo em dia: vencido, ele baixa os ~22 mil ativos de novo NA HORA, de 200
+    em 200 — mais de cem pedidos ao Fracttal, a página parada por minutos (a 1ª Fila do dia). Para nomear e contar, o de ontem
+    serve; vencido, ele é renovado por trás (`api._renovar_catalogo_por_tras`). Quem RESOLVE o ativo da OS continua lendo o
+    catálogo em dia (`_catalogo_para_aprovar`). Até 31/10/2026 esta função lia o arquivo do catálogo por conta própria e tinha
+    o renovador dela; hoje é o mesmo catálogo de todas as telas. Devolve o `Catalogo` (ou o vazio, sem catálogo nesta máquina:
+    a lista segue o caminho normal e baixa uma vez)."""
+    cat = ativos_central.atual()
+    if cat is None:
+        return ativos_central.VAZIO
+    if api.catalogo_vencido(cat):
+        api._renovar_catalogo_por_tras()
+    return cat
 
 
-def _indice_ativos() -> dict:
-    """O catálogo de ativos do DISCO como estiver — mesmo vencido (as 24 h do `api.ASSETS_TTL`) —, reduzido ao que as
-    páginas do PCM precisam: o tipo de cada ativo por id e por código (a ficha da Fila: o ativo existe? as subtarefas do
-    tema mudam com o tipo) e a contagem por tipo (o combo dos Temas). Ele também dá nome às solicitações (`api._code_loc`,
-    que a lista usa) antes de a lista ser pedida.
-
-    Por que não o `api.load_assets_cached()`: vencido, ele baixa os ~22 mil ativos de novo NA HORA, de 200 em 200 — mais
-    de cem pedidos ao Fracttal, a página parada por minutos (a 1ª Fila do dia). Para nomear e contar, o de ontem serve;
-    vencido, ele é renovado por trás (`_renovar_por_tras`). Quem RESOLVE o ativo da OS continua lendo o catálogo em dia
-    (`_catalogo_para_aprovar`)."""
-    vazio = {"por_id": {}, "por_code": {}, "tipos": []}
-    try:
-        mtime = os.path.getmtime(api.ASSETS_CACHE)
-    except OSError:
-        return vazio                 # nenhum catálogo nesta máquina: a lista segue o caminho normal (baixa uma vez)
-    with _DISCO_LOCK:
-        if _DISCO["mtime"] != mtime:
-            try:
-                with open(api.ASSETS_CACHE, encoding="utf-8") as f:
-                    bruto = json.load(f) or {}
-                ativos = api._corrigir_itens_usina_estrangeiros(bruto.get("assets") or [])
-            except Exception:                               # noqa: BLE001 — arquivo pela metade (sendo gravado)
-                return _DISCO["idx"] or vazio
-            por_id, por_code = {}, {}
-            for a in ativos:
-                tipo = a.get("tipo") or ""
-                if a.get("id") is not None:
-                    por_id.setdefault(a["id"], tipo)
-                code = str(a.get("code") or "").strip()
-                if code:
-                    por_code.setdefault(code, tipo)
-                    if code not in api._code_loc:
-                        api._code_loc[code] = (a.get("cliente") or "", api._usina_curta(a.get("usina") or ""), tipo)
-            vence = float(bruto.get("ts") or 0) + api.ASSETS_TTL if bruto.get("ver") == api._CACHE_VER else 0.0
-            _DISCO.update(mtime=mtime, vence=vence,
-                          idx={"por_id": por_id, "por_code": por_code, "tipos": sw.tipos_de_ativo(ativos)})
-        idx, vence = _DISCO["idx"], _DISCO["vence"]
-    if time.time() > vence:
-        _renovar_por_tras()
-    return idx
-
-
-def _renovar_por_tras() -> None:
-    """Baixa o catálogo vencido numa thread, com a sessão de quem abriu a página (a cópia do contexto leva o JWT). Uma
-    por vez, e a que falhou só tenta de novo depois de `_ESPERA_TENTATIVA`."""
-    if time.time() - _TENTOU["quando"] < _ESPERA_TENTATIVA or not _RENOVANDO.acquire(blocking=False):
-        return
-    _TENTOU["quando"] = time.time()
-    ctx = contextvars.copy_context()
-
-    def rodar():
-        try:
-            ctx.run(api.load_assets_cached, True)
-            _TENTOU["quando"] = 0.0
-        except Exception:                                   # noqa: BLE001 — fica o do disco; a próxima página tenta
-            pass
-        finally:
-            _RENOVANDO.release()
-    threading.Thread(target=rodar, name="os_web-catalogo", daemon=True).start()
-
-
-def _catalogo_para_aprovar() -> list:
-    """O catálogo COMPLETO, para resolver o ativo da OS: em dia, do disco. Vencido e já sendo baixado por trás, espera
-    esse download em vez de começar outro."""
-    if _RENOVANDO.acquire(timeout=240):
-        _RENOVANDO.release()
+def _catalogo_para_aprovar():
+    """O catálogo COMPLETO, para resolver o ativo da OS: em dia. Vencido e já sendo baixado por trás, espera esse download
+    (`api._ASSETS_RECARGA`) em vez de começar outro."""
     return api.load_assets_cached(em_dia=True)
 
 
-def _tipo_do_ativo(s: dict, idx: dict):
+def _ativo_para_aprovar(s: dict):
+    """O ativo da solicitação no catálogo em dia (`sw.asset_da`). Com o leitor do servidor pronto, quem NÃO acha o ativo espera
+    os ativos novos do Fracttal (até poucos segundos: o ativo cadastrado agora) e procura de novo; quem acha não espera nada
+    (revisão 1 da 2.2: cada aprovação esperava a leitura dos novos, mesmo com o ativo já no catálogo)."""
+    asset = sw.asset_da(s, _catalogo_para_aprovar())
+    if asset is None and ativos_central.leitor_pronto():
+        api.esperar_os_novos(so_em_curso=False)
+        asset = sw.asset_da(s, api.load_assets_cached())
+    return asset
+
+
+def _tipo_do_ativo(s: dict, cat):
     """O tipo do ativo da solicitação no catálogo — ou None quando não há certeza. Só id e código, como o `asset_da`."""
-    if s.get("id_item") is not None and s["id_item"] in idx["por_id"]:
-        return idx["por_id"][s["id_item"]]
+    if s.get("id_item") is not None:
+        a = cat.por_id.get(s["id_item"])
+        if a is not None:
+            return a.get("tipo") or ""
     code = str(s.get("code") or "").strip()
-    return idx["por_code"].get(code) if code else None
+    a = cat.por_codigo.get(code) if code else None
+    return (a.get("tipo") or "") if a is not None else None
 
 
-def _ficha(s: dict, idx: dict, agora) -> dict:
-    tipo = _tipo_do_ativo(s, idx)
+def _ficha(s: dict, cat, agora) -> dict:
+    tipo = _tipo_do_ativo(s, cat)
     return sw.ficha(s, {"tipo": tipo} if tipo is not None else None, agora)
 
 
@@ -259,13 +218,12 @@ def solicitacao():
     """O formulário. A cascata (cliente→usina→ativo) usa o catálogo cacheado, como o app."""
     assets = api.load_assets_cached()
     try:
-        # o Grupo e as Classificações da SOLICITAÇÃO, na chave dela: até 20/10/2026 ficavam em ("solic_cat", "tipos"),
-        # a mesma do Tipo de tarefa e das Classificações da OS da Fila (`_tipos`). Quem abria a Fila primeiro deixava
+        # o Grupo e as Classificações da SOLICITAÇÃO, no catálogo dele (`catalogos.tipos_solicitacao`): até 20/10/2026 ficavam
+        # na mesma chave do Tipo de tarefa e das Classificações da OS da Fila (`_tipos`). Quem abria a Fila primeiro deixava
         # a Classificação 1 daqui sem opção ("não consigo solicitar pelo nexus porque a classificação 1 não abre opção
         # de preencher", o programador do PCM), e o contrário esvaziava a Fila. A lista sem a Classificação 1 não fica
         # guardada.
-        tipos = _memo(("solic_cat", "tipos_solicitacao"), CATALOGO_TTL, lambda: api.get_request_types() or {},
-                      guardar=lambda t: bool(t.get("classif1")))
+        tipos = catalogos.tipos_solicitacao()
     except api.FracttalError:                       # a tela abre mesmo sem o catálogo de classificação:
         tipos = {}                                  # a pessoa recarrega, em vez de levar um erro na cara
     pessoas = _pessoas()                            # "técnico sugerido" é opcional: sem a lista, a tela abre
@@ -414,7 +372,10 @@ def fila():
     negado = _sem_area_pcm_pagina("Fila do PCM", "fila")
     if negado:
         return negado
-    idx = _indice_ativos()
+    # a volta do "Recarregar o catálogo de ativos" (que pediu os ativos novos ao leitor do servidor e voltou na hora): espera a
+    # leitura em curso, poucos segundos, para a ficha já achar o ativo cadastrado agora, e a tela diz como ela terminou
+    desfecho = api.esperar_os_novos() if request.args.get("novos") == "1" else None
+    cat = _indice_ativos()
     forcar = request.args.get("atualizar") == "1"
     lista, pessoas, etiquetas, tipos, status = _ao_mesmo_tempo(lambda: _lista(forcar), _pessoas, _etiquetas, _tipos,
                                                                _status_cat)
@@ -428,7 +389,7 @@ def fila():
         else:
             sel = ""
     agora = dt.datetime.now(dt.timezone.utc)
-    fichas = [_ficha(s, idx, agora) for s in pend]
+    fichas = [_ficha(s, cat, agora) for s in pend]
     for f in fichas:                     # os anexos da Nova solicitação que vão para a OS ao aprovar (29/10/2026)
         f["anexos_nexus"] = [dict(a, url=_link_guardado(f["id"], a["nome"]), tam=reg.tamanho_br(a["tamanho"]))
                                for a in solic_anexos.listar(f["id"])]
@@ -445,7 +406,15 @@ def fila():
         status=[{"id": i, "cod": cod, "rot": rot} for i, cod, rot in status],
         temas=sw.temas_da_fila(), tipos_sub=sw.TIPOS_SUB, tipo_padrao=sw.TIPO_PADRAO,
         classif1_padrao=sw.CLASSIF1_PADRAO, nenhuma=sw.SEM_CLASSIF, etiqueta_perf=sp.ETIQUETA_PERFORMANCE,
-        tempo_padrao=api.DURACAO_OS_AVULSA)
+        tempo_padrao=api.DURACAO_OS_AVULSA,
+        # de quando é o catálogo de ativos (as duas horas no `title`, Ruling AL) e se o servidor lê os novos sozinho (o link
+        # dele demora segundos, não minutos); na volta do link do catálogo, o desfecho da busca dos novos, e a leitura recusada
+        # ou o download que falhou, com o texto do SERVIDOR: a URL só traz o sinal (`?recusa=1`, `?falha=1`), e nenhum texto
+        # dela vai à tela (revisão 1 da 2.2: qualquer link punha qualquer frase na faixa)
+        ativos_de=api.ativos_de(), ativos_de_titulo=api.ativos_de_titulo(), leitor=ativos_central.leitor_pronto(),
+        novos_txt=(desfecho or {}).get("texto") or "",
+        recusa=api.aviso_da_recusa() if request.args.get("recusa") else "",
+        falha=api.aviso_da_falha() if request.args.get("falha") else "")
 
 
 @bp.route("/api/solic/<id_code>")
@@ -482,7 +451,7 @@ def api_aprovar(id_code):
     if not row:
         return jsonify({"erro": "Não achei a solicitação nº %s." % id_code}), 404
     s = sw.linha(api._req_row_to_d(row, api._code_to_loc()))
-    asset = sw.asset_da(s, _catalogo_para_aprovar())
+    asset = _ativo_para_aprovar(s)
     if not asset:
         return jsonify({"erro": sw.ERRO_SEM_ASSET}), 400
     # a lista da TELA (o PCM pode ter editado); a tela que esvaziou a lista leva a base, como o app
@@ -523,6 +492,7 @@ def api_aprovar(id_code):
         out["programada"] = prog.strftime("%d/%m/%Y %H:%M") if prog else ""
         out["tempo"] = sw.tempo_hhmm(dur or api.DURACAO_OS_AVULSA)
         out = _levar_anexos(out, s.get("id_code") or id_code)
+    lista_central.criadas(res)         # a OS que a aprovação criou entra na lista central na hora (31/10/2026, tarefa 3.3)
     if out.get("ok") or (res or {}).get("ok"):
         _esquecer_lista()              # nasceu OS (ou a tarefa): a solicitação saiu da fila para todo mundo
     return (jsonify(out), 200) if out.get("ok") else (jsonify({"erro": out["mensagem"]}), 400)
@@ -650,7 +620,7 @@ def temas():
     negado = _sem_area_pcm_pagina("Temas", "temas")
     if negado:
         return negado
-    idx = _indice_ativos()
+    cat = _indice_ativos()
     erro = ""
     try:
         itens = ts.do_banco()
@@ -660,7 +630,7 @@ def temas():
         itens, erro = ts.da_semente(), "Erro ao carregar do banco: %s — mostrando os temas do app." % str(e)[:140]
     nomes = sorted({str(e.get("description") or "").strip() for e in _etiquetas()} - {""}, key=str.lower)
     return render_template("solic_temas.html", conta=_conta(), aba="solic", nav="temas", nav_pcm=sw.NAV_PCM,
-                           temas=_temas_da_tela(itens), erro=erro, etiquetas=nomes, tipos=idx["tipos"],
+                           temas=_temas_da_tela(itens), erro=erro, etiquetas=nomes, tipos=cat.tipos,
                            tipos_os=sw.TIPOS_OS, classif1=sw.CLASSIF1_TEMA, tipos_sub=sw.TIPOS_SUB,
                            pode_gravar=ts.pode_gravar())
 
@@ -732,20 +702,23 @@ def api_tema_arquivar(chave):
 @exige_sessao
 def atualizar():
     """Recarrega o CATÁLOGO DE ATIVOS e volta à Fila (o aviso "não consegui identificar o ativo" da ficha leva aqui).
-    Existe porque a causa mais comum desse aviso é catálogo velho — um ativo cadastrado hoje de manhã. Se o catálogo já
-    está sendo baixado por trás, espera esse em vez de baixar duas vezes."""
+    Existe porque a causa mais comum desse aviso é catálogo velho — um ativo cadastrado hoje de manhã. Com o leitor do
+    servidor pronto (31/10/2026), pede os ativos NOVOS por trás e volta na hora, com `novos=1` (a Fila espera essa leitura,
+    poucos segundos); sem ele (o PC), baixa o catálogo pelo RPC com a sessão de quem clicou e, se o catálogo já está sendo
+    baixado por trás, espera esse em vez de baixar duas vezes."""
     negado = _sem_area_pcm_pagina("Fila do PCM", "fila")
     if negado:
         return negado
-    ja_baixando = _RENOVANDO.locked()
-    if _RENOVANDO.acquire(timeout=300):
-        try:
-            if not ja_baixando:
-                api.load_assets_cached(True)
-        finally:
-            _RENOVANDO.release()
+    novos = ativos_central.leitor_pronto()
+    # sem o leitor, se o catálogo já está sendo baixado por trás, este pedido espera esse download e o usa (o `force` do
+    # `load_assets_cached` confere se o catálogo foi conferido depois do pedido), em vez de baixar duas vezes
+    api.load_assets_cached(True)
     _esquecer_lista()
-    return redirect(url_for("os_web_solic.fila", sel=request.args.get("sel") or "", atualizar=1))
+    # este botão é um link que navega: não há JSON, então a volta leva só o SINAL da recusa e da falha (`recusa=1`, `falha=1`),
+    # e a Fila mostra o texto do servidor no alto
+    sinais = {k: 1 for k, texto in (("novos", novos), ("recusa", api.aviso_da_recusa()), ("falha", api.aviso_da_falha()))
+              if texto}
+    return redirect(url_for("os_web_solic.fila", sel=request.args.get("sel") or "", atualizar=1, **sinais))
 
 
 @bp.route("/api/solic/aquecer", methods=["POST"])

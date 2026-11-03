@@ -33,7 +33,8 @@ Estados de cada fato (`ESTADOS_FATO`):
 import re
 from dataclasses import dataclass
 
-from . import almoxarifado, fato_chamado, fato_inventario, fato_pt, fato_ronda, fato_tarefa_os, fatos, geracao, programacao
+from . import almoxarifado, fato_chamado, fato_inventario, fato_pt, fato_ronda, fato_tarefa_os, fato_uso_os, fatos, geracao
+from . import programacao
 
 ESTADOS = {"id": "ID", "cod": "código", "hmac": "código da pessoa", "nome": "nome", "largo": "em colunas",
            "prop": "cadastro próprio", "nao": "—"}
@@ -48,13 +49,14 @@ TIPO_ROTULO = {"transacao": "transação", "snapshot_periodico": "foto periódic
 # Como a medida soma. aditiva: em qualquer corte. semi: num eixo só (a irradiação soma no tempo de UMA usina, não
 # entre usinas). nao: nunca (nota, percentual, RPN: média, mínimo, máximo).
 SOMA = ("aditiva", "semi", "nao")
-SUFIXOS_UNIDADE = ("_min", "_kwh", "_kwh_m2", "_mm", "_pct", "_qtd", "_pts", "_nivel")
+# `_ms` entrou em 31/10/2026 com o tempo de resposta das telas do OS Creator (fato_uso_os: mediana e p95 em milissegundos)
+SUFIXOS_UNIDADE = ("_min", "_kwh", "_kwh_m2", "_mm", "_pct", "_qtd", "_pts", "_nivel", "_brl", "_ms")
 
 
 @dataclass(frozen=True)
 class Medida:
     coluna: str     # com a unidade no nome (SUFIXOS_UNIDADE); indicador sem sufixo, só 1/0
-    unidade: str    # "min", "kWh", "kWh/m²", "mm", "%", "qtd", "pts", "nível 1-5", "1/0"
+    unidade: str    # "min", "kWh", "kWh/m²", "mm", "%", "qtd", "pts", "nível 1-5", "R$", "ms", "1/0"
     soma: str       # SOMA
 
 
@@ -213,6 +215,20 @@ FATOS = (
                     "dos anexos só cifrados (Cofre, a chave do cadastro). Os anexos ficam no disco do servidor "
                     "(pasta de dados do Nexus, sugestoes/<id>/), não no banco. Só acrescenta: nada se edita nem se "
                     "apaga"),
+    # 03/11/2026 (Levi: "construa o que você sugere"; os setores conversando): quem assumiu, concluiu ou reabriu cada
+    # insight do motor de regras (Comando → Insights). Registrado antes da 1ª gravação
+    Fato("evento_insight", "Insight assumido ou concluído", "base", "nexus_insights · fato_evento_insight",
+         "1 linha = 1 evento (assumiu, concluiu, reabriu, notificou, respondeu) de 1 pessoa sobre 1 insight do motor "
+         "de regras",
+         _d(data=("id", "data_id (o dia de Brasília do evento)"),
+            pessoa=("id", "pessoa_id de quem fez (e o pessoa_hmac)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_insights · fato_evento_insight",),
+         janela_origem="o Nexus é a fonte",
+         observacao="insight_id = a regra e o objeto (N01:16702, R07:<usina_id>); regra e torre (a dona) em claro; "
+                    "o dono vale o último assumiu/concluiu/reabriu; notificou leva as áreas avisadas em para (torres, "
+                    "separadas por vírgula) e respondeu a área que responde em para e o status_retorno (recebido, "
+                    "andamento, resolvido; vale o último de cada área). O nome de quem fez, a mensagem e o retorno só "
+                    "cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
     # 28/10/2026 (Levi: "No sugestões recebidas deve ter a opção de mudar o status da solicitação: Iniciada, Em
     # verificação e Conclusão"): o status de cada sugestão, por evento. Registrado antes da 1ª mudança
     Fato("status_sugestao", "Status da sugestão", "base", "nexus_sugestoes · fato_status_sugestao",
@@ -356,7 +372,9 @@ FATOS = (
          janela_origem=fato_pt.JANELA_ORIGEM, estado="conformado", conformado_em="nexus_fatos · fato_pt",
          observacao="até 08/10: '1 linha = 1 PT', mas eram 233 linhas para 227 números (o App decide por linha). PTs "
                     "= SUM(primeira_linha_da_pt). O decisor liga 0%: as 6 contas Admin estão fora do cadastro "
-                    "(decisão 4). Sem o passo 0, a PT de 28/09 sai do fato em ~27/12"),
+                    "(decisão 4). Sem o passo 0, a PT de 28/09 sai do fato em ~27/12. Desde a v315 do App (30/10/2026), "
+                    "a coluna 'Itens NÃO' no fim do livro (os títulos dos itens respondidos NÃO, separados por '; ', "
+                    "sem texto livre): fica fora do fato, lida crua pelo card de assinar a PT"),
     # o Nexus é a FONTE deste: a decisão da PT assinada no Nexus com o login do Fracttal do OS Creator (05/10/2026);
     # quem aplica no campo é o App (nexus/campo/decisao_pt.py). Decisão 4 do Levi (11/10/2026): POR LINHA, como o App
     # decide (a PT × ativo do pt_app_campo), na aba fato_decisao_pt (era "decisoes", nunca gravada) com o codigo_ativo
@@ -719,8 +737,8 @@ FATOS = (
     # vontade" e "quero tirar do site de gestão"): o Nexus é a FONTE de quem cobre cada usina; o App de Campo lê daqui o
     # papel executa (as usinas da aba Ronda). Registrado antes da 1ª gravação.
     Fato("decisao_atribuicao_pcm", "Técnicos por usina", "pcm", "nexus_pcm_atribuicoes · fato_decisao_atribuicao",
-         "1 linha = 1 decisão de pôr ou tirar 1 pessoa de 1 usina num papel (executa); vale a última decisão de cada "
-         "usina, pessoa e papel",
+         "1 linha = 1 decisão de pôr ou tirar 1 pessoa de 1 usina num papel (executa ou responsavel); vale a última "
+         "decisão de cada usina, pessoa e papel",
          _d(data=("id", "data_id (o dia de Brasília da decisão; de_data_id e ate_data_id, o período do apoio)"),
             usina=("id", "usina_id (+ usina_fracttal, o nome da usina no Fracttal, por onde o App a acha)"),
             pessoa=("id", "pessoa_id + pessoa_hmac (o código do e-mail, por onde o App acha a pessoa) e "
@@ -734,7 +752,9 @@ FATOS = (
                     "leitura aberta da API e só aplica a linha assinada, quando o interruptor dele "
                     "(NEXUS_ATRIBUICOES) estiver ligado. A observação do PCM vai só cifrada (dados_cifrados, regra 8). "
                     "A carga inicial (origem carga_inicial) é a regra da equipe do cadastro: cada pessoa de campo "
-                    "recebe as usinas da equipe dela"),
+                    "recebe as usinas da equipe dela. responsavel (30/10/2026) = o Responsável UFV da ficha da usina "
+                    "(responsavel_om_id), que o Nexus põe sozinho de hora em hora (origem cadastro, nexus/pcm/responsaveis.py): "
+                    "o App manda a ele o aviso da PT aguardando assinatura e só ele assina a PT da usina"),
     # o almoxarifado (25/10/2026, Levi: "No fractall temos almoxarifado, gostaria de uma visão para a gestão desse
     # almoxarifado na parte de PCM"): a varredura diária do inventário do Fracttal, que o App faz e publica; o livro do
     # App guarda só o último ciclo, e o histórico é o do Nexus (`fato_almoxarifado.py`). O item do inventário segue o
@@ -748,12 +768,18 @@ FATOS = (
             equipamento=("prop", "id_item (o item do inventário, cadastro próprio: nexus_almoxarifado · dim_item_almox)")),
          tipo="snapshot_periodico", chave=("saldo_id",), estado="montado",
          conformado_em="nexus_almoxarifado_saldo_AAAA_MM · fato_saldo_almox",
-         medidas=_m((("saldo_qtd", "a do item", "semi"), ("minimo_qtd", "a do item", "semi"))),
+         medidas=_m((("saldo_qtd", "a do item", "semi"), ("minimo_qtd", "a do item", "semi"),
+                     ("custo_unitario_brl", "R$", "nao"))),
          fontes=(f"{almoxarifado.LIVRO_SALDO} · {almoxarifado.ABA_SALDO}",),
          janela_origem="o último ciclo completo (App)",
          observacao="o saldo soma entre almoxarifados do MESMO item, nunca no tempo nem entre itens (a unidade é a do "
                     "item: UNIDADE, METRO, MASSA). Mínimo 0 = sem mínimo cadastrado. O dia sem ciclo fica sem foto "
-                    "(\"não medido\" não vira \"não mudou\"). Até o App publicar, o livro não existe"),
+                    "(\"não medido\" não vira \"não mudou\"). Até o App publicar, o livro não existe. 30/10/2026: o "
+                    "custo_unitario_brl é o custo da peça naquele almoxarifado como o Fracttal deu no ciclo (preço não "
+                    "se soma: o valor em estoque é saldo × custo, feito na conta); vazio = o Fracttal não deu, nunca 0 "
+                    "(as fotos de antes da coluna ficam vazias). O grão não mudou. A criticidade e a Curva ABC da peça, "
+                    "as do cadastro dela no Fracttal, vão na dimensão do item (nexus_almoxarifado · dim_item_almox: "
+                    "criticidade e curva_abc, esta A, B ou C; vazio = sem curva, nunca C: o Nexus não calcula curva)"),
     Fato("ciclo_varredura", "Ciclo da varredura do almoxarifado", "pcm",
          f"{almoxarifado.LIVRO_CICLO} · {almoxarifado.ABA_CICLO}",
          "1 linha = 1 ciclo da varredura que o Nexus viu (aplicado ou recusado, e a marca de anulado)",
@@ -798,9 +824,12 @@ FATOS = (
          medidas=_m((("contado_qtd", "a do item", "semi"),)),
          fontes=(f"{almoxarifado.LIVRO_CONTAGENS} · {almoxarifado.ABA_CONTAGENS}",), janela_origem="90 dias (App)",
          observacao="colunas ID da contagem, Enviada em e Contada em (UTC), ID do almoxarifado, Usina, Tipo (item, "
-                    "identificar, fora_do_catalogo), ID do item, Código, Contado, Identificado como, Descrição, Foto, "
-                    "Contou (HMAC) e ID da linha. Contado vazio é \"não contei\", nunca 0 (o 0 digitado é \"zerar\"; a "
-                    "API devolve texto, e o \"None\" do sync-xlsx também é vazio: almoxarifado.contado). A linha é a "
+                    "identificar, fora_do_catalogo, avariado), ID do item, Código, Contado, Identificado como, "
+                    "Descrição, Foto, Contou (HMAC), ID da linha e, desde 30/10/2026 e só no fim, Fabricante, Modelo, "
+                    "Número de série (texto, ou n/a quando a peça não tem o dado), Fotos dos dados (as chaves das fotos "
+                    "deles) e Recontagem de (o ID da contagem em que o PCM pediu para recontar). Contado vazio é "
+                    "\"não contei\", nunca 0 (o 0 digitado é \"zerar\"; a API devolve texto, e o \"None\" do "
+                    "sync-xlsx também é vazio: almoxarifado.contado). A linha é a "
                     "contagem × o ID da linha (um por peça contada, gerado pelo App, único dentro da contagem: duas "
                     "peças fora do catálogo com a mesma descrição não podem ter a mesma chave). A soma é entre "
                     "almoxarifados do MESMO item, nunca entre itens. Sem nome nem e-mail (quem contou, só o HMAC); a "
@@ -813,7 +842,8 @@ FATOS = (
     Fato("evento_inventario", "Evento do inventário do almoxarifado", "pcm",
          f"{fato_inventario.LIVRO} · {fato_inventario.ABA_EVENTO}",
          "1 linha = 1 evento do inventário de 1 contagem (recebida, aprovada, peça gravada, conflito, erro, peça tirada do "
-         "lote, recontagem pedida, número corrigido, contagem substituída, curadoria ou régua gravada); nunca muda",
+         "lote, recontagem pedida, número corrigido, contagem substituída, curadoria, régua gravada ou recontagem de "
+         "uma peça pedida); nunca muda",
          _d(data=("id", "data_id (o dia de Brasília do evento; quando, a hora em UTC)"),
             usina=("id", "usina_id + usina_ligada_por (o almoxarifado da contagem, só pela de-para do Fracttal; vazio "
                          "quando não liga)"),
@@ -862,7 +892,8 @@ FATOS = (
     Fato("curadoria_inventario", "Curadoria do inventário do almoxarifado", "pcm",
          f"{fato_inventario.LIVRO} · {fato_inventario.ABA_CURADORIA}",
          "1 linha = 1 decisão do PCM (cadastrar, é a peça X, confirmar ou descartar) sobre 1 linha de 1 contagem que veio "
-         "fora do catálogo ou como genérico a identificar; vale a última de cada contagem e linha",
+         "fora do catálogo, como genérico a identificar ou como avariada sem cadastro (a avariada da aba Avariados do App "
+         "cujo -AV não está no catálogo, desde 30/10/2026); vale a última de cada contagem e linha",
          _d(data=("id", "data_id (o dia de Brasília da decisão; decidida_em, a hora em UTC)"),
             usina=("id", "usina_id + usina_ligada_por (o almoxarifado da contagem, id_almoxarifado, só pela de-para do "
                          "Fracttal; vazio quando não liga)"),
@@ -1213,6 +1244,85 @@ FATOS = (
                     "marcadas: quem conta as tira (o guia da API, seção 8). geracao_parou só na falha de comunicação "
                     "(vazio nos outros tipos). As proteções em códigos curtos (protecoes, separadas por ;). Os dois "
                     "nomes de pessoa e o texto livre da API (impacto, detalhes, informe) não entram (regra 8)"),
+    # as ocorrências ainda abertas da Ronda COS (30/10/2026, Levi: "para as em aberto contar na disponibilidade
+    # precisamos puxar os dados dessa fonte"): o retrato da hora, no mesmo livro das normalizações
+    Fato("ocorrencia_aberta", "Ocorrência aberta da Ronda COS", "cos",
+         "fora do banco: a fotografia do Andamento da Ronda COS (as ocorrências de cada usina)",
+         "1 linha = 1 ocorrência ainda aberta na Ronda COS (o registro), no retrato da última volta",
+         _d(data=("id", "data_id_inicio (o dia de Brasília da falha)"),
+            usina=("id", "usina_id (o código do Fracttal da usina contra o código do Registro mestre; só o código de "
+                         "uma usina liga)"),
+            cliente=("cod", "cliente (THOPEN: só ela, a disponibilidade pelo COS)"),
+            equipamento=("cod", "equipamentos_codigos (as tags do Fracttal, separadas por ;; vazio = sem a tag)"),
+            os=("cod", "os (o nº da OS no Fracttal; vazio enquanto a ocorrência não tem OS)")),
+         tipo="snapshot_periodico", chave=("registro",),
+         medidas=_m((("equipamentos_qtd", "qtd", "nao"), ("dias_aberta_qtd", "dias", "nao"),
+                     ("geracao_parou", "1/0", "aditiva"))),
+         fontes=("Ronda COS (API do Andamento) · ocorrências abertas",),
+         janela_origem="o que está aberto agora (a fotografia é trocada inteira a cada volta)",
+         estado="conformado", conformado_em="nexus_cos_normalizacoes · fato_ocorrencia_aberta",
+         observacao="quando a ocorrência normaliza, sai daqui e entra no fato_normalizacao (a mesma chave); a que já "
+                    "está normalizada na memória do Nexus não entra (conta uma vez). As tags, o código do tipo e o "
+                    "início vêm da fotografia ou, quando ela não manda, da rota das ocorrências de 30 dias "
+                    "(equipamentos_de diz de onde: fotografia, ocorrencias ou vazio); sem a tag, equipamentos_citados guarda o que "
+                    "o COS cita pelo nome em referência curta (Inversor 2.7 → INV2.7, Cabine 2 → CAB2). O tipo pelo rótulo vira código "
+                    "pelas normalizações. abertas_em na atualizacao é a hora do retrato: na falha da leitura, o de "
+                    "antes fica. Impacto, falha (texto livre), a última nota e o que se aguarda não entram (regra 8)"),
+    # o uso das telas do OS Creator e os pedidos do Nexus ao Fracttal, por hora (31/10/2026, etapa 0 do canto central do OS
+    # Creator): o servidor mede na memória (casca/uso_os.py e casca/fracttal_conta.py) e leva as horas fechadas ao banco.
+    # O Nexus é a FONTE; registrado antes da 1ª gravação. Só contagens: nada de pessoa nem de setor (regra 8)
+    Fato("uso_os_hora", "Uso das telas do OS Creator por hora", "os", f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_USO}",
+         fato_uso_os.GRAO_USO,
+         _d(data=("id", "data_id (o dia de Brasília da hora); hora (0 a 23) e hora_id (AAAAMMDDHH)")),
+         tipo=fato_uso_os.TIPO, chave=fato_uso_os.CHAVE_USO, medidas=_m(fato_uso_os.MEDIDAS_USO),
+         fontes=(f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_USO}",), janela_origem=fato_uso_os.JANELA_ORIGEM,
+         estado="conformado", conformado_em=f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_USO}",
+         observacao="um livro por mês (nexus_oscreator_uso_AAAA_MM, o mês é o do hora_id); só as horas fechadas: o "
+                    "servidor as tira da memória no :05 da hora seguinte, guarda no disco dele e as leva ao banco UMA vez por "
+                    "dia, às 04:45 de Brasília (gravar o livro do mês inteiro custa ~7 s de processador, e o Nexus é um "
+                    "processo só); regravar a mesma hora troca a linha (a chave), não a repete. rota é o caminho sem a "
+                    "query, com os números como <n> e os ids opacos como <id>; automatico 1 é o que a tela pede sozinha "
+                    "(Histórico, Solicitações, a sessão), 0 é o clique da pessoa. pessoas_qtd conta quem pediu sem dizer "
+                    "quem (depois de um reinício do servidor é aproximado); a mediana e o p95 (duracao_p50_ms, "
+                    "duracao_p95_ms) saem de faixas de 3% (erro até 1,5%) e ficam vazios no balde só de pedidos que o teto "
+                    "recusou (ocupado_qtd). Nunca o nome, o e-mail nem o SETOR da pessoa: há setor de uma ou duas pessoas "
+                    "e o banco é de leitura aberta e não apaga; o corte por setor mora só no disco do servidor, por dia, 30 "
+                    "dias, e o Raio-X mostra"),
+    Fato("fracttal_hora", "Pedidos do Nexus ao Fracttal por hora", "os",
+         f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_FRACTTAL}", fato_uso_os.GRAO_FRACTTAL,
+         _d(data=("id", "data_id (o dia de Brasília da hora); hora (0 a 23) e hora_id (AAAAMMDDHH)")),
+         tipo=fato_uso_os.TIPO, chave=fato_uso_os.CHAVE_FRACTTAL, medidas=_m(fato_uso_os.MEDIDAS_FRACTTAL),
+         fontes=(f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_FRACTTAL}",), janela_origem=fato_uso_os.JANELA_ORIGEM,
+         estado="conformado", conformado_em=f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_FRACTTAL}",
+         observacao="a cota do Fracttal é de 200 pedidos por minuto para a empresa toda (o OS Creator, o App de Campo e os "
+                    "robôs do Nexus); esta é a parte do Nexus, por quem pediu. origem é a rota do pedido (normalizada) ou "
+                    "fundo:<nome da thread>, no máximo 50 de fundo por hora; metodo é o method do RPC, o recurso do REST "
+                    "(work_orders), token ou outro. O total da hora e o pico por minuto de tudo junto NÃO estão aqui: moram "
+                    "no fato fracttal_total_hora, 1 linha por hora (31/10/2026, Ruling N: um total no meio do detalhe mistura "
+                    "dois grãos, e somar a coluna contaria em dobro). recusas_qtd são os 406 e 429 (o Fracttal pedindo "
+                    "calma); erros_qtd, a exceção e o 5xx. esperas_qtd (a última coluna, desde 31/10/2026, etapa 5) são os "
+                    "pedidos que esperaram a vez no porteiro do Nexus (no máximo 150 por minuto, 90 deles de fundo; fundo é "
+                    "só a origem fundo: que o laço do servidor declara, e o resto é clique, que espera no máximo 2 s e nunca "
+                    "é recusado; a fundo:<thread> que ninguém declarou, um pool ou a releitura por trás de uma tela, o "
+                    "porteiro trata como clique, e o nome não diz qual: a lista dos laços que declaram está no "
+                    "nexus/casca/CLAUDE.md), contados na hora em que saíram; vazia na hora de antes do porteiro. Só "
+                    "contagens; vai ao banco uma vez por dia, às 04:45"),
+    # o total da hora, na aba própria do mesmo livro do mês (Ruling N, 31/10/2026): o contador entrega a linha `*` no meio
+    # do detalhe, e `fato_uso_os.separar_total` a leva para cá
+    Fato("fracttal_total_hora", "Total de pedidos do Nexus ao Fracttal por hora", "os",
+         f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_TOTAL}", fato_uso_os.GRAO_TOTAL,
+         _d(data=("id", "data_id (o dia de Brasília da hora); hora (0 a 23) e hora_id (AAAAMMDDHH)")),
+         tipo=fato_uso_os.TIPO, chave=fato_uso_os.CHAVE_TOTAL, medidas=_m(fato_uso_os.MEDIDAS_TOTAL),
+         fontes=(f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_TOTAL}",), janela_origem=fato_uso_os.JANELA_ORIGEM,
+         estado="conformado", conformado_em=f"{fato_uso_os.LIVRO_MOLDE} · {fato_uso_os.ABA_TOTAL}",
+         observacao="1 linha por hora em que o Nexus pediu algo ao Fracttal (sem pedido, sem linha). É o total de TODAS as "
+                    "origens juntas, e o pico por minuto é o maior número de pedidos num mesmo minuto da hora, de tudo junto: "
+                    "não é a soma dos picos de cada origem, por isso não soma. A cota do Fracttal é de 200 pedidos por minuto "
+                    "para a empresa toda (o OS Creator, o App de Campo e os robôs do Nexus): compare o pico com ela. Foi "
+                    "separado do detalhe (fracttal_hora) porque o total dentro dele misturava dois grãos. recusas_qtd são os "
+                    "406 e 429; erros_qtd, a exceção e o 5xx; esperas_qtd (a última coluna, desde 31/10/2026, etapa 5), os "
+                    "pedidos da hora que esperaram a vez no porteiro do Nexus (150 por minuto, 90 deles de fundo), vazia na "
+                    "hora de antes do porteiro. Só contagens; vai ao banco uma vez por dia, às 04:45"),
 )
 POR_ID = {f.id: f for f in FATOS}
 
@@ -1252,10 +1362,19 @@ LIVROS = (
                 "20:42, antes da foto_ativos): só os códigos dos livros do banco e do PCM. Com a foto gravada (21:06), "
                 "a carga seguinte lê a foto do banco e a dimensão cresce (medido em 08/10 com as fotos locais: "
                 "22.356)"),
-    Livro("nexus_ativos_fracttal", ("foto_ativos", "atualizacao"), "carga única (quem grava é o Levi)",
-          "ferramentas/carregar_ativos_fracttal.py --gravar", True,
-          "gravada em 11/10/2026 (GET: foto_ativos 22.357 linhas, última gravação às 21:06). Renovar a foto exige "
-          "ler o Fracttal: fora do horário de campo"),
+    # 31/10/2026 (tarefa 2.2 do canto central do OS Creator): deixou de ser carga única. Registrado ANTES da 1ª renovação:
+    # as três colunas novas no fim, o grão e o novo sentido do foto_em; só cresce (o código que sai do Fracttal fica marcado)
+    Livro("nexus_ativos_fracttal", ("foto_ativos", "atualizacao"),
+          "toda noite (02:15 de Brasília), depois que o catálogo do OS Creator aceitou a leitura; grava só quando o sha "
+          "das linhas muda",
+          "nexus/torres/oscreator/os_creator/ativos_leitor.py + nexus/dados/foto_ativos.py (só o servidor)", True,
+          "gravada em 11/10/2026 pela carga única (GET: foto_ativos 22.357 linhas, às 21:06); desde 31/10/2026 renovada "
+          "toda noite pelo leitor REST do servidor (credencial da empresa, 1 pedido por segundo). 1 linha = 1 item do "
+          "Fracttal com 1 código (fracttal_item_id + codigo), a raiz de cada cliente inclusive (a linha sem pai_item_id). "
+          "Colunas novas no fim: id_type_item e id_group_task (os do Fracttal; o grupo cai no catálogo e na foto de antes "
+          "quando o REST não o dá) e fora_do_fracttal_desde (data_id em que o código deixou de vir; o código fica). "
+          "foto_em = o dia em que a linha mudou pela última vez. A leitura do banco curta não grava",
+          so_cresce=True),
     Livro("nexus_programacao", ("fato_programacao", "qualidade", "atualizacao"),
           "de hora em hora (:40), pela mescla por semana; grava só quando o sha das linhas muda",
           "nexus/dados/carga.py + programacao.py (o histórico: ferramentas/carregar_programacao_historica.py)", True,
@@ -1314,13 +1433,14 @@ LIVROS = (
           "nexus/cos/turno.py, pela tela COS > Passagem de turno", False,
           "registrado em 26/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª passagem registrada",
           so_cresce=True),
-    Livro("nexus_cos_normalizacoes", ("fato_normalizacao", "atualizacao"),
+    Livro("nexus_cos_normalizacoes", ("fato_normalizacao", "fato_ocorrencia_aberta", "atualizacao"),
           "de hora em hora (entre :22 e :27), só na máquina que lê a API da Ronda COS (o servidor)",
           "nexus/cos/normalizacoes_banco.py (laço do app.py e do servir.py; NEXUS_NORMALIZACOES_PUBLICAR=0 desliga)",
           False,
           "registrado em 29/10/2026 antes de existir: nasce na 1ª volta do servidor depois do deploy. Grava só com a "
           "memória das normalizações completa e sem erro e se a última gravação tiver mais de 50 min; troca o livro "
-          "inteiro, com as linhas de antes do que a memória guarda mantidas do banco"),
+          "inteiro, com as linhas de antes do que a memória guarda mantidas do banco. A fato_ocorrencia_aberta "
+          "(30/10/2026) é o retrato das abertas da Thopen na mesma volta"),
     Livro("nexus_engenharia_acompanhamento", ("dim_diagnostico", "fato_acompanhamento_ativo"),
           "a cada pegar, encaminhar, salvar, comentário e mudança no cadastro dos diagnósticos (tela Engenharia > "
           "Confiabilidade)",
@@ -1357,6 +1477,11 @@ LIVROS = (
           "a cada ocorrência criada ou mudada, ação do plano e andamento (tela Campo · App > Ocorrências)",
           "nexus/campo/ocorrencias.py, pela tela Campo · App > Ocorrências", False,
           "registrado em 18/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª ocorrência registrada",
+          so_cresce=True),
+    Livro("nexus_insights", ("fato_evento_insight",),
+          "a cada Assumir, Concluir, Reabrir, Notificar áreas ou Responder (a área notificada) de um insight",
+          "nexus/comando/estado.py, pelas telas Comando → Insights e Caixa de entrada", False,
+          "registrado em 03/11/2026 antes da 1ª gravação (regra 10): nasce no 1º Assumir",
           so_cresce=True),
     Livro("nexus_sugestoes", ("fato_sugestao", "fato_status_sugestao"),
           "a cada sugestão mandada e a cada mudança de status (Início > Sugestões)",
@@ -1487,11 +1612,27 @@ LIVROS = (
           "registrado em 24/10/2026 antes de existir: nasce com a 1ª decisão. A tela lê com cache de 1 minuto e a "
           "gravação relê o banco antes (troca o livro inteiro, as abas juntas)",
           so_cresce=True),
+    # o uso das telas do OS Creator e os pedidos ao Fracttal, por hora (31/10/2026, etapa 0 do canto central do OS Creator):
+    # um livro por mês, só cresce (a gravação relê o mês e troca as linhas de mesma chave)
+    Livro(fato_uso_os.LIVRO_MOLDE, fato_uso_os.ABAS,
+          "de hora em hora (:05) as horas fechadas vão ao disco do servidor; ao banco, uma vez por dia, às 04:45 "
+          "(Brasília), só no servidor",
+          "nexus/casca/uso_os.py (laço, ligado no servir.py) + nexus/dados/fato_uso_os.py", False,
+          "registrado em 31/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª gravação das 04:45 depois do deploy. Um "
+          "livro por mês (AAAA_MM do hora_id, de Brasília) com três abas: o uso por rota, o detalhe do Fracttal por "
+          "origem × método e o total da hora (1 linha por hora; a linha * que o contador entrega vai para ele). As três "
+          "abas vão juntas a cada gravação, sobre o livro do mês relido (leitura curta não grava). Gravar o livro do mês "
+          "inteiro a cada hora custaria ~7 s de processador num processo só (Ruling M): de hora em hora as linhas ficam "
+          "no disco (casca/uso_os_pendente.json, até 3 dias), e o Raio-X lê o banco por cima do pendente. O banco fora "
+          "deixa o pendente onde está e a gravação do dia seguinte leva tudo. Só contagens: nem pessoa nem setor (o corte "
+          "por setor fica no disco do servidor)",
+          so_cresce=True),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.
 FAMILIAS = {re.compile(r"^nexus_geracao_inversor_\d{4}_\d{2}$"): "nexus_geracao_inversor_AAAA_MM",
-            re.compile(r"^nexus_almoxarifado_saldo_\d{4}_\d{2}$"): "nexus_almoxarifado_saldo_AAAA_MM"}
+            re.compile(r"^nexus_almoxarifado_saldo_\d{4}_\d{2}$"): "nexus_almoxarifado_saldo_AAAA_MM",
+            re.compile(r"^nexus_oscreator_uso_\d{4}_\d{2}$"): fato_uso_os.LIVRO_MOLDE}
 
 
 def da_familia(livro: str, aba: str) -> bool:
@@ -1505,7 +1646,9 @@ ABAS_FORA_DA_REGRA = {
     "feriados_locais": "a lista de feriados estaduais e municipais (a dim_data só tem os nacionais)",
     "qualidade_historico": "a qualidade do histórico (SCD2): sobreposição, buraco e membro sem vigente",
     "equipamento_apelido": "o que cada sistema chama de cada equipamento (o modelo do de_para das usinas)",
-    "foto_ativos": "a foto dos ativos do Fracttal: insumo da dimensão de equipamento, carga única",
+    "foto_ativos": "a foto dos ativos do Fracttal, renovada toda noite pelo leitor do servidor (1 linha = 1 item com 1 "
+                   "código; o que saiu do Fracttal fica, com fora_do_fracttal_desde): insumo da dimensão de equipamento e "
+                   "do catálogo de ativos do OS Creator na máquina sem cópia",
     "meses": "a lista dos livros do mês do inversor × dia, com o sha de cada um (a geração regrava só o mês que mudou)",
     "aba_equipamentos": "a visão da estrutura das usinas no formato da aba Equipamentos do bd_performance (as mesmas "
                         "colunas, com os IDs no fim), só das chaves marcadas \"no lugar da aba\": é o que deixa cada "
@@ -1547,11 +1690,11 @@ CONHECIDAS = (
     Conhecida("falhas_performance", ("atualizacao",), "controle",
               "o controle da publicação da plataforma: as linhas de cada aba no mês"),
     # 29/10/2026: a Thopen pelas normalizações do COS vai nas abas de sempre (disponibilidade_dia e _os_dia, com fonte e
-    # protecoes); estas guardam a conta de antes só para o cliente do Dashboard Thopen até o Levi liberar
-    Conhecida("falhas_performance", ("disponibilidade_dia_fracttal", "disponibilidade_os_dia_fracttal"), "apoio",
-              "a disponibilidade de antes da Thopen (só do Fracttal), mesmas colunas da disponibilidade_dia e da "
-              "disponibilidade_os_dia, para o cliente do Dashboard Thopen até a liberação da conta pelas normalizações "
-              "do COS (29/10/2026); na liberação a plataforma para de gravar e elas se aposentam"),
+    # protecoes); estas guardaram a conta de antes só para o cliente do Dashboard Thopen até o Levi liberar
+    Conhecida("falhas_performance", ("disponibilidade_dia_fracttal", "disponibilidade_os_dia_fracttal"), "aposentada",
+              "a disponibilidade de antes da Thopen (só do Fracttal), para o cliente do Dashboard Thopen até a liberação "
+              "da conta pelas normalizações do COS: gravadas de 29 a 30/10/2026; a plataforma parou de gravar na "
+              "liberação (\"garanta que a única fonte seja a de normalizações\"); ficam no banco porque a API não apaga"),
     Conhecida("campo_nexus", ("rondas", "atualizacao"), "aposentada",
               "do coletor do Fracttal do Nexus, desligado em 05/10/2026 (o fato dele se aposentou); fica no banco "
               "porque a API não apaga livro"),
@@ -1559,7 +1702,8 @@ CONHECIDAS = (
     # nexus_almoxarifado · dim_item_almox
     Conhecida(almoxarifado.LIVRO_ITENS, (almoxarifado.ABA_ITENS,), "dimensao",
               "os itens do inventário do Fracttal (peças e insumos) que estavam na lista no último ciclo da varredura do "
-              "App: código, nome, unidade, família, avariado; a fonte da dimensão do item do almoxarifado"),
+              "App: código, nome, unidade, família, avariado e, desde 30/10/2026, a criticidade e a Curva ABC do "
+              "cadastro da peça no Fracttal; a fonte da dimensão do item do almoxarifado"),
     Conhecida("gemeo_digital", ("usina", "equipamento", "alias", "modelo"), "apoio",
               "o cadastro próprio do gêmeo digital: as 25 usinas, os equipamentos, os apelidos e os modelos dele"),
     Conhecida("gemeo_digital", ("cascata_dia", "evento"), "candidata",

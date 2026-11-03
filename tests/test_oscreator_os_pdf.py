@@ -11,7 +11,6 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
 pytest.importorskip("reportlab")
 Image = pytest.importorskip("PIL.Image")
 if ponte.RAIZ_CLONE not in sys.path:

@@ -198,7 +198,6 @@ WID, FOLIO, WID_MAE = 9301, 9302, 9303
 @pytest.fixture
 def tela(monkeypatch):
     """O clone com o Fracttal falso; devolve (cliente, lidos): `lidos` anota cada OS cujo detalhe foi pedido."""
-    pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
     import api
     import chamados_obs_store as obs_store
     from os_web import criar_app, rotas

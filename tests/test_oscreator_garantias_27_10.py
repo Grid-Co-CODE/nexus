@@ -68,7 +68,6 @@ def _linha(i, folio, nota="", status=1, criada="2026-10-20T13:00:00"):
 
 @pytest.fixture
 def tela(monkeypatch):
-    pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
     import api
     import chamados_obs_store as obs_store
     from os_web import criar_app, rotas

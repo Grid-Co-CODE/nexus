@@ -17,6 +17,12 @@ e a peça que nunca foi ligada ao almoxarifado no Fracttal não vem na leitura d
   catálogo ao contado de X NESSA contagem, e o total é o que substitui o saldo; o genérico identificado e confirmado tira
   as unidades do genérico e as põe no específico, para o estoque não ficar em dobro.
 - **Contado negativo nunca mexe:** o App não manda, mas o livro é texto; a peça entra como não contada e `invalido`.
+- **A avariada (30/10/2026, a aba Avariados do App)** chega aqui já resolvida pela `leitura.ler` (`avariados.resolver`): a
+  que achou o `-AV` no catálogo é linha `item` do -AV (com a marca `_avariado_de`), e a que não achou segue `avariado`, pelo
+  caminho do achado fora do catálogo (a decisão da curadoria a leva a uma peça). **A mesma contagem com o -AV contado direto
+  E pela aba é `dobro`** (com `invalido` junto, o caminho do contado inválido: fora do lote até o PCM corrigir), porque somar
+  contaria duas vezes a mesma peça; a avariada levada pela curadoria a uma peça ("é a peça Y", "cadastrar") conta como a da
+  aba para ela.
 
 A chave de uma linha é o "ID da linha" (a 14ª coluna do contrato, `nexus.dados.almoxarifado.COLUNAS_CONTAGENS`), único
 dentro da contagem: a curadoria é `{id_da_linha: {"decisao", "id_item"}}`.
@@ -28,6 +34,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from ...dados import almoxarifado as A
+from . import avariados
 from .estoque import instante
 
 # As seis situações de uma peça no lote (a ordem dos grupos da confirmação). Só as três primeiras mexem no estoque; a
@@ -44,6 +51,9 @@ APROVAVEL_DIAS = 90
 # Quanto o relógio do celular pode estar adiantado: o "Contada em" é a hora do celular, e a conferência de conflito olha
 # o que se moveu DEPOIS dela. Relógio adiantado de dias esconderia todo movimento real do Fracttal.
 RELOGIO_ADIANTADO = timedelta(hours=1)
+
+# as decisões da curadoria do achado (o fora do catálogo e a avariada sem o -AV no catálogo, 30/10/2026)
+DECISOES_DO_ACHADO = ("cadastrar", "e_a_peca", "descartar")
 
 CASAS = 6               # a soma de decimais (0.1 + 0.2) não sobra como 0.30000000000000004 e vira "ajuste"
 _TOLERANCIA = 1e-9
@@ -83,6 +93,7 @@ class _Lido:
     codigos: dict = field(default_factory=dict)     # id_item -> código (o da linha, ou o da decisão)
     achados: list = field(default_factory=list)     # (ID da linha, unidades, negativo) do fora do catálogo por decidir
     ordem: list = field(default_factory=list)       # ("peca", id_item) | ("achado", posição em `achados`), na ordem do livro
+    dobros: set = field(default_factory=set)        # id_item do -AV contado direto E pela aba Avariados (também em `invalidos`)
 
     def peca(self, id_item: str, codigo=None) -> None:
         if id_item not in self.total:
@@ -138,10 +149,19 @@ def _ler(linhas, curadoria) -> _Lido:
     - `fora_do_catalogo` (o achado sem peça): `e_a_peca` e `cadastrar` somam as unidades à peça da decisão; `descartar` as
       joga fora; sem decisão ficam por decidir (o achado em branco nem isso: não é pendência). A decisão que não é do tipo
       da linha não resolve nada: a linha segue pendente e nada é gravado por engano.
-    - Linha sem ID do item (nas duas primeiras) ou de um Tipo que não existe não é de peça nenhuma: não entra.
+    - `avariado` (30/10/2026, a aba Avariados): a que a `leitura.ler` levou ao -AV chega como `item` com a marca
+      `_avariado_de` e conta como a linha da própria peça; a que não achou o -AV segue o caminho do achado fora do catálogo
+      (sem o ID da boa, pelo Código dela; sem o ID E sem o Código não é de peça nenhuma, e a leitura põe o aviso do App na
+      contagem). A que já tem decisão da curadoria segue a decisão mesmo depois de se resolver
+      (o -AV entrou no catálogo do App, criado por outra contagem): o "descartar" do PCM não some em silêncio. O -AV com
+      número na linha direta E na da aba é `dobros` (e `invalidos`): somar contaria duas vezes a mesma peça. A avariada
+      decidida ("é a peça Y" ou "cadastrar", com unidades) conta como a da aba para Y.
+    - Linha sem ID do item (nas duas primeiras) ou de um Tipo que não existe não é de peça nenhuma: não entra. O ID "None" ou
+      "nan" que o `sync-xlsx` escreve no vazio é sem ID (`almoxarifado.id_ou_vazio`).
     - A mesma linha reenviada conta uma vez (`_unicas`)."""
     lido = _Lido()
     cur = {_id(k): v for k, v in (curadoria or {}).items() if isinstance(v, dict)}
+    diretas, pela_aba = set(), set()            # o -AV com número na linha dele e na da aba Avariados
     for l in _unicas(linhas):
         tipo = _txt(l.get("Tipo")).lower()
         chave = _id(l.get("ID da linha"))
@@ -149,13 +169,18 @@ def _ler(linhas, curadoria) -> _Lido:
         negativo = n is not None and n < 0
         dec = (cur.get(chave) or {}) if chave else {}
         decisao, alvo = _txt(dec.get("decisao")), _id(dec.get("id_item"))
+        da_aba = tipo == "item" and "_avariado_de" in l
+        if da_aba and decisao in DECISOES_DO_ACHADO:
+            tipo = "avariado"                   # decidida quando o -AV ainda não estava no catálogo: vale a decisão
         if tipo in ("item", "identificar"):
-            id_item = _id(l.get("ID do item"))
+            id_item = A.id_ou_vazio(l.get("ID do item"))        # o "None" do `sync-xlsx` não vira a peça "None"
             if not id_item:
                 continue
             lido.peca(id_item, l.get("Código"))
             if tipo == "item":
                 lido.somar(id_item, n, negativo)
+                if n is not None:
+                    (pela_aba if da_aba else diretas).add(id_item)
                 continue
             destino = (alvo or _id(l.get("Identificado como"))) if decisao == "confirmar" else ""
             if not destino:
@@ -168,12 +193,21 @@ def _ler(linhas, curadoria) -> _Lido:
                 else:
                     lido.somar(id_item, 0.0)                # o genérico foi contado: o que achou menos o que saiu dele
                 lido.achadas(destino, n)
-        elif tipo == "fora_do_catalogo":
+        elif tipo in ("fora_do_catalogo", "avariado"):
+            if tipo == "avariado" and not A.id_ou_vazio(l.get("ID do item")) and not avariados.codigo_da_linha(l):
+                continue                                    # sem o ID nem o Código da boa: o contrato violado (a leitura avisa)
             if decisao in ("e_a_peca", "cadastrar") and alvo:
                 lido.achadas(alvo, n, dec.get("codigo"))
+                if tipo == "avariado" and n:
+                    # a avariada decidida leva as unidades a Y como a resolvida: com Y contada direto também, é o dobro (a
+                    # revisão final de 31/10/2026: sem isso, "é a peça Y" e a linha direta de Y somavam). Com 0 unidades a
+                    # decisão não toca Y (`achadas`), e não há o que dobrar
+                    pela_aba.add(alvo)
             elif decisao != "descartar" and n is not None:
                 lido.ordem.append(("achado", len(lido.achados)))
                 lido.achados.append((chave, n, negativo))
+    lido.dobros = diretas & pela_aba
+    lido.invalidos |= lido.dobros
     return lido
 
 
@@ -194,10 +228,12 @@ def contado_efetivo(linhas: list[dict], curadoria: dict[str, dict]) -> dict[str,
 
 
 # ── o lote ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
-def _entrada(*, id_item, codigo, sistema, campo, contado, ligada, sit, corrigido, tirada, invalido, pendentes) -> dict:
+def _entrada(*, id_item, codigo, sistema, campo, contado, ligada, sit, corrigido, tirada, invalido, pendentes,
+             recontar=False, dobro=False) -> dict:
     return {"id_item": id_item, "codigo": codigo, "sistema": sistema, "contado": contado, "contado_campo": campo,
             "delta": None if contado is None else _limpo(contado - (sistema or 0.0)), "situacao": sit,
-            "ligada": ligada, "corrigido": corrigido, "tirada": tirada, "invalido": invalido, "pendentes": pendentes}
+            "ligada": ligada, "corrigido": corrigido, "tirada": tirada, "invalido": invalido, "pendentes": pendentes,
+            "recontar": recontar, "dobro": dobro}
 
 
 def itens_do_lote(contagem: list[dict], sistema: dict[str, dict], curadoria: dict, revisao: dict) -> list[dict]:
@@ -205,13 +241,17 @@ def itens_do_lote(contagem: list[dict], sistema: dict[str, dict], curadoria: dic
 
     `contagem`: as linhas do App. `sistema`: o que o `Estoque.ler` devolveu (`{id_item: {"saldo", "codigo", ...}}`; a peça
     fora dele não está ligada ao almoxarifado). `curadoria`: ver `contado_efetivo`. `revisao`: `{"tiradas": {id_item:
-    motivo}, "corrigidos": {id_item: número}}` (a correção ilegível ou negativa não vale; a que vale também resolve a
-    peça `invalido`: é o PCM, com o motivo na auditoria, dizendo o número).
+    motivo}, "corrigidos": {id_item: número}, "recontar": {id_item: motivo}}` (a correção ilegível ou negativa não vale; a
+    que vale também resolve a peça `invalido`: é o PCM, com o motivo na auditoria, dizendo o número).
 
     Cada entrada: `id_item`, `codigo`, `sistema` (o saldo do Fracttal; 0 se não ligada; None se o Fracttal não o disse),
     `contado_campo` (o número do campo já com a curadoria), `contado` (o que vai ao Fracttal: o do campo, ou o corrigido
     pelo PCM), `delta`, `situacao`, `ligada`, `corrigido`, `tirada` (fica de fora da gravação, mas guarda a situação que
-    teria), `invalido` e `pendentes` (os "ID da linha" do genérico por identificar).
+    teria), `invalido`, `pendentes` (os "ID da linha" do genérico por identificar), `recontar` (a recontagem da peça foi
+    pedida nesta contagem, 30/10/2026: ela vem `tirada` também, para todo caminho que já deixa a tirada de fora, a gravação
+    e a assinatura do lote inclusive, deixar a recontada de fora sem conhecer a regra nova) e `dobro` (o -AV contado direto
+    e pela aba Avariados, 30/10/2026: vem `invalido` também, e segue o caminho do contado inválido: fora do lote, e o número
+    corrigido pelo PCM entra).
 
     A peça com genérico por identificar fica na `curadoria` (não grava: as unidades ainda não têm dono). O achado fora do
     catálogo por decidir é uma entrada à parte, sem `id_item` (""), na `curadoria` também, com a linha em `pendentes`
@@ -221,6 +261,7 @@ def itens_do_lote(contagem: list[dict], sistema: dict[str, dict], curadoria: dic
     estoque = {_id(k): v for k, v in (sistema or {}).items() if isinstance(v, dict)}
     revisao = revisao or {}
     tiradas = {_id(k) for k in (revisao.get("tiradas") or {})}
+    recontar = {_id(k) for k in (revisao.get("recontar") or {})}
     corrigidos = {_id(k): v for k, v in (revisao.get("corrigidos") or {}).items()}
     itens = []
     for tipo, ref in lido.ordem:
@@ -245,7 +286,8 @@ def itens_do_lote(contagem: list[dict], sistema: dict[str, dict], curadoria: dic
         codigo = lido.codigos.get(id_item) or (_txt(no_estoque.get("codigo")) if ligada else "")
         itens.append(_entrada(id_item=id_item, codigo=codigo, sistema=saldo, campo=campo, contado=contado, ligada=ligada,
                               sit="curadoria" if pendentes else situacao(saldo, contado), corrigido=corrigido,
-                              tirada=id_item in tiradas, invalido=id_item in lido.invalidos, pendentes=pendentes))
+                              tirada=id_item in tiradas or id_item in recontar, invalido=id_item in lido.invalidos,
+                              pendentes=pendentes, recontar=id_item in recontar, dobro=id_item in lido.dobros))
     return itens
 
 
@@ -265,22 +307,30 @@ def substituidas(contagens: list[dict], gravadas: set[str]) -> set[str]:
     os `contagem_id` com gravação feita ou começada) fica como está. Data ilegível é a mais velha: sem como ordenar, ela
     não pode ser a que vale. Contagem sem `contagem_id` ou sem `id_almox` não entra (sem o almoxarifado não há de quem
     ser a mais nova, e juntar todas num "almoxarifado vazio" faria uma substituir as outras sem motivo). Cada contagem:
-    `contagem_id`, `id_almox`, `contada_em`, `enviada_em`.
+    `contagem_id`, `id_almox`, `contada_em`, `enviada_em` e `recontagem_de` (vazio na contagem inteira).
+
+    **A recontagem só das peças marcadas não substitui ninguém** (30/10/2026, item 4 das melhorias): ela traz só as peças
+    que o PCM pediu, e como "a mais nova" tiraria do caminho a original inteira, cujas outras peças seguem para aprovar e
+    gravar (o desenho chama isso de falha mesmo funcionando). A recontagem (`recontagem_de` preenchido) fica fora da escolha
+    da nova, e a original, mais velha, também não a substitui: ela só fica velha quando uma contagem INTEIRA do mesmo
+    almoxarifado é mais nova que ela (pela mesma chave), e a já gravada fica como está.
 
     Quem chama passa só as contagens VIVAS: nem a `recontagem pedida` (recusada pelo PCM) nem a `substituída` entram aqui.
     Uma recontagem pedida que contasse como "a mais nova" substituiria as boas anteriores sem ter número nenhum para
     gravar no lugar delas."""
     gravadas = {_txt(g) for g in (gravadas or ())}
-    por_almox: dict[str, list] = {}
+    inteiras: dict[str, list] = {}
+    recontagens: dict[str, list] = {}
     for c in contagens or []:
         cid, almox = _txt(c.get("contagem_id")), _id(c.get("id_almox"))
         if cid and almox:
-            por_almox.setdefault(almox, []).append(
-                ((_quando(c.get("contada_em")), _quando(c.get("enviada_em")), cid), cid))
+            chave = (_quando(c.get("contada_em")), _quando(c.get("enviada_em")), cid)
+            (recontagens if _txt(c.get("recontagem_de")) else inteiras).setdefault(almox, []).append((chave, cid))
     velhas: set[str] = set()
-    for lista in por_almox.values():
-        nova = max(lista)[1]
-        velhas |= {cid for _, cid in lista if cid != nova and cid not in gravadas}
+    for almox, lista in inteiras.items():
+        nova = max(lista)
+        velhas |= {cid for _, cid in lista if cid != nova[1] and cid not in gravadas}
+        velhas |= {cid for chave, cid in recontagens.get(almox, []) if chave < nova[0] and cid not in gravadas}
     return velhas
 
 

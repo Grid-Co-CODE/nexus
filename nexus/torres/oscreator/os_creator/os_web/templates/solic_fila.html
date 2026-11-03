@@ -18,6 +18,12 @@
     <a class="spc-btn-sec" id="fl_atualizar" href="/os/solicitacao/fila?atualizar=1" title="Busca as solicitações de novo no Fracttal">Atualizar</a>
     <span class="spc-cab-info" id="fl_cont"></span>
   </div>
+  {# na volta do "Recarregar o catálogo de ativos" (31/10/2026): como terminou a busca dos ativos novos no Fracttal, a leitura
+     que o catálogo não aceitou (encolheu) e o download que falhou há pouco. Os textos são do servidor: a URL só traz o sinal
+     (`?recusa=1`, `?falha=1`), e nada escrito nela chega à tela #}
+  {% if novos_txt %}<p class="spc-alerta spc-alerta--faixa" id="fl_novos">{{ novos_txt }}</p>{% endif %}
+  {% if recusa %}<p class="spc-alerta spc-alerta--faixa" id="fl_recusa">{{ recusa }}</p>{% endif %}
+  {% if falha %}<p class="spc-alerta spc-alerta--faixa" id="fl_falha">{{ falha }}</p>{% endif %}
   <div class="spc-corpo">
     <aside class="spc-lista" aria-label="Aguardando aprovação">
       <div class="spc-cabcol">AGUARDANDO APROVAÇÃO</div>
@@ -37,7 +43,7 @@
               <div><span class="spc-rot">Solicitante</span><span class="spc-val" id="fl_solic"></span></div>
               <div class="spc-larga"><span class="spc-rot">Ativo</span><span class="spc-val" id="fl_ativo"></span></div>
             </div>
-            <p class="spc-alerta" id="fl_ativo_aviso" hidden>Não achei o ativo desta solicitação no catálogo — criar a OS no ativo errado é pior. <a href="/os/solicitacao/atualizar" id="fl_recarregar">Recarregar o catálogo de ativos</a> (leva alguns minutos).</p>
+            <p class="spc-alerta" id="fl_ativo_aviso" hidden>Não achei o ativo desta solicitação no catálogo — criar a OS no ativo errado é pior. <a href="/os/solicitacao/atualizar" id="fl_recarregar">Recarregar o catálogo de ativos</a> ({% if leitor %}busca no Fracttal os ativos novos, em segundos{% else %}leva alguns minutos{% endif %}{% if ativos_de %}; <span title="{{ ativos_de_titulo }}">{{ ativos_de }}</span>{% endif %}).</p>
             <div class="spc-obs-cab"><span class="spc-rot">Observação</span><button type="button" class="spc-ver" id="fl_ver" hidden>ver inteira</button></div>
             <textarea class="spc-obs" id="fl_obs" placeholder="sem observação — clique para escrever" readonly aria-label="Observação da solicitação"></textarea>
             <p class="spc-dica">Rola aqui dentro e não empurra o resto. Clique no texto para editar.</p>

@@ -13,12 +13,12 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 
 import api  # noqa: E402 — o api.py do clone
 import chamados_obs_store as obs_store  # noqa: E402
+import os_central  # noqa: E402 — a lista central de OS (vazia aqui: o caminho de hoje)
 from os_web import criar_app, rotas, rotas_acomp  # noqa: E402
 from os_web import historico_store as HS  # noqa: E402
 
@@ -86,6 +86,9 @@ def fr(monkeypatch):
     HS.limpar()
     with rotas._MEMO_LOCK:
         rotas._MEMO.clear()
+    # a lista central de OS (31/10/2026, tarefa 3.3) fica vazia aqui, como no PC sem leitor (o conftest a limpa): a guarda da
+    # lista pela metade daqui é a do caminho de hoje; a da lista central é a conferência (`test_oscreator_historico_central`)
+    assert not os_central.atual().por_id
     yield f
     HS.limpar()
     with rotas._MEMO_LOCK:

@@ -10,7 +10,9 @@
     <a class="os-btn secondary os-voltar" href="/os/">&larr; Voltar</a>
     <div class="at-titulo"><div class="at-h1">Ativos</div><div class="at-sub" id="sub">carregando o catálogo…</div></div>
     <span class="os-cresce"></span>
-    <button type="button" class="os-btn secondary" id="b_reload" title="Busca o catálogo de ativos no Fracttal agora (leva alguns minutos) e vale para todos que usam o OS Creator. Use quando um ativo novo ainda não aparece. Sozinho, o catálogo se renova por trás uma vez por dia.">Atualizar ativos</button>
+    {# o que o botão faz depende da máquina (31/10/2026): com o leitor do servidor, busca só os ativos novos (segundos), e a
+       lista inteira é lida toda madrugada; sem ele (o PC), o catálogo inteiro pelo RPC (minutos) #}
+    <button type="button" class="os-btn secondary" id="b_reload" title="{% if leitor %}Busca no Fracttal, agora, os ativos que ainda não estão na lista (alguns segundos) e vale para todos que usam o OS Creator. Use quando um ativo novo ainda não aparece. A lista inteira é lida de novo toda madrugada.{% else %}Busca o catálogo de ativos no Fracttal agora (leva alguns minutos) e vale para todos que usam o OS Creator. Use quando um ativo novo ainda não aparece. Sozinho, o catálogo se renova por trás uma vez por dia.{% endif %}">Atualizar ativos</button>
     <input id="busca" type="search" class="at-busca" placeholder="código, nome, usina…   [Ctrl+F]" autocomplete="off">
   </div>
 

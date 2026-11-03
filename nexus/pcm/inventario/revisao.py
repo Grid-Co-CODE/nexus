@@ -1,7 +1,8 @@
 """A revisão de uma contagem pelo PCM (Levi, 26/10/2026; desenho, seção 4.2): o que a aba Inventário mostra (a lista das
 contagens e a contagem aberta, com o Sistema × Contado × Δ × Situação e os seis grupos da confirmação) e o que o PCM faz nela
-(tirar uma peça do lote, corrigir o número, pedir a recontagem). Sem Flask: quem chama (as rotas, em `__init__`) passa a
-configuração, a função que lê o saldo do Fracttal e a pessoa do pedido; os testes passam as suas.
+(tirar uma peça do lote, corrigir o número, pedir a recontagem só das peças marcadas ou a da contagem inteira). Sem Flask:
+quem chama (as rotas, em `__init__`) passa a configuração, a função que lê o saldo do Fracttal e a pessoa do pedido; os
+testes passam as suas.
 
 Quatro regras que a tela segue:
 
@@ -51,10 +52,10 @@ GRUPOS = {
     "zerar": ("Zerar o estoque", "O técnico digitou 0 em peça com saldo: o estoque dela vai a zero no Fracttal. Confira peça "
                                   "a peça antes de gravar."),
     "sem_alteracao": ("Sem alteração", "O contado é igual ao saldo do sistema: nada é gravado."),
-    "nao_tocada": ("Não será tocada", "Em branco, com contado inválido ou tirada do lote: nada é gravado, e o saldo do "
-                                      "Fracttal fica como está."),
-    "curadoria": ("Curadoria", "O que o PCM ainda decide (o genérico por identificar e a peça fora do catálogo): nada é "
-                               "gravado até decidir."),
+    "nao_tocada": ("Não será tocada", "Em branco, com contado inválido ou em dobro, tirada do lote ou em recontagem: nada é "
+                                      "gravado, e o saldo do Fracttal fica como está."),
+    "curadoria": ("Curadoria", "O que o PCM ainda decide (o genérico por identificar, a peça fora do catálogo e a avariada sem "
+                               "cadastro): nada é gravado até decidir."),
 }
 # a cor de cada situação (o tom do selo, do número do alto e da barra; a palavra vem sempre junto) e o selo do grupo na
 # confirmação (o que acontece no Fracttal). O desenho é o do mockup do Spare Parts (Levi, 27/10/2026): para cima verde, para
@@ -124,6 +125,15 @@ def _hora(iso, com_as: bool = False) -> str:
     return d.strftime("%d/%m/%Y às %H:%M" if com_as else "%d/%m/%Y %H:%M")
 
 
+def _dia(iso) -> str:
+    """O dia e o mês de Brasília de uma hora do livro (UTC com Z), para a nota "recontagem pedida em 30/10"; vazio se a hora
+    não se lê (a nota sai sem a data, nunca com uma inventada)."""
+    try:
+        return instante(iso).astimezone(_BRT).strftime("%d/%m")
+    except ValueError:
+        return ""
+
+
 # ── a pessoa que revisa ──────────────────────────────────────────────────────────────────────────────────────────────────
 def pessoa(cfg, email) -> dict | None:
     """Quem revisa, como o livro a guarda: `pessoa_hmac` (o código do e-mail, nunca o e-mail) e `pessoa_id` (quando a ficha do
@@ -149,19 +159,67 @@ def montar_lista(cfg) -> dict:
     except F.Recusada as ex:
         return {"erro": str(ex), "livro_existe": False, "contagens": [], "a_revisar": 0}
     cs = [dict(c, contada_txt=_hora(c["contada_em"]), enviada_txt=_hora(c["enviada_em"]),
-               rotulo=ROTULO_ESTADO[c["estado"]], tom=TOM_ESTADO[c["estado"]]) for c in d["contagens"]]
+               rotulo=ROTULO_ESTADO[c["estado"]], tom=TOM_ESTADO[c["estado"]],
+               recontagem_txt=_recontagem_de(c, d["contagens"])) for c in d["contagens"]]
     return {"erro": "", "livro_existe": d["livro_existe"], "contagens": cs,
             "a_revisar": sum(1 for c in cs if c["aprovavel"])}
 
 
+def _original(c: dict, contagens: list[dict]) -> dict | None:
+    """A contagem em que o PCM pediu a recontagem que `c` atende (o "Recontagem de" do App), se a lista a tem."""
+    de = A._txt(c.get("recontagem_de"))
+    return next((x for x in contagens if x["contagem_id"] == de), None) if de else None
+
+
+def _recontagem_de(c: dict, contagens: list[dict]) -> str:
+    """O rótulo da contagem de recontagem na lista (30/10/2026): de qual contagem ela é, pela hora da original ("recontagem
+    da contagem de 26/10/2026 09:00"; o ID do App é opaco). A original que a lista não tem (fora da janela de 90 dias, ou do
+    almoxarifado de teste) aparece pelo ID. Vazio na contagem inteira."""
+    de = A._txt(c.get("recontagem_de"))
+    if not de:
+        return ""
+    o = _original(c, contagens)
+    return f"recontagem da contagem de {_hora(o['contada_em'])}" if o else f"recontagem da contagem {de}"
+
+
+def resumo(cfg) -> dict | None:
+    """O que a tela principal do Almoxarifado pede ao inventário, de UMA leitura das contagens (30/10/2026): `{"n": quantas
+    esperam o PCM (o número da aba Inventário), "ultimas": {id do almoxarifado: "dd/mm/aaaa"} ou None}`. `ultimas` é o dia
+    (Brasília) da contagem gravada mais nova de cada almoxarifado, em estado `gravada` ou `gravada_com_conflitos`; o
+    almoxarifado sem nenhuma fica fora do dicionário (a tela diz "sem contagem gravada na janela lida": o livro do App é uma janela
+    que anda, e "nunca contado" seria mais do que se sabe); e `None` quando o App ainda não publica o livro das contagens
+    (`livro_existe` falso): não leu, a tela não diz nada. O retorno `None` é o inventário que não deu para ler.
+
+    **Quem abre a tela chama isto UMA vez por abertura e tira os dois valores daqui.** A falha de leitura não fica guardada (o
+    `visao._calcular` só guarda o que deu certo): chamar `a_revisar` e depois uma segunda função pelo mesmo caminho lia o livro
+    duas vezes por abertura justo quando o banco está ruim (a revisão de 30/10/2026). Pela cópia de 5 min do `visao._ler`, renovada
+    por trás: os dois são só enfeite, e a leitura do livro do inventário (2 min, no pedido) não pode segurar a tela principal quando
+    o banco está lento (a lista do Inventário, essa sim, mostra o estado de agora)."""
+    def contar() -> dict:
+        d = leitura.ler(cfg)
+        cs = d["contagens"]
+        ultimas: dict[str, tuple] = {}
+        for c in cs:
+            # a recontagem gravada também conta (é uma contagem real daquelas peças); a que ainda está gravando, não
+            if c["estado"] not in ("gravada", "gravada_com_conflitos") or not c["id_almox"]:
+                continue
+            try:
+                quando = instante(c["contada_em"])
+            except ValueError:
+                continue                  # sem data legível não há o que mostrar (e a que não se lê nem se aprova)
+            if c["id_almox"] not in ultimas or quando > ultimas[c["id_almox"]][0]:
+                ultimas[c["id_almox"]] = (quando, quando.astimezone(_BRT).strftime("%d/%m/%Y"))
+        return {"n": sum(1 for c in cs if c["aprovavel"]),
+                "ultimas": {a: dia for a, (_, dia) in ultimas.items()} if d["livro_existe"] else None}
+    g = visao._ler(("pcm_inventario_resumo",), contar)
+    return None if g.erro or not g.dados else g.dados
+
+
 def a_revisar(cfg) -> int | None:
-    """Quantas contagens esperam o PCM (o número da aba Inventário na tela principal do Almoxarifado); None se não deu para
-    ler: a aba segue sem número. Pela cópia de 5 min do `visao._ler`, renovada por trás: o número é só um enfeite, e a leitura do
-    livro do inventário (2 min, no pedido) não pode segurar a tela principal quando o banco está lento (a lista do Inventário,
-    essa sim, mostra o estado de agora)."""
-    g = visao._ler(("pcm_inventario_a_revisar",),
-                   lambda: {"n": sum(1 for c in leitura.contagens(cfg) if c["aprovavel"])})
-    return None if g.erro or not g.dados else g.dados["n"]
+    """Quantas contagens esperam o PCM (o número da aba Inventário nas outras páginas do Almoxarifado); None se não deu para
+    ler: a aba segue sem número. A tela principal usa o `resumo` inteiro (uma leitura só), não esta função mais outra."""
+    r = resumo(cfg)
+    return None if r is None else r["n"]
 
 
 # ── a auditoria ──────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -169,7 +227,8 @@ def a_revisar(cfg) -> int | None:
 ROTULO_EVENTO = {"contagem_recebida": "Contagem recebida", "aprovada": "Aprovada para gravar", "peca_gravada": "Peça gravada",
                  "conflito": "Conflito", "erro": "Erro", "peca_tirada": "Peça tirada do lote",
                  "recontagem_pedida": "Recontagem pedida", "numero_corrigido": "Número corrigido",
-                 "substituida": "Contagem substituída", "curadoria": "Curadoria decidida", "regua_gravada": "Régua gravada"}
+                 "substituida": "Contagem substituída", "curadoria": "Curadoria decidida", "regua_gravada": "Régua gravada",
+                 "recontagem_item_pedida": "Recontagem da peça pedida"}
 # o selo de cada evento, pelas quatro famílias do mockup do Spare Parts (Levi, 27/10/2026): a gravação no Fracttal em verde, a
 # curadoria em âmbar, a aprovação e a revisão em azul, o conflito e o erro em vermelho. A cor só reforça a palavra (o rótulo)
 SELO_EVENTO = {"peca_gravada": "ok", "regua_gravada": "ok", "curadoria": "alerta", "conflito": "critico", "erro": "critico"}
@@ -331,18 +390,26 @@ def _avisos_da_curadoria(itens: list[dict]) -> list[str]:
 
 def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, sistema: dict | None, pode: bool) -> dict:
     """O item das contas com o que a tela mostra: o nome, os números como texto, o porquê de a peça não ser gravada e as ações.
-    O MOTIVO do PCM (da peça tirada e do número corrigido) só vai a quem pode revisar: os outros setores leem "tirada do lote" e
-    "corrigida pelo PCM", sem o texto (ele é livre, e pode citar gente)."""
+    O MOTIVO do PCM (da peça tirada, do número corrigido e da recontagem pedida) só vai a quem pode revisar: os outros setores
+    leem "tirada do lote", "corrigida pelo PCM" e "recontagem pedida em dd/mm", sem o texto (ele é livre, e pode citar gente)."""
     meta = nomes.get(i["id_item"], {})
-    tirada, notas = i["tirada"], []
+    tirada, recontar, notas = i["tirada"], i.get("recontar", False), []
     sit = i["situacao"]
     grupo = "nao_tocada" if tirada else sit
     motivo_tirada = revisao["tiradas"].get(i["id_item"], "") if tirada and pode else ""
     motivo_correcao = revisao["motivos_corrigidos"].get(i["id_item"], "") if i["corrigido"] and pode else ""
-    if tirada:
+    if recontar:
+        # a recontagem só das marcadas (30/10/2026): a peça sai deste lote e o técnico a reconta no App; a contagem nova é
+        # que a traz. A data é a do pedido, para o PCM saber há quanto tempo espera
+        dia = _dia((revisao.get("recontar_em") or {}).get(i["id_item"]))
+        motivo_recontar = (revisao.get("recontar") or {}).get(i["id_item"], "") if pode else ""
+        notas.append("recontagem pedida" + (f" em {dia}" if dia else "") + (f": {motivo_recontar}" if motivo_recontar else ""))
+    elif tirada:
         notas.append("tirada do lote" + (f": {motivo_tirada}" if motivo_tirada else ""))
     elif i["invalido"] and not i["corrigido"] and sit != "curadoria":
-        notas.append("contado inválido (negativo): a peça não será gravada")
+        # o -AV contado direto e pela aba Avariados (30/10/2026) segue o caminho do contado inválido: o PCM corrige o número
+        notas.append("contado em dobro: o -AV veio direto e pela aba Avariados" if i.get("dobro")
+                     else "contado inválido (negativo): a peça não será gravada")
     elif sit == "nao_tocada":
         notas.append("em branco: o técnico não contou")
     if i["corrigido"]:
@@ -352,7 +419,8 @@ def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, sis
             notas.append("corrigida pelo PCM")
         else:
             agora = _num(i["contado"])
-            texto = (f"o técnico contou um valor inválido; o PCM corrigiu para {agora}" if i["invalido"]
+            texto = (f"o -AV veio em dobro (direto e pela aba Avariados); o PCM corrigiu para {agora}" if i.get("dobro")
+                     else f"o técnico contou um valor inválido; o PCM corrigiu para {agora}" if i["invalido"]
                      else f"o técnico deixou em branco; o PCM informou {agora}" if i["contado_campo"] is None
                      else f"o técnico contou {_num(i['contado_campo'])}; o PCM corrigiu para {agora}")
             notas.append(texto + (f" ({motivo_correcao})" if motivo_correcao else ""))
@@ -368,15 +436,21 @@ def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, sis
     nome, descricao = meta.get("nome", ""), ""
     if sit == "curadoria" and not i["id_item"]:
         linha = achados.get(i["pendentes"][0] if i["pendentes"] else "", {})
-        descricao = A._txt(linha.get("Descrição"))
-        nome = "Fora do catálogo" + (f": {descricao}" if descricao else "")
+        if A._txt(linha.get("Tipo")).lower() == "avariado":
+            # a avariada sem o -AV no catálogo (30/10/2026): a linha traz o -AV que falta (`avariados.resolver`)
+            codigo_av = A._txt(linha.get("_codigo_av")) or A._txt(linha.get("Código"))
+            nome = (f"Avariada com o código repetido no catálogo: {codigo_av}" if linha.get("_av_repetido")
+                    else "Avariada sem cadastro" + (f": {codigo_av}" if codigo_av else ""))
+        else:
+            descricao = A._txt(linha.get("Descrição"))
+            nome = "Fora do catálogo" + (f": {descricao}" if descricao else "")
     mexe = sit in contas.MEXEM and not tirada
     # sem Δ onde não há conta a fazer: a peça que não se toca, a da curadoria (as unidades ainda não têm dono: o Δ de um
     # genérico com 4 unidades por identificar contra o saldo 20 diria "-16", e não é isso) e a de saldo não informado (o Δ
     # contra um 0 que o Fracttal não disse seria um "+5" que ninguém viu; a nota diz que vale 0 na conta)
     sem_delta = i["delta"] is None or sit in SEM_DELTA or sem_saldo
     crit_n, crit_nome = _criticidade(((sistema or {}).get(i["id_item"]) or {}).get("criticidade")) if i["id_item"] else (None, "")
-    rotulo = "Tirada do lote" if tirada else ROTULO_SITUACAO[sit]
+    rotulo = "Em recontagem" if recontar else "Tirada do lote" if tirada else ROTULO_SITUACAO[sit]
     return dict(i, nome=nome, unidade=meta.get("unidade", ""), grupo=grupo, rotulo=rotulo, notas=notas, mexe=mexe,
                 descricao=descricao, tom="neutro" if tirada else TOM_SITUACAO[sit],
                 crit=crit_n, crit_nivel=min(crit_n, 4) if crit_n else None, crit_nome=crit_nome,
@@ -390,7 +464,11 @@ def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, sis
                 delta_sinal="" if sem_delta or not i["delta"] else "mais" if i["delta"] > 0 else "menos",
                 # as ações são da peça com número que entra ou entraria no lote (a curadoria, sem ID, e a tirada não têm)
                 acoes=bool(pode and c["aprovavel"] and i["id_item"] and not tirada and sit != "curadoria"
-                           and (sit in contas.MEXEM or i["invalido"])))
+                           and (sit in contas.MEXEM or i["invalido"])),
+                # a caixa da recontagem só das marcadas (30/10/2026): o que o servidor aceita, a peça com o ID do item fora da
+                # curadoria e ainda no lote (o achado e o genérico por identificar seguem na curadoria). A em branco e a que
+                # bate também: recontar o duvidoso inclui o que ninguém contou
+                marcavel=bool(pode and c["aprovavel"] and i["id_item"] and not tirada and sit != "curadoria"))
 
 
 def _contagem(cfg, contagem_id: str):
@@ -421,9 +499,19 @@ def montar(cfg, contagem_id: str, pode: bool = False) -> dict | None:
     ctx = {"c": c, "rotulo": ROTULO_ESTADO[c["estado"]], "tom_estado": TOM_ESTADO[c["estado"]],
            "contada_txt": _hora(c["contada_em"], com_as=True),
            "enviada_txt": _hora(c["enviada_em"], com_as=True), "itens": [], "avisos_curadoria": [], "pode": pode,
-           "so_pcm": SO_PCM, "vai_ler": False, "sem_login": SEM_LOGIN, "pausa": PAUSA}
+           "so_pcm": SO_PCM, "vai_ler": False, "sem_login": SEM_LOGIN, "pausa": PAUSA, "original": None,
+           "sem_catalogo": False}
+    o = _original(c, todas["contagens"])
+    if o:                    # a contagem de recontagem diz de qual é, com o link (a que a lista não tem, pelo ID: o template)
+        ctx["original"] = {"contagem_id": o["contagem_id"], "contada_txt": _hora(o["contada_em"], com_as=True)}
     if c["aviso"]:
         return ctx           # o App fora do contrato: nenhum número, que seria pela metade
+    if any(l.get("_sem_catalogo") for l in c["linhas"]):
+        # a contagem que já não se revisa (aprovada, gravada, recusada, substituída) com avariada e o catálogo do App que não se
+        # leu agora: ela não leva o aviso (a etapa Gravação e a Auditoria seguem na tela, 31/10/2026), mas as peças contadas
+        # dependem das avariadas levadas ao -AV, e a lista sem elas seria número pela metade: esperam o catálogo
+        ctx["sem_catalogo"] = True
+        return ctx
     ctx["itens"], lote = _itens(cfg, c, todas, None, pode)
     ctx["avisos_curadoria"] = _avisos_da_curadoria(lote)
     ctx["vai_ler"] = bool(pode and c["aprovavel"])
@@ -448,7 +536,9 @@ def montar_lote(cfg, contagem_id: str, ler_sistema, pode: bool = False) -> dict:
     if c is None:
         raise Recusa(404, "Contagem não encontrada: atualize a página.")
     if c["aviso"]:
-        raise Recusa(409, f"O App mandou esta contagem fora do contrato ({c['aviso']}): nada a comparar.")
+        # o catálogo do App que não se leu agora não é culpa do App (31/10/2026): a mensagem não diz "fora do contrato"
+        raise Recusa(409, f"O App mandou esta contagem fora do contrato ({c['aviso']}): nada a comparar." if c["aviso_do_app"]
+                     else f"Esta contagem não se revisa agora ({c['aviso']}): nada a comparar.")
     if not c["aprovavel"]:
         raise Recusa(409, f"Esta contagem não se aprova: {c['motivo_nao_aprovavel']}.")
     sistema, estado, mensagem = _do_sistema(ler_sistema, c["id_almox"])
@@ -532,18 +622,21 @@ def _evento(c: dict, quem: dict, tipo: str, item: dict | None = None, **mais) ->
 
 
 def revisar(cfg, contagem_id: str, pedido, quem: dict | None) -> dict:
-    """Tira uma peça do lote, corrige o número contado ou pede a recontagem. `pedido`: `{"acao": "tirar" | "corrigir" |
-    "recontagem", "id_item"?, "valor"?, "motivo", "sistema"?, "confirmo"?}`. Levanta `Recusa` (nada foi gravado) com o status e o
-    texto.
+    """Tira uma peça do lote, corrige o número contado, pede a recontagem só das peças marcadas ou a da contagem inteira.
+    `pedido`: `{"acao": "tirar" | "corrigir" | "recontagem_itens" | "recontagem", "id_item"?, "itens"?, "valor"?, "motivo",
+    "sistema"?, "confirmo"?}`. Levanta `Recusa` (nada foi gravado) com o status e o texto; devolve `{"ok", "n", "mensagem",
+    "estado"}` (`n`: quantos eventos foram gravados).
 
-    O motivo é obrigatório nas três (o desenho: "cada um com o motivo, na auditoria") e só vai cifrado. Peça tirada não grava no
+    O motivo é obrigatório em todas (o desenho: "cada um com o motivo, na auditoria") e só vai cifrado. Peça tirada não grava no
     Fracttal e mantém a situação; corrigir troca o número que vai ao Fracttal (a auditoria guarda o do campo, o corrigido, quem
-    corrigiu e o motivo); a recontagem recusa a contagem inteira (nada é gravado e o App pode contar de novo)."""
+    corrigiu e o motivo); a recontagem das marcadas (`itens`, 30/10/2026) tira só aquelas peças deste lote, um evento por peça,
+    e o resto da contagem segue para aprovar e gravar; a recontagem inteira recusa a contagem (nada é gravado e o App pode
+    contar de novo)."""
     if not isinstance(pedido, dict):
         raise Recusa(400, "Pedido sem corpo: mande a ação e o motivo em JSON.")
     acao = A._txt(pedido.get("acao"))
-    if acao not in ("tirar", "corrigir", "recontagem"):
-        raise Recusa(400, "Ação desconhecida: tirar, corrigir ou recontagem.")
+    if acao not in ("tirar", "corrigir", "recontagem_itens", "recontagem"):
+        raise Recusa(400, "Ação desconhecida: tirar, corrigir, recontagem_itens ou recontagem.")
     if quem is None:
         if not cfg.get("NEXUS_PESSOA_HMAC"):
             raise Recusa(409, "O servidor não está configurado para registrar quem revisa (falta a NEXUS_PESSOA_HMAC); avise a T.I.")
@@ -557,11 +650,13 @@ def revisar(cfg, contagem_id: str, pedido, quem: dict | None) -> dict:
     # da conferência do estado até a escrita, a vez da contagem (`travas.CONTAGEM`): a aprovação que está lendo o lote termina
     # antes (e então a contagem já não se revisa), em vez de montar o lote sem esta revisão
     with travas.CONTAGEM.de(A._txt(contagem_id)):
-        c = _revisar(cfg, contagem_id, pedido, quem, acao, motivo)
+        c, n = _revisar(cfg, contagem_id, pedido, quem, acao, motivo)
     novo = next((x for x in leitura.contagens(cfg) if x["contagem_id"] == contagem_id), c)
     texto = {"tirar": "Peça tirada do lote.", "corrigir": "Número corrigido.",
+             "recontagem_itens": (f"Recontagem pedida de {n} {'peça' if n == 1 else 'peças'}: "
+                                  f"{'ela sai' if n == 1 else 'elas saem'} deste lote, e o resto da contagem segue."),
              "recontagem": "Recontagem pedida: nada será gravado desta contagem."}[acao]
-    return {"ok": True, "mensagem": texto, "estado": novo["estado"]}
+    return {"ok": True, "n": n, "mensagem": texto, "estado": novo["estado"]}
 
 
 FOI_GRAVAR = "A contagem já foi para a gravação: o lote foi congelado na aprovação, e nenhuma revisão entra depois dele."
@@ -579,8 +674,53 @@ def _foi_para_a_gravacao(cfg, contagem_id: str) -> bool:
         return True
 
 
+EM_RECONTAGEM = "a recontagem dela foi pedida nesta contagem: ela saiu deste lote, e a contagem nova do App é que a traz"
+
+
+def _lote_sem_sistema(cfg, contagem_id: str, c: dict) -> dict[str, dict]:
+    """{id_item: entrada das contas} do lote da contagem com a revisão e a curadoria de agora (sem o saldo: revisar não lê o
+    Fracttal, e o que se confere aqui não depende dele)."""
+    revisao, curadoria = leitura.revisao_da(cfg, contagem_id, motivos=False), leitura.curadoria_da(cfg, contagem_id)
+    return {i["id_item"]: i for i in contas.itens_do_lote(c["linhas"], {}, curadoria, revisao) if i["id_item"]}
+
+
+def _a_recontar(cfg, contagem_id: str, c: dict, bruto) -> list[dict]:
+    """As peças marcadas para a recontagem (30/10/2026), TODAS conferidas antes de gravar qualquer uma: tudo ou nada, para o
+    PCM não ficar com metade das marcadas fora do lote sem saber quais. Só se marca o que aceita ação (a peça com o ID do item,
+    ainda no lote e fora da curadoria): o achado fora do catálogo não tem ID, e o genérico por identificar decide a curadoria.
+    A peça repetida na lista vale uma vez. A que já tem a recontagem pedida nesta contagem já está fora do lote: 409 (quem a
+    traz é a contagem nova do App). A lista maior que as linhas da contagem não é a tela marcando peças: 400 antes de
+    conferir qualquer uma (a conferência é por peça, e uma lista sem teto seria trabalho sem fim no pedido)."""
+    if not isinstance(bruto, list) or not bruto:
+        raise Recusa(400, "Marque ao menos uma peça para recontar.")
+    if len(bruto) > len(c["linhas"]):
+        raise Recusa(400, f"A lista tem mais peças ({len(bruto)}) que as linhas da contagem ({len(c['linhas'])}): recarregue "
+                          "a página e marque de novo.")
+    marcadas = [A._id(x) if isinstance(x, (str, int)) and not isinstance(x, bool) else "" for x in bruto]
+    if not all(i.isdigit() for i in marcadas):
+        raise Recusa(400, "Diga as peças pelo ID do item (o achado fora do catálogo não tem: ele segue na curadoria).")
+    ids = list(dict.fromkeys(marcadas))             # a repetida vale uma vez, na ordem em que veio
+    lote = _lote_sem_sistema(cfg, contagem_id, c)
+    escolhidas = []
+    for i in ids:
+        item = lote.get(i)
+        if item is None:
+            raise Recusa(400, f"A peça {i} não está nesta contagem.")
+        peca = item["codigo"] or i
+        if item["recontar"]:
+            raise Recusa(409, f"A peça {peca} já foi pedida para recontar: {EM_RECONTAGEM}.")
+        if item["tirada"]:
+            raise Recusa(409, f"A peça {peca} já está fora do lote.")
+        if item["situacao"] == "curadoria":
+            raise Recusa(409, f"A peça {peca} tem unidades por identificar: decida a curadoria antes de pedir a recontagem.")
+        escolhidas.append(item)
+    return escolhidas
+
+
 def _revisar(cfg, contagem_id: str, pedido: dict, quem: dict, acao: str, motivo: str):
-    """Confere o estado de agora e grava o evento (chamar com a trava da contagem). Devolve a contagem conferida."""
+    """Confere o estado de agora e grava os eventos (chamar com a trava da contagem), todos de uma vez (`acrescentar` com a
+    lista: a recontagem das marcadas grava um por peça, e o livro não fica com só uma parte). Devolve (a contagem conferida,
+    quantos eventos)."""
     try:
         F.ler(cfg, forcar=True)         # o estado de agora: dois PCMs revisando a mesma contagem não se atropelam
         _, c = _contagem(cfg, contagem_id)
@@ -592,28 +732,34 @@ def _revisar(cfg, contagem_id: str, pedido: dict, quem: dict, acao: str, motivo:
         raise Recusa(409, f"Esta contagem não se revisa: {c['motivo_nao_aprovavel']}.")
     if _foi_para_a_gravacao(cfg, contagem_id):
         raise Recusa(409, FOI_GRAVAR)
-    item, extra = None, {}
-    if acao != "recontagem":
-        id_item = A._id(pedido.get("id_item")) if isinstance(pedido.get("id_item"), (str, int)) else ""
-        if not id_item.isdigit():
-            raise Recusa(400, "Diga a peça (o ID do item).")
-        revisao, curadoria = leitura.revisao_da(cfg, contagem_id, motivos=False), leitura.curadoria_da(cfg, contagem_id)
-        item = next((i for i in contas.itens_do_lote(c["linhas"], {}, curadoria, revisao) if i["id_item"] == id_item), None)
-        if item is None:
-            raise Recusa(400, "Essa peça não está nesta contagem.")
-        if item["tirada"]:
-            raise Recusa(409, "A peça já está fora do lote.")
-        if acao == "corrigir":
-            if item["situacao"] == "curadoria":
-                raise Recusa(409, "A peça tem unidades por identificar: decida a curadoria antes de corrigir o número.")
-            valor = _valor(pedido.get("valor"))
-            _conferir_exagero(valor, item["contado_campo"], pedido.get("sistema"), pedido.get("confirmo") is True)
-            extra = {"de_qtd": item["contado_campo"], "para_qtd": valor}
-    tipo = {"tirar": "peca_tirada", "corrigir": "numero_corrigido", "recontagem": "recontagem_pedida"}[acao]
+    if acao == "recontagem_itens":
+        eventos = [_evento(c, quem, "recontagem_item_pedida", i, dados={"motivo": motivo})
+                   for i in _a_recontar(cfg, contagem_id, c, pedido.get("itens"))]
+    else:
+        item, extra = None, {}
+        if acao != "recontagem":
+            id_item = A._id(pedido.get("id_item")) if isinstance(pedido.get("id_item"), (str, int)) else ""
+            if not id_item.isdigit():
+                raise Recusa(400, "Diga a peça (o ID do item).")
+            item = _lote_sem_sistema(cfg, contagem_id, c).get(id_item)
+            if item is None:
+                raise Recusa(400, "Essa peça não está nesta contagem.")
+            if item["recontar"]:
+                raise Recusa(409, f"A peça está em recontagem: {EM_RECONTAGEM}.")
+            if item["tirada"]:
+                raise Recusa(409, "A peça já está fora do lote.")
+            if acao == "corrigir":
+                if item["situacao"] == "curadoria":
+                    raise Recusa(409, "A peça tem unidades por identificar: decida a curadoria antes de corrigir o número.")
+                valor = _valor(pedido.get("valor"))
+                _conferir_exagero(valor, item["contado_campo"], pedido.get("sistema"), pedido.get("confirmo") is True)
+                extra = {"de_qtd": item["contado_campo"], "para_qtd": valor}
+        tipo = {"tirar": "peca_tirada", "corrigir": "numero_corrigido", "recontagem": "recontagem_pedida"}[acao]
+        eventos = [_evento(c, quem, tipo, item, dados={"motivo": motivo}, **extra)]
     try:
-        F.acrescentar(cfg, F.ABA_EVENTO, [_evento(c, quem, tipo, item, dados={"motivo": motivo}, **extra)])
+        F.acrescentar(cfg, F.ABA_EVENTO, eventos)
     except F.Recusada as ex:
         raise Recusa(503, str(ex)) from None
     except ValueError as ex:        # o livro não aceita a linha (um ID que não cabe na coluna): nada foi gravado
         raise Recusa(400, f"O livro do inventário não aceitou: {ex}") from None
-    return c
+    return c, len(eventos)

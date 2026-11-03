@@ -13,6 +13,7 @@ O que estes testes seguram:
 O api e o banco são dublês: nada vai à rede, nada é criado no Fracttal. Nomes e usinas são de mentira (repositório público)."""
 import json
 import re
+import sys
 import threading
 import time
 from pathlib import Path
@@ -21,12 +22,11 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
-import sys  # noqa: E402
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 
 import api  # noqa: E402 — o api.py do clone
+import ativos_central  # noqa: E402 — o catálogo de ativos de todas as telas
 import solic_spec as sp  # noqa: E402
 import temas_store as ts  # noqa: E402
 from os_web import criar_app, lancador, rotas  # noqa: E402
@@ -66,7 +66,7 @@ def _cru(x):
 
 
 @pytest.fixture
-def cli(monkeypatch, tmp_path):
+def cli(monkeypatch):
     """O clone com o Fracttal e o banco FALSOS, a memória zerada e a rede proibida: um pedido que escapasse dos dublês
     derrubaria o teste em vez de ir ao Fracttal."""
     import requests
@@ -75,12 +75,9 @@ def cli(monkeypatch, tmp_path):
         raise AssertionError("o teste tentou ir à rede")
     monkeypatch.setattr(requests.Session, "request", sem_rede)
     rotas._MEMO.clear()
-    monkeypatch.setattr(rs, "_DISCO", {"mtime": None, "idx": None, "vence": 0.0})
-    monkeypatch.setattr(rs, "_TENTOU", {"quando": 0.0})
-    monkeypatch.setattr(api, "_code_loc", {})
-    cat = tmp_path / "assets_cache.json"
-    cat.write_text(json.dumps({"ts": time.time(), "ver": api._CACHE_VER, "assets": ATIVOS}), encoding="utf-8")
-    monkeypatch.setattr(api, "ASSETS_CACHE", str(cat))
+    monkeypatch.setattr(api, "_ASSETS_RENOVA", {"tentou": 0.0})
+    ativos_central.reiniciar()                   # o catálogo central do processo, só na memória, com os ativos do teste
+    ativos_central.trocar(ATIVOS, "rpc")
     chamadas, gravado = [], []
 
     def conta(nome, valor):
@@ -89,7 +86,7 @@ def cli(monkeypatch, tmp_path):
             return valor() if callable(valor) else valor
         return f
     monkeypatch.setattr(api, "list_minhas_solicitacoes", conta("lista", lambda: [dict(x) for x in LINHAS]))
-    monkeypatch.setattr(api, "get_responsaveis", conta("pessoas", [{"name": "Bruno Souza", "id_personnel": 2},
+    monkeypatch.setattr(api, "ler_pessoal", conta("pessoas", [{"name": "Bruno Souza", "id_personnel": 2},
                                                                     {"name": "Ana Teste Silva", "id_personnel": 1},
                                                                     {"name": "Sem Id", "id_personnel": None}]))
     monkeypatch.setattr(api, "get_labels", conta("etiquetas", [{"id": 7, "description": "PERFORMANCE"},
@@ -118,7 +115,8 @@ def cli(monkeypatch, tmp_path):
         s["jwt"] = JWT
         s["conta"] = {"nome": "Pessoa Teste", "email": "teste@exemplo.invalid", "perfil": ""}
     c.chamadas, c.gravado = chamadas, gravado
-    return c
+    yield c
+    ativos_central.reiniciar()
 
 
 def _dados(html, id_):
@@ -198,7 +196,7 @@ def test_a_carga_fria_e_paralela(cli, monkeypatch):
         return f
     monkeypatch.setattr(api, "list_minhas_solicitacoes", lento("lista", [dict(x) for x in LINHAS]))
     # catálogos com conteúdo: o vazio não fica guardado (20/10/2026) e seria lido de novo
-    monkeypatch.setattr(api, "get_responsaveis", lento("pessoas", [{"id": 1, "name": "Ana Teste Silva"}]))
+    monkeypatch.setattr(api, "ler_pessoal", lento("pessoas", [{"id": 1, "name": "Ana Teste Silva"}]))
     monkeypatch.setattr(api, "get_labels", lento("etiquetas", [{"id": 7, "description": "Etiqueta Teste"}]))
     monkeypatch.setattr(api, "get_tipos_classif", lento("tipos", {"tipos": [{"id": 1, "description": "Corretiva"}]}))
     monkeypatch.setattr(api, "status_solicitacao_catalogo", lento("status", list(api.STATUS_SOLICITACAO)))
@@ -211,12 +209,10 @@ def test_a_carga_fria_e_paralela(cli, monkeypatch):
     assert fria < 1.0 and quente < 0.3, (fria, quente)
 
 
-def test_catalogo_vencido_nao_segura_a_pagina_e_renova_por_tras(cli, monkeypatch, tmp_path):
+def test_catalogo_vencido_nao_segura_a_pagina_e_renova_por_tras(cli, monkeypatch):
     """O catálogo de ativos de ontem dá nome às solicitações NA HORA; o download dos ~22 mil ativos vai para uma thread."""
-    vencido = tmp_path / "vencido.json"
-    vencido.write_text(json.dumps({"ts": time.time() - 2 * api.ASSETS_TTL, "ver": api._CACHE_VER, "assets": ATIVOS}),
-                       encoding="utf-8")
-    monkeypatch.setattr(api, "ASSETS_CACHE", str(vencido))
+    ativos_central.reiniciar()
+    ativos_central.trocar(ATIVOS, "rpc", lido_em=time.time() - 2 * api.ASSETS_TTL)       # o de ontem
     baixou = threading.Event()
 
     def baixar(force=False):          # o download de verdade leva minutos; aqui 1,5 s já denuncia quem esperar por ele
@@ -228,11 +224,9 @@ def test_catalogo_vencido_nao_segura_a_pagina_e_renova_por_tras(cli, monkeypatch
     t0 = time.perf_counter()
     h = cli.get("/os/solicitacao/fila").get_data(as_text=True)
     assert time.perf_counter() - t0 < 1.0
-    assert api._code_loc["TST-INV11"] == ("Cliente X", api._usina_curta(USINA), "Inversor")
+    assert ativos_central.atual().local_por_codigo["TST-INV11"] == ("Cliente X", api._usina_curta(USINA), "Inversor")
     assert _dados(h, "fl_dados")["fichas"][0]["tipo_ativo"] == "Inversor"
     assert baixou.wait(5), "o catálogo vencido não foi renovado por trás"
-    rs._RENOVANDO.acquire(timeout=5)
-    rs._RENOVANDO.release()
 
 
 # ── Painel ──────────────────────────────────────────────────────────────────────────────────────────────────────────

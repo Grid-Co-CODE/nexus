@@ -46,6 +46,10 @@ def preparar_tarefas(tarefas: list, catalogo_por_id: dict) -> tuple[list, str]:
         else:
             t.pop("event_date", None)
         t["subtarefas"] = [s for s in (t.get("subtarefas") or []) if isinstance(s, dict) and s.get("_keep", True)]
+        # o tempo da tarefa (30/10/2026): o da tarefa de origem ou o do modelo; o que não for um número de segundos de
+        # 1 min a 24 h sai, e a tarefa fica com os 10 min de sempre
+        d = t.get("duracao")
+        t["duracao"] = d if isinstance(d, int) and not isinstance(d, bool) and 60 <= d <= 86400 else None
         out.append(t)
     com_ativo = [t for t in out if isinstance(t.get("asset"), dict) and t["asset"].get("id")]
     if not com_ativo:

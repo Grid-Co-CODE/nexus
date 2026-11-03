@@ -13,9 +13,12 @@
   // sem acento e sem caixa: a regra da PERFORMANCE compara "garantia" em qualquer grafia
   function norm(t) { return String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
 
-  // o pedido JSON: GET sem corpo, POST com. Devolve {ok, status, j}; a rede que caiu vira {ok:false, j:{erro}}
-  function pedir(url, corpo, texto) {
+  // o pedido JSON: GET sem corpo, POST com. Devolve {ok, status, j}; a rede que caiu vira {ok:false, j:{erro}}.
+  // `auto` (só o valor true) = a tela pediu sozinha (a atualização de 15 min do Histórico), e não a pessoa: o servidor a
+  // conta à parte (X-Nexus-Auto, casca/uso_os.py). O evento de um clique repassado sem querer não vale.
+  function pedir(url, corpo, texto, auto) {
     var op = {credentials: 'same-origin', headers: {'Accept': 'application/json'}};
+    if (auto === true) op.headers['X-Nexus-Auto'] = '1';
     if (corpo !== undefined) {
       op.method = 'POST';
       op.headers['Content-Type'] = 'application/json';

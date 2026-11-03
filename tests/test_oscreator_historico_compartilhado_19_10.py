@@ -11,11 +11,11 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 
 import api  # noqa: E402 — o api.py do clone
+import os_central  # noqa: E402 — a lista central de OS (vazia aqui: o caminho de hoje)
 from os_web import criar_app, rotas  # noqa: E402
 from os_web import historico_store as HS  # noqa: E402
 
@@ -82,6 +82,9 @@ def fr(monkeypatch):
     relogio = {"t": 1000.0}
     monkeypatch.setattr(HS, "_relogio", lambda: relogio["t"])
     f.relogio = relogio
+    # a lista central de OS (31/10/2026, tarefa 3.3) fica vazia aqui, como no PC sem leitor (o conftest a limpa): estes testes
+    # provam o caminho de 19/10, o que a tela usa quando a lista central não cobre (`tests/test_oscreator_historico_central.py`)
+    assert not os_central.atual().por_id
     yield f
     HS.limpar()
 
@@ -188,7 +191,8 @@ def test_as_linhas_sao_montadas_uma_vez_por_versao(fr, monkeypatch):
 def test_a_atualizacao_automatica_usa_a_lista_guardada(fr):
     html = _hist(_cliente())
     js = html[html.index("setInterval(function () {\n    if (document.hidden"):]
-    assert js.split("}, 10 * 60 * 1000")[0].strip().endswith("enviar(false);")
+    # `false` = sem o atualizar=1 (a lista guardada); o `true` de depois diz que a tela mandou sozinha (casca/uso_os.py)
+    assert js.split("}, 10 * 60 * 1000")[0].strip().endswith("enviar(false, true);")
     assert "Lista das " in html
 
 

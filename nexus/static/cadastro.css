@@ -561,3 +561,18 @@ details.csv-extra>.cad-sub{padding:0 14px 12px}
   .csv-acoes .gc-ajuda{flex-basis:100%}
   .csv-conta{min-width:0}
 }
+
+/* Raio-X: o uso do OS Creator nos últimos 7 dias (31/10/2026). Cor só por token; a barra é a largura em %, e o pico perto da
+   cota ou na cota leva a palavra junto (severidade por cor e palavra, nunca só cor). */
+.rx-sub{font:700 11px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo);margin:14px 16px 6px}
+.rx-barra{display:inline-block;width:72px;height:6px;margin-right:8px;overflow:hidden;vertical-align:middle;border-radius:3px;
+  background:var(--superficie-3)}
+.rx-barra i{display:block;height:100%;background:var(--info-cheio)}
+.rx-barra--cota i{background:var(--ok-cheio)}
+.rx-barra--alerta i{background:var(--alerta-cheio)}
+.rx-barra--critico i{background:var(--critico-cheio)}
+.rx-horas td.rx-c{text-align:left;white-space:nowrap}
+.rx-nowrap{white-space:nowrap}
+.rx-n{display:inline-block;min-width:4ch;text-align:right;font-variant-numeric:tabular-nums}
+.rx-tom--alerta{color:var(--alerta);font-weight:600}
+.rx-tom--critico{color:var(--critico);font-weight:600}

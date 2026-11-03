@@ -1,5 +1,5 @@
 # os_creator/os_web/rotas_engenharia.py
-"""Área Engenharia na web — a moldura do desktop (steps/engenharia/tela.py), nada mais.
+"""Área Engenharia na web — a moldura que o desktop tinha (steps/engenharia/tela.py, que saiu da cópia do Nexus), nada mais.
 
 Nasce vazia de propósito, como no app: o conteúdo é da Engenharia (docs/ambiente-compartilhado-engenharia.md, §7) e
 desenhá-lo aqui anularia o arranjo do fork. Título, descrição e ícone vêm do descritor da área (`steps/engenharia`),

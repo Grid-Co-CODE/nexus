@@ -18,6 +18,7 @@ import api
 import chamado_modelos_store as modelos
 
 from . import insp_web as iw
+from . import lista_central
 from . import rotas
 from .rotas import _conta, exige_sessao
 
@@ -157,6 +158,7 @@ def api_criar():
         r = api.create_inspecao_chamado(**kwargs)
     except Exception as e:                              # noqa: BLE001
         return jsonify({"erro": "Não consegui criar a OS: %s" % e}), 502
+    lista_central.criadas(r)                            # a OS criada entra na lista central na hora (31/10/2026)
     return jsonify(dict(iw.mensagem_criou(r, api.LABEL_INSPECAO), ok=True, folio=r.get("wo_folio")))
 
 

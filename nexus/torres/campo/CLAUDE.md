@@ -323,21 +323,46 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   None)` é a 1ª aba do livro. A mesma listagem enche o `_ciclo` das abas de cada livro (`_abas_dos_fatos`). Conferido
   no banco real: 20 abas, 48 mil linhas, iguais linha a linha à leitura de sempre. Prova:
   `tests/test_campo_pre_leitura_19_10.py`.
-- **Rondas** (05/10, no estilo do painel de rondas que o Levi mostrou; refeita em 08/10 pelo pedido dele): sete
-  indicadores do período (`painel_rondas`, depois dos filtros de região do Brasil, cliente, usina, Responsável O&M,
-  equipe, região de campo e gestor de contrato) e seis abas:
-  Registros, Painel, Sujidade e vegetação, Sem ronda, Trackers e Quem ronda. **A aba Cobertura saiu** (08/10: "já não
-  faz sentido tendo o histórico da usina"); o endereço antigo `aba=cobertura` cai na Sem ronda. Toda tabela da tela
-  ordena pelo cabeçalho, no navegador (`_ordenar.html`, `table.cn-ordenavel`: clicar de novo inverte, a seta é o
-  `aria-sort`, vazio no fim, a linha de fotos ou de detalhe anda junto). A seta já marca a ordem que vem do servidor
-  (Registros e Trackers pela data; Sujidade pelo Status; Painel pelo Índice; Sem ronda pela Última ronda), senão o 1º
-  clique não mudava nada; a pessoa ordena pelo nome (`data-ordem`, não pelas iniciais do avatar) e o Veredito pela
-  gravidade (o pior primeiro), não pelo alfabeto.
+- **Rondas** (05/10, no estilo do painel de rondas que o Levi mostrou; refeita em 08/10; **enxuta em 03/11/2026**: Levi,
+  "tem filtro em cima e filtro na tabela, tá uma bagunça", "Menos é mais!"): sete indicadores dos últimos 30 dias, juntos
+  numa faixa (`cn-numeros`, "no padrão de tudo junto"), e duas abas, **Registros** e **Trackers**. **O período é fixo em
+  30 dias** (`DIAS_RONDAS`; "Tire os filtros de dias, até pq carrega só de 300 em 300"; o `dias=` de link antigo não muda
+  nada) e a tabela vem **de 300 em 300** (`pag=`, `LIMITE_LINHAS`). Saíram o Painel, a Sujidade e vegetação e o Quem
+  ronda; o endereço de cada aba que saiu cai nos Registros (`aba=sem` e `aba=cobertura` caem no filtro Sem ronda). As
+  contas deles seguem no `visao` (`comparativos`, `sujidade_vegetacao`, `_por_cluster`), que outras telas usam.
+  - **A barra de uma linha, no modelo do Histórico do OS Creator Web** ("deixe escondido no padrão OS Creator Web >
+    Histórico"): o **Buscar por usina** (a lista `rd-usinas` com TODAS as usinas da tela, sem os filtros, no estilo do
+    Nexus e não a do navegador, que veio "mal formatada": o nome e, embaixo, o cliente e a UF; abre no foco, filtra
+    enquanto se digita sem acento nem caixa, setas e Enter escolhem, Esc fecha; escolher leva à página da usina; sem o
+    script, `/rondas/buscar-usina?nome=` acha pelo nome igual, sem acento nem caixa, ou pelo único que contém, senão
+    volta com `q=`), a busca da tabela (`q`), o botão **Filtros** com a contagem e, na ponta, Exportar
+    CSV e + Ronda avulsa. O painel dos Filtros (Mostrar, Região do Brasil, Cliente, Usina, Responsável O&M, Equipe,
+    Região de campo, Gestor de contrato; `FILTROS_DO_PAINEL`) só vale no Aplicar; fechar (×, Esc, clique fora) descarta;
+    Limpar volta cada lista ao "todos"; o endereço leva só o escolhido; no celular o painel sobe de baixo. Cada filtro
+    aplicado vira uma **etiqueta com o ×** (`rd-etiqueta`), que tira só aquele, na hora; a região de campo e o gestor que
+    vêm do login saem com o `*`. A duração, a pendência, o indicador e a busca também viram etiqueta.
+  - **O "como ler" e de onde vem o dado** moram na exclamação amarela ao lado do título (o `aviso` de
+    `hseq/_legenda.html`, o mesmo dos Extintores; a página carrega o `hseq.css`).
+  - **Os testes de página olham a tabela** (`<section class="cn-painel">`): a lista do Buscar por usina leva o nome de
+    todas as usinas, e "a usina X não aparece" na página inteira sempre falharia.
   - **Registros** (a tabela "Rondas diárias"; 08/10: "tira as colunas região, início e fim", "bote a coluna duração ao
     lado de data"): Data, Duração, Técnico, Usina, Equipe, Tipo, Qualidade, Veredito, Pendências, Trackers, OS, Fotos.
     O mouse (ou o foco do teclado) na duração mostra "Iniciou às 07:00 · terminou às 08:00 (Brasília)" numa dica fixa
     na tela (a rolagem da tabela cortaria uma dica presa à célula). O CSV continua com início, fim, estado e região.
-    Até 300 linhas com o aviso; filtro de duração e de pendência; Exportar CSV com BOM para o Excel.
+    De 300 em 300; Exportar CSV com BOM para o Excel. **A linha abre a barra lateral da ronda** (03/11/2026: "Tira esse
+    botão 'Fotos' ao clicar na linha já abre uma barra lateral mostrando tudo da ronda, a barra pode representar 1/3 do
+    tamanho da tela. Ficará do lado direito! Não irá mais abrir abaixo da linha"): `_ronda_gaveta.html`, 1/3 da tela à
+    direita (a tela inteira abaixo de 900 px), sem véu (a tabela segue clicável; a linha aberta fica marcada), Esc ou ×
+    fecha. Ela busca o pedaço `_ronda_detalhe.html` (rota `rondas_detalhe`, `/rondas/usina/<id>/ronda?os=&data=&ini=`: a
+    ronda pela OS e, sem OS, pelo dia e pela hora do início, no `historico_usina`): quem fez, quando (início e fim em
+    Brasília, duração), nota, veredito, OS, trackers, o checklist (sujidade, vegetação, vala, sombreamento, sensores), as
+    pendências e as fotos, que vêm depois pela rota das fotos da OS (o 429 do Fracttal tenta sozinho em 1 minuto). A
+    coluna Fotos e a linha que abria embaixo saíram dos Registros e do histórico da usina; a caixa que amplia a foto
+    (`_ronda_fotos_caixa.html`) segue, com o botão, na Zeladoria, no EPI e nos Extintores. **A duração e a pendência se escolhem no cabeçalho** (03/11/2026:
+    "ao clicar em 'Duração' no cabeçalho, aí vai ter essas opções ou 'ordenar'"): o menu da Duração ordena (mais longa
+    ou mais curta primeiro, pelo `th._ordenar` do `_ordenar.html`, o `<th data-ordem-menu>`) e filtra (toda, abaixo de
+    10 min, acima de 2 h); o da Pendências filtra (toda ronda, sem OS no Fracttal, evidência incompleta, com a conta). A
+    caixa do menu fica presa à tela (a rolagem da tabela a cortaria).
   - Cobertura = usinas mobilizadas com ronda no período ÷ mobilizadas; a seta compara com o período anterior de
     mesmo tamanho. Duração = fim − início carimbados pelo aparelho (0 a 8 h; fora disso, sem duração; o livro não
     traz a pausa). **Veredito = o `_veredito_ronda` do App, na mesma ordem, com os limites dele** (`LIMIARES_PADRAO`:
@@ -345,9 +370,9 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     (vira Atenção). Medido em 08/10, 30 dias: 527 rondas, cobertura 83% (106 de 128), qualidade 96%, duração média
     47 min; 7 dias: 149 rondas, 66% (84 de 128).
   - **Os sete indicadores filtram a tabela** (Levi, 05/10): Rondas finalizadas = as de hoje (`ind=hoje`); Cobertura =
-    a aba Sem ronda (`aba=sem`); **Nunca tiveram ronda** = `aba=sem&cob=nunca`; Qualidade = abaixo do limite
+    o filtro Sem ronda (`cob=sem`); **Nunca tiveram ronda** = `cob=nunca`; Qualidade = abaixo do limite
     (`ind=qualidade`); Duração = da mais longa para a mais curta (`ind=duracao`); Abaixo de 10 min = `dur=curta`; Usina
-    mais atrasada = as há 7 dias ou mais (`aba=sem&cob=atrasadas`). O cartão ativo fica marcado; clicar de novo, ou no
+    mais atrasada = as há 7 dias ou mais (`cob=atrasadas`). O cartão ativo fica marcado; clicar de novo, ou no
     × do filtro, tira.
   - **Nunca tiveram ronda** (08/10: "em KPIs coloque mais um, quantas usinas nunca tiveram ronda";
     `visao._registro_da_cobertura`): usina mobilizada sem nenhuma ronda em TODO o registro do Nexus, não só no período:
@@ -355,7 +380,8 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     registro (a data mais antiga das três). Medido em 08/10: registro desde 11/08/2026; 19 de 128 mobilizadas nunca
     tiveram ronda (igual à conta antiga "999 dias": a carga só tem rondas que o livro também tem).
   - **Sem ronda** (08/10: "troque por uma tabela chamada 'Sem ronda' que mostrará usina, equipe, técnicos, supervisor e
-    última OS feita na usina (para conseguir rastrear a última vez que o técnico foi lá)"): as mobilizadas sem ronda no
+    última OS feita na usina (para conseguir rastrear a última vez que o técnico foi lá)"; **desde 03/11/2026 um filtro
+    dos Registros**, o "Mostrar" do painel, `cob=`: "Sem ronda some e vira um filtro de registros"): as mobilizadas sem ronda no
     período (padrão), há 7 dias ou mais (`cob=atrasadas`) ou nunca (`cob=nunca`), a mais esquecida primeiro (mais dias
     sem ronda; no empate, a última OS mais antiga). Colunas: Usina (link ao histórico), Equipe, Técnicos (colaboradores
     de campo não desligados da equipe, nome curto decifrado; sem a chave do cadastro, só quantos são), Região de campo
@@ -367,32 +393,16 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     dias antes (o técnico foi lá e não fez ronda). 6 usinas em equipe sem técnico no cadastro. Ler o livro de
     fechamentos deixou a conta fria da tela ~3,6 s mais longa (2.907 linhas, medido do PC); ela é feita em segundo
     plano (`manter_quente`) e a tela quente responde em 0,01 a 0,2 s.
-  - **Painel** (08/10: "uma visão a mais, dashboards que mostre de fato, regiões com melhores indicadores, melhores
-    coberturas, quais equipes tem melhor qualidade e cobertura, qual cliente, qual supervisor!"; `visao.comparativos`):
-    respeitando o período e os filtros, uma tabela por região do Brasil (UF), equipe, cliente, região de campo (com o
-    Supervisor de Campo embaixo do nome) e gestor de contrato (do cadastro: a região pela equipe da usina, o gestor pela
-    usina; a de "supervisor" saiu com a estrutura de O&M de 10/2026) com Índice das rondas, Cobertura (barra), Qualidade
-    (barra), Rondas e Duração média, melhor índice primeiro; em cima, o melhor e o que pede atenção de cada uma (sem os de
-    base pequena). **Índice das rondas** = 60% da nota média das rondas + 40% cobertura: a fórmula do ranking por região
-    do App, só com as rondas (até 18/10/2026 chamava "Índice", "a régua do ranking do App"; mudou porque o Ranking das
-    equipes da Visão do responsável usa a régua inteira, com as tarefas fechadas pelo App, e a mesma equipe tinha duas
-    "notas do App" diferentes na mesma torre); grupo sem uma das duas fica sem índice. **Base pequena** = menos de 3 usinas
-    (`BASE_PEQUENA`). Clicar no nome leva aos Registros filtrados (`regiao=`, `equipe=`, `cliente=`, `regiao_campo=`,
-    `gestor=`; a
-    equipe virou filtro da tela, com o ×). Barras em CSS feitas no servidor, sem biblioteca. As tabelas ficam lado a
-    lado só quando cada uma cabe inteira (620 px); a 1280 px com o menu, duas colunas rolavam de lado. Com todos os
-    grupos de base pequena, o destaque diz isso em vez de "sem índice". Medido em 08/10 (30 dias):
-    5 regiões (índice 99 a 79; Sul com a menor cobertura, 58%), 53 equipes (47 com índice, 34 de base pequena), 12
-    clientes, 7 supervisores (índice 99 a 71); as somas batem com o total (128 usinas, 527 rondas). Com a estrutura
-    (conferência de 08/10, cadastro do ensaio da publicação): 9 grupos de região de campo (as 8 e "Sem região de
-    campo"; índice 99 a 82) e 5 gestores de contrato (98 a 87).
+  - **Painel** (08/10) **saiu em 03/11/2026** (Levi: "Tire o painel, ele não serve"). A conta (`visao.comparativos`,
+    Índice das rondas = 60% da nota das rondas + 40% cobertura) segue no visao, provada em
+    `test_painel_compara_regiao_equipe_cliente_regiao_de_campo_e_gestor`.
   - **Ronda sem OS, o motivo em português** (`visao.motivo_sem_os`; Levi, 05/10: "não entendi essa observação, minha
     conta fracttal já está conectada"): o App cria a OS de ronda com a conta Fracttal do TÉCNICO; "Conecte sua conta
     Fracttal" é a mensagem do App para o técnico. Medido em 05/10: 114 de 771 rondas (90 dias) sem OS por isso (os
     cinco técnicos com mais somavam 74). O App tenta 5 vezes, uma por
     minuto, e desiste (`RONDA_OS_FILA_MAX`, `_MAX_H` 24 h): a ronda antiga não ganha OS quando o técnico conecta depois.
-  - **Usina, Responsável O&M e equipe na barra** (Levi, 13/10/2026: "deve dar para filtrar cliente, usina, responsável
-    e equipe!"): três listas ao lado da de cliente (`usina=` pelo id do cadastro; `responsavel=` é o Responsável O&M da
+  - **Usina, Responsável O&M e equipe** (Levi, 13/10/2026: "deve dar para filtrar cliente, usina, responsável
+    e equipe!"; desde 03/11/2026 no painel dos Filtros): três listas ao lado da de cliente (`usina=` pelo id do cadastro; `responsavel=` é o Responsável O&M da
     ficha da usina, o mesmo da Central, com "Sem responsável O&M" e `*` = todos; `equipe=` virou lista, no lugar do
     filtro que só vinha do clique no Painel). Filtram as rondas E a base da cobertura (os sete indicadores e as seis
     abas, inclusive a Sem ronda e o CSV). A lista de usinas encolhe com os outros filtros (as mobilizadas e as que
@@ -403,20 +413,15 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     (`_Base.nome_cliente`), nunca do nome da usina no livro. Filtra as rondas E a base da cobertura; com cliente
     escolhido aparece a faixa "cobertura das rondas: N%, X de Y usinas mobilizadas do cliente no cadastro". Medido em
     05/10: as 128 mobilizadas têm cliente; Thopen 61 de 80 (76%) em 30 dias.
-  - **Quem ronda por cluster** (`visao._por_cluster`; Levi, 05/10: "seria melhor por cluster, aí nesse cluster clicando
-    apareceria as mesmas informações porém por pessoa"): o cluster é o do cadastro pela usina, numa grafia só
-    (`nome_cluster`: "SP OESTE" e "SP Oeste" eram dois no banco). **Pendentes de ronda** = usinas mobilizadas do cluster
-    que pedem ronda pela regra da Central (`_pendente`: 7 dias ou mais, nunca, ou a longa pendente). Abre em **blocos**
-    (08/10: "traga também uma visão em blocos para que fique mais visual para os supervisores!"; `ver=tabela` volta à
-    tabela): um cartão por cluster com a cobertura (usinas com ronda no período ÷ usinas, a mesma conta do indicador;
-    barra com ronda × sem), os pendentes, as rondas, a qualidade e os técnicos que rondaram; a borda pela cobertura
-    (80% ok, 50% alerta). Clicar abre as pessoas (`cluster=`), com as mesmas colunas; o pendente da pessoa é o da
-    equipe em que ela mais ronda, e **clicar na linha do técnico abre quais são** (08/10: "clicando na linha tem que
-    aparecer quais são essas 5"; `_item_pendente`): a usina (link ao histórico), há quanto tempo e o status e a
-    observação escritos como a Central escreve. A faixa do cluster tem "Ver as N usinas pendentes" (só as do cluster).
-    Conferido em 08/10 (7, 14 e 30 dias): 40 clusters; soma = 128 usinas, 82 pendentes (igual à regra direta) e as
-    rondas do total; cada técnico com a lista do tamanho do número dele (56 técnicos em 30 dias, 44 com pendentes).
-  - **Histórico da usina** (`/rondas/usina/<usina_id>`, `visao.historico_usina`; Levi, 05/10: "quando clicarmos no
+  - **Quem ronda por cluster** (05/10 e 08/10) **saiu em 03/11/2026** (Levi: "Pode tirar quem ronda também! Menos é
+    mais!"). A conta (`visao._por_cluster`, os pendentes de cada técnico pela regra da Central) segue no visao, provada
+    em `test_quem_ronda_mostra_quais_sao_as_pendentes_e_abre_em_blocos`.
+  - **Histórico da usina** (`/rondas/usina/<usina_id>`, `visao.historico_usina`; desde 03/11/2026 também pelo Buscar
+    por usina). **03/11/2026:** a evolução vem dos **últimos 30 dias** (o filtro de mês da 1ª rodada saiu no mesmo dia:
+    "Quando clica na usina deixa os últimas 30 dias, melhor que por mês"; sem leitura no período, diz isso; uma leitura
+    só fica no meio), os números ficam juntos numa faixa, o "De onde vem" (do fim da página e do canto) virou a
+    exclamação amarela ao lado do nome ("conforme segurança > extintores"), e a linha da ronda abre a barra lateral,
+    como nos Registros; a tabela segue com os 90 dias. Levi, 05/10: "quando clicarmos no
     nome da usina já aparece o histórico de rondas com data e sujidade e vegetação"): o nome da usina é link nas abas
     Registros, Sujidade e Sem ronda e nos pendentes do Quem ronda. Todas as rondas do livro (90 dias), a mais recente
     primeiro, com sujidade (número só com a cor da fonte, como na aba),
@@ -453,7 +458,9 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     não sei quando").
   - **As rondas feitas saíram da Central de atenção** (Levi, 05/10: "na parte de atenção quero só o que for pendente"):
     na aba Registros, o filtro de pendência (Sem OS no Fracttal, Evidência incompleta) e a coluna Pendências.
-  - **Sujidade e vegetação** (Levi, 05/10: "é importante!"; `nexus/campo/ronda_checklist.py`): o livro de rondas não
+  - **Sujidade e vegetação** (Levi, 05/10: "é importante!"; `nexus/campo/ronda_checklist.py`; **a aba saiu em
+    03/11/2026**: "também é redundante pois os registros já mostram"; a leitura segue no histórico da usina, na Zeladoria
+    e na Visão do responsável): o livro de rondas não
     traz o checklist, mas o App escreve cada resposta no texto da OS de ronda no Fracttal ("Sujidade dos módulos: 2;
     Altura da vegetação: 3; Sujidade da vala de drenagem: Parcial; Piranômetro IPOA ...: Limpo"). As listagens do REST
     trazem esse texto em lote: as em verificação já estão na fila da Aprovação; as aprovadas (que não mudam mais)
@@ -624,7 +631,11 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     usa o mesmo `_pt_esperando.html` com os modos dela); os endereços de antes (`modo=equipes`, `regioes`, `gestores`,
     `supervisores`) abrem Por responsável (`_modo_central`). O responsável é o **Responsável UFV**, o Responsável O&M da
     ficha da usina (`usinas.responsavel_om_id`; confirmado pelo Levi em 12/10: "é o Responsável O&M mesmo"), não o
-    gestor de contrato. **Rondas pendentes:** um cartão por responsável (`visao.por_responsavel`: as usinas dele,
+    gestor de contrato. **Os cartões por responsável são limpos** (Levi, 03/11/2026: "quero mais minimalista... já tem um
+    vermelho na lateral e a barra também fica vermelha... dói é os olhos!"; `cn-equipe--min`, nas duas abas e na APR
+    e PT): sem a borda colorida, sem o vermelho na barra e sem o número colorido; a cor fica num ponto pequeno ao lado
+    da palavra ("48% feitas", "7 paradas"; a cor nunca sozinha), e a barra, neutra, mostra só o que foi feito.
+    Prova: `tests/test_campo_central_cartoes_limpos_0311.py`. **Rondas pendentes:** um cartão por responsável (`visao.por_responsavel`: as usinas dele,
     pendentes por status, feitas = as não pendentes, o %), e o responsável escolhido (no cartão ou no filtro) abre o
     **kanban** (`visao.kanban`, `COLUNAS_KANBAN`): Nunca teve ronda | Ronda pendente (com o motivo e quem fez a última) |
     Ronda feita (a usina em dia). Cada usina do kanban diz a **equipe** com o rótulo ("pode ser uma ou mais": a do
@@ -924,6 +935,56 @@ uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **
   mexer na cópia); o Responsável UFV do quadro é o Responsável O&M da ficha da usina, o mesmo do Painel. Com "Todos",
   o filtro do supervisor sai. O setor Supervisão Campo tem telas do OS Creator (o portão por setor abre `/os/...` só a
   quem tem uma: conferido nos Acessos em 28/10).
+- **OSs em verificação** (6ª rodada, 29/10/2026: "ao lado de PTS PENDENTES quero um 'OSs em verificação' irá contar as
+  OSs em verificação que não tem etiqueta da performance, chamados, engenharia e não foi criada por ninguém do time do
+  COS. Pense em como fazer isso sem pesar todo carregamento"): o número à direita das PT, a lista na janela.
+  - **A regra** (`campo/verificacao.py`):
+    - **A fila:** a da Aprovação de OS, relida em segundo plano e guardada (`regras_app._FILA_CACHE`).
+    - **A usina:** a do cadastro, pelo nome do Fracttal, a MESMA ligação da Aprovação (`visao.usinas_do_fracttal`).
+    - **A OS:** junta as tarefas dela. O título, a criação e o técnico são da OS; os ativos são os `id_item` distintos.
+    - **A espera:** é a da tarefa terminada há mais tempo, como a Aprovação conta (a cor é a régua dela, 7 e 30 dias).
+    - **Ficam de fora:**
+      - as etiquetas PERFORMANCE, CHAMADOS e ENGENHARIA (o `labels`; nomes conferidos na fila de 29/10);
+      - as criadas por alguém do setor COS (`nexus_setores`), pelo código da pessoa no Fracttal (`code_create_by`) ou
+        pelo nome (`created_by`): o código casa 8 de 9, o nome 7.
+    - **O código da pessoa:** vem do `ler_pessoal`, guardado à parte em `codigos`, fora da linha da tela de Pessoas.
+  - **Sem pesar o Painel:**
+    - O número chega por `fetch` depois da página: `/t/campo/responsaveis/verificacao?so=n`, em JSON.
+    - A lista é o pedaço da mesma rota (`_resp_verificacao.html`), aberto pelo `data-cr-painel` de sempre.
+    - Medido na bancada com a fila real (6.550 tarefas): o número em 0,5 s e a lista em 0,1 s.
+    - Fila ainda não lida no servidor: "—", e a página pede de novo em 30 s.
+  - **As colunas** (as do pedido): OS (abre o card do OS Creator), Criação, Título, Ativos, Técnico, Cliente, Usina,
+    Sem conclusão, o Concluir e o PDF, este ao passar o mouse na linha.
+  - **Concluir e PDF:** são os do OS Creator, com a sessão do Fracttal da pessoa.
+    - O Concluir é `POST /os/api/os/<id>/concluir`, irreversível, com a confirmação antes. O PDF é `POST /os/api/os/pdf`
+      e depois o download.
+    - Sem a sessão (401), a janela manda entrar no Fracttal pelo OS Creator.
+    - A OS concluída, ou mudada no card, sai da fila guardada pela conferência da Aprovação
+      (`/t/campo/aprovacao/<id>/conferir`: só sai o que o Fracttal confirma).
+  - **Exemplo:** na bancada, um responsável com 26 usinas tinha 212 esperando; ficaram de fora 69 por etiqueta e 95
+    criadas pelo COS.
+- **O relatório em PDF** (6ª rodada: "Botão de baixar relatório: ao extremo lado direto da mesma linha dos filtros (...)
+  em PDF com basicamente o que tem focado no que falta para o supervisor (...) um resumo no início e depois
+  aprofunda!"). O botão "Exportar relatório" fica na ponta direita dos filtros, só no Painel. A rota é
+  `/t/campo/responsaveis/relatorio.pdf`, com os filtros da tela (`campo/painel_relatorio.py`, reportlab como o relatório
+  dos extintores).
+  - **O dado é o do Painel:** o `montar`, a faixa "Parada agora" e as OSs em verificação. Nada é recalculado.
+  - **A ordem:**
+    1. a faixa com o nome;
+    2. o resumo com os 8 números;
+    3. "O que cobrar primeiro", em frases, nesta ordem: o parado, o vencido, o que falta (abaixo de 90%, sem ronda,
+       extintores, OSs, o chamado mais antigo, a equipe de menor nota);
+    4. o detalhe de cada quadro, só o que falta: as usinas abaixo da meta, as paradas, as PT, as OSs em verificação,
+       os chamados, as rondas que faltam (nunca, 7 dias ou mais, longa pendente), os extintores vencidos e o ranking.
+  - **Os temas (7ª rodada, 30/10: "a pessoa possa marcar o tema que ela quer levar, as vezes não quer algo, tem que
+    ter a opção de tirar"):** o Exportar abre uma janela com os 8 temas de `painel_relatorio.TEMAS`, todos marcados,
+    "Marcar todos · Tirar todos" e o Baixar PDF (trava, com o aviso, sem nenhum marcado). Os marcados vão como `tema`
+    repetido no endereço; o tema tirado sai do resumo, de "O que cobrar primeiro" e do detalhe, e o PDF diz no topo
+    quais temas leva. Sem `tema` (ou só valores que não existem) o PDF sai inteiro, como o link antigo. As OSs em
+    verificação só são montadas se o tema estiver marcado.
+- **Prova da 6ª e da 7ª rodada:** `tests/test_campo_verificacao_painel.py` (a junção das tarefas, as etiquetas e o COS,
+  a rota do número e da lista, o script do Concluir e do PDF, o PDF do relatório, o placar da equipe, o ativo limpo, as
+  partes da nota com o peso e o que fazer, e os temas tirados do resumo e das frases).
 - **Prova:** `tests/test_campo_painel_responsavel.py` (a ordem e a completude de cada quadro, o nome do ativo, o número
   das rondas, os extintores, o padrão de quem entra, o "Todos", o CSS das 6 linhas com a rolagem e da janela do
   chamado), `tests/test_dados_fato_chamado_status.py` (o status no fato) e `tests/test_oscreator_chamado_por_cima.py`
@@ -1027,8 +1088,30 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
     mais larga (`.cr-modal:has(.cr-rk-j-mat)`). O Acompanhar segue em lista, com o "e mais N" que abre o `resto` ali
     mesmo. Para abrir TUDO, as atrasadas e as pausadas vêm inteiras (`manutencao`: `todas_atrasadas`/`todas_paradas`;
     a linha da Visão geral segue com as 5 piores, `lista_*`).
-  - **Nota do App** (`ranking_equipes.motivos`): o que ela perde, em pílulas (cobertura, cada critério da nota do App e
-    as rondas). A nota perde 100 − nota pontos: a qualidade tira 0,6 × (100 − qualidade), a cobertura o resto; a parte
+  - **O "e mais" aberto, em linhas, e o ativo limpo** (6ª rodada).
+    - **O "e mais":** "o e mais 2 não sumiu, os mais dois não quebraram como os demais, vieram juntos numa linha só".
+      Aberto, o resumo some, e as provas ficam numa lista dentro do `<details>` (`.cr-rk-j-mais-lista`): o `<details>`
+      não arruma os filhos em grade no Chrome.
+    - **O ativo:** "o nome do ativo pode aparecer sem nome de fabricante, modelo ou código do ativo. Só o nome limpo".
+      Os chamados e os ativos das provas passam pelo `responsaveis.nome_do_ativo`, o mesmo do quadro de chamados.
+  - **A pontuação do mês** (6ª rodada: "quero uma explicação da pontuação mensal daquela equipe, pontos por ronda, bonus,
+    quantidade de tarefas etc, um resumo do que temos no ranking das equipes"). Fica embaixo do cabeçalho.
+    - **A conta da nota:** "97 = 60% da qualidade 95 + 40% da cobertura 100%".
+    - **Três números:** a qualidade (a média de N notas: tarefas e rondas), a cobertura (usinas com ronda) e a posição
+      com a seta.
+    - **O placar do ciclo do App, por técnico:** sai de `ranking_equipes.placar_da_equipe` sobre o
+      `visao.ranking_pontos` do mês, casado pelo nome do cadastro. As colunas são posição, pontos, tarefas (registradas,
+      pontos, quantas contam, nota média), rondas (pontos, no teto), bônus e devolvidas.
+    - **A régua:** a frase do piso, do teto e do bônus, com os números que o App publicou.
+  - **Nota do App** (`ranking_equipes.motivos`): o que ela perde, uma linha por motivo. Desde a 6ª rodada ("-1 oq? -1
+    ponto? 1 OS anulada? explique melhor e explique o que impacta, o supervisor não tem uma cristal ball"), cada linha
+    diz:
+    - quantos pontos da nota da equipe, de 100;
+    - onde aconteceu ("em 58 de 125 tarefas");
+    - quanto o critério vale em cada tarefa (o peso da composição);
+    - o que o técnico faz para não perder (`ranking_equipes.COMO_RECUPERA`).
+
+    A cobertura diz as usinas sem ronda e que ela vale 40%. A nota perde 100 − nota pontos: a qualidade tira 0,6 × (100 − qualidade), a cobertura o resto; a parte
     da qualidade vai a cada critério (a "Composição da nota" de cada tarefa, no livro cru pela chave do fato: subtarefas
     25, fotos 20, descrição das fotos 10, assinatura 10, observação 15, GPS 20, que somam a nota; medido em 18/10/2026,
     fecha em 3.790 de 3.790 tarefas) e às rondas. Os inteiros são repartidos pelo maior resto e sempre fecham com a nota
@@ -1214,7 +1297,12 @@ o formulário mandava o código dela, por fora da recusa do `decidir`).
   certo!"). O OS Creator roda dentro do Nexus com sessão própria (cookie `os_sessao`, só em /os); por isso as rotas de
   assinatura moram em `/os/_nexus/...` (`assinatura.py`): `quem` (o e-mail de quem entrou), `pt/<n>/decidir` (POST) e
   `pt/<n>/voltar` (o OS Creator só devolve para /os depois do login). Token do Fracttal vencido (`exp`) não assina;
-  pedido de outra origem leva 403.
+  pedido de outro site leva 403 ("Origem recusada."), pela régua da moldura da Performance, a mesma dos POST da Base
+  e dos Acessos (`assinatura._de_outro_site`: o `Sec-Fetch-Site` do navegador, só `same-origin`; sem ele, o `Origin`).
+  **Não comparar o `Origin` com o `request.host`**: no servidor da T.I. o Nexus não recebe o endereço público no Host,
+  e até 30/10/2026 toda decisão pelo navegador levava 403 (uma Responsável UFV, no 1º dia do card de assinar; o mesmo
+  POST com `Origin: https://app.gridco.com.br` dava 403 em produção). Prova:
+  `test_a_decisao_passa_atras_do_proxy_que_troca_o_host` (falha com a regra antiga).
 - **A ida e a volta do login levam a linha** (revisão adversarial de 11/10/2026: só com o número no `next`, quem abria
   a linha do 2º equipamento sem a sessão do Fracttal voltava do login para a 1ª, com o código dela no formulário, e o
   clique seguinte decidia o outro equipamento; num Não autorizo, o App pausaria a tarefa errada). `_login(número,
@@ -1241,7 +1329,9 @@ o formulário mandava o código dela, por fora da recusa do `decidir`).
   aba `decisoes` de antes (nunca gravada) não é lida.
 - **Quem pode decidir** (Levi, 09/10/2026): o Supervisor de Campo da região da usina (com a vaga aberta, o
   Coordenador), o gestor de contrato da usina, quem tem o vínculo COS no cadastro e um administrador do Nexus
-  (`decisao_pt.aprovadores` / `pode_decidir`, conferido no `decidir`; a recusa diz quem pode). A pessoa é a do login
+  (`decisao_pt.aprovadores` / `pode_decidir`, conferido no `decidir`; a recusa diz quem pode). **Desde 30/10/2026, o
+  Responsável UFV da ficha da usina** (`usinas.responsavel_om_id`, papel "responsável UFV", o 1º da lista de quem
+  pode): é a quem o App manda o aviso e a assinatura da PT desde a v314 (30/10, 04:39Z). A pessoa é a do login
   do Fracttal, achada no cadastro pelo e-mail ou pelo nome de UMA pessoa. **Quem pediu a PT nunca a decide**, nem sendo
   administrador: `pode_decidir` compara o código do e-mail de quem assina com o `solicitante_hmac` da linha e, desde
   11/10/2026, também a pessoa do cadastro (`solicitante_pessoa_id`: quem tem um e-mail no Microsoft e outro no Fracttal
@@ -1263,6 +1353,39 @@ o formulário mandava o código dela, por fora da recusa do `decidir`).
   decisão): decisão gravada que o App descarta trava a linha aqui e deixa o técnico esperando. Até a v257 entrar no ar, a
   tela diz: "O App ainda não lê esta decisão". Falta no App: mandar a PT ao banco na hora em que nasce, não só no timer
   de hora em hora (hoje a PT chega ao Nexus com até 1 h de atraso).
+
+### O card de assinar a PT (30/10/2026)
+
+Pedido do Levi, pelo chat do App de Campo: "a parte de abrir PT e assinar no e-mail automático deve encaminhar para o
+Nexus para eles assinarem por lá ... um layout próprio como se fosse um card no meio da tela dando um blur no fundo e o
+supervisor pode assinar, ao assinar ele vê também se tem mais alguma aberta para alguma usina dele".
+- **O endereço é contrato com o App** (não muda): `/t/campo/pt/<número>/assinar?ativo=<Código do ativo>` (rota
+  `pt_assinar`, template `pt_assinar.html`), o botão do e-mail de PT aguardando da v315, atrás de um interruptor do
+  App. O `ativo` vem sempre (vazio = a linha sem ativo); sem ele, a PT de mais de uma linha só lista os equipamentos,
+  como a tela da PT. Debaixo do `/nexus` também abre (`https://app.gridco.com.br/nexus/t/campo/...`).
+- **O card**: por cima do Nexus desfocado (o véu e o blur da janela da Visão do responsável), uma superfície só, feito
+  para o celular (no estreito o card desce até o fim e o fundo rola; botões e linhas com 44 px). Mostra quem pediu,
+  quando e há quanto espera, a OS, a tarefa, a usina, o ativo, as atividades críticas e os itens marcados NÃO.
+- **Os itens NÃO**: a coluna `Itens NÃO` no fim do `pt_app_campo` (pedida ao App em 30/10: os títulos dos itens
+  respondidos NÃO, separados por "; ", sem texto livre; `visao.pts` → `itens_nao`). Sem ela, a contagem
+  (`Respostas NÃO`), como antes.
+- **A decisão é a de sempre** (`/os/_nexus/pt/<n>/decidir`, o login do Fracttal do OS Creator): o formulário leva
+  `volta` (o card, sem o prefixo) e `card=1`; sem o login do Fracttal, o script troca os botões por "Entrar com o
+  Fracttal para assinar", e o login volta ao card (`assinatura._login(..., card=True)`, `voltar?...&card=1`). O Não
+  autorizo pede o motivo antes (o 1º clique abre a caixa).
+- **Quem pode** é conferido com a pessoa da sessão do Nexus (a conta Microsoft; o e-mail é o mesmo do Fracttal, que o
+  portão de setor já usa), e o `decidir` confere de novo com a do Fracttal. Quem não pode lê o porquê, sem botão; quem
+  o Nexus não acha no cadastro lê também que falta o e-mail na ficha. Medido em 30/10: 6 dos 7 Responsáveis UFV sem
+  e-mail na ficha, achados pelo nome (o do e-mail, fulano.souza@); os 5 que o App passou a avisar na v314 são achados e
+  estão no setor Supervisão Campo, que abre o card.
+- **Depois** (assinada, decidida antes ou sem permissão): "Outras PTs esperando nas suas usinas", da mais antiga para a
+  mais nova, cada uma no próprio card (`decisao_pt.assinaveis`: as linhas esperando que a pessoa pode decidir, sem as
+  que o Nexus já decidiu, menos a que o App recusou). Sem nenhuma: "Nenhuma outra PT esperando nas suas usinas".
+- **A PT que acabou de nascer**: o App publica o livro antes do e-mail (v315), mas a cópia do Nexus é de 5 min; o card
+  que não acha a PT relê o livro na hora, no máximo uma vez por minuto (`_RELIDA_PT`).
+- Prova: `tests/test_campo_pt_assinar.py`. Bancada de 30/10 (dados reais, só leitura, decisão só na memória): 39 PT
+  esperando, 38 com o Responsável UFV na ficha; De acordo e Não autorizo de ponta a ponta, a lista das outras, e o
+  celular a 375 px sem rolagem lateral.
 
 ## As contas copiadas do App (`nexus/campo/regras_app.py`)
 
@@ -1449,7 +1572,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   `os_disponibilidade`); desde 18/10/2026, a Limpeza (`limpeza`), as paradas abertas (`paradas_abertas`) e o bloco
   Manutenção (`manutencao_fonte`, `alertas_manutencao`, `linha_manutencao`, `com_manutencao`, `limite_do_pedido`).
   `manutencao.py`: a conta pura do bloco Manutenção. `tarefas_os.py`: o laço que lê as tarefas das OS do Fracttal e
-  grava o `nexus_os` (acima). `responsaveis_graficos.py`: a geometria dos gráficos das janelas (SVG).
+  grava o `nexus_os` (acima); desde 31/10/2026 é também o leitor de OS que a lista central do OS Creator usa (as mesmas
+  funções e a mesma paginação, e a volta entrega a ela as abertas que leu; regra no `nexus/dados/CLAUDE.md`). `responsaveis_graficos.py`: a geometria dos gráficos das janelas (SVG).
   `chamados_acompanhamento.py`: os chamados de garantia no banco (acima). `ocorrencias.py`: as ocorrências com plano
   de ação (o livro `nexus_ocorrencias`, acima). `zeladoria.py`: a Zeladoria (acima), pura: as leituras, a zeladoria
   do Fracttal pelas três tarefas, as recomendações, a evolução por cliente, a situação, os números e a fila.
@@ -1460,6 +1584,11 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   recarrega a cópia das regras).
 - `pessoas.py`: `identidades.json` e a tabela dos tokens só na partição `cadastro`.
 - `nota_fracttal.py`, `coletor.py`, `banco_campo.py`: o caminho do coletor aposentado.
+- `fracttal.py` e o **porteiro do Fracttal** (31/10/2026): cada pedido do `ler` tira a vez no porteiro do Nexus ANTES de
+  pegar uma das 4 `_VAGAS` (`fracttal_conta.reservar_vez()`), e os laços do Campo que leem o Fracttal por trás se
+  declaram fundo no alvo da thread (`fracttal_conta.de_fundo`: `nexus-tarefas-os-banco`, `nexus-chamados-banco`,
+  `nexus-fila-fracttal` e `nexus-ronda-checklist`); laço novo que lê o Fracttal se declara do mesmo jeito, senão conta
+  como clique. Regras em `nexus/casca/CLAUDE.md`, "Pedidos ao Fracttal: o contador e o porteiro".
 
 Telas: `templates/campo/*.html` + `static/campo.css`; filtros pela URL.
 

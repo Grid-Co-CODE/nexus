@@ -7,11 +7,14 @@
     // Nexus, tem que pedir para logar de novo"): a página pergunta ao abrir, ao voltar a ficar à vista e a cada 5 minutos.
     // O servidor pergunta ao Fracttal no máximo a cada 5 minutos por sessão (ponte.py, /os/_nexus/sessao). Servidor fora
     // ou rede caída não decide nada; só a sessão encerrada leva ao login.
+    // O X-Nexus-Auto diz ao servidor que é a página perguntando sozinha, e não a pessoa clicando: o uso das telas
+    // (casca/uso_os.py, 31/10/2026) conta os dois à parte.
     var ultimaConferencia = 0;
     function confereSessao() {
       if (document.visibilityState === "hidden" || Date.now() - ultimaConferencia < 60000) return;
       ultimaConferencia = Date.now();
-      fetch(nexusRota("/os/_nexus/sessao"), {credentials: "same-origin", cache: "no-store", redirect: "manual"})
+      fetch(nexusRota("/os/_nexus/sessao"), {credentials: "same-origin", cache: "no-store", redirect: "manual",
+                                             headers: {"X-Nexus-Auto": "1"}})
         .then(function (r) {
           // o portão respondeu com o login: a sessão do Nexus já tinha acabado
           if (r.type === "opaqueredirect") { window.nexusEntrarDeNovo(); return null; }

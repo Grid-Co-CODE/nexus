@@ -22,7 +22,6 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 
@@ -116,7 +115,7 @@ def cli(monkeypatch):
     monkeypatch.setattr(requests.Session, "request", sem_rede)
     monkeypatch.setenv(solic_eng_web.ENV_RESPONSAVEIS, "Ana Teste;Bruno")
     monkeypatch.setattr(api, "load_assets_cached", lambda *a, **k: [dict(x) for x in CATALOGO])
-    monkeypatch.setattr(api, "get_responsaveis", lambda *a, **k: [dict(p) for p in PESSOAS])
+    monkeypatch.setattr(api, "ler_pessoal", lambda *a, **k: [dict(p) for p in PESSOAS])
     monkeypatch.setattr(api, "get_labels", lambda *a, **k: [{"id": 7, "description": "PERFORMANCE"}])
     monkeypatch.setattr(api, "get_pessoas_contas", lambda *a, **k: {"pessoas": [{"id_account": 11, "nome": "Ana Teste Silva"}],
                                                                     "eu": 11})
@@ -157,10 +156,11 @@ def test_telas_de_criar_os_saem_com_o_responsavel_digitavel_e_o_mesmo_select(cli
     assert 'id="resp_busca"' not in clo
 
 
-def test_historico_tem_busca_na_lista_de_usinas_com_os_mesmos_valores(cli):
-    """A lista de marcar com 6 opções ou mais ganha a busca do os_busca (a regra é a mesma do <select>). A de Usina é
-    marcada com data-busca e tem a caixa SEMPRE, mesmo com menos de 6 (catálogo fora do ar e período curto). Os
-    checkboxes são os de antes: mesmo valor, sem name (o filtro de usina é local, no navegador)."""
+def test_historico_tem_busca_em_todas_as_listas_com_os_mesmos_valores(cli):
+    """Toda lista de marcar do painel de filtros ganha a busca do os_busca (Levi, 03/11/2026: "quero que todas as opções do
+    filtro sejam digitáveis"). Até 03/11 só a de Usina (marcada com data-busca, mesmo com menos de 6 opções: catálogo fora do ar e
+    período curto) e as de 6 opções ou mais tinham a caixa; agora todas levam o data-busca. Os checkboxes são os de antes: mesmo
+    valor, sem name (o filtro de usina é local, no navegador), e o Status segue indo no formulário com name="status"."""
     h = _html(cli, "/os/historico?atualizar=1")
     js = _ler("static/os_busca.js")
     assert "details.os-multi" in js and "querMulti" in js and "MIN_OPC = 6" in js
@@ -169,9 +169,10 @@ def test_historico_tem_busca_na_lista_de_usinas_com_os_mesmos_valores(cli):
     valores = re.findall(r'<input type="checkbox" value="([^"]*)"', bloco)
     assert sorted(valores) == sorted(USINAS) and len(valores) >= 6
     assert 'name="usina"' not in bloco
-    assert '<details class="os-multi hf-multi" data-nome="cliente" data-local="1">' in h     # as outras: regra dos 6
-    # o Status vale no servidor (vai no formulário com name="status") e continua como era
-    assert '<details class="os-multi hf-multi" data-nome="status">' in h and 'name="status"' in h
+    for nome in ("cliente", "tipo", "tarefa"):                                         # as outras locais: agora também
+        assert '<details class="os-multi hf-multi" data-nome="%s" data-local="1" data-busca="1">' % nome in h, nome
+    # o Status vale no servidor (vai no formulário com name="status") e continua como era, agora também com a busca
+    assert '<details class="os-multi hf-multi" data-nome="status" data-busca="1">' in h and 'name="status"' in h
     assert '<select name="pessoa">' in h and '<select name="etiqueta">' in h
 
 

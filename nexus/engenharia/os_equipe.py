@@ -324,9 +324,11 @@ def pedir_releitura(app=None, esperar=False, forcar=False):
         from flask import current_app
         app = current_app._get_current_object()
     if esperar or app.config.get("TESTING"):
-        _reler(app)
+        _reler(app)                     # na thread de quem pediu: com `esperar`, é o clique, e segue clique no porteiro
     else:
-        threading.Thread(target=_reler, args=(app,), daemon=True, name="nexus-os-equipe").start()
+        from ..casca import fracttal_conta          # a releitura por trás declara o fundo (o teto de 90 do porteiro)
+        threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-os-equipe", _reler), args=(app,), daemon=True,
+                         name="nexus-os-equipe").start()
 
 
 def marcar_uso():

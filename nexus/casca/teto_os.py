@@ -13,7 +13,10 @@ pediria a T.I. (o serviço e o Caddy); o mesmo efeito sai daqui de dentro:
   ("o OS Creator está ocupado esperando o Fracttal"): a tela (HTML) se recarrega sozinha em alguns segundos; o pedido de
   dados recebe o recado em JSON. A thread é solta na hora, em vez de entrar na fila do Nexus inteiro;
 - os arquivos estáticos do OS Creator (`/os/static/`) e a pré-carga não contam;
-- o Raio-X (`/t/base/raio-x`) mostra quantas vagas estão em uso e quantos pedidos voltaram.
+- o Raio-X (`/t/base/raio-x`) mostra quantas vagas estão em uso e quantos pedidos voltaram;
+- o 503 nasce aqui, antes do Flask, então o `casca/uso_os.py` (o uso das telas por hora, 31/10/2026) não o vê pelos
+  ganchos do pedido: ele se pendura em `Teto.ao_recusar` e é avisado a cada recusa. `do_os_creator` é a régua única de
+  "pedido do OS Creator" (do teto e da medição de uso).
 
 Quem liga é o servir.py (o servidor), nunca o create_app: os testes e o PC seguem sem teto.
 """
@@ -36,6 +39,13 @@ _LOG_S = 30.0
 RECADO = "O OS Creator está ocupado esperando o Fracttal. Tente de novo em alguns segundos."
 
 
+def do_os_creator(environ) -> bool:
+    """O pedido é do OS Creator, para o teto e para o uso das telas (`uso_os`)? `/os/*` e `/t/os/*`, menos os estáticos
+    e a pré-carga (ela abre as telas por dentro, não é ninguém usando)."""
+    caminho = environ.get("PATH_INFO", "") or ""
+    return caminho.startswith(_DO_OS) and not caminho.startswith(_LIVRES) and not environ.get(_PRE_CARGA)
+
+
 class Teto:
     """O middleware: no máximo `teto` pedidos do OS Creator em andamento; o seguinte espera `espera` s e volta com 503."""
 
@@ -47,10 +57,10 @@ class Teto:
         self.recusados = 0
         self.ultimo_recusado = 0.0          # epoch
         self._logado = 0.0                  # monotonic
+        self.ao_recusar = None              # quem quer saber de cada 503: `uso_os.recusado(environ)` (o servidor liga)
 
     def conta(self, environ) -> bool:
-        caminho = environ.get("PATH_INFO", "") or ""
-        return caminho.startswith(_DO_OS) and not caminho.startswith(_LIVRES) and not environ.get(_PRE_CARGA)
+        return do_os_creator(environ)
 
     def _soltar(self) -> None:
         with self.trava:
@@ -83,6 +93,11 @@ class Teto:
             log.warning("OS Creator no teto (%s pedidos em andamento): %s %s voltou com 503 (%s recusados desde a "
                         "subida)", self.teto, environ.get("REQUEST_METHOD", ""), environ.get("PATH_INFO", ""),
                         self.recusados)
+        if self.ao_recusar is not None:
+            try:
+                self.ao_recusar(environ)
+            except Exception:           # noqa: BLE001 - a medição nunca estraga a resposta do 503
+                log.debug("OS Creator no teto: o aviso da recusa falhou", exc_info=True)
         aceita = environ.get("HTTP_ACCEPT", "") or ""
         navega = environ.get("HTTP_SEC_FETCH_MODE", "") == "navigate" or (
             "text/html" in aceita and "application/json" not in aceita)

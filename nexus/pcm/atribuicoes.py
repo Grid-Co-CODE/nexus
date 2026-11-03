@@ -33,8 +33,10 @@ LIVRO, NOME_LIVRO = "nexus_pcm_atribuicoes", "Nexus · técnicos por usina (PCM)
 ABA = "fato_decisao_atribuicao"
 CAB = ("decidida_em", "data_id", "usina_id", "usina_fracttal", "pessoa_id", "pessoa_hmac", "papel", "na_usina",
        "de_data_id", "ate_data_id", "origem", "decidida_por_hmac", "dados_cifrados", "assinatura")
-PAPEIS = ("executa",)                    # a fase 3 acrescenta "responsavel" (o supervisor da usina)
-ORIGENS = ("tela", "carga_inicial", "reemissao")
+# a fase 3 (30/10/2026, `responsaveis.py`): o `responsavel` é o Responsável UFV da ficha da usina, que o Nexus põe no
+# livro sozinho (origem `cadastro`) para o App mandar e assinar a PT; a tela Técnicos por usina segue só no `executa`
+PAPEIS = ("executa", "responsavel")
+ORIGENS = ("tela", "carga_inicial", "reemissao", "cadastro")
 OBS_MAX = 300
 TTL_S = 60
 # deriva a chave da assinatura da NEXUS_PESSOA_HMAC (a mesma nos dois lados): a MESMA conta do App (pacote
@@ -170,11 +172,15 @@ def _ultimas(decisoes: list[dict]) -> dict:
     return out
 
 
-def atuais(est: dict, hoje: int) -> dict:
+def atuais(est: dict, hoje: int, papel: str | None = "executa") -> dict:
     """As ligações que valem hoje (`status` "vale") ou começam depois (`status` "agendado"); as tiradas e as que já
-    acabaram não entram. O último dia do apoio ainda vale; o dia de início já vale."""
+    acabaram não entram. O último dia do apoio ainda vale; o dia de início já vale. Só as do `papel` (o `executa`, o
+    de sempre: a tela, a Visão do responsável e os Extintores contam técnicos; desde a fase 3 o livro tem também o
+    `responsavel`, que não é técnico); None = todos."""
     out = {}
     for k, x in _ultimas(est.get("decisoes") or []).items():
+        if papel is not None and k[2] != papel:
+            continue
         if not _sim(x.get("na_usina")):
             continue
         de, ate = _int_ou_none(x.get("de_data_id")), _int_ou_none(x.get("ate_data_id"))
@@ -210,9 +216,10 @@ def _ctx(usina_id, pessoa_id, quando: str) -> str:
     return f"pcm/atribuicoes/{usina_id}/{pessoa_id}/{quando}"
 
 
-def historico(cfg, est: dict, usina_id: int) -> list[dict]:
+def historico(cfg, est: dict, usina_id: int, papel: str | None = "executa") -> list[dict]:
     """As decisões de uma usina, da mais nova à mais antiga: {quando, pessoa_id, acao ("pôs" | "tirou"), de, ate,
-    origem, quem_hmac, obs}. A observação sai decifrada; sem a chave do cadastro, vazia."""
+    origem, quem_hmac, obs}. A observação sai decifrada; sem a chave do cadastro, vazia. Só as do `papel` (o histórico
+    da tela é o dos técnicos); None = todas."""
     cofre = _cofre(cfg)
     out = []
     # a mais nova primeiro; duas no mesmo segundo, a gravada depois primeiro (a ordem do livro desempata)
@@ -220,6 +227,8 @@ def historico(cfg, est: dict, usina_id: int) -> list[dict]:
                    reverse=True)
     for _i, x in ordem:
         if _int_ou_none(x.get("usina_id")) != usina_id:
+            continue
+        if papel is not None and D._txt(x.get("papel") or "executa") != papel:
             continue
         quando, pid = D._txt(x.get("decidida_em")), _int_ou_none(x.get("pessoa_id"))
         obs = ""
@@ -254,7 +263,7 @@ def _linha(cfg, p: dict, quem_hmac: str, origem: str, agora: datetime, hoje: int
         raise Recusada("A data final já passou: um apoio que já acabou não precisa ser lançado.")
     obs = " ".join(D._txt(p.get("obs")).split())[:OBS_MAX]
     ult = ultimas.get((uid, pid, papel))
-    vale_agora = bool(ult) and (uid, pid, papel) in atuais({"decisoes": [ult]}, hoje)
+    vale_agora = bool(ult) and (uid, pid, papel) in atuais({"decisoes": [ult]}, hoje, papel=papel)
     if not na and not vale_agora:
         raise Recusada("Essa pessoa já não está nesta usina (alguém mudou agora): atualize a página.")
     # a mesma decisão não grava de novo; o nome da usina no Fracttal e o código da pessoa contam (é o que o App lê:

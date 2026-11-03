@@ -9,9 +9,11 @@ O que estes testes seguram: vencido, o catálogo de ontem volta na hora e o novo
 sessão de quem pediu; o próximo pedido já recebe o novo; o download que falha deixa o de ontem e só tenta de novo depois
 de ASSETS_ESPERA_TENTATIVA; quem precisa do catálogo em dia (`em_dia=True`: resolver o ativo da OS na aprovação) espera,
 como antes; sem catálogo nenhum, espera o download; e o botão "Atualizar" da tela de Ativos baixa na hora e vale para
-todos (o arquivo é um só)."""
+todos (o catálogo é um só).
+
+Desde 31/10/2026 o catálogo é o central (`ativos_central`, etapa 2 do canto central): os cenários são os mesmos, e o que o
+download faz agora é trocar o catálogo da memória (e a cópia em disco), em vez de gravar o `assets_cache.json`."""
 import contextvars
-import json
 import sys
 import threading
 import time
@@ -20,11 +22,11 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 
 import api  # noqa: E402 — o api.py do clone (o mesmo módulo que as rotas do os_web usam)
+import ativos_central  # noqa: E402
 
 VELHO = [{"id": 1, "code": "VELHO", "usina": "", "cliente": "", "tipo": "", "description": ""}]
 NOVO = [{"id": 2, "code": "NOVO", "usina": "", "cliente": "", "tipo": "", "description": ""}]
@@ -33,15 +35,15 @@ QUEM = contextvars.ContextVar("quem_pediu", default=None)
 
 @pytest.fixture
 def catalogo(tmp_path, monkeypatch):
-    arq = tmp_path / "assets_cache.json"
-    monkeypatch.setattr(api, "ASSETS_CACHE", str(arq))
-    monkeypatch.setattr(api, "_ASSETS_MEM", {"chave": None, "c": None})
-    monkeypatch.setattr(api, "_seed_cache", lambda: None)
     monkeypatch.setattr(api, "_ASSETS_RENOVA", {"tentou": 0.0})
+    ativos_central.reiniciar(pasta=str(tmp_path / "oscreator"))
 
     def gravar(ativos, ts=None):
-        arq.write_text(json.dumps({"ts": ts or time.time(), "ver": api._CACHE_VER, "assets": ativos}), encoding="utf-8")
-    return gravar
+        """O catálogo de que o processo parte (a cópia de ontem, ou a de agora): como se tivesse subido com ele."""
+        ativos_central.reiniciar(pasta=str(tmp_path / "oscreator"))
+        assert ativos_central.trocar(ativos, "rpc", lido_em=ts or time.time())
+    yield gravar
+    ativos_central.reiniciar()
 
 
 class _Fracttal:

@@ -301,9 +301,9 @@ def marca_do_ativo(asset: dict) -> str:
     porque ali a descrição é o endereço da planta. Então isto é PRÉ-SELEÇÃO, nunca substitui o
     campo — quem confirma é quem abre a OS.
 
-    A marca vale como PALAVRA INTEIRA (20/10/2026): como pedaço de palavra, o "STI" achava "Justiniano" e "São
-    Sebastião" no endereço, e 16 cabines, skids e estações saíam como STI. Os apelidos (`APELIDOS_NO_FRACTTAL`) contam
-    como a marca. Os fornecedores que a tela Fabricantes cadastra entram em MARCAS_CONHECIDAS pelo `registro`."""
+    A marca vale como PALAVRA INTEIRA (20/10/2026): como pedaço de palavra, o "STI" achava o "sti" de "Rua Celestino" e de
+    "Rua Faustino" (exemplos inventados) no endereço, e 16 cabines, skids e estações saíam como STI. Os apelidos
+    (`APELIDOS_NO_FRACTTAL`) contam como a marca. Os fornecedores que a tela Fabricantes cadastra entram em MARCAS_CONHECIDAS pelo `registro`."""
     txt = _sem_acento("%s %s" % (asset.get("description") or "", asset.get("label") or ""))
     for m in MARCAS_CONHECIDAS:                              # 1º o nome do fornecedor
         if _sem_acento(m) in txt:

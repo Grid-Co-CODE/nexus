@@ -1,6 +1,6 @@
-# Python 3.14 — instalar sem pin rígido (PyQt6 6.11+ tem wheel cp314).
+# O que o motor do OS Creator Web (api.py) importa, sem pin rígido. O Nexus instala o requirements.txt da raiz (que traz
+# também o Flask e o waitress); sem o PyQt6 desde 31/10/2026: o caminho web não usa.
 #   python -m pip install -r requirements.txt
-PyQt6>=6.7
 requests>=2.31
 python-dotenv>=1.0
 keyring>=24            # opcional: guarda o token no cofre do SO (Windows Credential Manager).

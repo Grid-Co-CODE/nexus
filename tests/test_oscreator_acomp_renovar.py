@@ -13,7 +13,6 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 
@@ -116,6 +115,28 @@ def test_quadro_vencido_abre_na_hora_e_rele_por_tras(fracttal, fila):
     assert fracttal["jwt"][-1] == JWT                                     # com a sessão DELA no Fracttal
     h = cli.get(URL).get_data(as_text=True)                               # a próxima visita já tem a leitura nova
     assert "data-renovando" not in h and fracttal["listas"] == 2 and not fila
+
+
+def test_a_releitura_por_tras_e_fundo_declarado_no_porteiro(fracttal, fila, monkeypatch):
+    """O porteiro do Nexus (`nexus/casca/fracttal_conta.py`) só segura o fundo DECLARADO: a thread da releitura, sem
+    declaração, entrava como clique, sem teto. No Raio-X de 03/11/2026, às 10h, foram 828 pedidos ao Fracttal num minuto,
+    contra a cota de 200 da empresa toda, e o Acompanhamento fez 1.851 pedidos em 49 cliques. Ninguém espera a releitura (a
+    tela mostra a cópia anterior), então ela espera a vez do fundo e cede a vaga a quem clica."""
+    from nexus.casca import fracttal_conta
+    vistas = []
+
+    def tickets(ids):
+        m = fracttal_conta._marca_atual.get()
+        vistas.append((m.nome, m.declarada) if m else None)
+        return {i: "TK-%d" % i for i in ids}
+    monkeypatch.setattr(api, "tickets_os3_em_massa", tickets)
+    cli = _cliente()
+    cli.get(URL)
+    _envelhecer(rotas_acomp.TTL_QUADRO + 5)
+    cli.get(URL)
+    assert len(fila) == 1
+    _rodar_fora_da_requisicao(fila.pop())
+    assert vistas[-1] == ("fundo:os-web-acomp-renovar", True)
 
 
 def test_quadro_de_ontem_abre_na_hora_e_troca_sozinho(fracttal, fila):

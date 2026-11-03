@@ -84,7 +84,6 @@ JWT = "aaa.eyJlbWFpbCI6InRlc3RlQGV4ZW1wbG8uaW52YWxpZCIsImV4cCI6OTk5OTk5OTk5OX0.s
 
 @pytest.fixture
 def cli(monkeypatch):
-    pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
     import api
     import chamados_obs_store as obs_store
     from os_web import criar_app, rotas

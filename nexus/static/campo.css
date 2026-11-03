@@ -957,7 +957,11 @@ tr.rk-linha[aria-expanded="true"] .rk-seta{transform:rotate(180deg)}
 .cr-rk-j-mais > summary{cursor:pointer;width:max-content;color:var(--verde-texto);font-size:12.5px;font-weight:600;
   list-style:none}
 .cr-rk-j-mais > summary::-webkit-details-marker{display:none}
-.cr-rk-j-mais[open] > summary{color:var(--mudo)}
+/* aberto, o "e mais" some e cada prova fica na sua linha (29/10/2026: "o e mais 2 não sumiu, os mais dois não quebraram
+   como os demais"): o <details> não faz grade dos filhos no Chrome, então a grade é a da lista de dentro */
+.cr-rk-j-mais[open] > summary{display:none}
+.cr-rk-j-mais-lista{display:grid;gap:2px}
+.cr-rk-j-mais-lista > span{display:block;overflow-wrap:anywhere}
 /* o Focar em tabela (28/10/2026, "Usinas em linhas e essas linhas em coluna"): a usina na 1ª coluna, presa ao rolar
    para o lado; a célula da usina em crítico naquela área com a borda vermelha à esquerda */
 .cr-rk-j-mat{overflow-x:auto;border:1px solid var(--linha);border-radius:var(--raio-md)}
@@ -975,11 +979,27 @@ tr.rk-linha[aria-expanded="true"] .rk-seta{transform:rotate(180deg)}
 /* com a tabela do Focar, a janela fica mais larga (7 colunas não cabem nos 1.000 px das outras janelas) */
 .cr-modal:has(.cr-rk-j-mat){width:min(1320px,calc(100vw - 32px))}
 .cr-rk-j-ok,.cr-rk-j-txt{margin:0 0 10px;font-size:13px}
-.cr-rk-j-perdas{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;padding:0;list-style:none}
-.cr-rk-j-perdas li{padding:3px 10px;font-size:12.5px;background:var(--superficie-2);border:1px solid var(--linha);
-  border-radius:999px}
-.cr-rk-j-perdas b{font-variant-numeric:tabular-nums}
-.cr-rk-j-perdas small{color:var(--mudo)}
+/* as perdas da nota em linhas (29/10/2026, "-1 oq?"): o quanto à esquerda, o critério e o que fazer à direita */
+.cr-rk-j-perdas{display:grid;margin:0 0 10px;padding:0;list-style:none;border:1px solid var(--linha);
+  border-radius:var(--raio-md)}
+.cr-rk-j-perdas li{display:grid;grid-template-columns:96px minmax(0,1fr);gap:2px 12px;align-items:start;padding:8px 12px;
+  font-size:13px;border-bottom:1px solid var(--linha)}
+.cr-rk-j-perdas li:last-child{border-bottom:0}
+.cr-rk-j-perdas li > div{display:grid;gap:2px;min-width:0}
+.cr-rk-j-menos{color:var(--critico);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cr-rk-j-perdas small{color:var(--mudo);font-size:12.5px;overflow-wrap:anywhere}
+/* a pontuação do mês (29/10/2026): a conta da nota numa linha, três números e o placar do ciclo por técnico */
+.cr-rk-j-formula{margin:0 0 8px;font-size:14px}
+.cr-rk-j-formula b{font-variant-numeric:tabular-nums}
+.cr-rk-j-fatos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 10px;padding:0;
+  list-style:none}
+.cr-rk-j-fatos li{display:grid;gap:2px;padding:8px 12px;background:var(--superficie-2);border:1px solid var(--linha);
+  border-radius:var(--raio-md)}
+.cr-rk-j-fatos b{font-size:13.5px;font-variant-numeric:tabular-nums}
+.cr-rk-j-fatos small{font-size:12px;color:var(--mudo)}
+.cr-rk-j-placar td small{display:block;font-size:11.5px;color:var(--mudo)}
+.cr-rk-j-placar td{min-width:90px;font-variant-numeric:tabular-nums}
+@media (max-width:640px){.cr-rk-j-fatos{grid-template-columns:1fr}.cr-rk-j-perdas li{grid-template-columns:1fr}}
 .cr-rk-j-sub{margin:4px 0 6px;font:700 13px/1.3 var(--font-sans)}
 .cr-rk-j-os li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:8px 12px;
   border-bottom:1px solid var(--linha)}
@@ -1413,6 +1433,38 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
 .pn-topo > .cr-parada{flex:1;min-width:0;margin-top:0}
 /* a lista das PT na janela: inteira, sem o limite das 6 linhas do quadro */
 .pn-lista--jan{max-height:none;overflow:visible;margin:0;padding:0}
+/* as OSs em verificação (29/10/2026): o número chega depois da página, neutro até lá; na janela, uma tabela com a OS
+   que abre o card, o Concluir sempre à vista e o PDF ao passar o mouse na linha ("ao passar o mouse botão de baixar
+   pdf"; no toque, ele aparece com a linha em foco) */
+.pn-kpi--neutro .pn-kpi-ico{background:var(--superficie-2);color:var(--mudo)}
+/* o Exportar relatório na ponta direita da linha dos filtros (29/10/2026) */
+.cn-filtros .pn-exportar{margin-left:auto;white-space:nowrap}
+/* a escolha dos temas do relatório na janela (30/10/2026: "a pessoa possa marcar o tema que ela quer levar"): duas
+   colunas de caixas de marcar, o Marcar todos / Tirar todos em cima e o Baixar PDF embaixo, à direita */
+.cr-modal:has(.pn-rel){width:min(620px,calc(100vw - 32px))}
+.pn-rel-todos{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px}
+.pn-rel-temas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 18px;margin:0 0 14px;padding:0;
+  list-style:none}
+.pn-rel-temas label{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--raio-md);font-size:13.5px;
+  cursor:pointer}
+.pn-rel-temas label:hover{background:var(--superficie-2)}
+.pn-rel-temas input{width:16px;height:16px;accent-color:var(--verde);flex:none}
+.pn-rel-aviso{margin:0 0 10px;font-size:13px}
+.pn-rel-pe{display:flex;justify-content:flex-end}
+@media (max-width:640px){.pn-rel-temas{grid-template-columns:1fr}}
+.cr-modal:has(.pv-tab){width:min(1320px,calc(100vw - 32px))}
+.pv-tab{width:100%;border-collapse:collapse;font-size:12.5px}
+.pv-tab td,.pv-tab tbody th{vertical-align:middle}
+.pv-tab td{min-width:0;font-variant-numeric:tabular-nums}
+.pv-tab tbody th{position:static;min-width:0;white-space:nowrap}
+.pv-titulo{min-width:220px;max-width:340px;overflow-wrap:anywhere}
+.pv-acoes{white-space:nowrap;text-align:right}
+.pv-acoes .gc-btn{margin-left:6px;padding:4px 12px;font-size:12px}
+.pv-tab tbody tr .pv-pdf{visibility:hidden}
+.pv-tab tbody tr:hover .pv-pdf,.pv-tab tbody tr:focus-within .pv-pdf{visibility:visible}
+.pv-tab tbody tr:hover > *{background:var(--superficie-2)}
+.pv-msg{margin:0 0 10px;font-size:13px}
+.pv-oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:1180px){.pn{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.pn{grid-template-columns:minmax(0,1fr)}.pn-barra{flex-basis:56px}
   .pn-q--largo{grid-column:auto}
@@ -1428,3 +1480,180 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
 .cr-modal--chamado .cr-modal-barra{flex:none;padding-bottom:10px;border-bottom:1px solid var(--linha)}
 .cr-chamado-moldura{flex:1;display:block;width:100%;min-height:0;border:0;background:var(--fundo)}
 @media (max-width:760px){.cr-modal--chamado{width:calc(100vw - 16px);height:calc(100vh - 32px)}}
+/* O card de assinar a PT (30/10/2026): o link do e-mail de PT aguardando, no celular quase sempre. Por cima do Nexus
+   desfocado (o véu e o blur da janela da Visão do responsável), uma superfície só: nada de caixa dentro de caixa
+   (Levi, 16/10: "1 nível de superfície"). No celular o card desce até o fim e o fundo rola. */
+.pa-fundo{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;
+  background:var(--veu);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);overflow-y:auto}
+.pa-card{position:relative;width:min(600px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;
+  padding:22px 24px 20px;border:1px solid var(--linha-forte);border-radius:var(--raio-md);background:var(--superficie);
+  color:var(--tinta);box-shadow:0 24px 60px var(--sombra)}
+.pa-card [hidden]{display:none !important}
+.pa-fechar{position:absolute;top:20px;right:22px;font-size:13px}
+.pa-cab{padding-right:64px}
+.pa-titulo .cn-st--titulo{margin-left:8px}
+.pa-titulo{margin:4px 0 2px;font:700 22px/1.25 var(--font-sans);overflow-wrap:anywhere}
+.pa-onde{margin:0;color:var(--mudo);font-size:14px}
+.pa-dados{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px;margin:16px 0 4px;font-size:14px}
+.pa-dados dt{color:var(--mudo)}
+.pa-dados dd{margin:0;overflow-wrap:anywhere}
+.pa-det{display:block;color:var(--mudo);font-size:12.5px;font-weight:400}
+.pa-sub{margin:20px 0 8px;font:600 12px/1.3 var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--tinta-2)}
+.pa-texto{margin:6px 0;font-size:14px;line-height:1.5}
+.pa-ativ{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.pa-ativ li{padding:3px 10px;border:1px solid var(--linha-forte);border-radius:999px;font-size:13px}
+.pa-nao{margin:0;padding-left:22px;font-size:14px;line-height:1.5}
+.pa-nao li{margin:4px 0}
+.pa-nao li::marker{color:var(--alerta);font-weight:600}
+.pa-decisao,.pa-outras{margin-top:20px;border-top:1px solid var(--linha)}
+.pa-quem{margin:4px 0 12px;font-size:13.5px;color:var(--tinta-2)}
+.pa-motivo{margin-bottom:12px}
+.pa-motivo textarea{width:100%;box-sizing:border-box}
+.pa-botoes{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px}
+.pa-botoes .gc-btn{flex:1 1 180px;justify-content:center;min-height:44px}
+.pa-conta{margin-left:6px;color:var(--mudo)}
+.pa-lista{margin:0;padding:0;list-style:none}
+.pa-lista li+li{border-top:1px solid var(--linha)}
+.pa-item{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:8px 2px;
+  color:var(--tinta);text-decoration:none}
+.pa-item:hover .pa-item-nome>:first-child,.pa-item:focus-visible .pa-item-nome>:first-child{color:var(--verde-texto)}
+.pa-item-nome{display:flex;flex-direction:column;min-width:0;font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.pa-espera{flex:none;font-size:12.5px;font-weight:600}
+.pa-pe{margin:20px 0 0;font-size:13px}
+@media (max-width:600px){
+  .pa-fundo{align-items:flex-start;padding:12px}
+  .pa-card{max-height:none;overflow:visible;padding:18px 16px 16px}
+  .pa-fechar{top:18px;right:16px}
+  .pa-dados{grid-template-columns:minmax(0,1fr);gap:0}
+  .pa-dados dd{margin-bottom:10px}
+  .pa-botoes .gc-btn{flex-basis:100%}
+}
+/* Rondas enxuta (03/11/2026, Levi: "tem filtro em cima e filtro na tabela, tá uma bagunça"): a barra de uma linha no
+   modelo do Histórico do OS Creator Web (Buscar por usina, a busca da tabela, Filtros num painel escondido), uma
+   etiqueta por filtro aplicado com o ×, e o menu do cabeçalho (Duração, Pendências). No celular o painel sobe de baixo. */
+.rd-numeros{margin-top:16px}
+.rd-numeros .v small{font-size:15px;font-weight:600;margin-left:2px;color:var(--mudo)}
+/* o painel se ancora na barra inteira (no começo dela, como no Histórico): ancorado no botão, passava da tela à
+   direita a 1.000 px */
+.rd-barra{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px}
+.rd-filtros{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.rd-campo{display:flex;align-items:center;gap:8px;min-height:38px;margin:0;padding:0 12px;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);background:var(--superficie);color:var(--tinta)}
+.rd-campo i{color:var(--mudo)}
+.rd-campo input{width:210px;min-width:0;border:0;background:transparent;color:inherit;font:inherit;font-size:13.5px;outline:none}
+.rd-campo:focus-within{border-color:var(--verde)}
+.rd-btn{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:0 14px;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);background:var(--superficie);color:var(--tinta);font:600 13px/1 var(--font-sans);cursor:pointer}
+.rd-btn:hover,.rd-btn[aria-expanded="true"]{border-color:var(--verde)}
+.rd-btn:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.rd-badge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--verde);color:var(--sobre-verde);
+  font:700 11px/18px var(--font-sans);text-align:center}
+.rd-dir{display:flex;align-items:center;gap:14px;margin-left:auto}
+.rd-painel{position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:min(620px,calc(100vw - 32px));
+  border:1px solid var(--linha-forte);border-radius:var(--raio-md);background:var(--superficie);box-shadow:0 24px 60px var(--sombra)}
+.rd-painel-topo{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0}
+.rd-painel-topo h2{margin:0;font:600 15px/1.3 var(--font-sans)}
+.rd-fechar{width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:var(--mudo);font-size:20px;line-height:1;cursor:pointer}
+.rd-fechar:hover{background:var(--superficie-2);color:var(--tinta)}
+.rd-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;padding:14px 16px}
+.rd-cel{display:flex;flex-direction:column;gap:5px;margin:0}
+.rd-cel .gc-campo{width:100%}
+.rd-rodape{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;border-top:1px solid var(--linha)}
+.rd-veu{display:none}
+.rd-etiquetas{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
+.rd-etiqueta{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 11px;border:1px solid var(--linha-forte);
+  border-radius:999px;font-size:12.5px;color:var(--tinta-2);text-decoration:none}
+.rd-etiqueta b{color:var(--tinta);font-weight:600}
+.rd-etiqueta .rd-x{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+  color:var(--mudo);font-size:14px}
+.rd-etiqueta:hover{border-color:var(--verde)}
+.rd-etiqueta:hover .rd-x{background:var(--superficie-2);color:var(--tinta)}
+.rd-limpar-tudo{margin-left:4px;font-size:12.5px}
+.rd-paginas{margin-left:auto;font-size:12.5px;color:var(--mudo)}
+.rd-pe-paginas{display:flex;justify-content:flex-end;margin:10px 0 0}
+/* o menu do cabeçalho: o rótulo da coluna abre a caixa presa à tela */
+.rd-th{white-space:nowrap}
+.rd-menu summary{display:inline-flex;align-items:center;gap:4px;cursor:pointer;list-style:none;font:inherit;color:inherit}
+.rd-menu summary::-webkit-details-marker{display:none}
+.rd-menu summary:hover,.rd-menu[open] summary,.rd-menu summary.rd-menu-ativo{color:var(--verde-texto)}
+.rd-menu summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px;border-radius:3px}
+.rd-menu-caixa{position:fixed;z-index:45;display:flex;flex-direction:column;min-width:200px;padding:6px;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);background:var(--superficie);box-shadow:0 16px 40px var(--sombra);text-align:left;
+  text-transform:none;letter-spacing:0;font:400 13px/1.3 var(--font-sans);color:var(--tinta)}
+.rd-menu-t{padding:8px 10px 4px;font:600 11px/1 var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.rd-menu-caixa button,.rd-menu-caixa a{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;
+  border:0;border-radius:6px;background:transparent;color:var(--tinta);font:inherit;text-align:left;text-decoration:none;cursor:pointer}
+.rd-menu-caixa button:hover,.rd-menu-caixa a:hover{background:var(--superficie-2)}
+.rd-menu-caixa a[aria-current="true"]{color:var(--verde-texto);font-weight:600}
+.rd-menu-caixa b{color:var(--mudo);font-weight:600}
+/* a página da usina: a evolução sem leitura nos 30 dias */
+.rd-sem-leitura{margin:10px 0 4px}
+@media (max-width:640px){
+  .rd-usina,.rd-filtros,.rd-busca{flex:1 1 100%}
+  .rd-campo input{width:100%}
+  .rd-dir{margin-left:0}
+  .rd-veu:not([hidden]){display:block;position:fixed;inset:0;z-index:39;background:var(--veu)}
+  .rd-painel{position:fixed;top:auto;left:0;right:0;bottom:0;width:auto;max-height:85vh;overflow:auto;border-radius:14px 14px 0 0}
+  .rd-grade{grid-template-columns:minmax(0,1fr)}
+  .rd-rodape{position:sticky;bottom:0;background:var(--superficie)}
+}
+/* Os cartões por responsável da Central de atenção (e da APR e PT), limpos (Levi, 03/11/2026: "quero mais minimalista...
+   já tem um vermelho na lateral e a barra também fica vermelha... dói é os olhos!"): uma superfície só, sem a borda
+   colorida; a cor num ponto pequeno ao lado da palavra (a cor nunca sozinha); a barra neutra, só com o que foi feito. */
+.cn-equipe--min{gap:14px;border-left-width:1px}
+.cn-equipe--min .cn-eq-titulo > b{font-size:16px}
+.cn-min-st{display:inline-flex;align-items:center;gap:6px;flex:none;margin-top:2px;font:600 12.5px/18px var(--font-sans);
+  color:var(--tinta-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cn-min-st::before,.cn-min-motivos span::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--mudo)}
+.cn-min-st--ok::before,.cn-min-motivos .ok::before{background:var(--ok)}
+.cn-min-st--alerta::before,.cn-min-motivos .alerta::before{background:var(--alerta)}
+.cn-min-st--critico::before,.cn-min-motivos .critico::before{background:var(--critico)}
+.cn-min-num{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px}
+.cn-min-num b{font:600 28px/32px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--tinta)}
+.cn-min-num span{font-size:12.5px;color:var(--mudo)}
+.cn-min-barra{height:4px;border-radius:999px;background:var(--superficie-3);overflow:hidden}
+.cn-min-barra span{display:block;height:100%;border-radius:inherit;background:var(--tinta-2);opacity:.5}
+.cn-min-leg{margin-top:-6px;font-size:12px;color:var(--mudo);font-variant-numeric:tabular-nums}
+.cn-min-leg b{font-weight:600;color:var(--tinta-2)}
+.cn-min-motivos{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--tinta-2);font-variant-numeric:tabular-nums}
+.cn-min-motivos span{display:inline-flex;align-items:center;gap:6px}
+.cn-min-motivos span::before{width:6px;height:6px}
+/* Rondas, 2ª rodada (03/11/2026). O Buscar por usina com a lista do Nexus, não a do navegador ("essa lista está mal
+   formatada, quero estilo nexus"): o nome e, embaixo, o cliente e a UF; a marcada pelas setas ou pelo mouse. */
+.rd-usina{position:relative}
+.rd-usinas{position:absolute;z-index:42;top:calc(100% + 6px);left:-1px;width:max(calc(100% + 2px),320px);max-height:340px;
+  overflow:auto;margin:0;padding:6px;list-style:none;border:1px solid var(--linha-forte);border-radius:var(--raio-md);
+  background:var(--superficie);box-shadow:0 16px 40px var(--sombra)}
+.rd-usinas li[role="option"]{display:flex;flex-direction:column;gap:1px;padding:8px 10px;border-radius:6px;cursor:pointer}
+.rd-usinas li[role="option"] b{font:600 13.5px/18px var(--font-sans);color:var(--tinta)}
+.rd-usinas li[role="option"] span{font-size:12px;color:var(--mudo)}
+.rd-usinas li[role="option"]:hover,.rd-usinas li[aria-selected="true"]{background:var(--superficie-2)}
+.rd-usinas li[aria-selected="true"] b{color:var(--verde-texto)}
+.rd-usinas li[hidden]{display:none}
+.rd-usinas-nada{padding:10px;font-size:13px;color:var(--mudo)}
+/* a linha da ronda abre a barra lateral (03/11/2026: "ao clicar na linha já abre uma barra lateral mostrando tudo da
+   ronda, a barra pode representar 1/3 do tamanho da tela. Ficará do lado direito!"); a aberta fica marcada */
+tr.rd-linha{cursor:pointer}
+tr.rd-linha:hover td{background:var(--superficie-2)}
+tr.rd-linha:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+tr.rd-linha--ativa td{background:var(--verde-suave)}
+.rd-gaveta{position:fixed;z-index:60;top:0;right:0;bottom:0;display:flex;flex-direction:column;width:33.333vw;min-width:380px;
+  border-left:1px solid var(--linha-forte);background:var(--superficie);box-shadow:-24px 0 60px var(--sombra)}
+.rd-gaveta-topo{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--linha)}
+.rd-gaveta-corpo{flex:1;overflow-y:auto;padding:18px 22px 28px}
+.rg-cab h2{margin:4px 0 2px;font:700 20px/1.25 var(--font-sans)}
+.rg-cab p{margin:0;font-size:13px}
+.rg-dados{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px;margin:16px 0 4px;font-size:13.5px}
+.rg-dados dt{color:var(--mudo)}
+.rg-dados dd{margin:0;overflow-wrap:anywhere}
+.rg-dados .det{display:block;color:var(--mudo);font-size:12px}
+.rg-sub{margin:20px 0 6px;padding-top:14px;border-top:1px solid var(--linha);font:600 11.5px/1.3 var(--font-sans);
+  letter-spacing:.06em;text-transform:uppercase;color:var(--tinta-2)}
+.rg-pend{margin:0;padding-left:18px;font-size:13px;line-height:1.5}
+.rg-pe{margin:20px 0 0;font-size:13px}
+.rg-vazio{color:var(--mudo)}
+@media (max-width:900px){.rd-gaveta{width:100vw;min-width:0}}
+/* o "Tentar de novo" das fotos na barra lateral, no desenho do botão das fotos das outras telas */
+.rg-fotos .cn-bt-tentar{margin-left:6px;font:600 12px var(--font-sans);color:var(--verde-texto);background:transparent;
+  border:1px solid var(--linha);border-radius:7px;padding:3px 10px;cursor:pointer}
+.rg-fotos .cn-bt-tentar:hover{border-color:var(--verde-texto)}

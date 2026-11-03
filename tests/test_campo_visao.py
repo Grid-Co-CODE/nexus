@@ -178,9 +178,9 @@ def test_tela_de_rondas_no_estilo_do_painel(banco, logado):
     r = logado.get("/t/campo/rondas?csv=1")
     assert r.mimetype == "text/csv" and "Fulano Souza" in r.get_data(as_text=True)
     assert "Coração 1" in logado.get("/t/campo/rondas?aba=cobertura").get_data(as_text=True)
+    # o Quem ronda saiu (Levi, 03/11/2026: "Menos é mais!"): o endereço cai nos Registros
     quem = logado.get("/t/campo/rondas?aba=quem").get_data(as_text=True)
-    assert "Quem ronda, por cluster" in quem and "SP Norte" in quem and "SC Oeste" in quem
-    assert "Fulano Souza" in logado.get("/t/campo/rondas?aba=quem&cluster=SP+Norte").get_data(as_text=True)
+    assert "Quem ronda" not in quem and "<h2>Rondas diárias</h2>" in quem and "Fulano Souza" in quem
     assert "Nenhuma ronda" in logado.get("/t/campo/rondas?dur=curta").get_data(as_text=True)
 
 
@@ -227,7 +227,8 @@ def test_central_separa_ronda_de_pt_e_sem_hashtag_na_os(banco, logado):
     assert "<th>Usina</th><th>Equipe</th><th>Estado</th><th>Região</th>" in html and "<th>Cidade</th>" not in html
     assert "<th>O quê</th>" not in html and "<th>Quem</th>" not in html
     html = logado.get("/t/campo/rondas?pend=sem_os").get_data(as_text=True)
-    assert "<th>Pendências</th>" in html and "Não criada" in html and "Brodowski 1" in html and "#500" not in html
+    # a pendência se escolhe no cabeçalho "Pendências" (03/11/2026), marcado quando filtra
+    assert '<summary class="rd-menu-ativo">Pendências' in html and "Não criada" in html and "Brodowski 1" in html and "#500" not in html
     html = logado.get("/t/campo/rondas?pend=incompleta").get_data(as_text=True)
     assert "item sem foto de evidência" in html and ">500<" in html
     html = logado.get("/t/campo/atencao?vista=pt&modo=tabela").get_data(as_text=True)
@@ -283,7 +284,7 @@ def test_a_tela_de_pt_e_so_por_responsavel_com_os_filtros_de_cliente_usina_e_res
     html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
     assert 'aria-current="page">Por responsável</a>' in html and ">Tabela</a>" in html
     assert ">Por equipe</a>" not in html and ">Por região de campo</a>" not in html
-    assert "2</span><span class=\"d\">PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
+    assert "<b>2</b><span>PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
     for antigo in ('id="cn-regiao"', 'id="cn-regiao-campo"', 'id="cn-gestor"'):
         assert antigo not in html
     assert _re.findall(r'<select class="gc-campo" id="pt-(\w+)" name="(\w+)"', html) == [
@@ -291,7 +292,7 @@ def test_a_tela_de_pt_e_so_por_responsavel_com_os_filtros_de_cliente_usina_e_res
     assert '<option value="Thopen">Thopen (2)</option>' in html and '<option value="Altair">Altair (2)</option>' in html
     # o endereço de antes (por região, por gestor, a equipe) cai no Por responsável e não filtra
     antigo = logado.get("/t/hseq/apr-pt?modo=regioes&regiao_campo=Sul+01&gestor=Ciclano+Chefe").get_data(as_text=True)
-    assert 'aria-current="page">Por responsável</a>' in antigo and "2</span><span class=\"d\">PT esperando" in antigo
+    assert 'aria-current="page">Por responsável</a>' in antigo and "<b>2</b><span>PT esperando" in antigo
 
 
 def test_tela_de_pt_tabela_com_o_responsavel_e_historico(banco, logado):
@@ -322,7 +323,7 @@ def test_tela_de_pt_tabela_com_o_responsavel_e_historico(banco, logado):
 
 def test_o_cartao_do_responsavel_leva_a_tabela_dele(banco, logado):
     html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
-    i = html.index('<a class="cn-equipe cn-equipe--critico')
+    i = html.index('<a class="cn-equipe cn-equipe--min')
     href = html[i:html.index(">", i)].split('href="')[1].split('"')[0].replace("&amp;", "&")
     assert href.startswith("?modo=tabela&responsavel=")
     tabela = logado.get("/t/hseq/apr-pt" + href).get_data(as_text=True)
@@ -645,19 +646,22 @@ def test_indicadores_da_ronda_filtram_a_tabela(banco, logado):
     """Levi, 05/10: "quero que esses botões sejam clicáveis e filtre a tabela"."""
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
     # 08/10: o 7º indicador (nunca tiveram ronda) e a aba Sem ronda no lugar da Cobertura
-    assert html.count('class="cn-kpi cn-kpi--link"') == 7
-    assert 'href="?ind=qualidade"' in html and 'href="?aba=sem"' in html and 'href="?dur=curta"' in html
+    # juntos numa faixa desde 03/11/2026 ("no padrão de tudo junto"); a Sem ronda é o filtro cob
+    faixa = html.split('class="cn-numeros cn-numeros--filtro rd-numeros">', 1)[1].split("</div>", 1)[0]
+    assert faixa.count("<a href=") == 7
+    assert 'href="?ind=qualidade"' in html and 'href="?cob=sem"' in html and 'href="?dur=curta"' in html
+    # o filtro aplicado vira uma etiqueta com o × (03/11/2026, o modelo do Histórico do OS Creator Web)
     html = logado.get("/t/campo/rondas?ind=hoje").get_data(as_text=True)
-    assert "Só as de hoje" in html and "Nenhuma ronda com esses filtros" in html     # nenhuma ronda hoje no banco falso
+    assert "Indicador: <b>só as de hoje</b>" in html and "Nenhuma ronda com esses filtros" in html   # nenhuma hoje
     html = logado.get("/t/campo/rondas?ind=qualidade").get_data(as_text=True)
-    assert "Qualidade abaixo de 85%" in html and "Nenhuma ronda com esses filtros" in html   # todas com 90%
+    assert "Indicador: <b>qualidade abaixo de 85%</b>" in html and "Nenhuma ronda com esses filtros" in html   # todas com 90%
     html = logado.get("/t/campo/rondas?aba=cobertura&cob=sem").get_data(as_text=True)
-    corpo = html.split('class="cn-barra-filtros"', 1)[1].split("</form>", 1)[1]    # sem a barra (a lista de usinas do filtro)
-    assert "Coração 1" in corpo and "Brodowski 1" not in corpo and 'aria-current="true"' in html
+    corpo = html.split('<section class="cn-painel">', 1)[1]           # sem a lista do Buscar por usina, que leva todas
+    assert "Coração 1" in corpo and "Brodowski 1" not in corpo and "Mostrar: <b>Sem ronda nos últimos 30 dias</b>" in html
     html = logado.get("/t/campo/rondas?aba=cobertura&cob=atrasadas").get_data(as_text=True)
     assert "Coração 1" in html and "<td>Altair</td>" not in html
     html = logado.get("/t/campo/rondas?ind=duracao").get_data(as_text=True)
-    assert "Da mais longa para a mais curta" in html
+    assert "Indicador: <b>da mais longa para a mais curta</b>" in html
 
 
 def test_motivo_de_ronda_sem_os_fala_do_tecnico():
@@ -717,6 +721,7 @@ def test_grafico_do_historico_diz_os_quem_fez_e_quando(banco, logado, monkeypatc
     """Levi, 06/10: no gráfico de evolução, passar o mouse no ponto mostra a OS, quem fez e o dia com a hora."""
     from nexus.campo import ronda_checklist
     monkeypatch.setattr(ronda_checklist, "respostas", lambda: {"500": {"sujidade": 4, "vegetacao": 2}})
+    # a evolução dos últimos 30 dias (03/11/2026): as duas rondas da Altair (há 1 e 3 dias)
     pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
     assert pag.count('class="cn-ponto"') == 2 and 'class="cn-dica"' in pag
     d1 = _dia(1)
@@ -745,14 +750,16 @@ def test_eixo_de_datas_do_grafico_nao_encavala(banco, logado, monkeypatch):
     a última sempre aparece."""
     from nexus.campo import ronda_checklist
     base = visao.rondas().dados["todas"][0]
-    muitas = [dict(base, data=_dia(i), sujidade=3, vegetacao=2, lida=True, os=str(900 + i), sensores_sujos=[], vala="")
-              for i in range(80)]
+    # 80 rondas no mês de agora (a evolução vem por mês desde 03/11/2026), a mais recente primeiro, 3 por dia
+    mes = visao._agora().strftime("%Y-%m")
+    muitas = [dict(base, data=f"{mes}-{28 - i // 3:02d}", sujidade=3, vegetacao=2, lida=True, os=str(900 + i),
+                   sensores_sujos=[], vala="") for i in range(80)]
     monkeypatch.setattr(visao, "historico_usina", lambda todas, resp, uid, validacoes=(): muitas)
     monkeypatch.setattr(ronda_checklist, "pedir_releitura", lambda app=None: None)
     pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
     datas = pag.count('class="eixo data"')
     assert 20 <= datas <= 32 and pag.count('class="cn-ponto"') == 80      # 80 pontos, ~30 datas
-    assert f'class="eixo data" text-anchor="middle">{_dia(0)[8:10]}/{_dia(0)[5:7]}<' in pag     # a mais recente
+    assert f'class="eixo data" text-anchor="middle">28/{mes[5:7]}<' in pag     # a mais recente
 
 
 def test_fotos_da_ronda_separam_sujidade_e_vegetacao(banco, logado, monkeypatch):
@@ -790,8 +797,11 @@ def test_fotos_da_ronda_separam_sujidade_e_vegetacao(banco, logado, monkeypatch)
         assert mini.mimetype == "image/jpeg" and max(Image.open(io.BytesIO(mini.data)).size) == 240
         assert not ronda_fotos._EM_CURSO                            # nada ficou esperando (06/10: 60 s preso)
         assert pedidos == ["500", "500"]                       # a lista fica guardada (o limpar acima zera)
+        # as fotos vêm na barra lateral da ronda (03/11/2026), pelo pedaço do detalhe
         pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
-        assert 'data-url="/t/campo/rondas/os/500/fotos"' in pag and 'class="cn-caixa-foto"' in pag
+        assert 'data-detalhe="/t/campo/rondas/usina/1/ronda?os=500' in pag and 'class="cn-caixa-foto"' in pag
+        det = logado.get(f"/t/campo/rondas/usina/1/ronda?os=500&data={_dia(1)}").get_data(as_text=True)
+        assert 'data-fotos-url="/t/campo/rondas/os/500/fotos"' in det
     finally:
         ronda_fotos.limpar()
 
@@ -815,7 +825,8 @@ def test_supervisor_de_campo_que_entra_pelo_fracttal_ja_vem_na_regiao_dele(banco
                                           "regioes": ["Sudeste 03"]}
         assert s["usuario"]["nome"] == "Supervisora C." and not s.get("admin")
     html = cliente.get("/t/campo/rondas?aba=sem&cob=nunca").get_data(as_text=True)
-    assert '<option value="Sudeste 03" selected>' in html and "Coração 1" not in html     # Coração é da Sul 01
+    tabela = html.split('<section class="cn-painel">', 1)[1]          # (a lista do Buscar por usina leva todas)
+    assert '<option value="Sudeste 03" selected>' in html and "Coração 1" not in tabela     # Coração é da Sul 01
     todas = cliente.get("/t/campo/rondas?aba=sem&cob=nunca&regiao_campo=*").get_data(as_text=True)
     assert "Coração 1" in todas                                                             # pode trocar
     assert "Supervisora C." in html                                                         # quem entrou, no topo
@@ -828,7 +839,8 @@ def test_gestor_de_contrato_entra_nas_usinas_dele_e_coordenador_ve_tudo(banco, c
         assert s["supervisor_padrao"] == {"pessoa_id": 90, "nome": "Beltrano Supervisor", "papel": "gestor",
                                           "gestor": "Beltrano Supervisor"}
     html = cliente.get("/t/campo/rondas?aba=sem&cob=nunca").get_data(as_text=True)
-    assert '<option value="Beltrano Supervisor" selected>' in html and "Coração 1" not in html
+    assert '<option value="Beltrano Supervisor" selected>' in html
+    assert "Coração 1" not in html.split('<section class="cn-painel">', 1)[1]
     # o coordenador vê todas as regiões (sem filtro)
     _entra_fracttal(cliente, monkeypatch, "coordenador@exemplo.test", "Coordenador C.")
     with cliente.session_transaction() as s:

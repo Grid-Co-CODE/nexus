@@ -22,8 +22,10 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, render_template, request
 
 import api
+import catalogos
 
 from . import cos_web as cw
+from . import lista_central
 from . import sessao
 from .rotas import _conta, exige_sessao
 
@@ -106,18 +108,20 @@ def api_preview():
 @bp.route("/api/cos/listas")
 @exige_sessao
 def api_listas():
-    """?so=classif,falhas,responsaveis (padrão: as três). A sugestão da falha e a severidade padrão vêm com as falhas."""
+    """?so=classif,falhas,responsaveis (padrão: as três). A sugestão da falha e a severidade padrão vêm com as falhas. As
+    três listas vêm dos catálogos (`catalogos.py`, 31/10/2026, etapa 4 do canto central): o pessoal era lido a cada abertura
+    do COS, e os tipos e as falhas numa cópia que nunca vencia."""
     so = {x.strip() for x in (request.args.get("so") or "").split(",") if x.strip()} or {"classif", "falhas", "responsaveis"}
     out, erros = {}, {}
     if "classif" in so:
-        out["classif"] = _lista_ou_erro("classif", api.get_tipos_classif, erros) or {"tipos": [], "c1": [], "c2": []}
+        out["classif"] = _lista_ou_erro("classif", catalogos.tipos_classif, erros) or {"tipos": [], "c1": [], "c2": []}
     if "falhas" in so:
-        falhas = _lista_ou_erro("falhas", api.get_falha_listas, erros) or {"tipos": [], "causas": [], "metodos": []}
+        falhas = _lista_ou_erro("falhas", catalogos.falhas, erros) or {"tipos": [], "causas": [], "metodos": []}
         out["falhas"] = falhas
         out["sugestoes"] = cw.sugestoes_falha(falhas)
         out["severidade_padrao"] = cw.SEVERIDADE_PADRAO
     if "responsaveis" in so:
-        out["responsaveis"] = cw.ordenar_pessoas(_lista_ou_erro("responsaveis", api.get_responsaveis, erros) or [])
+        out["responsaveis"] = cw.ordenar_pessoas(_lista_ou_erro("responsaveis", catalogos.pessoas, erros) or [])
     out["erros"] = erros
     return jsonify(out)
 
@@ -142,10 +146,10 @@ def api_os_modelo():
 
 
 def _classif_para_criar() -> dict:
-    """As listas de tipo/classificação no momento da criação. Sem elas o `_tipo_dict` sai sem id_main e a criação para
-    na frase "Os tipos ainda não carregaram…" — é o `_classif_err` do app."""
+    """As listas de tipo/classificação no momento da criação (o catálogo dos tipos). Sem elas o `_tipo_dict` sai sem id_main e
+    a criação para na frase "Os tipos ainda não carregaram…" — é o `_classif_err` do app."""
     try:
-        return api.get_tipos_classif() or {}
+        return catalogos.tipos_classif() or {}
     except api.FracttalError as e:
         if sessao.morta() or isinstance(e, api.SessionExpired):
             raise
@@ -156,7 +160,7 @@ def _classif_para_criar() -> dict:
 
 def _falhas_para_criar() -> dict:
     try:
-        return api.get_falha_listas() or {}
+        return catalogos.falhas() or {}
     except api.FracttalError as e:
         if sessao.morta() or isinstance(e, api.SessionExpired):
             raise
@@ -181,4 +185,5 @@ def api_criar():
         raise
     except Exception as e:                              # noqa: BLE001
         return jsonify({"erro": str(e) or e.__class__.__name__}), 502
+    lista_central.criadas(res)                          # as OS criadas entram na lista central na hora (31/10/2026)
     return jsonify(cw.mensagem_resultado(res))

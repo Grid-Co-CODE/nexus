@@ -26,6 +26,11 @@ def _cartoes(html):
     return " ".join(re.sub(r'href="[^"]*"', "", corpo).split())
 
 
+def _tabela(html):
+    """A parte das abas (a tabela): a página leva também a lista do "Buscar por usina", com todas as usinas (03/11/2026)."""
+    return html.split('<section class="cn-painel">', 1)[1]
+
+
 def test_por_regiao_soma_os_cartoes_das_equipes_e_por_gestor_soma_as_usinas(banco):
     d = visao.atencao(14).dados
     eq = visao.por_equipe(d["usinas"], d["pendentes"], [], d["pts"], d["times"])
@@ -66,9 +71,9 @@ def test_linha_sem_regiao_e_sem_gestor_acha_as_linhas_em_rondas(banco, logado):
          "data_mobilizacao": _MOB, "uf": "MS", "cidade": "Órfã", "cliente_id": 1, "cluster": "MS Leste"}])
     _aba(banco, "cadastro_nexus", "equipes", EQUIPES + [{"equipe_id": 30, "nome": "MS Leste 01"}])
     visao.limpar()
-    html = logado.get("/t/campo/rondas?aba=sem&cob=nunca&regiao_campo=Sem+região+de+campo").get_data(as_text=True)
+    html = _tabela(logado.get("/t/campo/rondas?aba=sem&cob=nunca&regiao_campo=Sem+região+de+campo").get_data(as_text=True))
     assert "Órfã" in html and "Coração 1" not in html
-    html = logado.get("/t/campo/rondas?aba=sem&cob=nunca&gestor=Sem+gestor+de+contrato").get_data(as_text=True)
+    html = _tabela(logado.get("/t/campo/rondas?aba=sem&cob=nunca&gestor=Sem+gestor+de+contrato").get_data(as_text=True))
     assert "Órfã" in html and "Coração 1" not in html
 def test_a_tabela_de_pt_e_a_mesma_na_tela_de_pt_e_na_central(banco, logado):
     # _pt_esperando.html é o mesmo pedaço nas duas telas; desde 19/10/2026 a Central só pede o Por responsável e a tabela
@@ -99,13 +104,14 @@ def test_estrutura_nao_publicada_avisa_e_nao_quebra(banco, logado):
 
 def test_rondas_filtram_por_regiao_de_campo_e_por_gestor_e_o_csv_leva_os_dois(banco, logado):
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
-    assert 'id="cn-regiao-campo"' in html and 'id="cn-gestor"' in html and 'name="supervisor"' not in html
+    # desde 03/11/2026 no painel escondido dos Filtros
+    assert 'name="regiao_campo"' in html and 'name="gestor"' in html and 'name="supervisor"' not in html
     assert '<option value="Sudeste 03">Sudeste 03 · Supervisora Campo</option>' in html
     assert "Coração 1" in logado.get("/t/campo/rondas?aba=sem&cob=nunca&regiao_campo=Sul+01").get_data(as_text=True)
     assert "Nenhuma ronda com esses filtros" in logado.get("/t/campo/rondas?regiao_campo=Sul+01").get_data(as_text=True)
     so_b = logado.get("/t/campo/rondas?gestor=Beltrano+Supervisor").get_data(as_text=True)
     assert "Altair" in so_b and '<option value="Beltrano Supervisor" selected>' in so_b
-    assert "Coração 1" not in logado.get("/t/campo/rondas?aba=sem&cob=nunca&gestor=Beltrano+Supervisor").get_data(as_text=True)
+    assert "Coração 1" not in _tabela(logado.get("/t/campo/rondas?aba=sem&cob=nunca&gestor=Beltrano+Supervisor").get_data(as_text=True))
     # o CSV leva a região de campo, o supervisor de campo e o gestor no FIM (as colunas de antes no mesmo lugar)
     csv = logado.get("/t/campo/rondas?csv=1").get_data(as_text=True)
     cab = csv.splitlines()[0].lstrip("﻿").split(";")

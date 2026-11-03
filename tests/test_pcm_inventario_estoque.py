@@ -515,6 +515,20 @@ def test_criar_peca_acha_a_unidade_e_manda_o_corpo_da_tela():
         "associate_third_parties": [], "attached": [], "files": [], "custom_fields": []})
 
 
+def test_criar_peca_manda_a_descricao_no_description():
+    """A descrição da peça (30/10/2026: o fabricante, o modelo e a série da peça achada fora do catálogo, Task 8) vai no
+    `description` do `item_insert`, o campo que a tela do passo 0 mandava vazio; sem ela, continua vazio. O falso a guarda."""
+    fr = Fracttal({UNIDADES: ok([{"id": 362334, "description": "UNIDADE"}]), CRIAR: ok({"id": 53248312})})
+    est = estoque(fr)
+    est.criar_peca("SP-TST-003", "Peça", "UNIDADE", descricao="  Fabricante X · modelo Y  ")
+    est.criar_peca("SP-TST-004", "Outra")
+    assert [p[1]["description"] for p in fr.pedidos if p[0] == CRIAR] == ["Fabricante X · modelo Y", ""]
+    f = EstoqueFalso({})
+    novo = f.criar_peca("SP-TST-009", "Peça nova", descricao="Fabricante X")
+    assert f._catalogo[novo]["descricao"] == "Fabricante X"
+    assert "descricao" not in f._catalogo[f.criar_peca("SP-TST-010", "Outra")]
+
+
 def test_criar_peca_com_unidade_que_nao_existe_nao_cria():
     fr = Fracttal({UNIDADES: ok([{"id": 362334, "description": "UNIDADE"}]), CRIAR: ok({"id": 1})})
     with pytest.raises(E.ErroFracttal):

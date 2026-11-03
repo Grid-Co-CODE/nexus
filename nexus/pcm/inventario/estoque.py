@@ -280,8 +280,12 @@ class Estoque(abc.ABC):
         saldo nem gera movimento."""
 
     @abc.abstractmethod
-    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE") -> str:
-        """Cria a peça (tipo 4) no catálogo do Fracttal. Devolve o id do item."""
+    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "") -> str:
+        """Cria a peça (tipo 4) no catálogo do Fracttal. Devolve o id do item. `descricao` vai no `description` do
+        `item_insert` (o campo que a tela do passo 0 manda vazio); sem ela, vazio. **Ninguém a usa** (revisão final de
+        31/10/2026): a resposta do `item_insert` traz o `description` como "<nome>    { CODE }", um campo de exibição, e não foi
+        provado o que escrevê-lo faz com o catálogo do cliente; a curadoria não manda o fabricante, o modelo e a série por aqui
+        (a tela lembra de completá-los no Fracttal)."""
 
     @abc.abstractmethod
     def codigos(self, sigla: str) -> list[str]:
@@ -561,14 +565,14 @@ class EstoqueFracttal(Estoque):
             raise ErroFracttal(f"a unidade {nome!r} não existe no Fracttal", UNIDADES)
         return achada
 
-    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE") -> str:
-        codigo, nome = str(codigo or "").strip(), str(nome or "").strip()
+    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "") -> str:
+        codigo, nome, descricao = str(codigo or "").strip(), str(nome or "").strip(), str(descricao or "").strip()
         if not codigo or not nome:
             raise ValueError("a peça precisa de código e de nome")
         id_unit, descricao_da_unidade = self._unidade(unidade)
         r = self._rpc(CRIAR, {
             "id_type_item": TIPO_PECA, "field_1": nome, "code": codigo, "id_unit": id_unit,
-            "units_description": descricao_da_unidade, "active": True, "description": "", "is_serial_control": False,
+            "units_description": descricao_da_unidade, "active": True, "description": descricao, "is_serial_control": False,
             "is_lot_control": False, "visible_to_all": False, "ids_batch": [], "associate_warehouses": [],
             "associate_third_parties": [], "attached": [], "files": [], "custom_fields": []})
         return self._id_do_dado(r, CRIAR)
@@ -619,8 +623,8 @@ class _SessaoDoClone:
         # "details" ou "load_"; o resto é gravação de OS) e, a cada "gravação", limpa a memória das leituras de OS do
         # processo inteiro. `warehouses_items_stock` e toda gravação de estoque caem nesse "resto": cada pedido do
         # adaptador esvaziaria o cache de card do OS Creator de todo mundo (o card voltaria a ler o Fracttal). Nenhum
-        # pedido daqui toca numa OS, e é o mesmo POST e os mesmos erros, sem essa limpeza. O `api.py` não se edita (o
-        # clone fica idêntico ao do oem). Buscado a cada pedido: o teste troca o que quiser.
+        # pedido daqui toca numa OS, e é o mesmo POST e os mesmos erros, sem essa limpeza. O `api.py` não é editado para
+        # isso. Buscado a cada pedido: o teste troca o que quiser.
         with self._sessao.contexto(self._jwt, self._email):
             try:
                 return self._api._rpc_chamar(metodo, params, TIMEOUT_S)

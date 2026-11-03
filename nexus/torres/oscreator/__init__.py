@@ -1,10 +1,10 @@
 """Torre OS Creator: o criador de OS da Grid dentro do Nexus.
 
-As telas seguem as seções do OS Creator web (repo Grid-Co-CODE/oem, os_creator/os_web, servido em
-/os/* pela plataforma): Início (consulta, setores e solicitações), Histórico de OS, Setores,
-Solicitação e Clonagem de OS. Desde 30/09/2026 cada uma abre o CLONE do OS Creator web que mora nesta pasta
-(README.md), servido pelo próprio Nexus em /os/* depois do portão de login (ponte.py). O login no Fracttal
-continua por pessoa, na tela do próprio OS Creator.
+As telas seguem as seções do OS Creator web: Início (consulta, setores e solicitações), Histórico de OS, Setores,
+Solicitação e Clonagem de OS. Ele nasceu no repo Grid-Co-CODE/oem (os_creator/os_web, servido em /os/* pela plataforma, no
+5090) e mora nesta pasta desde 30/09/2026 (README.md), servido pelo próprio Nexus em /os/* depois do portão de login
+(ponte.py). Desde 31/10/2026 o Nexus é a casa dele: o oem está congelado. O login no Fracttal continua por pessoa, na tela
+do próprio OS Creator.
 """
 from ..modelo import Tela, Torre
 from .ponte import abrir, bp_raiz

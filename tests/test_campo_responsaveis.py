@@ -937,8 +937,11 @@ def test_o_cartao_abre_o_que_cobrar_com_a_prova(duas_equipes, logado):
     # a nota: perde 27, todos na qualidade (55; cobertura 100%): a ronda tira 15 (0,6 × 50 ÷ 2), as fotos e o GPS da
     # tarefa, 6 cada (0,6 × 20 ÷ 2)
     nota = jan[jan.index("Nota do App"):]
-    assert "perde 27" in nota
-    assert re.findall(r"<li>([^<]+) <b>−(\d+)</b>", nota) == [("Rondas", "15"), ("Fotos", "6"), ("GPS no fechamento", "6")]
+    # (29/10/2026, "-1 oq?"): o ponto é da nota da equipe, com onde aconteceu, quanto vale e o que fazer
+    assert "perdeu 27 pontos de 100 no mês" in nota and "não é OS anulada" in nota
+    assert re.findall(r'<li><b class="cr-rk-j-menos">−(\d+) pontos?</b><div><b>([^<]+)</b>', nota) == [
+        ("15", "Rondas"), ("6", "Fotos"), ("6", "GPS no fechamento")]
+    assert "vale 20 de 100 em cada tarefa · o que fazer: tirar ao menos 3 fotos na tarefa" in nota
     # as OS com nota mais baixa: a nota, a OS, a usina, quem fez, o dia e os pontos que perdeu
     os_ = nota[nota.index("OS com nota mais baixa"):]
     assert os_.index(">50<") < os_.index(">60<")

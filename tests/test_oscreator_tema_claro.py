@@ -7,17 +7,16 @@ O que estes testes seguram:
 - o card da OS (card_os.html) segue o mesmo cookie;
 - o botão do tema do Nexus troca as molduras do /os/ abertas, moldura dentro de moldura, e só elas (a função do base.html,
   rodada no node sobre um DOM falso);
-- o clone não importa o nexus (vai para o oem, que não tem o Nexus);
+- o front do clone (templates, scripts e folhas) não conhece nada do Nexus além do atributo data-tema;
 - a COBERTURA, que pega o esquecimento: toda cor fixa do escuro de cada .css do clone tem o par do claro (o mesmo seletor e a
   mesma propriedade), toda variável de cor tem o valor do claro, toda cor de traço de ícone tem a do claro e toda cor escrita
   num template (ou montada no JS) do clone tem o gancho do claro;
 - o claro só existe sob html[data-tema="claro"], em :where() (não soma especificidade: o estado .on/:hover/:focus do escuro
-  continua vencendo); fora dele (o oem sozinho) nada muda;
+  continua vencendo); fora dele (a página aberta sem o Nexus em cima) nada muda;
 - a paleta --osc-* do clone é a do tema claro do Nexus;
 - o contraste AA (4,5:1) do texto do claro, regra a regra, com o fundo que a própria regra declara.
 A tela foi conferida no Chrome sem janela (README da torre, seção "Tema claro").
 """
-import importlib.util
 import json
 import re
 import shutil
@@ -117,15 +116,10 @@ def _par_do_claro(parte: str) -> str:
 
 
 # ── a ponte e o card: o tema chega desenhado pelo servidor ──────────────────────────────────────────────────────────
-# o clone importa o steps/ui.py do OS Creator (PyQt6) ao montar a tela de Engenharia; as folhas não precisam dele
-precisa_do_clone = pytest.mark.skipif(importlib.util.find_spec("PyQt6") is None, reason="sem PyQt6 nesta máquina")
-
-
 def _html_abre(h: str) -> str:
     return re.search(r"<html[^>]*>", h).group(0)
 
 
-@precisa_do_clone
 def test_ponte_poe_o_tema_claro_pelo_cookie(logado):
     logado.set_cookie("nexus_tema", "claro")
     h = logado.get("/os/login").get_data(as_text=True)
@@ -137,7 +131,6 @@ def test_ponte_poe_o_tema_claro_pelo_cookie(logado):
     assert 'window.addEventListener("storage"' in cabeca
 
 
-@precisa_do_clone
 @pytest.mark.parametrize("cookie", [None, "escuro", "lilas"])
 def test_ponte_nao_poe_o_atributo_no_escuro(logado, cookie):
     """No escuro (o padrão, o cookie ausente ou desconhecido) o <html> do clone é o de sempre, sem data-tema."""
@@ -148,7 +141,6 @@ def test_ponte_nao_poe_o_atributo_no_escuro(logado, cookie):
     assert _html_abre(h) == '<html lang="pt-BR" data-sem-abas="1">'
 
 
-@precisa_do_clone
 def test_no_escuro_a_resposta_nao_depende_do_cookie(logado):
     """O HTML do escuro é um só (sem cookie, cookie escuro ou cookie estranho), e a ponte não mexe no que não é HTML."""
     sem = logado.get("/os/login").get_data()
@@ -169,7 +161,6 @@ def _login_do_fracttal(app, cliente):
     cliente.set_cookie("os_sessao", valor, path="/os")
 
 
-@precisa_do_clone
 def test_card_da_os_segue_o_tema(app, logado):
     _login_do_fracttal(app, logado)
     url = "/os/_nexus/card/9001?status=Em%20Processo&de=/t/engenharia/equipe"
@@ -233,13 +224,11 @@ console.log(JSON.stringify({r1, r2}));
     assert out["r2"] == ["escuro", "escuro", "escuro", None]
 
 
-# ── o clone continua sem o Nexus ────────────────────────────────────────────────────────────────────────────────────
-def test_clone_nao_importa_o_nexus():
-    """Toda .py da cópia (inclusive a que ainda não está no git): o tema claro mora no CSS do clone e na ponte."""
-    from nexus.torres.oscreator import sincronia as S
-    pys = [p.relative_to(S.AQUI).as_posix() for pasta in S.PASTAS for p in (S.AQUI / pasta).rglob("*.py")]
-    assert pys and S.importa_o_nexus(S.AQUI, pys) == []
-    # e nenhum template, script ou folha do clone carrega coisa do Nexus (o clone só conhece o atributo data-tema)
+# ── o front do clone só conhece o atributo ──────────────────────────────────────────────────────────────────────────
+def test_o_front_do_clone_so_conhece_o_atributo_do_tema():
+    """O tema claro mora no CSS do clone e na ponte: nenhum template, script ou folha do clone carrega coisa do Nexus (ele
+    só conhece o atributo data-tema, que a ponte põe). Até 31/10/2026 o Python da cópia também era cobrado aqui (não
+    importar o `nexus`), para o oem não quebrar ao receber a cópia; com o oem congelado, essa regra saiu."""
     for arq in list(WEB.rglob("*.html")) + list(WEB.rglob("*.js")) + list(WEB.rglob("*.css")):
         texto = _sem_comentarios(arq.read_text(encoding="utf-8"))
         assert not re.search(r"(?:href|src)=[\"']/static/|@import|NexusTema|NexusOsCard|nexus_tema", texto), arq.name
@@ -289,9 +278,9 @@ def test_cada_variavel_de_cor_tem_o_valor_do_claro(arq):
 
 
 def test_o_claro_so_existe_sob_o_atributo_e_sem_somar_especificidade():
-    """O claro mora todo sob html[data-tema="claro"]: no oem sozinho (sem o atributo) nada dele vale. As regras vão em
-    :where(), que não soma especificidade (o ".x" do claro não pode passar por cima do ".x.on" e do ":focus" do escuro);
-    só os blocos de variáveis ficam em html[data-tema="claro"], para vencer o :root."""
+    """O claro mora todo sob html[data-tema="claro"]: sem o atributo (a página aberta sozinha, como no oem) nada dele
+    vale. As regras vão em :where(), que não soma especificidade (o ".x" do claro não pode passar por cima do ".x.on" e do
+    ":focus" do escuro); só os blocos de variáveis ficam em html[data-tema="claro"], para vencer o :root."""
     erros = []
     for arq in _css_do_clone():
         for partes, decls in _tudo(arq):
@@ -359,8 +348,6 @@ def test_toda_cor_de_icone_tem_a_do_claro():
     ficaria o verde-claro (1,6:1) ou o branco no fundo branco."""
     cores = set()
     for arq in _fontes_do_clone():
-        if "steps" in arq.parts:                          # o app de desktop (PyQt): não vai à web
-            continue
         texto = arq.read_text(encoding="utf-8", errors="replace")
         for chamada in re.findall(r"icone\([^)]*\)", texto):
             cores |= {c.lower() for c in re.findall(r"['\"](#[0-9a-fA-F]{3,8})['\"]", chamada)}

@@ -22,11 +22,14 @@ duas calculam o mesmo número sem conversar, o fato põe o ID sem ler a dimensã
 mesmo ID. Custo medido: o código renomeado no Fracttal vira membro novo (19 itens com outro código entre a foto de
 21/06 e a de 22/09); o `fracttal_item_id` liga os dois e a qualidade conta.
 
-Membros: SÓ do que as duas máquinas leem igual, o banco. A foto de ativos do Fracttal que o OS Creator guardou em
-arquivo entra UMA vez em `nexus_ativos_fracttal · foto_ativos` (`ferramentas/carregar_ativos_fracttal.py`, quem grava
-é o Levi); a carga de hora em hora lê essa aba e os códigos dos livros do banco. Arquivo do PC (as fotos, o
-`os_falhas.json`) nunca entra na carga de hora em hora: o servidor tem outro (ou nenhum), e a dimensão trocaria de
-conteúdo a cada hora conforme a máquina.
+Membros: SÓ do que as duas máquinas leem igual, o banco. A foto de ativos do Fracttal, `nexus_ativos_fracttal ·
+foto_ativos`, entrou UMA vez em 11/10/2026 (as fotos que o OS Creator guardou em arquivo) e, desde 31/10/2026, é renovada
+toda noite pelo leitor do servidor (`nexus/dados/foto_ativos.py`, uma máquina grava): a carga de hora em hora lê essa aba
+e os códigos dos livros do banco. Na foto renovada vêm a raiz de cada cliente (a linha sem `pai_item_id`, que NÃO é
+equipamento: `membros` a pula, e a dimensão fica a mesma de antes) e o código que saiu do Fracttal, marcado com
+`fora_do_fracttal_desde` (segue membro: os fatos antigos ligam por ele). Arquivo do PC (as fotos, o `os_falhas.json`)
+nunca entra na carga de hora em hora: o servidor tem outro (ou nenhum), e a dimensão trocaria de conteúdo a cada hora
+conforme a máquina.
 
 Herda o passo 0 (adiado pelo Levi em 08/10): a carga refaz a dimensão inteira; um membro que só existe num fato de
 janela curta (App: 90 dias; PCM: 4 semanas) some da dimensão quando sai da janela, e volta com o mesmo ID. As fotos
@@ -45,10 +48,16 @@ from ..cadastro.banco import codigo_do_equipamento, sufixo_codigo
 _BRT = timezone(timedelta(hours=-3))
 
 LIVRO_FOTO, ABA_FOTO = "nexus_ativos_fracttal", "foto_ativos"
-NOME_FOTO = "Nexus · foto dos ativos do Fracttal (carga única; renovar exige ler o Fracttal)"
+# o nome só vale para quem CRIA o livro (o `livros.publicar` não renomeia o que existe): o de 11/10 segue com o nome de então
+NOME_FOTO = "Nexus · foto dos ativos do Fracttal (renovada toda noite pelo leitor do servidor)"
 LIVRO, NOME = "nexus_equipamentos", "Nexus · dimensão de equipamento (código do ativo do Fracttal) e apelidos"
 
-CAB_FOTO = ["fracttal_item_id", "codigo", "descricao", "pai_item_id", "tipo_fracttal", "foto_em"]
+# As três últimas colunas entraram em 31/10/2026, NO FIM (o livro é para sempre): o tipo do item e o grupo de tarefas do
+# Fracttal (a criação de OS do OS Creator usa os dois) e o dia (data_id) em que o código deixou de vir do Fracttal. O
+# `foto_em` passou a ser o dia em que a LINHA mudou pela última vez (a renovação de toda noite só troca o livro quando o sha
+# muda). O `os_creator/ativos_foto.CAB_FOTO` é cópia desta (um teste confere).
+CAB_FOTO = ["fracttal_item_id", "codigo", "descricao", "pai_item_id", "tipo_fracttal", "foto_em",
+            "id_type_item", "id_group_task", "fora_do_fracttal_desde"]
 CAB_DIM = ["equipamento_id", "codigo", "descricao", "usina_id", "usina_ligada_por", "motivo_sem_usina", "familia",
            "tipo_fracttal", "pai_id", "fracttal_item_id", "na_foto", "foto_em", "fontes_qtd"]
 CAB_APELIDO = ["equipamento_id", "sistema", "chave_externa", "casou_por"]
@@ -178,7 +187,7 @@ def usina_do_codigo(codigo, usinas) -> tuple[int | None, str]:
     return None, (DUAS_USINAS if len(suf) > 1 else FORA_CADASTRO)
 
 
-# ── a foto de ativos do Fracttal (carga única) ───────────────────────────────────────────────────────────────────
+# ── a foto de ativos do Fracttal (a carga única de 11/10; a renovação de toda noite é a `foto_ativos.py`) ────────────
 
 def _dia_da_foto(foto) -> str | None:
     try:
@@ -200,11 +209,12 @@ def foto_linhas(foto_set, foto_jun=None) -> list[list]:
     """As linhas de `foto_ativos` (CAB_FOTO) a partir do cache de ativos do OS Creator ({"ts", "assets"}).
     `foto_set` é a mais nova (a de 22/09/2026: 21.638 itens); da mais velha (21/06) entram só os itens cujo código a
     nova não tem (719: renomeados ou baixados), para o código antigo que um fato ainda carrega continuar sendo membro.
-    O item sem código (4) entra: é item do Fracttal e pode ser pai de outro."""
+    O item sem código (4) entra: é item do Fracttal e pode ser pai de outro. As três colunas do fim (tipo do item, grupo de
+    tarefas, fora do Fracttal) ficam vazias: o cache do OS Creator não as separava; quem as traz é a renovação da noite."""
     def linha(a, dia):
         cod = canon(a.get("code"))
         return [_int(a.get("id")), cod or None, _descricao(a.get("description"), cod), _int(a.get("id_parent")),
-                _txt(a.get("tipo_code")) or None, dia]
+                _txt(a.get("tipo_code")) or None, dia, None, None, None]
     dia = _dia_da_foto(foto_set)
     novas = sorted((linha(a, dia) for a in foto_set.get("assets") or ()), key=lambda l: (l[0] or 0, l[1] or ""))
     if not foto_jun:
@@ -225,11 +235,16 @@ def membros(foto, codigos_por_fonte: dict, usinas) -> list[list]:
     """A `dim_equipamento` (CAB_DIM), em ordem de código.
     `foto`: as linhas de `foto_ativos` (como lidas do banco, dicts; ou listas no CAB_FOTO).
     `codigos_por_fonte`: {fonte: [código de cada linha]} dos livros do banco (FONTES_BANCO + PCM).
-    `usinas`: o cadastro (lista ou IndiceUsinas). Código de fonte que não é `valido` não vira membro."""
+    `usinas`: o cadastro (lista ou IndiceUsinas). Código de fonte que não é `valido` não vira membro.
+    A linha sem `pai_item_id` é a raiz de um cliente (a renovação da foto, 31/10/2026, passou a trazê-las para o caminho do
+    ativo no OS Creator): não é equipamento, não vira membro nem é o pai de ninguém aqui, e a dimensão fica a mesma de antes
+    delas (a foto de 11/10 não tinha nenhuma linha sem pai)."""
     idx = usinas if isinstance(usinas, IndiceUsinas) else IndiceUsinas(usinas)
-    # a foto mais nova primeiro; no empate, o menor item
-    fotos = sorted(_como_dict(foto, CAB_FOTO), reverse=True,
-                   key=lambda f: (_txt(f.get("foto_em")), -(_int(f.get("fracttal_item_id")) or 0)))
+    # o código que está no Fracttal antes do que saiu dele (o mesmo item renomeado, o código reaproveitado por outro item); entre
+    # eles, o menor item, como antes. O `foto_em` não entra (revisão 1 da 2.2): na foto renovada ele é o dia em que a LINHA mudou,
+    # e desempatar por ele trocaria o membro de um código toda vez que a outra linha mudasse (e regravaria a dimensão)
+    fotos = sorted((f for f in _como_dict(foto, CAB_FOTO) if _int(f.get("pai_item_id"))), reverse=True,
+                   key=lambda f: (not _txt(f.get("fora_do_fracttal_desde")), -(_int(f.get("fracttal_item_id")) or 0)))
     por_codigo, codigo_do_item = {}, {}
     for f in fotos:
         c, item = canon(f.get("codigo")), _int(f.get("fracttal_item_id"))

@@ -12,8 +12,11 @@ from flask import (Blueprint, abort, current_app, jsonify, redirect, render_temp
                    url_for)
 
 import api
+import ativos_central
+import catalogos
+import catalogos_planos
 
-from . import ativo_curto, engenharia_web, lancador, oauth_fracttal, perf_web, sessao, sso
+from . import ativo_curto, engenharia_web, lancador, lista_central, oauth_fracttal, perf_web, sessao, sso
 from . import historico_store as HS
 from markupsafe import Markup
 
@@ -231,12 +234,12 @@ def _rota_existe(rota: str) -> bool:
 
 def _info_catalogo() -> dict:
     """De quando é o catálogo local e quantos ativos ele tem pela MESMA régua da tela de Ativos (só ativo com código):
-    o arquivo tem registro sem código, e a tela inicial dizia 21.639 enquanto a de Ativos dizia 21.635 (27/09).
-    Catálogo vencido (`_read_asset_cache` → None) fica com a conta do arquivo e a marca de desatualizado."""
+    o catálogo tem registro sem código, e a tela inicial dizia 21.639 enquanto a de Ativos dizia 21.635 (27/09). O catálogo
+    vencido segue contado, com a marca de desatualizado (`assets_cache_info`)."""
     info = dict(api.assets_cache_info())
-    ativos = api._read_asset_cache()
-    if ativos is not None:
-        info["n"] = sum(1 for a in ativos if isinstance(a, dict) and a.get("code"))
+    cat = ativos_central.atual()
+    if cat is not None:
+        info["n"] = cat.n_com_codigo            # os registros com código, repetidos inclusive: a conta da tela de Ativos
     return info
 
 
@@ -435,8 +438,10 @@ def api_alvo(aid):
 @bp.route("/api/performance/plano")
 @exige_sessao
 def api_plano():
-    # o tipo de tarefa que a OS vai levar (a Inspeção Geral do Inversor sai Corretiva, 29/10/2026), e não o do plano
-    plan = api.com_tipo_da_tarefa(api.get_plan_details(request.args.get("id_task"), request.args.get("id_item")))
+    # o tipo de tarefa que a OS vai levar (a Inspeção Geral do Inversor sai Corretiva, 29/10/2026), e não o do plano. O plano
+    # vem do catálogo dos planos (`catalogos_planos`, 31/10/2026, etapa 4 do canto central): a 2ª escolha da mesma usina não
+    # pede nada
+    plan = api.com_tipo_da_tarefa(catalogos_planos.detalhe_do_plano(request.args.get("id_task"), request.args.get("id_item")))
     return jsonify({"resumo": perf_web.resumo_plano(plan)})
 
 
@@ -483,11 +488,16 @@ def api_performance_criar():
         # "Agrupar em UMA OS com várias tarefas" (Levi, 13/10/2026, como no app: `PerfCriar._criar`): o mesmo `itens`,
         # com a OS pai e o título únicos, e a observação da OS inteira
         res = api.create_performance_os_agrupada(itens, note_os=perf_web.obs_da_os(corpo), **kwargs)
-        return jsonify(perf_web.mensagem_agrupada(res, corpo.get("frase") or "", bool(corpo.get("gerar_ticket", True))))
+        lista_central.criadas(res)                      # a OS criada entra na lista central na hora (31/10/2026)
+        # `comentario` (03/11/2026): o nº, o ativo e a observação de cada OS que saiu, para a página gravar o comentário
+        # automático na Plataforma de Performance (perf.js, `comentarNaPlataforma`)
+        return jsonify(dict(perf_web.mensagem_agrupada(res, corpo.get("frase") or "", bool(corpo.get("gerar_ticket", True))),
+                            comentario=perf_web.criadas_para_comentario(itens, res, corpo, True)))
     res = api.create_performance_os(itens, **kwargs)
+    lista_central.criadas(res)
     # a frase e a caixa vao junto: e delas que sai o "N tickets criados na aba X" (e o "sem ticket")
-    return jsonify(perf_web.mensagem_resultado(res, corpo.get("frase") or "",
-                                               bool(corpo.get("gerar_ticket", True))))
+    return jsonify(dict(perf_web.mensagem_resultado(res, corpo.get("frase") or "", bool(corpo.get("gerar_ticket", True))),
+                        comentario=perf_web.criadas_para_comentario(itens, res, corpo, False)))
 
 
 # ── Históricos de OS ──────────────────────────────────────────────────────────
@@ -497,7 +507,7 @@ def api_performance_criar():
 # por que não funciona como um filtro?"), é não repetir a busca: cada visão fica guardada alguns minutos por pessoa, e
 # voltar a ela é instantâneo. O botão de atualizar (e a atualização de 10 em 10 min) passam por cima da memória.
 TTL_HISTORICO = 180          # s — a lista de uma visão; o botão ↻ busca de novo na hora
-TTL_APOIO = 600              # s — etiquetas e pessoas, que quase não mudam
+TTL_APOIO = 600              # s — o "Criado por" de cada pessoa (as contas e o "eu"), que quase não muda
 _MEMO: dict = {}
 _MEMO_LOCK = threading.Lock()
 # o 1º elemento das chaves que o teto da memória tira POR ÚLTIMO (quem guarda por muito tempo se registra aqui). Caso: o
@@ -506,19 +516,29 @@ _MEMO_LOCK = threading.Lock()
 MEMO_FICA: set = set()
 
 
-def _memo(chave, ttl: float, fn, forcar: bool = False, guardar=None):
-    """O resultado de `fn()` guardado por `ttl` segundos. Erro não é guardado (sobe como sempre). `guardar(r)` falso =
-    devolve sem guardar: o catálogo que veio vazio (a sessão de alguém sem a permissão no Fracttal) não esvazia a tela
-    de todo mundo pelo TTL inteiro (20/10/2026)."""
-    agora = time.monotonic()
-    if not forcar:
-        with _MEMO_LOCK:
-            v = _MEMO.get(chave)
-        if v and agora - v[0] < ttl:
-            return v[1]
+# Uma leitura por chave (03/11/2026). O Raio-X do Nexus mostrou 828 pedidos ao Fracttal num minuto às 10h, contra a cota
+# de 200 da empresa toda: o servidor reinicia a cada push na `main`, a memória volta vazia, e quem abria o Acompanhamento
+# de chamados antes de a 1ª leitura terminar (até ~90 s) fazia a leitura inteira dele. Agora quem chega com a leitura da
+# MESMA chave em curso espera por ela e leva o mesmo resultado, o que levaria da memória um instante depois. A leitura que
+# falha, ou que o `guardar` não guarda, não serve a quem esperou: ele lê com a sessão dele, como antes. Uma leitura que
+# pedisse a própria chave já seria uma recursão sem fim antes disto, então ninguém espera por si mesmo; o prazo é só a rede.
+ESPERA_DA_LEITURA_S = 180.0
+_EM_CURSO: dict = {}                                     # chave -> _Leitura em curso (sob a _MEMO_LOCK)
+
+
+class _Leitura:
+    """A leitura de uma chave em curso: quem espera por ela e o que ela deu (`serve`: terminou e foi guardada)."""
+    __slots__ = ("pronta", "serve", "valor", "esperando")
+
+    def __init__(self):
+        self.pronta, self.serve, self.valor, self.esperando = threading.Event(), False, None, 0
+
+
+def _ler_e_guardar(chave, fn, guardar, agora) -> tuple:
+    """(resultado, se foi guardado)."""
     r = fn()
     if guardar is not None and not guardar(r):
-        return r
+        return r, False
     with _MEMO_LOCK:
         _MEMO[chave] = (agora, r)
         if len(_MEMO) > 300:                              # memória com teto: sai o que foi guardado há mais tempo
@@ -526,7 +546,38 @@ def _memo(chave, ttl: float, fn, forcar: bool = False, guardar=None):
                 return isinstance(k, tuple) and bool(k) and k[0] in MEMO_FICA
             for k in sorted(_MEMO, key=lambda k: (fica(k), _MEMO[k][0]))[:len(_MEMO) - 300]:
                 _MEMO.pop(k, None)
-    return r
+    return r, True
+
+
+def _memo(chave, ttl: float, fn, forcar: bool = False, guardar=None):
+    """O resultado de `fn()` guardado por `ttl` segundos, com uma leitura só por chave de cada vez (ver acima). Erro não é
+    guardado (sobe como sempre). `guardar(r)` falso = devolve sem guardar: o catálogo que veio vazio (a sessão de alguém
+    sem a permissão no Fracttal) não esvazia a tela de todo mundo pelo TTL inteiro (20/10/2026). `forcar` lê sempre."""
+    agora = time.monotonic()
+    if forcar:
+        return _ler_e_guardar(chave, fn, guardar, agora)[0]
+    with _MEMO_LOCK:
+        v = _MEMO.get(chave)
+        if v and agora - v[0] < ttl:
+            return v[1]
+        leitura = _EM_CURSO.get(chave)
+        minha = leitura is None
+        if minha:
+            leitura = _EM_CURSO[chave] = _Leitura()
+        else:
+            leitura.esperando += 1
+    if not minha:
+        if leitura.pronta.wait(ESPERA_DA_LEITURA_S) and leitura.serve:
+            return leitura.valor
+        return _ler_e_guardar(chave, fn, guardar, time.monotonic())[0]
+    try:
+        leitura.valor, leitura.serve = _ler_e_guardar(chave, fn, guardar, agora)
+        return leitura.valor
+    finally:
+        with _MEMO_LOCK:
+            if _EM_CURSO.get(chave) is leitura:
+                del _EM_CURSO[chave]
+        leitura.pronta.set()
 
 
 # ── o círculo de carga do Histórico (Levi, 27/09: "no período de carregamento poderia ter um círculo mostrando o
@@ -558,26 +609,32 @@ def _progresso_de(token):
     return _aviso
 
 
-# Os catálogos do Fracttal iguais para todos (19/10/2026, superplano do OS Creator): o pessoal ativo (2 pedidos), as
-# etiquetas, os motivos de cancelamento e as OS recentes da tinta dos Ativos eram relidos a cada tela e a cada clique,
-# por cada pessoa. Ficam TTL_CATALOGO na memória, um para todos; o erro não é guardado (a próxima tela tenta de novo).
+# Os catálogos do Fracttal iguais para todos: o pessoal ativo, as etiquetas e os motivos de cancelamento eram relidos a cada
+# tela e a cada clique, por cada pessoa, até 19/10/2026 (superplano do OS Creator: 10 min na memória, um para todos). Desde
+# 31/10/2026 (etapa 4 do canto central) o dono de cada um é o `catalogos.py`: um prazo por assunto, a cópia em disco (o
+# reinício não pede nada) e a renovação por trás. As OS recentes da tinta dos Ativos seguem aqui (`os_recentes`), quando a
+# lista central de OS não cobre o período.
 TTL_CATALOGO = 600
 
 
 def responsaveis_fracttal() -> list:
-    return [dict(p) for p in _memo(("cat", "responsaveis"), TTL_CATALOGO, lambda: api.get_responsaveis() or [],
-                                   guardar=bool)]
+    return catalogos.pessoas()
 
 
 def etiquetas_fracttal() -> list:
-    return [dict(e) for e in _memo(("cat", "etiquetas"), TTL_CATALOGO, lambda: api.get_labels() or [], guardar=bool)]
+    return catalogos.etiquetas()
 
 
 def motivos_cancelamento() -> list:
-    return list(_memo(("cat", "cancel_motivos"), TTL_CATALOGO, lambda: api.get_cancel_motivos() or [], guardar=bool))
+    return catalogos.motivos()
 
 
 def os_recentes(dias: int) -> list:
+    """A marcação verde dos Ativos: da lista central de OS quando ela cobre os `dias` (31/10/2026, tarefa 3.3: nenhum pedido);
+    senão a de sempre, uma para todos (`api.codigos_os_recentes`, ~17 páginas, 10 min na memória)."""
+    central = lista_central.codigos_recentes(dias)
+    if central is not None:
+        return central
     return list(_memo(("cat", "os_recentes", dias), TTL_CATALOGO, lambda: api.codigos_os_recentes(dias) or [],
                       guardar=bool))
 
@@ -615,15 +672,52 @@ def _catalogo_clientes_usinas() -> dict:
     return m
 
 
-def ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, *, forcar=False, aviso=None):
-    """(a Lista ou None, as linhas, o info, o erro) do Histórico, pela lista guardada e renovada sem repetir o Fracttal
-    (19/10/2026, `historico_store`): a de "Todos" é uma só para quem vê o mesmo total no Fracttal (1 pedido na sessão da
-    pessoa, a cada 30 min); a de cada pessoa segue dela. Saiu de dentro do `historico` em 26/10/2026 para o "Investigar
-    ativo" do Tempo real (`rotas_investigar`) ler a MESMA lista da Visão COS, sem uma busca a mais no Fracttal."""
+def _contas_do_filtro() -> list:
+    """As contas do "Criado por" (o mesmo que a tela mostra, guardado POR PESSOA: `_contas_da_pessoa`): o nome da conta
+    escolhida."""
+    return (_contas_da_pessoa() or {}).get("pessoas") or []
+
+
+def _contas_da_pessoa() -> dict:
+    """O "Criado por" do Histórico (as contas e o "eu"), lido com a sessão de quem abre e guardado 10 min para ela. Não é do
+    catálogo comum de pessoas (`catalogos.py`): quem não tem a permissão de pessoal no Fracttal recebe a lista vazia, e não
+    as contas da empresa (revisão da 4.1, 31/10/2026: a etapa 4 o tinha posto no catálogo, e voltou a ser como antes)."""
+    return _memo(("pessoas", _quem()), TTL_APOIO, lambda: api.get_pessoas_contas() or {})
+
+
+def ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, *, forcar=False, aviso=None, mudou=False, cos=False,
+              central=True):
+    """(a Lista ou None, as linhas, o info, o erro) do Histórico.
+
+    Desde 31/10/2026 (tarefa 3.3 do canto central), da LISTA CENTRAL DE OS primeiro (`lista_central.historico`): quando ela
+    cobre o período, tem os campos que a tela mostra e a pessoa passou na conferência do período (o "Todos" dela no Fracttal
+    contado até a marca d'água da lista, igual ao da lista: 1 pedido de uma página na sessão dela, a cada 30 min ou quando a
+    lista ganha OS que ela ainda não provou). Então nenhum pedido a mais: nem a lista inteira, nem as novas, nem a de 10 em 10
+    min. `cos`: a Visão COS (mostra o gatilho, a programação, o início e quem criou). `central=False`: só o caminho de hoje
+    (quem já tentou a lista pelo seu atalho, o Investigar).
+
+    Senão, o CAMINHO DE HOJE: a lista guardada e renovada sem repetir o Fracttal (19/10/2026, `historico_store`). A de "Todos"
+    é uma só para quem vê o mesmo total no Fracttal (1 pedido na sessão da pessoa, a cada 30 min) quando a lista central não
+    está em uso PARA O PERÍODO (o PC, a lista vazia, a janela que começa depois do começo dele: a de 7 dias do dia do deploy);
+    com ela em uso, coberta ou vencida, só para quem passou há pouco na conferência do
+    período (`lista_central.divide_a_todos`), e cada outra pessoa que chega aqui segue com a DELA (Rulings BU e BX da 3.3):
+    quem vê tudo lê da lista central e não ancorava a "Todos" dividida, a 1ª pessoa restrita a achava vazia e a lista dela
+    virava a de todos, e outra restrita com o mesmo total a herdava (a sonda mostrou as 30 OS de uma usina para quem só vê a
+    outra; e a lista vencida a devolvia). A de cada pessoa segue dela. `mudou`: o card acabou de mudar
+    uma OS; aqui a lista vem de novo do Fracttal (o que o `atualizar=1` forçado ao fechar o card fazia até 31/10/2026), e na
+    lista central ela já entrou pela ação. Saiu de dentro do `historico` em 26/10/2026 para o "Investigar ativo" do Tempo
+    real (`rotas_investigar`) ler a MESMA lista da Visão COS."""
+    if central:
+        v = lista_central.historico(modo_srv, id_account, id_label, de, ate, status_ids, pessoa=_quem(), forcar=forcar,
+                                    cos=cos, pessoal=responsaveis_fracttal, contas=_contas_do_filtro,
+                                    etiquetas=etiquetas_fracttal)
+        if v is not None:
+            return v, v.linhas, v.info, None
+    forcar = forcar or mudou
     linhas, erro, info, lista = [], None, {}, None
     filtros = (modo_srv, id_account, id_label, de, ate, tuple(status_ids or ()))
     chave = ("hist", _quem()) + filtros
-    if id_account == "TODOS":
+    if id_account == "TODOS" and lista_central.divide_a_todos(_quem(), de, ate):
         comum = ("hist", "TODOS") + filtros
         if HS.mesma_visao(_quem(), comum, lambda: (api.list_minhas_os_pagina(
                 modo_srv, "TODOS", id_label, de, ate, status_ids, "", 1, 1) or {}).get("total") or 0):
@@ -693,9 +787,11 @@ def historico():
 
     "Pq não funciona como um filtro?" (Levi, 27/09): porque as três visões são três buscas DIFERENTES no Fracttal
     (criadas por mim, atribuídas a mim, a equipe inteira) e a da equipe passa do teto de 2.000 em 30 dias — filtrar as
-    outras a partir dela perderia OS. O que dá para cortar, cortou-se: a lista fica 3 min na memória por pessoa e visão
-    (voltar a uma visão não vai ao Fracttal; o ↻, o F5 e a atualização de 10 min vão, com `atualizar=1`), e a tela
-    deixou de buscar de novo, em 34 lotes sequenciais de 60, o meta que o servidor já tinha mandado."""
+    outras a partir dela perderia OS. O que dá para cortar, cortou-se: a lista guardada e dividida de 19/10/2026
+    (`historico_store`), e a tela deixou de buscar de novo, em 34 lotes sequenciais de 60, o meta que o servidor já tinha
+    mandado. Desde 31/10/2026 (tarefa 3.3 do canto central) as visões são filtros da LISTA CENTRAL DE OS, que o servidor lê
+    em faixas, depois da conferência de cada pessoa (`ler_lista`, `lista_central`); o caminho de 19/10 fica para quem a lista
+    não cobre (o período fora da janela, a visão restrita, o PC sem leitor)."""
     modo = request.args.get("modo") or "criadas"
     if modo not in ("criadas", "atribuidas", "cos"):
         modo = "criadas"
@@ -720,8 +816,13 @@ def historico():
     status_sel = [x for x in request.args.getlist("status") if x in nome_para_id]
     status_ids = [nome_para_id[x] for x in status_sel] or None
     forcar = request.args.get("atualizar") == "1"
+    # `mudou=1`: o card fechou depois de mudar uma OS (31/10/2026: a tela não força mais o atualizar=1; a ação já pôs a OS na
+    # lista central, e no caminho de hoje a lista vem de novo, como vinha). O período inválido (o "de" depois do "até", a data
+    # torta) vai ao caminho de hoje: o invertido dava 0 OS na lista e 0 no Fracttal, e a conferência "batia" (rodada 1 da 3.3)
     lista, linhas, info, erro = ler_lista(modo_srv, id_account, id_label, de, ate, status_ids, forcar=forcar,
-                                          aviso=_progresso_de(request.args.get("p")))
+                                          aviso=_progresso_de(request.args.get("p")),
+                                          mudou=request.args.get("mudou") == "1", cos=modo == "cos",
+                                          central=lista_central.periodo_valido(de, ate))
     # o teto de 2.000 corta as OS MAIS ANTIGAS do período em silêncio — dizer, com o total do servidor e o que CHEGOU (a
     # conta é total − carregadas, antes da busca local; o teto só entra para saber se houve corte)
     total_srv, teto = int(info.get("total") or 0), int(info.get("cap") or 0)
@@ -730,13 +831,14 @@ def historico():
         b = busca.lower()
         linhas = [l for l in linhas if b in " ".join(str(l.get(k) or "") for k in ("folio", "usina", "ativo", "descricao", "cliente", "status")).lower()]
     labels, pessoas, eu = [], [], None
-    # etiquetas e pessoas quase não mudam: o ↻ não as busca de novo (2 pedidos a menos a cada ↻; 10 min na memória)
+    # etiquetas e pessoas quase não mudam: o ↻ não as busca de novo. As etiquetas vêm do catálogo (`catalogos.py`,
+    # 31/10/2026); as contas e o "eu" do "Criado por", da pessoa, guardados 10 min para ela (`_contas_da_pessoa`)
     try:
         labels = sorted(etiquetas_fracttal(), key=lambda x: (x.get("description") or "").lower())
     except Exception:                                    # noqa: BLE001 — sem etiquetas o filtro fica em 'Todas'
         pass
     try:
-        r = _memo(("pessoas", _quem()), TTL_APOIO, lambda: api.get_pessoas_contas() or {})
+        r = _contas_da_pessoa() or {}
         pessoas, eu = (r.get("pessoas") or []), r.get("eu")
     except Exception:                                    # noqa: BLE001 — idem
         pass
@@ -759,6 +861,7 @@ def historico():
                            cols=cols_v, datas=DATAS, fmt=api.fmt_data_br, linhas_html=linhas_html,
                            lista_de=(dt.datetime.fromtimestamp(lista.criada_em, api._BR_TZ).strftime("%H:%M")
                                      if lista else ""),
+                           da_lista_central=bool(getattr(lista, "central", False)),
                            labels=labels, pessoas=pessoas, pessoa_sel=pessoa_sel, etiqueta_sel=str(id_label or ""),
                            status_opts=list(api.WO_STATUS.values()), status_sel=status_sel, clientes=clientes,
                            usinas=sorted(usina_cli), usina_cli=usina_cli, tipos_ativo=tipos_ativo,
@@ -888,6 +991,20 @@ def os_preparar(wid):
     return jsonify({"pedido": preparar(_quem(), wid, modo)}), 202
 
 
+@bp.route("/api/os/<int:wid>/previa")
+@exige_sessao
+def os_previa(wid):
+    """A 1ª pintura do card (31/10/2026, tarefa 3.3 do canto central): o que a lista central de OS sabe desta OS (o nº, o tipo,
+    o status, o ativo, as datas, quem criou e com quem está), na hora e sem pedido ao Fracttal, enquanto o card inteiro vem ao
+    vivo (as subtarefas, os anexos, a OS pai e a solicitação, como sempre). 204 quando a lista não pode dizer (a OS que ela não
+    tem, quem não conferiu que vê no Fracttal o mesmo que ela, o PC sem leitor): o card abre como sempre. Fica em /os/api/:
+    sem a sessão, 401 em JSON, e a tela não pinta a página do login por engano."""
+    linha = lista_central.previa(wid)
+    if linha is None:
+        return "", 204
+    return render_template("_os_previa.html", l=linha, fmt=api.fmt_data_br)
+
+
 @bp.route("/os/folio/<int:folio>")
 @exige_sessao
 def os_detalhe_por_folio(folio):
@@ -898,20 +1015,24 @@ def os_detalhe_por_folio(folio):
         if request.args.get("parcial") or request.headers.get("X-Requested-With") == "fetch":
             return f'<p class="os-erro" style="padding:24px">{msg}</p>', 404
         return render_template("erro.html", conta=_conta(), aba="hist", mensagem=msg), 404
-    return os_detalhe(wid)
+    return os_detalhe(wid, folio=folio)
 
 
 @bp.route("/os/<int:wid>")
 @exige_sessao
-def os_detalhe(wid):
+def os_detalhe(wid, folio=None):
     # o Historico abre a OS num card sobreposto (Levi, 13/09): ?parcial=1 (ou fetch) devolve so o fragmento do detalhe,
     # sem o cabecalho/abas, para injetar no card. Sem isso, e a pagina cheia de sempre (fallback quando o JS nao roda).
     parcial = bool(request.args.get("parcial")) or request.headers.get("X-Requested-With") == "fetch"
     det = preparado(wid) or api.get_os_detalhes(wid) or {}      # o que o mouse parado no cartão já pediu (09/10/2026)
     if not det.get("folio"):
+        # aberta pelo nº, o recado diz o nº: o id pode ter vindo da lista central de OS, de uma OS que o Fracttal não mostra à
+        # pessoa, e não sai na tela (rodada 4 da 3.3)
+        msg = (f"Não achei nenhuma OS com o nº {folio}." if folio is not None
+               else f"Não achei a OS de id {wid} no Fracttal.")
         if parcial:
-            return f'<p class="os-erro" style="padding:24px">Não achei a OS de id {wid} no Fracttal.</p>', 404
-        return render_template("erro.html", conta=_conta(), aba="hist", mensagem=f"Não achei a OS de id {wid} no Fracttal."), 404
+            return f'<p class="os-erro" style="padding:24px">{msg}</p>', 404
+        return render_template("erro.html", conta=_conta(), aba="hist", mensagem=msg), 404
     status = request.args.get("status") or ""
     template = "os_detalhe_conteudo.html" if parcial else "os_detalhe.html"
     return render_template(template, conta=_conta(), aba="hist", d=det, wid=wid, status=status, parcial=parcial,

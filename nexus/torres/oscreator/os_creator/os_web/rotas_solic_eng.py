@@ -15,6 +15,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 import api
 
+from . import lista_central
 from . import perf_web
 from . import solic_eng_web as reg
 from . import rotas
@@ -99,9 +100,12 @@ def api_criar():
     _abrir_limite()
     corpo, brutos = _corpo_e_anexos()
     por_id = {str(a.get("id")): a for a in (api.load_assets_cached() or []) if isinstance(a, dict)}
-    # o responsável é conferido de novo AQUI: a lista da tela é só a primeira barreira
-    # na criação (uma gravação), o pessoal e as etiquetas vêm do Fracttal na hora, sem a cópia de 10 min
-    permitidos, _ = reg.responsaveis(api.get_responsaveis() or [], reg.nomes_configurados())
+    # o responsável é conferido de novo AQUI: a lista da tela é só a primeira barreira. Na criação (uma gravação) o pessoal e
+    # a etiqueta vêm do Fracttal AO VIVO, uma leitura de cada, com a sessão de quem cria: a regra de 19/10/2026 é que,
+    # faltando a pessoa ou a etiqueta ENGENHARIA no Fracttal, nenhuma OS sai. O catálogo (`catalogos.py`) serve à TELA; a
+    # pessoa desligada e a etiqueta apagada nas últimas horas seguiriam nele até a renovação (a etapa 4 do canto central o
+    # tinha posto aqui, e a revisão da 4.1 o tirou). E a sessão morta cai já aqui, antes de gravar: 401 e o login
+    permitidos, _ = reg.responsaveis(api.responsaveis_ao_vivo(), reg.nomes_configurados())
     ativos, c, erro = reg.montar(corpo, por_id, permitidos, _agora(), api.perf_os_nome)
     if erro:
         return jsonify({"erro": erro}), 400
@@ -111,7 +115,7 @@ def api_criar():
         erro = reg.erro_envios(anexos, 1 if c["agrupar"] else len(ativos))
     if erro:
         return jsonify({"erro": erro}), 400
-    # a etiqueta ANTES de criar: a ENGENHARIA sempre, e só ela — faltando no Fracttal, nenhuma OS sai
+    # a etiqueta ANTES de criar: a ENGENHARIA sempre, e só ela — faltando no Fracttal (ao vivo), nenhuma OS sai
     etiquetas, faltam = reg.etiquetas(api.get_labels() or [])
     if faltam:
         return jsonify({"erro": reg.erro_etiquetas(faltam)}), 400
@@ -130,6 +134,7 @@ def api_criar():
         res = api.create_work_orders_bulk(ativos, c["descricao"], reg.TIPO_TAREFA, [],
                                           responsible_code=c["responsible_code"], **comum)
         out, oss = reg.mensagem(res, ativos, c["prog_date"]), reg.oss_do_bulk(res)
+    lista_central.criadas(res)         # as OS criadas entram na lista central na hora (31/10/2026, tarefa 3.3)
     if anexos:
         alvos = [o for o in oss if o.get("id_work_order")]
         with api._ExecutorComContexto(max_workers=reg.ENVIOS_PARALELOS) as ex:

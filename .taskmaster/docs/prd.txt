@@ -1,0 +1,48 @@
+# PRD — Nexus: os setores conversando (Insights, sino, Caixa de entrada, conversas, pedidos e o Início novo)
+
+Levi, 03/11/2026: "Preciso pensar em uma forma dos setores conversarem entre si de forma rastreável e clara com chats,
+notificações..."; sobre a tela de Insights do mockup R18: "essa parte de insights também é muito boa"; e "construa o que
+você sugere". Formato do Taskmaster (eyaltoledano/claude-task-master): este PRD vira as tarefas de
+`.taskmaster/tasks/tasks.json`. A CLI do Taskmaster não é usada para gerar (ela chama IA paga; a casa é custo zero): o PRD e
+as tarefas são escritos à mão no formato dela, e a CLI pode lê-los depois.
+
+## Problema
+Cada setor (COS, PCM, Performance, Engenharia, Chamados, Segurança, Campo) vê o seu pedaço em telas próprias. O que cruza
+setores (a OS normalizada que segue aberta no Fracttal, o chamado parado com o fabricante, o extintor vencido, a equipe
+acima da capacidade) só aparece se alguém abrir a tela certa, e o combinado entre setores vive no WhatsApp, sem dono, sem
+prazo e sem histórico.
+
+## Como as plataformas maduras fazem (ServiceNow, Jira Service Management, Linear, Salesforce)
+1. A conversa presa ao objeto (OS, usina, ocorrência, chamado, PT), não um chat solto.
+2. O pedido entre setores com dono, prazo e status (aceito, concluído): rastreável e medível.
+3. @menção de pessoa e de setor gera notificação.
+4. Uma central de notificações (o sino), "para mim / meu setor / tudo"; o urgente também no celular.
+5. Tudo gravado e nada se apaga (o padrão do Nexus: livro que só cresce, texto cifrado).
+
+## Solução, em fases (uma de cada vez, mostrada antes de seguir)
+### Fase 1 — Insights, sino e Caixa de entrada (sem nada novo para digitar)
+- Um motor de regras que lê o que o Nexus JÁ lê (nenhuma fonte nova, nenhuma chamada ao Fracttal) e gera insights com
+  evidência, ação, torre dona e link para a tela. Regras com dado pronto em 03/11/2026:
+  R03 religamento repetido na mesma cabine (COS → Religamentos), R05 sem comunicação há mais de 24 h (Ronda COS, abertas
+  da Thopen no banco), R06* falha nova em ativo que já tem chamado de garantia (OS do Fracttal × chamados, no banco),
+  R07 extintor vencido (Segurança → Extintores), R09 equipe acima da capacidade na semana (PCM), R11 usina sem ronda há
+  mais de 7 dias (Campo · App → Rondas), R13 chamado parado com o fabricante (Chamados → Garantias), N01 normalizada com a
+  OS aberta no Fracttal há 7 dias ou mais / hora a corrigir (COS → Normalizações).
+  Fora da Fase 1: R01 (anomalia sem OS: calculada pela plataforma, não chega ao Nexus), R02, R04, R08 (ajuste), R06
+  completa, R10, R12 (sem fonte: a vigência da garantia, o EPC, o prazo do relatório).
+- Comando → Insights: os insights por gravidade, regra e torre, com a evidência, a ação e "Assumir" / "Concluir".
+- Comando → Caixa de entrada: o que é das torres que o setor da pessoa vê, o mais urgente primeiro; o assumido por ela.
+- O sino no topo: quantos críticos e de atenção ainda sem dono nas torres da pessoa; a lista curta e o link.
+- O "Assumir" e o "Concluir" gravam no livro novo `nexus_insights · fato_evento_insight` (só acrescenta; quem, cifrado).
+- Dono = a TORRE (o setor da pessoa vê as torres liberadas em Base → Acessos): não precisa cadastrar cadeiras.
+### Fase 2 — Conversa com @menção em cada insight, OS e usina
+### Fase 3 — Pedidos entre setores com prazo, e o painel de tempo de resposta por setor
+### Fase 4 — O Início novo ("Pede você agora"), alimentado pelo motor; a paleta preta, azul e lima do Levi
+
+## Requisitos não funcionais
+- O motor roda em segundo plano (cópia de 5 min, a vencida volta na hora e se refaz por trás: `visao._ler`). O sino e as
+  telas nunca esperam uma fonte: fonte que falha vira aviso da regra, e as outras seguem.
+- Nenhuma regra lê o Fracttal, a SunOp ou a PV Operation (as cotas e as fontes pagas).
+- Governança (nexus/dados/CLAUDE.md): o livro novo registrado no catálogo antes de existir; texto e nome só cifrados.
+- UX (UI UX Pro Max): status pela cor E pela palavra; estado vazio que orienta; confirmação de ação; foco visível;
+  badge para estado, botão para ação.

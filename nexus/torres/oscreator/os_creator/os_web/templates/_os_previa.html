@@ -1,0 +1,31 @@
+{# A 1ª pintura do card da OS (31/10/2026, tarefa 3.3 do canto central; `rotas.os_previa`): o que a lista central de OS sabe
+   da OS, na hora e sem pedido ao Fracttal, enquanto o card inteiro vem ao vivo pela sessão da pessoa. Só o que a lista tem; o
+   resto (as subtarefas, os anexos, a OS pai, a solicitação, as notas) diz que está vindo. Sem botões: as ações chegam com o
+   card, que toma o lugar desta. As classes são as do card (os.css, nos dois temas); `det-previa` sem o `data-wid`, para o
+   os_acoes.js não a tratar como o card. #}
+<section class="det det-previa" aria-busy="true">
+  <header class="det-top">
+    <div class="det-num"><div class="det-os">OS {{ l.folio }}</div><div class="det-num-sub">Ordem de serviço</div></div>
+    {% if l.tipo_tarefa %}<span class="det-badge">{{ l.tipo_tarefa }}</span>{% endif %}
+    {% if l.status %}<span class="os-status">{{ l.status }}</span>{% endif %}
+    {% if l._a_conferir %}<span class="os-ajuda" title="Uma leitura do Fracttal deveria ter trazido esta OS e não trouxe: o status pode ter mudado. O card, que está vindo, lê na hora.">a conferir</span>{% endif %}
+  </header>
+  <div class="det-corpo">
+    <div class="det-card det-banner">
+      <span class="det-banner-t">{{ l.ativo or '—' }}</span>
+      {% if l.code %}<span class="det-banner-code">{{ l.code }}</span>{% endif %}
+    </div>
+    <div class="det-cols">
+      <div class="det-card det-rows">
+        <div class="det-row"><span class="det-k">Data do evento</span><span class="det-v">{{ fmt(l.event_date) if l.event_date else '—' }}</span></div>
+        <div class="det-row"><span class="det-k">Data fim</span><span class="det-v">{{ fmt(l.data_fim) if l.data_fim else '—' }}</span></div>
+        <div class="det-row"><span class="det-k">Atribuído a</span><span class="det-v">{{ l.atribuido_a or '—' }}</span></div>
+        <div class="det-row"><span class="det-k">Criado por</span><span class="det-v">{{ l.criado_por or '—' }}</span></div>
+      </div>
+    </div>
+    <div class="det-card det-rows">
+      <div class="det-row"><span class="det-k">Título</span><span class="det-v">{{ l.descricao or '—' }}</span></div>
+    </div>
+    <p class="os-ajuda" style="padding:14px 4px">Carregando as tarefas, as subtarefas e os anexos…</p>
+  </div>
+</section>

@@ -18,7 +18,9 @@ from urllib.parse import quote
 from flask import Blueprint, Response, jsonify, request, send_file, session
 
 import api
+import ativos_central
 
+from . import lista_central
 from . import os_acoes_web as regra
 from . import rotas as _rotas
 from . import tradicional_web as trad
@@ -263,8 +265,10 @@ def api_os_pdf():
     if not d.get("folio") and not folio:
         return _erro("Não consegui ler a OS no Fracttal.", 502)
     d.setdefault("folio", folio)
-    # o cliente e a usina do ativo, se o catálogo já está na memória (carregá-lo aqui seria ler todos os ativos)
-    local = (getattr(api, "_code_loc", None) or {}).get(str(d.get("code") or ""))
+    # o cliente e a usina do ativo, pelo catálogo central (sem catálogo nesta máquina, o PDF sai sem eles: baixá-lo aqui
+    # seria ler todos os ativos)
+    cat = ativos_central.atual()
+    local = cat.local_por_codigo.get(str(d.get("code") or "")) if cat is not None else None
     m = os_pdf.modelo(d, recursos=recursos, anexos_sub=subs, anexos_os=oss, local=local)
     pasta_fotos = os.path.join(api._data_dir(), "os_pdf_fotos")    # a cópia reduzida de cada foto (os_pdf)
 
@@ -345,6 +349,9 @@ def api_responsavel(wid):
     r = api.mudar_responsavel(wid, idp)                              # os_detalhe.py:331 — (self._wo, p["id_personnel"])
     if not (isinstance(r, dict) and r.get("ok")):
         return _erro((r or {}).get("erro") or "não deu")
+    # a OS como ficou entra na lista central de OS na hora (31/10/2026, tarefa 3.3): o Histórico a mostra sem reler o
+    # Fracttal ao fechar o card. Lida pela sessão da pessoa; a falha vai ao log e nunca derruba a ação (como em todas abaixo)
+    lista_central.mudou(wid)
     # 19/10/2026 (a troca também na tela do chamado): o quadro do Acompanhamento que mostra esta OS sai da memória, senão
     # voltar a ele mostraria o responsável de antes por até 3 min; e `da_equipe` é a cor do nome na tela do chamado, pela
     # regra do quadro. A troca já está no Fracttal: nada daqui vira erro na tela.
@@ -368,6 +375,7 @@ def api_etiquetas_salvar(wid):
     r = api.apply_labels(wid, ids)                                   # os_detalhe.py:420 — (self._wo, ids)
     if isinstance(r, dict) and r.get("ok") is False:
         return _erro(r.get("erro") or "não foi possível salvar")
+    lista_central.mudou(wid)                                         # a etiqueta é coluna e filtro do Histórico
     return jsonify({"ok": True})
 
 
@@ -385,6 +393,7 @@ def api_nota(wid):
     r = api.editar_nota_os(wid, novo)                                # os_detalhe.py:1361 — (self._wo, novo)
     if not (isinstance(r, dict) and r.get("ok")):
         return _erro((r or {}).get("erro") or "Não consegui salvar a observação.")
+    lista_central.mudou(wid)                                         # a nota com o bloco do chamado é do Garantias
     # a API apara os espaços das pontas — devolver o que ELA gravou, não o que foi digitado
     return jsonify({"ok": True, "nota": r.get("nota", novo)})
 
@@ -398,6 +407,7 @@ def api_concluir(wid):
     res = api.concluir_os_checado(wid)                               # os_detalhe.py:896 — (self._wo)
     if isinstance(res, dict) and res.get("ok") is False:
         return _erro(res.get("msg") or "Não foi possível concluir.")
+    lista_central.mudou(wid)                                         # o status que o Fracttal deu (verificação ou concluída)
     texto, aviso = regra.mensagem_concluida(folio, (res or {}).get("data_fim") if isinstance(res, dict) else None)
     return jsonify({"ok": True, "mensagem": texto, "aviso": aviso,
                     "data_fim": (res or {}).get("data_fim") if isinstance(res, dict) else None})
@@ -449,6 +459,12 @@ def api_executar(wid, tid):
     if a_gravar:
         n = (api.salvar_subtarefas(wid, tid, a_gravar) or {}).get("n") or 0
     res = api.registrar_execucao(tid, ini, fim, note=str(c.get("nota") or "").strip())
+    if (res or {}).get("confirmado"):
+        lista_central.mudou(wid)
+    else:
+        # sem o registro confirmado, reler a OS seriam 2 pedidos que nada provam (rodada 1 da 3.3): ela fica "a conferir" e
+        # pendente, e a faixa das pendentes a lê pelo nº (Minor 3 da rodada 2: o início e o fim da Visão COS podem ter mudado)
+        lista_central.pendente(wid)
     texto, aviso = regra.mensagem_execucao(n, res, lambda x: api.fmt_data_br(x) or "—")
     return jsonify({"ok": True, "mensagem": texto, "aviso": aviso, "n": n,
                     "confirmado": bool(res.get("confirmado"))})
@@ -464,4 +480,5 @@ def api_cancelar(wid):
     if idm in (None, "", 0, "0"):
         return _erro("Escolha o motivo do cancelamento.")
     api.cancel_os(wid, idm, str(c.get("note") or "").strip())        # cancelar_os.py:77 — (self._wo, idm, obs.strip())
+    lista_central.mudou(wid)
     return jsonify({"ok": True, "mensagem": "OS %s cancelada com sucesso." % (c.get("folio") or wid)})

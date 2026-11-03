@@ -139,17 +139,19 @@
   $('hs_exportar').addEventListener('click', exportar);
 
   // ── recarregar (↻ e de 15 em 15 minutos), mantendo os filtros ──
-  function recarregar() {
+  // `auto` (só o valor true) = a atualização de 15 min, que a tela faz sozinha: o servidor a conta à parte do clique no ↻
+  // (X-Nexus-Auto, casca/uso_os.py)
+  function recarregar(auto) {
     rodape.textContent = 'carregando solicitações…';
-    SP.pedir('/os/api/solic/historico', undefined, 'Buscando as solicitações no Fracttal…').then(function (x) {
+    SP.pedir('/os/api/solic/historico', undefined, 'Buscando as solicitações no Fracttal…', auto === true).then(function (x) {
       if (!x.ok) { SP.aviso('Não consegui atualizar: ' + (x.j.erro || 'sem resposta'), true); aplica(); return; }
       linhas = x.j.linhas || [];
       encherFiltros();
       aplica();
     });
   }
-  $('hs_recarregar').addEventListener('click', recarregar);
-  setInterval(function () { if (!document.hidden && $('hs_ficha').hidden && $('os_card').hidden) recarregar(); }, 15 * 60 * 1000);
+  $('hs_recarregar').addEventListener('click', function () { recarregar(false); });
+  setInterval(function () { if (!document.hidden && $('hs_ficha').hidden && $('os_card').hidden) recarregar(true); }, 15 * 60 * 1000);
   document.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); busca.focus(); busca.select(); }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'e' || e.key === 'E')) { e.preventDefault(); exportar(); }

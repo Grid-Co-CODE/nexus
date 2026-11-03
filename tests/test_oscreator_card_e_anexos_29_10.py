@@ -42,7 +42,6 @@ class _Pedido(Exception):
 
 
 def test_o_tipo_que_a_lista_fixa_nao_tem_vem_do_catalogo_vivo(monkeypatch):
-    monkeypatch.setattr(api, "_CLASSIF_CACHE", {})
     monkeypatch.setattr(api, "get_tipos_classif", lambda: {"tipos": [{"id": 77001, "description": "Zeladoria"}], "c1": [], "c2": []})
     assert api.tipo_main_ao_vivo("Zeladoria") == 77001 and api.tipo_main_ao_vivo("zeladoria ") == 77001
     assert api.tipo_main_ao_vivo("Não existe") is None
@@ -60,7 +59,6 @@ def test_o_tipo_que_a_lista_fixa_nao_tem_vem_do_catalogo_vivo(monkeypatch):
 
 def test_tipo_que_nao_existe_em_lugar_nenhum_segue_recusado(monkeypatch):
     monkeypatch.setattr(api, "_rpc_headers", lambda: {})
-    monkeypatch.setattr(api, "_CLASSIF_CACHE", {})
     monkeypatch.setattr(api, "get_tipos_classif", lambda: {"tipos": [], "c1": [], "c2": []})
     with pytest.raises(api.FracttalError, match="Tipo de tarefa desconhecido"):
         api.create_os_rpc({"id": 5, "code": "TST-INV1"}, "T", "Inventado", [])

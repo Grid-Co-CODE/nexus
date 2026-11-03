@@ -38,7 +38,8 @@ def _n(s) -> str:
 
 def marca_do_ativo(asset: dict) -> str:
     """Marca lida da DESCRIÇÃO do ativo ('' se não reconhecer). A regra é uma só, a do `spec` (palavra inteira e os
-    apelidos do Fracttal, 20/10/2026): até então havia duas cópias, e as duas achavam o STI em "Justiniano"."""
+    apelidos do Fracttal, 20/10/2026): até então havia duas cópias, e as duas achavam o STI no "sti" de uma "Rua
+    Celestino" (exemplo inventado)."""
     return spec.marca_do_ativo(asset)
 
 

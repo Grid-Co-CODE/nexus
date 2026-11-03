@@ -21,9 +21,11 @@ RESUMO = {
     "evento_ocorrencia": "Cada ocorrência das usinas, o plano de ação e o andamento",
     "sugestao": "As sugestões que as pessoas mandam para melhorar o Nexus",
     "status_sugestao": "Cada mudança de status das sugestões, de Iniciada a Concluída",
+    "evento_insight": "Quem assumiu, avisou e respondeu cada insight do motor de regras",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
     "normalizacao": "Quando cada usina voltou pela hora do COS, o tipo e as proteções",
+    "ocorrencia_aberta": "As paradas que o COS ainda não normalizou, com o começo e o ativo",
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
     "acompanhamento_os": "O status, a prioridade e os comentários da Engenharia em cada OS",
     "marcacao_etm": "O diagnóstico e as marcações da Engenharia em cada OS de ETM",
@@ -88,6 +90,10 @@ RESUMO = {
     # ── PCM ──
     "programacao": "A agenda semanal de manutenção montada pelo PCM",
     "tarefa_os": "Cada tarefa das OS abertas no Fracttal e a zeladoria feita",
+    # ── OS Creator ──
+    "uso_os_hora": "O uso de cada tela do OS Creator, hora a hora",
+    "fracttal_hora": "Os pedidos do Nexus ao Fracttal, por hora e por quem pediu",
+    "fracttal_total_hora": "O total de pedidos do Nexus ao Fracttal por hora e o pico por minuto",
 }
 
 PARA_QUE = {
@@ -110,6 +116,11 @@ PARA_QUE = {
     "observacao_responsavel": "Guarda o que o Responsável O&M escreveu sobre a usina na Visão do responsável, com o dia "
                               "e a hora e se ele cobria outro responsável (férias). O texto e o nome vão cifrados; "
                               "serve para juntar as observações nos relatórios.",
+    "evento_insight": "Guarda quem assumiu ou concluiu cada insight que o motor de regras do Nexus apontou (a OS "
+                      "normalizada que segue aberta, o chamado parado com o fabricante, o extintor vencido), as áreas "
+                      "que foram avisadas e o retorno de cada uma (recebido, em andamento, resolvido), com o dia e a "
+                      "hora. Serve para quem gerencia acompanhar o que pediu e para medir quanto tempo cada área leva "
+                      "para responder.",
     "status_sugestao": "Guarda cada vez que um administrador mudou o status de uma sugestão (Iniciada, Em "
                        "verificação ou Concluída), com o dia e a hora. Serve para a pessoa acompanhar em Minhas "
                        "sugestões e para contar as que ainda não foram concluídas.",
@@ -125,6 +136,10 @@ PARA_QUE = {
     "tratamento_contestacao": "Guarda o acompanhamento de cada contestação do cliente: quem pegou a demanda (\"Pegar "
                               "para mim\") e cada atualização que o responsável escreveu, com o dia e a hora. Quem e o "
                               "texto vão cifrados; a tela Contratos e clientes → Contestações mostra.",
+    "ocorrencia_aberta": "Guarda, de hora em hora, as ocorrências da Thopen que a Ronda COS ainda não normalizou: "
+                         "quando a falha começou, o tipo, o equipamento, a etapa (aguardando peça, técnico acionado) e "
+                         "há quantos dias está aberta. É o que faz a parada que segue aberta contar na disponibilidade "
+                         "da Thopen; quando a usina volta, a ocorrência sai daqui e vai para as normalizações.",
     "normalizacao": "Guarda cada normalização da Ronda COS: quando a falha começou, a hora em que o COS registrou a "
                     "volta, o tipo de falha, se a geração parou (na falha de comunicação) e as proteções que atuaram. "
                     "É a base da disponibilidade da Thopen desde 29/10/2026: a hora da volta é a do COS, e não o "
@@ -233,9 +248,9 @@ PARA_QUE = {
                               "usina, fixo ou de apoio (com as datas). É a lista de quem vê e pode rondar cada usina no "
                               "App de Campo: o App lê daqui. A observação vai cifrada.",
     "saldo_almox": "Guarda, a cada varredura diária do App, quanto de cada peça há em cada almoxarifado do "
-                   "Fracttal e o mínimo cadastrado. É o histórico que o Fracttal não mostra: dá para ver quando "
-                   "uma peça ficou abaixo do mínimo e, mais adiante, prever a reposição. O dia sem varredura fica "
-                   "sem foto, sem inventar que nada mudou.",
+                   "Fracttal, o mínimo cadastrado e o custo unitário que o Fracttal deu. É o histórico que o "
+                   "Fracttal não mostra: dá para ver quando uma peça ficou abaixo do mínimo e, mais adiante, prever a "
+                   "reposição. O dia sem varredura fica sem foto, sem inventar que nada mudou.",
     "ciclo_varredura": "Guarda cada varredura do almoxarifado que o App fez: quantos itens o Fracttal listou, "
                        "quantos foram lidos e se o Nexus aplicou o ciclo (só com 90% lidos). É por ele que se "
                        "sabe se o saldo de um dia é confiável.",
@@ -247,7 +262,8 @@ PARA_QUE = {
                            "entrada do inventário: o PCM compara com o saldo do Fracttal antes de gravar qualquer ajuste.",
     "evento_inventario": "Guarda cada acontecimento do inventário do almoxarifado, na ordem em que aconteceu: a contagem "
                          "que chegou do App, a aprovação do PCM, cada peça gravada no Fracttal (de quanto para quanto e o "
-                         "número do movimento), os conflitos e erros, a peça tirada do lote, a recontagem pedida, o "
+                         "número do movimento), os conflitos e erros, a peça tirada do lote, a recontagem pedida (da "
+                         "contagem inteira ou só de algumas peças), o "
                          "número corrigido e a contagem trocada por outra mais nova. Nunca muda: é a auditoria de quem "
                          "mexeu no estoque, quando e por quê (o motivo vai cifrado).",
     "regua_minimo": "Guarda cada decisão do PCM sobre o mínimo e o máximo de uma peça num almoxarifado: a sugestão do "
@@ -332,4 +348,20 @@ PARA_QUE = {
                  "últimos 90 dias, lidas pelo próprio Nexus de hora em hora: a usina, o equipamento, o tipo, a data "
                  "programada e em que pé está. É de onde a Visão do responsável conta as OS abertas e atrasadas e a "
                  "zeladoria de cada usina.",
+    "uso_os_hora": "Guarda, de hora em hora, quantas vezes cada tela do OS Creator foi aberta, por quantas pessoas "
+                   "diferentes, quanto demorou (a mediana e o p95), quantos erros deu, quantas vezes o Nexus respondeu "
+                   "\"ocupado\" e quantos pedidos fez ao Fracttal, separando o clique da pessoa do que a tela pede "
+                   "sozinha. Serve para saber quais telas pesam e a que horas, e para medir o antes e o depois de cada "
+                   "mudança no OS Creator. Só contagens: nunca quem abriu nem o setor dela.",
+    "fracttal_hora": "Guarda, hora a hora, quantos pedidos o Nexus fez ao Fracttal, quem pediu (a tela ou a tarefa de "
+                     "fundo) e para quê, quantos o Fracttal recusou por excesso, quantos deram erro e quantos esperaram "
+                     "a vez no porteiro do Nexus. Serve para achar quem mais gasta a cota do Fracttal (200 por minuto "
+                     "para a empresa toda) e se cada mudança alivia essa conta. O total da hora, somando todos, fica na "
+                     "tabela ao lado.",
+    "fracttal_total_hora": "Guarda, hora a hora, o total de pedidos que o Nexus fez ao Fracttal (todas as telas e tarefas "
+                           "juntas), quantos o Fracttal recusou por excesso, quantos esperaram a vez no porteiro do "
+                           "Nexus (que segura o Nexus em 150 por minuto) e o maior número de pedidos num único minuto da "
+                           "hora. O Fracttal aceita 200 por minuto para a empresa toda: o pico mostra os horários de "
+                           "aperto de verdade e se cada mudança alivia a cota. O pico não se soma: o de uma hora não é a "
+                           "soma dos de cada tela.",
 }

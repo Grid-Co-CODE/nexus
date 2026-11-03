@@ -198,7 +198,10 @@ def pedir_releitura(app=None):
     def rodar():
         with app.app_context():
             _reler()
-    em_segundo_plano(rodar)
+    # a releitura por trás declara o fundo (o teto de 90 do porteiro). Aqui, e não no `em_segundo_plano`, que também abre as
+    # fotos da ronda, que a pessoa espera (essas seguem clique)
+    from ..casca import fracttal_conta
+    em_segundo_plano(fracttal_conta.de_fundo("fundo:nexus-ronda-checklist", rodar))
 
 
 def respostas() -> dict:

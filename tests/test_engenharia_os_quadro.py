@@ -236,7 +236,6 @@ def _login_do_fracttal(app, cliente):
 @pytest.fixture
 def fracttal_do_os(app, pagina, monkeypatch):
     """O api do clone com a OS de uma tarefa e a nota antiga; o que seria escrito no Fracttal fica em `escritas`."""
-    pytest.importorskip("PyQt6")
     from nexus.torres.oscreator import ponte
     ponte.clone(app)
     import api as os_api

@@ -22,8 +22,8 @@ NOTA_RETRO = ("[CHAMADO] Acompanhamento — Sungrow · Inversor\n"
 
 
 def test_a_lista_e_a_mesma_da_tela_de_garantias():
-    """CÓPIA de `acomp_web.STATUS_CHAMADO` (o OS Creator não importa o Nexus, e a camada de dados não importa o clone):
-    lida do arquivo, sem importar."""
+    """CÓPIA de `acomp_web.STATUS_CHAMADO` (a camada de dados não importa o clone do OS Creator, que a ponte carrega à
+    parte): lida do arquivo, sem importar."""
     arq = RAIZ / "nexus" / "torres" / "oscreator" / "os_creator" / "os_web" / "acomp_web.py"
     arvore = ast.parse(arq.read_text(encoding="utf-8"))
     tela = next(ast.literal_eval(n.value) for n in arvore.body

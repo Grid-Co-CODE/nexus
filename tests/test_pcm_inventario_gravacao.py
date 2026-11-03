@@ -918,6 +918,27 @@ def test_gravar_pela_tela(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
     assert L.contagens(app.config)[0]["estado"] == "gravada"
 
 
+def test_gravar_sem_as_pecas_em_recontagem(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
+    """A recontagem só das marcadas (30/10/2026): as peças marcadas saem do lote desta contagem, o "Gravar" conta sem elas, a
+    aprovação congela o lote sem elas e o Fracttal não as toca; o resto da contagem grava (o técnico reconta só as marcadas,
+    e a contagem nova as traz)."""
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    _cookie_os(app, c)
+    r = c.post(f"{LISTA}/C-1/revisar", json={"acao": "recontagem_itens", "itens": ["501", "503"], "motivo": "conferir"})
+    assert r.status_code == 200, r.get_json()
+    visto = _visto(app, ponte_falsa["falso"])
+    assert visto["n"] == 3
+    assert "Gravar 3 alterações" in c.get(f"{PONTE}/C-1/lote").get_data(as_text=True)
+    r = c.post(f"{PONTE}/C-1/gravar", json=visto)
+    assert r.status_code == 200, r.get_json()
+    G.aguardar("C-1")
+    assert {str(e["id_item"]) for e in _eventos(app, "aprovada")} == {"502", "508", "509"}
+    saldos = _saldos(ponte_falsa["falso"])
+    assert (saldos["501"], saldos["503"], saldos["502"]) == (10, 4, 3)    # as em recontagem ficaram como estavam
+    assert L.contagens(app.config)[0]["estado"] == "gravada"
+
+
 def test_gravar_pela_ponte_recusa(app, inv, ponte_falsa, monkeypatch):  # noqa: F811
     """Outro setor: 403. Outro site: 403. A senha de administrador (não é uma pessoa): 409. Sem o login do Fracttal: 401
     com o link do login. A conta do Fracttal de outra pessoa: 409. Sem o N ou a assinatura: 400. O lote mudou desde que a

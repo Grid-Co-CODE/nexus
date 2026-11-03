@@ -12,11 +12,11 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 
 import api  # noqa: E402 — o api.py do clone
+import ativos_central  # noqa: E402
 from os_web import criar_app, rotas  # noqa: E402
 from os_web import historico_store as HS  # noqa: E402
 from os_web import investigar_web as IW  # noqa: E402
@@ -87,12 +87,14 @@ def fr(monkeypatch):
     monkeypatch.setattr(api, "get_pessoas_contas", lambda *a, **k: {"pessoas": [], "eu": None})
     monkeypatch.setattr(api, "_code_to_loc", lambda *a, **k: {})
     monkeypatch.setattr(api, "_read_asset_cache", lambda *a, **k: [])
-    monkeypatch.setattr(api, "_catalogo_cru", lambda: {"assets": [dict(a) for a in CATALOGO]})
+    ativos_central.reiniciar()                       # o catálogo central do processo, só na memória
+    ativos_central.trocar([dict(a) for a in CATALOGO], "rpc")
     monkeypatch.setattr(rotas, "_em_segundo_plano", lambda fn: fn())
     relogio = {"t": 1000.0}
     monkeypatch.setattr(HS, "_relogio", lambda: relogio["t"])
     yield f
     HS.limpar()
+    ativos_central.reiniciar()
 
 
 def _cliente(email="pessoa1@exemplo.invalid"):

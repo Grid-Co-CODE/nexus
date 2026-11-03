@@ -172,12 +172,20 @@
   $('b_reload').onclick = async () => {                       // ↻ → load_assets_cached(force=True)
     hint.textContent = 'Recarregando ativos do Fracttal…';
     try {
-      const j = await getJson('/os/api/tradicional/catalogo?recarregar=1');
+      let j = await getJson('/os/api/tradicional/catalogo?recarregar=1');
+      const recusa = j.recusa, falha = j.falha;               // a leitura que o catálogo não aceitou; o download que falhou
+      // com o leitor do servidor (31/10/2026) o ↻ pediu os ativos NOVOS e voltou na hora: a lista pedida com ?novos=1
+      // espera essa leitura (segundos) e já vem com eles; sem ele (o PC), o ↻ já trouxe o catálogo inteiro pelo RPC
+      if (j.novos) j = await getJson('/os/api/tradicional/catalogo?novos=1');
       porCliente.clear();                                     // o catálogo foi relido: os ativos de cada cliente também
       const cur = cbCli.value;
       cbCli.innerHTML = '<option value="">— Selecione o cliente —</option>' + (j.clientes || []).map((c) => '<option value="' + esc(c) + '"' + (c === cur ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+      // o desfecho da busca dos novos (revisão 1 da 2.2): não terminou, falhou, ficou para a noite, nenhum ou quantos
+      const dn = j.novos_desfecho;
+      $('ativos_de').textContent = [j.ativos_de, dn && dn.texto, recusa, falha].filter(Boolean).join('  ·  ');
+      $('ativos_de').title = j.ativos_de_titulo || '';        // as duas horas: a lista completa e os novos (Ruling AL)
       await onCliente();
-    } catch (e) { hint.textContent = '⚠ ' + e.message; }
+    } catch (e) { hint.textContent = 'Não consegui recarregar os ativos: ' + e.message; }
   };
 
   // ═══ Passo 2 — Step2 + TipoTarefaBox ═══

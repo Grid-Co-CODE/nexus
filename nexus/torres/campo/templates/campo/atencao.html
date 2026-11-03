@@ -13,21 +13,16 @@
                     'longa_pendente': ('com a longa pendente', 'com a longa pendente'),
                     'sem_os': ('sem OS no Fracttal', 'sem OS no Fracttal'), 'incompleta': ('com evidência incompleta', 'com evidência incompleta')} %}
 {# os números da ronda de um cartão (equipe ou supervisor): pendentes, % feitas com a barra, total e o detalhe por status #}
-{% macro numeros_ronda(c) %}{% set pct = c.pct_feitas %}{% set cor = 'neutro' if pct is none else ('ok' if pct >= 80 else ('alerta' if pct >= 50 else 'critico')) %}
-        <div class="cn-eq-num">
-          <span><span class="v{% if c.pendentes %} cn-t-critico{% endif %}">{{ c.pendentes }}</span><span class="d">usina{{ 's' if c.pendentes != 1 }} pendente{{ 's' if c.pendentes != 1 }} de ronda</span></span>
-          <span class="dir"><span class="v cn-t-{{ cor }}">{{ '—' if pct is none else pct ~ '%' }}</span><span class="d">feitas</span></span>
-        </div>
-        <div class="cn-barra" role="img" aria-label="{{ c.feitas }} feitas e {{ c.pendentes }} pendentes de {{ c.usinas }} usinas">
-          {% if c.usinas %}<span class="ok" style="width: {{ (100 * c.feitas / c.usinas)|round(1) }}%"></span><span class="pend" style="width: {{ (100 * c.pendentes / c.usinas)|round(1) }}%"></span>{% endif %}
-        </div>
-        {# um leigo lê o cartão (Levi, 05/10): o número em cima, o que ele é embaixo #}
-        <div class="cn-eq-leg">
-          <span><b>{{ c.feitas }} usina{{ 's' if c.feitas != 1 }}</b>feita{{ 's' if c.feitas != 1 }}</span>
-          <span><b>{{ c.pendentes }} usina{{ 's' if c.pendentes != 1 }}</b>pendente{{ 's' if c.pendentes != 1 }}</span>
-          <span><b>{{ c.usinas }} usina{{ 's' if c.usinas != 1 }}</b>total</span>
-        </div>
-        <div class="cn-eq-pe">{% for s, (rot, cor2) in status.items() if c[s] %}<span class="cn-st cn-t-{{ cor2 }}">{{ c[s] }} {{ no_cartao[s][0 if c[s] == 1 else 1] }}</span>{% endfor %}</div>
+{# o cartão do responsável, limpo (Levi, 03/11/2026: "quero mais minimalista... já tem um vermelho na lateral e a barra
+   também fica vermelha... dói é os olhos!"): sem a borda colorida e sem o vermelho na barra; a cor fica num ponto pequeno
+   ao lado da palavra (a cor nunca sozinha), e a barra, neutra, mostra só o que foi feito. Um leigo lê o cartão (Levi,
+   05/10): o número e, ao lado, o que ele é #}
+{% macro pct_feitas(c) %}{% set pct = c.pct_feitas %}<span class="cn-min-st cn-min-st--{{ 'neutro' if pct is none else ('ok' if pct >= 80 else ('alerta' if pct >= 50 else 'critico')) }}" title="{{ c.feitas }} de {{ c.usinas }} usinas com a ronda em dia">{{ '—' if pct is none else pct ~ '%' }} feitas</span>{% endmacro %}
+{% macro numeros_ronda(c) %}
+        <div class="cn-min-num"><b>{{ c.pendentes }}</b><span>usina{{ 's' if c.pendentes != 1 }} pendente{{ 's' if c.pendentes != 1 }} de ronda</span></div>
+        <div class="cn-min-barra" role="img" aria-label="{{ c.feitas }} de {{ c.usinas }} usinas com a ronda em dia">{% if c.usinas %}<span style="width: {{ (100 * c.feitas / c.usinas)|round(1) }}%"></span>{% endif %}</div>
+        <div class="cn-min-leg"><b>{{ c.feitas }}</b> de <b>{{ c.usinas }}</b> usina{{ 's' if c.usinas != 1 }} com a ronda em dia</div>
+        {% if c.pendentes %}<div class="cn-min-motivos">{% for s, (rot, cor2) in status.items() if c[s] %}<span class="{{ cor2 }}">{{ c[s] }} {{ no_cartao[s][0 if c[s] == 1 else 1] }}</span>{% endfor %}</div>{% endif %}
 {% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
@@ -75,12 +70,10 @@
      cartão abre o kanban #}
   <div class="cn-equipes">
     {% for s in cartoes_resp %}
-      {% set pct = s.pct_feitas %}{% set cor = 'neutro' if pct is none else ('ok' if pct >= 80 else ('alerta' if pct >= 50 else 'critico')) %}
-      <a class="cn-equipe cn-equipe--{{ cor }} cn-sup{% if s.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(responsavel=s.responsavel, modo=None, equipe=None, f=None) }}">
+      <a class="cn-equipe cn-equipe--min cn-sup{% if s.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(responsavel=s.responsavel, modo=None, equipe=None, f=None) }}">
         <div class="cn-eq-cab">
-          <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b></div>
-          <span>{{ 'usinas sem responsável UFV no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }}</span>
-          <span>{{ s.usinas }} usina{{ 's' if s.usinas != 1 }} · {{ s.n_equipes }} equipe{{ 's' if s.n_equipes != 1 }}</span>
+          <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b>{{ pct_feitas(s) }}</div>
+          <span>{{ 'usinas sem responsável UFV no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }} · {{ s.usinas }} usina{{ 's' if s.usinas != 1 }} · {{ s.n_equipes }} equipe{{ 's' if s.n_equipes != 1 }}</span>
           <span class="cn-sup-equipes" title="{{ s.equipes|join(', ') }}">{{ s.equipes|join(', ') }}</span>
         </div>
         {{ numeros_ronda(s) }}

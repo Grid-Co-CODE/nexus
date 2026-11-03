@@ -30,7 +30,7 @@ import gridco_abas as ga
 
 from . import acomp_web as aw
 from . import historico_store as HS
-from . import rotas, sessao
+from . import lista_central, rotas, sessao
 from .rotas import _conta, exige_sessao
 
 bp = Blueprint("os_web_acomp", __name__, url_prefix="/os")
@@ -128,6 +128,28 @@ def _linhas(forcar: bool = False, pessoa=None) -> dict:
         inicio = time.monotonic()
         hoje = aw.agora_brt()
         de = (dt.date.today() - dt.timedelta(days=DIAS_BUSCA)).isoformat()
+        # da lista central de OS primeiro (31/10/2026, tarefa 3.3 do canto central): as OS da etiqueta, sem pedido nenhum,
+        # quando quem lê passou na conferência dos 365 dias que o quadro lê (o "Todos" dela até a marca d'água da lista, sem a
+        # etiqueta: rodada 2 da 3.3; no Atualizar e na releitura por trás, medida de novo), e só as que ela provou. A cópia do
+        # quadro segue a de sempre (o dono, os 30 min, os tickets lidos à parte; a regra de 19/10 do `_dono` não muda). O total
+        # da cópia é o do FRACTTAL de quem a monta (`total_chamados`, na chave do `_dono`), como no caminho de hoje, e não o da
+        # lista (a sonda V1 da rodada 4: o da lista não tinha as OS de chamado novas que a faixa ainda não trouxe, e a restrita
+        # com 2 a menos que ele, e 4 escondidas, caía na cópia "TODOS" pela folga de 19/10). Sem ele, o caminho de hoje.
+        # O total é pedido a CADA montagem (`max_idade=0`, 1 pedido; a sonda V1b da revisão final): o guardado de 30 min era o de
+        # quando a cópia anterior foi montada, e 10 min depois as OS de chamado novas já estavam no Fracttal e não no guardado
+        # (5 em vez de 7); a restrita com 3 visíveis ficava a 2 da cópia e a folga de 19/10 a punha nela, com as 4 escondidas
+        central = lista_central.garantias(de, _quem_le(), forcar=forcar)
+        if central is not None:
+            try:
+                total, _idade, _pedido = HS.total_conferido(_quem_le(), ("acomp", "TODOS"), lambda: api.total_chamados(de),
+                                                            max_idade=0)
+            except Exception:           # noqa: BLE001 — sem o total do Fracttal, a cópia vem ao vivo (com o total dela)
+                central = None
+        if central is not None:
+            linhas = [l for l in central["linhas"] if aw.eh_os3(l)]
+            quando = dt.datetime.fromtimestamp(central["lido_em"], aw.BRT) if central["lido_em"] else hoje
+            return _reaplicar({"linhas": linhas, "quando": quando.strftime("%d/%m/%Y %H:%M"), "total": int(total or 0)},
+                              inicio)
         inf = {}
         linhas = [l for l in (api.list_chamados(de=de, info=inf, meta_ja=_fechadas_ja_lidas(pessoa or _dono())) or [])
                   if aw.eh_os3(l)]
@@ -318,11 +340,12 @@ def _renovar_por_tras(pessoa) -> None:
             return
         _RENOVANDO.add(pessoa)
     jwt, email = sessao.jwt_atual(), sessao.email_atual()
+    liberada = lista_central.liberada()             # a marca do pedido (a lista central de OS), que a thread não leva
 
     def rodar():
         inicio = time.monotonic()
         try:
-            with sessao.contexto(jwt, email):
+            with sessao.contexto(jwt, email), lista_central.liberacao(liberada):
                 _dados(forcar=True, pessoa=pessoa)
             if _ESQUECIDO["em"] >= inicio:
                 _esquecer_pessoa(pessoa)
@@ -333,7 +356,19 @@ def _renovar_por_tras(pessoa) -> None:
         finally:
             with _RENOV_TRAVA:
                 _RENOVANDO.discard(pessoa)
-    _em_segundo_plano(rodar)
+    _em_segundo_plano(_de_fundo("fundo:os-web-acomp-renovar", rodar))
+
+
+def _de_fundo(nome: str, fn):
+    """A releitura conta como FUNDO declarado no porteiro do Nexus (`nexus/casca/fracttal_conta.py`): espera a vez do fundo
+    e cede a vaga a quem clica. Sem a declaração, a thread era clique, sem teto: no Raio-X de 03/11/2026, às 10h, foram 828
+    pedidos ao Fracttal num minuto (a cota é 200 para a empresa toda), e o Acompanhamento, 1.851 pedidos em 49 cliques.
+    Ninguém espera esta leitura (a tela mostra a cópia anterior). Sozinho (o oem), sem o contador, roda como antes."""
+    try:
+        from nexus.casca import fracttal_conta
+    except Exception:                                   # noqa: BLE001 — sem o Nexus, sem o porteiro
+        return fn
+    return fracttal_conta.de_fundo(nome, fn)
 
 
 def _ultimas(forcar: bool = False) -> tuple:
@@ -925,9 +960,12 @@ def api_finalizar(folio):
     res = api.concluir_os_checado(wid)                           # o Concluir do card (os_detalhe.py:896)
     if isinstance(res, dict) and res.get("ok") is False:
         return _erro(res.get("msg") or "O Fracttal não concluiu a OS.")
-    # o quadro guardado leva o status que o Fracttal deu depois de concluir (em verificação ou concluída: 1 pedido, aqui,
-    # e não a lista inteira na volta ao quadro); sem ele, o quadro não chuta e sai da memória, como até 20/10/2026
-    st = _status_depois_de_concluir(wid)
+    reg = lista_central.mudou(wid)              # a OS concluída entra na lista central na hora (31/10/2026; nunca derruba)
+    # o quadro guardado leva o status que o Fracttal deu depois de concluir (em verificação ou concluída): o da releitura que
+    # acabou de pôr a OS na lista central (o cabeçalho, lido agora), sem outro pedido; sem ela (a lista fora de uso, a releitura
+    # que falhou ou passou do prazo), 1 pedido, aqui, e não a lista inteira na volta ao quadro. Sem status nenhum, o quadro não
+    # chuta e sai da memória, como até 20/10/2026
+    st = reg.status_id if reg is not None else _status_depois_de_concluir(wid)
     if st in (2, 3):
         _ajustar(wid, {"status_id": st, "status": api.WO_STATUS.get(st, "")})
     else:

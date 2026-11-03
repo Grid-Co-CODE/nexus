@@ -2,8 +2,8 @@
 """Card Tradicional na web — Criar OS do zero, passo a passo: o wizard do `app.py` (Step1 → Step2 → Step3 → ResponsavelDialog)
 numa página só, com os quatro passos como cards numerados (o 4º é o diálogo do responsável, como no app).
 
-O motor é o mesmo do desktop: `api.load_assets_cached` (catálogo), `api.get_tipos_classif` (tipo/classificações),
-`api.get_labels` (etiquetas), `api.buscar_os_pai` (OS pai) e, na escrita, `api.create_work_orders_bulk` (uma OS por ativo)
+O motor é o mesmo do desktop: `api.load_assets_cached` (catálogo), os catálogos de tipos/classificações e de etiquetas
+(`catalogos.py`, 31/10/2026), `api.buscar_os_pai` (OS pai) e, na escrita, `api.create_work_orders_bulk` (uma OS por ativo)
 ou `api.create_work_orders_agrupada` (uma OS com várias tarefas) — com o payload montado por `tradicional_web.montar_payload`
 nos mesmos argumentos do `ResponsavelDialog._gerar`. O responsável vem de `/os/api/responsaveis` (rotas.py), a mesma lista
 que a Performance já usa. As imagens por ativo chegam em multipart e são repassadas em bytes, como o app manda em
@@ -16,8 +16,11 @@ from flask import Blueprint, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
 import api
+import ativos_central
+import catalogos
 
 from . import ativo_curto
+from . import lista_central
 from . import tradicional_web as trad
 from . import rotas
 from .rotas import _conta, _memo, exige_sessao
@@ -39,16 +42,24 @@ def tradicional():
                            programada=(agora + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M"),   # default do Step1: amanhã
                            # o "Criar OS" da OS do Quadro da equipe da Engenharia (25/10/2026): o ativo, a OS pai e a data
                            # do incidente pelo endereço, a mesma regra da Nova solicitação
-                           sugestao=trad.sugestao(assets, request.args), subs_padrao=trad.SUBS_PADRAO)
+                           sugestao=trad.sugestao(assets, request.args), subs_padrao=trad.SUBS_PADRAO,
+                           # "ativos de HH:MM" ao lado do ↻ (31/10/2026, tarefa 2.3 do canto central), e no `title`, as duas
+                           # horas: a da lista completa e a dos novos (Ruling AL)
+                           ativos_de=api.ativos_de(), ativos_de_titulo=api.ativos_de_titulo())
 
 
 @bp.route("/api/tradicional/catalogo")
 @exige_sessao
 def api_catalogo():
     """A cascata do Step 1 em três pedidos: sem parâmetro → clientes; ?cliente= → usinas; ?cliente=&usina= → tipos + ativos
-    (o filtro por tipo e a busca são locais, em memória, como no app). ?recarregar=1 é o botão ↻ (load_assets_cached(force)).
+    (o filtro por tipo e a busca são locais, em memória, como no app). ?recarregar=1 é o botão ↻ (load_assets_cached(force):
+    com o leitor do servidor, pede os ativos novos por trás e volta na hora, com `novos` True; sem ele, o RPC inteiro).
+    ?novos=1 → a tela acabou de apertar o ↻ e espera a leitura dos novos em curso (poucos segundos) antes de ler a lista, e
+    recebe o desfecho dela (`novos_desfecho`, com o `texto` que a tela mostra).
     ?cliente=&ativos=1 → as usinas e os ativos de todas elas (a Nova solicitação, numa leitura só)."""
     force = request.args.get("recarregar") == "1"
+    novos = force and ativos_central.leitor_pronto()
+    desfecho = api.esperar_os_novos() if not force and request.args.get("novos") == "1" else None
     assets = api.load_assets_cached(True) if force else api.load_assets_cached()
     cliente = (request.args.get("cliente") or "").strip()
     usina = (request.args.get("usina") or "").strip()
@@ -64,14 +75,19 @@ def api_catalogo():
                         "ativos": trad.ativos_do_cliente(assets, cliente, frases)})
     if cliente:
         return jsonify({"cliente": cliente, "usinas": trad.usinas_de(assets, cliente)})
-    return jsonify({"clientes": trad.clientes(assets), "recarregado": force})
+    return jsonify({"clientes": trad.clientes(assets), "recarregado": force,
+                    "recusa": api.aviso_da_recusa() if force else "", "falha": api.aviso_da_falha() if force else "",
+                    "ativos_de": api.ativos_de(), "ativos_de_titulo": api.ativos_de_titulo(), "novos": novos,
+                    "novos_desfecho": desfecho})
 
 
 @bp.route("/api/tradicional/tipos")
 @exige_sessao
 def api_tipos():
-    """Tipo de tarefa + Classificação 1/2 AO VIVO (TipoTarefaBox) e a criticidade fixa (5 níveis, default Médio)."""
-    d = api.get_tipos_classif() or {}
+    """Tipo de tarefa + Classificação 1/2 (TipoTarefaBox), do catálogo dos tipos (`catalogos.tipos_classif`, o do Fracttal,
+    24 h e em disco, 31/10/2026; era uma cópia por processo que nunca vencia), e a criticidade fixa (5 níveis, default
+    Médio)."""
+    d = catalogos.tipos_classif() or {}
     return jsonify({"tipos": d.get("tipos") or [], "c1": d.get("c1") or [], "c2": d.get("c2") or [],
                     "criticidades": [{"id": i, "description": n} for n, i in api.CRITICIDADES],
                     "crit_default": api.CRITICIDADE_DEFAULT, "nenhuma": trad.NENHUMA})
@@ -123,9 +139,14 @@ def api_criar():
     modo, args, kwargs, erro = trad.montar_payload(corpo, api.load_assets_cached(), imagens, frases)
     if erro:
         return jsonify({"erro": erro}), 400
+    # as OS criadas entram na lista central de OS na hora (31/10/2026, tarefa 3.3): o Histórico as mostra sem a próxima volta
     if modo == "agrupada":                                            # app.py:999 — "Agrupar em UMA OS com várias tarefas"
-        return jsonify(trad.mensagem_agrupada(api.create_work_orders_agrupada(*args, **kwargs)))
-    return jsonify(trad.mensagem_bulk(api.create_work_orders_bulk(*args, **kwargs)))   # app.py:1009 — uma OS por ativo
+        res = api.create_work_orders_agrupada(*args, **kwargs)
+        lista_central.criadas(res)
+        return jsonify(trad.mensagem_agrupada(res))
+    res = api.create_work_orders_bulk(*args, **kwargs)                # app.py:1009 — uma OS por ativo
+    lista_central.criadas(res)
+    return jsonify(trad.mensagem_bulk(res))
 
 
 @bp.errorhandler(RequestEntityTooLarge)

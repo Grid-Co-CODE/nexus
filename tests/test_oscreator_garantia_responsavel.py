@@ -15,7 +15,6 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 
@@ -167,10 +166,13 @@ def test_o_nexus_repassa_ao_clone_o_token_do_banco():
     assert ponte.token_do_banco_para_o_clone({}, amb) is False and amb == {}     # o Nexus sem token: nada
 
 
-def test_o_clone_criado_fora_dos_testes_leva_o_token(monkeypatch):
+def test_o_clone_criado_fora_dos_testes_leva_o_token(monkeypatch, tmp_path):
     """Na criação do clone (o 1º /os/ do processo). Nos testes, não: o ambiente é do processo inteiro."""
     from types import SimpleNamespace
     monkeypatch.setenv("GRIDCO_SQL_TOKEN", "")                  # vazio; o monkeypatch apaga no fim do teste
+    # criado "fora dos testes", o clone diz ao catálogo de ativos onde gravar a cópia: a pasta de teste, e não o %APPDATA% real
+    monkeypatch.setattr(api, "_data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(api, "ASSETS_CACHE_LEGADO", str(tmp_path / "assets_cache.json"))
     base = {"SECRET_KEY": "teste", "SESSION_COOKIE_SECURE": False, "GRIDCO_SQL_TOKEN": "tk-teste"}
     ponte._criar_clone(SimpleNamespace(config=dict(base, TESTING=True)))
     assert os.environ["GRIDCO_SQL_TOKEN"] == ""

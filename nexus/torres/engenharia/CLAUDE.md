@@ -516,6 +516,12 @@ construindo algo nosso!". Então o Nexus **não lê o site nem o JSON dele**: l�
   depois de subir (`nexus/engenharia/instalar`, desliga com `NEXUS_CAMPO_AQUECER=0`). **O reinício não relê o que
   acabou de ler (13/10/2026)**: o `pedir_releitura` decidia antes de carregar o arquivo, e cada deploy relia tudo; agora
   carrega antes, e a idade é a da última leitura das vivas (`vivas_em`, no arquivo), não "agora".
+- **O porteiro do Fracttal (31/10/2026):** a releitura POR TRÁS das OS de falha, do Quadro da equipe e das ETMs
+  (`nexus-os-falhas`, `nexus-os-equipe`, `nexus-etm`) se declara fundo no alvo da thread (`fracttal_conta.de_fundo`: no
+  máximo 90 pedidos por minuto, e depois do clique); a releitura com `esperar=True` roda na thread de quem clicou e segue
+  clique (por isso a declaração não vai dentro do `_reler`). A leitura passa pelo `campo/fracttal.ler`, que tira a vez no
+  porteiro antes de pegar uma das 4 `_VAGAS`. Releitura nova por trás se declara do mesmo jeito. Regras em
+  `nexus/casca/CLAUDE.md`, "Pedidos ao Fracttal: o contador e o porteiro".
 - O robô do PCM (`gerar_engenharia_json.py`) pagina a conta INTEIRA a cada rodada; aqui não.
 
 ### As regras (as do robô do PCM, para os números baterem)

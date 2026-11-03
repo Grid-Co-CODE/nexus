@@ -334,7 +334,6 @@ def test_a_nota_compara_a_linha_inteira():
 
 def test_sessao_morta_no_meio_da_importacao_para_tudo(app, monkeypatch):
     # o token vencido que não renova chega como FracttalError, não SessionExpired: a sessão morta também para o trabalho
-    pytest.importorskip("PyQt6")
     from nexus.torres.oscreator import ponte
     ponte.clone(app)
     import api as os_api

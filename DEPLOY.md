@@ -55,9 +55,10 @@ sudo .venv/bin/pip install -r requirements.txt
 O ponto de entrada de produção é o `servir.py`. Não use o `app.py`: ele é só para desenvolvimento (desliga o cookie
 seguro).
 
-O OS Creator embutido importa o PyQt6 (tela de Engenharia). Num servidor sem tela, se o `/os/` acusar falta de
-biblioteca gráfica, instale: `sudo apt install libgl1 libegl1 libxkbcommon0 libfontconfig1`. Sem elas, só o `/os/*`
-fica fora; o resto do Nexus funciona.
+O OS Creator embutido não usa mais o PyQt6 (31/10/2026: o `requirements.txt` não o traz e nada o importa), então o
+servidor sem tela não precisa de biblioteca gráfica (`libgl1`, `libegl1`...). Um `.venv` antigo que ainda o tenha
+instalado não atrapalha; `pip uninstall PyQt6` o tira. Se o `/os/` mostrar "O OS Creator não subiu", o motivo está na
+própria página (quase sempre uma dependência do `requirements.txt`); o resto do Nexus segue funcionando.
 
 ## 2. Conferir antes de subir
 
@@ -241,6 +242,38 @@ já não traz `/nexus/` (a reescrita da T.I. saiu). A data exata da virada não 
    do `.env` do OS Creator (06/10/2026; o Levi manda a linha, os nomes não vão ao GitHub). Menu vazio = falta a linha.
    O envio com anexos aceita até 21 MB: o Nexus aceita 25 MB por pedido e o Caddy não limita; outro proxy na frente
    precisa de pelo menos 25 MB de corpo.
+9. **Depois de subir o canto central do OS Creator (31/10/2026)** (os leitores dos ativos, da lista de OS e dos catálogos
+   pequenos; seções 7a e seguintes e `nexus/torres/oscreator/README.md`):
+   1. **Nada novo no `.env`.** Os leitores usam a `FRACTTAL_CLIENT_ID`/`FRACTTAL_CLIENT_SECRET` do Campo (a credencial REST da
+      empresa) e a `NEXUS_PESSOA_HMAC` que já está lá. Conferir no Raio-X (Base → Raio-X, só administrador), seção "Uso do OS
+      Creator", bloco do canto central: **"Leitor do servidor: ligado"** nas três peças, **Ativos centrais**, **Lista central de
+      OS** e **Catálogos pequenos** (nos ativos, "ligado, mas não está pronto" até a 1ª noite valer, e "pronto" depois). "Não
+      ligado: sem a credencial REST" = falta a credencial no `.env`; **"NÃO LIGOU, o clone quebrou ao subir"** = o import do clone falhou (o Nexus sobe sem o leitor, a pilha está no log do serviço, e as telas leem
+      ao vivo; o portão do deploy, `deploy/conferir_boot.py`, deveria ter barrado o commit antes).
+   2. **Subir de manhã, num dia útil, e na 1ª noite não dar push entre 02:10 e 03:50.** Cada push reinicia o serviço em ~2 min
+      (`atualizar.sh`), e a 1ª noite é a conferência de verdade: às 02:15 os ativos (a paridade REST x RPC, a foto do banco) e às
+      03:21 a lista de OS (90 dias; no domingo e na 1ª carga, a janela de 365 dias, de 19 a 29 min). O reinício no meio dela a
+      perde: a leitura é refeita só na noite seguinte. O resultado de cada uma fica gravado e aparece no Raio-X depois do reinício.
+   3. **Na 1ª manhã, olhar o Raio-X ANTES de qualquer push.** O resultado de cada noite fica no disco e volta depois do
+      reinício, mas o que é só da memória (as conferências das telas, os pedidos por hora, a leitura em curso) zera a cada push.
+      Em cada bloco:
+      - **Ativos centrais:** "Última noite (leitura inteira)" com a hora (~02:15) e "o catálogo aceitou a leitura" (se disser
+        "NÃO TROCOU O CATÁLOGO", o motivo está na frase); "Paridade do REST" = "valeu" (a 1ª noite é a sondagem REST x RPC, com 99%
+        dos códigos nos dois sentidos; "NÃO valeu" traz o motivo); a foto do banco: "gravou", as linhas, quantas mudaram e quantas
+        descrições o detector cortou; "Troca recusada" só aparece se o catálogo recusou uma leitura;
+      - **Lista central de OS:** "Janela lida inteira" começando a ~365 dias atrás; "A noite" com a hora (~03:21) e a entrega
+        ("N OS, N linhas") ou "FALHOU em ..., depois de N pedidos: o motivo"; "Trava de encolhimento" só se a lista recusou uma
+        leitura; "Campos que o REST trouxe" com todos acima de 0% (um campo em 0% manda a tela que o usa ao vivo); "Conferências
+        das telas" (quantas divergiram: a visão restrita diverge, e é esperado);
+      - **Catálogos pequenos:** cada catálogo com a fonte e a hora; "Pessoas pelo REST" ligado e a última leitura boa.
+   4. **Os setores já estão liberados** (03/11/2026): `ponte.SETORES_COM_LISTA_CENTRAL` vale o `TODOS_OS_SETORES` ("*"), porque
+      todos os setores veem todas as OS no Fracttal (Levi). Qualquer pessoa com setor no Nexus lê a lista central; a sem setor,
+      não. Se um dia um setor passar a ter visão restrita no Fracttal, troque o "*" pelos nomes dos outros setores (por commit):
+      a lista é lida pela credencial da empresa e vê tudo, e a pessoa de visão restrita só é protegida pela 2ª barreira (a
+      contagem).
+   5. **Base → Governança de dados:** o livro `nexus_oscreator_uso_AAAA_MM` (o uso do OS Creator e os pedidos ao Fracttal, que
+      o Nexus grava no banco uma vez por dia, às 04:45) tem de aparecer com dono no catálogo, e o radar de tabelas novas não pode
+      listá-lo como "sem dono". Ele só existe depois da primeira gravação (a manhã seguinte ao deploy).
 
 ## 7. Campo · App: o Nexus lê o que o App grava
 
@@ -285,6 +318,43 @@ usinas), `nexus_fatos` (fechamento, ronda e PT com os IDs do cadastro, e a quali
 semana que o arquivo do PCM ainda traz é trocada, as antigas ficam). Liga sozinho onde há o `GRIDCO_SQL_TOKEN` no `.env`
 (o pacote tem). Precisa também da `NEXUS_CHAVE_CADASTRO` (sem ela o técnico e o responsável da programação saem vazios)
 e da `NEXUS_PESSOA_HMAC` (sem ela a pessoa dos fatos do App não liga).
+
+**Os ativos do Fracttal, de madrugada (31/10/2026; nada a fazer no servidor).** O `servir.py` liga o leitor dos ativos do
+OS Creator (`nexus/torres/oscreator/os_creator/ativos_leitor.py`): às 02:15 ele lê o Fracttal inteiro pelo REST, com a
+mesma credencial do Campo · App e do motor do PCM (`FRACTTAL_CLIENT_ID` e `FRACTTAL_CLIENT_SECRET`, no ambiente ou no
+`.env`; sem ela o leitor não liga e tudo segue como antes), confere a leitura contra o catálogo do OS Creator e, se ela
+vale, troca o catálogo e renova a `nexus_ativos_fracttal · foto_ativos` no banco (só quando o sha das linhas muda); das
+06h às 22h, às :08 e :38, só os ativos novos. É a única máquina que grava a foto (a ferramenta
+`ferramentas/carregar_ativos_fracttal.py` ficou só com a medição). A 1ª noite depois do deploy é a conferência REST x RPC:
+o resultado fica em `ativos_central.estado()["paridade_rest"]` e na `ativos_estado.json` da pasta de dados do OS Creator, e o
+Raio-X mostra (seção "Uso do OS Creator", bloco "Ativos centrais").
+
+**O histórico de OS central (31/10/2026; nada a fazer no servidor).** O `servir.py` liga também o leitor da lista central de OS
+do OS Creator (`nexus/torres/oscreator/os_creator/os_leitor.py`), com a mesma credencial REST (sem ela não liga): as OS novas
+de 3 em 3 min (06h às 20h de segunda a sexta; de 15 em 15 fora disso), os últimos 7 dias às :00, :21, :30, :41 e :51 (06h às
+20h, ~15 pedidos), as finalizadas às :46, a janela de madrugada às 03:21 (90 dias, ~190 a 210 pedidos; no domingo e na 1ª
+carga, a janela inteira de 365 dias, ~750 a 830 pedidos a 1 por segundo: de 19 a 29 min, ~830 páginas a ~1,35 s pelo ensaio de
+18/10/2026 do `tarefas_os`, e por isso o uso do OS Creator vai ao banco às 04:45 e não às 03:45), e as abertas que o laço do `tarefas_os`
+já lê de hora em hora, entregues sem pedido a mais (sem entrega em 70 min, ele as lê no :55, ~98). Os números são da escala do
+AC, ~99 OS criadas por dia (36 mil por ano), medidos pelas funções de verdade num Fracttal de mentira: ~92 a 110 pedidos por
+hora de dia útil, ~1.500 a 1.850 num dia útil. O pico de memória da noite de 365 dias é de ~150 MB, o da de 90 dias ~40 MB (cada página
+cortada no que a lista lê). A lista mora na memória e numa cópia na pasta de dados do OS Creator (`os_central.json.gz`,
+~2,6 MB para 36 mil OS; não vai ao banco nem ao git): o reinício volta por ela sem pedir nada ao Fracttal. A 1ª noite depois
+do deploy é a 1ª carga e a conferência dos campos do REST: o Raio-X mostra (seção "Uso do OS Creator", peça "Lista central de
+OS"), e também a leitura que a lista recusou ("Trava de encolhimento": o REST que devolveu só uma parte; a recusa que se repete
+igual na leitura seguinte passa, "aceita na 2ª leitura": o apagamento de verdade) e a faixa que o REST não devolveu pela
+criação. As telas leem dela desde a tarefa 3.3 (31/10/2026), mas só para quem o Nexus liberou: o administrador, sempre, e os
+setores de `ponte.SETORES_COM_LISTA_CENTRAL` (desde 03/11/2026, todos: ver o passo 9 da seção 6); os outros seguem pelo caminho de antes, com a
+sessão deles no Fracttal. A lista central só vale para o período que a janela dela cobre: no dia do deploy, com só os 7 dias lidos,
+as telas de 30 dias seguem como antes até a primeira noite.
+
+**Os catálogos pequenos do OS Creator (31/10/2026; nada a fazer no servidor).** O `servir.py` liga também o laço das pessoas
+dos catálogos (`nexus/torres/oscreator/os_creator/catalogos_leitor.py`, o par do `catalogos.py`), com a mesma credencial REST (sem ela não liga, e as pessoas
+seguem pela sessão de quem usa): o `personnel` do Fracttal às 05h, 11h, 17h e 23h no :04, 2 pedidos a 1 por segundo, só aceito
+se trouxer os campos que as telas usam. Os catálogos (pessoas, etiquetas, tipos, falhas, status, motivos e os planos da
+Performance) moram na memória e numa cópia na pasta de dados do OS Creator (`oscreator/catalogos/`, um arquivo por catálogo,
+sem e-mail; não vai ao banco nem ao git): o reinício volta por ela sem pedir nada ao Fracttal. O Raio-X mostra (seção "Uso do
+OS Creator", peça "Catálogos pequenos"), inclusive o campo que o REST não trouxe.
 
 **Na 1ª carga depois da atualização de 08/10/2026** entram no banco, pela primeira vez, o `fato_ronda`, o `fato_pt`, o
 livro `nexus_equipamentos` e a mescla da programação; o histórico de pessoas e usinas passa a começar "desde sempre"
@@ -581,6 +651,29 @@ seguinte do novo põe a pasta de volta no commit do `/saude`.
 
 O git não toca nos `.env` nem na `dados/`. Dependência nova no `requirements.txt` (o `pillow` em 06/10, o `reportlab` em
 09/10) o script instala sozinho.
+
+**O teto de memória do serviço sai sozinho (30/10/2026).** Em toda rodada, antes de buscar no GitHub (também na de
+"nada a fazer"), o script confere o `MemoryHigh` e o `MemoryMax` da unidade e o `memory.high`/`memory.max` do cgroup do
+serviço, e o que estiver abaixo do piso de 4 GB (`NEXUS_MEMORIA_PISO_MB`) sai por três caminhos: o drop-in
+`/etc/systemd/system/nexus.service.d/zz-nexus-sem-teto.conf` (`MemoryHigh=infinity`, `MemoryMax=infinity`; o systemd
+aplica os drop-ins em ordem de NOME, de todas as pastas, e o `zz-` fica por último: o `override.conf` do `systemctl edit`
+venceria o `50-MemoryHigh.conf` do set-property no próximo daemon-reload), com o `daemon-reload` só quando ele muda; o
+`systemctl set-property`, que vale na hora; e o `max` escrito direto no cgroup, também quando quem põe o teto não é a
+unidade. O caso: o Raio-X mostrou o `nexus.service` com MemoryHigh=700M e MemoryMax=1024M, posto no servidor; o Linux
+apertou o Nexus 132.576 vezes numa manhã, com 2,8 GB dele no swap e 6,8 GB livres, e o "clonar OS" do OS Creator ficou
+preso 13 min. A 1ª versão (42e506c) só chamava o set-property, e às 15:13 o teto seguia lá com o deploy rodando. Teto
+acima do piso é decisão da T.I. e fica; o que falha vira AVISO e o deploy segue. **O que o script viu e fez vai para
+`.git/nexus-teto`** (os valores, as linhas `Memory*` de cada arquivo da unidade, a ação e o erro), e o Raio-X mostra no
+cartão da memória ("o deploy conferiu em ..."): quem não tem acesso ao servidor nem ao journal vê se tirou, se falhou e
+onde o teto está escrito. Prova: `tests/test_deploy_teto_memoria_30_10.py` e `tests/test_raio_x_teto_deploy_30_10.py`.
+
+**A pasta da plataforma depois da reescrita do PerformancePainel (30/10/2026).** O commit 616284b levou ao repositório
+público duas cópias de cache (o Registro mestre e o de-para), e a main de lá foi reescrita (6a5b14e → 9622f4f, a mesma
+árvore). A pasta da plataforma no servidor parou no commit reescrito, e o pull de lá não anda sozinho. O passo 0b do
+`atualizar.sh` procura o clone do PerformancePainel (`/opt`, `/srv`, `/home`, `/root`) e, só quando ele está exatamente no
+6a5b14e, o leva ao 9622f4f com `reset --keep` como o dono da pasta: nenhum arquivo muda. Depois disso não faz nada, e a
+falha dele nunca para o deploy do Nexus. Sai do script quando a plataforma voltar a andar (o `/versao` com o
+`commit_no_disco` novo).
 
 **Deploy por push (09/10/2026, Levi: "não dá para subir com o commit?").** O timer `deploy/nexus-atualizar.timer` roda o
 mesmo `atualizar.sh` a cada 2 minutos: push na `main` entra no ar em até ~3 min, sem ninguém rodar nada; sem commit

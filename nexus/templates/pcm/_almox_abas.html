@@ -1,11 +1,12 @@
-{# As abas do Almoxarifado nas telas que são OUTRA página (o inventário, 26/10/2026): as cinco da tela principal voltam a ela,
+{# As abas do Almoxarifado nas telas que são OUTRA página (o inventário, 26/10/2026): as seis da tela principal (a das
+   Avariadas desde 30/10/2026) voltam a ela,
    na aba delas (`?aba=`), e as quatro do inventário (Inventário, Mínimo e máximo, Curadoria, Auditoria) ficam juntas logo
    depois, com a de agora marcada (`aba_inventario`, que a página põe antes de incluir; sem ela, o Inventário). A tela
-   principal (almoxarifado.html) troca as suas cinco no lugar, por JavaScript, e põe as do inventário como link. `a_revisar`:
+   principal (almoxarifado.html) troca as suas seis no lugar, por JavaScript, e põe as do inventário como link. `a_revisar`:
    quantas contagens esperam o PCM (a lista do Inventário). #}
 {% set _aba = aba_inventario or 'inventario' %}
 <nav class="alm-abas" role="tablist" aria-label="Partes do almoxarifado">
-  {% for chave, rotulo in (('reposicao', 'Reposição'), ('almoxarifados', 'Por almoxarifado'), ('catalogo', 'Catálogo e saldo'), ('consumo', 'Consumo nas OS'), ('cadastro', 'Cadastro a corrigir')) %}
+  {% for chave, rotulo in (('reposicao', 'Reposição'), ('almoxarifados', 'Por almoxarifado'), ('catalogo', 'Catálogo e saldo'), ('consumo', 'Consumo nas OS'), ('avariadas', 'Avariadas'), ('cadastro', 'Cadastro a corrigir')) %}
   <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas?aba={{ chave }}">{{ rotulo }}</a>
   {% endfor %}
   <a class="alm-aba" role="tab" aria-selected="{{ 'true' if _aba == 'inventario' else 'false' }}" href="{{ raiz }}/t/pcm/pecas/inventario">Inventário{% if a_revisar %} ({{ a_revisar }}){% endif %}</a>
@@ -14,7 +15,7 @@
   {% endfor %}
 </nav>
 <script>
-  // no celular a fila das nove abas rola por dentro e a de agora (o Inventário é a 6ª, a Auditoria a 9ª) ficava fora da tela:
+  // no celular a fila das dez abas rola por dentro e a de agora (o Inventário é a 7ª, a Auditoria a 10ª) ficava fora da tela:
   // ela vem para o meio da fila ao abrir a página, e de novo quando a fonte chega (as abas alargam e a empurravam para fora)
   (function () {
     var fila = document.currentScript.previousElementSibling, aba = fila && fila.querySelector('[aria-selected="true"]');

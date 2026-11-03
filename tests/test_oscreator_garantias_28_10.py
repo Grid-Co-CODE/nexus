@@ -58,7 +58,6 @@ LINHAS = [_linha(1, 9101), _linha(2, 9102, usina="Usina A2", marca="STI"), _linh
 
 @pytest.fixture
 def tela(monkeypatch):
-    pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
     import api
     import chamados_obs_store as obs_store
     from os_web import criar_app, rotas, rotas_acomp
@@ -165,7 +164,6 @@ def test_sem_aviso_sem_exclamacao(tela, monkeypatch):
 
 # ── 3: sem o voltar para Chamados, no Nexus ─────────────────────────────────────────────────────────────────────
 def test_no_nexus_o_quadro_nao_tem_o_voltar_para_chamados(logado, monkeypatch):
-    pytest.importorskip("PyQt6")
     corpo = (b'<div class="ac-tit"><a class="ac-volta" href="/os/chamados">&larr; Chamados</a><h1>Acompanhamento</h1>'
              b'</div><a class="ac-volta" href="/os/chamados/acompanhamento">&larr; Acompanhamento</a>')
     limpo = ponte._SEM_VOLTAR_CHAMADOS.sub(b"", corpo)
@@ -307,7 +305,6 @@ def test_sem_o_cadastro_fica_vazio_e_a_falha_nao_apaga_o_de_antes(ufv_de_mentira
 def test_a_ponte_liga_o_responsavel_ufv_e_le_no_app_do_nexus(app, monkeypatch):
     """O nome vem do cofre do cadastro, com a chave do Nexus: a leitura por trás roda no app do Nexus. A ponte já pede a
     1ª leitura ao criar o clone."""
-    pytest.importorskip("PyQt6")
     import flask
 
     from nexus.torres.chamados import ufv
@@ -330,7 +327,6 @@ def test_a_ponte_liga_o_responsavel_ufv_e_le_no_app_do_nexus(app, monkeypatch):
 
 # ── o banco lento das observações ───────────────────────────────────────────────────────────────────────────────
 def test_observacoes_vencidas_saem_na_hora_e_releem_por_tras(monkeypatch):
-    pytest.importorskip("PyQt6")
     import chamados_obs_store as obs_store
     lidas = {"n": 0}
 
@@ -351,7 +347,6 @@ def test_observacoes_vencidas_saem_na_hora_e_releem_por_tras(monkeypatch):
 
 
 def test_releitura_que_falha_fica_com_a_de_antes(monkeypatch):
-    pytest.importorskip("PyQt6")
     import chamados_obs_store as obs_store
     obs_store._estado.update(lista=[{"id": "a", "quando": "2026-10-28T09:00:00-03:00", "os": "1", "tipo": "obs",
                                      "texto": "x", "quem": "", "email": "", "ativo": "", "extra": {}}],

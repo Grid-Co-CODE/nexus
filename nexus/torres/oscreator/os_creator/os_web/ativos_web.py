@@ -28,7 +28,7 @@ def nome_curto(descricao) -> str:
 
 
 def usina_exibe(usina, cliente) -> str:
-    """'2C - Araputanga 1 - MT' com cliente '2C' → 'Araputanga 1 - MT' (item 7): o cliente na frente só repetia a
+    """'CL - Usina Alfa 1 - MT' com cliente 'CL' → 'Usina Alfa 1 - MT' (item 7): o cliente na frente só repetia a
     coluna ao lado."""
     u, c = str(usina or "").strip(), str(cliente or "").strip()
     if c and api._norm_txt(u).startswith(api._norm_txt(c) + " - "):

@@ -18,7 +18,6 @@ import pytest
 
 from nexus.torres.oscreator import ponte
 
-pytest.importorskip("PyQt6")          # o clone importa o steps/ui.py do OS Creator ao montar a tela de Engenharia
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
 
@@ -150,7 +149,7 @@ def cli(monkeypatch):
     feito, agrupada, subidos = {}, {}, []
     monkeypatch.setenv(reg.ENV_RESPONSAVEIS, CFG)
     monkeypatch.setattr(api, "load_assets_cached", lambda *a, **k: [dict(x) for x in CATALOGO])
-    monkeypatch.setattr(api, "get_responsaveis", lambda *a, **k: [dict(p) for p in PESSOAS])
+    monkeypatch.setattr(api, "ler_pessoal", lambda *a, **k: [dict(p) for p in PESSOAS])
     monkeypatch.setattr(api, "get_request_types", lambda *a, **k: {})             # a tela do PCM, sem rede
     monkeypatch.setattr(api, "get_labels", lambda: [dict(e) for e in ETIQ])
 

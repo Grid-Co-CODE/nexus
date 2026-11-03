@@ -305,6 +305,34 @@ def frase_tickets(res: list, frase: str, gerar: bool) -> tuple:
     return txt, [str(t.get("erro") or t.get("aviso_os") or "") for t in falhas if t]
 
 
+def criadas_para_comentario(itens: list, res, corpo: dict, agrupada: bool) -> dict:
+    """O que a página manda à Plataforma de Performance para o comentário automático da OS criada (03/11/2026, Levi:
+    "quando eu crio uma OS de performance já vira um comentário automático: '<Levi> criou uma OS de <String> para o
+    <inversor X>' + 'Observação da OS'"): `{tipo, criadas: [{folio, ativo, observacao}]}`, só das que saíram COM nº.
+
+    Uma por ativo: o `create_performance_os` devolve um resultado por item, na ordem dos itens (ok ou com erro), e o
+    resultado que falhou ou veio sem `folio` fica de fora. Agrupada: a OS única, com os ativos juntos e a observação da
+    OS inteira (a do 1º ativo, sem ela). O comentário em si (o texto, o autor, um por nº) é da plataforma."""
+    corpo = corpo or {}
+    tipo = (plano_por_frase(corpo.get("frase") or "") or {}).get("titulo") or str(corpo.get("base") or "").strip()
+
+    def rotulo(it):
+        a = it.get("asset") or {}
+        return str(a.get("label") or a.get("code") or "").strip()
+    criadas = []
+    if agrupada:
+        r = res or {}
+        if r.get("ok") and r.get("folio"):
+            criadas.append({"folio": str(r["folio"]), "ativo": ", ".join(x for x in map(rotulo, itens) if x),
+                            "observacao": obs_da_os(corpo) or next((it.get("note") for it in itens if it.get("note")), "")})
+    else:
+        for it, r in zip(itens, res or []):
+            if isinstance(r, dict) and r.get("ok") and r.get("folio"):
+                criadas.append({"folio": str(r["folio"]), "ativo": str(r.get("asset") or rotulo(it)),
+                                "observacao": str(it.get("note") or "")})
+    return {"tipo": tipo, "criadas": criadas}
+
+
 def mensagem_resultado(res: list, frase: str = "", gerar_ticket: bool = True) -> dict:
     """[{ok, asset, folio|erro}] → {'ok','falhas','mensagem'} com a frase do app."""
     res = res or []

@@ -56,9 +56,9 @@ subtarefas do fabricante.
 
 1. **texto do ativo** — acerta 94% dos inversores e 85% das estruturas de tracker (medido no
    catálogo inteiro em 29/07). A marca vale como **palavra inteira** (20/10/2026: como pedaço de
-   palavra, o "STI" achava "Justiniano" e "São Sebastião" no endereço de 16 cabines, skids e estações,
-   e o código STI100 de Santo Inácio fazia os trackers dela virarem STI), e conta também como o
-   Fracttal a escreve (`APELIDOS_NO_FRACTTAL`: "CANANDIAN SOLAR", o modelo "SUN2000", "HUAWEII",
+   palavra, o "STI" achava o "sti" de uma "Rua Celestino" ou de uma "Rua Faustino" (exemplos
+   inventados) no endereço de 16 cabines, skids e estações, e o código de uma usina, que começa
+   com STI, fazia os trackers dela virarem STI), e conta também como o Fracttal a escreve (`APELIDOS_NO_FRACTTAL`: "CANANDIAN SOLAR", o modelo "SUN2000", "HUAWEII",
    "AXIALtracker"). O nome do fornecedor vale antes do apelido;
 2. **ativos irmãos da usina** — para NCU, RSU e sensores da estação, que se chamam só "NCU 1" ou
    "Piranômetro 1". A NCU de uma planta de trackers STI é STI. Só vale com o `catalogo`: sem ele, a
