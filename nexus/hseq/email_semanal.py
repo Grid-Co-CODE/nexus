@@ -47,6 +47,12 @@ COR = {"navy": "#090d18", "verde": "#a3d900", "tinta": "#111827", "mudo": "#5b64
        "fundo": "#f3f5f8", "branco": "#ffffff", "sub": "#c9cfdb", "critico": "#c8102e", "alerta": "#b26a00",
        "planilha": "#1d6f42"}
 FONTE = "'Segoe UI',Roboto,Arial,sans-serif"
+RODAPE = ("E-mail automático do Nexus (Segurança · HSEQ), toda segunda de manhã. Não responda: este endereço não recebe "
+          "mensagens.")
+# o e-mail do responsável vai com a TST em cópia (03/11/2026, Levi: "sempre mandar para responsável e deixar a [TST]
+# em cópia"): quem copia é o App, com os destinatários das linhas da TST da mesma semana (quem é TST o Nexus decide, no
+# setor Segurança); o livro e a assinatura não mudam
+COPIA = " A Segurança (TST) recebe uma cópia."
 POR_USINA_MAX = 25                           # as usinas no corpo; a planilha leva todas
 _BRT = timezone(timedelta(hours=-3))
 _LACO = {"thread": None, "parar": threading.Event(), "ultimo": None}
@@ -160,11 +166,11 @@ def montar(L: dict, *, papel: str, hoje, link: str, planilha: str) -> dict:
         t += ["", "Por usina"] + [f"- {u} ({c}): {o}" for u, c, o, _n in linhas_u]
         if mais > 0:
             t.append(f"- e mais {mais} usinas: veja no Nexus")
-    t += ["", f"{botao}: {link}", f"Planilha em Excel, caso a caso: {planilha}", "",
-          "E-mail automático do Nexus (Segurança · HSEQ), toda segunda de manhã. Não responda: este endereço não recebe "
-          "mensagens."]
+    rodape = RODAPE + (COPIA if papel == "responsavel" else "")
+    t += ["", f"{botao}: {link}", f"Planilha em Excel, caso a caso: {planilha}", "", rodape]
     return {"assunto": assunto, "corpo_texto": "\n".join(t),
-            "corpo_html": _html(quem, hoje, agir, atencao, total, total_at, linhas_u, mais, botao, link, planilha)}
+            "corpo_html": _html(quem, hoje, agir, atencao, total, total_at, linhas_u, mais, botao, link, planilha,
+                                rodape)}
 
 
 def _maiuscula(x: str) -> str:
@@ -172,7 +178,7 @@ def _maiuscula(x: str) -> str:
     return x[:1].upper() + x[1:]
 
 
-def _html(quem, hoje, agir, atencao, total, total_at, linhas_u, mais, botao, link, planilha) -> str:
+def _html(quem, hoje, agir, atencao, total, total_at, linhas_u, mais, botao, link, planilha, rodape) -> str:
     from html import escape as e
     c = COR
 
@@ -251,8 +257,7 @@ def _html(quem, hoje, agir, atencao, total, total_at, linhas_u, mais, botao, lin
           f'pendência, com os mesmos filtros.</div>',
           "</td></tr>",
           f'<tr><td style="padding:18px 24px 22px"><div style="border-top:1px solid {c["linha"]};padding-top:12px;'
-          f'font-size:12px;color:{c["mudo"]}">E-mail automático do Nexus (Segurança · HSEQ), toda segunda de manhã. Não '
-          f'responda: este endereço não recebe mensagens.</div></td></tr>',
+          f'font-size:12px;color:{c["mudo"]}">{e(rodape)}</div></td></tr>',
           "</table>", "</td></tr></table>"]
     return "\n".join(h)
 

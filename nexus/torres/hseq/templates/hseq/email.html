@@ -28,6 +28,7 @@
   {% if escolhido %}
   <article class="hs-email">
     <p class="hs-email-assunto"><span class="gc-rotulo">Assunto</span> {{ escolhido.assunto }}</p>
+    {% if escolhido.papel == 'responsavel' %}<p class="hs-dlg-nota">Com cópia para a TST ({{ d.n_tst }} {{ 'pessoa' if d.n_tst == 1 else 'pessoas' }} do setor Segurança).</p>{% endif %}
     <div class="hs-email-corpo">{{ escolhido.corpo_html|safe }}</div>
   </article>
   {% else %}

@@ -58,6 +58,9 @@ def test_o_email_da_semana_sem_nome_de_pessoa_e_assinado(com_tst, app):
     assert 'href="https://app.gridco.com.br/t/campo/responsaveis?r=92&amp;modo=painel"' in h
     assert "XLSX</span>Baixar a planilha em Excel</a>" in h and ">PT parada</td>" in h and ">Altair</div>" in h
     assert "var(--" not in h                       # o leitor de e-mail não lê as variáveis do nexus.css
+    # o responsável vai com a TST em cópia (03/11/2026): o App copia; o e-mail diz, e o da TST não
+    assert "A Segurança (TST) recebe uma cópia." in t and "A Segurança (TST) recebe uma cópia." in h
+    assert "recebe uma cópia" not in d["linhas"][0]["corpo_texto"]
     # nada de nome nem e-mail de pessoa no que vai para a API compartilhada
     tudo = " ".join(str(v) for x in d["linhas"] for v in x.values())
     for nome in ("Supervisora", "Coordenador", "Técnico", "Eletricista", "@exemplo"):
@@ -87,6 +90,7 @@ def test_a_previa_mostra_quem_recebe_e_o_email(com_tst, app, cliente):
     assert "publicação desligada nesta máquina" in cliente.get("/t/hseq/mesa/email").get_data(as_text=True)
     sup = cliente.get("/t/hseq/mesa/email?ver=92").get_data(as_text=True)
     assert "nas suas usinas" in sup and ">Altair</div>" in sup and ">Thopen</div>" in sup
+    assert "Com cópia para a TST (1 pessoa do setor Segurança)." in sup
 
 
 def test_a_previa_e_so_de_quem_decide(com_tst, cliente):

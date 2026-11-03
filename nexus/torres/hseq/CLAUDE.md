@@ -71,10 +71,14 @@ supervisor responsável"; Levi escolheu mandar pelo App de Campo, que já manda 
 Brasília o Nexus monta o e-mail de cada destinatário com as mesmas contas da Mesa (`_pendencias(fl)`) e publica uma
 linha por destinatário, uma vez por semana; o App lê, manda e diz o que mandou.
 - **Quem recebe:** a TST (as pessoas do setor Segurança em Base → Acessos → Pessoas e setores, pelo código do e-mail) com todas
-  as usinas, e cada Responsável UFV com pendência, só com as usinas dele, pelo código do usuário do Fracttal ligado a ele
+  as usinas, e cada Responsável UFV com pendência, só com as usinas dele e **a TST em cópia** (03/11/2026, Levi:
+  "sempre mandar para responsável e deixar a [TST] em cópia"; quem copia é o App, com os destinatários das linhas
+  `papel=tst` da mesma semana: o livro e a assinatura não mudam, o rodapé e a prévia dizem), pelo código do usuário do Fracttal ligado a ele
   ou, sem ele, do e-mail da ficha (`destinatarios`). Sem código, não recebe: a prévia lista quem ficou de fora (medido
   no banco real em 24/10: 1 da TST e 5 responsáveis recebem, 2 responsáveis sem código; em 03/11 eram os mesmos dois:
-  a ficha sem e-mail e, no Fracttal, outro sobrenome, que o critério do login não liga. O conserto é o e-mail na ficha).
+  a ficha sem e-mail e, no Fracttal, outro sobrenome, que o critério do login não liga. Resolvido no mesmo dia com o
+  e-mail da conta do Fracttal na ficha, nos dois donos do cadastro (o PC, publicado no banco, e o servidor): 7
+  responsáveis recebem, nenhum de fora. Caso igual se resolve assim, nunca pelo nome).
 - **O que vai no livro** (a API é compartilhada, regra 8): o código (HMAC) e o número da pessoa, nunca nome nem e-mail.
   O assunto e o corpo (texto e HTML) levam os quatro de agora, os de atenção, as usinas com mais pendências (até 25) e
   dois botões, sempre pelo número da pessoa (`?r=`): o responsável abre o **Painel dele no Campo · App** (03/11/2026,

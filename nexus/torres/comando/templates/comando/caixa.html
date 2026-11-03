@@ -9,26 +9,79 @@
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">{% if minhas_torres is none %}todas as torres{% else %}das torres do seu setor: {{ minhas_torres|join(', ') }}{% endif %}{% if gerado %}<br>conta das <b>{{ gerado.strftime('%H:%M') }}</b>{% endif %}</div>
+    <div class="cn-frescor">{% if minhas_torres is none %}todas as torres{% elif not minhas_torres %}o seu setor ainda não tem torre liberada{% else %}das torres do seu setor: {{ minhas_torres|join(', ') }}{% endif %}{% if gerado %}<br>conta das <b>{{ gerado.strftime('%H:%M') }}</b>{% endif %}</div>
   </div>
   {% if aviso %}<div class="cn-erro{% if aviso[0] == 'ok' %} ins-ok{% endif %}" role="{{ 'status' if aviso[0] == 'ok' else 'alert' }}"><b>{{ aviso[1] }}</b></div>{% endif %}
+  {% if calculando %}<div class="cn-erro cn-aviso" role="status" data-recarregar="10"><b>A conta dos insights está sendo feita agora</b> (o Nexus acabou de subir; leva perto de meio minuto). A página se atualiza sozinha.</div>{% endif %}
   {% if lei.erro %}<div class="cn-erro" role="alert"><b>{{ lei.erro }}.</b></div>{% endif %}
   {% if falhas %}<div class="cn-erro cn-aviso" role="status">{{ falhas|length }} {{ 'regra não leu' if falhas|length == 1 else 'regras não leram' }} a fonte agora: o que elas apontariam pode faltar. <a href="{{ raiz }}/t/comando/insights">Ver as regras</a></div>{% endif %}
   {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para notificar, responder e assumir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
 
   <div class="cn-numeros">
+    <span><span class="gc-rotulo">Menções</span><span class="v">{{ mencoes|length }}</span><span class="d">conversas que chamam você ou o seu setor</span></span>
     <span><span class="gc-rotulo">Pedidos para você</span><span class="v">{{ pedidos|length }}</span><span class="d">esperam o retorno do seu setor</span></span>
     <span><span class="gc-rotulo">Com você</span><span class="v">{{ meus|length }}</span><span class="d">o que você assumiu</span></span>
     <span><span class="gc-rotulo">Sem dono</span><span class="v">{{ sem_dono|length }}</span><span class="d">{{ sem_dono|selectattr('sev', 'equalto', 'critico')|list|length }} críticos</span></span>
     <span><span class="gc-rotulo">Com outra pessoa</span><span class="v">{{ com_dono|length }}</span><span class="d">já assumidos</span></span>
   </div>
 
+  {# as menções que ainda não li (Fase 2): uma linha por conversa, a mais nova primeiro #}
+  <h2 class="ins-sub">Menções para você{% if mencoes %} <span class="ins-sub-n">{{ mencoes|length }}</span>{% endif %}</h2>
+  {% if mencoes %}
+  <ol class="ins-lista">
+    {% for x in mencoes %}
+    <li class="ins-item"><div class="ins-linha ins-linha--mencao">
+      <span class="ins-sev ins-sev--info">{{ 'Seu setor' if x.por_area else 'Você' }}</span>
+      <span class="ins-o-que">
+        <a class="ins-titulo" href="{{ x.conversa|na_raiz }}">{{ x.titulo }}</a>
+        <span class="ins-meta">{{ x.mensagem.por or 'Alguém' }}, {{ x.mensagem.quando_txt }}: "{{ x.mensagem.texto|truncate(140) }}"{% if x.n > 1 %} · {{ x.n }} menções sem ler{% endif %}{% if x.por_area %} · para {{ x.por_area_nomes|join(', ') }}{% endif %}</span>
+      </span>
+      <span class="ins-com-quem">
+        <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ x.conversa|na_raiz }}">Responder</a>
+        {% if tem_login %}<form method="post" action="{{ raiz }}/t/comando/conversa/acao">
+          <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="objeto" value="{{ x.objeto }}"><input type="hidden" name="voltar" value="{{ voltar }}">
+          <button class="gc-btn gc-btn--ui gc-btn--fantasma" name="acao" value="leu" type="submit">Marcar como lida</button>
+        </form>{% endif %}
+      </span>
+      <span></span><span></span>
+    </div></li>
+    {% endfor %}
+  </ol>
+  {% else %}<p class="cn-vazio">Ninguém mencionou você nem o seu setor.</p>{% endif %}
+
+  {% if tem_login %}
+  <details class="ins-outras conv-nova">
+    <summary>Começar uma conversa sobre uma OS ou uma usina</summary>
+    <form method="post" action="{{ raiz }}/t/comando/conversa/acao" class="conv-form" data-conversa="{{ raiz }}/t/comando/conversa/pessoas">
+      <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="voltar" value="{{ voltar }}"><input type="hidden" name="acao" value="nova">
+      <div class="conv-sobre">
+        <label class="cn-filtro-par"><span class="gc-rotulo">Sobre</span>
+          <select class="gc-campo" name="tipo"><option value="os">Uma OS</option><option value="usina">Uma usina</option></select></label>
+        <label class="cn-filtro-par"><span class="gc-rotulo">Número da OS</span><input class="gc-campo" name="os" inputmode="numeric" pattern="[0-9]{1,9}" placeholder="Número da OS no Fracttal"></label>
+        <label class="cn-filtro-par"><span class="gc-rotulo">Usina</span>
+          <select class="gc-campo" name="usina"><option value="">Escolha</option>{% for uid, nome in usinas_lista %}<option value="{{ uid }}">{{ nome }}</option>{% endfor %}</select></label>
+      </div>
+      <label class="gc-rotulo" for="tx-nova">Mensagem</label>
+      <div class="conv-campo">
+        <textarea class="gc-campo" id="tx-nova" name="texto" rows="2" maxlength="1000" required placeholder="Escreva e use @ para mencionar (ex.: @PCM)"></textarea>
+        <ul class="conv-sugestoes" role="listbox" hidden></ul>
+      </div>
+      <div class="conv-escolhidas" aria-live="polite"></div>
+      <details class="ins-outras conv-areas"><summary>Mencionar áreas</summary>
+        <div class="ins-chk">{% for t, nome in areas %}<label><input type="checkbox" name="area" value="{{ t }}"> {{ nome }}</label>{% endfor %}</div></details>
+      <div class="conv-botoes"><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Enviar</button></div>
+    </form>
+  </details>
+  {% endif %}
+
   {% for titulo, lista, vazio, aberto in [('Pedidos para o seu setor', pedidos, 'Nenhuma área pediu retorno ao seu setor.', true), ('Com você', meus, 'Nada assumido por você.', false), ('Sem dono', sem_dono, 'Nada sem dono nas torres do seu setor.', false), ('Com outra pessoa', com_dono, '', false)] %}
   {% if lista or vazio %}
   <h2 class="ins-sub">{{ titulo }}{% if lista %} <span class="ins-sub-n">{{ lista|length }}</span>{% endif %}</h2>
-  {% if lista %}<ol class="ins-lista">{% for i in lista %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, aberto) }}{% endfor %}</ol>
-  {% else %}<p class="cn-vazio">{{ vazio }}</p>{% endif %}
+  {% if lista %}<ol class="ins-lista">{% for i in lista %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, aberto or i.id == abrir) }}{% endfor %}</ol>
+  {% else %}<p class="cn-vazio">{{ 'A lista aparece assim que a conta terminar.' if calculando else vazio }}</p>{% endif %}
   {% endif %}
   {% endfor %}
 </div>
+<script src="{{ url_for('static', filename='comando/conversa.js') }}" defer></script>
+<script src="{{ url_for('static', filename='comando/insights.js') }}" defer></script>
 {% endblock %}

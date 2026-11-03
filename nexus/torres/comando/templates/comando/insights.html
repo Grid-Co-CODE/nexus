@@ -12,6 +12,7 @@
     <div class="cn-frescor">{{ catalogo|length }} regras cruzando as fontes do Nexus{% if gerado %}<br>conta das <b>{{ gerado.strftime('%H:%M') }}</b>{% endif %}</div>
   </div>
   {% if aviso %}<div class="cn-erro{% if aviso[0] == 'ok' %} ins-ok{% endif %}" role="{{ 'status' if aviso[0] == 'ok' else 'alert' }}"><b>{{ aviso[1] }}</b></div>{% endif %}
+  {% if calculando %}<div class="cn-erro cn-aviso" role="status" data-recarregar="10"><b>A conta dos insights está sendo feita agora</b> (o Nexus acabou de subir; leva perto de meio minuto). A página se atualiza sozinha.</div>{% endif %}
   {% if lei.erro %}<div class="cn-erro" role="alert"><b>{{ lei.erro }}.</b></div>{% endif %}
   {% if erro_estado %}<div class="cn-erro cn-aviso" role="status"><b>Não li os avisos e os retornos agora ({{ erro_estado }}).</b> A lista segue sem eles.</div>{% endif %}
   {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para notificar, responder e assumir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
@@ -37,8 +38,8 @@
   </form>
 
   {% if itens %}
-  <ol class="ins-lista">{% for i in itens %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login) }}{% endfor %}</ol>
-  {% else %}<p class="cn-vazio">{% if sev or regra or torre_f %}Nenhum insight com estes filtros.{% else %}Nenhuma regra apontou problema agora. A conta se refaz a cada 5 minutos.{% endif %}</p>{% endif %}
+  <ol class="ins-lista">{% for i in itens %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, i.id == abrir) }}{% endfor %}</ol>
+  {% else %}<p class="cn-vazio">{% if calculando %}A lista aparece assim que a conta terminar.{% elif sev or regra or torre_f %}Nenhum insight com estes filtros.{% else %}Nenhuma regra apontou problema agora. A conta se refaz a cada 5 minutos.{% endif %}</p>{% endif %}
 
   <h2 class="ins-sub">As regras</h2>
   <div class="cn-tab"><table>
@@ -52,4 +53,6 @@
   </table></div>
   <p class="mudo ins-fora">Ainda fora: anomalia sem OS (calculada pela plataforma), a garantia vigente (falta a data de cada equipamento), EPC e o prazo do relatório mensal (sem fonte no Nexus).</p>
 </div>
+<script src="{{ url_for('static', filename='comando/conversa.js') }}" defer></script>
+<script src="{{ url_for('static', filename='comando/insights.js') }}" defer></script>
 {% endblock %}

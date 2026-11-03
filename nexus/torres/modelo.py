@@ -31,6 +31,9 @@ class Tela:
     # (uma tupla de nomes, `setor_telas.donos_do_codigo`; 16/10/2026, o Gerar e o Quadro do PCM, que são também dos
     # supervisores: Levi, "tanto PCM quanto supervisores! Vou criar um setor de Responsáveis UFV")
     do_setor: str | tuple[str, ...] = ""
+    # a tela de TODO setor (03/11/2026, a Caixa de entrada; Levi: "libera a caixa para todos os setores"): quem tem setor
+    # a vê sem marca, como a do dono; quem é mencionado numa conversa precisa dela para ver o aviso
+    de_todos: bool = False
 
 
 @dataclass

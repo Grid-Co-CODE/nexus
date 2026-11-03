@@ -573,6 +573,7 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .sino-sev{font:700 10.5px/1 var(--font-sans);padding:3px 6px;border-radius:4px;margin-right:4px;vertical-align:1px}
 .sino-sev--critico{color:var(--critico);background:var(--critico-suave)}
 .sino-sev--atencao{color:var(--alerta);background:var(--alerta-suave)}
+.sino-sev--mencao{color:var(--info);background:var(--info-suave)}
 .sino-vazio{margin:0 0 12px;color:var(--mudo);font-size:13px}
 .sino-todos{width:100%;justify-content:center}
 @media (max-width:640px){.sino-caixa{position:fixed;left:16px;right:16px;top:64px;width:auto}}
