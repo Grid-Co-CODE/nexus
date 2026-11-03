@@ -19,13 +19,16 @@ function montar(respostas) {
   const pedidos = [];
   const window = {
     ZELADORIA: { api: "/raiz/t/zeladoria/api", somenteLeitura: true, sair: "/raiz/sair" },
-    top: { location: { href: "" } },
+    top: { location: { href: "", recarregou: 0, reload() { this.recarregou += 1; } } },
     fetch: (url, opcoes) => {
       pedidos.push({ url: decodeURIComponent(url), opcoes: opcoes || {} });
       const r = respostas(url, opcoes || {});
       if (r instanceof Error) return Promise.reject(r);
       return Promise.resolve({ ok: r.status < 400, status: r.status, statusText: r.statusText || "",
-                               json: () => Promise.resolve(r.corpo) });
+                               redirected: !!r.redirecionou,
+                               headers: { get: (h) => (h.toLowerCase() === "content-type" ? (r.tipo || "application/json") : null) },
+                               json: () => (r.tipo && r.tipo !== "application/json" ? Promise.reject(new Error("não é JSON"))
+                                                                                    : Promise.resolve(r.corpo)) });
     },
   };
   vm.runInNewContext(codigo, { window, Promise, JSON, encodeURIComponent, setTimeout, console });
@@ -96,6 +99,21 @@ const testes = {
     assert.ok(r.error && r.error.message);
     const f = await sb.functions.invoke("fracttal-fotos", { body: {} });
     assert.ok(f.error && f.error.message);
+  },
+  async "sessão do Nexus que acabou vira erro SESSAO, nunca um Radar vazio"() {
+    // o portão do Nexus manda o pedido sem sessão para o login: o fetch segue e recebe a página HTML com 200
+    const { sb } = montar(() => ({ status: 200, redirecionou: true, tipo: "text/html", corpo: null }));
+    const r = await sb.from("rf_usinas").select("*");
+    assert.strictEqual(r.data, null);
+    assert.strictEqual(r.error.code, "SESSAO");
+  },
+  async "o /eu sem sessão recarrega a página do Nexus, que leva ao login"() {
+    const { sb, window } = montar(() => ({ status: 200, redirecionou: true, tipo: "text/html", corpo: null }));
+    let chamou = false;
+    sb.auth.onAuthStateChange(() => { chamou = true; });
+    await new Promise((ok) => setTimeout(ok, 20));
+    assert.strictEqual(window.top.location.recarregou, 1);
+    assert.strictEqual(chamou, false);           // a tela de senha do Radar nunca aparece
   },
   async "o erro do servidor chega no error com a mensagem dele"() {
     const { sb } = montar(() => ({ status: 403, statusText: "FORBIDDEN", corpo: { erro: "Sem permissão." } }));

@@ -25,8 +25,19 @@
     return { data: data, error: error, count: null, status: status, statusText: statusText || "" };
   }
 
+  // Sem sessão, o portão do Nexus manda o pedido para o login: o fetch segue o redirecionamento e recebe a página HTML
+  // com 200. Sem esta conferência, o clone recebia "sem erro e sem dado" e montava o Radar vazio sem aviso (revisão
+  // final de 03/11/2026).
+  var SESSAO = { message: "Sua sessão do Nexus acabou: entre de novo.", code: "SESSAO" };
+
+  function semSessao(r) {
+    var tipo = (r.headers && r.headers.get && r.headers.get("content-type")) || "";
+    return r.redirected || tipo.indexOf("json") < 0;
+  }
+
   function pedir(url, opcoes) {
     return w.fetch(url, opcoes || { credentials: "same-origin" }).then(function (r) {
+      if (semSessao(r)) return resposta(null, SESSAO, r.status, r.statusText);
       return r.json().then(function (corpo) { return corpo; }, function () { return null; }).then(function (corpo) {
         if (r.ok) return resposta(corpo, null, r.status, r.statusText);
         var msg = (corpo && (corpo.erro || corpo.message)) || ("O Nexus respondeu " + r.status + ".");
@@ -79,6 +90,9 @@
       auth: {
         onAuthStateChange: function (cb) {
           pedir(cfg.api + "/eu").then(function (r) {
+            // sem sessão, a página inteira do Nexus recarrega e o portão leva ao login (a tela de senha do Radar não
+            // serve mais)
+            if (r.error && r.error.code === "SESSAO") { w.top.location.reload(); return; }
             var sessao = r.data && r.data.user ? { user: r.data.user } : null;
             setTimeout(function () { cb("INITIAL_SESSION", sessao); }, 0);
           });
