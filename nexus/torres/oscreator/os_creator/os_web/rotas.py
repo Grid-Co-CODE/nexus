@@ -489,12 +489,15 @@ def api_performance_criar():
         # com a OS pai e o título únicos, e a observação da OS inteira
         res = api.create_performance_os_agrupada(itens, note_os=perf_web.obs_da_os(corpo), **kwargs)
         lista_central.criadas(res)                      # a OS criada entra na lista central na hora (31/10/2026)
-        return jsonify(perf_web.mensagem_agrupada(res, corpo.get("frase") or "", bool(corpo.get("gerar_ticket", True))))
+        # `comentario` (03/11/2026): o nº, o ativo e a observação de cada OS que saiu, para a página gravar o comentário
+        # automático na Plataforma de Performance (perf.js, `comentarNaPlataforma`)
+        return jsonify(dict(perf_web.mensagem_agrupada(res, corpo.get("frase") or "", bool(corpo.get("gerar_ticket", True))),
+                            comentario=perf_web.criadas_para_comentario(itens, res, corpo, True)))
     res = api.create_performance_os(itens, **kwargs)
     lista_central.criadas(res)
     # a frase e a caixa vao junto: e delas que sai o "N tickets criados na aba X" (e o "sem ticket")
-    return jsonify(perf_web.mensagem_resultado(res, corpo.get("frase") or "",
-                                               bool(corpo.get("gerar_ticket", True))))
+    return jsonify(dict(perf_web.mensagem_resultado(res, corpo.get("frase") or "", bool(corpo.get("gerar_ticket", True))),
+                        comentario=perf_web.criadas_para_comentario(itens, res, corpo, False)))
 
 
 # ── Históricos de OS ──────────────────────────────────────────────────────────

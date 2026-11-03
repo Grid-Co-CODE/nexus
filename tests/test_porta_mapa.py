@@ -34,11 +34,12 @@ relatorios|relatorio-semanal|/relatorio/semanal||
 relatorios|potencia-ativa|/relatorio/potencia-ativa||
 performance|gemeo|/gemeo/|/gemeo/<path:resto>|
 performance|monitor-ronda|/ronda/monitor||
+performance|comentarios|/painel/comentarios||
 cos|acompanhamento|/cos||
 base|chaves-fontes|/tokens||admin
 base|fontes-tempo-real|/admin/tempo-real||admin
 base|de-para-equipamentos|/admin/de-para||admin"""
-ASSINATURA_DA_PLATAFORMA = "69aca055f5d2c37a"
+ASSINATURA_DA_PLATAFORMA = "8bdc12283507094b"
 
 
 def _decodificar(passe: str) -> tuple[dict, bytes, bytes]:
@@ -52,7 +53,7 @@ def _decodificar(passe: str) -> tuple[dict, bytes, bytes]:
 def test_o_mapa_e_o_mesmo_da_plataforma():
     assert porta.texto_canonico_do_mapa() == TEXTO_DA_PLATAFORMA
     assert porta.assinatura_do_mapa() == ASSINATURA_DA_PLATAFORMA
-    assert len(porta.MAPA) == 15 and len({(t.torre, t.tela) for t in porta.MAPA}) == 15
+    assert len(porta.MAPA) == 16 and len({(t.torre, t.tela) for t in porta.MAPA}) == 16
 
 
 @pytest.mark.parametrize("caminho, tela", [
@@ -61,7 +62,7 @@ def test_o_mapa_e_o_mesmo_da_plataforma():
     ("/painel/usina/abc?fonte=pg&nome=Usina%20X", "diagnostico"), ("/painel/falhas", "strings-trackers"),
     ("/gerencial", "gerencial"), ("/gerencial/disponibilidade", "disponibilidade"), ("/relatorio", "relatorio"),
     ("/relatorio/semanal", "relatorio-semanal"), ("/relatorio/potencia-ativa", "potencia-ativa"), ("/gemeo/", "gemeo"), ("/gemeo/usina/12", "gemeo"),
-    ("/ronda/monitor", "monitor-ronda"), ("/cos", "acompanhamento"),
+    ("/ronda/monitor", "monitor-ronda"), ("/painel/comentarios", "comentarios"), ("/cos", "acompanhamento"),
     ("/tokens", "chaves-fontes"), ("/admin/tempo-real", "fontes-tempo-real"),
     ("/admin/de-para", "de-para-equipamentos"),
 ])

@@ -63,6 +63,10 @@ MAPA = (
     # O Histórico da plataforma saiu em 11/10/2026 (Levi: "Pode matar a seção histórico da plataforma!"). A ronda virou
     # "Rondas de Trackers" no mesmo dia; o id (o endereço /t/performance/monitor-ronda) ficou, para o favorito não quebrar.
     TelaDaPlataforma("performance", "monitor-ronda", "Rondas de Trackers", "/ronda/monitor", (), False),
+    # Comentários (03/11/2026, Levi: "Gostaria de um sistema mais sofisticado de comentários! [...] Ter um campo na
+    # performance de Comentários"): todos os comentários das usinas, que nascem no Tempo real, no Painel NOC e no
+    # Diagnóstico; o autor vem do passe (o nome do login), sem digitar.
+    TelaDaPlataforma("performance", "comentarios", "Comentários", "/painel/comentarios", (), False),
     TelaDaPlataforma("cos", "acompanhamento", "Acompanhamento COS", "/cos", (), False),
     # /tokens grava as chaves das fontes (SunOp, Axis, Plataforma): administração, só admin do Nexus (spec 5.3)
     TelaDaPlataforma("base", "chaves-fontes", "Chaves das fontes", "/tokens", (), True),

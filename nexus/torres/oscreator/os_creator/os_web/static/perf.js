@@ -418,11 +418,30 @@
       const j = await r.json();
       res.hidden = false; res.classList.toggle('ruim', !r.ok || !j.ok || !!j.alerta);
       res.textContent = r.ok ? j.mensagem + ((j.detalhes || []).length ? '\n\n' + j.detalhes.join('\n') : '') : ('⚠ ' + apiErro(j, r));
+      if (r.ok && j.ok) comentarNaPlataforma(j.comentario, cbUsi.value);
       // criou (mesmo a agrupada SEM número): limpa, senão a pessoa cria tudo de novo e duplica no Fracttal
       if (r.ok && j.ok) { checked = new Set(); obs = {}; ospai = {}; imgs = {}; qtd = {}; $('ed_pai_os').value = ''; $('ed_obs_os').value = ''; repop(); }
     } catch (e) { res.hidden = false; res.classList.add('ruim'); res.textContent = '⚠ ' + e; }
     btn.disabled = false; $('hint_criar').textContent = '';
   };
+
+  // O comentário automático da OS criada (03/11/2026, Levi: "quando eu crio uma OS de performance já vira um comentário
+  // automático: '<Levi> criou uma OS de <String> para o <inversor X>' + 'Observação da OS'"). Esta página é quem sabe
+  // que a OS saiu e com que nº: manda à Plataforma de Performance (mesma origem no servidor), que grava na conversa da
+  // usina (`?comentario=` = a chave que o Tempo real pôs no link; sem ela, a plataforma guarda pela usina) com o autor da
+  // sessão dela, um comentário por nº. Falhou a criação (sem nº), nada vai. URL completa: a camada da T.I. punha o
+  // prefixo do Nexus em todo fetch começado por "/", e este endereço é da plataforma. Sem resposta, só não comenta.
+  function comentarNaPlataforma(c, usina) {
+    if (!c || !Array.isArray(c.criadas) || !c.criadas.length) return;
+    const chave = new URLSearchParams(location.search).get('comentario') || '';
+    const el = document.querySelector('.os-nome'), conta = el && el.textContent.trim() !== 'Usuário' ? el.textContent.trim() : '';
+    try {
+      fetch(new URL('/api/state/comment/os', location.href).toString(), {method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({chave: /^[a-z0-9]{1,8}:[A-Za-z0-9_.\-]{1,64}$/.test(chave) ? chave : '', usina: usina || '',
+                              tipo: c.tipo || '', criadas: c.criadas, quem: conta})}).catch(() => {});
+    } catch (e) { /* sem a plataforma aqui: a OS segue criada, só sem o comentário */ }
+  }
 
   // arranque: modo do deep link, usina sugerida e responsáveis
   if (TEM_MODOS && (sug.modo === 'etm' || sug.modo === 'usina')) setModo(sug.modo); else setModo('geracao');

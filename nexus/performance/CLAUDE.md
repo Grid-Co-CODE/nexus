@@ -9,7 +9,7 @@ Plataforma de Performance (repositório PerformancePainel) continua o motor e de
 gravação, dentro de uma moldura (iframe) do Nexus. Nada da plataforma passa pelo processo do Nexus (a ponte passava): o
 navegador fala com cada sistema.
 
-- **O mapa** (`porta.py`, `MAPA`): as 14 telas, `torre · tela -> caminho na plataforma`. Fonte única: o Nexus é o dono;
+- **O mapa** (`porta.py`, `MAPA`): as 16 telas, `torre · tela -> caminho na plataforma`. Fonte única: o Nexus é o dono;
   a plataforma tem a cópia em `plataforma/porta_nexus.py`. Os dois comparam o mesmo texto canônico
   (`texto_canonico_do_mapa`; `tests/test_porta_mapa.py` aqui e o teste da porta lá): mudou um, muda o outro e o texto dos
   dois testes. Com `PLATAFORMA_REPO=<clone do PerformancePainel>` o teste daqui abre o módulo de lá e compara o mapa, a
@@ -27,6 +27,7 @@ navegador fala com cada sistema.
   | relatorios · `relatorio`, `relatorio-semanal` e `potencia-ativa` (pela Central de emissão, 13/10/2026) | `/relatorio`, `/relatorio/semanal` e `/relatorio/potencia-ativa` |
   | performance · `gemeo` | `/gemeo/` (e tudo debaixo dele) |
   | performance · `monitor-ronda` (o item "Rondas de Trackers") | `/ronda/monitor` |
+  | performance · `comentarios` (03/11/2026) | `/painel/comentarios`: todos os comentários das usinas, com busca e filtro de usina, autor e período, responder e apagar dali |
   | cos · `acompanhamento` | `/cos` |
   | base · `chaves-fontes` (só admin) | `/tokens` |
   | base · `fontes-tempo-real` (só admin, 11/10/2026) | `/admin/tempo-real`: quais usinas de cada fonte entram no tempo real |
@@ -45,6 +46,17 @@ navegador fala com cada sistema.
   Em 11/10/2026 o Histórico da plataforma saiu do mapa, dos dois lados, com a rota e o template na plataforma (Levi:
   "Pode matar a seção histórico da plataforma!"); o Monitor da ronda virou "Rondas de Trackers", com o mesmo id (o
   endereço `/t/performance/monitor-ronda` e o favorito não quebram; o nome fica fora do texto canônico de propósito).
+- **Comentários (03/11/2026**, Levi: "Gostaria de um sistema mais sofisticado de comentários! Ao comentar em tempo real
+  não precisar digitar o nome, já puxa automático. Ter um campo na performance de Comentários"): a tela é da plataforma
+  (o dado fica onde sempre esteve, o `comments_thread` do estado dela; nada novo no banco), e o autor é o `nome` do passe:
+  quem entrou pelo Nexus não digita o nome em nenhum comentário, desligamento ou fechamento de ticket, e só apaga o
+  próprio (o admin do Nexus, `admin` do passe, apaga qualquer um). A senha de administrador (`admin@nexus.invalid`) não
+  é uma pessoa: lá a tela pede o nome, como pela senha da plataforma. Regras e provas em `plataforma/CLAUDE.md`, seção
+  "Comentários". **Setores:** a tela nasce fechada para os setores (regra de Base → Acessos: tela nunca marcada fica
+  fechada); o administrador vê na hora, os setores depois de o Levi marcar Performance → Comentários. A OS de Performance
+  criada vira comentário automático na usina ("<Nome> criou a OS <nº> de <tipo> para o <ativo>" + a observação): o OS
+  Creator daqui devolve o nº na resposta e a página o manda à plataforma (`nexus/torres/oscreator/README.md`, seção "A OS
+  de Performance criada vira comentário na usina").
 - **O passe** (`montar_passe`): `base64url(json) + "." + base64url(HMAC-SHA256(json))` com a `NEXUS_SSO_CHAVE` (a MESMA
   no `.env` da plataforma; com menos de 32 caracteres vale como ausente, nos dois lados). O JSON leva `v`, `email`,
   `nome`, `admin` (o `session["admin"]` do Nexus: `NEXUS_ADMINS` ou a senha de administrador), `destino`, `vence` (60 s)

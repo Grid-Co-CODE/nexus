@@ -52,6 +52,11 @@ TORRE = Torre(
         Tela("monitor-ronda", "Rondas de Trackers",
              "A ronda dos trackers saiu em cada horário, e onde falhou?",
              "Plataforma de Performance"),
+        # Comentários (03/11/2026, Levi: "Ter um campo na performance de Comentários"): a tela da plataforma com todos os
+        # comentários das usinas; o autor é quem entrou no Nexus (o nome do passe), sem digitar
+        Tela("comentarios", "Comentários",
+             "O que a equipe anotou sobre cada usina, e quem anotou?",
+             "Plataforma de Performance (os comentários do Tempo real, do Painel NOC e do Diagnóstico)"),
         # O nome de cada fonte por extenso, de fontes.NOMES (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla")
         Tela("clima", "Clima e risco",
              f"Onde há aviso do {F.extenso('inmet')}, foco de queimada ou risco de fogo perto das usinas?",

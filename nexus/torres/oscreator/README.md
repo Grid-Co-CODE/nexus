@@ -287,6 +287,17 @@ Inversor, Recomposição de String, Tracker parado) criava sempre uma OS por ati
   o 3º ativo não religa; religada, o Criar chama a agrupada com os 3 títulos iguais, a OS pai e a observação da OS.
   **Falta a prova ao vivo** numa usina de `TESTE - PA` (criar e cancelar). O 5090 só pega no próximo reinício.
 
+## A OS de Performance criada vira comentário na usina (03/11/2026)
+
+Levi: "quando eu crio uma OS de performance já vira um comentário automático: '<Levi> criou uma OS de <String> para o
+<inversor X>' + 'Observação da OS'". A resposta do `/os/api/performance/criar` leva `comentario` =
+`perf_web.criadas_para_comentario` (`{tipo, criadas: [{folio, ativo, observacao}]}`, só as que saíram COM nº; a agrupada
+é uma OS, com os ativos juntos e a observação da OS), e o `perf.js` (`comentarNaPlataforma`) manda isso à Plataforma de
+Performance (`POST /api/state/comment/os`, por URL completa, mesma origem no servidor) com a chave da conversa que o Tempo
+real pôs no link (`?comentario=pv:22854`). O texto, o autor (a sessão da plataforma) e o "um por nº" são de lá
+(`plataforma/CLAUDE.md`, seção "Comentários das usinas"). Sem nº, nada vai; sem a plataforma, a OS segue criada e só não
+comenta. Prova: `tests/test_oscreator_perf_comentario.py`.
+
 ## Digitar para achar: responsável e usina (08/10/2026)
 
 O pedido do Levi, de 08/10: "Conseguir digitar no responsável na criação de OS" e "Conseguir digitar o nome da usina no
