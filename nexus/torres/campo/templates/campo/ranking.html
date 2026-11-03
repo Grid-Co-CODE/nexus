@@ -126,6 +126,8 @@
         <span class="rk-reg">{{ p.regiao or 'sem região' }}</span>
         <span class="rk-pts">{{ pts(p.total) }} <small>pts</small></span>
         <span class="rk-det">{{ pts(p.tarefas_pts) }} de tarefas · {{ pts(p.rondas_pts) }} de rondas · {{ pts(p.bonus) }} de bônus</span>
+        {# o e-mail no pódio (Fillipe Figueiró, 03/11/2026): o pódio vira pagamento, e o RH paga pelo e-mail, não pelo nome #}
+        {% if p.email %}<span class="rk-email">{{ p.email }}</span>{% endif %}
       </div>
       <div class="rk-degrau"><span class="rk-medalha" aria-hidden="true">{{ p.posicao }}</span></div>
     </div>
@@ -149,7 +151,7 @@
     <tbody>
     {% for p in classificacao %}{% set abre = p.devolvidas or p.anuladas or p.abaixo_do_piso %}
       {% if abre %}<tr class="cn-linha rk-linha" tabindex="0" aria-expanded="false" title="Ver as OS devolvidas, abaixo do piso e anuladas, com o motivo">{% else %}<tr>{% endif %}
-        <td class="m">{{ p.posicao }}º</td><td class="rk-tec">{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td>
+        <td class="m">{{ p.posicao }}º</td><td class="rk-tec"{% if p.email %} title="{{ p.email }}"{% endif %}>{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td>
         <td><b>{{ pts(p.total) }}</b></td>
         {# a quantidade em cima e os pontos embaixo (Levi, 29/10/2026: "acho bom botar primeiro a quantidade real e
            abaixo vir os pontos"; os pontos em cima pareciam "280 rondas" e "2.000 tarefas" no mês) #}
@@ -174,7 +176,7 @@
     <tbody>
     {% for p in fora %}{% set abre = p.devolvidas or p.anuladas or p.abaixo_do_piso %}
       {% if abre %}<tr class="cn-linha rk-linha" tabindex="0" aria-expanded="false" title="Ver as OS devolvidas, abaixo do piso e anuladas, com o motivo">{% else %}<tr>{% endif %}
-        <td class="rk-tec">{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td><td>{{ pts(p.total) }}</td><td>{{ p.tarefas }}</td>
+        <td class="rk-tec"{% if p.email %} title="{{ p.email }}"{% endif %}>{{ p.tecnico or '—' }}<span class="det">{{ p.regiao or 'sem região' }}</span></td><td>{{ pts(p.total) }}</td><td>{{ p.tarefas }}</td>
         <td>{{ pct(p.cumprimento) }}</td><td class="rk-motivo">{{ p.motivo or '—' }}{% if abre %} <i class="ph ph-caret-down rk-seta" aria-hidden="true"></i>{% endif %}</td></tr>
       {% if abre %}{{ lista_do_app(p, 5) }}{% endif %}
     {% endfor %}

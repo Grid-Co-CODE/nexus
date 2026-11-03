@@ -422,6 +422,13 @@ def _nome(quem: dict, codigo) -> str:
     return nome_curto((quem.get(c) or ("", ""))[1]) if c else ""
 
 
+def _email(quem: dict, codigo) -> str:
+    """O e-mail de quem o App mandou como código (Fillipe Figueiró, 03/11/2026: o pódio vira pagamento no Caju, e o
+    RH paga pelo e-mail, não pelo nome)."""
+    c = _codigo(codigo)
+    return str((quem.get(c) or ("", ""))[0] or "") if c else ""
+
+
 def _mobilizada(u: dict, hoje: str) -> bool:
     """Mobilizada = OPERAÇÃO no cadastro e com a data de mobilização já passada. Medido em 05/10: das 177 em OPERAÇÃO,
     49 não têm data de mobilização e NENHUMA delas teve ronda pelo App; as 107 com ronda têm a data (Levi: "tem usina
@@ -1626,11 +1633,12 @@ _REGUA_RANKING = (("piso", "Piso da nota"), ("teto", "Teto de tarefas"), ("anula
                   ("bonus_prev", "Bônus preventivas (%)"))
 
 
-def _pessoa_do_ranking(r: dict, nome: str) -> dict:
+def _pessoa_do_ranking(r: dict, nome: str, email: str = "") -> dict:
     def n(col):
         return _int(r.get(col)) or 0
     # o código da pessoa fica só no servidor: é por ele que a linha acha as tarefas dela (`ranking_tarefas`)
-    return {"posicao": _int(r.get("Posição")), "tecnico": nome, "regiao": str(r.get("Região") or "").strip(),
+    return {"posicao": _int(r.get("Posição")), "tecnico": nome, "email": email,
+            "regiao": str(r.get("Região") or "").strip(),
             "hmac": str(r.get("Técnico (HMAC)") or "").strip(),
             "total": n("Total (pts)"), "tarefas_pts": n("Tarefas (pts)"), "rondas_pts": n("Rondas (pts)"),
             "bonus": n("Bônus (pts)"), "bonus_prog": n("Bônus programação (pts)"),
@@ -1657,7 +1665,8 @@ def ranking_pontos() -> leitura.Leitura:
                                        "regua": {}})
             nome = _nome(quem, r.get("Técnico (HMAC)"))
             sem_nome += 0 if nome else 1
-            (m["classificacao"] if _sim(r.get("No ciclo")) else m["fora"]).append(_pessoa_do_ranking(r, nome))
+            (m["classificacao"] if _sim(r.get("No ciclo")) else m["fora"]).append(
+                _pessoa_do_ranking(r, nome, _email(quem, r.get("Técnico (HMAC)"))))
             m["calculado_em"] = max(m["calculado_em"], str(r.get("Calculado em") or "").strip())
             m["vale"] = m["vale"] or str(r.get("Régua") or "").strip().lower()
             for k, col in _REGUA_RANKING:
