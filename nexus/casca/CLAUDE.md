@@ -24,7 +24,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
 | `nexus/auth/setor_telas.py` + `templates/sem_setor.html` | o que cada setor vê: o portão por setor e o menu filtrado (seção "Telas por setor" abaixo) |
 | `nexus/auth/pre_carga.py` | a pré-carga das telas de quem tem setor (seção "Pré-carga" abaixo) |
-| `nexus/templates/base.html` | a moldura: o topo (o setor, a ação da tela no bloco `topo_acoes`, o Tema, quem entrou e o Sair; seção "Um cabeçalho só"), menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
+| `nexus/templates/base.html` | a moldura: o topo (a ação da tela no bloco `topo_acoes`, o sino e quem entrou, que abre o menu da conta com o Setor, o Tema e o Sair; seção "Um cabeçalho só"), menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
 | `nexus/templates/_icone.html` + `static/grid-icone-branco.png` | o ícone da aba do navegador (24/10/2026, Levi: "o logo branco da grid"): o símbolo branco sobre o navy do Nexus (só branco sumiria na aba clara do navegador), no `<head>` de base, entrar, sair e os dois modos TV; feito do `grid-icon.png` do OS Creator, 256 px |
 | `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base, entrar e os dois modos TV): a reserva do `localStorage` antes de pintar |
 | `nexus/templates/_entrar_de_novo_js.html` e `_confere_sessao_js.html` | o `window.nexusEntrarDeNovo` (a janela ao login quando a sessão acaba) e a conferência da sessão do Fracttal a cada 5 minutos (só `session.usuario`). Saíram do `base.html` sem mudar (11/10/2026) para o modo TV do Painel NOC, que não tem a casca, valer igual: a TV de quem saiu do Fracttal vai ao login |
@@ -95,12 +95,11 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
   de todo template, inclusive `/entrar` e o erro da ponte da Performance): a página já nasce no tema certo, sem piscar.
   Reserva: `localStorage` `nexus.tema`, aplicada pelo `_tema_cabeca.html` antes de pintar quando o cookie sumiu (e o
   cookie volta). Cookie desconhecido ou ausente = escuro. Não segue o tema do sistema operacional, de propósito.
-- **O botão:** no topo, "Tema: Escuro" / "Tema: Claro" (diz o de agora; o ícone, um meio círculo, é desenhado no CSS,
-  `.tema-icone`). Troca na hora, sem recarregar, grava cookie e `localStorage`, e outra aba aberta acompanha (evento
-  `storage`). Sem JavaScript é um formulário: `POST /tema` (`tema`, `voltar` com os filtros da tela) grava o cookie e
-  volta. Com o movimento reduzido do sistema a troca é seca; sem ele, um esmaecer de 0,18 s (View Transitions). Até
-  1180 px e no celular fica só o ícone; de 821 a 1180 px o setor do topo é quem encolhe (sem isso o topo passava
-  da borda de 821 a 845 px).
+- **O botão:** no menu da conta (desde 03/11/2026; seção "Um cabeçalho só"), "Tema: Escuro" / "Tema: Claro" (diz o
+  de agora; o ícone, um meio círculo, é desenhado no CSS, `.tema-icone`), sempre com o rótulo. Troca na hora, sem
+  recarregar e sem fechar o menu, grava cookie e `localStorage`, e outra aba aberta acompanha (evento `storage`). Sem
+  JavaScript é um formulário: `POST /tema` (`tema`, `voltar` com os filtros da tela) grava o cookie e volta. Com o
+  movimento reduzido do sistema a troca é seca; sem ele, um esmaecer de 0,18 s (View Transitions).
 - **O OS Creator embutido segue o tema** (Levi, 09/10/2026: "faltou o tema claro do OS Creator Web, não está
   sincronizando com o botão do Nexus"): a ponte desenha o `data-tema="claro"` no `<html>` das páginas do clone pelo mesmo
   `tema_do_pedido` (no escuro, sem o atributo), o card da OS (`card_os.html`) idem, e o botão troca ao vivo as molduras
@@ -639,7 +638,7 @@ que só reordenava o menu) saiu: no lugar dela o topo mostra "Setor: X". O códi
 - **Quem vê o quê.** Administrador é **só** a lista de Administradores (`NEXUS_ADMINS`, a lista desta tela, a senha):
   vê tudo, com ou sem setor, porque é quem configura e não pode ficar trancado fora. **Setor nunca dá administrador**:
   um setor chamado "Administrador" é setor como os outros (existiu assim por algumas horas em 12/10/2026 e saiu), e o
-  administrador que tem setor (o Levi, na Performance) segue vendo tudo; o setor dele só aparece no topo e na lista de
+  administrador que tem setor (o Levi, na Performance) segue vendo tudo; o setor dele só aparece no menu da conta e na lista de
   Administradores. Os setores veem só as telas marcadas, no menu e no Início (os cartões e os
   números contam só elas); setor sem nenhuma tela vê o Início com o aviso. Sem setor (ou com o setor excluído): toda
   página dá 403 com "Sem setor, fale com o responsável." (`templates/sem_setor.html`) e todo pedido de dados, 403 em
@@ -797,12 +796,20 @@ Levi, com o print do topo do OS Creator dentro do Nexus: "Quero que essa visão 
 cabeçalho do Nexus e suma esse 2° cabeçalho tanto de OS Creator Web quanto de plataforma de performance! Dá a impressão
 que é uma tela dentro de uma tela!".
 
-- **Quem entrou** (`base.html`, `.usuario-*` no `nexus.css`): entre o Tema e o Sair, o avatar com as iniciais (filtro
-  `iniciais` do `create_app`: primeiro + último nome, como o do OS Creator), o nome e o perfil do Fracttal (o
+- **Quem entrou** (`base.html`, `.usuario-*` no `nexus.css`): na ponta direita do topo, o avatar com as iniciais
+  (filtro `iniciais` do `create_app`: primeiro + último nome, como o do OS Creator), o nome e o perfil do Fracttal (o
   `session.usuario`, o mesmo `get_conta_info` que o OS Creator mostrava; o e-mail no `title`). Sem perfil, só o nome. Quem
-  entrou pela senha de administrador não tem nome: nada aparece. No celular, só o avatar, entre o Tema e o Sair (a regra
-  que esconde o nome fica DEPOIS das `.usuario-*`: dentro do bloco do celular, lá em cima, ela perdia e o nome seguia).
-- **A ação da tela no topo:** o bloco `topo_acoes`, antes do Tema. Hoje só o "Modo TV" do Painel NOC
+  entrou pela senha de administrador não tem nome: no lugar, só um ícone de pessoa (`.conta-sem-nome`). No celular, só o
+  avatar (a regra que esconde o nome fica DEPOIS das `.usuario-*`: dentro do bloco do celular, lá em cima, ela perdia e
+  o nome seguia).
+- **O menu da conta** (03/11/2026, Levi: "esse negócio de tema e setor fique oculto nessa barra inicial, que só apareça
+  quando clica no nome; aí vai ter: Setor, tema e sair"): quem entrou é o `<summary>` de um `<details class="conta-topo">`,
+  e a caixa (`.conta-caixa`, navy como o topo e o sino nos dois temas) traz o Setor (só quem tem um), o Tema e o Sair. Na
+  barra ficam só a marca, a ação da tela, o sino e o nome; o `.topo-espaco` vazio empurra o resto para a direita. Sem
+  JavaScript abre e fecha no clique; com ele, fecha ao clicar fora, no Esc, e o sino e o menu da conta não ficam abertos
+  juntos. No celular: linha 1 a marca e o Menu, linha 2 o sino e o avatar (numa linha só, a 375 px, o "Nexus" da marca
+  entrava por baixo do Menu).
+- **A ação da tela no topo:** o bloco `topo_acoes`, antes do sino. Hoje só o "Modo TV" do Painel NOC
   (`performance/moldura.html`); no celular ele some.
 - **O OS Creator dentro do Nexus sem o topo dele:** a ponte (`torres/oscreator/ponte.py`, `_MARCA_NO_NEXUS`) marca com
   `os-no-nexus` a tela logo abaixo do Nexus (a casca, o login, o card da OS) antes de pintar, e o topo some. Aberto sozinho
@@ -819,6 +826,10 @@ que é uma tela dentro de uma tela!".
   uma cópia de prova com uma pessoa de mentira e a plataforma do PC: o topo com "PE Pessoa Exemplo ADMINISTRATOR", o
   Performance do OS Creator começando no "← Voltar", o Tempo real e o Painel NOC sem a faixa (o "Modo TV" no topo), o
   Diagnóstico só com o seletor, o OS Creator aberto sozinho com o topo dele, 375 px só com o avatar, escuro e claro.
+  O menu da conta (03/11/2026): `test_setor_tema_e_sair_so_no_menu_da_conta` (nada de Setor, Tema e Sair na barra) e o
+  Setor dentro dele em `tests/test_setor_telas.py`; no navegador, numa bancada com uma pessoa de mentira no setor
+  Performance, a 1440, 1024 e 375 px, escuro e claro: abre no nome, troca o tema sem fechar, fecha no clique fora e no
+  Esc, e o celular sem rolagem lateral.
 
 ## Pedidos presos: o que o Nexus esperava quando parou (13/10/2026)
 
