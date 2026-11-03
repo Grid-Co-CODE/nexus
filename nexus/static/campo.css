@@ -1649,9 +1649,16 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .rg-grade,.rg-check{display:grid;gap:10px 14px;margin:14px 0 0;font-size:13px}
 .rg-grade{grid-template-columns:repeat(3,minmax(0,1fr))}
 .rg-grade .rg-larga{grid-column:span 2}
-.rg-check{grid-template-columns:repeat(4,minmax(0,1fr));padding:10px 12px;border:1px solid var(--linha);border-radius:var(--raio-md)}
+.rg-check{grid-template-columns:repeat(4,minmax(0,1fr));padding:10px 12px;border:1px solid var(--linha);border-radius:var(--raio-md);
+  text-align:center}
+/* o checklist centralizado, rótulo e valor (03/11/2026: "centralize as colunas cabeçalho e valores"); o rótulo e o valor
+   de cada coluna nas linhas da grade (subgrid): o "Vala de drenagem" que quebra em duas linhas encosta no valor e não
+   desce o "Limpa" para baixo dos outros */
+.rg-check>div{display:grid;grid-row:span 2;grid-template-rows:subgrid;row-gap:0}
+.rg-check dt{align-self:end}
 .rg-grade dt,.rg-check dt{margin-bottom:3px;font:600 10.5px/1.2 var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
 .rg-grade dd,.rg-check dd{margin:0;overflow-wrap:anywhere}
+.rg-check dd{align-self:baseline}
 .rg-check dd b{font-size:15px}
 .rg-nota{margin:12px 0 0;font-size:12.5px}
 .rg-pend{margin:12px 0 0;padding-left:18px;font-size:12.5px;line-height:1.5}

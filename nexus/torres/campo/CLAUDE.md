@@ -359,7 +359,9 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     fotos da OS (o 429 do Fracttal tenta sozinho em 1 minuto). **Enxuta no mesmo dia** ("Checklist pode ficar mais
     simples. Sujidade, Vegetação, Vala de Drenagem, Sensores. Tente aproveitar melhor o espaço e focar nas imagens";
     "aproveite mais o espaço para ter mais espaço vertical e melhor aproveitamento horizontal"): sem a faixa de cima (o ×
-    no canto), os dados em grade de três colunas (rótulo em cima, valor embaixo), o checklist numa linha de quatro e as
+    no canto), os dados em grade de três colunas (rótulo em cima, valor embaixo), o checklist numa linha de quatro,
+    centralizado ("centralize as colunas cabeçalho e valores"; rótulo e valor nas linhas de uma subgrid, para o "Vala de
+    drenagem" que quebra em duas linhas não desalinhar o valor dele dos outros) e as
     fotos com o resto do espaço (miniaturas de ~130 px que enchem a largura, só na barra: a grade das outras telas não
     muda); o "Ver o histórico da usina" saiu ("deixe completo"). A
     coluna Fotos e a linha que abria embaixo saíram dos Registros e do histórico da usina; a caixa que amplia a foto
