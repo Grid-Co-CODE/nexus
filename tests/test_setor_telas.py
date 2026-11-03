@@ -176,7 +176,7 @@ def test_setor_nao_da_administrador_e_administrador_com_setor_ve_tudo(app, setor
     app.config["NEXUS_ADMINS"] = ANA                                     # a Ana: Performance E administradora
     c = _como(app, ANA)
     html = c.get("/").get_data(as_text=True)
-    assert html.count('<details class="torre') == 13 and "Setor: <b>Performance</b>" in html
+    assert html.count('<details class="torre') == 14 and "Setor: <b>Performance</b>" in html
     assert c.get("/t/cos/ocorrencias").status_code == 200 and c.get(URL).status_code == 200
     with c.session_transaction() as s:
         assert s["admin"] is True

@@ -3,11 +3,11 @@ import re
 from nexus.torres import descobrir_torres, montar_menu, telas_com_conteudo
 
 
-def test_treze_torres_descobertas():
+def test_catorze_torres_descobertas():
     ids = [t.id for t in descobrir_torres()]
-    assert len(ids) == 13
+    assert len(ids) == 14
     assert ids[0] == "comando"
-    assert len(set(ids)) == 13
+    assert len(set(ids)) == 14
     # OS Creator entra logo abaixo da Base (pedido do Levi, 29/09).
     assert ids[-2:] == ["base", "os"]
     # Início é um botão da casca, não uma torre com sub-telas (pedido do Levi, 29/09).
@@ -64,7 +64,7 @@ def test_tela_com_view_propria_conta_como_conteudo(app):
 def test_menu_pinta_de_verde_so_o_que_tem_conteudo(logado):
     html = logado.get("/").get_data(as_text=True)
     classe = {torre: extra for extra, torre in re.findall(r'<details class="torre( com-conteudo)?" data-torre="([^"]+)"', html)}
-    assert len(classe) == 13
+    assert len(classe) == 14
     assert classe["base"] and classe["os"]
     assert classe["comando"]          # 03/11/2026: Caixa de entrada e Insights
     assert '<a href="/t/base/governanca" class="com-conteudo"' in html

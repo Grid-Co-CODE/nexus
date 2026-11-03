@@ -75,6 +75,38 @@ def renomear(valor, trocas: list):
     return novo, int(novo != valor)
 
 
+def sql_exportacao(de_para: dict) -> str:
+    """A consulta que se cola no SQL Editor do Supabase para exportar o Radar (03/11/2026): um SELECT só, que devolve uma
+    linha com o JSON que `copiar` lê. As seis tabelas da equipe levam o primeiro nome do supervisor; ele sai do de-para
+    (a entrada que vira "equipe"), que fica fora do repositório. Por isso a consulta é montada aqui, e não guardada."""
+    nome = next((k for k, v in (de_para or {}).items()
+                 if v == "equipe" and not k.startswith("_") and re.fullmatch(r"[a-z]+", k)), None)
+    if not nome:
+        raise ValueError("o de-para não diz o nome da equipe primarizada (a entrada que vira \"equipe\")")
+    tabelas = [a.replace("_equipe", f"_{nome}") for a in T.TABELAS if a != "fracttal_ultimas"]
+    pares = ",\n".join(f"    '{t}', (select coalesce(json_agg(x), '[]'::json) from radar_fornecedores.{t} x)"
+                        for t in tabelas)
+    return f"""-- Exportação do Radar para a cópia do Nexus. SÓ LEITURA: um SELECT, nada muda no banco do Radar.
+-- Sai uma linha com um JSON: os dados de cada tabela, os tipos das colunas e as chaves primárias.
+select json_build_object(
+  'gerado_em', now(),
+  'tipos', (select json_object_agg(table_name, cols) from (
+      select table_name, json_agg(json_build_array(column_name, data_type) order by ordinal_position) as cols
+        from information_schema.columns
+       where table_schema = 'radar_fornecedores' or (table_schema = 'public' and table_name = 'rf_fracttal_ultimas')
+       group by table_name) z),
+  'chaves', (select json_object_agg(c.relname, (select string_agg(a.attname, ',' order by a.attnum)
+               from pg_index i join pg_attribute a on a.attrelid = i.indrelid and a.attnum = any(i.indkey)
+              where i.indrelid = c.oid and i.indisprimary))
+               from pg_class c join pg_namespace n on n.oid = c.relnamespace
+              where n.nspname = 'radar_fornecedores' and c.relkind = 'r'),
+  'ultimas', (select coalesce(json_agg(x), '[]'::json) from public.rf_fracttal_ultimas x),
+  'tabelas', json_build_object(
+{pares}
+  )
+) as exportacao;"""
+
+
 def _maior_celula(abas: dict) -> int:
     return max((len(str(v)) for cab, linhas in abas.values() for l in linhas for v in l if v is not None), default=0)
 

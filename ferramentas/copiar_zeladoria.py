@@ -1,5 +1,8 @@
 """A cópia do Radar de Fornecedores (zeladoria) para os três livros do Nexus. Imprime só contagens, nunca linhas.
 
+    python ferramentas/copiar_zeladoria.py --sql --nomes <de_para_nomes.json>
+        imprime a consulta de exportação, para colar no SQL Editor do Supabase (um SELECT só, nada muda lá); o resultado
+        (uma célula com o JSON) se salva como arquivo, que é o --arquivo de baixo
     python ferramentas/copiar_zeladoria.py --arquivo <exportação.json> --nomes <de_para_nomes.json>
         o ensaio: monta os três livros com o dado real, cifra e NÃO grava
     python ferramentas/copiar_zeladoria.py --arquivo <exportação.json> --nomes <de_para_nomes.json> --gravar
@@ -34,15 +37,22 @@ from nexus.zeladoria import copia  # noqa: E402
 def main(argv=None) -> int:
     load_dotenv(RAIZ / ".env")
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("--arquivo", required=True, help="a exportação do Supabase (JSON)")
+    p.add_argument("--arquivo", help="a exportação do Supabase (JSON)")
+    p.add_argument("--sql", action="store_true", help="só imprime a consulta de exportação")
     p.add_argument("--nomes", default=os.environ.get("NEXUS_ZELADORIA_DE_PARA"), help="o de-para de nomes (JSON)")
     p.add_argument("--gravar", action="store_true", help="grava os três livros (sem isto, é o ensaio)")
     a = p.parse_args(argv)
     if not a.nomes:
         print("parei: falta o de-para de nomes (--nomes ou NEXUS_ZELADORIA_DE_PARA no .env)", file=sys.stderr)
         return 1
-    exp = json.loads(Path(a.arquivo).read_text(encoding="utf-8"))
     de_para = json.loads(Path(a.nomes).read_text(encoding="utf-8"))
+    if a.sql:
+        print(copia.sql_exportacao(de_para))
+        return 0
+    if not a.arquivo:
+        print("parei: falta o --arquivo com a exportação do Supabase", file=sys.stderr)
+        return 1
+    exp = json.loads(Path(a.arquivo).read_text(encoding="utf-8"))
     cofre = Cofre(os.environ.get("NEXUS_CHAVE_CADASTRO", ""))
     base = (os.environ.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
     t0 = time.time()

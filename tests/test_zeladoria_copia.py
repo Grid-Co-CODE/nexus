@@ -112,3 +112,17 @@ def test_valores_com_nome_renomeados():
                     banco.linhas(T.LIVRO_APP, "fornecedores"), COFRE, "id")
     assert forn[0]["empresa"] == "Fulano de Tal MEI" and forn[0]["email_contrato"] == "fulano@exemplo.com"
     assert rel["trocas"] == 3          # a chave do config, o escopo dentro do JSON e a origem da planilha
+
+
+def test_a_consulta_de_exportacao_sai_do_de_para():
+    """A consulta cita as seis tabelas pelo nome do supervisor: ela é montada na hora, pelo de-para que fica fora do
+    repositório, e nunca fica escrita nele."""
+    sql = C.sql_exportacao(DE_PARA)
+    for aba in T.TABELAS:
+        if aba != "fracttal_ultimas":
+            assert f"radar_fornecedores.{aba.replace('_equipe', '_fulano')} x)" in sql, aba
+    assert "public.rf_fracttal_ultimas" in sql and sql.lstrip().startswith("--") and "SÓ LEITURA" in sql
+    for proibido in ("insert ", "update ", "delete ", "drop ", "alter ", "create "):
+        assert proibido not in sql.lower()
+    with pytest.raises(ValueError):
+        C.sql_exportacao({"_leia": "sem o nome da equipe"})
