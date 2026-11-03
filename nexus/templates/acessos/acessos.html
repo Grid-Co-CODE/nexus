@@ -107,7 +107,7 @@
         <ul>
           {% for s in t.telas %}
           {# a tela que é DO setor (Tela.do_setor, 13/10/2026): ele a vê sempre; a caixa fica marcada e presa, sem ir ao Salvar #}
-          {% if s.do_setor %}<li><label><input type="checkbox" data-do-setor checked disabled> {{ s.nome }}</label><span class="ace-do-setor" title="Tela do setor {{ setor_sel.nome }}: quem é dele vê sem marcar">do setor</span></li>
+          {% if s.do_setor %}<li><label><input type="checkbox" data-do-setor checked disabled> {{ s.nome }}</label>{% if s.de_todos %}<span class="ace-do-setor" title="Todo setor vê esta tela sem marcar">de todos</span>{% else %}<span class="ace-do-setor" title="Tela do setor {{ setor_sel.nome }}: quem é dele vê sem marcar">do setor</span>{% endif %}</li>
           {% else %}<li><label><input type="checkbox" name="tela" value="{{ s.chave }}" {% if s.marcada %}checked{% endif %}> {{ s.nome }}</label>{% if not s.pronta %}<span class="ace-construcao">em construção</span>{% endif %}</li>{% endif %}
           {% endfor %}
         </ul>

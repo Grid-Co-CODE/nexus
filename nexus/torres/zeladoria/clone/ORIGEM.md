@@ -23,6 +23,7 @@ congelar (fim da etapa 2), este arquivo passa a ser a casa da zeladoria e se edi
   `<!--ZELADORIA:CONFIG-->`, para a configuração.
 - **A aba inicial** vem do menu do Nexus (`window.ZELADORIA_ABA`).
 - **O e-mail de exemplo do login** virou `voce@empresa.com.br`.
+- **O visual da Zeladoria (etapa 3):** a paleta com as três cores, as fontes do Nexus, as cores fixas viradas variável, sem emoji, o tema vindo do Nexus e as regras de tela estreita (`vestir`).
 
 ## Rodar de novo
 

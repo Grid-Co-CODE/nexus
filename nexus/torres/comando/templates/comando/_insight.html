@@ -3,25 +3,13 @@
    faixa nem borda colorida. Fechada, a linha diz o que é, onde, e com quem está (o dono e as áreas notificadas). Aberta,
    as provas, o que fazer, o retorno de cada área notificada e as ações: Notificar as áreas (as de costume já marcadas),
    Responder (só a área notificada), Assumir e Concluir. #}
-{% macro cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, aberto=false) %}
+{% from "comando/_conversa.html" import fio %}
+{# O miolo do insight aberto: as provas, as áreas e os retornos, e a conversa. Vai na página só para o que abre
+   aberto (os pedidos para o setor); o resto vem pela rota /insights/corpo quando a pessoa abre a linha
+   (comando/insights.js). Em 03/11/2026, com 327 insights, a página inteira dava 2 MB, 1.310 formulários e 12.544
+   campos, e o navegador travava (Levi: "cliquei em nexus insights e travou tudo"). #}
+{% macro corpo(i, nomes_torres, areas, retornos, codigo, voltar, tem_login) %}
 {% set ancora = 'ins-' ~ i.id|replace(':', '-') %}
-<li class="ins-item{% if i.estado == 'concluiu' %} ins-concluido{% endif %}" id="{{ ancora }}">
-<details class="ins-dobra"{% if aberto %} open{% endif %}>
-  <summary class="ins-linha">
-    <span class="ins-sev ins-sev--{{ i.sev_tom }}">{{ i.sev_rot }}</span>
-    <span class="ins-o-que">
-      <span class="ins-titulo">{{ i.titulo }}</span>
-      <span class="ins-meta">{{ i.regra_nome }} · {{ nomes_torres.get(i.torre, i.torre) }}</span>
-    </span>
-    <span class="ins-com-quem">
-      {% if i.pedidos %}{% for p in i.pedidos %}<span class="ins-area ins-area--{{ p.status }}" title="{{ p.nome }}: {{ p.rotulo }}">{{ p.nome }}<em>{{ p.rotulo }}</em></span>{% endfor %}
-      {% elif i.estado == 'assumiu' %}<span class="ins-dono">{{ 'Com você' if i.meu else ('Com ' ~ i.por if i.por else 'Assumido') }}</span>
-      {% elif i.estado == 'concluiu' %}<span class="ins-dono">Concluído</span>
-      {% else %}<span class="ins-dono ins-dono--livre">Ninguém avisado</span>{% endif %}
-    </span>
-    <span class="ins-seta" aria-hidden="true"></span>
-  </summary>
-  <div class="ins-corpo">
     <div class="ins-col">
       {% if i.evid %}<p class="ins-rot">O que a regra viu</p><ul class="ins-evid">{% for e in i.evid %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
       <p class="ins-rot">O que fazer</p><p class="ins-acao">{{ i.acao }}</p>
@@ -30,7 +18,7 @@
       <div class="ins-acoes">
         {% if i.link %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}{{ i.link }}"><i class="ph ph-arrow-square-out" aria-hidden="true"></i> Abrir a tela</a>{% endif %}
         {% if tem_login %}
-        <form method="post" action="{{ raiz }}/t/comando/insights/acao">
+        <form method="post" action="{{ raiz }}/t/comando/insight/acao">
           <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="insight" value="{{ i.id }}"><input type="hidden" name="voltar" value="{{ voltar }}">
           {% if i.estado == 'novo' %}<button class="gc-btn gc-btn--ui gc-btn--contorno" name="acao" value="assumir" type="submit">Assumir</button>
           {% elif i.estado == 'assumiu' %}<button class="gc-btn gc-btn--ui gc-btn--contorno" name="acao" value="concluir" type="submit">Concluir</button>
@@ -47,7 +35,7 @@
           <p class="mudo ins-ret-sub">Avisada{% if p.pedido_por %} por {{ p.pedido_por }}{% endif %}{% if p.pedido_em %} em {{ p.pedido_em }}{% endif %}{% if p.mensagem %}: "{{ p.mensagem }}"{% endif %}</p>
           {% if p.retorno or p.retorno_em %}<p class="ins-ret-txt">{{ p.retorno or 'Sem texto' }}<span class="mudo"> · {{ p.retorno_por }}{% if p.retorno_em %}, {{ p.retorno_em }}{% endif %}</span></p>{% endif %}
           {% if tem_login and p.minha and p.status != 'resolvido' %}
-          <form class="ins-responder" method="post" action="{{ raiz }}/t/comando/insights/acao">
+          <form class="ins-responder" method="post" action="{{ raiz }}/t/comando/insight/acao">
             <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="insight" value="{{ i.id }}"><input type="hidden" name="voltar" value="{{ voltar }}">
             <input type="hidden" name="acao" value="responder"><input type="hidden" name="area" value="{{ p.torre }}">
             <label class="gc-rotulo" for="st-{{ ancora }}-{{ p.torre }}">Responder por {{ p.nome }}</label>
@@ -60,7 +48,7 @@
         </li>{% endfor %}
       </ul>{% else %}<p class="mudo ins-nota">Nenhuma área avisada ainda.</p>{% endif %}
       {% if tem_login %}
-      <form class="ins-notificar" method="post" action="{{ raiz }}/t/comando/insights/acao">
+      <form class="ins-notificar" method="post" action="{{ raiz }}/t/comando/insight/acao">
         <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="insight" value="{{ i.id }}"><input type="hidden" name="voltar" value="{{ voltar }}">
         <input type="hidden" name="acao" value="notificar">
         {% set ja = i.pedidos|rejectattr('status', 'equalto', 'resolvido')|map(attribute='torre')|list %}
@@ -72,7 +60,7 @@
       </form>
       <details class="ins-outras">
         <summary>Notificar outras áreas</summary>
-        <form method="post" action="{{ raiz }}/t/comando/insights/acao">
+        <form method="post" action="{{ raiz }}/t/comando/insight/acao">
           <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="insight" value="{{ i.id }}"><input type="hidden" name="voltar" value="{{ voltar }}">
           <input type="hidden" name="acao" value="notificar">
           <div class="ins-chk">{% for t, nome in areas %}<label{% if t in ja %} class="ins-chk--ja"{% endif %}><input type="checkbox" name="para" value="{{ t }}"{% if t in ja %} disabled{% endif %}> {{ nome }}</label>{% endfor %}</div>
@@ -82,7 +70,30 @@
       </details>
       {% endif %}
     </div>
-  </div>
+    {% if i.ob %}<div class="ins-conversa">{{ fio(i.ob, i.conv, codigo, voltar, tem_login, areas) }}</div>{% endif %}
+{% endmacro %}
+
+{% macro cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, aberto=false) %}
+{% set ancora = 'ins-' ~ i.id|replace(':', '-') %}
+<li class="ins-item{% if i.estado == 'concluiu' %} ins-concluido{% endif %}" id="{{ ancora }}">
+<details class="ins-dobra"{% if aberto %} open{% endif %}>
+  <summary class="ins-linha">
+    <span class="ins-sev ins-sev--{{ i.sev_tom }}">{{ i.sev_rot }}</span>
+    <span class="ins-o-que">
+      <span class="ins-titulo">{{ i.titulo }}</span>
+      <span class="ins-meta">{{ i.regra_nome }} · {{ nomes_torres.get(i.torre, i.torre) }}</span>
+    </span>
+    <span class="ins-com-quem">
+      {% if i.pedidos %}{% for p in i.pedidos %}<span class="ins-area ins-area--{{ p.status }}" title="{{ p.nome }}: {{ p.rotulo }}">{{ p.nome }}<em>{{ p.rotulo }}</em></span>{% endfor %}
+      {% elif i.estado == 'assumiu' %}<span class="ins-dono">{{ 'Com você' if i.meu else ('Com ' ~ i.por if i.por else 'Assumido') }}</span>
+      {% elif i.estado == 'concluiu' %}<span class="ins-dono">Concluído</span>
+      {% else %}<span class="ins-dono ins-dono--livre">Ninguém avisado</span>{% endif %}
+    </span>
+    <span class="ins-conv-n">{% if i.conv and i.conv.n %}<span title="{{ i.conv.n }} {{ 'mensagem' if i.conv.n == 1 else 'mensagens' }} na conversa" aria-label="{{ i.conv.n }} {{ 'mensagem' if i.conv.n == 1 else 'mensagens' }} na conversa"><i class="ph ph-chat-circle" aria-hidden="true"></i>{{ i.conv.n }}</span>{% endif %}</span>
+    <span class="ins-seta" aria-hidden="true"></span>
+  </summary>
+  {% if aberto %}<div class="ins-corpo">{{ corpo(i, nomes_torres, areas, retornos, codigo, voltar, tem_login) }}</div>
+  {% else %}<div class="ins-corpo" data-corpo="{{ raiz }}/t/comando/insight/corpo?id={{ i.id|urlencode }}&amp;voltar={{ voltar|urlencode }}"><p class="mudo ins-nota ins-carregando">Carregando...</p><noscript><a class="conv-volta" href="?abrir={{ i.id|urlencode }}#{{ ancora }}">Abrir este insight</a></noscript></div>{% endif %}
 </details>
 </li>
 {% endmacro %}

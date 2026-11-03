@@ -370,7 +370,9 @@ def das_do_setor(setor) -> set[str]:
     for t in current_app.extensions.get("nexus_torres", []):
         for s in t.telas:
             k = chave(t.id, s.id)
-            if k in escolhas:
+            if s.de_todos:
+                out.add(k)
+            elif k in escolhas:
                 dono = escolhas[k]
                 if dono is not None and (dono == sid or (sid is None and _sem_acento(nomes.get(dono)) == alvo)):
                     out.add(k)

@@ -58,9 +58,18 @@ cliente, lugar). Por quê: a API do banco tem leitura aberta, e fornecedor MEI t
 - **Cópia:** a exportação das 17:07 UTC, 4.756 linhas nas 39 tabelas mais 117 últimas rondas, gravada em 13,8 s; as 40 abas têm no Nexus as mesmas linhas da origem. A maior célula é a do retrato do cronograma (86 mil caracteres), que vai partida em 3. 86 valores com nome foram renomeados (config 2, log 7, origem dos serviços 77).
 - **Tela:** na cópia de prova (porta 5172), a Visão Geral, o Financeiro e a Criticidade abriram com o dado real, sem erro no console. Em 375 px, o menu do Nexus vira o botão Menu, e o clone se ajusta.
 
+## O visual (etapa 3, 03/11/2026)
+
+- **Paleta:** as três cores do Levi (preto `#030407`, azul `#1558c9` e lima `#d4ff24`) ficam numa paleta própria, dentro do clone: o bloco `zeladoria-paleta`, que redefine as variáveis do Radar nos dois temas. No claro, o lima é só superfície, com texto preto em cima; o texto de destaque é um lima escuro, e a informação é o azul.
+- **Tema:** o `<html>` do clone nasce com o `data-theme` do tema do Nexus, e o botão do topo troca ao vivo (o aviso `nexus.tema` no navegador).
+- **Fontes:** as do Nexus (Poppins, Raleway nos títulos e IBM Plex Mono).
+- **Cores fixas:** a do CSS e a de aviso dos estilos do JavaScript viraram variável. A cor de DADO (o avatar de cada pessoa, a escala de dias de atraso, o calor da criticidade) e o CSS do relatório de impressão (papel branco) ficam como estavam.
+- **Emojis:** saíram. O que era o botão inteiro virou palavra (Excluir, Editar, Fotos, Simular...).
+- **Celular:** a 375 px nenhuma das 18 telas rola de lado. A tabela larga rola dentro dela, a grade fixa cai para uma coluna e a linha de botões quebra.
+- **Como se faz:** tudo pela `ferramentas/zeladoria_limpar_clone.py` (a função `vestir`), que roda de novo sobre o Radar original. Prova: `tests/test_zeladoria_clone.py`.
+
 ## O que falta (etapas do desenho)
 
-- **3:** o visual da torre (preto `#030407`, azul `#1558c9` e lima `#d4ff24`, só aqui), sem emoji.
 - **4:** a gravação com a versão do livro e as `fin_*` em Python.
 - **5:** o Fracttal (rondas) e a rota do cronograma.
 - **6:** as usinas ligadas ao cadastro, e a troca.

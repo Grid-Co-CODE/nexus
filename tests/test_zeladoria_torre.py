@@ -159,3 +159,14 @@ def test_foto_so_de_ronda_da_copia_e_so_para_aprovado(cliente, logado, copiado, 
     assert logado.post("/t/zeladoria/api/funcao/fracttal-fotos", json={"folio": "999"}).status_code == 404
     pendente = _entrar_como(cliente, "beltrano@exemplo.com")
     assert pendente.get("/t/zeladoria/foto/2/0").status_code == 403
+
+
+def test_o_clone_nasce_no_tema_do_nexus(logado, copiado):
+    """O escuro é o padrão do Nexus; o claro vem do cookie do botão do topo. O clone muda junto, ao vivo, pelo aviso que
+    o botão grava no navegador (`nexus.tema`)."""
+    html = logado.get("/t/zeladoria/app").get_data(as_text=True)
+    assert '<html lang="pt-BR" data-theme="dark">' in html and 'window.ZELADORIA_TEMA = "dark"' in html
+    assert "nexus.tema" in html
+    logado.set_cookie("nexus_tema", "claro")
+    html = logado.get("/t/zeladoria/app").get_data(as_text=True)
+    assert '<html lang="pt-BR" data-theme="light">' in html and 'window.ZELADORIA_TEMA = "light"' in html

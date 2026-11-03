@@ -58,6 +58,8 @@ O `-cheio` é para ÁREA: barra, borda grossa de destaque, preenchimento com tex
 impressão são sempre papel branco (`--papel-*`); a cor de DADO (a da pessoa no Quadro da equipe, a da etiqueta do
 Fracttal) é a mesma nos dois, com texto escuro por cima. A página da Plataforma no Tempo real fica no escuro dela.
 
+**A torre Zeladoria tem paleta própria** (Levi, 03/11/2026: preto `#030407`, azul `#1558c9` e lima `#d4ff24`, só nela). Ela mora DENTRO do clone do Radar, como a do OS Creator, no bloco `zeladoria-paleta` que a `ferramentas/zeladoria_limpar_clone.py` põe, com um par para cada tema (o `data-theme` que o Nexus marca). No claro, o lima é só superfície (texto preto em cima), e o texto de destaque é um lima escuro; o azul é a informação. A casca em volta (topo, menu, aviso) segue a do Nexus. Detalhe em `nexus/torres/zeladoria/CLAUDE.md`.
+
 **Gráficos e mapa:** as séries (`--serie-*`) e as rampas de calor do Mapa de risco (`--calor-*`, um matiz por rampa,
 luminosidade monótona) já têm token nos dois temas. Série nova passa pelo validador do dataviz antes de virar token.
 

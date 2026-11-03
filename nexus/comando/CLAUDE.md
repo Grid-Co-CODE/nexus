@@ -6,8 +6,8 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 `.taskmaster/tasks/tasks.json` (escritos à mão: a CLI do Taskmaster chama IA paga para gerar; a casa é custo zero).
 
 ## As fases (uma de cada vez, mostrada ao Levi antes de seguir)
-1. **Insights + sino + Caixa de entrada** (esta pasta + `nexus/torres/comando/`): NO AR quando o Levi aprovar a prévia.
-2. Conversa com @menção em cada insight, OS e usina.
+1. **Insights + sino + Caixa de entrada** (esta pasta + `nexus/torres/comando/`): NO AR 03/11/2026 (3cd7564).
+2. **Conversa com @menção em cada insight, OS e usina** (`conversa.py`): ver a seção abaixo.
 3. Pedidos entre setores com prazo e o painel de tempo de resposta.
 4. O Início novo ("Pede você agora", paleta preto #030407, azul #1558c9, lima #D4FF24): decidir antes se a paleta vale
    para o Nexus inteiro.
@@ -18,7 +18,10 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `regras.py` | As regras, PURAS (recebem listas já lidas, devolvem insights). O catálogo `REGRAS` (nome, torre dona, KPI, fonte) |
 | `motor.py` | Lê as fontes que o Nexus JÁ lê (uma função por regra em `FONTES`), roda as regras, cópia de 5 min pelo `visao._ler` |
 | `estado.py` | Quem assumiu, concluiu ou reabriu, as áreas notificadas e o retorno de cada uma: o livro `nexus_insights · fato_evento_insight` |
-| `../torres/comando/__init__.py` | As telas Comando → Insights e Caixa de entrada, e o POST `/t/comando/insights/acao` |
+| `../torres/comando/__init__.py` | As telas Comando → Insights e Caixa de entrada, o miolo de um insight (`GET /t/comando/insight/corpo`) e o POST `/t/comando/insight/acao` (os endereços antigos `/insights/...` seguem valendo) |
+| `../torres/comando/templates/comando/_insight.html` + `static/comando/insights.js` | A linha do insight (`cartao`) e o miolo (`corpo`), que vem só ao abrir |
+| `conversa.py` | A conversa presa ao objeto com @menção: o livro `nexus_conversas · fato_mensagem`, as menções não lidas (`para_mim`) e a lista do @ (`pessoas_mencionaveis`) |
+| `../torres/comando/templates/comando/_conversa.html` + `static/comando/conversa.js` | O componente da conversa (dentro de cada insight e na página da OS e da usina) e o @ |
 | `../casca/__init__.py` (`_sino`) + `base.html` | O sino do topo |
 
 ## As regras da Fase 1 (e de onde cada uma lê)
@@ -51,6 +54,26 @@ engenharia'"; "extintores pode ser tanto equipe de segurança quanto supervisor 
 - Se a regra para de apontar (a condição sumiu), o insight sai da lista, e os pedidos dele junto: está resolvido na
   fonte.
 
+## A conversa com @menção (Fase 2, 03/11/2026)
+Levi: "pode seguir para a fase 2". A conversa mora NO objeto (`tipo:id`: `insight:R07:2`, `os:16702`, `usina:12`),
+como fazem ServiceNow, Jira e Linear, não num chat solto.
+- **Onde aparece:** dentro de cada insight (a lista dos Insights e a Caixa), e na página `/t/comando/conversa/<tipo>/<id>`
+  (a OS e a usina; a conversa nova sai da Caixa: "Começar uma conversa sobre uma OS ou uma usina").
+- **@menção:** digitar @ abre a lista das áreas (as torres de operação) e das pessoas com setor (Base → Acessos → Pessoas e
+  setores; o nome do pessoal do Fracttal, 1 h na memória). A lista é pedida ao servidor só no 1º @
+  (`/t/comando/conversa/pessoas`), nunca ao abrir a página. A pessoa vai pelo código do e-mail (`pessoa_hmac`), a área
+  pela torre; o `@Nome` que sai do texto não vai. Sem JavaScript, as áreas se marcam em "Mencionar áreas".
+- **Quem é avisado:** a pessoa mencionada e todo mundo cujo setor vê a torre mencionada. Aparece na Caixa ("Menções
+  para você", uma linha por conversa) e no sino, até a pessoa marcar como lida ou escrever na conversa (escrever conta
+  como ler). Quem escreveu não se avisa.
+- **O sino só lê as cópias** (`conversa.copias()`): com a cópia vencida (1 min) ou vazia, a leitura das conversas e dos
+  eventos dos insights começa por trás, e o mencionado vê o número sem precisar abrir a Caixa antes.
+- **Acesso (03/11/2026, Levi: "libera a caixa para todos os setores"):** a Caixa de entrada é de todo setor
+  (`Tela.de_todos`, entra no `setor_telas.das_do_setor` como a tela do dono), então todo mencionado vê o aviso. O miolo e
+  as ações do insight moram em `/t/comando/insight/` (singular): `/insights/...` casa com a tela Insights no portão, e quem
+  só tem a Caixa não abriria o insight. Quem só tem a Caixa abre o miolo dos insights das torres dele e dos que pedem
+  retorno a ele (`_ve_o_insight`); a tela Insights continua pela marca.
+
 ## O visual
 Uma lista numa superfície só, uma linha por insight que abre ao clicar (Levi: "não sou muito fã dessa barra lateral em
 vermelho, temos muito dela... poderia fazer algo diferente?"): a gravidade é um selo (ponto + palavra), sem faixa nem
@@ -58,6 +81,14 @@ borda colorida; à direita, com quem está (as áreas avisadas e o retorno, ou o
 fazer, as áreas e os retornos, e as ações.
 
 ## As regras da casa aqui
+- **A lista vem leve; o miolo vem ao abrir** (03/11/2026, Levi: "cliquei em nexus insights e travou tudo"). Medido com o
+  dado real: 327 insights, a página com todos os miolos dava 2 MB, 1.310 formulários e 12.544 campos, e o navegador
+  travava. Agora a linha vem na página e o miolo (5,5 KB) vem por `/t/comando/insight/corpo` quando a pessoa abre
+  (`insights.js`); a página caiu para 320 KB e 4 campos. Só os "Pedidos para o seu setor" da Caixa vêm abertos. O
+  endereço com `#ins-...` ou `#conv-insight-...` (o sino, a volta de uma ação) abre o dele; sem JavaScript, `?abrir=<id>`.
+- **Insights e Caixa nunca esperam a conta** (`motor.sem_esperar`): sem a cópia (o Nexus acabou de subir, e todo push
+  reinicia), a conta começa por trás e a tela diz que está calculando e se atualiza em 10 s; o Assumir recusa até a
+  lista existir. A conta fria levou 19 s no PC (sem o Andamento, que no servidor soma) e segurava a página.
 - **O id do insight é estável** (`regra:objeto`, ex.: `N01:16702`, `R07:<usina_id>`): é por ele que o Assumir sobrevive
   à próxima conta. Mudar o objeto de uma regra solta o que foi assumido.
 - **A torre é o dono** (o setor vê as torres liberadas em Base → Acessos): sem cadastro de cadeira. A Caixa de entrada e
@@ -73,5 +104,6 @@ fazer, as áreas e os retornos, e as ações.
 
 ## Prova
 `tests/test_comando_insights.py` (cada regra com o caso e o vizinho; o motor com uma fonte quebrada; o Assumir cifrado e
-sem repetir; a Caixa só das torres do setor; o sino sem dono e sem cópia). Os testes da torre (`test_torres.py`,
+sem repetir; a Caixa só das torres do setor; o sino sem dono e sem cópia; a lista leve com o miolo ao abrir; a tela
+sem cópia que não espera; a Caixa de todo setor). Os testes da torre (`test_torres.py`,
 `test_casca_inicio.py`) passaram a esperar o Comando com a Caixa de entrada e os Insights prontos.

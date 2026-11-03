@@ -89,7 +89,8 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
     assert ">Central de emissão</a>" in _menu(c.get("/").get_data(as_text=True))
     assert c.get("/t/relatorios/potencia-ativa").status_code == 200
     with app.app_context():
-        assert ST.das_do_setor("performance") == ST.das_do_setor("Performance") == {f"relatorios/{t}" for t in RELATORIOS}
+        assert ST.das_do_setor("performance") == ST.das_do_setor("Performance") \
+            == {f"relatorios/{t}" for t in RELATORIOS} | {"comando/caixa-de-entrada"}   # a Caixa é de todos (03/11)
         # os do PCM (14/10/2026) são do setor PCM: os relatórios (nexus/pcm/relatorios, tests/test_relatorios_pcm.py) e o
         # Acompanhamento (nexus/pcm/acompanhamento, tests/test_pcm_acompanhamento.py)
         # e, desde 16/10/2026, o Gerar a semana e o Quadro da semana (Levi: "administradores e pessoas do setor de PCM
@@ -97,7 +98,7 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         # (nexus/pcm/almoxarifado.py, tests/test_pcm_almoxarifado.py)
         assert ST.das_do_setor("PCM") == ({f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta", "executivo")}
                                           | {"pcm/acompanhamento", "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao",
-                                             "pcm/tecnicos-por-usina", "pcm/pecas"})
+                                             "pcm/tecnicos-por-usina", "pcm/pecas", "comando/caixa-de-entrada"})
         # o Gerar e o Quadro têm dois donos: o PCM e os supervisores (Levi, 16/10/2026: "tanto PCM quanto supervisores!
         # Vou criar um setor de Responsáveis UFV"), pelo nome, sem acento nem caixa
         # e, desde 16/10/2026, o Fora da programação (os motivos que tiram a tarefa da semana; tests/test_pcm_motivos.py)
@@ -105,7 +106,8 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         # e, desde 18/10/2026, as Ocorrências do Campo · App (o painel de ocorrências dos supervisores, no Nexus;
         # tests/test_campo_ocorrencias.py)
         assert ST.das_do_setor("Responsáveis UFV") == ST.das_do_setor("responsaveis ufv") == {
-            "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao", "pcm/tecnicos-por-usina", "campo/ocorrencias"}
+            "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao", "pcm/tecnicos-por-usina", "campo/ocorrencias",
+            "comando/caixa-de-entrada"}
         assert ST.das_do_setor("") == set()
 
 

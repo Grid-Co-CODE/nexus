@@ -6,6 +6,7 @@ quando uma fonte falha; o Assumir e o Concluir gravam cifrados e não repetem; a
 setor da pessoa; o sino conta os sem dono pela cópia e nunca calcula na página. Nada vai à rede."""
 from datetime import date, datetime, timedelta, timezone
 
+import re
 import pytest
 from test_campo_visao import banco  # noqa: F401  (fixture: o banco falso)
 
@@ -124,9 +125,10 @@ INSIGHT = {"id": "N01:16702", "regra": "N01", "torre": "cos"}
 
 @pytest.fixture
 def limpo():
-    ES.limpar()
+    from nexus.comando import conversa as CV
+    ES.limpar(); CV.limpar()
     yield
-    ES.limpar()
+    ES.limpar(); CV.limpar()
 
 
 def test_assumir_e_concluir_gravam_cifrados_e_nao_repetem(app, banco, limpo):
@@ -177,13 +179,22 @@ def _cliente(app, admin=False):
     return c
 
 
+def _aberta(c, url) -> str:
+    """A página com o miolo de cada insight, como o navegador monta ao abrir as linhas (comando/insights.js): a lista
+    vem só com as linhas, e o miolo de cada uma pela rota /insight/corpo."""
+    html = c.get(url).get_data(as_text=True)
+    for u in re.findall(r'data-corpo="([^"]+)"', html):
+        html += c.get(u.replace("&amp;", "&")).get_data(as_text=True)
+    return html
+
+
 def _codigo(c, url="/t/comando/insights") -> str:
-    return c.get(url).get_data(as_text=True).split('name="codigo" value="', 1)[1].split('"', 1)[0]
+    return _aberta(c, url).split('name="codigo" value="', 1)[1].split('"', 1)[0]
 
 
 def test_a_tela_de_insights_e_o_assumir(app, banco, limpo, motor_dublado):
     c = _cliente(app)
-    html = c.get("/t/comando/insights").get_data(as_text=True)
+    html = _aberta(c, "/t/comando/insights")
     assert "a OS 16702 voltou e segue aberta" in html and "2 extintores vencidos" in html
     # a gravidade é um selo (ponto + palavra), sem a faixa vermelha (Levi, 03/11/2026: "não sou muito fã dessa barra
     # lateral em vermelho")
@@ -194,7 +205,7 @@ def test_a_tela_de_insights_e_o_assumir(app, banco, limpo, motor_dublado):
                                                  "voltar": "/t/comando/insights"})
     assert r.status_code == 303 and r.headers["Location"].endswith("/t/comando/insights#ins-N01-16702")
     assert [l["evento"] for l in banco.linhas(ES.LIVRO, ES.ABA)] == ["assumiu"]
-    html = c.get("/t/comando/insights").get_data(as_text=True)
+    html = _aberta(c, "/t/comando/insights")
     assert "Assumido: agora é seu." in html and "Com você" in html
     # outro site e o insight que a regra não aponta mais não gravam
     c.post("/t/comando/insights/acao", data={"codigo": _codigo(c), "insight": "N01:16702", "acao": "concluir"},
@@ -205,21 +216,21 @@ def test_a_tela_de_insights_e_o_assumir(app, banco, limpo, motor_dublado):
 
 def test_a_caixa_so_mostra_as_torres_do_setor(app, banco, limpo, motor_dublado, monkeypatch):
     monkeypatch.setattr(MO, "torres_da_pessoa", lambda: {"hseq"})
-    html = _cliente(app).get("/t/comando/caixa-de-entrada").get_data(as_text=True)
+    html = _aberta(_cliente(app), "/t/comando/caixa-de-entrada")
     assert "2 extintores vencidos" in html and "16702" not in html
     monkeypatch.setattr(MO, "torres_da_pessoa", lambda: None)
-    html = _cliente(app).get("/t/comando/caixa-de-entrada").get_data(as_text=True)
+    html = _aberta(_cliente(app), "/t/comando/caixa-de-entrada")
     assert "2 extintores vencidos" in html and "16702" in html and "todas as torres" in html
 
 
 def test_o_sino_conta_os_sem_dono_das_torres_da_pessoa(app, banco, limpo, motor_dublado, monkeypatch):
     monkeypatch.setattr(MO, "torres_da_pessoa", lambda: {"cos"})
-    html = _cliente(app).get("/t/comando/insights").get_data(as_text=True)
+    html = _aberta(_cliente(app), "/t/comando/insights")
     sino = html.split('class="sino-topo"', 1)[1].split("</details>", 1)[0]
     assert '<b class="sino-n sino-n--critico">1</b>' in sino and "a OS 16702 voltou" in sino and "extintores" not in sino
     ES.registrar(DOIS[0], "assumiu", PESSOA)                      # com dono: sai do sino
     ES.ler(forcar=True)
-    html = _cliente(app).get("/t/comando/insights").get_data(as_text=True)
+    html = _aberta(_cliente(app), "/t/comando/insights")
     sino = html.split('class="sino-topo"', 1)[1].split("</details>", 1)[0]
     assert "sino-n" not in sino and "Nada sem dono" in sino
 
@@ -257,21 +268,21 @@ def test_notificar_e_responder_no_estado(app, banco, limpo):
 
 def test_a_tela_notifica_a_area_de_costume_e_a_area_responde(app, banco, limpo, motor_dublado, monkeypatch):
     c = _cliente(app)
-    html = c.get("/t/comando/insights").get_data(as_text=True)
+    html = _aberta(c, "/t/comando/insights")
     # a ação de costume da regra: o extintor avisa a Segurança e o Campo; a normalização, o Campo
     assert "Notificar Segurança · HSEQ e Campo · App" in html and "Notificar outras áreas" in html
     c.post("/t/comando/insights/acao", data={"codigo": _codigo(c), "insight": "R07:1", "acao": "notificar",
                                              "para": ["hseq", "campo"], "voltar": "/t/comando/insights"})
     assert [l["para"] for l in banco.linhas(ES.LIVRO, ES.ABA)] == ["hseq,campo"]
     ES.ler(forcar=True)
-    html = c.get("/t/comando/insights").get_data(as_text=True)
+    html = _aberta(c, "/t/comando/insights")
     assert "Notificado: Segurança · HSEQ, Campo · App." in html and "Aguardando retorno" in html
     # a pessoa do setor da Segurança vê o pedido na Caixa, responde, e quem notificou vê o retorno
     monkeypatch.setattr(MO, "torres_da_pessoa", lambda: {"hseq"})
     seg = app.test_client()
     with seg.session_transaction() as s:
         s.update(logado=True, admin=False, usuario={"email": "seg@exemplo.test", "nome": "Ciclana da Segurança"})
-    caixa = seg.get("/t/comando/caixa-de-entrada").get_data(as_text=True)
+    caixa = _aberta(seg, "/t/comando/caixa-de-entrada")
     assert "Pedidos para o seu setor" in caixa and "Responder por Segurança · HSEQ" in caixa
     assert "Responder por Campo · App" not in caixa                          # só responde pela própria área
     sino = caixa.split('class="sino-topo"', 1)[1].split("</details>", 1)[0]
@@ -286,5 +297,62 @@ def test_a_tela_notifica_a_area_de_costume_e_a_area_responde(app, banco, limpo, 
     assert [l["status_retorno"] for l in banco.linhas(ES.LIVRO, ES.ABA)] == [None, "resolvido"]
     ES.ler(forcar=True)
     monkeypatch.setattr(MO, "torres_da_pessoa", lambda: None)
-    html = c.get("/t/comando/insights").get_data(as_text=True)
+    html = _aberta(c, "/t/comando/insights")
     assert "Extintores trocados" in html and "Ciclana da Segurança" in html
+
+
+def test_a_lista_vem_leve_e_o_miolo_quando_abre(app, banco, limpo, motor_dublado):
+    """03/11/2026, Levi: "cliquei em nexus insights e travou tudo". Com 327 insights, a página com todos os miolos dava
+    2 MB, 1.310 formulários e 12.544 campos. Agora a lista vem só com as linhas; o miolo vem ao abrir (ou com ?abrir=)."""
+    c = _cliente(app)
+    html = c.get("/t/comando/insights").get_data(as_text=True)
+    lista = html.split('class="ins-lista"', 1)[1].split("</ol>", 1)[0]
+    assert "<form" not in lista and "a OS 16702 voltou e segue aberta" in lista
+    assert lista.count("data-corpo=") == 2 and "comando/insights.js" in html
+    miolo = c.get("/t/comando/insight/corpo?id=R07:1&voltar=/t/comando/insights")
+    assert miolo.status_code == 200 and "<html" not in miolo.get_data(as_text=True)
+    m = miolo.get_data(as_text=True)
+    assert "Assumir" in m and 'value="/t/comando/insights"' in m and 'id="conv-insight-R07-1"' in m
+    assert 'value="https://' not in c.get("/t/comando/insight/corpo?id=R07:1&voltar=https://fora.test").get_data(as_text=True)
+    assert c.get("/t/comando/insight/corpo?id=R99:nada").status_code == 404
+    aberta = c.get("/t/comando/insights?abrir=R07:1").get_data(as_text=True)
+    assert aberta.split('id="ins-R07-1"', 1)[1].split("</li>", 1)[0].count("<form") >= 1
+
+
+def test_sem_a_copia_a_tela_nao_espera_a_conta(app, banco, limpo, monkeypatch):
+    """Logo depois de o Nexus subir não há cópia: a tela abre na hora, diz que a conta está correndo e se atualiza; o
+    Assumir não grava em cima de uma lista que ainda não existe."""
+    monkeypatch.setattr(MO, "sem_esperar", lambda: None)
+    monkeypatch.setattr(MO, "do_cache", lambda: None)
+    c = _cliente(app)
+    for url in ("/t/comando/insights", "/t/comando/caixa-de-entrada"):
+        r = c.get(url)
+        html = r.get_data(as_text=True)
+        assert r.status_code == 200 and "está sendo feita agora" in html and 'data-recarregar="10"' in html
+        assert "A lista aparece assim que a conta terminar." in html
+    c.post("/t/comando/insight/acao", data={"codigo": _codigo(c, "/t/comando/caixa-de-entrada"), "insight": "R07:1",
+                                            "acao": "assumir", "voltar": "/t/comando/insights"})
+    assert "tente de novo em meio minuto" in c.get("/t/comando/insights").get_data(as_text=True)
+    assert banco.linhas(ES.LIVRO, ES.ABA) == []
+
+
+def test_a_caixa_e_de_todo_setor(app, banco, limpo, motor_dublado, monkeypatch):
+    """03/11/2026, Levi: "libera a caixa para todos os setores". Quem tem setor vê a Caixa sem marca (o aviso de menção
+    chega a todos); o miolo e as ações do insight moram em /insight/ para quem só tem a Caixa; a tela Insights continua
+    pela marca."""
+    from nexus.auth import setor_telas as ST
+    with app.test_request_context("/"):
+        monkeypatch.setattr(ST, "escolhas_de_dono", lambda: {})
+        assert "comando/caixa-de-entrada" in ST.das_do_setor({"id": 5, "nome": "Setor Qualquer"})
+        assert "comando/insights" not in ST.das_do_setor({"id": 5, "nome": "Setor Qualquer"})
+        so_caixa = {"comando/caixa-de-entrada"}
+        assert ST.pode("/t/comando/caixa-de-entrada", so_caixa) and ST.pode("/t/comando/insight/corpo", so_caixa)
+        assert ST.pode("/t/comando/insight/acao", so_caixa) and ST.pode("/t/comando/conversa/os/15000", so_caixa)
+        assert not ST.pode("/t/comando/insights", so_caixa) and not ST.pode("/t/comando/insights/corpo", so_caixa)
+    # quem só tem a Caixa e a Segurança abre o miolo do insight da Segurança, não o de outra torre
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"comando/caixa-de-entrada", "hseq/extintores"},
+                                               "setor": {"id": 5, "nome": "Setor Qualquer"}, "erro": ""})
+    c = _cliente(app)
+    assert c.get("/t/comando/insight/corpo?id=R07:1").status_code == 200
+    outra = next(i["id"] for i in motor_dublado.dados["insights"] if i["torre"] != "hseq")
+    assert c.get(f"/t/comando/insight/corpo?id={outra}").status_code == 404
