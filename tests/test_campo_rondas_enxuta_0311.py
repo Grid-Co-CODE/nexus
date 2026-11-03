@@ -140,3 +140,19 @@ def test_a_linha_abre_a_barra_lateral_com_tudo_da_ronda(banco, logado, monkeypat
     css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
     assert ".rd-gaveta{position:fixed;z-index:60;top:0;right:0;bottom:0;display:flex;flex-direction:column;width:33.333vw" in css
     assert "@media (max-width:900px){.rd-gaveta{width:100vw;min-width:0}}" in css
+
+
+def test_a_os_da_barra_abre_o_card_da_os(banco, logado, monkeypatch):
+    """Levi, 03/11/2026: "quero que a OS seja clicável". O número abre o card da OS do OS Creator por cima da barra, pelo
+    número (o clone acha o id), como na Visão do responsável e no Ranking; o Esc com o card aberto fecha só o card."""
+    from nexus.campo import ronda_checklist
+    monkeypatch.setattr(ronda_checklist, "respostas", lambda: {})
+    det = logado.get(f"/t/campo/rondas/usina/1/ronda?os=500&data={_dia(1)}").get_data(as_text=True)
+    assert 'data-rg-os="500"' in det and 'title="Abrir o card da OS 500"' in det
+    # sem OS, nada para abrir
+    assert "data-rg-os" not in logado.get(f"/t/campo/rondas/usina/2/ronda?data={_dia(2)}&ini=07:00").get_data(as_text=True)
+    # as duas telas da barra trazem o card e o clique dele
+    for url in ("/t/campo/rondas", "/t/campo/rondas/usina/1"):
+        h = logado.get(url).get_data(as_text=True)
+        assert "window.NexusOsCard" in h and "NexusOsCard.abrirFolio(os.getAttribute('data-rg-os')" in h, url
+        assert h.index("!document.querySelector('.nexus-card-os')") < h.index("window.NexusOsCard = window.NexusOsCard"), url

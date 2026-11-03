@@ -9,8 +9,8 @@ def test_a_cadeira_saiu(logado):
     assert logado.post("/cadeira", data={"cadeira": "pcm"}).status_code == 404
     html = logado.get("/").get_data(as_text=True)
     assert 'class="cadeira"' not in html and "Cadeira" not in html and "data-sua" not in html
-    # a senha de administrador não tem setor: o espaço do setor no topo fica vazio
-    assert '<span class="setor-topo"></span>' in html
+    # a senha de administrador não tem setor: o menu da conta não traz a linha do setor
+    assert 'class="conta-setor"' not in html and "Setor:" not in html
 
 
 def test_inicio_logado(logado):

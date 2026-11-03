@@ -363,7 +363,13 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     centralizado ("centralize as colunas cabeçalho e valores"; rótulo e valor nas linhas de uma subgrid, para o "Vala de
     drenagem" que quebra em duas linhas não desalinhar o valor dele dos outros) e as
     fotos com o resto do espaço (miniaturas de ~130 px que enchem a largura, só na barra: a grade das outras telas não
-    muda); o "Ver o histórico da usina" saiu ("deixe completo"). A
+    muda); o "Ver o histórico da usina" saiu ("deixe completo"). **A OS da barra abre o card da OS** ("quero que a OS
+    seja clicável"): o do OS Creator, pelo número (`NexusOsCard.abrirFolio`, o clone acha o id), como na Visão do
+    responsável e no Ranking; o `card_os_abrir.html` entra no fim do `_ronda_gaveta.html`, DEPOIS do script da barra,
+    para o Esc com o card aberto fechar só o card. "A OS não tem fotos anexadas" com a ronda completa no App não é o
+    técnico: conferir no Fracttal se a tarefa da OS está Não iniciada e com o resumo vazio, que é o fechamento da OS da
+    ronda que não rodou no servidor do App (OS 18407, 03/11/2026: a OS nasceu da fila e a leitura seguinte foi adiada
+    pela reserva da cota da v317; as fotos ficaram no servidor do App). A
     coluna Fotos e a linha que abria embaixo saíram dos Registros e do histórico da usina; a caixa que amplia a foto
     (`_ronda_fotos_caixa.html`) segue, com o botão, na Zeladoria, no EPI e nos Extintores. **A duração e a pendência se escolhem no cabeçalho** (03/11/2026:
     "ao clicar em 'Duração' no cabeçalho, aí vai ter essas opções ou 'ordenar'"): o menu da Duração ordena (mais longa

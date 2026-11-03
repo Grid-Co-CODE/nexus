@@ -139,7 +139,9 @@ def test_o_setor_ve_so_as_telas_marcadas(app, setores, logado):
     assert _salvar(logado, 1, ["cos/mesa", "os/inicio"]).status_code == 303
     c = _como(app, ANA)
     html = c.get("/").get_data(as_text=True)
-    assert "Setor: <b>Performance</b>" in html                          # no topo, no lugar da cadeira
+    # no menu da conta (03/11/2026: só aparece ao clicar no nome), em cima do Tema; era no topo, no lugar da cadeira
+    assert '<p class="conta-setor">Setor: <b>Performance</b></p>' in html
+    assert html.index('class="conta-caixa"') < html.index("conta-setor") < html.index('class="troca-tema-form"')
     assert 'data-torre="cos"' in html and 'data-torre="os"' in html and 'data-torre="pcm"' not in html
     assert 'href="/t/cos/mesa"' in html and 'href="/t/cos/ocorrencias"' not in html
     assert "1 de 1 prontas" in html and "de 10 prontas" not in html     # o cartão da torre OS conta só as do setor

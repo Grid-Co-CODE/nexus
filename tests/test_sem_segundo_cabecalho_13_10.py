@@ -3,7 +3,7 @@ e suma esse 2° cabeçalho tanto de OS Creator Web quanto de plataforma de perfo
 dentro de uma tela!").
 
 - o topo do Nexus mostra quem entrou como o topo do OS Creator mostrava: o avatar com as iniciais, o nome e o perfil do
-  Fracttal, ao lado do Sair;
+  Fracttal; desde 03/11/2026 é o botão do menu da conta, com o Setor, o Tema e o Sair dentro;
 - o OS Creator logo abaixo do Nexus some com o topo dele (a ponte marca a tela antes de pintar); aberto sozinho, fica;
 - as telas da Plataforma de Performance perdem a faixa "<tela> · Plataforma de Performance": ela só nasce com controle
   (o seletor de usina do Diagnóstico), e o Modo TV do Painel NOC foi para o topo do Nexus.
@@ -35,9 +35,10 @@ def test_o_topo_mostra_quem_entrou_pelo_fracttal_ao_lado_do_sair(logado):
     topo = _topo(logado.get("/").get_data(as_text=True))
     assert '<span class="usuario-avatar" aria-hidden="true">PE</span>' in topo
     assert '<span class="usuario-nome">Pessoa Exemplo</span><span class="usuario-perfil">ADMINISTRATOR</span>' in topo
-    assert 'class="usuario-topo" title="pessoa@exemplo.test"' in topo
-    # entre o Tema e o Sair, como o bloco do OS Creator ficava ao lado do "sair" dele
-    assert topo.index('class="troca-tema-form"') < topo.index("usuario-topo") < topo.index('aria-label="Sair"')
+    assert '<summary class="usuario-topo" title="pessoa@exemplo.test"' in topo
+    # o nome abre o menu da conta, com o Tema e o Sair dentro (03/11/2026)
+    assert (topo.index("usuario-topo") < topo.index('class="conta-caixa"') < topo.index('class="troca-tema-form"')
+            < topo.index('aria-label="Sair"'))
     # sem perfil no Fracttal, só o nome (sem linha vazia)
     with logado.session_transaction() as s:
         s["usuario"] = {"email": "pessoa@exemplo.test", "nome": "Pessoa Exemplo", "perfil": ""}
@@ -46,14 +47,44 @@ def test_o_topo_mostra_quem_entrou_pelo_fracttal_ao_lado_do_sair(logado):
 
 
 def test_pela_senha_de_administrador_o_topo_nao_inventa_nome(logado):
-    assert "usuario-topo" not in _topo(logado.get("/").get_data(as_text=True))
+    topo = _topo(logado.get("/").get_data(as_text=True))
+    assert "usuario-topo" not in topo
+    # sem nome, o menu da conta abre pelo ícone: o Tema e o Sair continuam ao alcance
+    assert '<summary class="conta-sem-nome"' in topo and topo.index("conta-sem-nome") < topo.index('aria-label="Sair"')
 
 
-def test_no_celular_fica_so_o_avatar_entre_o_tema_e_o_sair():
-    celular = CSS.split("@media (max-width:820px)", 1)[1]
-    assert ".usuario-topo{grid-column:3;grid-row:2}" in celular
-    assert ".sair{grid-column:4;grid-row:2;justify-self:end}" in celular
-    assert "grid-template-columns:minmax(0,1fr) auto auto auto" in celular
+# ── o menu da conta (03/11/2026) ────────────────────────────────────────────────────────────────────────────────────
+def test_setor_tema_e_sair_so_no_menu_da_conta(logado):
+    """Levi, 03/11/2026: "quero que no nexus esse negócio de tema e setor fique oculto nessa barra inicial, que só
+    apareça quando clica no nome; aí vai ter: Setor, tema e sair"."""
+    with logado.session_transaction() as s:
+        s["usuario"] = {"email": "pessoa@exemplo.test", "nome": "Pessoa Exemplo", "perfil": ""}
+    topo = _topo(logado.get("/").get_data(as_text=True))
+    barra, menu = topo.split('<details class="conta-topo">', 1)
+    # na barra, nada de Setor, Tema nem Sair
+    assert "Setor:" not in barra and "troca-tema" not in barra and "/sair" not in barra
+    # dentro do menu da conta: o nome abre (summary), e a caixa traz o Tema e o Sair (o Setor, quando a pessoa tem um,
+    # vem em cima: tests/test_setor_telas.py)
+    caixa = menu.split('<div class="conta-caixa"', 1)[1]
+    assert menu.index("<summary") < menu.index('<div class="conta-caixa"')
+    assert caixa.index('class="troca-tema-form"') < caixa.index('aria-label="Sair"')
+    assert "Tema: Escuro" in caixa and 'href="/sair"' in caixa
+    # o JavaScript do tema segue achando o formulário, e o menu fecha ao clicar fora e no Esc
+    html = logado.get("/").get_data(as_text=True)
+    assert 'document.querySelector(".troca-tema-form")' in html
+    assert 'ev.key !== "Escape"' in html and '.closest(".conta-topo, .sino-topo")' in html
+
+
+def test_no_celular_fica_so_o_avatar_ao_lado_do_sino():
+    celular = CSS.split("@media (max-width:820px)", 1)[1].split("\n}\n", 1)[0]
+    # linha 1, a marca e o Menu; linha 2, o sino e o avatar (o Setor, o Tema e o Sair moram no menu da conta, 03/11/2026;
+    # numa linha só, a 375 px, o "Nexus" da marca entrava por baixo do Menu)
+    assert "grid-template-columns:minmax(0,1fr) auto auto;" in celular
+    assert ".sino-topo{grid-column:2;grid-row:2}" in celular and ".conta-topo{grid-column:3;grid-row:2}" in celular
+    assert ".botao-menu{display:inline-flex;grid-column:2 / 4;grid-row:1;justify-self:end}" in celular
+    assert "troca-tema" not in celular and ".sair{" not in celular
+    # e lá dentro o rótulo do Tema e o do Sair ficam sempre à vista (eram escondidos na barra estreita)
+    assert ".rotulo-tema{display:none}" not in CSS and ".rotulo-sair{display:none}" not in CSS
     # o esconder do nome vem DEPOIS do .usuario-txt{display:flex}: antes dele, perdia (o nome seguia à vista a 375 px)
     esconde = "@media (max-width:820px){.usuario-txt,.topo-tv{display:none}}"
     assert esconde in CSS and CSS.index(".usuario-txt{display:flex") < CSS.index(esconde)

@@ -33,12 +33,8 @@
     <img src="{{ url_for('static', filename='grid-h-branco.png') }}" alt="Grid Co.">
     <span class="marca-nexus">Nexus</span>
   </a>
-  {# O setor da pessoa (Base → Acessos → Pessoas e setores), no lugar da cadeira, que saiu em 12/10/2026: é o setor que diz o
-     que ela vê (Base → Acessos). O espaço fica mesmo sem setor: é ele que empurra o resto do topo para a direita. #}
-  <span class="setor-topo">{% if setor %}Setor: <b>{{ setor.nome }}</b>{% endif %}</span>
-  {# Tema escuro (padrão) ou claro (08/10/2026): o botão diz o de agora. Sem JavaScript, o formulário troca pelo servidor.
-     O ícone (meio círculo cheio) é desenhado no CSS, sem <svg> no topo: as telas com gráfico procuram o primeiro <svg> da
-     página (os testes do Mapa de risco quebraram com um ícone em SVG aqui) e sem depender da fonte de ícones da CDN. #}
+  {# o vão que empurra o resto do topo para a direita (era o "Setor:", que foi para o menu da conta em 03/11/2026) #}
+  <span class="topo-espaco"></span>
   {# a ação da tela no topo (13/10/2026, sem o 2º cabeçalho): hoje só o "Modo TV" do Painel NOC (performance/moldura.html) #}
   {% block topo_acoes %}{% endblock %}
   {# o sino (03/11/2026, os setores conversando): os insights críticos e de atenção sem dono das torres do setor da pessoa;
@@ -53,25 +49,41 @@
       <a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada">Abrir a Caixa de entrada</a>
     </div>
   </details>{% endif %}
-  {% set outro_tema = 'escuro' if tema == 'claro' else 'claro' %}
-  <form class="troca-tema-form" method="post" action="{{ raiz }}/tema">
-    <input type="hidden" name="tema" value="{{ outro_tema }}">
-    <input type="hidden" name="voltar" value="{{ caminho_completo }}">
-    <button type="submit" id="troca-tema" class="gc-btn gc-btn--ui gc-btn--fantasma troca-tema"
-            aria-label="Tema: {{ tema }}. Trocar para o tema {{ outro_tema }}" title="Trocar para o tema {{ outro_tema }}">
-      <span class="tema-icone" aria-hidden="true"></span>
-      <span class="rotulo-tema">Tema: {{ 'Claro' if tema == 'claro' else 'Escuro' }}</span>
-    </button>
-  </form>
   <label for="abre-menu" class="gc-btn gc-btn--ui gc-btn--contorno botao-menu"><i class="ph ph-list"></i> Menu</label>
-  {# Quem entrou, ao lado do Sair (13/10/2026, Levi: "Quero que essa visão de cabeçalho ao lado de sair vá para o
-     cabeçalho do Nexus e suma esse 2° cabeçalho"): o avatar, o nome e o perfil do Fracttal, como o topo do OS Creator,
-     que saiu de dentro do Nexus (ponte.py). O e-mail fica no title. Quem entrou pela senha de administrador não tem nome. #}
-  {% if session.usuario %}<span class="usuario-topo" title="{{ session.usuario.email }}">
-    <span class="usuario-avatar" aria-hidden="true">{{ session.usuario.nome|iniciais }}</span>
-    <span class="usuario-txt"><span class="usuario-nome">{{ session.usuario.nome }}</span>{% if session.usuario.perfil %}<span class="usuario-perfil">{{ session.usuario.perfil }}</span>{% endif %}</span>
-  </span>{% endif %}
-  <a class="gc-btn gc-btn--ui gc-btn--fantasma sair" href="{{ raiz }}/sair" aria-label="Sair"><i class="ph ph-sign-out"></i><span class="rotulo-sair">Sair</span></a>
+  {# O menu da conta (03/11/2026, Levi: "esse negócio de tema e setor fique oculto nessa barra inicial, que só apareça
+     quando clica no nome; aí vai ter: Setor, tema e sair"): no topo fica só quem entrou; o clique abre o Setor, o Tema e o
+     Sair. Quem entrou é o avatar, o nome e o perfil do Fracttal (13/10/2026: o topo do OS Creator, que saiu de dentro do
+     Nexus, ponte.py), com o e-mail no title. Quem entrou pela senha de administrador não tem nome: o botão é só o ícone. #}
+  {% set outro_tema = 'escuro' if tema == 'claro' else 'claro' %}
+  <details class="conta-topo">
+    {% if session.usuario %}<summary class="usuario-topo" title="{{ session.usuario.email }}" aria-label="{{ session.usuario.nome }}: abrir o menu da conta">
+      <span class="usuario-avatar" aria-hidden="true">{{ session.usuario.nome|iniciais }}</span>
+      <span class="usuario-txt"><span class="usuario-nome">{{ session.usuario.nome }}</span>{% if session.usuario.perfil %}<span class="usuario-perfil">{{ session.usuario.perfil }}</span>{% endif %}</span>
+      <i class="ph ph-caret-down conta-seta" aria-hidden="true"></i>
+    </summary>{% else %}<summary class="conta-sem-nome" title="Conta" aria-label="Abrir o menu da conta">
+      <span class="usuario-avatar" aria-hidden="true"><i class="ph ph-user"></i></span>
+      <i class="ph ph-caret-down conta-seta" aria-hidden="true"></i>
+    </summary>{% endif %}
+    <div class="conta-caixa" role="region" aria-label="Conta">
+      {# O setor da pessoa (Base → Acessos → Pessoas e setores), no lugar da cadeira, que saiu em 12/10/2026: é o setor
+         que diz o que ela vê. A senha de administrador não tem setor: a linha não aparece. #}
+      {% if setor %}<p class="conta-setor">Setor: <b>{{ setor.nome }}</b></p>{% endif %}
+      {# Tema escuro (padrão) ou claro (08/10/2026): o botão diz o de agora. Sem JavaScript, o formulário troca pelo
+         servidor. O ícone (meio círculo cheio) é desenhado no CSS, sem <svg> no topo: as telas com gráfico procuram o
+         primeiro <svg> da página (os testes do Mapa de risco quebraram com um ícone em SVG aqui) e sem depender da fonte
+         de ícones da CDN. #}
+      <form class="troca-tema-form" method="post" action="{{ raiz }}/tema">
+        <input type="hidden" name="tema" value="{{ outro_tema }}">
+        <input type="hidden" name="voltar" value="{{ caminho_completo }}">
+        <button type="submit" id="troca-tema" class="gc-btn gc-btn--ui gc-btn--fantasma troca-tema"
+                aria-label="Tema: {{ tema }}. Trocar para o tema {{ outro_tema }}" title="Trocar para o tema {{ outro_tema }}">
+          <span class="tema-icone" aria-hidden="true"></span>
+          <span class="rotulo-tema">Tema: {{ 'Claro' if tema == 'claro' else 'Escuro' }}</span>
+        </button>
+      </form>
+      <a class="gc-btn gc-btn--ui gc-btn--fantasma sair" href="{{ raiz }}/sair" aria-label="Sair"><i class="ph ph-sign-out"></i><span class="rotulo-sair">Sair</span></a>
+    </div>
+  </details>
 </header>
 
 <div class="corpo">
@@ -158,6 +170,23 @@
   });
   window.addEventListener("storage", function (ev) {
     if (ev.key === "nexus.tema" && (ev.newValue === "claro" || ev.newValue === "escuro")) mostrarTema(ev.newValue);
+  });
+  // O menu da conta e o sino são elementos details (sem JavaScript, abrem e fecham no clique): aqui só fecham ao clicar
+  // fora, no Esc, e um ao abrir o outro, que é o que se espera de um menu suspenso.
+  var suspensos = document.querySelectorAll(".topo .conta-topo, .topo .sino-topo");
+  function fecharSuspensos(menos) {
+    suspensos.forEach(function (d) { if (d !== menos) d.open = false; });
+  }
+  suspensos.forEach(function (d) {
+    d.addEventListener("toggle", function () { if (d.open) fecharSuspensos(d); });
+  });
+  document.addEventListener("click", function (ev) {
+    if (!ev.target.closest(".conta-topo, .sino-topo")) fecharSuspensos(null);
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Escape") return;
+    var aberto = document.querySelector(".topo details[open]:is(.conta-topo, .sino-topo)");
+    if (aberto) { aberto.open = false; aberto.querySelector("summary").focus(); }
   });
   {% if session.usuario %}
   {% include "_confere_sessao_js.html" %}
