@@ -415,6 +415,12 @@ def responsaveis():
     # para Onde Focar!"); o filtro continua, para olhar as usinas de quem ele estiver cobrindo
     logado = "" if leitura.erro else _responsavel_do_login(d)
     pedido = request.args.get("responsavel")
+    # o link do e-mail semanal da Segurança (03/11/2026, Levi: "O link do Nexus que vai para o e-mail tem que ser o nexus >
+    # campo app > painel (filtrado no responsável)"): o `r` é o número da pessoa no cadastro, porque o livro do e-mail fica
+    # na API compartilhada e não leva o nome
+    r = request.args.get("r", "").strip()
+    if pedido is None and r.isdigit():
+        pedido = (d.get("responsaveis_por_pessoa") or {}).get(int(r))
     if pedido is None:
         responsavel = logado
     else:

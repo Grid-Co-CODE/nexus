@@ -863,6 +863,10 @@ seja um tabelão. Então eu escolheria o responsável, vai ter o nome do respons
 da performance, chamados abertos, PTs pendentes, Ranking das equipes do maior para menor, acompanhamento de rondas! (...)
 uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **Painel** (`modo=painel`), a conta em
 `nexus/campo/painel_responsavel.py` (pura) e o bloco `{% if modo == 'painel' %}` do `responsaveis.html`.
+**O link do e-mail semanal da Segurança** abre aqui (03/11/2026, Levi: "tem que ser o nexus > campo app > painel (filtrado
+no responsável)"): `/t/campo/responsaveis?r=<número da pessoa>&modo=painel`. O `r` vira o responsável pelo
+`responsaveis_por_pessoa` da visão (o livro do e-mail fica na API compartilhada e não leva o nome); o número de quem não
+é responsável não filtra nada. Prova: `test_o_link_do_email_da_seguranca_abre_o_painel_pelo_numero_da_pessoa`.
 
 - **A tela inicial de um responsável:** é o padrão quando há um escolhido (pelo login do Fracttal, pelo cartão do
   responsável ou pelo filtro); sem escolha, quem não é responsável segue nos cartões e o responsável logado com "Todos"

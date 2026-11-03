@@ -73,11 +73,18 @@ linha por destinatário, uma vez por semana; o App lê, manda e diz o que mandou
 - **Quem recebe:** a TST (as pessoas do setor Segurança em Base → Acessos → Pessoas e setores, pelo código do e-mail) com todas
   as usinas, e cada Responsável UFV com pendência, só com as usinas dele, pelo código do usuário do Fracttal ligado a ele
   ou, sem ele, do e-mail da ficha (`destinatarios`). Sem código, não recebe: a prévia lista quem ficou de fora (medido
-  no banco real em 24/10: 1 da TST e 5 responsáveis recebem, 2 responsáveis sem código).
+  no banco real em 24/10: 1 da TST e 5 responsáveis recebem, 2 responsáveis sem código; em 03/11 eram os mesmos dois:
+  a ficha sem e-mail e, no Fracttal, outro sobrenome, que o critério do login não liga. O conserto é o e-mail na ficha).
 - **O que vai no livro** (a API é compartilhada, regra 8): o código (HMAC) e o número da pessoa, nunca nome nem e-mail.
   O assunto e o corpo (texto e HTML) levam os quatro de agora, os de atenção, as usinas com mais pendências (até 25) e
-  o link para a Mesa e a planilha filtradas pelo número da pessoa (`?r=`, que a Mesa traduz no Responsável UFV dela).
-  Cada linha assinada (HMAC, rótulo `nexus:hseq:email`).
+  dois botões, sempre pelo número da pessoa (`?r=`): o responsável abre o **Painel dele no Campo · App** (03/11/2026,
+  Levi: "tem que ser o nexus > campo app > painel (filtrado no responsável)"; o Campo traduz o `r`), a TST, a Mesa; e
+  a planilha da Mesa filtrada, com o selo XLSX. Cada linha assinada (HMAC, rótulo `nexus:hseq:email`).
+- **O visual** (03/11/2026, Levi: "Deixe a estrutura um pouco mais bonita e o link para o arquivo em excel deixe mais
+  bonito e formatado"): HTML de e-mail (tabelas e estilo na linha, coluna de até 600 px, botões em célula com fundo,
+  que o Outlook respeita), com o cabeçalho navy e a linha verde, os dois números da semana, as listas com o zero
+  apagado e a tabela por usina. As cores ficam em hex no `COR` do módulo, como as do PDF: o leitor de e-mail não lê as
+  variáveis do `nexus.css`. Conferido a 600 e a 375 px.
 - **O App** (contrato fechado com a sessão do App de Campo em 24/10/2026): acha o e-mail pelo código (o cadastro e as
   atribuições que ele conhece; a TST sem código casa no e-mail do aviso das luvas), manda pelo Microsoft Graph com fila
   e reenvio, saindo de naoresponda@ (a T.I. liberou o Graph em 29/10; até ali o tenant barrava com "AppOnly

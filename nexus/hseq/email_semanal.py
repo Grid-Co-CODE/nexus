@@ -41,6 +41,12 @@ CAB = ("semana", "gerado_em", "data_id", "papel", "pessoa_id", "destinatario_hma
 ROTULO_CHAVE = b"nexus:hseq:email"
 ENDERECO = "https://app.gridco.com.br"       # o Nexus no servidor (na raiz desde a fase 4): o link do e-mail
 HORA = 7                                     # segunda, 07:00 de Brasília
+# as cores do e-mail em hex, como as do PDF da Segurança (relatorio.py): o leitor de e-mail não lê as variáveis do
+# nexus.css, e o fundo é claro (o Outlook e o Gmail abrem em branco)
+COR = {"navy": "#090d18", "verde": "#a3d900", "tinta": "#111827", "mudo": "#5b6475", "linha": "#e3e7ee",
+       "fundo": "#f3f5f8", "branco": "#ffffff", "sub": "#c9cfdb", "critico": "#c8102e", "alerta": "#b26a00",
+       "planilha": "#1d6f42"}
+FONTE = "'Segoe UI',Roboto,Arial,sans-serif"
 POR_USINA_MAX = 25                           # as usinas no corpo; a planilha leva todas
 _BRT = timezone(timedelta(hours=-3))
 _LACO = {"thread": None, "parar": threading.Event(), "ultimo": None}
@@ -131,49 +137,142 @@ def _por_usina(L) -> list[dict]:
     return sorted(g.values(), key=lambda u: (-u["total"], u["usina"].lower()))
 
 
-def montar(L: dict, *, papel: str, hoje, link: str) -> dict:
-    """{assunto, corpo_texto, corpo_html} do e-mail de um destinatário (`L` = as listas da Mesa já filtradas)."""
-    from html import escape
+def montar(L: dict, *, papel: str, hoje, link: str, planilha: str) -> dict:
+    """{assunto, corpo_texto, corpo_html} do e-mail de um destinatário (`L` = as listas da Mesa já filtradas). O HTML é
+    de e-mail (03/11/2026, Levi: "Deixe a estrutura um pouco mais bonita e o link para o arquivo em excel deixe mais
+    bonito e formatado"): tabelas e estilo na linha, que é o que o Outlook respeita, numa coluna de até 600 px; os
+    botões são células com fundo (o `<a>` sozinho perde o fundo no Outlook)."""
     agir = {k: len(L[k]) for k in ROT_AGIR}
     atencao = {k: len(L[k]) for k in ROT_ATENCAO}
-    total = sum(agir.values())
+    total, total_at = sum(agir.values()), sum(atencao.values())
     quem = "nas suas usinas" if papel == "responsavel" else "de todas as usinas"
+    botao = "Abrir o meu Painel no Nexus" if papel == "responsavel" else "Abrir a Mesa da Segurança no Nexus"
     assunto = (f"Pendências da Segurança {quem} · semana de {hoje:%d/%m}: "
                + (_plural(total, "para agir", "para agir") if total else "nada para agir agora"))
     usinas = _por_usina(L)
+    linhas_u = [(u["usina"], u["cliente"], " · ".join(_plural(n, *ROT_AGIR[k]) for k, n in u["n"].items()), u["total"])
+                for u in usinas[:POR_USINA_MAX]]
+    mais = len(usinas) - POR_USINA_MAX
     t = [f"Pendências da Segurança {quem}, {hoje:%d/%m/%Y}.", "", "Para agir agora"]
     t += [f"- {_plural(agir[k], *ROT_AGIR[k])}" for k in ROT_AGIR]
     t += ["", "Atenção"] + [f"- {_plural(atencao[k], *ROT_ATENCAO[k])}" for k in ROT_ATENCAO]
-    linhas_u = []
-    for u in usinas[:POR_USINA_MAX]:
-        partes = " · ".join(_plural(n, *ROT_AGIR[k]) for k, n in u["n"].items())
-        linhas_u.append((f"{u['usina']} ({u['cliente']})", partes))
     if linhas_u:
-        t += ["", "Por usina"] + [f"- {a}: {b}" for a, b in linhas_u]
-        if len(usinas) > POR_USINA_MAX:
-            t.append(f"- e mais {len(usinas) - POR_USINA_MAX} usinas: veja no Nexus")
-    planilha = link.replace("/t/hseq/mesa", "/t/hseq/mesa/pendencias.xlsx", 1)
-    t += ["", f"Ver no Nexus: {link}", f"Planilha com caso a caso: {planilha}", "",
-          "E-mail automático do Nexus (Segurança · HSEQ), toda segunda de manhã."]
-    h = [f"<p><b>Pendências da Segurança {escape(quem)}</b>, {hoje:%d/%m/%Y}.</p>", "<p><b>Para agir agora</b></p><ul>"]
-    h += [f"<li>{escape(_plural(agir[k], *ROT_AGIR[k]))}</li>" for k in ROT_AGIR] + ["</ul><p><b>Atenção</b></p><ul>"]
-    h += [f"<li>{escape(_plural(atencao[k], *ROT_ATENCAO[k]))}</li>" for k in ROT_ATENCAO] + ["</ul>"]
-    if linhas_u:
-        h += ["<p><b>Por usina</b></p><ul>"] + [f"<li><b>{escape(a)}</b>: {escape(b)}</li>" for a, b in linhas_u]
-        if len(usinas) > POR_USINA_MAX:
-            h.append(f"<li>e mais {len(usinas) - POR_USINA_MAX} usinas: veja no Nexus</li>")
-        h.append("</ul>")
-    h += [f'<p><a href="{escape(link)}">Ver no Nexus</a> · <a href="{escape(planilha)}">Planilha com caso a caso</a></p>',
-          "<p><small>E-mail automático do Nexus (Segurança · HSEQ), toda segunda de manhã.</small></p>"]
-    return {"assunto": assunto, "corpo_texto": "\n".join(t), "corpo_html": "\n".join(h)}
+        t += ["", "Por usina"] + [f"- {u} ({c}): {o}" for u, c, o, _n in linhas_u]
+        if mais > 0:
+            t.append(f"- e mais {mais} usinas: veja no Nexus")
+    t += ["", f"{botao}: {link}", f"Planilha em Excel, caso a caso: {planilha}", "",
+          "E-mail automático do Nexus (Segurança · HSEQ), toda segunda de manhã. Não responda: este endereço não recebe "
+          "mensagens."]
+    return {"assunto": assunto, "corpo_texto": "\n".join(t),
+            "corpo_html": _html(quem, hoje, agir, atencao, total, total_at, linhas_u, mais, botao, link, planilha)}
 
 
-def _link(**args) -> str:
+def _maiuscula(x: str) -> str:
+    """Só a 1ª letra em maiúscula ("PT parada" segue com o PT; o `capitalize` faria "Pt parada")."""
+    return x[:1].upper() + x[1:]
+
+
+def _html(quem, hoje, agir, atencao, total, total_at, linhas_u, mais, botao, link, planilha) -> str:
+    from html import escape as e
+    c = COR
+
+    def caixa(n, rotulo, cor):
+        return (f'<td width="48%" style="padding:14px 16px;border:1px solid {c["linha"]};border-radius:10px;'
+                f'background:{c["branco"]}"><div style="font-size:30px;line-height:1;font-weight:700;color:{cor}">{n}</div>'
+                f'<div style="margin-top:6px;font-size:13px;color:{c["mudo"]}">{rotulo}</div></td>')
+
+    def lista(titulo, itens, rotulos, cor):
+        h = [f'<div style="margin:22px 0 6px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;'
+             f'color:{c["mudo"]}">{titulo}</div>',
+             '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">']
+        for k, n in itens.items():
+            um, varios = rotulos[k]
+            tom = cor if n else c["mudo"]
+            h.append(f'<tr><td style="padding:9px 0;border-bottom:1px solid {c["linha"]};font-size:14px;'
+                     f'color:{c["tinta"] if n else c["mudo"]}">{e(_maiuscula(um if n == 1 else varios))}</td>'
+                     f'<td align="right" style="padding:9px 0;border-bottom:1px solid {c["linha"]};font-size:15px;'
+                     f'font-weight:700;color:{tom}">{n}</td></tr>')
+        return h + ["</table>"]
+
+    def botao_html(href, texto, cheio, selo=""):
+        fundo = f'background:{c["verde"]};' if cheio else f'background:{c["branco"]};border:1px solid {c["navy"]};'
+        # o selo da planilha (XLSX no verde da planilha): diz antes do clique que é um arquivo para baixar
+        selo = (f'<span style="display:inline-block;margin-right:10px;padding:2px 6px;border-radius:4px;'
+                f'background:{c["planilha"]};color:{c["branco"]};font-size:11px;font-weight:700;letter-spacing:.04em;'
+                f'vertical-align:1px">{selo}</span>') if selo else ""
+        return (f'<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:10px"><tr>'
+                f'<td style="{fundo}border-radius:8px"><a href="{e(href)}" style="display:inline-block;padding:12px 22px;'
+                f'font-size:14px;font-weight:700;color:{c["navy"]};text-decoration:none">{selo}{texto}</a></td></tr></table>')
+
+    h = [f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{c["fundo"]};'
+         f'font-family:{FONTE}"><tr><td align="center" style="padding:24px 12px">',
+         f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;'
+         f'background:{c["branco"]};border:1px solid {c["linha"]};border-radius:12px;border-collapse:separate">',
+         # o cabeçalho: navy com a linha verde, como o topo do Nexus
+         f'<tr><td style="background:{c["navy"]};padding:20px 24px;border-bottom:3px solid {c["verde"]};'
+         f'border-radius:12px 12px 0 0"><div style="font-size:12px;font-weight:700;letter-spacing:.08em;'
+         f'text-transform:uppercase;color:{c["verde"]}">Nexus · Segurança · HSEQ</div>'
+         f'<div style="margin-top:6px;font-size:20px;font-weight:700;color:{c["branco"]}">Pendências da Segurança '
+         f'{e(quem)}</div><div style="margin-top:4px;font-size:13px;color:{c["sub"]}">Semana de {hoje:%d/%m/%Y}</div>'
+         f'</td></tr>',
+         f'<tr><td style="padding:20px 24px 4px">',
+         # os dois números da semana
+         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;'
+         'border-spacing:0"><tr>',
+         caixa(total, "para agir agora", c["critico"] if total else c["mudo"]), '<td width="4%"></td>',
+         caixa(total_at, "em atenção", c["alerta"] if total_at else c["mudo"]), "</tr></table>"]
+    h += lista("Para agir agora", agir, ROT_AGIR, c["critico"])
+    h += lista("Atenção", atencao, ROT_ATENCAO, c["alerta"])
+    if linhas_u:
+        h += [f'<div style="margin:22px 0 6px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;'
+              f'color:{c["mudo"]}">Por usina</div>',
+              '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">',
+              f'<tr><th align="left" style="padding:8px 8px 8px 0;border-bottom:2px solid {c["linha"]};font-size:12px;'
+              f'color:{c["mudo"]};font-weight:600">Usina</th><th align="left" style="padding:8px;border-bottom:2px solid '
+              f'{c["linha"]};font-size:12px;color:{c["mudo"]};font-weight:600">Para agir</th><th align="right" '
+              f'style="padding:8px 0;border-bottom:2px solid {c["linha"]};font-size:12px;color:{c["mudo"]};'
+              f'font-weight:600">Total</th></tr>']
+        for usina, cliente, o_que, n in linhas_u:
+            h.append(f'<tr><td valign="top" style="padding:9px 8px 9px 0;border-bottom:1px solid {c["linha"]}">'
+                     f'<div style="font-size:14px;font-weight:600;color:{c["tinta"]}">{e(usina)}</div>'
+                     f'<div style="font-size:12px;color:{c["mudo"]}">{e(cliente)}</div></td>'
+                     f'<td valign="top" style="padding:9px 8px;border-bottom:1px solid {c["linha"]};font-size:13px;'
+                     f'color:{c["tinta"]}">{e(o_que)}</td>'
+                     f'<td valign="top" align="right" style="padding:9px 0;border-bottom:1px solid {c["linha"]};'
+                     f'font-size:15px;font-weight:700;color:{c["critico"]}">{n}</td></tr>')
+        if mais > 0:
+            h.append(f'<tr><td colspan="3" style="padding:9px 0;font-size:13px;color:{c["mudo"]}">e mais {mais} usinas: '
+                     f'veja no Nexus</td></tr>')
+        h.append("</table>")
+    # os dois caminhos: o Nexus e a planilha em Excel
+    h += ['<div style="margin-top:24px"></div>', botao_html(link, botao, True), botao_html(planilha,
+          "Baixar a planilha em Excel", False, "XLSX"),
+          f'<div style="margin-top:8px;font-size:12px;color:{c["mudo"]}">A planilha traz caso a caso, uma aba por '
+          f'pendência, com os mesmos filtros.</div>',
+          "</td></tr>",
+          f'<tr><td style="padding:18px 24px 22px"><div style="border-top:1px solid {c["linha"]};padding-top:12px;'
+          f'font-size:12px;color:{c["mudo"]}">E-mail automático do Nexus (Segurança · HSEQ), toda segunda de manhã. Não '
+          f'responda: este endereço não recebe mensagens.</div></td></tr>',
+          "</table>", "</td></tr></table>"]
+    return "\n".join(h)
+
+
+def _no_nexus(caminho: str, **args) -> str:
     from urllib.parse import urlencode
 
     from ..prefixo import na_raiz
     q = urlencode({k: v for k, v in args.items() if v})
-    return ENDERECO + na_raiz("/t/hseq/mesa") + (f"?{q}" if q else "")
+    return ENDERECO + na_raiz(caminho) + (f"?{q}" if q else "")
+
+
+def _links(pessoa_id=None) -> dict:
+    """{link, planilha}. O responsável abre o Painel dele no Campo · App (03/11/2026, Levi: "O link do Nexus que vai
+    para o e-mail tem que ser o nexus > campo app > painel (filtrado no responsável)"); a TST, que não é responsável de
+    usina, a Mesa da Segurança. A planilha é a da Mesa, filtrada. Sempre pelo número da pessoa (`r`), nunca o nome."""
+    if pessoa_id:
+        return {"link": _no_nexus("/t/campo/responsaveis", r=pessoa_id, modo="painel"),
+                "planilha": _no_nexus("/t/hseq/mesa/pendencias.xlsx", r=pessoa_id)}
+    return {"link": _no_nexus("/t/hseq/mesa"), "planilha": _no_nexus("/t/hseq/mesa/pendencias.xlsx")}
 
 
 def da_semana(cfg, hoje=None) -> dict:
@@ -192,7 +291,7 @@ def da_semana(cfg, hoje=None) -> dict:
     geral = _pendencias({})
     erros = dict(geral["erros"], **({"cadastro": dest["falhou"]} if dest.get("falhou") else {}))
     if not erros:
-        corpo = montar(geral["listas"], papel="tst", hoje=hoje, link=_link())
+        corpo = montar(geral["listas"], papel="tst", hoje=hoje, **_links())
         for p in dest["tst"]:
             linhas.append(dict(base, papel="tst", pessoa_id=p["pessoa_id"] or "", destinatario_hmac=p["hmac"], **corpo))
         for nome, p in sorted(dest["responsaveis"].items()):
@@ -203,7 +302,7 @@ def da_semana(cfg, hoje=None) -> dict:
                 sem_codigo.append(nome)
                 continue
             linhas.append(dict(base, papel="responsavel", pessoa_id=p["pessoa_id"], destinatario_hmac=p["hmac"],
-                               **montar(L, papel="responsavel", hoje=hoje, link=_link(r=p["pessoa_id"]))))
+                               **montar(L, papel="responsavel", hoje=hoje, **_links(p["pessoa_id"]))))
     chave = cfg.get("NEXUS_PESSOA_HMAC")
     for x in linhas:
         x["assinatura"] = assinatura(x, chave)

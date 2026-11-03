@@ -213,6 +213,15 @@ def test_a_tela_do_painel_do_responsavel(tela, logado):
     assert html.count('class="pn-lista') == 6 and 'class="pn-lista pn-lista--jan"' in html
 
 
+def test_o_link_do_email_da_seguranca_abre_o_painel_pelo_numero_da_pessoa(tela, logado):
+    """O e-mail semanal da Segurança leva o número da pessoa (`r`), nunca o nome (03/11/2026, Levi: "O link do Nexus que
+    vai para o e-mail tem que ser o nexus > campo app > painel (filtrado no responsável)")."""
+    html = logado.get("/t/campo/responsaveis?r=91&modo=painel").get_data(as_text=True)
+    assert 'aria-current="page">Painel' in html and '<h1 class="cn-titulo">Ciclano Chefe</h1>' in html
+    # o número de quem não é responsável não filtra nada: os cartões de todos
+    assert 'class="cn-equipes"' in logado.get("/t/campo/responsaveis?r=999").get_data(as_text=True)
+
+
 def test_todos_sem_responsavel_segue_nos_cartoes_e_o_painel_de_todos_abre(tela, logado):
     html = logado.get("/t/campo/responsaveis").get_data(as_text=True)
     assert 'class="cn-equipes"' in html and 'class="pn"' not in html             # quem não é responsável: os cartões

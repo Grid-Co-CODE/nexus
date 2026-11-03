@@ -51,8 +51,13 @@ def test_o_email_da_semana_sem_nome_de_pessoa_e_assinado(com_tst, app):
     t = sup["corpo_texto"]
     assert "- 1 PT parada" in t and "- 1 extintor vencido" in t and "- 1 extintor não reconhecido" in t
     assert "- Altair (Thopen): 1 PT parada · 1 extintor vencido · 1 extintor não reconhecido" in t
-    assert "Ver no Nexus: https://app.gridco.com.br/t/hseq/mesa?r=92" in t
-    assert "https://app.gridco.com.br/t/hseq/mesa/pendencias.xlsx?r=92" in t
+    # o responsável abre o Painel dele no Campo · App (03/11/2026); a planilha é a da Mesa, filtrada pelo número
+    assert "Abrir o meu Painel no Nexus: https://app.gridco.com.br/t/campo/responsaveis?r=92&modo=painel" in t
+    assert "Planilha em Excel, caso a caso: https://app.gridco.com.br/t/hseq/mesa/pendencias.xlsx?r=92" in t
+    h = sup["corpo_html"]
+    assert 'href="https://app.gridco.com.br/t/campo/responsaveis?r=92&amp;modo=painel"' in h
+    assert "XLSX</span>Baixar a planilha em Excel</a>" in h and ">PT parada</td>" in h and ">Altair</div>" in h
+    assert "var(--" not in h                       # o leitor de e-mail não lê as variáveis do nexus.css
     # nada de nome nem e-mail de pessoa no que vai para a API compartilhada
     tudo = " ".join(str(v) for x in d["linhas"] for v in x.values())
     for nome in ("Supervisora", "Coordenador", "Técnico", "Eletricista", "@exemplo"):
@@ -61,6 +66,7 @@ def test_o_email_da_semana_sem_nome_de_pessoa_e_assinado(com_tst, app):
     assert sup["assinatura"] == ES.assinatura(sup, CHAVE) != ES.assinatura(dict(sup, assunto="outro"), CHAVE)
     tst = d["linhas"][0]
     assert tst["destinatario_hmac"] == TST and "de todas as usinas" in tst["assunto"] and "?r=" not in tst["corpo_texto"]
+    assert "Abrir a Mesa da Segurança no Nexus: https://app.gridco.com.br/t/hseq/mesa\n" in tst["corpo_texto"]
 
 
 def test_o_link_do_email_abre_a_mesa_filtrada_pelo_numero_da_pessoa(com_tst, logado):
@@ -80,7 +86,7 @@ def test_a_previa_mostra_quem_recebe_e_o_email(com_tst, app, cliente):
     app.config["NEXUS_CAMPO_AQUECER"] = "0"                         # o PC: a prévia diz que quem publica é o servidor
     assert "publicação desligada nesta máquina" in cliente.get("/t/hseq/mesa/email").get_data(as_text=True)
     sup = cliente.get("/t/hseq/mesa/email?ver=92").get_data(as_text=True)
-    assert "nas suas usinas" in sup and "Altair (Thopen)" in sup
+    assert "nas suas usinas" in sup and ">Altair</div>" in sup and ">Thopen</div>" in sup
 
 
 def test_a_previa_e_so_de_quem_decide(com_tst, cliente):
