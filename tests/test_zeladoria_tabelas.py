@@ -96,7 +96,7 @@ def test_coluna_de_negocio_fica_em_claro(aba, coluna, tipo):
 def test_livros_no_catalogo():
     for nome in (T.LIVRO_APP, T.LIVRO_FRACTTAL, T.LIVRO_HISTORICO):
         l = catalogo.LIVRO_POR_NOME[nome]
-        assert l.no_banco is False                       # regra 10: registrado antes da 1ª gravação
+        assert l.no_banco is True                        # gravados e conferidos em 03/11/2026 (cópia de 17:07 UTC)
         assert "atualizacao" in l.abas
         assert set(l.abas) - {"atualizacao"} == {a for a, lv in T.TABELAS.items() if lv == nome}
     assert set(catalogo.LIVRO_POR_NOME[T.LIVRO_HISTORICO].so_cresce) == {

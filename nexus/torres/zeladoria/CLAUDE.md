@@ -53,6 +53,11 @@ cliente, lugar). Por quê: a API do banco tem leitura aberta, e fornecedor MEI t
 - A tela na cópia de prova (`ferramentas/subir_copia_de_prova.py`), em desktop e em 375 px.
 - Os totais da Visão Geral, do Financeiro e do Farol Contratual iguais aos do Radar no ar, com a mesma exportação.
 
+## A 1ª medida (03/11/2026)
+
+- **Cópia:** a exportação das 17:07 UTC, 4.756 linhas nas 39 tabelas mais 117 últimas rondas, gravada em 13,8 s; as 40 abas têm no Nexus as mesmas linhas da origem. A maior célula é a do retrato do cronograma (86 mil caracteres), que vai partida em 3. 86 valores com nome foram renomeados (config 2, log 7, origem dos serviços 77).
+- **Tela:** na cópia de prova (porta 5172), a Visão Geral, o Financeiro e a Criticidade abriram com o dado real, sem erro no console. Em 375 px, o menu do Nexus vira o botão Menu, e o clone se ajusta.
+
 ## O que falta (etapas do desenho)
 
 - **3:** o visual da torre (preto `#030407`, azul `#1558c9` e lima `#d4ff24`, só aqui), sem emoji.

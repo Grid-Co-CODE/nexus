@@ -1543,14 +1543,14 @@ LIVROS = (
     # comando até a troca; depois, a torre Zeladoria grava. Desenho: docs/superpowers/specs/2026-11-03-zeladoria-no-nexus-design.md
     *(Livro(nome, tuple(a for a, lv in zeladoria_tabelas.TABELAS.items() if lv == nome) + ("atualizacao",),
             "sob comando (ferramentas/copiar_zeladoria.py) até a troca; depois, a cada salvamento da torre Zeladoria",
-            "nexus/zeladoria/copia.py (a cópia do Supabase do Radar); a torre Zeladoria depois da troca", False,
+            "nexus/zeladoria/copia.py (a cópia do Supabase do Radar); a torre Zeladoria depois da troca", True,
             obs, so_cresce=so)
       for nome, obs, so in (
-          (zeladoria_tabelas.LIVRO_APP, "registrado em 03/11/2026 antes de existir: o estado do app da zeladoria, uma "
+          (zeladoria_tabelas.LIVRO_APP, "registrado em 03/11/2026 e gravado no mesmo dia (cópia da exportação das 17:07 UTC, 4.756 linhas nas 39 tabelas, conferidas uma a uma): o estado do app da zeladoria, uma "
            "aba por tabela do Radar, com o dado pessoal, o texto livre e o nome do fornecedor cifrados", ()),
-          (zeladoria_tabelas.LIVRO_FRACTTAL, "registrado em 03/11/2026 antes de existir: as rondas do Fracttal que o "
+          (zeladoria_tabelas.LIVRO_FRACTTAL, "registrado e gravado em 03/11/2026: as rondas do Fracttal que o "
            "Radar lia (fracttal_rondas), o índice das fotos, o cursor da leitura e a última ronda de cada usina", ()),
-          (zeladoria_tabelas.LIVRO_HISTORICO, "registrado em 03/11/2026 antes de existir: o registro de ações e as "
+          (zeladoria_tabelas.LIVRO_HISTORICO, "registrado e gravado em 03/11/2026: o registro de ações e as "
            "alterações das parcelas, das provisões e do cronograma, que só crescem", zeladoria_tabelas.HISTORICO))),
     Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na aba Pessoas e setores de Base → Acessos",
           "nexus/cadastro/setores.py, pela tela Base > Acessos > Pessoas e setores", False,
