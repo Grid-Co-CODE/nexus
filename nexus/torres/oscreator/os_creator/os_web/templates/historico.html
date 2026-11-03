@@ -1,76 +1,147 @@
 {% extends "base.html" %}
 {% block titulo %}{{ {'atribuidas': 'Atribuídas a mim', 'cos': 'Visão COS'}.get(modo, 'Histórico de OS') }}{% endblock %}
 {% block body_class %}os-form{% endblock %}
-{# HistoricoOS (steps/historico.py) na web, com os mesmos filtros e a mesma divisão de trabalho: Visão, Criado por, Etiqueta,
-   Status e Período re-buscam no servidor (o formulário); Cliente, Usina, Tipo de ativo, Tipo de tarefa e a busca são locais
-   (JS sobre a lista carregada, como o `_aplica` do app). O nº abre o card do detalhe; "Buscar OS pelo nº" abre direto,
-   ignorando filtros e período. O tipo de tarefa já vem na lista (27/09: antes a tela buscava de novo, em lotes de 60,
-   o que o servidor já tinha). Os rótulos ficam FORA dos cards, numa grade de 4 colunas, e a busca por texto fica colada
-   na tabela (Levi, 27/09). #}
-{# Toda lista de marcar com 6 opções ou mais (a de Usina sempre) ganha, do os_busca.js, uma caixa de busca no topo, sem
-   acento e sem caixa (Levi, 08/10/2026: "conseguir digitar o nome da usina no filtro do histórico"). A busca só esconde
-   linhas; o filtro continua sendo o das caixas marcadas, com o mesmo valor de antes. Lista curta fica sem a caixa.
-   A de Usina leva data-busca="1" para ter a caixa mesmo com menos de 6 (catálogo fora do ar e período curto). #}
+{# HistoricoOS (steps/historico.py) na web, com os mesmos filtros e a mesma divisão de trabalho: a Visão, Criado por, Etiqueta e
+   Período re-buscam no servidor (o formulário); Status, Cliente, Usina, Tipo de ativo, Tipo de tarefa e a busca por texto filtram
+   a lista já carregada (JS sobre ela, como o `_aplica` do app). O nº abre o card do detalhe; "Buscar OS pelo nº" abre direto,
+   ignorando filtros e período. O tipo de tarefa já vem na lista (27/09: antes a tela buscava de novo, em lotes de 60, o que o
+   servidor já tinha).
+
+   OS FILTROS NO MODELO A (Levi, 03/11/2026: "refaz esse modelo de filtros [...] algo minimalista e moderno ao mesmo tempo"; "opção
+   A, suspenso com um botão de aplicar no final"; "todas as opções do filtro digitáveis"): a barra de uma linha (visões, busca,
+   Buscar OS, período, Filtros, e os ícones de exportar e atualizar), as etiquetas dos filtros aplicados logo abaixo e, num painel
+   suspenso preso aos botões do período e do Filtros, o período com atalhos e os sete campos, com o Aplicar no rodapé. O estilo
+   está no os.css, na seção "os filtros no modelo A"; a regra do Aplicar, no script daqui.
+   Criado por e Etiqueta são <select> de verdade, escondidos no formulário (é o que o servidor e os testes leem); o que a pessoa
+   vê é a lista com caixa de busca que o os_busca.js monta por cima (um valor só: escolher fecha). #}
+{# Toda lista de marcar do painel leva a caixa de busca no topo do os_busca.js, sem acento e sem caixa (Levi, 08/10/2026:
+   "conseguir digitar o nome da usina no filtro do histórico"; 03/11/2026: "todas as opções do filtro digitáveis", mesmo as de
+   duas ou três opções, como o Status). A busca só esconde linhas; o filtro continua sendo o das caixas marcadas. #}
 {% macro multi(nome, rotulo, todos, opcoes, marcados, local, extra) -%}
-<span class="hf-lbl">{{ rotulo }}</span>
-<details class="os-multi hf-multi" data-nome="{{ nome }}"{% if local %} data-local="1"{% endif %}{% if nome == 'usina' %} data-busca="1"{% endif %}>
-  <summary><span class="os-multi-txt" data-todos="{{ todos }}">{{ todos }}</span></summary>
-  <div class="os-multi-lista">
-    {% for o in opcoes %}<label{% if extra and extra.get(o) is not none %} data-cliente="{{ extra.get(o) }}"{% endif %}><input type="checkbox"{% if not local %} name="{{ nome }}"{% endif %} value="{{ o }}"{% if o in marcados %} checked{% endif %}> {{ o }}</label>{% endfor %}
-  </div>
-</details>
+<div class="fl-cel" data-filtro="{{ nome }}">
+  <span class="fl-rot" id="fl_rot_{{ nome }}">{{ rotulo }}</span>
+  <details class="os-multi hf-multi" data-nome="{{ nome }}"{% if local %} data-local="1"{% endif %} data-busca="1">
+    <summary aria-labelledby="fl_rot_{{ nome }} fl_val_{{ nome }}"><span class="os-multi-txt" id="fl_val_{{ nome }}" data-todos="{{ todos }}">{{ todos }}</span><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-seta"/></svg></summary>
+    <div class="os-multi-lista">
+      {% for o in opcoes %}<label{% if extra and extra.get(o) is not none %} data-cliente="{{ extra.get(o) }}"{% endif %}><input type="checkbox"{% if not local %} name="{{ nome }}"{% endif %} value="{{ o }}"{% if o in marcados %} checked{% endif %}> {{ o }}</label>{% endfor %}
+    </div>
+  </details>
+</div>
 {%- endmacro %}
 {% block conteudo %}
-<section class="os-pagina">
+<section class="os-pagina fl-pagina">
+  {# os ícones da barra, do painel e das etiquetas: um só conjunto, no traço da cor do texto (currentColor, nos dois temas) #}
+  <svg class="fl-defs" aria-hidden="true" focusable="false">
+    <symbol id="fl-i-busca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="fl-i-hash" viewBox="0 0 24 24"><path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/></symbol>
+    <symbol id="fl-i-filtro" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+    <symbol id="fl-i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+    <symbol id="fl-i-seta" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="fl-i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="fl-i-atual" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></symbol>
+    <symbol id="fl-i-baixar" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></symbol>
+  </svg>
   <form id="f_hist" method="get" action="/os/historico" autocomplete="off">
     <input type="hidden" name="modo" value="{{ modo }}">
     {# o ↻, o F5 e a atualização de 10 em 10 min passam por cima da memória da visão (rotas._memo) #}
     <input type="hidden" name="atualizar" id="atualizar" value="">
-    <div class="os-hist-topo">
-      <div class="os-seg" role="group" aria-label="Visão">
-        <button type="button" data-modo="criadas" class="{% if modo == 'criadas' %}on{% endif %}">Histórico Geral</button>
-        <button type="button" data-modo="atribuidas" class="{% if modo == 'atribuidas' %}on{% endif %}">Atribuídas a mim</button>
-        <button type="button" data-modo="cos" class="{% if modo == 'cos' %}on{% endif %}" title="Corretivas, emergenciais e religamentos — com programação, equipe e gatilho, como no Power BI">Visão COS</button>
+    {# a barra, uma linha só (quebra no celular): a busca por texto filtra enquanto se digita, sem Aplicar; o nº abre a OS direto;
+       o período e o Filtros abrem o MESMO painel; exportar e atualizar são só ícone, com os atalhos de sempre #}
+    <div class="fl-barra" id="fl_barra">
+      <div class="fl-seg" role="group" aria-label="Visão">
+        <button type="button" data-modo="criadas" class="{% if modo == 'criadas' %}on{% endif %}" aria-pressed="{{ 'true' if modo == 'criadas' else 'false' }}">Histórico Geral</button>
+        <button type="button" data-modo="atribuidas" class="{% if modo == 'atribuidas' %}on{% endif %}" aria-pressed="{{ 'true' if modo == 'atribuidas' else 'false' }}">Atribuídas a mim</button>
+        <button type="button" data-modo="cos" class="{% if modo == 'cos' %}on{% endif %}" aria-pressed="{{ 'true' if modo == 'cos' else 'false' }}" title="Corretivas, emergenciais e religamentos — com programação, equipe e gatilho, como no Power BI">Visão COS</button>
       </div>
-      <label class="os-busca-os hf-busca-os" title="Buscar OS pelo nº: digite o número e tecle Enter — abre a OS direto, mesmo fora do período e dos filtros">{{ icone('search', '#A6E22E', 15) }}<input type="text" id="busca_os" placeholder="Buscar OS" inputmode="numeric" aria-label="Buscar OS pelo número"></label>
-      {# a partir daqui tudo vai para a DIREITA: é o `row.addStretch(1)` do app, que separa o que
-         BUSCA (esquerda) do que age sobre o que já está na tela (direita). Sem ele os oito
-         controles ficavam encostados num canto só. #}
-      <div class="os-hist-dir">
-        <span class="os-hist-auto" id="lbl_auto" title="Com a aba aberta, o histórico se atualiza sozinho a cada 10 minutos.">&#8635; Atualiza a cada 10 min</span>
-        <button type="button" class="os-btn secondary" id="b_export" title="Exporta as OS exibidas p/ CSV (abre no Excel).  [Ctrl+E]">Exportar</button>
-        <button type="button" class="os-btn secondary" id="b_limpar" title="Limpa Cliente/Usina/Status/Tipos, a busca e a Etiqueta">Limpar filtros</button>
-        <button type="submit" class="os-btn secondary os-btn-ico" id="b_atualizar" title="{% if da_lista_central %}Atualizar  [F5] — confere de novo com o Fracttal e mostra a lista central de OS (o servidor a lê de poucos em poucos minutos){% else %}Atualizar  [F5] — busca de novo no Fracttal{% endif %}">&#8635;</button>
+      <label class="fl-campo fl-busca" title="Filtra as OS carregadas por nº, cliente, usina, ativo, descrição, status, tipo de tarefa e etiqueta  [Ctrl+F]"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-busca"/></svg><input type="search" name="busca" id="busca_no" value="{{ busca }}" placeholder="Filtrar por nº, cliente, usina, ativo, descrição…" aria-label="Filtrar as OS carregadas"></label>
+      <label class="fl-campo fl-busca-os" title="Buscar OS pelo nº: digite o número e tecle Enter — abre a OS direto, mesmo fora do período e dos filtros"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-hash"/></svg><input type="text" id="busca_os" placeholder="Nº da OS" inputmode="numeric" aria-label="Buscar OS pelo número"></label>
+      <button type="button" class="fl-btn fl-periodo" id="b_periodo" aria-haspopup="dialog" aria-expanded="false" aria-controls="fl_painel" title="Período das OS: abre os filtros"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-cal"/></svg><span id="fl_periodo_txt">{{ de[8:10] }}/{{ de[5:7] }} – {{ ate[8:10] }}/{{ ate[5:7] }}</span><svg class="fl-ico fl-seta" aria-hidden="true"><use href="#fl-i-seta"/></svg></button>
+      <button type="button" class="fl-btn" id="b_filtros" aria-haspopup="dialog" aria-expanded="false" aria-controls="fl_painel" title="Abre os filtros: Criado por, Etiqueta, Status, Cliente, Usina e os Tipos"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-filtro"/></svg>Filtros <span class="fl-badge" id="fl_n" hidden>0</span></button>
+      <div class="fl-dir">
+        <button type="button" class="fl-btn fl-so-icone" id="b_export" title="Exporta as OS exibidas p/ CSV (abre no Excel).  [Ctrl+E]" aria-label="Exportar"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-baixar"/></svg></button>
+        <button type="submit" class="fl-btn fl-so-icone" id="b_atualizar" title="{% if da_lista_central %}Atualizar  [F5] — confere de novo com o Fracttal e mostra a lista central de OS (o servidor a lê de poucos em poucos minutos){% else %}Atualizar  [F5] — busca de novo no Fracttal{% endif %}" aria-label="Atualizar"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-atual"/></svg></button>
+      </div>
+      {# o painel: o período vem primeiro (atalhos e as duas datas), depois os sete campos em duas colunas (uma no celular). Tudo o
+         que se escolhe aqui só vale no Aplicar; fechar sem aplicar descarta. No celular ele vira uma folha de baixo para cima, com
+         o rodapé fixo e o véu atrás (os.css). #}
+      <div class="fl-veu" id="fl_veu" hidden></div>
+      <div class="fl-painel" id="fl_painel" role="dialog" aria-label="Filtros" tabindex="-1" data-esc-fecha hidden>
+        <div class="fl-painel-topo">
+          <h4>Filtros</h4>
+          <button type="button" class="fl-fechar" id="fl_fechar" aria-label="Fechar os filtros sem aplicar" title="Fechar sem aplicar"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-x"/></svg></button>
+        </div>
+        <div class="fl-painel-corpo">
+          <div class="fl-grade">
+            <div class="fl-cel fl-periodo-cel" data-filtro="periodo">
+              <span class="fl-rot" id="fl_rot_periodo">Período</span>
+              <div class="fl-atalhos" role="group" aria-labelledby="fl_rot_periodo">
+                <button type="button" class="fl-atalho" data-atalho="7">7 dias</button>
+                <button type="button" class="fl-atalho" data-atalho="30">30 dias</button>
+                <button type="button" class="fl-atalho" data-atalho="mes">Este mês</button>
+              </div>
+              <div class="fl-datas">
+                <label class="fl-campo fl-data" data-ponto="de"><span class="fl-pre">De</span><input type="date" name="de" value="{{ de }}" aria-label="De"></label>
+                <label class="fl-campo fl-data" data-ponto="ate"><span class="fl-pre">Até</span><input type="date" name="ate" value="{{ ate }}" aria-label="Até"></label>
+              </div>
+              <p class="fl-aviso" id="fl_aviso" role="alert" hidden></p>
+            </div>
+            {# Criado por: em "Atribuídas a mim" não se aplica — fica no lugar, apagado, para a grade não abrir um buraco #}
+            {% if modo != 'atribuidas' %}
+            <div class="fl-cel" data-filtro="pessoa" data-campo-proprio="1">
+              <span class="fl-rot" id="fl_rot_pessoa">Criado por</span>
+              <select name="pessoa"><option value="TODOS" {% if pessoa_sel == 'TODOS' %}selected{% endif %}>Todos os usuários</option>
+                {% for p in pessoas %}<option value="{{ p.id_account }}" {% if pessoa_sel == p.id_account|string %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}</select>
+              <details class="os-multi hf-multi fl-uni" data-nome="pessoa" data-select="pessoa" data-busca="1">
+                <summary aria-labelledby="fl_rot_pessoa fl_val_pessoa"><span class="os-multi-txt" id="fl_val_pessoa" data-todos="Todos os usuários">Todos os usuários</span><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-seta"/></svg></summary>
+                <div class="os-multi-lista">
+                  <label><input type="radio" value="TODOS"> Todos os usuários</label>
+                  {% for p in pessoas %}<label><input type="radio" value="{{ p.id_account }}"> {{ p.nome }}</label>{% endfor %}
+                </div>
+              </details>
+            </div>
+            {% else %}
+            <div class="fl-cel" data-filtro="pessoa">
+              <span class="fl-rot">Criado por</span>
+              <div class="fl-campo-fixo">Não se aplica nesta visão</div>
+            </div>
+            {% endif %}
+            <div class="fl-cel" data-filtro="etiqueta" data-campo-proprio="1">
+              <span class="fl-rot" id="fl_rot_etiqueta">Etiqueta</span>
+              <select name="etiqueta"><option value="">Todas as etiquetas</option>
+                {% for l in labels %}<option value="{{ l.id }}" {% if etiqueta_sel == l.id|string %}selected{% endif %}>{{ l.description }}</option>{% endfor %}</select>
+              <details class="os-multi hf-multi fl-uni" data-nome="etiqueta" data-select="etiqueta" data-busca="1">
+                <summary aria-labelledby="fl_rot_etiqueta fl_val_etiqueta"><span class="os-multi-txt" id="fl_val_etiqueta" data-todos="Todas as etiquetas">Todas as etiquetas</span><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-seta"/></svg></summary>
+                <div class="os-multi-lista">
+                  <label><input type="radio" value=""> Todas as etiquetas</label>
+                  {% for l in labels %}<label><input type="radio" value="{{ l.id }}"> {{ l.description }}</label>{% endfor %}
+                </div>
+              </details>
+            </div>
+            {{ multi('status', 'Status', 'Todos os status', status_opts, status_sel, False, None) }}
+            {{ multi('cliente', 'Cliente', 'Todos os clientes', clientes, [], True, None) }}
+            {{ multi('usina', 'Usina', 'Todas as usinas', usinas, [], True, usina_cli) }}
+            {{ multi('tipo', 'Tipo de ativo', 'Todos os tipos', tipos_ativo, [], True, None) }}
+            {{ multi('tarefa', 'Tipo de tarefa', 'Todos os tipos de tarefa', tipos_tarefa, tarefa_sel, True, None) }}
+          </div>
+        </div>
+        <div class="fl-rodape">
+          <button type="button" class="fl-btn fl-fantasma" id="b_painel_limpar">Limpar</button>
+          <div class="fl-dir"><span id="fl_nalt" aria-live="polite">Sem alterações</span><button type="button" class="fl-btn fl-lima" id="b_aplicar" disabled>Aplicar</button></div>
+        </div>
       </div>
     </div>
-    {# 4 colunas iguais × 2 linhas, rótulo FORA de todos os controles e a mesma altura em todos (Levi, 27/09). Em
-       "Atribuídas a mim" o Criado por não se aplica — fica no lugar, apagado, para a grade não abrir um buraco. #}
-    <div class="hf-grade">
-      {% if modo != 'atribuidas' %}
-      <label class="hf-cel"><span class="hf-lbl">Criado por</span>
-        <select name="pessoa"><option value="TODOS" {% if pessoa_sel == 'TODOS' %}selected{% endif %}>Todos os usuários</option>
-          {% for p in pessoas %}<option value="{{ p.id_account }}" {% if pessoa_sel == p.id_account|string %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}</select></label>
-      {% else %}
-      <label class="hf-cel"><span class="hf-lbl">Criado por</span><select disabled><option>Não se aplica nesta visão</option></select></label>
-      {% endif %}
-      <label class="hf-cel"><span class="hf-lbl">Etiqueta</span>
-        <select name="etiqueta"><option value="">Todas as etiquetas</option>
-          {% for l in labels %}<option value="{{ l.id }}" {% if etiqueta_sel == l.id|string %}selected{% endif %}>{{ l.description }}</option>{% endfor %}</select></label>
-      <div class="hf-cel">{{ multi('status', 'Status', 'Todos os status', status_opts, status_sel, False, None) }}</div>
-      <div class="hf-cel"><span class="hf-lbl">Período</span>
-        <div class="hf-periodo"><input type="date" name="de" value="{{ de }}" aria-label="De"><span>até</span><input type="date" name="ate" value="{{ ate }}" aria-label="Até"></div></div>
-      <div class="hf-cel">{{ multi('cliente', 'Cliente', 'Todos os clientes', clientes, [], True, None) }}</div>
-      <div class="hf-cel">{{ multi('usina', 'Usina', 'Todas as usinas', usinas, [], True, usina_cli) }}</div>
-      <div class="hf-cel">{{ multi('tipo', 'Tipo de ativo', 'Todos os tipos', tipos_ativo, [], True, None) }}</div>
-      <div class="hf-cel">{{ multi('tarefa', 'Tipo de tarefa', 'Todos os tipos de tarefa', tipos_tarefa, tarefa_sel, True, None) }}</div>
+    {# as etiquetas: uma por filtro APLICADO (o script as monta); o × tira aquele filtro e aplica na hora; sem filtro, a linha não aparece #}
+    <div class="fl-etiquetas" id="fl_etiquetas" role="group" aria-label="Filtros aplicados" hidden>
+      <button type="button" class="fl-link" id="b_limpar" hidden>Limpar tudo</button>
     </div>
   </form>
-  {% if erro %}<p class="os-erro">⚠ {{ erro }}</p>{% endif %}
+  {% if erro %}<p class="os-erro">{{ erro }}</p>{% endif %}
   {% if cortadas %}<p class="hf-teto">O período tem {{ total_srv }} OS e a tela carrega até {{ teto }}: as {{ cortadas }} mais antigas ficaram de fora. Diminua o período para ver todas.</p>{% endif %}
   <div class="hf-tabela">
-    <div class="hf-barra">
-      <label class="hf-filtro">{{ icone('search', '#8A93A8', 15) }}<input type="search" name="busca" form="f_hist" id="busca_no" value="{{ busca }}" placeholder="Filtrar por nº, cliente, usina, ativo, descrição, status…" title="Filtra as OS carregadas por nº, cliente, usina, ativo, descrição, status, tipo de tarefa e etiqueta  [Ctrl+F]"></label>
-      <span class="hf-hint" id="hint">{{ linhas|length }} OS no período {{ fmt(de + 'T03:00:00', False) }} a {{ fmt(ate + 'T03:00:00', False) }}.</span>{% if lista_de %}<span class="hf-hint" title="{% if da_lista_central %}A lista central de OS do Nexus: o servidor a lê do Fracttal de poucos em poucos minutos (as novas a cada 3 min no horário de trabalho, os últimos 7 dias a cada 10 min, as antigas de madrugada), e o que o OS Creator muda entra na hora. O ↻ confere de novo que você vê o mesmo no Fracttal.{% else %}A lista se renova sozinha a cada poucos minutos; o ↻ busca no Fracttal na hora{% endif %}"> Lista das {{ lista_de }}.</span>{% endif %}
+    {# o resumo da tabela: quantas OS, e (apagado) de quando é a lista e que ela se atualiza sozinha #}
+    <div class="fl-resumo">
+      <span id="hint">{{ linhas|length }} OS no período {{ fmt(de + 'T03:00:00', False) }} a {{ fmt(ate + 'T03:00:00', False) }}</span>
+      <span class="fl-resumo-meta">{% if lista_de %}<span title="{% if da_lista_central %}A lista central de OS do Nexus: o servidor a lê do Fracttal de poucos em poucos minutos (as novas a cada 3 min no horário de trabalho, os últimos 7 dias a cada 10 min, as antigas de madrugada), e o que o OS Creator muda entra na hora. O ↻ confere de novo que você vê o mesmo no Fracttal.{% else %}A lista se renova sozinha a cada poucos minutos; o ↻ busca no Fracttal na hora{% endif %}">Lista das {{ lista_de }}</span><span aria-hidden="true">·</span>{% endif %}<span id="lbl_auto" title="Com a aba aberta, o histórico se atualiza sozinho a cada 10 minutos.">atualiza a cada 10 min</span></span>
     </div>
   <div class="os-tbl-wrap">
     <table class="os-tbl os-hist" id="tab_hist">
@@ -163,6 +234,7 @@
       var mu = form.querySelector("input[name=mudou]");
       if (!mu) { mu = document.createElement("input"); mu.type = "hidden"; mu.name = "mudou"; form.appendChild(mu); }
       mu.value = "1";
+      guardaLocais();
       enviar(false);
     }
   }
@@ -193,46 +265,80 @@
     } else if (a) a.remove();
     form.submit();
   }
-  form.addEventListener("submit", function (e) { e.preventDefault(); enviar(document.getElementById("atualizar").value === "1"); });
-  document.querySelectorAll(".os-seg [data-modo]").forEach(function (b) {
+  form.addEventListener("submit", function (e) { e.preventDefault(); guardaLocais(); enviar(document.getElementById("atualizar").value === "1"); });
+  document.querySelectorAll(".fl-seg [data-modo]").forEach(function (b) {
     b.addEventListener("click", function () {
       form.querySelector("input[name=modo]").value = b.getAttribute("data-modo");
       form.querySelectorAll("input[name=status]:checked").forEach(function (c) { c.checked = false; });   // troca de visao zera filtros locais
+      try { sessionStorage.removeItem(GUARDA); } catch (e) { /* nada guardado */ }
       enviar(false);                                                                     // a visão já vista volta da memória
     });
   });
-  // Criado por, Etiqueta e Período valem NO SERVIDOR: mudou, busca na hora (Levi, 27/09: "ao mudar o criado por tem que
-  // atualizar a tabela imediatamente"; "o filtro de etiquetas não funciona" — ele só valia no próximo ↻)
+  // Os filtros só valem no APLICAR (Levi, 03/11/2026: "selecionar os filtros sem carregar a cada filtro, pode aparecer um
+  // botão discreto de Aplicar sempre que selecionar algum filtro, aí só filtra mesmo se aplicar"). Antes, Criado por,
+  // Etiqueta e Período buscavam no servidor a cada troca (27/09: "ao mudar o criado por tem que atualizar a tabela
+  // imediatamente") e Status, Cliente, Usina e Tipos filtravam a tabela na hora: quem montava três filtros esperava três
+  // buscas. Agora a troca só acende o Aplicar (no rodapé do painel); ele busca no servidor se mudou Criado por, Etiqueta ou
+  // Período, e senão filtra a tabela que já está na tela, sem pedido. A busca por texto segue na hora (não carrega nada).
   ["pessoa", "etiqueta"].forEach(function (n) {
     var s = form.querySelector("select[name=" + n + "]");
-    if (s) s.addEventListener("change", function () { enviar(false); });
+    if (s) s.addEventListener("change", acende);
   });
-  var tPer;
   form.querySelectorAll("input[name=de], input[name=ate]").forEach(function (i) {
-    i.addEventListener("change", function () {
-      clearTimeout(tPer);
-      tPer = setTimeout(function () {                       // espera a data terminar de ser digitada
-        var de = form.querySelector("input[name=de]").value, ate = form.querySelector("input[name=ate]").value;
-        if (/^\d{4}-\d{2}-\d{2}$/.test(de) && /^\d{4}-\d{2}-\d{2}$/.test(ate) && de <= ate) enviar(false);
-      }, 700);
-    });
+    i.addEventListener("change", acende); i.addEventListener("input", acende);
   });
 
   // ── combos multi: texto do resumo (placeholder / o unico marcado / "N selecionados"), como o CheckableComboBox ──
+  // A Usina é feminina ("3 selecionadas", Levi, 03/11/2026); a lista de UM valor só (.fl-uni) tem o resumo dela, mais abaixo.
   function resumo(det) {
     var txt = det.querySelector(".os-multi-txt"), sel = [];
     det.querySelectorAll("input[type=checkbox]:checked").forEach(function (c) { if (!c.closest("label").hidden) sel.push(c.value); });
-    txt.textContent = sel.length === 0 ? txt.getAttribute("data-todos") : (sel.length === 1 ? sel[0] : sel.length + " selecionados");
+    var plural = det.getAttribute("data-nome") === "usina" ? " selecionadas" : " selecionados";
+    txt.textContent = sel.length === 0 ? txt.getAttribute("data-todos") : (sel.length === 1 ? sel[0] : sel.length + plural);
     det.title = sel.join("\n");
+    det.classList.toggle("fl-tem", sel.length > 0);                // com valor escolhido o campo sai do cinza do "Todos"
   }
   function marcados(nome) {
     var out = [];
     document.querySelectorAll('.os-multi[data-nome="' + nome + '"] input:checked').forEach(function (c) { if (!c.closest("label").hidden) out.push(c.value); });
     return out;
   }
-  document.querySelectorAll(".os-multi").forEach(resumo);
+  document.querySelectorAll(".os-multi:not(.fl-uni)").forEach(resumo);
   document.addEventListener("click", function (e) {                 // fecha o combo aberto ao clicar fora
     document.querySelectorAll(".os-multi[open]").forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute("open"); });
+  });
+
+  // ── Criado por e Etiqueta: UM valor só. O <select> segue no formulário, escondido, e guarda o valor (é ele que o servidor
+  // lê); o que a pessoa vê é a lista com caixa de busca que o os_busca.js monta no <details>: digitar filtra, as setas andam,
+  // Enter (ou o clique) escolhe, e escolher fecha a lista. O `click` do botão de escolha, e não o `change`: escolher o valor que
+  // já estava marcado também fecha. ──
+  var NEUTRO = {pessoa: "TODOS", etiqueta: ""};
+  function textoDaOpcao(s, v) {
+    for (var i = 0; i < s.options.length; i++) if (s.options[i].value === v) return s.options[i].text;
+    return "";
+  }
+  function sincronizaUnico(chave) {
+    var det = document.querySelector('.fl-uni[data-nome="' + chave + '"]'), s = form.querySelector("select[name=" + chave + "]");
+    if (!det || !s) return;
+    var txt = det.querySelector(".os-multi-txt"), rotulo = txt.getAttribute("data-todos"), tem = false;
+    det.querySelectorAll("input[type=radio]").forEach(function (r) {
+      var e = r.value === s.value;
+      r.checked = e; r.closest("label").classList.toggle("sel", e);
+      if (e && r.value !== NEUTRO[chave]) { rotulo = textoDaOpcao(s, r.value) || rotulo; tem = true; }
+    });
+    txt.textContent = rotulo; det.title = tem ? rotulo : ""; det.classList.toggle("fl-tem", tem);
+  }
+  document.querySelectorAll(".fl-uni").forEach(function (det) {
+    var chave = det.getAttribute("data-nome"), s = form.querySelector("select[name=" + chave + "]");
+    det.querySelectorAll("input[type=radio]").forEach(function (r) {
+      r.addEventListener("click", function () {
+        if (s) s.value = r.value;
+        sincronizaUnico(chave);
+        det.removeAttribute("open");                               // escolheu: a lista fecha, e o foco volta ao campo
+        var resumoDoCampo = det.querySelector("summary"); if (resumoDoCampo) resumoDoCampo.focus();
+        acende();
+      });
+    });
   });
 
   // ── filtros locais (Cliente, Usina, Tipo de ativo, Tipo de tarefa, Status tambem, e a busca) ──
@@ -264,9 +370,235 @@
     c.addEventListener("change", function () {
       var det = c.closest(".os-multi"); resumo(det);
       if (det.getAttribute("data-nome") === "cliente") { cascataUsinas(); resumo(document.querySelector('.os-multi[data-nome="usina"]')); }
-      aplica();
+      acende();                                                     // a tabela só muda no Aplicar
     });
   });
+
+  // ── o Aplicar: acende quando o que está escolhido difere do que está aplicado; apaga se a pessoa desfaz a troca ──
+  var bApl = document.getElementById("b_aplicar"), nAlt = document.getElementById("fl_nalt");
+  var LOCAIS = ["status", "cliente", "usina", "tipo", "tarefa"];
+  // A lista que chegou com Status no endereço já veio CORTADA pelo servidor (ele filtra pelo status): tirar ou trocar esse status
+  // só pela tabela mostraria as mesmas OS e diria que são todas. Nessa página o status conta como campo do servidor; na que veio
+  // sem status ele segue só filtrando a tabela (a regra do Aplicar).
+  var STATUS_DO_SERVIDOR = marcados("status").length > 0;
+  function doServidor() {
+    var v = {};
+    ["pessoa", "etiqueta"].forEach(function (n) { var s = form.querySelector("select[name=" + n + "]"); v[n] = s ? s.value : ""; });
+    v.de = form.querySelector("input[name=de]").value; v.ate = form.querySelector("input[name=ate]").value;
+    if (STATUS_DO_SERVIDOR) v.status = marcados("status").sort();
+    return JSON.stringify(v);
+  }
+  function dosLocais() { var v = {}; LOCAIS.forEach(function (n) { v[n] = marcados(n).sort(); }); return JSON.stringify(v); }
+  var servidorAplicado = doServidor(), locaisAplicados = "";
+  function juntos(a, b) { var o = {}; [a, b].forEach(function (x) { Object.keys(x).forEach(function (k) { o[k] = x[k]; }); }); return o; }
+  function escolhido() { return juntos(JSON.parse(doServidor()), JSON.parse(dosLocais())); }
+  function aplicado() { return juntos(JSON.parse(servidorAplicado), JSON.parse(locaisAplicados || "{}")); }
+  // os campos do painel e o que cada um guarda: o Período são duas datas e conta como UMA alteração
+  var CAMPOS = [["periodo", ["de", "ate"]], ["pessoa", ["pessoa"]], ["etiqueta", ["etiqueta"]], ["status", ["status"]],
+                ["cliente", ["cliente"]], ["usina", ["usina"]], ["tipo", ["tipo"]], ["tarefa", ["tarefa"]]];
+  var PONTO = {de: document.querySelector('[data-ponto="de"]'), ate: document.querySelector('[data-ponto="ate"]')};   // onde vai o ponto lima
+  CAMPOS.slice(1).forEach(function (c) { PONTO[c[0]] = document.querySelector('.fl-cel[data-filtro="' + c[0] + '"]'); });
+  // o Aplicar do rodapé acende com N alterações (a conta é por campo); cada campo que mudou ganha o ponto lima
+  function acende() {
+    var agora = escolhido(), ap = aplicado(), n = 0;
+    CAMPOS.forEach(function (c) {
+      var mudou = false;
+      c[1].forEach(function (k) {
+        var d = JSON.stringify(agora[k]) !== JSON.stringify(ap[k]);
+        if (PONTO[k]) PONTO[k].classList.toggle("mudou", d);
+        if (d) mudou = true;
+      });
+      if (mudou) n++;
+    });
+    bApl.disabled = n === 0;
+    nAlt.textContent = n === 0 ? "Sem alterações" : n + (n === 1 ? " alteração" : " alterações");
+    marcaAtalho();
+    return n;
+  }
+  // os filtros da tabela que não vão ao servidor (Cliente, Usina, Tipos) atravessam a busca: guardados antes de mandar e
+  // remarcados ao chegar. Sem isso, o Aplicar que muda o Período e a Usina juntos perdia a Usina, e a atualização de 10 min
+  // zerava os filtros da tabela. Sem sessionStorage (aba anônima com bloqueio), eles zeram, como antes.
+  var GUARDA = "os_hist_filtros_da_tabela", DA_TABELA = ["cliente", "usina", "tipo", "tarefa"];
+  function guardaLocais() {
+    try { var v = {}; DA_TABELA.forEach(function (n) { v[n] = marcados(n); }); sessionStorage.setItem(GUARDA, JSON.stringify(v)); }
+    catch (e) { /* sem sessionStorage: os filtros da tabela zeram na volta */ }
+  }
+  function poeLista(n, quer) {
+    document.querySelectorAll('.os-multi[data-nome="' + n + '"] input[type=checkbox]').forEach(function (c) { c.checked = quer.indexOf(c.value) >= 0; });
+  }
+  function remarcaLocais() {
+    var v = null;
+    try { v = JSON.parse(sessionStorage.getItem(GUARDA) || "null"); sessionStorage.removeItem(GUARDA); } catch (e) { v = null; }
+    if (!v) return;
+    DA_TABELA.forEach(function (n) { poeLista(n, v[n] || []); });
+  }
+  // ── o painel (Levi, 03/11/2026: "opção A, suspenso com um botão de aplicar no final"): o botão do período e o Filtros abrem o
+  // mesmo. Fechar sem aplicar (Esc, clique fora ou o botão de novo) DESCARTA as escolhas: os campos voltam ao aplicado. ──
+  var painel = document.getElementById("fl_painel"), veu = document.getElementById("fl_veu"), barra = document.getElementById("fl_barra");
+  var bFiltros = document.getElementById("b_filtros"), bPeriodo = document.getElementById("b_periodo");
+  var aberto = false, gatilho = null;
+  function celular() { return !!(window.matchMedia && window.matchMedia("(max-width: 639px)").matches); }
+  function posiciona(b) {                                           // PC: a borda direita do painel na do botão que o abriu
+    if (celular()) { painel.style.left = ""; return; }              // celular: o CSS faz dele uma folha de baixo
+    var c = barra.getBoundingClientRect(), r = b.getBoundingClientRect(), w = painel.offsetWidth;
+    painel.style.left = Math.max(0, Math.min(Math.round(r.right - c.left - w), c.width - w)) + "px";
+  }
+  function abrePainel(b) {
+    if (!aberto) { painel.hidden = false; veu.hidden = false; aberto = true; }
+    gatilho = b;
+    [bFiltros, bPeriodo].forEach(function (x) { x.setAttribute("aria-expanded", x === b ? "true" : "false"); });
+    posiciona(b);
+    painel.focus();
+  }
+  function avisa(texto) {                                           // o aviso de período inválido, no painel, junto das datas
+    var el = document.getElementById("fl_aviso");
+    el.textContent = texto; el.hidden = !texto;
+    if (texto && !aberto) abrePainel(bPeriodo);
+  }
+  function fechaPainel(descartar) {
+    if (!aberto) return;
+    if (descartar) descarta();
+    var focoDentro = painel.contains(document.activeElement);       // o Aplicar, por exemplo, some junto com o painel: o foco volta ao botão
+    painel.querySelectorAll("details[open]").forEach(function (d) { d.removeAttribute("open"); });
+    painel.hidden = true; veu.hidden = true; aberto = false;
+    [bFiltros, bPeriodo].forEach(function (x) { x.setAttribute("aria-expanded", "false"); });
+    avisa("");
+    if (focoDentro && gatilho) gatilho.focus();
+  }
+  function alterna(b) { if (aberto && gatilho === b) fechaPainel(true); else abrePainel(b); }
+  bFiltros.addEventListener("click", function () { alterna(bFiltros); });
+  bPeriodo.addEventListener("click", function () { alterna(bPeriodo); });
+  document.getElementById("fl_fechar").addEventListener("click", function () { fechaPainel(true); if (gatilho) gatilho.focus(); });
+  // o clique fora descarta ANTES de qualquer outro clique da página agir (captura): o clique numa aba da visão, no ↻ ou no × de uma
+  // etiqueta manda o formulário, e o que estava escolhido no painel e não foi aplicado não pode ir junto
+  document.addEventListener("click", function (e) {
+    if (aberto && !painel.contains(e.target) && !bFiltros.contains(e.target) && !bPeriodo.contains(e.target)) fechaPainel(true);
+  }, true);
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || !aberto || !modal.hidden) return;
+    var lista = painel.querySelector("details[open]");               // o Esc fecha só a lista; com ela fechada, o painel
+    if (lista) { lista.removeAttribute("open"); var s = lista.querySelector("summary"); if (s) s.focus(); return; }
+    fechaPainel(true); if (gatilho) gatilho.focus();
+  });
+  // Enter num campo do painel não manda o formulário por baixo (o navegador o mandaria pelo 1º botão de envio, o ↻, e levaria as
+  // escolhas sem o Aplicar): na data é o Aplicar; no resto, nada
+  painel.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" || e.target.tagName === "BUTTON" || e.target.tagName === "SUMMARY") return;
+    e.preventDefault();
+    if (e.target.type === "date") aplicar();
+  });
+
+  // ── o período: o atalho só preenche as duas datas (e espera o Aplicar, como tudo no painel); acende o que bate com elas ──
+  var relogio = function () { return new Date(); };            // o relógio da página (o teste troca o dia de hoje por aqui)
+  function iso(d) { function p(n) { return (n < 10 ? "0" : "") + n; } return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
+  function hojeLocal() { var h = relogio(); return new Date(h.getFullYear(), h.getMonth(), h.getDate()); }
+  function inicioDo(atalho) {                                      // 7 e 30 dias: de N dias atrás até hoje (os 30 são o padrão da tela)
+    var de = hojeLocal();
+    if (atalho === "mes") de.setDate(1); else de.setDate(de.getDate() - parseInt(atalho, 10));
+    return de;
+  }
+  function marcaAtalho() {
+    var de = form.querySelector("input[name=de]").value, ate = form.querySelector("input[name=ate]").value;
+    document.querySelectorAll("[data-atalho]").forEach(function (b) {
+      var on = de === iso(inicioDo(b.getAttribute("data-atalho"))) && ate === iso(hojeLocal());
+      b.classList.toggle("on", on); b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+  document.querySelectorAll("[data-atalho]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      form.querySelector("input[name=de]").value = iso(inicioDo(b.getAttribute("data-atalho")));
+      form.querySelector("input[name=ate]").value = iso(hojeLocal());
+      acende();
+    });
+  });
+  function textoDoPeriodo() {
+    var p = JSON.parse(servidorAplicado), cur = String(relogio().getFullYear());
+    var mesmo = /^\d{4}/.test(p.de) && p.de.slice(0, 4) === cur && p.ate.slice(0, 4) === cur;
+    function c(d) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || ""); return m ? m[3] + "/" + m[2] + (mesmo ? "" : "/" + m[1].slice(2)) : (d || ""); }
+    document.getElementById("fl_periodo_txt").textContent = c(p.de) + " – " + c(p.ate);
+  }
+
+  // ── descartar, limpar e as etiquetas ──
+  function poe(chave, v) {                                         // põe um campo do painel no valor `v` (sem aplicar nada)
+    if (chave === "pessoa" || chave === "etiqueta") {
+      var s = form.querySelector("select[name=" + chave + "]"); if (s) s.value = v;
+      sincronizaUnico(chave);
+    } else {
+      poeLista(chave, v);
+      if (chave === "cliente") cascataUsinas();
+      var det = document.querySelector('.os-multi[data-nome="' + chave + '"]'); if (det) resumo(det);
+    }
+  }
+  function descarta() {                                            // os campos voltam ao aplicado
+    var s = JSON.parse(servidorAplicado), l = JSON.parse(locaisAplicados || "{}");
+    poe("pessoa", s.pessoa); poe("etiqueta", s.etiqueta);
+    form.querySelector("input[name=de]").value = s.de; form.querySelector("input[name=ate]").value = s.ate;
+    poe("status", l.status || []); poe("cliente", l.cliente || []);                // o Cliente antes: a cascata esconde as usinas dele
+    poe("usina", l.usina || []); poe("tipo", l.tipo || []); poe("tarefa", l.tarefa || []);
+    document.querySelectorAll(".os-multi:not(.fl-uni)").forEach(resumo);
+    acende();
+  }
+  document.getElementById("b_painel_limpar").addEventListener("click", function () {
+    // zera os filtros do painel e espera o Aplicar. Criado por e o Período são o ESCOPO da lista e ficam: é o que o Limpar de
+    // sempre fazia ("como no app"): a visão, o Criado por e o período não saem
+    poe("etiqueta", ""); LOCAIS.forEach(function (n) { poe(n, []); });
+    acende();
+  });
+  var ROTULO = {pessoa: "Criado por", etiqueta: "Etiqueta", status: "Status", cliente: "Cliente", usina: "Usina", tipo: "Tipo de ativo", tarefa: "Tipo de tarefa"};
+  var ORDEM = ["pessoa", "etiqueta", "status", "cliente", "usina", "tipo", "tarefa"];
+  var caixaDasEtiquetas = document.getElementById("fl_etiquetas"), bLimpar = document.getElementById("b_limpar"), nFiltros = document.getElementById("fl_n");
+  function textoDaEtiqueta(chave, v) {                             // "" = filtro sem valor (não ganha etiqueta)
+    if (chave === "pessoa" || chave === "etiqueta") {
+      if (!v || v === NEUTRO[chave]) return "";
+      var s = form.querySelector("select[name=" + chave + "]");
+      return s ? textoDaOpcao(s, v) : "";
+    }
+    if (!v || !v.length) return "";
+    return v.length === 1 ? v[0] : v.length + (chave === "usina" ? " selecionadas" : " selecionados");
+  }
+  function umaEtiqueta(chave, texto) {
+    function no(tag, classe, t) { var e = document.createElement(tag); if (classe) e.className = classe; if (t !== undefined) e.textContent = t; return e; }
+    var NS = "http://www.w3.org/2000/svg", ico = document.createElementNS(NS, "svg"), uso = document.createElementNS(NS, "use");
+    ico.setAttribute("class", "fl-ico"); ico.setAttribute("aria-hidden", "true"); uso.setAttribute("href", "#fl-i-x"); ico.appendChild(uso);
+    var c = no("span", "fl-chip"), x = no("button", "fl-chip-x");
+    c.setAttribute("data-filtro", chave);
+    c.appendChild(no("i", "", ROTULO[chave])); c.appendChild(document.createTextNode(" ")); c.appendChild(no("span", "fl-chip-v", texto));
+    x.type = "button"; x.setAttribute("aria-label", "Tirar o filtro " + ROTULO[chave] + ": " + texto); x.appendChild(ico);
+    x.addEventListener("click", function () { tiraFiltro(chave); });
+    c.appendChild(x);
+    return c;
+  }
+  // as etiquetas são o que está APLICADO (não o que o painel tem escolhido agora): uma por filtro, e a contagem do botão Filtros é
+  // a mesma conta, sem o período. O "Limpar tudo" só aparece quando há o que ele limpa (o Criado por fica, como no Limpar de sempre)
+  function pintaEtiquetas() {
+    var ap = aplicado(), n = 0, limpaveis = 0;
+    caixaDasEtiquetas.querySelectorAll(".fl-chip").forEach(function (c) { c.remove(); });
+    ORDEM.forEach(function (chave) {
+      var t = textoDaEtiqueta(chave, ap[chave]);
+      if (!t) return;
+      n++; if (chave !== "pessoa") limpaveis++;
+      caixaDasEtiquetas.insertBefore(umaEtiqueta(chave, t), bLimpar);
+    });
+    caixaDasEtiquetas.hidden = n === 0; bLimpar.hidden = limpaveis === 0;
+    nFiltros.textContent = String(n); nFiltros.hidden = n === 0;
+  }
+  function tiraFiltro(chave) {                                     // o × de uma etiqueta: tira aquele filtro e APLICA na hora
+    descarta();                                                    // o que estava no painel sem aplicar não vai junto
+    poe(chave, ORDEM.indexOf(chave) < 2 ? NEUTRO[chave] : []);
+    aplicar();
+  }
+  function aplicar() {
+    var de = form.querySelector("input[name=de]").value, ate = form.querySelector("input[name=ate]").value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(de) || !/^\d{4}-\d{2}-\d{2}$/.test(ate) || de > ate) {
+      avisa("O período não vale: preencha as duas datas, com a inicial antes da final.");
+      return;
+    }
+    avisa("");
+    if (doServidor() !== servidorAplicado) { fechaPainel(false); guardaLocais(); enviar(false); return; }   // Criado por, Etiqueta ou Período
+    aplica(); locaisAplicados = dosLocais();                                              // só a tabela: sem pedido
+    fechaPainel(false); acende(); pintaEtiquetas();
+  }
+  bApl.addEventListener("click", aplicar);
   var tmr; document.getElementById("busca_no").addEventListener("input", function () { clearTimeout(tmr); tmr = setTimeout(aplica, 260); });
   document.getElementById("busca_no").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); aplica(); } });
   document.addEventListener("keydown", function (e) { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") { e.preventDefault(); var b = document.getElementById("busca_no"); b.focus(); b.select(); } });
@@ -285,7 +617,7 @@
   // ';' + UTF-8 com BOM = abre direto no Excel pt-BR (steps/exportar.py).
   function csvCampo(t) {
     t = String(t == null ? "" : t).replace(/\s+/g, " ").trim();
-    if (t === "\u2014") t = "";                                   // travessao vira celula VAZIA
+    if (t === "—") t = "";                                   // travessao vira celula VAZIA
     return /[";\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
   }
   document.getElementById("b_export").addEventListener("click", function () {
@@ -303,38 +635,46 @@
     });
     var de = form.querySelector("input[name=de]").value, ate = form.querySelector("input[name=ate]").value;
     var a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob(["\ufeff" + txt], {type: "text/csv;charset=utf-8"}));
+    a.href = URL.createObjectURL(new Blob(["﻿" + txt], {type: "text/csv;charset=utf-8"}));
     a.download = "historico_os_" + de + "_a_" + ate + ".csv";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
   });
   document.addEventListener("keydown", function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "e") { e.preventDefault(); document.getElementById("b_export").click(); }
-    if (e.key === "F5" && !e.ctrlKey) { e.preventDefault(); enviar(true); }
+    if (e.key === "F5" && !e.ctrlKey) { e.preventDefault(); fechaPainel(true); guardaLocais(); enviar(true); }
   });
 
   // Atualizacao automatica de 10 min (INTERVALO_MIN do app). So recarrega com a aba VISIVEL e
   // sem card aberto: recarregar por baixo de uma OS que a pessoa esta lendo fecharia a leitura.
+  // Com o painel aberto, também espera: a atualização mandaria o que está escolhido sem o Aplicar.
   setInterval(function () {
-    if (document.hidden || !modal.hidden) return;
+    if (document.hidden || !modal.hidden || aberto) return;
+    guardaLocais();
     enviar(false, true);
   }, 10 * 60 * 1000);
 
   document.getElementById("b_atualizar").addEventListener("click", function () { document.getElementById("atualizar").value = "1"; });
 
-  // Limpar filtros: Cliente/Usina/Status/Tipos, a busca e a Etiqueta (mantem visao, Criado por e periodo), como no app
+  // Limpar tudo (a etiqueta de baixo da barra): Cliente/Usina/Status/Tipos, a busca e a Etiqueta saem; mantem visao, Criado por e
+  // periodo, como no app
   document.getElementById("b_limpar").addEventListener("click", function () {
+    fechaPainel(true);
     var q = new URLSearchParams();
     q.set("modo", form.querySelector("input[name=modo]").value);
     var pessoa = form.querySelector("select[name=pessoa]"); if (pessoa) q.set("pessoa", pessoa.value);
     q.set("de", form.querySelector("input[name=de]").value); q.set("ate", form.querySelector("input[name=ate]").value);
     if (window.OsCarga) { var t = window.OsCarga.token(); q.set("p", t); window.OsCarga.mostrar(t); }
+    try { sessionStorage.removeItem(GUARDA); } catch (e) { /* nada guardado */ }
     location.href = "/os/historico?" + q.toString();
   });
 
   // O tipo de tarefa, o início e o gatilho chegam PRONTOS em cada linha: antes a tela buscava tudo de novo em lotes de 60,
   // um atrás do outro (34 idas ao Fracttal numa carga de 2.000 OS) — o servidor já tinha essa informação (27/09).
-  cascataUsinas(); aplica();
+  remarcaLocais();                                     // os filtros da tabela do último Aplicar (ou ↻, F5, 10 min) voltam
+  cascataUsinas(); document.querySelectorAll(".os-multi:not(.fl-uni)").forEach(resumo); aplica();
+  ORDEM.slice(0, 2).forEach(sincronizaUnico);
+  locaisAplicados = dosLocais(); textoDoPeriodo(); acende(); pintaEtiquetas();
 })();
 </script>
 {% endblock %}

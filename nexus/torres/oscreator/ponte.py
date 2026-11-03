@@ -496,15 +496,20 @@ def _do_setor_ou_admin(setor_alvo: str, nome: str, regra: str, onde_log: str) ->
 # cada rodada de sonda (as rodadas 1 a 3 da 3.3); a contagem fica como 2ª barreira, e a 1ª é uma decisão de governança.
 # A lista muda por COMMIT (a trilha fica no git), e não por Base → Acessos: lá cada item é uma tela do menu (abre uma página,
 # conta no "vê N de M telas", entra no "Marcar tudo" e no "Copiar de", e a tela "por dentro" libera a de fora), e uma
-# liberação que não é tela não cabe nele de forma limpa. Ela nasce vazia: só os administradores, até o Levi liberar os setores.
+# liberação que não é tela não cabe nele de forma limpa. Nasceu vazia (só os administradores) e, em 03/11/2026, o Levi liberou
+# todos ("Todos os setores veem todas as OSs" no Fracttal): `TODOS_OS_SETORES` vale para quem tem QUALQUER setor no Nexus. A
+# pessoa sem setor, o setor que não deu para ler e o Nexus sem a NEXUS_PESSOA_HMAC seguem fechados: sem saber quem é, não libera.
+# Para voltar a liberar só alguns, troque o "*" pelos nomes dos setores.
 LISTA_CENTRAL = "os_web.lista_central"
-SETORES_COM_LISTA_CENTRAL: frozenset = frozenset()
+TODOS_OS_SETORES = "*"
+SETORES_COM_LISTA_CENTRAL: frozenset = frozenset({TODOS_OS_SETORES})
 
 
 def lista_central() -> bool:
     """A pessoa do pedido pode ler a lista central de OS (ver acima): o administrador do Nexus, sem ler o setor; quem é de um
-    setor de `SETORES_COM_LISTA_CENTRAL`. Sem saber o setor (o Nexus sem a NEXUS_PESSOA_HMAC, o banco que não respondeu, a
-    pessoa sem setor): não. É a marca que vai no pedido ao clone (`encaminhar`); sem ela, o clone fecha."""
+    setor de `SETORES_COM_LISTA_CENTRAL` (com o `TODOS_OS_SETORES`, qualquer setor). Sem saber o setor (o Nexus sem a
+    NEXUS_PESSOA_HMAC, o banco que não respondeu, a pessoa sem setor): não. É a marca que vai no pedido ao clone
+    (`encaminhar`); sem ela, o clone fecha."""
     if session.get("admin"):
         return True
     if not SETORES_COM_LISTA_CENTRAL or not current_app.config.get("NEXUS_PESSOA_HMAC"):
@@ -517,7 +522,11 @@ def lista_central() -> bool:
     except Exception as ex:      # noqa: BLE001 — sem saber o setor, fecha: a pessoa segue pelo caminho de hoje
         logging.warning("OS Creator: não consegui ler o setor para a lista central de OS (%s)", type(ex).__name__)
         return False
-    return bool(setor) and _sem_acento(setor.get("nome")) in {_sem_acento(s) for s in SETORES_COM_LISTA_CENTRAL}
+    if not setor:
+        return False
+    if TODOS_OS_SETORES in SETORES_COM_LISTA_CENTRAL:
+        return True
+    return _sem_acento(setor.get("nome")) in {_sem_acento(s) for s in SETORES_COM_LISTA_CENTRAL}
 
 
 @bp_raiz.route("/os/", defaults={"resto": ""}, methods=_METODOS)

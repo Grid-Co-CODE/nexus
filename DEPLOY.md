@@ -266,10 +266,11 @@ já não traz `/nexus/` (a reescrita da T.I. saiu). A data exata da virada não 
         leitura; "Campos que o REST trouxe" com todos acima de 0% (um campo em 0% manda a tela que o usa ao vivo); "Conferências
         das telas" (quantas divergiram: a visão restrita diverge, e é esperado);
       - **Catálogos pequenos:** cada catálogo com a fonte e a hora; "Pessoas pelo REST" ligado e a última leitura boa.
-   4. **Liberar os setores por commit** em `ponte.SETORES_COM_LISTA_CENTRAL` (`nexus/torres/oscreator/ponte.py`), o nome do setor de
-      Base → Acessos → Pessoas e setores, sem acento nem caixa. **Só setores em que todos veem todas as OS no Fracttal:** a lista é
-      lida pela credencial da empresa e vê tudo, e a pessoa de visão restrita só é protegida pela 2ª barreira (a contagem). A lista
-      nasce vazia: até o commit, só os administradores leem dela.
+   4. **Os setores já estão liberados** (03/11/2026): `ponte.SETORES_COM_LISTA_CENTRAL` vale o `TODOS_OS_SETORES` ("*"), porque
+      todos os setores veem todas as OS no Fracttal (Levi). Qualquer pessoa com setor no Nexus lê a lista central; a sem setor,
+      não. Se um dia um setor passar a ter visão restrita no Fracttal, troque o "*" pelos nomes dos outros setores (por commit):
+      a lista é lida pela credencial da empresa e vê tudo, e a pessoa de visão restrita só é protegida pela 2ª barreira (a
+      contagem).
    5. **Base → Governança de dados:** o livro `nexus_oscreator_uso_AAAA_MM` (o uso do OS Creator e os pedidos ao Fracttal, que
       o Nexus grava no banco uma vez por dia, às 04:45) tem de aparecer com dono no catálogo, e o radar de tabelas novas não pode
       listá-lo como "sem dono". Ele só existe depois da primeira gravação (a manhã seguinte ao deploy).
@@ -343,7 +344,7 @@ do deploy é a 1ª carga e a conferência dos campos do REST: o Raio-X mostra (s
 OS"), e também a leitura que a lista recusou ("Trava de encolhimento": o REST que devolveu só uma parte; a recusa que se repete
 igual na leitura seguinte passa, "aceita na 2ª leitura": o apagamento de verdade) e a faixa que o REST não devolveu pela
 criação. As telas leem dela desde a tarefa 3.3 (31/10/2026), mas só para quem o Nexus liberou: o administrador, sempre, e os
-setores de `ponte.SETORES_COM_LISTA_CENTRAL` (nasce vazia, ver o passo 9 da seção 6); os outros seguem pelo caminho de antes, com a
+setores de `ponte.SETORES_COM_LISTA_CENTRAL` (desde 03/11/2026, todos: ver o passo 9 da seção 6); os outros seguem pelo caminho de antes, com a
 sessão deles no Fracttal. A lista central só vale para o período que a janela dela cobre: no dia do deploy, com só os 7 dias lidos,
 as telas de 30 dias seguem como antes até a primeira noite.
 

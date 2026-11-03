@@ -551,6 +551,184 @@ body.os-sem-topo .os-recolher svg{transform:rotate(180deg)}
 /* Windows sem animação: o giro fica, mais lento (é ele que diz "está trabalhando"); a barra só não desliza */
 @media (prefers-reduced-motion:reduce){.carga-anel.ind{animation-duration:2.4s}.carga-arco{transition:none}}
 
+/* ── HISTÓRICO: os filtros no modelo A (Levi, 03/11/2026) ─────────────────────────────────────────────────────────────────
+   "refaz esse modelo de filtros, veja se dá para melhorar"; "acho o estilo que temos atualmente um pouco básico, gostaria de algo
+   minimalista e moderno ao mesmo tempo"; "use as cores Black: 030407, Blue: 1558c9, lime: D4FF24"; "opção A, suspenso com um
+   botão de aplicar no final"; "quero que todas as opções do filtro sejam digitáveis". A maquete aprovada é o modelo A: uma
+   barra de uma linha, as etiquetas dos filtros aplicados logo abaixo e um painel suspenso preso aos botões Período e Filtros,
+   com o Aplicar no rodapé. O LIMA é a ação (o Aplicar, a contagem do botão Filtros, o ponto do que mudou); o AZUL é o que está
+   escolhido (a visão, as etiquetas, a marca nas listas); o PRETO é o texto sobre o lima e a base dos campos.
+   Só a barra, as etiquetas, o painel e os campos usam estas cores: o fundo da página e o resto do OS Creator seguem como
+   estavam. Classes fl-* só do Histórico (os hf-*, os-hist-* e os-multi seguem nas outras telas). COR SÓ POR TOKEN: nada de #hex
+   nem rgba() fora do :root daqui; o par do claro está no bloco de variáveis do tema claro, mais abaixo (o
+   tests/test_oscreator_historico_aplicar.py confere os dois). O cinza dos rótulos ficou um tom mais claro que o da maquete
+   (a 4,5:1 do painel), para ler a 11 px. */
+:root{
+  --fl-preto:#030407; --fl-campo:#0f1218; --fl-painel:#151922; --fl-linha:#1c212b; --fl-linha-2:#272d39;
+  --fl-campo-borda:#272d39; --fl-campo-borda-hover:#3a4252;
+  --fl-txt:#eef0f4; --fl-mudo:#8b91a0; --fl-mudo-2:#7b8291; --fl-hover:rgba(255,255,255,.05);
+  --fl-sombra:rgba(0,0,0,.6); --fl-veu:rgba(3,4,7,.6);
+  --fl-lima:#D4FF24; --fl-lima-suave:rgba(212,255,36,.10); --fl-lima-borda:rgba(212,255,36,.38); --fl-sobre-lima:#030407;
+  --fl-ponto:var(--fl-lima);
+  --fl-azul:#1558c9; --fl-azul-suave:rgba(21,88,201,.20); --fl-azul-borda:rgba(21,88,201,.60); --fl-azul-texto:#7ea8f0;
+  --fl-sobre-azul:#ffffff;
+}
+.fl-defs{position:absolute;width:0;height:0;overflow:hidden}
+.fl-ico{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* a barra: uma linha só, que quebra quando falta largura (e no celular, ver o fim da seção) */
+.fl-barra{position:relative;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fl-seg{display:inline-flex;background:var(--fl-campo);border:1px solid var(--fl-campo-borda);border-radius:10px;padding:3px}
+.fl-seg button{height:28px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:var(--fl-mudo);font:inherit;
+  font-size:13px;white-space:nowrap;cursor:pointer}
+.fl-seg button:hover{color:var(--fl-txt)}
+.fl-seg button.on{background:var(--fl-azul);color:var(--fl-sobre-azul)}
+.fl-campo{position:relative;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:10px;
+  background:var(--fl-campo);border:1px solid var(--fl-campo-borda);color:var(--fl-mudo);font-size:13px;white-space:nowrap;min-width:0}
+.fl-campo:hover{border-color:var(--fl-campo-borda-hover)}
+.fl-campo:focus-within{border-color:var(--fl-azul-borda);box-shadow:0 0 0 3px var(--fl-azul-suave)}
+.fl-campo:focus-within .fl-ico{color:var(--fl-txt)}
+body.os-form .fl-campo input{flex:1;min-width:0;width:100%;height:34px;padding:0;border:0;border-radius:0;background:transparent;
+  color:var(--fl-txt);font:inherit;outline:none;text-overflow:ellipsis}
+.fl-campo input::placeholder{color:var(--fl-mudo);opacity:1}
+.fl-busca{flex:1 1 240px;min-width:200px}
+.fl-busca-os{flex:0 0 136px;width:136px}
+.fl-btn{height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--fl-campo-borda);background:var(--fl-campo);
+  color:var(--fl-txt);font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer}
+.fl-btn:hover{border-color:var(--fl-campo-borda-hover)}
+.fl-btn[aria-expanded="true"]{border-color:var(--fl-azul-borda)}
+.fl-btn.fl-fantasma{background:transparent;border-color:transparent;color:var(--fl-mudo)}
+.fl-btn.fl-fantasma:hover{color:var(--fl-txt)}
+.fl-btn.fl-lima{background:var(--fl-lima);border-color:var(--fl-lima-borda);color:var(--fl-sobre-lima);font-weight:650}
+.fl-btn.fl-lima:disabled{opacity:.45;cursor:not-allowed}
+.fl-so-icone{width:36px;padding:0;justify-content:center}
+.fl-so-icone .fl-ico{width:16px;height:16px}
+.fl-periodo .fl-seta{color:var(--fl-mudo)}
+.fl-badge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--fl-lima);color:var(--fl-sobre-lima);
+  font-size:11px;font-weight:700;display:inline-grid;place-items:center;box-shadow:inset 0 0 0 1px var(--fl-lima-borda)}
+.fl-badge[hidden]{display:none}
+.fl-dir{margin-left:auto;display:flex;gap:8px;align-items:center}
+.fl-seg button:focus-visible,.fl-btn:focus-visible,.fl-atalho:focus-visible,.fl-chip-x:focus-visible,.fl-link:focus-visible,
+.fl-fechar:focus-visible,.fl-painel .os-multi summary:focus-visible{outline:2px solid var(--fl-azul-texto);outline-offset:2px}
+
+/* as etiquetas dos filtros aplicados: uma por filtro, o × tira aquele filtro e aplica na hora */
+.fl-etiquetas{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.fl-etiquetas[hidden]{display:none}
+.fl-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 11px;border-radius:999px;
+  background:var(--fl-azul-suave);border:1px solid var(--fl-azul-borda);color:var(--fl-txt);font-size:12.5px;max-width:100%}
+.fl-chip i{font-style:normal;color:var(--fl-mudo)}
+.fl-chip-v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px}
+.fl-chip-x{width:20px;height:20px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:transparent;
+  color:var(--fl-mudo);cursor:pointer;flex:none}
+.fl-chip-x:hover{background:var(--fl-azul);color:var(--fl-sobre-azul)}
+.fl-chip-x .fl-ico{width:12px;height:12px}
+.fl-link{padding:4px 2px;border:0;background:transparent;color:var(--fl-azul-texto);font:inherit;font-size:12.5px;cursor:pointer}
+.fl-link:hover{text-decoration:underline}
+.fl-link[hidden]{display:none}
+
+/* o painel suspenso: preso ao botão Filtros (ou ao do período), com o período primeiro e o Aplicar no rodapé */
+.fl-painel{position:absolute;top:calc(100% + 8px);left:0;z-index:40;width:520px;max-width:100%;padding:16px;border-radius:14px;
+  background:var(--fl-painel);border:1px solid var(--fl-linha-2);box-shadow:0 18px 50px var(--fl-sombra);color:var(--fl-txt)}
+.fl-painel[hidden]{display:none}
+.fl-painel:focus{outline:none}
+.fl-painel-topo{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}
+.fl-painel h4{margin:0;font-size:13px;font-weight:600;color:var(--fl-mudo)}
+.fl-fechar{display:none;width:32px;height:32px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--fl-mudo);
+  place-items:center;cursor:pointer}
+.fl-grade{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.fl-cel{position:relative;min-width:0}
+.fl-rot{display:block;margin-bottom:5px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--fl-mudo-2)}
+.fl-periodo-cel{grid-column:1 / -1}
+.fl-atalhos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.fl-atalho{height:28px;padding:0 11px;border-radius:8px;border:1px solid var(--fl-campo-borda);background:transparent;color:var(--fl-mudo);
+  font:inherit;font-size:12.5px;cursor:pointer}
+.fl-atalho:hover{color:var(--fl-txt);border-color:var(--fl-campo-borda-hover)}
+.fl-atalho.on{background:var(--fl-azul);border-color:var(--fl-azul);color:var(--fl-sobre-azul)}
+.fl-datas{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.fl-pre{color:var(--fl-mudo-2);font-size:12px}
+.fl-painel input[type=date]{color-scheme:dark}
+.fl-aviso{margin:8px 0 0;font-size:12px;line-height:1.35;color:var(--fl-txt)}
+.fl-aviso[hidden]{display:none}
+.fl-campo-fixo{display:flex;align-items:center;height:36px;padding:0 12px;border-radius:10px;border:1px dashed var(--fl-campo-borda);
+  color:var(--fl-mudo-2);font-size:13px}
+/* o <select> do formulário (Criado por e Etiqueta) fica escondido guardando o valor: o display:none o tira do Tab e do leitor de
+   tela (o campo é o da lista ao lado) e o formulário manda o valor do mesmo jeito */
+.fl-cel[data-campo-proprio]>select{display:none}
+/* o campo que mudou em relação ao aplicado ganha o ponto lima */
+.fl-cel.mudou>.os-multi::after,.fl-cel.mudou>.fl-campo-fixo::after,.fl-data.mudou::after{content:"";position:absolute;top:-3px;right:-3px;
+  width:8px;height:8px;border-radius:50%;background:var(--fl-ponto);box-shadow:0 0 0 2px var(--fl-painel),0 0 0 5px var(--fl-lima-suave);
+  pointer-events:none}
+/* as listas (os-multi, do os_busca.js) com a cara do painel: o campo, a lista, a linha e a caixa de busca no topo */
+.fl-painel .os-multi{position:relative}
+.fl-painel .os-multi summary{height:36px;padding:0 12px;border-radius:10px;background:var(--fl-campo);border:1px solid var(--fl-campo-borda);
+  color:var(--fl-mudo);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
+.fl-painel .os-multi summary:hover{border-color:var(--fl-campo-borda-hover)}
+.fl-painel .os-multi summary::after{content:none}
+.fl-painel .os-multi.fl-tem summary{color:var(--fl-txt)}
+.fl-painel .os-multi[open] summary{border-color:var(--fl-azul-borda)}
+.fl-painel .os-multi-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fl-painel .os-multi summary .fl-ico{color:var(--fl-mudo)}
+.fl-painel .os-multi[open] summary .fl-ico{transform:rotate(180deg)}
+.fl-painel .os-multi-lista{z-index:20;max-height:260px;padding:6px;border-radius:12px;background:var(--fl-campo);
+  border:1px solid var(--fl-linha-2);box-shadow:0 14px 34px var(--fl-sombra)}
+.fl-painel .os-multi-lista label{padding:6px 8px;border-radius:8px;color:var(--fl-txt);font-size:13px}
+.fl-painel .os-multi-lista label:hover{background:var(--fl-hover)}
+.fl-painel .os-multi-lista label.on{background:var(--fl-azul-suave)}
+.fl-painel .os-multi-lista input[type=checkbox]{flex:none;width:16px;height:16px;margin:0;padding:0;border-radius:4px;accent-color:var(--fl-azul)}
+.fl-painel .os-multi-lista .osm-busca{height:34px;padding:0 10px;border-radius:8px;background:var(--fl-painel);border:1px solid var(--fl-linha-2);
+  color:var(--fl-txt);box-shadow:0 0 0 6px var(--fl-campo)}
+.fl-painel .os-multi-lista .osm-busca:focus{border-color:var(--fl-azul-borda)}
+.fl-painel .os-multi-lista .osm-busca::placeholder{color:var(--fl-mudo)}
+.fl-painel .osm-vazio{color:var(--fl-mudo)}
+/* a lista de UM valor só (Criado por, Etiqueta): sem o círculo do radio; o escolhido ganha o azul e um risco */
+.fl-uni input[type=radio]{position:absolute;width:0;height:0;margin:0;opacity:0;pointer-events:none}
+.fl-painel .fl-uni .os-multi-lista label{position:relative;padding-right:28px}
+.fl-painel .fl-uni .os-multi-lista label.sel{color:var(--fl-azul-texto);font-weight:600}
+.fl-painel .fl-uni .os-multi-lista label.sel::after{content:"";position:absolute;right:11px;top:50%;width:9px;height:5px;margin-top:-4px;
+  border-left:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg)}
+.fl-rodape{display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--fl-linha-2)}
+.fl-rodape .fl-dir span{color:var(--fl-mudo);font-size:12.5px}
+.fl-veu{display:none}
+/* a linha do resumo da tabela: quantas OS, de quando é a lista e a atualização sozinha, em texto apagado */
+.fl-resumo{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;margin:0 0 8px;color:var(--fl-mudo);font-size:12.5px}
+.fl-resumo-meta{margin-left:auto;display:inline-flex;gap:6px;flex-wrap:wrap}
+/* a entrada do painel: só quando o sistema não pediu menos movimento */
+@media (prefers-reduced-motion:no-preference){
+  .fl-painel{animation:fl-desce .14s ease-out}
+  @keyframes fl-desce{from{opacity:0;transform:translateY(-4px)}}
+}
+/* celular (menos de 640 px): a barra quebra em linhas, o painel vira uma folha de baixo para cima, na largura toda, com o
+   rodapé fixo e as listas no fluxo (uma lista solta por cima seria cortada pela rolagem da folha) */
+@media (max-width:639px){
+  .fl-pagina{padding-left:14px;padding-right:14px}
+  .fl-barra{gap:8px}
+  .fl-seg{flex:1 1 100%}
+  .fl-seg button{flex:1 1 0;min-width:0;padding:0 4px;font-size:12.5px;overflow:hidden;text-overflow:ellipsis}
+  .fl-busca{flex:2 1 150px;min-width:0}
+  .fl-busca-os{flex:1 1 104px;width:auto;min-width:0}
+  .fl-btn{padding:0 11px}
+  .fl-periodo{flex:1 1 auto;min-width:0}
+  .fl-periodo .fl-seta{display:none}                       /* o período, o Filtros e os dois ícones cabem numa linha só a 375 px */
+  .fl-dir{margin-left:0}
+  .fl-veu{display:block;position:fixed;inset:0;z-index:39;background:var(--fl-veu)}
+  .fl-veu[hidden]{display:none}
+  .fl-painel{position:fixed;top:auto;right:0;bottom:0;left:0!important;width:auto;max-width:none;max-height:88vh;padding:0;
+    border-radius:16px 16px 0 0;border-bottom:0;display:flex;flex-direction:column}
+  .fl-painel[hidden]{display:none}
+  .fl-painel::before{content:"";flex:none;width:36px;height:4px;margin:8px auto 0;border-radius:2px;background:var(--fl-linha-2)}
+  .fl-painel-topo{flex:none;margin:0;padding:8px 8px 4px 16px}
+  .fl-fechar{display:grid}
+  .fl-painel-corpo{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 16px 12px}
+  .fl-grade{grid-template-columns:1fr}
+  .fl-datas{grid-template-columns:1fr 1fr}
+  .fl-painel .os-multi-lista{position:static;margin-top:6px;max-height:240px;box-shadow:none}
+  .fl-rodape{flex:none;margin:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--fl-painel)}
+}
+@media (max-width:639px) and (prefers-reduced-motion:no-preference){
+  .fl-painel{animation-name:fl-sobe}
+  @keyframes fl-sobe{from{opacity:0;transform:translateY(28px)}}
+}
+
 /* ══ TEMA CLARO (Levi, 09/10/2026: "faltou o tema claro do OS Creator Web, não está sincronizando com o botão do Nexus") ══
    Só vale com <html data-tema="claro">, e só o Nexus põe o atributo: a ponte (nexus/torres/oscreator/ponte.py) o desenha
    pelo cookie nexus_tema, e o botão do tema troca ao vivo as molduras abertas. Sozinho (o 5090 do supervisório) o OS Creator
@@ -589,6 +767,17 @@ html[data-tema="claro"]{
   --sec:var(--osc-secao-2); --sec-txt:var(--osc-texto); --input:var(--osc-cartao); --input-b:var(--osc-campo);
   --f-bg:var(--osc-pagina); --f-card:var(--osc-cartao); --f-input:var(--osc-secao); --f-border:var(--osc-linha-forte);
   --f-green:var(--osc-musgo); --f-ink:var(--osc-sobre-lima); --f-muted:var(--osc-mudo);
+  /* os filtros do Histórico no modelo A (Levi, 03/11/2026): o texto em azul é o próprio #1558c9 (6,4:1 no branco), o botão lima segue
+     lima com o texto escuro, e o ponto do que mudou usa o lima escuro (o musgo), porque o lima some no branco; o contorno do
+     lima (a contagem e o Aplicar) é o musgo a meia força */
+  --fl-preto:#030407; --fl-campo:var(--osc-cartao); --fl-painel:var(--osc-cartao); --fl-linha:var(--osc-linha); --fl-linha-2:var(--osc-linha-forte);
+  --fl-campo-borda:var(--osc-campo); --fl-campo-borda-hover:var(--osc-campo-hover);
+  --fl-txt:var(--osc-texto); --fl-mudo:var(--osc-texto-2); --fl-mudo-2:var(--osc-mudo); --fl-hover:var(--osc-clarao);
+  --fl-sombra:var(--osc-sombra-alta); --fl-veu:var(--osc-veu);
+  --fl-lima:#D4FF24; --fl-lima-suave:rgba(212,255,36,.35); --fl-lima-borda:rgba(86,102,16,.55); --fl-sobre-lima:#030407;
+  --fl-ponto:var(--osc-musgo);
+  --fl-azul:#1558c9; --fl-azul-suave:rgba(21,88,201,.10); --fl-azul-borda:rgba(21,88,201,.45); --fl-azul-texto:#1558c9;
+  --fl-sobre-azul:#ffffff;
   scrollbar-color:var(--osc-rolagem) transparent;
 }
 /* cabeçalho, abas e lançador */
@@ -732,6 +921,8 @@ html[data-tema="claro"]{
 :where(html[data-tema="claro"]) .os-hist tr.tk-g td{background:var(--osc-secao)}
 :where(html[data-tema="claro"]) .os-hist tr.tk-g:hover td{background:var(--osc-secao-2)}
 :where(html[data-tema="claro"]) .tk-g-usina{color:var(--osc-texto)}
+/* os filtros do Histórico no modelo A: o calendário do campo de data no claro (as cores vêm dos tokens --fl-*) */
+:where(html[data-tema="claro"]) .fl-painel input[type=date]{color-scheme:light}
 /* a barra de rolagem: a mesma do Nexus no claro */
 :where(html[data-tema="claro"]) .osb-lista,:where(html[data-tema="claro"]) .os-multi-lista,:where(html[data-tema="claro"]) .os-tbl-wrap,
 :where(html[data-tema="claro"]) .os-analise,:where(html[data-tema="claro"]) .acoes-dlg,:where(html[data-tema="claro"]) .acoes-exec,

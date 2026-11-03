@@ -318,13 +318,15 @@ filtro do histórico".
     o Esc da busca aberta). O `<select>` escondido sai do Tab, e o clique no rótulo cai na busca;
   - código da tela que faz `sel.value = x` (sugestão do deep link, reset) atualiza o texto, mesmo sem o `change`;
   - a opção vazia ("— selecione —", "carregando…") vira o texto de fundo, apagado, e a caixa fica livre para digitar.
-- **Histórico:** toda lista de marcar com 6 opções ou mais ganha a caixa no topo. A de Usina tem sempre, porque o
-  macro `multi` a marca com `data-busca="1"` (sem a marca, catálogo fora do ar e período curto a deixariam sem busca).
-  Lista curta fica sem ela.
+- **Histórico:** desde 03/11/2026 **toda** lista do painel de filtros ganha a caixa no topo (Levi: "todas as opções do filtro
+  digitáveis"): o macro `multi` marca todas com `data-busca="1"`, mesmo a de 2 ou 3 opções (até então só a de Usina, e as de 6 ou
+  mais). Criado por e Etiqueta (um valor só) usam a mesma lista, com um botão de escolha por linha (seção "Os filtros do Histórico só
+  valem no Aplicar").
   - Esconde o que não casa pela classe `osm-fora`, **nunca** por `[hidden]`. O hidden é a cascata cliente → usina, e o
     resumo e o filtro do Histórico ignoram o que está hidden. Assim, a usina marcada continua valendo mesmo fora da
     busca.
-  - Enter marca ou desmarca a linha em destaque; Esc limpa a busca, o segundo Esc fecha; fechar a lista limpa a busca.
+  - Enter marca ou desmarca a linha em destaque (ou escolhe, na lista de um valor só); Esc limpa a busca, o segundo Esc fecha
+    (dentro de um `[data-esc-fecha]`, como o painel do Histórico, um Esc só já fecha); fechar a lista limpa a busca.
   - A caixa não tem `name`: não vai no formulário. No celular, ela não toma o foco ao abrir a lista: o teclado cobriria
     metade dela.
 - **Performance:** o rótulo "Responsável" aponta para o campo (`for="cb_resp"`). Sem isso, o primeiro controle
@@ -1307,6 +1309,66 @@ com as tarefas de 130 OS), repetidos para cada pessoa (a memória era por pessoa
   pessoas, a visão restrita com a dela, a vencida que soma só as novas, a inteira a cada 10 min sem reler as tarefas
   das fechadas, o ↻, três pessoas ao mesmo tempo, o Fracttal fora, as linhas montadas uma vez).
 
+## Os filtros do Histórico só valem no Aplicar (03/11/2026)
+
+Levi, 03/11/2026: "quero que consigamos selecionar os filtros sem carregar a cada filtro, pode aparecer um botão discreto de
+Aplicar sempre que selecionar algum filtro, aí só filtra mesmo se aplicar". Antes, Criado por, Etiqueta e Período buscavam no
+servidor a cada troca, e Status, Cliente, Usina e Tipos filtravam a tabela na hora: montar três filtros custava três buscas.
+No mesmo dia ele pediu o visual: "refaz esse modelo de filtros [...] algo minimalista e moderno ao mesmo tempo", "use as cores
+Black: 030407, Blue: 1558c9, lime: D4FF24", "opção A, suspenso com um botão de aplicar no final" e "quero que todas as opções do
+filtro sejam digitáveis para facilitar encontrar o que quero". A maquete aprovada é o **modelo A**, e a tela é ela
+(`templates/historico.html`; o CSS na seção "os filtros no modelo A" do `static/os.css`; a busca no `static/os_busca.js`).
+- **A barra, numa linha só** (no celular quebra em linhas curtas: as abas, as duas buscas, e o período com o Filtros e os
+  ícones): as abas Histórico Geral, Atribuídas a mim e Visão COS (controle segmentado, a ativa em azul); a busca por texto (filtra
+  enquanto se digita, sem Aplicar); o "Buscar OS" pelo nº, compacto (abre a OS direto); o botão do **período**, que mostra o aplicado
+  ("04/10 – 03/11") e abre o painel; o botão **Filtros**, com a contagem em lima dos filtros aplicados (o período não conta); e os
+  ícones de Exportar (Ctrl+E) e Atualizar (F5), só ícone, com `title`. O "Lista das HH:MM · atualiza a cada 10 min" ficou em texto
+  apagado na linha do resumo da tabela.
+- **As etiquetas**, abaixo da barra: uma azul por filtro aplicado ("Status Em Processo", "Usina 3 selecionadas", "Criado por …").
+  O × tira aquele filtro e **aplica na hora** (pelo mesmo caminho do Aplicar: o da tabela sem pedido, o do servidor com a busca).
+  O "Limpar tudo" faz o que o Limpar filtros de antes fazia: sai o resto e a busca, e ficam a visão, o Criado por e o período (a
+  tela volta pelo endereço limpo). Ele só aparece quando há o que limpar. Sem filtro aplicado, a linha não existe. O Criado por vira
+  etiqueta sempre que não é "Todos os usuários": no Histórico Geral o padrão é a própria pessoa, e a etiqueta já está lá (a lista é
+  mesmo só das OS dela).
+- **O painel suspenso**, preso ao botão do período ou ao Filtros (o mesmo painel): o período primeiro (os atalhos 7 dias, 30 dias e
+  Este mês só **preenchem as duas datas** e esperam o Aplicar; "7 dias" é de 7 dias atrás até hoje, como os 30 do padrão da tela) e
+  depois Criado por, Etiqueta, Status, Cliente, Usina, Tipo de ativo e Tipo de tarefa, em 2 colunas (1 no celular). O campo que mudou
+  em relação ao aplicado ganha um ponto lima. No rodapé: **Limpar** (zera Etiqueta, Status, Cliente, Usina e os Tipos e espera o
+  Aplicar; Criado por e o período são o escopo da lista e ficam, como no Limpar de antes), "N alterações" e o **Aplicar** em lima,
+  apagado sem alteração. Com menos de 640 px o painel vira uma folha de baixo para cima, na largura toda, com o rodapé fixo, um véu
+  atrás e as listas no fluxo (solta por cima, a lista seria cortada pela rolagem da folha).
+- **Fechar sem aplicar descarta** (Esc, clique fora, o botão de novo ou o × da folha): os campos voltam ao aplicado. O clique fora
+  vale na captura, antes de qualquer outro clique da página: o que manda o formulário (as abas da visão, o ↻, o F5, o × de uma
+  etiqueta, o Limpar tudo) descarta o que estava no painel antes de mandar. Enter numa data é o Aplicar; nos outros campos do painel
+  não manda nada (o Enter solto mandaria o formulário pelo 1º botão de envio, o ↻, que busca tudo de novo e levaria as escolhas sem
+  o Aplicar). A atualização de 10 min espera com o painel aberto. Período sem as duas datas, ou com a inicial depois da final, não
+  aplica e avisa dentro do painel.
+- **A regra do Aplicar** não mudou: Criado por, Etiqueta e Período buscam no servidor; o resto (Cliente, Usina, os Tipos e o Status)
+  só filtra a tabela que já está na tela, sem pedido. Os filtros da tabela que não vão ao servidor atravessam a busca guardados no
+  `sessionStorage` da aba e remarcados ao chegar (o Aplicar que muda o período e a usina juntos não perde a usina, e a atualização de
+  10 min não zera os filtros da tabela); a troca de aba da visão e o Limpar tudo os zeram. **Exceção, achada ao fazer o ×:** a
+  página que chegou com Status no endereço já veio CORTADA pelo servidor (ele filtra por status), então nela o Status conta como
+  campo do servidor; só pela tabela, tirar a etiqueta mostraria as mesmas OS e diria que são todas.
+- **Tudo digitável.** Abrir um campo mostra a lista com a caixa de busca no topo (no PC já com o cursor; no celular não, porque o
+  teclado cobriria metade da lista): digitar filtra sem distinguir acento nem caixa ("sao" acha "São"), as setas andam, Enter marca
+  (as de vários valores: Status, Cliente, Usina e os Tipos, com o resumo "3 selecionadas", no feminino da Usina) ou escolhe (as de um
+  valor só, Criado por e Etiqueta, que fecham ao escolher), e o Esc fecha só a lista, de uma vez, com o texto digitado saindo
+  junto (com a lista fechada, o Esc fecha o painel; o painel marca isso com `data-esc-fecha`: nas outras telas o 1º Esc continua
+  limpando a busca e o 2º fecha). O `<select name="pessoa">` e o `<select name="etiqueta">` seguem no formulário, escondidos
+  (`display:none` dentro do `.fl-cel[data-campo-proprio]`, e é ele que o servidor lê); a lista que a pessoa vê é um `<details
+  class="os-multi fl-uni">` com um botão de escolha por linha, e o `os_busca.js` a trata como as outras (a caixa de busca, o teclado)
+  e deixa o `<select>` em paz. A cascata Cliente → Usina continua, e o descartar devolve o que ela desmarcou.
+- **Cores só por token** (`--fl-*`, no `:root` do `os.css`): o lima `#D4FF24` (a ação: o Aplicar, a contagem e o ponto do que mudou),
+  o azul `#1558c9` (o que está escolhido) e o preto `#030407` (o texto sobre o lima), com os "suaves" e as "bordas" em rgba. O par do
+  claro está no bloco de variáveis que já existia: o texto azul é o próprio `#1558c9`, o botão lima segue lima com texto escuro, e o
+  ponto lima vira o musgo. O fundo da página e o resto do OS Creator não mudaram. O botão Aplicar de hoje de manhã tinha `hidden` e
+  aparecia sempre (o `.os-btn{display:inline-flex}` vence o `hidden` do navegador): os controles novos que nascem escondidos
+  dizem `[hidden]{display:none}` no CSS.
+- **Prova:** `tests/test_oscreator_historico_aplicar.py` roda a página de verdade no node (`tests/historico_pagina_falsa.js`: o HTML
+  que o servidor monta é lido por um DOM de mentira que executa o script dela e o `os_busca.js`), com a troca que não filtra, o
+  descartar, o × que aplica, o atalho do período, a busca sem acento e o Enter que escolhe. A tela foi conferida no navegador, nos
+  dois temas, a 1280 e a 375 px, sobre a bancada do clone com dados inventados.
+
 ## O catálogo de ativos central: um só para todas as telas (31/10/2026, etapa 2 do canto central)
 
 Levi, 30/10/2026: "para abrir uma solicitação precisamos de ativos, para criar OS é preciso carregar os ativos, para abrir o
@@ -1758,9 +1820,11 @@ sondas das revisões):
   contagem fica como 2ª barreira (e como a guarda da lista pela metade).
   - Quem está liberado: o administrador do Nexus (a NEXUS_ADMINS, a lista de Base → Acessos, a senha de administrador),
     sempre; e quem é de um setor de `ponte.SETORES_COM_LISTA_CENTRAL` (o nome do setor de Base → Acessos → Pessoas e
-    setores, sem acento nem caixa). A lista nasce VAZIA: no começo, só os administradores.
-  - Como liberar um setor: um commit que põe o nome dele na `SETORES_COM_LISTA_CENTRAL` (`nexus/torres/oscreator/ponte.py`); a
-    trilha fica no git. Não é uma caixa de Base → Acessos: lá cada item é uma tela do menu (abre uma página, conta no "vê N de
+    setores, sem acento nem caixa). Nasceu VAZIA (só os administradores); desde 03/11/2026 vale o `TODOS_OS_SETORES` ("*"):
+    o Levi liberou todos ("Todos os setores veem todas as OSs" no Fracttal), e qualquer pessoa com setor no Nexus lê. A pessoa
+    sem setor segue fechada.
+  - Como mudar: um commit na `SETORES_COM_LISTA_CENTRAL` (`nexus/torres/oscreator/ponte.py`), com "*" para todos ou os nomes
+    dos setores; a trilha fica no git. Não é uma caixa de Base → Acessos: lá cada item é uma tela do menu (abre uma página, conta no "vê N de
     M telas", entra no "Marcar tudo" e no "Copiar de", e a tela "por dentro" libera a de fora), e uma liberação que não é tela
     não cabe nele de forma limpa (o plano B do Ruling BX).
   - Como o clone sabe: a ponte põe a marca em todo pedido ao OS Creator (`request.environ["os_web.lista_central"]`,

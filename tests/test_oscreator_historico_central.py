@@ -1390,8 +1390,8 @@ def setor_de_mentira(app, monkeypatch):
 
 def test_a_ponte_libera_o_administrador_e_os_setores_da_lista(app, setor_de_mentira, monkeypatch):
     """Quem a ponte libera (`ponte.lista_central`): o administrador do Nexus, sempre, sem ler o setor; quem é de um setor de
-    `SETORES_COM_LISTA_CENTRAL` (pelo nome, sem acento nem caixa), que nasce vazia. O resto, o sem setor, o setor que não deu
-    para ler e o Nexus sem a NEXUS_PESSOA_HMAC: não."""
+    `SETORES_COM_LISTA_CENTRAL` (pelo nome, sem acento nem caixa). O resto, o sem setor, o setor que não deu para ler e o
+    Nexus sem a NEXUS_PESSOA_HMAC: não."""
     from flask import session
 
     from nexus.torres.oscreator import ponte as P
@@ -1401,7 +1401,8 @@ def test_a_ponte_libera_o_administrador_e_os_setores_da_lista(app, setor_de_ment
         session["admin"] = False
         session["usuario"] = {"email": "Pessoa.Teste@exemplo.test", "nome": "Pessoa Teste", "perfil": ""}
         setor_de_mentira["valor"] = {"id": 3, "nome": "COS"}
-        assert P.lista_central() is False                        # a lista de setores nasce vazia
+        monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset())
+        assert P.lista_central() is False                        # a lista de setores vazia: só o administrador
         monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset({"cos"}))
         for nome in ("COS", "cos", " Cós "):
             setor_de_mentira["valor"] = {"id": 3, "nome": nome}
@@ -1409,6 +1410,29 @@ def test_a_ponte_libera_o_administrador_e_os_setores_da_lista(app, setor_de_ment
         assert setor_de_mentira["lidos"][-1] == "pessoa.teste@exemplo.test"
         setor_de_mentira["valor"] = {"id": 2, "nome": "Performance"}
         assert P.lista_central() is False
+        setor_de_mentira["valor"] = None
+        assert P.lista_central() is False
+        setor_de_mentira["valor"] = RuntimeError("setores ilegíveis no banco")
+        assert P.lista_central() is False
+        app.config["NEXUS_PESSOA_HMAC"] = ""
+        setor_de_mentira["valor"] = {"id": 3, "nome": "COS"}
+        assert P.lista_central() is False
+
+
+def test_todos_os_setores_libera_quem_tem_setor(app, setor_de_mentira):
+    """Levi, 03/11/2026: "Todos os setores veem todas as OSs" no Fracttal. O padrão é o `TODOS_OS_SETORES`: qualquer setor do
+    Nexus lê a lista central; a pessoa sem setor, o setor que não deu para ler e o Nexus sem a NEXUS_PESSOA_HMAC seguem
+    fechados (sem saber quem é, não libera)."""
+    from flask import session
+
+    from nexus.torres.oscreator import ponte as P
+    assert P.SETORES_COM_LISTA_CENTRAL == frozenset({P.TODOS_OS_SETORES})
+    with app.test_request_context("/os/historico"):
+        session["logado"], session["admin"] = True, False
+        session["usuario"] = {"email": "Pessoa.Teste@exemplo.test", "nome": "Pessoa Teste", "perfil": ""}
+        for nome in ("COS", "Performance", "Engenharia", "Segurança"):
+            setor_de_mentira["valor"] = {"id": 9, "nome": nome}
+            assert P.lista_central() is True, nome
         setor_de_mentira["valor"] = None
         assert P.lista_central() is False
         setor_de_mentira["valor"] = RuntimeError("setores ilegíveis no banco")
