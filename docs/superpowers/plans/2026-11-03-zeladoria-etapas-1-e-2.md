@@ -218,6 +218,18 @@ do Radar dentro do Nexus como uma torre só leitura, com o dado real.
     `has_table_privilege(..., 'INSERT')` é verdadeiro levanta `chaves.Recusada`, com "só leitura" na mensagem.
   - `test_pessoal_nao_sai_em_claro`: nenhuma célula do banco falso contém o e-mail ou o nome fictício da fixture.
 
+- [ ] **Step 1b (revisão final de 03/11): os valores com nome de gente nos dados.**
+  - O clone renomeou valores que estão gravados nos dados: o tipo/escopo das simulações, as chaves do `config`
+    (`previsto_decidido_*`, `simulacao_gastos_*`, `simulacao_cenarios_*`) e a origem `planilha_<nome>`.
+  - A cópia aplica o MESMO de-para da ferramenta do clone. Ele fica fora do repositório: o caminho do JSON vai na
+    variável `NEXUS_ZELADORIA_DE_PARA` do `.env`, e sem ela a cópia para.
+  - Vale só em texto com cara de identificador (`^[a-z0-9_:-]*<nome>[a-z0-9_:-]*$`), inclusive DENTRO do JSON (chaves
+    e valores), antes de cifrar. Nunca em nome de gente nem e-mail.
+  - O relatório conta quantas trocas fez por aba.
+  - Teste `test_valores_com_nome_renomeados`: uma linha do `config` com chave `previsto_decidido_fulano` e um JSON com
+    `{"escopo": "fulano"}` chegam como `previsto_decidido_equipe` e `{"escopo": "equipe"}`. Um e-mail
+    `fulano@exemplo.com` fica igual.
+  - Use `tabelas.mapa_de_tabelas(nomes)` (não o `nome_no_nexus` sozinho) para a lista do esquema.
 - [ ] **Step 2: Run** `python -m pytest tests/test_zeladoria_copia.py -q`. Expected: FAIL.
 
 - [ ] **Step 3: Implement.**
@@ -340,6 +352,9 @@ do Radar dentro do Nexus como uma torre só leitura, com o dado real.
   - `estado(config) -> dict[str, list[dict]] | None`: as 40 abas decifradas, com cache de 300 s; `None` quando um livro
     não existe ou volta vazio;
   - `linhas(view: str, filtros: list[tuple[str, str, object]], ordem: tuple[str, bool] | None, quem: dict) -> list[dict]`;
+  - **o contrato do `/api/eu` é `{"user": {"id", "email"}}`** (o que a ponte e o teste node esperam; revisão final de
+    03/11). O papel e o status, o clone lê de `rf_perfis?eq=user_id:...`, então o servidor monta a linha de `perfis`
+    do administrador sem linha (HEAD, aprovado) também nessa leitura;
   - `quem_sou(config, usuario: dict | None, admin: bool) -> dict`:
     - devolve `{"id", "email", "papel", "status"}`;
     - casa o e-mail normalizado com `perfis.email`;
