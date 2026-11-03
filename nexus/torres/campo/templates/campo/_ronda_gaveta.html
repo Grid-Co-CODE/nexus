@@ -1,0 +1,64 @@
+{# A barra lateral da ronda (Levi, 03/11/2026: "Tira esse botão 'Fotos' ao clicar na linha já abre uma barra lateral
+   mostrando tudo da ronda, a barra pode representar 1/3 do tamanho da tela. Ficará do lado direito! Não irá mais abrir
+   abaixo da linha"). Quem inclui: a aba Registros (rondas.html) e o histórico da usina (rondas_usina.html). A linha com
+   `data-detalhe` abre a barra no clique (ou no Enter) e busca o pedaço `_ronda_detalhe.html`; as fotos vêm depois, da
+   rota das fotos da OS (1 pedido ao Fracttal por OS, guardado 20 min). Se o Fracttal recusou (excesso de pedidos), o
+   pedaço das fotos vem com data-erro: a barra tenta sozinha em 1 minuto e o "Tentar de novo" busca na hora. A
+   miniatura abre ampliada na caixa do `_ronda_fotos_caixa.html`. #}
+<aside class="rd-gaveta" id="rd-gaveta" role="dialog" aria-modal="false" aria-labelledby="rg-titulo" hidden>
+  <div class="rd-gaveta-topo"><span class="gc-rotulo">Ronda</span>
+    <button type="button" class="rd-fechar" data-rg-fechar aria-label="Fechar a ronda" title="Fechar (Esc)">&times;</button></div>
+  <div class="rd-gaveta-corpo"></div>
+</aside>
+<script>
+  (function () {
+    var gaveta = document.getElementById('rd-gaveta'), corpo = gaveta.querySelector('.rd-gaveta-corpo');
+    var ativa = null, espera = null, pedido = 0;
+    function fotos(lugar) {
+      clearInterval(espera);
+      fetch(lugar.dataset.fotosUrl, {credentials: 'same-origin'}).then(function (r) { return r.text(); }).then(function (html) {
+        lugar.innerHTML = html;
+        if (!lugar.querySelector('[data-erro]')) return;
+        var n = 60, conta = lugar.querySelector('.cn-fotos-conta');
+        espera = setInterval(function () {
+          if (gaveta.hidden || !document.body.contains(lugar)) { clearInterval(espera); return; }
+          n -= 1;
+          if (conta) conta.textContent = ' Tento de novo sozinho em ' + n + ' s.';
+          if (n <= 0) fotos(lugar);
+        }, 1000);
+      }).catch(function () { lugar.textContent = 'Não consegui buscar as fotos. Feche e abra a ronda de novo.'; });
+    }
+    function abre(tr) {
+      if (ativa) ativa.classList.remove('rd-linha--ativa');
+      ativa = tr; tr.classList.add('rd-linha--ativa');
+      gaveta.hidden = false; document.body.classList.add('rd-com-gaveta');
+      corpo.innerHTML = '<p class="mudo">Abrindo a ronda…</p>';
+      var meu = ++pedido;
+      fetch(tr.dataset.detalhe, {credentials: 'same-origin'}).then(function (r) { return r.text(); }).then(function (html) {
+        if (meu !== pedido) return;                       // outra linha foi clicada no meio
+        corpo.innerHTML = html; corpo.scrollTop = 0;
+        var lugar = corpo.querySelector('[data-fotos-url]');
+        if (lugar) fotos(lugar);
+      }).catch(function () { if (meu === pedido) corpo.innerHTML = '<p class="cn-t-alerta">Não consegui abrir a ronda agora. Tente de novo.</p>'; });
+    }
+    function fecha() {
+      clearInterval(espera); gaveta.hidden = true; document.body.classList.remove('rd-com-gaveta');
+      if (ativa) { ativa.classList.remove('rd-linha--ativa'); ativa.focus(); ativa = null; }
+    }
+    document.addEventListener('click', function (ev) {
+      var t = ev.target.closest && ev.target.closest('.rd-gaveta .cn-bt-tentar');
+      if (t) { var l = corpo.querySelector('[data-fotos-url]'); if (l) fotos(l); return; }
+      var tr = ev.target.closest && ev.target.closest('tr[data-detalhe]');
+      // o link da usina, o menu do cabeçalho e o que mais for clicável na linha seguem o caminho deles
+      if (!tr || ev.target.closest('a, button, summary, details')) return;
+      abre(tr);
+    });
+    document.addEventListener('keydown', function (ev) {
+      var tr = ev.target.closest && ev.target.closest('tr[data-detalhe]');
+      if (tr && (ev.key === 'Enter' || ev.key === ' ') && ev.target === tr) { ev.preventDefault(); abre(tr); return; }
+      var caixa = document.querySelector('.cn-caixa-foto');
+      if (ev.key === 'Escape' && !gaveta.hidden && (!caixa || caixa.hidden)) fecha();
+    });
+    gaveta.querySelector('[data-rg-fechar]').addEventListener('click', fecha);
+  })();
+</script>

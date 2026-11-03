@@ -45,8 +45,9 @@ def _sem_fracttal(monkeypatch, respostas=None):
 # ── 1, 2 e 3: Registros sem Região, Início e Fim; Duração ao lado da Data, com o início e o fim no mouse ───────────
 def test_registros_sem_regiao_inicio_fim_e_a_duracao_ao_lado_da_data(banco, logado):
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
+    # a coluna Fotos saiu (03/11/2026): a linha abre a barra lateral com tudo da ronda, fotos inclusive
     assert _cabecalho(html, "cn-tab--rondas") == ["Data", "Duração", "Técnico", "Usina", "Equipe", "Tipo", "Qualidade",
-                                                  "Veredito", "Pendências", "Trackers", "OS", "Fotos"]
+                                                  "Veredito", "Pendências", "Trackers", "OS"]
     # 10:00Z às 11:00Z = 07:00 às 08:00 em Brasília; a dica vale no mouse e no foco do teclado (tabindex)
     assert 'class="cn-dur" tabindex="0" data-dica="Iniciou às 07:00 · terminou às 08:00 (Brasília)"' in html
     assert '<span class="cn-oculto">. Iniciou às 07:00 · terminou às 08:00 (Brasília)</span>' in html   # leitor de tela
@@ -55,16 +56,23 @@ def test_registros_sem_regiao_inicio_fim_e_a_duracao_ao_lado_da_data(banco, loga
     assert "Início;Fim" in logado.get("/t/campo/rondas?csv=1").get_data(as_text=True)
 
 
-# ── 4 e 4.1: o botão Fotos na tabela, o mesmo componente do histórico da usina ───────────────────────────────────
+# ── 4 e 4.1: as fotos da ronda; desde 03/11/2026 na barra lateral, a mesma da tabela e do histórico da usina ──────
 def test_botao_fotos_na_tabela_e_no_historico_com_o_mesmo_componente(banco, logado):
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
-    # as duas rondas da Altair têm OS 500; a de Brodowski não tem OS: sem botão, com o porquê
-    assert html.count('data-url="/t/campo/rondas/os/500/fotos"') == 2
-    assert html.count('<tr class="cn-fotos-linha" hidden><td colspan="12"></td></tr>') == 2
-    assert 'title="Ronda sem OS no Fracttal: as fotos ficam só no App">—<' in html
-    assert html.count('class="cn-caixa-foto"') == 1 and "ArrowLeft" in html and "Escape" in html
+    # a linha abre a barra lateral (03/11/2026: "Tira esse botão 'Fotos' ao clicar na linha já abre uma barra lateral");
+    # as duas rondas da Altair têm OS 500, a de Brodowski não tem OS: a barra diz que as fotos ficam no App
+    # (a caixa que amplia é a mesma da Zeladoria e da Segurança, que seguem com o botão: o script dele vem junto)
+    assert 'class="cn-bt-fotos"' not in html and '<tr class="cn-fotos-linha"' not in html
+    assert html.count('data-detalhe="/t/campo/rondas/usina/1/ronda?os=500&amp;data=') == 2
+    assert html.count('class="cn-caixa-foto"') == 1 and "ArrowLeft" in html and 'id="rd-gaveta"' in html
+    url = re.search(r'data-detalhe="(/t/campo/rondas/usina/1/ronda[^"]+)"', html).group(1).replace("&amp;", "&")
+    det = logado.get(url).get_data(as_text=True)
+    assert 'data-fotos-url="/t/campo/rondas/os/500/fotos"' in det and "<h2" in det and "Altair" in det
+    brod = re.search(r'data-detalhe="(/t/campo/rondas/usina/2/ronda[^"]+)"', html).group(1).replace("&amp;", "&")
+    assert "as fotos ficam só no App" in logado.get(brod).get_data(as_text=True)
     pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
-    assert 'data-url="/t/campo/rondas/os/500/fotos"' in pag and pag.count('class="cn-caixa-foto"') == 1
+    assert 'data-detalhe="/t/campo/rondas/usina/1/ronda?os=500' in pag and pag.count('class="cn-caixa-foto"') == 1
+    assert 'id="rd-gaveta"' in pag and 'class="cn-bt-fotos"' not in pag
 
 
 # ── 5: quantas usinas nunca tiveram ronda, em todo o registro ────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ cabeçalho da coluna; sem o Painel, a Sujidade e vegetação e o Quem ronda; a S
 "Buscar por usina" que leva à página da usina; e, na usina, a evolução por mês, os números juntos e o "De onde vem" na
 exclamação amarela. Banco falso (pg_falso) do test_campo_visao."""
 import re
+from pathlib import Path
 
 from test_campo_visao import _dia, banco  # noqa: F401  (fixture)
 
@@ -68,10 +69,12 @@ def test_a_duracao_e_a_pendencia_se_escolhem_no_cabecalho(banco, logado):
 
 def test_buscar_por_usina_leva_a_pagina_dela(banco, logado):
     html = logado.get("/t/campo/rondas?cliente=Outro+Cliente").get_data(as_text=True)
-    lista = html.split('<datalist id="rd-usinas">', 1)[1].split("</datalist>", 1)[0]
-    # todas as usinas, sem os filtros (buscar é ir à usina)
-    assert re.findall(r'<option value="([^"]+)" data-href="/t/campo/rondas/usina/(\d+)">', lista) == [
-        ("Altair", "1"), ("Brodowski 1", "2"), ("Coração 1", "3")]
+    lista = html.split('<ul class="rd-usinas" id="rd-usinas" role="listbox"', 1)[1].split("</ul>", 1)[0]
+    # todas as usinas, sem os filtros (buscar é ir à usina), na lista do Nexus com o cliente e a UF (03/11/2026: "essa
+    # lista está mal formatada, quero estilo nexus")
+    assert re.findall(r'<li role="option" id="rd-us-(\d+)" data-href="/t/campo/rondas/usina/\d+"><b>([^<]+)</b><span>([^<]+)</span>', lista) == [
+        ("1", "Altair", "Thopen · SP"), ("2", "Brodowski 1", "Thopen · SP"), ("3", "Coração 1", "Outro Cliente · SC")]
+    assert "<datalist" not in html and 'role="combobox"' in html and "Nenhuma usina com esse nome" in lista
     # sem o script: o nome igual (sem acento nem caixa) ou o único que contém vai à usina; senão, a busca da tabela
     assert logado.get("/t/campo/rondas/buscar-usina?nome=coracao+1").headers["Location"] == "/t/campo/rondas/usina/3"
     assert logado.get("/t/campo/rondas/buscar-usina?nome=brodow").headers["Location"] == "/t/campo/rondas/usina/2"
@@ -92,30 +95,45 @@ def test_o_como_ler_e_o_de_onde_vem_na_exclamacao_amarela(banco, logado):
     assert '<div class="cn-numeros rd-numeros">' in pag and 'class="cn-kpi' not in pag
 
 
-def test_a_evolucao_da_usina_vem_por_mes_aberta_no_de_agora(banco, logado, monkeypatch):
+def test_a_evolucao_da_usina_nos_ultimos_30_dias(banco, logado, monkeypatch):
+    """Levi, 03/11/2026, depois de ver o filtro de mês: "Quando clica na usina deixa os últimas 30 dias, melhor que por
+    mês". A tabela segue com os 90 dias."""
+    from datetime import timedelta
     from nexus.campo import ronda_checklist
     monkeypatch.setattr(ronda_checklist, "respostas", lambda: {"500": {"sujidade": 4, "vegetacao": 2}})
-    agora = visao._agora().strftime("%Y-%m")
     pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
-    sel = pag.split('<select class="gc-campo" id="rd-mes" name="mes"', 1)[1].split("</select>", 1)[0]
-    assert re.search(rf'<option value="{agora}" selected>', sel)                # o mês de agora, de início
-    meses = re.findall(r'<option value="(\d{4}-\d{2})"', sel)
-    assert meses == sorted({agora, _dia(1)[:7], _dia(3)[:7]}, reverse=True)
-    n_agora = sum(1 for d in (_dia(1), _dia(3)) if d[:7] == agora)
-    assert pag.count('class="cn-ponto"') == n_agora
-    # o mês de agora sem leitura diz isso (e o mês da leitura fica na lista); um mês com uma leitura só põe o ponto no meio
-    from datetime import date, timedelta
-    antes = (date.fromisoformat(agora + "-01") - timedelta(days=1)).strftime("%Y-%m")
+    assert 'id="rd-mes"' not in pag and "últimos 30 dias" in pag and pag.count('class="cn-ponto"') == 2
+    hoje = visao._agora().date()
     base = visao.rondas().dados["todas"][0]
 
-    def uma_leitura(mes):
-        return lambda todas, resp, uid, validacoes=(): [dict(base, data=f"{mes}-02", sujidade=3, vegetacao=1, lida=True,
-                                                            os="901", sensores_sujos=[], vala="")]
-    monkeypatch.setattr(visao, "historico_usina", uma_leitura(antes))
-    vazio = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
-    assert "Nenhuma leitura de sujidade e vegetação em" in vazio and 'class="cn-ponto"' not in vazio
-    assert f'<option value="{antes}">' in vazio
-    assert logado.get(f"/t/campo/rondas/usina/1?mes={antes}").get_data(as_text=True).count('class="cn-ponto"') == 1
-    monkeypatch.setattr(visao, "historico_usina", uma_leitura(agora))
-    um = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
-    assert um.count('class="cn-ponto"') == 1 and 'data-x="380.0"' in um
+    def leituras(*dias):
+        return lambda todas, resp, uid, validacoes=(): [
+            dict(base, data=(hoje - timedelta(days=n)).isoformat(), sujidade=3, vegetacao=1, lida=True, os=str(900 + n),
+                 sensores_sujos=[], vala="") for n in dias]
+    # a de 31 dias fica de fora da evolução e na tabela; a de 30, dentro
+    monkeypatch.setattr(visao, "historico_usina", leituras(30, 31))
+    pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
+    assert pag.count('class="cn-ponto"') == 1 and 'data-x="380.0"' in pag             # uma leitura só fica no meio
+    monkeypatch.setattr(visao, "historico_usina", leituras(31, 40))
+    pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
+    assert "Nenhuma leitura de sujidade e vegetação nos últimos 30 dias." in pag and 'class="cn-ponto"' not in pag
+    assert pag.count('class="rd-linha"') == 2                                         # a tabela segue com as duas
+
+
+def test_a_linha_abre_a_barra_lateral_com_tudo_da_ronda(banco, logado, monkeypatch):
+    """Levi, 03/11/2026: "Tira esse botão 'Fotos' ao clicar na linha já abre uma barra lateral mostrando tudo da ronda, a
+    barra pode representar 1/3 do tamanho da tela. Ficará do lado direito! Não irá mais abrir abaixo da linha"."""
+    from nexus.campo import ronda_checklist
+    monkeypatch.setattr(ronda_checklist, "respostas", lambda: {"500": {"sujidade": 4, "vegetacao": 2, "vala": "Parcial",
+                                                                       "sensores_sujos": ["IPOA"]}})
+    det = logado.get(f"/t/campo/rondas/usina/1/ronda?os=500&data={_dia(1)}").get_data(as_text=True)
+    for txt in ("Altair", "Fulano Souza", "07:00 às 08:00", "Sujidade dos módulos", "cn-nivel-txt--4", "Parcial",
+                "IPOA sujo", "ronda longa pendente", "item sem foto de evidência", 'data-fotos-url="/t/campo/rondas/os/500/fotos"'):
+        assert txt in det, txt
+    # sem OS: pelo dia e pela hora do início; a que não existe diz isso
+    assert "as fotos ficam só no App" in logado.get(f"/t/campo/rondas/usina/2/ronda?data={_dia(2)}&ini=07:00").get_data(as_text=True)
+    assert "Não achei esta ronda" in logado.get("/t/campo/rondas/usina/1/ronda?os=999&data=2026-01-01").get_data(as_text=True)
+    # a barra: 1/3 da tela, à direita; no celular, a tela inteira
+    css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    assert ".rd-gaveta{position:fixed;z-index:60;top:0;right:0;bottom:0;display:flex;flex-direction:column;width:33.333vw" in css
+    assert "@media (max-width:900px){.rd-gaveta{width:100vw;min-width:0}}" in css

@@ -721,10 +721,9 @@ def test_grafico_do_historico_diz_os_quem_fez_e_quando(banco, logado, monkeypatc
     """Levi, 06/10: no gráfico de evolução, passar o mouse no ponto mostra a OS, quem fez e o dia com a hora."""
     from nexus.campo import ronda_checklist
     monkeypatch.setattr(ronda_checklist, "respostas", lambda: {"500": {"sujidade": 4, "vegetacao": 2}})
-    # a evolução vem por mês (03/11/2026): no mês da ronda de ontem, as rondas dele (a de 3 dias atrás pode ser do outro)
-    mes = _dia(1)[:7]
-    pag = logado.get(f"/t/campo/rondas/usina/1?mes={mes}").get_data(as_text=True)
-    assert pag.count('class="cn-ponto"') == sum(1 for d in (_dia(1), _dia(3)) if d[:7] == mes) and 'class="cn-dica"' in pag
+    # a evolução dos últimos 30 dias (03/11/2026): as duas rondas da Altair (há 1 e 3 dias)
+    pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
+    assert pag.count('class="cn-ponto"') == 2 and 'class="cn-dica"' in pag
     d1 = _dia(1)
     assert f'data-quando="{d1[8:10]}/{d1[5:7]}/{d1[:4]} às 07:00 (até 08:00)"' in pag
     assert 'data-os="500"' in pag and 'data-tec="Fulano Souza"' in pag and 'data-suj="4"' in pag
@@ -798,8 +797,11 @@ def test_fotos_da_ronda_separam_sujidade_e_vegetacao(banco, logado, monkeypatch)
         assert mini.mimetype == "image/jpeg" and max(Image.open(io.BytesIO(mini.data)).size) == 240
         assert not ronda_fotos._EM_CURSO                            # nada ficou esperando (06/10: 60 s preso)
         assert pedidos == ["500", "500"]                       # a lista fica guardada (o limpar acima zera)
+        # as fotos vêm na barra lateral da ronda (03/11/2026), pelo pedaço do detalhe
         pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
-        assert 'data-url="/t/campo/rondas/os/500/fotos"' in pag and 'class="cn-caixa-foto"' in pag
+        assert 'data-detalhe="/t/campo/rondas/usina/1/ronda?os=500' in pag and 'class="cn-caixa-foto"' in pag
+        det = logado.get(f"/t/campo/rondas/usina/1/ronda?os=500&data={_dia(1)}").get_data(as_text=True)
+        assert 'data-fotos-url="/t/campo/rondas/os/500/fotos"' in det
     finally:
         ronda_fotos.limpar()
 

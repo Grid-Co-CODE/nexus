@@ -1271,11 +1271,12 @@ def rondas():
     etiquetas += [{"rotulo": rot, "valor": val, "tirar": {"pag": None, k: None}} for k, (rot, val) in extras.items() if val]
     # "Buscar por usina" (Levi, 03/11/2026: "a pessoa pesquisa o nome da UFV, assim que pesquisar já leva para a página
     # só da usina"): todas as usinas da tela, sem os filtros (buscar é ir à usina, não filtrar)
+    # (a lista no estilo do Nexus, com o cliente e a UF embaixo do nome: 03/11/2026, "essa lista está mal formatada")
     busca = {}
     for x in (d.get("cobertura") or []) + (d.get("todas") or []):
         if x.get("usina_id") and x.get("usina"):
-            busca.setdefault(x["usina_id"], x["usina"])
-    usinas_busca = sorted(busca.items(), key=lambda kv: _ordem_do_nome(kv[1]))
+            busca.setdefault(x["usina_id"], (x["usina"], " · ".join(v for v in (x.get("cliente"), x.get("uf")) if v)))
+    usinas_busca = sorted(((uid, nome, sub) for uid, (nome, sub) in busca.items()), key=lambda u: _ordem_do_nome(u[1]))
     return render_template("campo/rondas.html", **_comum(
         "rondas", leitura, dias=dias, regiao=regiao, aba=aba, abas=ABAS_RONDAS, dur=dur,
         pend=pend, pendencias={k: v for k, v in visao.FEITA.items() if k != "ok"}, ind=ind, cob=cob,
@@ -1312,18 +1313,6 @@ def rondas_buscar_usina():
     return redirect(na_raiz("/t/campo/rondas") + ("?" + urlencode({"q": texto}) if texto else ""))
 
 
-_MESES = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
-          "novembro", "dezembro")
-
-
-def _nome_do_mes(aaaa_mm) -> str:
-    """"2026-11" -> "novembro de 2026"."""
-    try:
-        return f"{_MESES[int(aaaa_mm[5:7]) - 1]} de {aaaa_mm[:4]}"
-    except (ValueError, IndexError):
-        return aaaa_mm
-
-
 @bp.route("/rondas/usina/<int:usina_id>")
 def rondas_usina(usina_id):
     """O histórico de rondas de uma usina, com data, sujidade e vegetação (Levi, 05/10: "quando clicarmos no nome da
@@ -1339,17 +1328,31 @@ def rondas_usina(usina_id):
     # fora da evolução (no dia dela, vale o valor validado)
     rondas_hist = [r for r in hist if not r.get("validada")]
     lidas = [r for r in hist if (r["sujidade"] is not None or r["vegetacao"] is not None) and not r.get("revisada")]
-    # a evolução por mês (Levi, 03/11/2026: "a evolução deve ter um filtro de mês, sempre no mês atual"): os meses com
-    # leitura nos 90 dias e o de agora, mesmo sem leitura
-    agora = visao._agora().strftime("%Y-%m")
-    meses = sorted({(r.get("data") or "")[:7] for r in lidas if r.get("data")} | {agora}, reverse=True)
-    mes = request.args.get("mes") if request.args.get("mes") in meses else agora
+    # a evolução dos últimos 30 dias (Levi, 03/11/2026, depois de ver o filtro de mês: "Quando clica na usina deixa os
+    # últimas 30 dias, melhor que por mês"); a tabela segue com os 90 dias
+    desde = (visao._agora().date() - timedelta(days=DIAS_RONDAS)).isoformat()
     return render_template("campo/rondas_usina.html", **_comum(
         "rondas", leitura, usina=usina, usina_id=usina_id, hist=hist, rondas_hist=rondas_hist, lidas=lidas,
-        meses=[(m, _nome_do_mes(m)) for m in meses], mes=mes, nome_mes=_nome_do_mes(mes),
-        lidas_mes=[r for r in lidas if (r.get("data") or "")[:7] == mes],
+        lidas_periodo=[r for r in lidas if (r.get("data") or "") >= desde], dias=DIAS_RONDAS,
         duracao=_duracao, iniciais=_iniciais, suj_estado=ronda_checklist.estado(),
         explicacao_avulsa=ronda_avulsa.EXPLICACAO, explicacao_validada=visao.VALIDADA_EXPLICACAO))
+
+
+@bp.route("/rondas/usina/<int:usina_id>/ronda")
+def rondas_detalhe(usina_id):
+    """Tudo da ronda, para a barra lateral (Levi, 03/11/2026: "Tira esse botão 'Fotos' ao clicar na linha já abre uma
+    barra lateral mostrando tudo da ronda ... Ficará do lado direito! Não irá mais abrir abaixo da linha"): o pedaço com
+    quem fez, quando, a nota, o veredito, a OS, o checklist (sujidade, vegetação, vala, sombreamento, sensores), as
+    pendências e o lugar das fotos (a barra as busca depois, pela rota das fotos da OS). A ronda vem pela OS e, sem OS,
+    pelo dia e pela hora do início, no histórico da usina (o mesmo do `rondas_usina`)."""
+    d = visao.rondas().dados or {}
+    hist = visao.historico_usina(d.get("todas") or [], ronda_checklist.respostas(), usina_id, d.get("validacoes") or [])
+    os_, dia, ini = request.args.get("os", ""), request.args.get("data", ""), request.args.get("ini", "")
+    r = next((x for x in hist if not x.get("validada") and x["data"] == dia
+              and (str(x.get("os") or "") == os_ if os_ else (x.get("ini_hm") or "") == ini)), None)
+    usina = next((c for c in d.get("cobertura") or [] if c["usina_id"] == usina_id), None) or r
+    return render_template("campo/_ronda_detalhe.html", r=r, usina=usina, usina_id=usina_id, duracao=_duracao,
+                           iniciais=_iniciais, dia_curto=_dia_curto, explicacao_avulsa=ronda_avulsa.EXPLICACAO)
 
 
 @bp.route("/rondas/avulsa", methods=["GET", "POST"])

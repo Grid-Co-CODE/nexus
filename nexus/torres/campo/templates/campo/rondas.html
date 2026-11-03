@@ -77,10 +77,16 @@
   <div class="rd-barra">
     {# "Buscar por usina" (Levi, 03/11/2026: "a pessoa pesquisa o nome da UFV, assim que pesquisar já leva para a página
        só da usina"): a lista leva na hora; sem o script, a rota acha a usina pelo nome #}
+    {# a lista no estilo do Nexus (03/11/2026: "essa lista está mal formatada, quero estilo nexus"), não a do navegador:
+       filtra enquanto se digita (sem acento nem caixa), setas e Enter escolhem, Esc fecha #}
     <form class="rd-campo rd-usina" method="get" action="{{ url_for('torre_campo.rondas_buscar_usina') }}" role="search" data-rd-usina>
       <i class="ph ph-solar-panel" aria-hidden="true"></i>
-      <input type="search" name="nome" list="rd-usinas" placeholder="Buscar por usina" aria-label="Buscar por usina: vai à página da usina" autocomplete="off">
-      <datalist id="rd-usinas">{% for uid, nome in usinas_busca %}<option value="{{ nome }}" data-href="{{ url_for('torre_campo.rondas_usina', usina_id=uid) }}"></option>{% endfor %}</datalist>
+      <input type="search" name="nome" placeholder="Buscar por usina" aria-label="Buscar por usina: vai à página da usina" autocomplete="off"
+             role="combobox" aria-expanded="false" aria-controls="rd-usinas" aria-autocomplete="list">
+      <ul class="rd-usinas" id="rd-usinas" role="listbox" aria-label="Usinas" hidden>
+        {% for uid, nome, sub in usinas_busca %}<li role="option" id="rd-us-{{ uid }}" data-href="{{ url_for('torre_campo.rondas_usina', usina_id=uid) }}"><b>{{ nome }}</b>{% if sub %}<span>{{ sub }}</span>{% endif %}</li>{% endfor %}
+        <li class="rd-usinas-nada" role="presentation" hidden>Nenhuma usina com esse nome</li>
+      </ul>
     </form>
     <form class="rd-filtros" method="get" action="{{ url_for('torre_campo.rondas') }}" data-rd-form>
       {% for x in ('aba', 'dur', 'pend', 'ind') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
@@ -185,10 +191,11 @@
             <a role="menuitem" href="{{ url(pend=None, pag=None) }}"{% if not pend %} aria-current="true"{% endif %}>Toda ronda</a>
             {% for p_, (rot, cor) in pendencias.items() %}<a role="menuitem" href="{{ url(pend=p_, pag=None) }}"{% if p_ == pend %} aria-current="true"{% endif %}>{{ rot }} <b>{{ n_pend[p_] }}</b></a>{% endfor %}
           </div></details></th>
-        <th data-primeiro="desc">Trackers</th><th>OS</th><th data-sem-ordem>Fotos</th></tr></thead>
+        <th data-primeiro="desc">Trackers</th><th>OS</th></tr></thead>
       <tbody>
+      {# a linha abre a barra lateral com tudo da ronda (03/11/2026: "ao clicar na linha já abre uma barra lateral") #}
       {% for r in registros %}{% set v = r.veredito %}
-        <tr><td class="m" data-ordem="{{ r.data }} {{ r.ini_hm }}"><b>{{ dia_curto(r.data) }}</b></td>
+        <tr{% if r.usina_id %} class="rd-linha" tabindex="0" title="Ver tudo da ronda" data-detalhe="{{ url_for('torre_campo.rondas_detalhe', usina_id=r.usina_id, os=(r.os if r.os and not r.sem_os else None), data=r.data, ini=r.ini_hm) }}"{% endif %}><td class="m" data-ordem="{{ r.data }} {{ r.ini_hm }}"><b>{{ dia_curto(r.data) }}</b></td>
           <td data-ordem="{{ '' if r.dur_min is none else r.dur_min }}">{% if r.ini_hm or r.fim_hm %}{% set dica = 'Iniciou às ' ~ (r.ini_hm or '—') ~ ' · terminou às ' ~ (r.fim_hm or '—') ~ ' (Brasília)' %}<span class="cn-dur" tabindex="0" data-dica="{{ dica }}"><b class="{{ 'cn-t-critico' if r.dur_min is not none and r.dur_min < k.dur_min else '' }}">{{ duracao(r.dur_min) }}</b><span class="cn-oculto">. {{ dica }}</span></span>{% else %}<b>{{ duracao(r.dur_min) }}</b>{% endif %}</td>
           <td class="cn-pessoa" data-ordem="{{ r.tecnico }}"><span class="cn-avatar">{{ iniciais(r.tecnico) }}</span>{{ r.tecnico or '—' }}</td>
           <td>{% if r.usina_id %}<a class="cn-link" href="{{ url_for('torre_campo.rondas_usina', usina_id=r.usina_id) }}">{{ r.usina }}</a>{% else %}{{ r.usina }}{% endif %}</td><td class="cn-menor">{{ r.equipe or '—' }}</td>
@@ -198,13 +205,12 @@
           <td data-ordem="{{ {'Não está bom': 0, 'Sem devolutiva': 0, 'Atenção': 1, 'Bom': 2, 'Muito bom': 3}.get(v[1], '') }}"><span class="cn-selo cn-selo--{{ v[0] }}" title="{{ r.falhas }}">{{ v[1] }}</span></td>
           <td class="cn-pend">{% if r.pendencia %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% elif r.avulsa and r.comentario %}<span class="mudo">{{ r.comentario }}</span>{% else %}—{% endif %}</td>
           <td class="m" data-ordem="{{ r.trk_apontados or '' }}">{{ r.trk_respondidos ~ '/' ~ r.trk_apontados if r.trk_apontados else '—' }}</td>
-          <td class="m">{% if r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td>
-          <td>{% if r.os and not r.sem_os %}<button type="button" class="cn-bt-fotos" aria-expanded="false" data-url="{{ url_for('torre_campo.ronda_fotos_os', os_=r.os|int) }}">Fotos</button>{% elif r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">—</span>{% else %}<span class="mudo" title="Ronda sem OS no Fracttal: as fotos ficam só no App">—</span>{% endif %}</td></tr>
-        {% if r.os and not r.sem_os %}<tr class="cn-fotos-linha" hidden><td colspan="12"></td></tr>{% endif %}
-      {% else %}<tr><td colspan="12" class="mudo">Nenhuma ronda com esses filtros.</td></tr>{% endfor %}
+          <td class="m">{% if r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td></tr>
+      {% else %}<tr><td colspan="11" class="mudo">Nenhuma ronda com esses filtros.</td></tr>{% endfor %}
       </tbody></table></div>
     {% if n_pag > 1 %}<p class="rd-pe-paginas">{{ paginas(n_registros) }}</p>{% endif %}
     {% include 'campo/_ronda_fotos_caixa.html' %}
+    {% include 'campo/_ronda_gaveta.html' %}
     <div class="cn-dica-flut" role="tooltip" id="cn-dica-flut" hidden></div>
     <script>
       // a dica da duração (início e fim em Brasília) no mouse e no foco do teclado; fixa na tela para a rolagem da
@@ -276,18 +282,44 @@
         f.querySelectorAll('input[name], select[name]').forEach(function (c) { if (!c.value) c.disabled = true; });
       });
     })();
-    // "Buscar por usina": escolher na lista leva direto à página da usina; Enter com um nome que não está na lista vai à
-    // rota, que acha pelo nome ou volta com a busca na tabela
+    // "Buscar por usina": a lista do Nexus abre no foco e filtra enquanto se digita (sem acento nem caixa); clicar, ou
+    // Enter na marcada, leva direto à página da usina; Enter sem nenhuma marcada vai à rota, que acha pelo nome
     (function () {
       var f = document.querySelector('[data-rd-usina]'); if (!f) return;
       var campo = f.querySelector('input'), lista = document.getElementById('rd-usinas');
-      function destino() {
-        var v = campo.value.trim().toLowerCase();
-        var o = Array.prototype.find.call(lista.options, function (x) { return x.value.toLowerCase() === v; });
-        return o ? o.dataset.href : '';
+      var itens = Array.prototype.slice.call(lista.querySelectorAll('li[role="option"]')), nada = lista.querySelector('.rd-usinas-nada');
+      var marcada = -1;
+      function sem(t) { return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+      itens.forEach(function (li) { li._busca = sem(li.textContent); });
+      function visiveis() { return itens.filter(function (li) { return !li.hidden; }); }
+      function marca(k) {
+        var vs = visiveis();
+        itens.forEach(function (li) { li.removeAttribute('aria-selected'); });
+        marcada = vs.length ? Math.max(0, Math.min(k, vs.length - 1)) : -1;
+        if (marcada >= 0) { vs[marcada].setAttribute('aria-selected', 'true'); vs[marcada].scrollIntoView({block: 'nearest'}); campo.setAttribute('aria-activedescendant', vs[marcada].id); }
+        else campo.removeAttribute('aria-activedescendant');
       }
-      campo.addEventListener('change', function () { var d = destino(); if (d) location.href = d; });
-      f.addEventListener('submit', function (ev) { var d = destino(); if (d) { ev.preventDefault(); location.href = d; } });
+      function filtra() {
+        var q = sem(campo.value), n = 0;
+        itens.forEach(function (li) { li.hidden = q !== '' && li._busca.indexOf(q) < 0; if (!li.hidden) n += 1; });
+        nada.hidden = n > 0; marca(q ? 0 : -1);
+      }
+      function abre() { lista.hidden = false; campo.setAttribute('aria-expanded', 'true'); filtra(); }
+      function fecha() { lista.hidden = true; campo.setAttribute('aria-expanded', 'false'); marcada = -1; }
+      campo.addEventListener('focus', abre);
+      campo.addEventListener('input', function () { if (lista.hidden) abre(); else filtra(); });
+      campo.addEventListener('keydown', function (ev) {
+        if (ev.key === 'ArrowDown') { ev.preventDefault(); if (lista.hidden) abre(); marca(marcada + 1); }
+        else if (ev.key === 'ArrowUp') { ev.preventDefault(); marca(marcada - 1); }
+        else if (ev.key === 'Escape') { fecha(); }
+      });
+      lista.addEventListener('mousedown', function (ev) { ev.preventDefault(); });    // o clique não tira o foco do campo
+      lista.addEventListener('click', function (ev) { var li = ev.target.closest('li[role="option"]'); if (li) location.href = li.dataset.href; });
+      f.addEventListener('submit', function (ev) {
+        var vs = visiveis();
+        if (marcada >= 0 && vs[marcada]) { ev.preventDefault(); location.href = vs[marcada].dataset.href; }
+      });
+      document.addEventListener('click', function (ev) { if (!f.contains(ev.target)) fecha(); });
     })();
     // os menus do cabeçalho (Duração, Pendências): a caixa fica presa à tela (a rolagem da tabela a cortaria); ordenar
     // usa a mesma ordem do clique no cabeçalho (_ordenar.html)

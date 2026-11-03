@@ -36,9 +36,9 @@
     <span><span class="gc-rotulo">Sujidade dos módulos</span><span class="v">{{ nivel(ult.sujidade if ult else none) }}</span><span class="d">{{ 'em ' ~ dia_curto(ult.data) if ult else 'sem leitura' }}</span></span>
     <span><span class="gc-rotulo">Altura da vegetação</span><span class="v">{{ nivel(ult.vegetacao if ult else none) }}</span><span class="d">{{ 'em ' ~ dia_curto(ult.data) if ult else 'sem leitura' }}</span></span>
   </div>
-  {# a evolução do mês escolhido (Levi, 03/11/2026: "a evolução deve ter um filtro de mês, sempre no mês atual"):
-     sujidade e vegetação de 1 a 5, da leitura mais antiga para a mais recente; uma leitura só fica no meio #}
-  {% set pts = lidas_mes|reverse|list %}{% set w = 760 %}{% set h = 150 %}{% set n = pts|length %}
+  {# a evolução dos últimos 30 dias (Levi, 03/11/2026: "Quando clica na usina deixa os últimas 30 dias, melhor que por
+     mês"): sujidade e vegetação de 1 a 5, da leitura mais antiga para a mais recente; uma leitura só fica no meio #}
+  {% set pts = lidas_periodo|reverse|list %}{% set w = 760 %}{% set h = 150 %}{% set n = pts|length %}
   {% macro x(i) %}{{ (w / 2) if n == 1 else 40 + (i * (w - 60) / ((n - 1) or 1))|round(1) }}{% endmacro %}
   {% macro y(v) %}{{ 15 + ((5 - v) * (h - 40) / 4)|round(1) }}{% endmacro %}
   {% set passo = (w - 60) / ((n - 1) or 1) %}
@@ -46,12 +46,9 @@
      unidades; com menos espaço, uma data a cada `salto` pontos, e a última sempre (a dica do ponto diz a data inteira) #}
   {% set salto = [((23 / passo) | round(0, 'ceil')) | int, 1] | max %}
   <section class="cn-painel cn-evolucao">
-    <div class="cn-lista-cab"><h2>Evolução</h2><span class="cn-leg"><i class="suj"></i>sujidade <i class="veg"></i>vegetação</span><span class="mudo">acima de 3 pede ação · passe o mouse no ponto</span>
-      <form class="rd-mes" method="get"><label class="gc-rotulo" for="rd-mes">Mês</label>
-        <select class="gc-campo" id="rd-mes" name="mes" onchange="this.form.submit()">{% for m, nome in meses %}<option value="{{ m }}"{% if m == mes %} selected{% endif %}>{{ nome }}</option>{% endfor %}</select>
-        <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Ver</button></noscript></form></div>
-    {% if not pts %}<p class="mudo rd-sem-leitura">Nenhuma leitura de sujidade e vegetação em {{ nome_mes }}.</p>{% else %}
-    <svg viewBox="0 0 {{ w }} {{ h }}" role="img" aria-label="Sujidade e vegetação por ronda em {{ nome_mes }}">
+    <div class="cn-lista-cab"><h2>Evolução</h2><span class="mudo">últimos {{ dias }} dias</span><span class="cn-leg"><i class="suj"></i>sujidade <i class="veg"></i>vegetação</span><span class="mudo">acima de 3 pede ação · passe o mouse no ponto</span></div>
+    {% if not pts %}<p class="mudo rd-sem-leitura">Nenhuma leitura de sujidade e vegetação nos últimos {{ dias }} dias.</p>{% else %}
+    <svg viewBox="0 0 {{ w }} {{ h }}" role="img" aria-label="Sujidade e vegetação por ronda nos últimos {{ dias }} dias">
       {% for v in range(1, 6) %}<line x1="34" x2="{{ w - 10 }}" y1="{{ y(v) }}" y2="{{ y(v) }}" class="grade{% if v == 3 %} limite{% endif %}"/><text x="24" y="{{ y(v)|float + 4 }}" class="eixo">{{ v }}</text>{% endfor %}
       {# o x é o da ronda na lista inteira: filtrar no for renumeraria o loop e deslocaria o ponto #}
       <polyline class="suj" points="{% for p in pts %}{% if p.sujidade is not none %}{{ x(loop.index0) }},{{ y(p.sujidade) }} {% endif %}{% endfor %}"/>
@@ -111,10 +108,11 @@
   </script>
   <div class="cn-lista-cab"><h2>Histórico de rondas</h2><span class="mudo">a mais recente primeiro</span></div>
   <div class="cn-tab"><table>
-    <thead><tr><th>Data</th><th>Tipo</th><th>Técnico</th><th>Duração</th><th>Qualidade</th><th>Veredito</th><th>Sujidade</th><th>Vegetação</th><th>Vala</th><th>Sensores</th><th>Pendências</th><th>OS</th><th>Fotos</th></tr></thead>
+    <thead><tr><th>Data</th><th>Tipo</th><th>Técnico</th><th>Duração</th><th>Qualidade</th><th>Veredito</th><th>Sujidade</th><th>Vegetação</th><th>Vala</th><th>Sensores</th><th>Pendências</th><th>OS</th></tr></thead>
     <tbody>
+    {# a linha da ronda abre a barra lateral com tudo dela (03/11/2026); a validação por foto não é ronda: fica na linha #}
     {% for r in hist %}{% set v = r.veredito %}
-      <tr><td class="m"><b>{{ dia_curto(r.data) }}</b><span class="det">{{ r.ini_hm }}{% if r.fim_hm %} às {{ r.fim_hm }}{% endif %}</span></td>
+      <tr{% if not r.validada %} class="rd-linha" tabindex="0" title="Ver tudo da ronda" data-detalhe="{{ url_for('torre_campo.rondas_detalhe', usina_id=usina_id, os=(r.os if r.os and not r.sem_os else None), data=r.data, ini=r.ini_hm) }}"{% endif %}><td class="m"><b>{{ dia_curto(r.data) }}</b><span class="det">{{ r.ini_hm }}{% if r.fim_hm %} às {{ r.fim_hm }}{% endif %}</span></td>
         {# validação por foto (08/10/2026): a linha própria, com o selo; a ronda do mesmo dia leva a marca "revisada" #}
         <td>{% if r.validada %}<span class="cn-validada" tabindex="0" title="{{ explicacao_validada }}{% if r.revisa %} Revisa a ronda de {{ r.revisa|map(attribute='tecnico')|reject('none')|join(', ') or '—' }} do mesmo dia.{% endif %}">Validada por foto</span>{% else %}<span class="cn-tipo{% if r.tipo == 'longa' %} cn-tipo--longa{% endif %}">{{ r.tipo or '—' }}</span>{% if r.avulsa %} <span class="cn-avulsa" tabindex="0" title="{{ explicacao_avulsa }}">Avulsa</span>{% endif %}{% if r.revisada %} <span class="cn-revisada" tabindex="0" title="Os níveis desta ronda foram revisados pela foto ({{ r.revisada.por or '—' }}): para a usina vale a linha Validada por foto do mesmo dia (sujidade {{ '—' if r.revisada.sujidade is none else r.revisada.sujidade }}, vegetação {{ '—' if r.revisada.vegetacao is none else r.revisada.vegetacao }}).">revisada</span>{% endif %}{% endif %}</td>
         <td class="cn-pessoa"><span class="cn-avatar">{{ iniciais(r.tecnico) }}</span>{{ r.tecnico or '—' }}</td>
@@ -126,12 +124,11 @@
         <td class="cn-menor">{{ r.vala or '—' }}</td>
         <td>{% if r.sensores_sujos %}<span class="cn-t-alerta">{{ r.sensores_sujos|join(', ') }}</span>{% elif r.lida %}<span class="mudo">limpos</span>{% else %}—{% endif %}</td>
         <td class="cn-pend">{% if r.falhas %}<span class="cn-t-alerta">{{ r.falhas }}</span>{% endif %}{% if r.pendencia and r.pend_obs not in (r.falhas or '') %}{% if r.falhas %}<br>{% endif %}<span class="cn-t-{{ 'alerta' if r.pendencia == 'sem_os' else 'info' }}">{{ r.pend_obs }}</span>{% endif %}{% if r.avulsa and r.comentario %}<span class="mudo">{{ r.comentario }}</span>{% elif not r.falhas and not r.pendencia %}—{% endif %}</td>
-        <td class="m">{% if r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">avulsa</span>{% elif r.validada %}<span class="mudo" title="{{ explicacao_validada }}">—</span>{% elif r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td>
-        <td>{% if r.os %}<button type="button" class="cn-bt-fotos" aria-expanded="false" data-url="{{ url_for('torre_campo.ronda_fotos_os', os_=r.os|int) }}">Fotos</button>{% elif r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">—</span>{% elif r.validada %}<span class="mudo" title="As fotos são as da ronda do App que a validação revisou">—</span>{% else %}<span class="mudo" title="Ronda sem OS: as fotos ficam só no App">—</span>{% endif %}</td></tr>
-      {% if r.os %}<tr class="cn-fotos-linha" hidden><td colspan="13"></td></tr>{% endif %}
-    {% else %}<tr><td colspan="13" class="mudo">Nenhuma ronda pelo App nos últimos 90 dias.</td></tr>{% endfor %}
+        <td class="m">{% if r.avulsa %}<span class="mudo" title="{{ explicacao_avulsa }}">avulsa</span>{% elif r.validada %}<span class="mudo" title="{{ explicacao_validada }}">—</span>{% elif r.sem_os %}<span class="cn-t-alerta">sem OS</span>{% else %}{{ r.os or '—' }}{% endif %}</td></tr>
+    {% else %}<tr><td colspan="12" class="mudo">Nenhuma ronda pelo App nos últimos 90 dias.</td></tr>{% endfor %}
     </tbody></table></div>
-  {# o botão Fotos e a caixa que amplia: o mesmo componente da aba Registros (Levi, 08/10/2026) #}
+  {# a barra lateral da ronda e a caixa que amplia a foto: os mesmos da aba Registros (03/11/2026) #}
   {% include 'campo/_ronda_fotos_caixa.html' %}
+  {% include 'campo/_ronda_gaveta.html' %}
 </div>
 {% endblock %}

@@ -331,9 +331,11 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   ronda; o endereço de cada aba que saiu cai nos Registros (`aba=sem` e `aba=cobertura` caem no filtro Sem ronda). As
   contas deles seguem no `visao` (`comparativos`, `sujidade_vegetacao`, `_por_cluster`), que outras telas usam.
   - **A barra de uma linha, no modelo do Histórico do OS Creator Web** ("deixe escondido no padrão OS Creator Web >
-    Histórico"): o **Buscar por usina** (a lista `rd-usinas` com TODAS as usinas da tela, sem os filtros: escolher leva à
-    página da usina; sem o script, `/rondas/buscar-usina?nome=` acha pelo nome igual, sem acento nem caixa, ou pelo único
-    que contém, senão volta com `q=`), a busca da tabela (`q`), o botão **Filtros** com a contagem e, na ponta, Exportar
+    Histórico"): o **Buscar por usina** (a lista `rd-usinas` com TODAS as usinas da tela, sem os filtros, no estilo do
+    Nexus e não a do navegador, que veio "mal formatada": o nome e, embaixo, o cliente e a UF; abre no foco, filtra
+    enquanto se digita sem acento nem caixa, setas e Enter escolhem, Esc fecha; escolher leva à página da usina; sem o
+    script, `/rondas/buscar-usina?nome=` acha pelo nome igual, sem acento nem caixa, ou pelo único que contém, senão
+    volta com `q=`), a busca da tabela (`q`), o botão **Filtros** com a contagem e, na ponta, Exportar
     CSV e + Ronda avulsa. O painel dos Filtros (Mostrar, Região do Brasil, Cliente, Usina, Responsável O&M, Equipe,
     Região de campo, Gestor de contrato; `FILTROS_DO_PAINEL`) só vale no Aplicar; fechar (×, Esc, clique fora) descarta;
     Limpar volta cada lista ao "todos"; o endereço leva só o escolhido; no celular o painel sobe de baixo. Cada filtro
@@ -347,7 +349,16 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     lado de data"): Data, Duração, Técnico, Usina, Equipe, Tipo, Qualidade, Veredito, Pendências, Trackers, OS, Fotos.
     O mouse (ou o foco do teclado) na duração mostra "Iniciou às 07:00 · terminou às 08:00 (Brasília)" numa dica fixa
     na tela (a rolagem da tabela cortaria uma dica presa à célula). O CSV continua com início, fim, estado e região.
-    De 300 em 300; Exportar CSV com BOM para o Excel. **A duração e a pendência se escolhem no cabeçalho** (03/11/2026:
+    De 300 em 300; Exportar CSV com BOM para o Excel. **A linha abre a barra lateral da ronda** (03/11/2026: "Tira esse
+    botão 'Fotos' ao clicar na linha já abre uma barra lateral mostrando tudo da ronda, a barra pode representar 1/3 do
+    tamanho da tela. Ficará do lado direito! Não irá mais abrir abaixo da linha"): `_ronda_gaveta.html`, 1/3 da tela à
+    direita (a tela inteira abaixo de 900 px), sem véu (a tabela segue clicável; a linha aberta fica marcada), Esc ou ×
+    fecha. Ela busca o pedaço `_ronda_detalhe.html` (rota `rondas_detalhe`, `/rondas/usina/<id>/ronda?os=&data=&ini=`: a
+    ronda pela OS e, sem OS, pelo dia e pela hora do início, no `historico_usina`): quem fez, quando (início e fim em
+    Brasília, duração), nota, veredito, OS, trackers, o checklist (sujidade, vegetação, vala, sombreamento, sensores), as
+    pendências e as fotos, que vêm depois pela rota das fotos da OS (o 429 do Fracttal tenta sozinho em 1 minuto). A
+    coluna Fotos e a linha que abria embaixo saíram dos Registros e do histórico da usina; a caixa que amplia a foto
+    (`_ronda_fotos_caixa.html`) segue, com o botão, na Zeladoria, no EPI e nos Extintores. **A duração e a pendência se escolhem no cabeçalho** (03/11/2026:
     "ao clicar em 'Duração' no cabeçalho, aí vai ter essas opções ou 'ordenar'"): o menu da Duração ordena (mais longa
     ou mais curta primeiro, pelo `th._ordenar` do `_ordenar.html`, o `<th data-ordem-menu>`) e filtra (toda, abaixo de
     10 min, acima de 2 h); o da Pendências filtra (toda ronda, sem OS no Fracttal, evidência incompleta, com a conta). A
@@ -406,10 +417,11 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     mais!"). A conta (`visao._por_cluster`, os pendentes de cada técnico pela regra da Central) segue no visao, provada
     em `test_quem_ronda_mostra_quais_sao_as_pendentes_e_abre_em_blocos`.
   - **Histórico da usina** (`/rondas/usina/<usina_id>`, `visao.historico_usina`; desde 03/11/2026 também pelo Buscar
-    por usina). **03/11/2026:** a evolução vem **por mês**, aberta no mês de agora (`mes=AAAA-MM`; a lista tem os meses
-    com leitura nos 90 dias e o de agora; mês sem leitura diz isso; uma leitura só fica no meio), os números ficam
-    juntos numa faixa, e o "De onde vem" (do fim da página e do canto) virou a exclamação amarela ao lado do nome
-    ("conforme segurança > extintores"); a tabela segue com os 90 dias. Levi, 05/10: "quando clicarmos no
+    por usina). **03/11/2026:** a evolução vem dos **últimos 30 dias** (o filtro de mês da 1ª rodada saiu no mesmo dia:
+    "Quando clica na usina deixa os últimas 30 dias, melhor que por mês"; sem leitura no período, diz isso; uma leitura
+    só fica no meio), os números ficam juntos numa faixa, o "De onde vem" (do fim da página e do canto) virou a
+    exclamação amarela ao lado do nome ("conforme segurança > extintores"), e a linha da ronda abre a barra lateral,
+    como nos Registros; a tabela segue com os 90 dias. Levi, 05/10: "quando clicarmos no
     nome da usina já aparece o histórico de rondas com data e sujidade e vegetação"): o nome da usina é link nas abas
     Registros, Sujidade e Sem ronda e nos pendentes do Quem ronda. Todas as rondas do livro (90 dias), a mais recente
     primeiro, com sujidade (número só com a cor da fonte, como na aba),
