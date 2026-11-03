@@ -244,7 +244,8 @@ def test_quem_esta_fora_do_ciclo_tambem_abre_as_os_com_o_motivo(ranking, logado)
         _tarefa("eva@exemplo.test", "16101", "devolvida", 48, "Devolvida no Fracttal: o motivo não passou pelo App.")])
     visao.limpar()
     fora = logado.get("/t/campo/ranking").get_data(as_text=True).split("Fora do ciclo</span></h2>", 1)[1]
-    assert re.search(r'<tr class="cn-linha rk-linha" tabindex="0" aria-expanded="false"[^>]*>\s*<td class="rk-tec">Eva Prado', fora)
+    assert re.search(r'<tr class="cn-linha rk-linha" tabindex="0" aria-expanded="false"[^>]*>\s*<td class="rk-tec"[^>]*>Eva Prado',
+                     fora)                                             # [^>]*: o e-mail no título da célula (03/11)
     eva = _detalhe(fora, "Eva Prado")
     assert "16101" in eva and "Devolvida no Fracttal: o motivo não passou pelo App." in eva and "10/10 14:00" in eva
     assert '<td colspan="5">' in eva                                   # a tabela do fora do ciclo tem 5 colunas
@@ -304,3 +305,28 @@ def test_o_ponto_de_exclamacao_ao_lado_do_titulo_explica_cada_metrica(ranking, l
         assert trecho in pont, trecho
     assert "nota menos 60 (nota 100 = 40 pontos)" in t and "teto de 250 pontos no mês" in t
     assert html.count("Como o App calcula.") == 1                                # saiu do pé da tela: está só no "!"
+
+
+# ── o pedido de 03/11/2026 (Fillipe Figueiró): o 3º de outubro saiu "Eduardo Sousa", lido como o Eduardo Souza ─────
+def test_o_nome_e_o_padrao_do_cadastro_e_o_podio_traz_o_email(banco, app, logado):    # noqa: F811
+    Path(app.config["NEXUS_CAMPO_IDENTIDADES"]).write_text(json.dumps({"porEmail": {
+        "ana@exemplo.test": {"nome": "Ana Maria Souza"},
+        "eduardo.souza@exemplo.test": {"nome": "Eduardo Elias Affonso De Souza", "nomePadrao": "Eduardo Souza"},
+        "eduardo.mendes@exemplo.test": {"nome": "Eduardo Felipe Brandão Maia Mendes de Sousa",
+                                        "nomePadrao": "Eduardo Mendes"}}}), encoding="utf-8")
+    _aba(banco, "ranking_app_campo", "Ranking", [
+        _linha("2026-10", "ana@exemplo.test", 4100, 1), _linha("2026-10", "eduardo.souza@exemplo.test", 3600, 2),
+        _linha("2026-10", "eduardo.mendes@exemplo.test", 3457, 3, regiao="SP Leste 02")])
+    visao.limpar()
+    tres = visao.ranking_pontos().dados["meses"][0]["classificacao"]
+    # o nome padrão do cadastro manda; sem ele, o nome curto do completo, como antes (a Ana)
+    assert [(p["tecnico"], p["email"]) for p in tres] == [
+        ("Ana Souza", "ana@exemplo.test"), ("Eduardo Souza", "eduardo.souza@exemplo.test"),
+        ("Eduardo Mendes", "eduardo.mendes@exemplo.test")]
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    podio = html.split('class="rk-podio"', 1)[1].split('class="cn-numeros"', 1)[0]
+    assert '<span class="rk-email">eduardo.mendes@exemplo.test</span>' in podio
+    assert re.search(r"3º lugar Eduardo Mendes SP Leste 02 3\.457 pts", _texto(podio))
+    assert "Eduardo Sousa" not in html
+    # na tabela, o e-mail fica no título da célula do nome (a linha não cresce)
+    assert 'class="rk-tec" title="eduardo.mendes@exemplo.test">Eduardo Mendes' in html

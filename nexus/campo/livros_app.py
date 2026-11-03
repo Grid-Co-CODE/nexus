@@ -59,7 +59,8 @@ def ler(base, sessao, livro) -> list[dict]:
 
 
 def pessoas_por_codigo(chave) -> dict:
-    """{código do App: (e-mail, nome)} pelo cadastro do App. Código que bate em dois e-mails não liga."""
+    """{código do App: (e-mail, nome)} pelo cadastro do App. Código que bate em dois e-mails não liga. O nome é o nome
+    padrão do cadastro (a coluna "Nome padrão" do BD_Operações), e o completo só na falta dele."""
     if not chave:
         return {}
     donos = {}
@@ -67,7 +68,10 @@ def pessoas_por_codigo(chave) -> dict:
         em = str(em or "").strip().lower()
         cod = codigo_da_pessoa(chave, em)
         if cod:
-            donos.setdefault(cod, []).append((em, _txt((p or {}).get("nome"))))
+            # o nome curto do completo é o primeiro e o último nome: o Eduardo Mendes ("Eduardo Felipe Brandão Maia
+            # Mendes de Sousa") saía "Eduardo Sousa" no 3º lugar do ranking de outubro, lido como o Eduardo Souza, que
+            # é outra pessoa (Fillipe Figueiró, 03/11/2026: "com o nome do ranking, o RH teria creditado o Eduardo errado")
+            donos.setdefault(cod, []).append((em, _txt((p or {}).get("nomePadrao")) or _txt((p or {}).get("nome"))))
     return {c: v[0] for c, v in donos.items() if len(v) == 1}
 
 

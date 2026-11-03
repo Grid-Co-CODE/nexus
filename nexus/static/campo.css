@@ -881,6 +881,7 @@ tr.rk-linha[aria-expanded="true"] .rk-seta{transform:rotate(180deg)}
 .rk-pts{font:600 26px/1.15 var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:6px;color:var(--tinta)}
 .rk-pts small{font-size:13px;font-weight:500;color:var(--mudo)}
 .rk-det{font-size:12px;color:var(--mudo)}
+.rk-email{font-size:11px;color:var(--mudo);margin-top:2px;overflow-wrap:anywhere}
 .cn-tab td.rk-tec{text-align:left;font-weight:500;white-space:nowrap}
 .cn-tab td.rk-motivo{text-align:left;color:var(--tinta-2)}
 /* no celular o pódio continua o das olimpíadas, mais baixo e sem o detalhe dos pontos */
