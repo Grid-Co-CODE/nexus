@@ -2,9 +2,11 @@
 campo"; o ranking responde "qual equipe cobrar"). A régua é a do Ranking por região do painel do App (`_ranking_regioes`
 no function_app.py: 60% qualidade + 40% cobertura, por cluster, a única conta por equipe que o App tem), sobre o dado do
 Nexus. Desenho: docs/superpowers/specs/2026-10-18-visao-responsavel-ranking-equipes-design.md."""
-from datetime import date
+from datetime import date, timedelta
 
+import pytest
 from test_campo_responsaveis import tela  # noqa: F401  (fixture: o banco falso com a meta, os chamados e os extintores)
+from test_campo_visao import HOJE as HOJE_DA_FIXTURE
 from test_campo_visao import banco  # noqa: F401  (fixture de que a `tela` depende)
 
 from nexus.campo import ranking_equipes as RE
@@ -90,7 +92,32 @@ def test_seta():
 
 
 # ── As notas na cópia de 5 min da Visão (o banco falso: Altair e Brodowski 1 na SP Norte 01, Coração 1 na SC Oeste 01) ──
-def test_as_notas_do_app_chegam_a_usina_do_cadastro(tela):  # noqa: F811
+@pytest.fixture
+def tela_no_mes(tela, monkeypatch):  # noqa: F811
+    """A `tela` com as notas do App no meio de um mês e o relógio do ranking dublado nele. O ranking é do mês vigente
+    desde 28/10/2026, e a fixture grava as rondas e os fechamentos em "N dias/horas atrás": nos primeiros dias do mês
+    parte deles é do mês passado e sai da conta, como deve (em 03/11/2026 a ronda de 31/10 da Altair saiu, e o teste
+    viu 1 ronda e 4 notas em vez de 2 e 5). Para a conta não depender do dia em que o teste roda, as rondas e os
+    fechamentos vão para perto do HOJE deste arquivo (18/10), com os mesmos intervalos entre si, e o ranking conta com
+    esse dia. A regra do mês vigente fica como está: quem prova o corte é `test_periodos_do_mes_vigente`."""
+    dias = (HOJE - HOJE_DA_FIXTURE).days
+
+    def levar(livro, aba, colunas):
+        for linha in tela._id(livro, aba)["linhas"]:
+            for c in colunas:
+                i = linha["headers"].index(c)
+                v = linha["values"][i]
+                if v:       # "AAAA-MM-DD" ou "AAAA-MM-DDTHH:MM:SS.000Z": o dia anda, a hora fica
+                    linha["values"][i] = (date.fromisoformat(v[:10]) + timedelta(days=dias)).isoformat() + v[10:]
+    levar("rondas_app_campo", "OS de ronda", ("Data", "Início", "Fim"))
+    levar("fechamentos_app_campo", "Fechamentos", ("Registrado em",))
+    fonte = R.ranking_fonte
+    monkeypatch.setattr(R, "ranking_fonte", lambda b, hoje: fonte(b, HOJE))
+    visao.limpar()
+    return tela
+
+
+def test_as_notas_do_app_chegam_a_usina_do_cadastro(tela_no_mes):
     d = R.visao_responsaveis().dados
     a = d["ranking_por_usina"]
     # Altair: 2 rondas (90) + 3 tarefas fechadas pelo App (90, 70, 100); Brodowski 1: 1 ronda (90); Coração 1: nada
@@ -136,7 +163,7 @@ def test_sem_nada_a_cobrar_nao_ha_etiqueta():
     assert RE.etiquetas({"disp": 99.5, "semana_pct": 90}, [_ua(1, meta={"atingimento": 98})]) == []
 
 
-def test_cartoes_da_pior_para_a_melhor(tela):  # noqa: F811
+def test_cartoes_da_pior_para_a_melhor(tela_no_mes):
     d = R.visao_responsaveis().dados
     r = RE.cartoes(R.com_manutencao(d["usinas"], 30), d["ranking_por_usina"], d["tecnicos_por_equipe"])
     assert [c["equipe"] for c in r["cartoes"]] == ["SC Oeste 01", "SP Norte 01"]     # sem nota antes das ranqueadas
@@ -150,7 +177,7 @@ def test_cartoes_da_pior_para_a_melhor(tela):  # noqa: F811
                          "menor": {"nota": 93, "equipe": "SP Norte 01"}, "amplitude": 0}
 
 
-def test_filtrado_o_cartao_da_equipe_e_o_mesmo(tela):  # noqa: F811
+def test_filtrado_o_cartao_da_equipe_e_o_mesmo(tela_no_mes):
     # Levi, 18/10/2026: "O ranking das equipes tem que permancer mesmo filtrados". Até aqui a nota era refeita só sobre
     # as usinas do filtro (só a Brodowski 1: 94); agora o cartão é o da equipe inteira, e o filtro escolhe os cartões
     d = R.visao_responsaveis().dados
@@ -182,7 +209,7 @@ def test_filtrado_a_posicao_e_a_do_ranking_inteiro(tela):  # noqa: F811
                          "menor": {"nota": 88, "equipe": "SC Oeste 01"}, "amplitude": 0}
 
 
-def test_sem_equipe_filtrado_conta_so_as_usinas_do_filtro(tela):  # noqa: F811
+def test_sem_equipe_filtrado_conta_so_as_usinas_do_filtro(tela_no_mes):
     # "Sem equipe" não é equipe do ranking: é a lista do conserto no cadastro, e quem filtra vê só as usinas do filtro
     d = R.visao_responsaveis().dados
     us = [dict(u, equipe=visao.SEM_EQUIPE) if u["usina"] != "Altair" else u for u in R.com_manutencao(d["usinas"], 30)]
@@ -190,7 +217,7 @@ def test_sem_equipe_filtrado_conta_so_as_usinas_do_filtro(tela):  # noqa: F811
     assert [(c["equipe"], c["usinas"]) for c in r["cartoes"]] == [(visao.SEM_EQUIPE, 1)]
 
 
-def test_sem_equipe_vai_para_o_fim_sem_posicao(tela):  # noqa: F811
+def test_sem_equipe_vai_para_o_fim_sem_posicao(tela_no_mes):
     d = R.visao_responsaveis().dados
     # a Brodowski 1 (nota 90, a melhor da tela) sem equipe no cadastro: nem com nota ela ganha posição
     us = [dict(u, equipe=visao.SEM_EQUIPE) if u["usina"] == "Brodowski 1" else u for u in R.com_manutencao(d["usinas"], 30)]
@@ -239,7 +266,7 @@ def test_toda_area_com_alerta_vira_etiqueta():
     assert [(e["cls"], e["txt"]) for e in RE.etiquetas({}, [pr])] == [("alerta", "1 usina com PR abaixo do previsto")]
 
 
-def test_nada_a_cobrar_so_quando_o_semaforo_esta_todo_em_dia(tela):  # noqa: F811
+def test_nada_a_cobrar_so_quando_o_semaforo_esta_todo_em_dia(tela_no_mes):
     d = R.visao_responsaveis().dados
     for c in RE.cartoes(R.com_manutencao(d["usinas"], 30), d["ranking_por_usina"], d["tecnicos_por_equipe"])["cartoes"]:
         pede = any(c["tri"][b]["critico"] or c["tri"][b]["atencao"] for b in ("perf", "acomp", "manut"))

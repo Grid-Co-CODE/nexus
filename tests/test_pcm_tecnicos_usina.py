@@ -15,6 +15,7 @@ from nexus.campo import visao
 from nexus.campo.ligacao_cadastro import codigo_da_pessoa
 from nexus.pcm import atribuicoes as A
 from nexus.pcm import tecnicos_usina as T
+from test_pcm_atribuicoes import Relogio
 
 HOJE = 20261017
 SEGUNDA = 20261012
@@ -69,7 +70,10 @@ def _h(email):
 
 
 @pytest.fixture
-def banco(app, tmp_path):
+def banco(app, tmp_path, monkeypatch):
+    # O relógio da gravação no mesmo 17/10/2026 da tela (`HOJE`). Sem ele, `decidir` contava com o dia de verdade, e o
+    # apoio "até 31/10" da fixture virou passado em 01/11/2026: a regra recusou, como deve ("A data final já passou").
+    Relogio(monkeypatch)
     api = ApiPGFalsa()
     _aba(api, "cadastro_nexus", "usinas", USINAS)
     _aba(api, "cadastro_nexus", "equipes", EQUIPES)

@@ -1161,7 +1161,9 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
   com as usinas da equipe (o nome exato do cadastro), com o "×"; a volta aos cartões dos responsáveis tira o filtro
   (revisão de 18/10/2026: ele vazava escondido para lá).
 - **Prova:** `tests/test_campo_ranking_equipes.py` (a régua, igual à aritmética do App, as etiquetas, os cartões, a seta,
-  a posição com filtro, o motivo que fecha com a nota; mutações pegas) e os testes da aba e da janela em
+  a posição com filtro, o motivo que fecha com a nota; mutações pegas; os testes que leem as notas da fixture usam a
+  `tela_no_mes`, que leva as rondas e os fechamentos para perto de 18/10 e dubla o dia do ranking, porque no começo do
+  mês a ronda de "3 dias atrás" é do mês passado e sai, como deve: em 03/11/2026 dois falharam assim) e os testes da aba e da janela em
   `tests/test_campo_responsaveis.py` (`duas_equipes`: a SC Oeste 01 com nota, 2ª de 2 com qualquer filtro). Com o banco real (18/10/2026, só GET, o
   `test_client` com a sessão de administrador e o HTML servido local): em "Todos", 55 cartões (52 ranqueadas, notas de 41
   a 98; 2 sem nota; 1 "Sem equipe"); o responsável com mais equipes vê 12. O agrupamento no pedido leva 7 a 8 ms para as
@@ -1457,6 +1459,13 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   segue a régua nova sozinha. No `nota_fracttal.py` o item ganhou o `fotoReq` do tipo 9: o `work_orders_subtasks` do
   REST não traz o `attachments_required` (medido em 15/10, 1 GET fora do horário de campo), e a spec do fabricante
   mora numa tabela do App (o porquê na docstring dele).
+- **03/11, App v317 (código `3451c2ca3893f6eb`, o mesmo da pasta `app-campo-v317`):** o teste acusou só a assinatura
+  do `fx` (as 80 copiadas iguais). A v317 pôs no `fx` do App a reserva da cota para os registros dos técnicos: a leitura
+  de fundo é adiada (levanta `FxLimite`) quando a cota está na reserva, cada pedido é contado, e o 429 só espera e tenta
+  de novo no pedido crítico. Decisão: **o substituto fica.** É controle de ritmo do processo do App, não conta: o pedido,
+  a resposta e o `ApiError` são os mesmos; o Nexus tem o próprio teto (`casca/fracttal_conta.py`: 150 dos 200/min, 90 no
+  fundo, sobrando 50 para o App e os robôs) e o `fx` dele segue levantando `fracttal.Recusado`, nunca `FxLimite`.
+  Recópia pelo extrator: muda só o cabeçalho, a assinatura e dois imports da biblioteca padrão que a cópia não usa.
 - Trocados pelo Nexus no fim do arquivo gerado: `_tabela` e `tabela_qlog` (leem pela fonte do Nexus, `tabelas.py`),
   `tabela` (a dos tokens do Fracttal: só a partição `cadastro`; `tok` e `pt` recusadas), `fx` (Fracttal só GET,
   `fracttal.py`), `ident` (`pessoas.ident`) e `_varredura_carregar` (sempre `False`: sem blob do App).
