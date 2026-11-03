@@ -284,7 +284,7 @@ def test_a_tela_de_pt_e_so_por_responsavel_com_os_filtros_de_cliente_usina_e_res
     html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
     assert 'aria-current="page">Por responsável</a>' in html and ">Tabela</a>" in html
     assert ">Por equipe</a>" not in html and ">Por região de campo</a>" not in html
-    assert "2</span><span class=\"d\">PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
+    assert "<b>2</b><span>PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
     for antigo in ('id="cn-regiao"', 'id="cn-regiao-campo"', 'id="cn-gestor"'):
         assert antigo not in html
     assert _re.findall(r'<select class="gc-campo" id="pt-(\w+)" name="(\w+)"', html) == [
@@ -292,7 +292,7 @@ def test_a_tela_de_pt_e_so_por_responsavel_com_os_filtros_de_cliente_usina_e_res
     assert '<option value="Thopen">Thopen (2)</option>' in html and '<option value="Altair">Altair (2)</option>' in html
     # o endereço de antes (por região, por gestor, a equipe) cai no Por responsável e não filtra
     antigo = logado.get("/t/hseq/apr-pt?modo=regioes&regiao_campo=Sul+01&gestor=Ciclano+Chefe").get_data(as_text=True)
-    assert 'aria-current="page">Por responsável</a>' in antigo and "2</span><span class=\"d\">PT esperando" in antigo
+    assert 'aria-current="page">Por responsável</a>' in antigo and "<b>2</b><span>PT esperando" in antigo
 
 
 def test_tela_de_pt_tabela_com_o_responsavel_e_historico(banco, logado):
@@ -323,7 +323,7 @@ def test_tela_de_pt_tabela_com_o_responsavel_e_historico(banco, logado):
 
 def test_o_cartao_do_responsavel_leva_a_tabela_dele(banco, logado):
     html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
-    i = html.index('<a class="cn-equipe cn-equipe--critico')
+    i = html.index('<a class="cn-equipe cn-equipe--min')
     href = html[i:html.index(">", i)].split('href="')[1].split('"')[0].replace("&amp;", "&")
     assert href.startswith("?modo=tabela&responsavel=")
     tabela = logado.get("/t/hseq/apr-pt" + href).get_data(as_text=True)

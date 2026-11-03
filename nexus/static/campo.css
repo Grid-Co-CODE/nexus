@@ -1600,3 +1600,24 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
   .rd-rodape{position:sticky;bottom:0;background:var(--superficie)}
   .rd-mes{margin-left:0}
 }
+/* Os cartões por responsável da Central de atenção (e da APR e PT), limpos (Levi, 03/11/2026: "quero mais minimalista...
+   já tem um vermelho na lateral e a barra também fica vermelha... dói é os olhos!"): uma superfície só, sem a borda
+   colorida; a cor num ponto pequeno ao lado da palavra (a cor nunca sozinha); a barra neutra, só com o que foi feito. */
+.cn-equipe--min{gap:14px;border-left-width:1px}
+.cn-equipe--min .cn-eq-titulo > b{font-size:16px}
+.cn-min-st{display:inline-flex;align-items:center;gap:6px;flex:none;margin-top:2px;font:600 12.5px/18px var(--font-sans);
+  color:var(--tinta-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cn-min-st::before,.cn-min-motivos span::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--mudo)}
+.cn-min-st--ok::before,.cn-min-motivos .ok::before{background:var(--ok)}
+.cn-min-st--alerta::before,.cn-min-motivos .alerta::before{background:var(--alerta)}
+.cn-min-st--critico::before,.cn-min-motivos .critico::before{background:var(--critico)}
+.cn-min-num{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px}
+.cn-min-num b{font:600 28px/32px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--tinta)}
+.cn-min-num span{font-size:12.5px;color:var(--mudo)}
+.cn-min-barra{height:4px;border-radius:999px;background:var(--superficie-3);overflow:hidden}
+.cn-min-barra span{display:block;height:100%;border-radius:inherit;background:var(--tinta-2);opacity:.5}
+.cn-min-leg{margin-top:-6px;font-size:12px;color:var(--mudo);font-variant-numeric:tabular-nums}
+.cn-min-leg b{font-weight:600;color:var(--tinta-2)}
+.cn-min-motivos{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--tinta-2);font-variant-numeric:tabular-nums}
+.cn-min-motivos span{display:inline-flex;align-items:center;gap:6px}
+.cn-min-motivos span::before{width:6px;height:6px}

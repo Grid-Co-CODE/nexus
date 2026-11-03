@@ -619,7 +619,11 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     usa o mesmo `_pt_esperando.html` com os modos dela); os endereços de antes (`modo=equipes`, `regioes`, `gestores`,
     `supervisores`) abrem Por responsável (`_modo_central`). O responsável é o **Responsável UFV**, o Responsável O&M da
     ficha da usina (`usinas.responsavel_om_id`; confirmado pelo Levi em 12/10: "é o Responsável O&M mesmo"), não o
-    gestor de contrato. **Rondas pendentes:** um cartão por responsável (`visao.por_responsavel`: as usinas dele,
+    gestor de contrato. **Os cartões por responsável são limpos** (Levi, 03/11/2026: "quero mais minimalista... já tem um
+    vermelho na lateral e a barra também fica vermelha... dói é os olhos!"; `cn-equipe--min`, nas duas abas e na APR
+    e PT): sem a borda colorida, sem o vermelho na barra e sem o número colorido; a cor fica num ponto pequeno ao lado
+    da palavra ("48% feitas", "7 paradas"; a cor nunca sozinha), e a barra, neutra, mostra só o que foi feito.
+    Prova: `tests/test_campo_central_cartoes_limpos_0311.py`. **Rondas pendentes:** um cartão por responsável (`visao.por_responsavel`: as usinas dele,
     pendentes por status, feitas = as não pendentes, o %), e o responsável escolhido (no cartão ou no filtro) abre o
     **kanban** (`visao.kanban`, `COLUNAS_KANBAN`): Nunca teve ronda | Ronda pendente (com o motivo e quem fez a última) |
     Ronda feita (a usina em dia). Cada usina do kanban diz a **equipe** com o rótulo ("pode ser uma ou mais": a do

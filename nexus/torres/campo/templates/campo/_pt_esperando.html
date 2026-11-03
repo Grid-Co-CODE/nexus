@@ -14,17 +14,18 @@
 {% if modo == 'responsaveis' %}
 {# por Responsável UFV (a Central de atenção, Levi, 19/10/2026: "Em permissão de trabalho deixe por responsável"): as PT
    esperando nas usinas de cada um; o cartão leva à tabela das PT dele #}
+{# limpo como o cartão das rondas (Levi, 03/11/2026: "quero mais minimalista... dói é os olhos!"): sem a borda e sem o
+   número coloridos; a cor num ponto pequeno, ao lado da palavra #}
 <div class="cn-equipes">
-  {% for s in cartoes_resp_pt %}{% set cor = 'critico' if s.parada else 'alerta' %}
-    <a class="cn-equipe cn-equipe--{{ cor }} cn-sup{% if s.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', responsavel=s.responsavel, f=None) }}">
+  {% for s in cartoes_resp_pt %}
+    <a class="cn-equipe cn-equipe--min cn-sup{% if s.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', responsavel=s.responsavel, f=None) }}">
       <div class="cn-eq-cab">
-        <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b></div>
-        <span>{{ 'PT de usinas sem responsável UFV no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }}</span>
-        <span>{{ s.usinas }} usina{{ 's' if s.usinas != 1 }} com PT esperando · {{ s.equipes|length }} equipe{{ 's' if s.equipes|length != 1 }}</span>
+        <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b><span class="cn-min-st cn-min-st--{{ 'critico' if s.parada else 'alerta' }}">{{ (s.parada ~ ' parada' ~ ('s' if s.parada != 1 else '')) if s.parada else 'aguardando' }}</span></div>
+        <span>{{ 'PT de usinas sem responsável UFV no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }} · {{ s.usinas }} usina{{ 's' if s.usinas != 1 }} com PT esperando · {{ s.equipes|length }} equipe{{ 's' if s.equipes|length != 1 }}</span>
         <span class="cn-sup-equipes" title="{{ s.equipes|join(', ') }}">{{ s.equipes|join(', ') }}</span>
       </div>
-      <div class="cn-eq-num"><span><span class="v cn-t-{{ cor }}">{{ s.pts }}</span><span class="d">PT esperando o De acordo</span></span></div>
-      <div class="cn-eq-pe"><span class="cn-st cn-t-critico">{{ s.parada }} parada{{ 's' if s.parada != 1 }} há mais de 2 h</span><span class="cn-st cn-t-alerta">{{ s.pts - s.parada }} aguardando</span></div>
+      <div class="cn-min-num"><b>{{ s.pts }}</b><span>PT esperando o De acordo</span></div>
+      <div class="cn-min-motivos">{% if s.parada %}<span class="critico">{{ s.parada }} parada{{ 's' if s.parada != 1 }} há mais de 2 h</span>{% endif %}{% if s.pts - s.parada %}<span class="alerta">{{ s.pts - s.parada }} aguardando</span>{% endif %}</div>
     </a>
   {% else %}<p class="mudo">Nenhuma PT esperando com esses filtros.</p>{% endfor %}
 </div>
