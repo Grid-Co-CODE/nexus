@@ -107,7 +107,8 @@ def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]
     arvore = []
     for t in torres:
         telas = [{"chave": ST.chave(t.id, s.id), "nome": s.nome, "pronta": f"/t/{t.id}/{s.id}" in prontas,
-                  "marcada": ST.chave(t.id, s.id) in marcadas, "do_setor": ST.chave(t.id, s.id) in do_setor}
+                  "marcada": ST.chave(t.id, s.id) in marcadas, "do_setor": ST.chave(t.id, s.id) in do_setor,
+                  "de_todos": s.de_todos}
                  for s in t.telas]
         arvore.append({"id": t.id, "nome": t.nome, "icone": t.icone, "telas": telas,
                        "marcadas": sum(x["marcada"] for x in telas)})

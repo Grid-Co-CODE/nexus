@@ -1,0 +1,38 @@
+{# A conversa de um objeto (Fase 2, 03/11/2026): as mensagens, com as menções em selo, e o formulário. O @ abre a lista de
+   pessoas e áreas (conversa.js, que pede /t/comando/conversa/pessoas só quando alguém digita @); sem JavaScript, as
+   áreas se marcam na caixa "Mencionar áreas". Quem é mencionado vê na Caixa de entrada e no sino. #}
+{% macro fio(ob, conv, codigo, voltar, tem_login, areas, titulo='Conversa') %}
+{% set ancora = 'conv-' ~ ob|replace(':', '-') %}
+<section class="conv" id="{{ ancora }}" aria-label="{{ titulo }}">
+  <p class="ins-rot">{{ titulo }}{% if conv.n %} <span class="conv-n">{{ conv.n }}</span>{% endif %}</p>
+  {% if conv.mensagens %}
+  <ol class="conv-lista">
+    {% for m in conv.mensagens %}
+    <li class="conv-msg{% if m.minha %} conv-msg--minha{% endif %}">
+      <div class="conv-cab"><b>{{ 'Você' if m.minha else (m.por or 'Alguém') }}</b><span class="mudo">{{ m.quando_txt }}</span></div>
+      <p class="conv-txt">{{ m.texto }}</p>
+      {% if m.areas_nomes or m.pessoas_nomes %}<p class="conv-mencoes">{% for n in m.pessoas_nomes %}<span class="conv-mencao">@{{ n }}</span>{% endfor %}{% for n in m.areas_nomes %}<span class="conv-mencao conv-mencao--area">@{{ n }}</span>{% endfor %}</p>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}<p class="mudo ins-nota">Ninguém escreveu ainda. Use @ para chamar uma pessoa ou uma área.</p>{% endif %}
+  {% if tem_login %}
+  <form class="conv-form" method="post" action="{{ raiz }}/t/comando/conversa/acao" data-conversa="{{ raiz }}/t/comando/conversa/pessoas">
+    <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="objeto" value="{{ ob }}"><input type="hidden" name="voltar" value="{{ voltar }}">
+    <label class="gc-rotulo" for="tx-{{ ancora }}">Escrever na conversa</label>
+    <div class="conv-campo">
+      <textarea class="gc-campo" id="tx-{{ ancora }}" name="texto" rows="2" maxlength="1000" required placeholder="Escreva e use @ para mencionar (ex.: @Engenharia)"></textarea>
+      <ul class="conv-sugestoes" role="listbox" hidden></ul>
+    </div>
+    <div class="conv-escolhidas" aria-live="polite"></div>
+    <details class="ins-outras conv-areas">
+      <summary>Mencionar áreas</summary>
+      <div class="ins-chk">{% for t, nome in areas %}<label><input type="checkbox" name="area" value="{{ t }}"> {{ nome }}</label>{% endfor %}</div>
+    </details>
+    <div class="conv-botoes">
+      <button class="gc-btn gc-btn--ui gc-btn--primario" name="acao" value="mensagem" type="submit"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Enviar</button>
+    </div>
+  </form>
+  {% endif %}
+</section>
+{% endmacro %}

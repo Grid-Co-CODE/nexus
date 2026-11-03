@@ -22,6 +22,7 @@ RESUMO = {
     "sugestao": "As sugestões que as pessoas mandam para melhorar o Nexus",
     "status_sugestao": "Cada mudança de status das sugestões, de Iniciada a Concluída",
     "evento_insight": "Quem assumiu, avisou e respondeu cada insight do motor de regras",
+    "mensagem_conversa": "As mensagens com @menção de cada insight, OS e usina",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
     "normalizacao": "Quando cada usina voltou pela hora do COS, o tipo e as proteções",
@@ -116,6 +117,9 @@ PARA_QUE = {
     "observacao_responsavel": "Guarda o que o Responsável O&M escreveu sobre a usina na Visão do responsável, com o dia "
                               "e a hora e se ele cobria outro responsável (férias). O texto e o nome vão cifrados; "
                               "serve para juntar as observações nos relatórios.",
+    "mensagem_conversa": "Guarda as mensagens que as pessoas trocam na conversa de cada insight, OS e usina, com quem "
+                         "foi mencionado (uma pessoa ou uma área inteira) e quem já leu. Serve para a Caixa de entrada "
+                         "e o sino avisarem quem foi chamado e para o combinado entre os setores ficar registrado.",
     "evento_insight": "Guarda quem assumiu ou concluiu cada insight que o motor de regras do Nexus apontou (a OS "
                       "normalizada que segue aberta, o chamado parado com o fabricante, o extintor vencido), as áreas "
                       "que foram avisadas e o retorno de cada uma (recebido, em andamento, resolvido), com o dia e a "

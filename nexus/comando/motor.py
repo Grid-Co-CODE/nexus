@@ -141,6 +141,18 @@ def ler():
     return visao._ler(CHAVE, calcular)
 
 
+def sem_esperar():
+    """A leitura para as telas Insights e Caixa de entrada: com a cópia, ela (a vencida se refaz por trás); sem cópia (o
+    Nexus acabou de subir), começa a conta por trás e devolve None, e a tela diz que está calculando. Em 03/11/2026 a
+    conta fria levou 19 s no PC sem o Andamento, e a página ficava parada esperando (Levi: "cliquei em nexus insights e
+    travou tudo")."""
+    from ..campo import visao
+    if visao._CACHE.get(CHAVE) is not None or current_app.config.get("TESTING"):
+        return ler()
+    _aquecer()
+    return None
+
+
 def do_cache():
     """Só a cópia, sem calcular nada na hora (o sino de toda página). Sem cópia, começa a conta por trás e devolve
     None: a página abre sem o número em vez de esperar as fontes."""

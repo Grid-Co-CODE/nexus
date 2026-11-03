@@ -230,6 +230,19 @@ FATOS = (
                     "separadas por vírgula) e respondeu a área que responde em para e o status_retorno (recebido, "
                     "andamento, resolvido; vale o último de cada área). O nome de quem fez, a mensagem e o retorno só "
                     "cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
+    # 03/11/2026 (Fase 2 dos setores conversando): a conversa presa ao objeto (insight, OS, usina) com @menção de pessoa
+    # e de área. Registrado antes da 1ª gravação
+    Fato("mensagem_conversa", "Mensagem de conversa com menção", "base", "nexus_conversas · fato_mensagem",
+         "1 linha = 1 mensagem (ou 1 marcação de lido) de 1 pessoa na conversa de 1 objeto (insight, OS ou usina)",
+         _d(data=("id", "data_id (o dia de Brasília da mensagem)"),
+            pessoa=("id", "pessoa_id de quem escreveu (e o pessoa_hmac)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_conversas · fato_mensagem",),
+         janela_origem="o Nexus é a fonte",
+         observacao="objeto_tipo (insight, os, usina) e objeto_id (o id do insight, o número da OS, o usina_id) em "
+                    "claro; evento mensagem ou leu (a pessoa marcou como lidas as menções daquele objeto; escrever "
+                    "também conta como ler); mencoes_pessoas = os códigos do e-mail (pessoa_hmac) mencionados e "
+                    "mencoes_areas = as torres mencionadas, separados por vírgula. O nome de quem escreveu e o texto "
+                    "só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
     # 28/10/2026 (Levi: "No sugestões recebidas deve ter a opção de mudar o status da solicitação: Iniciada, Em
     # verificação e Conclusão"): o status de cada sugestão, por evento. Registrado antes da 1ª mudança
     Fato("status_sugestao", "Status da sugestão", "base", "nexus_sugestoes · fato_status_sugestao",
@@ -1483,6 +1496,11 @@ LIVROS = (
           "a cada Assumir, Concluir, Reabrir, Notificar áreas ou Responder (a área notificada) de um insight",
           "nexus/comando/estado.py, pelas telas Comando → Insights e Caixa de entrada", False,
           "registrado em 03/11/2026 antes da 1ª gravação (regra 10): nasce no 1º Assumir",
+          so_cresce=True),
+    Livro("nexus_conversas", ("fato_mensagem",),
+          "a cada mensagem e a cada Marcar como lida nas conversas (insight, OS, usina)",
+          "nexus/comando/conversa.py, pelas telas Comando → Insights, Caixa de entrada e a conversa de cada objeto", False,
+          "registrado em 03/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª mensagem",
           so_cresce=True),
     Livro("nexus_sugestoes", ("fato_sugestao", "fato_status_sugestao"),
           "a cada sugestão mandada e a cada mudança de status (Início > Sugestões)",

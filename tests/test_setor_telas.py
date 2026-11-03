@@ -159,12 +159,15 @@ def test_o_setor_ve_so_as_telas_marcadas(app, setores, logado):
 
 def test_setor_sem_nenhuma_tela_ve_o_inicio_com_o_aviso(app, setores):
     # a Bia: o setor dela (chamado "Administrador") não é dono de tela nenhuma; a Performance é dona dos relatórios da
-    # Central de emissão desde 13/10/2026 (Tela.do_setor) e já nasce com eles
-    r = _como(app, BIA).get("/")
+    # Central de emissão desde 13/10/2026 (Tela.do_setor) e já nasce com eles. Desde 03/11/2026 todo setor tem a Caixa
+    # de entrada (Tela.de_todos; Levi: "libera a caixa para todos os setores"): o Início mostra só o Comando
+    c = _como(app, BIA)
+    r = c.get("/")
     assert r.status_code == 200
     html = r.get_data(as_text=True)
-    assert "O setor Administrador ainda não tem telas liberadas. Fale com o responsável." in html
-    assert 'data-torre="' not in html
+    assert "ainda não tem telas liberadas" not in html
+    assert set(re.findall(r'data-torre="([^"]+)"', html)) <= {"comando"}
+    assert c.get("/t/comando/caixa-de-entrada").status_code == 200 and c.get("/t/comando/insights").status_code == 403
 
 
 def test_setor_nao_da_administrador_e_administrador_com_setor_ve_tudo(app, setores):
@@ -258,8 +261,10 @@ def test_a_secao_mostra_os_setores_e_a_arvore_do_menu(app, setores, logado):
     html = logado.get(URL).get_data(as_text=True)
     assert "Telas por setor" in html and 'id="ace-matriz"' in html
     assert re.search(r'class="ace-setor ativo"[^>]*>\s*<span class="nome">Administrador</span>', html)  # o 1º pelo nome
-    assert '<span class="det">vê tudo' not in html and "0 de " in html            # nenhum setor "vê tudo"
-    assert html.count('<input type="checkbox" name="tela"') == sum(len(t.telas) for t in app.extensions["nexus_torres"])
+    assert '<span class="det">vê tudo' not in html and "1 de " in html            # nenhum setor "vê tudo"; a Caixa é de todos
+    # a Caixa de entrada é de todo setor (03/11/2026): marcada e presa, como a do dono
+    assert html.count('<input type="checkbox" name="tela"') + html.count('<input type="checkbox" data-do-setor')         == sum(len(t.telas) for t in app.extensions["nexus_torres"])
+    assert "Todo setor vê esta tela sem marcar" in html
     assert 'value="performance/clima/mapa"' in html and 'value="cos/mesa"' in html
     adm = logado.get(URL + "?setor=2").get_data(as_text=True)                  # o setor "Administrador": caixas
     assert 'id="ace-matriz"' in adm and '<input type="hidden" name="setor" value="2">' in adm

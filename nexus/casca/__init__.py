@@ -286,19 +286,23 @@ def saude():
 
 def _sino():
     """O sino do topo (03/11/2026, os setores conversando): os insights críticos e de atenção SEM DONO das torres que o
-    setor da pessoa vê. E os pedidos de retorno mandados às torres dela que ainda esperam resposta. Só lê as cópias (a do motor e a de quem assumiu): nenhuma página espera uma fonte por causa
-    dele. Sem a cópia do motor (logo depois de subir), não sai número, e a conta começa por trás."""
+    setor da pessoa vê, os pedidos de retorno mandados às torres dela que ainda esperam resposta e as menções a ela ou
+    ao setor dela que ainda não leu (Fase 2). Só lê as cópias (a do motor, a de quem assumiu e a das conversas): nenhuma
+    página espera uma fonte por causa dele. Sem nenhuma cópia (logo depois de subir), não sai número, e a conta começa
+    por trás."""
     if not session.get("logado"):
         return None
     try:
+        from ..comando import conversa as CV
         from ..comando import estado as ES
         from ..comando import motor as MO
         g = MO.do_cache()
-        if not g or not g.dados:
+        l_conv, l_est = CV.copias()
+        if (not g or not g.dados) and not l_conv:
             return None
-        est = ES.estado((ES._CACHE.get("livro") or {}).get("linhas") or [])
+        est = ES.estado(l_est)
         torres = MO.torres_da_pessoa()
-        todos = g.dados.get("insights") or []
+        todos = (g.dados.get("insights") or []) if g and g.dados else []
         itens = [i for i in MO.das_torres(todos, torres)
                  if i["sev"] in ("critico", "atencao") and (est.get(i["id"]) or {}).get("evento") in (None, "", "reabriu")]
         # e os pedidos de retorno que outras áreas mandaram para as minhas e ainda esperam resposta
@@ -308,7 +312,18 @@ def _sino():
             if i["id"] not in vistos and any((torres is None or t in torres) and p["status"] == "pendente"
                                              for t, p in peds.items()):
                 itens.append(dict(i, pedido=True))
-        return {"n": len(itens), "criticos": sum(1 for i in itens if i["sev"] == "critico"), "itens": itens[:6]}
+        # e as menções que ainda não li (sem o texto: a cópia do sino não decifra)
+        from ..torres.comando import _meu_hmac
+        titulo = {"insight:" + i["id"]: i["titulo"] for i in todos}
+        mencoes = []
+        for x in CV.para_mim(CV.conversas(l_conv), _meu_hmac(), torres):
+            tipo, _, oid = x["objeto"].partition(":")
+            mencoes.append({"link": "/t/comando/conversa/" + tipo + "/" + oid, "n": x["n"],
+                            "titulo": titulo.get(x["objeto"]) or (f"OS {oid}" if tipo == "os" else
+                                                                   "Conversa de uma usina" if tipo == "usina" else
+                                                                   f"Insight {oid}")})
+        return {"n": len(itens) + len(mencoes), "criticos": sum(1 for i in itens if i["sev"] == "critico"),
+                "itens": itens[:6], "insights": len(itens), "mencoes": mencoes[:6], "n_mencoes": len(mencoes)}
     except Exception:            # noqa: BLE001 — o sino nunca derruba uma página
         current_app.logger.exception("sino dos insights")
         return None
