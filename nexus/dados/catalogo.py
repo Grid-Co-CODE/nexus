@@ -35,6 +35,7 @@ from dataclasses import dataclass
 
 from . import almoxarifado, fato_chamado, fato_inventario, fato_pt, fato_ronda, fato_tarefa_os, fato_uso_os, fatos, geracao
 from . import programacao
+from ..zeladoria import tabelas as zeladoria_tabelas
 
 ESTADOS = {"id": "ID", "cod": "código", "hmac": "código da pessoa", "nome": "nome", "largo": "em colunas",
            "prop": "cadastro próprio", "nao": "—"}
@@ -1537,6 +1538,20 @@ LIVROS = (
           "checklist das rondas inteiro e novo (aprovadas relidas há menos de 3 h, fila da Aprovação há menos de 6 h), "
           "as rondas do banco sem erro e as OS de zeladoria presentes, e se a última gravação tiver mais de 50 min; "
           "troca o livro inteiro (as 12 semanas até a corrente)"),
+    # a plataforma de zeladoria (o Radar de Fornecedores) dentro do Nexus (Levi, 03/11/2026: "trazer toda a estrutura da
+    # plataforma de zeladoria com a mesma lógica e caminhos do BD"): as tabelas do Supabase com o mesmo nome, copiadas sob
+    # comando até a troca; depois, a torre Zeladoria grava. Desenho: docs/superpowers/specs/2026-11-03-zeladoria-no-nexus-design.md
+    *(Livro(nome, tuple(a for a, lv in zeladoria_tabelas.TABELAS.items() if lv == nome) + ("atualizacao",),
+            "sob comando (ferramentas/copiar_zeladoria.py) até a troca; depois, a cada salvamento da torre Zeladoria",
+            "nexus/zeladoria/copia.py (a cópia do Supabase do Radar); a torre Zeladoria depois da troca", False,
+            obs, so_cresce=so)
+      for nome, obs, so in (
+          (zeladoria_tabelas.LIVRO_APP, "registrado em 03/11/2026 antes de existir: o estado do app da zeladoria, uma "
+           "aba por tabela do Radar, com o dado pessoal, o texto livre e o nome do fornecedor cifrados", ()),
+          (zeladoria_tabelas.LIVRO_FRACTTAL, "registrado em 03/11/2026 antes de existir: as rondas do Fracttal que o "
+           "Radar lia (fracttal_rondas), o índice das fotos, o cursor da leitura e a última ronda de cada usina", ()),
+          (zeladoria_tabelas.LIVRO_HISTORICO, "registrado em 03/11/2026 antes de existir: o registro de ações e as "
+           "alterações das parcelas, das provisões e do cronograma, que só crescem", zeladoria_tabelas.HISTORICO))),
     Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na aba Pessoas e setores de Base → Acessos",
           "nexus/cadastro/setores.py, pela tela Base > Acessos > Pessoas e setores", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
@@ -1658,6 +1673,10 @@ ABAS_FORA_DA_REGRA = {
                         "em palavras do cliente; conta do Nexus (nexus/campo/zeladoria.py), não fato conformado: o "
                         "checklist das rondas que a origina não está no banco",
 }
+# as tabelas do Radar mantêm o nome do Supabase (o clone e a ponte usam o mesmo nome; os fatos vêm depois, a partir delas)
+ABAS_FORA_DA_REGRA.update({a: "cópia fiel da tabela do Radar de Fornecedores (zeladoria), com o mesmo nome; os fatos "
+                              "vêm depois, a partir dela" for a in zeladoria_tabelas.TABELAS
+                           if not a.endswith("_historico")})
 
 
 # As tabelas do banco que NÃO são fato nem livro do Nexus, cada uma com o papel e o porquê (Levi, 09/10/2026: "verifique
