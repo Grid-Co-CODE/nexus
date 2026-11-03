@@ -474,8 +474,9 @@ mandam e-mail. `NEXUS_PCM_RELATORIOS_AUTO=0` no `.env` desliga a emissão autom�
 `nexus/pcm/relatorios/CLAUDE.md`.
 
 O e-mail semanal das pendências da Segurança (24/10/2026) sai pelo App de Campo, não pelo Nexus: o Nexus só publica o
-livro `nexus_hseq_email` na segunda depois das 07:00, e só com `NEXUS_HSEQ_EMAIL_AUTO=1` no `.env` (sem ela, desligado).
-**Nada a fazer da T.I.** além de pôr a variável quando o App estiver pronto. Regras: `nexus/torres/hseq/CLAUDE.md`.
+livro `nexus_hseq_email` na segunda depois das 07:00, ligado por padrão desde 30/10/2026 (`NEXUS_HSEQ_EMAIL_AUTO=0`
+no `.env` desliga). **Nada a fazer da T.I.:** a liberação do Graph do App (o remetente naoresponda@) foi feita em 29/10.
+Regras: `nexus/torres/hseq/CLAUDE.md`.
 
 A assinatura da APR feita no App (26/10/2026) é lida do PDF da APR com o `pypdf`, que entrou no `requirements.txt`: o
 `deploy/atualizar.sh` o instala sozinho no próximo commit (o pip roda antes da conferência do boot).

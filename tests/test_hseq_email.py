@@ -75,8 +75,10 @@ def test_a_previa_mostra_quem_recebe_e_o_email(com_tst, app, cliente):
     mesa = cliente.get("/t/hseq/mesa").get_data(as_text=True)
     assert 'href="/t/hseq/mesa/email">Prévia do e-mail semanal</a>' in mesa
     html = cliente.get("/t/hseq/mesa/email").get_data(as_text=True)
-    assert "TST · 1 pessoa" in html and ">Supervisora Campo</a>" in html and "publicação desligada" in html
+    assert "TST · 1 pessoa" in html and ">Supervisora Campo</a>" in html and "publicação ligada" in html
     assert "de todas as usinas" in html
+    app.config["NEXUS_CAMPO_AQUECER"] = "0"                         # o PC: a prévia diz que quem publica é o servidor
+    assert "publicação desligada nesta máquina" in cliente.get("/t/hseq/mesa/email").get_data(as_text=True)
     sup = cliente.get("/t/hseq/mesa/email?ver=92").get_data(as_text=True)
     assert "nas suas usinas" in sup and "Altair (Thopen)" in sup
 
@@ -103,6 +105,14 @@ def test_publica_uma_vez_por_semana(com_tst, app, monkeypatch):
         assert ES.publicar(app.config, hoje=date(2026, 10, 12))["publicadas"] == 0
     assert ES.devido(ES._agora().replace(year=2026, month=10, day=26, hour=7)) and not ES.devido(
         ES._agora().replace(year=2026, month=10, day=26, hour=6))
+
+
+def test_a_publicacao_liga_no_servidor_e_nao_no_pc():
+    """Ligada por padrão desde 30/10/2026 (o teste do App deu 6 de 6 e o Levi não tem acesso ao .env do servidor); "0"
+    desliga, e o PC (NEXUS_CAMPO_AQUECER=0) não publica."""
+    assert ES.ligado({}) and ES.ligado({"NEXUS_HSEQ_EMAIL_AUTO": "1"}) and ES.ligado({"NEXUS_HSEQ_EMAIL_AUTO": ""})
+    assert not ES.ligado({"NEXUS_HSEQ_EMAIL_AUTO": "0"})
+    assert not ES.ligado({"NEXUS_CAMPO_AQUECER": "0"})
 
 
 def test_o_livro_esta_no_catalogo_antes_da_primeira_gravacao():

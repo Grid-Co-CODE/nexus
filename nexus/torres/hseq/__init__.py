@@ -367,7 +367,7 @@ def mesa_email():
     if escolhido is None and tst is None and resp:
         escolhido = resp[0]
     return render_template("hseq/email.html", torre=TORRE, tela=TORRE.tela("mesa"), d=d, resp=resp, tst=tst,
-                           escolhido=escolhido, ver=ver, ligado=str(cfg.get("NEXUS_HSEQ_EMAIL_AUTO") or "") == "1")
+                           escolhido=escolhido, ver=ver, ligado=ES.ligado(cfg))
 
 
 @bp.route("/mesa/pendencias.xlsx")

@@ -41,7 +41,7 @@ if __name__ == "__main__":
     # semana (14/10/2026; NEXUS_PCM_RELATORIOS_AUTO=0 desliga)
     from nexus.pcm.relatorios import agenda as relatorios_pcm
     relatorios_pcm.ligar(app)
-    # o e-mail semanal das pendências da Segurança, que o App de Campo manda (24/10/2026; só com NEXUS_HSEQ_EMAIL_AUTO=1)
+    # o e-mail semanal das pendências da Segurança, que o App de Campo manda (24/10/2026; ligado desde 30/10, NEXUS_HSEQ_EMAIL_AUTO=0 desliga)
     from nexus.hseq import email_semanal
     email_semanal.ligar(app)
     # as telas quentes depois de cada deploy (13/10/2026: a 1ª abertura do servidor recém-subido levou 27 s; 5 min)

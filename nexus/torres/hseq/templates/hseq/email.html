@@ -10,7 +10,7 @@
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Mesa da Segurança</p><h1 class="cn-titulo">Prévia do e-mail semanal</h1>
       <p class="cn-pergunta">Toda segunda depois das 7h, o Nexus monta o e-mail de cada um e o App de Campo manda.</p></div>
-    <div class="cn-frescor">semana {{ d.semana }}<br><b>{{ 'publicação ligada' if ligado else 'publicação desligada (NEXUS_HSEQ_EMAIL_AUTO)' }}</b></div>
+    <div class="cn-frescor">semana {{ d.semana }}<br><b>{{ 'publicação ligada' if ligado else 'publicação desligada nesta máquina (o servidor publica)' }}</b></div>
   </div>
   <p class="hs-voltar"><a class="cn-link" href="{{ url_for('torre_hseq.mesa')|na_raiz }}">Voltar à Mesa</a></p>
   {% if d.erros %}<p class="cn-erro cn-aviso" role="status"><b>Uma fonte não foi lida agora ({{ d.erros|join(', ') }}).</b> Sem ela, o e-mail não sai: o Nexus tenta de novo daqui a 10 minutos.</p>{% endif %}

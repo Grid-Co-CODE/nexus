@@ -1478,7 +1478,7 @@ LIVROS = (
     # as decisões da Segurança sobre os extintores (24/10/2026): a exclusão de extintor (o não reconhecido aceito e o
     # botão direito) e o pedido de nova ronda por usina; o App de Campo lê os dois daqui
     Livro("nexus_hseq_email", ("fato_email_pendencias",),
-          "toda segunda depois das 07:00 (com NEXUS_HSEQ_EMAIL_AUTO=1)", "nexus/hseq/email_semanal.py", False,
+          "toda segunda depois das 07:00, no servidor (NEXUS_HSEQ_EMAIL_AUTO=0 desliga)", "nexus/hseq/email_semanal.py", False,
           "registrado em 24/10/2026 antes de existir: nasce com a 1ª semana publicada, quando o App de Campo estiver "
           "pronto para ler e mandar",
           so_cresce=True),

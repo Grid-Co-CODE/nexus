@@ -16,8 +16,11 @@ O que vai no livro (a API é compartilhada, regra 8): o código da pessoa (HMAC)
 nem o e-mail; o corpo leva só usinas, clientes, números e o link para a Mesa filtrada pelo número da pessoa (`?r=`),
 sem o nome. Cada linha vai assinada (HMAC com a chave derivada da NEXUS_PESSOA_HMAC, rótulo `nexus:hseq:email`).
 
-Ligado por `NEXUS_HSEQ_EMAIL_AUTO=1` (desligado sem ela: o livro só nasce quando o App estiver pronto para ler), a
-segunda depois das 07:00 de Brasília, uma vez por semana (a semana que já está no livro não é publicada de novo).
+Publica na segunda depois das 07:00 de Brasília, uma vez por semana (a semana que já está no livro não é publicada de
+novo), no servidor (`ligado`). Até 30/10/2026 era só com `NEXUS_HSEQ_EMAIL_AUTO=1`; com o teste do App de 6 de 6 (a W44,
+publicada à mão, foi toda para o Levi) e o Levi sem acesso ao `.env` do servidor, ficou ligado por padrão:
+`NEXUS_HSEQ_EMAIL_AUTO=0` desliga, e não liga onde `NEXUS_CAMPO_AQUECER=0` (o PC e a cópia de prova), como a Zeladoria
+no banco.
 """
 import hashlib
 import hmac
@@ -246,9 +249,16 @@ def devido(agora: datetime) -> bool:
     return agora.weekday() == 0 and agora.hour >= HORA
 
 
+def ligado(cfg) -> bool:
+    """Publica nesta máquina? Sim no servidor; não onde NEXUS_HSEQ_EMAIL_AUTO=0 nem onde NEXUS_CAMPO_AQUECER=0 (o PC)."""
+    return (str(cfg.get("NEXUS_HSEQ_EMAIL_AUTO", "1") or "1").strip() != "0"
+            and str(cfg.get("NEXUS_CAMPO_AQUECER", "1") or "1").strip() != "0")
+
+
 def ligar(app):
-    """O laço: a cada 10 min, na segunda depois das 07:00, publica a semana (uma vez). Só com NEXUS_HSEQ_EMAIL_AUTO=1."""
-    if _LACO["thread"] is not None or str(app.config.get("NEXUS_HSEQ_EMAIL_AUTO") or "0").strip() != "1":
+    """O laço: a cada 10 min, na segunda depois das 07:00, publica a semana (uma vez). Só onde `ligado`. Quem chama é o
+    servir.py (o servidor), nunca o create_app nem o app.py: teste não fala com a rede."""
+    if _LACO["thread"] is not None or not ligado(app.config):
         return
 
     def laco():
