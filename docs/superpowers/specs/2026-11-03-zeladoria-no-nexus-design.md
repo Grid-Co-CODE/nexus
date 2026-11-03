@@ -21,8 +21,8 @@ PCM e os chamados.
    comando que se roda quando se quer comparar e no dia da troca. O laço de hora em hora saiu no corte de prazo de
    03/11. Quando tudo bater, o time que usa o Radar passa ao Nexus num dia combinado, e o Supabase fica só leitura.
    Precisa do acordo do dono do Radar (o HEAD de zeladoria).
-3. **Cores só na torre da Zeladoria:** preto `#030407`, azul `#1558c9` e lima `#d4ff24`. O resto do Nexus segue no
-   navy com o verde de hoje.
+3. **Cores: as do Nexus.** A 1ª versão teve preto, azul e lima só na torre; vendo a tela, o Levi trocou (03/11/2026):
+   "bote aquele azul nexus para ficar no padrão nexus de planilha e cards".
 4. **O Radar congela ao fim da etapa 2:** as novidades de tela e de regra param ali, e o clone vira a casa da
    zeladoria.
 
@@ -229,9 +229,7 @@ Toda rota da ponte exige sessão do Nexus e respeita o papel: escrita, só aprov
   endereço.
 
 ### Visual
-- Os tokens da Zeladoria entram no `nexus.css`, só no escopo da torre, nos dois temas:
-  - preto `#030407`, azul `#1558c9` e lima `#d4ff24`;
-  - no claro, o lima é fundo com texto preto, nunca texto sobre branco, e o azul faz o texto de destaque.
+- Os tokens do `nexus.css` entram no clone, e as variáveis do Radar apontam para eles, nos dois temas.
 - A casca (topo e menu) continua a do Nexus.
 - O CSS do clone (cerca de 40 variáveis e 116 cores fixas) passa a usar os tokens. Nenhum `#hex` nem `rgba()` fica em
   regra de CSS (regra da casa). **Por script (corte de prazo de 03/11):**

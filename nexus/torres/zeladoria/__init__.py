@@ -65,7 +65,28 @@ TORRE = Torre(
 bp = TORRE.criar_blueprint(__name__)
 
 CLONE = Path(__file__).resolve().parent / "clone" / "radar.html"
-_CLONE = {"texto": None}
+_CLONE = {"texto": None, "tokens": None}
+NEXUS_CSS = Path(__file__).resolve().parents[2] / "static" / "nexus.css"
+# os seletores dos tokens no nexus.css e o que eles viram dentro do clone: o atributo do Radar (data-theme, que o
+# <html> do clone sempre tem) dá a força para vencer o CSS do clone, e o data-tema="claro" do Nexus escolhe o claro
+_SELETORES_TOKENS = {':root,:root[data-tema="claro"] .topo{': ":root[data-theme]{",
+                     ':root[data-tema="claro"]{': ':root[data-theme][data-tema="claro"]{',
+                     ":root{": ":root[data-theme]{"}
+
+
+def tokens_do_nexus() -> str:
+    """Os tokens do nexus.css (os blocos do escuro, do claro e das fontes), para o clone usar a paleta do Nexus (Levi,
+    03/11/2026: "bote aquele azul nexus para ficar no padrão nexus de planilha e cards"). Tirados do próprio nexus.css,
+    e não copiados: o token que muda lá muda na Zeladoria junto."""
+    if _CLONE["tokens"] is None:
+        css = NEXUS_CSS.read_text(encoding="utf-8")
+        trecho = css[css.index("*/") + 2:css.index("*{box-sizing:border-box}")]
+        for de, para in _SELETORES_TOKENS.items():
+            if de not in trecho:
+                raise RuntimeError(f"o nexus.css mudou: o bloco {de!r} não está mais antes do *{{box-sizing}}")
+            trecho = trecho.replace(de, para)
+        _CLONE["tokens"] = '<style id="nexus-tokens">' + trecho.strip() + "</style>\n"
+    return _CLONE["tokens"]
 SOMENTE_LEITURA = "Cópia só leitura até a troca."
 _FOLIO = re.compile(r"^\d{1,12}$")
 
@@ -108,17 +129,22 @@ def app_radar():
         cfg["chaves"] = {f"rf_{aba}": ch for aba, ch in ((est or {}).get("chaves") or {}).items() if ch != "id"}
     # o tema do Nexus (o escuro é o padrão; o claro, o cookie do botão do topo) vira o data-theme do clone, que a paleta
     # da Zeladoria usa; o botão do topo grava `nexus.tema` no navegador, e o clone muda junto, sem recarregar
-    tema = "light" if tema_do_pedido() == "claro" else "dark"
+    claro = tema_do_pedido() == "claro"
+    tema = "light" if claro else "dark"
     config = (f"<script>window.ZELADORIA = {json.dumps(cfg)}; window.ZELADORIA_ABA = {json.dumps(aba)}; "
               f"window.ZELADORIA_TEMA = {json.dumps(tema)};\n"
-              "window.addEventListener('storage', function (e) { if (e.key === 'nexus.tema' && e.newValue) "
-              "document.documentElement.setAttribute('data-theme', e.newValue === 'claro' ? 'light' : 'dark'); });"
+              "window.addEventListener('storage', function (e) { if (e.key !== 'nexus.tema' || !e.newValue) return; "
+              "var h = document.documentElement, c = e.newValue === 'claro'; "
+              "h.setAttribute('data-theme', c ? 'light' : 'dark'); "
+              "if (c) h.setAttribute('data-tema', 'claro'); else h.removeAttribute('data-tema'); });"
               "</script>\n"
               # o menu é o do Nexus: a barra lateral do clone some (o #app dele é flex, o conteúdo ocupa a largura)
               "<style>.sidebar{display:none !important}</style>")
     ponte = (f'<script src="{url_for("static", filename="zeladoria/ponte.js")}"></script>\n'
              "<script>iniciarRadarApp();</script>")
-    html = (_CLONE["texto"].replace('<html lang="pt-BR">', f'<html lang="pt-BR" data-theme="{tema}">', 1)
+    atributos = f'data-theme="{tema}"' + (' data-tema="claro"' if claro else "")
+    html = (_CLONE["texto"].replace('<html lang="pt-BR">', f'<html lang="pt-BR" {atributos}>', 1)
+            .replace('<style id="zeladoria-paleta">', tokens_do_nexus() + '<style id="zeladoria-paleta">', 1)
             .replace("<!--ZELADORIA:CONFIG-->", config).replace("<!--ZELADORIA:PONTE-->", ponte))
     return Response(html, mimetype="text/html", headers={"Cache-Control": "no-store"})
 

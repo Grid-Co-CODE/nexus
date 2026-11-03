@@ -170,7 +170,17 @@ def test_o_clone_nasce_no_tema_do_nexus(logado, copiado):
     assert "nexus.tema" in html
     logado.set_cookie("nexus_tema", "claro")
     html = logado.get("/t/zeladoria/app").get_data(as_text=True)
-    assert '<html lang="pt-BR" data-theme="light">' in html and 'window.ZELADORIA_TEMA = "light"' in html
+    assert '<html lang="pt-BR" data-theme="light" data-tema="claro">' in html and 'window.ZELADORIA_TEMA = "light"' in html
+
+
+def test_o_clone_usa_os_tokens_do_nexus(logado, copiado):
+    """Levi, 03/11/2026: "bote aquele azul nexus para ficar no padrão nexus de planilha e cards". A torre põe os tokens
+    do próprio nexus.css antes da paleta da Zeladoria, com o atributo do clone para vencer o CSS dele."""
+    html = logado.get("/t/zeladoria/app").get_data(as_text=True)
+    tokens = html[html.index('<style id="nexus-tokens">'):html.index('<style id="zeladoria-paleta">')]
+    assert ":root[data-theme]{" in tokens and ':root[data-theme][data-tema="claro"]{' in tokens
+    assert "--superficie:#161d30" in tokens and "--fundo:#090d18" in tokens and "--info:" in tokens
+    assert ".topo" not in tokens and "box-sizing" not in tokens
 
 
 def test_banco_fora_do_ar_avisa_sem_erro_500(logado, banco, monkeypatch):

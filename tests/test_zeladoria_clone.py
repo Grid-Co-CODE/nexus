@@ -75,8 +75,14 @@ VARIAVEIS_DO_CLONE = ("--bg", "--surface", "--surface-2", "--surface-sunken", "-
 def _paleta(html):
     m = re.search(r'<style id="zeladoria-paleta">(.*?)</style>', html, re.S)
     assert m, "sem a paleta da Zeladoria"
-    blocos = dict(re.findall(r':root\[data-theme="(dark|light)"\]\s*\{([^}]*)\}', m.group(1)))
-    return m.group(1), {t: dict(re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;]+);", c)) for t, c in blocos.items()}
+    blocos = re.findall(r':root\[data-theme\]\s*\{([^}]*)\}', m.group(1))
+    assert len(blocos) == 1, "a paleta é um bloco só: os tokens do Nexus é que mudam com o tema"
+    return m.group(1), dict(re.findall(r"(--[a-z0-9-]+)\s*:\s*([^;]+);", blocos[0]))
+
+
+def _tokens_do_nexus():
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "nexus.css").read_text(encoding="utf-8")
+    return set(re.findall(r"(--[a-z0-9-]+)\s*:", css[:css.index("*{box-sizing:border-box}")]))
 
 
 def test_sem_emoji(html):
@@ -84,18 +90,19 @@ def test_sem_emoji(html):
     assert not achados, [f"U+{ord(c):04X}" for c in achados]
 
 
-def test_as_tres_cores_nos_dois_temas(html):
-    texto, temas = _paleta(html)
-    assert set(temas) == {"dark", "light"}
-    for t in ("dark", "light"):
-        v = temas[t]
-        assert (v["--zel-preto"], v["--zel-azul"], v["--zel-lima"]) == ("#030407", "#1558c9", "#d4ff24"), t
-        assert set(VARIAVEIS_DO_CLONE) <= set(v), (t, set(VARIAVEIS_DO_CLONE) - set(v))
-        assert v["--accent"] == "var(--zel-lima)" and v["--accent-ink"] == "var(--zel-preto)", t
-    assert set(temas["dark"]) == set(temas["light"])
-    assert temas["dark"]["--bg"] == "var(--zel-preto)"
-    # no claro o lima é só superfície: o texto de destaque é escuro, e o azul faz o papel de informação
-    assert temas["light"]["--accent-strong"] != "var(--zel-lima)" and temas["light"]["--info"] == "var(--zel-azul)"
+def test_a_paleta_e_a_do_nexus(html):
+    """Levi, 03/11/2026: "bote aquele azul nexus para ficar no padrão nexus de planilha e cards". Cada variável do clone
+    aponta para um token do nexus.css; o --info tem o mesmo nome nos dois e vem do Nexus (a torre põe os tokens)."""
+    texto, v = _paleta(html)
+    tokens = _tokens_do_nexus()
+    assert set(VARIAVEIS_DO_CLONE) - {"--info"} <= set(v), set(VARIAVEIS_DO_CLONE) - set(v)
+    assert "--info" not in v and "--info" in tokens
+    for nome, valor in v.items():
+        usados = re.findall(r"var\((--[a-z0-9-]+)\)", valor)
+        assert usados and set(usados) <= tokens, (nome, valor)
+    assert v["--bg"] == "var(--fundo)" and v["--surface"] == "var(--superficie)" and v["--accent"] == "var(--verde)"
+    assert not re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", texto)                 # nenhuma cor fixa: só token
+    assert "zel-preto" not in html and "zel-lima" not in html and "zel-azul" not in html
 
 
 def test_paleta_depois_do_css_do_clone(html):

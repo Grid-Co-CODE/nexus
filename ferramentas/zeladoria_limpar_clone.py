@@ -10,7 +10,7 @@ O que faz, e por quê:
 - faz o app abrir na aba pedida pelo menu do Nexus (`window.ZELADORIA_ABA`);
 - troca o e-mail de exemplo da tela de login;
 - veste o clone com o visual da Zeladoria (`vestir`, etapa 3, 03/11/2026):
-  - a paleta com as três cores do Levi (preto #030407, azul #1558c9, lima #d4ff24), nos dois temas;
+  - a paleta do Nexus: as variáveis do clone apontam para os tokens do nexus.css, nos dois temas;
   - as fontes do Nexus;
   - a cor fixa do CSS e dos estilos do JavaScript virando variável;
   - os emojis saindo (regra do Nexus);
@@ -76,45 +76,36 @@ def limpar(texto: str, de_para: dict) -> str:
 
 
 # ── o visual da Zeladoria (etapa 3) ────────────────────────────────────────────────────────────────────────────────
-# A paleta entra DEPOIS do CSS do clone e redefine as variáveis dele nos dois temas; o servidor marca o <html> com
-# data-theme="dark" ou "light", pelo tema do Nexus, e por isso o seletor com o atributo vence o :root e o
-# prefers-color-scheme do Radar. Levi, 03/11/2026: "use as cores Black 030407, Blue 1558c9, lime D4FF24", só na
-# Zeladoria. No claro, o lima é só superfície (texto preto em cima), e o texto de destaque é um lima escuro legível: o
-# lima puro no branco não passa no contraste, como o verde Grid (DESIGN.md). O azul faz o papel de informação.
+# A paleta é a do Nexus (Levi, 03/11/2026, vendo o preto e o lima da 1ª versão: "o design ficou estranho, bote aquele
+# azul nexus para ficar no padrão nexus de planilha e cards"). As variáveis do clone apontam para os tokens do
+# nexus.css, que a torre põe na página logo antes desta paleta (`<style id="nexus-tokens">`, tirados do próprio
+# nexus.css ao servir: token que muda lá muda aqui). O tema é o do Nexus: o servidor marca o <html> com data-theme (o
+# do Radar) e data-tema="claro" no claro (o do Nexus), e o seletor com o atributo vence o :root e o
+# prefers-color-scheme do Radar. O `--info` do clone e o do Nexus têm o mesmo nome e o mesmo papel: vale o do Nexus.
 PALETA = """<style id="zeladoria-paleta">
-/* A paleta da Zeladoria (nexus/torres/zeladoria/CLAUDE.md): as três cores e as variáveis do clone, nos dois temas.
-   Vem depois do CSS do clone e vence ele (o <html> sempre tem o data-theme, posto pelo Nexus). */
-:root[data-theme="dark"] {
-  --zel-preto: #030407; --zel-azul: #1558c9; --zel-lima: #d4ff24;
-  --zel-sobre-cor: #ffffff; --zel-veu: rgba(3,4,7,0.72); --zel-linha-clara: rgba(255,255,255,0.22);
-  --sidebar-bg: var(--zel-preto); --sidebar-bg-2: #0b0e14; --sidebar-border: #232a36; --sidebar-ink: #c3cad7;
-  --sidebar-ink-muted: #96a0b4; --sidebar-active-bg: var(--zel-lima); --sidebar-active-ink: var(--zel-preto);
-  --bg: var(--zel-preto); --surface: #0b0e14; --surface-2: #141923; --surface-sunken: var(--zel-preto);
-  --border: #232a36; --ink: #e9eef6; --ink-2: #c3cad7; --ink-muted: #96a0b4;
-  --accent: var(--zel-lima); --accent-strong: var(--zel-lima); --accent-ink: var(--zel-preto);
-  --accent-soft: rgba(212,255,36,0.14);
-  --good: #4ade80; --good-soft: rgba(74,222,128,0.16); --warn: #ffd83d; --warn-soft: rgba(255,216,61,0.16);
-  --critical: #ff5b6e; --critical-soft: rgba(255,91,110,0.16);
-  --info: #7aa2f7; --info-soft: rgba(21,88,201,0.28); --frozen: #7fb8ff; --frozen-soft: rgba(127,184,255,0.16);
-  --neutral-pill: rgba(255,255,255,0.07); --shadow: 0 1px 2px rgba(0,0,0,0.5), 0 3px 14px rgba(0,0,0,0.5);
-  --fx-aberto: #a6c93a; --fx-prov: var(--warn);
+/* A paleta da Zeladoria é a do Nexus (nexus/torres/zeladoria/CLAUDE.md): cada variável do clone aponta para um token do
+   nexus.css, nos dois temas. Vem depois do CSS do clone e vence ele. */
+:root[data-theme] {
+  --zel-sobre-cor: var(--foto-tinta); --zel-veu: var(--veu); --zel-linha-clara: var(--linha-forte);
+  --sidebar-bg: var(--barra); --sidebar-bg-2: var(--superficie); --sidebar-border: var(--linha);
+  --sidebar-ink: var(--tinta-2); --sidebar-ink-muted: var(--mudo); --sidebar-active-bg: var(--verde);
+  --sidebar-active-ink: var(--sobre-verde);
+  --bg: var(--fundo); --surface: var(--superficie); --surface-2: var(--superficie-2); --surface-sunken: var(--barra);
+  --border: var(--linha); --ink: var(--tinta); --ink-2: var(--tinta-2); --ink-muted: var(--mudo);
+  --accent: var(--verde); --accent-strong: var(--verde-texto); --accent-ink: var(--sobre-verde);
+  --accent-soft: var(--verde-suave);
+  --good: var(--ok); --good-soft: var(--ok-suave); --warn: var(--alerta); --warn-soft: var(--alerta-suave);
+  --critical: var(--critico); --critical-soft: var(--critico-suave);
+  --info-soft: var(--info-suave); --frozen: var(--info); --frozen-soft: var(--info-suave);
+  --neutral-pill: var(--clarao-a08); --shadow: 0 1px 2px var(--sombra);
+  --fx-aberto: var(--lima-cheio); --fx-prov: var(--alerta);
+  --radius: var(--raio-md);
 }
-:root[data-theme="light"] {
-  --zel-preto: #030407; --zel-azul: #1558c9; --zel-lima: #d4ff24;
-  --zel-sobre-cor: #ffffff; --zel-veu: rgba(3,4,7,0.45); --zel-linha-clara: rgba(3,4,7,0.18);
-  --sidebar-bg: var(--zel-preto); --sidebar-bg-2: #0b0e14; --sidebar-border: #232a36; --sidebar-ink: #c3cad7;
-  --sidebar-ink-muted: #96a0b4; --sidebar-active-bg: var(--zel-lima); --sidebar-active-ink: var(--zel-preto);
-  --bg: #fcfcfc; --surface: #ffffff; --surface-2: #f5f6f8; --surface-sunken: #f3f5f7;
-  --border: #e3e7eb; --ink: var(--zel-preto); --ink-2: #475569; --ink-muted: #5a6475;
-  --accent: var(--zel-lima); --accent-strong: #4b5e00; --accent-ink: var(--zel-preto); --accent-soft: #f2fbd0;
-  --good: #166b36; --good-soft: #e3f5e9; --warn: #7a5200; --warn-soft: #fbeeda;
-  --critical: #b42230; --critical-soft: #fae1de;
-  --info: var(--zel-azul); --info-soft: #e3ecfa; --frozen: #0a5fc4; --frozen-soft: #dcecfb;
-  --neutral-pill: #eceef2; --shadow: 0 1px 2px rgba(3,4,7,0.06), 0 3px 12px rgba(3,4,7,0.07);
-  --fx-aberto: #8fb31a; --fx-prov: #d9921c;
-}
-/* os títulos na fonte de título do Nexus */
-.page-title, .modal-head h3 { font-family: "Raleway", "Poppins", sans-serif; }
+/* o corpo, os títulos e os botões como no Nexus: a fonte do Nexus, o título na fonte de título, e o botão retangular
+   do gc-btn (o do Radar era uma pílula) */
+body { font-family: var(--font-sans); }
+.page-title, .modal-head h3 { font-family: var(--font-display); }
+.btn { border-radius: var(--raio-controle); font-weight: 600; padding: 8px 14px; }
 /* a 375 px (a prova do Nexus) nada rola de lado: a grade de duas colunas posta no estilo do elemento cai para uma, e o
    botão de rótulo longo ("Acompanhamento de Pagamentos - Terceirizados") quebra a linha */
 @media (max-width: 600px) {

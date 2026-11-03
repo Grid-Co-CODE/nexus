@@ -121,8 +121,8 @@ diferentes apagariam um ao outro. Levi escolheu "Salvo em 1 s, banco logo depois
 
 ## O visual (etapa 3, 03/11/2026)
 
-- **Paleta:** as três cores do Levi (preto `#030407`, azul `#1558c9` e lima `#d4ff24`) ficam numa paleta própria, dentro do clone: o bloco `zeladoria-paleta`, que redefine as variáveis do Radar nos dois temas. No claro, o lima é só superfície, com texto preto em cima; o texto de destaque é um lima escuro, e a informação é o azul.
-- **Tema:** o `<html>` do clone nasce com o `data-theme` do tema do Nexus, e o botão do topo troca ao vivo (o aviso `nexus.tema` no navegador).
+- **Paleta: a do Nexus.** A 1ª versão tinha as três cores do Levi (preto, azul e lima); vendo a tela, ele pediu (03/11/2026) "bote aquele azul nexus para ficar no padrão nexus de planilha e cards". A rota `/app` põe no clone os blocos de token do próprio `nexus.css` (`tokens_do_nexus`, com o seletor do clone para vencer o CSS dele), e o bloco `zeladoria-paleta` aponta cada variável do Radar para um token (`--bg` = `--fundo`, `--surface` = `--superficie`, `--accent` = `--verde`); o `--info` tem o mesmo nome nos dois e vem do Nexus. Token que muda no `nexus.css` muda aqui junto. O botão é o retângulo do `gc-btn`, não a pílula do Radar.
+- **Tema:** o `<html>` do clone nasce com o `data-theme` (o do Radar) e, no claro, o `data-tema="claro"` (o do Nexus), e o botão do topo troca os dois ao vivo (o aviso `nexus.tema` no navegador).
 - **Fontes:** as do Nexus (Poppins, Raleway nos títulos e IBM Plex Mono).
 - **Cores fixas:** a do CSS e a de aviso dos estilos do JavaScript viraram variável. A cor de DADO (o avatar de cada pessoa, a escala de dias de atraso, o calor da criticidade) e o CSS do relatório de impressão (papel branco) ficam como estavam.
 - **Emojis:** saíram. O que era o botão inteiro virou palavra (Excluir, Editar, Fotos, Simular...).
