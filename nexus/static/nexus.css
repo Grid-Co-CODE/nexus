@@ -547,3 +547,24 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 :root[data-tema="claro"] .entrar-logo{box-sizing:content-box;width:100%;margin:-28px -28px 22px;padding:22px 28px;
   background:var(--marca-fundo);border-radius:13px 13px 0 0;object-fit:contain;object-position:left center}
 :root[data-tema="claro"] ::placeholder{color:var(--mudo);opacity:1}
+
+/* o sino dos insights no topo (03/11/2026): o número de sem dono, vermelho com crítico; a lista curta por cima da tela */
+.sino-topo{position:relative}
+.sino-bt{position:relative;list-style:none;cursor:pointer}
+.sino-bt::-webkit-details-marker{display:none}
+.sino-bt .ph{font-size:18px}
+.sino-n{position:absolute;top:-4px;right:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--alerta);
+  color:var(--sobre-cheio);font:700 11px/18px var(--font-sans);text-align:center;font-variant-numeric:tabular-nums}
+.sino-n--critico{background:var(--critico);color:var(--sobre-cheio)}
+.sino-caixa{position:absolute;right:0;top:calc(100% + 10px);z-index:40;width:min(420px,calc(100vw - 32px));background:var(--superficie);
+  border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 12px 32px var(--sombra);padding:14px 16px;color:var(--tinta)}
+.sino-t{margin:0 0 8px;font-size:13.5px}
+.sino-caixa ul{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:2px;max-height:360px;overflow:auto}
+.sino-caixa li a{display:block;padding:8px;border-radius:6px;color:var(--tinta);text-decoration:none;font-size:13px;line-height:1.4}
+.sino-caixa li a:hover,.sino-caixa li a:focus-visible{background:var(--superficie-2)}
+.sino-sev{font:700 10.5px/1 var(--font-sans);padding:3px 6px;border-radius:4px;margin-right:4px;vertical-align:1px}
+.sino-sev--critico{color:var(--critico);background:var(--critico-suave)}
+.sino-sev--atencao{color:var(--alerta);background:var(--alerta-suave)}
+.sino-vazio{margin:0 0 12px;color:var(--mudo);font-size:13px}
+.sino-todos{width:100%;justify-content:center}
+@media (max-width:640px){.sino-caixa{position:fixed;left:16px;right:16px;top:64px;width:auto}}

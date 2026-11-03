@@ -284,6 +284,36 @@ def saude():
     return jsonify(ok=True, commit=_commit())
 
 
+def _sino():
+    """O sino do topo (03/11/2026, os setores conversando): os insights críticos e de atenção SEM DONO das torres que o
+    setor da pessoa vê. E os pedidos de retorno mandados às torres dela que ainda esperam resposta. Só lê as cópias (a do motor e a de quem assumiu): nenhuma página espera uma fonte por causa
+    dele. Sem a cópia do motor (logo depois de subir), não sai número, e a conta começa por trás."""
+    if not session.get("logado"):
+        return None
+    try:
+        from ..comando import estado as ES
+        from ..comando import motor as MO
+        g = MO.do_cache()
+        if not g or not g.dados:
+            return None
+        est = ES.estado((ES._CACHE.get("livro") or {}).get("linhas") or [])
+        torres = MO.torres_da_pessoa()
+        todos = g.dados.get("insights") or []
+        itens = [i for i in MO.das_torres(todos, torres)
+                 if i["sev"] in ("critico", "atencao") and (est.get(i["id"]) or {}).get("evento") in (None, "", "reabriu")]
+        # e os pedidos de retorno que outras áreas mandaram para as minhas e ainda esperam resposta
+        vistos = {i["id"] for i in itens}
+        for i in todos:
+            peds = (est.get(i["id"]) or {}).get("pedidos") or {}
+            if i["id"] not in vistos and any((torres is None or t in torres) and p["status"] == "pendente"
+                                             for t, p in peds.items()):
+                itens.append(dict(i, pedido=True))
+        return {"n": len(itens), "criticos": sum(1 for i in itens if i["sev"] == "critico"), "itens": itens[:6]}
+    except Exception:            # noqa: BLE001 — o sino nunca derruba uma página
+        current_app.logger.exception("sino dos insights")
+        return None
+
+
 def instalar_contexto(app) -> None:
     @app.context_processor
     def _contexto():
@@ -302,4 +332,6 @@ def instalar_contexto(app) -> None:
             # o prefixo em que o Nexus roda ('' na raiz, '/nexus' no servidor): todo href/src/action absoluto dos templates
             # começa por ele, e o JavaScript o recebe em window.NEXUS_RAIZ (_raiz_js.html). Ver nexus/prefixo.py
             "raiz": raiz(),
+            # o sino dos insights (03/11/2026), só das cópias: ver `_sino`
+            "sino": _sino(),
         }

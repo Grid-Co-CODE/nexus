@@ -56,7 +56,9 @@ def test_tela_com_view_propria_conta_como_conteudo(app):
     assert "/t/base/governanca" in prontas        # view própria
     assert "/t/pcm/quadro" in prontas
     assert "/t/cos/mesa" not in prontas           # ainda placeholder
-    assert all(not u.startswith("/t/comando/") for u in prontas)
+    # 03/11/2026: o Comando ganhou a Caixa de entrada e os Insights (os setores conversando); a Sala de comando segue placeholder
+    assert "/t/comando/caixa-de-entrada" in prontas and "/t/comando/insights" in prontas
+    assert "/t/comando/sala-de-comando" not in prontas
 
 
 def test_menu_pinta_de_verde_so_o_que_tem_conteudo(logado):
@@ -64,7 +66,7 @@ def test_menu_pinta_de_verde_so_o_que_tem_conteudo(logado):
     classe = {torre: extra for extra, torre in re.findall(r'<details class="torre( com-conteudo)?" data-torre="([^"]+)"', html)}
     assert len(classe) == 13
     assert classe["base"] and classe["os"]
-    assert not classe["comando"]
+    assert classe["comando"]          # 03/11/2026: Caixa de entrada e Insights
     assert '<a href="/t/base/governanca" class="com-conteudo"' in html
     assert 'href="/t/cos/mesa" class="com-conteudo"' not in html
 

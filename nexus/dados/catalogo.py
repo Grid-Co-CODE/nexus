@@ -215,6 +215,20 @@ FATOS = (
                     "dos anexos só cifrados (Cofre, a chave do cadastro). Os anexos ficam no disco do servidor "
                     "(pasta de dados do Nexus, sugestoes/<id>/), não no banco. Só acrescenta: nada se edita nem se "
                     "apaga"),
+    # 03/11/2026 (Levi: "construa o que você sugere"; os setores conversando): quem assumiu, concluiu ou reabriu cada
+    # insight do motor de regras (Comando → Insights). Registrado antes da 1ª gravação
+    Fato("evento_insight", "Insight assumido ou concluído", "base", "nexus_insights · fato_evento_insight",
+         "1 linha = 1 evento (assumiu, concluiu, reabriu, notificou, respondeu) de 1 pessoa sobre 1 insight do motor "
+         "de regras",
+         _d(data=("id", "data_id (o dia de Brasília do evento)"),
+            pessoa=("id", "pessoa_id de quem fez (e o pessoa_hmac)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_insights · fato_evento_insight",),
+         janela_origem="o Nexus é a fonte",
+         observacao="insight_id = a regra e o objeto (N01:16702, R07:<usina_id>); regra e torre (a dona) em claro; "
+                    "o dono vale o último assumiu/concluiu/reabriu; notificou leva as áreas avisadas em para (torres, "
+                    "separadas por vírgula) e respondeu a área que responde em para e o status_retorno (recebido, "
+                    "andamento, resolvido; vale o último de cada área). O nome de quem fez, a mensagem e o retorno só "
+                    "cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
     # 28/10/2026 (Levi: "No sugestões recebidas deve ter a opção de mudar o status da solicitação: Iniciada, Em
     # verificação e Conclusão"): o status de cada sugestão, por evento. Registrado antes da 1ª mudança
     Fato("status_sugestao", "Status da sugestão", "base", "nexus_sugestoes · fato_status_sugestao",
@@ -1463,6 +1477,11 @@ LIVROS = (
           "a cada ocorrência criada ou mudada, ação do plano e andamento (tela Campo · App > Ocorrências)",
           "nexus/campo/ocorrencias.py, pela tela Campo · App > Ocorrências", False,
           "registrado em 18/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª ocorrência registrada",
+          so_cresce=True),
+    Livro("nexus_insights", ("fato_evento_insight",),
+          "a cada Assumir, Concluir, Reabrir, Notificar áreas ou Responder (a área notificada) de um insight",
+          "nexus/comando/estado.py, pelas telas Comando → Insights e Caixa de entrada", False,
+          "registrado em 03/11/2026 antes da 1ª gravação (regra 10): nasce no 1º Assumir",
           so_cresce=True),
     Livro("nexus_sugestoes", ("fato_sugestao", "fato_status_sugestao"),
           "a cada sugestão mandada e a cada mudança de status (Início > Sugestões)",

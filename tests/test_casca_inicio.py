@@ -71,8 +71,8 @@ def test_o_cos_com_a_porta_leva_ao_acompanhamento_e_nao_a_mesa_em_construcao():
     assert cartoes["cos"][1] == "/t/cos/acompanhamento"
     assert cartoes["relatorios"][1] == "/t/relatorios/central"
     assert cartoes["contratos"][:2] == ("a", "/t/contratos/contestacoes")
-    for vazia in ("comando",):
-        assert cartoes[vazia][0] == "div" and "Em construção" in cartoes[vazia][2]
+    # 03/11/2026: o Comando deixou de ser todo em construção: o cartão leva à 1ª tela pronta, a Caixa de entrada
+    assert cartoes["comando"][:2] == ("a", "/t/comando/caixa-de-entrada")
 
 
 def test_debaixo_do_prefixo_o_cartao_sai_com_ele():

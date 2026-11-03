@@ -16,7 +16,7 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 | `engenharia/` | Mesa do engenheiro (a primeira tela, 18/10/2026: a mesa de cada um, com o que me encaminharam, o que está comigo e os críticos sem dono), Confiabilidade dos ativos (pelas OS de falha do Fracttal), com o acompanhamento dos ativos com sinal desde 18/10/2026 (pegar, encaminhar, diagnóstico, comentários; abas Em acompanhamento, Encerrados e Diagnósticos), e o Quadro da equipe, com a página da OS desde 24/10/2026 (status e prioridade da engenharia, comentários na nota da OS, Solicitar OS com a OS pai, o pulso das paradas); Criticidade, FMEA e Laudos ainda placeholder | `engenharia/CLAUDE.md` |
 | `contratos/` | Contestações do cliente (13/10/2026, do Dashboard Thopen, por setor); Clientes, Onboarding, Comunicação e Portal ainda placeholder | `contratos/CLAUDE.md` |
 | `chamados/` | na ordem Garantias, Fabricantes e Solicitações de clientes (Levi, 24/10/2026); as duas primeiras são atalhos para telas do OS Creator Web (`ponte.ATALHOS`), Solicitações de clientes ainda placeholder. `ufv.py` (28/10/2026): o Responsável UFV de cada chamado de Garantias pelo cadastro do Nexus, que a ponte entrega ao OS Creator; o cadastro é lido por trás, nunca dentro do pedido do quadro (29/10/2026: o quadro preso até 40 s) | o docstring da torre e `oscreator/README.md` |
-| as demais (`comando/`) | só placeholder | — |
+| `comando/` | Caixa de entrada e Nexus Insights (03/11/2026: o motor de regras, o Assumir e o Concluir, o sino do topo); Sala de comando, Kanban, Usinas e Metas ainda placeholder | `nexus/comando/CLAUDE.md` |
 
 ## Como funciona
 
