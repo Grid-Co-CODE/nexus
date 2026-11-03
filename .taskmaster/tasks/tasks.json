@@ -57,7 +57,7 @@
         "id": 5,
         "title": "Fase 2: conversa com @menção nos objetos",
         "description": "Linha do tempo de mensagens por insight, OS e usina, com @pessoa e @setor gerando notificação.",
-        "status": "deferred",
+        "status": "done",
         "dependencies": [
           4
         ],
@@ -70,7 +70,7 @@
         "id": 6,
         "title": "Fase 3: pedidos entre setores com prazo",
         "description": "Pedido com setor de origem e destino, prazo, aceite e conclusão; painel de tempo de resposta por setor.",
-        "status": "deferred",
+        "status": "done",
         "dependencies": [
           5
         ],
