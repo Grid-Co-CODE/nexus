@@ -54,12 +54,12 @@ Setting `PLACAR_V2` diz se é ela que o técnico vê), a mesma da aba "Ranking p
 - **Pessoa só pelo HMAC do e-mail** (`Técnico (HMAC)`, a API é de leitura aberta); o nome sai do cadastro do App na hora,
   e código sem dono fica "—" (a tela diz quantas linhas vieram sem nome), nunca o código.
 - **O nome é o "Nome padrão" do cadastro, e o pódio traz o e-mail** (03/11/2026, Fillipe Figueiró: o 3º de outubro saiu
-  "Eduardo Sousa", lido como o Eduardo Souza, e o pódio vira pagamento no Caju). O `livros_app.pessoas_por_codigo` dá o
+  com o nome curto igual ao de outro técnico, e o pódio vira pagamento no Caju). O `livros_app.pessoas_por_codigo` dá o
   `nomePadrao` do cadastro e, só na falta dele, o nome completo, que o `nome_curto` corta no primeiro e no último nome
-  ("Eduardo Felipe Brandão Maia Mendes de Sousa" virava "Eduardo Sousa"). Vale para toda tela do Campo que acha a
+  (o nome longo de um técnico virava o nome curto de outro). Vale para toda tela do Campo que acha a
   pessoa pelo código do App. O e-mail vai no pódio (`rk-email`) e no título da célula do nome nas tabelas.
 - **A região é a de MAIS fechamentos do técnico no mês**, e quem diz é o App (a v320, 03/11; até a v319 era a do último
-  fechamento: o Eduardo Mendes fez quase tudo na SP Leste 02 e saiu na SP Leste 05, onde fechou 3 tarefas).
+  fechamento: um técnico fez quase tudo na SP Leste 02 e saiu na SP Leste 05, onde fechou 3 tarefas).
 - **As colunas são um contrato**: a tela lê pelo NOME, e `tests/test_campo_ranking_pontos.py` (`COLUNAS_DO_APP`) tem a
   mesma lista do `NEXUS_COLUNAS["ranking"]` do App, na ordem dele. A régua do mês (piso, teto, anulação, teto das
   rondas, mínimos, bônus) vem nas oito últimas colunas, e o "Como o App calcula" da tela usa esses números. Coluna nova

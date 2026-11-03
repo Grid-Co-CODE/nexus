@@ -68,9 +68,9 @@ def pessoas_por_codigo(chave) -> dict:
         em = str(em or "").strip().lower()
         cod = codigo_da_pessoa(chave, em)
         if cod:
-            # o nome curto do completo é o primeiro e o último nome: o Eduardo Mendes ("Eduardo Felipe Brandão Maia
-            # Mendes de Sousa") saía "Eduardo Sousa" no 3º lugar do ranking de outubro, lido como o Eduardo Souza, que
-            # é outra pessoa (Fillipe Figueiró, 03/11/2026: "com o nome do ranking, o RH teria creditado o Eduardo errado")
+            # o nome curto do completo é o primeiro e o último nome: um técnico de nome longo saía, no 3º lugar do
+            # ranking de outubro, com o nome curto igual ao de outro técnico (Fillipe Figueiró, 03/11/2026: com o nome
+            # do ranking, o RH teria creditado a pessoa errada). Por isso vale o "Nome padrão" do cadastro
             donos.setdefault(cod, []).append((em, _txt((p or {}).get("nomePadrao")) or _txt((p or {}).get("nome"))))
     return {c: v[0] for c, v in donos.items() if len(v) == 1}
 
