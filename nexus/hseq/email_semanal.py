@@ -276,5 +276,7 @@ def ligar(app):
                     _LACO["ultimo"] = {"erro": f"{type(e).__name__}: {e}"[:300]}
                     log.exception("e-mail semanal da Segurança")
 
-    _LACO["thread"] = threading.Thread(target=laco, name="nexus-hseq-email", daemon=True)
+    from ..casca import fracttal_conta              # o laço declara o fundo: só o declarado tem o teto de 90 do porteiro
+    _LACO["thread"] = threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-hseq-email", laco),
+                                       name="nexus-hseq-email", daemon=True)
     _LACO["thread"].start()
