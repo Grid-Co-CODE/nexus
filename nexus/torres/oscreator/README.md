@@ -2549,6 +2549,18 @@ na nota entra a OS mãe do Fracttal; no banco, o chamado abre na data da nota.
   igual, a idade, a linha do tempo, a OS mãe, a tela e o fato). Conferido numa bancada local com o Fracttal falso, a 1440
   e a 375 px.
 
+## Uma leitura só por chave, e a releitura do quadro como fundo (03/11/2026)
+
+O Raio-X de 03/11 mostrou 828 pedidos ao Fracttal num minuto às 10h, com a cota em 200 para a empresa toda, e o
+Acompanhamento de chamados com 1.851 pedidos em 49 cliques. Desde então:
+- **`rotas._memo` lê uma vez por chave:** quem chega com a leitura da mesma chave em curso (o quadro logo depois de um
+  deploy, que esvazia a memória) espera por ela e leva o mesmo resultado. A leitura que falha, ou que o `guardar` não guarda,
+  não serve a quem esperou: ele lê com a sessão dele. O `forcar` (o Atualizar) lê sempre.
+- **A releitura de 30 em 30 min do quadro é fundo declarado** (`fundo:os-web-acomp-renovar`): espera a vez do fundo no
+  porteiro do Nexus e cede a vaga a quem clica; ninguém a espera, porque a tela mostra a cópia anterior.
+- Até a lista central cobrir os 365 dias que o quadro lê (a 1ª noite depois do deploy lê a janela inteira), o quadro segue
+  lendo a lista ao vivo. Prova: `tests/test_oscreator_memo_uma_leitura.py` e `tests/test_oscreator_acomp_renovar.py`.
+
 ## O quadro só relê no Atualizar ou a cada 30 min, com 6 cartões à vista (Garantias, 20/10/2026)
 
 Levi, 20/10/2026: "aumente o tamanho em acompanhamento de chamados para mostrar 6 usinas nas colunas kanban" e "quando

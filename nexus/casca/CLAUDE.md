@@ -382,8 +382,10 @@ memória, sem mudar quem pede. O resto da internet passa sem contar (`notfractta
     `fundo:nexus-ativos-leitor` (o laço da noite e dos novos das :08 e :38), `fundo:nexus-tarefas-os-banco`,
     `fundo:nexus-chamados-banco`, `fundo:nexus-fila-fracttal` (a releitura da Aprovação por trás),
     `fundo:nexus-ronda-checklist` (no `pedir_releitura`, não no `em_segundo_plano`, que também abre as fotos da ronda),
-    `fundo:nexus-os-falhas`, `fundo:nexus-os-equipe` e `fundo:nexus-etm` (só a thread por trás: com `esperar=True` a
-    releitura roda na thread do clique e segue clique). A zeladoria, as normalizações, a carga, os responsáveis e os
+    `fundo:nexus-os-falhas`, `fundo:nexus-os-equipe`, `fundo:nexus-etm` (só a thread por trás: com `esperar=True` a
+    releitura roda na thread do clique e segue clique) e `fundo:os-web-acomp-renovar` (a releitura de 30 em 30 min do
+    Acompanhamento de chamados, desde 03/11/2026: era clique, e às 10h desse dia o Nexus chegou a 828 pedidos num minuto).
+    A zeladoria, as normalizações, a carga, os responsáveis e os
     relatórios do PCM não pedem ao Fracttal na thread deles (a zeladoria pede as releituras acima). **Laço novo que pede
     ao Fracttal declara o fundo do mesmo jeito**, senão ele é clique: sem o teto de 90 e na frente do fundo.
   - **O que segue clique sem ser clique, de propósito (31/10/2026):** a cópia do catálogo de ativos que o OS Creator baixa

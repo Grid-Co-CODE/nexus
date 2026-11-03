@@ -356,7 +356,19 @@ def _renovar_por_tras(pessoa) -> None:
         finally:
             with _RENOV_TRAVA:
                 _RENOVANDO.discard(pessoa)
-    _em_segundo_plano(rodar)
+    _em_segundo_plano(_de_fundo("fundo:os-web-acomp-renovar", rodar))
+
+
+def _de_fundo(nome: str, fn):
+    """A releitura conta como FUNDO declarado no porteiro do Nexus (`nexus/casca/fracttal_conta.py`): espera a vez do fundo
+    e cede a vaga a quem clica. Sem a declaração, a thread era clique, sem teto: no Raio-X de 03/11/2026, às 10h, foram 828
+    pedidos ao Fracttal num minuto (a cota é 200 para a empresa toda), e o Acompanhamento, 1.851 pedidos em 49 cliques.
+    Ninguém espera esta leitura (a tela mostra a cópia anterior). Sozinho (o oem), sem o contador, roda como antes."""
+    try:
+        from nexus.casca import fracttal_conta
+    except Exception:                                   # noqa: BLE001 — sem o Nexus, sem o porteiro
+        return fn
+    return fracttal_conta.de_fundo(nome, fn)
 
 
 def _ultimas(forcar: bool = False) -> tuple:

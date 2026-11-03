@@ -516,19 +516,29 @@ _MEMO_LOCK = threading.Lock()
 MEMO_FICA: set = set()
 
 
-def _memo(chave, ttl: float, fn, forcar: bool = False, guardar=None):
-    """O resultado de `fn()` guardado por `ttl` segundos. Erro não é guardado (sobe como sempre). `guardar(r)` falso =
-    devolve sem guardar: o catálogo que veio vazio (a sessão de alguém sem a permissão no Fracttal) não esvazia a tela
-    de todo mundo pelo TTL inteiro (20/10/2026)."""
-    agora = time.monotonic()
-    if not forcar:
-        with _MEMO_LOCK:
-            v = _MEMO.get(chave)
-        if v and agora - v[0] < ttl:
-            return v[1]
+# Uma leitura por chave (03/11/2026). O Raio-X do Nexus mostrou 828 pedidos ao Fracttal num minuto às 10h, contra a cota
+# de 200 da empresa toda: o servidor reinicia a cada push na `main`, a memória volta vazia, e quem abria o Acompanhamento
+# de chamados antes de a 1ª leitura terminar (até ~90 s) fazia a leitura inteira dele. Agora quem chega com a leitura da
+# MESMA chave em curso espera por ela e leva o mesmo resultado, o que levaria da memória um instante depois. A leitura que
+# falha, ou que o `guardar` não guarda, não serve a quem esperou: ele lê com a sessão dele, como antes. Uma leitura que
+# pedisse a própria chave já seria uma recursão sem fim antes disto, então ninguém espera por si mesmo; o prazo é só a rede.
+ESPERA_DA_LEITURA_S = 180.0
+_EM_CURSO: dict = {}                                     # chave -> _Leitura em curso (sob a _MEMO_LOCK)
+
+
+class _Leitura:
+    """A leitura de uma chave em curso: quem espera por ela e o que ela deu (`serve`: terminou e foi guardada)."""
+    __slots__ = ("pronta", "serve", "valor", "esperando")
+
+    def __init__(self):
+        self.pronta, self.serve, self.valor, self.esperando = threading.Event(), False, None, 0
+
+
+def _ler_e_guardar(chave, fn, guardar, agora) -> tuple:
+    """(resultado, se foi guardado)."""
     r = fn()
     if guardar is not None and not guardar(r):
-        return r
+        return r, False
     with _MEMO_LOCK:
         _MEMO[chave] = (agora, r)
         if len(_MEMO) > 300:                              # memória com teto: sai o que foi guardado há mais tempo
@@ -536,7 +546,38 @@ def _memo(chave, ttl: float, fn, forcar: bool = False, guardar=None):
                 return isinstance(k, tuple) and bool(k) and k[0] in MEMO_FICA
             for k in sorted(_MEMO, key=lambda k: (fica(k), _MEMO[k][0]))[:len(_MEMO) - 300]:
                 _MEMO.pop(k, None)
-    return r
+    return r, True
+
+
+def _memo(chave, ttl: float, fn, forcar: bool = False, guardar=None):
+    """O resultado de `fn()` guardado por `ttl` segundos, com uma leitura só por chave de cada vez (ver acima). Erro não é
+    guardado (sobe como sempre). `guardar(r)` falso = devolve sem guardar: o catálogo que veio vazio (a sessão de alguém
+    sem a permissão no Fracttal) não esvazia a tela de todo mundo pelo TTL inteiro (20/10/2026). `forcar` lê sempre."""
+    agora = time.monotonic()
+    if forcar:
+        return _ler_e_guardar(chave, fn, guardar, agora)[0]
+    with _MEMO_LOCK:
+        v = _MEMO.get(chave)
+        if v and agora - v[0] < ttl:
+            return v[1]
+        leitura = _EM_CURSO.get(chave)
+        minha = leitura is None
+        if minha:
+            leitura = _EM_CURSO[chave] = _Leitura()
+        else:
+            leitura.esperando += 1
+    if not minha:
+        if leitura.pronta.wait(ESPERA_DA_LEITURA_S) and leitura.serve:
+            return leitura.valor
+        return _ler_e_guardar(chave, fn, guardar, time.monotonic())[0]
+    try:
+        leitura.valor, leitura.serve = _ler_e_guardar(chave, fn, guardar, agora)
+        return leitura.valor
+    finally:
+        with _MEMO_LOCK:
+            if _EM_CURSO.get(chave) is leitura:
+                del _EM_CURSO[chave]
+        leitura.pronta.set()
 
 
 # ── o círculo de carga do Histórico (Levi, 27/09: "no período de carregamento poderia ter um círculo mostrando o
