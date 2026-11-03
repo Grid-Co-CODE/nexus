@@ -18,6 +18,7 @@ O que ela garante, e o caso de cada um:
 """
 import json
 import re
+import unicodedata
 
 from ..dados import livros
 from . import guardar
@@ -37,6 +38,53 @@ class ExportacaoIncompleta(ValueError):
     """A exportação não traz todas as tabelas do Radar: nada é gravado."""
 
 
+class TrocaInsegura(ValueError):
+    """A troca de nome estragaria um dado (duas chaves de JSON viram a mesma): nada é gravado."""
+
+
+class NomeEmClaro(TrocaInsegura):
+    """Um nome do de-para sobrou num texto que vai em claro para o banco (leitura aberta): nada é gravado."""
+
+
+# Onde o clone renomeou valores que estão nos dados (revisão final de 03/11/2026: trocar por pedaço em QUALQUER texto
+# minúsculo estragaria id, código e chave de usina): as chaves e o JSON do config, a ação do log, e as colunas de
+# origem, escopo e tipo de qualquer tabela.
+RENOMEIA = {("config", "chave"), ("config", "valor"), ("log", "acao")}
+RENOMEIA_COLUNAS = {"origem", "escopo", "tipo"}
+# nome de lugar não conta como nome de gente ("Santa Maria" é usina e cidade)
+LUGARES = {"usina", "usinas", "usina_chave", "ufv", "cliente", "cidade", "estado", "uf", "regiao", "cluster",
+           "base_equipe", "equipe_cluster", "concessionaria", "fabricante_modulos"}
+
+
+def _renomeia(aba: str, coluna: str) -> bool:
+    return (aba, coluna) in RENOMEIA or coluna in RENOMEIA_COLUNAS
+
+
+def _sem_acento(s: str) -> str:
+    return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
+
+
+def _vigiados(de_para: dict) -> list:
+    """Os nomes que não podem ir em claro: a lista `_nomes` do de-para ou, sem ela, as chaves que são só letras."""
+    nomes = (de_para or {}).get("_nomes") or [k for k in (de_para or {}) if re.fullmatch(r"[a-z]+", k)]
+    return [re.compile(r"(?<![a-z0-9])" + re.escape(_sem_acento(n)) + r"(?![a-z0-9])") for n in nomes if n]
+
+
+def _conferir_claro(aba: str, colunas: list, linhas: list, vigiados: list) -> None:
+    from .tabelas import coluna_cifrada
+    for c, tipo in colunas:
+        if c in LUGARES or coluna_cifrada(aba, c, tipo):
+            continue
+        for linha in linhas:
+            v = linha.get(c)
+            if v is None or isinstance(v, (bool, int, float)):
+                continue
+            texto = _sem_acento(v if isinstance(v, str) else json.dumps(v, ensure_ascii=False))
+            if any(p.search(texto) for p in vigiados):
+                raise NomeEmClaro(f"{aba}.{c}: sobrou um nome do de-para num texto que vai em claro; acrescente a troca "
+                                  "ao de-para ou revise a coluna antes de copiar")
+
+
 def _trocas(de_para: dict) -> list:
     """As entradas do de-para que valem para dado (minúsculas, com cara de identificador), da mais longa para a mais
     curta: `planilha_<nome>` antes de `<nome>`."""
@@ -51,6 +99,8 @@ def renomear(valor, trocas: list):
         for k, v in valor.items():
             k2, nk = renomear(k, trocas)
             v2, nv = renomear(v, trocas)
+            if k2 in out or (nk and k2 in valor):
+                raise TrocaInsegura(f"a troca de nome faria duas chaves de JSON virarem {k2!r}")
             out[k2] = v2
             n += nk + nv
         return out, n
@@ -66,7 +116,7 @@ def renomear(valor, trocas: list):
         except ValueError:
             return valor, 0
         novo, n = renomear(dentro, trocas)
-        return (json.dumps(novo, ensure_ascii=False), n) if n else (valor, 0)
+        return (json.dumps(novo, ensure_ascii=False, separators=(",", ":")), n) if n else (valor, 0)
     if not _IDENTIFICADOR.match(valor):
         return valor, 0
     novo = valor
@@ -113,13 +163,18 @@ def _maior_celula(abas: dict) -> int:
 
 def montar(exp: dict, *, de_para: dict, cofre, agora) -> tuple:
     """({livro: {aba: (cab, linhas)}}, relatório sem a gravação). Nada vai à rede."""
-    nomes = list(exp.get("tabelas") or {})
+    # o mapa vem do ESQUEMA inteiro (os tipos), não só do que a consulta exportou: a tabela nova aparece nos tipos
+    nomes = sorted((set(exp.get("tipos") or {}) | set(exp.get("tabelas") or {})) - {VIEW_ULTIMAS})
     mapa = T.mapa_de_tabelas(nomes)
+    sem_dado = [n for n in nomes if n not in (exp.get("tabelas") or {})]
+    if sem_dado:
+        raise ExportacaoIncompleta(f"a exportação não traz os dados de: {', '.join(sem_dado)}")
     esperadas = {a for a in T.TABELAS if a != "fracttal_ultimas"}
     faltam = sorted(esperadas - set(mapa.values()))
     if faltam:
         raise ExportacaoIncompleta(f"a exportação não traz {len(faltam)} tabela(s) do Radar: {', '.join(faltam)}")
     trocas = _trocas(de_para)
+    vigiados = _vigiados(de_para)
     fontes = [(mapa[n], exp["tipos"].get(n) or [], exp["chaves"].get(n), exp["tabelas"][n]) for n in nomes]
     tipos_view = exp["tipos"].get(VIEW_ULTIMAS) or []
     chave_view = "usina_chave" if any(c == "usina_chave" for c, _t in tipos_view) else (tipos_view[0][0] if tipos_view else "")
@@ -137,9 +192,12 @@ def montar(exp: dict, *, de_para: dict, cofre, agora) -> tuple:
         for linha in linhas:
             nova = {}
             for c, v in linha.items():
-                nova[c], n = renomear(v, trocas)
-                rel["trocas"] += n
+                if _renomeia(aba, c):
+                    v, n = renomear(v, trocas)
+                    rel["trocas"] += n
+                nova[c] = v
             renomeadas.append(nova)
+        _conferir_claro(aba, colunas, renomeadas, vigiados)
         livro = T.TABELAS[aba]
         livros_prontos[livro][aba] = guardar.para_aba(aba, colunas, renomeadas, cofre, chave)
         atualizacao[livro] += [[aba, c, t, chave, len(linhas), copiado_em, exp.get("gerado_em")] for c, t in colunas]

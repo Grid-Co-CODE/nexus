@@ -102,3 +102,8 @@ def test_livros_no_catalogo():
     assert set(catalogo.LIVRO_POR_NOME[T.LIVRO_HISTORICO].so_cresce) == {
         "log", "financeiro_historico", "fin_provisao_historico", "cronograma_alteracoes"}
     assert all(catalogo.aba_segue_a_regra(a) for a in T.TABELAS)
+
+
+def test_link_do_mapa_da_usina_vai_cifrado():
+    """O link do Google Maps é a localização da usina: o endereço saiu da API em 04/10/2026 pela mesma razão."""
+    assert T.coluna_cifrada("usinas", "maps_link", "text")

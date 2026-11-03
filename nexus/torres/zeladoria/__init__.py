@@ -161,6 +161,8 @@ def api_funcao(nome: str):
     folio = str((request.get_json(silent=True) or {}).get("folio") or "").strip()
     if not _FOLIO.match(folio):
         return jsonify(erro="Nº de OS inválido."), 400
+    if folio not in leitura.folios(est):
+        return jsonify(erro="Essa OS não é ronda da zeladoria."), 404
     from ...campo import nota_fracttal, ronda_fotos
     try:
         anexos = ronda_fotos.anexos(folio)
@@ -179,6 +181,13 @@ def api_funcao(nome: str):
 def foto(folio: str, i: int):
     """A foto da ronda pelo Nexus (o link assinado do Fracttal fica no servidor), como na tela de Rondas do Campo."""
     if not _FOLIO.match(folio):
+        abort(404)
+    est, _erro = _estado()
+    if est is None:
+        abort(503)
+    if _quem(est).get("status") != "aprovado":
+        abort(403)
+    if folio not in leitura.folios(est):
         abort(404)
     from ...campo import ronda_fotos
     fazer = ronda_fotos.miniatura if request.args.get("mini") else ronda_fotos.tela

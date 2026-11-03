@@ -122,7 +122,9 @@ def linhas(est: dict, view: str, filtros: list, ordem: tuple | None, quem: dict)
         base = [dict(p) for p in est["abas"].get("perfis", [])]
         if quem.get("id") == ADMIN_ID:
             base.append({"user_id": ADMIN_ID, "email": quem.get("email"), "papel": "HEAD", "status": "aprovado"})
-        if not aprovado:
+        # a lista inteira (com o e-mail de todos) é da tela Usuários, que é só do HEAD; os demais veem a própria linha
+        # (revisão final de 03/11/2026)
+        if not (aprovado and quem.get("papel") == "HEAD"):
             base = [p for p in base if _igual(p.get("user_id"), quem.get("id"))]
     else:
         base = [dict(l) for l in est["abas"].get(aba, [])] if aprovado else []
@@ -134,3 +136,15 @@ def linhas(est: dict, view: str, filtros: list, ordem: tuple | None, quem: dict)
                      reverse=desc)
         base = com + [l for l in base if l.get(col) is None]
     return base
+
+
+def folios(est: dict) -> set:
+    """As OS que são ronda da zeladoria na cópia: só delas a torre pede foto ao Fracttal (a cota é da empresa, e a foto
+    de outra OS não é da zeladoria; revisão final de 03/11/2026)."""
+    out = set()
+    for aba in ("fracttal_rondas", "fracttal_fotos", "fracttal_ultimas"):
+        for l in est["abas"].get(aba, []):
+            f = l.get("folio")
+            if f is not None:
+                out.add(str(int(f)) if isinstance(f, (int, float)) else str(f).strip())
+    return out

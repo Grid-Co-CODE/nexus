@@ -113,7 +113,8 @@ _CLARO = {
     "criticidade", "categoria", "unidade", "via", "forma_pagamento", "investimento", "alinhamento_semanal",
     # onde: usina, cliente e lugar (o que liga ao cadastro do Nexus)
     "usina", "usinas", "ufv", "cliente", "estado", "uf", "regiao", "cluster", "base_equipe", "equipe_cluster",
-    "cidade", "concessionaria", "fabricante_modulos", "maps_link",
+    "cidade", "concessionaria", "fabricante_modulos",
+    # o maps_link fica cifrado: é a localização da usina (o endereço saiu da API em 04/10/2026 pela mesma razão)
 }
 _CLARO_PREFIXOS = ("status_", "tipo_", "data_", "forma_pagamento")
 _CLARO_SUFIXOS = ("_id", "_ids", "_em", "_data")

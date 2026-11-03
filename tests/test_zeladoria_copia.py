@@ -17,7 +17,8 @@ from tests.pg_falso import ApiPGFalsa
 COFRE = Cofre(gerar_chave())
 BASE = "http://banco"
 AGORA = datetime(2026, 11, 3, 17, 0, tzinfo=timezone.utc)
-DE_PARA = {"_leia": "fixture", "fulano": "equipe", "Fulano": "Equipe", "planilha_beltrana": "planilha_historica"}
+DE_PARA = {"_leia": "fixture", "_nomes": ["fulano", "beltrana"], "fulano": "equipe", "Fulano": "Equipe",
+           "planilha_beltrana": "planilha_historica"}
 
 
 def _exportacao(**mudar):
@@ -126,3 +127,41 @@ def test_a_consulta_de_exportacao_sai_do_de_para():
         assert proibido not in sql.lower()
     with pytest.raises(ValueError):
         C.sql_exportacao({"_leia": "sem o nome da equipe"})
+
+
+def test_tabela_nova_no_esquema_para_a_copia():
+    """A exportação real só traz as tabelas que a consulta cita; a tabela nova aparece nos tipos (o esquema inteiro)."""
+    exp = _exportacao()
+    exp["tipos"]["tabela_nova"] = [["id", "text"]]
+    banco = ApiPGFalsa()
+    with pytest.raises(T.TabelaDesconhecida, match="tabela_nova"):
+        _copiar(exp, banco)
+    assert not banco.workbooks
+
+
+def test_renomeia_so_onde_o_clone_renomeou():
+    """Fora das colunas que guardam chave de dado (config, ação do log, origem, escopo, tipo), nada é trocado, nem o
+    texto com cara de identificador (revisão final de 03/11/2026: a troca por pedaço em qualquer coluna estragaria id e
+    código)."""
+    exp = _exportacao()
+    exp["tipos"]["usinas"] = [["id", "text"], ["obs", "text"]]
+    exp["tabelas"]["usinas"] = [{"id": "USN-1", "obs": "visita_do_fulano"}]       # obs vai cifrado
+    banco = ApiPGFalsa()
+    _copiar(exp, banco)
+    usinas = G.de_aba("usinas", {"id": "text", "obs": "text"}, banco.linhas(T.LIVRO_APP, "usinas"), COFRE, "id")
+    assert usinas == [{"id": "USN-1", "obs": "visita_do_fulano"}]
+
+
+def test_nome_que_sobra_em_claro_para_a_copia():
+    exp = _exportacao()
+    exp["tipos"]["fila_prioridade"] = [["id", "text"], ["servico", "text"]]
+    exp["tabelas"]["fila_prioridade"] = [{"id": "PRI-1", "servico": "Roçagem do Fulano"}]
+    banco = ApiPGFalsa()
+    with pytest.raises(C.NomeEmClaro, match="fila_prioridade.servico"):
+        _copiar(exp, banco)
+    assert not banco.workbooks
+
+
+def test_chave_de_json_renomeada_que_colide_para():
+    with pytest.raises(C.TrocaInsegura):
+        C.renomear({"k_fulano": 1, "k_equipe": 2}, C._trocas(DE_PARA))

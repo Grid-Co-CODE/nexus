@@ -132,10 +132,10 @@ def test_fotos(logado, copiado, monkeypatch):
         {"i": 1, "desc": "Altura da vegetação — 5", "valor": "https://x/b.jpg", "mime": "image/jpeg"}])
     monkeypatch.setattr(nota_fracttal, "subtarefas_da_os", lambda folio, ler=None: [
         {"description": "Sujidade dos módulos", "value": "4"}])
-    r = logado.post("/t/zeladoria/api/funcao/fracttal-fotos", json={"folio": "123"}).get_json()
-    assert r["folio"] == "123" and [f["descricao"] for f in r["fotos"]] == ["Sujidade dos módulos — 4",
+    r = logado.post("/t/zeladoria/api/funcao/fracttal-fotos", json={"folio": "2"}).get_json()
+    assert r["folio"] == "2" and [f["descricao"] for f in r["fotos"]] == ["Sujidade dos módulos — 4",
                                                                            "Altura da vegetação — 5"]
-    assert all(f["url"].endswith(f"/t/zeladoria/foto/123/{i}") for i, f in enumerate(r["fotos"]))
+    assert all(f["url"].endswith(f"/t/zeladoria/foto/2/{i}") for i, f in enumerate(r["fotos"]))
     assert "https://" not in json.dumps(r)
     assert r["checklist"] == [{"item": "Sujidade dos módulos", "valor": "4"}]
     assert logado.post("/t/zeladoria/api/funcao/fracttal-fotos", json={"folio": "12a"}).status_code == 400
@@ -144,3 +144,18 @@ def test_fotos(logado, copiado, monkeypatch):
 def test_funcao_que_grava_e_recusada(logado, copiado):
     r = logado.post("/t/zeladoria/api/funcao/fracttal-sync", json={})
     assert r.status_code == 405 and r.get_json() == {"erro": "Cópia só leitura até a troca."}
+
+
+def test_so_o_head_ve_todos_os_perfis(cliente, copiado):
+    c = _entrar_como(cliente, "fulano@exemplo.com")             # aprovado, papel Analista
+    assert [p["user_id"] for p in c.get("/t/zeladoria/api/rf/rf_perfis").get_json()] == ["u-1"]
+
+
+def test_foto_so_de_ronda_da_copia_e_so_para_aprovado(cliente, logado, copiado, monkeypatch):
+    from nexus.campo import ronda_fotos
+    monkeypatch.setattr(ronda_fotos, "tela", lambda folio, i, ler=None: (b"jpg", "image/jpeg"))
+    assert logado.get("/t/zeladoria/foto/2/0").status_code == 200          # a OS 2 é ronda da cópia
+    assert logado.get("/t/zeladoria/foto/999/0").status_code == 404        # OS que não é ronda da zeladoria
+    assert logado.post("/t/zeladoria/api/funcao/fracttal-fotos", json={"folio": "999"}).status_code == 404
+    pendente = _entrar_como(cliente, "beltrano@exemplo.com")
+    assert pendente.get("/t/zeladoria/foto/2/0").status_code == 403
