@@ -332,6 +332,7 @@ plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento que
 - **Exceção à regra 10:** as abas não são fato nem dimensão, são a cópia fiel que a torre Zeladoria lê. Estão em `ABAS_FORA_DA_REGRA`; os fatos vêm depois, a partir delas.
 - **Cifra:** todo texto vai cifrado por padrão, menos `_CLARO` em `nexus/zeladoria/tabelas.py` (ids, datas, status, usina, cliente, lugar).
 - **Carga:** cópia sob comando da exportação do Supabase (`ferramentas/copiar_zeladoria.py`), não entra na carga de hora em hora. A 1ª medida, de 03/11/2026: 4.756 linhas mais 117 últimas rondas, as 40 abas iguais à origem, 13,8 s para gravar. Regra e passo a passo em `nexus/torres/zeladoria/CLAUDE.md`.
+- **Depois da troca, a torre grava** (`nexus/zeladoria/gravacao.py`, só com `NEXUS_ZELADORIA_GRAVA=1`): em lote, os livros que mudaram, pelo `livros.publicar`; a mudança espera num diário cifrado na pasta de dados, fora do banco. A `atualizacao` ganhou a coluna `versao` no fim (0 = a cópia; cada lote grava a sua), e a cópia recusa gravar por cima de uma versão acima de 0.
 
 ## As regras (valem para todo dado novo)
 

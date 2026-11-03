@@ -13,7 +13,8 @@ da limpeza do clone (`ferramentas/zeladoria_limpar_clone.py`). Os dois ficam FOR
 `--nomes` pode vir da variável NEXUS_ZELADORIA_DE_PARA do `.env`.
 
 Uma máquina grava: até a troca, a cópia roda à mão, sempre na mesma máquina. Depois da troca ela não roda mais: quem grava
-é a torre (desenho: docs/superpowers/specs/2026-11-03-zeladoria-no-nexus-design.md).
+é a torre (desenho: docs/superpowers/specs/2026-11-03-zeladoria-no-nexus-design.md). Por isso, depois que a torre gravou
+alguma mudança (a versão do banco passou de 0), a cópia recusa, e só passa por cima com --forcar.
 """
 import argparse
 import json
@@ -41,6 +42,8 @@ def main(argv=None) -> int:
     p.add_argument("--sql", action="store_true", help="só imprime a consulta de exportação")
     p.add_argument("--nomes", default=os.environ.get("NEXUS_ZELADORIA_DE_PARA"), help="o de-para de nomes (JSON)")
     p.add_argument("--gravar", action="store_true", help="grava os três livros (sem isto, é o ensaio)")
+    p.add_argument("--forcar", action="store_true",
+                   help="grava mesmo se a torre já gravou mudanças (elas se perdem: só com certeza)")
     a = p.parse_args(argv)
     if not a.nomes:
         print("parei: falta o de-para de nomes (--nomes ou NEXUS_ZELADORIA_DE_PARA no .env)", file=sys.stderr)
@@ -56,8 +59,12 @@ def main(argv=None) -> int:
     cofre = Cofre(os.environ.get("NEXUS_CHAVE_CADASTRO", ""))
     base = (os.environ.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
     t0 = time.time()
-    rel = copia.copiar(exp, de_para=de_para, cofre=cofre, base=base, token=os.environ.get("GRIDCO_SQL_TOKEN", ""),
-                       sessao=requests.Session(), gravar=a.gravar, agora=datetime.now(timezone.utc))
+    try:
+        rel = copia.copiar(exp, de_para=de_para, cofre=cofre, base=base, token=os.environ.get("GRIDCO_SQL_TOKEN", ""),
+                           sessao=requests.Session(), gravar=a.gravar, agora=datetime.now(timezone.utc), forcar=a.forcar)
+    except copia.CopiaRecusada as e:
+        print(f"parei: {e}", file=sys.stderr)
+        return 1
     print(f"exportada em {rel['exportado_em']} | {'GRAVOU' if rel['gravou'] else 'ensaio (nada gravado)'} | "
           f"{time.time() - t0:.1f} s | maior célula {rel['maior_celula']} | valores renomeados {rel['trocas']}")
     diferentes = 0

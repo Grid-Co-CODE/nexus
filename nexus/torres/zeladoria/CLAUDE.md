@@ -18,11 +18,14 @@ Plano e registro: `docs/superpowers/plans/2026-11-03-zeladoria-etapas-1-e-2.md`.
   - `POST /api/funcao/fracttal-fotos` traz as fotos;
   - `GET /foto/<folio>/<i>`.
 
-  Até a troca, gravar e as `fin_*` voltam `SOMENTE_LEITURA`. A sessão vencida volta `SESSAO` e recarrega o Nexus,
-  nunca um Radar vazio.
+  Até a troca, gravar e as `fin_*` voltam `SOMENTE_LEITURA`. Com a gravação ligada, `POST /api/gravar`,
+  `POST /api/funcao/fin_*` e `GET /api/situacao` (seção "A gravação"). A sessão vencida volta `SESSAO` e recarrega o
+  Nexus, nunca um Radar vazio.
 - **O dado** vem de três livros (`nexus_zeladoria_app`, `_fracttal` e `_historico`), lidos e decifrados por
   `nexus/zeladoria/leitura.py`, com cache de 5 min.
   - Livro, aba ou contagem faltando: a tela diz que a cópia não foi feita (`CopiaAusente`).
+  - Banco que não responde: a tela diz isso e pede para recarregar (`BancoFora`). Caso: em 03/11/2026 a API da T.I. deu
+    502 em dois de cada três pedidos, e a tela caía em erro 500.
   - Quem não está aprovado no `perfis` do Radar só vê a própria linha. A pessoa é casada pelo e-mail do login do
     Nexus, e o administrador sem linha vale HEAD.
 - **As fotos da ronda** vêm do Fracttal, no clique, pelo `nexus/campo/ronda_fotos.py`: o link assinado fica no
@@ -46,10 +49,68 @@ Os valores renomeados nos dados são as chaves `previsto_decidido_*` do config, 
 O que vai cifrado: todo texto, menos a lista `_CLARO` de `nexus/zeladoria/tabelas.py` (ids, datas, status, usina,
 cliente, lugar). Por quê: a API do banco tem leitura aberta, e fornecedor MEI tem nome de pessoa.
 
+## A gravação (etapa 4, 03/11/2026; desligada até a troca)
+
+Liga só onde `NEXUS_ZELADORIA_GRAVA=1`: o servidor, no dia da troca. Uma máquina grava; dois Nexus com estados
+diferentes apagariam um ao outro. Levi escolheu "Salvo em 1 s, banco logo depois": gravar e conferir o livro do app leva
+~8 s (medido), e esperar isso a cada clique travaria a tela.
+- **Na hora** (`nexus/zeladoria/gravacao.py`, `Gravador.aplicar`): a mudança entra no estado em memória e no diário
+  `<NEXUS_DADOS>/zeladoria/diario.jsonl`, cifrado linha a linha, e o "Salvo" do app acende. Diário que não gravou = 503,
+  e a mudança não entrou (o pedaço escrito sai). Ao reler, a última linha pela metade é ignorada (o acréscimo que não
+  terminou, sem "Salvo"); linha ruim no meio não se adivinha, e a torre não sobe.
+- **Em lote** (`persistir`, pelo laço em thread: 2 s sem mudança ou 20 s seguidos): grava no banco os livros que
+  mudaram, pelo `livros.publicar`, e só então esvazia o diário até aquela versão. Banco fora: o diário segura, a
+  situação mostra o erro, e o laço tenta de novo, esperando mais a cada falha (até 60 s).
+- **Ao subir** (`carregar`): o diário se reaplica por cima do banco, livro a livro pela versão de cada um (a coluna
+  `versao` da aba `atualizacao`). Assim, o banco que gravou o livro do app e caiu antes do histórico não perde o
+  histórico.
+- **Só a diferença** (`ponte.js`): o Radar salva o estado inteiro a cada mudança (o `syncTudo` faz upsert de todas as
+  tabelas). A ponte guarda uma cópia PROFUNDA do que leu e manda só as colunas que mudaram, das linhas que mudaram. A
+  cópia é profunda porque o Radar muda o JSON no lugar (as pendências do dano, o escopo do contrato, as etapas da rota):
+  com a cópia rasa, a pendência marcada não ia ao servidor e o "Salvo" acendia (a revisão de 03/11/2026 achou; provado
+  na página real depois da correção). O histórico de valores,
+  que o Radar apaga e regrava, vira a diferença das linhas. Na 1ª gravação, a rota da equipe vai uma vez (o Radar
+  normaliza as etapas); a prova mostrou que da 2ª em diante só vai o que mudou.
+- **Conflito simples:** a mudança de outra pessoa numa linha que você não mexeu fica. Na linha que os dois mexeram, vale
+  a última, e o aviso aparece no `showToast` do Radar ("Você e outra pessoa mudaram o mesmo registro"). A versão base é
+  a da página aberta (de `/api/eu`).
+- **Quem grava:** só quem está aprovado no `perfis`, como no RLS do Supabase. O `perfis` e as `fin_*`, só o HEAD; o
+  administrador do Nexus sem linha vale HEAD. A pessoa nova que abre a torre ganha a linha "pendente" (`garantir_perfil`).
+  POST de outro site, 403 (a régua `_de_outro_site` da moldura).
+- **Como o Postgres do Radar:** coluna que a tabela não tem e valor fora do tipo (texto em número, "8.5" em bigint) são
+  recusados. Sem isso, a coluna sumia calada no lote, e o texto em número derrubava a leitura no boot seguinte.
+- **Exclusão:** a definitiva deixa uma linha no `log` (`acao` "excluir-definitivo", `alvo` "<tabela>:<id>", quem, e em
+  `obs` o que foi junto). O `ON DELETE` do banco do Radar vale aqui (`CASCATA` em `gravacao.py`): o fornecedor leva as
+  cotações, os documentos e os apelidos, e solta (nulo) o fornecedor dos itens e das provisões do financeiro; o
+  colaborador leva os documentos; a rodada solta as cotações; o cenário leva os itens. O clone conta com isso: ao
+  excluir o fornecedor, ele tira as cotações só do estado dele.
+- **O histórico só recebe linha nova:** `log`, `financeiro_historico` e `cronograma_alteracoes` aceitam só linha nova (do
+  cronograma, também o `motivo`, que o app preenche depois); o `fin_provisao_historico`, só pelas funções do
+  financeiro (no Supabase o insert era revogado). Excluir no histórico é recusado: a trava do catálogo recusaria o lote
+  no banco para sempre.
+- **Padrões que o banco do Radar dava:** id `bigint` novo = o maior + 1, contando as linhas do mesmo salvamento e sem
+  reaproveitar o número que saiu (a resposta devolve os ids, e a ponte os guarda); `criado_em`, o `em` do log e
+  `excluido` falso.
+- **Leitura e lote sem trava longa:** a mudança troca a lista da tabela em vez de mudá-la (quem lê a antiga não a vê
+  mudar), o lote cifra fora da trava, e a carga que falhou (banco fora) volta a mesma recusa por 30 s, em vez de reler
+  os três livros a cada pedido.
+- **Ficou de fora (baixo):** a linha excluída por uma pessoa e editada por outra, com a página velha, volta só com as
+  colunas editadas (no Supabase voltava inteira).
+- **As funções do financeiro** (`nexus/zeladoria/financeiro.py`): `fin_promover`, `fin_definir_fornecedor` e
+  `fin_editar_provisao`, portadas do SQL do Radar (`docs/financeiro/*.sql`), com a mesma regra e a mesma mensagem. Cada
+  uma vira um salvamento só (`Gravador.chamar`): tudo ou nada.
+- **A cópia não passa por cima:** depois que a torre gravou (versão do banco acima de 0), `copiar_zeladoria.py --gravar`
+  recusa. O `--forcar` só com o servidor parado e o diário vazio; senão o diário se reaplica por cima da cópia.
+
 ## Como provar
 
 - `python -m pytest tests/test_zeladoria_*.py -q`, com o `.env`, para o `test_sem_nomes_no_repositorio.py` rodar junto.
-  `tests/zeladoria_ponte_node.js` prova a ponte no node.
+  `tests/zeladoria_ponte_node.js` prova a ponte no node, nos dois modos.
+- A gravação na cópia de prova: suba com `NEXUS_ZELADORIA_GRAVA=1` e `NEXUS_DADOS` numa pasta de rascunho. A cópia de
+  prova recusa toda gravação fora da máquina, então o banco de verdade não é tocado, e a prova mostra também o banco
+  fora do ar: o "Salvo" acende, a situação diz o erro, e o diário segura e se reaplica ao reiniciar. 1ª prova
+  (03/11/2026): editar um fornecedor mandou só `id,obs` (124 bytes); reiniciar manteve a versão 3; editar provisão com o
+  dado real gravou as duas linhas do histórico, e a terceira chamada, igual, voltou "nada mudou".
 - A tela na cópia de prova (`ferramentas/subir_copia_de_prova.py`), em desktop e em 375 px.
 - Os totais da Visão Geral, do Financeiro e do Farol Contratual iguais aos do Radar no ar, com a mesma exportação.
 
@@ -70,6 +131,5 @@ cliente, lugar). Por quê: a API do banco tem leitura aberta, e fornecedor MEI t
 
 ## O que falta (etapas do desenho)
 
-- **4:** a gravação com a versão do livro e as `fin_*` em Python.
 - **5:** o Fracttal (rondas) e a rota do cronograma.
 - **6:** as usinas ligadas ao cadastro, e a troca.

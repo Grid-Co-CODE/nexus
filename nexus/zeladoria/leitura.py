@@ -33,6 +33,11 @@ class CopiaAusente(RuntimeError):
     """A cópia do Radar não está inteira no banco: a tela avisa em vez de mostrar dado pela metade."""
 
 
+class BancoFora(CopiaAusente):
+    """O banco do Nexus não respondeu agora. Caso: em 03/11/2026 a API da T.I. deu 502 em dois de cada três pedidos, e a
+    tela da Zeladoria caía em erro 500; agora ela pede para tentar de novo."""
+
+
 def limpar() -> None:
     with _TRAVA:
         _CACHE.update(em=0.0, estado=None)
@@ -53,18 +58,23 @@ def _base(config) -> str:
     return (config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
 
 
-def _ler(config) -> dict:
+def cofre_de(config) -> Cofre:
     try:
-        cofre = Cofre(config.get("NEXUS_CHAVE_CADASTRO") or "")
+        return Cofre(config.get("NEXUS_CHAVE_CADASTRO") or "")
     except CifraErro:
         raise CopiaAusente("a chave do cadastro (NEXUS_CHAVE_CADASTRO) falta neste Nexus") from None
-    base, sessao = _base(config), _sessao()
-    abas_lidas, copiado_em, exportado_em = {}, None, None
+
+
+def ler_banco(base: str, sessao, cofre: Cofre) -> dict:
+    """Os três livros lidos e decifrados: {"abas", "tipos", "chaves", "versao", "versoes", "copiado_em",
+    "exportado_em"}. A versão é a da última gravação pelo Nexus (0 = só a cópia do Supabase); `versoes`, a de cada livro,
+    porque cada um grava à parte e o diário se reaplica livro a livro (`gravacao.Gravador.carregar`)."""
+    abas_lidas, tipos, chaves, copiado_em, exportado_em, versoes = {}, {}, {}, None, None, {}
     for livro in LIVROS:
         ids = livros.abas(base, sessao, livro)
         if "atualizacao" not in ids:
             raise CopiaAusente(f"a cópia do Radar ainda não foi feita ({livro} não está no banco)")
-        tipos, chaves, origem = {}, {}, {}
+        origem = {}
         # `_linhas` (e não `ler`): uma listagem do banco por livro, não uma por aba
         for l in livros._linhas(base, sessao, ids["atualizacao"]):
             aba = str(l.get("aba") or "")
@@ -72,6 +82,7 @@ def _ler(config) -> dict:
             chaves[aba] = str(l.get("chave") or "id")
             origem[aba] = int(float(l.get("linhas_origem") or 0))
             copiado_em, exportado_em = l.get("copiado_em") or copiado_em, l.get("exportado_em") or exportado_em
+            versoes[livro] = max(versoes.get(livro, 0), int(float(l.get("versao") or 0)))
         for aba in (a for a, lv in T.TABELAS.items() if lv == livro):
             if aba not in ids or aba not in tipos:
                 raise CopiaAusente(f"a cópia do Radar está incompleta: falta {aba}")
@@ -79,11 +90,24 @@ def _ler(config) -> dict:
             if len(linhas) != origem[aba]:
                 raise CopiaAusente(f"a cópia do Radar está pela metade: {aba} tem {len(linhas)} de {origem[aba]}")
             abas_lidas[aba] = guardar.de_aba(aba, tipos[aba], linhas, cofre, chaves[aba])
-    return {"abas": abas_lidas, "copiado_em": copiado_em, "exportado_em": exportado_em}
+    return {"abas": abas_lidas, "tipos": tipos, "chaves": chaves, "versao": max(versoes.values(), default=0),
+            "versoes": versoes, "copiado_em": copiado_em, "exportado_em": exportado_em}
+
+
+def _ler(config) -> dict:
+    import requests
+    try:
+        return ler_banco(_base(config), _sessao(), cofre_de(config))
+    except requests.RequestException as e:
+        raise BancoFora(f"o banco do Nexus não respondeu agora ({type(e).__name__}): tente de novo em 1 minuto") from None
 
 
 def estado(config) -> dict:
-    """{"abas": {aba: [linha]}, "copiado_em", "exportado_em"}, com cache de CACHE_S. CopiaAusente sem a cópia inteira."""
+    """{"abas": {aba: [linha]}, "tipos", "chaves", "versao", "copiado_em", "exportado_em"}, com cache de CACHE_S.
+    CopiaAusente sem a cópia inteira. Com a gravação ligada, é o estado vivo do gravador (o diário já aplicado)."""
+    from . import gravacao
+    if gravacao.ativo(config):
+        return gravacao.do_app(config).estado
     with _TRAVA:
         if _CACHE["estado"] is not None and time.time() - _CACHE["em"] < CACHE_S:
             return _CACHE["estado"]

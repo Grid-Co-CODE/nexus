@@ -15,10 +15,12 @@ const igual = (a, b) => assert.deepStrictEqual(JSON.parse(JSON.stringify(a)), JS
 
 const codigo = fs.readFileSync(process.argv[2], "utf8");
 
-function montar(respostas) {
+function montar(respostas, extra) {
   const pedidos = [];
+  const avisos = [];
   const window = {
-    ZELADORIA: { api: "/raiz/t/zeladoria/api", somenteLeitura: true, sair: "/raiz/sair" },
+    ZELADORIA: Object.assign({ api: "/raiz/t/zeladoria/api", somenteLeitura: true, sair: "/raiz/sair" }, extra || {}),
+    showToast: (t) => avisos.push(t),
     top: { location: { href: "", recarregou: 0, reload() { this.recarregou += 1; } } },
     fetch: (url, opcoes) => {
       pedidos.push({ url: decodeURIComponent(url), opcoes: opcoes || {} });
@@ -32,7 +34,7 @@ function montar(respostas) {
     },
   };
   vm.runInNewContext(codigo, { window, Promise, JSON, encodeURIComponent, setTimeout, console });
-  return { sb: window.supabase.createClient(), pedidos, window };
+  return { sb: window.supabase.createClient(), pedidos, window, avisos };
 }
 
 const testes = {
@@ -119,6 +121,102 @@ const testes = {
     const { sb } = montar(() => ({ status: 403, statusText: "FORBIDDEN", corpo: { erro: "Sem permissão." } }));
     const r = await sb.from("rf_usinas").select("*");
     igual([r.data, r.error.message, r.status], [null, "Sem permissão.", 403]);
+  },
+
+  // ── o modo de gravação (etapa 4: o servidor com NEXUS_ZELADORIA_GRAVA=1) ──
+  async "gravando, o upsert do estado inteiro manda só as colunas que mudaram"() {
+    const { sb, pedidos } = montar((url, o) => (o.method === "POST"
+      ? { status: 200, corpo: { versao: 4, outros_salvaram: false, sobrepostas: [], ids: [[]], situacao: { erro: null } } }
+      : { status: 200, corpo: [{ id: "C1", valor: 100, obs: "a" }, { id: "C2", valor: 200, obs: "b" }] }),
+      { somenteLeitura: false });
+    await sb.from("rf_cotacoes").select("*");
+    // o syncTudo do Radar manda tudo; só a C2 mudou, e só o valor
+    const r = await sb.from("rf_cotacoes").upsert([{ id: "C1", valor: "100", obs: "a" }, { id: "C2", valor: 250, obs: "b" }],
+                                                  { onConflict: "id" });
+    igual([r.data, r.error, r.status], [null, null, 201]);
+    igual(JSON.parse(pedidos[1].opcoes.body), { ops: [{ op: "upsert", view: "rf_cotacoes", linhas: [{ valor: 250, id: "C2" }] }], versao: 0 });
+    assert.strictEqual(pedidos[1].url, "/raiz/t/zeladoria/api/gravar");
+    // de novo, igual: nada vai ao servidor
+    await sb.from("rf_cotacoes").upsert([{ id: "C1", valor: 100, obs: "a" }, { id: "C2", valor: 250, obs: "b" }]);
+    assert.strictEqual(pedidos.length, 2);
+  },
+  async "gravando, a mudança DENTRO do JSON que o Radar muda no lugar não se perde"() {
+    // o Radar guarda a referência das pendências do dano e dá push nelas (revisão de 03/11/2026)
+    const { sb, pedidos } = montar((url, o) => (o.method === "POST" ? { status: 200, corpo: { versao: 1, ids: [[]] } }
+      : { status: 200, corpo: [{ id: "D1", pendencias: [{ p: "a", feito: false }], atualizado_em: "t0" }] }),
+      { somenteLeitura: false });
+    const r = await sb.from("rf_danos_modulos").select("*");
+    const dano = r.data[0];
+    dano.pendencias.push({ p: "b", feito: false });
+    dano.pendencias[0].feito = true;
+    await sb.from("rf_danos_modulos").upsert([{ id: "D1", pendencias: dano.pendencias, atualizado_em: "t1" }]);
+    igual(JSON.parse(pedidos[1].opcoes.body).ops[0].linhas,
+          [{ pendencias: [{ p: "a", feito: true }, { p: "b", feito: false }], atualizado_em: "t1", id: "D1" }]);
+    // e depois de salvar, a próxima mudança no lugar também é vista
+    dano.pendencias.push({ p: "c", feito: false });
+    await sb.from("rf_danos_modulos").upsert([{ id: "D1", pendencias: dano.pendencias, atualizado_em: "t1" }]);
+    assert.strictEqual(JSON.parse(pedidos[2].opcoes.body).ops[0].linhas[0].pendencias.length, 3);
+  },
+  async "gravando, a versão da página vai junto e o aviso de outra pessoa aparece no Radar"() {
+    const { sb, pedidos, avisos } = montar((url, o) => {
+      if (url.endsWith("/eu")) return { status: 200, corpo: { user: { id: "u1", email: "f@exemplo.com" }, grava: true, versao: 7 } };
+      if (o.method === "POST") return { status: 200, corpo: { versao: 9, outros_salvaram: true, sobrepostas: ["cotacoes:C9"], ids: [[]] } };
+      return { status: 200, corpo: [] };
+    }, { somenteLeitura: false });
+    await new Promise((ok) => sb.auth.onAuthStateChange(ok));
+    await sb.from("rf_cotacoes").upsert([{ id: "C9", valor: 1 }]);
+    assert.strictEqual(JSON.parse(pedidos[1].opcoes.body).versao, 7);
+    assert.match(avisos[0], /mudaram o mesmo registro \(cotacoes:C9\)/);
+  },
+  async "gravando, o histórico apagado e regravado vira a diferença das linhas"() {
+    let n = 0;
+    const { sb, pedidos } = montar((url, o) => (o.method === "POST"
+      ? { status: 200, corpo: { versao: ++n, ids: [[], [], [31]] } }
+      : { status: 200, corpo: [{ id: 1, cotacao_id: "C1", valor: 10 }, { id: 2, cotacao_id: "C1", valor: 20 },
+                               { id: 3, cotacao_id: "C2", valor: 30 }] }), { somenteLeitura: false });
+    await sb.from("rf_historico_valor").select("*");
+    // como o syncTudo: apaga tudo e, no passo seguinte, regrava
+    await Promise.resolve(sb.from("rf_historico_valor").delete().neq("id", -1)).then(() =>
+      sb.from("rf_historico_valor").insert([{ cotacao_id: "C1", valor: 10 }, { cotacao_id: "C2", valor: 30 },
+                                            { cotacao_id: "C2", valor: 35 }]));
+    assert.strictEqual(pedidos.length, 2);                                   // um salvamento só
+    igual(JSON.parse(pedidos[1].opcoes.body).ops, [
+      { op: "delete", view: "rf_historico_valor", filtros: [["eq", "id", 2]] },
+      { op: "insert", view: "rf_historico_valor", linhas: [{ cotacao_id: "C2", valor: 35 }] }]);
+    // a linha nova ganhou o id 31: a próxima regravação igual não manda nada
+    await Promise.resolve(sb.from("rf_historico_valor").delete().neq("id", -1)).then(() =>
+      sb.from("rf_historico_valor").insert([{ cotacao_id: "C1", valor: 10 }, { cotacao_id: "C2", valor: 30 },
+                                            { cotacao_id: "C2", valor: 35 }]));
+    await new Promise((ok) => setTimeout(ok, 10));
+    assert.strictEqual(pedidos.length, 2);
+  },
+  async "gravando, o apagar tudo sem regravação apaga o que tinha"() {
+    const { sb, pedidos } = montar((url, o) => (o.method === "POST" ? { status: 200, corpo: { versao: 1, ids: [] } }
+      : { status: 200, corpo: [{ id: 5, cotacao_id: "C1", valor: 10 }] }), { somenteLeitura: false });
+    await sb.from("rf_historico_valor").select("*");
+    await sb.from("rf_historico_valor").delete().neq("id", -1);
+    await new Promise((ok) => setTimeout(ok, 10));
+    igual(JSON.parse(pedidos[1].opcoes.body).ops, [{ op: "delete", view: "rf_historico_valor", filtros: [["eq", "id", 5]] }]);
+  },
+  async "gravando, update, delete, insert e rpc vão ao servidor, e a recusa chega no error"() {
+    const { sb, pedidos } = montar((url, o) => {
+      if (url.includes("/funcao/fin_promover")) return { status: 200, corpo: { versao: 3, dados: { promovidos: ["IT-1"] } } };
+      if (url.endsWith("/gravar") && JSON.parse(o.body).ops[0].view === "rf_perfis")
+        return { status: 403, corpo: { erro: "só o HEAD mexe nos usuários do Radar" } };
+      return { status: 200, corpo: { versao: 2, ids: [[8]] } };
+    }, { somenteLeitura: false, chaves: { rf_perfis: "user_id" } });
+    const u = await sb.from("rf_fin_cenario").update({ nome: "x" }).eq("id", "F1");
+    igual([u.error, JSON.parse(pedidos[0].opcoes.body).ops[0]],
+          [null, { op: "update", view: "rf_fin_cenario", patch: { nome: "x" }, filtros: [["eq", "id", "F1"]] }]);
+    const d = await sb.from("rf_cotacoes").delete().eq("id", "C2");
+    igual([d.error, JSON.parse(pedidos[1].opcoes.body).ops[0]], [null, { op: "delete", view: "rf_cotacoes", filtros: [["eq", "id", "C2"]] }]);
+    const i = await sb.from("rf_log").insert([{ acao: "editar" }]);
+    igual([i.error, i.status], [null, 201]);
+    const p = await sb.rpc("fin_promover", { p_cenario_id: "CEN-1" });
+    igual([p.data, p.error], [{ promovidos: ["IT-1"] }, null]);
+    igual(JSON.parse(pedidos[3].opcoes.body), { args: { p_cenario_id: "CEN-1" }, versao: 0 });
+    const f = await sb.from("rf_perfis").update({ papel: "HEAD" }).eq("user_id", "u1");
+    igual([f.data, f.error.message, f.status], [null, "só o HEAD mexe nos usuários do Radar", 403]);
   },
 };
 

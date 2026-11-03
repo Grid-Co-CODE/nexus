@@ -28,7 +28,8 @@ NOMES_LIVROS = {T.LIVRO_APP: "Zeladoria · estado do app", T.LIVRO_FRACTTAL: "Ze
                 T.LIVRO_HISTORICO: "Zeladoria · históricos"}
 # o histórico só cresce e é conferido antes da troca: vai primeiro, e se ele recusar, nada mais é gravado
 ORDEM = (T.LIVRO_HISTORICO, T.LIVRO_FRACTTAL, T.LIVRO_APP)
-CAB_ATUALIZACAO = ["aba", "coluna", "tipo_pg", "chave", "linhas_origem", "copiado_em", "exportado_em"]
+# a versão é a da última gravação pelo Nexus (0 = só a cópia do Supabase): a torre e a cópia leem dela
+CAB_ATUALIZACAO = ["aba", "coluna", "tipo_pg", "chave", "linhas_origem", "copiado_em", "exportado_em", "versao"]
 VIEW_ULTIMAS = "rf_fracttal_ultimas"
 
 _IDENTIFICADOR = re.compile(r"^[a-z0-9_:\-]+$")
@@ -36,6 +37,10 @@ _IDENTIFICADOR = re.compile(r"^[a-z0-9_:\-]+$")
 
 class ExportacaoIncompleta(ValueError):
     """A exportação não traz todas as tabelas do Radar: nada é gravado."""
+
+
+class CopiaRecusada(RuntimeError):
+    """O Nexus já gravou mudanças da zeladoria no banco (a troca aconteceu): a cópia do Supabase passaria por cima delas."""
 
 
 class TrocaInsegura(ValueError):
@@ -200,7 +205,7 @@ def montar(exp: dict, *, de_para: dict, cofre, agora) -> tuple:
         _conferir_claro(aba, colunas, renomeadas, vigiados)
         livro = T.TABELAS[aba]
         livros_prontos[livro][aba] = guardar.para_aba(aba, colunas, renomeadas, cofre, chave)
-        atualizacao[livro] += [[aba, c, t, chave, len(linhas), copiado_em, exp.get("gerado_em")] for c, t in colunas]
+        atualizacao[livro] += [[aba, c, t, chave, len(linhas), copiado_em, exp.get("gerado_em"), 0] for c, t in colunas]
         rel["abas"][aba] = {"origem": len(linhas), "nexus": None}
     for livro in ORDEM:
         livros_prontos[livro]["atualizacao"] = (list(CAB_ATUALIZACAO), atualizacao[livro])
@@ -208,12 +213,26 @@ def montar(exp: dict, *, de_para: dict, cofre, agora) -> tuple:
     return livros_prontos, rel
 
 
-def copiar(exp: dict, *, de_para: dict, cofre, base: str, token: str, sessao, gravar: bool, agora) -> dict:
-    """Monta os três livros e, com `gravar`, grava e confere cada um. Sem `gravar`, é o ensaio: nada sai da máquina."""
+def _versao_no_banco(base: str, sessao) -> int:
+    v = 0
+    for livro in ORDEM:
+        ids = livros.abas(base, sessao, livro)
+        if "atualizacao" in ids:
+            v = max([v] + [int(float(l.get("versao") or 0)) for l in livros._linhas(base, sessao, ids["atualizacao"])])
+    return v
+
+
+def copiar(exp: dict, *, de_para: dict, cofre, base: str, token: str, sessao, gravar: bool, agora,
+           forcar: bool = False) -> dict:
+    """Monta os três livros e, com `gravar`, grava e confere cada um. Sem `gravar`, é o ensaio: nada sai da máquina.
+    Depois que o Nexus gravou alguma mudança (versão > 0), a cópia recusa (`CopiaRecusada`), salvo `forcar`."""
     prontos, rel = montar(exp, de_para=de_para, cofre=cofre, agora=agora)
     rel["gravou"] = False
     if not gravar:
         return rel
+    if not forcar and _versao_no_banco(base, sessao) > 0:
+        raise CopiaRecusada("o Nexus já gravou mudanças da zeladoria no banco: a cópia do Supabase passaria por cima "
+                            "delas (use --forcar só se tiver certeza)")
     for livro in ORDEM:
         conferido = livros.publicar(livro, NOMES_LIVROS[livro], prontos[livro], base=base, token=token, sessao=sessao)
         for aba, n in conferido.items():

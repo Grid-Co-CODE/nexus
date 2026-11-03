@@ -17,7 +17,7 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 | `contratos/` | Contestações do cliente (13/10/2026, do Dashboard Thopen, por setor); Clientes, Onboarding, Comunicação e Portal ainda placeholder | `contratos/CLAUDE.md` |
 | `chamados/` | na ordem Garantias, Fabricantes e Solicitações de clientes (Levi, 24/10/2026); as duas primeiras são atalhos para telas do OS Creator Web (`ponte.ATALHOS`), Solicitações de clientes ainda placeholder. `ufv.py` (28/10/2026): o Responsável UFV de cada chamado de Garantias pelo cadastro do Nexus, que a ponte entrega ao OS Creator; o cadastro é lido por trás, nunca dentro do pedido do quadro (29/10/2026: o quadro preso até 40 s) | o docstring da torre e `oscreator/README.md` |
 | `comando/` | Caixa de entrada e Nexus Insights (03/11/2026: o motor de regras, o Assumir e o Concluir, o sino do topo); Sala de comando, Kanban, Usinas e Metas ainda placeholder | `nexus/comando/CLAUDE.md` |
-| `zeladoria/` | o Radar de Fornecedores (a plataforma de zeladoria) como clone numa moldura, 18 telas, só leitura até a troca (03/11/2026); a ponte `nexus/static/zeladoria/ponte.js` e os dados em `nexus/zeladoria/` | `zeladoria/CLAUDE.md` |
+| `zeladoria/` | o Radar de Fornecedores (a plataforma de zeladoria) como clone numa moldura, 18 telas, só leitura até a troca (03/11/2026; a gravação pelo Nexus pronta e desligada, `NEXUS_ZELADORIA_GRAVA=1`); a ponte `nexus/static/zeladoria/ponte.js` e os dados em `nexus/zeladoria/` | `zeladoria/CLAUDE.md` |
 
 ## Como funciona
 

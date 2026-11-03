@@ -99,7 +99,8 @@ def test_pendente_so_ve_a_propria_linha(cliente, copiado):
 
 def test_aprovado_casa_pelo_email_e_ve_decifrado(cliente, copiado):
     c = _entrar_como(cliente, " fulano@exemplo.com ")
-    assert c.get("/t/zeladoria/api/eu").get_json() == {"user": {"id": "u-1", "email": "Fulano@Exemplo.com"}}
+    assert c.get("/t/zeladoria/api/eu").get_json() == {"user": {"id": "u-1", "email": "Fulano@Exemplo.com"},
+                                                         "grava": False}
     forn = c.get("/t/zeladoria/api/rf/rf_fornecedores").get_json()
     assert forn[0]["empresa"] == "Fulano de Tal MEI" and forn[0]["valor_mes"] == 900
 
@@ -170,3 +171,16 @@ def test_o_clone_nasce_no_tema_do_nexus(logado, copiado):
     logado.set_cookie("nexus_tema", "claro")
     html = logado.get("/t/zeladoria/app").get_data(as_text=True)
     assert '<html lang="pt-BR" data-theme="light">' in html and 'window.ZELADORIA_TEMA = "light"' in html
+
+
+def test_banco_fora_do_ar_avisa_sem_erro_500(logado, banco, monkeypatch):
+    """Em 03/11/2026 a API do banco deu 502 em dois de cada três pedidos, e a tela caía em erro 500."""
+    import requests
+    from nexus.dados import livros
+
+    def fora(*a, **k):
+        raise requests.HTTPError("502 Server Error: Bad Gateway")
+    monkeypatch.setattr(livros, "abas", fora)
+    r = logado.get("/t/zeladoria/visao-geral")
+    assert r.status_code == 200 and "O banco do Nexus não respondeu agora" in r.get_data(as_text=True)
+    assert logado.get("/t/zeladoria/api/rf/rf_usinas").status_code == 503

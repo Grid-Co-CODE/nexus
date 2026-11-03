@@ -3,20 +3,28 @@
 {% block classe_conteudo %}conteudo--moldura{% endblock %}
 {% block conteudo %}
 {# Uma aba do Radar de Fornecedores dentro do Nexus (torre Zeladoria, 03/11/2026): o clone numa moldura, com o menu e o
-   login do Nexus. Até a troca, a torre só lê a cópia do Supabase e o aviso diz isso. Sem a cópia inteira no banco, a tela
+   login do Nexus. Até a troca, a torre só lê a cópia do Supabase e o aviso diz isso; com a gravação ligada
+   (NEXUS_ZELADORIA_GRAVA=1, a troca) o aviso sai e quem salva é o Nexus. Sem a cópia inteira no banco, a tela
    diz que ela não foi feita, nunca um Radar vazio (nexus/zeladoria/leitura.py). A moldura é a da porta única da
    Performance (.porta), para coisa parecida ter o mesmo desenho. #}
 <div class="porta">
-  {% if estado %}
+  {% if estado and not grava %}
   <p class="porta-alerta" role="status">Cópia do Radar, só para leitura: edite no Radar até a troca.
     {% if estado.copiado_em %}Copiado em {{ estado.copiado_em[8:10] }}/{{ estado.copiado_em[5:7] }}/{{ estado.copiado_em[0:4] }}
     às {{ estado.copiado_em[11:16] }} (UTC).{% endif %}</p>
+  {% endif %}
+  {% if estado %}
   <iframe class="porta-moldura" src="{{ url_for('.app_radar', aba=aba) }}" title="{{ tela.nome }} (Zeladoria)"></iframe>
   {% else %}
   <div class="porta-aviso">
+    {% if banco_fora %}
+    <h1>O banco do Nexus não respondeu agora</h1>
+    <p>A Zeladoria lê o banco do Nexus, e ele não respondeu. Nada se perdeu: recarregue a página em 1 minuto.</p>
+    {% else %}
     <h1>A cópia do Radar ainda não foi feita</h1>
     <p>As telas da Zeladoria mostram a cópia do Radar de Fornecedores no banco do Nexus, e ela não está inteira lá
       agora.</p>
+    {% endif %}
     <p class="mudo">{{ erro }}</p>
   </div>
   {% endif %}

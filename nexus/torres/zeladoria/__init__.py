@@ -7,7 +7,8 @@ lateral própria do clone some. No lugar do supabase-js, o clone recebe a ponte 
 que pede o dado às rotas `/api/*` desta torre. Elas leem os três livros da zeladoria (`nexus/zeladoria/leitura.py`).
 
 Até a troca a torre só lê: quem edita é o Radar, e a cópia do Supabase roda sob comando
-(`ferramentas/copiar_zeladoria.py`). Leia o CLAUDE.md desta pasta antes de mexer; o desenho é
+(`ferramentas/copiar_zeladoria.py`). A gravação pelo Nexus (`nexus/zeladoria/gravacao.py`, etapa 4) só liga onde
+`NEXUS_ZELADORIA_GRAVA=1`, o servidor no dia da troca. Leia o CLAUDE.md desta pasta antes de mexer; o desenho é
 `docs/superpowers/specs/2026-11-03-zeladoria-no-nexus-design.md`.
 """
 import json
@@ -18,9 +19,10 @@ from flask import Response, abort, current_app, jsonify, render_template, reques
 
 from ...casca import tema_do_pedido
 from ...prefixo import na_raiz
-from ...zeladoria import leitura
+from ...zeladoria import gravacao, leitura
 from ...zeladoria.tabelas import TabelaDesconhecida
 from ..modelo import Tela, Torre
+from ..moldura import _de_outro_site
 
 FONTE = "Radar de Fornecedores (cópia do Supabase até a troca)"
 # id da tela no Nexus -> id da aba no app do Radar (o `TABS` do clone)
@@ -77,9 +79,13 @@ def _estado():
 
 def _tela(tela_id: str):
     def view():
-        est, erro = _estado()
+        est, erro, banco_fora = None, None, False
+        try:
+            est = leitura.estado(current_app.config)
+        except leitura.CopiaAusente as e:
+            erro, banco_fora = str(e), isinstance(e, leitura.BancoFora)
         return render_template("zeladoria/tela.html", torre=TORRE, tela=TORRE.tela(tela_id), aba=ABAS[tela_id],
-                               estado=est, erro=erro)
+                               estado=est, erro=erro, banco_fora=banco_fora, grava=_grava())
     return view
 
 
@@ -95,7 +101,11 @@ def app_radar():
     aba = request.args.get("aba")
     if aba not in ABAS.values():
         aba = "overview"
-    cfg = {"api": na_raiz("/t/zeladoria/api"), "somenteLeitura": True, "sair": na_raiz("/sair")}
+    cfg = {"api": na_raiz("/t/zeladoria/api"), "somenteLeitura": not _grava(), "sair": na_raiz("/sair")}
+    if _grava():
+        # a coluna-chave das tabelas que não usam `id`: a ponte compara o que leu com o que o app manda, linha a linha
+        est, _erro = _estado()
+        cfg["chaves"] = {f"rf_{aba}": ch for aba, ch in ((est or {}).get("chaves") or {}).items() if ch != "id"}
     # o tema do Nexus (o escuro é o padrão; o claro, o cookie do botão do topo) vira o data-theme do clone, que a paleta
     # da Zeladoria usa; o botão do topo grava `nexus.tema` no navegador, e o clone muda junto, sem recarregar
     tema = "light" if tema_do_pedido() == "claro" else "dark"
@@ -115,6 +125,15 @@ def app_radar():
 
 def _quem(est):
     return leitura.quem_sou(est, session.get("usuario"), bool(session.get("admin")))
+
+
+def _grava() -> bool:
+    return gravacao.ativo(current_app.config)
+
+
+def _corpo() -> dict:
+    corpo = request.get_json(silent=True)
+    return corpo if isinstance(corpo, dict) else {}
 
 
 def _filtros():
@@ -155,11 +174,60 @@ def api_eu():
     if est is None:
         return jsonify(erro=erro), 503
     q = _quem(est)
-    return jsonify(user={"id": q["id"], "email": q["email"]})
+    if not _grava():
+        return jsonify(user={"id": q["id"], "email": q["email"]}, grava=False)
+    g = gravacao.do_app(current_app.config)
+    # a pessoa nova ganha a linha "pendente" no `perfis`, para o HEAD aprovar em Usuários (no Supabase era uma regra do
+    # banco ao criar a conta)
+    if q.get("status") == "pendente" and q.get("email") and q["id"] != leitura.ADMIN_ID:
+        g.garantir_perfil(q)
+    return jsonify(user={"id": q["id"], "email": q["email"]}, grava=True, versao=g.estado["versao"],
+                   situacao=g.situacao())
+
+
+def _gravar(fazer):
+    """O caminho comum do POST que grava: só com a gravação ligada, só da própria página, a recusa da regra como 403."""
+    if not _grava():
+        return jsonify(erro=SOMENTE_LEITURA), 405
+    if _de_outro_site():
+        return jsonify(erro="Pedido de outro site."), 403
+    est, erro = _estado()
+    if est is None:
+        return jsonify(erro=erro), 503
+    g = gravacao.do_app(current_app.config)
+    try:
+        r = fazer(g, _quem(est), _corpo())
+    except gravacao.Recusa as e:
+        return jsonify(erro=str(e)), 403
+    except OSError:
+        # o diário não gravou: a mudança NÃO entrou (o "Salvo" do app não acende)
+        current_app.logger.exception("zeladoria: o diário da gravação não gravou")
+        return jsonify(erro="O Nexus não conseguiu guardar agora. Tente de novo em instantes."), 503
+    return jsonify({**r, "situacao": g.situacao()})
+
+
+@bp.route("/api/gravar", methods=["POST"])
+def api_gravar():
+    """Um salvamento do app: {"ops": [...], "versao": a versão da página aberta}. Ver `gravacao.Gravador.aplicar`."""
+    def fazer(g, quem, corpo):
+        ops = corpo.get("ops")
+        if not isinstance(ops, list) or not all(isinstance(o, dict) for o in ops):
+            raise gravacao.Recusa("pedido de gravação inválido")
+        return g.aplicar(ops, quem, corpo.get("versao") or 0)
+    return _gravar(fazer)
+
+
+@bp.route("/api/situacao")
+def api_situacao():
+    if not _grava():
+        return jsonify(grava=False)
+    return jsonify(grava=True, **gravacao.do_app(current_app.config).situacao())
 
 
 @bp.route("/api/funcao/<nome>", methods=["POST"])
 def api_funcao(nome: str):
+    if nome.startswith("fin_"):
+        return _gravar(lambda g, quem, corpo: g.chamar(nome, corpo.get("args") or {}, quem, corpo.get("versao") or 0))
     if nome != "fracttal-fotos":
         return jsonify(erro=SOMENTE_LEITURA), 405
     est, erro = _estado()
