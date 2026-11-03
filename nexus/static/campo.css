@@ -1528,3 +1528,75 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
   .pa-dados dd{margin-bottom:10px}
   .pa-botoes .gc-btn{flex-basis:100%}
 }
+/* Rondas enxuta (03/11/2026, Levi: "tem filtro em cima e filtro na tabela, tá uma bagunça"): a barra de uma linha no
+   modelo do Histórico do OS Creator Web (Buscar por usina, a busca da tabela, Filtros num painel escondido), uma
+   etiqueta por filtro aplicado com o ×, e o menu do cabeçalho (Duração, Pendências). No celular o painel sobe de baixo. */
+.rd-numeros{margin-top:16px}
+.rd-numeros .v small{font-size:15px;font-weight:600;margin-left:2px;color:var(--mudo)}
+/* o painel se ancora na barra inteira (no começo dela, como no Histórico): ancorado no botão, passava da tela à
+   direita a 1.000 px */
+.rd-barra{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px}
+.rd-filtros{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.rd-campo{display:flex;align-items:center;gap:8px;min-height:38px;margin:0;padding:0 12px;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);background:var(--superficie);color:var(--tinta)}
+.rd-campo i{color:var(--mudo)}
+.rd-campo input{width:210px;min-width:0;border:0;background:transparent;color:inherit;font:inherit;font-size:13.5px;outline:none}
+.rd-campo:focus-within{border-color:var(--verde)}
+.rd-btn{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:0 14px;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);background:var(--superficie);color:var(--tinta);font:600 13px/1 var(--font-sans);cursor:pointer}
+.rd-btn:hover,.rd-btn[aria-expanded="true"]{border-color:var(--verde)}
+.rd-btn:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.rd-badge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--verde);color:var(--sobre-verde);
+  font:700 11px/18px var(--font-sans);text-align:center}
+.rd-dir{display:flex;align-items:center;gap:14px;margin-left:auto}
+.rd-painel{position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:min(620px,calc(100vw - 32px));
+  border:1px solid var(--linha-forte);border-radius:var(--raio-md);background:var(--superficie);box-shadow:0 24px 60px var(--sombra)}
+.rd-painel-topo{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0}
+.rd-painel-topo h2{margin:0;font:600 15px/1.3 var(--font-sans)}
+.rd-fechar{width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:var(--mudo);font-size:20px;line-height:1;cursor:pointer}
+.rd-fechar:hover{background:var(--superficie-2);color:var(--tinta)}
+.rd-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;padding:14px 16px}
+.rd-cel{display:flex;flex-direction:column;gap:5px;margin:0}
+.rd-cel .gc-campo{width:100%}
+.rd-rodape{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;border-top:1px solid var(--linha)}
+.rd-veu{display:none}
+.rd-etiquetas{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
+.rd-etiqueta{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 11px;border:1px solid var(--linha-forte);
+  border-radius:999px;font-size:12.5px;color:var(--tinta-2);text-decoration:none}
+.rd-etiqueta b{color:var(--tinta);font-weight:600}
+.rd-etiqueta .rd-x{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+  color:var(--mudo);font-size:14px}
+.rd-etiqueta:hover{border-color:var(--verde)}
+.rd-etiqueta:hover .rd-x{background:var(--superficie-2);color:var(--tinta)}
+.rd-limpar-tudo{margin-left:4px;font-size:12.5px}
+.rd-paginas{margin-left:auto;font-size:12.5px;color:var(--mudo)}
+.rd-pe-paginas{display:flex;justify-content:flex-end;margin:10px 0 0}
+/* o menu do cabeçalho: o rótulo da coluna abre a caixa presa à tela */
+.rd-th{white-space:nowrap}
+.rd-menu summary{display:inline-flex;align-items:center;gap:4px;cursor:pointer;list-style:none;font:inherit;color:inherit}
+.rd-menu summary::-webkit-details-marker{display:none}
+.rd-menu summary:hover,.rd-menu[open] summary,.rd-menu summary.rd-menu-ativo{color:var(--verde-texto)}
+.rd-menu summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px;border-radius:3px}
+.rd-menu-caixa{position:fixed;z-index:45;display:flex;flex-direction:column;min-width:200px;padding:6px;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);background:var(--superficie);box-shadow:0 16px 40px var(--sombra);text-align:left;
+  text-transform:none;letter-spacing:0;font:400 13px/1.3 var(--font-sans);color:var(--tinta)}
+.rd-menu-t{padding:8px 10px 4px;font:600 11px/1 var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.rd-menu-caixa button,.rd-menu-caixa a{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;
+  border:0;border-radius:6px;background:transparent;color:var(--tinta);font:inherit;text-align:left;text-decoration:none;cursor:pointer}
+.rd-menu-caixa button:hover,.rd-menu-caixa a:hover{background:var(--superficie-2)}
+.rd-menu-caixa a[aria-current="true"]{color:var(--verde-texto);font-weight:600}
+.rd-menu-caixa b{color:var(--mudo);font-weight:600}
+/* a página da usina: o mês da evolução */
+.rd-mes{display:flex;align-items:center;gap:8px;margin-left:auto}
+.rd-mes .gc-campo{min-width:170px}
+.rd-sem-leitura{margin:10px 0 4px}
+@media (max-width:640px){
+  .rd-usina,.rd-filtros,.rd-busca{flex:1 1 100%}
+  .rd-campo input{width:100%}
+  .rd-dir{margin-left:0}
+  .rd-veu:not([hidden]){display:block;position:fixed;inset:0;z-index:39;background:var(--veu)}
+  .rd-painel{position:fixed;top:auto;left:0;right:0;bottom:0;width:auto;max-height:85vh;overflow:auto;border-radius:14px 14px 0 0}
+  .rd-grade{grid-template-columns:minmax(0,1fr)}
+  .rd-rodape{position:sticky;bottom:0;background:var(--superficie)}
+  .rd-mes{margin-left:0}
+}

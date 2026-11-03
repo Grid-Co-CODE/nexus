@@ -19,26 +19,25 @@ def _select(html, nome):
 
 
 def _usinas_na_tabela(html):
-    """Os ids das usinas com link ao histórico na tabela que a aba mostra."""
-    return re.findall(r'href="/t/campo/rondas/usina/(\d+)"', html)
+    """Os ids das usinas com link ao histórico na tabela que a aba mostra (a lista do "Buscar por usina", que leva todas
+    as usinas, fica de fora: 03/11/2026)."""
+    return re.findall(r'href="/t/campo/rondas/usina/(\d+)"', html.split('<section class="cn-painel">', 1)[1])
 
 
 def test_a_barra_tem_cliente_usina_responsavel_e_equipe(com_responsavel, logado):
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
-    for nome, todos in (("cliente", "todos os clientes"), ("usina", "todas as usinas"),
-                        ("responsavel", "todos os responsáveis"), ("equipe", "todas as equipes")):
+    # desde 03/11/2026 no painel escondido dos Filtros, cada lista com o seu rótulo ("Todos", "Todas")
+    for nome, todos in (("cliente", "Todos"), ("usina", "Todas"), ("responsavel", "Todos"), ("equipe", "Todas")):
         ops, escolhido = _select(html, nome)
         assert ops[0][1] == todos and escolhido in ("", "*"), nome
     assert _select(html, "usina")[0][1:] == [("1", "Altair"), ("2", "Brodowski 1"), ("3", "Coração 1")]
     assert [r for _v, r in _select(html, "responsavel")[0][1:]] == ["Beltrano Supervisor", "Ciclano Chefe"]
     assert [r for _v, r in _select(html, "equipe")[0][1:]] == ["SC Oeste 01", "SP Norte 01"]
-    # a busca da tabela leva os filtros novos junto
-    busca = html.split('class="cn-busca"', 1)[1].split("</form>", 1)[0]
-    assert "'usina'" not in busca              # (o laço do template não vaza para a página)
+    # a busca da tabela mora no mesmo formulário dos Filtros: buscar leva os filtros junto
     h = logado.get("/t/campo/rondas?usina=1&responsavel=Ciclano+Chefe").get_data(as_text=True)
-    busca = h.split('class="cn-busca"', 1)[1].split("</form>", 1)[0]
-    assert '<input type="hidden" name="usina" value="1">' in busca
-    assert '<input type="hidden" name="responsavel" value="Ciclano Chefe">' in busca
+    form = h.split("data-rd-form>", 1)[1].split("</form>", 1)[0]
+    assert 'name="q"' in form and '<option value="1" selected>Altair</option>' in form
+    assert '<option value="Ciclano Chefe" selected>Ciclano Chefe</option>' in form
 
 
 def test_a_usina_filtra_a_tabela_e_o_csv(com_responsavel, logado):

@@ -1124,11 +1124,22 @@ def pt_assinar(numero):
 # Levi, 08/10/2026: a aba Cobertura saiu ("já não faz sentido tendo o histórico da usina") e entrou a "Sem ronda"; o
 # Painel é a "visão a mais, dashboards que mostre de fato" quem está melhor. Os botões de filtro da Sujidade saíram:
 # "se a pessoa quiser ordenar ela clica na coluna que ordena e já era!" (o clique no cabeçalho, `_ordenar.html`).
-ABAS_RONDAS = (("registros", "Registros"), ("painel", "Painel"), ("sujidade", "Sujidade e vegetação"),
-               ("sem", "Sem ronda"), ("trackers", "Trackers"), ("quem", "Quem ronda"))
-# a aba Sem ronda: sem ronda no período (o padrão), há 7 dias ou mais, ou nunca em todo o registro
+# Rondas enxuta (Levi, 03/11/2026: "tem filtro em cima e filtro na tabela, tá uma bagunça"; "Menos é mais!"): saíram
+# o Painel, a Sujidade e vegetação e o Quem ronda, e a Sem ronda virou filtro dos Registros ("Sem ronda some e vira um
+# filtro de registros"). O endereço antigo de cada aba cai nos Registros (o da Sem ronda, no filtro)
+ABAS_RONDAS = (("registros", "Registros"), ("trackers", "Trackers"))
+# o que os Registros mostram além das rondas feitas: as usinas sem ronda no período (o padrão do filtro), há 7 dias ou
+# mais, ou nunca em todo o registro (a tabela da antiga aba Sem ronda)
 FILTROS_SEM_RONDA = ("sem", "atrasadas", "nunca")
+# o período é fixo: o filtro de dias saiu (Levi, 03/11/2026: "Tire os filtros de dias, até pq carrega só de 300 em
+# 300"); fica o padrão de antes, 30 dias, e a tabela vem de 300 em 300
+DIAS_RONDAS = 30
 LIMITE_LINHAS = 300
+# os filtros que moram no painel escondido (o modelo do Histórico do OS Creator Web, Levi, 03/11/2026: "Os filtros como
+# clientes, usinas etc deixe escondido"), na ordem do painel e das etiquetas
+FILTROS_DO_PAINEL = (("cob", "Mostrar"), ("regiao", "Região do Brasil"), ("cliente", "Cliente"), ("usina", "Usina"),
+                     ("responsavel", "Responsável O&M"), ("equipe", "Equipe"), ("regiao_campo", "Região de campo"),
+                     ("gestor", "Gestor de contrato"))
 
 
 def _duracao(m) -> str:
@@ -1157,30 +1168,30 @@ def _ordem_sem_ronda(c):
 @bp.route("/rondas")
 def rondas():
     """Cobertura, duração e qualidade da ronda (Levi, 05/10: o estilo do painel de rondas, no tema do Nexus): sete
-    indicadores do período e seis abas (Registros, Painel, Sujidade e vegetação, Sem ronda, Trackers, Quem ronda).
-    Filtros de região do Brasil, cliente, usina, Responsável O&M, equipe, região de campo e gestor de contrato;
+    indicadores dos últimos 30 dias, juntos numa faixa, e duas abas (Registros e Trackers). Os filtros moram num painel
+    escondido, no modelo do Histórico do OS Creator Web (Levi, 03/11/2026), com uma etiqueta por filtro aplicado; a
+    duração e a pendência se escolhem no cabeçalho da coluna. "Buscar por usina" leva direto à página da usina.
     Exportar CSV dos registros."""
-    dias = _dias((7, 14, 30), 30)
+    dias = DIAS_RONDAS
     leitura = visao.rondas()
     d = leitura.dados
     regiao, regiao_campo, gestor = request.args.get("regiao", ""), _regiao_campo(), _gestor()
     # cliente pelo cadastro (Levi, 05/10: "filtro por cliente e a cobertura das rondas das UFVs do cliente. Essas usinas
     # tem que bater com as mesmas do registro mestre"): filtra as rondas E a base da cobertura
-    cliente, cluster, equipe = request.args.get("cliente", ""), request.args.get("cluster", ""), request.args.get("equipe", "")
-    # usina, Responsável O&M e equipe na barra (Levi, 13/10/2026: "deve dar para filtrar cliente, usina, responsável e
+    cliente, equipe = request.args.get("cliente", ""), request.args.get("equipe", "")
+    # usina, Responsável O&M e equipe (Levi, 13/10/2026: "deve dar para filtrar cliente, usina, responsável e
     # equipe!"). O responsável é o da ficha da usina (`usinas.responsavel_om_id`), o mesmo da Central; a usina vai pelo
     # id do cadastro (o nome do livro do App não é chave)
     responsavel, usina = _responsavel(), request.args.get("usina", "")
-    pedida = "sem" if request.args.get("aba") == "cobertura" else request.args.get("aba")     # endereço antigo
-    aba = pedida if pedida in dict(ABAS_RONDAS) else "registros"
+    pedida = request.args.get("aba") or ""
+    aba = "trackers" if pedida == "trackers" else "registros"
+    cob = request.args.get("cob", "") if request.args.get("cob") in FILTROS_SEM_RONDA else ""
+    if pedida in ("sem", "cobertura") and not cob:
+        cob = "sem"                         # o endereço da antiga aba Sem ronda (e da Cobertura de antes dela)
     dur, q = request.args.get("dur", ""), request.args.get("q", "").strip().lower()
     pend = request.args.get("pend", "") if request.args.get("pend") in visao.FEITA else ""
     # os indicadores filtram a tabela (Levi, 05/10: "quero que esses botões sejam clicáveis e filtre a tabela")
     ind = request.args.get("ind", "") if request.args.get("ind") in ("hoje", "qualidade", "duracao") else ""
-    cob = request.args.get("cob", "") if request.args.get("cob") in FILTROS_SEM_RONDA else ""
-    # Quem ronda em blocos (o padrão) ou em tabela (Levi, 08/10: "traga também uma visão em blocos para que fique mais
-    # visual para os supervisores!")
-    ver = "tabela" if request.args.get("ver") == "tabela" else "blocos"
 
     def filtra(lista, sem_usina=False):
         return [x for x in lista if (not regiao or x.get("regiao_br") == regiao)
@@ -1200,14 +1211,11 @@ def rondas():
                  and (not q or q in " ".join(str(r.get(c) or "") for c in ("tecnico", "usina", "equipe", "os")).lower())]
     if ind == "duracao":
         registros.sort(key=lambda r: -(r["dur_min"] if r["dur_min"] is not None else -1))
-    # a aba Sem ronda (Levi, 08/10: "troque por uma tabela chamada 'Sem ronda' que mostrará usina, equipe, técnicos,
-    # supervisor e última OS feita na usina"): sem ronda no período (padrão), há 7 dias ou mais, ou nunca
+    # as usinas sem ronda (Levi, 08/10: "uma tabela chamada 'Sem ronda' que mostrará usina, equipe, técnicos, supervisor
+    # e última OS feita na usina"): sem ronda no período, há 7 dias ou mais, ou nunca
     na_aba_sem = {"atrasadas": lambda c: c["dias"] >= visao.DIAS_SEM_RONDA_ALERTA,
                   "nunca": lambda c: c.get("nunca", c["dias"] >= 999)}.get(cob, lambda c: c["dias"] >= dias)
-    sem_ronda = sorted((c for c in cobertura if na_aba_sem(c)), key=_ordem_sem_ronda)
-    n_sem = {"sem": sum(1 for c in cobertura if c["dias"] >= dias),
-             "atrasadas": sum(1 for c in cobertura if c["dias"] >= visao.DIAS_SEM_RONDA_ALERTA),
-             "nunca": painel["kpi"]["nunca"]}
+    sem_ronda = sorted((c for c in cobertura if na_aba_sem(c)), key=_ordem_sem_ronda) if cob else []
     if request.args.get("csv") == "1":
         import csv
         import io
@@ -1223,7 +1231,7 @@ def rondas():
                         r["fim_hm"], r["dur_min"] if r["dur_min"] is not None else "", r["nota"] if r["nota"] is not None else "",
                         r["veredito"][1], r["trk_apontados"], r["trk_respondidos"], r["os"] or "", r["falhas"],
                         r.get("regiao_campo") or "", r.get("supervisor_campo") or "", r.get("gestor") or ""])
-        return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
+        return Response("﻿" + buf.getvalue(), mimetype="text/csv",
                         headers={"Content-Disposition": f'attachment; filename="rondas-{dias}d.csv"'})
     clientes = sorted({c.get("cliente") for c in d.get("cobertura") or [] if c.get("cliente")})
     # as usinas do filtro: as mobilizadas (e as que tiveram ronda) que passam pelos OUTROS filtros — escolher o cliente
@@ -1238,41 +1246,89 @@ def rondas():
     opcoes_usina = sorted(nomes_usina.items(), key=lambda kv: _ordem_do_nome(kv[1]))
     equipes = sorted({x.get("equipe") for x in (d.get("cobertura") or []) + (d.get("todas") or []) if x.get("equipe")}
                      | ({equipe} if equipe else set()), key=_ordem_do_nome)
-    cluster_aberto = next((c for c in painel["clusters"] if c["cluster"] == cluster), None) if cluster else None
-    suj, suj_estado = None, None
-    if aba == "sujidade":
-        # as respostas vêm das OS de ronda no Fracttal: as aprovadas, relidas em segundo plano, e as em verificação,
-        # que já estão na fila da Aprovação de OS (nunca espera o Fracttal)
-        campo_aprovacao._pedir_releitura()
-        ronda_checklist.pedir_releitura()
-        # + a validação por foto (Levi, 08/10/2026): a leitura da usina naquele dia, no lugar da ronda do mesmo dia
-        suj = visao.sujidade_vegetacao(filtra(d.get("todas") or []), cobertura, ronda_checklist.respostas(), dias,
-                                       d.get("hoje") or visao._agora().date().isoformat(),
-                                       filtra(d.get("validacoes") or []))
-        suj_estado = ronda_checklist.estado()
-    comparativos = visao.comparativos(painel["periodo"], cobertura) if aba == "painel" else None
+    papeis = _papeis(d, d.get("cobertura") or [], regiao_campo, gestor)
+    # de 300 em 300: a página das rondas, ou das usinas sem ronda com o filtro
+    lista = sem_ronda if cob else registros
+    n_pag = max(1, -(-len(lista) // LIMITE_LINHAS))
+    pag = min(_pagina(), n_pag)
+    de = (pag - 1) * LIMITE_LINHAS
+    # as etiquetas dos filtros aplicados (o × tira só aquele, na hora); a região de campo e o gestor que vêm do login
+    # saem com o "*" (todas), como a opção "todas" da lista
+    rotulos = {"cob": {"sem": f"Sem ronda nos últimos {dias} dias", "atrasadas": "Sem ronda há 7 dias ou mais",
+                       "nunca": "Nunca tiveram ronda"}.get(cob, ""),
+               "regiao": regiao, "cliente": cliente, "usina": nomes_usina.get(usina, "") if usina else "",
+               "responsavel": responsavel, "equipe": equipe,
+               "regiao_campo": dict(papeis["opcoes_regiao"]).get(regiao_campo, regiao_campo) if regiao_campo else "",
+               "gestor": gestor}
+    etiquetas = [{"rotulo": rot, "valor": rotulos[k], "tirar": {"pag": None, k: TODOS if k in ("regiao_campo", "gestor") else None}}
+                 for k, rot in FILTROS_DO_PAINEL if rotulos[k]]
+    n_filtros = len(etiquetas)
+    extras = {"dur": ("Duração", {"curta": f"abaixo de {lim} min", "longa": "acima de 2 h"}.get(dur, "")),
+              "pend": ("Pendência", visao.FEITA[pend][0] if pend else ""),
+              "ind": ("Indicador", {"hoje": "só as de hoje", "qualidade": f"qualidade abaixo de {painel['kpi']['limite']}%",
+                                    "duracao": "da mais longa para a mais curta"}.get(ind, "")),
+              "q": ("Busca", request.args.get("q", "").strip())}
+    etiquetas += [{"rotulo": rot, "valor": val, "tirar": {"pag": None, k: None}} for k, (rot, val) in extras.items() if val]
+    # "Buscar por usina" (Levi, 03/11/2026: "a pessoa pesquisa o nome da UFV, assim que pesquisar já leva para a página
+    # só da usina"): todas as usinas da tela, sem os filtros (buscar é ir à usina, não filtrar)
+    busca = {}
+    for x in (d.get("cobertura") or []) + (d.get("todas") or []):
+        if x.get("usina_id") and x.get("usina"):
+            busca.setdefault(x["usina_id"], x["usina"])
+    usinas_busca = sorted(busca.items(), key=lambda kv: _ordem_do_nome(kv[1]))
     return render_template("campo/rondas.html", **_comum(
         "rondas", leitura, dias=dias, regiao=regiao, aba=aba, abas=ABAS_RONDAS, dur=dur,
         pend=pend, pendencias={k: v for k, v in visao.FEITA.items() if k != "ok"}, ind=ind, cob=cob,
         n_pend={k: sum(1 for r in painel["periodo"] if r["pendencia"] == k) for k in ("sem_os", "incompleta")},
-        q=request.args.get("q", ""), k=painel["kpi"], registros=registros, limite=LIMITE_LINHAS, cobertura=cobertura,
-        sem_ronda=sem_ronda, n_sem=n_sem, registro_desde=d.get("registro_desde") or "",
-        trackers=painel["trackers"], quem=painel["quem"], regioes=visao.REGIOES,
-        **_papeis(d, d.get("cobertura") or [], regiao_campo, gestor),
-        duracao=_duracao, iniciais=_iniciais, suj=suj, suj_estado=suj_estado, equipe=equipe, ver=ver,
-        cliente=cliente, clientes=clientes, clusters=painel["clusters"], cluster_aberto=cluster_aberto,
-        responsavel=responsavel, opcoes_responsavel=_opcoes_responsavel(d.get("cobertura") or [], responsavel),
-        usina=usina, opcoes_usina=opcoes_usina, equipes=equipes,
-        comparativos=comparativos, dimensoes=visao.DIMENSOES, base_pequena=visao.BASE_PEQUENA,
-        filtro_da_dimensao={"regiao_br": "regiao", "equipe": "equipe", "cliente": "cliente",
-                            "regiao_campo": "regiao_campo", "gestor": "gestor"},
-        explicacao_avulsa=ronda_avulsa.EXPLICACAO, explicacao_validada=visao.VALIDADA_EXPLICACAO))
+        q=request.args.get("q", ""), k=painel["kpi"], registros=registros[de:de + LIMITE_LINHAS],
+        n_registros=len(registros), sem_ronda=sem_ronda[de:de + LIMITE_LINHAS], n_sem_ronda=len(sem_ronda),
+        pag=pag, n_pag=n_pag, limite=LIMITE_LINHAS, cobertura=cobertura, registro_desde=d.get("registro_desde") or "",
+        trackers=painel["trackers"], regioes=visao.REGIOES, **papeis, duracao=_duracao, iniciais=_iniciais,
+        equipe=equipe, cliente=cliente, clientes=clientes, responsavel=responsavel,
+        opcoes_responsavel=_opcoes_responsavel(d.get("cobertura") or [], responsavel), usina=usina,
+        opcoes_usina=opcoes_usina, equipes=equipes, etiquetas=etiquetas, n_filtros=n_filtros,
+        limpar_tudo=dict(regiao_campo=TODOS, gestor=TODOS, **{c: None for c in (
+            "cob", "regiao", "cliente", "usina", "responsavel", "equipe", "dur", "pend", "ind", "q", "pag", "aba")}),
+        usinas_busca=usinas_busca, explicacao_avulsa=ronda_avulsa.EXPLICACAO,
+        explicacao_validada=visao.VALIDADA_EXPLICACAO))
+
+
+@bp.route("/rondas/buscar-usina")
+def rondas_buscar_usina():
+    """O "Buscar por usina" sem o script (o script já leva à usina escolhida na lista): o nome igual, sem acento nem
+    caixa, ou o único que contém o que se digitou, leva à página da usina; senão volta às Rondas com a busca na tabela."""
+    texto = request.args.get("nome", "").strip()
+    alvo = visao._norm_nome(texto)
+    d = visao.rondas().dados or {}
+    nomes = {}
+    for x in (d.get("cobertura") or []) + (d.get("todas") or []):
+        if x.get("usina_id") and x.get("usina"):
+            nomes.setdefault(x["usina_id"], x["usina"])
+    iguais = [u for u, n in nomes.items() if visao._norm_nome(n) == alvo]
+    contem = [u for u, n in nomes.items() if alvo and alvo in visao._norm_nome(n)]
+    achada = iguais[0] if iguais else (contem[0] if len(contem) == 1 else None)
+    if achada:
+        return redirect(na_raiz(f"/t/campo/rondas/usina/{achada}"))
+    return redirect(na_raiz("/t/campo/rondas") + ("?" + urlencode({"q": texto}) if texto else ""))
+
+
+_MESES = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
+          "novembro", "dezembro")
+
+
+def _nome_do_mes(aaaa_mm) -> str:
+    """"2026-11" -> "novembro de 2026"."""
+    try:
+        return f"{_MESES[int(aaaa_mm[5:7]) - 1]} de {aaaa_mm[:4]}"
+    except (ValueError, IndexError):
+        return aaaa_mm
 
 
 @bp.route("/rondas/usina/<int:usina_id>")
 def rondas_usina(usina_id):
     """O histórico de rondas de uma usina, com data, sujidade e vegetação (Levi, 05/10: "quando clicarmos no nome da
-    usina já aparece o histórico de rondas ... essas informações são importantes!")."""
+    usina já aparece o histórico de rondas ... essas informações são importantes!"). A evolução vem por mês, aberta no
+    mês de agora (03/11/2026); a tabela, os 90 dias."""
     leitura = visao.rondas()
     d = leitura.dados or {}
     ronda_checklist.pedir_releitura()
@@ -1283,8 +1339,15 @@ def rondas_usina(usina_id):
     # fora da evolução (no dia dela, vale o valor validado)
     rondas_hist = [r for r in hist if not r.get("validada")]
     lidas = [r for r in hist if (r["sujidade"] is not None or r["vegetacao"] is not None) and not r.get("revisada")]
+    # a evolução por mês (Levi, 03/11/2026: "a evolução deve ter um filtro de mês, sempre no mês atual"): os meses com
+    # leitura nos 90 dias e o de agora, mesmo sem leitura
+    agora = visao._agora().strftime("%Y-%m")
+    meses = sorted({(r.get("data") or "")[:7] for r in lidas if r.get("data")} | {agora}, reverse=True)
+    mes = request.args.get("mes") if request.args.get("mes") in meses else agora
     return render_template("campo/rondas_usina.html", **_comum(
         "rondas", leitura, usina=usina, usina_id=usina_id, hist=hist, rondas_hist=rondas_hist, lidas=lidas,
+        meses=[(m, _nome_do_mes(m)) for m in meses], mes=mes, nome_mes=_nome_do_mes(mes),
+        lidas_mes=[r for r in lidas if (r.get("data") or "")[:7] == mes],
         duracao=_duracao, iniciais=_iniciais, suj_estado=ronda_checklist.estado(),
         explicacao_avulsa=ronda_avulsa.EXPLICACAO, explicacao_validada=visao.VALIDADA_EXPLICACAO))
 

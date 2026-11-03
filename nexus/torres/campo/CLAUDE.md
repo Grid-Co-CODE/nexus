@@ -323,21 +323,35 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   None)` é a 1ª aba do livro. A mesma listagem enche o `_ciclo` das abas de cada livro (`_abas_dos_fatos`). Conferido
   no banco real: 20 abas, 48 mil linhas, iguais linha a linha à leitura de sempre. Prova:
   `tests/test_campo_pre_leitura_19_10.py`.
-- **Rondas** (05/10, no estilo do painel de rondas que o Levi mostrou; refeita em 08/10 pelo pedido dele): sete
-  indicadores do período (`painel_rondas`, depois dos filtros de região do Brasil, cliente, usina, Responsável O&M,
-  equipe, região de campo e gestor de contrato) e seis abas:
-  Registros, Painel, Sujidade e vegetação, Sem ronda, Trackers e Quem ronda. **A aba Cobertura saiu** (08/10: "já não
-  faz sentido tendo o histórico da usina"); o endereço antigo `aba=cobertura` cai na Sem ronda. Toda tabela da tela
-  ordena pelo cabeçalho, no navegador (`_ordenar.html`, `table.cn-ordenavel`: clicar de novo inverte, a seta é o
-  `aria-sort`, vazio no fim, a linha de fotos ou de detalhe anda junto). A seta já marca a ordem que vem do servidor
-  (Registros e Trackers pela data; Sujidade pelo Status; Painel pelo Índice; Sem ronda pela Última ronda), senão o 1º
-  clique não mudava nada; a pessoa ordena pelo nome (`data-ordem`, não pelas iniciais do avatar) e o Veredito pela
-  gravidade (o pior primeiro), não pelo alfabeto.
+- **Rondas** (05/10, no estilo do painel de rondas que o Levi mostrou; refeita em 08/10; **enxuta em 03/11/2026**: Levi,
+  "tem filtro em cima e filtro na tabela, tá uma bagunça", "Menos é mais!"): sete indicadores dos últimos 30 dias, juntos
+  numa faixa (`cn-numeros`, "no padrão de tudo junto"), e duas abas, **Registros** e **Trackers**. **O período é fixo em
+  30 dias** (`DIAS_RONDAS`; "Tire os filtros de dias, até pq carrega só de 300 em 300"; o `dias=` de link antigo não muda
+  nada) e a tabela vem **de 300 em 300** (`pag=`, `LIMITE_LINHAS`). Saíram o Painel, a Sujidade e vegetação e o Quem
+  ronda; o endereço de cada aba que saiu cai nos Registros (`aba=sem` e `aba=cobertura` caem no filtro Sem ronda). As
+  contas deles seguem no `visao` (`comparativos`, `sujidade_vegetacao`, `_por_cluster`), que outras telas usam.
+  - **A barra de uma linha, no modelo do Histórico do OS Creator Web** ("deixe escondido no padrão OS Creator Web >
+    Histórico"): o **Buscar por usina** (a lista `rd-usinas` com TODAS as usinas da tela, sem os filtros: escolher leva à
+    página da usina; sem o script, `/rondas/buscar-usina?nome=` acha pelo nome igual, sem acento nem caixa, ou pelo único
+    que contém, senão volta com `q=`), a busca da tabela (`q`), o botão **Filtros** com a contagem e, na ponta, Exportar
+    CSV e + Ronda avulsa. O painel dos Filtros (Mostrar, Região do Brasil, Cliente, Usina, Responsável O&M, Equipe,
+    Região de campo, Gestor de contrato; `FILTROS_DO_PAINEL`) só vale no Aplicar; fechar (×, Esc, clique fora) descarta;
+    Limpar volta cada lista ao "todos"; o endereço leva só o escolhido; no celular o painel sobe de baixo. Cada filtro
+    aplicado vira uma **etiqueta com o ×** (`rd-etiqueta`), que tira só aquele, na hora; a região de campo e o gestor que
+    vêm do login saem com o `*`. A duração, a pendência, o indicador e a busca também viram etiqueta.
+  - **O "como ler" e de onde vem o dado** moram na exclamação amarela ao lado do título (o `aviso` de
+    `hseq/_legenda.html`, o mesmo dos Extintores; a página carrega o `hseq.css`).
+  - **Os testes de página olham a tabela** (`<section class="cn-painel">`): a lista do Buscar por usina leva o nome de
+    todas as usinas, e "a usina X não aparece" na página inteira sempre falharia.
   - **Registros** (a tabela "Rondas diárias"; 08/10: "tira as colunas região, início e fim", "bote a coluna duração ao
     lado de data"): Data, Duração, Técnico, Usina, Equipe, Tipo, Qualidade, Veredito, Pendências, Trackers, OS, Fotos.
     O mouse (ou o foco do teclado) na duração mostra "Iniciou às 07:00 · terminou às 08:00 (Brasília)" numa dica fixa
     na tela (a rolagem da tabela cortaria uma dica presa à célula). O CSV continua com início, fim, estado e região.
-    Até 300 linhas com o aviso; filtro de duração e de pendência; Exportar CSV com BOM para o Excel.
+    De 300 em 300; Exportar CSV com BOM para o Excel. **A duração e a pendência se escolhem no cabeçalho** (03/11/2026:
+    "ao clicar em 'Duração' no cabeçalho, aí vai ter essas opções ou 'ordenar'"): o menu da Duração ordena (mais longa
+    ou mais curta primeiro, pelo `th._ordenar` do `_ordenar.html`, o `<th data-ordem-menu>`) e filtra (toda, abaixo de
+    10 min, acima de 2 h); o da Pendências filtra (toda ronda, sem OS no Fracttal, evidência incompleta, com a conta). A
+    caixa do menu fica presa à tela (a rolagem da tabela a cortaria).
   - Cobertura = usinas mobilizadas com ronda no período ÷ mobilizadas; a seta compara com o período anterior de
     mesmo tamanho. Duração = fim − início carimbados pelo aparelho (0 a 8 h; fora disso, sem duração; o livro não
     traz a pausa). **Veredito = o `_veredito_ronda` do App, na mesma ordem, com os limites dele** (`LIMIARES_PADRAO`:
@@ -345,9 +359,9 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     (vira Atenção). Medido em 08/10, 30 dias: 527 rondas, cobertura 83% (106 de 128), qualidade 96%, duração média
     47 min; 7 dias: 149 rondas, 66% (84 de 128).
   - **Os sete indicadores filtram a tabela** (Levi, 05/10): Rondas finalizadas = as de hoje (`ind=hoje`); Cobertura =
-    a aba Sem ronda (`aba=sem`); **Nunca tiveram ronda** = `aba=sem&cob=nunca`; Qualidade = abaixo do limite
+    o filtro Sem ronda (`cob=sem`); **Nunca tiveram ronda** = `cob=nunca`; Qualidade = abaixo do limite
     (`ind=qualidade`); Duração = da mais longa para a mais curta (`ind=duracao`); Abaixo de 10 min = `dur=curta`; Usina
-    mais atrasada = as há 7 dias ou mais (`aba=sem&cob=atrasadas`). O cartão ativo fica marcado; clicar de novo, ou no
+    mais atrasada = as há 7 dias ou mais (`cob=atrasadas`). O cartão ativo fica marcado; clicar de novo, ou no
     × do filtro, tira.
   - **Nunca tiveram ronda** (08/10: "em KPIs coloque mais um, quantas usinas nunca tiveram ronda";
     `visao._registro_da_cobertura`): usina mobilizada sem nenhuma ronda em TODO o registro do Nexus, não só no período:
@@ -355,7 +369,8 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     registro (a data mais antiga das três). Medido em 08/10: registro desde 11/08/2026; 19 de 128 mobilizadas nunca
     tiveram ronda (igual à conta antiga "999 dias": a carga só tem rondas que o livro também tem).
   - **Sem ronda** (08/10: "troque por uma tabela chamada 'Sem ronda' que mostrará usina, equipe, técnicos, supervisor e
-    última OS feita na usina (para conseguir rastrear a última vez que o técnico foi lá)"): as mobilizadas sem ronda no
+    última OS feita na usina (para conseguir rastrear a última vez que o técnico foi lá)"; **desde 03/11/2026 um filtro
+    dos Registros**, o "Mostrar" do painel, `cob=`: "Sem ronda some e vira um filtro de registros"): as mobilizadas sem ronda no
     período (padrão), há 7 dias ou mais (`cob=atrasadas`) ou nunca (`cob=nunca`), a mais esquecida primeiro (mais dias
     sem ronda; no empate, a última OS mais antiga). Colunas: Usina (link ao histórico), Equipe, Técnicos (colaboradores
     de campo não desligados da equipe, nome curto decifrado; sem a chave do cadastro, só quantos são), Região de campo
@@ -367,32 +382,16 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     dias antes (o técnico foi lá e não fez ronda). 6 usinas em equipe sem técnico no cadastro. Ler o livro de
     fechamentos deixou a conta fria da tela ~3,6 s mais longa (2.907 linhas, medido do PC); ela é feita em segundo
     plano (`manter_quente`) e a tela quente responde em 0,01 a 0,2 s.
-  - **Painel** (08/10: "uma visão a mais, dashboards que mostre de fato, regiões com melhores indicadores, melhores
-    coberturas, quais equipes tem melhor qualidade e cobertura, qual cliente, qual supervisor!"; `visao.comparativos`):
-    respeitando o período e os filtros, uma tabela por região do Brasil (UF), equipe, cliente, região de campo (com o
-    Supervisor de Campo embaixo do nome) e gestor de contrato (do cadastro: a região pela equipe da usina, o gestor pela
-    usina; a de "supervisor" saiu com a estrutura de O&M de 10/2026) com Índice das rondas, Cobertura (barra), Qualidade
-    (barra), Rondas e Duração média, melhor índice primeiro; em cima, o melhor e o que pede atenção de cada uma (sem os de
-    base pequena). **Índice das rondas** = 60% da nota média das rondas + 40% cobertura: a fórmula do ranking por região
-    do App, só com as rondas (até 18/10/2026 chamava "Índice", "a régua do ranking do App"; mudou porque o Ranking das
-    equipes da Visão do responsável usa a régua inteira, com as tarefas fechadas pelo App, e a mesma equipe tinha duas
-    "notas do App" diferentes na mesma torre); grupo sem uma das duas fica sem índice. **Base pequena** = menos de 3 usinas
-    (`BASE_PEQUENA`). Clicar no nome leva aos Registros filtrados (`regiao=`, `equipe=`, `cliente=`, `regiao_campo=`,
-    `gestor=`; a
-    equipe virou filtro da tela, com o ×). Barras em CSS feitas no servidor, sem biblioteca. As tabelas ficam lado a
-    lado só quando cada uma cabe inteira (620 px); a 1280 px com o menu, duas colunas rolavam de lado. Com todos os
-    grupos de base pequena, o destaque diz isso em vez de "sem índice". Medido em 08/10 (30 dias):
-    5 regiões (índice 99 a 79; Sul com a menor cobertura, 58%), 53 equipes (47 com índice, 34 de base pequena), 12
-    clientes, 7 supervisores (índice 99 a 71); as somas batem com o total (128 usinas, 527 rondas). Com a estrutura
-    (conferência de 08/10, cadastro do ensaio da publicação): 9 grupos de região de campo (as 8 e "Sem região de
-    campo"; índice 99 a 82) e 5 gestores de contrato (98 a 87).
+  - **Painel** (08/10) **saiu em 03/11/2026** (Levi: "Tire o painel, ele não serve"). A conta (`visao.comparativos`,
+    Índice das rondas = 60% da nota das rondas + 40% cobertura) segue no visao, provada em
+    `test_painel_compara_regiao_equipe_cliente_regiao_de_campo_e_gestor`.
   - **Ronda sem OS, o motivo em português** (`visao.motivo_sem_os`; Levi, 05/10: "não entendi essa observação, minha
     conta fracttal já está conectada"): o App cria a OS de ronda com a conta Fracttal do TÉCNICO; "Conecte sua conta
     Fracttal" é a mensagem do App para o técnico. Medido em 05/10: 114 de 771 rondas (90 dias) sem OS por isso (os
     cinco técnicos com mais somavam 74). O App tenta 5 vezes, uma por
     minuto, e desiste (`RONDA_OS_FILA_MAX`, `_MAX_H` 24 h): a ronda antiga não ganha OS quando o técnico conecta depois.
-  - **Usina, Responsável O&M e equipe na barra** (Levi, 13/10/2026: "deve dar para filtrar cliente, usina, responsável
-    e equipe!"): três listas ao lado da de cliente (`usina=` pelo id do cadastro; `responsavel=` é o Responsável O&M da
+  - **Usina, Responsável O&M e equipe** (Levi, 13/10/2026: "deve dar para filtrar cliente, usina, responsável
+    e equipe!"; desde 03/11/2026 no painel dos Filtros): três listas ao lado da de cliente (`usina=` pelo id do cadastro; `responsavel=` é o Responsável O&M da
     ficha da usina, o mesmo da Central, com "Sem responsável O&M" e `*` = todos; `equipe=` virou lista, no lugar do
     filtro que só vinha do clique no Painel). Filtram as rondas E a base da cobertura (os sete indicadores e as seis
     abas, inclusive a Sem ronda e o CSV). A lista de usinas encolhe com os outros filtros (as mobilizadas e as que
@@ -403,20 +402,14 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     (`_Base.nome_cliente`), nunca do nome da usina no livro. Filtra as rondas E a base da cobertura; com cliente
     escolhido aparece a faixa "cobertura das rondas: N%, X de Y usinas mobilizadas do cliente no cadastro". Medido em
     05/10: as 128 mobilizadas têm cliente; Thopen 61 de 80 (76%) em 30 dias.
-  - **Quem ronda por cluster** (`visao._por_cluster`; Levi, 05/10: "seria melhor por cluster, aí nesse cluster clicando
-    apareceria as mesmas informações porém por pessoa"): o cluster é o do cadastro pela usina, numa grafia só
-    (`nome_cluster`: "SP OESTE" e "SP Oeste" eram dois no banco). **Pendentes de ronda** = usinas mobilizadas do cluster
-    que pedem ronda pela regra da Central (`_pendente`: 7 dias ou mais, nunca, ou a longa pendente). Abre em **blocos**
-    (08/10: "traga também uma visão em blocos para que fique mais visual para os supervisores!"; `ver=tabela` volta à
-    tabela): um cartão por cluster com a cobertura (usinas com ronda no período ÷ usinas, a mesma conta do indicador;
-    barra com ronda × sem), os pendentes, as rondas, a qualidade e os técnicos que rondaram; a borda pela cobertura
-    (80% ok, 50% alerta). Clicar abre as pessoas (`cluster=`), com as mesmas colunas; o pendente da pessoa é o da
-    equipe em que ela mais ronda, e **clicar na linha do técnico abre quais são** (08/10: "clicando na linha tem que
-    aparecer quais são essas 5"; `_item_pendente`): a usina (link ao histórico), há quanto tempo e o status e a
-    observação escritos como a Central escreve. A faixa do cluster tem "Ver as N usinas pendentes" (só as do cluster).
-    Conferido em 08/10 (7, 14 e 30 dias): 40 clusters; soma = 128 usinas, 82 pendentes (igual à regra direta) e as
-    rondas do total; cada técnico com a lista do tamanho do número dele (56 técnicos em 30 dias, 44 com pendentes).
-  - **Histórico da usina** (`/rondas/usina/<usina_id>`, `visao.historico_usina`; Levi, 05/10: "quando clicarmos no
+  - **Quem ronda por cluster** (05/10 e 08/10) **saiu em 03/11/2026** (Levi: "Pode tirar quem ronda também! Menos é
+    mais!"). A conta (`visao._por_cluster`, os pendentes de cada técnico pela regra da Central) segue no visao, provada
+    em `test_quem_ronda_mostra_quais_sao_as_pendentes_e_abre_em_blocos`.
+  - **Histórico da usina** (`/rondas/usina/<usina_id>`, `visao.historico_usina`; desde 03/11/2026 também pelo Buscar
+    por usina). **03/11/2026:** a evolução vem **por mês**, aberta no mês de agora (`mes=AAAA-MM`; a lista tem os meses
+    com leitura nos 90 dias e o de agora; mês sem leitura diz isso; uma leitura só fica no meio), os números ficam
+    juntos numa faixa, e o "De onde vem" (do fim da página e do canto) virou a exclamação amarela ao lado do nome
+    ("conforme segurança > extintores"); a tabela segue com os 90 dias. Levi, 05/10: "quando clicarmos no
     nome da usina já aparece o histórico de rondas com data e sujidade e vegetação"): o nome da usina é link nas abas
     Registros, Sujidade e Sem ronda e nos pendentes do Quem ronda. Todas as rondas do livro (90 dias), a mais recente
     primeiro, com sujidade (número só com a cor da fonte, como na aba),
@@ -453,7 +446,9 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     não sei quando").
   - **As rondas feitas saíram da Central de atenção** (Levi, 05/10: "na parte de atenção quero só o que for pendente"):
     na aba Registros, o filtro de pendência (Sem OS no Fracttal, Evidência incompleta) e a coluna Pendências.
-  - **Sujidade e vegetação** (Levi, 05/10: "é importante!"; `nexus/campo/ronda_checklist.py`): o livro de rondas não
+  - **Sujidade e vegetação** (Levi, 05/10: "é importante!"; `nexus/campo/ronda_checklist.py`; **a aba saiu em
+    03/11/2026**: "também é redundante pois os registros já mostram"; a leitura segue no histórico da usina, na Zeladoria
+    e na Visão do responsável): o livro de rondas não
     traz o checklist, mas o App escreve cada resposta no texto da OS de ronda no Fracttal ("Sujidade dos módulos: 2;
     Altura da vegetação: 3; Sujidade da vala de drenagem: Parcial; Piranômetro IPOA ...: Limpo"). As listagens do REST
     trazem esse texto em lote: as em verificação já estão na fila da Aprovação; as aprovadas (que não mudam mais)

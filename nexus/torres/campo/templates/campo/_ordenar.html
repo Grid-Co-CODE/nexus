@@ -5,7 +5,9 @@
    - a célula traz `data-ordem` quando o que ela mostra não ordena sozinho ("05/10", "1h04", "nunca"); sem ela, o texto;
    - vazio ("" ou "—") fica sempre no fim, nas duas ordens;
    - a linha que acompanha a de cima (fotos, detalhe: `tr.cn-fotos-linha`, `tr.cn-detalhe`) anda junto com ela;
-   - <th data-sem-ordem> não ordena. A ordem que veio do servidor é a de quem tem `aria-sort` no HTML. #}
+   - <th data-sem-ordem> não ordena. A ordem que veio do servidor é a de quem tem `aria-sort` no HTML;
+   - <th data-ordem-menu> ordena por um menu do próprio cabeçalho (a Duração das Rondas, 03/11/2026: "ao clicar em
+     'Duração' no cabeçalho, aí vai ter essas opções ou 'ordenar'"): não vira botão, e o menu chama `th._ordenar(desc)`. #}
 <script>
   (function () {
     var ACOMPANHA = /(^|\s)(cn-fotos-linha|cn-detalhe)(\s|$)/;
@@ -25,14 +27,7 @@
       var corpo = tab.tBodies[0], ths = tab.tHead.rows[0].cells;
       Array.prototype.forEach.call(ths, function (th, col) {
         if (th.hasAttribute('data-sem-ordem')) return;
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'cn-ordem';
-        while (th.firstChild) b.appendChild(th.firstChild);
-        th.appendChild(b);
-        b.addEventListener('click', function () {
-          var agora = th.getAttribute('aria-sort');
-          var desc = agora === 'ascending' ? true : (agora === 'descending' ? false : th.dataset.primeiro === 'desc');
+        th._ordenar = function (desc) {
           // os grupos: a linha principal e as que a acompanham (fotos, detalhe)
           var grupos = [];
           Array.prototype.forEach.call(corpo.rows, function (tr) {
@@ -48,6 +43,16 @@
           grupos.forEach(function (g) { g.forEach(function (tr) { corpo.appendChild(tr); }); });
           Array.prototype.forEach.call(ths, function (o) { if (o !== th) o.removeAttribute('aria-sort'); });
           th.setAttribute('aria-sort', desc ? 'descending' : 'ascending');
+        };
+        if (th.hasAttribute('data-ordem-menu')) return;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cn-ordem';
+        while (th.firstChild) b.appendChild(th.firstChild);
+        th.appendChild(b);
+        b.addEventListener('click', function () {
+          var agora = th.getAttribute('aria-sort');
+          th._ordenar(agora === 'ascending' ? true : (agora === 'descending' ? false : th.dataset.primeiro === 'desc'));
         });
       });
     });

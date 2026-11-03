@@ -1,40 +1,57 @@
 {% extends "base.html" %}
+{% from 'hseq/_legenda.html' import aviso, termo %}
 {% block titulo %}{{ usina.usina if usina else 'Usina' }} · Rondas{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
 {# O histórico de rondas de uma usina (Levi, 05/10/2026: "quando clicarmos no nome da usina já aparece o histórico de
-   rondas com data e sujidade e vegetação, essas informações são importantes!"). nexus/campo/visao.py: historico_usina. #}
+   rondas com data e sujidade e vegetação, essas informações são importantes!"). nexus/campo/visao.py: historico_usina.
+   03/11/2026 (Levi): o "De onde vem" virou a exclamação amarela ao lado do nome ("conforme segurança > extintores"), os
+   números ficam juntos numa faixa e a evolução tem o filtro de mês, aberto no mês de agora. #}
 {# nível só com a cor da fonte, como na aba Sujidade e vegetação (Levi, 08/10: "quero só a cor da fonte mesmo") #}
 {% macro nivel(n) %}{% if n is none %}<span class="mudo">—</span>{% else %}<b class="cn-nivel-txt cn-nivel-txt--{{ n }}">{{ n }}</b>{% endif %}{% endmacro %}
 <div class="campo-nativa">
   <p class="cn-voltar"><a class="cn-link" href="{{ url_for('torre_campo.rondas') }}">Voltar para Rondas</a></p>
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Rondas · Histórico da usina</p>
-      <h1 class="cn-titulo">{{ usina.usina if usina else 'Usina ' ~ usina_id }}</h1>
+      <div class="hs-titulo"><h1 class="cn-titulo">{{ usina.usina if usina else 'Usina ' ~ usina_id }}</h1>
+      {% call aviso('De onde vem') %}
+        {{ termo('Rondas') }}<dd>As do livro de rondas do App, dos últimos 90 dias, lido às {{ lido }}.</dd>
+        {{ termo('Sujidade, vegetação, vala e sensores') }}<dd>As respostas do checklist que o App copia no texto da OS de
+          ronda no Fracttal; o Nexus lê as OS em verificação e as aprovadas dos 90 dias.</dd>
+        {{ termo('Ronda sem OS') }}<dd>As de 11/08 a 06/10 vieram do registro da ronda no App numa carga única (06/10); depois
+          disso, ronda sem OS fica com "—".</dd>
+        {{ termo('Validada por foto') }}<dd>{{ explicacao_validada }}</dd>
+        {{ termo('Fotos') }}<dd>Os anexos da OS de ronda no Fracttal (ronda sem OS: só no App).</dd>
+      {% endcall %}</div>
       <p class="cn-pergunta">{% if usina %}{{ usina.cliente or '—' }} · {{ usina.cluster or '—' }} · {{ usina.equipe or '—' }} · {{ usina.cidade }}{% if usina.uf %} - {{ usina.uf }}{% endif %} · região de campo {{ usina.regiao_campo or '—' }}{% if usina.supervisor_campo %} (Supervisor de Campo: {{ usina.supervisor_campo }}){% endif %} · gestor de contrato {{ usina.gestor or '—' }}{% endif %}</p></div>
-    <div class="cn-frescor">livro de rondas do App + OS de ronda no Fracttal<br><b>lido às {{ lido }}</b></div>
   </div>
   {% include 'campo/_aviso_checklist.html' %}
   {% set ult = lidas[0] if lidas else none %}
-  <div class="cn-kpis">
-    {# a validação por foto (08/10/2026) não é ronda: só as rondas contam aqui #}
-    <div class="cn-kpi"><span class="gc-rotulo">Rondas</span><span class="v">{{ rondas_hist|length }}</span><span class="d">nos últimos 90 dias</span></div>
-    <div class="cn-kpi"><span class="gc-rotulo">Última ronda</span><span class="v">{{ dia_curto(rondas_hist[0].data) if rondas_hist else '—' }}</span><span class="d">{{ rondas_hist[0].tecnico if rondas_hist else 'nunca teve ronda pelo App' }}</span></div>
-    <div class="cn-kpi"><span class="gc-rotulo">Sujidade dos módulos</span><span class="v">{{ nivel(ult.sujidade if ult else none) }}</span><span class="d">{{ 'em ' ~ dia_curto(ult.data) if ult else 'sem leitura' }}</span></div>
-    <div class="cn-kpi"><span class="gc-rotulo">Altura da vegetação</span><span class="v">{{ nivel(ult.vegetacao if ult else none) }}</span><span class="d">{{ 'em ' ~ dia_curto(ult.data) if ult else 'sem leitura' }}</span></div>
+  {# juntos numa faixa (Levi, 03/11/2026: "Arrume esses cards de KPI para ficarem juntos também"); a validação por foto
+     (08/10/2026) não é ronda: só as rondas contam aqui #}
+  <div class="cn-numeros rd-numeros">
+    <span><span class="gc-rotulo">Rondas</span><span class="v">{{ rondas_hist|length }}</span><span class="d">nos últimos 90 dias</span></span>
+    <span><span class="gc-rotulo">Última ronda</span><span class="v">{{ dia_curto(rondas_hist[0].data) if rondas_hist else '—' }}</span><span class="d">{{ rondas_hist[0].tecnico if rondas_hist else 'nunca teve ronda pelo App' }}</span></span>
+    <span><span class="gc-rotulo">Sujidade dos módulos</span><span class="v">{{ nivel(ult.sujidade if ult else none) }}</span><span class="d">{{ 'em ' ~ dia_curto(ult.data) if ult else 'sem leitura' }}</span></span>
+    <span><span class="gc-rotulo">Altura da vegetação</span><span class="v">{{ nivel(ult.vegetacao if ult else none) }}</span><span class="d">{{ 'em ' ~ dia_curto(ult.data) if ult else 'sem leitura' }}</span></span>
   </div>
-  {% if lidas|length > 1 %}
-  {# a evolução: sujidade e vegetação de 1 a 5, da leitura mais antiga para a mais recente #}
-  {% set pts = lidas|reverse|list %}{% set w = 760 %}{% set h = 150 %}{% set n = pts|length %}
-  {% macro x(i) %}{{ 40 + (i * (w - 60) / ((n - 1) or 1))|round(1) }}{% endmacro %}
+  {# a evolução do mês escolhido (Levi, 03/11/2026: "a evolução deve ter um filtro de mês, sempre no mês atual"):
+     sujidade e vegetação de 1 a 5, da leitura mais antiga para a mais recente; uma leitura só fica no meio #}
+  {% set pts = lidas_mes|reverse|list %}{% set w = 760 %}{% set h = 150 %}{% set n = pts|length %}
+  {% macro x(i) %}{{ (w / 2) if n == 1 else 40 + (i * (w - 60) / ((n - 1) or 1))|round(1) }}{% endmacro %}
   {% macro y(v) %}{{ 15 + ((5 - v) * (h - 40) / 4)|round(1) }}{% endmacro %}
   {% set passo = (w - 60) / ((n - 1) or 1) %}
   {# a data no eixo em meia fonte (Levi, 06/10: Crateús, 25 rondas, as datas encavalavam): cada "dd/mm" pede ~23
      unidades; com menos espaço, uma data a cada `salto` pontos, e a última sempre (a dica do ponto diz a data inteira) #}
   {% set salto = [((23 / passo) | round(0, 'ceil')) | int, 1] | max %}
   <section class="cn-painel cn-evolucao">
-    <div class="cn-lista-cab"><h2>Evolução</h2><span class="cn-leg"><i class="suj"></i>sujidade <i class="veg"></i>vegetação</span><span class="mudo">acima de 3 pede ação · passe o mouse no ponto</span></div>
-    <svg viewBox="0 0 {{ w }} {{ h }}" role="img" aria-label="Sujidade e vegetação por ronda">
+    <div class="cn-lista-cab"><h2>Evolução</h2><span class="cn-leg"><i class="suj"></i>sujidade <i class="veg"></i>vegetação</span><span class="mudo">acima de 3 pede ação · passe o mouse no ponto</span>
+      <form class="rd-mes" method="get"><label class="gc-rotulo" for="rd-mes">Mês</label>
+        <select class="gc-campo" id="rd-mes" name="mes" onchange="this.form.submit()">{% for m, nome in meses %}<option value="{{ m }}"{% if m == mes %} selected{% endif %}>{{ nome }}</option>{% endfor %}</select>
+        <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Ver</button></noscript></form></div>
+    {% if not pts %}<p class="mudo rd-sem-leitura">Nenhuma leitura de sujidade e vegetação em {{ nome_mes }}.</p>{% else %}
+    <svg viewBox="0 0 {{ w }} {{ h }}" role="img" aria-label="Sujidade e vegetação por ronda em {{ nome_mes }}">
       {% for v in range(1, 6) %}<line x1="34" x2="{{ w - 10 }}" y1="{{ y(v) }}" y2="{{ y(v) }}" class="grade{% if v == 3 %} limite{% endif %}"/><text x="24" y="{{ y(v)|float + 4 }}" class="eixo">{{ v }}</text>{% endfor %}
       {# o x é o da ronda na lista inteira: filtrar no for renumeraria o loop e deslocaria o ponto #}
       <polyline class="suj" points="{% for p in pts %}{% if p.sujidade is not none %}{{ x(loop.index0) }},{{ y(p.sujidade) }} {% endif %}{% endfor %}"/>
@@ -53,6 +70,7 @@
       {% if loop.last or (loop.index0 % salto == 0 and n - 1 - loop.index0 >= salto) %}<text x="{{ x(loop.index0) }}" y="{{ h - 5 }}" class="eixo data" text-anchor="middle">{{ dia_curto(p.data) }}</text>{% endif %}
       {% endfor %}
     </svg>
+    {% endif %}
     <div class="cn-dica" role="tooltip" hidden>
       <b class="cn-dica-os"></b><span class="cn-dica-tec"></span><span class="cn-dica-quando"></span>
       <span class="cn-dica-niveis"><i class="suj"></i>sujidade <b class="cn-dica-suj"></b><i class="veg"></i>vegetação <b class="cn-dica-veg"></b></span>
@@ -91,7 +109,6 @@
       });
     })();
   </script>
-  {% endif %}
   <div class="cn-lista-cab"><h2>Histórico de rondas</h2><span class="mudo">a mais recente primeiro</span></div>
   <div class="cn-tab"><table>
     <thead><tr><th>Data</th><th>Tipo</th><th>Técnico</th><th>Duração</th><th>Qualidade</th><th>Veredito</th><th>Sujidade</th><th>Vegetação</th><th>Vala</th><th>Sensores</th><th>Pendências</th><th>OS</th><th>Fotos</th></tr></thead>
@@ -116,10 +133,5 @@
     </tbody></table></div>
   {# o botão Fotos e a caixa que amplia: o mesmo componente da aba Registros (Levi, 08/10/2026) #}
   {% include 'campo/_ronda_fotos_caixa.html' %}
-  <div class="cn-nota"><b>De onde vem.</b> As rondas são as do livro do App (90 dias). Sujidade, vegetação, vala e sensores
-    são as respostas do checklist que o App copia no texto da OS de ronda no Fracttal; o Nexus lê as OS em verificação
-    e as aprovadas dos 90 dias. As rondas sem OS de 11/08 a 06/10 vieram do registro da ronda no App numa carga única
-    (06/10); ronda sem OS depois disso fica com "—". As fotos são os anexos da OS no Fracttal (ronda sem OS: só
-    no App).</div>
 </div>
 {% endblock %}

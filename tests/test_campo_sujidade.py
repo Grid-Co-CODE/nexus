@@ -52,13 +52,12 @@ def test_aba_de_sujidade_e_vegetacao(banco, logado, monkeypatch):  # noqa: F811
     monkeypatch.setattr(ronda_checklist, "pedir_releitura", lambda app=None: None)
     monkeypatch.setattr(ronda_checklist, "estado", lambda: {"lendo": False, "erro": "", "lidas": True, "fila": True})
     monkeypatch.setattr(aprovacao, "_pedir_releitura", lambda: None)
+    # a aba saiu da tela de Rondas (Levi, 03/11/2026: "Esse 'sujidade e vegetação' também é redundante pois os
+    # registros já mostram"): o endereço cai nos Registros; a leitura segue no histórico da usina
     html = logado.get("/t/campo/rondas?aba=sujidade").get_data(as_text=True)
-    assert "Sujidade e vegetação" in html and "Altura da vegetação" in html
-    # 08/10: o número só com a cor da fonte, e o Status diz o porquê (sujidade 4, vala parcial, IPOA sujo)
-    assert 'class="cn-nivel-txt cn-nivel-txt--4">4<' in html and "IPOA" in html and "Parcial" in html
-    assert "Sujidade alta" in html and "Vala parcial" in html and "Sensor sujo (IPOA)" in html
-    # os botões de filtro saíram (Levi: "se a pessoa quiser ordenar ela clica na coluna"): sv= não filtra mais
-    assert "sv=" not in html and "Altair" in logado.get("/t/campo/rondas?aba=sujidade&sv=vegetacao").get_data(as_text=True)
+    assert "<h2>Rondas diárias</h2>" in html and "Sujidade e vegetação</a>" not in html
+    pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
+    assert 'class="cn-nivel-txt cn-nivel-txt--4">4<' in pag and "IPOA" in pag and "Parcial" in pag
 
 
 def _pagina(inicio, n=100, fim="2026-10-05"):

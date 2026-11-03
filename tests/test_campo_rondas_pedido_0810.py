@@ -1,8 +1,10 @@
 """Rondas, pedido do Levi de 08/10/2026 (Nexus > Campo App > Rondas): a tabela de registros sem Região, Início e Fim,
 com a Duração ao lado da Data e o início e o fim no mouse; o botão Fotos na tabela; o indicador "Nunca tiveram ronda";
-a aba "Sem ronda" no lugar da Cobertura; a Sujidade pela criticidade, com Status e Tipo; o Quem ronda com as pendentes
-de cada técnico e em blocos; e o Painel por região, equipe, cliente e supervisor (com a estrutura de O&M de 10/2026, o
-supervisor virou a região de campo e o gestor de contrato). Banco falso (pg_falso)."""
+a "Sem ronda" no lugar da Cobertura; a Sujidade pela criticidade, com Status e Tipo; o Quem ronda com as pendentes de
+cada técnico; e o Painel por região, equipe, cliente e supervisor (com a estrutura de O&M de 10/2026, o supervisor virou
+a região de campo e o gestor de contrato). Desde 03/11/2026 (Rondas enxuta) o Painel, a Sujidade e o Quem ronda saíram
+da tela e a Sem ronda é um filtro dos Registros: as contas deles seguem provadas aqui pelo visao. Banco falso
+(pg_falso)."""
 import json
 import pathlib
 import re
@@ -17,7 +19,9 @@ def _cabecalho(html, marca):
     """Os títulos das colunas da 1ª tabela depois de `marca`, como a pessoa lê: sem o hífen invisível (&shy;) que deixa
     "Sombreamento" quebrar linha para a tabela da Sujidade caber a 1366 px."""
     trecho = html.split(marca, 1)[1].split("</thead>", 1)[0]
-    return [re.sub(r"<[^>]+>", "", t).replace("&shy;", "").strip() for t in re.findall(r"<th[^>]*>(.*?)</th>", trecho)]
+    # o menu do cabeçalho (Duração, Pendências, 03/11/2026) não é o título da coluna
+    trecho = re.sub(r'<div class="rd-menu-caixa".*?</div>', "", trecho, flags=re.S)
+    return [re.sub(r"<[^>]+>", "", t).replace("&shy;", "").strip() for t in re.findall(r"<th[^>]*>(.*?)</th>", trecho, re.S)]
 
 
 def _rondas_do_banco(banco, *extras):
@@ -71,7 +75,7 @@ def test_indicador_nunca_tiveram_ronda_conta_todo_o_registro(banco, logado):
     assert k["nunca"] == 1                                     # Coração 1
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
     desde = _dia(3)
-    assert "Nunca tiveram ronda" in html and 'href="?aba=sem&amp;cob=nunca"' in html
+    assert "Nunca tiveram ronda" in html and 'href="?cob=nunca"' in html
     assert f"desde {desde[8:10]}/{desde[5:7]}/{desde[:4]}, rondas avulsas" in html          # o title diz desde quando
     # uma ronda de 40 dias atrás: fora dos 30 dias, mas no registro; Coração 1 deixa de ser "nunca" e segue sem ronda
     _rondas_do_banco(banco, _ronda(_dia(40), usina="Coração Fracttal", ativo="THPN-COR100"))
@@ -121,7 +125,9 @@ def test_aba_sem_ronda_com_tecnicos_regiao_gestor_e_ultima_os(banco, logado):
     assert "Cobertura</a>" not in html                                                # a aba Cobertura saiu
     # o endereço antigo (aba=cobertura) cai na aba nova; há 7 dias ou mais e nunca são filtros dela
     assert "<h2>Sem ronda</h2>" in logado.get("/t/campo/rondas?aba=cobertura").get_data(as_text=True)
-    assert 'aria-current="page">Nunca tiveram ronda <b>1</b>' in logado.get("/t/campo/rondas?aba=sem&cob=nunca").get_data(as_text=True)
+    # desde 03/11/2026 a Sem ronda é um filtro: a etiqueta diz qual, e o indicador fica marcado
+    nunca = logado.get("/t/campo/rondas?aba=sem&cob=nunca").get_data(as_text=True)
+    assert "Mostrar: <b>Nunca tiveram ronda</b>" in nunca and "<h2>Sem ronda</h2>" in nunca
 
 
 # ── 7, 7.1 e 7.2: Sujidade e vegetação pela criticidade, com Status e Tipo, sem fundo e sem botões de filtro ───────
@@ -153,21 +159,10 @@ def test_sujidade_do_mais_critico_com_status_tipo_e_so_a_cor_da_fonte(banco, log
     d = visao.rondas().dados
     s = visao.sujidade_vegetacao(d["todas"], d["cobertura"], resp, 30, d["hoje"])
     assert [(x["usina"], x["pontos"]) for x in s["linhas"]] == [("Brodowski 1", 10), ("Altair", 5)]
+    # a aba saiu da tela (Levi, 03/11/2026: "Esse 'sujidade e vegetação' também é redundante pois os registros já
+    # mostram"): o endereço dela cai nos Registros
     html = logado.get("/t/campo/rondas?aba=sujidade").get_data(as_text=True)
-    assert _cabecalho(html, "cn-painel-barra") == ["Data", "Técnico", "Usina", "Equipe", "Região", "Tipo", "Sujidade",
-                                                   "Vegetação", "Sombreamento", "Vala", "Sensores", "OS", "Status"]
-    corpo = html.split("<tbody>", 1)[1].split("</tbody>", 1)[0]
-    assert corpo.index("Brodowski 1") < corpo.index("Altair")
-    assert "Vegetação alta" in corpo and "Vala obstruída" in corpo and "Sensor sujo (IPOA)" in corpo
-    assert "Sujidade muito alta" in corpo and "Sudeste" in corpo                       # região do Brasil pela UF
-    assert '<td data-ordem="4"><span class="cn-t-critico">Obstruída</span></td>' in corpo   # a vala, pela cor da fonte
-    assert corpo.count('<span class="cn-tipo">curta</span>') == 2 and 'class="det">ronda' not in corpo   # Tipo: coluna
-    # o número só com a cor da fonte (sem o fundo do cn-nivel) e o status ordenado do mais crítico
-    assert 'class="cn-nivel-txt cn-nivel-txt--5">5<' in corpo and 'class="cn-nivel ' not in corpo
-    assert 'aria-sort="descending">Status' in html and 'data-ordem="10"' in corpo
-    # sem os botões de filtro (Sujidade alta, Vegetação alta...): ordenar é clicar no cabeçalho
-    assert "?aba=sujidade&amp;sv=" not in html and 'class="cn-ordenavel"' in html
-    assert html.count("table.cn-ordenavel") == 1                                         # o script de ordenar, uma vez
+    assert "<h2>Rondas diárias</h2>" in html and "Sujidade e vegetação</a>" not in html
 
 
 # ── 8 e 8.1: Quem ronda com as pendentes de cada técnico, em blocos ───────────────────────────────────────────────
@@ -182,16 +177,9 @@ def test_quem_ronda_mostra_quais_sao_as_pendentes_e_abre_em_blocos(banco, logado
     assert pend[0]["obs"].startswith("O App pede a ronda longa (última ronda em")
     assert [(p["usina"], p["status"]) for p in sc["pendentes_usinas"]] == [("Coração 1", "Nunca teve ronda")]
     assert [p["usina"] for p in sp["pendentes_usinas"]] == ["Altair"]          # só as do cluster
-    blocos = logado.get("/t/campo/rondas?aba=quem").get_data(as_text=True)
-    assert blocos.count('class="cn-equipe cn-equipe--') == 2 and 'aria-current="page">Blocos<' in blocos
-    assert 'href="?aba=quem&amp;cluster=SP+Norte#abas"' in blocos and ">100%<" in blocos
-    tabela = logado.get("/t/campo/rondas?aba=quem&ver=tabela").get_data(as_text=True)
-    assert 'class="cn-equipe ' not in tabela and "Quem ronda, por cluster" in tabela and 'aria-current="page">Tabela<' in tabela
-    pessoas = logado.get("/t/campo/rondas?aba=quem&cluster=SP+Norte").get_data(as_text=True)
-    assert '<tr class="cn-linha" tabindex="0" aria-expanded="false"' in pessoas
-    detalhe = pessoas.split('<tr class="cn-detalhe" hidden>', 1)[1].split("</tr>", 1)[0]
-    assert "Ronda longa pendente" in detalhe and '/t/campo/rondas/usina/1"' in detalhe and "Altair" in detalhe
-    assert "Ver a usina pendente de ronda do cluster" in pessoas
+    # a aba saiu (Levi, 03/11/2026: "Pode tirar quem ronda também! Menos é mais!"): o endereço cai nos Registros
+    html = logado.get("/t/campo/rondas?aba=quem&cluster=SP+Norte").get_data(as_text=True)
+    assert "<h2>Rondas diárias</h2>" in html and "Quem ronda" not in html and 'class="cn-equipe ' not in html
 
 
 # ── 9: o Painel, quem está melhor por região, equipe, cliente, região de campo e gestor de contrato ────────────────
@@ -211,16 +199,10 @@ def test_painel_compara_regiao_equipe_cliente_regiao_de_campo_e_gestor(banco, lo
     assert [(a["nome"], a["indice"], a["cobertura_pct"], a["nota"], a["rondas"], a["dur_media"]) for a in eq] == [
         ("SP Norte 01", 94, 100, 90, 3, 60), ("SC Oeste 01", None, 0, None, 0, None)]
     assert eq[0]["base_pequena"] and [a["nome"] for a in c["regiao_br"]] == ["Sudeste", "Sul"]
+    # a aba saiu (Levi, 03/11/2026: "Tire o painel, ele não serve"): o endereço cai nos Registros
     html = logado.get("/t/campo/rondas?aba=painel").get_data(as_text=True)
-    for titulo in ("Por região do Brasil", "Por equipe", "Por cliente", "Por região de campo", "Por gestor de contrato"):
-        assert titulo in html, titulo
-    assert "Por supervisor" not in html
-    assert html.count('class="cn-ordenavel"') == 5 and "base pequena" in html
-    for link in ('href="?equipe=SP+Norte+01"', 'href="?regiao=Sudeste"', 'href="?cliente=Thopen"',
-                 'href="?regiao_campo=Sudeste+03"', 'href="?gestor=Beltrano+Supervisor"'):
-        assert link in html, link
-    assert '<span class="det">Supervisor de Campo: vaga</span>' in html
-    # o clique leva à tabela filtrada; a equipe vira um filtro da tela (desde 13/10/2026 a lista de equipes da barra)
+    assert "<h2>Rondas diárias</h2>" in html and "Por região do Brasil" not in html
+    # a equipe é um filtro da tela (desde 13/10/2026; desde 03/11/2026 no painel dos Filtros)
     sem = logado.get("/t/campo/rondas?aba=sem&equipe=SC+Oeste+01").get_data(as_text=True)
     assert '<option value="SC Oeste 01" selected>SC Oeste 01</option>' in sem and "Coração 1" in sem
     assert "Nenhuma usina mobilizada sem ronda" in logado.get("/t/campo/rondas?aba=sem&equipe=SP+Norte+01").get_data(as_text=True)
@@ -228,39 +210,23 @@ def test_painel_compara_regiao_equipe_cliente_regiao_de_campo_e_gestor(banco, lo
 
 def test_indicadores_levam_a_aba_sem_ronda(banco, logado):
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
-    assert 'href="?aba=sem"' in html and 'href="?aba=sem&amp;cob=atrasadas"' in html
-    assert [a for a in re.findall(r'<nav class="cn-abas" id="abas".*?</nav>', html, re.S)[0].split("</a>") if "href" in a][3].endswith("Sem ronda<i>1</i>")
+    assert 'href="?cob=sem"' in html and 'href="?cob=atrasadas"' in html
+    # duas abas (03/11/2026): a Sem ronda virou o "Mostrar" dos Filtros
+    abas = re.findall(r'<nav class="cn-abas" id="abas".*?</nav>', html, re.S)[0]
+    assert re.findall(r">(Registros|Trackers)<", abas) == ["Registros", "Trackers"] and "Sem ronda" not in abas
 
 
 # ── Revisão (08/10): a seta mostra a ordem do servidor, a pessoa ordena pelo nome e o veredito pela gravidade ───────
 def test_ordem_inicial_marcada_pessoa_pelo_nome_veredito_pela_gravidade(banco, logado):
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
     # a mais recente primeiro já vem do servidor: o 1º clique em Data tem de inverter, não repetir
-    assert '<th data-primeiro="desc" aria-sort="descending">Data</th><th data-primeiro="desc">Duração</th>' in html
+    assert '<th data-primeiro="desc" aria-sort="descending">Data</th>' in html
+    assert '<th class="rd-th" data-ordem-menu data-primeiro="desc"><details class="rd-menu"><summary>Duração' in html
     # a célula do técnico tem o avatar com as iniciais; ordenar pelo texto juntaria "FS" ao nome
     assert '<td class="cn-pessoa" data-ordem="Fulano Souza"><span class="cn-avatar">FS</span>' in html
     assert re.search(r'<td data-ordem="[0-3]"><span class="cn-selo cn-selo--', html)
     dur = logado.get("/t/campo/rondas?ind=duracao").get_data(as_text=True)
-    assert '<th data-primeiro="desc">Data</th><th data-primeiro="desc" aria-sort="descending">Duração</th>' in dur
+    assert '<th data-primeiro="desc">Data</th>' in dur
+    assert '<th class="rd-th" data-ordem-menu data-primeiro="desc" aria-sort="descending"><details class="rd-menu">' in dur
     trk = logado.get("/t/campo/rondas?aba=trackers").get_data(as_text=True)
     assert '<th data-primeiro="desc" aria-sort="descending">Data</th><th>Técnico</th>' in trk
-
-
-def test_destaque_do_painel_com_base_pequena_e_titulo_dos_blocos(banco, logado):
-    # no banco falso todo grupo (região, equipe, cliente, região de campo e gestor) tem menos de 3 usinas: há índice,
-    # mas só de base pequena
-    html = logado.get("/t/campo/rondas?aba=painel").get_data(as_text=True)
-    destaques = html.split('<div class="cn-rank-destaques">', 1)[1].split('<div class="cn-rank-grade">', 1)[0]
-    assert destaques.count("só grupos de base pequena (menos de 3 usinas)") == 5
-    assert "sem índice das rondas no período" not in destaques
-    # o Índice das rondas (18/10/2026): a fórmula do ranking por região do App só com as rondas; o Ranking das equipes da
-    # Visão do responsável usa também as tarefas fechadas pelo App, e dois números com o mesmo nome confundiam
-    assert 'aria-sort="descending">Índice das rondas</th>' in html
-    assert "Índice das rondas = 60% da nota média das rondas + 40% cobertura" in html
-    assert "(a régua do ranking do App)" not in html
-    blocos = logado.get("/t/campo/rondas?aba=quem").get_data(as_text=True)
-    assert 'title="1 técnico rondou neste cluster no período"' in blocos
-    assert 'title="0 técnicos rondaram neste cluster no período"' in blocos
-    # lado a lado só quando cada tabela de 620 px cabe; no celular, uma coluna sem rolar a página
-    css = (pathlib.Path(__file__).resolve().parents[1] / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
-    assert ".cn-rank-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(640px,100%),1fr))" in css
