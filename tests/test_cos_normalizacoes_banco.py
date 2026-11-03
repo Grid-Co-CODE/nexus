@@ -183,6 +183,44 @@ def test_catalogo_bate_com_o_modulo():
     assert a.grao == NB.GRAO_ABERTAS and {(m.coluna, m.unidade, m.soma) for m in a.medidas} == set(NB.MEDIDAS_ABERTAS)
 
 
+# ── o pedido do Atualizar do Dashboard Thopen (03/11/2026) ─────────────────────────────────────────────────────────────
+BRT = timezone(timedelta(hours=-3))
+
+
+def test_o_pedido_do_atualizar_so_vale_depois_da_ultima_gravacao():
+    # Levi, 03/11/2026: "sinto falta do botão 'Atualizar' (...) fiz umas alterações nas normalizações e precisava trazer"
+    ped = [{"pedido_em": "2026-11-03T15:40:00-03:00"}, {"pedido_em": "2026-11-03T15:10:00-03:00"}, {"pedido_em": "x"}]
+    ultima = datetime(2026, 11, 3, 15, 29, tzinfo=BRT)
+    assert NB.pedido_a_atender(ped, ultima, None) == datetime(2026, 11, 3, 15, 40, tzinfo=BRT)
+    assert NB.pedido_a_atender(ped, datetime(2026, 11, 3, 15, 41, tzinfo=BRT), None) is None   # a volta da hora levou
+    assert NB.pedido_a_atender(ped, ultima, datetime(2026, 11, 3, 15, 40, tzinfo=BRT)) is None  # já gravado
+    assert NB.pedido_a_atender([{"pedido_em": ""}], ultima, None) is None and NB.pedido_a_atender([], None, None) is None
+
+
+def test_o_pedido_le_o_livro_so_quando_a_versao_muda_e_respeita_o_intervalo(app, monkeypatch):
+    for k in ("pedido_visto", "pedido_feito", "pedida_em"):
+        monkeypatch.setitem(NB._LACO, k, None)
+    versao, leituras = ["v1"], []
+    monkeypatch.setattr(livros, "atualizado_em", lambda base, s, livro: versao[0] if livro == NB.PEDIDO_LIVRO else None)
+    monkeypatch.setattr(livros, "ler", lambda base, s, livro, aba=None: leituras.append((livro, aba)) or [
+        {"pedido_em": "2026-11-03T15:40:00-03:00"}])
+    assert NB._pedido(app.config, None, 1000.0) is None and not leituras        # sem a fonte do Andamento (o PC): nada
+    app.config.update(NEXUS_COS_ANDAMENTO_URL="http://andamento.teste", NEXUS_COS_ANDAMENTO_CHAVE="k")
+    monkeypatch.setattr(NB, "_ultima", lambda base, s: datetime(2026, 11, 3, 15, 41, tzinfo=BRT))
+    assert NB._pedido(app.config, None, 1000.0) is None and leituras == [(NB.PEDIDO_LIVRO, NB.PEDIDO_ABA)]
+    assert NB._pedido(app.config, None, 1060.0) is None and len(leituras) == 1    # a mesma versão: não relê
+    versao[0] = "v2"
+    monkeypatch.setattr(NB, "_ultima", lambda base, s: datetime(2026, 11, 3, 15, 29, tzinfo=BRT))
+    assert NB._pedido(app.config, None, 1120.0) == datetime(2026, 11, 3, 15, 40, tzinfo=BRT)
+    NB._LACO["pedida_em"] = 1120.0
+    versao[0] = "v3"
+    assert NB._pedido(app.config, None, 1180.0) is None and len(leituras) == 2    # 2 min entre duas voltas pedidas
+    c = catalogo.conhecida(NB.PEDIDO_LIVRO, NB.PEDIDO_ABA)
+    assert c and c.papel == "controle"
+    from nexus.dados import telas
+    assert ("igual", NB.PEDIDO_LIVRO, "Dashboard Thopen (5080)") in telas.QUEM_GRAVA_ORIGEM
+
+
 # ── as ocorrências ainda abertas (30/10/2026) ──────────────────────────────────────────────────────────────────────────
 def _oc(registro, **kw):
     """Uma ocorrência aberta como a fotografia do Andamento manda (o tipo pelo rótulo, os nomes dos equipamentos)."""

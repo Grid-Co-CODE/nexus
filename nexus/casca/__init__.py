@@ -286,8 +286,8 @@ def saude():
 
 def _sino():
     """O sino do topo (03/11/2026, os setores conversando): os insights críticos e de atenção SEM DONO das torres que o
-    setor da pessoa vê, os pedidos de retorno mandados às torres dela que ainda esperam resposta e as menções a ela ou
-    ao setor dela que ainda não leu (Fase 2). Só lê as cópias (a do motor, a de quem assumiu e a das conversas): nenhuma
+    setor da pessoa vê, os pedidos mandados às torres dela que ainda esperam resposta ou passaram do prazo (Fase 3) e as
+    menções a ela ou ao setor dela que ainda não leu (Fase 2). Só lê as cópias (a do motor, a de quem assumiu e a das conversas): nenhuma
     página espera uma fonte por causa dele. Sem nenhuma cópia (logo depois de subir), não sai número, e a conta começa
     por trás."""
     if not session.get("logado"):
@@ -296,34 +296,39 @@ def _sino():
         from ..comando import conversa as CV
         from ..comando import estado as ES
         from ..comando import motor as MO
+        from ..comando import pedidos as PD
         g = MO.do_cache()
-        l_conv, l_est = CV.copias()
-        if (not g or not g.dados) and not l_conv:
+        l_conv, l_est, l_ped = CV.copias()
+        if (not g or not g.dados) and not l_conv and not l_ped:
             return None
         est = ES.estado(l_est)
         torres = MO.torres_da_pessoa()
         todos = (g.dados.get("insights") or []) if g and g.dados else []
         itens = [i for i in MO.das_torres(todos, torres)
                  if i["sev"] in ("critico", "atencao") and (est.get(i["id"]) or {}).get("evento") in (None, "", "reabriu")]
-        # e os pedidos de retorno que outras áreas mandaram para as minhas e ainda esperam resposta
-        vistos = {i["id"] for i in itens}
-        for i in todos:
-            peds = (est.get(i["id"]) or {}).get("pedidos") or {}
-            if i["id"] not in vistos and any((torres is None or t in torres) and p["status"] == "pendente"
-                                             for t, p in peds.items()):
-                itens.append(dict(i, pedido=True))
-        # e as menções que ainda não li (sem o texto: a cópia do sino não decifra)
-        from ..torres.comando import _meu_hmac
         titulo = {"insight:" + i["id"]: i["titulo"] for i in todos}
+
+        def _titulo(ob):
+            tipo, _, oid = ob.partition(":")
+            return titulo.get(ob) or (f"OS {oid}" if tipo == "os" else "Uma usina" if tipo == "usina" else f"Insight {oid}")
+        # os pedidos para as minhas áreas que ainda esperam resposta ou passaram do prazo (sem o texto: a cópia do sino
+        # não decifra), o mais atrasado primeiro
+        pedidos = [{"link": "/t/comando/conversa/" + p["objeto"].replace(":", "/", 1), "titulo": _titulo(p["objeto"]),
+                    "sit_rotulo": p["sit_rotulo"], "sit_tom": p["sit_tom"], "atrasado": p["situacao"] == "atrasado"}
+                   for p in sorted(PD.pedidos(l_ped).values(), key=PD.ordem)
+                   if (torres is None or p["torre"] in torres)
+                   and (p["status"] == "pendente" or p["situacao"] == "atrasado")]
+        # e as menções que ainda não li
+        from ..torres.comando import _meu_hmac
         mencoes = []
         for x in CV.para_mim(CV.conversas(l_conv), _meu_hmac(), torres):
             tipo, _, oid = x["objeto"].partition(":")
             mencoes.append({"link": "/t/comando/conversa/" + tipo + "/" + oid, "n": x["n"],
-                            "titulo": titulo.get(x["objeto"]) or (f"OS {oid}" if tipo == "os" else
-                                                                   "Conversa de uma usina" if tipo == "usina" else
-                                                                   f"Insight {oid}")})
-        return {"n": len(itens) + len(mencoes), "criticos": sum(1 for i in itens if i["sev"] == "critico"),
-                "itens": itens[:6], "insights": len(itens), "mencoes": mencoes[:6], "n_mencoes": len(mencoes)}
+                            "titulo": _titulo(x["objeto"])})
+        return {"n": len(itens) + len(mencoes) + len(pedidos),
+                "criticos": sum(1 for i in itens if i["sev"] == "critico") + sum(1 for p in pedidos if p["atrasado"]),
+                "itens": itens[:6], "insights": len(itens), "mencoes": mencoes[:6], "n_mencoes": len(mencoes),
+                "pedidos": pedidos[:6], "n_pedidos": len(pedidos)}
     except Exception:            # noqa: BLE001 — o sino nunca derruba uma página
         current_app.logger.exception("sino dos insights")
         return None

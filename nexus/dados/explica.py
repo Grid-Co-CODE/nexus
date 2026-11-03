@@ -21,7 +21,8 @@ RESUMO = {
     "evento_ocorrencia": "Cada ocorrência das usinas, o plano de ação e o andamento",
     "sugestao": "As sugestões que as pessoas mandam para melhorar o Nexus",
     "status_sugestao": "Cada mudança de status das sugestões, de Iniciada a Concluída",
-    "evento_insight": "Quem assumiu, avisou e respondeu cada insight do motor de regras",
+    "evento_insight": "Quem assumiu ou concluiu cada insight do motor de regras",
+    "pedido_area": "Os pedidos de retorno a cada área, com o prazo e a resposta",
     "mensagem_conversa": "As mensagens com @menção de cada insight, OS e usina",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
@@ -120,11 +121,13 @@ PARA_QUE = {
     "mensagem_conversa": "Guarda as mensagens que as pessoas trocam na conversa de cada insight, OS e usina, com quem "
                          "foi mencionado (uma pessoa ou uma área inteira) e quem já leu. Serve para a Caixa de entrada "
                          "e o sino avisarem quem foi chamado e para o combinado entre os setores ficar registrado.",
-    "evento_insight": "Guarda quem assumiu ou concluiu cada insight que o motor de regras do Nexus apontou (a OS "
-                      "normalizada que segue aberta, o chamado parado com o fabricante, o extintor vencido), as áreas "
-                      "que foram avisadas e o retorno de cada uma (recebido, em andamento, resolvido), com o dia e a "
-                      "hora. Serve para quem gerencia acompanhar o que pediu e para medir quanto tempo cada área leva "
-                      "para responder.",
+    "evento_insight": "Guarda quem assumiu, concluiu ou reabriu cada insight que o motor de regras do Nexus apontou "
+                      "(a OS normalizada que segue aberta, o chamado parado com o fabricante, o extintor vencido), com "
+                      "o dia e a hora. Serve para cada insight ter um dono e sair da Caixa de entrada quando é tratado.",
+    "pedido_area": "Guarda cada pedido de retorno que alguém fez a uma área sobre um insight, uma OS ou uma usina, "
+                   "com o prazo que quem pediu escolheu, e cada resposta da área (recebido, em andamento, resolvido). "
+                   "Serve para quem pediu acompanhar, para a área ver o que está atrasado e para medir quanto tempo "
+                   "cada área leva para responder e se resolve no prazo.",
     "status_sugestao": "Guarda cada vez que um administrador mudou o status de uma sugestão (Iniciada, Em "
                        "verificação ou Concluída), com o dia e a hora. Serve para a pessoa acompanhar em Minhas "
                        "sugestões e para contar as que ainda não foram concluídas.",

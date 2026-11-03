@@ -19,11 +19,50 @@
 
   <div class="cn-numeros">
     <span><span class="gc-rotulo">Menções</span><span class="v">{{ mencoes|length }}</span><span class="d">conversas que chamam você ou o seu setor</span></span>
-    <span><span class="gc-rotulo">Pedidos para você</span><span class="v">{{ pedidos|length }}</span><span class="d">esperam o retorno do seu setor</span></span>
+    <span><span class="gc-rotulo">Pedidos para você</span><span class="v">{{ pedidos|length }}</span><span class="d">{% set atr = pedidos|selectattr('situacao', 'equalto', 'atrasado')|list|length %}{{ atr }} {{ 'atrasado' if atr == 1 else 'atrasados' }}</span></span>
     <span><span class="gc-rotulo">Com você</span><span class="v">{{ meus|length }}</span><span class="d">o que você assumiu</span></span>
     <span><span class="gc-rotulo">Sem dono</span><span class="v">{{ sem_dono|length }}</span><span class="d">{{ sem_dono|selectattr('sev', 'equalto', 'critico')|list|length }} críticos</span></span>
     <span><span class="gc-rotulo">Com outra pessoa</span><span class="v">{{ com_dono|length }}</span><span class="d">já assumidos</span></span>
   </div>
+
+  {% if erro_pedidos %}<div class="cn-erro cn-aviso" role="status"><b>Não li os pedidos agora ({{ erro_pedidos }}).</b></div>{% endif %}
+  {# os pedidos para o meu setor (Fase 3): o atrasado primeiro, depois o que vence antes; responder abre o objeto #}
+  <h2 class="ins-sub">Pedidos para o seu setor{% if pedidos %} <span class="ins-sub-n">{{ pedidos|length }}</span>{% endif %}</h2>
+  {% if pedidos %}
+  <ol class="ins-lista">
+    {% for p in pedidos %}
+    <li class="ins-item"><div class="ins-linha ins-linha--mencao">
+      <span class="ins-sev ins-sev--{{ p.sit_tom }}">{{ p.sit_rotulo }}</span>
+      <span class="ins-o-que">
+        <a class="ins-titulo" href="{{ p.link|na_raiz }}">{{ p.titulo }}</a>
+        <span class="ins-meta">Para {{ p.nome }} · pedido por {{ 'você' if p.eu_pedi else (p.pedido_por or 'alguém') }} em {{ p.pedido_em_txt }}{% if p.mensagem %}: "{{ p.mensagem|truncate(140) }}"{% endif %}</span>
+      </span>
+      <span class="ins-com-quem">
+        <span class="cn-pill cn-{{ p.tom }}">{{ p.rotulo }}</span>
+        <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ p.link|na_raiz }}#ped-{{ p.objeto|replace(':', '-') }}">Responder</a>
+      </span>
+      <span></span><span></span>
+    </div></li>
+    {% endfor %}
+  </ol>
+  {% else %}<p class="cn-vazio">Nenhuma área pediu retorno ao seu setor.</p>{% endif %}
+
+  {% if feitos %}
+  <h2 class="ins-sub">Pedidos que você fez <span class="ins-sub-n">{{ feitos|length }}</span></h2>
+  <ol class="ins-lista">
+    {% for p in feitos %}
+    <li class="ins-item"><div class="ins-linha ins-linha--mencao">
+      <span class="ins-sev ins-sev--{{ p.sit_tom }}">{{ p.sit_rotulo }}</span>
+      <span class="ins-o-que">
+        <a class="ins-titulo" href="{{ p.link|na_raiz }}">{{ p.titulo }}</a>
+        <span class="ins-meta">Para {{ p.nome }} em {{ p.pedido_em_txt }}{% if p.retorno %} · retorno: "{{ p.retorno|truncate(120) }}"{% endif %}</span>
+      </span>
+      <span class="ins-com-quem"><span class="cn-pill cn-{{ p.tom }}">{{ p.rotulo }}</span></span>
+      <span></span><span></span>
+    </div></li>
+    {% endfor %}
+  </ol>
+  {% endif %}
 
   {# as menções que ainda não li (Fase 2): uma linha por conversa, a mais nova primeiro #}
   <h2 class="ins-sub">Menções para você{% if mencoes %} <span class="ins-sub-n">{{ mencoes|length }}</span>{% endif %}</h2>
@@ -74,10 +113,10 @@
   </details>
   {% endif %}
 
-  {% for titulo, lista, vazio, aberto in [('Pedidos para o seu setor', pedidos, 'Nenhuma área pediu retorno ao seu setor.', true), ('Com você', meus, 'Nada assumido por você.', false), ('Sem dono', sem_dono, 'Nada sem dono nas torres do seu setor.', false), ('Com outra pessoa', com_dono, '', false)] %}
+  {% for titulo, lista, vazio, aberto in [('Com você', meus, 'Nada assumido por você.', false), ('Sem dono', sem_dono, 'Nada sem dono nas torres do seu setor.', false), ('Com outra pessoa', com_dono, '', false)] %}
   {% if lista or vazio %}
   <h2 class="ins-sub">{{ titulo }}{% if lista %} <span class="ins-sub-n">{{ lista|length }}</span>{% endif %}</h2>
-  {% if lista %}<ol class="ins-lista">{% for i in lista %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, aberto or i.id == abrir) }}{% endfor %}</ol>
+  {% if lista %}<ol class="ins-lista">{% for i in lista %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, aberto or i.id == abrir, hoje) }}{% endfor %}</ol>
   {% else %}<p class="cn-vazio">{{ 'A lista aparece assim que a conta terminar.' if calculando else vazio }}</p>{% endif %}
   {% endif %}
   {% endfor %}

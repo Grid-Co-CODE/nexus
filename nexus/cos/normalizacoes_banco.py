@@ -80,11 +80,22 @@ INTERVALO_MIN = 50
 PRIMEIRA_S = 600            # a 1ª volta 10 min depois de subir: a 1ª carga da memória vem em páginas
 MINUTO_DA_HORA = 22
 DESENCONTRO_MAX_S = 300
+# O Atualizar do Dashboard Thopen (03/11/2026, Levi: "sinto falta do botão 'Atualizar' para puxar os dados (...) fiz umas
+# alterações nas normalizações e precisava trazer"): a correção feita no Andamento esperava até a volta da hora. O 5080
+# grava o pedido (o clique da conta da Grid) no livro dele; o laço confere de minuto em minuto, e o pedido mais novo que a
+# última gravação faz a volta na hora, sem a espera dos 50 min. Entre duas voltas pedidas, PEDIDO_INTERVALO_S
+PEDIDO_LIVRO = "thopen_pedidos"
+PEDIDO_ABA = "atualizacao"
+PEDIDO_CHECA_S = 60
+PEDIDO_INTERVALO_S = 120
 TENTATIVAS_MEMORIA = 8      # pedidos para a memória completar (4 páginas de 500 por pedido)
 # a proteção como o time escreve ("27ABC", "59C", "86", "78/81"): só o código curto; frase não entra (regra 8)
 PROTECAO = re.compile(r"^[0-9A-Z][0-9A-Z/ .+-]{0,19}$")
 _BRT = timezone(timedelta(hours=-3))
-_LACO = {"thread": None, "parar": threading.Event(), "ultimo": None, "quando": None}
+_LACO = {"thread": None, "parar": threading.Event(), "ultimo": None, "quando": None,
+         # o pedido do Atualizar: a versão do livro do 5080 já vista sem nada novo, o último pedido gravado e a hora da
+         # última volta pedida (o intervalo entre duas)
+         "pedido_visto": None, "pedido_feito": None, "pedida_em": None}
 log = logging.getLogger("nexus.cos")
 
 
@@ -343,8 +354,36 @@ def publicar(config, sessao=None, *, agora=None, forcar=False, leitura=None, abe
 
 
 def estado() -> dict:
-    """O resultado da última volta deste processo e quando foi."""
-    return {"ultimo": _LACO["ultimo"], "quando": _LACO["quando"]}
+    """O resultado da última volta deste processo, quando foi e o último pedido do Atualizar que virou gravação."""
+    return {"ultimo": _LACO["ultimo"], "quando": _LACO["quando"], "pedido": _iso(_LACO["pedido_feito"])}
+
+
+def pedido_a_atender(linhas, ultima: datetime | None, feito: datetime | None) -> datetime | None:
+    """O pedido do Atualizar ainda sem gravação: o `pedido_em` mais novo do livro do 5080, se for depois da última
+    gravação do livro das normalizações e do último pedido já gravado. A data que não se lê não conta."""
+    datas = [d for d in (AND.instante(r.get("pedido_em")) for r in linhas or ()) if d]
+    if not datas:
+        return None
+    novo = max(datas)
+    return None if any(x and novo <= x for x in (ultima, feito)) else novo
+
+
+def _pedido(config, sessao, agora_s: float) -> datetime | None:
+    """O pedido a atender agora, ou None. Quase sempre custa uma leitura só (a listagem dos livros, pela versão do livro
+    do 5080); onde a fonte do Andamento não está ligada (o PC), nem isso."""
+    if not AND.fonte(config).ligada:
+        return None
+    if _LACO["pedida_em"] is not None and agora_s - _LACO["pedida_em"] < PEDIDO_INTERVALO_S:
+        return None
+    base = _base(config)
+    versao = livros.atualizado_em(base, sessao, PEDIDO_LIVRO)
+    if not versao or versao == _LACO["pedido_visto"]:
+        return None
+    p = pedido_a_atender(livros.ler(base, sessao, PEDIDO_LIVRO, PEDIDO_ABA), _ultima(base, sessao),
+                         _LACO["pedido_feito"])
+    if p is None:
+        _LACO["pedido_visto"] = versao          # nada novo nesta versão do livro: só relê quando ela mudar
+    return p
 
 
 def _espera_s(agora=None, desencontro_s: float = 0.0) -> float:
@@ -364,17 +403,34 @@ def ligar(app):
     desencontro = random.uniform(0, DESENCONTRO_MAX_S)
 
     def laco():
-        espera = PRIMEIRA_S
-        while not _LACO["parar"].wait(espera):
+        import requests
+        sessao = requests.Session()
+        proxima = time.monotonic() + PRIMEIRA_S
+        # acorda de minuto em minuto para o pedido do Atualizar; a volta da hora segue no horário dela
+        while not _LACO["parar"].wait(max(1.0, min(PEDIDO_CHECA_S, proxima - time.monotonic()))):
+            pedido = None
+            if time.monotonic() < proxima:
+                try:
+                    with app.app_context():
+                        pedido = _pedido(app.config, sessao, time.monotonic())
+                except Exception as e:      # noqa: BLE001 — o banco fora não para a volta da hora
+                    log.warning("pedido do Atualizar não lido: %s: %s", type(e).__name__, e)
+                if pedido is None:
+                    continue
+                _LACO["pedida_em"] = time.monotonic()
             with app.app_context():
                 try:
-                    _LACO["ultimo"] = publicar(app.config)
-                    log.info("normalizações no banco: %s", {k: v for k, v in _LACO["ultimo"].items() if k != "gravado"})
+                    _LACO["ultimo"] = publicar(app.config, forcar=pedido is not None)
+                    log.info("normalizações no banco%s: %s", " (pedido do Atualizar)" if pedido else "",
+                             {k: v for k, v in _LACO["ultimo"].items() if k != "gravado"})
                 except Exception as e:      # noqa: BLE001 — o laço não morre por uma volta
                     _LACO["ultimo"] = {"erro": f"{type(e).__name__}: {e}"[:300]}
                     log.exception("normalizações no banco")
                 _LACO["quando"] = datetime.now(_BRT).isoformat(timespec="minutes")
-            espera = _espera_s(desencontro_s=desencontro)
+            if pedido is None:
+                proxima = time.monotonic() + _espera_s(desencontro_s=desencontro)
+            elif _LACO["ultimo"].get("gravado"):
+                _LACO["pedido_feito"] = pedido  # a volta que não gravou (a memória carregando) tenta de novo depois
 
     _LACO["thread"] = threading.Thread(target=laco, name="nexus-cos-normalizacoes-banco", daemon=True)
     _LACO["thread"].start()

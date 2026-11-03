@@ -40,11 +40,13 @@
   {# o sino (03/11/2026, os setores conversando): os insights críticos e de atenção sem dono das torres do setor da pessoa;
      abre a lista curta e leva à Caixa de entrada. Ícone da fonte (sem <svg> no topo, ver o comentário do tema) #}
   {% if sino is not none %}<details class="sino-topo">
-    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos: {{ sino.n }}" title="Menções, pedidos e insights sem dono nas suas torres">
+    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos: {{ sino.n }}" title="Menções, pedidos para o seu setor e insights sem dono nas suas torres">
       <i class="ph ph-bell" aria-hidden="true"></i>{% if sino.n %}<b class="sino-n{% if sino.criticos %} sino-n--critico{% endif %}">{{ sino.n }}</b>{% endif %}</summary>
     <div class="sino-caixa" role="region" aria-label="Avisos">
       {% if sino.n_mencoes %}<p class="sino-t"><b>{{ sino.n_mencoes }} {{ 'menção sem ler' if sino.n_mencoes == 1 else 'menções sem ler' }}</b></p>
       <ul>{% for m in sino.mencoes %}<li><a href="{{ raiz }}{{ m.link }}"><span class="sino-sev sino-sev--mencao">Menção</span> {{ m.titulo }}</a></li>{% endfor %}</ul>{% endif %}
+      {% if sino.n_pedidos %}<p class="sino-t"><b>{{ sino.n_pedidos }} {{ 'pedido para o seu setor' if sino.n_pedidos == 1 else 'pedidos para o seu setor' }}</b></p>
+      <ul>{% for p in sino.pedidos %}<li><a href="{{ raiz }}{{ p.link }}"><span class="sino-sev sino-sev--{{ 'critico' if p.atrasado else 'pedido' }}">{{ 'Atrasado' if p.atrasado else 'Pedido' }}</span> {{ p.titulo }}</a></li>{% endfor %}</ul>{% endif %}
       <p class="sino-t"><b>{{ sino.insights }} {{ 'insight sem dono' if sino.insights == 1 else 'insights sem dono' }}</b>{% if sino.criticos %} · {{ sino.criticos }} {{ 'crítico' if sino.criticos == 1 else 'críticos' }}{% endif %}</p>
       {% if sino.itens %}<ul>{% for i in sino.itens %}<li><a href="{{ raiz }}/t/comando/caixa-de-entrada#ins-{{ i.id|replace(':', '-') }}"><span class="sino-sev sino-sev--{{ i.sev }}">{{ 'Crítico' if i.sev == 'critico' else 'Atenção' }}</span> {{ i.titulo }}</a></li>{% endfor %}</ul>
       {% else %}<p class="sino-vazio">Nada sem dono nas torres do seu setor.</p>{% endif %}

@@ -223,13 +223,14 @@ def pessoas_mencionaveis() -> list[dict]:
 _RENOVANDO: dict = {"thread": None}
 
 
-def copias() -> tuple[list[dict], list[dict]]:
-    """(as linhas das conversas, as linhas dos eventos dos insights) das cópias de 1 minuto, para o sino de toda página.
-    Sem cópia ou com a cópia vencida, a leitura começa por trás e o sino usa o que tem: quem foi mencionado vê o número
-    sem precisar abrir a Caixa antes, e nenhuma página espera o banco."""
+def copias() -> tuple[list[dict], list[dict], list[dict]]:
+    """(as linhas das conversas, dos eventos dos insights e dos pedidos) das cópias de 1 minuto, para o sino de toda
+    página. Sem cópia ou com a cópia vencida, a leitura começa por trás e o sino usa o que tem: quem foi mencionado ou
+    recebeu um pedido vê o número sem precisar abrir a Caixa antes, e nenhuma página espera o banco."""
+    from . import pedidos as PD
     agora = time.time()
-    c, e = _CACHE.get("livro"), ES._CACHE.get("livro")
-    velha = any(x is None or not x.get("lido_em") or agora - x["lido_em"] >= TTL_S for x in (c, e))
+    c, e, p = _CACHE.get("livro"), ES._CACHE.get("livro"), PD._CACHE.get("livro")
+    velha = any(x is None or not x.get("lido_em") or agora - x["lido_em"] >= TTL_S for x in (c, e, p))
     if velha and not current_app.config.get("TESTING"):
         t = _RENOVANDO["thread"]
         if t is None or not t.is_alive():
@@ -237,7 +238,7 @@ def copias() -> tuple[list[dict], list[dict]]:
 
             def rodar():
                 with app.app_context():
-                    for ler_um in (ler, ES.ler):
+                    for ler_um in (ler, ES.ler, PD.ler):
                         try:
                             ler_um(forcar=True)
                         except Exception:    # noqa: BLE001 — o sino só fica com a cópia de antes
@@ -245,4 +246,4 @@ def copias() -> tuple[list[dict], list[dict]]:
             t = threading.Thread(target=rodar, name="nexus-conversas", daemon=True)
             _RENOVANDO["thread"] = t
             t.start()
-    return (c or {}).get("linhas") or [], (e or {}).get("linhas") or []
+    return (c or {}).get("linhas") or [], (e or {}).get("linhas") or [], (p or {}).get("linhas") or []

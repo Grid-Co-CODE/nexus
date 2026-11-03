@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
+{# Tempo de resposta (Fase 3 dos setores conversando, 03/11/2026): cada área pedida, quanto demora para responder e para
+   resolver, e quanto resolve no prazo que quem pediu escolheu. A conta é do livro nexus_pedidos (pedidos.py: no prazo =
+   resolvido até o fim do dia do prazo; atrasado = aberto depois dele). #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">todos os pedidos desde o começo<br>prazo escolhido por quem pede</div>
+  </div>
+  {% if erro_pedidos %}<div class="cn-erro" role="alert"><b>Não li os pedidos agora ({{ erro_pedidos }}).</b></div>{% endif %}
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Pedidos</span><span class="v">{{ total.pedidos }}</span><span class="d">{{ total.abertos }} {{ 'aberto' if total.abertos == 1 else 'abertos' }}</span></span>
+    <span><span class="gc-rotulo">Atrasados agora</span><span class="v">{{ total.atrasados }}</span><span class="d">abertos depois do prazo</span></span>
+    <span><span class="gc-rotulo">No prazo</span><span class="v">{{ '%d%%'|format(total.pct_no_prazo) if total.pct_no_prazo is not none else 'sem dado' }}</span><span class="d">{{ total.no_prazo }} de {{ total.resolvidos }} {{ 'resolvido' if total.resolvidos == 1 else 'resolvidos' }}</span></span>
+  </div>
+
+  {% if linhas %}
+  <h2 class="ins-sub">Por área</h2>
+  <div class="cn-tab tr-tab"><table>
+    <thead><tr><th class="ins-esq">Área</th><th class="num">Pedidos</th><th class="num">Abertos</th><th class="num">Sem resposta</th><th class="num">Atrasados</th><th class="num">No prazo</th><th class="num">Até a 1ª resposta</th><th class="num">Até resolver</th></tr></thead>
+    <tbody>{% for x in linhas %}
+      <tr><td class="ins-esq"><b>{{ x.nome }}</b></td>
+        <td class="num">{{ x.total }}</td><td class="num">{{ x.abertos }}</td><td class="num">{{ x.sem_resposta }}</td>
+        <td class="num">{% if x.atrasados %}<span class="cn-pill cn-critico">{{ x.atrasados }}</span>{% else %}0{% endif %}</td>
+        <td class="num">{% if x.pct_no_prazo is not none %}<b>{{ x.pct_no_prazo }}%</b> <span class="mudo">{{ x.no_prazo }}/{{ x.resolvidos }}</span>{% else %}<span class="mudo">sem resolvido</span>{% endif %}</td>
+        <td class="num">{{ x.resposta_txt }}</td><td class="num">{{ x.resolver_txt }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="mudo ins-fora">Os tempos são a mediana, em horas corridas desde o pedido. No prazo = resolvido até o fim do dia do prazo.</p>
+  {% else %}<p class="cn-vazio">Nenhum pedido ainda. Peça retorno a uma área dentro de um insight, ou na página de uma OS ou de uma usina (Caixa de entrada → Começar uma conversa).</p>{% endif %}
+
+  {% if atrasados %}
+  <h2 class="ins-sub">Atrasados agora <span class="ins-sub-n">{{ atrasados|length }}</span></h2>
+  <ol class="ins-lista">
+    {% for p in atrasados %}
+    <li class="ins-item"><div class="ins-linha ins-linha--mencao">
+      <span class="ins-sev ins-sev--critico">{{ p.sit_rotulo }}</span>
+      <span class="ins-o-que">
+        <a class="ins-titulo" href="{{ p.link|na_raiz }}">{{ p.titulo }}</a>
+        <span class="ins-meta">Para {{ p.nome }} · prazo {{ p.prazo_txt }} · pedido por {{ 'você' if p.eu_pedi else (p.pedido_por or 'alguém') }} em {{ p.pedido_em_txt }}</span>
+      </span>
+      <span class="ins-com-quem"><span class="cn-pill cn-{{ p.tom }}">{{ p.rotulo }}</span></span>
+      <span></span><span></span>
+    </div></li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</div>
+{% endblock %}
