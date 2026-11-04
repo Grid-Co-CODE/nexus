@@ -638,3 +638,49 @@ def test_recontagem_sem_o_almoxarifado_de_teste_e_sem_repetir(app, inv):
             _ev("C-T", "recontagem_pedida", almox="134082", quando=_iso(horas=28)))
     _, r = _rec(app)
     assert [(p["contagem_id"], p["quando"]) for p in r["esperando"]] == [("C-1", _iso(horas=28))] and r["atendidas"] == []
+
+
+# ── quem atende o pedido (a 1ª rodada de correções da revisão, 04/11/2026) ─────────────────────────────────────────────────
+def test_a_inteira_so_e_atendida_por_uma_contagem_inteira(app, inv):
+    """O pedido de contar o almoxarifado de novo só é atendido por uma contagem INTEIRA (sem o "Recontagem de"): com o App novo,
+    a recontagem só das peças de outro pedido ("Recontar 2 peças") não conta o almoxarifado de novo. O pedido da peça, esse, é
+    atendido pela recontagem que a contou."""
+    c1 = [_linha("C-1", "L1", "501", "3", contada=_iso(horas=30)), _linha("C-1", "L2", "502", "4", contada=_iso(horas=30))]
+    parcial = _linha("C-3", "R1", "502", "6", contada=_iso(horas=20), **{"Recontagem de": "C-0"})
+    _publicar(inv, *c1, parcial)
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 502, quando=_iso(horas=29)),
+            _ev("C-1", "recontagem_pedida", quando=_iso(horas=28)))
+    por, _ = _rec(app)
+    assert por == {("peca", "C-1", "502"): "C-3", ("inteira", "C-1", ""): None}
+    _publicar(inv, *c1, parcial, _linha("C-4", "L1", "501", "5", contada=_iso(horas=10)))
+    por, _ = _rec(app)
+    assert por == {("peca", "C-1", "502"): "C-3", ("inteira", "C-1", ""): "C-4"}
+
+
+def test_a_contagem_que_nao_serve_nao_atende(app, inv):
+    """Não atende pedido nenhum a contagem que não serve: a do contrato do App violado (`aviso_do_app`), a recusada inteira pelo
+    PCM (`recontagem_pedida`) e a contada no futuro (o "Contada em" além de agora mais `contas.RELOGIO_ADIANTADO`, o relógio do
+    celular adiantado). Em ordem, cada uma seria "a mais antiga que atende" se valesse; a boa que vem depois atende."""
+    linhas = [_linha("C-1", "L1", "501", "3", contada=_iso(horas=30)),
+              _linha("C-V", "", "501", "4", contada=_iso(horas=25)),          # sem o ID da linha: o contrato do App violado
+              _linha("C-R", "L1", "501", "5", contada=_iso(horas=24)),        # recusada inteira (o evento abaixo)
+              _linha("C-F", "L1", "501", "6", contada=_iso(horas=-2))]        # 2 h no futuro
+    _publicar(inv, *linhas)
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 501, quando=_iso(horas=28)),
+            _ev("C-R", "recontagem_pedida", quando=_iso(horas=23)))
+    por, r = _rec(app)
+    assert por[("peca", "C-1", "501")] is None and r["atendidas"] == []
+    _publicar(inv, *linhas, _linha("C-B", "L1", "501", "7", contada=_iso(horas=12)))
+    por, _ = _rec(app)
+    assert por[("peca", "C-1", "501")] == "C-B" and por[("inteira", "C-R", "")] == "C-B"
+
+
+def test_o_nome_do_almoxarifado_vem_do_livro_do_saldo(app, inv):
+    """A `ler` devolve o nome de cada almoxarifado que o livro do saldo dá (`almoxarifados`): o cartão das recontagens o usa
+    quando o almoxarifado do pedido não tem contagem na lista."""
+    _publicar(inv, _linha("C-1", "L1", "501", "3"))
+    _aba(inv, A.LIVRO_SALDO, A.ABA_SALDO, [{"ID do item": "501", "Código": "SP-501", "ID do almoxarifado": "50",
+                                            "Almoxarifado": "Almoxarifado Usina V", "Início do ciclo": "x",
+                                            "Local do almoxarifado": "x", "Saldo": "1", "Mínimo": "0"}])
+    visao.limpar()
+    assert L.ler(app.config)["almoxarifados"] == {"50": "Almoxarifado Usina V"}

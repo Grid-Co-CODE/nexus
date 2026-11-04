@@ -781,7 +781,8 @@ liga; senão o do Fracttal e `usina_id` None), `contada_em`, `enviada_em`, `reco
 da contagem em que o PCM pediu a recontagem que esta atende; vazio na inteira e no livro do App sem a coluna), `linhas` (as do
 App), `n_contadas`, `n_em_branco`, `n_curadoria`, `estado`, `aprovavel`, `motivo_nao_aprovavel` e `aviso`.
 `livro_existe(cfg)` diz se o App já publicou o livro (sem ele a tela diz que o App ainda não publica, e não "nenhuma
-contagem"); `ler(cfg)` devolve os dois com o nome de cada peça e o que o App faz, pela versão do livro.
+contagem"); `ler(cfg)` devolve os dois com o nome de cada peça, o de cada almoxarifado do livro do saldo (`almoxarifados`, também
+o que não tem contagem na lista: o cartão das recontagens o usa) e o que o App faz, pela versão do livro.
 
 - **O que o App faz sai das colunas do livro** (04/11/2026, `_o_que_o_app_faz`, no `_do_app`): `app_com_recontagem` é o livro
   com a coluna "Recontagem de" (o App lê os pedidos de recontagem e os mostra ao técnico) e `app_com_fotos`, com a "Fotos dos
@@ -853,22 +854,30 @@ contagem"); `ler(cfg)` devolve os dois com o nome de cada peça e o que o App fa
   última). O motivo só existe cifrado no livro; é aqui que se abre, e só quando `motivos=True` (quem não vai mostrar o texto não o
   decifra).
 - **As recontagens pedidas e para onde foi cada uma** (04/11/2026, `pedidos_de_recontagem`, pura, e `recontagens(cfg, lidas)`,
-  que a lê sobre a `ler` e os eventos): o cartão "Recontagens pedidas" da lista (a seção da aba Inventário). Um pedido por
-  `recontagem_item_pedida` (a peça; o mesmo par contagem e peça vale o primeiro, como a `revisao_da`) e por `recontagem_pedida`
-  (a contagem inteira). **Atendido, nas duas versões do App** (a mesma regra da seção 4 da proposta das contagens do App): uma
-  contagem do MESMO almoxarifado, outra que não a do pedido, com o "Contada em" DEPOIS do pedido, que contou a peça (`_contou`:
-  linha `item` ou `identificar` com o ID do item dela, já resolvida pelos avariados, e o "Contado" não vazio); na inteira,
-  qualquer contagem do almoxarifado depois do pedido. Vale a mais antiga que atende. O pedido do -AV é atendido pela linha
-  `avariado` da boa que achou o -AV (o técnico o reconta na aba Avariados); a avariada que não achou continua `avariado`, com o
-  ID da BOA, e não atende o pedido da boa (conta as avariadas, não a boa); com o catálogo do App que não se leu agora, o pedido do
-  -AV espera a próxima leitura. Os esperando dos últimos 90 dias (`contas.APROVAVEL_DIAS`), o mais velho primeiro; as atendidas
-  dos últimos 30 (`ATENDIDAS_DIAS`, pelo dia da contagem que atendeu), a mais nova primeiro. Sem o almoxarifado de teste. Nunca
-  o motivo.
+  que a lê sobre a `ler` e os eventos): o cartão "Recontagens pedidas" da lista e o aviso fixo de cada contagem (a seção da aba
+  Inventário). Um pedido por `recontagem_item_pedida` (a peça; o mesmo par contagem e peça vale o primeiro, como a `revisao_da`)
+  e por `recontagem_pedida` (a contagem inteira). **Atendido, nas duas versões do App** (a mesma regra da seção 4 da proposta das
+  contagens do App): uma contagem do MESMO almoxarifado, outra que não a do pedido, **que serve** (`_serve`: nem a do contrato do
+  App violado, `aviso_do_app`; nem a recusada inteira pelo PCM, `recontagem_pedida`; nem a contada no futuro, além de agora mais
+  `contas.RELOGIO_ADIANTADO`), com o "Contada em" DEPOIS do pedido, que contou a peça (`_contou`: linha `item` ou `identificar`
+  com o ID do item dela, já resolvida pelos avariados, e o "Contado" não vazio); **na inteira, uma contagem INTEIRA** (sem o
+  "Recontagem de": a recontagem só das peças de outro pedido não conta o almoxarifado de novo). Vale a mais antiga que atende. O
+  pedido do -AV é atendido pela linha `avariado` da boa que achou o -AV (o técnico o reconta na aba Avariados); a avariada que
+  não achou continua `avariado`, com o ID da BOA, e não atende o pedido da boa (conta as avariadas, não a boa); com o catálogo do
+  App que não se leu agora, o pedido do -AV espera a próxima leitura. **O "depois do pedido" não tem folga de relógio, de
+  propósito:** compara a hora do servidor (o `quando`) com o "Contada em" do celular; uma folga daria por atendido o pedido com
+  uma contagem feita ANTES dele (o PCM gravaria o resto achando a peça duvidosa conferida), e sem folga o erro possível é o
+  contrário (o celular atrasado deixa a recontagem feita logo depois do pedido "esperando" até a próxima contagem, que o PCM vê
+  na lista): entre um "atendida" falso e um "esperando" a mais, fica o "esperando". O resultado: `esperando` (últimos 90 dias,
+  `contas.APROVAVEL_DIAS`, o mais velho primeiro) e `atendidas` (últimos 30, `ATENDIDAS_DIAS`, pelo dia da contagem que atendeu,
+  a mais nova primeiro), as duas listas do cartão, e `todos`, sem janela (o aviso fixo da contagem segue o pedido mesmo depois
+  de ele sair do cartão). Sem o almoxarifado de teste. Nunca o motivo.
 - **Provar:** `tests/test_pcm_inventario_leitura.py` (os estados, a substituição, o livro que não existe e o que não lê, a janela de
   90 dias, o contrato violado, a cópia que ninguém estraga; desde 04/11/2026, `test_o_que_o_app_faz_sai_das_colunas_do_livro`, a
   linha de peça sem o ID e os `test_recontagem_*`: esperando, atendida pela peça contada depois, nem pela mais velha, nem pela
   própria, nem por outro almoxarifado, nem com a peça em branco, a inteira por qualquer contagem nova, o -AV pela avariada da boa,
-  as janelas de 90 e 30 dias e o almoxarifado de teste); mutações no lote vazio, nas contagens vivas, nas gravadas, na cópia
+  as janelas de 90 e 30 dias e o almoxarifado de teste; a inteira só pela contagem inteira, a contagem que não serve e o nome
+  do almoxarifado pelo livro do saldo); mutações no lote vazio, nas contagens vivas, nas gravadas, na cópia
   das linhas e na falha de leitura, e (04/11/2026) em cada regra do atendido, das janelas, da ordem e da versão do App, todas pegas.
 
 ## Inventário do almoxarifado: a aba Inventário (`inventario/revisao.py`, `ponte_os.py` e as rotas em `inventario/__init__.py`; 26/10/2026)
@@ -960,17 +969,33 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   **O App de hoje** (sem a coluna): as marcadas saem deste lote, "O App ainda não avisa o técnico: combine a recontagem com ele e
   grave o resto antes de ele mandar a contagem nova" (a contagem nova, inteira, substitui a que ainda não foi gravada); a inteira,
   "combine com ele uma contagem nova deste almoxarifado". **O App novo** (com a coluna): as marcadas "voltam ao técnico no App", e
-  a inteira "o técnico recebe no App o pedido de contar este almoxarifado de novo". Os textos exatos estão nos templates; a prova,
-  `test_os_textos_da_recontagem_dizem_o_que_o_app_faz` (os dois estados).
-- **O aviso fixo da Aprovação** (`revisao._aviso_da_recontagem`, da PÁGINA e não do pedaço da ponte: fica mesmo sem o saldo),
-  acima da tabela, quando a contagem tem peças com a recontagem pedida: "Recontagem pedida para N peças (os códigos) em dd/mm.
-  Elas estão em "não será tocada" e na lista "Recontagens pedidas" do Inventário." (com vários dias, o mais recente; 1 peça diz "1
-  peça" e "Ela está"), mais "O App ainda não avisa o técnico: combine com ele." ou "O técnico vê o pedido no App.". Sem o motivo.
+  a inteira "o técnico recebe no App o pedido de contar este almoxarifado de novo". **A abertura da lista** também: com o App novo,
+  "a recontagem só de algumas peças não substitui ninguém, e a contagem em que ela foi pedida segue com as outras"; com o de hoje,
+  "Com o App de hoje, a recontagem chega como uma contagem nova inteira e substitui a que ainda não foi gravada: grave o resto
+  antes." (a frase de antes era falsa com o App de hoje). Os textos exatos estão nos templates; a prova,
+  `test_os_textos_da_recontagem_dizem_o_que_o_app_faz` e `test_a_abertura_da_lista_diz_como_a_recontagem_chega` (os dois estados).
+- **Os avisos fixos seguem o pedido** (`revisao._aviso_da_recontagem` e `_aviso_da_inteira`, sobre os pedidos da contagem em
+  `leitura.pedidos_de_recontagem(...)["todos"]`, sem a janela do cartão), da PÁGINA e não do pedaço da ponte (ficam mesmo sem o
+  saldo), **só para quem pode agir** (`pode_programar`). Sem o motivo.
+  - **O das peças**, na Aprovação acima da tabela e **só na contagem que mostra a tabela do lote** (a que se aprova: ele fala do
+    "não será tocada"). Com algum pedido esperando: "Recontagem pedida para N peças (os códigos) em dd/mm. Elas estão em "não
+    será tocada" e na lista "Recontagens pedidas" do Inventário." (com vários dias, o mais recente; 1 peça diz "1 peça" e "Ela
+    está"), mais "O App ainda não avisa o técnico: combine com ele." ou "O técnico vê o pedido no App.". **Todos atendidos**:
+    "Recontagem pedida para N peças (os códigos) em dd/mm: atendida em dd/mm (contagem de dd/mm)." com o link da contagem que
+    atendeu por último, em neutro, sem o "combine" e sem a frase da lista (o atendido sai do cartão em 30 dias). Caso que criou
+    (a 1ª rodada de correções da revisão, 04/11/2026): com o App de hoje a recontagem chega numa contagem inteira que substitui
+    a C-1, e a página dela seguia dizendo "combine com ele"; agora a C-1 substituída não tem tabela nem aviso, e com o App novo
+    (a C-1 segue viva ao lado da recontagem) o aviso diz por qual contagem foi atendida.
+  - **O da contagem inteira**, no alto da página da contagem recusada (ela não tem tabela do lote e abre na etapa Contagem):
+    "Recontagem da contagem inteira pedida em dd/mm." mais "O App ainda não avisa o técnico: combine com ele uma contagem nova
+    deste almoxarifado." ou "O técnico vê o pedido no App."; atendido por uma contagem inteira nova, "…: atendida em dd/mm
+    (contagem de dd/mm)." com o link.
 - **O cartão "Recontagens pedidas"** (na lista, depois de "Contagens recebidas"; `revisao._recontagens_da_lista` sobre a
   `leitura.recontagens`, a seção da leitura tem a regra do atendido): no visual das outras (`.inv-card`, a tabela que vira cartão
   a 375 px), "Recontagens pedidas (N esperando)" e a nota pela versão do App ("O App ainda não avisa o técnico: o pedido fica aqui
   até uma contagem nova do almoxarifado contar a peça." ou "O técnico vê o pedido no App; fica aqui até a recontagem chegar.").
-  Colunas: Almoxarifado (com a usina), Peça (código e nome; na inteira, "a contagem inteira"), Pedida em (dd/mm às hh:mm,
+  Colunas: Almoxarifado (com a usina; o almoxarifado sem contagem na lista sai pelo nome do livro do saldo, `almoxarifados` da
+  leitura, e só sem ele "Almoxarifado <ID>"), Peça (código e nome; na inteira, "a contagem inteira"), Pedida em (dd/mm às hh:mm,
   Brasília), Contagem (o link, quando a lista a tem; fora dela a página não abriria) e Situação ("esperando o técnico" ou
   "atendida em dd/mm" com o link da contagem que atendeu). As atendidas dos últimos 30 dias num `<details>` fechado ("Atendidas
   nos últimos 30 dias (N)"); só com atendidas, "Nenhuma recontagem esperando o técnico"; sem pedido nenhum, o cartão não aparece.
@@ -1017,8 +1042,13 @@ função que lê o saldo e a pessoa); a leitura das contagens e o estado de cada
   `test_gravar_sem_as_pecas_em_recontagem`; os avariados na Aprovação, `test_avariados_na_aprovacao`. Os textos pela versão do
   App, o aviso fixo e o cartão (04/11/2026): `test_os_textos_da_recontagem_dizem_o_que_o_app_faz`,
   `test_o_aviso_fixo_da_recontagem_na_aprovacao`, `test_o_cartao_recontagens_pedidas_na_lista` (os três nos dois estados do
-  livro) e `test_o_cartao_recontagens_sem_almoxarifado_de_teste_e_sem_esperando`; no navegador, a cópia de prova com o livro nos
-  dois estados (o script da prova aceita `--app-de-hoje`, o livro sem as cinco colunas), a 1366 e 375 px.
+  livro) e `test_o_cartao_recontagens_sem_almoxarifado_de_teste_e_sem_esperando`; os avisos que seguem o pedido e a abertura da
+  lista (a 1ª rodada de correções): `test_o_aviso_fixo_diz_quando_a_recontagem_chegou`,
+  `test_o_aviso_atendido_fora_do_cartao_nao_fala_da_lista`, `test_com_o_app_de_hoje_a_contagem_nova_atende_e_o_combine_sai`,
+  `test_o_aviso_fixo_da_contagem_inteira`, `test_o_aviso_das_pecas_so_para_quem_revisa_e_com_a_tabela`,
+  `test_a_abertura_da_lista_diz_como_a_recontagem_chega` e `test_o_cartao_usa_o_nome_do_almoxarifado_sem_contagem_na_lista`; no
+  navegador, a cópia de prova com o livro nos dois estados (o script da prova aceita `--app-de-hoje`, o livro sem as cinco
+  colunas), a 1366 e 375 px.
 
 ## Inventário do almoxarifado: o livro (`nexus/dados/fato_inventario.py`; 26/10/2026)
 
@@ -1210,7 +1240,10 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
   (`fotos_app.registrar_recusa`, na rota, o do corpo grande inclusive): o status e a mensagem, nunca a assinatura, a chave dela nem
   a chave da foto (texto de quem chama, sem login). É por ali que a integração com o App acha a chave errada (401 "assinatura não
   confere") ou o relógio do celular fora da hora (401, a janela). Em WARNING, não INFO: só o logger `nexus.campo` tem handler em
-  INFO, e um `log.info` daqui não chegaria ao `journalctl -u nexus`.
+  INFO, e um `log.info` daqui não chegaria ao `journalctl -u nexus`. **No máximo uma linha por minuto para a mesma recusa**
+  (status e mensagem, `JANELA_DO_LOG_S`; a 1ª rodada de correções da revisão): a rota é pública, e o App com a chave errada
+  reenviando pela fila encheria o journal; as iguais dentro do minuto calam e são contadas, e a linha seguinte diz quantas
+  ("mais N iguais desde a linha anterior, caladas"). Prova: `test_a_recusa_repetida_vira_uma_linha_por_minuto`.
   Prova: `tests/test_pcm_inventario_fotos.py` (desde 04/11/2026, `test_a_chave_com_espaco_nas_pontas_e_a_do_livro` e
   `test_cada_recusa_vai_ao_log_sem_a_assinatura`).
 - **Fabricante, modelo, número de série e as fotos ampliadas** (30/10/2026, itens 2 e 3; as colunas 15 a 18 do livro das contagens):

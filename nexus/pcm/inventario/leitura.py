@@ -99,7 +99,8 @@ def _do_app() -> dict:
     abas = visao._ciclo(("_abas", A.LIVRO_CONTAGENS),
                         lambda: livros.abas(visao._base(), visao._sessao(), A.LIVRO_CONTAGENS))
     if A.ABA_CONTAGENS not in abas:
-        return {"livro_existe": False, "contagens": [], "itens": {}, "itens_lido": True, **_o_que_o_app_faz([])}
+        return {"livro_existe": False, "contagens": [], "itens": {}, "itens_lido": True, "almoxarifados": {},
+                **_o_que_o_app_faz([])}
     linhas = visao._livro(A.LIVRO_CONTAGENS, A.ABA_CONTAGENS)
     lig = Ligador(visao._livro("cadastro_nexus", "usinas"), visao._livro("cadastro_nexus", "de_para"), [], {})
     nome_usina = {_id(u.get("usina_id")): _txt(u.get("nome")) for u in visao._livro("cadastro_nexus", "usinas")}
@@ -137,7 +138,9 @@ def _do_app() -> dict:
                           # da contagem em que o pedido foi feito. O livro de hoje não tem a coluna: vazio, contagem inteira
                           "recontagem_de": _primeiro(ls, "Recontagem de"),
                           "linhas": ls})
-    return {"livro_existe": True, "contagens": contagens, "itens": itens, "itens_lido": itens_lido,
+    # `almoxarifados`: o nome de cada almoxarifado do livro do saldo, também para o que não tem contagem na lista (o cartão das
+    # recontagens mostra o pedido cuja contagem já saiu da janela do livro do App pelo nome, e não por "Almoxarifado <ID>")
+    return {"livro_existe": True, "contagens": contagens, "itens": itens, "itens_lido": itens_lido, "almoxarifados": almox,
             **_o_que_o_app_faz(linhas)}
 
 
@@ -357,10 +360,11 @@ def _pode_substituir(c: dict, agora: datetime) -> bool:
 
 
 def ler(cfg, *, com_teste: bool = False, app_agora: bool = False) -> dict:
-    """`{"livro_existe", "contagens", "itens", "app_com_recontagem", "app_com_fotos"}`: as contagens do App com o estado de cada
-    uma (a lista de `contagens`), o nome de cada peça (`itens`: `{id_item: {codigo, nome, unidade}}`) e o que o App que publicou
-    o livro faz, pelas colunas dele (`_o_que_o_app_faz`: lê os pedidos de recontagem, manda as fotos; os textos das telas dizem
-    isso sozinhos). As `linhas` de cada contagem saem com as avariadas
+    """`{"livro_existe", "contagens", "itens", "almoxarifados", "app_com_recontagem", "app_com_fotos"}`: as contagens do App com
+    o estado de cada uma (a lista de `contagens`), o nome de cada peça (`itens`: `{id_item: {codigo, nome, unidade}}`), o de
+    cada almoxarifado do livro do saldo (`almoxarifados`: `{id: nome}`) e o que o App que publicou o livro faz, pelas colunas
+    dele (`_o_que_o_app_faz`: lê os pedidos de recontagem, manda as fotos; os textos das telas dizem isso sozinhos). As
+    `linhas` de cada contagem saem com as avariadas
     já levadas ao -AV pelo catálogo (`avariados.resolver`): é a única porta das linhas para o lote, a curadoria e a gravação.
     Levanta `fato_inventario.Recusada` se não leu o livro do App ou o do inventário (nunca devolve vazio no lugar do que não
     leu).
@@ -369,9 +373,11 @@ def ler(cfg, *, com_teste: bool = False, app_agora: bool = False) -> dict:
     entre si, porque a substituição é por almoxarifado). `app_agora`: o livro do App relido agora, sem a cópia de 5 min (a
     aprovação)."""
     app = _app(agora=app_agora)
-    versao = {k: bool(app.get(k)) for k in ("app_com_recontagem", "app_com_fotos")}      # `_o_que_o_app_faz`
+    # o que o App faz (`_o_que_o_app_faz`) e o nome de cada almoxarifado do livro do saldo vão junto, com ou sem contagem
+    junto = {k: bool(app.get(k)) for k in ("app_com_recontagem", "app_com_fotos")}
+    junto["almoxarifados"] = dict(app.get("almoxarifados") or {})
     if not app["livro_existe"]:
-        return {"livro_existe": False, "contagens": [], "itens": {}, **versao}
+        return {"livro_existe": False, "contagens": [], "itens": {}, **junto}
     teste = set() if com_teste else A.ids_de_teste(cfg)
     do_livro = F.ler(cfg)
     eventos, curadoria = _por_contagem(do_livro[F.ABA_EVENTO]), do_livro[F.ABA_CURADORIA]
@@ -401,7 +407,7 @@ def ler(cfg, *, com_teste: bool = False, app_agora: bool = False) -> dict:
         c["motivo_nao_aprovavel"] = _motivo_nao_aprovavel(c, agora)
         c["aprovavel"] = not c["motivo_nao_aprovavel"]
     cs.sort(key=lambda c: (_quando(c["contada_em"]), _quando(c["enviada_em"]), c["contagem_id"]), reverse=True)
-    return {"livro_existe": True, "contagens": cs, "itens": app["itens"], **versao}
+    return {"livro_existe": True, "contagens": cs, "itens": app["itens"], **junto}
 
 
 def contagens(cfg) -> list[dict]:
@@ -448,28 +454,50 @@ def _contou(c: dict, id_item: str) -> bool:
                and A.contado(l.get("Contado")) is not None for l in contas._unicas(c.get("linhas")))
 
 
+def _serve(c: dict, agora) -> bool:
+    """A contagem que pode atender um pedido (a 1ª rodada de correções da revisão, 04/11/2026): nem a do contrato do App violado
+    (`aviso_do_app`: o número dela não se aproveita), nem a recusada inteira pelo PCM (`recontagem_pedida`: o PCM disse que ela
+    não serve, e o pedido que ela "atenderia" segue de pé), nem a contada no futuro (o "Contada em" além de agora mais
+    `contas.RELOGIO_ADIANTADO`: o relógio do celular adiantado faria qualquer contagem velha parecer "depois do pedido")."""
+    return not c.get("aviso_do_app") and c.get("estado") != "recontagem_pedida" \
+        and _quando(c.get("contada_em")) - agora <= contas.RELOGIO_ADIANTADO
+
+
 def pedidos_de_recontagem(contagens: list[dict], eventos: list[dict], agora, teste=()) -> dict:
-    """Os pedidos de recontagem do PCM e para onde foi cada um: o cartão "Recontagens pedidas" da lista do Inventário (04/11/2026;
-    caso real: uma pessoa do PCM pediu a recontagem de uma peça e perguntou "não sei pra onde foi essa informação"). Puro.
+    """Os pedidos de recontagem do PCM e para onde foi cada um: o cartão "Recontagens pedidas" da lista do Inventário e o aviso
+    fixo da contagem (04/11/2026; caso real: uma pessoa do PCM pediu a recontagem de uma peça e perguntou "não sei pra onde foi
+    essa informação"). Puro.
 
     `contagens`: as da `ler` (as linhas com as avariadas já levadas ao -AV, sem o almoxarifado de teste); `eventos`: os do livro do
     inventário, na ordem dele; `teste`: os IDs do almoxarifado de teste (o pedido dele fica de fora, como no resto).
 
     Um pedido por `recontagem_item_pedida` (a peça; o mesmo par contagem e peça vale o primeiro, como na `revisao_da`) e por
     `recontagem_pedida` (a contagem inteira). **Atendido** (a mesma regra nas duas versões do App, a seção 4 da proposta das
-    contagens do App): uma contagem do MESMO almoxarifado, outra que não a do pedido, com o "Contada em" DEPOIS do pedido, que
-    contou a peça (`_contou`); na inteira, qualquer contagem do almoxarifado depois do pedido. Vale a mais antiga que atende. A
-    recontagem que o App novo manda (com o "Recontagem de") atende por esta regra, e a contagem nova inteira de hoje também.
+    contagens do App): uma contagem do MESMO almoxarifado, outra que não a do pedido, que serve (`_serve`: nem a do contrato
+    violado, nem a recusada inteira, nem a do futuro), com o "Contada em" DEPOIS do pedido, e que contou a peça (`_contou`); na
+    inteira, uma contagem INTEIRA do almoxarifado depois do pedido (sem o "Recontagem de": a recontagem só das peças de outro
+    pedido não conta o almoxarifado de novo). Vale a mais antiga que atende. A recontagem que o App novo manda (com o "Recontagem
+    de") atende o pedido da peça por esta regra, e a contagem nova inteira de hoje atende os dois.
 
-    `{"esperando": [...], "atendidas": [...]}`: os esperando dos últimos `contas.APROVAVEL_DIAS` (a janela do livro do App), o mais
-    velho primeiro; os atendidos dos últimos `ATENDIDAS_DIAS`, pelo dia da contagem que atendeu, o mais novo primeiro. Cada pedido:
-    `tipo` ("peca" ou "inteira"), `contagem_id`, `id_almox`, `id_item` e `codigo` (vazios na inteira), `quando` (a hora do
-    pedido, UTC) e `atendida_por` (`{"contagem_id", "contada_em"}` da que atendeu, ou None). O motivo, nunca: é texto livre, e a
-    auditoria o mostra a quem pode."""
+    **O "depois do pedido" não tem folga de relógio, de propósito:** compara a hora do servidor (o `quando` do evento) com o
+    "Contada em", que é a hora do celular. Uma folga daria por atendido o pedido com uma contagem feita ANTES dele (o técnico
+    contou de manhã, o PCM pediu à tarde): o PCM acharia que a recontagem aconteceu, e gravaria o resto achando que a peça
+    duvidosa já foi conferida. Sem folga, o erro possível é o contrário: o celular atrasado faz a recontagem feita logo depois do
+    pedido parecer de antes, e o pedido segue "esperando o técnico" até a próxima contagem; o PCM vê a contagem nova na lista e
+    resolve olhando. Entre um "atendida" falso e um "esperando" a mais, fica o "esperando".
+
+    `{"esperando": [...], "atendidas": [...], "todos": [...]}`: os esperando dos últimos `contas.APROVAVEL_DIAS` (a janela do
+    livro do App), o mais velho primeiro; os atendidos dos últimos `ATENDIDAS_DIAS`, pelo dia da contagem que atendeu, o mais novo
+    primeiro (as duas listas do cartão); e `todos`, sem janela nenhuma, na ordem do livro (o aviso fixo de cada contagem: o
+    pedido atendido há mais de 30 dias saiu do cartão, mas a contagem ainda diz por quem foi atendido). Cada pedido: `tipo`
+    ("peca" ou "inteira"), `contagem_id`, `id_almox`, `id_item` e `codigo` (vazios na inteira), `quando` (a hora do pedido, UTC)
+    e `atendida_por` (`{"contagem_id", "contada_em"}` da que atendeu, ou None). O motivo, nunca: é texto livre, e a auditoria o
+    mostra a quem pode."""
     teste = {_id(t) for t in teste}
     agora_ = instante(agora)
     da_contagem = {c["contagem_id"]: c for c in contagens}
-    vistos, esperando, atendidas = set(), [], []
+    servem = [c for c in contagens if _serve(c, agora_)]
+    vistos, esperando, atendidas, todos = set(), [], [], []
     for e in eventos:
         tipo, cid = _PEDIDOS.get(_txt(e.get("tipo"))), _txt(e.get("contagem_id"))
         if not tipo or not cid:
@@ -483,12 +511,14 @@ def pedidos_de_recontagem(contagens: list[dict], eventos: list[dict], agora, tes
         except ValueError:
             continue                        # sem a hora não há "depois do pedido" (o livro sempre a põe)
         vistos.add((tipo, cid, item))
-        quem = [c for c in contagens if c["id_almox"] == almox and c["contagem_id"] != cid
-                and _quando(c["contada_em"]) > quando and (tipo == "inteira" or _contou(c, item))]
+        # sem folga de relógio no "depois do pedido" (o porquê no docstring): o atendido falso é pior que o "esperando" a mais
+        quem = [c for c in servem if c["id_almox"] == almox and c["contagem_id"] != cid and _quando(c["contada_em"]) > quando
+                and (not _txt(c.get("recontagem_de")) if tipo == "inteira" else _contou(c, item))]
         a = min(quem, key=lambda c: (_quando(c["contada_em"]), _quando(c["enviada_em"]), c["contagem_id"]), default=None)
         p = {"tipo": tipo, "contagem_id": cid, "id_almox": almox, "id_item": item,
              "codigo": _txt(e.get("codigo")) if tipo == "peca" else "", "quando": _txt(e.get("quando")),
              "atendida_por": None if a is None else {"contagem_id": a["contagem_id"], "contada_em": a["contada_em"]}}
+        todos.append(p)
         if a is None:
             if agora_ - quando <= timedelta(days=contas.APROVAVEL_DIAS):
                 esperando.append((quando, p))
@@ -496,7 +526,7 @@ def pedidos_de_recontagem(contagens: list[dict], eventos: list[dict], agora, tes
             atendidas.append((_quando(a["contada_em"]), p))
     esperando.sort(key=lambda x: (x[0], x[1]["contagem_id"], x[1]["id_item"]))
     atendidas.sort(key=lambda x: (x[0], x[1]["contagem_id"], x[1]["id_item"]), reverse=True)
-    return {"esperando": [p for _, p in esperando], "atendidas": [p for _, p in atendidas]}
+    return {"esperando": [p for _, p in esperando], "atendidas": [p for _, p in atendidas], "todos": todos}
 
 
 def recontagens(cfg, lidas: dict | None = None) -> dict:

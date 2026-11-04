@@ -35,6 +35,9 @@
   </ol>
 </aside>
 {% endmacro %}
+{# o aviso fixo de um pedido de recontagem (revisao._aviso_da_recontagem e _aviso_da_inteira, 04/11/2026): esperando, em âmbar,
+   com o que o App faz; atendido, neutro, com o dia e o link da contagem que atendeu. `marca` é o atributo que o identifica #}
+{% macro aviso_fixo(a, marca) %}<div class="{{ 'cn-nota inv-aviso-atendido' if a.atendida else 'cn-erro cn-aviso' }}" role="status" {{ marca }}>{{ a.texto }}{% if a.atendida %}<a class="inv-abrir" href="{{ raiz }}/t/pcm/pecas/inventario/{{ a.contagem_id|urlencode }}">{{ a.link }}</a>{{ a.fim }}{% endif %}</div>{% endmacro %}
 <div class="pg alm inv">
 <p class="gc-eyebrow">PCM · Almoxarifado · Inventário</p>
 <h1 class="titulo-pagina">{% if c %}{{ c.almox or 'Contagem' }}{% else %}Contagem{% endif %}</h1>
@@ -69,6 +72,9 @@
   para não mostrar conta pela metade.</div>{% endif %}
 {% else %}
 {% if not c.aprovavel and not gravacao %}<div class="cn-erro cn-aviso" role="status">Esta contagem não se aprova: {{ c.motivo_nao_aprovavel }}.</div>{% endif %}
+{# a recontagem da contagem inteira (só para quem pode agir): no alto, porque a contagem recusada não tem tabela do lote e abre
+   na etapa Contagem #}
+{% if aviso_inteira %}{{ aviso_fixo(aviso_inteira, 'data-aviso-inteira') }}{% endif %}
 
 {# a etapa aberta segue o estado da contagem: a que espera o PCM abre na Aprovação (só para quem lê o saldo), a gravação na
    Gravação, a gravada na Auditoria; a recusada, a substituída e a velha, na Contagem. A marca "agora" fica na etapa do estado #}
@@ -152,8 +158,9 @@
   </div>
   {% for a in avisos_curadoria %}<div class="cn-erro cn-aviso" role="status">{{ a }}</div>{% endfor %}
   {# o aviso FIXO das peças com a recontagem pedida (04/11/2026): da página, e não do pedaço da ponte, para ficar mesmo sem o
-     saldo; diz onde elas estão e, pela versão do App, se o técnico vê o pedido (revisao._aviso_da_recontagem) #}
-  {% if aviso_recontagem %}<div class="cn-erro cn-aviso" role="status" data-aviso-recontagem>{{ aviso_recontagem }}</div>{% endif %}
+     saldo; só para quem pode agir e só na contagem que mostra a tabela do lote (ele fala do "não será tocada"). Esperando, diz
+     onde elas estão e, pela versão do App, se o técnico vê o pedido; atendido, por qual contagem (revisao._aviso_da_recontagem) #}
+  {% if aviso_recontagem %}{{ aviso_fixo(aviso_recontagem, 'data-aviso-recontagem') }}{% endif %}
   {% if vai_ler %}
   <div class="inv-lote" data-lote data-url="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/lote" data-sem-login="{{ sem_login }}" data-contagem="{{ c.contagem_id }}">
     <p class="inv-espera" data-lote-msg role="status">lendo o saldo do Fracttal…</p>

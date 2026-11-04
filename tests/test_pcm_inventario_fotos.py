@@ -22,7 +22,10 @@ SEGREDO = "segredo-de-teste-das-fotos"
 
 @pytest.fixture
 def fotos(app, tmp_path):
-    """O Nexus com a chave das fotos e a pasta de dados de mentira; devolve a pasta onde as fotos ficam."""
+    """O Nexus com a chave das fotos e a pasta de dados de mentira; devolve a pasta onde as fotos ficam. A conta das recusas
+    caladas no log (uma linha por minuto) começa do zero em cada teste."""
+    from nexus.pcm.inventario import fotos_app as FA
+    FA._RECUSAS.clear()
     app.config.update(NEXUS_DADOS=str(tmp_path / "dados"), NEXUS_PESSOA_HMAC=SEGREDO, TESTING=True)
     return tmp_path / "dados" / "almox_inventario" / "fotos"
 
@@ -315,6 +318,32 @@ def test_cada_recusa_vai_ao_log_sem_a_assinatura(fotos, app, caplog):
     tudo = "\n".join(linhas)
     for segredo in assinaturas + ["cd" * 32, k.hex(), SEGREDO]:
         assert segredo not in tudo
+
+
+def test_a_recusa_repetida_vira_uma_linha_por_minuto(fotos, app, caplog):
+    """A rota é pública: o mesmo erro repetido (o App com a chave errada, reenviando pela fila) não pode encher o log. No máximo
+    uma linha por (status, mensagem) por minuto; a seguinte diz quantas iguais calaram. Outra recusa tem a linha dela."""
+    import logging
+    from nexus.pcm.inventario import fotos_app as FA
+    logger = "nexus.pcm.inventario.fotos_app"
+    with caplog.at_level(logging.INFO, logger=logger):
+        for t in (0, 10, 20, 59.9):
+            FA.registrar_recusa(401, "assinatura não confere", agora=1000 + t)
+        FA.registrar_recusa(400, "foto vazia ou maior que 8 MB", agora=1030)
+        FA.registrar_recusa(401, "assinatura não confere", agora=1060)            # passou o minuto: a linha conta as caladas
+        FA.registrar_recusa(401, "assinatura não confere", agora=1061)            # calada de novo
+    assert [r.getMessage() for r in caplog.records if r.name == logger] == [
+        "fotos do inventário: envio recusado com 401: assinatura não confere",
+        "fotos do inventário: envio recusado com 400: foto vazia ou maior que 8 MB",
+        "fotos do inventário: envio recusado com 401: assinatura não confere (mais 3 iguais desde a linha anterior, caladas: no "
+        "máximo uma linha por minuto)"]
+    # pela rota, três envios seguidos com a assinatura errada: uma linha só
+    FA._RECUSAS.clear()
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger=logger):
+        for _ in range(3):
+            assert _enviar(app, assinatura="0" * 64).status_code == 401
+    assert len([r for r in caplog.records if r.name == logger]) == 1
 
 
 def test_chave_com_barras_nao_vira_caminho(fotos, app, tmp_path):

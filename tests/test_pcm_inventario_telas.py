@@ -29,17 +29,18 @@ RAIZ = Path(__file__).resolve().parent.parent
 EMAIL = "supervisora@exemplo.test"            # a ficha 92 do cadastro do `banco`: o pessoa_id sai do e-mail pelo HMAC
 
 
-def _cenario(api, hoje=False):
+def _cenario(api, hoje=False, mais=()):
     """Uma contagem (C-1) no almoxarifado 10 (a Altair), com uma peça de cada situação:
     501 sobe (10 → 12), 502 desce (5 → 3), 503 zera (4 → 0), 504 igual (7), 505 em branco, 506 com contado negativo,
     507 genérico por identificar, um achado fora do catálogo, 508 nunca ligada ao almoxarifado (→ 3) e 509 ligada com o
     saldo vazio no Fracttal (→ 2). `hoje`: o livro como o App de hoje (v321) o publica, sem as cinco colunas novas da revisão
-    de 30/10/2026 (o App que não lê os pedidos de recontagem nem manda as fotos)."""
+    de 30/10/2026 (o App que não lê os pedidos de recontagem nem manda as fotos). `mais`: outras linhas no mesmo livro (outra
+    contagem)."""
     linhas = [_linha("C-1", "L1", "501", "12"), _linha("C-1", "L2", "502", "3"), _linha("C-1", "L3", "503", "0"),
               _linha("C-1", "L4", "504", "7"), _linha("C-1", "L5", "505", ""), _linha("C-1", "L6", "506", "-2"),
               _linha("C-1", "L7", "507", "4", tipo="identificar", **{"Identificado como": "501"}),
               _linha("C-1", "L8", "", "2", tipo="fora_do_catalogo", Descrição="peça sem etiqueta, caixa azul"),
-              _linha("C-1", "L9", "508", "3"), _linha("C-1", "L10", "509", "2")]
+              _linha("C-1", "L9", "508", "3"), _linha("C-1", "L10", "509", "2")] + list(mais)
     _publicar(api, *(_de_hoje(*linhas) if hoje else linhas))
     itens = [{"ID do item": str(i), "Código": f"SP-{i}", "Nome": nome, "Unidade": un, "Família": "Teste", "Avariado": "Não",
               "Ferramenta": "Não", "Início do ciclo": "x", "Lido": "Sim"}
@@ -1133,6 +1134,128 @@ def test_o_cartao_recontagens_sem_almoxarifado_de_teste_e_sem_esperando(app, inv
     cartao = _cartao_das_recontagens(_pcm(app, monkeypatch).get(LISTA).get_data(as_text=True))
     assert "<h3>Recontagens pedidas (0 esperando)</h3>" in cartao and "Nenhuma recontagem esperando o técnico" in cartao
     assert "C-5" not in cartao and "Atendidas nos últimos 30 dias (1)" in cartao
+
+
+# ── a 1ª rodada de correções da revisão (04/11/2026): o aviso segue o pedido ─────────────────────────────────────────────────
+FIM_DA_INTEIRA = {"hoje": " O App ainda não avisa o técnico: combine com ele uma contagem nova deste almoxarifado.",
+                  "novo": " O técnico vê o pedido no App."}
+ABERTURA = {
+    "hoje": "Com o App de hoje, a recontagem chega como uma contagem nova inteira e substitui a que ainda não foi gravada: grave o "
+            "resto antes.",
+    "novo": "a recontagem só de algumas peças não substitui ninguém, e a contagem em que ela foi pedida segue com as outras."}
+
+
+def _aviso_fixo(html, marca="data-aviso-recontagem"):
+    """O texto do aviso fixo (sem as tags: o link da contagem que atendeu vira o texto dele), ou "" sem o aviso."""
+    m = re.search(rf"<div[^>]*\b{marca}\b[^>]*>(.*?)</div>", html, re.S)
+    return unescape(re.sub(r"<[^>]+>", "", m.group(1))) if m else ""
+
+
+def _dia(iso):
+    """O dia/mês de Brasília de uma hora UTC do livro, como os avisos o escrevem."""
+    return E.instante(iso).astimezone(timezone(timedelta(hours=-3))).strftime("%d/%m")
+
+
+def test_o_aviso_fixo_diz_quando_a_recontagem_chegou(app, inv, falso, monkeypatch):
+    """O aviso segue o pedido: com o App novo a recontagem (a C-3, "Recontagem de" C-1) conta a peça e a C-1 segue se aprovando;
+    com todos os pedidos dela atendidos, o aviso diz quando e por qual contagem, com o link, sem o "combine" e sem a frase da
+    lista. Com algum pedido ainda esperando (a 502 ficou em branco na C-3), volta o texto de esperando."""
+    c3 = [_linha("C-3", "R1", "501", "11", contada=_iso(horas=1), **{"Recontagem de": "C-1"}),
+          _linha("C-3", "R2", "502", "", contada=_iso(horas=1), **{"Recontagem de": "C-1"})]
+    _cenario(inv, mais=c3)
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 501, codigo="SP-501", quando=_iso(horas=2)))
+    c = _pcm(app, monkeypatch)
+    pagina = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert _aviso_fixo(pagina) == (f"Recontagem pedida para 1 peça (SP-501) em {_dia(_iso(horas=2))}: atendida em "
+                                   f"{_dia(_iso(horas=1))} (contagem de {_dia(_iso(horas=1))}).")
+    assert f'href="{LISTA}/C-3"' in re.search(r"<div[^>]*\bdata-aviso-recontagem\b[^>]*>(.*?)</div>", pagina, re.S).group(1)
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 502, codigo="SP-502", quando=_iso(horas=2)))
+    texto = _aviso_fixo(c.get(f"{LISTA}/C-1").get_data(as_text=True))
+    assert texto.startswith("Recontagem pedida para 2 peças (SP-501, SP-502) em ") and texto.endswith(FIM_DO_AVISO["novo"])
+    assert "atendida" not in texto
+
+
+def test_o_aviso_atendido_fora_do_cartao_nao_fala_da_lista(app, inv, falso, monkeypatch):
+    """Atendida há mais de 30 dias, a recontagem já saiu do cartão "Recontagens pedidas": o aviso da contagem (que ainda se aprova,
+    com 50 dias) diz que ela foi atendida e não que está na lista."""
+    _publicar(inv, _linha("C-1", "L1", "501", "12", contada=_iso(dias_atras=50)),
+              _linha("C-1", "L2", "502", "3", contada=_iso(dias_atras=50)),
+              _linha("C-3", "R1", "501", "11", contada=_iso(dias_atras=40), **{"Recontagem de": "C-1"}))
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 501, codigo="SP-501", quando=_iso(dias_atras=49)))
+    c = _pcm(app, monkeypatch)
+    assert "Recontagens pedidas" not in c.get(LISTA).get_data(as_text=True)
+    assert _aviso_fixo(c.get(f"{LISTA}/C-1").get_data(as_text=True)) == (
+        f"Recontagem pedida para 1 peça (SP-501) em {_dia(_iso(dias_atras=49))}: atendida em {_dia(_iso(dias_atras=40))} "
+        f"(contagem de {_dia(_iso(dias_atras=40))}).")
+
+
+def test_com_o_app_de_hoje_a_contagem_nova_atende_e_o_combine_sai(app, inv, falso, monkeypatch):
+    """O fluxo de hoje: a C-1 tem a 501 em recontagem; o técnico manda a C-2 inteira, que conta a 501 e substitui a C-1. O cartão
+    diz "atendida" pela C-2, e a página da C-1 (substituída: sem a tabela do lote) não diz mais "combine com ele"."""
+    _cenario(inv, hoje=True, mais=[_linha("C-2", "N1", "501", "11", contada=_iso(horas=1))])
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 501, codigo="SP-501", quando=_iso(horas=2)))
+    c = _pcm(app, monkeypatch)
+    pagina = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert ">Substituída<" in pagina and "data-aviso-recontagem" not in pagina and "combine com ele" not in pagina
+    cartao = _cartao_das_recontagens(c.get(LISTA).get_data(as_text=True))
+    assert "(0 esperando)" in cartao and f"atendida em {_dia(_iso(horas=1))}" in cartao and f'href="{LISTA}/C-2"' in cartao
+
+
+@pytest.mark.parametrize("versao", ["hoje", "novo"])
+def test_o_aviso_fixo_da_contagem_inteira(app, inv, falso, monkeypatch, versao):
+    """A recontagem da contagem inteira também tem o aviso fixo, no alto da página da contagem recusada (ela não tem tabela do
+    lote, e abre na etapa Contagem): esperando, com o que o App faz; atendida por uma contagem inteira nova, com o dia e o link.
+    Só para quem pode revisar."""
+    _cenario(inv, hoje=versao == "hoje")
+    _gravar(app, _ev("C-1", "recontagem_pedida", quando=_iso(horas=2)))
+    pagina = _pcm(app, monkeypatch).get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert _aviso_fixo(pagina, "data-aviso-inteira") == (f"Recontagem da contagem inteira pedida em {_dia(_iso(horas=2))}."
+                                                        + FIM_DA_INTEIRA[versao])
+    assert pagina.index("data-aviso-inteira") < pagina.index("data-fluxo")          # no alto, antes das etapas
+    assert "data-aviso-recontagem" not in pagina
+    assert "data-aviso-inteira" not in _pcm(app, monkeypatch, setor="Performance").get(f"{LISTA}/C-1").get_data(as_text=True)
+    _cenario(inv, hoje=versao == "hoje", mais=[_linha("C-2", "N1", "501", "11", contada=_iso(horas=1))])
+    pagina = _pcm(app, monkeypatch).get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert _aviso_fixo(pagina, "data-aviso-inteira") == (f"Recontagem da contagem inteira pedida em {_dia(_iso(horas=2))}: "
+                                                        f"atendida em {_dia(_iso(horas=1))} (contagem de {_dia(_iso(horas=1))}).")
+    assert f'href="{LISTA}/C-2"' in re.search(r"<div[^>]*\bdata-aviso-inteira\b[^>]*>(.*?)</div>", pagina, re.S).group(1)
+
+
+def test_o_aviso_das_pecas_so_para_quem_revisa_e_com_a_tabela(app, inv, falso, monkeypatch):
+    """O aviso das peças fala do "não será tocada" da tabela do lote: só para quem revisa (o setor PCM) e só na contagem que mostra
+    a tabela (a que se aprova). Na que não se aprova (aqui, velha de 91 dias), nada."""
+    _cenario(inv)
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 501, codigo="SP-501", quando=_iso(horas=2)))
+    assert "data-aviso-recontagem" in _pcm(app, monkeypatch).get(f"{LISTA}/C-1").get_data(as_text=True)
+    outro = _pcm(app, monkeypatch, setor="Performance").get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert "data-aviso-recontagem" not in outro and "Recontagem pedida para" not in outro
+    _publicar(inv, _linha("C-9", "L1", "501", "3", almox="11", contada=_iso(dias_atras=91)))
+    _gravar(app, _ev("C-9", "recontagem_item_pedida", 501, almox="11", codigo="SP-501", quando=_iso(dias_atras=91, horas=-1)))
+    pagina = _pcm(app, monkeypatch).get(f"{LISTA}/C-9").get_data(as_text=True)
+    assert "mais de 90 dias" in pagina and "data-aviso-recontagem" not in pagina
+
+
+@pytest.mark.parametrize("versao", ["hoje", "novo"])
+def test_a_abertura_da_lista_diz_como_a_recontagem_chega(app, inv, falso, monkeypatch, versao):
+    """A abertura da lista do Inventário dizia que a recontagem só de algumas peças não substitui ninguém: falso com o App de hoje,
+    em que a recontagem chega como uma contagem inteira e substitui a que ainda não foi gravada. Pela versão do App."""
+    _cenario(inv, hoje=versao == "hoje")
+    html = " ".join(_pcm(app, monkeypatch).get(LISTA).get_data(as_text=True).split())
+    assert ABERTURA[versao] in html and ABERTURA["novo" if versao == "hoje" else "hoje"] not in html
+
+
+def test_o_cartao_usa_o_nome_do_almoxarifado_sem_contagem_na_lista(app, inv, falso, monkeypatch):
+    """O pedido de um almoxarifado sem contagem na lista (a contagem já saiu da janela do livro do App) mostra o nome que o livro
+    do saldo dá, e não "Almoxarifado <ID>"."""
+    _cenario_das_recontagens(inv)
+    _aba(inv, A.LIVRO_SALDO, A.ABA_SALDO, [
+        {"ID do item": "501", "Código": "SP-501", "ID do almoxarifado": a, "Almoxarifado": nome, "Início do ciclo": "x",
+         "Local do almoxarifado": "x", "Saldo": "1", "Mínimo": "0"}
+        for a, nome in (("10", "Almoxarifado Altair"), ("20", "Almoxarifado Usina Z"), ("50", "Almoxarifado Usina V"))])
+    visao.limpar()
+    _gravar(app, _ev("C-SUMIU", "recontagem_pedida", almox="50", quando=_iso(horas=6)))
+    cartao = _cartao_das_recontagens(_pcm(app, monkeypatch).get(LISTA).get_data(as_text=True))
+    assert "Almoxarifado Usina V" in cartao and "Almoxarifado 50" not in cartao and "C-SUMIU" in cartao
 
 
 def test_a_tela_e_do_setor_pcm(app, inv, falso, setores):  # noqa: F811

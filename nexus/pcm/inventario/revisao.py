@@ -181,22 +181,24 @@ def _hora_curta(iso) -> str:
 def _recontagens_da_lista(rec: dict, d: dict) -> dict | None:
     """O cartão "Recontagens pedidas" da lista (04/11/2026; a conta é a `leitura.pedidos_de_recontagem`), com o que a tela
     mostra de cada pedido: o almoxarifado e a usina (da contagem do pedido; sem ela, de outra do mesmo almoxarifado; sem
-    nenhuma, pelo ID), a peça (o código do pedido e o nome do catálogo do App), a hora do pedido, a contagem (com o link quando a
-    lista a tem: fora dela a página não abriria) e, na atendida, o dia e a contagem que atendeu. None sem pedido nenhum: o
-    cartão não aparece."""
+    nenhuma, o nome do livro do saldo, `almoxarifados` da leitura, e só sem ele o ID), a peça (o código do pedido e o nome do
+    catálogo do App), a hora do pedido, a contagem (com o link quando a lista a tem: fora dela a página não abriria) e, na
+    atendida, o dia e a contagem que atendeu. None sem pedido nenhum: o cartão não aparece."""
     if not rec["esperando"] and not rec["atendidas"]:
         return None
     da_contagem = {c["contagem_id"]: c for c in d["contagens"]}
     do_almox: dict[str, dict] = {}
     for c in d["contagens"]:
         do_almox.setdefault(c["id_almox"], c)
+    nomes = d.get("almoxarifados") or {}
 
     def tela(p: dict) -> dict:
         c = da_contagem.get(p["contagem_id"])
         ref = c or do_almox.get(p["id_almox"]) or {}
         item = d["itens"].get(p["id_item"], {}) if p["id_item"] else {}
         a = p["atendida_por"]
-        return dict(p, almox=ref.get("almox") or f"Almoxarifado {p['id_almox']}", usina=ref.get("usina", ""),
+        return dict(p, almox=ref.get("almox") or nomes.get(p["id_almox"]) or f"Almoxarifado {p['id_almox']}",
+                    usina=ref.get("usina", ""),
                     codigo=p["codigo"] or item.get("codigo", ""), nome=item.get("nome", ""),
                     pedida_txt=_hora_curta(p["quando"]), na_lista=c is not None,
                     contagem_txt=_hora(c["contada_em"]) if c else p["contagem_id"],
@@ -514,27 +516,60 @@ def _enriquecer(i: dict, c: dict, nomes: dict, revisao: dict, achados: dict, sis
                 marcavel=bool(pode and c["aprovavel"] and i["id_item"] and not tirada and sit != "curadoria"))
 
 
-def _aviso_da_recontagem(itens: list[dict], app_com_recontagem: bool) -> str:
-    """O aviso FIXO da Aprovação (04/11/2026; caso real: uma pessoa do PCM pediu a recontagem de uma peça e perguntou "aparece
-    alguma coisa dizendo que voltou pro técnico? não sei pra onde foi essa informação"): quantas e quais peças têm a recontagem
-    pedida nesta contagem, o dia do pedido (com vários dias, o mais recente), onde elas estão e, pela versão do App
-    (`leitura._o_que_o_app_faz`), se o técnico vê o pedido. Vazio sem peça em recontagem. Sem o motivo: o aviso é de todos."""
+def _instante_ou_velho(iso):
+    """O instante de uma hora do livro; a que não se lê vale a mais velha (nunca é "a mais recente")."""
+    try:
+        return instante(iso)
+    except ValueError:
+        return instante("2000-01-01T00:00:00Z")
+
+
+def _atendido(texto: str, atendida_por: dict) -> dict:
+    """O aviso do pedido atendido: o texto, o dia e o link da contagem que atendeu (ela está na lista: é de lá que a conta a
+    tirou), sem o "combine com ele" e sem a frase da lista (o atendido sai do cartão em 30 dias, e a contagem segue dizendo)."""
+    dia = _dia(atendida_por["contada_em"])
+    return {"atendida": True, "texto": f"{texto}: atendida em {dia} (", "contagem_id": atendida_por["contagem_id"],
+            "link": f"contagem de {dia}", "fim": ")."}
+
+
+def _aviso_da_recontagem(itens: list[dict], pedidos: list[dict], app_com_recontagem: bool) -> dict | None:
+    """O aviso FIXO das peças com a recontagem pedida, na Aprovação (04/11/2026; caso real: uma pessoa do PCM pediu a recontagem
+    de uma peça e perguntou "aparece alguma coisa dizendo que voltou pro técnico? não sei pra onde foi essa informação"): quantas
+    e quais peças, o dia do pedido (com vários dias, o mais recente) e o que aconteceu com ele, pelos pedidos desta contagem
+    (`leitura.pedidos_de_recontagem`, sem janela). Com algum ainda esperando: onde elas estão e, pela versão do App, se o técnico
+    vê o pedido. Todos atendidos (a 1ª rodada de correções da revisão: o aviso seguia dizendo "combine com ele" depois de a
+    recontagem chegar): "atendida em dd/mm (contagem de dd/mm)", pela contagem que atendeu por último, com o link. None sem
+    peça em recontagem. Sem o motivo."""
     pedidas = [x for x in itens if x.get("recontar")]
     if not pedidas:
-        return ""
+        return None
     n = len(pedidas)
-
-    def hora(x):
-        try:
-            return instante(x.get("recontar_em"))
-        except ValueError:
-            return instante("2000-01-01T00:00:00Z")     # a hora que não se lê nunca é "a mais recente"
-    dia = _dia(max(pedidas, key=hora).get("recontar_em"))
+    dia = _dia(max(pedidas, key=lambda x: _instante_ou_velho(x.get("recontar_em"))).get("recontar_em"))
     codigos = ", ".join(x["codigo"] or x["id_item"] for x in pedidas)
-    texto = (f"Recontagem pedida para {n} {'peça' if n == 1 else 'peças'} ({codigos})" + (f" em {dia}" if dia else "")
-             + (". Ela está" if n == 1 else ". Elas estão")
-             + ' em "não será tocada" e na lista "Recontagens pedidas" do Inventário.')
-    return texto + (" O técnico vê o pedido no App." if app_com_recontagem else " O App ainda não avisa o técnico: combine com ele.")
+    texto = f"Recontagem pedida para {n} {'peça' if n == 1 else 'peças'} ({codigos})" + (f" em {dia}" if dia else "")
+    da_peca = {p["id_item"]: p for p in pedidos if p["tipo"] == "peca"}
+    atendidas = [(da_peca.get(x["id_item"]) or {}).get("atendida_por") for x in pedidas]
+    if all(atendidas):
+        return _atendido(texto, max(atendidas, key=lambda a: _instante_ou_velho(a["contada_em"])))
+    texto += ((". Ela está" if n == 1 else ". Elas estão")
+              + ' em "não será tocada" e na lista "Recontagens pedidas" do Inventário.'
+              + (" O técnico vê o pedido no App." if app_com_recontagem else " O App ainda não avisa o técnico: combine com ele."))
+    return {"atendida": False, "texto": texto}
+
+
+def _aviso_da_inteira(pedidos: list[dict], app_com_recontagem: bool) -> dict | None:
+    """O aviso FIXO da recontagem da contagem inteira (a 1ª rodada de correções da revisão, 04/11/2026), no alto da página da
+    contagem recusada: o dia do pedido e, esperando, se o técnico vê o pedido no App (o de hoje não lê pedido nenhum: o PCM
+    combina com ele uma contagem nova); atendido por uma contagem inteira nova, o dia e o link dela. None sem o pedido."""
+    p = next((p for p in pedidos if p["tipo"] == "inteira"), None)
+    if p is None:
+        return None
+    texto = "Recontagem da contagem inteira pedida" + (f" em {_dia(p['quando'])}" if _dia(p["quando"]) else "")
+    if p["atendida_por"]:
+        return _atendido(texto, p["atendida_por"])
+    return {"atendida": False, "texto": texto + "." + (
+        " O técnico vê o pedido no App." if app_com_recontagem
+        else " O App ainda não avisa o técnico: combine com ele uma contagem nova deste almoxarifado.")}
 
 
 def _contagem(cfg, contagem_id: str):
@@ -567,12 +602,18 @@ def montar(cfg, contagem_id: str, pode: bool = False) -> dict | None:
            "contada_txt": _hora(c["contada_em"], com_as=True),
            "enviada_txt": _hora(c["enviada_em"], com_as=True), "itens": [], "avisos_curadoria": [], "pode": pode,
            "so_pcm": SO_PCM, "vai_ler": False, "sem_login": SEM_LOGIN, "pausa": PAUSA, "original": None,
-           "sem_catalogo": False, "app_com_recontagem": todas["app_com_recontagem"], "aviso_recontagem": ""}
+           "sem_catalogo": False, "app_com_recontagem": todas["app_com_recontagem"], "aviso_recontagem": None,
+           "aviso_inteira": None}
     o = _original(c, todas["contagens"])
     if o:                    # a contagem de recontagem diz de qual é, com o link (a que a lista não tem, pelo ID: o template)
         ctx["original"] = {"contagem_id": o["contagem_id"], "contada_txt": _hora(o["contada_em"], com_as=True)}
     if c["aviso"]:
         return ctx           # o App fora do contrato: nenhum número, que seria pela metade
+    # os avisos fixos dos pedidos de recontagem desta contagem são de quem pode agir neles (`pode`, o setor PCM), e seguem o
+    # pedido (`leitura.pedidos_de_recontagem`, sem a janela do cartão: esperando ou atendido, e por qual contagem)
+    pedidos = ([p for p in leitura.recontagens(cfg, todas)["todos"] if p["contagem_id"] == c["contagem_id"]]
+               if pode else [])
+    ctx["aviso_inteira"] = _aviso_da_inteira(pedidos, todas["app_com_recontagem"])
     if any(l.get("_sem_catalogo") for l in c["linhas"]):
         # a contagem que já não se revisa (aprovada, gravada, recusada, substituída) com avariada e o catálogo do App que não se
         # leu agora: ela não leva o aviso (a etapa Gravação e a Auditoria seguem na tela, 31/10/2026), mas as peças contadas
@@ -581,8 +622,11 @@ def montar(cfg, contagem_id: str, pode: bool = False) -> dict | None:
         return ctx
     ctx["itens"], lote = _itens(cfg, c, todas, None, pode)
     ctx["avisos_curadoria"] = _avisos_da_curadoria(lote)
-    ctx["aviso_recontagem"] = _aviso_da_recontagem(ctx["itens"], todas["app_com_recontagem"])
     ctx["vai_ler"] = bool(pode and c["aprovavel"])
+    if ctx["vai_ler"]:
+        # o aviso das peças fala do "não será tocada" da tabela do lote: só na contagem que mostra a tabela (a que se aprova).
+        # A recontagem que chegou numa contagem inteira nova substitui esta (com o App de hoje), e o aviso sai junto com a tabela
+        ctx["aviso_recontagem"] = _aviso_da_recontagem(ctx["itens"], pedidos, todas["app_com_recontagem"])
     return ctx
 
 

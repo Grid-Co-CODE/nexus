@@ -26,9 +26,13 @@
 {% else %}
 <div class="inv-tela-cab">
   <h2>Inventário</h2>
+  {# como a recontagem chega depende do App (04/11/2026, `app_com_recontagem`): o novo manda só as peças pedidas, que não
+     substituem ninguém; o de hoje manda uma contagem inteira, que substitui a que ainda não foi gravada #}
   <p>O técnico conta as peças no App sem ver o saldo do Fracttal. Aqui o PCM compara a contagem com o saldo lido na hora, revisa
-    e aprova. A contagem mais nova de cada almoxarifado substitui as mais velhas que ainda não foram gravadas; a recontagem só
-    de algumas peças não substitui ninguém, e a contagem em que ela foi pedida segue com as outras.</p>
+    e aprova. {% if app_com_recontagem %}A contagem mais nova de cada almoxarifado substitui as mais velhas que ainda não foram
+    gravadas; a recontagem só de algumas peças não substitui ninguém, e a contagem em que ela foi pedida segue com as outras.{% else %}A
+    contagem mais nova de cada almoxarifado substitui as mais velhas que ainda não foram gravadas. Com o App de hoje, a recontagem
+    chega como uma contagem nova inteira e substitui a que ainda não foi gravada: grave o resto antes.{% endif %}</p>
 </div>
 <ol class="inv-fluxo inv-fluxo--guia" aria-label="As etapas de cada contagem">
   <li><b>1 · Contagem</b><span>O técnico conta no App, sem ver o saldo</span></li>

@@ -78,13 +78,34 @@ def _chave_valida(c: str) -> bool:
         and not any(unicodedata.category(ch) in ("Cc", "Cs") for ch in c)
 
 
-def registrar_recusa(status: int, mensagem: str) -> None:
+JANELA_DO_LOG_S = 60          # a mesma recusa (status e mensagem) vai ao log no máximo uma vez por minuto
+# (status, mensagem) -> [a hora (monotonic) da última linha, quantas iguais calaram desde ela]. As mensagens são textos fixos do
+# Nexus: o dicionário não cresce com o que quem chama manda
+_RECUSAS: dict = {}
+_TRAVA_DAS_RECUSAS = threading.Lock()
+
+
+def registrar_recusa(status: int, mensagem: str, agora: float | None = None) -> None:
     """Cada recusa da rota vai ao log (a revisão final de 04/11/2026): é por ali que a integração com o App acha a chave errada
     (401 "assinatura não confere"), o relógio do celular fora da hora (401, a janela) ou o envio fora do contrato (400). Só o
     status e a mensagem, que são textos do Nexus: nunca a assinatura, a chave dela nem a chave da foto (texto de quem chama, sem
     login, que podia forjar linhas no log). Em WARNING, e não INFO: só o `nexus.campo` tem um handler em INFO, e um `log.info`
-    daqui nunca chegaria ao journal do servidor (`journalctl -u nexus`), onde as outras linhas de aviso já ficam."""
-    log.warning("fotos do inventário: envio recusado com %s: %s", status, mensagem)
+    daqui nunca chegaria ao journal do servidor (`journalctl -u nexus`), onde as outras linhas de aviso já ficam.
+
+    **Uma linha por minuto para a mesma recusa** (a 1ª rodada de correções da revisão): a rota é pública, e o App com a chave
+    errada reenviando pela fila (ou alguém batendo na rota) encheria o journal. A mesma (status, mensagem) dentro de
+    `JANELA_DO_LOG_S` da última linha cala e é contada; a linha seguinte, passado o minuto, diz quantas calaram. `agora`: o
+    relógio (`time.monotonic`), para o teste."""
+    agora = time.monotonic() if agora is None else agora
+    with _TRAVA_DAS_RECUSAS:
+        ultima = _RECUSAS.get((status, mensagem))
+        if ultima and agora - ultima[0] < JANELA_DO_LOG_S:
+            ultima[1] += 1
+            return
+        caladas = ultima[1] if ultima else 0
+        _RECUSAS[(status, mensagem)] = [agora, 0]
+    log.warning("fotos do inventário: envio recusado com %s: %s%s", status, mensagem,
+                f" (mais {caladas} iguais desde a linha anterior, caladas: no máximo uma linha por minuto)" if caladas else "")
 
 
 def _gravar(arq: Path, dados: bytes) -> None:
