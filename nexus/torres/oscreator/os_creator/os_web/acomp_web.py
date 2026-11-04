@@ -495,7 +495,11 @@ def montar_quadro(linhas, tickets: dict, ultimas: dict, hoje: dt.datetime, fins:
             # a régua da cobrança na faixa de números: quantas esperam ticket há mais de uma semana, e a mais antiga
             "mais_7": sum(1 for c in col["chegou"] if (c["dias"] or 0) > 7),
             "mais_antiga": col["chegou"][0] if col["chegou"] else None,
-            "opcoes": {"marca": opc("marca"), "cliente": opc("cliente"), "tipo": opc("tipo")}}
+            # o Status do chamado (Levi, 04/11/2026: "inclua uma filtros de status do chamado"): os 8 da lista na
+            # ordem dela, e o que veio de fora dela (o "Status atual" da planilha antiga) no fim
+            "opcoes": {"marca": opc("marca"), "cliente": opc("cliente"), "tipo": opc("tipo"),
+                       "status": list(STATUS_CHAMADO) + sorted({c["status_ch"] for c in vis if c["status_ch"]}
+                                                               - set(STATUS_CHAMADO), key=lambda x: _norm(x))}}
 
 
 def outros(c: dict, todos) -> dict:

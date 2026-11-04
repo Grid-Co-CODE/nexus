@@ -18,7 +18,7 @@
 {% set titulo = c.ativo_nome or c.code or '—' %}
 {% set onde = [c.code if c.code != titulo else '', c.local]|select|join(' · ') %}
 <a class="card {{ cls }} k-{{ c.urg }}{% if c.col == 'fim' %} fim{% endif %}{% if c.parada %} parada{% endif %}" href="/os/chamados/acompanhamento/{{ c.folio }}" title="{{ c.tempo }}{% if c.parada %} · 5 dias ou mais sem comentário{% endif %}"
-   data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-geral="{{ c.geral }}" data-ufv="{{ c.resp_ufv }}" data-busca="{{ c.busca }}">
+   data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-geral="{{ c.geral }}" data-st="{{ c.status_ch }}" data-ufv="{{ c.resp_ufv }}" data-busca="{{ c.busca }}">
   <div class="k-cab"><span class="k-os">OS {{ c.folio }}</span>{% if c.tempo_curto %}<span class="tag u-{{ c.urg }}">{{ c.tempo_curto }}</span>{% endif %}</div>
   <div class="k-tit">{{ titulo }}</div>
   {% if onde %}<div class="k-onde">{{ onde }}</div>{% endif %}
@@ -77,6 +77,7 @@
     <label class="fcampo"><span class="flbl">Cliente</span><select data-f="cliente" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.cliente %}<option value="{{ o }}">{{ o }}</option>{% endfor %}</select></label>
     <label class="fcampo"><span class="flbl">Tipo de ativo</span><select data-f="tipo" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.tipo %}<option value="{{ o }}">{{ o }}</option>{% endfor %}</select></label>
     <label class="fcampo"><span class="flbl">Status geral</span><select data-f="geral" data-osb="nativo"><option value="">Todos</option>{% for o in status_geral %}<option value="{{ o }}">{{ o }}</option>{% endfor %}<option value="_sem">Sem status</option></select></label>
+    <label class="fcampo"><span class="flbl">Status do chamado</span><select data-f="st" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.status %}<option value="{{ o }}">{{ o }}</option>{% endfor %}<option value="_sem">Sem status</option></select></label>
     {% if q.opcoes.ufv is not none %}<label class="fcampo"><span class="flbl">Responsável UFV</span><select data-f="ufv" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.ufv %}<option value="{{ o }}">{{ o }}</option>{% endfor %}<option value="_sem">Sem responsável UFV</option></select></label>{% endif %}
     <label class="fcampo"><span class="flbl">Buscar</span><input data-f="busca" type="search" placeholder="nº da OS, ativo, usina, ticket…" autocomplete="off"></label>
     <div class="vistas" role="group" aria-label="Ver como"><button type="button" data-vista="quadro">Quadro</button><button type="button" data-vista="tabela">Tabela</button></div>
@@ -93,7 +94,7 @@
      na linha abre o chamado, e a parada tem o ponto que pulsa #}
   <div class="tabela"><table class="tq"><thead><tr><th>OS</th><th>Ativo</th><th>Usina</th><th>Fornecedor</th><th>Geral</th><th>Status</th><th>Ticket</th><th>Situação</th><th>Responsável</th></tr></thead><tbody>
   {%- for chave, nome in (('chegou', 'Sem ticket'), ('ticket', 'Com o fornecedor'), ('fim', 'Finalizado')) %}{% for c in q.colunas[chave] %}
-    <tr data-linha data-href="/os/chamados/acompanhamento/{{ c.folio }}"{% if c.parada %} class="parada"{% endif %} data-folio="{{ c.folio }}" data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-geral="{{ c.geral }}" data-ufv="{{ c.resp_ufv }}" data-busca="{{ c.busca }}">
+    <tr data-linha data-href="/os/chamados/acompanhamento/{{ c.folio }}"{% if c.parada %} class="parada"{% endif %} data-folio="{{ c.folio }}" data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-geral="{{ c.geral }}" data-st="{{ c.status_ch }}" data-ufv="{{ c.resp_ufv }}" data-busca="{{ c.busca }}">
       <td class="t-os"><a href="/os/chamados/acompanhamento/{{ c.folio }}">{{ c.folio }}</a></td><td class="t-at">{{ c.ativo_nome or c.code or '—' }}</td>
       <td>{{ c.usina or '—' }}</td><td>{{ c.marca or '—' }}</td><td>{{ c.geral or '—' }}</td><td>{{ c.status_ch or '—' }}</td><td class="t-tk">{{ c.ticket or '—' }}</td>
       <td class="t-sit" title="{{ c.tempo }}"><span class="tag u-{{ c.urg }}">{{ c.situacao }}</span></td>

@@ -111,11 +111,11 @@
     const guardar = function (k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* aba anônima: vale só agora */ } };
     const campos = quadro.querySelectorAll("[data-f]");
     // a mesma regra no cartão e na linha da tabela (28/10/2026: o Status geral e o Responsável UFV no lugar do
-    // Responsável); "_sem" = o que não tem (sem status geral, sem Responsável UFV)
+    // Responsável; 04/11/2026: o Status do chamado, `st`); "_sem" = o que não tem (sem status, sem Responsável UFV)
     const casa = function (v, d) { return !v || (v === "_sem" ? !d : d === v); };
     const passa = function (d, f) {
       return casa(f.marca, d.marca) && casa(f.cliente, d.cliente) && casa(f.tipo, d.tipo) && casa(f.geral, d.geral) &&
-             casa(f.ufv, d.ufv) && (!f.busca || (d.busca || "").indexOf(f.busca) >= 0);
+             casa(f.st, d.st) && casa(f.ufv, d.ufv) && (!f.busca || (d.busca || "").indexOf(f.busca) >= 0);
     };
     const aplicar = function () {
       const f = {}, crus = {};

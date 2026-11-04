@@ -115,6 +115,43 @@ def test_os_filtros_status_geral_e_responsavel_ufv_no_lugar_do_responsavel(tela)
     assert "Limpar filtros" not in h and "data-limpar" not in h                                  # o item 7
 
 
+# ── 04/11/2026: o filtro Status do chamado (Levi: "inclua uma filtros de status do chamado") ──────────────────────
+def _filtro_st(h):
+    filtros = h.split('<div class="filtros">', 1)[1].split('<div class="board">', 1)[0]
+    return filtros.split('data-f="st"', 1)[1].split("</select>", 1)[0]
+
+
+def test_o_filtro_status_do_chamado_tem_os_8_na_ordem_da_lista_e_o_sem_status(tela):
+    c, _, _ = tela
+    h = _quadro(c)
+    st = _filtro_st(h)
+    assert ">Status do chamado<" in h.split('data-f="st"', 1)[0].rsplit("<label", 1)[1]
+    assert [o.split('"', 1)[0] for o in st.split('<option value="')[2:]] == list(aw.STATUS_CHAMADO) + ["_sem"]
+    assert '<option value="">Todos</option>' in st and '<option value="_sem">Sem status</option>' in st
+    # ao lado do Status geral
+    filtros = h.split('<div class="filtros">', 1)[1]
+    assert filtros.index('data-f="geral"') < filtros.index('data-f="st"') < filtros.index('data-f="busca"')
+
+
+def test_o_cartao_e_a_linha_levam_o_status_do_chamado(tela):
+    c, _, _ = tela
+    h = _quadro(c)
+    card = h.split('href="/os/chamados/acompanhamento/9101"', 1)[1].split(">", 1)[0]
+    assert 'data-st="Aguardando retorno do Cliente"' in card
+    linha = h.split('data-href="/os/chamados/acompanhamento/9103"', 1)[1].split(">", 1)[0]
+    assert 'data-st="Standby"' in linha
+
+
+def test_o_status_de_fora_da_lista_entra_no_fim_do_filtro(tela):
+    """O "Status atual" da planilha antiga (a nota da retroativa) não é da lista dela: se estiver no quadro, entra no
+    fim, para dar para achar o chamado com ele."""
+    c, banco, _ = tela
+    banco.append({"id": "s4", "quando": "2026-10-29T10:00:00-03:00", "os": "9102", "tipo": "status", "texto": "Status: w",
+                  "quem": "", "email": "", "ativo": "", "extra": {"status": "Em análise na planilha"}})
+    vals = [o.split('"', 1)[0] for o in _filtro_st(_quadro(c)).split('<option value="')[2:]]
+    assert vals == list(aw.STATUS_CHAMADO) + ["Em análise na planilha", "_sem"]
+
+
 def test_sem_o_nexus_dizer_o_responsavel_ufv_o_filtro_nao_aparece(tela, monkeypatch):
     c, _, ra = tela
     monkeypatch.setattr(ra, "RESPONSAVEL_UFV", None)

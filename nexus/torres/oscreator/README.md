@@ -2770,6 +2770,10 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   trás, numa thread no app do Nexus, e o quadro só consulta a memória; sem leitura ainda, sai sem o supervisor; vencida,
   sai com a de antes e relê. A ponte pede a 1ª leitura ao criar o clone. Sozinho (o oem), sem a função, o filtro não
   aparece. O "Limpar filtros" saiu ("Tire o botão de limpar filtros"); o filtro guardado na aba do navegador continua.
+- **O Status do chamado** (04/11/2026, Levi: "inclua uma filtros de status do chamado"), ao lado do Status geral: os 8
+  da lista na ordem dela, o status de fora dela que estiver no quadro (o "Status atual" da planilha antiga) no fim, e
+  "Sem status" (`opcoes.status` em `montar_quadro`, `data-st` no cartão e na linha, `st` no `acomp.js`). Vale no quadro e
+  na tabela, e o Exportar tabela leva só o que o filtro deixa.
 - **Os avisos numa exclamação** ao lado do título (o "Não consegui ler as observações" e o "N de M no nome de outra
   pessoa"), o desenho do `.hs-aviso` de Segurança > Extintores; o clique fora e o Esc fecham. O erro do Fracttal (o
   quadro sem OS) continua à vista.
