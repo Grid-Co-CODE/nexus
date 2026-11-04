@@ -24,6 +24,7 @@ RESUMO = {
     "evento_insight": "Quem assumiu ou concluiu cada insight do motor de regras",
     "pedido_area": "Os pedidos de retorno a cada área, com o prazo e a resposta",
     "mensagem_conversa": "As mensagens com @menção de cada insight, OS e usina",
+    "evento_aviso": "Os avisos das OS no sino: solicitação que virou OS e quem já leu",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
     "normalizacao": "Quando cada usina voltou pela hora do COS, o tipo e as proteções",
@@ -121,6 +122,10 @@ PARA_QUE = {
     "mensagem_conversa": "Guarda as mensagens que as pessoas trocam na conversa de cada insight, OS e usina, com quem "
                          "foi mencionado (uma pessoa ou uma área inteira) e quem já leu. Serve para a Caixa de entrada "
                          "e o sino avisarem quem foi chamado e para o combinado entre os setores ficar registrado.",
+    "evento_aviso": "Guarda os avisos das OS de cada pessoa no sino do topo: a solicitação aprovada no OS Creator que "
+                    "virou OS (para quem pediu) e cada Marcar como lida. O aviso de OS executada vem da lista central de "
+                    "OS e não é gravado aqui, só o lido dele. Os nomes vão cifrados; serve para o sino não repetir o que "
+                    "a pessoa já leu, em qualquer computador.",
     "evento_insight": "Guarda quem assumiu, concluiu ou reabriu cada insight que o motor de regras do Nexus apontou "
                       "(a OS normalizada que segue aberta, o chamado parado com o fabricante, o extintor vencido), com "
                       "o dia e a hora. Serve para cada insight ter um dono e sair da Caixa de entrada quando é tratado.",

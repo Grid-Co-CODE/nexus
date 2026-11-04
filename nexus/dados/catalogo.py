@@ -241,6 +241,20 @@ FATOS = (
                     "também conta como ler); mencoes_pessoas = os códigos do e-mail (pessoa_hmac) mencionados e "
                     "mencoes_areas = as torres mencionadas, separados por vírgula. O nome de quem escreveu e o texto "
                     "só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
+    # 04/11/2026 (Levi: "notificações para OSs abertas por mim ... e tem que ter um botão de marcar como lida!"): os avisos
+    # das OS de cada pessoa no sino. Registrado antes da 1ª gravação
+    Fato("evento_aviso", "Aviso de OS gerado ou lido", "base", "nexus_avisos · fato_evento_aviso",
+         "1 linha = 1 evento de 1 aviso: gerou_os (a solicitação aprovada no OS Creator virou OS) ou leu (1 pessoa "
+         "marcou o aviso como lido)",
+         _d(data=("id", "data_id (o dia de Brasília do evento)"),
+            pessoa=("id", "pessoa_hmac de quem leu ou aprovou (o código do e-mail)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_avisos · fato_evento_aviso",),
+         janela_origem="o Nexus é a fonte",
+         observacao="aviso_id em claro: E:<id da OS>:<data de fim AAAAMMDDHHMM> (a OS executada, lida da lista central "
+                    "de OS e nunca gravada aqui: só o leu dela) ou S:<código da solicitação>; tipo execucao ou "
+                    "solicitacao; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
+                    "Fracttal só traz o nome; prefixo nome:, separado do código do e-mail). Os nomes (quem pediu, quem "
+                    "aprovou) só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
     # 03/11/2026 (Fase 3 dos setores conversando): o pedido a uma área, com o prazo que quem pede escolhe, e o retorno
     # dela; o tempo de resposta de cada área sai daqui. Registrado antes da 1ª gravação
     Fato("pedido_area", "Pedido a uma área, com prazo", "base", "nexus_pedidos · fato_pedido_area",
@@ -1520,6 +1534,11 @@ LIVROS = (
           "nexus/comando/pedidos.py, pelas telas Comando → Insights, Caixa de entrada, a página de cada objeto e o "
           "Tempo de resposta", False,
           "registrado em 03/11/2026 antes da 1ª gravação (regra 10): nasce no 1º pedido",
+          so_cresce=True),
+    Livro("nexus_avisos", ("fato_evento_aviso",),
+          "a cada solicitação aprovada no OS Creator e a cada Marcar como lida no sino",
+          "nexus/comando/avisos.py, pelo sino do topo e pela aprovação da Fila do PCM (rotas_solic.AO_APROVAR)", False,
+          "registrado em 04/11/2026 antes da 1ª gravação (regra 10): nasce no 1º aviso de solicitação ou de lido",
           so_cresce=True),
     Livro("nexus_sugestoes", ("fato_sugestao", "fato_status_sugestao"),
           "a cada sugestão mandada e a cada mudança de status (Início > Sugestões)",

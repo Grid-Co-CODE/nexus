@@ -43,6 +43,14 @@
     <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos: {{ sino.n }}" title="Menções, pedidos para o seu setor e insights sem dono nas suas torres">
       <i class="ph ph-bell" aria-hidden="true"></i>{% if sino.n %}<b class="sino-n{% if sino.criticos %} sino-n--critico{% endif %}">{{ sino.n }}</b>{% endif %}</summary>
     <div class="sino-caixa" role="region" aria-label="Avisos">
+      {# os avisos das OS da pessoa (04/11/2026, comando/avisos.py): o clique abre o card da OS (o mesmo do Histórico, com o
+         PDF) por cima da tela; sem JavaScript, a página da OS. "Marcar como lida" é um formulário, como o tema #}
+      {% if sino.n_avisos %}<p class="sino-t"><b>{{ sino.n_avisos }} {{ 'aviso das suas OS' if sino.n_avisos == 1 else 'avisos das suas OS' }}</b></p>
+      <ul class="sino-avisos">{% for a in sino.avisos %}<li>
+        <a class="sino-aviso" href="{{ raiz }}/os/_nexus/card/{% if a.wid %}{{ a.wid }}{% else %}folio/{{ a.folio }}{% endif %}?status={{ a.status|urlencode }}" data-os-wid="{{ a.wid or '' }}" data-os-folio="{{ a.folio }}" data-os-status="{{ a.status }}"><span class="sino-sev sino-sev--{{ 'ok' if a.tipo == 'execucao' else 'mencao' }}">{{ 'Executada' if a.tipo == 'execucao' else 'Solicitação' }}</span> {{ a.titulo }}<small class="sino-aviso-d">{{ a.detalhe }} · {{ a.quando_txt }}</small></a>
+        <form method="post" action="{{ raiz }}/avisos/lida"><input type="hidden" name="aviso" value="{{ a.id }}"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar como lida</button></form>
+      </li>{% endfor %}</ul>
+      <form method="post" action="{{ raiz }}/avisos/lida" class="sino-lidas"><input type="hidden" name="todos" value="1"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar todas como lidas</button></form>{% endif %}
       {% if sino.n_mencoes %}<p class="sino-t"><b>{{ sino.n_mencoes }} {{ 'menção sem ler' if sino.n_mencoes == 1 else 'menções sem ler' }}</b></p>
       <ul>{% for m in sino.mencoes %}<li><a href="{{ raiz }}{{ m.link }}"><span class="sino-sev sino-sev--mencao">Menção</span> {{ m.titulo }}</a></li>{% endfor %}</ul>{% endif %}
       {% if sino.n_pedidos %}<p class="sino-t"><b>{{ sino.n_pedidos }} {{ 'pedido para o seu setor' if sino.n_pedidos == 1 else 'pedidos para o seu setor' }}</b></p>
@@ -52,7 +60,17 @@
       {% else %}<p class="sino-vazio">Nada sem dono nas torres do seu setor.</p>{% endif %}
       <a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada">Abrir a Caixa de entrada</a>
     </div>
-  </details>{% endif %}
+  </details>
+  {% if sino.n_avisos %}{% include "oscreator/card_os_abrir.html" %}
+  <script>
+    document.querySelectorAll('.sino-aviso').forEach(function (a) {
+      a.addEventListener('click', function (ev) {
+        if (!window.NexusOsCard) return;
+        var wid = a.getAttribute('data-os-wid'), op = {status: a.getAttribute('data-os-status') || '', folio: a.getAttribute('data-os-folio') || ''};
+        if (wid ? NexusOsCard.abrir(wid, op) : NexusOsCard.abrirFolio(op.folio, op)) ev.preventDefault();
+      });
+    });
+  </script>{% endif %}{% endif %}
   <label for="abre-menu" class="gc-btn gc-btn--ui gc-btn--contorno botao-menu"><i class="ph ph-list"></i> Menu</label>
   {# O menu da conta (03/11/2026, Levi: "esse negócio de tema e setor fique oculto nessa barra inicial, que só apareça
      quando clica no nome; aí vai ter: Setor, tema e sair"): no topo fica só quem entrou; o clique abre o Setor, o Tema e o

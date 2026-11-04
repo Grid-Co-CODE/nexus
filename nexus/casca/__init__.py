@@ -299,7 +299,8 @@ def _sino():
         from ..comando import pedidos as PD
         g = MO.do_cache()
         l_conv, l_est, l_ped = CV.copias()
-        if (not g or not g.dados) and not l_conv and not l_ped:
+        avisos = _avisos_do_sino()
+        if (not g or not g.dados) and not l_conv and not l_ped and not avisos:
             return None
         est = ES.estado(l_est)
         torres = MO.torres_da_pessoa()
@@ -325,13 +326,43 @@ def _sino():
             tipo, _, oid = x["objeto"].partition(":")
             mencoes.append({"link": "/t/comando/conversa/" + tipo + "/" + oid, "n": x["n"],
                             "titulo": _titulo(x["objeto"])})
-        return {"n": len(itens) + len(mencoes) + len(pedidos),
+        return {"n": len(itens) + len(mencoes) + len(pedidos) + len(avisos),
                 "criticos": sum(1 for i in itens if i["sev"] == "critico") + sum(1 for p in pedidos if p["atrasado"]),
                 "itens": itens[:6], "insights": len(itens), "mencoes": mencoes[:6], "n_mencoes": len(mencoes),
-                "pedidos": pedidos[:6], "n_pedidos": len(pedidos)}
+                "pedidos": pedidos[:6], "n_pedidos": len(pedidos), "avisos": avisos[:8], "n_avisos": len(avisos)}
     except Exception:            # noqa: BLE001 — o sino nunca derruba uma página
         current_app.logger.exception("sino dos insights")
         return None
+
+
+def _avisos_do_sino() -> list:
+    """Os avisos não lidos das OS da pessoa (04/11/2026, `comando/avisos.py`): "OS x concluída pelo técnico" e "Sua
+    solicitação gerou uma OS". A falha aqui não tira o resto do sino."""
+    try:
+        from ..comando import avisos as AV
+        return AV.para_o_sino(session.get("usuario"))
+    except Exception:            # noqa: BLE001
+        current_app.logger.exception("sino: os avisos das OS")
+        return []
+
+
+@bp.route("/avisos/lida", methods=["POST"])
+def avisos_lida():
+    """O "Marcar como lida" do sino, de um aviso (`aviso`) ou de todos os que ele mostra (`todos=1`). Formulário sem
+    JavaScript, como o tema: grava e volta para a mesma tela. O que não gravou (o banco fora, o login sem e-mail) volta com o
+    motivo no log, e o aviso segue no sino."""
+    from ..comando import avisos as AV
+    usuario = session.get("usuario")
+    ids = request.form.getlist("aviso")
+    if request.form.get("todos") == "1":
+        ids = [a["id"] for a in AV.para_o_sino(usuario)]
+    try:
+        AV.marcar_lidos(usuario, ids)
+    except AV.Recusada as ex:
+        current_app.logger.warning("sino: os avisos não foram marcados como lidos: %s", ex)
+    except Exception:            # noqa: BLE001 — banco fora: o aviso segue no sino
+        current_app.logger.exception("sino: os avisos não foram marcados como lidos")
+    return redirect(destino_seguro(request.form.get("voltar")))
 
 
 def instalar_contexto(app) -> None:

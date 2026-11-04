@@ -308,6 +308,21 @@ def test_aprovar_leva_o_que_esta_na_ficha_com_o_anexo(cli):
     assert cli.gravado[-1][3] == sw.subtarefas_do_tema("inversor_inspecao", "Inversor")
 
 
+def test_aprovar_chama_o_gancho_do_aviso_de_quem_pediu(cli, monkeypatch):
+    """O aviso "Sua solicitação gerou uma OS" no sino do Nexus (04/11/2026): a aprovação chama o gancho que a ponte liga,
+    com a solicitação, quem pediu e a OS nascida; o gancho que falha não derruba a aprovação; sem gancho (o oem), nada."""
+    vistos = []
+    monkeypatch.setattr(rs, "AO_APROVAR", vistos.append)
+    assert cli.post("/os/api/solic/5001/aprovar", json={"id_responsible": 1}).status_code == 200
+    assert len(vistos) == 1 and str(vistos[0]["solicitacao"]) == "5001" and str(vistos[0]["folio"]) == "4321"
+    assert set(vistos[0]) == {"solicitacao", "solicitante", "folio", "id_work_order", "aprovador", "aprovador_email"}
+
+    def quebra(_d):
+        raise RuntimeError("o banco caiu")
+    monkeypatch.setattr(rs, "AO_APROVAR", quebra)
+    assert cli.post("/os/api/solic/5001/aprovar", json={"id_responsible": 1}).status_code == 200
+
+
 def test_aprovar_recusa_sem_responsavel_sem_ativo_e_com_os_pai_ruim(cli):
     assert cli.post("/os/api/solic/5001/aprovar", json={"titulo": "x"}).status_code == 400
     assert "ativo" in cli.post("/os/api/solic/5005/aprovar", json={"id_responsible": 1}).get_json()["erro"]

@@ -25,6 +25,7 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `conversa.py` | A conversa presa ao objeto com @menção: o livro `nexus_conversas · fato_mensagem`, as menções não lidas (`para_mim`) e a lista do @ (`pessoas_mencionaveis`) |
 | `../torres/comando/templates/comando/_conversa.html` + `static/comando/conversa.js` | O componente da conversa (dentro de cada insight e na página da OS e da usina) e o @ |
 | `../casca/__init__.py` (`_sino`) + `base.html` | O sino do topo |
+| `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /avisos/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS") e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
 
 ## As regras da Fase 1 (e de onde cada uma lê)
 | Regra | Torre dona | Fonte |
@@ -87,6 +88,24 @@ como fazem ServiceNow, Jira e Linear, não num chat solto.
   só tem a Caixa não abriria o insight. Quem só tem a Caixa abre o miolo dos insights das torres dele e dos que pedem
   retorno a ele (`_ve_o_insight`); a tela Insights continua pela marca.
 
+## Os avisos das OS de cada pessoa (04/11/2026)
+Levi: "notificações para OSs abertas por mim que tiveram resposta ... tem que ter um botão de marcar como lida!"; "penso
+tanto em execução de OS quanto solicitação ... aí clica na notificação e aparece a OS, pode ter um botão para fazer
+download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
+- **"OS x concluída pelo técnico":** as OS que a pessoa criou (o "Criado por", pelo nome, com a regra do homônimo do
+  `os_central.filtrar`) que foram para Em Verificação ou Concluída nos últimos 7 dias, pela data de fim; quem executou é o
+  atribuído, e a OS que a própria pessoa executou não avisa. Vem da lista central de OS do OS Creator: nenhum pedido ao
+  Fracttal, com o atraso dela (minutos). Nunca é gravado: só o lido dele.
+- **"Sua solicitação gerou uma OS":** o evento `gerou_os`, gravado quando o PCM aprova na Fila do OS Creator
+  (`rotas_solic.AO_APROVAR`, que a ponte liga; por trás, no contexto do Nexus). Para quem pediu pelo código do NOME (a
+  solicitação do Fracttal só traz o nome; prefixo `nome:`, separado do código do e-mail). A aprovada direto no Fracttal
+  não avisa (decisão de 04/11/2026: custaria ler no Fracttal as solicitações de cada pessoa).
+- **No sino:** a parte "avisos das suas OS", no alto; o clique abre o card da OS (`oscreator/card_os_abrir.html`, com o
+  botão do PDF) por cima da tela, e sem JavaScript a página da OS. "Marcar como lida" e "Marcar todas como lidas" são
+  formulários (`POST /avisos/lida`, sem JavaScript, como o tema), e o lido vale em qualquer computador (o banco).
+- O sino só lê a cópia de 1 minuto do livro (`avisos.copia`) e a conta da lista central da pessoa (1 minuto, por versão
+  da lista): nenhuma página espera o banco.
+
 ## O visual
 Uma lista numa superfície só, uma linha por insight que abre ao clicar (Levi: "não sou muito fã dessa barra lateral em
 vermelho, temos muito dela... poderia fazer algo diferente?"): a gravidade é um selo (ponto + palavra), sem faixa nem
@@ -122,4 +141,7 @@ sem cópia que não espera; a Caixa de todo setor). Os testes da torre (`test_to
 `test_casca_inicio.py`) passaram a esperar o Comando com a Caixa de entrada e os Insights prontos.
 `tests/test_comando_pedidos.py` (Fase 3: um pedido por área com prazo obrigatório, só a área responde, o prazo
 (atrasado, vence hoje, no prazo) e as medianas do painel com linhas inventadas, a Caixa, o sino, a página da OS e o
-Tempo de resposta); `tests/test_comando_conversa.py` (Fase 2).
+Tempo de resposta); `tests/test_comando_conversa.py` (Fase 2); `tests/test_comando_avisos.py` (os avisos das OS: a
+execução pela lista central de mentira, a solicitação com os nomes cifrados, o sino com o card e o Marcar como lida, o
+"Marcar todas" e o gancho da aprovação) e o `test_aprovar_chama_o_gancho_do_aviso_de_quem_pediu` do
+`tests/test_oscreator_solic_pcm.py`.

@@ -34,7 +34,7 @@ import mimetypes
 from urllib.parse import quote
 
 import requests
-from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, Response, abort, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
 
 import api
@@ -51,6 +51,10 @@ from .rotas import _MEMO, _MEMO_LOCK, _conta, _memo, exige_sessao
 from .rotas_solic_eng import _abrir_limite, _corpo_e_anexos
 
 bp = Blueprint("os_web_solic", __name__, url_prefix="/os")
+
+# O aviso "Sua solicitação gerou uma OS" no sino do Nexus (04/11/2026, `nexus/comando/avisos.py`): a ponte põe aqui a
+# função que o grava, e a aprovação a chama com a solicitação e a OS nascida. Sozinho (o oem), sem a função: nada.
+AO_APROVAR = None
 
 LIMITE = 400            # o mesmo do painel do app (steps/solic_pcm.py: list_minhas_solicitacoes("TODOS", 400))
 LISTA_TTL = 120         # s: a lista vale isto entre Painel, Fila e Histórico; quem grava a esquece antes
@@ -493,6 +497,14 @@ def api_aprovar(id_code):
         out["tempo"] = sw.tempo_hhmm(dur or api.DURACAO_OS_AVULSA)
         out = _levar_anexos(out, s.get("id_code") or id_code)
     lista_central.criadas(res)         # a OS que a aprovação criou entra na lista central na hora (31/10/2026, tarefa 3.3)
+    if out.get("ok") and AO_APROVAR is not None:
+        conta = session.get("conta") or {}
+        try:
+            AO_APROVAR({"solicitacao": s.get("id_code") or id_code, "solicitante": s.get("criado_por") or "",
+                        "folio": out.get("folio"), "id_work_order": out.get("id_work_order"),
+                        "aprovador": conta.get("nome") or "", "aprovador_email": conta.get("email") or ""})
+        except Exception:              # noqa: BLE001 — o aviso nunca derruba a aprovação (a OS já nasceu no Fracttal)
+            pass
     if out.get("ok") or (res or {}).get("ok"):
         _esquecer_lista()              # nasceu OS (ou a tarefa): a solicitação saiu da fila para todo mundo
     return (jsonify(out), 200) if out.get("ok") else (jsonify({"erro": out["mensagem"]}), 400)

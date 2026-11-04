@@ -2549,6 +2549,13 @@ na nota entra a OS mãe do Fracttal; no banco, o chamado abre na data da nota.
   igual, a idade, a linha do tempo, a OS mãe, a tela e o fato). Conferido numa bancada local com o Fracttal falso, a 1440
   e a 375 px.
 
+## A solicitação aprovada avisa quem pediu (04/11/2026)
+
+O aviso "Sua solicitação gerou uma OS" do sino do Nexus (`nexus/comando/avisos.py`): o `api_aprovar` do `rotas_solic`
+chama o `AO_APROVAR` (que a ponte liga) com a solicitação, quem pediu (`criado_por`), a OS nascida e quem aprovou. O gancho
+grava por trás e nunca derruba a aprovação; sozinho (o oem), sem gancho, nada muda. O aviso de OS executada vem da lista
+central de OS (`os_central.filtrar("criadas", ...)`), sem tocar no clone.
+
 ## O Garantias sobrevive ao reinício (03/11/2026)
 
 Levi, 03/11/2026: "Nexus > Chamados > Garantias demora muito para carregar na 1ª vez e ele é 99% Fracttal" e "tem que ser

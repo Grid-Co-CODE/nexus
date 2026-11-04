@@ -365,6 +365,11 @@ def _criar_clone(app):
         ligar_garantias(app)
     except Exception:            # noqa: BLE001 — sem ligar, o Garantias vive só na memória (o reinício relê do Fracttal)
         logging.exception("OS Creator: o Garantias não foi ligado à pasta de dados")
+    # o aviso "Sua solicitação gerou uma OS" no sino, gravado quando o PCM aprova (04/11/2026; nexus/comando/avisos.py)
+    from os_web import rotas_solic
+
+    from ...comando import avisos
+    rotas_solic.AO_APROVAR = avisos.ao_aprovar(app)
     # o Responsável UFV dos chamados de Garantias, pelo cadastro do Nexus (28/10/2026; nexus/torres/chamados/ufv.py)
     from os_web import rotas_acomp
 

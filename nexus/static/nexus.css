@@ -577,4 +577,14 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .sino-sev--pedido{color:var(--alerta);background:var(--alerta-suave)}
 .sino-vazio{margin:0 0 12px;color:var(--mudo);font-size:13px}
 .sino-todos{width:100%;justify-content:center}
+/* os avisos das OS (04/11/2026): o aviso abre o card da OS; o "Marcar como lida" fica embaixo dele, discreto */
+.sino-sev--ok{color:var(--ok);background:var(--ok-suave)}
+.sino-caixa .sino-avisos li{display:grid;gap:0;padding-bottom:4px;border-bottom:1px solid var(--linha)}
+.sino-caixa .sino-avisos li:last-child{border-bottom:0}
+.sino-aviso-d{display:block;margin-top:2px;color:var(--mudo);font-size:12px}
+.sino-avisos li form{justify-self:end}
+.sino-lida{margin:0 8px 2px 0;padding:2px 6px;border:0;border-radius:4px;background:transparent;
+  color:var(--mudo);font:600 12px/1.4 var(--font-sans);cursor:pointer}
+.sino-lida:hover,.sino-lida:focus-visible{color:var(--tinta);background:var(--superficie-2)}
+.sino-lidas{display:flex;justify-content:flex-end;margin:-8px 0 12px}
 @media (max-width:640px){.sino-caixa{position:fixed;left:16px;right:16px;top:64px;width:auto}}
