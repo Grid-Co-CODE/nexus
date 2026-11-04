@@ -126,17 +126,18 @@ fazer, as áreas e os retornos, e as ações.
 - **A torre é o dono** (o setor vê as torres liberadas em Base → Acessos): sem cadastro de cadeira. A Caixa de entrada e
   o sino filtram por `motor.torres_da_pessoa()` (`setor_telas.acesso`; o administrador vê tudo).
 - **Fonte que falha não derruba as outras**: vira `regras[id]["erro"]`, a tela de Insights diz "não leu" e a Caixa avisa.
-- **O sino nunca calcula na página** (`motor.do_cache` + `estado._CACHE`): sem a cópia do motor, não sai número e a
-  conta começa por trás. Conta o crítico e o de atenção SEM DONO das torres da pessoa e os pedidos de retorno pendentes
-  para as áreas dela.
-- **Concluído some da Caixa e do sino** e fica concluído enquanto a regra seguir apontando (alguém já tratou); Reabrir
+- **O sino nunca calcula na página** (as cópias do motor, das conversas, dos pedidos e dos avisos): sem nenhuma cópia,
+  não sai número e a conta começa por trás. Conta os avisos das OS da pessoa, as menções sem ler e os pedidos de retorno
+  pendentes para as áreas dela. **Os insights sem dono não entram no sino** (Levi, 04/11/2026: "tira insights sem dono
+  do sino"; eram mais de mil e escondiam o resto): ficam na Caixa de entrada.
+- **Concluído some da Caixa** e fica concluído enquanto a regra seguir apontando (alguém já tratou); Reabrir
   volta. O livro só acrescenta; quem e a nota só cifrados.
 - Escrever regra nova: a função pura em `regras.py` (com teste de dado inventado: o caso e o vizinho que fica fora),
   a entrada em `REGRAS` e a leitura em `motor.FONTES`. Fonte nova no banco: governança antes (nexus/dados/CLAUDE.md).
 
 ## Prova
 `tests/test_comando_insights.py` (cada regra com o caso e o vizinho; o motor com uma fonte quebrada; o Assumir cifrado e
-sem repetir; a Caixa só das torres do setor; o sino sem dono e sem cópia; a lista leve com o miolo ao abrir; a tela
+sem repetir; a Caixa só das torres do setor; o sino sem os insights e sem cópia; a lista leve com o miolo ao abrir; a tela
 sem cópia que não espera; a Caixa de todo setor). Os testes da torre (`test_torres.py`,
 `test_casca_inicio.py`) passaram a esperar o Comando com a Caixa de entrada e os Insights prontos.
 `tests/test_comando_pedidos.py` (Fase 3: um pedido por área com prazo obrigatório, só a área responde, o prazo

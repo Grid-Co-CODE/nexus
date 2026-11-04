@@ -224,16 +224,14 @@ def test_a_caixa_so_mostra_as_torres_do_setor(app, banco, limpo, motor_dublado, 
     assert "2 extintores vencidos" in html and "16702" in html and "todas as torres" in html
 
 
-def test_o_sino_conta_os_sem_dono_das_torres_da_pessoa(app, banco, limpo, motor_dublado, monkeypatch):
+def test_o_sino_nao_mostra_os_insights_sem_dono(app, banco, limpo, motor_dublado, monkeypatch):
+    """Levi, 04/11/2026: "tira insights sem dono do sino" (eram mais de mil e escondiam os avisos das OS e as menções). Eles
+    seguem na Caixa de entrada, e o sino segue levando a ela."""
     monkeypatch.setattr(MO, "torres_da_pessoa", lambda: {"cos"})
     html = _aberta(_cliente(app), "/t/comando/insights")
     sino = html.split('class="sino-topo"', 1)[1].split("</details>", 1)[0]
-    assert '<b class="sino-n sino-n--critico">1</b>' in sino and "a OS 16702 voltou" in sino and "extintores" not in sino
-    ES.registrar(DOIS[0], "assumiu", PESSOA)                      # com dono: sai do sino
-    ES.ler(forcar=True)
-    html = _aberta(_cliente(app), "/t/comando/insights")
-    sino = html.split('class="sino-topo"', 1)[1].split("</details>", 1)[0]
-    assert "sino-n" not in sino and "Nada sem dono" in sino
+    assert "sino-n" not in sino and "a OS 16702 voltou" not in sino and "sem dono" not in sino
+    assert "Nada novo para você." in sino and "/t/comando/caixa-de-entrada" in sino
 
 
 def test_sem_a_copia_do_motor_o_topo_abre_sem_o_sino(app, logado, monkeypatch):

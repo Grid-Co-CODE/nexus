@@ -285,29 +285,26 @@ def saude():
 
 
 def _sino():
-    """O sino do topo (03/11/2026, os setores conversando): os insights críticos e de atenção SEM DONO das torres que o
-    setor da pessoa vê, os pedidos mandados às torres dela que ainda esperam resposta ou passaram do prazo (Fase 3) e as
-    menções a ela ou ao setor dela que ainda não leu (Fase 2). Só lê as cópias (a do motor, a de quem assumiu e a das conversas): nenhuma
-    página espera uma fonte por causa dele. Sem nenhuma cópia (logo depois de subir), não sai número, e a conta começa
-    por trás."""
+    """O sino do topo (03/11/2026, os setores conversando): os avisos das OS da pessoa (04/11/2026), os pedidos mandados às
+    torres dela que ainda esperam resposta ou passaram do prazo (Fase 3) e as menções a ela ou ao setor dela que ainda não
+    leu (Fase 2). Os insights sem dono saíram dele em 04/11/2026 (Levi: "tira insights sem dono do sino"): eram mais de mil
+    e escondiam o resto; ficam na Caixa de entrada. Só lê as cópias (a do motor, a das conversas, a dos pedidos e a dos
+    avisos): nenhuma página espera uma fonte por causa dele. Sem nenhuma cópia (logo depois de subir), não sai número, e a
+    conta começa por trás."""
     if not session.get("logado"):
         return None
     try:
         from ..comando import conversa as CV
-        from ..comando import estado as ES
         from ..comando import motor as MO
         from ..comando import pedidos as PD
         g = MO.do_cache()
-        l_conv, l_est, l_ped = CV.copias()
+        l_conv, _l_est, l_ped = CV.copias()
         avisos = _avisos_do_sino()
         if (not g or not g.dados) and not l_conv and not l_ped and not avisos:
             return None
-        est = ES.estado(l_est)
         torres = MO.torres_da_pessoa()
         todos = (g.dados.get("insights") or []) if g and g.dados else []
-        itens = [i for i in MO.das_torres(todos, torres)
-                 if i["sev"] in ("critico", "atencao") and (est.get(i["id"]) or {}).get("evento") in (None, "", "reabriu")]
-        titulo = {"insight:" + i["id"]: i["titulo"] for i in todos}
+        titulo = {"insight:" + i["id"]: i["titulo"] for i in todos}     # o nome do insight citado num pedido ou numa menção
 
         def _titulo(ob):
             tipo, _, oid = ob.partition(":")
@@ -326,10 +323,9 @@ def _sino():
             tipo, _, oid = x["objeto"].partition(":")
             mencoes.append({"link": "/t/comando/conversa/" + tipo + "/" + oid, "n": x["n"],
                             "titulo": _titulo(x["objeto"])})
-        return {"n": len(itens) + len(mencoes) + len(pedidos) + len(avisos),
-                "criticos": sum(1 for i in itens if i["sev"] == "critico") + sum(1 for p in pedidos if p["atrasado"]),
-                "itens": itens[:6], "insights": len(itens), "mencoes": mencoes[:6], "n_mencoes": len(mencoes),
-                "pedidos": pedidos[:6], "n_pedidos": len(pedidos), "avisos": avisos[:8], "n_avisos": len(avisos)}
+        return {"n": len(mencoes) + len(pedidos) + len(avisos), "criticos": sum(1 for p in pedidos if p["atrasado"]),
+                "mencoes": mencoes[:6], "n_mencoes": len(mencoes), "pedidos": pedidos[:6], "n_pedidos": len(pedidos),
+                "avisos": avisos[:8], "n_avisos": len(avisos)}
     except Exception:            # noqa: BLE001 — o sino nunca derruba uma página
         current_app.logger.exception("sino dos insights")
         return None
