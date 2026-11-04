@@ -17,6 +17,7 @@ from test_campo_visao import CHAVE_CADASTRO, banco  # noqa: F401  (banco é fixt
 from nexus.cadastro.cifra import Cofre
 from nexus.campo import ocorrencias as O
 from nexus.dados import catalogo, explica, livros
+from nexus.cadastro import setor_ids as SID
 
 BRT = timezone(timedelta(hours=-3))
 HOJE = datetime.now(BRT).date()
@@ -354,7 +355,7 @@ def _oid(resp) -> str:
 def test_a_tela_esta_no_menu_do_campo_e_e_dos_responsaveis_ufv():
     from nexus.torres.campo import TORRE
     t = TORRE.tela("ocorrencias")
-    assert t.nome == "Ocorrências" and t.do_setor == "Responsáveis UFV"
+    assert t.nome == "Ocorrências" and t.do_setor == SID.RESPONSAVEL_UFV
     ids = [x.id for x in TORRE.telas]
     assert ids.index("ocorrencias") == ids.index("responsaveis") + 1
 

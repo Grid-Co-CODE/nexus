@@ -13,6 +13,7 @@ import pytest
 from test_campo_visao import CHAVE, _aba, banco  # noqa: F401  (banco é fixture)
 from test_hseq_extintores import _abre, _linhas, _planilha, _tabela, _texto, com_nao_reconhecido  # noqa: F401
 
+from nexus.cadastro import setor_ids as SID
 from nexus.campo import visao
 from nexus.hseq import extintores as EXT
 from nexus.hseq import decisoes as DEC
@@ -99,8 +100,12 @@ def test_a_marca_de_nao_reconhecido_com_a_hora_do_app():
 
 
 def test_quem_pode_e_a_assinatura():
-    assert DEC.pode_decidir({"nome": "Segurança"}, False) and DEC.pode_decidir({"nome": " SEGURANCA "}, False)
-    assert DEC.pode_decidir(None, True) and not DEC.pode_decidir({"nome": "PCM"}, False) and not DEC.pode_decidir(None, False)
+    # pelo setor_id (04/11/2026): o setor renomeado decide igual, e outro setor com o nome "Segurança" não decide
+    assert DEC.pode_decidir({"id": SID.SEGURANCA, "nome": "Segurança"}, False)
+    assert DEC.pode_decidir({"id": SID.SEGURANCA, "nome": "HSEQ"}, False)
+    assert not DEC.pode_decidir({"id": SID.PCM, "nome": "Segurança"}, False) and not DEC.pode_decidir({"nome": "Segurança"}, False)
+    assert DEC.pode_decidir(None, True) and not DEC.pode_decidir({"id": SID.PCM, "nome": "PCM"}, False)
+    assert not DEC.pode_decidir(None, False)
     linha = {"codigo": "C1", "motivo": "nao_reconhecido", "marca_dia": "2026-10-05",
              "decidida_em": "2026-10-06T09:00:00-03:00"}
     a = DEC.assinatura(linha, DEC.ABA_EXC, CHAVE)

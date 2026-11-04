@@ -14,6 +14,7 @@ from nexus.cadastro.cifra import gerar_chave
 from nexus.dados import catalogo, explica
 from nexus.dados.equipamento import canon, equipamento_id
 from nexus.engenharia import acompanhamento as A
+from nexus.cadastro import setor_ids as SID
 
 BRT = timezone(timedelta(hours=-3))
 ANA = {"email": "ana.lima@gridco.com.br", "nome": "Ana Lima"}
@@ -333,7 +334,7 @@ def tela(banco, app, monkeypatch):
     monkeypatch.setattr(os_falhas, "estado", lambda: {"lendo": False, "erro": "", "completa": True, "n": len(linhas),
                                                        "vivas_em": 1})
     monkeypatch.setattr(torre, "_onde_do_cadastro", lambda: _onde)
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 1, "nome": "Engenharia"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"},
                                                "erro": ""})
     monkeypatch.setattr(A, "pessoas_da_engenharia", PESSOAS)
     A.pegar(dict(ATIVO, nFalha=4), ANA, pode=True)
@@ -373,7 +374,7 @@ def test_filtro_quem_acompanha(tela, cliente):
 
 def test_quem_nao_e_da_engenharia_le_sem_botoes(tela, cliente, monkeypatch):
     from nexus.auth import setor_telas as ST
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
                                                "erro": ""})
     html = _como(cliente, BETO).get("/t/engenharia/confiabilidade?aba=acompanhamento").get_data(as_text=True)
     assert "IBI200-INVR1.3" in _lista(html) and "Com Ana Lima desde" in html
@@ -462,7 +463,7 @@ def test_acao_de_outro_site_ou_sem_poder_nao_grava(tela, cliente, monkeypatch):
     _como(cliente, ANA)
     assert cliente.post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-INV02"},
                         headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
                                                "erro": ""})
     g = cliente.post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-INV02"}, headers=SAME).get_data(as_text=True)
     assert "Só quem é da Engenharia" in g and _aid_de("IBI200-INV02") is None

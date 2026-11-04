@@ -23,6 +23,7 @@ from nexus.dados import almoxarifado as A
 from nexus.dados import fato_inventario as F
 from nexus.pcm.inventario import estoque as E
 from nexus.pcm.inventario import leitura as L
+from nexus.cadastro import setor_ids as SID
 
 LISTA = "/t/pcm/pecas/inventario"
 RAIZ = Path(__file__).resolve().parent.parent
@@ -80,7 +81,7 @@ def _via(c, via="microsoft"):
     return c
 
 
-def _pcm(app, monkeypatch, email=EMAIL, setor="PCM", via="microsoft"):
+def _pcm(app, monkeypatch, email=EMAIL, setor=SID.PCM, via="microsoft"):
     """Uma pessoa do setor `setor`, entrando com o e-mail de uma ficha do cadastro (o pessoa_id sai dela)."""
     _no_setor(monkeypatch, setor)
     return _via(_como(app, email), via)
@@ -224,7 +225,7 @@ def test_a_contagem_nas_quatro_etapas(app, inv, falso, monkeypatch):
     assert "filtro-local.js" in html and "data-filtro-local" in etapa
     assert "Nada foi gravado no Fracttal ainda" in html and "estado.json" not in html
     # o outro setor (sem o saldo): a etapa aberta é a Contagem
-    outro = _pcm(app, monkeypatch, setor="Performance").get(f"{LISTA}/C-1").get_data(as_text=True)
+    outro = _pcm(app, monkeypatch, setor=SID.PERFORMANCE).get(f"{LISTA}/C-1").get_data(as_text=True)
     assert re.search(r'id="inv-etapa-contagem" aria-controls="inv-tela-contagem" aria-selected="true"', outro)
     # a gravada abre na Auditoria, sem buscar o lote na ponte
     gravada = c.get(f"{LISTA}/C-2").get_data(as_text=True)
@@ -436,7 +437,7 @@ def test_a_ponte_e_so_do_setor_pcm_e_de_dentro_do_site(app, inv, falso, monkeypa
         r = _lote(_pcm(app, monkeypatch, setor=setor))
         assert r.status_code == 403 and "setor PCM" in r.get_json()["erro"]
     assert falso.chamadas == []
-    c = _pcm(app, monkeypatch, setor="pcm")
+    c = _pcm(app, monkeypatch, setor=SID.PCM)
     r = c.get(LOTE.format("C-1"), headers={"Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 403 and falso.chamadas == []
     assert c.get(LOTE.format("C-1"), headers={"Sec-Fetch-Site": "same-origin"}).status_code == 200
@@ -631,7 +632,7 @@ def test_so_o_setor_pcm_revisa(app, inv, falso, monkeypatch):
         assert 'data-rev="' not in html and "revisa o lote" in html and "Pedir recontagem" not in html
         assert "data-lote" not in html and "Fusível 10A" in html
     assert _eventos(app) == [] and falso.chamadas == []
-    c = _pcm(app, monkeypatch, setor="pcm")
+    c = _pcm(app, monkeypatch, setor=SID.PCM)
     pagina = c.get(f"{LISTA}/C-1").get_data(as_text=True)
     assert 'data-rev="recontagem"' in pagina and "data-lote" in pagina
     lote = _lote(c).get_data(as_text=True)
@@ -761,7 +762,7 @@ def test_recontagem_parcial_sai_do_gravar(app, inv, falso, monkeypatch):
         assert f'data-rev="{acao}" data-item="501"' not in html and f'data-rev="{acao}" data-item="502"' not in html
     # a página (sem o Fracttal) diz o mesmo; o outro setor lê a nota sem o motivo (texto livre, pode citar gente)
     assert f"recontagem pedida em {dia}: conferir as caixas" in c.get(f"{LISTA}/C-1").get_data(as_text=True)
-    outro = _pcm(app, monkeypatch, setor="Performance").get(f"{LISTA}/C-1").get_data(as_text=True)
+    outro = _pcm(app, monkeypatch, setor=SID.PERFORMANCE).get(f"{LISTA}/C-1").get_data(as_text=True)
     assert f"recontagem pedida em {dia}" in outro and "conferir as caixas" not in outro
 
 
@@ -913,7 +914,7 @@ def test_recontagem_parcial_so_do_pcm(app, inv, falso, monkeypatch):
     """Como as outras ações: outro setor e outro site, 403; a senha de administrador (não é uma pessoa), 409."""
     _cenario(inv)
     corpo = {"acao": PARCIAL, "itens": ["501"], "motivo": "x"}
-    assert _revisar(_pcm(app, monkeypatch, setor="Performance"), corpo).status_code == 403
+    assert _revisar(_pcm(app, monkeypatch, setor=SID.PERFORMANCE), corpo).status_code == 403
     c = _pcm(app, monkeypatch)
     assert c.post(f"{LISTA}/C-1/revisar", json=corpo, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
     admin = app.test_client()
@@ -1213,7 +1214,7 @@ def test_o_aviso_fixo_da_contagem_inteira(app, inv, falso, monkeypatch, versao):
                                                         + FIM_DA_INTEIRA[versao])
     assert pagina.index("data-aviso-inteira") < pagina.index("data-fluxo")          # no alto, antes das etapas
     assert "data-aviso-recontagem" not in pagina
-    assert "data-aviso-inteira" not in _pcm(app, monkeypatch, setor="Performance").get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert "data-aviso-inteira" not in _pcm(app, monkeypatch, setor=SID.PERFORMANCE).get(f"{LISTA}/C-1").get_data(as_text=True)
     _cenario(inv, hoje=versao == "hoje", mais=[_linha("C-2", "N1", "501", "11", contada=_iso(horas=1))])
     pagina = _pcm(app, monkeypatch).get(f"{LISTA}/C-1").get_data(as_text=True)
     assert _aviso_fixo(pagina, "data-aviso-inteira") == (f"Recontagem da contagem inteira pedida em {_dia(_iso(horas=2))}: "
@@ -1227,7 +1228,7 @@ def test_o_aviso_das_pecas_so_para_quem_revisa_e_com_a_tabela(app, inv, falso, m
     _cenario(inv)
     _gravar(app, _ev("C-1", "recontagem_item_pedida", 501, codigo="SP-501", quando=_iso(horas=2)))
     assert "data-aviso-recontagem" in _pcm(app, monkeypatch).get(f"{LISTA}/C-1").get_data(as_text=True)
-    outro = _pcm(app, monkeypatch, setor="Performance").get(f"{LISTA}/C-1").get_data(as_text=True)
+    outro = _pcm(app, monkeypatch, setor=SID.PERFORMANCE).get(f"{LISTA}/C-1").get_data(as_text=True)
     assert "data-aviso-recontagem" not in outro and "Recontagem pedida para" not in outro
     _publicar(inv, _linha("C-9", "L1", "501", "3", almox="11", contada=_iso(dias_atras=91)))
     _gravar(app, _ev("C-9", "recontagem_item_pedida", 501, almox="11", codigo="SP-501", quando=_iso(dias_atras=91, horas=-1)))

@@ -12,6 +12,7 @@ from nexus.pcm import motivos as M
 from nexus.pcm import nota_os as NO
 from test_pcm_motivos import _mid, tela  # noqa: F401 (fixture)
 from test_pcm_publicar import _no_setor, _pessoa
+from nexus.cadastro import setor_ids as SID
 
 
 def test_a_linha_da_nota():
@@ -105,7 +106,7 @@ def _texto(app, pedido):
 
 def test_a_janela_do_quadro_pede_a_nota_ao_escolher_o_motivo(app, tela, notas, monkeypatch):
     c = _pessoa(app)
-    _no_setor(monkeypatch, "pcm")
+    _no_setor(monkeypatch, SID.PCM)
     am, pr = _mid(app.config, "Aguardando material"), _mid(app.config, "Prioridade")
     marca = {"semana": "2026-W41", "os": "5", "tarefa": "[Grid Co.] - MPM - Trafo", "codigo": "UFV1-TR01",
              "motivo_id": am, "obs": "sem o fusível"}
@@ -127,7 +128,7 @@ def test_o_painel_pede_a_nota_ao_trocar_o_motivo(app, tela, notas, monkeypatch):
     import html as H
     import re
     c = _pessoa(app)
-    _no_setor(monkeypatch, "pcm")
+    _no_setor(monkeypatch, SID.PCM)
     am, cl = _mid(app.config, "Aguardando material"), _mid(app.config, "Aguardando cliente")
     c.post("/t/pcm/quadro/motivo", json={"semana": "2026-W41", "os": "6", "tarefa": "Troca de fusível", "codigo": "",
                                          "motivo_id": am})
@@ -175,7 +176,7 @@ def test_a_ponte_ve_o_login_do_fracttal_e_a_marca_nao(app, tela, notas, fracttal
     `sessao_do_os` de verdade, a marca (em /t/pcm) não vê o login; a ponte (em /os) vê e escreve a nota."""
     from nexus.torres.oscreator import ponte
     c = _pessoa(app)
-    _no_setor(monkeypatch, "pcm")
+    _no_setor(monkeypatch, SID.PCM)
     _login_do_fracttal(app, c)
     viu, pedido = [], NO.pedido
     monkeypatch.setattr(NO, "pedido", lambda *a: viu.append(bool(ponte.sessao_do_os(app).get("jwt"))) or pedido(*a))
@@ -213,13 +214,13 @@ def test_a_ponte_sem_o_login_do_fracttal_pede_o_login_e_nao_escreve(app, tela, n
 def test_a_ponte_recusa_pedido_de_outro_login_de_outro_site_ou_de_quem_nao_marca(app, tela, notas, fracttal,
                                                                                  monkeypatch):
     c = _pessoa(app)
-    _no_setor(monkeypatch, "pcm")
+    _no_setor(monkeypatch, SID.PCM)
     _login_do_fracttal(app, c)
     alheio = NO.pedido(app, "6", "linha de outro login", {"email": "outra.pessoa@exemplo.com"})
     j = c.post(NOTA, json={"pedido": alheio}, headers=SAME)
     assert j.status_code == 400 and "outro login" in j.get_json()["nota_txt"]
     meu = NO.pedido(app, "6", "linha", USUARIO)
     assert c.post(NOTA, json={"pedido": meu}, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
-    _no_setor(monkeypatch, "Performance")
+    _no_setor(monkeypatch, SID.PERFORMANCE)
     assert c.post(NOTA, json={"pedido": meu}, headers=SAME).status_code == 403
     assert fracttal.gravadas == []

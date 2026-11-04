@@ -28,7 +28,7 @@ atropelam: na semana da troca, o PC do PCM não publica.
 **Quem pode (16/10/2026, Levi: "mude as configurações para administradores e pessoas do setor de PCM conseguir gerar uma
 programação semanal!" e, sobre gerar e as observações, "tanto PCM quanto supervisores! Vou criar um setor de
 Responsáveis UFV"):** Gerar a semana e o Quadro da semana são telas de DOIS setores, o PCM e o Responsáveis UFV
-(`do_setor=("PCM", "Responsáveis UFV")`, pelo nome, sem acento nem caixa: quem é deles as vê sem marcar em Base →
+(`do_setor=(SID.PCM, SID.RESPONSAVEL_UFV)`, pelo setor_id desde 04/11/2026: quem é deles as vê sem marcar em Base →
 Acessos; os outros setores, só se marcadas); dentro delas, gerar e mexer nas observações é de quem abre a tela;
 publicar no App e gravar a reprogramação do Quadro é do administrador ou de quem é do setor PCM (`telas.pode_programar`,
 pelo setor da pessoa do login): os supervisores montam a fila e copiam para o PCM. Testes: `test_o_setor_pcm_gera_e_publica`

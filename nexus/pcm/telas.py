@@ -19,23 +19,24 @@ from flask import abort, current_app, jsonify, redirect, render_template, reques
 
 from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, motivos as M, motivos_app as MA
 from . import observacoes as O
+from ..cadastro import setor_ids as SID
 from . import atribuicoes as AT, tecnicos_usina as TU
 from . import nota_os as NO, publicar as PB, quadro as Q, semana as S
 from ..auth import setor_telas as ST
 from ..prefixo import na_raiz
 
 POR_PAGINA = 150
-SETOR_PCM = "pcm"
-# quem marca e tira o motivo de uma tarefa (16/10/2026, Levi: "PCM no Nexus" e "Supervisores no Nexus"), pelo nome do
-# setor sem acento nem caixa; o administrador também
-SETORES_MARCAM = ("pcm", "responsaveis ufv")
+SETOR_PCM = SID.PCM
+# quem marca e tira o motivo de uma tarefa (16/10/2026, Levi: "PCM no Nexus" e "Supervisores no Nexus"), pelo setor_id; o
+# administrador também. Pelo nome até 04/11/2026: o "responsaveis ufv" daqui não casava com o "Responsável UFV" do banco
+SETORES_MARCAM = (SID.PCM, SID.RESPONSAVEL_UFV)
 
 
 def pode_programar() -> bool:
     """Publicar a semana no App e gravar a reprogramação do Quadro: administrador ou pessoa do setor PCM (16/10/2026,
     Levi: "mude as configurações para administradores e pessoas do setor de PCM conseguir gerar uma programação
-    semanal!"). O setor é o da pessoa do login (Base → Acessos → Pessoas e setores, `setor_telas.acesso`), pelo nome, sem acento
-    nem caixa. Gerar e as observações já eram de quem abre a tela Gerar a semana, que agora é do setor PCM."""
+    semanal!"). O setor é o da pessoa do login (Base → Acessos → Pessoas e setores, `setor_telas.acesso`), pelo
+    setor_id. Gerar e as observações já eram de quem abre a tela Gerar a semana, que agora é do setor PCM."""
     if session.get("admin"):
         return True
     if not session.get("logado"):
@@ -44,7 +45,7 @@ def pode_programar() -> bool:
         setor = ST.acesso().get("setor")
     except Exception:      # noqa: BLE001 — sem saber o setor, só o administrador
         return False
-    return bool(setor) and ST._sem_acento(setor.get("nome")) == SETOR_PCM
+    return bool(setor) and setor.get("id") == SETOR_PCM
 
 
 def pode_marcar() -> bool:
@@ -58,7 +59,7 @@ def pode_marcar() -> bool:
         setor = ST.acesso().get("setor")
     except Exception:      # noqa: BLE001 — sem saber o setor, só o administrador
         return False
-    return bool(setor) and ST._sem_acento(setor.get("nome")) in SETORES_MARCAM
+    return bool(setor) and setor.get("id") in SETORES_MARCAM
 
 
 def _usuario() -> dict | None:

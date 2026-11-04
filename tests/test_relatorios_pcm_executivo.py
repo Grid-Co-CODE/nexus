@@ -18,6 +18,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from nexus.pcm import relatorio_exec as R
+from nexus.cadastro import setor_ids as SID
 
 URL = "/t/relatorios/pcm-executivo"
 
@@ -171,5 +172,5 @@ def test_a_gerencial_sai_aberta_so_com_a_senha_e_so_o_que_a_fila_le(app, logado,
 def test_o_relatorio_executivo_e_do_setor_pcm(app, logado):
     from nexus.torres.relatorios import TORRE
     tela = TORRE.tela("pcm-executivo")
-    assert tela.do_setor == "PCM" and tela.dentro_de == "central"
+    assert tela.do_setor == SID.PCM and tela.dentro_de == "central"
     assert 'href="/t/relatorios/pcm-executivo?tipo=interno"' in logado.get("/t/relatorios/central").get_data(as_text=True)

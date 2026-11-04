@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from nexus.torres.oscreator import ponte
+from nexus.cadastro import setor_ids as SID
 
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
@@ -581,7 +582,7 @@ def test_a_regra_do_nexus_setor_pcm_ou_administrador(app, setor_de_mentira):
             setor_de_mentira["valor"] = {"id": 9, "nome": nome}
             assert ponte.area_pcm() == {"pode": True, "aviso": ""}, nome
         assert setor_de_mentira["lidos"][-1] == "pessoa.teste@exemplo.test"
-        setor_de_mentira["valor"] = {"id": 2, "nome": "Performance"}
+        setor_de_mentira["valor"] = {"id": SID.PERFORMANCE, "nome": "Performance"}
         a = ponte.area_pcm()
         assert a["pode"] is False and "Você está no setor Performance." in a["aviso"]
         assert "setor PCM e dos administradores" in a["aviso"] and "Base → Acessos → Pessoas e setores" in a["aviso"]
@@ -611,14 +612,14 @@ def test_pela_ponte_quem_nao_e_do_pcm_recebe_o_aviso(app, cli, setor_de_mentira)
     a do PCM passa. (O `cli` só põe os dublês do Fracttal no lugar.)"""
     c = app.test_client()
     _sessao_do_fracttal(app, c)
-    setor_de_mentira["valor"] = {"id": 1, "nome": "Engenharia"}
+    setor_de_mentira["valor"] = {"id": SID.ENGENHARIA, "nome": "Engenharia"}
     r = c.get("/os/solicitacao/fila")
     h = r.get_data(as_text=True)
     assert r.status_code == 403 and "Você está no setor Engenharia." in h and "Fila do PCM: só para a área do PCM" in h
     r = c.post("/os/api/solic/5001/aprovar", json={"id_responsible": 1, "titulo": "T", "subtarefas": []})
     assert r.status_code == 403 and "setor PCM" in r.get_json()["erro"] and cli.gravado == []
     assert c.get("/os/solicitacao/painel").status_code == 200 and c.get("/os/solicitacao/historico").status_code == 200
-    setor_de_mentira["valor"] = {"id": 9, "nome": "PCM"}
+    setor_de_mentira["valor"] = {"id": SID.PCM, "nome": "PCM"}
     r = c.get("/os/solicitacao/fila")
     assert r.status_code == 200 and 'id="fl_dados"' in r.get_data(as_text=True)
     r = c.post("/os/api/solic/5001/aprovar", json={"id_responsible": 1, "titulo": "T", "subtarefas": []})

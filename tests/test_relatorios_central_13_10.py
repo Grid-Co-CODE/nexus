@@ -12,7 +12,8 @@ chamado "Administrador" (um setor como os outros). O banco é o falso do test_ca
 import pytest
 from test_campo_visao import banco  # noqa: F401  (fixture)
 from test_porta_moldura import _cliente, _dados
-from test_setor_telas import ANA, BIA, URL, _como, _linhas, _salvar, _sem_copias, setores  # noqa: F401  (fixtures)
+from nexus.cadastro import setor_ids as SID
+from test_setor_telas import ADMINISTRADOR, ANA, BIA, URL, _como, _linhas, _salvar, _sem_copias, setores  # noqa: F401  (fixtures)
 
 from nexus.auth import setor_telas as ST
 from nexus.performance import porta
@@ -89,43 +90,44 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
     assert ">Central de emissão</a>" in _menu(c.get("/").get_data(as_text=True))
     assert c.get("/t/relatorios/potencia-ativa").status_code == 200
     with app.app_context():
-        assert ST.das_do_setor("performance") == ST.das_do_setor("Performance") \
-            == {f"relatorios/{t}" for t in RELATORIOS} | {"comando/caixa-de-entrada"}             | {"performance/equipe"}        # a Caixa é de todos (03/11); o Quadro da equipe da Performance (04/11)
+        assert ST.das_do_setor(SID.PERFORMANCE) == ST.das_do_setor({"id": SID.PERFORMANCE, "nome": "Performance e Dados"}) \n            == {f"relatorios/{t}" for t in RELATORIOS} | {"comando/caixa-de-entrada", "performance/equipe"}
+        # a Caixa é de todos (03/11); o Quadro da equipe da Performance (04/11)
         # os do PCM (14/10/2026) são do setor PCM: os relatórios (nexus/pcm/relatorios, tests/test_relatorios_pcm.py) e o
         # Acompanhamento (nexus/pcm/acompanhamento, tests/test_pcm_acompanhamento.py)
         # e, desde 16/10/2026, o Gerar a semana e o Quadro da semana (Levi: "administradores e pessoas do setor de PCM
         # conseguir gerar uma programação semanal!", tests/test_pcm_publicar.py); e, desde 25/10/2026, o Almoxarifado
         # (nexus/pcm/almoxarifado.py, tests/test_pcm_almoxarifado.py)
-        assert ST.das_do_setor("PCM") == ({f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta", "executivo")}
+        assert ST.das_do_setor(SID.PCM) == ({f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta", "executivo")}
                                           | {"pcm/acompanhamento", "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao",
                                              "pcm/tecnicos-por-usina", "pcm/pecas", "comando/caixa-de-entrada"})
         # o Gerar e o Quadro têm dois donos: o PCM e os supervisores (Levi, 16/10/2026: "tanto PCM quanto supervisores!
-        # Vou criar um setor de Responsáveis UFV"), pelo nome, sem acento nem caixa
+        # Vou criar um setor de Responsáveis UFV"), pelo setor_id (04/11/2026: pelo nome, o "Responsável UFV" do banco não
+        # casava com o "Responsáveis UFV" do código)
         # e, desde 16/10/2026, o Fora da programação (os motivos que tiram a tarefa da semana; tests/test_pcm_motivos.py)
         # e, desde 17/10/2026, os Técnicos por usina (quem vê cada usina no App; tests/test_pcm_tecnicos_tela.py)
         # e, desde 18/10/2026, as Ocorrências do Campo · App (o painel de ocorrências dos supervisores, no Nexus;
         # tests/test_campo_ocorrencias.py)
-        assert ST.das_do_setor("Responsáveis UFV") == ST.das_do_setor("responsaveis ufv") == {
+        assert ST.das_do_setor(SID.RESPONSAVEL_UFV) == ST.das_do_setor({"id": SID.RESPONSAVEL_UFV, "nome": "Responsável UFV"}) == {
             "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao", "pcm/tecnicos-por-usina", "campo/ocorrencias",
             "comando/caixa-de-entrada"}
-        assert ST.das_do_setor("") == set()
+        assert ST.das_do_setor(None) == set() and ST.das_do_setor({"nome": "PCM"}) == set()
 
 
 def test_na_matriz_os_relatorios_da_performance_ficam_marcados_e_o_salvar_nao_grava_decisao_para_eles(app, setores,
                                                                                                          logado):
-    h = logado.get(URL + "?setor=1").get_data(as_text=True)
+    h = logado.get(URL + "?setor=2").get_data(as_text=True)
     for tela in RELATORIOS:
         i = h.index(f"{dict(zip(RELATORIOS, NOMES))[tela]}</label>")
         assert "data-do-setor checked disabled" in h[i - 160:i] and "do setor" in h[i:i + 200], tela
-    assert _salvar(logado, 1, ["cos/mesa"]).status_code == 303
-    assert {x["tela"] for x in _linhas(setores) if x["setor_id"] in (1, "1")} == {"cos/mesa"}
+    assert _salvar(logado, SID.PERFORMANCE, ["cos/mesa"]).status_code == 303
+    assert {x["tela"] for x in _linhas(setores) if x["setor_id"] in (2, "2")} == {"cos/mesa"}
     # mesmo que a caixa presa venha no formulário, não vira decisão nem erro
-    assert _salvar(logado, 1, ["cos/mesa", "relatorios/potencia-ativa"]).status_code == 303
+    assert _salvar(logado, SID.PERFORMANCE, ["cos/mesa", "relatorios/potencia-ativa"]).status_code == 303
     assert not any(x["tela"].startswith("relatorios/") for x in _linhas(setores))
 
 
 def test_o_setor_ve_so_os_relatorios_marcados_e_a_central_sem_marcar(app, setores, logado):
-    assert _salvar(logado, 2, ["relatorios/relatorio-semanal"]).status_code == 303
+    assert _salvar(logado, ADMINISTRADOR, ["relatorios/relatorio-semanal"]).status_code == 303
     c = _como(app, BIA)
     r = c.get("/t/relatorios/central")
     assert r.status_code == 200
@@ -139,27 +141,27 @@ def test_o_setor_ve_so_os_relatorios_marcados_e_a_central_sem_marcar(app, setore
 
 
 def test_setor_sem_relatorio_nao_ve_a_central(app, setores, logado):
-    assert _salvar(logado, 2, ["cos/mesa"]).status_code == 303
+    assert _salvar(logado, ADMINISTRADOR, ["cos/mesa"]).status_code == 303
     c = _como(app, BIA)
     assert 'data-torre="relatorios"' not in _menu(c.get("/").get_data(as_text=True))
     assert c.get("/t/relatorios/central").status_code == 403
 
 
 def test_a_marca_de_antes_da_performance_vale_para_o_relatorio_daqui():
-    d = [{"decidida_em": "2026-10-12T10:00:00Z", "setor_id": 1, "tela": "performance/relatorio", "liberada": True},
-         {"decidida_em": "2026-10-12T10:00:00Z", "setor_id": 1, "tela": "performance/relatorio-semanal",
+    d = [{"decidida_em": "2026-10-12T10:00:00Z", "setor_id": 2, "tela": "performance/relatorio", "liberada": True},
+         {"decidida_em": "2026-10-12T10:00:00Z", "setor_id": 2, "tela": "performance/relatorio-semanal",
           "liberada": True},
          # a decisão mais nova, já com o nome novo, ganha
-         {"decidida_em": "2026-10-13T10:00:00Z", "setor_id": 1, "tela": "relatorios/relatorio-semanal",
+         {"decidida_em": "2026-10-13T10:00:00Z", "setor_id": 2, "tela": "relatorios/relatorio-semanal",
           "liberada": False}]
-    assert ST.vigentes(d) == {1: {"relatorios/relatorio"}}
+    assert ST.vigentes(d) == {2: {"relatorios/relatorio"}}
 
 
 def test_quem_tinha_o_relatorio_na_performance_continua_vendo(app, setores, monkeypatch):
     lido = ST._ler_banco
 
     def com_a_marca_antiga(base, sessao):
-        return lido(base, sessao) + [{"decidida_em": "2026-10-12T10:00:00Z", "data_id": 20261012, "setor_id": 2,
+        return lido(base, sessao) + [{"decidida_em": "2026-10-12T10:00:00Z", "data_id": 20261012, "setor_id": 8,
                                       "tela": "performance/relatorio", "liberada": True, "decidida_por_hmac": "",
                                       "origem": "tela"}]
     monkeypatch.setattr(ST, "_ler_banco", com_a_marca_antiga)

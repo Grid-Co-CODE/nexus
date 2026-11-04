@@ -623,8 +623,11 @@ que só reordenava o menu) saiu: no lugar dela o topo mostra "Setor: X". O códi
   semanal), e a mais nova ganha, como sempre; quem já via o relatório na Performance continua vendo. A tela que abre por
   dentro de outra (`Tela.dentro_de`) não é item do menu, mas é marcada na matriz como qualquer tela; quem tem ela
   liberada vê a de fora sem marcá-la (`setor_telas.com_as_de_fora`, no `acesso`): o relatório liberado traz a Central.
-- **Tela do setor (13/10/2026).** `Tela.do_setor` = o setor dono, pelo nome (sem acento nem caixa): quem é dele vê a
-  tela SEM marca (`setor_telas.das_do_setor`, somada às marcas no `acesso`). Pode ser mais de um (uma tupla de nomes,
+- **Tela do setor (13/10/2026).** `Tela.do_setor` = o setor dono, pelo `setor_id` (`cadastro/setor_ids.py`; até
+  04/11/2026 era o nome, sem acento nem caixa, e renomear o setor tirava a tela dele calado; o "Responsável UFV" do banco
+  já não casava com o "Responsáveis UFV" do código): quem é dele vê a tela SEM marca (`setor_telas.das_do_setor`, somada
+  às marcas no `acesso`). Setor que o código conhece, só pelo ID: o nome fica para mostrar, e
+  `tests/test_setor_por_id.py` cobra. Pode ser mais de um (uma tupla de IDs,
   `setor_telas.donos_do_codigo`, 16/10/2026: o Gerar a semana e o Quadro da semana do PCM são do PCM e do Responsáveis
   UFV, os supervisores); a Central, que mostra um dono por relatório, usa o primeiro. Os três relatórios da plataforma na Central
   são da Performance (Levi: "Potência ativa faz parte da performance!", "Esses dois são do setor performance") e os quatro

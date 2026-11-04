@@ -57,7 +57,7 @@
           <option value="" {% if c.dono.setor_id is none %}selected{% endif %}>Nenhum setor</option>
           {% for s in setores %}<option value="{{ s.setor_id }}" {% if c.dono.setor_id == s.setor_id %}selected{% endif %}>{{ s.nome }}</option>{% endfor %}
         </select>
-        {% if not c.dono.escolhido %}<span class="mudo">padrão{% if c.dono.setor_id is none and c.tela.do_setor %}: {{ c.tela.do_setor }} (não há setor com esse nome){% endif %}</span>{% endif %}
+        {% if not c.dono.escolhido %}<span class="mudo">padrão{% if c.dono.setor_id is none and c.dono.padrao_id %}: o setor nº {{ c.dono.padrao_id }}, que não existe mais{% endif %}</span>{% endif %}
       </div>
     </div>
     {% endfor %}

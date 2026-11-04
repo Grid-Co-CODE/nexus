@@ -28,6 +28,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from nexus.torres.oscreator import ponte
+from nexus.cadastro import setor_ids as SID
 
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
@@ -1390,7 +1391,7 @@ def setor_de_mentira(app, monkeypatch):
 
 def test_a_ponte_libera_o_administrador_e_os_setores_da_lista(app, setor_de_mentira, monkeypatch):
     """Quem a ponte libera (`ponte.lista_central`): o administrador do Nexus, sempre, sem ler o setor; quem é de um setor de
-    `SETORES_COM_LISTA_CENTRAL` (pelo nome, sem acento nem caixa). O resto, o sem setor, o setor que não deu para ler e o
+    `SETORES_COM_LISTA_CENTRAL` (pelo setor_id, desde 04/11/2026). O resto, o sem setor, o setor que não deu para ler e o
     Nexus sem a NEXUS_PESSOA_HMAC: não."""
     from flask import session
 
@@ -1400,22 +1401,22 @@ def test_a_ponte_libera_o_administrador_e_os_setores_da_lista(app, setor_de_ment
         assert P.lista_central() is True and setor_de_mentira["lidos"] == []
         session["admin"] = False
         session["usuario"] = {"email": "Pessoa.Teste@exemplo.test", "nome": "Pessoa Teste", "perfil": ""}
-        setor_de_mentira["valor"] = {"id": 3, "nome": "COS"}
+        setor_de_mentira["valor"] = {"id": SID.COS, "nome": "COS"}
         monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset())
         assert P.lista_central() is False                        # a lista de setores vazia: só o administrador
-        monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset({"cos"}))
-        for nome in ("COS", "cos", " Cós "):
-            setor_de_mentira["valor"] = {"id": 3, "nome": nome}
+        monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset({SID.COS}))
+        for nome in ("COS", "Centro de Operações"):        # o setor renomeado segue liberado
+            setor_de_mentira["valor"] = {"id": SID.COS, "nome": nome}
             assert P.lista_central() is True, nome
         assert setor_de_mentira["lidos"][-1] == "pessoa.teste@exemplo.test"
-        setor_de_mentira["valor"] = {"id": 2, "nome": "Performance"}
+        setor_de_mentira["valor"] = {"id": SID.PERFORMANCE, "nome": "Performance"}
         assert P.lista_central() is False
         setor_de_mentira["valor"] = None
         assert P.lista_central() is False
         setor_de_mentira["valor"] = RuntimeError("setores ilegíveis no banco")
         assert P.lista_central() is False
         app.config["NEXUS_PESSOA_HMAC"] = ""
-        setor_de_mentira["valor"] = {"id": 3, "nome": "COS"}
+        setor_de_mentira["valor"] = {"id": SID.COS, "nome": "COS"}
         assert P.lista_central() is False
 
 
@@ -1438,7 +1439,7 @@ def test_todos_os_setores_libera_quem_tem_setor(app, setor_de_mentira):
         setor_de_mentira["valor"] = RuntimeError("setores ilegíveis no banco")
         assert P.lista_central() is False
         app.config["NEXUS_PESSOA_HMAC"] = ""
-        setor_de_mentira["valor"] = {"id": 3, "nome": "COS"}
+        setor_de_mentira["valor"] = {"id": SID.COS, "nome": "COS"}
         assert P.lista_central() is False
 
 
@@ -1464,11 +1465,11 @@ def test_pela_ponte_so_o_administrador_e_o_setor_liberado_leem_da_lista(app, fr,
     lista."""
     from nexus.torres.oscreator import ponte as P
     _encher()
-    monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset({"cos"}))
-    setor_de_mentira["valor"] = {"id": 2, "nome": "Performance"}
+    monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset({SID.COS}))
+    setor_de_mentira["valor"] = {"id": SID.PERFORMANCE, "nome": "Performance"}
     h = _pela_ponte(app, TODA).get("/os/historico?modo=cos").get_data(as_text=True)
     assert _ao_vivo(h, 1) and "OS central" not in h and fr.n("total") == 0
-    setor_de_mentira["valor"] = {"id": 3, "nome": "COS"}
+    setor_de_mentira["valor"] = {"id": SID.COS, "nome": "COS"}
     h = _pela_ponte(app, OUTRA).get("/os/historico?modo=cos").get_data(as_text=True)
     assert _central(h, 1) and fr.n("lista", OUTRA) == 0
     monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset())
@@ -1480,8 +1481,8 @@ def test_o_arquivo_estatico_nao_paga_a_leitura_do_setor(app, setor_de_mentira, m
     """A marca da lista central (`ponte.lista_central`) lê o setor da pessoa no banco, e rodava em TODO pedido ao /os/*, os
     estáticos incluídos (uma tela carrega uma dúzia de .js e .css). O arquivo estático não lê a lista: a ponte nem pergunta."""
     from nexus.torres.oscreator import ponte as P
-    monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset({"cos"}))
-    setor_de_mentira["valor"] = {"id": 3, "nome": "COS"}
+    monkeypatch.setattr(P, "SETORES_COM_LISTA_CENTRAL", frozenset({SID.COS}))
+    setor_de_mentira["valor"] = {"id": SID.COS, "nome": "COS"}
     c = _pela_ponte(app, TODA)
     r = c.get("/os/static/os.css")
     assert r.status_code == 200 and setor_de_mentira["lidos"] == []

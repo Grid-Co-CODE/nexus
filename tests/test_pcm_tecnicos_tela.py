@@ -8,6 +8,7 @@ import json
 from nexus.pcm import atribuicoes as A
 from test_pcm_publicar import _no_setor, _pessoa
 from test_pcm_tecnicos_usina import F1, PESSOA, _h, banco  # noqa: F401 (fixture)
+from nexus.cadastro import setor_ids as SID
 
 ROTA = "/t/pcm/tecnicos-por-usina"
 
@@ -23,16 +24,16 @@ def _atuais(app):
 def test_quem_ve_e_quem_edita(app, banco, monkeypatch):
     c = _pessoa(app)
     por = {"usina_id": "1", "pessoa_id": "10", "acao": "por"}
-    _no_setor(monkeypatch, "Responsáveis UFV")
+    _no_setor(monkeypatch, SID.RESPONSAVEL_UFV)
     assert c.get(ROTA).status_code == 200
     assert c.post(ROTA + "/decidir", data=por).status_code == 403
     # quem vê: o portão por setor (desligado nos testes) segue o `Tela.do_setor` da torre
     from nexus.auth import setor_telas as ST
     with app.test_request_context():
-        assert "pcm/tecnicos-por-usina" in ST.das_do_setor({"id": 1, "nome": "Responsáveis UFV"})
-        assert "pcm/tecnicos-por-usina" in ST.das_do_setor({"id": 2, "nome": "PCM"})
-        assert "pcm/tecnicos-por-usina" not in ST.das_do_setor({"id": 3, "nome": "Performance"})
-    _no_setor(monkeypatch, "pcm")
+        assert "pcm/tecnicos-por-usina" in ST.das_do_setor({"id": SID.RESPONSAVEL_UFV, "nome": "Responsáveis UFV"})
+        assert "pcm/tecnicos-por-usina" in ST.das_do_setor({"id": SID.PCM, "nome": "PCM"})
+        assert "pcm/tecnicos-por-usina" not in ST.das_do_setor({"id": SID.PERFORMANCE, "nome": "Performance"})
+    _no_setor(monkeypatch, SID.PCM)
     r = c.post(ROTA + "/decidir", data=por)
     assert r.status_code == 303 and len(_decisoes(app)) == 1
     assert c.post(ROTA + "/carga-inicial").status_code == 403

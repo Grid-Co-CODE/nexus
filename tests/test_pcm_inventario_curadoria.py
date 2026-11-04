@@ -25,6 +25,7 @@ from nexus.pcm.inventario import erros
 from nexus.pcm.inventario import estoque as E
 from nexus.pcm.inventario.erros import Conflito
 from test_pcm_inventario_estoque import _jwt, _result, api_do_clone, com_o_fracttal  # noqa: F401  (api_do_clone é fixture)
+from nexus.cadastro import setor_ids as SID
 
 ALMOX = "10"
 LIGADA = "de-para do Fracttal"
@@ -553,7 +554,7 @@ def test_avariada_sem_cadastro_na_lista(cur, monkeypatch):
     assert (a["tipo"], a["contado"], a["id_item"], a["codigo"]) == ("avariado", 2, "3", "SP-3")
     assert (a["codigo_av"], a["nome_av"], a["unidade_av"]) == ("SP-3-AV", "[AVARIADO] Cabo solar 4 mm", "METRO")
     assert (p["L-2"]["codigo_av"], p["L-2"]["nome_av"], p["L-2"]["unidade_av"]) == ("", "", "")
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
     assert "Avariada sem cadastro" in html
     card = _cartao(html, "SP-3-AV")
@@ -647,7 +648,7 @@ def test_a_avariada_so_entra_numa_peca_avariada(cur, monkeypatch):
     with pytest.raises(ValueError, match=r"(?i)as avariadas só entram numa peça avariada \(-AV\)"):
         CU.decidir(cur.config, "C-1", "L-6", "e_a_peca", id_item="2", pessoa=PESSOA)
     assert _livro(cur.config, F.ABA_CURADORIA) == []
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     r = _pessoa_ms(cur).post(f"{URL}/decidir", data={"contagem": "C-1", "linha": "L-6", "decisao": "e_a_peca", "peca": "SP-2"})
     assert r.status_code == 400 and "as avariadas só entram numa peça avariada (-av)" in r.get_data(as_text=True).lower()
     assert CU.decidir(cur.config, "C-1", "L-6", "e_a_peca", id_item="6", pessoa=PESSOA)["id_item"] == "6"    # a marca vale
@@ -667,7 +668,7 @@ def test_avariada_com_o_av_repetido_no_catalogo(cur, monkeypatch):
     _o_bom_sem_av(cur, repetido=True)
     a = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}["L-6"]
     assert (a["codigo_av"], a["av_repetido"]) == ("SP-3-AV", True)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     card = _cartao(_pessoa_ms(cur).get(URL).get_data(as_text=True), "SP-3-AV")
     assert "há mais de um item com o código SP-3-AV no catálogo: escolha pelo 'é a peça X'" in card
     assert "não está no catálogo" not in card and "/curadoria/cadastrar" not in card
@@ -714,7 +715,7 @@ def test_sem_o_catalogo_lido_a_curadoria_nao_oferece_a_avariada(cur, monkeypatch
     with pytest.raises(F.Recusada, match="catálogo do App não foi lido") as ex:
         CU.decidir(cur.config, "C-1", "L-6", "descartar", motivo="x", pessoa=PESSOA)
     assert erros.resposta(ex.value)[0] == 503 and _livro(cur.config, F.ABA_CURADORIA) == []
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
     assert "O catálogo do App não foi lido agora" in html and "SP-3-AV" not in html and "Cabo azul 6 mm" in html
 
@@ -740,7 +741,7 @@ def _estoque_da_sessao(monkeypatch, falso):
 
 
 def test_tela_lista_as_pendencias_e_lembra_do_fracttal(cur, monkeypatch):
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     r = _pessoa_ms(cur).get(URL)
     html = r.get_data(as_text=True)
     assert r.status_code == 200 and "Curadoria" in html
@@ -761,7 +762,7 @@ def test_tela_mostra_a_foto_guardada(cur, monkeypatch):
     destino.mkdir(parents=True)
     foto_id = CU.nome_da_foto("foto-abc")
     (destino / f"{foto_id}.jpg").write_bytes(b"\xff\xd8\xff jpeg de mentira")
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(cur)
     html = c.get(URL).get_data(as_text=True)
     assert f"{URL}/foto/{foto_id}.jpg" in html
@@ -781,19 +782,19 @@ def test_so_o_setor_pcm_decide(cur, monkeypatch):
     _estoque_da_sessao(monkeypatch, falso)
     corpo = {"contagem": "C-1", "linha": "L-3", "decisao": "descartar", "motivo": "x"}
     c = _pessoa_ms(cur)
-    _no_setor(monkeypatch, "Performance")
+    _no_setor(monkeypatch, SID.PERFORMANCE)
     assert c.post(f"{URL}/decidir", data=corpo).status_code == 403
-    _no_setor(monkeypatch, "Responsáveis UFV")
+    _no_setor(monkeypatch, SID.RESPONSAVEL_UFV)
     assert c.post(f"{URL}/decidir", data=corpo).status_code == 403
     assert c.post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo"}).status_code == 403
     assert falso.chamadas == [] and F.ler(cur.config, forcar=True)[F.ABA_CURADORIA] == []
-    _no_setor(monkeypatch, "pcm")
+    _no_setor(monkeypatch, SID.PCM, "Planejamento")          # o setor PCM renomeado decide igual (04/11/2026)
     assert c.post(f"{URL}/decidir", data=corpo).status_code == 303
     assert len(F.ler(cur.config, forcar=True)[F.ABA_CURADORIA]) == 1
 
 
 def test_pedido_de_outro_site_e_recusado(cur, monkeypatch):
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     r = _pessoa_ms(cur).post(f"{URL}/decidir", data={"contagem": "C-1", "linha": "L-3", "decisao": "descartar", "motivo": "x"},
                           headers={"Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 403
@@ -807,7 +808,7 @@ def test_tela_cadastra_pelo_login_de_quem_decide(cur, monkeypatch):
     página, ao recarregar, mostra o aviso e o código novo."""
     falso = _falso()
     _estoque_da_sessao(monkeypatch, falso)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = com_o_fracttal(cur, _pessoa_ms(cur))
     r = c.post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm",
                                 "unidade": "METRO"})
@@ -822,7 +823,7 @@ def test_cadastrar_nao_e_rota_de_t_pcm(cur, monkeypatch):
     """O cadastro fala com o Fracttal: em /t/pcm o login dele nunca chega, e a rota recusa antes de qualquer pedido."""
     falso = _falso()
     _estoque_da_sessao(monkeypatch, falso)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     r = _pessoa_ms(cur).post(f"{URL}/decidir", data={"contagem": "C-1", "linha": "L-2", "decisao": "cadastrar",
                                                      "sigla": "CAB", "nome": "Cabo"})
     assert r.status_code == 400 and "roda pela ponte do login do Fracttal" in r.get_data(as_text=True)
@@ -831,7 +832,7 @@ def test_cadastrar_nao_e_rota_de_t_pcm(cur, monkeypatch):
 
 def test_tela_e_a_peca_pelo_codigo_ou_pelo_id(cur, monkeypatch):
     """O PCM conhece o CÓDIGO da peça, não o ID: a tela aceita os dois, e o ID que vale é o do catálogo."""
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(cur)
     assert c.post(f"{URL}/decidir", data={"contagem": "C-1", "linha": "L-2", "decisao": "e_a_peca", "peca": "sp-1"}
                   ).status_code == 303
@@ -845,7 +846,7 @@ def test_tela_e_a_peca_pelo_codigo_ou_pelo_id(cur, monkeypatch):
 
 def test_status_de_cada_recusa(cur, monkeypatch):
     """400 o pedido sem sentido, 409 a linha já decidida ou a contagem já gravada, 401 o Fracttal sem login, 429 o limite."""
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(cur)
     base = {"contagem": "C-1", "linha": "L-3", "decisao": "descartar", "motivo": "x"}
     assert c.post(f"{URL}/decidir", data={**base, "motivo": ""}).status_code == 400
@@ -878,7 +879,7 @@ def test_cadastrar_com_a_conta_do_fracttal_de_outra_pessoa_e_recusado(cur, monke
     from nexus.pcm.inventario import ponte_os
     falso = _falso()
     _estoque_da_sessao(monkeypatch, falso)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = com_o_fracttal(cur, _pessoa_ms(cur), "outra.pessoa@exemplo.test")
     r = c.post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm"})
     assert r.status_code == 409 and r.get_json()["erro"] == ponte_os.OUTRA_CONTA and "/os/login?next=" in r.get_json()["login"]
@@ -887,7 +888,7 @@ def test_cadastrar_com_a_conta_do_fracttal_de_outra_pessoa_e_recusado(cur, monke
 
 def test_limite_do_fracttal_na_curadoria_e_429(cur, monkeypatch):
     _estoque_da_sessao(monkeypatch, _falso(limite_em=1))
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     r = com_o_fracttal(cur, _pessoa_ms(cur)).post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm"})
     assert r.status_code == 429 and "tente de novo" in r.get_json()["erro"].lower()
 
@@ -896,7 +897,7 @@ def test_rede_que_cai_no_cadastro_diz_que_o_codigo_ficou_reservado(cur, monkeypa
     """A resposta do `criar_peca` se perde: a ponte responde 502 com o texto do CADASTRO (o código ficou reservado, repetir com os
     mesmos dados não cria outra peça), e não o da régua ("grave de novo, é o mesmo número")."""
     _estoque_da_sessao(monkeypatch, _falso(perder_resposta={"criar_peca"}))
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     r = com_o_fracttal(cur, _pessoa_ms(cur)).post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm"})
     assert r.status_code == 502 and "reservado" in r.get_json()["erro"] and "mesmo número" not in r.get_json()["erro"]
     assert F.ler(cur.config, forcar=True)[F.ABA_CURADORIA] == []
@@ -934,7 +935,7 @@ def test_o_login_do_fracttal_so_chega_na_ponte(cur, api_do_clone, monkeypatch):
     jwt = _jwt()
     cookie = clone.session_interface.get_signing_serializer(clone).dumps(
         {"jwt": jwt, "conta": {"email": "pessoa.teste@exemplo.com", "nome": "Pessoa"}})     # a pessoa da sessão (`_pessoa`)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa(cur)                                                    # a sessão nasceu do login do Fracttal
     c.set_cookie("os_sessao", cookie, path="/os")                       # como o login do Fracttal o grava
     assert c.get("/t/pcm/pecas/inventario/_sonda").get_data(as_text=True) == "sem login" and pedidos == []
@@ -959,7 +960,7 @@ def test_tela_de_quem_so_olha_nao_tem_formulario_nem_descricao_nem_foto(cur, mon
     destino.mkdir(parents=True)
     foto_id = CU.nome_da_foto("foto-abc")
     (destino / f"{foto_id}.jpg").write_bytes(b"\xff\xd8\xff jpeg de mentira")
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(cur)
     assert f"{URL}/foto/{foto_id}.jpg" in c.get(URL).get_data(as_text=True)         # quem decide vê
     monkeypatch.setattr(telas, "pode_programar", lambda: False)
@@ -1044,7 +1045,7 @@ def test_a_tela_volta_preenchida_com_a_reserva(cur, monkeypatch):
         _cadastrar(cur.config, falso)
     p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
     assert p["L-2"]["reserva"]["codigo"] == "SP-CAB-013" and p["L-3"]["reserva"] is None
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
     assert "já reservou o código SP-CAB-013" in html and '<option value="CAB" selected>' in html
     assert '<option value="METRO" selected>' in html and 'value="Cabo azul 6 mm"' in html
@@ -1208,7 +1209,7 @@ def test_curadoria_mostra_fabricante_modelo_serie(cur, monkeypatch):
     assert (p["L-10"]["fabricante"], p["L-10"]["modelo"], p["L-10"]["serie"]) == ("Fabricante Exemplo", "não tem", "SN-0001")
     assert (p["L-11"]["fabricante"], p["L-11"]["modelo"], p["L-11"]["serie"]) == ("Outro Fabricante", "M-20", "não tem")
     assert (p["L-3"]["fabricante"], p["L-3"]["modelo"], p["L-3"]["serie"]) == ("", "", "")      # a coluna vazia: nada
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(cur)
     html = c.get(URL).get_data(as_text=True)
     card = _cartao(html, "Disjuntor sem etiqueta")
@@ -1269,7 +1270,7 @@ def test_curadoria_foto_que_nao_chegou(cur, monkeypatch):
     """A foto vai depois da linha (a fila offline do App): a chave já está no livro e o arquivo ainda não está no Nexus. O cartão
     diz "foto ainda não chegou"; sem chave nenhuma, "sem foto", como hoje."""
     _so(cur, ACHADO_COM_DADOS, CONECTOR)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(cur)
     html = c.get(URL).get_data(as_text=True)
     card = _cartao(html, "Disjuntor sem etiqueta")
@@ -1286,7 +1287,7 @@ def test_a_foto_que_falta_diz_o_que_o_app_faz(cur, monkeypatch):
     de 30/10/2026 (com a coluna) manda, e a foto que falta "ainda não chegou"."""
     hoje = [{k: v for k, v in l.items() if k not in NOVAS} for l in (PECA_DA_LISTA, CABO, CONECTOR)]
     _so(cur, *hoje)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(cur)
     html = c.get(URL).get_data(as_text=True)
     assert "o App ainda não envia as fotos" in _cartao(html, "Cabo azul 6 mm") and "foto ainda não chegou" not in html
@@ -1313,7 +1314,7 @@ def test_ja_decididas_lembra_de_completar_no_fracttal(cur, monkeypatch):
     # com os dados, mas sem peça criada: o genérico confirmado e o achado descartado não lembram nada
     CU.decidir(cur.config, "C-1", "L-11", "confirmar", pessoa=PESSOA)
     CU.decidir(cur.config, "C-1", "L-12", "descartar", motivo="não é peça do estoque", pessoa=PESSOA)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(cur)
     tabela = c.get(URL).get_data(as_text=True).split("Já decididas, em contagens ainda não gravadas")[1]
     linhas = {cod: tr for tr in re.findall(r"<tr>\s*<td.*?</tr>", tabela, re.S)
@@ -1338,7 +1339,7 @@ def test_curadoria_livro_de_hoje(cur, monkeypatch):
     assert all((x["fabricante"], x["modelo"], x["serie"]) == ("", "", "") for x in p.values())
     assert p["L-2"]["fotos"] == [{"rotulo": "Peça", "foto_id": CU.nome_da_foto("foto-abc"), "tem": False, "versao": ""}]
     foto_id = _guardar_foto(cur.config, "foto-abc")
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
     assert "Fabricante" not in html and "Número de série" not in html and 'class="cu-dados"' not in html
     card = _cartao(html, "Cabo azul 6 mm")
@@ -1353,7 +1354,7 @@ def test_a_caixa_da_foto(cur, monkeypatch):
     from nexus.pcm import telas
     _so(cur, ACHADO_COM_DADOS)
     peca, fab, ser = (_guardar_foto(cur.config, c) for c in ("foto-peca", "foto-fab", "foto-ser"))
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(cur)
     html = c.get(URL).get_data(as_text=True)
     caixa = re.search(r"<dialog\b[^>]*>(.*?)</dialog>", html, re.S)
@@ -1394,7 +1395,7 @@ def test_a_foto_refeita_muda_o_endereco(cur, monkeypatch):
     import time
     _so(cur, ACHADO_COM_DADOS)
     fab = _guardar_foto(cur.config, "foto-fab")
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(cur)
 
     def endereco():
@@ -1417,7 +1418,7 @@ def test_cadastrar_nao_manda_os_dados_da_peca_e_a_tela_lembra(cur, monkeypatch):
     mandava antes (código, nome, unidade), e o cartão lembra de completar os três na tela do Fracttal, junto do grupo, da
     criticidade e da Curva ABC (sem as partes "n/a" ou vazias)."""
     _so(cur, PECA_DA_LISTA, ACHADO_COM_DADOS, CABO, GENERICO_COM_DADOS)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
     card = _cartao(html, "Disjuntor sem etiqueta")
     lembra = re.search(r'<p class="alm-det cu-lembrar">(.*?)</p>', card, re.S).group(1)
@@ -1440,7 +1441,7 @@ def test_cadastrar_avariado_nao_manda_os_dados_da_peca(cur, monkeypatch):
     _aba(cur.extensions["nexus_dados_sessao"], A.LIVRO_CONTAGENS, A.ABA_CONTAGENS,
          [PECA_DA_LISTA, dict(AVARIADA, Fabricante="Fabricante Exemplo", Modelo="M-1", **{"Número de série": "n/a"})])
     visao.limpar()
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     card = _cartao(_pessoa_ms(cur).get(URL).get_data(as_text=True), "SP-3-AV")
     assert re.search(r'<p class="alm-det cu-lembrar">[^<]*<b>Fabricante: Fabricante Exemplo · Modelo: M-1</b>', card)
     falso = _falso()

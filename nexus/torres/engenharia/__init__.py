@@ -15,6 +15,7 @@ from urllib.parse import urlencode
 
 from flask import abort, jsonify, redirect, render_template, request, session, url_for
 
+from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
 
 TORRE = Torre(
@@ -29,14 +30,14 @@ TORRE = Torre(
         Tela("mesa", "Mesa do engenheiro",
              "O que está comigo, o que me encaminharam e o que precisa de dono?",
              "Acompanhamento dos ativos da Engenharia (banco) e as OS de falha do Fracttal",
-             do_setor="Engenharia"),
+             do_setor=SID.ENGENHARIA),
         # do setor Engenharia também (revisão final, 18/10/2026): as ações da gaveta da Mesa vão para as rotas daqui, e o
         # portão do setor pede a marca desta tela; sem ela, o Pegar da Mesa voltava HTTP 403. A marca em Base → Acessos
         # segue valendo para os outros setores
         Tela("confiabilidade", "Confiabilidade",
              "Quais ativos falham mais e demoram mais a voltar?",
              "OS de falha do Fracttal, lidas pelo Nexus",
-             do_setor="Engenharia"),
+             do_setor=SID.ENGENHARIA),
         Tela("equipe", "Quadro da equipe",
              "Quem da engenharia está com o quê, o que atrasou e o que vem por aí?",
              "OS do Fracttal dos responsáveis da engenharia"),
@@ -45,7 +46,7 @@ TORRE = Torre(
         Tela("etm", "ETMs",
              "Quais estações meteorológicas têm OS aberta, com quem e há quanto tempo?",
              "OS de ETM do Fracttal e as marcações da Engenharia (banco)",
-             do_setor="Engenharia"),
+             do_setor=SID.ENGENHARIA),
         Tela("criticidade", "Matriz de criticidade",
              "Qual ativo, se parar, dói mais?",
              "engenharia.json do painel PCM"),
@@ -55,7 +56,7 @@ TORRE = Torre(
         Tela("fmea", "FMEA e causa raiz",
              "Por que a falha acontece e o que a elimina?",
              "Relatórios emitidos pela Engenharia (banco), sobre as OS de falha do Fracttal",
-             do_setor="Engenharia"),
+             do_setor=SID.ENGENHARIA),
         Tela("laudos", "Laudos MPS/MPA",
              "Que laudos estão pendentes ou vencidos?",
              "engenharia.json do painel PCM"),

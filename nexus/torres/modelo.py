@@ -25,12 +25,12 @@ class Tela:
     # pessoa escolhe que tipo de relatório ela quer!"): sem item próprio no menu, o item da outra acende quando ela está
     # aberta, e quem tem ela liberada no setor vê a outra também (auth/setor_telas.py). Vazio = item do menu, como sempre
     dentro_de: str = ""
-    # o setor DONO da tela, pelo nome (o da tela Base → Acessos → Pessoas e setores; sem acento nem caixa): quem é dele vê a tela
-    # sem marcá-la em Base → Acessos (13/10/2026, Levi, sobre os relatórios da Central: "Potência ativa faz parte da
-    # performance!" e "Esses dois são do setor performance"). Vazio = só as marcas, como sempre. Pode ser mais de um
-    # (uma tupla de nomes, `setor_telas.donos_do_codigo`; 16/10/2026, o Gerar e o Quadro do PCM, que são também dos
-    # supervisores: Levi, "tanto PCM quanto supervisores! Vou criar um setor de Responsáveis UFV")
-    do_setor: str | tuple[str, ...] = ""
+    # o setor DONO da tela, pelo setor_id (`cadastro/setor_ids.py`; até 04/11/2026 era o nome, e renomear o setor em Base →
+    # Acessos tirava a tela dele sem erro): quem é dele vê a tela sem marcá-la em Base → Acessos (13/10/2026, Levi, sobre os
+    # relatórios da Central: "Potência ativa faz parte da performance!" e "Esses dois são do setor performance"). Vazio = só
+    # as marcas, como sempre. Pode ser mais de um (uma tupla de IDs, `setor_telas.donos_do_codigo`; 16/10/2026, o Gerar e o
+    # Quadro do PCM, que são também dos supervisores: Levi, "tanto PCM quanto supervisores!")
+    do_setor: int | tuple[int, ...] = ()
     # a tela de TODO setor (03/11/2026, a Caixa de entrada; Levi: "libera a caixa para todos os setores"): quem tem setor
     # a vê sem marca, como a do dono; quem é mencionado numa conversa precisa dela para ver o aviso
     de_todos: bool = False

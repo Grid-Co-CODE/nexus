@@ -32,6 +32,7 @@ from ...campo import verificacao as campo_verif
 from ...campo import painel_relatorio as campo_relatorio
 from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
+from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
 from ...prefixo import na_raiz, raiz
 from .papel import papel_da_sessao
@@ -54,7 +55,7 @@ TORRE = Torre(
         # de um supervisor, no Nexus. Dos Responsáveis UFV sem marcar em Base → Acessos (como o Gerar e o Quadro do PCM);
         # os outros setores, pela marca
         Tela("ocorrencias", "Ocorrências", "Que ocorrência das minhas usinas tem ação vencendo, e com quem ela está?",
-             "Livro nexus_ocorrencias (escrito nesta tela) + cadastro do Nexus", do_setor="Responsáveis UFV"),
+             "Livro nexus_ocorrencias (escrito nesta tela) + cadastro do Nexus", do_setor=SID.RESPONSAVEL_UFV),
         Tela("atencao", "Central de atenção",
              "O que no campo pede ação agora: usina sem ronda, PT parada, ronda sem OS?", FONTE_APP),
         Tela("aprovacao", "Aprovação de OS",

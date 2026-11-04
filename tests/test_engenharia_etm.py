@@ -8,6 +8,7 @@ from datetime import date
 import pytest
 
 from nexus.engenharia import etm as E
+from nexus.cadastro import setor_ids as SID
 
 HOJE = date(2026, 10, 26)
 U = "Cliente X - Usina Alfa - MG"
@@ -277,7 +278,7 @@ def tela(banco, app, monkeypatch):
     monkeypatch.setattr(E, "dados", lambda: {"os": oss, "lido": time.time(), "lendo": False, "erro": ""})
     monkeypatch.setattr(E, "pedir_releitura", lambda app=None, esperar=False, forcar=False:
                         pedidos.append((esperar, forcar)))
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 1, "nome": "Engenharia"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"},
                                                "erro": ""})
     return pedidos
 
@@ -292,7 +293,7 @@ def test_a_tela_etms_na_torre_da_engenharia(tela, cliente):
 
     from nexus.torres import engenharia as torre
     t = torre.TORRE.tela("etm")
-    assert t.nome == "ETMs" and t.do_setor == "Engenharia"
+    assert t.nome == "ETMs" and t.do_setor == SID.ENGENHARIA
     html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
     d = _dados_da_tela(html)
     assert sorted(o["os"] for o in d["oss"]) == ["1", "2", "3", "4"]
@@ -439,7 +440,7 @@ def pagina_etm(banco, app, monkeypatch):
     monkeypatch.setattr(os_equipe, "_ler_fracttal", rest)
     monkeypatch.setattr(torre, "_onde_do_cadastro",
                         lambda: (lambda texto, cod: {"usina_id": 7, "ligada_por": "de-para do Fracttal"}))
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 1, "nome": "Engenharia"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"},
                                                "erro": ""})
 
 
@@ -503,7 +504,7 @@ def test_quem_nao_e_da_engenharia_le_as_marcacoes_sem_formularios(pagina_etm, cl
     from test_engenharia_acompanhamento import BETO, _como
 
     from nexus.auth import setor_telas as ST
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"etm"}, "setor": {"id": 2, "nome": "Performance"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"etm"}, "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
                                                "erro": ""})
     p = _secao_os(_como(cliente, BETO).get(URL_OS).get_data(as_text=True), "Marcações da Engenharia")
     assert "<form" not in p and "<dt>Diagnóstico</dt><dd>—</dd>" in p
@@ -655,7 +656,7 @@ def test_quem_pode_finalizar_vai_no_json(tela, cliente, monkeypatch):
     from nexus.auth import setor_telas as ST
     assert _dados_da_tela(_como(cliente, ANA).get(URL_TELA).get_data(as_text=True))["pode"] is True
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"engenharia/etm"},
-                                               "setor": {"id": 2, "nome": "Performance"}, "erro": ""})
+                                               "setor": {"id": SID.PERFORMANCE, "nome": "Performance"}, "erro": ""})
     assert _dados_da_tela(_como(cliente, BETO).get(URL_TELA).get_data(as_text=True))["pode"] is False
 
 
@@ -712,7 +713,7 @@ def test_finalizar_em_lote_so_quem_e_da_engenharia_e_do_proprio_site(lote, clien
     r = _como(cliente, ANA).post(URL_FIN, json={"usina": U, "os": ["3"]}, headers={"Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 403
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"engenharia/etm"},
-                                               "setor": {"id": 2, "nome": "Performance"}, "erro": ""})
+                                               "setor": {"id": SID.PERFORMANCE, "nome": "Performance"}, "erro": ""})
     r = _como(cliente, BETO).post(URL_FIN, json={"usina": U, "os": ["3"]}, headers=SAME)
     assert r.status_code == 403 and "Engenharia" in r.get_json()["erro"]
     assert M._reler()["eventos"] == []

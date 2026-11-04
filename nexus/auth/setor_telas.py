@@ -339,9 +339,9 @@ def _sem_acento(texto) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", str(texto or "")) if unicodedata.category(c) != "Mn").strip().lower()
 
 
-def donos_do_codigo(tela) -> tuple[str, ...]:
-    """Os nomes dos setores donos de uma tela no código (`Tela.do_setor`: um nome ou uma tupla deles; 16/10/2026, o
-    Gerar e o Quadro do PCM são do PCM e dos Responsáveis UFV)."""
+def donos_do_codigo(tela) -> tuple[int, ...]:
+    """Os setor_id dos setores donos de uma tela no código (`Tela.do_setor`: um ID ou uma tupla deles; 16/10/2026, o
+    Gerar e o Quadro do PCM são do PCM e dos Responsáveis UFV). Pelo ID desde 04/11/2026 (`cadastro/setor_ids.py`)."""
     d = tela.do_setor
     return tuple(x for x in (d if isinstance(d, (tuple, list)) else (d,)) if x)
 
@@ -350,22 +350,13 @@ def das_do_setor(setor) -> set[str]:
     """As telas que são DO setor: quem é dele as vê sem marcar (13/10/2026, Levi, sobre os relatórios da Central de
     emissão: "Potência ativa faz parte da performance!" e "Esses dois são do setor performance"). Setor de outro nome
     não ganha nada; a marca em Base → Acessos segue valendo para ele.
-    O dono é o que o administrador escolheu na Central (14/10/2026, `escolhas_de_dono`, pelo setor_id: o setor renomeado
-    continua dono) e, sem escolha, o `Tela.do_setor` do código, pelo nome (sem acento nem caixa). `setor` é o dict
-    {"id", "nome"} da pessoa ou só o nome (aí a escolha casa pelo nome de agora do setor escolhido)."""
-    nome = setor.get("nome") if isinstance(setor, dict) else setor
-    sid = setor.get("id") if isinstance(setor, dict) else None
-    alvo = _sem_acento(nome)
-    if not alvo and sid is None:
+    O dono é o que o administrador escolheu na Central (14/10/2026, `escolhas_de_dono`) e, sem escolha, o `Tela.do_setor`
+    do código; os dois pelo setor_id (desde 04/11/2026 também o do código: renomear o setor não tira tela de ninguém).
+    `setor` é o dict {"id", "nome"} da pessoa ou só o setor_id."""
+    sid = setor.get("id") if isinstance(setor, dict) else setor
+    if sid is None:
         return set()
     escolhas = escolhas_de_dono()
-    nomes: dict = {}
-    if escolhas and sid is None:
-        try:
-            st = _setores_no_clique(*_banco())
-            nomes = {s["setor_id"]: s["nome"] for s in S.ativos(st.get("setores") or [])}
-        except Exception:        # noqa: BLE001 — sem os nomes, a escolha não casa por nome
-            nomes = {}
     out = set()
     for t in current_app.extensions.get("nexus_torres", []):
         for s in t.telas:
@@ -373,27 +364,26 @@ def das_do_setor(setor) -> set[str]:
             if s.de_todos:
                 out.add(k)
             elif k in escolhas:
-                dono = escolhas[k]
-                if dono is not None and (dono == sid or (sid is None and _sem_acento(nomes.get(dono)) == alvo)):
+                if escolhas[k] is not None and escolhas[k] == sid:
                     out.add(k)
-            elif alvo and any(_sem_acento(d) == alvo for d in donos_do_codigo(s)):
+            elif sid in donos_do_codigo(s):
                 out.add(k)
     return out
 
 
 def dono_de(torre_id: str, tela, escolhas: dict, setores: list[dict]) -> dict:
     """O dono de agora de um relatório, para a Central: {"setor_id" (None = nenhum), "nome", "escolhido" (a escolha da
-    Central) ou False (o padrão do código, pelo nome)}. `setores` = os ativos ({setor_id, nome})."""
+    Central) ou False (o padrão do código, pelo setor_id), "padrao_id" (o do código)}. `setores` = os ativos ({setor_id,
+    nome})."""
     k = chave(torre_id, tela.id)
     if k in escolhas:
         sid = escolhas[k]
         nome = next((s["nome"] for s in setores if s["setor_id"] == sid), "setor excluído" if sid is not None else "")
-        return {"setor_id": sid, "nome": nome, "escolhido": True}
-    primeiro = (donos_do_codigo(tela) or ("",))[0]          # a Central mostra um dono: o primeiro do código
-    alvo = _sem_acento(primeiro)
-    s = next((s for s in setores if alvo and _sem_acento(s["nome"]) == alvo), None)
-    return {"setor_id": s["setor_id"] if s else None, "nome": s["nome"] if s else primeiro,
-            "escolhido": False}
+        return {"setor_id": sid, "nome": nome, "escolhido": True, "padrao_id": None}
+    primeiro = (donos_do_codigo(tela) or (None,))[0]        # a Central mostra um dono: o primeiro do código
+    s = next((s for s in setores if primeiro is not None and s["setor_id"] == primeiro), None)
+    return {"setor_id": s["setor_id"] if s else None, "nome": s["nome"] if s else "", "escolhido": False,
+            "padrao_id": primeiro}
 
 
 def com_as_de_fora(telas: set[str]) -> set[str]:

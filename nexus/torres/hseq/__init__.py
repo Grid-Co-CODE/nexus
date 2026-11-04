@@ -29,6 +29,7 @@ from ...hseq import info_extintor as INFO
 from ...hseq import planilha as PLA
 from ...hseq import relatorio as REL
 from ..campo import _lido, _url
+from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
 from ...prefixo import na_raiz
 
@@ -43,7 +44,7 @@ TORRE = Torre(
         # vencidos, usinas sem luvas"), do setor Segurança: quem é dele a vê sem marcar em Base → Acessos
         Tela("mesa", "Mesa da Segurança",
              "O que pede ação hoje: PT parada, extintor vencido ou não reconhecido e usina sem luvas?",
-             "PT do App, extintores e rondas do App + cadastro do Nexus", do_setor="Segurança"),
+             "PT do App, extintores e rondas do App + cadastro do Nexus", do_setor=SID.SEGURANCA),
         Tela("extintores", "Extintores",
              "Que extintor está vencido, perto de vencer ou sem conferência há mais de 30 dias, em que cliente e usina, "
              "e com qual responsável?",

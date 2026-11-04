@@ -13,6 +13,7 @@ from test_setor_telas import ANA, _como, setores  # noqa: F401  (setores é fixt
 
 from nexus.campo import visao
 from nexus.dados import almoxarifado as A
+from nexus.cadastro import setor_ids as SID
 
 INICIO, FIM = "2026-10-25T03:00:12Z", "2026-10-25T03:29:42Z"
 ALT = "// Thopen/ Thopen - Altair 1 - SP/"                 # a de-para do `banco` liga a Altair (usina 1)
@@ -93,7 +94,7 @@ def almox(banco, monkeypatch):
     return banco
 
 
-def _abrir(app, monkeypatch, setor="PCM"):
+def _abrir(app, monkeypatch, setor=SID.PCM):
     _no_setor(monkeypatch, setor)
     return _pessoa(app).get("/t/pcm/pecas")
 
@@ -201,7 +202,7 @@ def test_tela_so_do_setor_pcm(app, logado, setores):  # noqa: F811
     """O setor dono é o PCM (outros setores, pela marca em Base → Acessos); o endereço é o do placeholder de antes."""
     from nexus.torres.pcm import TORRE
     t = TORRE.tela("pecas")
-    assert t.do_setor == "PCM" and t.nome == "Almoxarifado"
+    assert t.do_setor == SID.PCM and t.nome == "Almoxarifado"
     assert _como(app, ANA).get("/t/pcm/pecas").status_code == 403           # a Ana é da Performance
 
 
@@ -601,7 +602,7 @@ def _codigos(html):
 
 
 def _pecas(app, monkeypatch, id_almox="10"):
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     return _pessoa(app).get(f"/t/pcm/pecas/almox/{id_almox}")
 
 

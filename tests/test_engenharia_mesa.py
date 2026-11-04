@@ -9,6 +9,7 @@ from test_engenharia_acompanhamento import (ANA, ATIVO, BETO, PESSOAS, _a, _aid,
                                             banco, tela)
 
 from nexus.engenharia import acompanhamento as A
+from nexus.cadastro import setor_ids as SID
 
 URL = "/t/engenharia/mesa"
 CAIO = {"email": "caio.prado@gridco.com.br", "nome": "Caio Prado"}      # administrador fora da Engenharia
@@ -61,7 +62,7 @@ def test_a_mesa_e_a_primeira_tela_da_engenharia_e_e_do_setor():
     from nexus.auth import pre_carga
     from nexus.torres import engenharia as torre
     t = torre.TORRE.telas[0]
-    assert t.id == "mesa" and t.do_setor == "Engenharia"
+    assert t.id == "mesa" and t.do_setor == SID.ENGENHARIA
     assert "engenharia/mesa" in pre_carga.FORA                        # lê as OS de falha do Fracttal ao abrir
 
 
@@ -143,7 +144,7 @@ def test_administrador_fora_da_engenharia_escolhe_e_volta_para_a_sua_mesa(mesa, 
     # revisão final: o administrador da Performance não está na lista da Engenharia; o seletor marcava a 1ª pessoa
     # como escolhida (a mesa dela não abria pelo seletor) e não havia como voltar à sua
     from nexus.auth import setor_telas as ST
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
                                                "erro": ""})
     app.config["NEXUS_ADMINS"] = CAIO["email"]
     html = _como(cliente, CAIO, admin=True).get(URL).get_data(as_text=True)
@@ -193,7 +194,7 @@ def test_a_engenharia_age_pela_mesa_sem_marcar_a_confiabilidade(app, monkeypatch
     from nexus.auth import setor_telas as ST
     monkeypatch.setattr(ST, "escolhas_de_dono", lambda: {})          # sem escolha na Central: vale o do código
     with app.app_context():
-        telas = ST.das_do_setor({"id": 1, "nome": "Engenharia"})
+        telas = ST.das_do_setor({"id": SID.ENGENHARIA, "nome": "Engenharia"})
         assert ST.pode("/t/engenharia/mesa", telas)
         for acao in ("pegar", "encaminhar", "a1b2c3/salvar", "a1b2c3/comentar"):
             assert ST.pode(f"/t/engenharia/confiabilidade/acompanhamento/{acao}", telas)

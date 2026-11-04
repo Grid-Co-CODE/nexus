@@ -14,6 +14,7 @@ import sys
 import pytest
 
 from nexus.torres.oscreator import ponte
+from nexus.cadastro import setor_ids as SID
 
 if ponte.RAIZ_CLONE not in sys.path:
     sys.path.append(ponte.RAIZ_CLONE)
@@ -169,15 +170,17 @@ def test_a_regra_do_nexus_administrador_ou_setor_chamados(app, setor_de_mentira)
         assert ponte.obs_chamados() == {"pode": True, "aviso": ""}
         session["admin"] = False
         session["usuario"] = {"email": "pessoa.teste@exemplo.test", "nome": "Pessoa Teste", "perfil": ""}
-        for nome in ("Chamados", "chamados", " CHAMADOS "):
-            setor_de_mentira["valor"] = {"id": 4, "nome": nome}
+        for nome in ("Chamados", "Atendimento"):            # pelo setor_id (04/11/2026): renomeado, segue podendo
+            setor_de_mentira["valor"] = {"id": SID.CHAMADOS, "nome": nome}
             assert ponte.obs_chamados() == {"pode": True, "aviso": ""}, nome
-        setor_de_mentira["valor"] = {"id": 2, "nome": "Performance"}
+        setor_de_mentira["valor"] = {"id": SID.SEGURANCA, "nome": "Chamados"}       # o nome sozinho não dá
+        assert ponte.obs_chamados()["pode"] is False
+        setor_de_mentira["valor"] = {"id": SID.PERFORMANCE, "nome": "Performance"}
         a = ponte.obs_chamados()
         assert a["pode"] is False and "setor Chamados e dos administradores" in a["aviso"]
         assert "Você está no setor Performance." in a["aviso"]
         # a regra da Área PCM continua a mesma
-        setor_de_mentira["valor"] = {"id": 9, "nome": "PCM"}
+        setor_de_mentira["valor"] = {"id": SID.PCM, "nome": "PCM"}
         assert ponte.area_pcm() == {"pode": True, "aviso": ""}
         assert ponte.obs_chamados()["pode"] is False
 

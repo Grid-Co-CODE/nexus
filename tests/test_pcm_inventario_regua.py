@@ -21,6 +21,7 @@ from nexus.dados import fato_inventario as F
 from nexus.pcm.inventario import estoque as E
 from nexus.pcm.inventario import regua as R
 from test_pcm_inventario_estoque import _jwt, _result, api_do_clone, com_o_fracttal  # noqa: F401  (api_do_clone é fixture)
+from nexus.cadastro import setor_ids as SID
 
 ALMOX, LIGADA = "900", "de-para do Fracttal"
 HMAC_CHAVE = "chave-de-teste"
@@ -361,7 +362,7 @@ def _estoque_da_sessao(monkeypatch, falso):
 
 
 def test_tela_mostra_o_quadro_e_o_formulario_do_pcm(inv, monkeypatch):
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(inv)
     html = c.get("/t/pcm/pecas/inventario/regua").get_data(as_text=True)
     assert "Mínimo e máximo" in html and "Almoxarifado 10" in html and "Almoxarifado 20" in html
@@ -382,14 +383,14 @@ def test_so_o_setor_pcm_decide(inv, monkeypatch):
     _estoque_da_sessao(monkeypatch, falso)
     corpo = {"almox": "10", "item": "1", "aco_min": "1", "aco_max": "9"}
     c = _pessoa_ms(inv)
-    _no_setor(monkeypatch, "Performance")
+    _no_setor(monkeypatch, SID.PERFORMANCE)
     assert c.post("/t/pcm/pecas/inventario/regua/decidir", data=corpo).status_code == 403
     assert c.post("/os/_nexus/inventario/regua/gravar", data={"almox": "10", "item": "1"}).status_code == 403
-    _no_setor(monkeypatch, "Responsáveis UFV")                       # os supervisores veem o Quadro, mas régua é do PCM
+    _no_setor(monkeypatch, SID.RESPONSAVEL_UFV)                       # os supervisores veem o Quadro, mas régua é do PCM
     assert c.post("/t/pcm/pecas/inventario/regua/decidir", data=corpo).status_code == 403
     assert falso.chamadas == [] and F.ler(inv.config, forcar=True)[F.ABA_REGUA] == []
     # o PCM decide; e a tela de quem só olha não traz o formulário
-    _no_setor(monkeypatch, "pcm")
+    _no_setor(monkeypatch, SID.PCM)
     r = c.post("/t/pcm/pecas/inventario/regua/decidir", data=corpo)
     assert r.status_code == 303
     assert len(F.ler(inv.config, forcar=True)[F.ABA_REGUA]) == 1
@@ -398,7 +399,7 @@ def test_so_o_setor_pcm_decide(inv, monkeypatch):
 def test_tela_de_quem_so_olha_nao_tem_botao(inv, monkeypatch):
     """Quem vê a tela por outro setor lê a régua (os números registrados em texto) e não tem formulário nem botão."""
     from nexus.pcm import telas
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(inv)
     assert c.post("/t/pcm/pecas/inventario/regua/decidir",
                   data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9", "rec_max": "5"}).status_code == 303
@@ -410,7 +411,7 @@ def test_tela_de_quem_so_olha_nao_tem_botao(inv, monkeypatch):
 
 
 def test_decidir_pela_tela_grava_e_volta_para_o_almoxarifado(inv, monkeypatch):
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa_ms(inv)
     r = c.post("/t/pcm/pecas/inventario/regua/decidir", data={
         "almox": "10", "item": "2", "rec_min": "1", "rec_max": "4", "aco_min": "2,5", "aco_max": "9"})
@@ -427,7 +428,7 @@ def test_decidir_pela_tela_grava_e_volta_para_o_almoxarifado(inv, monkeypatch):
 
 
 def test_minimo_acima_do_maximo_e_400_e_nao_grava(inv, monkeypatch):
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     r = _pessoa_ms(inv).post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1",
                                                                         "aco_min": "9", "aco_max": "2"})
     assert r.status_code == 400 and "mínimo" in r.get_data(as_text=True).lower()
@@ -435,7 +436,7 @@ def test_minimo_acima_do_maximo_e_400_e_nao_grava(inv, monkeypatch):
 
 
 def test_peca_de_outro_almoxarifado_e_400(inv, monkeypatch):
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     r = _pessoa_ms(inv).post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "3",
                                                                         "aco_min": "1", "aco_max": "2"})
     assert r.status_code == 400 and F.ler(inv.config, forcar=True)[F.ABA_REGUA] == []
@@ -450,7 +451,7 @@ def test_gravar_pela_ponte_usa_o_login_de_quem_aprova(inv, monkeypatch):
     aviso quando recarrega."""
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = com_o_fracttal(inv, _pessoa_ms(inv))
     corpo = {"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"}
     assert c.post("/t/pcm/pecas/inventario/regua/decidir", data=corpo).status_code == 303
@@ -466,14 +467,14 @@ def test_gravar_pela_ponte_usa_o_login_de_quem_aprova(inv, monkeypatch):
 
 def test_a_gravacao_nao_e_mais_uma_rota_de_t_pcm(inv, monkeypatch):
     """O que fala com o Fracttal mora na ponte; em /t/pcm o login do Fracttal nunca chega."""
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     assert _pessoa_ms(inv).post("/t/pcm/pecas/inventario/regua/gravar", data={"almox": "10", "item": "1"}).status_code == 404
 
 
 def test_gravar_sem_o_acordado_e_409(inv, monkeypatch):
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     r = com_o_fracttal(inv, _pessoa_ms(inv)).post(PONTE, data=GRAVAR)
     assert r.status_code == 409 and "acordad" in r.get_json()["erro"].lower() and falso.chamadas == []
 
@@ -498,7 +499,7 @@ def test_a_conta_do_fracttal_de_outra_pessoa_nao_grava(inv, monkeypatch):
     from nexus.pcm.inventario import ponte_os
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = com_o_fracttal(inv, _pessoa_ms(inv), "outra.pessoa@exemplo.test")
     assert c.post("/t/pcm/pecas/inventario/regua/decidir", data=GRAVAR).status_code == 303
     r = c.post(PONTE, data=GRAVAR)
@@ -509,7 +510,7 @@ def test_a_conta_do_fracttal_de_outra_pessoa_nao_grava(inv, monkeypatch):
 def test_limite_do_fracttal_e_429_com_o_que_fazer(inv, monkeypatch):
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}}, limite_em=1)
     _estoque_da_sessao(monkeypatch, falso)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = com_o_fracttal(inv, _pessoa_ms(inv))
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
     r = c.post(PONTE, data=GRAVAR)
@@ -522,7 +523,7 @@ def test_resposta_perdida_do_fracttal_grava_de_novo_sem_duplicar(inv, monkeypatc
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}},
                          perder_resposta={"definir_regua"})
     _estoque_da_sessao(monkeypatch, falso)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = com_o_fracttal(inv, _pessoa_ms(inv))
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
     r = c.post(PONTE, data=GRAVAR)
@@ -539,7 +540,7 @@ def test_gravar_com_a_regua_que_mudou_desde_que_a_tela_abriu_e_409(inv, monkeypa
     o acordado que a tela mostrava; a ponte compara com o registrado de agora e, se mudou, não envia nada ao Fracttal."""
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = com_o_fracttal(inv, _pessoa_ms(inv))
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "4", "aco_max": "9"})   # a outra pessoa
@@ -553,7 +554,7 @@ def test_gravar_com_a_regua_que_mudou_desde_que_a_tela_abriu_e_409(inv, monkeypa
 def test_gravar_sem_o_acordado_que_a_tela_mostrava_e_400(inv, monkeypatch):
     falso = EstoqueFalso({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
     _estoque_da_sessao(monkeypatch, falso)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = com_o_fracttal(inv, _pessoa_ms(inv))
     c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
     r = c.post(PONTE, data={"almox": "10", "item": "1"})
@@ -584,7 +585,7 @@ def test_acordado_decimal_so_em_metro_e_massa(cfg):
 
 
 def test_acordado_decimal_em_unidade_inteira_e_400_pela_tela(inv, monkeypatch):
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     r = _pessoa_ms(inv).post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2,5",
                                                                            "aco_max": "9"})
     assert r.status_code == 400 and "casa decimal" in r.get_data(as_text=True)
@@ -705,7 +706,7 @@ def test_o_login_do_fracttal_so_chega_na_ponte(inv, api_do_clone, monkeypatch):
     monkeypatch.setattr(api_do_clone.requests, "post", post)
     monkeypatch.setattr(E, "RITMO", E.Ritmo(dormir=lambda s: None))           # sem esperar o 1 pedido por segundo de verdade
     jwt, cookie = _jwt_e_cookie(inv)
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = _pessoa(inv)                                                           # a sessão nasceu do login do Fracttal
     c.set_cookie("os_sessao", cookie, path="/os")                              # como o login do Fracttal o grava
     assert c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2",
@@ -725,7 +726,7 @@ def test_o_login_do_fracttal_so_chega_na_ponte(inv, api_do_clone, monkeypatch):
 
 
 def test_pedido_de_outro_site_e_recusado(inv, monkeypatch):
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     r = _pessoa_ms(inv).post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "1",
                                                                         "aco_max": "2"},
                           headers={"Sec-Fetch-Site": "cross-site"})

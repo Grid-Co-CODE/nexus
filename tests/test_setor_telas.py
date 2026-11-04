@@ -20,6 +20,7 @@ from test_campo_visao import banco  # noqa: F401  (fixture)
 from nexus.auth import acessos as A
 from nexus.auth import setor_telas as ST
 from nexus.cadastro import setores as S
+from nexus.cadastro import setor_ids as SID
 from nexus.dados import catalogo
 
 URL = "/t/base/acessos"
@@ -28,6 +29,10 @@ ANA = "ana@exemplo.test"          # setor Performance
 BIA = "bia@exemplo.test"          # setor chamado "Administrador": um setor como os outros
 CAIO = "caio@exemplo.test"        # sem setor
 DADOS = {"Sec-Fetch-Dest": "empty"}
+# os setores de produção, na ordem em que foram criados (setor_id 1 a 10); o 8 é o "Administrador", um setor como os outros
+SETORES_DE_PRODUCAO = ("Engenharia", "Performance", "Zeladoria", "Segurança", "COS", "Supervisão Campo", "Chamados",
+                       "Administrador", "PCM", "Responsável UFV")
+ADMINISTRADOR = 8
 
 
 @pytest.fixture(autouse=True)
@@ -41,12 +46,14 @@ def _sem_copias():
 
 @pytest.fixture
 def setores(app, banco):
-    """Performance (1) e Administrador (2) no banco falso, com a Ana e a Bia; o portão ligado, como fora dos testes."""
+    """Os setores de produção no banco falso, na ordem de verdade (o setor_id de cada um é o de `cadastro/setor_ids.py`,
+    04/11/2026: o código acha o setor pelo ID): a Ana na Performance (2) e a Bia no Administrador (8); o portão ligado,
+    como fora dos testes."""
     cfg = app.config
-    S.criar("Performance", cfg, BASE, banco)
-    S.criar("Administrador", cfg, BASE, banco)
-    S.definir([{"id": 701, "email": ANA, "ficha": None, "por": ""}], 1, cfg, BASE, banco)
-    S.definir([{"id": 702, "email": BIA, "ficha": None, "por": ""}], 2, cfg, BASE, banco)
+    for nome in SETORES_DE_PRODUCAO:
+        S.criar(nome, cfg, BASE, banco)
+    S.definir([{"id": 701, "email": ANA, "ficha": None, "por": ""}], SID.PERFORMANCE, cfg, BASE, banco)
+    S.definir([{"id": 702, "email": BIA, "ficha": None, "por": ""}], ADMINISTRADOR, cfg, BASE, banco)
     app.config["NEXUS_ACESSO_POR_SETOR"] = "1"
     return banco
 
@@ -136,7 +143,7 @@ def test_sem_setor_so_a_mensagem(app, setores):
 
 
 def test_o_setor_ve_so_as_telas_marcadas(app, setores, logado):
-    assert _salvar(logado, 1, ["cos/mesa", "os/inicio"]).status_code == 303
+    assert _salvar(logado, SID.PERFORMANCE, ["cos/mesa", "os/inicio"]).status_code == 303
     c = _como(app, ANA)
     html = c.get("/").get_data(as_text=True)
     # no menu da conta (03/11/2026: só aparece ao clicar no nome), em cima do Tema; era no topo, no lugar da cadeira
@@ -153,7 +160,7 @@ def test_o_setor_ve_so_as_telas_marcadas(app, setores, logado):
     r = c.get("/t/pcm/quadro", headers=DADOS)
     assert r.status_code == 403 and r.get_json()["erro"] == "Esta tela não está liberada para o seu setor."
     # fechar vale no próximo clique
-    assert _salvar(logado, 1, ["os/inicio"]).status_code == 303
+    assert _salvar(logado, SID.PERFORMANCE, ["os/inicio"]).status_code == 303
     assert c.get("/t/cos/mesa").status_code == 403
 
 
@@ -266,29 +273,29 @@ def test_a_secao_mostra_os_setores_e_a_arvore_do_menu(app, setores, logado):
     assert html.count('<input type="checkbox" name="tela"') + html.count('<input type="checkbox" data-do-setor')         == sum(len(t.telas) for t in app.extensions["nexus_torres"])
     assert "Todo setor vê esta tela sem marcar" in html
     assert 'value="performance/clima/mapa"' in html and 'value="cos/mesa"' in html
-    adm = logado.get(URL + "?setor=2").get_data(as_text=True)                  # o setor "Administrador": caixas
-    assert 'id="ace-matriz"' in adm and '<input type="hidden" name="setor" value="2">' in adm
+    adm = logado.get(URL + f"?setor={ADMINISTRADOR}").get_data(as_text=True)                  # o setor "Administrador": caixas
+    assert 'id="ace-matriz"' in adm and '<input type="hidden" name="setor" value="8">' in adm
     assert "Cadeira" not in html
 
 
 def test_a_tela_grava_so_o_que_mudou(app, setores, logado):
-    r = _salvar(logado, 1, ["cos/mesa", "os/inicio"])
-    assert r.status_code == 303 and r.headers["Location"].endswith(URL + "?setor=1#ace-setores")
-    assert "Performance agora vê 2 telas (2 mudanças)" in logado.get(URL + "?setor=1").get_data(as_text=True)
+    r = _salvar(logado, SID.PERFORMANCE, ["cos/mesa", "os/inicio"])
+    assert r.status_code == 303 and r.headers["Location"].endswith(URL + "?setor=2#ace-setores")
+    assert "Performance agora vê 2 telas (2 mudanças)" in logado.get(URL + "?setor=2").get_data(as_text=True)
     linhas = _linhas(setores)
     assert list(linhas[0]) == list(ST.CAB)
-    assert sorted((x["setor_id"], x["tela"], x["liberada"]) for x in linhas) == [(1, "cos/mesa", "sim"),
-                                                                                (1, "os/inicio", "sim")]
+    assert sorted((x["setor_id"], x["tela"], x["liberada"]) for x in linhas) == [(SID.PERFORMANCE, "cos/mesa", "sim"),
+                                                                                (SID.PERFORMANCE, "os/inicio", "sim")]
     assert all(x["origem"] == "tela" and x["data_id"] for x in linhas)
     # salvar sem mexer não grava nada
-    assert _salvar(logado, 1, ["cos/mesa", "os/inicio"]).status_code == 303
+    assert _salvar(logado, SID.PERFORMANCE, ["cos/mesa", "os/inicio"]).status_code == 303
     assert len(_linhas(setores)) == 2
-    assert "Nada mudou: Performance já via 2 telas." in logado.get(URL + "?setor=1").get_data(as_text=True)
+    assert "Nada mudou: Performance já via 2 telas." in logado.get(URL + "?setor=2").get_data(as_text=True)
     # desmarcar grava a tela que fechou, e só ela
-    _salvar(logado, 1, ["cos/mesa"])
+    _salvar(logado, SID.PERFORMANCE, ["cos/mesa"])
     linhas = _linhas(setores)
     assert len(linhas) == 3 and (linhas[-1]["tela"], linhas[-1]["liberada"]) == ("os/inicio", "nao")
-    html = logado.get(URL + "?setor=1").get_data(as_text=True)
+    html = logado.get(URL + "?setor=2").get_data(as_text=True)
     assert re.search(r'<input type="checkbox" name="tela" value="cos/mesa" checked>', html)
     assert not re.search(r'<input type="checkbox" name="tela" value="os/inicio" checked>', html)
     # regra 8: nada de e-mail nem nome no banco
@@ -298,19 +305,19 @@ def test_a_tela_grava_so_o_que_mudou(app, setores, logado):
 def test_a_tela_recusa_o_que_nao_deve_gravar(app, setores, logado):
     r = _salvar(logado, 99, ["cos/mesa"])
     assert r.status_code == 400 and "Setor desconhecido" in r.get_data(as_text=True)
-    r = _salvar(logado, 1, ["cos/mesa", "nao/existe"])
+    r = _salvar(logado, SID.PERFORMANCE, ["cos/mesa", "nao/existe"])
     assert r.status_code == 400 and "Tela desconhecida" in r.get_data(as_text=True)
-    assert _salvar(logado, 1, ["cos/mesa"], codigo="outro").status_code == 403
+    assert _salvar(logado, SID.PERFORMANCE, ["cos/mesa"], codigo="outro").status_code == 403
     app.config.pop("GRIDCO_SQL_TOKEN")
-    r = _salvar(logado, 1, ["cos/mesa"])
+    r = _salvar(logado, SID.PERFORMANCE, ["cos/mesa"])
     assert r.status_code == 400 and "GRIDCO_SQL_TOKEN" in r.get_data(as_text=True)
     assert _linhas(setores) == []
     app.config["GRIDCO_SQL_TOKEN"] = "token-de-teste"
-    assert _salvar(logado, 2, ["cos/mesa"]).status_code == 303                # o setor "Administrador" grava como os outros
-    assert [(x["setor_id"], x["tela"]) for x in _linhas(setores)] == [(2, "cos/mesa")]
+    assert _salvar(logado, ADMINISTRADOR, ["cos/mesa"]).status_code == 303                # o setor "Administrador" grava como os outros
+    assert [(x["setor_id"], x["tela"]) for x in _linhas(setores)] == [(ADMINISTRADOR, "cos/mesa")]
     # quem não é administrador nem abre a tela, nem grava
     c = _como(app, ANA)
-    assert c.post(URL, data={"acao": "telas_setor", "setor": "1", "tela": ["cos/mesa"]}).status_code == 403
+    assert c.post(URL, data={"acao": "telas_setor", "setor": str(ADMINISTRADOR), "tela": ["cos/mesa"]}).status_code == 403
 
 
 def test_quem_entrou_aparece_com_o_setor(app, setores, logado, tmp_path):

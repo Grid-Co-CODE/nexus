@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import pytest
 
 from nexus.engenharia import etm_historico as H
+from nexus.cadastro import setor_ids as SID
 
 REPO = "dono/repositorio-de-teste"
 
@@ -251,7 +252,7 @@ def test_o_painel_so_para_o_administrador(app, cliente, monkeypatch):
     monkeypatch.setattr(E, "dados", lambda: {"os": [], "lido": time.time(), "lendo": False, "erro": ""})
     monkeypatch.setattr(E, "pedir_releitura", lambda app=None, esperar=False, forcar=False: None)
     monkeypatch.setattr(M, "ler", lambda forcar=False: {"eventos": [], "lido_em": time.time(), "erro": ""})
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 1, "nome": "Engenharia"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"},
                                                "erro": ""})
     assert "Trazer o histórico do app de ETM" not in _ms(cliente, ANA).get("/t/engenharia/etm").get_data(as_text=True)
     _admin(monkeypatch, ANA["email"])

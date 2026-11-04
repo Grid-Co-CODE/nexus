@@ -9,6 +9,7 @@ tem setor não disparam; a tela que lê o Fracttal na pré-carga sai dela; desli
 import re
 
 import pytest
+from nexus.cadastro import setor_ids as SID
 from test_setor_telas import ANA, CAIO, URL, _como, _salvar, _sem_copias, banco, setores  # noqa: F401  (fixtures)
 
 from nexus.auth import pre_carga as PC
@@ -25,7 +26,7 @@ QUENTES = {"cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/rondas", "relator
 @pytest.fixture
 def ligada(app, setores, logado):
     """O setor Performance (1) com telas de todo tipo, e a pré-carga ligada (na hora, sem thread)."""
-    assert _salvar(logado, 1, TELAS).status_code == 303
+    assert _salvar(logado, SID.PERFORMANCE, TELAS).status_code == 303
     app.config["NEXUS_PRE_CARGA"] = "1"
     app.extensions.pop("nexus_pre_carga", None)
     return app

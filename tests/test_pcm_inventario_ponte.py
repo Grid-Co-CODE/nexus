@@ -25,6 +25,7 @@ from nexus.dados import almoxarifado as A
 from nexus.dados import fato_inventario as F
 from nexus.pcm.inventario import erros, ponte_os
 from nexus.pcm.inventario import estoque as E
+from nexus.cadastro import setor_ids as SID
 
 SENHA = "senha-de-teste"
 PREFIXO = "/nexus"
@@ -67,7 +68,7 @@ def _pcm(app, monkeypatch, fracttal=True):
     `/nexus/os` do navegador: o cliente de teste do Flask casa o cookie com o endereço que ele monta, o `APPLICATION_ROOT` na frente
     do caminho pedido (`/nexus/nexus/os/...`). O caminho de verdade (`os_cookie_path`) é provado no `test_prefixo` e no login."""
     import time
-    _no_setor(monkeypatch, "PCM")
+    _no_setor(monkeypatch, SID.PCM)
     c = app.test_client()
     with c.session_transaction() as s:
         s["logado"], s["admin"], s["via"], s["ms_ate"] = True, False, "microsoft", time.time() + 3600

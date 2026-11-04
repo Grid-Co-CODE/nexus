@@ -12,7 +12,7 @@ escolhe que tipo de relatório ela quer! Sai da parte de Performance!"
   vê sem marcar; outro setor vê o que for marcado para ele em Base → Acessos (`auth/setor_telas.py`); o administrador vê
   todos. Quem tem um relatório vê a Central (a tela de fora) sem marcá-la. As marcas de antes, quando os relatórios eram
   da Performance (`performance/relatorio`...), valem para os daqui (`setor_telas.RENOMEADAS`).
-- Relatório novo: uma `Tela(..., dentro_de="central", do_setor="<setor dono>")` aqui e o ícone em RELATORIOS.
+- Relatório novo: uma `Tela(..., dentro_de="central", do_setor=SID.<setor dono>)` (o setor_id, `cadastro/setor_ids.py`) aqui e o ícone em RELATORIOS.
 - O Relatório executivo do PCM (14/10/2026: Interno Grid, Cliente, Abertura da Semana) é a CÓPIA do JavaScript do painel
   do PCM numa moldura (`nexus/pcm/relatorio_exec`), também do setor PCM.
 - O setor dono escolhido na tela (14/10/2026, Levi: "adicione a opção de eu escolher de qual setor é o relatório! Apenas
@@ -41,6 +41,7 @@ from ...pcm import relatorio_exec
 from ...pcm.relatorios import TIPOS as TIPOS_PCM
 from ...pcm.relatorios import telas as telas_pcm
 from ...performance import porta
+from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
 from ..moldura import estado_da_porta, registrar_molduras
 
@@ -56,22 +57,22 @@ TORRE = Torre(
              "os relatórios liberados para o setor de quem entrou (todos, para o administrador)"),
         Tela("relatorio", "Criador de relatório",
              "Como monto o relatório do cliente com os números certos?",
-             "Plataforma de Performance", dentro_de="central", do_setor="Performance"),
+             "Plataforma de Performance", dentro_de="central", do_setor=SID.PERFORMANCE),
         Tela("relatorio-semanal", "Relatório semanal",
              "Como foi a semana de cada usina no relatório do cliente?",
-             "Plataforma de Performance", dentro_de="central", do_setor="Performance"),
+             "Plataforma de Performance", dentro_de="central", do_setor=SID.PERFORMANCE),
         Tela("potencia-ativa", "Potência Ativa dos Inversores",
              "Como a potência ativa de cada inversor se comportou, dia a dia?",
              "Plataforma de Performance (as leituras das curvas do Tempo real)", dentro_de="central",
-             do_setor="Performance"),
+             do_setor=SID.PERFORMANCE),
         *[Tela(t.tela_id, t.nome, t.pergunta,
                "o robô do PCM: Programação Semanal, Gestão PCM, Gerencial e Confiabilidade", dentro_de="central",
-               do_setor="PCM") for t in TIPOS_PCM.values()],
+               do_setor=SID.PCM) for t in TIPOS_PCM.values()],
         # o Relatório executivo do painel do PCM, com o nome do bloco que o Levi deu (14/10/2026): "Relatório Gerencial PCM"
         Tela(relatorio_exec.TELA_ID, "Relatório Gerencial PCM",
              "O que rodou, o que travou e onde agir: Interno Grid, Cliente ou Abertura da Semana?",
              "o painel do PCM: Gestão PCM, programação semanal, Confiabilidade e Gerencial", dentro_de="central",
-             do_setor="PCM"),
+             do_setor=SID.PCM),
     ],
 )
 

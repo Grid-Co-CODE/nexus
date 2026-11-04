@@ -11,11 +11,12 @@ from test_hseq_extintores import LIVRO, _texto, com_cadastro, com_livro  # noqa:
 from nexus.campo import visao
 from nexus.hseq import extintores as EXT
 from nexus.torres.hseq import TORRE
+from nexus.cadastro import setor_ids as SID
 
 
 def test_a_mesa_e_a_primeira_tela_e_do_setor_seguranca():
     assert TORRE.telas[0].id == "mesa" and TORRE.telas[0].nome == "Mesa da Segurança"
-    assert "Segurança" in (TORRE.telas[0].do_setor if isinstance(TORRE.telas[0].do_setor, (tuple, list))
+    assert SID.SEGURANCA in (TORRE.telas[0].do_setor if isinstance(TORRE.telas[0].do_setor, (tuple, list))
                            else (TORRE.telas[0].do_setor,))
 
 

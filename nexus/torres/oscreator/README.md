@@ -763,8 +763,8 @@ alteração não salva.
 **Quem entra na Área PCM** (Levi, 13/10/2026: "Só o setor PCM ou administrador! Quem não é nenhum dos dois recebe a
 notificação!"). A Fila do PCM (aprovar, devolver, mudar status, gravar a observação, recarregar o catálogo) e os Temas
 (salvar, arquivar) são do setor PCM e dos administradores do Nexus; no app essa área pede a senha do PCM. Quem decide é a
-ponte (`ponte.area_pcm`): administrador passa sem ler nada; o resto, pelo setor de Base → Acessos → Pessoas e setores, pelo NOME
-("PCM", sem acento nem caixa). Sem saber o setor (banco fora, Nexus sem a `NEXUS_PESSOA_HMAC`), fecha — só o
+ponte (`ponte.area_pcm`): administrador passa sem ler nada; o resto, pelo setor de Base → Acessos → Pessoas e setores, pelo setor_id
+(`SID.PCM`, `cadastro/setor_ids.py`; pelo nome até 04/11/2026). Sem saber o setor (banco fora, Nexus sem a `NEXUS_PESSOA_HMAC`), fecha — só o
 administrador passa. A decisão vai ao clone no pedido (`request.environ["os_web.area_pcm"]`): no lugar da Fila e dos
 Temas vem o aviso (`solic_sem_acesso.html`, com a barra de sempre e o setor da pessoa), e as gravações voltam 403 com o
 mesmo aviso (a tela mostra no aviso de canto). O Painel, o Histórico e a Nova solicitação seguem abertos (são a Área do
@@ -1830,8 +1830,8 @@ sondas das revisões):
   mesmo que a lista teve buracos raros a cada rodada de sonda; a segurança passa a depender de uma decisão de governança, e a
   contagem fica como 2ª barreira (e como a guarda da lista pela metade).
   - Quem está liberado: o administrador do Nexus (a NEXUS_ADMINS, a lista de Base → Acessos, a senha de administrador),
-    sempre; e quem é de um setor de `ponte.SETORES_COM_LISTA_CENTRAL` (o nome do setor de Base → Acessos → Pessoas e
-    setores, sem acento nem caixa). Nasceu VAZIA (só os administradores); desde 03/11/2026 vale o `TODOS_OS_SETORES` ("*"):
+    sempre; e quem é de um setor de `ponte.SETORES_COM_LISTA_CENTRAL` (o setor_id do setor de Base → Acessos → Pessoas e
+    setores, desde 04/11/2026; era o nome). Nasceu VAZIA (só os administradores); desde 03/11/2026 vale o `TODOS_OS_SETORES` ("*"):
     o Levi liberou todos ("Todos os setores veem todas as OSs" no Fracttal), e qualquer pessoa com setor no Nexus lê. A pessoa
     sem setor segue fechada.
   - Como mudar: um commit na `SETORES_COM_LISTA_CENTRAL` (`nexus/torres/oscreator/ponte.py`), com "*" para todos ou os nomes

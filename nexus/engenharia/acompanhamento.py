@@ -30,6 +30,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from flask import current_app
 
+from ..cadastro import setor_ids as SID
 from ..dados import livros
 from ..dados.equipamento import canon, equipamento_id
 
@@ -52,7 +53,8 @@ COMECO = ("pegou", "encaminhou")          # os eventos que começam um acompanha
 # a lista que o Levi começou no pedido ("comunicação, disjuntor"); o resto a Engenharia cadastra na tela
 CADASTRO_INICIAL = (("Comunicação", ""), ("Disjuntor", ""))
 TEXTO_MAX = 2000                          # o teto das atualizações das Contestações
-SETOR = "engenharia"                      # o nome do setor (sem acento nem caixa) de quem age, além do administrador
+# o setor de quem age, além do administrador, pelo setor_id (04/11/2026: pelo nome, renomear o setor tirava o poder dele)
+SETOR = SID.ENGENHARIA
 TTL_S = 60
 # o piso das datas da análise: o começo das contas da Confiabilidade (o método do Power BI). Revisão final de 18/10/2026:
 # "0202-10-15" (o ano com um dígito a menos, fácil de digitar no campo de data) virava um data_id de 7 dígitos, lido
@@ -273,7 +275,7 @@ def codigo(usuario) -> str | None:
 
 def pode_agir(setor: dict | None, admin: bool) -> bool:
     """Pega, encaminha, salva, comenta e mexe no cadastro: o administrador e quem é do setor Engenharia."""
-    return bool(admin) or _norm((setor or {}).get("nome")) == SETOR
+    return bool(admin) or (setor or {}).get("id") == SETOR
 
 
 def _quem(usuario, pode: bool, o_que: str) -> dict:
@@ -653,7 +655,7 @@ def pessoas_da_engenharia() -> list[dict]:
     from ..cadastro import fracttal_pessoal as FP
     from ..cadastro import setores as S
     st = S.ler(*_banco())
-    sid = next((s["setor_id"] for s in S.ativos(st.get("setores") or []) if _norm(s["nome"]) == SETOR), None)
+    sid = next((s["setor_id"] for s in S.ativos(st.get("setores") or []) if s["setor_id"] == SETOR), None)
     if sid is None:
         return []
     ultima = {}

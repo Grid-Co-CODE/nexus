@@ -13,6 +13,7 @@ from test_engenharia_acompanhamento import ANA, BETO
 from nexus.cadastro.cifra import gerar_chave
 from nexus.dados import catalogo, explica
 from nexus.engenharia import os_acompanhamento as O
+from nexus.cadastro import setor_ids as SID
 
 BRT = timezone(timedelta(hours=-3))
 OS1 = {"wid": 39550452, "folio": "16502", "codigo": "IBI200-INVR1.3", "usina_id": 1,
@@ -133,7 +134,7 @@ def pagina(banco, app, monkeypatch):
     monkeypatch.setattr(E, "_ler_fracttal", rest)
     monkeypatch.setattr(torre, "_onde_do_cadastro",
                         lambda: (lambda texto, cod: {"usina_id": 7, "ligada_por": "de-para do Fracttal"}))
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 1, "nome": "Engenharia"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"},
                                                "erro": ""})
     return mae
 
@@ -201,7 +202,7 @@ def test_quem_nao_e_da_engenharia_le_sem_formularios(pagina, cliente, monkeypatc
     from test_engenharia_acompanhamento import _como
 
     from nexus.auth import setor_telas as ST
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
                                                "erro": ""})
     html = _como(cliente, BETO).get(URL).get_data(as_text=True)
     assert "Nota antiga da OS" in html and "/classificar" not in html and "<textarea" not in html
@@ -313,7 +314,7 @@ def test_comentario_de_outro_site_ou_de_fora_da_engenharia_e_recusado(fracttal_d
     r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "x", "folio": "16502"},
                      headers={"Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 403
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
                                                "erro": ""})
     r = _como(cliente, BETO).post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "x", "folio": "16502"},
                                   headers={"Sec-Fetch-Site": "same-origin"})
@@ -687,7 +688,7 @@ def test_quem_nao_e_da_engenharia_nao_troca_o_responsavel(pagina, cliente, monke
     from test_engenharia_acompanhamento import _como
 
     from nexus.auth import setor_telas as ST
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 2, "nome": "Performance"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
                                                "erro": ""})
     html = _como(cliente, BETO).get(URL).get_data(as_text=True)
     assert "data-trocar-resp" not in html and "Ana Lima" in _secao(html, "Dados")

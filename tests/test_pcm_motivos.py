@@ -24,6 +24,7 @@ from nexus.pcm import quadro as Q
 from test_pcm_geracao import config, origem  # noqa: F401 (fixtures)
 from test_pcm_publicar import GitHubFalso, _no_setor, _pessoa
 from test_pcm_quadro import _semana_teste
+from nexus.cadastro import setor_ids as SID
 
 PESSOA = {"email": "pessoa.teste@exemplo.com", "nome": "Pessoa Teste"}
 T1 = {"os": "15596", "codigo": "ELF1-INV02", "tarefa": "[Grid Co.] - MPA - Inversor", "usina": "Cliente A - Usina 1 - SP",
@@ -357,16 +358,16 @@ def test_quem_marca_e_quem_mexe_no_cadastro(app, tela, monkeypatch):
     """Marca e tira: PCM, Responsáveis UFV (os supervisores) e administrador. Cadastro: administrador e PCM."""
     c = _pessoa(app)
     marca = {"semana": "2026-W41", "os": "6", "tarefa": "Troca de fusível", "codigo": "", "motivo_id": 6}
-    _no_setor(monkeypatch, "Performance")
+    _no_setor(monkeypatch, SID.PERFORMANCE)
     assert c.post("/t/pcm/quadro/motivo", json=marca).status_code == 403
     assert c.post("/t/pcm/fora-da-programacao/marcar", data={"item": "x", "tirar": "1"}).status_code == 403
     assert c.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "criar", "nome": "Novo"}).status_code == 403
     assert not _dados(c.get("/t/pcm/quadro").get_data(as_text=True))["pode_marcar"]
-    _no_setor(monkeypatch, "Responsáveis UFV")
+    _no_setor(monkeypatch, SID.RESPONSAVEL_UFV)
     r = c.post("/t/pcm/quadro/motivo", json=marca)
     assert r.status_code == 200 and r.get_json()["ok"] and r.get_json()["marca"]["n"] == "Aguardando material"
     assert c.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "criar", "nome": "Novo"}).status_code == 403
-    _no_setor(monkeypatch, "pcm")
+    _no_setor(monkeypatch, SID.PCM)
     r = c.post("/t/pcm/fora-da-programacao/cadastro", data={"acao": "criar", "nome": "Aguardando laudo", "tira": "1"})
     assert r.status_code == 303 and "ver=cadastro" in r.headers["Location"]
     html = c.get("/t/pcm/fora-da-programacao?ver=cadastro").get_data(as_text=True)

@@ -38,6 +38,7 @@ import unicodedata
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+from ..cadastro import setor_ids as SID
 from ..dados import fatos as D
 from ..dados import livros
 
@@ -59,7 +60,7 @@ TEXTO_MAX = 60
 MOTIVOS = {"nao_reconhecido": "Não reconhecido em campo", "retirado": "Retirado da usina",
            "duplicado": "Duplicado no cadastro", "outro": "Outro motivo"}
 MOTIVOS_DO_BOTAO_DIREITO = ("retirado", "duplicado", "outro")
-SETOR = "seguranca"                          # o nome do setor sem acento nem caixa (Base → Acessos)
+SETOR = SID.SEGURANCA                        # o setor_id (Base → Acessos; pelo ID desde 04/11/2026)
 OBS_MAX = 300
 TTL_S = 60
 ROTULO_CHAVE = b"nexus:hseq:extintores"     # a chave da assinatura (a MESMA conta no App, quando ele ler este livro)
@@ -83,7 +84,7 @@ def _norm(s) -> str:
 
 def pode_decidir(setor: dict | None, admin: bool) -> bool:
     """Excluir extintor, aceitar o não reconhecido e pedir nova ronda: o administrador e quem é do setor Segurança."""
-    return bool(admin) or _norm((setor or {}).get("nome")) == SETOR
+    return bool(admin) or (setor or {}).get("id") == SETOR
 
 
 def _int(v) -> int | None:

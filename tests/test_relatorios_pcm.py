@@ -12,6 +12,7 @@ import pytest
 
 from conftest import SENHA_TESTE
 from nexus.cadastro import setores as S
+from nexus.cadastro import setor_ids as SID
 from nexus.pcm.relatorios import TIPOS, agenda, arquivo, dados, emitir, regras
 from test_campo_visao import banco  # noqa: F401  (fixture)
 from test_setor_telas import ANA, BASE, _como, setores  # noqa: F401  (fixtures)
@@ -176,7 +177,7 @@ def test_o_administrador_ve_os_quatro_na_central(logado, pcm):
 
 
 def test_o_setor_pcm_ve_os_quatro_sem_marcar_e_a_performance_nao(app, setores, pcm):   # noqa: F811
-    novo = S.criar("PCM", app.config, BASE, setores)
+    novo = {"setor_id": SID.PCM}        # o PCM de produção (9)
     S.definir([{"id": 703, "email": DANI, "ficha": None, "por": ""}], novo["setor_id"], app.config, BASE, setores)
     dani = _como(app, DANI)
     html = dani.get("/t/relatorios/central").get_data(as_text=True)

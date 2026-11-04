@@ -17,6 +17,7 @@ from test_setor_telas import ANA, _como, _sem_copias, setores  # noqa: F401  (fi
 from nexus.pcm.acompanhamento import curadoria as CUR
 from nexus.pcm.acompanhamento import dados as D
 from nexus.pcm.acompanhamento.mapa import Geo
+from nexus.cadastro import setor_ids as SID
 
 HOJE = date(2026, 10, 14)
 URL = "/t/pcm/acompanhamento"
@@ -232,7 +233,7 @@ def test_a_tela_e_os_dados_dela(logado, fontes):
 
 def test_e_do_setor_pcm(app, logado, setores):  # noqa: F811
     from nexus.torres.pcm import TORRE
-    assert TORRE.tela("acompanhamento").do_setor == "PCM"
+    assert TORRE.tela("acompanhamento").do_setor == SID.PCM
     ana = _como(app, ANA)                                          # a Ana é da Performance
     assert ana.get(URL).status_code == 403 and ana.get(URL + "/dados.json").status_code == 403
 

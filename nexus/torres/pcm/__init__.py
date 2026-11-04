@@ -19,6 +19,7 @@ from ...pcm.inventario import curadoria as inventario_curadoria
 from ...pcm.inventario import ponte_os as inventario_ponte
 from ...pcm.inventario import regua as inventario_regua
 from ...pcm.telas import registrar_pcm
+from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
 
 TORRE = Torre(
@@ -36,20 +37,20 @@ TORRE = Torre(
         Tela("quadro", "Quadro da semana",
              "O que cada equipe faz em cada dia, e o que reprogramar?",
              "banco_dados.json do painel PCM e as gerações do Nexus",
-             do_setor=("PCM", "Responsáveis UFV")),
+             do_setor=(SID.PCM, SID.RESPONSAVEL_UFV)),
         # as tarefas que saíram da programação por um motivo de espera e o cadastro dos motivos (16/10/2026, Levi:
         # "temos que montar um painel de acompanhamento as OSs que saíram da programação por esses motivos!" e "Também
         # temos que ter um canto no PCM onde podemos controlar todos esses motivos"); dos mesmos setores do Quadro
         Tela("fora-da-programacao", "Fora da programação",
              "Que tarefa saiu da programação por um motivo de espera, e desde quando?",
              "Os motivos marcados no Nexus (Quadro da semana e esta tela) e a Gestão PCM",
-             do_setor=("PCM", "Responsáveis UFV")),
+             do_setor=(SID.PCM, SID.RESPONSAVEL_UFV)),
         # quem vê e pode rondar cada usina no App de Campo (17/10/2026, Levi: "cria uma estrutura que liga usina e
         # técnico e o PCM pode editar a vontade"); dos mesmos setores do Quadro, edita o PCM (`pcm.telas.pode_programar`)
         Tela("tecnicos-por-usina", "Técnicos por usina",
              "Quem cobre cada usina, e quem pode rondar ali no App?",
              "O cadastro do Nexus, as rondas e a programação; as decisões do PCM nesta tela",
-             do_setor=("PCM", "Responsáveis UFV")),
+             do_setor=(SID.PCM, SID.RESPONSAVEL_UFV)),
         Tela("insights", "Insights do PCM",
              "Onde a aderência cai e que tarefa já rolou várias vezes?",
              "banco_dados.json do painel PCM"),
@@ -59,11 +60,11 @@ TORRE = Torre(
         Tela("gerar", "Gerar a semana",
              "Qual é a programação da próxima semana, e ela está pronta para ir ao App?",
              "Motor do PCM rodando no Nexus: a sombra é o rascunho, e a semana vai ao App pelo Publicar no App",
-             do_setor=("PCM", "Responsáveis UFV")),
+             do_setor=(SID.PCM, SID.RESPONSAVEL_UFV)),
         Tela("acompanhamento", "Acompanhamento PCM",
              "Que MPA ou MPS está travada, que OS envelhece no backlog e onde está a carga de cada time?",
              "Fracttal (pela Gestão PCM), programação semanal, Gerencial, cadastro e a curadoria do PCM",
-             do_setor="PCM"),
+             do_setor=SID.PCM),
         Tela("gestao", "Gestão PCM",
              "Quanto do plano de manutenção está feito por usina, e que MPA ou MPS está envelhecendo?",
              "gestao_pcm.json do painel PCM (e a planilha da Gerencial, cifrada)"),
@@ -79,7 +80,7 @@ TORRE = Torre(
         Tela("pecas", "Almoxarifado",
              "Que peça está abaixo do mínimo ou no limite, em que almoxarifado, e o que saiu nas OS?",
              "Fracttal (inventário), pela varredura diária do App de Campo",
-             do_setor="PCM"),
+             do_setor=SID.PCM),
     ],
 )
 

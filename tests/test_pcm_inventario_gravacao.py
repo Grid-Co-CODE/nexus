@@ -25,6 +25,7 @@ from nexus.pcm.inventario import contas
 from nexus.pcm.inventario import estoque as E
 from nexus.pcm.inventario import gravacao as G
 from nexus.pcm.inventario import leitura as L
+from nexus.cadastro import setor_ids as SID
 
 PONTE = "/os/_nexus/inventario"
 CONTADA = (AGORA.astimezone(timezone.utc) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -959,7 +960,7 @@ def test_gravar_pela_ponte_recusa(app, inv, ponte_falsa, monkeypatch):  # noqa: 
     _cenario(inv)
     falso = ponte_falsa["falso"]
     visto = _visto(app, falso)
-    outro = _pcm(app, monkeypatch, setor="Performance")
+    outro = _pcm(app, monkeypatch, setor=SID.PERFORMANCE)
     _cookie_os(app, outro)
     assert outro.post(f"{PONTE}/C-1/gravar", json=visto).status_code == 403
     c = _pcm(app, monkeypatch)

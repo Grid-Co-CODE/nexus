@@ -22,6 +22,7 @@ from nexus.pcm import observacoes as O
 from nexus.pcm import quadro as Q
 from test_pcm_geracao import config, origem  # noqa: F401 (fixtures)
 from test_pcm_publicar import GitHubFalso, _com_github, _rodada
+from nexus.cadastro import setor_ids as SID
 
 JS = Path(__file__).resolve().parents[1] / "nexus" / "static" / "pcm-quadro.js"
 
@@ -399,11 +400,11 @@ def test_o_setor_pcm_grava_a_reprogramacao(app, config, origem, monkeypatch):
     rid = _rodada(app.config, origem)
     c = _nao_admin(app)
     itens = json.dumps([{"os": "15021", "tarefa": "MPM cabine", "dia": "sex", "turno": "tarde"}])
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 7, "nome": "Performance"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
                                                "erro": ""})
     assert "Quem grava é o PCM" in c.get("/t/pcm/quadro").get_data(as_text=True)
     assert c.post("/t/pcm/quadro/reprogramar", data={"semana": "2026-W41", "rodada": rid, "itens": itens}).status_code == 403
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 3, "nome": "PCM"}, "erro": ""})
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PCM, "nome": "PCM"}, "erro": ""})
     assert "Gravar nas observações da 2026-W41" in c.get("/t/pcm/quadro").get_data(as_text=True)
     r = c.post("/t/pcm/quadro/reprogramar", data={"semana": "2026-W41", "rodada": rid, "itens": itens})
     assert r.status_code == 303 and "feito=salvo" in r.headers["Location"]
@@ -704,7 +705,7 @@ def test_tela_reprogramacoes_quem_nao_e_do_pcm_so_ve(app, tmp_path, monkeypatch)
     monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 7))
     app.config.update(NEXUS_PCM_FONTE=str(_banco(tmp_path)), NEXUS_PCM_TRABALHO=str(tmp_path / "trab"))
     gh = _com_github(app.config, GitHubFalso({"Observacoes_Semana_Atual.txt": ATUAL_W41.encode("utf-8")}))
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 7, "nome": "Performance"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
                                                "erro": ""})
     c = _nao_admin(app)
     html = _bloco(c)
@@ -713,7 +714,7 @@ def test_tela_reprogramacoes_quem_nao_e_do_pcm_so_ve(app, tmp_path, monkeypatch)
     assert c.post("/t/pcm/quadro/reprogramacoes", data={"semana": "2026-W41", "n": "1", "l0": "5; qua"}).status_code == 403
     assert not gh.commits
     # o setor PCM grava
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 3, "nome": "PCM"}, "erro": ""})
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PCM, "nome": "PCM"}, "erro": ""})
     html = _bloco(c)
     assert "Gravar o arquivo" in html
     assert c.post("/t/pcm/quadro/reprogramacoes", data=_form_reprogramacoes(html, tirar=[0])).status_code == 303

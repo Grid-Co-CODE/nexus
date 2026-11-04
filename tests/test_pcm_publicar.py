@@ -22,6 +22,7 @@ from nexus.pcm import insumos as I
 from nexus.pcm import publicar as PB
 from test_pcm_geracao import CAB, config, origem, planilha  # noqa: F401 (fixtures)
 from test_pcm_insumos import ler_feriados
+from nexus.cadastro import setor_ids as SID
 
 _BRT = timezone(timedelta(hours=-3))
 QUINTA_W41 = datetime(2026, 10, 8, 20, 0, tzinfo=_BRT)       # a W41 de teste ainda não acabou
@@ -204,10 +205,12 @@ def test_tela_publicar_so_administrador_e_com_confirmacao(app, logado, config, o
     assert len(gh.commits) == 2
 
 
-def _no_setor(monkeypatch, nome):
-    """A pessoa do login no setor `nome` (o setor vem da Base → Acessos → Pessoas e setores; aqui, dublado)."""
+def _no_setor(monkeypatch, setor_id, nome="Setor do teste"):
+    """A pessoa do login no setor `setor_id` (o setor vem da Base → Acessos → Pessoas e setores; aqui, dublado). Pelo ID
+    desde 04/11/2026 (`cadastro/setor_ids.py`): o nome é só de mostrar, e renomear o setor não muda quem pode."""
     from nexus.auth import setor_telas as ST
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 7, "nome": nome}, "erro": ""})
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": setor_id, "nome": nome},
+                                               "erro": ""})
 
 
 def _pessoa(app):
@@ -227,15 +230,15 @@ def test_o_setor_pcm_gera_e_publica(app, config, origem, monkeypatch):
     gh = _com_github(app.config, GitHubFalso({}))
     rid = _rodada(app.config, origem)
     c = _pessoa(app)
-    _no_setor(monkeypatch, "Performance")
+    _no_setor(monkeypatch, SID.PERFORMANCE)
     html = c.get(f"/t/pcm/gerar?rodada={rid}").get_data(as_text=True)
     assert "Publicar no App</a>" not in html and "administrador ou por quem é do setor PCM" in html
     assert c.get(f"/t/pcm/gerar/publicar?rodada={rid}").status_code == 403
     assert c.post("/t/pcm/gerar/publicar", data={"rodada": rid, "confirmo": "1"}).status_code == 403 and not gh.commits
     # os supervisores (Responsáveis UFV) abrem o Gerar e geram, mas publicar é do PCM e do administrador
-    _no_setor(monkeypatch, "Responsáveis UFV")
+    _no_setor(monkeypatch, SID.RESPONSAVEL_UFV)
     assert c.get(f"/t/pcm/gerar/publicar?rodada={rid}").status_code == 403 and not gh.commits
-    _no_setor(monkeypatch, "pcm")
+    _no_setor(monkeypatch, SID.PCM)
     assert 'Publicar no App</a>' in c.get(f"/t/pcm/gerar?rodada={rid}").get_data(as_text=True)
     assert c.get(f"/t/pcm/gerar/publicar?rodada={rid}").status_code == 200
     r = c.post("/t/pcm/gerar/publicar", data={"rodada": rid, "confirmo": "1"})

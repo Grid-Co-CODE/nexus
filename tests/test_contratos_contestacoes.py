@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from pg_falso import ApiPGFalsa
 
 from nexus.contratos import contestacoes as CT
+from nexus.cadastro import setor_ids as SID
 
 
 def _b64e(b):
@@ -183,7 +184,7 @@ def test_so_o_responsavel_escreve_e_a_atualizacao_fica_com_a_hora(trat, app):
 
 def test_o_setor_so_ve_a_contestacao_dele_e_o_administrador_ve_todas(trat, app, cliente, monkeypatch):
     from nexus.auth import setor_telas as ST
-    setor = {"v": {"id": 3, "nome": "Zeladoria"}}
+    setor = {"v": {"id": SID.ZELADORIA, "nome": "Zeladoria"}}
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": setor["v"], "erro": ""})
     _como(cliente, ANA)
     html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
@@ -193,7 +194,7 @@ def test_o_setor_so_ve_a_contestacao_dele_e_o_administrador_ve_todas(trat, app, 
     assert cliente.get("/t/contratos/contestacoes/a1/card").status_code == 404
     assert cliente.post("/t/contratos/contestacoes/a1/pegar", headers={"Sec-Fetch-Site": "same-origin"}).status_code == 404
     assert cliente.get("/t/contratos/contestacoes/a2/card").status_code == 200
-    setor["v"] = {"id": 1, "nome": "Engenharia"}                              # setor sem contestação: nenhuma
+    setor["v"] = {"id": SID.ENGENHARIA, "nome": "Engenharia"}                              # setor sem contestação: nenhuma
     html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
     assert "Nenhuma contestação para o seu setor" in html and "o seu setor é Engenharia" in html
     app.config["NEXUS_ADMINS"] = BETO["email"]                              # administrador (a lista de agora): todas
@@ -238,7 +239,7 @@ def test_disponibilidade_e_desligamento_sao_do_cos(trat, app, cliente, monkeypat
     d = CT.contestacoes()
     assert d["contagem"]["cos"] == 1 and d["por_setor"]["cos"][0]["itens"] == ["Disponibilidade", "Desligamento"]
     from nexus.auth import setor_telas as ST
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 5, "nome": "COS"}, "erro": ""})
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.COS, "nome": "COS"}, "erro": ""})
     _como(cliente, ANA)
     html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
     assert "COS<i>1</i>" in html and "Mandaguaçu" in html and "Performance<i>" not in html and "Zeladoria<i>" not in html
@@ -253,7 +254,7 @@ def test_setor_sem_teams_aparece_so_no_nexus_e_nao_como_recusa(trat, app, client
     d = CT.contestacoes()
     assert d["por_setor"]["cos"][0]["avisado"] is None and d["por_setor"]["zeladoria"][0]["avisado"] is False
     from nexus.auth import setor_telas as ST
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": 5, "nome": "COS"}, "erro": ""})
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.COS, "nome": "COS"}, "erro": ""})
     _como(cliente, ANA)
     html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
     assert "só no Nexus" in html and "não recebeu" not in html and "recusou" not in html

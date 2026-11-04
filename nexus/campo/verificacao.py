@@ -26,10 +26,11 @@ import unicodedata
 from datetime import datetime, timedelta, timezone
 
 from . import regras_app
+from ..cadastro import setor_ids as SID
 
 _BRT = timezone(timedelta(hours=-3))
 ETIQUETAS_FORA = ("PERFORMANCE", "CHAMADOS", "CHAMADO", "ENGENHARIA")
-SETOR_COS = "cos"
+SETOR_COS = SID.COS                  # o setor_id (pelo ID desde 04/11/2026)
 TTL_COS_S = 600              # quem é do COS muda pouco: 10 min de cópia (o pessoal do Fracttal já fica 1 h)
 _COS: dict = {"t": 0.0, "v": None}
 
@@ -125,7 +126,7 @@ def criadores_cos(base: str, sessao, ler_pessoal) -> dict:
         return v
     from ..cadastro import setores as S
     st = S.ler(base, sessao)
-    sid = {x["setor_id"] for x in S.ativos(st.get("setores") or []) if S._norm(x["nome"]) == SETOR_COS}
+    sid = {x["setor_id"] for x in S.ativos(st.get("setores") or []) if x["setor_id"] == SETOR_COS}
     quem = {str(fid) for fid, s in S.vigentes(st.get("decisoes") or []).items() if s in sid}
     p = ler_pessoal() or {}
     codigos = p.get("codigos") or {}

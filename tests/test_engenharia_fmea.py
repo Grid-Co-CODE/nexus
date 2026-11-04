@@ -61,6 +61,7 @@ from nexus.dados import catalogo, explica, livros  # noqa: E402
 from nexus.dados.equipamento import equipamento_id  # noqa: E402
 from nexus.engenharia import acompanhamento as AC  # noqa: E402
 from nexus.engenharia import fmea as F  # noqa: E402
+from nexus.cadastro import setor_ids as SID
 
 BRT = timezone(timedelta(hours=-3))
 ANA = AC_ANA = {"email": "ana.lima@gridco.com.br", "nome": "Ana Lima"}
@@ -273,7 +274,7 @@ def test_quem_nao_e_da_engenharia_le_e_nao_emite(tela, cliente, monkeypatch):
     _como(cliente, AC_ANA)
     _emitir(cliente)
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"engenharia/fmea", "engenharia/confiabilidade"},
-                                               "setor": {"id": 2, "nome": "Performance"}, "erro": ""})
+                                               "setor": {"id": SID.PERFORMANCE, "nome": "Performance"}, "erro": ""})
     ano = datetime.now(BRT).year
     assert cliente.get(f"{URL}/novo?tipo=fmea&ativo=IBI200-INVR1.3").status_code == 403
     assert _emitir(cliente).status_code == 403
@@ -302,11 +303,11 @@ def test_a_engenharia_emite_sem_marcar_a_tela_em_acessos(app, monkeypatch):
     from nexus.auth import setor_telas as ST
     monkeypatch.setattr(ST, "escolhas_de_dono", lambda: {})          # sem escolha na Central: vale o do código
     with app.app_context():
-        telas = ST.das_do_setor({"id": 1, "nome": "Engenharia"})
+        telas = ST.das_do_setor({"id": SID.ENGENHARIA, "nome": "Engenharia"})
         for caminho in ("/t/engenharia/fmea", "/t/engenharia/fmea/novo", "/t/engenharia/fmea/emitir",
                         "/t/engenharia/fmea/FMEA-2026-0001"):
             assert ST.pode(caminho, telas), caminho
-        assert not ST.pode("/t/engenharia/fmea", ST.das_do_setor({"id": 3, "nome": "Performance"}))
+        assert not ST.pode("/t/engenharia/fmea", ST.das_do_setor({"id": SID.PERFORMANCE, "nome": "Performance"}))
 
 
 def test_nova_revisao_guarda_o_medido_da_revisao_anterior(tela, cliente):

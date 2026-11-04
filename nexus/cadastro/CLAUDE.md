@@ -270,6 +270,11 @@ e-mails pessoais); filtro Origem e a etiqueta "externo" na linha.
   e-mail**. Antes de gravar, relê o livro do banco; leitura que falha não grava (gravaria por cima). POST só da própria
   página (`_de_outro_site`) e só administrador. Sem `GRIDCO_SQL_TOKEN` ou com o banco fora, a tela avisa e a caixa
   fica só para ver. O livro nasce com o 1º setor criado (registrado no catálogo antes).
+- **O código conhece alguns setores pelo `setor_id`** (`setor_ids.py`, 04/11/2026; Levi: "logo mais vou fazer
+  alterações, não podemos ficar dependente de texto"): Engenharia 1, Performance 2, Zeladoria 3, Segurança 4, COS 5,
+  Supervisão Campo 6, Chamados 7, PCM 9 e Responsável UFV 10 (as telas que são de cada um e quem age em cada área).
+  **Renomear é seguro**: nada muda de quem vê nem de quem age. **Excluir e criar de novo NÃO é a mesma coisa**: o
+  setor novo ganha outro ID, e o código não o reconhece até o ID entrar no `setor_ids.py` (por commit).
 - **Desenho (12/10, Levi):** sem o título "Pessoal do Fracttal" ("não serve de nada"; os filtros saíram do cartão, como
   na lista de Colaboradores), sem a coluna Código e o "Como liga" virou a dica do (!) ao lado de "Ler o Fracttal de
   novo" (passar o mouse ou focar; Esc fecha). O código de cada pessoa (o `code` do Fracttal) segue guardado À PARTE no

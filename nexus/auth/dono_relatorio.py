@@ -1,8 +1,8 @@
 """O setor dono de cada relatório da Central de emissão, escolhido pelo administrador (14/10/2026, Levi: "adicione a
 opção de eu escolher de qual setor é o relatório! Apenas administradores podem editar!").
 
-- O padrão é o `Tela.do_setor` do código, pelo NOME do setor (os da plataforma são da Performance; os do PCM, do PCM).
-  A escolha feita na Central vale por cima dele, pelo `setor_id`: o setor renomeado continua dono.
+- O padrão é o `Tela.do_setor` do código, pelo `setor_id` (desde 04/11/2026; os da plataforma são da Performance; os
+  do PCM, do PCM). A escolha feita na Central vale por cima dele, também pelo `setor_id`: o setor renomeado continua dono.
 - O setor dono vê o relatório sem marcar nada em Base → Acessos (`setor_telas.das_do_setor`), e o cartão traz o nome
   dele. "Nenhum setor" = só o administrador e quem for marcado em Base → Acessos.
 - Só administrador vê a seção e grava (o portão do POST: `torres/relatorios.central`).

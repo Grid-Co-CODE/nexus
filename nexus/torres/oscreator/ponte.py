@@ -28,6 +28,7 @@ from urllib.parse import urlsplit
 from flask import Blueprint, current_app, render_template, request, session
 from flask.sessions import SecureCookieSessionInterface
 
+from ...cadastro import setor_ids as SID
 from ...prefixo import ja_na_raiz, na_raiz, raiz, sem_raiz
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
@@ -455,10 +456,10 @@ def _fim_na_resposta(alvo, resp) -> str | None:
 # do app (a Fila do PCM, que aprova e cria a OS, e os Temas, que gravam no banco com a chave do servidor); no app ela
 # pede a senha do PCM. Aqui quem decide é o Nexus, e a decisão vai ao clone no pedido (`request.environ`), onde o
 # `rotas_solic` mostra o aviso no lugar da tela e recusa as gravações. O Painel, o Histórico e a Nova solicitação seguem
-# abertos (são a Área do Solicitante do app). O setor é o de Base → Acessos → Pessoas e setores, pelo NOME ("PCM"); sem saber o
-# setor (banco fora, Nexus sem a NEXUS_PESSOA_HMAC), fecha: só o administrador passa.
+# abertos (são a Área do Solicitante do app). O setor é o de Base → Acessos → Pessoas e setores, pelo setor_id (desde 04/11/2026; era
+# o nome); sem saber o setor (banco fora, Nexus sem a NEXUS_PESSOA_HMAC), fecha: só o administrador passa.
 AREA_PCM = "os_web.area_pcm"
-SETOR_PCM = "pcm"
+SETOR_PCM = SID.PCM
 
 
 def _sem_acento(t: str) -> str:
@@ -476,7 +477,7 @@ def area_pcm() -> dict:
 # mesma regra da Área PCM, com o setor Chamados; vai no pedido das telas do Acompanhamento de chamados
 # (`rotas_acomp.OBS_CHAMADOS`)
 OBS_CHAMADOS = "os_web.obs_chamados"
-SETOR_CHAMADOS = "chamados"
+SETOR_CHAMADOS = SID.CHAMADOS
 _ROTA_OBS = re.compile(r"chamados/acompanhamento/\d+|api/acomp/\d+/obs/[^/]+/(?:editar|excluir)")
 
 
@@ -486,8 +487,8 @@ def obs_chamados() -> dict:
                               "e dos administradores do Nexus.", "as observações de Garantias")
 
 
-def _do_setor_ou_admin(setor_alvo: str, nome: str, regra: str, onde_log: str) -> dict:
-    """O administrador, ou quem é do setor `setor_alvo` (sem acento e sem caixa) no Nexus."""
+def _do_setor_ou_admin(setor_alvo: int, nome: str, regra: str, onde_log: str) -> dict:
+    """O administrador, ou quem é do setor `setor_alvo` (o setor_id) no Nexus. O `nome` é só para o aviso."""
     if session.get("admin"):
         return {"pode": True, "aviso": ""}
     if not current_app.config.get("NEXUS_PESSOA_HMAC"):
@@ -501,7 +502,7 @@ def _do_setor_ou_admin(setor_alvo: str, nome: str, regra: str, onde_log: str) ->
     except Exception as ex:      # noqa: BLE001 — sem saber o setor, fecha (e diz que é leitura, não falta de setor)
         logging.warning("OS Creator: não consegui ler o setor para %s (%s)", onde_log, type(ex).__name__)
         return {"pode": False, "aviso": regra + " Não consegui ler o seu setor agora; tente de novo em instantes."}
-    if setor and _sem_acento(setor.get("nome")) == setor_alvo:
+    if setor and setor.get("id") == setor_alvo:
         return {"pode": True, "aviso": ""}
     onde = ("Você está no setor %s." % setor["nome"]) if setor else "Você está sem setor no Nexus."
     return {"pode": False, "aviso": regra + " " + onde + " Quem põe você no setor %s é o administrador "
@@ -520,10 +521,10 @@ def _do_setor_ou_admin(setor_alvo: str, nome: str, regra: str, onde_log: str) ->
 # liberação que não é tela não cabe nele de forma limpa. Nasceu vazia (só os administradores) e, em 03/11/2026, o Levi liberou
 # todos ("Todos os setores veem todas as OSs" no Fracttal): `TODOS_OS_SETORES` vale para quem tem QUALQUER setor no Nexus. A
 # pessoa sem setor, o setor que não deu para ler e o Nexus sem a NEXUS_PESSOA_HMAC seguem fechados: sem saber quem é, não libera.
-# Para voltar a liberar só alguns, troque o "*" pelos nomes dos setores.
+# Para voltar a liberar só alguns, troque o "*" pelos setor_id deles (`cadastro/setor_ids.py`; pelo ID desde 04/11/2026).
 LISTA_CENTRAL = "os_web.lista_central"
 TODOS_OS_SETORES = "*"
-SETORES_COM_LISTA_CENTRAL: frozenset = frozenset({TODOS_OS_SETORES})
+SETORES_COM_LISTA_CENTRAL: frozenset = frozenset({TODOS_OS_SETORES})          # o "*" ou setor_id
 
 
 def lista_central() -> bool:
@@ -547,7 +548,7 @@ def lista_central() -> bool:
         return False
     if TODOS_OS_SETORES in SETORES_COM_LISTA_CENTRAL:
         return True
-    return _sem_acento(setor.get("nome")) in {_sem_acento(s) for s in SETORES_COM_LISTA_CENTRAL}
+    return setor.get("id") in SETORES_COM_LISTA_CENTRAL
 
 
 @bp_raiz.route("/os/", defaults={"resto": ""}, methods=_METODOS)
