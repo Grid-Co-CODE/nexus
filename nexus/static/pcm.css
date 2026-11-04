@@ -1135,7 +1135,7 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .inv-vazio p{margin:0;max-width:72ch;font-size:13.5px;color:var(--tinta-2)}
 .inv-vazio b{color:var(--tinta)}
 .inv-pilha>.inv-vazio{margin-top:0}
-.inv-tela>.cn-erro+.inv-lote,.inv-tela>.cn-erro+.inv-espera{margin-top:14px}
+.inv-tela>.cn-erro+.inv-lote,.inv-tela>.cn-erro+.inv-espera,.inv-tela>.cn-nota+.inv-lote,.inv-tela>.cn-nota+.inv-espera{margin-top:14px}
 .inv-pilha>.cn-erro{margin-top:0}
 
 /* a tabela: a mesma `.alm-t` das outras abas, com a faixa no cabeçalho (o `th` navy do mockup, aqui a `--barra`) */

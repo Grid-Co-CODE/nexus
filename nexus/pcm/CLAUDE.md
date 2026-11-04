@@ -868,7 +868,9 @@ o que não tem contagem na lista: o cartão das recontagens o usa) e o que o App
   propósito:** compara a hora do servidor (o `quando`) com o "Contada em" do celular; uma folga daria por atendido o pedido com
   uma contagem feita ANTES dele (o PCM gravaria o resto achando a peça duvidosa conferida), e sem folga o erro possível é o
   contrário (o celular atrasado deixa a recontagem feita logo depois do pedido "esperando" até a próxima contagem, que o PCM vê
-  na lista): entre um "atendida" falso e um "esperando" a mais, fica o "esperando". O resultado: `esperando` (últimos 90 dias,
+  na lista): entre um "atendida" falso e um "esperando" a mais, fica o "esperando". A exceção é o celular ADIANTADO: o `_serve`
+  aceita o "Contada em" até `contas.RELOGIO_ADIANTADO` (1 h) à frente do servidor, e uma contagem feita pouco antes do pedido
+  num celular adiantado ainda pode passar por atendida. O resultado: `esperando` (últimos 90 dias,
   `contas.APROVAVEL_DIAS`, o mais velho primeiro) e `atendidas` (últimos 30, `ATENDIDAS_DIAS`, pelo dia da contagem que atendeu,
   a mais nova primeiro), as duas listas do cartão, e `todos`, sem janela (o aviso fixo da contagem segue o pedido mesmo depois
   de ele sair do cartão). Sem o almoxarifado de teste. Nunca o motivo.
