@@ -12,6 +12,7 @@ from flask import Response, current_app, jsonify, redirect, render_template, req
 from ...performance import ponte
 from ...performance.clima import fontes as F
 from ...prefixo import na_raiz
+from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
 from ..moldura import registrar_molduras
 
@@ -63,7 +64,7 @@ TORRE = Torre(
         Tela("equipe", "Quadro da equipe",
              "Quem da performance está com o quê, o que atrasou e o que vem por aí?",
              "OS do Fracttal das pessoas do setor Performance (Base → Acessos → Pessoas e setores)",
-             do_setor="Performance"),
+             do_setor=SID.PERFORMANCE),
         # O nome de cada fonte por extenso, de fontes.NOMES (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla")
         Tela("clima", "Clima e risco",
              f"Onde há aviso do {F.extenso('inmet')}, foco de queimada ou risco de fogo perto das usinas?",

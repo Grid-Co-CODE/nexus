@@ -18,9 +18,10 @@ import unicodedata
 from datetime import datetime, timezone
 from urllib.parse import quote
 
+from ..cadastro import setor_ids as SID
 from ..engenharia import os_equipe as OE
 
-SETOR = "performance"           # o nome do setor em Base → Acessos (sem acento nem caixa)
+SETOR = SID.PERFORMANCE         # o setor_id em Base → Acessos (pelo ID: renomear o setor não esvazia o quadro)
 VALIDADE_S = OE.VALIDADE_S
 FORCAR_S = OE.FORCAR_S
 PESSOAS_S = OE.PESSOAS_S
@@ -41,7 +42,7 @@ def ids_do_setor(setores: dict) -> list[str]:
     """Os ids do Fracttal (texto) de quem é do setor Performance hoje: a última decisão de cada pessoa
     (`setores.vigentes`, a mesma regra da tela Pessoas e setores). Setor apagado ou sem ninguém: lista vazia."""
     from ..cadastro import setores as S
-    sid = next((s["setor_id"] for s in S.ativos(setores.get("setores") or []) if _norm(s["nome"]) == SETOR), None)
+    sid = next((s["setor_id"] for s in S.ativos(setores.get("setores") or []) if s["setor_id"] == SETOR), None)
     if sid is None:
         return []
     return [str(fid) for fid, s in S.vigentes(setores.get("decisoes") or []).items()

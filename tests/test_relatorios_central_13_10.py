@@ -90,7 +90,8 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
     assert ">Central de emissão</a>" in _menu(c.get("/").get_data(as_text=True))
     assert c.get("/t/relatorios/potencia-ativa").status_code == 200
     with app.app_context():
-        assert ST.das_do_setor(SID.PERFORMANCE) == ST.das_do_setor({"id": SID.PERFORMANCE, "nome": "Performance e Dados"}) \n            == {f"relatorios/{t}" for t in RELATORIOS} | {"comando/caixa-de-entrada", "performance/equipe"}
+        assert ST.das_do_setor(SID.PERFORMANCE) == ST.das_do_setor({"id": SID.PERFORMANCE, "nome": "Performance e Dados"}) \
+            == {f"relatorios/{t}" for t in RELATORIOS} | {"comando/caixa-de-entrada", "performance/equipe"}
         # a Caixa é de todos (03/11); o Quadro da equipe da Performance (04/11)
         # os do PCM (14/10/2026) são do setor PCM: os relatórios (nexus/pcm/relatorios, tests/test_relatorios_pcm.py) e o
         # Acompanhamento (nexus/pcm/acompanhamento, tests/test_pcm_acompanhamento.py)

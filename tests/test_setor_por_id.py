@@ -33,8 +33,10 @@ def test_as_regras_de_quem_age_usam_o_setor_id():
     from nexus.engenharia import acompanhamento
     from nexus.hseq import decisoes
     from nexus.pcm import telas as pcm_telas
+    from nexus.performance import quadro_equipe
     from nexus.torres.oscreator import ponte
     assert acompanhamento.SETOR == SID.ENGENHARIA and decisoes.SETOR == SID.SEGURANCA
+    assert quadro_equipe.SETOR == SID.PERFORMANCE
     assert pcm_telas.SETOR_PCM == SID.PCM and pcm_telas.SETORES_MARCAM == (SID.PCM, SID.RESPONSAVEL_UFV)
     assert ponte.SETOR_PCM == SID.PCM and ponte.SETOR_CHAMADOS == SID.CHAMADOS and verificacao.SETOR_COS == SID.COS
     assert all(s == ponte.TODOS_OS_SETORES or s in SID.TODOS for s in ponte.SETORES_COM_LISTA_CENTRAL)
@@ -86,3 +88,10 @@ def test_renomear_nao_muda_quem_age():
     assert not acompanhamento.pode_agir({"id": SID.PERFORMANCE, "nome": "Engenharia"}, False)
     assert decisoes.pode_decidir({"id": SID.SEGURANCA, "nome": "HSEQ"}, False)
     assert not decisoes.pode_decidir({"id": SID.COS, "nome": "Segurança"}, False)
+    # o Quadro da equipe da Performance: a equipe é a do setor 2, com qualquer nome
+    from nexus.performance import quadro_equipe as Q
+    st = {"setores": [{"setor_id": SID.PERFORMANCE, "nome": "Desempenho", "excluido": False},
+                     {"setor_id": SID.ENGENHARIA, "nome": "Performance", "excluido": False}],
+          "decisoes": [{"fracttal_id": 10, "setor_id": SID.PERFORMANCE, "decidida_em": "2026-11-01T10:00:00"},
+                       {"fracttal_id": 11, "setor_id": SID.ENGENHARIA, "decidida_em": "2026-11-01T10:00:00"}]}
+    assert Q.ids_do_setor(st) == ["10"]
