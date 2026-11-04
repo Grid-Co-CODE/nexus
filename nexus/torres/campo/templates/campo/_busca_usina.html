@@ -1,0 +1,59 @@
+{# A busca de usina na lista do Nexus (Rondas, 03/11/2026: "a pessoa pesquisa o nome da UFV, assim que pesquisar já leva
+   para a página só da usina"; "essa lista está mal formatada, quero estilo nexus"; a Central da usina da Visão do
+   responsável, 04/11/2026). Quem inclui passa:
+     busca_usinas  [(usina_id, nome, "cliente · UF", endereço da usina)], na ordem do nome
+     busca_rota    a rota para onde o formulário vai sem o script (ela acha a usina pelo nome, no campo `nome`)
+     busca_ocultos {campo: valor} que o formulário leva junto (opcional)
+     busca_valor   o texto que volta no campo (opcional)
+     busca_rotulo  o texto do campo
+   A lista abre no foco e filtra enquanto se digita (sem acento nem caixa); setas e Enter escolhem, Esc fecha; clicar,
+   ou Enter na marcada, leva direto à usina. Uma busca por página (os ids são fixos). #}
+<form class="rd-campo rd-usina" method="get" action="{{ url_for(busca_rota) }}" role="search" data-rd-usina>
+  {% for k, v in (busca_ocultos or {}).items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <i class="ph ph-solar-panel" aria-hidden="true"></i>
+  <input type="search" name="nome" value="{{ busca_valor or '' }}" placeholder="{{ busca_rotulo }}" aria-label="{{ busca_rotulo }}: vai à página da usina" autocomplete="off"
+         role="combobox" aria-expanded="false" aria-controls="rd-usinas" aria-autocomplete="list">
+  <ul class="rd-usinas" id="rd-usinas" role="listbox" aria-label="Usinas" hidden>
+    {% for uid, nome, sub, href in busca_usinas %}<li role="option" id="rd-us-{{ uid }}" data-href="{{ href }}"><b>{{ nome }}</b>{% if sub %}<span>{{ sub }}</span>{% endif %}</li>{% endfor %}
+    <li class="rd-usinas-nada" role="presentation" hidden>Nenhuma usina com esse nome</li>
+  </ul>
+</form>
+<script>
+  (function () {
+    var f = document.querySelector('[data-rd-usina]'); if (!f) return;
+    var campo = f.querySelector('input[name="nome"]'), lista = document.getElementById('rd-usinas');
+    var itens = Array.prototype.slice.call(lista.querySelectorAll('li[role="option"]')), nada = lista.querySelector('.rd-usinas-nada');
+    var marcada = -1;
+    function sem(t) { return t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+    itens.forEach(function (li) { li._busca = sem(li.textContent); });
+    function visiveis() { return itens.filter(function (li) { return !li.hidden; }); }
+    function marca(k) {
+      var vs = visiveis();
+      itens.forEach(function (li) { li.removeAttribute('aria-selected'); });
+      marcada = vs.length ? Math.max(0, Math.min(k, vs.length - 1)) : -1;
+      if (marcada >= 0) { vs[marcada].setAttribute('aria-selected', 'true'); vs[marcada].scrollIntoView({block: 'nearest'}); campo.setAttribute('aria-activedescendant', vs[marcada].id); }
+      else campo.removeAttribute('aria-activedescendant');
+    }
+    function filtra() {
+      var q = sem(campo.value), n = 0;
+      itens.forEach(function (li) { li.hidden = q !== '' && li._busca.indexOf(q) < 0; if (!li.hidden) n += 1; });
+      nada.hidden = n > 0; marca(q ? 0 : -1);
+    }
+    function abre() { lista.hidden = false; campo.setAttribute('aria-expanded', 'true'); filtra(); }
+    function fecha() { lista.hidden = true; campo.setAttribute('aria-expanded', 'false'); marcada = -1; }
+    campo.addEventListener('focus', abre);
+    campo.addEventListener('input', function () { if (lista.hidden) abre(); else filtra(); });
+    campo.addEventListener('keydown', function (ev) {
+      if (ev.key === 'ArrowDown') { ev.preventDefault(); if (lista.hidden) abre(); marca(marcada + 1); }
+      else if (ev.key === 'ArrowUp') { ev.preventDefault(); marca(marcada - 1); }
+      else if (ev.key === 'Escape') { fecha(); }
+    });
+    lista.addEventListener('mousedown', function (ev) { ev.preventDefault(); });    // o clique não tira o foco do campo
+    lista.addEventListener('click', function (ev) { var li = ev.target.closest('li[role="option"]'); if (li) location.href = li.dataset.href; });
+    f.addEventListener('submit', function (ev) {
+      var vs = visiveis();
+      if (marcada >= 0 && vs[marcada]) { ev.preventDefault(); location.href = vs[marcada].dataset.href; }
+    });
+    document.addEventListener('click', function (ev) { if (!f.contains(ev.target)) fecha(); });
+  })();
+</script>

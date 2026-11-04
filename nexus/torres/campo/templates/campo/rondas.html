@@ -78,16 +78,8 @@
     {# "Buscar por usina" (Levi, 03/11/2026: "a pessoa pesquisa o nome da UFV, assim que pesquisar já leva para a página
        só da usina"): a lista leva na hora; sem o script, a rota acha a usina pelo nome #}
     {# a lista no estilo do Nexus (03/11/2026: "essa lista está mal formatada, quero estilo nexus"), não a do navegador:
-       filtra enquanto se digita (sem acento nem caixa), setas e Enter escolhem, Esc fecha #}
-    <form class="rd-campo rd-usina" method="get" action="{{ url_for('torre_campo.rondas_buscar_usina') }}" role="search" data-rd-usina>
-      <i class="ph ph-solar-panel" aria-hidden="true"></i>
-      <input type="search" name="nome" placeholder="Buscar por usina" aria-label="Buscar por usina: vai à página da usina" autocomplete="off"
-             role="combobox" aria-expanded="false" aria-controls="rd-usinas" aria-autocomplete="list">
-      <ul class="rd-usinas" id="rd-usinas" role="listbox" aria-label="Usinas" hidden>
-        {% for uid, nome, sub in usinas_busca %}<li role="option" id="rd-us-{{ uid }}" data-href="{{ url_for('torre_campo.rondas_usina', usina_id=uid) }}"><b>{{ nome }}</b>{% if sub %}<span>{{ sub }}</span>{% endif %}</li>{% endfor %}
-        <li class="rd-usinas-nada" role="presentation" hidden>Nenhuma usina com esse nome</li>
-      </ul>
-    </form>
+       a mesma busca da Central da usina da Visão do responsável (`_busca_usina.html`, 04/11/2026) #}
+    {% with busca_usinas=usinas_busca, busca_rota='torre_campo.rondas_buscar_usina', busca_rotulo='Buscar por usina' %}{% include 'campo/_busca_usina.html' %}{% endwith %}
     <form class="rd-filtros" method="get" action="{{ url_for('torre_campo.rondas') }}" data-rd-form>
       {% for x in ('aba', 'dur', 'pend', 'ind') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
       <label class="rd-campo rd-busca"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>
@@ -281,45 +273,6 @@
       f.addEventListener('submit', function () {
         f.querySelectorAll('input[name], select[name]').forEach(function (c) { if (!c.value) c.disabled = true; });
       });
-    })();
-    // "Buscar por usina": a lista do Nexus abre no foco e filtra enquanto se digita (sem acento nem caixa); clicar, ou
-    // Enter na marcada, leva direto à página da usina; Enter sem nenhuma marcada vai à rota, que acha pelo nome
-    (function () {
-      var f = document.querySelector('[data-rd-usina]'); if (!f) return;
-      var campo = f.querySelector('input'), lista = document.getElementById('rd-usinas');
-      var itens = Array.prototype.slice.call(lista.querySelectorAll('li[role="option"]')), nada = lista.querySelector('.rd-usinas-nada');
-      var marcada = -1;
-      function sem(t) { return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
-      itens.forEach(function (li) { li._busca = sem(li.textContent); });
-      function visiveis() { return itens.filter(function (li) { return !li.hidden; }); }
-      function marca(k) {
-        var vs = visiveis();
-        itens.forEach(function (li) { li.removeAttribute('aria-selected'); });
-        marcada = vs.length ? Math.max(0, Math.min(k, vs.length - 1)) : -1;
-        if (marcada >= 0) { vs[marcada].setAttribute('aria-selected', 'true'); vs[marcada].scrollIntoView({block: 'nearest'}); campo.setAttribute('aria-activedescendant', vs[marcada].id); }
-        else campo.removeAttribute('aria-activedescendant');
-      }
-      function filtra() {
-        var q = sem(campo.value), n = 0;
-        itens.forEach(function (li) { li.hidden = q !== '' && li._busca.indexOf(q) < 0; if (!li.hidden) n += 1; });
-        nada.hidden = n > 0; marca(q ? 0 : -1);
-      }
-      function abre() { lista.hidden = false; campo.setAttribute('aria-expanded', 'true'); filtra(); }
-      function fecha() { lista.hidden = true; campo.setAttribute('aria-expanded', 'false'); marcada = -1; }
-      campo.addEventListener('focus', abre);
-      campo.addEventListener('input', function () { if (lista.hidden) abre(); else filtra(); });
-      campo.addEventListener('keydown', function (ev) {
-        if (ev.key === 'ArrowDown') { ev.preventDefault(); if (lista.hidden) abre(); marca(marcada + 1); }
-        else if (ev.key === 'ArrowUp') { ev.preventDefault(); marca(marcada - 1); }
-        else if (ev.key === 'Escape') { fecha(); }
-      });
-      lista.addEventListener('mousedown', function (ev) { ev.preventDefault(); });    // o clique não tira o foco do campo
-      lista.addEventListener('click', function (ev) { var li = ev.target.closest('li[role="option"]'); if (li) location.href = li.dataset.href; });
-      f.addEventListener('submit', function (ev) {
-        var vs = visiveis();
-        if (marcada >= 0 && vs[marcada]) { ev.preventDefault(); location.href = vs[marcada].dataset.href; }
-      });
-      document.addEventListener('click', function (ev) { if (!f.contains(ev.target)) fecha(); });
     })();
     // os menus do cabeçalho (Duração, Pendências): a caixa fica presa à tela (a rolagem da tabela a cortaria); ordenar
     // usa a mesma ordem do clique no cabeçalho (_ordenar.html)

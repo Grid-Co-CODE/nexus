@@ -1674,3 +1674,34 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .rg-fotos .cn-bt-tentar{margin-left:6px;font:600 12px var(--font-sans);color:var(--verde-texto);background:transparent;
   border:1px solid var(--linha);border-radius:7px;padding:3px 10px;cursor:pointer}
 .rg-fotos .cn-bt-tentar:hover{border-color:var(--verde-texto)}
+/* a Central da usina (04/11/2026, a aba da Visão do responsável): a busca, o cabeçalho com as pessoas, os números da
+   linha da usina e os quadros em duas colunas, numa superfície só (à la Nexus, sem azul em camadas) */
+.cu-busca{display:flex;margin-top:16px}
+.cu-busca .rd-usina{flex:0 1 440px}
+.cu-busca .rd-campo input{width:100%}
+.cu-vazio{margin-top:16px;font-size:13.5px}
+.cu-vazio p{margin:0 0 6px}
+.cu-cab{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:14px 40px;margin-top:20px}
+.cu-nome{margin:0;font:700 22px/1.25 var(--font-sans);color:var(--tinta)}
+.cu-id p{margin:3px 0 0;font-size:13px}
+.cu-pessoas{display:grid;grid-template-columns:repeat(3,minmax(0,auto));gap:8px 32px;margin:0;font-size:13px}
+.cu-pessoas dt{font:600 10.5px/1.2 var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.cu-pessoas dd{margin:3px 0 0}
+.cu-pessoas .cu-larga{grid-column:1/-1}
+.cn-numeros > button{display:block;padding:16px 20px;border:0;border-left:1px solid var(--linha);background:transparent;
+  color:inherit;font:inherit;text-align:left;cursor:pointer}
+.cn-numeros > button:hover{background:var(--superficie-3)}
+.cn-numeros > button:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+/* os oito números numa linha (a faixa das outras telas quebra em 150 px) */
+.cu-numeros{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
+.cu-numeros > *{padding:14px 16px}
+.cu-numeros .v{font-size:20px;line-height:26px;white-space:nowrap}
+/* duas colunas que se empilham por dentro: o quadro mais curto não deixa buraco embaixo */
+.cu-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px;align-items:start}
+.cu-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.cu-q{min-width:0;padding:12px 16px 14px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.cu-q .pn-cab{margin-bottom:10px}
+.cu-q .cr-dl{grid-template-columns:140px minmax(0,1fr)}
+.cu-q .cr-dl + .cr-dl{margin-top:7px}
+@media (max-width:900px){.cu-grade{grid-template-columns:1fr}.cu-pessoas{grid-template-columns:1fr 1fr}}
+@media (max-width:480px){.cu-pessoas{grid-template-columns:1fr}.cu-q .cr-dl{grid-template-columns:1fr}}
