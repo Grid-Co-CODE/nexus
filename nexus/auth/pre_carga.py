@@ -38,7 +38,9 @@ LEMBRAR_S = 60
 PAUSA_S = 0.3
 # as telas que leem o Fracttal ao abrir: medido em 12/10/2026 abrindo as 85 telas com o Fracttal bloqueado, só estas
 # tentaram. Tela nova que lê o Fracttal ao abrir entra aqui (nexus/torres/CLAUDE.md).
-FORA = frozenset({"engenharia/mesa", "engenharia/confiabilidade", "engenharia/equipe", "campo/aprovacao"})
+# o Quadro da equipe da Performance (04/11/2026) lê o Fracttal ao abrir sem cópia, como o da Engenharia
+FORA = frozenset({"engenharia/mesa", "engenharia/confiabilidade", "engenharia/equipe", "campo/aprovacao",
+                  "performance/equipe"})
 CABECALHO = "X-Nexus-Pre-Carga"
 
 

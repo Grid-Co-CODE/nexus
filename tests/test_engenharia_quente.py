@@ -85,6 +85,8 @@ def test_instalar_liga_o_quente_sempre_e_a_leitura_da_subida_so_sem_a_chave(monk
     ligados, timers = [], []
     monkeypatch.setattr(E, "manter_quente", lambda app: ligados.append("quente"))
     monkeypatch.setattr(etm, "manter_quente", lambda app: ligados.append("etm"))
+    from nexus.performance import quadro_equipe       # o clone para a Performance (04/11/2026), depois da tela ETMs
+    monkeypatch.setattr(quadro_equipe, "manter_quente", lambda app: ligados.append("performance"))
 
     class _Timer:
         def __init__(self, segundos, fn):
@@ -98,8 +100,8 @@ def test_instalar_liga_o_quente_sempre_e_a_leitura_da_subida_so_sem_a_chave(monk
         def __init__(self, config):
             self.config = config
     engenharia.instalar(_App({}))
-    assert ligados == ["quente", "etm"] and timers == [150, 210, 270]
+    assert ligados == ["quente", "etm", "performance"] and timers == [150, 210, 270, 330]
     ligados.clear()
     timers.clear()
     engenharia.instalar(_App({"NEXUS_CAMPO_AQUECER": "0"}))
-    assert ligados == ["quente", "etm"] and timers == []
+    assert ligados == ["quente", "etm", "performance"] and timers == []

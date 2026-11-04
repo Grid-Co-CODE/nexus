@@ -8,16 +8,22 @@
    está em nexus/engenharia/os_equipe.py. O clique numa OS abre a página da OS da engenharia (Levi, 24/10/2026: "Ao
    clicar quero uma visão parecida com o que aparece quando clica na OS da parte de CHAMADOS > GARANTIA"; até então era o
    card do OS Creator), e a OS aberta sem atualização há mais de 7 dias pulsa em laranja. #}
+{# O mesmo quadro serve à Performance (04/11/2026, Levi: "clone o quadro de equipe da engenharia para o time de
+   performance"): `area` = "performance" troca o texto da área, a equipe vem do setor Performance (Base → Acessos) e o
+   clique abre o card da OS do OS Creator, não a página da OS da Engenharia (que carrega o status e a prioridade dela). #}
+{% set area = area|default('engenharia') %}
+{% set card = area != 'engenharia' %}
+{% if card %}{% include "oscreator/card_os_abrir.html" %}{% endif %}
 <div class="campo-nativa kb">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Quadro da equipe</p>
       <h1 class="cn-titulo">Quem está com o quê</h1>
-      <p class="cn-pergunta">As OS de quem é da engenharia no Fracttal: as que vão abrir, as abertas, as em verificação e as
-        fechadas. Clique numa pessoa para ver só as dela, e numa OS para abrir a página dela (status, prioridade, comentários e a cadeia).</p></div>
+      <p class="cn-pergunta">As OS de quem é da {{ area }} no Fracttal: as que vão abrir, as abertas, as em verificação e as
+        fechadas. Clique numa pessoa para ver só as dela, e numa OS para abrir {% if card %}o card dela (o mesmo do Histórico do OS Creator){% else %}a página dela (status, prioridade, comentários e a cadeia){% endif %}.</p></div>
     <div class="cn-frescor">OS do Fracttal<br><b>lidas às {{ lido }}</b></div>
   </div>
   {% if erro %}<div class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou a leitura agora ({{ erro }}).</b> Mostrando a última leitura; nova tentativa em 1 minuto.</div>{% endif %}
-  {% if faltam %}<div class="cn-erro cn-aviso" role="status"><b>Não achei no Fracttal: {{ faltam|join(', ') }}.</b> Confira o nome na lista de responsáveis da engenharia (a mesma da Nova solicitação | Engenharia).</div>{% endif %}
+  {% if faltam %}<div class="cn-erro cn-aviso" role="status"><b>Não achei no Fracttal: {{ faltam|join(', ') }}.</b> {% if card %}Confira a pessoa em Base → Acessos → Pessoas e setores.{% else %}Confira o nome na lista de responsáveis da engenharia (a mesma da Nova solicitação | Engenharia).{% endif %}</div>{% endif %}
 
   {# A faixa de números no modelo do Acompanhamento de chamados do OS Creator (Levi, 08/10/2026: "o card de KPIS eu gostei
      mais do de chamados"): o rótulo em cima, o número colorido pela gravidade e, ao lado, o detalhe que diz por onde
@@ -61,7 +67,7 @@
       <span class="kb-faixa-legenda"><span>hoje</span><span>{{ c.faixa[7].dia }}</span><span>{{ c.faixa[-1].dia }}</span></span>
       <span class="kb-proxima">{% if c.proxima %}Próxima: OS {{ c.proxima.os }} em {{ c.proxima.programada }}{% elif c.carga %}Nenhuma programada daqui para a frente{% else %}Sem OS em aberto{% endif %}</span>
     </button>
-    {% else %}<p class="mudo">Nenhum responsável da engenharia achado no Fracttal.</p>{% endfor %}
+    {% else %}<p class="mudo">{% if card %}Ninguém no setor Performance em Base → Acessos → Pessoas e setores.{% else %}Nenhum responsável da engenharia achado no Fracttal.{% endif %}</p>{% endfor %}
   </section>
 
   <div class="kb-barra">
@@ -75,11 +81,11 @@
   <div class="kb-quadro" aria-live="polite"></div>
   <p class="mudo kb-rodape">Coluna: A fazer = aberta e não começou (a data programada diz se atrasou, se vence em 2 dias ou se
     ainda vai abrir); Em execução = alguma tarefa começou; Em verificação = esperando a aprovação; Concluídas = aprovadas
-    (as dos últimos {{ janela }} dias, ou de todo o período). O clique abre a página da OS da engenharia: o status, a
-    prioridade, os comentários (vão para a nota da OS) e o Solicitar OS. Pulsa em laranja a OS aberta sem atualização há
+    (as dos últimos {{ janela }} dias, ou de todo o período). {% if card %}O clique abre o card da OS, o mesmo do Histórico do OS Creator.{% else %}O clique abre a página da OS da engenharia: o status, a
+    prioridade, os comentários (vão para a nota da OS) e o Solicitar OS.{% endif %} Pulsa em laranja a OS aberta sem atualização há
     mais de 7 dias.{% if erro_eng %} <b>Agora sem o status da engenharia ({{ erro_eng }}): sem o pulso.</b>{% endif %}</p>
 </div>
-<script type="application/json" id="kb-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "piso": piso_concluidas}|tojson }}</script>
+<script type="application/json" id="kb-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "piso": piso_concluidas, "card": card}|tojson }}</script>
 <script>
 (function () {
   var D = JSON.parse(document.getElementById('kb-dados').textContent);
@@ -117,8 +123,12 @@
   }
   // a página da OS da engenharia (Levi, 24/10/2026: "Ao clicar quero uma visão parecida com o que aparece quando clica
   // na OS da parte de CHAMADOS > GARANTIA"). O nº é o link dela: Ctrl+clique ou o botão do meio a abrem numa aba nova.
-  function paginaOs(o) { return nexusRota('/t/engenharia/equipe/os/') + encodeURIComponent(o.os); }
-  function abrirOs(o) { location.href = paginaOs(o); }
+  function paginaOs(o) { return D.card ? (o.url || '#') : nexusRota('/t/engenharia/equipe/os/') + encodeURIComponent(o.os); }
+  // a Performance (04/11/2026): o card da OS do OS Creator por cima do quadro; mudou a OS, o quadro relê o Fracttal
+  {% if card %}function abrirOs(o) {
+    var op = {status: o.status || '', folio: o.os, aoFechar: function (mudou) { if (mudou) location.href = location.pathname + '?atualizar=1'; }};
+    if (o.wid) NexusOsCard.abrir(o.wid, op); else NexusOsCard.abrirFolio(o.os, op);
+  }{% else %}function abrirOs(o) { location.href = paginaOs(o); }{% endif %}
   var GRAV = {1: 'neutro', 2: 'alerta', 3: 'critico'};
   function cartao(o) {
     var c = el('article', 'kb-card kb-card--' + (o.prazo || o.coluna) + (o.parada ? ' kb-card--parada' : ''));

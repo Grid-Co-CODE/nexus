@@ -57,6 +57,13 @@ TORRE = Torre(
         Tela("comentarios", "Comentários",
              "O que a equipe anotou sobre cada usina, e quem anotou?",
              "Plataforma de Performance (os comentários do Tempo real, do Painel NOC e do Diagnóstico)"),
+        # o Quadro da equipe da Engenharia clonado para a Performance (Levi, 04/11/2026: "clone o quadro de equipe da
+        # engenharia para o time de performance com as pessoas da performance"); a equipe é o setor Performance de
+        # Base → Acessos → Pessoas e setores, e quem é dele vê a tela sem marcá-la
+        Tela("equipe", "Quadro da equipe",
+             "Quem da performance está com o quê, o que atrasou e o que vem por aí?",
+             "OS do Fracttal das pessoas do setor Performance (Base → Acessos → Pessoas e setores)",
+             do_setor="Performance"),
         # O nome de cada fonte por extenso, de fontes.NOMES (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla")
         Tela("clima", "Clima e risco",
              f"Onde há aviso do {F.extenso('inmet')}, foco de queimada ou risco de fogo perto das usinas?",
@@ -204,3 +211,42 @@ def plataforma(caminho: str):
 from . import clima_tela  # noqa: E402,F401
 # Mapa de risco (07/10/2026): a mesma leitura do Clima e risco, num mapa do Brasil (/t/performance/clima/mapa).
 from . import mapa_tela  # noqa: E402,F401
+
+
+# ── Quadro da equipe (04/11/2026) ───────────────────────────────────────────────────────────────────────────────────
+# O clone do Quadro da equipe da Engenharia (Levi: "clone o quadro de equipe da engenharia para o time de performance com
+# as pessoas da performance"): a leitura em nexus/performance/quadro_equipe.py; os supercards, a faixa de números e o
+# template são os da Engenharia (a mesma tela, com o texto da área). Diferenças: a equipe é o setor Performance (Base →
+# Acessos), o clique abre o card da OS do OS Creator (a página da OS da Engenharia carrega o status e a prioridade DELA) e
+# o pulso da OS parada conta só o Fracttal (as tarefas e a criação), porque a Performance não tem livro de OS.
+@bp.route("/equipe")
+def equipe():
+    from datetime import timedelta, timezone
+
+    from ...engenharia import os_acompanhamento as O
+    from ...performance import quadro_equipe as Q
+    from .. import engenharia as ENG
+    brt = timezone(timedelta(hours=-3))
+    Q.marcar_uso()
+    if request.args.get("atualizar") == "1":
+        Q.pedir_releitura(esperar=True, forcar=True)
+    else:
+        Q.pedir_releitura(esperar=not Q.dados()["lido"])
+    d = Q.dados()
+    agora = datetime.now(brt)
+    hoje = agora.date()
+    cards = ENG.supercards(d["os"], d["equipe"], hoje)
+    cor = {c["id"]: c["cor"] for c in cards}
+    ini = {c["id"]: c["iniciais"] for c in cards}
+    oss = []
+    for o in d["os"]:
+        ultima = O.ultima_atualizacao([ENG._iso(o.get("atividade_iso")), ENG._iso(o.get("criada_iso"))])
+        oss.append(dict(o, cor=cor.get(o["pid"], ENG.CORES_PESSOA[-1]), iniciais=ini.get(o["pid"]) or ENG._iniciais(o["pessoa"]),
+                        ultima_iso=ultima.isoformat() if ultima else "", parada=O.parada(o["coluna"], ultima, agora)))
+    piso = (hoje - timedelta(days=ENG.JANELA_CONCLUIDAS)).isoformat()
+    return render_template(
+        "engenharia/equipe.html", torre=TORRE, tela=TORRE.tela("equipe"), cards=cards, oss=oss,
+        kpis=ENG.faixa_kpis(oss, hoje, ENG.JANELA_CONCLUIDAS), area="performance",
+        faltam=d["faltam"], erro=d["erro"], colunas=Q.COLUNAS, erro_eng="",
+        hoje=hoje.isoformat(), piso_concluidas=piso, janela=ENG.JANELA_CONCLUIDAS, dias_faixa=ENG.DIAS_FAIXA,
+        lido=datetime.fromtimestamp(d["lido"], brt).strftime("%H:%M") if d["lido"] else "—")

@@ -19,9 +19,12 @@ def instalar(app):
     from . import etm, os_equipe
     os_equipe.manter_quente(app)
     etm.manter_quente(app)          # a tela ETMs (26/10/2026), do mesmo jeito
+    from ..performance import quadro_equipe
+    quadro_equipe.manter_quente(app)    # o clone do Quadro para a Performance (04/11/2026), do mesmo jeito
     if str(app.config.get("NEXUS_CAMPO_AQUECER", "1")) != "0":
         from . import os_falhas
         threading.Timer(150, lambda: os_falhas.pedir_releitura(app)).start()
         # o quadro já lido quando a 1ª pessoa abrir depois de um reinício (no servidor, o deploy)
         threading.Timer(210, lambda: os_equipe.pedir_releitura(app)).start()
         threading.Timer(270, lambda: etm.pedir_releitura(app)).start()
+        threading.Timer(330, lambda: quadro_equipe.pedir_releitura(app)).start()

@@ -301,6 +301,10 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
 - **Supercards:** um por pessoa, com a cor dela; em aberto, a trilha por etapa, atrasadas, fechadas em 30 dias e a
   faixa dos próximos 14 dias (um degrau por dia, um ponto por OS programada; fim de semana vazado, hoje marcado). O
   clique filtra o quadro. Busca, Quadro/Por pessoa, concluídas de todo o período e canceladas sem recarregar.
+- **Serve também à Performance (04/11/2026):** o template `equipe.html`, os `supercards` e a `faixa_kpis` daqui desenham
+  o Quadro da equipe da torre Performance (`area="performance"`: o texto da área, o card do OS Creator no clique; a
+  equipe é o setor Performance de Base → Acessos, em `nexus/performance/quadro_equipe.py`). Mudou o quadro aqui, confira
+  lá: `tests/test_performance_quadro_equipe.py`.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_equipe.py` (a faixa: número, gravidade e nota de cada um, e
   a tela com rótulo + número + explicação nos cinco).
 - **O clique no cartão abre a página da OS da engenharia** (24/10/2026, seção abaixo; de 08/10 até então era o card do

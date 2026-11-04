@@ -360,7 +360,10 @@ def test_quadro_sem_o_livro_nao_pulsa_e_diz(banco, cliente, monkeypatch):
 def test_clique_no_cartao_abre_a_pagina_da_os():
     from pathlib import Path
     t = Path("nexus/torres/engenharia/templates/engenharia/equipe.html").read_text(encoding="utf-8")
-    assert "nexusRota('/t/engenharia/equipe/os/')" in t and "NexusOsCard" not in t and "card_os_abrir" not in t
+    # o card do OS Creator só no ramo da Performance (`{% if card %}`, 04/11/2026); o quadro da Engenharia abre a página
+    import re
+    so_eng = re.sub(r"\{% if card %\}.*?\{% (else|endif) %\}", "", t, flags=re.S)
+    assert "nexusRota('/t/engenharia/equipe/os/')" in so_eng and "NexusOsCard" not in so_eng and "card_os_abrir" not in so_eng
     assert "kb-card--parada" in t and "o.eng_status" in t and "o.eng_prioridade" in t
 
 
