@@ -1280,6 +1280,53 @@ def test_curadoria_foto_que_nao_chegou(cur, monkeypatch):
     assert card.count("foto ainda não chegou") == 2 and f"{URL}/foto/{fab}.jpg?mini=1" in card
 
 
+def test_a_foto_que_falta_diz_o_que_o_app_faz(cur, monkeypatch):
+    """A foto que ainda não está no Nexus (04/11/2026): o App de hoje (o livro sem a coluna "Fotos dos dados") NÃO manda as
+    fotos, e "foto ainda não chegou" prometia o que não acontece: a tela diz "o App ainda não envia as fotos". O App da revisão
+    de 30/10/2026 (com a coluna) manda, e a foto que falta "ainda não chegou"."""
+    hoje = [{k: v for k, v in l.items() if k not in NOVAS} for l in (PECA_DA_LISTA, CABO, CONECTOR)]
+    _so(cur, *hoje)
+    _no_setor(monkeypatch, "PCM")
+    c = _pessoa_ms(cur)
+    html = c.get(URL).get_data(as_text=True)
+    assert "o App ainda não envia as fotos" in _cartao(html, "Cabo azul 6 mm") and "foto ainda não chegou" not in html
+    assert "sem foto" in _cartao(html, "Conector estanque")
+    _so(cur, PECA_DA_LISTA, ACHADO_COM_DADOS, CABO)
+    html = c.get(URL).get_data(as_text=True)
+    assert "o App ainda não envia as fotos" not in html
+    assert "foto ainda não chegou" in _cartao(html, "Cabo azul 6 mm")
+    assert _cartao(html, "Disjuntor sem etiqueta").count("foto ainda não chegou") == 3        # a da peça e as dos dados
+
+
+def test_ja_decididas_lembra_de_completar_no_fracttal(cur, monkeypatch):
+    """A peça cadastrada pela curadoria cuja linha tem fabricante, modelo ou série: a API não os grava, e o lembrete do cartão
+    some com a decisão. Em "Já decididas" ela diz "Complete no Fracttal: Fabricante X · Modelo Y · Série Z", sem as partes
+    "n/a" ou vazias. Só na cadastrada (as outras decisões não criaram peça), e só para quem decide (como os dados)."""
+    from nexus.pcm import telas
+    descartado = _linha("L-12", Descrição="Peça quebrada sem uso", contado="1", Fabricante="Fabricante Z", Modelo="MZ-1")
+    _so(cur, PECA_DA_LISTA, ACHADO_COM_DADOS, CABO, CONECTOR, GENERICO_COM_DADOS, descartado)
+    falso = _falso()
+    CU.decidir(cur.config, "C-1", "L-10", "cadastrar", sigla="CAB", nome="Disjuntor", unidade="UNIDADE", estoque=falso,
+               pessoa=PESSOA)
+    _cadastrar(cur.config, falso)                                                       # o CABO, sem os dados
+    CU.decidir(cur.config, "C-1", "L-3", "descartar", motivo="não é peça", pessoa=PESSOA)
+    # com os dados, mas sem peça criada: o genérico confirmado e o achado descartado não lembram nada
+    CU.decidir(cur.config, "C-1", "L-11", "confirmar", pessoa=PESSOA)
+    CU.decidir(cur.config, "C-1", "L-12", "descartar", motivo="não é peça do estoque", pessoa=PESSOA)
+    _no_setor(monkeypatch, "PCM")
+    c = _pessoa_ms(cur)
+    tabela = c.get(URL).get_data(as_text=True).split("Já decididas, em contagens ainda não gravadas")[1]
+    linhas = {cod: tr for tr in re.findall(r"<tr>\s*<td.*?</tr>", tabela, re.S)
+              for cod in ("Disjuntor sem etiqueta", "Cabo azul 6 mm", "Conector estanque", "SP-4", "Peça quebrada sem uso")
+              if cod in tr}
+    assert "Complete no Fracttal: Fabricante Fabricante Exemplo · Série SN-0001" in linhas["Disjuntor sem etiqueta"]
+    assert "n/a" not in linhas["Disjuntor sem etiqueta"] and "Modelo" not in linhas["Disjuntor sem etiqueta"]
+    for sem in ("Cabo azul 6 mm", "Conector estanque", "SP-4", "Peça quebrada sem uso"):
+        assert "Complete no Fracttal" not in linhas[sem], sem
+    monkeypatch.setattr(telas, "pode_programar", lambda: False)
+    assert "Complete no Fracttal" not in c.get(URL).get_data(as_text=True)
+
+
 def test_curadoria_livro_de_hoje(cur, monkeypatch):
     """O Nexus sobe antes do App: o livro das contagens de hoje não tem as cinco colunas novas, e a curadoria é a de hoje (sem os
     dados da peça; a foto da peça como antes)."""

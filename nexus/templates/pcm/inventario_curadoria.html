@@ -16,11 +16,14 @@
    Os dados da peça e as fotos ampliadas (30/10/2026, itens 2 e 3 das melhorias): o fabricante, o modelo e o número de série
    (ou "não tem", o "n/a" do técnico), cada um com a miniatura da foto dele, e a foto da peça à esquerda. As miniaturas são
    <button> com a cópia de 160 px (`?mini=1`); o clique abre a caixa (<dialog>, pcm-fotos.js) com a foto inteira, pedida só ao
-   abrir, e as setas passam entre as fotos do mesmo achado. A foto que o App ainda não mandou (ela vai depois da linha, pela
-   fila offline) diz "foto ainda não chegou"; o livro de hoje, sem as colunas novas, mostra o cartão de hoje. O endereço da
+   abrir, e as setas passam entre as fotos do mesmo achado. A foto que ainda não está no Nexus diz o que o App faz (04/11/2026,
+   `app_com_fotos`, o livro com a coluna "Fotos dos dados"): o App que manda as fotos (ela vai depois da linha, pela fila
+   offline) "ainda não chegou"; o de hoje, que não manda, "o App ainda não envia as fotos". O livro de hoje, sem as colunas
+   novas, mostra o cartão de hoje. O endereço da
    foto leva a versão do arquivo (`?v=`): a foto refeita com a mesma chave não fica na cópia de 1 h do navegador. Os três dados
    NÃO vão ao Fracttal pela API (31/10/2026: o `description` do `item_insert` não foi provado): o cadastrar lembra de completá-
-   los na tela do Fracttal, junto do grupo, da criticidade e da Curva ABC. #}
+   los na tela do Fracttal, junto do grupo, da criticidade e da Curva ABC, e a peça já cadastrada lembra em "Já decididas". #}
+{% set falta_a_foto = 'foto ainda não chegou' if app_com_fotos else 'o App ainda não envia as fotos' %}
 <div class="pg alm inv cu">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
 <h1 class="titulo-pagina">Curadoria</h1>
@@ -62,7 +65,7 @@
   {% if pode %}<div class="cu-foto">
     {% set fp = x.fotos|selectattr('rotulo', 'equalto', 'Peça')|first %}
     {% if fp and fp.tem %}<button type="button" class="cu-mini cu-mini--peca" data-cu-foto="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ fp.foto_id }}.jpg?v={{ fp.versao }}" data-cu-legenda="Foto da peça · {{ titulo }}" aria-label="Ampliar a foto da peça"><img class="cu-img" loading="lazy" src="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ fp.foto_id }}.jpg?mini=1&amp;v={{ fp.versao }}" alt=""></button>
-    {% elif fp %}<span class="cu-sem-foto mudo">foto ainda não chegou</span>
+    {% elif fp %}<span class="cu-sem-foto mudo">{{ falta_a_foto }}</span>
     {% else %}<span class="cu-sem-foto mudo">sem foto</span>{% endif %}
   </div>{% endif %}
   <div class="cu-corpo">
@@ -94,7 +97,7 @@
         <dt>{{ rot }}</dt>
         <dd>{% if val == 'não tem' %}<span class="mudo">não tem</span>{% else %}<span class="cu-dado-v">{{ val or '—' }}</span>{% endif %}
           {% if f and f.tem %}<button type="button" class="cu-mini cu-mini--dado" data-cu-foto="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ f.foto_id }}.jpg?v={{ f.versao }}" data-cu-legenda="{{ rot }} · {{ val or titulo }}" aria-label="Ampliar a foto: {{ rot }}"><img loading="lazy" src="{{ raiz }}/t/pcm/pecas/inventario/curadoria/foto/{{ f.foto_id }}.jpg?mini=1&amp;v={{ f.versao }}" alt=""></button>
-          {% elif f %}<span class="cu-sem mudo">foto ainda não chegou</span>{% endif %}
+          {% elif f %}<span class="cu-sem mudo">{{ falta_a_foto }}</span>{% endif %}
         </dd>
       </div>
       {% endif %}
@@ -194,7 +197,8 @@
   <tr>
     <td data-r="Achado"><span class="alm-v">{% if x.tipo == 'avariado' %}Avariadas de {{ x.codigo or ('peça ' ~ x.id_item) }}{% if x.codigo_av %} ({{ x.codigo_av }}){% endif %}{% else %}{{ x.descricao or x.codigo or 'Achado fora do catálogo' }}{% endif %}<span class="alm-det">{{ fmt(x.contado) }} unidades · {{ x.usina }}</span></span></td>
     <td data-r="Decisão"><span class="alm-v"><span class="inv-selo inv-selo--{{ 'neutro' if x.decisao.decisao == 'descartar' else 'ok' }}">{{ rotulo.get(x.decisao.decisao, x.decisao.decisao) }}</span></span></td>
-    <td data-r="Peça"><span class="alm-v">{% if x.decisao.codigo_criado %}<span class="alm-cod">{{ x.decisao.codigo_criado }}</span>{% elif x.decisao.id_item %}peça {{ x.decisao.id_item }}{% else %}<span class="mudo">—</span>{% endif %}</span></td>
+    {# a peça cadastrada com fabricante, modelo ou série: a API não os grava, e o lembrete do cartão sumiu com a decisão #}
+    <td data-r="Peça"><span class="alm-v">{% if x.decisao.codigo_criado %}<span class="alm-cod">{{ x.decisao.codigo_criado }}</span>{% elif x.decisao.id_item %}peça {{ x.decisao.id_item }}{% else %}<span class="mudo">—</span>{% endif %}{% if x.completar_no_fracttal %}<span class="alm-det cu-completar">{{ x.completar_no_fracttal }}</span>{% endif %}</span></td>
     <td data-r="Quando"><span class="alm-v">{{ x.decisao.quando_txt or '?' }}</span></td>
   </tr>
   {% endfor %}

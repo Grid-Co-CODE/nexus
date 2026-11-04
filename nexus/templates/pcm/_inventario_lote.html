@@ -9,7 +9,9 @@
    A recontagem só das marcadas (30/10/2026, item 4 das melhorias): uma caixa por peça marcável (`x.marcavel`: com o ID do item,
    ainda no lote e fora da curadoria), a de "marcar todas" (as marcáveis à vista, sob a busca e o filtro; no celular, uma linha
    acima dos cartões) e o botão "Pedir recontagem das marcadas (N)", que abre o mesmo painel de motivo das outras ações
-   (data-rev="recontagem_itens"); o N e o ligar do botão são do script da página. #}
+   (data-rev="recontagem_itens"); o N e o ligar do botão são do script da página. A ajuda diz o que o App faz (04/11/2026,
+   `app_com_recontagem`, o livro com o "Recontagem de"): o de hoje não avisa o técnico, e prometer "volta ao técnico no App"
+   deixava o PCM esperando o que não vinha. #}
 {% set cob = cobertura %}
 {% set marcar = itens|selectattr('marcavel')|list %}{# o `marcavel` já traz o `pode` e o `c.aprovavel` (revisao._enriquecer) #}
 <div class="inv-pilha" data-ponte-para="contagem" data-divergentes="{{ cob.diverge }}">
@@ -62,7 +64,7 @@
   {% if marcar %}
   <div class="inv-recontar" data-recontar>
     <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="recontagem_itens" disabled aria-describedby="inv-recontar-ajuda">Pedir recontagem das marcadas (0)</button>
-    <span class="alm-ajuda" id="inv-recontar-ajuda">Marque as peças duvidosas: só elas voltam ao técnico no App e saem deste lote; o resto da contagem segue para aprovar e gravar.</span>
+    <span class="alm-ajuda" id="inv-recontar-ajuda">{% if app_com_recontagem %}Marque as peças duvidosas: só elas saem deste lote e voltam ao técnico no App; o resto da contagem segue para aprovar e gravar.{% else %}Marque as peças duvidosas: só elas saem deste lote (ficam em "não será tocada", com o motivo) e o resto da contagem segue para aprovar e gravar. O App ainda não avisa o técnico: combine a recontagem com ele e grave o resto antes de ele mandar a contagem nova.{% endif %}</span>
   </div>
   {% endif %}
   {% if itens %}

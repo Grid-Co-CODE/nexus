@@ -168,7 +168,9 @@ def _valor(linhas: list[dict], tem_custo: bool) -> tuple[dict | None, int]:
     A peça COM saldo e sem custo fica fora da soma e é CONTADA à parte (o cartão diz "N peças sem custo no Fracttal"): somar
     como se valesse zero seria inventar o número, e esconder a soma pela metade, enganar (o desenho: "soma pela metade avisa,
     não esconde"). A peça de saldo zero ou não informado não precisa de custo e não conta. O livro sem a coluna de custo (o App
-    de antes) é `(None, 0)`: não há o que somar nem o que cobrar, e coluna ausente não é peça sem custo."""
+    de antes) é `(None, 0)`: não há o que somar nem o que cobrar, e coluna ausente não é peça sem custo. O total 0 é "nenhuma
+    peça entrou na conta" (todas sem saldo informado, zeradas ou sem custo): o cartão diz "–", nunca "R$ 0,00" (a revisão
+    final de 04/11/2026)."""
     if not tem_custo:
         return None, 0
     v, sem_custo = {"total": 0.0, "A": 0.0, "B": 0.0, "C": 0.0, "sem_curva": 0.0}, 0

@@ -11,9 +11,10 @@ peça já ia no livro das contagens desde 27/10, mas a curadoria mostrava "sem f
 (segundos Unix), `assinatura` e o arquivo em `foto`. Sem sessão: vale a assinatura (a rota está em `auth.ROTAS_PUBLICAS`, e só
 por POST). No molde do extintor (`nexus/hseq/fotos.receber`): HMAC-SHA256 com uma chave DERIVADA da NEXUS_PESSOA_HMAC (outro
 rótulo, `ROTULO_CHAVE`, para a assinatura de uma rota não valer na outra), janela de 15 min no `ts` (inteiro) e até 8 MB. A
-validação é a própria: a chave é texto opaco do App (até 200 caracteres, sem caractere de controle e sem o "|", que partiria
-a coluna "Fotos dos dados", `rotulo:chave|...`), sem o código em maiúsculas nem o `dia` do extintor, e **a mesma chave
-reenviada substitui** (a fila offline do App reenvia; o técnico pode refazer a foto). A chave nunca vira caminho: o arquivo é
+validação é a própria: a chave é texto opaco do App, lida sem o espaço das pontas como o livro a lê (até 200 caracteres, sem
+caractere de controle e sem o "|", que partiria a coluna "Fotos dos dados", `rotulo:chave|...`), sem o código em maiúsculas
+nem o `dia` do extintor, e **a mesma chave reenviada substitui** (a fila offline do App reenvia; o técnico pode refazer a
+foto). Cada recusa vai ao log (`registrar_recusa`), sem a assinatura. A chave nunca vira caminho: o arquivo é
 `curadoria.nome_da_foto(chave)` (o SHA-1). Só JPEG ou PNG (o que a câmera do celular dá), até 50 megapixels: o tamanho vem do
 cabeçalho, lido antes de decodificar (a "bomba" de pixels, pequena no disco e enorme na memória, para ali).
 
@@ -29,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import io
+import logging
 import os
 import threading
 import time
@@ -37,6 +39,8 @@ from pathlib import Path
 
 from ...hseq import fotos as HF
 from . import curadoria as CU
+
+log = logging.getLogger(__name__)
 
 ROTULO_CHAVE = b"nexus:pcm:fotos-inventario"   # deriva a chave das fotos do inventário da NEXUS_PESSOA_HMAC
 JANELA_S = 15 * 60
@@ -65,12 +69,22 @@ def assinatura(k: bytes, chave_foto: str, ts, dados: bytes) -> str:
 
 
 def _chave_valida(c: str) -> bool:
-    """Não vazia, até `CHAVE_MAX` caracteres e sem caractere de controle (C0, DEL, C1: a quebra de linha de uma chave colada
-    no livro não é a mesma chave) nem metade de par substituto (não se codifica para a assinatura), nem o "|": a chave vai à
-    coluna "Fotos dos dados" como `rotulo:chave|...`, e o "|" a partiria (a foto ficaria sem dono). O contrato proíbe o ":"
-    também; aqui ele passa, porque a leitura da coluna parte só no primeiro ":" (`almoxarifado.fotos_dos_dados`)."""
-    return bool(c.strip()) and len(c) <= CHAVE_MAX and "|" not in c \
+    """A chave já sem o espaço das pontas (`receber`): não vazia, até `CHAVE_MAX` caracteres e sem caractere de controle (C0,
+    DEL, C1: a quebra de linha NO MEIO de uma chave colada no livro faz outra chave; a das pontas o livro tira, e o `receber`
+    também) nem metade de par substituto (não se codifica para a assinatura), nem o "|": a chave vai à coluna "Fotos dos dados"
+    como `rotulo:chave|...`, e o "|" a partiria (a foto ficaria sem dono). O contrato proíbe o ":" também; aqui ele passa,
+    porque a leitura da coluna parte só no primeiro ":" (`almoxarifado.fotos_dos_dados`)."""
+    return bool(c) and len(c) <= CHAVE_MAX and "|" not in c \
         and not any(unicodedata.category(ch) in ("Cc", "Cs") for ch in c)
+
+
+def registrar_recusa(status: int, mensagem: str) -> None:
+    """Cada recusa da rota vai ao log (a revisão final de 04/11/2026): é por ali que a integração com o App acha a chave errada
+    (401 "assinatura não confere"), o relógio do celular fora da hora (401, a janela) ou o envio fora do contrato (400). Só o
+    status e a mensagem, que são textos do Nexus: nunca a assinatura, a chave dela nem a chave da foto (texto de quem chama, sem
+    login, que podia forjar linhas no log). Em WARNING, e não INFO: só o `nexus.campo` tem um handler em INFO, e um `log.info`
+    daqui nunca chegaria ao journal do servidor (`journalctl -u nexus`), onde as outras linhas de aviso já ficam."""
+    log.warning("fotos do inventário: envio recusado com %s: %s", status, mensagem)
 
 
 def _gravar(arq: Path, dados: bytes) -> None:
@@ -134,7 +148,11 @@ def receber(cfg, chave_foto, ts, assinatura_recebida, dados: bytes, agora=None) 
     destino = CU._pasta_fotos(cfg)
     if not k or destino is None:
         return 503, "recebimento das fotos do inventário desligado neste Nexus (sem NEXUS_PESSOA_HMAC)"
-    chave_foto = "" if chave_foto is None else str(chave_foto)
+    como_veio = "" if chave_foto is None else str(chave_foto)
+    # a chave como o livro a lê (`almoxarifado.campo`, o `strip` das pontas; a revisão final de 04/11/2026): " abc " no envio
+    # é a "abc" da coluna. Sem isso, a chave com a quebra de linha (ou com 200 caracteres e o espaço) nas pontas era recusada,
+    # e a foto ficava "ainda não chegou" para sempre. A assinatura é a da chave como veio (o contrato: "<chave>|<ts>|<sha256>")
+    chave_foto = como_veio.strip()
     if not _chave_valida(chave_foto):
         return 400, f"chave da foto vazia, com mais de {CHAVE_MAX} caracteres, com caractere de controle ou com \"|\""
     try:
@@ -147,7 +165,7 @@ def receber(cfg, chave_foto, ts, assinatura_recebida, dados: bytes, agora=None) 
         return 400, "foto vazia ou maior que 8 MB"
     # em bytes: o `compare_digest` de texto levanta TypeError com letra fora do ASCII (seria um 500, não um 401)
     recebida = str(assinatura_recebida or "").strip().lower().encode("utf-8", "replace")
-    if not hmac.compare_digest(assinatura(k, chave_foto, ts, dados).encode(), recebida):
+    if not hmac.compare_digest(assinatura(k, como_veio, ts, dados).encode(), recebida):
         return 401, "assinatura não confere"
     try:
         fotos = _regravar(dados)

@@ -473,3 +473,168 @@ def test_o_arquivo_do_livro_guarda_o_que_foi_gravado(app, inv, tmp_path):
     _gravar(app, _ev("C-1", "recontagem_pedida"))
     d = json.loads((tmp_path / "inventario.json").read_text("utf-8"))
     assert [e["tipo"] for e in d[F.ABA_EVENTO]] == ["recontagem_pedida"]
+
+
+# ── o que o App de agora faz, pela versão do livro (04/11/2026) ──────────────────────────────────────────────────────────
+# As cinco colunas da revisão de 30/10/2026 (a 15ª à 19ª) vêm juntas no App que a monta: é por elas que as telas dizem se o
+# técnico vê o pedido de recontagem e se as fotos vêm. O App de hoje (v321) publica as 14 de antes.
+NOVAS = A.COLUNAS_CONTAGENS[A.COLUNAS_CONTAGENS.index("Fabricante"):]
+
+
+def _de_hoje(*linhas):
+    """As linhas como o App de hoje as publica: sem as cinco colunas novas."""
+    return [{k: v for k, v in l.items() if k not in NOVAS} for l in linhas]
+
+
+def _versao(app):
+    d = L.ler(app.config)
+    return d["app_com_recontagem"], d["app_com_fotos"]
+
+
+def test_o_que_o_app_faz_sai_das_colunas_do_livro(app, inv):
+    """`app_com_recontagem` é o livro com a coluna "Recontagem de"; `app_com_fotos`, com a "Fotos dos dados". Coluna ausente (o
+    App de hoje), livro sem linha nenhuma ou App que nem publica o livro: falso. Nenhuma chave de configuração vira isso à mão:
+    o App novo publica, e as telas passam a dizer o que ele faz."""
+    assert _versao(app) == (False, False)                                   # o App ainda nem publica o livro
+    _publicar(inv)
+    assert _versao(app) == (False, False)                                   # o livro sem linha nenhuma
+    _publicar(inv, *_de_hoje(_linha("C-1", "L1", "501", "3")))
+    assert _versao(app) == (False, False)                                   # o App de hoje
+    _publicar(inv, _linha("C-1", "L1", "501", "3"))
+    assert _versao(app) == (True, True)                                     # o App da revisão de 30/10/2026
+    # cada uma pela sua coluna (as cinco vêm juntas, mas a tela não supõe), e a coluna vazia ainda é a coluna
+    so_a_recontagem = {k: v for k, v in _linha("C-1", "L1", "501", "3").items() if k != "Fotos dos dados"}
+    _publicar(inv, so_a_recontagem)
+    assert _versao(app) == (True, False)
+    assert L.contagens(app.config)[0]["recontagem_de"] == ""
+
+
+# ── a linha de peça com número e sem o ID do item (a revisão final de 04/11/2026, R2) ────────────────────────────────────
+@pytest.mark.parametrize("tipo, vazio", [("item", ""), ("item", "None"), ("identificar", "none"), ("identificar", "nan")])
+def test_linha_de_peca_com_numero_e_sem_o_id_do_item_e_contrato_violado(app, inv, tipo, vazio):
+    """A linha `item` ou `identificar` COM número e SEM o ID do item (o vazio, ou o "None" que o `sync-xlsx` escreve) não é de
+    peça nenhuma: as contas a pulavam caladas, e as unidades contadas sumiam do lote. É o contrato do App violado, pelo mesmo
+    caminho da avariada sem o ID nem o Código: o aviso do App, e a contagem não se aprova."""
+    _publicar(inv, _linha("C-1", "L1", "501", "3"), _linha("C-1", "L2", vazio, "4", tipo=tipo))
+    c = L.contagens(app.config)[0]
+    assert c["aviso"] == "o App mandou linha de peça sem o ID do item" and c["aviso_do_app"]
+    assert not c["aprovavel"] and c["motivo_nao_aprovavel"] == "linha de peça sem o ID do item"
+
+
+def test_linha_de_peca_em_branco_sem_o_id_nao_e_aviso(app, inv):
+    """Sem número, a linha sem o ID não esconde unidade nenhuma: segue como antes (não entra, e a contagem se aprova)."""
+    _publicar(inv, _linha("C-1", "L1", "501", "3"), _linha("C-1", "L2", "None", "", tipo="item"),
+              _linha("C-1", "L3", "", "None", tipo="identificar"))
+    c = L.contagens(app.config)[0]
+    assert c["aviso"] == "" and c["aprovavel"] and c["motivo_nao_aprovavel"] == ""
+
+
+# ── as recontagens pedidas e para onde foi cada uma (04/11/2026) ─────────────────────────────────────────────────────────
+# Caso real: uma pessoa do PCM pediu a recontagem de uma peça e perguntou "não sei pra onde foi essa informação". O cartão
+# "Recontagens pedidas" da lista do Inventário diz: esperando o técnico, ou atendida (e por qual contagem).
+def _rec(app):
+    """{(tipo, contagem do pedido, peça): o ID da contagem que atendeu, ou None} das que o cartão mostra, e as duas listas."""
+    r = L.recontagens(app.config)
+    por = {(p["tipo"], p["contagem_id"], p["id_item"]): (p["atendida_por"] or {}).get("contagem_id")
+           for p in r["esperando"] + r["atendidas"]}
+    return por, r
+
+
+def test_recontagem_esperando_e_atendida_pela_peca_contada_depois(app, inv):
+    """Atendida: outra contagem do MESMO almoxarifado, com o "Contada em" DEPOIS do pedido, em que a peça foi contada (a linha com
+    o ID do item dela e o "Contado" não vazio). Vale a mais antiga que atende. A peça em branco na contagem nova não atende."""
+    _publicar(inv,
+              _linha("C-1", "L1", "501", "3", contada=_iso(horas=30)), _linha("C-1", "L2", "502", "4", contada=_iso(horas=30)),
+              _linha("C-2", "L1", "501", "6", contada=_iso(horas=20)), _linha("C-2", "L2", "502", "", contada=_iso(horas=20)),
+              _linha("C-3", "L1", "501", "7", contada=_iso(horas=10)))
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 501, codigo="SP-501", quando=_iso(horas=28)),
+            _ev("C-1", "recontagem_item_pedida", 502, codigo="SP-502", quando=_iso(horas=28)))
+    por, r = _rec(app)
+    assert por == {("peca", "C-1", "501"): "C-2", ("peca", "C-1", "502"): None}
+    p = r["esperando"][0]
+    assert (p["id_almox"], p["codigo"], p["quando"], p["atendida_por"]) == ("10", "SP-502", _iso(horas=28), None)
+    assert r["atendidas"][0]["atendida_por"] == {"contagem_id": "C-2", "contada_em": _iso(horas=20)}
+
+
+def test_recontagem_nao_e_atendida_pela_mais_velha_pela_propria_nem_por_outro_almoxarifado(app, inv):
+    """A contagem mais velha que o pedido não atende (ela não é a recontagem), nem a própria contagem do pedido (com o relógio
+    do celular adiantado, ela parece "depois"), nem a de outro almoxarifado."""
+    _publicar(inv,
+              _linha("C-0", "L1", "501", "9", contada=_iso(horas=40)),
+              _linha("C-1", "L1", "501", "3", contada=_iso(horas=30)),
+              _linha("C-9", "L1", "501", "2", almox="11", contada=_iso(horas=5)))
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 501, quando=_iso(horas=31)))
+    por, r = _rec(app)
+    assert por == {("peca", "C-1", "501"): None} and r["atendidas"] == []
+
+
+def test_recontagem_da_contagem_inteira_e_atendida_por_qualquer_contagem_nova(app, inv):
+    """A contagem inteira (`recontagem_pedida`): qualquer contagem do almoxarifado depois do pedido a atende, conte ela o que
+    contar; sem nenhuma, esperando. Na inteira não há peça."""
+    _publicar(inv,
+              _linha("C-1", "L1", "501", "3", contada=_iso(horas=30)),
+              _linha("C-2", "L1", "502", "1", contada=_iso(horas=20)),
+              _linha("C-5", "L1", "501", "3", almox="12", contada=_iso(horas=30)))
+    _gravar(app, _ev("C-1", "recontagem_pedida", quando=_iso(horas=28)),
+            _ev("C-5", "recontagem_pedida", almox="12", quando=_iso(horas=28)))
+    por, r = _rec(app)
+    assert por == {("inteira", "C-1", ""): "C-2", ("inteira", "C-5", ""): None}
+    assert (r["esperando"][0]["codigo"], r["esperando"][0]["id_almox"]) == ("", "12")
+
+
+def test_recontagem_do_av_e_atendida_pela_avariada_da_boa_resolvida(app, inv):
+    """O pedido da peça -AV: o técnico reconta na aba Avariados, pela peça BOA, e a linha `avariado` da boa que a leitura leva ao
+    -AV (`avariados.resolver`) atende. A avariada que não achou o -AV continua `avariado` com o ID da BOA: ela conta as
+    avariadas, não a boa, e não atende o pedido da boa."""
+    _aba(inv, A.LIVRO_ITENS, A.ABA_ITENS, [
+        {"ID do item": i, "Código": cod, "Nome": nome, "Unidade": "UNIDADE", "Família": "Teste", "Avariado": "Não",
+         "Ferramenta": "Não", "Início do ciclo": "x", "Lido": "Sim"}
+        for i, cod, nome in (("501", "SP-501", "Fusível 10A"), ("502", "SP-502", "Cabo 6 mm"),
+                             ("591", "SP-501-AV", "[AVARIADO] Fusível 10A"))])
+    _publicar(inv,
+              _linha("C-1", "L1", "591", "1", contada=_iso(horas=30)), _linha("C-1", "L2", "502", "4", contada=_iso(horas=30)),
+              _linha("C-2", "L1", "501", "2", tipo="avariado", contada=_iso(horas=20)),
+              _linha("C-2", "L2", "502", "1", tipo="avariado", contada=_iso(horas=20)))
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 591, codigo="SP-501-AV", quando=_iso(horas=28)),
+            _ev("C-1", "recontagem_item_pedida", 502, codigo="SP-502", quando=_iso(horas=28)))
+    por, _ = _rec(app)
+    assert por == {("peca", "C-1", "591"): "C-2", ("peca", "C-1", "502"): None}
+
+
+def test_recontagem_as_janelas_de_90_e_30_dias(app, inv):
+    """Os esperando dos últimos 90 dias (`contas.APROVAVEL_DIAS`), os mais velhos primeiro; as atendidas dos últimos 30 dias
+    (pelo dia da contagem que atendeu), a mais nova primeiro. O mais velho que isso sai do cartão."""
+    assert L.ATENDIDAS_DIAS == 30
+    _publicar(inv,
+              _linha("C-A", "L1", "501", "3", almox="10", contada=_iso(dias_atras=92)),
+              _linha("C-B", "L1", "501", "3", almox="11", contada=_iso(dias_atras=90)),
+              _linha("C-B2", "L1", "501", "3", almox="14", contada=_iso(dias_atras=50)),
+              _linha("C-C", "L1", "501", "3", almox="12", contada=_iso(dias_atras=60)),
+              _linha("C-D", "L1", "501", "4", almox="12", contada=_iso(dias_atras=31)),
+              _linha("C-E", "L1", "501", "3", almox="13", contada=_iso(dias_atras=60)),
+              _linha("C-F", "L1", "501", "4", almox="13", contada=_iso(dias_atras=29)),
+              _linha("C-G", "L1", "501", "3", almox="15", contada=_iso(dias_atras=60)),
+              _linha("C-H", "L1", "501", "4", almox="15", contada=_iso(dias_atras=2)))
+    _gravar(app, _ev("C-A", "recontagem_item_pedida", 501, almox="10", quando=_iso(dias_atras=91)),
+            _ev("C-B", "recontagem_item_pedida", 501, almox="11", quando=_iso(dias_atras=89)),
+            _ev("C-B2", "recontagem_item_pedida", 501, almox="14", quando=_iso(dias_atras=49)),
+            _ev("C-C", "recontagem_item_pedida", 501, almox="12", quando=_iso(dias_atras=59)),
+            _ev("C-E", "recontagem_item_pedida", 501, almox="13", quando=_iso(dias_atras=59)),
+            _ev("C-G", "recontagem_item_pedida", 501, almox="15", quando=_iso(dias_atras=59)))
+    _, r = _rec(app)
+    assert [p["contagem_id"] for p in r["esperando"]] == ["C-B", "C-B2"]          # o de 91 dias saiu; o mais velho primeiro
+    assert [(p["contagem_id"], p["atendida_por"]["contagem_id"]) for p in r["atendidas"]] == [("C-G", "C-H"), ("C-E", "C-F")]
+
+
+def test_recontagem_sem_o_almoxarifado_de_teste_e_sem_repetir(app, inv):
+    """O almoxarifado de teste fica de fora, como no resto; o mesmo pedido (a peça na mesma contagem) gravado duas vezes vale o
+    primeiro, como a `revisao_da`."""
+    app.config.update(NEXUS_ALMOX_TESTE_IDS="134082")
+    _publicar(inv, _linha("C-1", "L1", "501", "3", contada=_iso(horas=30)),
+              _linha("C-T", "L1", "501", "3", almox="134082", contada=_iso(horas=30)))
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 501, quando=_iso(horas=28)),
+            _ev("C-1", "recontagem_item_pedida", 501, quando=_iso(horas=27)),
+            _ev("C-T", "recontagem_item_pedida", 501, almox="134082", quando=_iso(horas=28)),
+            _ev("C-T", "recontagem_pedida", almox="134082", quando=_iso(horas=28)))
+    _, r = _rec(app)
+    assert [(p["contagem_id"], p["quando"]) for p in r["esperando"]] == [("C-1", _iso(horas=28))] and r["atendidas"] == []

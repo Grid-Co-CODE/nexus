@@ -835,6 +835,20 @@ def test_valor_por_curva(app, almox, monkeypatch):
     assert "R$ 0,00" not in cartao and "2 peças sem custo no Fracttal" in cartao
 
 
+def test_valor_sem_nenhuma_peca_na_conta_e_traco(app, almox, monkeypatch):
+    """O almoxarifado em que nenhuma peça entra na conta do valor (todas sem saldo informado: o Fracttal não deu o número):
+    "–", nunca "R$ 0,00", que seria um valor inventado (a revisão final de 04/11/2026). Nenhuma peça sem custo a cobrar: a de
+    saldo não informado não precisa de custo."""
+    from nexus.pcm import almoxarifado as T
+    _semear(almox, saldo_extra=[_s(5, 40, ALT, "", 1), _s(6, 40, ALT, "None", 1)], novas={}, custo={(5, 40): 10, (6, 40): 3})
+    visao.limpar()
+    c = {c["id"]: c for c in T.montar().dados["por_almoxarifado"]}["40"]
+    assert c["nao_informado"] == 2 and c["sem_custo"] == 0 and c["valor"]["total"] == 0.0
+    cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 40")
+    assert re.search(r'Valor em estoque: <span class="mudo">–</span>', cartao) and "R$ 0,00" not in cartao
+    assert "sem custo no Fracttal" not in cartao
+
+
 def test_sem_coluna_custo_nao_mostra_valor(app, almox, monkeypatch):
     """O App de hoje não traz o custo: sem valor e sem cobrança (a coluna ausente não é a peça sem custo)."""
     from nexus.pcm import almoxarifado as T

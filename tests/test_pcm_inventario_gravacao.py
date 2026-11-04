@@ -631,6 +631,19 @@ def test_confirmar_sem_alvo_e_pendente_e_segura_o_especifico(app, grav):
     assert [e["id_item"] for e in _eventos(app, "conflito")] == ["501"] and _saldos(falso)["501"] == 10
 
 
+def test_o_generico_none_do_sync_nao_vira_a_peca_none():
+    """O "ID do item" "None" (ou "nan") que o `sync-xlsx` escreve no vazio é sem ID (`almoxarifado.id_ou_vazio`), como nas
+    contas: duas linhas `identificar` "None" não são o genérico "None", e a pendência de uma não segura o específico confirmado
+    da outra (a revisão final de 04/11/2026; a leitura também põe o aviso do App nessa contagem)."""
+    linhas = [_linha("C-1", "L1", "None", "2", tipo="identificar", **{"Identificado como": "202"}),
+              _linha("C-1", "L2", "None", "3", tipo="identificar")]
+    curadoria = {"L1": {"decisao": "confirmar", "id_item": "202"}}
+    assert G._com_generico_pendente(linhas, curadoria) == set()
+    # o genérico de verdade continua segurando o específico (o caso do `test_especifico_com_generico_pendente_vira_conflito`)
+    com_id = [dict(l, **{"ID do item": "507"}) for l in linhas]
+    assert G._com_generico_pendente(com_id, curadoria) == {"202"}
+
+
 # ── encerrar (Levi, 26/10/2026) ──────────────────────────────────────────────────────────────────────────────────────────
 def _encerrar(grav, falso, pessoa=APROVADOR, motivo="o almoxarifado vai ser recontado", admin=False, horas=0.0):
     agora = (lambda: grav["relogio"].t + timedelta(hours=horas)) if horas else grav["relogio"]

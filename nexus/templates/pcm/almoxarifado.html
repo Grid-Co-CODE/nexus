@@ -151,9 +151,11 @@
            foi lido e não tem uma gravada deste almoxarifado: o livro do App é uma janela que anda, e "nunca contado" diria mais
            do que se sabe #}
         {% if c.ultima_contagem is not none %}<p>Última contagem gravada: {% if c.ultima_contagem %}<b>{{ c.ultima_contagem }}</b>{% else %}<span class="mudo">sem contagem gravada na janela lida</span>{% endif %}</p>{% endif %}
-        {# sem a coluna de custo no livro (o App de antes) não há valor nem cobrança; com ela, a soma pela metade AVISA #}
+        {# sem a coluna de custo no livro (o App de antes) não há valor nem cobrança; com ela, a soma pela metade AVISA. Nenhuma
+           peça na conta (todas sem saldo informado, ou sem o custo): "–", nunca um "R$ 0,00" inventado (a revisão final de
+           04/11/2026: o almoxarifado em que o Fracttal não deu saldo nenhum aparecia valendo zero) #}
         {% if c.valor %}
-        <p>Valor em estoque: {% if c.valor.total or not c.sem_custo %}<b>{{ c.valor_txt.total }}</b>{% else %}<span class="mudo">–</span>{% endif %}
+        <p>Valor em estoque: {% if c.valor.total %}<b>{{ c.valor_txt.total }}</b>{% else %}<span class="mudo">–</span>{% endif %}
           {% if c.valor.total and d.tem_curva %}<span class="alm-det">A {{ c.valor_txt.A }} · B {{ c.valor_txt.B }} · C {{ c.valor_txt.C }}{% if c.valor.sem_curva %} · sem curva {{ c.valor_txt.sem_curva }}{% endif %}</span>
           {%- elif c.valor.total %}<span class="alm-det">o App ainda não traz a curva</span>{% endif %}</p>
         {% if c.sem_custo %}<p class="alm-aviso">{{ c.sem_custo }} peça{{ 's' if c.sem_custo != 1 else '' }} sem custo no Fracttal</p>{% endif %}

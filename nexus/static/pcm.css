@@ -1157,6 +1157,13 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .inv-recontar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 14px;border-bottom:1px solid var(--linha)}
 .inv-recontar .alm-ajuda{margin:0;flex:1 1 280px}
 .inv-recontar .gc-btn[disabled]{opacity:.55;cursor:not-allowed}
+/* o cartão "Recontagens pedidas" da lista (04/11/2026): as atendidas num <details> fechado, abaixo das que esperam */
+.inv-rec-atendidas{border-top:1px solid var(--linha)}
+.inv-rec-atendidas>summary{padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--tinta-2)}
+.inv-rec-atendidas>summary:hover{color:var(--tinta)}
+.inv-rec-atendidas>summary:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.inv-rec-atendidas[open]>summary{border-bottom:1px solid var(--linha)}
+.inv-rec-por{font-size:12.5px;color:var(--mudo);white-space:nowrap}
 
 /* o selo (o `.pill` do mockup): a palavra no tom, com o ponto na frente, como o gc-status da casa */
 .inv-selo{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font:600 11.5px/16px var(--font-sans);

@@ -76,6 +76,46 @@
     técnico enviar a primeira contagem (Ronda, a usina, Inventário de almoxarifado), ela aparece aqui para o PCM revisar.</p>
   {% else %}<p class="mudo inv-card-corpo">Nenhuma contagem recebida ainda.</p>{% endif %}
 </section>
+
+{# "Recontagens pedidas" (04/11/2026; caso real: uma pessoa do PCM pediu a recontagem de uma peça e perguntou "não sei pra onde
+   foi essa informação"): os pedidos da peça e da contagem inteira, esperando o técnico (os mais velhos primeiro) ou atendidos
+   por uma contagem do mesmo almoxarifado que veio depois e contou a peça (as atendidas fechadas, abaixo). A conta é a
+   leitura.pedidos_de_recontagem; a nota diz, pela versão do App (`app_com_recontagem`), se o técnico vê o pedido. O motivo não
+   aparece aqui (a auditoria o mostra a quem pode). Sem pedido nenhum, o cartão não aparece #}
+{% macro tabela_recontagens(pedidos) %}
+<div class="inv-tw">
+<table class="alm-t inv-t">
+  <thead><tr><th>Almoxarifado</th><th>Peça</th><th>Pedida em</th><th>Contagem</th><th>Situação</th></tr></thead>
+  <tbody>
+  {% for p in pedidos %}
+  <tr>
+    <td data-r="Almoxarifado"><span class="alm-v">{{ p.almox }}{% if p.usina %}<span class="alm-det">{{ p.usina }}</span>{% endif %}</span></td>
+    <td data-r="Peça"><span class="alm-v">{% if p.tipo == 'inteira' %}a contagem inteira{% else %}{% if p.codigo %}<span class="alm-cod">{{ p.codigo }}</span> {% endif %}{{ p.nome or ('peça ' ~ p.id_item if not p.codigo else '') }}{% endif %}</span></td>
+    <td data-r="Pedida em"><span class="alm-v inv-quando">{{ p.pedida_txt or '?' }}</span></td>
+    <td data-r="Contagem"><span class="alm-v">{% if p.na_lista %}<a class="inv-abrir" href="{{ raiz }}/t/pcm/pecas/inventario/{{ p.contagem_id|urlencode }}">{{ p.contagem_txt }}</a>{% else %}<span class="mudo">{{ p.contagem_txt }}</span>{% endif %}</span></td>
+    <td data-r="Situação"><span class="alm-v">{% if p.atendida_por %}<span class="inv-selo inv-selo--ok">atendida em {{ p.atendida_dia }}</span> <span class="inv-rec-por">(<a class="inv-abrir" href="{{ raiz }}/t/pcm/pecas/inventario/{{ p.atendida_por.contagem_id|urlencode }}">contagem de {{ p.atendida_txt }}</a>)</span>{% else %}<span class="inv-selo inv-selo--alerta">esperando o técnico</span>{% endif %}</span></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endmacro %}
+{% if recontagens %}
+<section class="inv-card" aria-label="Recontagens pedidas" data-recontagens>
+  <div class="inv-card-cab">
+    <h3>Recontagens pedidas ({{ recontagens.esperando|length }} esperando)</h3>
+    <span class="inv-card-nota">{% if app_com_recontagem %}O técnico vê o pedido no App; fica aqui até a recontagem chegar.{% else %}O App ainda não avisa o técnico: o pedido fica aqui até uma contagem nova do almoxarifado contar a peça.{% endif %}</span>
+  </div>
+  {% if recontagens.esperando %}{{ tabela_recontagens(recontagens.esperando) }}
+  {% else %}<p class="mudo inv-card-corpo">Nenhuma recontagem esperando o técnico.</p>{% endif %}
+  {% if recontagens.atendidas %}
+  <details class="inv-rec-atendidas">
+    <summary>Atendidas nos últimos {{ recontagens.dias }} dias ({{ recontagens.atendidas|length }})</summary>
+    {{ tabela_recontagens(recontagens.atendidas) }}
+  </details>
+  {% endif %}
+</section>
+{% endif %}
 </div>
 <aside class="inv-card inv-lado" aria-label="Regras do inventário">
   <div class="inv-card-cab"><h3>Regras</h3></div>

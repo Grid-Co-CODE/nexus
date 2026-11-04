@@ -291,23 +291,39 @@ def _dado(v) -> str:
     return NAO_TEM if t.lower() == A.NA else t
 
 
+def _os_dados(l: dict, separador: str) -> str:
+    """Os três dados da linha que a peça tem (sem o "n/a" e o vazio), "Fabricante<separador>X · Modelo<separador>Y · Série<...>Z"."""
+    partes = []
+    for _, coluna, curto in _DADOS_DA_PECA:
+        v = _dado(l.get(coluna))
+        if v and v != NAO_TEM:
+            partes.append(f"{curto}{separador}{' '.join(v.split())}")
+    return " · ".join(partes)
+
+
 def descricao_dos_dados(l: dict) -> str:
     """"Fabricante: X · Modelo: Y · Série: Z", o que o cartão lembra de completar na tela do Fracttal depois de cadastrar, junto
     do grupo, da criticidade e da Curva ABC. NÃO vai ao Fracttal pela API (revisão final de 31/10/2026): o `item_insert` não tem
     campo próprio para eles, e o `description` que ele tem é o de exibição ("<nome>    { CODE }" na resposta do passo 0), sem
     prova do que escrevê-lo faz. O "n/a" e o vazio saem; sem nenhum, vazio (e o cartão não lembra nada a mais)."""
-    partes = []
-    for _, coluna, curto in _DADOS_DA_PECA:
-        v = _dado(l.get(coluna))
-        if v and v != NAO_TEM:
-            partes.append(f"{curto}: {' '.join(v.split())}")
-    return " · ".join(partes)
+    return _os_dados(l, ": ")
+
+
+def completar_no_fracttal(l: dict, decisao: dict | None) -> str:
+    """"Complete no Fracttal: Fabricante X · Modelo Y · Série Z", o lembrete da linha em "Já decididas" (a revisão final de
+    04/11/2026): o do cartão (`descricao_dos_dados`) some quando a linha é decidida, e a API não grava os três. Só na peça
+    CADASTRADA pela curadoria (as outras decisões não criaram peça a completar) e só com algum dado (sem o "n/a" e o vazio)."""
+    if not decisao or _txt(decisao.get("decisao")) != "cadastrar":
+        return ""
+    dados = _os_dados(l, " ")
+    return f"Complete no Fracttal: {dados}" if dados else ""
 
 
 def _fotos_da_linha(cfg, l: dict) -> list[dict]:
     """As fotos do achado na ordem da tela: a da peça ("Foto") e as dos dados ("Fotos dos dados", `A.fotos_dos_dados`), só as que
     o App escreveu na linha (o dado "n/a" não tem foto). `tem`: a foto já chegou ao Nexus (ela vai depois da linha, pela fila
-    offline do App; sem ela, "foto ainda não chegou"); `versao`: o instante do arquivo, para o endereço (`_versao_da_foto`)."""
+    offline do App; sem ela, a tela diz "foto ainda não chegou" ou, com o App de hoje, que não manda as fotos, "o App ainda não
+    envia as fotos": `leitura.app_com_fotos`); `versao`: o instante do arquivo, para o endereço (`_versao_da_foto`)."""
     chaves = [("Peça", A.campo(l.get("Foto")))]
     dos_dados = A.fotos_dos_dados(l.get("Fotos dos dados"))
     chaves += [(coluna, dos_dados.get(rotulo_col, "")) for rotulo_col, coluna, _ in _DADOS_DA_PECA]
@@ -353,7 +369,8 @@ def pendencias(cfg) -> list[dict]:
 
     Desde 30/10/2026 (itens 2 e 3): `fabricante`, `modelo` e `serie` (texto; o "n/a" do técnico vira "não tem"; sem a coluna,
     vazio), `lembrar_no_fracttal` (o que o cartão lembra de completar na tela do Fracttal, `descricao_dos_dados`: não vai pela
-    API) e `fotos`, a da peça e as dos dados na ordem da tela: `[{"rotulo": "Peça" | "Fabricante" | "Modelo" | "Número de
+    API), `completar_no_fracttal` (o mesmo lembrete na linha de "Já decididas" da peça cadastrada, 04/11/2026) e `fotos`, a da
+    peça e as dos dados na ordem da tela: `[{"rotulo": "Peça" | "Fabricante" | "Modelo" | "Número de
     série", "foto_id", "tem", "versao"}]` (`versao`: o instante do arquivo, que vai no endereço como `?v=`).
     O livro de hoje, sem as colunas novas, dá os três vazios e só a foto da peça: a tela de hoje."""
     abertas = contagens_abertas(cfg)
@@ -383,6 +400,7 @@ def pendencias(cfg) -> list[dict]:
                 "unidade_av": _txt(l.get("_unidade_av")), "av_repetido": bool(l.get("_av_repetido")),
                 "fabricante": _dado(l.get("Fabricante")), "modelo": _dado(l.get("Modelo")),
                 "serie": _dado(l.get("Número de série")), "lembrar_no_fracttal": descricao_dos_dados(l),
+                "completar_no_fracttal": completar_no_fracttal(l, d),
                 "fotos": _fotos_da_linha(cfg, l),
                 "decisao": None if d is None else {
                     "decisao": _txt(d.get("decisao")), "id_item": _id(d.get("id_item")),
@@ -762,21 +780,23 @@ def _pagina(*, erro: str = "", status: int = 200):
     catalogo = _catalogo() or {}
     try:
         sem_catalogo = not erro_livro and not leitura.catalogo_lido()
+        # a foto que falta diz o que o App faz (04/11/2026): o de hoje NÃO manda as fotos, e "ainda não chegou" prometia
+        app_com_fotos = leitura.app_com_fotos()
     except (F.Recusada, visao.SemBanco, OSError):
-        sem_catalogo = False            # o erro de leitura do livro do App já está na tela
+        sem_catalogo = app_com_fotos = False     # o erro de leitura do livro do App já está na tela
     aviso = session.pop("pcm_curadoria_aviso", None) if status == 200 else None
     pode = telas.pode_programar()
     if not pode:
         # o que o técnico escreveu e a foto dele são de quem decide (podem mostrar gente, placa de equipamento, o que estiver à
         # volta): quem só olha vê que há um achado, a quantidade e a usina. Os dados da peça (fabricante, modelo, série) e as
-        # fotos deles também (30/10/2026), como a descrição
+        # fotos deles também (30/10/2026), como a descrição, e o lembrete de completá-los da peça já cadastrada (04/11/2026)
         lista = [dict(p, descricao="", foto="", foto_id="", tem_foto=False, reserva=None, fabricante="", modelo="", serie="",
-                      lembrar_no_fracttal="", fotos=[]) for p in lista]
+                      lembrar_no_fracttal="", completar_no_fracttal="", fotos=[]) for p in lista]
     pendentes = [p for p in lista if p["decisao"] is None]
     resp = render_template(
         "pcm/inventario_curadoria.html", pendentes=pendentes, decididas=[p for p in lista if p["decisao"] is not None],
         siglas_de=lambda almox: siglas(cfg, almox), unidades=UNIDADES, fmt=fmt, pode=pode, ok=aviso or "",
-        erro=erro, erro_livro=erro_livro, sem_catalogo=sem_catalogo,
+        erro=erro, erro_livro=erro_livro, sem_catalogo=sem_catalogo, app_com_fotos=app_com_fotos,
         pecas=sorted(((v["codigo"], v["nome"]) for v in catalogo.values() if v["codigo"])))
     return resp, status
 
@@ -818,8 +838,12 @@ def registrar(bp) -> None:
             chave, ts, sig = request.form.get("chave"), request.form.get("ts"), request.form.get("assinatura")
             dados = arq.read(fotos_app.TAMANHO_MAX + 1) if arq else b""
         except RequestEntityTooLarge:
-            return jsonify({"ok": False, "mensagem": fotos_app.CORPO_GRANDE}), 400
-        status, msg = fotos_app.receber(current_app.config, chave, ts, sig, dados)
+            status, msg = 400, fotos_app.CORPO_GRANDE
+        else:
+            status, msg = fotos_app.receber(current_app.config, chave, ts, sig, dados)
+        if status != 200:
+            # a integração com o App acha a chave errada ou o relógio adiantado por aqui (sem a assinatura: `registrar_recusa`)
+            fotos_app.registrar_recusa(status, msg)
         return jsonify({"ok": status == 200, "mensagem": msg}), status
 
     @bp.route("/pecas/inventario/curadoria/decidir", methods=["POST"], endpoint="inventario_curadoria_decidir")

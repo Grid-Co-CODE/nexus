@@ -361,7 +361,9 @@ def _com_generico_pendente(linhas: list[dict], curadoria: dict) -> set[str]:
     for l in contas._unicas(linhas):
         if A._txt(l.get("Tipo")).lower() != "identificar":
             continue
-        generico = A._id(l.get("ID do item"))
+        # o "None" do `sync-xlsx` é o ID que não veio, como em `contas._ler` (a revisão final de 04/11/2026): com o `_id`, duas
+        # linhas "None" viravam o genérico "None", e a pendência de uma segurava o específico confirmado da outra
+        generico = A.id_ou_vazio(l.get("ID do item"))
         n = A.contado(l.get("Contado"))
         if not generico or n is None:
             continue

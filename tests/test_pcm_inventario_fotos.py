@@ -12,6 +12,7 @@ import pytest
 from PIL import Image
 
 from nexus.auth import ROTAS_PUBLICAS
+from nexus.dados import almoxarifado as A
 from nexus.pcm.inventario import curadoria as CU
 
 URL = "/t/pcm/pecas/inventario/foto"
@@ -268,6 +269,52 @@ def test_chave_vazia_ou_longa_400(fotos, app):
     assert _arquivos(fotos) == []
     assert _enviar(app, chave="x" * 200).status_code == 200                            # 200 cabe
     assert _enviar(app, chave="fabricante 4f2c-ç").status_code == 200                  # espaço e acento não são controle
+
+
+def test_a_chave_com_espaco_nas_pontas_e_a_do_livro(fotos, app):
+    """O livro lê a coluna da chave sem o espaço das pontas (`almoxarifado.campo`, o `strip`): a chave do envio é normalizada do
+    mesmo jeito ANTES de validar e de dar o nome ao arquivo, senão a foto ficava "ainda não chegou" para sempre (a revisão final
+    de 04/11/2026). A assinatura é a da chave como veio (o contrato: "<chave>|<ts>|<sha256>"). O caractere de controle no MEIO
+    continua recusado: aquela já não é a mesma chave."""
+    from nexus.pcm.inventario import fotos_app as FA
+    assert _enviar(app, chave=" abc ").status_code == 200
+    assert CU._tem_foto(app.config, "abc") and CU._tem_foto(app.config, A.campo(" abc "))
+    assert _enviar(app, chave=" " + "x" * 200 + " ").status_code == 200                 # as 200 de dentro cabem
+    assert CU._tem_foto(app.config, "x" * 200)
+    agora, dados = int(time.time()), _jpeg((40, 40))
+    k = FA.chave(app.config)
+    for chave, no_livro in (("def\n", "def"), ("\tghi ", "ghi"), ("  jkl\r\n", "jkl")):
+        assert FA.receber(app.config, chave, agora, FA.assinatura(k, chave, agora, dados), dados, agora=agora)[0] == 200, \
+            repr(chave)
+        assert CU._tem_foto(app.config, no_livro), repr(chave)
+    assert FA.receber(app.config, "a\nb", agora, FA.assinatura(k, "a\nb", agora, dados), dados, agora=agora)[0] == 400
+
+
+def test_cada_recusa_vai_ao_log_sem_a_assinatura(fotos, app, caplog):
+    """Cada recusa da rota vai ao log com o status e a mensagem (a revisão final de 04/11/2026): é por ali que a integração com o
+    App acha a chave errada ou o relógio adiantado do celular. Nunca a assinatura, a chave dela nem a NEXUS_PESSOA_HMAC; a foto
+    guardada não vai ao log."""
+    import logging
+    from nexus.pcm.inventario import fotos_app as FA
+    ts, dados = int(time.time()), _jpeg((40, 40))
+    k = FA.chave(app.config)
+    assinaturas = ["ab" * 32, FA.assinatura(k, "foto-abc", ts - 3600, dados), FA.assinatura(k, "a|b", ts, dados)]
+    with caplog.at_level(logging.INFO, logger="nexus.pcm.inventario.fotos_app"):
+        assert _enviar(app, ts=ts, dados=dados, assinatura=assinaturas[0]).status_code == 401
+        assert _enviar(app, ts=ts - 3600, dados=dados, assinatura=assinaturas[1]).status_code == 401
+        assert _enviar(app, chave="a|b", ts=ts, dados=dados, assinatura=assinaturas[2]).status_code == 400
+        assert _enviar(app, dados=_jpeg() + b"\0" * (FA.TAMANHO_MAX + 128 * 1024)).status_code == 400
+        assert _enviar(app, ts=ts, dados=dados).status_code == 200
+        app.config["NEXUS_PESSOA_HMAC"] = ""
+        assert _enviar(app, ts=ts, dados=dados, assinatura="cd" * 32).status_code == 503
+    linhas = [r.getMessage() for r in caplog.records if r.name == "nexus.pcm.inventario.fotos_app"]
+    assert len(linhas) == 5, linhas
+    for linha, status, texto in zip(linhas, (401, 401, 400, 400, 503),
+                                    ("assinatura não confere", "janela", '"|"', FA.CORPO_GRANDE, "desligado")):
+        assert str(status) in linha and texto in linha, linha
+    tudo = "\n".join(linhas)
+    for segredo in assinaturas + ["cd" * 32, k.hex(), SEGREDO]:
+        assert segredo not in tudo
 
 
 def test_chave_com_barras_nao_vira_caminho(fotos, app, tmp_path):

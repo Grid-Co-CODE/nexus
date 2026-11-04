@@ -151,6 +151,9 @@
     <p>O saldo do sistema, lido agora no Fracttal, ao lado do contado. Nada vai ao Fracttal antes de revisar o lote e gravar.</p>
   </div>
   {% for a in avisos_curadoria %}<div class="cn-erro cn-aviso" role="status">{{ a }}</div>{% endfor %}
+  {# o aviso FIXO das peças com a recontagem pedida (04/11/2026): da página, e não do pedaço da ponte, para ficar mesmo sem o
+     saldo; diz onde elas estão e, pela versão do App, se o técnico vê o pedido (revisao._aviso_da_recontagem) #}
+  {% if aviso_recontagem %}<div class="cn-erro cn-aviso" role="status" data-aviso-recontagem>{{ aviso_recontagem }}</div>{% endif %}
   {% if vai_ler %}
   <div class="inv-lote" data-lote data-url="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/lote" data-sem-login="{{ sem_login }}" data-contagem="{{ c.contagem_id }}">
     <p class="inv-espera" data-lote-msg role="status">lendo o saldo do Fracttal…</p>
@@ -160,10 +163,11 @@
   {% else %}<p class="inv-espera">Nada a aprovar: {{ c.motivo_nao_aprovavel or 'esta contagem não se aprova' }}.</p>{% endif %}
 
   {% if pode and c.aprovavel %}
+  {# os textos da recontagem dizem o que o App faz (04/11/2026, `app_com_recontagem`, o livro com o "Recontagem de"): o de hoje
+     não lê os pedidos, e o PCM combina com o técnico; o novo os mostra a ele. A ajuda daqui e a da caixa (TEXTOS) são as mesmas #}
   <div class="inv-rodape inv-rodape--fim">
     <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="recontagem">Recontar a contagem inteira</button>
-    <span class="alm-ajuda">Recusa a contagem inteira: nada é gravado, e o técnico conta tudo de novo no App. Para recontar só
-      algumas peças, marque-as na tabela e peça a recontagem das marcadas.</span>
+    <span class="alm-ajuda">{% if app_com_recontagem %}Recusa a contagem inteira: nada é gravado, e o técnico recebe no App o pedido de contar este almoxarifado de novo. Para recontar só algumas peças, marque-as na Aprovação.{% else %}Recusa a contagem inteira: nada é gravado. O App ainda não avisa o técnico: combine com ele uma contagem nova deste almoxarifado. Para recontar só algumas peças, marque-as na Aprovação.{% endif %}</span>
   </div>
 
   <dialog class="q-det" id="inv-rev" aria-label="Revisar a contagem" data-url="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}/revisar">
@@ -200,8 +204,9 @@
       var TEXTOS = {
         tirar: ['Tirar do lote', 'A peça não será gravada no Fracttal, e fica na auditoria com o motivo. As outras peças seguem.', 'Tirar do lote'],
         corrigir: ['Corrigir o número', 'O Fracttal recebe este número no lugar do que o técnico contou. A auditoria guarda os dois e o motivo.', 'Corrigir'],
-        recontagem_itens: ['Pedir recontagem das marcadas', 'Só as peças marcadas voltam ao técnico no App: saem deste lote (ficam em "não será tocada") e o resto da contagem segue para aprovar e gravar. O motivo vale para todas e fica na auditoria.', 'Pedir recontagem'],
-        recontagem: ['Recontar a contagem inteira', 'Recusa a contagem inteira: nada é gravado e o técnico conta tudo de novo no App. Para recontar só algumas peças, marque-as na tabela. O motivo fica na auditoria.', 'Recontar a contagem inteira']
+        // os da recontagem pela versão do App (`app_com_recontagem`): a caixa não promete o que o App de hoje não faz
+        recontagem_itens: ['Pedir recontagem das marcadas', '{% if app_com_recontagem %}Só as peças marcadas voltam ao técnico no App e saem deste lote (ficam em "não será tocada"); o resto da contagem segue para aprovar e gravar. O motivo vale para todas e fica na auditoria; o pedido aparece em "Recontagens pedidas", na lista do Inventário, até a recontagem chegar.{% else %}Só as peças marcadas saem deste lote (ficam em "não será tocada") e o resto da contagem segue para aprovar e gravar. O App ainda não avisa o técnico: combine a recontagem com ele e grave o resto antes de ele mandar a contagem nova (a contagem nova substitui a que ainda não foi gravada). O motivo vale para todas e fica na auditoria; o pedido aparece em "Recontagens pedidas", na lista do Inventário.{% endif %}', 'Pedir recontagem'],
+        recontagem: ['Recontar a contagem inteira', '{% if app_com_recontagem %}Recusa a contagem inteira: nada é gravado, e o técnico recebe no App o pedido de contar este almoxarifado de novo. Para recontar só algumas peças, marque-as na Aprovação.{% else %}Recusa a contagem inteira: nada é gravado. O App ainda não avisa o técnico: combine com ele uma contagem nova deste almoxarifado. Para recontar só algumas peças, marque-as na Aprovação.{% endif %}', 'Recontar a contagem inteira']
       };
       var atual = null;
       function mostrar(msg) { erro.textContent = msg || ''; erro.hidden = !msg; }
