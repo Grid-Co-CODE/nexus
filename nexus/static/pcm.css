@@ -707,7 +707,10 @@ html.pgp-aberto{overflow:hidden}
 .pgp-os-cab{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .pgp-os-n{border:0;background:transparent;padding:0;font:700 15px/1.2 var(--font-sans);color:var(--verde-texto);cursor:pointer;
   text-decoration:underline;text-underline-offset:3px}
-.pgp-os-n:hover,.pgp-os-n:focus-visible{color:var(--tinta);outline:none}
+.pgp-os-n:hover{color:var(--tinta)}
+/* o foco do teclado à vista (revisão de 05/11/2026): o número da OS agora está também na árvore, no Só atrasadas e na
+   confiabilidade, e só a cor mudando não basta para quem anda de Tab */
+.pgp-os-n:focus-visible{color:var(--tinta);outline:2px solid var(--foco);outline-offset:2px;border-radius:2px}
 .pgp-os-n--sem{color:var(--tinta);text-decoration:none;cursor:default}
 .pgp-chip{display:inline-block;border-radius:999px;padding:1px 9px;font:600 11px/18px var(--font-sans)}
 .pgp-chip--info{background:var(--info-suave);color:var(--info)}
@@ -786,8 +789,8 @@ html.pgp-aberto{overflow:hidden}
   border-radius:999px;background:var(--verde-suave);padding:1px 3px 1px 10px;font-size:12px;line-height:20px;color:var(--tinta)}
 .pgf-ficha-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pgf-ficha-t b{font-weight:700;color:var(--tinta-2)}
-.pgf-x{flex:none;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;color:var(--tinta-2);
-  text-decoration:none;font-size:13px}
+.pgf-x{flex:none;display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;color:var(--tinta-2);
+  text-decoration:none;font-size:13px}                       /* 24 px: o alvo mínimo para o dedo e o mouse */
 .pgf-x:hover{background:var(--superficie-3);color:var(--tinta)}
 .pgf-x:focus-visible{outline:2px solid var(--foco);outline-offset:0}
 /* aberta: as listas e os campos na ordem da barra do painel */
@@ -804,10 +807,15 @@ html.pgp-aberto{overflow:hidden}
 .pgf-ms-bt[aria-expanded="true"]>i{transform:rotate(180deg)}
 .pgf-ms-v{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pgf-ms.on .pgf-ms-bt{border-color:var(--verde-a60);background:var(--verde-suave);color:var(--tinta);font-weight:600}
-/* o painel ocupa a largura da célula: mais largo, ele passaria da borda da tela e a página rolaria de lado */
+/* no celular o painel ocupa a largura da célula (a tela toda); acima de 640 px ele tem ao menos 300 px (com ~200 px, os
+   nomes longos das usinas quebravam em três linhas), e o JS o vira para a esquerda quando passaria da borda da tela */
 .pgf-ms-painel{position:absolute;z-index:30;top:calc(100% + 4px);left:0;right:0;display:flex;flex-direction:column;gap:8px;
   padding:10px;border:1px solid var(--linha-forte);border-radius:var(--raio-md);background:var(--superficie-3);
   box-shadow:0 12px 28px var(--sombra)}
+@media (min-width:641px){
+  .pgf-ms-painel{right:auto;width:100%;min-width:300px;box-sizing:border-box}
+  .pgf-ms-painel.pgf-ms-painel--dir{left:auto;right:0}
+}
 .pgf-ms-busca{width:100%;box-sizing:border-box;padding:6px 10px}
 .pgf-ms-rapido{display:flex;gap:8px}
 .pgf-ms-lista{max-height:260px;overflow:auto;display:flex;flex-direction:column;margin:0 -4px}
@@ -927,6 +935,7 @@ details.pgc-clu--sem{border-style:dashed}
   color:var(--tinta);cursor:pointer;text-align:left;white-space:normal}
 .pgc-a-bt:hover span:first-of-type{text-decoration:underline;text-underline-offset:3px}
 .pg-tbl tr.pgc-os>td{height:auto;padding:8px 10px;white-space:normal;background:var(--superficie-2)}
+.pgc-os-caixa{text-align:left}             /* a legenda das horas, embaixo das OS, não herda o "à direita" dos números */
 .pgc-os-tbl{border:1px solid var(--linha);border-radius:var(--raio-tag)}
 .pgc-msg{margin:8px 4px;font-size:13px;color:var(--tinta-2)}
 .pgc-leg{margin-top:10px}

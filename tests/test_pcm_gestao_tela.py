@@ -259,3 +259,69 @@ def test_o_teto_da_copia_nao_joga_fora_a_versao(app, logado, fonte):
     assert telas._G_CACHE.get("versao") == versao
     telas._guardado(("depois",), lambda: 1)
     assert logado.get("/t/pcm/gestao").status_code == 200 and ("depois",) in telas._G_CACHE
+
+
+# ── rodada 1 da revisão das partes B e C (05/11/2026) ────────────────────────────────────────────────────────
+def test_o_so_atrasadas_sobrevive_ao_envio_da_barra(logado, fonte):
+    """I1: o Só atrasadas é um link, não um campo da barra; sem o campo escondido, fechar uma lista, o Enter na OS ou
+    sair de uma data mandavam a barra sem ele, e o Só atrasadas sumia."""
+    barra = _trecho(_html(logado, "?atr=1&cliente=Cliente+A"), '<section class="pgf"', "</section>")
+    form = _trecho(barra, '<form class="pg-filtros pgf-corpo"', "</form>")
+    assert form.count('<input type="hidden" name="atr" value="1">') == 1
+    barra = _trecho(_html(logado, "?cliente=Cliente+A"), '<section class="pgf"', "</section>")
+    assert 'name="atr"' not in barra
+
+
+def test_mais_de_tres_escolhas_numa_lista_viram_uma_etiqueta(logado, fonte):
+    """M6: a barra fechada com muitas etiquetas: acima de 3 escolhas numa lista, uma etiqueta só ("Usina: 4
+    selecionadas"), cujo × tira a lista inteira; o botão da lista concorda com ela (selecionadas/selecionados)."""
+    f = G.filtros(MultiDict([("usina", u) for u in ("U1", "U2", "U3", "U4")] + [("cliente", "Cliente A")]))
+    fs = G.fichas(f)
+    assert [(x["rot"], x["valor"], x["tirar"]) for x in fs] == [("Cliente", "Cliente A", {"cliente": None}),
+                                                                  ("Usina", "4 selecionadas", {"usina": None})]
+    assert [x["valor"] for x in G.fichas(G.filtros(MultiDict([("estado", e) for e in "abcd"])))] == ["4 selecionados"]
+    assert len(G.fichas(G.filtros(MultiDict([("usina", u) for u in ("U1", "U2", "U3")])))) == 3   # até 3, uma a uma
+    q = "?" + "&".join(f"usina={u}" for u in ("A1", "A2", "B1", "X9")) + "&estado=Pausada&estado=Finalizada"
+    barra = _trecho(_html(logado, q), '<section class="pgf"', "</section>")
+    tirar = dict((rot, href) for href, rot in re.findall(r'<a class="pgf-x" href="([^"]*)" aria-label="Tirar ([^"]*)"',
+                                                          barra))
+    assert tirar["Usina: 4 selecionadas"] == "?estado=Pausada&amp;estado=Finalizada"
+    assert re.search(r'id="pgf-v-usina">4 selecionadas</span>', barra)
+    assert re.search(r'id="pgf-v-estado">2 selecionados</span>', barra)
+
+
+def test_o_so_atrasadas_em_partes_pelo_tamanho_da_pagina(logado, fonte, monkeypatch):
+    """M9: o tamanho da parte é o G.PAGINA_ATRASADAS (na página e no JS), e o "restantes" leva o separador de milhar."""
+    monkeypatch.setattr(G, "PAGINA_ATRASADAS", 10)
+    fonte([t(A1, f"Tarefa {i:04d}", os_=str(20000 + i), wid=20000 + i, dias=20 + i % 50, atrasado=True)
+           for i in range(1015)], "mil-e-quinze")
+    lista = _trecho(_html(logado, "?atr=1"), '<section class="pgs"', "</section>")
+    assert lista.count('<tr class="pgs-lin') == 10
+    mais = re.search(r'<button type="button" class="pgf-bt pgs-mais" data-url="([^"]*)" data-pagina="10"[^>]*>([^<]*)<',
+                     lista)
+    assert mais and mais.group(1) == "?atr=1&amp;ap=10" and mais.group(2).strip() == "Mostrar mais 10 de 1.005 restantes"
+    js = (RAIZ / "nexus" / "static" / "pcm-gestao.js").read_text(encoding="utf-8")
+    assert "dataset.pagina" in js and "Math.min(restam, 100)" not in js
+
+
+def test_o_js_da_barra_e_dos_pedacos(logado, fonte):
+    """I4: sair de uma data para a outra (ou para o Considerar), ou da OS para a Solicitação, não envia a barra pela
+    metade: o grupo só aplica ao Enter ou quando o foco sai dele. M5: a busca da lista só ganha o foco com ponteiro fino
+    (no celular, o teclado subia a cada abertura). M11: 404 de um pedaço = a lista mudou (sem "Tentar de novo"); outro
+    erro mostra a mensagem do servidor. M7: a lista larga, virada para a esquerda quando passaria da tela."""
+    js = (RAIZ / "nexus" / "static" / "pcm-gestao.js").read_text(encoding="utf-8")
+    assert "[['os', 'ss'], ['pini', 'pfim', 'pmodo']]" in js and "relatedTarget" in js
+    assert "matchMedia('(pointer: fine)')" in js
+    assert "A lista mudou" in js and "recarregue a página" in js and "status === 404" in js
+    assert "pgf-ms-painel--dir" in js
+
+
+def test_o_foco_da_os_aparece_e_o_x_tem_24_px(logado, fonte):
+    """M12: o número da OS (agora também na árvore, no Só atrasadas e na confiabilidade) mostra o foco do teclado;
+    M6: o × da etiqueta com 24 px de alvo; M7: a lista com largura mínima acima de 640 px."""
+    css = (RAIZ / "nexus" / "static" / "pcm.css").read_text(encoding="utf-8")
+    foco = re.search(r"\.pgp-os-n:focus-visible\{([^}]*)\}", css)
+    assert foco and "outline:2px solid var(--foco)" in foco.group(1) and "outline:none" not in foco.group(1)
+    x = re.search(r"\.pgf-x\{([^}]*)\}", css).group(1)
+    assert "width:24px" in x and "height:24px" in x
+    assert re.search(r"@media \(min-width:641px\)\{[^@]*\.pgf-ms-painel\{[^}]*min-width:300px", css)

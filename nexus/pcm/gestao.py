@@ -307,16 +307,28 @@ def chave(f: Filtros) -> tuple:
             f.pini, f.pfim, f.pmodo if (f.pini or f.pfim) else "qq", f.atr)
 
 
+MAX_FICHAS_POR_LISTA = 3      # acima disso, a lista vira uma etiqueta só ("Usina: 12 selecionadas")
+
+
+def selecionados(n: int, vazio: str) -> str:
+    """"N selecionados" (o gpMsLabel do painel), concordando com a lista: a de "Todas" (Usina, Etiqueta) é feminina."""
+    return f"{n} selecionadas" if vazio == "Todas" else f"{n} selecionados"
+
+
 # Os escolhidos em etiquetas na barra fechada (Levi, 04/11/2026: os filtros "suspenso e expandível"), cada um com o ×
 # que tira só ele: (rótulo, o valor como a tela mostra, o que muda na URL para tirá-lo)
 def fichas(f: Filtros, escolhas: dict | None = None) -> list[dict]:
     """As etiquetas dos filtros escolhidos, na ordem da barra: cada valor de cada lista (na grafia da lista, a mais
     frequente), a OS, a Solicitação, o período com o "considerar" e o Só atrasadas. `tirar` vai no `url(**tirar)` da
-    tela: a lista sem aquele valor (as outras escolhas ficam), o campo vazio, o período inteiro."""
+    tela: a lista sem aquele valor (as outras escolhas ficam), o campo vazio, o período inteiro. Lista com mais de 3
+    escolhas vira uma etiqueta só, cujo × tira a lista inteira (revisão de 05/11/2026: 12 usinas eram 12 etiquetas)."""
     out = []
-    for nome, _campo, rot, _vazio in LISTAS:
+    for nome, _campo, rot, vazio in LISTAS:
         grafia = {v.lower(): v for v in (escolhas or {}).get(nome) or ()}
         vs = getattr(f, nome)
+        if len(vs) > MAX_FICHAS_POR_LISTA:
+            out.append({"rot": rot, "valor": selecionados(len(vs), vazio), "tirar": {nome: None}})
+            continue
         for v in vs:
             resto = [x for x in vs if x != v]
             out.append({"rot": rot, "valor": grafia.get(v.lower(), v), "tirar": {nome: resto or None}})

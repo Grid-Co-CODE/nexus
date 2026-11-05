@@ -9,14 +9,18 @@ disponibilidade do grupo (ver nexus/torres/engenharia/CLAUDE.md, "O que muda em 
 - a árvore Cliente ▸ Usina ▸ Ativo (o `renderConfiab`/`cfUsiHTML` do js/app.js do painel), com os indicadores da
   Engenharia por usina (as medianas dos ativos) e, na tabela da usina, os de cada ativo;
 - as OS de cada ativo (as mesmas que entraram na conta, `porAtivo`), com as horas de reparo de cada uma
-  (`confiabilidade.reparo_h`, a parcela do MTTR: a média das horas da lista é o MTTR do ativo);
+  (`confiabilidade.reparo_h`, a parcela do MTTR: a média das horas da lista é o MTTR do ativo), pedidas só quando o
+  ativo abre (uma usina de verdade tinha 1.090 OS de falha em 282 ativos: tudo no pedaço da usina dava ~1 MB);
 - o MTTR por equipe cluster: a média POR FALHA das falhas dos ativos do cluster (cada falha pesa igual, a mesma definição
   do MTTR do ativo; o `mttr_de` do robô do PCM faz igual), com o cluster do cadastro;
 - os filtros de cima: cliente, usina e equipe cluster, sem maiúscula. O cliente e o cluster são os do cadastro dos dois
   lados; a usina da Gestão é o texto do Fracttal ("Cliente - Usina - UF", a Classificação 1) e a da Engenharia é o nome
   do cadastro, então a usina casa pelo texto das OS dos ativos dela (em 04/11/2026, 130 das 143 usinas da Gestão tinham
   OS de falha, todas com o texto igual ao da Gestão; as outras 13 não tinham falha).
-Só lê: nada grava, e nada lê o Fracttal (a releitura das OS de falha é a da torre da Engenharia).
+Só lê: nada grava. O Fracttal não é lido aqui: o `copia()` pede a mesma releitura das OS de falha que a tela da
+Engenharia pede ao abrir (`os_falhas.pedir_releitura`: no máximo uma a cada 30 min, por trás e no porteiro do Fracttal),
+e a conta usa o que já foi lido. Sem a leitura completa ou sem o cadastro (a conta segue com os nomes do Fracttal, sem
+cluster e com a mobilização de 20/10/2025 para todas: número enganoso), o bloco não mostra número e diz por quê.
 """
 import hashlib
 from datetime import datetime, timedelta, timezone
@@ -26,7 +30,9 @@ from . import gestao as G
 
 BRT = timezone(timedelta(hours=-3))
 INCOMPLETA = "A leitura do Fracttal ainda não terminou: tente em alguns minutos."
-SEM_CLUSTER = "Sem cluster no cadastro"
+SEM_CADASTRO = "O cadastro do Nexus não respondeu: tente em alguns minutos."
+# a usina sem cluster no cadastro e a usina que não ligou ao cadastro (sem ela, o cluster vem vazio) caem juntas aqui
+SEM_CLUSTER = "Sem cluster no cadastro (ou sem ligação)"
 BASE = ", ".join(t.capitalize() for t in os_falhas.TIPOS)        # Corretiva, Corretiva emergencial, ...
 _STATUS = {1: "Em Processo", 2: "Em Verificação", 3: "Concluída"}     # a grafia do card da OS do Nexus
 # os filtros de cima que não valem nestes blocos, na ordem da barra (a linha de baixo do título diz quais)
@@ -80,23 +86,26 @@ def nao_se_aplicam(f: G.Filtros) -> str:
 
 
 # ── a cópia da Engenharia ────────────────────────────────────────────────────────────────────────────────────
-def copia() -> dict | None:
-    """A conta da Engenharia (a cópia de 5 min da torre) e o índice daqui, refeito só quando a cópia de lá muda. None =
-    a leitura das OS de falha ainda não terminou: número pela metade não vai para a tela (a tela da Engenharia mostra
-    com aviso; aqui o bloco espera)."""
+def copia() -> tuple[dict | None, str]:
+    """(a conta, "") ou (None, o porquê). A conta é a da Engenharia (a cópia de 5 min da torre, `_dados()`, pedida a
+    cada vez) mais o índice e os resultados daqui, refeitos só quando a cópia de lá muda. Daqui só se guarda o índice e
+    os resultados (números e nomes): a conta de lá não fica presa entre um pedido e outro (~5 MB; a memória do servidor
+    é curta). Sem número quando a leitura das OS de falha ainda não terminou (número pela metade não vai para a tela; a
+    tela da Engenharia mostra com aviso) ou quando o cadastro não respondeu; e aí nada fica guardado."""
     from ..torres import engenharia
     os_falhas.pedir_releitura()          # carrega o arquivo antes de perguntar (e pede a releitura, como a torre faz)
     if not os_falhas.estado()["completa"]:
-        return None
+        return None, INCOMPLETA
     g = engenharia._dados()
-    marca = (g["marca"], g["em"])
-    c = _COPIA.get("c")
-    if c is None or c["marca"] != marca:
-        d = g["dados"]
-        c = {"marca": marca, "d": d, "idx": _indice(d), "grupos": _grupos(d), "res": {},
-             "quando": _quando(g["marca"][1])}
-        _COPIA["c"] = c
-    return c
+    if g.get("sem_cadastro"):
+        return None, SEM_CADASTRO
+    marca, d = (g["marca"], g["em"]), g["dados"]
+    guardada = _COPIA.get("c")
+    if guardada is None or guardada["marca"] != marca:
+        guardada = {"marca": marca, "idx": _indice(d), "res": {}, "quando": _quando(g["marca"][1])}
+        _COPIA["c"] = guardada
+    return {"d": d, "idx": guardada["idx"], "res": guardada["res"], "quando": guardada["quando"],
+            "grupos": _grupos(d)}, ""
 
 
 def _quando(ts) -> str:
@@ -185,7 +194,8 @@ def _data(v) -> str:
 
 def _linha_os(r: dict) -> dict:
     """Uma OS do ativo (o `cfTaskRows` do painel): o número (abre o card da OS no Nexus; o Fracttal no ícone), a tarefa,
-    o tipo, o início e o fim em Brasília e as horas de reparo (do incidente ao fim, a conta do MTTR)."""
+    o tipo, o início do trabalho e o fim em Brasília e as horas de reparo (do INCIDENTE ao fim, a conta do MTTR: o início
+    do trabalho pode vir depois do incidente, e a tela diz isso na legenda)."""
     from ..engenharia.confiabilidade import OS_URL, reparo_h
     wid = r.get("id_work_order")
     try:
@@ -199,21 +209,27 @@ def _linha_os(r: dict) -> dict:
 
 
 def tabela_da_usina(c: dict, cliente: str, usina: str) -> dict | None:
-    """A tabela de UMA usina: Ativo · MTBF · MTTR · Disp. inerente · Falhas, os de mais falhas primeiro (o painel), cada
-    um com as OS dele, a de início mais novo primeiro. None = a usina não está na conta."""
-    from ..engenharia.confiabilidade import _dt
+    """A tabela de UMA usina: Ativo · MTBF · MTTR · Disp. inerente · Falhas, os de mais falhas primeiro (o painel). As
+    OS de cada ativo vêm à parte, quando ele abre (`os_do_ativo`). None = a usina não está na conta."""
     ats = c["grupos"].get((cliente, usina))
     if not ats:
         return None
-    por = c["d"].get("porAtivo") or {}
-    piso = datetime.min.replace(tzinfo=timezone.utc)
-    linhas = []
-    for a in sorted(ats, key=lambda a: (-(a.get("n") or 0), G.ordem_pt(a.get("nome") or a["cod"]))):
-        rs = sorted(por.get(a["cod"]) or [], key=lambda r: _dt(r.get("initial_date")) or piso, reverse=True)
-        linhas.append({"cod": a["cod"], "nome": a.get("nome") or a["cod"], "mtbf": a.get("mtbf"), "mttr": a.get("mttr"),
-                       "disp": a.get("disp"), "n": a.get("n") or 0, "os": [_linha_os(r) for r in rs]})
+    linhas = [{"cod": a["cod"], "nome": a.get("nome") or a["cod"], "mtbf": a.get("mtbf"), "mttr": a.get("mttr"),
+               "disp": a.get("disp"), "n": a.get("n") or 0}
+              for a in sorted(ats, key=lambda a: (-(a.get("n") or 0), G.ordem_pt(a.get("nome") or a["cod"])))]
     uid = "u" + hashlib.sha1(f"{cliente}|{usina}".encode("utf-8")).hexdigest()[:10]
     return {"cliente": cliente, "usina": usina, "id": uid, "ativos": linhas}
+
+
+def os_do_ativo(c: dict, cod: str) -> list[dict] | None:
+    """As OS de UM ativo (as que entraram na conta), a de início mais novo primeiro. None = o ativo não está na conta."""
+    from ..engenharia.confiabilidade import _dt
+    if cod not in c["idx"]:
+        return None
+    piso = datetime.min.replace(tzinfo=timezone.utc)
+    rs = sorted((c["d"].get("porAtivo") or {}).get(cod) or [], key=lambda r: _dt(r.get("initial_date")) or piso,
+                reverse=True)
+    return [_linha_os(r) for r in rs]
 
 
 # ── o Tempo médio de reparo por Equipe Cluster ───────────────────────────────────────────────────────────────
@@ -221,7 +237,8 @@ def clusters(c: dict, f: G.Filtros) -> list[dict]:
     """Por equipe cluster (a do cadastro): o MTTR = a soma das horas de reparo das falhas dos ativos do cluster ÷ quantas
     falhas têm o reparo medido (cada falha pesa igual, a mesma definição do MTTR do ativo); as falhas = as da Engenharia
     (desde 20/10/2025, a aberta também). Os piores no topo; dentro, as usinas com o MTTR e as falhas delas, a pior
-    primeiro. A usina sem cluster no cadastro vai num grupo próprio, por último (não some da conta)."""
+    primeiro. A usina sem cluster no cadastro (ou que não ligou ao cadastro) vai num grupo próprio, por último (não some
+    da conta)."""
     from ..campo.visao import SEM_CLUSTER as SEM_DO_CADASTRO
 
     def fazer():

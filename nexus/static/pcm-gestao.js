@@ -20,7 +20,7 @@
       return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
     });
   }
-  function semAcento(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  function semAcento(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
 
   // ── a barra recolhível ──
   if (abre && corpo) {
@@ -66,17 +66,30 @@
     window.addEventListener('pageshow', function () {
       corpo.querySelectorAll('input:disabled, select:disabled').forEach(function (el) { el.disabled = false; });
     });
-    // OS, Solicitação e as datas: ao Enter ou ao sair do campo, e não a cada dígito (o campo de data muda de valor
-    // enquanto o ano é digitado). O Enter é daqui: o formulário tem vários campos e nenhum botão de enviar, e aí o
-    // navegador não envia sozinho
-    corpo.querySelectorAll('input[name=os], input[name=ss], input[type=date]').forEach(function (el) {
-      var antes = el.value;
-      el.addEventListener('blur', function () { if (el.value !== antes) enviar(); });
-      el.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); enviar(); } });
-    });
-    var pm = corpo.elements.pmodo;
-    if (pm) pm.addEventListener('change', function () {
-      if ((corpo.elements.pini && corpo.elements.pini.value) || (corpo.elements.pfim && corpo.elements.pfim.value)) enviar();
+    // OS e Solicitação, e o período (de, até e o considerar), em grupos: aplicam ao Enter ou quando o foco SAI do grupo,
+    // e não a cada campo (revisão de 05/11/2026: preencher "Período de" e ir para o "Até" recarregava a tela com meio
+    // período, também no seletor de data do celular), nem a cada dígito (a data muda de valor enquanto o ano é
+    // digitado). O Enter é daqui: o formulário tem vários campos e nenhum botão de enviar, e aí o navegador não envia.
+    // O considerar sem data não envia (sem data ele não filtra nada)
+    [['os', 'ss'], ['pini', 'pfim', 'pmodo']].forEach(function (nomes) {
+      var els = nomes.map(function (n) { return corpo.elements[n]; }).filter(Boolean);
+      var antes = els.map(function (e) { return e.value; });
+      function mudou() {
+        var ini = corpo.elements.pini, fim = corpo.elements.pfim;
+        return els.some(function (e, i) {
+          if (e.value === antes[i]) return false;
+          return e.name !== 'pmodo' || !!((ini && ini.value) || (fim && fim.value));
+        });
+      }
+      els.forEach(function (el) {
+        el.addEventListener('blur', function (ev) {
+          if (ev.relatedTarget && els.indexOf(ev.relatedTarget) >= 0) return;       // ainda dentro do grupo
+          if (mudou()) enviar();
+        });
+        el.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter') { ev.preventDefault(); if (mudou()) enviar(); }
+        });
+      });
     });
   }
 
@@ -88,16 +101,21 @@
   function rotular(ms) {
     var m = ms.querySelectorAll('input[type=checkbox]:checked'), v = ms.querySelector('.pgf-ms-v');
     if (!v) return;
-    v.textContent = !m.length ? (ms.dataset.vazio || 'Todos') : (m.length === 1 ? m[0].value : m.length + ' selecionados');
+    v.textContent = !m.length ? (ms.dataset.vazio || 'Todos') :
+      (m.length === 1 ? m[0].value : m.length + (ms.dataset.vazio === 'Todas' ? ' selecionadas' : ' selecionados'));
     ms.classList.toggle('on', m.length > 0);
   }
   function abrirMs(ms) {
     var bt = ms.querySelector('.pgf-ms-bt'), painel = ms.querySelector('.pgf-ms-painel');
     if (aberta && aberta !== ms) fecharMs(aberta, false);
     aberta = ms; marcadasAntes = marcadas(ms);
+    painel.classList.remove('pgf-ms-painel--dir');
     painel.hidden = false; bt.setAttribute('aria-expanded', 'true');
+    // a lista larga (acima de 640 px) passaria da borda direita da tela: vira para a esquerda
+    if (painel.getBoundingClientRect().right > document.documentElement.clientWidth - 8) painel.classList.add('pgf-ms-painel--dir');
+    // a busca só ganha o foco com ponteiro fino: no celular o teclado subia a cada abertura (revisão de 05/11/2026)
     var busca = painel.querySelector('.pgf-ms-busca');
-    (busca || painel.querySelector('input')).focus();
+    if (busca && window.matchMedia && window.matchMedia('(pointer: fine)').matches) busca.focus();
   }
   function fecharMs(ms, focar) {
     if (!ms) return;
@@ -150,13 +168,26 @@
     return fetch(url, {credentials: 'same-origin', headers: {'Accept': 'text/html'}})
       .then(function (r) { return r.text().then(function (t) { return {ok: r.ok, status: r.status, t: t}; }); });
   }
+  // o erro de um pedaço (revisão de 05/11/2026): 404 = a lista mudou (o robô regravou o arquivo, ou a conta da
+  // Engenharia mudou), e "Tentar de novo" não adianta; outro erro, a mensagem que o servidor mandou (não "HTTP 503"),
+  // com o "Tentar de novo"
+  function falha(r, semTentar) {
+    if (r.status === 404) {
+      return '<p class="pgx-erro" role="alert">A lista mudou: <a class="pcm-link" href="">recarregue a página</a>.</p>';
+    }
+    var tpl = document.createElement('template');
+    tpl.innerHTML = r.t || '';
+    var msg = (tpl.content.textContent || '').replace(/\s+/g, ' ').replace(/Tentar de novo/g, '').trim();
+    return '<p class="pgx-erro" role="alert">' + esc(msg || 'Não consegui ler agora.')
+      + (semTentar ? '' : ' <button type="button" class="pgf-lnk" data-tentar>Tentar de novo</button>') + '</p>';
+  }
   function encher(caixa, url, depois) {
     if (!caixa || caixa.dataset.cheio === '1' || caixa.dataset.lendo === '1') return;
     caixa.dataset.url = url; caixa.dataset.lendo = '1';
     caixa.innerHTML = '<p class="pgx-carga" role="status">Lendo…</p>';
     ler(url).then(function (r) {
       caixa.dataset.lendo = '';
-      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (!r.ok) { caixa.innerHTML = falha(r); return; }
       caixa.innerHTML = r.t;
       // a confiabilidade sem a leitura completa das OS de falha não fica guardada: abrir de novo pergunta de novo
       if (!caixa.querySelector('[data-pgc-incompleta]')) caixa.dataset.cheio = '1';
@@ -171,7 +202,7 @@
   document.addEventListener('click', function (ev) {
     var t = ev.target.closest('[data-tentar]');
     if (!t) return;
-    var caixa = t.closest('.pga-tab, .pgc-corpo, .pgc-tab');
+    var caixa = t.closest('.pga-tab, .pgc-corpo, .pgc-tab, .pgc-os-caixa');
     if (caixa && caixa.dataset.url) { caixa.dataset.cheio = ''; encher(caixa, caixa.dataset.url, quandoDe(caixa)); }
   });
   function urlCom(base, mudar) {
@@ -206,7 +237,8 @@
     }
   }, true);
 
-  // o ativo da confiabilidade abre as OS dele (a linha de baixo)
+  // o ativo da confiabilidade abre as OS dele (a linha de baixo), pedidas só na 1ª abertura (?cf=ativo&ca=<código>):
+  // uma usina grande tinha 1.090 OS no pedaço dela (revisão de 05/11/2026)
   document.addEventListener('click', function (ev) {
     var bt = ev.target.closest('.pgc-a-bt');
     if (!bt) return;
@@ -214,9 +246,12 @@
     if (!det) return;
     det.hidden = !det.hidden;
     bt.setAttribute('aria-expanded', String(!det.hidden));
+    var caixa = det.querySelector('.pgc-os-caixa'), bloco = bt.closest('.pgc');
+    if (!det.hidden && caixa && bloco) encher(caixa, urlCom(bloco.dataset.url, {cf: 'ativo', ca: caixa.dataset.ca}));
   });
 
-  // o Só atrasadas em partes: o "Mostrar mais" pede as 100 seguintes e as põe no fim da tabela
+  // o Só atrasadas em partes: o "Mostrar mais" pede a parte seguinte (o tamanho no data-pagina) e a põe no fim da
+  // tabela; no erro, o próprio botão é o "tentar de novo"
   document.addEventListener('click', function (ev) {
     var bt = ev.target.closest('.pgs-mais');
     if (!bt || bt.disabled) return;
@@ -224,7 +259,14 @@
     bt.disabled = true;
     if (msg) msg.textContent = 'Lendo…';
     ler(bt.dataset.url).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (!r.ok) {
+        bt.disabled = false;
+        var p = document.createElement('template');
+        p.innerHTML = falha(r, true);
+        if (msg) msg.innerHTML = p.content.firstChild.innerHTML;
+        if (r.status === 404) bt.parentNode.removeChild(bt);
+        return;
+      }
       var tpl = document.createElement('template');
       tpl.innerHTML = r.t;
       var tb = tpl.content.querySelector('tbody[data-proximo]');
@@ -235,7 +277,9 @@
       if (msg) msg.textContent = '';
       if (!restam) { bt.parentNode.removeChild(bt); return; }
       bt.dataset.url = urlCom(bt.dataset.url, {ap: tb.dataset.proximo});
-      bt.textContent = 'Mostrar mais ' + Math.min(restam, 100) + (restam > 100 ? ' de ' + restam.toLocaleString('pt-BR') + ' restantes' : '');
+      var pagina = parseInt(bt.dataset.pagina, 10) || 100;
+      bt.textContent = 'Mostrar mais ' + Math.min(restam, pagina).toLocaleString('pt-BR')
+        + (restam > pagina ? ' de ' + restam.toLocaleString('pt-BR') + ' restantes' : '');
       bt.disabled = false;
     }).catch(function (e) {
       bt.disabled = false;

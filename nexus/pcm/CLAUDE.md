@@ -1782,24 +1782,33 @@ atrasadas) e a Confiabilidade por ativo e o MTTR por equipe cluster. As contas: 
   (Visíveis, Finalizadas em verde com a dica do painel, `gestao.dica_finalizadas`, Em aberto, Atrasadas em vermelho: um
   link que liga e desliga o `atr=1`, marcado quando ligado). **A barra dos filtros é recolhível** (Levi: "suspenso e
   expandível"): fechada por padrão, uma linha com "Filtros", quantos valem e os escolhidos em etiquetas, cada uma com o ×
-  que tira só ela (`gestao.fichas`; o período sai inteiro); o clique abre a barra inteira e ela lembra se estava aberta
+  (alvo de 24 px) que tira só ela (`gestao.fichas`; o período sai inteiro; acima de 3 escolhas numa lista, uma etiqueta
+  só, "Usina: 12 selecionadas", cujo × tira a lista); o clique abre a barra inteira e ela lembra se estava aberta
   (`sessionStorage`, aplicado logo depois da barra para não piscar). Dentro, na ordem do painel, as 7 listas de várias
-  escolhas (o botão diz "Todos"/"Todas", o valor ou "N selecionados"; abre com busca, "Todos", "Limpar" e as caixinhas;
-  o padrão de revelar, com `aria-expanded`), OS #, Solicitação #, Período de/Até, Considerar (os rótulos do painel: Só
+  escolhas (o botão diz "Todos"/"Todas", o valor ou "N selecionados"/"N selecionadas", concordando com a lista; abre com
+  busca, "Todos", "Limpar" e as caixinhas; o padrão de revelar, com `aria-expanded`; a busca só ganha o foco com ponteiro
+  fino, porque no celular o teclado subia a cada abertura; acima de 640 px a lista tem ao menos 300 px e vira para a
+  esquerda quando passaria da borda), OS #, Solicitação #, Período de/Até, Considerar (os rótulos do painel: Só
   programada, Só início, Só final) e os botões Só atrasadas, **Limpar filtros** (o nome com "filtros" para não confundir
   com o "Limpar" de dentro de cada lista) e Relatório executivo (a Central de emissão, `/t/relatorios/pcm-executivo`,
   só para quem abre aquela tela). A lista **aplica ao fechar** (Esc, clique fora, o foco que sai), não a cada caixinha;
   **todas marcadas = sem filtro** (nada vai na URL: mandar as 143 usinas passaria do teto de 50); mais de 50 marcadas, a
-  lista avisa e não envia. OS, Solicitação e as datas aplicam ao Enter ou ao sair do campo (a data não envia a cada
-  dígito do ano); o Considerar sem data não envia. Os filtros antigos do topo saíram (estão na barra), e a busca do Plano
-  & Fila (`q`, que só vale nele) foi para a linha de controles dele, levando os filtros escondidos.
+  lista avisa e não envia. OS e Solicitação, e o período (de, até e o considerar), são grupos: aplicam ao Enter ou
+  quando o foco SAI do grupo (revisão de 05/11/2026: ir do "Período de" para o "Até" recarregava com meio período, também
+  no seletor de data do celular), nunca a cada dígito do ano; o Considerar sem data não envia. O Só atrasadas é um link,
+  e a barra o leva escondido (`atr`): sem isso, fechar uma lista ou sair de uma data o perdia. Os filtros antigos do topo
+  saíram (estão na barra), e a busca do Plano & Fila (`q`, que só vale nele) foi para a linha de controles dele, levando
+  os filtros escondidos.
   **As árvores:** cada nível é um `<details>`; o tipo pede a tabela à rota `arv` só na 1ª abertura ("Lendo…", e o erro
   com "Tentar de novo"); as "Não finalizadas no período" num bloco fechado com o número; até 60 tarefas a árvore vem
-  aberta com as tabelas. **O Só atrasadas vem em partes:** a página leva 100 linhas e o "Mostrar mais" pede as seguintes
-  ao mesmo endereço com `ap=<de onde seguir>` (`_gestao_atrasadas.html`, a mesma cópia; sem `atr=1`, 404): sem filtro
-  são ~2,2 mil linhas. As mensagens são as constantes `gestao.MSG_*`, as mesmas que a prova confere. **A OS abre o card
-  do Nexus em qualquer lugar da tela** (o painel lateral, a árvore, o Só atrasadas, a confiabilidade): um ouvinte só, no
-  `pcm-gestao.js` (antes o clique só valia dentro do painel lateral). **Abaixo de 640 px** a barra empilha e as tabelas
+  aberta com as tabelas. O erro de um pedaço diz o que houve: 404 é "a lista mudou: recarregue a página" (o robô
+  regravou o arquivo, e tentar de novo não adianta); outro erro mostra a mensagem do servidor, com o "Tentar de novo".
+  **O Só atrasadas vem em partes:** a página leva `gestao.PAGINA_ATRASADAS` (100) linhas e o "Mostrar mais" (o tamanho no
+  `data-pagina`, o "restantes" com o separador de milhar) pede as seguintes ao mesmo endereço com `ap=<de onde seguir>`
+  (`_gestao_atrasadas.html`, a mesma cópia; sem `atr=1`, 404): sem filtro são ~2,2 mil linhas. As mensagens são as
+  constantes `gestao.MSG_*`, as mesmas que a prova confere. **A OS abre o card do Nexus em qualquer lugar da tela** (o
+  painel lateral, a árvore, o Só atrasadas, a confiabilidade): um ouvinte só, no `pcm-gestao.js` (antes o clique só
+  valia dentro do painel lateral), com o foco do teclado à vista no número. **Abaixo de 640 px** a barra empilha e as tabelas
   da árvore, do Só atrasadas e da confiabilidade viram cartões (`pg-cartoes`, o rótulo no `data-r`; o valor quebra a
   linha: as etiquetas sem quebrar empurravam a página para 441 px, medido em 04/11); a matriz do Plano & Fila segue
   rolando dentro dela, e a página não rola de lado. O contexto que a A deixou (`filtros`, `listas`, `escolhas`,
@@ -1809,16 +1818,22 @@ atrasadas) e a Confiabilidade por ativo e o MTTR por equipe cluster. As contas: 
 - **A confiabilidade (parte C, 04/11/2026; `gestao_confiab.py`):** a "Confiabilidade por ativo" e o "Tempo médio de
   reparo por Equipe Cluster" do painel, com a **conta da Engenharia** (decisão do Levi): os números são os da tela
   Engenharia → Confiabilidade (`nexus/engenharia/confiabilidade.py`), na cópia de 5 min que a torre de lá já guarda
-  (`torres.engenharia._dados()`), sem calcular de novo nem ler o Fracttal (no painel vinham do `confiabilidade.json` do
-  robô, que casava o ativo pelo nome). Cliente ▸ Usina ▸ Ativo: no cliente, usinas e falhas; na usina, o MTBF, o MTTR e a
-  disponibilidade da Engenharia (as medianas dos ativos, `indicadores` por usina); a tabela da usina vem por fetch
-  (`?cf=usina&cc=&cu=`), os ativos de mais falhas primeiro, e cada ativo abre as OS dele (as mesmas da conta,
-  `porAtivo`), com as horas de reparo de cada uma (`confiabilidade.reparo_h`: a média da coluna é o MTTR do ativo). A
-  disponibilidade é verde na meta de 85% ou acima e vermelha abaixo (a regra de lá). **O MTTR do cluster é a média por
-  falha** (as horas de todas as falhas fechadas dos ativos do cluster ÷ quantas; cada falha pesa igual, como no MTTR do
-  ativo e no `mttr_de` do robô), o cluster do cadastro, os piores no topo, as usinas dentro com o MTTR (a mesma conta) e
-  as falhas (as da Engenharia, a aberta também; o número de fechadas vai na dica); até 24 h verde, até 72 h âmbar, acima
-  vermelho; a usina sem cluster no cadastro vai num grupo próprio, por último. **Os filtros:** cliente e cluster pelo nome
+  (`torres.engenharia._dados()`), sem calcular de novo (o Fracttal só é lido pela releitura que a torre já pede, no
+  máximo a cada 30 min; no painel os números vinham do `confiabilidade.json` do robô, que casava o ativo pelo nome).
+  Daqui só se guarda o índice e os resultados; a conta de lá vem a cada pedido, e a cópia velha (~5 MB) não fica presa.
+  Cliente ▸ Usina ▸ Ativo: no cliente, usinas e falhas; na usina, o MTBF, o MTTR e a disponibilidade da Engenharia, ditos
+  **"mediana dos N ativos"** (`indicadores` por usina); a tabela da usina vem por fetch (`?cf=usina&cc=&cu=`), os ativos
+  de mais falhas primeiro, e cada ativo pede as OS dele só quando abre (`?cf=ativo&ca=<código>`; uma usina de verdade tem
+  282 ativos e 1.090 OS de falha, ~1 MB se viessem com a usina): as mesmas da conta (`porAtivo`), com o **início do
+  trabalho** e as **horas de reparo**, que contam do INCIDENTE ao fim (`confiabilidade.reparo_h`; a regra fica na
+  legenda, à vista também no celular; a média da coluna é o MTTR do ativo). A disponibilidade é verde na meta de 85% ou
+  acima e vermelha abaixo (a regra de lá). **O MTTR do cluster é o "MTTR por falha"** (as horas de todas as falhas
+  fechadas dos ativos do cluster ÷ quantas; cada falha pesa igual, como no MTTR do ativo e no `mttr_de` do robô), o
+  cluster do cadastro, os piores no topo, as usinas dentro com o MTTR por falha (a mesma conta) e as falhas (as da
+  Engenharia, a aberta também; o número de fechadas vai na dica); até 24 h verde, até 72 h âmbar, acima vermelho. A mesma
+  usina tem então dois MTTR, e cada um diz qual é: a coluna "MTTR por falha (h)" e o "mediana dos ativos", com uma frase
+  em cada legenda (revisão de 05/11/2026). A usina sem cluster no cadastro ou sem ligação vai no grupo "Sem cluster no
+  cadastro (ou sem ligação)", por último. **Os filtros:** cliente e cluster pelo nome
   do cadastro, sem maiúscula; a usina pelo texto do Fracttal das OS dos ativos dela (a usina da Gestão é a Classificação
   1, "Cliente - Usina - UF", e a da Engenharia é o nome do cadastro; com os dados de 04/11, as 130 usinas da Gestão com OS
   de falha casaram todas pelo texto); a usina entra inteira ou fica fora, então os números dela são os da Engenharia. Os
@@ -1826,7 +1841,10 @@ atrasadas) e a Confiabilidade por ativo e o MTTR por equipe cluster. As contas: 
   vêm fechados e pedem o corpo quando abrem** (`?cf=conf|mttr`, com os filtros): a página não espera a conta da
   Engenharia; o "atualizado" é a hora da leitura das OS de falha. Sem a leitura completa (`os_falhas.estado()["completa"]`),
   nenhum número: "A leitura do Fracttal ainda não terminou: tente em alguns minutos." (número pela metade não vai para a
-  tela; a tela da Engenharia mostra com aviso). Quem vê é quem vê a Gestão PCM (a rota é a da tela). Testes:
+  tela; a tela da Engenharia mostra com aviso). **Sem o cadastro** (o `sem_cadastro` da cópia de lá), também nenhum
+  número: "O cadastro do Nexus não respondeu: tente em alguns minutos.", com o "Tentar de novo" e nada guardado (a conta
+  seguiria com os nomes do Fracttal, sem cluster e com a mobilização de 20/10/2025 para todas, e os filtros de cliente e
+  cluster parariam de casar). Quem vê é quem vê a Gestão PCM (a rota é a da tela). Testes:
   `tests/test_pcm_gestao_confiab.py`.
 
 - **O aviso de onde vêm os dados** (o `gestao_pcm.json` e, sem a chave, a nota da Gerencial) mora num ícone à direita

@@ -88,6 +88,8 @@
   </div>
   <form class="pg-filtros pgf-corpo" id="pgf-corpo" method="get" role="search" aria-label="Filtros" hidden>
     {% for k, v in ocultos %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    {# o Só atrasadas é um link, não um campo: sem isto, fechar uma lista ou sair de uma data o perdia (revisão de 05/11) #}
+    {% if filtros.atr %}<input type="hidden" name="atr" value="1">{% endif %}
     <div class="pgf-grade">
     {% for m in ms %}<div class="pgf-ms{{ ' on' if m.marcadas }}" data-nome="{{ m.nome }}" data-vazio="{{ m.vazio }}">
       <span class="pgf-rot" id="pgf-l-{{ m.nome }}">{{ m.rot }}</span>
@@ -408,13 +410,13 @@
    tarefas visíveis por cliente. As tabelas dos tipos vêm pela rota da tela (?arv=&ac=&au=&at=), na 1ª abertura ── #}
 {% if atrasadas is not none %}
 <section class="pgs" aria-labelledby="pgs-t">
-  <div class="pga-topo"><h2 class="pga-h" id="pgs-t">Atrasadas</h2> <span class="pga-badge pga-badge--crit">{{ atrasadas.total }}</span>
+  <div class="pga-topo"><h2 class="pga-h" id="pgs-t">Atrasadas</h2> <span class="pga-badge pga-badge--crit">{{ inteiro(atrasadas.total) }}</span>
     <span class="pga-dica">das mais velhas para as mais novas · vermelho = mais de {{ dias_alerta }} dias em aberto · só a visão principal (sem as não finalizadas no período)</span></div>
   {% if atrasadas.total %}
   <div class="pg-rolo pga-rolo"><table class="pg-tbl pgs-tbl pg-cartoes">
     <thead><tr><th>Dias</th><th>OS</th><th>Cliente</th><th>Usina</th><th>Tarefa</th><th>Tipo</th><th>Estado</th><th>Data Prog.</th><th>Etiqueta</th><th>Observação da OS</th></tr></thead>
     <tbody id="pgs-corpo">{% with linhas=atrasadas.linhas, parte=false %}{% include "pcm/_gestao_atrasadas.html" %}{% endwith %}</tbody></table></div>
-  {% if atrasadas.restam %}<p class="pgs-pe"><button type="button" class="pgf-bt pgs-mais" data-url="{{ url(ap=atrasadas.proximo) }}" aria-controls="pgs-corpo">Mostrar mais {{ [atrasadas.restam, 100]|min }}{% if atrasadas.restam > 100 %} de {{ atrasadas.restam }} restantes{% endif %}</button>
+  {% if atrasadas.restam %}<p class="pgs-pe"><button type="button" class="pgf-bt pgs-mais" data-url="{{ url(ap=atrasadas.proximo) }}" data-pagina="{{ pagina_atrasadas }}" aria-controls="pgs-corpo">Mostrar mais {{ inteiro([atrasadas.restam, pagina_atrasadas]|min) }}{% if atrasadas.restam > pagina_atrasadas %} de {{ inteiro(atrasadas.restam) }} restantes{% endif %}</button>
     <span class="pgs-msg" role="status"></span></p>{% endif %}
   {% else %}<p class="pga-vazio">{{ msg_sem_atrasada }}</p>{% endif %}
 </section>

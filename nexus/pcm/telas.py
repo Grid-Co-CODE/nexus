@@ -949,18 +949,20 @@ def _ctx_atrasadas(cfg, args) -> dict | None:
 
 def _confiab(args):
     """A Confiabilidade por ativo e o Tempo médio de reparo por Equipe Cluster (parte C, 04/11/2026), com a conta da
-    Engenharia (`gestao_confiab`): a página da Gestão não espera por ela, o bloco pede quando abre. Sem a leitura das OS de
-    falha completa, o pedaço diz que ela não terminou (200, sem número). cf ou usina que não existe = 404."""
+    Engenharia (`gestao_confiab`): a página da Gestão não espera por ela, o bloco pede quando abre. cf=conf | mttr |
+    usina (cc e cu: a tabela de uma usina) | ativo (ca: as OS de um ativo, só quando ele abre; uma usina grande tinha
+    1.090 OS no pedaço dela). Sem a leitura das OS de falha completa ou sem o cadastro, o pedaço diz por quê (200, sem
+    número). cf, usina ou ativo que não existe = 404."""
     cf = args.get("cf")
-    if cf not in ("conf", "mttr", "usina"):
+    if cf not in ("conf", "mttr", "usina", "ativo"):
         abort(404)
     try:
-        c = GC.copia()
+        c, aviso = GC.copia()
     except Exception as e:      # noqa: BLE001 — a conta da Engenharia falhou: o bloco diz, e a Gestão segue
         log.warning("gestão PCM: a confiabilidade não veio (%s: %s)", type(e).__name__, str(e)[:160])
         return render_template("pcm/_gestao_confiab.html", cf=cf, falhou=True), 503
     if c is None:
-        return render_template("pcm/_gestao_confiab.html", cf=cf, incompleta=GC.INCOMPLETA)
+        return render_template("pcm/_gestao_confiab.html", cf=cf, incompleta=aviso)
     comum = {"horas": GC.horas, "pct": GC.pct, "inteiro": GC.inteiro, "classe_disp": GC.classe_disp,
              "classe_mttr": GC.classe_mttr, "quando": c["quando"]}
     if cf == "usina":
@@ -968,6 +970,11 @@ def _confiab(args):
         if t is None:
             abort(404)
         return render_template("pcm/_gestao_confiab_usina.html", t=t, **comum)
+    if cf == "ativo":
+        oss = GC.os_do_ativo(c, str(args.get("ca") or "")[:120])
+        if oss is None:
+            abort(404)
+        return render_template("pcm/_gestao_confiab_ativo.html", oss=oss, **comum)
     f = G.filtros(args)
     if cf == "conf":
         return render_template("pcm/_gestao_confiab.html", cf=cf, clientes=GC.arvore(c, f), **comum)
@@ -976,19 +983,19 @@ def _confiab(args):
 
 # os parâmetros dos pedaços pedidos por fetch (a tabela de um tipo, o painel da célula, as partes do Só atrasadas e a
 # confiabilidade): nunca vão escondidos nos formulários da página
-_DOS_PEDACOS = ("pu", "pc", "arv", "ac", "au", "at", "ap", "cf", "cc", "cu")
+_DOS_PEDACOS = ("pu", "pc", "arv", "ac", "au", "at", "ap", "cf", "cc", "cu", "ca")
 
 
 def _ms(f, escolhas: dict) -> list[dict]:
     """As 7 listas de várias escolhas da barra (a ordem do painel): as opções em cascata, as marcadas e o rótulo do botão
-    ("Todos", o valor escolhido ou "N selecionados", como o `gpMsLabel` do painel)."""
+    ("Todos", o valor escolhido ou "N selecionados", como o `gpMsLabel` do painel, concordando com a lista)."""
     out = []
     for nome, _campo, rot, vazio in G.LISTAS:
         ops, sel = escolhas.get(nome) or [], getattr(f, nome)
         grafia = {v.lower(): v for v in ops}
         marcadas = [grafia.get(v.lower(), v) for v in sel]
         out.append({"nome": nome, "rot": rot, "vazio": vazio, "opcoes": ops, "marcadas": {v.lower() for v in sel},
-                    "rotulo": vazio if not sel else (marcadas[0] if len(sel) == 1 else f"{len(sel)} selecionados"),
+                    "rotulo": vazio if not sel else (marcadas[0] if len(sel) == 1 else G.selecionados(len(sel), vazio)),
                     "titulo": ", ".join(marcadas)})
     return out
 
@@ -1057,6 +1064,7 @@ def _ctx_gestao(cfg, args) -> dict:
                ocultos=[(k, v) for k, vs in pares.items() for v in vs if k not in G.PARAMS_FILTRO and k not in _DOS_PEDACOS],
                ocultos_busca=[(k, v) for k, vs in pares.items() for v in vs if k != "q" and k not in _DOS_PEDACOS],
                atrasadas=_parte_atrasadas(a["so_atrasadas"], 0) if a["so_atrasadas"] is not None else None,
+               pagina_atrasadas=G.PAGINA_ATRASADAS, inteiro=GC.inteiro,
                pode_exec=_pode_ver("/t/relatorios/pcm-executivo"), base_falhas=GC.BASE,
                nao_se_aplicam=GC.nao_se_aplicam(f))
     if o.modo == "plano":
