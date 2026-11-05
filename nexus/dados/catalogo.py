@@ -241,6 +241,22 @@ FATOS = (
                     "também conta como ler); mencoes_pessoas = os códigos do e-mail (pessoa_hmac) mencionados e "
                     "mencoes_areas = as torres mencionadas, separados por vírgula. O nome de quem escreveu e o texto "
                     "só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
+    # 05/11/2026 (Levi: "Quero que no OS Creator > Performance tenha um campo para subtarefas, que vamos poder editar as
+    # subtarefas padrões de cada atividade!"): o padrão editado de cada atividade, que toda OS nova dela já leva. O plano
+    # do Fracttal não muda. Registrado antes da 1ª gravação
+    Fato("versao_subtarefas", "Versão das subtarefas padrão de uma atividade da Performance", "performance",
+         "nexus_subtarefas_performance · fato_versao_subtarefas",
+         "1 linha = 1 versão salva da lista de subtarefas de 1 atividade da Performance no OS Creator (salvou) ou a volta "
+         "dela ao plano do Fracttal (voltou_ao_fracttal)",
+         _d(data=("id", "data_id (o dia de Brasília em que a versão foi salva)"),
+            pessoa=("id", "pessoa_hmac de quem salvou (o código do e-mail do login do Fracttal)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_subtarefas_performance · fato_versao_subtarefas",),
+         janela_origem="o Nexus é a fonte (só acrescenta: a versão em vigor é a última de cada atividade)",
+         observacao="atividade = a frase do plano da Performance (inspecao geral do inversor, recomposicao de string, "
+                    "verificacao de tracker parado, coleta de dados de geracao): dimensão degenerada; subtarefas_json = "
+                    "a lista em ordem, cada uma com o texto (desc), o tipo (texto, simnao, verif, num ou lista), se exige "
+                    "anexo e a subtarefa do plano de onde veio (origem); n_subtarefas = o tamanho dela. O nome de quem "
+                    "salvou só cifrado (Cofre). Nada se edita nem se apaga"),
     # 04/11/2026 (Levi: "notificações para OSs abertas por mim ... e tem que ter um botão de marcar como lida!"): os avisos
     # das OS de cada pessoa no sino. Registrado antes da 1ª gravação
     Fato("evento_aviso", "Aviso de OS gerado ou lido", "base", "nexus_avisos · fato_evento_aviso",
@@ -1539,6 +1555,12 @@ LIVROS = (
           "a cada solicitação aprovada no OS Creator e a cada Marcar como lida no sino",
           "nexus/comando/avisos.py, pelo sino do topo e pela aprovação da Fila do PCM (rotas_solic.AO_APROVAR)", False,
           "registrado em 04/11/2026 antes da 1ª gravação (regra 10): nasce no 1º aviso de solicitação ou de lido",
+          so_cresce=True),
+    Livro("nexus_subtarefas_performance", ("fato_versao_subtarefas",),
+          "a cada Salvar padrão ou Voltar ao do Fracttal das subtarefas de uma atividade da Performance",
+          "nexus/torres/oscreator/subtarefas_padrao.py, pela tela de criar OS da Performance no OS Creator "
+          "(perf_web.SUBTAREFAS_PADRAO)", False,
+          "registrado em 05/11/2026 antes da 1ª gravação (regra 10): nasce no 1º padrão salvo",
           so_cresce=True),
     Livro("nexus_sugestoes", ("fato_sugestao", "fato_status_sugestao"),
           "a cada sugestão mandada e a cada mudança de status (Início > Sugestões)",

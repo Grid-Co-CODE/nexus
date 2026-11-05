@@ -374,6 +374,17 @@ body.os-form .os-sub .s-x{width:34px;padding:0;display:flex;align-items:center;j
 .os-sub .os-check{height:34px}
 .os-subs-lista{margin:6px 0 0;padding-left:20px;color:#e6e8ef;font-size:13px}
 .os-subs-lista li{margin:3px 0}
+/* as subtarefas padrão da atividade na Performance (05/11/2026): a linha do editor ganha subir e descer, e o tipo ao lado */
+.perf-sub{grid-template-columns:minmax(0,1fr) 150px auto 34px 34px 34px}
+.perf-sub input,.perf-sub select{min-width:0}         /* o tipo comprido ("Lista (do plano)") não empurra a linha */
+#w_subs [hidden]{display:none!important}             /* o .os-btn tem display próprio, que venceria o hidden */
+.perf-sub-tag{color:var(--muted);font-size:11.5px;margin-left:4px}
+@media (max-width:640px){
+  .perf-sub{grid-template-columns:minmax(0,1fr) auto 30px 30px 30px;gap:6px}
+  .perf-sub .s-desc{grid-column:1/-1}
+  body.os-form .perf-sub .s-x{width:30px}
+  .perf-sub-exige{display:none}                       /* no celular, "anexo": o tipo ganha o espaço */
+}
 /* o painel de contagem: três números clicáveis que também são o filtro da tabela */
 .os-painel{display:flex;gap:10px;flex-wrap:wrap}
 .os-painel-card{display:flex;flex-direction:column;gap:2px;min-width:132px;padding:10px 14px;background:var(--f-card);border:1px solid var(--f-border);border-radius:12px;text-decoration:none}

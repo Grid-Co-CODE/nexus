@@ -376,6 +376,11 @@ def _criar_clone(app):
 
     from ..chamados import ufv
     rotas_acomp.RESPONSAVEL_UFV = ufv.ligar(app)
+    # as subtarefas padrão de cada atividade da Performance, no livro do Nexus (05/11/2026; subtarefas_padrao.py)
+    from os_web import perf_web
+
+    from . import subtarefas_padrao
+    perf_web.SUBTAREFAS_PADRAO = subtarefas_padrao.ligar(app)
     # o original fala http com a plataforma na mesma máquina; aqui o cookie segue o do Nexus (Secure no servidor)
     clone.config["SESSION_COOKIE_SECURE"] = bool(app.config.get("SESSION_COOKIE_SECURE"))
     # e mora no /os do Nexus, debaixo do prefixo em que ele roda (o clone fixa "/os", que debaixo de /nexus não ia ao

@@ -443,6 +443,96 @@
     } catch (e) { /* sem a plataforma aqui: a OS segue criada, só sem o comentário */ }
   }
 
+  // ── As subtarefas padrão da atividade (05/11/2026; Levi: "Quero que no OS Creator > Performance tenha um campo para
+  //    subtarefas, que vamos poder editar as subtarefas padrões de cada atividade!"). O bloco mostra a lista que a OS leva
+  //    (o padrão do Nexus ou a do plano do Fracttal) e a edita; o Salvar padrão vale para todo mundo, a partir da próxima
+  //    OS. Sem janela de confirmação: o aviso de que vale para todos fica escrito ao lado do botão.
+  const subs = {estado: null};
+  const wSubs = $('w_subs'), subsLista = $('subs_lista'), subsOrigem = $('subs_origem'), subsEd = $('subs_ed'),
+        subsLinhas = $('subs_linhas'), subsErro = $('subs_erro'), bSubsEditar = $('b_subs_editar');
+  const SUBS_BOTOES = ['b_subs_salvar', 'b_subs_fracttal', 'b_subs_cancelar'];
+  function rotuloTipo(it) {
+    if (it.tipo === 'plano') return (it.tipo_rotulo || 'Tipo') + ' (do plano)';
+    const t = ((subs.estado && subs.estado.tipos) || []).find((x) => x[0] === it.tipo);
+    return t ? t[1] : it.tipo;
+  }
+  function subsMostrar(e) {
+    subs.estado = e;
+    const lista = e.lista || [];
+    subsLista.innerHTML = lista.map((it) => '<li>' + esc(it.desc) + ' <small class="perf-sub-tag">' + esc(rotuloTipo(it)) + '</small>'
+      + (it.anexo ? ' <small class="perf-sub-tag">exige anexo</small>' : '') + '</li>').join('');
+    let origem = e.origem === 'nexus'
+      ? 'Padrão do Nexus' + (e.por ? ', salvo por ' + e.por : '') + (e.quando ? ' em ' + e.quando : '') + '.'
+      : 'Do plano do Fracttal.';
+    if (!lista.length) origem = 'Não achei o plano desta atividade no Fracttal.';
+    subsOrigem.textContent = origem + (e.erro ? ' ' + e.erro : '');
+    subsOrigem.classList.toggle('os-erro', !!e.erro);
+    bSubsEditar.hidden = !e.pode_salvar;
+    subsLista.hidden = false; subsEd.hidden = true;
+  }
+  function subsCarregar() {
+    fetch('/os/api/performance/subtarefas?frase=' + encodeURIComponent(FRASE), {credentials: 'same-origin'})
+      .then((r) => r.json().then((j) => ({r, j})))
+      .then(({r, j}) => { if (r.ok) subsMostrar(j); else subsOrigem.textContent = 'Não carreguei as subtarefas: ' + apiErro(j, r); })
+      .catch((e) => { subsOrigem.textContent = 'Não carreguei as subtarefas: ' + e; });
+  }
+  function subsLinha(it) {
+    const tipos = (subs.estado && subs.estado.tipos) || [];
+    let ops = tipos.map((t) => '<option value="' + esc(t[0]) + '"' + (t[0] === it.tipo ? ' selected' : '') + '>' + esc(t[1]) + '</option>').join('');
+    if (it.tipo === 'plano') ops += '<option value="plano" selected>' + esc(rotuloTipo(it)) + '</option>';
+    const row = document.createElement('div'); row.className = 'os-sub perf-sub';
+    row.dataset.origem = it.origem || ''; row.dataset.tipoRotulo = it.tipo_rotulo || '';
+    row.innerHTML = '<input type="text" class="s-desc" maxlength="' + ((subs.estado && subs.estado.max_texto) || 250) + '" value="'
+      + esc(it.desc || '') + '" placeholder="Texto da subtarefa" aria-label="Texto da subtarefa">'
+      + '<select class="s-tipo" aria-label="Tipo da subtarefa">' + ops + '</select>'
+      + '<label class="os-check"><input type="checkbox" class="s-anexo"' + (it.anexo ? ' checked' : '') + '><span class="perf-sub-exige">Exige </span>anexo</label>'
+      + '<button type="button" class="os-btn secondary s-x" data-acao="subir" title="Subir" aria-label="Subir">↑</button>'
+      + '<button type="button" class="os-btn secondary s-x" data-acao="descer" title="Descer" aria-label="Descer">↓</button>'
+      + '<button type="button" class="os-btn secondary s-x" data-acao="tirar" title="Tirar" aria-label="Tirar">✕</button>';
+    return row;
+  }
+  function subsEditar() {
+    subsLinhas.innerHTML = '';
+    ((subs.estado && subs.estado.lista) || []).forEach((it) => subsLinhas.appendChild(subsLinha(it)));
+    if (!subsLinhas.children.length) subsLinhas.appendChild(subsLinha({desc: '', tipo: 'texto'}));
+    subsErro.hidden = true;
+    $('b_subs_fracttal').hidden = !subs.estado || subs.estado.origem !== 'nexus';
+    subsLista.hidden = true; subsEd.hidden = false; bSubsEditar.hidden = true;
+  }
+  function subsDaTela() {
+    return [...subsLinhas.querySelectorAll('.perf-sub')].map((r) => {
+      const it = {desc: r.querySelector('.s-desc').value.trim(), tipo: r.querySelector('.s-tipo').value,
+                  anexo: r.querySelector('.s-anexo').checked, origem: r.dataset.origem || null};
+      if (it.tipo === 'plano') it.tipo_rotulo = r.dataset.tipoRotulo || '';
+      return it;
+    }).filter((it) => it.desc);
+  }
+  function subsSalvar(corpo) {
+    subsErro.hidden = true;
+    SUBS_BOTOES.forEach((id) => { $(id).disabled = true; });
+    fetch('/os/api/performance/subtarefas', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(Object.assign({frase: FRASE}, corpo))})
+      .then((r) => r.json().then((j) => ({r, j})))
+      .then(({r, j}) => { if (r.ok) subsMostrar(j); else { subsErro.textContent = apiErro(j, r); subsErro.hidden = false; } })
+      .catch((e) => { subsErro.textContent = String(e); subsErro.hidden = false; })
+      .finally(() => { SUBS_BOTOES.forEach((id) => { $(id).disabled = false; }); });
+  }
+  if (wSubs) {
+    bSubsEditar.onclick = subsEditar;
+    $('b_subs_cancelar').onclick = () => subsMostrar(subs.estado);
+    $('b_subs_mais').onclick = () => { const r = subsLinha({desc: '', tipo: 'texto'}); subsLinhas.appendChild(r); r.querySelector('.s-desc').focus(); };
+    $('b_subs_salvar').onclick = () => subsSalvar({lista: subsDaTela()});
+    $('b_subs_fracttal').onclick = () => subsSalvar({voltar: true});
+    subsLinhas.addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-acao]'); if (!b) return;
+      const row = b.closest('.perf-sub');
+      if (b.dataset.acao === 'tirar') { if (subsLinhas.children.length > 1) row.remove(); else row.querySelector('.s-desc').value = ''; }
+      else if (b.dataset.acao === 'subir' && row.previousElementSibling) subsLinhas.insertBefore(row, row.previousElementSibling);
+      else if (b.dataset.acao === 'descer' && row.nextElementSibling) subsLinhas.insertBefore(row.nextElementSibling, row);
+    });
+    subsCarregar();
+  }
+
   // arranque: modo do deep link, usina sugerida e responsáveis
   if (TEM_MODOS && (sug.modo === 'etm' || sug.modo === 'usina')) setModo(sug.modo); else setModo('geracao');
   carregarResp();

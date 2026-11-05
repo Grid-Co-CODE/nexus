@@ -81,6 +81,7 @@ def cli(monkeypatch):
         raise AssertionError("o teste tentou ir à rede")
     monkeypatch.setattr(requests.Session, "request", sem_rede)
     monkeypatch.setattr(api, "load_assets_cached", lambda *a, **k: [])
+    monkeypatch.setattr(perf_web, "SUBTAREFAS_PADRAO", None)       # o gancho do Nexus que outro teste ligou não vale aqui
     chamadas = []
     monkeypatch.setattr(api, "create_performance_os_agrupada", lambda itens, **kw: chamadas.append(("agrupada", itens, kw)) or {
         "ok": True, "folio": "16001", "n_criadas": len(itens), "erros": [], "img_erro": [], "tickets": []})

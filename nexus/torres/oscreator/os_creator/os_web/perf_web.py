@@ -382,9 +382,9 @@ def mensagem_agrupada(res: dict, frase: str = "", gerar_ticket: bool = True) -> 
             "detalhes": det, "alerta": bool(det or not folio)}
 
 
-def contar_subtarefas(assets: list) -> dict:
-    """{frase: [nomes das subtarefas]} de cada plano — espelho de `_contar_subtarefas` do app. Amostra: 1 ativo de
-    cada tipo relevante (Inversor, Estação, tracker generalizado). Best-effort: plano não achado → fora do dict."""
+def _planos_de_amostra(assets: list) -> dict:
+    """{frase: (id_task, id_item)} do plano de cada atividade, por uma amostra: 1 ativo de cada tipo relevante (Inversor,
+    Estação, tracker generalizado). Best-effort: plano não achado → fora do dict."""
     inv = next((a for a in assets if a.get("tipo") == "Inversor"), None)
     est = next((a for a in assets if a.get("tipo") == ETM_TIPO), None)
     trk = next((a for a in assets if api._eh_tracker_generalizado(a)), None)
@@ -392,13 +392,84 @@ def contar_subtarefas(assets: list) -> dict:
     if not sample:
         return {}
     plans = api.get_plans_for_assets(sample)
-    pares, frase_task = [], {}
+    out = {}
     for entry in PLANOS:
         frase = entry["frase"]
         fn = api._norm_txt(frase)
         p = next((pl for pl in plans if fn in api._norm_txt(pl.get("description"))), None)
         if p and p.get("asset"):
-            frase_task[frase] = p["id_task"]
-            pares.append((p["id_task"], p["asset"]["id"]))
-    nomes = api.get_subtask_names(pares)
-    return {frase: nomes[tid] for frase, tid in frase_task.items() if nomes.get(tid) is not None}
+            out[frase] = (p["id_task"], p["asset"]["id"])
+    return out
+
+
+def contar_subtarefas(assets: list) -> dict:
+    """{frase: [nomes das subtarefas]} de cada plano — espelho de `_contar_subtarefas` do app (`_planos_de_amostra`)."""
+    frase_par = _planos_de_amostra(assets)
+    nomes = api.get_subtask_names(list(frase_par.values()))
+    return {frase: nomes[par[0]] for frase, par in frase_par.items() if nomes.get(par[0]) is not None}
+
+
+# ── As subtarefas padrão de cada atividade (05/11/2026) ─────────────────────────────────────────────────────────────
+# Levi: "Quero que no OS Creator > Performance tenha um campo para subtarefas, que vamos poder editar as subtarefas padrões
+# de cada atividade!"; "Quando criamos uma OS as atividades já vem com aquelas subtarefas"; quem muda: "Qualquer um". A tela
+# de criar OS mostra a lista da atividade e a edita; o salvo vale para toda OS nova dela, para todo mundo. A ponte põe aqui o
+# gancho do Nexus (`nexus/torres/oscreator/subtarefas_padrao.py`: `atual`, `salvar`, `voltar`, `Recusada`); sem ele (o OS
+# Creator sozinho), a lista é a do plano e não se salva.
+SUBTAREFAS_PADRAO = None
+# os tipos do editor de Temas da Solicitação (`solic_web.TIPOS_SUB`), e o do plano que o editor não monta
+TIPOS_SUB = [("texto", "Texto"), ("simnao", "Sim/Não"), ("verif", "Verificação"), ("num", "Numérico")]
+TIPO_DO_PLANO = "plano"
+MAX_SUBTAREFAS = 40
+MAX_TEXTO = 250
+
+
+def subtarefas_do_fracttal(frase: str, assets: list) -> list:
+    """A lista que a OS da atividade leva sem padrão salvo: as subtarefas do plano do Fracttal (pela amostra) mais as do
+    app (`com_subtarefas_extra`), no formato do editor. Vazia quando o plano não foi achado."""
+    par = _planos_de_amostra(assets).get(frase)
+    if not par:
+        return []
+    plano = api.com_subtarefas_extra(api.get_plan_details(*par))
+    return api.subtarefas_para_editor(plano.get("subtasks") or [])
+
+
+def com_aviso(msg: dict, aviso: str) -> dict:
+    """O resultado da criação com mais um aviso no fim, em palavra e em cor (`alerta`); sem aviso, o mesmo."""
+    if not aviso:
+        return msg
+    return dict(msg, mensagem=(msg.get("mensagem") or "") + "\n\n" + aviso, alerta=True)
+
+
+def validar_lista(bruta) -> tuple[list, str]:
+    """A lista que a tela mandou salvar → (a lista limpa, "") ou ([], o motivo). Texto obrigatório e sem repetir (sem acento
+    e sem caixa), no máximo MAX_SUBTAREFAS, cada texto com até MAX_TEXTO letras; o tipo de um dos TIPOS_SUB ou o do plano
+    (só a subtarefa que veio do plano, com a `origem`)."""
+    if not isinstance(bruta, list) or not bruta:
+        return [], "A lista de subtarefas não pode ficar vazia."
+    if len(bruta) > MAX_SUBTAREFAS:
+        return [], "No máximo %d subtarefas." % MAX_SUBTAREFAS
+    tipos = {k for k, _r in TIPOS_SUB}
+    out, vistos = [], set()
+    for n, it in enumerate(bruta, 1):
+        if not isinstance(it, dict):
+            return [], "A subtarefa %d veio sem texto." % n
+        desc = re.sub(r"\s+", " ", str(it.get("desc") or "")).strip()
+        if not desc:
+            return [], "A subtarefa %d está sem texto." % n
+        if len(desc) > MAX_TEXTO:
+            return [], "A subtarefa %d passa de %d letras." % (n, MAX_TEXTO)
+        chave = api._norm_txt(desc)
+        if chave in vistos:
+            return [], "A subtarefa \"%s\" aparece duas vezes." % desc
+        vistos.add(chave)
+        origem = str(it.get("origem") or "").strip()[:64] or None
+        tipo = str(it.get("tipo") or "texto")
+        if tipo == TIPO_DO_PLANO and not origem:
+            tipo = "texto"
+        if tipo not in tipos and tipo != TIPO_DO_PLANO:
+            return [], "A subtarefa %d tem um tipo que não existe." % n
+        item = {"desc": desc, "tipo": tipo, "anexo": bool(it.get("anexo")), "origem": origem}
+        if tipo == TIPO_DO_PLANO:
+            item["tipo_rotulo"] = str(it.get("tipo_rotulo") or "do plano").strip()[:40]
+        out.append(item)
+    return out, ""

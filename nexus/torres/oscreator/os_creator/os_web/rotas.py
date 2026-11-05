@@ -466,7 +466,82 @@ def api_contagens():
                   lambda: perf_web.contar_subtarefas(api.load_assets_cached()))
     except Exception as e:                              # noqa: BLE001 — a contagem é enfeite do card
         return jsonify({"contagens": {}, "erro": str(e)})
+    # a atividade com padrão salvo no Nexus (05/11/2026) conta as subtarefas dele, que são as que a OS leva
+    d = dict(d)
+    for p in perf_web.PLANOS:
+        lista = _padrao_da_atividade(p["frase"]).get("lista")
+        if lista:
+            d[p["frase"]] = [x.get("desc") for x in lista]
     return jsonify({"contagens": d})
+
+
+def _padrao_da_atividade(frase: str) -> dict:
+    """O padrão do Nexus da atividade (`perf_web.SUBTAREFAS_PADRAO.atual`): {"lista" (None = a do plano), "evento", "quando",
+    "por", "erro"}. Sem o gancho (o OS Creator sozinho), a do plano, sem erro; o gancho que falha vira `erro`."""
+    gancho = perf_web.SUBTAREFAS_PADRAO
+    if gancho is None:
+        return {"lista": None, "evento": "", "quando": "", "por": "", "erro": ""}
+    try:
+        return gancho.atual(frase)
+    except Exception as e:                              # noqa: BLE001 — quem pediu decide o que dizer
+        return {"lista": None, "evento": "", "quando": "", "por": "", "erro": "%s: %s" % (type(e).__name__, str(e)[:160])}
+
+
+def _subtarefas_da_atividade(frase: str) -> dict:
+    """O que o bloco "Subtarefas da atividade" mostra: a lista em vigor (o padrão do Nexus ou a do plano), de onde ela vem,
+    quem salvou e quando, a do plano (para o "Voltar ao do Fracttal") e os tipos do editor."""
+    padrao = _padrao_da_atividade(frase)
+    erro = ""
+    try:
+        do_plano = _memo(("perf_subs_plano", frase), CONTAGENS_TTL_S,
+                         lambda: perf_web.subtarefas_do_fracttal(frase, api.load_assets_cached()))
+    except Exception as e:                              # noqa: BLE001 — sem o plano, mostra o padrão (se houver) e diz
+        do_plano, erro = [], "Não consegui ler o plano no Fracttal (%s)." % str(e)[:120]
+    if padrao.get("erro"):
+        erro = ("Não consegui ler o padrão salvo no Nexus agora (%s): a OS sai com as subtarefas do plano do Fracttal."
+                % padrao["erro"][:120])
+    return {"frase": frase, "lista": padrao.get("lista") or do_plano, "origem": "nexus" if padrao.get("lista") else "fracttal",
+            "quando": padrao.get("quando") or "", "por": padrao.get("por") or "", "evento": padrao.get("evento") or "",
+            "do_plano": do_plano, "tipos": perf_web.TIPOS_SUB, "pode_salvar": perf_web.SUBTAREFAS_PADRAO is not None,
+            "max": perf_web.MAX_SUBTAREFAS, "max_texto": perf_web.MAX_TEXTO, "erro": erro}
+
+
+@bp.route("/api/performance/subtarefas")
+@exige_sessao
+def api_perf_subtarefas():
+    plano = perf_web.plano_por_frase(request.args.get("frase") or "")
+    if not plano:
+        return jsonify({"erro": "Atividade desconhecida."}), 400
+    return jsonify(_subtarefas_da_atividade(plano["frase"]))
+
+
+@bp.route("/api/performance/subtarefas", methods=["POST"])
+@exige_sessao
+def api_perf_subtarefas_salvar():
+    """Salvar padrão (`lista`) ou Voltar ao do Fracttal (`voltar`): vale para toda OS nova da atividade, para todo mundo
+    (Levi, 05/11/2026: quem muda é "Qualquer um"). Quem salvou e quando ficam no livro do Nexus."""
+    corpo = request.get_json(silent=True) or {}
+    plano = perf_web.plano_por_frase(corpo.get("frase") or "")
+    if not plano:
+        return jsonify({"erro": "Atividade desconhecida."}), 400
+    gancho = perf_web.SUBTAREFAS_PADRAO
+    if gancho is None:
+        return jsonify({"erro": "Este OS Creator não está ligado ao banco do Nexus: o padrão não pode ser salvo."}), 503
+    conta = session.get("conta") or {}
+    try:
+        if corpo.get("voltar"):
+            gancho.voltar(plano["frase"], conta)
+        else:
+            lista, erro = perf_web.validar_lista(corpo.get("lista"))
+            if erro:
+                return jsonify({"erro": erro}), 400
+            gancho.salvar(plano["frase"], lista, conta)
+    except gancho.Recusada as e:
+        return jsonify({"erro": str(e)}), 400
+    except Exception as e:                              # noqa: BLE001 — o banco fora: nada foi salvo, e a tela diz
+        current_app.logger.exception("subtarefas padrão: não gravou")
+        return jsonify({"erro": "Não consegui gravar no banco do Nexus (%s). Nada foi salvo." % type(e).__name__}), 502
+    return jsonify(_subtarefas_da_atividade(plano["frase"]))
 
 
 @bp.route("/api/responsaveis")
@@ -490,6 +565,13 @@ def api_performance_criar():
         cheio = catalogo.get(it["asset"].get("id"))
         if cheio:
             it["asset"] = cheio
+    # as subtarefas padrão da atividade (05/11/2026): o salvo no Nexus vai no lugar das do plano; sem conseguir ler o
+    # padrão, a OS sai com as do plano e a tela diz
+    plano = perf_web.plano_por_frase(corpo.get("frase") or "")
+    padrao = _padrao_da_atividade(plano["frase"]) if plano else {}
+    kwargs["subtarefas_padrao"] = padrao.get("lista")
+    aviso_padrao = ("Não consegui ler as subtarefas padrão do Nexus agora: a OS saiu com as subtarefas do plano do "
+                    "Fracttal." if padrao.get("erro") else "")
     if perf_web.quer_agrupar(corpo):
         # "Agrupar em UMA OS com várias tarefas" (Levi, 13/10/2026, como no app: `PerfCriar._criar`): o mesmo `itens`,
         # com a OS pai e o título únicos, e a observação da OS inteira
@@ -497,12 +579,14 @@ def api_performance_criar():
         lista_central.criadas(res)                      # a OS criada entra na lista central na hora (31/10/2026)
         # `comentario` (03/11/2026): o nº, o ativo e a observação de cada OS que saiu, para a página gravar o comentário
         # automático na Plataforma de Performance (perf.js, `comentarNaPlataforma`)
-        return jsonify(dict(perf_web.mensagem_agrupada(res, corpo.get("frase") or "", bool(corpo.get("gerar_ticket", True))),
+        msg = perf_web.mensagem_agrupada(res, corpo.get("frase") or "", bool(corpo.get("gerar_ticket", True)))
+        return jsonify(dict(perf_web.com_aviso(msg, aviso_padrao),
                             comentario=perf_web.criadas_para_comentario(itens, res, corpo, True)))
     res = api.create_performance_os(itens, **kwargs)
     lista_central.criadas(res)
     # a frase e a caixa vao junto: e delas que sai o "N tickets criados na aba X" (e o "sem ticket")
-    return jsonify(dict(perf_web.mensagem_resultado(res, corpo.get("frase") or "", bool(corpo.get("gerar_ticket", True))),
+    msg = perf_web.mensagem_resultado(res, corpo.get("frase") or "", bool(corpo.get("gerar_ticket", True)))
+    return jsonify(dict(perf_web.com_aviso(msg, aviso_padrao),
                         comentario=perf_web.criadas_para_comentario(itens, res, corpo, False)))
 
 
