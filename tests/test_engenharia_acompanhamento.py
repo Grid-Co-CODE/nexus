@@ -66,7 +66,9 @@ def _aid_de(cod):
 
 def _lista(html):
     """A lista da aba (os cartões), sem a gaveta nem os filtros."""
-    return html.split('<div class="eg-itens">', 1)[1].split("</section>", 1)[0] if 'class="eg-itens"' in html else ""
+    if 'class="eg-itens' not in html:
+        return ""
+    return html.split('class="eg-itens', 1)[1].split(">", 1)[1].split("</section>", 1)[0]
 
 
 def _dec(fracttal_id, setor_id, hmac, quando):

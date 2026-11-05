@@ -149,7 +149,7 @@ def _pct(x) -> str:
     return "—" if x is None else f"{100 * x:.1f}".replace(".", ",") + "%"
 
 
-def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
+def _gavetas_e_listas(d: dict, f: dict, aba: str) -> dict:
     """O acompanhamento na Confiabilidade (18/10/2026; desenho em docs/superpowers/specs/2026-10-18-engenharia-
     acompanhamento-design.md): as três listas das abas, com os filtros, e a gaveta de cada cartão da aba aberta."""
     from ...dados.equipamento import canon
@@ -174,7 +174,7 @@ def _gavetas_e_listas(d: dict, f: dict, esconder: bool, aba: str) -> dict:
                 and (not f["fam"] or a.get("fam") == f["fam"]) and (not f["crit"] or a.get("crit") == f["crit"])
                 and (not f["nivel"] or nivel == f["nivel"]) and (quem is None or not f["quem"] or quem == f["quem"])
                 and (not q or q in f"{a.get('cod')} {a.get('nome')} {a.get('usina')} {a.get('cliente')}".lower()))
-    sinais = [s for s in sep["sinal"] if passa(s, s.get("nivel")) and not (esconder and s["soServico"])]
+    sinais = [s for s in sep["sinal"] if passa(s, s.get("nivel"))]
     # em acompanhamento vale o nível de agora; no encerrado, o da entrada (encerrado quase nunca tem sinal agora)
     abertos = [dict(x, a=ativo_de(x)) for x in sep["aberto"]
                if passa(ativo_de(x), (x["ativo"] or {}).get("nivel"), x["acomp"]["responsavel"]["hmac"])]
@@ -315,7 +315,6 @@ def confiabilidade():
     pode, meu = _quem_pode()
     abas = tuple(x for x in ABAS if x[0] != "diagnosticos" or pode)
     f = {k: request.args.get(k, "") for k in ("cliente", "usina", "fam", "crit", "nivel", "q", "quem")}
-    esconder = request.args.get("servico") == "0"
     aba = request.args.get("aba") if request.args.get("aba") in dict(abas) else "ativos"
     q = f["q"].strip().lower()
 
@@ -325,7 +324,7 @@ def confiabilidade():
                 and (not com_nivel or not f["nivel"] or a.get("nivel") == f["nivel"])
                 and (not q or q in f"{a['cod']} {a['nome']} {a.get('usina')} {a.get('cliente')}".lower()))
     # todos os ativos com sinal (acompanhados ou não): o painel ao lado e a faixa descrevem a frota (escolha de 18/10)
-    todos = [a for a in d["sinais"] if passa(a) and not (esconder and a["soServico"])]
+    todos = [a for a in d["sinais"] if passa(a)]
     ativos = [a for a in d["ativos"] if passa(a, com_nivel=False)]
     por = request.args.get("por") if request.args.get("por") in ("cliente", "usina") else "cliente"
     clientes = sorted({a.get("cliente") for a in d["ativos"] + d["sinais"] if a.get("cliente")})
@@ -338,11 +337,11 @@ def confiabilidade():
         x["sinais"] += 1
         x["criticos"] += a["nivel"] == "critico"
     top_clientes = sorted(por_cliente.values(), key=lambda x: (-x["sinais"], -x["criticos"], x["nome"]))[:6]
-    ac = _gavetas_e_listas(d, f, esconder, aba)
+    ac = _gavetas_e_listas(d, f, aba)
     return render_template(
         "engenharia/confiabilidade.html", fams=d.get("familias") or [], crit_dist=d.get("critDist") or {},
         top_clientes=top_clientes, torre=TORRE, tela=TORRE.tela("confiabilidade"), d=d, k=d["kpi"],
-        todos=todos, total_sinais=len(d["sinais"]), ativos=ativos, f=f, esconder=esconder, aba=aba, abas=abas,
+        todos=todos, total_sinais=len(d["sinais"]), ativos=ativos, f=f, aba=aba, abas=abas,
         por=por, indicadores=C.indicadores(ativos, todos, por) if aba == "indicadores" else [],
         clientes=clientes, usinas=usinas, familias=C.FAMILIAS, niveis=C.NIVEIS, meta=C.META_DISP,
         janela=C.JANELA_DIAS, url=_url, h=_h, pct=_pct, est=os_falhas.estado(), sem_cadastro=g.get("sem_cadastro"),

@@ -21,6 +21,7 @@
     // data-gaveta abrem o <template> do mesmo id; os formulários data-eg-form gravam por fetch e a resposta (a gaveta
     // de novo, com o aviso ou o erro) vira o conteúdo; ao fechar depois de gravar, a página recarrega.
     ligar: function () {
+        limita(); w.addEventListener('resize', limita);
         // a gaveta do ativo: o clique no cartão copia o detalhe dele para a gaveta lateral (sem animação). Desde 18/10/2026
         // ela traz o acompanhamento: os formulários gravam sem sair dela (a resposta é a gaveta de novo) e, ao fechar
         // depois de gravar, a página recarrega (as listas e os números das abas mudaram)
@@ -141,4 +142,14 @@
         }
     }
   };
+  // a lista que mostra N e rola na própria caixa ([data-eg-max]: os Críticos sem dono da Mesa, 6; os Ativos com sinal da
+  // Confiabilidade, 20; Levi, 30/10 e 05/11/2026): a altura dos N primeiros, medida
+  function limita() {
+    document.querySelectorAll('[data-eg-max]').forEach(function (l) {
+      var max = +l.dataset.egMax, f = l.children;
+      if (f.length <= max) { l.style.maxHeight = ''; l.classList.remove('eg-rola'); return; }
+      var h = 0; for (var i = 0; i < max; i++) h += f[i].offsetHeight;
+      l.style.maxHeight = h + 'px'; l.classList.add('eg-rola');
+    });
+  }
 })(window);

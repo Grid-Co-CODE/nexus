@@ -40,7 +40,8 @@ Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusR
   (`OS_WEB_ENGENHARIA_RESPONSAVEIS`), não o setor: quem é do setor e está fora dessa lista vê "não está na equipe do
   Quadro da equipe" no lugar de um zero falso; a leitura velha (o Fracttal não respondeu) diz a hora.
 - **Críticos sem dono (30/10/2026):** 6 à vista e o resto rola na própria caixa (`data-eg-max`, a altura dos 6 medida
-  no navegador); os botões Pegar e Encaminhar na linha do "Crit." (no celular, embaixo) e o cartão mais baixo.
+  no navegador pelo `limita()` do `engenharia-gaveta.js`, que o `egGaveta.ligar()` chama; o mesmo dos 20 da
+  Confiabilidade); os botões Pegar e Encaminhar na linha do "Crit." (no celular, embaixo) e o cartão mais baixo.
 
 O Levi escolheu, no rascunho aprovado, a primeira tela da Engenharia ("Sim, a primeira"), do setor Engenharia
 (`Tela.do_setor`: quem é dele a vê sem marcar em Base → Acessos). Cada um vê a sua mesa ("Cada um vê a sua"), e só o
@@ -564,6 +565,20 @@ está o problema" (falhas por família, com P90), "Criticidade" (A/B/C clicávei
 **Indicadores** = painel "Estatísticas" com "Ver por" cliente/usina, filtro de texto, ordenação pelo cabeçalho e
 barras dentro das colunas (disponibilidade com o marco de 85%). Classes `eg-*` em `nexus/static/engenharia.css`;
 cuidado com `.m` (do campo.css, é fonte de código).
+
+**A tela enxuta (05/11/2026).** Levi: "Para ver o que realmente importa preciso fazer uma rolagem completa de tela".
+- A explicação ("Para que serve", Sinal, Nível, Disponibilidade, Criticidade) e as metas de classe mundial (no pé) moram
+  no **"!" ao lado do título**, o da Segurança > Extintores (`aviso`/`termo` de `hseq/_legenda.html`, com o `hseq.css`,
+  que só tem regras `hs-` e `ext-`). Saíram o subtítulo, o "Entenda esta tela" e o rodapé dos números.
+- "OS de falha do Fracttal / contas às" fica na linha do título, na ponta direita (no celular, embaixo dele).
+- A ordem é **números, filtros, abas, lista**. Saíram a linha "N ativos com sinal, de M com corretiva" e o "Esconder
+  serviço registrado como corretiva" ("não serve"), e com ele o parâmetro `servico` da view.
+- Os números 20% menores e no meio da casa (na horizontal e na vertical); em duas colunas (até 1100 px), o 5º ocupa a
+  linha inteira.
+- **Ativos com sinal:** as etiquetas e o nível só na cor da letra, sem borda nem fundo (`eg-tag--sem`, `eg-pill--sem`,
+  com largura fixa para os títulos alinharem); 20 à vista e o resto rola na caixa (`data-eg-max="20"`). No celular os 20
+  passam da altura da tela, então lá a rolagem da lista continua na da página (sem o `overscroll-behavior: contain`).
+- Prova: `tests/test_engenharia_confiabilidade_tela.py`.
 
 ### O que muda em relação ao PCM (de propósito)
 - **O ativo é o código** (IBI200-INVR1.3, com a usina dentro). No PCM o MTBF era casado pelo NOME (26 letras), sem a
