@@ -2,15 +2,19 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {% from "_explica.html" import explica %}
+{% from "campo/_graficos.html" import geracao %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Visão do responsável (12/10/2026, Levi: "uma visão que ele olha as usinas, as metas, os problemas, onde ele deve focar,
    no que ele deve deixar. No caso seria separado por responsável"; protótipo aprovado: "aposte em um formato reduzido que
    quando eu expanda aparece mais informações / Separe a visão em dois blocos"). A conta é nexus/campo/responsaveis.py:
    cada número é o da tela dona dele, com a régua de lá. Aqui: os cartões por responsável e, com um escolhido, os dois
    blocos (Performance e Acompanhamento), cada usina numa linha que abre o detalhe (<details>, sem script). #}
-{# O "!" do título (05/11/2026): De onde vem cada número e a régua de cada alerta. Nada é recalculado com régua nova. #}
+{# O "!" do título (05/11/2026): De onde vem cada número e a régua de cada alerta. Nada é recalculado com régua nova. A
+   hora da leitura entrou aqui no mesmo dia (Levi, sobre a caixa "Gerencial, Confiabilidade (...) lido às" do canto do
+   cabeçalho: "não precisam aparecer, pode ficar nos disclaimers"). #}
 {% macro reguas_do_titulo() %}
   {% call explica('De onde vem cada número e a régua de cada alerta') %}
+    <p><b>Lido às {{ lido }}</b>, pelo banco do Nexus: Gerencial, Confiabilidade, chamados, extintores, rondas e PT.</p>
     <p><b>De onde vem cada número, e a régua de cada alerta.</b> Nada é recalculado com régua nova: cada número é o da tela
     dona dele, e o alerta usa a régua de lá. Cada linha abre ao clicar.</p>
     {% for b, nome, _txt, _bl in blocos_geral %}
@@ -47,6 +51,21 @@
           </dl>
 {% endmacro %}
 {% macro det_bloco(u, b) %}{{ det_linhas(u, u[b].det, b == 'perf') }}{% endmacro %}
+{# a lista das PT esperando o De acordo, na janela: a do número do Painel (29/10/2026) e a do número da PT da Central da
+   usina (05/11/2026, Levi: "ao clicar no KPI aparece o mesmo card que aparece em visão do responsável > painel"). `pt`
+   é o `painel_responsavel.pts` (a parada de hoje primeiro); cada PT abre a decisão na mesma janela #}
+{% macro idade(m) %}{% if m is none %}—{% elif m >= 1440 %}{{ m // 1440 }} d {{ (m % 1440) // 60 }} h{% elif m >= 60 %}{{ m // 60 }} h {{ m % 60 }} min{% else %}{{ m }} min{% endif %}{% endmacro %}
+{% macro lista_pts(pt, nome) %}
+    <header class="cr-jan-cab"><div><p class="gc-eyebrow">PTs pendentes</p><h2>{{ nome }}</h2>
+      <p class="mudo">{{ pt.aguardando }} esperando o De acordo{% if pt.paradas %} · {{ pt.paradas }} há mais de 2 h{% endif %}</p></div></header>
+    <ol class="pn-lista pn-lista--jan" aria-label="Todas as PT esperando o De acordo">
+      {% for x in pt.linhas %}
+      <li><button type="button" class="pn-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=x.numero, ativo=x.codigo, volta=request.full_path) }}" title="Abrir a PT {{ x.numero }} para decidir">
+        <span class="pn-it-nome"><b>{{ x.numero }} · {{ x.usina }}</b><small>{{ x.tarefa or '—' }}</small></span>
+        <b class="pn-v {{ 'cn-t-critico' if x.parada else 'cn-t-alerta' }}">{% if x.parada and x.hoje %}agora · {% endif %}{{ idade(x.idade_min) }}</b></button></li>
+      {% else %}<li class="pn-vazio">Nenhuma PT esperando o De acordo.</li>{% endfor %}
+    </ol>
+{% endmacro %}
 <div class="campo-nativa{% if modo == 'painel' and painel %} pn-pagina{% endif %}">
   <div class="cn-cab">
     {# no Painel, o nome do responsável é o título (Levi, 28/10/2026: "vai ter o nome do responsável como [título]") #}
@@ -56,7 +75,6 @@
     {% else %}
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>{{ reguas_do_titulo() }}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     {% endif %}
-    <div class="cn-frescor">Gerencial, Confiabilidade, chamados, extintores,<br>rondas e PT, pelo banco do Nexus<br><b>lido às {{ lido }}</b></div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
   {% for f, e in erros.items() %}<div class="cn-erro cn-aviso" role="status">Não consegui ler {{ fonte_nome.get(f, f) }} ({{ e }}): essa parte ficou de fora, o resto da tela vale.</div>{% endfor %}
@@ -84,6 +102,9 @@
   <div class="cn-erro cn-aviso" role="status"><b>{{ manut_i.ilegiveis }} marca{{ 's' if manut_i.ilegiveis > 1 }} do Fora da programação não {{ 'abriram' if manut_i.ilegiveis > 1 else 'abriu' }} com a chave desta máquina:</b> {{ 'essas tarefas contam' if manut_i.ilegiveis > 1 else 'essa tarefa conta' }} como atrasada{{ 's' if manut_i.ilegiveis > 1 }}, não como pausada{{ 's' if manut_i.ilegiveis > 1 }}.</div>
   {% endif %}
 
+  {# na Central da usina, a busca da usina fica à direita, na linha das abas (05/11/2026, Levi: "Quero o 'Buscar usinas'
+     do lado direito paralelizando com os botões a visão dos responsáveis!") #}
+  {% if modo == 'usina' %}<div class="cu-topo">{% endif %}
   <form class="cn-filtros" method="get">
     {# o responsável que entrou pelo Fracttal não vê os cartões dos outros: vai direto para a Visão geral, que desde
        18/10/2026 ocupa o lugar de Onde focar; o Ranking das equipes é para todos, com as equipes do filtro #}
@@ -119,6 +140,10 @@
        id="pn-rel-temas">, fora deste <form>) #}
     {% if modo == 'painel' and painel %}<button type="button" class="gc-btn gc-btn--contorno pn-exportar" data-pn-rel aria-haspopup="dialog" title="Escolher os temas e baixar o relatório do Painel em PDF"><i class="ph ph-file-pdf" aria-hidden="true"></i> Exportar relatório</button>{% endif %}
   </form>
+  {% if modo == 'usina' %}
+  <div class="cu-busca">{% with busca_usinas=central.busca, busca_rota='torre_campo.responsaveis', busca_ocultos={'modo': 'usina'}, busca_valor=central.nome, busca_rotulo='Buscar a usina' %}{% include 'campo/_busca_usina.html' %}{% endwith %}</div>
+  </div>
+  {% endif %}
 
   {# a faixa "Parada agora" (18/10/2026; o painel próprio de um supervisor tinha a de "Usinas desligadas"): as OS de
      parada ainda abertas nas usinas do filtro, a mais antiga primeiro (a disponibilidade do Gerencial, do Fracttal) #}
@@ -167,7 +192,6 @@
   {# o endereço sai do url() aqui dentro, nunca pronto de fora: o Nexus mora debaixo do /nexus e o test_prefixo confere
      que todo href passa pelo url()/raiz, o que um destino recebido pronto não deixa conferir #}
   {% macro ver(txt='ver todas') %}<a class="pn-ver" href="{{ url(**kwargs) }}">{{ txt }}</a>{% endmacro %}
-  {% macro idade(m) %}{% if m is none %}—{% elif m >= 1440 %}{{ m // 1440 }} d {{ (m % 1440) // 60 }} h{% elif m >= 60 %}{{ m // 60 }} h {{ m % 60 }} min{% else %}{{ m }} min{% endif %}{% endmacro %}
   {# o desenho de 29/10/2026 (Levi: "Padronize o tamanho do card para todas as modalidades"; "PTs pendentes pode ficar
      como um KPI que quando o supervisor clicasse ele veria quais são as PTs (...) Aproveita o espaço para dar um destaque
      nas usinas abaixo da performance"): todos os quadros com a mesma altura, as PT no número do cabeçalho (o clique
@@ -279,17 +303,7 @@
   </div>
   {# a lista das PT pendentes, que o número do cabeçalho abre na janela (29/10/2026: "um KPI que quando o supervisor
      clicasse ele veria quais são as PTs, não precisa ser algo aberto toda hora"); cada PT abre a decisão ali mesmo #}
-  <template id="pn-pts-lista">
-    <header class="cr-jan-cab"><div><p class="gc-eyebrow">PTs pendentes</p><h2>{{ painel.nome }}</h2>
-      <p class="mudo">{{ pt.aguardando }} esperando o De acordo{% if pt.paradas %} · {{ pt.paradas }} há mais de 2 h{% endif %}</p></div></header>
-    <ol class="pn-lista pn-lista--jan" aria-label="Todas as PT esperando o De acordo">
-      {% for x in pt.linhas %}
-      <li><button type="button" class="pn-it cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=x.numero, ativo=x.codigo, volta=request.full_path) }}" title="Abrir a PT {{ x.numero }} para decidir">
-        <span class="pn-it-nome"><b>{{ x.numero }} · {{ x.usina }}</b><small>{{ x.tarefa or '—' }}</small></span>
-        <b class="pn-v {{ 'cn-t-critico' if x.parada else 'cn-t-alerta' }}">{% if x.parada and x.hoje %}agora · {% endif %}{{ idade(x.idade_min) }}</b></button></li>
-      {% else %}<li class="pn-vazio">Nenhuma PT esperando o De acordo.</li>{% endfor %}
-    </ol>
-  </template>
+  <template id="pn-pts-lista">{{ lista_pts(pt, painel.nome) }}</template>
   {# a escolha dos temas do relatório, que o Exportar abre na janela (30/10/2026: "a pessoa possa marcar o tema que ela
      quer levar, as vezes não quer algo, tem que ter a opção de tirar"): todos marcados; o Baixar PDF leva os marcados
      (`tema` repetido no endereço, os filtros da tela junto) #}
@@ -565,11 +579,13 @@
      dele: o mês corrente; nas pendências, rondas, OS atrasadas e pausadas, ocorrências abertas e Segurança; todas as
      usinas na busca. 2ª rodada (mesmo dia): a lista da busca já aberta sem usina escolhida ("Deixar a lista de 'buscar
      usina' já no estilo nexus"), os quadros com respiro e marca de situação ("está simples demais e as linhas estão
-     muito coladas") e o relatório do cliente em PDF (nexus/campo/relatorio_usina.py) #}
+     muito coladas") e o relatório do cliente em PDF (nexus/campo/relatorio_usina.py). 3ª rodada (05/11/2026): sem usina,
+     só o campo da busca ("não precisa amontoar um monte de card de usinas"), à direita das abas; os números alinhados em
+     linhas, no meio; o gráfico da geração na Performance; os chamados só com as linhas que têm chamado; o número da PT
+     abre a lista do Painel (o quadro da PT saiu); o mês do relatório em botões, primeiro #}
   {% set cu = central %}
-  <div class="cu-busca{% if not cu.u %} cu-busca--aberta{% endif %}">{% with busca_usinas=cu.busca, busca_rota='torre_campo.responsaveis', busca_ocultos={'modo': 'usina'}, busca_valor=cu.nome, busca_rotulo='Buscar a usina', busca_aberta=not cu.u %}{% include 'campo/_busca_usina.html' %}{% endwith %}</div>
   {% if not cu.u %}
-  {% if cu.nome %}<p class="cu-vazio"><b>Nenhuma usina com o nome "{{ cu.nome }}".</b> Escolha na lista: ela filtra enquanto você digita.</p>{% endif %}
+  {% if cu.nome %}<p class="cu-vazio"><b>Nenhuma usina com o nome "{{ cu.nome }}".</b> Clique em "Buscar a usina": a lista filtra enquanto você digita.</p>{% endif %}
   {% else %}{% set u = cu.u %}{% set pv, mv, av = u.perf.valores, u.manut.valores, u.acomp.valores %}
   {% for f, e in cu.erros.items() %}<div class="cn-erro cn-aviso" role="status">Não consegui ler {{ e }}: essa parte ficou de fora, o resto da página vale.</div>{% endfor %}
   <header class="cu-cab">
@@ -592,9 +608,10 @@
     {% for k, rot in (('meta', 'Meta do mês'), ('pr', 'PR'), ('disp', 'Disponibilidade')) %}{% set v = pv[k] %}
     <button type="button" class="cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=k) }}" title="{{ v.get('dica') or (rot ~ ': ver o dia a dia') }}"><span class="d">{{ rot }}</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}{{ '%' if k == 'pr' and v.txt != '—' }}</b>{% if v.sub %}<span class="d">{{ 'previsto ' ~ v.sub[2:] ~ '%' if k == 'pr' else v.sub }}</span>{% endif %}</button>
     {% endfor %}
-    {% for k, rot in (('limpeza', 'Limpeza'), ('ronda', 'Ronda'), ('chamados', 'Chamados'), ('pt', 'PT')) %}{% set v = av[k] %}
+    {% for k, rot in (('limpeza', 'Limpeza'), ('ronda', 'Ronda'), ('chamados', 'Chamados')) %}{% set v = av[k] %}
     <span><span class="d">{{ rot }}</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}</b></span>
     {% endfor %}
+    {% set v = av.pt %}<button type="button" data-cu-pts aria-haspopup="dialog" title="Ver as PT esperando o De acordo"><span class="d">PT</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}</b></button>
     {% set v = mv.atrasadas %}<span><span class="d">OS atrasadas</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}</b>{% if v.sub %}<span class="d">a mais antiga há {{ v.sub }}</span>{% endif %}</span>
   </div>
   {# a marca de situação de cada linha das pendências: o ponto na cor da régua da Visão #}
@@ -606,6 +623,9 @@
     <section class="cu-q" aria-labelledby="cu-perf">
       <header class="pn-cab"><h2 id="cu-perf"><i class="ph ph-chart-line-up" aria-hidden="true"></i>Performance do mês</h2></header>
       {% if u.perf.det %}{{ det_bloco(u, 'perf') }}{% else %}<p class="mudo">Sem meta, PR ou disponibilidade publicados para a usina neste mês.</p>{% endif %}
+      {# o gráfico da geração do mês (05/11/2026, Levi: "Quero que o gráfico de geração também apareça na visão do
+         responsável > central da usina"): o mesmo da janela da Meta; sem a série do dia a dia no banco, fica de fora #}
+      {% if cu.graf_ger %}{{ geracao(cu.graf_ger) }}{% endif %}
     </section>
     <section class="cu-q" aria-labelledby="cu-ronda">
       <header class="pn-cab"><h2 id="cu-ronda"><i class="ph ph-path" aria-hidden="true"></i>Rondas e limpeza</h2>{% if cu.link['campo/rondas'] %}<a class="pn-ver" href="{{ url_for('torre_campo.rondas_usina', usina_id=u.usina_id) }}">evolução dos últimos 30 dias</a>{% endif %}</header>
@@ -614,14 +634,16 @@
     <section class="cu-q" aria-labelledby="cu-ch">
       {% set ch = u.chamados or {} %}{% set lista_ch = ch.get('lista') or [] %}
       <header class="pn-cab"><h2 id="cu-ch"><i class="ph ph-lifebuoy" aria-hidden="true"></i>Chamados</h2></header>
+      {% if lista_ch or cu.chamados_mes %}
       <dl class="cr-dl">
         {% for situ, rot in (('aberto', 'Abertos'), ('verificacao', 'Em verificação')) %}{% set da = lista_ch|selectattr('situacao', 'equalto', situ)|list %}
-        <dt>{{ rot }}<span class="cu-n">{{ da|length }}</span></dt>
-        <dd>{% for c in da %}<span class="it"><button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="{{ c.os }}" title="Abrir o card da OS">OS {{ c.os }}</button> · {{ c.equip }}{% if c.fabricante %} · {{ c.fabricante }}{% endif %}{% if situ == 'aberto' and c.dias is not none %} · há {{ c.dias }} d{% endif %}{% if c.status %} · {{ c.status }}{% endif %}</span>{% else %}<span class="mudo">—</span>{% endfor %}</dd>
+        {% if da %}<dt>{{ rot }}<span class="cu-n">{{ da|length }}</span></dt>
+        <dd>{% for c in da %}<span class="it"><button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="{{ c.os }}" title="Abrir o card da OS">OS {{ c.os }}</button> · {{ c.equip }}{% if c.fabricante %} · {{ c.fabricante }}{% endif %}{% if situ == 'aberto' and c.dias is not none %} · há {{ c.dias }} d{% endif %}{% if c.status %} · {{ c.status }}{% endif %}</span>{% endfor %}</dd>{% endif %}
         {% endfor %}
-        <dt>Finalizados no mês<span class="cu-n">{{ cu.chamados_mes|length }}</span></dt>
-        <dd>{% for c in cu.chamados_mes %}<span class="it"><button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="{{ c.os }}" title="Abrir o card da OS">OS {{ c.os }}</button> · {{ c.equip }}{% if c.fim %} · fechado em {{ c.fim.strftime('%d/%m') }}{% endif %}{% if c.dias is not none %} · {{ c.dias }} d aberto{% endif %}</span>{% else %}<span class="mudo">—</span>{% endfor %}</dd>
+        {% if cu.chamados_mes %}<dt>Finalizados no mês<span class="cu-n">{{ cu.chamados_mes|length }}</span></dt>
+        <dd>{% for c in cu.chamados_mes %}<span class="it"><button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="{{ c.os }}" title="Abrir o card da OS">OS {{ c.os }}</button> · {{ c.equip }}{% if c.fim %} · fechado em {{ c.fim.strftime('%d/%m') }}{% endif %}{% if c.dias is not none %} · {{ c.dias }} d aberto{% endif %}</span>{% endfor %}</dd>{% endif %}
       </dl>
+      {% else %}<p class="mudo">Nenhum chamado aberto, em verificação ou finalizado no mês.</p>{% endif %}
     </section>
   </div><div class="cu-col">
     <section class="cu-q" aria-labelledby="cu-pend">
@@ -647,24 +669,21 @@
       <header class="pn-cab"><h2 id="cu-os"><i class="ph ph-wrench" aria-hidden="true"></i>OS e manutenção</h2></header>
       {% if cu.os_linhas %}{{ det_linhas(u, cu.os_linhas) }}{% else %}<p class="mudo">Nenhuma OS aberta da usina no Fracttal.</p>{% endif %}
     </section>
-    <section class="cu-q" aria-labelledby="cu-pt">
-      <header class="pn-cab"><h2 id="cu-pt"><i class="ph ph-file-text" aria-hidden="true"></i>PT</h2></header>
-      <dl class="cr-dl">
-        <dt>Esperando<span class="cu-n">{{ cu.pt_esperando|length }}</span></dt>
-        <dd>{% for x in cu.pt_esperando %}<span class="it">{% if x.hoje and x.parada %}<span class="cr-agora">Agora</span>{% endif %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=x.numero, ativo=x.codigo, volta=request.full_path) }}" title="{{ x.tarefa }}">OS {{ x.os or x.numero }}</button> · há {{ x.idade }}{% if x.parada and not x.hoje %} · <span class="cn-t-critico">sem decisão desde {{ x.dia[8:10] }}/{{ x.dia[5:7] }}</span>{% endif %}</span>{% else %}<span class="mudo">—</span>{% endfor %}</dd>
-        <dt>Pedidas no mês<span class="cu-n">{{ cu.pts_mes|length }}</span></dt>
-        <dd>{% for p in cu.pts_mes %}<span class="it"><button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=p.numero, ativo=p.codigo, volta=request.full_path) }}" title="{{ p.tarefa }}">OS {{ p.os or p.numero }}</button>{% set st = cu.situacao_pt.get(p.situacao) or (p.situacao, 'neutro') %} · <span class="cn-t-{{ st[1] }}">{{ st[0] }}</span>{% if p.decidida_por %} por {{ p.decidida_por }}{% endif %}{% if p.dia_txt %} · {{ p.dia_txt }}{% endif %}</span>{% else %}<span class="mudo">—</span>{% endfor %}</dd>
-      </dl>
-    </section>
   </div></div>
+  {# a lista das PT da usina, que o número da PT abre na janela: a do Painel, da mesma macro (05/11/2026) #}
+  <template id="cu-pts-lista">{{ lista_pts(cu.pts, u.usina) }}</template>
   {# o relatório do cliente (04/11/2026, Levi: "Algo bem profissional para o cliente!"; "Tem que poder escolher que nem é
-     no painel"): o mês (o anterior de início) e os temas, todos marcados; o Baixar PDF leva o mês e os marcados #}
+     no painel"): o mês (o anterior de início) e os temas, todos marcados; o Baixar PDF leva o mês e os marcados. O mês
+     vem primeiro, em botões (05/11/2026: "Quando clicar em baixar relatórios: escolher qual o mês!") #}
   <template id="cu-rel-temas">
     <header class="cr-jan-cab"><div><p class="gc-eyebrow">Relatório da usina</p><h2>{{ u.usina }}</h2>
       <p class="mudo">O PDF é para o cliente: geração, disponibilidade, rondas, manutenção e chamados do mês. PT, Segurança e nomes de técnicos não entram.</p></div></header>
     <form class="pn-rel" method="get" action="{{ url_for('torre_campo.responsaveis_usina_relatorio', usina_id=u.usina_id) }}" data-cu-rel-form>
-      <label class="gc-rotulo" for="cu-rel-mes">Mês</label>
-      <select class="gc-campo cu-rel-mes" id="cu-rel-mes" name="mes">{% for m, rot in cu.rel_meses %}<option value="{{ m }}"{% if m == cu.rel_mes %} selected{% endif %}>{{ rot }}{{ ' (até ontem)' if loop.first }}</option>{% endfor %}</select>
+      <fieldset class="cu-rel-meses">
+        <legend class="gc-rotulo">Qual mês?</legend>
+        <div class="cu-rel-chips">{% for m, rot in cu.rel_meses %}<label><input type="radio" name="mes" value="{{ m }}"{% if m == cu.rel_mes %} checked{% endif %}><span>{{ rot }}{% if loop.first %}<small>até ontem</small>{% endif %}</span></label>{% endfor %}</div>
+      </fieldset>
+      <p class="gc-rotulo cu-rel-t">Quais temas?</p>
       <p class="pn-rel-todos"><button type="button" class="cn-link cr-link-botao" data-cu-rel-todos="1">Marcar todos</button><span aria-hidden="true">·</span><button type="button" class="cn-link cr-link-botao" data-cu-rel-todos="0">Tirar todos</button></p>
       <ul class="pn-rel-temas" aria-label="Temas do relatório">
         {% for k, rot in cu.rel_temas %}<li><label><input type="checkbox" name="tema" value="{{ k }}" checked> {{ rot }}</label></li>{% endfor %}
@@ -709,6 +728,19 @@
 // mesma janela, pelo `data-cr-painel` de sempre
 (function () {
   var b = document.querySelector('[data-pn-pts]'), lista = document.getElementById('pn-pts-lista');
+  var dlg = document.getElementById('cr-modal');
+  if (!b || !lista || !dlg) { return; }
+  b.addEventListener('click', function () {
+    var corpo = dlg.querySelector('.cr-modal-corpo');
+    corpo.innerHTML = '';
+    corpo.appendChild(lista.content.cloneNode(true));
+    if (!dlg.open) { dlg.showModal(); }
+  });
+})();
+// o número da PT da Central da usina abre a mesma lista, só da usina (05/11/2026, Levi: "ao clicar no KPI aparece o mesmo
+// card que aparece em visão do responsável > painel")
+(function () {
+  var b = document.querySelector('[data-cu-pts]'), lista = document.getElementById('cu-pts-lista');
   var dlg = document.getElementById('cr-modal');
   if (!b || !lista || !dlg) { return; }
   b.addEventListener('click', function () {
