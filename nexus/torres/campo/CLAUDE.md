@@ -12,8 +12,8 @@ App nem no Fracttal. Devolver OS e encaminhar ponto continuam no App. Sem link p
 
 **Exceções: a decisão da PT** (Levi, 05/10: "Técnico faz APR e PT -> Chega no PG -> Atualiza para os steakholders ->
 Atualiza na aprovação de PT -> Supervisor faz -> Fica salvo!"; ver "Aprovação de PT no Nexus" abaixo) **e a
-Aprovação de OS** (desde 18/10/2026 a OS abre o card do OS Creator, cujo Concluir aprova no Fracttal com o login de quem
-clica, como no OS Creator Web; ver "Aprovação de OS").
+Aprovação de OS** (desde 05/11/2026 o quadro por fatos, com o Aprovar no cartão e em lote: o Concluir do OS Creator, com
+o login do Fracttal de quem clica, como no OS Creator Web; ver "Aprovação de OS").
 
 ## As telas
 
@@ -22,7 +22,7 @@ clica, como no OS Creator Web; ver "Aprovação de OS").
 | **Visão do responsável** (12/10/2026, a 1ª do Campo) | o **Painel** (28/10/2026, a tela inicial de um responsável: seis quadros, ver "O Painel do responsável" abaixo) e três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
 | **Ocorrências** (18/10/2026) | o livro `nexus_ocorrencias` (escrito nesta tela) + cadastro do Nexus | `campo/ocorrencias.py` (ver "Ocorrências com plano de ação" abaixo) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
-| Aprovação de OS | fila de verificação do Fracttal INTEIRA (só GET) + nota do livro do App + o Responsável O&M da usina (cadastro); aprovar é o Concluir do card do OS Creator | regras copiadas do App (a conta pronta por fila lida) |
+| Aprovação de OS (quadro por fatos desde 05/11/2026) | fila de verificação do Fracttal INTEIRA (só GET) + nota e fechamento do livro do App + os anexos das OS (1 GET por OS, lido por trás, e as fotos pelo S3) + o Responsável O&M da usina (cadastro); aprovar é o Concluir do OS Creator, no cartão ou em lote | `campo/prefiltro.py` (as colunas) sobre a conta pronta das regras copiadas do App; `campo/prefiltro_fundo.py` (as fotos) |
 | Permissões de trabalho → **em Segurança · HSEQ > APR e PT desde 09/10/2026** (`/t/hseq/apr-pt`; `/t/campo/pt` leva para lá). O código continua aqui (`pagina_pt`, a aprovação `/t/campo/pt/<número>`, os PDFs da PT e da APR); a regra de lá está em `nexus/torres/hseq/CLAUDE.md` | `fato_pt` (+ `pt_app_campo` para o texto) | `visao.pts` (conta nossa) |
 | Rondas | `fato_ronda` (App, checklist da carga única, avulsa) + usinas mobilizadas do cadastro + `fato_fechamento` (última OS da usina) + a validação por foto (só sujidade e vegetação) | `visao.rondas` (conta nossa) |
 | Ronda avulsa (`/t/campo/rondas/avulsa`) | lançada à mão no Nexus, com o login do Fracttal | `campo/ronda_avulsa.py` |
@@ -1587,70 +1587,74 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     pedidos ao mesmo tempo, no máximo 4 por segundo, e em segundo plano tenta de novo depois de um 429 (5 s, 10 s); a
     fila é lida ao subir o Nexus (`aprovacao.aquecer`, 20 s depois; `NEXUS_CAMPO_AQUECER=0` desliga). Medido: fila
     inteira em ~20 s.
-  - **Tela para insight** (Levi, 05/10: "refaça essa parte de aprovação de OS para retirada de bons insights";
-    `aprovacao.fila_toda` + `_agrupa_os`): a fila pela conta do App (a cópia devolve 200 linhas por chamada; as páginas
-    são juntadas, ~4 s na 1ª, e a conta fica pronta logo depois de cada releitura). **A fila INTEIRA, sem período**
-    (Levi, 08/10: "não deve ter filtro 'OS fechadas nos X dias' ... ficar preso nessa visão é foda"): a conta do App só
-    conta por janela, e `aprovacao.FILA_INTEIRA` = 3650 dias (o teto do `_janela`), que pega toda OS em verificação; é
-    essa a conta que a releitura deixa pronta (antes, a de 30 dias). Seis indicadores (esperando, prontas para aprovar,
-    pedem olho, paradas há 30 dias, espera máxima, uso do App) e a barra da idade da fila: os números são da fila toda;
-    o clique filtra os cartões e a tabela, sempre as MESMAS OS que o número conta ("paradas há 30 dias" = `idade=30-`,
-    30 dias ou mais; até 08/10 levava à faixa 31 a 60 e, com a fila inteira, escondia as mais antigas). **Uma visão só,
-    a dos cartões** (08/10: "a visão de por técnico e fila pode matar"), hoje **por região de campo** (estrutura de O&M
-    de 10/2026; alternância "por gestor de contrato", `por=gestor`), o que mais tem parada há 30 dias primeiro: a
-    equipe, a região e o gestor saem do cadastro pela usina do Fracttal; o cartão da região diz o Supervisor de Campo, o
-    Coordenador e quem aprova ali; OS de usina sem de-para cai no cartão "Sem cadastro" e a de equipe fora da estrutura
-    em "Sem região de campo", os dois por último. **O cartão abre a tabela das OS dele** (`?ver=`;
-    08/10: "quando clica aparece a OS, dia, data da criação da OS, data fim, supervisor, prontas, pedem olho, fora do
-    App, uso do App, nota média e devolvidas"), nessa ordem, uma linha por OS: Dia = dias esperando (a tarefa mais
-    antiga); criação = `creation_date` da OS, que vem na MESMA linha do REST que a fila já lê (sem pedido novo;
-    conferido em 08/10 nas 1.583 linhas em verificação guardadas pela Engenharia, todas com a data); datas em Brasília
-    (o Fracttal fala UTC); Prontas, Pedem olho e Fora do App = tarefas da OS em cada grupo; Uso do App = % das tarefas
-    pelo App; Nota média = das tarefas pelo App; Devolvidas = tarefas já devolvidas. Medido em 05/10 (90 dias): 1.827 OS
-    e 4.736 tarefas esperando; 937 prontas; 1.780 tarefas paradas há 30 dias ou mais; uso do App 41%.
-  - **Por responsável da UFV, com o card da OS (18/10/2026)** (Levi: "está por região e gestor de contrato quero apenas
-    por responsável da UFV, quando abrir aparece uma lista das usinas que tem OSs não concluídas, ao clicar na linha
-    aparece o mesmo card que aparece ao clicar na OS do histórico de OS do OS Creator Web"; e, no quiz do mesmo dia: só
-    as OS esperando aprovação, a usina abre as OS dela, aprovar pelo Concluir do card, os indicadores do responsável
-    escolhido). Os cartões por região de campo e por gestor de contrato, o `ver=`, o `por=` e os filtros de equipe,
-    região e gestor SAÍRAM (o endereço velho abre a lista). O filtro é o **Responsável O&M da usina** (`responsavel=`,
-    "*" = todos; quem entrou pelo Fracttal e é responsável já vem nele, `_responsavel_logado_pelo_cadastro`); o
-    responsável e o cliente vêm do cadastro pela usina do Fracttal (`por_nome` de `visao.usinas_do_fracttal`; usina sem
-    de-para sai com o nome do Fracttal, só em "Todos"). **A lista é uma linha por usina** (`_usinas_da_fila`: as OS, os
-    três grupos, a mais antiga e o uso do App; a com mais OS paradas há 30 dias, e depois a que espera há mais tempo,
-    primeiro) que abre a tabela das OS dela (a mais antiga primeiro; colunas OS, Dia, criação, fim, Técnicos, Grupo,
-    Prontas, Pedem olho, Fora do App, Uso do App, Nota média, Devolvidas; o porquê do grupo, `aprovacao.motivos`, fica
-    no selo do Grupo, no mouse). **A OS abre o card do OS Creator** (`NexusOsCard.abrir`, status "Em Verificação"): o
-    Concluir dele aprova, com o login do Fracttal de quem clica, como no OS Creator Web (a regra de "só o supervisor de
-    campo da região ou admin" era do botão do Nexus, que saiu da tela). Fechado o card com mudança, a tela chama
-    `POST /t/campo/aprovacao/<id>/conferir`: só sai da fila guardada a OS que o Fracttal já não tem em verificação (1
-    pedido de leitura, `work_orders?id_status_work_order=2&wo_folio=`), e ninguém esconde OS da fila. Os seis
-    indicadores e a idade são do responsável escolhido e filtram a lista. CSV: OS, dias, criação, fim, Responsável O&M,
-    usina, cliente, técnicos, tarefas, os grupos, uso do App, nota, devolvidas e o grupo.
+  - **A fila INTEIRA, sem período** (Levi, 08/10: "não deve ter filtro 'OS fechadas nos X dias' ... ficar preso nessa
+    visão é foda"): a conta do App (`aprovacao.fila_toda`; a cópia devolve 200 linhas por chamada e as páginas são
+    juntadas) só conta por janela, e `aprovacao.FILA_INTEIRA` = 3650 dias (o teto do `_janela`) pega toda OS em
+    verificação. **Contada por OS** (05/10: "ele não consegue aprovar uma tarefa em si, e sim uma PT ou uma OS";
+    `_por_os`): a espera é a da tarefa mais antiga, a nota é a pior. A criação é o `creation_date` da OS, que vem na mesma
+    linha do REST; datas em Brasília (o Fracttal fala UTC). Medido em 05/10 (90 dias): 1.827 OS e 4.736 tarefas.
+  - **O quadro por fatos (05/11/2026)** (Levi, 04/11: "No nexus, em campo app crie uma aba de aprovação de OS. Pode fazer
+    por cima da aba Aprovação de OS, refaça com essas regras e deixe algo bem fácil e dinâmico para os supervisores!"; no
+    quiz: todos os supervisores veem; "uma a uma pelo card, tem que ter um botão de aprovar logo após todo o score e
+    avisos, deve ser possível também aprovar mais que uma de uma vez!"; três colunas). A lista por usina, os seis
+    indicadores e a barra da idade (18/10) saíram; o endereço velho (`ver=`, `por=`, `balde=`, `idade=`, `vista=`) abre
+    o quadro. Desenho: `docs/superpowers/specs/2026-11-05-aprovacao-por-fatos-design.md`.
+    - **As colunas** (`nexus/campo/prefiltro.py`, `classificar`; medidas nas 30 OS de 26/10, relatório "Pré-filtro da
+      Verificação: fatos primeiro"). **Não OK**: foto anexada mais de `NEXUS_PREFILTRO_HORAS_TARDE` (24) h depois do
+      último fechamento da OS no App; pegou 4 devolvidas e nenhuma aprovada. A anexação é o `Last-Modified` do arquivo no
+      S3 (o REST de anexos não dá data); o fechamento, a maior hora do celular (`dev_ts`, senão `server_ts`) do
+      `qualidadelog` da OS (`fechado_app` na conta pronta; sem ela, a anexação não é julgada). **Em dúvida**: foto
+      repetida (dHash de 256 bits dos 75% de cima, SEM o carimbo do App, que muda a cada anexo; diferença até
+      `NEXUS_PREFILTRO_DIF` 12; captura de tela, sem "GPS " na descrição, só até `NEXUS_PREFILTRO_DIF_PRINT` 4, porque
+      telas parecidas enganam) ou tarefa fechada fora do App. **Pronta**: nenhum fato. A OS fica na pior coluna; um fato
+      com fotos ainda por ler já a põe na coluna pior, com "Faltam fotos por ler"; sem fato e sem as fotos lidas, ela
+      fica em **Ainda conferindo** (abaixo do quadro: aprova pelo cartão, não entra no lote). A regra do App de antes
+      (nota abaixo de 80, já devolvida, foto divergente, ronda; `aprovacao.motivos`) virou só aviso, sem mudar a coluna.
+      "Menos de 5 min no App" e "subtarefas respondidas" não separaram na medição e ficaram de fora.
+    - **Fora do pré-filtro** (abaixo do quadro, com o motivo; aprova pelo cartão): religamento, pelo tipo ou pela tarefa,
+      e a etiqueta PERFORMANCE (Levi, 04/11: "religamento remoto ou religamento real não entra, nem OSs com etiqueta de
+      performance!"); e, como nas OSs em verificação do Painel, as etiquetas CHAMADOS e ENGENHARIA e as OS criadas pelo
+      COS, para os dois números baterem. Quem é do COS vem da última conta (`verificacao.cos_guardado`, a da volta).
+    - **As fotos, por trás** (`nexus/campo/prefiltro_fundo.py`): depois de cada releitura da fila (`aprovacao._reler`) e
+      no boot com a fila do disco (`_preparar`), uma thread `nexus-prefiltro` declarada de fundo no porteiro confere as
+      OS do escopo sem fatos (ou cujas tarefas mudaram), a mais nova primeiro: UM GET de anexos por OS no Fracttal
+      (`work_orders_attachments?folio=`, 100 por página) e as imagens pelo S3, fora da cota de 200/min; no máximo
+      `NEXUS_PREFILTRO_POR_VOLTA` (150) OS por volta e `NEXUS_PREFILTRO_PAUSA_S` (2) s entre elas; o 429 para a volta e
+      guarda o que leu. Foto que não baixou deixa a OS sem fatos (meia leitura nunca vira Pronta). Fica o hash, a hora de
+      anexação e o campo, nunca os bytes; a miniatura de 240 px só das repetidas (`dados/campo/prefiltro_fotos/<id>.jpg`,
+      servida por `/t/campo/aprovacao/foto/<id>` com login e cópia privada). Memória e `dados/campo/prefiltro.json.gz`
+      (a volta carrega o disco antes de ler: sem isso cada deploy relia tudo); a OS que sai da fila sai dali com as
+      miniaturas. `NEXUS_PREFILTRO=0` desliga o laço. **A visita só lê memória** (nem Fracttal, nem banco, nem S3).
+    - **O cartão**, nesta ordem: a OS (abre o card do OS Creator, `NexusOsCard.abrir`, status "Em Verificação"), os
+      dias esperando, a UFV, o cliente e as tarefas; o **score** (a nota do App, a pior das tarefas; "Fora do App" sem
+      ela); os **avisos com a prova** (as duas fotos repetidas lado a lado; "6 fotos anexadas 2 dias depois do
+      fechamento no App"); e logo depois o **Aprovar** = o Concluir do OS Creator (`POST /os/api/os/<id>/concluir` com
+      `{folio}`, a rota do Painel do responsável e do OS Creator Web: status 3 + recalculate + reconferência da data de
+      fim), com o login do Fracttal de quem clica; IRREVERSÍVEL, pede confirmação; o 401 vira "Entre no OS Creator com a
+      sua conta do Fracttal". Aprovada, a conferência (`POST /t/campo/aprovacao/<id>/conferir`: só sai da fila guardada o
+      que o Fracttal já não tem em verificação, 1 pedido de leitura; ninguém esconde OS da fila) tira o cartão.
+    - **O lote**: caixa de marcar só em Pronta e Em dúvida, "Selecionar todas" por coluna e "Aprovar as marcadas (N)",
+      com a confirmação que diz quantas e de que coluna; uma depois da outra, com o andamento; para no 1º 401 (sem a
+      sessão do Fracttal, todas falhariam igual), e o outro erro fica no cartão e o lote segue. O quadro é montado na
+      visita e não muda sozinho na frente da pessoa.
+    - **Filtros**: o Responsável O&M da usina vai ao servidor (`responsavel=`, "*" = todos; quem entrou pelo Fracttal e é
+      responsável já vem nele, `_responsavel_logado_pelo_cadastro`; o responsável e o cliente vêm do cadastro pela usina
+      do Fracttal, `visao.usinas_do_fracttal`); cliente e busca (OS, UFV, técnico, sem acento) filtram na página e
+      recontam as colunas. CSV: OS, dias, criação, fim, Responsável O&M, usina, cliente, técnicos, tarefas, nota do App,
+      a coluna ("Fora do pré-filtro (motivo)") e os motivos. No celular as colunas deslizam de lado dentro do quadro.
+      Prova: `test_campo_aprovacao_responsavel.py`, `test_campo_prefiltro.py` e `test_campo_prefiltro_fundo.py`.
   - **A conta pronta (18/10/2026, "Está demorando muito para carregar")**: a regra do App sobre a fila inteira leva uns
     3,5 s só de conta (medido em 18/10 com uma fila falsa de 5.500 tarefas), mais a leitura das notas no banco, e a
     cópia de 5 min (`leitura.ler`) vencia entre uma releitura e outra: quase toda visita pagava, e cada filtro de região
     fazia a sua. Agora `aprovacao.fila_toda` guarda a conta da fila inteira até a fila mudar (`_PRONTA`, pela hora da
     leitura), feita logo depois da releitura e ao subir com a fila do disco (`_preparar`), e a tela filtra sobre ela. A OS
     que sai da fila (`tirar_da_fila`) sai da conta pronta também. Prova: `test_a_visita_nao_refaz_a_conta_da_fila`.
-  - **Contada por OS, não por tarefa** (Levi, 05/10: "ele não consegue aprovar uma tarefa em si, e sim uma PT ou uma
-    OS"; `_por_os`, `_agrupa_os`): a OS fica no pior grupo das tarefas dela (olho > fora do App > completa), a espera é
-    a da tarefa mais antiga, a nota é a pior; indicadores, idade, cartões e técnicos em OS. A linha aberta mostra cada
-    tarefa com o grupo e os motivos dela.
-  - **A linha aberta diz o porquê do grupo e aprova** (Levi, 05/10): `aprovacao.motivos` = a regra `_triagem` do App
-    mostrando TODOS os motivos que valem (nota abaixo de 80, ronda com pendência, já devolvida, tempo fora por causa
-    do técnico, foto divergente; ou por que está completa). **Aprovar = o Concluir do OS Creator Web** ("usando o
-    mesmo caminho que o OS Creator Web"), com o login do Fracttal de quem clica (status 3 + recalculate +
-    reconferência da data de fim; IRREVERSÍVEL, pede confirmação). O id da OS vem da fila crua.
   - **O portão do Aprovar do Nexus saiu (18/10/2026, Levi: "pode tirar a rota antiga!")**: de 08/10 a 18/10 o Aprovar
-    da linha chamava `POST /os/_nexus/aprovacao/<id>/aprovar`, que só deixava o Supervisor de Campo da região da usina
-    (com a vaga aberta, o Coordenador) ou um administrador. Com a OS abrindo o card do OS Creator, cujo Concluir aprova
-    (a mesma rota do clone, `/os/api/os/<id>/concluir`, como no OS Creator Web), o botão saiu da tela e a rota, o
-    `aprovar_os.py` e a conta de quem aprova por região (`visao._Base._aprovador`) saíram do servidor. O papel de quem
-    entrou pelo Fracttal, que as outras telas usam para vir filtradas, mora em `papel.py`. A OS aprovada pelo card sai
-    da lista pela conferência (`POST /t/campo/aprovacao/<id>/conferir`, acima).
-    **Até 08/10 o script desta tela não rodava**: o `confirm()` do Aprovar tinha uma quebra de linha dentro da string
-    (SyntaxError no navegador), então nem a linha abria nem o Aprovar funcionava; um teste roda `node --check` no script.
+    chamava `POST /os/_nexus/aprovacao/<id>/aprovar`, que só deixava o Supervisor de Campo da região da usina ou um
+    administrador; a rota, o `aprovar_os.py` e a conta de quem aprova por região saíram do servidor. Desde então aprova
+    quem o Fracttal deixar, pelo Concluir do OS Creator (o do cartão, acima). O papel de quem entrou pelo Fracttal, que as
+    outras telas usam para vir filtradas, mora em `papel.py`. **Até 08/10 o script desta tela não rodava** (um
+    `confirm()` com quebra de linha dentro da string): um teste roda `node --check` no script.
     **Cuidado com a cota:** cada reinício do Nexus relê a fila (55 páginas; as rondas aprovadas vêm do arquivo desde 06/10); em 05/10, com
     muitos reinícios seguidos, o Fracttal passou a recusar (429). Em desenvolvimento, `NEXUS_CAMPO_AQUECER=0`.
 

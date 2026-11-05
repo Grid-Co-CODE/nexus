@@ -70,22 +70,23 @@
   {# o responsável vai ao servidor (Levi, 18/10/2026: "quero apenas por responsável da UFV"); cliente e busca filtram na
      página, sem recarregar #}
   <form class="cn-barra-filtros apq-filtros" method="get" data-apq-filtros>
-    <label class="gc-rotulo" for="apq-responsavel">Responsável O&amp;M</label>
+    {# cada rótulo junto do seu campo: quando a linha quebra, o par desce junto #}
+    <span class="apq-filtro"><label class="gc-rotulo" for="apq-responsavel">Responsável O&amp;M</label>
     <select class="gc-campo" id="apq-responsavel" name="responsavel" onchange="this.form.submit()">
       <option value="*"{% if not responsavel %} selected{% endif %}>Todos</option>{% for r in opcoes_responsavel %}<option value="{{ r }}"{% if r == responsavel %} selected{% endif %}>{{ r }}</option>{% endfor %}
-    </select>
-    <label class="gc-rotulo" for="apq-cliente">Cliente</label>
+    </select></span>
+    <span class="apq-filtro"><label class="gc-rotulo" for="apq-cliente">Cliente</label>
     <select class="gc-campo" id="apq-cliente" data-apq-cliente>
       <option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
-    </select>
-    <label class="gc-rotulo" for="apq-busca">Buscar</label>
-    <input class="gc-campo apq-busca" id="apq-busca" type="search" data-apq-busca placeholder="OS, UFV ou técnico" autocomplete="off">
+    </select></span>
+    <span class="apq-filtro"><label class="gc-rotulo" for="apq-busca">Buscar</label>
+    <input class="gc-campo apq-busca" id="apq-busca" type="search" data-apq-busca placeholder="OS, UFV ou técnico" autocomplete="off"></span>
     <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}">Exportar CSV</a>
   </form>
 
   <div class="apq-lote" role="region" aria-label="Aprovar várias OS de uma vez">
     <p class="apq-lote-total"><b class="gc-num">{{ n_os }}</b> OS esperando aprovação{% if responsavel %} nas usinas de {{ responsavel }}{% else %}, a fila inteira{% endif %}</p>
-    <button type="button" class="gc-btn gc-btn--primario" data-apq-lote disabled>Aprovar as marcadas (<span data-apq-lote-n>0</span>)</button>
+    <button type="button" class="gc-btn gc-btn--primario" data-apq-lote disabled><span>Aprovar as marcadas (<span data-apq-lote-n>0</span>)</span></button>
     <p class="apq-lote-msg" data-apq-lote-msg role="status" aria-live="polite"></p>
   </div>
 

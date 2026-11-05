@@ -1141,7 +1141,7 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
    para os supervisores!"): as três colunas lado a lado, cada uma rolando por dentro; no celular cada coluna ocupa quase a
    tela e o quadro desliza de lado dentro da própria caixa (a página não rola de lado), como um quadro de tarefas. O
    cartão: a OS, onde, o score, os avisos com a prova e o Aprovar, nessa ordem */
-.apq-filtros{flex-wrap:wrap}
+.apq-filtro{display:inline-flex;align-items:center;gap:8px;min-width:0}
 .apq-busca{min-width:180px}
 .apq-lote{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:14px;padding:10px 14px;
   background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
@@ -1198,6 +1198,10 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .apq-extra{margin-top:14px;padding:10px 14px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
 .apq-extra > summary{font:600 14px/1.4 var(--font-sans);cursor:pointer}
 .apq-extra > p{margin:8px 0 0;font-size:12.5px}
+@media (max-width:560px){
+  .apq-filtro{flex:1 1 100%}
+  .apq-filtro .gc-campo{flex:1;min-width:0}
+}
 @media (max-width:900px){
   .apq-quadro{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}
   .apq-coluna{flex:0 0 86%;scroll-snap-align:start}

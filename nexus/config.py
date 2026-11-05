@@ -103,7 +103,12 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # Engenharia → ETMs (26/10/2026, nexus/engenharia/etm_historico.py): o histórico do app de ETM, trazido uma
              # vez — um token que leia as Issues do repositório privado do app e o repositório (dono/nome; o nome traz
              # o de uma pessoa, por isso não fica no código)
-             "NEXUS_ETM_GITHUB_TOKEN", "NEXUS_ETM_GITHUB_REPO")
+             "NEXUS_ETM_GITHUB_TOKEN", "NEXUS_ETM_GITHUB_REPO",
+             # Campo · App → Aprovação de OS em quadro por fatos (05/11/2026, nexus/campo/prefiltro.py e prefiltro_fundo.py):
+             # NEXUS_PREFILTRO=0 desliga a leitura das fotos por trás numa máquina; os limites das regras (horas depois do
+             # fechamento, diferença da foto repetida e da captura de tela) e o ritmo da leitura (OS por volta, pausa)
+             "NEXUS_PREFILTRO", "NEXUS_PREFILTRO_HORAS_TARDE", "NEXUS_PREFILTRO_DIF", "NEXUS_PREFILTRO_DIF_PRINT",
+             "NEXUS_PREFILTRO_POR_VOLTA", "NEXUS_PREFILTRO_PAUSA_S")
 
 
 class ConfigErro(RuntimeError):

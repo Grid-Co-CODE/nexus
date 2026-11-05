@@ -229,3 +229,13 @@ def test_cada_aviso_diz_o_tipo_e_a_repetida_traz_os_pares():
     assert r["avisos"][1]["pares"] == [{"a": "a1", "b": "a3", "ra": "p01", "rb": "p03"}]
     sem_fotos = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None)), None, "", P)
     assert [a["tipo"] for a in sem_fotos["avisos"]] == ["fora_app", "faltam"]
+
+
+def test_as_variaveis_do_pre_filtro_chegam_ao_config():
+    """O config só passa ao app as variáveis declaradas: sem declarar, o NEXUS_PREFILTRO=0 do .env não desligava o laço
+    (achado na prova no navegador, 05/11/2026) e os limites ficavam sempre no padrão."""
+    from nexus.config import OBRIGATORIAS, carregar_config
+    pre = {"NEXUS_PREFILTRO": "0", "NEXUS_PREFILTRO_HORAS_TARDE": "48", "NEXUS_PREFILTRO_DIF": "10",
+           "NEXUS_PREFILTRO_DIF_PRINT": "3", "NEXUS_PREFILTRO_POR_VOLTA": "20", "NEXUS_PREFILTRO_PAUSA_S": "5"}
+    cfg = carregar_config({k: "x" for k in OBRIGATORIAS} | pre)
+    assert {k: cfg.get(k) for k in pre} == pre
