@@ -1000,7 +1000,11 @@ no responsável)"): `/t/campo/responsaveis?r=<número da pessoa>&modo=painel`. O
       sem nada ter ido ao Fracttal; e o aviso saía como "concluída. true". Redirecionado, ou resposta sem JSON: "A sua
       sessão do Nexus acabou: recarregue a página e entre de novo." O PDF segue a mesma regra. Prova na bancada (fila
       real de 29/10): o Concluir depois do /sair deu o aviso da sessão, e a resposta simulada da rota (com e sem o
-      aviso, o erro e sem o ok) deu a frase certa em cada caso; a prova no Fracttal de verdade (TESTE - PA) espera o OK.
+      aviso, o erro e sem o ok) deu a frase certa em cada caso. No ar (05/11/2026, 15:11 de Brasília, e4df64a): o POST
+      sem sessão na produção volta 302 para /entrar e, seguido, 200 em HTML (o caso do defeito), e a página no ar traz o
+      script novo. A OS de TESTE - PA não aparece nesta lista (não é usina da Visão), então o Concluir de verdade pela
+      tela pediria uma OS de cliente: não foi feito; a mesma rota respondendo `ok: true` com o status 3 lido de volta foi
+      provada no Fracttal pela Aprovação de OS (OS 18630, acima).
     - A OS concluída, ou mudada no card, sai da fila guardada pela conferência da Aprovação
       (`/t/campo/aprovacao/<id>/conferir`: só sai o que o Fracttal confirma).
   - **Exemplo:** na bancada, um responsável com 26 usinas tinha 212 esperando; ficaram de fora 69 por etiqueta e 95
