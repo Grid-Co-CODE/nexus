@@ -55,7 +55,7 @@ def test_tela_com_view_propria_conta_como_conteudo(app):
     prontas = telas_com_conteudo(app)
     assert "/t/base/governanca" in prontas        # view própria
     assert "/t/pcm/quadro" in prontas
-    assert "/t/cos/mesa" not in prontas           # ainda placeholder
+    assert "/t/cos/mesa" in prontas               # 05/11/2026: a Mesa do operador deixou de ser placeholder
     # 03/11/2026: o Comando ganhou a Caixa de entrada e os Insights (os setores conversando); a Sala de comando segue placeholder
     assert "/t/comando/caixa-de-entrada" in prontas and "/t/comando/insights" in prontas
     assert "/t/comando/sala-de-comando" not in prontas
@@ -68,7 +68,8 @@ def test_menu_pinta_de_verde_so_o_que_tem_conteudo(logado):
     assert classe["base"] and classe["os"]
     assert classe["comando"]          # 03/11/2026: Caixa de entrada e Insights
     assert '<a href="/t/base/governanca" class="com-conteudo"' in html
-    assert 'href="/t/cos/mesa" class="com-conteudo"' not in html
+    assert 'href="/t/cos/mesa" class="com-conteudo"' in html
+    assert 'href="/t/comando/sala-de-comando" class="com-conteudo"' not in html   # ainda placeholder
 
 
 def test_aviso_aponta_a_pasta_certa(app):
