@@ -775,6 +775,16 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .eg-coment-editar textarea{width:100%;margin:6px 0}
 .eg-coment-apagar{background:none;border:0;padding:0;font:inherit;color:var(--erro);cursor:pointer}
 .eg-coment-apagar:hover,.eg-coment-editar summary:hover{text-decoration:underline}
+/* Editar e Apagar só ao passar o mouse no comentário (Levi, 05/11/2026: "esse apagar ou editar comentário deve aparecer
+   apenas ao passar o mouse no comentário!"), na gaveta e na página da OS do Quadro. Com o teclado, ao chegar nele
+   (focus-within); aberto para editar ou com o aviso de erro, fica. Só com mouse (hover:hover): no toque ficam à vista.
+   É opacidade, não display: o comentário não pula quando os botões aparecem, e o teclado ainda os alcança */
+@media (hover:hover){
+.eg-tl-e .eg-coment-acoes,.eg-acomp-tl>li .eg-coment-acoes{opacity:0;transition:opacity .12s}
+.eg-tl-e:hover .eg-coment-acoes,.eg-tl-e:focus-within .eg-coment-acoes,.eg-acomp-tl>li:hover .eg-coment-acoes,
+.eg-acomp-tl>li:focus-within .eg-coment-acoes,.eg-coment-acoes:has(details[open]),
+.eg-coment-acoes:has(.eg-os-msg:not([hidden])){opacity:1}
+}
 .eg-acomp-gerar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;
   padding:10px 12px;border-radius:10px;background:var(--superficie-2);font-size:13px;color:var(--tinta-2)}
 .eg-acomp-gerar form{margin:0}

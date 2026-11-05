@@ -363,6 +363,11 @@ Acompanhamento é dividido entre quem vê o mesmo no Fracttal (seção "O quadro
   conferência antes de gravar o ticket). Eram até 5 pedidos em fila. Tarefas, subtarefas e cabeçalho vão juntos;
   solicitação, OS pai e motivo do cancelamento vão juntos depois. Os mesmos pedidos; a ordem das subtarefas é a da
   seção "O card da OS com várias tarefas".
+- **A nota em dois campos (05/11/2026):** `api.get_os_detalhes` devolve `notas`, a `note` e a `task_note` de cada tarefa
+  sem repetir a que já está DENTRO de outra (`os_detalhe.juntar_notas`), e, crus, `nota_gravada` (a `note` da 1ª tarefa,
+  o que o `editar_nota_os` grava) e `nota_da_tarefa` (a `task_note`, a nota com que a OS nasceu). Quem regrava a nota parte
+  do cru, nunca da junção (a ponte da Engenharia, `ponte._base_da_nota`): regravar a junção repetia a nota de entrada a
+  cada comentário (prova no Fracttal da OS 18591 de TESTE - PA). A prova: `tests/test_engenharia_nota_da_os.py`.
 - **Leitura enxuta, por contexto:** `with api.enxuta("vinculos")` pula a 2ª leva (a tela de um chamado não mostra
   solicitação nem OS pai); `with api.enxuta("url")` traz as listas de anexos sem a URL pré-assinada. É por contexto, e
   não por argumento, porque as rotas chamam essas funções com um argumento só e os testes do oem as trocam por

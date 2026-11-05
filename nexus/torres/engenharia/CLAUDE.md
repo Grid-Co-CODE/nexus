@@ -136,8 +136,10 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   OS do Quadro; são eventos novos (`comentario_editado`, `comentario_apagado`, com o `alvo_id`), e a linha da nota da OS
   muda junto (a editada leva "(editado)" no fim; a apagada sai). A linha é achada pelo que o livro guardou dela
   (`linha_nota`, cifrada) ou, no comentário de antes, pela data, o nome e o texto; a OS fechada ou a linha que alguém
-  mudou no Fracttal deixam a nota como está, e a tela diz. O "Apagar" pergunta antes. A rota antiga de comentar da
-  Confiabilidade (só a página aberta antes do deploy a usa) segue sem a regra.
+  mudou no Fracttal deixam a nota como está, e a tela diz. O "Apagar" pergunta antes. Editar e Apagar só aparecem ao
+  passar o mouse no comentário (Levi, 05/11/2026: "deve aparecer apenas ao passar o mouse no comentário!"), ou com o
+  teclado nele; no toque, sem mouse, ficam à vista (`@media (hover:hover)` no `engenharia.css`). A rota antiga de comentar
+  da Confiabilidade (só a página aberta antes do deploy a usa) segue sem a regra.
 - **Falha nova** é a do sinal (corretiva e corretiva emergencial, sem o serviço registrado como corretiva): "desde que
   entrou" conta da gravação do Pegar (o início pode ser anterior), e o retorno conta do dia seguinte ao fim.
 - **A OS de análise no Fracttal** (29/10/2026: "quando eu clico em pegar para acompanhar criar uma OS para a pessoa que
@@ -150,7 +152,13 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   quem encaminhou para quem) e as falhas até ali, e a subtarefa "Diagnóstico". Encerrar (o fim com o diagnóstico) responde
   a subtarefa com o nome do diagnóstico, lança a execução das 8h do início às 18h do fim (nunca depois de agora) e CONCLUI
   a OS, o que não volta: as regras do salvar são conferidas antes (`acompanhamento.conferir_encerrar`), e a OS que outra
-  tentativa já concluiu (`ERROR_WO_FINISHED`) segue para o Nexus. Encaminhar um acompanhamento com OS troca o responsável
+  tentativa já concluiu (`ERROR_WO_FINISHED`) segue para o Nexus; a sessão do Fracttal que cai no meio dá "a sessão
+  venceu" (o `id_tarefa_da_os` do clone engole o erro, e o `encerrar` confere o `is_logged_in` antes de dizer que a OS não
+  tem tarefa). **Conferido no Fracttal** (05/11/2026, OS 18591 de TESTE - PA, cancelada no fim): o Pegar cria a OS como
+  descrito acima, e o comentário, o editar e o apagar mudam só a linha deles na nota. O encerrar, o Gerar OS e o
+  encaminhar com OS ainda não foram conferidos lá: a Confiabilidade do ar tira os ativos TESTE das contas, e a cópia de
+  prova (banco falso, Fracttal de verdade) perde a sessão quando o Fracttal é aberto noutra aba (uma sessão por conta).
+  Encaminhar um acompanhamento com OS troca o responsável
   dela (`mudar_responsavel`, a nota fica) e escreve a linha na nota; o comentário vai para a nota da OS, como no Quadro da
   equipe (a mesma `_acrescentar_na_nota` e a mesma trava). Com a OS, a gaveta mostra o número (a página dela no Quadro) e o
   Solicitar OS e o Criar OS com ela como OS pai e a data do evento dela, como a página da OS do Quadro. As ações da gaveta
@@ -383,9 +391,14 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   por vez). A regra medida do card vale: OS concluída, cancelada ou de várias tarefas não deixa editar a nota (com
   várias, sobrescreveria a observação da tarefa errada); aí o comentário fica só no Nexus e a linha do tempo diz por
   quê. Da revisão final (24/10/2026): a OS que o Fracttal devolve sem tarefas (a leitura que falha "mole") não é
-  gravada, porque a nota inteira viraria a linha nova; e a nota que a página mostra tem de estar no que vai ser
-  regravado (o Fracttal tem a nota da OS e a da tarefa, e a OS 12191 tinha as duas diferentes), senão o comentário fica
-  só no Nexus. Sem a sessão do Fracttal (quem entrou pela Microsoft), a resposta traz o login do Fracttal, que volta
+  gravada, porque a nota inteira viraria a linha nova. **A nota tem dois campos** no Fracttal: a `note`, que o
+  `editar_nota_os` grava (é onde o Nexus escreve), e a `task_note`, a nota com que a OS nasceu; o card do OS Creator mostra
+  as duas juntas (`notas`, sem repetir a que já está dentro da outra). Quem regrava parte da `note` (na 1ª vez, da
+  `task_note`), nunca da junção (`ponte._base_da_nota`): regravar a junção punha a nota de entrada de novo a cada
+  comentário, edição ou remoção (prova no Fracttal de 05/11/2026, OS 18591 de TESTE - PA; o Fracttal falso dos testes
+  tinha um campo só, e o `tests/test_engenharia_nota_da_os.py` tem os dois). A nota que a página mostra tem de estar na
+  junção (a OS 12191 tinha as duas diferentes), senão o comentário fica só no Nexus. "Na nota da OS" da página mostra a
+  `task_note` (`os_equipe._nota_da_os`): as linhas do Nexus aparecem no card do OS Creator e na linha do tempo, não ali. Sem a sessão do Fracttal (quem entrou pela Microsoft), a resposta traz o login do Fracttal, que volta
   para a página; a sessão cassada antes do vencimento encerra o Nexus de quem entrou pelo Fracttal (o /os/login, com o
   JWT morto no cookie, voltava direto para a página) e tira o cookie do OS Creator de quem entrou pela Microsoft. Erro
   do Fracttal não grava nada. O comentário também fica no livro (texto e nome cifrados).
