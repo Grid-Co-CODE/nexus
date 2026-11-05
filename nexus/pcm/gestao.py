@@ -1,14 +1,17 @@
-"""Gestão PCM: o bloco "Manutenções — Plano & Fila" do painel do PCM, no Nexus.
+"""Gestão PCM: a aba Gestão PCM do painel do PCM, no Nexus.
 
 Levi (07/10/2026): "quero que traga a visão de acompanhamento de manutenção do aplicativo para o Nexus conforme prints".
-É a transcrição das contas do `js/preventivas.js` do gridco-pcm-data (pcm.gridco.com.br, aba Gestão PCM), para os
-números do Nexus baterem com os do painel: a prova (`python -m nexus.pcm.prova_gestao`) roda o próprio JavaScript do
-painel contra o mesmo JSON e compara célula a célula (ver nexus/pcm/CLAUDE.md). Mudou a regra lá? Mude aqui e rode a
-prova de novo.
+É a transcrição das contas do `js/preventivas.js` (o bloco "Manutenções — Plano & Fila") e, desde 04/11/2026, do
+`js/app.js` (os filtros de cima completos, os números do alto, as árvores Cliente ▸ Usina ▸ Tipo e o Só atrasadas) do
+gridco-pcm-data (pcm.gridco.com.br, aba Gestão PCM), para os números do Nexus baterem com os do painel: a prova
+(`python -m nexus.pcm.prova_gestao`) roda o próprio JavaScript do painel contra o mesmo JSON e compara célula a célula
+(ver nexus/pcm/CLAUDE.md). Mudou a regra lá? Mude aqui e rode a prova de novo.
 
 Diferenças de propósito: a OS sem "#" (convenção do Nexus); o "hoje" em Brasília (o painel usa o dia UTC para
-"atrasada", e entre 21h e meia-noite já conta o dia seguinte); a célula de grupo e do TOTAL sem a dica falsa "sem
-preventiva no período"; e o cabeçalho Tipo da Fila ordena pelo tipo (no painel ele não ordena nada).
+"atrasada", e entre 21h e meia-noite já conta o dia seguinte); a hora do "Atualizado" em Brasília; a célula de grupo e
+do TOTAL sem a dica falsa "sem preventiva no período"; o cabeçalho Tipo da Fila ordena pelo tipo (no painel ele não
+ordena nada); as listas de cima em cascata (no painel cada lista mostra tudo); e o Fracttal pela OS da tarefa (no
+painel, o módulo de OS inteiro).
 
 - PLANO: % de tarefas finalizadas por grupo ▸ usina × sigla (MPM/MPT/MPS/MPA) ou × mês, nos três últimos meses.
   Preventiva conta no mês da Data Programada; demanda (corretiva, religamento...) no mês da CRIAÇÃO. MPA/MPS em fração
@@ -216,43 +219,214 @@ def escopo(tarefas) -> list[dict]:
             and t["cliente"] != "(sem cliente)" and str(t["cliente"]).lower() != "usina teste"]
 
 
-TOPO = ("cliente", "usina", "cluster", "responsavel")      # os filtros de cima que o Nexus traz da aba do painel
+# ── os filtros de cima da aba (a barra do index.html do painel e o `gpFilteredTarefas` do js/app.js) ─────────────────
+# (nome na URL, campo da tarefa, rótulo, o "vazio" da lista), na ordem da barra do painel. O Tipo de cima vai como
+# `tipo_tarefa` porque o `tipo` da URL já é o Tipo do Plano & Fila (prev, MPM, corr...): o endereço de hoje não muda
+LISTAS = (("cliente", "cliente", "Cliente", "Todos"), ("usina", "usina", "Usina", "Todas"),
+          ("cluster", "cluster", "Equipe cluster", "Todos"), ("responsavel", "responsavel", "Responsável O&M", "Todos"),
+          ("tipo_tarefa", "tipo", "Tipo", "Todos"), ("etiqueta", "etiquetas", "Etiqueta", "Todas"),
+          ("estado", "estado", "Estado", "Todos"))
+PMODOS = (("qq", "Qualquer data"), ("prog", "Só programada"), ("ini", "Só início"), ("fim", "Só final"))
+PARAMS_FILTRO = (*(n for n, *_ in LISTAS), "os", "ss", "pini", "pfim", "pmodo", "atr")   # o "Limpar" tira todos
+MAX_VALORES, MAX_TEXTO = 50, 160
+_DIA = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
-def escolhas_topo(tarefas, topo: dict | None = None) -> dict[str, list[str]]:
-    """As opções de cada filtro de cima. Grafias que só mudam na maiúscula viram UMA, a mais frequente (painel:
-    "PA Norte 01" × "PA NORTE 01"); o filtro compara sem maiúscula, então qualquer uma pega as duas.
+@dataclass(frozen=True)
+class Filtros:
+    """Os filtros de cima, já limpos: cada lista com as escolhas (na grafia de quem escolheu; a conta compara sem
+    maiúscula), a OS e a Solicitação por "contém", o período (AAAA-MM-DD) com o "considerar" e o Só atrasadas.
+    Imutável: entra inteiro na chave da cópia guardada da tela (`telas._G_CACHE`)."""
+    cliente: tuple = ()
+    usina: tuple = ()
+    cluster: tuple = ()
+    responsavel: tuple = ()
+    tipo_tarefa: tuple = ()
+    etiqueta: tuple = ()
+    estado: tuple = ()
+    os: str = ""
+    ss: str = ""
+    pini: str = ""
+    pfim: str = ""
+    pmodo: str = "qq"
+    atr: bool = False
 
-    Com `topo` (os filtros escolhidos), cada filtro lista só o que existe com os OUTROS aplicados (Levi, 09/10/2026:
-    "Os filtros tem que se auto filtrar também"): escolhido o cliente, a Usina e a Equipe cluster só listam as dele. O
-    filtro não restringe a si mesmo (dá para trocar de cliente sem limpar o resto), e o valor escolhido fica na lista."""
-    topo = topo or {}
-    out = {}
-    for campo in TOPO:
-        outros = {k: v for k, v in topo.items() if k != campo and k in TOPO}
-        base_ = filtrar_topo(tarefas, **outros) if any(outros.values()) else tarefas
-        por_baixa: dict[str, dict[str, int]] = {}
-        for t in base_:
-            v = t.get(campo)
-            if v:
-                g = por_baixa.setdefault(str(v).lower(), {})
-                g[str(v)] = g.get(str(v), 0) + 1
-        valores = sorted((max(g, key=g.get) for g in por_baixa.values()), key=sem_acento)
-        escolhido = str(topo.get(campo) or "")
-        if escolhido and escolhido.lower() not in por_baixa:
-            valores.append(escolhido)
-        out[campo] = valores
-    return out
+    def ativos(self) -> bool:
+        """Algum filtro valendo (o "considerar" sozinho, sem as datas, não filtra nada)."""
+        return bool(any(getattr(self, n) for n, *_ in LISTAS) or self.os or self.ss or self.pini or self.pfim
+                    or self.atr)
 
 
-def filtrar_topo(tarefas, cliente="", cluster="", responsavel="", usina="") -> list[dict]:
-    """Os filtros de cima da aba (no painel, multisseleção; aqui, um de cada), sem diferenciar maiúscula
-    (o Fracttal escreve "PA NORTE 01" e "PA Norte 01")."""
-    c, k, r, u = (str(x or "").lower() for x in (cliente, cluster, responsavel, usina))
-    return [t for t in tarefas if (not c or str(t.get("cliente") or "").lower() == c)
-            and (not u or str(t.get("usina") or "").lower() == u)
-            and (not k or str(t.get("cluster") or "").lower() == k)
-            and (not r or str(t.get("responsavel") or "").lower() == r)]
+def _escolhas_da_url(args, nome) -> tuple:
+    if hasattr(args, "getlist"):
+        brutos = args.getlist(nome)
+    else:
+        v = (args or {}).get(nome)
+        brutos = list(v) if isinstance(v, (list, tuple)) else ([] if v is None else [v])
+    out, vistos = [], set()
+    for v in brutos:
+        s = str(v)[:MAX_TEXTO]
+        if s.strip() and s.lower() not in vistos:       # sem a vazia e sem a que só muda na maiúscula
+            vistos.add(s.lower())
+            out.append(s)
+            if len(out) == MAX_VALORES:
+                break
+    return tuple(out)
+
+
+def _um(args, nome) -> str:
+    v = (args or {}).get(nome)
+    return str(v if v is not None else "").strip()[:MAX_TEXTO]       # o gpVal do painel também tira os espaços
+
+
+def _dia_da_url(args, nome) -> str:
+    v = _um(args, nome)
+    try:
+        return v if _DIA.fullmatch(v) and date.fromisoformat(v) else ""
+    except ValueError:                                               # 2026-02-30: o campo de data do painel não deixa
+        return ""
+
+
+def filtros(args) -> Filtros:
+    """Os filtros de cima pela URL. Cada lista pode repetir (`?cliente=A&cliente=B`: várias escolhas, como as caixas
+    do painel), e o valor único de antes vale igual. Até 50 escolhas por lista e 160 letras por valor; data que não é
+    AAAA-MM-DD (ou não existe) e "considerar" desconhecido caem fora."""
+    pmodo = _um(args, "pmodo")
+    return Filtros(**{n: _escolhas_da_url(args, n) for n, *_ in LISTAS}, os=_um(args, "os"), ss=_um(args, "ss"),
+                   pini=_dia_da_url(args, "pini"), pfim=_dia_da_url(args, "pfim"),
+                   pmodo=pmodo if pmodo in dict(PMODOS) else "qq", atr=_um(args, "atr") == "1")
+
+
+# A ordem do `localeCompare(…, 'pt-BR')` do painel (o ICU do navegador), nas listas e nas árvores: o espaço e a
+# pontuação antes dos dígitos, os dígitos antes das letras; decide a letra sem acento e sem maiúscula, depois o acento
+# (sem acento antes) e por último a maiúscula (a minúscula antes). A ordem dos sinais e dos acentos é a do ICU,
+# conferida no node (ICU 78, 04/11/2026; `test_a_ordem_das_listas_e_das_arvores_e_a_do_localecompare_do_painel`)
+_SINAIS = " _-‐‑‒–—,;:!?.'\"()[]{}§@*/\\&#%`^°+<=>|~$"
+_ACENTOS = "̧̨́̀̆̂̌̊̈̋̃̇̄"
+
+
+def ordem_pt(s) -> tuple:
+    letras, acentos, caixa = [], [], []
+    for c in unicodedata.normalize("NFKD", str(s or "")):
+        if unicodedata.combining(c):
+            if acentos:
+                acentos[-1] += (_ACENTOS.find(c) if c in _ACENTOS else 100 + ord(c),)
+            continue
+        b = c.lower()
+        letras.append((3, b) if c.isalpha() else (2, b) if c.isdigit() else
+                      (0, _SINAIS.index(c)) if c in _SINAIS else (1, ord(c)))
+        acentos.append(())
+        caixa.append(c != b)
+    return letras, acentos, caixa
+
+
+def _js(v) -> str:
+    """O String(v) do JavaScript para um valor do JSON (null vira "null", 2.0 vira "2"): é assim que o painel compara a
+    OS e a Solicitação e monta as chaves da árvore."""
+    if v is None:
+        return "null"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
+
+
+def _campo_js(t, campo) -> str:
+    return _js(t[campo]) if campo in t else "undefined"
+
+
+def _esc_js(v) -> str:
+    return "" if v is None else _js(v)                  # o gpEsc do painel: nulo vira texto vazio
+
+
+@dataclass(frozen=True)
+class Recorte:
+    """O que os filtros de cima deixam: `todas` (o gpFilteredTarefas do painel: os números, as árvores, o Só atrasadas
+    e o Plano & Fila sem Tipo próprio), `sem_tipo` (todos os filtros menos o Tipo de cima: o Plano & Fila com Tipo
+    próprio) e `escolhas` (as opções de cada lista, em cascata)."""
+    todas: list
+    sem_tipo: list
+    escolhas: dict
+
+
+_BIT_TIPO = 1 << [n for n, *_ in LISTAS].index("tipo_tarefa")
+_BIT_RESTO = 1 << len(LISTAS)            # a OS, a Solicitação e o período: não são lista e valem para todas
+
+
+def recortar(tarefas, f: Filtros) -> Recorte:
+    """Os filtros de cima (gpFilteredTarefas): dentro de uma lista, qualquer das escolhas; entre as listas, todas; sem
+    diferenciar maiúscula (o Fracttal escreve "PA NORTE 01" e "PA Norte 01"); a Etiqueta pega a tarefa com qualquer das
+    etiquetas escolhidas; OS e Solicitação por "contém"; o período pega a tarefa se a data do "considerar" (por padrão
+    qualquer das três: programada, início ou final) cair na faixa.
+
+    Uma passada só: cada tarefa sai marcada com os filtros em que falha, e daí vêm as três coisas. As listas em cascata
+    (Levi, 09/10/2026: "Os filtros tem que se auto filtrar também"): cada uma com os OUTROS filtros aplicados (o filtro
+    não restringe a si mesmo), a grafia mais frequente entre as que só mudam na maiúscula e a ordem do localeCompare
+    pt-BR (gpMsOptions do painel); o valor escolhido fica na lista mesmo sem tarefa (a tela não esconde o filtro que
+    está valendo)."""
+    sel = [frozenset(v.lower() for v in getattr(f, n)) for n, *_ in LISTAS]
+    ativas = [(i, campo, s) for i, ((_n, campo, *_r), s) in enumerate(zip(LISTAS, sel)) if s]
+    q_os, q_ss = f.os.lower(), f.ss.lower()
+    datas = ({"prog": ("dataProg",), "ini": ("dataInicio",), "fim": ("dataFinal",)}.get(
+        f.pmodo, ("dataProg", "dataInicio", "dataFinal")) if (f.pini or f.pfim) else ())
+
+    def dentro(v) -> bool:
+        d = _js(v)[:10] if v else ""
+        return bool(d) and not (f.pini and d < f.pini) and not (f.pfim and d > f.pfim)
+    contas: list[dict] = [{} for _ in LISTAS]
+
+    def conta(i, t):
+        v = t.get(LISTAS[i][1])
+        for x in (v if isinstance(v, list) else [v]):
+            if x:
+                s = _js(x)
+                g = contas[i].setdefault(s.lower(), {})
+                g[s] = g.get(s, 0) + 1
+    todas, sem_tipo = [], []
+    for t in tarefas:
+        m = 0
+        for i, campo, s in ativas:
+            if campo == "etiquetas":
+                if not any((_js(e) if e else "").lower() in s for e in (t.get("etiquetas") or [])):
+                    m |= 1 << i
+            elif (_js(t.get(campo)) if t.get(campo) else "").lower() not in s:
+                m |= 1 << i
+        if ((q_os and q_os not in _campo_js(t, "os").lower()) or (q_ss and q_ss not in _campo_js(t, "ss").lower())
+                or (datas and not any(dentro(t.get(c)) for c in datas))):
+            m |= _BIT_RESTO
+        if m == 0:
+            todas.append(t)
+            for i in range(len(LISTAS)):
+                conta(i, t)
+        elif m & (m - 1) == 0 and m != _BIT_RESTO:          # falha só numa lista: conta para ela (não se restringe)
+            conta(m.bit_length() - 1, t)
+        if f.tipo_tarefa and m & ~_BIT_TIPO == 0:
+            sem_tipo.append(t)
+    escolhas = {}
+    for i, (n, *_r) in enumerate(LISTAS):
+        valores = sorted((max(g, key=g.get) for g in contas[i].values()), key=ordem_pt)
+        ja = set(contas[i])
+        for v in getattr(f, n):
+            if v.lower() not in ja:
+                ja.add(v.lower())
+                valores.append(v)
+        escolhas[n] = valores
+    return Recorte(todas=todas, sem_tipo=sem_tipo if f.tipo_tarefa else todas, escolhas=escolhas)
+
+
+def tipo_local(o: "Opcoes", f: Filtros) -> bool:
+    """O Tipo do Plano & Fila sobrepõe o Tipo de cima (preventivas.js, gpvTarefasTop): compor os dois daria matriz
+    vazia sem explicação (Corretiva em cima e Preventivas no Plano). Com o Todos, o de cima vale."""
+    return o.tipo != "todos" and bool(f.tipo_tarefa)
+
+
+def tarefas_do_plano(rec: Recorte, f: Filtros, local: bool) -> list[dict]:
+    """As tarefas do Plano & Fila (a matriz, as pendentes da célula e a Fila do Fracttal), como o gpvTarefasTop do
+    painel: as do recorte, sem o Tipo de cima quando o Plano tem Tipo próprio; com o Só atrasadas, só as abertas e
+    atrasadas."""
+    ts = rec.sem_tipo if local else rec.todas
+    return [t for t in ts if t.get("aberta") and t.get("atrasado")] if f.atr else ts
 
 
 def classificar(t) -> tuple[str, str] | None:
@@ -622,21 +796,34 @@ def fila_gerencial(mp: dict, h: date) -> list[dict]:
 _OBS_DATA = re.compile(r"^\d{2}/\d{2}/\d{4}\s*[-–—:]*\s*")
 
 
-def fila_topo_ok(x: dict, cliente="", cluster="", usina="", **_) -> bool:
-    """Os filtros de cima nas linhas da Gerencial: os nomes divergem do Fracttal, então a comparação é frouxa.
-    Responsável não existe na Gerencial e não filtra a Fila (painel)."""
-    if cliente and not bate(norm(cliente), norm(x.get("cli"))):
+def fila_topo_ok(x: dict, f: Filtros) -> bool:
+    """Os filtros de cima nas linhas da Gerencial (gpvFilaTopOk do painel): Cliente, Usina e Cluster pela comparação
+    frouxa (os nomes divergem do Fracttal), qualquer das escolhas; a OS por "contém"; o período pela Prevista OU pela
+    Programada (o "considerar" não vale aqui); o Só atrasadas. Responsável, Tipo, Etiqueta, Estado e Solicitação não
+    existem na Gerencial e não filtram a Fila (painel)."""
+    def algum(escolhas, valores):
+        return any(bate(norm(s), norm(v)) for s in escolhas for v in valores if v)
+    if f.cliente and not algum(f.cliente, [x.get("cli")]):
         return False
-    if usina and not any(bate(norm(usina), norm(v)) for v in (x.get("usinaFull"), x.get("nome"))):
+    if f.usina and not algum(f.usina, [x.get("usinaFull"), x.get("nome")]):
         return False
-    return not (cluster and not bate(norm(cluster), norm(x.get("clu"))))
+    if f.cluster and not algum(f.cluster, [x.get("clu")]):
+        return False
+    if f.os and f.os.lower() not in str(x.get("os") or "").lower():
+        return False
+    if f.pini or f.pfim:
+        def dentro(d):
+            return bool(d) and (not f.pini or d >= f.pini) and (not f.pfim or d <= f.pfim)
+        if not dentro(x.get("prev")) and not dentro(x.get("prog")):
+            return False
+    return not (f.atr and x["sit"]["k"] != "Atrasada")
 
 
-def fila_universo(tarefas, mp, topo: dict, h: date) -> list[dict]:
+def fila_universo(tarefas, mp, f: Filtros, h: date) -> list[dict]:
     """Todas as linhas da Fila antes dos filtros do bloco: as da Gerencial (com os filtros de cima) quando a planilha
-    abriu, senão o lado do Fracttal, já recortado pelos filtros de cima em `tarefas`."""
+    abriu, senão o lado do Fracttal, já recortado pelos filtros de cima em `tarefas` (`tarefas_do_plano`)."""
     if mp is not None:
-        return [x for x in fila_gerencial(mp, h) if fila_topo_ok(x, **topo)]
+        return [x for x in fila_gerencial(mp, h) if fila_topo_ok(x, f)]
     return fila_fracttal(tarefas, h)
 
 
@@ -720,3 +907,152 @@ def par_topo(b, meses_, fila=None) -> dict:
         out.update(atrasadas=len(atr), mais_antiga=max((x["atraso"] or 0 for x in atr), default=0),
                    crit_sem_data=k["critsem"], sem_os=k["semos"])
     return out
+
+
+# ── a aba Gestão PCM do painel além do Plano & Fila (Levi, 04/11/2026): os números do alto, as árvores Cliente ▸ Usina
+# ▸ Tipo e o Só atrasadas, transcritos do js/app.js (renderGestao, gpTreeHTML, gpTableHTML, gpFlatHTML) ──────────────
+ABRE_SOZINHA = 60          # a árvore principal abre sozinha, com as tabelas cheias, até 60 tarefas (renderGestao)
+_TIPO_CLASSE = (("emergencial", "emergencial"), ("corretiva", "corretiva"), ("preventiva", "preventiva"),
+                ("handover", "handover"), ("religa", "religamento"), ("inspe", "inspecao"), ("predit", "preditiva"),
+                ("admin", "administrativa"))
+
+
+def nao_finalizada(t) -> bool:
+    """"Não finalizada no período" (gpNaoFin): a OS já está Finalizados no Fracttal e a tarefa ficou em aberto. Vai numa
+    lista à parte e fica fora dos números do alto."""
+    return t.get("osStatus") == "Finalizados" and bool(t.get("aberta"))
+
+
+def tipo_classe(tipo) -> str:
+    """A família do tipo na árvore, para a cor (gpTipoClass do painel, pelo pedaço do nome; Zeladoria e o resto,
+    "outra")."""
+    x = str(tipo or "").lower()
+    return next((c for k, c in _TIPO_CLASSE if k in x), "outra")
+
+
+def estado_cls(estado) -> str:
+    """A cor do estado da tarefa (gpEstadoPill do painel) nas classes do Nexus: em progresso info, pausada nulo,
+    finalizada ok e o resto (não iniciada) âmbar."""
+    x = str(estado or "").lower()
+    return "info" if "progress" in x else ("nulo" if "paus" in x else ("ok" if "finaliz" in x else "and"))
+
+
+def data_br(iso) -> str:
+    """A data como a árvore e o Só atrasadas do painel mostram (gpFmtData): dd/mm/aaaa; sem data, "—"."""
+    if not iso:
+        return "—"
+    p = str(iso).split("-")
+    return f"{p[2]}/{p[1]}/{p[0]}" if len(p) == 3 else str(iso)
+
+
+def _card(t) -> dict:
+    """O que abre a OS: o card dela no Nexus (o id do Fracttal e o status na grafia do card, como nas pendentes) e o
+    Fracttal no ícone (a `url` da tarefa: o painel abre só o módulo de OS, porque achava que não havia link por OS)."""
+    st = str(t.get("osStatus") or "")
+    return {"os": _esc_js(t.get("os")), "wid": t.get("idWO"), "status": STATUS_DO_CARD.get(sem_acento(st).strip(), st),
+            "url": str(t.get("url") or "")}
+
+
+def linha_tarefa(t, dias_alerta: int = 10) -> dict:
+    """Uma linha da tabela de um tipo da árvore (gpTableHTML): a OS (sem "#", convenção do Nexus), a tarefa, o estado,
+    até três etiquetas e quantas mais, as datas no dd/mm/aaaa do painel e os dias em aberto (gpDiasCell: acima do
+    diasAlerta vermelho, de 5 em diante âmbar; finalizada, sem dias ou com dias negativos, "—")."""
+    d, etq = t.get("dias"), list(t.get("etiquetas") or [])
+    if not t.get("aberta") or d is None or d < 0:
+        dias, dias_cls = "—", "ok"
+    else:
+        dias, dias_cls = _js(d) + "d", ("crit" if d > dias_alerta else ("and" if d >= 5 else "ok"))
+    return {**_card(t), "tarefa": str(t.get("tarefa") or "—"), "curto": curto(t.get("tarefa")),
+            "estado": str(t.get("estado") or "—"), "estado_cls": estado_cls(t.get("estado")),
+            "etiquetas": [_esc_js(e) for e in etq[:3]], "etiquetas_mais": max(0, len(etq) - 3),
+            "prog": data_br(t.get("dataProg")), "fim": data_br(t.get("dataFinal")), "dias": dias, "dias_cls": dias_cls}
+
+
+def linha_atrasada(t, dias_alerta: int = 10) -> dict:
+    """Uma linha do Só atrasadas (gpFlatHTML): os dias (sem dias, 0; acima do diasAlerta vermelho, de 5 em diante
+    âmbar), a OS, o cliente, a usina, a tarefa, o tipo, o estado, a Data Programada, TODAS as etiquetas e a
+    observação da OS."""
+    d = t["dias"] if t.get("dias") is not None else 0
+    return {**_card(t), "dias": _js(d) + "d", "dias_cls": "crit" if d > dias_alerta else ("and" if d >= 5 else ""),
+            "cliente": _esc_js(t.get("cliente")), "usina": _esc_js(t.get("usina")),
+            "tarefa": str(t.get("tarefa") or "—"), "curto": curto(t.get("tarefa")), "tipo": str(t.get("tipo") or "—"),
+            "estado": str(t.get("estado") or "—"), "estado_cls": estado_cls(t.get("estado")),
+            "prog": data_br(t.get("dataProg")), "etiquetas": [_esc_js(e) for e in (t.get("etiquetas") or [])],
+            "obs": str(t.get("obs") or "")}
+
+
+def _pelos_dias(ts) -> list[dict]:
+    """As abertas pelos dias em aberto, as mais velhas primeiro; as outras (finalizadas e sem dias) depois, na ordem do
+    arquivo (o sort do painel é estável)."""
+    return sorted(ts, key=lambda t: -(t["dias"] if t.get("aberta") and t.get("dias") is not None else -1e9))
+
+
+def arvore(lista, dias_alerta: int = 10, linhas: bool = False) -> list[dict]:
+    """A árvore Cliente ▸ Usina ▸ Tipo (gpTreeHTML), cada nível na ordem do localeCompare pt-BR, com quantas tarefas
+    cada nó tem e, no tipo, quantas estão atrasadas. Com `linhas` (a árvore que o painel abre sozinha), cada tipo leva
+    as linhas da tabela dele; sem, a tabela vem pela rota (`tarefas_do_no`): 31 mil tarefas não vão na página."""
+    clientes: dict[str, dict] = {}
+    for t in lista:
+        c = clientes.setdefault(_campo_js(t, "cliente"), {"n": 0, "usinas": {}})
+        u = c["usinas"].setdefault(_campo_js(t, "usina"), {"n": 0, "tipos": {}})
+        u["tipos"].setdefault(_campo_js(t, "tipo"), []).append(t)
+        c["n"] += 1
+        u["n"] += 1
+    out = []
+    for cn in sorted(clientes, key=ordem_pt):
+        usinas = []
+        for un in sorted(clientes[cn]["usinas"], key=ordem_pt):
+            u, tipos = clientes[cn]["usinas"][un], []
+            for tn in sorted(u["tipos"], key=ordem_pt):
+                ts = u["tipos"][tn]
+                no = {"nome": tn, "n": len(ts), "atrasadas": sum(1 for t in ts if t.get("atrasado")),
+                      "classe": tipo_classe(tn)}
+                if linhas:
+                    no["linhas"] = [linha_tarefa(t, dias_alerta) for t in _pelos_dias(ts)]
+                tipos.append(no)
+            usinas.append({"nome": un, "n": u["n"], "tipos": tipos})
+        out.append({"nome": cn, "n": clientes[cn]["n"], "usinas": usinas})
+    return out
+
+
+def tarefas_do_no(lista, cliente, usina, tipo, dias_alerta: int = 10) -> list[dict] | None:
+    """As linhas da tabela de UM tipo da árvore (Cliente ▸ Usina ▸ Tipo), na ordem do painel. None = o nó não existe."""
+    ts = [t for t in lista if _campo_js(t, "cliente") == cliente and _campo_js(t, "usina") == usina
+          and _campo_js(t, "tipo") == tipo]
+    return [linha_tarefa(t, dias_alerta) for t in _pelos_dias(ts)] if ts else None
+
+
+def aba(todas, dias_alerta: int = 10, so_atrasadas: bool = False) -> dict:
+    """A aba Gestão PCM do painel (renderGestao) sobre as tarefas dos filtros de cima: os números do alto (Visíveis =
+    Finalizadas + Em aberto, sem as "Não Finalizadas no Período", que vão à parte; Atrasadas = as abertas e atrasadas),
+    as duas árvores (a das não finalizadas no período, que abre fechada, e a principal, aberta até 60 tarefas) e, no
+    Só atrasadas, a lista plana das mais velhas para as mais novas, só da visão principal (como no painel)."""
+    nf = [t for t in todas if nao_finalizada(t)]
+    arr = [t for t in todas if not nao_finalizada(t)]
+    ab = [t for t in arr if t.get("aberta")]
+    atr = [t for t in ab if t.get("atrasado")]
+    fin, aberta = len(arr) - len(ab), len(arr) <= ABRE_SOZINHA
+    return {"nf": nf, "arr": arr,
+            "numeros": {"todas": len(todas), "visiveis": len(arr), "finalizadas": fin, "em_aberto": len(ab),
+                        "atrasadas": len(atr), "nf": len(nf),
+                        "pct_finalizadas": _round(fin / len(arr) * 100) if arr else 0},
+            "arvores": {"nf": {"n": len(nf), "clientes": arvore(nf, dias_alerta)},
+                        "todas": {"n": len(arr), "aberta": aberta,
+                                  "clientes": arvore(arr, dias_alerta, linhas=aberta)}},
+            "so_atrasadas": ([linha_atrasada(t, dias_alerta) for t in sorted(atr, key=lambda t: -(t.get("dias") or 0))]
+                             if so_atrasadas else None)}
+
+
+def atualizado(d: dict) -> str:
+    """A linha debaixo do título da aba (renderGestao): "Atualizado: <geradoEm> · corte <corteData> · fonte: API
+    Fracttal", no formato do toLocaleString('pt-BR') do painel. Diferença de propósito: a hora de Brasília (o robô grava
+    o geradoEm em UTC sem fuso e o painel o mostra como se fosse hora local: 20:50 lá é 17:50 aqui)."""
+    g = d.get("geradoEm")
+    try:
+        quando = datetime.fromisoformat(str(g)) if g else agora()
+        if quando.tzinfo is None:
+            quando = quando.replace(tzinfo=timezone.utc)
+        txt = f"{quando.astimezone(_BRT):%d/%m/%Y, %H:%M:%S}"
+    except ValueError:
+        txt = "—"
+    return f"Atualizado: {txt} · corte {data_br(d.get('corteData'))} · fonte: API Fracttal"

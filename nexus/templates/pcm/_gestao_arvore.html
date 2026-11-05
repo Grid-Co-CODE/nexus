@@ -1,0 +1,21 @@
+{# A tabela de UM tipo da árvore Cliente ▸ Usina ▸ Tipo da Gestão PCM (Levi, 04/11/2026; o gpTableHTML do painel do
+   PCM): vem por fetch (gestao?arv=todas|nf&ac=<cliente>&au=<usina>&at=<tipo>, com os filtros de cima) e entra no nó
+   aberto da gestao.html; 32 mil tarefas não vão na página. As abertas pelos dias, as mais velhas primeiro; depois as
+   outras. A OS abre o card dela no Nexus (NexusOsCard, como nas pendentes da célula); o Fracttal fica no ícone. #}
+{% if erro %}<p class="pgp-carga" role="status">Não consegui ler as tarefas agora: o gestao_pcm.json do painel do PCM não respondeu. Tente de novo em instantes.</p>
+{% else %}
+<div class="pg-rolo"><table class="pg-tbl pg-arv-tbl">
+  <thead><tr><th>OS</th><th>Tarefa</th><th>Estado</th><th>Etiquetas</th><th>Data Prog.</th><th>Data Final</th><th>Dias</th></tr></thead>
+  <tbody>
+  {% for x in linhas %}<tr>
+    <td class="pg-dt">{% if x.wid %}<button type="button" class="pgp-os-n" data-wid="{{ x.wid }}" data-status="{{ x.status }}" data-folio="{{ x.os }}" title="Abrir o card da OS {{ x.os }}">{{ x.os }}</button>{% else %}{{ x.os }}{% endif %}
+      {%- if x.url %} <a class="pgp-fracttal" href="{{ x.url|na_raiz }}" target="_blank" rel="noopener" title="Abrir a OS {{ x.os }} no Fracttal" aria-label="Abrir a OS {{ x.os }} no Fracttal"><i class="ph ph-arrow-square-out" aria-hidden="true"></i></a>{% endif %}</td>
+    <td class="pg-obs" title="{{ x.tarefa }}">{{ x.tarefa }}</td>
+    <td><span class="pgp-estado pgp-estado--{{ x.estado_cls }}">{{ x.estado }}</span></td>
+    <td>{% for e in x.etiquetas %}<span class="pgp-chip pgp-chip--nulo">{{ e }}</span> {% endfor %}{% if x.etiquetas_mais %}<span class="pgp-chip pgp-chip--nulo">+{{ x.etiquetas_mais }}</span>{% endif %}{% if not x.etiquetas %}—{% endif %}</td>
+    <td class="pg-dt">{{ x.prog }}</td>
+    <td class="pg-dt">{{ x.fim }}</td>
+    <td class="pg-dt">{% if x.dias_cls in ('crit', 'and') %}<span class="pgp-chip pgp-chip--{{ x.dias_cls }}">{{ x.dias }}</span>{% else %}{{ x.dias }}{% endif %}</td>
+  </tr>{% endfor %}
+  </tbody></table></div>
+{% endif %}

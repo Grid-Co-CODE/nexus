@@ -383,6 +383,13 @@ def registrar_pcm(bp) -> None:
             if ctx is None:
                 return render_template("pcm/_gestao_pendentes_erro.html"), 503
             return render_template("pcm/_gestao_pendentes.html", **ctx)
+        # a tabela de um tipo da árvore Cliente ▸ Usina ▸ Tipo (04/11/2026): o mesmo endereço com arv/ac/au/at (e os
+        # filtros de cima), pedido pelo fetch da tela quando o nó abre
+        if request.args.get("arv") is not None:
+            ctx = _ctx_arvore(current_app.config, request.args)
+            if ctx is None:
+                return render_template("pcm/_gestao_arvore.html", erro=True), 503
+            return render_template("pcm/_gestao_arvore.html", **ctx)
         return render_template("pcm/gestao.html", **_ctx_gestao(current_app.config, request.args))
 
     @bp.route("/quadro")
@@ -770,10 +777,14 @@ def _tecnicos_decidir(cfg, f) -> str:
     return r["texto"]
 
 
-# ── Gestão PCM: o bloco "Manutenções — Plano & Fila" do painel (nexus/pcm/gestao.py) ──────────────────────────
-# As 28 mil tarefas do gestao_pcm.json não precisam ser revarridas a cada clique: o escopo e a base atômica ficam
-# guardados pela versão do arquivo (dataHash) e pelos filtros de cima; a Gerencial decifrada, pela versão do mpas.json.
+# ── Gestão PCM: a aba Gestão PCM do painel (nexus/pcm/gestao.py) ────────────────────────────────────────────────
+# As 32 mil tarefas do gestao_pcm.json não precisam ser revarridas a cada clique: o escopo, o recorte dos filtros de
+# cima, as árvores e a base atômica ficam guardados pela versão do arquivo (dataHash) e pelos filtros (o `G.Filtros`
+# inteiro na chave); a Gerencial decifrada, pela versão do mpas.json. A rota da tabela de um tipo usa a mesma cópia.
 _G_CACHE: dict = {}
+# passou disso, limpa tudo: cada combinação de filtros guarda ~6 entradas (o recorte, a aba, as tarefas, a base e a
+# Fila do Plano); eram 40 quando cada uma guardava 3 (até 04/11/2026)
+_G_TETO = 80
 
 
 def _guardado(chave, fazer):
@@ -781,10 +792,63 @@ def _guardado(chave, fazer):
     v = _G_CACHE.get(chave)
     if v is None:
         v = fazer()
-        if len(_G_CACHE) > 40:
+        if len(_G_CACHE) > _G_TETO:
             _G_CACHE.clear()
         _G_CACHE[chave] = v
     return v
+
+
+def _gestao_lida(cfg):
+    """A leitura do gestao_pcm.json, os dados e a versão. Arquivo novo do robô: o que foi guardado da versão anterior
+    sai inteiro (cada versão prende ~49 MB de tarefas, medido em 08/10/2026; sem isto, várias versões velhas ficariam
+    na memória antes de o teto limpar)."""
+    leitura = fonte.ler_gestao(cfg)
+    d = leitura.dados
+    if d is None:
+        return leitura, None, None
+    versao = d.get("dataHash") or d.get("geradoEm")
+    if _G_CACHE.get("versao") != versao:
+        _G_CACHE.clear()
+        _G_CACHE["versao"] = versao
+    return leitura, d, versao
+
+
+def _recorte(d, versao, f):
+    escopo = _guardado(("escopo", versao), lambda: G.escopo(d.get("tarefas")))
+    return _guardado(("recorte", versao, f), lambda: G.recortar(escopo, f))
+
+
+def _do_plano(d, versao, f, o):
+    """As tarefas do Plano & Fila (a matriz, as pendentes da célula, a Fila do Fracttal) e se o Tipo do Plano sobrepôs
+    o Tipo de cima (preventivas.js): as mesmas para a tela e para o painel lateral, então o número bate."""
+    rec = _recorte(d, versao, f)
+    local = G.tipo_local(o, f)
+    return _guardado(("plano", versao, f, local), lambda: G.tarefas_do_plano(rec, f, local)), local
+
+
+def _dias_alerta(d) -> int:
+    try:
+        return int(d.get("diasAlerta") or 10)      # o `diasAlerta||10` do painel
+    except (TypeError, ValueError):
+        return 10
+
+
+def _aba(d, versao, f):
+    rec = _recorte(d, versao, f)
+    return _guardado(("aba", versao, f), lambda: G.aba(rec.todas, _dias_alerta(d), f.atr))
+
+
+def _pares(args) -> dict:
+    """Os parâmetros da URL com TODOS os valores de cada um: o filtro de cima pode repetir (`?cliente=A&cliente=B`), e
+    o `args.items()` de antes levava só o primeiro para os links da tela."""
+    itens = args.lists() if hasattr(args, "lists") else (
+        (k, list(v) if isinstance(v, (list, tuple)) else [v]) for k, v in args.items())
+    out = {}
+    for k, vs in itens:
+        vs = [v for v in vs if v not in ("", None)]
+        if vs:
+            out[k] = vs
+    return out
 
 
 def _gerencial(cfg) -> tuple[dict | None, str]:
@@ -808,19 +872,12 @@ def _ctx_pendentes(cfg, args) -> dict | None:
     tem pendente aparecia as tarefas pendentes"): a mesma leitura, os mesmos filtros de cima (a cópia guardada da tela)
     e os mesmos recortes da matriz. `pu` = a usina; `pc` = a coluna (sigla, CORR ou mês) ou "*" (a coluna Pendentes).
     Coluna que a matriz não tem = 404. None = o arquivo não está legível."""
-    leitura = fonte.ler_gestao(cfg)
-    d = leitura.dados
+    _leitura, d, versao = _gestao_lida(cfg)
     if d is None:
         return None
     meses = G.meses(G.hoje())
     o = G.opcoes(args, meses)
-    versao = d.get("dataHash") or d.get("geradoEm")
-    if _G_CACHE.get("versao") != versao:
-        _G_CACHE.clear()
-        _G_CACHE["versao"] = versao
-    escopo = _guardado(("escopo", versao), lambda: G.escopo(d.get("tarefas")))
-    topo = {k: str(args.get(k) or "")[:160] for k in G.TOPO}
-    tarefas = _guardado(("topo", versao, *topo.values()), lambda: G.filtrar_topo(escopo, **topo))
+    tarefas, _local = _do_plano(d, versao, G.filtros(args), o)
     col = str(args.get("pc") or "")[:12]
     if col != "*" and col not in G.colunas(o, meses):
         abort(404)
@@ -829,52 +886,71 @@ def _ctx_pendentes(cfg, args) -> dict | None:
     return {"p": p, "rot_col": rot, "data_curta": G.data_curta}
 
 
+def _ctx_arvore(cfg, args) -> dict | None:
+    """A tabela de UM tipo da árvore Cliente ▸ Usina ▸ Tipo (04/11/2026), pedida pelo fetch da tela: `arv` = "todas" (a
+    árvore principal) ou "nf" (a das não finalizadas no período); `ac`, `au` e `at` = o cliente, a usina e o tipo; mais
+    os filtros de cima. A mesma cópia guardada da tela (nada de revarrer as 32 mil tarefas). Árvore ou nó que não
+    existe = 404; None = o arquivo não está legível."""
+    arv = args.get("arv")
+    if arv not in ("todas", "nf"):
+        abort(404)
+    _leitura, d, versao = _gestao_lida(cfg)
+    if d is None:
+        return None
+    a = _aba(d, versao, G.filtros(args))
+    no = [str(args.get(k) or "")[:200] for k in ("ac", "au", "at")]
+    linhas = G.tarefas_do_no(a["nf"] if arv == "nf" else a["arr"], *no, _dias_alerta(d))
+    if linhas is None:
+        abort(404)
+    return {"linhas": linhas, "arv": arv, "cliente": no[0], "usina": no[1], "tipo": no[2]}
+
+
 def _ctx_gestao(cfg, args) -> dict:
-    leitura = fonte.ler_gestao(cfg)
-    d = leitura.dados or {}
-    ctx = {"fonte_erro": leitura.erro, "fonte_velha": leitura.velha, "fonte_gerada": _quando(d.get("geradoEm")),
-           "dados": leitura.dados is not None}
-    if leitura.dados is None:
+    leitura, d, versao = _gestao_lida(cfg)
+    ctx = {"fonte_erro": leitura.erro, "fonte_velha": leitura.velha, "fonte_gerada": _quando((d or {}).get("geradoEm")),
+           "dados": d is not None}
+    if d is None:
         return ctx
     h = G.hoje()
     meses = G.meses(h)
     o = G.opcoes(args, meses)
-    versao = d.get("dataHash") or d.get("geradoEm")
-    # arquivo novo do robô: o que foi guardado da versão anterior sai inteiro. Cada versão prende ~49 MB de tarefas
-    # (medido em 08/10/2026); sem isto, até 8 versões velhas ficariam na memória antes de o teto de 40 limpar
-    if _G_CACHE.get("versao") != versao:
-        _G_CACHE.clear()
-        _G_CACHE["versao"] = versao
-    escopo = _guardado(("escopo", versao), lambda: G.escopo(d.get("tarefas")))
-    topo = {k: str(args.get(k) or "")[:160] for k in G.TOPO}
-    # as opções de cada filtro de cima com os OUTROS aplicados (09/10/2026: "os filtros tem que se auto filtrar")
-    escolhas = _guardado(("escolhas", versao, *topo.values()), lambda: G.escolhas_topo(escopo, topo))
-    tarefas = _guardado(("topo", versao, *topo.values()), lambda: G.filtrar_topo(escopo, **topo))
-    base = _guardado(("base", versao, *topo.values(), *meses), lambda: G.base(tarefas, meses))
+    f = G.filtros(args)
+    # as opções de cada lista com os OUTROS filtros aplicados (09/10/2026: "os filtros tem que se auto filtrar")
+    rec = _recorte(d, versao, f)
+    tarefas, local = _do_plano(d, versao, f, o)
+    base = _guardado(("base", versao, f, local, *meses), lambda: G.base(tarefas, meses))
     mp, ger_erro = _gerencial(cfg)
     # a Fila inteira (antes dos filtros do bloco): é dela que saem o par de números do topo e os KPIs. Sem a
     # Gerencial, é o lado do Fracttal, e o par mostra as atrasadas pela Data Programada (o painel só mostra o cadeado)
     # o atraso conta do meio-dia (regra do painel): a cópia guardada vale por meio dia, não pelo dia inteiro
     ver_ger, meio_dia = (mp or {}).get("geradoEm"), G.agora().hour >= 12
-    fila = _guardado(("fila", versao, ver_ger, mp is not None, h, meio_dia, *topo.values()),
-                     lambda: G.fila_universo(tarefas, mp, topo, h))
+    fila = _guardado(("fila", versao, ver_ger, mp is not None, h, meio_dia, f, local),
+                     lambda: G.fila_universo(tarefas, mp, f, h))
+    a = _aba(d, versao, f)
+    pares = _pares(args)
 
     def url(**mud):
-        q = {k: v for k, v in args.items() if v not in ("", None)}
+        q = {k: list(v) for k, v in pares.items()}
         for k, v in mud.items():
             if v is None:
                 q.pop(k, None)
             else:
-                q[k] = v
-        return "?" + urlencode(q) if q else "?"
+                q[k] = list(v) if isinstance(v, (list, tuple)) else [v]
+        return "?" + urlencode(q, doseq=True) if q else "?"
 
     ctx.update(o=o, meses=meses, rot_mes=G.rot_mes, par=G.par_topo(base, meses, fila), tem_ger=mp is not None,
-               ger_erro=ger_erro, topo=topo, url=url, primarios=G.PRIMARIOS, mais=G.MAIS, rot_tipo=G.ROT_TIPO,
+               ger_erro=ger_erro, url=url, primarios=G.PRIMARIOS, mais=G.MAIS, rot_tipo=G.ROT_TIPO,
                sub_siglas=[("prev", "Todas")] + [(s, s) for s in G.SIGLAS], dims=G.DIMS, valores=G.VALORES,
                val_rot=G.VAL_ROT, pendencias=G.PENDENCIAS, mes_ops=[("todos", "Todos")] + [(m, G.rot_mes(m)) for m in meses],
                em_prev=o.tipo == "prev" or o.tipo in G.SIGLAS, eh_demanda=G.eh_demanda(o.tipo), data_curta=G.data_curta,
-               faixa_atraso=G.faixa_atraso, kpis=G.kpis_fila(fila), escolhas=escolhas,
-               tem_topo=any(topo.values()), corte=d.get("corteData"))
+               faixa_atraso=G.faixa_atraso, kpis=G.kpis_fila(fila), corte=d.get("corteData"),
+               # os filtros de cima: as escolhas de cada lista, o que está escolhido, os números do alto, as duas
+               # árvores (só as contagens; a tabela de um tipo vem pela rota arv/ac/au/at) e o Só atrasadas
+               filtros=f, listas=G.LISTAS, pmodos=G.PMODOS, escolhas=rec.escolhas,
+               escolhidos={n: [v.lower() for v in getattr(f, n)] for n, *_ in G.LISTAS}, tem_topo=f.ativos(),
+               limpar={n: None for n in (*G.PARAMS_FILTRO, "q")}, numeros=a["numeros"],
+               arvores=a["arvores"], so_atrasadas=a["so_atrasadas"], dias_alerta=_dias_alerta(d),
+               atualizado=G.atualizado(d))
     if o.modo == "plano":
         ctx.update(mx=G.plano(base, o, meses, G.crit_obs(mp) if mp is not None else None), rot_col=G.rot_col,
                    faixa=G.faixa, tom=G.tom)

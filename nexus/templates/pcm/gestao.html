@@ -74,18 +74,19 @@
   {{ ger_erro }}. A Fila segue com o lado do Fracttal.</div></div>
 {% endif %}
 
-{# os filtros de cima da aba Gestão PCM do painel; valem nos dois modos #}
+{# os filtros de cima da aba Gestão PCM do painel; valem nos dois modos. Os que esta barra não mostra (Tipo, Etiqueta,
+   Estado, OS, Solicitação, Período, Só atrasadas, desde 04/11/2026) seguem no formulário, com todas as escolhas #}
 <form class="pg-filtros" method="get" role="search" aria-label="Filtros">
-  {% for k, v in request.args.items() if k not in ('cliente', 'usina', 'cluster', 'responsavel', 'q') %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  {% for k, v in request.args.items(multi=True) if k not in ('cliente', 'usina', 'cluster', 'responsavel', 'q') %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
   {% for nome, rot, vazio in (('cliente', 'Cliente', 'Todos'), ('usina', 'Usina', 'Todas'), ('cluster', 'Equipe cluster', 'Todas'), ('responsavel', 'Responsável O&M', 'Todos')) %}
   <label class="pg-campo"><span>{{ rot }}</span>
     <select class="gc-campo" name="{{ nome }}" onchange="this.form.submit()">
-      <option value="">{{ vazio }}</option>{% for x in escolhas[nome] %}<option{% if x|lower == topo[nome]|lower %} selected{% endif %}>{{ x }}</option>{% endfor %}
+      <option value="">{{ vazio }}</option>{% for x in escolhas[nome] %}<option{% if x|lower in escolhidos[nome] %} selected{% endif %}>{{ x }}</option>{% endfor %}
     </select></label>{% endfor %}
   <label class="pg-campo pg-busca"><span>Buscar</span>
     <input class="gc-campo" type="search" name="q" value="{{ o.busca }}" placeholder="usina, cliente{{ ' ou OS' if o.modo == 'fila' else ', cluster ou responsável' }}"></label>
   <button class="gc-btn gc-btn--contorno pg-ir" type="submit">Filtrar</button>
-  {% if tem_topo or o.busca %}<a class="pcm-link pg-limpar" href="{{ url(cliente=None, usina=None, cluster=None, responsavel=None, q=None) }}">Limpar filtros</a>{% endif %}
+  {% if tem_topo or o.busca %}<a class="pcm-link pg-limpar" href="{{ url(**limpar) }}">Limpar filtros</a>{% endif %}
 </form>
 
 {% macro seg(campo, ops, atual, desligados=(), rotulo='') -%}
