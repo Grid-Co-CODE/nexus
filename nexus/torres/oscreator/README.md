@@ -2598,8 +2598,10 @@ para Verificação", nasceu Em Processo, sem fim e com "0 de 1" subtarefas, e o 
 - Vale para o Criar OS do zero (uma OS por ativo, também o da Engenharia) e o COS (uma por ativo e "várias datas"), que
   chegam ao `create_os_rpc` pelo `create_work_orders_bulk` e pelo `create_work_orders_datas`. Os avisos de cada OS se somam
   (o do status, o da etiqueta que falhou e o da OS pai); até aqui o da etiqueta apagava o que vinha antes.
-- **A provar no ar:** que `work_done` com `to_in_review` dá Em Verificação, e não Concluída. Se o Fracttal concluir, o aviso
-  diz; aí o `work_done` volta à regra antiga e fica a mudança de status.
+- **Provado no ar** em 05/11/2026, em TESTE - PA: a OS 18635, criada pelo Criar OS do zero como já realizada com "enviar
+  para Verificação", nasceu Em Verificação, com a data de fim e "1 de 1" subtarefas, sem aviso (lida de volta pelo Fluxo e
+  pelo card), e foi cancelada. Os Finalizados não foram criados no ar (a OS concluída não se cancela): o pedido deles não
+  mudou, o `work_done` já ia True; só ganhou a leitura do cabeçalho.
 - Prova: `test_a_os_ja_realizada_vai_feita_aos_dois_destinos`, `test_a_verificacao_que_ficou_em_processo_vai_para_a_verificacao`,
   `test_o_destino_que_nao_ficou_vira_aviso`, `test_sem_o_status_no_cabecalho_nao_ha_aviso` e
   `test_o_aviso_do_status_fica_junto_do_da_etiqueta_e_do_da_os_pai`, em `tests/test_oscreator_os_juntar.py`. O ouro
