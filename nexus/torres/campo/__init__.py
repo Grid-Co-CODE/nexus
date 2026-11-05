@@ -1697,35 +1697,21 @@ def ranking():
         media=round(sum(p["total"] for p in classificacao) / len(classificacao)) if classificacao else None))
 
 
-# ── Aprovação de OS (a fila e os grupos são os do App, nexus/campo/aprovacao.py) ─────────────────────────────────
-GRUPOS = (("completa", "Evidência completa", "ok",
-           "Subtarefas respondidas, nota alta, tempo dentro do previsto, nenhuma foto marcada. Não pede análise, "
-           "pede decisão."),
-          ("olho", "Precisa do seu olho", "alerta",
-           "Nota abaixo de 80, tempo muito fora do previsto, foto marcada pelo motor ou já devolvida antes."),
-          ("fora_do_app", "Fechadas fora do App", "neutro",
-           "Sem evidência para julgar por aqui. Encolhe conforme a equipe adota o App, e é essa a métrica deste "
-           "grupo."))
-
-
+# ── Aprovação de OS em quadro por fatos (a fila é a do App, nexus/campo/aprovacao.py; as regras, nexus/campo/prefiltro.py;
+# as fotos, lidas por trás, nexus/campo/prefiltro_fundo.py) ─────────────────────────────────────────────────────────
 def _cor_espera(dias) -> str:
     n = int(dias or 0)
     return "critico" if n >= 30 else ("alerta" if n >= 7 else "ok")
 
 
-IDADES = (("0-2", "até 2 dias", 0, 2), ("3-7", "3 a 7 dias", 3, 7), ("8-30", "8 a 30 dias", 8, 30),
-          ("31-60", "31 a 60 dias", 31, 60), ("61-", "mais de 60 dias", 61, 10 ** 6))
-# O cartão "Paradas há 30 dias ou mais" filtra as MESMAS OS que conta (30 dias ou mais). Levava à faixa "31 a 60 dias":
-# com a fila inteira (Levi, 08/10/2026: "não deve ter filtro 'OS fechadas nos X dias'") a OS parada há 120 dias contava
-# no cartão e sumia no clique. Só o cartão usa esta faixa; a barra de idade segue com as cinco de cima.
-IDADE_PARADAS = ("30-", "há 30 dias ou mais", 30, 10 ** 6)
-# As visões "por técnico" e "fila" saíram em 08/10/2026 (Levi: "a visão de por técnico e fila pode matar, pode tirar que
-# é irrelevante!"): ficam os cartões (hoje por região de campo ou por gestor), e o cartão abre a tabela das OS dele
-# (`ver=`), onde se aprova.
 SEM_CADASTRO = "Sem cadastro"
-# Os cartões da Aprovação: por região de campo (o padrão: é o Supervisor de Campo da região quem aprova) ou por gestor de
-# contrato (a alternância). `ver=` abre a tabela do cartão do agrupamento de agora.
-AGRUPAR = {"regiao": "regiao_cad", "gestor": "gestor_cad"}
+# O quadro (Levi, 04/11/2026: "refaça com essas regras e deixe algo bem fácil e dinâmico para os supervisores!"): as três
+# colunas na ordem em que o supervisor trabalha, com o tom e a linha de baixo do cabeçalho de cada uma. A tela de antes (a
+# lista por usina, os indicadores e a barra da idade) saiu inteira, no mesmo endereço.
+COLUNAS_DO_QUADRO = (("pronta", "Pronta", "ok", "Nenhum fato contra"),
+                     ("duvida", "Em dúvida", "alerta", "Um fato pede o seu olho"),
+                     ("nao_ok", "Não OK", "critico", "Prova de problema: confira antes"))
+NOME_DA_COLUNA = {c[0]: c[1] for c in COLUNAS_DO_QUADRO} | {"conferindo": "Ainda conferindo"}
 
 
 # O grupo da OS sai das tarefas dela: quem aprova, aprova a OS inteira (Levi, 05/10: "ele não consegue aprovar uma
@@ -1783,32 +1769,6 @@ def _data_br(iso) -> str:
     return d.astimezone(_BRT).strftime("%d/%m/%y")
 
 
-def _agrupa_os(oss, chaves) -> list[dict]:
-    """Um cartão por supervisor (a chave que `chaves` der): as OS esperando, os três grupos, a idade e o uso do App,
-    em OS. (A nota, as devolvidas, a equipe e o supervisor "da maioria" serviam só à tabela por técnico, que saiu em
-    08/10/2026; o que é da OS está na tabela do supervisor, `_por_os`.)"""
-    g = {}
-    for o in oss:
-        for k in chaves(o):
-            k = k or SEM_CADASTRO
-            a = g.setdefault(k, {"nome": k, "ordens": 0, "tarefas": 0, "completa": 0, "olho": 0, "fora_do_app": 0,
-                                 "aged7": 0, "aged30": 0, "espera_max": 0, "pelo_app": 0, "equipes": set(),
-                                 "tecnicos": set()})
-            a["ordens"] += 1
-            a["tarefas"] += len(o["tarefas"])
-            a[o["balde"]] += 1
-            a["aged7"] += o["espera_d"] >= 7
-            a["aged30"] += o["espera_d"] >= 30
-            a["espera_max"] = max(a["espera_max"], o["espera_d"])
-            a["pelo_app"] += o["pelo_app"]
-            a["equipes"].add(o.get("equipe_cad") or SEM_CADASTRO)
-            a["tecnicos"].update(o["tecnicos"])
-    for a in g.values():
-        a["uso_app"] = round(100 * a["pelo_app"] / a["ordens"]) if a["ordens"] else None
-        a["n_equipes"], a["n_tecnicos"] = len(a.pop("equipes")), len(a.pop("tecnicos"))
-    return list(g.values())
-
-
 def _responsavel_logado_pelo_cadastro() -> str:
     """O Responsável O&M de quem entrou pelo Fracttal, para o filtro da Aprovação já vir nele (o `_responsavel_do_login`
     da Visão do responsável), com o mapa pessoa → responsável montado da ficha das usinas: sem a conta inteira da Visão,
@@ -1827,53 +1787,70 @@ def _responsavel_logado_pelo_cadastro() -> str:
     return _responsavel_do_login({"responsaveis_por_pessoa": mapa})
 
 
-def _usinas_da_fila(oss) -> list[dict]:
-    """A lista da Aprovação (Levi, 18/10/2026: "quando abrir aparece uma lista das usinas que tem OSs não concluídas"):
-    uma linha por usina, com as OS esperando, os três grupos, a idade e o uso do App (a conta dos cartões de antes,
-    `_agrupa_os`), e as OS dela, a mais antiga primeiro. A que tem mais OS paradas há 30 dias, e depois a que espera há
-    mais tempo, vem primeiro."""
-    por = {}
+def _sem_acento(s) -> str:
+    import unicodedata
+    return unicodedata.normalize("NFD", str(s or "")).encode("ascii", "ignore").decode().lower()
+
+
+def _quadro(oss) -> dict:
+    """As OS da visita no quadro: {"pronta", "duvida", "nao_ok", "conferindo", "fora"}, cada uma com a lista das OS (a que
+    espera há mais tempo primeiro, a ordem do `_por_os`), e cada OS com a coluna, os avisos com a prova e o motivo de ficar
+    fora. Só memória: a fila guardada, os fatos da leitura de fundo e quem é do COS pela última conta; a visita não lê o
+    Fracttal, o banco nem o S3 (o antiobjetivo do desenho de 05/11/2026: "a tela esperar o Fracttal ou ficar lenta")."""
+    from ...campo import prefiltro, prefiltro_fundo
+    p = prefiltro.parametros(current_app.config)
+    cruas: dict = {}
+    for w in regras_app._FILA_CACHE.get("linhas") or ():
+        cruas.setdefault(str(w.get("id_work_order") or ""), []).append(w)
+    cos = campo_verif.cos_guardado()
+    q = {k: [] for k in ("pronta", "duvida", "nao_ok", "conferindo", "fora")}
     for o in oss:
-        por.setdefault(o["usina_cad"] or SEM_CADASTRO, []).append(o)
-    out = _agrupa_os(oss, lambda o: [o["usina_cad"] or SEM_CADASTRO])
-    for a in out:
-        lista = por[a["nome"]]
-        a["oss"] = sorted(lista, key=lambda o: (-o["espera_d"], str(o["os"])))
-        a["cliente"], a["responsavel"], a["cadastrada"] = (lista[0]["cliente_cad"], lista[0]["responsavel_cad"],
-                                                           lista[0]["cadastrada"])
-    out.sort(key=lambda a: (-a["aged30"], -a["espera_max"], -a["ordens"], a["nome"]))
-    return out
+        o["fora_motivo"] = prefiltro.fora_do_escopo(cruas.get(str(o.get("id_wo") or ""), []), cos)
+        if o["fora_motivo"]:
+            o["coluna"], o["avisos"] = "fora", []        # sem as regras (Levi, 04/11): só o motivo, e aprova pelo cartão
+        else:
+            fechado = max((str(t.get("fechado_app") or "") for t in o["tarefas"]), default="")
+            r = prefiltro.classificar(o, prefiltro_fundo.fatos(o.get("id_wo")), fechado, p)
+            o["coluna"], o["avisos"] = r["coluna"], r["avisos"]
+        o["busca"] = _sem_acento(" ".join([str(o["os"]), o["usina_cad"], o["cliente_cad"], o["responsavel_cad"],
+                                           *o["tecnicos"]]))
+        q[o["coluna"]].append(o)
+    return q
 
 
-def _porque(o) -> str:
-    """O porquê do grupo da OS, cada motivo uma vez (a regra do App): vai no selo do grupo, sem abrir nada."""
-    vistos = []
-    for x in o["tarefas"]:
-        for _cor, texto in campo_aprovacao.motivos(x):
-            if texto not in vistos:
-                vistos.append(texto)
-    return " · ".join(vistos)
+def _csv_do_quadro(oss) -> Response:
+    """O quadro em planilha: as colunas de antes, a nota do App, a coluna do quadro e os motivos (os avisos, em texto)."""
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";")
+    w.writerow(["OS", "Dias esperando", "Criação da OS", "Data fim", "Responsável O&M", "Usina", "Cliente", "Técnicos",
+                "Tarefas", "Nota do App", "Coluna", "Motivos"])
+    for o in oss:
+        coluna = f"Fora do pré-filtro ({o['fora_motivo']})" if o["fora_motivo"] else NOME_DA_COLUNA[o["coluna"]]
+        w.writerow([o["os"], o["espera_d"], _data_br(o["criada"]) if o["criada"] else "", _data_br(o["fim"]),
+                    o["responsavel_cad"], o["usina_cad"], o["cliente_cad"], ", ".join(o["tecnicos"]), len(o["tarefas"]),
+                    "" if o["nota"] is None else o["nota"], coluna, " · ".join(a["texto"] for a in o["avisos"])])
+    return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="aprovacao-os.csv"'})
 
 
 @bp.route("/aprovacao")
 def aprovacao():
-    """A fila de verificação do Fracttal, contada por OS, que é o que se aprova (Levi, 05/10: "refaça essa parte de
-    aprovação de OS para retirada de bons insights"). Os grupos de cada tarefa são os do App (a fila inteira pela
-    `_fila_supervisao`). Desde 18/10/2026 (Levi: "está por região e gestor de contrato quero apenas por responsável da UFV,
-    quando abrir aparece uma lista das usinas que tem OSs não concluídas, ao clicar na linha aparece o mesmo card que
-    aparece ao clicar na OS do histórico de OS do OS Creator Web"): o filtro é só o Responsável O&M da usina (do cadastro,
-    pela usina do Fracttal; quem entrou pelo Fracttal e é responsável já vem nele), a lista é das usinas com OS esperando
-    aprovação, a usina abre as OS dela e a OS abre o card do OS Creator, cujo Concluir aprova. Os indicadores e a barra
-    da idade são do responsável escolhido e filtram a lista. "Está demorando muito para carregar": a conta das regras do
-    App fica pronta por fila lida (`aprovacao.fila_toda`), e o filtro é feito sobre ela."""
+    """A Aprovação de OS em quadro por fatos (Levi, 04/11/2026: "No nexus, em campo app crie uma aba de aprovação de OS.
+    Pode fazer por cima da aba Aprovação de OS, refaça com essas regras e deixe algo bem fácil e dinâmico para os
+    supervisores!"). A fila é a de verificação do Fracttal, contada por OS (o que se aprova) e relida por trás a cada 10
+    min; cada OS cai na coluna dos fatos dela (Pronta, Em dúvida, Não OK), com os avisos e a prova, e o Aprovar do cartão
+    é o Concluir do OS Creator, com a conta do Fracttal de quem clica, uma a uma ou as marcadas. O filtro do servidor é o
+    Responsável O&M da usina (quem entrou pelo Fracttal e é responsável já vem nele; Levi, 18/10/2026: "quero apenas por
+    responsável da UFV"); cliente e busca respondem na página, sem recarregar."""
+    from ...campo import prefiltro, prefiltro_fundo
     v = request.args.get("responsavel")
     responsavel = _responsavel_logado_pelo_cadastro() if v is None else ("" if v == TODOS else v)
     mapa = visao.usinas_do_fracttal()
-    opcoes = mapa.dados or {}
+    por_nome = (mapa.dados or {}).get("por_nome") or {}
     leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA)
-    d = leitura.dados or {}
-    por_nome = opcoes.get("por_nome") or {}
-    todas = d.get("linhas") or []
+    todas = (leitura.dados or {}).get("linhas") or []
     for x in todas:
         cad = por_nome.get(regras_app._norm(x.get("usina_fx"))) or {}
         x["usina_cad"], x["equipe_cad"] = cad.get("usina") or x.get("usina_fx") or "", cad.get("equipe") or ""
@@ -1881,41 +1858,32 @@ def aprovacao():
         x["cadastrada"] = bool(cad)
     todas_os = _por_os(todas)
     oss = [o for o in todas_os if not responsavel or o["responsavel_cad"] == responsavel]
-    balde = request.args.get("balde") if request.args.get("balde") in ORDEM_DO_GRUPO else ""
-    idade = next((i for i in IDADES + (IDADE_PARADAS,) if i[0] == request.args.get("idade")), None)
-    # os indicadores e a idade filtram a lista; os números do topo são das usinas do responsável escolhido
-    filtradas = [o for o in oss if (not balde or o["balde"] == balde)
-                 and (not idade or idade[2] <= o["espera_d"] <= idade[3])]
-    nome_grupo = {g[0]: g[1] for g in GRUPOS}
+    q = _quadro(oss)
     if request.args.get("csv") == "1":
-        import csv
-        import io
-        buf = io.StringIO()
-        w = csv.writer(buf, delimiter=";")
-        w.writerow(["OS", "Dias esperando", "Criação da OS", "Data fim", "Responsável O&M", "Usina", "Cliente",
-                    "Técnicos", "Tarefas", "Prontas", "Pedem olho", "Fora do App", "Uso do App (%)", "Nota média",
-                    "Devolvidas", "Grupo da OS"])
-        for o in filtradas:
-            n = o["n_por_grupo"]
-            w.writerow([o["os"], o["espera_d"], _data_br(o["criada"]) if o["criada"] else "", _data_br(o["fim"]),
-                        o["responsavel_cad"], o["usina_cad"], o["cliente_cad"], ", ".join(o["tecnicos"]),
-                        len(o["tarefas"]), n["completa"], n["olho"], n["fora_do_app"], o["uso_app"],
-                        "" if o["nota_media"] is None else o["nota_media"], o["n_devolvidas"],
-                        nome_grupo.get(o["balde"])])
-        return Response("\ufeff" + buf.getvalue(), mimetype="text/csv",
-                        headers={"Content-Disposition": 'attachment; filename="aprovacao-os.csv"'})
-    mais_antiga = oss[0] if oss else None
-    k = {"ordens": len(oss), "tarefas": sum(len(o["tarefas"]) for o in oss),
-         "baldes": {b: sum(1 for o in oss if o["balde"] == b) for b in ORDEM_DO_GRUPO},
-         "aged30": sum(1 for o in oss if o["espera_d"] >= 30), "espera_max": mais_antiga["espera_d"] if mais_antiga else 0,
-         "mais_antiga": mais_antiga, "uso_app": round(100 * sum(o["pelo_app"] for o in oss) / len(oss)) if oss else None}
-    idades = [(i, sum(1 for o in oss if i[2] <= o["espera_d"] <= i[3])) for i in IDADES]
+        return _csv_do_quadro(oss)
     return render_template("campo/aprovacao.html", **_comum(
-        "aprovacao", leitura, grupos=GRUPOS, nome_grupo={g[0]: (g[1], g[2]) for g in GRUPOS}, balde=balde,
-        cor_espera=_cor_espera, coleta=_coleta(), fila=campo_aprovacao.estado(), responsavel=responsavel,
+        "aprovacao", leitura, coleta=_coleta(), fila=campo_aprovacao.estado(), fotos=prefiltro_fundo.estado(),
+        responsavel=responsavel, mapa_erro=mapa.erro, q=q, colunas=COLUNAS_DO_QUADRO, n_os=len(oss),
         opcoes_responsavel=_opcoes_responsavel([{"responsavel": o["responsavel_cad"]} for o in todas_os], responsavel),
-        mapa_erro=mapa.erro, k=k, idades=idades, idade=idade, usinas_fila=_usinas_da_fila(filtradas),
-        sem_responsavel=visao.SEM_RESPONSAVEL, data_br=_data_br, porque=_porque))
+        clientes=sorted({o["cliente_cad"] for o in oss if o["cliente_cad"]}),
+        horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"], cor_espera=_cor_espera,
+        sem_responsavel=visao.SEM_RESPONSAVEL, sem_cadastro=SEM_CADASTRO))
+
+
+@bp.route("/aprovacao/foto/<id_anexo>")
+def aprovacao_foto(id_anexo):
+    """A miniatura de uma foto repetida (a prova do aviso no cartão), guardada pela leitura de fundo. Só o id que é nosso
+    (16 letras de 0 a f; o resto é 404) e só com login (o portão de toda rota): é foto de usina de cliente, e por isso a
+    cópia do navegador é privada."""
+    from flask import send_file
+    from ...campo import prefiltro_fundo
+    arq = prefiltro_fundo.miniatura(id_anexo)
+    if arq is None:
+        abort(404)
+    r = send_file(arq, mimetype="image/jpeg", max_age=3600)
+    r.cache_control.public = False
+    r.cache_control.private = True
+    return r
 
 
 @bp.route("/aprovacao/<int:id_wo>/conferir", methods=["POST"])

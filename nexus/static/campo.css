@@ -1137,38 +1137,71 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .cr-ronda-amp img{max-width:100%;max-height:60vh;border-radius:var(--raio-md);background:var(--superficie-2)}
 .cr-ronda-amp figcaption{color:var(--mudo);font-size:12px;text-align:center}
 
-/* A lista da Aprovação de OS por responsável da UFV (18/10/2026, Levi: "quando abrir aparece uma lista das usinas que
-   tem OSs não concluídas, ao clicar na linha aparece o mesmo card que aparece ao clicar na OS do histórico de OS do OS
-   Creator Web"): uma linha por usina, que abre a tabela das OS dela; a OS abre o card */
-/* a coluna da lista não cresce com a tabela (980 px de mínimo): no celular a tabela rola dentro do quadro */
-.ap-usinas{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
-.ap-usina{min-width:0;background:var(--superficie);border:1px solid var(--linha);border-left:3px solid var(--ok-cheio);
-  border-radius:var(--raio-md)}
-.ap-usina--alerta{border-left-color:var(--alerta-cheio)}
-.ap-usina--critico{border-left-color:var(--critico-cheio)}
-.ap-u{display:grid;grid-template-columns:minmax(180px,2fr) minmax(64px,.5fr) minmax(220px,2fr) minmax(150px,1.2fr) 14px;
-  align-items:center;gap:12px;padding:10px 14px;cursor:pointer;list-style:none}
-.ap-u::-webkit-details-marker{display:none}
-.ap-u:hover,.ap-usina[open] > .ap-u{background:var(--superficie-2)}
-.ap-u:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
-.ap-u-nome{display:grid;min-width:0}
-.ap-u-nome b{font:600 14px/1.3 var(--font-sans);overflow-wrap:anywhere}
-.ap-u-nome small{color:var(--mudo);font-size:12px;line-height:1.35;overflow-wrap:anywhere}
-.ap-u-n{font-size:12.5px;color:var(--mudo)}
-.ap-u-n b{font:700 18px/1 var(--font-sans)}
-.ap-u-g{display:grid;gap:5px;min-width:0}
-.ap-u-leg{font-size:12px;color:var(--tinta-2)}
-.ap-u-d{font-size:12.5px;color:var(--mudo)}
-.ap-seta{color:var(--mudo);transition:transform .15s ease}
-.ap-usina[open] .ap-seta{transform:rotate(180deg)}
-.ap-usina > .cn-tab{margin:0 14px 12px}
-tr.ap-os{cursor:pointer}
-tr.ap-os:hover td{background:var(--superficie-2)}
-tr.ap-os:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
-@media (max-width:760px){
-  .ap-u{grid-template-columns:minmax(0,1fr) auto 14px}
-  .ap-u-g,.ap-u-d{grid-column:1 / -1}
-  .ap-seta{grid-row:1;grid-column:3}
+/* A Aprovação de OS em quadro por fatos (05/11/2026, Levi: "refaça com essas regras e deixe algo bem fácil e dinâmico
+   para os supervisores!"): as três colunas lado a lado, cada uma rolando por dentro; no celular cada coluna ocupa quase a
+   tela e o quadro desliza de lado dentro da própria caixa (a página não rola de lado), como um quadro de tarefas. O
+   cartão: a OS, onde, o score, os avisos com a prova e o Aprovar, nessa ordem */
+.apq-filtros{flex-wrap:wrap}
+.apq-busca{min-width:180px}
+.apq-lote{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:14px;padding:10px 14px;
+  background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.apq-lote-total{flex:1 1 240px;margin:0;font-size:13px;color:var(--tinta-2)}
+.apq-lote-total b{font-size:16px;color:var(--tinta)}
+.apq-lote-msg{flex:1 1 100%;margin:0;font-size:13px;color:var(--tinta-2)}
+.apq-lote-msg:empty{display:none}
+.apq-quadro{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start;margin-top:14px}
+.apq-coluna{min-width:0;padding:10px;background:var(--superficie-2);border:1px solid var(--linha);
+  border-top:3px solid var(--ok-cheio);border-radius:var(--raio-md)}
+.apq-coluna[data-tom="alerta"]{border-top-color:var(--alerta-cheio)}
+.apq-coluna[data-tom="critico"]{border-top-color:var(--critico-cheio)}
+.apq-col-cab{display:grid;gap:2px;margin:0 2px 8px}
+.apq-col-cab h2{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0;font:700 14px/1.3 var(--font-sans)}
+.apq-col-n{font:700 20px/1 var(--font-sans);color:var(--tinta)}
+.apq-col-cab p{margin:0;font-size:12px}
+.apq-todas{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:12.5px;color:var(--tinta-2);cursor:pointer}
+.apq-cartoes{display:grid;gap:8px;max-height:calc(100vh - 230px);overflow-y:auto;padding:1px 2px 1px 0}
+.apq-cartoes--grade{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));max-height:none;overflow:visible;margin-top:10px}
+.apq-cartao{display:grid;gap:6px;min-width:0;padding:10px 12px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio-md);content-visibility:auto;contain-intrinsic-size:auto 190px}
+.apq-cartao[hidden]{display:none}
+.apq-cartao[data-estado="aprovada"]{background:var(--superficie-2);border-color:var(--ok-cheio)}
+.apq-c-cab{display:flex;align-items:center;gap:8px;min-width:0}
+.apq-marcar{flex:none;width:17px;height:17px;margin:0;accent-color:var(--verde);cursor:pointer}
+.apq-c-os{padding:0;border:0;background:none;color:var(--tinta);font:700 14px/1.2 var(--font-mono);cursor:pointer;
+  text-decoration:underline;text-decoration-color:var(--linha-forte);text-underline-offset:3px}
+.apq-c-os:hover,.apq-c-os:focus-visible{text-decoration-color:var(--verde-texto)}
+.apq-c-os:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.apq-c-dias{margin-left:auto}
+.apq-c-onde,.apq-c-quem{margin:0;font-size:12.5px;line-height:1.35;overflow-wrap:anywhere}
+.apq-c-onde{color:var(--tinta-2)}
+.apq-c-onde b{color:var(--tinta);font-weight:600}
+.apq-c-quem{font-size:12px}
+.apq-score{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;margin:2px 0 0;font:700 11px/1.3 var(--font-sans);
+  letter-spacing:.04em;text-transform:uppercase;color:var(--mudo)}
+.apq-score b{font:700 18px/1 var(--font-sans);letter-spacing:0}
+.apq-score small{font-weight:400;letter-spacing:0;text-transform:none}
+.apq-avisos{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.apq-aviso{padding:4px 8px 4px 9px;border-left:3px solid var(--linha-forte);border-radius:0 6px 6px 0;background:var(--superficie-2);
+  font-size:12.5px;line-height:1.4;color:var(--tinta-2);overflow-wrap:anywhere}
+.apq-aviso[data-nivel="critico"]{border-left-color:var(--critico-cheio);color:var(--tinta);font-weight:600}
+.apq-aviso[data-nivel="alerta"]{border-left-color:var(--alerta-cheio)}
+.apq-aviso[data-nivel="ok"]{border-left-color:var(--ok-cheio)}
+.apq-par{display:flex;gap:6px;margin-top:6px}
+.apq-par figure{display:grid;flex:1 1 0;gap:2px;justify-items:center;min-width:0;margin:0}
+.apq-par figure[hidden]{display:none}
+.apq-par img{width:100%;max-width:150px;height:auto;aspect-ratio:4 / 3;object-fit:cover;border-radius:6px;background:var(--foto-veu)}
+.apq-par figcaption{font:600 11px/1 var(--font-mono);color:var(--mudo)}
+.apq-aprovar{justify-self:start;margin-top:2px}
+.apq-msg{margin:0;font-size:12.5px;line-height:1.4}
+.apq-msg[hidden]{display:none}
+.apq-vazio{margin:6px 2px;font-size:12.5px}
+.apq-extra{margin-top:14px;padding:10px 14px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.apq-extra > summary{font:600 14px/1.4 var(--font-sans);cursor:pointer}
+.apq-extra > p{margin:8px 0 0;font-size:12.5px}
+@media (max-width:900px){
+  .apq-quadro{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}
+  .apq-coluna{flex:0 0 86%;scroll-snap-align:start}
+  .apq-cartoes{max-height:none;overflow:visible}
 }
 
 /* APR e PT (24/10/2026): as páginas do histórico, de 20 em 20 */

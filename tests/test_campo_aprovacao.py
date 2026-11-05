@@ -131,7 +131,7 @@ def test_tela_nao_espera_o_fracttal(logado, campo, monkeypatch):
     pendentes[0]()                                     # a releitura termina
     lidos = len(campo.pedidos)
     html = logado.get("/t/campo/aprovacao?ver=Sem+cadastro").get_data(as_text=True)
-    assert ">15102<" in html and "fila lida em" in html and len(pendentes) == 1
+    assert 'data-folio="15102"' in html and "fila lida em" in html and len(pendentes) == 1
     # e a cópia do App serve a fila relida, sem ir ao Fracttal na hora da tela: desde o v235 (06/10) o _fila_bruta
     # do App mede a idade da fila por _FILA_CACHE["t"]; sem ele, cada visita relia as 55 páginas
     assert len(campo.pedidos) == lidos
@@ -140,11 +140,11 @@ def test_tela_nao_espera_o_fracttal(logado, campo, monkeypatch):
 def test_recusa_mantem_a_ultima_fila_boa_e_espera_para_tentar_de_novo(logado, campo):
     import time
     from nexus.campo import regras_app
-    assert ">15102<" in logado.get("/t/campo/aprovacao?ver=Sem+cadastro").get_data(as_text=True)
+    assert 'data-folio="15102"' in logado.get("/t/campo/aprovacao?ver=Sem+cadastro").get_data(as_text=True)
     regras_app._FILA_CACHE["t"] = time.time() - 20 * 60     # a fila envelheceu (o relógio da cópia do App)
     campo.recusar = True
     html = logado.get("/t/campo/aprovacao?ver=Sem+cadastro").get_data(as_text=True)
-    assert ">15102<" in html and "A última releitura falhou" in html
+    assert 'data-folio="15102"' in html and "A última releitura falhou" in html
     antes = len(campo.pedidos)
     logado.get("/t/campo/aprovacao")
     assert len(campo.pedidos) == antes                 # 5 min sem pedir de novo ao Fracttal
@@ -153,10 +153,10 @@ def test_recusa_mantem_a_ultima_fila_boa_e_espera_para_tentar_de_novo(logado, ca
 def test_tela_do_nexus(logado, campo):
     html = logado.get("/t/campo/aprovacao?ver=Sem+cadastro").get_data(as_text=True)
     assert "<iframe" not in html and 'class="campo-nativa"' in html
-    assert "Evidência completa" in html and "Precisa do seu olho" in html and "Fechadas fora do App" in html
-    assert ">15102<" in html and ">15088<" in html and ">15002<" in html
-    html = logado.get("/t/campo/aprovacao?ver=Sem+cadastro&balde=olho").get_data(as_text=True)
-    assert ">15088<" in html and ">15102<" not in html
+    # o quadro por fatos (05/11/2026): as três colunas; sem as fotos lidas, as OS pelo App esperam a conferência
+    assert all(f'data-coluna="{c}"' in html for c in ("pronta", "duvida", "nao_ok")) and 'id="apq-conferindo"' in html
+    for folio in ("15102", "15088", "15002"):
+        assert f'data-folio="{folio}"' in html, folio
 
 
 def test_tela_com_fracttal_recusando_avisa(logado, campo):

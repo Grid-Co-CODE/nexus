@@ -99,7 +99,8 @@ def _s(n: int) -> str:
 
 def classificar(o: dict, fatos: dict | None, fechado_app: str, p: dict) -> dict:
     """A coluna da OS e os avisos com a prova. `o` = a OS da fila (as tarefas com a regra do App); `fatos` = o que a
-    leitura de fundo achou nos anexos (None = ainda não lidos); `fechado_app` = o último fechamento da OS no App."""
+    leitura de fundo achou nos anexos (None = ainda não lidos); `fechado_app` = o último fechamento da OS no App. Cada aviso
+    diz o `tipo` (tarde, repetida, fora_app, faltam, app), que o cartão do quadro usa para mostrar a prova."""
     avisos, tarde, repetidas, nao_ok, duvida = [], 0, 0, False, False
     if fatos is not None:
         anexos = fatos.get("anexos") or []
@@ -111,7 +112,7 @@ def classificar(o: dict, fatos: dict | None, fechado_app: str, p: dict) -> dict:
             if atrasadas:
                 tarde, nao_ok = len(atrasadas), True
                 dias = max(1, int(max(s for _, s in atrasadas) // 86400))
-                avisos.append({"nivel": "critico", "fotos": [i for i, _ in atrasadas],
+                avisos.append({"tipo": "tarde", "nivel": "critico", "fotos": [i for i, _ in atrasadas],
                                "texto": f"{tarde} foto{_s(tarde)} anexada{_s(tarde)} {dias} dia{_s(dias)} depois do "
                                         "fechamento no App"})
         pares = fatos.get("pares") or []
@@ -123,15 +124,17 @@ def classificar(o: dict, fatos: dict | None, fechado_app: str, p: dict) -> dict:
             else:
                 lista = ", ".join(f"{num.get(b, '?')} = {num.get(a, '?')}" for a, b in pares[:4])
                 texto = f"{len(pares)} fotos repetidas: {lista}{', …' if len(pares) > 4 else ''}"
-            avisos.append({"nivel": "alerta", "texto": texto, "fotos": [x for par in pares for x in par]})
+            # os pares vão juntos para o cartão mostrar as duas fotos lado a lado, com o número de cada
+            avisos.append({"tipo": "repetida", "nivel": "alerta", "texto": texto, "fotos": [x for par in pares for x in par],
+                           "pares": [{"a": a, "b": b, "ra": num.get(a, "?"), "rb": num.get(b, "?")} for a, b in pares[:4]]})
     fora = sum(1 for t in o.get("tarefas") or [] if not t.get("pelo_app"))
     if fora:
         duvida = True
-        avisos.append({"nivel": "alerta", "fotos": [],
+        avisos.append({"tipo": "fora_app", "nivel": "alerta", "fotos": [],
                        "texto": f"{fora} tarefa{_s(fora)} fechada{_s(fora)} fora do App: sem as fotos e os horários do "
                                 "App para conferir"})
     if fatos is None and (nao_ok or duvida):
-        avisos.append({"nivel": "neutro", "texto": "Faltam fotos por ler", "fotos": []})
+        avisos.append({"tipo": "faltam", "nivel": "neutro", "texto": "Faltam fotos por ler", "fotos": []})
     # a regra do App de antes (nota, devolvida, foto divergente, ronda com pendência) vira só aviso: a coluna é dos fatos
     from .aprovacao import motivos
     vistos = set()
@@ -141,6 +144,7 @@ def classificar(o: dict, fatos: dict | None, fechado_app: str, p: dict) -> dict:
         for cor, texto in motivos(t):
             if cor != "ok" and texto not in vistos:
                 vistos.add(texto)
-                avisos.append({"nivel": "alerta" if cor == "alerta" else "neutro", "texto": texto, "fotos": []})
+                avisos.append({"tipo": "app", "nivel": "alerta" if cor == "alerta" else "neutro", "texto": texto,
+                               "fotos": []})
     coluna = "nao_ok" if nao_ok else ("duvida" if duvida else ("conferindo" if fatos is None else "pronta"))
     return {"coluna": coluna, "avisos": avisos, "tarde": tarde, "repetidas": repetidas}

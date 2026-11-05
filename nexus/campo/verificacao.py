@@ -141,5 +141,11 @@ def criadores_cos(base: str, sessao, ler_pessoal) -> dict:
     return v
 
 
+def cos_guardado() -> dict | None:
+    """Quem é do COS pela última conta (a da leitura de fundo do pré-filtro ou a do Painel), sem ler nada: a Aprovação de
+    OS não espera o banco nem o Fracttal na visita (05/11/2026). None antes da 1ª conta: até lá nada sai por COS."""
+    return _COS["v"]
+
+
 def limpar() -> None:
     _COS.update(t=0.0, v=None)

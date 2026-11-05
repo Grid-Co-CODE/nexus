@@ -218,3 +218,14 @@ def test_sem_o_registro_do_app_a_hora_fica_vazia(monkeypatch):
         raise ConnectionError("tabela fora")
     monkeypatch.setattr(regras_app, "tabela_qlog", quebra)
     assert aprovacao._ultimo_fechamento_no_app() == {}
+
+
+def test_cada_aviso_diz_o_tipo_e_a_repetida_traz_os_pares():
+    """O cartão do quadro mostra a prova pelo tipo do aviso: as duas fotos da repetida lado a lado, com o número de cada."""
+    anexos = [{"id": f"a{i}", "anexada": _anexada(30 if i == 4 else 0)} for i in range(1, 5)]
+    o = _os(_tarefa(qualidade=60), _tarefa(pelo_app=False, qualidade=None))
+    r = prefiltro.classificar(o, _fatos(anexos, [("a1", "a3")]), FECHADO, P)
+    assert [a["tipo"] for a in r["avisos"]] == ["tarde", "repetida", "fora_app", "app"]
+    assert r["avisos"][1]["pares"] == [{"a": "a1", "b": "a3", "ra": "p01", "rb": "p03"}]
+    sem_fotos = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None)), None, "", P)
+    assert [a["tipo"] for a in sem_fotos["avisos"]] == ["fora_app", "faltam"]
