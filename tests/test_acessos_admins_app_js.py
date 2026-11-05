@@ -54,7 +54,7 @@ let cancelou = false;
 (ouvintes.submit || []).forEach(f => f({target: {tirar, email: porEmail}[CENA.alvo] || form,
                                         preventDefault() { cancelou = true; }}));
 process.stdout.write(JSON.stringify({cancelou, required, conta: conta.textContent, foco: busca.focado, perguntas,
-  escondidas: pessoas.map(p => p.hidden)}));
+  escondidas: pessoas.map(p => p.hidden), nada: nada.hidden}));
 """
 
 
@@ -93,6 +93,17 @@ def test_a_linha_sem_radio_nao_quebra_a_busca_nem_o_envio():
     r = enviar(nomes=["usuario do fracttal 510 pcm", "tecnico dez"], semRadio=[0], busca="dez")
     assert r["escondidas"] == [True, False] and r["conta"].startswith("Escolha a pessoa na lista")
     assert enviar(nomes=["usuario do fracttal 510 pcm", "tecnico dez"], semRadio=[0], marca=1)["cancelou"] is False
+
+
+def test_a_contagem_da_busca_conta_so_quem_tem_radio():
+    """3ª revisão de 05/11/2026: a contagem `aria-live` conta só quem se pode escolher, como o card; a linha sem rádio que
+    a busca mostra não some da tela nem faz aparecer o "Ninguém com essa busca"."""
+    # o envio é o do avulso (alvo "email"), que não troca a contagem pelo aviso de escolher a pessoa
+    r = enviar(nomes=["usuario do fracttal 510 pcm", "analista vinte pcm", "tecnico dez"], semRadio=[0], busca="pcm",
+               alvo="email")
+    assert r["escondidas"] == [False, False, True] and r["conta"] == "1 pessoa" and r["nada"] is True
+    r = enviar(nomes=["usuario do fracttal 510 pcm", "tecnico dez"], semRadio=[0], busca="pcm", alvo="email")
+    assert r["conta"] == "0 pessoas" and r["nada"] is True               # a linha sem rádio está à vista
 
 
 def test_a_busca_pelo_setor_e_o_avulso_nao_pede_pessoa_da_lista():

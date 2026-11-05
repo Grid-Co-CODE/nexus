@@ -54,10 +54,14 @@ FICHA_DE_CAMPO, SEM_SETOR, AVULSO = "ficha de campo", "sem setor", "avulso (sem 
 FICHA_FORA = "a ficha está desligada ou excluída no cadastro"
 LIGACAO_FORA = "a ligação em Pessoas e setores aponta para uma ficha desligada: refaça a ligação"
 SEM_NOME = "o Fracttal não respondeu: sem o nome, não dá para conferir quem é"
+# sem a cópia porque a 1ª leitura ainda vem vindo (todo deploy começa assim; 3ª revisão de 05/11/2026: a 1ª tela do Levi
+# depois do push dizia que o Fracttal não respondeu, sem o Fracttal ter falhado)
+CHEGANDO = "a leitura do Fracttal ainda está chegando: recarregue a página em alguns segundos"
 SEM_CHAVE = "sem a chave do cadastro, o Nexus não confere se ela já tem ficha"
 # os marcadores, que só avisam
 OUTRO_DOMINIO = "outro domínio: o App não o reconhece como administrador"
 CONTA_INATIVA = "conta do Fracttal desativada"
+NOME_DE_DESLIGADA = "o nome bate com uma ficha desligada: confira se é a mesma pessoa"
 TEM_FICHA_AGORA = "esta pessoa tem ficha agora: tire e ponha de novo para ligar à ficha"
 
 
@@ -117,17 +121,19 @@ def _cadastro(cfg) -> dict:
 
 
 def _pessoas_e_setores(cfg) -> dict:
-    """As pessoas de Base → Acessos → Pessoas e setores: {"pessoas": [{"fracttal_id", "nome", "sem_nome", "pessoa_id",
-    "codigo", "setor", "por" ("ligacao" | "email" | ""), "conta_ativa"}], "dominios", "sem_fracttal", "idade_s",
-    "erro_setores"}. O pessoal do Fracttal vem da cópia daquela aba, sem nunca ler o Fracttal na hora
-    (`telas_fracttal.copia_sem_esperar`, que pede a leitura nova por trás); a ligação de hoje e o setor, do livro
-    `nexus_setores`. Sem a cópia, as ligações de hoje vêm pelo número do usuário, sem nome. Sem o livro dos setores (nem a
-    cópia dele), ninguém, e o `erro_setores` trava o Pôr."""
+    """As pessoas de Base → Acessos → Pessoas e setores: {"pessoas": [{"fracttal_id", "nome", "sem_nome", "chegando",
+    "pessoa_id", "codigo", "setor", "por" ("ligacao" | "email" | ""), "nome_de" (a ficha do palpite pelo nome),
+    "conta_ativa"}], "dominios", "estado_fracttal", "idade_s", "vencida", "erro_setores"}. O pessoal do Fracttal vem da
+    cópia daquela aba, sem nunca ler o Fracttal na hora (`telas_fracttal.copia_sem_esperar`, que pede a leitura nova por
+    trás); a ligação de hoje e o setor, do livro `nexus_setores`. Sem a cópia, as ligações de hoje vêm pelo número do
+    usuário, sem nome (`chegando` enquanto a 1ª leitura vem vindo). Sem o livro dos setores (nem a cópia dele), ninguém, e
+    o `erro_setores` trava o Pôr."""
     from ..cadastro import setores as S
     from ..cadastro import telas_fracttal as TF
     from ..campo import visao
     from ..campo.ligacao_cadastro import codigo_da_pessoa
-    out = {"pessoas": [], "dominios": {}, "sem_fracttal": False, "idade_s": None, "erro_setores": ""}
+    out = {"pessoas": [], "dominios": {}, "estado_fracttal": "fora", "idade_s": None, "vencida": False,
+           "erro_setores": ""}
     try:
         st = S.ler(visao._base(), visao._sessao())
     except Exception as ex:      # noqa: BLE001 — sem o banco (o teste sem banco): a aba diz
@@ -145,10 +151,11 @@ def _pessoas_e_setores(cfg) -> dict:
     try:
         copia = TF.copia_sem_esperar()
     except Exception:            # noqa: BLE001 — a cópia do Fracttal fora não tira a aba do ar: o caminho fechado
-        copia = {"rel": {"linhas": []}, "idade_s": None}
+        copia = {"rel": {"linhas": []}, "idade_s": None, "vencida": False, "estado": "fora"}
     chave = cfg.get("NEXUS_PESSOA_HMAC")
     linhas = copia["rel"].get("linhas") or []
-    out["sem_fracttal"], out["idade_s"] = not linhas, copia["idade_s"]
+    out["estado_fracttal"] = copia["estado"] if linhas or copia["estado"] != "copia" else "fora"
+    out["idade_s"], out["vencida"] = copia["idade_s"], copia["vencida"]
     for x in linhas:
         fid = D._id(x.get("id"))
         if not fid:
@@ -166,15 +173,21 @@ def _pessoas_e_setores(cfg) -> dict:
             # sem ficha: o código do e-mail do Fracttal, a mesma conta que a ligação gravaria (`setores.definir`)
             pid, codigo, sid, por = None, email_c, None, ""
         nome = D._txt(x.get("nome"))
+        # o palpite pelo nome (sem ligação nem e-mail que bata) não junta, mas fica anotado: se a ficha estiver
+        # desligada, a linha ganha o marcador para conferir (pode ser um homônimo; 3ª revisão de 05/11/2026)
+        nome_de = D._id((x.get("ficha") or {}).get("pessoa_id")) if not d and x.get("por") == "nome" else None
         out["pessoas"].append({"fracttal_id": fid, "nome": nome or f"Usuário do Fracttal {fid}", "sem_nome": not nome,
-                               "pessoa_id": D._id(pid), "codigo": codigo, "setor": setor(sid), "por": por,
-                               "conta_ativa": bool(x.get("conta_ativa"))})
+                               "chegando": False, "pessoa_id": D._id(pid), "codigo": codigo, "setor": setor(sid),
+                               "por": por, "nome_de": nome_de, "conta_ativa": bool(x.get("conta_ativa"))})
     if not linhas:
-        # sem a cópia do Fracttal: quem tem a ligação de hoje segue na lista, pelo número, sem nome (fica sem rádio)
+        # sem a cópia do Fracttal: quem tem a ligação de hoje segue na lista, pelo número, sem nome (fica sem rádio);
+        # "chegando" quando a 1ª leitura ainda vem vindo, e não falhou
+        chegando = out["estado_fracttal"] == "chegando"
         for fid, d in sorted(hoje.items(), key=lambda t: t[0]):
             out["pessoas"].append({"fracttal_id": fid, "nome": f"Usuário do Fracttal {fid}", "sem_nome": True,
-                                   "pessoa_id": D._id(d.get("pessoa_id")), "codigo": D._txt(d.get("pessoa_hmac")),
-                                   "setor": setor(d.get("setor_id")), "por": "ligacao", "conta_ativa": None})
+                                   "chegando": chegando, "pessoa_id": D._id(d.get("pessoa_id")),
+                                   "codigo": D._txt(d.get("pessoa_hmac")), "setor": setor(d.get("setor_id")),
+                                   "por": "ligacao", "nome_de": None, "conta_ativa": None})
     return out
 
 
@@ -189,7 +202,8 @@ def _uniao(cad: dict, ps: dict, sem_chave: bool = False) -> list[dict]:
 
     def nova(pid, codigo, nome, *, cargo="", vinculo="", porque="", bloqueio="", aviso="") -> dict:
         return {"pessoa_id": pid, "codigo": codigo, "nome": nome, "setor": "", "cargo": cargo, "vinculo": vinculo,
-                "porque": porque, "bloqueio": bloqueio, "aviso": aviso, "nomes": [nome], "fracttal_ids": [], "contas": []}
+                "porque": porque, "bloqueio": bloqueio, "aviso": aviso, "nomes": [nome], "fracttal_ids": [], "contas": [],
+                "nome_de_desligada": False}
     por_chave: dict = {}
     for pid, f in fichas.items():
         if f["ativa"]:
@@ -210,11 +224,15 @@ def _uniao(cad: dict, ps: dict, sem_chave: bool = False) -> list[dict]:
                 # sem ficha ativa: a pessoa pelo código; o código que saiu de duas fichas não volta por aqui (o porquê de
                 # lá), e quem não tem nome (sem a cópia do Fracttal) não se confere
                 k = ("codigo", codigo) if codigo else ("fracttal", u["fracttal_id"])
+                sem_nome = (CHEGANDO if u.get("chegando") else SEM_NOME) if u["sem_nome"] else ""
                 por_chave[k] = nova(None, codigo, u["nome"], porque=cod_ambiguo.get(codigo, "") if codigo else "",
-                                    bloqueio=SEM_NOME if u["sem_nome"] else SEM_CHAVE if sem_chave else "")
+                                    bloqueio=sem_nome or (SEM_CHAVE if sem_chave else ""))
                 if codigo:
                     por_codigo[codigo] = k
         p = por_chave[k]
+        nome_de = u.get("nome_de")
+        if nome_de and nome_de in fichas and not fichas[nome_de]["ativa"]:
+            p["nome_de_desligada"] = True               # só avisa: pode ser um homônimo
         p["setor"] = p["setor"] or u["setor"]
         if u["nome"] not in p["nomes"]:
             p["nomes"].append(u["nome"])
@@ -296,7 +314,6 @@ def _pessoa_da_linha(pid, codigo, fichas, por_pid, por_codigo, avulsos) -> tuple
 def contexto(cfg) -> dict:
     """O que a aba mostra: os administradores do App que valem hoje, quem dá para escolher, o histórico e os avisos.
     Tudo com o prefixo `app_` (a página de Acessos é uma só, com as três abas)."""
-    from ..cadastro import telas_fracttal as TF
     from .acessos import hora_br
     est = AA.ler(cfg)
     hoje = A.hoje_id()
@@ -372,9 +389,10 @@ def contexto(cfg) -> dict:
     grava = bool(AA._arquivo_local(cfg) or cfg.get("GRIDCO_SQL_TOKEN"))
     pode = tem_hmac and grava and not est.get("erro")
     pode_por = pode and not erro_cadastro and not ps["erro_setores"]
-    # o aviso do Fracttal: nenhuma cópia ("fora": as ligações pelo número, sem rádio) ou a cópia vencida, com a idade
-    idade = ps["idade_s"]
-    fracttal = "fora" if ps["sem_fracttal"] else "velha" if idade is not None and idade >= TF.RELACAO_S else ""
+    # o aviso do Fracttal: sem cópia, "chegando" (a 1ª leitura vem vindo: todo deploy começa assim) ou "fora" (a leitura
+    # falhou: as ligações pelo número, sem rádio); com a cópia vencida, "velha", com a idade da leitura do Fracttal
+    idade, estado = ps["idade_s"], ps["estado_fracttal"]
+    fracttal = estado if estado in ("chegando", "fora") else "velha" if ps["vencida"] else ""
     return {"app_vigentes": vigentes, "app_escolher": escolher, "app_historico": historico,
             "app_erro": est.get("erro") or "", "app_velha": bool(est.get("velha")), "app_erro_cadastro": erro_cadastro,
             "app_erro_setores": ps["erro_setores"], "app_fracttal": fracttal,
@@ -458,8 +476,10 @@ def por(cfg, escolha, obs, usuario) -> str:
 
 def por_email(cfg, email, obs, usuario) -> str:
     """O avulso: põe pelo e-mail digitado. O código que é de alguém da lista leva a linha para essa pessoa (a mesma pessoa
-    não aparece duas vezes), e o de quem está sem rádio recusa com o porquê; o de ninguém vai sem ficha, com o e-mail só
-    cifrado. O texto do aviso, ou `AA.Recusada`."""
+    não aparece duas vezes), e o de quem está sem rádio pela ficha desligada ou sem a chave do cadastro recusa com o
+    porquê; o de ninguém, ou o de quem só está sem o nome do Fracttal, vai sem ficha, com o e-mail só cifrado (3ª revisão
+    de 05/11/2026: o e-mail digitado já diz quem é, e depois de todo deploy a cópia do Fracttal ainda não chegou). O texto
+    do aviso, ou `AA.Recusada`."""
     from ..campo.ligacao_cadastro import codigo_da_pessoa
     chave = str(cfg.get("NEXUS_PESSOA_HMAC") or "").strip()
     if not chave:
@@ -471,7 +491,7 @@ def por_email(cfg, email, obs, usuario) -> str:
         raise AA.Recusada(f"{email}: sem código, porque {cad['cod_ambiguo'][codigo]}: o App acharia outra pessoa; "
                           "corrija o cadastro antes.")
     p = _do_codigo(uniao, codigo)
-    if p is not None:
+    if p is not None and p["bloqueio"] not in (SEM_NOME, CHEGANDO):
         return _por_pessoa(cfg, cad, p, obs, usuario)
     est = AA.ler(cfg, forcar=True)
     outra = AA.atuais(est, A.hoje_id()).get((codigo, "admin"))

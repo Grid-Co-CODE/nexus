@@ -14,6 +14,7 @@
         {% elif not p.tem_codigo %}<span class="cad-chip cad-chip--alerta">sem código: o App não a reconheceria</span>{% endif %}
         {% if not p.bloqueio and p.outro_dominio %}<span class="cad-chip cad-chip--alerta">outro domínio: o App não o reconhece como administrador</span>{% endif %}
         {% if not p.bloqueio and p.conta_inativa %}<span class="cad-chip cad-chip--info">conta do Fracttal desativada</span>{% endif %}
+        {% if not p.bloqueio and p.nome_de_desligada %}<span class="cad-chip cad-chip--info">o nome bate com uma ficha desligada: confira se é a mesma pessoa</span>{% endif %}
 {% endmacro %}
 {% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Gravado.</strong> {{ aviso }}</div></div>{% endif %}
 {% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}
@@ -22,7 +23,9 @@
 {% if app_erro %}<div class="cad-aviso cad-aviso--{{ 'alerta' if app_velha else 'critico' }}" role="alert"><i class="ph ph-database"></i><div><strong>{{ 'Mostrando a última leitura boa.' if app_velha else 'Não consegui ler os administradores do App no banco.' }}</strong> {{ app_erro }}. Enquanto isso, nada se grava.</div></div>{% endif %}
 {% if app_erro_cadastro %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-database"></i><div><strong>Não consegui ler o cadastro de pessoas do banco</strong> ({{ app_erro_cadastro }}). Os nomes aparecem pelo número, e o Pôr administrador fica travado.</div></div>{% endif %}
 {% if app_erro_setores %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-database"></i><div><strong>Não consegui ler Pessoas e setores no banco</strong> ({{ app_erro_setores }}). Sem a ligação de hoje de cada usuário do Fracttal, o código da pessoa pode sair errado: a lista mostra só as fichas, e o Pôr administrador fica travado.</div></div>{% endif %}
-{% if app_fracttal == 'fora' %}<div class="cad-aviso cad-aviso--alerta" role="status"><i class="ph ph-plugs"></i><div><strong>Sem o pessoal do Fracttal.</strong> Esta aba usa a leitura que a aba <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}">Pessoas e setores</a> guarda, e ainda não há uma: ela foi pedida agora, por trás (atualize a página em alguns segundos), ou o Fracttal não respondeu. Até lá, quem tem a ligação de hoje e não tem ficha aparece pelo número do usuário do Fracttal, sem escolha.</div></div>
+{# 3ª revisão de 05/11/2026: depois de todo deploy a cópia ainda não chegou; a 1ª tela não pode parecer erro #}
+{% if app_fracttal == 'chegando' %}<div class="cad-aviso cad-aviso--info" role="status"><i class="ph ph-hourglass-medium"></i><div><strong>A leitura do Fracttal ainda está chegando: recarregue a página em alguns segundos.</strong> Esta aba usa a leitura que a aba <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}">Pessoas e setores</a> guarda, pedida agora, por trás. Até ela chegar, quem tem a ligação de hoje e não tem ficha aparece pelo número do usuário do Fracttal, sem escolha; o Pôr pelo e-mail já vale.</div></div>
+{% elif app_fracttal == 'fora' %}<div class="cad-aviso cad-aviso--alerta" role="status"><i class="ph ph-plugs"></i><div><strong>Sem o pessoal do Fracttal.</strong> Esta aba usa a leitura que a aba <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}">Pessoas e setores</a> guarda, e a última leitura do Fracttal não deu (o Fracttal não respondeu). Até a próxima dar certo, quem tem a ligação de hoje e não tem ficha aparece pelo número do usuário do Fracttal, sem escolha; o Pôr pelo e-mail já vale.</div></div>
 {% elif app_fracttal == 'velha' %}<div class="cad-aviso cad-aviso--info" role="status"><i class="ph ph-clock"></i><div><strong>O pessoal do Fracttal desta lista foi lido há {{ app_fracttal_min }} min.</strong> A leitura nova foi pedida por trás: atualize a página daqui a pouco.</div></div>{% endif %}
 {% if app_sem_chave %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Sem a chave do cadastro, o Nexus não confere os códigos.</strong> Os nomes aparecem pelo número, o e-mail das fichas não é lido (só vale o código do usuário do Fracttal ligado), quem não tem ficha fica sem escolha, e a observação e o avulso pelo e-mail não se gravam.</div></div>{% endif %}
 
@@ -88,7 +91,8 @@
       {% else %}<p class="ace-vazio aa-vazio">Ninguém para escolher.</p>{% endfor %}
       <p class="mudo aa-vazio" data-aa-nada hidden>Ninguém com essa busca.</p>
     </fieldset>
-    <p class="gc-ajuda aa-conta" id="aa-conta" aria-live="polite" data-aa-conta>{{ app_escolher|length }} {{ 'pessoa' if app_escolher|length == 1 else 'pessoas' }}</p>
+    {# conta só quem se pode escolher, como o card (3ª revisão de 05/11/2026); o JavaScript faz a mesma conta na busca #}
+    <p class="gc-ajuda aa-conta" id="aa-conta" aria-live="polite" data-aa-conta>{{ app_escolhiveis }} {{ 'pessoa' if app_escolhiveis == 1 else 'pessoas' }}</p>
     <div class="campo">
       <label class="gc-rotulo" for="aa-obs">Observação (opcional)</label>
       <textarea id="aa-obs" name="obs" class="gc-campo" maxlength="300" rows="2" placeholder="ex.: cobre as férias do supervisor"></textarea>

@@ -582,9 +582,37 @@ def test_sem_o_fracttal_quem_nao_tem_ficha_fica_sem_radio(app, admin):
     assert 'value="11"' in _item(_lista(html), "Supervisora Onze")
     r = _post(admin, "admin_app_por", pessoa=f"codigo:{_h(ANALISTA)}")
     assert r.status_code == 409 and "o Fracttal não respondeu" in r.get_data(as_text=True)
-    r = _post(admin, "admin_app_por_email", email=ANALISTA)                 # nem pela porta do avulso
-    assert r.status_code == 409 and "o Fracttal não respondeu" in r.get_data(as_text=True)
     assert _linhas(app) == []
+    # o avulso passa (3ª revisão de 05/11/2026): o e-mail digitado já diz quem é; a linha vai sem ficha, com ele cifrado
+    assert _post(admin, "admin_app_por_email", email=ANALISTA).status_code == 303
+    linha = _linhas(app)[0]
+    assert (linha["pessoa_id"], linha["pessoa_hmac"]) == (None, _h(ANALISTA)) and _cifrado(linha)["email"] == ANALISTA
+
+
+def test_a_primeira_visita_depois_do_deploy_diz_que_a_leitura_esta_chegando(app, admin, monkeypatch):
+    """3ª revisão de 05/11/2026: depois de todo deploy a cópia do Fracttal ainda não chegou, e a lista fechada dizia "o
+    Fracttal não respondeu" sem o Fracttal ter falhado. Enquanto a leitura por trás não chega, a aba e as linhas sem rádio
+    dizem que ela está chegando; só a leitura que falhou de verdade diz que o Fracttal não respondeu."""
+    _ligacoes(app.extensions["nexus_dados_sessao"])
+    fracttal.usar_fornecedor(lambda path: {"data": PESSOAL})
+    monkeypatch.setattr(TF, "_renovar", lambda a: TF._TELA.update(renovando=False))      # a leitura ainda vem vindo
+    html = admin.get(ABA).get_data(as_text=True)
+    chegando = "a leitura do Fracttal ainda está chegando: recarregue a página em alguns segundos"
+    assert chegando.lower() in html.split('id="aa-lista"', 1)[0].lower()  # a lista fechada diz (na frase, com maiúscula)
+    item = _item(_lista(html), "Usuário do Fracttal 510")
+    assert "<input" not in item and chegando in item
+    assert "não respondeu" not in _lista(html) and "Sem o pessoal do Fracttal" not in html
+    monkeypatch.undo()
+    # a leitura que falha de verdade (o Fracttal fora): agora sim, "o Fracttal não respondeu"
+    fracttal.usar_fornecedor(lambda path: (_ for _ in ()).throw(ConnectionError("Fracttal fora")))
+    TF.esquecer()
+    admin.get(ABA)
+    fim = time.monotonic() + 5
+    while TF._TELA["renovando"] or not TF._TELA.get("falhou"):
+        assert time.monotonic() < fim
+        time.sleep(0.01)
+    html = admin.get(ABA).get_data(as_text=True)
+    assert "o Fracttal não respondeu" in _item(_lista(html), "Usuário do Fracttal 510") and chegando not in html
 
 
 def test_a_aba_nunca_le_o_fracttal_na_hora_e_mostra_a_idade_da_copia(app, admin, monkeypatch):
@@ -610,7 +638,10 @@ def test_a_aba_nunca_le_o_fracttal_na_hora_e_mostra_a_idade_da_copia(app, admin,
     assert pediu(3) == 3 and pedidos == []
     _com_o_fracttal(app, PESSOAL)
     pedidos.clear()
-    TF._TELA["g"]["t"] -= TF.RELACAO_S + 12 * 60                      # a cópia de 14 minutos atrás
+    # a cópia vencida (3 min) de uma leitura do Fracttal de 14 min atrás: a idade é a da leitura do Fracttal (o
+    # `lido_em`), não a da cópia (3ª revisão de 05/11/2026: o pessoal do Fracttal fica guardado 1 hora)
+    TF._TELA["g"]["t"] -= TF.RELACAO_S + 60
+    TF._TELA["g"]["lido"]["lido_em"] -= 14 * 60
     html = admin.get(ABA).get_data(as_text=True)
     assert pediu(4) == 4 and pedidos == []
     assert "lido há 14 min" in html and 'value="codigo:' in _item(_lista(html), "Analista Vinte")
@@ -645,6 +676,30 @@ def test_o_palpite_pelo_email_para_a_ficha_desligada_fica_sem_radio(app, admin, 
     assert "refaça a ligação" not in item
     r = _post(admin, "admin_app_por", pessoa=f"codigo:{_h(EMAILS[13])}")
     assert r.status_code == 409 and _linhas(app) == []
+
+
+def test_o_palpite_pelo_nome_para_a_ficha_desligada_so_ganha_marcador(app, admin, pessoas_e_setores):
+    """3ª revisão de 05/11/2026: sem ligação, o usuário do Fracttal com o nome da ficha 13 (desligada) e outro e-mail pode
+    ser um homônimo: segue escolhível, sem ficha, com o marcador só informativo."""
+    outro = "treze.outro@exemplo.test"
+    _com_o_fracttal(app, PESSOAL + [_usuario(533, "Técnico Treze", outro)])
+    item = _item(_lista(admin.get(ABA).get_data(as_text=True)), "Técnico Treze")
+    assert f'value="codigo:{_h(outro)}"' in item and "<input" in item
+    assert "o nome bate com uma ficha desligada: confira se é a mesma pessoa" in item
+    assert "a ficha está desligada ou excluída no cadastro" not in item
+    assert _post(admin, "admin_app_por", pessoa=f"codigo:{_h(outro)}").status_code == 303
+    assert [(x["pessoa_id"], x["pessoa_hmac"]) for x in _linhas(app)] == [(None, _h(outro))]
+
+
+def test_a_contagem_aria_live_conta_so_quem_se_pode_escolher(app, admin, pessoas_e_setores):
+    """3ª revisão de 05/11/2026: a linha `aria-live` debaixo da lista conta só as pessoas com rádio, como o card."""
+    _com_o_fracttal(app, PESSOAL + [_usuario(531, "Técnico Treze", EMAILS[13])])     # o palpite para a desligada: sem rádio
+    html = admin.get(ABA).get_data(as_text=True)
+    lista = _lista(html)
+    com_radio = len(re.findall(r'<label class="aa-pessoa"', lista))
+    assert '<div class="aa-pessoa aa-pessoa--fora"' in lista and com_radio == 6
+    assert re.search(r"data-aa-conta>\s*6 pessoas\s*<", html)
+    assert re.search(r'Pessoas para escolher</div><div class="v">6<', html)
 
 
 def test_a_conta_do_fracttal_desativada_so_ganha_etiqueta(app, admin, pessoas_e_setores):

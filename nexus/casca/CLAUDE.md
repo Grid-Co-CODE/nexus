@@ -228,21 +228,28 @@ lista de 5 em 5 min. **Ao contrário da lista de administradores do Nexus, esta 
   (o mesmo e-mail é a mesma pessoa para o App); o nome é o da ficha, senão o de Pessoas e setores.
   Cada uma com o setor, ou "ficha de campo" (ou "sem setor"), e a busca vale para o nome e o setor. O rádio `pessoa`
   leva o número da ficha ou `codigo:<código>` de quem não tem ficha (o `pessoa_id` da página de antes ainda vale). A aba
-  lê só a cópia de Pessoas e setores, nunca o Fracttal na hora, num GET ou num POST: a cópia vencida mostra a idade ("lido
-  há N min") e pede a nova por trás; sem cópia, as ligações de hoje seguem na lista pelo número do usuário ("Usuário do
-  Fracttal 510"), sem rádio. Sem o livro dos setores, a lista mostra só as fichas e o Pôr trava (o código das fichas
+  lê só a cópia de Pessoas e setores, nunca o Fracttal na hora, num GET ou num POST (nem na subida): a cópia vencida
+  mostra a idade da leitura do Fracttal ("lido há N min", pelo `lido_em`: o pessoal fica guardado 1 hora) e pede a nova
+  por trás; sem cópia, as ligações de hoje seguem na lista pelo número do usuário ("Usuário do Fracttal 510"), sem
+  rádio. Sem cópia porque a 1ª leitura ainda vem vindo (todo deploy começa assim; 3ª revisão de 05/11/2026: a 1ª tela
+  depois do push dizia que o Fracttal não respondeu), a aba e essas linhas dizem "a leitura do Fracttal ainda está
+  chegando: recarregue a página em alguns segundos", em azul; "o Fracttal não respondeu" só quando a última leitura
+  falhou de verdade (`telas_fracttal` anota a falha até a próxima leitura boa). A contagem `aria-live` debaixo da lista
+  conta só quem tem rádio, como o card. Sem o livro dos setores, a lista mostra só as fichas e o Pôr trava (o código das fichas
   ligadas sairia errado).
-- **Quem fica sem rádio** (2ª revisão de 05/11/2026), na lista com o porquê; o POST feito à mão e o avulso com o mesmo
-  código recusam com 409: a ligação ou o palpite que aponta para uma ficha desligada ou excluída ("a ficha está desligada
-  ou excluída no cadastro" e, da ligação, "a ligação em Pessoas e setores aponta para uma ficha desligada: refaça a
-  ligação"; o recontratado entra pela ficha nova, que fica com o código pelo e-mail); o usuário do Fracttal sem nome ("o
-  Fracttal não respondeu: sem o nome, não dá para conferir quem é": nunca se dá acesso a quem não se confere); e, sem a
-  chave do cadastro, quem não tem ficha (a ficha e a conta com o mesmo e-mail apareceriam duas vezes, e a linha iria sem
-  `pessoa_id`).
+- **Quem fica sem rádio** (2ª revisão de 05/11/2026), na lista com o porquê, e o POST feito à mão recusa com 409: a
+  ligação ou o palpite que aponta para uma ficha desligada ou excluída ("a ficha está desligada ou excluída no cadastro"
+  e, da ligação, "a ligação em Pessoas e setores aponta para uma ficha desligada: refaça a ligação"; o recontratado entra
+  pela ficha nova, que fica com o código pelo e-mail); o usuário do Fracttal sem nome ("o Fracttal não respondeu: sem o
+  nome, não dá para conferir quem é", ou "ainda está chegando": nunca se dá acesso pela lista a quem não se confere); e,
+  sem a chave do cadastro, quem não tem ficha (a ficha e a conta com o mesmo e-mail apareceriam duas vezes, e a linha iria
+  sem `pessoa_id`). O avulso com o mesmo código recusa na ficha desligada e sem a chave; no sem nome ele passa (3ª
+  revisão: o e-mail digitado já diz quem é), e a linha vai sem ficha, com o e-mail cifrado.
 - **Os marcadores, que só avisam** (a pessoa segue escolhível): "outro domínio: o App não o reconhece como
   administrador" para o e-mail que não é @gridco.com.br, comparado exato com o `admins_app.DOMINIO_AVULSO` (Levi,
   05/11/2026: "Deixar aparecer"; o gridco.com sem o .br também é outro), na lista e nos que valem; e "conta do Fracttal
-  desativada" (o login do App é pela Microsoft). Nos que valem, "esta pessoa tem ficha agora: tire e ponha de novo para
+  desativada" (o login do App é pela Microsoft); e, no palpite pelo nome para uma ficha desligada, "o nome bate com uma
+  ficha desligada: confira se é a mesma pessoa" (3ª revisão: pode ser um homônimo, então não trava). Nos que valem, "esta pessoa tem ficha agora: tire e ponha de novo para
   ligar à ficha" para quem foi posto sem ficha e ganhou ficha depois (o inverso do "Nada mudou").
 - **O avulso pelo e-mail** (Levi: "tem que ter como fazer avulso também so digitando o e-mail"): o segundo formulário da
   caixa do Pôr (`acao` `admin_app_por_email`). O e-mail perde os espaços das pontas, vai para minúsculas e tem o formato
@@ -280,10 +287,12 @@ lista de 5 em 5 min. **Ao contrário da lista de administradores do Nexus, esta 
   campo de antes; e, da 2ª revisão, o palpite pelo nome que não junta, a ligação e o palpite para a ficha desligada sem
   rádio e o recontratado pela ficha nova, a conta desativada, o Fracttal fora sem rádio, a aba que nunca lê o Fracttal na
   hora e a idade da cópia, sem a chave do cadastro, o `codigo:` forjado e o `fracttal:` sem e-mail, o marcador de outro
-  domínio, a explicação no "!" e o aviso de quem ganhou ficha), `tests/test_pcm_admins_app.py` (o `pessoa_id` vazio, o
+  domínio, a explicação no "!" e o aviso de quem ganhou ficha; e, da 3ª revisão, o avulso que passa no sem nome, a
+  leitura que ainda está chegando e a que falhou, a idade pela leitura do Fracttal, o nome de uma ficha desligada e a
+  contagem só das escolhíveis), `tests/test_pcm_admins_app.py` (o `pessoa_id` vazio, o
   e-mail só cifrado e amarrado à linha, o domínio, sem a chave do cadastro, a chave HMAC aparada nos dois vetores),
   `tests/test_explica_padrao.py` (a marca em `<strong>` e o "Como vale") e `tests/test_acessos_admins_app_js.py` (o envio
-  sem pessoa, a busca pelo setor, o avulso e a linha sem rádio, no node). No navegador, a cópia de prova com dados de mentira, com o Fracttal de mentira em Pessoas e
+  sem pessoa, a busca pelo setor, o avulso, a linha sem rádio e a contagem só de quem tem rádio, no node). No navegador, a cópia de prova com dados de mentira, com o Fracttal de mentira em Pessoas e
   setores (1366 e 375 px).
 
 ## Nexus lento: Raio-X e o teto do OS Creator (14/10/2026)

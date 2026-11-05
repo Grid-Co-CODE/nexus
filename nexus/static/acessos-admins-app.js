@@ -21,16 +21,18 @@
   itens.forEach(function (l) { var r = radio(l); if (r) r.removeAttribute("required"); });
   if (busca) {
     busca.addEventListener("input", function () {
-      var q = sem(busca.value), n = 0;
+      var q = sem(busca.value), n = 0, vistas = 0;
       itens.forEach(function (l) {
         // a pessoa marcada fica à vista mesmo fora da busca: escondida, o formulário mandaria quem ninguém vê. A linha
-        // sem rádio (quem não se pode escolher, 2ª revisão de 05/11/2026) só segue a busca
+        // sem rádio (quem não se pode escolher, 2ª revisão de 05/11/2026) só segue a busca, e a contagem conta só quem
+        // tem rádio, como o card (3ª revisão)
         var r = radio(l);
         var mostra = !q || l.getAttribute("data-aa-texto").indexOf(q) >= 0 || !!(r && r.checked);
         l.hidden = !mostra;
-        if (mostra) n++;
+        if (mostra) vistas++;
+        if (mostra && r) n++;
       });
-      if (nada) nada.hidden = n > 0 || !itens.length;
+      if (nada) nada.hidden = vistas > 0 || !itens.length;
       if (conta) conta.textContent = n + (n === 1 ? " pessoa" : " pessoas");
     });
   }
