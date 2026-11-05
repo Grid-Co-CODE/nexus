@@ -2956,3 +2956,6 @@ dia, "quero que dê para editar o tipo de tarefa também!".
   05/11/2026, em TESTE - PA: com um padrão de teste da Inspeção Geral do Inversor (a 1ª renomeada, a 2ª de Verificação para
   Sim/Não, a última do plano fora e uma nova no fim), a OS 18600 nasceu com essa lista, na ordem, lida de volta; o padrão
   voltou ao do Fracttal e a OS foi cancelada. O plano real tem 9 subtarefas, todas com `origem` (o `id` do item do plano).
+  O tipo de tarefa, no mesmo dia: com o padrão de teste em Inspeção (o do app é Corretiva), o resumo do plano disse "Tipo:
+  Inspeção" e a OS 18625 nasceu com o tipo Inspeção, lido de volta; o padrão voltou e a OS foi cancelada. A 1ª gravação
+  depois da coluna `tipo_tarefa` regravou o livro com ela, sem recusa.
