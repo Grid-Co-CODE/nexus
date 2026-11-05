@@ -715,6 +715,22 @@ def registrar_pcm(bp) -> None:
             session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
         return redirect(na_raiz("/t/pcm/tecnicos-por-usina") + ("?" + urlencode(volta) if volta else ""), code=303)
 
+    @bp.route("/tecnicos-por-usina/reemitir-tudo", methods=["POST"])
+    def tecnicos_reemitir_tudo():
+        """O "Reenviar tudo ao App" (05/11/2026): as ligações de todas as usinas cujo nome no Fracttal ou código da
+        pessoa mudou, numa gravação só, com as regras do Reenviar de uma usina. Quem `pode_programar`. O `esperado` é a
+        conta que a pessoa confirmou: diferente da de agora (alguém mudou a lista no meio), nada grava."""
+        cfg = current_app.config
+        if not pode_programar() or _de_outro_site():
+            abort(403)
+        f = request.form
+        volta = {k: str(f.get("v_" + k))[:80] for k in ("ver", "todas") + TU.FILTROS if f.get("v_" + k)}
+        try:
+            session["pcm_tecnicos_aviso"] = {"ok": _tecnicos_reemitir_tudo(cfg, f)}
+        except (AT.Recusada, TU.SemCadastro) as ex:
+            session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
+        return redirect(na_raiz("/t/pcm/tecnicos-por-usina") + ("?" + urlencode(volta) if volta else ""), code=303)
+
     @bp.route("/tecnicos-por-usina/carga-inicial", methods=["POST"])
     def tecnicos_carga_inicial():
         """A regra da equipe (cada pessoa de campo recebe as usinas da equipe dela), uma vez, com o livro vazio: a lista
@@ -787,6 +803,23 @@ def _tecnicos_decidir(cfg, f) -> str:
     else:
         abort(400)
     return r["texto"]
+
+
+def _tecnicos_reemitir_tudo(cfg, f) -> str:
+    """O "Reenviar tudo ao App"; devolve o texto do aviso ou levanta `AT.Recusada` (ou `TU.SemCadastro`)."""
+    est = AT.ler(cfg, forcar=True)
+    if est.get("erro"):
+        raise AT.Recusada(f"Não consegui ler os técnicos por usina no banco ({est['erro']}): nada foi gravado.")
+    base = TU.ler_base()
+    pedidos = TU.pedidos_da_reemissao_geral(base, TU.pessoas_de_campo(base, cfg), est, AT.hoje_id())
+    esperado = _num_arg(f.get("esperado"))
+    if esperado is not None and esperado != len(pedidos):
+        raise AT.Recusada(f"A conta mudou desde que a tela abriu (eram {esperado} ligações, agora são {len(pedidos)}): "
+                          "confira na tela e reenvie. Nada foi gravado.")
+    if not pedidos:
+        return "Nada a reenviar: o App já tem o nome e os códigos de hoje."
+    n = AT.decidir_varias(cfg, pedidos, _usuario(), "reemissao")
+    return f"{n} {'ligação reenviada' if n == 1 else 'ligações reenviadas'} ao App, numa gravação só."
 
 
 # ── Gestão PCM: a aba Gestão PCM do painel (nexus/pcm/gestao.py) ────────────────────────────────────────────────

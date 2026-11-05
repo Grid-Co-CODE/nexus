@@ -305,3 +305,97 @@ def test_a_tela_fria_lista_o_banco_poucas_vezes_e_le_a_programacao_do_fim(app, b
     antes = len(api.paginas)
     _montar(app, ver="tecnico")
     assert len(api.paginas) == antes                         # a 2ª aba não volta ao banco
+
+
+# ── o nome da usina que vai ao App (05/11/2026) ──────────────────────────────────────────────────────────────────
+SIS = "Fracttal · Classificação 1"
+SEM_CLASSE = "(sem Classificação 1) CLA100"
+
+
+def _com_nomes(banco, extra, foto=None):
+    """O de-para com os nomes de `extra` ({usina_id: [nomes]}) somados aos de sempre e, se vier, a foto do App."""
+    _aba(banco, "cadastro_nexus", "de_para", DE_PARA + [{"usina_id": u, "sistema": SIS, "chave_externa": n}
+                                                        for u, ns in extra.items() for n in ns])
+    if foto is not None:
+        _aba(banco, "organizacao_app_campo", "Atribuicoes", [{"Usina": u, "Pessoa (HMAC)": "f" * 24, "Papel": p}
+                                                              for u, p in foto])
+    visao.limpar()
+
+
+def test_o_nome_sem_classificacao_nunca_vai_ao_app_quando_a_usina_tem_outro(app, banco):
+    """Medido em 05/11/2026: o 1º do de-para em ordem alfabética ia ao App, e o "(sem Classificação 1) …" (o agrupamento
+    do Fracttal para o ativo sem classificação) vem antes das letras. Quatro usinas (6 vínculos) iam com ele tendo o
+    nome de verdade ao lado; o App não acha a usina por ele."""
+    _com_nomes(banco, {1: [SEM_CLASSE], 3: ["(sem Classificação 1) CLB300"]})
+    with app.test_request_context():
+        base = visao._Base()
+        assert T._fracttal(base)[1] == [F1, SEM_CLASSE]                 # o de verdade primeiro; o aviso segue vendo os dois
+        assert T.nome_no_fracttal(base, 1) == F1
+        assert T.nome_no_fracttal(base, 3) == "(sem Classificação 1) CLB300"      # é o único: vai ele
+        peds = T.pedidos_da_carga_inicial(base, T.pessoas_de_campo(base, app.config))
+    assert {p["usina_fracttal"] for p in peds if p["usina_id"] == 1} == {F1}
+    l1 = _linha(_montar(app), 1)
+    assert l1["fracttal"] == F1 and "Duas grafias no Fracttal: vai ao App " + F1 in l1["avisos"]
+
+
+def test_entre_dois_nomes_de_verdade_a_foto_do_app_desempata(app, banco):
+    """Uma usina com "… - CE" e "… - MT" no de-para: vai a grafia que o App já usa (a foto `organizacao_app_campo ·
+    Atribuicoes`, a mesma da Comparação, casada sem acento, caixa nem espaço no hífen) e, sem ela, a 1ª em ordem
+    alfabética. Nem a foto traz de volta o "(sem Classificação …)"."""
+    ce, mt = "Cliente A - Usina 2 - CE", "Cliente A - Usina 2 - MT"
+    _com_nomes(banco, {1: [SEM_CLASSE], 2: [ce, mt]})
+    with app.test_request_context():
+        assert T.nome_no_fracttal(visao._Base(), 2) == ce                # sem a foto: a ordem alfabética
+    _com_nomes(banco, {1: [SEM_CLASSE], 2: [ce, mt]},
+               foto=[("cliente a - usina 2-mt", "executa"), (SEM_CLASSE, "responsavel")])
+    with app.test_request_context():
+        base = visao._Base()
+        assert T.nome_no_fracttal(base, 2) == mt
+        assert T.nome_no_fracttal(base, 1) == F1
+        from nexus.pcm import responsaveis as R
+        peds, _conta = R.pedidos(base, {90: "c" * 24}, A.ler(app.config, forcar=True), HOJE)
+    # a linha do Responsável UFV leva o mesmo nome que a do técnico
+    assert {p["usina_id"]: p["usina_fracttal"] for p in peds if p["na_usina"]}[2] == mt
+    ctx = _montar(app)
+    assert _linha(ctx, 2)["fracttal"] == mt and _linha(ctx, 1)["fracttal"] == F1
+
+
+# ── o "Reenviar tudo ao App" (05/11/2026) ────────────────────────────────────────────────────────────────────────
+def test_reenviar_tudo_leva_so_as_ligacoes_que_mudaram_numa_gravacao(app, banco, monkeypatch):
+    """As ligações vigentes de todas as usinas cujo nome do Fracttal ou código de hoje difere do que foi ao App, e só
+    elas: a mesma decisão não grava de novo, e o código bom nunca vira vazio."""
+    _por(app, 1, 10, fracttal="Nome Antigo", ate="2026-10-31")        # o nome mudou (o apoio vai com as datas)
+    _por(app, 1, 11)                                                  # nada mudou
+    _por(app, 2, 11, hmac="c" * 24)                                   # o código mudou (e-mail corrigido no cadastro)
+    _por(app, 2, 13, hmac="")                                         # sem código hoje nem gravado: não há o que mandar
+    with app.test_request_context():
+        base = visao._Base()
+        pessoas = T.pessoas_de_campo(base, app.config)
+        peds = T.pedidos_da_reemissao_geral(base, pessoas, A.ler(app.config, forcar=True), HOJE)
+    assert [(p["usina_id"], p["pessoa_id"], p["usina_fracttal"], p["pessoa_hmac"], p["ate"]) for p in peds] == [
+        (1, 10, F1, _h("t10@exemplo.test"), "2026-10-31"), (2, 11, F2, _h("t11@exemplo.test"), "")]
+    ctx = _montar(app)
+    assert ctx["reenviar_total"] == 2 and ctx["reenviar_usinas"] == 2
+    gravou = []
+    original = A._gravar_cru
+    monkeypatch.setattr(A, "_gravar_cru", lambda c, t, *a: (gravou.append(1), original(c, t, *a)))
+    assert A.decidir_varias(app.config, peds, PESSOA, "reemissao") == 2 and len(gravou) == 1
+    ctx = _montar(app)
+    assert ctx["reenviar_total"] == 0 and not any(l["reenviar"] for l in ctx["todas_linhas"])
+    with app.test_request_context():
+        base = visao._Base()
+        assert T.pedidos_da_reemissao_geral(base, T.pessoas_de_campo(base, app.config),
+                                            A.ler(app.config, forcar=True), HOJE) == []
+
+
+def test_reenviar_tudo_sem_a_chave_do_cadastro_leva_o_codigo_gravado(app, banco):
+    """Sem o código de hoje (o Nexus sem a chave do cadastro), a linha vai com o código que o App já tem: trocar o bom
+    por vazio tiraria a usina da pessoa no App sem o PCM decidir (a mesma regra do Reenviar de uma usina)."""
+    _por(app, 1, 10, fracttal="Nome Antigo")
+    _por(app, 2, 11)
+    app.config.pop("NEXUS_CHAVE_CADASTRO")
+    with app.test_request_context():
+        base = visao._Base()
+        peds = T.pedidos_da_reemissao_geral(base, T.pessoas_de_campo(base, app.config),
+                                            A.ler(app.config, forcar=True), HOJE)
+    assert [(p["usina_id"], p["pessoa_id"], p["pessoa_hmac"]) for p in peds] == [(1, 10, _h("t10@exemplo.test"))]

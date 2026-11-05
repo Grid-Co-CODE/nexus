@@ -812,7 +812,10 @@ FATOS = (
                     "A carga inicial (origem carga_inicial) é a regra da equipe do cadastro: cada pessoa de campo "
                     "recebe as usinas da equipe dela. responsavel (30/10/2026) = o Responsável UFV da ficha da usina "
                     "(responsavel_om_id), que o Nexus põe sozinho de hora em hora (origem cadastro, nexus/pcm/responsaveis.py): "
-                    "o App manda a ele o aviso da PT aguardando assinatura e só ele assina a PT da usina"),
+                    "o App manda a ele o aviso da PT aguardando assinatura e só ele assina a PT da usina. O usina_fracttal "
+                    "(05/11/2026) nunca é o \"(sem Classificação …)\" quando a usina tem outro nome no de-para; entre os de "
+                    "verdade, o que o App já usa (a foto organizacao_app_campo · Atribuicoes) e, sem ele, o 1º em ordem "
+                    "alfabética"),
     # o almoxarifado (25/10/2026, Levi: "No fractall temos almoxarifado, gostaria de uma visão para a gestão desse
     # almoxarifado na parte de PCM"): a varredura diária do inventário do Fracttal, que o App faz e publica; o livro do
     # App guarda só o último ciclo, e o histórico é o do Nexus (`fato_almoxarifado.py`). O item do inventário segue o

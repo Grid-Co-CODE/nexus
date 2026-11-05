@@ -68,6 +68,19 @@
   </form>
   {% endif %}
 
+  {# o "Reenviar tudo ao App" (05/11/2026): as ligações de todas as usinas cujo nome no Fracttal ou código mudou, numa
+     gravação só; o "esperado" é a conta confirmada, e o servidor não grava se a de agora for outra #}
+  {% if pode and reenviar_total and not erro %}
+  {% set n_lig = reenviar_total ~ (' ligação' if reenviar_total == 1 else ' ligações') %}
+  {% set n_us = reenviar_usinas ~ (' usina' if reenviar_usinas == 1 else ' usinas') %}
+  <form class="cn-erro cn-aviso tu-carga" method="post" action="{{ raiz }}/t/pcm/tecnicos-por-usina/reemitir-tudo"
+        data-confirmar="Reenviar ao App as {{ n_lig }} de {{ n_us }} com o nome do Fracttal ou o código de hoje? Vão numa gravação só.">
+    <input type="hidden" name="esperado" value="{{ reenviar_total }}">{{ manter() }}
+    <span><b>{{ n_lig }} em {{ n_us }}</b> com o nome do Fracttal ou o código da pessoa mudado: o App ainda tem o de antes.</span>
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-arrows-clockwise"></i> Reenviar tudo ao App</button>
+  </form>
+  {% endif %}
+
   {# as abas Por usina e Por técnico trocam na própria página (pcm-tecnicos.js); a Comparação com o App é outra página #}
   <nav class="cn-abas" aria-label="Abas">
     <a href="{{ url(ver='') }}" data-aba="usina"{% if ver == 'usina' %} aria-current="page"{% endif %}>Por usina<i data-fl-conta="usina">{{ chips.get('todas', 0) }}</i></a>

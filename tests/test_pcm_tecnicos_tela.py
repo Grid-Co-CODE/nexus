@@ -155,3 +155,47 @@ def test_o_filtro_e_na_pagina(app, banco, logado):
     assert all('data-f-equipe="' in l and 'data-f-situacao="' in l and 'data-f-busca="' in l for l in linhas)
     assert sum('data-fl-fora="1"' in l for l in linhas) == 1
     assert 'data-aba-secao="usina"' in html and 'data-aba-secao="tecnico"' in html
+
+
+def _nomes_antigos(app):
+    """Duas usinas cujo nome no Fracttal mudou depois de as ligações irem ao App."""
+    for uid, pid in ((1, 10), (2, 11)):
+        A.decidir(app.config, usina_id=uid, usina_fracttal=f"Nome Antigo {uid}", pessoa_id=pid,
+                  pessoa_hmac=_h(f"t{pid}@exemplo.test"), na_usina=True, usuario=PESSOA)
+
+
+def test_reenviar_tudo_ao_app_confirma_a_conta_e_grava_uma_vez(app, banco, logado, monkeypatch):
+    """O "Reenviar tudo ao App" (05/11/2026): as ligações de todas as usinas cujo nome do Fracttal ou código mudou, com a
+    confirmação de quantas vão, numa gravação só. A conta que mudou desde que a tela abriu não grava."""
+    from test_pcm_tecnicos_usina import F2
+    _nomes_antigos(app)
+    html = logado.get(ROTA).get_data(as_text=True)
+    assert "Reenviar tudo ao App" in html and 'name="esperado" value="2"' in html
+    assert 'data-confirmar="Reenviar ao App as 2 ligações' in html
+    r = logado.post(ROTA + "/reemitir-tudo", data={"esperado": "3"})
+    assert r.status_code == 303 and len(_decisoes(app)) == 2
+    assert "A conta mudou desde que a tela abriu" in logado.get(ROTA).get_data(as_text=True)
+    gravou = []
+    original = A._gravar_cru
+    monkeypatch.setattr(A, "_gravar_cru", lambda c, t, *a: (gravou.append(1), original(c, t, *a)))
+    r = logado.post(ROTA + "/reemitir-tudo", data={"esperado": "2", "v_equipe": "SP Norte 01"})
+    assert r.status_code == 303 and r.headers["Location"].endswith(ROTA + "?equipe=SP+Norte+01") and gravou == [1]
+    dec = _decisoes(app)
+    assert len(dec) == 4 and [d["origem"] for d in dec[2:]] == ["reemissao", "reemissao"]
+    assert {d["usina_fracttal"] for d in dec[2:]} == {F1, F2}
+    html = logado.get(ROTA).get_data(as_text=True)
+    assert "2 ligações reenviadas ao App" in html and "Reenviar tudo ao App" not in html
+
+
+def test_reenviar_tudo_so_quem_programa_e_da_propria_pagina(app, banco, monkeypatch):
+    _nomes_antigos(app)
+    c = _pessoa(app)
+    _no_setor(monkeypatch, SID.RESPONSAVEL_UFV)
+    assert "Reenviar tudo ao App" not in c.get(ROTA).get_data(as_text=True)
+    assert c.post(ROTA + "/reemitir-tudo", data={"esperado": "2"}).status_code == 403
+    _no_setor(monkeypatch, SID.PCM)
+    assert c.post(ROTA + "/reemitir-tudo", data={"esperado": "2"},
+                  headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    assert len(_decisoes(app)) == 2
+    assert c.post(ROTA + "/reemitir-tudo", data={"esperado": "2"}).status_code == 303
+    assert len(_decisoes(app)) == 4

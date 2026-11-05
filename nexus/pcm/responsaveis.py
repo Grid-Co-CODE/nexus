@@ -7,8 +7,8 @@ Responsável UFV do Nexus também passa a ser quem pode assinar a PT da usina. O
 usina no Fracttal nem com o código da pessoa. Aqui o Nexus põe no livro, no papel `responsavel`, o Responsável O&M da
 ficha de cada usina, pelo mesmo caminho das decisões do PCM (assinado, só acrescenta), com a origem `cadastro`:
 
-- **quem:** o `responsavel_om_id` da ficha das usinas não excluídas que têm nome no Fracttal (o 1º do de-para, o que o
-  App lê), com o código do e-mail da pessoa (`codigo_da_pessoa`): o da pessoa ligada ao usuário do Fracttal (Base →
+- **quem:** o `responsavel_om_id` da ficha das usinas não excluídas que têm nome no Fracttal (o escolhido pelo
+  `tecnicos_usina._fracttal`, o mesmo do `executa`), com o código do e-mail da pessoa (`codigo_da_pessoa`): o da pessoa ligada ao usuário do Fracttal (Base →
   Acessos → Pessoas e setores) e, sem ele, o do e-mail da ficha. É a mesma conta do e-mail semanal da Segurança
   (`hseq/email_semanal.destinatarios`), que casou os 6 códigos da W44 no App;
 - **o que muda no livro:** o responsável que vale hoje e não é mais o da ficha sai (a ficha trocou de responsável ou

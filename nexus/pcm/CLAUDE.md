@@ -63,7 +63,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
 | `responsaveis.py` | **o Responsável UFV no livro** (30/10/2026, fase 3 dos técnicos por usina): de hora em hora, o `responsavel_om_id` da ficha de cada usina vai ao `nexus_pcm_atribuicoes` no papel `responsavel`, para o App mandar e assinar a PT |
-| `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe e a comparação com a foto do App |
+| `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, o nome da usina que vai ao App (`_fracttal`), a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe, a reemissão (de uma usina e o Reenviar tudo) e a comparação com a foto do App |
 | `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; `revisao.py` é a aba Inventário (a lista, a contagem aberta com o Sistema × Contado × Δ e a revisão do PCM), com as rotas em `__init__.py`; `gravacao.py` grava o lote aprovado no Fracttal em segundo plano, por sessão de ajuste; `regua.py` é a régua de mínimo e máximo e `curadoria.py` o fora do catálogo (com `fotos_app.py`, a rota assinada que recebe as fotos do App); a auditoria é o `revisao.montar_auditoria`; `ponte_os.py` é a ponte com o login do Fracttal (as rotas de `/os/_nexus/inventario`, a ÚNICA porta de tudo o que lê ou grava no Fracttal: o lote, gravar, continuar, encerrar, a régua acordada, cadastrar a peça); o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `cb8239c` (23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina, e o preenchimento dos dias livres respeita o dia fixo da usina e o feriado municipal) |
 
@@ -362,6 +362,15 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   mudança (a reemissão), mas a reemissão nunca troca um código bom por vazio (sem o código de hoje vai o gravado). O
   tirar leva o nome e o código da linha que pôs (é por eles que o App acha o que tirar). Sem a `NEXUS_PESSOA_HMAC` nada
   se grava (a linha iria sem assinatura e o App a descartaria).
+- **O nome da usina que vai ao App** (`tecnicos_usina._fracttal`, 05/11/2026): o 1º da lista do de-para, nesta ordem:
+  nunca um "(sem Classificação …)" (o agrupamento do Fracttal para o ativo sem classificação) quando a usina tem outro
+  nome; entre os de verdade, o que o App já usa (a foto `organizacao_app_campo · Atribuicoes`, a mesma da Comparação,
+  casada pelo `_norm`) e, sem ele, o 1º em ordem alfabética. O caso: até 05/11 valia a ordem alfabética pura, o "(" vem
+  antes das letras, e 4 usinas (6 vínculos) iam ao App com o "(sem Classificação 1) …" tendo o nome de verdade no
+  de-para; uma usina com "… - CE" e "… - MT" depende da foto para saber qual o App conhece. Medido no banco no mesmo
+  dia: 5 usinas mudam de nome escolhido, o que dá 7 linhas `executa` para o Reenviar tudo e 5 `responsavel`, que o laço
+  de hora em hora reenvia sozinho. Vale para todos que mandam o nome: o Pôr, a carga inicial, a reemissão e o
+  Responsável UFV. O aviso "Duas grafias no Fracttal" continua, e diz qual vai.
 - **A tela** (PCM → Técnicos por usina), no estilo da tela de PT do Campo (Levi, 17/10: "quero que a tabela seja no
   mesmo estilo de PT e APR"; usa o `campo.css`): os números do topo (usinas, sem técnico, pessoas de campo, apoios,
   com aviso), as abas Por usina, Por técnico e, com a foto do App, Comparação com o App (outra página: as duas
@@ -384,6 +393,12 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   lida do FIM (a semana em curso está entre as do arquivo do robô, no fim do fato) e a evidência guardada por 10 min:
   3,3 s fria, 0,02 a 0,06 s quente. Visão por técnico. Sem o
   cadastro do banco, a tela abre com o aviso e nada grava.
+- **O Reenviar tudo ao App** (05/11/2026, quem `pode_programar`, como o Reenviar de uma usina): a faixa âmbar abaixo dos
+  números diz quantas ligações, de quantas usinas, têm o nome do Fracttal ou o código da pessoa mudado; o botão
+  confirma a conta e reemite todas num `decidir_varias` só (uma gravação do livro, origem `reemissao`), com as regras de
+  sempre (`tecnicos_usina._reemissoes`, a mesma conta do de uma usina: só as que mudaram, só usina do cadastro, e sem o
+  nome ou o código de hoje vai o gravado). O `esperado` do formulário é a conta confirmada: se a de agora for outra
+  (alguém mudou a lista no meio), nada grava e a tela diz "A conta mudou desde que a tela abriu".
 - **O App: A1–A3 no ar na v283 (17/10/2026). `NEXUS_ATRIBUICOES=ligado` desde 29/10/2026 20:31Z: a regra é o Nexus.**
   - **A decisão do Levi:** "o app de gestão não vai mandar mais nada para o app de campo, pelo menos no quesito de
     técnicos".
@@ -411,8 +426,9 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   - **O pedido:** Levi, 30/10: "PT aguardando assinatura você manda para os responsáveis das UFVs do Nexus". Perguntado,
     o responsável também passa a assinar a PT da usina.
   - **Quem entra:** o Nexus põe sozinho, de hora em hora (origem `cadastro`), o `responsavel_om_id` da ficha de cada
-    usina não excluída. A linha leva o 1º nome do Fracttal e o código do e-mail, pela conta do e-mail semanal da
-    Segurança: o código da pessoa ligada ao usuário do Fracttal (Pessoas e setores) e, sem ele, o do e-mail da ficha.
+    usina não excluída. A linha leva o nome do Fracttal escolhido (o do `_fracttal`, o mesmo do `executa`) e o código
+    do e-mail, pela conta do e-mail semanal da Segurança (`responsaveis.codigos`): o
+    código da pessoa ligada ao usuário do Fracttal (Pessoas e setores) e, sem ele, o do e-mail da ficha.
   - **Quem sai:** o responsável que a ficha trocou, ou que ficou sem. Sem código ou sem nome no Fracttal, ninguém entra,
     e a mesma pessoa que já estava fica.
   - **O que não grava:** cadastro ilegível, cadastro sem nenhum responsável, livro ilegível, ou falta de
@@ -425,11 +441,12 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   - **Provar:** `tests/test_pcm_responsaveis.py`, 15 testes; 12 mutações, todas pegas
     (`scratchpad/v301/mut_nx_responsaveis.py`).
 - **Provar:** `tests/test_pcm_atribuicoes.py` (o livro: vigência, dia de Brasília, mesma decisão, assinatura),
-  `tests/test_pcm_tecnicos_usina.py` (a visão: regra da equipe, evidência, avisos, cascata, foto do App; o relógio da
-  gravação dublado em 17/10/2026, o mesmo `HOJE` da tela: com o dia de verdade, o apoio "até 31/10" virou passado em
-  01/11 e a regra o recusou) e
-  `tests/test_pcm_tecnicos_tela.py` (quem vê e edita, carga inicial, reenviar, tirar, banco fora); 11 mutações, todas
-  pegas. A tela: renderizar com o banco de mentira dos testes e servir a pasta (1366 e 375 px, escuro e claro).
+  `tests/test_pcm_tecnicos_usina.py` (a visão: regra da equipe, evidência, avisos, cascata, foto do App, o nome que vai
+  ao App e o Reenviar tudo; o relógio da gravação dublado em 17/10/2026, o mesmo `HOJE` da tela: com o dia de verdade, o
+  apoio "até 31/10" virou passado em 01/11 e a regra o recusou) e
+  `tests/test_pcm_tecnicos_tela.py` (quem vê e edita, carga inicial, reenviar de uma usina e tudo, tirar, banco fora);
+  11 mutações, todas pegas (17/10). A tela: a cópia de prova com dados
+  de mentira (banco dos testes, livro num arquivo, rede só para 127.0.0.1; 1366 e 375 px, escuro e claro).
 
 ## O menu da torre PCM (`nexus/torres/pcm/__init__.py`)
 
