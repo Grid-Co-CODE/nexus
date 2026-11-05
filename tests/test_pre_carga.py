@@ -52,9 +52,10 @@ def test_o_primeiro_clique_de_quem_tem_setor_aquece_as_telas_dele(ligada):
     assert set(e["aquecida_em"]) == QUENTES
     assert all(status == 200 for status, _ in e["ultimo"].values())
     assert e["ultima_volta"]["telas"] == 6 and not e["ultima_volta"]["erros"] and not e["trabalhando"]
-    # a 1ª tela de cada torre primeiro (onde o cartão do Início leva), depois o resto na ordem do menu
-    assert list(e["ultimo"]) == ["comando/caixa-de-entrada", "cos/mesa", "pcm/quadro", "relatorios/central",
-                                 "campo/rondas", "cos/ocorrencias"]
+    # a 1ª tela de cada torre primeiro (onde o cartão do Início leva), depois o resto na ordem do menu (a Usinas 360°,
+    # id `campo`, logo abaixo de Comando desde 05/11/2026)
+    assert list(e["ultimo"]) == ["comando/caixa-de-entrada", "campo/rondas", "cos/mesa", "pcm/quadro",
+                                 "relatorios/central", "cos/ocorrencias"]
 
 
 def test_uma_vez_por_minuto_e_so_o_que_esfriou(ligada):

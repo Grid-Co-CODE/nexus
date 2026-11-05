@@ -146,7 +146,7 @@ PARA_QUE = {
                          "de cada uma (o que fazer, quem faz, até quando e em que pé está) e o andamento, com o dia e "
                          "a hora. Serve para cobrar as ações que vencem, ver as ocorrências abertas de cada usina na "
                          "Visão geral e, com o tempo, saber o que se repete por usina e equipamento. O texto e quem "
-                         "escreveu vão cifrados; a tela Campo · App → Ocorrências mostra.",
+                         "escreveu vão cifrados; a tela Usinas 360° → Ocorrências mostra.",
     "tratamento_contestacao": "Guarda o acompanhamento de cada contestação do cliente: quem pegou a demanda (\"Pegar "
                               "para mim\") e cada atualização que o responsável escreveu, com o dia e a hora. Quem e o "
                               "texto vão cifrados; a tela Contratos e clientes → Contestações mostra.",

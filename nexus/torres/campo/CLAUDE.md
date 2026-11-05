@@ -1,4 +1,13 @@
-# CLAUDE.md — torre Campo · App
+# CLAUDE.md — torre Usinas 360° (o id `campo`)
+
+**O nome (05/11/2026):** a torre se chamava "Campo · App". Levi, pelo Scrum master: "Quero ideias de nomes
+alternativos para o campo 'Campo app'. Como ele engloba pendências e visão geral do supervisor queria que tivesse um
+nome mais aberto, até para botar a visão do cliente também junto!"; depois, "Usinas 360°" e "Mande!". Só o nome que
+aparece mudou (`TORRE.nome`, a descrição do Início e os textos das telas que diziam o nome): o id `campo`, o
+`/t/campo`, as chaves `campo/<tela>` dos Acessos e os livros ficaram, para nenhum link, favorito, acesso ou teste de
+rota quebrar. No menu, logo abaixo de Comando (`ordem=5`; no mesmo dia: "usina 360 abaixo de Comando"), e a
+Zeladoria logo abaixo de Chamados (`ordem=55`). O Nexus não tem busca no menu: nada a normalizar no "°".
+Abaixo, "Campo · App" é o nome de quando cada coisa foi feita.
 
 A visão do Nexus sobre o trabalho de campo. **Nenhuma tela abre o painel do App nem aponta para o Azure** (Levi,
 05/10/2026: "quero parar de referenciar o Azure e ter uma visão nossa!"): todas leem o banco do Nexus (API db_performace).
@@ -244,7 +253,7 @@ gaveta) em `__init__.py`.
 
 ## As explicações das telas (05/11/2026)
 
-Em todas as telas do Campo · App, "De onde vem", "Como ler", "Entenda esta tela" e afins moram no "!" amarelo ao lado do
+Em todas as telas da torre (Usinas 360°), "De onde vem", "Como ler", "Entenda esta tela" e afins moram no "!" amarelo ao lado do
 título (`explica` de `nexus/templates/_explica.html`, o padrão do Nexus): Aprovação de OS, Central de atenção, PT, a
 decisão da PT, Ranking, Triagem, Zeladoria, Responsáveis e Rondas. Fica fora dele o que muda com o dado (a nota do
 Ranking com as linhas sem nome, os avisos de dado faltando, as usinas sem mobilização da Central de atenção). A

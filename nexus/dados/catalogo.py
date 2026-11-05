@@ -1395,8 +1395,8 @@ LIVROS = (
           "registrado em 13/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª observação de um responsável",
           so_cresce=True),
     Livro("nexus_ocorrencias", ("fato_evento_ocorrencia",),
-          "a cada ocorrência criada ou mudada, ação do plano e andamento (tela Campo · App > Ocorrências)",
-          "nexus/campo/ocorrencias.py, pela tela Campo · App > Ocorrências", False,
+          "a cada ocorrência criada ou mudada, ação do plano e andamento (tela Usinas 360° > Ocorrências)",
+          "nexus/campo/ocorrencias.py, pela tela Usinas 360° > Ocorrências", False,
           "registrado em 18/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª ocorrência registrada",
           so_cresce=True),
     Livro("nexus_insights", ("fato_evento_insight",),
@@ -1610,7 +1610,7 @@ ABAS_FORA_DA_REGRA = {
     "aba_equipamentos": "a visão da estrutura das usinas no formato da aba Equipamentos do bd_performance (as mesmas "
                         "colunas, com os IDs no fim), só das chaves marcadas \"no lugar da aba\": é o que deixa cada "
                         "leitor antigo da aba trocar a fonte sem ser reescrito (nexus/cadastro/estrutura_usina.py)",
-    "zeladoria_semana": "a visão pronta da tela Zeladoria do Campo · App para o dashboard do cliente (26/10/2026): 1 linha "
+    "zeladoria_semana": "a visão pronta da tela Zeladoria do Usinas 360° para o dashboard do cliente (26/10/2026): 1 linha "
                         "= usina × semana com leitura, os níveis da semana, a recomendação e a situação da zeladoria "
                         "em palavras do cliente; conta do Nexus (nexus/campo/zeladoria.py), não fato conformado: o "
                         "checklist das rondas que a origina não está no banco",

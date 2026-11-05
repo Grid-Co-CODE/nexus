@@ -42,10 +42,14 @@ FONTE_APP = "Livros que o App de Campo grava no banco do Nexus + cadastro do Nex
 
 TORRE = Torre(
     id="campo",
-    nome="Campo · App",
-    ordem=90,
+    # "Usinas 360°" (Levi, 05/11/2026, pelo Scrum master: "Como ele engloba pendências e visão geral do supervisor queria
+    # que tivesse um nome mais aberto, até para botar a visão do cliente também junto!"); era "Campo · App". Só o nome que
+    # aparece mudou: o id e o /t/campo ficam. Logo abaixo de Comando no menu (no mesmo dia: "usina 360 abaixo de Comando")
+    nome="Usinas 360°",
+    ordem=5,
     icone="hard-hat",
-    descricao="Visão do Nexus sobre o campo: aprovação, PT, rondas, zeladoria e qualidade.",
+    descricao=("A usina por inteiro: visão do responsável, Central da usina, pendências, aprovação de OS, PT, rondas e "
+               "zeladoria; a visão do cliente vem a seguir."),
     telas=[
         # A tela dos supervisores (Levi, 12/10/2026: "construa a visão dos responsáveis da usina!"): a 1ª do Campo
         Tela("responsaveis", "Visão do responsável",

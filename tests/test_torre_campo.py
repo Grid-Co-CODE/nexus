@@ -1,5 +1,6 @@
 """Torre Campo · App: a visão do Nexus sobre o campo, sem o painel do App nem o Azure (Levi, 05/10/2026: "quero parar de
 referenciar o Azure e ter uma visão nossa!")."""
+import re
 from nexus.torres import descobrir_torres
 
 # Ordens de serviço ("os"), Ranking e Imagens da ronda saíram em 08/10/2026 (Levi: "são redundantes"); a Visão do
@@ -46,3 +47,22 @@ def test_sem_banco_a_tela_avisa_e_nao_some(logado):
 def test_rotas_segue_em_construcao(logado):
     html = logado.get("/t/campo/rotas").get_data(as_text=True)
     assert "Em construção" in html and "<iframe" not in html
+
+
+def test_a_torre_se_chama_usinas_360_e_o_endereco_fica(logado):
+    """Levi, 05/11/2026 (pelo Scrum master): "Quero ideias de nomes alternativos para o campo 'Campo app'. Como ele engloba
+    pendências e visão geral do supervisor queria que tivesse um nome mais aberto, até para botar a visão do cliente também
+    junto!"; depois, "Usinas 360°" e "Mande!". Só o nome que aparece muda: o id `campo` e o /t/campo ficam (nenhum link,
+    favorito ou teste de rota quebra). E, no mesmo dia: "coloque Zeladoria abaixo de chamados e usina 360 abaixo de
+    Comando"."""
+    from nexus.torres.campo import TORRE
+    assert TORRE.nome == "Usinas 360°" and TORRE.id == "campo"
+    d = TORRE.descricao.lower()
+    for t in ("visão do responsável", "central da usina", "pendências", "aprovação", "pt", "rondas", "zeladoria", "cliente"):
+        assert t in d, t
+    html = logado.get("/t/campo/responsaveis").get_data(as_text=True)
+    assert '<summary title="Usinas 360°"' in html and "<span>Usinas 360°</span>" in html and "Campo · App" not in html
+    menu = html.split('<nav class="menu"', 1)[1].split("</nav>", 1)[0]
+    ordem = re.findall(r'data-torre="([a-z]+)"', menu)
+    assert ordem[:2] == ["comando", "campo"], ordem
+    assert ordem[ordem.index("chamados") + 1] == "zeladoria", ordem

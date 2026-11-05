@@ -90,7 +90,7 @@ linha por destinatário, uma vez por semana; o App lê, manda e diz o que mandou
   responsáveis recebem, nenhum de fora. Caso igual se resolve assim, nunca pelo nome).
 - **O que vai no livro** (a API é compartilhada, regra 8): o código (HMAC) e o número da pessoa, nunca nome nem e-mail.
   O assunto e o corpo (texto e HTML) levam os quatro de agora, os de atenção, as usinas com mais pendências (até 25) e
-  dois botões, sempre pelo número da pessoa (`?r=`): o responsável abre o **Painel dele no Campo · App** (03/11/2026,
+  dois botões, sempre pelo número da pessoa (`?r=`): o responsável abre o **Painel dele no Usinas 360°** (ex-Campo · App) (03/11/2026,
   Levi: "tem que ser o nexus > campo app > painel (filtrado no responsável)"; o Campo traduz o `r`), a TST, a Mesa; e
   a planilha da Mesa filtrada, com o selo XLSX. Cada linha assinada (HMAC, rótulo `nexus:hseq:email`).
 - **O visual** (03/11/2026, Levi: "Deixe a estrutura um pouco mais bonita e o link para o arquivo em excel deixe mais

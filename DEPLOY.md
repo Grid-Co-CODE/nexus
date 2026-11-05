@@ -231,7 +231,7 @@ já não traz `/nexus/` (a reescrita da T.I. saiu). A data exata da virada não 
    A "Pasta do PCM" e as durações aprendidas aparecem como opcionais ausentes: é o esperado no servidor.
 5. **OS Creator → Início** abre a entrada do OS Creator: cada pessoa entra com o próprio usuário do Fracttal, e
    depois disso **Ativos Fracttal** lista os ativos.
-6. **Campo · App → Triagem de qualidade** mostra as OS do período com a nota do painel do App (a fonte é o livro que o
+6. **Usinas 360° → Triagem de qualidade** mostra as OS do período com a nota do painel do App (a fonte é o livro que o
    App grava no banco; precisa da `NEXUS_PESSOA_HMAC` no `.env`, ver o passo 7). A tela Ordens de serviço saiu em
    08/10/2026.
 7. **Performance → Clima e risco** abre com as três fontes em verde (INMET, focos e risco de fogo do INPE). A primeira
@@ -275,7 +275,7 @@ já não traz `/nexus/` (a reescrita da T.I. saiu). A data exata da virada não 
       o Nexus grava no banco uma vez por dia, às 04:45) tem de aparecer com dono no catálogo, e o radar de tabelas novas não pode
       listá-lo como "sem dono". Ele só existe depois da primeira gravação (a manhã seguinte ao deploy).
 
-## 7. Campo · App: o Nexus lê o que o App grava
+## 7. Usinas 360° (ex-Campo · App): o Nexus lê o que o App grava
 
 As telas Aprovação de OS e Triagem leem o registro de cada fechamento **que o próprio App de Campo
 grava no banco** (API db_performace, livros `fechamentos_app_campo` e `rondas_app_campo`, de hora em hora). O técnico
@@ -321,7 +321,7 @@ e da `NEXUS_PESSOA_HMAC` (sem ela a pessoa dos fatos do App não liga).
 
 **Os ativos do Fracttal, de madrugada (31/10/2026; nada a fazer no servidor).** O `servir.py` liga o leitor dos ativos do
 OS Creator (`nexus/torres/oscreator/os_creator/ativos_leitor.py`): às 02:15 ele lê o Fracttal inteiro pelo REST, com a
-mesma credencial do Campo · App e do motor do PCM (`FRACTTAL_CLIENT_ID` e `FRACTTAL_CLIENT_SECRET`, no ambiente ou no
+mesma credencial da torre Usinas 360° e do motor do PCM (`FRACTTAL_CLIENT_ID` e `FRACTTAL_CLIENT_SECRET`, no ambiente ou no
 `.env`; sem ela o leitor não liga e tudo segue como antes), confere a leitura contra o catálogo do OS Creator e, se ela
 vale, troca o catálogo e renova a `nexus_ativos_fracttal · foto_ativos` no banco (só quando o sha das linhas muda); das
 06h às 22h, às :08 e :38, só os ativos novos. É a única máquina que grava a foto (a ferramenta
@@ -365,7 +365,7 @@ a hora da carga com a máquina "servidor", as barras de ligação de cada fato e
 tempo, só um grava por hora (o outro vê a hora da última carga no próprio livro e pula). Desligar numa máquina:
 `NEXUS_CARGA_DADOS=0`. Conferir: Base → **Governança de dados** mostra a hora da última carga e a máquina.
 
-**Pré-carga das telas (09/10/2026): nada a fazer no servidor.** O Nexus deixa as telas do Campo · App prontas na memória
+**Pré-carga das telas (09/10/2026): nada a fazer no servidor.** O Nexus deixa as telas da torre Usinas 360° prontas na memória
 logo depois de subir e as renova antes de vencer, lendo só o banco. No servidor **não** ponha `NEXUS_CAMPO_AQUECER` no
 `.env`: sem ela, o servidor também lê do Fracttal, ao subir, a fila da Aprovação, as rondas aprovadas, as OS de falha da
 Engenharia e o Quadro da equipe. `NEXUS_CAMPO_AQUECER=0` é só para o PC do Levi, para os dois não gastarem a cota do
@@ -375,7 +375,7 @@ Fracttal em dobro.
 OS em verificação (1 pedido ao Fracttal por OS, no máximo 150 por volta, 2 s entre elas) e baixa as fotos do S3 (fora
 da cota). Sem `NEXUS_PREFILTRO`, a leitura segue o `NEXUS_CAMPO_AQUECER`: o servidor lê, o PC (com 0) não. A primeira
 passada, depois do deploy, é a fila inteira (~2.000 OS, ~5 GB baixados do S3 em ~2 h): melhor subir depois das 18h.
-Desligar numa máquina: `NEXUS_PREFILTRO=0`. Conferir: Campo · App → Aprovação de OS, "fotos conferidas de N OS".
+Desligar numa máquina: `NEXUS_PREFILTRO=0`. Conferir: Usinas 360° → Aprovação de OS, "fotos conferidas de N OS".
 
 ## 7b. Servidor da PLATAFORMA (app.gridco.com.br): uma linha para ligar o Tempo real
 

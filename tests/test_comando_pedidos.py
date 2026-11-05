@@ -99,7 +99,7 @@ def test_o_pedido_no_insight_a_caixa_o_sino_e_o_painel(app, banco, limpo, motor_
     assert [l["torre"] for l in banco.linhas(PD.LIVRO, PD.ABA)] == ["hseq", "campo"]
     html = _aberta(c, "/t/comando/insights")
     prazo = (PD.hoje() + timedelta(days=3)).strftime("%d/%m")
-    assert f"Pedido enviado a Segurança · HSEQ, Campo · App, com prazo até {prazo}." in html
+    assert f"Pedido enviado a Segurança · HSEQ, Usinas 360°, com prazo até {prazo}." in html
     assert "Aguardando retorno" in html and f"Vence {prazo}" in html
     # sem o prazo, nada é gravado
     c.post("/t/comando/pedido/acao", data={"codigo": _codigo(c), "objeto": "insight:R07:1", "acao": "pedir",
@@ -111,12 +111,12 @@ def test_o_pedido_no_insight_a_caixa_o_sino_e_o_painel(app, banco, limpo, motor_
     seg = _de(app, SEG)
     caixa = seg.get("/t/comando/caixa-de-entrada").get_data(as_text=True)
     secao = caixa.split("Pedidos para o seu setor", 1)[1].split("</ol>", 1)[0]
-    assert "2 extintores vencidos" in secao and "Para Segurança · HSEQ" in secao and "Campo · App" not in secao
+    assert "2 extintores vencidos" in secao and "Para Segurança · HSEQ" in secao and "Usinas 360°" not in secao
     assert "/t/comando/conversa/insight/R07:1#ped-insight-R07-1" in secao
     sino = caixa.split('class="sino-topo"', 1)[1].split("</details>", 1)[0]
     assert "1 pedido para o seu setor" in sino and "/t/comando/conversa/insight/R07:1" in sino
     pag = seg.get("/t/comando/conversa/insight/R07:1").get_data(as_text=True)
-    assert "Responder por Segurança · HSEQ" in pag and "Responder por Campo · App" not in pag
+    assert "Responder por Segurança · HSEQ" in pag and "Responder por Usinas 360°" not in pag
     pid = next(l["pedido_id"] for l in banco.linhas(PD.LIVRO, PD.ABA) if l["torre"] == "hseq")
     seg.post("/t/comando/pedido/acao", data={"codigo": _codigo(seg, "/t/comando/caixa-de-entrada"),
                                              "objeto": "insight:R07:1", "acao": "responder", "pedido": pid,
@@ -127,9 +127,9 @@ def test_o_pedido_no_insight_a_caixa_o_sino_e_o_painel(app, banco, limpo, motor_
     monkeypatch.setattr(MO, "torres_da_pessoa", lambda: None)
     assert "Extintores trocados" in _aberta(c, "/t/comando/insights")
     caixa = c.get("/t/comando/caixa-de-entrada").get_data(as_text=True)
-    assert "Pedidos que você fez" in caixa and "Para Campo · App" in caixa
+    assert "Pedidos que você fez" in caixa and "Para Usinas 360°" in caixa
     painel = c.get("/t/comando/tempo-de-resposta").get_data(as_text=True)
-    assert "Tempo de resposta" in painel and "Segurança · HSEQ" in painel and "Campo · App" in painel
+    assert "Tempo de resposta" in painel and "Segurança · HSEQ" in painel and "Usinas 360°" in painel
     assert "<b>100%</b>" in painel and "1 de 1 resolvido" in painel and "Atrasados agora" in painel
 
 

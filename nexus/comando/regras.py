@@ -38,7 +38,7 @@ REGRAS = {
     "R09": {"nome": "Equipe acima da capacidade na semana", "torre": "pcm", "kpi": "Backlog ≤ 10%",
             "fonte": "PCM (a programação da semana)", "avisar": ["pcm"]},
     "R11": {"nome": "Usina sem ronda há mais de 7 dias", "torre": "campo", "kpi": "Cobertura de rondas",
-            "fonte": "Campo · App → Rondas", "avisar": ["campo", "pcm"]},
+            "fonte": "Usinas 360° → Rondas", "avisar": ["campo", "pcm"]},
     "R13": {"nome": "Chamado parado com o fabricante", "torre": "chamados", "kpi": "Custo evitado",
             "fonte": "Chamados → Garantias", "avisar": ["chamados"]},
     "N01": {"nome": "Normalizada com a OS aberta no Fracttal", "torre": "cos", "kpi": "MTTR e disponibilidade",

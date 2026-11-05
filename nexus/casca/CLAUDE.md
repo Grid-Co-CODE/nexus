@@ -1031,7 +1031,7 @@ conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no
   12 h), assinado com a chave do clone, e `/sair` apaga os dois. Sessão do Nexus: `logado`, `usuario` {email, nome, perfil} (o nome aparece
   no topo), `admin` (o e-mail em `NEXUS_ADMINS` ou na lista da tela Base → Acessos, conferido a cada pedido: seção
   "Acessos") e `supervisor_padrao`: desde a estrutura de O&M de
-  10/2026, o PAPEL de quem entrou no Campo · App ({pessoa_id, nome, papel: supervisor_campo | coordenador | gestor,
+  10/2026, o PAPEL de quem entrou na torre Usinas 360° (ex-Campo · App) ({pessoa_id, nome, papel: supervisor_campo | coordenador | gestor,
   regioes ou gestor}; o filtro que já vem marcado e quem vê o Aprovar; ver `nexus/torres/campo/CLAUDE.md`). Sessão de
   antes, com o nome do supervisor em texto, não vale como papel. A
   senha de admin segue em "Entrar com a senha de administrador" (`/entrar?admin=1`) e é a porta do Cadastro. **O login
