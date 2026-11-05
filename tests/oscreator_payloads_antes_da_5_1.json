@@ -363,6 +363,7 @@
   "retorno": [{"code": "TST-INV1", "ok": true, "os": {"duracao": 600, "etiquetas": [11], "id_task": 1001, "id_work_order": 7001, "raw": {"data": {"id_task": 1001, "id_work_order": 7001, "wo_folio": 9001}, "success": true}, "wo_folio": 9001}}],
   "eventos": [
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:30:00.000Z", "id_assigned_user": 77, "id_item": 1, "id_parent": null, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-03T12:00:00.000Z", "name": "Ana Teste", "note": null, "to_work_order": true, "work_done": true}, "sha1": "9ee670567a74d2171c22b7e01851345e3532b585"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
    {"tarefas_da_os": 7001},
    {"anexo": {"bytes": 15, "nome": "foto.png", "os": 7001, "tarefa": 5001}}

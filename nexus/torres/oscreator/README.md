@@ -2569,10 +2569,10 @@ Uma colega avisou ao Levi: "o OS Creator do nexus não tá puxando a OS pai". Pr
 - **Os caminhos que criam a OS de uma vez** (`to_work_order=True`: a OS já realizada, a Performance de uma OS por ativo e a
   inspeção do chamado) mandam a OS pai no mesmo pedido que cria a OS, e ela fica: provado no ar em 04/11/2026 em TESTE - PA,
   a OS 18564 (realizada) e a 18571 (Performance de uma OS por ativo) nasceram com a 18560 de pai, no card e no Fluxo.
-- **Conferir depois de gravar** (`os_juntar.conferir_os_pai`, 1 leitura do cabeçalho, só com OS pai): a fase 2 e os três
+- **Conferir depois de gravar** (`os_juntar.conferir_os_pai`, 1 leitura do cabeçalho, só com OS pai): a fase 2 e os
   caminhos de uma vez leem a OS criada e, se o Fracttal não gravou a OS pai, a tela diz. Foi o silêncio que deixou o defeito
-  passar semanas. Os três de uma vez ganharam a conferência no mesmo dia, depois do pedido do Levi ("Performance e
-  engenharia também tem OS pai, veja se está funcionando normalmente!").
+  passar semanas. Os de uma vez ganharam a conferência no mesmo dia, depois do pedido do Levi ("Performance e engenharia
+  também tem OS pai, veja se está funcionando normalmente!"); a OS já realizada do COS por data, em 05/11/2026.
 - **A Performance de uma OS por ativo diz o que houve:** o nº de OS pai digitado que não existe no Fracttal vira "OS X criada
   sem a OS pai" (a agrupada já dizia), e as ressalvas de cada OS (essa, a OS pai não gravada e as perguntas de fim de
   atividade recusadas, que se perdiam dentro do `create_performance_os`) chegam à tela em "Atenção:", com o resultado em
@@ -2582,6 +2582,29 @@ Uma colega avisou ao Levi: "o OS Creator do nexus não tá puxando a OS pai". Pr
 - Prova: `test_a_os_pai_vai_no_pedido_que_cria_a_os_numerada` (vermelho nos 7 caminhos antes da correção),
   `test_a_os_que_nasce_numerada_tambem_confere_a_os_pai` e `test_a_performance_diz_a_os_pai_que_nao_achou_e_a_tela_mostra`
   (vermelhos antes da conferência), em `tests/test_oscreator_os_juntar.py`.
+
+## A OS já realizada vai feita aos dois destinos (05/11/2026)
+
+A revisão das OS achou, na prova no Fracttal de verdade: a OS 18630 (TESTE - PA), criada como "já realizada" com "enviar
+para Verificação", nasceu Em Processo, sem fim e com "0 de 1" subtarefas, e o Fracttal não disse nada.
+- **A causa:** o `create_os_rpc` mandava `work_done` False sempre que o destino era a Verificação (`to_in_review`), e o
+  Fracttal tratava a tarefa como não feita. Agora ela vai feita (`work_done` True) nos dois destinos; o `to_in_review` diz
+  qual.
+- **Conferir depois de gravar** (`api._conferir_ja_realizada`, 1 leitura do cabeçalho por OS já realizada): o status tem de
+  ser o pedido (Em Verificação ou Concluída). A de Verificação que ficou Em Processo vai para Em Verificação pelo
+  `mudar_status_os` e é lida de novo. O resto (a dos Finalizados que ficou Em Processo, a de Verificação que o Fracttal
+  concluiu) vira o aviso da OS na tela, sem mexer: concluir daqui fecharia a OS sem a pessoa ver, e fechar é irreversível.
+  Cabeçalho sem status ou leitura que falhou: sem aviso (a OS existe).
+- Vale para o Criar OS do zero (uma OS por ativo, também o da Engenharia) e o COS (uma por ativo e "várias datas"), que
+  chegam ao `create_os_rpc` pelo `create_work_orders_bulk` e pelo `create_work_orders_datas`. Os avisos de cada OS se somam
+  (o do status, o da etiqueta que falhou e o da OS pai); até aqui o da etiqueta apagava o que vinha antes.
+- **A provar no ar:** que `work_done` com `to_in_review` dá Em Verificação, e não Concluída. Se o Fracttal concluir, o aviso
+  diz; aí o `work_done` volta à regra antiga e fica a mudança de status.
+- Prova: `test_a_os_ja_realizada_vai_feita_aos_dois_destinos`, `test_a_verificacao_que_ficou_em_processo_vai_para_a_verificacao`,
+  `test_o_destino_que_nao_ficou_vira_aviso`, `test_sem_o_status_no_cabecalho_nao_ha_aviso` e
+  `test_o_aviso_do_status_fica_junto_do_da_etiqueta_e_do_da_os_pai`, em `tests/test_oscreator_os_juntar.py`. O ouro
+  (`oscreator_payloads_antes_da_5_1.json`) foi regravado: a única mudança é a leitura do cabeçalho no
+  `uma_os_por_ativo_ja_realizada`.
 
 ## A OS de vários ativos: ordem natural, anexos por tarefa e "Vários" no Histórico (04/11/2026)
 

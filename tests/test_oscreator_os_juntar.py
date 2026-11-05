@@ -65,14 +65,29 @@ class _Resp:
 class FracttalFalso:
     """O rpc/proxy: responde como o Fracttal e guarda tudo o que recebe, na ordem (`eventos`), junto das leituras e dos anexos
     que o teste troca. `falhar` = os métodos que dão HTTP 500; `kanban_vazio` = a lista de pendentes que não traz as tarefas
-    recém-criadas; `falta_a_primeira` = a que não traz a primeira; `falha_tarefa` = a N-ésima tarefa a criar dá HTTP 500."""
+    recém-criadas; `falta_a_primeira` = a que não traz a primeira; `falha_tarefa` = a N-ésima tarefa a criar dá HTTP 500.
+    O status da OS já realizada (`status_da_os`, que o cabeçalho devolve): a tarefa feita (`work_done`) vai à Verificação ou
+    aos Finalizados, a não feita fica Em Processo (a OS 18630, 05/11/2026); `fica_em_processo` = o Fracttal que ignora o destino
+    calado, `conclui_a_verificacao` = o que conclui a que ia à Verificação, `recusa_status` = a mudança de status recusada,
+    `sem_status` = o cabeçalho que não traz o status."""
 
-    def __init__(self, falhar=(), kanban_vazio=False, falta_a_primeira=False, falha_tarefa=0, ignora_pai=False):
+    def __init__(self, falhar=(), kanban_vazio=False, falta_a_primeira=False, falha_tarefa=0, ignora_pai=False,
+                 fica_em_processo=False, conclui_a_verificacao=False, recusa_status=False, sem_status=False):
         self.eventos, self.pendentes = [], []
         self.ignora_pai, self.pai_da_os = ignora_pai, {}          # a OS pai que cada OS "gravou" (o cabeçalho a devolve)
+        self.status_da_os = {}
+        self.fica_em_processo, self.conclui_a_verificacao = fica_em_processo, conclui_a_verificacao
+        self.recusa_status, self.sem_status = recusa_status, sem_status
         self.n_tarefa = self.n_os = self.n_pedidos_de_tarefa = 0
         self.falhar, self.kanban_vazio, self.falta_a_primeira = set(falhar), kanban_vazio, falta_a_primeira
         self.falha_tarefa = falha_tarefa
+
+    def _status_ao_nascer(self, params) -> int:
+        if self.fica_em_processo or not params.get("work_done"):
+            return 1
+        if params.get("to_in_review"):
+            return 3 if self.conclui_a_verificacao else 2
+        return 3
 
     def post(self, url, headers=None, json=None, timeout=None, **_kw):
         corpo = json[0]
@@ -89,6 +104,7 @@ class FracttalFalso:
             if params.get("to_work_order"):                      # a OS já realizada nasce numerada, sem a fase 2
                 self.n_os += 1
                 self.pai_da_os[7000 + self.n_os] = None if self.ignora_pai else params.get("id_parent")
+                self.status_da_os[7000 + self.n_os] = self._status_ao_nascer(params)
                 return _Resp([{"result": {"success": True, "data": {
                     "id_task": idt, "id_work_order": 7000 + self.n_os, "wo_folio": 9000 + self.n_os}}}])
             self.pendentes.append({"id_task": idt, "id_item": params.get("id_item"), "description": params.get("description"),
@@ -103,8 +119,16 @@ class FracttalFalso:
             self.n_os += 1
             self.pai_da_os[7000 + self.n_os] = None if self.ignora_pai else params.get("id_parent")
             return _Resp([{"result": {"data": {"id": 7000 + self.n_os, "wo_folio": 9000 + self.n_os}}}])
-        if metodo == api.RPC_WO_DETAILS:                          # o cabeçalho: a conferência da OS pai depois de gravar
-            return _Resp([{"result": {"data": [{"id": params.get("id"), "id_parent_wo": self.pai_da_os.get(params.get("id"))}]}}])
+        if metodo == api.RPC_WO_DETAILS:                          # o cabeçalho: a conferência depois de gravar (OS pai, status)
+            cab = {"id": params.get("id"), "id_parent_wo": self.pai_da_os.get(params.get("id"))}
+            if not self.sem_status and params.get("id") in self.status_da_os:
+                cab["id_status_work_order"] = self.status_da_os[params["id"]]
+            return _Resp([{"result": {"data": [cab]}}])
+        if metodo == api.RPC_WO_CHANGE_STATUS:
+            if self.recusa_status:
+                return _Resp([{"result": {"success": False, "message": "sem permissão de mentira"}}])
+            self.status_da_os[params.get("id_work_order")] = params.get("id_status_work_order")
+            return _Resp([{"result": {"success": True, "data": []}}])
         if metodo == api.RPC_WO_PARENTS:
             return _Resp([{"result": {"data": [{"id": 4321, "wo_folio": "1234", "description": "1234"}]}}])
         if metodo == api.RPC_WO_TASKS_NEW:
@@ -681,6 +705,14 @@ def _realizada_com_pai(mp, fr):
                                        finalizar=fin, event_date=EVENTO, id_parent=555)
 
 
+def _datas_realizada_com_pai(mp, fr):
+    """O COS, "Mesmo ativo · várias datas" com a OS já realizada: cada data é o par (início, fim)."""
+    fin = {"to_in_review": False, "id_assigned_user": 77, "name": "Ana Teste"}
+    return api.create_work_orders_datas(ativo(1), "Descrição", "Corretiva", ["Conferir"],
+                                        [(EVENTO, PROGRAMADA), (PROGRAMADA, PROGRAMADA + timedelta(hours=1))],
+                                        id_responsible=77, finalizar=fin, id_parent=555)
+
+
 def _inspecao_com_pai(mp, fr):
     import chamado_insp_spec
     mp.setattr(chamado_insp_spec, "subtarefas", lambda tipo, marca: ["Conferir a placa"])
@@ -691,6 +723,8 @@ def _inspecao_com_pai(mp, fr):
 @pytest.mark.parametrize("nome, corpo, pai, avisos_de", [
     ("a Performance de uma OS por ativo", _perf_uma_por_ativo, 4321, lambda ret: [ret[0].get("aviso") or ""]),
     ("a OS já realizada", _realizada_com_pai, 555, lambda ret: [r["os"].get("aviso") or "" for r in ret]),
+    ("a OS já realizada do COS, uma por data", _datas_realizada_com_pai, 555,
+     lambda ret: [r["os"].get("aviso") or "" for r in ret]),
     ("a inspeção do chamado", _inspecao_com_pai, 555, lambda ret: [ret.get("aviso") or ""]),
 ])
 def test_a_os_que_nasce_numerada_tambem_confere_a_os_pai(nome, corpo, pai, avisos_de):
@@ -722,3 +756,74 @@ def test_a_performance_diz_a_os_pai_que_nao_achou_e_a_tela_mostra():
     assert "alerta" not in m and "Atenção" not in m["mensagem"]
     aviso = "OS 9001 criada, mas o Fracttal não gravou a OS pai: confira no Fluxo da OS e avise o administrador do Nexus."
     assert insp_web.mensagem_criou({"wo_folio": "9001", "n_subtarefas": 1, "aviso": aviso}, "INSPEÇÃO")["aviso"] == aviso
+
+
+# ── a OS já realizada: o destino que a pessoa escolheu, conferido no Fracttal ─────────────────────────────────────────────
+def _realizada(mp, fr, verificacao=True, **mais):
+    """O Criar OS (e o COS) com "Esta tarefa já foi realizada?": vai à Verificação ou aos Finalizados."""
+    fin = {"to_in_review": verificacao, "final_date": PROGRAMADA, "id_assigned_user": 77, "name": "Ana Teste"}
+    args = dict(id_responsible=77, finalizar=fin, event_date=EVENTO)
+    args.update(mais)
+    return api.create_work_orders_bulk([ativo(1)], "Descrição", "Corretiva", ["Conferir"], **args)
+
+
+def _mudancas_de_status(fr):
+    return [e["params"] for e in fr.eventos if e.get("pedido") == api.RPC_WO_CHANGE_STATUS]
+
+
+@pytest.mark.parametrize("verificacao, status", [(True, 2), (False, 3)])
+def test_a_os_ja_realizada_vai_feita_aos_dois_destinos(verificacao, status):
+    """A OS 18630 (TESTE - PA, 05/11/2026): "já realizada", enviar para Verificação, nasceu Em Processo, sem fim e com "0 de 1"
+    subtarefas, e o Fracttal não disse nada. O pedido mandava a tarefa como não feita (`work_done` False) sempre que o destino
+    era a Verificação. Agora vai feita nos dois destinos, e o status lido de volta é o que a pessoa escolheu, sem aviso."""
+    saida, fr = _rodar(lambda mp, f: _realizada(mp, f, verificacao))
+    pedido = next(e["params"] for e in fr.eventos if e.get("pedido") == INSERIR_TAREFA)
+    assert (pedido["work_done"], pedido["to_work_order"], pedido["to_in_review"]) == (True, True, verificacao)
+    assert fr.status_da_os[7001] == status
+    assert any(e.get("pedido") == api.RPC_WO_DETAILS for e in saida["eventos"])           # o status lido de volta
+    assert not _mudancas_de_status(fr)
+    assert "aviso" not in saida["retorno"][0]["os"]
+
+
+def test_a_verificacao_que_ficou_em_processo_vai_para_a_verificacao():
+    """O Fracttal que ainda assim deixa a OS Em Processo: ela vai para Em Verificação pela mudança de status (a que a revisão
+    das OS provou que funciona) e é lida de novo; ficou certa, a tela não diz nada."""
+    saida, fr = _rodar(lambda mp, f: _realizada(mp, f, True), fica_em_processo=True)
+    assert [(m["id_work_order"], m["id_status_work_order"]) for m in _mudancas_de_status(fr)] == [(7001, 2)]
+    assert fr.status_da_os[7001] == 2
+    assert "aviso" not in saida["retorno"][0]["os"]
+
+
+@pytest.mark.parametrize("verificacao, opcoes, ficou, pedido", [
+    (True, {"fica_em_processo": True, "recusa_status": True}, "Em Processo", "Em Verificação"),
+    (True, {"conclui_a_verificacao": True}, "Concluída", "Em Verificação"),
+    (False, {"fica_em_processo": True}, "Em Processo", "Concluída"),
+])
+def test_o_destino_que_nao_ficou_vira_aviso(verificacao, opcoes, ficou, pedido):
+    """O que não ficou como a pessoa pediu, a tela diz: a Verificação que nem a mudança de status tirou de Em Processo, a que o
+    Fracttal concluiu (fechar é irreversível: só o aviso) e a dos Finalizados que ficou Em Processo (concluir daqui fecharia a
+    OS sem a pessoa ver: só o aviso)."""
+    saida, fr = _rodar(lambda mp, f: _realizada(mp, f, verificacao), **opcoes)
+    assert saida["retorno"][0]["os"]["aviso"] == (
+        "OS 9001 criada, mas ficou %s no Fracttal, e não %s: confira no Fracttal e avise o administrador do Nexus."
+        % (ficou, pedido))
+    assert all(m["id_status_work_order"] == 2 for m in _mudancas_de_status(fr))            # nunca concluir daqui
+
+
+def test_sem_o_status_no_cabecalho_nao_ha_aviso():
+    """O cabeçalho que não traz o status, ou a leitura que falhou: a OS existe, e não há o que conferir."""
+    for opcoes in ({"sem_status": True}, {"falhar": [api.RPC_WO_DETAILS]}):
+        saida, fr = _rodar(lambda mp, f: _realizada(mp, f, True), **opcoes)
+        assert "aviso" not in saida["retorno"][0]["os"] and not _mudancas_de_status(fr), opcoes
+
+
+def test_o_aviso_do_status_fica_junto_do_da_etiqueta_e_do_da_os_pai():
+    """Os avisos da OS já realizada se somam: o do status, o da etiqueta que falhou e o da OS pai que não ficou (até aqui o da
+    etiqueta apagava o que vinha antes)."""
+    for corpo in (lambda mp, f: _realizada(mp, f, False, etiqueta_ids=[11], id_parent=555),
+                  lambda mp, f: api.create_work_orders_datas(
+                      ativo(1), "Descrição", "Corretiva", ["Conferir"], [(EVENTO, PROGRAMADA)], id_responsible=77,
+                      etiqueta_ids=[11], finalizar={"to_in_review": False, "id_assigned_user": 77}, id_parent=555)):
+        saida, _fr = _rodar(corpo, fica_em_processo=True, falhar=[ETIQUETAS], ignora_pai=True)
+        aviso = saida["retorno"][0]["os"]["aviso"]
+        assert "não gravou a OS pai" in aviso and "e não Concluída" in aviso and "etiqueta falhou" in aviso, aviso

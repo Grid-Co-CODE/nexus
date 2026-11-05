@@ -726,8 +726,9 @@ def create_work_orders_bulk(assets: list, description: str, task_type: str, subt
                 try:
                     api.apply_labels(r["os"]["id_work_order"], etiqueta_ids)
                     r["os"]["etiquetas"] = list(etiqueta_ids)
-                except FracttalError as e:
-                    r["os"]["aviso"] = f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}"
+                except FracttalError as e:     # junto do aviso do status (`_conferir_ja_realizada`), sem apagá-lo
+                    r["os"]["aviso"] = ((r["os"].get("aviso") or "") + " "
+                                        + f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}").strip()
         # a OS pai foi no mesmo pedido que criou a OS (provado no ar em 04/11/2026, a OS 18564): conferida como na fase 2
         if id_parent:
             for r in [x for x in fase1 if x.get("ok") and x["os"].get("id_work_order")]:
@@ -846,8 +847,14 @@ def create_work_orders_datas(asset: dict, description: str, task_type: str, subt
                 try:
                     api.apply_labels(r["os"]["id_work_order"], etiqueta_ids)
                     r["os"]["etiquetas"] = list(etiqueta_ids)
-                except FracttalError as e:
-                    r["os"]["aviso"] = f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}"
+                except FracttalError as e:     # junto do aviso do status (`_conferir_ja_realizada`), sem apagá-lo
+                    r["os"]["aviso"] = ((r["os"].get("aviso") or "") + " "
+                                        + f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}").strip()
+        if id_parent:                                    # a OS pai conferida, como no uma-OS-por-ativo já realizada
+            for r in [x for x in fase1 if x.get("ok") and x["os"].get("id_work_order")]:
+                aviso_pai = os_juntar.conferir_os_pai(r["os"]["id_work_order"], id_parent, r["os"].get("wo_folio"))
+                if aviso_pai:
+                    r["os"]["aviso"] = (aviso_pai + " " + (r["os"].get("aviso") or "")).strip()
         return fase1
 
     os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids,     # a mesma do uma-OS-por-ativo
