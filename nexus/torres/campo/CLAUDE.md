@@ -1306,6 +1306,26 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   74,4%), disponibilidade 100,0%, S3 V3, ronda longa pendente, 7 OS atrasadas (a mais antiga há 72 dias), sem luvas desde
   03/11, a PT 15688 De acordo; a busca com 131 usinas, "coracao" leva à usina; a janela do PR e o card da OS abrem; a 375
   px uma coluna, sem rolagem de lado. Testes: `tests/test_campo_central_usina_0411.py`.
+- **2ª rodada (04/11/2026):** "Deixar a lista de 'buscar usina' já no estilo nexus": sem usina escolhida, a lista
+  fica aberta em grade embaixo do campo (`busca_aberta` do `_busca_usina.html`, com a contagem que filtra junto); com a
+  usina, volta a abrir só no foco. "Melhore o visual dos cards, está simples demais e as linhas estão muito coladas": o
+  cabeçalho com as pessoas em selos (as iniciais, o papel e o nome), o quadro com o ícone num selo verde, as linhas
+  separadas por um fio com 13 px de respiro, o ponto da situação nas pendências (`det_linhas(..., marca=)`, a cor da
+  régua da Visão) e a contagem nas linhas de chamados e de PT. Só `.cu-*`: a Visão geral não muda.
+- **O relatório da usina para o cliente (2ª rodada):** "é interessante que dê para baixar um relatório da usina também!
+  Algo bem profissional para o cliente!". O "Baixar relatório" do cabeçalho abre a janela do mês e dos temas (a do
+  Painel: "Tem que poder escolher que nem é no painel"); a rota `responsaveis_usina_relatorio`
+  (`/responsaveis/usina/<id>/relatorio.pdf?mes=&tema=`) monta o PDF em `nexus/campo/relatorio_usina.py`. Decisões do
+  Levi: o **mês escolhido, o anterior (fechado) de início**, o corrente sai parcial até ontem (os três últimos meses: as
+  rondas, os chamados e as tarefas ficam 90 dias no banco); os temas Performance e disponibilidade, Rondas e limpeza,
+  Manutenção e Chamados de garantia, todos marcados; **PT, Segurança e nomes de técnicos não entram** (são internos). O
+  dado é o das telas donas: a meta, o PR e o dia a dia do Gerencial e a disponibilidade com os eventos (os leitores das
+  janelas), as rondas do mês (`historico_usina`), as tarefas feitas pelo App (`fato_fechamento`, sem as devolvidas), as OS
+  abertas (`fato_tarefa_os`, a regra do bloco Manutenção) e os chamados (`fato_chamado`). O PDF: a faixa navy com o logo
+  e o mês, os quatro números com a cor da régua, o resumo em frases, o gráfico da geração do dia contra a meta e as
+  tabelas; o evento de disponibilidade da usina que junta duas do Gerencial (Coração 1 e 2) diz a parte
+  (`os_disponibilidade` leva a `usina` do Gerencial). Prova: o de outubro da Coração 1 e 2 (671,4 MWh, 72% da meta, PR
+  101,9%, 99,1%, 4 eventos, 5 tarefas, 0 ronda no mês: a usina só tem a ronda de 03/11 nos 90 dias) em 0,9 s.
 
 ## Estrutura de O&M de 10/2026: região de campo e gestor de contrato (08/10/2026)
 
@@ -1635,6 +1655,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   Manutenção (`manutencao_fonte`, `alertas_manutencao`, `linha_manutencao`, `com_manutencao`, `limite_do_pedido`).
 - `central_usina.py`: a Central da usina (04/11/2026, acima): a busca, os técnicos, as ocorrências, a Segurança e as PT
   do mês da usina escolhida; o resto é a linha dela na Visão.
+- `relatorio_usina.py`: o relatório da usina em PDF para o cliente (04/11/2026, acima): os meses, os temas, os dados
+  das telas donas e o PDF (reportlab, a paleta e a fonte dos outros relatórios).
   `manutencao.py`: a conta pura do bloco Manutenção. `tarefas_os.py`: o laço que lê as tarefas das OS do Fracttal e
   grava o `nexus_os` (acima); desde 31/10/2026 é também o leitor de OS que a lista central do OS Creator usa (as mesmas
   funções e a mesma paginação, e a volta entrega a ela as abertas que leu; regra no `nexus/dados/CLAUDE.md`). `responsaveis_graficos.py`: a geometria dos gráficos das janelas (SVG).

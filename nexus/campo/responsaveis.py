@@ -1539,7 +1539,8 @@ def os_disponibilidade(uid: int, mes: str, nomes: Nomes) -> dict:
         except ValueError:
             dur = None
         aberta = str(r.get("aberta") or "").strip().lower() in ("sim", "true", "1")
-        oss.append({"os": str(r.get("os") or ""), "tipo": str(r.get("tipo") or "—"), "origem": str(r.get("origem") or ""),
+        oss.append({"os": str(r.get("os") or ""), "usina": str(r.get("usina") or ""),
+                    "tipo": str(r.get("tipo") or "—"), "origem": str(r.get("origem") or ""),
                     "escopo": str(r.get("escopo") or "—"), "codigo": str(r.get("codigo_ativo") or ""),
                     "inicio": _hora(ini), "fim": _hora(fim) if fim else "", "aberta": aberta, "duracao_min": dur,
                     "sol_min": _int(r.get("duracao_sol_min")), "perda_kwh": _num(r.get("perda_kwh")), "_ini": ini})

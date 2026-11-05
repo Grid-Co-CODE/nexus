@@ -1674,20 +1674,33 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .rg-fotos .cn-bt-tentar{margin-left:6px;font:600 12px var(--font-sans);color:var(--verde-texto);background:transparent;
   border:1px solid var(--linha);border-radius:7px;padding:3px 10px;cursor:pointer}
 .rg-fotos .cn-bt-tentar:hover{border-color:var(--verde-texto)}
-/* a Central da usina (04/11/2026, a aba da Visão do responsável): a busca, o cabeçalho com as pessoas, os números da
-   linha da usina e os quadros em duas colunas, numa superfície só (à la Nexus, sem azul em camadas) */
+/* a Central da usina (04/11/2026, a aba da Visão do responsável), numa superfície só (à la Nexus, sem azul em camadas).
+   2ª rodada no mesmo dia ("está simples demais e as linhas estão muito coladas"): o cabeçalho com as pessoas, os quadros
+   com o ícone num selo, as linhas separadas por um fio com respiro, o ponto da situação e a contagem de cada linha */
 .cu-busca{display:flex;margin-top:16px}
 .cu-busca .rd-usina{flex:0 1 440px}
 .cu-busca .rd-campo input{width:100%}
-.cu-vazio{margin-top:16px;font-size:13.5px}
-.cu-vazio p{margin:0 0 6px}
-.cu-cab{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:14px 40px;margin-top:20px}
-.cu-nome{margin:0;font:700 22px/1.25 var(--font-sans);color:var(--tinta)}
-.cu-id p{margin:3px 0 0;font-size:13px}
-.cu-pessoas{display:grid;grid-template-columns:repeat(3,minmax(0,auto));gap:8px 32px;margin:0;font-size:13px}
-.cu-pessoas dt{font:600 10.5px/1.2 var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
-.cu-pessoas dd{margin:3px 0 0}
-.cu-pessoas .cu-larga{grid-column:1/-1}
+/* sem usina escolhida, a lista já aberta, em grade (04/11/2026: "Deixar a lista de 'buscar usina' já no estilo nexus") */
+.cu-busca--aberta .rd-usina{flex:1 1 auto}
+.rd-usina--aberta .rd-campo{max-width:440px}
+.rd-usinas-n{margin-left:auto;font-size:12px;color:var(--mudo);white-space:nowrap}
+.rd-usinas--aberta{position:static;width:auto;max-height:min(62vh,560px);margin:12px 0 0;padding:6px;overflow:auto;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:2px;list-style:none;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-md);box-shadow:none}
+.rd-usinas--aberta li[role="option"]{padding:10px 12px}
+.rd-usinas--aberta .rd-usinas-nada{grid-column:1/-1;padding:12px;color:var(--mudo)}
+.cu-vazio{margin:14px 0 0;font-size:13.5px}
+.cu-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 24px;margin-top:22px}
+.cu-nome{margin:0;font:700 26px/1.2 var(--font-sans);letter-spacing:-.01em;color:var(--tinta)}
+.cu-onde{margin:5px 0 0;font-size:13.5px;color:var(--mudo)}
+.cu-baixar{flex:0 0 auto}
+.cu-gente{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 0;padding:0;list-style:none}
+.cu-gente li{display:flex;align-items:center;gap:10px;min-width:0;padding:7px 16px 7px 7px;border:1px solid var(--linha);
+  border-radius:999px}
+.cu-gente .cn-avatar{width:32px;height:32px;margin:0;font-size:12px}
+.cu-gente small{display:block;font-size:11.5px;line-height:1.3;color:var(--mudo)}
+.cu-gente b{display:block;font:500 13.5px/1.35 var(--font-sans);color:var(--tinta);white-space:nowrap}
+.cu-gente b.mudo{color:var(--mudo);font-weight:400}
 .cn-numeros > button{display:block;padding:16px 20px;border:0;border-left:1px solid var(--linha);background:transparent;
   color:inherit;font:inherit;text-align:left;cursor:pointer}
 .cn-numeros > button:hover{background:var(--superficie-3)}
@@ -1697,11 +1710,33 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .cu-numeros > *{padding:14px 16px}
 .cu-numeros .v{font-size:20px;line-height:26px;white-space:nowrap}
 /* duas colunas que se empilham por dentro: o quadro mais curto não deixa buraco embaixo */
-.cu-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px;align-items:start}
-.cu-col{display:flex;flex-direction:column;gap:14px;min-width:0}
-.cu-q{min-width:0;padding:12px 16px 14px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
-.cu-q .pn-cab{margin-bottom:10px}
-.cu-q .cr-dl{grid-template-columns:140px minmax(0,1fr)}
-.cu-q .cr-dl + .cr-dl{margin-top:7px}
-@media (max-width:900px){.cu-grade{grid-template-columns:1fr}.cu-pessoas{grid-template-columns:1fr 1fr}}
-@media (max-width:480px){.cu-pessoas{grid-template-columns:1fr}.cu-q .cr-dl{grid-template-columns:1fr}}
+.cu-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px;align-items:start}
+.cu-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.cu-q{min-width:0;padding:0;overflow:hidden;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio-md)}
+.cu-q > .pn-cab{gap:12px;padding:14px 20px;border-bottom:1px solid var(--linha)}
+.cu-q > .pn-cab h2{gap:12px;font:600 15px/22px var(--font-sans)}
+.cu-q > .pn-cab h2 .ph{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:9px;
+  background:var(--verde-suave);color:var(--verde-texto);font-size:17px}
+.cu-q > p{margin:0;padding:16px 20px;font-size:13px}
+.cu-q .cr-dl{grid-template-columns:150px minmax(0,1fr);gap:0 18px;margin:0;padding:0 20px;font-size:13px;line-height:1.55}
+.cu-q .cr-dl > dt,.cu-q .cr-dl > dd{padding:13px 0;border-top:1px solid var(--linha)}
+.cu-q .cr-dl > dt:first-of-type,.cu-q .cr-dl > dd:first-of-type{border-top:0}
+.cu-q .cr-dl + .cr-dl{border-top:1px solid var(--linha)}
+.cu-q .cr-dl dt{display:flex;align-items:baseline;gap:8px;color:var(--mudo);font-size:12.5px}
+.cu-q .cr-dl .it{display:block;margin-top:6px;font-size:12.5px;line-height:1.55}
+.cu-q .cr-dl dd > .it:first-child{margin-top:0}
+.cu-q .cr-dia-a-dia{margin-left:6px}
+/* a contagem da linha (chamados, PT): o número ao lado do nome, discreto */
+.cu-n{margin-left:auto;min-width:22px;padding:0 7px;border-radius:999px;background:var(--superficie-2);color:var(--tinta);
+  font:600 11.5px/20px var(--font-sans);text-align:center}
+/* o ponto da situação na linha das pendências, na cor da régua da Visão */
+.cu-dt::before{content:"";flex:0 0 8px;width:8px;height:8px;border-radius:50%;background:var(--mudo);transform:translateY(-1px)}
+.cu-dt--critico::before{background:var(--critico)}
+.cu-dt--alerta::before{background:var(--alerta)}
+.cu-dt--ok::before{background:var(--ok)}
+.cu-pe{display:flex;flex-wrap:wrap;gap:8px 20px;padding:12px 20px;border-top:1px solid var(--linha);font-size:12.5px}
+.cu-rel-mes{display:block;width:100%;max-width:280px;margin:4px 0 14px}
+@media (max-width:900px){.cu-grade{grid-template-columns:1fr}}
+@media (max-width:480px){.cu-q .cr-dl{grid-template-columns:1fr}.cu-q .cr-dl > dd{padding-top:0;border-top:0}
+  .cu-gente li{flex:1 1 100%}.rd-usinas--aberta{grid-template-columns:1fr}}

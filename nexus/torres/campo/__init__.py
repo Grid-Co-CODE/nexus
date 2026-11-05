@@ -411,6 +411,9 @@ def _central_da_usina(todas: list[dict]) -> dict:
     out = {"busca": [(i, n, s, url_for("torre_campo.responsaveis", modo="usina", usina=i))
                      for i, n, s in CU.busca(todas, _ordem_do_nome)],
            "u": u, "nome": "" if u else nome, "erros": {}, "situacao_pt": SITUACAO_PT}
+    from ...campo import relatorio_usina as RU
+    hoje_rel = visao._agora().date()
+    out.update(rel_meses=RU.meses(hoje_rel), rel_mes=RU.mes_padrao(hoje_rel), rel_temas=RU.TEMAS)
     if not u:
         return out
     uid = u["usina_id"]
@@ -586,7 +589,7 @@ def responsaveis():
                                            for bb, nome, txt in campo_resp.BLOCOS if bb == b],
         base_pequena=visao.BASE_PEQUENA,
         responsavel_logado=logado, limite=limite, faixa=faixa, faixa_max=FAIXA_MAX, estado_os=tarefas_os.estado(),
-        central=central,
+        central=central, iniciais=_iniciais,
         foto_os=campo_resp.foto_das_os(((d.get("info") or {}).get("manut") or {}).get("gerado_em"), visao._agora()),
         usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),
         blocos=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b, nome, txt in campo_resp.BLOCOS],
@@ -799,6 +802,29 @@ def responsaveis_relatorio():
     pdf = painel_relatorio.gerar(painel, faixa, v["r"] if v["pronta"] else None, filtros=filtros,
                                  gerado_em=agora.strftime("%d/%m/%Y %H:%M"), temas=temas)
     nome = f"Painel do responsável - {responsavel or 'todos'} - {agora.strftime('%Y-%m-%d')}.pdf"
+    return Response(pdf, mimetype="application/pdf",
+                    headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(nome),
+                             "Cache-Control": "no-store"})
+
+
+
+@bp.route("/responsaveis/usina/<int:usina_id>/relatorio.pdf")
+def responsaveis_usina_relatorio(usina_id):
+    """O relatório da usina em PDF, para o cliente (Levi, 04/11/2026: "é interessante que dê para baixar um relatório da
+    usina também! Algo bem profissional para o cliente!"): o mês (`mes`, AAAA-MM: o atual ou um dos dois anteriores; o
+    anterior de início) e os temas marcados na janela (`tema` repetido; sem nenhum, todos), em
+    nexus/campo/relatorio_usina.py. Só as usinas da Visão (as mobilizadas)."""
+    from ...campo import relatorio_usina as RU
+    d = campo_resp.visao_responsaveis().dados or {}
+    if not any(u["usina_id"] == usina_id for u in d.get("usinas") or []):
+        abort(404)
+    agora = datetime.now(_BRT)
+    hoje = agora.date()
+    mes = RU.mes_do_pedido(request.args.get("mes"), hoje)
+    temas = RU.temas_do_pedido(request.args.getlist("tema"))
+    dados = RU.dados(usina_id, mes, hoje)
+    pdf = RU.gerar(dados, temas, gerado_em=agora.strftime("%d/%m/%Y às %H:%M"))
+    nome = f"Relatório {dados['usina']} - {mes}.pdf"
     return Response(pdf, mimetype="application/pdf",
                     headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(nome),
                              "Cache-Control": "no-store"})

@@ -6,23 +6,41 @@
      busca_ocultos {campo: valor} que o formulário leva junto (opcional)
      busca_valor   o texto que volta no campo (opcional)
      busca_rotulo  o texto do campo
-   A lista abre no foco e filtra enquanto se digita (sem acento nem caixa); setas e Enter escolhem, Esc fecha; clicar,
-   ou Enter na marcada, leva direto à usina. Uma busca por página (os ids são fixos). #}
+     busca_aberta  a lista já aberta embaixo do campo, em grade (a Central da usina sem usina escolhida, 04/11/2026:
+                   "Deixar a lista de 'buscar usina' já no estilo nexus"); sem ela, a lista abre no foco, por cima
+   A lista filtra enquanto se digita (sem acento nem caixa); setas e Enter escolhem, Esc fecha (a aberta só desmarca);
+   clicar, ou Enter na marcada, leva direto à usina. Uma busca por página (os ids são fixos). #}
+{% macro _itens(usinas) %}
+    {% for uid, nome, sub, href in usinas %}<li role="option" id="rd-us-{{ uid }}" data-href="{{ href }}"><b>{{ nome }}</b>{% if sub %}<span>{{ sub }}</span>{% endif %}</li>{% endfor %}
+    <li class="rd-usinas-nada" role="presentation" hidden>Nenhuma usina com esse nome</li>
+{% endmacro %}
+{% if busca_aberta %}
+<form class="rd-usina rd-usina--aberta" method="get" action="{{ url_for(busca_rota) }}" role="search" data-rd-usina data-rd-aberta>
+  {% for k, v in (busca_ocultos or {}).items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <div class="rd-campo">
+    <i class="ph ph-solar-panel" aria-hidden="true"></i>
+    <input type="search" name="nome" value="{{ busca_valor or '' }}" placeholder="{{ busca_rotulo }}" aria-label="{{ busca_rotulo }}: vai à página da usina" autocomplete="off"
+           role="combobox" aria-expanded="true" aria-controls="rd-usinas" aria-autocomplete="list">
+    <span class="rd-usinas-n" aria-live="polite">{{ busca_usinas|length }} usinas</span>
+  </div>
+  <ul class="rd-usinas rd-usinas--aberta" id="rd-usinas" role="listbox" aria-label="Usinas">{{ _itens(busca_usinas) }}</ul>
+</form>
+{% else %}
 <form class="rd-campo rd-usina" method="get" action="{{ url_for(busca_rota) }}" role="search" data-rd-usina>
   {% for k, v in (busca_ocultos or {}).items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
   <i class="ph ph-solar-panel" aria-hidden="true"></i>
   <input type="search" name="nome" value="{{ busca_valor or '' }}" placeholder="{{ busca_rotulo }}" aria-label="{{ busca_rotulo }}: vai à página da usina" autocomplete="off"
          role="combobox" aria-expanded="false" aria-controls="rd-usinas" aria-autocomplete="list">
-  <ul class="rd-usinas" id="rd-usinas" role="listbox" aria-label="Usinas" hidden>
-    {% for uid, nome, sub, href in busca_usinas %}<li role="option" id="rd-us-{{ uid }}" data-href="{{ href }}"><b>{{ nome }}</b>{% if sub %}<span>{{ sub }}</span>{% endif %}</li>{% endfor %}
-    <li class="rd-usinas-nada" role="presentation" hidden>Nenhuma usina com esse nome</li>
-  </ul>
+  <ul class="rd-usinas" id="rd-usinas" role="listbox" aria-label="Usinas" hidden>{{ _itens(busca_usinas) }}</ul>
 </form>
+{% endif %}
 <script>
   (function () {
     var f = document.querySelector('[data-rd-usina]'); if (!f) return;
+    var aberta = f.hasAttribute('data-rd-aberta');
     var campo = f.querySelector('input[name="nome"]'), lista = document.getElementById('rd-usinas');
     var itens = Array.prototype.slice.call(lista.querySelectorAll('li[role="option"]')), nada = lista.querySelector('.rd-usinas-nada');
+    var conta = f.querySelector('.rd-usinas-n');
     var marcada = -1;
     function sem(t) { return t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
     itens.forEach(function (li) { li._busca = sem(li.textContent); });
@@ -38,9 +56,14 @@
       var q = sem(campo.value), n = 0;
       itens.forEach(function (li) { li.hidden = q !== '' && li._busca.indexOf(q) < 0; if (!li.hidden) n += 1; });
       nada.hidden = n > 0; marca(q ? 0 : -1);
+      if (conta) conta.textContent = n + (n === 1 ? ' usina' : ' usinas');
     }
     function abre() { lista.hidden = false; campo.setAttribute('aria-expanded', 'true'); filtra(); }
-    function fecha() { lista.hidden = true; campo.setAttribute('aria-expanded', 'false'); marcada = -1; }
+    function fecha() {
+      marcada = -1; itens.forEach(function (li) { li.removeAttribute('aria-selected'); });
+      if (aberta) return;                       // a lista aberta fica; só a marca sai
+      lista.hidden = true; campo.setAttribute('aria-expanded', 'false');
+    }
     campo.addEventListener('focus', abre);
     campo.addEventListener('input', function () { if (lista.hidden) abre(); else filtra(); });
     campo.addEventListener('keydown', function (ev) {

@@ -25,9 +25,13 @@ def test_a_aba_fica_ao_lado_das_outras_e_busca_todas_as_usinas(tela, logado):
     # a busca traz TODAS as usinas da Visão, sem o filtro do responsável (decisão do Levi: as 131, para quem abre a tela)
     for uid in (1, 2, 3):
         assert f'id="rd-us-{uid}"' in html
-    assert 'name="modo" value="usina"' in html and "Busque a usina pelo nome" in html
+    assert 'name="modo" value="usina"' in html
+    # sem usina escolhida, a lista já aberta, em grade (2ª rodada: "Deixar a lista de 'buscar usina' já no estilo nexus")
+    assert 'class="rd-usinas rd-usinas--aberta"' in html and "data-rd-aberta" in html and ">3 usinas<" in html
     # o responsável, o cliente e a busca da lista não valem na Central
     assert 'id="cr-responsavel"' not in html and 'id="cr-cliente"' not in html
+    # com a usina escolhida, a lista volta a abrir só no foco (por cima)
+    assert "rd-usinas--aberta" not in _central(logado, "&usina=1")
 
 
 def test_a_usina_escolhida_traz_os_numeros_da_linha_dela_na_visao(tela, logado):
@@ -103,3 +107,58 @@ def test_as_pt_do_mes_sao_as_pedidas_no_mes_em_brasilia():
             {"usina_id": 2, "numero": "C", "criada": no_mes}]
     out = CU.pts_do_mes(1, hist, hoje)
     assert [p["numero"] for p in out] == ["A"] and out[0]["dia_txt"] == f"01/{hoje.month:02d}"
+
+
+# ── o relatório da usina para o cliente (2ª rodada, 04/11/2026: "é interessante que dê para baixar um relatório da usina
+# também! Algo bem profissional para o cliente!"; o mês escolhido, o anterior de início; os temas como no Painel) ──────
+def test_os_meses_do_relatorio_e_o_padrao_o_anterior():
+    from datetime import date
+
+    from nexus.campo import relatorio_usina as RU
+    hoje = date(2026, 1, 15)
+    assert RU.meses(hoje) == [("2026-01", "Janeiro de 2026"), ("2025-12", "Dezembro de 2025"),
+                              ("2025-11", "Novembro de 2025")]
+    assert RU.mes_padrao(hoje) == "2025-12"                       # o mês fechado anterior
+    assert RU.mes_do_pedido("2025-11", hoje) == "2025-11" and RU.mes_do_pedido("2025-10", hoje) == "2025-12"
+    assert RU.temas_do_pedido(["rondas", "x"]) == ("rondas",) and RU.temas_do_pedido([]) == RU.CHAVES_TEMAS
+
+
+def test_a_central_tem_o_botao_e_a_janela_do_relatorio(tela, logado):
+    html = _central(logado, "&usina=1")
+    assert "data-cu-rel" in html and 'id="cu-rel-temas"' in html
+    assert "/t/campo/responsaveis/usina/1/relatorio.pdf" in html
+    from nexus.campo import relatorio_usina as RU
+    for k, rot in RU.TEMAS:                                       # os quatro temas, todos marcados
+        assert f'value="{k}" checked> {rot}' in html
+    # PT, Segurança e técnicos ficam de fora do relatório do cliente (são internos)
+    assert "PT, Segurança e nomes de técnicos não entram" in html
+
+
+def test_o_relatorio_sai_em_pdf_com_os_temas_escolhidos(tela, logado):
+    r = logado.get(f"/t/campo/responsaveis/usina/1/relatorio.pdf?mes={HOJE.strftime('%Y-%m')}")
+    assert r.status_code == 200 and r.mimetype == "application/pdf" and r.data[:5] == b"%PDF-"
+    assert "Altair" in r.headers["Content-Disposition"].replace("%20", " ")
+    assert logado.get("/t/campo/responsaveis/usina/999/relatorio.pdf").status_code == 404
+    import pytest
+    fitz = pytest.importorskip("fitz")
+    texto = "".join(p.get_text() for p in fitz.open(stream=r.data, filetype="pdf"))
+    for t in ("Altair", "Performance e disponibilidade", "Rondas e limpeza", "Manutenção", "Chamados de garantia",
+              "Resumo do mês", "85%"):
+        assert t in texto, t
+    # só os temas marcados
+    r = logado.get(f"/t/campo/responsaveis/usina/1/relatorio.pdf?mes={HOJE.strftime('%Y-%m')}&tema=chamados")
+    texto = "".join(p.get_text() for p in fitz.open(stream=r.data, filetype="pdf"))
+    assert "Chamados de garantia" in texto and "Performance e disponibilidade" not in texto and "Rondas e limpeza" not in texto
+    # o chamado aberto da Altair no mês (16034, aberto há 26 dias, conta no mês se abriu nele)
+    assert "Em aberto em" in texto
+
+
+def test_os_dados_do_relatorio_sao_os_das_telas_donas(tela):
+    from nexus.campo import relatorio_usina as RU
+    d = RU.dados(1, HOJE.strftime("%Y-%m"), HOJE)
+    a = _por_usina()["Altair"]
+    # a meta e a disponibilidade do mês são as da linha da Altair na Visão (o mesmo leitor)
+    assert d["perf"]["meta"]["atingimento"] == a["meta"]["atingimento"] == 85.0
+    assert d["perf"]["disp"]["disp"] == a["disp"]["disp"]
+    assert d["chamados"]["em_aberto"] == a["chamados"]["abertos"] + a["chamados"]["verificacao"]
+    assert not d["erros"]

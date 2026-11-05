@@ -20,11 +20,11 @@
 {% macro triagem_leg(t) %}<div class="cr-tri-leg"><span><b class="cn-t-critico">{{ t.critico }}</b>focar</span><span><b class="cn-t-alerta">{{ t.atencao }}</b>acompanhar</span><span><b class="cn-t-ok">{{ t.ok }}</b>em dia</span></div>{% endmacro %}
 {# o detalhe de um bloco de uma usina, na linha da Visão geral (18/10/2026; era o detalhe dos blocos de Onde focar) #}
 {# as linhas de um bloco (a Central da usina, 04/11/2026, mostra só as que pedem cada quadro, com os mesmos botões) #}
-{% macro det_linhas(u, linhas, perf=false) %}
+{% macro det_linhas(u, linhas, perf=false, marca=none) %}
           <dl class="cr-dl">
             {% for i in linhas %}{% set jan = {'Meta do mês': 'meta', 'PR': 'pr', 'Disponibilidade': 'disp', 'Ativos falhando': 'ativos'}.get(i.rot) if perf else none %}
               {# a ronda abre o card dela por cima (Levi, 18/10/2026: "ao clicar na última ronda aparece um card sobreposto") #}
-              <dt>{{ i.rot }}</dt><dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('ronda') %} · <button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel='ronda', os=i.ronda.os, data=i.ronda.data) }}" title="Ver a ronda: data, quem fez e as fotos">{{ i.ronda.txt }}</button>{% endif %}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
+              <dt{% if marca and marca.get(i.rot) %} class="cu-dt cu-dt--{{ marca[i.rot] }}"{% endif %}>{{ i.rot }}</dt><dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('ronda') %} · <button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel='ronda', os=i.ronda.os, data=i.ronda.data) }}" title="Ver a ronda: data, quem fez e as fotos">{{ i.ronda.txt }}</button>{% endif %}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
               {% if jan %}<button type="button" class="cr-dia-a-dia cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=jan) }}">{{ 'ver os ativos' if jan == 'ativos' else 'dia a dia' }}</button>{% endif %}
               {# a OS da PT abre a PT por cima, para aprovar sem sair da tela (Levi, 12/10/2026) #}
               {# a OS da Manutenção abre o card dela no Nexus (o do OS Creator), como a Gestão PCM: `os_card` #}
@@ -549,28 +549,30 @@
      responsáveis, como aba alternativa"). A busca leva à usina; a página junta a linha dela na Visão (os mesmos números e
      as mesmas janelas do Painel e da Visão geral) e o que vem das telas donas (nexus/campo/central_usina.py). Decisões
      dele: o mês corrente; nas pendências, rondas, OS atrasadas e pausadas, ocorrências abertas e Segurança; todas as
-     usinas na busca #}
+     usinas na busca. 2ª rodada (mesmo dia): a lista da busca já aberta sem usina escolhida ("Deixar a lista de 'buscar
+     usina' já no estilo nexus"), os quadros com respiro e marca de situação ("está simples demais e as linhas estão
+     muito coladas") e o relatório do cliente em PDF (nexus/campo/relatorio_usina.py) #}
   {% set cu = central %}
-  <div class="cu-busca">{% with busca_usinas=cu.busca, busca_rota='torre_campo.responsaveis', busca_ocultos={'modo': 'usina'}, busca_valor=cu.nome, busca_rotulo='Buscar a usina' %}{% include 'campo/_busca_usina.html' %}{% endwith %}</div>
+  <div class="cu-busca{% if not cu.u %} cu-busca--aberta{% endif %}">{% with busca_usinas=cu.busca, busca_rota='torre_campo.responsaveis', busca_ocultos={'modo': 'usina'}, busca_valor=cu.nome, busca_rotulo='Buscar a usina', busca_aberta=not cu.u %}{% include 'campo/_busca_usina.html' %}{% endwith %}</div>
   {% if not cu.u %}
-  <div class="cu-vazio">
-    {% if cu.nome %}<p><b>Nenhuma usina com o nome "{{ cu.nome }}".</b> Escolha na lista: ela filtra enquanto você digita.</p>{% endif %}
-    <p class="mudo">Busque a usina pelo nome: a página traz a performance, a disponibilidade, a limpeza, as pendências, os chamados e as PT dela, cada número da tela que já o mostra.</p>
-  </div>
+  {% if cu.nome %}<p class="cu-vazio"><b>Nenhuma usina com o nome "{{ cu.nome }}".</b> Escolha na lista: ela filtra enquanto você digita.</p>{% endif %}
   {% else %}{% set u = cu.u %}{% set pv, mv, av = u.perf.valores, u.manut.valores, u.acomp.valores %}
   {% for f, e in cu.erros.items() %}<div class="cn-erro cn-aviso" role="status">Não consegui ler {{ e }}: essa parte ficou de fora, o resto da página vale.</div>{% endfor %}
   <header class="cu-cab">
     <div class="cu-id">
       <h2 class="cu-nome">{{ u.usina }}</h2>
-      <p class="mudo">{{ u.cliente or '—' }}{% if u.cidade %} · {{ u.cidade }}{% if u.uf %}/{{ u.uf }}{% endif %}{% endif %}{% if u.equipe %} · {{ u.equipe }}{% endif %}</p>
+      <p class="cu-onde">{{ u.cliente or '—' }}{% if u.cidade %} · {{ u.cidade }}{% if u.uf %}/{{ u.uf }}{% endif %}{% endif %}{% if u.equipe %} · {{ u.equipe }}{% endif %}</p>
     </div>
-    <dl class="cu-pessoas">
-      <div><dt>Responsável O&amp;M</dt><dd>{{ u.responsavel or sem_responsavel }}</dd></div>
-      <div><dt>Supervisor de Campo</dt><dd>{{ cu.pessoas.supervisor or '—' }}</dd></div>
-      <div><dt>Gestor do contrato</dt><dd>{{ cu.pessoas.gestor or '—' }}</dd></div>
-      <div class="cu-larga"><dt>Técnicos na usina (PCM)</dt><dd>{{ cu.pessoas.tecnicos|join(', ') if cu.pessoas.tecnicos else '—' }}</dd></div>
-    </dl>
+    <button type="button" class="gc-btn gc-btn--contorno cu-baixar" data-cu-rel aria-haspopup="dialog" title="Escolher o mês e os temas e baixar o relatório da usina em PDF"><i class="ph ph-file-pdf" aria-hidden="true"></i> Baixar relatório</button>
   </header>
+  {# as pessoas da usina: o papel em cima, o nome embaixo, as iniciais no círculo (o técnico da barra lateral das Rondas) #}
+  {% macro pessoa(papel, nome, vazio='—') %}<li><span class="cn-avatar">{{ iniciais(nome) if nome else '—' }}</span><span><small>{{ papel }}</small><b{% if not nome %} class="mudo"{% endif %}>{{ nome or vazio }}</b></span></li>{% endmacro %}
+  <ul class="cu-gente" aria-label="Pessoas da usina">
+    {{ pessoa('Responsável O&M', u.responsavel if u.responsavel != sem_responsavel else '', 'sem responsável') }}
+    {{ pessoa('Supervisor de Campo', cu.pessoas.supervisor if cu.pessoas.supervisor != 'vaga' else '', 'vaga') }}
+    {{ pessoa('Gestor do contrato', cu.pessoas.gestor) }}
+    {% for t in cu.pessoas.tecnicos %}{{ pessoa('Técnico na usina', t) }}{% else %}{{ pessoa('Técnico na usina', '', 'nenhum no PCM') }}{% endfor %}
+  </ul>
   {# os números da linha da usina na Visão, na cor da régua de cada um; os da Performance abrem o dia a dia #}
   <div class="cn-numeros cu-numeros">
     {% for k, rot in (('meta', 'Meta do mês'), ('pr', 'PR'), ('disp', 'Disponibilidade')) %}{% set v = pv[k] %}
@@ -581,6 +583,11 @@
     {% endfor %}
     {% set v = mv.atrasadas %}<span><span class="d">OS atrasadas</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}</b>{% if v.sub %}<span class="d">a mais antiga há {{ v.sub }}</span>{% endif %}</span>
   </div>
+  {# a marca de situação de cada linha das pendências: o ponto na cor da régua da Visão #}
+  {% set tipo_ronda = (u.ronda or {}).get('tipo') %}
+  {% set marca = {'Ronda': 'alerta' if tipo_ronda == 'longa_pendente' else 'critico', 'Atrasadas': mv.atrasadas.cls, 'Pausadas': 'alerta'} %}
+  {% set oc_pior = 'critico' if cu.ocorrencias|selectattr('cor', 'equalto', 'critico')|list else ('alerta' if cu.ocorrencias else 'ok') %}
+  {% set seg_pior = 'critico' if cu.seguranca|selectattr('chave', 'in', ['pts', 'vencidos', 'sem_luvas'])|list else ('alerta' if cu.seguranca else 'ok') %}
   <div class="cu-grade"><div class="cu-col">
     <section class="cu-q" aria-labelledby="cu-perf">
       <header class="pn-cab"><h2 id="cu-perf"><i class="ph ph-chart-line-up" aria-hidden="true"></i>Performance do mês</h2></header>
@@ -594,28 +601,33 @@
       {% set ch = u.chamados or {} %}{% set lista_ch = ch.get('lista') or [] %}
       <header class="pn-cab"><h2 id="cu-ch"><i class="ph ph-lifebuoy" aria-hidden="true"></i>Chamados</h2></header>
       <dl class="cr-dl">
-        {% for situ, rot in (('aberto', 'Abertos'), ('verificacao', 'Em verificação')) %}
-        <dt>{{ rot }}</dt>
-        <dd>{% for c in lista_ch if c.situacao == situ %}<span class="it"><button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="{{ c.os }}" title="Abrir o card da OS">OS {{ c.os }}</button> · {{ c.equip }}{% if c.fabricante %} · {{ c.fabricante }}{% endif %}{% if situ == 'aberto' and c.dias is not none %} · há {{ c.dias }} d{% endif %}{% if c.status %} · {{ c.status }}{% endif %}</span>{% else %}<span class="mudo">nenhum</span>{% endfor %}</dd>
+        {% for situ, rot in (('aberto', 'Abertos'), ('verificacao', 'Em verificação')) %}{% set da = lista_ch|selectattr('situacao', 'equalto', situ)|list %}
+        <dt>{{ rot }}<span class="cu-n">{{ da|length }}</span></dt>
+        <dd>{% for c in da %}<span class="it"><button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="{{ c.os }}" title="Abrir o card da OS">OS {{ c.os }}</button> · {{ c.equip }}{% if c.fabricante %} · {{ c.fabricante }}{% endif %}{% if situ == 'aberto' and c.dias is not none %} · há {{ c.dias }} d{% endif %}{% if c.status %} · {{ c.status }}{% endif %}</span>{% else %}<span class="mudo">—</span>{% endfor %}</dd>
         {% endfor %}
-        <dt>Finalizados no mês</dt>
-        <dd>{% for c in cu.chamados_mes %}<span class="it"><button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="{{ c.os }}" title="Abrir o card da OS">OS {{ c.os }}</button> · {{ c.equip }}{% if c.fim %} · fechado em {{ c.fim.strftime('%d/%m') }}{% endif %}{% if c.dias is not none %} · {{ c.dias }} d aberto{% endif %}</span>{% else %}<span class="mudo">nenhum</span>{% endfor %}</dd>
+        <dt>Finalizados no mês<span class="cu-n">{{ cu.chamados_mes|length }}</span></dt>
+        <dd>{% for c in cu.chamados_mes %}<span class="it"><button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="{{ c.os }}" title="Abrir o card da OS">OS {{ c.os }}</button> · {{ c.equip }}{% if c.fim %} · fechado em {{ c.fim.strftime('%d/%m') }}{% endif %}{% if c.dias is not none %} · {{ c.dias }} d aberto{% endif %}</span>{% else %}<span class="mudo">—</span>{% endfor %}</dd>
       </dl>
     </section>
   </div><div class="cu-col">
     <section class="cu-q" aria-labelledby="cu-pend">
       <header class="pn-cab"><h2 id="cu-pend"><i class="ph ph-list-checks" aria-hidden="true"></i>Pendências</h2></header>
-      {% if cu.ronda_pendente %}{{ det_linhas(u, cu.ronda_pendente) }}{% else %}<dl class="cr-dl"><dt>Ronda</dt><dd class="cn-t-ok">em dia</dd></dl>{% endif %}
-      {% if cu.os_pendentes %}{{ det_linhas(u, cu.os_pendentes) }}{% else %}<dl class="cr-dl"><dt>OS</dt><dd class="cn-t-ok">nenhuma atrasada ou pausada</dd></dl>{% endif %}
+      {% if cu.ronda_pendente %}{{ det_linhas(u, cu.ronda_pendente, marca=marca) }}{% else %}<dl class="cr-dl"><dt class="cu-dt cu-dt--ok">Ronda</dt><dd class="cn-t-ok">em dia</dd></dl>{% endif %}
+      {% if cu.os_pendentes %}{{ det_linhas(u, cu.os_pendentes, marca=marca) }}{% else %}<dl class="cr-dl"><dt class="cu-dt cu-dt--ok">OS</dt><dd class="cn-t-ok">nenhuma atrasada ou pausada</dd></dl>{% endif %}
       <dl class="cr-dl">
-        <dt>Ocorrências</dt>
-        <dd>{% for o in cu.ocorrencias %}<span class="it"><em class="cr-tag cr-tag--{{ o.cor }}">{{ o.crit_txt }}</em> {{ o.titulo or ('ativo ' ~ o.cod if o.cod else 'sem título') }}{% if o.inicio %} · desde {{ o.inicio.strftime('%d/%m') }}{% endif %}{% if o.atrasada %} · <span class="cn-t-critico">ação atrasada</span>{% elif not o.acoes_abertas %} · <span class="cn-t-alerta">sem ação planejada</span>{% endif %}</span>{% else %}<span class="cn-t-ok">nenhuma aberta</span>{% endfor %}
-          {% if cu.ocorrencias and cu.link['campo/ocorrencias'] %}<a class="cn-link it" href="{{ url_for('torre_campo.ocorrencias', usina=u.usina_id, responsavel='*') }}">ver na tela Ocorrências</a>{% endif %}</dd>
-        <dt>Segurança</dt>
-        <dd>{% for g in cu.seguranca %}<span class="it"><b class="{{ 'cn-t-critico' if g.chave in ('pts', 'vencidos', 'sem_luvas') else 'cn-t-alerta' }}">{{ g.rot }}{% if g.n > 1 %} ({{ g.n }}){% endif %}</b></span>{% for it in g.itens %}<span class="it">{% if it.get('pt') %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=it.pt.numero, ativo=it.pt.codigo, volta=request.full_path) }}" title="{{ it.pt.titulo }}">{{ it.forte }}</button>{% elif it.forte %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %}{{ ' · ' if it.forte else '' }}{{ it.txt }}{% endif %}</span>{% endfor %}{% else %}<span class="cn-t-ok">nada pendente</span>{% endfor %}
-          {% if (u.extintores or {}).get('total') %}<button type="button" class="cr-dia-a-dia cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel='extintores') }}">ver os extintores</button>{% endif %}
-          {% if cu.seguranca and cu.link['hseq/mesa'] %}<a class="cn-link it" href="{{ url_for('torre_hseq.mesa') }}">ver na Mesa da Segurança</a>{% endif %}</dd>
+        <dt class="cu-dt cu-dt--{{ oc_pior }}">Ocorrências</dt>
+        <dd>{% for o in cu.ocorrencias %}<span class="it"><em class="cr-tag cr-tag--{{ o.cor }}">{{ o.crit_txt }}</em> {{ o.titulo or ('ativo ' ~ o.cod if o.cod else 'sem título') }}{% if o.inicio %} · desde {{ o.inicio.strftime('%d/%m') }}{% endif %}{% if o.atrasada %} · <span class="cn-t-critico">ação atrasada</span>{% elif not o.acoes_abertas %} · <span class="cn-t-alerta">sem ação planejada</span>{% endif %}</span>{% else %}<span class="cn-t-ok">nenhuma aberta</span>{% endfor %}</dd>
+        <dt class="cu-dt cu-dt--{{ seg_pior }}">Segurança</dt>
+        <dd>{% for g in cu.seguranca %}<span class="it"><b class="{{ 'cn-t-critico' if g.chave in ('pts', 'vencidos', 'sem_luvas') else 'cn-t-alerta' }}">{{ g.rot }}{% if g.n > 1 %} ({{ g.n }}){% endif %}</b>{% for it in g.itens %}{{ ' · ' if loop.first else '' }}{% if it.get('pt') %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=it.pt.numero, ativo=it.pt.codigo, volta=request.full_path) }}" title="{{ it.pt.titulo }}">{{ it.forte }}</button>{% elif it.forte %}{{ it.forte }}{% endif %}{% if it.txt %}{{ ' · ' if it.forte else '' }}{{ it.txt }}{% endif %}{{ '; ' if not loop.last else '' }}{% endfor %}</span>{% else %}<span class="cn-t-ok">nada pendente</span>{% endfor %}</dd>
       </dl>
+      {% set ver_ext = (u.extintores or {}).get('total') %}
+      {% if ver_ext or (cu.ocorrencias and cu.link['campo/ocorrencias']) or (cu.seguranca and cu.link['hseq/mesa']) %}
+      <footer class="cu-pe">
+        {% if ver_ext %}<button type="button" class="cn-link cr-link-botao cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel='extintores') }}">Ver os extintores</button>{% endif %}
+        {% if cu.ocorrencias and cu.link['campo/ocorrencias'] %}<a class="cn-link" href="{{ url_for('torre_campo.ocorrencias', usina=u.usina_id, responsavel='*') }}">Abrir as ocorrências</a>{% endif %}
+        {% if cu.seguranca and cu.link['hseq/mesa'] %}<a class="cn-link" href="{{ url_for('torre_hseq.mesa') }}">Abrir a Mesa da Segurança</a>{% endif %}
+      </footer>
+      {% endif %}
     </section>
     <section class="cu-q" aria-labelledby="cu-os">
       <header class="pn-cab"><h2 id="cu-os"><i class="ph ph-wrench" aria-hidden="true"></i>OS e manutenção</h2></header>
@@ -624,13 +636,29 @@
     <section class="cu-q" aria-labelledby="cu-pt">
       <header class="pn-cab"><h2 id="cu-pt"><i class="ph ph-file-text" aria-hidden="true"></i>PT</h2></header>
       <dl class="cr-dl">
-        <dt>Esperando</dt>
-        <dd>{% for x in cu.pt_esperando %}<span class="it">{% if x.hoje and x.parada %}<span class="cr-agora">Agora</span>{% endif %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=x.numero, ativo=x.codigo, volta=request.full_path) }}" title="{{ x.tarefa }}">OS {{ x.os or x.numero }}</button> · há {{ x.idade }}{% if x.parada and not x.hoje %} · <span class="cn-t-critico">sem decisão desde {{ x.dia[8:10] }}/{{ x.dia[5:7] }}</span>{% endif %}</span>{% else %}<span class="mudo">nenhuma</span>{% endfor %}</dd>
-        <dt>Pedidas no mês</dt>
-        <dd>{% for p in cu.pts_mes %}<span class="it"><button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=p.numero, ativo=p.codigo, volta=request.full_path) }}" title="{{ p.tarefa }}">OS {{ p.os or p.numero }}</button> {% set st = cu.situacao_pt.get(p.situacao) or (p.situacao, 'neutro') %} · <span class="cn-t-{{ st[1] }}">{{ st[0] }}</span>{% if p.decidida_por %} por {{ p.decidida_por }}{% endif %}{% if p.dia_txt %} · {{ p.dia_txt }}{% endif %}</span>{% else %}<span class="mudo">nenhuma decidida no mês</span>{% endfor %}</dd>
+        <dt>Esperando<span class="cu-n">{{ cu.pt_esperando|length }}</span></dt>
+        <dd>{% for x in cu.pt_esperando %}<span class="it">{% if x.hoje and x.parada %}<span class="cr-agora">Agora</span>{% endif %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=x.numero, ativo=x.codigo, volta=request.full_path) }}" title="{{ x.tarefa }}">OS {{ x.os or x.numero }}</button> · há {{ x.idade }}{% if x.parada and not x.hoje %} · <span class="cn-t-critico">sem decisão desde {{ x.dia[8:10] }}/{{ x.dia[5:7] }}</span>{% endif %}</span>{% else %}<span class="mudo">—</span>{% endfor %}</dd>
+        <dt>Pedidas no mês<span class="cu-n">{{ cu.pts_mes|length }}</span></dt>
+        <dd>{% for p in cu.pts_mes %}<span class="it"><button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=p.numero, ativo=p.codigo, volta=request.full_path) }}" title="{{ p.tarefa }}">OS {{ p.os or p.numero }}</button>{% set st = cu.situacao_pt.get(p.situacao) or (p.situacao, 'neutro') %} · <span class="cn-t-{{ st[1] }}">{{ st[0] }}</span>{% if p.decidida_por %} por {{ p.decidida_por }}{% endif %}{% if p.dia_txt %} · {{ p.dia_txt }}{% endif %}</span>{% else %}<span class="mudo">—</span>{% endfor %}</dd>
       </dl>
     </section>
-  </div>  </div>
+  </div></div>
+  {# o relatório do cliente (04/11/2026, Levi: "Algo bem profissional para o cliente!"; "Tem que poder escolher que nem é
+     no painel"): o mês (o anterior de início) e os temas, todos marcados; o Baixar PDF leva o mês e os marcados #}
+  <template id="cu-rel-temas">
+    <header class="cr-jan-cab"><div><p class="gc-eyebrow">Relatório da usina</p><h2>{{ u.usina }}</h2>
+      <p class="mudo">O PDF é para o cliente: geração, disponibilidade, rondas, manutenção e chamados do mês. PT, Segurança e nomes de técnicos não entram.</p></div></header>
+    <form class="pn-rel" method="get" action="{{ url_for('torre_campo.responsaveis_usina_relatorio', usina_id=u.usina_id) }}" data-cu-rel-form>
+      <label class="gc-rotulo" for="cu-rel-mes">Mês</label>
+      <select class="gc-campo cu-rel-mes" id="cu-rel-mes" name="mes">{% for m, rot in cu.rel_meses %}<option value="{{ m }}"{% if m == cu.rel_mes %} selected{% endif %}>{{ rot }}{{ ' (até ontem)' if loop.first }}</option>{% endfor %}</select>
+      <p class="pn-rel-todos"><button type="button" class="cn-link cr-link-botao" data-cu-rel-todos="1">Marcar todos</button><span aria-hidden="true">·</span><button type="button" class="cn-link cr-link-botao" data-cu-rel-todos="0">Tirar todos</button></p>
+      <ul class="pn-rel-temas" aria-label="Temas do relatório">
+        {% for k, rot in cu.rel_temas %}<li><label><input type="checkbox" name="tema" value="{{ k }}" checked> {{ rot }}</label></li>{% endfor %}
+      </ul>
+      <p class="pn-rel-aviso cn-t-alerta" role="status" hidden>Marque pelo menos um tema para baixar.</p>
+      <div class="pn-rel-pe"><button type="submit" class="gc-btn gc-btn--primario"><i class="ph ph-file-pdf" aria-hidden="true"></i> Baixar PDF</button></div>
+    </form>
+  </template>
   {% endif %}
   {% endif %}
 
@@ -717,6 +745,42 @@
   });
   dlg.addEventListener('submit', function (ev) {
     var f = ev.target.closest('[data-pn-rel-form]');
+    if (!f) { return; }
+    if (!conferir(f)) { ev.preventDefault(); return; }
+    setTimeout(function () { if (dlg.open) { dlg.close(); } }, 400);
+  });
+})();
+// o relatório da usina (Central da usina, 04/11/2026: "Tem que poder escolher que nem é no painel"): a janela com o mês
+// e os temas, todos marcados; sem nenhum, o Baixar PDF trava e diz por quê; baixado, a janela fecha
+(function () {
+  var b = document.querySelector('[data-cu-rel]'), tpl = document.getElementById('cu-rel-temas');
+  var dlg = document.getElementById('cr-modal');
+  if (!b || !tpl || !dlg) { return; }
+  b.addEventListener('click', function () {
+    var corpo = dlg.querySelector('.cr-modal-corpo');
+    corpo.innerHTML = '';
+    corpo.appendChild(tpl.content.cloneNode(true));
+    if (!dlg.open) { dlg.showModal(); }
+  });
+  function conferir(f) {
+    var algum = !!f.querySelector('input[name="tema"]:checked');
+    f.querySelector('button[type="submit"]').disabled = !algum;
+    f.querySelector('.pn-rel-aviso').hidden = algum;
+    return algum;
+  }
+  dlg.addEventListener('change', function (ev) {
+    var f = ev.target.closest('[data-cu-rel-form]');
+    if (f) { conferir(f); }
+  });
+  dlg.addEventListener('click', function (ev) {
+    var t = ev.target.closest('[data-cu-rel-todos]');
+    if (!t) { return; }
+    var f = t.closest('[data-cu-rel-form]'), marcar = t.getAttribute('data-cu-rel-todos') === '1';
+    f.querySelectorAll('input[name="tema"]').forEach(function (c) { c.checked = marcar; });
+    conferir(f);
+  });
+  dlg.addEventListener('submit', function (ev) {
+    var f = ev.target.closest('[data-cu-rel-form]');
     if (!f) { return; }
     if (!conferir(f)) { ev.preventDefault(); return; }
     setTimeout(function () { if (dlg.open) { dlg.close(); } }, 400);
