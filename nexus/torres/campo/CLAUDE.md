@@ -1652,9 +1652,16 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       a cada 4 s (`PAUSA_LOTE_MS`: cada aprovação custa 5 a 7 pedidos ao Fracttal), com o andamento; para no que se
       repetiria em todas (401 do Fracttal, 403, 429 e 5xx, a sessão do Nexus e 3 erros seguidos), e o outro erro fica no
       cartão e o lote segue. O quadro é montado na visita e não muda sozinho na frente da pessoa.
+    - **Prova no Fracttal de verdade (05/11/2026)**: a OS 18630 (TESTE - PA, TESTE100-CHSC1), criada pela rota da OS
+      tradicional com 3 fotos (duas iguais), posta em Em Verificação e lida numa cópia local do código novo (a fila só com
+      ela, sem ler a fila inteira no horário de campo): caiu em Em dúvida com "Foto repetida: p03 é a mesma imagem de p01"
+      (as duas miniaturas baixadas do S3) e "fechada fora do App"; o Aprovar do cartão concluiu, a conferência tirou o
+      cartão e o REST leu de volta o status 3. Para pôr uma OS de teste em verificação: a OS "já realizada" com
+      `to_in_review` nasce Em Processo (o Fracttal ignora calado); vale `api.mudar_status_os(wid, 2)` na sessão de quem
+      entrou (rota de prova só da cópia).
     - **Pendente** (05/11/2026): o veredito no banco (o fato `fato_prefiltro_os`, a medida da sombra contra a decisão do
-      supervisor; a Task 6 do plano); o Aprovar provado numa OS de TESTE - PA lendo o status de volta; e, para as capturas
-      de tela do mesmo layout (que só mudam os números), um hash maior (32×32), a medir nas 30 OS antes de mudar a regra.
+      supervisor; a Task 6 do plano); e, para as capturas de tela do mesmo layout (que só mudam os números), um hash maior
+      (32×32), a medir nas 30 OS antes de mudar a regra.
     - **Filtros**: o Responsável O&M da usina vai ao servidor (`responsavel=`, "*" = todos; quem entrou pelo Fracttal e é
       responsável já vem nele, `_responsavel_logado_pelo_cadastro`; o responsável e o cliente vêm do cadastro pela usina
       do Fracttal, `visao.usinas_do_fracttal`); cliente e busca (OS, UFV, técnico, sem acento) filtram na página e
