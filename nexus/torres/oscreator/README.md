@@ -2562,12 +2562,21 @@ Uma colega avisou ao Levi: "o OS Creator do nexus não tá puxando a OS pai". Pr
 - **A correção:** todo caminho que recebe a OS pai a passa ao `juntar_em_os` (e o `uma_os_por_tarefa` a repassa). O
   `oscreator_payloads_antes_da_5_1.json` foi regravado: a única mudança nos 41 cenários é a OS pai no pedido da OS.
 - **Os caminhos que criam a OS de uma vez** (`to_work_order=True`: a OS já realizada, a Performance de uma OS por ativo e a
-  inspeção do chamado) mandam a OS pai no mesmo pedido que cria a OS, e ela fica: provado no ar em 04/11/2026, a OS 18564
-  (realizada, em TESTE - PA) nasceu com a 18560 de pai, no card e no Fluxo.
-- **Conferir depois de gravar:** com a OS pai, o `juntar_em_os` lê o cabeçalho da OS criada (`_cabecalho_os`, 1 pedido) e,
-  se o Fracttal não gravou, diz na tela "o Fracttal não gravou a OS pai". Foi o silêncio que deixou o defeito passar semanas.
-- Prova: `test_a_os_pai_vai_no_pedido_que_cria_a_os_numerada` (`tests/test_oscreator_os_juntar.py`), vermelho nos 7
-  caminhos antes da correção.
+  inspeção do chamado) mandam a OS pai no mesmo pedido que cria a OS, e ela fica: provado no ar em 04/11/2026 em TESTE - PA,
+  a OS 18564 (realizada) e a 18571 (Performance de uma OS por ativo) nasceram com a 18560 de pai, no card e no Fluxo.
+- **Conferir depois de gravar** (`os_juntar.conferir_os_pai`, 1 leitura do cabeçalho, só com OS pai): a fase 2 e os três
+  caminhos de uma vez leem a OS criada e, se o Fracttal não gravou a OS pai, a tela diz. Foi o silêncio que deixou o defeito
+  passar semanas. Os três de uma vez ganharam a conferência no mesmo dia, depois do pedido do Levi ("Performance e
+  engenharia também tem OS pai, veja se está funcionando normalmente!").
+- **A Performance de uma OS por ativo diz o que houve:** o nº de OS pai digitado que não existe no Fracttal vira "OS X criada
+  sem a OS pai" (a agrupada já dizia), e as ressalvas de cada OS (essa, a OS pai não gravada e as perguntas de fim de
+  atividade recusadas, que se perdiam dentro do `create_performance_os`) chegam à tela em "Atenção:", com o resultado em
+  cor de alerta. A inspeção do chamado mostra a OS pai não gravada junto do aviso da etiqueta.
+- **A Engenharia:** o Solicitar OS e o Criar OS da página da OS (e da gaveta do acompanhamento) abrem a Nova solicitação e o
+  Criar OS do zero com a OS já escolhida como OS pai (conferido no ar com a 18567), e a criação segue os caminhos acima.
+- Prova: `test_a_os_pai_vai_no_pedido_que_cria_a_os_numerada` (vermelho nos 7 caminhos antes da correção),
+  `test_a_os_que_nasce_numerada_tambem_confere_a_os_pai` e `test_a_performance_diz_a_os_pai_que_nao_achou_e_a_tela_mostra`
+  (vermelhos antes da conferência), em `tests/test_oscreator_os_juntar.py`.
 
 ## A OS de vários ativos: ordem natural, anexos por tarefa e "Vários" no Histórico (04/11/2026)
 

@@ -88,6 +88,7 @@ class FracttalFalso:
             idt = 1000 + self.n_tarefa
             if params.get("to_work_order"):                      # a OS já realizada nasce numerada, sem a fase 2
                 self.n_os += 1
+                self.pai_da_os[7000 + self.n_os] = None if self.ignora_pai else params.get("id_parent")
                 return _Resp([{"result": {"success": True, "data": {
                     "id_task": idt, "id_work_order": 7000 + self.n_os, "wo_folio": 9000 + self.n_os}}}])
             self.pendentes.append({"id_task": idt, "id_item": params.get("id_item"), "description": params.get("description"),
@@ -663,3 +664,61 @@ def test_a_os_pai_que_o_fracttal_nao_gravou_vira_aviso():
     assert avisos and all("não gravou a OS pai" in a for a in avisos)
     saida, _fr = _rodar(_bulk)
     assert not any("OS pai" in (r["os"].get("aviso") or "") for r in saida["retorno"])
+
+
+# ── os caminhos que criam a OS numerada de uma vez (`to_work_order`), sem a fase 2 ────────────────────────────────────────
+def _perf_uma_por_ativo(mp, fr, os_pai="1234"):
+    """A Performance de uma OS por ativo: a OS pai é a da linha de cada ativo, pelo nº (o "1234" é o 4321 da busca)."""
+    itens = [{"asset": ativo(1), "plano_id_task": 9, "plano_id_item": 1, "note": "n1", "os_pai": os_pai, "gerar_ticket": False},
+             {"asset": ativo(2), "plano_id_task": 9, "plano_id_item": 2, "note": "n2", "gerar_ticket": False}]
+    return api.create_performance_os(itens, id_responsible=77, responsible_name="Ana Teste", event_date=EVENTO,
+                                     prog_date=PROGRAMADA)
+
+
+def _realizada_com_pai(mp, fr):
+    fin = {"to_in_review": False, "final_date": PROGRAMADA, "id_assigned_user": 77, "name": "Ana Teste"}
+    return api.create_work_orders_bulk([ativo(1)], "Descrição", "Corretiva", ["Conferir"], id_responsible=77,
+                                       finalizar=fin, event_date=EVENTO, id_parent=555)
+
+
+def _inspecao_com_pai(mp, fr):
+    import chamado_insp_spec
+    mp.setattr(chamado_insp_spec, "subtarefas", lambda tipo, marca: ["Conferir a placa"])
+    return api.create_inspecao_chamado(ativo(1, tipo="Inversor"), "Marca X", id_responsible=77, responsible_name="Ana Teste",
+                                       event_date=EVENTO, prog_date=PROGRAMADA, id_parent=555)
+
+
+@pytest.mark.parametrize("nome, corpo, pai, avisos_de", [
+    ("a Performance de uma OS por ativo", _perf_uma_por_ativo, 4321, lambda ret: [ret[0].get("aviso") or ""]),
+    ("a OS já realizada", _realizada_com_pai, 555, lambda ret: [r["os"].get("aviso") or "" for r in ret]),
+    ("a inspeção do chamado", _inspecao_com_pai, 555, lambda ret: [ret.get("aviso") or ""]),
+])
+def test_a_os_que_nasce_numerada_tambem_confere_a_os_pai(nome, corpo, pai, avisos_de):
+    """Levi, 04/11/2026: "Performance e engenharia também tem OS pai, veja se está funcionando normalmente!". Estes caminhos não
+    passam pela fase 2: a OS nasce numerada no pedido que cria a tarefa, e a OS pai vai nele e fica (provado no ar no mesmo
+    dia: a OS 18571, Performance de uma OS por ativo, nasceu com a 18560 de pai). Faltava a conferência depois de gravar, a
+    mesma da fase 2: o cabeçalho lido de volta e, se o Fracttal ignorou, o aviso na tela."""
+    saida, _fr = _rodar(corpo)
+    criadas = [e for e in saida["eventos"] if e.get("pedido") == INSERIR_TAREFA and e["resumo"].get("to_work_order")]
+    assert criadas and criadas[0]["resumo"].get("id_parent") == pai, nome
+    assert any(e.get("pedido") == api.RPC_WO_DETAILS for e in saida["eventos"]), nome     # o cabeçalho lido de volta
+    assert not any(avisos_de(saida["retorno"])), nome
+    saida, _fr = _rodar(corpo, ignora_pai=True)
+    assert all("não gravou a OS pai" in a for a in avisos_de(saida["retorno"])), nome
+
+
+def test_a_performance_diz_a_os_pai_que_nao_achou_e_a_tela_mostra():
+    """O nº digitado que não existe: a OS sai sem pai, como sempre saiu, mas agora a tela diz (até aqui era calado). E o que a
+    Performance de uma OS por ativo tem a dizer chega à tela, em palavra e em cor (`alerta`), como na agrupada."""
+    from os_web import insp_web, perf_web
+    saida, _fr = _rodar(lambda mp, fr: _perf_uma_por_ativo(mp, fr, os_pai="999"))
+    criadas = [e for e in saida["eventos"] if e.get("pedido") == INSERIR_TAREFA]
+    assert criadas[0]["resumo"].get("id_parent") is None
+    assert saida["retorno"][0]["aviso"] == "OS 9001 criada sem a OS pai: não achei a OS 999 no Fracttal."
+    assert "aviso" not in saida["retorno"][1]                                            # a linha sem OS pai, sem ressalva
+    m = perf_web.mensagem_resultado(saida["retorno"], "inspecao geral do inversor", False)
+    assert m["alerta"] is True and "Atenção:\n• OS 9001 criada sem a OS pai" in m["mensagem"]
+    m = perf_web.mensagem_resultado([{"ok": True, "asset": "Inversor 1.1", "folio": "9001"}])
+    assert "alerta" not in m and "Atenção" not in m["mensagem"]
+    aviso = "OS 9001 criada, mas o Fracttal não gravou a OS pai: confira no Fluxo da OS e avise o administrador do Nexus."
+    assert insp_web.mensagem_criou({"wo_folio": "9001", "n_subtarefas": 1, "aviso": aviso}, "INSPEÇÃO")["aviso"] == aviso

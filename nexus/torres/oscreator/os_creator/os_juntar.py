@@ -77,6 +77,22 @@ def da_os(resultado: dict) -> dict:
     return {k: resultado[k] for k in _CHAVES_DA_OS if k in resultado}
 
 
+def conferir_os_pai(id_work_order, pai, folio, texto: str = "") -> str:
+    """A OS pai conferida no Fracttal, depois de gravar (04/11/2026, Levi: "quero que sane esses problemas de construirmos algo e
+    quando vão usar não presta!"): o Fracttal aceita o campo e ignora calado, e foi assim que a OS pai sumiu por semanas sem
+    ninguém ver. Devolve o aviso da tela, ou "" (sem OS pai pedida, sem a OS, ou sem a leitura: a que não dá para ler não vira
+    aviso). 1 leitura do cabeçalho, só quando há OS pai. Vale para a fase 2 (`juntar_em_os`) e para os caminhos que criam a OS
+    numerada de uma vez, sem a fase 2 (`to_work_order`: a OS já realizada, a Performance de uma OS por ativo e a inspeção do
+    chamado; Levi, no mesmo dia: "Performance e engenharia também tem OS pai, veja se está funcionando normalmente!")."""
+    if not (id_work_order and pai):
+        return ""
+    try:
+        gravado = (_api()._cabecalho_os(id_work_order) or {}).get("id_parent_wo")
+    except Exception:                                        # noqa: BLE001 — sem a leitura, sem a conferência
+        return ""
+    return "" if str(gravado or "") == str(pai) else _frase(texto or FRASES["os_pai"], folio=folio)
+
+
 def juntar_em_os(id_tasks, duracoes, id_responsible, responsible_name: str = "", *, id_parent=None, note: str = "",
                  etiqueta_ids=None, imagens=None, registros=None, frases=None) -> dict:
     """Junta as tarefas PENDENTES `id_tasks` (na ordem dada) numa OS numerada, com o responsável, e devolve o que houve (ver o topo).
@@ -117,16 +133,10 @@ def juntar_em_os(id_tasks, duracoes, id_responsible, responsible_name: str = "",
     wo = a._work_order_insert([achados[i] for i in na_os], id_responsible, responsible_name, **kw)
     idwo = wo.get("id_work_order")
     saida.update(id_work_order=idwo, wo_folio=wo.get("wo_folio"), nao_entraram=len(id_tasks) - len(na_os))
-    # 2b. a OS pai conferida no Fracttal, depois de gravar (04/11/2026, Levi: "quero que sane esses problemas de construirmos
-    # algo e quando vão usar não presta!"): o Fracttal aceita o campo e ignora calado, e foi assim que a OS pai sumiu por
-    # semanas sem ninguém ver. 1 leitura do cabeçalho, só quando há OS pai; a que não dá para ler não vira aviso
-    if idwo and pai:
-        try:
-            gravado = (a._cabecalho_os(idwo) or {}).get("id_parent_wo")
-        except Exception:                                    # noqa: BLE001 — sem a leitura, sem a conferência
-            gravado = pai
-        if str(gravado or "") != str(pai):
-            saida["aviso"] = _frase(textos["os_pai"], folio=wo.get("wo_folio"))
+    # 2b. a OS pai conferida no Fracttal, depois de gravar
+    aviso_pai = conferir_os_pai(idwo, pai, wo.get("wo_folio"), textos["os_pai"])
+    if aviso_pai:
+        saida["aviso"] = aviso_pai
     # 3. as etiquetas. Qualquer falha vira aviso, e não só a do Fracttal: a OS já existe, e a etiqueta é o acabamento (a Performance
     # já engolia tudo; as outras só o `FracttalError`, e um erro de programa aqui faria a pessoa criar a mesma OS de novo)
     if idwo and etiqueta_ids:

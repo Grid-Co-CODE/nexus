@@ -301,7 +301,7 @@ def mensagem_criou(r: dict, etiqueta: str) -> dict:
     """{texto, aviso} depois de criar — o `_criou` do app."""
     r = r or {}
     texto = "OS %s criada com %s subtarefas." % (r.get("wo_folio") or "?", r.get("n_subtarefas"))
-    aviso = ""
+    avisos = [str(r["aviso"])] if r.get("aviso") else []          # a OS pai que o Fracttal não gravou (04/11/2026)
     if r.get("etiqueta_erro"):
-        aviso = "A OS existe, mas a etiqueta %s não foi aplicada: %s" % (etiqueta, r["etiqueta_erro"])
-    return {"texto": texto, "aviso": aviso}
+        avisos.append("A OS existe, mas a etiqueta %s não foi aplicada: %s" % (etiqueta, r["etiqueta_erro"]))
+    return {"texto": texto, "aviso": " ".join(avisos)}

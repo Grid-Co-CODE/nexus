@@ -347,8 +347,16 @@ def mensagem_resultado(res: list, frase: str = "", gerar_ticket: bool = True) ->
             msg += f"\n\n{len(fail)} falharam:\n" + "\n".join(f"• {r.get('asset')}: {r.get('erro')}" for r in fail[:6])
     erros_img = [e for r in ok for e in (r.get("img_erro") or [])]
     tk_txt, tk_erros = frase_tickets(res, frase, gerar_ticket)
-    return {"ok": len(ok), "falhas": len(fail), "mensagem": msg + tk_txt,
-            "folios": [r.get("folio") for r in ok], "detalhes": erros_img + tk_erros}
+    # as ressalvas de cada OS que saiu (04/11/2026): a OS pai que o Fracttal não gravou ou que não achei pelo nº, e as perguntas
+    # que não entraram. Em palavra e em cor (`alerta` pinta o resultado), como na agrupada
+    avisos = ["• " + str(r["aviso"]) for r in ok if r.get("aviso")]
+    if avisos:
+        msg += "\n\nAtenção:\n" + "\n".join(avisos[:8]) + ("\n…" if len(avisos) > 8 else "")
+    saida = {"ok": len(ok), "falhas": len(fail), "mensagem": msg + tk_txt,
+             "folios": [r.get("folio") for r in ok], "detalhes": erros_img + tk_erros}
+    if avisos:
+        saida["alerta"] = True
+    return saida
 
 
 def mensagem_agrupada(res: dict, frase: str = "", gerar_ticket: bool = True) -> dict:
