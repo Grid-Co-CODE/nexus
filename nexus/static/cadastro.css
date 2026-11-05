@@ -358,6 +358,12 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 /* a etiqueta do porquê quebra dentro da linha: em 375 px a de "outra ficha (nome)" passava da caixa e era cortada */
 .aa-pessoa .cad-chip{white-space:normal;max-width:100%}
 .aa-nome{font-weight:600;color:var(--tinta)}
+/* quem fica na lista sem rádio (2ª revisão de 05/11/2026: a ficha desligada, o Fracttal sem nome): sem o cursor de
+   clique, o nome no tom de apoio e o lugar do rádio guardado, para os nomes alinharem com os de cima */
+.aa-pessoa--fora{cursor:default}
+.aa-pessoa--fora:hover{background:transparent}
+.aa-pessoa--fora::before{content:"";flex:none;width:15px}
+.aa-pessoa--fora .aa-nome{color:var(--tinta-2)}
 .aa-det{font-size:12px;color:var(--mudo)}
 .aa-vazio{margin:0;padding:10px 12px}
 /* com uma largura mínima, no celular a tabela rola de lado (como as outras de Acessos) em vez de espremer o aviso */

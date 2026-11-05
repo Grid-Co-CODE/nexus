@@ -22,7 +22,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/auth/microsoft.py` | o login pela conta Microsoft da Grid (Entra ID), desligado sem as quatro `NEXUS_MS_*` (seção "Entrar com a Microsoft" abaixo) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
-| `nexus/auth/telas_admins_app.py` + `templates/acessos/_admins_app.html` + `static/acessos-admins-app.js` | a aba Administradores do App de Campo de Base → Acessos (05/11/2026; o dado em `nexus/pcm/admins_app.py`; seção "Acessos" abaixo) |
+| `nexus/auth/telas_admins_app.py` + `templates/acessos/_admins_app.html` (+ `_admins_app_explica.html`, o "!" do título) + `static/acessos-admins-app.js` | a aba Administradores do App de Campo de Base → Acessos (05/11/2026; o dado em `nexus/pcm/admins_app.py`; seção "Acessos" abaixo) |
 | `nexus/auth/setor_telas.py` + `templates/sem_setor.html` | o que cada setor vê: o portão por setor e o menu filtrado (seção "Telas por setor" abaixo) |
 | `nexus/auth/pre_carga.py` | a pré-carga das telas de quem tem setor (seção "Pré-carga" abaixo) |
 | `nexus/templates/base.html` | a moldura: o topo (a ação da tela no bloco `topo_acoes`, o sino e quem entrou, que abre o menu da conta com o Setor, o Tema e o Sair; seção "Um cabeçalho só"), menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`; no trilho recolhido, passar o mouse
@@ -131,8 +131,10 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
 
 **Três abas:** Telas e administradores (o que está abaixo), Pessoas e setores (desde 25/10/2026, a antiga Base →
 Integração Fracttal: o pessoal do Fracttal e o setor de cada um; regras em `nexus/cadastro/CLAUDE.md`) e Administradores
-do App de Campo (desde 05/11/2026, `?aba=admins_app`; bloco no fim desta seção). A segunda lê o Fracttal, e a terceira
-usa a cópia dela (`telas_fracttal._dados`); a primeira não lê.
+do App de Campo (desde 05/11/2026, `?aba=admins_app`; bloco no fim desta seção). A segunda lê o Fracttal; a terceira usa só a
+cópia dela (`telas_fracttal.copia_sem_esperar`: nunca lê na hora, pede a leitura nova por trás); a primeira não lê. O
+"Como vale." da aba de telas e o da dos administradores do App (e o da tela Chaves do Nexus) moram no "!" do título
+(2ª revisão de 05/11/2026: eram avisos soltos na tela; `tests/test_explica_padrao.py` pega o `<strong>` agora).
 
 Pedido de 11/10/2026, na véspera de o Nexus virar a porta principal: "Tem algum canto do Nexus onde eu posso administrar
 isso?". Até então administrador era só a `NEXUS_ADMINS` do `.env` do servidor (pôr ou tirar alguém = a T.I. editar e
@@ -206,8 +208,9 @@ lista de 5 em 5 min. **Ao contrário da lista de administradores do Nexus, esta 
   NEXUS_PESSOA_HMAC), outro site ou o formulário vencido dão 403, a pessoa ou o e-mail que faltou 400; gravou, 303 de
   volta à aba. O nome da pessoa sai ANTES da gravação, no Pôr e no Tirar (revisão de 05/11/2026: a leitura
   do cadastro que falhasse depois de gravar viraria um erro com a linha já no livro).
-- **A aba:** a nota "O App de Campo lê esta lista de 5 em 5 min; com a lista vazia ele não tira ninguém (não tranca o
-  App)", os números, os que valem hoje (o nome e o setor, ou "ficha de campo"; o avulso pelo e-mail, "avulso (sem
+- **A aba:** o "!" do título (`acessos/_admins_app_explica.html`; 2ª revisão de 05/11/2026: o "Como vale." era um aviso
+  solto na tela) com o "Como vale." ("O App de Campo lê esta lista de 5 em 5 min; com a lista vazia ele não tira ninguém
+  (não tranca o App)"), quem o App reconhece, o outro domínio e quem fica sem escolha; os números, os que valem hoje (o nome e o setor, ou "ficha de campo"; o avulso pelo e-mail, "avulso (sem
   ficha)"; desde quando, quem decidiu, Tirar com confirmação), o Pôr administrador (a lista, com a busca da própria
   página, e o avulso pelo e-mail; observação opcional, cifrada) e o histórico, o mais novo primeiro. Sem a chave HMAC,
   sem o token do banco ou com a leitura falhando, a aba só mostra. Com o JavaScript, os rádios perdem o `required` e o
@@ -218,13 +221,29 @@ lista de 5 em 5 min. **Ao contrário da lista de administradores do Nexus, esta 
   aparecer todos do pessoas e setores!"; a maioria dos administradores do App é do escritório, sem ficha): a união, sem
   repetir pessoa, das fichas não desligadas e não excluídas com as pessoas de Pessoas e setores (o pessoal do Fracttal,
   pela cópia daquela aba). Cada usuário do Fracttal vale pela ligação de hoje (a última decisão de cada `fracttal_id`): o
-  código, a ficha e o setor dela; sem ligação, o que a aba liga a uma ficha é a ficha, e o sem ficha vai com o código do
-  e-mail do Fracttal (a conta que a ligação gravaria). A mesma pessoa aparece uma vez: pela ficha para onde a ligação
-  aponta, ou pelo código (o mesmo e-mail é a mesma pessoa para o App); o nome é o da ficha, senão o de Pessoas e setores.
+  código, a ficha e o setor dela; sem ligação, só o palpite da aba pelo e-mail junta à ficha, o pelo nome não (2ª
+  revisão de 05/11/2026: o analista do escritório com o primeiro e último nome de um técnico seria a ficha do técnico, e
+  o Pôr faria o técnico administrador), e quem fica sem ficha vai com o código do e-mail do Fracttal (a conta que a
+  ligação gravaria). A mesma pessoa aparece uma vez: pela ficha para onde a ligação (ou o e-mail) aponta, ou pelo código
+  (o mesmo e-mail é a mesma pessoa para o App); o nome é o da ficha, senão o de Pessoas e setores.
   Cada uma com o setor, ou "ficha de campo" (ou "sem setor"), e a busca vale para o nome e o setor. O rádio `pessoa`
-  leva o número da ficha ou `codigo:<código>` de quem não tem ficha (o `pessoa_id` da página de antes ainda vale). Sem a
-  leitura do Fracttal, as ligações de hoje seguem na lista pelo número do usuário ("Usuário do Fracttal 510"); sem o livro
-  dos setores, a lista mostra só as fichas e o Pôr trava (o código das fichas ligadas sairia errado).
+  leva o número da ficha ou `codigo:<código>` de quem não tem ficha (o `pessoa_id` da página de antes ainda vale). A aba
+  lê só a cópia de Pessoas e setores, nunca o Fracttal na hora, num GET ou num POST: a cópia vencida mostra a idade ("lido
+  há N min") e pede a nova por trás; sem cópia, as ligações de hoje seguem na lista pelo número do usuário ("Usuário do
+  Fracttal 510"), sem rádio. Sem o livro dos setores, a lista mostra só as fichas e o Pôr trava (o código das fichas
+  ligadas sairia errado).
+- **Quem fica sem rádio** (2ª revisão de 05/11/2026), na lista com o porquê; o POST feito à mão e o avulso com o mesmo
+  código recusam com 409: a ligação ou o palpite que aponta para uma ficha desligada ou excluída ("a ficha está desligada
+  ou excluída no cadastro" e, da ligação, "a ligação em Pessoas e setores aponta para uma ficha desligada: refaça a
+  ligação"; o recontratado entra pela ficha nova, que fica com o código pelo e-mail); o usuário do Fracttal sem nome ("o
+  Fracttal não respondeu: sem o nome, não dá para conferir quem é": nunca se dá acesso a quem não se confere); e, sem a
+  chave do cadastro, quem não tem ficha (a ficha e a conta com o mesmo e-mail apareceriam duas vezes, e a linha iria sem
+  `pessoa_id`).
+- **Os marcadores, que só avisam** (a pessoa segue escolhível): "outro domínio: o App não o reconhece como
+  administrador" para o e-mail que não é @gridco.com.br, comparado exato com o `admins_app.DOMINIO_AVULSO` (Levi,
+  05/11/2026: "Deixar aparecer"; o gridco.com sem o .br também é outro), na lista e nos que valem; e "conta do Fracttal
+  desativada" (o login do App é pela Microsoft). Nos que valem, "esta pessoa tem ficha agora: tire e ponha de novo para
+  ligar à ficha" para quem foi posto sem ficha e ganhou ficha depois (o inverso do "Nada mudou").
 - **O avulso pelo e-mail** (Levi: "tem que ter como fazer avulso também so digitando o e-mail"): o segundo formulário da
   caixa do Pôr (`acao` `admin_app_por_email`). O e-mail perde os espaços das pontas, vai para minúsculas e tem o formato
   conferido (a régua de `acessos.email_normal`), e **só @gridco.com.br** entra (decisão do Levi: o administrador do App
@@ -238,7 +257,7 @@ lista de 5 em 5 min. **Ao contrário da lista de administradores do Nexus, esta 
   se conta.
 - **O código da ficha** é o do `responsaveis.conta_dos_codigos`: o do usuário do Fracttal ligado à pessoa em Pessoas e
   setores (só a ligação de hoje de cada usuário: o religado da ficha 11 para a 10 deixava o código nas duas) e, sem ele,
-  o do e-mail da ficha (a desligada ou excluída não entra pelo e-mail). Sem código, a etiqueta "sem código" e a recusa
+  o do e-mail da ficha (a desligada ou excluída não entra nem pelo e-mail nem pela ligação). Sem código, a etiqueta "sem código" e a recusa
   "sem e-mail na ficha nem usuário do Fracttal ligado: o App não a reconheceria; corrija o cadastro antes" (sem ficha:
   "sem e-mail no usuário do Fracttal"). O código que cai em duas fichas: vence a ligação do Fracttal, e a outra fica "sem
   código: o e-mail dela é o do usuário do Fracttal ligado a outra ficha"; sem ligação a desempatar, sai das duas ("o
@@ -258,9 +277,13 @@ lista de 5 em 5 min. **Ao contrário da lista de administradores do Nexus, esta 
   o aviso da linha, com e sem a chave do cadastro; o nome antes da gravação; só fichas ativas; outro site, formulário vencido e sem a chave; banco fora; nenhum e-mail das fichas na
   página; e, da 2ª volta, a união sem repetir, o setor na busca, o pôr e o tirar sem ficha, o avulso pôr e tirar, o
   domínio recusado, o avulso com o código de alguém da lista e o de duas fichas, nenhum e-mail em claro na linha, o
-  Fracttal fora e o campo de antes), `tests/test_pcm_admins_app.py` (o `pessoa_id` vazio, o e-mail só cifrado e amarrado
-  à linha, o domínio, sem a chave do cadastro) e `tests/test_acessos_admins_app_js.py` (o envio sem pessoa, a busca pelo
-  setor e o avulso, no node). No navegador, a cópia de prova com dados de mentira, com o Fracttal de mentira em Pessoas e
+  campo de antes; e, da 2ª revisão, o palpite pelo nome que não junta, a ligação e o palpite para a ficha desligada sem
+  rádio e o recontratado pela ficha nova, a conta desativada, o Fracttal fora sem rádio, a aba que nunca lê o Fracttal na
+  hora e a idade da cópia, sem a chave do cadastro, o `codigo:` forjado e o `fracttal:` sem e-mail, o marcador de outro
+  domínio, a explicação no "!" e o aviso de quem ganhou ficha), `tests/test_pcm_admins_app.py` (o `pessoa_id` vazio, o
+  e-mail só cifrado e amarrado à linha, o domínio, sem a chave do cadastro, a chave HMAC aparada nos dois vetores),
+  `tests/test_explica_padrao.py` (a marca em `<strong>` e o "Como vale") e `tests/test_acessos_admins_app_js.py` (o envio
+  sem pessoa, a busca pelo setor, o avulso e a linha sem rádio, no node). No navegador, a cópia de prova com dados de mentira, com o Fracttal de mentira em Pessoas e
   setores (1366 e 375 px).
 
 ## Nexus lento: Raio-X e o teto do OS Creator (14/10/2026)

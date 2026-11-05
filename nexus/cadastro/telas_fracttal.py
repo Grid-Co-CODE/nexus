@@ -68,6 +68,26 @@ def _dados(cfg, reler: bool = False) -> tuple:
     return _ler_agora(cfg, reler)
 
 
+def copia_sem_esperar() -> dict:
+    """A cópia do Fracttal ligado às fichas sem NUNCA ler o Fracttal na hora (a aba dos administradores do App de Base →
+    Acessos, 2ª revisão de 05/11/2026: aquela aba lia na hora, num GET ou num POST, quando não havia cópia). A cópia como
+    está, fresca ou vencida; vencida ou sem cópia, a releitura por trás (a mesma do `_dados`, uma por vez), se este Nexus
+    tem o Fracttal. {"lido", "rel", "idade_s"}: sem cópia, `rel` sem linhas e `idade_s` None."""
+    from ..campo import fracttal
+    with _TELA_TRAVA:
+        g = _TELA["g"]
+        pedir = (g is None or time.time() - g["t"] >= RELACAO_S) and not _TELA["renovando"]
+    if pedir and fracttal.configurado():
+        with _TELA_TRAVA:
+            if not _TELA["renovando"]:
+                _TELA["renovando"] = True
+                threading.Thread(target=_renovar, args=(current_app._get_current_object(),),
+                                 name="nexus-pessoas-fracttal", daemon=True).start()
+    if g is None:
+        return {"lido": {"pessoas": [], "erro": "", "lido_em": None}, "rel": {"linhas": []}, "idade_s": None}
+    return {"lido": g["lido"], "rel": g["rel"], "idade_s": max(0.0, time.time() - g["t"])}
+
+
 def _ler_agora(cfg, reler: bool) -> tuple:
     lido = FP.ler_pessoal(forcar=reler)
     rel, erro_cadastro = _relacao(cfg, lido)

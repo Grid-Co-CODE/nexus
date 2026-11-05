@@ -28,7 +28,9 @@ function el(attrs) {
 }
 const CENA = JSON.parse(process.argv[2]);
 const radios = CENA.nomes.map(() => el({required: ""}));
-const pessoas = CENA.nomes.map((n, i) => Object.assign(el({"data-aa-texto": n}), {querySelector() { return radios[i]; }}));
+// a linha de quem não se pode escolher (sem rádio: a ficha desligada, o Fracttal sem nome) não tem o input
+const pessoas = CENA.nomes.map((n, i) => Object.assign(el({"data-aa-texto": n}), {
+  querySelector() { return (CENA.semRadio || []).includes(i) ? null : radios[i]; }}));
 const busca = el({}), conta = el({}), nada = el({}), form = el({id: "aa-por"}), tirar = el({"data-confirmar": "Tirar?"});
 const porEmail = el({id: "aa-por-email"});
 nada.hidden = true;
@@ -83,6 +85,14 @@ def test_a_busca_sem_acento_e_o_tirar_pergunta_antes():
     r = enviar(alvo="tirar", confirma=False)
     assert r["cancelou"] is True and r["perguntas"] == ["Tirar?"]
     assert enviar(alvo="tirar", confirma=True)["cancelou"] is False
+
+
+def test_a_linha_sem_radio_nao_quebra_a_busca_nem_o_envio():
+    """2ª revisão de 05/11/2026: quem não se pode escolher (a ficha desligada, o usuário do Fracttal sem nome) vem sem
+    rádio; a busca e a conferência do envio seguem, sem erro no JavaScript."""
+    r = enviar(nomes=["usuario do fracttal 510 pcm", "tecnico dez"], semRadio=[0], busca="dez")
+    assert r["escondidas"] == [True, False] and r["conta"].startswith("Escolha a pessoa na lista")
+    assert enviar(nomes=["usuario do fracttal 510 pcm", "tecnico dez"], semRadio=[0], marca=1)["cancelou"] is False
 
 
 def test_a_busca_pelo_setor_e_o_avulso_nao_pede_pessoa_da_lista():

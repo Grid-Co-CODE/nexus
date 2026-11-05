@@ -16,6 +16,7 @@ repetir ninguém, com o setor (ou "ficha de campo") e a busca pelo nome e pelo s
 mentira; o livro é um arquivo, o cadastro um banco de mentira."""
 import json
 import re
+import time
 
 import pytest
 from pg_falso import ApiPGFalsa
@@ -44,7 +45,8 @@ def _h(email):
     return codigo_da_pessoa(HMAC, email)
 
 
-def _pessoas(emails=None):
+def _pessoas(emails=None, extra=()):
+    """As fichas de mentira; `extra` = (pessoa_id, nome) de mais fichas ativas (o recontratado, por exemplo)."""
     cofre = Cofre(CHAVE)
     emails = EMAILS if emails is None else emails
 
@@ -53,7 +55,8 @@ def _pessoas(emails=None):
         return {"pessoa_id": pid, "vinculo": vinculo, "cargo": cargo, "equipe_id": 1, "status": status,
                 "excluido": excluido, "sensivel_cifrado": cofre.cifrar(json.dumps(segredo), f"banco/pessoas/{pid}")}
     return [p(10, "Técnico Dez"), p(11, "Supervisora Onze", vinculo="Supervisor", cargo="Supervisor de Campo"),
-            p(12, "Técnico Doze"), p(13, "Técnico Treze", status="Desligado"), p(14, "Técnico Catorze", excluido="sim")]
+            p(12, "Técnico Doze"), p(13, "Técnico Treze", status="Desligado"), p(14, "Técnico Catorze", excluido="sim"),
+            *(p(pid, nome) for pid, nome in extra)]
 
 
 def _aba(api, livro, aba, linhas):
@@ -379,12 +382,20 @@ def _ligacoes(api, *extra):
     S._CACHE.clear()
 
 
+def _com_o_fracttal(app, pessoal):
+    """O pessoal do Fracttal de mentira e a cópia de Pessoas e setores já lida: a aba dos administradores do App só lê a
+    cópia, e a leitura nova vai por trás (2ª revisão de 05/11/2026)."""
+    fracttal.usar_fornecedor(lambda path: {"data": pessoal if path.startswith("personnel") else []})
+    FP._CACHE.clear()
+    TF.esquecer()
+    with app.app_context():
+        TF._ler_agora(app.config, False)
+
+
 @pytest.fixture
 def pessoas_e_setores(app):
     _ligacoes(app.extensions["nexus_dados_sessao"])
-    fracttal.usar_fornecedor(lambda path: {"data": PESSOAL if path.startswith("personnel") else []})
-    FP._CACHE.clear()
-    TF.esquecer()
+    _com_o_fracttal(app, PESSOAL)
     return PESSOAL
 
 
@@ -392,10 +403,18 @@ def _lista(html) -> str:
     return html.split('id="aa-lista"', 1)[1].split("</fieldset>", 1)[0]
 
 
+def _itens(lista) -> list[str]:
+    """As linhas da lista, cada uma inteira: a que se escolhe é um <label> com o rádio; a que não se escolhe, um <div>."""
+    return re.findall(r'<label class="aa-pessoa.*?</label>|<div class="aa-pessoa.*?</div>', lista, flags=re.S)
+
+
 def _item(lista, nome) -> str:
-    """A linha da lista com este nome (o rótulo inteiro)."""
-    i = lista.index(f'<span class="aa-nome">{nome}</span>')
-    return lista[lista.rindex("<label", 0, i):lista.index("</label>", i)]
+    """A (primeira) linha da lista com este nome."""
+    return next(x for x in _itens(lista) if f'<span class="aa-nome">{nome}</span>' in x)
+
+
+def _item_com(lista, trecho) -> str:
+    return next(x for x in _itens(lista) if trecho in x)
 
 
 def _cifrado(linha) -> dict:
@@ -423,23 +442,28 @@ def test_a_lista_une_pessoas_e_setores_e_as_fichas_sem_repetir(app, admin, pesso
     assert "exemplo.test" not in html and ANALISTA not in html and GERENTE not in html
 
 
-def test_a_mesma_pessoa_uma_vez_pela_ficha_da_aba_ou_pelo_codigo(app, admin, pessoas_e_setores):
-    """Sem repetir pessoa quando os códigos não ajudam: o usuário do Fracttal sem ligação que a aba liga a uma ficha pelo
-    nome (a ficha sem e-mail) é a ficha; a ligação sem ficha cujo código hoje é o do e-mail de uma ficha é essa ficha; e
+def test_o_palpite_pelo_nome_nao_junta_a_ficha_e_o_codigo_junta(app, admin, pessoas_e_setores):
+    """2ª revisão de 05/11/2026: a aba de Pessoas e setores liga pelo nome quando não acha o e-mail, e o analista do
+    escritório com o primeiro e último nome de um técnico seria a ficha do técnico (o Pôr faria o técnico administrador).
+    Sem ligação no banco, só o palpite pelo e-mail junta à ficha; pelo nome, a pessoa entra sem ficha, com o código do
+    e-mail do Fracttal. Pelo código, junta: a ligação sem ficha cujo código hoje é o do e-mail de uma ficha é essa ficha, e
     duas contas do Fracttal com o mesmo e-mail são uma pessoa só (para o App, o mesmo código)."""
     api = app.extensions["nexus_dados_sessao"]
     _aba(api, "cadastro_nexus", "pessoas", _pessoas({**EMAILS, 12: ANALISTA}))     # a ficha 12 com o e-mail da 510
     visao.limpar()
-    mais = [_usuario(520, "Técnico Doze", "doze.fracttal@exemplo.test"), _usuario(521, "Gerente Trinta", GERENTE)]
-    fracttal.usar_fornecedor(lambda path: {"data": PESSOAL + mais if path.startswith("personnel") else []})
-    FP._CACHE.clear()
-    TF.esquecer()
+    doze_fracttal = "doze.fracttal@exemplo.test"
+    _com_o_fracttal(app, PESSOAL + [_usuario(520, "Técnico Doze", doze_fracttal), _usuario(521, "Gerente Trinta", GERENTE)])
     lista = _lista(admin.get(ABA).get_data(as_text=True))
     nomes = re.findall(r'<span class="aa-nome">([^<]+)</span>', lista)
-    assert sorted(nomes) == ["Gerente Trinta", "Pessoa Sem Email", "Supervisora Onze", "Técnico Dez", "Técnico Doze"]
-    doze = _item(lista, "Técnico Doze")
-    assert 'value="12"' in doze and "PCM" in doze                       # a ficha, com o setor da ligação da 510
+    assert sorted(nomes) == ["Gerente Trinta", "Pessoa Sem Email", "Supervisora Onze", "Técnico Dez", "Técnico Doze",
+                             "Técnico Doze"]
+    assert "PCM" in _item_com(lista, 'value="12"')                    # a ficha, com o setor da ligação da 510
+    pelo_nome = _item_com(lista, f'value="codigo:{_h(doze_fracttal)}"')
+    assert "Técnico Doze" in pelo_nome and "sem setor" in pelo_nome
     assert f'value="codigo:{_h(GERENTE)}"' in _item(lista, "Gerente Trinta")
+    # o Pôr da pessoa ligada só pelo nome não faz a ficha administradora: vai sem ficha, com o código dela
+    assert _post(admin, "admin_app_por", pessoa=f"codigo:{_h(doze_fracttal)}").status_code == 303
+    assert [(x["pessoa_id"], x["pessoa_hmac"]) for x in _linhas(app)] == [(None, _h(doze_fracttal))]
 
 
 def test_a_busca_vale_para_o_nome_e_o_setor(app, admin, pessoas_e_setores):
@@ -545,16 +569,149 @@ def test_nenhum_email_em_claro_na_linha_gravada(app, admin, pessoas_e_setores):
     assert "gerência" not in txt and "gerencia" not in txt
 
 
-def test_sem_o_fracttal_as_ligacoes_de_pessoas_e_setores_aparecem_pelo_numero(app, admin):
-    """O Fracttal fora (aqui, o teste sem fornecedor): quem tem a ligação de hoje no banco segue na lista, pelo número
-    do usuário do Fracttal e com o setor, e a aba diz por quê."""
+def test_sem_o_fracttal_quem_nao_tem_ficha_fica_sem_radio(app, admin):
+    """O Fracttal fora (aqui, o teste sem fornecedor e sem cópia): quem tem a ligação de hoje no banco segue na lista,
+    pelo número do usuário do Fracttal, mas sem rádio: sem o nome, não dá para conferir quem é, e nunca se dá acesso a um
+    usuário sem nome. A ficha que a ligação aponta segue escolhível (o nome é o da ficha)."""
     _ligacoes(app.extensions["nexus_dados_sessao"])
     html = admin.get(ABA).get_data(as_text=True)
-    assert "Não consegui ler o pessoal do Fracttal" in html
+    assert "Sem o pessoal do Fracttal" in html
     item = _item(_lista(html), "Usuário do Fracttal 510")
-    assert "PCM" in item and f'value="codigo:{_h(ANALISTA)}"' in item
-    assert _post(admin, "admin_app_por", pessoa=f"codigo:{_h(ANALISTA)}").status_code == 303
-    assert _linhas(app)[0]["pessoa_hmac"] == _h(ANALISTA)
+    assert "PCM" in item and "<input" not in item
+    assert "o Fracttal não respondeu: sem o nome, não dá para conferir quem é" in item
+    assert 'value="11"' in _item(_lista(html), "Supervisora Onze")
+    r = _post(admin, "admin_app_por", pessoa=f"codigo:{_h(ANALISTA)}")
+    assert r.status_code == 409 and "o Fracttal não respondeu" in r.get_data(as_text=True)
+    r = _post(admin, "admin_app_por_email", email=ANALISTA)                 # nem pela porta do avulso
+    assert r.status_code == 409 and "o Fracttal não respondeu" in r.get_data(as_text=True)
+    assert _linhas(app) == []
+
+
+def test_a_aba_nunca_le_o_fracttal_na_hora_e_mostra_a_idade_da_copia(app, admin, monkeypatch):
+    """2ª revisão de 05/11/2026 (o custo): a aba lê só a cópia de Pessoas e setores e pede a leitura nova por trás, num GET
+    ou num POST; sem cópia, vale o caminho fechado (sem rádio para quem não tem ficha). A cópia velha mostra a idade."""
+    _ligacoes(app.extensions["nexus_dados_sessao"])
+    pedidos, renovar = [], []
+    fracttal.usar_fornecedor(lambda path: pedidos.append(path) or {"data": PESSOAL})
+    monkeypatch.setattr(TF, "_renovar", lambda a: (renovar.append(1), TF._TELA.update(renovando=False)))
+
+    def pediu(n):
+        """A leitura por trás é uma thread: espera ela ser pedida n vezes (e acabar)."""
+        fim = time.monotonic() + 5
+        while len(renovar) < n or TF._TELA["renovando"]:
+            assert time.monotonic() < fim, renovar
+            time.sleep(0.01)
+        return len(renovar)
+    codigo = _codigo(admin)                                            # um GET
+    assert pediu(1) == 1
+    html = admin.get(ABA).get_data(as_text=True)
+    assert pediu(2) == 2 and pedidos == [] and "<input" not in _item(_lista(html), "Usuário do Fracttal 510")
+    assert _post(admin, "admin_app_por", codigo, pessoa="10").status_code == 303
+    assert pediu(3) == 3 and pedidos == []
+    _com_o_fracttal(app, PESSOAL)
+    pedidos.clear()
+    TF._TELA["g"]["t"] -= TF.RELACAO_S + 12 * 60                      # a cópia de 14 minutos atrás
+    html = admin.get(ABA).get_data(as_text=True)
+    assert pediu(4) == 4 and pedidos == []
+    assert "lido há 14 min" in html and 'value="codigo:' in _item(_lista(html), "Analista Vinte")
+
+
+def test_a_ligacao_para_a_ficha_desligada_fica_sem_radio_e_o_recontratado_entra_pela_ficha_nova(app, admin):
+    """A ligação de Pessoas e setores feita antes do desligamento aponta para a ficha 13, desligada. O usuário do Fracttal
+    fica na lista sem rádio, com o porquê e o aviso para refazer a ligação; a ficha nova (15), ativa, com o mesmo e-mail,
+    fica com o código e é escolhível (a ligação velha não dá código à desligada)."""
+    api = app.extensions["nexus_dados_sessao"]
+    _aba(api, "cadastro_nexus", "pessoas", _pessoas({**EMAILS, 15: EMAILS[13]}, extra=[(15, "Técnico Quinze")]))
+    _ligacoes(api, {"decidida_em": "2026-10-14T12:00:00Z", "data_id": 20261014, "fracttal_id": 530, "pessoa_id": 13,
+                    "pessoa_ligada_por": "e-mail", "pessoa_hmac": _h(EMAILS[13]), "setor_id": 1})
+    _com_o_fracttal(app, PESSOAL + [_usuario(530, "Técnico Treze", EMAILS[13])])
+    lista = _lista(admin.get(ABA).get_data(as_text=True))
+    velho = _item(lista, "Técnico Treze")
+    assert "<input" not in velho and "a ficha está desligada ou excluída no cadastro" in velho
+    assert "a ligação em Pessoas e setores aponta para uma ficha desligada: refaça a ligação" in velho
+    assert 'value="15"' in _item(lista, "Técnico Quinze") and "sem código" not in _item(lista, "Técnico Quinze")
+    r = _post(admin, "admin_app_por", pessoa="fracttal:530")
+    assert r.status_code == 409 and "a ficha está desligada ou excluída no cadastro" in r.get_data(as_text=True)
+    assert _post(admin, "admin_app_por", pessoa="15").status_code == 303
+    assert [(x["pessoa_id"], x["pessoa_hmac"]) for x in _linhas(app)] == [(15, _h(EMAILS[13]))]
+
+
+def test_o_palpite_pelo_email_para_a_ficha_desligada_fica_sem_radio(app, admin, pessoas_e_setores):
+    """Sem ligação, a aba de Pessoas e setores liga pelo e-mail o usuário do Fracttal à ficha 13, desligada: ele fica na
+    lista sem rádio, com o porquê (sem o aviso de refazer a ligação, que não existe)."""
+    _com_o_fracttal(app, PESSOAL + [_usuario(531, "Técnico Treze", EMAILS[13])])
+    item = _item(_lista(admin.get(ABA).get_data(as_text=True)), "Técnico Treze")
+    assert "<input" not in item and "a ficha está desligada ou excluída no cadastro" in item
+    assert "refaça a ligação" not in item
+    r = _post(admin, "admin_app_por", pessoa=f"codigo:{_h(EMAILS[13])}")
+    assert r.status_code == 409 and _linhas(app) == []
+
+
+def test_a_conta_do_fracttal_desativada_so_ganha_etiqueta(app, admin, pessoas_e_setores):
+    """O login do App é pela Microsoft: a conta do Fracttal desativada não impede, só avisa."""
+    inativa = dict(_usuario(511, "Gerente Trinta", GERENTE), account_active=False)
+    _com_o_fracttal(app, [inativa if p["id_personnel"] == 511 else p for p in PESSOAL])
+    item = _item(_lista(admin.get(ABA).get_data(as_text=True)), "Gerente Trinta")
+    assert "conta do Fracttal desativada" in item and f'value="codigo:{_h(GERENTE)}"' in item
+    assert _post(admin, "admin_app_por", pessoa=f"codigo:{_h(GERENTE)}").status_code == 303
+
+
+def test_sem_a_chave_do_cadastro_quem_nao_tem_ficha_fica_travado(app, admin, pessoas_e_setores):
+    """Sem a chave do cadastro o Nexus não lê o e-mail das fichas: a ficha e a conta do Fracttal com o mesmo e-mail
+    apareceriam duas vezes, e a linha iria sem `pessoa_id`. Quem não tem ficha fica sem rádio, com o aviso geral."""
+    app.config.pop("NEXUS_CHAVE_CADASTRO")
+    visao.limpar()
+    _com_o_fracttal(app, PESSOAL)
+    html = admin.get(ABA).get_data(as_text=True)
+    assert "Sem a chave do cadastro, o Nexus não confere os códigos" in html
+    item = _item(_lista(html), "Analista Vinte")
+    assert "<input" not in item and "sem a chave do cadastro" in item
+    assert _post(admin, "admin_app_por", pessoa=f"codigo:{_h(ANALISTA)}").status_code == 409
+    assert _linhas(app) == []
+
+
+def test_o_codigo_forjado_e_o_fracttal_sem_email_dao_409(app, admin, pessoas_e_setores):
+    r = _post(admin, "admin_app_por", pessoa="codigo:" + "ab" * 12)          # fora da lista
+    assert r.status_code == 409 and "nem em Pessoas e setores" in r.get_data(as_text=True)
+    r = _post(admin, "admin_app_por", pessoa="fracttal:513")                 # a conta do Fracttal sem e-mail
+    assert r.status_code == 409 and "sem e-mail no usuário do Fracttal" in r.get_data(as_text=True)
+    assert _linhas(app) == []
+
+
+def test_o_marcador_de_outro_dominio_e_quem_continua_escolhivel(app, admin, pessoas_e_setores):
+    """Levi, 05/11/2026: "Deixar aparecer". Quem tem o e-mail de outro domínio fica na lista, escolhível, com o marcador
+    (comparado exato com @gridco.com.br: o gridco.com sem o .br também é outro)."""
+    _com_o_fracttal(app, PESSOAL + [_usuario(540, "Consultora Externa", "consultora@gridco.com")])
+    html = admin.get(ABA).get_data(as_text=True)
+    lista = _lista(html)
+    marca = "outro domínio: o App não o reconhece como administrador"
+    for nome in ("Supervisora Onze", "Técnico Dez", "Consultora Externa"):
+        assert marca in _item(lista, nome) and "<input" in _item(lista, nome)
+    for nome in ("Analista Vinte", "Gerente Trinta", "Pessoa Sem Email", "Técnico Doze"):
+        assert marca not in _item(lista, nome)
+    assert _post(admin, "admin_app_por", pessoa="10").status_code == 303
+    vig = admin.get(ABA).get_data(as_text=True).split('id="aa-vigentes"', 1)[1].split("</table>", 1)[0]
+    assert "Técnico Dez" in vig and marca in vig
+
+
+def test_a_explicacao_mora_no_explica_do_titulo(app, admin):
+    """O padrão de 05/11/2026 (DESIGN.md): o "Como vale." e a regra do domínio no "!" amarelo ao lado do título."""
+    html = admin.get(ABA).get_data(as_text=True)
+    caixa = html.split('<details class="gc-explica">', 1)[1].split("</details>", 1)[0]
+    assert "<b>Como vale.</b>" in caixa and "com a lista vazia ele não tira ninguém" in caixa
+    assert "outro domínio" in caixa and "@gridco.com.br" in caixa
+    assert "<strong>Como vale.</strong>" not in html
+
+
+def test_quem_vale_sem_ficha_e_hoje_tem_ficha_ganha_o_aviso(app, admin, pessoas_e_setores):
+    """O inverso da regra do "Nada mudou": a linha posta sem ficha segue sem `pessoa_id` quando a pessoa ganha ficha; a
+    linha dos que valem avisa para tirar e pôr de novo."""
+    assert _post(admin, "admin_app_por", pessoa=f"codigo:{_h(GERENTE)}").status_code == 303
+    api = app.extensions["nexus_dados_sessao"]
+    _aba(api, "cadastro_nexus", "pessoas", _pessoas({**EMAILS, 12: GERENTE}))     # a ficha 12 com o e-mail dela
+    visao.limpar()
+    vig = admin.get(ABA).get_data(as_text=True).split('id="aa-vigentes"', 1)[1].split("</table>", 1)[0]
+    assert "esta pessoa tem ficha agora: tire e ponha de novo para ligar à ficha" in vig
 
 
 def test_a_pagina_aberta_antes_da_troca_ainda_poe_pelo_campo_de_antes(app, admin):

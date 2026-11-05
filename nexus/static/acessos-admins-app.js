@@ -5,7 +5,8 @@
    busca escondeu, o navegador barrava o envio calado (o aviso dele não aparece num campo que não se vê). O aviso vai à
    linha `aria-live` da contagem, e o foco volta à busca.
    O texto de cada pessoa (`data-aa-texto`, montado no servidor) leva o nome e o setor, ou "ficha de campo": a busca vale
-   para os dois (2ª volta de 05/11/2026). O Pôr pelo e-mail (o avulso) é outro formulário, com o campo à vista: o
+   para os dois (2ª volta de 05/11/2026). Quem não se pode escolher vem sem rádio (a ficha desligada, o usuário do
+   Fracttal sem nome) e só segue a busca. O Pôr pelo e-mail (o avulso) é outro formulário, com o campo à vista: o
    `required` dele é o do navegador. */
 (function () {
   function sem(s) {
@@ -22,8 +23,10 @@
     busca.addEventListener("input", function () {
       var q = sem(busca.value), n = 0;
       itens.forEach(function (l) {
-        // a pessoa marcada fica à vista mesmo fora da busca: escondida, o formulário mandaria quem ninguém vê
-        var mostra = !q || l.getAttribute("data-aa-texto").indexOf(q) >= 0 || radio(l).checked;
+        // a pessoa marcada fica à vista mesmo fora da busca: escondida, o formulário mandaria quem ninguém vê. A linha
+        // sem rádio (quem não se pode escolher, 2ª revisão de 05/11/2026) só segue a busca
+        var r = radio(l);
+        var mostra = !q || l.getAttribute("data-aa-texto").indexOf(q) >= 0 || !!(r && r.checked);
         l.hidden = !mostra;
         if (mostra) n++;
       });

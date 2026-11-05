@@ -68,8 +68,9 @@ def conta_dos_codigos(cfg, base) -> dict:
     O código que cai em duas ou mais fichas (re-revisão de 05/11/2026, N2): quando um deles vem da ligação do Fracttal,
     vence a ligação (a ficha ligada fica com ele, e a que só o tinha pelo e-mail fica sem, `DE_OUTRA`); sem ligação a
     desempatar (o mesmo e-mail em duas fichas, ou dois usuários ligados), sai de todas (`AMBIGUO`): o App acharia uma e
-    o Nexus diria outra. O porquê vai em `por_que`. A ficha desligada ou excluída não entra pelo e-mail: a pessoa
-    recontratada tem a ficha antiga, desligada, com o mesmo e-mail da nova.
+    o Nexus diria outra. O porquê vai em `por_que`. A ficha desligada ou excluída não entra pelo e-mail nem pela ligação
+    (2ª revisão de 05/11/2026): a pessoa recontratada tem a ficha antiga, desligada, com o mesmo e-mail da nova, e a
+    ligação de Pessoas e setores feita antes ainda aponta para a antiga.
 
     O `antes` é o código que cada ficha teria sem o desempate: a aba dos administradores do App (05/11/2026) marca com o
     mesmo porquê quem chega com o código que saiu das fichas (a pessoa de Pessoas e setores sem ficha e o e-mail digitado
@@ -80,14 +81,17 @@ def conta_dos_codigos(cfg, base) -> dict:
     from ..campo import visao
     from ..campo.ligacao_cadastro import codigo_da_pessoa
     chave, chave_hmac = cfg.get("NEXUS_CHAVE_CADASTRO"), cfg.get("NEXUS_PESSOA_HMAC")
+    # a ficha desligada ou excluída não ganha código nem pelo e-mail nem pela ligação (2ª revisão de 05/11/2026: a ligação
+    # feita antes do desligamento vencia o e-mail da ficha nova, e o recontratado ficava sem código na ficha ativa)
+    fora = {D._id(p.get("pessoa_id")) for p in base.pessoas
+            if D._txt(p.get("excluido")).lower() == "sim" or D._txt(p.get("status")).lower() == "desligado"}
     do_email: dict = {}
     if chave and chave_hmac:
         from ..cadastro.cifra import Cofre
         cofre = Cofre(chave)
         for p in base.pessoas:
             pid = D._id(p.get("pessoa_id"))
-            if (not pid or D._txt(p.get("excluido")).lower() == "sim" or D._txt(p.get("status")).lower() == "desligado"
-                    or not p.get("sensivel_cifrado")):
+            if not pid or pid in fora or not p.get("sensivel_cifrado"):
                 continue
             try:
                 email = json.loads(cofre.decifrar(p["sensivel_cifrado"], f"banco/pessoas/{pid}")).get("email")
@@ -104,7 +108,7 @@ def conta_dos_codigos(cfg, base) -> dict:
         for d in sorted(st.get("decisoes") or [], key=lambda x: x["decidida_em"]):
             hoje[d.get("fracttal_id")] = d          # a ligação de hoje de cada usuário do Fracttal
         for d in sorted(hoje.values(), key=lambda x: x["decidida_em"]):
-            if d.get("pessoa_id") and d.get("pessoa_hmac"):
+            if d.get("pessoa_id") and d.get("pessoa_hmac") and d["pessoa_id"] not in fora:
                 do_fracttal[d["pessoa_id"]] = d["pessoa_hmac"]
     except Exception as e:      # noqa: BLE001 — sem os setores, vale o código do e-mail da ficha
         log.info("responsáveis: sem os setores (%s); vale o código do e-mail da ficha", type(e).__name__)

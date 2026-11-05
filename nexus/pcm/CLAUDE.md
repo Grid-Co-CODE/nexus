@@ -466,8 +466,9 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
     a ligação de hoje de cada usuário do Fracttal (a última decisão de cada `fracttal_id`: o religado da ficha 11 para
     a 10 deixava o código nas duas). O código que cai em duas ou mais fichas: com a ligação do Fracttal numa delas,
     vence a ligação (a ficha ligada fica com ele, a que só o tinha pelo e-mail fica sem, com o porquê); sem ligação a
-    desempatar (o mesmo e-mail em duas fichas), sai de todas. A ficha desligada ou excluída não entra pelo e-mail: a
-    pessoa recontratada tem a ficha antiga, desligada, com o mesmo e-mail da nova.
+    desempatar (o mesmo e-mail em duas fichas), sai de todas. A ficha desligada ou excluída não entra pelo e-mail nem
+    pela ligação (2ª revisão de 05/11/2026): a pessoa recontratada tem a ficha antiga, desligada, com o mesmo e-mail da
+    nova, e a ligação de Pessoas e setores feita antes ainda aponta para a antiga; ela ficava com o código e a nova, sem.
   - **Quem sai:** o responsável que a ficha trocou, ou que ficou sem. Sem código ou sem nome no Fracttal, ninguém entra,
     e a mesma pessoa que já estava fica.
   - **O que não grava:** cadastro ilegível, cadastro sem nenhum responsável, livro ilegível, ou falta de

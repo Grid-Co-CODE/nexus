@@ -91,6 +91,12 @@ def test_o_vetor_da_linha_completa_do_contrato():
     assert codigo_da_pessoa(CHAVE, "tecnico.exemplo@exemplo.com.br") == "71ed3f80ace91f8cf509cbda"
     assert codigo_da_pessoa(CHAVE, "  Tecnico.Exemplo@EXEMPLO.com.br ") == "71ed3f80ace91f8cf509cbda"
     assert codigo_da_pessoa(CHAVE, "admin.exemplo@exemplo.com.br") == "b9525c290e97596479379177"
+    # a chave com espaço nas pontas dá o mesmo código (2ª revisão de 05/11/2026: a lista, o avulso e o setores.definir
+    # aparavam a chave cada um do seu jeito); os dois vetores não mudam
+    assert codigo_da_pessoa(f"  {CHAVE} ", "tecnico.exemplo@exemplo.com.br") == "71ed3f80ace91f8cf509cbda"
+    assert codigo_da_pessoa(f"{CHAVE}\n", "admin.exemplo@exemplo.com.br") == "b9525c290e97596479379177"
+    assert codigo_da_pessoa("   ", "tecnico.exemplo@exemplo.com.br") is None
+    assert AA.assinatura(VETOR_LINHA, f" {CHAVE} ") == VETOR
     assert list(LINHA_COMPLETA) == list(AA.CAB[:-1])
     assert AA.assinatura(LINHA_COMPLETA, CHAVE) == VETOR_COMPLETO
     chave = hmac.new(CHAVE.encode(), b"nexus:pcm:admins-app", hashlib.sha256).digest()

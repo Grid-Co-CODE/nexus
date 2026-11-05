@@ -254,6 +254,22 @@ def test_a_pessoa_recontratada_so_a_ficha_nova_fica_com_o_codigo(cfg, monkeypatc
     assert R.codigos_e_ambiguos(cfg, fichas) == ({21: _h(cfg, email)}, {})
 
 
+def test_a_ligacao_para_a_ficha_desligada_nao_da_codigo_e_o_recontratado_fica_com_o_da_ficha_nova(cfg, monkeypatch):
+    """2ª revisão de 05/11/2026: a ligação de Pessoas e setores feita antes do desligamento ainda aponta para a ficha
+    antiga. Ela não dá código à ficha desligada ou excluída: o recontratado fica com o código na ficha nova, ativa, pelo
+    e-mail (antes, a ligação velha vencia, e a ficha nova ficava sem, "ligada a outra ficha")."""
+    email = "recontratada@exemplo.test"
+    fichas = SimpleNamespace(pessoas=_fichas(cfg, {20: email, 21: email, 22: "outra@exemplo.test"}, desligadas=(20,)))
+    _setores(monkeypatch, [_lig(601, 20, _h(cfg, email), "2026-10-01T12:00:00Z")])
+    assert R.codigos_e_ambiguos(cfg, fichas) == ({21: _h(cfg, email), 22: _h(cfg, "outra@exemplo.test")}, {})
+    c = R.conta_dos_codigos(cfg, fichas)
+    assert 20 not in c["codigos"] and 20 not in c["antes"] and c["por_que"] == {}
+    # a excluída também não ganha código pela ligação
+    fichas.pessoas[2]["excluido"] = "sim"
+    _setores(monkeypatch, [_lig(602, 22, cod(77), "2026-10-02T12:00:00Z")])
+    assert 22 not in R.codigos(cfg, fichas)
+
+
 def test_os_leitores_do_nexus_seguem_contando_so_o_executa(cfg):
     A.decidir(cfg, usina_id=1, usina_fracttal="Cliente A - Usina 1 - SP", pessoa_id=10, pessoa_hmac=cod(10),
               na_usina=True, usuario=None)
