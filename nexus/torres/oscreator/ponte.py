@@ -474,17 +474,18 @@ def area_pcm() -> dict:
 
 
 # Editar e excluir as observações de Garantias (29/10/2026, Levi: "qualquer um que é ADM ou do setor de chamados"): a
-# mesma regra da Área PCM, com o setor Chamados; vai no pedido das telas do Acompanhamento de chamados
-# (`rotas_acomp.OBS_CHAMADOS`)
+# mesma regra da Área PCM; vai no pedido das telas do Acompanhamento de chamados (`rotas_acomp.OBS_CHAMADOS`). Desde
+# 05/11/2026 é o setor Performance: o Levi excluiu o setor Chamados e pôs as pessoas dele na Performance, e a regra pelo
+# setor_id do Chamados deixou só o administrador ("Sim, passa", para o setor Performance inteiro).
 OBS_CHAMADOS = "os_web.obs_chamados"
-SETOR_CHAMADOS = SID.CHAMADOS
+SETOR_OBS_GARANTIAS = SID.PERFORMANCE
 _ROTA_OBS = re.compile(r"chamados/acompanhamento/\d+|api/acomp/\d+/obs/[^/]+/(?:editar|excluir)")
 
 
 def obs_chamados() -> dict:
     """{"pode": bool, "aviso": str}: quem edita e exclui as observações de Garantias."""
-    return _do_setor_ou_admin(SETOR_CHAMADOS, "Chamados", "Editar e excluir observações em Garantias é do setor Chamados "
-                              "e dos administradores do Nexus.", "as observações de Garantias")
+    return _do_setor_ou_admin(SETOR_OBS_GARANTIAS, "Performance", "Editar e excluir observações em Garantias é do setor "
+                              "Performance e dos administradores do Nexus.", "as observações de Garantias")
 
 
 def _do_setor_ou_admin(setor_alvo: int, nome: str, regra: str, onde_log: str) -> dict:

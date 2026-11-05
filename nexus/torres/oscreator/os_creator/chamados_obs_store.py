@@ -11,7 +11,7 @@ troca o texto INTEIRO: duas pessoas escrevendo ao mesmo tempo, uma perde o que e
 
 SÓ POST, NUNCA PUT: linha nova a cada vez é o que torna a escrita segura entre duas pessoas (não há linha para uma
 sobrescrever a da outra) e o que mantém o histórico honesto. Desde 29/10/2026 a tela edita e exclui a observação escrita
-(o administrador do Nexus ou o setor Chamados), também por linha nova (`edicao`, `exclusao`): a original nunca muda, e a
+(o administrador do Nexus ou o setor Performance), também por linha nova (`edicao`, `exclusao`): a original nunca muda, e a
 tela mostra a versão em vigor (`vigentes`).
 
 A DATA É DO SERVIDOR, em Brasília, carimbada na hora em que a linha é gravada — a pessoa não digita data. A planilha de
@@ -34,7 +34,7 @@ COLUNAS = ["id", "quando", "os", "ativo", "tipo", "texto", "quem", "email", "ext
 # observação comum
 TIPOS = ("obs", "ticket", "finalizado", "status", "edicao", "exclusao")
 # Editar e excluir (29/10/2026, Levi: "gostaria de poder excluir a observação e editar a observação"; quem pode, o
-# Nexus decide: o administrador ou o setor Chamados) também só ACRESCENTAM: a linha `edicao` traz o texto novo e a
+# Nexus decide: o administrador ou o setor Performance) também só ACRESCENTAM: a linha `edicao` traz o texto novo e a
 # `exclusao` some com a observação, as duas apontando a original em `extra.de`. A original nunca muda no banco; a tela
 # mostra a versão em vigor (`vigentes`). Só a observação escrita muda; os automáticos (ticket, status, finalizado), não.
 EDITAVEIS = ("obs",)

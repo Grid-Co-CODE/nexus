@@ -2863,8 +2863,9 @@ quem pode: "qualquer um que é ADM ou do setor de chamados".
   (`acomp_web.chave_do_historico`, "h-...") e a edição ou a exclusão fica no banco do Nexus por cima dela
   (`chamados_obs_store.ajustes_do_historico`; `rotas_acomp._mexer_historico` confere que a chave está na nota de agora).
   Se a nota mudar a linha, a chave muda e o ajuste de antes deixa de valer para ela.
-- **Quem pode** o Nexus decide (`ponte.obs_chamados`: o administrador ou quem é do setor Chamados, a mesma regra da Área
-  PCM, `ponte._do_setor_ou_admin`) e põe no pedido (`os_web.obs_chamados`), só na tela de um chamado e nas rotas de
+- **Quem pode** o Nexus decide (`ponte.obs_chamados`: o administrador ou quem é do setor Performance, a mesma regra da
+  Área PCM, `ponte._do_setor_ou_admin`; até 05/11/2026 era o setor Chamados, que o Levi excluiu, pondo as pessoas dele
+  na Performance: "Sim, passa", para o setor inteiro) e põe no pedido (`os_web.obs_chamados`), só na tela de um chamado e nas rotas de
   editar e excluir (`ponte._ROTA_OBS`: o quadro não paga a leitura do setor). Quem não pode não vê os botões e recebe 403
   com o aviso. Sem a chave (o oem, sozinho), fica aberto, como a Área PCM.
 - **A tela:** o clique na observação escrita mostra o "editar" e o "excluir" dela (Levi: "clica no comentário e aparece
