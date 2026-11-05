@@ -218,6 +218,26 @@ def test_os_que_nao_existe_diz_que_nao_achou(pagina, cliente):
     from test_engenharia_acompanhamento import _como
     r = _como(cliente, ANA).get("/t/engenharia/equipe/os/99999")
     assert r.status_code == 404 and "Não achei a OS 99999" in r.get_data(as_text=True)
+    assert "Tentar novamente" not in r.get_data(as_text=True)                  # o nº errado não se resolve tentando de novo
+
+
+@pytest.mark.parametrize("url", [URL, "/t/engenharia/etm/os/16502"])
+def test_o_fracttal_que_recusa_deixa_o_botao_de_tentar_de_novo(pagina, cliente, monkeypatch, url):
+    """Levi, 05/11/2026: "Deixa um botão para a pessoa tentar novamente". A recusa costuma ser a cota de 200 pedidos por
+    minuto da empresa toda (às 23h30 de 04/11/2026 o App de Campo e esta página levaram 429 juntos): a página diz e dá o
+    botão, um link para ela mesma (na tela de ETM, a de ETM)."""
+    from test_engenharia_acompanhamento import _como
+
+    from nexus.campo import fracttal
+    from nexus.engenharia import os_equipe as E
+
+    def recusa(path):
+        raise fracttal.Recusado("o Fracttal recusou por excesso de pedidos (HTTP 429); a fila não foi lida")
+    monkeypatch.setattr(E, "_ler_fracttal", recusa)
+    r = _como(cliente, ANA).get(url)
+    html = r.get_data(as_text=True)
+    assert r.status_code == 502 and "O Fracttal não respondeu (Recusado)" in html
+    assert f'<a class="eg-ac-btn eg-ac-btn--g" href="{url}">Tentar novamente</a>' in html
 
 
 # ── Task 3: o comentário na nota da OS (pela ponte do OS Creator, na sessão do Fracttal da pessoa) ───────────────────
