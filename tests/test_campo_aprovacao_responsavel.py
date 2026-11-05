@@ -135,9 +135,10 @@ def test_o_cartao_traz_o_score_os_avisos_e_logo_depois_o_aprovar(quadro, logado)
 
 def test_marcar_para_o_lote_so_em_pronta_e_em_duvida(quadro, logado):
     html = logado.get("/t/campo/aprovacao?responsavel=*").get_data(as_text=True)
-    for folio in ("16001", "15088", "15002"):
+    for folio in ("16001", "15088"):
         assert "data-apq-marcar" in _cartao(html, folio), folio
     assert "data-apq-marcar" not in _cartao(html, "15102")
+    assert "data-apq-marcar" not in _cartao(html, "15002")        # em dúvida, mas com fotos por ler
     assert "data-apq-lote" in html and "Aprovar as marcadas" in html
     for coluna in ("pronta", "duvida"):
         assert "data-apq-todas" in _coluna(html, coluna)
@@ -280,3 +281,56 @@ def test_criada_pelo_cos_fica_fora_pela_ultima_conta_do_cos(quadro, logado):
     html = logado.get("/t/campo/aprovacao?responsavel=*").get_data(as_text=True)
     fora = _bloco(html, "apq-fora")
     assert "17002" in _folios(fora) and "Criada pelo COS" in _cartao(fora, "17002")
+
+
+# ── a revisão final (05/11/2026) ────────────────────────────────────────────────────────────────────────────────────
+def test_ainda_conferindo_diz_que_as_fotos_nao_foram_conferidas(quadro, logado):
+    """Nas primeiras horas, a maior parte da fila está em "Ainda conferindo": o cartão diz o que falta, não "Nenhum fato
+    contra" em verde (dado pela metade não vai para a tela como se estivesse inteiro)."""
+    prefiltro_fundo._FATOS.pop("16001")
+    c = _cartao(_bloco(logado.get("/t/campo/aprovacao?responsavel=*").get_data(as_text=True), "apq-conferindo"), "16001")
+    assert "Fotos ainda não conferidas" in c and "Nenhum fato contra" not in c
+
+
+def test_o_cartao_diz_quando_as_fotos_foram_conferidas(quadro, logado):
+    html = logado.get("/t/campo/aprovacao?responsavel=*").get_data(as_text=True)
+    assert "fotos conferidas em" in _cartao(html, "15088") and "fotos conferidas em" not in _cartao(html, "15002")
+
+
+def test_com_fotos_por_ler_nao_entra_no_lote(quadro, logado):
+    """A OS em dúvida com fotos ainda por ler pode virar Não OK depois da leitura: aprova pelo cartão, não no lote."""
+    c = _cartao(logado.get("/t/campo/aprovacao?responsavel=*").get_data(as_text=True), "15002")
+    assert "Faltam fotos por ler" in c and "data-apq-marcar" not in c and "data-apq-aprovar" in c
+
+
+def test_o_lote_tem_ritmo_e_para_no_que_se_repetiria(quadro, logado):
+    """Cada aprovação custa 5 a 7 pedidos ao Fracttal (a cota de 200/min é da empresa): uma OS a cada 4 s. O lote para
+    no que se repetiria em todas: o login do Fracttal (401), o acesso (403), o Fracttal recusando (429, 5xx), a sessão do
+    Nexus que acabou (o fetch segue o 302 para /entrar e recebe 200 em HTML: isso NÃO é "aprovada") e 3 erros seguidos."""
+    html = logado.get("/t/campo/aprovacao?responsavel=*").get_data(as_text=True)
+    js = next(s for s in re.findall(r"<script>(.*?)</script>", html, re.S) if "data-apq-aprovar" in s)
+    assert "PAUSA_LOTE_MS = 4000" in js and "setTimeout(proxima, PAUSA_LOTE_MS)" in js
+    assert "r.ok && !r.redirected && r.j.ok === true" in js
+    assert "r.status === 401" in js and "r.status === 403 || r.status === 429 || r.status >= 500" in js
+    assert "seguidos >= 3" in js and "A sua sessão do Nexus acabou" in js
+    assert "r.j.mensagem" in js                                  # a frase do OS Creator, não "true" do aviso
+    assert "loteMsg.innerHTML" not in js                         # o número da OS entra como texto
+
+
+def test_aprovar_varias_regrava_a_fila_uma_vez_por_vez(quadro, logado, monkeypatch, app):
+    """Cada OS aprovada sai da fila guardada e a cópia em disco é regravada (~1,5 s com a fila real). No lote, as
+    gravações se sobrepunham no mesmo .tmp: agora uma por vez, e a que chega durante outra só marca que falta gravar."""
+    logado.get("/t/campo/aprovacao")
+    gravadas = []
+    monkeypatch.setattr(aprovacao, "_gravar_no_disco", lambda: gravadas.append(1))
+    aprovacao._GRAVA.update(rodando=True, sujo=False)                    # uma gravação andando
+    try:
+        with app.app_context():                      # como na conferência (a rota): a regravação precisa do app
+            aprovacao.tirar_da_fila(15102)
+            aprovacao.tirar_da_fila(15088)
+        assert gravadas == [] and aprovacao._GRAVA["sujo"] is True
+    finally:
+        aprovacao._GRAVA.update(rodando=False, sujo=False)
+    with app.app_context():
+        aprovacao.tirar_da_fila(16001)
+    assert gravadas == [1] and aprovacao._GRAVA == {"rodando": False, "sujo": False}

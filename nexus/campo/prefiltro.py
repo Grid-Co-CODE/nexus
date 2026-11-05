@@ -100,15 +100,28 @@ def _s(n: int) -> str:
 def classificar(o: dict, fatos: dict | None, fechado_app: str, p: dict) -> dict:
     """A coluna da OS e os avisos com a prova. `o` = a OS da fila (as tarefas com a regra do App); `fatos` = o que a
     leitura de fundo achou nos anexos (None = ainda não lidos); `fechado_app` = o último fechamento da OS no App. Cada aviso
-    diz o `tipo` (tarde, repetida, fora_app, faltam, app), que o cartão do quadro usa para mostrar a prova."""
+    diz o `tipo` (tarde, repetida, nao_abriu, fora_app, faltam, app), que o cartão do quadro usa para mostrar a prova."""
     avisos, tarde, repetidas, nao_ok, duvida = [], 0, 0, False, False
+    tarefas = o.get("tarefas") or []
+    # a hora do App só julga as fotos das tarefas do App (pelo id da tarefa): na OS mista, a tarefa fechada fora do App
+    # tem as fotos anexadas no Fracttal na hora dela, e julgá-las pela do App dava Não OK falso (revisão de 05/11/2026).
+    # Foto sem tarefa (da OS) ou de tarefa desconhecida, só quando a OS inteira foi pelo App.
+    ids_app = {str(t["id_wt"]) for t in tarefas if t.get("pelo_app") and t.get("id_wt")}
+    ids_fora = {str(t["id_wt"]) for t in tarefas if not t.get("pelo_app") and t.get("id_wt")}
+    toda_pelo_app = all(t.get("pelo_app") for t in tarefas)
+
+    def julgada(a) -> bool:
+        tarefa = str(a.get("tarefa") or "")
+        return tarefa in ids_app or (tarefa not in ids_fora and toda_pelo_app)
+
     if fatos is not None:
         anexos = fatos.get("anexos") or []
         num = {a["id"]: f"p{n:02d}" for n, a in enumerate(anexos, 1)}
         fim = _quando(fechado_app)
         if fim:
             atrasadas = [(a["id"], (q - fim).total_seconds()) for a in anexos
-                         if (q := _quando(a.get("anexada"))) and (q - fim).total_seconds() > p["horas_tarde"] * 3600]
+                         if julgada(a) and (q := _quando(a.get("anexada")))
+                         and (q - fim).total_seconds() > p["horas_tarde"] * 3600]
             if atrasadas:
                 tarde, nao_ok = len(atrasadas), True
                 dias = max(1, int(max(s for _, s in atrasadas) // 86400))
@@ -127,7 +140,13 @@ def classificar(o: dict, fatos: dict | None, fechado_app: str, p: dict) -> dict:
             # os pares vão juntos para o cartão mostrar as duas fotos lado a lado, com o número de cada
             avisos.append({"tipo": "repetida", "nivel": "alerta", "texto": texto, "fotos": [x for par in pares for x in par],
                            "pares": [{"a": a, "b": b, "ra": num.get(a, "?"), "rb": num.get(b, "?")} for a, b in pares[:4]]})
-    fora = sum(1 for t in o.get("tarefas") or [] if not t.get("pelo_app"))
+        # a foto que baixou e não abriu (upload cortado) não foi conferida: a OS não vai calada para Pronta e o lote
+        nao_abriu = [a["id"] for a in anexos if "hash" in a and a["hash"] is None]
+        if nao_abriu:
+            duvida, n = True, len(nao_abriu)
+            avisos.append({"tipo": "nao_abriu", "nivel": "alerta", "fotos": nao_abriu,
+                           "texto": f"{n} foto{_s(n)} não {'abriram' if n > 1 else 'abriu'} no Nexus: confira no card da OS"})
+    fora = sum(1 for t in tarefas if not t.get("pelo_app"))
     if fora:
         duvida = True
         avisos.append({"tipo": "fora_app", "nivel": "alerta", "fotos": [],

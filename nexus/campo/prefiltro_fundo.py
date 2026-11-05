@@ -8,12 +8,18 @@ hora de anexação (o `Last-Modified` do arquivo: o REST de anexos não dá data
 bytes não ficam. A miniatura (240 px) só das fotos repetidas, para o supervisor ver as duas lado a lado.
 
 - Roda depois de cada releitura da fila (`aprovacao._reler`) e no boot, numa thread declarada de fundo no porteiro do
-  Fracttal; uma volta por vez, no máximo `NEXUS_PREFILTRO_POR_VOLTA` OS, com `NEXUS_PREFILTRO_PAUSA_S` entre elas.
-  O Fracttal recusou (429): a volta para e guarda o que leu; a próxima continua.
-- Meia leitura nunca vira fato: uma foto que não baixou deixa a OS sem fatos ("Ainda conferindo") até a próxima volta,
-  porque a OS sem as fotos todas cairia em "Pronta" sem ter sido conferida.
-- Fica em memória e em `dados/campo/prefiltro.json.gz` (cópia de trabalho, como a fila); a OS que sai da fila sai daqui
-  e do disco, com as miniaturas. `NEXUS_PREFILTRO=0` desliga o laço.
+  Fracttal; uma volta por vez, no máximo `NEXUS_PREFILTRO_POR_VOLTA` OS, com `NEXUS_PREFILTRO_PAUSA_S` entre elas (também
+  depois de um erro). O Fracttal recusou (429): a volta para e guarda o que leu; a próxima continua.
+- **A OS conferida é relida** (revisão de 05/11/2026): a OS é lida minutos depois de entrar na verificação, e a foto
+  anexada "mais de 24 h depois do fechamento" só existe DEPOIS. Relê uma vez quando a janela de `NEXUS_PREFILTRO_HORAS_TARDE`
+  desde o fim no Fracttal fecha e, depois, uma vez por dia enquanto a OS espera; só as fotos novas são baixadas (o id é o
+  caminho no S3, que não muda). As OS novas passam na frente das relidas.
+- Meia leitura nunca vira fato: a foto que não baixou deixa a OS sem fatos ("Ainda conferindo") até a próxima volta, porque
+  a OS sem as fotos todas cairia em "Pronta" sem ter sido conferida; três falhas seguidas, e a OS espera 6 h. A foto que
+  baixou mas não abre (upload cortado, arquivo que não é imagem) fica "não abriu", sem hash, e a OS segue (em dúvida).
+- Fica em memória e em `dados/campo/prefiltro.json.gz` (cópia de trabalho, como a fila), gravada a cada 10 OS: cada push
+  na `main` reinicia o servidor. A OS que sai da fila sai daqui e do disco, com as miniaturas; a fila vazia (soluço do
+  Fracttal) não apaga nada. `ligado()` diz se a máquina lê (o servidor sim; o PC, com `NEXUS_CAMPO_AQUECER=0`, não).
 """
 import gzip
 import hashlib
@@ -38,10 +44,26 @@ IMG = re.compile(r"\.(jpe?g|png|webp)$", re.I)
 _ID = re.compile(r"^[0-9a-f]{16}$")
 MINI_LADO = 240
 POR_PAGINA = 100
+MAX_PAGINAS = 20                  # 2.000 anexos numa OS; a maior da medição de 26/10 tinha 75
+RELER_S = 24 * 3600               # a OS conferida é relida uma vez por dia enquanto espera a aprovação
+TENTATIVAS, ESPERA_FALHA_S = 3, 6 * 3600
+GRAVAR_A_CADA = 10
 _FATOS: dict = {}
+_FALHAS: dict = {}                # {id_wo: [falhas seguidas, quando foi a última]}: foto que não baixou (passageiro)
 _ESTADO = {"lendo": False, "erro": "", "erro_em": 0.0}
 _TRAVA = threading.Lock()
 _dormir = time.sleep
+_agora = time.time
+
+
+def ligado(config) -> bool:
+    """A leitura das fotos roda nesta máquina? `NEXUS_PREFILTRO` decide quando dito ("0" desliga); sem ele, segue o
+    `NEXUS_CAMPO_AQUECER`: o servidor aquece e lê, o PC (com 0) não. Revisão de 05/11/2026: ligado em toda máquina, a 1ª
+    visita à Aprovação no PC começava a passada de ~2.000 OS fora do porteiro do servidor, na rede do escritório."""
+    v = str((config or {}).get("NEXUS_PREFILTRO") or "").strip()
+    if v:
+        return v != "0"
+    return str((config or {}).get("NEXUS_CAMPO_AQUECER") or "1").strip() != "0"
 
 
 def baixar(url: str) -> tuple[bytes, str]:
@@ -58,7 +80,10 @@ def fatos(id_wo) -> dict | None:
 
 
 def estado() -> dict:
-    return {"conferidas": len(_FATOS), "lendo": _ESTADO["lendo"], "erro": _ESTADO["erro"]}
+    """O que a tela diz da leitura: quantas OS conferidas, se está lendo, o último erro e quantas OS estão esperando
+    depois de três downloads que falharam."""
+    return {"conferidas": len(_FATOS), "lendo": _ESTADO["lendo"], "erro": _ESTADO["erro"],
+            "falhas": sum(1 for n, _ in _FALHAS.values() if n >= TENTATIVAS)}
 
 
 def _pasta() -> Path | None:
@@ -117,6 +142,7 @@ def carregar_do_disco(app) -> bool:
 
 def _apagar(id_wo: str) -> None:
     f = _FATOS.pop(id_wo, None) or {}
+    _FALHAS.pop(id_wo, None)
     pasta = _pasta()
     if pasta is None:
         return
@@ -146,69 +172,139 @@ def _desc(texto) -> tuple[str, bool]:
     return " · ".join(p for p in partes[:1] if p), not any(p.startswith("GPS ") for p in partes)
 
 
-def _ler_os(tarefas: list[dict], p: dict) -> dict:
-    folio = str(tarefas[0].get("wo_folio") or "")
-    rest, inicio = [], 0
-    while True:
+def _fim(tarefas: list[dict]) -> float | None:
+    """O fim mais recente das tarefas no Fracttal (UTC), em segundos: o relógio da janela da releitura."""
+    qs = [q for w in tarefas if (q := prefiltro._quando(w.get("final_date")))]
+    return max(qs).timestamp() if qs else None
+
+
+def _devida(f: dict, tarefas: list[dict], agora: float, p: dict) -> bool:
+    """A OS já conferida precisa de nova leitura? Uma vez quando a janela da foto anexada depois fecha (lida antes dela,
+    relida depois) e, fora isso, uma vez por dia."""
+    lido = float(f.get("lido_em") or 0)
+    if agora - lido >= RELER_S:
+        return True
+    fim = _fim(tarefas)
+    return bool(fim) and lido < fim + p["horas_tarde"] * 3600 <= agora
+
+
+def _hash_e_miniatura(conteudo: bytes) -> tuple[str | None, bytes | None]:
+    """O hash sem o carimbo e a miniatura, ou (None, None) se a imagem não abre (upload cortado, arquivo que não é
+    imagem, imagem gigante): a foto fica "não abriu", fora da comparação, e a OS segue. Antes, a exceção prendia a OS em
+    "Ainda conferindo" para sempre, relendo tudo a cada volta (revisão de 05/11/2026)."""
+    try:
+        im = Image.open(io.BytesIO(conteudo))
+        im.load()
+        h = format(prefiltro.dhash(im), "064x")
+        mini = im.convert("RGB")
+        mini.thumbnail((MINI_LADO, MINI_LADO))
+        buf = io.BytesIO()
+        mini.save(buf, "JPEG", quality=80)
+        return h, buf.getvalue()
+    except (OSError, ValueError, SyntaxError, Image.DecompressionBombError):
+        return None, None
+
+
+def _listar(folio: str) -> list[dict]:
+    """Os anexos da OS, de 100 em 100. Para na página repetida e no teto: se o REST ignorar o `start`, a mesma página
+    voltaria para sempre (revisão de 05/11/2026)."""
+    rest, inicio, anterior = [], 0, None
+    for _ in range(MAX_PAGINAS):
         pag = (fracttal.ler(f"work_orders_attachments?folio={quote(folio)}&limit={POR_PAGINA}&start={inicio}")
                or {}).get("data") or []
+        marca = [str(a.get("value") or "") for a in pag]
+        if not pag or marca == anterior:
+            break
         rest += pag
         if len(pag) < POR_PAGINA:
             break
-        inicio += POR_PAGINA
+        anterior, inicio = marca, inicio + POR_PAGINA
+    return rest
+
+
+def _ler_os(tarefas: list[dict], p: dict, velho: dict | None = None) -> dict:
+    """Os fatos da OS. `velho` = os da leitura anterior: as fotos já lidas não são baixadas de novo."""
+    folio = str(tarefas[0].get("wo_folio") or "")
     ids_tarefas = {str(w.get("id_work_orders_tasks")) for w in tarefas}
-    anexos, minis = [], {}
-    for a in rest:
+    conhecidos = {a["id"]: a for a in (velho or {}).get("anexos") or []}
+    anexos, minis, urls = [], {}, {}
+    for a in _listar(folio):
         url = str(a.get("value") or "")
         caminho = urlsplit(url).path
         tarefa = str(a.get("id_work_order_task") or "")
         if not IMG.search(caminho) or (tarefa and tarefa not in ids_tarefas):
             continue
-        conteudo, anexada = baixar(url)          # falhou: sobe, e a OS fica para a próxima volta (nada pela metade)
-        im = Image.open(io.BytesIO(conteudo))
-        im.load()
         id_ = hashlib.sha1(caminho.encode("utf-8")).hexdigest()[:16]
+        if id_ in urls:                           # o mesmo arquivo listado duas vezes não vira "p02 é a mesma de p02"
+            continue
+        urls[id_] = url
         desc, imprime = _desc(a.get("description"))
-        anexos.append({"id": id_, "tarefa": tarefa, "desc": desc, "anexada": anexada, "print": imprime,
-                       "hash": format(prefiltro.dhash(im), "064x")})
-        mini = im.convert("RGB")
-        mini.thumbnail((MINI_LADO, MINI_LADO))
-        buf = io.BytesIO()
-        mini.save(buf, "JPEG", quality=80)
-        minis[id_] = buf.getvalue()
-    pares = prefiltro.pares_repetidos([{**a, "hash": int(a["hash"], 16)} for a in anexos], p["dif"], p["dif_print"])
+        if id_ in conhecidos:                     # já lido: o arquivo no S3 não muda (o id é o caminho)
+            anexos.append({**conhecidos[id_], "tarefa": tarefa, "desc": desc, "print": imprime})
+            continue
+        conteudo, anexada = baixar(url)           # falhou: sobe, e a OS fica para a próxima volta (nada pela metade)
+        h, mini = _hash_e_miniatura(conteudo)
+        anexos.append({"id": id_, "tarefa": tarefa, "desc": desc, "anexada": anexada, "print": imprime, "hash": h})
+        if mini:
+            minis[id_] = mini
+    pares = prefiltro.pares_repetidos([{**a, "hash": int(a["hash"], 16)} for a in anexos if a.get("hash")],
+                                      p["dif"], p["dif_print"])
     pasta = _pasta()
     if pasta is not None and pares:
         (pasta / "prefiltro_fotos").mkdir(parents=True, exist_ok=True)
         for i in {x for par in pares for x in par}:
-            (pasta / "prefiltro_fotos" / f"{i}.jpg").write_bytes(minis[i])
-    return {"chave": _chave(tarefas), "lido_em": time.time(), "anexos": anexos, "pares": pares, "erro": ""}
+            arq = pasta / "prefiltro_fotos" / f"{i}.jpg"
+            if i not in minis and not arq.exists():   # foto lida antes que só agora entrou num par: baixa a miniatura
+                minis[i] = _hash_e_miniatura(baixar(urls[i])[0])[1]
+            if minis.get(i):
+                arq.write_bytes(minis[i])
+    return {"chave": _chave(tarefas), "lido_em": _agora(), "anexos": anexos, "pares": pares, "erro": ""}
 
 
 def conferir(app, linhas: list[dict], cos: dict | None = None) -> int:
-    """Uma volta: confere as OS do escopo ainda sem fatos (ou com tarefas que mudaram), a mais nova primeiro, até o teto.
-    Quantas OS ficaram conferidas."""
+    """Uma volta: as OS do escopo sem fatos (ou com tarefas que mudaram), a mais nova primeiro, e depois as conferidas
+    que precisam ser relidas (`_devida`), a lida há mais tempo primeiro, até o teto. Quantas OS ficaram conferidas."""
     p = prefiltro.parametros(app.config if app else {})
+    agora = _agora()
     with app.app_context() if app else _nada():
         grupos = _por_os(linhas)
+        if not grupos:                # fila vazia é soluço do Fracttal (total 0): apagar tudo faria a próxima reler tudo
+            return 0
         for id_wo in [k for k in _FATOS if k not in grupos]:
             _apagar(id_wo)
-        candidatas = [(k, ts) for k, ts in grupos.items()
-                      if (_FATOS.get(k) or {}).get("chave") != _chave(ts) and not prefiltro.fora_do_escopo(ts, cos)]
-        candidatas.sort(key=lambda c: max(str(w.get("final_date") or "") for w in c[1]), reverse=True)
+        for id_wo in [k for k in _FALHAS if k not in grupos]:
+            _FALHAS.pop(id_wo, None)
+        novas, relidas = [], []
+        for k, ts in grupos.items():
+            n, quando = _FALHAS.get(k, (0, 0.0))
+            if (n >= TENTATIVAS and agora - quando < ESPERA_FALHA_S) or prefiltro.fora_do_escopo(ts, cos):
+                continue
+            f = _FATOS.get(k)
+            if f is None or f.get("chave") != _chave(ts):
+                novas.append((k, ts))
+            elif _devida(f, ts, agora, p):
+                relidas.append((k, ts))
+        novas.sort(key=lambda c: max(str(w.get("final_date") or "") for w in c[1]), reverse=True)
+        relidas.sort(key=lambda c: float(_FATOS[c[0]].get("lido_em") or 0))
         lidas = 0
-        for k, ts in candidatas[:p["por_volta"]]:
+        for k, ts in (novas + relidas)[:p["por_volta"]]:
             try:
-                f = _ler_os(ts, p)
+                f = _ler_os(ts, p, _FATOS.get(k))
             except fracttal.Recusado as e:
                 _ESTADO.update(erro=str(e)[:160], erro_em=time.time())
                 break
-            except Exception as e:      # noqa: BLE001 — foto que não baixou, imagem ruim: a OS fica para a próxima volta
+            except Exception as e:      # noqa: BLE001 — foto que não baixou, S3 fora: passageiro, a OS fica para depois
+                falha = _FALHAS.setdefault(k, [0, 0.0])
+                falha[0], falha[1] = falha[0] + 1, agora
                 logging.warning("pré-filtro: a OS %s não foi conferida (%s: %s)", ts[0].get("wo_folio"),
                                 type(e).__name__, str(e)[:120])
+                _dormir(p["pausa_s"])     # a pausa vale também depois do erro: com o S3 fora, a volta não queima a fila
                 continue
             _FATOS[k] = f
+            _FALHAS.pop(k, None)
             lidas += 1
+            if lidas % GRAVAR_A_CADA == 0:
+                _gravar()                 # cada push na main reinicia o servidor: o lido até aqui não se perde
             _dormir(p["pausa_s"])
         else:
             _ESTADO.update(erro="", erro_em=0.0)
@@ -246,8 +342,9 @@ def _volta(app) -> None:
 
 
 def pedir_conferencia(app) -> None:
-    """Uma volta por trás, se não há outra andando. Nos testes não roda sozinha (os testes chamam `conferir`)."""
-    if str(app.config.get("NEXUS_PREFILTRO", "1")) == "0" or app.config.get("TESTING"):
+    """Uma volta por trás, se não há outra andando e a máquina lê (`ligado`). Nos testes não roda sozinha (os testes
+    chamam `conferir`)."""
+    if not ligado(app.config) or app.config.get("TESTING"):
         return
     with _TRAVA:
         if _ESTADO["lendo"]:
@@ -260,4 +357,5 @@ def pedir_conferencia(app) -> None:
 
 def limpar() -> None:
     _FATOS.clear()
+    _FALHAS.clear()
     _ESTADO.update(lendo=False, erro="", erro_em=0.0)

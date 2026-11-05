@@ -9,7 +9,8 @@
    avisos, deve ser possível também aprovar mais que uma de uma vez!"; três colunas. A coluna de cada OS sai dos fatos
    (nexus/campo/prefiltro.py); o quadro é montado na visita e não muda sozinho na frente da pessoa: a marcação vive na
    página, e a OS aprovada sai do quadro quando o Fracttal confirma (a conferência). #}
-{% macro cartao(o, marcar) %}{% set tom = 'neutro' if o.nota is none else ('ok' if o.nota >= 80 else ('alerta' if o.nota >= 50 else 'critico')) %}
+{# a OS com fotos ainda por ler pode virar Não OK depois da leitura: aprova pelo cartão, mas não entra no lote #}
+{% macro cartao(o, marcar) %}{% set tom = 'neutro' if o.nota is none else ('ok' if o.nota >= 80 else ('alerta' if o.nota >= 50 else 'critico')) %}{% set marcar = marcar and not (o.avisos|selectattr('tipo', 'equalto', 'faltam')|list) %}
 <article class="apq-cartao" data-wo="{{ o.id_wo or '' }}" data-folio="{{ o.os }}" data-coluna="{{ o.coluna }}" data-cliente="{{ o.cliente_cad }}" data-busca="{{ o.busca }}">
   <header class="apq-c-cab">
     {% if marcar %}<input class="apq-marcar" type="checkbox" data-apq-marcar aria-label="Marcar a OS {{ o.os }} para aprovar">{% endif %}
@@ -17,13 +18,15 @@
     <span class="cn-st cn-t-{{ cor_espera(o.espera_d) }} apq-c-dias" title="Dias esperando aprovação, desde o fim da tarefa mais antiga">{{ 'hoje' if o.espera_d == 0 else o.espera_d ~ ' d' }}</span>
   </header>
   <p class="apq-c-onde"><b>{{ o.usina_cad or sem_cadastro }}</b> · {{ o.cliente_cad or 'sem cliente no cadastro' }} · {{ o.tarefas|length }} tarefa{{ 's' if o.tarefas|length != 1 }}</p>
-  <p class="apq-c-quem mudo">{{ o.tecnicos|join(', ') }}{% if not responsavel %} · {{ o.responsavel_cad or sem_responsavel }}{% endif %}</p>
+  <p class="apq-c-quem mudo">{{ o.tecnicos|join(', ') }}{% if not responsavel %} · {{ o.responsavel_cad or sem_responsavel }}{% endif %}{% if o.fotos_em %} · fotos conferidas em {{ o.fotos_em }}{% endif %}</p>
   <p class="apq-score" data-tom="{{ tom }}">{% if o.nota is none %}<span>Fora do App</span><small>sem a nota do App</small>{% else %}<span>Nota do App</span><b class="gc-num cn-t-{{ tom }}">{{ o.nota }}</b>{% if o.tarefas|length > 1 %}<small>a pior das tarefas</small>{% endif %}{% endif %}</p>
   <ul class="apq-avisos">
     {% if o.fora_motivo %}<li class="apq-aviso" data-nivel="neutro">Fora do pré-filtro: {{ o.fora_motivo }}</li>{% endif %}
+    {# dado pela metade não vai para a tela como inteiro: sem as fotos lidas, o cartão diz o que falta #}
+    {% if o.coluna == 'conferindo' %}<li class="apq-aviso" data-nivel="neutro">Fotos ainda não conferidas</li>{% endif %}
     {% for a in o.avisos %}<li class="apq-aviso" data-nivel="{{ a.nivel }}">{{ a.texto }}{% if a.tipo == 'repetida' %}{% for par in a.pares %}
       <span class="apq-par">{% for i, rot in ((par.a, par.ra), (par.b, par.rb)) %}<figure><img src="{{ url_for('torre_campo.aprovacao_foto', id_anexo=i) }}" alt="Foto {{ rot }} da OS {{ o.os }}" loading="lazy" width="120" height="90" onerror="this.parentNode.hidden = true"><figcaption>{{ rot }}</figcaption></figure>{% endfor %}</span>{% endfor %}{% endif %}</li>
-    {% else %}{% if not o.fora_motivo %}<li class="apq-aviso" data-nivel="ok">Nenhum fato contra</li>{% endif %}{% endfor %}
+    {% else %}{% if not o.fora_motivo and o.coluna != 'conferindo' %}<li class="apq-aviso" data-nivel="ok">Nenhum fato contra</li>{% endif %}{% endfor %}
   </ul>
   <button type="button" class="gc-btn gc-btn--primario apq-aprovar" data-apq-aprovar>Aprovar</button>
   <p class="apq-msg" data-apq-msg role="status" hidden></p>
@@ -123,12 +126,18 @@
 {% include "oscreator/card_os_abrir.html" %}
 <script>
   // O Aprovar é o Concluir do OS Creator (o mesmo do Painel do responsável), com a conta do Fracttal de quem clica; depois,
-  // a conferência tira a OS do quadro quando o Fracttal confirma. O lote aprova uma depois da outra e para no primeiro
-  // pedido de login (sem a sessão do Fracttal, todas as outras falhariam igual); outro erro fica no cartão e o lote segue.
+  // a conferência tira a OS do quadro quando o Fracttal confirma. O lote aprova uma OS a cada PAUSA_LOTE_MS (cada uma custa
+  // 5 a 7 pedidos ao Fracttal, e a cota de 200 por minuto é da empresa inteira) e para no que se repetiria em todas: o
+  // login do Fracttal (401), o acesso (403), o Fracttal recusando (429, 5xx), a sessão do Nexus que acabou e 3 erros
+  // seguidos; outro erro fica no cartão e o lote segue (revisão de 05/11/2026).
   (function () {
     var NOMES = {pronta: 'Pronta', duvida: 'Em dúvida', nao_ok: 'Não OK'};
+    var PAUSA_LOTE_MS = 4000;
     var ENTRAR = 'Entre no OS Creator com a sua conta do Fracttal e tente de novo: <a class="cn-link" href="' +
       nexusRota('/os/login') + '" target="_blank" rel="noopener">entrar no Fracttal</a>.';
+    // sem a sessão do Nexus, o portão responde 302 para /entrar, o fetch segue e recebe 200 em HTML: isso não é aprovada
+    var SESSAO = 'A sua sessão do Nexus acabou: recarregue a página e entre de novo.';
+    var RECUSA = 'O Fracttal recusou agora: tente daqui a alguns minutos.';
     var lote = document.querySelector('[data-apq-lote]'), loteN = document.querySelector('[data-apq-lote-n]');
     var loteMsg = document.querySelector('[data-apq-lote-msg]');
     var selCli = document.querySelector('[data-apq-cliente]'), busca = document.querySelector('[data-apq-busca]');
@@ -138,7 +147,9 @@
       return fetch(url, {method: 'POST', credentials: 'same-origin', body: JSON.stringify(corpo),
                          headers: {'Accept': 'application/json', 'Content-Type': 'application/json'}})
         .then(function (r) {
-          return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok, status: r.status, j: j || {}}; });
+          return r.json().catch(function () { return null; }).then(function (j) {
+            return {ok: r.ok, status: r.status, redirected: r.redirected, json: j !== null, j: j || {}};
+          });
         });
     }
     function marcadas() {
@@ -153,10 +164,11 @@
       loteN.textContent = m;
       lote.disabled = andando || !m;
     }
-    function msg(c, txt, ruim, html) {
+    // tom: 'ok', 'alerta' ou 'critico'
+    function msg(c, txt, tom, html) {
       var m = c.querySelector('[data-apq-msg]');
       m.hidden = !txt;
-      m.className = 'apq-msg ' + (ruim ? 'cn-t-critico' : 'cn-t-ok');
+      m.className = 'apq-msg cn-t-' + (tom || 'ok');
       if (html) { m.innerHTML = txt; } else { m.textContent = txt; }      // o texto do servidor nunca vira HTML
     }
     function conferir(wo, c) {
@@ -165,28 +177,35 @@
         .then(function (j) { if (j && j.saiu && c.parentNode) { c.remove(); contar(); } })
         .catch(function () { /* sem resposta: a OS sai na releitura de 10 min */ });
     }
-    // 'ok', 'login' ou 'erro'
+    // 'ok', 'erro' ou o motivo de parar o lote: 'login' (Fracttal), 'sessao' (Nexus), 'recusa' (403, 429, 5xx)
     function aprovar(c) {
       var wo = c.getAttribute('data-wo'), folio = c.getAttribute('data-folio');
       var b = c.querySelector('[data-apq-aprovar]');
-      if (!wo) { msg(c, 'Sem o número interno da OS ' + folio + ': abra o card e conclua por lá.', true); return Promise.resolve('erro'); }
+      if (!wo) { msg(c, 'Sem o número interno da OS ' + folio + ': abra o card e conclua por lá.', 'critico'); return Promise.resolve('erro'); }
       b.disabled = true; b.textContent = 'Aprovando…';
       return pedir(nexusRota('/os/api/os/') + wo + '/concluir', {folio: folio}).then(function (r) {
-        if (r.ok) {
+        if (r.ok && !r.redirected && r.j.ok === true) {
           c.setAttribute('data-estado', 'aprovada'); b.textContent = 'Aprovada';
           var m = c.querySelector('[data-apq-marcar]');
           if (m) { m.checked = false; m.disabled = true; }
-          msg(c, 'OS ' + folio + ' aprovada.' + (r.j.aviso ? ' ' + r.j.aviso : ''));
+          // a frase do OS Creator (com o aviso de quando fechou sem a data de fim), não "aprovada" genérico
+          msg(c, r.j.mensagem || ('OS ' + folio + ' aprovada.'), r.j.aviso ? 'alerta' : 'ok');
           conferir(wo, c);
           return 'ok';
         }
         b.disabled = false; b.textContent = 'Aprovar';
-        if (r.status === 401) { msg(c, ENTRAR, true, true); return 'login'; }
-        msg(c, r.j.erro || ('Não consegui aprovar a OS ' + folio + '.'), true);
+        if (r.redirected) { msg(c, SESSAO, 'critico'); return 'sessao'; }
+        if (r.status === 401) { msg(c, ENTRAR, 'critico', true); return 'login'; }
+        if (r.status === 403 || r.status === 429 || r.status >= 500) {
+          msg(c, r.j.erro || (r.status === 403 ? 'O seu acesso não deixa concluir OS pelo OS Creator.' : RECUSA), 'critico');
+          return 'recusa';
+        }
+        if (!r.json) { msg(c, SESSAO, 'critico'); return 'sessao'; }
+        msg(c, r.j.erro || ('Não consegui aprovar a OS ' + folio + '.'), 'critico');
         return 'erro';
       }).catch(function (e) {
         b.disabled = false; b.textContent = 'Aprovar';
-        msg(c, 'Não consegui falar com o OS Creator (' + e.message + ').', true);
+        msg(c, 'Não consegui falar com o OS Creator (' + e.message + ').', 'critico');
         return 'erro';
       });
     }
@@ -229,7 +248,17 @@
       var partes = Object.keys(por).map(function (k) { return por[k] + ' de ' + (NOMES[k] || k); });
       if (!window.confirm('Aprovar ' + cartoes.length + ' OS no Fracttal (' + partes.join(', ') + ')? Não tem volta: elas saem da verificação.')) { return; }
       andando = true; contar();
-      var feitas = 0, erros = 0, i = 0;
+      var feitas = 0, erros = 0, seguidos = 0, i = 0;
+      function aprovadas() { return feitas + (feitas === 1 ? ' aprovada' : ' aprovadas'); }
+      // o número da OS entra como texto; só o link de entrar no Fracttal (fixo, sem dado) entra como HTML
+      function parar(c, r) {
+        andando = false;
+        loteMsg.textContent = 'Parei na OS ' + c.getAttribute('data-folio') + ' (' + aprovadas() + ' antes). ';
+        var resto = document.createElement('span');
+        if (r === 'login') { resto.innerHTML = ENTRAR; } else { resto.textContent = r === 'sessao' ? SESSAO : RECUSA; }
+        loteMsg.appendChild(resto);
+        contar();
+      }
       function proxima() {
         if (i >= cartoes.length) {
           andando = false;
@@ -239,16 +268,17 @@
           return;
         }
         var c = cartoes[i++];
-        loteMsg.textContent = 'Aprovando ' + i + ' de ' + cartoes.length + '…';
+        loteMsg.textContent = 'Aprovando ' + i + ' de ' + cartoes.length + '… (uma OS a cada ' + (PAUSA_LOTE_MS / 1000) + ' s)';
         aprovar(c).then(function (r) {
-          if (r === 'login') {
+          if (r === 'login' || r === 'sessao' || r === 'recusa') { parar(c, r); return; }
+          if (r === 'ok') { feitas++; seguidos = 0; } else { erros++; seguidos++; }
+          if (seguidos >= 3) {
             andando = false;
-            loteMsg.innerHTML = 'Parei na OS ' + c.getAttribute('data-folio') + ' (' + feitas + ' aprovadas antes). ' + ENTRAR;
+            loteMsg.textContent = 'Parei depois de 3 erros seguidos (' + aprovadas() + '): o motivo está em cada cartão.';
             contar();
             return;
           }
-          if (r === 'ok') { feitas++; } else { erros++; }
-          proxima();
+          if (i < cartoes.length) { setTimeout(proxima, PAUSA_LOTE_MS); } else { proxima(); }
         });
       }
       proxima();

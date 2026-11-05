@@ -35,12 +35,14 @@ class S3Falso:
     """Cada URL é uma foto: a semente decide a imagem (mesma semente = mesma foto), a hora vem junto."""
 
     def __init__(self):
-        self.pedidos, self.falhar = [], set()
+        self.pedidos, self.falhar, self.lixo = [], set(), set()
 
     def __call__(self, url):
         self.pedidos.append(url)
         if url in self.falhar:
             raise OSError("S3 fora")
+        if url in self.lixo:                      # o arquivo veio, mas não é imagem (upload cortado)
+            return b"isto nao e uma imagem", "2026-10-20T12:00:00Z"
         semente, hora = url.split("/")[-1].split(".")[0].split("_")[:2]
         return _jpeg(int(semente), carimbo=f"carimbo {url}"), hora.replace("h", ":")
 
@@ -251,3 +253,123 @@ def test_a_volta_le_o_disco_antes_do_fracttal(fundo, monkeypatch):
     prefiltro_fundo._volta(fundo["app"])
     assert not [p for p in fx.pedidos if p.startswith("work_orders_attachments")]
     assert prefiltro_fundo.fatos(15001) is not None
+
+
+# ── a revisão final (05/11/2026): relida, foto que não abre, disco no meio da volta, página repetida ──────────────────
+def _epoch(iso):
+    from datetime import datetime, timezone
+    return datetime.fromisoformat(iso).replace(tzinfo=timezone.utc).timestamp()
+
+
+def test_a_os_conferida_e_relida_depois_da_janela_e_ve_a_foto_nova(fundo, monkeypatch):
+    """A foto anexada dias depois do fechamento só existe depois da 1ª leitura (a OS é lida minutos depois de entrar na
+    verificação): passada a janela de 24 h desde o fim, a OS é relida, e só a foto nova é baixada."""
+    from nexus.campo import prefiltro
+    anexos = {"15001": [_anexo("15001", 1, "2026-10-20T10h30h00Z")]}
+    fx = _usar(anexos)
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: _epoch("2026-10-20T11:00:00"))
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    anexos["15001"].append(_anexo("15001", 2, "2026-10-22T12h00h00Z"))
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: _epoch("2026-10-20T15:00:00"))      # ainda na janela
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(prefiltro_fundo.fatos(15001)["anexos"]) == 1 and len(fx.pedidos) == 1
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: _epoch("2026-10-22T13:00:00"))      # passou a janela
+    baixadas = len(fundo["s3"].pedidos)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    f = prefiltro_fundo.fatos(15001)
+    assert [a["anexada"] for a in f["anexos"]] == ["2026-10-20T10:30:00Z", "2026-10-22T12:00:00Z"]
+    assert len(fundo["s3"].pedidos) == baixadas + 1                                           # só a foto nova
+    o = {"os": "15001", "tarefas": [{"pelo_app": True, "qualidade": 90}]}
+    assert prefiltro.classificar(o, f, "2026-10-20T10:00:00Z", prefiltro.parametros({}))["coluna"] == "nao_ok"
+
+
+def test_a_conferida_e_relida_uma_vez_por_dia_sem_baixar_de_novo(fundo, monkeypatch):
+    fx = _usar({"15001": [_anexo("15001", 1)]})
+    t0 = _epoch("2026-10-25T12:00:00")                    # já depois da janela da OS (fim em 20/10)
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: t0)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: t0 + 23 * 3600)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(fx.pedidos) == 1
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: t0 + 25 * 3600)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(fx.pedidos) == 2 and len(fundo["s3"].pedidos) == 1
+
+
+def test_a_os_nova_vem_antes_da_relida(fundo, monkeypatch):
+    fundo["app"].config["NEXUS_PREFILTRO_POR_VOLTA"] = "1"
+    fx = _usar({"15001": [_anexo("15001", 1)], "15002": [_anexo("15002", 2)]})
+    t0 = _epoch("2026-10-25T12:00:00")
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: t0)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: t0 + 25 * 3600)      # a 15001 venceu o dia
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001), _tarefa(15002)])
+    assert fx.pedidos[-1].startswith("work_orders_attachments?folio=15002")
+
+
+def test_foto_que_nao_abre_nao_prende_a_os(fundo):
+    """Upload cortado ou arquivo que não é imagem: a foto fica sem hash ("não abriu") e a OS ganha os fatos; antes ela
+    ficava em "Ainda conferindo" para sempre, relendo tudo a cada volta."""
+    fx = _usar({"15001": [_anexo("15001", 1), _anexo("15001", 2, n=1)]})
+    fundo["s3"].lixo.add(_anexo("15001", 2, n=1)["value"])
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    f = prefiltro_fundo.fatos(15001)
+    assert f is not None and [a["hash"] is None for a in f["anexos"]] == [False, True]
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(fx.pedidos) == 1
+
+
+def test_download_que_falha_tenta_tres_vezes_e_espera(fundo):
+    fx = _usar({"15001": [_anexo("15001", 1)]})
+    fundo["s3"].falhar.add(_anexo("15001", 1)["value"])
+    for _ in range(4):
+        prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert prefiltro_fundo.fatos(15001) is None and len(fx.pedidos) == 3       # a 4ª volta espera
+    assert len(fundo["dormidas"]) == 3                                         # a pausa vale também depois do erro
+    assert prefiltro_fundo.estado()["falhas"] == 1
+
+
+def test_grava_no_disco_durante_a_volta(fundo, monkeypatch):
+    """Cada push na main reinicia o servidor: o que a volta já leu vai ao disco a cada 10 OS, não só no fim."""
+    gravadas = []
+    monkeypatch.setattr(prefiltro_fundo, "_gravar", lambda: gravadas.append(len(prefiltro_fundo._FATOS)))
+    _usar({str(15000 + i): [_anexo(str(15000 + i), i)] for i in range(25)})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15000 + i) for i in range(25)])
+    assert gravadas[:2] == [10, 20] and gravadas[-1] == 25
+
+
+def test_a_paginacao_para_quando_a_pagina_se_repete(fundo):
+    """Se o REST de anexos ignorar o `start`, a mesma página volta sempre: a leitura para, em vez de girar sem fim."""
+    class SemStart(FracttalAnexos):
+        def __call__(self, path):
+            self.pedidos.append(path)
+            return {"data": self.anexos["15001"][:100]}
+    fx = SemStart({"15001": [_anexo("15001", i % 7, n=i) for i in range(100)]})
+    fracttal.usar_fornecedor(fx)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(fx.pedidos) == 2 and len(prefiltro_fundo.fatos(15001)["anexos"]) == 100
+
+
+def test_o_mesmo_arquivo_listado_duas_vezes_nao_vira_par(fundo):
+    a = _anexo("15001", 1)
+    _usar({"15001": [a, dict(a)]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    f = prefiltro_fundo.fatos(15001)
+    assert len(f["anexos"]) == 1 and f["pares"] == []
+
+
+def test_fila_vazia_nao_apaga_os_fatos(fundo):
+    """Uma fila vazia é soluço do Fracttal (total 0): apagar tudo faria a fila seguinte reler ~2.000 OS."""
+    _usar({"15001": [_anexo("15001", 1)]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    prefiltro_fundo.conferir(fundo["app"], [])
+    assert prefiltro_fundo.fatos(15001) is not None
+
+
+def test_ligado_por_padrao_so_onde_o_campo_aquece():
+    """O PC (NEXUS_CAMPO_AQUECER=0) não lê as fotos sem pedir: a primeira visita lá começaria a passada de ~2.000 OS fora
+    do porteiro do servidor. O servidor (que aquece) lê; o NEXUS_PREFILTRO decide quando dito."""
+    assert prefiltro_fundo.ligado({}) is True
+    assert prefiltro_fundo.ligado({"NEXUS_CAMPO_AQUECER": "0"}) is False
+    assert prefiltro_fundo.ligado({"NEXUS_CAMPO_AQUECER": "0", "NEXUS_PREFILTRO": "1"}) is True
+    assert prefiltro_fundo.ligado({"NEXUS_PREFILTRO": "0"}) is False

@@ -371,6 +371,12 @@ logo depois de subir e as renova antes de vencer, lendo só o banco. No servidor
 Engenharia e o Quadro da equipe. `NEXUS_CAMPO_AQUECER=0` é só para o PC do Levi, para os dois não gastarem a cota do
 Fracttal em dobro.
 
+**As fotos da Aprovação de OS (05/11/2026): nada a fazer no servidor.** O quadro por fatos lê por trás os anexos de cada
+OS em verificação (1 pedido ao Fracttal por OS, no máximo 150 por volta, 2 s entre elas) e baixa as fotos do S3 (fora
+da cota). Sem `NEXUS_PREFILTRO`, a leitura segue o `NEXUS_CAMPO_AQUECER`: o servidor lê, o PC (com 0) não. A primeira
+passada, depois do deploy, é a fila inteira (~2.000 OS, ~5 GB baixados do S3 em ~2 h): melhor subir depois das 18h.
+Desligar numa máquina: `NEXUS_PREFILTRO=0`. Conferir: Campo · App → Aprovação de OS, "fotos conferidas de N OS".
+
 ## 7b. Servidor da PLATAFORMA (app.gridco.com.br): uma linha para ligar o Tempo real
 
 *Desde 09/10/2026 esta é só a RESERVA do Tempo real: com a porta única ligada (seção 7e) o Tempo real abre a tela da plataforma numa moldura. A `NEXUS_PLATAFORMA_URL` fica como está no servidor (`https://app.gridco.com.br`): é ela que faz esta ponte voltar se a chave sair, e a moldura usa o mesmo endereço.*

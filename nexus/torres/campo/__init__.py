@@ -1806,11 +1806,14 @@ def _quadro(oss) -> dict:
     q = {k: [] for k in ("pronta", "duvida", "nao_ok", "conferindo", "fora")}
     for o in oss:
         o["fora_motivo"] = prefiltro.fora_do_escopo(cruas.get(str(o.get("id_wo") or ""), []), cos)
+        f = None if o["fora_motivo"] else prefiltro_fundo.fatos(o.get("id_wo"))
+        # quando as fotos foram lidas: a OS é relida por trás (a foto anexada depois só aparece na releitura)
+        o["fotos_em"] = datetime.fromtimestamp(float(f["lido_em"]), _BRT).strftime("%d/%m %H:%M") if f else ""
         if o["fora_motivo"]:
             o["coluna"], o["avisos"] = "fora", []        # sem as regras (Levi, 04/11): só o motivo, e aprova pelo cartão
         else:
             fechado = max((str(t.get("fechado_app") or "") for t in o["tarefas"]), default="")
-            r = prefiltro.classificar(o, prefiltro_fundo.fatos(o.get("id_wo")), fechado, p)
+            r = prefiltro.classificar(o, f, fechado, p)
             o["coluna"], o["avisos"] = r["coluna"], r["avisos"]
         o["busca"] = _sem_acento(" ".join([str(o["os"]), o["usina_cad"], o["cliente_cad"], o["responsavel_cad"],
                                            *o["tecnicos"]]))

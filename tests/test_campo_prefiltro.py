@@ -192,8 +192,9 @@ def test_fechado_app_e_o_ultimo_fechamento_da_os():
     from nexus.campo import aprovacao, fracttal, leitura, tabelas
     so_servidor = _nota(15088, 71)
     dados = {"qualidadelog": [
-        dict(_nota(15102, 96), RowKey="q1", dev_ts="2026-10-20T12:00:00Z"),
-        dict(_nota(15102, 90), RowKey="q2", dev_ts="2026-10-21T08:30:00.000Z"),     # a última tarefa fechada da OS
+        dict(_nota(15102, 96), RowKey="q1", dev_ts="2026-10-20T12:00:00Z", server_ts="2026-10-20T12:00:00"),
+        dict(_nota(15102, 90), RowKey="q2", dev_ts="2026-10-21T08:30:00.000Z",       # a última tarefa fechada da OS
+             server_ts="2026-10-21T08:30:00"),                                       # (com sinal: chega na hora)
         so_servidor]}                                                               # sem a hora do celular
     tabelas.usar_fornecedor(lambda nome: TabelaFalsa(dados.setdefault(nome, [])))
     fracttal.usar_fornecedor(FracttalFalso([_os(15002, 33), _os(15088, 8), _os(15102, 4)]))
@@ -222,8 +223,8 @@ def test_sem_o_registro_do_app_a_hora_fica_vazia(monkeypatch):
 
 def test_cada_aviso_diz_o_tipo_e_a_repetida_traz_os_pares():
     """O cartão do quadro mostra a prova pelo tipo do aviso: as duas fotos da repetida lado a lado, com o número de cada."""
-    anexos = [{"id": f"a{i}", "anexada": _anexada(30 if i == 4 else 0)} for i in range(1, 5)]
-    o = _os(_tarefa(qualidade=60), _tarefa(pelo_app=False, qualidade=None))
+    anexos = [{"id": f"a{i}", "tarefa": "1", "anexada": _anexada(30 if i == 4 else 0)} for i in range(1, 5)]
+    o = _os(_tarefa(qualidade=60, id_wt=1), _tarefa(pelo_app=False, qualidade=None, id_wt=2))     # as fotos da tarefa do App
     r = prefiltro.classificar(o, _fatos(anexos, [("a1", "a3")]), FECHADO, P)
     assert [a["tipo"] for a in r["avisos"]] == ["tarde", "repetida", "fora_app", "app"]
     assert r["avisos"][1]["pares"] == [{"a": "a1", "b": "a3", "ra": "p01", "rb": "p03"}]
@@ -239,3 +240,39 @@ def test_as_variaveis_do_pre_filtro_chegam_ao_config():
            "NEXUS_PREFILTRO_DIF_PRINT": "3", "NEXUS_PREFILTRO_POR_VOLTA": "20", "NEXUS_PREFILTRO_PAUSA_S": "5"}
     cfg = carregar_config({k: "x" for k in OBRIGATORIAS} | pre)
     assert {k: cfg.get(k) for k in pre} == pre
+
+
+# ── a revisão final (05/11/2026) ────────────────────────────────────────────────────────────────────────────────────
+def test_foto_de_tarefa_fora_do_app_nao_e_julgada_pela_hora_do_app():
+    """OS mista: a tarefa fechada fora do App tem as fotos anexadas no Fracttal na hora dela; julgá-las pela hora do App
+    de outra tarefa dava Não OK falso. Só as fotos das tarefas do App (pelo id da tarefa) são julgadas."""
+    o = _os(_tarefa(id_wt=1), _tarefa(pelo_app=False, qualidade=None, id_wt=2))
+    fatos = _fatos([{"id": "a", "tarefa": "1", "anexada": _anexada(1)}, {"id": "b", "tarefa": "2", "anexada": _anexada(50)}])
+    r = prefiltro.classificar(o, fatos, FECHADO, P)
+    assert r["coluna"] == "duvida" and r["tarde"] == 0
+    fatos["anexos"].append({"id": "c", "tarefa": "1", "anexada": _anexada(50)})
+    assert prefiltro.classificar(o, fatos, FECHADO, P)["coluna"] == "nao_ok"
+
+
+def test_foto_que_nao_abriu_pede_o_olho():
+    """A foto que o Nexus não conseguiu abrir não foi conferida: a OS não vai para Pronta (nem para o lote) calada."""
+    fatos = _fatos([{"id": "a", "anexada": _anexada(1), "hash": None}, {"id": "b", "anexada": _anexada(1)}])
+    r = prefiltro.classificar(_os(_tarefa()), fatos, FECHADO, P)
+    assert r["coluna"] == "duvida"
+    assert {"tipo": "nao_abriu", "nivel": "alerta", "texto": "1 foto não abriu no Nexus: confira no card da OS",
+            "fotos": ["a"]} in r["avisos"]
+
+
+def test_fechamento_offline_vale_a_chegada_no_servidor(monkeypatch):
+    """Celular sem sinal: o fechamento (hora do celular) e as fotos chegam juntos dias depois; julgar pela hora do
+    celular dava "anexadas 3 dias depois" falso. Vale a maior entre a hora do celular e a da chegada no servidor."""
+    from datetime import datetime, timezone
+
+    from test_campo_regras_app import TabelaFalsa
+
+    from nexus.campo import aprovacao, regras_app
+    linhas = [{"PartitionKey": "q", "RowKey": "q1", "os": "15102", "dev_ts": "2026-10-20T12:00:00Z",
+               "server_ts": "2026-10-23T09:00:00"}]
+    monkeypatch.setattr(regras_app, "tabela_qlog", lambda: TabelaFalsa(linhas))
+    fim = prefiltro._quando(aprovacao._ultimo_fechamento_no_app()["15102"])
+    assert fim == datetime(2026, 10, 23, 9, tzinfo=timezone.utc)

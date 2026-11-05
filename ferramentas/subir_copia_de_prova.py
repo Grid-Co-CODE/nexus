@@ -94,6 +94,8 @@ def main() -> None:
     # gastaria a cota da empresa lendo (18/10/2026: a dos chamados lia desde 12/10 em toda cópia de prova)
     os.environ["NEXUS_CHAMADOS_PUBLICAR"] = "0"
     os.environ["NEXUS_OS_PUBLICAR"] = "0"
+    # a leitura das fotos da Aprovação de OS (05/11/2026): 1 pedido por OS ao Fracttal e as fotos pelo S3, ~2.000 OS
+    os.environ["NEXUS_PREFILTRO"] = "0"
     if args.plataforma is not None:
         # "" também vale: vence o .env (a moldura da porta única só abre na mesma origem; nexus/torres/moldura.py)
         os.environ["NEXUS_PLATAFORMA_URL"] = args.plataforma

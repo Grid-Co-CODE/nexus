@@ -1602,11 +1602,14 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     - **As colunas** (`nexus/campo/prefiltro.py`, `classificar`; medidas nas 30 OS de 26/10, relatório "Pré-filtro da
       Verificação: fatos primeiro"). **Não OK**: foto anexada mais de `NEXUS_PREFILTRO_HORAS_TARDE` (24) h depois do
       último fechamento da OS no App; pegou 4 devolvidas e nenhuma aprovada. A anexação é o `Last-Modified` do arquivo no
-      S3 (o REST de anexos não dá data); o fechamento, a maior hora do celular (`dev_ts`, senão `server_ts`) do
-      `qualidadelog` da OS (`fechado_app` na conta pronta; sem ela, a anexação não é julgada). **Em dúvida**: foto
-      repetida (dHash de 256 bits dos 75% de cima, SEM o carimbo do App, que muda a cada anexo; diferença até
-      `NEXUS_PREFILTRO_DIF` 12; captura de tela, sem "GPS " na descrição, só até `NEXUS_PREFILTRO_DIF_PRINT` 4, porque
-      telas parecidas enganam) ou tarefa fechada fora do App. **Pronta**: nenhum fato. A OS fica na pior coluna; um fato
+      S3 (o REST de anexos não dá data); o fechamento, em cada linha do `qualidadelog` da OS, a maior entre a hora do
+      celular (`dev_ts`) e a da chegada no servidor (`server_ts`), e a última das linhas (`fechado_app` na conta pronta;
+      sem ela, a anexação não é julgada). A chegada conta porque o celular sem sinal sobe o fechamento e as fotos juntos
+      dias depois (era Não OK falso). Só as fotos das tarefas do App são julgadas, pelo id da tarefa: na OS mista, a tarefa
+      fechada fora do App tem as fotos anexadas na hora dela. **Em dúvida**: foto repetida (dHash de 256 bits dos 75% de
+      cima, SEM o carimbo do App, que muda a cada anexo; diferença até `NEXUS_PREFILTRO_DIF` 12; captura de tela, sem
+      "GPS " na descrição, só até `NEXUS_PREFILTRO_DIF_PRINT` 4, porque telas parecidas enganam), tarefa fechada fora do
+      App ou foto que não abriu no Nexus (upload cortado). **Pronta**: nenhum fato. A OS fica na pior coluna; um fato
       com fotos ainda por ler já a põe na coluna pior, com "Faltam fotos por ler"; sem fato e sem as fotos lidas, ela
       fica em **Ainda conferindo** (abaixo do quadro: aprova pelo cartão, não entra no lote). A regra do App de antes
       (nota abaixo de 80, já devolvida, foto divergente, ronda; `aprovacao.motivos`) virou só aviso, sem mudar a coluna.
@@ -1619,24 +1622,39 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       no boot com a fila do disco (`_preparar`), uma thread `nexus-prefiltro` declarada de fundo no porteiro confere as
       OS do escopo sem fatos (ou cujas tarefas mudaram), a mais nova primeiro: UM GET de anexos por OS no Fracttal
       (`work_orders_attachments?folio=`, 100 por página) e as imagens pelo S3, fora da cota de 200/min; no máximo
-      `NEXUS_PREFILTRO_POR_VOLTA` (150) OS por volta e `NEXUS_PREFILTRO_PAUSA_S` (2) s entre elas; o 429 para a volta e
-      guarda o que leu. Foto que não baixou deixa a OS sem fatos (meia leitura nunca vira Pronta). Fica o hash, a hora de
-      anexação e o campo, nunca os bytes; a miniatura de 240 px só das repetidas (`dados/campo/prefiltro_fotos/<id>.jpg`,
-      servida por `/t/campo/aprovacao/foto/<id>` com login e cópia privada). Memória e `dados/campo/prefiltro.json.gz`
-      (a volta carrega o disco antes de ler: sem isso cada deploy relia tudo); a OS que sai da fila sai dali com as
-      miniaturas. `NEXUS_PREFILTRO=0` desliga o laço. **A visita só lê memória** (nem Fracttal, nem banco, nem S3).
+      `NEXUS_PREFILTRO_POR_VOLTA` (150) OS por volta e `NEXUS_PREFILTRO_PAUSA_S` (2) s entre elas (também depois de um
+      erro); o 429 para a volta e guarda o que leu. **A OS conferida é relida** (revisão de 05/11/2026): ela é lida
+      minutos depois de entrar na verificação, e a foto anexada dias depois só existe depois; relê uma vez quando a janela
+      de 24 h desde o fim no Fracttal fecha e, depois, uma vez por dia enquanto espera, baixando só as fotos novas (o id é
+      o caminho no S3). As OS novas passam na frente das relidas. Foto que não baixou deixa a OS sem fatos (meia leitura
+      nunca vira Pronta); três falhas seguidas e ela espera 6 h. Foto que baixou e não abre fica "não abriu", sem hash.
+      Fica o hash, a hora de anexação e o campo, nunca os bytes; a miniatura de 240 px só das repetidas
+      (`dados/campo/prefiltro_fotos/<id>.jpg`, servida por `/t/campo/aprovacao/foto/<id>` com login e cópia privada).
+      Memória e `dados/campo/prefiltro.json.gz`, gravada a cada 10 OS (cada push reinicia o servidor); a volta carrega o
+      disco antes de ler, a OS que sai da fila sai dali com as miniaturas e a fila vazia (soluço) não apaga nada. Medido
+      nas 476 fotos da medição: 10 ms de CPU e 144 KB por foto, 16 fotos por OS. **Onde roda** (`prefiltro_fundo.ligado`):
+      `NEXUS_PREFILTRO` decide quando dito (0 desliga); sem ele, segue o `NEXUS_CAMPO_AQUECER` (o servidor lê, o PC não;
+      a cópia de prova põe 0). **A visita só lê memória** (nem Fracttal, nem banco, nem S3).
     - **O cartão**, nesta ordem: a OS (abre o card do OS Creator, `NexusOsCard.abrir`, status "Em Verificação"), os
       dias esperando, a UFV, o cliente e as tarefas; o **score** (a nota do App, a pior das tarefas; "Fora do App" sem
       ela); os **avisos com a prova** (as duas fotos repetidas lado a lado; "6 fotos anexadas 2 dias depois do
       fechamento no App"); e logo depois o **Aprovar** = o Concluir do OS Creator (`POST /os/api/os/<id>/concluir` com
       `{folio}`, a rota do Painel do responsável e do OS Creator Web: status 3 + recalculate + reconferência da data de
       fim), com o login do Fracttal de quem clica; IRREVERSÍVEL, pede confirmação; o 401 vira "Entre no OS Creator com a
-      sua conta do Fracttal". Aprovada, a conferência (`POST /t/campo/aprovacao/<id>/conferir`: só sai da fila guardada o
-      que o Fracttal já não tem em verificação, 1 pedido de leitura; ninguém esconde OS da fila) tira o cartão.
-    - **O lote**: caixa de marcar só em Pronta e Em dúvida, "Selecionar todas" por coluna e "Aprovar as marcadas (N)",
-      com a confirmação que diz quantas e de que coluna; uma depois da outra, com o andamento; para no 1º 401 (sem a
-      sessão do Fracttal, todas falhariam igual), e o outro erro fica no cartão e o lote segue. O quadro é montado na
-      visita e não muda sozinho na frente da pessoa.
+      sua conta do Fracttal". Aprovada só com `ok: true` na resposta: sem a sessão do Nexus, o portão dá 302 para /entrar
+      e o fetch recebe 200 em HTML, que NÃO é aprovada ("A sua sessão do Nexus acabou"). A conferência
+      (`POST /t/campo/aprovacao/<id>/conferir`: só sai da fila guardada o que o Fracttal já não tem em verificação, 1
+      pedido de leitura; ninguém esconde OS da fila) tira o cartão, e a cópia da fila em disco é regravada uma vez por vez
+      (`aprovacao._regravar`: a que chega durante outra só marca que falta). O cartão diz quando as fotos foram
+      conferidas, e o de "Ainda conferindo" diz "Fotos ainda não conferidas".
+    - **O lote**: caixa de marcar só em Pronta e Em dúvida (não na OS com "Faltam fotos por ler", que pode virar Não OK),
+      "Selecionar todas" por coluna e "Aprovar as marcadas (N)", com a confirmação que diz quantas e de que coluna. Uma OS
+      a cada 4 s (`PAUSA_LOTE_MS`: cada aprovação custa 5 a 7 pedidos ao Fracttal), com o andamento; para no que se
+      repetiria em todas (401 do Fracttal, 403, 429 e 5xx, a sessão do Nexus e 3 erros seguidos), e o outro erro fica no
+      cartão e o lote segue. O quadro é montado na visita e não muda sozinho na frente da pessoa.
+    - **Pendente** (05/11/2026): o veredito no banco (o fato `fato_prefiltro_os`, a medida da sombra contra a decisão do
+      supervisor; a Task 6 do plano); o Aprovar provado numa OS de TESTE - PA lendo o status de volta; e, para as capturas
+      de tela do mesmo layout (que só mudam os números), um hash maior (32×32), a medir nas 30 OS antes de mudar a regra.
     - **Filtros**: o Responsável O&M da usina vai ao servidor (`responsavel=`, "*" = todos; quem entrou pelo Fracttal e é
       responsável já vem nele, `_responsavel_logado_pelo_cadastro`; o responsável e o cliente vêm do cadastro pela usina
       do Fracttal, `visao.usinas_do_fracttal`); cliente e busca (OS, UFV, técnico, sem acento) filtram na página e
