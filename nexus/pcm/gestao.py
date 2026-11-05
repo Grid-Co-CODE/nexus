@@ -236,7 +236,7 @@ _DIA = re.compile(r"\d{4}-\d{2}-\d{2}")
 class Filtros:
     """Os filtros de cima, já limpos: cada lista com as escolhas (na grafia de quem escolheu; a conta compara sem
     maiúscula), a OS e a Solicitação por "contém", o período (AAAA-MM-DD) com o "considerar" e o Só atrasadas.
-    Imutável: entra inteiro na chave da cópia guardada da tela (`telas._G_CACHE`)."""
+    Imutável; entra na chave da cópia guardada da tela (`telas._G_CACHE`) pelo `chave`, normalizado."""
     cliente: tuple = ()
     usina: tuple = ()
     cluster: tuple = ()
@@ -295,6 +295,42 @@ def filtros(args) -> Filtros:
     return Filtros(**{n: _escolhas_da_url(args, n) for n, *_ in LISTAS}, os=_um(args, "os"), ss=_um(args, "ss"),
                    pini=_dia_da_url(args, "pini"), pfim=_dia_da_url(args, "pfim"),
                    pmodo=pmodo if pmodo in dict(PMODOS) else "qq", atr=_um(args, "atr") == "1")
+
+
+def chave(f: Filtros) -> tuple:
+    """O filtro como entra na chave da cópia guardada (`telas._G_CACHE`): sem maiúscula, as escolhas de cada lista em
+    ordem e o "considerar" sem datas no padrão (sem datas ele não filtra nada). Duas URLs que filtram igual dividem uma
+    entrada só (revisão da parte A, 04/11/2026: a memória do servidor é curta). Toda conta guardada compara sem
+    maiúscula e não depende da ordem das escolhas; a única marca da grafia é o escolhido sem tarefa no fim da lista, na
+    grafia de quem o escolheu primeiro."""
+    return (*(tuple(sorted({v.lower() for v in getattr(f, n)})) for n, *_ in LISTAS), f.os.lower(), f.ss.lower(),
+            f.pini, f.pfim, f.pmodo if (f.pini or f.pfim) else "qq", f.atr)
+
+
+# Os escolhidos em etiquetas na barra fechada (Levi, 04/11/2026: os filtros "suspenso e expandível"), cada um com o ×
+# que tira só ele: (rótulo, o valor como a tela mostra, o que muda na URL para tirá-lo)
+def fichas(f: Filtros, escolhas: dict | None = None) -> list[dict]:
+    """As etiquetas dos filtros escolhidos, na ordem da barra: cada valor de cada lista (na grafia da lista, a mais
+    frequente), a OS, a Solicitação, o período com o "considerar" e o Só atrasadas. `tirar` vai no `url(**tirar)` da
+    tela: a lista sem aquele valor (as outras escolhas ficam), o campo vazio, o período inteiro."""
+    out = []
+    for nome, _campo, rot, _vazio in LISTAS:
+        grafia = {v.lower(): v for v in (escolhas or {}).get(nome) or ()}
+        vs = getattr(f, nome)
+        for v in vs:
+            resto = [x for x in vs if x != v]
+            out.append({"rot": rot, "valor": grafia.get(v.lower(), v), "tirar": {nome: resto or None}})
+    for nome, rot in (("os", "OS"), ("ss", "Solicitação")):
+        if getattr(f, nome):
+            out.append({"rot": rot, "valor": getattr(f, nome), "tirar": {nome: None}})
+    if f.pini or f.pfim:
+        faixa = (f"{data_br(f.pini)} a {data_br(f.pfim)}" if f.pini and f.pfim else
+                 f"desde {data_br(f.pini)}" if f.pini else f"até {data_br(f.pfim)}")
+        modo = "" if f.pmodo == "qq" else f" · {dict(PMODOS)[f.pmodo].lower()}"
+        out.append({"rot": "Período", "valor": faixa + modo, "tirar": {"pini": None, "pfim": None, "pmodo": None}})
+    if f.atr:
+        out.append({"rot": "Só atrasadas", "valor": "", "tirar": {"atr": None}})
+    return out
 
 
 # A ordem do `localeCompare(…, 'pt-BR')` do painel (o ICU do navegador), nas listas e nas árvores: o espaço e a
@@ -1041,6 +1077,23 @@ def aba(todas, dias_alerta: int = 10, so_atrasadas: bool = False) -> dict:
                                   "clientes": arvore(arr, dias_alerta, linhas=aberta)}},
             "so_atrasadas": ([linha_atrasada(t, dias_alerta) for t in sorted(atr, key=lambda t: -(t.get("dias") or 0))]
                              if so_atrasadas else None)}
+
+
+# As mensagens da aba (renderGestao e gpFlatHTML do painel), as mesmas na tela e na prova: o texto que a tela mostra é
+# o que a prova confere contra o painel (revisão da parte A: a prova tinha a sua cópia, e a tela podia mudar sozinha)
+MSG_SEM_TAREFA = "Nenhuma tarefa para os filtros selecionados."
+MSG_SO_NF = "Sem tarefas na visão principal (só há não finalizadas no período)."
+MSG_SEM_ATRASADA = "Nenhuma tarefa atrasada nos filtros atuais."      # o painel abre com um emoji; aqui, sem
+PAGINA_ATRASADAS = 100      # o Só atrasadas vem em partes: sem filtro são ~2,2 mil linhas, que não vão de uma vez
+
+
+def dica_finalizadas(numeros: dict) -> str:
+    """A dica das Finalizadas no alto (o title do `gp-kpi-fin` do painel): o % do que está visível e, quando há, as "Não
+    Finalizadas no Período" que ficam fora da conta."""
+    dica = f"Estado da Tarefa = Finalizada · {numeros['pct_finalizadas']}% do que está visível"
+    if numeros.get("nf"):
+        dica += f' (as {numeros["nf"]} de "Não Finalizadas no Período" ficam fora desta conta)'
+    return dica
 
 
 def atualizado(d: dict) -> str:

@@ -8,6 +8,7 @@ repositório do PCM, pelo mesmo caminho do PC do PCM (`publicar.py`): administra
 Quadro da semana (09/10/2026): o quadro da aba Semana do painel do PCM e a reprogramação de tarefas (`quadro.py`).
 """
 import json
+import logging
 import re
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -18,13 +19,14 @@ from markupsafe import Markup, escape
 from flask import abort, current_app, jsonify, redirect, render_template, request, session
 
 from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, motivos as M, motivos_app as MA
-from . import observacoes as O
+from . import gestao_confiab as GC, observacoes as O
 from ..cadastro import setor_ids as SID
 from . import atribuicoes as AT, tecnicos_usina as TU
 from . import nota_os as NO, publicar as PB, quadro as Q, semana as S
 from ..auth import setor_telas as ST
 from ..prefixo import na_raiz
 
+log = logging.getLogger("nexus.pcm")
 POR_PAGINA = 150
 SETOR_PCM = SID.PCM
 # quem marca e tira o motivo de uma tarefa (16/10/2026, Levi: "PCM no Nexus" e "Supervisores no Nexus"), pelo setor_id; o
@@ -390,6 +392,16 @@ def registrar_pcm(bp) -> None:
             if ctx is None:
                 return render_template("pcm/_gestao_arvore.html", erro=True), 503
             return render_template("pcm/_gestao_arvore.html", **ctx)
+        # as partes seguintes do Só atrasadas (04/11/2026): o mesmo endereço com ap=<de onde seguir>
+        if request.args.get("ap") is not None:
+            ctx = _ctx_atrasadas(current_app.config, request.args)
+            if ctx is None:
+                return render_template("pcm/_gestao_arvore.html", erro=True), 503
+            return render_template("pcm/_gestao_atrasadas.html", parte=True, **ctx)
+        # a Confiabilidade por ativo e o MTTR por equipe cluster (parte C, 04/11/2026), pedidos quando o bloco abre:
+        # cf=conf | mttr | usina (com cc e cu)
+        if request.args.get("cf") is not None:
+            return _confiab(request.args)
         return render_template("pcm/gestao.html", **_ctx_gestao(current_app.config, request.args))
 
     @bp.route("/quadro")
@@ -779,11 +791,12 @@ def _tecnicos_decidir(cfg, f) -> str:
 
 # ── Gestão PCM: a aba Gestão PCM do painel (nexus/pcm/gestao.py) ────────────────────────────────────────────────
 # As 32 mil tarefas do gestao_pcm.json não precisam ser revarridas a cada clique: o escopo, o recorte dos filtros de
-# cima, as árvores e a base atômica ficam guardados pela versão do arquivo (dataHash) e pelos filtros (o `G.Filtros`
-# inteiro na chave); a Gerencial decifrada, pela versão do mpas.json. A rota da tabela de um tipo usa a mesma cópia.
+# cima, as árvores e a base atômica ficam guardados pela versão do arquivo (dataHash) e pelos filtros (`G.chave`: o
+# filtro sem maiúscula e com as escolhas em ordem, então duas URLs que filtram igual dividem a entrada); a Gerencial
+# decifrada, pela versão do mpas.json. A rota da tabela de um tipo e as partes do Só atrasadas usam a mesma cópia.
 _G_CACHE: dict = {}
-# passou disso, limpa tudo: cada combinação de filtros guarda ~6 entradas (o recorte, a aba, as tarefas, a base e a
-# Fila do Plano); eram 40 quando cada uma guardava 3 (até 04/11/2026)
+# passou disso, limpa tudo (menos a versão): cada combinação de filtros guarda 5 entradas (o recorte, as tarefas do
+# Plano, a base, a Fila e a aba); eram 4, e o teto era 40, até 04/11/2026
 _G_TETO = 80
 
 
@@ -793,7 +806,12 @@ def _guardado(chave, fazer):
     if v is None:
         v = fazer()
         if len(_G_CACHE) > _G_TETO:
+            # a versão fica (revisão da parte A, 04/11/2026): sem ela, o pedido seguinte via "outra versão" do arquivo e
+            # limpava tudo de novo, inclusive o que este acabou de montar
+            versao = _G_CACHE.get("versao")
             _G_CACHE.clear()
+            if versao is not None:
+                _G_CACHE["versao"] = versao
         _G_CACHE[chave] = v
     return v
 
@@ -815,7 +833,7 @@ def _gestao_lida(cfg):
 
 def _recorte(d, versao, f):
     escopo = _guardado(("escopo", versao), lambda: G.escopo(d.get("tarefas")))
-    return _guardado(("recorte", versao, f), lambda: G.recortar(escopo, f))
+    return _guardado(("recorte", versao, G.chave(f)), lambda: G.recortar(escopo, f))
 
 
 def _do_plano(d, versao, f, o):
@@ -823,7 +841,7 @@ def _do_plano(d, versao, f, o):
     o Tipo de cima (preventivas.js): as mesmas para a tela e para o painel lateral, então o número bate."""
     rec = _recorte(d, versao, f)
     local = G.tipo_local(o, f)
-    return _guardado(("plano", versao, f, local), lambda: G.tarefas_do_plano(rec, f, local)), local
+    return _guardado(("plano", versao, G.chave(f), local), lambda: G.tarefas_do_plano(rec, f, local)), local
 
 
 def _dias_alerta(d) -> int:
@@ -835,7 +853,7 @@ def _dias_alerta(d) -> int:
 
 def _aba(d, versao, f):
     rec = _recorte(d, versao, f)
-    return _guardado(("aba", versao, f), lambda: G.aba(rec.todas, _dias_alerta(d), f.atr))
+    return _guardado(("aba", versao, G.chave(f)), lambda: G.aba(rec.todas, _dias_alerta(d), f.atr))
 
 
 def _pares(args) -> dict:
@@ -905,6 +923,85 @@ def _ctx_arvore(cfg, args) -> dict | None:
     return {"linhas": linhas, "arv": arv, "cliente": no[0], "usina": no[1], "tipo": no[2]}
 
 
+def _parte_atrasadas(linhas: list, ini: int) -> dict:
+    """Uma parte do Só atrasadas: sem filtro são ~2,2 mil linhas, e a página leva só a primeira (100); o resto vem pela
+    rota `ap`, da mesma cópia."""
+    fim = ini + G.PAGINA_ATRASADAS
+    return {"linhas": linhas[ini:fim], "proximo": min(fim, len(linhas)), "restam": max(0, len(linhas) - fim),
+            "total": len(linhas)}
+
+
+def _ctx_atrasadas(cfg, args) -> dict | None:
+    """As partes seguintes do Só atrasadas (`ap` = de onde seguir), com os filtros de cima. Sem o Só atrasadas, 404;
+    None = o arquivo não está legível."""
+    f = G.filtros(args)
+    if not f.atr:
+        abort(404)
+    try:
+        ini = max(0, int(str(args.get("ap") or "0")[:9]))
+    except ValueError:
+        abort(404)
+    _leitura, d, versao = _gestao_lida(cfg)
+    if d is None:
+        return None
+    return _parte_atrasadas(_aba(d, versao, f)["so_atrasadas"] or [], ini)
+
+
+def _confiab(args):
+    """A Confiabilidade por ativo e o Tempo médio de reparo por Equipe Cluster (parte C, 04/11/2026), com a conta da
+    Engenharia (`gestao_confiab`): a página da Gestão não espera por ela, o bloco pede quando abre. Sem a leitura das OS de
+    falha completa, o pedaço diz que ela não terminou (200, sem número). cf ou usina que não existe = 404."""
+    cf = args.get("cf")
+    if cf not in ("conf", "mttr", "usina"):
+        abort(404)
+    try:
+        c = GC.copia()
+    except Exception as e:      # noqa: BLE001 — a conta da Engenharia falhou: o bloco diz, e a Gestão segue
+        log.warning("gestão PCM: a confiabilidade não veio (%s: %s)", type(e).__name__, str(e)[:160])
+        return render_template("pcm/_gestao_confiab.html", cf=cf, falhou=True), 503
+    if c is None:
+        return render_template("pcm/_gestao_confiab.html", cf=cf, incompleta=GC.INCOMPLETA)
+    comum = {"horas": GC.horas, "pct": GC.pct, "inteiro": GC.inteiro, "classe_disp": GC.classe_disp,
+             "classe_mttr": GC.classe_mttr, "quando": c["quando"]}
+    if cf == "usina":
+        t = GC.tabela_da_usina(c, str(args.get("cc") or "")[:200], str(args.get("cu") or "")[:200])
+        if t is None:
+            abort(404)
+        return render_template("pcm/_gestao_confiab_usina.html", t=t, **comum)
+    f = G.filtros(args)
+    if cf == "conf":
+        return render_template("pcm/_gestao_confiab.html", cf=cf, clientes=GC.arvore(c, f), **comum)
+    return render_template("pcm/_gestao_confiab.html", cf=cf, clusters=GC.clusters(c, f), **comum)
+
+
+# os parâmetros dos pedaços pedidos por fetch (a tabela de um tipo, o painel da célula, as partes do Só atrasadas e a
+# confiabilidade): nunca vão escondidos nos formulários da página
+_DOS_PEDACOS = ("pu", "pc", "arv", "ac", "au", "at", "ap", "cf", "cc", "cu")
+
+
+def _ms(f, escolhas: dict) -> list[dict]:
+    """As 7 listas de várias escolhas da barra (a ordem do painel): as opções em cascata, as marcadas e o rótulo do botão
+    ("Todos", o valor escolhido ou "N selecionados", como o `gpMsLabel` do painel)."""
+    out = []
+    for nome, _campo, rot, vazio in G.LISTAS:
+        ops, sel = escolhas.get(nome) or [], getattr(f, nome)
+        grafia = {v.lower(): v for v in ops}
+        marcadas = [grafia.get(v.lower(), v) for v in sel]
+        out.append({"nome": nome, "rot": rot, "vazio": vazio, "opcoes": ops, "marcadas": {v.lower() for v in sel},
+                    "rotulo": vazio if not sel else (marcadas[0] if len(sel) == 1 else f"{len(sel)} selecionados"),
+                    "titulo": ", ".join(marcadas)})
+    return out
+
+
+def _pode_ver(caminho: str) -> bool:
+    """O link para outra tela só aparece para quem a abre (o portão do setor, Base → Acessos)."""
+    try:
+        a = ST.acesso()
+        return a["tudo"] or ST.pode(caminho, a["telas"])
+    except Exception:           # noqa: BLE001 — sem saber, mostra: o portão da outra tela decide
+        return True
+
+
 def _ctx_gestao(cfg, args) -> dict:
     leitura, d, versao = _gestao_lida(cfg)
     ctx = {"fonte_erro": leitura.erro, "fonte_velha": leitura.velha, "fonte_gerada": _quando((d or {}).get("geradoEm")),
@@ -918,13 +1015,13 @@ def _ctx_gestao(cfg, args) -> dict:
     # as opções de cada lista com os OUTROS filtros aplicados (09/10/2026: "os filtros tem que se auto filtrar")
     rec = _recorte(d, versao, f)
     tarefas, local = _do_plano(d, versao, f, o)
-    base = _guardado(("base", versao, f, local, *meses), lambda: G.base(tarefas, meses))
+    base = _guardado(("base", versao, G.chave(f), local, *meses), lambda: G.base(tarefas, meses))
     mp, ger_erro = _gerencial(cfg)
     # a Fila inteira (antes dos filtros do bloco): é dela que saem o par de números do topo e os KPIs. Sem a
     # Gerencial, é o lado do Fracttal, e o par mostra as atrasadas pela Data Programada (o painel só mostra o cadeado)
     # o atraso conta do meio-dia (regra do painel): a cópia guardada vale por meio dia, não pelo dia inteiro
     ver_ger, meio_dia = (mp or {}).get("geradoEm"), G.agora().hour >= 12
-    fila = _guardado(("fila", versao, ver_ger, mp is not None, h, meio_dia, f, local),
+    fila = _guardado(("fila", versao, ver_ger, mp is not None, h, meio_dia, G.chave(f), local),
                      lambda: G.fila_universo(tarefas, mp, f, h))
     a = _aba(d, versao, f)
     pares = _pares(args)
@@ -950,7 +1047,18 @@ def _ctx_gestao(cfg, args) -> dict:
                escolhidos={n: [v.lower() for v in getattr(f, n)] for n, *_ in G.LISTAS}, tem_topo=f.ativos(),
                limpar={n: None for n in (*G.PARAMS_FILTRO, "q")}, numeros=a["numeros"],
                arvores=a["arvores"], so_atrasadas=a["so_atrasadas"], dias_alerta=_dias_alerta(d),
-               atualizado=G.atualizado(d))
+               atualizado=G.atualizado(d),
+               # a tela (parte B, 04/11/2026): a dica das Finalizadas e as mensagens (as mesmas que a prova confere),
+               # a barra de filtros (as listas, os escolhidos em etiquetas, o resto da URL escondido), a 1ª parte do Só
+               # atrasadas e a linha de baixo dos blocos da confiabilidade
+               dica_finalizadas=G.dica_finalizadas(a["numeros"]), msg_sem_tarefa=G.MSG_SEM_TAREFA,
+               msg_so_nf=G.MSG_SO_NF, msg_sem_atrasada=G.MSG_SEM_ATRASADA, ms=_ms(f, rec.escolhas),
+               fichas=G.fichas(f, rec.escolhas),
+               ocultos=[(k, v) for k, vs in pares.items() for v in vs if k not in G.PARAMS_FILTRO and k not in _DOS_PEDACOS],
+               ocultos_busca=[(k, v) for k, vs in pares.items() for v in vs if k != "q" and k not in _DOS_PEDACOS],
+               atrasadas=_parte_atrasadas(a["so_atrasadas"], 0) if a["so_atrasadas"] is not None else None,
+               pode_exec=_pode_ver("/t/relatorios/pcm-executivo"), base_falhas=GC.BASE,
+               nao_se_aplicam=GC.nao_se_aplicam(f))
     if o.modo == "plano":
         ctx.update(mx=G.plano(base, o, meses, G.crit_obs(mp) if mp is not None else None), rot_col=G.rot_col,
                    faixa=G.faixa, tom=G.tom)

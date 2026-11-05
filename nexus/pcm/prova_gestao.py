@@ -444,10 +444,9 @@ def comparar_aba(painel: dict, caso: dict, esc: list[dict], gestao: dict) -> tup
     for rot, chave, valor in (("Visíveis", "vis", "visiveis"), ("Finalizadas", "fin", "finalizadas"),
                               ("Em aberto", "ab", "em_aberto"), ("Atrasadas", "atr", "atrasadas")):
         ver(rot, k[chave], str(num[valor]))
-    dica = f"Estado da Tarefa = Finalizada · {num['pct_finalizadas']}% do que está visível"
-    if num["nf"]:
-        dica += f' (as {num["nf"]} de "Não Finalizadas no Período" ficam fora desta conta)'
-    ver("a dica das Finalizadas", k["finTitle"], dica)
+    # a dica e as mensagens pelas MESMAS peças que a tela usa (gestao.dica_finalizadas e as MSG_*): o que a tela mostra
+    # é o que se confere contra o painel
+    ver("a dica das Finalizadas", k["finTitle"], G.dica_finalizadas(num))
     for nome, chave in _LISTA_DO_PAINEL.items():
         esperado, baixa = list(painel["opcoes"][chave]), {v.lower() for v in painel["opcoes"][chave]}
         for v in getattr(f, nome):                       # o escolhido fica na lista mesmo sem tarefa (regra do Nexus)
@@ -458,8 +457,7 @@ def comparar_aba(painel: dict, caso: dict, esc: list[dict], gestao: dict) -> tup
     if f.atr:
         pl, rows = painel["plana"], a["so_atrasadas"]
         # diferença de propósito: o painel abre a mensagem com um emoji (🎉); o Nexus não usa emoji na interface
-        ver("Só atrasadas vazia", pl["msg"] and re.sub(r"^\W+", "", pl["msg"]),
-            "Nenhuma tarefa atrasada nos filtros atuais." if not rows else None)
+        ver("Só atrasadas vazia", pl["msg"] and re.sub(r"^\W+", "", pl["msg"]), G.MSG_SEM_ATRASADA if not rows else None)
         ver("Só atrasadas: linhas", len(pl["rows"]), len(rows))
         if rows:
             ver("Só atrasadas: contagem", pl["cnt"], str(len(rows)))
@@ -473,8 +471,7 @@ def comparar_aba(painel: dict, caso: dict, esc: list[dict], gestao: dict) -> tup
                 ver(f"Só atrasadas {i} {campo}", x[campo], y[campo], oculto=True)
         return n, dif
     arv, nx = painel["arvore"], a["arvores"]
-    ver("a mensagem", arv["msg"], "Nenhuma tarefa para os filtros selecionados." if not num["todas"] else (
-        "Sem tarefas na visão principal (só há não finalizadas no período)." if not nx["todas"]["n"] else None))
+    ver("a mensagem", arv["msg"], G.MSG_SEM_TAREFA if not num["todas"] else (G.MSG_SO_NF if not nx["todas"]["n"] else None))
     ver("Não Finalizadas no Período", arv["nfN"], str(nx["nf"]["n"]) if nx["nf"]["n"] else None)
     if nx["todas"]["clientes"]:
         ver("a árvore abre sozinha", arv["aberta"], nx["todas"]["aberta"])

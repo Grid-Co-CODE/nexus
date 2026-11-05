@@ -1,0 +1,23 @@
+{# A tabela de UMA usina na "Confiabilidade por ativo" da Gestão PCM (Levi, 04/11/2026; o cfUsiHTML do painel do PCM):
+   Ativo · MTBF · MTTR · Disp. inerente · Falhas, os números da Engenharia; o ativo abre as OS dele (OS · Tarefa · Tipo ·
+   Início · Fim · Horas), a OS com o card do Nexus. Vem por fetch (gestao?cf=usina&cc=<cliente>&cu=<usina>) quando a usina
+   abre. No celular, cartões (`pg-cartoes`). #}
+<div class="pg-rolo pga-rolo"><table class="pg-tbl pgc-tbl pg-cartoes">
+  <thead><tr><th>Ativo</th><th>MTBF (h)</th><th>MTTR (h)</th><th>Disp. inerente</th><th>Falhas</th></tr></thead>
+  <tbody>
+  {% for a in t.ativos %}{% set id = t.id ~ '-' ~ loop.index %}
+    <tr class="pgc-a"><td class="pgc-ativo" data-r="Ativo"><button type="button" class="pgc-a-bt" aria-expanded="false" aria-controls="pgc-os-{{ id }}"><i class="ph ph-caret-right pgc-chev" aria-hidden="true"></i><span>{{ a.nome }}</span> <span class="pgc-mudo">{{ a.cod }}</span></button></td>
+      <td data-r="MTBF (h)">{{ horas(a.mtbf) }}</td><td data-r="MTTR (h)">{{ horas(a.mttr) }}</td>
+      <td data-r="Disp. inerente"><span class="pg-t--{{ classe_disp(a.disp) }}">{{ pct(a.disp) }}</span></td><td data-r="Falhas">{{ a.n }}</td></tr>
+    <tr class="pgc-os" id="pgc-os-{{ id }}" hidden><td class="pgc-os-td" colspan="5">
+      <table class="pg-tbl pgc-os-tbl pg-cartoes">
+        <thead><tr><th>OS</th><th>Tarefa</th><th>Tipo</th><th>Início</th><th>Fim</th><th title="do incidente ao fim: até 1 dia, as horas corridas; acima, os dias x 12 (a conta do MTTR)">Horas</th></tr></thead>
+        <tbody>{% for o in a.os %}<tr>
+          <td class="pg-dt" data-r="OS">{% if o.wid %}<button type="button" class="pgp-os-n" data-wid="{{ o.wid }}" data-status="{{ o.status }}" data-folio="{{ o.os }}" title="Abrir o card da OS {{ o.os }}">{{ o.os }}</button>{% else %}{{ o.os }}{% endif %}
+            {%- if o.url %} <a class="pgp-fracttal" href="{{ o.url|na_raiz }}" target="_blank" rel="noopener" title="Abrir a OS {{ o.os }} no Fracttal" aria-label="Abrir a OS {{ o.os }} no Fracttal"><i class="ph ph-arrow-square-out" aria-hidden="true"></i></a>{% endif %}</td>
+          <td class="pg-obs" data-r="Tarefa" title="{{ o.tarefa }}">{{ o.tarefa }}</td><td data-r="Tipo">{{ o.tipo }}</td>
+          <td class="pg-dt" data-r="Início">{{ o.inicio }}</td><td class="pg-dt" data-r="Fim">{{ o.fim }}</td>
+          <td class="pg-dt" data-r="Horas">{{ o.horas }}</td></tr>{% else %}<tr><td colspan="6" class="pg-vazio">Sem OS.</td></tr>{% endfor %}</tbody>
+      </table></td></tr>
+  {% endfor %}
+  </tbody></table></div>

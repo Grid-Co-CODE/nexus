@@ -749,6 +749,224 @@ html.pgp-aberto{overflow:hidden}
 .pgp-fila:hover{text-decoration:underline}
 @media (max-width:560px){.pgp-corpo{padding:16px}.pgp-estado{min-width:0}.pgp-tarefas li{flex-wrap:wrap}}
 
+/* ── Gestão PCM, o resto da aba do painel (04/11/2026, Levi): os números do alto (pgn-), a barra dos filtros de cima
+   recolhível (pgf-), o bloco do Plano & Fila (pg-bloco), as árvores Cliente ▸ Usina ▸ Tipo (pga-), o Só atrasadas
+   (pgs-) e a confiabilidade com a conta da Engenharia (pgc-). A ESTRUTURA é a do painel; o visual, o do Nexus, só por
+   token nos dois temas (sem o emoji do painel: a severidade é cor e palavra). Abaixo de 640 px a barra empilha e as
+   tabelas viram cartões (`pg-cartoes`, o rótulo no data-r): nada rola de lado na página. */
+.pg-topo-dir .pgn{flex:0 1 auto}
+.pgn{display:grid;grid-template-columns:repeat(4,minmax(84px,auto));border:1px solid var(--linha);border-radius:var(--raio-md);
+  background:var(--superficie-2);overflow:hidden}
+.pgn-n{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:8px 16px;
+  border-left:1px solid var(--linha);color:var(--tinta);text-decoration:none}
+.pgn-n:first-child{border-left:0}
+.pgn-r{font:700 10px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.pgn-n b{font:600 22px/27px var(--font-sans);color:var(--tinta)}
+.pgn-n--ok b{color:var(--ok)}
+.pgn-n--crit b{color:var(--critico)}
+.pgn-n--bt{cursor:pointer}
+.pgn-n--bt:hover{background:var(--superficie-3)}
+.pgn-n--bt[aria-current]{background:var(--critico-suave);box-shadow:inset 0 -3px 0 var(--critico-cheio)}
+.pgn-n--bt:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+
+/* a barra dos filtros: fechada é uma linha (o botão, quantos valem e os escolhidos em etiquetas, cada uma com o ×) */
+.pgf{margin:2px 0 16px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie)}
+.pgf-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:8px 10px}
+.pgf-abre{display:inline-flex;align-items:center;gap:8px;flex:none;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-controle);background:var(--superficie-2);color:var(--tinta);font:600 13px/18px var(--font-sans);
+  padding:7px 12px;cursor:pointer}
+.pgf-abre:hover{background:var(--superficie-3)}
+.pgf-abre>i{font-size:15px;color:var(--mudo)}
+.pgf-quantos{font-weight:500;color:var(--mudo)}
+.pgf-quantos.on{color:var(--verde-texto)}
+.pgf-chev{transition:transform .15s}
+.pgf-abre[aria-expanded="true"] .pgf-chev{transform:rotate(180deg)}
+.pgf-fichas{display:flex;flex-wrap:wrap;gap:6px;min-width:0;margin:0;padding:0;list-style:none}
+.pgf-ficha{display:inline-flex;align-items:center;gap:2px;max-width:100%;border:1px solid var(--verde-a35);
+  border-radius:999px;background:var(--verde-suave);padding:1px 3px 1px 10px;font-size:12px;line-height:20px;color:var(--tinta)}
+.pgf-ficha-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pgf-ficha-t b{font-weight:700;color:var(--tinta-2)}
+.pgf-x{flex:none;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;color:var(--tinta-2);
+  text-decoration:none;font-size:13px}
+.pgf-x:hover{background:var(--superficie-3);color:var(--tinta)}
+.pgf-x:focus-visible{outline:2px solid var(--foco);outline-offset:0}
+/* aberta: as listas e os campos na ordem da barra do painel */
+.pg-filtros.pgf-corpo{display:block;margin:0;padding:12px;border-top:1px solid var(--linha)}
+.pgf-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;align-items:end}
+.pgf-grade select.gc-campo,.pgf-grade input.gc-campo{width:100%;box-sizing:border-box}
+.pgf-ms{position:relative;display:flex;flex-direction:column;gap:5px;min-width:0}
+.pgf-rot{font:600 11px/14px var(--font-sans);letter-spacing:.04em;text-transform:uppercase;color:var(--mudo)}
+.pgf-ms-bt{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-width:0;
+  font:400 13px/20px var(--font-sans);color:var(--tinta);background:var(--superficie);border:1px solid var(--linha-forte);
+  border-radius:var(--raio-controle);padding:8px 10px 8px 12px;cursor:pointer;text-align:left}
+.pgf-ms-bt>i{flex:none;color:var(--mudo);transition:transform .15s}
+.pgf-ms-bt[aria-expanded="true"]{border-color:var(--foco)}
+.pgf-ms-bt[aria-expanded="true"]>i{transform:rotate(180deg)}
+.pgf-ms-v{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pgf-ms.on .pgf-ms-bt{border-color:var(--verde-a60);background:var(--verde-suave);color:var(--tinta);font-weight:600}
+/* o painel ocupa a largura da célula: mais largo, ele passaria da borda da tela e a página rolaria de lado */
+.pgf-ms-painel{position:absolute;z-index:30;top:calc(100% + 4px);left:0;right:0;display:flex;flex-direction:column;gap:8px;
+  padding:10px;border:1px solid var(--linha-forte);border-radius:var(--raio-md);background:var(--superficie-3);
+  box-shadow:0 12px 28px var(--sombra)}
+.pgf-ms-busca{width:100%;box-sizing:border-box;padding:6px 10px}
+.pgf-ms-rapido{display:flex;gap:8px}
+.pgf-ms-lista{max-height:260px;overflow:auto;display:flex;flex-direction:column;margin:0 -4px}
+.pgf-ms-op{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:var(--raio-tag);font-size:13px;
+  line-height:1.35;color:var(--tinta);cursor:pointer}
+.pgf-ms-op:hover{background:var(--superficie-2)}
+.pgf-ms-op input{flex:none;margin:2px 0 0;accent-color:var(--verde)}
+.pgf-ms-op span{min-width:0;overflow-wrap:anywhere}
+.pgf-ms-vazio{margin:4px;font-size:12.5px;color:var(--mudo)}
+.pgf-ms-aviso{margin:0;font-size:12px;color:var(--critico)}
+.pgf-lnk{border:1px solid var(--linha-forte);border-radius:var(--raio-controle);background:transparent;color:var(--tinta-2);
+  font:600 12px/16px var(--font-sans);padding:5px 10px;cursor:pointer}
+.pgf-lnk:hover{background:var(--superficie-2);color:var(--tinta)}
+.pgf-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px}
+.pgf-bt{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-controle);background:transparent;color:var(--tinta);font:600 13px/18px var(--font-sans);
+  padding:7px 12px;text-decoration:none;cursor:pointer}
+.pgf-bt:hover{background:var(--superficie-3)}
+.pgf-bt:disabled{opacity:.6;cursor:progress}
+.pgf-bt>i{font-size:15px}
+.pgf-atr.on{border-color:var(--critico-a45);background:var(--critico-suave);color:var(--critico)}
+.pgf-exec{margin-left:auto}
+
+/* o Plano & Fila agora é um bloco da página (o título da página é "Gestão PCM") */
+.pg-bloco{margin:6px 0 0}
+.pg-bloco-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 16px;margin:0 0 10px}
+.pg-h2{margin:0 0 2px;font:800 20px/1.25 var(--font-display);color:var(--tinta)}
+.pg-busca-f{flex:0 1 280px;margin:0 0 0 auto}
+.pg-ctl .pg-lnk+.pg-busca-f{margin-left:4px}
+.pg-busca-f .gc-campo{width:100%;box-sizing:border-box;padding:6px 10px}
+
+/* as árvores: cada nível um <details>, o número numa pílula, as atrasadas do tipo em vermelho */
+.pga,.pga-nf,.pgs{margin:20px 0 0}
+.pga-topo{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 8px}
+.pga-h{margin:0;font:800 20px/1.25 var(--font-display);color:var(--tinta)}
+.pga-dica{font-size:12px;color:var(--mudo)}
+.pga-badge{display:inline-block;min-width:28px;text-align:center;border-radius:999px;padding:1px 9px;
+  font:700 12px/18px var(--font-sans);background:var(--superficie-3);color:var(--tinta);font-variant-numeric:tabular-nums}
+.pga-badge--2,.pga-badge--3{font-weight:600;color:var(--tinta-2)}
+.pga-badge--crit{background:var(--critico-suave);color:var(--critico)}
+.pga-badge--alerta{background:var(--pg-alerta-suave);color:var(--alerta)}
+.pga-atr{display:inline-block;border-radius:999px;padding:1px 8px;font:700 11px/16px var(--font-sans);
+  background:var(--critico-suave);color:var(--critico);white-space:nowrap}
+.pga-cab{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:9px 12px;cursor:pointer;list-style:none;
+  font-size:13.5px;color:var(--tinta);border-radius:var(--raio-md)}
+.pga-cab::-webkit-details-marker{display:none}
+.pga-cab:hover{background:var(--superficie-3)}
+.pga-cab:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.pga-chev{flex:none;font-size:12px;color:var(--mudo);transition:transform .12s}
+details[open]>.pga-cab>.pga-chev{transform:rotate(90deg)}
+.pga-nome{flex:1 1 auto;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.pga-usi>.pga-cab .pga-nome,.pga-tip>.pga-cab .pga-nome{font-weight:500}
+details.pga-cli{margin:0 0 6px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie)}
+details.pga-usi{margin:0 10px 6px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie-2)}
+details.pga-tip{margin:0 10px 6px;border:1px solid var(--linha);border-left:3px solid var(--linha-forte);
+  border-radius:var(--raio-tag);background:var(--superficie)}
+/* a família do tipo na borda (o gpTipoClass do painel) */
+.pga-tip--corretiva{border-left-color:var(--alerta-cheio)}
+.pga-tip--emergencial{border-left-color:var(--critico-cheio)}
+.pga-tip--preventiva{border-left-color:var(--ok-cheio)}
+.pga-tip--religamento{border-left-color:var(--info-cheio)}
+.pga-tip--inspecao,.pga-tip--preditiva{border-left-color:var(--laranja)}
+.pga-tab{padding:0 8px 8px}
+.pga-tab:empty{display:none}
+.pg-rolo.pga-rolo{max-height:60vh;border-top:1px solid var(--linha);border-radius:var(--raio-md)}
+.pga-bloco{border:1px solid var(--alerta-a35);border-radius:var(--raio-md);background:var(--alerta-a08)}
+.pga-cab--bloco .pga-nome{flex:0 1 auto}
+.pga-ic{flex:none;font-size:16px;color:var(--alerta)}
+.pga-dentro{padding:2px 8px 8px}
+.pga-vazio{margin:16px 0 0;padding:18px;border:1px dashed var(--linha-forte);border-radius:var(--raio-md);text-align:center;
+  font-size:13px;color:var(--mudo)}
+.pgx-carga,.pgx-erro{margin:8px 4px;font-size:13px;color:var(--mudo)}
+.pgx-erro{color:var(--critico)}
+/* o Só atrasadas: a lista plana, a mais velha no alto; mais de diasAlerta dias marca a linha */
+tr.pgs-lin--crit td:first-child{box-shadow:inset 3px 0 0 var(--critico-cheio)}
+.pgs-pe{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:10px 0 0}
+.pgs-msg{font-size:12.5px;color:var(--mudo)}
+
+/* a confiabilidade: os dois blocos fechados, o corpo pedido quando abrem */
+details.pgc{margin:16px 0 0;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie)}
+.pgc-sum{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;cursor:pointer;list-style:none;border-radius:var(--raio-md)}
+.pgc-sum::-webkit-details-marker{display:none}
+.pgc-sum:hover{background:var(--superficie-2)}
+.pgc-sum:focus-visible,.pgc-cab:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.pgc-chev{flex:none;font-size:13px;color:var(--mudo);transition:transform .12s}
+.pgc-sum>.pgc-chev{margin-top:4px}
+details[open]>.pgc-sum>.pgc-chev,details[open]>.pgc-cab>.pgc-chev,.pgc-a-bt[aria-expanded="true"] .pgc-chev{transform:rotate(90deg)}
+.pgc-t{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pgc-tit{display:inline-flex;align-items:center;gap:8px;font:800 17px/1.3 var(--font-display);color:var(--tinta)}
+.pgc-tit i{font-size:18px;color:var(--verde-texto)}
+.pgc-sub{font-size:12px;line-height:1.45;color:var(--mudo)}
+.pgc-corpo{padding:0 12px 12px}
+details.pgc-cli{margin:0 0 6px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie-2)}
+details.pgc-usi{margin:0 0 6px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie)}
+details.pgc-clu--sem{border-style:dashed}
+.pgc-dentro{padding:0 8px 8px}
+.pgc-cab{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:9px 12px;cursor:pointer;list-style:none;
+  border-radius:var(--raio-md)}
+.pgc-cab::-webkit-details-marker{display:none}
+.pgc-cab:hover{background:var(--superficie-3)}
+.pgc-nome{flex:1 1 220px;min-width:0;font-size:13.5px;font-weight:600;color:var(--tinta);overflow-wrap:anywhere}
+.pgc-nome small{display:block;font-size:11.5px;font-weight:400}
+.pgc-chips{display:flex;flex-wrap:wrap;gap:6px}
+.pgc-chip{display:inline-flex;align-items:baseline;gap:5px;border-radius:999px;padding:2px 10px;font:600 12px/18px var(--font-sans);
+  background:var(--superficie-3);color:var(--tinta);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pgc-chip b{font:700 10px/18px var(--font-sans);letter-spacing:.05em;color:var(--mudo)}
+.pgc-chip--ok{background:var(--ok-suave);color:var(--ok)}
+.pgc-chip--and{background:var(--pg-alerta-suave);color:var(--alerta)}
+.pgc-chip--crit{background:var(--critico-suave);color:var(--critico)}
+.pgc-chip--ok b,.pgc-chip--and b,.pgc-chip--crit b{color:inherit}
+.pgc-tab{padding:0 8px 8px}
+.pgc-tab:empty{display:none}
+.pgc-mudo{font-size:11.5px;font-weight:400;color:var(--mudo)}
+.pgc-tbl td{text-align:right}
+.pgc-tbl td.pgc-ativo,.pgc-os-tbl td{text-align:left}
+.pgc-a-bt{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:0;background:transparent;padding:4px 0;font:inherit;
+  color:var(--tinta);cursor:pointer;text-align:left;white-space:normal}
+.pgc-a-bt:hover span:first-of-type{text-decoration:underline;text-underline-offset:3px}
+.pg-tbl tr.pgc-os>td{height:auto;padding:8px 10px;white-space:normal;background:var(--superficie-2)}
+.pgc-os-tbl{border:1px solid var(--linha);border-radius:var(--raio-tag)}
+.pgc-msg{margin:8px 4px;font-size:13px;color:var(--tinta-2)}
+.pgc-leg{margin-top:10px}
+.pgc-amostra--ok{background:var(--ok-cheio)}
+.pgc-amostra--and{background:var(--alerta-cheio)}
+.pgc-amostra--crit{background:var(--critico-cheio)}
+
+@media (max-width:640px){
+  .pg-topo-dir{width:100%}
+  .pg-topo-dir .pgn{flex:1 1 auto}
+  .pgn{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pgn-n:nth-child(3){border-left:0}
+  .pgn-n:nth-child(n+3){border-top:1px solid var(--linha)}
+  .pgf-grade{grid-template-columns:1fr}
+  .pgf-acoes .pgf-bt{flex:1 1 auto}
+  .pgf-exec{margin-left:0}
+  .pg-busca-f,.pg-ctl .pg-lnk+.pg-busca-f{flex:1 1 100%;margin:0}
+  details.pga-usi,details.pga-tip{margin-left:6px;margin-right:6px}
+  .pgc-sum{padding:10px}
+  .pgc-corpo{padding:0 8px 8px}
+  /* as tabelas viram cartões: o rótulo de cada célula vem do data-r */
+  .pg-rolo.pga-rolo{max-height:none;overflow:visible;border:0}
+  .pg-cartoes thead{display:none}
+  .pg-cartoes,.pg-cartoes tbody,.pg-cartoes tr{display:block;width:auto}
+  .pg-cartoes tr{margin:0 0 8px;padding:6px 10px;border:1px solid var(--linha);border-radius:var(--raio-md);
+    background:var(--superficie)}
+  /* o valor quebra a linha quando não cabe (as etiquetas da tarefa: sem quebrar, empurravam a página para 441 px, medido
+     a 375 px em 04/11/2026); o rótulo fica à esquerda e o valor à direita */
+  .pg-tbl.pg-cartoes td{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:baseline;gap:4px 8px;height:auto;
+    padding:4px 0;border:0;text-align:right;white-space:normal}
+  .pg-cartoes td::before{flex:none;margin-right:auto;content:attr(data-r);font-size:12px;color:var(--mudo);text-align:left}
+  .pg-cartoes .pgp-fracttal{margin-left:0}        /* o ícone do Fracttal junto do número da OS, não na outra ponta */
+  .pg-tbl.pg-cartoes td.pg-obs{max-width:none;overflow:visible;overflow-wrap:anywhere}
+  .pg-tbl.pg-cartoes tr.pgc-os{padding:0;border:0;background:transparent}
+  .pg-tbl.pg-cartoes td.pgc-os-td{display:block;padding:4px 0 0;background:transparent}
+  .pg-cartoes td.pgc-os-td::before{content:none}
+  .pgc-os-tbl.pg-cartoes{border:0}
+  .pgc-os-tbl.pg-cartoes tr{background:var(--superficie-2)}
+}
+
 /* ── Motivos das tarefas e Fora da programação (16/10/2026, nexus/pcm/motivos.py) ── */
 /* o selo do motivo (Levi, 16/10/2026: "troque as cores de azul e amarelo para vermelho e laranja — vermelho o que sai
    da programação, laranja o que não sai"): o que tira a tarefa da programação em vermelho, os outros em laranja; as

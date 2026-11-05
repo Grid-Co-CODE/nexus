@@ -47,6 +47,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `fonte.py` | lê o `banco_dados.json` do App (a semana que está valendo) e, para a Gestão PCM, o `gestao_pcm.json` e o `mpas.json`; cópia de 5 min e, passado isso, confere pelo ETag (304 = segue a cópia, sem baixar de novo); na cópia em memória, o `cliente` já vem pelo nome do cadastro (`clientes.py`). **Uma trava por arquivo** (27/10/2026, ronda de dados do PCM): com uma só, o download lento do `gestao_pcm.json` (14,9 MB, até 30 s) segurava a leitura de todos os outros arquivos, mesmo com cópia válida; e quem já tem cópia não espera o download que outro pedido já faz do mesmo arquivo (`tests/test_pcm_fonte_trava.py`) |
 | `clientes.py` | **o nome do cliente é o do cadastro do Nexus** (18/10/2026, seção abaixo) |
 | `gestao.py` | as contas da Gestão PCM (o Plano & Fila, do `js/preventivas.js` do painel; os filtros de cima, os números do alto, as árvores e o Só atrasadas, do `js/app.js`) |
+| `gestao_confiab.py` | a Confiabilidade por ativo e o MTTR por equipe cluster da Gestão PCM, sobre a conta da Engenharia (a cópia de 5 min da torre de lá) |
 | `prova_gestao.py` + `.js` | a prova de que a Gestão PCM bate célula a célula com o painel (roda o JS dele no node) |
 | `semana.py` | as regras da semana que as telas Tarefas e OS, Quadro e Gerar usam: achar a semana, dia, situação, fora da jornada, filtros (a tela Semana saiu em 12/10/2026) |
 | `geracao.py` | roda o motor numa pasta por rodada, num subprocesso, a 1 pedido por segundo ao Fracttal; depois do motor, tira da planilha as tarefas do `sem:` das observações (`aplicar_sem`, 15/10/2026: o motor só o aplica nas OS de plano; seção do Quadro); `gerar_com_foto`, o mesmo com a FOTO do Fracttal e sem credencial (a prova) |
@@ -1733,11 +1734,13 @@ usina, OS fora, OS com dia fixo), **3** gerar em sombra, **4** últimas geraçõ
 Levi (07/10 e 08/10/2026): "traga a visão de acompanhamento de manutenção do aplicativo para o Nexus conforme prints".
 É a aba Gestão PCM do painel do PCM (gridco-pcm-data): o bloco **"Manutenções — Plano & Fila"** (`js/preventivas.js`)
 e, desde 04/11/2026 (pedido do Levi), o resto do `js/app.js`: **todos os filtros de cima**, os **números do alto**, as
-**árvores** Cliente ▸ Usina ▸ Tipo e o **Só atrasadas**. Só lê: nada vai ao banco nem ao Fracttal. Os controles vão pela
-URL (`modo`, `tipo`, `dim`, `col`, `val`, `mes`, `q`, `ordem`/`desc`, `pend`, `ordemf`/`descf`; o drill da fração é
-`drill` + `dt`, porque `usina` é o filtro de cima), e os filtros de cima também (abaixo). Parte A (04/11/2026): as
-contas, a rota da tabela e a prova; a tela dos filtros novos, dos números e das árvores é a parte B (até lá o
-`gestao.html` só mostra Cliente, Usina, Equipe cluster e Responsável, e leva os outros escondidos no formulário).
+**árvores** Cliente ▸ Usina ▸ Tipo, o **Só atrasadas** e os dois blocos da **confiabilidade** (com a conta da
+Engenharia). Só lê: nada vai ao banco nem ao Fracttal. Os controles vão pela URL (`modo`, `tipo`, `dim`, `col`, `val`,
+`mes`, `q`, `ordem`/`desc`, `pend`, `ordemf`/`descf`; o drill da fração é `drill` + `dt`, porque `usina` é o filtro de
+cima), e os filtros de cima também (abaixo). A página, de cima para baixo (a ordem do painel): o cabeçalho com os quatro
+números, a barra dos filtros de cima, o Plano & Fila, as "Não finalizadas no período", a árvore por cliente (ou o Só
+atrasadas) e a Confiabilidade por ativo e o MTTR por equipe cluster. As contas: parte A (`gestao.py`); a tela: parte B
+(`gestao.html` + `static/pcm-gestao.js`); a confiabilidade: parte C (`gestao_confiab.py`).
 
 - **Os filtros de cima** (`gestao.filtros` + `gestao.recortar`, o `gpFilteredTarefas` do painel; 04/11/2026): Cliente
   (`cliente`), Usina (`usina`), Equipe cluster (`cluster`), Responsável O&M (`responsavel`), Tipo (**`tipo_tarefa`**,
@@ -1774,14 +1777,57 @@ contas, a rota da tabela e a prova; a tela dos filtros novos, dos números e das
   Usina · Tarefa · Tipo · Estado · Data Prog. · todas as etiquetas · Observação da OS), só da visão principal (sem as
   não finalizadas no período); sem filtro são ~2,2 mil linhas. "Atualizado: <geradoEm> · corte <corteData> · fonte:
   API Fracttal" sai pronto em `gestao.atualizado`.
-- **O que o `gestao.html` recebe para a parte B** (`telas._ctx_gestao`): `filtros` (o `G.Filtros`: as tuplas de cada
-  lista, `os`, `ss`, `pini`, `pfim`, `pmodo`, `atr`), `listas` (`G.LISTAS`: nome na URL, campo, rótulo, o "vazio"),
-  `escolhas` (nome → opções), `escolhidos` (nome → as escolhidas sem maiúscula, para o `selected`), `pmodos`,
-  `tem_topo`, `limpar` (`url(**limpar)` tira todos os filtros e a busca), `numeros` (`todas`, `visiveis`,
-  `finalizadas`, `em_aberto`, `atrasadas`, `nf`, `pct_finalizadas`), `arvores` (`nf` e `todas`: `n`, `clientes` →
-  `usinas` → `tipos` com `nome`, `n`, `atrasadas`, `classe`; a `todas` com `aberta` e, aberta, as `linhas`),
-  `so_atrasadas` (as linhas, só com `atr=1`; senão None), `dias_alerta` e `atualizado`. O `url()` agora guarda TODAS as
-  escolhas de cada filtro (antes levava só a primeira). Testes: `tests/test_pcm_gestao_filtros.py`.
+- **A tela (parte B, 04/11/2026; `gestao.html`, `static/pcm-gestao.js`, classes `pgn-`, `pgf-`, `pga-`, `pgs-`,
+  `pgc-` no `pcm.css`):** o título da página é "Gestão PCM", com a linha "Atualizado…" e os quatro números à direita
+  (Visíveis, Finalizadas em verde com a dica do painel, `gestao.dica_finalizadas`, Em aberto, Atrasadas em vermelho: um
+  link que liga e desliga o `atr=1`, marcado quando ligado). **A barra dos filtros é recolhível** (Levi: "suspenso e
+  expandível"): fechada por padrão, uma linha com "Filtros", quantos valem e os escolhidos em etiquetas, cada uma com o ×
+  que tira só ela (`gestao.fichas`; o período sai inteiro); o clique abre a barra inteira e ela lembra se estava aberta
+  (`sessionStorage`, aplicado logo depois da barra para não piscar). Dentro, na ordem do painel, as 7 listas de várias
+  escolhas (o botão diz "Todos"/"Todas", o valor ou "N selecionados"; abre com busca, "Todos", "Limpar" e as caixinhas;
+  o padrão de revelar, com `aria-expanded`), OS #, Solicitação #, Período de/Até, Considerar (os rótulos do painel: Só
+  programada, Só início, Só final) e os botões Só atrasadas, **Limpar filtros** (o nome com "filtros" para não confundir
+  com o "Limpar" de dentro de cada lista) e Relatório executivo (a Central de emissão, `/t/relatorios/pcm-executivo`,
+  só para quem abre aquela tela). A lista **aplica ao fechar** (Esc, clique fora, o foco que sai), não a cada caixinha;
+  **todas marcadas = sem filtro** (nada vai na URL: mandar as 143 usinas passaria do teto de 50); mais de 50 marcadas, a
+  lista avisa e não envia. OS, Solicitação e as datas aplicam ao Enter ou ao sair do campo (a data não envia a cada
+  dígito do ano); o Considerar sem data não envia. Os filtros antigos do topo saíram (estão na barra), e a busca do Plano
+  & Fila (`q`, que só vale nele) foi para a linha de controles dele, levando os filtros escondidos.
+  **As árvores:** cada nível é um `<details>`; o tipo pede a tabela à rota `arv` só na 1ª abertura ("Lendo…", e o erro
+  com "Tentar de novo"); as "Não finalizadas no período" num bloco fechado com o número; até 60 tarefas a árvore vem
+  aberta com as tabelas. **O Só atrasadas vem em partes:** a página leva 100 linhas e o "Mostrar mais" pede as seguintes
+  ao mesmo endereço com `ap=<de onde seguir>` (`_gestao_atrasadas.html`, a mesma cópia; sem `atr=1`, 404): sem filtro
+  são ~2,2 mil linhas. As mensagens são as constantes `gestao.MSG_*`, as mesmas que a prova confere. **A OS abre o card
+  do Nexus em qualquer lugar da tela** (o painel lateral, a árvore, o Só atrasadas, a confiabilidade): um ouvinte só, no
+  `pcm-gestao.js` (antes o clique só valia dentro do painel lateral). **Abaixo de 640 px** a barra empilha e as tabelas
+  da árvore, do Só atrasadas e da confiabilidade viram cartões (`pg-cartoes`, o rótulo no `data-r`; o valor quebra a
+  linha: as etiquetas sem quebrar empurravam a página para 441 px, medido em 04/11); a matriz do Plano & Fila segue
+  rolando dentro dela, e a página não rola de lado. O contexto que a A deixou (`filtros`, `listas`, `escolhas`,
+  `escolhidos`, `numeros`, `arvores`, `so_atrasadas`, `url()` com todas as escolhas) segue; a B junta `ms` (as listas
+  prontas para a barra), `fichas`, `ocultos`, `atrasadas` (a 1ª parte), `dica_finalizadas`, as `MSG_*` e a linha de baixo
+  da confiabilidade. Testes: `tests/test_pcm_gestao_filtros.py` e `tests/test_pcm_gestao_tela.py`.
+- **A confiabilidade (parte C, 04/11/2026; `gestao_confiab.py`):** a "Confiabilidade por ativo" e o "Tempo médio de
+  reparo por Equipe Cluster" do painel, com a **conta da Engenharia** (decisão do Levi): os números são os da tela
+  Engenharia → Confiabilidade (`nexus/engenharia/confiabilidade.py`), na cópia de 5 min que a torre de lá já guarda
+  (`torres.engenharia._dados()`), sem calcular de novo nem ler o Fracttal (no painel vinham do `confiabilidade.json` do
+  robô, que casava o ativo pelo nome). Cliente ▸ Usina ▸ Ativo: no cliente, usinas e falhas; na usina, o MTBF, o MTTR e a
+  disponibilidade da Engenharia (as medianas dos ativos, `indicadores` por usina); a tabela da usina vem por fetch
+  (`?cf=usina&cc=&cu=`), os ativos de mais falhas primeiro, e cada ativo abre as OS dele (as mesmas da conta,
+  `porAtivo`), com as horas de reparo de cada uma (`confiabilidade.reparo_h`: a média da coluna é o MTTR do ativo). A
+  disponibilidade é verde na meta de 85% ou acima e vermelha abaixo (a regra de lá). **O MTTR do cluster é a média por
+  falha** (as horas de todas as falhas fechadas dos ativos do cluster ÷ quantas; cada falha pesa igual, como no MTTR do
+  ativo e no `mttr_de` do robô), o cluster do cadastro, os piores no topo, as usinas dentro com o MTTR (a mesma conta) e
+  as falhas (as da Engenharia, a aberta também; o número de fechadas vai na dica); até 24 h verde, até 72 h âmbar, acima
+  vermelho; a usina sem cluster no cadastro vai num grupo próprio, por último. **Os filtros:** cliente e cluster pelo nome
+  do cadastro, sem maiúscula; a usina pelo texto do Fracttal das OS dos ativos dela (a usina da Gestão é a Classificação
+  1, "Cliente - Usina - UF", e a da Engenharia é o nome do cadastro; com os dados de 04/11, as 130 usinas da Gestão com OS
+  de falha casaram todas pelo texto); a usina entra inteira ou fica fora, então os números dela são os da Engenharia. Os
+  outros filtros não valem aqui, e a linha de baixo do título diz quais quando algum está escolhido. **Os dois blocos
+  vêm fechados e pedem o corpo quando abrem** (`?cf=conf|mttr`, com os filtros): a página não espera a conta da
+  Engenharia; o "atualizado" é a hora da leitura das OS de falha. Sem a leitura completa (`os_falhas.estado()["completa"]`),
+  nenhum número: "A leitura do Fracttal ainda não terminou: tente em alguns minutos." (número pela metade não vai para a
+  tela; a tela da Engenharia mostra com aviso). Quem vê é quem vê a Gestão PCM (a rota é a da tela). Testes:
+  `tests/test_pcm_gestao_confiab.py`.
 
 - **O aviso de onde vêm os dados** (o `gestao_pcm.json` e, sem a chave, a nota da Gerencial) mora num ícone à direita
   do topo e abre ao clicar (Levi, 18/10/2026); o que é falha de verdade (a última leitura boa, a chave que não abriu)
@@ -1869,22 +1915,28 @@ livre (tarefa, etiqueta, observação: só diz que difere).
   do Plano & Fila e 28 da aba), 1.233.805 valores, **0 divergências** (75 s). A única que ela achou era de propósito (o
   emoji da mensagem "Nenhuma tarefa atrasada"). Ela pega o erro plantado: o vermelho dos dias a partir de 12 dá 9
   divergências, a ordem da tabela sem olhar se a tarefa está aberta 13.509, as listas sem a cascata 148, o período com
-  um dia a mais 9.256 e a ordem só sem acento (a de antes) 8.
+  um dia a mais 9.256 e a ordem só sem acento (a de antes) 8. Depois das partes B e C (a tela e a chave normalizada),
+  com os mesmos JSON e JS: 552 casos, 1.233.805 valores, **0 divergências** (122 s). A dica das Finalizadas e as três
+  mensagens da aba vêm das mesmas peças da tela (`gestao.dica_finalizadas` e `gestao.MSG_*`, revisão da parte A): a
+  prova tinha a sua cópia do texto, e a tela podia mudar sem ela ver.
 
 **Desempenho** (08/10, `test_client`, JSON do GitHub, quatro rodadas): fria 1,3 a 2,5 s, conforme a rede (baixar
 ~0,9 s ou mais + `json.loads` 0,32 s + contas ~0,1 s); quente 6 a 33 ms; um filtro de cima novo, 110 a 190 ms na primeira
 vez; a conferência de 5 em 5 minutos, com o 304 do GitHub, 34 a 73 ms (antes do ETag, os mesmos 1,3 s da fria). Com
 `NEXUS_PCM_GESTAO_FONTE` num arquivo LOCAL não há cópia em memória: cada clique relê os 14,7 MB (~0,4 s), então medir
 com arquivo local não diz nada do servidor. As contas ficam guardadas pela versão do arquivo (`dataHash`) e pelos
-filtros de cima, o `G.Filtros` inteiro na chave (`telas._G_CACHE`: o recorte, a aba, as tarefas do Plano, a base e a
-Fila; teto de 80 entradas, eram 40 quando cada filtro guardava 3); a Fila, por meio dia (o atraso conta do meio-dia). A
-rota da tabela de um tipo usa a mesma cópia da tela (o teste conta: um recorte para a tela, a rota e a Fila). Versão
-nova do arquivo limpa tudo da velha: cada uma prende ~49 MB de tarefas. Medido em 04/11 no PC com o JSON de verdade:
-o recorte sem filtro ~140 ms (um cliente, ~40 ms) e a aba ~80 ms, só na primeira vez de cada filtro.
+filtros de cima normalizados (`gestao.chave`: sem maiúscula, as escolhas em ordem e o "considerar" sem datas no padrão,
+então `?cliente=A&cliente=B` e `?cliente=b&cliente=a` dividem a entrada; `telas._G_CACHE`: 5 entradas por combinação,
+o recorte, as tarefas do Plano, a base, a Fila e a aba; teto de 80, que limpa tudo MENOS a versão: sem ela o pedido
+seguinte via "outra versão" e limpava de novo o que o anterior acabou de montar); a Fila, por meio dia (o atraso conta
+do meio-dia). A rota da tabela de um tipo e as partes do Só atrasadas usam a mesma cópia da tela (o teste conta: um
+recorte para a tela, a rota e a Fila). Versão nova do arquivo limpa tudo da velha: cada uma prende ~49 MB de tarefas.
+Medido em 04/11 no PC com o JSON de verdade: o recorte sem filtro ~140 ms (um cliente, ~40 ms) e a aba ~80 ms, só na
+primeira vez de cada filtro. A confiabilidade guarda à parte (`gestao_confiab`, até 40 combinações de cliente, usina e
+cluster por cópia da Engenharia, refeita quando a de lá muda).
 
-**Não veio (a aba Gestão PCM do painel tem mais blocos):** "Confiabilidade por ativo" (MTBF, MTTR, disponibilidade, do
-`confiabilidade.json`), "Tempo médio de reparo por Equipe Cluster" (a parte C do pedido de 04/11) e o Relatório
-Executivo.
+**O Relatório executivo** do painel é a Central de emissão do Nexus (`nexus/pcm/relatorio_exec/CLAUDE.md`): o botão da
+barra leva lá.
 
 ## O processador por visita (19/10/2026)
 

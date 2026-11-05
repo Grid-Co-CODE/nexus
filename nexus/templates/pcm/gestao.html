@@ -3,23 +3,48 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
 {# Gestão PCM (Levi, 07/10 e 08/10/2026: "traga a visão de acompanhamento de manutenção do aplicativo para o Nexus
-   conforme prints"): o bloco "Manutenções — Plano & Fila" da aba Gestão PCM do painel do PCM, com os filtros de cima
-   da aba. As contas estão em nexus/pcm/gestao.py, transcritas do js/preventivas.js e provadas célula a célula contra
-   ele (nexus/pcm/prova_gestao.py); os controles vão pela URL, então todo estado da tela tem endereço. #}
+   conforme prints"; 04/11/2026: o resto da aba Gestão PCM do painel do PCM). De cima para baixo, a ordem do painel: o
+   cabeçalho com os quatro números, a barra dos filtros de cima (recolhível: "suspenso e expandível"), o "Manutenções —
+   Plano & Fila", as "Não finalizadas no período", a árvore de todas as tarefas por cliente (ou, no Só atrasadas, a
+   lista plana) e os dois blocos da confiabilidade, com a conta da Engenharia. As contas estão em nexus/pcm/gestao.py
+   (provadas contra o painel: nexus/pcm/prova_gestao.py) e nexus/pcm/gestao_confiab.py; os filtros vão pela URL, então
+   todo estado da tela tem endereço. O que abre sem recarregar (as listas, as árvores, as tabelas que vêm por fetch, a
+   confiabilidade) mora em static/pcm-gestao.js. #}
+{# a árvore Cliente ▸ Usina ▸ Tipo (o gpTreeHTML do painel): cada nível recolhível; o tipo pede a tabela dele à rota
+   ?arv=&ac=&au=&at= ao abrir (a 1ª vez), menos quando a árvore abre sozinha (até 60 tarefas: as linhas já vêm) #}
+{% macro arvore(clientes, aberta=false) -%}
+{% for c in clientes %}<details class="pga-cli" data-ac="{{ c.nome }}"{{ ' open' if aberta }}>
+  <summary class="pga-cab"><i class="ph ph-caret-right pga-chev" aria-hidden="true"></i><span class="pga-nome">{{ c.nome }}</span> <span class="pga-badge">{{ c.n }}</span></summary>
+  {% for u in c.usinas %}<details class="pga-usi" data-au="{{ u.nome }}"{{ ' open' if aberta }}>
+    <summary class="pga-cab"><i class="ph ph-caret-right pga-chev" aria-hidden="true"></i><span class="pga-nome">{{ u.nome }}</span> <span class="pga-badge pga-badge--2">{{ u.n }}</span></summary>
+    {% for tp in u.tipos %}<details class="pga-tip pga-tip--{{ tp.classe }}" data-at="{{ tp.nome }}"{{ ' open' if aberta }}>
+      <summary class="pga-cab"><i class="ph ph-caret-right pga-chev" aria-hidden="true"></i><span class="pga-nome">{{ tp.nome }}</span> <span class="pga-badge pga-badge--3">{{ tp.n }}</span>{% if tp.atrasadas %} <span class="pga-atr">{{ tp.atrasadas }} atrasada{{ 's' if tp.atrasadas != 1 }}</span>{% endif %}</summary>
+      {% if tp.linhas is defined %}<div class="pga-tab" data-cheio="1">{% with linhas=tp.linhas %}{% include "pcm/_gestao_arvore.html" %}{% endwith %}</div>
+      {%- else %}<div class="pga-tab"></div>{% endif %}
+    </details>{% endfor %}
+  </details>{% endfor %}
+</details>{% endfor %}
+{%- endmacro %}
 <div class="pg">
 <p class="gc-eyebrow">PCM · Gestão PCM</p>
 <div class="pcm-topo">
   <div>
-    <h1 class="titulo-pagina">Manutenções: Plano &amp; Fila</h1>
-    {% if dados %}<p class="pcm-sub">{% if o.modo == 'plano' %}Quanto do plano está feito: preventivas, corretivas e demais
-      atividades por usina, de {{ rot_mes(meses[0]) }} a {{ rot_mes(meses[2]) }}.{% else %}O que está velho e por quê:
-      o envelhecimento das MPA e MPS, da mais antiga para a mais nova.{% endif %}</p>{% endif %}
+    <h1 class="titulo-pagina">Gestão PCM</h1>
+    {% if dados %}<p class="pcm-sub">{{ atualizado }}</p>{% endif %}
   </div>
   {% if dados %}<div class="pg-topo-dir">
-  <nav class="pg-seg pg-modo" aria-label="Modo">
-    <a href="{{ url(modo='plano') }}"{% if o.modo == 'plano' %} aria-current="page"{% endif %}><i class="ph ph-table" aria-hidden="true"></i>Plano</a>
-    <a href="{{ url(modo='fila') }}"{% if o.modo == 'fila' %} aria-current="page"{% endif %}><i class="ph ph-hourglass-medium" aria-hidden="true"></i>Fila</a>
-  </nav>
+  {# os quatro números do alto (o renderGestao do painel): Visíveis = Finalizadas + Em aberto, sem as "Não Finalizadas
+     no Período"; Atrasadas liga e desliga o Só atrasadas #}
+  <div class="pgn" role="group" aria-label="As tarefas dos filtros de cima">
+    <div class="pgn-n"><span class="pgn-r">Visíveis</span>
+      <b class="gc-num">{{ numeros.visiveis }}</b></div>
+    <div class="pgn-n pgn-n--ok" title="{{ dica_finalizadas }}"><span class="pgn-r">Finalizadas</span>
+      <b class="gc-num">{{ numeros.finalizadas }}</b></div>
+    <div class="pgn-n"><span class="pgn-r">Em aberto</span>
+      <b class="gc-num">{{ numeros.em_aberto }}</b></div>
+    <a class="pgn-n pgn-n--crit pgn-n--bt" href="{{ url(atr=None if filtros.atr else '1') }}"{% if filtros.atr %} aria-current="true"{% endif %} title="{{ 'Clique para voltar à árvore de todas as tarefas' if filtros.atr else 'Clique para ver só as atrasadas' }}"><span class="pgn-r">Atrasadas</span>
+      <b class="gc-num">{{ numeros.atrasadas }}</b></a>
+  </div>
   {# de onde vêm os dados, num ícone à direita (Levi, 18/10/2026: "podem muito bem estar em um ícone do lado direito
      da tela para quando a pessoa clicar na exclamação aparecer esse disclaimer"); o que é falha de verdade (a última
      leitura boa, a chave da Gerencial que não abriu) segue à vista, em amarelo #}
@@ -46,6 +71,78 @@
 {% else %}
 {% if fonte_velha %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-clock-counter-clockwise"></i><div><strong>Mostrando a última leitura boa.</strong>
   A tentativa de agora falhou ({{ fonte_erro }}).</div></div>{% endif %}
+
+{# os filtros de cima numa barra recolhível (Levi, 04/11/2026: "suspenso e expandível"): fechada, uma linha com quantos
+   estão valendo e os escolhidos em etiquetas, cada uma com o × que tira só ela; aberta, a barra do painel inteira, na
+   ordem dele. As listas são de várias escolhas e aplicam ao fechar (não a cada caixinha); OS, Solicitação e as datas, ao
+   Enter ou ao sair do campo. Valem na tela toda, inclusive no Plano & Fila (nexus/pcm/CLAUDE.md) #}
+<section class="pgf" aria-label="Filtros de cima">
+  <div class="pgf-cab">
+    <button type="button" class="pgf-abre" id="pgf-abre" aria-expanded="false" aria-controls="pgf-corpo">
+      <i class="ph ph-funnel" aria-hidden="true"></i><span class="pgf-tit">Filtros</span>
+      <span class="pgf-quantos{{ ' on' if fichas }}">{% if fichas %}{{ fichas|length }} filtro{{ 's' if fichas|length != 1 }}{% else %}nenhum filtro{% endif %}</span>
+      <i class="ph ph-caret-down pgf-chev" aria-hidden="true"></i></button>
+    {% if fichas %}<ul class="pgf-fichas" aria-label="Filtros escolhidos">{% for c in fichas %}
+      <li class="pgf-ficha"><span class="pgf-ficha-t"><b>{{ c.rot }}</b>{% if c.valor %}: {{ c.valor }}{% endif %}</span><a class="pgf-x" href="{{ url(**c.tirar) }}" aria-label="Tirar {{ c.rot }}{{ (': ' ~ c.valor) if c.valor }}" title="Tirar este filtro"><i class="ph ph-x" aria-hidden="true"></i></a></li>{% endfor %}
+    </ul>{% endif %}
+  </div>
+  <form class="pg-filtros pgf-corpo" id="pgf-corpo" method="get" role="search" aria-label="Filtros" hidden>
+    {% for k, v in ocultos %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <div class="pgf-grade">
+    {% for m in ms %}<div class="pgf-ms{{ ' on' if m.marcadas }}" data-nome="{{ m.nome }}" data-vazio="{{ m.vazio }}">
+      <span class="pgf-rot" id="pgf-l-{{ m.nome }}">{{ m.rot }}</span>
+      <button type="button" class="pgf-ms-bt" aria-expanded="false" aria-controls="pgf-p-{{ m.nome }}" aria-labelledby="pgf-l-{{ m.nome }} pgf-v-{{ m.nome }}"{% if m.titulo %} title="{{ m.titulo }}"{% endif %}>
+        <span class="pgf-ms-v" id="pgf-v-{{ m.nome }}">{{ m.rotulo }}</span><i class="ph ph-caret-down" aria-hidden="true"></i></button>
+      <div class="pgf-ms-painel" id="pgf-p-{{ m.nome }}" role="group" aria-labelledby="pgf-l-{{ m.nome }}" hidden>
+        <input class="gc-campo pgf-ms-busca" type="search" placeholder="Buscar" aria-label="Buscar em {{ m.rot }}" autocomplete="off">
+        <div class="pgf-ms-rapido"><button type="button" class="pgf-lnk" data-ms="todos">Todos</button><button type="button" class="pgf-lnk" data-ms="limpar">Limpar</button></div>
+        <div class="pgf-ms-lista">{% for x in m.opcoes %}
+          <label class="pgf-ms-op"><input type="checkbox" name="{{ m.nome }}" value="{{ x }}"{% if x|lower in m.marcadas %} checked{% endif %}><span>{{ x }}</span></label>{% else %}
+          <p class="pgf-ms-vazio">Nada com os outros filtros.</p>{% endfor %}</div>
+        <p class="pgf-ms-aviso" role="alert" hidden></p>
+      </div>
+    </div>{% endfor %}
+    <label class="pg-campo pgf-txt"><span>OS #</span><input class="gc-campo" type="text" name="os" value="{{ filtros.os }}" placeholder="ex.: 8856" inputmode="numeric" autocomplete="off"></label>
+    <label class="pg-campo pgf-txt"><span>Solicitação #</span><input class="gc-campo" type="text" name="ss" value="{{ filtros.ss }}" placeholder="ex.: 2946" inputmode="numeric" autocomplete="off"></label>
+    <label class="pg-campo pgf-dia"><span>Período de</span><input class="gc-campo" type="date" name="pini" value="{{ filtros.pini }}"></label>
+    <label class="pg-campo pgf-dia"><span>Até</span><input class="gc-campo" type="date" name="pfim" value="{{ filtros.pfim }}"></label>
+    <label class="pg-campo pgf-modo" title="Pega a tarefa se a data programada, a de início OU a final cair no período"><span>Considerar</span>
+      <select class="gc-campo" name="pmodo">{% for v, r in pmodos %}<option value="{{ v }}"{% if v == filtros.pmodo %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="pgf-acoes">
+      <a class="pgf-bt pgf-atr{{ ' on' if filtros.atr }}" href="{{ url(atr=None if filtros.atr else '1') }}"{% if filtros.atr %} aria-current="true"{% endif %}><i class="ph ph-clock-countdown" aria-hidden="true"></i>Só atrasadas</a>
+      <a class="pgf-bt" href="{{ url(**limpar) }}">Limpar filtros</a>
+      {% if pode_exec %}<a class="pgf-bt pgf-exec" href="{{ raiz }}/t/relatorios/pcm-executivo"><i class="ph ph-presentation-chart" aria-hidden="true"></i>Relatório executivo</a>{% endif %}
+    </div>
+  </form>
+</section>
+<script>
+  // a barra lembra se estava aberta (sessionStorage), aplicado aqui, antes de pintar o resto da tela; sem o
+  // armazenamento (aba anônima, bloqueio), ela abre fechada
+  (function () {
+    try {
+      if (sessionStorage.getItem('nexus.pcm.gestao.filtros') === '1') {
+        document.getElementById('pgf-corpo').hidden = false;
+        document.getElementById('pgf-abre').setAttribute('aria-expanded', 'true');
+      }
+    } catch (e) { /* sem armazenamento: fechada */ }
+  })();
+</script>
+
+{# ── o "Manutenções — Plano & Fila" (js/preventivas.js do painel), com os filtros de cima ── #}
+<section class="pg-bloco" aria-labelledby="pg-plano-t">
+<div class="pg-bloco-cab">
+  <div>
+    <h2 class="pg-h2" id="pg-plano-t">Manutenções: Plano &amp; Fila</h2>
+    <p class="pcm-sub">{% if o.modo == 'plano' %}Quanto do plano está feito: preventivas, corretivas e demais
+      atividades por usina, de {{ rot_mes(meses[0]) }} a {{ rot_mes(meses[2]) }}.{% else %}O que está velho e por quê:
+      o envelhecimento das MPA e MPS, da mais antiga para a mais nova.{% endif %}</p>
+  </div>
+  <nav class="pg-seg pg-modo" aria-label="Modo">
+    <a href="{{ url(modo='plano') }}"{% if o.modo == 'plano' %} aria-current="page"{% endif %}><i class="ph ph-table" aria-hidden="true"></i>Plano</a>
+    <a href="{{ url(modo='fila') }}"{% if o.modo == 'fila' %} aria-current="page"{% endif %}><i class="ph ph-hourglass-medium" aria-hidden="true"></i>Fila</a>
+  </nav>
+</div>
 
 {# o PAR de números do topo, nunca uma média única (regra do painel) #}
 {% set rp = par.rotina %}
@@ -74,21 +171,6 @@
   {{ ger_erro }}. A Fila segue com o lado do Fracttal.</div></div>
 {% endif %}
 
-{# os filtros de cima da aba Gestão PCM do painel; valem nos dois modos. Os que esta barra não mostra (Tipo, Etiqueta,
-   Estado, OS, Solicitação, Período, Só atrasadas, desde 04/11/2026) seguem no formulário, com todas as escolhas #}
-<form class="pg-filtros" method="get" role="search" aria-label="Filtros">
-  {% for k, v in request.args.items(multi=True) if k not in ('cliente', 'usina', 'cluster', 'responsavel', 'q') %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
-  {% for nome, rot, vazio in (('cliente', 'Cliente', 'Todos'), ('usina', 'Usina', 'Todas'), ('cluster', 'Equipe cluster', 'Todas'), ('responsavel', 'Responsável O&M', 'Todos')) %}
-  <label class="pg-campo"><span>{{ rot }}</span>
-    <select class="gc-campo" name="{{ nome }}" onchange="this.form.submit()">
-      <option value="">{{ vazio }}</option>{% for x in escolhas[nome] %}<option{% if x|lower in escolhidos[nome] %} selected{% endif %}>{{ x }}</option>{% endfor %}
-    </select></label>{% endfor %}
-  <label class="pg-campo pg-busca"><span>Buscar</span>
-    <input class="gc-campo" type="search" name="q" value="{{ o.busca }}" placeholder="usina, cliente{{ ' ou OS' if o.modo == 'fila' else ', cluster ou responsável' }}"></label>
-  <button class="gc-btn gc-btn--contorno pg-ir" type="submit">Filtrar</button>
-  {% if tem_topo or o.busca %}<a class="pcm-link pg-limpar" href="{{ url(**limpar) }}">Limpar filtros</a>{% endif %}
-</form>
-
 {% macro seg(campo, ops, atual, desligados=(), rotulo='') -%}
 <div class="pg-seg"{% if rotulo %} role="group" aria-label="{{ rotulo }}"{% endif %}>{% for v, r in ops %}{% if v in desligados %}<span class="off" title="sem data prevista na Gerencial: acompanhe no Plano">{{ r }}</span>{% else %}<a href="{{ url(**{campo: v}) }}"{% if v == atual %} aria-current="true"{% endif %}>{{ r }}</a>{% endif %}{% endfor %}</div>
 {%- endmacro %}
@@ -100,6 +182,11 @@
   </select>
   {% if em_prev %}{{ seg('tipo', sub_siglas, o.tipo, ('MPM', 'MPT') if o.modo == 'fila' else (), 'Sigla') }}{% endif %}
   {% if o.modo == 'plano' and o.dim != 'usi' and mx.grupos %}<button type="button" class="pg-lnk" id="pg-expandir">Expandir tudo</button>{% endif %}
+  {# a busca é do Plano & Fila (as árvores e os números do alto não a usam); leva os filtros de cima junto #}
+  <form class="pg-busca-f" method="get" role="search" aria-label="Buscar no Plano &amp; Fila">
+    {% for k, v in ocultos_busca %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <input class="gc-campo" type="search" name="q" value="{{ o.busca }}" aria-label="Buscar no Plano &amp; Fila" placeholder="Buscar usina, cliente{{ ' ou OS' if o.modo == 'fila' else ', cluster ou responsável' }}">
+  </form>
 </div>
 
 {% if o.modo == 'plano' %}
@@ -177,15 +264,15 @@
   {% if tem_ger %}<span><b>Criticidade · observação</b>: da Gerencial (aba MPAS), a última entrada datada do log</span>{% endif %}
   <span class="pg-fim">clique no grupo para abrir as usinas · na célula da usina para ver as tarefas dela, pendentes e finalizadas (a de MPA e MPS leva também à Fila)</span></p>
 {# o painel das tarefas pendentes (12/10/2026: "Faça maior e mais bonito"): lateral, largo, com a lista por OS; a OS abre
-   o card dela no Nexus (oscreator/card_os_abrir.html, o NexusOsCard das outras torres) #}
+   o card dela no Nexus (oscreator/card_os_abrir.html, o NexusOsCard das outras torres; o clique é o do pcm-gestao.js,
+   o mesmo da árvore e do Só atrasadas) #}
 <div class="pgp-veu" id="pgp-veu" hidden></div>
 <aside class="pgp" id="pgp" role="dialog" aria-modal="true" aria-labelledby="pgp-titulo" hidden>
   <div class="pgp-corpo" id="pgp-corpo"></div>
 </aside>
-{% include "oscreator/card_os_abrir.html" %}
 <script>
   // o painel das pendentes: o clique na célula pede a lista (o mesmo endereço da tela com pu/pc) e abre o painel;
-  // Esc, o X e o véu fecham, e o foco volta para a célula. A OS da lista abre o card dela no Nexus.
+  // Esc, o X e o véu fecham, e o foco volta para a célula. A OS da lista abre o card dela no Nexus (pcm-gestao.js).
   (function () {
     var painel = document.getElementById('pgp'), corpo = document.getElementById('pgp-corpo'),
         veu = document.getElementById('pgp-veu'), origem = null, pedido = 0;
@@ -214,9 +301,7 @@
             a.innerHTML = 'Ver na Fila <i class="ph ph-arrow-right" aria-hidden="true"></i>';
             cab.appendChild(a);
           }
-          corpo.querySelectorAll('.pgp-os-n[data-wid]').forEach(function (b) {
-            if (window.NexusOsCard && NexusOsCard.prepararAoParar) NexusOsCard.prepararAoParar(b, b.dataset.wid);
-          });
+          if (window.pgGestao) pgGestao.prepararOs(corpo);
         })
         .catch(function () { if (meu === pedido) corpo.innerHTML = '<p class="pgp-carga">Sem conexão: não consegui ler as tarefas.</p>'; });
     }
@@ -224,8 +309,6 @@
       var bt = ev.target.closest('[data-pend]');
       if (bt) { ev.preventDefault(); ev.stopPropagation(); abrir(bt); return; }
       if (ev.target.closest('#pgp [data-fechar]') || ev.target === veu) { fechar(); return; }
-      var os = ev.target.closest('#pgp .pgp-os-n[data-wid]');
-      if (os && window.NexusOsCard) NexusOsCard.abrir(os.dataset.wid, {status: os.dataset.status, folio: os.dataset.folio});
     });
     document.addEventListener('keydown', function (ev) {
       // o card da OS aberto por cima fecha primeiro (ele ouve o próprio Esc)
@@ -318,8 +401,59 @@
   })();
 </script>{% endif %}
 {% endif %}
+</section>
+
+{# ── as tarefas da aba (o renderGestao do painel): no Só atrasadas, a lista plana no lugar das árvores; senão, as "Não
+   finalizadas no período" (a OS já Finalizados no Fracttal com a tarefa aberta), fechadas, e a árvore de todas as
+   tarefas visíveis por cliente. As tabelas dos tipos vêm pela rota da tela (?arv=&ac=&au=&at=), na 1ª abertura ── #}
+{% if atrasadas is not none %}
+<section class="pgs" aria-labelledby="pgs-t">
+  <div class="pga-topo"><h2 class="pga-h" id="pgs-t">Atrasadas</h2> <span class="pga-badge pga-badge--crit">{{ atrasadas.total }}</span>
+    <span class="pga-dica">das mais velhas para as mais novas · vermelho = mais de {{ dias_alerta }} dias em aberto · só a visão principal (sem as não finalizadas no período)</span></div>
+  {% if atrasadas.total %}
+  <div class="pg-rolo pga-rolo"><table class="pg-tbl pgs-tbl pg-cartoes">
+    <thead><tr><th>Dias</th><th>OS</th><th>Cliente</th><th>Usina</th><th>Tarefa</th><th>Tipo</th><th>Estado</th><th>Data Prog.</th><th>Etiqueta</th><th>Observação da OS</th></tr></thead>
+    <tbody id="pgs-corpo">{% with linhas=atrasadas.linhas, parte=false %}{% include "pcm/_gestao_atrasadas.html" %}{% endwith %}</tbody></table></div>
+  {% if atrasadas.restam %}<p class="pgs-pe"><button type="button" class="pgf-bt pgs-mais" data-url="{{ url(ap=atrasadas.proximo) }}" aria-controls="pgs-corpo">Mostrar mais {{ [atrasadas.restam, 100]|min }}{% if atrasadas.restam > 100 %} de {{ atrasadas.restam }} restantes{% endif %}</button>
+    <span class="pgs-msg" role="status"></span></p>{% endif %}
+  {% else %}<p class="pga-vazio">{{ msg_sem_atrasada }}</p>{% endif %}
+</section>
+{% elif not numeros.todas %}
+<p class="pga-vazio pga-vazio--so">{{ msg_sem_tarefa }}</p>
+{% else %}
+{% if arvores.nf.n %}<section class="pga-nf" data-arv="nf" data-base="{{ url() }}" aria-label="Não finalizadas no período">
+  <details class="pga-bloco">
+    <summary class="pga-cab pga-cab--bloco"><i class="ph ph-caret-right pga-chev" aria-hidden="true"></i><i class="ph ph-warning pga-ic" aria-hidden="true"></i><span class="pga-nome">Não finalizadas no período</span> <span class="pga-badge pga-badge--alerta">{{ arvores.nf.n }}</span>
+      <span class="pga-dica">a OS já está finalizada no Fracttal e a tarefa ficou em aberto · fora dos números do alto</span></summary>
+    <div class="pga-dentro">{{ arvore(arvores.nf.clientes) }}</div>
+  </details>
+</section>{% endif %}
+<section class="pga" data-arv="todas" data-base="{{ url() }}" aria-labelledby="pga-t">
+  <div class="pga-topo"><h2 class="pga-h" id="pga-t">Tarefas visíveis por cliente</h2> <span class="pga-badge">{{ arvores.todas.n }}</span>
+    <span class="pga-dica">cliente ▸ usina ▸ tipo · no tipo, as atrasadas em vermelho{{ ' · até 60 tarefas a árvore abre inteira' if arvores.todas.aberta }}</span></div>
+  {% if arvores.todas.n %}{{ arvore(arvores.todas.clientes, arvores.todas.aberta) }}{% else %}<p class="pga-vazio">{{ msg_so_nf }}</p>{% endif %}
+</section>
+{% endif %}
+
+{# ── a confiabilidade (parte C, 04/11/2026; o renderConfiab e o renderMttrCluster do painel), com a conta da
+   Engenharia: fechados; o corpo vem por fetch quando o bloco abre (a página não espera por ele). Valem o cliente, a usina
+   e a equipe cluster de cima; a linha de baixo do título diz quando algum outro filtro está escolhido ── #}
+<details class="pgc" id="pgc-conf" data-url="{{ url(cf='conf') }}">
+  <summary class="pgc-sum"><i class="ph ph-caret-right pgc-chev" aria-hidden="true"></i><span class="pgc-t">
+    <span class="pgc-tit"><i class="ph ph-heartbeat" aria-hidden="true"></i>Confiabilidade por ativo</span>
+    <span class="pgc-sub">MTBF · MTTR · Disponibilidade inerente · base: {{ base_falhas }} · conta da Engenharia<span class="pgc-quando"></span>{% if nao_se_aplicam %} · {{ nao_se_aplicam }}{% endif %}</span></span></summary>
+  <div class="pgc-corpo"></div>
+</details>
+<details class="pgc" id="pgc-mttr" data-url="{{ url(cf='mttr') }}">
+  <summary class="pgc-sum"><i class="ph ph-caret-right pgc-chev" aria-hidden="true"></i><span class="pgc-t">
+    <span class="pgc-tit"><i class="ph ph-wrench" aria-hidden="true"></i>Tempo médio de reparo por Equipe Cluster</span>
+    <span class="pgc-sub">MTTR por equipe cluster · os piores no topo · média por falha · verde até 24 h, âmbar até 72 h, vermelho acima · conta da Engenharia<span class="pgc-quando"></span>{% if nao_se_aplicam %} · {{ nao_se_aplicam }}{% endif %}</span></span></summary>
+  <div class="pgc-corpo"></div>
+</details>
 {% endif %}
 </div>
+{% include "oscreator/card_os_abrir.html" %}
+<script src="{{ url_for('static', filename='pcm-gestao.js') }}"></script>
 <script>
   // o aviso do ícone fecha com o clique fora dele e com o Esc
   document.addEventListener("click", function (ev) {

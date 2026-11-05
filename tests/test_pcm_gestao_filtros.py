@@ -284,8 +284,11 @@ def test_a_tela_abre_com_varias_escolhas_e_com_os_filtros_novos(logado, fonte_fi
         r = logado.get("/t/pcm/gestao" + q)
         assert r.status_code == 200, q
     html = logado.get("/t/pcm/gestao?cliente=Cliente+A&cliente=Cliente+B&tipo_tarefa=Corretiva").get_data(as_text=True)
-    # o formulário de cima leva os filtros que ele não mostra, com todas as escolhas
-    assert '<input type="hidden" name="tipo_tarefa" value="Corretiva">' in html
+    # a barra de cima (parte B) mostra todos os filtros, com todas as escolhas marcadas; a busca do Plano & Fila os leva
+    # escondidos
+    assert '<input type="checkbox" name="tipo_tarefa" value="Corretiva" checked>' in html
+    assert '<input type="checkbox" name="cliente" value="Cliente B" checked>' in html
+    assert '<input type="hidden" name="tipo_tarefa" value="Corretiva">' in html.split('class="pg-busca-f"', 1)[1]
     assert "Limpar filtros" in html
 
 
