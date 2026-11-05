@@ -21,6 +21,7 @@ from flask import Response, current_app, render_template, request
 
 from ...dados import livros
 from .. import fonte
+from .. import gestao as G
 from . import curadoria as CUR
 from . import dados as D
 from .mapa import Geo
@@ -112,7 +113,9 @@ def montar(forcar: bool = False) -> dict:
         return c[2]
     with _TRAVA:
         geo, colab, sup, aviso_geo = _geo_e_pessoas()
-        hoje = datetime.now(BRT).date()
+        # o "hoje" da Gestão PCM (Brasília, o mesmo relógio da conta): os testes o param num dia só. Com o relógio do
+        # sistema aqui, o teste da tela quebrou em 05/11/2026, quando a OS de 10/10 da amostra passou dos 25 dias do Radar
+        hoje = G.hoje()
         payload = D.montar(lg.dados, lb.dados, mp, cur.get("itens") or [], cur.get("manutencao") or {}, hoje, geo=geo,
                            colab=colab, sup_cadastro=sup)
         avisos = {"gestao": "" if lg.dados else (lg.erro or "sem dado"), "bd": "" if lb.dados else (lb.erro or "sem dado"),

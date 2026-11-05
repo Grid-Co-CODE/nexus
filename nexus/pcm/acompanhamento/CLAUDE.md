@@ -52,7 +52,9 @@ As três seguem a marca da tela no portão de setor.
 ## Como provar
 
 - `python -m pytest -q tests/test_pcm_acompanhamento.py` (as contas, a curadoria cifrada no banco de mentira, o mapa sem
-  número de coordenada no JSON, as rotas, o setor e o `node --check` do JS).
+  número de coordenada no JSON, as rotas, o setor e o `node --check` do JS). O "hoje" da tela é o `gestao.hoje()` (o mesmo
+  relógio de Brasília da Gestão PCM), que os testes param em 14/10/2026: com o relógio do sistema na rota, o teste da tela
+  quebrou em 05/11/2026, quando a OS de 10/10 da amostra passou dos 25 dias do Radar.
 - A tela, numa cópia de prova (`ferramentas/subir_copia_de_prova.py`) com os JSON reais do PCM (`NEXUS_PCM_GESTAO_FONTE`,
   `NEXUS_PCM_FONTE`), a curadoria num arquivo (`NEXUS_PCM_CURADORIA_ARQUIVO`, só fora do servidor), uma Gerencial
   sintética cifrada (`prova_gestao.gerencial_sintetica`) e o cadastro do PC (armazém e chave do .env, nunca impressos).
