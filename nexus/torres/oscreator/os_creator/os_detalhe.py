@@ -185,7 +185,7 @@ def juntar_notas(tasks: list) -> list[str]:
     notas: list[str] = []
     for t in tasks:
         for k in ("note", "task_note"):
-            v = _campo_de_nota(t, k)
+            v = api._campo_de_nota(t, k)
             if not v or any(v in x for x in notas):
                 continue
             notas = [x for x in notas if x not in v] + [v]
@@ -219,7 +219,7 @@ def get_os_detalhes(id_work_order) -> dict:
                     "det": (api._cabecalho_os, id_work_order)})
     tasks, items = lev1["tasks"], lev1["items"]
     t0 = tasks[0] if tasks else {}
-    notas = juntar_notas(tasks)
+    notas = api.juntar_notas(tasks)
     # A ORDEM das subtarefas é a da TAREFA e, dentro dela, o `order_number` (Levi, 08/10/2026: "quando a OS tem mais que
     # uma tarefa está duplicando as subtarefas"). O `order_number` recomeça em 1 em cada tarefa (REST, OS 8709: 13
     # tarefas, cada uma de 1 a n), e a ordem só por ele intercalava as tarefas: na OS de 8 tarefas com o mesmo checklist
@@ -336,15 +336,33 @@ def get_os_detalhes(id_work_order) -> dict:
             "notas": "\n".join(notas),
             # os dois campos crus da 1ª tarefa: o `editar_nota_os` grava só a `note`, e quem escreve na nota parte dela
             # (ou, na 1ª vez, da `task_note` com que a OS nasceu), nunca da junção acima (05/11/2026, a ponte da Engenharia)
-            "nota_gravada": _campo_de_nota(t0, "note"),
-            "nota_da_tarefa": _campo_de_nota(t0, "task_note"),
+            "nota_gravada": api._campo_de_nota(t0, "note"),
+            "nota_da_tarefa": api._campo_de_nota(t0, "task_note"),
             "subtarefas": subtarefas,
             "tarefas": tarefas,
             "etiquetas": [{"id": l.get("id"), "nome": l.get("description"), "cor": l.get("color")}
                           for l in (det.get("labels") or []) if isinstance(l, dict) and l.get("id") is not None],
             "code": code0, "ativo": ativo0,
+            # a usina e a data de criação no card (Levi, 05/11/2026: "as vezes clico na OS sem contexto e não sei que usina
+            # é. adicione também data de criação da OS")
+            "usinas": api._usinas_da_os(tasks),
+            "criada": det.get("creation_date") or t0.get("creation_date"),
             # o status da OS (1..4, `WO_STATUS`): o PDF da OS diz em que pé ela está (19/10/2026)
             "status_id": det.get("id_status_work_order") or t0.get("id_status_work_order")}
+
+
+def _usinas_da_os(tasks: list) -> list:
+    """As usinas dos ativos das tarefas, na ordem delas e sem repetir: a mesma Usina (nome curto) da coluna do Histórico, pelo
+    código do ativo no catálogo central em memória. Sem o catálogo, nenhuma: o card não espera a carga dos ativos."""
+    cat = api.ativos_central.atual()
+    local = cat.local_por_codigo if cat is not None else {}
+    usinas = []
+    for t in tasks or []:
+        cod = str(t.get("code_item") or "").strip() or api._extrai_code(str(t.get("items_description") or ""))
+        u = ((local.get(cod) if cod else None) or ("", "", ""))[1]
+        if u and u not in usinas:
+            usinas.append(u)
+    return usinas
 
 
 def get_os_detalhes_por_folio(folio) -> dict:

@@ -178,6 +178,34 @@ body.os-modal-aberto{overflow:hidden}
 .det-ico-sq{width:46px;height:46px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:none;border:1px solid var(--f-border)}
 .det-ico-sq.v{background:rgba(166,226,46,.14)}.det-ico-sq.a{background:rgba(87,182,245,.14)}
 .det-banner-t{font-size:17px;font-weight:600;color:#fff}.det-banner-code{margin-left:auto;color:var(--f-muted);font-size:12px;white-space:nowrap}
+/* a usina em cima dos ativos (05/11/2026: "Usina sempre acima dos ativos! pois a usina é mais importante"): ela vira o título
+   do banner, e os ativos descem um degrau; no celular, o código do ativo vai para baixo, alinhado ao texto */
+.det-banner-col{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1 1 0}
+.det-banner-usina{display:flex;flex-direction:column;gap:3px;min-width:0}
+.det-banner-n{color:var(--f-muted);font-size:12.5px;font-weight:600}
+.det-banner-ativo{font-size:14px;font-weight:600}
+@media (max-width:560px){.det-banner{flex-wrap:wrap}.det-banner-col~.det-banner-code{margin-left:60px;flex-basis:100%}}
+/* a bateria do quanto da OS foi feito (05/11/2026): as subtarefas concluídas, numa coluna dela à direita da duração, com a
+   etiqueta embaixo das duas ("encaixe melhor no espaço dela"); no celular, entre a duração e a etiqueta. O
+   recheio é o da barra das subtarefas (`det-prog-f`, verde e laranja nos dois temas) */
+.det-dur.com-bat{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:1fr auto;
+  grid-template-areas:"txt bat" "etq etq";column-gap:20px;row-gap:10px}
+.det-dur-txt{grid-area:txt;display:flex;flex-direction:column;gap:10px;min-width:0}
+/* os dois quadrados de cima com o conteúdo no meio, nos dois sentidos (Levi: "deixe o quadrado do horário centralizado
+   horizontal e verticalmente") */
+.det-dur.com-bat .det-dur-txt{align-items:center;justify-content:center;text-align:center}
+.det-dur.com-bat .det-etq-l{grid-area:etq;align-self:end}
+.det-bat-caixa{grid-area:bat;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
+  padding:4px 4px 4px 22px;border-left:1px solid var(--f-border)}
+.det-bat-linha{display:flex;align-items:center;gap:16px}
+.det-bat{position:relative;display:block;width:120px;height:46px;padding:4px;border:2px solid var(--f-muted);border-radius:11px;
+  box-sizing:border-box}
+.det-bat::after{content:"";position:absolute;right:-8px;top:13px;width:6px;height:16px;border-radius:0 4px 4px 0;background:var(--f-muted)}
+.det-bat .det-prog-f{display:block;border-radius:6px}
+.det-bat-caixa.vazia .det-bat{border-style:dashed}
+.det-bat-pct.det-dur-v{font-size:24px;min-width:3.2ch}
+@media (max-width:560px){.det-dur.com-bat{grid-template-columns:minmax(0,1fr);grid-template-areas:"txt" "bat" "etq"}
+  .det-bat-caixa{padding:12px 0 2px;border-left:0;border-top:1px solid var(--f-border)}}
 /* os ativos da OS de vários ativos em etiquetas, na ordem natural (04/11/2026: era uma frase corrida) */
 .det-banner-ativos{display:flex;flex-direction:column;gap:8px;min-width:0}
 .det-ativos{display:flex;flex-wrap:wrap;gap:6px}

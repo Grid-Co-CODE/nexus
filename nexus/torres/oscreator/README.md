@@ -2628,6 +2628,24 @@ tarefa e dê para baixar tudo de uma vez, o download sai com o nome do ativo!"; 
 - Prova: `tests/test_oscreator_card_ativos_anexos_04_11.py`; os 2 testes de `test_oscreator_card_por_ativo_28_10.py`
   aceitam o `data-ativo` novo na tarefa.
 
+## O card diz a usina, a data de criação e quanto já foi feito (05/11/2026)
+
+Levi, 05/11/2026: "as vezes clico na OS sem contexto e não sei que usina é. adicione também data de criação da OS"; "Usina
+sempre acima dos ativos! pois a usina é mais importante"; e, no espaço livre do card da duração, "uma barra dizendo a
+porcentagem da OS? quanto foi feita? ... tipo barra de bateria do celular".
+- **A usina** (`os_detalhe._usinas_da_os`): a mesma da coluna Usina do Histórico (o nome curto), pelo código de cada ativo
+  das tarefas no catálogo central em memória (`ativos_central.atual().local_por_codigo`), cada uma uma vez. É o título do
+  banner ("Usina" ou "Usinas"), em cima dos ativos, que descem um degrau (o nome do ativo, ou "N ativos" e as etiquetas).
+  Sem o catálogo carregado, o card não espera a carga: fica como era, com o ativo de título.
+- **A data de criação** (`criada`): o `creation_date` do cabeçalho da OS (ou da 1ª tarefa), em Brasília, na linha "Data de
+  criação" embaixo do "Criado por". A 1ª pintura do card (`_os_previa.html`) já mostra as duas, pela linha da lista
+  central (`usina` e `data`), para o card não pular.
+- **A bateria** ("Feito", num quadrado dela à direita do da duração, os dois com o conteúdo no meio, e a etiqueta no
+  retângulo embaixo; no celular, entre a duração e a etiqueta): as subtarefas concluídas, a mesma conta da barra
+  das subtarefas, com o "X de Y subtarefas" embaixo. O recheio é o da barra (`det-prog-f`, verde completa e laranja em
+  andamento, nos dois temas); vazia sem nada feito e tracejada, com "—", na OS sem subtarefas.
+- Prova: `tests/test_oscreator_card_usina_criacao_05_11.py`; conferido na bancada (desktop, 375 px e tema claro).
+
 ## A solicitação aprovada avisa quem pediu (04/11/2026)
 
 O aviso "Sua solicitação gerou uma OS" do sino do Nexus (`nexus/comando/avisos.py`): o `api_aprovar` do `rotas_solic`

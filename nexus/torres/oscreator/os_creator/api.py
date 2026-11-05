@@ -1240,9 +1240,9 @@ from os_estado import (  # noqa: E402,F401
     _wo_id_por_folio, _wo_resumo, cancel_os, cancelamento_da_os, checar_data_fim, concluir_os, concluir_os_checado,
     editar_nota_os, fluxo_da_os, get_cancel_motivos, mudar_responsavel, mudar_status_os, os_por_folio, status_da_os)
 from os_detalhe import (  # noqa: E402,F401
-    RPC_WO_PARENTS, _ATRIB_NOME_KEYS, _FORM_RESP_KEYS, _VERIF_MAP, _cabecalho_os, _folio_da_os_pai,
+    RPC_WO_PARENTS, _ATRIB_NOME_KEYS, _FORM_RESP_KEYS, _VERIF_MAP, _cabecalho_os, _campo_de_nota, _folio_da_os_pai,
     _form_item_resposta, _ids_atribuido, _juntos, _nome_atribuido, _personnel_nome_por_id, _solicitacao_da_os,
-    buscar_os_pai, get_os_detalhes, get_os_detalhes_por_folio, get_os_para_clonar)
+    _usinas_da_os, buscar_os_pai, get_os_detalhes, get_os_detalhes_por_folio, get_os_para_clonar, juntar_notas)
 from os_historico import (  # noqa: E402,F401
     HISTORICO_CAP, RPC_WO_FORMIT, RPC_WO_TASKS, TIPOS_COS, _MetaLida, _Passos, _code_to_loc, _extrai_code,
     _extrai_codigos, _lista_pela_metade, _meta_tarefa_por_os, _primeiro, _shape_wo_row, contar_minhas_analises,

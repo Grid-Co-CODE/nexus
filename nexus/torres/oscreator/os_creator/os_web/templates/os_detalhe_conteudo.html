@@ -57,10 +57,17 @@
       <span class="det-ico-sq v">{{ icone('clipboard', '#A6E22E', 22) }}</span>
       {# os ativos em etiquetas, na ordem natural (Levi, 04/11/2026: "quero que os ativos fiquem mais organizados"): era uma
          frase corrida, "16 ativos: Inversor 1.1 · Inversor 1.10 · ...", na ordem do Fracttal #}
-      {% if por_ativo %}<div class="det-banner-ativos"><span class="det-banner-t">{{ ativos_os|length }} ativos</span>
-        <div class="det-ativos">{% for a in ativos_os %}<span class="det-ativo">{{ a }}</span>{% endfor %}</div></div>
-      {% else %}<span class="det-banner-t">{{ d.ativo or '—' }}</span>
-      {% if d.code %}<span class="det-banner-code">{{ d.code }}</span>{% endif %}{% endif %}
+      {# a USINA em cima dos ativos (Levi, 05/11/2026: "as vezes clico na OS sem contexto e não sei que usina é"; "Usina sempre
+         acima dos ativos! pois a usina é mais importante"), a mesma da coluna Usina do Histórico; sem ela, o banner de antes #}
+      {% set usinas = d.usinas or [] %}
+      <div class="det-banner-col">
+        {% if usinas %}<div class="det-banner-usina" data-usina><span class="det-sec">{{ 'Usinas' if usinas|length > 1 else 'Usina' }}</span>
+          <b class="det-banner-t">{{ usinas|join(' · ') }}</b></div>{% endif %}
+        {% if por_ativo %}<div class="det-banner-ativos"><span class="{{ 'det-banner-n' if usinas else 'det-banner-t' }}">{{ ativos_os|length }} ativos</span>
+          <div class="det-ativos">{% for a in ativos_os %}<span class="det-ativo">{{ a }}</span>{% endfor %}</div></div>
+        {% else %}<span class="{{ 'det-banner-ativo' if usinas else 'det-banner-t' }}">{{ d.ativo or '—' }}</span>{% endif %}
+      </div>
+      {% if d.code and not por_ativo %}<span class="det-banner-code">{{ d.code }}</span>{% endif %}
     </div>
 
     <div class="det-cols">
@@ -72,11 +79,27 @@
           <button type="button" class="det-mini" data-acao="responsavel" title="Atribuir esta OS a outra pessoa">trocar</button></div>
         <div class="det-row">{{ icone('userplus', '#8A93A8', 18) }}<span class="det-k">Criado por</span>
           <span class="det-pessoa">{% if d.criado_por %}<span class="det-av">{{ d.criado_por|iniciais }}</span>{% endif %}<b>{{ d.criado_por or '—' }}</b></span></div>
+        <div class="det-row" data-criada>{{ icone('calendar', '#8A93A8', 18) }}<span class="det-k">Data de criação</span><span class="det-v">{{ fmt(d.criada) if d.criada else '—' }}</span></div>
       </div>
-      <div class="det-card det-dur">
-        <div class="det-sec-h"><span class="det-ico-round s">{{ icone('clock', '#A6E22E', 16) }}</span><span class="det-sec">DURAÇÃO TOTAL</span></div>
-        <div class="det-dur-v">{{ dur or '—' }}</div>
-        <div class="det-ajuda">{% if dur %}do evento ao fim{% elif not d.data_fim %}OS ainda sem data de fim{% else %}datas sem intervalo válido{% endif %}</div>
+      {# a duração à esquerda e a bateria numa coluna dela, à direita, com a etiqueta embaixo das duas (Levi, 05/11/2026:
+         "encaixe melhor no espaço dela") #}
+      <div class="det-card det-dur com-bat">
+          <div class="det-dur-txt">
+            <div class="det-sec-h"><span class="det-ico-round s">{{ icone('clock', '#A6E22E', 16) }}</span><span class="det-sec">DURAÇÃO TOTAL</span></div>
+            <div class="det-dur-v">{{ dur or '—' }}</div>
+            <div class="det-ajuda">{% if dur %}do evento ao fim{% elif not d.data_fim %}OS ainda sem data de fim{% else %}datas sem intervalo válido{% endif %}</div>
+          </div>
+          {# a BATERIA do quanto da OS foi feito (Levi, 05/11/2026: "que tal uma barra dizendo a porcentagem da OS? quanto foi
+             feita? ... tipo barra de bateria do celular"): as subtarefas concluídas, a mesma conta da barra das subtarefas;
+             o recheio é o dela (`det-prog-f`: verde completa, laranja em andamento), vazia sem nada feito, tracejada sem
+             subtarefas #}
+          {% set bat = 'vazia' if not n_sub else ('cheia' if completo else ('parcial' if n_feitas else 'zerada')) %}
+          <div class="det-bat-caixa {{ bat }}" data-bateria="{{ bat }}">
+            <span class="det-sec">Feito</span>
+            <div class="det-bat-linha"><span class="det-bat" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct if n_sub else 0 }}" aria-label="Subtarefas concluídas">{% if n_sub %}<span class="det-prog-f{% if not completo %} parcial{% endif %}" style="width:{{ pct }}%"></span>{% endif %}</span>
+              <b class="det-dur-v det-bat-pct">{{ (pct ~ '%') if n_sub else '—' }}</b></div>
+            <span class="det-ajuda">{% if n_sub %}{{ n_feitas }} de {{ n_sub }} subtarefas{% else %}OS sem subtarefas{% endif %}</span>
+          </div>
         <div class="det-etq-l"><span class="det-sec">ETIQUETA</span>
           {% for e in d.etiquetas %}{% set c = e.cor or '#A6A6A6' %}<span class="det-chip" data-id="{{ e.id }}" style="color:{{ c }};border-color:{{ c }};background:{{ c }}22">{{ e.nome }}</span>{% else %}<span class="det-ajuda">nenhuma</span>{% endfor %}
           <span class="det-dot">·</span><button type="button" class="det-link" data-acao="etiquetas">{% if d.etiquetas %}editar{% else %}definir{% endif %}</button></div>
