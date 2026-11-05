@@ -357,11 +357,15 @@ def _avisos_do_sino() -> list:
         return []
 
 
-@bp.route("/avisos/lida", methods=["POST"])
+@bp.route("/t/comando/aviso/lida", methods=["POST"])
 def avisos_lida():
     """O "Marcar como lida" do sino, de um aviso (`aviso`) ou de todos os que ele mostra (`todos=1`). Formulário sem
     JavaScript, como o tema: grava e volta para a mesma tela. O que não gravou (o banco fora, o login sem e-mail) volta com o
-    motivo no log, e o aviso segue no sino."""
+    motivo no log, e o aviso segue no sino.
+    Mora em /t/comando/ porque o Caddy do servidor só manda ao Nexus a raiz, /t/* e poucos outros caminhos: nasceu em
+    /avisos/lida e no servidor caía na plataforma (tests/test_rotas_no_caminho_do_nexus.py). O portão por setor abre o
+    caminho a quem tem uma tela do Comando, e a Caixa de entrada é de todo setor. "aviso" no singular, como insight/acao e
+    pedido/acao: uma tela "avisos" no Comando casaria com o caminho e trancaria quem não a tem."""
     from ..comando import avisos as AV
     usuario = session.get("usuario")
     ids = request.form.getlist("aviso")

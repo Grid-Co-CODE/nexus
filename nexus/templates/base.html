@@ -51,9 +51,9 @@
       {% if sino.n_avisos %}<p class="sino-t"><b>{{ sino.n_avisos }} {{ 'aviso das suas OS' if sino.n_avisos == 1 else 'avisos das suas OS' }}</b></p>
       <ul class="sino-avisos">{% for a in sino.avisos %}<li>
         <a class="sino-aviso" href="{{ raiz }}/os/_nexus/card/{% if a.wid %}{{ a.wid }}{% else %}folio/{{ a.folio }}{% endif %}?status={{ a.status|urlencode }}" data-os-wid="{{ a.wid or '' }}" data-os-folio="{{ a.folio }}" data-os-status="{{ a.status }}"><span class="sino-sev sino-sev--{{ 'ok' if a.tipo == 'execucao' else 'mencao' }}">{{ 'Executada' if a.tipo == 'execucao' else 'Solicitação' }}</span> {{ a.titulo }}<small class="sino-aviso-d">{{ a.detalhe }} · {{ a.quando_txt }}</small></a>
-        <form method="post" action="{{ raiz }}/avisos/lida"><input type="hidden" name="aviso" value="{{ a.id }}"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar como lida</button></form>
+        <form method="post" action="{{ raiz }}/t/comando/aviso/lida"><input type="hidden" name="aviso" value="{{ a.id }}"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar como lida</button></form>
       </li>{% endfor %}</ul>
-      <form method="post" action="{{ raiz }}/avisos/lida" class="sino-lidas"><input type="hidden" name="todos" value="1"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar todas como lidas</button></form>{% endif %}
+      <form method="post" action="{{ raiz }}/t/comando/aviso/lida" class="sino-lidas"><input type="hidden" name="todos" value="1"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar todas como lidas</button></form>{% endif %}
       {% if sino.n_mencoes %}<p class="sino-t"><b>{{ sino.n_mencoes }} {{ 'menção sem ler' if sino.n_mencoes == 1 else 'menções sem ler' }}</b></p>
       <ul>{% for m in sino.mencoes %}<li><a href="{{ raiz }}{{ m.link }}"><span class="sino-sev sino-sev--mencao">Menção</span> {{ m.titulo }}</a></li>{% endfor %}</ul>{% endif %}
       {% if sino.n_pedidos %}<p class="sino-t"><b>{{ sino.n_pedidos }} {{ 'pedido para o seu setor' if sino.n_pedidos == 1 else 'pedidos para o seu setor' }}</b></p>

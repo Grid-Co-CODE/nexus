@@ -14,6 +14,8 @@ from nexus.comando import avisos as AV
 from nexus.dados import catalogo, explica
 
 Reg = namedtuple("Reg", "id folio descricao atribuido_a status_id data_fim")
+# o Marcar como lida mora debaixo de /t/ (05/11/2026): nasceu em /avisos/lida, que o Caddy do servidor manda à plataforma
+LIDA = "/t/comando/aviso/lida"
 
 
 def _fim(dias_atras: float) -> str:
@@ -98,11 +100,12 @@ def test_o_sino_mostra_o_aviso_abre_o_card_e_marcar_como_lida_tira(app, banco, l
     botao = sino.split("</summary>", 1)[0]                                # o botão leva o ícone do OS Creator, não o sino
     assert 'class="ph ph-clipboard-text"' in botao and "ph-bell" not in botao
     aid = re.search(r'name="aviso" value="([^"]+)"', sino).group(1)
-    r = c.post("/avisos/lida", data={"aviso": aid, "voltar": "/t/comando/caixa-de-entrada"})
+    assert sino.count(f'action="{LIDA}"') == 2 and "/avisos/lida" not in html       # a lida e a "todas", na rota que existe
+    r = c.post(LIDA, data={"aviso": aid, "voltar": "/t/comando/caixa-de-entrada"})
     assert r.status_code in (302, 303) and r.headers["Location"].endswith("/t/comando/caixa-de-entrada")
     assert [(l["aviso_id"], l["evento"]) for l in banco.linhas(AV.LIVRO, AV.ABA)] == [(aid, "leu")]
     assert "concluída pelo técnico" not in c.get("/").get_data(as_text=True)
-    c.post("/avisos/lida", data={"aviso": aid, "voltar": "/"})                    # o duplo clique não grava outra
+    c.post(LIDA, data={"aviso": aid, "voltar": "/"})                              # o duplo clique não grava outra
     assert len(banco.linhas(AV.LIVRO, AV.ABA)) == 1
 
 
@@ -110,10 +113,19 @@ def test_marcar_todas_como_lidas_e_o_id_que_nao_e_de_aviso(app, banco, limpo, li
     lista.linhas.append(Reg(106, "18379", "Limpeza", "Técnico Exemplo", 3, _fim(2)))
     c = _cliente_de(app, PESSOA)
     assert "2 avisos das suas OS" in _sino(c.get("/").get_data(as_text=True))
-    c.post("/avisos/lida", data={"todos": "1", "voltar": "/"})
+    c.post(LIDA, data={"todos": "1", "voltar": "/"})
     assert sorted(l["aviso_id"].split(":")[1] for l in banco.linhas(AV.LIVRO, AV.ABA)) == ["101", "106"]
-    c.post("/avisos/lida", data={"aviso": "<script>", "voltar": "https://outro.exemplo"})
+    c.post(LIDA, data={"aviso": "<script>", "voltar": "https://outro.exemplo"})
     assert len(banco.linhas(AV.LIVRO, AV.ABA)) == 2
+
+
+def test_o_marcar_como_lida_abre_para_todo_setor_no_portao(app):
+    """Debaixo de /t/comando/ o portão por setor abre o caminho a quem tem uma tela da torre, e a Caixa de entrada é de
+    todo setor: todo mundo com setor marca como lida. Uma tela do Comando que casasse com o caminho (como /insights/...
+    casava com a tela Insights) trancaria quem não a tem: por isso o singular, como insight/acao e pedido/acao."""
+    from nexus.auth import setor_telas as ST
+    with app.app_context():
+        assert ST.pode(LIDA, {"comando/caixa-de-entrada"})
 
 
 def test_o_gancho_da_aprovacao_grava_por_tras_no_contexto_do_nexus(app, monkeypatch):
