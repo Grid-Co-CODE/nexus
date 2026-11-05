@@ -30,6 +30,12 @@
         {{ termo('Nível') }}<dd>Crítico com 4 falhas ou mais, ou 3 em 7 dias; atenção com 3 falhas, ou 2 em 7 dias, ou acima do P90; monitorar com 2. Criticidade A sobe monitorar para atenção. Só serviço (nenhuma falha e 2 OS ou mais) fica em monitorar para reclassificar a OS. OS cancelada não conta.</dd>
         {{ termo('Disponibilidade') }}<dd>MTBF ÷ (MTBF + MTTR), por ativo, desde 20/10/2025 (corretiva, emergencial, religamento e religamento remoto). MTBF = horas desde a mobilização (do cadastro) menos as horas paradas, ÷ nº de falhas. MTTR = média do incidente ao fim (até 1 dia, em horas corridas; acima, 12 h por dia). λ = 1 ÷ MTBF.</dd>
         {{ termo('Criticidade') }}<dd>Por família enquanto a matriz real não existe: inversor, QGBT, cabine e transformador = A; outros = B; tracker = C. O ativo é o código do Fracttal (com a usina); usina, cliente e cluster vêm do cadastro do Nexus.</dd>
+        {{ termo('Estatísticas') }}<dd>disponibilidade, MTBF e MTTR são as <b>medianas dos ativos</b> do grupo. A conta do grupo
+      inteiro soma as falhas da frota toda e derruba a disponibilidade (era assim que a Athon aparecia com 14%); a mediana diz
+      como está um ativo típico do cliente. "Eventos" são as falhas desde 20/10/2025.</dd>
+        {{ termo('De onde vem') }}<dd>As OS de falha (corretiva, corretiva emergencial, religamento e religamento remoto)
+    lidas pelo Nexus no Fracttal: as abertas a cada leitura, as concluídas desde 20/10/2025 guardadas e atualizadas pelo
+    que fechou depois; as canceladas ficam fora. {{ est.n }} OS na conta de agora.</dd>
       {% endcall %}</div></div>
     <div class="cn-frescor">OS de falha do Fracttal<br><b>contas às {{ lido }}</b></div>
   </header>
@@ -210,9 +216,7 @@
           <td data-v="{{ r.disp if r.disp is not none else -1 }}" class="eg-num eg-disp-cel">{{ disp_barra(r.disp) }}</td></tr>
       {% else %}<tr><td colspan="{{ cols|length + 2 }}" class="mudo">Nada com esses filtros.</td></tr>{% endfor %}
       </tbody></table></div>
-    <p class="eg-leia"><b>Como ler:</b> disponibilidade, MTBF e MTTR são as <b>medianas dos ativos</b> do grupo. A conta do grupo
-      inteiro soma as falhas da frota toda e derruba a disponibilidade (era assim que a Athon aparecia com 14%); a mediana diz
-      como está um ativo típico do cliente. "Eventos" são as falhas desde 20/10/2025.</p>
+    {# o "Como ler" da tabela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
   </section>
   {% endif %}
   {# a gaveta de cada cartão da aba aberta (o acompanhamento entra nela; 18/10/2026) #}
@@ -222,9 +226,7 @@
     <button type="button" class="eg-gav-fechar" aria-label="Fechar">×</button>
     <div class="eg-gav-corpo"></div>
   </aside>
-  <div class="cn-nota"><b>De onde vem.</b> As OS de falha (corretiva, corretiva emergencial, religamento e religamento remoto)
-    lidas pelo Nexus no Fracttal: as abertas a cada leitura, as concluídas desde 20/10/2025 guardadas e atualizadas pelo
-    que fechou depois; as canceladas ficam fora. {{ est.n }} OS na conta de agora.</div>
+  {# o "De onde vem" foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
 </div>
 {% include "oscreator/card_os_abrir.html" %}
 <script src="{{ url_for('static', filename='engenharia-os.js') }}"></script>

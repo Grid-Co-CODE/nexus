@@ -15,8 +15,8 @@ def _pagina(cliente):
 def test_a_explicacao_e_as_metas_ficam_no_ponto_de_exclamacao(tela, cliente):
     html = _pagina(cliente)
     cab = html.split('class="cn-cab eg-cab"', 1)[1].split("</header>", 1)[0]
-    assert 'class="hs-aviso-bt"' in cab and "Confiabilidade dos ativos" in cab
-    caixa = cab.split('class="hs-legenda hs-aviso-caixa"', 1)[1]
+    assert 'class="gc-explica-bt"' in cab and "Confiabilidade dos ativos" in cab
+    caixa = cab.split('class="gc-explica-caixa"', 1)[1]
     assert "Para que serve" in caixa and "classe mundial" in caixa and "MTBF ÷ (MTBF + MTTR)" in caixa
     # a leitura do Fracttal no mesmo cabeçalho, à direita do título
     assert "contas às" in cab
@@ -24,6 +24,8 @@ def test_a_explicacao_e_as_metas_ficam_no_ponto_de_exclamacao(tela, cliente):
     resto = html.replace(caixa, "")
     assert "Entenda esta tela" not in html and 'class="cn-pergunta"' not in html
     assert "eg-kpi-rodape" not in resto and "classe mundial" not in resto
+    # o "Como ler" da tabela e o "De onde vem" também (05/11/2026, o padrão do Nexus)
+    assert "medianas dos ativos" in caixa and "As OS de falha" in caixa and 'class="cn-nota"' not in html
 
 
 def test_os_numeros_vem_antes_dos_filtros_e_as_abas_depois(tela, cliente):
