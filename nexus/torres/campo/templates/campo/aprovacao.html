@@ -294,6 +294,26 @@
       if (ev.target.closest('[data-apq-g-fechar]')) { fecharGaveta(); return; }
       var card = ev.target.closest('[data-apq-card]');
       if (card) { abrirCard(card.getAttribute('data-apq-card'), card.getAttribute('data-folio')); return; }
+      // o PDF da OS (05/11/2026: "Quero o botão de baixar o PDF da OS!"): o do OS Creator, como nas OSs em verificação do
+      // Painel, com a sessão do Fracttal de quem clica; a mensagem fica na barra
+      var pdf = ev.target.closest('[data-apq-pdf]');
+      if (pdf) {
+        var gm = gCorpo.querySelector('[data-apq-g-msg]'), rotPdf = pdf.innerHTML, folioPdf = pdf.getAttribute('data-folio');
+        function dizer(txt, html) {
+          if (!gm) { return; }
+          gm.hidden = !txt; gm.className = 'apq-msg cn-t-critico';
+          if (html) { gm.innerHTML = txt; } else { gm.textContent = txt; }
+        }
+        pdf.disabled = true; pdf.textContent = 'Gerando o PDF…'; dizer('');
+        pedir(nexusRota('/os/api/os/pdf'), {wid: pdf.getAttribute('data-apq-pdf'), folio: folioPdf}).then(function (r) {
+          pdf.disabled = false; pdf.innerHTML = rotPdf;
+          if (r.ok && !r.redirected && r.j.url) { location.href = nexusRota(r.j.url); return; }
+          if (r.status === 401) { dizer(ENTRAR, true); return; }
+          if (r.redirected || !r.json) { dizer(SESSAO); return; }
+          dizer(r.j.erro || ('Não consegui gerar o PDF da OS ' + folioPdf + '.'));
+        }).catch(function (e) { pdf.disabled = false; pdf.innerHTML = rotPdf; dizer('Não consegui gerar o PDF (' + e.message + ').'); });
+        return;
+      }
       // o Aprovar da barra é o do cartão: a mesma confirmação, o mesmo pedido e a mesma conferência
       var de = ev.target.closest('[data-apq-aprovar-de]');
       if (de) {

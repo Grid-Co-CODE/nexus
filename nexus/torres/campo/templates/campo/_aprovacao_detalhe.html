@@ -12,6 +12,8 @@
   <div class="apq-g-acoes">
     <button type="button" class="gc-btn gc-btn--primario" data-apq-aprovar-de="{{ o.id_wo }}">Aprovar</button>
     <button type="button" class="gc-btn gc-btn--contorno" data-apq-card="{{ o.id_wo }}" data-folio="{{ o.os }}"><i class="ph ph-arrow-square-out" aria-hidden="true"></i> Abrir o card da OS</button>
+    {# o PDF da OS do OS Creator, o mesmo das OSs em verificação do Painel (05/11/2026: "Quero o botão de baixar o PDF da OS!") #}
+    <button type="button" class="gc-btn gc-btn--contorno" data-apq-pdf="{{ o.id_wo }}" data-folio="{{ o.os }}"><i class="ph ph-file-pdf" aria-hidden="true"></i> Baixar o PDF da OS</button>
   </div>
   <p class="apq-msg" data-apq-g-msg role="status" hidden></p>
 </header>

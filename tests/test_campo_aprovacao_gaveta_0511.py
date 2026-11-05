@@ -97,3 +97,16 @@ def test_quem_e_do_app_sai_da_conta_pronta_sem_refazer(quadro, logado):
     logado.get("/t/campo/aprovacao?responsavel=*")
     do_app = aprovacao.tarefas_do_app()
     assert do_app["15002"] == set() and do_app["15088"]
+
+
+def test_a_barra_baixa_o_pdf_da_os(quadro, logado):
+    """"Quero o botão de baixar o PDF da OS!" (05/11/2026): o PDF do OS Creator (o mesmo das OSs em verificação do Painel),
+    com a sessão do Fracttal de quem clica; a sessão do Nexus vencida e o 401 têm a frase própria."""
+    logado.get("/t/campo/aprovacao?responsavel=*")
+    barra = logado.get("/t/campo/aprovacao/15088/detalhe").get_data(as_text=True)
+    assert 'data-apq-pdf="15088"' in barra and "Baixar o PDF da OS" in barra
+    html = _html(logado)
+    js = next(s for s in re.findall(r"<script>(.*?)</script>", html, re.S) if "data-apq-aprovar" in s)
+    pdf = js[js.index("closest('[data-apq-pdf]')"):]
+    assert "nexusRota('/os/api/os/pdf')" in pdf and "r.ok && !r.redirected && r.j.url" in pdf
+    assert "r.status === 401" in pdf and "SESSAO" in pdf

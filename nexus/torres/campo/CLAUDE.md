@@ -1803,8 +1803,9 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       a OS, a coluna, a UFV e o responsável; cada fato com a prova (a hora do fechamento no App e cada foto atrasada com o
       campo, a tarefa e a hora de anexação; os pares repetidos; as tarefas fechadas fora do App); as tarefas da OS (pelo
       App com a nota e os avisos do App, ou fora do App); e o estado das fotos. O número de cada foto e o "Abrir o card da
-      OS" abrem o card do OS Creator (`NexusOsCard.abrir`, status "Em Verificação"), onde as fotos estão; o Aprovar da
-      barra é o do cartão. Logo depois do score e dos avisos vem o **Aprovar** = o Concluir do OS Creator (`POST /os/api/os/<id>/concluir` com
+      OS" abrem o card do OS Creator (`NexusOsCard.abrir`, status "Em Verificação"), onde as fotos estão; o "Baixar o PDF
+      da OS" é o do OS Creator (`POST /os/api/os/pdf`, o mesmo das OSs em verificação do Painel; Levi: "Quero o botão de
+      baixar o PDF da OS!"); o Aprovar da barra é o do cartão. Logo depois do score e dos avisos vem o **Aprovar** = o Concluir do OS Creator (`POST /os/api/os/<id>/concluir` com
       `{folio}`, a rota do Painel do responsável e do OS Creator Web: status 3 + recalculate + reconferência da data de
       fim), com o login do Fracttal de quem clica; IRREVERSÍVEL, pede confirmação; o 401 vira "Entre no OS Creator com a
       sua conta do Fracttal". Aprovada só com `ok: true` na resposta: sem a sessão do Nexus, o portão dá 302 para /entrar
