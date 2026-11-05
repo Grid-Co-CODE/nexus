@@ -1,0 +1,19 @@
+{# As linhas do Só atrasadas da Gestão PCM (Levi, 04/11/2026; o gpFlatHTML do painel do PCM): Dias · OS · Cliente ·
+   Usina · Tarefa · Tipo · Estado · Data Prog. · Etiqueta · Observação da OS, das mais velhas para as mais novas. A página
+   leva a 1ª parte (100 linhas, gestao.PAGINA_ATRASADAS) e o "Mostrar mais" pede as outras por aqui (gestao?atr=1&ap=<de
+   onde seguir>); com `parte`, a resposta vem numa tabela com a marca de onde seguir. A OS abre o card dela no Nexus. #}
+{% if parte %}<table><tbody data-proximo="{{ proximo }}" data-restam="{{ restam }}">{% endif %}
+{% for x in linhas %}<tr class="pgs-lin{{ ' pgs-lin--crit' if x.dias_cls == 'crit' }}">
+  <td class="pg-dt" data-r="Dias">{% if x.dias_cls %}<span class="pgp-chip pgp-chip--{{ x.dias_cls }}">{{ x.dias }}</span>{% else %}{{ x.dias }}{% endif %}</td>
+  <td class="pg-dt" data-r="OS">{% if x.wid %}<button type="button" class="pgp-os-n" data-wid="{{ x.wid }}" data-status="{{ x.status }}" data-folio="{{ x.os }}" title="Abrir o card da OS {{ x.os }}">{{ x.os }}</button>{% else %}{{ x.os }}{% endif %}
+    {%- if x.url %} <a class="pgp-fracttal" href="{{ x.url|na_raiz }}" target="_blank" rel="noopener" title="Abrir a OS {{ x.os }} no Fracttal" aria-label="Abrir a OS {{ x.os }} no Fracttal"><i class="ph ph-arrow-square-out" aria-hidden="true"></i></a>{% endif %}</td>
+  <td data-r="Cliente">{{ x.cliente }}</td>
+  <td class="pg-obs" data-r="Usina" title="{{ x.usina }}">{{ x.usina }}</td>
+  <td class="pg-obs" data-r="Tarefa" title="{{ x.tarefa }}">{{ x.tarefa }}</td>
+  <td data-r="Tipo">{{ x.tipo }}</td>
+  <td data-r="Estado"><span class="pgp-estado pgp-estado--{{ x.estado_cls }}">{{ x.estado }}</span></td>
+  <td class="pg-dt" data-r="Data Prog.">{{ x.prog }}</td>
+  <td data-r="Etiqueta">{% for e in x.etiquetas %}<span class="pgp-chip pgp-chip--nulo">{{ e }}</span> {% else %}—{% endfor %}</td>
+  <td class="pg-obs" data-r="Observação da OS"{% if x.obs %} title="{{ x.obs }}"{% endif %}>{{ x.obs or '—' }}</td>
+</tr>{% endfor %}
+{% if parte %}</tbody></table>{% endif %}

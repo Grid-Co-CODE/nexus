@@ -8,6 +8,12 @@ parado no mesmo instante. Depois compara, caso a caso, o que o painel desenharia
 - Plano: cada linha (grupo, usina e TOTAL GERAL) e cada célula: texto, faixa de cor, se a fração abre a Fila e a dica
   do mouse com as OS; o Geral, os Pendentes e, com a Gerencial, a criticidade e a observação da usina.
 - Fila: as linhas, na ordem, com as colunas visíveis; os quatro KPIs; e o par de números do topo.
+- A aba além do Plano & Fila (04/11/2026; o renderGestao do js/app.js, com um `document` de mentira para os campos da
+  barra): os números do alto (Visíveis, Finalizadas, Em aberto, Atrasadas e a dica das Finalizadas), a linha
+  "Atualizado", as duas árvores Cliente ▸ Usina ▸ Tipo (nó a nó, na ordem, com as contagens e as atrasadas, e as
+  tabelas dos tipos linha a linha), o Só atrasadas e as listas de cada filtro. Os filtros de cima em várias
+  combinações (sem filtro, cliente, cliente + tipo, estado, etiqueta, OS e Solicitação por "contém", o período em
+  cada "considerar", duas escolhas no mesmo filtro...), também no Plano & Fila.
 
 A Gerencial (mpas.json) é cifrada: com `NEXUS_PCM_MPAS_SENHA` no ambiente a prova usa a de verdade (decifrada só em
 memória); sem ela, monta uma Gerencial SINTÉTICA a partir das OS de MPA/MPS do próprio gestao_pcm.json, com todos os
@@ -24,13 +30,17 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
 import urllib.request
+from collections import Counter
 from datetime import timedelta
 from pathlib import Path
+
+from werkzeug.datastructures import MultiDict
 
 from . import fonte, gestao as G
 
@@ -143,7 +153,83 @@ def casos(tarefas: list[dict], meses_: list[str]) -> list[dict]:
     novo({"modo": "fila", "drill": {"usina": usina_drill, "tipo": "MPS"}})
     for topo in topos[1:]:
         novo({"modo": "fila", "ordemF": "atraso", "descF": True}, topo)
+    # os filtros de cima completos (04/11/2026) também valem no Plano & Fila: o Plano com o Tipo Todos (o Tipo de cima
+    # vale), o Plano com Tipo próprio (o de cima sai) e a Fila
+    for _rot, topo in combos(esc, meses_):
+        novo({}, topo)
+        novo({"tipo": "prev", "col": "mes", "val": "pend"}, topo)
+        novo({"modo": "fila", "ordemF": "atraso", "descF": True}, topo)
     return out
+
+
+def combos(esc: list[dict], meses_: list[str]) -> list[tuple[str, dict]]:
+    """As combinações dos filtros de cima que a prova passa (nas chaves do GP_SEL do painel), tiradas do próprio JSON:
+    os valores mais comuns de cada campo, uma OS de poucas tarefas (a árvore que abre sozinha) e, se houver, uma OS só
+    de "não finalizadas no período" (a mensagem de visão principal vazia)."""
+    def por_frequencia(campo):
+        cont = Counter()
+        for t in esc:
+            v = t.get(campo)
+            for x in (v if isinstance(v, list) else [v]):
+                if x:
+                    cont[str(x)] += 1
+        return [v for v, _n in cont.most_common()] or [""]
+    cli, tipo, est, etq, usi, clu, resp = (por_frequencia(c) for c in (
+        "cliente", "tipo", "estado", "etiquetas", "usina", "cluster", "responsavel"))
+    oss = Counter(str(t.get("os")) for t in esc)
+    com_principal = {str(t.get("os")) for t in esc if not G.nao_finalizada(t)}
+
+    def acha_os(candidatas, regra):
+        """A primeira OS (das mais cheias) cujo "contém" pega um conjunto de OS que cabe na regra."""
+        for o in sorted(candidatas, key=lambda x: (-oss[x], x)):
+            if len(o) >= 4 and regra([x for x in oss if o in x]):
+                return o
+        return None
+    pequena = acha_os([o for o in oss if 3 <= oss[o] <= 40], lambda pega: sum(oss[x] for x in pega) <= 40)
+    so_nf = acha_os([o for o in oss if o not in com_principal], lambda pega: not any(x in com_principal for x in pega))
+    ini, fim = f"{meses_[1]}-01", f"{meses_[1]}-15"
+    out = [("sem filtro", {}), ("um cliente", {"cliente": [cli[0]]}),
+           ("cliente + tipo", {"cliente": [cli[0]], "tipo": [tipo[1 % len(tipo)]]}),
+           ("estado", {"estado": [est[1 % len(est)]]}), ("etiqueta", {"etq": [etq[0]]}),
+           ("OS por contém", {"os": "12"}), ("Solicitação por contém", {"ss": "29"}),
+           *((f"período, considerar {m}", {"pini": ini, "pfim": fim, "pmodo": m})
+             for m in ("qq", "prog", "ini", "fim")),
+           ("período só com o fim", {"pfim": f"{meses_[0]}-10"}),
+           ("duas escolhas no cliente", {"cliente": cli[:2]}), ("duas escolhas no tipo", {"tipo": tipo[1:3]}),
+           ("duas escolhas no estado", {"estado": est[-2:]}), ("duas etiquetas", {"etq": etq[1:3]}),
+           ("usina em maiúsculas", {"usina": [usi[0].upper()]}),
+           ("cluster em minúsculas", {"cluster": [clu[0].lower()]}),
+           ("responsável", {"resp": [resp[0]]}),
+           ("cliente + estado + período", {"cliente": [cli[1 % len(cli)]], "estado": [est[1 % len(est)]],
+                                           "pini": ini, "pfim": fim}),
+           ("tipo de cima com etiqueta", {"tipo": [tipo[0]], "etq": [etq[0]]}),
+           ("escolha que não existe", {"cliente": ["Cliente que não existe"]}), ("nada", {"os": "zzzz"}),
+           ("só atrasadas", {"atr": True}), ("só atrasadas de um cliente", {"atr": True, "cliente": [cli[0]]}),
+           ("só atrasadas sem nada", {"atr": True, "os": "zzzz"})]
+    if pequena:
+        out.append(("árvore pequena, que abre sozinha", {"os": pequena}))
+    if so_nf:
+        out.append(("só não finalizadas no período", {"os": so_nf}))
+    return out
+
+
+def casos_arv(tarefas: list[dict], meses_: list[str]) -> list[dict]:
+    """Os casos da aba além do Plano & Fila: as tabelas de todos os tipos sem filtro (as 32 mil tarefas, uma vez) e,
+    nos outros, de até 150 tipos espalhados pela árvore."""
+    return [{"id": f"a{i:03d}", "rot": rot, "topo": topo, "maxTabelas": None if not topo else 150}
+            for i, (rot, topo) in enumerate(combos(G.escopo(tarefas), meses_), 1)]
+
+
+_NA_URL = {"cliente": "cliente", "usina": "usina", "cluster": "cluster", "resp": "responsavel", "tipo": "tipo_tarefa",
+           "etq": "etiqueta", "estado": "estado"}
+
+
+def _args(topo: dict) -> MultiDict:
+    """O caso (nas chaves do GP_SEL do painel) como a URL da tela o escreve: o lado do Nexus passa pelo `G.filtros`."""
+    pares = [(_NA_URL[k], x) for k in _NA_URL for x in (topo.get(k) if isinstance(topo.get(k), list)
+                                                        else [topo.get(k)]) if x]
+    pares += [(k, topo[k]) for k in ("os", "ss", "pini", "pfim", "pmodo") if topo.get(k)]
+    return MultiDict(pares + ([("atr", "1")] if topo.get("atr") else []))
 
 
 # ── o lado do Nexus ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -212,14 +298,23 @@ def linhas_fila(ls: list[dict], ger: bool) -> list[dict]:
     return out
 
 
+_RECORTES: dict = {}           # o mesmo filtro aparece em vários casos: o recorte das 32 mil tarefas sai uma vez
+
+
+def _recorte(tarefas_esc, f: G.Filtros) -> G.Recorte:
+    if f not in _RECORTES:
+        _RECORTES[f] = G.recortar(tarefas_esc, f)
+    return _RECORTES[f]
+
+
 def nexus(caso: dict, tarefas_esc: list[dict], mp, meses_, h) -> dict:
+    """O que o Nexus calcula para o caso, pelas mesmas funções da tela (telas._ctx_gestao, sem a cópia guardada)."""
     gpv = caso["gpv"]
-    topo = {"cliente": caso["topo"].get("cliente", ""), "usina": caso["topo"].get("usina", ""),
-            "cluster": caso["topo"].get("cluster", ""), "responsavel": caso["topo"].get("resp", "")}
+    f = G.filtros(_args(caso["topo"]))
     o = _opcoes(gpv, meses_)
-    tarefas = G.filtrar_topo(tarefas_esc, **topo)
+    tarefas = G.tarefas_do_plano(_recorte(tarefas_esc, f), f, G.tipo_local(o, f))
     b = G.base(tarefas, meses_)
-    fila = G.fila_universo(tarefas, mp, topo, h)
+    fila = G.fila_universo(tarefas, mp, f, h)
     par = G.par_topo(b, meses_, fila)
     res = {"par": par}
     if o.modo == "plano":
@@ -235,7 +330,6 @@ def nexus(caso: dict, tarefas_esc: list[dict], mp, meses_, h) -> dict:
 
 def _par_painel(txt: str, ger: bool) -> dict:
     """Os números do par de topo, lidos do texto que o painel desenhou."""
-    import re
     rot = re.search(r"ROTINA \(MPM/MPT · [a-z]{3}/\d{2}\) (—|\d+%)", txt)
     out = {"rotina": rot.group(1) if rot else "?"}
     if ger:
@@ -312,6 +406,108 @@ def comparar(painel: dict, nx: dict, caso: dict, ger: bool) -> tuple[int, list[s
     return n, dif
 
 
+# a cor do painel e a classe do Nexus: o estado (gpEstadoPill) e os dias (gpDiasCell e gpFlatHTML)
+_ESTADO = {"gp-e-em": "info", "gp-e-pau": "nulo", "gp-e-fin": "ok", "gp-e-ni": "and"}
+_DIAS = {"red": "crit", "amber": "and", "ok": "ok", "": ""}
+_LISTA_DO_PAINEL = {"cliente": "cliente", "usina": "usina", "cluster": "cluster", "responsavel": "resp",
+                    "tipo_tarefa": "tipo", "etiqueta": "etq", "estado": "estado"}
+
+
+def _nos(clientes: list[dict]) -> list[dict]:
+    """A árvore do Nexus na sequência em que o painel a desenha: cliente, as usinas dele, os tipos de cada usina."""
+    out = []
+    for c in clientes:
+        out.append({"k": "c", "nome": c["nome"], "n": str(c["n"])})
+        for u in c["usinas"]:
+            out.append({"k": "u", "nome": u["nome"], "n": str(u["n"])})
+            out += [{"k": "t", "nome": x["nome"], "n": str(x["n"]), "atr": str(x["atrasadas"])} for x in u["tipos"]]
+    return out
+
+
+def comparar_aba(painel: dict, caso: dict, esc: list[dict], gestao: dict) -> tuple[int, list[str]]:
+    """A aba além do Plano & Fila, caso a caso: os números do alto, as listas de cada filtro, as duas árvores nó a nó,
+    as tabelas dos tipos linha a linha e o Só atrasadas. Nome de pessoa e texto livre (tarefa, etiqueta, observação)
+    não saem na divergência."""
+    dif, n = [], 0
+    alerta = int(gestao.get("diasAlerta") or 10)
+
+    def ver(rotulo, a, b, oculto=False):
+        nonlocal n
+        n += 1
+        if a != b:
+            dif.append(f"{caso['id']} ({caso['rot']}) {rotulo}: "
+                       + ("o texto difere (oculto)" if oculto else f"painel={a!r} nexus={b!r}"))
+    f = G.filtros(_args(caso["topo"]))
+    rec = _recorte(esc, f)
+    a = G.aba(rec.todas, alerta, f.atr)
+    num, k = a["numeros"], painel["k"]
+    for rot, chave, valor in (("Visíveis", "vis", "visiveis"), ("Finalizadas", "fin", "finalizadas"),
+                              ("Em aberto", "ab", "em_aberto"), ("Atrasadas", "atr", "atrasadas")):
+        ver(rot, k[chave], str(num[valor]))
+    # a dica e as mensagens pelas MESMAS peças que a tela usa (gestao.dica_finalizadas e as MSG_*): o que a tela mostra
+    # é o que se confere contra o painel
+    ver("a dica das Finalizadas", k["finTitle"], G.dica_finalizadas(num))
+    for nome, chave in _LISTA_DO_PAINEL.items():
+        esperado, baixa = list(painel["opcoes"][chave]), {v.lower() for v in painel["opcoes"][chave]}
+        for v in getattr(f, nome):                       # o escolhido fica na lista mesmo sem tarefa (regra do Nexus)
+            if v.lower() not in baixa:
+                baixa.add(v.lower())
+                esperado.append(v)
+        ver(f"a lista {nome}", esperado, rec.escolhas[nome], oculto=nome in ("responsavel", "etiqueta"))
+    if f.atr:
+        pl, rows = painel["plana"], a["so_atrasadas"]
+        # diferença de propósito: o painel abre a mensagem com um emoji (🎉); o Nexus não usa emoji na interface
+        ver("Só atrasadas vazia", pl["msg"] and re.sub(r"^\W+", "", pl["msg"]), G.MSG_SEM_ATRASADA if not rows else None)
+        ver("Só atrasadas: linhas", len(pl["rows"]), len(rows))
+        if rows:
+            ver("Só atrasadas: contagem", pl["cnt"], str(len(rows)))
+            ver("Só atrasadas: o limite do vermelho", pl["lim"], str(alerta))
+        for i, (x, y) in enumerate(zip(pl["rows"], rows)):
+            for campo in ("dias", "os", "cliente", "usina", "tipo", "estado", "prog"):
+                ver(f"Só atrasadas {i} {campo}", x[campo], y[campo])
+            ver(f"Só atrasadas {i} cor dos dias", _DIAS.get(x["diasCls"], x["diasCls"]), y["dias_cls"])
+            ver(f"Só atrasadas {i} cor do estado", _ESTADO.get(x["estadoCls"], x["estadoCls"]), y["estado_cls"])
+            for campo in ("tarefa", "etiquetas", "obs"):
+                ver(f"Só atrasadas {i} {campo}", x[campo], y[campo], oculto=True)
+        return n, dif
+    arv, nx = painel["arvore"], a["arvores"]
+    ver("a mensagem", arv["msg"], G.MSG_SEM_TAREFA if not num["todas"] else (G.MSG_SO_NF if not nx["todas"]["n"] else None))
+    ver("Não Finalizadas no Período", arv["nfN"], str(nx["nf"]["n"]) if nx["nf"]["n"] else None)
+    if nx["todas"]["clientes"]:
+        ver("a árvore abre sozinha", arv["aberta"], nx["todas"]["aberta"])
+    for qual, lista in (("nf", a["nf"]), ("todas", a["arr"])):
+        pa, nb = arv[qual], _nos(nx[qual]["clientes"])
+        ver(f"árvore {qual}: nós", len(pa), len(nb))
+        # as tabelas: as linhas de cada tipo pelo mesmo caminho da árvore que abre sozinha (`linhas`), e a rota da
+        # tabela (`tarefas_do_no`) conferida em parte dos nós
+        linhas = {}
+        for c in G.arvore(lista, alerta, linhas=True):
+            for u in c["usinas"]:
+                for x in u["tipos"]:
+                    linhas[(c["nome"], u["nome"], x["nome"])] = x["linhas"]
+        cli = usi = ""
+        for i, (x, y) in enumerate(zip(pa, nb)):
+            rot = f"árvore {qual} nó {i} ({x['k']}:{x['nome']})"
+            for campo in ("k", "nome", "n", "atr"):
+                ver(f"{rot} {campo}", x.get(campo), y.get(campo))
+            cli, usi = (x["nome"], "") if x["k"] == "c" else (cli, x["nome"] if x["k"] == "u" else usi)
+            if x["k"] != "t" or str(x.get("idx")) not in painel["tabelas"]:
+                continue
+            tab, minhas = painel["tabelas"][str(x["idx"])], linhas.get((cli, usi, x["nome"])) or []
+            if i % 25 == 0:
+                ver(f"{rot}: a rota da tabela", G.tarefas_do_no(lista, cli, usi, x["nome"], alerta), minhas or None)
+            ver(f"{rot}: linhas", len(tab), len(minhas))
+            for j, (p, m) in enumerate(zip(tab, minhas)):
+                for campo in ("os", "estado", "prog", "fim", "dias"):
+                    ver(f"{rot} linha {j} {campo}", p[campo], m[campo])
+                ver(f"{rot} linha {j} cor do estado", _ESTADO.get(p["estadoCls"], p["estadoCls"]), m["estado_cls"])
+                ver(f"{rot} linha {j} cor dos dias", _DIAS.get(p["diasCls"], p["diasCls"]), m["dias_cls"])
+                ver(f"{rot} linha {j} tarefa", p["tarefa"], m["tarefa"], oculto=True)
+                ver(f"{rot} linha {j} etiquetas", p["etiquetas"],
+                    m["etiquetas"] + ([f"+{m['etiquetas_mais']}"] if m["etiquetas_mais"] else []), oculto=True)
+    return n, dif
+
+
 def rodar_node(entrada: dict) -> dict:
     node = shutil.which("node")
     if not node:
@@ -356,23 +552,39 @@ def main(argv=None) -> int:
     total_n, total_dif, total_casos = 0, [], 0
     for ger, rotulo in ((False, "sem a Gerencial (lado do Fracttal)"), (True, "com " + qual_ger)):
         cs = casos(gestao.get("tarefas") or [], meses_)
-        saida = rodar_node({"js": js, "gestao": gestao, "mp": mp if ger else None,
-                            "agora": int(fixo.timestamp() * 1000), "casos": cs})["casos"]
+        # a aba além do Plano & Fila não depende da Gerencial: vai só na primeira rodada
+        ca = [] if ger else casos_arv(gestao.get("tarefas") or [], meses_)
+        tudo = rodar_node({"js": js, "gestao": gestao, "mp": mp if ger else None,
+                           "agora": int(fixo.timestamp() * 1000), "casos": cs, "casosArv": ca})
+        saida = tudo["casos"]
         n_rodada, dif_rodada = 0, []
         for c in cs:
             n, dif = comparar(saida[c["id"]], nexus(c, esc, mp if ger else None, meses_, h), c, ger)
             n_rodada += n
             dif_rodada += dif
-        print(f"{rotulo}: {len(cs)} casos, {n_rodada} valores comparados, {len(dif_rodada)} divergências")
+        print(f"Plano & Fila {rotulo}: {len(cs)} casos, {n_rodada} valores comparados, {len(dif_rodada)} divergências")
         total_n, total_dif, total_casos = total_n + n_rodada, total_dif + dif_rodada, total_casos + len(cs)
-    # a versão do JavaScript provado: se o painel mudar o preventivas.js, o resumo muda e a prova tem de rodar de novo
-    versao_js = hashlib.sha256(js["preventivas"].encode("utf-8")).hexdigest()[:12]
+        if ca:
+            n_aba, dif_aba = 1, []
+            if tudo["sub"] != G.atualizado(gestao):
+                dif_aba.append(f"a linha Atualizado: painel={tudo['sub']!r} nexus={G.atualizado(gestao)!r}")
+            for c in ca:
+                n, dif = comparar_aba(tudo["arv"][c["id"]], c, esc, gestao)
+                n_aba += n
+                dif_aba += dif
+            print(f"a aba (números, árvores, Só atrasadas, listas): {len(ca)} casos, {n_aba} valores comparados, "
+                  f"{len(dif_aba)} divergências")
+            total_n, total_dif, total_casos = total_n + n_aba, total_dif + dif_aba, total_casos + len(ca)
+    # a versão do JavaScript provado: se o painel mudar o preventivas.js ou o app.js, o resumo muda e a prova tem de
+    # rodar de novo
+    versao_js, versao_app = (hashlib.sha256(js[k].encode("utf-8")).hexdigest()[:12] for k in ("preventivas", "app"))
     print(f"gestao_pcm.json de {gestao.get('geradoEm')} ({len(gestao.get('tarefas') or [])} tarefas), preventivas.js "
-          f"sha256 {versao_js}, relógio em {fixo:%d/%m/%Y %H:%M} (meses {', '.join(meses_)}), "
-          f"{time.perf_counter() - t0:.0f} s")
+          f"sha256 {versao_js}, app.js sha256 {versao_app}, relógio em {fixo:%d/%m/%Y %H:%M} "
+          f"(meses {', '.join(meses_)}), {time.perf_counter() - t0:.0f} s")
     for d in total_dif[:a.max_dif]:
         print("  " + d)
-    print("BATE célula a célula." if not total_dif else f"NÃO BATE: {len(total_dif)} divergências em {total_casos} casos.")
+    print(f"BATE célula a célula: {total_casos} casos, {total_n} valores." if not total_dif
+          else f"NÃO BATE: {len(total_dif)} divergências em {total_casos} casos.")
     return 0 if not total_dif else 1
 
 

@@ -1,0 +1,14 @@
+{# As OS de UM ativo na "Confiabilidade por ativo" da Gestão PCM (o cfTaskRows do painel do PCM), pedidas quando o ativo
+   abre (gestao?cf=ativo&ca=<código>): as mesmas OS que entraram na conta da Engenharia, a de início mais novo primeiro.
+   O início é o do TRABALHO e as horas de reparo contam do INCIDENTE ao fim (a conta do MTTR): a legenda diz isso à vista,
+   porque no celular o title do cabeçalho some (revisão de 05/11/2026). A OS abre o card do Nexus; o Fracttal no ícone. #}
+<table class="pg-tbl pgc-os-tbl pg-cartoes">
+  <thead><tr><th>OS</th><th>Tarefa</th><th>Tipo</th><th>Início do trabalho</th><th>Fim</th><th>Horas de reparo</th></tr></thead>
+  <tbody>{% for o in oss %}<tr>
+    <td class="pg-dt" data-r="OS">{% if o.wid %}<button type="button" class="pgp-os-n" data-wid="{{ o.wid }}" data-status="{{ o.status }}" data-folio="{{ o.os }}" title="Abrir o card da OS {{ o.os }}">{{ o.os }}</button>{% else %}{{ o.os }}{% endif %}
+      {%- if o.url %} <a class="pgp-fracttal" href="{{ o.url|na_raiz }}" target="_blank" rel="noopener" title="Abrir a OS {{ o.os }} no Fracttal" aria-label="Abrir a OS {{ o.os }} no Fracttal"><i class="ph ph-arrow-square-out" aria-hidden="true"></i></a>{% endif %}</td>
+    <td class="pg-obs" data-r="Tarefa" title="{{ o.tarefa }}">{{ o.tarefa }}</td><td data-r="Tipo">{{ o.tipo }}</td>
+    <td class="pg-dt" data-r="Início do trabalho">{{ o.inicio }}</td><td class="pg-dt" data-r="Fim">{{ o.fim }}</td>
+    <td class="pg-dt" data-r="Horas de reparo">{{ o.horas }}</td></tr>{% else %}<tr><td colspan="6" class="pg-vazio">Sem OS.</td></tr>{% endfor %}</tbody>
+</table>
+<p class="pg-leg pgc-leg">Horas de reparo = do incidente ao fim (até 1 dia, as horas corridas; acima, os dias × 12), a conta do MTTR; o início do trabalho pode vir depois do incidente. A média das horas é o MTTR do ativo; a OS aberta conta como falha, sem reparo ainda.</p>

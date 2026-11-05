@@ -236,20 +236,21 @@ def test_drill_da_fracao_e_filtro_de_usina_de_cima_nao_se_confundem():
     assert (o.drill_usina, o.drill_tipo) == (ALTAIR, "MPA")
     assert [x["os"] for x in G.fila_filtrada(fila, o)] == ["102"]
     assert G.opcoes({"usina": ALTAIR}, M).drill_usina == ""            # "usina" é o filtro de cima
-    assert {x["usina"] for x in G.filtrar_topo(G.escopo(tarefas()), usina=ALTAIR.upper())} == {ALTAIR}
+    rec = G.recortar(G.escopo(tarefas()), G.filtros({"usina": ALTAIR.upper()}))
+    assert {x["usina"] for x in rec.todas} == {ALTAIR}
 
 
 def test_escolhas_de_cima_juntam_grafias_que_so_mudam_na_maiuscula():
     ts = [t(ALTAIR, "MPM", "Finalizada", cluster="PA Norte 01"), t(ALTAIR, "MPM", "Finalizada", cluster="PA Norte 01"),
           t(TUCANO, "MPM", "Finalizada", cluster="PA NORTE 01")]
-    e = G.escolhas_topo(ts)
+    e = G.recortar(ts, G.Filtros()).escolhas
     assert e["cluster"] == ["PA Norte 01"] and e["usina"] == [TUCANO, ALTAIR]
 
 
 def test_fila_da_gerencial_obedece_os_filtros_de_cima_com_nome_frouxo():
-    fila = G.fila_universo([], _gerencial(), {"cliente": "SEMP", "usina": "", "cluster": "", "responsavel": ""}, H)
+    fila = G.fila_universo([], _gerencial(), G.filtros({"cliente": "SEMP"}), H)
     assert {x["cli"] for x in fila} == {"Semp"}
-    fila = G.fila_universo([], _gerencial(), {"cliente": "", "usina": ALTAIR, "cluster": "", "responsavel": ""}, H)
+    fila = G.fila_universo([], _gerencial(), G.filtros({"usina": ALTAIR}), H)
     assert [x["os"] for x in fila] == ["102"]                        # "Thopen - Altair 1 - SP" acha "Thopen – Altair 1"
 
 
@@ -362,12 +363,12 @@ def test_filtros_de_cima_em_cascata():
     Responsável só listam os dele; o cliente não se restringe a si mesmo; o valor escolhido fica na lista."""
     ts = [t(ALTAIR, "MPM", "Finalizada", cluster="SP Leste 02", resp="Responsável A"),
           t(TUCANO, "MPM", "Finalizada", cluster="BA Sul 01", resp="Responsável B")]
-    e = G.escolhas_topo(ts, {"cliente": "thopen", "usina": "", "cluster": "", "responsavel": ""})
+    e = G.recortar(ts, G.filtros({"cliente": "thopen"})).escolhas
     assert e["usina"] == [ALTAIR] and e["cluster"] == ["SP Leste 02"] and e["responsavel"] == ["Responsável A"]
     assert e["cliente"] == ["Semp", "Thopen"]
-    e = G.escolhas_topo(ts, {"cliente": "Thopen", "usina": TUCANO, "cluster": "", "responsavel": ""})
+    e = G.recortar(ts, G.filtros({"cliente": "Thopen", "usina": TUCANO})).escolhas
     assert TUCANO in e["usina"] and e["cluster"] == []
-    assert G.escolhas_topo(ts) == G.escolhas_topo(ts, {})          # sem filtro, tudo como antes
+    assert G.recortar(ts, G.Filtros()).escolhas == G.recortar(ts, G.filtros({})).escolhas   # sem filtro, tudo
 
 
 def test_a_celula_colorida_enche_a_altura_da_linha():

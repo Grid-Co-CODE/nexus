@@ -94,6 +94,18 @@ def _codigo(r) -> str:
     return m.group(1) if m else str(r.get("code") or "").strip()
 
 
+def reparo_h(r) -> float | None:
+    """As horas de reparo de UMA falha, a parcela do MTTR do Power BI: do incidente ao fim; até 1 dia, as horas corridas,
+    acima, os dias x 12 (12 h de sol por dia). Sem as duas datas, ou com o fim antes do incidente, None (não entra na
+    média). À parte do `metodo` desde 04/11/2026: a Gestão PCM mostra as horas de cada OS do ativo e o MTTR por equipe
+    cluster pela mesma conta (`nexus/pcm/gestao_confiab.py`)."""
+    ev, fim = _dt(r.get("event_date")), _dt(r.get("final_date"))
+    if ev and fim and fim >= ev:
+        d = (fim - ev).total_seconds() / 86400.0
+        return d * 12 if d * 24 > 24 else d * 24
+    return None
+
+
 def metodo(falhas: list[dict], mob_eff: datetime, agora: datetime) -> dict:
     """MTBF, MTTR e disponibilidade de um conjunto de falhas (o `bloco` do Power BI)."""
     ini = [(_dt(r.get("initial_date")), _dt(r.get("final_date"))) for r in falhas]
@@ -101,12 +113,7 @@ def metodo(falhas: list[dict], mob_eff: datetime, agora: datetime) -> dict:
     uptime = max(0.0, _horas(mob_eff, agora) - parado)
     n = sum(1 for i, _f in ini if i and i >= INICIO_METODO)
     mtbf = uptime / n if n else None
-    reparos = []
-    for r in falhas:
-        ev, fim = _dt(r.get("event_date")), _dt(r.get("final_date"))
-        if ev and fim and fim >= ev:
-            d = (fim - ev).total_seconds() / 86400.0
-            reparos.append(d * 12 if d * 24 > 24 else d * 24)
+    reparos = [h for h in map(reparo_h, falhas) if h is not None]
     mttr = sum(reparos) / len(reparos) if reparos else None
     disp = mtbf / (mtbf + mttr) if (mtbf and mttr is not None and mtbf + mttr > 0) else None
     return {"mtbf": mtbf, "mttr": mttr, "disp": disp, "n": n}
@@ -236,10 +243,13 @@ def calcular(linhas: list[dict], onde, agora: datetime | None = None) -> dict:
     for s in sinais:
         fams[s["fam"]]["sinais"] += 1
     familias = sorted(({"fam": f, **v, "p90": p90.get(f, 2)} for f, v in fams.items()), key=lambda x: -x["falhas"])
+    # `porAtivo`: as OS de cada código, as MESMAS que entraram na conta (04/11/2026): a Gestão PCM lista as OS do ativo e
+    # soma as horas de reparo por equipe cluster sem reagrupar as 13 mil linhas (é a mesma cópia de 5 min da torre)
     return {"kpi": kpi, "p90": p90, "critDist": dict(crit_dist), "sinais": sinais, "familias": familias,
             "ativos": [{k: v for k, v in a.items() if k != "janela"} for a in confi], "semCodigo": sem_codigo,
             "periodo": {"de": inicio_janela, "ate": agora},
-            "falhasEm": {c: sorted(fs, key=lambda f: f["quando"]) for c, fs in falhas_em.items()}}
+            "falhasEm": {c: sorted(fs, key=lambda f: f["quando"]) for c, fs in falhas_em.items()},
+            "porAtivo": dict(por)}
 
 
 def indicadores(ativos: list[dict], sinais: list[dict], por: str) -> list[dict]:

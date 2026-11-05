@@ -1,0 +1,15 @@
+{# A tabela de UMA usina na "Confiabilidade por ativo" da Gestão PCM (Levi, 04/11/2026; o cfUsiHTML do painel do PCM):
+   Ativo · MTBF · MTTR · Disp. inerente · Falhas, os números da Engenharia. Vem por fetch (gestao?cf=usina&cc=<cliente>&
+   cu=<usina>) quando a usina abre. As OS de cada ativo vêm só quando ele abre (gestao?cf=ativo&ca=<código>,
+   _gestao_confiab_ativo.html): uma usina de verdade tinha 282 ativos e 1.090 OS de falha, ~1 MB se viessem juntas. No
+   celular, cartões (`pg-cartoes`). #}
+<div class="pg-rolo pga-rolo"><table class="pg-tbl pgc-tbl pg-cartoes">
+  <thead><tr><th>Ativo</th><th>MTBF (h)</th><th>MTTR (h)</th><th>Disp. inerente</th><th>Falhas</th></tr></thead>
+  <tbody>
+  {% for a in t.ativos %}{% set id = t.id ~ '-' ~ loop.index %}
+    <tr class="pgc-a"><td class="pgc-ativo" data-r="Ativo"><button type="button" class="pgc-a-bt" aria-expanded="false" aria-controls="pgc-os-{{ id }}"><i class="ph ph-caret-right pgc-chev" aria-hidden="true"></i><span>{{ a.nome }}</span> <span class="pgc-mudo">{{ a.cod }}</span></button></td>
+      <td data-r="MTBF (h)">{{ horas(a.mtbf) }}</td><td data-r="MTTR (h)">{{ horas(a.mttr) }}</td>
+      <td data-r="Disp. inerente"><span class="pg-t--{{ classe_disp(a.disp) }}">{{ pct(a.disp) }}</span></td><td data-r="Falhas">{{ a.n }}</td></tr>
+    <tr class="pgc-os" id="pgc-os-{{ id }}" hidden><td class="pgc-os-td" colspan="5"><div class="pgc-os-caixa" data-ca="{{ a.cod }}"></div></td></tr>
+  {% endfor %}
+  </tbody></table></div>

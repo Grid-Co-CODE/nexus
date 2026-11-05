@@ -1,0 +1,42 @@
+{# O corpo da "Confiabilidade por ativo" (cf=conf) e do "Tempo médio de reparo por Equipe Cluster" (cf=mttr) da Gestão
+   PCM (Levi, 04/11/2026; o renderConfiab e o renderMttrCluster do painel do PCM), com a conta da Engenharia
+   (nexus/pcm/gestao_confiab.py). Vem por fetch quando o bloco abre: a página não espera por ele. O `data-quando` (a hora
+   da leitura das OS de falha) vai para a linha de baixo do título. Sem a leitura completa ou sem o cadastro, nenhum
+   número. A mesma usina tem dois MTTR, e cada um diz qual é (revisão de 05/11/2026): aqui na usina, a MEDIANA dos
+   ativos (a regra da Engenharia); no bloco do cluster, a média POR FALHA. #}
+{% if incompleta %}<div class="pgc-frag" data-pgc-incompleta><p class="pgc-msg" role="status">{{ incompleta }}
+  <button type="button" class="pgf-lnk" data-tentar>Tentar de novo</button></p></div>
+{% elif falhou %}<div class="pgc-frag" data-pgc-incompleta><p class="pgc-msg" role="alert">Não consegui montar a conta da Engenharia agora.
+  <button type="button" class="pgf-lnk" data-tentar>Tentar de novo</button></p></div>
+{% elif cf == 'conf' %}<div class="pgc-frag" data-quando="{{ quando }}">
+{% for c in clientes %}<details class="pgc-cli">
+  <summary class="pgc-cab"><i class="ph ph-caret-right pgc-chev" aria-hidden="true"></i><span class="pgc-nome">{{ c.nome }}</span>
+    <span class="pgc-chips"><span class="pgc-chip">{{ c.n_usinas }} usina{{ 's' if c.n_usinas != 1 }}</span><span class="pgc-chip">{{ inteiro(c.falhas) }} falha{{ 's' if c.falhas != 1 }}</span></span></summary>
+  <div class="pgc-dentro">
+  {% for u in c.usinas %}<details class="pgc-usi" data-cc="{{ u.cliente }}" data-cu="{{ u.nome }}">
+    <summary class="pgc-cab"><i class="ph ph-caret-right pgc-chev" aria-hidden="true"></i><span class="pgc-nome">{{ u.nome }}<small class="pgc-mudo">mediana dos {{ u.ativos }} ativo{{ 's' if u.ativos != 1 }}</small></span>
+      <span class="pgc-chips"><span class="pgc-chip"><b>MTBF</b> {{ horas(u.mtbf) }} h</span><span class="pgc-chip"><b>MTTR</b> {{ horas(u.mttr) }} h</span><span class="pgc-chip pgc-chip--{{ classe_disp(u.disp) }}"><b>Disp</b> {{ pct(u.disp) }}</span></span></summary>
+    <div class="pgc-tab"></div>
+  </details>{% endfor %}
+  </div>
+</details>{% else %}<p class="pgc-msg">Nenhum ativo com falha para os filtros de cima.</p>{% endfor %}
+<p class="pg-leg pgc-leg"><span>Na usina, MTBF, MTTR e disponibilidade são a mediana dos ativos dela (a regra da Engenharia: a conta da usina inteira derruba a disponibilidade); o MTTR por falha de cada usina está no bloco do MTTR por equipe cluster</span>
+  <span><i class="pg-amostra pgc-amostra--ok"></i>disponibilidade na meta de 85% ou acima</span><span><i class="pg-amostra pgc-amostra--crit"></i>abaixo da meta</span>
+  <span>horas de reparo de cada OS: do incidente ao fim (até 1 dia, as horas corridas; acima, os dias × 12)</span>
+  <span class="pg-fim">abra a usina para ver os ativos, e o ativo para ver as OS dele</span></p>
+</div>
+{% else %}<div class="pgc-frag" data-quando="{{ quando }}">
+{% for c in clusters %}<details class="pgc-usi pgc-clu{{ ' pgc-clu--sem' if c.sem }}">
+  <summary class="pgc-cab"><i class="ph ph-caret-right pgc-chev" aria-hidden="true"></i><span class="pgc-nome">{{ c.nome }}{% if c.clientes %}<small class="pgc-mudo">{{ c.clientes|join(', ') }}</small>{% endif %}</span>
+    <span class="pgc-chips"><span class="pgc-chip pgc-chip--{{ c.cls }}"><b>MTTR por falha</b> {{ horas(c.mttr) }} h</span><span class="pgc-chip" title="{{ c.com_reparo }} com o reparo medido (do incidente ao fim): a média é delas">{{ inteiro(c.falhas) }} falha{{ 's' if c.falhas != 1 }}</span></span></summary>
+  <div class="pgc-dentro"><table class="pg-tbl pgc-tbl pg-cartoes">
+    <thead><tr><th>Usina</th><th>MTTR por falha (h)</th><th>Falhas</th></tr></thead>
+    <tbody>{% for u in c.usinas %}<tr><td class="pgc-ativo" data-r="Usina">{{ u.nome }} <span class="pgc-mudo">{{ u.cliente }}</span></td>
+      <td data-r="MTTR por falha (h)"><span class="pg-t--{{ classe_mttr(u.mttr) }}">{{ horas(u.mttr) }}</span></td>
+      <td data-r="Falhas">{{ inteiro(u.falhas) }}</td></tr>{% endfor %}</tbody></table></div>
+</details>{% else %}<p class="pgc-msg">Nenhuma falha para os filtros de cima.</p>{% endfor %}
+<p class="pg-leg pgc-leg"><span>MTTR por falha = as horas de reparo de todas as falhas fechadas do cluster (ou da usina) ÷ quantas foram: cada falha pesa igual, e não é a mediana dos ativos da Confiabilidade por ativo</span>
+  <span><i class="pg-amostra pgc-amostra--ok"></i>até 24 h</span><span><i class="pg-amostra pgc-amostra--and"></i>até 72 h</span><span><i class="pg-amostra pgc-amostra--crit"></i>acima de 72 h</span>
+  {% if clusters and clusters[-1].sem %}<span>o último grupo junta as usinas sem cluster no cadastro e as que não ligaram ao cadastro</span>{% endif %}</p>
+</div>
+{% endif %}
