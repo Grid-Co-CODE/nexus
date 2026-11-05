@@ -323,9 +323,12 @@ def _sino():
             tipo, _, oid = x["objeto"].partition(":")
             mencoes.append({"link": "/t/comando/conversa/" + tipo + "/" + oid, "n": x["n"],
                             "titulo": _titulo(x["objeto"])})
+        # o botão do topo leva o ícone do OS Creator do menu lateral, no lugar do sino (Levi, 04/11/2026: "quero que troque
+        # esse símbolo de sino pelo símbolo do OS Creator"): lido da torre, para os dois nunca divergirem
+        icone_os = next((t.icone for t in current_app.extensions.get("nexus_torres", []) if t.id == "os"), "clipboard-text")
         return {"n": len(mencoes) + len(pedidos) + len(avisos), "criticos": sum(1 for p in pedidos if p["atrasado"]),
                 "mencoes": mencoes[:6], "n_mencoes": len(mencoes), "pedidos": pedidos[:6], "n_pedidos": len(pedidos),
-                "avisos": avisos[:8], "n_avisos": len(avisos)}
+                "avisos": avisos[:8], "n_avisos": len(avisos), "icone_os": icone_os}
     except Exception:            # noqa: BLE001 — o sino nunca derruba uma página
         current_app.logger.exception("sino dos insights")
         return None
