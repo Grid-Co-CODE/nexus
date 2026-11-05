@@ -1,8 +1,9 @@
 """A leitura de fundo do pré-filtro (nexus/campo/prefiltro_fundo.py): para cada OS da fila de verificação ainda não
 conferida, UM pedido de leitura ao Fracttal (a lista de anexos) e as fotos pelo S3 (fora da cota da empresa), o hash
-sem o carimbo e a hora de anexação; tudo guardado em memória e em disco, com a miniatura só das fotos repetidas.
+sem o carimbo e a hora de anexação; tudo guardado em memória e em disco, sem miniatura (05/11/2026).
 Fracttal e S3 falsos do começo ao fim."""
 import io
+from pathlib import Path
 import random
 
 import pytest
@@ -142,16 +143,16 @@ def test_pagina_os_com_mais_de_100_anexos(fundo):
     assert [p.split("start=")[1] for p in fx.pedidos] == ["0", "100"]
 
 
-def test_repetida_vira_par_e_ganha_miniatura(fundo):
+def test_repetida_vira_par_sem_guardar_miniatura(fundo, tmp_path):
+    """A imagem é baixada para o hash (a repetida compara a imagem), mas nenhuma miniatura é guardada (Levi, 05/11/2026:
+    "nem precisa mostrar a foto de cara não... pode mostrar o nome das fotos")."""
     _usar({"15001": [_anexo("15001", 7), _anexo("15001", 8), _anexo("15001", 7, "2026-10-21T12h00h00Z")]})
     prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
     f = prefiltro_fundo.fatos(15001)
     ids = [a["id"] for a in f["anexos"]]
     assert f["pares"] == [[ids[0], ids[2]]]
-    with fundo["app"].app_context():                               # a rota da foto chama dentro do pedido
-        assert prefiltro_fundo.miniatura(ids[0]).exists() and prefiltro_fundo.miniatura(ids[2]).exists()
-        assert prefiltro_fundo.miniatura(ids[1]) is None          # só das repetidas
-        assert prefiltro_fundo.miniatura("../../.env") is None
+    assert not hasattr(prefiltro_fundo, "miniatura")
+    assert not list(Path(fundo["app"].config["NEXUS_DADOS"]).rglob("prefiltro_fotos"))
 
 
 def test_so_imagens_e_so_as_tarefas_da_fila(fundo):
@@ -177,13 +178,15 @@ def test_fora_do_escopo_nao_e_lido(fundo):
 
 
 def test_os_que_saiu_da_fila_some_do_disco(fundo):
+    """A OS que sai da fila sai dos fatos, e a miniatura de antes de 05/11/2026 (quando ainda se guardavam) sai junto."""
     _usar({"15001": [_anexo("15001", 7), _anexo("15001", 7, "2026-10-21T12h00h00Z")]})
     prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
-    with fundo["app"].app_context():
-        mini = prefiltro_fundo.miniatura(prefiltro_fundo.fatos(15001)["pares"][0][0])
-    assert mini.exists()
+    velha = Path(fundo["app"].config["NEXUS_DADOS"]) / "campo" / "prefiltro_fotos" / (
+        prefiltro_fundo.fatos(15001)["pares"][0][0] + ".jpg")
+    velha.parent.mkdir(parents=True, exist_ok=True)
+    velha.write_bytes(b"jpg")
     prefiltro_fundo.conferir(fundo["app"], [_tarefa(15002)])
-    assert prefiltro_fundo.fatos(15001) is None and not mini.exists()
+    assert prefiltro_fundo.fatos(15001) is None and not velha.exists()
 
 
 def test_ida_e_volta_do_disco(fundo):

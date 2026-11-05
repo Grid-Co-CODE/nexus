@@ -121,11 +121,15 @@ def test_o_cartao_traz_o_score_os_avisos_e_logo_depois_o_aprovar(quadro, logado)
     score = c[c.index('class="apq-score'):c.index('class="apq-avisos"')]
     assert "Nota do App" in score and ">71<" in score
     avisos = c[c.index('class="apq-avisos"'):c.index("data-apq-aprovar")]
-    for texto in ("Foto repetida: p03 é a mesma imagem de p01", "Nota do registro 71%", "Já foi devolvida"):
+    for texto in ("Nota do registro 71%", "Já foi devolvida"):
         assert texto in avisos, texto
-    # a prova da repetida: as duas fotos lado a lado
-    for i in (ID["p1"], ID["p3"]):
-        assert f'src="/t/campo/aprovacao/foto/{i}"' in avisos
+    # o fato que decide a coluna fica no motivo em destaque, no topo (2ª rodada, 05/11/2026), com o nome das duas fotos
+    # da repetida, que abrem o card da OS (Levi: "pode mostrar o nome das fotos e se a pessoa clicar ela vai abrir o card")
+    motivo = c[c.index('class="apq-motivo"'):c.index('class="apq-score')]
+    assert "Foto repetida: p03 é a mesma imagem de p01" in motivo
+    for rot in ("p01 · Inversor", "p03 · Inversor"):
+        assert f'<button type="button" class="apq-foto" data-apq-abrir' in motivo and rot in motivo, rot
+    assert "<img" not in c and "/t/campo/aprovacao/foto/" not in c
     nao_ok = _cartao(html, "15102")
     assert "1 foto anexada 2 dias depois do fechamento no App" in nao_ok and "data-apq-aprovar" in nao_ok
     fora_do_app = _cartao(html, "15002")
@@ -207,14 +211,9 @@ def test_o_script_da_tela_e_javascript_valido(quadro, logado, tmp_path):
     assert r.returncode == 0, r.stderr
 
 
-def test_a_foto_da_repetida_pede_login_e_so_serve_o_que_e_nosso(quadro, logado, cliente):
-    r = logado.get(f"/t/campo/aprovacao/foto/{ID['p1']}")
-    assert r.status_code == 200 and r.mimetype == "image/jpeg" and r.data[:2] == b"\xff\xd8"
-    assert logado.get(f"/t/campo/aprovacao/foto/{ID['p2']}").status_code == 404        # sem miniatura
-    assert logado.get("/t/campo/aprovacao/foto/..%2F..%2Fsegredo").status_code == 404
-    with cliente.session_transaction() as s:
-        s.clear()
-    assert cliente.get(f"/t/campo/aprovacao/foto/{ID['p1']}").status_code != 200
+def test_a_rota_da_miniatura_saiu(quadro, logado):
+    """Sem miniatura guardada (05/11/2026), a rota que a servia saiu: o nome da foto abre o card da OS."""
+    assert logado.get(f"/t/campo/aprovacao/foto/{ID['p1']}").status_code == 404
 
 
 def test_o_csv_tem_a_coluna_e_os_motivos(quadro, logado):

@@ -1875,27 +1875,14 @@ def aprovacao():
         return _csv_do_quadro(oss)
     return render_template("campo/aprovacao.html", **_comum(
         "aprovacao", leitura, coleta=_coleta(), fila=campo_aprovacao.estado(), fotos=prefiltro_fundo.estado(),
-        responsavel=responsavel, mapa_erro=mapa.erro, q=q, colunas=COLUNAS_DO_QUADRO, n_os=len(oss),
+        # o que está fora do pré-filtro não entra na conta (Levi, 05/11/2026: "O que tiver fora do pré filtro não é
+        # contabilizado"): o total é o do quadro e do Ainda conferindo; a lista de fora segue no pé, aprovável pelo cartão
+        responsavel=responsavel, mapa_erro=mapa.erro, q=q, colunas=COLUNAS_DO_QUADRO, n_os=len(oss) - len(q["fora"]),
+        tipos_motivo=prefiltro.TIPOS_DO_MOTIVO, iniciais=_iniciais,
         opcoes_responsavel=_opcoes_responsavel([{"responsavel": o["responsavel_cad"]} for o in todas_os], responsavel),
         clientes=sorted({o["cliente_cad"] for o in oss if o["cliente_cad"]}),
         horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"], cor_espera=_cor_espera,
         sem_responsavel=visao.SEM_RESPONSAVEL, sem_cadastro=SEM_CADASTRO))
-
-
-@bp.route("/aprovacao/foto/<id_anexo>")
-def aprovacao_foto(id_anexo):
-    """A miniatura de uma foto repetida (a prova do aviso no cartão), guardada pela leitura de fundo. Só o id que é nosso
-    (16 letras de 0 a f; o resto é 404) e só com login (o portão de toda rota): é foto de usina de cliente, e por isso a
-    cópia do navegador é privada."""
-    from flask import send_file
-    from ...campo import prefiltro_fundo
-    arq = prefiltro_fundo.miniatura(id_anexo)
-    if arq is None:
-        abort(404)
-    r = send_file(arq, mimetype="image/jpeg", max_age=3600)
-    r.cache_control.public = False
-    r.cache_control.private = True
-    return r
 
 
 @bp.route("/aprovacao/<int:id_wo>/conferir", methods=["POST"])

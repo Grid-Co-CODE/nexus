@@ -5,7 +5,10 @@ Para cada OS da fila ainda não conferida (ou cujas tarefas mudaram), a mais nov
 Fracttal (`work_orders_attachments?folio=`, 100 por página) e as imagens baixadas do S3, que não contam na cota de 200
 pedidos por minuto da empresa (o link do anexo é o arquivo no S3). De cada foto ficam o hash sem o carimbo do App, a
 hora de anexação (o `Last-Modified` do arquivo: o REST de anexos não dá data, medido em 28/10/2026) e o campo; os
-bytes não ficam. A miniatura (240 px) só das fotos repetidas, para o supervisor ver as duas lado a lado.
+bytes não ficam. A imagem é baixada porque a regra da foto repetida compara a própria imagem (o hash sem o carimbo):
+a mesma foto anexada em dois campos ganha nome e carimbo diferentes. Miniatura não se guarda mais (Levi, 05/11/2026: "nem
+precisa mostrar a foto de cara não... pode mostrar o nome das fotos"): o cartão mostra o nome, e o clique abre o card da
+OS, onde as fotos estão.
 
 - Roda depois de cada releitura da fila (`aprovacao._reler`) e no boot, numa thread declarada de fundo no porteiro do
   Fracttal; uma volta por vez, no máximo `NEXUS_PREFILTRO_POR_VOLTA` OS, com `NEXUS_PREFILTRO_PAUSA_S` entre elas (também
@@ -18,7 +21,8 @@ bytes não ficam. A miniatura (240 px) só das fotos repetidas, para o superviso
   a OS sem as fotos todas cairia em "Pronta" sem ter sido conferida; três falhas seguidas, e a OS espera 6 h. A foto que
   baixou mas não abre (upload cortado, arquivo que não é imagem) fica "não abriu", sem hash, e a OS segue (em dúvida).
 - Fica em memória e em `dados/campo/prefiltro.json.gz` (cópia de trabalho, como a fila), gravada a cada 10 OS: cada push
-  na `main` reinicia o servidor. A OS que sai da fila sai daqui e do disco, com as miniaturas; a fila vazia (soluço do
+  na `main` reinicia o servidor. A OS que sai da fila sai daqui e do disco (com as miniaturas de antes de 05/11/2026,
+  quando ainda se guardavam); a fila vazia (soluço do
   Fracttal) não apaga nada. `ligado()` diz se a máquina lê (o servidor sim; o PC, com `NEXUS_CAMPO_AQUECER=0`, não).
 """
 import gzip
@@ -41,8 +45,6 @@ from PIL import Image
 from . import fracttal, prefiltro, regras_app
 
 IMG = re.compile(r"\.(jpe?g|png|webp)$", re.I)
-_ID = re.compile(r"^[0-9a-f]{16}$")
-MINI_LADO = 240
 POR_PAGINA = 100
 MAX_PAGINAS = 20                  # 2.000 anexos numa OS; a maior da medição de 26/10 tinha 75
 RELER_S = 24 * 3600               # a OS conferida é relida uma vez por dia enquanto espera a aprovação
@@ -95,15 +97,6 @@ def _pasta() -> Path | None:
         return pasta_dados(current_app.config) / "campo"
     except RuntimeError:
         return None
-
-
-def miniatura(id_anexo: str) -> Path | None:
-    """O arquivo da miniatura da foto repetida, ou None (id que não é nosso, ou foto sem miniatura)."""
-    pasta = _pasta()
-    if pasta is None or not _ID.match(str(id_anexo or "")):
-        return None
-    arq = pasta / "prefiltro_fotos" / f"{id_anexo}.jpg"
-    return arq if arq.exists() else None
 
 
 def _gravar() -> None:
@@ -188,21 +181,16 @@ def _devida(f: dict, tarefas: list[dict], agora: float, p: dict) -> bool:
     return bool(fim) and lido < fim + p["horas_tarde"] * 3600 <= agora
 
 
-def _hash_e_miniatura(conteudo: bytes) -> tuple[str | None, bytes | None]:
-    """O hash sem o carimbo e a miniatura, ou (None, None) se a imagem não abre (upload cortado, arquivo que não é
-    imagem, imagem gigante): a foto fica "não abriu", fora da comparação, e a OS segue. Antes, a exceção prendia a OS em
-    "Ainda conferindo" para sempre, relendo tudo a cada volta (revisão de 05/11/2026)."""
+def _hash(conteudo: bytes) -> str | None:
+    """O hash sem o carimbo, ou None se a imagem não abre (upload cortado, arquivo que não é imagem, imagem gigante): a
+    foto fica "não abriu", fora da comparação, e a OS segue. Antes, a exceção prendia a OS em "Ainda conferindo" para
+    sempre, relendo tudo a cada volta (revisão de 05/11/2026)."""
     try:
         im = Image.open(io.BytesIO(conteudo))
         im.load()
-        h = format(prefiltro.dhash(im), "064x")
-        mini = im.convert("RGB")
-        mini.thumbnail((MINI_LADO, MINI_LADO))
-        buf = io.BytesIO()
-        mini.save(buf, "JPEG", quality=80)
-        return h, buf.getvalue()
+        return format(prefiltro.dhash(im), "064x")
     except (OSError, ValueError, SyntaxError, Image.DecompressionBombError):
-        return None, None
+        return None
 
 
 def _listar(folio: str) -> list[dict]:
@@ -227,7 +215,7 @@ def _ler_os(tarefas: list[dict], p: dict, velho: dict | None = None) -> dict:
     folio = str(tarefas[0].get("wo_folio") or "")
     ids_tarefas = {str(w.get("id_work_orders_tasks")) for w in tarefas}
     conhecidos = {a["id"]: a for a in (velho or {}).get("anexos") or []}
-    anexos, minis, urls = [], {}, {}
+    anexos, urls = [], {}
     for a in _listar(folio):
         url = str(a.get("value") or "")
         caminho = urlsplit(url).path
@@ -243,21 +231,10 @@ def _ler_os(tarefas: list[dict], p: dict, velho: dict | None = None) -> dict:
             anexos.append({**conhecidos[id_], "tarefa": tarefa, "desc": desc, "print": imprime})
             continue
         conteudo, anexada = baixar(url)           # falhou: sobe, e a OS fica para a próxima volta (nada pela metade)
-        h, mini = _hash_e_miniatura(conteudo)
-        anexos.append({"id": id_, "tarefa": tarefa, "desc": desc, "anexada": anexada, "print": imprime, "hash": h})
-        if mini:
-            minis[id_] = mini
+        anexos.append({"id": id_, "tarefa": tarefa, "desc": desc, "anexada": anexada, "print": imprime,
+                       "hash": _hash(conteudo)})
     pares = prefiltro.pares_repetidos([{**a, "hash": int(a["hash"], 16)} for a in anexos if a.get("hash")],
                                       p["dif"], p["dif_print"])
-    pasta = _pasta()
-    if pasta is not None and pares:
-        (pasta / "prefiltro_fotos").mkdir(parents=True, exist_ok=True)
-        for i in {x for par in pares for x in par}:
-            arq = pasta / "prefiltro_fotos" / f"{i}.jpg"
-            if i not in minis and not arq.exists():   # foto lida antes que só agora entrou num par: baixa a miniatura
-                minis[i] = _hash_e_miniatura(baixar(urls[i])[0])[1]
-            if minis.get(i):
-                arq.write_bytes(minis[i])
     return {"chave": _chave(tarefas), "lido_em": _agora(), "anexos": anexos, "pares": pares, "erro": ""}
 
 

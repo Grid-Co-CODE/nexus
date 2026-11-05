@@ -9,32 +9,60 @@
    avisos, deve ser possível também aprovar mais que uma de uma vez!"; três colunas. A coluna de cada OS sai dos fatos
    (nexus/campo/prefiltro.py); o quadro é montado na visita e não muda sozinho na frente da pessoa: a marcação vive na
    página, e a OS aprovada sai do quadro quando o Fracttal confirma (a conferência). #}
-{# a OS com fotos ainda por ler pode virar Não OK depois da leitura: aprova pelo cartão, mas não entra no lote #}
-{% macro cartao(o, marcar) %}{% set tom = 'neutro' if o.nota is none else ('ok' if o.nota >= 80 else ('alerta' if o.nota >= 50 else 'critico')) %}{% set marcar = marcar and not (o.avisos|selectattr('tipo', 'equalto', 'faltam')|list) %}
+{# O cartão no modelo do Quadro da equipe da Engenharia, com o Aprovar (Levi, 05/11/2026: "pode adotar um visual de card
+   de OS parecido com Engenharia > Quadro da equipe porém com o botão aprovar"): no topo o número da OS (verde, sem
+   sublinhado: "deixa o número da OS em verde Grid e tire esse underline estranho!") e os dias; logo abaixo, o motivo da
+   coluna em destaque ("Sempre destacar o motivo de estar em dúvida ou não OK! tem que estar bem visual e acessível": a
+   cor, o ícone e a palavra, nunca só a cor), com a prova; depois a tarefa, onde, o score e os outros avisos; no pé, o
+   técnico e as tarefas, e o Aprovar logo depois do score e dos avisos (a decisão de 04/11).
+   A OS com fotos ainda por ler pode virar Não OK depois da leitura: aprova pelo cartão, mas não entra no lote. #}
+{# o nome das duas fotos do par (o número e o campo), sem a foto: o clique abre o card da OS, onde elas estão, como no
+   Histórico do OS Creator (Levi, 05/11/2026: "pode mostrar o nome das fotos e se a pessoa clicar ela vai abrir o card") #}
+{% macro fotos_do_par(o, a) %}{% for par in a.pares %}
+      <span class="apq-par">{% for rot, campo in ((par.ra, par.da), (par.rb, par.db)) %}{% if not loop.first %}<span class="apq-par-igual" aria-hidden="true">=</span>{% endif %}<button type="button" class="apq-foto" data-apq-abrir title="Abrir o card da OS {{ o.os }}, com as fotos"><i class="ph ph-image" aria-hidden="true"></i>{{ rot }}{% if campo %} · {{ campo }}{% endif %}</button>{% endfor %}</span>{% endfor %}{% endmacro %}
+{% macro cartao(o, marcar) %}{% set tom = 'neutro' if o.nota is none else ('ok' if o.nota >= 80 else ('alerta' if o.nota >= 50 else 'critico')) %}{% set marcar = marcar and not (o.avisos|selectattr('tipo', 'equalto', 'faltam')|list) %}{% set motivos = o.avisos|selectattr('tipo', 'in', tipos_motivo)|list %}{% set resto = o.avisos|rejectattr('tipo', 'in', tipos_motivo)|list %}{% set n_t = o.tarefas|length %}
 <article class="apq-cartao" data-wo="{{ o.id_wo or '' }}" data-folio="{{ o.os }}" data-coluna="{{ o.coluna }}" data-cliente="{{ o.cliente_cad }}" data-busca="{{ o.busca }}">
   <header class="apq-c-cab">
     {% if marcar %}<input class="apq-marcar" type="checkbox" data-apq-marcar aria-label="Marcar a OS {{ o.os }} para aprovar">{% endif %}
     <button type="button" class="apq-c-os" data-apq-abrir title="Abrir o card da OS {{ o.os }} no OS Creator">OS {{ o.os }}</button>
-    <span class="cn-st cn-t-{{ cor_espera(o.espera_d) }} apq-c-dias" title="Dias esperando aprovação, desde o fim da tarefa mais antiga">{{ 'hoje' if o.espera_d == 0 else o.espera_d ~ ' d' }}</span>
+    <span class="apq-c-dias cn-t-{{ cor_espera(o.espera_d) }}" title="Dias esperando aprovação, desde o fim da tarefa mais antiga">{{ 'hoje' if o.espera_d == 0 else 'há ' ~ o.espera_d ~ ' d' }}</span>
   </header>
-  <p class="apq-c-onde"><b>{{ o.usina_cad or sem_cadastro }}</b> · {{ o.cliente_cad or 'sem cliente no cadastro' }} · {{ o.tarefas|length }} tarefa{{ 's' if o.tarefas|length != 1 }}</p>
-  <p class="apq-c-quem mudo">{{ o.tecnicos|join(', ') }}{% if not responsavel %} · {{ o.responsavel_cad or sem_responsavel }}{% endif %}{% if o.fotos_em %} · fotos conferidas em {{ o.fotos_em }}{% endif %}</p>
-  <p class="apq-score" data-tom="{{ tom }}">{% if o.nota is none %}<span>Fora do App</span><small>sem a nota do App</small>{% else %}<span>Nota do App</span><b class="gc-num cn-t-{{ tom }}">{{ o.nota }}</b>{% if o.tarefas|length > 1 %}<small>a pior das tarefas</small>{% endif %}{% endif %}</p>
+  {% if motivos %}{% set grave = o.coluna == 'nao_ok' %}
+  <div class="apq-motivo" data-nivel="{{ 'critico' if grave else 'alerta' }}" role="note">
+    <i class="ph {{ 'ph-x-circle' if grave else 'ph-warning' }}" aria-hidden="true"></i>
+    <div><b class="apq-motivo-t">{{ 'Não OK' if grave else 'Em dúvida' }}</b>
+      <ul>{% for a in motivos %}<li>{{ a.texto }}{% if a.tipo == 'repetida' %}{{ fotos_do_par(o, a) }}{% endif %}</li>{% endfor %}</ul>
+    </div>
+  </div>
+  {% elif o.fora_motivo %}
+  <div class="apq-motivo" data-nivel="neutro" role="note"><i class="ph ph-funnel-x" aria-hidden="true"></i><div><b class="apq-motivo-t">Fora do pré-filtro</b><ul><li>{{ o.fora_motivo }}</li></ul></div></div>
+  {% elif o.coluna == 'conferindo' %}
+  {# dado pela metade não vai para a tela como inteiro: sem as fotos lidas, o cartão diz o que falta #}
+  <div class="apq-motivo" data-nivel="neutro" role="note"><i class="ph ph-hourglass-medium" aria-hidden="true"></i><div><b class="apq-motivo-t">Ainda conferindo</b><ul><li>Fotos ainda não conferidas</li></ul></div></div>
+  {% endif %}
+  <h3 class="apq-c-tit">{{ o.tarefas[0].tarefa or '(sem título)' }}{% if n_t > 1 %}<small> e mais {{ n_t - 1 }}</small>{% endif %}</h3>
+  <p class="apq-c-onde">{% if o.tarefas[0].ativo %}{{ o.tarefas[0].ativo }} · {% endif %}<b>{{ o.usina_cad or sem_cadastro }}</b> · {{ o.cliente_cad or 'sem cliente no cadastro' }}</p>
+  <p class="apq-score" data-tom="{{ tom }}">{% if o.nota is none %}<span>Fora do App</span><small>sem a nota do App</small>{% else %}<span>Nota do App</span><b class="gc-num cn-t-{{ tom }}">{{ o.nota }}</b>{% if n_t > 1 %}<small>a pior das tarefas</small>{% endif %}{% endif %}</p>
   <ul class="apq-avisos">
-    {% if o.fora_motivo %}<li class="apq-aviso" data-nivel="neutro">Fora do pré-filtro: {{ o.fora_motivo }}</li>{% endif %}
-    {# dado pela metade não vai para a tela como inteiro: sem as fotos lidas, o cartão diz o que falta #}
-    {% if o.coluna == 'conferindo' %}<li class="apq-aviso" data-nivel="neutro">Fotos ainda não conferidas</li>{% endif %}
-    {% for a in o.avisos %}<li class="apq-aviso" data-nivel="{{ a.nivel }}">{{ a.texto }}{% if a.tipo == 'repetida' %}{% for par in a.pares %}
-      <span class="apq-par">{% for i, rot in ((par.a, par.ra), (par.b, par.rb)) %}<figure><img src="{{ url_for('torre_campo.aprovacao_foto', id_anexo=i) }}" alt="Foto {{ rot }} da OS {{ o.os }}" loading="lazy" width="120" height="90" onerror="this.parentNode.hidden = true"><figcaption>{{ rot }}</figcaption></figure>{% endfor %}</span>{% endfor %}{% endif %}</li>
-    {% else %}{% if not o.fora_motivo and o.coluna != 'conferindo' %}<li class="apq-aviso" data-nivel="ok">Nenhum fato contra</li>{% endif %}{% endfor %}
+    {% for a in resto %}<li class="apq-aviso" data-nivel="{{ a.nivel }}">{{ a.texto }}</li>{% endfor %}
+    {% if o.coluna == 'pronta' %}<li class="apq-aviso" data-nivel="ok"><i class="ph ph-check-circle" aria-hidden="true"></i> Nenhum fato contra</li>{% endif %}
   </ul>
+  <footer class="apq-c-pe">
+    <span class="cn-avatar apq-c-av" aria-hidden="true">{{ iniciais(o.tecnicos[0]) if o.tecnicos and o.tecnicos[0] != '—' else '—' }}</span>
+    <span class="apq-c-quem">{{ o.tecnicos|join(', ') }}{% if not responsavel %} · {{ o.responsavel_cad or sem_responsavel }}{% endif %}{% if o.fotos_em %}<small>fotos conferidas em {{ o.fotos_em }}</small>{% endif %}</span>
+    <span class="apq-c-n">{{ n_t }} tarefa{{ 's' if n_t != 1 }}</span>
+  </footer>
   <button type="button" class="gc-btn gc-btn--primario apq-aprovar" data-apq-aprovar>Aprovar</button>
   <p class="apq-msg" data-apq-msg role="status" hidden></p>
 </article>{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
-      {% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal (fechadas e
+      {% call explica('Entenda esta tela') %}<p><b>A leitura.</b> Fila de verificação do Fracttal, inteira{% if coleta %},
+      com as notas do App até {{ coleta }}{% endif %}: {% if fila.lida_em %}fila lida em {{ fila.lida_em }}{% else %}a fila
+      ainda não foi lida{% endif %}{% if fila.lendo %} (relendo agora){% endif %}; fotos conferidas de {{ fotos.conferidas }}
+      OS{% if fotos.lendo %} (conferindo agora){% endif %}.</p>
+      <p><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal (fechadas e
       esperando a aprovação), relida pelo Nexus a cada 10 minutos e contada por OS, que é o que se aprova. Por trás, sem a
       tela esperar, o Nexus confere as fotos de cada OS nova: um pedido ao Fracttal por OS e as imagens baixadas do
       arquivo. O responsável e o cliente saem do cadastro do Nexus pela usina da OS.</p>
@@ -43,14 +71,13 @@
       sem o carimbo do App, ou tarefa fechada fora do App. <b>Pronta</b>: nenhum desses fatos. A OS fica na pior coluna. A
       nota do App, a devolução anterior e a foto marcada pelo App aparecem como aviso, sem mudar a coluna.</p>
       <p><b>Ainda conferindo.</b> OS cujas fotos o Nexus ainda não leu: aprova pelo cartão, mas não entra no lote.
-      <b>Fora do pré-filtro.</b> Religamento (remoto ou no local), OS com as etiquetas PERFORMANCE, CHAMADOS ou ENGENHARIA e
-      OS criadas pelo COS, como nas OSs em verificação do Painel: ficam sem as regras.</p>
+      <b>Fora do pré-filtro.</b> Religamento (remoto ou no local), OS com as etiquetas PERFORMANCE ou CHAMADOS e OS
+      criadas pelo COS: ficam sem as regras e não entram na conta. A ENGENHARIA entra no pré-filtro.</p>
       <p><b>Aprovar.</b> É o Concluir do OS Creator, com a sua conta do Fracttal: não tem volta, a OS sai da verificação.
       Para aprovar várias, marque os cartões (ou Selecionar todas) e use Aprovar as marcadas: o Nexus aprova uma depois da
       outra e para no primeiro pedido de login. O número da OS abre o card dela. Devolver segue no App.</p>{% endcall %}</div>
       <p class="cn-pergunta">Toda OS fechada no Fracttal espera aprovação. O que dá para aprovar já, o que pede o seu olho e
         o que tem prova de problema?</p></div>
-    <div class="cn-frescor">fila de verificação do Fracttal, inteira{% if coleta %} · notas do App até {{ coleta }}{% endif %}<br><b>{% if fila.lida_em %}fila lida em {{ fila.lida_em }}{% else %}fila ainda não lida{% endif %}</b>{% if fila.lendo %} · relendo agora{% endif %}<br>fotos conferidas de {{ fotos.conferidas }} OS{% if fotos.lendo %} · conferindo agora{% endif %}</div>
   </div>
 
   {# a tela nunca espera o Fracttal: a fila é relida em segundo plano (nexus/campo/aprovacao.py) #}
@@ -117,8 +144,8 @@
   {% endif %}
   {% if q.fora %}
   <details class="apq-extra" id="apq-fora">
-    <summary>Fora do pré-filtro: <b class="gc-num" data-apq-n>{{ q.fora|length }}</b> OS</summary>
-    <p class="mudo">Religamento, as etiquetas PERFORMANCE, CHAMADOS e ENGENHARIA e as criadas pelo COS ficam sem as regras; aprovam pelo cartão.</p>
+    <summary>Fora do pré-filtro: <b class="gc-num" data-apq-n>{{ q.fora|length }}</b> OS, que não entram na conta</summary>
+    <p class="mudo">Religamento, as etiquetas PERFORMANCE e CHAMADOS e as criadas pelo COS ficam sem as regras e não entram na conta das OS esperando; aprovam pelo cartão.</p>
     <div class="apq-cartoes apq-cartoes--grade">{% for o in q.fora %}{{ cartao(o, False) }}{% endfor %}</div>
   </details>
   {% endif %}

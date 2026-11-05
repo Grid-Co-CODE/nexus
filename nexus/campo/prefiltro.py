@@ -16,8 +16,9 @@ da Verificação: fatos primeiro"):
 - "Menos de 5 min no App" (4 devolvidas e 5 aprovadas: o técnico fecha no App depois do serviço) e "subtarefas
   respondidas" (o App já não deixa fechar em branco) não separaram e ficaram de fora.
 - **Fora do pré-filtro** (Levi, 04/11: "religamento remoto ou religamento real não entra, nem OSs com etiqueta de
-  performance!"): religamento e a etiqueta PERFORMANCE; e, como nas "OSs em verificação" do Painel (Levi, 29/10), as
-  etiquetas CHAMADOS e ENGENHARIA e as OS criadas pelo COS, para os dois números baterem.
+  performance!"): religamento e a etiqueta PERFORMANCE; e, como nas "OSs em verificação" do Painel (Levi, 29/10), a
+  etiqueta CHAMADOS e as OS criadas pelo COS. A ENGENHARIA entra (Levi, 05/11/2026: "Engenharia entra no pré filtro");
+  no Painel ela segue de fora (`verificacao.etiqueta_fora`, a regra dele de 29/10).
 """
 from datetime import datetime, timezone
 
@@ -28,6 +29,12 @@ _CHAVES = {"horas_tarde": "NEXUS_PREFILTRO_HORAS_TARDE", "dif": "NEXUS_PREFILTRO
            "dif_print": "NEXUS_PREFILTRO_DIF_PRINT", "por_volta": "NEXUS_PREFILTRO_POR_VOLTA",
            "pausa_s": "NEXUS_PREFILTRO_PAUSA_S"}
 COLUNAS = ("pronta", "duvida", "nao_ok")
+# as etiquetas que tiram a OS do pré-filtro: as do Painel menos a ENGENHARIA (Levi, 05/11/2026: "Engenharia entra no pré
+# filtro"). Olha todas as etiquetas da OS: a OS com ENGENHARIA e PERFORMANCE fica fora pela PERFORMANCE
+ETIQUETAS_FORA = ("PERFORMANCE", "CHAMADOS", "CHAMADO")
+# o fato que decide a coluna (o motivo em destaque no cartão, 05/11/2026: "Sempre destacar o motivo de estar em dúvida ou
+# não OK!"); os outros avisos (a regra do App, as fotos por ler) não mudam a coluna
+TIPOS_DO_MOTIVO = ("tarde", "repetida", "nao_abriu", "fora_app")
 # o hash: 16 x 16 diferenças de brilho (256 bits) da parte de CIMA da foto; o carimbo do App (data, GPS, nome, campo) é
 # uma faixa no pé que muda a cada anexo (medido nas fotos da medição: até ~21% da altura)
 LADO, CORTE = 16, 0.75
@@ -77,9 +84,10 @@ def fora_do_escopo(cruas: list[dict], cos: dict | None) -> str:
         if tipo.startswith("RELIGAMENTO") or "RELIGAMENTO" in texto:
             return "Religamento"
     for w in cruas:
-        e = verificacao.etiqueta_fora(w)
-        if e:
-            return "CHAMADOS" if e.startswith("CHAMADO") else e
+        for x in w.get("labels") or ():
+            e = verificacao._norm(x.get("description") if isinstance(x, dict) else x)
+            if e in ETIQUETAS_FORA:
+                return "CHAMADOS" if e.startswith("CHAMADO") else e
     if any(verificacao.criada_pelo_cos(w, cos) for w in cruas):
         return "Criada pelo COS"
     return ""
@@ -137,9 +145,12 @@ def classificar(o: dict, fatos: dict | None, fechado_app: str, p: dict) -> dict:
             else:
                 lista = ", ".join(f"{num.get(b, '?')} = {num.get(a, '?')}" for a, b in pares[:4])
                 texto = f"{len(pares)} fotos repetidas: {lista}{', …' if len(pares) > 4 else ''}"
-            # os pares vão juntos para o cartão mostrar as duas fotos lado a lado, com o número de cada
+            # os pares vão juntos para o cartão mostrar o nome das duas fotos (o número e o campo), que abre o card da OS
+            # (Levi, 05/11/2026: "nem precisa mostrar a foto de cara não... pode mostrar o nome das fotos")
+            campo = {x["id"]: x.get("desc") or "" for x in anexos}
             avisos.append({"tipo": "repetida", "nivel": "alerta", "texto": texto, "fotos": [x for par in pares for x in par],
-                           "pares": [{"a": a, "b": b, "ra": num.get(a, "?"), "rb": num.get(b, "?")} for a, b in pares[:4]]})
+                           "pares": [{"a": a, "b": b, "ra": num.get(a, "?"), "rb": num.get(b, "?"),
+                                      "da": campo.get(a, ""), "db": campo.get(b, "")} for a, b in pares[:4]]})
         # a foto que baixou e não abriu (upload cortado) não foi conferida: a OS não vai calada para Pronta e o lote
         nao_abriu = [a["id"] for a in anexos if "hash" in a and a["hash"] is None]
         if nao_abriu:

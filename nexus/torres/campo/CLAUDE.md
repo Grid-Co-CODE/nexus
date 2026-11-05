@@ -1670,10 +1670,14 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       fica em **Ainda conferindo** (abaixo do quadro: aprova pelo cartão, não entra no lote). A regra do App de antes
       (nota abaixo de 80, já devolvida, foto divergente, ronda; `aprovacao.motivos`) virou só aviso, sem mudar a coluna.
       "Menos de 5 min no App" e "subtarefas respondidas" não separaram na medição e ficaram de fora.
-    - **Fora do pré-filtro** (abaixo do quadro, com o motivo; aprova pelo cartão): religamento, pelo tipo ou pela tarefa,
-      e a etiqueta PERFORMANCE (Levi, 04/11: "religamento remoto ou religamento real não entra, nem OSs com etiqueta de
-      performance!"); e, como nas OSs em verificação do Painel, as etiquetas CHAMADOS e ENGENHARIA e as OS criadas pelo
-      COS, para os dois números baterem. Quem é do COS vem da última conta (`verificacao.cos_guardado`, a da volta).
+    - **Fora do pré-filtro** (abaixo do quadro, com o motivo; aprova pelo cartão; **não entra na conta** das OS
+      esperando, Levi 05/11/2026: "O que tiver fora do pré filtro não é contabilizado"): religamento, pelo tipo ou pela
+      tarefa, e a etiqueta PERFORMANCE (Levi, 04/11: "religamento remoto ou religamento real não entra, nem OSs com
+      etiqueta de performance!"); a etiqueta CHAMADOS e as OS criadas pelo COS, como nas OSs em verificação do Painel.
+      **A ENGENHARIA entra no pré-filtro** (Levi, 05/11/2026: "Engenharia entra no pré filtro"; `prefiltro.ETIQUETAS_FORA`
+      olha todas as etiquetas da OS); no Painel ela segue de fora (`verificacao.etiqueta_fora`, a regra de 29/10). Com
+      isso a leitura de fundo passa a conferir também as OS da Engenharia (um GET por OS). Quem é do COS vem da última
+      conta (`verificacao.cos_guardado`, a da volta).
     - **As fotos, por trás** (`nexus/campo/prefiltro_fundo.py`): depois de cada releitura da fila (`aprovacao._reler`) e
       no boot com a fila do disco (`_preparar`), uma thread `nexus-prefiltro` declarada de fundo no porteiro confere as
       OS do escopo sem fatos (ou cujas tarefas mudaram), a mais nova primeiro: UM GET de anexos por OS no Fracttal
@@ -1684,25 +1688,37 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       de 24 h desde o fim no Fracttal fecha e, depois, uma vez por dia enquanto espera, baixando só as fotos novas (o id é
       o caminho no S3). As OS novas passam na frente das relidas. Foto que não baixou deixa a OS sem fatos (meia leitura
       nunca vira Pronta); três falhas seguidas e ela espera 6 h. Foto que baixou e não abre fica "não abriu", sem hash.
-      Fica o hash, a hora de anexação e o campo, nunca os bytes; a miniatura de 240 px só das repetidas
-      (`dados/campo/prefiltro_fotos/<id>.jpg`, servida por `/t/campo/aprovacao/foto/<id>` com login e cópia privada).
+      Fica o hash, a hora de anexação e o campo, nunca os bytes. **Sem miniatura** desde 05/11/2026 (Levi: "nem
+      precisa mostrar a foto de cara não... pode mostrar o nome das fotos e se a pessoa clicar ela vai abrir o card da
+      OS"): a imagem ainda é baixada, porque a repetida compara a própria imagem (a mesma foto em dois campos ganha nome
+      e carimbo diferentes), mas não se guarda miniatura e a rota `/t/campo/aprovacao/foto/<id>` saiu; as miniaturas de
+      antes (`dados/campo/prefiltro_fotos/`) saem quando a OS deixa a fila.
       Memória e `dados/campo/prefiltro.json.gz`, gravada a cada 10 OS (cada push reinicia o servidor); a volta carrega o
       disco antes de ler, a OS que sai da fila sai dali com as miniaturas e a fila vazia (soluço) não apaga nada. Medido
       nas 476 fotos da medição: 10 ms de CPU e 144 KB por foto, 16 fotos por OS. **Onde roda** (`prefiltro_fundo.ligado`):
       `NEXUS_PREFILTRO` decide quando dito (0 desliga); sem ele, segue o `NEXUS_CAMPO_AQUECER` (o servidor lê, o PC não;
       a cópia de prova põe 0). **A visita só lê memória** (nem Fracttal, nem banco, nem S3).
-    - **O cartão**, nesta ordem: a OS (abre o card do OS Creator, `NexusOsCard.abrir`, status "Em Verificação"), os
-      dias esperando, a UFV, o cliente e as tarefas; o **score** (a nota do App, a pior das tarefas; "Fora do App" sem
-      ela); os **avisos com a prova** (as duas fotos repetidas lado a lado; "6 fotos anexadas 2 dias depois do
-      fechamento no App"); e logo depois o **Aprovar** = o Concluir do OS Creator (`POST /os/api/os/<id>/concluir` com
+    - **O cartão** (2ª rodada, 05/11/2026: o modelo do cartão do Quadro da equipe da Engenharia, "porém com o botão
+      aprovar"; a coluna e o cartão com o fio na cor da coluna, o cartão na superfície 2), nesta ordem: no topo a OS em
+      **verde Grid, sem sublinhado** ("tire esse underline estranho!"; abre o card do OS Creator, `NexusOsCard.abrir`,
+      status "Em Verificação") e os dias; logo abaixo o **motivo da coluna em destaque** (`apq-motivo`: "Sempre destacar
+      o motivo de estar em dúvida ou não OK! tem que estar bem visual e acessível"): o fundo e o fio na cor, o ícone e a
+      palavra NÃO OK ou EM DÚVIDA (a cor nunca sozinha) e os fatos que puseram a OS ali (`prefiltro.TIPOS_DO_MOTIVO`:
+      tarde, repetida, não abriu, fora do App), com a prova (da repetida, o nome das duas fotos, o número e o campo,
+      que abre o card da OS, como no Histórico do OS Creator); em Fora do pré-filtro e
+      Ainda conferindo, o mesmo bloco, neutro, com o motivo; depois a tarefa (a 1ª, "e mais N"), o ativo, a UFV e o
+      cliente; o **score** (a nota do App, a pior das tarefas; "Fora do App" sem ela); os outros avisos (a regra do App,
+      as fotos por ler); no pé o técnico (as iniciais), as tarefas e quando as fotos foram conferidas; e logo depois o
+      **Aprovar** = o Concluir do OS Creator (`POST /os/api/os/<id>/concluir` com
       `{folio}`, a rota do Painel do responsável e do OS Creator Web: status 3 + recalculate + reconferência da data de
       fim), com o login do Fracttal de quem clica; IRREVERSÍVEL, pede confirmação; o 401 vira "Entre no OS Creator com a
       sua conta do Fracttal". Aprovada só com `ok: true` na resposta: sem a sessão do Nexus, o portão dá 302 para /entrar
       e o fetch recebe 200 em HTML, que NÃO é aprovada ("A sua sessão do Nexus acabou"). A conferência
       (`POST /t/campo/aprovacao/<id>/conferir`: só sai da fila guardada o que o Fracttal já não tem em verificação, 1
       pedido de leitura; ninguém esconde OS da fila) tira o cartão, e a cópia da fila em disco é regravada uma vez por vez
-      (`aprovacao._regravar`: a que chega durante outra só marca que falta). O cartão diz quando as fotos foram
-      conferidas, e o de "Ainda conferindo" diz "Fotos ainda não conferidas".
+      (`aprovacao._regravar`: a que chega durante outra só marca que falta). A leitura (a fila de verificação, a hora em
+      que foi lida, as notas do App e quantas OS tiveram as fotos conferidas) fica no "!" amarelo do título, não no canto
+      (Levi, 05/11/2026: "pode deixar no disclaimer da exclamação em amarelo").
     - **O lote**: caixa de marcar só em Pronta e Em dúvida (não na OS com "Faltam fotos por ler", que pode virar Não OK),
       "Selecionar todas" por coluna e "Aprovar as marcadas (N)", com a confirmação que diz quantas e de que coluna. Uma OS
       a cada 4 s (`PAUSA_LOTE_MS`: cada aprovação custa 5 a 7 pedidos ao Fracttal), com o andamento; para no que se
@@ -1723,7 +1739,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       do Fracttal, `visao.usinas_do_fracttal`); cliente e busca (OS, UFV, técnico, sem acento) filtram na página e
       recontam as colunas. CSV: OS, dias, criação, fim, Responsável O&M, usina, cliente, técnicos, tarefas, nota do App,
       a coluna ("Fora do pré-filtro (motivo)") e os motivos. No celular as colunas deslizam de lado dentro do quadro.
-      Prova: `test_campo_aprovacao_responsavel.py`, `test_campo_prefiltro.py` e `test_campo_prefiltro_fundo.py`.
+      Prova: `test_campo_aprovacao_responsavel.py`, `test_campo_aprovacao_visual_0511.py` (a 2ª rodada),
+      `test_campo_prefiltro.py` e `test_campo_prefiltro_fundo.py`.
   - **A conta pronta (18/10/2026, "Está demorando muito para carregar")**: a regra do App sobre a fila inteira leva uns
     3,5 s só de conta (medido em 18/10 com uma fila falsa de 5.500 tarefas), mais a leitura das notas no banco, e a
     cópia de 5 min (`leitura.ler`) vencia entre uma releitura e outra: quase toda visita pagava, e cada filtro de região

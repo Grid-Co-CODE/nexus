@@ -165,7 +165,7 @@ def test_escopo():
         ([_crua(description="[Cabine 1] - Religamento da cabine 1")], "Religamento"),
         ([_crua(labels=[{"description": "PERFORMANCE"}])], "PERFORMANCE"),
         ([_crua(labels=[{"description": "Chamados"}])], "CHAMADOS"),
-        ([_crua(labels=[{"description": "ENGENHARIA"}])], "ENGENHARIA"),
+        ([_crua(labels=[{"description": "ENGENHARIA"}])], ""),          # entra (Levi, 05/11/2026)
         ([_crua(code_create_by="c7")], "Criada pelo COS"),
         ([_crua(), _crua(tasks_log_task_type_main="Religamento")], "Religamento"),
         ([_crua(labels=[{"description": "REMOTO"}])], ""),
@@ -222,12 +222,14 @@ def test_sem_o_registro_do_app_a_hora_fica_vazia(monkeypatch):
 
 
 def test_cada_aviso_diz_o_tipo_e_a_repetida_traz_os_pares():
-    """O cartão do quadro mostra a prova pelo tipo do aviso: as duas fotos da repetida lado a lado, com o número de cada."""
-    anexos = [{"id": f"a{i}", "tarefa": "1", "anexada": _anexada(30 if i == 4 else 0)} for i in range(1, 5)]
+    """O cartão do quadro mostra a prova pelo tipo do aviso: o nome das duas fotos da repetida, o número e o campo de cada
+    (05/11/2026: o nome no lugar da foto, e o clique abre o card da OS)."""
+    anexos = [{"id": f"a{i}", "tarefa": "1", "desc": "Inversor" if i != 3 else "",
+               "anexada": _anexada(30 if i == 4 else 0)} for i in range(1, 5)]
     o = _os(_tarefa(qualidade=60, id_wt=1), _tarefa(pelo_app=False, qualidade=None, id_wt=2))     # as fotos da tarefa do App
     r = prefiltro.classificar(o, _fatos(anexos, [("a1", "a3")]), FECHADO, P)
     assert [a["tipo"] for a in r["avisos"]] == ["tarde", "repetida", "fora_app", "app"]
-    assert r["avisos"][1]["pares"] == [{"a": "a1", "b": "a3", "ra": "p01", "rb": "p03"}]
+    assert r["avisos"][1]["pares"] == [{"a": "a1", "b": "a3", "ra": "p01", "rb": "p03", "da": "Inversor", "db": ""}]
     sem_fotos = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None)), None, "", P)
     assert [a["tipo"] for a in sem_fotos["avisos"]] == ["fora_app", "faltam"]
 

@@ -1146,48 +1146,77 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .apq-lote-msg{flex:1 1 100%;margin:0;font-size:13px;color:var(--tinta-2)}
 .apq-lote-msg:empty{display:none}
 .apq-quadro{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start;margin-top:14px}
-.apq-coluna{min-width:0;padding:10px;background:var(--superficie-2);border:1px solid var(--linha);
-  border-top:3px solid var(--ok-cheio);border-radius:var(--raio-md)}
-.apq-coluna[data-tom="alerta"]{border-top-color:var(--alerta-cheio)}
-.apq-coluna[data-tom="critico"]{border-top-color:var(--critico-cheio)}
-.apq-col-cab{display:grid;gap:2px;margin:0 2px 8px}
-.apq-col-cab h2{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0;font:700 14px/1.3 var(--font-sans)}
-.apq-col-n{font:700 20px/1 var(--font-sans);color:var(--tinta)}
+/* 2ª rodada (05/11/2026, Levi: "pode adotar um visual de card de OS parecido com Engenharia > Quadro da equipe porém com o
+   botão aprovar"): a coluna e o cartão do Quadro da equipe (o kb-col e o kb-card do engenharia.css), o fio de cima da
+   coluna e o da esquerda do cartão na cor da coluna */
+.apq-coluna{display:flex;flex-direction:column;min-width:0;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:14px;box-shadow:inset 0 3px 0 var(--ok-cheio)}
+.apq-coluna[data-tom="alerta"]{box-shadow:inset 0 3px 0 var(--alerta-cheio)}
+.apq-coluna[data-tom="critico"]{box-shadow:inset 0 3px 0 var(--critico-cheio)}
+.apq-col-cab{display:grid;gap:2px;padding:12px 14px;border-bottom:1px solid var(--linha)}
+.apq-col-cab h2{display:flex;align-items:center;gap:8px;margin:0;font:700 13.5px/1.3 var(--font-sans);color:var(--tinta)}
+.apq-col-n{margin-left:auto;font:700 12px var(--font-sans);padding:1px 8px;border-radius:999px;background:var(--superficie-3);
+  color:var(--tinta-2)}
 .apq-col-cab p{margin:0;font-size:12px}
 .apq-todas{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:12.5px;color:var(--tinta-2);cursor:pointer}
-.apq-cartoes{display:grid;gap:8px;max-height:calc(100vh - 230px);overflow-y:auto;padding:1px 2px 1px 0}
-.apq-cartoes--grade{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));max-height:none;overflow:visible;margin-top:10px}
-.apq-cartao{display:grid;gap:6px;min-width:0;padding:10px 12px;background:var(--superficie);border:1px solid var(--linha);
-  border-radius:var(--raio-md);content-visibility:auto;contain-intrinsic-size:auto 190px}
+.apq-cartoes{display:grid;gap:10px;align-content:start;padding:10px;max-height:calc(100vh - 230px);overflow-y:auto}
+.apq-cartoes--grade{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));max-height:none;overflow:visible;padding:10px 0 0}
+.apq-cartao{display:grid;gap:7px;min-width:0;padding:12px 12px 10px;background:var(--superficie-2);border:1px solid var(--linha);
+  border-radius:12px;box-shadow:inset 3px 0 0 var(--linha-forte);content-visibility:auto;contain-intrinsic-size:auto 230px}
+.apq-cartao[data-coluna="pronta"]{box-shadow:inset 3px 0 0 var(--ok-cheio)}
+.apq-cartao[data-coluna="duvida"]{box-shadow:inset 3px 0 0 var(--alerta-cheio)}
+.apq-cartao[data-coluna="nao_ok"]{box-shadow:inset 3px 0 0 var(--critico-cheio)}
 .apq-cartao[hidden]{display:none}
-.apq-cartao[data-estado="aprovada"]{background:var(--superficie-2);border-color:var(--ok-cheio)}
+.apq-cartao[data-estado="aprovada"]{border-color:var(--ok-cheio);box-shadow:inset 3px 0 0 var(--ok-cheio)}
 .apq-c-cab{display:flex;align-items:center;gap:8px;min-width:0}
 .apq-marcar{flex:none;width:17px;height:17px;margin:0;accent-color:var(--verde);cursor:pointer}
-.apq-c-os{padding:0;border:0;background:none;color:var(--tinta);font:700 14px/1.2 var(--font-mono);cursor:pointer;
-  text-decoration:underline;text-decoration-color:var(--linha-forte);text-underline-offset:3px}
-.apq-c-os:hover,.apq-c-os:focus-visible{text-decoration-color:var(--verde-texto)}
-.apq-c-os:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
-.apq-c-dias{margin-left:auto}
-.apq-c-onde,.apq-c-quem{margin:0;font-size:12.5px;line-height:1.35;overflow-wrap:anywhere}
-.apq-c-onde{color:var(--tinta-2)}
-.apq-c-onde b{color:var(--tinta);font-weight:600}
-.apq-c-quem{font-size:12px}
-.apq-score{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;margin:2px 0 0;font:700 11px/1.3 var(--font-sans);
+/* o número da OS no verde da Grid, sem sublinhado (05/11/2026: "tire esse underline estranho!") */
+.apq-c-os{padding:0;border:0;background:none;color:var(--verde-texto);font:700 13px/1.2 var(--font-mono);cursor:pointer;text-decoration:none}
+.apq-c-os:hover{color:var(--tinta)}
+.apq-c-os:focus-visible{outline:2px solid var(--foco);outline-offset:2px;border-radius:4px}
+.apq-c-dias{margin-left:auto;font:700 11.5px var(--font-sans)}
+/* o motivo da coluna em destaque (05/11/2026: "Sempre destacar o motivo de estar em dúvida ou não OK! tem que estar bem
+   visual e acessível"): o fundo e o fio na cor, o ícone e a palavra (a cor nunca sozinha), o texto na tinta */
+.apq-motivo{display:flex;gap:9px;align-items:flex-start;padding:9px 10px;border-radius:9px;border:1px solid var(--linha-forte);
+  border-left-width:4px;background:var(--superficie-3);color:var(--tinta)}
+.apq-motivo > .ph{flex:none;font-size:19px;line-height:1.2;color:var(--tinta-2)}
+.apq-motivo > div{min-width:0}
+.apq-motivo-t{display:block;font:800 12px/1.3 var(--font-sans);letter-spacing:.05em;text-transform:uppercase}
+.apq-motivo ul{display:grid;gap:4px;margin:3px 0 0;padding:0;list-style:none;font:600 13px/1.4 var(--font-sans);overflow-wrap:anywhere}
+.apq-motivo[data-nivel="critico"]{background:var(--critico-suave);border-color:var(--critico-cheio)}
+.apq-motivo[data-nivel="critico"] > .ph,.apq-motivo[data-nivel="critico"] .apq-motivo-t{color:var(--critico)}
+.apq-motivo[data-nivel="alerta"]{background:var(--alerta-suave);border-color:var(--alerta-cheio)}
+.apq-motivo[data-nivel="alerta"] > .ph,.apq-motivo[data-nivel="alerta"] .apq-motivo-t{color:var(--alerta)}
+.apq-motivo[data-nivel="neutro"] ul{font-weight:500;color:var(--tinta-2)}
+.apq-c-tit{margin:0;font:600 13.5px/1.35 var(--font-sans);color:var(--tinta);overflow-wrap:anywhere}
+.apq-c-tit small{font-weight:500;color:var(--mudo)}
+.apq-c-onde{margin:0;font-size:12px;line-height:1.35;color:var(--mudo);overflow-wrap:anywhere}
+.apq-c-onde b{color:var(--tinta-2);font-weight:600}
+.apq-score{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;margin:0;font:700 11px/1.3 var(--font-sans);
   letter-spacing:.04em;text-transform:uppercase;color:var(--mudo)}
 .apq-score b{font:700 18px/1 var(--font-sans);letter-spacing:0}
 .apq-score small{font-weight:400;letter-spacing:0;text-transform:none}
 .apq-avisos{display:grid;gap:4px;margin:0;padding:0;list-style:none}
-.apq-aviso{padding:4px 8px 4px 9px;border-left:3px solid var(--linha-forte);border-radius:0 6px 6px 0;background:var(--superficie-2);
+.apq-avisos:empty{display:none}
+.apq-aviso{padding:4px 8px 4px 9px;border-left:3px solid var(--linha-forte);border-radius:0 6px 6px 0;background:var(--superficie);
   font-size:12.5px;line-height:1.4;color:var(--tinta-2);overflow-wrap:anywhere}
 .apq-aviso[data-nivel="critico"]{border-left-color:var(--critico-cheio);color:var(--tinta);font-weight:600}
 .apq-aviso[data-nivel="alerta"]{border-left-color:var(--alerta-cheio)}
-.apq-aviso[data-nivel="ok"]{border-left-color:var(--ok-cheio)}
-.apq-par{display:flex;gap:6px;margin-top:6px}
-.apq-par figure{display:grid;flex:1 1 0;gap:2px;justify-items:center;min-width:0;margin:0}
-.apq-par figure[hidden]{display:none}
-.apq-par img{width:100%;max-width:150px;height:auto;aspect-ratio:4 / 3;object-fit:cover;border-radius:6px;background:var(--foto-veu)}
-.apq-par figcaption{font:600 11px/1 var(--font-mono);color:var(--mudo)}
-.apq-aprovar{justify-self:start;margin-top:2px}
+.apq-aviso[data-nivel="ok"]{border-left-color:var(--ok-cheio);color:var(--ok)}
+/* o nome das duas fotos do par, que abre o card da OS (05/11/2026: sem a foto no cartão) */
+.apq-par{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:5px}
+.apq-par-igual{font:700 12px var(--font-mono);color:var(--mudo)}
+.apq-foto{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid var(--linha-forte);border-radius:999px;
+  background:var(--superficie);color:var(--verde-texto);font:600 12px/18px var(--font-sans);cursor:pointer;text-decoration:none}
+.apq-foto:hover{border-color:var(--verde-texto)}
+.apq-foto:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.apq-c-pe{display:flex;align-items:center;gap:8px;min-width:0;padding-top:7px;border-top:1px solid var(--linha);font-size:11.5px;
+  color:var(--tinta-2)}
+.apq-c-av{flex:none;width:24px;height:24px;margin:0;font-size:10px}
+.apq-c-quem{min-width:0;overflow-wrap:anywhere}
+.apq-c-quem small{display:block;color:var(--mudo)}
+.apq-c-n{margin-left:auto;flex:none;color:var(--mudo)}
+.apq-aprovar{justify-self:start}
 .apq-msg{margin:0;font-size:12.5px;line-height:1.4}
 .apq-msg[hidden]{display:none}
 .apq-vazio{margin:6px 2px;font-size:12.5px}
