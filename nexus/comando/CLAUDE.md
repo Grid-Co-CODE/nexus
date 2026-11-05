@@ -25,7 +25,7 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `conversa.py` | A conversa presa ao objeto com @menção: o livro `nexus_conversas · fato_mensagem`, as menções não lidas (`para_mim`) e a lista do @ (`pessoas_mencionaveis`) |
 | `../torres/comando/templates/comando/_conversa.html` + `static/comando/conversa.js` | O componente da conversa (dentro de cada insight e na página da OS e da usina) e o @ |
 | `../casca/__init__.py` (`_sino`) + `base.html` | O sino do topo |
-| `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /avisos/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS") e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
+| `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS") e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
 
 ## As regras da Fase 1 (e de onde cada uma lê)
 | Regra | Torre dona | Fonte |
@@ -102,7 +102,12 @@ download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
   não avisa (decisão de 04/11/2026: custaria ler no Fracttal as solicitações de cada pessoa).
 - **No sino:** a parte "avisos das suas OS", no alto; o clique abre o card da OS (`oscreator/card_os_abrir.html`, com o
   botão do PDF) por cima da tela, e sem JavaScript a página da OS. "Marcar como lida" e "Marcar todas como lidas" são
-  formulários (`POST /avisos/lida`, sem JavaScript, como o tema), e o lido vale em qualquer computador (o banco).
+  formulários (`POST /t/comando/aviso/lida`, sem JavaScript, como o tema), e o lido vale em qualquer computador (o
+  banco). **Mora em `/t/comando/`** porque o Caddy do servidor só manda ao Nexus a raiz, `/t/*` e poucos outros
+  caminhos: nasceu em `/avisos/lida` (04/11/2026), que no servidor caía na plataforma, e o Marcar como lida não gravava
+  (`tests/test_rotas_no_caminho_do_nexus.py` pegou; regra em `nexus/casca/CLAUDE.md`, "Regras que já custaram caro").
+  O portão por setor abre o caminho a quem tem uma tela do Comando, e a Caixa de entrada é de todo setor; "aviso" no
+  singular, como `insight/acao`: uma tela "avisos" casaria com o caminho e trancaria quem não a tem.
 - **O botão do topo leva o ícone do OS Creator** do menu lateral (lido da torre `os`), no lugar do sino (Levi,
   04/11/2026: "quero que troque esse símbolo de sino pelo símbolo do OS Creator"). As classes seguem `sino-*`.
 - O sino só lê a cópia de 1 minuto do livro (`avisos.copia`) e a conta da lista central da pessoa (1 minuto, por versão
@@ -145,6 +150,7 @@ sem cópia que não espera; a Caixa de todo setor). Os testes da torre (`test_to
 `tests/test_comando_pedidos.py` (Fase 3: um pedido por área com prazo obrigatório, só a área responde, o prazo
 (atrasado, vence hoje, no prazo) e as medianas do painel com linhas inventadas, a Caixa, o sino, a página da OS e o
 Tempo de resposta); `tests/test_comando_conversa.py` (Fase 2); `tests/test_comando_avisos.py` (os avisos das OS: a
-execução pela lista central de mentira, a solicitação com os nomes cifrados, o sino com o card e o Marcar como lida, o
-"Marcar todas" e o gancho da aprovação) e o `test_aprovar_chama_o_gancho_do_aviso_de_quem_pediu` do
+execução pela lista central de mentira, a solicitação com os nomes cifrados, o sino com o card e o Marcar como lida
+(os dois formulários no caminho da rota), o "Marcar todas", o caminho aberto no portão de todo setor e o gancho da
+aprovação) e o `test_aprovar_chama_o_gancho_do_aviso_de_quem_pediu` do
 `tests/test_oscreator_solic_pcm.py`.
