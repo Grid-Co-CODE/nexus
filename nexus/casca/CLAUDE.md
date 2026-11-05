@@ -213,16 +213,21 @@ lista de 5 em 5 min. **Ao contrário da lista de administradores do Nexus, esta 
   o envio calado; `tests/test_acessos_admins_app_js.py`). Sem JavaScript, o `required` vale.
 - **O código da pessoa** é o do `responsaveis.codigos_e_ambiguos`: o do usuário do Fracttal ligado à pessoa em Pessoas e
   setores (só a ligação de hoje de cada usuário: o religado da ficha 11 para a 10 deixava o código nas duas) e, sem ele,
-  o do e-mail da ficha. Sem código, a etiqueta "sem código" e a recusa "sem e-mail na ficha nem usuário do Fracttal
-  ligado: o App não a reconheceria; corrija o cadastro antes"; o código que cai em duas fichas sai das duas, com a
-  etiqueta "o mesmo código está em mais de uma ficha" e a recusa dizendo isso. O código que já vale na lista por outra
-  ficha é recusado com o nome dela, e a linha cujo código já não é o da ficha (o e-mail mudou, o usuário do Fracttal
-  foi religado, o código caiu em duas) ganha o aviso para tirar e, se for o caso, pôr de novo.
+  o do e-mail da ficha (a desligada ou excluída não entra pelo e-mail). Sem código, a etiqueta "sem código" e a recusa
+  "sem e-mail na ficha nem usuário do Fracttal ligado: o App não a reconheceria; corrija o cadastro antes". O código que
+  cai em duas fichas: vence a ligação do Fracttal, e a outra fica "sem código: o e-mail dela é o do usuário do Fracttal
+  ligado a outra ficha"; sem ligação a desempatar, sai das duas ("o mesmo código está em mais de uma ficha"); a recusa
+  do Pôr diz o mesmo. O código que já vale na lista por outra ficha é recusado com o nome dela.
+- **O aviso da linha** ("o código desta linha já não é o desta ficha… tire e, se for o caso, ponha de novo"): só quando
+  o código de hoje da ficha existe e é outro (o e-mail mudou) ou quando a ficha perdeu o código (está entre as sem
+  código com o porquê). Sem a chave do cadastro, nenhuma linha o leva (o Nexus não lê o e-mail das fichas, e toda linha
+  posta pelo e-mail avisava em falso: re-revisão de 05/11/2026), e a aba diz "Sem a chave do cadastro, o Nexus não
+  confere os códigos".
 - **Quem decidiu** é o código do e-mail do login: o nome da ficha que o tem ou, sem ficha (o administrador do
   escritório), o e-mail que este Nexus conhece (administradores e quem entrou em 30 dias); vazio = a senha.
 - **Prova:** `tests/test_base_acessos_admins_app.py` (só administrador; pôr, tirar e histórico com quem decidiu; a 409
-  sem código; o código pelo Fracttal ligado; o religado da 11 para a 10 e o código de duas fichas; o nome antes da
-  gravação; só fichas ativas; outro site, formulário vencido e sem a chave; banco fora; nenhum e-mail das fichas na
+  sem código; o código pelo Fracttal ligado; o religado da 11 para a 10 e a ligação que vence o e-mail de outra ficha;
+  o aviso da linha, com e sem a chave do cadastro; o nome antes da gravação; só fichas ativas; outro site, formulário vencido e sem a chave; banco fora; nenhum e-mail das fichas na
   página) e `tests/test_acessos_admins_app_js.py` (o envio sem pessoa, no node). No navegador, a cópia de prova com dados
   de mentira (1366 e 375 px).
 

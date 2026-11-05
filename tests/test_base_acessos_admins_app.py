@@ -35,11 +35,12 @@ def _h(email):
     return codigo_da_pessoa(HMAC, email)
 
 
-def _pessoas():
+def _pessoas(emails=None):
     cofre = Cofre(CHAVE)
+    emails = EMAILS if emails is None else emails
 
     def p(pid, nome, status="Ativo", excluido="não", vinculo="Colaborador de campo", cargo="Técnico O&M"):
-        segredo = {"nome": nome, "nome_padrao": nome, "email": EMAILS.get(pid)}
+        segredo = {"nome": nome, "nome_padrao": nome, "email": emails.get(pid)}
         return {"pessoa_id": pid, "vinculo": vinculo, "cargo": cargo, "equipe_id": 1, "status": status,
                 "excluido": excluido, "sensivel_cifrado": cofre.cifrar(json.dumps(segredo), f"banco/pessoas/{pid}")}
     return [p(10, "Técnico Dez"), p(11, "Supervisora Onze", vinculo="Supervisor", cargo="Supervisor de Campo"),
@@ -248,7 +249,7 @@ def _religar(app, *decisoes):
 def test_o_religado_da_ficha_11_para_a_10_e_recusado_com_o_nome_da_outra(app, admin):
     """O usuário do Fracttal 501 estava ligado à ficha 11, que virou administradora do App pelo código dele; depois foi
     religado à ficha 10. Pela ligação de hoje o código é da 10 (a 11 fica sem), e pôr a 10 com o código que já vale na
-    lista pela 11 é recusado, dizendo qual; a linha da 11 avisa que o código dela já não é o da ficha."""
+    lista pela 11 é recusado, dizendo qual."""
     assert _post(admin, "admin_app_por", pessoa_id="11").status_code == 303
     _religar(app, (501, 11, EMAIL_FRACTTAL_11, "2026-10-12T12:00:00Z"), (501, 10, EMAIL_FRACTTAL_11, "2026-10-20T12:00:00Z"))
     # a 10 segue na lista para escolher (ela não é administradora), com o porquê de não poder entrar ainda
@@ -260,21 +261,48 @@ def test_o_religado_da_ficha_11_para_a_10_e_recusado_com_o_nome_da_outra(app, ad
     assert r.status_code == 409
     assert "Técnico Dez: o código dela já está na lista de administradores do App com outra ficha (Supervisora Onze)" in html
     assert len(_linhas(app)) == 1
-    vig = html.split('id="aa-vigentes"', 1)[1].split("</table>", 1)[0]
-    assert "Supervisora Onze" in vig and "já não é o desta ficha" in vig
 
 
-def test_o_codigo_de_duas_fichas_fica_sem_e_a_tela_diz_por_que(app, admin):
-    """O usuário do Fracttal com o e-mail da ficha 10 ligado à ficha 12: o código cai nas duas e sai das duas; a lista
-    diz por quê, e o Pôr recusa com 409."""
+def test_a_ligacao_do_fracttal_vence_e_a_outra_ficha_fica_sem_com_o_porque(app, admin):
+    """O usuário do Fracttal com o e-mail da ficha 10 ligado à ficha 12 (re-revisão de 05/11/2026, N2): vence a ligação,
+    a 12 fica com o código, e a 10 fica sem, com o porquê na lista e na recusa do Pôr."""
     _religar(app, (502, 12, EMAILS[10], "2026-10-12T12:00:00Z"))
     html = admin.get(ABA).get_data(as_text=True)
     escolher = html.split('id="aa-lista"', 1)[1].split("</fieldset>", 1)[0]
     dez = escolher.split('value="10"', 1)[1].split("</label>", 1)[0]
-    assert "o mesmo código está em mais de uma ficha" in dez
+    doze = escolher.split('value="12"', 1)[1].split("</label>", 1)[0]
+    assert "sem código: o e-mail dela é o do usuário do Fracttal ligado a outra ficha" in dez and "sem código" not in doze
     r = _post(admin, "admin_app_por", pessoa_id="10")
-    assert r.status_code == 409 and "o mesmo código está em mais de uma ficha" in r.get_data(as_text=True)
+    assert r.status_code == 409 and "o e-mail dela é o do usuário do Fracttal ligado a outra ficha" in r.get_data(
+        as_text=True)
     assert _linhas(app) == []
+    assert _post(admin, "admin_app_por", pessoa_id="12").status_code == 303
+    assert _linhas(app)[0]["pessoa_hmac"] == _h(EMAILS[10])
+
+
+def test_o_aviso_do_codigo_so_quando_o_de_hoje_e_outro_ou_a_ficha_perdeu_e_sem_a_chave_nenhum(app, admin):
+    """Re-revisão de 05/11/2026 (N1): sem a chave do cadastro o Nexus não lê o e-mail das fichas, e toda linha posta pelo
+    e-mail mostrava "tire e ponha de novo". O aviso da linha só vale quando o código de hoje da ficha existe e é outro,
+    ou quando a ficha perdeu o código (entre as sem código, com o porquê); sem a chave, nenhuma linha o leva, e a tela diz
+    que o Nexus não confere os códigos."""
+    api = app.extensions["nexus_dados_sessao"]
+
+    def aviso():
+        html = admin.get(ABA).get_data(as_text=True)
+        return "já não é o desta ficha" in html.split('id="aa-vigentes"', 1)[1].split("</table>", 1)[0], html
+    assert _post(admin, "admin_app_por", pessoa_id="10").status_code == 303
+    assert aviso()[0] is False                                      # o código de hoje é o da linha
+    _aba(api, "cadastro_nexus", "pessoas", _pessoas({**EMAILS, 10: "t10.novo@exemplo.test"}))
+    visao.limpar()
+    assert aviso()[0] is True                                       # o e-mail da ficha mudou: o código de hoje é outro
+    _aba(api, "cadastro_nexus", "pessoas", _pessoas())
+    _religar(app, (502, 12, EMAILS[10], "2026-10-12T12:00:00Z"))
+    assert aviso()[0] is True                                       # a 10 perdeu o código para a ligação da 12
+    app.config.pop("NEXUS_CHAVE_CADASTRO")
+    visao.limpar()
+    S._CACHE.clear()
+    tem, html = aviso()
+    assert tem is False and "o Nexus não confere os códigos" in html
 
 
 # ── o nome antes da gravação (revisão de 05/11/2026, achado 8) ───────────────────────────────────────────────────

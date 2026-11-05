@@ -13,7 +13,7 @@
 {% if app_sem_token %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-lock"></i><div><strong>Só leitura.</strong> Este Nexus não tem a chave de gravação do banco (<span class="gc-dado">GRIDCO_SQL_TOKEN</span>).</div></div>{% endif %}
 {% if app_erro %}<div class="cad-aviso cad-aviso--{{ 'alerta' if app_velha else 'critico' }}" role="alert"><i class="ph ph-database"></i><div><strong>{{ 'Mostrando a última leitura boa.' if app_velha else 'Não consegui ler os administradores do App no banco.' }}</strong> {{ app_erro }}. Enquanto isso, nada se grava.</div></div>{% endif %}
 {% if app_erro_cadastro %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-database"></i><div><strong>Não consegui ler o cadastro de pessoas do banco</strong> ({{ app_erro_cadastro }}). Os nomes aparecem pelo número, e o Pôr administrador fica travado.</div></div>{% endif %}
-{% if app_sem_chave %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Sem a chave do cadastro.</strong> Os nomes aparecem pelo número, o e-mail das fichas não é lido e a observação não se grava.</div></div>{% endif %}
+{% if app_sem_chave %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Sem a chave do cadastro, o Nexus não confere os códigos.</strong> Os nomes aparecem pelo número, o e-mail das fichas não é lido (só vale o código do usuário do Fracttal ligado), e a observação não se grava.</div></div>{% endif %}
 
 <div class="cad-numeros">
   <div><div class="r">Administradores do App</div><div class="v">{{ app_vigentes|length }}</div><div class="d">pela lista do Nexus</div></div>
@@ -72,7 +72,7 @@
         <span class="aa-nome">{{ p.nome }}</span>
         {% if p.cargo or p.vinculo %}<span class="aa-det">{{ p.cargo or p.vinculo }}</span>{% endif %}
         {% if p.outra %}<span class="cad-chip cad-chip--alerta">o código dela já está na lista com outra ficha ({{ p.outra }})</span>
-        {% elif p.porque %}<span class="cad-chip cad-chip--alerta" title="{{ p.porque }}">sem código: o mesmo código está em mais de uma ficha</span>
+        {% elif p.porque %}<span class="cad-chip cad-chip--alerta">sem código: {{ p.porque }}</span>
         {% elif not p.tem_codigo %}<span class="cad-chip cad-chip--alerta">sem código: o App não a reconheceria</span>{% endif %}
       </label>
       {% else %}<p class="ace-vazio aa-vazio">Nenhuma ficha ativa para escolher.</p>{% endfor %}

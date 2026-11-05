@@ -166,12 +166,12 @@ def test_sem_as_chaves_nao_grava(cfg):
     assert linhas(cfg) == []
 
 
-def _fichas(cfg, emails: dict):
+def _fichas(cfg, emails: dict, desligadas=()):
     """O cadastro de pessoas com o e-mail de cada ficha cifrado, como o banco o guarda (e-mails de mentira)."""
     import json
     from nexus.cadastro.cifra import Cofre
     cofre = Cofre(cfg["NEXUS_CHAVE_CADASTRO"])
-    return [{"pessoa_id": pid, "excluido": "não",
+    return [{"pessoa_id": pid, "excluido": "não", "status": "Desligado" if pid in desligadas else "Ativo",
              "sensivel_cifrado": cofre.cifrar(json.dumps({"nome": f"Pessoa {pid}", "email": e}), f"banco/pessoas/{pid}")}
             for pid, e in emails.items()]
 
@@ -223,17 +223,30 @@ def test_so_vale_a_ligacao_de_hoje_de_cada_usuario_do_fracttal(cfg, monkeypatch)
     assert R.codigos(cfg, fichas) == {}
 
 
-def test_o_codigo_de_duas_fichas_sai_das_duas_e_diz_por_que(cfg, monkeypatch):
-    """O código que cai em duas fichas (o mesmo e-mail em duas, ou o usuário do Fracttal ligado à ficha errada) não é
-    de ninguém: o App acharia uma pessoa e o Nexus diria outra. A pessoa fica sem código, com o porquê."""
+def test_a_ligacao_do_fracttal_vence_o_email_de_outra_ficha_e_email_com_email_sai_das_duas(cfg, monkeypatch):
+    """O código que cai em duas fichas: quando um deles vem da ligação do Fracttal (Pessoas e setores), vence a ligação
+    (a ficha ligada fica com ele, a outra perde, com o porquê); o mesmo e-mail em duas fichas não é de nenhuma (o App
+    acharia uma pessoa e o Nexus diria outra). Re-revisão de 05/11/2026 (N2)."""
     fichas = SimpleNamespace(pessoas=_fichas(cfg, {10: "t10@exemplo.test", 11: "", 12: "dupla@exemplo.test",
                                                    13: "Dupla@Exemplo.test ", 14: "t14@exemplo.test"}))
     # o usuário do Fracttal com o e-mail da ficha 10 ligado à 11
     _setores(monkeypatch, [_lig(501, 11, _h(cfg, "t10@exemplo.test"), "2026-10-12T12:00:00Z")])
-    codigos, ambiguos = R.codigos_e_ambiguos(cfg, fichas)
-    assert codigos == {14: _h(cfg, "t14@exemplo.test")}
-    assert set(ambiguos) == {10, 11, 12, 13} and all("mais de uma ficha" in v for v in ambiguos.values())
+    codigos, por_que = R.codigos_e_ambiguos(cfg, fichas)
+    assert codigos == {11: _h(cfg, "t10@exemplo.test"), 14: _h(cfg, "t14@exemplo.test")}
+    assert por_que[10] == R.DE_OUTRA and por_que[12] == por_que[13] == R.AMBIGUO and set(por_que) == {10, 12, 13}
     assert R.codigos(cfg, fichas) == codigos
+
+
+def test_a_pessoa_recontratada_so_a_ficha_nova_fica_com_o_codigo(cfg, monkeypatch):
+    """Re-revisão de 05/11/2026 (N2): a ficha antiga, desligada, e a nova, ativa e ligada ao usuário do Fracttal, com o
+    mesmo e-mail. A desligada (ou excluída) não entra na conta pelo e-mail: só a nova fica com o código, sem disputa."""
+    email = "recontratada@exemplo.test"
+    fichas = SimpleNamespace(pessoas=_fichas(cfg, {20: email, 21: email}, desligadas=(20,)))
+    _setores(monkeypatch, [_lig(601, 21, _h(cfg, email), "2026-10-20T12:00:00Z")])
+    assert R.codigos_e_ambiguos(cfg, fichas) == ({21: _h(cfg, email)}, {})
+    # sem a ligação, a ficha nova fica com o código do e-mail, e a desligada não disputa
+    _setores(monkeypatch, [])
+    assert R.codigos_e_ambiguos(cfg, fichas) == ({21: _h(cfg, email)}, {})
 
 
 def test_os_leitores_do_nexus_seguem_contando_so_o_executa(cfg):

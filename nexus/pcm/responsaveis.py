@@ -43,7 +43,8 @@ _BRT = timezone(timedelta(hours=-3))
 _LACO = {"thread": None, "parar": threading.Event(), "ultimo": None, "quando": None}
 
 
-AMBIGUO = "o mesmo código está em mais de uma ficha (o mesmo e-mail, ou o usuário do Fracttal ligado a outra ficha)"
+AMBIGUO = "o mesmo código está em mais de uma ficha"
+DE_OUTRA = "o e-mail dela é o do usuário do Fracttal ligado a outra ficha"
 
 
 def codigos(cfg, base) -> dict:
@@ -55,22 +56,27 @@ def codigos_e_ambiguos(cfg, base) -> tuple[dict, dict]:
     """({pessoa_id: o código do e-mail}, {pessoa_id: por que ficou sem}). O código de cada ficha é o do e-mail dela e,
     por cima, o da pessoa ligada ao usuário do Fracttal em Pessoas e setores, pela ligação de HOJE de cada usuário (a
     última decisão de cada `fracttal_id`). Revisão de 05/11/2026 (achado 4): contando toda decisão, o usuário religado da
-    ficha 11 para a 10 deixava o código dele nas duas, e o App acharia a 11 pelo código de quem agora é a 10. O código que
-    cai em duas ou mais fichas sai de todas (o App acharia uma e o Nexus diria outra): a pessoa fica sem código, e o
-    porquê vai no segundo dicionário. A ficha excluída não conta."""
+    ficha 11 para a 10 deixava o código dele nas duas, e o App acharia a 11 pelo código de quem agora é a 10.
+
+    O código que cai em duas ou mais fichas (re-revisão de 05/11/2026, N2): quando um deles vem da ligação do Fracttal,
+    vence a ligação (a ficha ligada fica com ele, e a que só o tinha pelo e-mail fica sem, `DE_OUTRA`); sem ligação a
+    desempatar (o mesmo e-mail em duas fichas, ou dois usuários ligados), sai de todas (`AMBIGUO`): o App acharia uma e
+    o Nexus diria outra. O porquê vai no segundo dicionário. A ficha desligada ou excluída não entra pelo e-mail: a
+    pessoa recontratada tem a ficha antiga, desligada, com o mesmo e-mail da nova."""
     import json
     from collections import defaultdict
 
     from ..campo import visao
     from ..campo.ligacao_cadastro import codigo_da_pessoa
     chave, chave_hmac = cfg.get("NEXUS_CHAVE_CADASTRO"), cfg.get("NEXUS_PESSOA_HMAC")
-    codigo: dict = {}
+    do_email: dict = {}
     if chave and chave_hmac:
         from ..cadastro.cifra import Cofre
         cofre = Cofre(chave)
         for p in base.pessoas:
             pid = D._id(p.get("pessoa_id"))
-            if not pid or D._txt(p.get("excluido")).lower() == "sim" or not p.get("sensivel_cifrado"):
+            if (not pid or D._txt(p.get("excluido")).lower() == "sim" or D._txt(p.get("status")).lower() == "desligado"
+                    or not p.get("sensivel_cifrado")):
                 continue
             try:
                 email = json.loads(cofre.decifrar(p["sensivel_cifrado"], f"banco/pessoas/{pid}")).get("email")
@@ -78,7 +84,8 @@ def codigos_e_ambiguos(cfg, base) -> tuple[dict, dict]:
                 continue
             c = codigo_da_pessoa(chave_hmac, email)
             if c:
-                codigo[pid] = c
+                do_email[pid] = c
+    do_fracttal: dict = {}
     try:
         from ..cadastro import setores as S
         st = S.ler(visao._base(), visao._sessao())
@@ -87,14 +94,24 @@ def codigos_e_ambiguos(cfg, base) -> tuple[dict, dict]:
             hoje[d.get("fracttal_id")] = d          # a ligação de hoje de cada usuário do Fracttal
         for d in sorted(hoje.values(), key=lambda x: x["decidida_em"]):
             if d.get("pessoa_id") and d.get("pessoa_hmac"):
-                codigo[d["pessoa_id"]] = d["pessoa_hmac"]
+                do_fracttal[d["pessoa_id"]] = d["pessoa_hmac"]
     except Exception as e:      # noqa: BLE001 — sem os setores, vale o código do e-mail da ficha
         log.info("responsáveis: sem os setores (%s); vale o código do e-mail da ficha", type(e).__name__)
+    codigo = dict(do_email)
+    codigo.update(do_fracttal)                      # a ligação da ficha vale por cima do e-mail dela
     donos = defaultdict(set)
     for pid, c in codigo.items():
         donos[c].add(pid)
-    ambiguos = {pid: AMBIGUO for c, pids in donos.items() if len(pids) > 1 for pid in pids}
-    return {pid: c for pid, c in codigo.items() if pid not in ambiguos}, ambiguos
+    por_que: dict = {}
+    for c, pids in donos.items():
+        if len(pids) < 2:
+            continue
+        ligadas = {p for p in pids if do_fracttal.get(p) == c}
+        if len(ligadas) == 1:                       # a ligação do Fracttal vence o e-mail da outra ficha
+            por_que.update({p: DE_OUTRA for p in pids - ligadas})
+        else:
+            por_que.update({p: AMBIGUO for p in pids})
+    return {pid: c for pid, c in codigo.items() if pid not in por_que}, por_que
 
 
 def pedidos(base, codigo_da: dict, est: dict, hoje: int) -> tuple[list[dict], dict]:

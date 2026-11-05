@@ -410,8 +410,9 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   Reenviar mandam o `esperado` (o `resumo_da_reemissao`: a quantidade e um hash dos pares usina, pessoa, nome no
   Fracttal e código), e o `decidir_varias` monta os pedidos de uma leitura nova do livro, dentro da `_TRAVA`, e só grava
   se o resumo for o confirmado ("A conta mudou desde que a tela abriu"). O `esperado` é obrigatório (sem ele, "Faltou a
-  conferência da tela"; com nada a reenviar, "Nada a reenviar", e nada grava). E o `_linha` da reemissão pula o par que
-  já não vale ou mudou de datas: um "tirar" no meio nunca volta atrás.
+  conferência da tela"; com nada a reenviar, "Nada a reenviar", e nada grava). Na recusa, a leitura feita dentro da
+  trava vale como a de agora (a cópia de 1 minuto se renova): a tela seguinte já mostra a conta nova, e não a de antes.
+  E o `_linha` da reemissão pula o par que já não vale ou mudou de datas: um "tirar" no meio nunca volta atrás.
 - **Os administradores do App de Campo** (`admins_app.py`, 05/11/2026; Levi: "os administradores do App de Campo e os
   técnicos por usina têm de ser escolhidos no Nexus"): o livro **`nexus_acessos_app_campo`**, aba `fato_admin_app`, só
   deles (catálogo: `decisao_admin_app`), escolhidos em Base → Acessos → Administradores do App de Campo (a aba e as
@@ -458,7 +459,10 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
     do e-mail (`responsaveis.codigos_e_ambiguos`, a mesma conta dos administradores do App): o código da pessoa ligada
     ao usuário do Fracttal em Pessoas e setores e, sem ele, o do e-mail da ficha. Desde a revisão de 05/11/2026 vale só
     a ligação de hoje de cada usuário do Fracttal (a última decisão de cada `fracttal_id`: o religado da ficha 11 para
-    a 10 deixava o código nas duas), e o código que cai em duas ou mais fichas sai de todas, com o porquê.
+    a 10 deixava o código nas duas). O código que cai em duas ou mais fichas: com a ligação do Fracttal numa delas,
+    vence a ligação (a ficha ligada fica com ele, a que só o tinha pelo e-mail fica sem, com o porquê); sem ligação a
+    desempatar (o mesmo e-mail em duas fichas), sai de todas. A ficha desligada ou excluída não entra pelo e-mail: a
+    pessoa recontratada tem a ficha antiga, desligada, com o mesmo e-mail da nova.
   - **Quem sai:** o responsável que a ficha trocou, ou que ficou sem. Sem código ou sem nome no Fracttal, ninguém entra,
     e a mesma pessoa que já estava fica.
   - **O que não grava:** cadastro ilegível, cadastro sem nenhum responsável, livro ilegível, ou falta de

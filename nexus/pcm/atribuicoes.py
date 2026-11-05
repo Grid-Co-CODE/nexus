@@ -323,7 +323,13 @@ def decidir_varias(cfg, pedidos, usuario: dict | None, origem: str, conferir=Non
             pedidos = pedidos({"decisoes": [x for x in cru if _int_ou_none(x.get("usina_id"))
                                             and _int_ou_none(x.get("pessoa_id"))]}, hoje)
         if conferir is not None:
-            conferir(pedidos)
+            try:
+                conferir(pedidos)
+            except Recusada:
+                # a leitura de agora vale como a leitura nova também na recusa (re-revisão de 05/11/2026, N3): sem isto a
+                # cópia de 1 minuto seguia velha, e a tela seguinte mostrava (e recusava) o resumo de antes
+                _CACHE[str(_arquivo_local(cfg) or "banco")] = {"decisoes": cru, "erro": "", "lido_em": time.time()}
+                raise
         ultimas = _ultimas(cru)
         novas = []
         for p in pedidos:

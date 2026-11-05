@@ -233,6 +233,26 @@ def test_um_tirar_entre_a_tela_e_o_clique_nao_volta_e_a_tela_diz_que_a_conta_mud
     assert (2, 11, "executa") not in _atuais(app)
 
 
+def test_a_recusa_renova_a_leitura_e_a_tela_seguinte_ja_mostra_a_conta_nova(app, banco, logado):
+    """Re-revisão de 05/11/2026 (N3): quando a conferência dentro da trava recusa, a leitura que ela acabou de fazer vale
+    como a leitura de agora. Antes, a cópia de 1 minuto do livro seguia velha, e a tela seguinte mostrava o resumo velho
+    (e recusava de novo) até a cópia vencer."""
+    from pathlib import Path
+    _nomes_antigos(app)
+    esperado = _esperado(logado.get(ROTA).get_data(as_text=True))
+    assert esperado.startswith("2-")
+    # outra máquina tira a ligação da usina 2: o livro muda sem passar pela cópia deste Nexus
+    arq = Path(app.config["NEXUS_PCM_ATRIBUICOES_ARQUIVO"])
+    d = json.loads(arq.read_text(encoding="utf-8"))
+    d[A.ABA].append(dict(d[A.ABA][-1], decidida_em="2026-10-17T13:00:00Z", na_usina="nao"))
+    arq.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    assert _esperado(logado.get(ROTA).get_data(as_text=True)) == esperado          # a cópia ainda mostra a conta velha
+    assert logado.post(ROTA + "/reemitir-tudo", data={"esperado": esperado}).status_code == 303
+    html = logado.get(ROTA).get_data(as_text=True)
+    assert "A conta mudou desde que a tela abriu" in html and _esperado(html).startswith("1-")
+    assert "reemissao" not in {x["origem"] for x in _decisoes(app)}
+
+
 def test_reenviar_tudo_so_quem_programa_e_da_propria_pagina(app, banco, monkeypatch):
     _nomes_antigos(app)
     c = _pessoa(app)

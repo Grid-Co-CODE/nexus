@@ -120,15 +120,20 @@ def contexto(cfg) -> dict:
         return emails.get(h) or "alguém fora do cadastro"
 
     atuais = AA.atuais(est, hoje)
+    # só com a chave do cadastro o Nexus lê o e-mail das fichas e confere o código de cada linha (re-revisão de
+    # 05/11/2026, N1: sem ela, toda linha posta pelo e-mail da ficha avisava "tire e ponha de novo", em falso)
+    confere = bool(cfg.get("NEXUS_CHAVE_CADASTRO")) and not erro_cadastro
     vigentes = []
     for (codigo, _papel), x in atuais.items():
         pid = A._int_ou_none(x.get("pessoa_id"))
+        hoje_cod = codigos.get(pid)
         vigentes.append({"pessoa_id": pid, "nome": _nome(fichas, pid), "pessoa_hmac": codigo, "status": x["status"],
                          "desde": hora_br(x.get("decidida_em")), "de": _dm(A._int_ou_none(x.get("de_data_id"))),
                          "ate": _dm(A._int_ou_none(x.get("ate_data_id"))), "quem": quem(D._txt(x.get("decidida_por_hmac"))),
-                         # o código da linha já não é o da ficha (o e-mail mudou, o usuário do Fracttal foi religado a
-                         # outra ficha, ou o código caiu em duas): o App acha a pessoa pelo código de antes
-                         "codigo_mudou": not erro_cadastro and codigos.get(pid) != codigo})
+                         # o código de hoje da ficha é outro (o e-mail mudou), ou ela perdeu o código (o mesmo em duas
+                         # fichas, ou o do e-mail dela é o do usuário do Fracttal ligado a outra): o App acha a pessoa
+                         # pelo código da linha, o de antes
+                         "codigo_mudou": confere and (bool(hoje_cod) and hoje_cod != codigo or pid in ambiguos)})
     vigentes.sort(key=lambda v: (v["nome"].lower(), v["pessoa_hmac"]))
     dono = {c: A._int_ou_none(x.get("pessoa_id")) for (c, _p), x in atuais.items()}
     escolher = []
