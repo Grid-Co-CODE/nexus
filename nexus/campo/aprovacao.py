@@ -58,6 +58,7 @@ _PRONTA: dict = {}
 # auditoria de 08/11/2026: um lote de aprovações durante os minutos da releitura voltava inteiro para o quadro)
 _APROVADAS: dict = {}
 APROVADA_VALE_S = 20 * 60
+_CONTA = threading.Lock()     # uma conta da fila_toda por vez (ver fila_toda)
 
 
 class _Pedido:
@@ -244,17 +245,21 @@ def aquecer(app):
     from ..casca import fracttal_conta              # a releitura por trás declara o fundo (o teto de 90 do porteiro)
     threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-fila-fracttal", lambda: _reler(app)), daemon=True,
                      name="nexus-fila-fracttal").start()
+    # a releitura leva minutos, e quem abre a tela nesse meio tempo vê a fila do disco: a conta dela começa já (05/11/2026,
+    # a 1ª visita depois do deploy esperou 97 s fazendo esta conta); as fotos esperam a fila relida, como antes
+    threading.Thread(target=lambda: _preparar(app, fotos=False), daemon=True, name="nexus-fila-conta").start()
 
 
-def _preparar(app):
-    """A conta da tela sobre a fila da memória (o boot com a fila do disco ainda nova). Conforto: sem ela, a tela faz."""
+def _preparar(app, fotos=True):
+    """A conta da tela sobre a fila da memória (o boot com a fila do disco). Conforto: sem ela, a tela faz."""
     try:
-        with app.test_request_context():
+        with app.test_request_context() if app else contextlib.nullcontext():
             fila_toda(FILA_INTEIRA)
     except Exception:      # noqa: BLE001
         logging.exception("fila da Aprovação: a conta pronta não saiu")
-    from . import prefiltro_fundo                 # e a volta do pré-filtro sobre a fila do disco
-    prefiltro_fundo.pedir_conferencia(app)
+    if fotos:
+        from . import prefiltro_fundo             # e a volta do pré-filtro sobre a fila do disco
+        prefiltro_fundo.pedir_conferencia(app)
 
 
 def fila_toda(params: dict) -> Leitura:
@@ -306,11 +311,15 @@ def fila_toda(params: dict) -> Leitura:
     pronta = _PRONTA.get(chave)
     if pronta is not None:
         return pronta
-    r = leitura.ler(chave, calcular)
-    if not r.erro and isinstance((r.dados or {}).get("linhas"), list):
-        for velha in [k for k in _PRONTA if k[1] != str(lida)]:      # só as contas da fila de agora
-            del _PRONTA[velha]
-        _PRONTA[chave] = r
+    # uma conta por vez (Desempenho, 05/11/2026): a visita que chega com a conta em curso (a do boot, a da releitura ou
+    # a de outra visita) espera por ela e leva a pronta da cópia do `leitura.ler`, em vez de fazer outra ao lado,
+    # disputando o processador
+    with _CONTA:
+        r = leitura.ler(chave, calcular)
+        if not r.erro and isinstance((r.dados or {}).get("linhas"), list):
+            for velha in [k for k in _PRONTA if k[1] != str(lida)]:      # só as contas da fila de agora
+                del _PRONTA[velha]
+            _PRONTA[chave] = r
     return r
 
 

@@ -2149,6 +2149,15 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     fazia a sua. Agora `aprovacao.fila_toda` guarda a conta da fila inteira até a fila mudar (`_PRONTA`, pela hora da
     leitura), feita logo depois da releitura e ao subir com a fila do disco (`_preparar`), e a tela filtra sobre ela. A OS
     que sai da fila (`tirar_da_fila`) sai da conta pronta também, e fica anotada por 20 min para a releitura que começou antes não a devolver ao quadro (08/11/2026). Prova: `test_a_visita_nao_refaz_a_conta_da_fila`.
+  - **A conta sem refazer o que não muda (05/11/2026, desempenho)**: a 1ª visita depois do deploy esperou 97 s (o Raio-X:
+    "trabalhando" na `/t/campo/aprovacao`, 15 presos em 24 h). A cópia da regra devolve 200 linhas por chamada e a conta
+    junta ~28 páginas; a cada página a fonte (`fonte_pg._do_app`) remontava o registro do App inteiro e as rondas, e cada
+    visita que chegava com a conta em curso fazia outra ao lado. Agora a fonte monta cada tabela uma vez por leitura dos
+    livros (a hora deles invalida), uma conta por vez (`_CONTA`: quem chega espera a em curso e leva a pronta), e o boot
+    com a fila do disco velha começa a conta enquanto a releitura anda (as fotos esperam a fila relida). Medido no PC,
+    fila de 5.500 tarefas sobre o registro e o cadastro reais: a conta fria de 6,5 s para 3,3 s. O que sobra é a regra
+    copiada refeita por página (o laço da fila e o par das rondas): não se edita aqui. Prova:
+    `tests/test_campo_aprovacao_conta_rapida.py`.
   - **O portão do Aprovar do Nexus saiu (18/10/2026, Levi: "pode tirar a rota antiga!")**: de 08/10 a 18/10 o Aprovar
     chamava `POST /os/_nexus/aprovacao/<id>/aprovar`, que só deixava o Supervisor de Campo da região da usina ou um
     administrador; a rota, o `aprovar_os.py` e a conta de quem aprova por região saíram do servidor. Desde então aprova

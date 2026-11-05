@@ -74,6 +74,8 @@ class Fornecedor:
         self.chave_hmac = config.get("NEXUS_PESSOA_HMAC")
         self.do_app = bool(self.chave_hmac)
         self._cache_app = {"t": 0.0, "fech": None, "rondas": None, "em": None}
+        # as tabelas montadas dos livros do App, por leitura dos livros: {nome: (lidos_em, TabelaSoLeitura)}
+        self._tabelas_app = {}
 
     def livros(self) -> tuple[list, list]:
         """(fechamentos, rondas) dos livros do App. Erro de leitura sobe: quem chama anota e a tela avisa."""
@@ -156,7 +158,22 @@ class Fornecedor:
         return TabelaSoLeitura(nome, [])
 
     def _do_app(self, nome):
+        """A tabela montada uma vez por leitura dos livros (Desempenho, 05/11/2026): a Aprovação de OS junta a fila em
+        páginas de 200 pela regra copiada do App, e cada página pedia o registro de novo. Remontar os ~5.600 fechamentos
+        (e as rondas) a cada página era a maior parte dos 23 s da conta fria no PC (97 s no servidor). A tabela só lê:
+        quem consulta recebe cópias."""
         fech, rondas = self.livros()
+        lidos_em = self._cache_app["t"]
+        with self._trava:
+            pronta = self._tabelas_app.get(nome)
+        if pronta is not None and pronta[0] == lidos_em:
+            return pronta[1]
+        tabela = self._monta_do_app(nome, fech, rondas)
+        with self._trava:
+            self._tabelas_app[nome] = (lidos_em, tabela)
+        return tabela
+
+    def _monta_do_app(self, nome, fech, rondas):
         if nome == "qualidadelog":
             quem = self._quem()
             out = []
