@@ -37,91 +37,10 @@ from . import almoxarifado, fato_chamado, fato_inventario, fato_pt, fato_ronda, 
 from . import programacao
 from ..zeladoria import tabelas as zeladoria_tabelas
 
-ESTADOS = {"id": "ID", "cod": "código", "hmac": "código da pessoa", "nome": "nome", "largo": "em colunas",
-           "prop": "cadastro próprio", "nao": "—"}
-ESTADOS_FATO = {"origem": "como a fonte grava", "montado": "montado, sem gravar", "conformado": "com IDs",
-                "parte": "fonte de outro fato", "aposentado": "aposentado", "fora": "fora do banco"}
-# Os tipos de fato do Kimball. Transação: 1 linha por acontecimento, nunca muda. Foto periódica: o estado no fim de
-# cada período (dia, semana, mês). Foto acumulada: 1 linha por coisa que anda (a PT aguardando e depois decidida) e
-# MUDA até fechar. Sem medida: só registra que aconteceu (conta-se linhas).
-TIPOS_FATO = ("transacao", "snapshot_periodico", "snapshot_acumulado", "sem_medida")
-TIPO_ROTULO = {"transacao": "transação", "snapshot_periodico": "foto periódica",
-               "snapshot_acumulado": "foto acumulada", "sem_medida": "sem medida"}
-# Como a medida soma. aditiva: em qualquer corte. semi: num eixo só (a irradiação soma no tempo de UMA usina, não
-# entre usinas). nao: nunca (nota, percentual, RPN: média, mínimo, máximo).
-SOMA = ("aditiva", "semi", "nao")
-# `_ms` entrou em 31/10/2026 com o tempo de resposta das telas do OS Creator (fato_uso_os: mediana e p95 em milissegundos)
-SUFIXOS_UNIDADE = ("_min", "_kwh", "_kwh_m2", "_mm", "_pct", "_qtd", "_pts", "_nivel", "_brl", "_ms")
-
-
-@dataclass(frozen=True)
-class Medida:
-    coluna: str     # com a unidade no nome (SUFIXOS_UNIDADE); indicador sem sufixo, só 1/0
-    unidade: str    # "min", "kWh", "kWh/m²", "mm", "%", "qtd", "pts", "nível 1-5", "R$", "ms", "1/0"
-    soma: str       # SOMA
-
-
-def medida_valida(m: Medida) -> bool:
-    """A regra 3 da casa: a unidade está no nome da coluna, ou é indicador 1/0."""
-    return m.soma in SOMA and (m.coluna.endswith(SUFIXOS_UNIDADE) or m.unidade == "1/0")
-
-
-def _m(tuplas) -> tuple:
-    return tuple(Medida(*t) for t in tuplas)
-
-
-def _fontes(pares) -> tuple:
-    return tuple(f"{l} · {a}" for l, a in pares)
-
-
-# As dimensões conformadas: UMA de cada, com o mesmo ID para todos os setores.
-DIMENSOES = (
-    ("data", "Data", "nexus_dimensoes · dim_data", "data_id (AAAAMMDD)"),
-    # HIST-10 (auditoria 08/10): a usina tem histórico (equipe, responsáveis, região "da época") e a dimensão não o citava
-    # a estrutura física da usina (13/10/2026) é hierarquia da MESMA dimensão (usina -> chave do supervisório, cabine,
-    # inversor), não um segundo cadastro de equipamento: o inversor aponta o ativo do Fracttal pelo equipamento_id
-    ("usina", "Usina", "cadastro_nexus · usinas (+ de_para; nexus_dimensoes · usinas_historico; nexus_estrutura_usina: "
-     "chaves do supervisório, cabines e inversores)", "usina_id"),
-    ("cliente", "Cliente", "cadastro_nexus · clientes", "cliente_id"),
-    # a região de campo (estrutura de O&M de 10/2026) é da EQUIPE: hierarquia da mesma dimensão (equipe -> região, com o
-    # Supervisor de Campo e o Coordenador por pessoa_id), não uma dimensão à parte; o fato chega à região pelo equipe_id.
-    # (O "região" do nome é a "Região" que o App escreve, que é a equipe; a região de campo é outra coisa.)
-    ("equipe", "Equipe / região", "cadastro_nexus · equipes (+ regioes_campo: a região de campo da equipe)",
-     "equipe_id (→ regiao_campo_id)"),
-    # o setor (12/10/2026) é atributo da PESSOA, como a região de campo é da equipe: a lista em nexus_setores · dim_setor
-    # e o setor de cada pessoa do Fracttal em nexus_setores · fato_decisao_setor (vale a última decisão de cada uma)
-    ("pessoa", "Pessoa", "cadastro_nexus · pessoas (+ nexus_dimensoes · pessoas_historico; + nexus_setores: o setor "
-     "do pessoal do Fracttal)", "pessoa_id"),
-    ("equipamento", "Equipamento", "nexus_equipamentos · dim_equipamento (+ equipamento_apelido)",
-     "equipamento_id (sha1 do código do ativo do Fracttal)"),
-    ("os", "OS", "o número no próprio fato (dimensão degenerada)", "os"),
-)
-DIM_IDS = tuple(d[0] for d in DIMENSOES)
-
-
-@dataclass(frozen=True)
-class Fato:
-    id: str
-    nome: str
-    area: str                  # o setor dono (a torre do Nexus)
-    livro: str                 # de onde vem no banco (workbook · aba), ou "fora do banco: ..."
-    grao: str                  # o que é UMA linha: sem isto escrito, dois relatórios contam coisas diferentes
-    dims: dict                 # {dimensão: (estado, coluna/observação)}
-    tipo: str = ""             # TIPOS_FATO (obrigatório em todo fato: o teste exige)
-    chave: tuple = ()          # a(s) coluna(s) que identificam a linha; vazio só em fato de origem que diz por quê
-    medidas: tuple = ()        # (Medida, ...): no fato de origem, as que o fato conformado vai ter
-    fontes: tuple = ()         # "livro · aba" de cada fonte (o fato único de ronda tem três)
-    janela_origem: str = ""    # quanto a fonte guarda ("90 dias (App)", "4 semanas (PCM)"); vazio = tudo
-    estado: str = "origem"     # ESTADOS_FATO
-    conformado_em: str = ""    # o livro do Nexus que tem (conformado) ou terá (montado) o fato com os IDs
-    parte_de: tuple = ()       # estado "parte": os fatos de que este virou fonte
-    observacao: str = ""
-
-
-def _d(**kw):
-    out = {d: ("nao", "") for d in DIM_IDS}
-    out.update({k: (v if isinstance(v, tuple) else (v, "")) for k, v in kw.items()})
-    return out
+# o modelo (Fato, Livro, as dimensões e as regras) mora em modelo.py desde 05/11/2026; o catálogo o reexporta
+from .modelo import (ESTADOS, ESTADOS_FATO, TIPOS_FATO, TIPO_ROTULO, SOMA, SUFIXOS_UNIDADE, Medida, medida_valida, _m, _fontes, DIMENSOES, DIM_IDS, Fato, _d, Livro)  # noqa: F401
+# os fatos e livros que cada área declara na pasta dela (05/11/2026, Levi: "independente no setor dela")
+from ..hseq import catalogo as hseq_catalogo  # noqa: E402
 
 
 FATOS = (
@@ -501,70 +420,8 @@ FATOS = (
          janela_origem="todas as conferências feitas pelo App",
          observacao="o histórico das conferências pelo App (as do Forms da TST, antes dele, ficaram na planilha da "
                     "TST). Mesma regra da observação: só sim/não. Até o App publicar, o livro não existe"),
-    # as decisões da Segurança sobre os extintores (24/10/2026, Levi: "quando a TST aceita o extintor é excluído e vai
-    # para um histórico de extintores excluídos"; "pedir uma nova ronda é uma nova ronda do zero então será por usina"):
-    # o Nexus é a FONTE; o App de Campo lê daqui a baixa e o pedido de ronda. Registrado antes da 1ª gravação.
-    Fato("exclusao_extintor", "Exclusão de extintor (Segurança)", "hseq",
-         "nexus_hseq_extintores · fato_exclusao_extintor",
-         "1 linha = 1 exclusão (a baixa) de 1 extintor pela Segurança, com o motivo; vale a última de cada extintor",
-         _d(data=("id", "data_id (o dia de Brasília da exclusão; marca_dia, o dia do Não reconhecido aceito)"),
-            usina=("id", "usina_id (vazio para extintor de usina fora do cadastro)"),
-            pessoa=("hmac", "decidida_por_hmac (quem excluiu; o nome só cifrado)"),
-            equipamento=("prop", "codigo: o código do extintor (cadastro próprio do App, fora do Fracttal)")),
-         tipo="sem_medida", chave=("decidida_em", "codigo"),
-         fontes=("nexus_hseq_extintores · fato_exclusao_extintor",),
-         janela_origem="o Nexus é a fonte (só acrescenta)",
-         observacao="motivo (domínio): nao_reconhecido (o Aceitar do não reconhecido, com a marca do App em marca_dia), "
-                    "retirado, duplicado ou outro (pelo botão direito na linha do extintor). O excluído some das telas e "
-                    "das contas do Nexus e vai para o histórico de excluídos; volta sozinho se aparecer uma conferência "
-                    "num dia depois da exclusão. Quem excluiu e a observação só cifrados (dados_cifrados, regra 8). "
-                    "Cada linha vai assinada (assinatura, HMAC com a chave derivada da NEXUS_PESSOA_HMAC, rótulo "
-                    "nexus:hseq:extintores): o App lê pela leitura aberta da API e só aplica a linha assinada"),
-    Fato("pedido_ronda_extintor", "Pedido de nova ronda de extintores", "hseq",
-         "nexus_hseq_extintores · fato_pedido_ronda",
-         "1 linha = 1 pedido da Segurança de uma nova ronda de extintores, do zero, em 1 usina",
-         _d(data=("id", "data_id (o dia de Brasília do pedido)"),
-            usina=("id", "usina_id (+ usina_app, o nome que o App usa para a usina)"),
-            pessoa=("hmac", "decidida_por_hmac (quem pediu; o nome só cifrado)")),
-         tipo="sem_medida", chave=("decidida_em", "usina_id"),
-         fontes=("nexus_hseq_extintores · fato_pedido_ronda",),
-         janela_origem="o Nexus é a fonte (só acrescenta)",
-         observacao="o App mostra à equipe da usina a ronda pendente (\"O TST solicitou uma nova ronda\"); o Nexus o "
-                    "dá por atendido, como o App, quando TODOS os extintores da usina chegam conferidos (a 'Recebida em' "
-                    "do livro de conferências, pela hora) ou marcados como não reconhecidos depois do pedido. Assinado "
-                    "como a exclusão"),
-    # a edição do cadastro de um extintor pela Segurança (24/10/2026, a TST: "Eu consigo editar o cadastro de
-    # extintores?"): o Nexus é a FONTE; o App grava a edição no cadastro dele
-    Fato("edicao_extintor", "Edição do cadastro de extintor (Segurança)", "hseq",
-         "nexus_hseq_extintores · fato_edicao_extintor",
-         "1 linha = 1 edição do cadastro de 1 extintor pela Segurança, só com os campos que mudaram",
-         _d(data=("id", "data_id (o dia de Brasília da edição)"),
-            usina=("id", "usina_id (vazio para extintor de usina fora do cadastro)"),
-            pessoa=("hmac", "decidida_por_hmac (quem editou; o nome só cifrado)"),
-            equipamento=("prop", "codigo: o código do extintor (cadastro próprio do App, fora do Fracttal)")),
-         tipo="sem_medida", chave=("decidida_em", "codigo"),
-         fontes=("nexus_hseq_extintores · fato_edicao_extintor",),
-         janela_origem="o Nexus é a fonte (só acrescenta)",
-         observacao="campos: JSON {coluna do livro do App: valor novo} com Local, Posição, Classe, Peso (kg), Validade "
-                    "da recarga e Validade do hidrostático (o código não muda); são dados do equipamento, em claro. "
-                    "O Nexus mostra o editado por cima do livro do App até uma conferência num dia depois da edição. "
-                    "Quem editou e a observação só cifrados. Assinado como a exclusão (o texto leva o campos como "
-                    "está gravado)"),
-    # o e-mail semanal das pendências da Segurança (24/10/2026, a TST: "Receber report semanal das pendências por
-    # email, pra mim e pro supervisor responsável"): o Nexus monta e publica, o App de Campo manda
-    Fato("email_pendencias_seguranca", "E-mail semanal das pendências da Segurança", "hseq",
-         "nexus_hseq_email · fato_email_pendencias",
-         "1 linha = 1 e-mail de 1 destinatário numa semana (a TST, com todas as usinas, ou um Responsável UFV, com as "
-         "usinas dele)",
-         _d(data=("id", "data_id (o dia de Brasília em que foi montado; semana = a semana ISO)"),
-            pessoa=("id", "pessoa_id (o número no cadastro) + destinatario_hmac (o código do e-mail, como o do login)")),
-         tipo="sem_medida", chave=("semana", "destinatario_hmac"),
-         fontes=("nexus_hseq_email · fato_email_pendencias",),
-         janela_origem="o Nexus é a fonte (só acrescenta, uma vez por semana)",
-         observacao="papel tst ou responsavel; assunto, corpo_texto e corpo_html com usinas, clientes e números, nunca "
-                    "nome nem e-mail de pessoa (o link da Mesa leva o número da pessoa, ?r=). Assinado (assinatura, HMAC "
-                    "com a chave derivada da NEXUS_PESSOA_HMAC, rótulo nexus:hseq:email): o App só manda a linha "
-                    "assinada e acha o e-mail pelo código"),
+    # os fatos que o Nexus grava pela Segurança · HSEQ, declarados na pasta dela (nexus/hseq/catalogo.py)
+    *hseq_catalogo.FATOS,
     # o que o App de Campo mandou do e-mail semanal (contrato fechado com a sessão do App em 24/10/2026): registrado
     # antes de o App publicar, com as colunas combinadas
     Fato("envio_email_seguranca", "Envio do e-mail semanal da Segurança (App)", "hseq", "email_app_campo · Envios",
@@ -1409,24 +1266,6 @@ FATOS = (
 POR_ID = {f.id: f for f in FATOS}
 
 
-@dataclass(frozen=True)
-class Livro:
-    nome: str
-    abas: tuple
-    cadencia: str
-    quem_grava: str
-    no_banco: bool             # já existe no banco (False = registrado antes de existir: regra 10)
-    observacao: str = ""
-    # as abas que só crescem (18/10/2026): o livros.publicar recusa gravar se a listagem vier incompleta, se uma aba do
-    # banco ficar de fora ou se uma destas encolher. Vazio = livro sem trava (a carga, que encolhe pela janela da fonte);
-    # True = todas as abas do livro
-    so_cresce: tuple = ()
-
-    def __post_init__(self):
-        if self.so_cresce is True:
-            object.__setattr__(self, "so_cresce", tuple(self.abas))
-
-
 # Os livros que o NEXUS grava (regra 10: nome `nexus_<assunto>`, para sempre; registrar AQUI antes de criar).
 LIVROS = (
     Livro("nexus_dimensoes", ("dim_data", "feriados_locais", "pessoas_historico", "usinas_historico",
@@ -1728,18 +1567,8 @@ LIVROS = (
           "1 minuto e a gravação relê o banco antes (troca o livro inteiro); a leitura que não acha a aba do livro que "
           "existe não vira \"vazio\" (livros.abas_conferidas)",
           so_cresce=True),
-    # as decisões da Segurança sobre os extintores (24/10/2026): a exclusão de extintor (o não reconhecido aceito e o
-    # botão direito) e o pedido de nova ronda por usina; o App de Campo lê os dois daqui
-    Livro("nexus_hseq_email", ("fato_email_pendencias",),
-          "toda segunda depois das 07:00, no servidor (NEXUS_HSEQ_EMAIL_AUTO=0 desliga)", "nexus/hseq/email_semanal.py", False,
-          "registrado em 24/10/2026 antes de existir: nasce com a 1ª semana publicada, quando o App de Campo estiver "
-          "pronto para ler e mandar",
-          so_cresce=True),
-    Livro("nexus_hseq_extintores", ("fato_exclusao_extintor", "fato_pedido_ronda", "fato_edicao_extintor"),
-          "a cada decisão na tela de Extintores", "nexus/hseq/decisoes.py, pela tela Extintores da Segurança", False,
-          "registrado em 24/10/2026 antes de existir: nasce com a 1ª decisão. A tela lê com cache de 1 minuto e a "
-          "gravação relê o banco antes (troca o livro inteiro, as abas juntas)",
-          so_cresce=True),
+    # os livros da Segurança · HSEQ, declarados na pasta dela (nexus/hseq/catalogo.py)
+    *hseq_catalogo.LIVROS,
     # o uso das telas do OS Creator e os pedidos ao Fracttal, por hora (31/10/2026, etapa 0 do canto central do OS Creator):
     # um livro por mês, só cresce (a gravação relê o mês e troca as linhas de mesma chave)
     Livro(fato_uso_os.LIVRO_MOLDE, fato_uso_os.ABAS,

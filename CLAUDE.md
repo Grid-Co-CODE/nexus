@@ -24,7 +24,8 @@ confiabilidade e governança dos dados, não podemos fazer nada nas coxas."
 "Prioridade 0 para a governança e controle de dados"; "precisamos construir e manter uma base sólida para futuras
 análises correlacionadas". O modelo é o de **Kimball** (fato com IDs, dimensão única, grão escrito), e mora em
 `nexus/dados/` — **leia `nexus/dados/CLAUDE.md` antes de pôr qualquer dado novo no banco** (chamados, engenharia, PCM,
-segurança, mais inversores). Em uma linha: fonte nova entra primeiro no catálogo (`nexus/dados/catalogo.py`) com o grão
+segurança, mais inversores). Em uma linha: fonte nova entra primeiro no catálogo (`nexus/dados/catalogo.py`, ou no da área que tem o seu: a Segurança em
+`nexus/hseq/catalogo.py`) com o grão
 e as dimensões declarados; o fato vai ao banco com `data_id`, `usina_id`, `pessoa_id`…, nunca com nome em claro nem ID
 chutado; a qualidade da ligação é medida e aparece em Base → Governança de dados. **Toda tabela do banco tem dono no
 catálogo** (Levi, 09/10/2026: "verifique se aparece a cada tabela nova que aparece!"): o radar da Governança compara o
