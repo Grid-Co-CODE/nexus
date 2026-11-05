@@ -174,40 +174,49 @@ body.os-modal-aberto{overflow:hidden}
   .det-pill{height:auto;min-height:36px;padding:6px 12px;flex-wrap:wrap}.det-pdf{height:36px}}
 .det-corpo{display:flex;flex-direction:column;gap:14px;padding:18px 22px 22px}
 .det-card{background:var(--f-card);border:1px solid #222c46;border-radius:13px}
-.det-banner{display:flex;align-items:center;gap:14px;padding:16px 18px}
+.det-banner{display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:10px;padding:16px 18px}
 .det-ico-sq{width:46px;height:46px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:none;border:1px solid var(--f-border)}
 .det-ico-sq.v{background:rgba(166,226,46,.14)}.det-ico-sq.a{background:rgba(87,182,245,.14)}
 .det-banner-t{font-size:17px;font-weight:600;color:#fff}.det-banner-code{margin-left:auto;color:var(--f-muted);font-size:12px;white-space:nowrap}
-/* a usina em cima dos ativos (05/11/2026: "Usina sempre acima dos ativos! pois a usina é mais importante"): ela vira o título
-   do banner, e os ativos descem um degrau; no celular, o código do ativo vai para baixo, alinhado ao texto */
-.det-banner-col{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1 1 0}
-.det-banner-usina{display:flex;flex-direction:column;gap:3px;min-width:0}
-.det-banner-n{color:var(--f-muted);font-size:12.5px;font-weight:600}
-.det-banner-ativo{font-size:14px;font-weight:600}
-@media (max-width:560px){.det-banner{flex-wrap:wrap}.det-banner-col~.det-banner-code{margin-left:60px;flex-basis:100%}}
-/* a bateria do quanto da OS foi feito (05/11/2026): as subtarefas concluídas, numa coluna dela à direita da duração, com a
-   etiqueta embaixo das duas ("encaixe melhor no espaço dela"); no celular, entre a duração e a etiqueta. O
-   recheio é o da barra das subtarefas (`det-prog-f`, verde e laranja nos dois temas) */
-.det-dur.com-bat{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:1fr auto;
-  grid-template-areas:"txt bat" "etq etq";column-gap:20px;row-gap:10px}
+/* o banner em campos lado a lado (05/11/2026: "Bora aproveitar esse espaço!"): a usina, o ativo (ou os ativos, recolhidos)
+   e o código numa faixa só, separados por um traço; no celular, um embaixo do outro */
+.det-banner-campo{display:flex;flex-direction:column;gap:4px;min-width:0;padding:0 24px}
+.det-banner-campo:first-child{padding-left:0}
+.det-banner-campo+.det-banner-campo{border-left:1px solid var(--f-border)}
+.det-banner>.det-banner-ativos{flex:1 1 0}
+.det-banner-ativo{font-size:15px;font-weight:600}
+.det-banner-campo .det-banner-code{margin-left:0;font-size:13px}
+@media (max-width:560px){.det-banner-campo{flex-basis:100%;padding:0}
+  .det-banner-campo+.det-banner-campo{border-left:0;border-top:1px solid var(--f-border);padding-top:10px}}
+/* os ativos recolhidos (05/11/2026: "Está ocupando muito espaço na tela"; "Quero os ativos fiquem recolhidos e que seja
+   expansível!"): o "ATIVOS (N)" do tamanho do "USINA", e as etiquetas no clique */
+.det-banner-ativos>summary{display:inline-flex;align-items:center;gap:8px;cursor:pointer;list-style:none;user-select:none}
+.det-banner-ativos>summary::-webkit-details-marker{display:none}
+.det-ativos-chev{color:var(--f-muted);font-size:16px;line-height:1;transition:transform .15s}
+.det-banner-ativos[open] .det-ativos-chev{transform:rotate(90deg)}
+.det-banner-ativos[open]>.det-ativos{margin-top:8px}
+/* o card da duração em dois quadrados e um retângulo (05/11/2026): a duração e, à direita, a data de criação, cada uma no
+   meio do seu quadrado, separadas por um traço, e a etiqueta embaixo das duas */
+.det-dur.com-bat{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr auto;
+  grid-template-areas:"txt cri" "etq etq";column-gap:18px;row-gap:10px}
 .det-dur-txt{grid-area:txt;display:flex;flex-direction:column;gap:10px;min-width:0}
-/* os dois quadrados de cima com o conteúdo no meio, nos dois sentidos (Levi: "deixe o quadrado do horário centralizado
-   horizontal e verticalmente") */
 .det-dur.com-bat .det-dur-txt{align-items:center;justify-content:center;text-align:center}
+.det-dur.com-bat .det-criada{grid-area:cri;padding-left:18px;border-left:1px solid var(--f-border)}
 .det-dur.com-bat .det-etq-l{grid-area:etq;align-self:end}
-.det-bat-caixa{grid-area:bat;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
-  padding:4px 4px 4px 22px;border-left:1px solid var(--f-border)}
-.det-bat-linha{display:flex;align-items:center;gap:16px}
-.det-bat{position:relative;display:block;width:120px;height:46px;padding:4px;border:2px solid var(--f-muted);border-radius:11px;
-  box-sizing:border-box}
-.det-bat::after{content:"";position:absolute;right:-8px;top:13px;width:6px;height:16px;border-radius:0 4px 4px 0;background:var(--f-muted)}
-.det-bat .det-prog-f{display:block;border-radius:6px}
-.det-bat-caixa.vazia .det-bat{border-style:dashed}
-.det-bat-pct.det-dur-v{font-size:24px;min-width:3.2ch}
-@media (max-width:560px){.det-dur.com-bat{grid-template-columns:minmax(0,1fr);grid-template-areas:"txt" "bat" "etq"}
-  .det-bat-caixa{padding:12px 0 2px;border-left:0;border-top:1px solid var(--f-border)}}
+/* o Feito, deitado, no fim do banner (05/11/2026: "pode ser deitada horizontal mesmo"): a barra com os segmentos inclinados
+   de uma barra de carga (a máscara corta o recheio em faixas); o recheio é o da barra das subtarefas (`det-prog-f`, verde e
+   laranja nos dois temas) */
+.det-banner>.det-feito{margin-left:auto}
+.det-feito-linha{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.det-bat{position:relative;display:block;width:150px;height:20px;border:2px solid var(--f-muted);border-radius:7px;box-sizing:border-box}
+.det-bat-in{position:absolute;inset:3px;overflow:hidden;border-radius:4px}
+.det-bat .det-prog-f{position:absolute;left:0;top:0;bottom:0;height:auto;border-radius:0;
+  -webkit-mask-image:repeating-linear-gradient(120deg,black 0 7px,transparent 7px 10px);
+  mask-image:repeating-linear-gradient(120deg,black 0 7px,transparent 7px 10px)}
+.det-feito.vazia .det-bat{border-style:dashed}
+.det-bat-pct{font-size:15px;font-weight:700}
+@media (max-width:560px){.det-banner>.det-feito{margin-left:0}}
 /* os ativos da OS de vários ativos em etiquetas, na ordem natural (04/11/2026: era uma frase corrida) */
-.det-banner-ativos{display:flex;flex-direction:column;gap:8px;min-width:0}
 .det-ativos{display:flex;flex-wrap:wrap;gap:6px}
 .det-ativo{padding:4px 10px;border:1px solid var(--f-border);border-radius:999px;background:var(--f-input);color:var(--f-muted);
   font-size:12.5px;font-weight:600;white-space:nowrap}

@@ -12,12 +12,10 @@
   </header>
   <div class="det-corpo">
     <div class="det-card det-banner">
-      <div class="det-banner-col">
-        {% if l.usina and l.usina != '—' %}<div class="det-banner-usina"><span class="det-sec">Usina</span><b class="det-banner-t">{{ l.usina }}</b></div>
-        <span class="det-banner-ativo">{{ l.ativo or '—' }}</span>
-        {% else %}<span class="det-banner-t">{{ l.ativo or '—' }}</span>{% endif %}
-      </div>
-      {% if l.code %}<span class="det-banner-code">{{ l.code }}</span>{% endif %}
+      {% set tem_usina = l.usina and l.usina != '—' %}
+      {% if tem_usina %}<div class="det-banner-campo det-banner-usina"><span class="det-sec">Usina</span><b class="det-banner-t">{{ l.usina }}</b></div>{% endif %}
+      <div class="det-banner-campo"><span class="det-sec">Ativo</span><span class="{{ 'det-banner-ativo' if tem_usina else 'det-banner-t' }}">{{ l.ativo or '—' }}</span></div>
+      {% if l.code %}<div class="det-banner-campo"><span class="det-sec">Código</span><span class="det-banner-code">{{ l.code }}</span></div>{% endif %}
     </div>
     <div class="det-cols">
       <div class="det-card det-rows">

@@ -39,8 +39,8 @@ def test_o_card_diz_a_usina_e_a_data_de_criacao(monkeypatch):
     assert "Usina</span>" in b and '<b class="det-banner-t">Usina Alfa</b>' in b
     assert b.index("Usina Alfa") < b.index("Inversor 1.1")                       # a usina em cima do ativo
     assert '<span class="det-banner-ativo">Inversor 1.1</span>' in b and 'class="det-banner-code">TST-INV1.1<' in b
-    linha = html[html.index("data-criada"):][:400]
-    assert "Data de criação" in linha and "29/10/2026 17:40" in linha              # 20:40 UTC = 17:40 em Brasília
+    linha = html[html.index("data-criada"):][:1200]
+    assert "Data de criação" in linha and "29/10/2026" in linha and "às 17:40" in linha   # 20:40 UTC = 17:40 em Brasília
 
 
 def test_a_os_de_varios_ativos_diz_cada_usina_uma_vez(monkeypatch):
@@ -48,7 +48,7 @@ def test_a_os_de_varios_ativos_diz_cada_usina_uma_vez(monkeypatch):
     monkeypatch.setattr(api, "_rpc_call", _ComCriacao([_tarefa(k) for k in (1, 2, 3)], [_item(k, 1) for k in (1, 2, 3)]).rpc)
     b = _banner(_card())
     assert "Usinas</span>" in b and '<b class="det-banner-t">Usina Alfa · Usina Beta</b>' in b
-    assert b.index("Usina Beta") < b.index("3 ativos") and "det-banner-code" not in b   # sem o código: são vários ativos
+    assert b.index("Usina Beta") < b.index("Ativos (3)") and "det-banner-code" not in b   # sem o código: são vários ativos
 
 
 def test_sem_o_catalogo_o_card_fica_como_antes(monkeypatch):
@@ -60,7 +60,7 @@ def test_sem_o_catalogo_o_card_fica_como_antes(monkeypatch):
     b = _banner(html)
     assert "det-banner-usina" not in b and '<span class="det-banner-t">Inversor 1.1</span>' in b
     assert 'class="det-banner-code">TST-INV1.1<' in b
-    linha = html[html.index("data-criada"):][:400]
+    linha = html[html.index("data-criada"):][:1200]
     assert "Data de criação" in linha and "—" in linha
 
 
@@ -106,3 +106,21 @@ def test_a_bateria_diz_quanto_da_os_foi_feito(monkeypatch):
         e, r, txt = _bateria(_card())
         assert (e, r) == (estado, recheio), estado
         assert texto in txt and (("%s%%" % recheio[0]) in txt if recheio else " — " in txt), estado
+
+
+def test_os_ativos_vem_recolhidos_e_o_banner_sem_icone(monkeypatch):
+    """Levi, 05/11/2026, na OS de 14 ativos: "Está ocupando muito espaço na tela"; "Quero os ativos fiquem recolhidos e que
+    seja expansível!"; "ATIVOS (14)" do tamanho do "USINA"; "Tire esse emoji também!". E a data de criação foi para cima da
+    duração e depois ao lado dela ("separe data de criação, deixe ao lado direito de duração total"), e o Feito foi para o
+    banner, deitado ("a barra tente colocar em outro canto, pode ser deitada horizontal mesmo")."""
+    _catalogo(monkeypatch)
+    monkeypatch.setattr(api, "_rpc_call", _ComCriacao([_tarefa(k) for k in (1, 2, 3)], [_item(k, 1) for k in (1, 2, 3)]).rpc)
+    html = _card()
+    b = _banner(html)
+    assert '<details class="det-banner-campo det-banner-ativos"><summary><span class="det-sec">Ativos (3)</span>' in b    # fechado: sem open
+    assert "det-ico-sq" not in b
+    dur = html[html.index('class="det-card det-dur'):]
+    assert dur.index("DURAÇÃO TOTAL") < dur.index("data-criada")                   # ao lado direito da duração
+    assert 'class="det-banner-campo det-feito' in b                                # a barra deitada, no banner
+    linhas = html[html.index('class="det-card det-rows"'):html.index('class="det-card det-dur')]
+    assert "Data de criação" not in linhas

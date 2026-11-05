@@ -31,7 +31,7 @@ def test_os_ativos_vem_na_ordem_natural_e_em_etiquetas(monkeypatch):
     numeros = [re.search(r'det-tarefa-n">(\d+)<', b).group(1) for _t, b in _blocos(html)]
     assert numeros == ["1", "2", "3", "4", "5"]                  # o número da tarefa acompanha a ordem
     banner = html[html.index('class="det-card det-banner"'):html.index('class="det-cols"')]
-    assert "5 ativos</span>" in banner and " · " not in banner
+    assert "Ativos (5)</span>" in banner and " · " not in banner
     assert [x.strip() for x in re.findall(r'class="det-ativo">([^<]+)<', banner)] == nomes   # etiquetas, na mesma ordem
 
 
