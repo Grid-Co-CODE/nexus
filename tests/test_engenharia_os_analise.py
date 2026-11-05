@@ -408,6 +408,31 @@ def test_encerrar_de_novo_nao_lanca_outra_execucao():
     assert "execucao" not in [c[0] for c in api.chamadas] and feito == ["subtarefa", "concluida"]
 
 
+def test_encerrar_com_a_sessao_caida_diz_que_a_sessao_venceu():
+    """Prova no Fracttal de 05/11/2026: a sessão da pessoa caiu no meio (o Fracttal aceita uma sessão por conta: entrar
+    noutra aba derruba esta), o `id_tarefa_da_os` do clone engoliu o erro e devolveu nada, e o encerrar dizia "Não achei a
+    tarefa da OS no Fracttal". Com a sessão caída, o erro é o da sessão (a ponte manda entrar de novo)."""
+    class Caida(ApiFalsa):
+        class SessionExpired(ApiFalsa.FracttalError):
+            pass
+
+        def id_tarefa_da_os(self, wid):
+            return None
+
+        def is_logged_in(self):
+            return False
+
+    with pytest.raises(Caida.SessionExpired):
+        OA.encerrar(Caida(), 39001, "Disjuntor", date(2026, 10, 20), date(2026, 10, 28), "Ana Lima", agora=AGORA)
+
+    class Viva(Caida):
+        def is_logged_in(self):
+            return True
+
+    with pytest.raises(OA.Falhou, match="Não achei a tarefa"):
+        OA.encerrar(Viva(), 39001, "Disjuntor", date(2026, 10, 20), date(2026, 10, 28), "Ana Lima", agora=AGORA)
+
+
 def test_o_erro_de_os_fechada_com_espacos_tambem_vale():
     # o `registrar_execucao` do clone troca o "_" por espaço na mensagem do Fracttal
     api = ApiFalsa(erro_exec="O Fracttal recusou o registro: ERROR WO FINISHED BY OTHER USER")

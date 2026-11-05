@@ -172,6 +172,26 @@ def _juntos(tarefas: dict) -> dict:
         return {nome: f.result() for nome, f in futuros.items()}
 
 
+def _campo_de_nota(t: dict, k: str) -> str:
+    v = str((t or {}).get(k) or "").strip()
+    return "" if v.lower() == "none" else v
+
+
+def juntar_notas(tasks: list) -> list[str]:
+    """A nota que o card mostra: a `note` e a `task_note` de cada tarefa, sem repetir. A que já está DENTRO de outra não
+    aparece de novo (prova no Fracttal de 05/11/2026, OS 18591 de TESTE - PA: o comentário da Engenharia grava a `note`
+    com a nota de entrada mais a linha nova, e a `task_note` segue com a de entrada; o card mostrava a de entrada duas
+    vezes)."""
+    notas: list[str] = []
+    for t in tasks:
+        for k in ("note", "task_note"):
+            v = _campo_de_nota(t, k)
+            if not v or any(v in x for x in notas):
+                continue
+            notas = [x for x in notas if x not in v] + [v]
+    return notas
+
+
 def get_os_detalhes(id_work_order) -> dict:
     """Detalhe de UMA OS p/ o histórico. → {'folio','descricao','tipo','event_date','responsavel',
     'notas','subtarefas':[{'descricao','feito','tipo','resposta','id_tarefa','id_form_item'}],'tarefas':[…]}.
@@ -199,12 +219,7 @@ def get_os_detalhes(id_work_order) -> dict:
                     "det": (api._cabecalho_os, id_work_order)})
     tasks, items = lev1["tasks"], lev1["items"]
     t0 = tasks[0] if tasks else {}
-    notas = []
-    for t in tasks:                                  # junta note + task_note de todas as tarefas
-        for k in ("note", "task_note"):
-            v = str(t.get(k) or "").strip()
-            if v and v.lower() != "none" and v not in notas:
-                notas.append(v)
+    notas = juntar_notas(tasks)
     # A ORDEM das subtarefas é a da TAREFA e, dentro dela, o `order_number` (Levi, 08/10/2026: "quando a OS tem mais que
     # uma tarefa está duplicando as subtarefas"). O `order_number` recomeça em 1 em cada tarefa (REST, OS 8709: 13
     # tarefas, cada uma de 1 a n), e a ordem só por ele intercalava as tarefas: na OS de 8 tarefas com o mesmo checklist
@@ -319,6 +334,10 @@ def get_os_detalhes(id_work_order) -> dict:
             "os_pai": os_pai,
             "os_pai_id": pai_id or None,
             "notas": "\n".join(notas),
+            # os dois campos crus da 1ª tarefa: o `editar_nota_os` grava só a `note`, e quem escreve na nota parte dela
+            # (ou, na 1ª vez, da `task_note` com que a OS nasceu), nunca da junção acima (05/11/2026, a ponte da Engenharia)
+            "nota_gravada": _campo_de_nota(t0, "note"),
+            "nota_da_tarefa": _campo_de_nota(t0, "task_note"),
             "subtarefas": subtarefas,
             "tarefas": tarefas,
             "etiquetas": [{"id": l.get("id"), "nome": l.get("description"), "cor": l.get("color")}
