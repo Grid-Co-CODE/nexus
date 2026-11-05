@@ -2549,6 +2549,46 @@ na nota entra a OS mãe do Fracttal; no banco, o chamado abre na data da nota.
   igual, a idade, a linha do tempo, a OS mãe, a tela e o fato). Conferido numa bancada local com o Fracttal falso, a 1440
   e a 375 px.
 
+## A OS pai vai no pedido que cria a OS numerada (04/11/2026)
+
+Uma colega avisou ao Levi: "o OS Creator do nexus não tá puxando a OS pai". Provado no ar no mesmo dia, em TESTE - PA: a OS
+18561, criada pelo Criar OS com a 18560 de pai, nasceu sem pai (o card sem "OS pai" e o Fluxo só com ela).
+- **A causa:** a OS pai só vale no pedido que cria a OS numerada (`_work_order_insert`, sondado em 26/08/2026); na tarefa
+  pendente (o `create_os_rpc` e o `create_planned_os` sem `to_work_order`) o Fracttal a ignora. A fase 2 de todos
+  (`os_juntar.juntar_em_os`) aceitava a OS pai, mas só a Performance agrupada a passava: o Criar OS (uma por ativo,
+  agrupado e por data), a Fila do PCM (aprovar e retomar), a Clonagem de OS, a OS sem plano e a Clonagem de planos
+  mandavam a OS pai só na tarefa, e as OS nasciam sem pai. O seletor e o "puxar" das telas (a OS pai da Engenharia no Criar
+  OS e na Nova solicitação, a da solicitação na Fila) estavam certos: a OS pai chegava ao servidor e se perdia na criação.
+- **A correção:** todo caminho que recebe a OS pai a passa ao `juntar_em_os` (e o `uma_os_por_tarefa` a repassa). O
+  `oscreator_payloads_antes_da_5_1.json` foi regravado: a única mudança nos 41 cenários é a OS pai no pedido da OS.
+- **Os caminhos que criam a OS de uma vez** (`to_work_order=True`: a OS já realizada, a Performance de uma OS por ativo e a
+  inspeção do chamado) mandam a OS pai no mesmo pedido que cria a OS, e ela fica: provado no ar em 04/11/2026, a OS 18564
+  (realizada, em TESTE - PA) nasceu com a 18560 de pai, no card e no Fluxo.
+- **Conferir depois de gravar:** com a OS pai, o `juntar_em_os` lê o cabeçalho da OS criada (`_cabecalho_os`, 1 pedido) e,
+  se o Fracttal não gravou, diz na tela "o Fracttal não gravou a OS pai". Foi o silêncio que deixou o defeito passar semanas.
+- Prova: `test_a_os_pai_vai_no_pedido_que_cria_a_os_numerada` (`tests/test_oscreator_os_juntar.py`), vermelho nos 7
+  caminhos antes da correção.
+
+## A OS de vários ativos: ordem natural, anexos por tarefa e "Vários" no Histórico (04/11/2026)
+
+Levi, 04/11/2026: "quero que os ativos fiquem mais organizados"; "quero que dê para ver o anexo especificamente daquela
+tarefa e dê para baixar tudo de uma vez, o download sai com o nome do ativo!"; e "no Histórico ... no ativo apareça
+'VÁRIOS' ao invés de aparecer o 1° ativo".
+- **Ordem natural** (`os_acoes_web.ordem_natural`): com mais de um ativo, as tarefas do card vão por ativo, 1.1, 1.2 ...
+  1.10 (o Fracttal devolvia 1.1, 1.10, 1.2), e o número da tarefa acompanha. O banner virou etiquetas (`.det-ativo`), na
+  mesma ordem, no lugar da frase corrida.
+- **Anexos por tarefa:** cada anexo de subtarefa sabe a tarefa dele (`id_tarefa` no `os_anexos.get_os_subtarefa_anexos`,
+  `tarefa` no JSON); a contagem do card (`/os/os/<id>/anexos`) diz quantos de cada tarefa (`por_tarefa`), o ativo mostra
+  "N anexos" e o botão "Ver os anexos desta tarefa" abre a mesma janela dos anexos só com os dele.
+- **O nome do ativo no arquivo:** o card manda `{id da tarefa: ativo}` (lido das tarefas dele) ao `anexos-zip`, e o
+  `plano_do_zip` põe cada arquivo na pasta do ativo, começando pelo nome dele ("Inversor 1.2/Inversor 1.2 - 01 -
+  print.jpg"); com `tarefa`, o .zip leva só os daquela tarefa ("OS 15900 - Inversor 1.2 - anexos.zip"). O "Baixar" de um
+  anexo também sai com o nome do ativo. Sem ativos (OS de um ativo só), a arrumação de antes, pela subtarefa.
+- **"Vários" no Histórico** (`rotas.preparar_linhas`): a OS com mais de um código de ativo mostra "Vários" na coluna (e
+  "Vários (N)" no Exportar); a de um ativo, o nome curto de sempre.
+- Prova: `tests/test_oscreator_card_ativos_anexos_04_11.py`; os 2 testes de `test_oscreator_card_por_ativo_28_10.py`
+  aceitam o `data-ativo` novo na tarefa.
+
 ## A solicitação aprovada avisa quem pediu (04/11/2026)
 
 O aviso "Sua solicitação gerou uma OS" do sino do Nexus (`nexus/comando/avisos.py`): o `api_aprovar` do `rotas_solic`

@@ -9,7 +9,8 @@
         {% elif chave == 'status' %}<td class="k-status">{% if l.status %}<span class="os-status" {% if l._status_cor %}style="color:{{ l._status_cor }};background:{{ l._status_cor }}29;border-color:{{ l._status_cor }}6b"{% endif %}>{{ l.status }}</span>{% endif %}</td>
         {% elif chave == 'etiqueta' %}<td class="k-etiqueta">{{ l._etiqueta }}</td>
         {% elif chave == 'descricao' %}<td class="c-desc k-descricao">{{ l.descricao }}</td>
-        {% elif chave == 'ativo' %}<td class="k-ativo" data-k="ativo" title="{{ l.ativo }}" data-csv="{{ l.ativo }}">{{ l._ativo_curto or l.ativo or '—' }}</td>
+        {% elif chave == 'ativo' %}{% if (l._n_ativos or 0) > 1 %}<td class="k-ativo" data-k="ativo" title="{{ l._n_ativos }} ativos: abra a OS para ver cada um" data-csv="Vários ({{ l._n_ativos }})">Vários</td>
+        {% else %}<td class="k-ativo" data-k="ativo" title="{{ l.ativo }}" data-csv="{{ l.ativo }}">{{ l._ativo_curto or l.ativo or '—' }}</td>{% endif %}
         {% elif chave in datas %}<td class="c-data k-{{ chave }}" data-k="{{ chave }}">{{ fmt(l[chave]) if l.get(chave) else '—' }}</td>
         {% else %}<td class="k-{{ chave }}" data-k="{{ chave }}">{{ l.get(chave) or '—' }}</td>{% endif %}
         {% endfor %}

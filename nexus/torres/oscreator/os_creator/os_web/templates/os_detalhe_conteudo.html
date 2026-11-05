@@ -55,7 +55,10 @@
     <div class="os-resultado" data-pdf-msg hidden></div>
     <div class="det-card det-banner">
       <span class="det-ico-sq v">{{ icone('clipboard', '#A6E22E', 22) }}</span>
-      {% if por_ativo %}<span class="det-banner-t">{{ ativos_os|length }} ativos: {{ ativos_os|join(' · ') }}</span>
+      {# os ativos em etiquetas, na ordem natural (Levi, 04/11/2026: "quero que os ativos fiquem mais organizados"): era uma
+         frase corrida, "16 ativos: Inversor 1.1 · Inversor 1.10 · ...", na ordem do Fracttal #}
+      {% if por_ativo %}<div class="det-banner-ativos"><span class="det-banner-t">{{ ativos_os|length }} ativos</span>
+        <div class="det-ativos">{% for a in ativos_os %}<span class="det-ativo">{{ a }}</span>{% endfor %}</div></div>
       {% else %}<span class="det-banner-t">{{ d.ativo or '—' }}</span>
       {% if d.code %}<span class="det-banner-code">{{ d.code }}</span>{% endif %}{% endif %}
     </div>
@@ -103,14 +106,18 @@
       <span class="det-pill-ok">{{ n_feitas }} de {{ n_sub }} subtarefas concluídas</span></div>
     <div class="det-prog"><div class="det-prog-f{% if n_sub and not completo %} parcial{% endif %}" style="width:{{ pct }}%"></div></div>
     {% for g in grupos %}
-    <details class="det-tarefa{% if g.total and g.feitas == g.total %} feito{% endif %}" data-tarefa="{% if g.n %}{{ g.id if g.id is not none else '' }}{% else %}sem-tarefa{% endif %}"{% if por_ativo and ativos_os|length <= 4 %} open{% endif %}>
+    <details class="det-tarefa{% if g.total and g.feitas == g.total %} feito{% endif %}" data-tarefa="{% if g.n %}{{ g.id if g.id is not none else '' }}{% else %}sem-tarefa{% endif %}"{% if por_ativo and g.ativo %} data-ativo="{{ g.ativo }}"{% endif %}{% if por_ativo and ativos_os|length <= 4 %} open{% endif %}>
       <summary><span class="det-tarefa-n">{{ g.n or '—' }}</span>
         {% if por_ativo and g.ativo %}<span class="det-tarefa-t"><b>{{ g.ativo }}</b>{% if g.titulo != g.ativo %}<small>{{ g.titulo }}</small>{% endif %}</span>
         {% else %}<span class="det-tarefa-t"><b>{{ g.titulo }}</b>{% if g.ativo and g.ativo != g.titulo %}<small>{{ g.ativo }}</small>{% endif %}</span>{% endif %}
         {% if g.n %}<span class="det-situ {{ g.sit }}">{{ g.situacao }}</span>{% endif %}
+        {% if g.n and g.id is not none %}<span class="det-tarefa-anx" data-n-tarefa="{{ g.id }}" hidden></span>{% endif %}
         <span class="det-tarefa-c{% if g.total and g.feitas == g.total %} ok{% elif g.feitas %} parcial{% endif %}">{% if g.total %}{{ g.feitas }} de {{ g.total }} concluídas{% else %}sem subtarefas{% endif %}</span>
         <span class="det-chev">›</span></summary>
       <div class="det-tarefa-corpo">
+        {# os anexos desta tarefa (Levi, 04/11/2026: "quero que dê para ver o anexo especificamente daquela tarefa"): a mesma
+           janela dos anexos das subtarefas, só com os desta tarefa, e o "Baixar todos" com o nome do ativo #}
+        {% if g.n and g.id is not none %}<button type="button" class="det-mini det-anx-tarefa" data-acao="anexos-tarefa" data-tarefa-id="{{ g.id }}" data-ativo="{{ g.ativo or g.titulo }}" hidden>Ver os anexos desta tarefa</button>{% endif %}
         {% if g.n %}<p class="det-tarefa-info">Tipo <b>{{ g.tipo or '—' }}</b><span class="det-dot">·</span>Programada <b>{{ fmt(g.programada) if g.programada else '—' }}</b>{% if g.inicio or g.fim %}<span class="det-dot">·</span>Execução <b>{{ fmt(g.inicio) if g.inicio else '—' }} → {{ fmt(g.fim) if g.fim else 'em aberto' }}</b>{% endif %}</p>{% endif %}
         {% for s in g.subtarefas %}{{ subtarefa(s) }}{% else %}<div class="det-ajuda">Sem subtarefas nesta tarefa.</div>{% endfor %}
       </div>

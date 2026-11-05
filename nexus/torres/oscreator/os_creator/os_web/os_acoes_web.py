@@ -6,6 +6,7 @@ o que decide alguma coisa mora aqui e tem a MESMA regra do `steps/os_detalhe.py`
 comparar lado a lado."""
 from __future__ import annotations
 import os
+import re
 import urllib.parse
 
 # ── textos do card (steps/os_detalhe.py) ────────────────────────────────────────────────────────────────
@@ -151,6 +152,9 @@ def itens_subtarefas(anexos_sub, wid) -> list:
         texto = str(a.get("descricao") or a.get("nome") or "").strip()
         out.append(_item("nota", wid, a, str(a.get("nome") or "nota"), str(a.get("descricao") or a.get("nome") or "nota"),
                          str(a.get("subtarefa") or ""), texto))
+    # a tarefa de cada anexo (04/11/2026): a OS de vários ativos mostra no ativo os anexos da tarefa dele
+    for item, a in zip(out, imgs + docs + cru):
+        item["tarefa"] = None if a.get("id_tarefa") is None else str(a.get("id_tarefa"))
     return out
 
 
@@ -201,33 +205,41 @@ def itens_para_baixar(grupo, anexos_sub, anexos_os) -> list:
     subs = [a for a in (anexos_sub or []) if isinstance(a, dict)]
     if grupo == "sub":
         return [{"url": a.get("url"), "value": str(a.get("value") or "").strip(), "nome": a.get("nome"),
-                 "descricao": a.get("descricao"), "subtarefa": a.get("subtarefa") or "", "is_text": bool(a.get("is_text"))}
+                 "descricao": a.get("descricao"), "subtarefa": a.get("subtarefa") or "", "is_text": bool(a.get("is_text")),
+                 "tarefa": None if a.get("id_tarefa") is None else str(a.get("id_tarefa"))}
                 for a in subs]
     return [{"url": a.get("url"), "value": str(a.get("value") or "").strip(), "nome": a.get("nome"),
              "descricao": a.get("desc") or a.get("nome"), "subtarefa": "", "is_text": bool(a.get("is_text"))}
             for a in anexos_da_os_unicos(subs, anexos_os)]
 
 
-def plano_do_zip(itens) -> list:
+def plano_do_zip(itens, ativos=None) -> list:
     """[{caminho, tipo ('arquivo' | 'nota'), item, texto}] — o `baixar_em_massa` sem gravar nada. A numeração conta até a
     nota vazia que fica de fora, como lá. Diferença (mais segura): o arquivo sem URL mas com o caminho no S3 continua
-    arquivo — o app o gravaria como .txt com o caminho; aqui o servidor renova o link (`tem_arquivo`)."""
+    arquivo — o app o gravaria como .txt com o caminho; aqui o servidor renova o link (`tem_arquivo`).
+
+    `ativos` ({id da tarefa: nome do ativo}, a OS de vários ativos): a pasta é a do ATIVO e cada arquivo começa pelo nome
+    dele (Levi, 04/11/2026: "dê para baixar tudo de uma vez, o download sai com o nome do ativo!"); a coleta de geração em
+    16 inversores tinha a mesma subtarefa nas 16 tarefas, e o .zip juntava tudo numa pasta só, sem dizer de qual era."""
+    ativos = ativos or {}
     out, usados, n_sub = [], set(), {}
     for i, d in enumerate(itens or [], 1):
         if not isinstance(d, dict):
             continue
-        sub = limpar_nome(d.get("subtarefa") or "", "")
+        ativo = limpar_nome(ativos.get(str(d.get("tarefa"))) or "", "") if d.get("tarefa") is not None else ""
+        sub = ativo or limpar_nome(d.get("subtarefa") or "", "")
         pasta = sub + "/" if sub else ""
+        antes = ativo + " - " if ativo else ""
         n_sub[sub] = n_sub.get(sub, 0) + 1
         k = n_sub[sub]
         if d.get("is_text") or not tem_arquivo(d):
             txt = str(d.get("descricao") or d.get("value") or "").strip()
             if txt:
-                out.append({"caminho": pasta + "%02d - %s.txt" % (k, limpar_nome(d.get("nome") or "nota", "nota")),
+                out.append({"caminho": pasta + antes + "%02d - %s.txt" % (k, limpar_nome(d.get("nome") or "nota", "nota")),
                             "tipo": "nota", "item": d, "texto": txt})
             continue
         base = limpar_nome(d.get("nome") or "anexo_%d" % i)
-        cam = pasta + "%02d - %s" % (k, base)
+        cam = pasta + antes + "%02d - %s" % (k, base)
         raiz, extensao = os.path.splitext(cam)
         j = 2
         while cam.lower() in usados:
@@ -354,6 +366,11 @@ def rotulos_tarefas(tarefas) -> dict:
     return out
 
 
+def ordem_natural(texto) -> list:
+    """A chave que põe "Inversor 1.2" antes de "Inversor 1.10" (o número como número, o resto sem caixa)."""
+    return [int(p) if p.isdigit() else p.casefold() for p in re.split(r"(\d+)", str(texto or ""))]
+
+
 def subtarefas_por_tarefa(d: dict) -> list:
     """As tarefas do card com as subtarefas de cada uma, na ordem das tarefas: [{id, n, titulo, ativo, tipo, programada,
     inicio, fim, situacao, sit, subtarefas, feitas, total}]. [] quando a OS tem uma tarefa só: aí fica a lista direta.
@@ -383,6 +400,12 @@ def subtarefas_por_tarefa(d: dict) -> list:
                        "subtarefas": ss, "feitas": sum(1 for s in ss if s.get("feito")), "total": len(ss)})
     if len(grupos) < 2:
         return []
+    # com mais de um ativo, na ordem natural do ativo (Levi, 04/11/2026: "quero que os ativos fiquem mais organizados"): o
+    # Fracttal devolvia Inversor 1.1, 1.10, 1.11 ... 1.2, e o card seguia essa ordem; o número da tarefa acompanha
+    if len({g["ativo"] for g in grupos if g["ativo"]}) > 1:
+        grupos.sort(key=lambda g: (ordem_natural(g["ativo"]), ordem_natural(g["titulo"])))
+        for i, g in enumerate(grupos, 1):
+            g["n"] = i
     soltas = [s for s in subs if s.get("id_tarefa") is None or s.get("id_tarefa") not in usadas]
     if soltas:
         grupos.append({"id": None, "n": None, "titulo": SEM_TAREFA, "ativo": "", "tipo": "", "programada": None,

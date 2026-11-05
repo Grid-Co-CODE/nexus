@@ -492,7 +492,8 @@ def create_planned_os_multi(selecoes: list, id_responsible, responsible_name: st
     if not id_tasks:
         return {"ok": False, "erro": "Falha ao criar as tarefas: " + "; ".join(erros[:3]),
                 "n_tarefas": len(sel), "n_criadas": 0}
-    jun = os_juntar.juntar_em_os(id_tasks, dur_de, id_responsible, responsible_name)       # a fase 2, a mesma de todos
+    jun = os_juntar.juntar_em_os(id_tasks, dur_de, id_responsible, responsible_name,       # a fase 2, a mesma de todos
+                                 id_parent=id_parent)
     saida = {"ok": True, "n_tarefas": len(sel), "n_criadas": len(id_tasks), "erros": erros, "os": os_juntar.da_os(jun)}
     if jun.get("aviso"):
         saida["aviso"] = jun["aviso"]
@@ -598,7 +599,7 @@ def clonar_os(tarefas: list, id_responsible, responsible_name: str = "",
     # "nas SSs o tempo que aparece na OS do Fracttal permanece 10 min, porém nas tarefas aparece o tempo que foi solicitado") e as
     # etiquetas: a mesma de todos os caminhos (`os_juntar`), com as frases desta tela
     jun = os_juntar.juntar_em_os(id_tasks, dur_tarefa, id_responsible, responsible_name, etiqueta_ids=etiqueta_ids,
-                                 frases=os_juntar.FRASES_CLONAR)
+                                 id_parent=id_parent, frases=os_juntar.FRASES_CLONAR)
     if "id_work_order" not in jun:                       # a OS não saiu: as tarefas ficam pendentes no Fracttal
         return {"ok": True, "os": os_juntar.da_os(jun), "aviso": jun["aviso"],
                 "n_tarefas": len(val), "n_criadas": len(id_tasks)}
@@ -704,7 +705,7 @@ def create_work_orders_bulk(assets: list, description: str, task_type: str, subt
 
     # Fase 2 e 3 — converter cada tarefa em WO + responsável + etiquetas (só se um responsável foi escolhido): o kanban é lido
     # uma vez para todas, e cada OS sai pela fase 2 de todos os caminhos (`os_juntar`)
-    os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids)
+    os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids, id_parent=id_parent)
     api._anexa_imagens_bulk(fase1, imagens_por_ativo)
     return fase1
 
@@ -768,7 +769,7 @@ def create_work_orders_agrupada(assets: list, description: str, task_type: str, 
     imagens = {idt: imagens_por_ativo.get(por_task[idt]) or [] for idt in id_tasks} if imagens_por_ativo else None
     try:
         jun = os_juntar.juntar_em_os(id_tasks, dur_de, id_responsible, responsible_name, etiqueta_ids=etiqueta_ids,
-                                     imagens=imagens)
+                                     imagens=imagens, id_parent=id_parent)
     except FracttalError as e:
         saida["aviso"] = "tarefas criadas; a OS não fechou (%s)." % e
         return saida
@@ -815,7 +816,8 @@ def create_work_orders_datas(asset: dict, description: str, task_type: str, subt
                     r["os"]["aviso"] = f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}"
         return fase1
 
-    os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids)     # a mesma do uma-OS-por-ativo
+    os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids,     # a mesma do uma-OS-por-ativo
+                                id_parent=id_parent)
     return fase1
 
 

@@ -129,8 +129,10 @@ def test_leitura_enxuta_pula_a_solicitacao_e_a_os_pai(falso):
 def test_a_contagem_dos_anexos_nao_paga_a_url_de_cada_foto(falso):
     cli = _cliente()
     r = cli.get("/os/os/%d/anexos" % WID)
-    # 2 fotos da subtarefa; na OS, a foto0 repete a da subtarefa e conta só o doc.pdf: o número de antes
-    assert r.get_json() == {"sub": 2, "os": 1}
+    # 2 fotos da subtarefa; na OS, a foto0 repete a da subtarefa e conta só o doc.pdf: o número de antes; e, desde
+    # 04/11/2026, quantas de cada tarefa (o ativo da OS de vários ativos mostra as dele)
+    j = r.get_json()
+    assert (j["sub"], j["os"]) == (2, 1) and sum(j["por_tarefa"].values()) == 2
     assert falso.s3 == 0
     # a lista (o clique nos anexos) continua com a URL de cada arquivo, para a galeria abrir
     j = cli.get("/os/api/os/%d/anexos-lista" % WID).get_json()

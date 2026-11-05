@@ -67,8 +67,9 @@ class FracttalFalso:
     que o teste troca. `falhar` = os métodos que dão HTTP 500; `kanban_vazio` = a lista de pendentes que não traz as tarefas
     recém-criadas; `falta_a_primeira` = a que não traz a primeira; `falha_tarefa` = a N-ésima tarefa a criar dá HTTP 500."""
 
-    def __init__(self, falhar=(), kanban_vazio=False, falta_a_primeira=False, falha_tarefa=0):
+    def __init__(self, falhar=(), kanban_vazio=False, falta_a_primeira=False, falha_tarefa=0, ignora_pai=False):
         self.eventos, self.pendentes = [], []
+        self.ignora_pai, self.pai_da_os = ignora_pai, {}          # a OS pai que cada OS "gravou" (o cabeçalho a devolve)
         self.n_tarefa = self.n_os = self.n_pedidos_de_tarefa = 0
         self.falhar, self.kanban_vazio, self.falta_a_primeira = set(falhar), kanban_vazio, falta_a_primeira
         self.falha_tarefa = falha_tarefa
@@ -99,7 +100,10 @@ class FracttalFalso:
             return _Resp([{"result": {"data": lista}}])
         if metodo == INSERIR_OS:
             self.n_os += 1
+            self.pai_da_os[7000 + self.n_os] = None if self.ignora_pai else params.get("id_parent")
             return _Resp([{"result": {"data": {"id": 7000 + self.n_os, "wo_folio": 9000 + self.n_os}}}])
+        if metodo == api.RPC_WO_DETAILS:                          # o cabeçalho: a conferência da OS pai depois de gravar
+            return _Resp([{"result": {"data": [{"id": params.get("id"), "id_parent_wo": self.pai_da_os.get(params.get("id"))}]}}])
         if metodo == api.RPC_WO_PARENTS:
             return _Resp([{"result": {"data": [{"id": 4321, "wo_folio": "1234", "description": "1234"}]}}])
         if metodo == api.RPC_WO_TASKS_NEW:
@@ -630,3 +634,32 @@ def test_a_criacao_da_engenharia_confere_ao_vivo_e_passa_pelo_juntar(agrupar, mo
 if __name__ == "__main__":
     if "--regravar" in sys.argv:
         regravar()
+
+
+@pytest.mark.parametrize("nome, corpo", [
+    ("a Clonagem de planos do PCM", _multi),
+    ("o Criar OS agrupado", _agrupada),
+    ("a Clonagem de OS e a Fila do PCM", _clonar),
+    ("a OS sem plano", _sem_plano),
+    ("o Criar OS, uma OS por ativo", _bulk),
+    ("o COS, uma OS por data", _datas),
+    ("a retomada da Fila do PCM", lambda mp, fr: _aprovar_retomada(mp, fr, id_parent=555)),
+])
+def test_a_os_pai_vai_no_pedido_que_cria_a_os_numerada(nome, corpo):
+    """A OS pai só vale no pedido que cria a OS numerada (o `work_order_insert`, sondado em 26/08/2026): na tarefa pendente o
+    Fracttal a ignora. Provado no ar em 04/11/2026: a OS 18561, criada pelo Criar OS com a 18560 de pai, nasceu sem pai, e uma
+    colega avisou que "o OS Creator do nexus não tá puxando a OS pai". Todo caminho que recebe a OS pai a manda na OS."""
+    saida, _fr = _rodar(corpo)
+    oss = [e for e in saida["eventos"] if e.get("pedido") == INSERIR_OS]
+    assert oss, nome
+    assert all(e["resumo"].get("id_parent") == 555 for e in oss), nome
+
+
+def test_a_os_pai_que_o_fracttal_nao_gravou_vira_aviso():
+    """Conferir depois de gravar (04/11/2026): o Fracttal aceita o campo e ignora calado, e foi assim que a OS pai sumiu por
+    semanas. Com a OS pai, a OS criada tem o cabeçalho lido de volta; a que nasceu sem ela diz isso na tela."""
+    saida, _fr = _rodar(_bulk, ignora_pai=True)
+    avisos = [r["os"].get("aviso") or "" for r in saida["retorno"]]
+    assert avisos and all("não gravou a OS pai" in a for a in avisos)
+    saida, _fr = _rodar(_bulk)
+    assert not any("OS pai" in (r["os"].get("aviso") or "") for r in saida["retorno"])

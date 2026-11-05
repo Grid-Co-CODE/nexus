@@ -187,7 +187,15 @@ def api_anexos_zip(wid):
         return _erro("Escolha os anexos: das subtarefas ou da OS.")
     folio = "".join(ch for ch in str(c.get("folio") or "") if ch.isdigit())[:12] or str(int(wid))
     subs, oss = _anexos_da_os(wid)
-    plano = regra.plano_do_zip(regra.itens_para_baixar(grupo, subs, oss))
+    # a OS de vários ativos (04/11/2026): o card manda {id da tarefa: ativo}, que vira a pasta e o começo do nome de cada
+    # arquivo (só nome de arquivo: o `limpar_nome` tira barra e dois-pontos); com `tarefa`, só os anexos daquela tarefa
+    ativos = {str(k)[:20]: str(v)[:80] for k, v in list((c.get("ativos") or {}).items())[:500]} \
+        if isinstance(c.get("ativos"), dict) else {}
+    tarefa = str(c.get("tarefa") or "").strip()[:20]
+    itens = regra.itens_para_baixar(grupo, subs, oss)
+    if tarefa:
+        itens = [i for i in itens if str(i.get("tarefa")) == tarefa]
+    plano = regra.plano_do_zip(itens, ativos)
     if not plano:
         return _erro("Não há anexos para baixar neste card.", 404)
     agora = time.time()
@@ -203,6 +211,8 @@ def api_anexos_zip(wid):
             pass
         return _erro("Nenhum anexo veio do Fracttal (a URL expira: abra os anexos de novo e tente outra vez).", 502)
     nome = "OS %s - anexos %s.zip" % (folio, "das subtarefas" if grupo == "sub" else "da OS")
+    if tarefa and ativos.get(tarefa):
+        nome = "OS %s - %s - anexos.zip" % (folio, regra.limpar_nome(ativos[tarefa]))
     with _ZIPS_LOCK:
         _ZIPS[token] = {"caminho": caminho, "nome": nome, "wid": int(wid), "email": _email(), "criado": agora}
     return jsonify({"ok": True, "nome": nome, "url": "/os/api/os/%d/anexos-zip/%s" % (int(wid), token),
