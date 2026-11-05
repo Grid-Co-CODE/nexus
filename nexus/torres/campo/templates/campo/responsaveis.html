@@ -846,20 +846,26 @@
     }).catch(function () { pintar(null); });
   }
   contar();
-  function aviso(txt, ruim, html) {
+  // tom: 'ok', 'alerta' ou 'critico'
+  function aviso(txt, tom, html) {
     var m = dlg.querySelector('.pv-msg');
     if (!m) { return; }
     m.hidden = !txt;
-    m.className = 'pv-msg ' + (ruim ? 'cn-t-critico' : 'cn-t-ok');
+    m.className = 'pv-msg cn-t-' + (tom || 'ok');
     if (html) { m.innerHTML = txt; } else { m.textContent = txt; }      // o texto do servidor nunca vira HTML
   }
   var ENTRAR = 'Entre no OS Creator com a sua conta do Fracttal e tente de novo: <a class="cn-link" href="' +
     nexusRota('/os/login') + '" target="_blank" rel="noopener">entrar no Fracttal</a>.';
+  // sem a sessão do Nexus (12 h, ou o Sair noutra aba), o portão responde 302 para /entrar, o fetch segue e recebe 200 em
+  // HTML: isso não é "concluída" (revisão de 05/11/2026, achado na Aprovação por fatos, que usa a mesma rota)
+  var SESSAO = 'A sua sessão do Nexus acabou: recarregue a página e entre de novo.';
   function pedir(url, corpo) {
     return fetch(url, {method: 'POST', credentials: 'same-origin', body: JSON.stringify(corpo),
                                   headers: {'Accept': 'application/json', 'Content-Type': 'application/json'}})
       .then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok, status: r.status, j: j || {}}; });
+        return r.json().catch(function () { return null; }).then(function (j) {
+          return {ok: r.ok, status: r.status, redirected: r.redirected, json: j !== null, j: j || {}};
+        });
       });
   }
   function conferir(wo, tr) {
@@ -892,18 +898,28 @@
       var rot = b.textContent;
       b.disabled = true; b.textContent = 'Concluindo…';
       pedir(nexusRota('/os/api/os/') + wo + '/concluir', {folio: folio}).then(function (r) {
-        if (r.ok) { aviso('OS ' + folio + ' concluída.' + (r.j.aviso ? ' ' + r.j.aviso : '')); conferir(wo, tr); return; }
+        // concluída só com o ok do OS Creator; a frase é a dele (o `aviso` é um booleano: fechou sem a data de fim)
+        if (r.ok && !r.redirected && r.j.ok === true) {
+          aviso(r.j.mensagem || ('OS ' + folio + ' concluída.'), r.j.aviso ? 'alerta' : 'ok');
+          conferir(wo, tr);
+          return;
+        }
         b.disabled = false; b.textContent = rot;
-        if (r.status === 401) { aviso(ENTRAR, true, true); } else { aviso(r.j.erro || ('Não consegui concluir a OS ' + folio + '.'), true); }
-      }).catch(function (e) { b.disabled = false; b.textContent = rot; aviso('Não consegui falar com o OS Creator (' + e.message + ').', true); });
+        if (r.redirected) { aviso(SESSAO, 'critico'); return; }
+        if (r.status === 401) { aviso(ENTRAR, 'critico', true); return; }
+        if (!r.json) { aviso(SESSAO, 'critico'); return; }
+        aviso(r.j.erro || ('Não consegui concluir a OS ' + folio + '.'), 'critico');
+      }).catch(function (e) { b.disabled = false; b.textContent = rot; aviso('Não consegui falar com o OS Creator (' + e.message + ').', 'critico'); });
       return;
     }
     b.disabled = true;
     pedir(nexusRota('/os/api/os/pdf'), {wid: wo, folio: folio}).then(function (r) {
       b.disabled = false;
-      if (r.ok && r.j.url) { location.href = nexusRota(r.j.url); return; }
-      if (r.status === 401) { aviso(ENTRAR, true, true); } else { aviso(r.j.erro || ('Não consegui gerar o PDF da OS ' + folio + '.'), true); }
-    }).catch(function (e) { b.disabled = false; aviso('Não consegui gerar o PDF (' + e.message + ').', true); });
+      if (r.ok && !r.redirected && r.j.url) { location.href = nexusRota(r.j.url); return; }
+      if (r.status === 401) { aviso(ENTRAR, 'critico', true); return; }
+      if (r.redirected || !r.json) { aviso(SESSAO, 'critico'); return; }
+      aviso(r.j.erro || ('Não consegui gerar o PDF da OS ' + folio + '.'), 'critico');
+    }).catch(function (e) { b.disabled = false; aviso('Não consegui gerar o PDF (' + e.message + ').', 'critico'); });
   });
 })();
 // o chamado do Painel abre a tela dele de Garantias por cima (28/10/2026); Esc, o Fechar, o clique fora e o "fechar" que

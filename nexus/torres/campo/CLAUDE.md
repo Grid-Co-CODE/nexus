@@ -992,7 +992,15 @@ no responsável)"): `/t/campo/responsaveis?r=<número da pessoa>&modo=painel`. O
   - **Concluir e PDF:** são os do OS Creator, com a sessão do Fracttal da pessoa.
     - O Concluir é `POST /os/api/os/<id>/concluir`, irreversível, com a confirmação antes. O PDF é `POST /os/api/os/pdf`
       e depois o download.
-    - Sem a sessão (401), a janela manda entrar no Fracttal pelo OS Creator.
+    - Sem a sessão do Fracttal (401), a janela manda entrar no Fracttal pelo OS Creator.
+    - **"Concluída" só com o ok do OS Creator** (revisão de 05/11/2026, achado na Aprovação por fatos, que usa a mesma
+      rota): `r.ok && !r.redirected && r.j.ok === true`, com a frase da rota (`mensagem`), em âmbar quando o `aviso`
+      (um booleano: fechou sem a data de fim) vem ligado. Antes, a sessão do Nexus vencida (12 h, ou o Sair noutra aba)
+      fazia o portão responder 302 para /entrar, o fetch seguia, recebia 200 em HTML e a tela dizia "OS X concluída."
+      sem nada ter ido ao Fracttal; e o aviso saía como "concluída. true". Redirecionado, ou resposta sem JSON: "A sua
+      sessão do Nexus acabou: recarregue a página e entre de novo." O PDF segue a mesma regra. Prova na bancada (fila
+      real de 29/10): o Concluir depois do /sair deu o aviso da sessão, e a resposta simulada da rota (com e sem o
+      aviso, o erro e sem o ok) deu a frase certa em cada caso; a prova no Fracttal de verdade (TESTE - PA) espera o OK.
     - A OS concluída, ou mudada no card, sai da fila guardada pela conferência da Aprovação
       (`/t/campo/aprovacao/<id>/conferir`: só sai o que o Fracttal confirma).
   - **Exemplo:** na bancada, um responsável com 26 usinas tinha 212 esperando; ficaram de fora 69 por etiqueta e 95

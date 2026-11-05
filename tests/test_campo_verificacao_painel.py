@@ -102,6 +102,34 @@ def test_o_numero_chega_depois_e_a_lista_abre_na_janela(tela, logado, fila):
     assert logado.get(n_url.replace("Ciclano+Chefe", "Outro+Chefe")).get_json()["n"] == 0
 
 
+
+def test_o_concluir_so_diz_concluida_com_o_ok_do_os_creator(tela, logado, fila, tmp_path):
+    """Revisão de 05/11/2026 (achado na Aprovação por fatos, que usa a mesma rota): com a sessão do Nexus vencida (12 h, ou
+    o Sair noutra aba), o portão responde 302 para /entrar, o fetch segue e recebe 200 em HTML, e o Concluir dizia "OS X
+    concluída." sem nada ter ido ao Fracttal. E o `aviso` da rota é um booleano (fechou sem a data de fim): saía
+    "concluída. true". Agora: concluída só com `ok: true` em JSON, sem redirecionamento; a frase é a do OS Creator."""
+    import shutil
+    import subprocess
+    html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
+    js = next(s for s in re.findall(r"<script>(.*?)</script>", html, re.S) if "data-pv-concluir" in s)
+    # o pedido diz se foi redirecionado e se a resposta era JSON (o `.catch` do r.json() devolve null, não {})
+    assert "r.json().catch(function () { return null; })" in js
+    assert "redirected: r.redirected" in js and "json: j !== null" in js
+    concluir = js[js.index("if (b.hasAttribute('data-pv-concluir'))"):js.index("nexusRota('/os/api/os/pdf')")]
+    assert "if (r.ok && !r.redirected && r.j.ok === true)" in concluir
+    assert "r.j.mensagem || ('OS ' + folio + ' concluída.')" in concluir and "r.j.aviso ? 'alerta' : 'ok'" in concluir
+    assert "' ' + r.j.aviso" not in js                                           # o "concluída. true" saiu
+    # a sessão do Nexus que acabou (redirecionado, ou sem JSON) tem frase própria; o 401 segue o ENTRAR do Fracttal
+    assert "var SESSAO = 'A sua sessão do Nexus acabou: recarregue a página e entre de novo.';" in js
+    assert concluir.index("if (r.redirected)") < concluir.index("r.status === 401") < concluir.index("if (!r.json)")
+    pdf = js[js.index("nexusRota('/os/api/os/pdf')"):]
+    assert "if (r.ok && !r.redirected && r.j.url)" in pdf and "if (r.redirected || !r.json)" in pdf
+    if shutil.which("node"):
+        arq = tmp_path / "verificacao.js"
+        arq.write_text("var nexusRota = function (x) { return x; };" + chr(10) + js, encoding="utf-8")
+        r = subprocess.run(["node", "--check", str(arq)], capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+
 def test_o_relatorio_em_pdf_e_o_botao_na_linha_dos_filtros(tela, logado, fila):
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
     filtros = html[html.index('<form class="cn-filtros"'):html.index("</form>", html.index('<form class="cn-filtros"'))]
