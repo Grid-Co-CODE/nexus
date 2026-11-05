@@ -278,10 +278,11 @@ def tema():
     return resp
 
 
-@bp.route("/paleta")
+@bp.route("/t/base/paleta")
 def paleta():
     """A Paleta Nexus (04/11/2026): o escuro ao lado do claro, token a token. Só administradores (Levi: "ao clicar no
-    nome da pessoa aparecer 'paleta nexus' só para os administradores")."""
+    nome da pessoa aparecer 'paleta nexus' só para os administradores"). Mora em /t/base/ porque o Caddy do servidor só
+    manda ao Nexus a raiz, /t/* e poucos outros caminhos (tests/test_rotas_no_caminho_do_nexus.py)."""
     if not session.get("admin"):
         abort(403)
     from . import paleta_tokens as PA

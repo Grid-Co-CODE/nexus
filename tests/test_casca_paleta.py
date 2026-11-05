@@ -6,8 +6,8 @@ from nexus.casca import paleta_tokens as PA
 def test_o_administrador_ve_a_paleta_lida_do_css(app, logado):
     html = logado.get("/").get_data(as_text=True)
     conta = html.split('class="conta-caixa"', 1)[1].split("</details>", 1)[0]
-    assert 'href="/paleta"' in conta and "Paleta Nexus" in conta
-    r = logado.get("/paleta")
+    assert 'href="/t/base/paleta"' in conta and "Paleta Nexus" in conta
+    r = logado.get("/t/base/paleta")
     pag = r.get_data(as_text=True)
     assert r.status_code == 200 and "Início · escuro" in pag and "Início · claro" in pag
     with app.app_context():
@@ -21,8 +21,8 @@ def test_quem_nao_e_administrador_nao_ve(app):
     c = app.test_client()
     with c.session_transaction() as s:
         s.update(logado=True, admin=False, usuario={"email": "pessoa@exemplo.test", "nome": "Pessoa de Teste"})
-    assert c.get("/paleta").status_code == 403
-    assert 'href="/paleta"' not in c.get("/").get_data(as_text=True)
+    assert c.get("/t/base/paleta").status_code == 403
+    assert 'href="/t/base/paleta"' not in c.get("/").get_data(as_text=True)
 
 
 def test_o_contraste_do_texto():
