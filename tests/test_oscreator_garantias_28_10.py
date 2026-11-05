@@ -101,36 +101,37 @@ def test_o_cartao_e_a_linha_levam_o_geral_e_o_responsavel_ufv(tela):
     assert 'data-geral="Standby"' in linha and 'data-ufv=""' in linha
 
 
+# os filtros moram no painel suspenso desde 05/11/2026 (o modelo do Histórico): uma lista de marcar por campo
+def _painel(h):
+    return h.split('id="fl_painel"', 1)[1].split('<div class="board">', 1)[0]
+
+
+def _valores(h, nome):
+    campo = _painel(h).split('data-nome="%s"' % nome, 1)[1].split("</details>", 1)[0]
+    return [x.split('"', 1)[0] for x in campo.split('<input type="checkbox" value="')[1:]]
+
+
 def test_os_filtros_status_geral_e_responsavel_ufv_no_lugar_do_responsavel(tela):
     c, _, _ = tela
     h = _quadro(c)
-    filtros = h.split('<div class="filtros">', 1)[1].split('<div class="board">', 1)[0]
-    assert 'data-f="geral"' in filtros and 'data-f="ufv"' in filtros and 'data-f="equipe"' not in filtros
-    geral = filtros.split('data-f="geral"', 1)[1].split("</select>", 1)[0]
-    assert [o for o in ("Grid", "Cliente", "Fabricante", "Standby") if '<option value="%s">' % o in geral] == \
-        ["Grid", "Cliente", "Fabricante", "Standby"]
-    assert '<option value="_sem">Sem status</option>' in geral
-    ufv = filtros.split('data-f="ufv"', 1)[1].split("</select>", 1)[0]
-    assert '<option value="Supervisor Dois">' in ufv and '<option value="Supervisor Um">' in ufv
+    painel = _painel(h)
+    assert 'data-nome="geral"' in painel and 'data-nome="ufv"' in painel and 'data-nome="equipe"' not in painel
+    assert _valores(h, "geral") == ["Grid", "Cliente", "Fabricante", "Standby", "_sem"]
+    assert '<input type="checkbox" value="_sem"> Sem status</label>' in painel
+    assert _valores(h, "ufv") == ["Supervisor Dois", "Supervisor Um", "_sem"]
     assert "Limpar filtros" not in h and "data-limpar" not in h                                  # o item 7
 
 
 # ── 04/11/2026: o filtro Status do chamado (Levi: "inclua uma filtros de status do chamado") ──────────────────────
-def _filtro_st(h):
-    filtros = h.split('<div class="filtros">', 1)[1].split('<div class="board">', 1)[0]
-    return filtros.split('data-f="st"', 1)[1].split("</select>", 1)[0]
-
-
 def test_o_filtro_status_do_chamado_tem_os_8_na_ordem_da_lista_e_o_sem_status(tela):
     c, _, _ = tela
     h = _quadro(c)
-    st = _filtro_st(h)
-    assert ">Status do chamado<" in h.split('data-f="st"', 1)[0].rsplit("<label", 1)[1]
-    assert [o.split('"', 1)[0] for o in st.split('<option value="')[2:]] == list(aw.STATUS_CHAMADO) + ["_sem"]
-    assert '<option value="">Todos</option>' in st and '<option value="_sem">Sem status</option>' in st
-    # ao lado do Status geral
-    filtros = h.split('<div class="filtros">', 1)[1]
-    assert filtros.index('data-f="geral"') < filtros.index('data-f="st"') < filtros.index('data-f="busca"')
+    painel = _painel(h)
+    assert '<span class="fl-rot" id="fl_rot_st">Status do chamado</span>' in painel
+    assert _valores(h, "st") == list(aw.STATUS_CHAMADO) + ["_sem"]
+    assert '<input type="checkbox" value="_sem"> Sem status</label>' in painel.split('data-nome="st"', 1)[1]
+    # ao lado do Status geral, no painel
+    assert painel.index('data-nome="geral"') < painel.index('data-nome="st"') < painel.index('data-nome="ufv"')
 
 
 def test_o_cartao_e_a_linha_levam_o_status_do_chamado(tela):
@@ -148,14 +149,13 @@ def test_o_status_de_fora_da_lista_entra_no_fim_do_filtro(tela):
     c, banco, _ = tela
     banco.append({"id": "s4", "quando": "2026-10-29T10:00:00-03:00", "os": "9102", "tipo": "status", "texto": "Status: w",
                   "quem": "", "email": "", "ativo": "", "extra": {"status": "Em análise na planilha"}})
-    vals = [o.split('"', 1)[0] for o in _filtro_st(_quadro(c)).split('<option value="')[2:]]
-    assert vals == list(aw.STATUS_CHAMADO) + ["Em análise na planilha", "_sem"]
+    assert _valores(_quadro(c), "st") == list(aw.STATUS_CHAMADO) + ["Em análise na planilha", "_sem"]
 
 
 def test_sem_o_nexus_dizer_o_responsavel_ufv_o_filtro_nao_aparece(tela, monkeypatch):
     c, _, ra = tela
     monkeypatch.setattr(ra, "RESPONSAVEL_UFV", None)
-    assert 'data-f="ufv"' not in _quadro(c)
+    assert 'data-nome="ufv"' not in _quadro(c)
 
 
 def test_a_tabela_tem_o_geral(tela):

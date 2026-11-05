@@ -2847,6 +2847,32 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   cliente, o relatório (um PDF; dois clientes, um .zip) e a planilha; a 375 px a página não rola para o lado e a caixa
   dos avisos fica na tela.
 
+## Garantias: os filtros no modelo do Histórico (05/11/2026)
+
+Levi: "quero que os filtros dos chamados sejam no estilo OS CREATOR WEB > HISTÓRICO", "algo suspenso e moderno, do jeito
+que está está ocupando muito espaço na tela!". A linha de seis `<select>` sublinhados virou o modelo A do Histórico (seção
+"Os filtros do Histórico só valem no Aplicar"), com o MESMO CSS (`os.css`, as classes `fl-*` e as cores `--fl-*`, nos dois
+temas): nenhuma cor nova, e o `chamados.css` só põe o respiro, o foco azul da barra (o `body.cham :focus-visible` verde
+venceria) e o celular.
+- **A barra, numa linha:** a busca (filtra enquanto se digita, sem Aplicar), o botão **Filtros** com a contagem em lima dos
+  campos aplicados (a busca não conta) e, à direita, o Quadro | Tabela (o controle segmentado, a vista de agora em azul) e o
+  Exportar tabela (só na tabela). A 375 px: a busca na 1ª linha; Filtros, Quadro | Tabela e o Exportar só com o ícone na 2ª.
+- **O painel suspenso**, preso ao botão Filtros (a borda esquerda na dele), com Fornecedor, Cliente, Tipo de ativo, Status
+  geral, Status do chamado e Responsável UFV em 2 colunas: listas de MARCAR VÁRIOS (vários valores num campo = qualquer um
+  deles), todas digitáveis (`data-busca="1"`: o `os_busca.js` põe a caixa de busca). "Sem status" e "Sem responsável UFV"
+  (`_sem`) no fim da lista deles. O campo que mudou ganha o ponto lima; o rodapé diz "N alterações" e o **Aplicar** só
+  acende com alteração. Fechar sem aplicar (clique fora, na captura; Esc, que fecha antes a lista aberta; o botão de novo; o
+  × da folha) DESCARTA. Com menos de 640 px o painel vira a folha de baixo para cima do Histórico.
+- **As etiquetas** (uma por campo aplicado: "Fornecedor STI", "Status do chamado 2 selecionados") ficam abaixo da barra, e o
+  × tira aquele campo e aplica na hora. **Sem o Limpar** do Histórico (28/10/2026: "Tire o botão de limpar filtros").
+- **Guardado na aba** como antes (`acomp.filtros` no `sessionStorage`), agora com uma lista por campo; o guardado de antes
+  (um valor por campo) vale como lista de um, e o valor que saiu da lista não vira filtro. O Exportar relatório abre com os
+  clientes do filtro aplicado marcados.
+- **Prova:** `tests/test_oscreator_garantias_filtros_05_11.py` roda a página de verdade no node, com o DOM de mentira do
+  Histórico (`tests/historico_pagina_falsa.js`, que ganhou o `script_js`: o script da página num arquivo, o `acomp.js`). Os
+  testes de filtro do DOM montado à mão (24/10 e 27/10) foram para lá; a rolagem, a troca de vista e o clique na linha
+  ficaram onde estavam. A tela foi conferida na bancada, a 1280 e a 375 px.
+
 ## Garantias: editar e excluir as observações (29/10/2026)
 
 Levi: "Em garantias > clico na OS > Em observações da OS gostaria de poder excluir a observação e editar a observação";

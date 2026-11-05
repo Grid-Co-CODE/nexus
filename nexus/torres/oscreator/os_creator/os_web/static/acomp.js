@@ -109,17 +109,42 @@
     const CHAVE_FILTRO = "acomp.filtros", CHAVE_ROLAGEM = "acomp.rolagem";
     const lerGuardado = function (k) { try { return JSON.parse(sessionStorage.getItem(k) || "null"); } catch (e) { return null; } };
     const guardar = function (k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* aba anônima: vale só agora */ } };
-    const campos = quadro.querySelectorAll("[data-f]");
+    // ── os filtros no modelo do Histórico (Levi, 05/11/2026: "quero que os filtros dos chamados sejam no estilo OS CREATOR
+    // WEB > HISTÓRICO", "algo suspenso e moderno"): a busca à vista filtra enquanto se digita; os seis campos moram no painel
+    // suspenso do botão Filtros, de marcar vários (o os_busca.js põe a caixa de busca em cada lista), e só valem no Aplicar;
+    // fechar sem aplicar (Esc, clique fora, o botão de novo, o × da folha) DESCARTA. Cada filtro aplicado vira uma etiqueta,
+    // e o × dela o tira na hora. Sem o "Limpar" (28/10/2026: "Tire o botão de limpar filtros"). ──
+    const CAMPOS = ["marca", "cliente", "tipo", "geral", "st", "ufv"];
+    const ROTULO = {marca: "Fornecedor", cliente: "Cliente", tipo: "Tipo de ativo", geral: "Status geral", st: "Status do chamado",
+                    ufv: "Responsável UFV"};
+    const busca = quadro.querySelector('[data-f="busca"]');
+    const listaDe = function (nome) { return quadro.querySelector('.os-multi[data-nome="' + nome + '"]'); };
+    const caixasDe = function (nome) {
+      const d = listaDe(nome);
+      return d ? Array.prototype.slice.call(d.querySelectorAll('input[type="checkbox"]')) : [];
+    };
+    const marcados = function (nome) {
+      return caixasDe(nome).filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+    };
+    const textoDe = function (nome, v) {
+      const c = caixasDe(nome).filter(function (x) { return x.value === v; })[0];
+      const l = c && c.closest ? c.closest("label") : null;
+      return l ? l.textContent.trim() : v;
+    };
+    const aplicado = {};                                                  // {campo: [valores]}: o que vale na tela
+    CAMPOS.forEach(function (n) { aplicado[n] = []; });
     // a mesma regra no cartão e na linha da tabela (28/10/2026: o Status geral e o Responsável UFV no lugar do
-    // Responsável; 04/11/2026: o Status do chamado, `st`); "_sem" = o que não tem (sem status, sem Responsável UFV)
-    const casa = function (v, d) { return !v || (v === "_sem" ? !d : d === v); };
+    // Responsável; 04/11/2026: o Status do chamado, `st`); vários valores num campo = qualquer um deles; "_sem" = o que
+    // não tem (sem status, sem Responsável UFV)
+    const casa = function (vs, d) {
+      return !vs || !vs.length || vs.some(function (v) { return v === "_sem" ? !d : d === v; });
+    };
     const passa = function (d, f) {
-      return casa(f.marca, d.marca) && casa(f.cliente, d.cliente) && casa(f.tipo, d.tipo) && casa(f.geral, d.geral) &&
-             casa(f.st, d.st) && casa(f.ufv, d.ufv) && (!f.busca || (d.busca || "").indexOf(f.busca) >= 0);
+      return CAMPOS.every(function (n) { return casa(f[n], d[n]); }) && (!f.busca || (d.busca || "").indexOf(f.busca) >= 0);
     };
     const aplicar = function () {
-      const f = {}, crus = {};
-      campos.forEach(function (c) { crus[c.dataset.f] = c.value; f[c.dataset.f] = c.dataset.f === "busca" ? norm(c.value) : c.value; });
+      const f = {busca: busca ? norm(busca.value) : ""}, crus = {busca: busca ? busca.value : ""};
+      CAMPOS.forEach(function (n) { f[n] = aplicado[n]; crus[n] = aplicado[n].slice(); });
       guardar(CHAVE_FILTRO, crus);
       quadro.querySelectorAll(".col").forEach(function (col) {
         let n = 0;
@@ -143,7 +168,125 @@
       if (vazioTabela) vazioTabela.classList.toggle("oculto", nLinhas > 0);
       medir();                                                            // o filtro muda quais são os 6 primeiros
     };
-    campos.forEach(function (c) { c.addEventListener(c.tagName === "INPUT" ? "input" : "change", aplicar); });
+    if (busca) busca.addEventListener("input", aplicar);
+    // o resumo do campo: "Todos", o único marcado ou "N selecionados"
+    const resumo = function (nome) {
+      const d = listaDe(nome);
+      if (!d) return;
+      const txt = d.querySelector(".os-multi-txt"), sel = marcados(nome);
+      if (txt) txt.textContent = !sel.length ? txt.getAttribute("data-todos") : (sel.length === 1 ? textoDe(nome, sel[0]) : sel.length + " selecionados");
+      d.title = sel.map(function (v) { return textoDe(nome, v); }).join("\n");
+      d.classList.toggle("fl-tem", sel.length > 0);
+    };
+    const poe = function (nome, vs) {
+      caixasDe(nome).forEach(function (c) { c.checked = vs.indexOf(c.value) >= 0; });
+      resumo(nome);
+    };
+    const igual = function (a, b) { return JSON.stringify(a.slice().sort()) === JSON.stringify(b.slice().sort()); };
+    const painel = document.getElementById("fl_painel"), veu = document.getElementById("fl_veu");
+    const barra = document.getElementById("fl_barra"), bFiltros = document.getElementById("b_filtros");
+    const bApl = document.getElementById("b_aplicar"), nAlt = document.getElementById("fl_nalt");
+    const caixaEtiquetas = document.getElementById("fl_etiquetas"), nFiltros = document.getElementById("fl_n");
+    // o Aplicar acende com N alterações (a conta é por campo), e o campo que mudou ganha o ponto lima
+    const acende = function () {
+      let n = 0;
+      CAMPOS.forEach(function (nome) {
+        const mudou = !igual(marcados(nome), aplicado[nome]);
+        const cel = quadro.querySelector('.fl-cel[data-filtro="' + nome + '"]');
+        if (cel) cel.classList.toggle("mudou", mudou);
+        if (mudou) n++;
+      });
+      if (bApl) bApl.disabled = n === 0;
+      if (nAlt) nAlt.textContent = n === 0 ? "Sem alterações" : n + (n === 1 ? " alteração" : " alterações");
+      return n;
+    };
+    const no = function (tag, classe, t) {
+      const e = document.createElement(tag);
+      if (classe) e.className = classe;
+      if (t !== undefined) e.textContent = t;
+      return e;
+    };
+    // as etiquetas são o que está APLICADO: uma por campo, e a contagem do botão Filtros é a mesma conta (a busca não conta)
+    const etiquetas = function () {
+      if (!caixaEtiquetas) return;
+      while (caixaEtiquetas.firstChild) caixaEtiquetas.removeChild(caixaEtiquetas.firstChild);
+      let n = 0;
+      CAMPOS.forEach(function (nome) {
+        const vs = aplicado[nome];
+        if (!vs.length) return;
+        n++;
+        const texto = vs.length === 1 ? textoDe(nome, vs[0]) : vs.length + " selecionados";
+        const NS = "http://www.w3.org/2000/svg", ico = document.createElementNS(NS, "svg"), uso = document.createElementNS(NS, "use");
+        ico.setAttribute("class", "fl-ico"); ico.setAttribute("aria-hidden", "true"); uso.setAttribute("href", "#fl-i-x"); ico.appendChild(uso);
+        const c = no("span", "fl-chip"), x = no("button", "fl-chip-x");
+        c.setAttribute("data-filtro", nome);
+        c.appendChild(no("i", "", ROTULO[nome])); c.appendChild(document.createTextNode(" ")); c.appendChild(no("span", "fl-chip-v", texto));
+        if (vs.length > 1) c.title = vs.map(function (v) { return textoDe(nome, v); }).join("\n");
+        x.type = "button"; x.setAttribute("aria-label", "Tirar o filtro " + ROTULO[nome] + ": " + texto); x.appendChild(ico);
+        x.addEventListener("click", function () { tirar(nome); });
+        c.appendChild(x);
+        caixaEtiquetas.appendChild(c);
+      });
+      caixaEtiquetas.hidden = n === 0;
+      if (nFiltros) { nFiltros.textContent = String(n); nFiltros.hidden = n === 0; }
+    };
+    const descarta = function () { CAMPOS.forEach(function (nome) { poe(nome, aplicado[nome]); }); acende(); };
+    // o painel: o botão Filtros abre e fecha; fechar sem aplicar descarta
+    let aberto = false;
+    const celular = function () { return !!(window.matchMedia && window.matchMedia("(max-width: 639px)").matches); };
+    const posiciona = function () {                                       // PC: a borda esquerda do painel na do botão
+      if (celular() || !barra || !bFiltros.getBoundingClientRect) { painel.style.left = ""; return; }
+      const c = barra.getBoundingClientRect(), r = bFiltros.getBoundingClientRect(), w = painel.offsetWidth || 0;
+      painel.style.left = Math.max(0, Math.min(Math.round(r.left - c.left), Math.round(c.width - w))) + "px";
+    };
+    const abrePainel = function () {
+      if (!aberto) { painel.hidden = false; if (veu) veu.hidden = false; aberto = true; }
+      bFiltros.setAttribute("aria-expanded", "true");
+      posiciona();
+      if (painel.focus) painel.focus();
+    };
+    const fechaPainel = function (descartar) {
+      if (!aberto) return;
+      if (descartar) descarta();
+      const focoDentro = painel.contains(document.activeElement);
+      painel.querySelectorAll("details[open]").forEach(function (d) { d.removeAttribute("open"); });
+      painel.hidden = true; if (veu) veu.hidden = true; aberto = false;
+      bFiltros.setAttribute("aria-expanded", "false");
+      if (focoDentro && bFiltros.focus) bFiltros.focus();
+    };
+    const aplicarPainel = function () {
+      CAMPOS.forEach(function (nome) { aplicado[nome] = marcados(nome); });
+      aplicar(); fechaPainel(false); acende(); etiquetas();
+    };
+    const tirar = function (nome) {                                       // o × de uma etiqueta: tira o filtro e aplica na hora
+      descarta();                                                         // o que estava no painel sem aplicar não vai junto
+      aplicado[nome] = []; poe(nome, []);
+      aplicar(); acende(); etiquetas();
+    };
+    if (painel && bFiltros) {
+      bFiltros.addEventListener("click", function () { if (aberto) fechaPainel(true); else abrePainel(); });
+      const bFechar = document.getElementById("fl_fechar");
+      if (bFechar) bFechar.addEventListener("click", function () { fechaPainel(true); });
+      if (bApl) bApl.addEventListener("click", aplicarPainel);
+      CAMPOS.forEach(function (nome) {
+        caixasDe(nome).forEach(function (c) { c.addEventListener("change", function () { resumo(nome); acende(); }); });
+      });
+      // o clique fora descarta ANTES de qualquer outro clique da página agir (captura), como no Histórico
+      document.addEventListener("click", function (e) {
+        if (aberto && !painel.contains(e.target) && !bFiltros.contains(e.target)) fechaPainel(true);
+      }, true);
+      // a lista aberta fecha no clique fora dela, dentro do painel
+      document.addEventListener("click", function (e) {
+        painel.querySelectorAll("details.os-multi[open]").forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute("open"); });
+      });
+      // o Esc fecha só a lista aberta; com ela fechada, o painel (sem aplicar)
+      document.addEventListener("keydown", function (e) {
+        if (e.key !== "Escape" || !aberto) return;
+        const lista = painel.querySelector("details[open]");
+        if (lista) { lista.removeAttribute("open"); const sm = lista.querySelector("summary"); if (sm && sm.focus) sm.focus(); return; }
+        fechaPainel(true);
+      });
+    }
     // quadro ou tabela (27/10/2026): a escolha fica neste navegador; o <script> curto do acomp.html já a pôs antes da
     // 1ª pintura (a mesma chave). Ao voltar ao quadro, as colunas são medidas de novo (escondidas, não dá para medir).
     quadro.querySelectorAll(".vistas [data-vista]").forEach(function (b) {
@@ -176,13 +319,12 @@
       catch (e) { if (e.message !== "sessão") alert("Não exportou: " + e.message); }
       bTabela.disabled = false;
     });
-    // Exportar relatório (28/10/2026): um checkbox por cliente; o filtro de cliente da tela vem marcado
+    // Exportar relatório (28/10/2026): um checkbox por cliente; os clientes do filtro aplicado vêm marcados
     const dlg = quadro.querySelector("[data-dlg-relatorio]"), bRel = quadro.querySelector("[data-relatorio]");
     if (dlg && bRel) {
       const mRel = dlg.querySelector("[data-msg-relatorio]");
       bRel.addEventListener("click", function () {
-        const fc = quadro.querySelector('[data-f="cliente"]');
-        dlg.querySelectorAll('input[type="checkbox"]').forEach(function (x) { x.checked = !!fc && fc.value === x.value; });
+        dlg.querySelectorAll('input[type="checkbox"]').forEach(function (x) { x.checked = aplicado.cliente.indexOf(x.value) >= 0; });
         msg(mRel, "");
         if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
       });
@@ -204,16 +346,18 @@
         bExp.disabled = false;
       });
     }
+    // o filtro guardado volta (o de antes de 05/11/2026 guardava um valor só por campo: vira lista de um)
     const salvo = lerGuardado(CHAVE_FILTRO) || {};
     let comFiltro = false;
-    campos.forEach(function (c) {
-      const v = salvo[c.dataset.f];
-      if (!v) return;
-      if (c.tagName === "SELECT" && !Array.prototype.some.call(c.options || [], function (o) { return o.value === v; })) return;
-      c.value = v;
-      comFiltro = true;
+    CAMPOS.forEach(function (nome) {
+      const quer = [].concat(salvo[nome] || []), tem = caixasDe(nome).map(function (c) { return c.value; });
+      aplicado[nome] = quer.filter(function (v) { return v && tem.indexOf(v) >= 0; });
+      if (aplicado[nome].length) comFiltro = true;
+      poe(nome, aplicado[nome]);
     });
+    if (busca && salvo.busca) { busca.value = salvo.busca; comFiltro = true; }
     if (comFiltro) aplicar();
+    etiquetas();
     const caixas = quadro.querySelectorAll(".cards");
     window.addEventListener("pagehide", function () {
       guardar(CHAVE_ROLAGEM, {pagina: window.scrollY || 0, colunas: Array.prototype.map.call(caixas, function (b) { return b.scrollTop || 0; })});

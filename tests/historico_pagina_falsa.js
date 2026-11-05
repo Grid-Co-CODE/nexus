@@ -11,7 +11,8 @@
    Uso (de um teste Python): node -e "<RODAR>" historico_pagina_falsa.js os_busca.js '<opções JSON>' < pagina.html
    O `<RODAR>` faz `require(arquivo).abrir(html, opcoes)` e recebe a `pag`: ver `abrir` embaixo.
    opções: {pagina: "/os/historico?modo=criadas", hoje: "2026-11-03", celular: false, ponteiro_fino: false, busca_js: "<arquivo>",
-            sessao: {chave: "valor"} (o sessionStorage de antes)} */
+            sessao: {chave: "valor"} (o sessionStorage de antes),
+            script_js: "<arquivo>" (05/11/2026: a página cujo script mora num arquivo, e não nela: o acomp.js de Garantias)} */
 "use strict";
 const fs = require("fs");
 const vm = require("vm");
@@ -363,6 +364,7 @@ function abrir(html, opcoes) {
     setTimeout: (f, ms) => marcarTimer(f, ms || 0, false), clearTimeout: (id) => { const i = timers.findIndex((t) => t.id === id); if (i >= 0) timers.splice(i, 1); },
     setInterval: (f, ms) => marcarTimer(f, ms, true), clearInterval: (id) => { const i = timers.findIndex((t) => t.id === id); if (i >= 0) timers.splice(i, 1); },
     requestAnimationFrame: (f) => { f(); return 0; },
+    getComputedStyle: () => ({paddingBottom: "0", display: ""}), scrollY: 0, scrollTo() {},
     MutationObserver: class { observe() {} disconnect() {} },
     HTMLSelectElement: class {},
     Event: class { constructor(t, o) { this.type = t; Object.assign(this, o || {}); } },
@@ -375,10 +377,14 @@ function abrir(html, opcoes) {
   vm.createContext(sandbox);
 
   // o script da página (o único que tem o `enviar`) e depois o os_busca.js, que no navegador é `defer` (roda com a página pronta)
-  const scripts = doc.querySelectorAll("script").filter((s) => !s.hasAttribute("src"));
-  const doHistorico = scripts.find((s) => s.textContent.includes("function enviar(forcar, auto)"));
-  if (!doHistorico) throw new Error("o script do Histórico não está na página");
-  vm.runInContext(doHistorico.textContent, sandbox, {filename: "historico.html"});
+  if (opcoes.script_js) {
+    vm.runInContext(fs.readFileSync(opcoes.script_js, "utf8"), sandbox, {filename: opcoes.script_js.split(/[\/]/).pop()});
+  } else {
+    const scripts = doc.querySelectorAll("script").filter((s) => !s.hasAttribute("src"));
+    const doHistorico = scripts.find((s) => s.textContent.includes("function enviar(forcar, auto)"));
+    if (!doHistorico) throw new Error("o script do Histórico não está na página");
+    vm.runInContext(doHistorico.textContent, sandbox, {filename: "historico.html"});
+  }
   if (opcoes.busca_js) vm.runInContext(fs.readFileSync(opcoes.busca_js, "utf8"), sandbox, {filename: "os_busca.js"});
 
   // ── o que o teste faz na página ──

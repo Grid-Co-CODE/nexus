@@ -569,8 +569,8 @@ body.os-sem-topo .os-recolher svg{transform:rotate(180deg)}
    com o Aplicar no rodapé. O LIMA é a ação (o Aplicar, a contagem do botão Filtros, o ponto do que mudou); o AZUL é o que está
    escolhido (a visão, as etiquetas, a marca nas listas); o PRETO é o texto sobre o lima e a base dos campos.
    Só a barra, as etiquetas, o painel e os campos usam estas cores: o fundo da página e o resto do OS Creator seguem como
-   estavam. Classes fl-* só do Histórico (os hf-*, os-hist-* e os-multi seguem nas outras telas). COR SÓ POR TOKEN: nada de #hex
-   nem rgba() fora do :root daqui; o par do claro está no bloco de variáveis do tema claro, mais abaixo (o
+   estavam. Classes fl-* do Histórico e, desde 05/11/2026, dos filtros de Garantias (acomp.html); os hf-*, os-hist-* e
+   os-multi seguem nas outras telas. COR SÓ POR TOKEN: nada de #hex nem rgba() fora do :root daqui; o par do claro está no bloco de variáveis do tema claro, mais abaixo (o
    tests/test_oscreator_historico_aplicar.py confere os dois). O cinza dos rótulos ficou um tom mais claro que o da maquete
    (a 4,5:1 do painel), para ler a 11 px. */
 :root{
