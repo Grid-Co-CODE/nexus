@@ -12,7 +12,9 @@
    Encerrados; a gaveta (engenharia/_gaveta.html, a mesma da resposta das ações) traz o acompanhamento. #}
 {% macro tag(texto, cor) %}<span class="eg-tag eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
 {% macro sinal(texto, cor) %}<span class="eg-tag eg-tag--sem eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
-{% from 'hseq/_legenda.html' import aviso, termo %}
+{# o "!" com outro nome: o `aviso` é a mensagem verde da gaveta (_gaveta.html, incluída nas <template> desta página), e o
+   macro com o mesmo nome a tomava (05/11/2026: toda gaveta mostrava "<Macro 'aviso'>") #}
+{% from 'hseq/_legenda.html' import aviso as aviso_legenda, termo %}
 {% macro pill(n, sem=False) %}{% for k, rot, cor in niveis if k == n %}<span class="eg-pill {% if sem %}eg-pill--sem {% endif %}eg-pill--{{ cor }}">{{ rot }}</span>{% endfor %}{% endmacro %}
 {% macro barra(v, maximo) %}<span class="eg-mini" style="width:{{ (100 * (v or 0) / (maximo or 1))|round(0) }}%"></span>{% endmacro %}
 {% macro disp_barra(x) %}{% if x is not none %}<span class="eg-disp"><i class="{{ 'mal' if x < meta else '' }}" style="width:{{ (100 * x)|round(1) }}%"></i><u style="left:{{ (meta * 100)|int }}%"></u></span><b class="cn-t-{{ 'ok' if x >= meta else 'critico' }}">{{ pct(x) }}</b>{% else %}—{% endif %}{% endmacro %}
@@ -24,7 +26,7 @@
   <header class="cn-cab eg-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Confiabilidade</p>
       <div class="eg-cab-tit"><h1 class="cn-titulo">Confiabilidade dos ativos</h1>
-      {% call aviso('Como ler a Confiabilidade', 'Metas de classe mundial: disponibilidade ≥ ' ~ (meta * 100)|int ~ '% · Disp = MTBF ÷ (MTBF + MTTR) · λ = 1 ÷ MTBF.') %}
+      {% call aviso_legenda('Como ler a Confiabilidade', 'Metas de classe mundial: disponibilidade ≥ ' ~ (meta * 100)|int ~ '% · Disp = MTBF ÷ (MTBF + MTTR) · λ = 1 ÷ MTBF.') %}
         {{ termo('Para que serve') }}<dd>Que ativo falha mais e demora mais a voltar: os sinais das corretivas dos últimos {{ janela }} dias ({{ periodo }}) e a disponibilidade de cada ativo pelo método do Power BI.</dd>
         {{ termo('Sinal') }}<dd>Só corretiva e corretiva emergencial dos últimos {{ janela }} dias; serviço registrado como corretiva (limpeza, ensaio, vistoria, reset) não conta como falha. <b>A</b> = falhas em {{ janela }} dias; <b>B</b> = falhas em 7 dias; <b>D</b> = falhas acima do P90 da família (o normal da família no período).</dd>
         {{ termo('Nível') }}<dd>Crítico com 4 falhas ou mais, ou 3 em 7 dias; atenção com 3 falhas, ou 2 em 7 dias, ou acima do P90; monitorar com 2. Criticidade A sobe monitorar para atenção. Só serviço (nenhuma falha e 2 OS ou mais) fica em monitorar para reclassificar a OS. OS cancelada não conta.</dd>
