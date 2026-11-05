@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# A Visão do cliente, fase 1 (05/11/2026; a sugestão "Visão do cliente: Comando com a síntese das usinas dele" e o "Sim,
+   fase 1" do Levi): a tela do mockup para a Grid, com o login de hoje. A conta é nexus/campo/visao_cliente.py, por
+   cliente; nada de nome de técnico, custo, horas, comentário interno nem causa de falha (a fase 2, o login do cliente,
+   reaproveita a mesma conta). Fonte que não respondeu: "sem leitura", nunca 0 #}
+{% macro numero(icone, titulo) %}<section class="vc-num"><p class="vc-num-t"><i class="ph ph-{{ icone }}" aria-hidden="true"></i>{{ titulo }}</p>{{ caller() }}</section>{% endmacro %}
+{% macro sem_leitura() %}<p class="vc-num-v vc-sem">sem leitura</p>{% endmacro %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+        {% call explica('De onde vem cada número') %}
+          <p><b>Status:</b> o tempo real da plataforma de Performance, lido só para leitura (o Nexus não pede nada novo
+          às fontes). Usina que ele não traz fica "Sem leitura", nunca parada; fora da janela solar, "Sem sol".</p>
+          <p><b>Performance do mês:</b> a geração do mês sobre a meta (P50) até os dias cobertos, do Gerencial; a do
+          cliente é a soma das usinas. Verde a partir de 97%, âmbar de 90% a 97%, vermelho abaixo de 90%.</p>
+          <p><b>Chamados na distribuidora:</b> os dos últimos 30 dias, com o protocolo, do Andamento da Ronda COS (sem os
+          dispensados). O Andamento não diz quando a distribuidora resolveu: por isso "nos últimos 30 dias".</p>
+          <p><b>OSs:</b> as OS do Fracttal ainda por fazer (a fazer e em execução), com a régua do quadro "OS e manutenção"
+          da Visão do responsável: fora o backoffice, o Teste, a zeladoria e as OS de chamado. As concluídas que esperam a
+          conferência da Grid aparecem à parte.</p>
+          <p><b>Próxima visita:</b> a programação do PCM (o Quadro da semana), o próximo bloco ainda não feito. A hora
+          prevista de chegada da equipe vem numa fase seguinte.</p>
+          <p><b>Fica de fora, de propósito:</b> nomes e telefones de técnicos, custos, horas, comentários internos da OS
+          e a causa da falha antes da análise da Engenharia.</p>
+        {% endcall %}
+      </div>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+  </div>
+  {% if erro_visao %}<div class="cn-erro" role="alert"><b>{{ erro_visao }}.</b></div>{% endif %}
+
+  <form class="cn-filtros vc-escolha" method="get">
+    <label class="gc-rotulo" for="vc-cliente">Cliente</label>
+    <select class="gc-campo" id="vc-cliente" name="cliente" onchange="this.form.submit()">
+      <option value="">Escolha o cliente</option>
+      {% for i, n, q in opcoes %}<option value="{{ i }}"{% if i == cid %} selected{% endif %}>{{ n }} ({{ q }} usina{{ 's' if q != 1 }})</option>{% endfor %}
+    </select>
+    <noscript><button class="gc-btn gc-btn--contorno" type="submit">Ver</button></noscript>
+  </form>
+
+  {% if not cid %}
+  <p class="mudo vc-vazio">Escolha um cliente para ver a síntese das usinas dele: o status agora, a performance do mês, os
+    chamados na distribuidora, as OS e a próxima visita.</p>
+  {% else %}{% set s = sintese %}{% set k = s.kpis %}
+  {% for f, e in erros.items() %}<div class="cn-erro cn-aviso" role="status">Não consegui ler {{ fontes_nome.get(f, f) }} ({{ e }}): essa parte fica "sem leitura", o resto da tela vale.</div>{% endfor %}
+  <header class="vc-cab">
+    <div><h2 class="vc-nome">{{ nome }}</h2>
+      <p class="vc-onde">{{ s.total }} usina{{ 's' if s.total != 1 }} em operação</p></div>
+    {% if lido_tr %}<p class="vc-lido"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> Tempo real de {{ lido_tr }}</p>{% endif %}
+  </header>
+
+  <div class="vc-numeros">
+    {% call numero('power', 'Status das usinas') %}
+      {% if k.status %}<p class="vc-num-v"><b>{{ k.status.valor }}</b> de {{ k.status.de }} {{ k.status.rotulo }}</p>
+        <p class="vc-selos">{% for n, rot, tom in k.status.selos %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% endfor %}</p>
+      {% else %}{{ sem_leitura() }}{% endif %}
+    {% endcall %}
+    {% call numero('chart-line-up', 'Performance do mês') %}
+      {% if k.perf.pct is not none %}<p class="vc-num-v"><b class="cn-t-{{ k.perf.tom }}">{{ ('%.1f'|format(k.perf.pct))|replace('.', ',') }}%</b> do esperado</p>
+        <p class="vc-num-d">{{ k.perf.usinas }} usina{{ 's' if k.perf.usinas != 1 }} com meta no Gerencial</p>
+      {% else %}{{ sem_leitura() }}{% endif %}
+    {% endcall %}
+    {% call numero('plug-charging', 'Chamados na distribuidora') %}
+      {% if k.chamados is not none %}<p class="vc-num-v"><b>{{ k.chamados.n }}</b> em 30 dias</p>
+        <p class="vc-num-d">{% if k.chamados.n %}{{ k.chamados.protocolo }} com protocolo{% if k.chamados.mais_antigo is not none %} · o mais antigo há {{ k.chamados.mais_antigo }} d{% endif %}{% else %}nenhum chamado{% endif %}</p>
+      {% else %}{{ sem_leitura() }}{% endif %}
+    {% endcall %}
+    {% call numero('wrench', 'Ordens de serviço') %}
+      {% if k.os is not none %}<p class="vc-num-v"><b>{{ k.os.n }}</b> aberta{{ 's' if k.os.n != 1 }}</p>
+        <p class="vc-num-d">{{ k.os.programadas }} a fazer · {{ k.os.execucao }} em execução{% if k.os.verificacao %}<br>+ {{ k.os.verificacao }} concluída{{ 's' if k.os.verificacao != 1 }}, em conferência{% endif %}</p>
+      {% else %}{{ sem_leitura() }}{% endif %}
+    {% endcall %}
+    {% call numero('van', 'Próxima visita') %}
+      {% if k.visita is not none %}{% if k.visita.quando %}<p class="vc-num-v"><b>{{ k.visita.quando }}</b></p>
+        <p class="vc-num-d">{{ k.visita.usina }}{% if k.visita.tipo %} · {{ k.visita.tipo }}{% endif %}</p>
+        {% else %}<p class="vc-num-v vc-sem">nenhuma programada</p>{% endif %}
+      {% else %}{{ sem_leitura() }}{% endif %}
+    {% endcall %}
+  </div>
+
+  {% macro linha(x) %}
+      <tr>
+        <td class="vc-usina"><b>{{ x.usina }}</b>{% if x.onde %}<span class="det">{{ x.onde }}</span>{% endif %}</td>
+        <td><span class="cn-pill cn-{{ x.status.tom }}">{{ x.status.rotulo }}</span>{% if x.status.lido and x.status.chave not in ('gerando', 'sem_sol') %}<span class="det">última leitura {{ x.status.lido }}</span>{% endif %}</td>
+        <td class="vc-perf">{% if x.perf %}<span class="cn-t-{{ x.perf.tom }}">{{ ('%.1f'|format(x.perf.pct))|replace('.', ',') }}%</span>
+          <span class="vc-barra" aria-hidden="true"><i class="vc-barra--{{ x.perf.tom }}" style="width: {{ [x.perf.pct, 100]|min|round|int }}%"></i></span>{% else %}<span class="mudo">sem meta</span>{% endif %}</td>
+        <td>{% if x.chamados is none %}<span class="mudo">sem leitura</span>{% elif x.chamados %}<span class="cn-pill cn-alerta">{{ x.chamados|length }} chamado{{ 's' if x.chamados|length != 1 }}</span>{% if x.chamados[0].protocolo %}<span class="det">protocolo {{ x.chamados[0].protocolo }}</span>{% endif %}{% else %}<span class="cn-pill cn-neutro">nenhum</span>{% endif %}</td>
+        <td>{% if x.os is none %}<span class="mudo">sem leitura</span>{% else %}{{ x.os_abertas }}{% endif %}</td>
+        <td>{% if not x.visita_lida %}<span class="mudo">sem leitura</span>{% elif not x.visita %}<span class="mudo">—</span>{% else %}{{ x.visita_txt }}{% if x.visita.tipo %}<span class="det">{{ x.visita.tipo }}</span>{% endif %}{% endif %}</td>
+      </tr>
+  {% endmacro %}
+  <section class="vc-q" aria-labelledby="vc-usinas">
+    <header class="vc-q-cab"><h2 id="vc-usinas">Usinas</h2><p class="mudo">quem precisa de atenção vem primeiro</p></header>
+    {% if s.linhas or s.normais %}
+    <div class="cn-tab vc-tab"><table>
+      <thead><tr><th class="vc-esq">Usina</th><th>Status</th><th>Performance do mês</th><th>Distribuidora</th><th>OSs</th><th>Próxima visita</th></tr></thead>
+      <tbody>
+        {% for x in s.linhas %}{{ linha(x) }}{% endfor %}
+      </tbody>
+    </table></div>
+    {% if s.normais %}
+    <details class="vc-normais"{% if not s.linhas %} open{% endif %}>
+      <summary>+ {{ s.normais|length }} usina{{ 's' if s.normais|length != 1 }} sem pendência</summary>
+      <div class="cn-tab vc-tab"><table>
+        <thead><tr><th class="vc-esq">Usina</th><th>Status</th><th>Performance do mês</th><th>Distribuidora</th><th>OSs</th><th>Próxima visita</th></tr></thead>
+        <tbody>{% for x in s.normais %}{{ linha(x) }}{% endfor %}</tbody>
+      </table></div>
+    </details>
+    {% endif %}
+    {% else %}<p class="mudo vc-vazio">Nenhuma usina em operação deste cliente no cadastro.</p>{% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

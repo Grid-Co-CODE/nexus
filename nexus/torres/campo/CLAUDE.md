@@ -29,6 +29,7 @@ o login do Fracttal de quem clica, como no OS Creator Web; ver "Aprovação de O
 | Tela | De onde vem | Quem calcula |
 |---|---|---|
 | **Visão do responsável** (12/10/2026, a 1ª do Campo) | o **Painel** (28/10/2026, a tela inicial de um responsável: seis quadros, ver "O Painel do responsável" abaixo) e três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
+| **Visão do cliente** (05/11/2026) | o tempo real da plataforma (a Entrada, pela ponte só de leitura) + o Gerencial (a meta, a mesma linha da Visão do responsável) + o Andamento da Ronda COS (os chamados à distribuidora) + `fato_tarefa_os` (as OS) + `fato_programacao` (a próxima visita) | `campo/visao_cliente.py` (junta; nenhuma conta nova, ver "Visão do cliente" abaixo) |
 | **Ocorrências** (18/10/2026) | o livro `nexus_ocorrencias` (escrito nesta tela) + cadastro do Nexus | `campo/ocorrencias.py` (ver "Ocorrências com plano de ação" abaixo) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
 | Aprovação de OS (quadro por fatos desde 05/11/2026) | fila de verificação do Fracttal INTEIRA (só GET) + nota e fechamento do livro do App + os anexos das OS (1 GET por OS, lido por trás, e as fotos pelo S3) + o Responsável O&M da usina (cadastro); aprovar é o Concluir do OS Creator, no cartão ou em lote | `campo/prefiltro.py` (as colunas) sobre a conta pronta das regras copiadas do App; `campo/prefiltro_fundo.py` (as fotos) |
@@ -1392,6 +1393,53 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   rolagem de lado; a exclamação no celular presa à tela), a PT de 29 d 22 h na janela do número, o relatório com
   outubro marcado.
 
+## Visão do cliente (05/11/2026)
+
+De onde veio: a sugestão "Visão do cliente" (Início → Sugestões, 04/11/2026, com o mockup). O Levi decidiu a **fase 1**
+("Sim, fase 1"; "cuida, começa e já vai cuidando"): a tela para a Grid (COS, PCM e Performance), com o login de hoje, em
+Usinas 360° › Visão do cliente (`/t/campo/cliente`), para responder o cliente em segundos, sem abrir cinco telas. A fase 2
+(o cliente entra com o login dele e vê a mesma síntese, só do `cliente_id` dele) e a fase 3 (a equipe saiu da base, a
+hora prevista de chegada, pelo App) estão FORA.
+
+- **O recorte é o `cliente_id` da usina** (o cadastro do Nexus): "contrato" não existe como entidade, e a fase 2 filtra
+  pelo mesmo campo. A conta é feita por cliente, no servidor, e já sai **sem o que é interno**: nada de nome ou telefone
+  de técnico, custo, horas, comentário interno da OS nem causa de falha (a plataforma diz o sintoma, não a causa). O teste
+  `test_a_sintese_nao_leva_nada_interno` trava as chaves que saem.
+- **Nenhuma conta nova; cada número é o da tela dona**:
+  - Status: o tempo real da plataforma (`/api/entrada/tempo-real`) pela ponte SÓ DE LEITURA (`ler_tempo_real`, guardado
+    2 min): a plataforma serve o que já montou e não fala com a API PV (a SunOp é paga). A resposta sem o
+    `X-Nexus-Leitura-Ok: 1` não vale. Usina que o tempo real não traz é "Sem leitura", nunca parada. À noite a plataforma
+    manda status ok com a causa "Sem sol (fora da janela solar)": aqui fica "Sem sol", nunca "Gerando" (na bancada às
+    18:15, as 10 usinas da Athon). A última leitura de outro dia leva a data ("04/11 22:43"; sem ela, parecia de hoje).
+  - Performance do mês: o Gerencial, a mesma linha da Visão do responsável (`meta.prod_kwh` e `meta_kwh`). O do cliente é
+    a **soma** da geração sobre a soma da meta, não a média dos % (a usina grande pesa mais).
+  - Chamados na distribuidora: o Andamento da Ronda COS (a tela Acionamentos), 30 dias, com o protocolo, sem os
+    DISPENSADOS. O Andamento não diz quando a distribuidora resolveu: a tela escreve "nos últimos 30 dias", não "abertos".
+  - OSs: `fato_tarefa_os` pela régua do quadro "OS e manutenção" da Visão (`manutencao.tarefas_por_usina`): fora o
+    backoffice, o Teste, a zeladoria e as OS de chamado. O número é o que **ainda vai ser feito** (a fazer + em
+    execução); a concluída que espera a conferência da Grid fica à parte, porque na bancada a Athon tinha 382 de 422 em
+    conferência: o número do cliente não pode ser a nossa fila de aprovação.
+  - Próxima visita: a programação do PCM (`fato_programacao`, a semana corrente e a próxima), o bloco não finalizado
+    mais cedo de hoje em diante; de hoje, só o que ainda vai começar (o bloco das 09:00 visto às 18:00 já foi feito ou
+    está em execução, não é "a próxima"). O código de plano do PCM ("MPA") vira "preventiva (MPA)".
+- **Fonte que não respondeu = "sem leitura", nunca 0**, com o aviso amarelo no topo dizendo qual; o resto da tela vale.
+  No PC o Andamento não está ligado (os chamados ficam "sem leitura"); no servidor está.
+- A ordem da tabela: quem pede atenção primeiro (parada, sem comunicação, com perda, sem leitura; depois mais chamados,
+  pior %, mais OS a fazer). As sem pendência (gerando ou sem sol, sem chamado, sem OS a fazer e % ≥ 90) ficam dobradas
+  em "+ N usinas sem pendência". A cor da performance é a régua do Gerencial: ≥ 97% verde, ≥ 90% amarelo, abaixo vermelho.
+- Acesso: a tela é `campo/cliente` em Base › Acessos; tela nova nasce fechada para os setores (só o administrador vê) e
+  quem libera para COS, PCM e Performance é o Levi.
+
+Prova (05/11/2026): `tests/test_campo_visao_cliente_0511.py` (13 testes; e 11 quebras de propósito na conta, todas pegas:
+média no lugar da soma, sem sol vira gerando, sem leitura vira zero, chamado leva tudo, ordem invertida, dispensado
+entra, visita já feita conta, OS de chamado entra, visita de hoje que já passou, tipo sem normalizar, conferência conta
+como aberta) e a bancada só leitura com o banco real e o tempo real de produção: a Thopen (81 usinas, 80 com o status
+igual ao da Entrada; a que a Entrada não trouxe, "Sem leitura") e a Athon (10 usinas, 101,4%), a 1440 px e a 375 px (a
+tabela desliza dentro do quadro; a página não rola de lado).
+
+A entrega 2 (o painel de detalhe por usina: a linha do dia, os chamados com o protocolo, as OS com a situação) vem
+depois, na mesma tela.
+
 ## Estrutura de O&M de 10/2026: região de campo e gestor de contrato (08/10/2026)
 
 Levi, 08/10, sobre a "Nova Estrutura O&M Equipe": "pode adaptar, deixa as vagas preparadas". O antigo "Supervisor de
@@ -1766,6 +1814,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   Manutenção (`manutencao_fonte`, `alertas_manutencao`, `linha_manutencao`, `com_manutencao`, `limite_do_pedido`).
 - `central_usina.py`: a Central da usina (04/11/2026, acima): a busca, os técnicos, as ocorrências e a Segurança da
   usina escolhida; o resto é a linha dela na Visão.
+- `visao_cliente.py`: a Visão do cliente (05/11/2026, acima): o recorte por `cliente_id`, o status pelo tempo real,
+  as OS, os chamados e a próxima visita por usina, os 5 números e a ordem; a leitura do tempo real pela ponte.
 - `relatorio_usina.py`: o relatório da usina em PDF para o cliente (04/11/2026, acima): os meses, os temas, os dados
   das telas donas e o PDF (reportlab, a paleta e a fonte dos outros relatórios).
   `manutencao.py`: a conta pura do bloco Manutenção. `tarefas_os.py`: o laço que lê as tarefas das OS do Fracttal e
@@ -1790,7 +1840,7 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
 Telas: `templates/campo/*.html` + `static/campo.css`; filtros pela URL.
 
 Prova: `tests/test_torre_campo.py` (nenhuma tela com Azure, moldura ou "Abrir no App"), `test_campo_responsaveis.py`
-(a Visão do responsável), `test_campo_ocorrencias.py` (as ocorrências com plano de ação), `test_campo_chamados_acompanhamento.py` (os chamados no banco), `test_campo_visao.py` (as
+(a Visão do responsável), `test_campo_ocorrencias.py` (as ocorrências com plano de ação), `test_campo_visao_cliente_0511.py` (a Visão do cliente), `test_campo_chamados_acompanhamento.py` (os chamados no banco), `test_campo_visao.py` (as
 contas nossas, a Central em três visões e a aprovação da PT com o login do OS Creator, banco falso), `test_campo_ronda_avulsa.py` (lançar, cobertura, selo, recusas, anulação, catálogo; 08/10: vala do App, sensor em três estados, anulação sem dia nem usina, o caminho de gravação que a importação usa), `test_campo_importar_avulsas.py` (a importação da validação por foto com planilha sintética: de-para exato, data mais recente, "Sem foto", a pessoa que tem de ser uma ficha com e-mail, gravação, conferência linha a linha, idempotência, fora do fato de ronda), `test_campo_rondas_pedido_0810.py` (Rondas de 08/10: colunas e dica da duração, Fotos na tabela, nunca tiveram ronda, Sem ronda, criticidade, Quem ronda em blocos com as pendentes, Painel), `test_campo_sujidade.py`, `test_campo_zeladoria_semanal.py` (a Zeladoria de 26/10/2026), `test_campo_regras_app.py`, `test_campo_aprovacao.py`, `test_campo_fila_rapida.py`,
 `test_campo_aprovacao_supervisor.py` (08/10: fila inteira, cartões por região e por gestor, a tabela, o portão do
 Aprovar: supervisor de campo, coordenador com a vaga aberta, só admin sem os dois ou sem a estrutura publicada, gestor

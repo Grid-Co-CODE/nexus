@@ -1804,3 +1804,41 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 @media (max-width:700px){.cu-busca{flex:1 1 100%}}
 @media (max-width:480px){.cu-q .cr-dl{grid-template-columns:1fr}.cu-q .cr-dl > dd{padding-top:0;border-top:0}
   .cu-gente li{flex:1 1 100%}}
+/* a Visão do cliente (05/11/2026, fase 1; a tela do mockup da sugestão, no desenho do Nexus): uma superfície só */
+.vc-escolha .gc-campo{min-width:260px}
+.vc-vazio{margin:16px 0 0;font-size:13.5px}
+.vc-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px;margin-top:22px}
+.vc-nome{margin:0;font:700 26px/1.2 var(--font-sans);letter-spacing:-.01em;color:var(--tinta)}
+.vc-onde{margin:5px 0 0;font-size:13.5px;color:var(--mudo)}
+.vc-lido{margin:0;font-size:12.5px;color:var(--mudo)}
+.vc-numeros{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:16px}
+.vc-num{min-width:0;padding:14px 18px 16px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.vc-num-t{display:flex;align-items:center;gap:8px;margin:0;font:600 12.5px/18px var(--font-sans);color:var(--tinta-2)}
+.vc-num-t .ph{font-size:16px;color:var(--verde-texto)}
+.vc-num-v{margin:10px 0 0;font-size:14px;color:var(--tinta-2)}
+.vc-num-v b{font:700 28px/1.1 var(--font-sans);letter-spacing:-.02em;color:var(--tinta);font-variant-numeric:tabular-nums}
+.vc-num-v b.cn-t-ok{color:var(--ok)}
+.vc-num-v b.cn-t-alerta{color:var(--alerta)}
+.vc-num-v b.cn-t-critico{color:var(--critico)}
+.vc-num-d{margin:6px 0 0;font-size:12.5px;line-height:1.45;color:var(--mudo)}
+.vc-sem{color:var(--mudo);font-size:15px}
+.vc-selos{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.vc-q{margin-top:16px;padding:14px 18px 16px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.vc-q-cab{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px}
+.vc-q-cab h2{margin:0;font:600 15px/22px var(--font-sans);color:var(--tinta)}
+.vc-q-cab p{margin:0;font-size:12.5px}
+.vc-tab{border:0;background:transparent}
+/* o cabeçalho da tabela sem a faixa de outra cor: o quadro já é a superfície (à la Nexus, sem azul em camadas) */
+.vc-tab th{background:transparent;border-bottom:1px solid var(--linha)}
+.vc-tab table{min-width:760px}
+.vc-tab .vc-esq,.vc-tab td.vc-usina{text-align:left}
+.vc-perf{white-space:nowrap}
+.vc-barra{display:block;width:96px;height:5px;margin:6px auto 0;border-radius:3px;background:var(--superficie-3);overflow:hidden}
+.vc-barra i{display:block;height:100%;border-radius:3px;background:var(--mudo)}
+.vc-barra i.vc-barra--ok{background:var(--ok)}
+.vc-barra i.vc-barra--alerta{background:var(--alerta)}
+.vc-barra i.vc-barra--critico{background:var(--critico)}
+.vc-normais{margin-top:6px}
+.vc-normais summary{cursor:pointer;padding:10px 0;text-align:center;font:600 13px var(--font-sans);color:var(--tinta-2)}
+.vc-normais summary:hover{color:var(--verde-texto)}
+@media (max-width:480px){.vc-num-v b{font-size:24px}.vc-escolha .gc-campo{min-width:0;width:100%}}

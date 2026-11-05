@@ -55,6 +55,11 @@ TORRE = Torre(
         Tela("responsaveis", "Visão do responsável",
              "Nas minhas usinas, onde focar primeiro e o que pode esperar?",
              "Gerencial, Confiabilidade, COS, tickets, rondas e PT, no banco do Nexus"),
+        # a Visão do cliente, fase 1 (05/11/2026; a sugestão "Visão do cliente: Comando com a síntese das usinas dele" e o
+        # "Sim, fase 1" do Levi): para a Grid, com o login de hoje; a conta mora em nexus/campo/visao_cliente.py
+        Tela("cliente", "Visão do cliente",
+             "Como estão agora as usinas de um cliente, e o que responder a ele sem abrir cinco telas?",
+             "Tempo real da plataforma (só leitura) + Gerencial + Andamento da Ronda COS + OS e programação no banco"),
         # as ocorrências com plano de ação (Levi, 18/10/2026: "as ocorrências com plano de ação. siga!"): o painel próprio
         # de um supervisor, no Nexus. Dos Responsáveis UFV sem marcar em Base → Acessos (como o Gerar e o Quadro do PCM);
         # os outros setores, pela marca
@@ -1934,3 +1939,5 @@ def triagem():
 # As ocorrências com plano de ação (18/10/2026): as rotas moram em ocorrencias_tela.py, importada aqui no fim porque
 # precisa do `bp`, da `TORRE` e do `_responsavel_do_login` definidos acima; a regra mora em nexus/campo/ocorrencias.py.
 from . import ocorrencias_tela  # noqa: E402,F401
+# a Visão do cliente (05/11/2026): as rotas em cliente_tela.py, pelo mesmo motivo
+from . import cliente_tela  # noqa: E402,F401
