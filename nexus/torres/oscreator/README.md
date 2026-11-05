@@ -2941,5 +2941,7 @@ cada atividade!"; "Quando criamos uma OS as atividades já vem com aquelas subta
   (`os_planos.com_subtarefas_padrao`), cada uma na forma da subtarefa do plano de onde veio (a `origem`: o tipo, as opções e
   a unidade ficam quando o tipo não mudou), e a OS segue ligada ao plano. Se o Fracttal recusar, a OS sai com as do plano e
   a tela diz (a rede de segurança das extras). Sem conseguir ler o padrão, a OS sai com as do plano e a tela também diz.
-- Prova: `tests/test_oscreator_perf_subtarefas.py`; a tela conferida numa bancada (desktop e 375 px). A prova no Fracttal
-  (a OS ligada ao plano com a lista editada, lida de volta em TESTE - PA) é a do primeiro padrão salvo no ar.
+- Prova: `tests/test_oscreator_perf_subtarefas.py`; a tela conferida numa bancada (desktop e 375 px); e no ar, em
+  05/11/2026, em TESTE - PA: com um padrão de teste da Inspeção Geral do Inversor (a 1ª renomeada, a 2ª de Verificação para
+  Sim/Não, a última do plano fora e uma nova no fim), a OS 18600 nasceu com essa lista, na ordem, lida de volta; o padrão
+  voltou ao do Fracttal e a OS foi cancelada. O plano real tem 9 subtarefas, todas com `origem` (o `id` do item do plano).
