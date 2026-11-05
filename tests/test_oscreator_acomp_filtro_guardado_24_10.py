@@ -71,25 +71,8 @@ def _rodar(guardado=None, acao="") -> dict:
     return json.loads(r.stdout.strip().splitlines()[-1])
 
 
-def _filtro(r) -> dict:
-    return json.loads(r["armazem"]["acomp.filtros"])
-
-
-def test_o_filtro_escolhido_fica_guardado():
-    r = _rodar(acao="filtrar")
-    assert _filtro(r) == {"marca": "Huawei", "busca": "OS 3"}
-    assert r["visiveis"] == 1
-
-
-def test_a_volta_ao_quadro_poe_o_filtro_de_volta():
-    r = _rodar({"acomp.filtros": json.dumps({"marca": "Huawei", "busca": ""})})
-    assert (r["marca"], r["visiveis"], r["n"]) == ("Huawei", 2, "2")
-
-
-def test_o_que_saiu_da_lista_nao_vira_filtro():
-    """A marca do filtro guardado não está mais no quadro (o último chamado dela fechou): o quadro abre inteiro."""
-    r = _rodar({"acomp.filtros": json.dumps({"marca": "Marca Que Saiu"})})
-    assert (r["marca"], r["visiveis"]) == ("", 3)
+# o filtro escolhido, a volta dele e o valor que saiu da lista: desde 05/11/2026 (os filtros no modelo do Histórico) na
+# página de verdade, em `test_oscreator_garantias_filtros_05_11.py`; aqui fica a rolagem
 
 
 def test_a_rolagem_da_coluna_e_da_pagina_tambem_voltam():

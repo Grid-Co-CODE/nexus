@@ -60,19 +60,14 @@ body.cham :focus-visible{outline:2px solid var(--gr);outline-offset:2px}
 .kpi .note b{color:var(--tx);font-weight:600}
 @media (max-width:980px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:14px}.kpi:nth-child(3){padding-left:0;border-left:0}}
 
-/* filtros: uma linha, campos sublinhados */
-.filtros{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
-.fcampo{display:flex;flex-direction:column;gap:4px}
-.flbl{font:600 10.5px/1 var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--mu)}
-body.cham .filtros select,body.cham .filtros input{background:transparent;border:0;border-bottom:1px solid var(--ln2);border-radius:0;
-  color:var(--tx);font:500 13px var(--font);padding:5px 2px;height:32px;min-width:170px}
-body.cham .filtros input{min-width:250px;font-weight:400}
-body.cham .filtros select:hover,body.cham .filtros input:hover{border-color:var(--ln2);border-bottom-color:var(--mu)}
-body.cham .filtros select:focus,body.cham .filtros input:focus{outline:none;border-bottom-color:var(--gr)}
-body.cham .filtros input::placeholder{color:var(--fa)}
-body.cham .filtros option{color:var(--tx);background:var(--sf)}
-.limpar{background:none;border:0;color:var(--gr-t);font:500 12.5px var(--font);cursor:pointer;padding:0 0 8px;margin-left:auto}
-.limpar:hover{color:#fff;text-decoration:underline;text-underline-offset:3px}
+/* os filtros (05/11/2026, Levi: "quero que os filtros dos chamados sejam no estilo OS CREATOR WEB > HISTÓRICO", "do jeito
+   que está está ocupando muito espaço na tela!"): a barra, o painel suspenso e as etiquetas são os do Histórico (os.css,
+   "os filtros no modelo A", com as cores --fl-*); aqui, só o respiro até o quadro */
+.ac-filtros{margin-bottom:18px}
+/* o foco da barra e do painel é o azul do modelo A, e não o verde de toda a tela (body.cham :focus-visible); o painel em si,
+   que recebe o foco ao abrir, não ganha anel */
+body.cham .ac-filtros :focus-visible{outline:2px solid var(--fl-azul-texto);outline-offset:2px}
+body.cham .ac-filtros .fl-painel:focus-visible{outline:none}
 
 .aviso{background:var(--sf);border:1px solid var(--ln);border-left:3px solid var(--am);border-radius:8px;padding:10px 14px;
   margin:0 0 14px;font-size:12.5px;color:var(--tx)}
@@ -276,7 +271,9 @@ body.cham .ac textarea.obs::placeholder{color:var(--fa)}
   .kpi .val{font-size:21px}.kpi .note{white-space:normal}table.t td.k,table.t.qa td.k{width:auto}
   body.cham .os-n2,body.cham .os-cargo,body.cham .os-nome,body.cham .os-sair{display:none}
   body.cham .os-header{padding:10px 16px}body.cham .os-tabs{overflow-x:auto}body.cham .os-tab{white-space:nowrap;padding:10px 12px}
-  .filtros{gap:16px}body.cham .filtros select{min-width:140px}body.cham .filtros input{min-width:0;width:100%}.fcampo:has(input){flex:1 1 100%}}
+  .ac-filtros .fl-busca{flex:1 1 100%}.ac-filtros .fl-dir{margin-left:auto}
+  .ac-filtros .fl-seg{flex:0 0 auto}.ac-filtros .fl-seg button{flex:0 0 auto;padding:0 12px;font-size:13px}
+  .ac-filtros .exportar-tabela{width:36px;padding:0;justify-content:center}.ac-filtros .ac-exp-txt{display:none}}
 @media (prefers-reduced-motion:reduce){.card{transition-duration:.06s}.recolher svg{transition-duration:.06s}}
 
 /* ── Controle de fornecedores ── o desenho é do fornecedores.js (as classes são as dele). A lista à esquerda e o editor à
@@ -388,9 +385,7 @@ html[data-tema="claro"]{--bg:var(--osc-pagina);--sf:var(--osc-cartao);--sf2:var(
 :where(html[data-tema="claro"]) .btn-g{background:var(--osc-lima);color:var(--osc-sobre-lima)}
 :where(html[data-tema="claro"]) .btn-i{color:var(--osc-texto)}
 :where(html[data-tema="claro"]) .btn-i:hover{background:var(--osc-secao-3)}
-:where(html[data-tema="claro"]) .btn-o:hover,:where(html[data-tema="claro"]) .limpar:hover{color:var(--osc-texto)}
-/* os campos sublinhados e as caixas de texto: borda de campo a 3:1 */
-:where(html[data-tema="claro"]) body.cham .filtros select,:where(html[data-tema="claro"]) body.cham .filtros input{border-bottom-color:var(--osc-campo)}
+:where(html[data-tema="claro"]) .btn-o:hover{color:var(--osc-texto)}
 /* o quadro */
 :where(html[data-tema="claro"]) .k-av{color:var(--osc-sobre-cheio)}
 :where(html[data-tema="claro"]) .u-m{background:var(--osc-clarao-2)}
@@ -426,11 +421,8 @@ html[data-tema="claro"]{--bg:var(--osc-pagina);--sf:var(--osc-cartao);--sf2:var(
 /* ── a vista em tabela das Garantias (27/10/2026, Levi: "Em garantias quero uma visão de tabela o mais enxuta e direta
    possível") e a troca quadro/tabela, que fica guardada neste navegador (acomp.js). O ticket longo quebra dentro da
    célula, como no cartão ("não quero as OSs quebrando para os lados, pode quebrar o texto"). ── */
-.vistas{display:inline-flex;margin-left:auto;border:1px solid var(--ln2);border-radius:8px;overflow:hidden}
-.vistas button{all:unset;cursor:pointer;padding:6px 14px;font:600 12px/1.2 var(--font);color:var(--mu)}
-.vistas button:hover{color:var(--tx)}
-.vistas button:focus-visible{outline:2px solid var(--gr);outline-offset:-2px}
-#acomp[data-vista="quadro"] .vistas [data-vista="quadro"],#acomp[data-vista="tabela"] .vistas [data-vista="tabela"]{background:var(--gr-tint);color:var(--gr-t)}
+/* o Quadro | Tabela é o controle segmentado da barra dos filtros (.fl-seg, os.css): a vista de agora em azul */
+#acomp[data-vista="quadro"] .vistas [data-vista="quadro"],#acomp[data-vista="tabela"] .vistas [data-vista="tabela"]{background:var(--fl-azul);color:var(--fl-sobre-azul)}
 #acomp[data-vista="tabela"] .board{display:none}
 #acomp:not([data-vista="tabela"]) .tabela{display:none}
 .tabela{overflow-x:auto;border:1px solid var(--ln);border-radius:12px;background:var(--sf)}
@@ -452,7 +444,7 @@ html[data-tema="claro"]{--bg:var(--osc-pagina);--sf:var(--osc-cartao);--sf2:var(
 .tq tr.parada .t-sit .tag::before{content:"";display:inline-block;width:7px;height:7px;margin-right:6px;border-radius:50%;
   vertical-align:1px;background:var(--pulso-a71);animation:ac-pulso 1.4s ease-in-out infinite alternate}
 @media (prefers-reduced-motion:reduce){.tq tr.parada .t-sit .tag::before{animation:ac-pulso 1.4s ease-in-out infinite alternate!important}}
-@media (max-width:640px){.vistas{margin-left:0}.tq{font-size:12px}.tq th,.tq td{padding:8px 10px}}
+@media (max-width:640px){.tq{font-size:12px}.tq th,.tq td{padding:8px 10px}}
 
 /* ── o status geral, a exportação da tabela e o diálogo do relatório para o cliente (28/10/2026) ── */
 .st-geral{margin:8px 0 0;font-size:12.5px;color:var(--mu)}

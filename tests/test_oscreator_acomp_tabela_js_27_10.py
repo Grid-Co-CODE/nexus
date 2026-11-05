@@ -75,14 +75,8 @@ def _rodar(guardado=None, acao="") -> dict:
     return json.loads(r.stdout.strip().splitlines()[-1])
 
 
-def test_o_filtro_vale_nas_linhas_da_tabela():
-    r = _rodar(acao="filtrar")
-    assert r["visiveis"] == ["os 9104"] and r["vazio"] is False
-
-
-def test_filtro_sem_nenhuma_linha_diz_que_nao_ha():
-    r = _rodar(acao="nada")
-    assert r["visiveis"] == [] and r["vazio"] is True
+# os filtros nas linhas da tabela (o que fica, o "nenhum chamado", o Status geral e o Responsável UFV): desde 05/11/2026
+# (os filtros no modelo do Histórico) na página de verdade, em `test_oscreator_garantias_filtros_05_11.py`
 
 
 def test_a_troca_para_tabela_fica_guardada():
@@ -93,9 +87,3 @@ def test_a_troca_para_tabela_fica_guardada():
 def test_o_clique_na_linha_abre_o_chamado():
     assert _rodar(acao="clique")["navegou"] == "/os/chamados/acompanhamento/9104"
 
-
-@pytest.mark.parametrize("acao,ficam", [("geral", ["os 9103"]), ("sem_geral", ["os 9105"]),
-                                        ("ufv", ["os 9103", "os 9105"]), ("sem_ufv", ["os 9104"])])
-def test_os_filtros_status_geral_e_responsavel_ufv(acao, ficam):
-    """28/10/2026: o Status geral e o Responsável UFV no lugar do Responsável; "_sem" acha o que não tem."""
-    assert _rodar(acao=acao)["visiveis"] == ficam

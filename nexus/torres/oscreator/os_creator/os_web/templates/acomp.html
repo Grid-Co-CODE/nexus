@@ -40,6 +40,20 @@
     <p class="vazio{% if q.colunas[chave] %} oculto{% endif %}" data-vazio>{{ vazio }}</p></div>
 </section>
 {%- endmacro %}
+{# uma lista do painel de filtros: de marcar vários, com a caixa de busca do os_busca.js (data-busca); `sem` = a opção do que
+   não tem valor ("_sem": sem status, sem Responsável UFV), no fim #}
+{% macro multi(nome, rotulo, opcoes, sem='') -%}
+<div class="fl-cel" data-filtro="{{ nome }}">
+  <span class="fl-rot" id="fl_rot_{{ nome }}">{{ rotulo }}</span>
+  <details class="os-multi" data-nome="{{ nome }}" data-busca="1">
+    <summary aria-labelledby="fl_rot_{{ nome }} fl_val_{{ nome }}"><span class="os-multi-txt" id="fl_val_{{ nome }}" data-todos="Todos">Todos</span><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-seta"/></svg></summary>
+    <div class="os-multi-lista">
+      {%- for o in opcoes %}<label><input type="checkbox" value="{{ o }}"> {{ o }}</label>{% endfor %}
+      {%- if sem %}<label><input type="checkbox" value="_sem"> {{ sem }}</label>{% endif %}
+    </div>
+  </details>
+</div>
+{%- endmacro %}
 <section class="ac" id="acomp" data-vista="quadro">
 {# a vista escolhida (quadro ou tabela, 27/10/2026) volta antes da 1ª pintura: pelo acomp.js, no fim da página, o quadro
    apareceria e trocaria na frente da pessoa. O clique e a gravação da escolha moram no acomp.js (mesma chave). #}
@@ -72,17 +86,46 @@
     <div class="kpi"><div class="lbl">Finalizados</div><div class="linha"><span class="val{% if q.n.fim %} g{% endif %}">{{ q.n.fim }}</span>
       <span class="note">nos últimos 90 dias</span></div></div>
   </div>
-  <div class="filtros">
-    <label class="fcampo"><span class="flbl">Fornecedor</span><select data-f="marca" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.marca %}<option value="{{ o }}">{{ o }}</option>{% endfor %}</select></label>
-    <label class="fcampo"><span class="flbl">Cliente</span><select data-f="cliente" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.cliente %}<option value="{{ o }}">{{ o }}</option>{% endfor %}</select></label>
-    <label class="fcampo"><span class="flbl">Tipo de ativo</span><select data-f="tipo" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.tipo %}<option value="{{ o }}">{{ o }}</option>{% endfor %}</select></label>
-    <label class="fcampo"><span class="flbl">Status geral</span><select data-f="geral" data-osb="nativo"><option value="">Todos</option>{% for o in status_geral %}<option value="{{ o }}">{{ o }}</option>{% endfor %}<option value="_sem">Sem status</option></select></label>
-    <label class="fcampo"><span class="flbl">Status do chamado</span><select data-f="st" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.status %}<option value="{{ o }}">{{ o }}</option>{% endfor %}<option value="_sem">Sem status</option></select></label>
-    {% if q.opcoes.ufv is not none %}<label class="fcampo"><span class="flbl">Responsável UFV</span><select data-f="ufv" data-osb="nativo"><option value="">Todos</option>{% for o in q.opcoes.ufv %}<option value="{{ o }}">{{ o }}</option>{% endfor %}<option value="_sem">Sem responsável UFV</option></select></label>{% endif %}
-    <label class="fcampo"><span class="flbl">Buscar</span><input data-f="busca" type="search" placeholder="nº da OS, ativo, usina, ticket…" autocomplete="off"></label>
-    <div class="vistas" role="group" aria-label="Ver como"><button type="button" data-vista="quadro">Quadro</button><button type="button" data-vista="tabela">Tabela</button></div>
-    {# a tabela em Excel, com as linhas que os filtros deixam (28/10/2026) #}
-    <button type="button" class="btn btn-o btn-p exportar-tabela" data-exportar-tabela>Exportar tabela</button>
+  {# os filtros no modelo do Histórico (Levi, 05/11/2026: "quero que os filtros dos chamados sejam no estilo OS CREATOR WEB >
+     HISTÓRICO", "algo suspenso e moderno, do jeito que está está ocupando muito espaço na tela!"): numa linha, a busca à vista
+     (filtra enquanto se digita) e o botão Filtros, que abre o painel suspenso com os seis campos, todos de marcar vários e
+     digitáveis (o os_busca.js monta a caixa de busca da lista); a troca só vale no Aplicar e fechar sem aplicar descarta. Cada
+     filtro aplicado vira uma etiqueta com o × que o tira na hora. Sem o "Limpar" (28/10/2026: "Tire o botão de limpar
+     filtros"). O estilo é o do Histórico (os.css, "os filtros no modelo A"); a regra, no acomp.js. #}
+  <svg class="fl-defs" aria-hidden="true" focusable="false">
+    <symbol id="fl-i-busca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="fl-i-filtro" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+    <symbol id="fl-i-seta" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="fl-i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="fl-i-baixar" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></symbol>
+  </svg>
+  <div class="ac-filtros">
+    <div class="fl-barra" id="fl_barra">
+      <label class="fl-campo fl-busca" title="Filtra pelo nº da OS, ativo, usina, ticket…"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-busca"/></svg><input data-f="busca" type="search" placeholder="Buscar por nº da OS, ativo, usina, ticket…" autocomplete="off" aria-label="Buscar nos chamados"></label>
+      <button type="button" class="fl-btn" id="b_filtros" aria-haspopup="dialog" aria-expanded="false" aria-controls="fl_painel" title="Abre os filtros: Fornecedor, Cliente, Tipo de ativo, os dois status e o Responsável UFV"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-filtro"/></svg>Filtros <span class="fl-badge" id="fl_n" hidden>0</span></button>
+      <div class="fl-dir">
+        <div class="fl-seg vistas" role="group" aria-label="Ver como"><button type="button" data-vista="quadro">Quadro</button><button type="button" data-vista="tabela">Tabela</button></div>
+        {# a tabela em Excel, com as linhas que os filtros deixam (28/10/2026) #}
+        <button type="button" class="fl-btn exportar-tabela" data-exportar-tabela title="As linhas que os filtros deixam, numa planilha" aria-label="Exportar tabela"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-baixar"/></svg><span class="ac-exp-txt">Exportar tabela</span></button>
+      </div>
+      <div class="fl-veu" id="fl_veu" hidden></div>
+      <div class="fl-painel" id="fl_painel" role="dialog" aria-label="Filtros" tabindex="-1" data-esc-fecha hidden>
+        <div class="fl-painel-topo">
+          <h4>Filtros</h4>
+          <button type="button" class="fl-fechar" id="fl_fechar" aria-label="Fechar os filtros sem aplicar" title="Fechar sem aplicar"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-x"/></svg></button>
+        </div>
+        <div class="fl-painel-corpo"><div class="fl-grade">
+          {{ multi('marca', 'Fornecedor', q.opcoes.marca) }}
+          {{ multi('cliente', 'Cliente', q.opcoes.cliente) }}
+          {{ multi('tipo', 'Tipo de ativo', q.opcoes.tipo) }}
+          {{ multi('geral', 'Status geral', status_geral, 'Sem status') }}
+          {{ multi('st', 'Status do chamado', q.opcoes.status, 'Sem status') }}
+          {% if q.opcoes.ufv is not none %}{{ multi('ufv', 'Responsável UFV', q.opcoes.ufv, 'Sem responsável UFV') }}{% endif %}
+        </div></div>
+        <div class="fl-rodape"><div class="fl-dir"><span id="fl_nalt" aria-live="polite">Sem alterações</span><button type="button" class="fl-btn fl-lima" id="b_aplicar" disabled>Aplicar</button></div></div>
+      </div>
+    </div>
+    <div class="fl-etiquetas" id="fl_etiquetas" role="group" aria-label="Filtros aplicados" hidden></div>
   </div>
   <div class="board">
     {{ coluna('cr', 'chegou', 'Chegaram', 'abrir o ticket', 'Nenhuma OS esperando ticket.') }}

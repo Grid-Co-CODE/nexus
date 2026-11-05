@@ -132,10 +132,11 @@ def test_o_quadro_mantem_o_que_os_filtros_e_o_clique_usam(quadro):
                  'data-busca="9103 9102 9101 tst100-etkr1.100'):
         assert attr in c
     # 28/10/2026: o filtro Responsável (equipe ou outra pessoa) saiu; entraram o Status geral e o Responsável UFV
-    # (este só com o Nexus dizendo quem é: test_oscreator_garantias_28_10.py)
-    for f in ("marca", "cliente", "tipo", "geral", "busca"):
-        assert 'data-f="%s"' % f in quadro
-    assert 'data-f="equipe"' not in quadro
+    # (este só com o Nexus dizendo quem é: test_oscreator_garantias_28_10.py). Desde 05/11/2026 os campos são listas
+    # do painel suspenso (o modelo do Histórico) e a busca fica na barra
+    for f in ("marca", "cliente", "tipo", "geral", "st"):
+        assert 'class="os-multi" data-nome="%s"' % f in quadro
+    assert 'data-f="busca"' in quadro and 'data-nome="equipe"' not in quadro
     # o Limpar filtros saiu em 28/10/2026 (Levi: "Tire o botão de limpar filtros"); o Atualizar fica
     assert "data-limpar" not in quadro and 'href="/os/chamados/acompanhamento?atualizar=1"' in quadro
     # com a versão no endereço desde 29/10/2026 (o navegador reusava o acomp.js de antes)
