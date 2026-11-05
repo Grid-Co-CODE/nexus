@@ -1188,14 +1188,16 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .apq-motivo[data-nivel="alerta"]{background:var(--alerta-suave);border-color:var(--alerta-cheio)}
 .apq-motivo[data-nivel="alerta"] > .ph,.apq-motivo[data-nivel="alerta"] .apq-motivo-t{color:var(--alerta)}
 .apq-motivo[data-nivel="neutro"] ul{font-weight:500;color:var(--tinta-2)}
+/* a tarefa e a nota na mesma linha (05/11/2026: "Nota do app pode ficar ao lado direito de tarefa") */
+.apq-c-tarefa{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.apq-c-tarefa .apq-c-tit{flex:1 1 auto;min-width:0}
 .apq-c-tit{margin:0;font:600 13.5px/1.35 var(--font-sans);color:var(--tinta);overflow-wrap:anywhere}
 .apq-c-tit small{font-weight:500;color:var(--mudo)}
 .apq-c-onde{margin:0;font-size:12px;line-height:1.35;color:var(--mudo);overflow-wrap:anywhere}
 .apq-c-onde b{color:var(--tinta-2);font-weight:600}
-.apq-score{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;margin:0;font:700 11px/1.3 var(--font-sans);
-  letter-spacing:.04em;text-transform:uppercase;color:var(--mudo)}
-.apq-score b{font:700 18px/1 var(--font-sans);letter-spacing:0}
-.apq-score small{font-weight:400;letter-spacing:0;text-transform:none}
+.apq-score{flex:none;display:flex;align-items:baseline;gap:5px;margin:0;font:700 9.5px/1.3 var(--font-sans);
+  letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);white-space:nowrap}
+.apq-score b{font:700 15px/1 var(--font-sans);letter-spacing:0}
 .apq-avisos{display:grid;gap:4px;margin:0;padding:0;list-style:none}
 .apq-avisos:empty{display:none}
 .apq-aviso{padding:4px 8px 4px 9px;border-left:3px solid var(--linha-forte);border-radius:0 6px 6px 0;background:var(--superficie);
@@ -1215,8 +1217,8 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .apq-c-av{flex:none;width:24px;height:24px;margin:0;font-size:10px}
 .apq-c-quem{min-width:0;overflow-wrap:anywhere}
 .apq-c-quem small{display:block;color:var(--mudo)}
-.apq-c-n{margin-left:auto;flex:none;color:var(--mudo)}
-.apq-aprovar{justify-self:start}
+/* o Aprovar menor, na ponta direita do pé (05/11/2026: "paralelo ao extremo direita do nome do técnico") */
+.apq-c-pe .apq-aprovar{flex:none;margin-left:auto;padding:5px 12px;font-size:12.5px;line-height:16px}
 .apq-msg{margin:0;font-size:12.5px;line-height:1.4}
 .apq-msg[hidden]{display:none}
 .apq-vazio{margin:6px 2px;font-size:12.5px}

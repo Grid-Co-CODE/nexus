@@ -49,8 +49,14 @@ def test_o_cartao_no_modelo_do_quadro_da_equipe_com_o_aprovar(quadro, logado):
     cab = c[c.index('<header class="apq-c-cab">'):c.index("</header>")]
     assert 'class="apq-c-os"' in cab and 'class="apq-c-dias' in cab
     assert '<h3 class="apq-c-tit">' in c and 'class="apq-c-onde"' in c and "Usina A" in c and "Thopen" in c
-    pe = c[c.index('class="apq-c-pe"'):]
+    pe = c[c.index('class="apq-c-pe"'):c.index("</footer>")]
     assert 'class="cn-avatar apq-c-av"' in pe and "2 tarefas" in pe
+    # 3ª volta (05/11/2026: "o botão aprovar pode ficar paralelo ao extremo direita do nome do técnico / Nota do app pode
+    # ficar ao lado direito de tarefa (...) diminua o tamanho do botão para caber, nota também!")
+    assert "data-apq-aprovar" in pe and pe.index("apq-c-quem") < pe.index("data-apq-aprovar")
+    linha = c[c.index('<div class="apq-c-tarefa">'):c.index('class="apq-c-onde"')]
+    assert linha.index('class="apq-c-tit"') < linha.index('class="apq-score"') and "Nota do App" in linha
+    assert re.search(r"\.apq-c-pe \.apq-aprovar\{[^}]*margin-left:auto", CSS.read_text(encoding="utf-8"))
     assert c.index('class="apq-score') < c.index('class="apq-avisos"') < c.index("data-apq-aprovar")
     css = CSS.read_text(encoding="utf-8")
     assert re.search(r"\.apq-cartao\{[^}]*background:var\(--superficie-2\)", css)
