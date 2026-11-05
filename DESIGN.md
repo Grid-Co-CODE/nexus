@@ -87,6 +87,8 @@ Número em coluna ou em cartão leva `.gc-num` (algarismos de largura igual). As
 
 - Raios: `--raio-tag` 6px (etiqueta), `--raio-controle` 8px (botão, campo), `--raio-md` 10px (cartão, caixa).
 - Topo: `--topo` 60px.
+- **Menu recolhido (trilho de ícones):** passar o mouse num ícone abre ao lado a caixa com o nome da área e as telas
+  dela (`.menu-voo`, o verde da tela pronta e a tela aberta, como no menu aberto); o clique no ícone leva à 1ª tela.
 - **Até 820px:** o menu sai da lateral e abre pelo botão "Menu" (um checkbox, sem JavaScript); some o nome de quem
   entrou.
 - **De 821 a 1180px:** o menu estreita (196px) e o setor do topo encolhe.

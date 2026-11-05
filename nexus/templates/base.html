@@ -103,7 +103,8 @@
       }
       caixa.addEventListener('submit', function (ev) {
         var f = ev.target;
-        if (!f.matches('form[action$="/t/comando/aviso/lida"]')) return;
+        // a rota pelo nexusRota (o prefixo), como todo caminho do Nexus no JavaScript (tests/test_prefixo.py)
+        if (!f.matches('form[action$="' + nexusRota('/t/comando/aviso/lida') + '"]')) return;
         ev.preventDefault();
         var bt = f.querySelector('button'), todos = f.classList.contains('sino-lidas');
         if (bt) bt.disabled = true;
@@ -280,6 +281,56 @@
       }
     });
   });
+  // ...e as sub-telas aparecem ao passar o mouse (05/11/2026, Levi: "Quando estou com a barra lateral esquerda recolhida
+  // gostaria que ao passar o mouse aparecesse as opções daquela área"): uma caixa ao lado do trilho com o nome da torre e
+  // as telas dela, os mesmos links do menu (o verde da tela pronta e a tela aberta vêm junto). Some ao tirar o mouse, com
+  // 150 ms de folga para atravessar do ícone até ela, ou com o Esc. O foco do teclado no ícone também abre. Só no trilho
+  // recolhido e acima de 820 px: no celular o menu é a lista inteira. O title do ícone sai, para a dica do navegador não
+  // cobrir a caixa (o nome já está nela).
+  var voo = document.createElement("nav");
+  voo.className = "menu-voo";
+  voo.hidden = true;
+  voo.setAttribute("aria-label", "Telas da área");
+  document.body.appendChild(voo);
+  var vooDe = null, vooRelogio = 0;
+  function noTrilho() { return raiz.classList.contains("menu-recolhido") && window.innerWidth > 820; }
+  function abrirVoo(torre) {
+    if (!noTrilho()) return;
+    clearTimeout(vooRelogio);
+    if (vooDe === torre && !voo.hidden) return;
+    var nome = torre.querySelector("summary span"), lista = torre.querySelector("ul");
+    var t = document.createElement("p");
+    t.className = "menu-voo-t" + (torre.classList.contains("com-conteudo") ? " com-conteudo" : "");
+    t.textContent = nome ? nome.textContent : "";
+    voo.replaceChildren(t);
+    if (lista) voo.appendChild(lista.cloneNode(true));
+    var ic = torre.querySelector("summary").getBoundingClientRect();
+    voo.style.left = (document.querySelector(".menu").getBoundingClientRect().right + 6) + "px";
+    voo.style.top = "0px";
+    voo.hidden = false;
+    voo.style.top = Math.max(8, Math.min(ic.top - 6, window.innerHeight - voo.offsetHeight - 8)) + "px";
+    vooDe = torre;
+  }
+  function fecharVoo(agora) {
+    clearTimeout(vooRelogio);
+    vooRelogio = setTimeout(function () { voo.hidden = true; vooDe = null; }, agora ? 0 : 150);
+  }
+  document.querySelectorAll(".menu .torre").forEach(function (torre) {
+    var s = torre.querySelector("summary");
+    s.removeAttribute("title");
+    torre.addEventListener("mouseenter", function () { abrirVoo(torre); });
+    torre.addEventListener("mouseleave", function () { fecharVoo(false); });
+    s.addEventListener("focus", function () { abrirVoo(torre); });
+    s.addEventListener("blur", function () { fecharVoo(false); });
+  });
+  voo.addEventListener("mouseenter", function () { clearTimeout(vooRelogio); });
+  voo.addEventListener("mouseleave", function () { fecharVoo(false); });
+  voo.addEventListener("focusin", function () { clearTimeout(vooRelogio); });
+  voo.addEventListener("focusout", function (ev) { if (!voo.contains(ev.relatedTarget)) fecharVoo(false); });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !voo.hidden) fecharVoo(true); });
+  // rolar a página ou o próprio trilho tira o ícone do lugar: a caixa fecha em vez de ficar solta
+  window.addEventListener("scroll", function (ev) { if (!voo.hidden && !voo.contains(ev.target)) fecharVoo(true); }, true);
+  document.getElementById("recolhe-menu").addEventListener("click", function () { fecharVoo(true); });
 })();
 </script>
 </body>
