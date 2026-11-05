@@ -61,6 +61,7 @@ RESUMO = {
     "decisao_motivo_pcm": "O motivo de cada tarefa do PCM, e as que saíram da programação por ele",
     "decisao_backoffice_pcm": "Quem é do backoffice: as OS dessas pessoas ficam fora da programação",
     "decisao_atribuicao_pcm": "Quem cobre cada usina: os técnicos que o PCM põe e tira",
+    "decisao_admin_app": "Quem administra o App de Campo, escolhido no Nexus",
     "saldo_almox": "O saldo de cada peça em cada almoxarifado, a cada varredura diária",
     "ciclo_varredura": "Cada varredura do almoxarifado: se leu tudo e se valeu",
     "peca_lancada": "Cada peça que o técnico lançou (ou tentou lançar) pelo App numa OS",
@@ -264,6 +265,9 @@ PARA_QUE = {
     "decisao_atribuicao_pcm": "Guarda cada vez que o PCM põe ou tira um técnico de uma usina na tela Técnicos por "
                               "usina, fixo ou de apoio (com as datas). É a lista de quem vê e pode rondar cada usina no "
                               "App de Campo: o App lê daqui. A observação vai cifrada.",
+    "decisao_admin_app": "Guarda cada vez que um administrador do Nexus põe ou tira alguém dos administradores do App de "
+                         "Campo, na aba de Base → Acessos. O App lê esta lista de 5 em 5 minutos e reconhece a pessoa "
+                         "pelo código do e-mail; com a lista vazia ele não tira ninguém. A observação vai cifrada.",
     "saldo_almox": "Guarda, a cada varredura diária do App, quanto de cada peça há em cada almoxarifado do "
                    "Fracttal, o mínimo cadastrado e o custo unitário que o Fracttal deu. É o histórico que o "
                    "Fracttal não mostra: dá para ver quando uma peça ficou abaixo do mínimo e, mais adiante, prever a "

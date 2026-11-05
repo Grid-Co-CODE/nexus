@@ -42,7 +42,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 
 | Área | `.md` |
 |---|---|
-| Casca, login (Fracttal; a conta Microsoft da Grid, pronta em 14/10/2026 e desligada no servidor até a T.I. pôr as `NEXUS_MS_*`), quem é administrador (Base → Acessos), menu, tema (escuro e claro), servidor local, o endereço (raiz desde a fase 4; o prefixo `/nexus` é a volta), o cookie `nexus_sessao`, as Chaves do Nexus e o Raio-X | `nexus/casca/CLAUDE.md` |
+| Casca, login (Fracttal; a conta Microsoft da Grid, pronta em 14/10/2026 e desligada no servidor até a T.I. pôr as `NEXUS_MS_*`), quem é administrador (Base → Acessos; desde 05/11/2026 também os administradores do App de Campo, numa aba de lá, gravados no banco), menu, tema (escuro e claro), servidor local, o endereço (raiz desde a fase 4; o prefixo `/nexus` é a volta), o cookie `nexus_sessao`, as Chaves do Nexus e o Raio-X | `nexus/casca/CLAUDE.md` |
 | Torres (como criar tela; a tabela de cada torre, inclusive Chamados, Pessoas e Comando, que ainda são atalho ou placeholder) | `nexus/torres/CLAUDE.md` |
 | Base (Registro mestre, Equipamentos das usinas, Chaves das fontes; Acessos na casca, com a aba Pessoas e setores, a antiga Integração Fracttal; Governança nos dados) | `nexus/cadastro/CLAUDE.md` |
 | Relatórios (Central de emissão: os quatro do PCM, o executivo do PCM e os da Performance; o setor de cada relatório) | `nexus/pcm/relatorios/CLAUDE.md`, `nexus/pcm/relatorio_exec/CLAUDE.md` e `nexus/torres/CLAUDE.md` |

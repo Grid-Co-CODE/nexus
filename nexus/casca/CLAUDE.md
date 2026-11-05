@@ -22,6 +22,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/auth/microsoft.py` | o login pela conta Microsoft da Grid (Entra ID), desligado sem as quatro `NEXUS_MS_*` (seção "Entrar com a Microsoft" abaixo) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
+| `nexus/auth/telas_admins_app.py` + `templates/acessos/_admins_app.html` + `static/acessos-admins-app.js` | a aba Administradores do App de Campo de Base → Acessos (05/11/2026; o dado em `nexus/pcm/admins_app.py`; seção "Acessos" abaixo) |
 | `nexus/auth/setor_telas.py` + `templates/sem_setor.html` | o que cada setor vê: o portão por setor e o menu filtrado (seção "Telas por setor" abaixo) |
 | `nexus/auth/pre_carga.py` | a pré-carga das telas de quem tem setor (seção "Pré-carga" abaixo) |
 | `nexus/templates/base.html` | a moldura: o topo (a ação da tela no bloco `topo_acoes`, o sino e quem entrou, que abre o menu da conta com o Setor, o Tema e o Sair; seção "Um cabeçalho só"), menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`; no trilho recolhido, passar o mouse
@@ -128,9 +129,9 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
 
 ## Acessos: quem é administrador (Base → Acessos, 11/10/2026)
 
-**Duas abas desde 25/10/2026:** Telas e administradores (o que está abaixo) e Pessoas e setores (a antiga Base →
-Integração Fracttal: o pessoal do Fracttal e o setor de cada um; regras em `nexus/cadastro/CLAUDE.md`). Só a segunda lê o
-Fracttal.
+**Três abas:** Telas e administradores (o que está abaixo), Pessoas e setores (desde 25/10/2026, a antiga Base →
+Integração Fracttal: o pessoal do Fracttal e o setor de cada um; regras em `nexus/cadastro/CLAUDE.md`) e Administradores
+do App de Campo (desde 05/11/2026, `?aba=admins_app`; bloco no fim desta seção). Só a segunda lê o Fracttal.
 
 Pedido de 11/10/2026, na véspera de o Nexus virar a porta principal: "Tem algum canto do Nexus onde eu posso administrar
 isso?". Até então administrador era só a `NEXUS_ADMINS` do `.env` do servidor (pôr ou tirar alguém = a T.I. editar e
@@ -191,6 +192,30 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
   e não é sobrescrito; e-mails inválidos; POST de outro site ou sem o código; ninguém se tira sozinho por engano; o
   registro de logins com teto e janela, e que falha sem barrar a entrada; a pasta sem permissão, o arquivo que não é
   UTF-8 e o aninhado a fundo deixam o Início em 200 e fecham, com o aviso na tela e uma linha só no journal).
+
+**A aba Administradores do App de Campo (05/11/2026, `telas_admins_app.py`).** Levi: "os administradores do App de Campo
+e os técnicos por usina têm de ser escolhidos no Nexus". Quem administra o App passa a ser decidido aqui, e o App lê a
+lista de 5 em 5 min. **Ao contrário da lista de administradores do Nexus, esta mora no BANCO** (a aba `fato_admin_app` do
+livro `nexus_pcm_atribuicoes`, o que o App já lê; dado, assinatura e vigente em `nexus/pcm/CLAUDE.md`, Técnicos por
+usina): é o App que a aplica, e ele só lê o banco.
+- **Quem vê e grava:** só o administrador do Nexus (a trava da rota de Acessos). O Pôr e o Tirar vêm pelo POST da página,
+  com o código do formulário e a régua do `_de_outro_site` (`acao` `admin_app_por` e `admin_app_tirar`); recusa volta à
+  aba com o motivo e 409 (a pessoa sem código, a fora das fichas ativas, a lista que mudou, sem a NEXUS_PESSOA_HMAC),
+  outro site ou o formulário vencido dão 403, a pessoa que faltou 400; gravou, 303 de volta à aba.
+- **A aba:** a nota "O App de Campo lê esta lista de 5 em 5 min; com a lista vazia ele não tira ninguém (não tranca o
+  App)", os números, os que valem hoje (nome da ficha, desde quando, quem decidiu, Tirar com confirmação), o Pôr
+  administrador (as fichas do cadastro não desligadas e não excluídas, com a busca da própria página; observação
+  opcional, cifrada) e o histórico, o mais novo primeiro. Sem a chave HMAC, sem o token do banco ou com a leitura
+  falhando, a aba só mostra.
+- **O código da pessoa** é o do `responsaveis.codigos`: o do usuário do Fracttal ligado à pessoa em Pessoas e setores e,
+  sem ele, o do e-mail da ficha. Sem código, ela aparece com a etiqueta "sem código" e o Pôr é recusado com "sem e-mail
+  na ficha nem usuário do Fracttal ligado: o App não a reconheceria; corrija o cadastro antes". A ficha cujo e-mail
+  mudou depois de posta ganha o aviso "tire e ponha de novo": o App a acha pelo código da linha que a pôs.
+- **Quem decidiu** é o código do e-mail do login: o nome da ficha que o tem ou, sem ficha (o administrador do
+  escritório), o e-mail que este Nexus conhece (administradores e quem entrou em 30 dias); vazio = a senha.
+- **Prova:** `tests/test_base_acessos_admins_app.py` (só administrador; pôr, tirar e histórico com quem decidiu; a 409
+  sem código; o código pelo Fracttal ligado; só fichas ativas; outro site, formulário vencido e sem a chave; banco
+  fora; nenhum e-mail das fichas na página). No navegador, a cópia de prova com dados de mentira (1366 e 375 px).
 
 ## Nexus lento: Raio-X e o teto do OS Creator (14/10/2026)
 

@@ -341,6 +341,27 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
   .ace-dar .gc-btn{flex:1 1 100%;justify-content:center}
   .ace-matriz-rodape .gc-btn{flex:1 1 100%;justify-content:center}
 }
+/* Base > Acessos · Administradores do App de Campo (05/11/2026): a lista das fichas para escolher, com a busca da
+   própria página; a etiqueta "sem código" no âmbar do aviso (o App não a reconheceria) */
+.aa-por{display:flex;flex-direction:column;gap:10px;padding:14px 16px 16px}
+.aa-por .campo{display:flex;flex-direction:column;gap:5px;min-width:0}
+.aa-por .gc-ajuda{margin:0}
+.aa-lista{min-width:0;margin:0;padding:0;border:1px solid var(--linha);border-radius:var(--raio-md);
+  max-height:min(46vh,420px);overflow-y:auto}
+.aa-pessoa{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;padding:8px 12px;border-top:1px solid var(--linha);
+  font-size:13px;color:var(--tinta);cursor:pointer}
+.aa-pessoa:first-of-type{border-top:0}
+.aa-pessoa:hover{background:var(--superficie-2)}
+.aa-pessoa:has(input:checked){background:var(--verde-suave)}
+.aa-pessoa input{accent-color:var(--verde);width:15px;height:15px;margin:0}
+.aa-pessoa:focus-within{outline:2px solid var(--foco);outline-offset:-2px}
+.aa-nome{font-weight:600;color:var(--tinta)}
+.aa-det{font-size:12px;color:var(--mudo)}
+.aa-vazio{margin:0;padding:10px 12px}
+.aa-aviso{display:block;margin-top:3px;font-size:12px;color:var(--alerta)}
+.aa-por textarea.gc-campo{width:100%;box-sizing:border-box;resize:vertical;font-family:var(--font-sans)}
+.aa-por>.gc-btn{align-self:flex-start}
+@media (max-width:560px){.aa-por>.gc-btn{align-self:stretch;justify-content:center}}
 /* Base > Integração Fracttal (12/10/2026): equipe e setor numa linha só */
 .fr-tabela td.fr-curta{white-space:nowrap}
 .fr-tabela td{vertical-align:middle}

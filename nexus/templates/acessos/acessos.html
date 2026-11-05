@@ -9,16 +9,18 @@
 <div class="cad-topo">
   <div>
     <h1 class="titulo-pagina">Acessos</h1>
-    {% if aba != 'pessoas' %}<p class="cad-sub">O que cada setor vê no Nexus, quem é administrador e quem entrou nos últimos 30 dias.</p>{% endif %}
+    {% if aba == 'telas' %}<p class="cad-sub">O que cada setor vê no Nexus, quem é administrador e quem entrou nos últimos 30 dias.</p>{% endif %}
   </div>
 </div>
 {# as abas (25/10/2026, Levi: "gostaria que não tivesse uma tela só para integração fractall e sim fosse para acessos"):
-   a antiga tela Base > Integração Fracttal é a aba Pessoas e setores; só ela lê o Fracttal #}
+   a antiga tela Base > Integração Fracttal é a aba Pessoas e setores; só ela lê o Fracttal. A dos administradores do
+   App de Campo (05/11/2026: "os administradores do App de Campo [...] têm de ser escolhidos no Nexus") é a terceira #}
 <nav class="gc-subabas" aria-label="Acessos">
-  <a href="{{ url_for('torre_base.acessos') }}"{% if aba != 'pessoas' %} aria-current="page"{% endif %}>Telas e administradores</a>
+  <a href="{{ url_for('torre_base.acessos') }}"{% if aba == 'telas' %} aria-current="page"{% endif %}>Telas e administradores</a>
   <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}"{% if aba == 'pessoas' %} aria-current="page"{% endif %}>Pessoas e setores</a>
+  <a href="{{ url_for('torre_base.acessos', aba='admins_app') }}"{% if aba == 'admins_app' %} aria-current="page"{% endif %}>Administradores do App de Campo</a>
 </nav>
-{% if aba == 'pessoas' %}{% include "acessos/_pessoas.html" %}{% else %}
+{% if aba == 'pessoas' %}{% include "acessos/_pessoas.html" %}{% elif aba == 'admins_app' %}{% include "acessos/_admins_app.html" %}{% else %}
 
 {% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Gravado.</strong> {{ aviso }}</div></div>{% endif %}
 {% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}

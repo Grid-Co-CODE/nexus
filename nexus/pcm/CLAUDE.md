@@ -61,7 +61,8 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `relatorio_exec/` | **o Relatório executivo do PCM** na Central de emissão (14/10/2026): Interno Grid, Cliente e Abertura da Semana, CÓPIA do `js/relatorio_exec.js` do painel (hash conferido no teste), com o gestao_pcm.json, o banco_dados.json e o confiabilidade.json servidos ao lado e a Gerencial aberta pelo servidor (`NEXUS_PCM_MPAS_SENHA`, o "MPA/MPS atrasadas"); na estrutura de toda a Central (os tipos no bloco "Relatório Gerencial PCM", o período e o escopo na coluna, a folha à direita); regras e como atualizar no `relatorio_exec/CLAUDE.md` |
 | `acompanhamento/` | **o Acompanhamento do PCM** (14/10/2026, PCM → Acompanhamento PCM): as cinco abas do painel de acompanhamento do PCM O&M (MPA, MPS, Radar de Backlog, Mapa e One Page) com as estruturas de lá e o desenho do Nexus, montadas com as fontes que o Nexus já usa (Gestão PCM, banco_dados, Gerencial, cadastro) e a curadoria da reunião de PCM no livro `nexus_pcm_curadoria` (cifrado); a coordenada da usina não sai do servidor; regras e prova no `acompanhamento/CLAUDE.md` |
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
-| `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
+| `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App); toda gravação leva as duas abas do livro (a dos técnicos e, desde 05/11/2026, a dos administradores do App) |
+| `admins_app.py` | **os administradores do App de Campo** (05/11/2026, seção Técnicos por usina abaixo): a aba `fato_admin_app` do mesmo livro, escolhidos em Base → Acessos (a aba da tela mora na casca: `nexus/auth/telas_admins_app.py`) |
 | `responsaveis.py` | **o Responsável UFV no livro** (30/10/2026, fase 3 dos técnicos por usina): de hora em hora, o `responsavel_om_id` da ficha de cada usina vai ao `nexus_pcm_atribuicoes` no papel `responsavel`, para o App mandar e assinar a PT |
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, o nome da usina que vai ao App (`_fracttal`), a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe, a reemissão (de uma usina e o Reenviar tudo) e a comparação com a foto do App |
 | `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; `revisao.py` é a aba Inventário (a lista, a contagem aberta com o Sistema × Contado × Δ e a revisão do PCM), com as rotas em `__init__.py`; `gravacao.py` grava o lote aprovado no Fracttal em segundo plano, por sessão de ajuste; `regua.py` é a régua de mínimo e máximo e `curadoria.py` o fora do catálogo (com `fotos_app.py`, a rota assinada que recebe as fotos do App); a auditoria é o `revisao.montar_auditoria`; `ponte_os.py` é a ponte com o login do Fracttal (as rotas de `/os/_nexus/inventario`, a ÚNICA porta de tudo o que lê ou grava no Fracttal: o lote, gravar, continuar, encerrar, a régua acordada, cadastrar a peça); o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo |
@@ -399,6 +400,20 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   sempre (`tecnicos_usina._reemissoes`, a mesma conta do de uma usina: só as que mudaram, só usina do cadastro, e sem o
   nome ou o código de hoje vai o gravado). O `esperado` do formulário é a conta confirmada: se a de agora for outra
   (alguém mudou a lista no meio), nada grava e a tela diz "A conta mudou desde que a tela abriu".
+- **Os administradores do App de Campo** (`admins_app.py`, 05/11/2026; Levi: "os administradores do App de Campo e os
+  técnicos por usina têm de ser escolhidos no Nexus"): a aba `fato_admin_app` deste livro (catálogo:
+  `decisao_admin_app`), escolhidos em Base → Acessos → Administradores do App de Campo (a aba e as regras da tela:
+  `nexus/casca/CLAUDE.md`, seção Acessos). 1 linha = 1 decisão de pôr ou tirar 1 pessoa (`ativo` sim ou nao, papel
+  `admin`, origem `tela`); só acrescenta; vale a última de cada (`pessoa_hmac`, `papel`) pela `decidida_em` (empate: a
+  de depois no livro), com as datas cobrindo hoje no dia de Brasília. A conta é pelo código, não pelo `pessoa_id`: é por
+  ele que o App acha a pessoa. Assinada com o rótulo `nexus:pcm:admins-app` (texto
+  `admin_app|pessoa_hmac|papel|ativo|de_data_id|ate_data_id|decidida_em`), o vetor nos dois lados. Sem código, sem a
+  `NEXUS_PESSOA_HMAC` ou com a leitura que falha, nada grava. **Toda gravação do livro leva as duas abas**
+  (`atribuicoes._gravar_cru` relê a outra sob a mesma `_TRAVA`; a que não se relê não grava) e o catálogo declara as
+  duas em `so_cresce`: uma gravação sem uma delas é recusada. **Nexus antigo apaga a aba:** um Nexus sem este código (o
+  da 5070 desatualizado, com o laço do Responsável UFV ligado) grava só a dos técnicos e o catálogo dele não conhece a
+  outra; atualize as máquinas antes do 1º administrador. O contrato:
+  `C:\GridcoBuild\app-campo-docs\_propostas\admins-app-nexus\LEIA.md`.
 - **O App: A1–A3 no ar na v283 (17/10/2026). `NEXUS_ATRIBUICOES=ligado` desde 29/10/2026 20:31Z: a regra é o Nexus.**
   - **A decisão do Levi:** "o app de gestão não vai mandar mais nada para o app de campo, pelo menos no quesito de
     técnicos".
@@ -427,7 +442,7 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
     o responsável também passa a assinar a PT da usina.
   - **Quem entra:** o Nexus põe sozinho, de hora em hora (origem `cadastro`), o `responsavel_om_id` da ficha de cada
     usina não excluída. A linha leva o nome do Fracttal escolhido (o do `_fracttal`, o mesmo do `executa`) e o código
-    do e-mail, pela conta do e-mail semanal da Segurança (`responsaveis.codigos`): o
+    do e-mail, pela conta do e-mail semanal da Segurança (`responsaveis.codigos`, a mesma dos administradores do App): o
     código da pessoa ligada ao usuário do Fracttal (Pessoas e setores) e, sem ele, o do e-mail da ficha.
   - **Quem sai:** o responsável que a ficha trocou, ou que ficou sem. Sem código ou sem nome no Fracttal, ninguém entra,
     e a mesma pessoa que já estava fica.
@@ -443,9 +458,10 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
 - **Provar:** `tests/test_pcm_atribuicoes.py` (o livro: vigência, dia de Brasília, mesma decisão, assinatura),
   `tests/test_pcm_tecnicos_usina.py` (a visão: regra da equipe, evidência, avisos, cascata, foto do App, o nome que vai
   ao App e o Reenviar tudo; o relógio da gravação dublado em 17/10/2026, o mesmo `HOJE` da tela: com o dia de verdade, o
-  apoio "até 31/10" virou passado em 01/11 e a regra o recusou) e
-  `tests/test_pcm_tecnicos_tela.py` (quem vê e edita, carga inicial, reenviar de uma usina e tudo, tirar, banco fora);
-  11 mutações, todas pegas (17/10). A tela: a cópia de prova com dados
+  apoio "até 31/10" virou passado em 01/11 e a regra o recusou),
+  `tests/test_pcm_tecnicos_tela.py` (quem vê e edita, carga inicial, reenviar de uma usina e tudo, tirar, banco fora) e
+  `tests/test_pcm_admins_app.py` (os administradores do App: o vetor, o vigente, as duas abas juntas no arquivo e no
+  banco de mentira, a trava do catálogo, o radar); 11 mutações, todas pegas (17/10). A tela: a cópia de prova com dados
   de mentira (banco dos testes, livro num arquivo, rede só para 127.0.0.1; 1366 e 375 px, escuro e claro).
 
 ## O menu da torre PCM (`nexus/torres/pcm/__init__.py`)

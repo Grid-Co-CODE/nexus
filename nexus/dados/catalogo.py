@@ -816,6 +816,27 @@ FATOS = (
                     "(05/11/2026) nunca é o \"(sem Classificação …)\" quando a usina tem outro nome no de-para; entre os de "
                     "verdade, o que o App já usa (a foto organizacao_app_campo · Atribuicoes) e, sem ele, o 1º em ordem "
                     "alfabética"),
+    # Os administradores do App de Campo (05/11/2026, Levi: "os administradores do App de Campo e os técnicos por usina
+    # têm de ser escolhidos no Nexus"): o Nexus é a FONTE; a aba mora no livro dos técnicos por usina, que o App já lê
+    # (o contrato de lá). Registrado antes da 1ª gravação.
+    Fato("decisao_admin_app", "Administradores do App de Campo", "base", "nexus_pcm_atribuicoes · fato_admin_app",
+         "1 linha = 1 decisão de pôr ou tirar 1 pessoa como administrador do App de Campo (ativo sim ou nao); vale a "
+         "última decisão de cada código da pessoa e papel",
+         _d(data=("id", "data_id (o dia de Brasília da decisão; de_data_id e ate_data_id, o período, vazios = sem "
+                        "prazo)"),
+            pessoa=("id", "pessoa_id + pessoa_hmac (o código do e-mail, por onde o App acha a pessoa) e "
+                          "decidida_por_hmac (quem decidiu)")),
+         tipo="sem_medida", chave=("decidida_em", "pessoa_hmac", "papel"),
+         fontes=("nexus_pcm_atribuicoes · fato_admin_app",),
+         janela_origem="o Nexus é a fonte (só acrescenta: o que vale é a última decisão de cada código e papel)",
+         observacao="admin = quem administra o App de Campo; escolhido em Base → Acessos → Administradores do App de "
+                    "Campo, só por administrador do Nexus (nexus/pcm/admins_app.py). O vigente é pelo código "
+                    "(pessoa_hmac), não pelo pessoa_id: é por ele que o App acha a pessoa, e tirar leva o código da "
+                    "linha que pôs. Pessoa sem código (sem e-mail na ficha nem usuário do Fracttal ligado) não entra. "
+                    "Cada linha vai assinada (assinatura, HMAC com a chave derivada da NEXUS_PESSOA_HMAC, rótulo "
+                    "nexus:pcm:admins-app): o App lê de 5 em 5 min e só aplica a linha assinada; com a lista vazia ele "
+                    "não tira ninguém. A observação vai só cifrada (dados_cifrados, regra 8). As duas abas do livro vão "
+                    "juntas a cada gravação (gravar sem uma a apagaria)"),
     # o almoxarifado (25/10/2026, Levi: "No fractall temos almoxarifado, gostaria de uma visão para a gestão desse
     # almoxarifado na parte de PCM"): a varredura diária do inventário do Fracttal, que o App faz e publica; o livro do
     # App guarda só o último ciclo, e o histórico é o do Nexus (`fato_almoxarifado.py`). O item do inventário segue o
@@ -1691,11 +1712,17 @@ LIVROS = (
           "duas vezes: dados_5080 (selado para a pública do Dashboard Thopen, que lê a cada 2 min) e dados_nexus "
           "(Cofre, a chave do cadastro); o link de definir senha só como sha256; quem mudou só como HMAC",
           so_cresce=True),
-    # os técnicos por usina (17/10/2026): o PCM põe e tira técnicos de cada usina; o App de Campo lê o executa daqui
-    Livro("nexus_pcm_atribuicoes", ("fato_decisao_atribuicao",), "a cada decisão na tela Técnicos por usina",
-          "nexus/pcm/atribuicoes.py, pela tela Técnicos por usina do PCM", True,
+    # os técnicos por usina (17/10/2026): o PCM põe e tira técnicos de cada usina; o App de Campo lê o executa daqui. E,
+    # desde 05/11/2026, os administradores do App de Campo (a aba fato_admin_app), escolhidos em Base → Acessos
+    Livro("nexus_pcm_atribuicoes", ("fato_decisao_atribuicao", "fato_admin_app"),
+          "a cada decisão na tela Técnicos por usina e na aba Administradores do App de Campo (Base → Acessos); o "
+          "Responsável UFV de hora em hora",
+          "nexus/pcm/atribuicoes.py (pela tela Técnicos por usina do PCM e pelo laço do Responsável UFV) e "
+          "nexus/pcm/admins_app.py (pela aba Administradores do App de Campo de Base → Acessos)", True,
           "registrado em 17/10/2026 antes de existir; no banco (GET em 27/10/2026: 287 decisões): nasce com a 1ª decisão ou com a carga inicial (a regra da equipe "
-          "do cadastro). A tela lê com cache de 1 minuto e a gravação relê o banco antes (troca o livro inteiro)",
+          "do cadastro). A tela lê com cache de 1 minuto e a gravação relê o banco antes (troca o livro inteiro). A aba "
+          "fato_admin_app foi registrada em 05/11/2026 antes da 1ª gravação; desde então toda gravação leva as duas "
+          "abas (gravar uma sem a outra a apagaria), e a trava do livro que só cresce recusa a que vier sem uma delas",
           so_cresce=True),
     # as decisões da Segurança sobre os extintores (24/10/2026): a exclusão de extintor (o não reconhecido aceito e o
     # botão direito) e o pedido de nova ronda por usina; o App de Campo lê os dois daqui
