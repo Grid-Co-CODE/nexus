@@ -401,7 +401,7 @@ tr.cn-fotos-linha td{background:var(--superficie-2);text-align:left;padding:12px
 .cn-fotos-grupo--vegetacao h3{color:var(--serie-vegetacao)}
 .cn-fotos-grade{display:flex;flex-wrap:wrap;gap:8px}
 .cn-foto{position:relative;display:block;width:96px;height:96px;border-radius:8px;overflow:hidden;border:1px solid var(--linha);
-  background:var(--superficie-3)}
+  background:var(--superficie-3);text-decoration:none}
 .cn-foto img{width:100%;height:100%;object-fit:cover;display:block}
 .cn-foto:hover,.cn-foto:focus{border-color:var(--verde-texto);outline:none}
 .cn-foto-resp{position:absolute;left:4px;bottom:4px;padding:1px 6px;border-radius:5px;font:700 11px var(--font-sans);
@@ -417,18 +417,14 @@ tr.cn-fotos-linha td{background:var(--superficie-2);text-align:left;padding:12px
   font:600 22px/1 var(--font-sans);width:44px;height:44px;cursor:pointer}
 .cn-caixa-foto button:hover{border-color:var(--foto-borda-hover)}
 .cn-caixa-fechar{position:absolute;top:16px;right:16px}
-.cn-fotos-demais{border-top:1px solid var(--linha);padding-top:10px}
-.cn-fotos-demais summary{cursor:pointer;font:700 13px var(--font-sans);color:var(--tinta);list-style-position:inside}
-.cn-fotos-demais summary:hover{color:var(--verde-texto)}
-.cn-fotos-tipos{margin-left:10px;font:500 12px var(--font-sans);color:var(--tinta-2)}
-.cn-fotos-demais[open] .cn-fotos-tipos{display:none}
-.cn-fotos-demais .cn-fotos-grupo{margin-top:12px}
-.cn-fotos-grupo h4{margin:0 0 8px;font:600 12.5px var(--font-sans);color:var(--tinta-2)}
-.cn-foto--legenda{height:116px}
+/* as demais fotos, abertas por tipo (05/11/2026); com legenda, o cartão é a foto mais a legenda, e a etiqueta da
+   resposta fica dentro da foto (`cn-foto-img`): presa ao fim do cartão, ela caía em cima da legenda */
+.cn-foto--legenda{height:auto}
+.cn-foto-img{position:relative;display:block}
 .cn-foto--legenda img{height:96px}
 .cn-foto-rotulo{display:block;height:20px;padding:2px 4px;font:600 10.5px/16px var(--font-sans);color:var(--tinta-2);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--superficie-2)}
-.cn-foto--legenda .cn-foto-resp{bottom:24px}
+.cn-foto--legenda .cn-foto-resp{bottom:4px}
 
 /* Ronda avulsa (07/10/2026): o selo diz que foi lançada à mão; o title explica no mouse, o foco do teclado também */
 .cn-avulsa{display:inline-block;font:700 10.5px/14px var(--font-sans);padding:2px 9px;border-radius:999px;cursor:help;
@@ -1681,6 +1677,9 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .rg-fotos{margin-top:16px}
 .rg-fotos .cn-fotos-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
 .rg-fotos .cn-foto{width:auto;height:auto;aspect-ratio:1}
+/* com legenda, a foto é que fica quadrada, e o cartão cresce com a legenda embaixo */
+.rg-fotos .cn-foto--legenda{aspect-ratio:auto}
+.rg-fotos .cn-foto--legenda img{height:auto;aspect-ratio:1}
 .rg-vazio{color:var(--mudo)}
 @media (max-width:900px){.rd-gaveta{width:100vw;min-width:0}}
 @media (max-width:480px){.rg-grade{grid-template-columns:repeat(2,minmax(0,1fr))}.rg-check{grid-template-columns:repeat(2,minmax(0,1fr))}}

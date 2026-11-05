@@ -782,7 +782,15 @@ def test_fotos_da_ronda_separam_sujidade_e_vegetacao(banco, logado, monkeypatch)
         assert tipos == {"vala": ["Vala"], "capa": ["Capa"]}                    # as demais, por tipo, com o nome curto
         html = logado.get("/t/campo/rondas/os/500/fotos").get_data(as_text=True)
         assert "Sujidade dos módulos" in html and "Vegetação" in html and "s3/" not in html
-        assert '<details class="cn-fotos-demais">' in html and "Vala de drenagem" in html     # recolhido, por tipo
+        # as demais, por tipo e já abertas (05/11/2026, Levi: "Ao clicar na ronda tire esse 'demais fotos' quero tudo
+        # expandido"): sem o recolhido, cada tipo com o título no mesmo nível de Sujidade e Vegetação
+        assert "cn-fotos-demais" not in html and "Demais fotos" not in html and "<details" not in html
+        assert '<h3>Vala de drenagem <span class="mudo">1</span></h3>' in html
+        # a etiqueta da resposta fica dentro da foto, e a legenda embaixo dela, sem se cobrirem ("O texto não está
+        # encaixando onde deveria encaixar, conserte!")
+        vala = html.split("Vala de drenagem", 1)[1]
+        cartao = vala[vala.index('<a class="cn-foto cn-foto--legenda"'):vala.index("</a>")]
+        assert cartao.index('<span class="cn-foto-img"><img') < cartao.index('<span class="cn-foto-resp">parcial</span>')             < cartao.index("</span>", cartao.index("cn-foto-resp")) < cartao.index('<span class="cn-foto-rotulo">Vala</span>')
         r = logado.get("/t/campo/rondas/os/500/foto/1")
         assert r.mimetype == "image/jpeg" and r.data == b"IMG:https://s3/b.jpg?x=1"
         assert logado.get("/t/campo/rondas/os/500/foto/9").status_code == 404

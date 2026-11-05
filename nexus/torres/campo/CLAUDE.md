@@ -464,9 +464,14 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     duas páginas incluem; ronda sem OS ou avulsa fica sem botão, com o porquê no `title`; medido em 08/10: 288 botões
     nas 300 linhas de 30 dias): o botão Fotos de cada ronda com OS carrega os anexos da OS no
     Fracttal (1 pedido por OS, guardado 20 min; o link assinado fica no servidor e o Nexus entrega a imagem). Separação
-    pela descrição que o App escreve ("Sujidade dos módulos — 4", "Altura da vegetação — 5"); as demais vêm recolhidas
-    e, abertas, por tipo (sensores, vala, infraestrutura, pragas/dejeto/trincado, zonas, capa), com o nome curto do
-    item na miniatura ("deixe recolhido, quando expandir quero que mostre por tipo, o que é piranômetro e etc"). A 1ª
+    pela descrição que o App escreve ("Sujidade dos módulos — 4", "Altura da vegetação — 5"); as demais vêm **abertas,
+    por tipo** (sensores, vala, infraestrutura, pragas/dejeto/trincado, zonas, capa), cada tipo com o título no nível
+    de Sujidade e Vegetação e o nome curto do item embaixo da miniatura. Eram um "Demais fotos da ronda" recolhido (06/10:
+    "deixe recolhido, quando expandir quero que mostre por tipo"); desde 05/11/2026, abertas ("Ao clicar na ronda tire
+    esse 'demais fotos' quero tudo expandido"). A etiqueta da resposta ("limpo") mora na própria foto (`cn-foto-img`) e a
+    legenda fica embaixo: presa a 24 px do fim do cartão, ela caía em cima da legenda quando a barra lateral esticava o
+    cartão para quadrado ("O texto não está encaixando onde deveria encaixar, conserte!"); na barra, a foto é que fica
+    quadrada e o cartão cresce com a legenda (`tests/test_campo_ronda_fotos_0511.py`). A 1ª
     foto o App descreve como a capa da ronda. Miniatura de 240 px pelo Pillow (medido em 06/10: 7 a 14 kB contra 182 a
     690 kB a foto inteira), feitas em paralelo assim que a grade é pedida; a mesma foto pedida duas vezes baixa uma vez
     (a chave de "em andamento" leva a cache: com a mesma chave a miniatura esperava por si mesma 60 s). Clicar amplia,

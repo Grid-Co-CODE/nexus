@@ -1,13 +1,18 @@
-{# As fotos de uma OS de ronda, separadas em sujidade, vegetação e as demais (Levi, 06/10/2026). Pedaço carregado pelo
-   botão Fotos do histórico da usina e da aba Registros; a miniatura abre ampliada (a caixa e o script ficam no
-   _ronda_fotos_caixa.html, que as duas páginas incluem). #}
+{# As fotos de uma OS de ronda, separadas em sujidade, vegetação e as demais por tipo (Levi, 06/10/2026). Pedaço
+   carregado pela barra lateral da ronda, pelo botão Fotos do histórico da usina e pela aba Registros; a miniatura abre
+   ampliada (a caixa e o script ficam no _ronda_fotos_caixa.html). As demais eram um "Demais fotos da ronda" recolhido;
+   desde 05/11/2026 vêm abertas, cada tipo com o título no mesmo nível de Sujidade e Vegetação (Levi: "Ao clicar na ronda
+   tire esse 'demais fotos' quero tudo expandido"). #}
 {% if erro %}<p class="cn-fotos-msg cn-t-alerta" data-erro="1">{{ erro }} <button type="button" class="cn-bt-tentar">Tentar de novo</button><span class="mudo cn-fotos-conta"></span></p>
 {% elif not total %}<p class="cn-fotos-msg mudo">A OS {{ os_ }} não tem fotos anexadas no Fracttal.</p>
 {% else %}
 {% macro miniatura(f, legenda=false) %}
+      {# com legenda, a etiqueta da resposta mora na própria foto (`cn-foto-img`) e a legenda fica embaixo: presa ao fim
+         do cartão, a etiqueta caía em cima da legenda quando a barra lateral esticava o cartão (05/11/2026: "O texto não
+         está encaixando onde deveria encaixar, conserte!") #}
       <a class="cn-foto{% if legenda %} cn-foto--legenda{% endif %}" href="{{ url_for('torre_campo.ronda_foto', os_=os_, i=f.i, v=f.v) }}" data-legenda="{{ f.desc }}" title="{{ f.desc }}">
-        <img src="{{ url_for('torre_campo.ronda_foto', os_=os_, i=f.i, mini=1, v=f.v) }}" alt="{{ f.desc }}" loading="lazy" width="96" height="96">
-        {% if f.resposta %}<span class="cn-foto-resp">{{ f.resposta }}</span>{% endif %}
+        {% if legenda %}<span class="cn-foto-img">{% endif %}<img src="{{ url_for('torre_campo.ronda_foto', os_=os_, i=f.i, mini=1, v=f.v) }}" alt="{{ f.desc }}" loading="lazy" width="96" height="96">
+        {% if f.resposta %}<span class="cn-foto-resp">{{ f.resposta }}</span>{% endif %}{% if legenda %}</span>{% endif %}
         {% if legenda %}<span class="cn-foto-rotulo">{{ f.rotulo }}</span>{% endif %}
       </a>{% endmacro %}
 <div class="cn-fotos" data-os="{{ os_ }}">
@@ -18,19 +23,11 @@
   </section>
   {% endfor %}
   {% if not grupos[0].fotos and not grupos[1].fotos %}<p class="cn-fotos-msg mudo">Nenhuma foto de sujidade ou de vegetação nesta OS.</p>{% endif %}
-  {% set demais = grupos[2] %}
-  {% if demais.fotos %}
-  {# recolhido; aberto, por tipo (Levi, 06/10). A foto dentro do recolhido só carrega quando abre (loading=lazy) #}
-  <details class="cn-fotos-demais">
-    <summary>Demais fotos da ronda <span class="mudo">{{ demais.fotos|length }}</span>
-      <span class="cn-fotos-tipos">{% for tp in demais.tipos if tp.fotos %}{{ tp.titulo.split(':')[0] }} {{ tp.fotos|length }}{% if not loop.last %} · {% endif %}{% endfor %}</span></summary>
-    {% for tp in demais.tipos if tp.fotos %}
-    <section class="cn-fotos-grupo cn-fotos-grupo--tipo">
-      <h4>{{ tp.titulo }} <span class="mudo">{{ tp.fotos|length }}</span></h4>
-      <div class="cn-fotos-grade">{% for f in tp.fotos %}{{ miniatura(f, true) }}{% endfor %}</div>
-    </section>
-    {% endfor %}
-  </details>
-  {% endif %}
+  {% for tp in grupos[2].tipos if tp.fotos %}
+  <section class="cn-fotos-grupo cn-fotos-grupo--tipo">
+    <h3>{{ tp.titulo }} <span class="mudo">{{ tp.fotos|length }}</span></h3>
+    <div class="cn-fotos-grade">{% for f in tp.fotos %}{{ miniatura(f, true) }}{% endfor %}</div>
+  </section>
+  {% endfor %}
 </div>
 {% endif %}

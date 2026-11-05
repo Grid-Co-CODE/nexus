@@ -38,7 +38,8 @@ GRUPOS = (("sujidade", "Sujidade dos módulos", ("sujidade dos modulos",)),
           ("vegetacao", "Vegetação", ("altura da vegetacao", "sombreamento por vegetacao")),
           ("outras", "Demais fotos da ronda", ()))
 # as demais, por tipo (Levi, 06/10: "deixe recolhido, quando expandir quero que mostre por tipo, o que é piranômetro e
-# etc"), pelo começo da descrição que o App escreve (o rótulo do item do checklist)
+# etc"; desde 05/11 abertas: "tire esse 'demais fotos' quero tudo expandido"), pelo começo da descrição que o App escreve
+# (o rótulo do item do checklist)
 TIPOS = (("sensores", "Sensores: piranômetros e albedômetro", ("piranometro", "albedometro")),
          ("vala", "Vala de drenagem", ("sujidade da vala",)),
          ("infra", "Infraestrutura: sala, almoxarifado, banheiro, portaria, placas, computador, CFTV e luvas",
