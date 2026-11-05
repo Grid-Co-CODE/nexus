@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block titulo %}Paleta Nexus{% endblock %}
+{% block conteudo %}
+{# A Paleta Nexus (04/11/2026, só administradores): o escuro ao lado do claro, lidos do nexus.css a cada abertura
+   (casca/paleta_tokens.py). As cores das amostras vêm do próprio CSS como valor de estilo: a página mostra os tokens, não os usa. #}
+{% macro mini(t, barra, nome) %}
+<div class="pal-mini" style="background:{{ t['fundo'] }};border-color:{{ t['linha-forte'] }}">
+  <div class="pal-mini-topo" style="background:{{ barra }}">Grid Co. <span>Nexus</span></div>
+  <div class="pal-mini-corpo">
+    <p class="pal-mini-olho" style="color:{{ t['verde-texto'] }}">SETOR PERFORMANCE</p>
+    <h3 style="color:{{ t['tinta'] }}">Início · {{ nome }}</h3>
+    <div class="pal-mini-cartoes">
+      {% for titulo, n, desc in [('Comando', '3 de 7 prontas', 'Sala de comando, fila única de ações e o que pede decisão.'), ('COS', '9 de 11 prontas', 'Mesa do operador: ver, informar o cliente e acionar o campo.')] %}
+      <div class="pal-mini-cartao" style="background:{{ t['superficie'] }};border-color:{{ t['linha'] }}">
+        <div class="pal-mini-cab"><b style="color:{{ t['tinta'] }}">{{ titulo }}</b><span style="color:{{ t['mudo'] }}">{{ n }}</span></div>
+        <p style="color:{{ t['tinta-2'] }}">{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="pal-mini-pills">
+      {% for cor, suave, txt in [('ok', 'ok-suave', 'No prazo'), ('alerta', 'alerta-suave', 'Vence hoje'), ('critico', 'critico-suave', 'Atrasado 2 dias'), ('info', 'info-suave', 'Em andamento')] %}
+      <span style="color:{{ t[cor] }};background:{{ t[suave] }}"><i style="background:{{ t[cor] }}"></i>{{ txt }}</span>
+      {% endfor %}
+    </div>
+    <div class="pal-mini-botoes">
+      <span style="background:{{ t['verde'] }};color:{{ t['sobre-verde'] }}">Botão principal</span>
+      <span style="border-color:{{ t['linha-forte'] }};color:{{ t['tinta'] }}">Contorno</span>
+      <span style="color:{{ t['verde-texto'] }}">Link verde</span>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+{% macro celula(x) %}
+<td class="pal-cel" style="background:{{ x.fundo }}">
+  <span class="pal-chip" style="background:{{ x.valor }}"></span>
+  <code style="color:{{ x.tinta }}">{{ x.valor }}</code>
+  {% if x.cr %}<span class="cn-pill cn-{{ 'critico' if x.ruim else 'ok' }} pal-cr">{{ x.cr|string|replace('.', ',') }}:1</span>{% endif %}
+</td>
+{% endmacro %}
+<div class="pal">
+  <p class="gc-eyebrow">Administradores</p>
+  <h1 class="pal-titulo">Paleta Nexus</h1>
+  <p class="mudo pal-sub">O tema escuro ao lado do claro, token a token, lidos do nexus.css que está no ar. Nas cores de texto, o contraste com o cartão (mínimo 4,5:1).</p>
+  <div class="pal-lado">{{ mini(escuro, escuro['barra'], 'escuro') }}{{ mini(claro, escuro['barra'], 'claro') }}</div>
+  {% for g in grupos %}
+  {% if g.fechado %}<details class="pal-resto"><summary>{{ g.titulo }}</summary>{% else %}<h2 class="pal-h2">{{ g.titulo }}</h2>{% if g.sub %}<p class="mudo pal-sub">{{ g.sub }}</p>{% endif %}{% endif %}
+  <table class="pal-tab">
+    <thead><tr><th>Token</th><th>Escuro</th><th>Claro</th></tr></thead>
+    <tbody>{% for l in g.linhas %}
+      <tr><th><code>--{{ l.nome }}</code>{% if l.igual %}<span class="mudo pal-igual">igual nos dois</span>{% endif %}</th>{{ celula(l.esc) }}{{ celula(l.cla) }}</tr>
+    {% endfor %}</tbody>
+  </table>
+  {% if g.fechado %}</details>{% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

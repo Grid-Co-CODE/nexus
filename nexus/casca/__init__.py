@@ -278,6 +278,17 @@ def tema():
     return resp
 
 
+@bp.route("/paleta")
+def paleta():
+    """A Paleta Nexus (04/11/2026): o escuro ao lado do claro, token a token. Só administradores (Levi: "ao clicar no
+    nome da pessoa aparecer 'paleta nexus' só para os administradores")."""
+    if not session.get("admin"):
+        abort(403)
+    from . import paleta_tokens as PA
+    escuro, claro, grupos = PA.grupos()
+    return render_template("paleta.html", escuro=escuro, claro=claro, grupos=grupos)
+
+
 @bp.route("/saude")
 def saude():
     # Público de propósito (monitoramento do servidor). Não diz nada além de "está de pé" e o commit.

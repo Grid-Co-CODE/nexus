@@ -79,9 +79,12 @@
   --papel-crit-suave:#fde2e2; --papel-alerta-suave:#fdf0d5; --papel-ok-suave:#e3f6ea;
 }
 :root[data-tema="claro"]{
-  /* superfícies e texto (o mudo e o fraco escurecidos até 4,5:1 também no #eceef2 de uma linha em hover) */
-  --fundo:#fcfcfc; --superficie:#ffffff; --superficie-2:#f5f6f8; --superficie-3:#eceef2;
-  --barra:#eef2f7; --tinta:#1f2937; --tinta-2:#475569; --mudo:#5a6475; --fraco:#606978;
+  /* superfícies e texto. O cartão é um cinza claro sobre o fundo branco, o espelho do escuro (fundo escuro, cartão mais
+     claro); Levi, 04/11/2026: "o fundo claro podemos ter o fundo claro e os cards um pouco mais escuros, indico um cinza
+     claro só para fazer contraste"; e, na prévia, "um cinza um pouco mais escuro". O mudo e o fraco escurecidos até
+     4,5:1 ou mais no #dde2e9, o tom mais fundo dentro do cartão. */
+  --fundo:#ffffff; --superficie:#e9ecf1; --superficie-2:#e3e7ed; --superficie-3:#dde2e9;
+  --barra:#eef2f7; --tinta:#1f2937; --tinta-2:#475569; --mudo:#525c6b; --fraco:#545e6e;
   --linha:rgba(15,23,42,.10); --linha-forte:rgba(15,23,42,.18);
   /* verde Grid: o #a9db21 é superfície; o texto verde é o musgo #566610 (o #5e6f0e cai a 4,49:1 no verde-suave de uma
      linha em hover; o #566610 é o mesmo musgo um tom abaixo, 5,1:1 ou mais em todas as combinações) */
@@ -91,7 +94,7 @@
   --verde-a42:rgba(107,138,0,.5); --verde-a45:rgba(107,138,0,.5); --verde-a60:rgba(107,138,0,.7);
   --faixa-verde:#f6fbe9;
   /* semáforo: os fundos (a08 a a18) viram o suave do matiz, as bordas (a35 a a60) um contorno mais firme */
-  --ok:#166b36; --ok-suave:rgba(31,136,61,.12); --ok-a12:rgba(31,136,61,.12);
+  --ok:#14612f; --ok-suave:rgba(31,136,61,.12); --ok-a12:rgba(31,136,61,.12);
   --fogo-nasa:#c2185b;
   --alerta:#7a5200; --alerta-suave:rgba(230,175,46,.18);
   --alerta-a08:rgba(230,175,46,.12); --alerta-a10:rgba(230,175,46,.16); --alerta-a12:rgba(230,175,46,.16);
@@ -100,12 +103,12 @@
   --alerta-a55:rgba(176,124,0,.55); --alerta-a60:rgba(176,124,0,.6);
   --severo:#a33d00; --severo-suave:rgba(247,140,60,.16); --laranja:#a33d00; --laranja-a16:rgba(247,140,60,.16);
   --pulso-a71:rgba(247,140,60,.71); --pulso-a57:rgba(247,140,60,.57); --pulso-a43:rgba(247,140,60,.43); --pulso-a28:rgba(247,140,60,.28); --pulso-a14:rgba(247,140,60,.14);
-  --critico:#b42230; --critico-suave:rgba(220,53,69,.09);
+  --critico:#a81f2c; --critico-suave:rgba(220,53,69,.09);
   --critico-a12:rgba(220,53,69,.10); --critico-a18:rgba(220,53,69,.12); --critico-a30:rgba(220,53,69,.18);
   --critico-a35:rgba(220,53,69,.22); --critico-a45:rgba(180,34,48,.40); --agir-tinta:#8a1822;
   --erro:#b42230; --erro-cheio:#ef5d6e; --erro-a08:rgba(220,53,69,.07); --erro-a42:rgba(180,34,48,.38); --erro-a55:rgba(180,34,48,.5);
-  --info:#0a5fc4; --info-suave:rgba(9,105,218,.08); --info-a10:rgba(9,105,218,.07); --info-a42:rgba(10,95,196,.38);
-  --semcom:#7442d1; --semcom-suave:rgba(130,80,223,.08);
+  --info:#0954ad; --info-suave:rgba(9,105,218,.08); --info-a10:rgba(9,105,218,.07); --info-a42:rgba(10,95,196,.38);
+  --semcom:#673ab9; --semcom-suave:rgba(130,80,223,.08);
   --ok-cheio:#3dbb68; --lima-cheio:#a8e05f; --alerta-cheio:#f0b429; --severo-cheio:#f59342; --critico-cheio:#ef5d6e;
   --info-cheio:#5c9cf5; --sobre-cheio:#0b1220;
   --ouro:#e0ac2b; --prata:#b9c1cd; --bronze:#c47f45;
@@ -588,3 +591,40 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .sino-lida:hover,.sino-lida:focus-visible{color:var(--tinta);background:var(--superficie-2)}
 .sino-lidas{display:flex;justify-content:flex-end;margin:-8px 0 12px}
 @media (max-width:640px){.sino-caixa{position:fixed;left:16px;right:16px;top:64px;width:auto}}
+
+/* a Paleta Nexus (04/11/2026, só administradores; casca/paleta_tokens.py): as amostras levam a cor do token como valor de estilo */
+.pal{max-width:1180px}
+.pal-titulo{margin:2px 0 4px}
+.pal-sub{margin:0 0 12px;font-size:13px}
+.pal-h2{margin:30px 0 2px;font-size:17px;color:var(--tinta)}
+.pal-lado{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0 8px}
+.pal-mini{border:1px solid;border-radius:12px;overflow:hidden}
+.pal-mini-topo{color:var(--sobre-barra);padding:10px 14px;font-weight:700;font-size:14px}
+.pal-mini-topo span{color:var(--sobre-barra-mudo);font-weight:500}
+.pal-mini-corpo{padding:16px}
+.pal-mini-olho{margin:0;font-size:11px;letter-spacing:.14em;font-weight:700}
+.pal-mini-corpo h3{margin:2px 0 12px;font-size:22px}
+.pal-mini-cartoes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pal-mini-cartao{border:1px solid;border-radius:10px;padding:12px 14px}
+.pal-mini-cab{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.pal-mini-cab span{font-size:12px}
+.pal-mini-cartao p{margin:6px 0 0;font-size:12.5px;line-height:1.45}
+.pal-mini-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.pal-mini-pills span{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px}
+.pal-mini-pills i{width:6px;height:6px;border-radius:50%}
+.pal-mini-botoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:12.5px}
+.pal-mini-botoes span{padding:7px 14px;border-radius:8px;font-weight:600}
+.pal-mini-botoes span:nth-child(2){border:1px solid;font-weight:500}
+.pal-mini-botoes span:nth-child(3){padding:7px 4px}
+.pal-tab{width:100%;border-collapse:separate;border-spacing:0 4px;table-layout:fixed}
+.pal-tab thead th{text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mudo);padding:0 10px}
+.pal-tab tbody th{text-align:left;font-weight:500;padding:6px 10px;width:26%;vertical-align:middle;color:var(--tinta)}
+.pal-tab tbody th code{font-size:12.5px}
+.pal-igual{display:block;font-size:11px}
+.pal-cel{padding:8px 10px;border-radius:8px}
+.pal-cel code{font-size:12px;margin-left:10px;vertical-align:middle;word-break:break-all}
+.pal-chip{display:inline-block;width:44px;height:28px;border-radius:6px;vertical-align:middle;box-shadow:inset 0 0 0 1px var(--linha-forte)}
+.pal-cr{float:right;margin-top:3px}
+.pal-resto{margin-top:30px}
+.pal-resto summary{cursor:pointer;font-weight:600;color:var(--tinta)}
+@media (max-width:760px){.pal-lado{grid-template-columns:1fr}.pal-tab tbody th{width:34%}.pal-cel code{display:block;margin:4px 0 0}.pal-cr{float:none}}
