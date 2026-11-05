@@ -509,6 +509,13 @@ construindo algo nosso!". Então o Nexus **não lê o site nem o JSON dele**: l�
 | Contas | `nexus/engenharia/confiabilidade.py` | sinais dos 30 dias, nível, P90, criticidade, MTBF/MTTR/disponibilidade, indicadores |
 | Tela | `__init__.py` + `templates/engenharia/confiabilidade.html` + `nexus/static/engenharia.css` | abas Ativos e Indicadores |
 
+**Quem mais usa esta conta (04/11/2026):** a Gestão PCM (`nexus/pcm/gestao_confiab.py`, a Confiabilidade por ativo e o
+MTTR por equipe cluster) lê a MESMA cópia de 5 min (`_dados()`), sem calcular de novo. Para ela o `calcular` devolve
+também `porAtivo` (as OS de cada código, as mesmas que entraram na conta) e o `reparo_h` saiu do `metodo` (as horas de
+reparo de uma falha; o MTTR do ativo é a média delas): nada do que esta tela mostra mudou (os testes da Engenharia são
+os mesmos). Mudou a regra do MTTR ou o agrupamento por código? A Gestão PCM muda junto, e o
+`tests/test_pcm_gestao_confiab.py` confere que os números de lá são os daqui.
+
 ### A leitura (por que é leve)
 - O REST filtra pelo **tipo da tarefa** (`tasks_log_task_type_main`). Medido em 06/10: a conta tem 37.960 linhas de OS;
   os quatro tipos de falha somam 13.666 (Corretiva 6.189, Corretiva Emergencial 954, Religamento 4.789, Religamento
