@@ -235,6 +235,11 @@ def test_a_ligacao_do_fracttal_vence_o_email_de_outra_ficha_e_email_com_email_sa
     assert codigos == {11: _h(cfg, "t10@exemplo.test"), 14: _h(cfg, "t14@exemplo.test")}
     assert por_que[10] == R.DE_OUTRA and por_que[12] == por_que[13] == R.AMBIGUO and set(por_que) == {10, 12, 13}
     assert R.codigos(cfg, fichas) == codigos
+    # o código que cada ficha teria antes do desempate (05/11/2026): a aba dos administradores do App marca com o mesmo
+    # porquê quem chega com o código que saiu das fichas (a pessoa de Pessoas e setores sem ficha, o e-mail do avulso)
+    c = R.conta_dos_codigos(cfg, fichas)
+    assert (c["codigos"], c["por_que"]) == (codigos, por_que)
+    assert c["antes"][12] == c["antes"][13] == _h(cfg, "dupla@exemplo.test") and c["antes"][10] == _h(cfg, "t10@exemplo.test")
 
 
 def test_a_pessoa_recontratada_so_a_ficha_nova_fica_com_o_codigo(cfg, monkeypatch):

@@ -681,7 +681,8 @@ FATOS = (
          "última decisão de cada código da pessoa e papel",
          _d(data=("id", "data_id (o dia de Brasília da decisão; de_data_id e ate_data_id, o período, vazios = sem "
                         "prazo)"),
-            pessoa=("id", "pessoa_id + pessoa_hmac (o código do e-mail, por onde o App acha a pessoa) e "
+            pessoa=("id", "pessoa_id (vazio = sem ficha: a pessoa de Pessoas e setores sem ficha ou o avulso, posto "
+                          "pelo e-mail) + pessoa_hmac (o código do e-mail, por onde o App acha a pessoa) e "
                           "decidida_por_hmac (quem decidiu)")),
          tipo="sem_medida", chave=("decidida_em", "pessoa_hmac", "papel"),
          fontes=("nexus_acessos_app_campo · fato_admin_app",),
@@ -690,10 +691,14 @@ FATOS = (
                     "Campo, só por administrador do Nexus (nexus/pcm/admins_app.py). O vigente é pelo código "
                     "(pessoa_hmac), não pelo pessoa_id: é por ele que o App acha a pessoa, e tirar leva o código da "
                     "linha que pôs. Pessoa sem código (sem e-mail na ficha nem usuário do Fracttal ligado, ou com o "
-                    "código de duas fichas) não entra, nem o código que já vale na lista por outra ficha. Cada linha "
-                    "vai assinada (assinatura, HMAC com a chave derivada da NEXUS_PESSOA_HMAC, rótulo "
-                    "nexus:pcm:admins-app): o App lê de 5 em 5 min e só aplica a linha assinada; com a lista vazia ele "
-                    "não tira ninguém. A observação vai só cifrada (dados_cifrados, regra 8)"),
+                    "código de duas fichas) não entra, nem o código que já vale na lista por outra ficha. Sem ficha "
+                    "(05/11/2026: a maioria dos administradores do App é do escritório), o pessoa_id vai vazio: a "
+                    "pessoa de Pessoas e setores (o código da ligação de hoje ou, sem ligação, o do e-mail do "
+                    "Fracttal) ou o avulso, posto pelo e-mail digitado, só do domínio da Grid; a ligação à dimensão "
+                    "pessoa se conta na própria aba (os sem ficha entre os que valem). Cada linha vai assinada "
+                    "(assinatura, HMAC com a chave derivada da NEXUS_PESSOA_HMAC, rótulo nexus:pcm:admins-app): o App "
+                    "lê de 5 em 5 min e só aplica a linha assinada; com a lista vazia ele não tira ninguém. A "
+                    "observação e o e-mail do avulso vão só cifrados (dados_cifrados, regra 8)"),
     # o almoxarifado (25/10/2026, Levi: "No fractall temos almoxarifado, gostaria de uma visão para a gestão desse
     # almoxarifado na parte de PCM"): a varredura diária do inventário do Fracttal, que o App faz e publica; o livro do
     # App guarda só o último ciclo, e o histórico é o do Nexus (`fato_almoxarifado.py`). O item do inventário segue o

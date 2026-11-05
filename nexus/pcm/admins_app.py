@@ -16,8 +16,15 @@ código, não pelo `pessoa_id`, porque é pelo código que o App acha a pessoa: 
 ficha cujo e-mail mudou é outra linha. Em claro: os IDs, o código e quem decidiu (HMAC); a observação só cifrada (o App a
 ignora); cada linha assinada (HMAC com a chave derivada da NEXUS_PESSOA_HMAC, rótulo `nexus:pcm:admins-app`), e o App só
 aplica a assinada. Sem a NEXUS_PESSOA_HMAC nada se grava (a linha iria sem assinatura). Pessoa sem código não entra: o
-App não a reconheceria; e o código que já vale na lista por outra ficha também não (o usuário do Fracttal religado leva
-o código junto, e "a mesma decisão" esconderia a troca de pessoa).
+App não a reconheceria; e o código que já vale na lista por uma ficha também não vai por outra, nem sem ficha (o usuário
+do Fracttal religado leva o código junto, e "a mesma decisão" esconderia a troca de pessoa).
+
+**Sem ficha** (05/11/2026, Levi: "tem que aparecer todos do pessoas e setores! e tem que ter como fazer avulso também so
+digitando o e-mail"): quem é do escritório não tem ficha no cadastro, e a linha vai com o `pessoa_id` vazio. Dois casos:
+a pessoa de Pessoas e setores sem ficha (o nome vem de lá, pelo código) e o **avulso**, posto pelo e-mail digitado, que
+vai SÓ cifrado no `dados_cifrados` (com a observação; o Cofre amarrado à linha pelo código e pela hora) e só
+@gridco.com.br: o administrador do App entra pela conta Microsoft da Grid, e outro domínio nunca casaria. As 12 colunas e
+a assinatura não mudam (o App já ignora o `pessoa_id`).
 
 Gravar troca o livro inteiro, relido do banco antes (leitura que falha não grava; a listagem que não traz a aba do livro
 que existe também falha: `livros.abas_conferidas`), uma gravação por vez neste processo (`_TRAVA`, própria).
@@ -48,6 +55,9 @@ ROTULO_CHAVE = b"nexus:pcm:admins-app"
 # a frase da recusa (o pedido de 05/11/2026): a pessoa sem código não vira administrador, porque o App não a acharia
 SEM_CODIGO = ("sem e-mail na ficha nem usuário do Fracttal ligado: o App não a reconheceria; corrija o cadastro "
               "antes")
+# o avulso (05/11/2026): o administrador do App entra pela conta Microsoft da Grid, então só este domínio casa (decisão
+# do Levi); a pessoa de outro domínio não seria reconhecida, e a linha só faria barulho no /health do App
+DOMINIO_AVULSO = "gridco.com.br"
 _TRAVA = threading.Lock()
 _CACHE: dict = {}
 
@@ -169,13 +179,34 @@ def assinatura(linha: dict, chave_base: str) -> str:
     return hmac.new(chave, txt.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def _ctx(pessoa_id, quando: str) -> str:
-    return f"pcm/admins_app/{pessoa_id}/{quando}"
+def _ctx(pessoa_id, quando: str, pessoa_hmac: str = "") -> str:
+    """O contexto da cifra: amarra o `dados_cifrados` à linha (copiado para outra, não abre). Sem ficha (o avulso), o
+    código no lugar do ID: é ele que identifica a pessoa."""
+    if pessoa_id:
+        return f"pcm/admins_app/{pessoa_id}/{quando}"
+    return f"pcm/admins_app/codigo/{pessoa_hmac}/{quando}"
+
+
+def email_do_avulso(texto) -> str:
+    """O e-mail digitado no avulso: sem espaço nas pontas, minúsculas, o formato conferido (a régua da lista de
+    administradores do Nexus, `acessos.email_normal`) e só @gridco.com.br. `Recusada` com a frase para a tela."""
+    from ..auth import acessos as AC
+    if not str(texto or "").strip():
+        raise Recusada("Digite o e-mail da pessoa: nada foi gravado.")
+    try:
+        email = AC.email_normal(texto)
+    except AC.Recusado as ex:
+        raise Recusada("E-mail inválido: escreva o e-mail inteiro da pessoa (nome@gridco.com.br), sem espaço no meio. "
+                       "Nada foi gravado.") from ex
+    if email.rsplit("@", 1)[1] != DOMINIO_AVULSO:
+        raise Recusada(f"Só e-mail @{DOMINIO_AVULSO}: o administrador do App entra pela conta Microsoft da Grid, e um "
+                       "e-mail de outro domínio nunca casaria com ela. Nada foi gravado.")
+    return email
 
 
 def historico(cfg, est: dict) -> list[dict]:
     """As decisões, da mais nova à mais antiga: {quando, pessoa_id, pessoa_hmac, acao ("pôs" | "tirou"), de, ate,
-    origem, quem_hmac, obs}. A observação sai decifrada; sem a chave do cadastro, vazia."""
+    origem, quem_hmac, obs, email}. A observação e o e-mail do avulso saem decifrados; sem a chave do cadastro, vazios."""
     cofre = A._cofre(cfg)
     out = []
     # a mais nova primeiro; duas no mesmo segundo, a gravada depois primeiro (a ordem do livro desempata)
@@ -183,26 +214,32 @@ def historico(cfg, est: dict) -> list[dict]:
                    reverse=True)
     for _i, x in ordem:
         quando, pid = D._txt(x.get("decidida_em")), A._int_ou_none(x.get("pessoa_id"))
-        obs = ""
+        codigo = D._txt(x.get("pessoa_hmac"))
+        segredo = {}
         if cofre and D._txt(x.get("dados_cifrados")):
             try:
-                obs = D._txt(json.loads(cofre.decifrar(D._txt(x.get("dados_cifrados")), _ctx(pid, quando))).get("obs"))
-            except Exception:    # noqa: BLE001 — cifra de outra chave ou linha mexida: sem a observação
-                obs = ""
-        out.append({"quando": quando, "pessoa_id": pid, "pessoa_hmac": D._txt(x.get("pessoa_hmac")),
+                segredo = json.loads(cofre.decifrar(D._txt(x.get("dados_cifrados")), _ctx(pid, quando, codigo)))
+            except Exception:    # noqa: BLE001 — cifra de outra chave ou linha mexida: sem a observação nem o e-mail
+                segredo = {}
+            segredo = segredo if isinstance(segredo, dict) else {}
+        out.append({"quando": quando, "pessoa_id": pid, "pessoa_hmac": codigo,
                     "acao": "pôs" if A._sim(x.get("ativo")) else "tirou",
                     "de": A._int_ou_none(x.get("de_data_id")), "ate": A._int_ou_none(x.get("ate_data_id")),
-                    "origem": D._txt(x.get("origem")), "quem_hmac": D._txt(x.get("decidida_por_hmac")), "obs": obs})
+                    "origem": D._txt(x.get("origem")), "quem_hmac": D._txt(x.get("decidida_por_hmac")),
+                    "obs": D._txt(segredo.get("obs")), "email": D._txt(segredo.get("email"))})
     return out
 
 
 # ── gravar ────────────────────────────────────────────────────────────────────────────────────────────────────
 def decidir(cfg, *, pessoa_id, pessoa_hmac: str, ativo: bool, usuario: dict | None, obs: str = "", de: str = "",
-            ate: str = "", papel: str = "admin", origem: str = "tela") -> dict:
+            ate: str = "", papel: str = "admin", origem: str = "tela", email: str = "") -> dict:
     """Pôr (`ativo`) ou tirar uma pessoa dos administradores do App. {"gravou", "texto"}; `Recusada` com o motivo quando
-    não vale. Tirar: o `pessoa_hmac` da linha que pôs (o que vale hoje)."""
+    não vale. Tirar: o `pessoa_hmac` da linha que pôs (o que vale hoje). `pessoa_id` None = sem ficha (a pessoa de
+    Pessoas e setores sem ficha ou o avulso); `email` só no pôr do avulso: o código sai dele, e ele vai só cifrado."""
+    from ..campo.ligacao_cadastro import codigo_da_pessoa
     from .motivos import _quem
-    if not str(cfg.get("NEXUS_PESSOA_HMAC") or "").strip():
+    chave = str(cfg.get("NEXUS_PESSOA_HMAC") or "").strip()
+    if not chave:
         # sem a chave a linha iria sem assinatura e o App a descartaria: o Nexus diria uma coisa e o App faria outra
         raise Recusada("Este Nexus não tem a NEXUS_PESSOA_HMAC: a linha iria sem assinatura e o App não a aplicaria. "
                        "Nada foi gravado.")
@@ -212,10 +249,20 @@ def decidir(cfg, *, pessoa_id, pessoa_hmac: str, ativo: bool, usuario: dict | No
     if origem not in ORIGENS:
         raise Recusada(f"Origem que o Nexus não conhece: {origem[:20]}.")
     pid, codigo = A._int_ou_none(pessoa_id), D._txt(pessoa_hmac)
-    if not pid or pid <= 0:
+    # só o None diz "sem ficha": o ID que veio e não é um número de ficha recusa (a página velha, o formulário mexido)
+    if pessoa_id is not None and (not pid or pid <= 0):
         raise Recusada("Faltou a pessoa: atualize a página.")
+    if email:
+        if not ativo:
+            raise Recusada("O e-mail só vai no pôr do avulso: o tirar é pelo código.")
+        if pid:
+            raise Recusada("O avulso pelo e-mail é só para quem está sem ficha: escolha a pessoa na lista.")
+        email = email_do_avulso(email)
+        if codigo and codigo != codigo_da_pessoa(chave, email):
+            raise Recusada("O código não é o deste e-mail: atualize a página. Nada foi gravado.")
+        codigo = codigo_da_pessoa(chave, email)
     if not codigo:
-        raise Recusada(f"Pessoa {pid}: {SEM_CODIGO}.")
+        raise Recusada(f"{f'Pessoa {pid}' if pid else 'A pessoa sem ficha'}: {SEM_CODIGO}.")
     ativo = bool(ativo)
     de_id, ate_id = (A._dia(de), A._dia(ate)) if ativo else (None, None)
     if de_id and ate_id and ate_id < de_id:
@@ -236,11 +283,14 @@ def decidir(cfg, *, pessoa_id, pessoa_hmac: str, ativo: bool, usuario: dict | No
         if not ativo and not vale:
             raise Recusada("Essa pessoa já não é administradora do App de Campo (alguém mudou agora): atualize a "
                            "página.")
-        if ativo and vale and A._int_ou_none(ult.get("pessoa_id")) != pid:
-            # o código vale na lista por outra ficha (o usuário do Fracttal religado leva o código junto): pôr esta
-            # seria "a mesma decisão" para o App, que acha a pessoa pelo código, e o Nexus diria outra pessoa
+        ult_pid = A._int_ou_none(ult.get("pessoa_id")) if ult else None
+        if ativo and vale and ult_pid is not None and ult_pid != pid:
+            # o código vale na lista por outra ficha (o usuário do Fracttal religado leva o código junto), ou a pessoa
+            # vem sem ficha com o código que vale por uma (o e-mail dela mudou e o de antes ficou na linha): pôr esta
+            # seria "a mesma decisão" para o App, que acha a pessoa pelo código, e o Nexus diria outra pessoa. O
+            # contrário (vale sem ficha e hoje o código é de uma ficha) é a mesma pessoa: cai no "a mesma decisão"
             raise Recusada(f"O código desta pessoa já está na lista de administradores do App com outra ficha (pessoa "
-                           f"{A._int_ou_none(ult.get('pessoa_id'))}): tire aquela antes. Nada foi gravado.")
+                           f"{ult_pid}): tire aquela antes. Nada foi gravado.")
         # a mesma decisão não grava de novo: já vale, com as mesmas datas
         if ativo and vale and A._int_ou_none(ult.get("de_data_id")) == de_id \
                 and A._int_ou_none(ult.get("ate_data_id")) == ate_id:
@@ -250,12 +300,14 @@ def decidir(cfg, *, pessoa_id, pessoa_hmac: str, ativo: bool, usuario: dict | No
         nova = {"decidida_em": quando, "data_id": A._data_id(agora), "pessoa_id": pid, "pessoa_hmac": codigo,
                 "papel": papel, "ativo": "sim" if ativo else "nao", "de_data_id": de_id or "",
                 "ate_data_id": ate_id or "", "origem": origem, "decidida_por_hmac": quem_hmac, "dados_cifrados": ""}
-        if obs:
+        segredo = {k: v for k, v in (("obs", obs), ("email", email)) if v}
+        if segredo:
             cofre = A._cofre(cfg)
             if cofre is None:
-                raise Recusada("Este Nexus não tem a chave do cadastro (NEXUS_CHAVE_CADASTRO): a observação vai "
-                               "cifrada, e sem ela nada é gravado.")
-            nova["dados_cifrados"] = cofre.cifrar(json.dumps({"obs": obs}, ensure_ascii=False), _ctx(pid, quando))
+                raise Recusada("Este Nexus não tem a chave do cadastro (NEXUS_CHAVE_CADASTRO): "
+                               + ("o e-mail do avulso vai cifrado" if email else "a observação vai cifrada")
+                               + ", e sem ela nada é gravado.")
+            nova["dados_cifrados"] = cofre.cifrar(json.dumps(segredo, ensure_ascii=False), _ctx(pid, quando, codigo))
         nova["assinatura"] = assinatura(nova, cfg.get("NEXUS_PESSOA_HMAC"))
         _gravar_cru(cfg, cru + [nova])
         # o que acabou de ser lido e gravado vale como a leitura de agora: a tela não volta ao banco em seguida

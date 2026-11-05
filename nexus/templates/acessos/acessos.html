@@ -13,8 +13,9 @@
   </div>
 </div>
 {# as abas (25/10/2026, Levi: "gostaria que não tivesse uma tela só para integração fractall e sim fosse para acessos"):
-   a antiga tela Base > Integração Fracttal é a aba Pessoas e setores; só ela lê o Fracttal. A dos administradores do
-   App de Campo (05/11/2026: "os administradores do App de Campo [...] têm de ser escolhidos no Nexus") é a terceira #}
+   a antiga tela Base > Integração Fracttal é a aba Pessoas e setores, que lê o Fracttal. A dos administradores do
+   App de Campo (05/11/2026: "os administradores do App de Campo [...] têm de ser escolhidos no Nexus") é a terceira e
+   usa a cópia dela; a de telas não lê o Fracttal #}
 <nav class="gc-subabas" aria-label="Acessos">
   <a href="{{ url_for('torre_base.acessos') }}"{% if aba == 'telas' %} aria-current="page"{% endif %}>Telas e administradores</a>
   <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}"{% if aba == 'pessoas' %} aria-current="page"{% endif %}>Pessoas e setores</a>

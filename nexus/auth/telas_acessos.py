@@ -13,8 +13,9 @@ livro `nexus_setor_telas` (regras e portão em `setor_telas.py`). O setor de cad
 aqui aparece também na lista de quem entrou, pelo código do e-mail (sem o e-mail ir ao banco).
 
 A aba Administradores do App de Campo (05/11/2026, `?aba=admins_app`; as contas em `telas_admins_app.py`, o dado em
-`nexus/pcm/admins_app.py`): o pôr e o tirar vêm por este mesmo POST, com o mesmo código do formulário e a mesma régua de
-origem (dar administrador do App é tão sensível quanto dar o do Nexus); recusa volta à aba com o motivo e 409.
+`nexus/pcm/admins_app.py`): o pôr (da lista ou, desde a 2ª volta de 05/11/2026, pelo e-mail: o avulso) e o tirar vêm por
+este mesmo POST, com o mesmo código do formulário e a mesma régua de origem (dar administrador do App é tão sensível
+quanto dar o do Nexus); recusa volta à aba com o motivo e 409.
 """
 import hmac
 import logging
@@ -34,7 +35,7 @@ _CHAVE_CODIGO = "acessos_codigo"
 _CHAVE_AVISO = "acessos_aviso"
 _CHAVE_AVISO_APP = "acessos_app_aviso"
 ABA_APP = "admins_app"
-_ACOES_APP = ("admin_app_por", "admin_app_tirar")
+_ACOES_APP = ("admin_app_por", "admin_app_por_email", "admin_app_tirar")
 
 
 def _meu_email() -> str:
@@ -150,17 +151,19 @@ def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]
     }
 
 
-def _pagina_admins_app(erro: str | None = None, status: int = 200):
-    """A aba Administradores do App de Campo (05/11/2026)."""
+def _pagina_admins_app(erro: str | None = None, status: int = 200, email_digitado: str = ""):
+    """A aba Administradores do App de Campo (05/11/2026). Na recusa do avulso, o e-mail digitado volta ao campo."""
     from . import telas_admins_app as TAA
     return render_template("acessos/acessos.html", aba=ABA_APP, **TAA.contexto(current_app.config), codigo=_codigo(),
-                           erro=erro, aviso=session.pop(_CHAVE_AVISO_APP, None)), status
+                           erro=erro, aviso=session.pop(_CHAVE_AVISO_APP, None),
+                           email_digitado=email_digitado), status
 
 
 def _pagina(erro: str | None = None, status: int = 200, email_digitado: str = "", setor_escolhido: int | None = None):
     cfg = current_app.config
     if request.method == "GET" and request.args.get("aba") == "pessoas":
-        # a aba Pessoas e setores (25/10/2026: era a tela Base > Acessos > Pessoas e setores); só ela lê o Fracttal
+        # a aba Pessoas e setores (25/10/2026: era a tela Base > Acessos > Pessoas e setores); ela lê o Fracttal, e a dos
+        # administradores do App usa a cópia dela (a aba de telas não lê)
         from ..cadastro import telas_fracttal as TF
         return render_template("acessos/acessos.html", aba="pessoas", **TF.contexto(cfg, request.args)), status
     if request.method == "GET" and request.args.get("aba") == ABA_APP:
@@ -242,21 +245,32 @@ def _gravar():
 
 
 def _gravar_admins_app(acao: str):
-    """Pôr ou tirar um administrador do App de Campo. Recusa (sem código, pessoa fora das fichas ativas, a lista que
-    mudou, sem a NEXUS_PESSOA_HMAC): 409 com o motivo, na própria aba. Gravou: 303 de volta à aba (F5 não repete)."""
+    """Pôr (da lista ou pelo e-mail, o avulso) ou tirar um administrador do App de Campo. Recusa (sem código, pessoa fora
+    da lista, o e-mail de outro domínio, a lista que mudou, sem a NEXUS_PESSOA_HMAC): 409 com o motivo, na própria aba.
+    Gravou: 303 de volta à aba (F5 não repete)."""
     from ..pcm import admins_app as AA
     from . import telas_admins_app as TAA
     cfg = current_app.config
     usuario = session.get("usuario") if isinstance(session.get("usuario"), dict) else None
+    obs = (request.form.get("obs") or "")[:2000]
+    email = ""
     try:
         if acao == "admin_app_por":
-            if not (request.form.get("pessoa_id") or "").strip():
+            # o rádio se chama `pessoa` desde a 2ª volta de 05/11/2026 (o número da ficha ou o código de quem não tem);
+            # o `pessoa_id` é o da página aberta antes do deploy, que só tinha fichas
+            escolha = (request.form.get("pessoa") or request.form.get("pessoa_id") or "").strip()[:120]
+            if not escolha:
                 return _pagina_admins_app(erro="Escolha a pessoa: nada foi gravado.", status=400)
-            texto = TAA.por(cfg, request.form.get("pessoa_id"), (request.form.get("obs") or "")[:2000], usuario)
+            texto = TAA.por(cfg, escolha, obs, usuario)
+        elif acao == "admin_app_por_email":
+            email = (request.form.get("email") or "")[:300]
+            if not email.strip():
+                return _pagina_admins_app(erro="Digite o e-mail da pessoa: nada foi gravado.", status=400)
+            texto = TAA.por_email(cfg, email, obs, usuario)
         else:
             texto = TAA.tirar(cfg, (request.form.get("pessoa_hmac") or "")[:80], usuario)
     except AA.Recusada as ex:
-        return _pagina_admins_app(erro=str(ex), status=409)
+        return _pagina_admins_app(erro=str(ex), status=409, email_digitado=email.strip())
     except Exception as ex:      # noqa: BLE001 — a publicação no banco falhou: nada mudou (o livro é trocado inteiro)
         log.error("Administradores do App: a gravação falhou (%s: %s); nada mudou.", type(ex).__name__, ex)
         return _pagina_admins_app(erro=f"Não consegui gravar no banco ({type(ex).__name__}): nada mudou. Tente de novo; "

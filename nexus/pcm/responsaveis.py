@@ -53,16 +53,27 @@ def codigos(cfg, base) -> dict:
 
 
 def codigos_e_ambiguos(cfg, base) -> tuple[dict, dict]:
-    """({pessoa_id: o código do e-mail}, {pessoa_id: por que ficou sem}). O código de cada ficha é o do e-mail dela e,
-    por cima, o da pessoa ligada ao usuário do Fracttal em Pessoas e setores, pela ligação de HOJE de cada usuário (a
-    última decisão de cada `fracttal_id`). Revisão de 05/11/2026 (achado 4): contando toda decisão, o usuário religado da
-    ficha 11 para a 10 deixava o código dele nas duas, e o App acharia a 11 pelo código de quem agora é a 10.
+    """({pessoa_id: o código do e-mail}, {pessoa_id: por que ficou sem}): a conta do `conta_dos_codigos`."""
+    c = conta_dos_codigos(cfg, base)
+    return c["codigos"], c["por_que"]
+
+
+def conta_dos_codigos(cfg, base) -> dict:
+    """{"codigos": {pessoa_id: o código do e-mail}, "por_que": {pessoa_id: por que ficou sem}, "antes": {pessoa_id: o
+    código antes do desempate}}. O código de cada ficha é o do e-mail dela e, por cima, o da pessoa ligada ao usuário do
+    Fracttal em Pessoas e setores, pela ligação de HOJE de cada usuário (a última decisão de cada `fracttal_id`). Revisão
+    de 05/11/2026 (achado 4): contando toda decisão, o usuário religado da ficha 11 para a 10 deixava o código dele nas
+    duas, e o App acharia a 11 pelo código de quem agora é a 10.
 
     O código que cai em duas ou mais fichas (re-revisão de 05/11/2026, N2): quando um deles vem da ligação do Fracttal,
     vence a ligação (a ficha ligada fica com ele, e a que só o tinha pelo e-mail fica sem, `DE_OUTRA`); sem ligação a
     desempatar (o mesmo e-mail em duas fichas, ou dois usuários ligados), sai de todas (`AMBIGUO`): o App acharia uma e
-    o Nexus diria outra. O porquê vai no segundo dicionário. A ficha desligada ou excluída não entra pelo e-mail: a
-    pessoa recontratada tem a ficha antiga, desligada, com o mesmo e-mail da nova."""
+    o Nexus diria outra. O porquê vai em `por_que`. A ficha desligada ou excluída não entra pelo e-mail: a pessoa
+    recontratada tem a ficha antiga, desligada, com o mesmo e-mail da nova.
+
+    O `antes` é o código que cada ficha teria sem o desempate: a aba dos administradores do App (05/11/2026) marca com o
+    mesmo porquê quem chega com o código que saiu das fichas (a pessoa de Pessoas e setores sem ficha e o e-mail digitado
+    no avulso), para o código de duas fichas não voltar por outra porta."""
     import json
     from collections import defaultdict
 
@@ -111,7 +122,8 @@ def codigos_e_ambiguos(cfg, base) -> tuple[dict, dict]:
             por_que.update({p: DE_OUTRA for p in pids - ligadas})
         else:
             por_que.update({p: AMBIGUO for p in pids})
-    return {pid: c for pid, c in codigo.items() if pid not in por_que}, por_que
+    return {"codigos": {pid: c for pid, c in codigo.items() if pid not in por_que}, "por_que": por_que,
+            "antes": codigo}
 
 
 def pedidos(base, codigo_da: dict, est: dict, hoje: int) -> tuple[list[dict], dict]:

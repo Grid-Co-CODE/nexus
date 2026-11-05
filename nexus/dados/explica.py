@@ -250,8 +250,10 @@ PARA_QUE = {
                               "usina, fixo ou de apoio (com as datas). É a lista de quem vê e pode rondar cada usina no "
                               "App de Campo: o App lê daqui. A observação vai cifrada.",
     "decisao_admin_app": "Guarda cada vez que um administrador do Nexus põe ou tira alguém dos administradores do App de "
-                         "Campo, na aba de Base → Acessos. O App lê esta lista de 5 em 5 minutos e reconhece a pessoa "
-                         "pelo código do e-mail; com a lista vazia ele não tira ninguém. A observação vai cifrada.",
+                         "Campo, na aba de Base → Acessos: uma ficha do cadastro, uma pessoa de Pessoas e setores ou um "
+                         "e-mail da Grid digitado (o avulso). O App lê esta lista de 5 em 5 minutos e reconhece a pessoa "
+                         "pelo código do e-mail; com a lista vazia ele não tira ninguém. A observação e o e-mail do "
+                         "avulso vão cifrados.",
     "saldo_almox": "Guarda, a cada varredura diária do App, quanto de cada peça há em cada almoxarifado do "
                    "Fracttal, o mínimo cadastrado e o custo unitário que o Fracttal deu. É o histórico que o "
                    "Fracttal não mostra: dá para ver quando uma peça ficou abaixo do mínimo e, mais adiante, prever a "

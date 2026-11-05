@@ -3,7 +3,10 @@
    formulário (o `required` do rádio) e o Tirar vai direto.
    Com JavaScript, quem confere a escolha é o envio (revisão de 05/11/2026, achado 7): com o `required` num rádio que a
    busca escondeu, o navegador barrava o envio calado (o aviso dele não aparece num campo que não se vê). O aviso vai à
-   linha `aria-live` da contagem, e o foco volta à busca. */
+   linha `aria-live` da contagem, e o foco volta à busca.
+   O texto de cada pessoa (`data-aa-texto`, montado no servidor) leva o nome e o setor, ou "ficha de campo": a busca vale
+   para os dois (2ª volta de 05/11/2026). O Pôr pelo e-mail (o avulso) é outro formulário, com o campo à vista: o
+   `required` dele é o do navegador. */
 (function () {
   function sem(s) {
     return String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -25,7 +28,7 @@
         if (mostra) n++;
       });
       if (nada) nada.hidden = n > 0 || !itens.length;
-      if (conta) conta.textContent = n + (n === 1 ? " ficha" : " fichas");
+      if (conta) conta.textContent = n + (n === 1 ? " pessoa" : " pessoas");
     });
   }
   document.addEventListener("submit", function (ev) {

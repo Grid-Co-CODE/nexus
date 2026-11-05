@@ -364,6 +364,9 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 .aa-aviso{display:block;margin-top:3px;font-size:12px;color:var(--alerta);min-width:220px}
 .aa-por textarea.gc-campo{width:100%;box-sizing:border-box;resize:vertical;font-family:var(--font-sans)}
 .aa-por>.gc-btn{align-self:flex-start}
+/* o avulso pelo e-mail (2ª volta de 05/11/2026): o segundo formulário da mesma caixa, separado da lista por uma linha */
+.aa-por--email{border-top:1px solid var(--linha)}
+.aa-por input[type=email].gc-campo{width:100%;max-width:420px;box-sizing:border-box}
 @media (max-width:560px){.aa-por>.gc-btn{align-self:stretch;justify-content:center}}
 /* Base > Integração Fracttal (12/10/2026): equipe e setor numa linha só */
 .fr-tabela td.fr-curta{white-space:nowrap}

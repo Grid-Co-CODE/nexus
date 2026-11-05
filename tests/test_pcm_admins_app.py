@@ -223,6 +223,98 @@ def test_nada_em_claro_e_a_observacao_cifrada(cfg, relogio, tmp_path):
     assert AA.historico(cfg, AA.ler(cfg, forcar=True))[1]["obs"] == ""         # sem a chave, sem a observação
 
 
+# ── sem ficha e o avulso pelo e-mail (05/11/2026) ─────────────────────────────────────────────────────────────────
+# Levi, 05/11/2026: "tem que aparecer todos do pessoas e setores! e tem que ter como fazer avulso também so digitando o
+# e-mail". Quem é do escritório não tem ficha no cadastro: a linha vai sem `pessoa_id`, e o avulso leva o e-mail só cifrado.
+AVULSO = "pessoa.avulsa@gridco.com.br"
+
+
+def _avulso(cfg, email=AVULSO, **kw):
+    return AA.decidir(cfg, pessoa_id=None, pessoa_hmac="", ativo=True, usuario=PESSOA, email=email, **kw)
+
+
+def test_sem_ficha_o_pessoa_id_vai_vazio_e_o_vigente_e_o_tirar_sao_pelo_codigo(cfg, relogio):
+    assert AA.decidir(cfg, pessoa_id=None, pessoa_hmac=cod(700), ativo=True, usuario=PESSOA)["gravou"] is True
+    linha = _arquivo(cfg)[AA.ABA][0]
+    assert list(linha) == list(AA.CAB)                                  # as 12 colunas, como sempre
+    assert (linha["pessoa_id"], linha["pessoa_hmac"], linha["origem"], linha["dados_cifrados"]) == (
+        None, cod(700), "tela", None)
+    assert linha["assinatura"] == AA.assinatura(linha, CHAVE)
+    assert set(_atuais(cfg)) == {(cod(700), "admin")}
+    assert AA.decidir(cfg, pessoa_id=None, pessoa_hmac=cod(700), ativo=True, usuario=PESSOA)["gravou"] is False
+    assert AA.decidir(cfg, pessoa_id=None, pessoa_hmac=cod(700), ativo=False, usuario=PESSOA)["gravou"] is True
+    assert _atuais(cfg) == {}
+    # o pessoa_id que veio e não é um ID não vira "sem ficha": só o None diz que a pessoa não tem ficha
+    for ruim in ("", "abc", 0):
+        with pytest.raises(AA.Recusada, match="Faltou a pessoa"):
+            AA.decidir(cfg, pessoa_id=ruim, pessoa_hmac=cod(701), ativo=True, usuario=PESSOA)
+
+
+def test_o_avulso_leva_o_email_so_cifrado_e_amarrado_a_linha(cfg, relogio, tmp_path):
+    assert _avulso(cfg, email="  Pessoa.Avulsa@GRIDCO.com.br ", obs="cobre a gerência")["gravou"] is True
+    linha = _arquivo(cfg)[AA.ABA][0]
+    assert linha["pessoa_id"] is None and linha["pessoa_hmac"] == codigo_da_pessoa(CHAVE, AVULSO)
+    assert linha["assinatura"] == AA.assinatura(linha, CHAVE) and linha["dados_cifrados"]
+    txt = (tmp_path / "admins_app.json").read_text(encoding="utf-8")
+    assert "@" not in txt and "avulsa" not in txt.lower() and "gerência" not in txt and "gerencia" not in txt
+    h = AA.historico(cfg, AA.ler(cfg, forcar=True))[0]
+    assert (h["email"], h["obs"], h["pessoa_id"], h["acao"]) == (AVULSO, "cobre a gerência", None, "pôs")
+    # a cifra amarrada à linha: a mesma cifra noutra linha (outro código ou outra hora) não abre
+    for outra in (dict(linha, pessoa_hmac=cod(9)), dict(linha, decidida_em="2026-11-05T12:59:00Z")):
+        assert AA.historico(cfg, {"decisoes": [outra]})[0]["email"] == ""
+    # o tirar é pelo código, como o dos outros; a linha do tirar não leva o e-mail
+    assert AA.decidir(cfg, pessoa_id=None, pessoa_hmac=linha["pessoa_hmac"], ativo=False, usuario=PESSOA)["gravou"]
+    h = AA.historico(cfg, AA.ler(cfg, forcar=True))
+    assert [(x["acao"], x["email"]) for x in h] == [("tirou", ""), ("pôs", AVULSO)] and _atuais(cfg) == {}
+    # o mesmo e-mail de novo, já valendo: a mesma decisão não grava
+    _avulso(cfg)
+    assert _avulso(cfg)["gravou"] is False and len(_arquivo(cfg)[AA.ABA]) == 3
+
+
+def test_o_avulso_so_aceita_o_dominio_da_grid_e_o_formato(cfg, relogio):
+    """O administrador do App entra pela conta Microsoft da Grid: outro domínio nunca casaria com ela."""
+    assert AA.email_do_avulso("  Pessoa.Avulsa@GridCo.com.BR ") == AVULSO
+    for ruim in ("pessoa@exemplo.com", "pessoa@gridco.com", "pessoa@sub.gridco.com.br"):
+        with pytest.raises(AA.Recusada, match="Só e-mail @gridco.com.br"):
+            _avulso(cfg, email=ruim)
+    for ruim in ("nao e email", "pessoa@", "a@b@gridco.com.br", "pessoa avulsa@gridco.com.br"):
+        with pytest.raises(AA.Recusada, match="E-mail inválido"):
+            _avulso(cfg, email=ruim)
+    with pytest.raises(AA.Recusada, match="Digite o e-mail"):
+        AA.email_do_avulso("   ")
+    assert AA.ler(cfg, forcar=True)["decisoes"] == []
+
+
+def test_o_avulso_sem_a_chave_do_cadastro_nao_grava(cfg, relogio):
+    """O e-mail vai cifrado: sem a chave do cadastro ele iria em claro, então nada se grava."""
+    cfg.pop("NEXUS_CHAVE_CADASTRO")
+    with pytest.raises(AA.Recusada, match="NEXUS_CHAVE_CADASTRO"):
+        _avulso(cfg)
+    assert AA.ler(cfg, forcar=True)["decisoes"] == []
+
+
+def test_o_avulso_e_so_sem_ficha_e_com_o_codigo_do_proprio_email(cfg, relogio):
+    with pytest.raises(AA.Recusada, match="sem ficha"):
+        AA.decidir(cfg, pessoa_id=10, pessoa_hmac="", ativo=True, usuario=PESSOA, email=AVULSO)
+    with pytest.raises(AA.Recusada, match="não é o deste e-mail"):
+        AA.decidir(cfg, pessoa_id=None, pessoa_hmac=cod(9), ativo=True, usuario=PESSOA, email=AVULSO)
+    with pytest.raises(AA.Recusada, match="só vai no pôr"):
+        AA.decidir(cfg, pessoa_id=None, pessoa_hmac="", ativo=False, usuario=PESSOA, email=AVULSO)
+    assert AA.ler(cfg, forcar=True)["decisoes"] == []
+
+
+def test_sem_ficha_com_o_codigo_que_ja_vale_por_uma_ficha_e_o_contrario(cfg, relogio):
+    """O código que já vale por uma ficha não vai de novo sem ficha (o e-mail da ficha mudou e o código de antes ficou na
+    linha: para o Nexus é outra pessoa; tire aquela antes). O que já vale sem ficha e hoje é o de uma ficha é a mesma
+    pessoa para o App (o mesmo código): nada muda, e nada grava."""
+    _por(cfg, 10, codigo=cod(800))
+    with pytest.raises(AA.Recusada, match="outra ficha"):
+        AA.decidir(cfg, pessoa_id=None, pessoa_hmac=cod(800), ativo=True, usuario=PESSOA)
+    AA.decidir(cfg, pessoa_id=None, pessoa_hmac=cod(801), ativo=True, usuario=PESSOA)
+    assert _por(cfg, 11, codigo=cod(801))["gravou"] is False
+    assert [x["pessoa_id"] for x in _arquivo(cfg)[AA.ABA]] == [10, None]
+
+
 # ── o livro só deles ────────────────────────────────────────────────────────────────────────────────────────────
 def _tecnico(cfg, pid):
     return A.decidir(cfg, usina_id=1, usina_fracttal="Cliente A - Usina 1 - SP", pessoa_id=pid,
@@ -337,6 +429,8 @@ def test_o_livro_esta_no_catalogo_e_o_radar_nao_o_acusa():
     assert set(f.chave) <= set(AA.CAB)
     assert {d for d, (e, _c) in f.dims.items() if e != "nao"} == {"data", "pessoa"}
     assert f.dims["data"][0] == f.dims["pessoa"][0] == "id"
+    # o pessoa_id pode vir vazio (sem ficha: Pessoas e setores ou o avulso, 05/11/2026), e o catálogo diz
+    assert "vazio = sem ficha" in f.dims["pessoa"][1] and "avulso" in f.dims["pessoa"][1]
     lv = catalogo.LIVRO_POR_NOME[AA.LIVRO]
     assert lv.abas == (AA.ABA,) and lv.so_cresce == lv.abas and "admins_app.py" in lv.quem_grava and not lv.no_banco
     # o livro dos técnicos volta a ter uma aba só

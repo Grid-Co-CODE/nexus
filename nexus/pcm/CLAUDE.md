@@ -421,9 +421,14 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   Responsável UFV) apagaria os administradores. 1 linha = 1 decisão de pôr ou tirar 1 pessoa (`ativo` sim ou nao, papel
   `admin`, origem `tela`); só acrescenta; vale a última de cada (`pessoa_hmac`, `papel`) pela `decidida_em` (empate: a
   de depois no livro), com as datas cobrindo hoje no dia de Brasília. A conta é pelo código, não pelo `pessoa_id`: é por
-  ele que o App acha a pessoa. Assinada com o rótulo `nexus:pcm:admins-app` (texto
+  ele que o App acha a pessoa. **O `pessoa_id` vai vazio sem ficha** (2ª volta de 05/11/2026: a maioria dos
+  administradores do App é do escritório): a pessoa de Pessoas e setores sem ficha, ou o **avulso**, posto pelo e-mail
+  digitado (`email_do_avulso`: só @gridco.com.br), que leva o e-mail SÓ no `dados_cifrados`, com a observação (o
+  contexto da cifra é o código no lugar do ID, e sem a chave do cadastro nada grava); as 12 colunas e a assinatura não
+  mudam. Assinada com o rótulo `nexus:pcm:admins-app` (texto
   `admin_app|pessoa_hmac|papel|ativo|de_data_id|ate_data_id|decidida_em`), os vetores nos dois lados. Sem código, com o
-  código que já vale na lista por outra ficha, sem a `NEXUS_PESSOA_HMAC` ou com a leitura que falha, nada grava. Trava
+  código que já vale na lista por uma ficha (venha a outra com ficha ou sem), sem a `NEXUS_PESSOA_HMAC` ou com a leitura
+  que falha, nada grava; o que vale sem ficha e é posto com a ficha que hoje tem o código é "a mesma decisão". Trava
   própria, arquivo próprio na cópia de prova (`NEXUS_ADMINS_APP_ARQUIVO`). **A leitura dos dois livros não vira
   "vazio" por engano** (`livros.abas_conferidas`): o livro que existe e cuja aba não vem na listagem, ou que traz menos
   abas que o `sheet_count`, é "não li" e nada grava. O contrato:
@@ -481,7 +486,8 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   tela: com o dia de verdade, o apoio "até 31/10" virou passado em 01/11 e a regra o recusou),
   `tests/test_pcm_tecnicos_tela.py` (quem vê e edita, carga inicial, reenviar de uma usina e tudo com a conferência,
   o tirar entre a tela e o clique, banco fora) e `tests/test_pcm_admins_app.py` (os administradores do App: os vetores,
-  o vigente, o livro só deles no arquivo e no banco de mentira, a leitura incompleta, a trava do catálogo, o radar); 11
+  o vigente, o livro só deles no arquivo e no banco de mentira, a leitura incompleta, a trava do catálogo, o radar, o
+  `pessoa_id` vazio sem ficha e o avulso: o e-mail só cifrado e amarrado à linha, o domínio e a chave do cadastro); 11
   mutações, todas pegas (17/10). A tela: a cópia de prova com dados de mentira (banco dos testes, livros em arquivos,
   rede só para 127.0.0.1; 1366 e 375 px, escuro e claro).
 

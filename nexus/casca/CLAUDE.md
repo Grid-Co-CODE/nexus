@@ -131,7 +131,8 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
 
 **Três abas:** Telas e administradores (o que está abaixo), Pessoas e setores (desde 25/10/2026, a antiga Base →
 Integração Fracttal: o pessoal do Fracttal e o setor de cada um; regras em `nexus/cadastro/CLAUDE.md`) e Administradores
-do App de Campo (desde 05/11/2026, `?aba=admins_app`; bloco no fim desta seção). Só a segunda lê o Fracttal.
+do App de Campo (desde 05/11/2026, `?aba=admins_app`; bloco no fim desta seção). A segunda lê o Fracttal, e a terceira
+usa a cópia dela (`telas_fracttal._dados`); a primeira não lê.
 
 Pedido de 11/10/2026, na véspera de o Nexus virar a porta principal: "Tem algum canto do Nexus onde eu posso administrar
 isso?". Até então administrador era só a `NEXUS_ADMINS` do `.env` do servidor (pôr ou tirar alguém = a T.I. editar e
@@ -199,37 +200,68 @@ lista de 5 em 5 min. **Ao contrário da lista de administradores do Nexus, esta 
 (`nexus_acessos_app_campo · fato_admin_app`; dado, assinatura e vigente em `nexus/pcm/CLAUDE.md`, Técnicos por usina):
 é o App que a aplica, e ele só lê o banco.
 - **Quem vê e grava:** só o administrador do Nexus (a trava da rota de Acessos). O Pôr e o Tirar vêm pelo POST da página,
-  com o código do formulário e a régua do `_de_outro_site` (`acao` `admin_app_por` e `admin_app_tirar`); recusa volta à
-  aba com o motivo e 409 (a pessoa sem código, a fora das fichas ativas, o código que já vale na lista por outra ficha,
-  a lista que mudou, sem a NEXUS_PESSOA_HMAC), outro site ou o formulário vencido dão 403, a pessoa que faltou 400;
-  gravou, 303 de volta à aba. O nome da pessoa sai ANTES da gravação, no Pôr e no Tirar (revisão de 05/11/2026: a leitura
+  com o código do formulário e a régua do `_de_outro_site` (`acao` `admin_app_por`, `admin_app_por_email`, o avulso, e
+  `admin_app_tirar`); recusa volta à aba com o motivo e 409 (a pessoa sem código, a fora da lista, o e-mail de outro
+  domínio ou fora do formato, o código que já vale na lista por outra ficha, a lista que mudou, sem a
+  NEXUS_PESSOA_HMAC), outro site ou o formulário vencido dão 403, a pessoa ou o e-mail que faltou 400; gravou, 303 de
+  volta à aba. O nome da pessoa sai ANTES da gravação, no Pôr e no Tirar (revisão de 05/11/2026: a leitura
   do cadastro que falhasse depois de gravar viraria um erro com a linha já no livro).
 - **A aba:** a nota "O App de Campo lê esta lista de 5 em 5 min; com a lista vazia ele não tira ninguém (não tranca o
-  App)", os números, os que valem hoje (nome da ficha, desde quando, quem decidiu, Tirar com confirmação), o Pôr
-  administrador (as fichas do cadastro não desligadas e não excluídas, com a busca da própria página; observação
-  opcional, cifrada) e o histórico, o mais novo primeiro. Sem a chave HMAC, sem o token do banco ou com a leitura
-  falhando, a aba só mostra. Com o JavaScript, os rádios perdem o `required` e o envio confere a escolha: sem pessoa, o
-  aviso vai à linha `aria-live` da contagem e o foco volta à busca (o `required` num rádio que a busca escondeu barrava
-  o envio calado; `tests/test_acessos_admins_app_js.py`). Sem JavaScript, o `required` vale.
-- **O código da pessoa** é o do `responsaveis.codigos_e_ambiguos`: o do usuário do Fracttal ligado à pessoa em Pessoas e
+  App)", os números, os que valem hoje (o nome e o setor, ou "ficha de campo"; o avulso pelo e-mail, "avulso (sem
+  ficha)"; desde quando, quem decidiu, Tirar com confirmação), o Pôr administrador (a lista, com a busca da própria
+  página, e o avulso pelo e-mail; observação opcional, cifrada) e o histórico, o mais novo primeiro. Sem a chave HMAC,
+  sem o token do banco ou com a leitura falhando, a aba só mostra. Com o JavaScript, os rádios perdem o `required` e o
+  envio confere a escolha: sem pessoa, o aviso vai à linha `aria-live` da contagem e o foco volta à busca (o `required`
+  num rádio que a busca escondeu barrava o envio calado; `tests/test_acessos_admins_app_js.py`). Sem JavaScript, o
+  `required` vale.
+- **Quem dá para escolher** (2ª volta de 05/11/2026, Levi, olhando a aba no ar: "Só tá aparecendo os técnicos, tem que
+  aparecer todos do pessoas e setores!"; a maioria dos administradores do App é do escritório, sem ficha): a união, sem
+  repetir pessoa, das fichas não desligadas e não excluídas com as pessoas de Pessoas e setores (o pessoal do Fracttal,
+  pela cópia daquela aba). Cada usuário do Fracttal vale pela ligação de hoje (a última decisão de cada `fracttal_id`): o
+  código, a ficha e o setor dela; sem ligação, o que a aba liga a uma ficha é a ficha, e o sem ficha vai com o código do
+  e-mail do Fracttal (a conta que a ligação gravaria). A mesma pessoa aparece uma vez: pela ficha para onde a ligação
+  aponta, ou pelo código (o mesmo e-mail é a mesma pessoa para o App); o nome é o da ficha, senão o de Pessoas e setores.
+  Cada uma com o setor, ou "ficha de campo" (ou "sem setor"), e a busca vale para o nome e o setor. O rádio `pessoa`
+  leva o número da ficha ou `codigo:<código>` de quem não tem ficha (o `pessoa_id` da página de antes ainda vale). Sem a
+  leitura do Fracttal, as ligações de hoje seguem na lista pelo número do usuário ("Usuário do Fracttal 510"); sem o livro
+  dos setores, a lista mostra só as fichas e o Pôr trava (o código das fichas ligadas sairia errado).
+- **O avulso pelo e-mail** (Levi: "tem que ter como fazer avulso também so digitando o e-mail"): o segundo formulário da
+  caixa do Pôr (`acao` `admin_app_por_email`). O e-mail perde os espaços das pontas, vai para minúsculas e tem o formato
+  conferido (a régua de `acessos.email_normal`), e **só @gridco.com.br** entra (decisão do Levi: o administrador do App
+  entra pela conta Microsoft da Grid, e outro domínio nunca casaria; a recusa diz isso). O código é o `codigo_da_pessoa`,
+  o mesmo do App. Se é o código de alguém da lista, a linha vai para essa pessoa (com o `pessoa_id` quando ela tem
+  ficha) e sem o e-mail; o código que saiu de duas fichas recusa; o de ninguém vai com o `pessoa_id` vazio e o e-mail SÓ
+  no `dados_cifrados` (com a observação; sem a chave do cadastro, o formulário não aparece). Na tela, o avulso aparece
+  pelo e-mail decifrado, "avulso (sem ficha)", nos que valem e no histórico (a linha do tirar não leva o e-mail: vem pelo
+  código da que pôs). O Tirar é o de todos, pelo código. Na recusa, o e-mail digitado volta ao campo. O número dos que
+  valem sem ficha (e quantos pelo e-mail) vai no detalhe de "Administradores do App": é onde a ligação à dimensão pessoa
+  se conta.
+- **O código da ficha** é o do `responsaveis.conta_dos_codigos`: o do usuário do Fracttal ligado à pessoa em Pessoas e
   setores (só a ligação de hoje de cada usuário: o religado da ficha 11 para a 10 deixava o código nas duas) e, sem ele,
   o do e-mail da ficha (a desligada ou excluída não entra pelo e-mail). Sem código, a etiqueta "sem código" e a recusa
-  "sem e-mail na ficha nem usuário do Fracttal ligado: o App não a reconheceria; corrija o cadastro antes". O código que
-  cai em duas fichas: vence a ligação do Fracttal, e a outra fica "sem código: o e-mail dela é o do usuário do Fracttal
-  ligado a outra ficha"; sem ligação a desempatar, sai das duas ("o mesmo código está em mais de uma ficha"); a recusa
-  do Pôr diz o mesmo. O código que já vale na lista por outra ficha é recusado com o nome dela.
+  "sem e-mail na ficha nem usuário do Fracttal ligado: o App não a reconheceria; corrija o cadastro antes" (sem ficha:
+  "sem e-mail no usuário do Fracttal"). O código que cai em duas fichas: vence a ligação do Fracttal, e a outra fica "sem
+  código: o e-mail dela é o do usuário do Fracttal ligado a outra ficha"; sem ligação a desempatar, sai das duas ("o
+  mesmo código está em mais de uma ficha"), e quem chega com ele sem ficha (Pessoas e setores, o avulso) também não
+  entra (o `antes` da conta); a recusa do Pôr diz o mesmo. O código que já vale na lista por uma ficha é recusado com o
+  nome dela, venha a outra pessoa com ficha ou sem; o que vale sem ficha e hoje é o de uma ficha é a mesma pessoa
+  ("Nada mudou").
 - **O aviso da linha** ("o código desta linha já não é o desta ficha… tire e, se for o caso, ponha de novo"): só quando
   o código de hoje da ficha existe e é outro (o e-mail mudou) ou quando a ficha perdeu o código (está entre as sem
   código com o porquê). Sem a chave do cadastro, nenhuma linha o leva (o Nexus não lê o e-mail das fichas, e toda linha
   posta pelo e-mail avisava em falso: re-revisão de 05/11/2026), e a aba diz "Sem a chave do cadastro, o Nexus não
   confere os códigos".
-- **Quem decidiu** é o código do e-mail do login: o nome da ficha que o tem ou, sem ficha (o administrador do
-  escritório), o e-mail que este Nexus conhece (administradores e quem entrou em 30 dias); vazio = a senha.
+- **Quem decidiu** é o código do e-mail do login: o nome da pessoa da lista que o tem (a ficha ou Pessoas e setores)
+  ou o e-mail que este Nexus conhece (administradores e quem entrou em 30 dias); vazio = a senha.
 - **Prova:** `tests/test_base_acessos_admins_app.py` (só administrador; pôr, tirar e histórico com quem decidiu; a 409
   sem código; o código pelo Fracttal ligado; o religado da 11 para a 10 e a ligação que vence o e-mail de outra ficha;
   o aviso da linha, com e sem a chave do cadastro; o nome antes da gravação; só fichas ativas; outro site, formulário vencido e sem a chave; banco fora; nenhum e-mail das fichas na
-  página) e `tests/test_acessos_admins_app_js.py` (o envio sem pessoa, no node). No navegador, a cópia de prova com dados
-  de mentira (1366 e 375 px).
+  página; e, da 2ª volta, a união sem repetir, o setor na busca, o pôr e o tirar sem ficha, o avulso pôr e tirar, o
+  domínio recusado, o avulso com o código de alguém da lista e o de duas fichas, nenhum e-mail em claro na linha, o
+  Fracttal fora e o campo de antes), `tests/test_pcm_admins_app.py` (o `pessoa_id` vazio, o e-mail só cifrado e amarrado
+  à linha, o domínio, sem a chave do cadastro) e `tests/test_acessos_admins_app_js.py` (o envio sem pessoa, a busca pelo
+  setor e o avulso, no node). No navegador, a cópia de prova com dados de mentira, com o Fracttal de mentira em Pessoas e
+  setores (1366 e 375 px).
 
 ## Nexus lento: Raio-X e o teto do OS Creator (14/10/2026)
 

@@ -30,6 +30,7 @@ const CENA = JSON.parse(process.argv[2]);
 const radios = CENA.nomes.map(() => el({required: ""}));
 const pessoas = CENA.nomes.map((n, i) => Object.assign(el({"data-aa-texto": n}), {querySelector() { return radios[i]; }}));
 const busca = el({}), conta = el({}), nada = el({}), form = el({id: "aa-por"}), tirar = el({"data-confirmar": "Tirar?"});
+const porEmail = el({id: "aa-por-email"});
 nada.hidden = true;
 globalThis.window = globalThis;
 const perguntas = [];
@@ -48,7 +49,7 @@ busca.value = CENA.busca;
 busca.disparar("input", {});
 if (CENA.marca !== null) radios[CENA.marca].checked = true;
 let cancelou = false;
-(ouvintes.submit || []).forEach(f => f({target: CENA.alvo === "tirar" ? tirar : form,
+(ouvintes.submit || []).forEach(f => f({target: {tirar, email: porEmail}[CENA.alvo] || form,
                                         preventDefault() { cancelou = true; }}));
 process.stdout.write(JSON.stringify({cancelou, required, conta: conta.textContent, foco: busca.focado, perguntas,
   escondidas: pessoas.map(p => p.hidden)}));
@@ -74,7 +75,7 @@ def test_o_required_sai_dos_radios_e_o_envio_sem_pessoa_avisa_na_linha_aria_live
 
 def test_com_a_pessoa_escolhida_envia():
     r = enviar(busca="onze", marca=1)
-    assert r["cancelou"] is False and r["conta"] == "1 ficha"
+    assert r["cancelou"] is False and r["conta"] == "1 pessoa"
 
 
 def test_a_busca_sem_acento_e_o_tirar_pergunta_antes():
@@ -82,3 +83,12 @@ def test_a_busca_sem_acento_e_o_tirar_pergunta_antes():
     r = enviar(alvo="tirar", confirma=False)
     assert r["cancelou"] is True and r["perguntas"] == ["Tirar?"]
     assert enviar(alvo="tirar", confirma=True)["cancelou"] is False
+
+
+def test_a_busca_pelo_setor_e_o_avulso_nao_pede_pessoa_da_lista():
+    """2ª volta de 05/11/2026: o texto da busca leva o setor (ou "ficha de campo"), e o Pôr pelo e-mail (o avulso), que é
+    outro formulário, não passa pela conferência da pessoa marcada na lista."""
+    nomes = ["analista vinte pcm", "tecnico dez ficha de campo tecnico o&m"]
+    assert enviar(nomes=nomes, busca="PCM")["escondidas"] == [False, True]
+    assert enviar(nomes=nomes, busca="ficha de campo")["escondidas"] == [True, False]
+    assert enviar(nomes=nomes, alvo="email")["cancelou"] is False
