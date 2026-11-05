@@ -38,7 +38,7 @@ def test_as_regras_de_quem_age_usam_o_setor_id():
     assert acompanhamento.SETOR == SID.ENGENHARIA and decisoes.SETOR == SID.SEGURANCA
     assert quadro_equipe.SETOR == SID.PERFORMANCE
     assert pcm_telas.SETOR_PCM == SID.PCM and pcm_telas.SETORES_MARCAM == (SID.PCM, SID.RESPONSAVEL_UFV)
-    assert ponte.SETOR_PCM == SID.PCM and ponte.SETOR_CHAMADOS == SID.CHAMADOS and verificacao.SETOR_COS == SID.COS
+    assert ponte.SETOR_PCM == SID.PCM and ponte.SETOR_OBS_GARANTIAS == SID.PERFORMANCE and verificacao.SETOR_COS == SID.COS
     assert all(s == ponte.TODOS_OS_SETORES or s in SID.TODOS for s in ponte.SETORES_COM_LISTA_CENTRAL)
 
 

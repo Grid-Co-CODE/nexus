@@ -168,7 +168,7 @@
         </div>
         <div class="msg" id="msg_obs"></div>
         <div class="tl" id="tl">
-          {# a observação escrita edita e exclui (29/10/2026: o administrador ou o setor Chamados; os automáticos, nunca) #}
+          {# a observação escrita edita e exclui (29/10/2026: o administrador ou o setor Performance, desde 05/11; os automáticos, nunca) #}
           {% for e in tl %}<div class="tl-e{% if e.novo %} novo{% endif %}{% if e.ev %} ev{% endif %}"{% if e.editavel and e.id %} data-obs-id="{{ e.id }}"{% if pode_obs %} title="Clique para editar ou excluir"{% endif %}{% endif %}><div class="tl-g"><div class="tl-d">{{ e.d }}</div><div class="tl-a">{{ e.a }}</div></div>
             <div class="tl-b"><div class="tl-x"><div class="tl-t">{{ e.texto }}</div><div class="tl-u">{{ e.autor }}</div>
             {%- if e.editavel and e.id and pode_obs %}<div class="tl-acoes"><button type="button" class="det-mini" data-obs-editar>editar</button><button type="button" class="det-mini" data-obs-excluir>excluir</button></div>{% endif %}</div></div></div>{% endfor %}

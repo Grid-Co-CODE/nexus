@@ -356,6 +356,12 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   Observações de lá: a data e o ano à esquerda, o mais novo em verde, a mudança de status ou prioridade com o ponto
   âmbar). **A nota da OS** é a que o card do OS Creator lê (`os_equipe._nota_da_os`: a da tarefa, `task_note`, senão a
   `note`; Levi, 24/10/2026: "não está puxando a nota da OS da engenharia", a página mostrava só a `note`).
+- **Quando o Fracttal não responde** (502), a página diz o nome do erro e dá o botão **Tentar novamente**, um link para
+  ela mesma (a de ETM na tela de ETM; Levi, 05/11/2026: "Deixa um botão para a pessoa tentar novamente"). O erro mais
+  comum é o `Recusado`: o 429 da cota de 200 pedidos por minuto da empresa toda. Dentro do clique, o
+  `campo/fracttal.ler` não tenta de novo, para não prender a tela o minuto que o Fracttal pede. Caso real: às 23h30 de
+  04/11/2026 o App de Campo e esta página levaram 429 juntos, com o Nexus a 77 pedidos/min. A OS que não existe (404)
+  não tem o botão.
 - **Trocar o responsável** (Levi, 24/10/2026: "em responsável quero a opção de mudar de responsável que nem é feito
   no chamados"): o "trocar" ao lado do nome nos Dados, só para a Engenharia, abre o diálogo da tela do chamado (Hoje
   está com..., a busca pelo nome, Atribuir), pela API do OS Creator (`/os/api/responsaveis` e

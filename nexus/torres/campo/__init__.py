@@ -13,7 +13,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote, urlencode
 
-from flask import Response, abort, current_app, make_response, redirect, render_template, request, session
+from flask import Response, abort, current_app, make_response, redirect, render_template, request, session, url_for
 from markupsafe import Markup, escape
 
 import logging as _logging
@@ -398,6 +398,79 @@ def _ocorrencias_abertas() -> dict:
         return {}
 
 
+def _central_da_usina(todas: list[dict]) -> dict:
+    """A aba Central da usina (Levi, 04/11/2026: "pesquisar a usina e ter uma central de informações daquela usina"; "como
+    aba alternativa"): a busca com todas as usinas da Visão (decisão dele: as 131, para quem abre a tela) e, com uma
+    escolhida (`usina`, o id; sem o script, `nome`), a linha dela na Visão e o que a linha não traz, cada coisa da tela
+    dona (nexus/campo/central_usina.py). A fonte que não abre fica de fora com o aviso (`erros`); o resto vale."""
+    from ...auth import setor_telas
+    from ...campo import central_usina as CU
+    nome = request.args.get("nome", "").strip()
+    uid = visao.D._id(request.args.get("usina")) or CU.achar(todas, nome)
+    u = next((x for x in todas if x["usina_id"] == uid), None)
+    out = {"busca": [(i, n, s, url_for("torre_campo.responsaveis", modo="usina", usina=i))
+                     for i, n, s in CU.busca(todas, _ordem_do_nome)],
+           "u": u, "nome": "" if u else nome, "erros": {}, "situacao_pt": SITUACAO_PT}
+    from ...campo import relatorio_usina as RU
+    hoje_rel = visao._agora().date()
+    out.update(rel_meses=RU.meses(hoje_rel), rel_mes=RU.mes_padrao(hoje_rel), rel_temas=RU.TEMAS)
+    if not u:
+        return out
+    uid = u["usina_id"]
+    hoje = visao._agora().date()
+    # as linhas da Visão que cada quadro mostra, com os mesmos botões (o card da ronda, da OS, a janela da PT)
+    pendente = (u.get("ronda") or {}).get("tipo") in ("nunca", "sem_ronda", "longa_pendente")
+    out.update(ronda_pendente=CU.linhas(u, "acomp", ("Ronda",)) if pendente else [],
+               ronda_limpeza=CU.linhas(u, "acomp", ("Ronda", "Limpeza")),
+               os_pendentes=CU.linhas(u, "manut", ("Atrasadas", "Pausadas")),
+               os_linhas=CU.linhas(u, "manut", ("Parada agora", "OS abertas", "Vencem até amanhã", "Semana", "Zeladoria")),
+               pt_esperando=[dict(x, idade=campo_resp._duracao(x.get("idade_min")))
+                             for x in (u.get("pt") or {}).get("lista") or []])
+    liberadas = setor_telas.liberadas_do_menu()
+    out["link"] = {t: liberadas is None or t in liberadas for t in ("campo/ocorrencias", "hseq/mesa", "campo/rondas")}
+    # os técnicos que o PCM põe na usina hoje (a regra do App desde 29/10/2026); sem ler, a lista fica vazia e a tela diz
+    atr = None
+    try:
+        from ...pcm import atribuicoes as A
+        est = A.ler(current_app.config)
+        if not (est.get("erro") and not est.get("velha")):
+            atr = A.atuais(est, int(hoje.strftime("%Y%m%d")))
+    except Exception:           # noqa: BLE001
+        _log_campo.exception("Central da usina: as atribuições do PCM não abriram")
+    if atr is None:
+        out["erros"]["tecnicos"] = "os técnicos por usina do PCM"
+    out["pessoas"] = CU.pessoas(uid, visao._Base(), atr)
+    try:
+        lido = campo_oc.ler_sem_esperar()
+        out["ocorrencias"] = CU.ocorrencias(uid, campo_oc.estado(lido["eventos"], campo_oc.cofre_ou_nada()))
+    except Exception:           # noqa: BLE001
+        _log_campo.exception("Central da usina: as ocorrências não abriram")
+        out["ocorrencias"], out["erros"]["ocorrencias"] = [], "as ocorrências"
+    try:
+        from ..hseq import _pendencias as pendencias_da_mesa
+        mesa = pendencias_da_mesa({})
+        out["seguranca"] = CU.seguranca(uid, mesa["listas"])
+        if mesa["erros"]:
+            out["erros"]["seguranca"] = "parte das pendências da Segurança"
+    except Exception:           # noqa: BLE001
+        _log_campo.exception("Central da usina: a Mesa da Segurança não abriu")
+        out["seguranca"], out["erros"]["seguranca"] = [], "as pendências da Segurança"
+    try:
+        out["chamados_mes"] = campo_resp.chamados_finalizados(uid, hoje)
+    except Exception:           # noqa: BLE001
+        _log_campo.exception("Central da usina: os chamados finalizados não abriram")
+        out["chamados_mes"], out["erros"]["chamados_mes"] = [], "os chamados finalizados no mês"
+    try:
+        lp = visao.pts()
+        out["pts_mes"] = [] if lp.erro else CU.pts_do_mes(uid, (lp.dados or {}).get("historico") or [], hoje)
+        if lp.erro:
+            out["erros"]["pts_mes"] = "as PT do mês"
+    except Exception:           # noqa: BLE001
+        _log_campo.exception("Central da usina: as PT não abriram")
+        out["pts_mes"], out["erros"]["pts_mes"] = [], "as PT do mês"
+    return out
+
+
 @bp.route("/responsaveis")
 def responsaveis():
     """Os cartões dos responsáveis (o padrão de quem não é responsável) ou, com um escolhido (no cartão, no filtro, ou o
@@ -456,8 +529,8 @@ def responsaveis():
         # o responsável logado nunca vê os cartões dos outros responsáveis; o Painel, o Ranking das equipes e a Visão
         # geral das usinas dele, sim (18/10/2026; o Painel em 28/10/2026). Com "Todos" escolhido não há um responsável:
         # fica a Visão geral de todas, como antes
-        modo = modo if modo in ("painel", "ranking", "geral") else ("painel" if responsavel else "geral")
-    elif modo not in ("cartoes", "ranking", "geral", "painel"):
+        modo = modo if modo in ("painel", "ranking", "geral", "usina") else ("painel" if responsavel else "geral")
+    elif modo not in ("cartoes", "ranking", "geral", "painel", "usina"):
         modo = "painel" if responsavel else "cartoes"
     # a Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas"): todas as usinas do filtro numa lista
     # só, e o clique num bloco, nível ou número do resumo filtra (`filtro`, a condição daquele número no `soma`)
@@ -496,6 +569,9 @@ def responsaveis():
     # o Painel: os cinco quadros sobre as MESMAS usinas e o mesmo Ranking (nexus/campo/painel_responsavel.py)
     from ...campo import painel_responsavel as campo_painel
     painel = campo_painel.montar(responsavel or "Todos os responsáveis", usinas, ranking) if modo == "painel" else None
+    # a Central da usina (Levi, 04/11/2026, "como aba alternativa"): a busca com TODAS as usinas da Visão (sem o filtro
+    # de responsável, de cliente e da busca: buscar é ir à usina) e a usina escolhida
+    central = _central_da_usina(todas) if modo == "usina" else None
     nomes = sorted({u.get("responsavel") or visao.SEM_RESPONSAVEL for u in todas} | ({responsavel} if responsavel else set()),
                    key=lambda n: (n == visao.SEM_RESPONSAVEL, n))
     # a faixa "Parada agora" (18/10/2026): as OS de parada abertas nas usinas DO FILTRO, a mais antiga primeiro
@@ -513,6 +589,7 @@ def responsaveis():
                                            for bb, nome, txt in campo_resp.BLOCOS if bb == b],
         base_pequena=visao.BASE_PEQUENA,
         responsavel_logado=logado, limite=limite, faixa=faixa, faixa_max=FAIXA_MAX, estado_os=tarefas_os.estado(),
+        central=central, iniciais=_iniciais,
         foto_os=campo_resp.foto_das_os(((d.get("info") or {}).get("manut") or {}).get("gerado_em"), visao._agora()),
         usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),
         blocos=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b, nome, txt in campo_resp.BLOCOS],
@@ -725,6 +802,29 @@ def responsaveis_relatorio():
     pdf = painel_relatorio.gerar(painel, faixa, v["r"] if v["pronta"] else None, filtros=filtros,
                                  gerado_em=agora.strftime("%d/%m/%Y %H:%M"), temas=temas)
     nome = f"Painel do responsável - {responsavel or 'todos'} - {agora.strftime('%Y-%m-%d')}.pdf"
+    return Response(pdf, mimetype="application/pdf",
+                    headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(nome),
+                             "Cache-Control": "no-store"})
+
+
+
+@bp.route("/responsaveis/usina/<int:usina_id>/relatorio.pdf")
+def responsaveis_usina_relatorio(usina_id):
+    """O relatório da usina em PDF, para o cliente (Levi, 04/11/2026: "é interessante que dê para baixar um relatório da
+    usina também! Algo bem profissional para o cliente!"): o mês (`mes`, AAAA-MM: o atual ou um dos dois anteriores; o
+    anterior de início) e os temas marcados na janela (`tema` repetido; sem nenhum, todos), em
+    nexus/campo/relatorio_usina.py. Só as usinas da Visão (as mobilizadas)."""
+    from ...campo import relatorio_usina as RU
+    d = campo_resp.visao_responsaveis().dados or {}
+    if not any(u["usina_id"] == usina_id for u in d.get("usinas") or []):
+        abort(404)
+    agora = datetime.now(_BRT)
+    hoje = agora.date()
+    mes = RU.mes_do_pedido(request.args.get("mes"), hoje)
+    temas = RU.temas_do_pedido(request.args.getlist("tema"))
+    dados = RU.dados(usina_id, mes, hoje)
+    pdf = RU.gerar(dados, temas, gerado_em=agora.strftime("%d/%m/%Y às %H:%M"))
+    nome = f"Relatório {dados['usina']} - {mes}.pdf"
     return Response(pdf, mimetype="application/pdf",
                     headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(nome),
                              "Cache-Control": "no-store"})
@@ -1283,7 +1383,9 @@ def rondas():
     for x in (d.get("cobertura") or []) + (d.get("todas") or []):
         if x.get("usina_id") and x.get("usina"):
             busca.setdefault(x["usina_id"], (x["usina"], " · ".join(v for v in (x.get("cliente"), x.get("uf")) if v)))
-    usinas_busca = sorted(((uid, nome, sub) for uid, (nome, sub) in busca.items()), key=lambda u: _ordem_do_nome(u[1]))
+    # a lista é a da busca compartilhada com a Central da usina (`_busca_usina.html`, 04/11/2026): o endereço vai junto
+    usinas_busca = sorted(((uid, nome, sub, url_for("torre_campo.rondas_usina", usina_id=uid))
+                           for uid, (nome, sub) in busca.items()), key=lambda u: _ordem_do_nome(u[1]))
     return render_template("campo/rondas.html", **_comum(
         "rondas", leitura, dias=dias, regiao=regiao, aba=aba, abas=ABAS_RONDAS, dur=dur,
         pend=pend, pendencias={k: v for k, v in visao.FEITA.items() if k != "ok"}, ind=ind, cob=cob,

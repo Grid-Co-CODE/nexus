@@ -207,7 +207,13 @@ def os_anexos_contagem(wid):
             raise
         return jsonify({"sub": None, "os": None, "erro": str(e)[:160]})
     vistos = {chave(a) for a in subs if chave(a)}
-    return jsonify({"sub": len(subs), "os": sum(1 for a in oss if chave(a) not in vistos)})
+    # e quantos de cada tarefa (Levi, 04/11/2026: "quero que dê para ver o anexo especificamente daquela tarefa"): a OS de
+    # vários ativos mostra no ativo quantos anexos a tarefa dele tem
+    por_tarefa = {}
+    for a in subs:
+        if a.get("id_tarefa") is not None:
+            por_tarefa[str(a["id_tarefa"])] = por_tarefa.get(str(a["id_tarefa"]), 0) + 1
+    return jsonify({"sub": len(subs), "os": sum(1 for a in oss if chave(a) not in vistos), "por_tarefa": por_tarefa})
 
 
 @bp.route("/logout")
@@ -769,7 +775,11 @@ def preparar_linhas(lista) -> None:
     # — ler o do Fracttal aqui (quando o cache venceu) poria minutos na frente do Histórico por um detalhe de exibição
     frases = _memo(("frases_ativo",), 3600, lambda: ativo_curto.frases(api._read_asset_cache() or []))
     for l in lista.linhas:
-        l["_ativo_curto"] = ativo_curto.curto(l.get("ativo"), frases.get(l.get("tipo")))
+        # a OS de vários ativos (a agrupada da Performance: 16 inversores numa OS só) diz "Vários" e não o 1º deles (Levi,
+        # 04/11/2026: "no ativo apareça 'VÁRIOS' ao invés de aparecer o 1° ativo"); cada ativo fica no card da OS
+        l["_n_ativos"] = len({str(c).strip() for c in (l.get("codigos") or []) if str(c or "").strip()})
+        l["_ativo_curto"] = ("Vários" if l["_n_ativos"] > 1
+                             else ativo_curto.curto(l.get("ativo"), frases.get(l.get("tipo"))))
         l["_status_cor"] = STATUS_COR.get(l.get("status") or "")
         l["_etiqueta"] = ", ".join(e.get("nome") or "" for e in (l.get("etiquetas") or []) if isinstance(e, dict))
         l["_texto"] = (" ".join(str(l.get(k) or "") for k in ("folio", "cliente", "usina", "ativo", "descricao", "status")) + " " + l["_etiqueta"]).lower()

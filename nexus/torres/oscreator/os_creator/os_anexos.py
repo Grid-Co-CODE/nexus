@@ -279,11 +279,11 @@ def get_os_subtarefa_anexos(id_work_order) -> list:
                 is_image = any(low.endswith(e) for e in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"))
                 out.append({"url": None, "thumb": None, "descricao": legenda or nome, "nome": nome,
                             "value": val, "subtarefa": sub_desc, "is_image": is_image,
-                            "is_text": False, "raw": d})
+                            "is_text": False, "raw": d, "id_tarefa": wid})
             else:                                               # nota de texto (type 3)
                 out.append({"url": None, "thumb": None, "descricao": legenda or att_desc or val,
                             "nome": att_desc or val or "nota", "value": "", "subtarefa": sub_desc,
-                            "is_image": False, "is_text": True, "raw": d})
+                            "is_image": False, "is_text": True, "raw": d, "id_tarefa": wid})
     arquivos = [a for a in out if not a["is_text"] and a["value"]] if com_url else []   # resolve URL pré-assinada (S3)
     if arquivos:
         try:

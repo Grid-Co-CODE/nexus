@@ -39,10 +39,12 @@
   {% block topo_acoes %}{% endblock %}
   {# o sino (03/11/2026, os setores conversando): os avisos das OS da pessoa, as menções e os pedidos para o setor dela;
      leva à Caixa de entrada. Os insights sem dono saíram em 04/11/2026 (Levi: "tira insights sem dono do sino"): eram mais
-     de mil e escondiam o resto; ficam na Caixa. Ícone da fonte (sem <svg> no topo, ver o comentário do tema) #}
+     de mil e escondiam o resto; ficam na Caixa. O botão leva o ícone do OS Creator do menu lateral, e não o sino (Levi,
+     04/11/2026: "quero que troque esse símbolo de sino pelo símbolo do OS Creator"). Ícone da fonte (sem <svg> no topo,
+     ver o comentário do tema) #}
   {% if sino is not none %}<details class="sino-topo">
     <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos: {{ sino.n }}" title="Avisos das suas OS, menções e pedidos para o seu setor">
-      <i class="ph ph-bell" aria-hidden="true"></i>{% if sino.n %}<b class="sino-n{% if sino.criticos %} sino-n--critico{% endif %}">{{ sino.n }}</b>{% endif %}</summary>
+      <i class="ph ph-{{ sino.icone_os or 'clipboard-text' }}" aria-hidden="true"></i>{% if sino.n %}<b class="sino-n{% if sino.criticos %} sino-n--critico{% endif %}">{{ sino.n }}</b>{% endif %}</summary>
     <div class="sino-caixa" role="region" aria-label="Avisos">
       {# os avisos das OS da pessoa (04/11/2026, comando/avisos.py): o clique abre o card da OS (o mesmo do Histórico, com o
          PDF) por cima da tela; sem JavaScript, a página da OS. "Marcar como lida" é um formulário, como o tema #}
@@ -102,6 +104,8 @@
           <span class="rotulo-tema">Tema: {{ 'Claro' if tema == 'claro' else 'Escuro' }}</span>
         </button>
       </form>
+      {# a Paleta Nexus (04/11/2026): o escuro ao lado do claro, só para administradores #}
+      {% if session.admin %}<a class="gc-btn gc-btn--ui gc-btn--fantasma conta-paleta" href="{{ raiz }}/t/base/paleta"><i class="ph ph-palette" aria-hidden="true"></i><span>Paleta Nexus</span></a>{% endif %}
       <a class="gc-btn gc-btn--ui gc-btn--fantasma sair" href="{{ raiz }}/sair" aria-label="Sair"><i class="ph ph-sign-out"></i><span class="rotulo-sair">Sair</span></a>
     </div>
   </details>

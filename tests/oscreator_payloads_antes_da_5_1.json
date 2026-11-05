@@ -5,7 +5,8 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 3, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "81ba07c489618eb3fb33f38acc97f7c156c6dc30"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "[Inversor 1.2] - X", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 3, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "n2", "to_work_order": false, "work_done": false}, "sha1": "b0c0bf6e08c9f76b4809bdf508830e75453a4cf0"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 1200, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "a9d733960ff50d4e4acc3ec0b969759922f8d1ef"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 1200, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "18aea24a023c3b241659f0ff8fa2bf4a49dd53be"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11, 12], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
    {"tarefas_da_os": 7001},
    {"anexo": {"bytes": 15, "nome": "foto.png", "os": 7001, "tarefa": 5001}},
@@ -19,7 +20,7 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 3, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "81ba07c489618eb3fb33f38acc97f7c156c6dc30"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "[Inversor 1.2] - X", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 3, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "n2", "to_work_order": false, "work_done": false}, "sha1": "b0c0bf6e08c9f76b4809bdf508830e75453a4cf0"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 1200, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "a9d733960ff50d4e4acc3ec0b969759922f8d1ef"}
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 1200, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "18aea24a023c3b241659f0ff8fa2bf4a49dd53be"}
   ]
  },
  "agrupada_etiqueta_falhou": {
@@ -28,7 +29,8 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 3, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "81ba07c489618eb3fb33f38acc97f7c156c6dc30"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "[Inversor 1.2] - X", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 3, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "n2", "to_work_order": false, "work_done": false}, "sha1": "b0c0bf6e08c9f76b4809bdf508830e75453a4cf0"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 1200, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "a9d733960ff50d4e4acc3ec0b969759922f8d1ef"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 1200, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "18aea24a023c3b241659f0ff8fa2bf4a49dd53be"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11, 12], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
    {"tarefas_da_os": 7001},
    {"anexo": {"bytes": 15, "nome": "foto.png", "os": 7001, "tarefa": 5001}},
@@ -44,7 +46,8 @@
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "e07763d7e4b6ed07945837e1d40f99d894ff90ea"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "823ebf81f6c9a4ce9ebf4b158a56f0e17ff1ee3d"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11, 12], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"}
   ]
  },
@@ -69,7 +72,8 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 3, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "81ba07c489618eb3fb33f38acc97f7c156c6dc30"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "[Inversor 1.2] - X", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 3, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "n2", "to_work_order": false, "work_done": false}, "sha1": "b0c0bf6e08c9f76b4809bdf508830e75453a4cf0"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "869565c267b54b563fd16e475746cd6a2a6f98ca"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "afcfe34003d8fd8943cb456bd5ce0fb698270b65"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11, 12], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
    {"tarefas_da_os": 7001},
    {"anexo": {"bytes": 15, "nome": "foto.png", "os": 7001, "tarefa": 5001}},
@@ -82,7 +86,8 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "A", "duration": 5400, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-03T13:30:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-03T12:00:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "c27dca70698bd02d68fb03671de073d8827639f2"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "B", "duration": 600, "event_date": "2026-11-04T11:30:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "5a323c6b2436bc015c52758981e8726b6abb515c"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 6000, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "fe004554c9eaab3188438f1b888152d7f6e5d14e"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 6000, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "507e9bfd400c349f7e55fb43e54911eaf62feeaa"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"}
   ]
  },
@@ -92,7 +97,8 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "A", "duration": 5400, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-03T13:30:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-03T12:00:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "c27dca70698bd02d68fb03671de073d8827639f2"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "B", "duration": 600, "event_date": "2026-11-04T11:30:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "5a323c6b2436bc015c52758981e8726b6abb515c"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 6000, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "fe004554c9eaab3188438f1b888152d7f6e5d14e"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 6000, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "507e9bfd400c349f7e55fb43e54911eaf62feeaa"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"}
   ]
  },
@@ -110,7 +116,8 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "A", "duration": 5400, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-03T13:30:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-03T12:00:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "c27dca70698bd02d68fb03671de073d8827639f2"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "B", "duration": 600, "event_date": "2026-11-04T11:30:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "5a323c6b2436bc015c52758981e8726b6abb515c"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 6000, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "fe004554c9eaab3188438f1b888152d7f6e5d14e"}
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 6000, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "507e9bfd400c349f7e55fb43e54911eaf62feeaa"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"}
   ]
  },
  "clonar_sem_responsavel": {
@@ -136,7 +143,8 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "A", "duration": 5400, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-03T13:30:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-03T12:00:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "c27dca70698bd02d68fb03671de073d8827639f2"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "B", "duration": 600, "event_date": "2026-11-04T11:30:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "5a323c6b2436bc015c52758981e8726b6abb515c"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 5400, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "f93ce63ac7a6e46f7d85e94359318618d90ecb07"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 5400, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "0d49394da0dc6dc596e9d30a61e7f736fde3ff02"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"}
   ]
  },
@@ -181,7 +189,8 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Procedimento X", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-03T12:20:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-03T12:00:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "f57069d6512fc5aa34f0e8ea24a89075aeec2681"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Procedimento X", "duration": 600, "event_date": "2026-10-31T12:00:00.000Z", "final_date": "2026-10-31T12:20:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-10-31T12:00:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "712d65bf6e5bef320b9a534f8a488427711b77f1"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 1200, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "a91f8d5bc6a4f3bd66e789d3a95a2a045e1eaf77"}
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 1200, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "073dbfdd116664b527f318d41161e7b48670acdf"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"}
   ]
  },
  "performance_agrupada": {
@@ -192,6 +201,7 @@
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
    {"params": {"filter": [{"condition": "or", "operator": "like", "property": "wo_folio", "value": "1234"}], "is_tree": false, "limit": 20, "node": null, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.work_orders_parents_list"},
    {"pedido": "tasks.work_order_insert", "resumo": {"duration": 7200, "id_parent": 4321, "id_responsible": 77, "name": "Ana Teste", "note": "obs da OS", "tarefas": [1001, 1002]}, "sha1": "5926afb6c27429d08e6abe11506f566491b37d4e"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [31, 32], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
    {"params": {"filter": [], "id_work_order": 7001, "is_tree": false, "limit": 200, "node": null, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.work_orders_tasks_new_list"},
    {"anexo": {"bytes": 15, "nome": "foto.png", "os": 7001, "tarefa": 5001}}
@@ -205,6 +215,7 @@
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
    {"params": {"filter": [{"condition": "or", "operator": "like", "property": "wo_folio", "value": "1234"}], "is_tree": false, "limit": 20, "node": null, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.work_orders_parents_list"},
    {"pedido": "tasks.work_order_insert", "resumo": {"duration": 7200, "id_parent": 4321, "id_responsible": 77, "name": "Ana Teste", "note": "obs da OS", "tarefas": [1001, 1002]}, "sha1": "5926afb6c27429d08e6abe11506f566491b37d4e"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [31, 32], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
    {"params": {"filter": [], "id_work_order": 7001, "is_tree": false, "limit": 200, "node": null, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.work_orders_tasks_new_list"},
    {"anexo": {"bytes": 15, "nome": "foto.png", "os": 7001, "tarefa": 5001}}
@@ -220,6 +231,7 @@
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
    {"params": {"filter": [{"condition": "or", "operator": "like", "property": "wo_folio", "value": "1234"}], "is_tree": false, "limit": 20, "node": null, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.work_orders_parents_list"},
    {"pedido": "tasks.work_order_insert", "resumo": {"duration": 3600, "id_parent": 4321, "id_responsible": 77, "name": "Ana Teste", "note": "obs da OS", "tarefas": [1002]}, "sha1": "7583a92cae8340303b910bb71635cf24ac73fd8e"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [31, 32], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
    {"params": {"filter": [], "id_work_order": 7001, "is_tree": false, "limit": 200, "node": null, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.work_orders_tasks_new_list"},
    {"anexo": {"bytes": 15, "nome": "foto.png", "os": 7001, "tarefa": 5001}}
@@ -257,7 +269,8 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "[Grid Co.] - Limpeza", "duration": 5400, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-03T13:40:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 3, "id_request": null, "id_task": 9, "initial_date": "2026-11-03T12:10:00.000Z", "name": null, "note": "", "to_work_order": false, "work_done": false}, "sha1": "c03c7f6b3cd495ef9a5a32e8a0dfac8c525dee45"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "[Grid Co.] - Limpeza", "duration": 3600, "event_date": "2026-11-04T11:30:00.000Z", "final_date": "2026-11-04T12:40:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 3, "id_request": null, "id_task": 9, "initial_date": "2026-11-04T11:40:00.000Z", "name": null, "note": "", "to_work_order": false, "work_done": false}, "sha1": "f308be317529cb07de51def1bf797ddeae921366"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 9000, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "474eb735125210ca68ebf1f029fa4fc213066518"}
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 9000, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001, 1002]}, "sha1": "318bf0c88d9e7e9ed6f2411ba1cdc3923f15fa10"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"}
   ]
  },
  "planos_do_pcm_tarefas_nao_achadas": {
@@ -276,7 +289,8 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "[Grid Co.] - Limpeza", "duration": 5400, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-03T13:40:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 3, "id_request": null, "id_task": 9, "initial_date": "2026-11-03T12:10:00.000Z", "name": null, "note": "", "to_work_order": false, "work_done": false}, "sha1": "c03c7f6b3cd495ef9a5a32e8a0dfac8c525dee45"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "[Grid Co.] - Limpeza", "duration": 3600, "event_date": "2026-11-04T11:30:00.000Z", "final_date": "2026-11-04T12:40:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 3, "id_request": null, "id_task": 9, "initial_date": "2026-11-04T11:40:00.000Z", "name": null, "note": "", "to_work_order": false, "work_done": false}, "sha1": "f308be317529cb07de51def1bf797ddeae921366"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 5400, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "9b4612e944aadde84ea5de41a976fd7e823573a8"}
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 5400, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "6afdc9128d7bbc211d3ba27d8ecf44a0e1120c4e"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"}
   ]
  },
  "um_plano_varios_ativos": {
@@ -294,9 +308,11 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "628c9857be1a1461313a747bc128ea8bf2f5a9f2"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "[Inversor 1.2] - X", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "n2", "to_work_order": false, "work_done": false}, "sha1": "9cf69fa377037ae5a04c6f1218d29bcfa070d5b1"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "12fa4781fcb761482829814d90a172d6d91a6fa0"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "467c8806114fc61cad1418be3cdea582b71b11c1"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "e0ba7eacda9d69fae436c69f1c5ebe2f2d4d8a49"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "67bdf884c1296c759d50981718bdc39fa511ff9e"},
+   {"params": {"get_iso_codes": false, "id": 7002}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7002, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
    {"tarefas_da_os": 7001},
    {"anexo": {"bytes": 15, "nome": "foto.png", "os": 7001, "tarefa": 5001}},
@@ -309,8 +325,8 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "628c9857be1a1461313a747bc128ea8bf2f5a9f2"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "[Inversor 1.2] - X", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "n2", "to_work_order": false, "work_done": false}, "sha1": "9cf69fa377037ae5a04c6f1218d29bcfa070d5b1"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "12fa4781fcb761482829814d90a172d6d91a6fa0"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "e07763d7e4b6ed07945837e1d40f99d894ff90ea"}
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "467c8806114fc61cad1418be3cdea582b71b11c1"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "823ebf81f6c9a4ce9ebf4b158a56f0e17ff1ee3d"}
   ]
  },
  "uma_os_por_ativo_etiqueta_falhou": {
@@ -319,9 +335,11 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "628c9857be1a1461313a747bc128ea8bf2f5a9f2"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "[Inversor 1.2] - X", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 2, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "n2", "to_work_order": false, "work_done": false}, "sha1": "9cf69fa377037ae5a04c6f1218d29bcfa070d5b1"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "12fa4781fcb761482829814d90a172d6d91a6fa0"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "467c8806114fc61cad1418be3cdea582b71b11c1"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "e0ba7eacda9d69fae436c69f1c5ebe2f2d4d8a49"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "67bdf884c1296c759d50981718bdc39fa511ff9e"},
+   {"params": {"get_iso_codes": false, "id": 7002}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7002, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
    {"tarefas_da_os": 7001},
    {"anexo": {"bytes": 15, "nome": "foto.png", "os": 7001, "tarefa": 5001}},
@@ -336,7 +354,8 @@
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "e07763d7e4b6ed07945837e1d40f99d894ff90ea"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "823ebf81f6c9a4ce9ebf4b158a56f0e17ff1ee3d"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"}
   ]
  },
@@ -380,9 +399,11 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-03T12:20:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-03T12:00:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "0c80049e12119ae1a2f7bd1f9d4d26ee3a334cdb"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-04T11:30:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "ad81385726316218b2273b843c3366eebdb2f249"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "12fa4781fcb761482829814d90a172d6d91a6fa0"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "467c8806114fc61cad1418be3cdea582b71b11c1"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "1b27c97b2556f7613f986cb120bb4dfad335fd10"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "444adae7bbd252fa78152b38f227a0e5fa690a72"},
+   {"params": {"get_iso_codes": false, "id": 7002}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7002, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"}
   ]
  },
@@ -392,9 +413,11 @@
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-03T12:00:00.000Z", "final_date": "2026-11-03T12:20:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-03T12:00:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "0c80049e12119ae1a2f7bd1f9d4d26ee3a334cdb"},
    {"pedido": "tasks.tasks_noscheduled_react_insert", "resumo": {"description": "Descrição", "duration": 600, "event_date": "2026-11-04T11:30:00.000Z", "final_date": "2026-11-04T11:50:00.000Z", "id_item": 1, "id_parent": 555, "id_priorities": 2, "id_request": null, "initial_date": "2026-11-04T11:30:00.000Z", "name": null, "note": "obs", "to_work_order": false, "work_done": false}, "sha1": "ad81385726316218b2273b843c3366eebdb2f249"},
    {"params": {"append": true, "filter": [], "group": {}, "id_type_item": 0, "is_tree": false, "limit": 200, "page": 1, "sort": [], "start": 0}, "pedido": "tasks.tasks_todo_list_kanban"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "12fa4781fcb761482829814d90a172d6d91a6fa0"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1001]}, "sha1": "467c8806114fc61cad1418be3cdea582b71b11c1"},
+   {"params": {"get_iso_codes": false, "id": 7001}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7001, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"},
-   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "1b27c97b2556f7613f986cb120bb4dfad335fd10"},
+   {"pedido": "tasks.work_order_insert", "resumo": {"duration": 600, "id_parent": 555, "id_responsible": 77, "name": "Ana Teste", "tarefas": [1002]}, "sha1": "444adae7bbd252fa78152b38f227a0e5fa690a72"},
+   {"params": {"get_iso_codes": false, "id": 7002}, "pedido": "tasks.work_order_details_new"},
    {"params": {"append": true, "id_labels": [11], "id_work_order": 7002, "limit": 200, "page": 1, "start": 0}, "pedido": "tasks.work_order_labels_sync"}
   ]
  },

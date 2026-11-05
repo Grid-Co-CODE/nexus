@@ -77,7 +77,12 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
 
 - **Tokens:** dois blocos no `nexus.css`. `:root,:root[data-tema="claro"] .topo` é o escuro (o `.topo` repete o escuro
   dentro do claro: o cabeçalho fica navy com o logo branco nos dois temas) e `:root[data-tema="claro"]` é o claro, na
-  identidade do site (página #fcfcfc, cartão branco, seções #f5f6f8, texto #1f2937). Todo token tem valor nos dois. As
+  identidade do site (texto #1f2937). Desde 04/11/2026 o cartão é cinza sobre a página branca, o espelho do escuro (Levi:
+  "o fundo claro podemos ter o fundo claro e os cards um pouco mais escuros, indico um cinza claro"; e "um cinza um pouco
+  mais escuro"): página #ffffff, cartão #e9ecf1, hover #e3e7ed, o tom mais fundo #dde2e9; o mudo, o fraco e as palavras
+  do semáforo (ok, crítico, info, sem comunicação) escurecidos para seguir em 4,5:1 nesses cinzas (o test_tema cobra).
+  Comparar os dois temas: **Paleta Nexus** (`/t/base/paleta`: o Caddy só manda ao Nexus a raiz, `/t/*` e poucos outros; só administradores, no menu da conta; `paleta_tokens.py` lê os
+  dois blocos do nexus.css a cada abertura). Todo token tem valor nos dois. As
   outras folhas (`campo`, `pcm`, `cadastro`, `dados`, `engenharia`, `clima`, `clima-mapa`) não têm cor nenhuma, só
   `var(--token)`; os tokens locais delas (`--cl-*`, `--pg-*`, `--mp-*`) apontam para os globais.
 - **REGRA: cor só por token.** Cor nova = token novo nos DOIS blocos, com o valor do escuro e o do claro; nada de

@@ -103,6 +103,8 @@ download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
 - **No sino:** a parte "avisos das suas OS", no alto; o clique abre o card da OS (`oscreator/card_os_abrir.html`, com o
   botão do PDF) por cima da tela, e sem JavaScript a página da OS. "Marcar como lida" e "Marcar todas como lidas" são
   formulários (`POST /avisos/lida`, sem JavaScript, como o tema), e o lido vale em qualquer computador (o banco).
+- **O botão do topo leva o ícone do OS Creator** do menu lateral (lido da torre `os`), no lugar do sino (Levi,
+  04/11/2026: "quero que troque esse símbolo de sino pelo símbolo do OS Creator"). As classes seguem `sino-*`.
 - O sino só lê a cópia de 1 minuto do livro (`avisos.copia`) e a conta da lista central da pessoa (1 minuto, por versão
   da lista): nenhuma página espera o banco.
 

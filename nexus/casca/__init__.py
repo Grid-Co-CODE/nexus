@@ -278,6 +278,18 @@ def tema():
     return resp
 
 
+@bp.route("/t/base/paleta")
+def paleta():
+    """A Paleta Nexus (04/11/2026): o escuro ao lado do claro, token a token. Só administradores (Levi: "ao clicar no
+    nome da pessoa aparecer 'paleta nexus' só para os administradores"). Mora em /t/base/ porque o Caddy do servidor só
+    manda ao Nexus a raiz, /t/* e poucos outros caminhos (tests/test_rotas_no_caminho_do_nexus.py)."""
+    if not session.get("admin"):
+        abort(403)
+    from . import paleta_tokens as PA
+    escuro, claro, grupos = PA.grupos()
+    return render_template("paleta.html", escuro=escuro, claro=claro, grupos=grupos)
+
+
 @bp.route("/saude")
 def saude():
     # Público de propósito (monitoramento do servidor). Não diz nada além de "está de pé" e o commit.
@@ -323,9 +335,12 @@ def _sino():
             tipo, _, oid = x["objeto"].partition(":")
             mencoes.append({"link": "/t/comando/conversa/" + tipo + "/" + oid, "n": x["n"],
                             "titulo": _titulo(x["objeto"])})
+        # o botão do topo leva o ícone do OS Creator do menu lateral, no lugar do sino (Levi, 04/11/2026: "quero que troque
+        # esse símbolo de sino pelo símbolo do OS Creator"): lido da torre, para os dois nunca divergirem
+        icone_os = next((t.icone for t in current_app.extensions.get("nexus_torres", []) if t.id == "os"), "clipboard-text")
         return {"n": len(mencoes) + len(pedidos) + len(avisos), "criticos": sum(1 for p in pedidos if p["atrasado"]),
                 "mencoes": mencoes[:6], "n_mencoes": len(mencoes), "pedidos": pedidos[:6], "n_pedidos": len(pedidos),
-                "avisos": avisos[:8], "n_avisos": len(avisos)}
+                "avisos": avisos[:8], "n_avisos": len(avisos), "icone_os": icone_os}
     except Exception:            # noqa: BLE001 — o sino nunca derruba uma página
         current_app.logger.exception("sino dos insights")
         return None

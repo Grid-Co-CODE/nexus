@@ -22,7 +22,11 @@
   <a class="eg-ac-volta" href="{{ url_for(volta_endpoint) }}">← {{ volta_texto }}</a>
   <h1 class="cn-titulo">OS {{ folio }}</h1>
   {% if nao_achou %}<p class="cn-erro" role="status"><b>Não achei a OS {{ folio }} no Fracttal.</b> Confira o número.</p>
-  {% else %}<p class="cn-erro" role="status"><b>O Fracttal não respondeu ({{ erro_fracttal }}).</b> Recarregue em instantes.</p>{% endif %}
+  {% else %}<p class="cn-erro" role="status"><b>O Fracttal não respondeu ({{ erro_fracttal }}).</b> Tente de novo em instantes.</p>
+  {# o botão de tentar de novo (Levi, 05/11/2026: "Deixa um botão para a pessoa tentar novamente"): a recusa costuma ser a
+     cota de 200 pedidos por minuto da empresa toda (às 23h30 de 04/11/2026 o App de Campo e esta página levaram 429 juntos),
+     e dentro de um clique o Nexus não espera o minuto. Um link para a própria página: vale sem JavaScript #}
+  <p class="eg-ac-tentar"><a class="eg-ac-btn eg-ac-btn--g" href="{{ url_for(rota_os, folio=folio) }}">Tentar novamente</a></p>{% endif %}
   {% else %}
   {# o topo da tela do chamado da Garantia (Levi, 24/10/2026: "essa parte de cima quero na mesma estrutura e fonte os
      botões quero nas mesmas posições"): numa linha a volta, a pílula do estado e o título com o ativo em verde; embaixo o

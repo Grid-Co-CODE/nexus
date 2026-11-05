@@ -197,7 +197,7 @@ def aprovar_solicitacao(asset: dict, descricao: str, subtarefas: list, id_reques
     # PCM poe no Fracttal se faltar
     idt = rec.get("id_task")
     jun = os_juntar.juntar_em_os([idt], {idt: api._segundos(rec.get("duration")) or duracao or api.DURACAO_OS_AVULSA}, id_responsible,
-                                 responsible_name, etiqueta_ids=etiqueta_ids, registros={idt: rec})
+                                 responsible_name, etiqueta_ids=etiqueta_ids, registros={idt: rec}, id_parent=id_parent)
     idwo = jun.get("id_work_order")
     return {"ok": bool(idwo),
             "os": {"id_work_order": idwo, "wo_folio": jun.get("wo_folio"),

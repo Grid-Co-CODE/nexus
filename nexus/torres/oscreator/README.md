@@ -2549,6 +2549,55 @@ na nota entra a OS mãe do Fracttal; no banco, o chamado abre na data da nota.
   igual, a idade, a linha do tempo, a OS mãe, a tela e o fato). Conferido numa bancada local com o Fracttal falso, a 1440
   e a 375 px.
 
+## A OS pai vai no pedido que cria a OS numerada (04/11/2026)
+
+Uma colega avisou ao Levi: "o OS Creator do nexus não tá puxando a OS pai". Provado no ar no mesmo dia, em TESTE - PA: a OS
+18561, criada pelo Criar OS com a 18560 de pai, nasceu sem pai (o card sem "OS pai" e o Fluxo só com ela).
+- **A causa:** a OS pai só vale no pedido que cria a OS numerada (`_work_order_insert`, sondado em 26/08/2026); na tarefa
+  pendente (o `create_os_rpc` e o `create_planned_os` sem `to_work_order`) o Fracttal a ignora. A fase 2 de todos
+  (`os_juntar.juntar_em_os`) aceitava a OS pai, mas só a Performance agrupada a passava: o Criar OS (uma por ativo,
+  agrupado e por data), a Fila do PCM (aprovar e retomar), a Clonagem de OS, a OS sem plano e a Clonagem de planos
+  mandavam a OS pai só na tarefa, e as OS nasciam sem pai. O seletor e o "puxar" das telas (a OS pai da Engenharia no Criar
+  OS e na Nova solicitação, a da solicitação na Fila) estavam certos: a OS pai chegava ao servidor e se perdia na criação.
+- **A correção:** todo caminho que recebe a OS pai a passa ao `juntar_em_os` (e o `uma_os_por_tarefa` a repassa). O
+  `oscreator_payloads_antes_da_5_1.json` foi regravado: a única mudança nos 41 cenários é a OS pai no pedido da OS.
+- **Os caminhos que criam a OS de uma vez** (`to_work_order=True`: a OS já realizada, a Performance de uma OS por ativo e a
+  inspeção do chamado) mandam a OS pai no mesmo pedido que cria a OS, e ela fica: provado no ar em 04/11/2026 em TESTE - PA,
+  a OS 18564 (realizada) e a 18571 (Performance de uma OS por ativo) nasceram com a 18560 de pai, no card e no Fluxo.
+- **Conferir depois de gravar** (`os_juntar.conferir_os_pai`, 1 leitura do cabeçalho, só com OS pai): a fase 2 e os três
+  caminhos de uma vez leem a OS criada e, se o Fracttal não gravou a OS pai, a tela diz. Foi o silêncio que deixou o defeito
+  passar semanas. Os três de uma vez ganharam a conferência no mesmo dia, depois do pedido do Levi ("Performance e
+  engenharia também tem OS pai, veja se está funcionando normalmente!").
+- **A Performance de uma OS por ativo diz o que houve:** o nº de OS pai digitado que não existe no Fracttal vira "OS X criada
+  sem a OS pai" (a agrupada já dizia), e as ressalvas de cada OS (essa, a OS pai não gravada e as perguntas de fim de
+  atividade recusadas, que se perdiam dentro do `create_performance_os`) chegam à tela em "Atenção:", com o resultado em
+  cor de alerta. A inspeção do chamado mostra a OS pai não gravada junto do aviso da etiqueta.
+- **A Engenharia:** o Solicitar OS e o Criar OS da página da OS (e da gaveta do acompanhamento) abrem a Nova solicitação e o
+  Criar OS do zero com a OS já escolhida como OS pai (conferido no ar com a 18567), e a criação segue os caminhos acima.
+- Prova: `test_a_os_pai_vai_no_pedido_que_cria_a_os_numerada` (vermelho nos 7 caminhos antes da correção),
+  `test_a_os_que_nasce_numerada_tambem_confere_a_os_pai` e `test_a_performance_diz_a_os_pai_que_nao_achou_e_a_tela_mostra`
+  (vermelhos antes da conferência), em `tests/test_oscreator_os_juntar.py`.
+
+## A OS de vários ativos: ordem natural, anexos por tarefa e "Vários" no Histórico (04/11/2026)
+
+Levi, 04/11/2026: "quero que os ativos fiquem mais organizados"; "quero que dê para ver o anexo especificamente daquela
+tarefa e dê para baixar tudo de uma vez, o download sai com o nome do ativo!"; e "no Histórico ... no ativo apareça
+'VÁRIOS' ao invés de aparecer o 1° ativo".
+- **Ordem natural** (`os_acoes_web.ordem_natural`): com mais de um ativo, as tarefas do card vão por ativo, 1.1, 1.2 ...
+  1.10 (o Fracttal devolvia 1.1, 1.10, 1.2), e o número da tarefa acompanha. O banner virou etiquetas (`.det-ativo`), na
+  mesma ordem, no lugar da frase corrida.
+- **Anexos por tarefa:** cada anexo de subtarefa sabe a tarefa dele (`id_tarefa` no `os_anexos.get_os_subtarefa_anexos`,
+  `tarefa` no JSON); a contagem do card (`/os/os/<id>/anexos`) diz quantos de cada tarefa (`por_tarefa`), o ativo mostra
+  "N anexos" e o botão "Ver os anexos desta tarefa" abre a mesma janela dos anexos só com os dele.
+- **O nome do ativo no arquivo:** o card manda `{id da tarefa: ativo}` (lido das tarefas dele) ao `anexos-zip`, e o
+  `plano_do_zip` põe cada arquivo na pasta do ativo, começando pelo nome dele ("Inversor 1.2/Inversor 1.2 - 01 -
+  print.jpg"); com `tarefa`, o .zip leva só os daquela tarefa ("OS 15900 - Inversor 1.2 - anexos.zip"). O "Baixar" de um
+  anexo também sai com o nome do ativo. Sem ativos (OS de um ativo só), a arrumação de antes, pela subtarefa.
+- **"Vários" no Histórico** (`rotas.preparar_linhas`): a OS com mais de um código de ativo mostra "Vários" na coluna (e
+  "Vários (N)" no Exportar); a de um ativo, o nome curto de sempre.
+- Prova: `tests/test_oscreator_card_ativos_anexos_04_11.py`; os 2 testes de `test_oscreator_card_por_ativo_28_10.py`
+  aceitam o `data-ativo` novo na tarefa.
+
 ## A solicitação aprovada avisa quem pediu (04/11/2026)
 
 O aviso "Sua solicitação gerou uma OS" do sino do Nexus (`nexus/comando/avisos.py`): o `api_aprovar` do `rotas_solic`
@@ -2814,8 +2863,9 @@ quem pode: "qualquer um que é ADM ou do setor de chamados".
   (`acomp_web.chave_do_historico`, "h-...") e a edição ou a exclusão fica no banco do Nexus por cima dela
   (`chamados_obs_store.ajustes_do_historico`; `rotas_acomp._mexer_historico` confere que a chave está na nota de agora).
   Se a nota mudar a linha, a chave muda e o ajuste de antes deixa de valer para ela.
-- **Quem pode** o Nexus decide (`ponte.obs_chamados`: o administrador ou quem é do setor Chamados, a mesma regra da Área
-  PCM, `ponte._do_setor_ou_admin`) e põe no pedido (`os_web.obs_chamados`), só na tela de um chamado e nas rotas de
+- **Quem pode** o Nexus decide (`ponte.obs_chamados`: o administrador ou quem é do setor Performance, a mesma regra da
+  Área PCM, `ponte._do_setor_ou_admin`; até 05/11/2026 era o setor Chamados, que o Levi excluiu, pondo as pessoas dele
+  na Performance: "Sim, passa", para o setor inteiro) e põe no pedido (`os_web.obs_chamados`), só na tela de um chamado e nas rotas de
   editar e excluir (`ponte._ROTA_OBS`: o quadro não paga a leitura do setor). Quem não pode não vê os botões e recebe 403
   com o aviso. Sem a chave (o oem, sozinho), fica aberto, como a Área PCM.
 - **A tela:** o clique na observação escrita mostra o "editar" e o "excluir" dela (Levi: "clica no comentário e aparece

@@ -5,7 +5,7 @@ setor de chamados".
 O banco só acrescenta (a regra de 27/09 do `chamados_obs_store`: linha nova a cada vez, o histórico honesto): editar grava
 uma linha `edicao` e excluir uma `exclusao`, que apontam a observação (`extra.de`); a tela mostra a versão em vigor
 (`vigentes`), com a marca "editada", e some com a excluída. Só a observação escrita (tipo obs) muda; ticket, status e
-finalizado, os automáticos, nunca. Quem pode o Nexus decide (`ponte.obs_chamados`: o administrador ou o setor Chamados) e
+finalizado, os automáticos, nunca. Quem pode o Nexus decide (`ponte.obs_chamados`: o administrador ou o setor Performance; até 05/11/2026, o setor Chamados) e
 põe no pedido; o OS Creator sozinho (o oem) fica aberto, como a Área PCM.
 
 Fracttal e banco FALSOS (nada vai à rede). Nomes e números de mentira: o repositório é público."""
@@ -85,7 +85,7 @@ def tela(monkeypatch):
 
 
 PODE = {CHAVE: {"pode": True, "aviso": ""}}
-NAO_PODE = {CHAVE: {"pode": False, "aviso": "Editar e excluir observações em Garantias é do setor Chamados."}}
+NAO_PODE = {CHAVE: {"pode": False, "aviso": "Editar e excluir observações em Garantias é do setor Performance."}}
 
 
 def _pagina(c, extra=None):
@@ -131,7 +131,7 @@ def test_quem_nao_pode_recebe_403_com_o_aviso(tela):
     c, banco = tela
     for acao, corpo in (("editar", {"texto": "x"}), ("excluir", {})):
         r = c.post("/os/api/acomp/9101/obs/a/%s" % acao, json=corpo, environ_overrides=NAO_PODE)
-        assert r.status_code == 403 and "setor Chamados" in r.get_json()["erro"]
+        assert r.status_code == 403 and "setor Performance" in r.get_json()["erro"]
     assert len(banco) == 2
 
 
@@ -152,7 +152,7 @@ def test_sem_o_nexus_dizer_quem_pode_fica_aberto(tela):
     assert r.status_code == 200 and banco[-1]["tipo"] == "edicao"
 
 
-# ── quem pode: o administrador ou o setor Chamados (o Nexus decide) ─────────────────────────────────────────────
+# ── quem pode: o administrador ou o setor Performance (o Nexus decide; até 05/11/2026, o setor Chamados) ───────────
 @pytest.fixture
 def setor_de_mentira(app, monkeypatch):
     from nexus.auth import setor_telas
@@ -163,22 +163,23 @@ def setor_de_mentira(app, monkeypatch):
     return caixa
 
 
-def test_a_regra_do_nexus_administrador_ou_setor_chamados(app, setor_de_mentira):
+def test_a_regra_do_nexus_administrador_ou_setor_performance(app, setor_de_mentira):
     from flask import session
     with app.test_request_context("/os/chamados/acompanhamento/9101"):
         session["logado"], session["admin"] = True, True
         assert ponte.obs_chamados() == {"pode": True, "aviso": ""}
         session["admin"] = False
         session["usuario"] = {"email": "pessoa.teste@exemplo.test", "nome": "Pessoa Teste", "perfil": ""}
-        for nome in ("Chamados", "Atendimento"):            # pelo setor_id (04/11/2026): renomeado, segue podendo
-            setor_de_mentira["valor"] = {"id": SID.CHAMADOS, "nome": nome}
+        for nome in ("Performance", "Performance e Chamados"):   # pelo setor_id (04/11/2026): renomeado, segue podendo
+            setor_de_mentira["valor"] = {"id": SID.PERFORMANCE, "nome": nome}
             assert ponte.obs_chamados() == {"pode": True, "aviso": ""}, nome
-        setor_de_mentira["valor"] = {"id": SID.SEGURANCA, "nome": "Chamados"}       # o nome sozinho não dá
+        setor_de_mentira["valor"] = {"id": SID.SEGURANCA, "nome": "Performance"}    # o nome sozinho não dá
         assert ponte.obs_chamados()["pode"] is False
-        setor_de_mentira["valor"] = {"id": SID.PERFORMANCE, "nome": "Performance"}
+        # 05/11/2026: o setor Chamados foi excluído e as pessoas dele foram para a Performance
+        setor_de_mentira["valor"] = {"id": SID.CHAMADOS, "nome": "Chamados"}
         a = ponte.obs_chamados()
-        assert a["pode"] is False and "setor Chamados e dos administradores" in a["aviso"]
-        assert "Você está no setor Performance." in a["aviso"]
+        assert a["pode"] is False and "setor Performance e dos administradores" in a["aviso"]
+        assert "Você está no setor Chamados." in a["aviso"]
         # a regra da Área PCM continua a mesma
         setor_de_mentira["valor"] = {"id": SID.PCM, "nome": "PCM"}
         assert ponte.area_pcm() == {"pode": True, "aviso": ""}

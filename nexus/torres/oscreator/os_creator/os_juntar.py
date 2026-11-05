@@ -38,6 +38,7 @@ FRASES = {
     "kanban": "tarefas criadas; não gerei a OS numerada ({erro}).",
     "nao_achadas": "tarefas criadas, mas não as achei no kanban p/ gerar a OS.",
     "etiqueta": "OS {folio} criada, mas a etiqueta falhou: {erro}",
+    "os_pai": "OS {folio} criada, mas o Fracttal não gravou a OS pai: confira no Fluxo da OS e avise o administrador do Nexus.",
 }
 # A Clonagem de OS (`api.clonar_os`, que a Fila do PCM e a OS sem plano também usam)
 FRASES_CLONAR = {
@@ -76,6 +77,22 @@ def da_os(resultado: dict) -> dict:
     return {k: resultado[k] for k in _CHAVES_DA_OS if k in resultado}
 
 
+def conferir_os_pai(id_work_order, pai, folio, texto: str = "") -> str:
+    """A OS pai conferida no Fracttal, depois de gravar (04/11/2026, Levi: "quero que sane esses problemas de construirmos algo e
+    quando vão usar não presta!"): o Fracttal aceita o campo e ignora calado, e foi assim que a OS pai sumiu por semanas sem
+    ninguém ver. Devolve o aviso da tela, ou "" (sem OS pai pedida, sem a OS, ou sem a leitura: a que não dá para ler não vira
+    aviso). 1 leitura do cabeçalho, só quando há OS pai. Vale para a fase 2 (`juntar_em_os`) e para os caminhos que criam a OS
+    numerada de uma vez, sem a fase 2 (`to_work_order`: a OS já realizada, a Performance de uma OS por ativo e a inspeção do
+    chamado; Levi, no mesmo dia: "Performance e engenharia também tem OS pai, veja se está funcionando normalmente!")."""
+    if not (id_work_order and pai):
+        return ""
+    try:
+        gravado = (_api()._cabecalho_os(id_work_order) or {}).get("id_parent_wo")
+    except Exception:                                        # noqa: BLE001 — sem a leitura, sem a conferência
+        return ""
+    return "" if str(gravado or "") == str(pai) else _frase(texto or FRASES["os_pai"], folio=folio)
+
+
 def juntar_em_os(id_tasks, duracoes, id_responsible, responsible_name: str = "", *, id_parent=None, note: str = "",
                  etiqueta_ids=None, imagens=None, registros=None, frases=None) -> dict:
     """Junta as tarefas PENDENTES `id_tasks` (na ordem dada) numa OS numerada, com o responsável, e devolve o que houve (ver o topo).
@@ -104,7 +121,9 @@ def juntar_em_os(id_tasks, duracoes, id_responsible, responsible_name: str = "",
     if not na_os:
         saida["aviso"] = _frase(textos["nao_achadas"], n=len(id_tasks))
         return saida
-    # 2. a OS. Só o que a chamada tem entra nos argumentos (o `id_parent` e a `note` são da Performance agrupada)
+    # 2. a OS. Só o que a chamada tem entra nos argumentos. A OS pai vai AQUI, no pedido que cria a OS numerada (sondado em
+    # 26/08/2026: na tarefa pendente o Fracttal a ignora): até 04/11/2026 só a Performance agrupada a passava, e o Criar OS, a
+    # Fila do PCM e as Clonagens criavam a OS sem pai (a OS 18561, com a 18560 de pai, nasceu sem pai)
     kw = {"duration": a._tempo_da_os((duracoes or {}).get(i) for i in na_os)}
     pai = id_parent() if callable(id_parent) else id_parent
     if pai:
@@ -114,6 +133,10 @@ def juntar_em_os(id_tasks, duracoes, id_responsible, responsible_name: str = "",
     wo = a._work_order_insert([achados[i] for i in na_os], id_responsible, responsible_name, **kw)
     idwo = wo.get("id_work_order")
     saida.update(id_work_order=idwo, wo_folio=wo.get("wo_folio"), nao_entraram=len(id_tasks) - len(na_os))
+    # 2b. a OS pai conferida no Fracttal, depois de gravar
+    aviso_pai = conferir_os_pai(idwo, pai, wo.get("wo_folio"), textos["os_pai"])
+    if aviso_pai:
+        saida["aviso"] = aviso_pai
     # 3. as etiquetas. Qualquer falha vira aviso, e não só a do Fracttal: a OS já existe, e a etiqueta é o acabamento (a Performance
     # já engolia tudo; as outras só o `FracttalError`, e um erro de programa aqui faria a pessoa criar a mesma OS de novo)
     if idwo and etiqueta_ids:
@@ -121,7 +144,8 @@ def juntar_em_os(id_tasks, duracoes, id_responsible, responsible_name: str = "",
             a.apply_labels(idwo, etiqueta_ids)
             saida["etiquetas"] = list(etiqueta_ids)
         except Exception as e:                              # noqa: BLE001
-            saida["aviso"] = _frase(textos["etiqueta"], erro=e, folio=wo.get("wo_folio"))
+            saida["aviso"] = " ".join(x for x in (saida.get("aviso"),
+                                                  _frase(textos["etiqueta"], erro=e, folio=wo.get("wo_folio"))) if x)
     # 4. as fotos
     if idwo and imagens:
         saida.update(_anexar(a, idwo, na_os, imagens))
@@ -148,7 +172,7 @@ def _anexar(a, idwo, na_os: list, imagens: dict) -> dict:
     return {"n_img_ok": ok, "img_erro": erros}
 
 
-def uma_os_por_tarefa(fase1: list, id_responsible, responsible_name: str = "", etiqueta_ids=None) -> None:
+def uma_os_por_tarefa(fase1: list, id_responsible, responsible_name: str = "", etiqueta_ids=None, id_parent=None) -> None:
     """A fase 2 de "uma OS por ativo" (`api.create_work_orders_bulk`: o Criar OS do zero, o COS e a Engenharia) e "uma OS por data"
     (`api.create_work_orders_datas`): cada tarefa criada vira a sua OS. O kanban é lido UMA vez para todas (50 OS do COS não são 50
     leituras), e cada OS sai pelo `juntar_em_os` com o registro já lido. Escreve o resultado em `r["os"]` de cada item de `fase1`
@@ -172,7 +196,7 @@ def uma_os_por_tarefa(fase1: list, id_responsible, responsible_name: str = "", e
             r["os"]["aviso"] = "tarefa criada, mas não a achei no kanban p/ virar WO."
             continue
         try:
-            jun = juntar_em_os([idt], {idt: r["os"].get("duracao")}, id_responsible, responsible_name,
+            jun = juntar_em_os([idt], {idt: r["os"].get("duracao")}, id_responsible, responsible_name, id_parent=id_parent,
                                etiqueta_ids=etiqueta_ids, registros={idt: rec}, frases=FRASES_UMA_POR_TAREFA)
         except a.FracttalError as e:
             r["os"]["aviso"] = f"tarefa criada, mas falhou virar WO: {e}"

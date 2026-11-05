@@ -28,7 +28,7 @@ def test_dois_ativos_com_o_mesmo_titulo_abrem_pelo_ativo(monkeypatch):
     for k, (_tid, b) in enumerate(blocos, 1):
         topo = b[:b.index("</summary>")]
         assert re.search(r"<b>Inversor 1\.%d[^<]*</b><small>%s</small>" % (k, t), topo), topo      # o ativo em destaque
-        assert re.match(r'<details class="det-tarefa[^"]*" data-tarefa="[^"]*" open>', b)          # já aberta
+        assert re.match(r'<details class="det-tarefa[^"]*" data-tarefa="[^"]*" data-ativo="[^"]*" open>', b)          # já aberta
         assert b.count('<details class="det-sub') == 2
     banner = html[html.index('class="det-card det-banner"'):]
     banner = banner[:banner.index("</div>")]
@@ -39,7 +39,7 @@ def test_muitos_ativos_seguem_pelo_ativo_mas_fechados(monkeypatch):
     html = _os(monkeypatch, [_tarefa(k) for k in range(1, 7)], [_item(k, n) for k in range(1, 7) for n in (1, 2)])
     assert "SUBTAREFAS POR ATIVO (6)" in html
     blocos = _blocos(html)
-    assert all(re.match(r'<details class="det-tarefa[^"]*" data-tarefa="[^"]*">', b) for _t, b in blocos)   # fechadas
+    assert all(re.match(r'<details class="det-tarefa[^"]*" data-tarefa="[^"]*" data-ativo="[^"]*">', b) for _t, b in blocos)   # fechadas
     assert re.search(r"<b>Inversor 1\.3[^<]*</b>", blocos[2][1])
 
 

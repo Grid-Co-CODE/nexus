@@ -975,7 +975,7 @@ def api_status(folio):
 # Nexus decide e põe no pedido, `request.environ["os_web.obs_chamados"]` = {"pode": bool, "aviso": str}
 # (`ponte.obs_chamados`). Sem a chave (o OS Creator sozinho, o oem), fica aberto, como a Área PCM.
 OBS_CHAMADOS = "os_web.obs_chamados"
-AVISO_OBS = "Editar e excluir observações em Garantias é do setor Chamados e dos administradores do Nexus."
+AVISO_OBS = "Editar e excluir observações em Garantias é do setor Performance e dos administradores do Nexus."
 
 
 def _pode_mexer_obs() -> dict:

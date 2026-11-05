@@ -639,10 +639,35 @@ def chamados(hoje: date) -> tuple[dict, dict]:
                        "sem_usina": sem}
 
 
+def chamados_finalizados(uid: int, hoje: date) -> list[dict]:
+    """Os chamados da usina que fecharam no mês de `hoje` (a Central da usina, 04/11/2026: o histórico do mês corrente):
+    o Finalizados do quadro Acompanhamento de chamados, pelo MESMO fato de `chamados` (situação concluído, pelo dia do
+    fim). O que fecha ainda é o mesmo chamado do quadro: o fato guarda os últimos 90 dias."""
+    linhas = [r for r in visao._livro(LIVRO_CHAMADOS, ABA_CHAMADOS)
+              if str(r.get("situacao") or "") == "concluido" and visao.D._id(r.get("usina_id")) == uid]
+    mes = hoje.year * 100 + hoje.month
+    linhas = [r for r in linhas if (_int(r.get("data_id_fim")) or 0) // 100 == mes]
+    if not linhas:
+        return []
+    nome_equip = {visao.D._id(r.get("equipamento_id")): str(r.get("descricao") or "").strip()
+                  for r in visao._livro(LIVRO_EQUIP, ABA_EQUIP) if visao.D._id(r.get("equipamento_id"))}
+    out = []
+    for r in linhas:
+        eid = visao.D._id(r.get("equipamento_id"))
+        ini, fim = _dia_do_id(r.get("data_id_abertura")), _dia_do_id(r.get("data_id_fim"))
+        out.append({"os": _int(r.get("os")), "ini": ini, "fim": fim, "dias": (fim - ini).days if ini and fim else None,
+                    "equip": (nome_equip.get(eid) or str(r.get("codigo_ativo") or "") or "equipamento")[:48],
+                    "fabricante": str(r.get("fabricante") or ""), "componente": str(r.get("componente") or "")})
+    return sorted(out, key=lambda c: (c["fim"] or date.min, c["os"] or 0), reverse=True)
+
+
 # ── Extintores (Segurança · HSEQ) ───────────────────────────────────────────────────────────────────────────────
 def extintores() -> tuple[dict, dict]:
     """{usina_id: total, vencidos, a vencer, sem conferência e os piores}: a conta do HSEQ (`hseq/extintores.py`, as
     situações exclusivas e a "sem atualização" à parte), sem régua nova."""
+    from flask import current_app
+
+    from ..hseq import decisoes as DEC
     from ..hseq import extintores as E
     lei = E.extintores()
     if lei.erro:
@@ -651,7 +676,12 @@ def extintores() -> tuple[dict, dict]:
     por = collections.defaultdict(lambda: {"total": 0, "vencidos": 0, "a_vencer": 0, "sem_conferir": 0,
                                            "sem_validade": 0, "lista": [], "ultima": None, "dias_ultima": None,
                                            "rel_usina": "", "rel_cliente": ""})
-    for x in d.get("extintores") or []:
+    # as exclusões e as edições da Segurança (24/10/2026) valem aqui como na Mesa, no HSEQ e no Comando
+    # (`decisoes.separar`): sem elas, a Visão contava o extintor que a Segurança tirou ou corrigiu (achado da Central da
+    # usina, 04/11/2026: as duas telas têm de dar o mesmo número). Sem ler as decisões, ficam os extintores do livro
+    todas, _nr, _fora = DEC.separar(d.get("extintores") or [], d.get("nao_reconhecidos") or [],
+                                    DEC.ler(current_app.config))
+    for x in todas:
         uid = x.get("usina_id")
         if not uid:
             continue
@@ -1509,7 +1539,8 @@ def os_disponibilidade(uid: int, mes: str, nomes: Nomes) -> dict:
         except ValueError:
             dur = None
         aberta = str(r.get("aberta") or "").strip().lower() in ("sim", "true", "1")
-        oss.append({"os": str(r.get("os") or ""), "tipo": str(r.get("tipo") or "—"), "origem": str(r.get("origem") or ""),
+        oss.append({"os": str(r.get("os") or ""), "usina": str(r.get("usina") or ""),
+                    "tipo": str(r.get("tipo") or "—"), "origem": str(r.get("origem") or ""),
                     "escopo": str(r.get("escopo") or "—"), "codigo": str(r.get("codigo_ativo") or ""),
                     "inicio": _hora(ini), "fim": _hora(fim) if fim else "", "aberta": aberta, "duracao_min": dur,
                     "sol_min": _int(r.get("duracao_sol_min")), "perda_kwh": _num(r.get("perda_kwh")), "_ini": ini})

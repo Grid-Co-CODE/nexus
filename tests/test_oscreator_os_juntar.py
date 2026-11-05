@@ -67,8 +67,9 @@ class FracttalFalso:
     que o teste troca. `falhar` = os métodos que dão HTTP 500; `kanban_vazio` = a lista de pendentes que não traz as tarefas
     recém-criadas; `falta_a_primeira` = a que não traz a primeira; `falha_tarefa` = a N-ésima tarefa a criar dá HTTP 500."""
 
-    def __init__(self, falhar=(), kanban_vazio=False, falta_a_primeira=False, falha_tarefa=0):
+    def __init__(self, falhar=(), kanban_vazio=False, falta_a_primeira=False, falha_tarefa=0, ignora_pai=False):
         self.eventos, self.pendentes = [], []
+        self.ignora_pai, self.pai_da_os = ignora_pai, {}          # a OS pai que cada OS "gravou" (o cabeçalho a devolve)
         self.n_tarefa = self.n_os = self.n_pedidos_de_tarefa = 0
         self.falhar, self.kanban_vazio, self.falta_a_primeira = set(falhar), kanban_vazio, falta_a_primeira
         self.falha_tarefa = falha_tarefa
@@ -87,6 +88,7 @@ class FracttalFalso:
             idt = 1000 + self.n_tarefa
             if params.get("to_work_order"):                      # a OS já realizada nasce numerada, sem a fase 2
                 self.n_os += 1
+                self.pai_da_os[7000 + self.n_os] = None if self.ignora_pai else params.get("id_parent")
                 return _Resp([{"result": {"success": True, "data": {
                     "id_task": idt, "id_work_order": 7000 + self.n_os, "wo_folio": 9000 + self.n_os}}}])
             self.pendentes.append({"id_task": idt, "id_item": params.get("id_item"), "description": params.get("description"),
@@ -99,7 +101,10 @@ class FracttalFalso:
             return _Resp([{"result": {"data": lista}}])
         if metodo == INSERIR_OS:
             self.n_os += 1
+            self.pai_da_os[7000 + self.n_os] = None if self.ignora_pai else params.get("id_parent")
             return _Resp([{"result": {"data": {"id": 7000 + self.n_os, "wo_folio": 9000 + self.n_os}}}])
+        if metodo == api.RPC_WO_DETAILS:                          # o cabeçalho: a conferência da OS pai depois de gravar
+            return _Resp([{"result": {"data": [{"id": params.get("id"), "id_parent_wo": self.pai_da_os.get(params.get("id"))}]}}])
         if metodo == api.RPC_WO_PARENTS:
             return _Resp([{"result": {"data": [{"id": 4321, "wo_folio": "1234", "description": "1234"}]}}])
         if metodo == api.RPC_WO_TASKS_NEW:
@@ -630,3 +635,90 @@ def test_a_criacao_da_engenharia_confere_ao_vivo_e_passa_pelo_juntar(agrupar, mo
 if __name__ == "__main__":
     if "--regravar" in sys.argv:
         regravar()
+
+
+@pytest.mark.parametrize("nome, corpo", [
+    ("a Clonagem de planos do PCM", _multi),
+    ("o Criar OS agrupado", _agrupada),
+    ("a Clonagem de OS e a Fila do PCM", _clonar),
+    ("a OS sem plano", _sem_plano),
+    ("o Criar OS, uma OS por ativo", _bulk),
+    ("o COS, uma OS por data", _datas),
+    ("a retomada da Fila do PCM", lambda mp, fr: _aprovar_retomada(mp, fr, id_parent=555)),
+])
+def test_a_os_pai_vai_no_pedido_que_cria_a_os_numerada(nome, corpo):
+    """A OS pai só vale no pedido que cria a OS numerada (o `work_order_insert`, sondado em 26/08/2026): na tarefa pendente o
+    Fracttal a ignora. Provado no ar em 04/11/2026: a OS 18561, criada pelo Criar OS com a 18560 de pai, nasceu sem pai, e uma
+    colega avisou que "o OS Creator do nexus não tá puxando a OS pai". Todo caminho que recebe a OS pai a manda na OS."""
+    saida, _fr = _rodar(corpo)
+    oss = [e for e in saida["eventos"] if e.get("pedido") == INSERIR_OS]
+    assert oss, nome
+    assert all(e["resumo"].get("id_parent") == 555 for e in oss), nome
+
+
+def test_a_os_pai_que_o_fracttal_nao_gravou_vira_aviso():
+    """Conferir depois de gravar (04/11/2026): o Fracttal aceita o campo e ignora calado, e foi assim que a OS pai sumiu por
+    semanas. Com a OS pai, a OS criada tem o cabeçalho lido de volta; a que nasceu sem ela diz isso na tela."""
+    saida, _fr = _rodar(_bulk, ignora_pai=True)
+    avisos = [r["os"].get("aviso") or "" for r in saida["retorno"]]
+    assert avisos and all("não gravou a OS pai" in a for a in avisos)
+    saida, _fr = _rodar(_bulk)
+    assert not any("OS pai" in (r["os"].get("aviso") or "") for r in saida["retorno"])
+
+
+# ── os caminhos que criam a OS numerada de uma vez (`to_work_order`), sem a fase 2 ────────────────────────────────────────
+def _perf_uma_por_ativo(mp, fr, os_pai="1234"):
+    """A Performance de uma OS por ativo: a OS pai é a da linha de cada ativo, pelo nº (o "1234" é o 4321 da busca)."""
+    itens = [{"asset": ativo(1), "plano_id_task": 9, "plano_id_item": 1, "note": "n1", "os_pai": os_pai, "gerar_ticket": False},
+             {"asset": ativo(2), "plano_id_task": 9, "plano_id_item": 2, "note": "n2", "gerar_ticket": False}]
+    return api.create_performance_os(itens, id_responsible=77, responsible_name="Ana Teste", event_date=EVENTO,
+                                     prog_date=PROGRAMADA)
+
+
+def _realizada_com_pai(mp, fr):
+    fin = {"to_in_review": False, "final_date": PROGRAMADA, "id_assigned_user": 77, "name": "Ana Teste"}
+    return api.create_work_orders_bulk([ativo(1)], "Descrição", "Corretiva", ["Conferir"], id_responsible=77,
+                                       finalizar=fin, event_date=EVENTO, id_parent=555)
+
+
+def _inspecao_com_pai(mp, fr):
+    import chamado_insp_spec
+    mp.setattr(chamado_insp_spec, "subtarefas", lambda tipo, marca: ["Conferir a placa"])
+    return api.create_inspecao_chamado(ativo(1, tipo="Inversor"), "Marca X", id_responsible=77, responsible_name="Ana Teste",
+                                       event_date=EVENTO, prog_date=PROGRAMADA, id_parent=555)
+
+
+@pytest.mark.parametrize("nome, corpo, pai, avisos_de", [
+    ("a Performance de uma OS por ativo", _perf_uma_por_ativo, 4321, lambda ret: [ret[0].get("aviso") or ""]),
+    ("a OS já realizada", _realizada_com_pai, 555, lambda ret: [r["os"].get("aviso") or "" for r in ret]),
+    ("a inspeção do chamado", _inspecao_com_pai, 555, lambda ret: [ret.get("aviso") or ""]),
+])
+def test_a_os_que_nasce_numerada_tambem_confere_a_os_pai(nome, corpo, pai, avisos_de):
+    """Levi, 04/11/2026: "Performance e engenharia também tem OS pai, veja se está funcionando normalmente!". Estes caminhos não
+    passam pela fase 2: a OS nasce numerada no pedido que cria a tarefa, e a OS pai vai nele e fica (provado no ar no mesmo
+    dia: a OS 18571, Performance de uma OS por ativo, nasceu com a 18560 de pai). Faltava a conferência depois de gravar, a
+    mesma da fase 2: o cabeçalho lido de volta e, se o Fracttal ignorou, o aviso na tela."""
+    saida, _fr = _rodar(corpo)
+    criadas = [e for e in saida["eventos"] if e.get("pedido") == INSERIR_TAREFA and e["resumo"].get("to_work_order")]
+    assert criadas and criadas[0]["resumo"].get("id_parent") == pai, nome
+    assert any(e.get("pedido") == api.RPC_WO_DETAILS for e in saida["eventos"]), nome     # o cabeçalho lido de volta
+    assert not any(avisos_de(saida["retorno"])), nome
+    saida, _fr = _rodar(corpo, ignora_pai=True)
+    assert all("não gravou a OS pai" in a for a in avisos_de(saida["retorno"])), nome
+
+
+def test_a_performance_diz_a_os_pai_que_nao_achou_e_a_tela_mostra():
+    """O nº digitado que não existe: a OS sai sem pai, como sempre saiu, mas agora a tela diz (até aqui era calado). E o que a
+    Performance de uma OS por ativo tem a dizer chega à tela, em palavra e em cor (`alerta`), como na agrupada."""
+    from os_web import insp_web, perf_web
+    saida, _fr = _rodar(lambda mp, fr: _perf_uma_por_ativo(mp, fr, os_pai="999"))
+    criadas = [e for e in saida["eventos"] if e.get("pedido") == INSERIR_TAREFA]
+    assert criadas[0]["resumo"].get("id_parent") is None
+    assert saida["retorno"][0]["aviso"] == "OS 9001 criada sem a OS pai: não achei a OS 999 no Fracttal."
+    assert "aviso" not in saida["retorno"][1]                                            # a linha sem OS pai, sem ressalva
+    m = perf_web.mensagem_resultado(saida["retorno"], "inspecao geral do inversor", False)
+    assert m["alerta"] is True and "Atenção:\n• OS 9001 criada sem a OS pai" in m["mensagem"]
+    m = perf_web.mensagem_resultado([{"ok": True, "asset": "Inversor 1.1", "folio": "9001"}])
+    assert "alerta" not in m and "Atenção" not in m["mensagem"]
+    aviso = "OS 9001 criada, mas o Fracttal não gravou a OS pai: confira no Fluxo da OS e avise o administrador do Nexus."
+    assert insp_web.mensagem_criou({"wo_folio": "9001", "n_subtarefas": 1, "aviso": aviso}, "INSPEÇÃO")["aviso"] == aviso

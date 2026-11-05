@@ -331,7 +331,14 @@ def create_planned_os(asset: dict, plan: dict, id_responsible=None, responsible_
     if to_work_order and id_responsible is not None:      # WO direto (1 ativo) → atribui o responsável
         params["id_assigned_user"] = id_responsible
     body = [{"id": str(uuid.uuid4()), "jsonrpc": "2.0", "method": api.RPC_METHOD, "params": params}]
-    return {**api._react_insert_post(body), "duracao": dur}     # o tempo da tarefa: a OS que junta as tarefas soma este
+    r = {**api._react_insert_post(body), "duracao": dur}        # o tempo da tarefa: a OS que junta as tarefas soma este
+    # a OS que nasce numerada (`to_work_order`) leva a OS pai neste mesmo pedido, e ela fica (provado no ar em 04/11/2026: a OS
+    # 18571, Performance de uma OS por ativo, nasceu com a 18560 de pai); a conferência depois de gravar é a da fase 2
+    if to_work_order and id_parent:
+        aviso = os_juntar.conferir_os_pai(r.get("id_work_order"), id_parent, r.get("wo_folio"))
+        if aviso:
+            r["aviso"] = aviso
+    return r
 
 
 def nascer_ticket(item: dict, asset: dict, plano_desc, folio, event_date) -> dict:
@@ -413,7 +420,8 @@ def create_performance_os(itens: list, id_responsible=None, responsible_name: st
             plan = cache[k]
             nome = (it.get("titulo") or "").strip() or \
                 api.perf_os_nome(a, it.get("base") or api.plano_base_nome(plan.get("description")))
-            ip = _resolve_pai(it.get("os_pai")) or id_parent   # OS pai do ativo (senão o global, se houver)
+            folio_pai = str(it.get("os_pai") or "").strip()
+            ip = _resolve_pai(folio_pai) or id_parent   # OS pai do ativo (senão o global, se houver)
             def _criar(p):
                 return api.create_planned_os(a, p, id_responsible=id_responsible,
                                          responsible_name=responsible_name,
@@ -433,16 +441,20 @@ def create_performance_os(itens: list, id_responsible=None, responsible_name: st
                 res = _criar(plan)
                 aviso_extra = ("as perguntas de fim de atividade não entraram — o Fracttal "
                                "recusou; a OS foi criada com as subtarefas do plano.")
+            # as ressalvas desta OS vão à tela (04/11/2026): a OS pai que o Fracttal não gravou (o `create_planned_os` confere)
+            # e a que não achei pelo nº digitado. Até aqui a OS saía sem pai calada, e o aviso das perguntas se perdia aqui
+            # dentro (o `res` não volta à tela, só o `out`)
+            avisos = [res["aviso"]] if res.get("aviso") else []
+            if folio_pai and not ip:
+                avisos.append("OS %s criada sem a OS pai: não achei a OS %s no Fracttal." % (res.get("wo_folio"), folio_pai))
             if aviso_extra:
-                res["aviso"] = (str(res.get("aviso") or "") + " " + aviso_extra).strip()
+                avisos.append("OS %s: %s" % (res.get("wo_folio"), aviso_extra))
             if lbls and res.get("id_work_order"):
                 try:
                     api.apply_labels(res["id_work_order"], lbls)
                 except Exception:
                     pass
-            tk = api.nascer_ticket(it, a, plan.get("description"), res.get("wo_folio"), event_date)
-            if tk.get("aviso_os"):
-                res["aviso"] = ((res.get("aviso") or "") + " " + tk["aviso_os"]).strip()
+            tk = api.nascer_ticket(it, a, plan.get("description"), res.get("wo_folio"), event_date)   # o aviso dele vai pelo `ticket`
             nok, nerr = 0, []
             for img in (it.get("imagens") or []):
                 try:
@@ -453,7 +465,8 @@ def create_performance_os(itens: list, id_responsible=None, responsible_name: st
                     nerr.append(str(e)[:600])
             # o id vai junto (31/10/2026): a tela põe a OS criada na lista central de OS (`lista_central.criadas`)
             out.append({"ok": True, "asset": a.get("label") or a.get("code"), "folio": res.get("wo_folio"),
-                        "id_work_order": res.get("id_work_order"), "n_img_ok": nok, "img_erro": nerr, "ticket": tk})
+                        "id_work_order": res.get("id_work_order"), "n_img_ok": nok, "img_erro": nerr, "ticket": tk,
+                        **({"aviso": " ".join(avisos)} if avisos else {})})
         except SessionExpired:
             raise
         except Exception as e:
@@ -492,7 +505,8 @@ def create_planned_os_multi(selecoes: list, id_responsible, responsible_name: st
     if not id_tasks:
         return {"ok": False, "erro": "Falha ao criar as tarefas: " + "; ".join(erros[:3]),
                 "n_tarefas": len(sel), "n_criadas": 0}
-    jun = os_juntar.juntar_em_os(id_tasks, dur_de, id_responsible, responsible_name)       # a fase 2, a mesma de todos
+    jun = os_juntar.juntar_em_os(id_tasks, dur_de, id_responsible, responsible_name,       # a fase 2, a mesma de todos
+                                 id_parent=id_parent)
     saida = {"ok": True, "n_tarefas": len(sel), "n_criadas": len(id_tasks), "erros": erros, "os": os_juntar.da_os(jun)}
     if jun.get("aviso"):
         saida["aviso"] = jun["aviso"]
@@ -598,7 +612,7 @@ def clonar_os(tarefas: list, id_responsible, responsible_name: str = "",
     # "nas SSs o tempo que aparece na OS do Fracttal permanece 10 min, porém nas tarefas aparece o tempo que foi solicitado") e as
     # etiquetas: a mesma de todos os caminhos (`os_juntar`), com as frases desta tela
     jun = os_juntar.juntar_em_os(id_tasks, dur_tarefa, id_responsible, responsible_name, etiqueta_ids=etiqueta_ids,
-                                 frases=os_juntar.FRASES_CLONAR)
+                                 id_parent=id_parent, frases=os_juntar.FRASES_CLONAR)
     if "id_work_order" not in jun:                       # a OS não saiu: as tarefas ficam pendentes no Fracttal
         return {"ok": True, "os": os_juntar.da_os(jun), "aviso": jun["aviso"],
                 "n_tarefas": len(val), "n_criadas": len(id_tasks)}
@@ -699,12 +713,18 @@ def create_work_orders_bulk(assets: list, description: str, task_type: str, subt
                     r["os"]["etiquetas"] = list(etiqueta_ids)
                 except FracttalError as e:
                     r["os"]["aviso"] = f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}"
+        # a OS pai foi no mesmo pedido que criou a OS (provado no ar em 04/11/2026, a OS 18564): conferida como na fase 2
+        if id_parent:
+            for r in [x for x in fase1 if x.get("ok") and x["os"].get("id_work_order")]:
+                aviso_pai = os_juntar.conferir_os_pai(r["os"]["id_work_order"], id_parent, r["os"].get("wo_folio"))
+                if aviso_pai:
+                    r["os"]["aviso"] = (aviso_pai + " " + (r["os"].get("aviso") or "")).strip()
         api._anexa_imagens_bulk(fase1, imagens_por_ativo)
         return fase1
 
     # Fase 2 e 3 — converter cada tarefa em WO + responsável + etiquetas (só se um responsável foi escolhido): o kanban é lido
     # uma vez para todas, e cada OS sai pela fase 2 de todos os caminhos (`os_juntar`)
-    os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids)
+    os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids, id_parent=id_parent)
     api._anexa_imagens_bulk(fase1, imagens_por_ativo)
     return fase1
 
@@ -768,7 +788,7 @@ def create_work_orders_agrupada(assets: list, description: str, task_type: str, 
     imagens = {idt: imagens_por_ativo.get(por_task[idt]) or [] for idt in id_tasks} if imagens_por_ativo else None
     try:
         jun = os_juntar.juntar_em_os(id_tasks, dur_de, id_responsible, responsible_name, etiqueta_ids=etiqueta_ids,
-                                     imagens=imagens)
+                                     imagens=imagens, id_parent=id_parent)
     except FracttalError as e:
         saida["aviso"] = "tarefas criadas; a OS não fechou (%s)." % e
         return saida
@@ -815,7 +835,8 @@ def create_work_orders_datas(asset: dict, description: str, task_type: str, subt
                     r["os"]["aviso"] = f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}"
         return fase1
 
-    os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids)     # a mesma do uma-OS-por-ativo
+    os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids,     # a mesma do uma-OS-por-ativo
+                                id_parent=id_parent)
     return fase1
 
 
@@ -870,7 +891,8 @@ def create_inspecao_chamado(asset: dict, fabricante: str, id_responsible=None,
             erro_lbl = str(exc)[:200]
     return {"id_work_order": idwo, "wo_folio": r.get("wo_folio"),
             "id_work_order_task": r.get("id_work_order_task"),
-            "n_subtarefas": len(subs), "etiqueta_erro": erro_lbl}
+            "n_subtarefas": len(subs), "etiqueta_erro": erro_lbl,
+            "aviso": r.get("aviso") or ""}                  # a OS pai que o Fracttal não gravou (o `create_planned_os` confere)
 
 
 def concluir_os_analise(id_work_order, id_work_order_task=None, observacao: str = "") -> dict:

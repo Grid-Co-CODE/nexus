@@ -437,6 +437,7 @@ a.kb-os{text-decoration:none}a.kb-os:hover{text-decoration:underline}   /* o nº
   font:600 12.5px/1 var(--fonte-ac);padding:9px 15px;cursor:pointer;text-decoration:none;white-space:nowrap}
 .eg-ac-btn--o{background:transparent;color:var(--tinta);border:1px solid var(--linha-forte);padding:8px 14px}
 .eg-ac-btn--o:hover{border-color:var(--verde);color:var(--tinta)}
+.eg-ac-tentar{margin:12px 0 0}
 .eg-ac-tag{display:inline-block;font:700 10px/1.4 var(--fonte-ac);letter-spacing:.05em;text-transform:uppercase;border-radius:5px;
   padding:2px 7px;white-space:nowrap}
 .eg-ac-tag--r{background:var(--critico-suave);color:var(--critico)}

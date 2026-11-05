@@ -95,6 +95,8 @@ def test_o_sino_mostra_o_aviso_abre_o_card_e_marcar_como_lida_tira(app, banco, l
     sino = _sino(html)
     assert "1 aviso das suas OS" in sino and "OS 18374 concluída pelo técnico" in sino and "Marcar como lida" in sino
     assert "/os/_nexus/card/101?status=Em%20Verifica" in sino and "window.NexusOsCard" in html
+    botao = sino.split("</summary>", 1)[0]                                # o botão leva o ícone do OS Creator, não o sino
+    assert 'class="ph ph-clipboard-text"' in botao and "ph-bell" not in botao
     aid = re.search(r'name="aviso" value="([^"]+)"', sino).group(1)
     r = c.post("/avisos/lida", data={"aviso": aid, "voltar": "/t/comando/caixa-de-entrada"})
     assert r.status_code in (302, 303) and r.headers["Location"].endswith("/t/comando/caixa-de-entrada")

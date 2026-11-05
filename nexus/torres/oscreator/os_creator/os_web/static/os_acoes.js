@@ -38,7 +38,13 @@
     const el = q(d, '[data-anexos]'); if (!el) return;
     fetch(el.getAttribute('data-anexos'), {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
       .then((r) => r.ok ? r.json() : null)
-      .then((j) => { d.querySelectorAll('.det-n').forEach((n) => { const v = j ? j[n.getAttribute('data-n')] : null; n.textContent = (v === null || v === undefined) ? '—' : v; }); })
+      .then((j) => {
+        d.querySelectorAll('.det-n').forEach((n) => { const v = j ? j[n.getAttribute('data-n')] : null; n.textContent = (v === null || v === undefined) ? '—' : v; });
+        // quantos anexos cada tarefa tem (04/11/2026): o número no ativo e o botão dos anexos dela
+        const pt = (j && j.por_tarefa) || {};
+        d.querySelectorAll('[data-n-tarefa]').forEach((el) => { const n = pt[el.getAttribute('data-n-tarefa')] || 0; el.textContent = n === 1 ? '1 anexo' : n + ' anexos'; el.hidden = !n; });
+        d.querySelectorAll('[data-acao="anexos-tarefa"]').forEach((b) => { b.hidden = !pt[b.dataset.tarefaId]; });
+      })
       .catch(() => { d.querySelectorAll('.det-n').forEach((n) => { n.textContent = '—'; }); });
   }
 
@@ -296,6 +302,7 @@
     },
 
     'anexos-sub'(d) { return abrirAnexos(d, 'sub', 'Anexos das subtarefas', 'Sem anexos nas subtarefas.'); },
+    'anexos-tarefa'(d, b) { return abrirAnexos(d, 'sub', 'Anexos · ' + (b.dataset.ativo || 'tarefa'), 'Sem anexos nesta tarefa.', b.dataset.tarefaId); },
     'anexos-os'(d) { return abrirAnexos(d, 'os', 'Anexos da OS', 'Sem anexos nesta OS.'); }
   };
 
@@ -316,22 +323,42 @@
     if (cadeia.length <= 1) corpo.insertAdjacentHTML('beforeend', '<div class="acoes-hint i centro">' + esc(j.aviso || 'Esta OS não tem outra ligada a ela — nem como pai, nem como filha.') + '</div>');
   }
 
-  async function abrirAnexos(d, chave, titulo, vazio) {
+  async function abrirAnexos(d, chave, titulo, vazio, tarefa) {
     const dlg = dialogo(d, 'anexos'); if (!dlg) return;
     q(dlg.caixa, '[data-anx-titulo]').textContent = titulo;
     const corpo = q(dlg.caixa, '[data-anx-corpo]');
     try {
       let j = anexosCache.get(d);
       if (!j) { j = await pedir('/os/api/os/' + d.dataset.wid + '/anexos-lista', undefined, 'Abrindo os anexos…'); anexosCache.set(d, j); }
-      pintarAnexos(dlg, (j[chave] || {itens: []}).itens || [], vazio);
-      baixarTodos(d, dlg, chave, (j[chave] || {}).baixar || 0);
+      const ativos = mapaAtivos(d);
+      let itens = (j[chave] || {itens: []}).itens || [];
+      if (tarefa) itens = itens.filter((x) => String(x.tarefa) === String(tarefa));
+      itens = itens.map((x) => comAtivo(x, ativos));
+      pintarAnexos(dlg, itens, vazio);
+      const n = tarefa ? itens.filter((x) => x.tipo !== 'nota' || (x.texto || '').trim()).length : (j[chave] || {}).baixar || 0;
+      baixarTodos(d, dlg, chave, n, tarefa, ativos);
     } catch (e) { corpo.innerHTML = '<div class="acoes-hint">' + esc('não consegui carregar os anexos: ' + e.message) + '</div>'; }
+  }
+
+  // A OS de vários ativos (Levi, 04/11/2026: "o download sai com o nome do ativo!"): {id da tarefa: ativo}, lido das
+  // tarefas do card; cada anexo diz de qual ativo é, e o arquivo baixado começa pelo nome dele
+  function mapaAtivos(d) {
+    const m = {};
+    d.querySelectorAll('details.det-tarefa[data-ativo]').forEach((t) => { const id = t.getAttribute('data-tarefa'); if (id) m[id] = t.getAttribute('data-ativo'); });
+    return m;
+  }
+  function comAtivo(x, ativos) {
+    const a = x.tarefa != null ? ativos[String(x.tarefa)] : '';
+    if (!a) return x;
+    const nome = a + ' - ' + x.nome;
+    return Object.assign({}, x, {legenda: a + ' · ' + (x.legenda || x.nome || ''), quem: a, nome: nome,
+      baixar: x.baixar ? x.baixar.replace(/([?&]nome=)[^&]*/, '$1' + encodeURIComponent(nome)) : x.baixar});
   }
 
   // "Baixar todos (N)" — o do app (steps/galeria.py, steps/documentos.py). Lá grava numa pasta; aqui o servidor junta o
   // card num .zip com a MESMA arrumação (uma pasta por subtarefa, as notas em .txt) e diz o que não veio. N conta o que
   // vai no .zip: arquivo, ou nota com texto.
-  function baixarTodos(d, dlg, chave, n) {
+  function baixarTodos(d, dlg, chave, n, tarefa, ativos) {
     const b = q(dlg.caixa, '[data-baixar-todos]'); if (!b) return;
     const rot = 'Baixar todos (' + n + ')';
     b.textContent = rot; b.hidden = !n;
@@ -339,7 +366,8 @@
       if (b.disabled) return;
       trava(b, true, 'Juntando…'); msgAnexos(dlg, '');
       try {
-        const j = await pedir('/os/api/os/' + d.dataset.wid + '/anexos-zip', {grupo: chave, folio: d.dataset.folio || ''},
+        const j = await pedir('/os/api/os/' + d.dataset.wid + '/anexos-zip',
+                              {grupo: chave, folio: d.dataset.folio || '', ativos: ativos || {}, tarefa: tarefa || ''},
                               'Juntando os anexos num .zip…');
         const a = document.createElement('a');              // o navegador baixa (o arquivo não passa pela memória da tela)
         a.href = j.url; a.download = j.nome || '';
