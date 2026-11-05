@@ -751,8 +751,9 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   (`ordem_da_manutencao`); o Acompanhamento pela ronda, a pior em cima (`ordem_da_ronda`: nunca teve; sem ronda há 7
   dias ou mais, mais dias primeiro; longa pendente; em dia, a mais antiga primeiro; sem dado). As réguas de cada alerta
   ficam no "!" amarelo ao lado do título (o `explica` de `_explica.html`, desde 05/11/2026; de 18/10 a 05/11 ficavam
-  atrás de um "!" abaixo da tabela), fechado ao abrir a tela; o que muda com o dado (usinas sem de-para, livro que não
-  chegou) segue numa nota no pé.
+  atrás de um "!" abaixo da tabela), fechado ao abrir a tela, com a hora da leitura (a caixa "Gerencial, Confiabilidade
+  (...) lido às" do canto do cabeçalho saiu no mesmo dia; Levi: "pode ficar nos disclaimers"); o que muda com o dado
+  (usinas sem de-para, livro que não chegou) segue numa nota no pé.
 - **Nenhum indicador refeito com régua nova.** Cada número vem da tela dona, pela MESMA fonte que o Nexus já usa, e cada
   alerta usa a régua de lá (`REGUAS`, mostradas na nota da tela, por bloco).
   - Meta do mês: `nexus_performance · fato_meta_usina_mes`, o `_gerencial_payload` da plataforma publicado pelo worker
@@ -991,7 +992,19 @@ no responsável)"): `/t/campo/responsaveis?r=<número da pessoa>&modo=painel`. O
   - **Concluir e PDF:** são os do OS Creator, com a sessão do Fracttal da pessoa.
     - O Concluir é `POST /os/api/os/<id>/concluir`, irreversível, com a confirmação antes. O PDF é `POST /os/api/os/pdf`
       e depois o download.
-    - Sem a sessão (401), a janela manda entrar no Fracttal pelo OS Creator.
+    - Sem a sessão do Fracttal (401), a janela manda entrar no Fracttal pelo OS Creator.
+    - **"Concluída" só com o ok do OS Creator** (revisão de 05/11/2026, achado na Aprovação por fatos, que usa a mesma
+      rota): `r.ok && !r.redirected && r.j.ok === true`, com a frase da rota (`mensagem`), em âmbar quando o `aviso`
+      (um booleano: fechou sem a data de fim) vem ligado. Antes, a sessão do Nexus vencida (12 h, ou o Sair noutra aba)
+      fazia o portão responder 302 para /entrar, o fetch seguia, recebia 200 em HTML e a tela dizia "OS X concluída."
+      sem nada ter ido ao Fracttal; e o aviso saía como "concluída. true". Redirecionado, ou resposta sem JSON: "A sua
+      sessão do Nexus acabou: recarregue a página e entre de novo." O PDF segue a mesma regra. Prova na bancada (fila
+      real de 29/10): o Concluir depois do /sair deu o aviso da sessão, e a resposta simulada da rota (com e sem o
+      aviso, o erro e sem o ok) deu a frase certa em cada caso. No ar (05/11/2026, 15:11 de Brasília, e4df64a): o POST
+      sem sessão na produção volta 302 para /entrar e, seguido, 200 em HTML (o caso do defeito), e a página no ar traz o
+      script novo. A OS de TESTE - PA não aparece nesta lista (não é usina da Visão), então o Concluir de verdade pela
+      tela pediria uma OS de cliente: não foi feito; a mesma rota respondendo `ok: true` com o status 3 lido de volta foi
+      provada no Fracttal pela Aprovação de OS (OS 18630, acima).
     - A OS concluída, ou mudada no card, sai da fila guardada pela conferência da Aprovação
       (`/t/campo/aprovacao/<id>/conferir`: só sai o que o Fracttal confirma).
   - **Exemplo:** na bancada, um responsável com 26 usinas tinha 212 esperando; ficaram de fora 69 por etiqueta e 95
@@ -1302,7 +1315,8 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   (`nexus/campo/central_usina.py`): os técnicos de hoje (PCM › Técnicos por usina, `atribuicoes.atuais`), as ocorrências
   abertas (`ocorrencias.estado` + `ordenar`, com o cofre), as pendências da Segurança (`hseq._pendencias`, a conta da Mesa,
   só as linhas da usina), os chamados finalizados no mês (`responsaveis.chamados_finalizados`, o fato do quadro
-  Acompanhamento de chamados pelo dia do fim) e as PT pedidas no mês (`visao.pts().historico`, pelo dia em Brasília).
+  Acompanhamento de chamados pelo dia do fim) e as PT esperando o De acordo na lista do Painel
+  (`painel_responsavel.pts([u])`).
 - **A busca** é a das Rondas, num pedaço só (`_busca_usina.html`, a lista do Nexus com nome e cliente · UF; a rota e o
   endereço de cada usina vêm de quem inclui). Sem o script, o `nome` acha a usina pela regra das Rondas (`CU.achar`: o
   nome igual sem acento nem caixa, ou o único que contém).
@@ -1315,12 +1329,11 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   74,4%), disponibilidade 100,0%, S3 V3, ronda longa pendente, 7 OS atrasadas (a mais antiga há 72 dias), sem luvas desde
   03/11, a PT 15688 De acordo; a busca com 131 usinas, "coracao" leva à usina; a janela do PR e o card da OS abrem; a 375
   px uma coluna, sem rolagem de lado. Testes: `tests/test_campo_central_usina_0411.py`.
-- **2ª rodada (04/11/2026):** "Deixar a lista de 'buscar usina' já no estilo nexus": sem usina escolhida, a lista
-  fica aberta em grade embaixo do campo (`busca_aberta` do `_busca_usina.html`, com a contagem que filtra junto); com a
-  usina, volta a abrir só no foco. "Melhore o visual dos cards, está simples demais e as linhas estão muito coladas": o
-  cabeçalho com as pessoas em selos (as iniciais, o papel e o nome), o quadro com o ícone num selo verde, as linhas
-  separadas por um fio com 13 px de respiro, o ponto da situação nas pendências (`det_linhas(..., marca=)`, a cor da
-  régua da Visão) e a contagem nas linhas de chamados e de PT. Só `.cu-*`: a Visão geral não muda.
+- **2ª rodada (04/11/2026):** "Deixar a lista de 'buscar usina' já no estilo nexus" (a lista aberta em grade que entrou
+  aqui saiu na 3ª rodada: só o campo). "Melhore o visual dos cards, está simples demais e as linhas estão muito
+  coladas": o cabeçalho com as pessoas em selos (as iniciais, o papel e o nome), o quadro com o ícone num selo verde, as
+  linhas separadas por um fio com 13 px de respiro, o ponto da situação nas pendências (`det_linhas(..., marca=)`, a cor
+  da régua da Visão) e a contagem nas linhas de chamados. Só `.cu-*`: a Visão geral não muda.
 - **O relatório da usina para o cliente (2ª rodada):** "é interessante que dê para baixar um relatório da usina também!
   Algo bem profissional para o cliente!". O "Baixar relatório" do cabeçalho abre a janela do mês e dos temas (a do
   Painel: "Tem que poder escolher que nem é no painel"); a rota `responsaveis_usina_relatorio`
@@ -1335,6 +1348,35 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   tabelas; o evento de disponibilidade da usina que junta duas do Gerencial (Coração 1 e 2) diz a parte
   (`os_disponibilidade` leva a `usina` do Gerencial). Prova: o de outubro da Coração 1 e 2 (671,4 MWh, 72% da meta, PR
   101,9%, 99,1%, 4 eventos, 5 tarefas, 0 ronda no mês: a usina só tem a ronda de 03/11 nos 90 dias) em 0,9 s.
+- **3ª rodada (05/11/2026), nove pedidos do Levi:**
+  1. "Nesses KPIS quero campos separados por linhas invisíveis separando cabeçalho e valor / quero que centralize
+     horizontal e verticalmente": cada número da faixa ocupa três linhas da grade (o nome, o valor, o complemento), as
+     MESMAS em todos (`grid-template-rows:subgrid`), cada pedaço no meio da casa; o complemento longo quebra parelho
+     (`text-wrap:balance`).
+  2. e 3. O cabeçalho da Visão (todas as abas) sem a caixa "lido às" do canto: a hora da leitura foi para o "!" amarelo
+     ao lado do título, que outra frente do mesmo dia pôs como padrão do Nexus (`_explica.html`, acima, na Visão do
+     responsável).
+  4. "Quando não tem nenhum usina não precisa amontoar um monte de card de usinas, deixa só a parte de pesquisar
+     mesmo!": a lista aberta em grade da 2ª rodada saiu (e o `busca_aberta` do `_busca_usina.html` com ela); a lista
+     abre no foco, por cima, como nas Rondas.
+  5. "Quero o 'Buscar usinas' do lado direito paralelizando com os botões a visão dos responsáveis!": a busca fica na
+     linha das abas, à direita (`.cu-topo`); abaixo de 700 px, embaixo das abas, na largura toda.
+  6. "Quando clicar em baixar relatórios: escolher qual o mês!": a janela do relatório pergunta primeiro "Qual mês?",
+     com os três meses em botões (o anterior marcado), e depois "Quais temas?".
+  7. "Quero que o gráfico de geração também apareça na visão do responsável > central da usina": o gráfico da janela do
+     PR (a mesma macro, `campo/_graficos.html` · `geracao`) no quadro da Performance, do mesmo leitor
+     (`serie_diaria` + `responsaveis_graficos.geracao`); sem a série no banco, o quadro fica sem ele. Na meia largura os
+     eixos crescem e o valor em cima de cada barra sai (encavalava; o valor do dia fica na dica da coluna). Achado no
+     caminho: o eixo de passo 2,5 escrevia "2" e "8" nas marcas 2,5 e 7,5 (0 casa); agora o eixo com marca quebrada leva
+     uma casa em todas (`_casas`), na janela do PR também.
+  8. "SE NÃO TIVER VERIFICAÇÃO OU CONCLUSÃO NÃO PRECISA APARECER NA TELA": no quadro Chamados só aparece a linha que tem
+     chamado (a dos abertos também, pela mesma regra); sem nenhum, uma frase só.
+  9. "o KPI de PT já tem a informação, ao clicar no KPI aparece o mesmo card que aparece em visão do responsável >
+     painel": o quadro da PT saiu (com ele, as "Pedidas no mês" e o `central_usina.pts_do_mes`); o número da PT abre na
+     janela a lista do Painel, da mesma macro (`lista_pts`), só da usina.
+  Prova (05/11/2026, bancada só leitura com o banco real): a Altair e a Nova Xavantina 2 a 1440 px e a 375 px (sem
+  rolagem de lado; a exclamação no celular presa à tela), a PT de 29 d 22 h na janela do número, o relatório com
+  outubro marcado.
 
 ## Estrutura de O&M de 10/2026: região de campo e gestor de contrato (08/10/2026)
 
@@ -1691,8 +1733,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   `montar`, `bloco`, `soma`, e os leitores das janelas (`serie_diaria`, `tabela_meta`, `disp_diaria`,
   `os_disponibilidade`); desde 18/10/2026, a Limpeza (`limpeza`), as paradas abertas (`paradas_abertas`) e o bloco
   Manutenção (`manutencao_fonte`, `alertas_manutencao`, `linha_manutencao`, `com_manutencao`, `limite_do_pedido`).
-- `central_usina.py`: a Central da usina (04/11/2026, acima): a busca, os técnicos, as ocorrências, a Segurança e as PT
-  do mês da usina escolhida; o resto é a linha dela na Visão.
+- `central_usina.py`: a Central da usina (04/11/2026, acima): a busca, os técnicos, as ocorrências e a Segurança da
+  usina escolhida; o resto é a linha dela na Visão.
 - `relatorio_usina.py`: o relatório da usina em PDF para o cliente (04/11/2026, acima): os meses, os temas, os dados
   das telas donas e o PDF (reportlab, a paleta e a fonte dos outros relatórios).
   `manutencao.py`: a conta pura do bloco Manutenção. `tarefas_os.py`: o laço que lê as tarefas das OS do Fracttal e

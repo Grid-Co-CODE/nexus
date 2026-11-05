@@ -1,3 +1,4 @@
+{% from 'campo/_graficos.html' import geracao %}
 {# A janela por cima da Visão do responsável (12/10/2026, Levi: "precisamos mostrar para o supervisor de onde está
    vindo!"): um pedaço de página, sem a moldura, que a tela põe num <dialog> com o fundo desfocado. Meta: a tabela do dia
    a dia (geração da meta, geração real, o total); PR: as barras da geração com a linha do POA e, embaixo, a curva do PR
@@ -71,21 +72,7 @@
   {% if not serie.dias %}
   <p class="cr-jan-vazio">{{ 'Sem a série do dia a dia desta usina no banco: o Painel NOC não tem o PR diário dela (sem aba no BD).' if serie.publicado else 'A série do dia a dia ainda não chegou ao banco: a plataforma publica com a meta do mês, de hora em hora.' }}</p>
   {% else %}{% set g = graf_ger %}{% set q = graf_pr %}
-  <section class="cr-graf">
-    <div class="cr-graf-cab"><h3>Geração diária (MWh) e POA (kWh/m²)</h3>
-      <span class="cr-leg"><i class="cr-leg-barra"></i>geração <i class="cr-leg-meta"></i>meta {{ g.meta }} MWh/dia <i class="cr-leg-poa"></i>POA <i class="cr-leg-meta-poa"></i>meta POA {{ g.meta_poa }}</span></div>
-    <svg class="cr-svg" viewBox="{{ g.viewbox }}" role="img" aria-label="Geração diária em barras, com a linha do POA">
-      {% for l in g.grades %}<line class="cr-grade" x1="{{ g.esq }}" x2="{{ g.dir }}" y1="{{ l.y }}" y2="{{ l.y }}"/><text class="cr-eixo" x="{{ g.esq - 6 }}" y="{{ l.y + 4 }}" text-anchor="end">{{ l.rotulo }}</text>{% endfor %}
-      {% for l in g.grades_dir %}<text class="cr-eixo cr-eixo--poa" x="{{ g.dir + 6 }}" y="{{ l.y + 4 }}">{{ l.rotulo }}</text>{% endfor %}
-      {% for b in g.barras %}<rect class="cr-barra cr-barra--{{ b.cls }}" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"/><text class="cr-rot" x="{{ b.rx }}" y="{{ b.ry }}" text-anchor="middle">{{ b.rotulo }}</text>{% endfor %}
-      {% if g.meta_y is not none %}<line class="cr-meta" x1="{{ g.esq }}" x2="{{ g.dir }}" y1="{{ g.meta_y }}" y2="{{ g.meta_y }}"/>{% endif %}
-      {% if g.meta_poa_y is not none %}<line class="cr-meta cr-meta--poa" x1="{{ g.esq }}" x2="{{ g.dir }}" y1="{{ g.meta_poa_y }}" y2="{{ g.meta_poa_y }}"/>{% endif %}
-      {% for t in g.poa %}<polyline class="cr-linha-poa" points="{{ t }}"/>{% endfor %}
-      {% for p in g.poa_pontos %}<circle class="cr-ponto-poa" cx="{{ p.x }}" cy="{{ p.y }}" r="3"/>{% endfor %}
-      {% for x in g.dias %}<text class="cr-eixo" x="{{ x.x }}" y="{{ g.base + 18 }}" text-anchor="middle">{{ x.rotulo }}</text>{% endfor %}
-      {% for c in g.colunas %}<rect class="cr-coluna" x="{{ c.x }}" y="0" width="{{ c.w }}" height="{{ g.base }}"><title>{{ c.dica }}</title></rect>{% endfor %}
-    </svg>
-  </section>
+  {{ geracao(g) }}
   <section class="cr-graf">
     <div class="cr-graf-cab"><h3>Qualidade diária: PR (%)</h3>
       <span class="cr-leg"><i class="cr-leg-pr"></i>PR do dia <i class="cr-leg-meta"></i>meta {{ q.meta }}%</span></div>

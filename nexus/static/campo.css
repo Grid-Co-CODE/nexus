@@ -1691,18 +1691,13 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 /* a Central da usina (04/11/2026, a aba da Visão do responsável), numa superfície só (à la Nexus, sem azul em camadas).
    2ª rodada no mesmo dia ("está simples demais e as linhas estão muito coladas"): o cabeçalho com as pessoas, os quadros
    com o ícone num selo, as linhas separadas por um fio com respiro, o ponto da situação e a contagem de cada linha */
-.cu-busca{display:flex;margin-top:16px}
-.cu-busca .rd-usina{flex:0 1 440px}
+/* a busca da usina à direita, na linha das abas (05/11/2026: "Quero o 'Buscar usinas' do lado direito paralelizando com
+   os botões a visão dos responsáveis!"); a lista abre no foco, por cima, como nas Rondas */
+.cu-topo{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:18px}
+.cu-topo > .cn-filtros{margin-top:0}
+.cu-busca{display:flex;flex:0 1 380px;min-width:0}
+.cu-busca .rd-usina{flex:1 1 auto}
 .cu-busca .rd-campo input{width:100%}
-/* sem usina escolhida, a lista já aberta, em grade (04/11/2026: "Deixar a lista de 'buscar usina' já no estilo nexus") */
-.cu-busca--aberta .rd-usina{flex:1 1 auto}
-.rd-usina--aberta .rd-campo{max-width:440px}
-.rd-usinas-n{margin-left:auto;font-size:12px;color:var(--mudo);white-space:nowrap}
-.rd-usinas--aberta{position:static;width:auto;max-height:min(62vh,560px);margin:12px 0 0;padding:6px;overflow:auto;
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:2px;list-style:none;background:var(--superficie);
-  border:1px solid var(--linha);border-radius:var(--raio-md);box-shadow:none}
-.rd-usinas--aberta li[role="option"]{padding:10px 12px}
-.rd-usinas--aberta .rd-usinas-nada{grid-column:1/-1;padding:12px;color:var(--mudo)}
 .cu-vazio{margin:14px 0 0;font-size:13.5px}
 .cu-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 24px;margin-top:22px}
 .cu-nome{margin:0;font:700 26px/1.2 var(--font-sans);letter-spacing:-.01em;color:var(--tinta)}
@@ -1719,9 +1714,15 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
   color:inherit;font:inherit;text-align:left;cursor:pointer}
 .cn-numeros > button:hover{background:var(--superficie-3)}
 .cn-numeros > button:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
-/* os oito números numa linha (a faixa das outras telas quebra em 150 px) */
+/* os oito números numa linha (a faixa das outras telas quebra em 150 px). Cada um ocupa três linhas da faixa, as MESMAS
+   em todos (a subgrade): o nome, o valor e o complemento alinhados entre si, cada pedaço no meio da casa dele (05/11/2026,
+   Levi: "campos separados por linhas invisíveis separando cabeçalho e valor / quero que centralize horizontal e
+   verticalmente") */
 .cu-numeros{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
-.cu-numeros > *{padding:14px 16px}
+.cn-numeros.cu-numeros > *{display:grid;grid-row:span 3;grid-template-rows:subgrid;place-items:center;row-gap:2px;padding:14px 12px;text-align:center}
+.cu-numeros .v{margin-top:0}
+/* o complemento que não cabe quebra em duas linhas parelhas ("a mais antiga / há 57 d"), não com o "d" sozinho */
+.cu-numeros .d{text-wrap:balance}
 .cu-numeros .v{font-size:20px;line-height:26px;white-space:nowrap}
 /* duas colunas que se empilham por dentro: o quadro mais curto não deixa buraco embaixo */
 .cu-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px;align-items:start}
@@ -1750,7 +1751,26 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .cu-dt--alerta::before{background:var(--alerta)}
 .cu-dt--ok::before{background:var(--ok)}
 .cu-pe{display:flex;flex-wrap:wrap;gap:8px 20px;padding:12px 20px;border-top:1px solid var(--linha);font-size:12.5px}
-.cu-rel-mes{display:block;width:100%;max-width:280px;margin:4px 0 14px}
+/* o gráfico da geração dentro do quadro da Performance: sem a caixa da janela (uma superfície só) */
+.cu-q .cr-graf{margin:0;padding:14px 20px 8px;border:0;border-top:1px solid var(--linha);border-radius:0;background:transparent}
+/* na meia largura o desenho da janela encolhe ~30%: os eixos crescem para ler a ~10 px e o valor em cima de cada barra
+   sai (encavalava; o valor do dia fica na dica de cada coluna, e o total na linha da Meta) */
+.cu-q .cr-svg .cr-eixo{font-size:14px}
+.cu-q .cr-svg .cr-rot{display:none}
+/* o mês do relatório, primeiro e em botões (05/11/2026: "Quando clicar em baixar relatórios: escolher qual o mês!") */
+.cu-rel-meses{margin:0 0 16px;padding:0;border:0}
+.cu-rel-meses legend{margin:0 0 8px;padding:0}
+.cu-rel-chips{display:flex;flex-wrap:wrap;gap:8px}
+.cu-rel-chips label{position:relative;cursor:pointer}
+.cu-rel-chips input{position:absolute;opacity:0;pointer-events:none}
+.cu-rel-chips span{display:block;padding:8px 16px;border:1px solid var(--linha-forte);border-radius:999px;
+  font:600 13px/18px var(--font-sans);color:var(--tinta-2);white-space:nowrap}
+.cu-rel-chips small{margin-left:6px;font-weight:400;font-size:11.5px;color:inherit;opacity:.8}
+.cu-rel-chips label:hover span{border-color:var(--verde);color:var(--tinta)}
+.cu-rel-chips input:checked + span{border-color:var(--verde);background:var(--verde);color:var(--sobre-verde)}
+.cu-rel-chips input:focus-visible + span{outline:2px solid var(--foco);outline-offset:2px}
+.cu-rel-t{margin:0 0 4px}
 @media (max-width:900px){.cu-grade{grid-template-columns:1fr}}
+@media (max-width:700px){.cu-busca{flex:1 1 100%}}
 @media (max-width:480px){.cu-q .cr-dl{grid-template-columns:1fr}.cu-q .cr-dl > dd{padding-top:0;border-top:0}
-  .cu-gente li{flex:1 1 100%}.rd-usinas--aberta{grid-template-columns:1fr}}
+  .cu-gente li{flex:1 1 100%}}

@@ -405,12 +405,13 @@ def _central_da_usina(todas: list[dict]) -> dict:
     dona (nexus/campo/central_usina.py). A fonte que não abre fica de fora com o aviso (`erros`); o resto vale."""
     from ...auth import setor_telas
     from ...campo import central_usina as CU
+    from ...campo import painel_responsavel as campo_painel
     nome = request.args.get("nome", "").strip()
     uid = visao.D._id(request.args.get("usina")) or CU.achar(todas, nome)
     u = next((x for x in todas if x["usina_id"] == uid), None)
     out = {"busca": [(i, n, s, url_for("torre_campo.responsaveis", modo="usina", usina=i))
                      for i, n, s in CU.busca(todas, _ordem_do_nome)],
-           "u": u, "nome": "" if u else nome, "erros": {}, "situacao_pt": SITUACAO_PT}
+           "u": u, "nome": "" if u else nome, "erros": {}}
     from ...campo import relatorio_usina as RU
     hoje_rel = visao._agora().date()
     out.update(rel_meses=RU.meses(hoje_rel), rel_mes=RU.mes_padrao(hoje_rel), rel_temas=RU.TEMAS)
@@ -424,8 +425,9 @@ def _central_da_usina(todas: list[dict]) -> dict:
                ronda_limpeza=CU.linhas(u, "acomp", ("Ronda", "Limpeza")),
                os_pendentes=CU.linhas(u, "manut", ("Atrasadas", "Pausadas")),
                os_linhas=CU.linhas(u, "manut", ("Parada agora", "OS abertas", "Vencem até amanhã", "Semana", "Zeladoria")),
-               pt_esperando=[dict(x, idade=campo_resp._duracao(x.get("idade_min")))
-                             for x in (u.get("pt") or {}).get("lista") or []])
+               # as PT esperando o De acordo, na lista do número da PT do Painel (05/11/2026: "ao clicar no KPI aparece
+               # o mesmo card que aparece em visão do responsável > painel")
+               pts=campo_painel.pts([u]))
     liberadas = setor_telas.liberadas_do_menu()
     out["link"] = {t: liberadas is None or t in liberadas for t in ("campo/ocorrencias", "hseq/mesa", "campo/rondas")}
     # os técnicos que o PCM põe na usina hoje (a regra do App desde 29/10/2026); sem ler, a lista fica vazia e a tela diz
@@ -460,14 +462,17 @@ def _central_da_usina(todas: list[dict]) -> dict:
     except Exception:           # noqa: BLE001
         _log_campo.exception("Central da usina: os chamados finalizados não abriram")
         out["chamados_mes"], out["erros"]["chamados_mes"] = [], "os chamados finalizados no mês"
+    # o gráfico da geração do mês no quadro da Performance (05/11/2026, Levi: "Quero que o gráfico de geração também
+    # apareça na visão do responsável > central da usina"): o mesmo da janela do PR, do mesmo leitor
+    out["graf_ger"] = None
     try:
-        lp = visao.pts()
-        out["pts_mes"] = [] if lp.erro else CU.pts_do_mes(uid, (lp.dados or {}).get("historico") or [], hoje)
-        if lp.erro:
-            out["erros"]["pts_mes"] = "as PT do mês"
+        import calendar
+        serie = campo_resp.serie_diaria(uid, hoje.year * 100 + hoje.month, campo_resp.Nomes(visao._Base()))
+        if serie["dias"]:
+            out["graf_ger"] = campo_graficos.geracao(serie["dias"], calendar.monthrange(hoje.year, hoje.month)[1])
     except Exception:           # noqa: BLE001
-        _log_campo.exception("Central da usina: as PT não abriram")
-        out["pts_mes"], out["erros"]["pts_mes"] = [], "as PT do mês"
+        _log_campo.exception("Central da usina: a série do dia a dia não abriu")
+        out["erros"]["serie"] = "a série do dia a dia da geração (o gráfico)"
     return out
 
 

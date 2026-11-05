@@ -34,6 +34,12 @@ def _num(v, casas=1) -> str:
     return s
 
 
+def _casas(marcas) -> int:
+    """As casas do eixo: a menor que escreve todas as marcas sem arredondar. O passo de 2,5 pede uma: com 0 casa, as
+    marcas 2,5 e 7,5 do POA saíam "2" e "8" (o gráfico da Altair na Central da usina, 05/11/2026)."""
+    return next((c for c in (0, 1) if all(abs(m - round(m, c)) < 1e-9 for m in marcas)), 2)
+
+
 def _x(dia: int, dias_mes: int) -> float:
     banda = (W - ESQ - DIR) / dias_mes
     return ESQ + banda * (dia - 0.5)
@@ -96,8 +102,8 @@ def geracao(dias: list[dict], dias_mes: int) -> dict:
             "poa_pontos": [{"x": round(_x(d, dias_mes), 1), "y": round(_y(v, topo_poa), 1)} for d, v in poa if v is not None],
             "meta_y": round(_y(meta, topo), 1) if meta else None, "meta": _num(meta),
             "meta_poa_y": round(_y(meta_poa, topo_poa), 1) if meta_poa else None, "meta_poa": _num(meta_poa, 2),
-            "grades": [{"y": round(_y(m, topo), 1), "rotulo": _num(m, 0 if topo >= 10 else 1)} for m in marcas],
-            "grades_dir": [{"y": round(_y(m, topo_poa), 1), "rotulo": _num(m, 0 if topo_poa >= 10 else 1)} for m in marcas_poa],
+            "grades": [{"y": round(_y(m, topo), 1), "rotulo": _num(m, _casas(marcas))} for m in marcas],
+            "grades_dir": [{"y": round(_y(m, topo_poa), 1), "rotulo": _num(m, _casas(marcas_poa))} for m in marcas_poa],
             "dias": [{"x": round(_x(d, dias_mes), 1), "rotulo": str(d)} for d in range(1, dias_mes + 1)
                      if dias_mes <= 16 or d % 2 == 1 or d == dias_mes]}
 
@@ -142,6 +148,6 @@ def pr(dias: list[dict], dias_mes: int) -> dict:
                          "dica": f"Dia {d}: PR {_num(v)}%" + (f" (meta {_num(meta)}%)" if meta else "")}
                         for d, v in validos],
             "meta_y": round(_y(meta, topo), 1) if meta else None, "meta": _num(meta),
-            "grades": [{"y": round(_y(m, topo), 1), "rotulo": f"{_num(m, 0)}%"} for m in marcas],
+            "grades": [{"y": round(_y(m, topo), 1), "rotulo": f"{_num(m, _casas(marcas))}%"} for m in marcas],
             "dias": [{"x": round(_x(d, dias_mes), 1), "rotulo": str(d)} for d in range(1, dias_mes + 1)
                      if dias_mes <= 16 or d % 2 == 1 or d == dias_mes]}

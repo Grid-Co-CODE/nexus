@@ -7,18 +7,15 @@ Nenhuma conta nova. A linha da usina é a MESMA da Visão (`responsaveis.montar`
 quem olha): a meta, o PR, a disponibilidade, a ronda, a limpeza, as PT esperando, os chamados abertos, os extintores e as
 OS. O que a linha não traz vem da tela dona de cada coisa (Nexus centralizado, 12/10/2026): as ocorrências abertas
 (Campo › Ocorrências), as pendências da Segurança (a Mesa do HSEQ), os técnicos da usina (PCM › Técnicos por usina,
-a regra do App desde 29/10/2026), os chamados finalizados no mês (o fato do quadro Acompanhamento de chamados) e as
-PT decididas no mês (o fato das PT).
+a regra do App desde 29/10/2026) e os chamados finalizados no mês (o fato do quadro Acompanhamento de chamados). As PT
+decididas no mês saíram com o quadro da PT (05/11/2026: o número da PT abre a lista do Painel).
 
-Decisões do Levi (04/11/2026): o mês corrente na performance, na disponibilidade e no histórico de chamados e de PT;
+Decisões do Levi (04/11/2026): o mês corrente na performance, na disponibilidade e no histórico de chamados;
 nas pendências, as rondas, as OS atrasadas e pausadas, as ocorrências abertas e a Segurança; a busca com todas as usinas
 mobilizadas, para quem abre a Visão (como a Visão, que deixa escolher qualquer responsável)."""
-from datetime import date, datetime, timedelta, timezone
-
 from . import ocorrencias as campo_oc
 from . import visao
 
-_BRT = timezone(timedelta(hours=-3))
 # a Segurança, na ordem da Mesa (o que pede ação primeiro), com o rótulo daqui
 SEGURANCA = (("pts", "PT parada"), ("vencidos", "Extintor vencido"), ("nr", "Extintor não reconhecido"),
              ("sem_luvas", "Sem luvas"), ("perto", "Extintor a vencer"), ("sem_atual", "Extintor sem conferência"),
@@ -111,33 +108,4 @@ def seguranca(uid: int, listas: dict) -> list[dict]:
         itens = [x for x in listas.get(k) or [] if x.get("usina_id") == uid]
         if itens:
             out.append({"chave": k, "rot": rot, "n": len(itens), "itens": [_item_seguranca(k, x) for x in itens]})
-    return out
-
-
-def do_mes(data, hoje: date) -> bool:
-    """A data (datetime com fuso, date ou o data_id AAAAMMDD) cai no mês de hoje, em Brasília?"""
-    if data is None or data == "":
-        return False
-    if isinstance(data, datetime):
-        d = (data if data.tzinfo else data.replace(tzinfo=timezone.utc)).astimezone(_BRT).date()
-    elif isinstance(data, date):
-        d = data
-    else:
-        try:
-            n = int(data)
-        except (TypeError, ValueError):
-            return False
-        return n // 100 == hoje.year * 100 + hoje.month
-    return (d.year, d.month) == (hoje.year, hoje.month)
-
-
-def pts_do_mes(uid: int, historico: list[dict], hoje: date) -> list[dict]:
-    """As PT da usina decididas (ou que saíram da espera) e pedidas no mês corrente, a mais nova primeiro (a ordem do
-    histórico da tela APR e PT). As que esperam o De acordo são as da linha da Visão (`u["pt"]`)."""
-    out = []
-    for p in historico:
-        if p.get("usina_id") == uid and do_mes(p.get("criada"), hoje):
-            c = p["criada"]
-            dia = (c if c.tzinfo else c.replace(tzinfo=timezone.utc)).astimezone(_BRT) if isinstance(c, datetime) else c
-            out.append(dict(p, dia_txt=dia.strftime("%d/%m") if hasattr(dia, "strftime") else ""))
     return out
