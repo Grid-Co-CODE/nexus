@@ -225,8 +225,9 @@ def montar(usinas: list[dict], tempo_real: dict[int, dict] | None, chamados: dic
         ch = (chamados or {}).get(uid, []) if chamados is not None else None
         os_ = (os_abertas or {}).get(uid, []) if os_abertas is not None else None
         vis = (visitas or {}).get(uid) if visitas is not None else None
-        linha = {"usina_id": uid, "usina": u.get("usina") or "", "onde": " · ".join(x for x in (
-            u.get("cidade") and (f"{u['cidade']}/{u['uf']}" if u.get("uf") else u["cidade"]), u.get("equipe")) if x),
+        # o lugar é a cidade, sem a equipe: o nome da equipe pode ser o de uma pessoa (o PCM, 05/11/2026)
+        onde = (f"{u['cidade']}/{u['uf']}" if u.get("uf") else u["cidade"]) if u.get("cidade") else ""
+        linha = {"usina_id": uid, "usina": u.get("usina") or "", "onde": onde,
                  "status": st, "perf": None if pct is None else {"pct": pct, "tom": _tom_perf(pct)},
                  "prod_kwh": m.get("prod_kwh"), "meta_kwh": m.get("meta_kwh"),
                  "chamados": ch, "os": os_, "visita": vis, "visita_lida": visitas is not None,

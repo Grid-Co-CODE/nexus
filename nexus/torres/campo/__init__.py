@@ -57,14 +57,15 @@ TORRE = Torre(
              "Gerencial, Confiabilidade, COS, tickets, rondas e PT, no banco do Nexus"),
         # a Visão do cliente, fase 1 (05/11/2026; a sugestão "Visão do cliente: Comando com a síntese das usinas dele" e o
         # "Sim, fase 1" do Levi): para a Grid, com o login de hoje; a conta mora em nexus/campo/visao_cliente.py
-        Tela("cliente", "Visão do cliente",
-             "Como estão agora as usinas de um cliente, e o que responder a ele sem abrir cinco telas?",
-             "Tempo real da plataforma (só leitura) + Gerencial + Andamento da Ronda COS + OS e programação no banco"),
         # as ocorrências com plano de ação (Levi, 18/10/2026: "as ocorrências com plano de ação. siga!"): o painel próprio
         # de um supervisor, no Nexus. Dos Responsáveis UFV sem marcar em Base → Acessos (como o Gerar e o Quadro do PCM);
         # os outros setores, pela marca
         Tela("ocorrencias", "Ocorrências", "Que ocorrência das minhas usinas tem ação vencendo, e com quem ela está?",
              "Livro nexus_ocorrencias (escrito nesta tela) + cadastro do Nexus", do_setor=SID.RESPONSAVEL_UFV),
+        # a Visão do cliente (05/11/2026, fase 1): a síntese das usinas de um cliente (nexus/campo/visao_cliente.py)
+        Tela("cliente", "Visão do cliente",
+             "Como estão agora as usinas de um cliente, e o que responder a ele sem abrir cinco telas?",
+             "Tempo real da plataforma (só leitura) + Gerencial + Andamento da Ronda COS + OS e programação no banco"),
         Tela("atencao", "Central de atenção",
              "O que no campo pede ação agora: usina sem ronda, PT parada, ronda sem OS?", FONTE_APP),
         Tela("aprovacao", "Aprovação de OS",

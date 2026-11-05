@@ -95,6 +95,14 @@ def test_fonte_que_nao_respondeu_e_sem_leitura_nunca_zero():
     assert x["visita_lida"] is False
 
 
+def test_o_nome_da_equipe_nao_sai():
+    """O PCM avisou (05/11/2026): o nome da equipe pode ser o de uma pessoa. Fica só a cidade."""
+    u = _u(1, "Alfa", 10, 10, 100.0)
+    u["equipe"] = "Equipe Fulano"
+    s = VC.montar([u], {1: _tr("Alfa", "ok")}, {}, {}, {}, date(2026, 11, 5))
+    assert "Fulano" not in repr(s) and s["normais"][0]["onde"] == "Alfa/SP"
+
+
 def test_a_noite_nao_vira_gerando():
     s = VC.montar([_u(1, "Alfa"), _u(2, "Bravo")], {1: _tr("Alfa", "ok", "Sem sol na usina"), 2: _tr("Bravo", "ok")},
                   {}, {}, {}, date(2026, 11, 5))
@@ -241,6 +249,21 @@ def test_a_tela_escolhe_o_cliente_e_mostra_a_sintese(cliente_tela, logado):
     assert "Não consegui ler os chamados na distribuidora" in html
     assert '<details class="gc-explica">' in html and "De onde vem cada número" in html
     assert "/t/campo/cliente" in logado.get("/t/campo/responsaveis").get_data(as_text=True)   # no menu da torre
+
+
+def test_sem_cadastro_a_tela_abre_com_o_aviso(cliente_tela, logado, monkeypatch):
+    """Sem o banco (o cadastro não responde), a tela abre com o aviso, como as outras do Campo; nunca o erro 500."""
+    def _sem(*a, **k):
+        raise visao.SemBanco("sem banco")
+    monkeypatch.setattr(visao, "_Base", _sem)
+    r = logado.get("/t/campo/cliente?cliente=1")
+    assert r.status_code == 200 and "Não consegui ler o cadastro do Nexus" in r.get_data(as_text=True)
+
+
+def test_fica_logo_depois_das_ocorrencias_no_menu():
+    from nexus.torres.campo import TORRE
+    ids = [t.id for t in TORRE.telas]
+    assert ids.index("cliente") == ids.index("ocorrencias") + 1         # a Visão do responsável e as Ocorrências juntas
 
 
 def test_cliente_que_nao_existe_volta_a_escolha(cliente_tela, logado):

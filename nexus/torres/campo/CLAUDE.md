@@ -1404,7 +1404,8 @@ hora prevista de chegada, pelo App) estão FORA.
 - **O recorte é o `cliente_id` da usina** (o cadastro do Nexus): "contrato" não existe como entidade, e a fase 2 filtra
   pelo mesmo campo. A conta é feita por cliente, no servidor, e já sai **sem o que é interno**: nada de nome ou telefone
   de técnico, custo, horas, comentário interno da OS nem causa de falha (a plataforma diz o sintoma, não a causa). O teste
-  `test_a_sintese_nao_leva_nada_interno` trava as chaves que saem.
+  `test_a_sintese_nao_leva_nada_interno` trava as chaves que saem. O lugar da usina é só a cidade, **sem o nome da
+  equipe**: o PCM avisou (05/11/2026) que ele pode ser o de uma pessoa (`test_o_nome_da_equipe_nao_sai`).
 - **Nenhuma conta nova; cada número é o da tela dona**:
   - Status: o tempo real da plataforma (`/api/entrada/tempo-real`) pela ponte SÓ DE LEITURA (`ler_tempo_real`, guardado
     2 min): a plataforma serve o que já montou e não fala com a API PV (a SunOp é paga). A resposta sem o
@@ -1427,6 +1428,8 @@ hora prevista de chegada, pelo App) estão FORA.
 - A ordem da tabela: quem pede atenção primeiro (parada, sem comunicação, com perda, sem leitura; depois mais chamados,
   pior %, mais OS a fazer). As sem pendência (gerando ou sem sol, sem chamado, sem OS a fazer e % ≥ 90) ficam dobradas
   em "+ N usinas sem pendência". A cor da performance é a régua do Gerencial: ≥ 97% verde, ≥ 90% amarelo, abaixo vermelho.
+- No menu, logo depois das Ocorrências (a Visão do responsável e as Ocorrências ficam juntas, regra do teste delas). Sem
+  o cadastro (o banco fora), a tela abre com o aviso, como as outras do Campo, nunca o erro 500.
 - Acesso: a tela é `campo/cliente` em Base › Acessos; tela nova nasce fechada para os setores (só o administrador vê) e
   quem libera para COS, PCM e Performance é o Levi.
 

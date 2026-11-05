@@ -71,9 +71,14 @@ def cliente():
     """A Visão do cliente: a escolha do cliente e, com um escolhido, os 5 números e a tabela das usinas dele."""
     leitura = campo_resp.visao_responsaveis()
     d = leitura.dados or {}
-    b = visao._Base()
-    grupos = VC.por_cliente(d.get("usinas") or [], b)
-    opcoes = VC.opcoes_de_cliente(grupos, b.nome_cliente)
+    erro_visao = leitura.erro
+    try:
+        b = visao._Base()
+    except Exception as e:      # noqa: BLE001 — sem o cadastro, a tela abre com o aviso, como as outras do Campo
+        _log.warning("Visão do cliente: não consegui ler o cadastro (%s)", type(e).__name__)
+        b, erro_visao = None, f"Não consegui ler o cadastro do Nexus ({type(e).__name__})"
+    grupos = VC.por_cliente(d.get("usinas") or [], b) if b else {}
+    opcoes = VC.opcoes_de_cliente(grupos, b.nome_cliente) if b else []
     cid = D._id(request.args.get("cliente"))
     if cid not in grupos:
         cid = None
@@ -85,8 +90,8 @@ def cliente():
         ts = fontes.get("tempo_real_ts") or ""
         sintese = VC.montar(usinas, fontes["tempo_real"], fontes["chamados"], fontes["os"], fontes["visitas"], hoje)
     return render_template("campo/cliente.html", torre=TORRE, tela=TORRE.tela("cliente"), opcoes=opcoes, cid=cid,
-                           nome=b.nome_cliente.get(cid) or "" if cid else "", sintese=sintese, erros=erros,
-                           erro_visao=leitura.erro, lido_tr=ts, fontes_nome=FONTES_NOME)
+                           nome=(b.nome_cliente.get(cid) or "") if cid else "", sintese=sintese, erros=erros,
+                           erro_visao=erro_visao, lido_tr=ts, fontes_nome=FONTES_NOME)
 
 
 FONTES_NOME = {"tempo_real": "o status do tempo real", "chamados": "os chamados na distribuidora",
