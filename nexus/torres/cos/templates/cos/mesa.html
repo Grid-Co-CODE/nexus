@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+<noscript><meta http-equiv="refresh" content="60"></noscript>
+{# Mesa do operador (05/11/2026): a carteira de quem entrou (a da Ronda COS, pelo HMAC do e-mail), o que está aberto nela
+   e o que falta avisar ao cliente ou acionar o campo, com os prazos da tela Ocorrências (nexus/cos/mesa.py). Só lê. #}
+{% macro lista(itens, vazio) %}
+  {% if itens %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Prazo</th><th class="cos-esq">Usina</th><th class="cos-esq">Ocorrência</th><th class="cos-esq">Início</th><th class="cos-esq">OS</th><th class="cos-esq"></th></tr></thead>
+    <tbody>
+    {% for i in itens %}
+      <tr>
+        <td class="cos-esq"><span class="cn-pill cn-{{ i.etapa.tom }}">{{ 'Atrasada' if i.etapa.estado == 'atrasada' else 'Correndo' }}</span>
+          <span class="det">{{ i.etapa.detalhe }}</span></td>
+        <td class="cos-esq cos-usina"><b>{{ i.linha.usina }}</b><span class="det">{{ i.cliente }}{% if i.linha.equipamentos %} · {{ i.linha.equipamentos }}{% endif %}</span></td>
+        <td class="cos-esq">{{ i.linha.tipo }}{% if i.linha.severidade %}<span class="det cn-t-{{ i.linha.severidade_tom }}">{{ i.linha.severidade }}</span>{% endif %}</td>
+        <td class="cos-esq">{{ i.inicio.strftime('%d/%m %H:%M') if i.inicio else '—' }}<span class="det">{{ i.linha.estado }}</span></td>
+        <td class="cos-esq">{{ i.linha.os or '—' }}</td>
+        <td class="cos-esq">{% if i.linha.link_plataforma %}<a class="cn-fora" href="{{ i.linha.link_plataforma }}" target="_blank" rel="noopener">abrir na Ronda COS</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="cn-vazio">{{ vazio }}</p>{% endif %}
+{% endmacro %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>A mesa.</b> É a carteira de clientes de quem entrou, a da Ronda COS (a aba
+      Operador x clientes), achada pelo e-mail do login sem que o e-mail saia do Nexus. Quem não tem carteira (o supervisor e a
+      gestão, como na Ronda COS) vê todas as mesas, e qualquer um pode trocar para "Todas as mesas".</p>
+      <p><b>De onde vem.</b> O que está aberto é a fotografia do Andamento, a mesma da Ronda padronizada. O que falta avisar e o
+      campo a acionar são as ocorrências abertas dos últimos {{ dias }} dias, com os prazos da tela Ocorrências: o cliente
+      informado em até {{ prazos.informado.minutos }} min e o campo acionado em até {{ prazos.campo.minutos }} min, contados do
+      início da falha. <b>Correndo</b> ainda está no prazo; <b>atrasada</b> já passou dele.</p>
+      <p><b>Só lê.</b> Avisar o cliente e acionar o campo são na Ronda COS, pelo link de cada linha.</p>{% endcall %}</div>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Andamento da Ronda COS{% if lido %}<br>lido às <b>{{ lido }}</b>{% endif %}</div>
+  </div>
+
+  {% if not ligada %}
+  <div class="cn-vazio cos-aviso">A fonte do Andamento ainda não está ligada neste servidor: faltam o endereço e a chave
+    (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>), que um administrador grava em Base →
+    Chaves do Nexus. O resto do Nexus segue igual.</div>
+  {% else %}
+  {% if erro_clientes %}<div class="cn-erro" role="alert"><b>{{ erro_clientes[:1]|upper }}{{ erro_clientes[1:] }}.</b></div>{% endif %}
+
+  <div class="cn-filtros">
+    <div class="cn-seg" aria-label="Mesa">
+      <a href="{{ url(mesa=None) }}"{% if ver != 'todas' %} aria-current="page"{% endif %}>Minha mesa</a>
+      <a href="{{ url(mesa='todas') }}"{% if ver == 'todas' %} aria-current="page"{% endif %}>Todas as mesas</a>
+    </div>
+    <p class="cos-mesa-clientes">{% if mesa.minha %}Sua carteira: {% endif %}<b>{{ mesa.clientes|join(' · ') or 'nenhum cliente' }}</b></p>
+  </div>
+  {% if mesa.aviso and ver != 'todas' %}<div class="cn-erro cn-aviso" role="status">{{ mesa.aviso }}</div>{% endif %}
+  {% if mesa.fora %}<p class="mudo">Da sua carteira, o Andamento não acompanha: {{ mesa.fora|join(', ') }}.</p>{% endif %}
+
+  {% if p %}
+  {% for c, erro, velha in p.erros %}<div class="cn-erro{% if velha %} cn-aviso{% endif %}" role="alert"><b>{{ c }}: {{ erro }}.</b>
+    {% if velha %}A tela mostra a última leitura boa.{% else %}Este cliente fica de fora agora.{% endif %}</div>{% endfor %}
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Abertas na mesa</span><span class="v">{{ '—' if p.resumo.abertas is none else p.resumo.abertas }}</span>
+      <span class="d">{% if p.resumo.criticas %}{{ p.resumo.criticas }} crítica{{ '' if p.resumo.criticas == 1 else 's' }} ou alta{{ '' if p.resumo.criticas == 1 else 's' }}{% elif p.resumo.abertas is none %}falta a leitura de um cliente{% else %}na fotografia de agora{% endif %}</span></span>
+    <span><span class="gc-rotulo">Falta avisar o cliente</span><span class="v{% if p.resumo.avisar_atrasadas %} ruim{% endif %}">{{ p.resumo.falta_avisar }}</span>
+      <span class="d">{{ p.resumo.avisar_atrasadas }} fora dos {{ prazos.informado.minutos }} min</span></span>
+    <span><span class="gc-rotulo">Campo a acionar</span><span class="v{% if p.resumo.campo_atrasadas %} ruim{% endif %}">{{ p.resumo.campo }}</span>
+      <span class="d">{{ p.resumo.campo_atrasadas }} fora dos {{ prazos.campo.minutos }} min</span></span>
+  </div>
+
+  <h2 class="cos-sub">Falta avisar o cliente</h2>
+  {{ lista(p.falta_avisar, 'Nenhuma ocorrência aberta esperando o aviso ao cliente nesta mesa.') }}
+
+  <h2 class="cos-sub">Campo a acionar</h2>
+  {{ lista(p.campo, 'Nenhuma ocorrência aberta esperando o acionamento do campo nesta mesa.') }}
+
+  <h2 class="cos-sub">Aberto em cada cliente</h2>
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Cliente</th><th>Abertas</th><th>Críticas ou altas</th><th class="cos-esq"></th></tr></thead>
+    <tbody>
+    {% for c in p.por_cliente %}
+      <tr><td class="cos-esq"><b>{{ c.cliente }}</b>{% if c.erro %}<span class="det cn-t-alerta">{{ c.erro }}</span>{% endif %}</td>
+        <td>{{ '—' if c.abertas is none else c.abertas }}</td>
+        <td>{% if c.criticas %}<span class="cn-pill cn-critico">{{ c.criticas }}</span>{% else %}{{ '—' if c.criticas is none else 0 }}{% endif %}</td>
+        <td class="cos-esq"><a class="cn-fora" href="{{ raiz }}/t/cos/ronda?cliente={{ c.cliente|urlencode }}">ver na Ronda padronizada</a></td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

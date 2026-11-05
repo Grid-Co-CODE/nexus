@@ -18,6 +18,8 @@ Nos testes, sem a chave na config do app, NÃO se vai à rede (o mesmo cuidado d
 A leitura não trava a tela: 5 s de teto por pedido, 30 s de cópia em memória por cliente (o Andamento lê a Ronda COS de
 minuto em minuto, e as duas telas recarregam sozinhas), e na falha a última cópia boa continua na tela, dita velha.
 """
+import hashlib
+import hmac
 import json
 import re
 import threading
@@ -342,6 +344,59 @@ def ler_os_abertas(config) -> Leitura:
         except FonteErro as ex:
             if ex.codigo == 404:
                 raise FonteErro("o Andamento ainda não tem a rota das OS abertas, ou a rota do Nexus está desligada lá",
+                                404) from None
+            raise
+    except FonteErro as ex:
+        if em_cache:
+            return Leitura("", em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
+        return Leitura("", None, erro=str(ex))
+    with _trava:
+        _cache[chave] = (agora, dados, time.time())
+    return Leitura("", dados, lido_em=time.time())
+
+
+# A Mesa do operador e o Desempenho da equipe (05/11/2026) leem a quinta rota: a carteira de cada operador da Ronda COS (a
+# aba "Operador x clientes"), com o e-mail trocado pelo HMAC-SHA256 com a chave do Nexus (`GET /api/nexus/carteiras`). A
+# carteira muda quando a gestão a edita (raro): 5 min de cópia, como a lista de clientes.
+VERSAO_DAS_CARTEIRAS = 1
+TTL_CARTEIRAS_S = 300
+
+
+def chave_da_pessoa(email: str, chave: str) -> str:
+    """O HMAC do e-mail (minúsculo, sem espaço) com a chave do Nexus: a mesma conta do Andamento
+    (`servico/nexus-carteiras.ts`). O e-mail não vai ao Andamento nem volta de lá."""
+    return hmac.new(chave.encode("utf-8"), email.strip().lower().encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def validar_carteiras(d) -> dict:
+    if not isinstance(d, dict):
+        raise FonteErro("a resposta do Andamento não é um objeto")
+    if d.get("versao") != VERSAO_DAS_CARTEIRAS:
+        raise FonteErro(f"o Andamento fala a versão {d.get('versao')!r} das carteiras, e o Nexus entende a "
+                        f"{VERSAO_DAS_CARTEIRAS}")
+    if not isinstance(d.get("carteiras"), list):
+        raise FonteErro("a resposta do Andamento não tem as carteiras")
+    return d
+
+
+def ler_carteiras(config) -> Leitura:
+    """As carteiras dos operadores (a Mesa e o Desempenho). Na falha, a última cópia boa continua, dita velha; o
+    Andamento de antes da rota responde 404, e o erro diz isso."""
+    f = fonte(config)
+    if not f.ligada:
+        return Leitura("", None, erro="a fonte do Andamento não está ligada neste servidor")
+    chave = (f.url, "|carteiras")
+    agora = time.monotonic()
+    with _trava:
+        em_cache = _cache.get(chave)
+        if em_cache and agora - em_cache[0] < TTL_CARTEIRAS_S:
+            return Leitura("", em_cache[1], lido_em=em_cache[2])
+    try:
+        try:
+            dados = validar_carteiras(_pedir(f, "/api/nexus/carteiras"))
+        except FonteErro as ex:
+            if ex.codigo == 404:
+                raise FonteErro("o Andamento ainda não tem a rota das carteiras, ou a rota do Nexus está desligada lá",
                                 404) from None
             raise
     except FonteErro as ex:
