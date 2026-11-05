@@ -132,7 +132,7 @@
 
       <h4 class="vc-det-t">Chamados na distribuidora <span>· 30 dias</span></h4>
       {% if x.chamados is none %}<p class="vc-sem vc-det-vazio">sem leitura</p>
-      {% elif x.chamados %}<ul class="vc-det-lista">{% for c in x.chamados %}<li><div><b>{% if c.protocolo %}Protocolo {{ c.protocolo }}{% else %}Sem protocolo ainda{% endif %}</b><span class="vc-det-d">{{ c.concessionaria or 'distribuidora' }}{% if c.uc %} · UC {{ c.uc }}{% endif %}{% if c.criado %} · aberto em {{ c.criado.strftime('%d/%m %H:%M') }}{% endif %}</span></div><span class="cn-pill cn-{{ c.tom }}">{{ c.situacao }}</span></li>{% endfor %}</ul>
+      {% elif x.chamados %}<ul class="vc-det-lista">{% for c in x.chamados_grupos %}<li><div><b>{% if c.protocolo %}Protocolo {{ c.protocolo }}{% else %}Sem protocolo ainda{% endif %}</b><span class="vc-det-d">{{ c.concessionaria or 'distribuidora' }}{% if c.ucs|length > 1 %} · {{ c.ucs|length }} UCs ({{ c.ucs|join(', ') }}){% elif c.ucs %} · UC {{ c.ucs[0] }}{% endif %}{% if c.criado %} · aberto em {{ c.criado.strftime('%d/%m %H:%M') }}{% endif %}</span></div><span class="cn-pill cn-{{ c.tom }}">{{ c.situacao }}</span></li>{% endfor %}</ul>
       {% else %}<p class="mudo vc-det-vazio">Nenhum nos últimos 30 dias.</p>{% endif %}
 
       <h4 class="vc-det-t">Ordens de serviço</h4>

@@ -1454,7 +1454,9 @@ leitura a mais por clique. O painel tem:
   fim com "hoje" (o fato das OS guarda o dia, não a hora), e a que já está em conferência diz "aberta e concluída" (na
   bancada, duas OS de religamento abertas no dia já estavam concluídas);
 - os chamados na distribuidora de 30 dias, com o protocolo (ou "sem protocolo ainda"), a distribuidora, a UC, quando
-  abriu e a situação;
+  abriu e a situação. **Um protocolo de várias UCs é um item só, com as UCs** (`chamados_agrupados`), e na linha do dia
+  uma linha só com "· N UCs": em produção (05/11/2026, Mandaguaçu) a COPEL deu um protocolo para as 4 UCs e o painel
+  repetia a mesma linha 4 vezes. A contagem da tabela e do topo segue por chamado, como a tela Acionamentos;
 - as OS a fazer com a situação, e a contagem das concluídas em conferência.
 
 Defeito achado e corrigido na entrega 2: o instante do Andamento vem com fuso, e a ordem dos chamados usava o

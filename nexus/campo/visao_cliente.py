@@ -134,6 +134,26 @@ def chamados_por_usina(b, leituras: list) -> dict[int, list[dict]]:
     return dict(out)
 
 
+def chamados_agrupados(chamados: list | None) -> list[dict]:
+    """Os chamados da usina para o painel: os do MESMO protocolo (a distribuidora dá um para as várias UCs) num item só,
+    com as UCs; sem protocolo, cada chamado é um item. A contagem da tabela e do topo segue por chamado, como a tela
+    Acionamentos (a dona)."""
+    out, por = [], {}
+    for c in chamados or ():
+        chave = (c.get("protocolo"), c.get("concessionaria"), c.get("situacao")) if c.get("protocolo") else None
+        if chave and chave in por:
+            if c.get("uc"):
+                por[chave]["ucs"].append(c["uc"])
+            continue
+        g = {"protocolo": c.get("protocolo") or "", "concessionaria": c.get("concessionaria") or "",
+             "situacao": c.get("situacao"), "tom": c.get("tom"), "criado": c.get("criado"),
+             "ucs": [c["uc"]] if c.get("uc") else []}
+        out.append(g)
+        if chave:
+            por[chave] = g
+    return out
+
+
 def os_por_usina(tarefas: list[dict] | None, os_de_chamado: set, hoje: date) -> dict[int, list[dict]]:
     """{usina_id: as OS abertas, uma por OS}, pela régua do quadro "OS e manutenção" da Visão (`manutencao.
     tarefas_por_usina`: fora o backoffice, o Teste, a zeladoria e as OS de chamado; a OS em verificação conta, qualquer
@@ -258,14 +278,21 @@ def linha_do_dia(paradas: list | None, chamados: list | None, os_: list | None, 
         if ini[:10] == iso and len(ini) >= 16:
             ev.append({"hora": ini[11:16], "texto": f"Parada registrada: {p.get('escopo') or 'usina'} · OS {p.get('os')}",
                        "tom": "critico"})
+    # a distribuidora dá UM protocolo para as várias UCs da usina (produção, 05/11/2026: a Mandaguaçu repetia a mesma
+    # linha 4 vezes): o mesmo acontecimento das várias UCs é uma linha só, com quantas UCs
+    do_chamado: dict[tuple, int] = {}
     for c in chamados or ():
         conc = c.get("concessionaria") or "distribuidora"
         q = c.get("enviado") or c.get("criado")
         if q and q.date() == hoje:
-            ev.append({"hora": f"{q:%H:%M}", "texto": f"Chamado aberto na {conc}", "tom": "alerta"})
+            k = (f"{q:%H:%M}", f"Chamado aberto na {conc}", "alerta")
+            do_chamado[k] = do_chamado.get(k, 0) + 1
         pq = c.get("protocolo_quando")
         if c.get("protocolo") and pq and pq.date() == hoje:
-            ev.append({"hora": f"{pq:%H:%M}", "texto": f"Protocolo {c['protocolo']} da {conc}", "tom": "ok"})
+            k = (f"{pq:%H:%M}", f"Protocolo {c['protocolo']} da {conc}", "ok")
+            do_chamado[k] = do_chamado.get(k, 0) + 1
+    for (hora, texto, tom), n in do_chamado.items():
+        ev.append({"hora": hora, "texto": texto + (f" · {n} UCs" if n > 1 else ""), "tom": tom})
     for b in agenda or ():
         ev.append({"hora": b["hora"] or "—", "texto": f"Visita {b['situacao']}: {b['tipo']}", "tom": b["tom"]})
     ev.sort(key=lambda e: e["hora"])
@@ -319,7 +346,8 @@ def montar(usinas: list[dict], tempo_real: dict[int, dict] | None, chamados: dic
         linha = {"usina_id": uid, "usina": u.get("usina") or "", "onde": onde,
                  "status": st, "perf": None if pct is None else {"pct": pct, "tom": _tom_perf(pct)},
                  "prod_kwh": m.get("prod_kwh"), "meta_kwh": m.get("meta_kwh"),
-                 "chamados": ch, "os": os_, "visita": vis, "visita_lida": visitas is not None,
+                 "chamados": ch, "chamados_grupos": chamados_agrupados(ch) if ch is not None else None,
+                 "os": os_, "visita": vis, "visita_lida": visitas is not None,
                  "visita_txt": _quando(vis["dia"], vis["hora"], hoje) if vis else ""}
         linha["paradas"] = [_parada(p) for p in u.get("paradas_abertas") or ()]
         linha["dia"] = linha_do_dia(u.get("paradas_abertas"), ch, os_, (agenda or {}).get(uid), hoje)

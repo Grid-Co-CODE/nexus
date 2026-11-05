@@ -264,6 +264,27 @@ def test_a_linha_do_dia_so_com_o_que_aconteceu_hoje():
     assert VC.linha_do_dia(None, None, None, None, hoje) == []             # sem fonte: nada inventado
 
 
+def _ch_uc(uc, protocolo="20266296905597", criado="2026-11-04T20:31:00-03:00", prot_em="2026-11-05T07:29:00-03:00"):
+    return {"concessionaria": "COPEL", "uc": uc, "protocolo": protocolo, "criado": _quando(criado),
+            "enviado": _quando(criado), "protocolo_quando": _quando(prot_em), "situacao": "com protocolo", "tom": "ok",
+            "os": ""}
+
+
+def test_um_protocolo_de_varias_ucs_e_uma_linha_so():
+    """Produção, 05/11/2026 (Mandaguaçu): a COPEL deu UM protocolo para as 4 UCs da usina, e a linha do dia repetia
+    "07:29 Protocolo ... da COPEL" quatro vezes; a lista dos chamados também. Fica uma linha, com as UCs."""
+    hoje = date(2026, 11, 5)
+    chamados = [_ch_uc(uc) for uc in ("1", "2", "3", "4")]
+    dia = VC.linha_do_dia(None, chamados, None, None, hoje)
+    assert [(e["hora"], e["texto"]) for e in dia] == [("07:29", "Protocolo 20266296905597 da COPEL · 4 UCs")]
+    grupos = VC.chamados_agrupados(chamados + [_ch_uc("9", protocolo="777", criado="2026-11-01T10:00:00-03:00",
+                                                     prot_em="2026-11-01T11:00:00-03:00")])
+    assert [(g["protocolo"], g["ucs"]) for g in grupos] == [("20266296905597", ["1", "2", "3", "4"]), ("777", ["9"])]
+    # sem protocolo não junta: cada chamado é um
+    sem = [_ch_uc("1", protocolo=""), _ch_uc("2", protocolo="")]
+    assert len(VC.chamados_agrupados(sem)) == 2
+
+
 def test_o_detalhe_vai_na_linha_sem_nada_interno():
     hoje = date(2026, 11, 5)
     u = _u(1, "Alfa", 10, 10, 100.0)
@@ -396,6 +417,21 @@ def test_a_tela_abre_o_detalhe_da_usina_escolhida(cliente_tela, logado):
     # a usina de outro cliente no endereço não abre: volta para a primeira deste
     html = logado.get("/t/campo/cliente?cliente=1&usina=3").get_data(as_text=True)
     assert 'id="vc-det-3"' not in html and 'id="vc-det-1" class="vc-det-u">' in html
+
+
+def test_o_painel_lista_o_protocolo_de_varias_ucs_uma_vez(cliente_tela, logado, monkeypatch):
+    from nexus.torres.campo import cliente_tela as CT
+    original = CT._fontes
+
+    def _com_chamados(b, uids, hoje):
+        f, e = original(b, uids, hoje)
+        f["chamados"] = {1: [_ch_uc(uc) for uc in ("11", "12")]}
+        e.pop("chamados", None)
+        return f, e
+    monkeypatch.setattr(CT, "_fontes", _com_chamados)
+    html = logado.get("/t/campo/cliente?cliente=1&usina=1").get_data(as_text=True)
+    det = html.split('id="vc-det-1"', 1)[1].split("</section>", 1)[0]
+    assert det.count("Protocolo 20266296905597</b>") == 1 and "2 UCs (11, 12)" in det
 
 
 def test_cliente_que_nao_existe_volta_a_escolha(cliente_tela, logado):
