@@ -83,8 +83,8 @@
   </div>
 
   {% macro linha(x) %}
-      <tr>
-        <td class="vc-usina"><b>{{ x.usina }}</b>{% if x.onde %}<span class="det">{{ x.onde }}</span>{% endif %}</td>
+      <tr class="vc-linha{% if x.usina_id == sel %} vc-sel{% endif %}" data-vc="{{ x.usina_id }}">
+        <td class="vc-usina"><a class="vc-ir" href="?cliente={{ cid }}&amp;usina={{ x.usina_id }}" aria-controls="vc-det-{{ x.usina_id }}">{{ x.usina }}</a>{% if x.onde %}<span class="det">{{ x.onde }}</span>{% endif %}</td>
         <td><span class="cn-pill cn-{{ x.status.tom }}">{{ x.status.rotulo }}</span>{% if x.status.lido and x.status.chave not in ('gerando', 'sem_sol') %}<span class="det">última leitura {{ x.status.lido }}</span>{% endif %}</td>
         <td class="vc-perf">{% if x.perf %}<span class="cn-t-{{ x.perf.tom }}">{{ ('%.1f'|format(x.perf.pct))|replace('.', ',') }}%</span>
           <span class="vc-barra" aria-hidden="true"><i class="vc-barra--{{ x.perf.tom }}" style="width: {{ [x.perf.pct, 100]|min|round|int }}%"></i></span>{% else %}<span class="mudo">sem meta</span>{% endif %}</td>
@@ -93,8 +93,9 @@
         <td>{% if not x.visita_lida %}<span class="mudo">sem leitura</span>{% elif not x.visita %}<span class="mudo">—</span>{% else %}{{ x.visita_txt }}{% if x.visita.tipo %}<span class="det">{{ x.visita.tipo }}</span>{% endif %}{% endif %}</td>
       </tr>
   {% endmacro %}
+  <div class="vc-corpo">
   <section class="vc-q" aria-labelledby="vc-usinas">
-    <header class="vc-q-cab"><h2 id="vc-usinas">Usinas</h2><p class="mudo">quem precisa de atenção vem primeiro</p></header>
+    <header class="vc-q-cab"><h2 id="vc-usinas">Usinas</h2><p class="mudo">quem precisa de atenção vem primeiro · clique para o detalhe</p></header>
     {% if s.linhas or s.normais %}
     <div class="cn-tab vc-tab"><table>
       <thead><tr><th class="vc-esq">Usina</th><th>Status</th><th>Performance do mês</th><th>Distribuidora</th><th>OSs</th><th>Próxima visita</th></tr></thead>
@@ -113,6 +114,70 @@
     {% endif %}
     {% else %}<p class="mudo vc-vazio">Nenhuma usina em operação deste cliente no cadastro.</p>{% endif %}
   </section>
+  {% if s.linhas or s.normais %}
+  <aside class="vc-det" aria-label="Detalhe da usina">
+    {% for x in s.linhas + s.normais %}
+    <section id="vc-det-{{ x.usina_id }}" class="vc-det-u"{% if x.usina_id != sel %} hidden{% endif %}>
+      <header class="vc-det-cab">
+        <div><h3 class="vc-det-nome">{{ x.usina }}</h3>{% if x.onde %}<p class="vc-det-onde">{{ x.onde }}</p>{% endif %}</div>
+        <span class="cn-pill cn-{{ x.status.tom }}">{{ x.status.rotulo }}</span>
+      </header>
+      {% if x.status.lido %}<p class="vc-det-lido">Última leitura do monitoramento: {{ x.status.lido }}</p>{% endif %}
+      {% if x.paradas %}<ul class="vc-det-paradas">{% for p in x.paradas %}<li><b>{{ p.escopo or 'Usina' }}</b>: parada desde {{ p.desde }}{% if p.tipo %} · {{ p.tipo }}{% endif %} · OS {{ p.os }}</li>{% endfor %}</ul>{% endif %}
+      {% if x.visita %}<p class="vc-det-visita"><i class="ph ph-van" aria-hidden="true"></i><span>Próxima visita: <b>{{ x.visita_txt }}</b>{% if x.visita.tipo %} · {{ x.visita.tipo }}{% endif %}</span></p>{% endif %}
+
+      <h4 class="vc-det-t">Hoje</h4>
+      {% if x.dia %}<ol class="vc-dia">{% for e in x.dia %}<li><span class="vc-dia-h">{{ e.hora }}</span><i class="vc-ponto vc-ponto--{{ e.tom }}" aria-hidden="true"></i><span>{{ e.texto }}</span></li>{% endfor %}</ol>
+      {% else %}<p class="mudo vc-det-vazio">Nada registrado hoje.</p>{% endif %}
+
+      <h4 class="vc-det-t">Chamados na distribuidora <span>· 30 dias</span></h4>
+      {% if x.chamados is none %}<p class="vc-sem vc-det-vazio">sem leitura</p>
+      {% elif x.chamados %}<ul class="vc-det-lista">{% for c in x.chamados %}<li><div><b>{% if c.protocolo %}Protocolo {{ c.protocolo }}{% else %}Sem protocolo ainda{% endif %}</b><span class="vc-det-d">{{ c.concessionaria or 'distribuidora' }}{% if c.uc %} · UC {{ c.uc }}{% endif %}{% if c.criado %} · aberto em {{ c.criado.strftime('%d/%m %H:%M') }}{% endif %}</span></div><span class="cn-pill cn-{{ c.tom }}">{{ c.situacao }}</span></li>{% endfor %}</ul>
+      {% else %}<p class="mudo vc-det-vazio">Nenhum nos últimos 30 dias.</p>{% endif %}
+
+      <h4 class="vc-det-t">Ordens de serviço</h4>
+      {% if x.os is none %}<p class="vc-sem vc-det-vazio">sem leitura</p>
+      {% else %}{% set a_fazer = x.os|rejectattr('verificacao')|list %}{% set conf = x.os|selectattr('verificacao')|list|length %}
+        {% if a_fazer %}<ul class="vc-det-lista">{% for o in a_fazer %}<li><div><b>OS {{ o.os }}</b><span class="vc-det-d">{{ o.tipo }}</span></div><span class="cn-pill cn-{{ o.tom }}">{{ o.situacao }}</span></li>{% endfor %}</ul>
+        {% else %}<p class="mudo vc-det-vazio">Nenhuma OS a fazer.</p>{% endif %}
+        {% if conf %}<p class="vc-det-d vc-det-conf">+ {{ conf }} concluída{{ 's' if conf != 1 }}, em conferência</p>{% endif %}
+      {% endif %}
+    </section>
+    {% endfor %}
+  </aside>
+  {% endif %}
+  </div>
   {% endif %}
 </div>
+<script>
+/* o detalhe da usina sem recarregar: a linha clicada abre o painel dela (o endereço guarda a escolha); na tela
+   estreita o painel fica abaixo da tabela, e a página desce até ele */
+(function () {
+  var det = document.querySelector('.vc-det');
+  if (!det) return;
+  var estreita = window.matchMedia('(max-width: 1279px)');
+  function abrir(id) {
+    var alvo = document.getElementById('vc-det-' + id);
+    if (!alvo) return;
+    det.querySelectorAll('.vc-det-u').forEach(function (s) { s.hidden = s !== alvo; });
+    document.querySelectorAll('.vc-linha').forEach(function (tr) {
+      tr.classList.toggle('vc-sel', tr.getAttribute('data-vc') === String(id));
+    });
+    var u = new URL(location.href);
+    u.searchParams.set('usina', id);
+    history.replaceState(null, '', u);
+    if (estreita.matches) {           // o painel abaixo da tabela: desce até ele, sem ficar sob o topo fixo da casca
+      var topo = document.querySelector('header.topo');
+      window.scrollTo(0, det.getBoundingClientRect().top + window.scrollY - (topo ? topo.offsetHeight : 0) - 8);
+    }
+  }
+  document.querySelectorAll('.vc-linha').forEach(function (tr) {
+    tr.addEventListener('click', function (ev) {
+      if (ev.target.closest('a') && (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button === 1)) return;
+      ev.preventDefault();
+      abrir(tr.getAttribute('data-vc'));
+    });
+  });
+})();
+</script>
 {% endblock %}

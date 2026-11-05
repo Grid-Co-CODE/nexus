@@ -21,9 +21,14 @@ Nenhuma conta nova; cada número é o da tela dona, com a régua de lá:
   05/11/2026: o número do cliente não pode ser a fila interna de aprovação);
 - próxima visita: a programação do PCM (`fato_programacao`, o Quadro da semana), o bloco ainda não feito mais próximo de
   hoje em diante. A hora prevista de chegada (equipe saiu da base) é a fase 3, no App.
+
+O detalhe da usina (a entrega 2, mesmo dia): a linha do dia com o que as fontes guardam COM HORA (a parada aberta pela OS
+de parada da disponibilidade, o chamado e o protocolo na distribuidora, os blocos de hoje da programação; a OS aberta hoje
+vai no fim, com "hoje", porque o fato das OS só guarda o dia), as paradas abertas, os chamados com o protocolo e as OS
+com a situação. As mesmas fontes da síntese, nenhuma leitura nova além da agenda de hoje (da mesma programação lida).
 """
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from ..dados import fatos as D
 from . import manutencao as M
@@ -41,6 +46,8 @@ TIPO = {"preventiva": "preventiva", "corretiva": "corretiva", "corretiva_emergen
         "preditiva": "preditiva", "administrativa": "administrativa", "handover": "handover"}
 _VIVA = M._VIVA
 _COMECOU = M._COMECOU
+# o instante do Andamento vem com fuso (`andamento.instante`): o "nunca" da ordem também precisa de fuso
+_NUNCA = datetime.min.replace(tzinfo=timezone.utc)
 
 
 def _dia(v) -> date | None:
@@ -99,7 +106,8 @@ def juntar_tempo_real(usinas_tr: list[dict], nomes) -> dict[int, dict]:
 def chamados_por_usina(b, leituras: list) -> dict[int, list[dict]]:
     """{usina_id: os chamados à distribuidora de 30 dias, o mais novo primeiro}, pelas leituras do Andamento (uma por
     cliente dele), com a usina ligada pelo código como a tela Acionamentos (`acionamentos.painel`). Só o que o cliente
-    pode ver: a distribuidora, a UC, a situação, quando abriu, o protocolo e a OS. Os dispensados ficam de fora."""
+    pode ver: a distribuidora, a UC, a situação, quando abriu e quando foi enviado, o protocolo e a OS (nada de quem
+    abriu, do contato nem das proteções que atuaram). Os dispensados ficam de fora."""
     from ..cos import acionamentos as AC
     from ..cos import andamento as AND
     out: dict[int, list[dict]] = defaultdict(list)
@@ -119,9 +127,10 @@ def chamados_por_usina(b, leituras: list) -> dict[int, list[dict]]:
             out[uid].append({"concessionaria": D._txt(c.get("concessionaria")), "uc": D._txt(c.get("uc")),
                              "situacao": rot, "tom": tom, "criado": AND.instante(c.get("criado_em")),
                              "protocolo": D._txt(c.get("protocolo")),
-                             "protocolo_quando": AND.instante(c.get("protocolo_em")), "os": D._txt(c.get("os"))})
+                             "protocolo_quando": AND.instante(c.get("protocolo_em")), "os": D._txt(c.get("os")),
+                             "enviado": AND.instante(c.get("enviado_em"))})
     for lst in out.values():
-        lst.sort(key=lambda c: c["criado"] or datetime.min, reverse=True)
+        lst.sort(key=lambda c: c["criado"] or _NUNCA, reverse=True)
     return dict(out)
 
 
@@ -199,6 +208,84 @@ def visitas_por_usina(programacao: list[dict] | None, hoje: date, agora_hhmm: st
     return out
 
 
+def _situacao_bloco(status: list[str], passou: bool = False) -> tuple[str, str]:
+    """A situação de um bloco da programação pelas tarefas dele: alguma em progresso = em execução; todas finalizadas =
+    feita; alguma pausada = pausada; a hora já passou sem começar = não iniciada (o status do Quadro); senão,
+    programada."""
+    if "em_progresso" in status:
+        return "em execução", "info"
+    if status and all(s == "finalizada" for s in status):
+        return "feita", "ok"
+    if "pausada" in status:
+        return "pausada", "alerta"
+    if passou:
+        return "não iniciada", "alerta"
+    return "programada", "neutro"
+
+
+def agenda_de_hoje(programacao: list[dict] | None, hoje: date, agora_hhmm: str = "00:00") -> dict[int, list[dict]]:
+    """{usina_id: os blocos de hoje da programação do PCM, em ordem de hora}: um por hora e tipo (as tarefas do mesmo
+    bloco juntas), com a situação. O bloco cuja hora já passou sem começar diz "não iniciada" (na bancada da Athon, às
+    18:50, o das 09:00 dizia "programada"). Sem quem vai nem duração: só a hora planejada no Quadro, o tipo e a
+    situação."""
+    hid = int(f"{hoje:%Y%m%d}")
+    blocos: dict[tuple, list] = defaultdict(list)
+    for l in programacao or ():
+        uid = D._id(l.get("usina_id"))
+        if not uid or D._int(l.get("data_id_programada")) != hid:
+            continue
+        blocos[(uid, D._txt(l.get("hora_inicio"))[:5], _tipo(l.get("tipo_tarefa")))].append(
+            D._txt(l.get("status_execucao")))
+    out: dict[int, list[dict]] = defaultdict(list)
+    for (uid, hora, tipo), status in blocos.items():
+        sit, tom = _situacao_bloco(status, passou=bool(hora) and hora < agora_hhmm)
+        out[uid].append({"hora": hora, "tipo": tipo, "situacao": sit, "tom": tom, "tarefas": len(status)})
+    for lst in out.values():
+        lst.sort(key=lambda b: (b["hora"] or "99:99", b["tipo"]))
+    return dict(out)
+
+
+def linha_do_dia(paradas: list | None, chamados: list | None, os_: list | None, agenda: list | None,
+                 hoje: date) -> list[dict]:
+    """O que aconteceu hoje na usina, pela hora: a parada que começou hoje (a OS de parada da disponibilidade), o chamado
+    aberto na distribuidora (o envio; sem envio, quando foi registrado) e o protocolo, os blocos da programação de hoje.
+    A OS aberta hoje vai no fim com "hoje": o fato das OS guarda o dia, não a hora. Fonte que não respondeu não inventa
+    nada."""
+    iso = f"{hoje:%Y-%m-%d}"
+    ev = []
+    for p in paradas or ():
+        ini = str(p.get("_ini") or "")
+        if ini[:10] == iso and len(ini) >= 16:
+            ev.append({"hora": ini[11:16], "texto": f"Parada registrada: {p.get('escopo') or 'usina'} · OS {p.get('os')}",
+                       "tom": "critico"})
+    for c in chamados or ():
+        conc = c.get("concessionaria") or "distribuidora"
+        q = c.get("enviado") or c.get("criado")
+        if q and q.date() == hoje:
+            ev.append({"hora": f"{q:%H:%M}", "texto": f"Chamado aberto na {conc}", "tom": "alerta"})
+        pq = c.get("protocolo_quando")
+        if c.get("protocolo") and pq and pq.date() == hoje:
+            ev.append({"hora": f"{pq:%H:%M}", "texto": f"Protocolo {c['protocolo']} da {conc}", "tom": "ok"})
+    for b in agenda or ():
+        ev.append({"hora": b["hora"] or "—", "texto": f"Visita {b['situacao']}: {b['tipo']}", "tom": b["tom"]})
+    ev.sort(key=lambda e: e["hora"])
+    for o in os_ or ():
+        if o.get("criada") == hoje:
+            # a OS aberta hoje que já está em conferência foi feita no mesmo dia: "aberta" sozinho enganava
+            ev.append({"hora": "hoje", "texto": f"OS {o['os']} aberta e concluída: {o['tipo']}", "tom": "ok"}
+                      if o.get("verificacao") else
+                      {"hora": "hoje", "texto": f"OS {o['os']} aberta: {o['tipo']}", "tom": "info"})
+    return ev
+
+
+def _parada(p: dict) -> dict:
+    """A parada aberta para quem lê: o escopo, desde quando, o tipo da OS e o número. Sem o código do ativo."""
+    tipo = D._txt(p.get("tipo"))
+    return {"os": D._txt(p.get("os")), "tipo": _tipo(tipo) if tipo and tipo != "—" else "",
+            "escopo": "" if D._txt(p.get("escopo")) == "—" else D._txt(p.get("escopo")),
+            "desde": D._txt(p.get("inicio"))}
+
+
 def _tom_perf(p) -> str:
     return "neutro" if p is None else ("ok" if p >= PERF_OK else ("alerta" if p >= PERF_ATENCAO else "critico"))
 
@@ -211,10 +298,12 @@ def _quando(dia: date | None, hora: str, hoje: date) -> str:
 
 
 def montar(usinas: list[dict], tempo_real: dict[int, dict] | None, chamados: dict[int, list] | None,
-           os_abertas: dict[int, list] | None, visitas: dict[int, dict] | None, hoje: date) -> dict:
+           os_abertas: dict[int, list] | None, visitas: dict[int, dict] | None, hoje: date,
+           agenda: dict[int, list] | None = None) -> dict:
     """A síntese de UM cliente. `usinas` = as linhas da Visão do responsável SÓ desse cliente (usina_id, usina, cidade,
-    uf, meta); as fontes por usina_id, ou None quando a fonte não respondeu: aí o número fica "sem leitura" (None),
-    nunca 0. Devolve {kpis, linhas (quem pede atenção primeiro), normais (sem pendência), total}."""
+    uf, meta, paradas_abertas); as fontes por usina_id, ou None quando a fonte não respondeu: aí o número fica "sem
+    leitura" (None), nunca 0. Cada linha leva o detalhe (as paradas abertas e a linha do dia, com a `agenda` de hoje).
+    Devolve {kpis, linhas (quem pede atenção primeiro), normais (sem pendência), total}."""
     linhas = []
     for u in usinas:
         uid = u["usina_id"]
@@ -232,6 +321,8 @@ def montar(usinas: list[dict], tempo_real: dict[int, dict] | None, chamados: dic
                  "prod_kwh": m.get("prod_kwh"), "meta_kwh": m.get("meta_kwh"),
                  "chamados": ch, "os": os_, "visita": vis, "visita_lida": visitas is not None,
                  "visita_txt": _quando(vis["dia"], vis["hora"], hoje) if vis else ""}
+        linha["paradas"] = [_parada(p) for p in u.get("paradas_abertas") or ()]
+        linha["dia"] = linha_do_dia(u.get("paradas_abertas"), ch, os_, (agenda or {}).get(uid), hoje)
         a_fazer = [o for o in (os_ or ()) if not o["verificacao"]]
         linha["os_abertas"] = len(a_fazer) if os_ is not None else None
         pendente = (st["chave"] not in ("gerando", "sem_sol") or bool(ch) or bool(a_fazer)

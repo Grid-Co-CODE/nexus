@@ -61,8 +61,10 @@ def _fontes(b, uids: set, hoje) -> tuple[dict, dict]:
         agora = visao._agora()           # já em Brasília
         fontes["visitas"] = {uid: v for uid, v in VC.visitas_por_usina(prog, hoje, f"{agora:%H:%M}").items()
                              if uid in uids}
+        fontes["agenda"] = {uid: v for uid, v in VC.agenda_de_hoje(prog, hoje, f"{agora:%H:%M}").items()
+                            if uid in uids}
     except Exception as e:      # noqa: BLE001
-        fontes["visitas"], erros["visitas"] = None, str(e)[:160]
+        fontes["visitas"], fontes["agenda"], erros["visitas"] = None, None, str(e)[:160]
     return fontes, erros
 
 
@@ -82,16 +84,22 @@ def cliente():
     cid = D._id(request.args.get("cliente"))
     if cid not in grupos:
         cid = None
-    sintese, erros, ts = None, {}, ""
+    sintese, erros, ts, sel = None, {}, "", None
     if cid:
         hoje = visao._agora().date()
         usinas = grupos[cid]
         fontes, erros = _fontes(b, {u["usina_id"] for u in usinas}, hoje)
         ts = fontes.get("tempo_real_ts") or ""
-        sintese = VC.montar(usinas, fontes["tempo_real"], fontes["chamados"], fontes["os"], fontes["visitas"], hoje)
+        sintese = VC.montar(usinas, fontes["tempo_real"], fontes["chamados"], fontes["os"], fontes["visitas"], hoje,
+                            agenda=fontes.get("agenda"))
+        # o detalhe aberto: a usina do endereço, se for DESTE cliente; senão a primeira que pede atenção
+        ids = [x["usina_id"] for x in sintese["linhas"] + sintese["normais"]]
+        sel = D._id(request.args.get("usina"))
+        if sel not in ids:
+            sel = ids[0] if ids else None
     return render_template("campo/cliente.html", torre=TORRE, tela=TORRE.tela("cliente"), opcoes=opcoes, cid=cid,
                            nome=(b.nome_cliente.get(cid) or "") if cid else "", sintese=sintese, erros=erros,
-                           erro_visao=erro_visao, lido_tr=ts, fontes_nome=FONTES_NOME)
+                           erro_visao=erro_visao, lido_tr=ts, fontes_nome=FONTES_NOME, sel=sel)
 
 
 FONTES_NOME = {"tempo_real": "o status do tempo real", "chamados": "os chamados na distribuidora",

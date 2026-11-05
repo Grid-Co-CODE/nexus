@@ -159,8 +159,123 @@ def test_os_chamados_da_distribuidora_so_com_o_que_o_cliente_pode_ver():
                               {"usina_codigo": "THPN-ALT100", "estado": "DISPENSADO", "criado_em": "2026-11-04T07:40:00"}]}
     ch = VC.chamados_por_usina(_B(), [_L()])
     assert len(ch[1]) == 1 and ch[1][0]["protocolo"] == "123" and ch[1][0]["situacao"] == "com protocolo"
-    assert set(ch[1][0]) == {"concessionaria", "uc", "situacao", "tom", "criado", "protocolo", "protocolo_quando",
-                             "os"}                                            # nada de quem abriu nem telefone
+    assert set(ch[1][0]) == {"concessionaria", "uc", "situacao", "tom", "criado", "enviado", "protocolo",
+                             "protocolo_quando", "os"}                       # nada de quem abriu nem telefone
+
+
+def test_chamado_sem_hora_nao_derruba_a_lista():
+    """O Andamento entrega o instante com fuso: um chamado sem `criado_em` não pode quebrar a ordem (com o `datetime.min`
+    sem fuso, a comparação dava TypeError e a tela inteira dizia "sem leitura" nos chamados)."""
+    class _Lig:
+        def usina(self, nome, codigo):
+            return (1, "código")
+
+    class _B:
+        lig = _Lig()
+
+    class _L:
+        dados = {"usinas": [{"nome": "Altair", "codigo": "X"}],
+                 "chamados": [{"usina_codigo": "X", "estado": "PENDENTE"},
+                              {"usina_codigo": "X", "estado": "ENVIADO", "criado_em": "2026-11-05T07:40:00-03:00"}]}
+    ch = VC.chamados_por_usina(_B(), [_L()])[1]
+    assert [c["situacao"] for c in ch] == ["enviado, aguardando resposta", "pendente"]   # o sem hora no fim
+
+
+# ── o detalhe da usina (entrega 2) ──────────────────────────────────────────────────────────────────────────────────
+def _quando(txt):
+    from nexus.cos import andamento as AND
+    return AND.instante(txt)
+
+
+def test_a_agenda_de_hoje_junta_as_tarefas_do_bloco():
+    hoje = date(2026, 11, 5)
+    prog = [{"usina_id": 1, "data_id_programada": 20261105, "hora_inicio": "14:00", "tipo_tarefa": "MPA",
+             "status_execucao": "nao_iniciada", "pessoa_id_tecnico": 7},
+            {"usina_id": 1, "data_id_programada": 20261105, "hora_inicio": "14:00", "tipo_tarefa": "MPA",
+             "status_execucao": "finalizada"},
+            {"usina_id": 1, "data_id_programada": 20261105, "hora_inicio": "07:30", "tipo_tarefa": "Corretiva",
+             "status_execucao": "finalizada"},
+            {"usina_id": 1, "data_id_programada": 20261105, "hora_inicio": "10:00", "tipo_tarefa": "Inspeção",
+             "status_execucao": "em_progresso"},
+            {"usina_id": 1, "data_id_programada": 20261105, "hora_inicio": "11:00", "tipo_tarefa": "Corretiva",
+             "status_execucao": "pausada"},
+            {"usina_id": 1, "data_id_programada": 20261106, "hora_inicio": "08:00", "tipo_tarefa": "MPA"},
+            {"usina_id": 2, "data_id_programada": 20261105, "hora_inicio": "09:00", "tipo_tarefa": "MPA"}]
+    ag = VC.agenda_de_hoje(prog, hoje)
+    assert [(b["hora"], b["tipo"], b["situacao"]) for b in ag[1]] == [
+        ("07:30", "corretiva", "feita"), ("10:00", "inspeção", "em execução"), ("11:00", "corretiva", "pausada"),
+        ("14:00", "preventiva (MPA)", "programada")]                       # a de amanhã não entra
+    assert ag[1][3]["tarefas"] == 2 and ag[2][0]["situacao"] == "programada"
+    assert set(ag[1][0]) == {"hora", "tipo", "situacao", "tom", "tarefas"}    # sem quem vai
+
+
+def test_o_bloco_de_hoje_que_passou_sem_comecar_e_nao_iniciada():
+    """Na bancada (Athon, 18:50 de 05/11/2026): "Visita programada: corretiva" às 09:00, de um bloco que nunca começou.
+    O status do Quadro é "nao_iniciada": com a hora passada, a linha diz isso; o bloco que ainda vem segue "programada"."""
+    hoje = date(2026, 11, 5)
+    prog = [{"usina_id": 1, "data_id_programada": 20261105, "hora_inicio": "09:00", "tipo_tarefa": "Corretiva",
+             "status_execucao": "nao_iniciada"},
+            {"usina_id": 1, "data_id_programada": 20261105, "hora_inicio": "16:00", "tipo_tarefa": "Corretiva",
+             "status_execucao": "nao_iniciada"}]
+    ag = VC.agenda_de_hoje(prog, hoje, "12:00")[1]
+    assert [(b["hora"], b["situacao"], b["tom"]) for b in ag] == [("09:00", "não iniciada", "alerta"),
+                                                                  ("16:00", "programada", "neutro")]
+
+
+def test_a_os_aberta_hoje_e_ja_concluida_diz_isso():
+    """Na bancada (Athon): duas OS de religamento abertas hoje já estavam em conferência; "aberta" sozinho enganava."""
+    hoje = date(2026, 11, 5)
+    os_ = [{"os": 18604, "tipo": "religamento", "criada": hoje, "verificacao": True}]
+    assert VC.linha_do_dia(None, None, os_, None, hoje) == [
+        {"hora": "hoje", "texto": "OS 18604 aberta e concluída: religamento", "tom": "ok"}]
+
+
+def test_a_linha_do_dia_so_com_o_que_aconteceu_hoje():
+    hoje = date(2026, 11, 5)
+    paradas = [{"os": "4812", "tipo": "Religamento", "escopo": "Usina inteira", "inicio": "05/11 07:15",
+                "_ini": "2026-11-05T07:15:00", "codigo": "UFV"},
+               {"os": "4700", "tipo": "desligamento de inversor", "escopo": "Inversor 1.3", "inicio": "24/10 10:45",
+                "_ini": "2026-10-24T10:45:00", "codigo": "INV-13"}]
+    chamados = [{"concessionaria": "CPFL", "protocolo": "2026-118734", "criado": _quando("2026-11-05T07:38:00-03:00"),
+                 "enviado": _quando("2026-11-05T07:40:00-03:00"),
+                 "protocolo_quando": _quando("2026-11-05T08:00:00-03:00"), "situacao": "com protocolo", "tom": "ok"},
+                {"concessionaria": "CPFL", "protocolo": "", "criado": _quando("2026-11-04T09:00:00-03:00"),
+                 "enviado": None, "protocolo_quando": None, "situacao": "pendente", "tom": "alerta"},
+                # aberto e com protocolo ontem: nada hoje
+                {"concessionaria": "CPFL", "protocolo": "2026-1", "criado": _quando("2026-11-04T09:00:00-03:00"),
+                 "enviado": _quando("2026-11-04T09:05:00-03:00"),
+                 "protocolo_quando": _quando("2026-11-04T10:00:00-03:00"), "situacao": "com protocolo", "tom": "ok"},
+                # aberto ontem, protocolo hoje: só o protocolo
+                {"concessionaria": "CPFL", "protocolo": "2026-2", "criado": _quando("2026-11-04T15:00:00-03:00"),
+                 "enviado": _quando("2026-11-04T15:05:00-03:00"),
+                 "protocolo_quando": _quando("2026-11-05T09:30:00-03:00"), "situacao": "com protocolo", "tom": "ok"}]
+    os_ = [{"os": 4813, "tipo": "corretiva", "criada": hoje, "verificacao": False},
+           {"os": 4790, "tipo": "preventiva", "criada": date(2026, 11, 1), "verificacao": False}]
+    agenda = [{"hora": "14:00", "tipo": "corretiva", "situacao": "programada", "tom": "neutro", "tarefas": 1}]
+    dia = VC.linha_do_dia(paradas, chamados, os_, agenda, hoje)
+    assert [(e["hora"], e["texto"]) for e in dia] == [
+        ("07:15", "Parada registrada: Usina inteira · OS 4812"),
+        ("07:40", "Chamado aberto na CPFL"),
+        ("08:00", "Protocolo 2026-118734 da CPFL"),
+        ("09:30", "Protocolo 2026-2 da CPFL"),
+        ("14:00", "Visita programada: corretiva"),
+        ("hoje", "OS 4813 aberta: corretiva")]                              # o fato da OS só guarda o dia
+    assert all(set(e) == {"hora", "texto", "tom"} for e in dia)
+    assert VC.linha_do_dia(None, None, None, None, hoje) == []             # sem fonte: nada inventado
+
+
+def test_o_detalhe_vai_na_linha_sem_nada_interno():
+    hoje = date(2026, 11, 5)
+    u = _u(1, "Alfa", 10, 10, 100.0)
+    u["paradas_abertas"] = [{"os": "4812", "tipo": "Religamento Remoto", "escopo": "Usina inteira",
+                             "inicio": "05/11 07:15", "_ini": "2026-11-05T07:15:00", "codigo": "UFV-1"}]
+    agenda = {1: [{"hora": "14:00", "tipo": "corretiva", "situacao": "programada", "tom": "neutro", "tarefas": 1}]}
+    s = VC.montar([u], {1: _tr("Alfa", "desligada")}, {}, {}, {}, hoje, agenda=agenda)
+    x = s["linhas"][0]
+    assert x["paradas"] == [{"os": "4812", "tipo": "religamento remoto", "escopo": "Usina inteira",
+                             "desde": "05/11 07:15"}]                       # sem o código do ativo
+    assert [e["hora"] for e in x["dia"]] == ["07:15", "14:00"]
+    assert "codigo" not in _chaves(s, set()) and "_ini" not in _chaves(s, set())
 
 
 def _chaves(x, out):
@@ -264,6 +379,23 @@ def test_fica_logo_depois_das_ocorrencias_no_menu():
     from nexus.torres.campo import TORRE
     ids = [t.id for t in TORRE.telas]
     assert ids.index("cliente") == ids.index("ocorrencias") + 1         # a Visão do responsável e as Ocorrências juntas
+
+
+def test_a_tela_abre_o_detalhe_da_usina_escolhida(cliente_tela, logado):
+    html = logado.get("/t/campo/cliente?cliente=1").get_data(as_text=True)
+    det = html.split('<aside class="vc-det"', 1)[1]
+    # sem escolha: o detalhe da primeira que pede atenção (a Altair, parada); as outras escondidas
+    assert det.index('id="vc-det-1"') < det.index('id="vc-det-2"')
+    assert 'id="vc-det-1" class="vc-det-u">' in det and 'id="vc-det-2" class="vc-det-u" hidden>' in det
+    assert 'data-vc="1"' in html and 'class="vc-linha vc-sel"' in html
+    html = logado.get("/t/campo/cliente?cliente=1&usina=2").get_data(as_text=True)
+    det = html.split('<aside class="vc-det"', 1)[1]
+    assert 'id="vc-det-2" class="vc-det-u">' in det and 'id="vc-det-1" class="vc-det-u" hidden>' in det
+    bro = det.split('id="vc-det-2"', 1)[1]
+    assert "Amanhã 08:00" in bro and "OS 901" in bro                     # a próxima visita e a OS da Brodowski 1
+    # a usina de outro cliente no endereço não abre: volta para a primeira deste
+    html = logado.get("/t/campo/cliente?cliente=1&usina=3").get_data(as_text=True)
+    assert 'id="vc-det-3"' not in html and 'id="vc-det-1" class="vc-det-u">' in html
 
 
 def test_cliente_que_nao_existe_volta_a_escolha(cliente_tela, logado):

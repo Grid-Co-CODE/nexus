@@ -1440,8 +1440,31 @@ como aberta) e a bancada só leitura com o banco real e o tempo real de produç�
 igual ao da Entrada; a que a Entrada não trouxe, "Sem leitura") e a Athon (10 usinas, 101,4%), a 1440 px e a 375 px (a
 tabela desliza dentro do quadro; a página não rola de lado).
 
-A entrega 2 (o painel de detalhe por usina: a linha do dia, os chamados com o protocolo, as OS com a situação) vem
-depois, na mesma tela.
+**O detalhe da usina** (a entrega 2, 05/11/2026, como no mockup): o painel ao lado da tabela (a partir de 1280 px; abaixo
+dela na tela estreita, e a página desce até ele sem ficar sob o topo fixo). Abre na primeira usina que pede atenção; o
+clique na linha troca o painel sem recarregar e o endereço guarda a escolha (`&usina=`, que só vale para usina DESTE
+cliente; a de outro cliente volta para a primeira). Todos os painéis vêm na página (escondidos), da mesma conta: nenhuma
+leitura a mais por clique. O painel tem:
+- o status e a última leitura do monitoramento; as **paradas abertas** (as OS de parada da disponibilidade, a mesma
+  fonte da faixa "Parada agora" da Visão: o escopo, desde quando, o tipo e a OS; sem o código do ativo); a próxima visita;
+- **Hoje**, a linha do dia, só com o que a fonte guarda COM HORA: a parada que começou hoje, o chamado aberto na
+  distribuidora (o envio; sem envio, quando foi registrado) e o protocolo, os blocos de hoje da programação (um por hora e
+  tipo, com a situação pelas tarefas do bloco: em execução, feita, pausada, **não iniciada** quando a hora passou sem
+  começar, ou programada; na bancada da Athon, às 18:50, o bloco das 09:00 dizia "programada"). A OS aberta hoje vai no
+  fim com "hoje" (o fato das OS guarda o dia, não a hora), e a que já está em conferência diz "aberta e concluída" (na
+  bancada, duas OS de religamento abertas no dia já estavam concluídas);
+- os chamados na distribuidora de 30 dias, com o protocolo (ou "sem protocolo ainda"), a distribuidora, a UC, quando
+  abriu e a situação;
+- as OS a fazer com a situação, e a contagem das concluídas em conferência.
+
+Defeito achado e corrigido na entrega 2: o instante do Andamento vem com fuso, e a ordem dos chamados usava o
+`datetime.min` sem fuso: um chamado sem `criado_em` derrubava a leitura inteira dos chamados ("sem leitura" na tela).
+
+Prova da entrega 2 (05/11/2026): 23 testes no mesmo arquivo e 21 quebras de propósito, todas pegas (as 12 da entrega 1,
+com a equipe de volta ao lugar, e 9 do detalhe: parada, chamado e protocolo de outro dia no dia, o envio ignorado, o
+bloco que passou como programada, a OS concluída como só aberta, o bloco "feita" com uma tarefa só, o código do ativo e
+a ordem sem fuso); a bancada com o banco real a 1440 px (a tabela de 6 colunas cabe ao lado do painel: 711 px por
+dentro do quadro) e a 375 px (sem rolagem de lado; o clique desce ao painel).
 
 ## Estrutura de O&M de 10/2026: região de campo e gestor de contrato (08/10/2026)
 
