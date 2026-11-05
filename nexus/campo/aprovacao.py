@@ -267,7 +267,11 @@ def fila_toda(params: dict, usinas=None) -> Leitura:
                 break
             pag += 1
         crua = {w.get("id_work_orders_tasks") or w.get("id_work_order"): w for w in regras_app._FILA_CACHE.get("linhas") or []}
+        fechado = _ultimo_fechamento_no_app()
         for x in todas:
+            # o último fechamento da OS no App (o pré-filtro por fatos, 05/11/2026: foto anexada mais de 24 h depois
+            # dele é Não OK); fechada fora do App, vazio (a anexação não é julgada)
+            x["fechado_app"] = fechado.get(str(x.get("os") or "").strip(), "")
             w = crua.get(x.get("id_wt")) or {}
             # a usina do Fracttal e o id da OS (o que o Concluir do OS Creator pede), que a cópia do App não devolve.
             # E a criação da OS (Levi, 08/10: "DATA DA CRIAÇÃO DA OS"): o `creation_date` vem na mesma linha do REST
@@ -288,6 +292,25 @@ def fila_toda(params: dict, usinas=None) -> Leitura:
             del _PRONTA[velha]
         _PRONTA[chave] = r
     return r
+
+
+def _ultimo_fechamento_no_app() -> dict[str, str]:
+    """{folio: a hora do último fechamento da OS no App}, em ISO UTC: a maior hora do celular (`dev_ts`; sem ela, a do
+    servidor) entre as linhas do registro do App (`qualidadelog`) daquela OS. É a hora da OS, não a da tarefa (desenho
+    de 05/11/2026: casar a tarefa do anexo com a do registro pelo nome é frágil, e nas 30 OS da medição dá o mesmo). O
+    registro que não abre deixa todas vazias: sem a hora, a anexação não é julgada (nunca um Não OK chutado)."""
+    from . import prefiltro
+    out: dict[str, tuple] = {}
+    try:
+        for e in regras_app.tabela_qlog().query_entities("PartitionKey eq 'q'"):
+            folio = str(e.get("os") or e.get("fx_folio") or "").strip()
+            q = prefiltro._quando(e.get("dev_ts") or e.get("server_ts"))
+            if folio and q and (folio not in out or q > out[folio]):
+                out[folio] = q
+    except Exception as ex:      # noqa: BLE001 — o registro fora: a fila segue, sem a hora do fechamento
+        logging.warning("aprovação: o registro do App não abriu para a hora do fechamento (%s)", str(ex)[:160])
+        return {}
+    return {k: v.isoformat(timespec="seconds") for k, v in out.items()}
 
 
 def motivos(x) -> list[tuple[str, str]]:

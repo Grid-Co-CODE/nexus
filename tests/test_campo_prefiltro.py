@@ -179,3 +179,42 @@ def test_escopo():
 def test_parametros_do_config():
     p = prefiltro.parametros({"NEXUS_PREFILTRO_HORAS_TARDE": "48", "NEXUS_PREFILTRO_DIF": 9})
     assert p["horas_tarde"] == 48 and p["dif"] == 9 and p["dif_print"] == 4 and p["por_volta"] == 150 and p["pausa_s"] == 2
+
+
+def test_fechado_app_e_o_ultimo_fechamento_da_os():
+    """A hora do fechamento é a da OS: o ÚLTIMO fechamento das tarefas dela no App (a hora do celular, `dev_ts`; sem ela,
+    a do servidor), na linha da fila da Aprovação (`fila_toda`). Foto anexada mais de 24 h depois dele é Não OK."""
+    from datetime import datetime, timezone
+
+    from test_campo_aprovacao import FracttalFalso, _nota, _os
+    from test_campo_regras_app import TabelaFalsa
+
+    from nexus.campo import aprovacao, fracttal, leitura, tabelas
+    so_servidor = _nota(15088, 71)
+    dados = {"qualidadelog": [
+        dict(_nota(15102, 96), RowKey="q1", dev_ts="2026-10-20T12:00:00Z"),
+        dict(_nota(15102, 90), RowKey="q2", dev_ts="2026-10-21T08:30:00.000Z"),     # a última tarefa fechada da OS
+        so_servidor]}                                                               # sem a hora do celular
+    tabelas.usar_fornecedor(lambda nome: TabelaFalsa(dados.setdefault(nome, [])))
+    fracttal.usar_fornecedor(FracttalFalso([_os(15002, 33), _os(15088, 8), _os(15102, 4)]))
+    leitura.limpar_cache()
+    try:
+        linhas = aprovacao.fila_toda({"dias": "60"}).dados["linhas"]
+    finally:
+        tabelas.usar_fornecedor(None)
+        fracttal.usar_fornecedor(None)
+        leitura.limpar_cache()
+    por_os = {x["os"]: x["fechado_app"] for x in linhas}
+    assert prefiltro._quando(por_os["15102"]) == datetime(2026, 10, 21, 8, 30, tzinfo=timezone.utc)
+    assert prefiltro._quando(por_os["15088"]) == prefiltro._quando(so_servidor["server_ts"])
+    assert por_os["15002"] == ""                    # fechada fora do App: sem hora, a anexação não é julgada
+
+
+def test_sem_o_registro_do_app_a_hora_fica_vazia(monkeypatch):
+    """O registro do App que não abre não derruba a fila: a hora do fechamento fica vazia (a anexação não é julgada)."""
+    from nexus.campo import aprovacao, regras_app
+
+    def quebra():
+        raise ConnectionError("tabela fora")
+    monkeypatch.setattr(regras_app, "tabela_qlog", quebra)
+    assert aprovacao._ultimo_fechamento_no_app() == {}
