@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Curadoria · Almoxarifado{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
@@ -26,16 +27,16 @@
 {% set falta_a_foto = 'foto ainda não chegou' if app_com_fotos else 'o App ainda não envia as fotos' %}
 <div class="pg alm inv cu">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
-<h1 class="titulo-pagina">Curadoria</h1>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">Curadoria</h1>
+{% call explica('Entenda esta tela') %}<p>O que o campo contou fora do catálogo, o genérico que o técnico identificou e as avariadas de uma peça cujo -AV não
+    está no catálogo, nas contagens que ainda não foram gravadas. Decidir não grava no estoque: a quantidade entra no lote da contagem (as unidades achadas somam ao contado da peça, e o
+    total substitui o saldo no Fracttal quando você gravar). Cadastrar cria a peça no Fracttal agora, com o seu login.</p>
+<p><b>Grupo, criticidade e Curva ABC da peça nova</b> não se gravam pela API: complete na tela de Peças e
+  Suprimentos do Fracttal depois de cadastrar.</p>{% endcall %}</div>
 {# as partes do almoxarifado: a fila das abas, com as quatro do inventário juntas (pcm/_almox_abas.html) #}
 {% set aba_inventario = 'curadoria' %}
 {% include "pcm/_almox_abas.html" %}
-<div class="inv-tela-cab">
-  <h2>Curadoria</h2>
-  <p>O que o campo contou fora do catálogo, o genérico que o técnico identificou e as avariadas de uma peça cujo -AV não
-    está no catálogo, nas contagens que ainda não foram gravadas. Decidir não grava no estoque: a quantidade entra no lote da contagem (as unidades achadas somam ao contado da peça, e o
-    total substitui o saldo no Fracttal quando você gravar). Cadastrar cria a peça no Fracttal agora, com o seu login.</p>
-</div>
+{# a explicação da tela e a nota do cadastro foram para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
 <div class="inv-tiles" aria-label="Resumo da curadoria">
   <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ pendentes|length }}</b><span class="inv-tile-r">Para decidir</span></div>
   <div class="inv-tile"><b class="inv-tile-v">{{ pendentes|selectattr('tipo', 'equalto', 'fora_do_catalogo')|list|length }}</b><span class="inv-tile-r">Fora do catálogo</span></div>
@@ -43,9 +44,6 @@
   <div class="inv-tile"><b class="inv-tile-v">{{ pendentes|selectattr('tipo', 'equalto', 'avariado')|list|length }}</b><span class="inv-tile-r">Avariada sem cadastro</span></div>
   <div class="inv-tile inv-tile--ok"><b class="inv-tile-v">{{ decididas|length }}</b><span class="inv-tile-r">Já decididas</span></div>
 </div>
-<div class="cn-nota"><b>Grupo, criticidade e Curva ABC da peça nova</b> não se gravam pela API: complete na tela de Peças e
-  Suprimentos do Fracttal depois de cadastrar.</div>
-
 <div data-ponte-aviso aria-live="polite"></div>
 {% if ok %}<div class="cn-certo" role="status"><span><b>{{ ok }}</b></span></div>{% endif %}
 {% if erro %}<div class="cn-erro" role="alert"><span><b>{{ erro }}</b></span></div>{% endif %}

@@ -242,6 +242,14 @@ gaveta) em `__init__.py`.
   da tela com a semana passada, a evolução por cliente e a ordem, a situação, os números, a fila, a tela e a gaveta com o
   banco falso; mutações 5/5).
 
+## As explicações das telas (05/11/2026)
+
+Em todas as telas do Campo · App, "De onde vem", "Como ler", "Entenda esta tela" e afins moram no "!" amarelo ao lado do
+título (`explica` de `nexus/templates/_explica.html`, o padrão do Nexus): Aprovação de OS, Central de atenção, PT, a
+decisão da PT, Ranking, Triagem, Zeladoria, Responsáveis e Rondas. Fica fora dele o que muda com o dado (a nota do
+Ranking com as linhas sem nome, os avisos de dado faltando, as usinas sem mobilização da Central de atenção). A
+legenda do semáforo dos cartões (`cr-rk-leg`) e a das cores da Zeladoria (`zl-legenda`) ficam junto do que colorem.
+
 ## De onde vem o dado
 
 **Os livros que o próprio App grava no banco** (Levi, 05/10: "operador faz ronda > após ronda input é dado na API do PG
@@ -742,8 +750,9 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   meta do mês, da pior para a melhor, sem meta no fim (`ordem_da_meta`); a Manutenção pelo nível e pelas atrasadas
   (`ordem_da_manutencao`); o Acompanhamento pela ronda, a pior em cima (`ordem_da_ronda`: nunca teve; sem ronda há 7
   dias ou mais, mais dias primeiro; longa pendente; em dia, a mais antiga primeiro; sem dado). As réguas de cada alerta
-  ficam atrás do "!" abaixo da tabela (Levi, 18/10/2026: "deve ficar em um símbolo de exclamação abaixo da tabela!"),
-  fechadas ao abrir a tela.
+  ficam no "!" amarelo ao lado do título (o `explica` de `_explica.html`, desde 05/11/2026; de 18/10 a 05/11 ficavam
+  atrás de um "!" abaixo da tabela), fechado ao abrir a tela; o que muda com o dado (usinas sem de-para, livro que não
+  chegou) segue numa nota no pé.
 - **Nenhum indicador refeito com régua nova.** Cada número vem da tela dona, pela MESMA fonte que o Nexus já usa, e cada
   alerta usa a régua de lá (`REGUAS`, mostradas na nota da tela, por bloco).
   - Meta do mês: `nexus_performance · fato_meta_usina_mes`, o `_gerencial_payload` da plataforma publicado pelo worker

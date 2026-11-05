@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <noscript><meta http-equiv="refresh" content="60"></noscript>
@@ -14,7 +15,15 @@
 {% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> Do Andamento da Ronda COS: as ocorrências registradas no período, abertas ou
+    não, e quando cada etapa aconteceu. Os prazos são os da spec R04 ({{ prazos.informado.minutos }} min para o cliente
+    saber, {{ prazos.campo.minutos }} min para acionar o campo) e contam do <b>início da falha</b>, o mesmo relógio do
+    escalonamento a campo da Ronda COS. <b>Cliente informado</b> é o primeiro flash ou a primeira fotografia que nomeou a
+    ocorrência ao grupo do cliente (a ocorrência sem OS não é nomeada); antes de o Andamento mandar ao cliente, não se
+    mede. <b>Campo acionado</b> é a primeira passagem a "Técnico acionado" feita por pessoa ou pela OS aberta com
+    religamento local; a passagem automática da Ronda COS, quando a tratativa remota passa do tempo, aparece como
+    <b>só automático</b> e fica fora da conta. A tela relê sozinha a cada minuto.</p>{% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">Andamento da Ronda COS{% if p and p.gerado_em %}<br>leitura das <b>{{ p.gerado_em.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
   </div>
 
@@ -74,14 +83,7 @@
   {% else %}<p class="cn-vazio">Nenhuma ocorrência {% if situacao %}nesta situação {% endif %}no período.</p>{% endif %}
   {% endif %}
 
-  <div class="cn-nota"><b>De onde vem.</b> Do Andamento da Ronda COS: as ocorrências registradas no período, abertas ou
-    não, e quando cada etapa aconteceu. Os prazos são os da spec R04 ({{ prazos.informado.minutos }} min para o cliente
-    saber, {{ prazos.campo.minutos }} min para acionar o campo) e contam do <b>início da falha</b>, o mesmo relógio do
-    escalonamento a campo da Ronda COS. <b>Cliente informado</b> é o primeiro flash ou a primeira fotografia que nomeou a
-    ocorrência ao grupo do cliente (a ocorrência sem OS não é nomeada); antes de o Andamento mandar ao cliente, não se
-    mede. <b>Campo acionado</b> é a primeira passagem a "Técnico acionado" feita por pessoa ou pela OS aberta com
-    religamento local; a passagem automática da Ronda COS, quando a tratativa remota passa do tempo, aparece como
-    <b>só automático</b> e fica fora da conta. A tela relê sozinha a cada minuto.</div>
+  {# A explicação da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
   {% endif %}
 </div>
 <script>

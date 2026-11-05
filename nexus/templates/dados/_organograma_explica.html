@@ -1,0 +1,14 @@
+{# O "!" do título da Governança de dados, na visão do organograma (05/11/2026, o padrão do Nexus, _explica.html): o que
+   é a tela e o estado de cada tabela, que estavam no corpo do `_organograma.html`. Incluído pela governanca.html ao lado
+   do h1; usa `estado_org` da tela. #}
+{% from "_explica.html" import explica %}
+{% call explica('Entenda o organograma') %}
+<p>A visão de cima dos dados da operação: os setores, as tabelas que cada um gera e o quanto cada uma já se
+liga às outras pelos IDs do Nexus. Clique numa tabela (ou Enter) para ver para que ela serve, de onde vem e como se liga;
+no detalhe, o botão <i class="ph ph-table" aria-hidden="true"></i> mostra as linhas de verdade, só para ler. Tudo vem do
+catálogo do Nexus (<code>nexus/dados/catalogo.py</code>).</p>
+<dl class="gc-explica-termos">
+{% for e, (rot, tom, explica_estado) in estado_org.items() if e != 'aposentado' %}<dt><span class="dd-org-estado {{ tom }}">{{ rot }}</span></dt><dd>{{ explica_estado }}</dd>
+{% endfor %}
+</dl>
+{% endcall %}

@@ -31,6 +31,8 @@ Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusR
 
 ## Mesa do engenheiro (18/10/2026)
 
+> Desde 05/11/2026 as explicações da Mesa ("De onde vem") e da Confiabilidade ("Entenda esta tela", "Como ler" e "De onde vem", juntas) estão na exclamação amarela do título (`explica`, `_explica.html`), não mais no corpo nem no pé. A `_gaveta.html` não tem explicação de tela: as dicas dela são instrução de ação e ficam.
+
 - **As OS da pessoa (29/10/2026; 30/10/2026 por tipo de ativo):** os números do Quadro só com as dela e as abertas
   separadas por tipo de ativo (`TIPOS_DE_ATIVO`, pelo nome do ativo: Relé, Disjuntor, Inversor, Tracker, Transformador,
   Cabine, QGBT, String e módulo, Usina, e a ETM pela lista da tela ETMs; Levi: "conta o total inicialmente e separe por

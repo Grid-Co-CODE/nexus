@@ -1,0 +1,23 @@
+{# O "!" amarelo das explicações: o padrão do Nexus para todo "entenda esta tela", "de onde vem", "como se conta", "como
+   ler" e "o que é" (05/11/2026, Levi: "Disclaimers de 'entenda o que aconteceu' 'o que é' precisa estar em um símbolo de
+   exclamação amarelo no estilo segurança > extintores ... sempre que uma tela for criada tenha esse estilo, padrão
+   nexus!"). Nasceu em Extintores (24/10/2026: "deve ficar compactado em um símbolo de exclamação amarelo, quando a pessoa
+   clica aparece o comunicado"). Fica ao lado do título da tela; o clique abre a caixa por cima, e clicar fora ou o Esc
+   fecha (base.html). Sem JavaScript, abre e fecha pelo próprio <details>. Estilo no nexus.css ("O ! das explicações").
+
+   Uso, com texto:
+     {% from "_explica.html" import explica %}
+     <div class="gc-titulo-explica"><h1 class="titulo-pagina">Tela</h1>
+       {% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> ...</p>{% endcall %}</div>
+   Com termos (cada um com a cor dele e o que quer dizer):
+     {% from "_explica.html" import explica, termo %}
+     {% call explica('Como ler', 'o pé, em texto', termos=True) %}{{ termo('Atrasado', 'critico') }}<dd>...</dd>{% endcall %}
+   O tom do termo: critico, alerta, ok, info ou neutro. Uma tela tem UM "!": explicações diferentes viram parágrafos dele. #}
+{% macro explica(titulo, pe='', termos=False) %}<details class="gc-explica"><summary class="gc-explica-bt" title="{{ titulo }}" aria-label="{{ titulo }}">!</summary>
+    <section class="gc-explica-caixa" aria-label="{{ titulo }}">
+      <p class="gc-explica-t"><b>{{ titulo }}</b></p>
+      {% if termos %}<dl class="gc-explica-termos">{{ caller() }}</dl>{% else %}<div class="gc-explica-texto">{{ caller() }}</div>{% endif %}
+      {% if pe %}<p class="gc-explica-pe">{{ pe }}</p>{% endif %}
+    </section>
+  </details>{% endmacro %}
+{% macro termo(rotulo, tom='') %}<dt>{% if tom %}<span class="gc-ponto gc-ponto--{{ tom }}">{{ rotulo }}</span>{% else %}<b>{{ rotulo }}</b>{% endif %}</dt>{% endmacro %}

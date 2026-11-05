@@ -10,7 +10,8 @@
    pendências, sendo possível filtrar por cliente, por UFV e por supervisor) e ter a opção de baixar"): os filtros, a
    faixa com os quatro números de agora e a linha dos de atenção, um cartão por responsável ou por cliente (o que tem
    mais primeiro) e a planilha com caso a caso. Cada número leva à tela de origem filtrada. A mesa só lê. #}
-{% from 'hseq/_legenda.html' import legenda, termo %}
+{% from 'hseq/_legenda.html' import termo %}
+{% from '_explica.html' import explica %}
 {% macro kpi(rot, v, grav, nota) %}<div class="kb-kpi"><span class="kb-kpi-rot">{{ rot }}</span><span class="kb-kpi-linha"><b class="kb-kpi-v kb-kpi-v--{{ grav }}">{{ v }}</b><span class="kb-kpi-nota">{{ nota }}</span></span></div>{% endmacro %}
 {# uma linha do cartão: o número (colorido quando há), o que ele conta e o link para a tela de origem filtrada #}
 {% macro conta(n, rotulo, tom, href, erro=false) %}<a class="hs-conta{% if not n %} hs-conta--zero{% endif %}" href="{{ href|na_raiz }}"><b class="{{ 'cn-t-' ~ tom if n else '' }}">{{ '—' if erro else n }}</b><span>{{ rotulo }}</span></a>{% endmacro %}
@@ -18,7 +19,14 @@
 {% macro rot_atencao(k, v) %}{% if k == 'perto' %}perto de vencer{% elif k == 'sem_atual' %}sem atualização{% elif k == 'luvas_semv' %}{{ 'usina sem verificar as luvas' if v == 1 else 'usinas sem verificar as luvas' }}{% else %}{{ 'nova ronda pedida' if v == 1 else 'novas rondas pedidas' }}{% endif %}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab eg-mesa-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }} · Mesa da Segurança</p><h1 class="cn-titulo">A mesa da Segurança</h1>
+    <div><p class="gc-eyebrow">{{ torre.nome }} · Mesa da Segurança</p><div class="gc-titulo-explica"><h1 class="cn-titulo">A mesa da Segurança</h1>
+    {% call explica('Como ler a mesa', 'A mesa só lê: cada número leva à tela de origem, já filtrada pelo responsável ou pelo cliente (e pelos filtros do alto), onde a Segurança age: as PTs paradas, à tabela de APR e PT; os extintores, à tabela de Extintores no status; as luvas, à tabela de EPI. A planilha leva caso a caso, com os mesmos filtros.', termos=True) %}
+    {{ termo('PTs paradas', 'critico') }}<dd>A PT está esperando o De acordo há mais de 2 h.</dd>
+    {{ termo('Extintores vencidos', 'critico') }}<dd>A recarga ou o teste hidrostático do extintor venceu.</dd>
+    {{ termo('Não reconhecidos', 'alerta') }}<dd>A equipe não achou o extintor na usina; na usina, a Segurança aceita (o extintor é excluído) ou pede nova ronda.</dd>
+    {{ termo('Usinas sem luvas', 'critico') }}<dd>A última ronda diária respondeu Não à pergunta das luvas isolantes.</dd>
+    {{ termo('Atenção') }}<dd>O que ainda não pede ação, mas vai pedir: extintor perto de vencer (30 dias) ou sem atualização há mais de 30 dias (sem contar os vencidos e os perto de vencer), usina sem verificar as luvas há {{ dias_sem }} dias ou mais e nova ronda de extintores pedida que a equipe ainda não refez.</dd>
+  {% endcall %}</div>
       <p class="cn-pergunta">Onde atacar: PT parada, extintor vencido ou não reconhecido e usina sem luvas, por {{ 'cliente' if chave == 'cliente' else 'responsável' }}.</p></div>
     <div class="cn-frescor">PT do App, extintores e rondas do App + cadastro do Nexus{% if lido %}<br><b>lido às {{ lido }}</b>{% endif %}</div>
   </div>
@@ -75,13 +83,7 @@
       <p class="mudo">Nada pede ação{{ ' com esses filtros' if fl.values()|select|list else '' }} agora.</p>
     {% endfor %}
   </div>
+  {# a legenda do fim da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
 
-  {% call legenda('Como ler a mesa', 'A mesa só lê: cada número leva à tela de origem, já filtrada pelo responsável ou pelo cliente (e pelos filtros do alto), onde a Segurança age: as PTs paradas, à tabela de APR e PT; os extintores, à tabela de Extintores no status; as luvas, à tabela de EPI. A planilha leva caso a caso, com os mesmos filtros.') %}
-    {{ termo('PTs paradas', 'critico') }}<dd>A PT está esperando o De acordo há mais de 2 h.</dd>
-    {{ termo('Extintores vencidos', 'critico') }}<dd>A recarga ou o teste hidrostático do extintor venceu.</dd>
-    {{ termo('Não reconhecidos', 'alerta') }}<dd>A equipe não achou o extintor na usina; na usina, a Segurança aceita (o extintor é excluído) ou pede nova ronda.</dd>
-    {{ termo('Usinas sem luvas', 'critico') }}<dd>A última ronda diária respondeu Não à pergunta das luvas isolantes.</dd>
-    {{ termo('Atenção') }}<dd>O que ainda não pede ação, mas vai pedir: extintor perto de vencer (30 dias) ou sem atualização há mais de 30 dias (sem contar os vencidos e os perto de vencer), usina sem verificar as luvas há {{ dias_sem }} dias ou mais e nova ronda de extintores pedida que a equipe ainda não refez.</dd>
-  {% endcall %}
 </div>
 {% endblock %}

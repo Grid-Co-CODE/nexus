@@ -201,6 +201,42 @@ a{color:inherit}
   border-bottom:2px solid transparent;margin-bottom:-1px}
 .gc-subabas a:hover{color:var(--tinta)}
 .gc-subabas a[aria-current="page"]{color:var(--tinta);border-bottom-color:var(--verde)}
+
+/* O "!" das explicações (_explica.html): o padrão do Nexus para todo "entenda esta tela", "de onde vem", "como se conta",
+   "como ler" e "o que é" (05/11/2026, Levi: "padrão nexus!"). É o de Extintores (hseq.css, 24/10/2026), com o mesmo
+   desenho: o "!" amarelo ao lado do título e a caixa com a borda bevel amarela por cima da tela */
+.gc-titulo-explica{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.gc-titulo-explica > h1,.gc-titulo-explica > h2{margin-bottom:0}
+.gc-explica{position:relative;display:inline-block;align-self:center;vertical-align:middle}
+.gc-explica-bt{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1.5px solid var(--alerta);
+  border-radius:50%;background:var(--alerta-suave);color:var(--alerta);font:800 14px/1 var(--font-sans);cursor:pointer;list-style:none}
+.gc-explica-bt::-webkit-details-marker{display:none}
+.gc-explica-bt:hover,.gc-explica[open] .gc-explica-bt{background:var(--alerta);color:var(--sobre-cheio)}
+.gc-explica-bt:focus-visible{outline:2px solid var(--alerta);outline-offset:2px}
+.gc-explica-caixa{position:absolute;z-index:30;top:calc(100% + 8px);left:0;width:min(620px,calc(100vw - 32px));margin:0;
+  padding:14px 18px 16px;border:1px solid var(--alerta);corner-shape:bevel;border-radius:14px;
+  background:linear-gradient(var(--alerta-suave),var(--alerta-suave)),var(--superficie-3);box-shadow:0 8px 24px var(--sombra);
+  max-height:calc(100vh - 140px);overflow:auto;text-align:left;font-weight:400;letter-spacing:0;text-transform:none}
+.gc-explica-t{margin:0 0 12px;font-size:14px;color:var(--tinta)}
+.gc-explica-texto{font-size:13px;line-height:1.5;color:var(--tinta-2)}
+.gc-explica-texto > *{margin:0 0 9px}
+.gc-explica-texto > :last-child{margin-bottom:0}
+.gc-explica-texto b{color:var(--tinta)}
+.gc-explica-termos{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr);gap:9px 18px;align-items:baseline;margin:0}
+.gc-explica-termos dt{margin:0}
+.gc-explica-termos dt b{font-size:13px;color:var(--tinta)}
+.gc-explica-termos dd{margin:0;font-size:13px;line-height:1.45;color:var(--tinta-2)}
+.gc-explica-pe{margin:14px 0 0;padding-top:10px;border-top:1px solid var(--alerta);font-size:12.5px;line-height:1.45;color:var(--tinta-2)}
+.gc-ponto{display:inline-flex;align-items:center;gap:6px;font:600 12px/16px var(--font-sans)}
+.gc-ponto::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.gc-ponto--critico{color:var(--critico)}
+.gc-ponto--alerta{color:var(--alerta)}
+.gc-ponto--info{color:var(--info)}
+.gc-ponto--ok{color:var(--ok)}
+.gc-ponto--neutro{color:var(--mudo)}
+/* no celular a caixa vem presa à tela, com 16 px de cada lado, e os termos um embaixo do outro */
+@media (max-width:640px){.gc-explica-caixa{position:fixed;top:72px;left:16px;right:16px;width:auto;max-height:calc(100vh - 96px)}
+  .gc-explica-termos{grid-template-columns:minmax(0,1fr);gap:3px 0}.gc-explica-termos dd{margin-bottom:9px}}
 /* Atualizações: os commits por dia */
 .atualizacoes{max-width:920px;margin-top:18px}
 .atu-lista{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:10px}

@@ -213,6 +213,15 @@
     var aberto = document.querySelector(".topo details[open]:is(.conta-topo, .sino-topo)");
     if (aberto) { aberto.open = false; aberto.querySelector("summary").focus(); }
   });
+  // o "!" das explicações (_explica.html): clicar fora fecha a caixa aberta; o Esc fecha e volta o foco ao "!"
+  document.addEventListener("click", function (ev) {
+    document.querySelectorAll("details.gc-explica[open]").forEach(function (d) { if (!d.contains(ev.target)) d.open = false; });
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Escape") return;
+    var d = document.querySelector("details.gc-explica[open]");
+    if (d) { d.open = false; d.querySelector("summary").focus(); }
+  });
   {% if session.usuario %}
   {% include "_confere_sessao_js.html" %}
   {% endif %}

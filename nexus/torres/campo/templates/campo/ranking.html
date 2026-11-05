@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica, termo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Ranking de pontos (13/10/2026, Levi: "Cria uma seção de Ranking de Pontos no App de Campo!"): o placar do ciclo que o
    App calcula e publica no livro ranking_app_campo (nexus/campo/visao.py, ranking_pontos). Nada é recalculado aqui: a
@@ -30,45 +31,42 @@
    até o programado + PONTUAL_GRACE_MIN, 30 min) da 1ª tarefa fechada da OS no dia, só nas OS da programação, e a OS sem
    horário programado entra como fora do horário (o `bool(None)` do App). Mudou lá, muda aqui. #}
 {% macro como_ler() %}
-  <details class="cr-info rk-info">
-  <summary title="Como o App calcula cada coluna" aria-label="Como o App calcula cada coluna"><i class="ph ph-warning-circle" aria-hidden="true"></i></summary>
-  <div class="cn-nota">
-    <b>Como o App calcula.</b> O placar é de {{ mes_txt }} (o App chama o mês de ciclo): o App calcula e publica aqui de
-    hora em hora, e o Nexus não recalcula.
-    <dl class="cr-reguas rk-metricas">
-      <dt>Total</dt><dd>A soma que define a posição: pontos de tarefas + pontos de rondas + bônus. No empate, fica na
+  {% call explica('Como o App calcula cada coluna') %}
+    <p><b>Como o App calcula.</b> O placar é de {{ mes_txt }} (o App chama o mês de ciclo): o App calcula e publica aqui de
+    hora em hora, e o Nexus não recalcula.</p>
+    <dl class="gc-explica-termos">
+      {{ termo('Total') }}<dd>A soma que define a posição: pontos de tarefas + pontos de rondas + bônus. No empate, fica na
         frente quem tem mais tarefas contadas.</dd>
-      <dt>Tarefas</dt><dd>Em cima, quantas tarefas a pessoa registrou no mês; embaixo, os pontos e quantas contam. Cada
+      {{ termo('Tarefas') }}<dd>Em cima, quantas tarefas a pessoa registrou no mês; embaixo, os pontos e quantas contam. Cada
         tarefa vale a nota menos 60 (nota 100 = 40 pontos), se a nota chegou ao piso{% if g.get('piso') is not none %}
         ({{ g.piso }}){% endif %} e houve GPS, com o peso do tipo (religamento e administrativa valem metade). Contam as
         {% if g.get('teto') is not none %}{{ g.teto }} {% endif %}melhores do mês, e cada tarefa abaixo do piso anula uma
         das que contavam{% if g.get('anula_max') is not none %} (até {{ g.anula_max }}){% endif %}.</dd>
-      <dt>Rondas</dt><dd>Em cima, quantas rondas no mês; embaixo, os pontos. As rondas somam num balde à parte, pelo tipo
+      {{ termo('Rondas') }}<dd>Em cima, quantas rondas no mês; embaixo, os pontos. As rondas somam num balde à parte, pelo tipo
         de cada uma{% if g.get('ronda_teto') is not none %}, com teto de {{ pts(g.ronda_teto) }} pontos no mês{% endif %}:
         "no teto" quer dizer que passou do teto e as rondas a mais não somam.</dd>
-      <dt>Bônus</dt><dd>Só nas semanas já encerradas e sem devolução, sobre os pontos de tarefas da semana:
+      {{ termo('Bônus') }}<dd>Só nas semanas já encerradas e sem devolução, sobre os pontos de tarefas da semana:
         {% if g.get('bonus_prog') is not none %}+{{ g.bonus_prog }}% com a programação da semana completa{% else %}um
         tanto com a programação da semana completa{% endif %}{% if g.get('bonus_prev') is not none %} e até
         +{{ g.bonus_prev }}% pelas preventivas feitas na própria semana{% endif %}.</dd>
-      <dt>Nota média</dt><dd>A média das notas (de 0 a 100) de todas as tarefas que ele registrou no mês.</dd>
-      <dt>Cumprimento</dt><dd>Concluídas ÷ programadas, só nos dias já vencidos; embaixo, quantas de quantas.</dd>
-      <dt>Pontualidade</dt><dd>Das OS da programação dele, em quantas ele começou a execução até 30 minutos depois do
+      {{ termo('Nota média') }}<dd>A média das notas (de 0 a 100) de todas as tarefas que ele registrou no mês.</dd>
+      {{ termo('Cumprimento') }}<dd>Concluídas ÷ programadas, só nos dias já vencidos; embaixo, quantas de quantas.</dd>
+      {{ termo('Pontualidade') }}<dd>Das OS da programação dele, em quantas ele começou a execução até 30 minutos depois do
         horário programado (começar antes também vale); conta uma vez por OS por dia, pela primeira tarefa fechada.
         Não soma ponto: é só informação. A OS sem horário na programação conta como fora do horário.</dd>
-      <dt>Sequência</dt><dd>Quantos dias programados seguidos, até hoje, ele terminou no próprio dia tudo o que estava
+      {{ termo('Sequência') }}<dd>Quantos dias programados seguidos, até hoje, ele terminou no próprio dia tudo o que estava
         programado. Dia sem programação (folga, fim de semana) não conta nem zera.</dd>
-      <dt>Devolvidas · anuladas</dt><dd>As tarefas devolvidas pelo supervisor (ficam com 0 ponto até serem refeitas e
+      {{ termo('Devolvidas · anuladas') }}<dd>As tarefas devolvidas pelo supervisor (ficam com 0 ponto até serem refeitas e
         aprovadas) e as anuladas por tarefa abaixo do piso. A linha com alguma abre a lista, com a OS e o motivo.</dd>
-      <dt>Fora do ciclo</dt><dd>{{ (dica_fora[15:16]|upper ~ dica_fora[16:]) if dica_fora else '' }}</dd>
+      {{ termo('Fora do ciclo') }}<dd>{{ (dica_fora[15:16]|upper ~ dica_fora[16:]) if dica_fora else '' }}</dd>
     </dl>
-    Com uma região escolhida, a posição continua a do mês inteiro: é a que o técnico vê no App.
-  </div>
-  </details>
+    <p>Com uma região escolhida, a posição continua a do mês inteiro: é a que o técnico vê no App.</p>
+  {% endcall %}
 {% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab rk-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p>
-      <div class="rk-titulo"><h1 class="cn-titulo">{{ tela.nome }}</h1>{% if atual %}{{ como_ler() }}{% endif %}</div>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>{% if atual %}{{ como_ler() }}{% endif %}</div>
       <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">placar do mês do App{% if calculado %}<br><b>calculado em {{ calculado }}</b>{% endif %}</div>
   </div>
@@ -200,13 +198,7 @@
     ev.preventDefault(); ev.stopPropagation();
     NexusOsCard.abrirFolio(b.getAttribute('data-folio'), {status: ''});
   });
-  // o "!" do título fecha no clique fora dele e no Esc (29/10/2026)
-  (function () {
-    var d = document.querySelector('.rk-info');
-    if (!d) { return; }
-    document.addEventListener('click', function (ev) { if (d.open && !d.contains(ev.target)) { d.open = false; } });
-    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && d.open) { d.open = false; } });
-  })();
+  // o "!" do título fecha no clique fora e no Esc pelo base.html (05/11/2026)
   // a linha com devolvida, abaixo do piso ou anulada abre a lista do App (Levi, 18/10/2026)
   document.querySelectorAll('tr.rk-linha').forEach(function (tr) {
     function alterna() {

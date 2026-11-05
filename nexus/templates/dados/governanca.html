@@ -9,6 +9,7 @@
 <div class="dd-barra"><span class="rot">{{ rot }}</span><span class="trilho">{% if p is not none %}<span class="enche {{ 'ok' if p >= 98 else ('al' if p >= 90 else 'er') }}" style="width:{{ p }}%"></span>{% endif %}</span><span class="pct">{{ pct(v) or '—' }}</span></div>
 {% endmacro %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dados.css') }}">
 {# Duas visões da mesma governança (08/10/2026): o organograma, a visão de cima, e a matriz (`?ver=matriz`). O padrão
    era a matriz; desde 09/10 é o organograma (Levi: "Deixe organograma como padrão, Matriz em segundo"), e o link antigo
@@ -17,7 +18,10 @@
 <div class="dd-topo">
   <div>
     <p class="gc-eyebrow">Base · Governança de dados</p>
-    <h1 class="titulo-pagina">{{ 'Organograma da governança' if ver == 'organograma' else 'Matriz de barramento' }}</h1>
+    <div class="gc-titulo-explica"><h1 class="titulo-pagina">{{ 'Organograma da governança' if ver == 'organograma' else 'Matriz de barramento' }}</h1>{% if ver == 'organograma' %}{% include "dados/_organograma_explica.html" %}{% else %}{% call explica('O que é a matriz') %}<p>Cada acontecimento (um <b>fato</b>: um fechamento, uma ronda, a geração de um dia) ligado aos cadastros de
+referência (as <b>dimensões</b>: usina, pessoa, data…) por <b>ID</b>. Quando dois setores usam a mesma dimensão pelo mesmo
+ID, os dados deles se cruzam sem conversão. A matriz vem do catálogo do Nexus (<code>nexus/dados/catalogo.py</code>); a
+qualidade, da carga de hora em hora.</p>{% endcall %}{% endif %}</div>
   </div>
   <nav class="dd-ver" aria-label="Visão da governança">
     <a href="{{ (url_organograma)|na_raiz }}"{% if ver == 'organograma' %} aria-current="page"{% endif %}>Organograma</a>
@@ -27,10 +31,7 @@
 {% if ver == 'organograma' %}
 {% include "dados/_organograma.html" %}
 {% else %}
-<p class="dd-sub">Cada acontecimento (um <b>fato</b>: um fechamento, uma ronda, a geração de um dia) ligado aos cadastros de
-referência (as <b>dimensões</b>: usina, pessoa, data…) por <b>ID</b>. Quando dois setores usam a mesma dimensão pelo mesmo
-ID, os dados deles se cruzam sem conversão. A matriz vem do catálogo do Nexus (<code>nexus/dados/catalogo.py</code>); a
-qualidade, da carga de hora em hora.</p>
+{# o "o que é" da Matriz foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
 
 <div class="dd-kpis">
   <div class="dd-kpi"><span class="v">{{ resumo.fatos }}</span><span class="r">fatos no catálogo</span></div>

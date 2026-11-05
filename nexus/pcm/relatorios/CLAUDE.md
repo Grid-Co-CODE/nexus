@@ -9,6 +9,8 @@ numa moldura em `nexus/pcm/relatorio_exec` (tela `pcm-executivo`, ver o CLAUDE.m
 
 ## De onde vem cada coisa
 
+> O "Como funciona" das telas da Central (`pcm.html`, `pcm_executivo.html`) está, desde 05/11/2026, na exclamação amarela do título (`explica`, `_explica.html`), não mais na nota do pé.
+
 - **As contas e a folha** são CÓPIA do Python do PCM (`relatorio_diario.py` e `relatorios_semana.py` do repositório
   `fillipefigueiro-source/gridco-pcm-data`): é o Python que gerava os relatórios arquivados e os e-mails (o
   `js/relatorios.js` do painel era o espelho dele no navegador). Um módulo por relatório: `diario.py`, `tarde.py` (lá a

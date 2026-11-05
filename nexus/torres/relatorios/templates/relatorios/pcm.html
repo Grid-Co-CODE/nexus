@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "relatorios/_lado.html" import blocos %}
+{% from "_explica.html" import explica %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {# Os relatórios do PCM na Central (14/10/2026, Levi: "Quero trazer esses quatro relatórios para a plataforma, com as
@@ -8,7 +9,8 @@
    esquerda é a de toda a Central: os blocos (relatorios/_lado.html) no lugar do "1 · Tipo". #}
 <link rel="stylesheet" href="{{ url_for('static', filename='relatorios-pcm.css') }}">
 <p class="gc-eyebrow">{{ torre.nome }} · PCM</p>
-<h1 class="titulo-pagina">{{ tela.nome }}</h1>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">{{ tela.nome }}</h1>
+{% call explica('Como funciona') %}<p>A folha é montada pelo Nexus com os mesmos dados que o painel do PCM lê, com as mesmas regras dos relatórios automáticos. "Imprimir / PDF" imprime só a folha; para guardar, escolha "Salvar como PDF" na impressão. Nada é gravado ao gerar.</p>{% endcall %}</div>
 <p class="lead">{{ tipo.descricao|capitalize }}. Gerado com o dado de agora do PCM (Programação Semanal, Gestão PCM,
   Gerencial e Confiabilidade); as regras são as mesmas dos relatórios automáticos.</p>
 {% if erro_fonte %}<p class="aviso">Não consegui ler a programação do PCM agora ({{ erro_fonte }}): a lista de semanas e o
@@ -92,9 +94,7 @@
         {% endif %}
       </div>
     </div>
-    <p class="rp-nota"><b>Como funciona:</b> a folha é montada pelo Nexus com os mesmos dados que o painel do PCM lê, com
-      as mesmas regras dos relatórios automáticos. "Imprimir / PDF" imprime só a folha; para guardar, escolha "Salvar como
-      PDF" na impressão. Nada é gravado ao gerar.</p>
+    {# o "Como funciona" foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
   </div>
 </div>
 

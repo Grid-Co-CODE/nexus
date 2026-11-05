@@ -293,6 +293,8 @@ e-mails pessoais); filtro Origem e a etiqueta "externo" na linha.
 
 ## Equipamentos das usinas (`estrutura_usina.py`, `telas_equipamentos.py`, `/t/base/equipamentos`; 13/10/2026)
 
+> Desde 05/11/2026 o guia "Como funciona" e a dica do (!) antigo ficam juntos na exclamação amarela do título (`explica`, `_explica.html`); o guia deixou de ser uma seção do painel vazio.
+
 Levi, 13/10/2026 (o atalho do Tempo real abria o editor do de-para da plataforma na fonte errada): "Temos que substituir a
 aba equipamentos aproveitando o que tem lá e usando o Nexus como ponto de partida a partir daquele produto. Precisamos
 ligar a usina do Fractal com Usina cadastrada no registro mestre com usina do supervisório para aí poder ligar os

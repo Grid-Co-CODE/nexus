@@ -3,6 +3,13 @@
 A torre do Centro de Operações: a mesa do operador, o ciclo da ocorrência e a comunicação com o cliente. É a pasta
 do programador do tempo real/COS. Leia também o `CLAUDE.md` da raiz (convenções e regras da casa).
 
+## As explicações das telas (05/11/2026)
+
+O "De onde vem", o "Como se conta" e o "Como funciona" de cada tela (Ronda, Eventos, Ocorrências, Religamentos,
+Acionamentos, OS em aberto, Passagem de turno) moram no "!" amarelo ao lado do título, o `explica` de
+`nexus/templates/_explica.html` (o padrão do Nexus, pedido do Levi). Tela nova do COS segue o mesmo: nada de nota
+`cn-nota` no pé para explicar como a tela funciona; o que muda com o dado (erro, dado faltando) fica na tela.
+
 ## O que a torre vai ser
 
 As telas estão declaradas em `__init__.py`. Ronda padronizada, Parede de eventos, Ocorrências, Religamentos e

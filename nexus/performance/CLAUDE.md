@@ -340,12 +340,12 @@ A citação que a NASA pede ("NASA LaRC POWER") continua no rodapé da página d
 
 **A tela (leitura rápida, aprovada pelo Levi em 07/10/2026; didática desde 09/10/2026), na ordem:** cabeçalho (filtro de
 cliente, "atualizada às HH:MM"); **faixa de 4 números** (Agir agora, Atenção, Sem alerta, Cobertura), cada nível com "O que
-fazer" quando tem usina (com zero ou com "—" não diz nada); o link "Como ler esta tela"; **Agir agora**, um cartão por usina
+fazer" quando tem usina (com zero ou com "—" não diz nada); **Agir agora**, um cartão por usina
 (pílula, frase principal, "Quando:", "O que pode acontecer" e "O que conferir" do motivo principal, os outros motivos e o
 "Também"); **Por estado**, uma grade de 27 quadrados (cada quadrado é um estado, não é um mapa; o número é de usinas com alerta
 no estado e a cor, a do pior nível); **De onde vêm os dados** (de quando é cada um); **Atenção**, a tabela usina x "Por quê" x
 avisos x fogo a até 5 km x os quatro dias do risco de fogo (as 20 primeiras; "Ver todas (N)" é `?todas=1`); **Entenda os
-alertas** (os três níveis da tela com o que fazer, os níveis do INMET, foco, risco de fogo com a escala, os eventos que estão
+alertas**, desde 05/11/2026 na exclamação amarela do título (`explica`, `_explica.html`; era a seção do pé, com o link "Como ler esta tela") (os três níveis da tela com o que fazer, os níveis do INMET, foco, risco de fogo com a escala, os eventos que estão
 valendo agora e, recolhidos, os outros que o INMET publica). A grade de estados e a tabela rolam DENTRO da caixa em 375 px,
 nunca a página. Cada cartão e cada linha levam à página da usina.
 
@@ -603,8 +603,8 @@ Fernando de Noronha: uma malha com ilhas alargaria o recorte do Brasil em ~15% d
 - **A tela enxuta (27/10/2026)**: Levi: "o foco da tela é o mapa, mas até chega no mapa é quase metade da tela só de texto e
   filtros, talvez seria legal os filtros laterais" e "poderia ficar escondido toda essa legenda, imagino os status na parte de
   cima ... caso tenha um disclaimer eu clico para ver que nem é no extintores". O cabeçalho é uma linha (título + "!"); a
-  pergunta da tela, o que cada nível quer dizer e o como ler de cada camada moram no "!" (`_mapa_ajuda.html`, o mesmo desenho do
-  aviso dos Extintores, `hseq/_legenda.html`, com o CSS copiado como `.mp-aviso*`; texto FIXO e fora de qualquer `data-parte`, senão
+  pergunta da tela, o que cada nível quer dizer e o como ler de cada camada moram no "!" (`_mapa_ajuda.html`, desde 05/11/2026 o `explica`
+  de `_explica.html`, o padrão do Nexus; o CSS `.mp-aviso-dl` e afins só estilizam o conteúdo; texto FIXO e fora de qualquer `data-parte`, senão
   a releitura fecharia a caixa aberta). Os níveis viraram uma faixa em cima do mapa (`_mapa_status.html`, `data-parte="status"`):
   cor, palavra e número, e o clique é o mesmo filtro `ocultar` da legenda de antes. Os filtros (região, camada de fundo, mostrar,
   cliente, busca) e a chave de cores estão num cartão só, à esquerda (`.mp-lado`; o `_mapa_barra.html` com `lado`). A chave é a

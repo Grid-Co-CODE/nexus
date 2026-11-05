@@ -72,7 +72,7 @@ def test_tela_por_responsavel_e_o_kanban_ao_clicar(com_responsavel, logado):
     assert "Altair" in col["pendente"] and "Brodowski" not in col["pendente"]
     assert "Brodowski 1" in col["feita"] and "Última ronda" in col["feita"]
     assert 'href="/t/campo/rondas/usina/1"' in html and 'href="/t/campo/rondas/usina/2"' in html
-    assert "Coração" not in html.split('class="cn-kanban"')[1].split('class="cn-nota"')[0]   # é do outro responsável
+    assert "Coração" not in html.split('class="cn-kanban"')[1].split('</main>')[0]   # é do outro responsável
     # a tabela continua a um clique, só com as pendentes dele
     tab = logado.get("/t/campo/atencao?responsavel=Ciclano+Chefe&modo=tabela").get_data(as_text=True)
     corpo = tab[tab.index("<tbody>"):tab.index("</tbody>")]
@@ -116,7 +116,7 @@ def test_a_central_so_tem_por_responsavel_e_a_tabela(com_responsavel, logado):
 
 def test_pt_por_responsavel_e_o_cartao_leva_a_tabela_dele(com_responsavel, logado):
     html = logado.get("/t/campo/atencao?vista=pt").get_data(as_text=True)
-    cartoes = html[html.index('class="cn-equipes"'):html.index('class="cn-nota"')]
+    cartoes = html[html.index('class="cn-equipes"'):html.index('</main>')]
     # a PT-1 (parada) e a PT-2 são da Altair, do Ciclano Chefe; o Beltrano não tem PT esperando: sem cartão
     assert "<b>Ciclano Chefe</b>" in cartoes and "Beltrano Supervisor" not in cartoes and "Responsável UFV" in cartoes
     assert "<b>2</b><span>PT esperando o De acordo" in cartoes and "1 parada há mais de 2 h" in cartoes

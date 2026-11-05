@@ -7,8 +7,8 @@ template, aqui.
 
 **O desenho da Segurança (24/10/2026, escolhido pelo Levi numa amostra com dado real).** Os filtros em squircle; os
 cartões de responsável, a caixa dos não reconhecidos e o aviso do fim da tela em bevel (`corner-shape` em `hseq.css`; o
-navegador que ainda não o desenha mostra o arredondado de sempre); o resto como no Campo. O aviso do fim da tela
-(`_legenda.html`, macros `legenda` e `termo`) é a caixa com a borda amarela da dos não reconhecidos: o título, cada termo
+navegador que ainda não o desenha mostra o arredondado de sempre); o resto como no Campo. O aviso (`_legenda.html`, macros `legenda` e `termo`; desde 05/11/2026 EPI e EPC e a Mesa o têm na exclamação amarela do
+título, o `explica` de `_explica.html`, e não mais no fim da tela) é a caixa com a borda amarela da dos não reconhecidos: o título, cada termo
 com a cor dele e o que quer dizer, e o pé ("Esses avisos no final da tela pode ficar como bevel mas com uma borda
 parecida com o aviso de extintores não reconhecidos"). Até ali era o parágrafo corrido do `cn-nota`. Em Extintores
 o aviso ("Como cada extintor entra") fica numa exclamação amarela ao lado do título, que abre a caixa por cima da tela

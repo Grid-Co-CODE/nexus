@@ -276,7 +276,7 @@ def test_a_tela(ligada, logado, monkeypatch):
     linha = html.split('class="cos-det-linha"', 1)[1].split("</tr>", 1)[0]
     assert "<dt>Ação</dt><dd>Religamento Remoto</dd>" in linha and "<li>Religada remotamente as 06:00, trip exemplo.</li>" in linha
     assert ">Ciclano Operador<" in html and ">Tecnica Dois<" in html and 'name="criado_por"' in html
-    assert "Severidade" not in cab and "Crítico" not in html and 'class="hs-aviso"' in html
+    assert "Severidade" not in cab and "Crítico" not in html and 'class="gc-explica"' in html
     assert "Último dia" not in html and "Últimos 7 dias" not in html
     # o Operador vem da API, nunca de uma leitura do Fracttal uma a uma (Levi: "isso vai pesar muito nas requisições!")
     assert "lendo no Fracttal" not in html

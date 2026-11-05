@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <noscript><meta http-equiv="refresh" content="60"></noscript>
@@ -8,7 +9,11 @@
    normalizada), de todos os clientes, do mais novo para o mais velho (nexus/cos/andamento.py). #}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> Do Andamento da Ronda COS: cada ocorrência que entra (<b>nova</b>), que recebe
+    nota ou muda de etapa (<b>atualizada</b>) e que volta (<b>normalizada</b>), na hora em que aconteceu. Só entra o que já
+    tem OS no Fracttal. As linhas em destaque são as de depois da última fotografia emitida. O Andamento guarda 7 dias. A
+    tela relê sozinha a cada minuto.</p>{% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">Andamento da Ronda COS{% if lido %}<br>lido às <b>{{ lido }}</b>{% endif %}</div>
   </div>
 
@@ -68,10 +73,7 @@
   {% else %}<p class="cn-vazio">Nenhum evento nesta janela{% if problema or situacao %} com esses filtros{% endif %}.</p>{% endif %}
   {% endif %}
 
-  <div class="cn-nota"><b>De onde vem.</b> Do Andamento da Ronda COS: cada ocorrência que entra (<b>nova</b>), que recebe
-    nota ou muda de etapa (<b>atualizada</b>) e que volta (<b>normalizada</b>), na hora em que aconteceu. Só entra o que já
-    tem OS no Fracttal. As linhas em destaque são as de depois da última fotografia emitida. O Andamento guarda 7 dias. A
-    tela relê sozinha a cada minuto.</div>
+  {# A explicação da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
 </div>
 <script>
   // Relê a cada minuto, como o Andamento lê a Ronda COS; nunca com um campo em uso.

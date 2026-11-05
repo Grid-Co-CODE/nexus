@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 {# Passagem de turno (26/10/2026), spec R12: "a passagem é registrada no sistema; sem registro, ela não aconteceu". Quem
@@ -10,7 +11,14 @@
 {% macro aberto_txt(e) %}{% if e.abertas is not none %}{{ e.abertas }} aberta{{ '' if e.abertas == 1 else 's' }}{% if e.criticas %}, {{ e.criticas }} crítica{{ '' if e.criticas == 1 else 's' }}{% endif %}{% else %}—{% endif %}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>Como funciona.</b> Os turnos são os da Ronda COS: {% for t in turnos %}{{ t.nome|lower }} a partir das
+    {{ '%02d'|format(t.inicio_h) }}:00{{ ', ' if not loop.last else '' }}{% endfor %}. Quem sai escreve a passagem, e ela vai para
+    a troca do fim do turno, ou para a que acabou de acontecer se for escrita até {{ tolerancia }} min depois dela
+    (quem já assumiu essa troca escreve para a seguinte). Quem entra
+    lê e marca <b>assumi</b>: quem passou não assume a própria passagem. Troca sem passagem {{ tolerancia }} min depois da
+    hora fica <b>sem registro</b>: pela R12, a passagem não aconteceu. Quem passou e o texto vão cifrados para o banco; o
+    que estava aberto é a contagem do Andamento da Ronda COS na hora da passagem.</p>{% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     {% if p %}<div class="cn-frescor">Turno <b>{{ p.turno.nome }}</b><br>{{ p.turno_inicio.strftime('%d/%m %H:%M') }} às {{ p.turno_fim.strftime('%H:%M') }}</div>{% endif %}
   </div>
 
@@ -118,13 +126,7 @@
     </tbody>
   </table></div>
 
-  <div class="cn-nota"><b>Como funciona.</b> Os turnos são os da Ronda COS: {% for t in turnos %}{{ t.nome|lower }} a partir das
-    {{ '%02d'|format(t.inicio_h) }}:00{{ ', ' if not loop.last else '' }}{% endfor %}. Quem sai escreve a passagem, e ela vai para
-    a troca do fim do turno, ou para a que acabou de acontecer se for escrita até {{ tolerancia }} min depois dela
-    (quem já assumiu essa troca escreve para a seguinte). Quem entra
-    lê e marca <b>assumi</b>: quem passou não assume a própria passagem. Troca sem passagem {{ tolerancia }} min depois da
-    hora fica <b>sem registro</b>: pela R12, a passagem não aconteceu. Quem passou e o texto vão cifrados para o banco; o
-    que estava aberto é a contagem do Andamento da Ronda COS na hora da passagem.</div>
+  {# A explicação da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
   {% endif %}
 </div>
 {% endblock %}

@@ -187,7 +187,7 @@ def test_sem_o_livro_a_tela_diz_que_os_extintores_ainda_nao_chegaram(banco, loga
     html = logado.get("/t/hseq/extintores").get_data(as_text=True)
     assert "Os extintores ainda não chegaram ao banco do Nexus" in html and "extintores_app_campo" in html
     assert "cn-numeros" not in html and "<table>" not in html
-    assert "Como cada extintor entra" in html and 'class="hs-legenda hs-aviso-caixa"' in html   # a explicação das regras fica, na exclamação
+    assert "Como cada extintor entra" in html and 'class="gc-explica-caixa"' in html   # a explicação das regras fica, na exclamação
 
 
 def test_a_faixa_conta_o_que_o_pedido_quer_e_cada_numero_filtra_a_tabela(com_livro, logado):

@@ -28,7 +28,13 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 - **Tela que sai não vira 404:** tire a `Tela` da `TORRE` (sai do menu e do Início) e deixe a rota respondendo um
   redirecionamento (com `na_raiz`) para a tela que ficou no lugar, para quem tinha o endereço salvo. Caso: Base → Listas
   saiu em 11/10/2026 e o `/t/base/listas` leva à Governança de dados (`nexus/cadastro/CLAUDE.md`).
-- Templates em `nexus/torres/<torre>/templates/<torre>/`.
+- Templates em `nexus/torres/<torre>/templates/<torre>/`. O visual (cores, a ordem do cabeçalho, os componentes) é o
+  `DESIGN.md` da raiz; leia antes de desenhar.
+- **Tela nova explica-se no "!" amarelo ao lado do título** (05/11/2026, Levi: "sempre que uma tela for criada tenha
+  esse estilo, padrão nexus!"): o "Entenda esta tela", o "De onde vem", o "Como se conta", o "Como ler" e a legenda
+  de termos vão no `{% call explica(...) %}` de `nexus/templates/_explica.html`, nunca num parágrafo solto no pé da
+  tela. Erro, dado faltando e aviso que muda com o dado ficam na tela. Como usar: `DESIGN.md`, seção 6;
+  `tests/test_explica_padrao.py` pega a explicação que ficou de fora.
 - **Endereço nunca a partir da raiz** (09/10/2026): o Nexus pode rodar debaixo de um prefixo (`NEXUS_PREFIXO`: `/nexus` no servidor até a fase 4; hoje na raiz, e o
   prefixo é a volta), e aí um
   `href="/t/..."`, `redirect("/t/...")` ou `fetch("/os/...")` cru cai na plataforma de Performance. No template,

@@ -55,7 +55,7 @@ def test_tela_tem_a_exclamacao_e_a_busca_embaixo(app, logado, tmp_path, monkeypa
     html = logado.get("/t/pcm/quadro").get_data(as_text=True)
     topo = html.split('class="q-barra"', 1)[0]
     # os textos longos estão na exclamação (o details do aviso), não num parágrafo solto antes dos filtros
-    assert 'class="hs-aviso"' in topo and "Como o Quadro lê e conta a semana" in topo
+    assert 'class="gc-explica"' in topo and "Como o Quadro lê e conta a semana" in topo
     assert "sábado 03/10 00:00" in topo and 'class="pcm-fonte"' not in topo
     # a busca vem depois dos chips, sozinha
     barra = html.split('class="q-barra"', 1)[1].split("</form>", 1)[0]
