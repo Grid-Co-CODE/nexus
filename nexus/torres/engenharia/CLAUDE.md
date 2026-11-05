@@ -571,7 +571,9 @@ cuidado com `.m` (do campo.css, é fonte de código).
   1.338 nomes se repetem entre usinas.
 - **Usina, cliente, cluster e mobilização vêm do cadastro do Nexus** (registro mestre), pelo de-para do Fracttal
   (`visao._Base().lig`); sem ligação, o texto do Fracttal ("Cliente - Usina - UF"). No PCM a mobilização vinha da
-  planilha AUXILIAR.
+  planilha AUXILIAR. **O texto do local** (`confiabilidade._local`) é o da OS mais nova do ativo; vazio, o da OS mais nova
+  que o traz e, sem nenhuma, a usina do caminho do ativo no Fracttal (`parent_description`). Em 05/11/2026 as OS novas de
+  duas usinas vinham sem o local e 91 dos 2.363 ativos caíam no cliente e na usina "—"; com a regra, nenhum.
 - **Cancelada não entra** (no PCM entrava nos sinais dos 30 dias, porque ele lia todas as OS).
 - **Indicadores por cliente/usina = mediana dos ativos.** No PCM a disponibilidade agregada somava as falhas da frota
   toda e dava Athon 14% (o próprio site avisava).

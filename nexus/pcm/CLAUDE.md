@@ -1833,7 +1833,10 @@ atrasadas) e a Confiabilidade por ativo e o MTTR por equipe cluster. As contas: 
   Engenharia, a aberta também; o número de fechadas vai na dica); até 24 h verde, até 72 h âmbar, acima vermelho. A mesma
   usina tem então dois MTTR, e cada um diz qual é: a coluna "MTTR por falha (h)" e o "mediana dos ativos", com uma frase
   em cada legenda (revisão de 05/11/2026). A usina sem cluster no cadastro ou sem ligação vai no grupo "Sem cluster no
-  cadastro (ou sem ligação)", por último. **Os filtros:** cliente e cluster pelo nome
+  cadastro (ou sem ligação)", por último. O ativo sem cliente vai no cliente "Sem cliente no cadastro", por último, e a
+  usina sem nome é dita pelo prefixo do código ("Sem usina (código IPX100)"), nunca um "—" (Levi, 05/11/2026; o caso
+  era o local vazio das OS novas, que a Engenharia agora busca nas outras OS e no caminho do ativo). **Os filtros:**
+  cliente e cluster pelo nome
   do cadastro, sem maiúscula; a usina pelo texto do Fracttal das OS dos ativos dela (a usina da Gestão é a Classificação
   1, "Cliente - Usina - UF", e a da Engenharia é o nome do cadastro; com os dados de 04/11, as 130 usinas da Gestão com OS
   de falha casaram todas pelo texto); a usina entra inteira ou fica fora, então os números dela são os da Engenharia. Os

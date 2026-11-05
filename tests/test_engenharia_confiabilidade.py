@@ -143,3 +143,21 @@ def test_falhas_em_tem_so_as_que_contam_no_sinal_e_todo_o_periodo():
     f = C.calcular(linhas, _onde, AGORA)["falhasEm"]["IBI200-INVR1.3"]
     assert [(AGORA - x["quando"]).days for x in f] == [40, 5, 1]
     assert f[0]["tipo"] == "Corretiva" and f[1]["tipo"] == "Corretiva Emergencial" and f[2]["os"] == "IBI200-INVR1.3-1"
+
+
+def test_o_local_da_usina_vem_de_outra_os_ou_do_caminho_quando_a_mais_nova_nao_traz():
+    """A OS mais nova de um ativo pode vir do Fracttal sem o local ("Cliente - Usina - UF"): em 05/11/2026 os ativos de
+    duas usinas caíam no cliente e na usina "—" da Confiabilidade (Engenharia e Gestão PCM). Vale o local da OS mais nova
+    do ativo que o traz e, sem nenhuma, a usina do caminho do ativo no Fracttal (`parent_description`)."""
+    def onde(texto, cod):
+        if not texto:
+            return {"usina_id": None, "usina": "—", "cliente": "—", "cluster": "", "uf": "", "equipe": "",
+                    "mobilizacao": None, "ligada_por": None}
+        return _onde(texto, cod)
+    linhas = [_os("IPX100-INVR1.1", 2, usina=None), _os("IPX100-INVR1.1", 9, usina="Cliente X - Usina Norte 9 - PA"),
+              _os("BWK200-DINV2.14", 3, usina=None,
+                  parent_description="// Cliente X/ Cliente X - Usina Sul 7 - SP/ Cabine 1/ SKID 2/ ")]
+    a = {x["cod"]: x for x in C.calcular(linhas, onde, AGORA)["ativos"]}
+    assert (a["IPX100-INVR1.1"]["cliente"], a["IPX100-INVR1.1"]["usina"]) == ("Cliente X", "Usina Norte 9")
+    assert (a["BWK200-DINV2.14"]["cliente"], a["BWK200-DINV2.14"]["usina"]) == ("Cliente X", "Usina Sul 7")
+    assert a["BWK200-DINV2.14"]["circuito"] == "Cabine 1 / SKID 2"

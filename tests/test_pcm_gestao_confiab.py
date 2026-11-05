@@ -267,3 +267,16 @@ def test_a_copia_daqui_nao_prende_a_conta_da_engenharia(app, logado, eng):
     assert logado.get("/t/pcm/gestao?cf=conf").status_code == 200
     guardada = GC._COPIA["c"]
     assert set(guardada) == {"marca", "idx", "res", "quando"}
+
+
+def test_sem_cliente_e_sem_usina_ditos_e_por_ultimo():
+    """O ativo que nem o cadastro nem o Fracttal ligam a um cliente ou a uma usina não vai para um grupo "—" (Levi,
+    05/11/2026: "ajusta o grupo '—' para dizer sem cliente no cadastro e mostrar qual usina é"): o cliente vira "Sem
+    cliente no cadastro", a usina sem nome é dita pelo prefixo do código dos ativos, e o grupo fica por último."""
+    d = {"ativos": [{"cod": "IPX100-INVR1.1", "cliente": "—", "usina": "—"},
+                    {"cod": "UNA100-INV01", "cliente": "Cliente A", "usina": "Usina Norte 1"},
+                    {"cod": "XYZ300-TRK1", "cliente": "", "usina": "Usina Solta"}]}
+    assert set(GC._grupos(d)) == {(GC.SEM_CLIENTE, "Sem usina (código IPX100)"), ("Cliente A", "Usina Norte 1"),
+                                  (GC.SEM_CLIENTE, "Usina Solta")}
+    assert GC.SEM_CLIENTE == "Sem cliente no cadastro"
+    assert sorted(["SEMP", GC.SEM_CLIENTE, "Athon"], key=GC.ordem_cliente) == ["Athon", "SEMP", GC.SEM_CLIENTE]

@@ -124,6 +124,26 @@ def _mediana(xs):
     return statistics.median(xs) if xs else None
 
 
+def _local(rs: list[dict], r0: dict) -> str:
+    """O local da usina ("Cliente - Usina - UF") que liga o ativo ao cadastro. A OS mais nova pode vir do Fracttal sem ele:
+    em 05/11/2026 os ativos de duas usinas da Thopen caíam no cliente e na usina "—" (as OS novas sem o local, as velhas
+    com ele). Vale o da OS mais nova que o traz e, sem nenhuma, a usina do caminho do ativo no Fracttal
+    (`parent_description`: "// Cliente/ Cliente - Usina - UF/ Cabine/ ...", a mesma divisão do `circuito`)."""
+    texto = str(r0.get("groups_1_description") or "").strip()
+    if texto:
+        return texto
+    recentes = sorted(rs, key=lambda r: str(r.get("creation_date") or ""), reverse=True)
+    for r in recentes:
+        texto = str(r.get("groups_1_description") or "").strip()
+        if texto:
+            return texto
+    for r in recentes:
+        pai = [s.strip() for s in str(r.get("parent_description") or "").split("/") if s.strip()]
+        if len(pai) >= 2:
+            return pai[1]
+    return ""
+
+
 def calcular(linhas: list[dict], onde, agora: datetime | None = None) -> dict:
     """`linhas`: as OS de falha (`os_falhas.linhas()`); `onde(texto_usina, codigo)` -> {usina_id, usina, cliente,
     cluster, mobilizacao, ligada_por}: a ligação com o cadastro (a torre passa a do Campo · App)."""
@@ -155,7 +175,7 @@ def calcular(linhas: list[dict], onde, agora: datetime | None = None) -> dict:
         r0 = max(rs, key=lambda r: str(r.get("creation_date") or ""))
         # sem o código e sem a marca ou o endereço que vêm depois de 2+ espaços (o limpa_ativo do PCM)
         nome = re.split(r"\s{2,}", RX_COD.sub("", str(r0.get("items_log_description") or "")).strip())[0] or cod
-        lug = onde(str(r0.get("groups_1_description") or ""), cod)
+        lug = onde(_local(rs, r0), cod)
         mob = lug.get("mobilizacao")
         mob_eff = max(mob, INICIO_METODO) if mob else INICIO_METODO
         m = metodo(rs, mob_eff, agora)

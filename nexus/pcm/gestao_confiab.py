@@ -33,6 +33,7 @@ INCOMPLETA = "A leitura do Fracttal ainda não terminou: tente em alguns minutos
 SEM_CADASTRO = "O cadastro do Nexus não respondeu: tente em alguns minutos."
 # a usina sem cluster no cadastro e a usina que não ligou ao cadastro (sem ela, o cluster vem vazio) caem juntas aqui
 SEM_CLUSTER = "Sem cluster no cadastro (ou sem ligação)"
+SEM_CLIENTE = "Sem cliente no cadastro"
 BASE = ", ".join(t.capitalize() for t in os_falhas.TIPOS)        # Corretiva, Corretiva emergencial, ...
 _STATUS = {1: "Em Processo", 2: "Em Verificação", 3: "Concluída"}     # a grafia do card da OS do Nexus
 # os filtros de cima que não valem nestes blocos, na ordem da barra (a linha de baixo do título diz quais)
@@ -131,11 +132,22 @@ def _indice(d: dict) -> dict:
 
 
 def _grupos(d: dict) -> dict:
-    """{(cliente, usina): os ativos}, como a Engenharia os mostra (o nome do cadastro; sem ligação, o do Fracttal)."""
+    """{(cliente, usina): os ativos}, como a Engenharia os mostra (o nome do cadastro; sem ligação, o do Fracttal). O
+    ativo sem cliente ou sem usina não vai para um grupo "—" (Levi, 05/11/2026): o cliente vira `SEM_CLIENTE` e a usina
+    sem nome é dita pelo prefixo do código dos ativos (o código traz a usina: IPX100-INVR1.1), para o PCM saber qual é."""
     out: dict = {}
     for a in d.get("ativos") or []:
-        out.setdefault((a.get("cliente") or "—", a.get("usina") or "—"), []).append(a)
+        cli = str(a.get("cliente") or "").strip()
+        usi = str(a.get("usina") or "").strip()
+        if not usi or usi == "—":
+            usi = f"Sem usina (código {str(a.get('cod') or '').split('-')[0] or '?'})"
+        out.setdefault((SEM_CLIENTE if not cli or cli == "—" else cli, usi), []).append(a)
     return out
+
+
+def ordem_cliente(nome: str):
+    """A ordem dos clientes na Confiabilidade: a do painel (localeCompare pt-BR), com o `SEM_CLIENTE` por último."""
+    return (nome == SEM_CLIENTE, G.ordem_pt(nome))
 
 
 def _guardado(c: dict, chave, fazer):
@@ -179,7 +191,7 @@ def arvore(c: dict, f: G.Filtros) -> list[dict]:
                                                  "disp": ind["disp"], "ativos": len(ats),
                                                  "falhas": sum(a.get("n") or 0 for a in ats)})
         out = []
-        for cli in sorted(clientes, key=G.ordem_pt):
+        for cli in sorted(clientes, key=ordem_cliente):
             us = sorted(clientes[cli], key=lambda u: G.ordem_pt(u["nome"]))
             out.append({"nome": cli, "usinas": us, "n_usinas": len(us), "falhas": sum(u["falhas"] for u in us)})
         return out
