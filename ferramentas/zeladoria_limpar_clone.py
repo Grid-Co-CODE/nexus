@@ -106,6 +106,18 @@ PALETA = """<style id="zeladoria-paleta">
 body { font-family: var(--font-sans); }
 .page-title, .modal-head h3 { font-family: var(--font-display); }
 .btn { border-radius: var(--raio-controle); font-weight: 600; padding: 8px 14px; }
+/* o card do fornecedor (Levi, 05/11/2026: "em fornecedores as palavras estão passando os cards"): a coluna da grade
+   era de 272 px, pouco para o nome e os três botões; o nome quebra a linha, e os botões descem quando não cabem */
+.forn-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.forn-card { min-width: 0; overflow-wrap: anywhere; }
+.forn-card .top { flex-wrap: wrap; }
+.forn-card .who { min-width: 0; flex: 1 1 170px; }
+.forn-card .top > div:last-child { flex-wrap: wrap; justify-content: flex-end; }
+/* o carregamento discreto, no lugar da tela inteira com o G (Levi, 05/11/2026: "tire esse carregamento feio") */
+.zel-carregando { padding: 24px 28px; color: var(--mudo); font-size: 13px; }
+/* a visão de 75% no desktop (Levi, 05/11/2026: "a mesma visão que tenho quando o zoom está em 75%, fica tudo bem mais
+   encaixado"): o zoom é só do clone, a casca do Nexus fica como está; no tablet e no celular, o tamanho de sempre */
+@media (min-width: 1000px) { html { zoom: 0.75; } }
 /* a 375 px (a prova do Nexus) nada rola de lado: a grade de duas colunas posta no estilo do elemento cai para uma, e o
    botão de rótulo longo ("Acompanhamento de Pagamentos - Terceirizados") quebra a linha */
 @media (max-width: 600px) {
@@ -120,6 +132,11 @@ body { font-family: var(--font-sans); }
 }
 </style>
 """
+# a tela de carregamento do Radar (o G grande sobre o fundo de Gs) vira uma linha discreta: ela aparece a cada tela
+# aberta, porque cada tela do menu abre o clone de novo
+CARREGANDO_RADAR = ('<div class="auth-screen"><div class="auth-loading"><div class="mark">G</div>'
+                    '<div class="spinner"></div></div></div>')
+CARREGANDO_NEXUS = '<div class="zel-carregando">Carregando a Zeladoria…</div>'
 FONTES_RADAR = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;'
                 '0,700;0,800;1,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap">')
 FONTES_NEXUS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700'
@@ -240,6 +257,7 @@ def vestir(texto: str) -> str:
     texto = _emojis(texto)
     texto = _uma_vez(texto, "var t = localStorage.getItem('rf_tema');",
                      "var t = window.ZELADORIA_TEMA || localStorage.getItem('rf_tema');", "o tema salvo do Radar")
+    texto = _uma_vez(texto, CARREGANDO_RADAR, CARREGANDO_NEXUS, "a tela de carregamento do Radar")
     return _uma_vez(texto, "\n</head>", "\n" + PALETA + "</head>", "o fim do <head>")
 
 

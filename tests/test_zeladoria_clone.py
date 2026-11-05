@@ -135,3 +135,18 @@ def test_cores_de_aviso_do_js_viram_variavel(html):
 
 def test_o_tema_vem_do_nexus(html):
     assert "var t = window.ZELADORIA_TEMA || localStorage.getItem('rf_tema');" in html
+
+
+def test_o_carregamento_e_discreto(html):
+    """Levi, 05/11/2026: "tire esse carregamento feio sempre carrega!". A tela inteira com o G saiu."""
+    corpo = html[html.index("function renderCarregando(){"):]
+    corpo = corpo[:corpo.index("}")]
+    assert '<div class="zel-carregando">Carregando a Zeladoria' in corpo and "auth-loading" not in corpo
+
+
+def test_o_card_do_fornecedor_e_a_visao_de_75(html):
+    """Levi, 05/11/2026: "em fornecedores as palavras estão passando os cards" e "a mesma visão que tenho quando o
+    zoom está em 75%". Só no desktop: no celular o tamanho é o de sempre."""
+    texto, _v = _paleta(html)
+    assert "minmax(320px, 1fr)" in texto and ".forn-card .top { flex-wrap: wrap; }" in texto
+    assert re.search(r"@media \(min-width: 1000px\) \{ html \{ zoom: 0\.75; \} \}", texto)

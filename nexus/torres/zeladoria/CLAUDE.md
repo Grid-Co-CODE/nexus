@@ -126,6 +126,9 @@ diferentes apagariam um ao outro. Levi escolheu "Salvo em 1 s, banco logo depois
 - **Fontes:** as do Nexus (Poppins, Raleway nos títulos e IBM Plex Mono).
 - **Cores fixas:** a do CSS e a de aviso dos estilos do JavaScript viraram variável. A cor de DADO (o avatar de cada pessoa, a escala de dias de atraso, o calor da criticidade) e o CSS do relatório de impressão (papel branco) ficam como estavam.
 - **Emojis:** saíram. O que era o botão inteiro virou palavra (Excluir, Editar, Fotos, Simular...).
+- **Visão de 75% no desktop** (Levi, 05/11/2026: "a mesma visão que tenho quando o zoom está em 75%, fica tudo bem mais encaixado"): `zoom: 0.75` no `<html>` do clone a partir de 1000 px; a casca do Nexus fica como está, e o tablet e o celular ficam no tamanho de sempre.
+- **Carregamento discreto:** a tela inteira com o G do Radar saiu (Levi, 05/11/2026: "tire esse carregamento feio"); no lugar, a linha "Carregando a Zeladoria…". Cada tela do menu abre o clone de novo, então ela aparece a cada troca de tela (~0,6 s na cópia local).
+- **Card do fornecedor:** a coluna da grade foi de 272 para 320 px, o nome quebra a linha e os botões descem quando não cabem (o texto passava do card).
 - **Celular:** a 375 px nenhuma das 18 telas rola de lado. A tabela larga rola dentro dela, a grade fixa cai para uma coluna e a linha de botões quebra.
 - **Como se faz:** tudo pela `ferramentas/zeladoria_limpar_clone.py` (a função `vestir`), que roda de novo sobre o Radar original. Prova: `tests/test_zeladoria_clone.py`.
 
