@@ -371,12 +371,22 @@ def avisos_lida():
     ids = request.form.getlist("aviso")
     if request.form.get("todos") == "1":
         ids = [a["id"] for a in AV.para_o_sino(usuario)]
+    # o sino da página pede por fetch e espera JSON (Levi, 05/11/2026: "cada vez que clico em marcar como lida a tela
+    # atualiza... atrapalha a experiência do usuário"): grava e responde, sem recarregar; o formulário sem JavaScript volta
+    quer_json = "application/json" in (request.headers.get("Accept") or "")
     try:
-        AV.marcar_lidos(usuario, ids)
+        n = AV.marcar_lidos(usuario, ids)
     except AV.Recusada as ex:
         current_app.logger.warning("sino: os avisos não foram marcados como lidos: %s", ex)
+        if quer_json:
+            return jsonify({"ok": False, "erro": str(ex)}), 400
     except Exception:            # noqa: BLE001 — banco fora: o aviso segue no sino
         current_app.logger.exception("sino: os avisos não foram marcados como lidos")
+        if quer_json:
+            return jsonify({"ok": False, "erro": "O banco não respondeu: o aviso segue no sino."}), 503
+    else:
+        if quer_json:
+            return jsonify({"ok": True, "lidos": n})
     return redirect(destino_seguro(request.form.get("voltar")))
 
 
