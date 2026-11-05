@@ -166,8 +166,6 @@
    que conferir no cartão do "Agir agora", o porquê de cada usina da Atenção e o "Entenda os alertas" no pé da tela. */
 .cl-fazer{display:block;margin-top:2px;font-size:12px;line-height:1.45;color:var(--tinta-2);overflow-wrap:anywhere}
 .cl-fazer strong{color:var(--tinta);font-weight:600}
-.cl-como-ler{margin:10px 0 0;font-size:13px}
-.cl-como-ler a{color:var(--verde-texto)}
 .cl-explica{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;margin:0;padding:10px 12px;border-radius:var(--raio-controle);
   background:var(--superficie-2)}
 .cl-explica dt{margin-top:6px;font:700 10.5px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ titulo or tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Permissões de trabalho, visão do Nexus (05/10/2026): o livro de PT que o App grava no banco (nexus/campo/visao.py,
    pts e pt_por_responsavel). Duas abas: esperando o De acordo (por responsável ou tabela; Levi, 24/10/2026: "Tire por
@@ -39,7 +40,17 @@
 {% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ titulo or tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ titulo or tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}
+        {% if aba == 'sem' %}<p>{% if tipo == 'pt' %}<b>Como entra:</b> a APR de pré-execução feita no App com uma das 5 atividades críticas marcada (altura, escada, telhados, químicos, eletricidade energizada), que pede PT, e sem o número de PT ligado a ela. A APR ainda não medida (as de antes da versão 298 são lidas aos poucos) não entra.{% else %}<b>Como entra:</b> a tarefa fechada pelo App, de OS criada desde 10/10/2026, sem nenhuma APR da OS até o dia do serviço (a hora do celular, não a chegada ao servidor). A APR vale para a atividade: a tarefa pausada e retomada em outro dia não pede outra, como no App. A OS criada antes de 10/10 fica fora (pode ter a APR por tarefa de antes do registro). A régua não olha o técnico.{% endif %}</p>{% endif %}
+        <p><b>De onde vem.</b> As PT são as que o App grava no banco do Nexus, de hora em hora. A pessoa vem do
+    App como código do e-mail; o nome (resumido) sai do cadastro do App, na hora. Equipe, região de campo (com o
+    Supervisor de Campo), gestor de contrato e técnicos vêm do cadastro do Nexus. Clique na linha para ver o detalhe; a OS em verde abre a PT para aprovar.
+    <br><b>PT e APR:</b> os PDFs que o App anexou na tarefa do Fracttal (a PT no De acordo, com a assinatura do técnico
+    e a de quem aceitou; a APR desde a v251 do App); o Nexus busca no Fracttal na hora do clique. PT não autorizada não
+    tem PDF. <b>Quem pode dar o De acordo:</b> o Supervisor de Campo da região da usina (com a vaga aberta, o
+    Coordenador), o gestor de contrato da usina, quem é do COS (o vínculo COS no cadastro de pessoas) e um administrador.</p>
+      {% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">livro de PT do App<br><b>lido às {{ lido }}</b>{% include 'campo/_aviso_fato.html' %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
@@ -114,7 +125,6 @@
     {% for i in range(1, n_pag + 1) if i in (1, n_pag) or (i - pag)|abs <= 2 %}{% if not loop.first and i - loop.previtem > 1 %}<span class="mudo">…</span>{% endif %}<a href="{{ url(pag=i if i > 1 else None) }}"{% if i == pag %} aria-current="page"{% endif %}>{{ i }}</a>{% endfor %}
     {% if pag < n_pag %}<a href="{{ url(pag=pag + 1) }}">Próxima</a>{% endif %}
   </nav>{% endif %}
-  <p class="cn-nota">{% if tipo == 'pt' %}<b>Como entra:</b> a APR de pré-execução feita no App com uma das 5 atividades críticas marcada (altura, escada, telhados, químicos, eletricidade energizada), que pede PT, e sem o número de PT ligado a ela. A APR ainda não medida (as de antes da versão 298 são lidas aos poucos) não entra.{% else %}<b>Como entra:</b> a tarefa fechada pelo App, de OS criada desde 10/10/2026, sem nenhuma APR da OS até o dia do serviço (a hora do celular, não a chegada ao servidor). A APR vale para a atividade: a tarefa pausada e retomada em outro dia não pede outra, como no App. A OS criada antes de 10/10 fica fora (pode ter a APR por tarefa de antes do registro). A régua não olha o técnico.{% endif %}</p>
   {% endif %}
   {% else %}
   <div class="cn-chips">
@@ -144,13 +154,7 @@
   </nav>{% endif %}
   {% endif %}
 
-  <div class="cn-nota"><b>De onde vem.</b> As PT são as que o App grava no banco do Nexus, de hora em hora. A pessoa vem do
-    App como código do e-mail; o nome (resumido) sai do cadastro do App, na hora. Equipe, região de campo (com o
-    Supervisor de Campo), gestor de contrato e técnicos vêm do cadastro do Nexus. Clique na linha para ver o detalhe; a OS em verde abre a PT para aprovar.
-    <br><b>PT e APR:</b> os PDFs que o App anexou na tarefa do Fracttal (a PT no De acordo, com a assinatura do técnico
-    e a de quem aceitou; a APR desde a v251 do App); o Nexus busca no Fracttal na hora do clique. PT não autorizada não
-    tem PDF. <b>Quem pode dar o De acordo:</b> o Supervisor de Campo da região da usina (com a vaga aberta, o
-    Coordenador), o gestor de contrato da usina, quem é do COS (o vínculo COS no cadastro de pessoas) e um administrador.</div>
+  {# As explicações da tela foram para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
 </div>
 {% if aba == 'historico' %}
 <script>

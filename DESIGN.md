@@ -17,6 +17,10 @@ arquivo diz quais usar, para quê e as regras que os testes cobram. Regra mudou:
 - **No claro nada esmaece por opacidade** (linha concluída, cartão cancelado): vira `--superficie-2` com texto `--mudo`,
   porque a opacidade derrubava o contraste a 2,4–3,5:1 no branco.
 - **Verde Grid é superfície, não texto, no claro:** o `#a9db21` dá 1,6:1 no branco. Texto verde é sempre `--verde-texto`.
+- **Explicação mora no "!" amarelo ao lado do título** (05/11/2026, Levi: "Disclaimers de 'entenda o que aconteceu'
+  'o que é' precisa estar em um símbolo de exclamação amarelo no estilo segurança > extintores ... padrão nexus!"):
+  "Entenda esta tela", "De onde vem", "Como se conta", "Como funciona", "Como ler", "O que é" e a legenda de
+  termos nunca ficam soltos na tela, nem no pé dela. Componente na seção 6; `tests/test_explica_padrao.py` cobra.
 - **Contraste AA (4,5:1)** em todo texto do claro, sobre o branco, o `#f5f6f8`, o `#eceef2` e o fundo "-suave".
 
 ## 2. Cores
@@ -94,13 +98,14 @@ Número em coluna ou em cartão leva `.gc-num` (algarismos de largura igual). As
 De cima para baixo, no `{% block conteudo %}` (exemplo vivo: `nexus/templates/inicio.html`):
 
 1. `p.gc-eyebrow`: a torre (ou o setor).
-2. `h1.titulo-pagina`: o nome da tela.
+2. `h1.titulo-pagina`: o nome da tela, com o "!" das explicações ao lado (`div.gc-titulo-explica`, seção 6).
 3. `p.lead`: a pergunta que a tela responde, em uma ou duas frases.
 4. `nav.gc-subabas` (se houver abas): a ativa leva `aria-current="page"` e ganha o sublinhado verde.
 5. `div.gc-numeros`: os números do alto, cada um com `.r` (rótulo), `.v` (valor, `.gc-num`) e `.d` (o
    que o número quer dizer).
 6. `h2.ui-kicker` antes de cada seção, e o conteúdo (tabela, cartões, lista).
-7. `p.aviso` para o que a pessoa precisa saber (sem dado, setor sem tela); `.mudo` para a nota de rodapé.
+7. `p.aviso` para o que a pessoa precisa saber AGORA (sem dado, setor sem tela, leitura que falhou); `.mudo` para a nota
+   que muda com o dado. Como a tela funciona e de onde vem o dado não ficam aqui: vão para o "!" do título.
 
 Dado que veio pela metade não vai para a tela: a tela diz o que falta (`CLAUDE.md` raiz, "Confiabilidade antes de
 tela"). Como criar a tela de uma torre (a rota, o template, o menu): `nexus/torres/CLAUDE.md`.
@@ -112,6 +117,14 @@ tela"). Como criar a tela de uma torre (a rota, o template, o menu): `nexus/torr
   muda nada.
 - **Etiqueta de situação** `.gc-status` + `--ok`, `--alerta`, `--critico`, `--info` ou `--neutro`: bolinha e palavra
   na cor do nível, sobre o `-suave`. Sempre com a palavra.
+- **O "!" das explicações** (`nexus/templates/_explica.html`, o padrão de toda tela desde 05/11/2026; nasceu em
+  Segurança → Extintores): o círculo amarelo com "!" ao lado do título; o clique abre a caixa por cima da tela, com a
+  borda bevel amarela, e clicar fora ou o Esc fecha (`base.html`). No celular a caixa fica presa à tela, com 16px de
+  cada lado. Uma tela tem UM "!": explicações diferentes viram parágrafos dele, na ordem em que se lê. Uso:
+  `{% from "_explica.html" import explica %}`, o h1 dentro de `<div class="gc-titulo-explica">` e, logo depois dele,
+  `{% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> ...</p>{% endcall %}`. Legenda de termos coloridos:
+  `explica(titulo, pe, termos=True)` com `termo('Atrasado', 'critico')` e `<dd>`. O que NÃO vai para o "!": erro,
+  dado faltando, aviso que muda com o dado e a instrução de uma ação (esses ficam onde a pessoa age).
 - **Chip** `.gc-chip`: filtro ou escolha que liga e desliga (redondo, com borda).
 - **Campo** `.gc-campo`, com `.gc-rotulo` acima e `.gc-ajuda` abaixo (`.gc-ajuda--erro` quando errado).
 - **Cartão de torre** `.card-torre`: o ícone em verde-texto, o nome e a contagem à direita. Sem tela pronta, ele não é

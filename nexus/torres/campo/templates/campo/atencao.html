@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Central de atenção, visão do Nexus (05/10/2026): só o que está pendente, em duas abas (rondas pendentes e PT), cada uma
    Por responsável ou em tabela (Levi, 19/10/2026: "tire essa visão por região, e gestor de contrato. Uma visão só por
@@ -26,7 +27,19 @@
 {% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}
+        {% if vista == 'pendentes' %}<p><b>O que entra.</b> Usina mobilizada (OPERAÇÃO no cadastro, com a data de mobilização já
+    passada) sem ronda há 7 dias ou mais, ou cuja última ronda deixou a ronda longa pendente. Uma linha por usina. As
+    rondas feitas, com o que ficou faltando nelas, estão na tela Rondas. Por responsável: o Responsável UFV (o
+    Responsável O&amp;M da ficha da usina); no cartão, "feitas" são as usinas dele que não estão pendentes, e o % é sobre
+    as usinas dele; o cartão abre o kanban das usinas dele (nunca teve ronda, ronda pendente e ronda feita, a feita sendo
+    a usina em dia), com a equipe de cada usina.</p>
+        {% else %}<p><b>O que entra.</b> As PT esperando o De acordo, da mais antiga para a mais nova; parada = mais de 2 h. Clique
+    na OS para abrir a PT e decidir. Por responsável: o Responsável UFV da usina da PT; o cartão leva à tabela das PT
+    dele. O livro de PT do App chega de hora em hora.</p>{% endif %}
+        <p>A região da tabela sai do estado da usina no cadastro.</p>
+      {% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">rondas e PT do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% include 'campo/_aviso_fato.html' %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
@@ -143,19 +156,9 @@
   {% endif %}
 
   {% endif %}
-  <div class="cn-nota">
-  {% if vista == 'pendentes' %}<b>O que entra.</b> Usina mobilizada (OPERAÇÃO no cadastro, com a data de mobilização já
-    passada) sem ronda há 7 dias ou mais, ou cuja última ronda deixou a ronda longa pendente. Uma linha por usina. As
-    rondas feitas, com o que ficou faltando nelas, estão na tela Rondas. Por responsável: o Responsável UFV (o
-    Responsável O&amp;M da ficha da usina); no cartão, "feitas" são as usinas dele que não estão pendentes, e o % é sobre
-    as usinas dele; o cartão abre o kanban das usinas dele (nunca teve ronda, ronda pendente e ronda feita, a feita sendo
-    a usina em dia), com a equipe de cada usina.
-    {% if d.get('sem_mobilizacao') %}<br>{{ d.sem_mobilizacao|length }} usinas estão em OPERAÇÃO no cadastro sem data de
-    mobilização e ficam de fora até a data entrar no cadastro.{% endif %}
-  {% else %}<b>O que entra.</b> As PT esperando o De acordo, da mais antiga para a mais nova; parada = mais de 2 h. Clique
-    na OS para abrir a PT e decidir. Por responsável: o Responsável UFV da usina da PT; o cartão leva à tabela das PT
-    dele. O livro de PT do App chega de hora em hora.{% endif %}
-    A região da tabela sai do estado da usina no cadastro.
-  </div>
+  {# A explicação da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html); o aviso que muda com o dado fica aqui. #}
+  {% if vista == 'pendentes' and d.get('sem_mobilizacao') %}<div class="cn-nota">{{ d.sem_mobilizacao|length }} usinas estão em OPERAÇÃO no cadastro sem data de
+    mobilização e ficam de fora até a data entrar no cadastro.</div>{% endif %}
+
 </div>
 {% endblock %}

@@ -134,6 +134,8 @@ PerformancePainel.
   A API é compartilhada por vários sistemas: nada que identifique pessoa vai para ela em claro
   (cifrado ou como HMAC).
 - **Sempre pt-BR**, inclusive comentários. **Sem emoji na interface**; severidade por cor e palavra.
+- **Explicação de tela no "!" amarelo ao lado do título** (05/11/2026, "padrão nexus!"): "Entenda esta tela", "De onde
+  vem", "Como se conta", "Como ler", "O que é" e legendas vão no `_explica.html`, nunca soltos na tela (`DESIGN.md`).
 - Tema escuro **navy** (`#090d18` / `#161d30`) + verde Grid, o padrão, que não muda. Nunca lilás (o `#191528` do mockup não
   entra). O claro (08/10/2026) é escolha da pessoa, pelo botão do topo. **Cor só por token**, nos dois temas do
   `nexus.css`: nada de `#hex` ou `rgba()` em regra de CSS nem em template (`nexus/casca/CLAUDE.md`, seção Tema).

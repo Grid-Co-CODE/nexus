@@ -8,7 +8,7 @@ from test_campo_visao import banco  # noqa: F401  (fixture)
 
 
 def _cartoes(html):
-    return html[html.index('class="cn-equipes"'):html.index('class="cn-nota"')]
+    return html[html.index('class="cn-equipes"'):html.index('</main>')]
 
 
 def test_o_cartao_das_rondas_sem_borda_nem_barra_vermelha(banco, logado):

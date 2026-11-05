@@ -22,7 +22,7 @@ def _tabela(html):
 
 def _cartoes(html):
     """O pedaço dos cartões, sem os endereços, para comparar duas telas."""
-    corpo = html[html.index('<div class="cn-equipes">'):html.index('<div class="cn-nota">')]
+    corpo = html[html.index('<div class="cn-equipes">'):html.index('</main>')]
     return " ".join(re.sub(r'href="[^"]*"', "", corpo).split())
 
 

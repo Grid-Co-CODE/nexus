@@ -33,13 +33,13 @@ def _cartao(html, nome):
     """O texto do cartão de um grupo (até o próximo cartão ou o fim dos grupos)."""
     i = html.index(f"<b>{nome}</b>")
     fim = html.find('<div class="cn-equipe ', i)
-    return _texto(html[i:fim if fim > 0 else html.index('class="hs-legenda"', i)])
+    return _texto(html[i:fim if fim > 0 else len(html)])
 
 
 def test_a_mesa_por_responsavel_mostra_onde_atacar(com_cadastro, logado):
     _com_casos(com_cadastro)
     html = logado.get("/t/hseq/mesa").get_data(as_text=True)
-    faixa = _texto(html[html.index('class="kb-kpis'):html.index("</section>")])
+    faixa = _texto(html[html.index('class="kb-kpis'):html.index("</section>", html.index('class="kb-kpis'))])
     assert "PTs paradas 1" in faixa and "Extintores vencidos 2" in faixa and "Não reconhecidos 1" in faixa
     assert 'aria-current="page">Por responsável</a>' in html
     assert "PT-1" not in html and "EXT02" not in html                    # grupos, não a lista dos casos
@@ -57,7 +57,7 @@ def test_a_mesa_por_responsavel_mostra_onde_atacar(com_cadastro, logado):
     assert 'href="/t/hseq/apr-pt?modo=tabela&amp;f=parada&amp;responsavel=Supervisora+Campo"' in html
     tabela = logado.get("/t/hseq/apr-pt?modo=tabela&f=parada&responsavel=Supervisora+Campo").get_data(as_text=True)
     assert tabela.count('class="cn-link cn-os"') == 1                          # a PT-1, parada (a PT-2 tem 30 min)
-    assert 'class="hs-legenda"' in html and "Como ler a mesa" in _texto(html)
+    assert 'class="gc-explica-caixa"' in html and "Como ler a mesa" in _texto(html)   # a legenda, no "!" do título
     # só lê: nenhum formulário que grava no conteúdo (o do topo é a troca de tema da casca)
     assert 'method="post"' not in html[html.index('class="campo-nativa"'):].lower()
 
@@ -74,7 +74,7 @@ def test_a_mesa_por_cliente(com_cadastro, logado):
 def test_sem_os_extintores_a_mesa_diz_e_os_outros_seguem(banco, logado):
     html = logado.get("/t/hseq/mesa").get_data(as_text=True)
     assert "Não consegui ler os extintores agora" in html and "PTs paradas" in html
-    assert "Extintores vencidos —" in _texto(html[html.index('class="kb-kpis'):html.index("</section>")])
+    assert "Extintores vencidos —" in _texto(html[html.index('class="kb-kpis'):html.index("</section>", html.index('class="kb-kpis'))])
 
 
 # ── a visão geral (a TST, 24/10/2026: "Adicionar uma opção de visão geral (um resumo com todas as pendências, sendo
@@ -96,7 +96,7 @@ def test_a_visao_geral_filtra_por_cliente_ufv_e_responsavel_em_cascata(com_cadas
     assert 'href="/t/hseq/mesa/pendencias.xlsx"' in form and ">Baixar planilha</a>" in form
     # o Outro Cliente: só o Coração 1 e o Coordenador Campo nas listas, e os números só dele
     out = logado.get("/t/hseq/mesa?cliente=Outro+Cliente").get_data(as_text=True)
-    faixa = _texto(out[out.index('class="kb-kpis'):out.index("</section>")])
+    faixa = _texto(out[out.index('class="kb-kpis'):out.index("</section>", out.index('class="kb-kpis'))])
     assert "PTs paradas 0" in faixa and "Extintores vencidos 1" in faixa and "Não reconhecidos 0" in faixa
     f2 = _form(out)
     usinas = re.findall(r'<option value="([^"]+)"', f2[f2.index('id="mesa-usina"'):f2.index('id="mesa-responsavel"')])

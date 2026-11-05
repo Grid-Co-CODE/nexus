@@ -84,11 +84,11 @@ def test_buscar_por_usina_leva_a_pagina_dela(banco, logado):
 def test_o_como_ler_e_o_de_onde_vem_na_exclamacao_amarela(banco, logado):
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
     titulo = html.split('<div class="hs-titulo"><h1 class="cn-titulo">Rondas</h1>', 1)[1].split("</details>", 1)[0]
-    assert '<details class="hs-aviso"><summary class="hs-aviso-bt" title="Como ler as Rondas"' in titulo
+    assert '<details class="gc-explica"><summary class="gc-explica-bt" title="Como ler as Rondas"' in titulo
     assert "De onde vem" in titulo and "lido às" in titulo and 'class="cn-entenda"' not in html
     assert "hseq.css" in html and 'class="cn-barra-fonte"' not in html
     pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
-    assert '<summary class="hs-aviso-bt" title="De onde vem"' in pag and "lido às" in pag
+    assert '<summary class="gc-explica-bt" title="De onde vem"' in pag and "lido às" in pag
     assert 'class="cn-frescor"' not in pag and "<b>De onde vem.</b>" not in pag      # nem no canto, nem no fim
     # os números juntos numa faixa, nas duas páginas
     assert 'class="cn-numeros cn-numeros--filtro rd-numeros"' in html and 'class="cn-kpi' not in html

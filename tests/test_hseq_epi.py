@@ -77,9 +77,9 @@ def test_tela_por_responsavel_e_tabela_com_as_fotos_da_ronda(luvas, logado):
     assert 'name="responsavel"' in html and 'name="regiao_campo"' not in html and 'name="gestor"' not in html
     so = logado.get("/t/hseq/epi?modo=tabela&responsavel=Coordenador+Campo").get_data(as_text=True)
     assert "Coração 1" in so and "Altair" not in so.split("cn-tab")[1]
-    assert 'class="hs-legenda"' in html and "Como cada usina entra" in html
+    assert 'class="gc-explica-caixa"' in html and "Como cada usina entra" in html   # a legenda, no "!" do título
     tab = logado.get("/t/hseq/epi?f=sem_luvas").get_data(as_text=True)
-    corpo = tab.split('class="hs-legenda"')[0]                             # o aviso do fim também tem o termo
+    corpo = tab.split('</details>', 1)[1]                                  # o "!" do título também tem o termo
     assert corpo.count('<span class="cn-st cn-t-critico">Sem luvas</span>') == 1 and "Coração 1" not in tab
     assert "<b>Não</b>" in tab and "1 Não em 2" in tab
     assert 'data-url="/t/campo/rondas/os/500/fotos"' in tab and 'class="cn-fotos-linha" hidden' in tab

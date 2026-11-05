@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <noscript><meta http-equiv="refresh" content="120"></noscript>
@@ -9,7 +10,15 @@
    repetição, de nexus/cos/religamentos.py. Só lê. #}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>Como se conta.</b> Entram as ocorrências registradas no período com religamento: <b>remoto</b>
+    (a ação declarada na abertura, a OS de Religamento Remoto ou a normalização pela plataforma) ou <b>local</b> (a ação
+    declarada ou a OS de Religamento). O remoto <b>resolveu</b> quando a ocorrência fechou sem ir a campo; <b>foi a campo
+    depois</b> quando veio a OS com religamento local ou o campo foi acionado por pessoa (a passagem automática a "Técnico
+    acionado" não conta). O resultado "Persistiu" ou "Parcial" do religamento remoto fica só no checklist da OS e não
+    entra aqui. A ocorrência de vários equipamentos conta em cada um; sem equipamento, conta na usina inteira. O
+    equipamento <b>repete</b> com {{ repete }} religamentos no período e fica em vermelho com {{ reincidente }} ou mais, a
+    régua de reincidência do RDO da Ronda COS.</p>{% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">Andamento da Ronda COS{% if p and p.gerado_em %}<br>leitura das <b>{{ p.gerado_em.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
   </div>
 
@@ -78,14 +87,7 @@
   {% else %}<p class="cn-vazio">{% if ver == 'repetem' and p.contagem.todos %}Nenhum equipamento com {{ repete }} religamentos ou mais no período: veja todos os equipamentos.{% else %}Nenhum religamento no período.{% endif %}</p>{% endif %}
   {% endif %}
 
-  <div class="cn-nota"><b>Como se conta.</b> Entram as ocorrências registradas no período com religamento: <b>remoto</b>
-    (a ação declarada na abertura, a OS de Religamento Remoto ou a normalização pela plataforma) ou <b>local</b> (a ação
-    declarada ou a OS de Religamento). O remoto <b>resolveu</b> quando a ocorrência fechou sem ir a campo; <b>foi a campo
-    depois</b> quando veio a OS com religamento local ou o campo foi acionado por pessoa (a passagem automática a "Técnico
-    acionado" não conta). O resultado "Persistiu" ou "Parcial" do religamento remoto fica só no checklist da OS e não
-    entra aqui. A ocorrência de vários equipamentos conta em cada um; sem equipamento, conta na usina inteira. O
-    equipamento <b>repete</b> com {{ repete }} religamentos no período e fica em vermelho com {{ reincidente }} ou mais, a
-    régua de reincidência do RDO da Ronda COS.</div>
+  {# A explicação da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
   {% endif %}
 </div>
 {% endblock %}

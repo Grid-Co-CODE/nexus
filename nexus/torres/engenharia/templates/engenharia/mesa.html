@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
 {# A Mesa do engenheiro (Levi, 18/10/2026): a primeira tela da Engenharia, a mesa de quem entrou (o administrador escolhe
@@ -44,7 +45,9 @@
 <div class="campo-nativa">
   <div class="cn-cab eg-mesa-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Mesa do engenheiro</p>
-      <h1 class="cn-titulo">{% if alvo and alvo != meu %}A mesa de {{ nome_alvo or 'outra pessoa' }}{% else %}A sua mesa{% endif %}</h1>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">{% if alvo and alvo != meu %}A mesa de {{ nome_alvo or 'outra pessoa' }}{% else %}A sua mesa{% endif %}</h1>
+      {% call explica('De onde vem') %}<p><b>De onde vem.</b> Os acompanhamentos do livro da Engenharia (o banco do Nexus) e os sinais da
+    Confiabilidade, pelas OS de falha do Fracttal ({{ est.n }} OS na conta das {{ lido }}).</p>{% endcall %}</div>
       <p class="cn-pergunta">O que está com {{ quem }} na Confiabilidade e o que precisa de dono.</p></div>
     {# o administrador fora da Engenharia (o da Performance) não está na lista: a 1ª opção é a mesa dele, escolhida
        quando ninguém da lista está, e a volta a ela depois de ver a de alguém (revisão final, 18/10/2026) #}
@@ -137,25 +140,10 @@
     <button type="button" class="eg-gav-fechar" aria-label="Fechar">×</button>
     <div class="eg-gav-corpo"></div>
   </aside>
-  <div class="cn-nota"><b>De onde vem.</b> Os acompanhamentos do livro da Engenharia (o banco do Nexus) e os sinais da
-    Confiabilidade, pelas OS de falha do Fracttal ({{ est.n }} OS na conta das {{ lido }}).</div>
+  {# a explicação saiu do corpo da tela e foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
 </div>
 {% include "oscreator/card_os_abrir.html" %}
 <script src="{{ url_for('static', filename='engenharia-os.js') }}"></script>
 <script src="{{ url_for('static', filename='engenharia-gaveta.js') }}"></script>
-<script>
-(function () {
-  // Críticos sem dono: os 6 primeiros à vista e o resto rola na própria caixa (a altura dos 6, medida)
-  var l = document.querySelector('[data-eg-max]');
-  if (!l) return;
-  function mede() {
-    var max = +l.dataset.egMax, f = l.children;
-    if (f.length <= max) { l.style.maxHeight = ''; l.classList.remove('eg-rola'); return; }
-    var h = 0; for (var i = 0; i < max; i++) h += f[i].offsetHeight;
-    l.style.maxHeight = h + 'px'; l.classList.add('eg-rola');
-  }
-  mede(); window.addEventListener('resize', mede);
-})();
-</script>
 <script>egGaveta.ligar();</script>
 {% endblock %}

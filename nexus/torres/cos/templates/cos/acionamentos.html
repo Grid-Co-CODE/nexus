@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 {# Acionamentos e distribuidoras (26/10/2026): quem aciono e qual o canal da distribuidora desta UF. Quem aciono é do
@@ -13,7 +14,14 @@
 {% else %}<span class="det">canal não levantado na Ronda COS</span>{% endif %}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> <b>Quem aciono</b> é do cadastro do Nexus: o Supervisor de Campo da região da
+    usina, o Responsável O&M e o técnico, o eletricista e o mantenedor dela, com o contato que o cadastro guarda cifrado
+    (o corporativo, ou o pessoal). <b>A distribuidora</b> é a UC da planilha do cliente que a Ronda COS usa para abrir o
+    chamado (uma por sub-usina); sem UC lá, a concessionária do cadastro. O <b>canal</b> é o que a Ronda COS declarou: o
+    SMS de registro de falta de energia, com o formato e quanto ele está confirmado, e o canal para abrir à mão (quase
+    sempre o WhatsApp da distribuidora). Concessionária com outro nome no cadastro fica "canal não levantado". Os
+    <b>chamados</b> são os que a Ronda COS abriu nos últimos {{ p.dias if p else 30 }} dias, com o protocolo da distribuidora.</p>{% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">Cadastro do Nexus{% if ligada %} + Andamento da Ronda COS{% endif %}{% if lido %}<br>lido às <b>{{ lido }}</b>{% endif %}</div>
   </div>
 
@@ -124,12 +132,6 @@
     no cadastro (Base → Ligações).</p>{% endif %}
   {% endif %}
 
-  <div class="cn-nota"><b>De onde vem.</b> <b>Quem aciono</b> é do cadastro do Nexus: o Supervisor de Campo da região da
-    usina, o Responsável O&M e o técnico, o eletricista e o mantenedor dela, com o contato que o cadastro guarda cifrado
-    (o corporativo, ou o pessoal). <b>A distribuidora</b> é a UC da planilha do cliente que a Ronda COS usa para abrir o
-    chamado (uma por sub-usina); sem UC lá, a concessionária do cadastro. O <b>canal</b> é o que a Ronda COS declarou: o
-    SMS de registro de falta de energia, com o formato e quanto ele está confirmado, e o canal para abrir à mão (quase
-    sempre o WhatsApp da distribuidora). Concessionária com outro nome no cadastro fica "canal não levantado". Os
-    <b>chamados</b> são os que a Ronda COS abriu nos últimos {{ p.dias if p else 30 }} dias, com o protocolo da distribuidora.</div>
+  {# A explicação da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
 </div>
 {% endblock %}

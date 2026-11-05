@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <noscript><meta http-equiv="refresh" content="120"></noscript>
@@ -8,7 +9,15 @@
    alerta são regra de lá); os filtros e as contas, de nexus/cos/os_abertas.py. Só lê: a OS abre no card do Fracttal. #}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>Como se conta.</b> É o Panorama da Ronda COS: entram as OS abertas no Fracttal (em processo e em
+    verificação) que o COS abre — corretiva emergencial, religamento e religamento remoto —, menos as de classificação
+    programada, as da usina de teste e as normalizadas na Ronda COS que já estão 100% feitas no Fracttal. A normalizada com
+    a OS abaixo de 100% fica: a Ronda COS diz que acabou e o Fracttal diz que não. <b>Pendentes</b> são as que ainda não
+    foram feitas; <b>feitas, falta finalizar</b> estão 100% no Fracttal e só falta alguém finalizar a OS. O <b>alerta</b> é
+    a pendente aberta há mais de {{ p.horas_para_alerta if p else 1 }} h que ninguém reconheceu; reconhecer é na Ronda COS.
+    <b>Sem registro</b> é a OS que ninguém acompanha pela Ronda COS. A varredura do Fracttal roda lá de 30 em 30 minutos.
+    Clique na OS para abrir o card do Fracttal (com o seu login do Fracttal).</p>{% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">Panorama da Ronda COS{% if p and p.varredura %}<br>varredura do Fracttal às <b>{{ p.varredura.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
   </div>
 
@@ -95,14 +104,7 @@
     {{ p.cortes.assunto_encerrado }} normalizadas na Ronda COS e feitas no Fracttal.</p>{% endif %}
   {% endif %}
 
-  <div class="cn-nota"><b>Como se conta.</b> É o Panorama da Ronda COS: entram as OS abertas no Fracttal (em processo e em
-    verificação) que o COS abre — corretiva emergencial, religamento e religamento remoto —, menos as de classificação
-    programada, as da usina de teste e as normalizadas na Ronda COS que já estão 100% feitas no Fracttal. A normalizada com
-    a OS abaixo de 100% fica: a Ronda COS diz que acabou e o Fracttal diz que não. <b>Pendentes</b> são as que ainda não
-    foram feitas; <b>feitas, falta finalizar</b> estão 100% no Fracttal e só falta alguém finalizar a OS. O <b>alerta</b> é
-    a pendente aberta há mais de {{ p.horas_para_alerta if p else 1 }} h que ninguém reconheceu; reconhecer é na Ronda COS.
-    <b>Sem registro</b> é a OS que ninguém acompanha pela Ronda COS. A varredura do Fracttal roda lá de 30 em 30 minutos.
-    Clique na OS para abrir o card do Fracttal (com o seu login do Fracttal).</div>
+  {# A explicação da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
   {% endif %}
 </div>
 {% include "oscreator/card_os_abrir.html" %}

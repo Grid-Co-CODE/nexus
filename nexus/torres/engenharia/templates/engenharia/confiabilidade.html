@@ -3,45 +3,57 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+{# o "!" da explicação é o da Segurança > Extintores (hseq/_legenda.html e o hseq.css, só regras hs- e ext-) #}
+<link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
 {# Confiabilidade, nossa (06/10/2026): as OS de falha do Fracttal lidas pelo Nexus (nexus/engenharia/os_falhas.py) e as
    contas em nexus/engenharia/confiabilidade.py. Visual (Levi, 06/10: "acho essa estética bem mais atrativa, o nosso está
    pouco criativo"): lista em cartões com a gaveta lateral, painel "onde está o problema" e estatísticas com barras.
    O acompanhamento (18/10/2026): o ativo pego sai de Ativos com sinal e vai para Em acompanhamento; o encerrado, para
    Encerrados; a gaveta (engenharia/_gaveta.html, a mesma da resposta das ações) traz o acompanhamento. #}
 {% macro tag(texto, cor) %}<span class="eg-tag eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
-{% macro pill(n) %}{% for k, rot, cor in niveis if k == n %}<span class="eg-pill eg-pill--{{ cor }}">{{ rot }}</span>{% endfor %}{% endmacro %}
+{% macro sinal(texto, cor) %}<span class="eg-tag eg-tag--sem eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
+{% from 'hseq/_legenda.html' import aviso, termo %}
+{% macro pill(n, sem=False) %}{% for k, rot, cor in niveis if k == n %}<span class="eg-pill {% if sem %}eg-pill--sem {% endif %}eg-pill--{{ cor }}">{{ rot }}</span>{% endfor %}{% endmacro %}
 {% macro barra(v, maximo) %}<span class="eg-mini" style="width:{{ (100 * (v or 0) / (maximo or 1))|round(0) }}%"></span>{% endmacro %}
 {% macro disp_barra(x) %}{% if x is not none %}<span class="eg-disp"><i class="{{ 'mal' if x < meta else '' }}" style="width:{{ (100 * x)|round(1) }}%"></i><u style="left:{{ (meta * 100)|int }}%"></u></span><b class="cn-t-{{ 'ok' if x >= meta else 'critico' }}">{{ pct(x) }}</b>{% else %}—{% endif %}{% endmacro %}
 <div class="campo-nativa">
-  <div class="cn-cab">
+  {# a tela enxuta (Levi, 05/11/2026: "Para ver o que realmente importa preciso fazer uma rolagem completa de tela"): a
+     explicação e as metas num "!" ao lado do título, o da Segurança > Extintores ("Os disclaimers como avisar para que
+     serve, o que é etc precisam estar em uma exclamação ao lado do título"), e a leitura do Fracttal na mesma linha, à
+     direita ("tem que estar paralela ao lado direito extremo do título") #}
+  <header class="cn-cab eg-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Confiabilidade</p>
-      <h1 class="cn-titulo">Confiabilidade dos ativos</h1>
-      <p class="cn-pergunta">Que ativo falha mais e demora mais a voltar: os sinais das corretivas dos últimos {{ janela }} dias
-        ({{ periodo }}) e a disponibilidade de cada ativo pelo método do Power BI.</p></div>
+      <div class="eg-cab-tit"><h1 class="cn-titulo">Confiabilidade dos ativos</h1>
+      {% call aviso('Como ler a Confiabilidade', 'Metas de classe mundial: disponibilidade ≥ ' ~ (meta * 100)|int ~ '% · Disp = MTBF ÷ (MTBF + MTTR) · λ = 1 ÷ MTBF.') %}
+        {{ termo('Para que serve') }}<dd>Que ativo falha mais e demora mais a voltar: os sinais das corretivas dos últimos {{ janela }} dias ({{ periodo }}) e a disponibilidade de cada ativo pelo método do Power BI.</dd>
+        {{ termo('Sinal') }}<dd>Só corretiva e corretiva emergencial dos últimos {{ janela }} dias; serviço registrado como corretiva (limpeza, ensaio, vistoria, reset) não conta como falha. <b>A</b> = falhas em {{ janela }} dias; <b>B</b> = falhas em 7 dias; <b>D</b> = falhas acima do P90 da família (o normal da família no período).</dd>
+        {{ termo('Nível') }}<dd>Crítico com 4 falhas ou mais, ou 3 em 7 dias; atenção com 3 falhas, ou 2 em 7 dias, ou acima do P90; monitorar com 2. Criticidade A sobe monitorar para atenção. Só serviço (nenhuma falha e 2 OS ou mais) fica em monitorar para reclassificar a OS. OS cancelada não conta.</dd>
+        {{ termo('Disponibilidade') }}<dd>MTBF ÷ (MTBF + MTTR), por ativo, desde 20/10/2025 (corretiva, emergencial, religamento e religamento remoto). MTBF = horas desde a mobilização (do cadastro) menos as horas paradas, ÷ nº de falhas. MTTR = média do incidente ao fim (até 1 dia, em horas corridas; acima, 12 h por dia). λ = 1 ÷ MTBF.</dd>
+        {{ termo('Criticidade') }}<dd>Por família enquanto a matriz real não existe: inversor, QGBT, cabine e transformador = A; outros = B; tracker = C. O ativo é o código do Fracttal (com a usina); usina, cliente e cluster vêm do cadastro do Nexus.</dd>
+        {{ termo('Estatísticas') }}<dd>disponibilidade, MTBF e MTTR são as <b>medianas dos ativos</b> do grupo. A conta do grupo
+      inteiro soma as falhas da frota toda e derruba a disponibilidade (era assim que a Athon aparecia com 14%); a mediana diz
+      como está um ativo típico do cliente. "Eventos" são as falhas desde 20/10/2025.</dd>
+        {{ termo('De onde vem') }}<dd>As OS de falha (corretiva, corretiva emergencial, religamento e religamento remoto)
+    lidas pelo Nexus no Fracttal: as abertas a cada leitura, as concluídas desde 20/10/2025 guardadas e atualizadas pelo
+    que fechou depois; as canceladas ficam fora. {{ est.n }} OS na conta de agora.</dd>
+      {% endcall %}</div></div>
     <div class="cn-frescor">OS de falha do Fracttal<br><b>contas às {{ lido }}</b></div>
-  </div>
-  <details class="cn-entenda">
-    <summary>Entenda esta tela</summary>
-    <ul>
-      <li><b>Sinal</b> (só corretiva e corretiva emergencial dos últimos {{ janela }} dias; serviço registrado como corretiva,
-        como limpeza, ensaio, vistoria ou reset, não conta como falha): <b>A</b> = falhas em {{ janela }} dias; <b>B</b> = falhas
-        em 7 dias; <b>D</b> = falhas acima do P90 da família (o normal da família no período).</li>
-      <li><b>Nível:</b> crítico com 4 falhas ou mais, ou 3 em 7 dias; atenção com 3 falhas, ou 2 em 7 dias, ou acima do P90;
-        monitorar com 2. Criticidade A sobe monitorar para atenção. Só serviço (nenhuma falha e 2 OS ou mais) fica em
-        monitorar para reclassificar a OS. OS cancelada não conta.</li>
-      <li><b>Disponibilidade</b> = MTBF ÷ (MTBF + MTTR), por ativo, desde 20/10/2025 (corretiva, emergencial, religamento e
-        religamento remoto). MTBF = horas desde a mobilização (do cadastro) menos as horas paradas, ÷ nº de falhas. MTTR =
-        média do incidente ao fim (até 1 dia, em horas corridas; acima, 12 h por dia). λ = 1 ÷ MTBF.</li>
-      <li><b>Criticidade</b> por família enquanto a matriz real não existe: inversor, QGBT, cabine e transformador = A;
-        outros = B; tracker = C. O ativo é o <b>código</b> do Fracttal (com a usina); usina, cliente e cluster vêm do
-        cadastro do Nexus.</li>
-    </ul>
-  </details>
+  </header>
   {% if sem_cadastro %}<div class="cn-erro cn-aviso" role="status"><b>O cadastro do Nexus não respondeu.</b> Usina e cliente estão como o Fracttal escreve, e a mobilização vale 20/10/2025 para todas.</div>{% endif %}
   {% if est.lendo and not est.completa %}<div class="cn-erro cn-aviso" role="status"><b>Lendo as OS de falha no Fracttal pela primeira vez.</b> {{ est.n }} já lidas; recarregue em 2 a 3 minutos.</div>
   {% elif est.erro %}<div class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou parte da leitura ({{ est.erro }}).</b> Mostrando as {{ est.n }} OS já lidas; nova tentativa em 5 minutos.</div>
   {% elif not est.completa %}<div class="cn-erro cn-aviso" role="status"><b>A leitura das OS de falha ainda não terminou.</b> Os números podem mudar; recarregue em alguns minutos.</div>{% endif %}
 
+  <section class="eg-painel eg-kpis">
+    <div class="eg-kpi"><span class="v cn-t-{{ 'ok' if (k.disp or 0) >= meta else 'critico' }}">{{ pct(k.disp) }}</span><span class="n">Disponibilidade</span><span class="s">mediana de {{ k.ativosConf }} ativos · meta ≥ {{ (meta * 100)|int }}%</span></div>
+    <div class="eg-kpi"><span class="v">{{ h(k.mtbf) }}</span><span class="n">MTBF mediano</span><span class="s">{% if k.mtbf %}λ = {{ '%.1e'|format(1 / k.mtbf) }} falhas/h{% endif %}</span></div>
+    <div class="eg-kpi"><span class="v">{{ h(k.mttr) }}</span><span class="n">MTTR mediano</span><span class="s">tempo médio de reparo</span></div>
+    <div class="eg-kpi"><span class="v cn-t-{{ 'critico' if k.abaixo else 'ok' }}">{{ k.abaixo }}</span><span class="n">Abaixo da meta</span><span class="s">ativos com disponibilidade &lt; {{ (meta * 100)|int }}%</span></div>
+    <div class="eg-kpi"><span class="v cn-t-{{ 'critico' if k.criticos else 'ok' }}">{{ k.criticos }}</span><span class="n">Críticos</span><span class="s">{{ k.corretivas }} corretivas em {{ janela }} dias</span></div>
+  </section>
+
+  {# os filtros depois dos números (Levi, 05/11/2026: "Filtros após os KPIs"); a linha das contas e o "Esconder serviço
+     registrado como corretiva" saíram ("não serve") #}
   <section class="eg-painel eg-topo">
     <form class="eg-filtros" method="get">
       <label><span class="gc-rotulo">Cliente</span>
@@ -60,10 +72,8 @@
       <label><span class="gc-rotulo">{{ 'Quem acompanha' if aba == 'acompanhamento' else 'Quem acompanhava' }}</span>
         <select class="gc-campo" name="quem" onchange="this.form.submit()"><option value="">Todos</option>{% for hm, nome in quem_opcoes %}<option value="{{ hm }}"{% if hm == f.quem %} selected{% endif %}>{{ nome }}</option>{% endfor %}</select></label>
       {% endif %}
-      {% for x in ('aba', 'por', 'servico') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+      {% for x in ('aba', 'por') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
     </form>
-    <p class="eg-conta"><b>{{ todos|length }}</b> ativos com sinal, de <b>{{ k.ativosCorretiva }}</b> com corretiva em {{ janela }} dias{% if contas.acompanhamento %} · <b>{{ contas.acompanhamento }}</b> em acompanhamento{% endif %}
-      <a class="eg-alterna{% if esconder %} eg-alterna--on{% endif %}" href="{{ url(servico=None if esconder else '0') }}">{{ 'Mostrar' if esconder else 'Esconder' }} serviço registrado como corretiva</a></p>
   </section>
 
   {% if velha_em %}<p class="cn-erro cn-aviso" role="status"><b>Mostrando a última leitura boa dos acompanhamentos ({{ velha_em }}).</b> O banco não respondeu agora; recarregue em instantes.</p>{% endif %}
@@ -71,34 +81,28 @@
     {% for a, nome in abas %}<a href="{{ url(aba=None if a == 'ativos' else a) }}"{% if a == aba %} aria-current="page"{% endif %}>{{ nome }}{% if a in contas %} <i>{{ contas[a] }}</i>{% endif %}</a>{% endfor %}
   </nav>
 
-  <section class="eg-painel eg-kpis">
-    <div class="eg-kpi"><span class="v cn-t-{{ 'ok' if (k.disp or 0) >= meta else 'critico' }}">{{ pct(k.disp) }}</span><span class="n">Disponibilidade</span><span class="s">mediana de {{ k.ativosConf }} ativos · meta ≥ {{ (meta * 100)|int }}%</span></div>
-    <div class="eg-kpi"><span class="v">{{ h(k.mtbf) }}</span><span class="n">MTBF mediano</span><span class="s">{% if k.mtbf %}λ = {{ '%.1e'|format(1 / k.mtbf) }} falhas/h{% endif %}</span></div>
-    <div class="eg-kpi"><span class="v">{{ h(k.mttr) }}</span><span class="n">MTTR mediano</span><span class="s">tempo médio de reparo</span></div>
-    <div class="eg-kpi"><span class="v cn-t-{{ 'critico' if k.abaixo else 'ok' }}">{{ k.abaixo }}</span><span class="n">Abaixo da meta</span><span class="s">ativos com disponibilidade &lt; {{ (meta * 100)|int }}%</span></div>
-    <div class="eg-kpi"><span class="v cn-t-{{ 'critico' if k.criticos else 'ok' }}">{{ k.criticos }}</span><span class="n">Críticos</span><span class="s">{{ k.corretivas }} corretivas em {{ janela }} dias</span></div>
-    <p class="eg-kpi-rodape">Metas de <b>classe mundial</b>: disponibilidade ≥ 85% · Disp = MTBF ÷ (MTBF + MTTR) · λ = 1 ÷ MTBF.</p>
-  </section>
-
   {% if aba == 'ativos' %}
   <div class="eg-grade">
     <section class="eg-painel">
       <div class="eg-painel-cab"><h2>Ativos com sinal</h2><span>por gravidade · quem está em acompanhamento sai daqui · clique abre a gaveta</span></div>
       {% if erro_acomp %}<p class="cn-erro cn-aviso eg-aviso-lista" role="status"><b>Não consegui ler os acompanhamentos ({{ erro_acomp }}).</b> A lista pode trazer ativos que já estão em acompanhamento; recarregue em instantes.</p>{% endif %}
-      <div class="eg-itens">
+      {# 20 à vista e o resto rola na própria caixa (Levi, 05/11/2026: "quero limitado em até 20 ativos na visualização, se
+         passar disso vira uma barra de scroll"); as etiquetas só com a cor da letra ("tira essa borda arredondada e fundo
+         pintado para só a fonte pintada") #}
+      <div class="eg-itens eg-sinais" data-eg-max="20">
       {% for a in sinais %}
         <article class="eg-cartao">
         <button type="button" class="eg-item" data-gaveta="g{{ loop.index0 }}">
-          {{ pill(a.nivel) }}
+          {{ pill(a.nivel, sem=True) }}
           <span class="eg-item-corpo">
             <span class="eg-item-tit"><b>{{ a.nome }}</b> <code>{{ a.cod }}</code> <span class="eg-onde">{{ a.usina }}{% if a.uf %} - {{ a.uf }}{% endif %}</span></span>
             <span class="eg-item-tags"><span class="eg-crit">Crit. {{ a.crit }}</span>
-              {% if a.soServico %}{{ tag(a.n30 ~ ' OS de serviço', 'info') }}{% endif %}
-              {% if a.nFalha >= 3 %}{{ tag('A · ' ~ a.nFalha ~ ' falhas em ' ~ janela ~ 'd', 'critico' if a.nFalha >= 4 else 'alerta') }}{% endif %}
-              {% if a.n7 >= 1 %}{{ tag('B · ' ~ a.n7 ~ ' em 7d', 'critico' if a.n7 >= 3 else ('alerta' if a.n7 >= 2 else 'neutro')) }}{% endif %}
-              {% if a.nFalha > a.p90 %}{{ tag('D · P90 ' ~ a.fam ~ ' = ' ~ a.p90, 'alerta') }}{% endif %}
-              {% if a.disp is not none %}{{ tag('Disp ' ~ pct(a.disp), 'alerta' if a.disp < meta else 'neutro') }}{% endif %}
-              {% if a.ja %}{{ tag('já acompanhado · ' ~ diag_nome.get(a.ja.diagnostico_id, 'sem diagnóstico') ~ ' em ' ~ a.ja.fim.strftime('%d/%m'), 'neutro') }}{% endif %}</span>
+              {% if a.soServico %}{{ sinal(a.n30 ~ ' OS de serviço', 'info') }}{% endif %}
+              {% if a.nFalha >= 3 %}{{ sinal('A · ' ~ a.nFalha ~ ' falhas em ' ~ janela ~ 'd', 'critico' if a.nFalha >= 4 else 'alerta') }}{% endif %}
+              {% if a.n7 >= 1 %}{{ sinal('B · ' ~ a.n7 ~ ' em 7d', 'critico' if a.n7 >= 3 else ('alerta' if a.n7 >= 2 else 'neutro')) }}{% endif %}
+              {% if a.nFalha > a.p90 %}{{ sinal('D · P90 ' ~ a.fam ~ ' = ' ~ a.p90, 'alerta') }}{% endif %}
+              {% if a.disp is not none %}{{ sinal('Disp ' ~ pct(a.disp), 'alerta' if a.disp < meta else 'neutro') }}{% endif %}
+              {% if a.ja %}{{ sinal('já acompanhado · ' ~ diag_nome.get(a.ja.diagnostico_id, 'sem diagnóstico') ~ ' em ' ~ a.ja.fim.strftime('%d/%m'), 'neutro') }}{% endif %}</span>
           </span>
           <span class="eg-item-n"><b>{{ a.nFalha }}</b><span>falha{{ 's' if a.nFalha != 1 }} · {{ a.n30 }} OS</span></span>
         </button>
@@ -212,9 +216,7 @@
           <td data-v="{{ r.disp if r.disp is not none else -1 }}" class="eg-num eg-disp-cel">{{ disp_barra(r.disp) }}</td></tr>
       {% else %}<tr><td colspan="{{ cols|length + 2 }}" class="mudo">Nada com esses filtros.</td></tr>{% endfor %}
       </tbody></table></div>
-    <p class="eg-leia"><b>Como ler:</b> disponibilidade, MTBF e MTTR são as <b>medianas dos ativos</b> do grupo. A conta do grupo
-      inteiro soma as falhas da frota toda e derruba a disponibilidade (era assim que a Athon aparecia com 14%); a mediana diz
-      como está um ativo típico do cliente. "Eventos" são as falhas desde 20/10/2025.</p>
+    {# o "Como ler" da tabela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
   </section>
   {% endif %}
   {# a gaveta de cada cartão da aba aberta (o acompanhamento entra nela; 18/10/2026) #}
@@ -224,9 +226,7 @@
     <button type="button" class="eg-gav-fechar" aria-label="Fechar">×</button>
     <div class="eg-gav-corpo"></div>
   </aside>
-  <div class="cn-nota"><b>De onde vem.</b> As OS de falha (corretiva, corretiva emergencial, religamento e religamento remoto)
-    lidas pelo Nexus no Fracttal: as abertas a cada leitura, as concluídas desde 20/10/2025 guardadas e atualizadas pelo
-    que fechou depois; as canceladas ficam fora. {{ est.n }} OS na conta de agora.</div>
+  {# o "De onde vem" foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
 </div>
 {% include "oscreator/card_os_abrir.html" %}
 <script src="{{ url_for('static', filename='engenharia-os.js') }}"></script>

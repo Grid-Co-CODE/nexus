@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <noscript><meta http-equiv="refresh" content="60"></noscript>
@@ -9,7 +10,12 @@
 {% macro plural(n, um, varios) %}{{ n }} {{ um if n == 1 else varios }}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> Do Andamento da Ronda COS, que lê as ocorrências abertas da Ronda COS de minuto
+    em minuto e tira a fotografia de hora em hora para o cliente. A cor da usina é a da pior ocorrência aberta; o
+    problema, a etapa e a última nota são os da Ronda COS. <b>Desde a fotografia anterior</b> conta o que mudou desde a
+    última fotografia emitida e só conta o que já tem OS no Fracttal; a ocorrência ainda sem OS entra no placar e na lista
+    das usinas, dita "ainda sem OS". A tela relê sozinha a cada minuto.</p>{% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">Andamento da Ronda COS{% if r and r.gerado_em %}<br>leitura das <b>{{ r.gerado_em.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
   </div>
 
@@ -98,11 +104,7 @@
   {% endif %}
   {% endif %}
 
-  <div class="cn-nota"><b>De onde vem.</b> Do Andamento da Ronda COS, que lê as ocorrências abertas da Ronda COS de minuto
-    em minuto e tira a fotografia de hora em hora para o cliente. A cor da usina é a da pior ocorrência aberta; o
-    problema, a etapa e a última nota são os da Ronda COS. <b>Desde a fotografia anterior</b> conta o que mudou desde a
-    última fotografia emitida e só conta o que já tem OS no Fracttal; a ocorrência ainda sem OS entra no placar e na lista
-    das usinas, dita "ainda sem OS". A tela relê sozinha a cada minuto.</div>
+  {# A explicação da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
 </div>
 <script>
   // Relê a cada minuto, como o Andamento lê a Ronda COS; nunca com um campo em uso.

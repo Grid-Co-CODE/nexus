@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ numero }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Aprovação da PT no Nexus (05/10/2026): a PT do livro do App + a decisão assinada com o login do Fracttal do OS Creator,
    gravada no banco (nexus/campo/decisao_pt.py). Quem aplica no campo é o App. #}
@@ -37,7 +38,12 @@
   {% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Aprovação de PT</p>
-      <h1 class="cn-titulo">{{ p.numero }} <span class="cn-st cn-t-{{ s[1] }} cn-st--titulo">{{ s[0] }}</span></h1>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ p.numero }} <span class="cn-st cn-t-{{ s[1] }} cn-st--titulo">{{ s[0] }}</span></h1>
+      {% call explica('Como a decisão chega ao campo') %}<p>A decisão fica salva no banco do Nexus com o código de quem
+    assinou. Quem libera ou nega o técnico é o App: ele aplica a primeira decisão de cada equipamento se a PT ainda estiver
+    esperando, se a decisão tiver menos de 7 dias e se quem decidiu não for quem pediu a PT. Quem pode decidir, só o
+    Nexus confere. <b>O App ainda não lê esta decisão</b> (é a próxima versão dele); até lá, a decisão do App continua
+    sendo a que vale no campo.</p>{% endcall %}</div>
       <p class="cn-pergunta">{{ p.usina }}{% if p.equipe %} · {{ p.equipe }}{% endif %}{% if p.uf %} · {{ p.uf }}{% endif %}{% if p.regiao_br %} · {{ p.regiao_br }}{% endif %}</p></div>
     <div class="cn-frescor">livro de PT do App<br><b>lido às {{ lido }}</b></div>
   </div>
@@ -137,14 +143,10 @@
       {% endif %}
     </section>
   </div>
-  {# o que o App v257 confere ao aplicar (function_app.py, "A DECISÃO DE PT TOMADA NO NEXUS"): a 1ª decisão de cada
+  {# A explicação "Como a decisão chega ao campo" foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html).
+     O que o App v257 confere ao aplicar (function_app.py, "A DECISÃO DE PT TOMADA NO NEXUS"): a 1ª decisão de cada
      linha, a linha ainda esperando, menos de 7 dias e quem decidiu diferente de quem pediu. QUEM pode decidir ele não
      confere (não tem os papéis da estrutura de O&M): a trava é o `decisao_pt.pode_decidir` daqui #}
-  <div class="cn-nota"><b>Como a decisão chega ao campo.</b> A decisão fica salva no banco do Nexus com o código de quem
-    assinou. Quem libera ou nega o técnico é o App: ele aplica a primeira decisão de cada equipamento se a PT ainda estiver
-    esperando, se a decisão tiver menos de 7 dias e se quem decidiu não for quem pediu a PT. Quem pode decidir, só o
-    Nexus confere. <b>O App ainda não lê esta decisão</b> (é a próxima versão dele); até lá, a decisão do App continua
-    sendo a que vale no campo.</div>
   {% endif %}
 </div>
 {% endblock %}

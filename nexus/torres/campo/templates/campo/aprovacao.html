@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Aprovação de OS, para tirar insight (Levi, 05/10/2026), contada por OS: é a OS que se aprova, não a tarefa. A fila, os
    grupos e os números são os do App (a fila inteira pela _fila_supervisao, nexus/campo/aprovacao.py: fila_toda).
@@ -14,7 +15,15 @@
 {% macro cor_uso(u) %}{{ 'ok' if (u or 0) >= 80 else ('alerta' if (u or 0) >= 50 else 'critico') }}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal (fechadas e esperando a
+    aprovação), inteira, relida pelo Nexus a cada 10 minutos, contada por OS, que é o que se aprova. Cada tarefa ganha o
+    grupo pela regra do painel do App, e a OS fica no pior grupo das tarefas dela: <b>prontas</b> = subtarefas
+    respondidas, nota alta, tempo dentro do previsto e nenhuma foto marcada; <b>pedem olho</b> = nota abaixo de 80, tempo
+    muito fora do previsto, foto marcada ou já devolvida; <b>fora do App</b> = fechada sem o App, sem evidência. O
+    responsável e o cliente saem do cadastro do Nexus pela usina da OS (o de-para do Fracttal). <b>Aprovar</b> é o
+    Concluir do card da OS, o mesmo do OS Creator Web, com o login do Fracttal de quem clica; aprovada, a OS sai da
+    lista.</p>{% endcall %}</div>
       <p class="cn-pergunta">Toda OS fechada no Fracttal espera aprovação. Nas usinas de cada responsável, o que dá para
         aprovar já e o que precisa de olho?</p></div>
     <div class="cn-frescor">fila de verificação do Fracttal, inteira{% if coleta %} · notas do App até {{ coleta }}{% endif %}<br><b>{% if fila.lida_em %}fila lida em {{ fila.lida_em }}{% else %}fila ainda não lida{% endif %}</b>{% if fila.lendo %} · relendo agora{% endif %}</div>
@@ -120,14 +129,7 @@
     </div>
   </section>
 
-  <div class="cn-nota"><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal (fechadas e esperando a
-    aprovação), inteira, relida pelo Nexus a cada 10 minutos, contada por OS, que é o que se aprova. Cada tarefa ganha o
-    grupo pela regra do painel do App, e a OS fica no pior grupo das tarefas dela: <b>prontas</b> = subtarefas
-    respondidas, nota alta, tempo dentro do previsto e nenhuma foto marcada; <b>pedem olho</b> = nota abaixo de 80, tempo
-    muito fora do previsto, foto marcada ou já devolvida; <b>fora do App</b> = fechada sem o App, sem evidência. O
-    responsável e o cliente saem do cadastro do Nexus pela usina da OS (o de-para do Fracttal). <b>Aprovar</b> é o
-    Concluir do card da OS, o mesmo do OS Creator Web, com o login do Fracttal de quem clica; aprovada, a OS sai da
-    lista.</div>
+  {# A explicação da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
 </div>
 {% include "oscreator/card_os_abrir.html" %}
 <script>

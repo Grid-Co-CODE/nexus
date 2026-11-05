@@ -6,7 +6,8 @@
 {# EPI e EPC (Segurança · HSEQ, 09/10/2026): começa pelo EPI, as luvas isolantes de cada usina pela ronda diária
    (nexus/hseq/epi.py). O mesmo desenho dos Extintores: a faixa que filtra a tabela, os cartões por Responsável O&M da
    usina com as usinas dele (24/10/2026; até ali, por região de campo e por gestor de contrato) e a tabela. #}
-{% from 'hseq/_legenda.html' import legenda, termo %}
+{% from 'hseq/_legenda.html' import termo %}
+{% from '_explica.html' import explica %}
 {% macro plural(n, um, varios) %}{{ n }} {{ um if n == 1 else varios }}{% endmacro %}
 {% macro numeros(s) %}
         <div class="cn-eq-num">
@@ -25,7 +26,13 @@
 {% set pronto = not leitura.erro %}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+    {% call explica('Como cada usina entra', 'A ronda diária pergunta "' ~ pergunta ~ '" (Sim ou Não, com foto). O Não também vai por e-mail à TST pelo App, na hora. As respostas vêm do checklist que o App manda junto com as rondas (desde 28/09/2026); as fotos, dos anexos da OS da ronda no Fracttal.', termos=True) %}
+    {{ termo('Sem luvas', 'critico') }}<dd>A última ronda respondeu Não; o "desde" é o primeiro Não da sequência até ela.</dd>
+    {{ termo('Sem verificação', 'info') }}<dd>Nenhuma resposta há {{ dias_sem }} dias ou mais, ou nunca (a mesma régua da ronda pendente).</dd>
+    {{ termo('Com luvas', 'ok') }}<dd>A última ronda respondeu Sim.</dd>
+    {{ termo('Responsável') }}<dd>O Responsável O&amp;M da ficha da usina (o Responsável UFV). O cartão mostra as usinas dele, as sem luvas primeiro.</dd>
+  {% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">rondas diárias do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% include 'campo/_aviso_fato.html' %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>
@@ -104,12 +111,7 @@
   {% include 'campo/_ronda_fotos_caixa.html' %}
   {% endif %}
   {% endif %}
+  {# a legenda do fim da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
 
-  {% call legenda('Como cada usina entra', 'A ronda diária pergunta "' ~ pergunta ~ '" (Sim ou Não, com foto). O Não também vai por e-mail à TST pelo App, na hora. As respostas vêm do checklist que o App manda junto com as rondas (desde 28/09/2026); as fotos, dos anexos da OS da ronda no Fracttal.') %}
-    {{ termo('Sem luvas', 'critico') }}<dd>A última ronda respondeu Não; o "desde" é o primeiro Não da sequência até ela.</dd>
-    {{ termo('Sem verificação', 'info') }}<dd>Nenhuma resposta há {{ dias_sem }} dias ou mais, ou nunca (a mesma régua da ronda pendente).</dd>
-    {{ termo('Com luvas', 'ok') }}<dd>A última ronda respondeu Sim.</dd>
-    {{ termo('Responsável') }}<dd>O Responsável O&amp;M da ficha da usina (o Responsável UFV). O cartão mostra as usinas dele, as sem luvas primeiro.</dd>
-  {% endcall %}
 </div>
 {% endblock %}

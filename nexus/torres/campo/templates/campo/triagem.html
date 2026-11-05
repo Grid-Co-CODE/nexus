@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Triagem de qualidade do Nexus (04/10/2026). A mesa de triagem do painel do App (gestao/prioridades), pela cópia das
    regras dele: OS e supervisores, com o livro que o App grava no banco. Rondas e cobertura: tela Rondas. #}
@@ -11,7 +12,11 @@
   <div class="cn-cab">
     <div>
       <p class="gc-eyebrow">{{ torre.nome }}</p>
-      <h1 class="cn-titulo">{{ tela.nome }}</h1>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> A mesma triagem do painel do App, com os limiares padrão dele. A nota de cada
+    OS é a que o próprio App grava no banco do Nexus, de hora em hora. Demora e divergência de supervisor dependem da
+    situação e da avaliação da OS no Fracttal, que o livro do App ainda não traz. Rondas e usinas sem ronda: tela
+    <a class="cn-fora" href="{{ raiz }}/t/campo/rondas">Rondas</a> e <a class="cn-fora" href="{{ raiz }}/t/campo/atencao">Central de atenção</a>.</p>{% endcall %}</div>
       <p class="cn-pergunta">{{ tela.pergunta }}</p>
     </div>
     <div class="cn-frescor">notas do App{% if coleta %} até {{ coleta }}{% endif %}<br><b>lido às {{ lido }}</b> · últimos {{ dias }} dias</div>
@@ -79,9 +84,6 @@
     </div>
   </div>
 
-  <div class="cn-nota"><b>De onde vem.</b> A mesma triagem do painel do App, com os limiares padrão dele. A nota de cada
-    OS é a que o próprio App grava no banco do Nexus, de hora em hora. Demora e divergência de supervisor dependem da
-    situação e da avaliação da OS no Fracttal, que o livro do App ainda não traz. Rondas e usinas sem ronda: tela
-    <a class="cn-fora" href="{{ raiz }}/t/campo/rondas">Rondas</a> e <a class="cn-fora" href="{{ raiz }}/t/campo/atencao">Central de atenção</a>.</div>
+  {# A explicação da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
 </div>
 {% endblock %}

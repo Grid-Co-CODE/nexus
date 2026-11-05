@@ -291,9 +291,9 @@ def test_a_quantidade_vem_em_cima_e_os_pontos_embaixo(ranking, logado):
 
 def test_o_ponto_de_exclamacao_ao_lado_do_titulo_explica_cada_metrica(ranking, logado):
     html = logado.get("/t/campo/ranking").get_data(as_text=True)
-    cab = html.split('class="rk-titulo"', 1)[1].split("</details>", 1)[0]
-    assert "<h1" in cab and 'class="cr-info rk-info"' in cab and "ph-warning-circle" in cab
-    assert "<details" in cab and " open" not in cab.split(">", 3)[2]              # fechado ao abrir a tela
+    cab = html.split('class="gc-titulo-explica"', 1)[1].split("</details>", 1)[0]
+    assert "<h1" in cab and '<details class="gc-explica">' in cab and 'title="Como o App calcula cada coluna"' in cab
+    assert '<details class="gc-explica" open' not in cab                         # fechado ao abrir a tela
     t = _texto(cab)
     for coluna in ("Total", "Tarefas", "Rondas", "Bônus", "Nota média", "Cumprimento", "Pontualidade", "Sequência",
                    "Devolvidas · anuladas", "Fora do ciclo"):

@@ -687,7 +687,7 @@ def test_filtros_e_chave_na_lateral_niveis_em_cima_do_mapa_e_a_tabela_a_direita(
     assert (corpo.index('class="mp-lado"') < corpo.index('data-parte="barra"') < corpo.index('data-parte="chave"')
             < corpo.index('class="mp-status"') < corpo.index('class="mp-mapa"') < corpo.index('class="mp-tabela"'))
     cab = trecho(html, '<header class="cl-cab mp-cab">', '</header>')
-    assert 'class="mp-aviso"' in cab and 'class="cl-pergunta"' not in cab
+    assert 'class="gc-explica"' in cab and 'class="cl-pergunta"' not in cab
     # a faixa dos níveis é o filtro de antes: cada nível esconde e mostra, com o estado no endereço
     status = trecho(corpo, 'class="mp-status"', '</div>')
     for nivel in ("agir", "atencao", "regiao", "sem"):

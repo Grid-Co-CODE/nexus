@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Técnicos por usina{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
 {# Técnicos por usina (17/10/2026, Levi: "cria uma estrutura que liga usina e técnico e o PCM pode editar a vontade" e
@@ -29,7 +30,12 @@
 
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">PCM · Campo</p><h1 class="cn-titulo">Técnicos por usina</h1>
+    <div><p class="gc-eyebrow">PCM · Campo</p><div class="gc-titulo-explica"><h1 class="cn-titulo">Técnicos por usina</h1>
+      {% call explica('De onde vem') %}<p><b>De onde vem.</b> As usinas e as pessoas são as do cadastro do Nexus; "em campo" são as rondas e as
+    tarefas fechadas no App nos últimos 30 dias e a programação da semana. Clique na linha para ver o detalhe e o histórico
+    da usina. <b>O App de Campo ainda não lê esta lista:</b> hoje a aba Ronda segue a tela Organização do site de gestão. A
+    troca é ligada quando as pendências da comparação com o App chegarem a zero. Fixo = sem datas; apoio = com a data
+    final (sai sozinho depois dela); a partir de = começa nesse dia.</p>{% endcall %}</div>
       <p class="cn-pergunta">Quem vê e pode rondar cada usina no App? Quem esteve lá nos últimos 30 dias?</p></div>
     <div class="cn-frescor">cadastro, rondas e decisões do banco<br><b>lido às {{ lido }}</b></div>
   </div>
@@ -169,11 +175,7 @@
   {% endfor %}
   {% endif %}
 
-  <div class="cn-nota"><b>De onde vem.</b> As usinas e as pessoas são as do cadastro do Nexus; "em campo" são as rondas e as
-    tarefas fechadas no App nos últimos 30 dias e a programação da semana. Clique na linha para ver o detalhe e o histórico
-    da usina. <b>O App de Campo ainda não lê esta lista:</b> hoje a aba Ronda segue a tela Organização do site de gestão. A
-    troca é ligada quando as pendências da comparação com o App chegarem a zero. Fixo = sem datas; apoio = com a data
-    final (sai sozinho depois dela); a partir de = começa nesse dia.</div>
+  {# a explicação "De onde vem" foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
 </div>
 
 <dialog class="q-det" id="tu-det" aria-label="Pôr técnico" data-rota="{{ raiz }}/t/pcm/tecnicos-por-usina">

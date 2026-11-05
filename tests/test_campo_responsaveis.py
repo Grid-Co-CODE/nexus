@@ -556,7 +556,7 @@ def manut(tela):
 
 def _bloco_manut(html):
     """A lista da Visão geral (desde 18/10/2026 no lugar dos três blocos de Onde focar)."""
-    return html[html.index('class="cr-gr-lista"'):html.index('class="cn-nota"')]
+    return html[html.index('class="cr-gr-lista"'):html.index('</main>')]
 
 
 def _nivel_da_linha(trecho, usina, bloco="manut"):
@@ -744,7 +744,7 @@ def test_a_ordem_do_bloco_manutencao():
 
 def test_cartoes_com_os_tres_blocos(manut, logado):
     html = logado.get("/t/campo/responsaveis?modo=cartoes&responsavel=*").get_data(as_text=True)
-    cartoes = html[html.index('class="cn-equipes"'):html.index('class="cn-nota"')]
+    cartoes = html[html.index('class="cn-equipes"'):html.index('</main>')]
     assert cartoes.count("<span>Manutenção</span>") == 2
 
 
@@ -1299,15 +1299,17 @@ def test_o_destaque_do_bloco_e_uma_faixa_verde_do_cabecalho_ao_fim(manut, logado
     assert not re.search(r"\.cr-gr-csel\{[^}]*superficie-3", css)                      # o azul saiu
 
 
-def test_as_reguas_ficam_no_ponto_de_exclamacao_abaixo_da_tabela(manut, logado):
-    """Levi: o texto "De onde vem cada número, e a régua de cada alerta. (...)" "deve ficar em um símbolo de exclamação
-    abaixo da tabela!". Fechado ao abrir a tela; o símbolo abre o texto de sempre."""
+def test_as_reguas_ficam_no_ponto_de_exclamacao_ao_lado_do_titulo(manut, logado):
+    """Levi (05/11/2026, o padrão do Nexus): "De onde vem cada número, e a régua de cada alerta" mora no "!" amarelo ao
+    lado do título (antes, desde 18/10, ficava num "!" abaixo da tabela). Fechado ao abrir a tela; o texto de sempre."""
     for modo, tabela in (("geral", 'class="cr-gr-lista"'), ("cartoes", 'class="cn-equipes"')):
         html = logado.get(f"/t/campo/responsaveis?responsavel=*&modo={modo}").get_data(as_text=True)
-        i = html.index('<details class="cr-info">')
-        assert html.index(tabela) < i < html.index("<b>De onde vem cada número, e a régua de cada alerta.</b>"), modo
+        i = html.index('<details class="gc-explica">')
+        assert html.index('<h1 class="cn-titulo">') < i < html.index(tabela), modo
+        assert 'class="cr-info"' not in html, modo
         resumo = html[i:html.index("</summary>", i)]
-        assert 'aria-label="De onde vem cada número e a régua de cada alerta"' in resumo and "ph-warning-circle" in resumo
+        assert 'aria-label="De onde vem cada número e a régua de cada alerta"' in resumo
+        assert "<b>De onde vem cada número, e a régua de cada alerta.</b>" in html[i:html.index("</details>", i)]
 
 
 # ── O número anômalo (Levi, 18/10/2026: "apenas sinalize que o número está anômalo e o dado pode estar errado, temos

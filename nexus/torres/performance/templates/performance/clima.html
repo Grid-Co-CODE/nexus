@@ -35,6 +35,7 @@
     {% if ns.entorno %}<p class="cl-nota">* maior valor do entorno de 2 km: o {{ fonte_nome.inpe }} não calcula o pixel da usina onde não há vegetação.</p>{% endif %}
 {% endmacro %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='clima.css') }}">
 {# Clima e risco (06/10/2026; leitura rápida em 07/10/2026): avisos do INMET, focos de queimada e risco de fogo do INPE por usina,
    só leitura. A tela se recarrega a cada 60 s, como a Operação em tempo real; o que vai à rede é decidido pelo cache de cada
@@ -45,7 +46,67 @@
   <header class="cl-cab">
     <div class="cl-cab-txt">
       <p class="gc-eyebrow">{{ torre.nome }}</p>
-      <h1 class="cl-titulo">{{ tela.nome }}</h1>
+      <div class="gc-titulo-explica"><h1 class="cl-titulo">{{ tela.nome }}</h1>
+      {% if not v.erro_cadastro and not v.sem_usinas %}{% set gl = v.glossario %}{% call explica('Entenda os alertas') %}
+<div class="cl-entenda-niveis">
+      {% for n in v.como_ler %}
+      <div class="cl-entenda-nivel cl-entenda--{{ n.id }}">
+        <span class="cl-pill cl-pill--{{ n.id }}">{{ n.rotulo }}</span>
+        <p>{{ n.quer_dizer }}</p>
+        <p class="cl-fazer"><strong>O que fazer:</strong> {{ n.fazer }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="cl-entenda-grade">
+      <div class="cl-bloco">
+        <h3 class="cl-rotulo-bloco">Os níveis dos avisos do {{ fonte_nome.inmet }}</h3>
+        <ul class="cl-linhas">
+          {% for n in gl.niveis %}<li class="cl-linha"><span class="cl-pill cl-pill--n{{ n.nivel }}">{{ n.nome }}</span> {{ n.quer_dizer }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="cl-bloco">
+        <h3 class="cl-rotulo-bloco">Foco de queimada</h3>
+        <p class="cl-linha">{{ gl.foco.o_que_e }}</p>
+        <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ gl.foco.na_usina }}</p>
+        <p class="cl-linha"><strong>O que conferir:</strong> {{ gl.foco.conferir }}</p>
+      </div>
+      <div class="cl-bloco">
+        <h3 class="cl-rotulo-bloco">Fogo nas últimas 24 horas</h3>
+        <p class="cl-linha">{{ gl.fogo24.o_que_e }}</p>
+        <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ gl.fogo24.na_usina }}</p>
+        <p class="cl-linha"><strong>O que conferir:</strong> {{ gl.fogo24.conferir }}</p>
+        <p class="cl-linha">{{ gl.forca }}</p>
+        <p class="cl-linha">{{ gl.confianca }}</p>
+      </div>
+      <div class="cl-bloco">
+        <h3 class="cl-rotulo-bloco">Risco de fogo</h3>
+        <p class="cl-linha">{{ gl.risco.o_que_e }}</p>
+        <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ gl.risco.na_usina }}</p>
+        <p class="cl-linha cl-escala"><span class="cl-c">Mínimo</span><span class="cl-c">Baixo</span><span class="cl-c">Médio</span><span class="cl-c cl-c-a">Alto</span><span class="cl-c cl-c-c">Crítico</span></p>
+      </div>
+    </div>
+    {% if gl.eventos_agora %}
+    <h3 class="cl-rotulo-bloco cl-entenda-sub">Os avisos que estão valendo agora</h3>
+    <div class="cl-eventos">
+      {% for e in gl.eventos_agora %}
+      <div class="cl-evento"><h4 class="cl-evento-nome">{{ e.nome }}</h4><p class="cl-linha">{{ e.o_que_e }}</p>
+        <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ e.na_usina }}</p><p class="cl-linha"><strong>O que conferir:</strong> {{ e.conferir }}</p></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if gl.eventos_outros %}
+    <details class="cl-mais-eventos">
+      <summary>Outros avisos que o {{ fonte_nome.inmet }} publica ({{ gl.eventos_outros|length }})</summary>
+      <div class="cl-eventos">
+        {% for e in gl.eventos_outros %}
+        <div class="cl-evento"><h4 class="cl-evento-nome">{{ e.nome }}</h4><p class="cl-linha">{{ e.o_que_e }}</p>
+          <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ e.na_usina }}</p><p class="cl-linha"><strong>O que conferir:</strong> {{ e.conferir }}</p></div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+      {% endcall %}{% endif %}</div>
       <p class="cl-pergunta">{{ tela.pergunta }}</p>
     </div>
     <div class="cl-cab-dir">
@@ -84,9 +145,6 @@
     </div>
     {% endfor %}
   </section>
-  {# 09/10/2026 (Levi: "pouco entendível para um leigo, deixe mais didático"): o que cada nível quer dizer, os níveis do INMET e
-     cada evento ficam em "Entenda os alertas", no pé da tela; daqui se chega lá com um clique. #}
-  <p class="cl-como-ler"><a href="#cl-entenda">Como ler esta tela: o que cada alerta quer dizer e o que conferir</a></p>
   {% if v.faltando %}<p class="cl-nota cl-nota--atencao">Os números da faixa e as listas não incluem: {{ v.faltando|join(", ") }}. A fonte está fora e a tela tenta de novo sozinha.</p>{% endif %}
   {% if v.lendo %}<p class="cl-nota cl-nota--atencao">Lendo agora: {{ v.lendo|join(", ") }}. Os números da faixa e as listas ainda não incluem essa leitura; a tela se atualiza sozinha em {{ v.recarrega_em }} s.</p>{% endif %}
 
@@ -187,70 +245,7 @@
     {% endif %}
   </section>
 
-  {# "Entenda os alertas" (09/10/2026, "deixe mais didático"): os níveis da tela, os do INMET, o foco, o risco de fogo e cada
-     evento, com o que pode acontecer na usina e o que conferir. Os textos moram em nexus/performance/clima/explica.py. #}
-  {% set gl = v.glossario %}
-  <section class="cl-secao cl-entenda" aria-labelledby="cl-entenda">
-    <h2 class="cl-h2" id="cl-entenda">Entenda os alertas</h2>
-    <div class="cl-entenda-niveis">
-      {% for n in v.como_ler %}
-      <div class="cl-entenda-nivel cl-entenda--{{ n.id }}">
-        <span class="cl-pill cl-pill--{{ n.id }}">{{ n.rotulo }}</span>
-        <p>{{ n.quer_dizer }}</p>
-        <p class="cl-fazer"><strong>O que fazer:</strong> {{ n.fazer }}</p>
-      </div>
-      {% endfor %}
-    </div>
-    <div class="cl-entenda-grade">
-      <div class="cl-bloco">
-        <h3 class="cl-rotulo-bloco">Os níveis dos avisos do {{ fonte_nome.inmet }}</h3>
-        <ul class="cl-linhas">
-          {% for n in gl.niveis %}<li class="cl-linha"><span class="cl-pill cl-pill--n{{ n.nivel }}">{{ n.nome }}</span> {{ n.quer_dizer }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-      <div class="cl-bloco">
-        <h3 class="cl-rotulo-bloco">Foco de queimada</h3>
-        <p class="cl-linha">{{ gl.foco.o_que_e }}</p>
-        <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ gl.foco.na_usina }}</p>
-        <p class="cl-linha"><strong>O que conferir:</strong> {{ gl.foco.conferir }}</p>
-      </div>
-      <div class="cl-bloco">
-        <h3 class="cl-rotulo-bloco">Fogo nas últimas 24 horas</h3>
-        <p class="cl-linha">{{ gl.fogo24.o_que_e }}</p>
-        <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ gl.fogo24.na_usina }}</p>
-        <p class="cl-linha"><strong>O que conferir:</strong> {{ gl.fogo24.conferir }}</p>
-        <p class="cl-linha">{{ gl.forca }}</p>
-        <p class="cl-linha">{{ gl.confianca }}</p>
-      </div>
-      <div class="cl-bloco">
-        <h3 class="cl-rotulo-bloco">Risco de fogo</h3>
-        <p class="cl-linha">{{ gl.risco.o_que_e }}</p>
-        <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ gl.risco.na_usina }}</p>
-        <p class="cl-linha cl-escala"><span class="cl-c">Mínimo</span><span class="cl-c">Baixo</span><span class="cl-c">Médio</span><span class="cl-c cl-c-a">Alto</span><span class="cl-c cl-c-c">Crítico</span></p>
-      </div>
-    </div>
-    {% if gl.eventos_agora %}
-    <h3 class="cl-rotulo-bloco cl-entenda-sub">Os avisos que estão valendo agora</h3>
-    <div class="cl-eventos">
-      {% for e in gl.eventos_agora %}
-      <div class="cl-evento"><h4 class="cl-evento-nome">{{ e.nome }}</h4><p class="cl-linha">{{ e.o_que_e }}</p>
-        <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ e.na_usina }}</p><p class="cl-linha"><strong>O que conferir:</strong> {{ e.conferir }}</p></div>
-      {% endfor %}
-    </div>
-    {% endif %}
-    {% if gl.eventos_outros %}
-    <details class="cl-mais-eventos">
-      <summary>Outros avisos que o {{ fonte_nome.inmet }} publica ({{ gl.eventos_outros|length }})</summary>
-      <div class="cl-eventos">
-        {% for e in gl.eventos_outros %}
-        <div class="cl-evento"><h4 class="cl-evento-nome">{{ e.nome }}</h4><p class="cl-linha">{{ e.o_que_e }}</p>
-          <p class="cl-linha"><strong>O que pode acontecer:</strong> {{ e.na_usina }}</p><p class="cl-linha"><strong>O que conferir:</strong> {{ e.conferir }}</p></div>
-        {% endfor %}
-      </div>
-    </details>
-    {% endif %}
-  </section>
+  {# o "Entenda os alertas" (09/10/2026, "deixe mais didático") foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html); os textos moram em nexus/performance/clima/explica.py #}
   {% endif %}
 
   {% if v.sem_coordenada %}

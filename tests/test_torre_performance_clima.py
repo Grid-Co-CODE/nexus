@@ -338,8 +338,9 @@ def test_aviso_vencido_nao_conta(mundo):
     html = pagina(c)
     # o "Entenda os alertas" (09/10/2026) explica todo evento que o INMET publica, o Vendaval inclusive, na lista dos "outros";
     # o que não pode é o aviso vencido aparecer como alerta nem entre os avisos que estão valendo agora
-    assert "Vendaval" not in html[:html.index('id="cl-entenda"')]
-    assert "Vendaval" not in html[html.index('id="cl-entenda"'):html.index('class="cl-mais-eventos"')]
+    # (desde 05/11/2026 o "Entenda os alertas" mora no "!" do título: a caixa começa em gc-explica)
+    assert "Vendaval" not in html[:html.index('class="gc-explica"')]
+    assert "Vendaval" not in html[html.index('class="gc-explica"'):html.index('class="cl-mais-eventos"')]
 
 
 def test_uma_so_leitura_da_rede_por_fonte_mesmo_com_varias_visitas(mundo):

@@ -1,12 +1,26 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Visão do responsável (12/10/2026, Levi: "uma visão que ele olha as usinas, as metas, os problemas, onde ele deve focar,
    no que ele deve deixar. No caso seria separado por responsável"; protótipo aprovado: "aposte em um formato reduzido que
    quando eu expanda aparece mais informações / Separe a visão em dois blocos"). A conta é nexus/campo/responsaveis.py:
    cada número é o da tela dona dele, com a régua de lá. Aqui: os cartões por responsável e, com um escolhido, os dois
    blocos (Performance e Acompanhamento), cada usina numa linha que abre o detalhe (<details>, sem script). #}
+{# O "!" do título (05/11/2026): De onde vem cada número e a régua de cada alerta. Nada é recalculado com régua nova. #}
+{% macro reguas_do_titulo() %}
+  {% call explica('De onde vem cada número e a régua de cada alerta') %}
+    <p><b>De onde vem cada número, e a régua de cada alerta.</b> Nada é recalculado com régua nova: cada número é o da tela
+    dona dele, e o alerta usa a régua de lá. Cada linha abre ao clicar.</p>
+    {% for b, nome, _txt, _bl in blocos_geral %}
+    <dl class="cr-reguas"><dt class="cr-reguas-bloco">{{ nome }}</dt>{% for bb, a, r, t in reguas if bb == b %}<dt>{{ r }}</dt><dd>{{ t }}</dd>{% endfor %}</dl>
+    {% endfor %}
+    <p>Responsável O&amp;M é o da ficha da usina no cadastro (o mesmo da Central de atenção); só usina mobilizada. Fonte sem
+    dado da usina não alerta nem conta como em dia: fica "—". Usina com duas linhas no Gerencial (Santarém 1 e 2) soma
+    as duas.</p>
+  {% endcall %}
+{% endmacro %}
 {% set cor = {'agora': 'critico', 'critico': 'critico', 'atencao': 'alerta', 'ok': 'ok'} %}
 {% set fonte_nome = {'metas': 'a meta do mês', 'disp': 'a disponibilidade', 'ativos': 'os ativos da Confiabilidade',
                      'chamados': 'os chamados', 'extintores': 'os extintores', 'pt': 'as PT',
@@ -37,10 +51,10 @@
   <div class="cn-cab">
     {# no Painel, o nome do responsável é o título (Levi, 28/10/2026: "vai ter o nome do responsável como [título]") #}
     {% if modo == 'painel' and painel %}
-    <div><p class="gc-eyebrow">{{ torre.nome }} · {{ tela.nome }}</p><h1 class="cn-titulo">{{ painel.nome }}</h1>
+    <div><p class="gc-eyebrow">{{ torre.nome }} · {{ tela.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ painel.nome }}</h1>{{ reguas_do_titulo() }}</div>
       <p class="cn-pergunta">{{ painel.usinas }} usina{{ 's' if painel.usinas != 1 }}{% if painel.clientes %} · {{ painel.clientes|join(', ') }}{% endif %}{% if painel.equipes %} · {{ painel.equipes|length }} equipe{{ 's' if painel.equipes|length != 1 }}{% endif %}</p></div>
     {% else %}
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>{{ reguas_do_titulo() }}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     {% endif %}
     <div class="cn-frescor">Gerencial, Confiabilidade, chamados, extintores,<br>rondas e PT, pelo banco do Nexus<br><b>lido às {{ lido }}</b></div>
   </div>
@@ -662,26 +676,17 @@
   {% endif %}
   {% endif %}
 
-  {# as réguas atrás do "!" abaixo da tabela (Levi, 18/10/2026: o texto "deve ficar em um símbolo de exclamação abaixo
-     da tabela!"): fechado ao abrir a tela, o símbolo abre o texto de sempre #}
-  <details class="cr-info">
-  <summary title="De onde vem cada número e a régua de cada alerta" aria-label="De onde vem cada número e a régua de cada alerta"><i class="ph ph-warning-circle" aria-hidden="true"></i></summary>
+  {# As réguas ("De onde vem cada número, e a régua de cada alerta") foram para o "!" do título (05/11/2026, o padrão do
+     Nexus, _explica.html; antes, 18/10/2026, ficavam atrás de um "!" abaixo da tabela). O que muda com o dado fica aqui. #}
+  {% if (info.get('disp') or {}).get('ate') or (info.get('metas') or {}).get('sem_usina') or (info.get('chamados') or {}).get('sem_usina') or (info.get('extintores') and not info.extintores.publicado) or (info.get('ativos') and not info.ativos.completa) %}
   <div class="cn-nota">
-    <b>De onde vem cada número, e a régua de cada alerta.</b> Nada é recalculado com régua nova: cada número é o da tela
-    dona dele, e o alerta usa a régua de lá. Cada linha abre ao clicar.
-    {% for b, nome, _txt, _bl in blocos_geral %}
-    <dl class="cr-reguas"><dt class="cr-reguas-bloco">{{ nome }}</dt>{% for bb, a, r, t in reguas if bb == b %}<dt>{{ r }}</dt><dd>{{ t }}</dd>{% endfor %}</dl>
-    {% endfor %}
-    Responsável O&amp;M é o da ficha da usina no cadastro (o mesmo da Central de atenção); só usina mobilizada. Fonte sem
-    dado da usina não alerta nem conta como em dia: fica "—". Usina com duas linhas no Gerencial (Santarém 1 e 2) soma
-    as duas.
-    {% if (info.get('disp') or {}).get('ate') %}<br>Disponibilidade até {{ dia_curto(info.disp.ate) }} (dias fechados do mês).{% endif %}
-    {% if (info.get('metas') or {}).get('sem_usina') %}<br>{{ info.metas.sem_usina|length }} usina{{ 's' if info.metas.sem_usina|length != 1 }} do Gerencial sem usina no cadastro (fora do de-para): {{ info.metas.sem_usina[:8]|join(', ') }}{% if info.metas.sem_usina|length > 8 %} e mais {{ info.metas.sem_usina|length - 8 }}{% endif %}.{% endif %}
-    {% if (info.get('chamados') or {}).get('sem_usina') %}<br>{{ info.chamados.sem_usina }} chamado{{ 's' if info.chamados.sem_usina != 1 }} em aberto sem usina no cadastro (o site do Fracttal fora do de-para) ficou de fora.{% endif %}
-    {% if info.get('extintores') and not info.extintores.publicado %}<br>O livro de extintores do App ainda não chegou ao banco: a coluna Extintores fica vazia.{% endif %}
-    {% if info.get('ativos') and not info.ativos.completa %}<br>A leitura das OS de falha do Fracttal ainda não terminou: os ativos podem estar incompletos.{% endif %}
+    {% if (info.get('disp') or {}).get('ate') %}<p>Disponibilidade até {{ dia_curto(info.disp.ate) }} (dias fechados do mês).</p>{% endif %}
+    {% if (info.get('metas') or {}).get('sem_usina') %}<p>{{ info.metas.sem_usina|length }} usina{{ 's' if info.metas.sem_usina|length != 1 }} do Gerencial sem usina no cadastro (fora do de-para): {{ info.metas.sem_usina[:8]|join(', ') }}{% if info.metas.sem_usina|length > 8 %} e mais {{ info.metas.sem_usina|length - 8 }}{% endif %}.</p>{% endif %}
+    {% if (info.get('chamados') or {}).get('sem_usina') %}<p>{{ info.chamados.sem_usina }} chamado{{ 's' if info.chamados.sem_usina != 1 }} em aberto sem usina no cadastro (o site do Fracttal fora do de-para) ficou de fora.</p>{% endif %}
+    {% if info.get('extintores') and not info.extintores.publicado %}<p>O livro de extintores do App ainda não chegou ao banco: a coluna Extintores fica vazia.</p>{% endif %}
+    {% if info.get('ativos') and not info.ativos.completa %}<p>A leitura das OS de falha do Fracttal ainda não terminou: os ativos podem estar incompletos.</p>{% endif %}
   </div>
-  </details>
+  {% endif %}
 
   {# as janelas por cima da tela, com o fundo desfocado: o pedaço de página vem da rota (`responsaveis_painel`,
      `responsaveis_pt`) e entra aqui; Esc, o Fechar e o clique fora fecham #}

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "relatorios/_lado.html" import blocos %}
+{% from "_explica.html" import explica %}
 {% block titulo %}{{ tipo.nome }} · Relatório Gerencial PCM{% endblock %}
 {% block conteudo %}
 {# O Relatório executivo do PCM (14/10/2026, Levi: "Quero trazer esses três relatórios para a plataforma, com as mesmas
@@ -9,7 +10,8 @@
    presets, a mesma cascata cliente → usinas) e a folha é a do PCM, montada na moldura da direita. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='relatorios-pcm.css') }}">
 <p class="gc-eyebrow">{{ torre.nome }} · Relatório Gerencial PCM</p>
-<h1 class="titulo-pagina">{{ tipo.nome }}</h1>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">{{ tipo.nome }}</h1>
+{% call explica('Como funciona') %}<p>A folha é a do relatório executivo do painel do PCM, montada com os mesmos dados e as mesmas contas. "Imprimir / PDF" imprime só a folha; para guardar, escolha "Salvar como PDF" na impressão. Nada é gravado ao gerar.</p>{% endcall %}</div>
 <p class="lead">{{ tipo.descricao[:1]|upper }}{{ tipo.descricao[1:] }}. Gerado com o dado de agora da Gestão PCM, da
   programação semanal, da Confiabilidade e da Gerencial; as regras são as do relatório executivo do painel do PCM.</p>
 {% if erro_fonte %}<p class="aviso">Não consegui ler a Gestão PCM agora ({{ erro_fonte }}): as listas de cliente, cluster e
@@ -92,9 +94,7 @@
         {% endif %}
       </div>
     </div>
-    <p class="rp-nota"><b>Como funciona:</b> a folha é a do relatório executivo do painel do PCM, montada com os mesmos
-      dados e as mesmas contas. "Imprimir / PDF" imprime só a folha; para guardar, escolha "Salvar como PDF" na impressão.
-      Nada é gravado ao gerar.</p>
+    {# o "Como funciona" foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
   </div>
 </div>
 

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Zeladoria (Levi, 26/10/2026, com o modelo "Rondas Sujidade e Vegetação": "Quero algo nesses padrões para a parte de
    zeladoria da seção campo app do nexus. deixe no estilo do Nexus porém nesse padrão! a evolução por usina deve ser por
@@ -15,32 +16,34 @@
 <div class="campo-nativa zl">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Zeladoria</p>
-      <h1 class="cn-titulo">Vegetação e sujidade dos módulos</h1>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">Vegetação e sujidade dos módulos</h1>
+      {% call explica('Entenda esta tela') %}
+      <p><b>Nível:</b> o julgamento do técnico na ronda, comparando com as fotos de referência do App (a premissa de cada
+        nível), com pelo menos 2 fotos. Vem do texto da OS de ronda no Fracttal; a ronda sem OS, do checklist que o App
+        gravou; a ronda avulsa, do que foi lançado no Nexus. Acima de {{ alerta_acima }} pede ação (a régua do App).</p>
+      <p><b>Semana:</b> de segunda a domingo (W43, a mesma do PCM). Com mais de uma leitura na usina na semana, vale a
+        última. A semana corrente fica marcada "em andamento" até o domingo.</p>
+      <p><b>Evolução por cliente:</b> o nível de cada usina em cada uma das 8 semanas que terminam na semana escolhida;
+        o tracejado é semana sem leitura. A linha do cliente diz quantas usinas ficaram acima de {{ alerta_acima }} sobre
+        quantas tiveram leitura. Clique no cliente para recolher; clique na célula para abrir a usina.</p>
+      <p><b>Situação por usina:</b> a última leitura até o fim da semana escolhida (na corrente, até hoje); leitura com
+        {{ dias_velha }} dias ou mais fica marcada. A seta compara com a leitura anterior da usina. A ordem é a da aba
+        Sujidade e vegetação das Rondas: o mais crítico primeiro (vegetação, sujidade, vala e sensores somados).</p>
+      <p><b>Recomendações:</b> vegetação acima de {{ alerta_acima }} pede supressão vegetal; sujidade acima de
+        {{ alerta_acima }}, limpeza de módulos. Ao lado, o que o Fracttal tem: a OS de zeladoria aberta (programada ou em
+        execução), a feita depois da leitura (resolve a recomendação) ou nenhuma.</p>
+      <p><b>Validada por foto:</b> níveis revisados a partir das fotos das rondas do App, em nome de quem validou; vale no
+        lugar das rondas do mesmo dia. <b>Avulsa:</b> ronda lançada à mão no Nexus.</p>
+      <p><b>De onde vem.</b> Os níveis são as respostas do checklist da ronda que o App copia no texto da OS
+        de ronda no Fracttal (o Nexus lê as OS em verificação e as aprovadas dos 90 dias); a ronda sem OS, do checklist que o
+        App gravou; a avulsa e a validação por foto, do livro do Nexus. A zeladoria é a das tarefas do tipo Zeladoria das OS do
+        Fracttal que o Nexus guarda no banco de hora em hora. Nada desta tela escreve no Fracttal nem no App.</p>
+      {% endcall %}</div>
       <p class="cn-pergunta">Em cada ronda o técnico compara a vegetação sob os módulos e a sujidade dos painéis com as
         fotos de referência do App e dá um nível de 1 a 5; acima de {{ alerta_acima }} o App alerta. Aqui, a situação de
         cada usina, a evolução semana a semana por cliente e a zeladoria que o Fracttal tem feita ou programada.</p></div>
   </div>
-  <details class="cn-entenda">
-    <summary>Entenda esta tela</summary>
-    <ul>
-      <li><b>Nível:</b> o julgamento do técnico na ronda, comparando com as fotos de referência do App (a premissa de cada
-        nível), com pelo menos 2 fotos. Vem do texto da OS de ronda no Fracttal; a ronda sem OS, do checklist que o App
-        gravou; a ronda avulsa, do que foi lançado no Nexus. Acima de {{ alerta_acima }} pede ação (a régua do App).</li>
-      <li><b>Semana:</b> de segunda a domingo (W43, a mesma do PCM). Com mais de uma leitura na usina na semana, vale a
-        última. A semana corrente fica marcada "em andamento" até o domingo.</li>
-      <li><b>Evolução por cliente:</b> o nível de cada usina em cada uma das 8 semanas que terminam na semana escolhida;
-        o tracejado é semana sem leitura. A linha do cliente diz quantas usinas ficaram acima de {{ alerta_acima }} sobre
-        quantas tiveram leitura. Clique no cliente para recolher; clique na célula para abrir a usina.</li>
-      <li><b>Situação por usina:</b> a última leitura até o fim da semana escolhida (na corrente, até hoje); leitura com
-        {{ dias_velha }} dias ou mais fica marcada. A seta compara com a leitura anterior da usina. A ordem é a da aba
-        Sujidade e vegetação das Rondas: o mais crítico primeiro (vegetação, sujidade, vala e sensores somados).</li>
-      <li><b>Recomendações:</b> vegetação acima de {{ alerta_acima }} pede supressão vegetal; sujidade acima de
-        {{ alerta_acima }}, limpeza de módulos. Ao lado, o que o Fracttal tem: a OS de zeladoria aberta (programada ou em
-        execução), a feita depois da leitura (resolve a recomendação) ou nenhuma.</li>
-      <li><b>Validada por foto:</b> níveis revisados a partir das fotos das rondas do App, em nome de quem validou; vale no
-        lugar das rondas do mesmo dia. <b>Avulsa:</b> ronda lançada à mão no Nexus.</li>
-    </ul>
-  </details>
+  {# A explicação da tela ("Entenda esta tela" e "De onde vem") foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
   {% set foto = z.get('foto_os') or {} %}
   {% if erro_os %}<div class="cn-erro cn-aviso" role="status"><b>As OS de zeladoria do Fracttal não vieram do banco ({{ erro_os }}).</b> As recomendações aparecem sem a situação da OS.</div>
@@ -212,10 +215,6 @@
       </tbody></table></div>
   </details>
 
-  <div class="cn-nota"><b>De onde vem.</b> Os níveis são as respostas do checklist da ronda que o App copia no texto da OS
-    de ronda no Fracttal (o Nexus lê as OS em verificação e as aprovadas dos 90 dias); a ronda sem OS, do checklist que o
-    App gravou; a avulsa e a validação por foto, do livro do Nexus. A zeladoria é a das tarefas do tipo Zeladoria das OS do
-    Fracttal que o Nexus guarda no banco de hora em hora. Nada desta tela escreve no Fracttal nem no App.</div>
 </div>
 
 {# a gaveta da usina: o conteúdo vem da rota /zeladoria/usina/<id>, no clique #}

@@ -344,6 +344,8 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
 
 ## Técnicos por usina (`atribuicoes.py`, `tecnicos_usina.py`, `templates/pcm/tecnicos.html`; 17/10/2026)
 
+> Desde 05/11/2026 o "De onde vem" da tela (e o da Curadoria do inventário, com a nota do cadastro da peça nova) está na exclamação amarela do título (`explica`, `_explica.html`), não mais no pé da tela.
+
 Levi, 17/10/2026: "cria uma estrutura que liga usina e técnico e o PCM pode editar a vontade"; "é normal usinas terem
 dois técnicos e receberem de vez em quando mais técnicos"; "quero tirar do site de gestão"; "vamos deixar redondo,
 depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-10-17-tecnicos-por-usina-design.md`.

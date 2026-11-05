@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Equipamentos das usinas{% endblock %}
 {% block conteudo %}
+{% from "_explica.html" import explica %}
 {# Base > Equipamentos das usinas (13/10/2026, Levi: "Temos que substituir a aba equipamentos aproveitando o que tem lá e
    usando o Nexus como ponto de partida"; "Não quero que faça as conexões automaticamente, quero poder ver e fazer de forma
    versátil"). À esquerda, as usinas do Registro mestre; à direita, a usina aberta em 2 passos: as chaves do supervisório
@@ -15,18 +16,22 @@
 <p class="gc-eyebrow">Base · Equipamentos das usinas</p>
 <div class="cad-topo">
   <div>
-    <h1 class="titulo-pagina">Equipamentos das usinas</h1>
+    <div class="gc-titulo-explica"><h1 class="titulo-pagina">Equipamentos das usinas</h1>
+    {% call explica('Como funciona') %}
+<ol class="eq-passos-guia">
+          <li><strong>Escolha a usina</strong> na lista ao lado: é a do Registro mestre, o ponto de partida.</li>
+          <li><strong>Ligue as chaves do supervisório</strong>: o nome que o supervisório dá à usina (a "Usina Supervisório" da aba Equipamentos). Uma usina pode ter mais de uma.</li>
+          <li><strong>Preencha a tabela dos equipamentos</strong>, nas colunas da aba Equipamentos: Usina Supervisório, Equipamento, Equipamento Supervisório, Equipamento Parente (a cabine), Potência e Strings. À mão, gerando os inversores de uma cabine, ou pelo "Trazer da aba". A potência confere com a do Registro mestre. Só o Salvar grava.</li>
+        </ol>
+<p>Nada liga sozinho: a tela ordena as chaves pelo nome parecido e escreve o porquê; quem escolhe é você. O Fracttal já está ligado pelo código da UFV no Registro mestre.</p>
+<p><strong>Nada liga sozinho.</strong> As chaves da aba vêm ordenadas pelo nome parecido com a usina, com o porquê escrito; quem escolhe e liga é você.</p>
+<p><strong>Supervisório e equipamentos.</strong> Vão para o banco (livro nexus_estrutura_usina), sem nome nem e-mail de ninguém. A aba Equipamentos não muda.</p>
+    {% endcall %}</div>
     <p class="cad-sub">A usina do Registro mestre ligada ao supervisório (a plataforma de tempo real), com os equipamentos nas colunas da aba Equipamentos: cabines, inversores, strings e potência. A aba fica só como referência.{% if aba_lida_em %} Aba lida em {{ aba_lida_em }}.{% endif %}</p>
   </div>
   <div class="fr-acoes">
     <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url_for('torre_base.equipamentos', reler=1, usina=painel.usina.id if painel else None, **volta) }}"><i class="ph ph-arrows-clockwise"></i> Ler o banco de novo</a>
-    <span class="fr-dica">
-      <button type="button" class="fr-dica-botao" aria-label="Como esta tela funciona" aria-describedby="eq-dica-texto"><i class="ph ph-warning-circle" aria-hidden="true"></i></button>
-      <span class="fr-dica-texto" id="eq-dica-texto" role="tooltip">
-        <span><strong>Nada liga sozinho.</strong> As chaves da aba vêm ordenadas pelo nome parecido com a usina, com o porquê escrito; quem escolhe e liga é você.</span>
-        <span><strong>Supervisório e equipamentos.</strong> Vão para o banco (livro nexus_estrutura_usina), sem nome nem e-mail de ninguém. A aba Equipamentos não muda.</span>
-      </span>
-    </span>
+    {# a dica "Como esta tela funciona" e o guia "Como funciona" foram para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
   </div>
 </div>
 
@@ -110,17 +115,6 @@
 
   <div class="eq-painel">
   {% if not painel %}
-    <section class="cad-secao eq-guia">
-      <h2>Como funciona</h2>
-      <div class="eq-corpo">
-        <ol class="eq-passos-guia">
-          <li><strong>Escolha a usina</strong> na lista ao lado: é a do Registro mestre, o ponto de partida.</li>
-          <li><strong>Ligue as chaves do supervisório</strong>: o nome que o supervisório dá à usina (a "Usina Supervisório" da aba Equipamentos). Uma usina pode ter mais de uma.</li>
-          <li><strong>Preencha a tabela dos equipamentos</strong>, nas colunas da aba Equipamentos: Usina Supervisório, Equipamento, Equipamento Supervisório, Equipamento Parente (a cabine), Potência e Strings. À mão, gerando os inversores de uma cabine, ou pelo "Trazer da aba". A potência confere com a do Registro mestre. Só o Salvar grava.</li>
-        </ol>
-        <p class="gc-ajuda">Nada liga sozinho: a tela ordena as chaves pelo nome parecido e escreve o porquê; quem escolhe é você. O Fracttal já está ligado pelo código da UFV no Registro mestre.</p>
-      </div>
-    </section>
   {% else %}{% set u = painel.usina %}
     <div class="eq-cab-usina">
       <div>

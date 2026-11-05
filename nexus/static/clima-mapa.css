@@ -326,17 +326,6 @@
 .mp-st-n{font:800 15px/18px var(--font-display);color:var(--tinta)}
 .mp-st[aria-pressed="false"],.mp-st[aria-pressed="false"] .mp-st-n{color:var(--mudo);text-decoration:line-through}
 .mp-st[aria-pressed="false"] .mp-chave{background:transparent;border:1.5px dashed var(--fraco)}
-/* o "!" do como ler: o mesmo desenho do aviso da tela de Extintores (hseq.css, .hs-aviso), aqui com a chave de cada nível */
-.mp-aviso{position:relative}
-.mp-aviso-bt{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1.5px solid var(--alerta);
-  border-radius:50%;background:var(--alerta-suave);color:var(--alerta);font:800 14px/1 var(--font-sans);cursor:pointer;list-style:none}
-.mp-aviso-bt::-webkit-details-marker{display:none}
-.mp-aviso-bt:hover,.mp-aviso[open] .mp-aviso-bt{background:var(--alerta);color:var(--sobre-cheio)}
-.mp-aviso-bt:focus-visible{outline:2px solid var(--alerta);outline-offset:2px}
-.mp-aviso-caixa{position:absolute;z-index:40;top:calc(100% + 8px);left:0;width:min(660px,calc(100vw - 32px));
-  max-height:calc(100vh - 140px);overflow:auto;margin:0;padding:14px 18px 16px;border:1px solid var(--alerta);corner-shape:bevel;
-  border-radius:14px;background:linear-gradient(var(--alerta-suave),var(--alerta-suave)),var(--superficie-3);
-  box-shadow:0 8px 24px var(--sombra)}
 .mp-aviso-t{margin:0 0 10px;font-size:14px;color:var(--tinta)}
 .mp-aviso-t--2{margin-top:18px}
 .mp-aviso-p{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--tinta-2)}
@@ -345,8 +334,7 @@
 .mp-aviso-dl dt{display:flex;align-items:center;gap:8px;margin:0;font:600 13px/1.4 var(--font-sans);color:var(--tinta)}
 .mp-aviso-dl dt .mp-chave{margin:0;flex:none}
 .mp-aviso-dl dd{margin:0;font-size:13px;line-height:1.45;color:var(--tinta-2)}
-.mp-aviso-pe{margin:14px 0 0;padding-top:10px;border-top:1px solid var(--alerta);font-size:12.5px;line-height:1.45;color:var(--tinta-2)}
-@media (max-width:640px){.mp-aviso-caixa{position:fixed;top:72px;left:16px;right:16px;width:auto;max-height:calc(100vh - 96px)}
+@media (max-width:640px){
   .mp-aviso-dl{grid-template-columns:minmax(0,1fr);gap:3px 0}.mp-aviso-dl dd{margin-bottom:9px}}
 @container mp (min-width:760px){
   .mp-corpo{grid-template-columns:minmax(220px,250px) minmax(0,1fr);align-items:stretch}
