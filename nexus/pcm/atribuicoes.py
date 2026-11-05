@@ -16,10 +16,10 @@ O dado (livro `nexus_pcm_atribuicoes`, registrado em `nexus/dados/catalogo.py`; 
 - Em claro: os IDs, o nome da usina no Fracttal (`usina_fracttal`, por onde o App acha a usina) e os códigos HMAC
   (`pessoa_hmac`, por onde o App acha a pessoa; `decidida_por_hmac`). A observação só cifrada (o Cofre). Cada linha vai
   assinada (`assinatura`): o App lê o livro pela leitura aberta da API e só aplica a linha assinada.
-- `fato_admin_app` (05/11/2026): os administradores do App de Campo, escolhidos em Base → Acessos (`admins_app.py`).
-  Mora neste livro porque é este que o App já lê (o contrato de lá).
-Gravar troca o livro inteiro, relido do banco antes (leitura que falha não grava), uma gravação por vez neste processo
-(`_TRAVA`, a mesma para as duas abas), e leva SEMPRE as duas abas: gravar uma sem a outra a apagaria.
+Gravar troca o livro inteiro, relido do banco antes (leitura que falha não grava; a listagem que não traz a aba do
+livro que existe também falha: `livros.abas_conferidas`), uma gravação por vez neste processo. Os administradores do
+App de Campo moram num livro só deles (`admins_app.py`): este livro tem uma aba, e um Nexus antigo que o troque inteiro
+não leva nada de outro dado junto.
 """
 import hashlib
 import hmac
@@ -36,12 +36,6 @@ LIVRO, NOME_LIVRO = "nexus_pcm_atribuicoes", "Nexus · técnicos por usina (PCM)
 ABA = "fato_decisao_atribuicao"
 CAB = ("decidida_em", "data_id", "usina_id", "usina_fracttal", "pessoa_id", "pessoa_hmac", "papel", "na_usina",
        "de_data_id", "ate_data_id", "origem", "decidida_por_hmac", "dados_cifrados", "assinatura")
-# os administradores do App de Campo (05/11/2026, `admins_app.py`): as colunas, nesta ordem, são o contrato com o App
-# (`_propostas/admins-app-nexus/LEIA.md` do app-campo-docs); coluna nova só no FIM, nos dois lados
-ABA_ADMIN = "fato_admin_app"
-CAB_ADMIN = ("decidida_em", "data_id", "pessoa_id", "pessoa_hmac", "papel", "ativo", "de_data_id", "ate_data_id",
-             "origem", "decidida_por_hmac", "dados_cifrados", "assinatura")
-CABS = {ABA: CAB, ABA_ADMIN: CAB_ADMIN}
 # a fase 3 (30/10/2026, `responsaveis.py`): o `responsavel` é o Responsável UFV da ficha da usina, que o Nexus põe no
 # livro sozinho (origem `cadastro`) para o App mandar e assinar a PT; a tela Técnicos por usina segue só no `executa`
 PAPEIS = ("executa", "responsavel")
@@ -107,54 +101,43 @@ def _arquivo_local(cfg) -> Path | None:
     return Path(p) if p else None
 
 
-def _ler_cru(cfg, aba: str = ABA) -> list[dict]:
-    """As linhas de uma aba do livro (a dos técnicos, ou a dos administradores do App), lidas agora. Livro ou aba que
-    ainda não existe = vazio; erro de leitura sobe. Teste sem o arquivo nunca vai à rede (vale vazio)."""
+def _ler_cru(cfg) -> list[dict]:
+    """As linhas da aba, lidas agora. Livro que ainda não existe = vazio; erro de leitura sobe, e a listagem que não traz
+    a aba do livro que existe também (`livros.abas_conferidas`: "não li" nunca vira "vazio"). Teste sem o arquivo
+    nunca vai à rede (vale vazio)."""
     loc = _arquivo_local(cfg)
     if loc is not None:
         try:
             d = json.loads(loc.read_text(encoding="utf-8"))
         except FileNotFoundError:
             d = {}
-        return [dict(x) for x in d.get(aba) or []]
+        return [dict(x) for x in d.get(ABA) or []]
     if cfg.get("TESTING"):
         return []
     from .motivos import _banco
     base, sessao = _banco(cfg)
-    a = livros.abas(base, sessao, LIVRO)
-    return list(livros._linhas(base, sessao, a[aba])) if aba in a else []
+    a = livros.abas_conferidas(base, sessao, LIVRO, (ABA,))
+    return list(livros._linhas(base, sessao, a[ABA])) if ABA in a else []
 
 
-def _gravar_cru(cfg, linhas: list[dict], aba: str = ABA) -> None:
-    """Troca o livro inteiro com as `linhas` da `aba` e confere (`livros.publicar` relê e compara a contagem). A outra
-    aba vai junto, relida agora (quem chama segura a `_TRAVA`): a troca é do livro inteiro, e gravar sem ela a apagaria
-    (05/11/2026, a aba dos administradores do App). A outra que não se relê: nada é gravado. Na cópia de prova, o
-    arquivo."""
+def _gravar_cru(cfg, linhas: list[dict]) -> None:
+    """Troca o livro inteiro e confere (`livros.publicar` relê e compara a contagem). Na cópia de prova, o arquivo."""
     vazio = (lambda v: None if v in ("", None) else v)      # noqa: E731
-    outras = [a for a in CABS if a != aba]
+    corpo = [[vazio(x.get(c)) for c in CAB] for x in linhas]
     loc = _arquivo_local(cfg)
-    if loc is None:
-        token = cfg.get("GRIDCO_SQL_TOKEN")
-        if not token:
-            raise Recusada("Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN): nada foi gravado.")
-    try:
-        tudo = {a: _ler_cru(cfg, a) for a in outras}
-    except Exception as ex:  # noqa: BLE001 — banco fora no meio: gravar sem a outra aba a apagaria
-        raise Recusada(f"Não consegui reler a outra aba do livro dos técnicos por usina ({type(ex).__name__}): nada foi "
-                       "gravado, para não apagá-la.") from ex
-    tudo[aba] = linhas
-    corpo = {a: [[vazio(x.get(c)) for c in CABS[a]] for x in tudo[a]] for a in CABS}
     if loc is not None:
         loc.parent.mkdir(parents=True, exist_ok=True)
         tmp = loc.with_suffix(".tmp")
-        tmp.write_text(json.dumps({a: [dict(zip(CABS[a], l)) for l in corpo[a]] for a in CABS}, ensure_ascii=False,
-                                  indent=1), encoding="utf-8")
+        tmp.write_text(json.dumps({ABA: [dict(zip(CAB, l)) for l in corpo]}, ensure_ascii=False, indent=1),
+                       encoding="utf-8")
         tmp.replace(loc)
         return
+    token = cfg.get("GRIDCO_SQL_TOKEN")
+    if not token:
+        raise Recusada("Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN): nada foi gravado.")
     from .motivos import _banco
     base, sessao = _banco(cfg)
-    livros.publicar(LIVRO, NOME_LIVRO, {a: (list(CABS[a]), corpo[a]) for a in CABS}, base=base, token=token,
-                    sessao=sessao)
+    livros.publicar(LIVRO, NOME_LIVRO, {ABA: (list(CAB), corpo)}, base=base, token=token, sessao=sessao)
 
 
 def ler(cfg, forcar: bool = False) -> dict:
@@ -285,6 +268,11 @@ def _linha(cfg, p: dict, quem_hmac: str, origem: str, agora: datetime, hoje: int
     obs = " ".join(D._txt(p.get("obs")).split())[:OBS_MAX]
     ult = ultimas.get((uid, pid, papel))
     vale_agora = bool(ult) and (uid, pid, papel) in atuais({"decisoes": [ult]}, hoje, papel=papel)
+    if origem == "reemissao" and (not na or not vale_agora or _int_ou_none(ult.get("de_data_id")) != de
+                                  or _int_ou_none(ult.get("ate_data_id")) != ate):
+        # a reemissão reenvia o que vale agora, com as datas de agora, e nunca põe de volta quem foi tirado (revisão de
+        # 05/11/2026: o pedido montado antes de um "tirar" devolvia a pessoa à usina): o par que mudou pula
+        return None
     if not na and not vale_agora:
         raise Recusada("Essa pessoa já não está nesta usina (alguém mudou agora): atualize a página.")
     # a mesma decisão não grava de novo; o nome da usina no Fracttal e o código da pessoa contam (é o que o App lê:
@@ -311,9 +299,13 @@ def _linha(cfg, p: dict, quem_hmac: str, origem: str, agora: datetime, hoje: int
     return nova
 
 
-def decidir_varias(cfg, pedidos: list[dict], usuario: dict | None, origem: str) -> int:
+def decidir_varias(cfg, pedidos, usuario: dict | None, origem: str, conferir=None) -> int:
     """Várias decisões numa gravação só (a carga inicial, a reemissão). Cada pedido tem as chaves de `decidir`. Devolve
-    quantas linhas entraram; o pedido que não muda nada não entra, e um pedido recusado recusa todos."""
+    quantas linhas entraram; o pedido que não muda nada não entra, e um pedido recusado recusa todos.
+
+    `pedidos` também pode ser uma função (est, hoje) -> pedidos: ela roda DENTRO da trava, sobre a leitura nova do
+    livro, e `conferir(pedidos)`, se vier, recusa antes de gravar (revisão de 05/11/2026, achado 2: o Reenviar tudo
+    montava os pedidos de uma leitura de antes, e um "tirar" no meio voltava atrás)."""
     from .motivos import _quem
     if not str(cfg.get("NEXUS_PESSOA_HMAC") or "").strip():
         # sem a chave a linha iria sem assinatura e o App a descartaria: o Nexus diria uma coisa e o App faria outra
@@ -327,6 +319,11 @@ def decidir_varias(cfg, pedidos: list[dict], usuario: dict | None, origem: str) 
             raise Recusada(f"Não consegui ler os técnicos por usina no banco ({type(ex).__name__}): nada foi gravado, "
                            "para não apagar o que já está lá.") from ex
         agora, hoje = _agora(), hoje_id()
+        if callable(pedidos):
+            pedidos = pedidos({"decisoes": [x for x in cru if _int_ou_none(x.get("usina_id"))
+                                            and _int_ou_none(x.get("pessoa_id"))]}, hoje)
+        if conferir is not None:
+            conferir(pedidos)
         ultimas = _ultimas(cru)
         novas = []
         for p in pedidos:

@@ -26,6 +26,10 @@ class GravacaoRecusada(GravacaoErro):
     """Nada foi gravado: o livro que só cresce ficaria menor do que está no banco, ou a listagem veio incompleta."""
 
 
+class LeituraIncompleta(RuntimeError):
+    """A listagem do banco não trouxe o que o livro tem: é "não li", nunca "livro vazio" (`abas_conferidas`)."""
+
+
 def _int(v) -> int | None:
     try:
         return int(float(v))
@@ -92,6 +96,29 @@ def abas(base: str, sessao, livro: str) -> dict:
     r = sessao.get(f"{base}/api/sheets", timeout=60)
     r.raise_for_status()
     return {x["sheet_name"]: x["id"] for x in r.json() if x.get("workbook_key") == livro}
+
+
+def abas_conferidas(base: str, sessao, livro: str, declaradas) -> dict:
+    """{aba: id} do livro, conferido com o /api/workbooks, para quem lê e grava por cima (achado 6 da revisão de
+    05/11/2026): o `abas` sozinho devolvia {} quando a listagem omitia o livro por um instante, quem lia via "livro
+    vazio" e a gravação seguinte trocaria o livro só com a linha nova. Sobe `LeituraIncompleta` quando o livro existe e
+    a listagem traz menos abas que o `sheet_count` dele, ou não traz uma aba `declarada`. O livro que não existe é vazio,
+    e o criado e nunca gravado (`sheet_count` 0) também, como na trava da gravação (`_conferir_antes`)."""
+    r = sessao.get(f"{base}/api/workbooks", timeout=60)
+    r.raise_for_status()
+    w = next((x for x in r.json() if x.get("key") == livro), None)
+    a = abas(base, sessao, livro)
+    if w is None:
+        return a
+    n = _int(w.get("sheet_count"))
+    if n == 0 and not a:
+        return a
+    if n is not None and len(a) < n:
+        raise LeituraIncompleta(f"{livro}: o banco diz que o livro tem {n} abas e a listagem trouxe {len(a)}")
+    faltam = [x for x in declaradas if x not in a]
+    if faltam:
+        raise LeituraIncompleta(f"{livro}: a listagem não trouxe a aba {', '.join(faltam)} do livro que existe")
+    return a
 
 
 PAGINA = 1000

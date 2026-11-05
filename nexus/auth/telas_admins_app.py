@@ -1,15 +1,19 @@
 """Base → Acessos, aba Administradores do App de Campo (05/11/2026): quem administra o App de Campo, escolhido no Nexus.
 
 Levi, 05/11/2026: "os administradores do App de Campo e os técnicos por usina têm de ser escolhidos no Nexus". O dado e as
-regras moram em `nexus/pcm/admins_app.py` (a aba `fato_admin_app` do livro dos técnicos por usina, que o App lê de 5 em 5
-minutos); aqui ficam as contas da aba e o pôr e o tirar. A página e o POST são os de Base → Acessos
-(`telas_acessos.py`): só o administrador do Nexus vê e grava, e o POST confere o código do formulário e a origem.
+regras moram em `nexus/pcm/admins_app.py` (o livro `nexus_acessos_app_campo`, que o App lê de 5 em 5 minutos); aqui ficam
+as contas da aba e o pôr e o tirar. A página e o POST são os de Base → Acessos (`telas_acessos.py`): só o administrador do
+Nexus vê e grava, e o POST confere o código do formulário e a origem.
 
 - **Quem dá para escolher:** as fichas do cadastro de pessoas do banco que não estão desligadas nem excluídas.
-- **O código da pessoa** (por onde o App a acha) é o do `responsaveis.codigos`: o do usuário do Fracttal ligado à pessoa
-  em Pessoas e setores e, sem ele, o do e-mail da ficha. Sem código, a pessoa não vira administrador (409 com a frase).
+- **O código da pessoa** (por onde o App a acha) é o do `responsaveis.codigos_e_ambiguos`: o do usuário do Fracttal
+  ligado à pessoa em Pessoas e setores (a ligação de hoje) e, sem ele, o do e-mail da ficha. Sem código, ou com o código
+  que cai em duas fichas, a pessoa não vira administrador (409, com o porquê); nem com o código que já vale na lista por
+  outra ficha (o usuário do Fracttal religado leva o código junto: revisão de 05/11/2026).
 - **Quem decidiu** sai do código do e-mail do login: pela ficha que o tem ou, sem ficha (quem é do escritório ainda não
   tem), pelo e-mail que este Nexus conhece (os administradores e quem entrou em 30 dias). Vazio = a senha de administrador.
+- **O nome sai antes da gravação** no Pôr e no Tirar (revisão de 05/11/2026): um erro na leitura do cadastro depois de
+  gravar viraria "nada mudou" com a linha já no livro.
 """
 import json
 import unicodedata
@@ -28,9 +32,9 @@ class SemCadastro(Exception):
 
 
 def _cadastro(cfg) -> dict:
-    """{"fichas": {pessoa_id: {"nome", "cargo", "vinculo", "ativa"}}, "codigos": {pessoa_id: código}} do cadastro de
-    pessoas do banco, decifrado uma vez. Sem a chave do cadastro, os nomes pelo número (e só os códigos de Pessoas e
-    setores, que não dependem dela)."""
+    """{"fichas": {pessoa_id: {"nome", "cargo", "vinculo", "ativa"}}, "codigos": {pessoa_id: código},
+    "ambiguos": {pessoa_id: por que ficou sem}} do cadastro de pessoas do banco, decifrado uma vez. Sem a chave do
+    cadastro, os nomes pelo número (e só os códigos de Pessoas e setores, que não dependem dela)."""
     from ..campo import visao
     from ..pcm import responsaveis as RP
     try:
@@ -57,7 +61,8 @@ def _cadastro(cfg) -> dict:
         fora = D._txt(p.get("excluido")).lower() == "sim" or D._txt(p.get("status")).lower() == "desligado"
         fichas[pid] = {"pessoa_id": pid, "nome": nome or f"Pessoa {pid}", "cargo": D._txt(p.get("cargo")),
                        "vinculo": D._txt(p.get("vinculo")), "ativa": not fora}
-    return {"fichas": fichas, "codigos": RP.codigos(cfg, SimpleNamespace(pessoas=linhas))}
+    codigos, ambiguos = RP.codigos_e_ambiguos(cfg, SimpleNamespace(pessoas=linhas))
+    return {"fichas": fichas, "codigos": codigos, "ambiguos": ambiguos}
 
 
 def _emails_conhecidos(cfg) -> dict:
@@ -88,6 +93,10 @@ def _sem_acento(s) -> str:
     return " ".join(s.split())
 
 
+def _nome(fichas: dict, pid) -> str:
+    return (fichas.get(pid) or {}).get("nome") or (f"Pessoa {pid}" if pid else "")
+
+
 def contexto(cfg) -> dict:
     """O que a aba mostra: os administradores do App que valem hoje, as fichas para escolher, o histórico e os avisos.
     Tudo com o prefixo `app_` (a página de Acessos é uma só, com as três abas)."""
@@ -98,44 +107,45 @@ def contexto(cfg) -> dict:
     try:
         cad = _cadastro(cfg)
     except SemCadastro as ex:
-        cad, erro_cadastro = {"fichas": {}, "codigos": {}}, str(ex) or "erro"
-    fichas, codigos = cad["fichas"], cad["codigos"]
+        cad, erro_cadastro = {"fichas": {}, "codigos": {}, "ambiguos": {}}, str(ex) or "erro"
+    fichas, codigos, ambiguos = cad["fichas"], cad["codigos"], cad["ambiguos"]
     por_codigo = {c: pid for pid, c in codigos.items()}
     emails = _emails_conhecidos(cfg)
-
-    def nome(pid):
-        return (fichas.get(pid) or {}).get("nome") or (f"Pessoa {pid}" if pid else "")
 
     def quem(h):
         if not h:
             return "administrador (senha)"
         if h in por_codigo:
-            return nome(por_codigo[h])
+            return _nome(fichas, por_codigo[h])
         return emails.get(h) or "alguém fora do cadastro"
 
     atuais = AA.atuais(est, hoje)
     vigentes = []
     for (codigo, _papel), x in atuais.items():
         pid = A._int_ou_none(x.get("pessoa_id"))
-        vigentes.append({"pessoa_id": pid, "nome": nome(pid), "pessoa_hmac": codigo, "status": x["status"],
+        vigentes.append({"pessoa_id": pid, "nome": _nome(fichas, pid), "pessoa_hmac": codigo, "status": x["status"],
                          "desde": hora_br(x.get("decidida_em")), "de": _dm(A._int_ou_none(x.get("de_data_id"))),
                          "ate": _dm(A._int_ou_none(x.get("ate_data_id"))), "quem": quem(D._txt(x.get("decidida_por_hmac"))),
-                         # o e-mail da ficha mudou depois: o App acha a pessoa pelo código de antes, e pode não achar mais
-                         "codigo_mudou": bool(codigos.get(pid)) and codigos.get(pid) != codigo})
+                         # o código da linha já não é o da ficha (o e-mail mudou, o usuário do Fracttal foi religado a
+                         # outra ficha, ou o código caiu em duas): o App acha a pessoa pelo código de antes
+                         "codigo_mudou": not erro_cadastro and codigos.get(pid) != codigo})
     vigentes.sort(key=lambda v: (v["nome"].lower(), v["pessoa_hmac"]))
-    ja = {c for c, _p in atuais}
+    dono = {c: A._int_ou_none(x.get("pessoa_id")) for (c, _p), x in atuais.items()}
     escolher = []
     for pid, f in fichas.items():
-        if not f["ativa"] or (codigos.get(pid) and codigos[pid] in ja):
+        c = codigos.get(pid)
+        if not f["ativa"] or (c and dono.get(c) == pid):          # desligada, excluída ou já administradora
             continue
-        escolher.append(dict(f, tem_codigo=bool(codigos.get(pid)),
+        # o código dela já vale na lista por outra ficha (o usuário do Fracttal religado): fica na lista, com o porquê
+        outra = _nome(fichas, dono[c]) if c and c in dono else ""
+        escolher.append(dict(f, tem_codigo=bool(c), porque=ambiguos.get(pid, ""), outra=outra,
                              busca=_sem_acento(" ".join((f["nome"], f["cargo"], f["vinculo"])))))
     escolher.sort(key=lambda f: (f["nome"].lower(), f["pessoa_id"]))
-    historico = [dict(h, nome=nome(h["pessoa_id"]), quem=quem(h["quem_hmac"]), quando_br=hora_br(h["quando"]),
+    historico = [dict(h, nome=_nome(fichas, h["pessoa_id"]), quem=quem(h["quem_hmac"]), quando_br=hora_br(h["quando"]),
                       de=_dm(h["de"]), ate=_dm(h["ate"]))
                  for h in AA.historico(cfg, est)]
     tem_hmac = bool(str(cfg.get("NEXUS_PESSOA_HMAC") or "").strip())
-    grava = bool(A._arquivo_local(cfg) or cfg.get("GRIDCO_SQL_TOKEN"))
+    grava = bool(AA._arquivo_local(cfg) or cfg.get("GRIDCO_SQL_TOKEN"))
     pode = tem_hmac and grava and not est.get("erro")
     return {"app_vigentes": vigentes, "app_escolher": escolher, "app_historico": historico,
             "app_erro": est.get("erro") or "", "app_velha": bool(est.get("velha")), "app_erro_cadastro": erro_cadastro,
@@ -158,13 +168,25 @@ def por(cfg, pessoa_id, obs, usuario) -> str:
     if not f or not f["ativa"]:
         raise AA.Recusada("Essa pessoa não está entre as fichas ativas do cadastro (desligada ou excluída): atualize a "
                           "página. Nada foi gravado.")
+    nome = f["nome"]                 # antes da gravação: depois dela, nada pode falhar calado
+    if pid in cad["ambiguos"]:
+        raise AA.Recusada(f"{nome}: sem código, porque {cad['ambiguos'][pid]}: o App acharia outra pessoa; corrija o "
+                          "cadastro antes.")
     codigo = cad["codigos"].get(pid)
     if not codigo:
-        raise AA.Recusada(f"{f['nome']}: {AA.SEM_CODIGO}.")
+        raise AA.Recusada(f"{nome}: {AA.SEM_CODIGO}.")
+    est = AA.ler(cfg, forcar=True)
+    outra = AA.atuais(est, A.hoje_id()).get((codigo, "admin"))
+    if outra and A._int_ou_none(outra.get("pessoa_id")) != pid:
+        # o código já vale na lista por outra ficha (o usuário do Fracttal religado leva o código junto); o
+        # `admins_app.decidir` também recusa, aqui é para dizer quem
+        raise AA.Recusada(f"{nome}: o código dela já está na lista de administradores do App com outra ficha "
+                          f"({_nome(cad['fichas'], A._int_ou_none(outra.get('pessoa_id')))}): tire aquela antes. Nada foi "
+                          "gravado.")
     r = AA.decidir(cfg, pessoa_id=pid, pessoa_hmac=codigo, ativo=True, usuario=usuario, obs=obs or "")
     if not r["gravou"]:
-        return f"Nada mudou: {f['nome']} já é administrador do App de Campo."
-    return f"{f['nome']} agora é administrador do App de Campo. O App lê a lista de 5 em 5 minutos."
+        return f"Nada mudou: {nome} já é administrador do App de Campo."
+    return f"{nome} agora é administrador do App de Campo. O App lê a lista de 5 em 5 minutos."
 
 
 def tirar(cfg, pessoa_hmac, usuario) -> str:
@@ -179,9 +201,9 @@ def tirar(cfg, pessoa_hmac, usuario) -> str:
     if not x:
         raise AA.Recusada("Essa pessoa já não é administradora do App de Campo (alguém mudou agora): atualize a página.")
     pid = A._int_ou_none(x.get("pessoa_id"))
-    AA.decidir(cfg, pessoa_id=pid, pessoa_hmac=codigo, ativo=False, usuario=usuario)
-    try:
-        nome = (_cadastro(cfg)["fichas"].get(pid) or {}).get("nome") or f"Pessoa {pid}"
+    try:                             # o nome antes da gravação (revisão de 05/11/2026)
+        nome = _nome(_cadastro(cfg)["fichas"], pid)
     except SemCadastro:
         nome = f"Pessoa {pid}"
+    AA.decidir(cfg, pessoa_id=pid, pessoa_hmac=codigo, ativo=False, usuario=usuario)
     return f"{nome} deixou de ser administrador do App de Campo. O App lê a lista de 5 em 5 minutos."

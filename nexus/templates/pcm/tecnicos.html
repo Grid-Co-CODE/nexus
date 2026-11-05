@@ -69,13 +69,13 @@
   {% endif %}
 
   {# o "Reenviar tudo ao App" (05/11/2026): as ligações de todas as usinas cujo nome no Fracttal ou código mudou, numa
-     gravação só; o "esperado" é a conta confirmada, e o servidor não grava se a de agora for outra #}
+     gravação só; o "esperado" é o resumo confirmado (a conta e os pares), conferido de novo dentro da trava #}
   {% if pode and reenviar_total and not erro %}
   {% set n_lig = reenviar_total ~ (' ligação' if reenviar_total == 1 else ' ligações') %}
   {% set n_us = reenviar_usinas ~ (' usina' if reenviar_usinas == 1 else ' usinas') %}
   <form class="cn-erro cn-aviso tu-carga" method="post" action="{{ raiz }}/t/pcm/tecnicos-por-usina/reemitir-tudo"
         data-confirmar="Reenviar ao App as {{ n_lig }} de {{ n_us }} com o nome do Fracttal ou o código de hoje? Vão numa gravação só.">
-    <input type="hidden" name="esperado" value="{{ reenviar_total }}">{{ manter() }}
+    <input type="hidden" name="esperado" value="{{ reenviar_resumo }}">{{ manter() }}
     <span><b>{{ n_lig }} em {{ n_us }}</b> com o nome do Fracttal ou o código da pessoa mudado: o App ainda tem o de antes.</span>
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-arrows-clockwise"></i> Reenviar tudo ao App</button>
   </form>
@@ -147,7 +147,7 @@
             {% if pode %}<div class="tu-acoes">
               <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-por="{{ l.usina_id }}"><i class="ph ph-user-plus"></i> Pôr técnico</button>
               {% if l.reenviar %}<form method="post" action="{{ raiz }}/t/pcm/tecnicos-por-usina/decidir">
-                <input type="hidden" name="usina_id" value="{{ l.usina_id }}"><input type="hidden" name="acao" value="reemitir">{{ manter() }}
+                <input type="hidden" name="usina_id" value="{{ l.usina_id }}"><input type="hidden" name="acao" value="reemitir"><input type="hidden" name="esperado" value="{{ l.reenviar_resumo }}">{{ manter() }}
                 <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-arrows-clockwise"></i> Reenviar ao App</button></form>{% endif %}
             </div>{% endif %}
           </div>

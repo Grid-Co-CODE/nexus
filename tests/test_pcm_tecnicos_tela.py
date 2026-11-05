@@ -68,11 +68,25 @@ def test_carga_inicial_so_com_livro_vazio(app, banco, logado):
     assert "o livro já tem decisões" in logado.get(ROTA).get_data(as_text=True)
 
 
+def _esperado(html, usina=None):
+    """O resumo que a tela mostrou para confirmar: o do Reenviar tudo, ou o do Reenviar de uma usina."""
+    import re
+    if usina is None:
+        return re.search(r'action="[^"]*/reemitir-tudo"[\s\S]*?name="esperado" value="([^"]+)"', html).group(1)
+    return re.search(rf'name="usina_id" value="{usina}"><input type="hidden" name="acao" value="reemitir">'
+                     r'<input type="hidden" name="esperado" value="([^"]+)"', html).group(1)
+
+
 def test_reemitir_regrava_com_o_nome_novo(app, banco, logado):
     A.decidir(app.config, usina_id=1, usina_fracttal="Nome Antigo", pessoa_id=10, pessoa_hmac=_h("t10@exemplo.test"),
               na_usina=True, usuario=PESSOA)
-    assert "Reenviar ao App" in logado.get(ROTA).get_data(as_text=True)
+    html = logado.get(ROTA).get_data(as_text=True)
+    assert "Reenviar ao App" in html
+    # sem o resumo que a tela mostrou, nada vai (revisão de 05/11/2026: a conta é conferida dentro da trava)
     assert logado.post(ROTA + "/decidir", data={"usina_id": "1", "acao": "reemitir"}).status_code == 303
+    assert len(_decisoes(app)) == 1 and "Faltou a conferência da tela" in logado.get(ROTA).get_data(as_text=True)
+    assert logado.post(ROTA + "/decidir", data={"usina_id": "1", "acao": "reemitir",
+                                                "esperado": _esperado(html, 1)}).status_code == 303
     dec = _decisoes(app)
     assert len(dec) == 2 and dec[-1]["usina_fracttal"] == F1 and dec[-1]["origem"] == "reemissao"
 
@@ -170,15 +184,16 @@ def test_reenviar_tudo_ao_app_confirma_a_conta_e_grava_uma_vez(app, banco, logad
     from test_pcm_tecnicos_usina import F2
     _nomes_antigos(app)
     html = logado.get(ROTA).get_data(as_text=True)
-    assert "Reenviar tudo ao App" in html and 'name="esperado" value="2"' in html
+    esperado = _esperado(html)
+    assert "Reenviar tudo ao App" in html and esperado.startswith("2-")
     assert 'data-confirmar="Reenviar ao App as 2 ligações' in html
-    r = logado.post(ROTA + "/reemitir-tudo", data={"esperado": "3"})
+    r = logado.post(ROTA + "/reemitir-tudo", data={"esperado": "2-0000000000000000"})
     assert r.status_code == 303 and len(_decisoes(app)) == 2
     assert "A conta mudou desde que a tela abriu" in logado.get(ROTA).get_data(as_text=True)
     gravou = []
     original = A._gravar_cru
     monkeypatch.setattr(A, "_gravar_cru", lambda c, t, *a: (gravou.append(1), original(c, t, *a)))
-    r = logado.post(ROTA + "/reemitir-tudo", data={"esperado": "2", "v_equipe": "SP Norte 01"})
+    r = logado.post(ROTA + "/reemitir-tudo", data={"esperado": esperado, "v_equipe": "SP Norte 01"})
     assert r.status_code == 303 and r.headers["Location"].endswith(ROTA + "?equipe=SP+Norte+01") and gravou == [1]
     dec = _decisoes(app)
     assert len(dec) == 4 and [d["origem"] for d in dec[2:]] == ["reemissao", "reemissao"]
@@ -187,15 +202,47 @@ def test_reenviar_tudo_ao_app_confirma_a_conta_e_grava_uma_vez(app, banco, logad
     assert "2 ligações reenviadas ao App" in html and "Reenviar tudo ao App" not in html
 
 
+def test_reenviar_tudo_sem_a_conferencia_da_tela_nao_grava(app, banco, logado):
+    """Revisão de 05/11/2026 (achado 5): o `esperado` é obrigatório. Ausente ou vazio, nada vai; o "0" com nada a
+    reenviar é recusa clara, não "Gravado"."""
+    _nomes_antigos(app)
+    for dados in ({}, {"esperado": ""}):
+        assert logado.post(ROTA + "/reemitir-tudo", data=dados).status_code == 303
+        assert "Faltou a conferência da tela" in logado.get(ROTA).get_data(as_text=True)
+    assert len(_decisoes(app)) == 2
+    logado.post(ROTA + "/reemitir-tudo", data={"esperado": _esperado(logado.get(ROTA).get_data(as_text=True))})
+    assert len(_decisoes(app)) == 4
+    assert logado.post(ROTA + "/reemitir-tudo", data={"esperado": "0"}).status_code == 303
+    html = logado.get(ROTA).get_data(as_text=True)
+    assert "Nada a reenviar" in html and "Nada foi gravado" in html and len(_decisoes(app)) == 4
+
+
+def test_um_tirar_entre_a_tela_e_o_clique_nao_volta_e_a_tela_diz_que_a_conta_mudou(app, banco, logado):
+    """Revisão de 05/11/2026 (achado 2): a conta da tela e a gravação tinham uma janela entre elas. O PCM tira uma pessoa
+    (noutra aba, ou outra pessoa do PCM) depois de a tela abrir e antes do clique: o Reenviar tudo, montado da leitura
+    velha, a punha de volta. Agora os pedidos saem de uma leitura nova, dentro da trava, e só vão se o resumo for o
+    confirmado."""
+    _nomes_antigos(app)
+    esperado = _esperado(logado.get(ROTA).get_data(as_text=True))
+    A.decidir(app.config, usina_id=2, usina_fracttal="Nome Antigo 2", pessoa_id=11,
+              pessoa_hmac=_h("t11@exemplo.test"), na_usina=False, usuario=PESSOA)
+    assert logado.post(ROTA + "/reemitir-tudo", data={"esperado": esperado}).status_code == 303
+    assert "A conta mudou desde que a tela abriu" in logado.get(ROTA).get_data(as_text=True)
+    dec = _decisoes(app)
+    assert len(dec) == 3 and "reemissao" not in {d["origem"] for d in dec}
+    assert (2, 11, "executa") not in _atuais(app)
+
+
 def test_reenviar_tudo_so_quem_programa_e_da_propria_pagina(app, banco, monkeypatch):
     _nomes_antigos(app)
     c = _pessoa(app)
     _no_setor(monkeypatch, SID.RESPONSAVEL_UFV)
     assert "Reenviar tudo ao App" not in c.get(ROTA).get_data(as_text=True)
-    assert c.post(ROTA + "/reemitir-tudo", data={"esperado": "2"}).status_code == 403
+    assert c.post(ROTA + "/reemitir-tudo", data={"esperado": "2-x"}).status_code == 403
     _no_setor(monkeypatch, SID.PCM)
-    assert c.post(ROTA + "/reemitir-tudo", data={"esperado": "2"},
+    esperado = _esperado(c.get(ROTA).get_data(as_text=True))
+    assert c.post(ROTA + "/reemitir-tudo", data={"esperado": esperado},
                   headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
     assert len(_decisoes(app)) == 2
-    assert c.post(ROTA + "/reemitir-tudo", data={"esperado": "2"}).status_code == 303
+    assert c.post(ROTA + "/reemitir-tudo", data={"esperado": esperado}).status_code == 303
     assert len(_decisoes(app)) == 4

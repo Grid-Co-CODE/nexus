@@ -388,6 +388,70 @@ def test_reenviar_tudo_leva_so_as_ligacoes_que_mudaram_numa_gravacao(app, banco,
                                             A.ler(app.config, forcar=True), HOJE) == []
 
 
+CE, MT = "Cliente A - Usina 2 - CE", "Cliente A - Usina 2 - MT"
+
+
+def _usina2_com_duas_grafias(banco, foto=None):
+    """A usina 2 com dois nomes de verdade no de-para (CE e MT) e, se vier, a foto do App com as grafias dela."""
+    _aba(banco, "cadastro_nexus", "de_para", [DE_PARA[0]] + [{"usina_id": 2, "sistema": SIS, "chave_externa": n}
+                                                             for n in (CE, MT)])
+    if foto is not None:
+        _aba(banco, "organizacao_app_campo", "Atribuicoes", [{"Usina": u, "Pessoa (HMAC)": "f" * 24,
+                                                               "Papel": "executa"} for u in foto])
+    visao.limpar()
+
+
+def test_sem_a_foto_do_app_a_usina_de_duas_grafias_fica_com_o_nome_do_livro(app, banco):
+    """Revisão de 05/11/2026 (achado 3): sem a foto do App (ausente, vazia ou fora do ar), o desempate entre dois nomes de
+    verdade virava a ordem alfabética, e o laço, a reemissão e o Reenviar tudo trocariam o nome que o App já usa. Sem a
+    foto, a usina fica com o nome que já vale no livro; o Pôr usa o das linhas que valem; sem nenhuma, o 1º em ordem
+    alfabética. A tela diz que a foto não veio."""
+    from nexus.pcm import responsaveis as R
+    _usina2_com_duas_grafias(banco)
+    with app.test_request_context():
+        assert T.usinas_do_app() is None
+        assert T.nome_no_fracttal(visao._Base(), 2, A.ler(app.config, forcar=True)) == CE        # sem linha: a 1ª
+    _por(app, 2, 11, fracttal=MT)
+    _por(app, 2, 10, fracttal=MT)
+    with app.test_request_context():
+        base, est = visao._Base(), A.ler(app.config, forcar=True)
+        assert T.nome_no_fracttal(base, 2, est) == MT                                            # a do livro
+        assert T.pedidos_da_reemissao_geral(base, T.pessoas_de_campo(base, app.config), est, HOJE) == []
+        peds, _conta = R.pedidos(base, {90: "c" * 24}, est, HOJE)
+    assert {p["usina_id"]: p["usina_fracttal"] for p in peds if p["na_usina"]}[2] == MT
+    ctx = _montar(app)
+    l2 = _linha(ctx, 2)
+    assert l2["fracttal"] == MT and not l2["reenviar"] and ctx["reenviar_total"] == 0
+    assert not any("mudou" in a for a in l2["avisos"])
+    assert any(a.startswith("A foto do App não veio: o nome das usinas com duas grafias não muda até ela voltar")
+               for a in ctx["avisos_gerais"])
+
+
+def test_com_a_foto_do_app_a_grafia_que_ele_usa_vale_e_a_linha_vai_de_novo(app, banco):
+    _usina2_com_duas_grafias(banco, foto=[CE])
+    _por(app, 2, 11, fracttal=MT)
+    with app.test_request_context():
+        base, est = visao._Base(), A.ler(app.config, forcar=True)
+        assert T.usinas_do_app() == {"cliente a-usina 2-ce"}
+        assert T.nome_no_fracttal(base, 2, est) == CE
+        peds = T.pedidos_da_reemissao_geral(base, T.pessoas_de_campo(base, app.config), est, HOJE)
+    assert [(p["usina_id"], p["pessoa_id"], p["usina_fracttal"]) for p in peds] == [(2, 11, CE)]
+    ctx = _montar(app)
+    assert _linha(ctx, 2)["reenviar"] and ctx["reenviar_total"] == 1
+    assert not any(a.startswith("A foto do App não veio") for a in ctx["avisos_gerais"])
+
+
+def test_o_resumo_da_reemissao_e_dos_pares_nao_so_da_conta():
+    """Revisão de 05/11/2026 (achado 2): a tela confirma o resumo das ligações a reenviar, e o envio confere o mesmo
+    resumo; a mesma quantidade com outras ligações é outra conta."""
+    a = [{"usina_id": 1, "pessoa_id": 10, "usina_fracttal": "N1", "pessoa_hmac": "c" * 24},
+         {"usina_id": 2, "pessoa_id": 11, "usina_fracttal": "N2", "pessoa_hmac": "d" * 24}]
+    b = [dict(a[0]), dict(a[1], pessoa_id=12)]
+    assert T.resumo_da_reemissao(a) == T.resumo_da_reemissao(list(reversed(a)))
+    assert T.resumo_da_reemissao(a) != T.resumo_da_reemissao(b)
+    assert T.resumo_da_reemissao(a).startswith("2-") and T.resumo_da_reemissao([]).startswith("0-")
+
+
 def test_reenviar_tudo_sem_a_chave_do_cadastro_leva_o_codigo_gravado(app, banco):
     """Sem o código de hoje (o Nexus sem a chave do cadastro), a linha vai com o código que o App já tem: trocar o bom
     por vazio tiraria a usina da pessoa no App sem o PCM decidir (a mesma regra do Reenviar de uma usina)."""

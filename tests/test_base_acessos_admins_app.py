@@ -58,7 +58,7 @@ def app(tmp_path):
                       "NEXUS_ADMINS": SERVIDOR, "NEXUS_DADOS": str(tmp_path / "dados")})
     app.config.update(TESTING=True, SESSION_COOKIE_SECURE=False, GRIDCO_DB_API="http://pg.falso",
                       NEXUS_PESSOA_HMAC=HMAC, NEXUS_CHAVE_CADASTRO=CHAVE,
-                      NEXUS_PCM_ATRIBUICOES_ARQUIVO=str(tmp_path / "atribuicoes.json"))
+                      NEXUS_ADMINS_APP_ARQUIVO=str(tmp_path / "admins_app.json"))
     api = ApiPGFalsa()
     _aba(api, "cadastro_nexus", "pessoas", _pessoas())
     # o usuário do Fracttal 501 ligado à ficha 11 em Base → Acessos → Pessoas e setores (o setor dele)
@@ -233,3 +233,73 @@ def test_sem_o_banco_a_aba_abre_e_diz(app, admin):
     assert r.status_code == 200 and "Não consegui ler o cadastro de pessoas" in html
     r = _post(admin, "admin_app_por", pessoa_id="10")
     assert r.status_code == 409 and _linhas(app) == []
+
+
+# ── o código da pessoa (revisão de 05/11/2026, achado 4) ─────────────────────────────────────────────────────────
+def _religar(app, *decisoes):
+    """Troca as decisões de Pessoas e setores: (fracttal_id, pessoa_id, e-mail do usuário do Fracttal, quando)."""
+    _aba(app.extensions["nexus_dados_sessao"], S.LIVRO, S.ABA_DECISAO, [
+        {"decidida_em": q, "data_id": 20261012, "fracttal_id": f, "pessoa_id": p, "pessoa_ligada_por": "nome",
+         "pessoa_hmac": _h(e), "setor_id": 1} for f, p, e, q in decisoes])
+    visao.limpar()
+    S._CACHE.clear()
+
+
+def test_o_religado_da_ficha_11_para_a_10_e_recusado_com_o_nome_da_outra(app, admin):
+    """O usuário do Fracttal 501 estava ligado à ficha 11, que virou administradora do App pelo código dele; depois foi
+    religado à ficha 10. Pela ligação de hoje o código é da 10 (a 11 fica sem), e pôr a 10 com o código que já vale na
+    lista pela 11 é recusado, dizendo qual; a linha da 11 avisa que o código dela já não é o da ficha."""
+    assert _post(admin, "admin_app_por", pessoa_id="11").status_code == 303
+    _religar(app, (501, 11, EMAIL_FRACTTAL_11, "2026-10-12T12:00:00Z"), (501, 10, EMAIL_FRACTTAL_11, "2026-10-20T12:00:00Z"))
+    # a 10 segue na lista para escolher (ela não é administradora), com o porquê de não poder entrar ainda
+    escolher = admin.get(ABA).get_data(as_text=True).split('id="aa-lista"', 1)[1].split("</fieldset>", 1)[0]
+    dez = escolher.split('value="10"', 1)[1].split("</label>", 1)[0]
+    assert "o código dela já está na lista com outra ficha (Supervisora Onze)" in dez
+    r = _post(admin, "admin_app_por", pessoa_id="10")
+    html = r.get_data(as_text=True)
+    assert r.status_code == 409
+    assert "Técnico Dez: o código dela já está na lista de administradores do App com outra ficha (Supervisora Onze)" in html
+    assert len(_linhas(app)) == 1
+    vig = html.split('id="aa-vigentes"', 1)[1].split("</table>", 1)[0]
+    assert "Supervisora Onze" in vig and "já não é o desta ficha" in vig
+
+
+def test_o_codigo_de_duas_fichas_fica_sem_e_a_tela_diz_por_que(app, admin):
+    """O usuário do Fracttal com o e-mail da ficha 10 ligado à ficha 12: o código cai nas duas e sai das duas; a lista
+    diz por quê, e o Pôr recusa com 409."""
+    _religar(app, (502, 12, EMAILS[10], "2026-10-12T12:00:00Z"))
+    html = admin.get(ABA).get_data(as_text=True)
+    escolher = html.split('id="aa-lista"', 1)[1].split("</fieldset>", 1)[0]
+    dez = escolher.split('value="10"', 1)[1].split("</label>", 1)[0]
+    assert "o mesmo código está em mais de uma ficha" in dez
+    r = _post(admin, "admin_app_por", pessoa_id="10")
+    assert r.status_code == 409 and "o mesmo código está em mais de uma ficha" in r.get_data(as_text=True)
+    assert _linhas(app) == []
+
+
+# ── o nome antes da gravação (revisão de 05/11/2026, achado 8) ───────────────────────────────────────────────────
+def test_o_nome_sai_antes_da_gravacao_no_por_e_no_tirar(app, admin, monkeypatch):
+    """Uma leitura do cadastro que falhasse DEPOIS de gravar viraria "Não consegui gravar" (ou "nada mudou") com a linha
+    já no livro. O nome sai antes; depois da gravação, nada mais lê o cadastro."""
+    from nexus.auth import telas_admins_app as TAA
+    gravou = {"sim": False}
+    decidir, cadastro = AA.decidir, TAA._cadastro
+
+    def decidir_e_marcar(*a, **k):
+        r = decidir(*a, **k)
+        gravou["sim"] = True
+        return r
+
+    def cadastro_so_antes(cfg):
+        if gravou["sim"]:
+            raise RuntimeError("o cadastro lido depois da gravação")
+        return cadastro(cfg)
+    monkeypatch.setattr(AA, "decidir", decidir_e_marcar)
+    monkeypatch.setattr(TAA, "_cadastro", cadastro_so_antes)
+    codigo = _codigo(admin)
+    assert _post(admin, "admin_app_por", codigo, pessoa_id="10").status_code == 303
+    gravou["sim"] = False
+    assert _post(admin, "admin_app_tirar", codigo, pessoa_hmac=_h(EMAILS[10])).status_code == 303
+    assert [x["ativo"] for x in _linhas(app)] == ["sim", "nao"]
+    gravou["sim"] = False
+    assert "Técnico Dez deixou de ser administrador do App de Campo" in admin.get(ABA).get_data(as_text=True)

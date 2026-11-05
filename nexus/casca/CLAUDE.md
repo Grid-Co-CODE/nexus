@@ -195,27 +195,36 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
 
 **A aba Administradores do App de Campo (05/11/2026, `telas_admins_app.py`).** Levi: "os administradores do App de Campo
 e os técnicos por usina têm de ser escolhidos no Nexus". Quem administra o App passa a ser decidido aqui, e o App lê a
-lista de 5 em 5 min. **Ao contrário da lista de administradores do Nexus, esta mora no BANCO** (a aba `fato_admin_app` do
-livro `nexus_pcm_atribuicoes`, o que o App já lê; dado, assinatura e vigente em `nexus/pcm/CLAUDE.md`, Técnicos por
-usina): é o App que a aplica, e ele só lê o banco.
+lista de 5 em 5 min. **Ao contrário da lista de administradores do Nexus, esta mora no BANCO**, num livro só dela
+(`nexus_acessos_app_campo · fato_admin_app`; dado, assinatura e vigente em `nexus/pcm/CLAUDE.md`, Técnicos por usina):
+é o App que a aplica, e ele só lê o banco.
 - **Quem vê e grava:** só o administrador do Nexus (a trava da rota de Acessos). O Pôr e o Tirar vêm pelo POST da página,
   com o código do formulário e a régua do `_de_outro_site` (`acao` `admin_app_por` e `admin_app_tirar`); recusa volta à
-  aba com o motivo e 409 (a pessoa sem código, a fora das fichas ativas, a lista que mudou, sem a NEXUS_PESSOA_HMAC),
-  outro site ou o formulário vencido dão 403, a pessoa que faltou 400; gravou, 303 de volta à aba.
+  aba com o motivo e 409 (a pessoa sem código, a fora das fichas ativas, o código que já vale na lista por outra ficha,
+  a lista que mudou, sem a NEXUS_PESSOA_HMAC), outro site ou o formulário vencido dão 403, a pessoa que faltou 400;
+  gravou, 303 de volta à aba. O nome da pessoa sai ANTES da gravação, no Pôr e no Tirar (revisão de 05/11/2026: a leitura
+  do cadastro que falhasse depois de gravar viraria um erro com a linha já no livro).
 - **A aba:** a nota "O App de Campo lê esta lista de 5 em 5 min; com a lista vazia ele não tira ninguém (não tranca o
   App)", os números, os que valem hoje (nome da ficha, desde quando, quem decidiu, Tirar com confirmação), o Pôr
   administrador (as fichas do cadastro não desligadas e não excluídas, com a busca da própria página; observação
   opcional, cifrada) e o histórico, o mais novo primeiro. Sem a chave HMAC, sem o token do banco ou com a leitura
-  falhando, a aba só mostra.
-- **O código da pessoa** é o do `responsaveis.codigos`: o do usuário do Fracttal ligado à pessoa em Pessoas e setores e,
-  sem ele, o do e-mail da ficha. Sem código, ela aparece com a etiqueta "sem código" e o Pôr é recusado com "sem e-mail
-  na ficha nem usuário do Fracttal ligado: o App não a reconheceria; corrija o cadastro antes". A ficha cujo e-mail
-  mudou depois de posta ganha o aviso "tire e ponha de novo": o App a acha pelo código da linha que a pôs.
+  falhando, a aba só mostra. Com o JavaScript, os rádios perdem o `required` e o envio confere a escolha: sem pessoa, o
+  aviso vai à linha `aria-live` da contagem e o foco volta à busca (o `required` num rádio que a busca escondeu barrava
+  o envio calado; `tests/test_acessos_admins_app_js.py`). Sem JavaScript, o `required` vale.
+- **O código da pessoa** é o do `responsaveis.codigos_e_ambiguos`: o do usuário do Fracttal ligado à pessoa em Pessoas e
+  setores (só a ligação de hoje de cada usuário: o religado da ficha 11 para a 10 deixava o código nas duas) e, sem ele,
+  o do e-mail da ficha. Sem código, a etiqueta "sem código" e a recusa "sem e-mail na ficha nem usuário do Fracttal
+  ligado: o App não a reconheceria; corrija o cadastro antes"; o código que cai em duas fichas sai das duas, com a
+  etiqueta "o mesmo código está em mais de uma ficha" e a recusa dizendo isso. O código que já vale na lista por outra
+  ficha é recusado com o nome dela, e a linha cujo código já não é o da ficha (o e-mail mudou, o usuário do Fracttal
+  foi religado, o código caiu em duas) ganha o aviso para tirar e, se for o caso, pôr de novo.
 - **Quem decidiu** é o código do e-mail do login: o nome da ficha que o tem ou, sem ficha (o administrador do
   escritório), o e-mail que este Nexus conhece (administradores e quem entrou em 30 dias); vazio = a senha.
 - **Prova:** `tests/test_base_acessos_admins_app.py` (só administrador; pôr, tirar e histórico com quem decidiu; a 409
-  sem código; o código pelo Fracttal ligado; só fichas ativas; outro site, formulário vencido e sem a chave; banco
-  fora; nenhum e-mail das fichas na página). No navegador, a cópia de prova com dados de mentira (1366 e 375 px).
+  sem código; o código pelo Fracttal ligado; o religado da 11 para a 10 e o código de duas fichas; o nome antes da
+  gravação; só fichas ativas; outro site, formulário vencido e sem a chave; banco fora; nenhum e-mail das fichas na
+  página) e `tests/test_acessos_admins_app_js.py` (o envio sem pessoa, no node). No navegador, a cópia de prova com dados
+  de mentira (1366 e 375 px).
 
 ## Nexus lento: Raio-X e o teto do OS Creator (14/10/2026)
 

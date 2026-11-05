@@ -355,10 +355,13 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 .aa-pessoa:has(input:checked){background:var(--verde-suave)}
 .aa-pessoa input{accent-color:var(--verde);width:15px;height:15px;margin:0}
 .aa-pessoa:focus-within{outline:2px solid var(--foco);outline-offset:-2px}
+/* a etiqueta do porquê quebra dentro da linha: em 375 px a de "outra ficha (nome)" passava da caixa e era cortada */
+.aa-pessoa .cad-chip{white-space:normal;max-width:100%}
 .aa-nome{font-weight:600;color:var(--tinta)}
 .aa-det{font-size:12px;color:var(--mudo)}
 .aa-vazio{margin:0;padding:10px 12px}
-.aa-aviso{display:block;margin-top:3px;font-size:12px;color:var(--alerta)}
+/* com uma largura mínima, no celular a tabela rola de lado (como as outras de Acessos) em vez de espremer o aviso */
+.aa-aviso{display:block;margin-top:3px;font-size:12px;color:var(--alerta);min-width:220px}
 .aa-por textarea.gc-campo{width:100%;box-sizing:border-box;resize:vertical;font-family:var(--font-sans)}
 .aa-por>.gc-btn{align-self:flex-start}
 @media (max-width:560px){.aa-por>.gc-btn{align-self:stretch;justify-content:center}}

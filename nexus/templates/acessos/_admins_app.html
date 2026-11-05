@@ -31,7 +31,7 @@
       {% for a in app_vigentes %}
       <tr>
         <td><span class="aa-nome">{{ a.nome }}</span>{% if a.status == 'agendado' %} <span class="cad-chip cad-chip--info">a partir de {{ a.de }}</span>{% endif %}{% if a.ate %} <span class="cad-chip cad-chip--info">até {{ a.ate }}</span>{% endif %}
-          {% if a.codigo_mudou %}<span class="aa-aviso">o e-mail mudou no cadastro depois: tire e ponha de novo para o App reconhecer</span>{% endif %}</td>
+          {% if a.codigo_mudou %}<span class="aa-aviso">o código desta linha já não é o desta ficha no cadastro (o e-mail mudou, o usuário do Fracttal foi religado a outra ficha ou o código está em duas): tire e, se for o caso, ponha de novo</span>{% endif %}</td>
         <td class="num">{{ a.desde or '—' }}</td>
         <td>{{ a.quem }}</td>
         <td class="ace-acao">
@@ -71,7 +71,9 @@
         <input type="radio" name="pessoa_id" value="{{ p.pessoa_id }}" required>
         <span class="aa-nome">{{ p.nome }}</span>
         {% if p.cargo or p.vinculo %}<span class="aa-det">{{ p.cargo or p.vinculo }}</span>{% endif %}
-        {% if not p.tem_codigo %}<span class="cad-chip cad-chip--alerta">sem código: o App não a reconheceria</span>{% endif %}
+        {% if p.outra %}<span class="cad-chip cad-chip--alerta">o código dela já está na lista com outra ficha ({{ p.outra }})</span>
+        {% elif p.porque %}<span class="cad-chip cad-chip--alerta" title="{{ p.porque }}">sem código: o mesmo código está em mais de uma ficha</span>
+        {% elif not p.tem_codigo %}<span class="cad-chip cad-chip--alerta">sem código: o App não a reconheceria</span>{% endif %}
       </label>
       {% else %}<p class="ace-vazio aa-vazio">Nenhuma ficha ativa para escolher.</p>{% endfor %}
       <p class="mudo aa-vazio" data-aa-nada hidden>Ninguém com essa busca.</p>
