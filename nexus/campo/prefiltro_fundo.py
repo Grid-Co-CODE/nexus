@@ -12,7 +12,14 @@ OS, onde as fotos estão.
 
 - Roda depois de cada releitura da fila (`aprovacao._reler`) e no boot, numa thread declarada de fundo no porteiro do
   Fracttal; uma volta por vez, no máximo `NEXUS_PREFILTRO_POR_VOLTA` OS, com `NEXUS_PREFILTRO_PAUSA_S` entre elas (também
-  depois de um erro). O Fracttal recusou (429): a volta para e guarda o que leu; a próxima continua.
+  depois de um erro). O Fracttal recusou (429): a volta espera `ESPERA_RECUSA_S` e segue com a próxima OS; com
+  `RECUSAS_POR_VOLTA` recusas seguidas ela para e guarda o que leu (até 05/11/2026 parava na 1ª e só voltava na releitura
+  da fila, 10 min depois: 3 OS em 40 min).
+- **Só o que muda a coluna** (05/11/2026, "Tem 730 OSs conferindo fotos, veja se travou algo para seguir"): a OS fechada
+  inteira fora do App não é lida (as fotos não mudam a coluna dela: já é Em dúvida, e a foto atrasada só se mede contra o
+  fechamento no App), e na OS mista só as fotos das tarefas do App são baixadas. Eram 522 OS assim, 2.664 tarefas, uma
+  com 66, na frente das 728 feitas pelo App. Quem é do App vem da conta pronta da fila (`aprovacao.tarefas_do_app`); sem
+  ela, lê como antes.
 - **A OS conferida é relida** (revisão de 05/11/2026): a OS é lida minutos depois de entrar na verificação, e a foto
   anexada "mais de 24 h depois do fechamento" só existe DEPOIS. Relê uma vez quando a janela de `NEXUS_PREFILTRO_HORAS_TARDE`
   desde o fim no Fracttal fecha e, depois, uma vez por dia enquanto a OS espera; só as fotos novas são baixadas (o id é o
@@ -49,6 +56,8 @@ POR_PAGINA = 100
 MAX_PAGINAS = 20                  # 2.000 anexos numa OS; a maior da medição de 26/10 tinha 75
 RELER_S = 24 * 3600               # a OS conferida é relida uma vez por dia enquanto espera a aprovação
 TENTATIVAS, ESPERA_FALHA_S = 3, 6 * 3600
+RECUSAS_POR_VOLTA = 5         # recusas seguidas do Fracttal (429) que param a volta
+ESPERA_RECUSA_S = 60          # a espera depois de uma recusa, antes da próxima OS
 GRAVAR_A_CADA = 10
 _FATOS: dict = {}
 _FALHAS: dict = {}                # {id_wo: [falhas seguidas, quando foi a última]}: foto que não baixou (passageiro)
@@ -210,10 +219,13 @@ def _listar(folio: str) -> list[dict]:
     return rest
 
 
-def _ler_os(tarefas: list[dict], p: dict, velho: dict | None = None) -> dict:
-    """Os fatos da OS. `velho` = os da leitura anterior: as fotos já lidas não são baixadas de novo."""
+def _ler_os(tarefas: list[dict], p: dict, velho: dict | None = None, do_app: set[str] | None = None) -> dict:
+    """Os fatos da OS. `velho` = os da leitura anterior: as fotos já lidas não são baixadas de novo. `do_app` = as tarefas
+    da OS fechadas pelo App: só as fotos delas são baixadas (a foto sem tarefa, só se a OS inteira foi pelo App); None =
+    todas."""
     folio = str(tarefas[0].get("wo_folio") or "")
     ids_tarefas = {str(w.get("id_work_orders_tasks")) for w in tarefas}
+    toda_do_app = do_app is not None and ids_tarefas <= do_app
     conhecidos = {a["id"]: a for a in (velho or {}).get("anexos") or []}
     anexos, urls = [], {}
     for a in _listar(folio):
@@ -222,6 +234,8 @@ def _ler_os(tarefas: list[dict], p: dict, velho: dict | None = None) -> dict:
         tarefa = str(a.get("id_work_order_task") or "")
         if not IMG.search(caminho) or (tarefa and tarefa not in ids_tarefas):
             continue
+        if do_app is not None and not (tarefa in do_app if tarefa else toda_do_app):
+            continue                              # a foto da tarefa fora do App não é julgada: não é baixada
         id_ = hashlib.sha1(caminho.encode("utf-8")).hexdigest()[:16]
         if id_ in urls:                           # o mesmo arquivo listado duas vezes não vira "p02 é a mesma de p02"
             continue
@@ -238,7 +252,7 @@ def _ler_os(tarefas: list[dict], p: dict, velho: dict | None = None) -> dict:
     return {"chave": _chave(tarefas), "lido_em": _agora(), "anexos": anexos, "pares": pares, "erro": ""}
 
 
-def conferir(app, linhas: list[dict], cos: dict | None = None) -> int:
+def conferir(app, linhas: list[dict], cos: dict | None = None, do_app: dict[str, set[str]] | None = None) -> int:
     """Uma volta: as OS do escopo sem fatos (ou com tarefas que mudaram), a mais nova primeiro, e depois as conferidas
     que precisam ser relidas (`_devida`), a lida há mais tempo primeiro, até o teto. Quantas OS ficaram conferidas."""
     p = prefiltro.parametros(app.config if app else {})
@@ -256,6 +270,9 @@ def conferir(app, linhas: list[dict], cos: dict | None = None) -> int:
             n, quando = _FALHAS.get(k, (0, 0.0))
             if (n >= TENTATIVAS and agora - quando < ESPERA_FALHA_S) or prefiltro.fora_do_escopo(ts, cos):
                 continue
+            folio = str(ts[0].get("wo_folio") or "")
+            if do_app is not None and folio in do_app and not do_app[folio]:
+                continue                          # fechada inteira fora do App: as fotos não mudam a coluna
             f = _FATOS.get(k)
             if f is None or f.get("chave") != _chave(ts):
                 novas.append((k, ts))
@@ -263,13 +280,17 @@ def conferir(app, linhas: list[dict], cos: dict | None = None) -> int:
                 relidas.append((k, ts))
         novas.sort(key=lambda c: max(str(w.get("final_date") or "") for w in c[1]), reverse=True)
         relidas.sort(key=lambda c: float(_FATOS[c[0]].get("lido_em") or 0))
-        lidas = 0
+        lidas, recusas = 0, 0
         for k, ts in (novas + relidas)[:p["por_volta"]]:
             try:
-                f = _ler_os(ts, p, _FATOS.get(k))
+                f = _ler_os(ts, p, _FATOS.get(k), (do_app or {}).get(str(ts[0].get("wo_folio") or "")))
             except fracttal.Recusado as e:
-                _ESTADO.update(erro=str(e)[:160], erro_em=time.time())
-                break
+                recusas += 1
+                if recusas >= RECUSAS_POR_VOLTA:
+                    _ESTADO.update(erro=str(e)[:160], erro_em=time.time())
+                    break
+                _dormir(ESPERA_RECUSA_S)          # a cota volta em um minuto; a OS recusada fica para a próxima volta
+                continue
             except Exception as e:      # noqa: BLE001 — foto que não baixou, S3 fora: passageiro, a OS fica para depois
                 falha = _FALHAS.setdefault(k, [0, 0.0])
                 falha[0], falha[1] = falha[0] + 1, agora
@@ -279,7 +300,7 @@ def conferir(app, linhas: list[dict], cos: dict | None = None) -> int:
                 continue
             _FATOS[k] = f
             _FALHAS.pop(k, None)
-            lidas += 1
+            lidas, recusas = lidas + 1, 0
             if lidas % GRAVAR_A_CADA == 0:
                 _gravar()                 # cada push na main reinicia o servidor: o lido até aqui não se perde
             _dormir(p["pausa_s"])
@@ -311,7 +332,8 @@ def _volta(app) -> None:
                 cos = verificacao.criadores_cos(visao._base(), visao._sessao(), fracttal_pessoal.ler_pessoal)
             except Exception:      # noqa: BLE001 — sem o setor COS agora: lê também as do COS (só custa pedidos)
                 cos = None
-        conferir(app, list(regras_app._FILA_CACHE.get("linhas") or []), cos)
+        from . import aprovacao
+        conferir(app, list(regras_app._FILA_CACHE.get("linhas") or []), cos, aprovacao.tarefas_do_app())
     except Exception:      # noqa: BLE001
         logging.exception("pré-filtro: a volta de fundo falhou")
     finally:

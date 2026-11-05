@@ -163,7 +163,9 @@ def classificar(o: dict, fatos: dict | None, fechado_app: str, p: dict) -> dict:
         avisos.append({"tipo": "fora_app", "nivel": "alerta", "fotos": [],
                        "texto": f"{fora} tarefa{_s(fora)} fechada{_s(fora)} fora do App: sem as fotos e os horários do "
                                 "App para conferir"})
-    if fatos is None and (nao_ok or duvida):
+    # as fotos só mudam a coluna da OS que tem tarefa pelo App (a foto atrasada se mede contra o fechamento no App); a OS
+    # fechada inteira fora do App não espera foto nenhuma (05/11/2026: 522 OS assim seguravam a leitura de fundo)
+    if fatos is None and (nao_ok or duvida) and any(t.get("pelo_app") for t in tarefas):
         avisos.append({"tipo": "faltam", "nivel": "neutro", "texto": "Faltam fotos por ler", "fotos": []})
     # a regra do App de antes (nota, devolvida, foto divergente, ronda com pendência) vira só aviso: a coluna é dos fatos
     from .aprovacao import motivos

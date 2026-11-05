@@ -50,7 +50,7 @@ def test_o_cartao_no_modelo_do_quadro_da_equipe_com_o_aprovar(quadro, logado):
     assert 'class="apq-c-os"' in cab and 'class="apq-c-dias' in cab
     assert '<h3 class="apq-c-tit">' in c and 'class="apq-c-onde"' in c and "Usina A" in c and "Thopen" in c
     pe = c[c.index('class="apq-c-pe"'):c.index("</footer>")]
-    assert 'class="cn-avatar apq-c-av"' in pe and "2 tarefas" in pe
+    assert 'class="cn-avatar apq-c-av"' in pe and "2 tarefas" in c[c.index('class="apq-c-onde"'):]
     # 3ª volta (05/11/2026: "o botão aprovar pode ficar paralelo ao extremo direita do nome do técnico / Nota do app pode
     # ficar ao lado direito de tarefa (...) diminua o tamanho do botão para caber, nota também!")
     assert "data-apq-aprovar" in pe and pe.index("apq-c-quem") < pe.index("data-apq-aprovar")
@@ -74,18 +74,18 @@ def test_a_leitura_da_fila_vai_para_a_exclamacao(quadro, logado):
 
 
 def test_o_motivo_de_em_duvida_e_de_nao_ok_em_destaque(quadro, logado):
-    """5. O motivo da coluna vem no topo do cartão, num bloco com a cor, o ícone e a palavra (não só a cor): o fato que
-    pôs a OS ali, com a prova (as duas fotos da repetida)."""
+    """5. O motivo da coluna vem no topo do cartão, num bloco com a cor e o ícone (não só a cor; a palavra é a da
+    coluna, desde a 3ª rodada): o fato que pôs a OS ali; a prova (as fotos) fica na barra lateral."""
     html = _html(logado)
     nao_ok = _cartao(html, "15102")
-    m = re.search(r'<div class="apq-motivo" data-nivel="critico" role="note">(.*?)</div>\s*</div>', nao_ok, re.S)
-    assert m and '<i class="ph ph-x-circle"' in m.group(1) and "Não OK" in m.group(1)
+    m = re.search(r'<div class="apq-motivo" data-nivel="critico" role="note">(.*?)</div>', nao_ok, re.S)
+    assert m and '<i class="ph ph-x-circle"' in m.group(1)
     assert "1 foto anexada 2 dias depois do fechamento no App" in m.group(1)
     assert nao_ok.index('class="apq-motivo"') < nao_ok.index('class="apq-c-tit"')     # antes de tudo, depois do topo
     duvida = _cartao(html, "15088")
-    m = re.search(r'<div class="apq-motivo" data-nivel="alerta" role="note">(.*?)</div>\s*</div>', duvida, re.S)
-    assert m and '<i class="ph ph-warning"' in m.group(1) and "Em dúvida" in m.group(1)
-    assert "Foto repetida: p03 é a mesma imagem de p01" in m.group(1) and "p03 · Inversor" in m.group(1)
+    m = re.search(r'<div class="apq-motivo" data-nivel="alerta" role="note">(.*?)</div>', duvida, re.S)
+    assert m and '<i class="ph ph-warning"' in m.group(1)
+    assert "Foto repetida: p03 é a mesma imagem de p01" in m.group(1)
     assert "1 tarefa fechada fora do App" in _cartao(html, "15002").split('class="apq-c-tit"')[0]
     assert 'class="apq-motivo"' not in _cartao(html, "16001")                       # Pronta: nada a destacar
     css = CSS.read_text(encoding="utf-8")

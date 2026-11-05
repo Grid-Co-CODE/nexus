@@ -1,0 +1,57 @@
+{# A barra lateral da OS na Aprovação (Levi, 05/11/2026: "clica no número da OS ou no próprio card da OS e abre uma barra
+   lateral detalhando qual é a pendência, em que tarefa é, uma coisa profissional e detalhada! poupa informação inicial e
+   vai aprofundando"). O pedaço vem da rota `aprovacao_detalhe` (só memória) e entra na `#apq-gaveta` da tela. Cada fato
+   com a prova: a foto (o número, o campo e a tarefa) e a hora; a tarefa fechada fora do App. As fotos abrem no card da
+   OS (o do OS Creator), como no Histórico. O Aprovar daqui é o do cartão (a mesma confirmação e a mesma conferência). #}
+{% set tom = {'pronta': 'ok', 'duvida': 'alerta', 'nao_ok': 'critico'}.get(o.coluna, 'neutro') %}
+{% macro foto(x) %}<button type="button" class="apq-foto" data-apq-card="{{ o.id_wo }}" data-folio="{{ o.os }}" title="Abrir o card da OS {{ o.os }}, com as fotos"><i class="ph ph-image" aria-hidden="true"></i>{{ x.rot }}{% if x.campo %} · {{ x.campo }}{% endif %}</button>{% endmacro %}
+<header class="apq-g-cab">
+  <p class="gc-eyebrow">OS em verificação · <span class="cn-t-{{ cor_espera(o.espera_d) }}">{{ 'hoje' if o.espera_d == 0 else 'há ' ~ o.espera_d ~ ' dias' }}</span></p>
+  <h2 id="apq-g-titulo"><span class="apq-g-os">OS {{ o.os }}</span><span class="cn-st cn-t-{{ tom }}">{{ nome_coluna.get(o.coluna, o.coluna) }}</span></h2>
+  <p class="apq-g-onde"><b>{{ o.usina_cad or sem_cadastro }}</b> · {{ o.cliente_cad or 'sem cliente no cadastro' }} · Responsável O&amp;M: {{ o.responsavel_cad or sem_responsavel }}</p>
+  <div class="apq-g-acoes">
+    <button type="button" class="gc-btn gc-btn--primario" data-apq-aprovar-de="{{ o.id_wo }}">Aprovar</button>
+    <button type="button" class="gc-btn gc-btn--contorno" data-apq-card="{{ o.id_wo }}" data-folio="{{ o.os }}"><i class="ph ph-arrow-square-out" aria-hidden="true"></i> Abrir o card da OS</button>
+  </div>
+  <p class="apq-msg" data-apq-g-msg role="status" hidden></p>
+</header>
+
+<section class="apq-g-sec" aria-labelledby="apq-g-fatos">
+  <h3 id="apq-g-fatos">{% if o.coluna == 'nao_ok' %}Por que é Não OK{% elif o.coluna == 'duvida' %}O que pede o seu olho{% elif o.coluna == 'pronta' %}Nenhum fato contra{% else %}A situação{% endif %}</h3>
+  {% if o.fora_motivo %}<p class="apq-g-nota">Fora do pré-filtro: {{ o.fora_motivo }}. A OS fica sem as regras e não entra na conta.</p>{% endif %}
+  {% for x in d.fatos if x.tipo != 'app' %}
+  <article class="apq-g-fato" data-nivel="{{ x.nivel }}">
+    <p class="apq-g-fato-t"><i class="ph {{ 'ph-x-circle' if x.nivel == 'critico' else ('ph-warning' if x.nivel == 'alerta' else 'ph-info') }}" aria-hidden="true"></i>{{ x.texto }}</p>
+    {% if x.tipo == 'tarde' %}
+    <p class="apq-g-det">Fechada no App em <b>{{ d.fechado_app or '—' }}</b>; conta a foto anexada mais de {{ horas_tarde }} h depois.</p>
+    <ul class="apq-g-lista">{% for f in x.fotos %}<li>{{ foto(f) }}<span>{% if f.tarefa %}{{ f.tarefa }} · {% endif %}anexada em <b>{{ f.anexada or '—' }}</b></span></li>{% endfor %}</ul>
+    {% elif x.tipo == 'repetida' %}
+    <ul class="apq-g-lista">{% for b, a in x.pares %}<li>{% if b %}{{ foto(b) }}{% endif %}<span class="apq-par-igual" aria-hidden="true">=</span>{% if a %}{{ foto(a) }}{% endif %}<span>{% if b and b.tarefa %}{{ b.tarefa }}{% endif %}{% if a and a.tarefa and a.tarefa != (b.tarefa if b else '') %} · {{ a.tarefa }}{% endif %}</span></li>{% endfor %}</ul>
+    <p class="apq-g-det">A mesma imagem, comparada sem o carimbo do App (data, GPS e campo mudam a cada anexo).</p>
+    {% elif x.tipo == 'nao_abriu' %}
+    <ul class="apq-g-lista">{% for f in x.fotos %}<li>{{ foto(f) }}<span>{{ f.tarefa }}</span></li>{% endfor %}</ul>
+    {% elif x.tipo == 'fora_app' %}
+    <ul class="apq-g-lista">{% for t in x.tarefas %}<li><span><b>{{ t.texto }}</b> · {{ t.tecnico }}{% if t.fim %} · fim {{ t.fim }}{% endif %}</span></li>{% endfor %}</ul>
+    {% endif %}
+  </article>
+  {% else %}{% if not o.fora_motivo %}<p class="apq-g-nota cn-t-ok"><i class="ph ph-check-circle" aria-hidden="true"></i> As fotos e os horários conferem: nada contra a OS.</p>{% endif %}{% endfor %}
+</section>
+
+<section class="apq-g-sec" aria-labelledby="apq-g-t">
+  <h3 id="apq-g-t">Tarefas <span class="apq-g-n">{{ d.tarefas|length }}</span></h3>
+  <ol class="apq-g-tarefas">
+    {% for t in d.tarefas %}
+    <li>
+      <p class="apq-g-tarefa"><b>{{ t.texto }}</b>{% if t.pelo_app %}<span class="apq-g-chip" data-tom="{{ 'neutro' if t.nota is none else ('ok' if t.nota >= 80 else ('alerta' if t.nota >= 50 else 'critico')) }}">Pelo App{% if t.nota is not none %} · nota {{ t.nota }}{% endif %}</span>{% else %}<span class="apq-g-chip" data-tom="alerta">Fora do App</span>{% endif %}</p>
+      <p class="apq-g-meta">{% if t.ativo %}{{ t.ativo }} · {% endif %}{{ t.tecnico }}{% if t.fim %} · fim {{ t.fim }}{% endif %}</p>
+      {% if t.motivos %}<ul class="apq-g-motivos">{% for m in t.motivos %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="apq-g-sec" aria-labelledby="apq-g-f">
+  <h3 id="apq-g-f">Fotos{% if d.n_fotos %} <span class="apq-g-n">{{ d.n_fotos }}</span>{% endif %}</h3>
+  <p class="apq-g-nota">{{ d.estado_fotos }}</p>
+  <p class="apq-g-nota mudo">As fotos ficam no card da OS: o número de cada foto abre o card.</p>
+</section>

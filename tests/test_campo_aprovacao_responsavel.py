@@ -123,17 +123,16 @@ def test_o_cartao_traz_o_score_os_avisos_e_logo_depois_o_aprovar(quadro, logado)
     avisos = c[c.index('class="apq-avisos"'):c.index("data-apq-aprovar")]
     for texto in ("Nota do registro 71%", "Já foi devolvida"):
         assert texto in avisos, texto
-    # o fato que decide a coluna fica no motivo em destaque, no topo (2ª rodada, 05/11/2026), com o nome das duas fotos
-    # da repetida, que abrem o card da OS (Levi: "pode mostrar o nome das fotos e se a pessoa clicar ela vai abrir o card")
+    # o fato que decide a coluna fica no motivo em destaque, no topo (2ª rodada, 05/11/2026); o nome das fotos fica na
+    # barra lateral da OS (3ª rodada: "poupa informação inicial e vai aprofundando")
     motivo = c[c.index('class="apq-motivo"'):c.index('class="apq-score')]
     assert "Foto repetida: p03 é a mesma imagem de p01" in motivo
-    for rot in ("p01 · Inversor", "p03 · Inversor"):
-        assert f'<button type="button" class="apq-foto" data-apq-abrir' in motivo and rot in motivo, rot
-    assert "<img" not in c and "/t/campo/aprovacao/foto/" not in c
+    assert "<img" not in c and "/t/campo/aprovacao/foto/" not in c and 'class="apq-foto"' not in c
     nao_ok = _cartao(html, "15102")
     assert "1 foto anexada 2 dias depois do fechamento no App" in nao_ok and "data-apq-aprovar" in nao_ok
     fora_do_app = _cartao(html, "15002")
-    assert "1 tarefa fechada fora do App" in fora_do_app and "Faltam fotos por ler" in fora_do_app
+    # fechada inteira fora do App: as fotos não mudam a coluna e não são esperadas (05/11/2026)
+    assert "1 tarefa fechada fora do App" in fora_do_app and "Faltam fotos por ler" not in fora_do_app
     assert "Fora do App" in fora_do_app[fora_do_app.index('class="apq-score'):]
 
 
@@ -142,7 +141,8 @@ def test_marcar_para_o_lote_so_em_pronta_e_em_duvida(quadro, logado):
     for folio in ("16001", "15088"):
         assert "data-apq-marcar" in _cartao(html, folio), folio
     assert "data-apq-marcar" not in _cartao(html, "15102")
-    assert "data-apq-marcar" not in _cartao(html, "15002")        # em dúvida, mas com fotos por ler
+    # a 15002 (fechada inteira fora do App) não espera foto desde 05/11/2026: entra no lote como as outras
+    assert "data-apq-marcar" in _cartao(html, "15002")
     assert "data-apq-lote" in html and "Aprovar as marcadas" in html
     for coluna in ("pronta", "duvida"):
         assert "data-apq-todas" in _coluna(html, coluna)
@@ -297,9 +297,10 @@ def test_o_cartao_diz_quando_as_fotos_foram_conferidas(quadro, logado):
 
 
 def test_com_fotos_por_ler_nao_entra_no_lote(quadro, logado):
-    """A OS em dúvida com fotos ainda por ler pode virar Não OK depois da leitura: aprova pelo cartão, não no lote."""
+    """A OS em dúvida com fotos ainda por ler pode virar Não OK depois da leitura: aprova pelo cartão, não no lote. A OS
+    fechada inteira fora do App não espera foto (elas não mudam a coluna): entra no lote (05/11/2026)."""
     c = _cartao(logado.get("/t/campo/aprovacao?responsavel=*").get_data(as_text=True), "15002")
-    assert "Faltam fotos por ler" in c and "data-apq-marcar" not in c and "data-apq-aprovar" in c
+    assert "Faltam fotos por ler" not in c and "data-apq-marcar" in c and "data-apq-aprovar" in c
 
 
 def test_o_lote_tem_ritmo_e_para_no_que_se_repetiria(quadro, logado):

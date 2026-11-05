@@ -135,9 +135,19 @@ def test_sem_fatos_e_conferindo():
 
 
 def test_fato_com_fotos_por_ler_vai_para_a_coluna_pior():
-    r = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None)), None, "", P)
+    """A OS mista (uma tarefa fora do App, outra pelo App) com as fotos por ler: Em dúvida já, e as fotos da tarefa do App
+    ainda podem pôr Não OK."""
+    r = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None, id_wt=1), _tarefa(id_wt=2)), None, FECHADO, P)
     assert r["coluna"] == "duvida"
     assert any(a["texto"] == "Faltam fotos por ler" for a in r["avisos"])
+
+
+def test_os_inteira_fora_do_app_nao_espera_as_fotos():
+    """05/11/2026 ("Tem 730 OSs conferindo fotos, veja se travou algo"): 522 OS fechadas inteiras fora do App esperavam
+    a leitura das fotos, que não muda a coluna delas (Em dúvida pela tarefa fora do App; a foto atrasada só se mede
+    contra o fechamento no App, que elas não têm). Sem "Faltam fotos por ler": entram no lote como as outras."""
+    r = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None)), None, "", P)
+    assert r["coluna"] == "duvida" and [a["tipo"] for a in r["avisos"]] == ["fora_app"]
 
 
 def test_avisos_da_regra_do_app_nao_mudam_a_coluna():
@@ -230,7 +240,8 @@ def test_cada_aviso_diz_o_tipo_e_a_repetida_traz_os_pares():
     r = prefiltro.classificar(o, _fatos(anexos, [("a1", "a3")]), FECHADO, P)
     assert [a["tipo"] for a in r["avisos"]] == ["tarde", "repetida", "fora_app", "app"]
     assert r["avisos"][1]["pares"] == [{"a": "a1", "b": "a3", "ra": "p01", "rb": "p03", "da": "Inversor", "db": ""}]
-    sem_fotos = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None)), None, "", P)
+    sem_fotos = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None, id_wt=1), _tarefa(id_wt=2)), None,
+                                      FECHADO, P)
     assert [a["tipo"] for a in sem_fotos["avisos"]] == ["fora_app", "faltam"]
 
 

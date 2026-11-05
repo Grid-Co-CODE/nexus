@@ -1743,7 +1743,10 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       "GPS " na descrição, só até `NEXUS_PREFILTRO_DIF_PRINT` 4, porque telas parecidas enganam), tarefa fechada fora do
       App ou foto que não abriu no Nexus (upload cortado). **Pronta**: nenhum fato. A OS fica na pior coluna; um fato
       com fotos ainda por ler já a põe na coluna pior, com "Faltam fotos por ler"; sem fato e sem as fotos lidas, ela
-      fica em **Ainda conferindo** (abaixo do quadro: aprova pelo cartão, não entra no lote). A regra do App de antes
+      fica em **Ainda conferindo** (abaixo do quadro: aprova pelo cartão, não entra no lote). A OS **fechada inteira fora
+      do App não espera foto nenhuma** (05/11/2026): as fotos não mudam a coluna dela (Em dúvida pela tarefa fora do App; a
+      foto atrasada só se mede contra o fechamento no App), então vai direto para Em dúvida, sem "Faltam fotos por ler",
+      e entra no lote. A regra do App de antes
       (nota abaixo de 80, já devolvida, foto divergente, ronda; `aprovacao.motivos`) virou só aviso, sem mudar a coluna.
       "Menos de 5 min no App" e "subtarefas respondidas" não separaram na medição e ficaram de fora.
     - **Fora do pré-filtro** (abaixo do quadro, com o motivo; aprova pelo cartão; **não entra na conta** das OS
@@ -1759,7 +1762,14 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       OS do escopo sem fatos (ou cujas tarefas mudaram), a mais nova primeiro: UM GET de anexos por OS no Fracttal
       (`work_orders_attachments?folio=`, 100 por página) e as imagens pelo S3, fora da cota de 200/min; no máximo
       `NEXUS_PREFILTRO_POR_VOLTA` (150) OS por volta e `NEXUS_PREFILTRO_PAUSA_S` (2) s entre elas (também depois de um
-      erro); o 429 para a volta e guarda o que leu. **A OS conferida é relida** (revisão de 05/11/2026): ela é lida
+      erro). **O 429** (o Fracttal recusou pela cota) espera `ESPERA_RECUSA_S` (60 s) e segue com a próxima OS; com
+      `RECUSAS_POR_VOLTA` (5) recusas seguidas a volta para e guarda o que leu (até 05/11/2026 parava na 1ª e só voltava
+      na releitura da fila, 10 min depois). **Só o que muda a coluna** (05/11/2026, "Tem 730 OSs conferindo fotos, veja
+      se travou algo para seguir"; medido em produção: 72 OS conferidas em 90 min, com 522 OS fechadas inteiras fora do
+      App, 2.664 tarefas, uma com 66, na fila de leitura na frente das 728 feitas pelo App): a OS sem tarefa do App não é
+      lida, e na OS mista só as fotos das tarefas do App são baixadas (a repetida entre uma foto do App e uma de fora não
+      é mais vista; a OS mista já é Em dúvida pela tarefa fora do App). Quem é do App vem da conta pronta da fila
+      (`aprovacao.tarefas_do_app`, sem refazer a conta); sem ela, lê como antes. **A OS conferida é relida** (revisão de 05/11/2026): ela é lida
       minutos depois de entrar na verificação, e a foto anexada dias depois só existe depois; relê uma vez quando a janela
       de 24 h desde o fim no Fracttal fecha e, depois, uma vez por dia enquanto espera, baixando só as fotos novas (o id é
       o caminho no S3). As OS novas passam na frente das relidas. Foto que não baixou deixa a OS sem fatos (meia leitura
@@ -1776,16 +1786,25 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       a cópia de prova põe 0). **A visita só lê memória** (nem Fracttal, nem banco, nem S3).
     - **O cartão** (2ª rodada, 05/11/2026: o modelo do cartão do Quadro da equipe da Engenharia, "porém com o botão
       aprovar"; a coluna e o cartão com o fio na cor da coluna, o cartão na superfície 2), nesta ordem: no topo a OS em
-      **verde Grid, sem sublinhado** ("tire esse underline estranho!"; abre o card do OS Creator, `NexusOsCard.abrir`,
-      status "Em Verificação") e os dias; logo abaixo o **motivo da coluna em destaque** (`apq-motivo`: "Sempre destacar
-      o motivo de estar em dúvida ou não OK! tem que estar bem visual e acessível"): o fundo e o fio na cor, o ícone e a
-      palavra NÃO OK ou EM DÚVIDA (a cor nunca sozinha) e os fatos que puseram a OS ali (`prefiltro.TIPOS_DO_MOTIVO`:
-      tarde, repetida, não abriu, fora do App), com a prova (da repetida, o nome das duas fotos, o número e o campo,
-      que abre o card da OS, como no Histórico do OS Creator); em Fora do pré-filtro e
-      Ainda conferindo, o mesmo bloco, neutro, com o motivo; depois a tarefa (a 1ª, "e mais N"), o ativo, a UFV e o
-      cliente; o **score** (a nota do App, a pior das tarefas; "Fora do App" sem ela); os outros avisos (a regra do App,
-      as fotos por ler); no pé o técnico (as iniciais), as tarefas e quando as fotos foram conferidas; e logo depois o
-      **Aprovar** = o Concluir do OS Creator (`POST /os/api/os/<id>/concluir` com
+      **verde Grid, sem sublinhado** ("tire esse underline estranho!") e os dias; logo abaixo o **motivo da coluna em
+      destaque** (`apq-motivo`: "Sempre destacar o motivo de estar em dúvida ou não OK! tem que estar bem visual e
+      acessível"): o fundo e o fio na cor, o ícone e a mensagem na cor da coluna, sem repetir o nome da coluna (3ª rodada:
+      "tire esse 'EM DÚVIDA' da OS deixe só a mensagem em laranja"), com os fatos que puseram a OS ali
+      (`prefiltro.TIPOS_DO_MOTIVO`: tarde, repetida, não abriu, fora do App); em Fora do pré-filtro e Ainda conferindo, o
+      mesmo bloco, neutro; depois a tarefa (a 1ª, "e mais N") com a nota do App ao lado (pequena; "Fora do App" sem ela);
+      a linha de baixo com quantas tarefas, a UFV e o cliente (o ativo já vem no título: "não precisa repetir o nome do
+      ativo abaixo, ao invés disso bote a quantidade de tarefas"); os outros avisos (a regra do App, as fotos por ler); e
+      o pé com o técnico (as iniciais), quando as fotos foram conferidas e, na ponta direita, o **Aprovar** pequeno. A
+      caixa de marcar é a do Nexus (o fundo da superfície e o fio; marcada, o verde com o visto), não a nativa, branca no
+      tema escuro. **A barra lateral** (3ª rodada: "clica no número da OS ou no próprio card da OS e abre uma barra
+      lateral detalhando qual é a pendência, em que tarefa é (...) poupa informação inicial e vai aprofundando"): o
+      número e o cartão (fora da caixa e dos botões; o Enter também) abrem a barra das Rondas (`rd-gaveta`, 1/3 da tela à
+      direita), que busca `/t/campo/aprovacao/<id>/detalhe` (`_aprovacao_detalhe.html`, só memória, 404 fora da fila):
+      a OS, a coluna, a UFV e o responsável; cada fato com a prova (a hora do fechamento no App e cada foto atrasada com o
+      campo, a tarefa e a hora de anexação; os pares repetidos; as tarefas fechadas fora do App); as tarefas da OS (pelo
+      App com a nota e os avisos do App, ou fora do App); e o estado das fotos. O número de cada foto e o "Abrir o card da
+      OS" abrem o card do OS Creator (`NexusOsCard.abrir`, status "Em Verificação"), onde as fotos estão; o Aprovar da
+      barra é o do cartão. Logo depois do score e dos avisos vem o **Aprovar** = o Concluir do OS Creator (`POST /os/api/os/<id>/concluir` com
       `{folio}`, a rota do Painel do responsável e do OS Creator Web: status 3 + recalculate + reconferência da data de
       fim), com o login do Fracttal de quem clica; IRREVERSÍVEL, pede confirmação; o 401 vira "Entre no OS Creator com a
       sua conta do Fracttal". Aprovada só com `ok: true` na resposta: sem a sessão do Nexus, o portão dá 302 para /entrar
@@ -1816,7 +1835,7 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       recontam as colunas. CSV: OS, dias, criação, fim, Responsável O&M, usina, cliente, técnicos, tarefas, nota do App,
       a coluna ("Fora do pré-filtro (motivo)") e os motivos. No celular as colunas deslizam de lado dentro do quadro.
       Prova: `test_campo_aprovacao_responsavel.py`, `test_campo_aprovacao_visual_0511.py` (a 2ª rodada),
-      `test_campo_prefiltro.py` e `test_campo_prefiltro_fundo.py`.
+      `test_campo_aprovacao_gaveta_0511.py` (a 3ª), `test_campo_prefiltro.py` e `test_campo_prefiltro_fundo.py`.
   - **A conta pronta (18/10/2026, "Está demorando muito para carregar")**: a regra do App sobre a fila inteira leva uns
     3,5 s só de conta (medido em 18/10 com uma fila falsa de 5.500 tarefas), mais a leitura das notas no banco, e a
     cópia de 5 min (`leitura.ler`) vencia entre uma releitura e outra: quase toda visita pagava, e cada filtro de região

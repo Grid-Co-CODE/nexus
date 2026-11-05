@@ -1167,9 +1167,22 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .apq-cartao[data-coluna="duvida"]{box-shadow:inset 3px 0 0 var(--alerta-cheio)}
 .apq-cartao[data-coluna="nao_ok"]{box-shadow:inset 3px 0 0 var(--critico-cheio)}
 .apq-cartao[hidden]{display:none}
+.apq-cartao[data-apq-detalhe]{cursor:pointer}
+.apq-cartao[data-apq-detalhe]:hover{border-color:var(--linha-forte)}
+.apq-cartao:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.apq-cartao--ativo{border-color:var(--verde)}
 .apq-cartao[data-estado="aprovada"]{border-color:var(--ok-cheio);box-shadow:inset 3px 0 0 var(--ok-cheio)}
 .apq-c-cab{display:flex;align-items:center;gap:8px;min-width:0}
-.apq-marcar{flex:none;width:17px;height:17px;margin:0;accent-color:var(--verde);cursor:pointer}
+/* a caixa de marcar do Nexus (05/11/2026: "Esse check box branco no tema escuro é muito feio!"): o fundo da superfície,
+   o fio e, marcada, o verde com o visto */
+.apq-marcar,.apq-todas input{appearance:none;-webkit-appearance:none;flex:none;display:inline-grid;place-content:center;width:18px;height:18px;
+  margin:0;border:1.5px solid var(--linha-forte);border-radius:5px;background:var(--superficie);cursor:pointer}
+.apq-marcar:hover,.apq-todas input:hover{border-color:var(--verde)}
+.apq-marcar:checked,.apq-todas input:checked{border-color:var(--verde);background:var(--verde)}
+.apq-marcar:checked::after,.apq-todas input:checked::after{content:"";width:5px;height:9px;margin-top:-2px;
+  border:solid var(--sobre-verde);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.apq-marcar:focus-visible,.apq-todas input:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.apq-marcar:disabled{opacity:.45;cursor:default}
 /* o número da OS no verde da Grid, sem sublinhado (05/11/2026: "tire esse underline estranho!") */
 .apq-c-os{padding:0;border:0;background:none;color:var(--verde-texto);font:700 13px/1.2 var(--font-mono);cursor:pointer;text-decoration:none}
 .apq-c-os:hover{color:var(--tinta)}
@@ -1180,13 +1193,15 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .apq-motivo{display:flex;gap:9px;align-items:flex-start;padding:9px 10px;border-radius:9px;border:1px solid var(--linha-forte);
   border-left-width:4px;background:var(--superficie-3);color:var(--tinta)}
 .apq-motivo > .ph{flex:none;font-size:19px;line-height:1.2;color:var(--tinta-2)}
-.apq-motivo > div{min-width:0}
-.apq-motivo-t{display:block;font:800 12px/1.3 var(--font-sans);letter-spacing:.05em;text-transform:uppercase}
-.apq-motivo ul{display:grid;gap:4px;margin:3px 0 0;padding:0;list-style:none;font:600 13px/1.4 var(--font-sans);overflow-wrap:anywhere}
+/* a coluna já diz Em dúvida ou Não OK (05/11/2026: "tire esse 'EM DÚVIDA' da OS deixe só a mensagem em laranja"): a
+   mensagem na cor da coluna, com o ícone */
+.apq-motivo ul{display:grid;gap:4px;min-width:0;margin:0;padding:0;list-style:none;font:600 13px/1.4 var(--font-sans);overflow-wrap:anywhere}
 .apq-motivo[data-nivel="critico"]{background:var(--critico-suave);border-color:var(--critico-cheio)}
-.apq-motivo[data-nivel="critico"] > .ph,.apq-motivo[data-nivel="critico"] .apq-motivo-t{color:var(--critico)}
+.apq-motivo[data-nivel="critico"] > .ph{color:var(--critico)}
+.apq-motivo[data-nivel="critico"] li{color:var(--critico)}
 .apq-motivo[data-nivel="alerta"]{background:var(--alerta-suave);border-color:var(--alerta-cheio)}
-.apq-motivo[data-nivel="alerta"] > .ph,.apq-motivo[data-nivel="alerta"] .apq-motivo-t{color:var(--alerta)}
+.apq-motivo[data-nivel="alerta"] > .ph{color:var(--alerta)}
+.apq-motivo[data-nivel="alerta"] li{color:var(--alerta)}
 .apq-motivo[data-nivel="neutro"] ul{font-weight:500;color:var(--tinta-2)}
 /* a tarefa e a nota na mesma linha (05/11/2026: "Nota do app pode ficar ao lado direito de tarefa") */
 .apq-c-tarefa{display:flex;align-items:flex-start;gap:10px;min-width:0}
@@ -1206,7 +1221,6 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .apq-aviso[data-nivel="alerta"]{border-left-color:var(--alerta-cheio)}
 .apq-aviso[data-nivel="ok"]{border-left-color:var(--ok-cheio);color:var(--ok)}
 /* o nome das duas fotos do par, que abre o card da OS (05/11/2026: sem a foto no cartão) */
-.apq-par{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:5px}
 .apq-par-igual{font:700 12px var(--font-mono);color:var(--mudo)}
 .apq-foto{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid var(--linha-forte);border-radius:999px;
   background:var(--superficie);color:var(--verde-texto);font:600 12px/18px var(--font-sans);cursor:pointer;text-decoration:none}
@@ -1220,6 +1234,42 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 /* o Aprovar menor, na ponta direita do pé (05/11/2026: "paralelo ao extremo direita do nome do técnico") */
 .apq-c-pe .apq-aprovar{flex:none;margin-left:auto;padding:5px 12px;font-size:12.5px;line-height:16px}
 .apq-msg{margin:0;font-size:12.5px;line-height:1.4}
+/* a barra lateral da OS (05/11/2026): a das Rondas (rd-gaveta), com o detalhe da pendência em seções */
+.apq-g-cab{padding-right:36px}
+.apq-g-cab h2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:4px 0 2px;font:700 19px/1.25 var(--font-sans)}
+.apq-g-os{font:700 19px/1.25 var(--font-mono);color:var(--verde-texto)}
+.apq-g-onde{margin:0;font-size:12.5px;color:var(--tinta-2)}
+.apq-g-acoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.apq-g-acoes .gc-btn{padding:6px 12px;font-size:12.5px}
+.apq-g-cab .apq-msg{margin-top:8px}
+.apq-g-sec{margin-top:18px;padding-top:14px;border-top:1px solid var(--linha)}
+.apq-g-sec h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font:700 13px/1.3 var(--font-sans);letter-spacing:.04em;
+  text-transform:uppercase;color:var(--mudo)}
+.apq-g-n{padding:0 7px;border-radius:999px;background:var(--superficie-3);font:700 11.5px/18px var(--font-sans);color:var(--tinta-2);
+  letter-spacing:0}
+.apq-g-fato{margin-bottom:10px;padding:10px 12px;border:1px solid var(--linha-forte);border-left-width:4px;border-radius:9px;
+  background:var(--superficie-2)}
+.apq-g-fato[data-nivel="critico"]{border-color:var(--critico-cheio);background:var(--critico-suave)}
+.apq-g-fato[data-nivel="alerta"]{border-color:var(--alerta-cheio);background:var(--alerta-suave)}
+.apq-g-fato-t{display:flex;gap:8px;align-items:flex-start;margin:0;font:600 13.5px/1.4 var(--font-sans);color:var(--tinta)}
+.apq-g-fato-t .ph{flex:none;font-size:18px;line-height:1.1}
+.apq-g-fato[data-nivel="critico"] .apq-g-fato-t .ph{color:var(--critico)}
+.apq-g-fato[data-nivel="alerta"] .apq-g-fato-t .ph{color:var(--alerta)}
+.apq-g-det{margin:6px 0 0 26px;font-size:12.5px;color:var(--tinta-2)}
+.apq-g-lista{display:grid;gap:6px;margin:8px 0 0 26px;padding:0;list-style:none;font-size:12.5px;color:var(--tinta-2)}
+.apq-g-lista li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.apq-g-nota{display:flex;gap:6px;align-items:center;margin:0 0 6px;font-size:13px;color:var(--tinta-2)}
+.apq-g-tarefas{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.apq-g-tarefas > li{padding:9px 11px;border:1px solid var(--linha);border-radius:9px;background:var(--superficie-2)}
+.apq-g-tarefa{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;margin:0;font-size:13px;color:var(--tinta)}
+.apq-g-tarefa b{font-weight:600}
+.apq-g-chip{margin-left:auto;padding:1px 8px;border-radius:999px;border:1px solid var(--linha-forte);font:700 11px/17px var(--font-sans);
+  color:var(--tinta-2);white-space:nowrap}
+.apq-g-chip[data-tom="ok"]{border-color:var(--ok-cheio);color:var(--ok)}
+.apq-g-chip[data-tom="alerta"]{border-color:var(--alerta-cheio);color:var(--alerta)}
+.apq-g-chip[data-tom="critico"]{border-color:var(--critico-cheio);color:var(--critico)}
+.apq-g-meta{margin:3px 0 0;font-size:12px;color:var(--mudo);overflow-wrap:anywhere}
+.apq-g-motivos{margin:6px 0 0;padding-left:16px;font-size:12px;color:var(--tinta-2)}
 .apq-msg[hidden]{display:none}
 .apq-vazio{margin:6px 2px;font-size:12.5px}
 .apq-extra{margin-top:14px;padding:10px 14px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}

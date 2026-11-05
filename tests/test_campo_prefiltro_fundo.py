@@ -120,13 +120,36 @@ def test_teto_por_volta_e_a_mais_nova_primeiro(fundo):
     assert prefiltro_fundo.conferir(fundo["app"], linhas) == 1 and prefiltro_fundo.fatos(15001)
 
 
-def test_recusa_para_a_volta_e_guarda_o_lido(fundo):
+def test_recusa_espera_e_segue_e_para_no_teto(fundo):
+    """O Fracttal recusou (429): a volta espera um minuto e segue com a próxima OS (05/11/2026: antes ela parava e só
+    voltava na releitura da fila, 10 min depois, e em 40 min só 3 OS eram conferidas); com 5 recusas seguidas ela para e
+    guarda o que leu."""
     fx = _usar({})
     fx.recusar_em = 1
-    linhas = [_tarefa(15001, fim="2026-10-20T10:00:00"), _tarefa(15002, fim="2026-10-10T10:00:00")]
+    linhas = [_tarefa(15000 + i, fim=f"2026-10-{20 - i:02d}T10:00:00") for i in range(1, 9)]
     assert prefiltro_fundo.conferir(fundo["app"], linhas) == 1
     assert prefiltro_fundo.fatos(15001) and prefiltro_fundo.fatos(15002) is None
+    assert len(fx.pedidos) == 1 + prefiltro_fundo.RECUSAS_POR_VOLTA == 6            # a 7ª e a 8ª ficam para a próxima
+    assert fundo["dormidas"].count(prefiltro_fundo.ESPERA_RECUSA_S) == prefiltro_fundo.RECUSAS_POR_VOLTA - 1 == 4
     assert "429" in prefiltro_fundo.estado()["erro"]
+
+
+def test_uma_recusa_so_espera_e_a_volta_segue(fundo):
+    fx = _usar({"15001": [_anexo("15001", 1)], "15003": [_anexo("15003", 3)]})
+    original = fx.__call__
+    n = []
+
+    def uma_recusa(path):
+        n.append(path)
+        if len(n) == 2:
+            raise fracttal.Recusado("429")
+        return original(path)
+    fracttal.usar_fornecedor(uma_recusa)
+    linhas = [_tarefa(15001, fim="2026-10-20T10:00:00"), _tarefa(15002, fim="2026-10-19T10:00:00"),
+              _tarefa(15003, fim="2026-10-18T10:00:00")]
+    assert prefiltro_fundo.conferir(fundo["app"], linhas) == 2
+    assert prefiltro_fundo.fatos(15002) is None and prefiltro_fundo.fatos(15003)
+    assert prefiltro_fundo.ESPERA_RECUSA_S in fundo["dormidas"] and prefiltro_fundo.estado()["erro"] == ""
 
 
 def test_falha_no_s3_nao_guarda_a_os(fundo):
@@ -376,3 +399,26 @@ def test_ligado_por_padrao_so_onde_o_campo_aquece():
     assert prefiltro_fundo.ligado({"NEXUS_CAMPO_AQUECER": "0"}) is False
     assert prefiltro_fundo.ligado({"NEXUS_CAMPO_AQUECER": "0", "NEXUS_PREFILTRO": "1"}) is True
     assert prefiltro_fundo.ligado({"NEXUS_PREFILTRO": "0"}) is False
+
+
+# ── só o que muda a coluna (05/11/2026, "Tem 730 OSs conferindo fotos, veja se travou algo para seguir") ──────────
+def test_os_sem_tarefa_do_app_nao_e_lida(fundo):
+    """A OS fechada inteira fora do App não tem as fotos lidas: elas não mudam a coluna (eram 522 OS e 2.664 tarefas na
+    fila de leitura, uma delas com 66 tarefas, na frente das 728 feitas pelo App). Sem saber quem é do App (a conta
+    pronta ainda não saiu), lê como antes."""
+    fx = _usar({"15001": [_anexo("15001", 1)], "15002": [_anexo("15002", 2)]})
+    linhas = [_tarefa(15001, fim="2026-10-20T10:00:00"), _tarefa(15002, fim="2026-10-19T10:00:00")]
+    assert prefiltro_fundo.conferir(fundo["app"], linhas, None, {"15001": set(), "15002": {"150021"}}) == 1
+    assert [p.split("folio=")[1].split("&")[0] for p in fx.pedidos] == ["15002"]
+    assert prefiltro_fundo.fatos(15001) is None and prefiltro_fundo.fatos(15002)
+    prefiltro_fundo.limpar()
+    assert prefiltro_fundo.conferir(fundo["app"], linhas, None, None) == 2
+
+
+def test_na_os_mista_so_as_fotos_das_tarefas_do_app_sao_baixadas(fundo):
+    """Na OS mista, a foto da tarefa fechada fora do App não é julgada (a hora do App não vale para ela): não é baixada."""
+    sem_tarefa = {**_anexo("15001", 3), "id_work_order_task": None}
+    _usar({"15001": [_anexo("15001", 1, tarefa=150011), _anexo("15001", 2, tarefa=150012), sem_tarefa]})
+    linhas = [_tarefa(15001, 1), _tarefa(15001, 2)]
+    assert prefiltro_fundo.conferir(fundo["app"], linhas, None, {"15001": {"150011"}}) == 1
+    assert len(fundo["s3"].pedidos) == 1 and [a["tarefa"] for a in prefiltro_fundo.fatos(15001)["anexos"]] == ["150011"]

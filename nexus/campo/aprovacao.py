@@ -405,6 +405,22 @@ def tirar_da_fila(id_wo) -> int:
     return len(linhas) - len(restam)
 
 
+def tarefas_do_app() -> dict[str, set[str]] | None:
+    """{folio: as tarefas da OS fechadas pelo App (id da tarefa)}, da conta pronta da fila inteira, sem refazer a conta;
+    None se ela ainda não saiu. A leitura de fundo das fotos usa para não ler o que não muda a coluna (05/11/2026): a OS
+    sem tarefa do App e as fotos das tarefas fechadas fora do App."""
+    alvo = tuple(sorted({k: str(v) for k, v in FILA_INTEIRA.items()}.items()))
+    for chave, r in list(_PRONTA.items()):
+        if chave[0] == "fila_toda" and chave[2] is None and chave[3:] == alvo:
+            out: dict[str, set[str]] = {}
+            for x in (r.dados or {}).get("linhas") or ():
+                ids = out.setdefault(str(x.get("os") or ""), set())
+                if x.get("pelo_app") and x.get("id_wt"):
+                    ids.add(str(x["id_wt"]))
+            return out
+    return None
+
+
 def limpar():
     _PRONTA.clear()
     _ESTADO.update(lendo=False, erro="", erro_em=0.0)

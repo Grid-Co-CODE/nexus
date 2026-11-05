@@ -1866,14 +1866,8 @@ def aprovacao():
     v = request.args.get("responsavel")
     responsavel = _responsavel_logado_pelo_cadastro() if v is None else ("" if v == TODOS else v)
     mapa = visao.usinas_do_fracttal()
-    por_nome = (mapa.dados or {}).get("por_nome") or {}
     leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA)
-    todas = (leitura.dados or {}).get("linhas") or []
-    for x in todas:
-        cad = por_nome.get(regras_app._norm(x.get("usina_fx"))) or {}
-        x["usina_cad"], x["equipe_cad"] = cad.get("usina") or x.get("usina_fx") or "", cad.get("equipe") or ""
-        x["responsavel_cad"], x["cliente_cad"] = cad.get("responsavel") or "", cad.get("cliente") or ""
-        x["cadastrada"] = bool(cad)
+    todas = _com_cadastro((leitura.dados or {}).get("linhas") or [], mapa)
     todas_os = _por_os(todas)
     oss = [o for o in todas_os if not responsavel or o["responsavel_cad"] == responsavel]
     q = _quadro(oss)
@@ -1889,6 +1883,75 @@ def aprovacao():
         clientes=sorted({o["cliente_cad"] for o in oss if o["cliente_cad"]}),
         horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"], cor_espera=_cor_espera,
         sem_responsavel=visao.SEM_RESPONSAVEL, sem_cadastro=SEM_CADASTRO))
+
+
+def _com_cadastro(linhas: list[dict], mapa) -> list[dict]:
+    """A usina, a equipe, o responsável e o cliente do cadastro em cada tarefa da fila, pela usina do Fracttal."""
+    por_nome = (mapa.dados or {}).get("por_nome") or {}
+    for x in linhas:
+        cad = por_nome.get(regras_app._norm(x.get("usina_fx"))) or {}
+        x["usina_cad"], x["equipe_cad"] = cad.get("usina") or x.get("usina_fx") or "", cad.get("equipe") or ""
+        x["responsavel_cad"], x["cliente_cad"] = cad.get("responsavel") or "", cad.get("cliente") or ""
+        x["cadastrada"] = bool(cad)
+    return linhas
+
+
+def _detalhe_da_os(o: dict, f: dict | None) -> dict:
+    """O que a barra lateral mostra da OS (05/11/2026: "detalhando qual é a pendência, em que tarefa é"): cada fato com a
+    prova (a foto, o campo, a tarefa e a hora; a tarefa fechada fora do App), as tarefas da OS com o que o App disse de
+    cada uma, e o estado das fotos. Só o que a visita já tem em memória: a fila e os fatos da leitura de fundo."""
+    texto = {str(t.get("id_wt") or ""): t.get("tarefa") or "" for t in o["tarefas"]}
+    fechado = max((str(t.get("fechado_app") or "") for t in o["tarefas"]), default="")
+    fotos = {}
+    for n, a in enumerate((f or {}).get("anexos") or [], 1):
+        fotos[a["id"]] = {"rot": f"p{n:02d}", "campo": a.get("desc") or "", "tarefa": texto.get(str(a.get("tarefa") or ""), ""),
+                          "anexada": _hora_do_app(a.get("anexada")) if a.get("anexada") else "",
+                          "abriu": a.get("hash") is not None or "hash" not in a}
+    tarefas = [{"texto": t.get("tarefa") or "(sem título)", "ativo": t.get("ativo") or "", "tecnico": t.get("tecnico") or "—",
+                "fim": _hora_do_app(t.get("fim")) if t.get("fim") else "", "pelo_app": bool(t.get("pelo_app")),
+                "nota": t.get("qualidade") if t.get("pelo_app") else None,
+                "motivos": [txt for cor, txt in campo_aprovacao.motivos(t) if cor != "ok"] if t.get("pelo_app") else []}
+               for t in o["tarefas"]]
+    fatos = []
+    for a in o["avisos"]:
+        x = {"tipo": a.get("tipo"), "nivel": a.get("nivel"), "texto": a.get("texto"), "fotos": [], "pares": [], "tarefas": []}
+        if a.get("tipo") in ("tarde", "nao_abriu"):
+            x["fotos"] = [fotos[i] for i in a.get("fotos") or [] if i in fotos]
+        elif a.get("tipo") == "repetida":
+            x["pares"] = [(fotos.get(par["b"]), fotos.get(par["a"])) for par in a.get("pares") or []]
+        elif a.get("tipo") == "fora_app":
+            x["tarefas"] = [t for t in tarefas if not t["pelo_app"]]
+        fatos.append(x)
+    if o["fora_motivo"]:
+        estado = f"Fotos não lidas: a OS fica fora do pré-filtro ({o['fora_motivo']})."
+    elif not any(t.get("pelo_app") for t in o["tarefas"]):
+        estado = "Fotos não lidas: a OS foi fechada inteira fora do App, e as fotos não mudam a coluna dela."
+    elif f is None:
+        estado = "Fotos ainda não conferidas: o Nexus lê por trás, as OS mais novas primeiro."
+    else:
+        estado = f"{len(fotos)} foto{'s' if len(fotos) != 1 else ''} das tarefas do App conferida{'s' if len(fotos) != 1 else ''} em {o['fotos_em']}."
+    return {"fatos": fatos, "tarefas": tarefas, "fechado_app": _hora_do_app(fechado) if fechado else "",
+            "estado_fotos": estado, "n_fotos": len(fotos)}
+
+
+@bp.route("/aprovacao/<int:id_wo>/detalhe")
+def aprovacao_detalhe(id_wo):
+    """A barra lateral da OS (Levi, 05/11/2026: "clica no número da OS ou no próprio card da OS e abre uma barra lateral
+    detalhando qual é a pendência, em que tarefa é, uma coisa profissional e detalhada! poupa informação inicial e vai
+    aprofundando"). Um pedaço de página, buscado no clique; só memória (a fila guardada e os fatos da leitura de fundo),
+    como a tela: nada do Fracttal, do banco nem do S3. A OS que não está na fila dá 404."""
+    from ...campo import prefiltro, prefiltro_fundo
+    leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA)
+    linhas = [x for x in (leitura.dados or {}).get("linhas") or [] if str(x.get("id_wo") or "") == str(id_wo)]
+    if not linhas:
+        abort(404)
+    o = _por_os(_com_cadastro(linhas, visao.usinas_do_fracttal()))[0]
+    _quadro([o])
+    f = None if o["fora_motivo"] else prefiltro_fundo.fatos(o.get("id_wo"))
+    return render_template("campo/_aprovacao_detalhe.html", o=o, d=_detalhe_da_os(o, f),
+                           nome_coluna=NOME_DA_COLUNA | {"fora": "Fora do pré-filtro"}, cor_espera=_cor_espera,
+                           horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"],
+                           sem_responsavel=visao.SEM_RESPONSAVEL, sem_cadastro=SEM_CADASTRO)
 
 
 @bp.route("/aprovacao/<int:id_wo>/conferir", methods=["POST"])
