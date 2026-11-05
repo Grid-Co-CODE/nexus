@@ -40,8 +40,11 @@ def instalar(app):
     # mandar e assinar a PT pelo responsável do Nexus (NEXUS_RESPONSAVEIS=0 desliga numa máquina)
     from ..pcm import responsaveis
     responsaveis.ligar(app)
-    # a última fila boa da Aprovação, do disco, já no boot e em toda máquina: não vai ao Fracttal (13/10/2026)
-    threading.Thread(target=lambda: aprovacao.carregar_do_disco(app), daemon=True, name="nexus-fila-disco").start()
+    # a última fila boa da Aprovação, do disco, já no boot e em toda máquina: não vai ao Fracttal (13/10/2026); e os
+    # fatos das fotos que o pré-filtro já conferiu (05/11/2026), também do disco
+    from . import prefiltro_fundo
+    threading.Thread(target=lambda: (aprovacao.carregar_do_disco(app), prefiltro_fundo.carregar_do_disco(app)),
+                     daemon=True, name="nexus-fila-disco").start()
     # NEXUS_CAMPO_AQUECER=0 desliga só o que vai ao Fracttal ao subir (a cota é de 200/min para a empresa inteira)
     if str(app.config.get("NEXUS_CAMPO_AQUECER", "1")) != "0":
         from . import ronda_checklist

@@ -114,6 +114,9 @@ def _reler(app):
                     fila_toda(FILA_INTEIRA)
             except Exception:      # noqa: BLE001 — aquecer é conforto; a tela calcula na hora se precisar
                 pass
+            # as fotos das OS novas da fila (o pré-filtro por fatos, 05/11/2026): uma volta por trás, nunca na tela
+            from . import prefiltro_fundo
+            prefiltro_fundo.pedir_conferencia(app)
     except Exception as e:      # noqa: BLE001 — 429, página faltando, rede: a tela segue com a última fila boa
         _ESTADO.update(erro=str(getattr(e, "msg", "") or e)[:160], erro_em=time.time())
     finally:
@@ -218,6 +221,8 @@ def _preparar(app):
             fila_toda(FILA_INTEIRA)
     except Exception:      # noqa: BLE001
         logging.exception("fila da Aprovação: a conta pronta não saiu")
+    from . import prefiltro_fundo                 # e a volta do pré-filtro sobre a fila do disco
+    prefiltro_fundo.pedir_conferencia(app)
 
 
 def fila(params: dict, usinas=None) -> Leitura:
