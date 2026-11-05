@@ -69,13 +69,16 @@
 
   {# as subtarefas padrão da atividade (Levi, 05/11/2026: "Quero que no OS Creator > Performance tenha um campo para
      subtarefas, que vamos poder editar as subtarefas padrões de cada atividade!"; "Quando criamos uma OS as atividades já
-     vem com aquelas subtarefas"): a lista que toda OS desta atividade leva. O Salvar padrão vale para todo mundo, a partir
-     da próxima OS; o plano no Fracttal não muda. Quem monta é o perf.js (`/os/api/performance/subtarefas`) #}
-  <div class="os-cardf" id="w_subs"><div class="os-cardf-h"><span class="os-badge">4</span><span class="os-cardf-t">Subtarefas da atividade</span>
+     vem com aquelas subtarefas"; e "quero que dê para editar o tipo de tarefa também!"): o tipo e a lista que toda OS desta
+     atividade leva. O Salvar padrão vale para todo mundo, a partir da próxima OS; o plano no Fracttal não muda. Quem monta é
+     o perf.js (`/os/api/performance/subtarefas`) #}
+  <div class="os-cardf" id="w_subs"><div class="os-cardf-h"><span class="os-badge">4</span><span class="os-cardf-t">Tipo e subtarefas da atividade</span>
       <span class="os-cresce"></span><button type="button" class="os-btn secondary mini" id="b_subs_editar" hidden>Editar</button></div>
     <div class="os-ajuda" id="subs_origem">Carregando as subtarefas…</div>
+    <div class="os-resumo" id="subs_tipo" hidden></div>
     <ol class="os-subs-lista" id="subs_lista"></ol>
     <div id="subs_ed" hidden>
+      <label class="os-campo perf-sub-tipo-tarefa"><span class="os-lbl">Tipo de tarefa</span><select id="subs_tipo_sel"></select></label>
       <div class="os-subs" id="subs_linhas"></div>
       <div><button type="button" class="os-btn secondary mini" id="b_subs_mais">+ Acrescentar subtarefa</button></div>
       <div class="os-ajuda">Salvar vale para todas as OS novas desta atividade, para todo mundo. O plano no Fracttal não muda.</div>

@@ -120,14 +120,16 @@ def livro_limpo():
 
 def test_o_padrao_salvo_vale_e_a_volta_ao_fracttal_fica_no_historico(app, banco, livro_limpo):
     assert SP.atual(FRASE)["lista"] is None and not SP.atual(FRASE)["erro"]   # o livro antes da 1ª gravação: o plano
-    e = SP.salvar(FRASE, LISTA, CONTA)
-    assert e["lista"] == LISTA and e["por"] == "Pessoa Teste" and e["evento"] == "salvou" and e["quando"]
+    e = SP.salvar(FRASE, LISTA, CONTA, "Inspeção")
+    assert e["lista"] == LISTA and e["tipo_tarefa"] == "Inspeção" and e["por"] == "Pessoa Teste" and e["evento"] == "salvou"
+    assert e["quando"]
     linhas = banco.linhas(SP.LIVRO, SP.ABA)
-    assert [(l["atividade"], l["evento"], str(l["n_subtarefas"])) for l in linhas] == [(FRASE, "salvou", "2")]
+    assert [(l["atividade"], l["evento"], str(l["n_subtarefas"]), l["tipo_tarefa"]) for l in linhas] == \
+        [(FRASE, "salvou", "2", "Inspeção")]
     assert "Pessoa Teste" not in json.dumps(linhas, default=str, ensure_ascii=False) and linhas[0]["pessoa_hmac"]
     assert SP.atual("recomposicao de string")["lista"] is None                # a outra atividade não muda
     e = SP.voltar_ao_fracttal(FRASE, CONTA)
-    assert e["lista"] is None and e["evento"] == "voltou_ao_fracttal"
+    assert e["lista"] is None and e["tipo_tarefa"] == "" and e["evento"] == "voltou_ao_fracttal"
     assert len(banco.linhas(SP.LIVRO, SP.ABA)) == 2                           # o histórico fica
     with pytest.raises(SP.Recusada, match="login"):
         SP.salvar(FRASE, LISTA, {"nome": "Sem E-mail"})
@@ -178,6 +180,18 @@ def test_a_os_da_atividade_ja_sai_com_o_padrao(caminho):
     assert [s["description"] for s in tarefas[0]["subtasks"]] == [s["description"] for s in PLANO_SUBS]
 
 
+def test_a_os_da_atividade_leva_o_tipo_de_tarefa_do_padrao():
+    """No mesmo dia: "quero que dê para editar o tipo de tarefa também!": o tipo do padrão vence o do plano e o do app (a
+    inspeção do inversor sairia Corretiva)."""
+    _ret, tarefas = _rodar(lambda: api.create_performance_os(_itens(), id_responsible=77, responsible_name="Ana Teste",
+                                                             event_date=EVENTO, prog_date=PROGRAMADA, subtarefas_padrao=LISTA,
+                                                             tipo_tarefa_padrao="Inspeção"))
+    assert {(t["tasks_types_main_description"], t["id_task_type_main"]) for t in tarefas} == \
+        {("Inspeção", api.TASK_TYPE_MAIN["Inspeção"])}
+    _ret, tarefas = _rodar(_uma_por_ativo(LISTA))                                    # sem tipo no padrão: o do app
+    assert {t["tasks_types_main_description"] for t in tarefas} == {"Corretiva"}
+
+
 def test_o_fracttal_que_recusa_o_padrao_cria_com_as_do_plano_e_diz():
     ret, tarefas = _rodar(_uma_por_ativo(LISTA), falha_tarefa=1)
     assert [len(t["subtasks"]) for t in tarefas] == [2, 4, 4]           # a recusada, a de novo e a 2ª, com as do plano
@@ -188,30 +202,33 @@ def test_o_fracttal_que_recusa_o_padrao_cria_com_as_do_plano_e_diz():
 class _Gancho:
     Recusada = SP.Recusada
 
-    def __init__(self, lista=None, erro=""):
-        self.estado = {"lista": lista, "evento": "salvou" if lista else "", "quando": "05/11/2026 01:30" if lista else "",
-                       "por": "Pessoa Teste" if lista else "", "erro": erro}
+    def __init__(self, lista=None, erro="", tipo_tarefa=""):
+        self.estado = {"lista": lista, "tipo_tarefa": tipo_tarefa, "evento": "salvou" if lista else "",
+                       "quando": "05/11/2026 01:30" if lista else "", "por": "Pessoa Teste" if lista else "", "erro": erro}
         self.salvos = []
 
     def atual(self, frase):
         if frase != FRASE:                    # só a inspeção do inversor tem padrão salvo
-            return {"lista": None, "evento": "", "quando": "", "por": "", "erro": self.estado["erro"]}
+            return {"lista": None, "tipo_tarefa": "", "evento": "", "quando": "", "por": "", "erro": self.estado["erro"]}
         return dict(self.estado)
 
-    def salvar(self, frase, lista, conta):
+    def salvar(self, frase, lista, conta, tipo_tarefa=""):
         if not conta.get("email"):
             raise SP.Recusada("Entre com o seu login do Fracttal no OS Creator")
-        self.salvos.append((frase, lista, conta.get("email")))
-        self.estado = {"lista": lista, "evento": "salvou", "quando": "05/11/2026 01:31", "por": conta.get("nome"), "erro": ""}
+        self.salvos.append((frase, lista, conta.get("email"), tipo_tarefa))
+        self.estado = {"lista": lista, "tipo_tarefa": tipo_tarefa, "evento": "salvou", "quando": "05/11/2026 01:31",
+                       "por": conta.get("nome"), "erro": ""}
         return dict(self.estado)
 
     def voltar(self, frase, conta):
-        self.salvos.append((frase, None, conta.get("email")))
-        self.estado = {"lista": None, "evento": "voltou_ao_fracttal", "quando": "05/11/2026 01:32", "por": "", "erro": ""}
+        self.salvos.append((frase, None, conta.get("email"), ""))
+        self.estado = {"lista": None, "tipo_tarefa": "", "evento": "voltou_ao_fracttal", "quando": "05/11/2026 01:32",
+                       "por": "", "erro": ""}
         return dict(self.estado)
 
 
 DO_PLANO = [{"desc": "Conferir o display", "tipo": "texto", "anexo": True, "origem": "f1"}]
+PADRAO_DO_PLANO = {"lista": DO_PLANO, "tipo_tarefa": "Corretiva"}
 
 
 @pytest.fixture
@@ -222,7 +239,7 @@ def cli(monkeypatch):
         raise AssertionError("o teste tentou ir à rede")
     monkeypatch.setattr(requests.Session, "request", sem_rede)
     monkeypatch.setattr(api, "load_assets_cached", lambda *a, **k: [])
-    monkeypatch.setattr(perf_web, "subtarefas_do_fracttal", lambda frase, assets: copy.deepcopy(DO_PLANO))
+    monkeypatch.setattr(perf_web, "padrao_do_fracttal", lambda frase, assets: copy.deepcopy(PADRAO_DO_PLANO))
     monkeypatch.setattr(perf_web, "contar_subtarefas", lambda assets: {"recomposicao de string": ["a", "b"]})
     monkeypatch.setattr(perf_web, "SUBTAREFAS_PADRAO", None)
     rotas._MEMO.clear()
@@ -240,8 +257,8 @@ def cli(monkeypatch):
 
 def test_sem_o_banco_do_nexus_mostra_o_do_plano_e_nao_salva(cli):
     j = cli.get("/os/api/performance/subtarefas?frase=" + FRASE).get_json()
-    assert (j["origem"], j["lista"], j["pode_salvar"]) == ("fracttal", DO_PLANO, False)
-    assert [t[0] for t in j["tipos"]] == ["texto", "simnao", "verif", "num"]
+    assert (j["origem"], j["lista"], j["pode_salvar"], j["tipo_tarefa"]) == ("fracttal", DO_PLANO, False, "Corretiva")
+    assert [t[0] for t in j["tipos"]] == ["texto", "simnao", "verif", "num"] and "Preventiva" in j["tipos_tarefa"]
     r = cli.post("/os/api/performance/subtarefas", json={"frase": FRASE, "lista": LISTA})
     assert r.status_code == 503 and "não pode ser salvo" in r.get_json()["erro"]
 
@@ -250,16 +267,21 @@ def test_o_bloco_le_salva_e_volta_ao_do_fracttal(cli, monkeypatch):
     g = _Gancho()
     monkeypatch.setattr(perf_web, "SUBTAREFAS_PADRAO", g)
     assert cli.get("/os/api/performance/subtarefas?frase=" + FRASE).get_json()["origem"] == "fracttal"
-    r = cli.post("/os/api/performance/subtarefas", json={"frase": FRASE, "lista": [dict(x, desc=" " + x["desc"]) for x in LISTA]})
+    r = cli.post("/os/api/performance/subtarefas", json={"frase": FRASE, "lista": [dict(x, desc=" " + x["desc"]) for x in LISTA],
+                                                         "tipo_tarefa": "Preventiva"})
     j = r.get_json()
     assert r.status_code == 200 and (j["origem"], j["lista"], j["por"], j["do_plano"]) == ("nexus", LISTA, "Pessoa Teste", DO_PLANO)
-    assert g.salvos == [(FRASE, LISTA, CONTA["email"])]                      # a lista limpa, de quem está logado
+    assert (j["tipo_tarefa"], j["tipo_do_plano"]) == ("Preventiva", "Corretiva")
+    assert g.salvos == [(FRASE, LISTA, CONTA["email"], "Preventiva")]        # a lista limpa e o tipo, de quem está logado
     r = cli.post("/os/api/performance/subtarefas", json={"frase": FRASE, "lista": [{"desc": ""}]})
     assert r.status_code == 400 and "sem texto" in r.get_json()["erro"] and len(g.salvos) == 1
+    r = cli.post("/os/api/performance/subtarefas", json={"frase": FRASE, "lista": LISTA, "tipo_tarefa": "Inventada"})
+    assert r.status_code == 400 and "não existe" in r.get_json()["erro"] and len(g.salvos) == 1
     r = cli.post("/os/api/performance/subtarefas", json={"frase": "outra coisa", "lista": LISTA})
     assert r.status_code == 400
     j = cli.post("/os/api/performance/subtarefas", json={"frase": FRASE, "voltar": True}).get_json()
-    assert j["origem"] == "fracttal" and j["lista"] == DO_PLANO and g.salvos[-1] == (FRASE, None, CONTA["email"])
+    assert j["origem"] == "fracttal" and j["lista"] == DO_PLANO and j["tipo_tarefa"] == "Corretiva"
+    assert g.salvos[-1] == (FRASE, None, CONTA["email"], "")
     def recusa(*a):                           # o Nexus recusou (sem a chave do banco, sem o e-mail): a tela diz o motivo
         raise SP.Recusada("Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN)")
     monkeypatch.setattr(g, "salvar", recusa)
@@ -275,13 +297,23 @@ def _corpo():
 
 
 def test_a_criacao_leva_o_padrao_e_avisa_quando_nao_o_leu(cli, monkeypatch):
-    monkeypatch.setattr(perf_web, "SUBTAREFAS_PADRAO", _Gancho(lista=LISTA))
+    monkeypatch.setattr(perf_web, "SUBTAREFAS_PADRAO", _Gancho(lista=LISTA, tipo_tarefa="Preventiva"))
     j = cli.post("/os/api/performance/criar", json=_corpo()).get_json()
-    assert cli.chamadas[-1]["subtarefas_padrao"] == LISTA and "alerta" not in j
+    assert cli.chamadas[-1]["subtarefas_padrao"] == LISTA and cli.chamadas[-1]["tipo_tarefa_padrao"] == "Preventiva"
+    assert "alerta" not in j
     monkeypatch.setattr(perf_web, "SUBTAREFAS_PADRAO", _Gancho(erro="ConnectionError: o banco caiu"))
     j = cli.post("/os/api/performance/criar", json=_corpo()).get_json()
-    assert cli.chamadas[-1]["subtarefas_padrao"] is None and j["alerta"] is True
-    assert "Não consegui ler as subtarefas padrão do Nexus" in j["mensagem"]
+    assert cli.chamadas[-1]["subtarefas_padrao"] is None and cli.chamadas[-1]["tipo_tarefa_padrao"] is None
+    assert j["alerta"] is True and "Não consegui ler as subtarefas padrão do Nexus" in j["mensagem"]
+
+
+def test_o_resumo_do_plano_diz_o_tipo_do_padrao(cli, monkeypatch):
+    import catalogos_planos
+    monkeypatch.setattr(catalogos_planos, "detalhe_do_plano", lambda idt, idi: copy.deepcopy(PLANO))
+    url = "/os/api/performance/plano?id_task=900&id_item=1&frase=" + FRASE
+    assert "Tipo: Corretiva" in cli.get(url).get_json()["resumo"]          # o do app (a inspeção sai Corretiva)
+    monkeypatch.setattr(perf_web, "SUBTAREFAS_PADRAO", _Gancho(lista=LISTA, tipo_tarefa="Preventiva"))
+    assert "Tipo: Preventiva" in cli.get(url).get_json()["resumo"]
 
 
 def test_o_card_da_atividade_conta_o_padrao_salvo(cli, monkeypatch):
@@ -292,9 +324,14 @@ def test_o_card_da_atividade_conta_o_padrao_salvo(cli, monkeypatch):
 
 def test_a_tela_tem_o_bloco_das_subtarefas():
     html = (WEB / "templates" / "perf_criar.html").read_text(encoding="utf-8")
-    assert 'id="w_subs"' in html and "Subtarefas da atividade" in html and 'id="b_subs_salvar"' in html
-    assert "para todo mundo" in html and 'id="b_subs_fracttal" hidden' in html
+    assert 'id="w_subs"' in html and "Tipo e subtarefas da atividade" in html and 'id="b_subs_salvar"' in html
+    assert "para todo mundo" in html and 'id="b_subs_fracttal" hidden' in html and 'id="subs_tipo_sel"' in html
     js = (WEB / "static" / "perf.js").read_text(encoding="utf-8")
     bloco = js.split("As subtarefas padrão da atividade", 1)[1].split("// arranque", 1)[0]
     assert "/os/api/performance/subtarefas" in bloco and "subsSalvar({voltar: true})" in bloco
+    assert "tipo_tarefa: subsTipoSel.value" in bloco and "subtarefas') === 'editar'" in bloco
     assert "confirm(" not in bloco and "alert(" not in bloco                 # o aviso de que vale para todos fica escrito
+    # o "ver lista" dos cards da tela de Performance mostra a lista em vigor e leva ao editor (Levi, 05/11/2026)
+    inicio = (WEB / "templates" / "performance.html").read_text(encoding="utf-8")
+    assert "/os/api/performance/subtarefas?frase=" in inicio and "searchParams.set('subtarefas', 'editar')" in inicio
+    assert "Editar as subtarefas" in inicio and "Tipo de tarefa:" in inicio

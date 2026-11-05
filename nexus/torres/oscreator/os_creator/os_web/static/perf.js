@@ -339,12 +339,18 @@
     limite = PAGINA; repop(); marcarUnico();
     if (alvos.length) {
       hint.textContent = tbody.querySelectorAll('tr[data-id]').length + ' ativo(s) com o plano.';
-      resumo.textContent = 'carregando o plano…';
-      fetch('/os/api/performance/plano?id_task=' + alvos[0].plano_id_task + '&id_item=' + alvos[0].plano_id_item)
-        .then(r => r.json().then(jj => ({ok: r.ok, jj}))).then(({ok, jj}) => { resumo.innerHTML = ok ? esc(jj.resumo).replace(/(Tipo|Classif\. 1|Classif\. 2|Criticidade|Duração):/g, '<b>$1:</b>') : '⚠ plano: ' + apiErro(jj, {status: '?'}); })
-        .catch(e => { resumo.textContent = '⚠ plano: ' + e; });
+      carregarResumo();
     } else if (!j.erro) { hint.textContent = 'Nenhum ativo desta usina tem esse plano.'; resumo.textContent = '—'; }
     aplicarSugestao();
+  }
+  // o resumo do plano, com o tipo de tarefa que a OS vai levar (o do padrão do Nexus, quando salvo: a `frase` vai junto);
+  // relido depois de salvar o padrão (05/11/2026)
+  function carregarResumo() {
+    if (!alvos.length) return;
+    resumo.textContent = 'carregando o plano…';
+    fetch('/os/api/performance/plano?id_task=' + alvos[0].plano_id_task + '&id_item=' + alvos[0].plano_id_item + '&frase=' + encodeURIComponent(FRASE))
+      .then(r => r.json().then(jj => ({ok: r.ok, jj}))).then(({ok, jj}) => { resumo.innerHTML = ok ? esc(jj.resumo).replace(/(Tipo|Classif\. 1|Classif\. 2|Criticidade|Duração):/g, '<b>$1:</b>') : '⚠ plano: ' + apiErro(jj, {status: '?'}); })
+      .catch(e => { resumo.textContent = '⚠ plano: ' + e; });
   }
 
   function aplicarSugestao() {                             // deep link da plataforma: marca o inversor + observação + OS pai
@@ -447,9 +453,11 @@
   //    subtarefas, que vamos poder editar as subtarefas padrões de cada atividade!"). O bloco mostra a lista que a OS leva
   //    (o padrão do Nexus ou a do plano do Fracttal) e a edita; o Salvar padrão vale para todo mundo, a partir da próxima
   //    OS. Sem janela de confirmação: o aviso de que vale para todos fica escrito ao lado do botão.
+  //    E o tipo de tarefa da OS no mesmo padrão (no mesmo dia: "quero que dê para editar o tipo de tarefa também!").
   const subs = {estado: null};
   const wSubs = $('w_subs'), subsLista = $('subs_lista'), subsOrigem = $('subs_origem'), subsEd = $('subs_ed'),
-        subsLinhas = $('subs_linhas'), subsErro = $('subs_erro'), bSubsEditar = $('b_subs_editar');
+        subsLinhas = $('subs_linhas'), subsErro = $('subs_erro'), bSubsEditar = $('b_subs_editar'),
+        subsTipo = $('subs_tipo'), subsTipoSel = $('subs_tipo_sel');
   const SUBS_BOTOES = ['b_subs_salvar', 'b_subs_fracttal', 'b_subs_cancelar'];
   function rotuloTipo(it) {
     if (it.tipo === 'plano') return (it.tipo_rotulo || 'Tipo') + ' (do plano)';
@@ -467,13 +475,21 @@
     if (!lista.length) origem = 'Não achei o plano desta atividade no Fracttal.';
     subsOrigem.textContent = origem + (e.erro ? ' ' + e.erro : '');
     subsOrigem.classList.toggle('os-erro', !!e.erro);
+    subsTipo.innerHTML = e.tipo_tarefa ? '<b>Tipo de tarefa:</b> ' + esc(e.tipo_tarefa) : '';
+    subsTipo.hidden = !e.tipo_tarefa;
     bSubsEditar.hidden = !e.pode_salvar;
     subsLista.hidden = false; subsEd.hidden = true;
   }
+  // o "Editar as subtarefas" do painel "ver lista" da tela de Performance abre a atividade com o editor já aberto
+  const EDITAR_AO_ABRIR = new URLSearchParams(location.search).get('subtarefas') === 'editar';
   function subsCarregar() {
     fetch('/os/api/performance/subtarefas?frase=' + encodeURIComponent(FRASE), {credentials: 'same-origin'})
       .then((r) => r.json().then((j) => ({r, j})))
-      .then(({r, j}) => { if (r.ok) subsMostrar(j); else subsOrigem.textContent = 'Não carreguei as subtarefas: ' + apiErro(j, r); })
+      .then(({r, j}) => {
+        if (!r.ok) { subsOrigem.textContent = 'Não carreguei as subtarefas: ' + apiErro(j, r); return; }
+        subsMostrar(j);
+        if (EDITAR_AO_ABRIR && j.pode_salvar) { subsEditar(); wSubs.scrollIntoView({block: 'start'}); }
+      })
       .catch((e) => { subsOrigem.textContent = 'Não carreguei as subtarefas: ' + e; });
   }
   function subsLinha(it) {
@@ -496,8 +512,12 @@
     ((subs.estado && subs.estado.lista) || []).forEach((it) => subsLinhas.appendChild(subsLinha(it)));
     if (!subsLinhas.children.length) subsLinhas.appendChild(subsLinha({desc: '', tipo: 'texto'}));
     subsErro.hidden = true;
+    // o tipo de tarefa: os que o app conhece; o em vigor já escolhido (o do plano quando nada foi salvo)
+    const atual = (subs.estado && subs.estado.tipo_tarefa) || '';
+    subsTipoSel.innerHTML = ((subs.estado && subs.estado.tipos_tarefa) || []).map((t) => '<option value="' + esc(t) + '"'
+      + (t === atual ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
     $('b_subs_fracttal').hidden = !subs.estado || subs.estado.origem !== 'nexus';
-    subsLista.hidden = true; subsEd.hidden = false; bSubsEditar.hidden = true;
+    subsLista.hidden = true; subsTipo.hidden = true; subsEd.hidden = false; bSubsEditar.hidden = true;
   }
   function subsDaTela() {
     return [...subsLinhas.querySelectorAll('.perf-sub')].map((r) => {
@@ -513,7 +533,7 @@
     fetch('/os/api/performance/subtarefas', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(Object.assign({frase: FRASE}, corpo))})
       .then((r) => r.json().then((j) => ({r, j})))
-      .then(({r, j}) => { if (r.ok) subsMostrar(j); else { subsErro.textContent = apiErro(j, r); subsErro.hidden = false; } })
+      .then(({r, j}) => { if (r.ok) { subsMostrar(j); carregarResumo(); } else { subsErro.textContent = apiErro(j, r); subsErro.hidden = false; } })
       .catch((e) => { subsErro.textContent = String(e); subsErro.hidden = false; })
       .finally(() => { SUBS_BOTOES.forEach((id) => { $(id).disabled = false; }); });
   }
@@ -521,7 +541,7 @@
     bSubsEditar.onclick = subsEditar;
     $('b_subs_cancelar').onclick = () => subsMostrar(subs.estado);
     $('b_subs_mais').onclick = () => { const r = subsLinha({desc: '', tipo: 'texto'}); subsLinhas.appendChild(r); r.querySelector('.s-desc').focus(); };
-    $('b_subs_salvar').onclick = () => subsSalvar({lista: subsDaTela()});
+    $('b_subs_salvar').onclick = () => subsSalvar({lista: subsDaTela(), tipo_tarefa: subsTipoSel.value});
     $('b_subs_fracttal').onclick = () => subsSalvar({voltar: true});
     subsLinhas.addEventListener('click', (ev) => {
       const b = ev.target.closest('button[data-acao]'); if (!b) return;

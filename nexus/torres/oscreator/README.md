@@ -2931,20 +2931,26 @@ se renova sozinha põe o cabeçalho; sem ele conta como clique.
 ## As subtarefas padrão de cada atividade da Performance (05/11/2026)
 
 Levi: "Quero que no OS Creator > Performance tenha um campo para subtarefas, que vamos poder editar as subtarefas padrões de
-cada atividade!"; "Quando criamos uma OS as atividades já vem com aquelas subtarefas"; quem muda: "Qualquer um".
-- **A tela:** o card 4 da tela de criar OS da Performance, "Subtarefas da atividade", mostra a lista que a OS leva e de onde
-  ela vem ("Do plano do Fracttal" ou "Padrão do Nexus, salvo por X em ..."). O Editar muda o texto, o tipo (os do editor de
-  Temas: texto, sim/não, verificação, numérico; o que o editor não monta, como a lista de opções, fica "do plano"), o
-  "exige anexo" e a ordem, tira e acrescenta. **Salvar padrão** vale para toda OS nova da atividade, para todo mundo (escrito
-  ao lado do botão, sem janela de confirmação); **Voltar ao do Fracttal** desfaz. O card da atividade na tela inicial da
-  Performance conta o padrão salvo.
+cada atividade!"; "Quando criamos uma OS as atividades já vem com aquelas subtarefas"; quem muda: "Qualquer um"; e no mesmo
+dia, "quero que dê para editar o tipo de tarefa também!".
+- **A tela:** o card 4 da tela de criar OS da Performance, "Tipo e subtarefas da atividade", mostra o tipo de tarefa e a
+  lista que a OS leva e de onde vêm ("Do plano do Fracttal" ou "Padrão do Nexus, salvo por X em ..."). O Editar muda o tipo de
+  tarefa (os do `api.TASK_TYPE_MAIN`; sem padrão, o do plano com o do app: a inspeção do inversor, Corretiva) e, em cada
+  subtarefa, o texto, o tipo (os do editor de Temas: texto, sim/não, verificação, numérico; o que o editor não monta, como a
+  lista de opções, fica "do plano"), o "exige anexo" e a ordem, tira e acrescenta. **Salvar padrão** vale para toda OS nova
+  da atividade, para todo mundo (escrito ao lado do botão, sem janela de confirmação); **Voltar ao do Fracttal** desfaz. O
+  resumo do plano (card 3) diz o tipo do padrão.
+- **A tela inicial da Performance:** o card da atividade conta o padrão salvo, e o "ver lista" (onde o Levi procurou o
+  editor) mostra o tipo e a lista em vigor e o botão **Editar as subtarefas**, que abre a atividade com o editor já aberto
+  (`?subtarefas=editar`).
 - **Onde mora:** o livro `nexus_subtarefas_performance · fato_versao_subtarefas`
   (`nexus/torres/oscreator/subtarefas_padrao.py`, no catálogo de dados), uma linha por versão salva, com quem salvou (o
   código do e-mail; o nome só cifrado). A ponte liga o gancho (`perf_web.SUBTAREFAS_PADRAO`); sem ele, a lista é a do plano e
   não se salva (503). O plano do Fracttal não muda: ele é de outra área e vale para quem cria OS por fora.
 - **Na criação** (uma OS por ativo e agrupada): o padrão salvo vai no lugar das subtarefas do plano e das do app
   (`os_planos.com_subtarefas_padrao`), cada uma na forma da subtarefa do plano de onde veio (a `origem`: o tipo, as opções e
-  a unidade ficam quando o tipo não mudou), e a OS segue ligada ao plano. Se o Fracttal recusar, a OS sai com as do plano e
+  a unidade ficam quando o tipo não mudou), o tipo de tarefa do padrão no lugar do do plano (`os_planos.com_tipo_padrao`; a
+  coluna `tipo_tarefa` do livro, vazia = o do plano), e a OS segue ligada ao plano. Se o Fracttal recusar, a OS sai com as do plano e
   a tela diz (a rede de segurança das extras). Sem conseguir ler o padrão, a OS sai com as do plano e a tela também diz.
 - Prova: `tests/test_oscreator_perf_subtarefas.py`; a tela conferida numa bancada (desktop e 375 px); e no ar, em
   05/11/2026, em TESTE - PA: com um padrão de teste da Inspeção Geral do Inversor (a 1ª renomeada, a 2ª de Verificação para

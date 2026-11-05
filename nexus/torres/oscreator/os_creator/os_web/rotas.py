@@ -448,6 +448,10 @@ def api_plano():
     # vem do catálogo dos planos (`catalogos_planos`, 31/10/2026, etapa 4 do canto central): a 2ª escolha da mesma usina não
     # pede nada
     plan = api.com_tipo_da_tarefa(catalogos_planos.detalhe_do_plano(request.args.get("id_task"), request.args.get("id_item")))
+    # e o tipo do padrão do Nexus da atividade, quando salvo (05/11/2026): o resumo diz o que a OS vai levar
+    plano = perf_web.plano_por_frase(request.args.get("frase") or "")
+    if plano:
+        plan = api.com_tipo_padrao(plan, _padrao_da_atividade(plano["frase"]).get("tipo_tarefa"))
     return jsonify({"resumo": perf_web.resumo_plano(plan)})
 
 
@@ -476,33 +480,38 @@ def api_contagens():
 
 
 def _padrao_da_atividade(frase: str) -> dict:
-    """O padrão do Nexus da atividade (`perf_web.SUBTAREFAS_PADRAO.atual`): {"lista" (None = a do plano), "evento", "quando",
-    "por", "erro"}. Sem o gancho (o OS Creator sozinho), a do plano, sem erro; o gancho que falha vira `erro`."""
+    """O padrão do Nexus da atividade (`perf_web.SUBTAREFAS_PADRAO.atual`): {"lista" (None = a do plano), "tipo_tarefa" ("" =
+    o do plano), "evento", "quando", "por", "erro"}. Sem o gancho (o OS Creator sozinho), o do plano, sem erro; o gancho que
+    falha vira `erro`."""
+    vazio = {"lista": None, "tipo_tarefa": "", "evento": "", "quando": "", "por": "", "erro": ""}
     gancho = perf_web.SUBTAREFAS_PADRAO
     if gancho is None:
-        return {"lista": None, "evento": "", "quando": "", "por": "", "erro": ""}
+        return vazio
     try:
-        return gancho.atual(frase)
+        return dict(vazio, **gancho.atual(frase))
     except Exception as e:                              # noqa: BLE001 — quem pediu decide o que dizer
-        return {"lista": None, "evento": "", "quando": "", "por": "", "erro": "%s: %s" % (type(e).__name__, str(e)[:160])}
+        return dict(vazio, erro="%s: %s" % (type(e).__name__, str(e)[:160]))
 
 
 def _subtarefas_da_atividade(frase: str) -> dict:
-    """O que o bloco "Subtarefas da atividade" mostra: a lista em vigor (o padrão do Nexus ou a do plano), de onde ela vem,
-    quem salvou e quando, a do plano (para o "Voltar ao do Fracttal") e os tipos do editor."""
+    """O que o bloco "Tipo e subtarefas da atividade" mostra: a lista e o tipo de tarefa em vigor (o padrão do Nexus ou o do
+    plano), de onde vêm, quem salvou e quando, os do plano (para o "Voltar ao do Fracttal") e as opções do editor."""
     padrao = _padrao_da_atividade(frase)
     erro = ""
     try:
-        do_plano = _memo(("perf_subs_plano", frase), CONTAGENS_TTL_S,
-                         lambda: perf_web.subtarefas_do_fracttal(frase, api.load_assets_cached()))
+        do_plano = _memo(("perf_padrao_plano", frase), CONTAGENS_TTL_S,
+                         lambda: perf_web.padrao_do_fracttal(frase, api.load_assets_cached()))
     except Exception as e:                              # noqa: BLE001 — sem o plano, mostra o padrão (se houver) e diz
-        do_plano, erro = [], "Não consegui ler o plano no Fracttal (%s)." % str(e)[:120]
+        do_plano, erro = {"lista": [], "tipo_tarefa": ""}, "Não consegui ler o plano no Fracttal (%s)." % str(e)[:120]
     if padrao.get("erro"):
         erro = ("Não consegui ler o padrão salvo no Nexus agora (%s): a OS sai com as subtarefas do plano do Fracttal."
                 % padrao["erro"][:120])
-    return {"frase": frase, "lista": padrao.get("lista") or do_plano, "origem": "nexus" if padrao.get("lista") else "fracttal",
+    nexus = bool(padrao.get("lista"))
+    return {"frase": frase, "lista": padrao.get("lista") or do_plano["lista"], "origem": "nexus" if nexus else "fracttal",
+            "tipo_tarefa": (padrao.get("tipo_tarefa") if nexus else "") or do_plano["tipo_tarefa"],
             "quando": padrao.get("quando") or "", "por": padrao.get("por") or "", "evento": padrao.get("evento") or "",
-            "do_plano": do_plano, "tipos": perf_web.TIPOS_SUB, "pode_salvar": perf_web.SUBTAREFAS_PADRAO is not None,
+            "do_plano": do_plano["lista"], "tipo_do_plano": do_plano["tipo_tarefa"], "tipos": perf_web.TIPOS_SUB,
+            "tipos_tarefa": perf_web.TIPOS_TAREFA, "pode_salvar": perf_web.SUBTAREFAS_PADRAO is not None,
             "max": perf_web.MAX_SUBTAREFAS, "max_texto": perf_web.MAX_TEXTO, "erro": erro}
 
 
@@ -533,9 +542,10 @@ def api_perf_subtarefas_salvar():
             gancho.voltar(plano["frase"], conta)
         else:
             lista, erro = perf_web.validar_lista(corpo.get("lista"))
-            if erro:
-                return jsonify({"erro": erro}), 400
-            gancho.salvar(plano["frase"], lista, conta)
+            tipo, erro_tipo = perf_web.validar_tipo(corpo.get("tipo_tarefa"))
+            if erro or erro_tipo:
+                return jsonify({"erro": erro or erro_tipo}), 400
+            gancho.salvar(plano["frase"], lista, conta, tipo)
     except gancho.Recusada as e:
         return jsonify({"erro": str(e)}), 400
     except Exception as e:                              # noqa: BLE001 — o banco fora: nada foi salvo, e a tela diz
@@ -570,8 +580,9 @@ def api_performance_criar():
     plano = perf_web.plano_por_frase(corpo.get("frase") or "")
     padrao = _padrao_da_atividade(plano["frase"]) if plano else {}
     kwargs["subtarefas_padrao"] = padrao.get("lista")
-    aviso_padrao = ("Não consegui ler as subtarefas padrão do Nexus agora: a OS saiu com as subtarefas do plano do "
-                    "Fracttal." if padrao.get("erro") else "")
+    kwargs["tipo_tarefa_padrao"] = (padrao.get("tipo_tarefa") or None) if padrao.get("lista") else None
+    aviso_padrao = ("Não consegui ler as subtarefas padrão do Nexus agora: a OS saiu com as subtarefas e o tipo do plano "
+                    "do Fracttal." if padrao.get("erro") else "")
     if perf_web.quer_agrupar(corpo):
         # "Agrupar em UMA OS com várias tarefas" (Levi, 13/10/2026, como no app: `PerfCriar._criar`): o mesmo `itens`,
         # com a OS pai e o título únicos, e a observação da OS inteira

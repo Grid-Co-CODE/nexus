@@ -419,18 +419,30 @@ SUBTAREFAS_PADRAO = None
 # os tipos do editor de Temas da Solicitação (`solic_web.TIPOS_SUB`), e o do plano que o editor não monta
 TIPOS_SUB = [("texto", "Texto"), ("simnao", "Sim/Não"), ("verif", "Verificação"), ("num", "Numérico")]
 TIPO_DO_PLANO = "plano"
+# o tipo de tarefa da OS (Levi, no mesmo dia: "quero que dê para editar o tipo de tarefa também!"): os que o app conhece
+TIPOS_TAREFA = list(api.TASK_TYPE_MAIN)
 MAX_SUBTAREFAS = 40
 MAX_TEXTO = 250
 
 
-def subtarefas_do_fracttal(frase: str, assets: list) -> list:
-    """A lista que a OS da atividade leva sem padrão salvo: as subtarefas do plano do Fracttal (pela amostra) mais as do
-    app (`com_subtarefas_extra`), no formato do editor. Vazia quando o plano não foi achado."""
+def padrao_do_fracttal(frase: str, assets: list) -> dict:
+    """O que a OS da atividade leva sem padrão salvo: {"lista": as subtarefas do plano do Fracttal (pela amostra) mais as do
+    app (`com_subtarefas_extra`), no formato do editor; "tipo_tarefa": o tipo do plano, com o do app (`com_tipo_da_tarefa`:
+    a Inspeção Geral do Inversor sai Corretiva)}. Plano não achado: lista vazia e tipo vazio."""
     par = _planos_de_amostra(assets).get(frase)
     if not par:
-        return []
-    plano = api.com_subtarefas_extra(api.get_plan_details(*par))
-    return api.subtarefas_para_editor(plano.get("subtasks") or [])
+        return {"lista": [], "tipo_tarefa": ""}
+    plano = api.com_tipo_da_tarefa(api.com_subtarefas_extra(api.get_plan_details(*par)))
+    return {"lista": api.subtarefas_para_editor(plano.get("subtasks") or []),
+            "tipo_tarefa": str(plano.get("tasks_types_main_description") or "").strip()}
+
+
+def validar_tipo(bruto) -> tuple[str, str]:
+    """O tipo de tarefa que a tela mandou salvar → (o tipo, "") ou ("", o motivo). Vazio = o do plano."""
+    tipo = str(bruto or "").strip()
+    if tipo and tipo not in TIPOS_TAREFA:
+        return "", "O tipo de tarefa \"%s\" não existe." % tipo[:40]
+    return tipo, ""
 
 
 def com_aviso(msg: dict, aviso: str) -> dict:

@@ -1,7 +1,9 @@
 """As subtarefas padrão de cada atividade da Performance no OS Creator (05/11/2026).
 
 Levi: "Quero que no OS Creator > Performance tenha um campo para subtarefas, que vamos poder editar as subtarefas padrões de
-cada atividade!"; "Quando criamos uma OS as atividades já vem com aquelas subtarefas"; e quem pode mudar: "Qualquer um".
+cada atividade!"; "Quando criamos uma OS as atividades já vem com aquelas subtarefas"; e quem pode mudar: "Qualquer um". No
+mesmo dia: "quero que dê para editar o tipo de tarefa também!": a versão salva leva também o tipo de tarefa (`tipo_tarefa`,
+vazio = o do plano).
 
 Até aqui as subtarefas de cada atividade (Inspeção Geral do Inversor, Recomposição de String, Verificação de Tracker Parado,
 Coleta de dados de geração) eram as do plano do Fracttal, mais as perguntas que o app acrescenta (`os_planos.SUBTAREFAS_EXTRA`).
@@ -29,8 +31,8 @@ log = logging.getLogger(__name__)
 
 LIVRO, NOME_LIVRO, ABA = ("nexus_subtarefas_performance", "Nexus · subtarefas padrão da Performance (OS Creator)",
                           "fato_versao_subtarefas")
-CAB = ("id", "registrado_em", "data_id", "atividade", "evento", "n_subtarefas", "subtarefas_json", "pessoa_hmac",
-       "dados_cifrados")
+CAB = ("id", "registrado_em", "data_id", "atividade", "evento", "n_subtarefas", "subtarefas_json", "tipo_tarefa",
+       "pessoa_hmac", "dados_cifrados")
 EVENTOS = ("salvou", "voltou_ao_fracttal")
 TTL_S = 60
 _BRT = timezone(timedelta(hours=-3))
@@ -104,13 +106,15 @@ def _nome(l: dict, cofre) -> str:
 
 
 def atual(atividade: str, lido: dict | None = None) -> dict:
-    """A versão em vigor da atividade: {"lista": [...] ou None (o plano do Fracttal), "evento", "quando", "por", "erro"}.
+    """A versão em vigor da atividade: {"lista": [...] ou None (o plano do Fracttal), "tipo_tarefa" ("" = o do plano),
+    "evento", "quando", "por", "erro"}.
 
     `erro` só quando o livro não pôde ser lido NENHUMA vez desde que o Nexus subiu: aí não se sabe se há padrão salvo, e quem
     cria a OS avisa (a OS sai com as do plano do Fracttal). Com uma leitura boa guardada, vale a última boa."""
+    vazio = {"lista": None, "tipo_tarefa": "", "evento": "", "quando": "", "por": "", "erro": ""}
     lido = lido or ler()
     if lido.get("erro") and not lido.get("ja_leu"):
-        return {"lista": None, "evento": "", "quando": "", "por": "", "erro": lido["erro"]}
+        return dict(vazio, erro=lido["erro"])
     alvo = _txt(atividade)
     ult = None
     for l in lido.get("linhas") or []:
@@ -118,8 +122,8 @@ def atual(atividade: str, lido: dict | None = None) -> dict:
             if ult is None or _txt(l.get("registrado_em")) >= _txt(ult.get("registrado_em")):
                 ult = l
     if ult is None:
-        return {"lista": None, "evento": "", "quando": "", "por": "", "erro": ""}
-    lista = None
+        return vazio
+    lista, tipo = None, ""
     if _txt(ult.get("evento")) == "salvou":
         try:
             lista = json.loads(ult.get("subtarefas_json") or "[]")
@@ -127,16 +131,17 @@ def atual(atividade: str, lido: dict | None = None) -> dict:
             lista = None
         if not isinstance(lista, list) or not lista:
             lista = None
+        tipo = _txt(ult.get("tipo_tarefa"))
     try:
         cofre = ES._cofre()
     except ES.Recusada:
         cofre = None
-    return {"lista": lista, "evento": _txt(ult.get("evento")), "quando": _quando(ult), "por": _nome(ult, cofre),
-            "erro": ""}
+    return dict(vazio, lista=lista, tipo_tarefa=tipo, evento=_txt(ult.get("evento")), quando=_quando(ult),
+                por=_nome(ult, cofre))
 
 
 # ── gravar ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-def _linha_de(atividade: str, evento: str, lista: list | None, conta: dict) -> dict:
+def _linha_de(atividade: str, evento: str, lista: list | None, conta: dict, tipo_tarefa: str = "") -> dict:
     c = conta if isinstance(conta, dict) else {}
     email = _txt(c.get("email")).lower()
     if not email:
@@ -152,7 +157,7 @@ def _linha_de(atividade: str, evento: str, lista: list | None, conta: dict) -> d
          "registrado_em": agora.strftime("%Y-%m-%dT%H:%M:%S.") + f"{agora.microsecond // 1000:03d}Z",
          "data_id": int(agora.astimezone(_BRT).strftime("%Y%m%d")), "atividade": _txt(atividade), "evento": evento,
          "n_subtarefas": len(lista or []), "subtarefas_json": json.dumps(lista, ensure_ascii=False) if lista else "",
-         "pessoa_hmac": quem, "dados_cifrados": None}
+         "tipo_tarefa": _txt(tipo_tarefa), "pessoa_hmac": quem, "dados_cifrados": None}
     nome = _txt(c.get("nome"))
     if nome:
         try:
@@ -162,13 +167,14 @@ def _linha_de(atividade: str, evento: str, lista: list | None, conta: dict) -> d
     return l
 
 
-def salvar(atividade: str, lista: list, conta: dict) -> dict:
-    """Grava a lista (já conferida pela tela do OS Creator, `perf_web.validar_lista`) como o padrão da atividade."""
+def salvar(atividade: str, lista: list, conta: dict, tipo_tarefa: str = "") -> dict:
+    """Grava a lista e o tipo de tarefa (já conferidos pela tela do OS Creator, `perf_web.validar_lista` e
+    `perf_web.validar_tipo`; o tipo vazio = o do plano) como o padrão da atividade."""
     if not _txt(atividade):
         raise Recusada("Sem a atividade")
     if not isinstance(lista, list) or not lista:
         raise Recusada("A lista de subtarefas está vazia")
-    _gravar(_linha_de(atividade, "salvou", lista, conta))
+    _gravar(_linha_de(atividade, "salvou", lista, conta, tipo_tarefa))
     return atual(atividade)
 
 
@@ -193,9 +199,9 @@ class _Gancho:
         with self._app.app_context():
             return atual(atividade)
 
-    def salvar(self, atividade: str, lista: list, conta: dict) -> dict:
+    def salvar(self, atividade: str, lista: list, conta: dict, tipo_tarefa: str = "") -> dict:
         with self._app.app_context():
-            return salvar(atividade, lista, conta)
+            return salvar(atividade, lista, conta, tipo_tarefa)
 
     def voltar(self, atividade: str, conta: dict) -> dict:
         with self._app.app_context():

@@ -255,8 +255,9 @@ FATOS = (
          observacao="atividade = a frase do plano da Performance (inspecao geral do inversor, recomposicao de string, "
                     "verificacao de tracker parado, coleta de dados de geracao): dimensão degenerada; subtarefas_json = "
                     "a lista em ordem, cada uma com o texto (desc), o tipo (texto, simnao, verif, num ou lista), se exige "
-                    "anexo e a subtarefa do plano de onde veio (origem); n_subtarefas = o tamanho dela. O nome de quem "
-                    "salvou só cifrado (Cofre). Nada se edita nem se apaga"),
+                    "anexo e a subtarefa do plano de onde veio (origem); n_subtarefas = o tamanho dela; tipo_tarefa = o "
+                    "tipo de tarefa da OS (Corretiva, Preventiva...; vazio = o do plano). O nome de quem salvou só "
+                    "cifrado (Cofre). Nada se edita nem se apaga"),
     # 04/11/2026 (Levi: "notificações para OSs abertas por mim ... e tem que ter um botão de marcar como lida!"): os avisos
     # das OS de cada pessoa no sino. Registrado antes da 1ª gravação
     Fato("evento_aviso", "Aviso de OS gerado ou lido", "base", "nexus_avisos · fato_evento_aviso",

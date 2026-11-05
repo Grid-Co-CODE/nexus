@@ -117,6 +117,14 @@ TIPO_TAREFA_DO_PLANO = {
 }
 
 
+def com_tipo_padrao(plan: dict, tipo: str) -> dict:
+    """O tipo de tarefa do padrão do Nexus da atividade (05/11/2026, Levi: "quero que dê para editar o tipo de tarefa
+    também!") no lugar do do plano e do TIPO_TAREFA_DO_PLANO. CÓPIA; tipo vazio ou desconhecido, o mesmo plano."""
+    if not tipo or tipo not in api.TASK_TYPE_MAIN:
+        return plan
+    return dict(plan, id_task_type_main=api.TASK_TYPE_MAIN[tipo], tasks_types_main_description=tipo)
+
+
 def com_tipo_da_tarefa(plan: dict) -> dict:
     """O plano com o tipo de tarefa do TIPO_TAREFA_DO_PLANO, quando o nome casa. Devolve uma CÓPIA (o plano fica em cache
     por id_task); sem regra para o plano, devolve o mesmo."""

@@ -1189,7 +1189,7 @@ from os_planos import (  # noqa: E402,F401
     RPC_TASK_DETAILS, RPC_TASK_EVENTS, RPC_TASK_TEMPLATE_ITEMS, SUBTAREFAS_EXTRA, TIPO_SUB_ID, TIPO_TAREFA_DO_PLANO,
     _DURACAO_PLANO, _MARCA_EXTRA, _PERF_PLANOS, _TIPO_ITEM_DESC, _duracao_do_modelo, _find_subtasks, _norm_txt,
     _plan_family, _subtarefas_de_modelo, atualizar_modelos_subtarefas, com_subtarefas_extra, com_subtarefas_padrao,
-    com_tipo_da_tarefa, duracao_do_plano, get_plan_details, get_plans_for_assets, get_subtask_counts, get_subtask_names,
+    com_tipo_da_tarefa, com_tipo_padrao, duracao_do_plano, get_plan_details, get_plans_for_assets, get_subtask_counts, get_subtask_names,
     get_task_plans, get_template_subtarefas, ler_planos_do_ativo, sem_subtarefas_extra, subtarefas_para_editor,
     tem_subtarefas_extra, tem_subtarefas_padrao)
 from perf_alvos import (  # noqa: E402,F401

@@ -380,28 +380,29 @@ def nascer_ticket(item: dict, asset: dict, plano_desc, folio, event_date) -> dic
                 "aviso_os": "ocorrência não registrada (%s)" % str(e)[:80]}
 
 
-def _plano_da_performance(id_task, id_item, subtarefas_padrao=None) -> dict:
+def _plano_da_performance(id_task, id_item, subtarefas_padrao=None, tipo_tarefa_padrao=None) -> dict:
     """O plano de uma atividade da Performance como a OS o leva: com o padrão do Nexus no lugar das subtarefas, quando a
     atividade tem um salvo (05/11/2026, `com_subtarefas_padrao`), senão com as do app (`com_subtarefas_extra`); e o tipo de
-    tarefa do app (`com_tipo_da_tarefa`)."""
+    tarefa do padrão do Nexus (`com_tipo_padrao`), senão o do app (`com_tipo_da_tarefa`)."""
     p = api.get_plan_details(id_task, id_item)
     if subtarefas_padrao and p.get("subtasks"):
         p = api.com_subtarefas_padrao(p, subtarefas_padrao)
     else:
         p = api.com_subtarefas_extra(p)
-    return api.com_tipo_da_tarefa(p)
+    return api.com_tipo_padrao(api.com_tipo_da_tarefa(p), tipo_tarefa_padrao)
 
 
 def create_performance_os(itens: list, id_responsible=None, responsible_name: str = "",
                           event_date: datetime = None, id_parent=None, progresso=None,
-                          prog_date: datetime = None, etiquetas_extra=None, subtarefas_padrao=None) -> list:
+                          prog_date: datetime = None, etiquetas_extra=None, subtarefas_padrao=None,
+                          tipo_tarefa_padrao=None) -> list:
     """Cria N OS (1 por ativo). `itens` = [{asset, plano_id_task, plano_id_item, linkar, base, note, imagens}]
     onde imagens = [{'bytes','nome'}]. Lê o plano (cache por id_task), cria a OS '[Ativo] - base' + note,
     marca com a etiqueta 'Performance' e anexa as imagens. → [{ok, asset, folio/erro, n_img_ok, img_erro}].
 
     `event_date` = data do INCIDENTE; `prog_date` = data PROGRAMADA (None → incidente + 10 min, como era).
     `etiquetas_extra` = nomes de etiquetas a somar à 'Performance' (o modo ETM manda 'ENGENHARIA').
-    `subtarefas_padrao` = a lista do padrão do Nexus da atividade (`_plano_da_performance`), ou None (a do plano).
+    `subtarefas_padrao` e `tipo_tarefa_padrao` = o padrão do Nexus da atividade (`_plano_da_performance`), ou None (o do plano).
     Um item pode trazer `titulo`: título LITERAL da OS, que pula o prefixo automático `[Ativo] -`."""
     cache, out = {}, []
     lbl_perf = api._label_performance_id()               # etiqueta "Performance" em toda OS criada aqui
@@ -429,7 +430,7 @@ def create_performance_os(itens: list, id_responsible=None, responsible_name: st
             k = it.get("plano_id_task")
             if k not in cache:
                 # as subtarefas extras (ou o padrão do Nexus) entram UMA vez, junto do cache — ver com_subtarefas_extra
-                cache[k] = api._plano_da_performance(k, it.get("plano_id_item"), subtarefas_padrao)
+                cache[k] = api._plano_da_performance(k, it.get("plano_id_item"), subtarefas_padrao, tipo_tarefa_padrao)
             plan = cache[k]
             nome = (it.get("titulo") or "").strip() or \
                 api.perf_os_nome(a, it.get("base") or api.plano_base_nome(plan.get("description")))
@@ -962,7 +963,7 @@ def concluir_os_analise(id_work_order, id_work_order_task=None, observacao: str 
 def create_performance_os_agrupada(itens: list, id_responsible=None, responsible_name: str = "",
                                    event_date: datetime = None, progresso=None,
                                    prog_date: datetime = None, etiquetas_extra=None,
-                                   note_os: str = "", subtarefas_padrao=None) -> dict:
+                                   note_os: str = "", subtarefas_padrao=None, tipo_tarefa_padrao=None) -> dict:
     """UMA OS com N tarefas — uma por ativo — no lugar de N OS (Levi, 21/08).
 
     Mesmo `itens` do `create_performance_os`, para as duas rotas comerem o mesmo prato: trocar de
@@ -996,7 +997,7 @@ def create_performance_os_agrupada(itens: list, id_responsible=None, responsible
             k = it.get("plano_id_task")
             if k not in cache:
                 # as subtarefas extras (ou o padrão do Nexus) entram UMA vez, junto do cache — ver com_subtarefas_extra
-                cache[k] = api._plano_da_performance(k, it.get("plano_id_item"), subtarefas_padrao)
+                cache[k] = api._plano_da_performance(k, it.get("plano_id_item"), subtarefas_padrao, tipo_tarefa_padrao)
             plan = cache[k]
             plano_de[id(it)] = plan.get("description")
             nome = (it.get("titulo") or "").strip() or \
