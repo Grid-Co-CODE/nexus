@@ -59,13 +59,13 @@ def test_setor_vazio_ou_fora_a_tela_diz(cli, equipe, monkeypatch):
 
 
 def test_criar_leva_so_a_etiqueta_performance(cli, equipe):
-    r = cli.post("/os/api/solicitacao/performance/criar", json=_corpo())
+    r = cli.post("/os/api/solicitacao/performance/criar", json=_corpo(ativos=[1]))
     assert r.status_code == 200
     f = cli.feito
     assert (f["task_type"], f["subtasks"], f["etiqueta_ids"]) == ("Administrativa", [], [1])   # a PERFORMANCE, só ela
     assert f["tipo"] == {"id_c1": 11, "desc_c1": "Programada"} and f["id_responsible"] == 501
-    assert r.get_json()["mensagem"].startswith("2 OS criada(s) para a Performance — Nº 15000, 15001")
-    r = cli.post("/os/api/solicitacao/performance/criar", json=_corpo(agrupar=True))
+    assert r.get_json()["mensagem"].startswith("1 OS criada(s) para a Performance — Nº 15000")
+    r = cli.post("/os/api/solicitacao/performance/criar", json=_corpo())          # dois ativos: uma OS só
     assert r.status_code == 200 and cli.agrupada["etiqueta_ids"] == [1]
     assert r.get_json()["mensagem"].startswith("1 OS criada para a Performance — Nº 15100, com 2 atividade(s)")
 

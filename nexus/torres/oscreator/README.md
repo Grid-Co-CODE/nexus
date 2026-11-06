@@ -216,12 +216,13 @@ aba, sem abrir outra.
 
 Os pedidos do Levi, de 08/10: "Agrupar ativos em atividades por OS" e "Engenharia poder anexar arquivos".
 
-- **Uma OS por ativo × uma OS com todos os ativos:** a escolha fica no bloco 2, antes da tabela (numa usina grande são
-  centenas de linhas), com o padrão em "Uma OS por ativo", o comportamento de antes.
-  - A agrupada sai pelo `api.create_work_orders_agrupada`, o mesmo do "Agrupar em UMA OS" do Tradicional: cada ativo
-    vira uma atividade (tarefa) com o seu `[Ativo] - Descrição`, todas numa OS só. As regras da seção acima valem
-    iguais: Administrativa, só a Classificação 1, só a `ENGENHARIA`, as duas datas e o responsável do `.env`.
-  - Com um ativo só, as duas escolhas dão a mesma OS: vai pelo caminho de sempre.
+- **Um ativo, uma OS; mais de um, uma OS só** (sem escolha desde 06/11/2026, Levi: "UM ATIVO UMA OS, SE FOR MAIS QUE UM
+  ATIVO JÁ VIRA UMA OS com mais ativos!"; até ali a tela tinha "Uma OS por ativo" × "Uma OS com todos os ativos", com o
+  padrão em uma por ativo). O servidor decide (`montar`: `agrupar = len(ativos) > 1`) e ignora um `agrupar` no pedido.
+  - Mais de um ativo sai pelo `api.create_work_orders_agrupada`, o mesmo do "Agrupar em UMA OS" do Tradicional: cada
+    ativo vira uma atividade (tarefa) com o seu `[Ativo] - Descrição`, todas numa OS só. As regras da seção acima valem
+    iguais: Administrativa, só a Classificação 1, só a etiqueta do setor, as duas datas e o responsável.
+  - Um ativo só vai pelo caminho de sempre, o `api.create_work_orders_bulk`.
   - A OS que não fecha (o Fracttal recusa o `work_order_insert`) deixa as atividades pendentes lá. A tela diz isso e
     manda gerar a OS no Fracttal; a resposta é 200, para os ativos saírem da seleção (um 2º clique criaria tudo de novo).
 - **Anexos:** PDF; imagem (JPG, JPEG, PNG, WEBP, GIF, BMP); planilha (XLSX, XLS, CSV, ODS); documento (DOCX, DOC, ODT,
@@ -229,7 +230,7 @@ Os pedidos do Levi, de 08/10: "Agrupar ativos em atividades por OS" e "Engenhari
   (`solic_eng_web.py`), que confere tudo de novo. Tipo novo é uma linha no `TIPOS_ANEXO`.
   - Sobem pelo **mesmo caminho do anexo de hoje**, o `api.attach_imagem_os` (s3_object_post, S3,
     `work_orders_tasks_files_insert`; o das imagens da Performance e do Tradicional), **depois** de a OS existir, na 1ª
-    tarefa de cada OS. Uma OS por ativo: cada anexo vai para cada OS. Agrupada: uma vez, na OS (o card junta as tarefas).
+    tarefa da OS: uma vez, na OS (o card junta as tarefas).
   - **Nada é criado antes de os anexos passarem:** tipo, tamanho, quantidade, total e o conteúdo. O conteúdo é conferido
     porque a extensão é só o nome: um executável chamado `.pdf` iria para o Fracttal, onde qualquer um baixa. O `.xls` e
     o `.doc` antigos aceitam também texto (sistema que exporta HTML com nome de `.xls`).
@@ -2633,8 +2634,8 @@ tarefa e dê para baixar tudo de uma vez, o download sai com o nome do ativo!"; 
 Levi, 06/11/2026: "adicione mais um em solicitações agora performance, será a mesma coisa porém com etiqueta de
 performance!"; e, no quiz do responsável, "Só a equipe da Performance".
 - **A mesma tela da Engenharia, com o setor no endereço** (`/os/solicitacao/performance`; as rotas `/os/api/solicitacao/
-  <engenharia|performance>/...`): os mesmos campos, regras, datas, anexos e as duas formas (uma OS por ativo ou a
-  agrupada); tipo Administrativa e só a Classificação 1, Programada. O que muda vem de `solic_eng_web.SETORES`: a
+  <engenharia|performance>/...`): os mesmos campos, regras, datas, anexos e a mesma regra (um ativo, uma OS; mais de
+  um, uma OS só); tipo Administrativa e só a Classificação 1, Programada. O que muda vem de `solic_eng_web.SETORES`: a
   etiqueta **PERFORMANCE**, sempre e só ela (faltando no Fracttal, nenhuma OS sai), a lista de responsáveis e
   "Performance" nas frases. A Nova solicitação tem agora três abas: PCM, Engenharia e Performance.
 - **Os responsáveis:** só a equipe da Performance, que é quem está no setor Performance em Base → Acessos → Pessoas e

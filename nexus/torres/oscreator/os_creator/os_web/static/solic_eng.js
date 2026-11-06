@@ -20,7 +20,6 @@
   const hintResp = $('hint_resp'), hintCriar = $('hint_criar'), btn = $('btn_criar'), resultado = $('resultado');
   const bAnexar = $('b_anexar'), anexoIn = $('anexo_in'), listaAnexo = $('anexo_lista'), regras = $('anexo_regras');
   const hintAnexo = $('hint_anexo');
-  const modos = Array.from(raiz.querySelectorAll('input[name="eng_modo"]'));
   const DIAS = Number(raiz.dataset.dias), DIAS_URG = Number(raiz.dataset.diasUrgente);
   // os limites dos anexos são os do servidor (vêm no HTML): o navegador recusa antes, o servidor confere de novo
   const MB = 1024 * 1024, ANEXO_MAX = Number(raiz.dataset.anexoMax), ANEXO_MB = Number(raiz.dataset.anexoMb);
@@ -31,8 +30,8 @@
   // sincronia troca os arquivos sem reiniciar o serviço (o 5090, o Nexus): até o reinício, o Python e o HTML guardado em
   // memória são os de antes, e este .js já é o novo. Sem a conferência, um elemento que falta derrubava a tela inteira, e
   // o "Uma OS com todos os ativos" iria a um servidor que não o conhece — e sairia uma OS por ativo.
-  const NOVO = !!(raiz.dataset.anexoMax && lbAtivos && bAnexar && anexoIn && listaAnexo && regras && hintAnexo && modos.length);
-  if (!NOVO) raiz.querySelectorAll('.eng-modo, .eng-anexos').forEach((x) => { x.hidden = true; });
+  const NOVO = !!(raiz.dataset.anexoMax && lbAtivos && bAnexar && anexoIn && listaAnexo && regras && hintAnexo);
+  if (!NOVO) raiz.querySelectorAll('.eng-anexos').forEach((x) => { x.hidden = true; });
   let ativos = [], pessoas = [], criando = false, arquivos = [];
   const marcados = new Set();
   // a tabela de 10 em 10, como a Nova solicitação PCM (Levi, 28/10/2026: "tá mostrando todos os ativos de uma vez, o
@@ -133,7 +132,7 @@
     const id = tr.dataset.id;
     if (ck.checked) marcados.add(id); else marcados.delete(id);
     tr.classList.toggle('sel', ck.checked);
-    contar();
+    contar(); regrasAnexo();
   });
   bAll.addEventListener('click', () => { visiveis().forEach((a) => marcados.add(String(a.id))); pintar(); });
   bNone.addEventListener('click', () => { marcados.clear(); pintar(); });
@@ -143,15 +142,9 @@
   cbUsi.addEventListener('change', trocarUsina);
   edDesc.addEventListener('input', contar);
 
-  // ── uma OS por ativo × uma OS com todos (Levi, 08/10/2026: "Agrupar ativos em atividades por OS") ─────────────
-  function agrupar() { const m = NOVO && modos.find((r) => r.checked); return !!m && m.value === 'agrupada'; }
-  function trocarModo() {
-    modos.forEach((r) => r.closest('.eng-modo-op').classList.toggle('on', r.checked));
-    lbAtivos.textContent = agrupar() ? '(marque um ou vários — todos numa OS, uma atividade por ativo)'
-                                     : '(marque um ou vários — cada um vira uma OS)';
-    contar(); regrasAnexo();
-  }
-  if (NOVO) modos.forEach((r) => r.addEventListener('change', trocarModo));
+  // ── a regra, sem escolha (Levi, 06/11/2026: "UM ATIVO UMA OS, SE FOR MAIS QUE UM ATIVO JÁ VIRA UMA OS com mais
+  // ativos!"): com mais de um ativo marcado, uma OS só, uma atividade por ativo; o servidor faz a mesma conta ──────────
+  function agrupar() { return marcados.size > 1; }
 
   // ── anexos (Levi, 08/10/2026: "Engenharia poder anexar arquivos") ─────────────────────────────────────────────
   // Tipo pela extensão, tamanho, quantidade e total, com os números do servidor; o conteúdo, só ele confere.
@@ -163,7 +156,7 @@
   function regrasAnexo() {
     if (!NOVO) return;
     regras.textContent = 'Até ' + ANEXO_MAX + ' arquivos, ' + ANEXO_MB + ' MB cada e ' + ANEXO_TOTAL_MB + ' MB no total — '
-      + (agrupar() ? 'os anexos vão para a OS.' : 'cada anexo vai para cada OS criada.')
+      + 'os anexos vão para a OS.'
       + (arquivos.length ? ' Escolhidos: ' + arquivos.length + ' (' + tam(soma()) + ').' : '');
   }
   function pintarAnexos() {
@@ -267,9 +260,8 @@
     const frase = agr
       ? 'Vou criar 1 OS com ' + n + ' atividades — uma por ativo — para a ' + SETOR_NOME + ', atribuída a ' + resp.name
         + ', com o evento em ' + evBr(dtEvento.value) + ' e programada para ' + dataProg() + (urg ? ' (URGENTE)' : '') + '.'
-      : 'Vou criar ' + n + ' OS — uma por ativo — para a ' + SETOR_NOME + ', atribuída' + (n > 1 ? 's' : '') + ' a ' + resp.name
-        + ', com o evento em ' + evBr(dtEvento.value) + ' e programada' + (n > 1 ? 's' : '') + ' para ' + dataProg()
-        + (urg ? ' (URGENTE)' : '') + '.';
+      : 'Vou criar 1 OS para a ' + SETOR_NOME + ', atribuída a ' + resp.name
+        + ', com o evento em ' + evBr(dtEvento.value) + ' e programada para ' + dataProg() + (urg ? ' (URGENTE)' : '') + '.';
     const nomes = arquivos.map((f) => f.name).join(', ');
     const fraseAnexos = !arquivos.length ? '' : '\n\n' + (agr || n === 1 ? 'A OS recebe ' : 'Cada OS recebe ')
       + (arquivos.length === 1 ? 'o anexo ' : 'os ' + arquivos.length + ' anexos: ') + nomes + '.';

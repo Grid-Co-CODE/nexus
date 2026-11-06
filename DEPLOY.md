@@ -237,8 +237,8 @@ já não traz `/nexus/` (a reescrita da T.I. saiu). A data exata da virada não 
 7. **Performance → Clima e risco** abre com as três fontes em verde (INMET, focos e risco de fogo do INPE). A primeira
    visita leva uns 10 s (lê o risco de fogo de todas as usinas); depois a tela é imediata. Fonte "fora agora": confira a
    saída para os dois endereços da seção 0 (ver a seção 7c).
-8. **OS Creator → Solicitação → Engenharia** mostra a escolha "Uma OS por ativo" × "Uma OS com todos os ativos" e o
-   campo de anexos (desde 08/10/2026), e o menu de Responsável traz os nomes da linha `OS_WEB_ENGENHARIA_RESPONSAVEIS`
+8. **OS Creator → Solicitação → Engenharia** mostra o campo de anexos (desde 08/10/2026; um ativo vira uma OS, mais de
+   um, uma OS só, sem escolha desde 06/11/2026), e o menu de Responsável traz os nomes da linha `OS_WEB_ENGENHARIA_RESPONSAVEIS`
    do `.env` do OS Creator (06/10/2026; o Levi manda a linha, os nomes não vão ao GitHub). Menu vazio = falta a linha.
    O envio com anexos aceita até 21 MB: o Nexus aceita 25 MB por pedido e o Caddy não limita; outro proxy na frente
    precisa de pelo menos 25 MB de corpo. **Solicitação → Performance** (06/11/2026) é a mesma tela com a etiqueta

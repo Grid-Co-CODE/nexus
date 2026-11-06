@@ -232,11 +232,11 @@ def test_criar_sai_como_a_os_de_analise_com_a_etiqueta_da_engenharia(cli):
     # a programada mandada pela tela não vale: o servidor programa para 7 dias depois da criação; o evento vem da tela
     ontem = (dt.datetime.now(reg.BRT) - dt.timedelta(days=1)).replace(second=0, microsecond=0)
     r = cli.post("/os/api/solicitacao/engenharia/criar",
-                 json=_corpo(programada="2030-01-01T08:00", evento=ontem.strftime("%Y-%m-%dT%H:%M")))
+                 json=_corpo(ativos=[1], programada="2030-01-01T08:00", evento=ontem.strftime("%Y-%m-%dT%H:%M")))
     assert r.status_code == 200
     f = cli.feito
     assert _perto(f["prog_date"], dt.datetime.now(reg.BRT) + dt.timedelta(days=7)) and f["event_date"] == ontem
-    assert r.get_json()["mensagem"] == ("2 OS criada(s) para a Engenharia — Nº 15000, 15001 — programada(s) para %s."
+    assert r.get_json()["mensagem"] == ("1 OS criada(s) para a Engenharia — Nº 15000 — programada(s) para %s."
                                         % f["prog_date"].strftime("%d/%m/%Y %H:%M"))
     # tipo Administrativa, só a Classificação 1 (Programada) e só a etiqueta ENGENHARIA — sem PERFORMANCE nem Backoffice
     assert (f["task_type"], f["subtasks"], f["etiqueta_ids"]) == ("Administrativa", [], [900])
@@ -246,7 +246,7 @@ def test_criar_sai_como_a_os_de_analise_com_a_etiqueta_da_engenharia(cli):
 
 
 def test_urgente_so_muda_a_data_as_etiquetas_sao_as_mesmas(cli):
-    r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo(urgente=True, programada="2030-01-01T08:00"))
+    r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo(ativos=[1], urgente=True, programada="2030-01-01T08:00"))
     assert r.status_code == 200
     assert _perto(cli.feito["prog_date"], dt.datetime.now(reg.BRT) + dt.timedelta(days=2))
     assert cli.feito["etiqueta_ids"] == [900]                       # sem "Dar prioridade": só a ENGENHARIA
@@ -263,7 +263,7 @@ def test_sem_a_etiqueta_no_fracttal_nenhuma_os_e_criada(cli, monkeypatch):
 def test_sem_a_backoffice_no_fracttal_a_os_sai(cli, monkeypatch):
     """21/10/2026: a Backoffice não é mais obrigatória; o Fracttal sem ela não segura a Solicitação de Engenharia."""
     monkeypatch.setattr(api, "get_labels", lambda: [dict(e) for e in ETIQ if e["id"] != 901])
-    r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo())
+    r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo(ativos=[1]))
     assert r.status_code == 200 and cli.feito["etiqueta_ids"] == [900]
 
 
@@ -332,9 +332,8 @@ def test_limite_de_envios_vale_quando_cada_anexo_sobe_para_cada_os():
     dois, _ = reg.anexos([("a.pdf", PDF + b"0" * (4 * reg.MB)), ("b.pdf", PDF + b"0" * (4 * reg.MB))])
     assert reg.erro_envios(dois, 1) == "" and reg.erro_envios(dois, 12) == ""           # 24 envios, ~96 MB
     assert reg.erro_envios(dois, 13) == (
-        "Com uma OS por ativo, cada anexo sobe para cada OS: 13 OS × 2 anexo(s) = 26 envios (104,1 MB). O limite por "
-        "criação é 30 envios e 100 MB. Escolha “Uma OS com todos os ativos” (os anexos sobem uma vez só) ou anexe menos "
-        "arquivos. Nenhuma OS foi criada.")
+        "Cada anexo sobe para cada OS: 13 OS × 2 anexo(s) = 26 envios (104,1 MB). O limite por criação é 30 envios e "
+        "100 MB: anexe menos arquivos. Nenhuma OS foi criada.")
     cinco, _ = reg.anexos([("%d.txt" % i, b"x") for i in range(5)])
     assert reg.erro_envios(cinco, 6) == "" and "= 35 envios" in reg.erro_envios(cinco, 7)
     assert reg.erro_envios([], 500) == ""
@@ -383,32 +382,33 @@ def _multipart(corpo, arquivos):
     return {"payload": json.dumps(corpo), "anexos": [(io.BytesIO(b), n) for n, b in arquivos]}
 
 
-def test_criar_com_anexos_sobe_cada_um_em_cada_os(cli):
+def test_criar_com_anexos_sobe_cada_um_na_os(cli):
     r = cli.post(CRIAR, content_type="multipart/form-data",
-                 data=_multipart(_corpo(), [("relatório.pdf", PDF), ("foto.png", PNG)]))
+                 data=_multipart(_corpo(ativos=[1]), [("relatório.pdf", PDF), ("foto.png", PNG)]))
     assert r.status_code == 200, r.get_json()
     j = r.get_json()
-    # as OS saem pelo mesmo pedido de antes; os anexos sobem DEPOIS, na 1ª tarefa de cada OS, com os bytes que vieram
-    assert [a["code"] for a in cli.feito["assets"]] == ["TST-NBRK1", "TST-RELE1"] and cli.agrupada == {}
-    assert sorted(cli.subidos) == [(9000, 90001, "foto.png", PNG), (9000, 90001, "relatório.pdf", PDF),
-                                   (9001, 90011, "foto.png", PNG), (9001, 90011, "relatório.pdf", PDF)]
-    assert (j["ok"], j["falhas"], j["anexos_falhas"]) == (2, 0, 0)
-    assert j["mensagem"].endswith("\n\nAnexos:\n• relatório.pdf (1 KB): subiu nas OS 15000 e 15001.\n"
-                                  "• foto.png (1 KB): subiu nas OS 15000 e 15001.")
+    # a OS sai pelo mesmo pedido de antes; os anexos sobem DEPOIS, na 1ª tarefa dela, com os bytes que vieram
+    assert [a["code"] for a in cli.feito["assets"]] == ["TST-NBRK1"] and cli.agrupada == {}
+    assert sorted(cli.subidos) == [(9000, 90001, "foto.png", PNG), (9000, 90001, "relatório.pdf", PDF)]
+    assert (j["ok"], j["falhas"], j["anexos_falhas"]) == (1, 0, 0)
+    assert j["mensagem"].endswith("\n\nAnexos:\n• relatório.pdf (1 KB): subiu na OS 15000.\n"
+                                  "• foto.png (1 KB): subiu na OS 15000.")
 
 
 def test_anexo_que_falha_no_fracttal_aparece_na_tela_e_a_os_continua(cli, monkeypatch):
     def subir(idwo, tid, dados, nome):
-        if idwo == 9001:
+        if nome == "relatorio.pdf":
             raise api.FracttalError("upload S3 HTTP 403: AccessDenied")
         cli.subidos.append((idwo, tid, nome, dados))
     monkeypatch.setattr(api, "attach_imagem_os", subir)
-    r = cli.post(CRIAR, content_type="multipart/form-data", data=_multipart(_corpo(), [("relatorio.pdf", PDF)]))
+    r = cli.post(CRIAR, content_type="multipart/form-data",
+                 data=_multipart(_corpo(ativos=[1]), [("relatorio.pdf", PDF), ("foto.png", PNG)]))
     j = r.get_json()
-    assert r.status_code == 200 and j["ok"] == 2 and j["anexos_falhas"] == 1
-    assert "• relatorio.pdf (1 KB): subiu na OS 15000; falhou na OS 15001 (upload S3 HTTP 403: AccessDenied)." in j["mensagem"]
-    assert j["anexos"] == [{"nome": "relatorio.pdf", "tamanho": len(PDF), "ok": ["15000"],
-                            "falhas": [{"os": "15001", "erro": "upload S3 HTTP 403: AccessDenied"}]}]
+    assert r.status_code == 200 and j["ok"] == 1 and j["anexos_falhas"] == 1
+    assert "• relatorio.pdf (1 KB): NÃO subiu: na OS 15000 (upload S3 HTTP 403: AccessDenied)." in j["mensagem"]
+    assert "• foto.png (1 KB): subiu na OS 15000." in j["mensagem"]
+    assert j["anexos"][0] == {"nome": "relatorio.pdf", "tamanho": len(PDF), "ok": [],
+                              "falhas": [{"os": "15000", "erro": "upload S3 HTTP 403: AccessDenied"}]}
 
 
 def test_os_sem_numero_nao_recebe_anexo_e_a_tela_diz(cli, monkeypatch):
@@ -416,7 +416,7 @@ def test_os_sem_numero_nao_recebe_anexo_e_a_tela_diz(cli, monkeypatch):
     monkeypatch.setattr(api, "create_work_orders_bulk", lambda assets, *a, **k: [
         {"code": "TST-NBRK1", "ok": True, "os": {"wo_folio": 15000, "id_work_order": 9000}},
         {"code": "TST-RELE1", "ok": True, "os": {"id_task": 77, "aviso": "tarefa criada, mas não a achei no kanban p/ virar WO."}}])
-    r = cli.post(CRIAR, content_type="multipart/form-data", data=_multipart(_corpo(), [("relatorio.pdf", PDF)]))
+    r = cli.post(CRIAR, content_type="multipart/form-data", data=_multipart(_corpo(ativos=[1]), [("relatorio.pdf", PDF)]))
     j = r.get_json()
     assert r.status_code == 200 and [(i, n) for i, _t, n, _d in cli.subidos] == [(9000, "relatorio.pdf")]
     assert j["mensagem"].endswith("Anexos:\n• relatorio.pdf (1 KB): subiu na OS 15000.\n• 1 OS sem número ficou sem os anexos.")
@@ -431,13 +431,12 @@ def test_anexo_recusado_nenhuma_os_e_criada(cli, arquivos):
     assert cli.feito == {} and cli.agrupada == {} and cli.subidos == []
 
 
-def test_anexos_demais_para_uma_os_por_ativo_pedem_a_agrupada(cli, monkeypatch):
-    monkeypatch.setattr(reg, "MAX_ENVIOS", 3)                   # 2 OS × 2 anexos = 4 envios
+def test_com_varios_ativos_os_anexos_sobem_uma_vez_na_os_unica(cli, monkeypatch):
+    """Com mais de um ativo a OS é uma só (06/11/2026): cada anexo sobe uma vez, e o limite de envios (pensado para uma OS
+    por ativo, que saiu) não chega a valer."""
+    monkeypatch.setattr(reg, "MAX_ENVIOS", 3)                   # 2 ativos × 2 anexos seriam 4 envios
     dois = [("a.pdf", PDF), ("b.pdf", PDF)]
     r = cli.post(CRIAR, content_type="multipart/form-data", data=_multipart(_corpo(), dois))
-    assert r.status_code == 400 and "“Uma OS com todos os ativos”" in r.get_json()["erro"] and cli.feito == {}
-    # numa OS só, os anexos sobem uma vez
-    r = cli.post(CRIAR, content_type="multipart/form-data", data=_multipart(_corpo(agrupar=True), dois))
     assert r.status_code == 200 and cli.feito == {} and len(cli.subidos) == 2
 
 
@@ -503,6 +502,14 @@ def test_agrupada_com_anexos_sobe_uma_vez_na_os(cli):
                                              "• medicoes.xlsx (1 KB): subiu na OS 15100.")
 
 
+def test_mais_de_um_ativo_vira_uma_os_so_sem_escolha(cli):
+    """A regra (Levi, 06/11/2026: "UM ATIVO UMA OS, SE FOR MAIS QUE UM ATIVO JÁ VIRA UMA OS com mais ativos!"): dois ativos
+    vão à OS única mesmo com "agrupar" falso no pedido; um ativo vai à OS dele mesmo com "agrupar" verdadeiro."""
+    r = cli.post(CRIAR, json=_corpo(agrupar=False))
+    assert r.status_code == 200 and cli.feito == {}
+    assert [a["code"] for a in cli.agrupada["assets"]] == ["TST-NBRK1", "TST-RELE1"]
+
+
 def test_agrupar_com_um_ativo_so_vai_pelo_caminho_de_sempre(cli):
     r = cli.post(CRIAR, json=_corpo(ativos=[1], agrupar=True))
     assert r.status_code == 200 and cli.agrupada == {} and [a["code"] for a in cli.feito["assets"]] == ["TST-NBRK1"]
@@ -540,12 +547,11 @@ def test_agrupada_diz_o_ativo_que_ficou_de_fora_e_a_que_falhou_inteira(cli, monk
 
 def test_a_tela_tem_a_escolha_e_os_anexos(cli):
     h = cli.get("/os/solicitacao/engenharia").get_data(as_text=True)
-    # a escolha, com o padrão no comportamento de antes (uma OS por ativo)
-    assert '<input type="radio" name="eng_modo" value="por_ativo" checked>' in h
-    assert '<input type="radio" name="eng_modo" value="agrupada">' in h
-    for txt in ("<b>Uma OS por ativo</b>", "<b>Uma OS com todos os ativos</b>", "uma atividade por ativo, todas na mesma OS",
+    # sem a escolha (06/11/2026: "UM ATIVO UMA OS, SE FOR MAIS QUE UM ATIVO JÁ VIRA UMA OS com mais ativos!")
+    assert 'name="eng_modo"' not in h and "Uma OS por ativo" not in h and "Uma OS com todos os ativos" not in h
+    for txt in ("com mais de um, uma OS só, uma atividade por ativo",
                 'id="b_anexar"', ">Adicionar arquivos</button>", '<input id="anexo_in" type="file" multiple accept="%s" hidden>'
-                % reg.ACEITAR, "Até 5 arquivos, 10 MB cada e 20 MB no total — cada anexo vai para cada OS criada.",
+                % reg.ACEITAR, "Até 5 arquivos, 10 MB cada e 20 MB no total — os anexos vão para a OS.",
                 "Tipos aceitos: PDF; imagem (JPG, JPEG, PNG, WEBP, GIF, BMP); planilha (XLSX, XLS, CSV, ODS); documento "
                 "(DOCX, DOC, ODT, TXT).", 'data-anexo-max="5"', 'data-anexo-mb="10"', 'data-anexo-total-mb="20"',
                 'data-anexo-envios="30"', 'data-anexo-envios-mb="100"'):
