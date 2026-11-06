@@ -256,6 +256,8 @@ def api_funcao(nome: str):
         return _gravar(lambda g, quem, corpo: g.chamar(nome, corpo.get("args") or {}, quem, corpo.get("versao") or 0))
     if nome == "fracttal-os":
         return _fracttal_os()
+    if nome == "fracttal-sync":
+        return _fracttal_sync()
     if nome != "fracttal-fotos":
         return jsonify(erro=SOMENTE_LEITURA), 405
     est, erro = _estado()
@@ -280,6 +282,23 @@ def api_funcao(nome: str):
              for a in anexos]
     checklist = [{"item": s.get("description") or "", "valor": s.get("value") or ""} for s in sub]
     return jsonify(folio=folio, fotos=fotos, checklist=checklist, validade_horas=24)
+
+
+def _fracttal_sync():
+    """O botão "Sincronizar com Fracttal" do app: relê as rondas na hora (`nexus/zeladoria/rondas_fracttal.py`). Até a
+    troca, as rondas vêm da cópia do Radar, e o botão diz isso."""
+    if not _grava():
+        return jsonify(ok=False, gravadas=0, erro="Até a troca, as rondas vêm da cópia do Radar; o Nexus passa a ler o "
+                                                  "Fracttal quando a gravação ligar.")
+    if _de_outro_site():
+        return jsonify(erro="Pedido de outro site."), 403
+    est, erro = _estado()
+    if est is None:
+        return jsonify(erro=erro), 503
+    if _quem(est).get("status") != "aprovado":
+        return jsonify(erro="Sem permissão."), 403
+    from ...zeladoria import rondas_fracttal
+    return jsonify(rondas_fracttal.sincronizar(gravacao.do_app(current_app.config), forcar=_corpo().get("forcar") is True))
 
 
 def _fracttal_os():
@@ -398,3 +417,32 @@ def foto(folio: str, i: int):
     except Exception:            # noqa: BLE001 — foto que sumiu do Fracttal ou cota da empresa
         abort(404)
     return Response(corpo, mimetype=mime, headers={"Cache-Control": "private, max-age=3600"})
+
+
+@bp.route("/api/cronograma", methods=["GET", "OPTIONS"])
+def cronograma_api():
+    """O link do cronograma para o app central (o `cronograma-api` do Radar; `nexus/zeladoria/cronograma_api.py`). Rota
+    pública (`auth.ROTAS_PUBLICAS`): vale a chave no header `x-api-key`, nunca a sessão."""
+    from ...auth import chaves
+    from ...zeladoria import cronograma_api as CA
+
+    def resp(corpo, status=200):
+        r = jsonify(corpo)
+        r.status_code = status
+        r.headers.update({**CA.CORS, "Cache-Control": "no-store"})
+        return r
+    if request.method == "OPTIONS":
+        return resp("ok")
+    esperada = chaves.valor(CA.CHAVE)
+    if not esperada:
+        return resp({"erro": "API ainda não configurada (falta a chave no Nexus)."}, 503)
+    if not CA.chave_confere(esperada, request.headers.get("x-api-key")):
+        return resp({"erro": "Chave inválida."}, 401)
+    try:
+        est = leitura.estado(current_app.config)
+    except leitura.BancoFora:
+        return resp({"erro": "Falha ao ler o cronograma."}, 502)
+    except leitura.CopiaAusente:
+        return resp({"erro": "Cronograma ainda não publicado. Abra a Zeladoria no Nexus uma vez para publicar."}, 503)
+    status, corpo = CA.responder(est, request.args)
+    return resp(corpo, status)

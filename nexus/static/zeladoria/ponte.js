@@ -14,8 +14,9 @@
      as COLUNAS que mudaram, das linhas que mudaram. Assim a mudança de outra pessoa numa linha que você não mexeu fica.
      O histórico de valores, que o Radar apaga inteiro e regrava, vira a diferença das linhas. A resposta diz se outra
      pessoa salvou depois que a página abriu, e o aviso aparece no `showToast` do próprio Radar.
-   Nos dois, o retrato do cronograma, que o clone regrava sozinho ao abrir, é aceito em silêncio: é derivado, e a rota
-   dele é a etapa 5.
+   O retrato do cronograma, que o clone regrava sozinho ao abrir, é aceito em silêncio no só leitura. Na gravação ele
+   vai ao servidor, que só o grava quando o cronograma mudou (a hora sozinha não conta): é dele que sai o link do app
+   central (`/api/cronograma`, etapa 5).
 
    O login é o do Nexus: `onAuthStateChange` entrega a pessoa de /api/eu, e as telas de senha do Radar não servem mais.
    O `storage` só conhece o arquivo dos PDFs dos contratos, que mora no servidor do Nexus; as fotos da ronda, o clone pede
@@ -265,7 +266,7 @@
     };
     function executar() {
       if (gravando) {
-        if (gravando === "upsert" && DERIVADAS[view]) return Promise.resolve(resposta(null, null, 201, "Created"));
+        if (gravando === "upsert" && DERIVADAS[view] && !GRAVA) return Promise.resolve(resposta(null, null, 201, "Created"));
         if (!GRAVA) return Promise.resolve(resposta(null, SOMENTE_LEITURA, 405, ""));
         return executarGravacao(view, gravando, valores || [], filtros);
       }

@@ -48,7 +48,8 @@ log = logging.getLogger(__name__)
 # assinatura HMAC antes de gravar qualquer coisa (`nexus/hseq/fotos.receber`, `nexus/hseq/info_extintor.receber`,
 # `nexus/pcm/motivos_app.conferir`, `nexus/pcm/inventario/fotos_app.receber`); só elas passam sem login, e só por POST
 ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static", "torre_hseq.extintores_foto_receber",
-                  "torre_hseq.extintores_info_receber", "torre_pcm.motivo_do_app", "torre_pcm.inventario_foto_receber"}
+                  "torre_hseq.extintores_info_receber", "torre_pcm.motivo_do_app", "torre_pcm.inventario_foto_receber",
+                  "torre_zeladoria.cronograma_api"}
 
 # Limite de tentativas do Entrar (auditoria A2 da porta única e revisão adversarial, 10/10/2026). Até a A2 era por IP: 5
 # erros de QUALQUER pessoa no mesmo IP trancavam o Entrar de todos por 15 min, inclusive a senha de administrador, e até o

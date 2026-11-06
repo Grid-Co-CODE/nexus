@@ -72,6 +72,14 @@ const testes = {
     igual([r.data, r.error], [null, null]);
     assert.strictEqual(pedidos.length, 0);
   },
+  async "gravando, o retrato do cronograma vai ao servidor, que decide se mudou"() {
+    const { sb, pedidos } = montar(() => ({ status: 200, corpo: { versao: 0, ids: [[]] } }), { somenteLeitura: false });
+    const r = await sb.from("rf_cronograma_publico").upsert({ id: "cronograma", dados: { versao: 1, usinas: [] } },
+                                                            { onConflict: "id" });
+    igual([r.error, r.status], [null, 201]);
+    assert.strictEqual(pedidos[0].url, "/raiz/t/zeladoria/api/gravar");
+    igual(JSON.parse(pedidos[0].opcoes.body).ops[0].view, "rf_cronograma_publico");
+  },
   async "o login vem do Nexus"() {
     const { sb, pedidos, window } = montar(() => ({ status: 200, corpo: { user: { id: "u1", email: "fulano@exemplo.com" } } }));
     const evento = await new Promise((ok) => {

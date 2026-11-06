@@ -491,6 +491,7 @@ memória, sem mudar quem pede. O resto da internet passa sem contar (`notfractta
     o fato já mostrava: `fundo:nexus-os-leitor:<faixa>` (o `os_leitor`, que já declarava, por `origem`),
     `fundo:nexus-ativos-leitor` (o laço da noite e dos novos das :08 e :38), `fundo:nexus-tarefas-os-banco`,
     `fundo:nexus-chamados-banco`, `fundo:nexus-fila-fracttal` (a releitura da Aprovação por trás),
+    `fundo:nexus-zeladoria-rondas` (as rondas da Zeladoria, a cada 2 h, só com a gravação da Zeladoria ligada),
     `fundo:nexus-ronda-checklist` (no `pedir_releitura`, não no `em_segundo_plano`, que também abre as fotos da ronda),
     `fundo:nexus-os-falhas`, `fundo:nexus-os-equipe`, `fundo:nexus-etm` (só a thread por trás: com `esperar=True` a
     releitura roda na thread do clique e segue clique) e `fundo:os-web-acomp-renovar` (a releitura de 30 em 30 min do
@@ -705,8 +706,9 @@ gravar) e VENCE a do .env; "Apagar" volta à do .env. A tela nunca mostra o valo
   contra o painel, a prova é a pessoa entrar) e, desde 16/10, o `NEXUS_PCM_GITHUB_TOKEN` (o token do repositório do
   PCM: o servidor não tinha, e a tela de publicar a W43 dizia "sem token do GitHub"; a conferência só LÊ o GitHub: o token
   tem a forma ghp_/github_pat_, o GitHub o aceita, ele enxerga o repositório, a conta pode gravar e, sendo clássico, tem o
-  escopo repo ou public_repo; `pcm/publicar.token` usa o da tela primeiro). A tela não edita o .env: nome fora da lista é
-  recusado.
+  escopo repo ou public_repo; `pcm/publicar.token` usa o da tela primeiro) e, desde 06/11, a
+  `NEXUS_ZELADORIA_CRONOGRAMA_CHAVE` (o link do cronograma da zeladoria: 32 caracteres ou mais, sem espaço; não há contra
+  o que conferir, é a chave combinada com quem lê). A tela não edita o .env: nome fora da lista é recusado.
 - **Quem lê usa `chaves.valor(nome)`** (a da tela e, sem ela, a do .env), nunca `config.get` direto: as Contestações
   (`nexus/contratos/contestacoes.py`) e os Acessos dos clientes (`nexus/contratos/acessos_clientes.py`) leem assim.
 - **NEXUS_SECRET_KEY trocada:** a gravada não abre; vale a do .env (ou nenhuma), e a tela diz "não abre, cole de novo".
@@ -1055,8 +1057,9 @@ conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no
   Campo chama assinadas com a chave derivada da `NEXUS_PESSOA_HMAC`, cada uma com o seu rótulo: a foto do extintor,
   `torre_hseq.extintores_foto_receber`, o texto da informação adicional da conferência, `torre_hseq.extintores_info_receber`
   (26/10/2026), a marca de motivo do técnico, `torre_pcm.motivo_do_app` (16/10/2026), e as fotos do inventário do
-  almoxarifado, `torre_pcm.inventario_foto_receber` (30/10/2026, `nexus/pcm/inventario/fotos_app.py`)). O teste
-  `test_toda_rota_nao_publica_exige_login` pega rota nova esquecida.
+  almoxarifado, `torre_pcm.inventario_foto_receber` (30/10/2026, `nexus/pcm/inventario/fotos_app.py`)), e o link do
+  cronograma da zeladoria, `torre_zeladoria.cronograma_api` (06/11/2026, só GET, com a chave no header `x-api-key`;
+  `nexus/torres/zeladoria/CLAUDE.md`). O teste `test_toda_rota_nao_publica_exige_login` pega rota nova esquecida.
 - **Limite de tentativas do Entrar** (auditoria A2 e revisão adversarial da porta única, 10/10/2026). Era 5 erros por
   IP: um colega errando a senha cinco vezes trancava o Entrar da sala inteira por 15 min (o escritório sai por um IP
   público só), inclusive a senha de administrador, e até o 429 do Fracttal contava. A A2 passou a contar só por e-mail, e

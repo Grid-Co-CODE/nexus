@@ -142,9 +142,13 @@ def test_fotos(logado, copiado, monkeypatch):
     assert logado.post("/t/zeladoria/api/funcao/fracttal-fotos", json={"folio": "12a"}).status_code == 400
 
 
-def test_funcao_que_grava_e_recusada(logado, copiado):
-    r = logado.post("/t/zeladoria/api/funcao/fracttal-sync", json={})
+def test_funcao_que_nao_existe_e_recusada_e_o_sincronizar_diz_que_vem_da_copia(logado, copiado):
+    r = logado.post("/t/zeladoria/api/funcao/outra-funcao", json={})
     assert r.status_code == 405 and r.get_json() == {"erro": "Cópia só leitura até a troca."}
+    # até a troca, o "Sincronizar com Fracttal" do Radar mostra o porquê no aviso dele (o `d.erro`), em vez de "Não foi
+    # possível sincronizar agora"
+    r = logado.post("/t/zeladoria/api/funcao/fracttal-sync", json={"forcar": True}).get_json()
+    assert r["ok"] is False and "cópia do Radar" in r["erro"]
 
 
 def test_so_o_head_ve_todos_os_perfis(cliente, copiado):

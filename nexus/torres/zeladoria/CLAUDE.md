@@ -19,6 +19,7 @@ Plano e registro: `docs/superpowers/plans/2026-11-03-zeladoria-etapas-1-e-2.md`.
   - `POST /api/funcao/fracttal-fotos` traz as fotos;
   - `POST /api/funcao/fracttal-os` traz a OS pelo número (até 10 por pedido; `nexus/zeladoria/fracttal_os.py`, os campos
     da antiga função do Radar: técnico, datas, situação, área, usina, serviço);
+  - `POST /api/funcao/fracttal-sync` é o botão "Sincronizar com Fracttal" (seção "O Fracttal e o cronograma");
   - `GET /api/contrato-pdf?caminho=` é o `storage.createSignedUrl` do arquivo `contratos-zeladoria` (abaixo);
   - `GET /foto/<folio>/<i>`.
 
@@ -147,7 +148,38 @@ diferentes apagariam um ao outro. Levi escolheu "Salvo em 1 s, banco logo depois
 - **Celular:** a 375 px nenhuma das 18 telas rola de lado. A tabela larga rola dentro dela, a grade fixa cai para uma coluna e a linha de botões quebra.
 - **Como se faz:** tudo pela `ferramentas/zeladoria_limpar_clone.py` (a função `vestir`), que roda de novo sobre o Radar original. Prova: `tests/test_zeladoria_clone.py`.
 
+## O Fracttal e o cronograma (etapa 5, 06/11/2026)
+
+O Radar tinha duas funções no Supabase que não são do app: a `fracttal-sync` (lê as rondas no Fracttal a cada 2 h) e a
+`cronograma-api` (o link do cronograma para o app central). As duas passam para o Nexus.
+- **As rondas** (`nexus/zeladoria/rondas_fracttal.py`): a mesma regra da `fracttal-sync`. A cada 2 h relê as OS criadas
+  desde o último corte menos 1 dia até amanhã (`work_orders`, 100 por página, até 12 páginas), fica com as que são ronda
+  (`eh_ronda`: "ronda" na descrição, ou "inspeção" com a tarefa de zeladoria), grava só as rondas que mudaram e refaz a
+  última de cada usina (a view `rf_fracttal_ultimas`: a última não cancelada, a nota da última com nível e o total). A
+  linha `fracttal_sync` guarda o corte, a última volta e o último erro. Grava pelo gravador (`interno`, quem é o
+  sistema), num salvamento só; as três tabelas não deixam rastro de exclusão nem aviso de "mexeram no mesmo registro".
+  - **Só com a gravação ligada.** O laço sobe com o gravador (olha a cada 10 min, `fundo:nexus-zeladoria-rondas` no
+    porteiro do Fracttal, porque a cota de 200 pedidos por minuto é da empresa). Até a troca, as rondas são as da cópia
+    do Radar, e o botão do app diz isso no aviso dele.
+  - **Limite do Fracttal** ("excesso de pedidos"): a volta para, o erro fica na linha `fracttal_sync`, e o corte não
+    anda (nada se perde; a próxima volta relê). Outro erro: "O Fracttal não respondeu agora".
+  - **Prova com o dado real (06/11/2026):** a regra da última de cada usina deu as 120 linhas da view do Radar, coluna a
+    coluna; a chave da usina, 1.416 de 1.416; uma leitura de verdade no Fracttal trouxe 41 rondas, e as 28 que a cópia
+    também tinha saíram iguais.
+- **O cronograma** (`nexus/zeladoria/cronograma_api.py`, rota `GET /t/zeladoria/api/cronograma`, pública em
+  `auth.ROTAS_PUBLICAS`): a mesma resposta da `cronograma-api`, campo a campo (fonte, atualizado_em, serviços, usinas
+  com histórico e próximos, a situação em_execucao, confirmado ou previsto e o atrasado pelo dia de Brasília), e os
+  mesmos filtros (`usina` contém, `cliente` e `uf` iguais, sem acento; `historico_desde`). Vale a chave no header
+  `x-api-key`, igual à `NEXUS_ZELADORIA_CRONOGRAMA_CHAVE` (Base → Chaves das fontes → aba Nexus, ou o .env). Sem a chave,
+  503 "ainda não configurada", como no Radar. Não mostra quem executa, valor, fornecedor nem documento.
+  - **De onde vem:** do retrato que o próprio app publica em `cronograma_publico` (as regras do cronograma vivem no
+    clone, `snapshotCronograma`). O clone publica a cada página aberta, com a hora nova: o gravador só regrava quando o
+    cronograma muda (`gravacao.RETRATO`), senão cada clique no menu gravaria 86 mil caracteres.
+  - **Quem lê:** em 06/11/2026 ninguém. A chave nunca foi posta no Supabase (a função respondia 503), então não há quem
+    trocar de endereço. Quem for ler recebe o endereço do Nexus e a chave; perguntar ao supervisor que pediu o link quem
+    é o app central. Prova com o dado real: o retrato do banco do Nexus deu 91 usinas.
+
 ## O que falta (etapas do desenho)
 
-- **5:** o Fracttal (rondas) e a rota do cronograma.
-- **6:** as usinas ligadas ao cadastro, e a troca.
+- **6:** as usinas ligadas ao cadastro, e a troca (congelar o Radar, a última cópia, `NEXUS_ZELADORIA_GRAVA=1` no
+  servidor, que liga também as rondas do Fracttal, e o endereço `zeladoria.gridco.com.br` apontando para o Nexus).

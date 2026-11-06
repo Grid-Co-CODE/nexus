@@ -143,6 +143,14 @@ def _conferir_andamento(nome: str):
     return conferir
 
 
+def _conferir_cronograma(valor: str) -> str:
+    """A chave do link do cronograma da zeladoria (06/11/2026, `nexus/zeladoria/cronograma_api.py`): quem a tem lê o
+    cronograma sem login, então ela é longa. Não há do que conferir contra: é a chave combinada com quem vai ler."""
+    if len(valor) < 32 or any(c.isspace() for c in valor):
+        raise Recusada("A chave do cronograma precisa de 32 caracteres ou mais, sem espaço: nada foi gravado.")
+    return f"a chave tem {len(valor)} caracteres"
+
+
 # nome da variável → o que é, para que serve, e a conferência antes de gravar
 CHAVES = {
     "NEXUS_CONTESTACAO_CHAVE_PRIVADA": {
@@ -183,6 +191,15 @@ CHAVES = {
         "arquivo": "",
         "dica": "a ANDAMENTO_NEXUS_CHAVE do .env do servidor da Ronda COS",
         "conferir": _conferir_andamento("NEXUS_COS_ANDAMENTO_CHAVE"),
+    },
+    # a torre Zeladoria (06/11/2026): o link do cronograma que o Radar dava ao app central (a CRONOGRAMA_API_KEY de lá)
+    "NEXUS_ZELADORIA_CRONOGRAMA_CHAVE": {
+        "nome": "Zeladoria: link do cronograma (chave de leitura)",
+        "para": "o app central lê o cronograma de zeladoria em /t/zeladoria/api/cronograma, com esta chave no header "
+                "x-api-key",
+        "arquivo": "",
+        "dica": "uma chave longa (32 caracteres ou mais), a mesma que vai para quem lê o cronograma",
+        "conferir": _conferir_cronograma,
     },
 }
 

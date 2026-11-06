@@ -40,9 +40,10 @@ log = logging.getLogger(__name__)
 _BRT = timezone(timedelta(hours=-3))
 CTX_DIARIO = "zeladoria/diario"
 _INTEIROS = ("integer", "bigint", "smallint")
-# as tabelas sem rastro de exclusão nem aviso de "mexeram no mesmo registro": o próprio registro (só cresce) e o
-# histórico de valor, que o app regrava inteiro a cada salvamento (é derivado das cotações)
-SEM_RASTRO = {"log", "historico_valor"}
+# as tabelas sem rastro de exclusão nem aviso de "mexeram no mesmo registro": o próprio registro (só cresce), o
+# histórico de valor, que o app regrava inteiro a cada salvamento (é derivado das cotações), e as rondas do Fracttal,
+# que o Nexus relê sozinho (`rondas_fracttal.py`)
+SEM_RASTRO = {"log", "historico_valor", "fracttal_rondas", "fracttal_ultimas", "fracttal_sync"}
 # o ON DELETE do banco do Radar: o clone conta com ele (excluir o fornecedor tira as cotações só do estado dele e põe na
 # fila só o fornecedor; revisão de 03/11/2026). "apagar" = cascade; "nulo" = set null. Os documentos ficam dentro do
 # fornecedor e do colaborador no app: órfão não aparece em tela nenhuma, então saem junto
@@ -57,6 +58,10 @@ CASCATA = {
 # o histórico só recebe linha nova, como no banco do Radar; a exceção é o motivo da alteração do cronograma, que o app
 # preenche depois de gravar a alteração. O das provisões só pela função do financeiro (lá o insert era revogado)
 HISTORICO_MUDA = {"cronograma_alteracoes": {"motivo"}}
+# o retrato que o app regrava sozinho: o do cronograma (o link do app central, `cronograma_api.py`) se publica a cada
+# página aberta, com a hora nova. Só a hora mudando não é mudança: sem isso, cada clique no menu gravava 86 mil
+# caracteres no diário e no banco (o clone reabre a cada tela)
+RETRATO = {"cronograma_publico": {"atualizado_em", "atualizado_por"}}
 SO_PELA_FUNCAO = {"fin_provisao_historico"}
 
 
@@ -299,6 +304,9 @@ class Gravador:
                         gerados[-1].append(linha[chave])
                         k = _txt(linha[chave])
                     existente = atual(aba).get(k)
+                    if existente is not None and aba in RETRATO and nome == "upsert" and all(
+                            _igual(v, existente.get(c)) for c, v in linha.items() if c not in RETRATO[aba]):
+                        continue
                     if existente is not None and (nome == "insert" or historico):
                         raise Recusa(f"{aba}: o {chave} {k} já existe (outra pessoa criou ao mesmo tempo); "
                                      "recarregue a página")
@@ -481,7 +489,34 @@ def do_app(config):
             _DO_APP.update(g=g, falha=None)
             if not config.get("TESTING"):
                 threading.Thread(target=_laco, args=(g,), daemon=True, name="nexus-zeladoria-gravacao").start()
+                _ligar_rondas(g)
         return _DO_APP["g"]
+
+
+RONDAS_A_CADA_S = 600       # olha a cada 10 min; a releitura no Fracttal é a cada 2 h, como no Radar
+
+
+def _ligar_rondas(g: Gravador) -> None:
+    """O laço das rondas do Fracttal (o lugar da função `fracttal-sync` do Radar), no servidor com a gravação ligada. Fundo
+    declarado no porteiro: a cota de 200 pedidos por minuto é da empresa inteira."""
+    from flask import current_app
+    from ..casca import fracttal_conta
+    from . import rondas_fracttal
+    app = current_app._get_current_object()
+
+    def laco():
+        while True:
+            try:
+                with app.app_context():
+                    r = rondas_fracttal.sincronizar(g)
+                if r.get("erro"):
+                    log.warning("zeladoria: as rondas do Fracttal: %s", r["erro"])
+            except Exception:  # noqa: BLE001 — a volta seguinte tenta de novo
+                log.exception("zeladoria: a volta das rondas do Fracttal falhou")
+            time.sleep(RONDAS_A_CADA_S)
+
+    threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-zeladoria-rondas", laco), daemon=True,
+                     name="nexus-zeladoria-rondas").start()
 
 
 def esquecer() -> None:
