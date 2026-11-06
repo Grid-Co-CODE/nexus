@@ -1228,9 +1228,35 @@ def _pagina_da_os(folio: int, tela_id: str):
         comentar_url=na_raiz(f"/os/_nexus/engenharia/os/{o['wid']}/comentar"),
         # editar e apagar o comentário (30/10/2026): quem escreveu ou o administrador, pela ponte (a nota muda junto)
         comentario_url=na_raiz(f"/os/_nexus/engenharia/os/{o['wid']}/comentario"), meu=_meu,
+        # as ações da OS (06/11/2026): os anexos e o Incluir anexo, pelo OS Creator; o accept e as regras são as dele
+        anexos_url=na_raiz(f"/os/os/{o['wid']}/anexos"), incluir_url=na_raiz(f"/os/api/os/{o['wid']}/anexos"),
+        regras_anexo=_regras_do_anexo(),
+        # as tarefas da OS, uma a uma (06/11/2026): o cronômetro e as respostas pelo OS Creator
+        tarefas_url=na_raiz(f"/os/api/os/{o['wid']}/tarefas"), tarefa_url=na_raiz(f"/os/api/os/{o['wid']}/tarefa"),
+        motivos_url=na_raiz("/os/api/execucao/motivos"),
+        acoes_tarefa=bool(pode and (session.get("admin") or TAREFAS_PARA_A_EQUIPE)),
         admin=bool(session.get("admin")),
         # a página de onde o comentário sai, sem o prefixo: o login do Fracttal volta para ela (a ponte confere)
         de_pagina=f"/t/engenharia/{tela_id}/os/{o['os']}", **base)
+
+
+# O cronômetro e as respostas por tarefa na página da OS (06/11/2026): só o administrador vê os botões até a prova no
+# Fracttal (TESTE - PA: iniciar, pausar, retomar e concluir lidos de volta, sem horas em dobro); provado, vale True e a
+# Engenharia (quem classifica a OS) os vê. Regra da casa: o que grava no Fracttal só fica pronto com a prova lida de volta.
+TAREFAS_PARA_A_EQUIPE = False
+
+
+def _regras_do_anexo() -> tuple[str, str]:
+    """(o accept do seletor, a frase das regras) do Incluir anexo: os do OS Creator (`solic_eng_web`, os anexos da
+    Solicitação de Engenharia), uma fonte só. Sem o clone, o seletor aceita tudo e o servidor recusa o que não vale."""
+    from flask import current_app
+    try:
+        from ..oscreator.ponte import clone
+        clone(current_app._get_current_object())
+        from os_web import solic_eng_web as SE                 # noqa: E402
+        return SE.ACEITAR, "%s · até %d MB cada, %d por vez" % (SE.tipos_aceitos(), SE.MAX_MB_ARQUIVO, SE.MAX_ARQUIVOS)
+    except Exception:                                          # noqa: BLE001
+        return "", ""
 
 
 @bp.route("/etm/os/<int:folio>/marcar", methods=["POST"])

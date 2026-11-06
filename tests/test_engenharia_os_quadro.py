@@ -144,6 +144,11 @@ def _secao(html, titulo):
     return html.split(marca, 1)[1].split("</section>", 1)[0] if marca in html else ""
 
 
+def _acoes(html):
+    """A caixa Ações da OS inteira: o `_secao` para no primeiro </section>, e o "!" do título dela tem uma (06/11/2026)."""
+    return html.split("data-os-acoes-eng", 1)[1].split("</aside>", 1)[0] if "data-os-acoes-eng" in html else ""
+
+
 def _kpis(html):
     """Os quatro números do topo, no desenho da faixa da tela do chamado (.kpis da Garantia)."""
     faixa = html.split('<div class="eg-ac-kpis"', 1)[1].split("</section>", 1)[0]
@@ -689,8 +694,10 @@ def test_trocar_o_responsavel_como_no_chamado(pagina, cliente):
     from test_engenharia_acompanhamento import _como
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
     dados = _secao(html, "Dados")
-    assert re.search(r"<dt>Responsável</dt><dd class=\"eg-resp\"><span data-resp-nome>Ana Lima</span>"
-                     r"<button type=\"button\" class=\"eg-resp-bt\" data-trocar-resp[^>]*>trocar</button>", dados)
+    # (06/11/2026, Levi: "tire esse botão trocar e a troca pode ser feita ao clicar no nome do responsável")
+    assert re.search(r"<dt>Responsável</dt><dd class=\"eg-resp\"><button type=\"button\" class=\"eg-resp-nome\" "
+                     r"data-resp-nome data-trocar-resp[^>]*>Ana Lima</button></dd>", dados)
+    assert ">trocar<" not in dados
     assert "Trocar o responsável da OS 16502" in html and "Hoje está com <b data-resp-hoje>Ana Lima</b>." in html
     assert "nexusRota('/os/api/responsaveis')" in html and "nexusRota('/os/api/os/' + wid + '/responsavel')" in html
 
@@ -744,4 +751,60 @@ def test_ate_cinco_ativos_sem_o_mostrar_mais(pagina, cliente, monkeypatch):
     monkeypatch.setattr(E, "_ler_fracttal", lambda path: ({"data": list(lido(path)["data"]) + [outra]}
                                                            if path.startswith("work_orders?wo_folio=16502") else lido(path)))
     ativos = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Ativos")
-    assert "hidden" not in ativos and "Mostrar mais" not in ativos
+    # nenhuma linha de ativo escondida (o painel das tarefas, de 06/11/2026, tem os seus elementos escondidos)
+    assert "<tr data-ativo hidden" not in ativos and "Mostrar mais" not in ativos
+
+
+def test_a_pagina_da_os_tem_as_acoes_da_os(pagina, cliente):
+    """Levi, 06/11/2026: "poderia incluir um botão de incluir anexo?" e "Nessas telas devem ter essas opção também:
+    Enviar para verificação, concluir e cancelar!". O Incluir anexo sobe da própria página; os anexos, o Concluir e o
+    Cancelar abrem o card do OS Creator já no diálogo (o NexusOsCard com a ação)."""
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    caixa = _acoes(html)
+    for a in ("anexos-os", "anexos-sub", "verificacao", "concluir", "cancelar"):
+        assert f'data-card-acao="{a}"' in caixa, a
+    assert "data-incluir-anexo" in caixa and f'data-incluir-url="/os/api/os/{pagina["id_work_order"]}/anexos"' in html
+    assert 'accept=".pdf' in caixa and "window.NexusOsCard" in html
+
+
+def test_as_acoes_da_os_em_dois_grupos_e_as_regras_no_explica(pagina, cliente):
+    """Levi, 06/11/2026: "Em ações de OS tire o texto 'PDF; imagem (...) · ou cole com Ctrl+V' e organize melhor a
+    informação". A caixa fica em dois grupos (os Anexos, com o Incluir anexo; o Andamento, com a verificação, o concluir e
+    o cancelar) e as regras do anexo vão para o "!" do título dela (o padrão do Nexus) e para a dica do botão."""
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    caixa = _acoes(html)
+    assert "<span>Anexos</span>" in caixa and "<span>Andamento</span>" in caixa
+    assert "MB cada" not in re.sub(r'<details.*?</details>', '', re.sub(r'title="[^"]*"', '', caixa), flags=re.S)                              # a frase não está à vista
+    assert re.search(r'data-incluir-anexo[^>]*title="[^"]*até 10 MB cada', caixa)
+    assert re.search(r'data-card-acao="anexos-os"><span>Da OS</span><b data-n="os">', caixa)
+    explica = caixa.split('class="gc-explica"', 1)[1].split("</details>", 1)[0]
+    assert "até 10 MB cada" in explica and "Ctrl+V" in explica
+
+
+def test_os_ativos_se_recolhem(pagina, cliente):
+    """Levi, 06/11/2026: "quero só que dê para recolher os ativos". O Esconder no título do bloco esconde o corpo (a lista
+    das tarefas e a do REST) e lembra a escolha neste navegador."""
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    bloco = html.split("data-tarefas-os", 1)[1].split("</section>", 1)[0]
+    assert re.search(r'<button type="button" class="eg-recolher" data-recolher-ativos aria-expanded="true" '
+                     r'aria-controls="corpo_ativos"', bloco)
+    corpo = bloco.split('id="corpo_ativos"', 1)[1]
+    assert "data-tarefas-lista" in corpo and "data-tarefas-msg" in corpo        # (a lista do REST, com 2+ ativos, também)
+    from pathlib import Path
+    js = Path("nexus/static/engenharia-os.js").read_text(encoding="utf-8")
+    assert "[data-recolher-ativos]" in js and "localStorage" in js
+
+
+def test_o_painel_das_tarefas_esta_na_pagina_e_os_botoes_esperam_a_prova(pagina, cliente):
+    """06/11/2026: o bloco dos ativos vira o painel das tarefas (o check, os anexos, o cronômetro e as subtarefas pelo OS
+    Creator). Até a prova no Fracttal, os botões que gravam saem só para o administrador."""
+    from test_engenharia_acompanhamento import _como
+    html = _como(cliente, ANA).get(URL).get_data(as_text=True)
+    wid = pagina["id_work_order"]
+    assert "data-tarefas-os" in html and f'data-tarefas-url="/os/api/os/{wid}/tarefas"' in html
+    assert f'data-tarefa-url="/os/api/os/{wid}/tarefa"' in html and 'data-motivos-url="/os/api/execucao/motivos"' in html
+    assert 'data-acoes=""' in html.split("data-tarefas-os", 1)[1].split(">", 1)[0]
+

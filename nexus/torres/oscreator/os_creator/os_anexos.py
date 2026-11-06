@@ -177,7 +177,7 @@ def get_os_anexos(id_work_order) -> list:
             respostas = list(ex.map(_arquivos, tids))
     else:
         respostas = [_arquivos(t) for t in tids]
-    for res in respostas:
+    for tid, res in zip(tids, respostas):
         if res is None:
             continue
         for d in (res.get("data") if isinstance(res, dict) else res) or []:
@@ -204,8 +204,9 @@ def get_os_anexos(id_work_order) -> list:
             is_image = any(low.endswith(e) for e in
                            (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"))
             is_text = not val and not url                  # nota de texto (sem arquivo)
+            # a tarefa de onde veio (06/11/2026): o "x anexos" de cada ativo na página da OS da Engenharia
             out.append({"value": val, "nome": nome, "user": user, "url": url,
-                        "is_image": is_image, "is_text": is_text, "desc": desc, "raw": d})
+                        "is_image": is_image, "is_text": is_text, "desc": desc, "raw": d, "id_tarefa": tid})
     # imagens que só têm o CAMINHO → busca a URL pré-assinada (em paralelo) p/ a galeria abrir
     faltam = [a for a in out if a.get("is_image") and not a.get("url") and a.get("value")] if com_url else []
     if faltam:

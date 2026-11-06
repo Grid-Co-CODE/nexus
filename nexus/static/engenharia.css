@@ -538,9 +538,11 @@ table.eg-t td.eg-mono{font:500 12px var(--font-mono);white-space:nowrap}
 
 /* ── trocar o responsável como na tela do chamado e os ativos de 5 em 5 (24/10/2026) ── */
 dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:4px 8px}
-.eg-resp-bt{background:transparent;border:1px solid var(--linha-forte);border-radius:6px;color:var(--mudo);cursor:pointer;
-  font:600 11px/1 var(--fonte-ac);padding:4px 8px}
-.eg-resp-bt:hover,.eg-resp-bt:focus-visible{color:var(--verde-texto);border-color:var(--verde)}
+/* o nome é o botão (06/11/2026: "a troca pode ser feita ao clicar no nome do responsável"): parece texto, com o traço
+   embaixo dizendo que clica */
+.eg-resp-nome{background:transparent;border:0;border-bottom:1px dashed var(--linha-forte);border-radius:0;color:inherit;
+  cursor:pointer;font:inherit;padding:0 0 1px;text-align:right}
+.eg-resp-nome:hover,.eg-resp-nome:focus-visible{color:var(--verde-texto);border-bottom-color:var(--verde)}
 .eg-dlg-veu{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;
   background:var(--veu)}
 .eg-dlg-veu[hidden]{display:none}
@@ -818,3 +820,57 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 /* o nível na lista de Ativos com sinal só na cor da letra, como as etiquetas (Levi, 05/11/2026: "tira essa borda
    arredondada e fundo pintado para só a fonte pintada") */
 .eg-pill.eg-pill--sem{background:transparent;box-shadow:none;padding-left:0;padding-right:0;min-width:7em}
+
+/* as ações da OS na página da OS do Quadro (06/11/2026): os anexos, o Incluir anexo, o Concluir e o Cancelar */
+.eg-os-acoes-l{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.eg-ac-btn--perigo{color:var(--critico);border-color:var(--critico)}
+.eg-ac-btn--perigo:hover{border-color:var(--critico);color:var(--critico);background:var(--critico-suave)}
+
+/* as tarefas da OS, uma a uma (06/11/2026): o check, o ativo com a linha de baixo e os botões; e os diálogos da página */
+/* enxuto (Levi, 06/11/2026: "os botões de ativos sejam um pouco menores, está ocupando muito espaço de tela... reduza as
+   fontes em 30%, não precisa ter uma borda para todas os ativos, separe por linhas sutis"): sem caixa por ativo, a linha
+   de baixo separa; as letras e o check 30% menores e os botões mais baixos */
+.eg-tar-lista{display:grid;gap:0}
+.eg-tar{display:grid;grid-template-columns:15px minmax(0,1fr) auto;gap:3px 8px;align-items:center;padding:6px 0;
+  border-bottom:1px solid var(--linha)}
+.eg-tar:last-child{border-bottom:0}
+.eg-tar-ok{display:grid;place-items:center;width:14px;height:14px;border-radius:50%;border:1px solid var(--linha-forte);
+  font:800 8.5px/1 var(--font-sans);color:var(--superficie)}
+.eg-tar--feita .eg-tar-ok{background:var(--ok);border-color:var(--ok)}
+.eg-tar-t{display:grid;gap:1px;min-width:0}
+.eg-tar-t b{font-size:10px;color:var(--tinta);overflow-wrap:anywhere}
+.eg-tar-t small{font-size:8.5px;color:var(--mudo)}
+.eg-tar-b{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}
+.eg-tar-b .eg-ac-btn--p{padding:3px 7px;font-size:9.5px;border-radius:6px}
+@media (max-width:640px){.eg-tar{grid-template-columns:15px minmax(0,1fr)}.eg-tar-b{grid-column:1/-1;justify-content:flex-start}}
+/* o Esconder / Mostrar do título dos ativos (06/11/2026: "quero só que dê para recolher os ativos") */
+.eg-recolher{margin-left:auto;display:inline-flex;align-items:center;gap:4px;background:transparent;border:0;padding:2px 4px;
+  color:var(--mudo);cursor:pointer;font:600 11px/1 var(--fonte-ac)}
+.eg-recolher svg{width:14px;height:14px;transition:transform .15s}
+.eg-recolher[aria-expanded="false"] svg{transform:rotate(-90deg)}
+.eg-recolher:hover,.eg-recolher:focus-visible{color:var(--verde-texto)}
+.eg-dlg{border:1px solid var(--linha-forte);border-radius:14px;background:var(--superficie);color:var(--tinta);
+  padding:18px 20px;width:min(520px,calc(100vw - 32px))}
+.eg-dlg::backdrop{background:var(--veu)}
+.eg-dlg h3{margin:0 0 12px;font:700 16px/1.3 var(--font-sans)}
+.eg-dlg-c{display:grid;gap:10px;max-height:60vh;overflow:auto}
+.eg-dlg-campo{display:grid;gap:4px;font-size:13px;color:var(--tinta-2)}
+.eg-dlg-req{font-size:11px;color:var(--alerta)}
+.eg-dlg-hint{min-height:18px;margin:10px 0 0;font-size:12.5px;color:var(--mudo)}
+.eg-dlg-b{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+
+/* ── a caixa Ações da OS em dois grupos (06/11/2026: "organize melhor a informação"): o rótulo de cada grupo à esquerda,
+   o Incluir anexo na ponta, as duas contagens de anexos em linhas e o Andamento com o cancelar à parte ── */
+.eg-acoes-g{display:flex;flex-direction:column;gap:6px}
+.eg-acoes-g + .eg-acoes-g{margin-top:14px;padding-top:12px;border-top:1px solid var(--linha)}
+.eg-acoes-g-h{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:28px}
+.eg-acoes-g-h > span{font:700 10.5px/1 var(--fonte-ac);letter-spacing:.08em;text-transform:uppercase;color:var(--mudo)}
+.eg-acoes-item{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:8px 10px;
+  background:transparent;border:1px solid var(--linha);border-radius:8px;color:var(--tinta);cursor:pointer;
+  font:600 12.5px/1.2 var(--fonte-ac);text-align:left}
+.eg-acoes-item:hover,.eg-acoes-item:focus-visible{border-color:var(--verde);color:var(--verde-texto)}
+.eg-acoes-item b{font-variant-numeric:tabular-nums}
+.eg-acoes-bts{display:flex;flex-wrap:wrap;gap:8px}
+.eg-acoes-bts > .eg-ac-btn{flex:1 1 140px;justify-content:center}
+.eg-acoes-bts > .eg-ac-btn--perigo{flex:0 0 auto}
+.eg-acoes-g [data-anexo-colado]{margin:4px 0 0}

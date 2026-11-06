@@ -213,7 +213,14 @@ def os_anexos_contagem(wid):
     for a in subs:
         if a.get("id_tarefa") is not None:
             por_tarefa[str(a["id_tarefa"])] = por_tarefa.get(str(a["id_tarefa"]), 0) + 1
-    return jsonify({"sub": len(subs), "os": sum(1 for a in oss if chave(a) not in vistos), "por_tarefa": por_tarefa})
+    # e os arquivos da aba Anexos de cada tarefa (06/11/2026: o "Anexar" da tarefa na página da OS da Engenharia grava lá,
+    # não numa subtarefa), à parte: o `por_tarefa` é o que o botão dos anexos da tarefa no card mostra (as fotos dela)
+    arquivos_por_tarefa = {}
+    for a in oss:
+        if a.get("id_tarefa") is not None and chave(a) not in vistos:
+            arquivos_por_tarefa[str(a["id_tarefa"])] = arquivos_por_tarefa.get(str(a["id_tarefa"]), 0) + 1
+    return jsonify({"sub": len(subs), "os": sum(1 for a in oss if chave(a) not in vistos), "por_tarefa": por_tarefa,
+                    "arquivos_por_tarefa": arquivos_por_tarefa})
 
 
 @bp.route("/logout")

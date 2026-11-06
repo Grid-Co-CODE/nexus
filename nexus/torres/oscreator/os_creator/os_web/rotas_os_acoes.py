@@ -22,6 +22,7 @@ import ativos_central
 
 from . import lista_central
 from . import os_acoes_web as regra
+from . import solic_eng_web as regra_anexo
 from . import rotas as _rotas
 from . import tradicional_web as trad
 from .rotas import exige_sessao
@@ -58,6 +59,18 @@ def _tg_grupos_tarefas(d):
 def _tg_rotulos_tarefas(d):
     """{id da tarefa: o nome que a distingue das outras} — a pendência do Concluir diz de qual tarefa é."""
     return regra.rotulos_tarefas((d or {}).get("tarefas"))
+
+
+@bp.app_template_global("acoes_anexo_aceitar")
+def _tg_anexo_aceitar():
+    """O accept do seletor do Incluir anexo: os tipos dos anexos da Solicitação de Engenharia."""
+    return regra_anexo.ACEITAR
+
+
+@bp.app_template_global("acoes_anexo_regra")
+def _tg_anexo_regra():
+    return "%s · até %d MB cada, %d por vez · ou cole com Ctrl+V" % (
+        regra_anexo.tipos_aceitos(), regra_anexo.MAX_MB_ARQUIVO, regra_anexo.MAX_ARQUIVOS)
 
 
 def _corpo() -> dict:
@@ -102,6 +115,66 @@ def api_anexos_lista(wid):
     api resolve e o link que a renova — as duas chamadas do `_carregar` do card (get_os_subtarefa_anexos + get_os_anexos)."""
     subs, oss = _anexos_da_os(wid, forcar=True)
     return jsonify(regra.anexos_web(subs, oss, wid))
+
+
+def _nomes_na_os(wid) -> set:
+    """Os nomes dos arquivos que a OS já tem (o fim da chave `.ot/<OS>/<nome>` no S3), sem pedir as URLs pré-assinadas:
+    só o nome importa aqui, e cada URL seria um pedido a mais na cota da empresa."""
+    with api.enxuta("url"):
+        listas = [api.get_os_subtarefa_anexos(wid) or [], api.get_os_anexos(wid) or []]
+    return {(str(a.get("value") or "").rsplit("/", 1)[-1] or str(a.get("nome") or "")).lower()
+            for lista in listas for a in lista if isinstance(a, dict)} - {""}
+
+
+# Incluir anexo numa OS que já existe (Levi, 06/11/2026: "poderia incluir um botão de incluir anexo? Aí incluiria um anexo
+# na OS e será possível ver o anexo e baixar os anexos conforme já temos quando clicamos na OS no histórico de OS"), no
+# card e nas páginas da OS (a da Engenharia e a do chamado de Garantias). As regras e o envio são os dos anexos da
+# Solicitação de Engenharia, em produção desde 29/10/2026 (`solic_eng_web.anexos`: o tipo conferido pelo conteúdo, 10 MB
+# cada, 20 MB juntos, 5 por vez; `solic_eng_web.anexar`: o S3 do Fracttal e a 1ª tarefa da OS). O que uma OS existente
+# pede a mais: o nome que já está nela ganha " (2)" (a chave no S3 é `.ot/<OS>/<nome>`, e o novo apagaria o antigo), e os
+# anexos são relidos depois do envio: o que não aparece na OS não subiu (o Fracttal aceita calado).
+@bp.route("/api/os/<int:wid>/anexos", methods=["POST"])
+@exige_sessao
+def api_anexos_incluir(wid):
+    try:
+        request.max_content_length = regra_anexo.LIMITE_PEDIDO   # só esta rota abre (o app aceita 4 MB por pedido)
+    except AttributeError:
+        pass
+    folio = "".join(ch for ch in str(request.form.get("folio") or "") if ch.isdigit())[:12] or str(int(wid))
+    brutos = [(f.filename or "", f.read()) for f in request.files.getlist("anexos")]
+    ok, erro = regra_anexo.anexos(brutos, nada=" Nenhum anexo foi incluído.")
+    if erro:
+        return _erro(erro)
+    if not ok:
+        return _erro("Escolha o arquivo para anexar à OS.")
+    # o anexo de UMA tarefa (06/11/2026: "Botão de anexar na tarefa"), que tem de ser da OS; sem ela, a 1ª tarefa
+    tarefa = str(request.form.get("tarefa") or "").strip()
+    if tarefa and not _tarefa_da_os(wid, tarefa):
+        return _erro("Esta tarefa não é da OS.", 404)
+    vistos = _nomes_na_os(wid)
+    for a in ok:
+        a["nome"] = regra_anexo._sem_repetir(a["nome"], vistos)
+    tarefas = (lambda _w: [int(tarefa)]) if tarefa else api._ids_tarefas_da_os
+    with api._ExecutorComContexto(max_workers=regra_anexo.ENVIOS_PARALELOS) as ex:
+        res = regra_anexo.anexar([{"folio": folio, "id_work_order": wid}], ok, api.attach_imagem_os, tarefas,
+                                 mapa=ex.map)
+    na_os = _nomes_na_os(wid)
+    incluidos, falhas = [], []
+    for r in res:
+        if r["ok"] and r["nome"].lower() in na_os:
+            incluidos.append(r["nome"])
+        else:
+            falhas.append({"nome": r["nome"], "motivo": "; ".join(m for _, m in r["falhas"])
+                           or "o Fracttal aceitou o envio, mas o anexo não apareceu na OS"})
+    nao = "; ".join("%s (%s)" % (f["nome"], f["motivo"]) for f in falhas)
+    if not incluidos:
+        texto = "Nenhum anexo foi incluído na OS %s: %s." % (folio, nao)
+    else:
+        n = len(incluidos)
+        texto = ("1 anexo incluído" if n == 1 else "%d anexos incluídos" % n) + " na OS %s." % folio
+        texto += " Não subiu: %s." % nao if falhas else ""
+    return jsonify({"ok": not falhas, "mensagem": texto, "incluidos": incluidos, "falhas": falhas}), \
+        200 if incluidos else 502
 
 
 @bp.route("/api/os/<int:wid>/anexo")
@@ -480,6 +553,175 @@ def api_executar(wid, tid):
                     "confirmado": bool(res.get("confirmado"))})
 
 
+# ── as tarefas da OS, uma a uma (06/11/2026) ──────────────────────────────────────────────────────────────────────────
+# Levi, na página da OS da Engenharia (a OS 16289, de seis inversores): "Nos ativos deve mostrar um check quando a tarefa
+# for concluída"; "Quando temos mais de um ativo deve ter a opção de abrir as subtarefas do ativo e responder a subtarefa";
+# "Ao lado do ativo deve ter um botão de 'Iniciar atividade' que o início da atividade já marca a data e hora que a pessoa
+# clica, pode ter a opção de pausar"; "Botão de anexar na tarefa, aí terá ao lado do nome do ativo 'x anexos' e os botões
+# de iniciar, pausar ou concluir!". O cronômetro é o do Fracttal web (`os_execucao`, capturado em 27/07/2026 e usado pelo
+# kanban da Performance do app de mesa), por id da tarefa, com as regras da resposta da sessão do OS Creator (06/11/2026):
+# pausar pede o motivo; a pausada é retomada antes de encerrar; o estado é relido depois de cada passo (o Fracttal aceita
+# calado); a tarefa tem de ser da OS. Concluir a tarefa encerra o tempo e NÃO lança outro registro de execução (o
+# /executar lança um novo, e as horas dobrariam); antes, as subtarefas obrigatórias têm de estar respondidas.
+def _uma_tarefa(d: dict) -> list:
+    """A OS de UMA tarefa no formato do `subtarefas_por_tarefa` (que devolve [] nela: a lista direta do card)."""
+    ts = [t for t in (d.get("tarefas") or []) if isinstance(t, dict) and t.get("id") is not None]
+    if not ts:
+        return []
+    t, subs = ts[0], [s for s in (d.get("subtarefas") or []) if isinstance(s, dict)]
+    situacao, sit = regra.situacao_tarefa(t)
+    ativo = str(t.get("ativo") or "").strip()
+    return [{"id": t["id"], "n": 1, "titulo": str(t.get("titulo") or "").strip() or ativo or "Tarefa 1", "ativo": ativo,
+             "situacao": situacao, "sit": sit, "feitas": sum(1 for s in subs if s.get("feito")), "total": len(subs)}]
+
+
+@bp.route("/api/os/<int:wid>/tarefas")
+@exige_sessao
+def api_tarefas(wid):
+    """Cada tarefa da OS com o ativo, a situação (o check: a tarefa com fim), as subtarefas respondidas e o cronômetro."""
+    d = api.get_os_detalhes(wid) or {}
+    grupos = [g for g in (regra.subtarefas_por_tarefa(d) or _uma_tarefa(d)) if g.get("id") is not None]
+    ids = [g["id"] for g in grupos]
+    with api._ExecutorComContexto(max_workers=4) as ex:
+        execs = dict(zip(ids, ex.map(api.execucao_atual, ids)))
+    out = []
+    for g in grupos:
+        e = execs.get(g["id"]) or {}
+        out.append({"id": g["id"], "n": g["n"], "titulo": g["titulo"], "ativo": g["ativo"], "situacao": g["situacao"],
+                    "feita": g["sit"] == "ok", "feitas": g["feitas"], "total": g["total"],
+                    "execucao": {"estado": e.get("estado") or "parada", "inicio": e.get("inicio") or "",
+                                 "trabalhado_s": e.get("trabalhado_s") or 0, "motivo": e.get("motivo") or ""}})
+    return jsonify({"folio": d.get("folio"), "tarefas": out})
+
+
+@bp.route("/api/execucao/motivos")
+@exige_sessao
+def api_motivos_pausa():
+    return jsonify({"motivos": api.motivos_pausa() or []})
+
+
+_CRONOMETRO = {  # ação → (o estado de antes que ela aceita, o estado esperado depois, o que se diz)
+    "iniciar": (("parada",), "rodando", "Atividade iniciada"),
+    "pausar": (("rodando",), "pausada", "Atividade pausada"),
+    "retomar": (("pausada",), "rodando", "Atividade retomada"),
+    "concluir": (("rodando", "pausada"), "parada", "Atividade concluída"),
+}
+_ESTADO_TXT = {"parada": "parada", "rodando": "em andamento", "pausada": "pausada"}
+
+
+def _tarefa_da_os(wid, tid) -> bool:
+    try:
+        return int(tid) in {int(x) for x in (api._ids_tarefas_da_os(wid) or []) if str(x).isdigit()}
+    except (TypeError, ValueError):
+        return False
+
+
+@bp.route("/api/os/<int:wid>/tarefa/<int:tid>/cronometro", methods=["POST"])
+@exige_sessao
+def api_cronometro(wid, tid):
+    c = _corpo()
+    acao = str(c.get("acao") or "")
+    if acao not in _CRONOMETRO:
+        return _erro("Ação desconhecida: use iniciar, pausar, retomar ou concluir.")
+    if not _tarefa_da_os(wid, tid):
+        return _erro("Esta tarefa não é da OS.", 404)
+    aceita, esperado, feito = _CRONOMETRO[acao]
+    antes = (api.execucao_atual(tid) or {}).get("estado") or "parada"
+    if antes not in aceita:
+        return _erro("A atividade está %s: não dá para %s." % (_ESTADO_TXT.get(antes, antes), acao))
+    if acao == "iniciar":
+        res = api.iniciar_execucao(tid)
+    elif acao == "pausar":
+        motivo = c.get("motivo")
+        if not str(motivo or "").isdigit():
+            return _erro("Escolha o motivo da pausa.")
+        res = api.pausar_execucao(tid, int(motivo), str(c.get("nota") or "").strip())
+    elif acao == "retomar":
+        res = api.retomar_execucao(tid)
+    else:
+        campos = api.subtarefas_da_tarefa(tid)
+        faltam = regra.faltando_obrigatorias(campos, {str(x.get("id_form_item")): x.get("valor") for x in campos})
+        if faltam:
+            return _erro("Responda as subtarefas obrigatórias antes de concluir: %s." % "; ".join(faltam[:4]))
+        res = {"ok": True}
+        if antes == "pausada":                       # a pausada não aceita encerrar: retoma antes (os_execucao)
+            res = api.retomar_execucao(tid)
+        if isinstance(res, dict) and res.get("ok"):
+            res = api.finalizar_execucao(tid)
+    if not (isinstance(res, dict) and res.get("ok")):
+        return _erro((res or {}).get("erro") or "O Fracttal não fez.", 502)
+    lista_central.mudou(wid)
+    agora = api.execucao_atual(tid) or {}
+    if (agora.get("estado") or "parada") != esperado:
+        return _erro("O Fracttal aceitou, mas a atividade ficou %s." % _ESTADO_TXT.get(agora.get("estado"), "como estava"),
+                     502)
+    return jsonify({"ok": True, "estado": esperado, "mensagem": feito + " no Fracttal.",
+                    "execucao": {"estado": esperado, "inicio": agora.get("inicio") or "",
+                                 "trabalhado_s": agora.get("trabalhado_s") or 0}})
+
+
+@bp.route("/api/os/<int:wid>/tarefa/<int:tid>/respostas", methods=["POST"])
+@exige_sessao
+def api_respostas(wid, tid):
+    """Responder as subtarefas de UMA tarefa, sem lançar execução (o "Fazer a tarefa" lança): o `salvar_subtarefas` do
+    /executar, e a releitura diz quantas obrigatórias ainda faltam."""
+    if not _tarefa_da_os(wid, tid):
+        return _erro("Esta tarefa não é da OS.", 404)
+    valores = _corpo().get("valores") or {}
+    campos = api.subtarefas_da_tarefa(tid)
+    por_id = {str(x.get("id_form_item")): x for x in campos}
+    a_gravar = [{"id_form_item": por_id[k]["id_form_item"], "valor": v, "tipo": por_id[k].get("tipo") or 1}
+                for k, v in valores.items() if k in por_id and str(v or "").strip()]
+    if not a_gravar:
+        return _erro("Responda ao menos uma subtarefa.")
+    n = (api.salvar_subtarefas(wid, tid, a_gravar) or {}).get("n") or 0
+    depois = api.subtarefas_da_tarefa(tid)
+    faltam = regra.faltando_obrigatorias(depois, {str(x.get("id_form_item")): x.get("valor") for x in depois})
+    lista_central.mudou(wid)
+    texto = ("1 resposta gravada" if n == 1 else "%d respostas gravadas" % n) + " na tarefa."
+    if faltam:
+        texto += " Faltam as obrigatórias: %s." % "; ".join(faltam[:4])
+    return jsonify({"ok": True, "mensagem": texto, "n": n, "pendentes": len(faltam)})
+
+
+def _no_quadro_de_garantias(wid, st) -> None:
+    """O status novo no quadro guardado de Garantias (o mesmo ajuste do Finalizar de lá, `rotas_acomp._ajustar`): sem ele,
+    a OS cancelada ou em verificação pela tela do chamado seguia na coluna de antes até o quadro reler o Fracttal. A
+    gravação já está no Fracttal quando isto roda: erro aqui não vira erro na tela."""
+    try:
+        from . import rotas_acomp
+        rotas_acomp._ajustar(wid, {"status_id": st, "status": api.WO_STATUS.get(st, "")})
+    except Exception:                                    # noqa: BLE001
+        import logging
+        logging.exception("o quadro de Garantias não recebeu o status %s da OS %s", st, wid)
+
+
+# Enviar para verificação (Levi, 06/11/2026: "Nessas telas devem ter essas opção também: Enviar para verificação, concluir
+# e cancelar!"): o status 2 (Em Verificação) pelo `api.mudar_status_os(wid, 2)` (tasks.work_orders_change_status), o
+# caminho que a revisão das OS provou no ar (a OS 18630 foi para Em Verificação por ele, e a 18635 na volta do
+# `_conferir_ja_realizada`; a resposta da sessão do OS Creator, 06/11/2026). Ele só muda o status: o fim e as
+# subtarefas são do "Fazer a tarefa", que o diálogo oferece antes, como o do Concluir. Só a OS Em Processo vai, e o
+# status é lido antes e depois (o Fracttal aceita calado).
+@bp.route("/api/os/<int:wid>/verificacao", methods=["POST"])
+@exige_sessao
+def api_verificacao(wid):
+    folio = _corpo().get("folio") or wid
+    antes = api.status_da_os(wid)
+    if antes is not None and int(antes) != 1:
+        return _erro("A OS %s está %s no Fracttal: só a OS em processo vai para verificação."
+                     % (folio, api.WO_STATUS.get(int(antes), "fora de processo").lower()))
+    res = api.mudar_status_os(wid, 2)
+    if not (isinstance(res, dict) and res.get("ok")):
+        return _erro((res or {}).get("erro") or "O Fracttal não mudou o status da OS.", 502)
+    lista_central.mudou(wid)
+    depois = api.status_da_os(wid)
+    if depois is not None and int(depois) != 2:
+        return _erro("O Fracttal aceitou o pedido, mas a OS %s seguiu %s." % (
+            folio, api.WO_STATUS.get(int(depois), "como estava").lower()), 502)
+    _no_quadro_de_garantias(wid, 2)
+    return jsonify({"ok": True, "mensagem": "OS %s enviada para verificação no Fracttal." % folio})
+
+
 @bp.route("/api/os/<int:wid>/cancelar", methods=["POST"])
 @exige_sessao
 def api_cancelar(wid):
@@ -491,4 +733,5 @@ def api_cancelar(wid):
         return _erro("Escolha o motivo do cancelamento.")
     api.cancel_os(wid, idm, str(c.get("note") or "").strip())        # cancelar_os.py:77 — (self._wo, idm, obs.strip())
     lista_central.mudou(wid)
+    _no_quadro_de_garantias(wid, 4)
     return jsonify({"ok": True, "mensagem": "OS %s cancelada com sucesso." % (c.get("folio") or wid)})
