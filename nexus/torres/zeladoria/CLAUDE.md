@@ -39,9 +39,11 @@ Plano e registro: `docs/superpowers/plans/2026-11-03-zeladoria-etapas-1-e-2.md`.
   `contratos-zeladoria` do Supabase moram no disco do servidor, `<NEXUS_DADOS>/zeladoria/contratos/<caminho>`, com o
   caminho que a tabela `zeladoria_contratual_docs` cita (`nexus/zeladoria/contratos_pdf.py`). Grande demais para o banco,
   que guarda planilhas. Quem envia: só o administrador, pela página `/t/zeladoria/contratos-pdf` (escolhe a pasta, cada
-  arquivo vai para o caminho que termina igual; só PDF, até 60 MB). Quem abre: quem está aprovado, e só o caminho que a
-  cópia cita. O PDF que ainda não veio diz isso no botão. Os 105 baixados do Supabase em 06/11/2026 estão em
-  `Downloads\Deploy\radar_contratos` no PC do Levi (conferidos: mesmos arquivos e bytes do bucket).
+  arquivo vai para o caminho que termina igual; só PDF, até 60 MB: a única rota acima do limite geral de 25 MB do Nexus,
+  porque dois contratos têm 27,5 MB e voltavam 413). Quem abre: quem está aprovado, e só o caminho que a cópia cita. O
+  PDF que ainda não veio diz isso no botão. **Os 105 estão no servidor desde 06/11/2026** (baixados do Supabase, conferidos
+  com o bucket, e enviados pela página; a cópia de garantia fica em `Downloads\Deploy\radar_contratos` no PC do Levi).
+  PDF novo de contrato, depois da troca, entra pela mesma página.
 
 ## A cópia (até a troca)
 
