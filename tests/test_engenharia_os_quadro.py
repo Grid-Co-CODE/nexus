@@ -798,13 +798,33 @@ def test_os_ativos_se_recolhem(pagina, cliente):
     assert "[data-recolher-ativos]" in js and "localStorage" in js
 
 
-def test_o_painel_das_tarefas_esta_na_pagina_e_os_botoes_esperam_a_prova(pagina, cliente):
+def test_o_painel_le_o_inicio_em_utc_e_conta_no_singular():
+    """Prova no ar de 06/11/2026 (OS 18750): o início do cronômetro vem do Fracttal em UTC sem o fuso ("15:38" era 12:38
+    em Brasília), e a OS de uma subtarefa dizia "0 de 1 subtarefas"."""
+    from pathlib import Path
+    js = Path("nexus/static/engenharia-os.js").read_text(encoding="utf-8")
+    assert "iso + 'Z'" in js and "getHours()" in js
+    assert "t.total === 1 ? ' subtarefa' : ' subtarefas'" in js
+
+
+def test_o_painel_das_tarefas_esta_na_pagina_e_os_botoes_sao_da_engenharia(pagina, cliente):
     """06/11/2026: o bloco dos ativos vira o painel das tarefas (o check, os anexos, o cronômetro e as subtarefas pelo OS
-    Creator). Até a prova no Fracttal, os botões que gravam saem só para o administrador."""
+    Creator). Os botões que gravam ficaram só com o administrador até a prova no Fracttal (TESTE - PA, OS 18750 e 18751,
+    06/11/2026); provados, são da Engenharia."""
     from test_engenharia_acompanhamento import _como
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
     wid = pagina["id_work_order"]
     assert "data-tarefas-os" in html and f'data-tarefas-url="/os/api/os/{wid}/tarefas"' in html
     assert f'data-tarefa-url="/os/api/os/{wid}/tarefa"' in html and 'data-motivos-url="/os/api/execucao/motivos"' in html
+    assert 'data-acoes="sim"' in html.split("data-tarefas-os", 1)[1].split(">", 1)[0]
+
+
+def test_quem_nao_e_da_engenharia_ve_as_tarefas_sem_os_botoes(pagina, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import _como
+
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
+                                               "erro": ""})
+    html = _como(cliente, BETO).get(URL).get_data(as_text=True)
     assert 'data-acoes=""' in html.split("data-tarefas-os", 1)[1].split(">", 1)[0]
 

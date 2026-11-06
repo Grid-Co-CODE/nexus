@@ -1295,9 +1295,11 @@ concluir e cancelar!".
   - O Incluir anexo aceita `tarefa`: o arquivo vai para a aba Anexos daquela tarefa, e não para a 1ª. A contagem
     (`/os/os/<id>/anexos`) passa a trazer `arquivos_por_tarefa` (o `get_os_anexos` diz a tarefa de cada arquivo); o
     `por_tarefa` segue sendo o das fotos das subtarefas, que o botão dos anexos da tarefa no card mostra.
-  - A provar no TESTE - PA antes de abrir para a equipe (`TAREFAS_PARA_A_EQUIPE` na torre da Engenharia): se encerrar o
-    cronômetro grava a data de fim da tarefa (o check), se as horas não dobram (`historico_execucao`) e se o anexo da
-    tarefa aparece nela.
+  - Provado no TESTE - PA em 06/11/2026 (OS 18750 e 18751, lido de volta): encerrar o cronômetro deixa a tarefa
+    Finalizada (o check); o concluir faz uma execução só (as horas não dobram); o anexo vai para a tarefa escolhida; o
+    Incluir anexo entra na OS Em Processo, Em Verificação, Concluída e Cancelada; o `execucao_atual` devolve o início em
+    UTC sem o fuso (quem mostra converte). O card sem o status no endereço usa o `status_id` do Fracttal para o "Enviar
+    para verificação" (só na OS Em Processo).
 - Prova: `tests/test_oscreator_anexo_incluir.py`, `tests/test_oscreator_acoes_nas_telas.py` e
   `tests/test_oscreator_tarefas_da_os.py`.
 

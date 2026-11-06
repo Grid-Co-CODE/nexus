@@ -179,7 +179,10 @@
   <footer class="det-foot">
     <span class="det-ajuda">{{ n_sub }} subtarefa(s){% if grupos %} em {{ n_tarefas }} tarefas{% endif %}</span><span class="os-cresce"></span>
     <button type="button" class="det-b verde" data-acao="fluxo" title="Mostra esta OS encadeada com as outras — pais, filhas e todo o histórico do ativo">{{ icone('branch', '#0B1020', 16) }}Fluxo</button>
-    {% if status not in ('Em Verificação', 'Concluída', 'Cancelada') %}<button type="button" class="det-b ambar" data-acao="verificacao" title="Muda a OS para Em Verificação no Fracttal (precisa de permissão na sua conta)">Enviar para verificação</button>{% endif %}
+    {# sem o status no endereço (a página da OS da Engenharia abre o card assim), vale o do Fracttal: a prova no ar de
+       06/11/2026 mostrou o botão na OS concluída (a rota recusa, mas o botão não serve) #}
+    {% set pode_verificar = (d.status_id == 1) if (not status and d.status_id) else (status not in ('Em Verificação', 'Concluída', 'Cancelada')) %}
+    {% if pode_verificar %}<button type="button" class="det-b ambar" data-acao="verificacao" title="Muda a OS para Em Verificação no Fracttal (precisa de permissão na sua conta)">Enviar para verificação</button>{% endif %}
     <button type="button" class="det-b ok" data-acao="concluir" title="Fecha a OS no Fracttal (irreversível — precisa de permissão na sua conta)">Concluir OS</button>
     <button type="button" class="det-b perigo" data-acao="cancelar" title="Cancela a OS no Fracttal (precisa de permissão na sua conta)">Cancelar OS</button>
     {% if parcial %}<button type="button" class="det-b ghost" data-fechar>Fechar</button>{% else %}<a class="det-b ghost" href="/os/historico" data-aba-fechar>Fechar</a>{% endif %}

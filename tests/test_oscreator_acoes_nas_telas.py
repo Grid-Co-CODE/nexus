@@ -44,3 +44,19 @@ def test_a_moldura_do_card_abre_so_nas_acoes_do_card(cliente):
     c = _pela_microsoft(cliente, ANA) or cliente
     assert 'data-acao="concluir"' in c.get("/os/_nexus/card/15088?acao=concluir").get_data(as_text=True)
     assert 'data-acao=""' in c.get("/os/_nexus/card/15088?acao=apagar-tudo").get_data(as_text=True)
+
+
+def test_o_card_sem_o_status_no_endereco_le_o_do_fracttal(monkeypatch):
+    """Prova no ar de 06/11/2026 (OS 18750, concluída): a página da OS da Engenharia abre o card sem o status no endereço,
+    e o "Enviar para verificação" aparecia na OS concluída (a rota recusa, mas o botão não serve). Sem o status, vale o
+    do Fracttal: o botão só na OS Em Processo (status 1)."""
+    from test_oscreator_card_tarefas import _tarefa as tarefa
+    t = tarefa(1)
+    t["id_status_work_order"] = 3
+    monkeypatch.setattr(api, "_rpc_call", Fracttal([t], []).rpc)
+    api.esquecer_os()
+    assert 'data-acao="verificacao"' not in _card(status="")
+    t["id_status_work_order"] = 1
+    api.esquecer_os()
+    assert 'data-acao="verificacao"' in _card(status="")
+    api.esquecer_os()

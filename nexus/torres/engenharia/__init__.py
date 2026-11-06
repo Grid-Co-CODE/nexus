@@ -1240,10 +1240,12 @@ def _pagina_da_os(folio: int, tela_id: str):
         de_pagina=f"/t/engenharia/{tela_id}/os/{o['os']}", **base)
 
 
-# O cronômetro e as respostas por tarefa na página da OS (06/11/2026): só o administrador vê os botões até a prova no
-# Fracttal (TESTE - PA: iniciar, pausar, retomar e concluir lidos de volta, sem horas em dobro); provado, vale True e a
-# Engenharia (quem classifica a OS) os vê. Regra da casa: o que grava no Fracttal só fica pronto com a prova lida de volta.
-TAREFAS_PARA_A_EQUIPE = False
+# O cronômetro e as respostas por tarefa na página da OS (06/11/2026): os botões ficaram só com o administrador até a
+# prova no Fracttal, e a prova passou (TESTE - PA, OS 18750 e 18751, 06/11/2026): iniciar, pausar com o motivo, retomar e
+# concluir lidos de volta; encerrar o cronômetro deixa a tarefa Finalizada (o check); o concluir não lança outro registro
+# (as horas não dobram); o anexo da tarefa fica nela. Desde então a Engenharia (quem classifica a OS) os vê. Voltar a
+# False devolve os botões só ao administrador, se o Fracttal mudar.
+TAREFAS_PARA_A_EQUIPE = True
 
 
 def _regras_do_anexo() -> tuple[str, str]:

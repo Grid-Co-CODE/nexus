@@ -401,9 +401,11 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   Anexar grava) e o cronômetro do Fracttal (Iniciar, Pausar com o motivo, Retomar, Concluir). O Concluir pede as
   obrigatórias respondidas, encerra o tempo e não lança outro registro (as horas dobrariam); o ✓ sai da tarefa relida, e
   quando o Fracttal não a marca como finalizada a tela diz. O número da subtarefa aceita vírgula ("7,9" vai como 7.9).
-  **Os botões só aparecem para o administrador** (`TAREFAS_PARA_A_EQUIPE = False`) até a prova no TESTE - PA:
-  encerrar o cronômetro grava a data de fim da tarefa? as horas não dobram (`historico_execucao`)? o anexo da tarefa
-  aparece nela? Provado, a constante vira True. Rotas e regras em `nexus/torres/oscreator/README.md`.
+  **Os botões são da Engenharia** (`TAREFAS_PARA_A_EQUIPE = True`) desde a prova no TESTE - PA (OS 18750, de dois
+  inversores, e 18751; 06/11/2026), lida de volta do Fracttal: encerrar o cronômetro deixa a tarefa Finalizada (o ✓); o
+  concluir não lança outro registro (uma execução, as horas não dobram); o anexo da tarefa fica nela; o anexo da OS entra
+  também na Em Verificação, na Concluída e na Cancelada. O início do cronômetro vem do Fracttal em UTC sem o fuso: o
+  painel o lê como UTC. False devolve os botões só ao administrador. Rotas e regras em `nexus/torres/oscreator/README.md`.
 - **O comentário na OS de várias tarefas não vai para o Fracttal** (pedido de 06/11/2026: "o certo é comentar e já
   incluir na nota da OS"): falta achar o caminho da nota da OS com várias tarefas (a sessão do OS Creator não tem um
   provado; o experimento é gravar uma marca numa OS de TESTE e reler a nota de cada tarefa). Até lá, fica no Nexus.

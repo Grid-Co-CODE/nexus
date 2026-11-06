@@ -163,7 +163,13 @@
     });
   }
   function falhou(e) { dizer(e.message, true, e.login ? caixa.dataset.login : ''); }
-  function hora(iso) { var m = /T(\d\d):(\d\d)/.exec(iso || ''); return m ? m[1] + ':' + m[2] : ''; }
+  // o início do cronômetro vem do Fracttal em UTC e sem o fuso (na prova no ar de 06/11/2026, "15:38" era 12:38 em
+  // Brasília): lido como UTC, sai na hora de quem olha
+  function hora(iso) {
+    if (!iso) return '';
+    var d = new Date(/(Z|[+-]\d\d:?\d\d)$/.test(iso) ? iso : iso + 'Z');
+    return isNaN(d.getTime()) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
   function botao(texto, acao, classe) {
     return '<button type="button" class="eg-ac-btn eg-ac-btn--p ' + (classe || 'eg-ac-btn--o') + '" data-tarefa-acao="' + acao + '">' + texto + '</button>';
   }
@@ -171,7 +177,7 @@
     lista.innerHTML = tarefas.map(function (t) {
       var e = t.execucao || {}, n = (anexos.fotos[String(t.id)] || 0) + (anexos.arquivos[String(t.id)] || 0), partes = [];
       if (t.titulo && t.titulo !== t.ativo) partes.push(esc(t.titulo));
-      if (t.total) partes.push(t.feitas + ' de ' + t.total + ' subtarefas');
+      if (t.total) partes.push(t.feitas + ' de ' + t.total + (t.total === 1 ? ' subtarefa' : ' subtarefas'));
       partes.push(n === 1 ? '1 anexo' : n + ' anexos');
       if (e.estado === 'rodando') partes.push('em andamento' + (hora(e.inicio) ? ' desde ' + hora(e.inicio) : ''));
       else if (e.estado === 'pausada') partes.push('pausada' + (e.motivo ? ' (' + esc(e.motivo) + ')' : ''));
