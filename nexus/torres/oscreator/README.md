@@ -2628,6 +2628,23 @@ tarefa e dê para baixar tudo de uma vez, o download sai com o nome do ativo!"; 
 - Prova: `tests/test_oscreator_card_ativos_anexos_04_11.py`; os 2 testes de `test_oscreator_card_por_ativo_28_10.py`
   aceitam o `data-ativo` novo na tarefa.
 
+## A Nova solicitação para a Performance (06/11/2026)
+
+Levi, 06/11/2026: "adicione mais um em solicitações agora performance, será a mesma coisa porém com etiqueta de
+performance!"; e, no quiz do responsável, "Só a equipe da Performance".
+- **A mesma tela da Engenharia, com o setor no endereço** (`/os/solicitacao/performance`; as rotas `/os/api/solicitacao/
+  <engenharia|performance>/...`): os mesmos campos, regras, datas, anexos e as duas formas (uma OS por ativo ou a
+  agrupada); tipo Administrativa e só a Classificação 1, Programada. O que muda vem de `solic_eng_web.SETORES`: a
+  etiqueta **PERFORMANCE**, sempre e só ela (faltando no Fracttal, nenhuma OS sai), a lista de responsáveis e
+  "Performance" nas frases. A Nova solicitação tem agora três abas: PCM, Engenharia e Performance.
+- **Os responsáveis:** só a equipe da Performance, da `OS_WEB_PERFORMANCE_RESPONSAVEIS` (nomes separados por `;`, que casam
+  com o Fracttal como os da Engenharia). Os nomes não vão ao código (o repositório é público): o administrador os cola em
+  Base → Chaves das fontes → aba Nexus, cifrados na pasta de dados, sem a T.I. (o gancho `solic_eng_web.LER_NOMES`, que
+  a ponte liga, vale por cima do .env do OS Creator). Sem a lista, a tela abre e diz que falta. A da Engenharia segue no
+  .env (`OS_WEB_ENGENHARIA_RESPONSAVEIS`).
+- Prova: `tests/test_oscreator_solic_performance_06_11.py` (e os da Engenharia, `test_oscreator_solic_engenharia.py`,
+  seguem verdes); conferido na bancada (desktop e 375 px).
+
 ## O card diz a usina, a data de criação e quanto já foi feito (05/11/2026)
 
 Levi, 05/11/2026, em várias voltas na bancada e no ar: "as vezes clico na OS sem contexto e não sei que usina é. adicione

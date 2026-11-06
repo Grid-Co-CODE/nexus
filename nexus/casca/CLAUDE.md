@@ -705,8 +705,10 @@ gravar) e VENCE a do .env; "Apagar" volta à do .env. A tela nunca mostra o valo
   contra o painel, a prova é a pessoa entrar) e, desde 16/10, o `NEXUS_PCM_GITHUB_TOKEN` (o token do repositório do
   PCM: o servidor não tinha, e a tela de publicar a W43 dizia "sem token do GitHub"; a conferência só LÊ o GitHub: o token
   tem a forma ghp_/github_pat_, o GitHub o aceita, ele enxerga o repositório, a conta pode gravar e, sendo clássico, tem o
-  escopo repo ou public_repo; `pcm/publicar.token` usa o da tela primeiro). A tela não edita o .env: nome fora da lista é
-  recusado.
+  escopo repo ou public_repo; `pcm/publicar.token` usa o da tela primeiro) e, desde 06/11, a
+  `OS_WEB_PERFORMANCE_RESPONSAVEIS` (a equipe da Performance na Nova solicitação do OS Creator: uma lista de nomes, a única
+  com `texto` — os espaços de dentro ficam; ao menos um nome, sem dígito nem "@"; a ponte do OS Creator a lê pelo gancho
+  `solic_eng_web.LER_NOMES`, por cima do .env do OS Creator). A tela não edita o .env: nome fora da lista é recusado.
 - **Quem lê usa `chaves.valor(nome)`** (a da tela e, sem ela, a do .env), nunca `config.get` direto: as Contestações
   (`nexus/contratos/contestacoes.py`) e os Acessos dos clientes (`nexus/contratos/acessos_clientes.py`) leem assim.
 - **NEXUS_SECRET_KEY trocada:** a gravada não abre; vale a do .env (ou nenhuma), e a tela diz "não abre, cole de novo".

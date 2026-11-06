@@ -5,7 +5,10 @@ cascata e a criação. Uma OS por ativo sai pelo `api.create_work_orders_bulk` �
 UMA OS" do Tradicional. Nos dois: tipo 'Administrativa', só a Classificação 1 'Programada' (pelo nome), a etiqueta
 ENGENHARIA (só ela desde 21/10/2026; antes ia também a BACKOFFICE, e até 13/10 a REMOTO), sem plano e com o título por
 ativo no `por_ativo`. Os anexos (08/10) sobem depois de a
-OS existir, pelo `api.attach_imagem_os`, o mesmo caminho das imagens da Performance e do Tradicional."""
+OS existir, pelo `api.attach_imagem_os`, o mesmo caminho das imagens da Performance e do Tradicional.
+
+A Performance (06/11/2026) é a mesma tela e as mesmas rotas com o setor no endereço (`/solicitacao/performance`): muda a
+etiqueta (PERFORMANCE), a lista de responsáveis e o nome do setor nas frases (`reg.SETORES`)."""
 from __future__ import annotations
 import datetime as dt
 import json
@@ -23,20 +26,22 @@ from .rotas import _conta, exige_sessao
 
 bp = Blueprint("os_web_solic_eng", __name__, url_prefix="/os")
 _FMT = "%Y-%m-%dT%H:%M"
+_SETOR = "<any(engenharia, performance):setor>"      # os setores de `reg.SETORES`
 
 
 def _agora() -> dt.datetime:
     return dt.datetime.now(reg.BRT).replace(second=0, microsecond=0)
 
 
-@bp.route("/solicitacao/engenharia")
+@bp.route("/solicitacao/" + _SETOR)
 @exige_sessao
-def tela():
+def tela(setor):
     assets = api.load_assets_cached()
     agora = _agora()
     # a hora COM segundos: é a base de onde a tela anda o relógio da data mostrada (que o servidor recalcula ao criar)
     agora_s = dt.datetime.now(reg.BRT).strftime(_FMT + ":%S")
-    return render_template("solic_eng.html", conta=_conta(), aba="solic",
+    return render_template("solic_eng.html", conta=_conta(), aba="solic", setor=setor,
+                           setor_nome=reg.setor_de(setor)["nome"], setor_env=reg.setor_de(setor)["env"],
                            clientes=sorted(perf_web.clientes_reais(assets)), usinas=perf_web.usinas_para(assets, None),
                            agora=agora_s, evento=agora.strftime(_FMT),
                            programada=reg.data_br(reg.data_padrao(agora, False)), dias=reg.DIAS_PADRAO,
@@ -47,24 +52,24 @@ def tela():
                            anexo_tipos=reg.tipos_aceitos())
 
 
-@bp.route("/api/solicitacao/engenharia/usinas")
+@bp.route("/api/solicitacao/" + _SETOR + "/usinas")
 @exige_sessao
-def api_usinas():
+def api_usinas(setor):
     cliente = (request.args.get("cliente") or "").strip() or None
     return jsonify({"usinas": perf_web.usinas_para(api.load_assets_cached(), cliente)})
 
 
-@bp.route("/api/solicitacao/engenharia/ativos")
+@bp.route("/api/solicitacao/" + _SETOR + "/ativos")
 @exige_sessao
-def api_ativos():
+def api_ativos(setor):
     ativos = reg.ativos_da_usina(api.load_assets_cached(), (request.args.get("usina") or "").strip(), api._asset_short_name)
     return jsonify({"ativos": ativos, "tipos": [{"tipo": t, "nome": n} for t, n in reg.tipos_de(ativos)]})
 
 
-@bp.route("/api/solicitacao/engenharia/responsaveis")
+@bp.route("/api/solicitacao/" + _SETOR + "/responsaveis")
 @exige_sessao
-def api_responsaveis():
-    nomes = reg.nomes_configurados()
+def api_responsaveis(setor):
+    nomes = reg.nomes_configurados(setor=setor)
     if not nomes:
         return jsonify({"pessoas": [], "faltam": [], "configurado": False})
     pessoas, faltam = reg.responsaveis(rotas.responsaveis_fracttal(), nomes)
@@ -94,9 +99,9 @@ def _corpo_e_anexos() -> tuple[dict, list]:
     return (corpo if isinstance(corpo, dict) else {}), brutos
 
 
-@bp.route("/api/solicitacao/engenharia/criar", methods=["POST"])
+@bp.route("/api/solicitacao/" + _SETOR + "/criar", methods=["POST"])
 @exige_sessao
-def api_criar():
+def api_criar(setor):
     _abrir_limite()
     corpo, brutos = _corpo_e_anexos()
     por_id = {str(a.get("id")): a for a in (api.load_assets_cached() or []) if isinstance(a, dict)}
@@ -105,8 +110,8 @@ def api_criar():
     # faltando a pessoa ou a etiqueta ENGENHARIA no Fracttal, nenhuma OS sai. O catálogo (`catalogos.py`) serve à TELA; a
     # pessoa desligada e a etiqueta apagada nas últimas horas seguiriam nele até a renovação (a etapa 4 do canto central o
     # tinha posto aqui, e a revisão da 4.1 o tirou). E a sessão morta cai já aqui, antes de gravar: 401 e o login
-    permitidos, _ = reg.responsaveis(api.responsaveis_ao_vivo(), reg.nomes_configurados())
-    ativos, c, erro = reg.montar(corpo, por_id, permitidos, _agora(), api.perf_os_nome)
+    permitidos, _ = reg.responsaveis(api.responsaveis_ao_vivo(), reg.nomes_configurados(setor=setor))
+    ativos, c, erro = reg.montar(corpo, por_id, permitidos, _agora(), api.perf_os_nome, setor=setor)
     if erro:
         return jsonify({"erro": erro}), 400
     # os anexos ANTES de criar, como as etiquetas: anexo recusado = nenhuma OS criada
@@ -115,8 +120,9 @@ def api_criar():
         erro = reg.erro_envios(anexos, 1 if c["agrupar"] else len(ativos))
     if erro:
         return jsonify({"erro": erro}), 400
-    # a etiqueta ANTES de criar: a ENGENHARIA sempre, e só ela — faltando no Fracttal (ao vivo), nenhuma OS sai
-    etiquetas, faltam = reg.etiquetas(api.get_labels() or [])
+    # a etiqueta ANTES de criar: a do setor sempre, e só ela (a ENGENHARIA ou a PERFORMANCE) — faltando no Fracttal (ao
+    # vivo), nenhuma OS sai
+    etiquetas, faltam = reg.etiquetas(api.get_labels() or [], setor)
     if faltam:
         return jsonify({"erro": reg.erro_etiquetas(faltam)}), 400
     # só a Classificação 1, pelo NOME (como a OS de análise): nome que não existir no catálogo apenas não entra
@@ -129,11 +135,11 @@ def api_criar():
     if c["agrupar"]:
         # cada ativo vira uma atividade (tarefa) com o seu '[Ativo] - Descrição', e todas entram numa OS só
         res = api.create_work_orders_agrupada(ativos, c["descricao"], reg.TIPO_TAREFA, [], **comum)
-        out, oss = reg.mensagem_agrupada(res, ativos, c["prog_date"]), reg.oss_da_agrupada(res)
+        out, oss = reg.mensagem_agrupada(res, ativos, c["prog_date"], setor=setor), reg.oss_da_agrupada(res)
     else:
         res = api.create_work_orders_bulk(ativos, c["descricao"], reg.TIPO_TAREFA, [],
                                           responsible_code=c["responsible_code"], **comum)
-        out, oss = reg.mensagem(res, ativos, c["prog_date"]), reg.oss_do_bulk(res)
+        out, oss = reg.mensagem(res, ativos, c["prog_date"], setor=setor), reg.oss_do_bulk(res)
     lista_central.criadas(res)         # as OS criadas entram na lista central na hora (31/10/2026, tarefa 3.3)
     if anexos:
         alvos = [o for o in oss if o.get("id_work_order")]

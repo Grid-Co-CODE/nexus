@@ -8,6 +8,11 @@
   'use strict';
   const $ = (id) => document.getElementById(id);
   const raiz = $('eng');
+  // o setor da tela (06/11/2026: a Performance é esta mesma tela, com a etiqueta e a equipe dela): o endereço das rotas e
+  // o nome nas frases
+  const SETOR = raiz.dataset.setor || 'engenharia', SETOR_NOME = raiz.dataset.setorNome || 'Engenharia';
+  const SETOR_ENV = raiz.dataset.setorEnv || 'OS_WEB_ENGENHARIA_RESPONSAVEIS';
+  const API = '/os/api/solicitacao/' + SETOR;
   if (!raiz) return;
   const cbCli = $('cb_cli'), cbUsi = $('cb_usi'), busca = $('busca'), cbTipo = $('cb_tipo'), tbody = $('tbody');
   const bAll = $('b_all'), bNone = $('b_none'), selLbl = $('sel_lbl'), edDesc = $('ed_desc'), taProb = $('ta_prob');
@@ -69,7 +74,7 @@
   }
   async function trocarCliente() {
     try {
-      const j = await pedir('/os/api/solicitacao/engenharia/usinas?cliente=' + encodeURIComponent(cbCli.value), null, 'Carregando as usinas…');
+      const j = await pedir(API + '/usinas?cliente=' + encodeURIComponent(cbCli.value), null, 'Carregando as usinas…');
       const antes = cbUsi.value, us = j.usinas || [];
       cbUsi.innerHTML = '<option value="">— Selecione a usina —</option>'
         + us.map((u) => '<option value="' + esc(u) + '">' + esc(u) + '</option>').join('');
@@ -80,7 +85,7 @@
   async function trocarUsina() {
     if (!cbUsi.value) { semAtivos('Selecione a usina para carregar os ativos.'); return; }
     try {
-      const j = await pedir('/os/api/solicitacao/engenharia/ativos?usina=' + encodeURIComponent(cbUsi.value), null, 'Buscando os ativos da usina…');
+      const j = await pedir(API + '/ativos?usina=' + encodeURIComponent(cbUsi.value), null, 'Buscando os ativos da usina…');
       ativos = j.ativos || []; marcados.clear();
       cbTipo.innerHTML = '<option value="">Todos os tipos</option>'
         + (j.tipos || []).map((t) => '<option value="' + esc(t.tipo) + '">' + esc(t.nome) + '</option>').join('');
@@ -203,12 +208,13 @@
   // ── responsável e data ─────────────────────────────────────────────────────────────────────────────
   async function carregarResponsaveis() {
     try {
-      const j = await pedir('/os/api/solicitacao/engenharia/responsaveis', null, 'Carregando os responsáveis…');
+      const j = await pedir(API + '/responsaveis', null, 'Carregando os responsáveis…');
       pessoas = j.pessoas || [];
       cbResp.innerHTML = '<option value="">— Selecione —</option>'
         + pessoas.map((p) => '<option value="' + esc(p.id_personnel) + '">' + esc(p.name) + '</option>').join('');
       cbResp.disabled = !pessoas.length;
-      if (!j.configurado) hintResp.textContent = 'A lista da Engenharia não está configurada (OS_WEB_ENGENHARIA_RESPONSAVEIS no .env do servidor).';
+      if (!j.configurado) hintResp.textContent = 'A lista da ' + SETOR_NOME + ' não está configurada (' + SETOR_ENV
+        + ' na tela Chaves do Nexus ou no .env do servidor).';
       else if ((j.faltam || []).length) hintResp.textContent = 'Não achei no Fracttal: ' + j.faltam.join(', ') + '.';
       else hintResp.textContent = '';
     } catch (e) {
@@ -241,7 +247,7 @@
     if (!marcados.size) return 'Marque ao menos um ativo.';
     if (!edDesc.value.trim()) return 'Escreva a atividade a ser realizada (o nome da OS).';
     if (!taProb.value.trim()) return 'Descreva o problema.';
-    if (!cbResp.value) return 'Escolha o responsável da Engenharia.';
+    if (!cbResp.value) return 'Escolha o responsável da ' + SETOR_NOME + '.';
     if (!dtEvento.value) return 'Informe a data do evento.';
     if (arquivos.length && !agrupar()) {                   // cada anexo sobe para cada OS: a mesma conta do servidor
       const n = marcados.size, envios = arquivos.length * n, volume = soma() * n;
@@ -261,9 +267,9 @@
     const resp = pessoas.find((p) => String(p.id_personnel) === cbResp.value) || {};
     const n = marcados.size, urg = ckUrg.checked, agr = agrupar() && n > 1;     // com 1 ativo, as duas dão a mesma OS
     const frase = agr
-      ? 'Vou criar 1 OS com ' + n + ' atividades — uma por ativo — para a Engenharia, atribuída a ' + resp.name
+      ? 'Vou criar 1 OS com ' + n + ' atividades — uma por ativo — para a ' + SETOR_NOME + ', atribuída a ' + resp.name
         + ', com o evento em ' + evBr(dtEvento.value) + ' e programada para ' + dataProg() + (urg ? ' (URGENTE)' : '') + '.'
-      : 'Vou criar ' + n + ' OS — uma por ativo — para a Engenharia, atribuída' + (n > 1 ? 's' : '') + ' a ' + resp.name
+      : 'Vou criar ' + n + ' OS — uma por ativo — para a ' + SETOR_NOME + ', atribuída' + (n > 1 ? 's' : '') + ' a ' + resp.name
         + ', com o evento em ' + evBr(dtEvento.value) + ' e programada' + (n > 1 ? 's' : '') + ' para ' + dataProg()
         + (urg ? ' (URGENTE)' : '') + '.';
     const nomes = arquivos.map((f) => f.name).join(', ');
@@ -284,7 +290,7 @@
     }
     criando = true; btn.disabled = true; mostrar('');
     try {
-      const j = await pedir('/os/api/solicitacao/engenharia/criar', opcoes,
+      const j = await pedir(API + '/criar', opcoes,
                             arquivos.length ? 'Criando as OS e subindo os anexos…' : 'Criando as OS no Fracttal…');
       mostrar(j.mensagem + ((j.avisos || []).length ? '\n\n' + j.avisos.join('\n') : ''), j.falhas > 0 || j.anexos_falhas > 0);
       // o que foi criado sai da seleção (um 2º clique não duplica), e os anexos já foram com ele

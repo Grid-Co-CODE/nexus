@@ -381,6 +381,12 @@ def _criar_clone(app):
 
     from . import subtarefas_padrao
     perf_web.SUBTAREFAS_PADRAO = subtarefas_padrao.ligar(app)
+    # a equipe da Performance na Nova solicitação (06/11/2026): os nomes gravados na tela Chaves do Nexus valem por cima
+    # do .env do OS Creator (nexus/auth/chaves.py, OS_WEB_PERFORMANCE_RESPONSAVEIS). Variável que a tela não guarda: None
+    from os_web import solic_eng_web
+
+    from ...auth import chaves
+    solic_eng_web.LER_NOMES = lambda var: (chaves.valor(var, app.config) if var in chaves.CHAVES else None)
     # o original fala http com a plataforma na mesma máquina; aqui o cookie segue o do Nexus (Secure no servidor)
     clone.config["SESSION_COOKIE_SECURE"] = bool(app.config.get("SESSION_COOKIE_SECURE"))
     # e mora no /os do Nexus, debaixo do prefixo em que ele roda (o clone fixa "/os", que debaixo de /nexus não ia ao
