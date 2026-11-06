@@ -1602,7 +1602,7 @@ LIVROS = (
             "nexus/zeladoria/copia.py (a cópia do Supabase do Radar); a torre Zeladoria depois da troca", True,
             obs, so_cresce=so)
       for nome, obs, so in (
-          (zeladoria_tabelas.LIVRO_APP, "registrado em 03/11/2026 e gravado no mesmo dia (cópia da exportação das 17:07 UTC, 4.756 linhas nas 39 tabelas, conferidas uma a uma): o estado do app da zeladoria, uma "
+          (zeladoria_tabelas.LIVRO_APP, "registrado em 03/11/2026 e gravado no mesmo dia (cópia da exportação das 17:07 UTC, 4.756 linhas nas 39 tabelas, conferidas uma a uma; em 06/11/2026, 5.148 linhas nas 41, com as duas do contrato de cada cliente): o estado do app da zeladoria, uma "
            "aba por tabela do Radar, com o dado pessoal, o texto livre e o nome do fornecedor cifrados", ()),
           (zeladoria_tabelas.LIVRO_FRACTTAL, "registrado e gravado em 03/11/2026: as rondas do Fracttal que o "
            "Radar lia (fracttal_rondas), o índice das fotos, o cursor da leitura e a última ronda de cada usina", ()),

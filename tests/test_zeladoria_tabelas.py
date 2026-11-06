@@ -12,7 +12,7 @@ from nexus.zeladoria import tabelas as T
 
 
 def test_as_40_abas_em_um_livro_so():
-    assert len(T.TABELAS) == 40
+    assert len(T.TABELAS) == 42
     assert set(T.TABELAS.values()) <= {T.LIVRO_APP, T.LIVRO_FRACTTAL, T.LIVRO_HISTORICO}
     assert T.TABELAS["fracttal_ultimas"] == T.LIVRO_FRACTTAL
     assert T.TABELAS["log"] == T.LIVRO_HISTORICO
@@ -50,7 +50,7 @@ RADAR = [a for a in T.TABELAS if a != "fracttal_ultimas" and not a.endswith(("_e
 
 def test_mapa_de_tabelas_aceita_o_radar():
     m = T.mapa_de_tabelas(RADAR)
-    assert len(m) == 39 and sorted(m.values()) == sorted(a for a in T.TABELAS if a != "fracttal_ultimas")
+    assert len(m) == 41 and sorted(m.values()) == sorted(a for a in T.TABELAS if a != "fracttal_ultimas")
     assert m["gastos_fulano"] == "gastos_equipe" and m["cotacoes"] == "cotacoes"
 
 

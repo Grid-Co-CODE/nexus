@@ -116,7 +116,8 @@ diferentes apagariam um ao outro. Levi escolheu "Salvo em 1 s, banco logo depois
 
 ## A 1ª medida (03/11/2026)
 
-- **Cópia:** a exportação das 17:07 UTC, 4.756 linhas nas 39 tabelas mais 117 últimas rondas, gravada em 13,8 s; as 40 abas têm no Nexus as mesmas linhas da origem. A maior célula é a do retrato do cronograma (86 mil caracteres), que vai partida em 3. 86 valores com nome foram renomeados (config 2, log 7, origem dos serviços 77).
+- **Cópia de 06/11/2026:** a exportação das 12:16 UTC, 5.148 linhas nas 41 tabelas mais 120 últimas rondas, gravada em 20 s; as 42 abas iguais à origem. O Radar NÃO congelou: ganhou as tabelas `zeladoria_contratual` (o que o contrato de cada cliente pede: lavagens e roçagens por ano, a regra) e `zeladoria_contratual_docs` (o índice dos PDFs dos contratos), que o Radar no ar já usa e o clone ainda não mostra. A cópia parou nelas (tabela fora do mapa não entra calada); foram registradas no `tabelas.py` para o dado ficar no Nexus antes da restrição do Supabase em 10/11.
+- **Cópia de 03/11/2026:** a exportação das 17:07 UTC, 4.756 linhas nas 39 tabelas mais 117 últimas rondas, gravada em 13,8 s; as 40 abas têm no Nexus as mesmas linhas da origem. A maior célula é a do retrato do cronograma (86 mil caracteres), que vai partida em 3. 86 valores com nome foram renomeados (config 2, log 7, origem dos serviços 77).
 - **Tela:** na cópia de prova (porta 5172), a Visão Geral, o Financeiro e a Criticidade abriram com o dado real, sem erro no console. Em 375 px, o menu do Nexus vira o botão Menu, e o clone se ajusta.
 
 ## O visual (etapa 3, 03/11/2026)

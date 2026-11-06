@@ -1,6 +1,7 @@
 """O mapa das tabelas do Radar para os livros do Nexus, e quais colunas vão cifradas.
 
-O Radar guardava 39 tabelas no esquema `radar_fornecedores` do Supabase, cada uma vista pelo app como `public.rf_<x>`,
+O Radar guarda 41 tabelas no esquema `radar_fornecedores` do Supabase (39 em 03/11/2026; as duas do contrato de cada
+cliente entraram depois do clone), cada uma vista pelo app como `public.rf_<x>`,
 mais a view `rf_fracttal_ultimas` (a última ronda de cada usina). Elas vêm com o MESMO nome (Levi, 03/11/2026: "com a
 mesma lógica e caminhos do BD"), em três livros: o estado do app, o que vem do Fracttal e os históricos, que só crescem.
 
@@ -27,6 +28,9 @@ _APP = (
     "fila_prioridade", "periodos", "cotacoes", "historico_valor", "simulacoes_aprovacao",
     # contratos e OS
     "contratos_anuais", "contrato_os", "ordens_servico", "servicos_zeladoria", "danos_modulos",
+    # o que o contrato de cada cliente pede de zeladoria e o índice dos PDFs dos contratos (06/11/2026: o Radar ganhou as
+    # duas depois do clone; entram na cópia para o dado não ficar só no Supabase, que restringe o projeto em 10/11)
+    "zeladoria_contratual", "zeladoria_contratual_docs",
     # financeiro
     "financeiro_parcelas", "fin_cenario", "fin_cenario_item", "fin_provisao", "fin_provisao_vinculo",
     "fin_fornecedor_alias",
