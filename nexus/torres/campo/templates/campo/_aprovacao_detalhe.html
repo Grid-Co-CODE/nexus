@@ -34,6 +34,18 @@
     <ul class="apq-g-lista">{% for f in x.fotos %}<li>{{ foto(f) }}<span>{{ f.tarefa }}</span></li>{% endfor %}</ul>
     {% elif x.tipo == 'fora_app' %}
     <ul class="apq-g-lista">{% for t in x.tarefas %}<li><span><b>{{ t.texto }}</b> · {{ t.tecnico }}{% if t.fim %} · fim {{ t.fim }}{% endif %}</span></li>{% endfor %}</ul>
+    {% elif x.tipo == 'tempo' %}
+    <ul class="apq-g-lista">{% for t in x.tarefas %}<li><span><b>{{ t.texto }}</b> · {{ t.exec }} · {{ t.tecnico }}</span></li>{% endfor %}</ul>
+    <p class="apq-g-det">O tempo entre o início e o fim da tarefa no App, como o Fracttal guardou.</p>
+    {% elif x.tipo == 'vazia' %}
+    <ul class="apq-g-lista">{% for v in x.itens %}<li><span><b>"{{ v.valor }}"</b> em {{ v.campo or 'campo sem nome' }}{% if v.tarefa %} · {{ v.tarefa }}{% endif %}</span></li>{% endfor %}</ul>
+    <p class="apq-g-det">Respostas das perguntas obrigatórias de texto, como estão no Fracttal. "Não se aplica" marcado não conta.</p>
+    {% elif x.tipo == 'gps' %}
+    <ul class="apq-g-lista">{% for f in x.fotos %}<li>{{ foto(f) }}<span>{% if f.tarefa %}{{ f.tarefa }}{% endif %}{% if f.km %} · a <b>{{ f.km }} km</b> das outras fotos{% endif %}</span></li>{% endfor %}</ul>
+    <p class="apq-g-det">O GPS que o App grava em cada foto, comparado com o das outras fotos da OS.</p>
+    {% elif x.tipo == 'foto_faltando' %}
+    <ul class="apq-g-lista">{% for v in x.itens %}<li><span><b>{{ v.tem }} de {{ v.pede }} fotos</b> · {{ v.campo }}{% if v.tarefa %} · {{ v.tarefa }}{% endif %}</span></li>{% endfor %}</ul>
+    <p class="apq-g-det">As fotos do campo contadas pelo nome que o App põe nelas.</p>
     {% endif %}
   </article>
   {% else %}{% if not o.fora_motivo %}<p class="apq-g-nota cn-t-ok"><i class="ph ph-check-circle" aria-hidden="true"></i> As fotos e os horários conferem: nada contra a OS.</p>{% endif %}{% endfor %}
@@ -55,5 +67,6 @@
 <section class="apq-g-sec" aria-labelledby="apq-g-f">
   <h3 id="apq-g-f">Fotos{% if d.n_fotos %} <span class="apq-g-n">{{ d.n_fotos }}</span>{% endif %}</h3>
   <p class="apq-g-nota">{{ d.estado_fotos }}</p>
+  {% if d.estado_respostas %}<p class="apq-g-nota">{{ d.estado_respostas }}</p>{% endif %}
   <p class="apq-g-nota mudo">As fotos ficam no card da OS: o número de cada foto abre o card.</p>
 </section>

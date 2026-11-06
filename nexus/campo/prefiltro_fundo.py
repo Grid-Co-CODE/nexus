@@ -27,6 +27,14 @@ OS, onde as fotos estão.
 - Meia leitura nunca vira fato: a foto que não baixou deixa a OS sem fatos ("Ainda conferindo") até a próxima volta, porque
   a OS sem as fotos todas cairia em "Pronta" sem ter sido conferida; três falhas seguidas, e a OS espera 6 h. A foto que
   baixou mas não abre (upload cortado, arquivo que não é imagem) fica "não abriu", sem hash, e a OS segue (em dúvida).
+- **A leitura rápida** (05/11/2026, as regras do tempo curto, da resposta vazia, do GPS e da foto faltando): numa thread
+  própria, `conferir_meta` lê de cada OS do escopo a lista de anexos e as respostas (`work_orders_subtasks?folio=`), DOIS
+  pedidos ao Fracttal e nenhuma foto baixada, e guarda o campo e o GPS de cada foto, as respostas vazias e os campos com
+  foto faltando (as contas são do `prefiltro.py`). Separada da das fotos de propósito: medido no Raio-X em 05/11, 21:33,
+  a thread das fotos passa o tempo todo baixando do S3 (0,3 OS por minuto), e as quatro regras não precisam de imagem.
+  Lê também a OS fechada inteira fora do App (as respostas dela estão no Fracttal). Mesma ordem (a mais nova primeiro),
+  mesma releitura (`_devida`), mesma espera depois de uma recusa; `META_V` muda quando a conta muda (a OS de versão
+  velha é relida). Em memória e em `dados/campo/prefiltro_meta.json.gz`.
 - Fica em memória e em `dados/campo/prefiltro.json.gz` (cópia de trabalho, como a fila), gravada a cada 10 OS: cada push
   na `main` reinicia o servidor. A OS que sai da fila sai daqui e do disco (com as miniaturas de antes de 05/11/2026,
   quando ainda se guardavam); a fila vazia (soluço do
@@ -49,9 +57,10 @@ from urllib.parse import quote, urlsplit
 from flask import current_app, has_app_context
 from PIL import Image
 
-from . import fracttal, prefiltro, regras_app
+from . import fracttal, nota_fracttal, prefiltro, regras_app
 
 IMG = re.compile(r"\.(jpe?g|png|webp)$", re.I)
+META_V = 1                        # a versão da conta da leitura rápida: a OS lida com outra é relida
 POR_PAGINA = 100
 MAX_PAGINAS = 20                  # 2.000 anexos numa OS; a maior da medição de 26/10 tinha 75
 RELER_S = 24 * 3600               # a OS conferida é relida uma vez por dia enquanto espera a aprovação
@@ -62,6 +71,8 @@ GRAVAR_A_CADA = 10
 _FATOS: dict = {}
 _FALHAS: dict = {}                # {id_wo: [falhas seguidas, quando foi a última]}: foto que não baixou (passageiro)
 _ESTADO = {"lendo": False, "erro": "", "erro_em": 0.0}
+_META: dict = {}                  # {id_wo: o que a leitura rápida achou}: as fotos (campo, GPS), as respostas vazias...
+_ESTADO_META = {"lendo": False, "erro": ""}
 _TRAVA = threading.Lock()
 _dormir = time.sleep
 _agora = time.time
@@ -90,11 +101,19 @@ def fatos(id_wo) -> dict | None:
     return _FATOS.get(str(id_wo))
 
 
+def meta(id_wo) -> dict | None:
+    """O que a leitura rápida achou da OS (None = ainda não lida, ou lida com a conta de antes)."""
+    m = _META.get(str(id_wo))
+    return m if m and m.get("v") == META_V else None
+
+
 def estado() -> dict:
     """O que a tela diz da leitura: quantas OS conferidas, se está lendo, o último erro e quantas OS estão esperando
-    depois de três downloads que falharam."""
+    depois de três downloads que falharam; e as OS com as respostas e o GPS lidos (a leitura rápida)."""
     return {"conferidas": len(_FATOS), "lendo": _ESTADO["lendo"], "erro": _ESTADO["erro"],
-            "falhas": sum(1 for n, _ in _FALHAS.values() if n >= TENTATIVAS)}
+            "falhas": sum(1 for n, _ in _FALHAS.values() if n >= TENTATIVAS),
+            "respostas": sum(1 for m in _META.values() if m.get("v") == META_V), "lendo_respostas": _ESTADO_META["lendo"],
+            "erro_respostas": _ESTADO_META["erro"]}
 
 
 def _pasta() -> Path | None:
@@ -108,38 +127,53 @@ def _pasta() -> Path | None:
         return None
 
 
-def _gravar() -> None:
+def _gravar(nome: str = "prefiltro.json.gz", corpo=None) -> None:
     pasta = _pasta()
     if pasta is None:
         return
     try:
         pasta.mkdir(parents=True, exist_ok=True)
-        arq = pasta / "prefiltro.json.gz"
+        arq = pasta / nome
         tmp = arq.with_name(arq.name + ".tmp")
         with gzip.open(tmp, "wt", encoding="utf-8") as f:
-            json.dump({"v": 1, "fatos": _FATOS}, f, ensure_ascii=False)
+            json.dump(corpo if corpo is not None else {"v": 1, "fatos": _FATOS}, f, ensure_ascii=False)
         os.replace(tmp, arq)
     except OSError as e:
         logging.warning("pré-filtro: não gravei a cópia em disco (%s)", e)
 
 
+def _gravar_meta() -> None:
+    _gravar("prefiltro_meta.json.gz", {"v": META_V, "meta": _META})
+
+
+def _ler_do_disco(nome: str) -> dict | None:
+    pasta = _pasta()
+    arq = pasta / nome if pasta else None
+    if arq is None or not arq.exists():
+        return None
+    try:
+        with gzip.open(arq, "rt", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError, EOFError) as e:
+        logging.warning("pré-filtro: cópia em disco ilegível (%s: %s)", nome, e)
+        return None
+
+
 def carregar_do_disco(app) -> bool:
-    """Os fatos guardados para a memória (o boot), se a memória ainda não tem nenhum."""
+    """Os fatos e a leitura rápida guardados para a memória (o boot), cada um se a memória ainda não tem nenhum. Devolve
+    se carregou algum."""
     with app.app_context():
-        pasta = _pasta()
-        arq = pasta / "prefiltro.json.gz" if pasta else None
-        if arq is None or not arq.exists() or _FATOS:
-            return False
-        try:
-            with gzip.open(arq, "rt", encoding="utf-8") as f:
-                d = json.load(f)
-        except (OSError, ValueError, EOFError) as e:
-            logging.warning("pré-filtro: cópia em disco ilegível (%s)", e)
-            return False
+        d = None if _FATOS else _ler_do_disco("prefiltro.json.gz")
+        m = None if _META else _ler_do_disco("prefiltro_meta.json.gz")
+    carregou = False
     with _TRAVA:
-        if not _FATOS:
+        if d is not None and not _FATOS:
             _FATOS.update(d.get("fatos") or {})
-    return True
+            carregou = True
+        if m is not None and not _META:
+            _META.update(m.get("meta") or {})
+            carregou = True
+    return carregou
 
 
 def _apagar(id_wo: str) -> None:
@@ -318,6 +352,99 @@ class _nada:
         return False
 
 
+def _ler_meta(tarefas: list[dict], do_app: set[str] | None = None) -> dict:
+    """A leitura rápida da OS: a lista de anexos e as respostas, sem baixar foto. `do_app` = as tarefas fechadas pelo App
+    (a foto faltando só se mede nelas); None = todas."""
+    folio = str(tarefas[0].get("wo_folio") or "")
+    ids = {str(w.get("id_work_orders_tasks")) for w in tarefas}
+    fotos, vistos = [], set()
+    for a in _listar(folio):
+        caminho = urlsplit(str(a.get("value") or "")).path
+        tarefa = str(a.get("id_work_order_task") or "")
+        if not IMG.search(caminho) or (tarefa and tarefa not in ids):
+            continue
+        id_ = hashlib.sha1(caminho.encode("utf-8")).hexdigest()[:16]      # o mesmo id da leitura das fotos
+        if id_ in vistos:
+            continue
+        vistos.add(id_)
+        desc, gps = nota_fracttal.descricao_da_foto(a.get("description"))
+        fotos.append({"id": id_, "tarefa": tarefa, "desc": desc[:120], "gps": [gps[0], gps[1]] if gps else None})
+    subs = [s for s in nota_fracttal.subtarefas_da_os(folio, fracttal.ler) if str(s.get("id_work_order_task")) in ids]
+    nomes = {str(w.get("id_work_orders_tasks")): regras_app._txt_tarefa(w) for w in tarefas}
+    do_app_subs = [s for s in subs if do_app is None or str(s.get("id_work_order_task")) in do_app]
+    return {"v": META_V, "chave": _chave(tarefas), "lido_em": _agora(), "fotos": fotos,
+            "vazias": prefiltro.respostas_vazias(subs, nomes), "faltando": prefiltro.fotos_faltando(do_app_subs, fotos)}
+
+
+def conferir_meta(app, linhas: list[dict], cos: dict | None = None, do_app: dict[str, set[str]] | None = None) -> int:
+    """Uma volta da leitura rápida: as OS do escopo sem ela (ou com tarefas que mudaram, ou de versão velha), a mais nova
+    primeiro, e depois as que precisam ser relidas (`_devida`), até o teto. Quantas OS foram lidas."""
+    p = prefiltro.parametros(app.config if app else {})
+    agora = _agora()
+    with app.app_context() if app else _nada():
+        grupos = _por_os(linhas)
+        if not grupos:                # fila vazia é soluço do Fracttal: não apaga nada
+            return 0
+        for id_wo in [k for k in _META if k not in grupos]:
+            _META.pop(id_wo, None)
+        novas, relidas = [], []
+        for k, ts in grupos.items():
+            if prefiltro.fora_do_escopo(ts, cos):
+                continue
+            m = _META.get(k)
+            if m is None or m.get("v") != META_V or m.get("chave") != _chave(ts):
+                novas.append((k, ts))
+            elif _devida(m, ts, agora, p):
+                relidas.append((k, ts))
+        novas.sort(key=lambda c: max(str(w.get("final_date") or "") for w in c[1]), reverse=True)
+        relidas.sort(key=lambda c: float(_META[c[0]].get("lido_em") or 0))
+        lidas, recusas = 0, 0
+        for k, ts in (novas + relidas)[:p["por_volta"]]:
+            try:
+                m = _ler_meta(ts, (do_app or {}).get(str(ts[0].get("wo_folio") or "")) if do_app is not None else None)
+            except fracttal.Recusado as e:
+                recusas += 1
+                if recusas >= RECUSAS_POR_VOLTA:
+                    _ESTADO_META.update(erro=str(e)[:160])
+                    break
+                _dormir(ESPERA_RECUSA_S)
+                continue
+            except Exception as e:      # noqa: BLE001 — Fracttal fora, resposta estranha: a OS fica para a próxima volta
+                logging.warning("pré-filtro (leitura rápida): a OS %s não foi lida (%s: %s)", ts[0].get("wo_folio"),
+                                type(e).__name__, str(e)[:120])
+                _dormir(p["pausa_s"])
+                continue
+            _META[k] = m
+            lidas, recusas = lidas + 1, 0
+            if lidas % GRAVAR_A_CADA == 0:
+                _gravar_meta()
+            _dormir(p["pausa_s"])
+        else:
+            _ESTADO_META.update(erro="")
+        _gravar_meta()
+    return lidas
+
+
+def _volta_meta(app) -> None:
+    """A volta da thread da leitura rápida (a fila guardada, quem é do COS e quem é do App, como a das fotos)."""
+    try:
+        carregar_do_disco(app)
+        with app.app_context():
+            cos = None
+            try:
+                from ..cadastro import fracttal_pessoal
+                from . import verificacao, visao
+                cos = verificacao.criadores_cos(visao._base(), visao._sessao(), fracttal_pessoal.ler_pessoal)
+            except Exception:      # noqa: BLE001
+                cos = None
+        from . import aprovacao
+        conferir_meta(app, list(regras_app._FILA_CACHE.get("linhas") or []), cos, aprovacao.tarefas_do_app())
+    except Exception:      # noqa: BLE001
+        logging.exception("pré-filtro: a volta da leitura rápida falhou")
+    finally:
+        _ESTADO_META["lendo"] = False
+
+
 def _volta(app) -> None:
     """A volta que a thread de fundo roda: a fila guardada e quem é do COS (para não ler à toa o que fica fora)."""
     try:
@@ -345,11 +472,19 @@ def pedir_conferencia(app) -> None:
     chamam `conferir`)."""
     if not ligado(app.config) or app.config.get("TESTING"):
         return
+    from ..casca import fracttal_conta
+    # a leitura rápida (as respostas e o GPS) anda na sua thread: a das fotos passa horas baixando do S3
+    with _TRAVA:
+        rapida = not _ESTADO_META["lendo"]
+        if rapida:
+            _ESTADO_META["lendo"] = True
+    if rapida:
+        threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-prefiltro-respostas", lambda: _volta_meta(app)),
+                         daemon=True, name="nexus-prefiltro-respostas").start()
     with _TRAVA:
         if _ESTADO["lendo"]:
             return
         _ESTADO["lendo"] = True
-    from ..casca import fracttal_conta
     threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-prefiltro", lambda: _volta(app)), daemon=True,
                      name="nexus-prefiltro").start()
 
@@ -357,4 +492,6 @@ def pedir_conferencia(app) -> None:
 def limpar() -> None:
     _FATOS.clear()
     _FALHAS.clear()
+    _META.clear()
     _ESTADO.update(lendo=False, erro="", erro_em=0.0)
+    _ESTADO_META.update(lendo=False, erro="")

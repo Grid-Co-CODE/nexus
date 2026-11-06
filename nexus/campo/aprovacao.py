@@ -297,6 +297,9 @@ def fila_toda(params: dict) -> Leitura:
             # com a data), sem pedido novo ao Fracttal
             x["usina_fx"], x["id_wo"] = w.get("groups_1_description") or "", w.get("id_work_order")
             x["criada"] = str(w.get("creation_date") or "")
+            # o tempo de execução da tarefa no Fracttal, em segundos (a regra do tempo curto, 05/11/2026): o App grava
+            # o início e o fim dele; na mesma linha do REST que a fila já lê
+            x["exec_s"] = regras_app._int0(w.get("real_duration"))
         return {"janela": primeira.get("janela"), "resumo": primeira.get("resumo"), "baldes": primeira.get("baldes"),
                 "sem_cadastro": primeira.get("sem_cadastro"), "linhas": todas}
     chave = ("fila_toda", str(lida)) + tuple(sorted(p.items()))

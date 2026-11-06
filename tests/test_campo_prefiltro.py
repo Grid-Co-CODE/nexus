@@ -47,6 +47,12 @@ def _fatos(anexos, pares=()):
 FECHADO = "2026-10-05T16:21:15.362Z"
 
 
+def _classificar(o, fatos, fechado, p, meta=None):
+    """A leitura rápida (as respostas e o GPS, 05/11/2026) dada como feita e sem nada: estes testes são das regras das
+    fotos. As regras novas e a OS sem a leitura rápida: test_campo_prefiltro_sinais_0511.py."""
+    return prefiltro.classificar(o, fatos, fechado, p, {} if meta is None else meta)
+
+
 def _anexada(horas_depois):
     from datetime import datetime, timedelta, timezone
     base = datetime(2026, 10, 5, 16, 21, 15, tzinfo=timezone.utc)
@@ -84,7 +90,7 @@ def test_cada_foto_repetida_aponta_a_primeira_igual():
 # ── a coluna da OS ──────────────────────────────────────────────────────────────────────────────────────────────────
 def test_anexada_mais_de_24h_depois_e_nao_ok():
     fatos = _fatos([{"id": "1", "anexada": _anexada(25)}, {"id": "2", "anexada": _anexada(1)}])
-    r = prefiltro.classificar(_os(_tarefa()), fatos, FECHADO, P)
+    r = _classificar(_os(_tarefa()), fatos, FECHADO, P)
     assert r["coluna"] == "nao_ok" and r["tarde"] == 1
     aviso = r["avisos"][0]
     assert aviso["nivel"] == "critico" and aviso["texto"] == "1 foto anexada 1 dia depois do fechamento no App"
@@ -93,18 +99,18 @@ def test_anexada_mais_de_24h_depois_e_nao_ok():
 
 def test_varias_anexadas_dias_depois():
     fatos = _fatos([{"id": str(i), "anexada": _anexada(52)} for i in range(6)])
-    r = prefiltro.classificar(_os(_tarefa()), fatos, FECHADO, P)
+    r = _classificar(_os(_tarefa()), fatos, FECHADO, P)
     assert r["coluna"] == "nao_ok" and r["avisos"][0]["texto"] == "6 fotos anexadas 2 dias depois do fechamento no App"
 
 
 def test_23h_depois_nao_dispara():
-    r = prefiltro.classificar(_os(_tarefa()), _fatos([{"id": "1", "anexada": _anexada(23)}]), FECHADO, P)
+    r = _classificar(_os(_tarefa()), _fatos([{"id": "1", "anexada": _anexada(23)}]), FECHADO, P)
     assert r["coluna"] == "pronta" and r["tarde"] == 0
 
 
 def test_repetida_e_em_duvida():
     anexos = [{"id": "a1", "anexada": _anexada(0)}, {"id": "a2", "anexada": _anexada(0)}, {"id": "a3", "anexada": _anexada(0)}]
-    r = prefiltro.classificar(_os(_tarefa()), _fatos(anexos, [("a1", "a3")]), FECHADO, P)
+    r = _classificar(_os(_tarefa()), _fatos(anexos, [("a1", "a3")]), FECHADO, P)
     assert r["coluna"] == "duvida" and r["repetidas"] == 1
     aviso = r["avisos"][0]
     assert aviso["nivel"] == "alerta" and aviso["texto"] == "Foto repetida: p03 é a mesma imagem de p01"
@@ -113,31 +119,31 @@ def test_repetida_e_em_duvida():
 
 def test_varias_repetidas_num_aviso_so():
     anexos = [{"id": f"a{i}", "anexada": _anexada(0)} for i in range(1, 6)]
-    r = prefiltro.classificar(_os(_tarefa()), _fatos(anexos, [("a1", "a3"), ("a2", "a5")]), FECHADO, P)
+    r = _classificar(_os(_tarefa()), _fatos(anexos, [("a1", "a3"), ("a2", "a5")]), FECHADO, P)
     assert r["avisos"][0]["texto"] == "2 fotos repetidas: p03 = p01, p05 = p02"
     assert r["avisos"][0]["fotos"] == ["a1", "a3", "a2", "a5"]
 
 
 def test_nao_ok_ganha_da_duvida():
     anexos = [{"id": "a1", "anexada": _anexada(30)}, {"id": "a2", "anexada": _anexada(30)}]
-    r = prefiltro.classificar(_os(_tarefa()), _fatos(anexos, [("a1", "a2")]), FECHADO, P)
+    r = _classificar(_os(_tarefa()), _fatos(anexos, [("a1", "a2")]), FECHADO, P)
     assert r["coluna"] == "nao_ok" and [a["nivel"] for a in r["avisos"][:2]] == ["critico", "alerta"]
 
 
 def test_fora_do_app_e_em_duvida():
-    r = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None)), _fatos([]), "", P)
+    r = _classificar(_os(_tarefa(pelo_app=False, qualidade=None)), _fatos([]), "", P)
     assert r["coluna"] == "duvida"
     assert r["avisos"][0]["texto"] == "1 tarefa fechada fora do App: sem as fotos e os horários do App para conferir"
 
 
 def test_sem_fatos_e_conferindo():
-    assert prefiltro.classificar(_os(_tarefa()), None, FECHADO, P)["coluna"] == "conferindo"
+    assert _classificar(_os(_tarefa()), None, FECHADO, P)["coluna"] == "conferindo"
 
 
 def test_fato_com_fotos_por_ler_vai_para_a_coluna_pior():
     """A OS mista (uma tarefa fora do App, outra pelo App) com as fotos por ler: Em dúvida já, e as fotos da tarefa do App
     ainda podem pôr Não OK."""
-    r = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None, id_wt=1), _tarefa(id_wt=2)), None, FECHADO, P)
+    r = _classificar(_os(_tarefa(pelo_app=False, qualidade=None, id_wt=1), _tarefa(id_wt=2)), None, FECHADO, P)
     assert r["coluna"] == "duvida"
     assert any(a["texto"] == "Faltam fotos por ler" for a in r["avisos"])
 
@@ -146,24 +152,24 @@ def test_os_inteira_fora_do_app_nao_espera_as_fotos():
     """05/11/2026 ("Tem 730 OSs conferindo fotos, veja se travou algo"): 522 OS fechadas inteiras fora do App esperavam
     a leitura das fotos, que não muda a coluna delas (Em dúvida pela tarefa fora do App; a foto atrasada só se mede
     contra o fechamento no App, que elas não têm). Sem "Faltam fotos por ler": entram no lote como as outras."""
-    r = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None)), None, "", P)
+    r = _classificar(_os(_tarefa(pelo_app=False, qualidade=None)), None, "", P)
     assert r["coluna"] == "duvida" and [a["tipo"] for a in r["avisos"]] == ["fora_app"]
 
 
 def test_avisos_da_regra_do_app_nao_mudam_a_coluna():
     # a devolvida (e a foto divergente, a ronda com pendência) é aviso; a coluna é dos fatos
-    r = prefiltro.classificar(_os(_tarefa(qualidade=90, foi_devolvida=True)), _fatos([]), FECHADO, P)
+    r = _classificar(_os(_tarefa(qualidade=90, foi_devolvida=True)), _fatos([]), FECHADO, P)
     assert r["coluna"] == "pronta" and any("devolvida" in a["texto"] for a in r["avisos"])
     # a nota do App abaixo de 80 deixou de ser só aviso em 09/11/2026 (o caso da OS 8159, em Pronta com nota 50): é
     # motivo de Em dúvida, com o porquê (test_campo_aprovacao_nota_0911)
-    r = prefiltro.classificar(_os(_tarefa(qualidade=60, foi_devolvida=True)), _fatos([]), FECHADO, P)
+    r = _classificar(_os(_tarefa(qualidade=60, foi_devolvida=True)), _fatos([]), FECHADO, P)
     textos = [a["texto"] for a in r["avisos"]]
     assert r["coluna"] == "duvida" and any(t.startswith("Nota do App 60%, abaixo de 80%") for t in textos)
     assert any("devolvida" in t for t in textos)
 
 
 def test_sem_hora_de_fechamento_nao_julga_a_anexacao():
-    r = prefiltro.classificar(_os(_tarefa()), _fatos([{"id": "1", "anexada": _anexada(99)}]), "", P)
+    r = _classificar(_os(_tarefa()), _fatos([{"id": "1", "anexada": _anexada(99)}]), "", P)
     assert r["coluna"] == "pronta" and r["tarde"] == 0
 
 
@@ -242,11 +248,11 @@ def test_cada_aviso_diz_o_tipo_e_a_repetida_traz_os_pares():
     anexos = [{"id": f"a{i}", "tarefa": "1", "desc": "Inversor" if i != 3 else "",
                "anexada": _anexada(30 if i == 4 else 0)} for i in range(1, 5)]
     o = _os(_tarefa(qualidade=60, id_wt=1), _tarefa(pelo_app=False, qualidade=None, id_wt=2))     # as fotos da tarefa do App
-    r = prefiltro.classificar(o, _fatos(anexos, [("a1", "a3")]), FECHADO, P)
+    r = _classificar(o, _fatos(anexos, [("a1", "a3")]), FECHADO, P)
     # a nota 60 da tarefa do App é o aviso "nota" desde 09/11/2026 (era um "app")
     assert [a["tipo"] for a in r["avisos"]] == ["tarde", "repetida", "fora_app", "nota"]
     assert r["avisos"][1]["pares"] == [{"a": "a1", "b": "a3", "ra": "p01", "rb": "p03", "da": "Inversor", "db": ""}]
-    sem_fotos = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None, id_wt=1), _tarefa(id_wt=2)), None,
+    sem_fotos = _classificar(_os(_tarefa(pelo_app=False, qualidade=None, id_wt=1), _tarefa(id_wt=2)), None,
                                       FECHADO, P)
     assert [a["tipo"] for a in sem_fotos["avisos"]] == ["fora_app", "faltam"]
 
@@ -267,16 +273,16 @@ def test_foto_de_tarefa_fora_do_app_nao_e_julgada_pela_hora_do_app():
     de outra tarefa dava Não OK falso. Só as fotos das tarefas do App (pelo id da tarefa) são julgadas."""
     o = _os(_tarefa(id_wt=1), _tarefa(pelo_app=False, qualidade=None, id_wt=2))
     fatos = _fatos([{"id": "a", "tarefa": "1", "anexada": _anexada(1)}, {"id": "b", "tarefa": "2", "anexada": _anexada(50)}])
-    r = prefiltro.classificar(o, fatos, FECHADO, P)
+    r = _classificar(o, fatos, FECHADO, P)
     assert r["coluna"] == "duvida" and r["tarde"] == 0
     fatos["anexos"].append({"id": "c", "tarefa": "1", "anexada": _anexada(50)})
-    assert prefiltro.classificar(o, fatos, FECHADO, P)["coluna"] == "nao_ok"
+    assert _classificar(o, fatos, FECHADO, P)["coluna"] == "nao_ok"
 
 
 def test_foto_que_nao_abriu_pede_o_olho():
     """A foto que o Nexus não conseguiu abrir não foi conferida: a OS não vai para Pronta (nem para o lote) calada."""
     fatos = _fatos([{"id": "a", "anexada": _anexada(1), "hash": None}, {"id": "b", "anexada": _anexada(1)}])
-    r = prefiltro.classificar(_os(_tarefa()), fatos, FECHADO, P)
+    r = _classificar(_os(_tarefa()), fatos, FECHADO, P)
     assert r["coluna"] == "duvida"
     assert {"tipo": "nao_abriu", "nivel": "alerta", "texto": "1 foto não abriu no Nexus: confira no card da OS",
             "fotos": ["a"]} in r["avisos"]

@@ -38,7 +38,7 @@
   <div class="apq-motivo" data-nivel="neutro" role="note"><i class="ph ph-funnel-x" aria-hidden="true"></i><ul><li>{{ o.fora_motivo }}</li></ul></div>
   {% elif o.coluna == 'conferindo' %}
   {# dado pela metade não vai para a tela como inteiro: sem as fotos lidas, o cartão diz o que falta #}
-  <div class="apq-motivo" data-nivel="neutro" role="note"><i class="ph ph-hourglass-medium" aria-hidden="true"></i><ul><li>Fotos ainda não conferidas</li></ul></div>
+  <div class="apq-motivo" data-nivel="neutro" role="note"><i class="ph ph-hourglass-medium" aria-hidden="true"></i><ul><li>{{ o.ainda or 'Fotos ainda não conferidas' }}</li></ul></div>
   {% endif %}
   <div class="apq-c-tarefa">
     <h3 class="apq-c-tit">{{ o.tarefas[0].tarefa or '(sem título)' }}{% if n_t > 1 %}<small> e mais {{ n_t - 1 }}</small>{% endif %}</h3>
@@ -62,16 +62,24 @@
       {% call explica('Entenda esta tela') %}<p><b>A leitura.</b> Fila de verificação do Fracttal, inteira{% if coleta %},
       com as notas do App até {{ coleta }}{% endif %}: {% if fila.lida_em %}fila lida em {{ fila.lida_em }}{% else %}a fila
       ainda não foi lida{% endif %}{% if fila.lendo %} (relendo agora){% endif %}; fotos conferidas de {{ fotos.conferidas }}
-      OS{% if fotos.lendo %} (conferindo agora){% endif %}.</p>
+      OS{% if fotos.lendo %} (conferindo agora){% endif %}; respostas e GPS lidos de {{ fotos.respostas }}
+      OS{% if fotos.lendo_respostas %} (lendo agora){% endif %}.</p>
       <p><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal (fechadas e
       esperando a aprovação), relida pelo Nexus a cada 10 minutos e contada por OS, que é o que se aprova. Por trás, sem a
-      tela esperar, o Nexus confere as fotos de cada OS nova: um pedido ao Fracttal por OS e as imagens baixadas do
-      arquivo. O responsável e o cliente saem do cadastro do Nexus pela usina da OS.</p>
+      tela esperar, o Nexus confere as fotos de cada OS nova (um pedido ao Fracttal por OS e as imagens baixadas do
+      arquivo) e, numa leitura separada e mais rápida, as respostas e o GPS de cada foto (dois pedidos por OS, sem baixar
+      imagem). O tempo de execução da tarefa vem da própria fila. O responsável e o cliente saem do cadastro do Nexus pela
+      usina da OS.</p>
       <p><b>As colunas.</b> <b>Não OK</b>: foto anexada mais de {{ horas_tarde }} h depois do último fechamento da OS no App
-      (nas 30 OS medidas em 26/10, toda OS assim foi devolvida). <b>Em dúvida</b>: a mesma foto duas vezes na OS, comparada
-      sem o carimbo do App, ou tarefa fechada fora do App. <b>Pronta</b>: nenhum desses fatos. A OS fica na pior coluna. A
-      nota do App, a devolução anterior e a foto marcada pelo App aparecem como aviso, sem mudar a coluna.</p>
-      <p><b>Ainda conferindo.</b> OS cujas fotos o Nexus ainda não leu: aprova pelo cartão, mas não entra no lote.
+      (nas 30 OS medidas em 26/10, toda OS assim foi devolvida); tarefa do App executada em menos de 2 minutos com foto;
+      duas ou mais respostas obrigatórias vazias ("N/A", "ok", "sim", "positivo", o nome da tarefa). <b>Em dúvida</b>: a
+      mesma foto duas vezes na OS, comparada sem o carimbo do App; uma resposta vazia; foto com o GPS fora do Brasil ou a
+      mais de 5 km das outras fotos da OS; campo que pede "mínimo N fotos" com menos; tarefa fechada fora do App.
+      <b>Pronta</b>: nenhum desses fatos. A OS fica na pior coluna. A nota do App, a devolução anterior e a foto marcada
+      pelo App aparecem como aviso, sem mudar a coluna. O GPS é comparado com as outras fotos da OS, não com o ponto da
+      usina no cadastro: na medição, o ponto do cadastro estava errado em várias usinas.</p>
+      <p><b>Ainda conferindo.</b> OS cujas fotos, respostas ou GPS o Nexus ainda não leu: aprova pelo cartão, mas não
+      entra no lote.
       <b>Fora do pré-filtro.</b> Religamento (remoto ou no local), OS com as etiquetas PERFORMANCE ou CHAMADOS e OS
       criadas pelo COS: ficam sem as regras e não entram na conta. A ENGENHARIA entra no pré-filtro.</p>
       <p><b>Aprovar.</b> É o Concluir do OS Creator, com a sua conta do Fracttal: não tem volta, a OS sai da verificação.

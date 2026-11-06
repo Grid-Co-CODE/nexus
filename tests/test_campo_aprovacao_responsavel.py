@@ -70,6 +70,11 @@ def quadro(fila_resp, app, tmp_path):
     _fatos(15088, [(ID["p1"], _hora(-20)), (ID["p2"], _hora(-20)), (ID["p3"], _hora(-20))], [(ID["p1"], ID["p3"])])
     _fatos(15102, [(ID["tarde"], _hora(24))])
     _fatos(16001, [(ID["ok"], _hora(-20))])
+    # a leitura rápida (as respostas e o GPS, 05/11/2026) feita e sem nada em toda OS da fila: estes testes são das
+    # regras das fotos; as regras novas têm o teste delas (test_campo_prefiltro_sinais_0511.py)
+    for w in fila_resp.linhas:
+        prefiltro_fundo._META[str(w["id_work_order"])] = {"v": prefiltro_fundo.META_V, "chave": "x", "lido_em": 1.0,
+                                                           "fotos": [], "vazias": [], "faltando": []}
     fotos = tmp_path / "campo" / "prefiltro_fotos"
     fotos.mkdir(parents=True)
     for i in (ID["p1"], ID["p3"]):

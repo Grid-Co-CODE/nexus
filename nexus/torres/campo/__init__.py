@@ -1724,14 +1724,15 @@ def _quadro(oss) -> dict:
     for o in oss:
         o["fora_motivo"] = prefiltro.fora_do_escopo(cruas.get(str(o.get("id_wo") or ""), []), cos)
         f = None if o["fora_motivo"] else prefiltro_fundo.fatos(o.get("id_wo"))
+        m = None if o["fora_motivo"] else prefiltro_fundo.meta(o.get("id_wo"))
         # quando as fotos foram lidas: a OS é relida por trás (a foto anexada depois só aparece na releitura)
         o["fotos_em"] = datetime.fromtimestamp(float(f["lido_em"]), _BRT).strftime("%d/%m %H:%M") if f else ""
         if o["fora_motivo"]:
             o["coluna"], o["avisos"] = "fora", []        # sem as regras (Levi, 04/11): só o motivo, e aprova pelo cartão
         else:
             fechado = max((str(t.get("fechado_app") or "") for t in o["tarefas"]), default="")
-            r = prefiltro.classificar(o, f, fechado, p)
-            o["coluna"], o["avisos"] = r["coluna"], r["avisos"]
+            r = prefiltro.classificar(o, f, fechado, p, m)
+            o["coluna"], o["avisos"], o["ainda"] = r["coluna"], r["avisos"], r["ainda"]
         o["busca"] = _sem_acento(" ".join([str(o["os"]), o["usina_cad"], o["cliente_cad"], o["responsavel_cad"],
                                            *o["tecnicos"]]))
         q[o["coluna"]].append(o)
@@ -1798,10 +1799,11 @@ def _com_cadastro(linhas: list[dict], mapa) -> list[dict]:
     return linhas
 
 
-def _detalhe_da_os(o: dict, f: dict | None) -> dict:
+def _detalhe_da_os(o: dict, f: dict | None, m: dict | None = None) -> dict:
     """O que a barra lateral mostra da OS (05/11/2026: "detalhando qual é a pendência, em que tarefa é"): cada fato com a
-    prova (a foto, o campo, a tarefa e a hora; a tarefa fechada fora do App), as tarefas da OS com o que o App disse de
-    cada uma, e o estado das fotos. Só o que a visita já tem em memória: a fila e os fatos da leitura de fundo."""
+    prova (a foto, o campo, a tarefa e a hora; a tarefa fechada fora do App; o tempo, a resposta, a distância e o campo
+    das regras da leitura rápida), as tarefas da OS com o que o App disse de cada uma, e o estado das fotos e das
+    respostas. Só o que a visita já tem em memória: a fila e os fatos das duas leituras de fundo (`m` = a rápida)."""
     texto = {str(t.get("id_wt") or ""): t.get("tarefa") or "" for t in o["tarefas"]}
     fechado = max((str(t.get("fechado_app") or "") for t in o["tarefas"]), default="")
     fotos = {}
@@ -1814,15 +1816,36 @@ def _detalhe_da_os(o: dict, f: dict | None) -> dict:
                 "nota": t.get("qualidade") if t.get("pelo_app") else None,
                 "motivos": [txt for cor, txt in campo_aprovacao.motivos(t) if cor != "ok"] if t.get("pelo_app") else []}
                for t in o["tarefas"]]
+    # as fotos da leitura rápida (o campo e a tarefa), com o número da leitura das fotos quando ela já passou pela OS
+    fotos_m = {x["id"]: fotos.get(x["id"]) or {"rot": "foto", "campo": x.get("desc") or "", "anexada": "", "abriu": True,
+                                               "tarefa": texto.get(str(x.get("tarefa") or ""), "")}
+               for x in (m or {}).get("fotos") or []}
+    por_id = {str(t.get("id_wt") or ""): d for t, d in zip(o["tarefas"], tarefas)}
     fatos = []
     for a in o["avisos"]:
-        x = {"tipo": a.get("tipo"), "nivel": a.get("nivel"), "texto": a.get("texto"), "fotos": [], "pares": [], "tarefas": []}
+        x = {"tipo": a.get("tipo"), "nivel": a.get("nivel"), "texto": a.get("texto"), "fotos": [], "pares": [], "tarefas": [],
+             "itens": []}
         if a.get("tipo") in ("tarde", "nao_abriu"):
             x["fotos"] = [fotos[i] for i in a.get("fotos") or [] if i in fotos]
         elif a.get("tipo") == "repetida":
             x["pares"] = [(fotos.get(par["b"]), fotos.get(par["a"])) for par in a.get("pares") or []]
         elif a.get("tipo") == "fora_app":
             x["tarefas"] = [t for t in tarefas if not t["pelo_app"]]
+        elif a.get("tipo") == "tempo":
+            for i in a.get("tarefas") or []:
+                s, n = (a.get("segundos") or {}).get(i, [0, 0])
+                if i in por_id:
+                    x["tarefas"].append({**por_id[i], "exec": f"executada em {s} s no App, {n} foto{'s' if n != 1 else ''}"})
+        elif a.get("tipo") == "vazia":
+            x["itens"] = [{"tarefa": texto.get(v["tarefa"], ""), "campo": v.get("campo") or "", "valor": v.get("valor") or ""}
+                          for v in a.get("vazias") or []]
+        elif a.get("tipo") == "gps":
+            km = a.get("longe") or {}
+            x["fotos"] = [{**fotos_m[i], "km": str(km[i]).replace(".", ",") if i in km else ""} for i in a.get("fotos") or []
+                          if i in fotos_m]
+        elif a.get("tipo") == "foto_faltando":
+            x["itens"] = [{"tarefa": texto.get(v["tarefa"], ""), "campo": v.get("campo") or "", "tem": v.get("tem"),
+                           "pede": v.get("pede")} for v in a.get("faltando") or []]
         fatos.append(x)
     if o["fora_motivo"]:
         estado = f"Fotos não lidas: a OS fica fora do pré-filtro ({o['fora_motivo']})."
@@ -1832,8 +1855,15 @@ def _detalhe_da_os(o: dict, f: dict | None) -> dict:
         estado = "Fotos ainda não conferidas: o Nexus lê por trás, as OS mais novas primeiro."
     else:
         estado = f"{len(fotos)} foto{'s' if len(fotos) != 1 else ''} das tarefas do App conferida{'s' if len(fotos) != 1 else ''} em {o['fotos_em']}."
+    if o["fora_motivo"]:
+        respostas = ""
+    elif m is None:
+        respostas = "Respostas e GPS ainda não lidos: o Nexus lê por trás, as OS mais novas primeiro."
+    else:
+        respostas = ("Respostas, GPS e fotos pedidas lidos no Fracttal em "
+                     f"{datetime.fromtimestamp(float(m['lido_em']), _BRT).strftime('%d/%m %H:%M')}.")
     return {"fatos": fatos, "tarefas": tarefas, "fechado_app": _hora_do_app(fechado) if fechado else "",
-            "estado_fotos": estado, "n_fotos": len(fotos)}
+            "estado_fotos": estado, "n_fotos": len(fotos), "estado_respostas": respostas}
 
 
 @bp.route("/aprovacao/<int:id_wo>/detalhe")
@@ -1850,7 +1880,8 @@ def aprovacao_detalhe(id_wo):
     o = _por_os(_com_cadastro(linhas, visao.usinas_do_fracttal()))[0]
     _quadro([o])
     f = None if o["fora_motivo"] else prefiltro_fundo.fatos(o.get("id_wo"))
-    return render_template("campo/_aprovacao_detalhe.html", o=o, d=_detalhe_da_os(o, f),
+    m = None if o["fora_motivo"] else prefiltro_fundo.meta(o.get("id_wo"))
+    return render_template("campo/_aprovacao_detalhe.html", o=o, d=_detalhe_da_os(o, f, m),
                            nome_coluna=NOME_DA_COLUNA | {"fora": "Fora do pré-filtro"}, cor_espera=_cor_espera,
                            horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"],
                            sem_responsavel=visao.SEM_RESPONSAVEL, sem_cadastro=SEM_CADASTRO)

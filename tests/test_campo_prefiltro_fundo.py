@@ -223,7 +223,8 @@ def test_ida_e_volta_do_disco(fundo):
 
 
 def test_a_volta_roda_numa_thread_de_fundo_e_desliga(fundo, monkeypatch):
-    """Fora dos testes, uma thread `nexus-prefiltro` por vez; `NEXUS_PREFILTRO=0` desliga."""
+    """Fora dos testes, uma thread `nexus-prefiltro` por vez (e a da leitura rápida, `nexus-prefiltro-respostas`, desde
+    05/11/2026); `NEXUS_PREFILTRO=0` desliga as duas."""
     import threading
     criadas = []
 
@@ -243,7 +244,7 @@ def test_a_volta_roda_numa_thread_de_fundo_e_desliga(fundo, monkeypatch):
         app.config["NEXUS_PREFILTRO"] = "1"
         prefiltro_fundo.pedir_conferencia(app)
         prefiltro_fundo.pedir_conferencia(app)             # já há uma andando: não abre outra
-        assert [t.name for t in criadas] == ["nexus-prefiltro"]
+        assert [t.name for t in criadas] == ["nexus-prefiltro-respostas", "nexus-prefiltro"]
     finally:
         app.config["TESTING"] = True
 

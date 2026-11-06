@@ -30,9 +30,10 @@ def test_o_motivo_sai_da_composicao_o_que_mais_perdeu_primeiro():
 
 def test_nota_abaixo_de_80_deixa_a_os_em_duvida_com_o_motivo():
     fatos = _fatos([{"id": "1", "anexada": _anexada(1)}])
-    # sem nada contra nos fatos, a OS com nota 95 segue Pronta
-    assert prefiltro.classificar(_os(_tarefa(qualidade=95, id_wt="7")), fatos, FECHADO, P)["coluna"] == "pronta"
-    r = prefiltro.classificar(_os(_tarefa(qualidade=55, id_wt="7", nota_itens=COMPOSICAO)), fatos, FECHADO, P)
+    # sem nada contra nos fatos, a OS com nota 95 segue Pronta (a leitura rápida das respostas e do GPS, da 4ª rodada,
+    # dada como feita e sem nada: `meta` = {})
+    assert prefiltro.classificar(_os(_tarefa(qualidade=95, id_wt="7")), fatos, FECHADO, P, {})["coluna"] == "pronta"
+    r = prefiltro.classificar(_os(_tarefa(qualidade=55, id_wt="7", nota_itens=COMPOSICAO)), fatos, FECHADO, P, {})
     assert r["coluna"] == "duvida"
     nota = [a for a in r["avisos"] if a["tipo"] == "nota"]
     assert len(nota) == 1 and nota[0]["nivel"] == "alerta"

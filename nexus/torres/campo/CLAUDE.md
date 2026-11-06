@@ -33,7 +33,7 @@ o login do Fracttal de quem clica, como no OS Creator Web; ver "Aprovação de O
 | **Mapa de equipe** (08/11/2026) | os pontos de posição que o celular do técnico (Nexus Field) manda às três rotas públicas `/t/campo/equipe/...` + o cadastro (técnicos de campo ativos, coordenada das usinas) + a malha do IBGE (só para a cidade) | `campo/equipe/` (as réguas, os pontos, a situação, os deslocamentos; ver "Mapa de equipe" abaixo) |
 | **Ocorrências** (18/10/2026) | o livro `nexus_ocorrencias` (escrito nesta tela) + cadastro do Nexus | `campo/ocorrencias.py` (ver "Ocorrências com plano de ação" abaixo) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
-| Aprovação de OS (quadro por fatos desde 05/11/2026) | fila de verificação do Fracttal INTEIRA (só GET) + nota e fechamento do livro do App + os anexos das OS (1 GET por OS, lido por trás, e as fotos pelo S3) + o Responsável O&M da usina (cadastro); aprovar é o Concluir do OS Creator, no cartão ou em lote | `campo/prefiltro.py` (as colunas) sobre a conta pronta das regras copiadas do App; `campo/prefiltro_fundo.py` (as fotos) |
+| Aprovação de OS (quadro por fatos desde 05/11/2026) | fila de verificação do Fracttal INTEIRA (só GET) + nota e fechamento do livro do App + os anexos das OS (1 GET por OS, lido por trás, e as fotos pelo S3) + as respostas e o GPS de cada foto (a leitura rápida: 2 GET por OS, sem baixar foto) + o tempo de execução da tarefa (`real_duration`, na própria fila) + o Responsável O&M da usina (cadastro); aprovar é o Concluir do OS Creator, no cartão ou em lote | `campo/prefiltro.py` (as colunas) sobre a conta pronta das regras copiadas do App; `campo/prefiltro_fundo.py` (as fotos e a leitura rápida) |
 | Permissões de trabalho → **em Segurança · HSEQ > APR e PT desde 09/10/2026** (`/t/hseq/apr-pt`; `/t/campo/pt` leva para lá). O código continua aqui (`pagina_pt`, a aprovação `/t/campo/pt/<número>`, os PDFs da PT e da APR); a regra de lá está em `nexus/torres/hseq/CLAUDE.md` | `fato_pt` (+ `pt_app_campo` para o texto) | `visao.pts` (conta nossa) |
 | Rondas | `fato_ronda` (App, checklist da carga única, avulsa) + usinas mobilizadas do cadastro + `fato_fechamento` (última OS da usina) + a validação por foto (só sujidade e vegetação) | `visao.rondas` (conta nossa) |
 | Ronda avulsa (`/t/campo/rondas/avulsa`) | lançada à mão no Nexus, com o login do Fracttal | `campo/ronda_avulsa.py` |
@@ -1998,15 +1998,19 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       celular (`dev_ts`) e a da chegada no servidor (`server_ts`), e a última das linhas (`fechado_app` na conta pronta;
       sem ela, a anexação não é julgada). A chegada conta porque o celular sem sinal sobe o fechamento e as fotos juntos
       dias depois (era Não OK falso). Só as fotos das tarefas do App são julgadas, pelo id da tarefa: na OS mista, a tarefa
-      fechada fora do App tem as fotos anexadas na hora dela. **Em dúvida**: foto repetida (dHash de 256 bits dos 75% de
+      fechada fora do App tem as fotos anexadas na hora dela. Também **Não OK** (as regras de 05/11/2026, abaixo): tarefa
+      do App executada em menos de 2 min com foto, e 2 ou mais respostas vazias na mesma tarefa. **Em dúvida**: foto
+      repetida (dHash de 256 bits dos 75% de
       cima, SEM o carimbo do App, que muda a cada anexo; diferença até `NEXUS_PREFILTRO_DIF` 12; captura de tela, sem
       "GPS " na descrição, só até `NEXUS_PREFILTRO_DIF_PRINT` 4, porque telas parecidas enganam), tarefa fechada fora do
-      App ou foto que não abriu no Nexus (upload cortado). **Pronta**: nenhum fato. A OS fica na pior coluna; um fato
-      com fotos ainda por ler já a põe na coluna pior, com "Faltam fotos por ler"; sem fato e sem as fotos lidas, ela
-      fica em **Ainda conferindo** (abaixo do quadro: aprova pelo cartão, não entra no lote). A OS **fechada inteira fora
-      do App não espera foto nenhuma** (05/11/2026): as fotos não mudam a coluna dela (Em dúvida pela tarefa fora do App; a
-      foto atrasada só se mede contra o fechamento no App), então vai direto para Em dúvida, sem "Faltam fotos por ler",
-      e entra no lote. A regra do App de antes
+      App, foto que não abriu no Nexus (upload cortado), uma resposta vazia por tarefa, GPS fora do Brasil ou longe das
+      outras fotos, campo com foto faltando. **Pronta**: nenhum fato. A OS fica na pior coluna; um fato com fotos ou
+      respostas ainda por ler já a põe na coluna pior, com "Faltam ... por ler"; sem fato e sem as duas leituras, ela fica
+      em **Ainda conferindo** (abaixo do quadro: aprova pelo cartão, não entra no lote; o cartão diz o que falta). A OS
+      **fechada inteira fora do App não espera foto nenhuma** (05/11/2026): as fotos não mudam a coluna dela (Em dúvida
+      pela tarefa fora do App; a foto atrasada só se mede contra o fechamento no App); **mas espera as respostas** (desde
+      a regra da resposta vazia, que vale para ela e a põe em Não OK): até a leitura rápida passar, "Faltam as respostas
+      por ler" e fora do lote. A regra do App de antes
       (já devolvida, foto divergente, ronda com pendência; `aprovacao.motivos`) virou só aviso, sem mudar a coluna.
       **A nota do App abaixo de 80 é motivo de Em dúvida desde 09/11/2026** (Levi, pelo Scrum master: "Em OS 8159
       aprovação de OS diz que está aprovado porém a OS tem nota 50 no app (...) tem que ter 'motivo da nota abaixo de
@@ -2014,7 +2018,39 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       critérios em que a tarefa perdeu pontos pela "Composição da nota" que o App grava (`campo/nota_app.py`; a
       composição do fechamento da OS com a MESMA nota, o mais novo: `aprovacao._composicao_de`). Sem a composição no
       livro, diz "o App não guardou a composição desta nota". A ronda fica de fora (a nota dela vem com as falhas).
-      "Menos de 5 min no App" e "subtarefas respondidas" não separaram na medição e ficaram de fora.
+      "Menos de 5 min no App" e "subtarefas respondidas" não separaram na medição de 26/10 e ficaram de fora.
+    - **As quatro regras de 05/11/2026** (Levi: "Tempo curto, resposta vazia, GPS fora da usina, foto faltando / consegue
+      adicionar"; "pode seguir!"; `prefiltro._regras_rapidas`), medidas nas 30 OS da medição de 26/10 relidas do Fracttal
+      em 05/11 (só GET, fora do horário de campo; o cru fica fora do git). No código final, das 15 devolvidas 3 vão a Não
+      OK e 6 a Em dúvida; das 15 aprovadas, NENHUMA a Não OK e 4 a Em dúvida.
+      - **Tempo curto** (Não OK): tarefa do App com `real_duration` (o tempo do início ao fim no App, em segundos, na linha
+        da fila: `x["exec_s"]` em `aprovacao.fila_toda`) abaixo de `NEXUS_PREFILTRO_MIN_EXEC_S` (120) e com foto
+        anexada. 0 ou sem dado não julga. Pegou 2 devolvidas (10 s com 9 fotos; 59 s), nenhuma aprovada. O "Execução
+        (min)" do livro do App NÃO serve: inteiro em minutos e 0 em 40% das 400 últimas linhas (medido em 05/11).
+      - **Resposta vazia** (`prefiltro.respostas_vazias`): obrigatória de texto (tipo 1 e 6 do Fracttal) respondida só com
+        "N/A", "na", "ok", "sim", "positivo", "feito", "realizado", "x", só pontuação, ou com o nome da tarefa; "Não se
+        aplica" marcado não conta. **Não OK com 2 ou mais NA MESMA tarefa**, Em dúvida com uma por tarefa: a MPM aprovada de
+        13 tarefas tinha um "N/A" em cada uma de 3 (contada por OS, caía em Não OK); a devolvida, quatro "N/A" numa só.
+        O "menos de 12 caracteres" do desenho saiu: pegava resposta boa (número de série, "Motor", "QGBT"). Vale para a
+        OS fora do App (as respostas estão no Fracttal). 6 devolvidas e 2 aprovadas com alguma.
+      - **GPS** (Em dúvida): a foto do App com o GPS (o que o App grava na descrição: "campo · GPS lat,lon · hora") fora
+        do Brasil (a caixa do mapa de risco) ou a mais de `NEXUS_PREFILTRO_GPS_KM` (5) km da MEDIANA das fotos do App da
+        OS. **Não contra o ponto da usina no cadastro**: em 7 das 30 OS todas as fotos davam de 12 a 2.058 km dele, com as
+        fotos batendo com a tarefa (o ponto do cadastro é que está errado; vale a revisão do cadastro). A 2 km, uma usina
+        grande aprovada caía (fotos a 2,02 km da mediana). Pegou 2 devolvidas (uma foto a 199 km; fotos a 18 km) e 1
+        aprovada (todas as 329 fotos em Bogotá). A coordenada nunca vira texto na tela: só a distância.
+      - **Foto faltando** (Em dúvida; `prefiltro.fotos_faltando`): campo cuja pergunta diz "mínimo N fotos" com menos
+        fotos do campo. A foto é do campo pelo nome que o App põe nela (os 80 primeiros caracteres do campo; casam os 60
+        primeiros). Só nas tarefas do App (a anexada pelo Fracttal não diz o campo). 2 devolvidas e 2 aprovadas: sinal
+        fraco, por isso só Em dúvida. O "tipo 9" (campo de foto) não apareceu nas 30 OS.
+    - **A leitura rápida, por trás** (`prefiltro_fundo.conferir_meta`, thread `nexus-prefiltro-respostas`, declarada de
+      fundo no porteiro, aberta junto com a das fotos em `pedir_conferencia`): de cada OS do escopo, a lista de anexos e
+      as respostas (`work_orders_subtasks/?folio=`), 2 GET e nenhuma foto baixada; guarda o id (o mesmo da leitura das
+      fotos), o campo e o GPS de cada foto, as respostas vazias e os campos com foto faltando. Separada da das fotos de
+      propósito: medido no Raio-X em 05/11, 21:33, a thread das fotos passa o tempo todo baixando do S3 ("esperando a
+      rede", 0,3 OS por minuto), e as quatro regras não precisam de imagem. Lê também a OS fechada inteira fora do App.
+      Mesma ordem, releitura, espera depois do 429 e teto por volta da das fotos; `META_V` muda quando a conta muda (a
+      OS de versão velha é relida). Memória e `dados/campo/prefiltro_meta.json.gz`.
     - **Fora do pré-filtro** (abaixo do quadro, com o motivo; aprova pelo cartão; **não entra na conta** das OS
       esperando, Levi 05/11/2026: "O que tiver fora do pré filtro não é contabilizado"): religamento, pelo tipo ou pela
       tarefa, e a etiqueta PERFORMANCE (Levi, 04/11: "religamento remoto ou religamento real não entra, nem OSs com
@@ -2056,8 +2092,9 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       destaque** (`apq-motivo`: "Sempre destacar o motivo de estar em dúvida ou não OK! tem que estar bem visual e
       acessível"): o fundo e o fio na cor, o ícone e a mensagem na cor da coluna, sem repetir o nome da coluna (3ª rodada:
       "tire esse 'EM DÚVIDA' da OS deixe só a mensagem em laranja"), com os fatos que puseram a OS ali
-      (`prefiltro.TIPOS_DO_MOTIVO`: tarde, repetida, não abriu, fora do App e, desde 09/11/2026, a nota do App abaixo de
-      80); em Fora do pré-filtro e Ainda conferindo, o
+      (`prefiltro.TIPOS_DO_MOTIVO`: tarde, tempo, vazia, repetida, gps, foto faltando, não abriu, fora do App e, desde
+      09/11/2026, a nota do App abaixo de 80); em Fora do pré-filtro e Ainda conferindo (o que falta ler: as fotos, as
+      respostas e o GPS), o
       mesmo bloco, neutro; depois a tarefa (a 1ª, "e mais N") com a nota do App ao lado (pequena; "Fora do App" sem ela);
       a linha de baixo com quantas tarefas, a UFV e o cliente (o ativo já vem no título: "não precisa repetir o nome do
       ativo abaixo, ao invés disso bote a quantidade de tarefas"); os outros avisos (a regra do App, as fotos por ler); e
@@ -2068,8 +2105,9 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       número e o cartão (fora da caixa e dos botões; o Enter também) abrem a barra das Rondas (`rd-gaveta`, 1/3 da tela à
       direita), que busca `/t/campo/aprovacao/<id>/detalhe` (`_aprovacao_detalhe.html`, só memória, 404 fora da fila):
       a OS, a coluna, a UFV e o responsável; cada fato com a prova (a hora do fechamento no App e cada foto atrasada com o
-      campo, a tarefa e a hora de anexação; os pares repetidos; as tarefas fechadas fora do App); as tarefas da OS (pelo
-      App com a nota e os avisos do App, ou fora do App); e o estado das fotos. O número de cada foto e o "Abrir o card da
+      campo, a tarefa e a hora de anexação; os pares repetidos; as tarefas fechadas fora do App; a tarefa e o tempo do
+      tempo curto; cada resposta vazia com o campo e a tarefa; a foto longe com a distância; o campo com "N de M fotos");
+      as tarefas da OS (pelo App com a nota e os avisos do App, ou fora do App); e o estado das fotos e das respostas. O número de cada foto e o "Abrir o card da
       OS" abrem o card do OS Creator (`NexusOsCard.abrir`, status "Em Verificação"), onde as fotos estão; o "Baixar o PDF
       da OS" é o do OS Creator (`POST /os/api/os/pdf`, o mesmo das OSs em verificação do Painel; Levi: "Quero o botão de
       baixar o PDF da OS!"); o Aprovar da barra é o do cartão. Logo depois do score e dos avisos vem o **Aprovar** = o Concluir do OS Creator (`POST /os/api/os/<id>/concluir` com
@@ -2082,7 +2120,7 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       (`aprovacao._regravar`: a que chega durante outra só marca que falta). A leitura (a fila de verificação, a hora em
       que foi lida, as notas do App e quantas OS tiveram as fotos conferidas) fica no "!" amarelo do título, não no canto
       (Levi, 05/11/2026: "pode deixar no disclaimer da exclamação em amarelo").
-    - **O lote**: caixa de marcar só em Pronta e Em dúvida (não na OS com "Faltam fotos por ler", que pode virar Não OK),
+    - **O lote**: caixa de marcar só em Pronta e Em dúvida (não na OS com "Faltam ... por ler", que pode virar Não OK),
       "Selecionar todas" por coluna e "Aprovar as marcadas (N)", com a confirmação que diz quantas e de que coluna. Uma OS
       a cada 4 s (`PAUSA_LOTE_MS`: cada aprovação custa 5 a 7 pedidos ao Fracttal), com o andamento; para no que se
       repetiria em todas (401 do Fracttal, 403, 429 e 5xx, a sessão do Nexus e 3 erros seguidos), e o outro erro fica no
@@ -2103,7 +2141,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       recontam as colunas. CSV: OS, dias, criação, fim, Responsável O&M, usina, cliente, técnicos, tarefas, nota do App,
       a coluna ("Fora do pré-filtro (motivo)") e os motivos. No celular as colunas deslizam de lado dentro do quadro.
       Prova: `test_campo_aprovacao_responsavel.py`, `test_campo_aprovacao_visual_0511.py` (a 2ª rodada),
-      `test_campo_aprovacao_gaveta_0511.py` (a 3ª), `test_campo_prefiltro.py` e `test_campo_prefiltro_fundo.py`.
+      `test_campo_aprovacao_gaveta_0511.py` (a 3ª), `test_campo_prefiltro.py`, `test_campo_prefiltro_fundo.py` e
+      `test_campo_prefiltro_sinais_0511.py` (as quatro regras de 05/11 e a leitura rápida).
   - **A conta pronta (18/10/2026, "Está demorando muito para carregar")**: a regra do App sobre a fila inteira leva uns
     3,5 s só de conta (medido em 18/10 com uma fila falsa de 5.500 tarefas), mais a leitura das notas no banco, e a
     cópia de 5 min (`leitura.ler`) vencia entre uma releitura e outra: quase toda visita pagava, e cada filtro de região
