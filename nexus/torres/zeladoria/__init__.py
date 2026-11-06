@@ -141,7 +141,11 @@ def app_radar():
               # o menu é o do Nexus: a barra lateral do clone some (o #app dele é flex, o conteúdo ocupa a largura)
               "<style>.sidebar{display:none !important}</style>")
     ponte = (f'<script src="{url_for("static", filename="zeladoria/ponte.js")}"></script>\n'
-             "<script>iniciarRadarApp();</script>")
+             "<script>iniciarRadarApp();</script>\n"
+             # os filtros no painel suspenso do Histórico de OS (06/11/2026): de fora do clone, pelo DOM
+             # (nexus/static/zeladoria/filtros.js)
+             f'<link rel="stylesheet" href="{url_for("static", filename="zeladoria/filtros.css")}">\n'
+             f'<script src="{url_for("static", filename="zeladoria/filtros.js")}"></script>')
     atributos = f'data-theme="{tema}"' + (' data-tema="claro"' if claro else "")
     html = (_CLONE["texto"].replace('<html lang="pt-BR">', f'<html lang="pt-BR" {atributos}>', 1)
             .replace('<style id="zeladoria-paleta">', tokens_do_nexus() + '<style id="zeladoria-paleta">', 1)

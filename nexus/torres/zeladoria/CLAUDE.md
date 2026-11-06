@@ -147,6 +147,21 @@ diferentes apagariam um ao outro. Levi escolheu "Salvo em 1 s, banco logo depois
 - **Card do fornecedor:** a coluna da grade foi de 272 para 320 px, o nome quebra a linha e os botões descem quando não cabem (o texto passava do card).
 - **Celular:** a 375 px nenhuma das 18 telas rola de lado. A tabela larga rola dentro dela, a grade fixa cai para uma coluna e a linha de botões quebra.
 - **Como se faz:** tudo pela `ferramentas/zeladoria_limpar_clone.py` (a função `vestir`), que roda de novo sobre o Radar original. Prova: `tests/test_zeladoria_clone.py`.
+- **Os filtros num painel suspenso** (Levi, 06/11/2026: "quero que todos os filtros sejam suspensos alá histórico de OS do
+  OS Creator!"): o modelo A do Histórico de OS (`nexus/torres/oscreator/README.md`, "Os filtros do Histórico só valem no
+  Aplicar"). Na barra ficam a busca (filtra enquanto se digita) e o botão Filtros com a contagem; o painel tem cada filtro
+  numa lista digitável (sem acento nem caixa), o ponto verde no que mudou, o Limpar e o Aplicar; nada filtra antes do
+  Aplicar; as etiquetas azuis dos aplicados ficam abaixo, o × tira um na hora, e o "Limpar tudo" é o "Limpar filtros" do
+  próprio Radar. Fechar sem aplicar (Esc, clique fora) descarta. No celular, folha de baixo para cima.
+  - **De fora do clone, pelo DOM** (`nexus/static/zeladoria/filtros.js` e `.css`, que a rota `/app` põe depois da ponte):
+    o estado do Radar mora dentro de uma função, então a peça esconde os `<select id="flt-*">` e as listas de vários
+    valores (`.msf`), monta o painel com cópias, e no Aplicar escreve nos campos escondidos e dispara o `change`, um por
+    vez (o Radar refaz o `#app` a cada um; um MutationObserver remonta a barra). Filtro novo com id `flt-*` entra sozinho.
+  - **Ficam fora:** a busca de texto, e os campos que escolhem o que a tela mostra (`FORA`: o usuário em Permissões, o
+    "Previsto adotado" e o mês da simulação de repasse).
+  - **O desenho é o do Histórico com as cores do Nexus** (`zf-*` espelha o `fl-*` do `os.css`): mudou o modelo de lá,
+    leve aqui. Prova: `tests/test_zeladoria_filtros.py` (o que a peça supõe do clone e a cor só por token) e as 18 telas
+    na cópia de prova (abrir, digitar, aplicar, etiqueta, ×, Esc, Limpar tudo e as listas de vários valores do Financeiro).
 
 ## O Fracttal e o cronograma (etapa 5, 06/11/2026)
 
