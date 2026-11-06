@@ -26,6 +26,11 @@ Pedidos do Levi de 08/10/2026:
   - "Engenharia poder anexar arquivos": PDF, imagem, planilha ou documento, que sobem DEPOIS de a OS existir, pelo mesmo
     caminho do anexo de hoje (`api.attach_imagem_os`), em cada OS criada; a tela diz o que subiu e o que falhou.
 
+A PERFORMANCE (Levi, 06/11/2026: "adicione mais um em solicitações agora performance, será a mesma coisa porém com
+etiqueta de performance!"): a mesma tela e as mesmas regras, com a etiqueta PERFORMANCE (só ela) e o responsável só entre
+a equipe da Performance ("Só a equipe da Performance"): quem está no setor Performance em Base → Acessos → Pessoas e
+setores ("Já tem no setor da performance em base > acessos"), pelo gancho `MEMBROS_DO_SETOR`, que a ponte liga.
+
 Regras puras (sem Flask): o teste as roda sem rede, e a rota só monta a requisição e a resposta."""
 from __future__ import annotations
 import datetime as dt
@@ -38,10 +43,19 @@ DIAS_PADRAO = 7
 DIAS_URGENTE = 2
 TIPO_TAREFA = "Administrativa"
 CLASSIF_1 = "Programada"
-# os nomes do catálogo do Fracttal. Levi, 21/10/2026: "tire a obrigatoriedade da etiqueta backoffice, deixe só a
-# etiqueta engenharia mesmo" (de 13/10 a 21/10 ia também a Backoffice; até 13/10, a Remoto)
-ETIQUETAS = ("ENGENHARIA",)
-ENV_RESPONSAVEIS = "OS_WEB_ENGENHARIA_RESPONSAVEIS"
+# os setores que a Nova solicitação atende criando a OS direto: o nome na tela, as etiquetas (os nomes do catálogo do
+# Fracttal) e a variável com os nomes da equipe. Engenharia: Levi, 21/10/2026, "tire a obrigatoriedade da etiqueta
+# backoffice, deixe só a etiqueta engenharia mesmo" (de 13/10 a 21/10 ia também a Backoffice; até 13/10, a Remoto).
+# Performance: 06/11/2026, "a mesma coisa porém com etiqueta de performance"
+SETORES = {
+    "engenharia": {"nome": "Engenharia", "etiquetas": ("ENGENHARIA",), "env": "OS_WEB_ENGENHARIA_RESPONSAVEIS"},
+    "performance": {"nome": "Performance", "etiquetas": ("PERFORMANCE",), "env": None, "do_setor": True},
+}
+ETIQUETAS = SETORES["engenharia"]["etiquetas"]
+ENV_RESPONSAVEIS = SETORES["engenharia"]["env"]
+# o gancho da ponte: (setor) → os ids do Fracttal (id_personnel, em texto) de quem está hoje no setor do Nexus (Base →
+# Acessos → Pessoas e setores), ou None quando não deu para ler os setores
+MEMBROS_DO_SETOR = None
 SUB_DESCRICAO = "Atividade a ser realizada (de forma direta)"
 ROTULO_PROBLEMA = "Descreva o problema"
 
@@ -96,10 +110,16 @@ def tipos_de(ativos) -> list:
     return sorted(vistos.items(), key=lambda kv: _sem_acento(kv[1]))
 
 
-# ── os responsáveis da Engenharia ─────────────────────────────────────────────────────────────────────
-def nomes_configurados(valor: str | None = None) -> list:
-    """Os nomes do .env, separados por ';' (ou vírgula). Sem a variável: lista vazia — e a tela diz isso."""
-    bruto = os.environ.get(ENV_RESPONSAVEIS, "") if valor is None else valor
+def setor_de(setor) -> dict:
+    """O setor da Nova solicitação ('engenharia' ou 'performance'); outro nome é a Engenharia, a de sempre."""
+    return SETORES.get(str(setor or "").strip().lower()) or SETORES["engenharia"]
+
+
+# ── os responsáveis do setor ──────────────────────────────────────────────────────────────────────────
+def nomes_configurados(valor: str | None = None, setor: str = "engenharia") -> list:
+    """Os nomes da equipe do setor no .env, separados por ';' (ou vírgula). Sem a variável: lista vazia — e a tela diz isso."""
+    env = setor_de(setor)["env"]
+    bruto = (os.environ.get(env, "") if env else "") if valor is None else valor
     return [n.strip() for n in re.split(r"[;,]", bruto or "") if n.strip()]
 
 
@@ -126,6 +146,29 @@ def responsaveis(pessoas, nomes) -> tuple[list, list]:
     return achadas, faltam
 
 
+def equipe(pessoas, setor: str = "engenharia") -> tuple[list, list, bool, str]:
+    """(as pessoas do Fracttal que podem ser o responsável, os nomes do .env que não acharam ninguém, se a lista existe, o
+    aviso da tela quando não existe). A Engenharia pelos nomes do .env; a Performance pelo setor do Nexus
+    (`MEMBROS_DO_SETOR`): quem está no setor, pelo id do Fracttal, que é o `id_personnel` da pessoa."""
+    st = setor_de(setor)
+    if st.get("do_setor"):
+        ids = MEMBROS_DO_SETOR(setor) if MEMBROS_DO_SETOR else None
+        if ids is None:
+            return [], [], False, "Não consegui ler os setores do Nexus agora: tente de novo em instantes."
+        achadas = sorted(({"id_personnel": p["id_personnel"], "code": p.get("code") or "", "name": p.get("name") or ""}
+                          for p in (pessoas or []) if isinstance(p, dict) and p.get("id_personnel")
+                          and str(p["id_personnel"]) in ids), key=lambda p: _sem_acento(p["name"]))
+        if not achadas:
+            return [], [], False, ("Ninguém do setor %s em Base → Acessos → Pessoas e setores está no Fracttal: ponha a "
+                                   "equipe lá." % st["nome"])
+        return achadas, [], True, ""
+    nomes = nomes_configurados(setor=setor)
+    if not nomes:
+        return [], [], False, "A lista da %s não está configurada (%s no .env do servidor)." % (st["nome"], st["env"])
+    achadas, faltam = responsaveis(pessoas, nomes)
+    return achadas, faltam, True, ""
+
+
 # ── as etiquetas ───────────────────────────────────────────────────────────────────────────────────────
 def _nome_etq(t) -> str:
     """O nome inteiro, sem acento, sem caixa e sem espaço, hífen, ponto ou sublinhado: "ENGENHARIA", "Engenharia" e
@@ -134,16 +177,17 @@ def _nome_etq(t) -> str:
     return re.sub(r"[\s\-_.]+", "", _sem_acento(t))
 
 
-def etiquetas(catalogo) -> tuple[list, list]:
-    """(ids das ETIQUETAS no catálogo do Fracttal, os nomes que faltam). Pelo nome INTEIRO (`_nome_etq`): a busca
+def etiquetas(catalogo, setor: str = "engenharia") -> tuple[list, list]:
+    """(ids das etiquetas do setor no catálogo do Fracttal, os nomes que faltam). Pelo nome INTEIRO (`_nome_etq`): a busca
     por trecho do `api.label_id_por_nome` tomaria a 'Religamento Remoto' pela 'Remoto'. Faltou: quem chama não cria
-    nada — OS da Engenharia sem a etiqueta ENGENHARIA não sai."""
+    nada — OS da Engenharia sem a etiqueta ENGENHARIA (ou da Performance sem a PERFORMANCE) não sai."""
+    nomes = setor_de(setor)["etiquetas"]
     por_nome = {}
     for e in catalogo or []:
         if isinstance(e, dict) and e.get("id"):
             por_nome.setdefault(_nome_etq(e.get("description")), e["id"])
-    ids = [por_nome[_nome_etq(n)] for n in ETIQUETAS if _nome_etq(n) in por_nome]
-    return ids, [n for n in ETIQUETAS if _nome_etq(n) not in por_nome]
+    ids = [por_nome[_nome_etq(n)] for n in nomes if _nome_etq(n) in por_nome]
+    return ids, [n for n in nomes if _nome_etq(n) not in por_nome]
 
 
 def erro_etiquetas(faltam) -> str:
@@ -162,7 +206,8 @@ def data_br(d: dt.datetime) -> str:
 
 
 # ── o pedido ───────────────────────────────────────────────────────────────────────────────────────────
-def montar(corpo: dict, assets_por_id: dict, permitidos: list, agora: dt.datetime, nome_os) -> tuple[list, dict, str]:
+def montar(corpo: dict, assets_por_id: dict, permitidos: list, agora: dt.datetime, nome_os,
+           setor: str = "engenharia") -> tuple[list, dict, str]:
     """Do JSON da tela → (ativos do catálogo, campos da criação, erro). `nome_os(asset, base)` é o `api.perf_os_nome`
     ('[Ativo] - base'), passado de fora para a regra não depender do api."""
     corpo = corpo or {}
@@ -182,7 +227,7 @@ def montar(corpo: dict, assets_por_id: dict, permitidos: list, agora: dt.datetim
     pid = resp.get("id_personnel") if isinstance(resp, dict) else None
     pessoa = next((p for p in permitidos or [] if str(p.get("id_personnel")) == str(pid)), None)
     if not pessoa:
-        return [], {}, "Escolha o responsável entre os nomes da Engenharia."
+        return [], {}, "Escolha o responsável entre os nomes da %s." % setor_de(setor)["nome"]
     try:
         evento = dt.datetime.fromisoformat(str(corpo["evento"])).replace(tzinfo=BRT) if corpo.get("evento") else agora
     except ValueError:
@@ -205,7 +250,7 @@ def _nomes(assets) -> dict:
     return {a.get("code"): (a.get("label") or a.get("code")) for a in assets or []}
 
 
-def mensagem(res, assets, prog: dt.datetime | None = None) -> dict:
+def mensagem(res, assets, prog: dt.datetime | None = None, setor: str = "engenharia") -> dict:
     """[{code, ok, os:{wo_folio}} | {code, ok:False, erro}] do `create_work_orders_bulk` → {ok, falhas, mensagem, folios}.
     Com `prog`, a mensagem diz a data que o servidor pôs — a tela não a escolhe, então quem criou precisa vê-la."""
     nome = _nomes(assets)
@@ -216,7 +261,8 @@ def mensagem(res, assets, prog: dt.datetime | None = None) -> dict:
     if not ok:
         msg = "Nenhuma OS criada.\n" + "\n".join("• %s: %s" % (nome.get(r.get("code"), r.get("code")), r.get("erro")) for r in fail[:8])
     else:
-        msg = "%d OS criada(s) para a Engenharia — Nº %s" % (len(ok), ", ".join(str(f or "?") for f in folios[:12]))
+        msg = "%d OS criada(s) para a %s — Nº %s" % (len(ok), setor_de(setor)["nome"],
+                                                    ", ".join(str(f or "?") for f in folios[:12]))
         msg += (" — programada(s) para %s." % data_br(prog)) if prog else "."
         if fail:
             msg += "\n\n%d falharam:\n" % len(fail) + "\n".join(
@@ -234,7 +280,7 @@ def _lista_erros(erros, nome) -> str:
     return "\n".join(linhas)
 
 
-def mensagem_agrupada(res, assets, prog: dt.datetime | None = None) -> dict:
+def mensagem_agrupada(res, assets, prog: dt.datetime | None = None, setor: str = "engenharia") -> dict:
     """O {ok, os:{wo_folio}, n_criadas, erros, aviso} do `create_work_orders_agrupada` → o formato do `mensagem`, mais
     `pendentes`: as atividades que nasceram no Fracttal mas ficaram sem a OS numerada (a OS não fechou). Isso não é
     "nenhuma criada" — a tela precisa tirar os ativos da seleção, ou um 2º clique criaria tudo de novo."""
@@ -247,7 +293,7 @@ def mensagem_agrupada(res, assets, prog: dt.datetime | None = None) -> dict:
     n = int(res.get("n_criadas") or 0)
     erros = res.get("erros") or []
     if folio:
-        msg = "1 OS criada para a Engenharia — Nº %s, com %d atividade(s), uma por ativo" % (folio, n)
+        msg = "1 OS criada para a %s — Nº %s, com %d atividade(s), uma por ativo" % (setor_de(setor)["nome"], folio, n)
         msg += (" — programada para %s." % data_br(prog)) if prog else "."
     else:
         msg = ("As %d atividade(s) nasceram no Fracttal, mas a OS não foi numerada: elas ficaram pendentes. Gere a OS a "

@@ -217,7 +217,9 @@ def test_ativos_e_responsaveis_da_tela(cli):
 
 def test_sem_a_lista_no_env_a_tela_avisa(cli, monkeypatch):
     monkeypatch.delenv(reg.ENV_RESPONSAVEIS)
-    assert cli.get("/os/api/solicitacao/engenharia/responsaveis").get_json() == {"pessoas": [], "faltam": [], "configurado": False}
+    assert cli.get("/os/api/solicitacao/engenharia/responsaveis").get_json() == {
+        "pessoas": [], "faltam": [], "configurado": False,
+        "aviso": "A lista da Engenharia não está configurada (OS_WEB_ENGENHARIA_RESPONSAVEIS no .env do servidor)."}
     r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo())
     assert r.status_code == 400 and r.get_json()["erro"] == "Escolha o responsável entre os nomes da Engenharia."
 

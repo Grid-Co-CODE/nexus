@@ -2628,6 +2628,23 @@ tarefa e dê para baixar tudo de uma vez, o download sai com o nome do ativo!"; 
 - Prova: `tests/test_oscreator_card_ativos_anexos_04_11.py`; os 2 testes de `test_oscreator_card_por_ativo_28_10.py`
   aceitam o `data-ativo` novo na tarefa.
 
+## A Nova solicitação para a Performance (06/11/2026)
+
+Levi, 06/11/2026: "adicione mais um em solicitações agora performance, será a mesma coisa porém com etiqueta de
+performance!"; e, no quiz do responsável, "Só a equipe da Performance".
+- **A mesma tela da Engenharia, com o setor no endereço** (`/os/solicitacao/performance`; as rotas `/os/api/solicitacao/
+  <engenharia|performance>/...`): os mesmos campos, regras, datas, anexos e as duas formas (uma OS por ativo ou a
+  agrupada); tipo Administrativa e só a Classificação 1, Programada. O que muda vem de `solic_eng_web.SETORES`: a
+  etiqueta **PERFORMANCE**, sempre e só ela (faltando no Fracttal, nenhuma OS sai), a lista de responsáveis e
+  "Performance" nas frases. A Nova solicitação tem agora três abas: PCM, Engenharia e Performance.
+- **Os responsáveis:** só a equipe da Performance, que é quem está no setor Performance em Base → Acessos → Pessoas e
+  setores (Levi: "Já tem no setor da performance em base > acessos"): o gancho `solic_eng_web.MEMBROS_DO_SETOR`, que a
+  ponte liga (`ponte.membros_do_setor`), lê a última decisão de cada pessoa no livro `nexus_setores` (1 min de cópia) e
+  dá os ids do Fracttal, que são o `id_personnel` do responsável. Ninguém do setor no Fracttal, ou o livro fora, a tela
+  abre e diz. Nada no `.env` nem no código. A da Engenharia segue nos nomes do .env (`OS_WEB_ENGENHARIA_RESPONSAVEIS`).
+- Prova: `tests/test_oscreator_solic_performance_06_11.py` (e os da Engenharia, `test_oscreator_solic_engenharia.py`,
+  seguem verdes); conferido na bancada (desktop e 375 px).
+
 ## O card diz a usina, a data de criação e quanto já foi feito (05/11/2026)
 
 Levi, 05/11/2026, em várias voltas na bancada e no ar: "as vezes clico na OS sem contexto e não sei que usina é. adicione
