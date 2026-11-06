@@ -95,3 +95,14 @@ def test_a_rota_da_os_e_o_limite_da_cota(cliente, com_contratos, monkeypatch):
     assert c.post("/t/zeladoria/api/funcao/fracttal-os", json={"folios": [str(i) for i in range(11)]}).status_code == 400
     pendente = _entrar_como(cliente, "beltrano@exemplo.com")
     assert pendente.post("/t/zeladoria/api/funcao/fracttal-os", json={"folios": ["1"]}).status_code == 403
+
+
+def test_o_pdf_de_27_mb_passa_so_nesta_rota(logado, com_contratos):
+    """O limite geral do Nexus é 25 MB; dois contratos têm 27,5 MB e voltavam 413 (06/11/2026)."""
+    import io
+    grande = PDF + b"0" * (27 * 1024 * 1024)
+    r = logado.post("/t/zeladoria/api/contratos/enviar",
+                    data={"caminho": "cliente-a/contrato.pdf", "arquivo": (io.BytesIO(grande), "contrato.pdf")},
+                    content_type="multipart/form-data")
+    assert r.status_code == 200, r.status_code
+    assert logado.application.config["MAX_CONTENT_LENGTH"] == 25 * 1024 * 1024        # o resto do Nexus segue igual

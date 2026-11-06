@@ -358,6 +358,10 @@ def api_contratos_enviar():
         return jsonify(erro="Só o administrador envia os PDFs."), 403
     if _de_outro_site():
         return jsonify(erro="Pedido de outro site."), 403
+    # o limite geral do Nexus é 25 MB por pedido; dois contratos têm 27,5 MB (06/11/2026: voltaram 413). Só esta rota,
+    # só do administrador, aceita o teto dos PDFs, e antes de o corpo ser lido
+    from ...zeladoria import contratos_pdf
+    request.max_content_length = (contratos_pdf.MAX_MB + 1) * contratos_pdf.MB
     est, erro = _estado()
     if est is None:
         return jsonify(erro=erro), 503
