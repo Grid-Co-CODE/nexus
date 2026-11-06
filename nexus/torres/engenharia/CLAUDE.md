@@ -406,9 +406,11 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   concluir não lança outro registro (uma execução, as horas não dobram); o anexo da tarefa fica nela; o anexo da OS entra
   também na Em Verificação, na Concluída e na Cancelada. O início do cronômetro vem do Fracttal em UTC sem o fuso: o
   painel o lê como UTC. False devolve os botões só ao administrador. Rotas e regras em `nexus/torres/oscreator/README.md`.
-- **O comentário na OS de várias tarefas não vai para o Fracttal** (pedido de 06/11/2026: "o certo é comentar e já
-  incluir na nota da OS"): falta achar o caminho da nota da OS com várias tarefas (a sessão do OS Creator não tem um
-  provado; o experimento é gravar uma marca numa OS de TESTE e reler a nota de cada tarefa). Até lá, fica no Nexus.
+- **O comentário na OS de várias tarefas também vai para a nota da OS** (06/11/2026, pela OS 16289, de seis
+  inversores: "o certo é comentar e já incluir na nota da OS"). A prova no Fracttal (OS 18754 de TESTE - PA, duas
+  tarefas, lida de volta) mediu: o `work_orders_update` grava a `note` da OS, igual em todas as tarefas, e a observação
+  de cada tarefa (`task_note`) fica como estava. O "Editar observação" do card segue recusando OS de várias tarefas (ele
+  regrava a observação inteira); o comentário só põe uma linha no fim da nota da OS.
 - **Status e prioridade** moram no livro `nexus_engenharia_os` (`nexus/engenharia/os_acompanhamento.py`; regra no
   `nexus/dados/CLAUDE.md`): os oito do time (Análise de Solução, Atividade em Andamento, Diagnóstico em Andamento,
   Agendamento de OS, Tratativa com Equipe de Campo, Validação Final, Stand-By, Diagnóstico Concluído; o id é a ordem do
@@ -418,9 +420,9 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
 - **O comentário vai para a nota da OS** pela ponte do OS Creator (`/os/_nexus/engenharia/os/<id>/comentar`, em
   `oscreator/ponte.py`, porque o cookie do Fracttal só vai para /os), na sessão do Fracttal da pessoa: a linha
   `[24/10/2026 14:32] Nome (Engenharia): texto` entra no fim da nota (`api.editar_nota_os`, relida na hora, uma escrita
-  por vez). A regra medida do card vale: OS concluída, cancelada ou de várias tarefas não deixa editar a nota (com
-  várias, sobrescreveria a observação da tarefa errada); aí o comentário fica só no Nexus e a linha do tempo diz por
-  quê. Da revisão final (24/10/2026): a OS que o Fracttal devolve sem tarefas (a leitura que falha "mole") não é
+  por vez). OS concluída ou cancelada não deixa editar a nota (o Fracttal recusa; o status sai do `status_id` do
+  detalhe da OS, e do nome quando ele falta); aí o comentário fica só no Nexus e a linha do tempo diz por quê. A OS de
+  várias tarefas grava (ver o item acima). Da revisão final (24/10/2026): a OS que o Fracttal devolve sem tarefas (a leitura que falha "mole") não é
   gravada, porque a nota inteira viraria a linha nova. **A nota tem dois campos** no Fracttal: a `note`, que o
   `editar_nota_os` grava (é onde o Nexus escreve), e a `task_note`, a nota com que a OS nasceu; o card do OS Creator mostra
   as duas juntas (`notas`, sem repetir a que já está dentro da outra). Quem regrava parte da `note` (na 1ª vez, da

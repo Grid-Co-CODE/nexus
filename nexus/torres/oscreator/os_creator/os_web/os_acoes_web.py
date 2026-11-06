@@ -32,6 +32,11 @@ def status_id_de(status_nome, d: dict):
     d = d or {}
     if str(d.get("cancel_motivo") or "").strip() or str(d.get("cancel_nota") or "").strip():
         return 4
+    # o detalhe traz o status do Fracttal desde 19/10/2026 (`status_id`, o do PDF): vale antes do nome, que a página
+    # nem sempre manda (06/11/2026: o comentário na OS de várias tarefas passou a ir para a nota, e a OS fechada tem de
+    # continuar recusada pelo status, e não pelo número de tarefas)
+    if d.get("status_id") in (1, 2, 3, 4):
+        return int(d["status_id"])
     for k, v in _WO_STATUS.items():
         if v == str(status_nome or "").strip():
             return k

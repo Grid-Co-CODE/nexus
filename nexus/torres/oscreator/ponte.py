@@ -928,8 +928,10 @@ def ir():
 # Levi: "Todo comentário que a engenharia fizer vai para a nota da OS com data e hora do comentário." A página da OS do
 # Quadro da equipe (/t/engenharia/equipe/os/<nº>) manda aqui, em /os/_nexus, porque o cookie do Fracttal (os_sessao) só
 # vai para /os: a nota é escrita pelo `api.editar_nota_os` do clone na sessão do Fracttal da PESSOA, o mesmo caminho do
-# card da OS, e a regra medida do card vale (OS concluída, cancelada ou de várias tarefas não deixa editar a nota: com
-# várias tarefas, ela sobrescreveria a observação da tarefa errada). O que é só do Nexus fica aqui, nunca na cópia.
+# card da OS. OS concluída ou cancelada não deixa editar a nota (o Fracttal recusa). A OS de várias tarefas, sim
+# (06/11/2026, Levi, pela OS 16289: "o certo é comentar e já incluir na nota da OS"): a prova no Fracttal (OS 18754 de
+# TESTE - PA, duas tarefas) mediu que o `work_orders_update` grava a `note` da OS, igual em todas as tarefas, e que a
+# observação de cada tarefa (`task_note`) fica como estava. O que é só do Nexus fica aqui, nunca na cópia.
 _trava_nota = threading.Lock()      # dois comentários juntos na mesma OS: um não apaga o outro na nota
 # a página da OS de onde veio o comentário (a do Quadro da equipe ou a da tela ETMs): o login do Fracttal volta para ela
 _PAGINA_DA_OS = re.compile(r"^/t/engenharia/(equipe|etm)/os/\d+$")
@@ -954,9 +956,10 @@ def _base_da_nota(d: dict) -> str:
 
 
 def _acrescentar_na_nota(os_api, regra, o: dict, linhas: list[str]) -> str:
-    """As linhas no fim da nota da OS no Fracttal (o comentário da Engenharia e, uma vez, o histórico do app de ETM),
-    com a regra medida do card: OS concluída, cancelada ou de várias tarefas não deixa editar a nota (com várias, ela
-    sobrescreveria a observação da tarefa errada). A nota que a página mostra tem de estar no que vai ser regravado (o
+    """As linhas no fim da nota da OS no Fracttal (o comentário da Engenharia e, uma vez, o histórico do app de ETM).
+    OS concluída ou cancelada não deixa editar a nota; a de várias tarefas, sim (a nota é da OS, igual em todas as
+    tarefas, e a observação de cada uma não muda: a prova de 06/11/2026). A nota que a página mostra tem de estar no
+    que vai ser regravado (o
     Fracttal tem a nota da OS e a da tarefa, e a OS 12191 tinha as duas diferentes). A linha que já está na nota não
     volta: trazer o histórico de novo não a repete. Devolve "sim" ou o motivo de o comentário ficar só no Nexus."""
     d = os_api.get_os_detalhes(o["wid"]) or {}
@@ -964,7 +967,9 @@ def _acrescentar_na_nota(os_api, regra, o: dict, linhas: list[str]) -> str:
         # a leitura que falha "mole" volta sem tarefas e com a nota vazia: gravar trocaria a nota inteira pela linha nova
         # (revisão final de 24/10/2026)
         raise _NotaIncompleta()
-    pode_nota, motivo = regra.nota_pode_editar(regra.status_id_de(o.get("status"), d), len(d.get("tarefas") or []))
+    # uma tarefa na conta: a recusa por várias tarefas é do "Editar observação" do card, que regrava a observação
+    # inteira; aqui só entra uma linha no fim da nota da OS (a prova de 06/11/2026, no comentário acima)
+    pode_nota, motivo = regra.nota_pode_editar(regra.status_id_de(o.get("status"), d), 1)
     if not pode_nota:
         return motivo
     atual = _base_da_nota(d)

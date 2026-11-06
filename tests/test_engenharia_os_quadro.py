@@ -306,17 +306,31 @@ def test_sem_login_do_fracttal_pede_o_login_e_nao_grava(fracttal_do_os, pagina, 
     assert not fracttal_do_os["escritas"] and not _est(pagina["id_work_order"])
 
 
-def test_os_de_varias_tarefas_fica_so_no_nexus_com_o_motivo(fracttal_do_os, pagina, cliente, app):
-    # a regra medida do OS Creator: com várias tarefas a nota sobrescreveria a observação da tarefa errada
+def test_os_de_varias_tarefas_tambem_vai_para_a_nota_da_os(fracttal_do_os, pagina, cliente, app):
+    # Levi, 06/11/2026 (a OS 16289, de seis inversores): "o certo é comentar e já incluir na nota da OS". A prova no
+    # Fracttal (OS 18754 de TESTE - PA, duas tarefas) mediu: o `work_orders_update` grava a `note` da OS, igual nas duas
+    # tarefas, e a observação de cada tarefa (`task_note`) fica como estava. O comentário vai para a nota também aqui
     from test_engenharia_acompanhamento import SAME, _como
     fracttal_do_os["det"]["tarefas"] = [{"id": 1}, {"id": 2}]
     _como(cliente, ANA)
     _login_do_fracttal(app, cliente)
     r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "Visto", "folio": "16502"}, headers=SAME)
+    assert r.status_code == 200 and "nota da OS 16502" in r.get_json()["mensagem"]
+    (wid, nota), = fracttal_do_os["escritas"]
+    assert re.fullmatch(r"Nota antiga da OS\n\[\d\d/\d\d/\d{4} \d\d:\d\d\] Ana Lima \(Engenharia\): Visto", nota)
+    c = _est(pagina["id_work_order"])["eventos"][0]
+    assert c["texto"] == "Visto" and c["nota"] == "sim"
+
+
+def test_os_concluida_continua_so_no_nexus(fracttal_do_os, pagina, cliente, app):
+    # o Fracttal recusa editar a nota da OS fechada (ERROR_WO_FINISHED_BY_OTHER_USER): essa regra fica
+    from test_engenharia_acompanhamento import SAME, _como
+    fracttal_do_os["det"].update(tarefas=[{"id": 1}, {"id": 2}], status_id=3)
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(COMENTAR.format(pagina["id_work_order"]), json={"texto": "Visto", "folio": "16502"}, headers=SAME)
     assert r.status_code == 200 and "só no Nexus" in r.get_json()["mensagem"]
     assert not fracttal_do_os["escritas"]
-    c = _est(pagina["id_work_order"])["eventos"][0]
-    assert c["texto"] == "Visto" and "tarefas" in c["nota"]
 
 
 def test_erro_do_fracttal_nao_grava_nada(fracttal_do_os, pagina, cliente, app):
