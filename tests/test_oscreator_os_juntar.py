@@ -614,10 +614,11 @@ CATALOGO = [{"id": 1, "code": "TST-NBRK1", "label": "TST-NBRK1 — Nobreak", "de
 JWT = "aaa.eyJlbWFpbCI6InRlc3RlQGV4ZW1wbG8uaW52YWxpZCIsImV4cCI6OTk5OTk5OTk5OX0.sig"      # de mentira
 
 
-@pytest.mark.parametrize("agrupar", [False, True])
-def test_a_criacao_da_engenharia_confere_ao_vivo_e_passa_pelo_juntar(agrupar, monkeypatch):
+@pytest.mark.parametrize("ativos", [[1], [1, 3]], ids=["um_ativo", "dois_ativos"])
+def test_a_criacao_da_engenharia_confere_ao_vivo_e_passa_pelo_juntar(ativos, monkeypatch):
     """A regra de 19/10/2026: faltando no Fracttal a pessoa ou a etiqueta ENGENHARIA, nenhuma OS sai. A criação confere as duas
-    AO VIVO, antes de gravar o primeiro pedido, e a OS (uma por ativo ou agrupada) chega pelo `juntar_em_os`."""
+    AO VIVO, antes de gravar o primeiro pedido, e a OS chega pelo `juntar_em_os`: uma só, com um ativo ou com mais (a regra
+    de 06/11/2026, "UM ATIVO UMA OS, SE FOR MAIS QUE UM ATIVO JÁ VIRA UMA OS com mais ativos!")."""
     import os_juntar
     from os_web import criar_app, solic_eng_web as reg
     fr = FracttalFalso()
@@ -640,13 +641,13 @@ def test_a_criacao_da_engenharia_confere_ao_vivo_e_passa_pelo_juntar(agrupar, mo
     with c.session_transaction() as s:
         s["jwt"] = JWT
         s["conta"] = {"nome": "Pessoa Teste", "email": "teste@exemplo.invalid", "perfil": "ADMINISTRATOR"}
-    corpo = {"ativos": [1, 3], "descricao": "Avaliar o religamento", "problema": "Desarma toda manhã.",
-             "responsavel": {"id_personnel": 501}, "urgente": False, "agrupar": agrupar}
+    corpo = {"ativos": ativos, "descricao": "Avaliar o religamento", "problema": "Desarma toda manhã.",
+             "responsavel": {"id_personnel": 501}, "urgente": False}
     r = c.post("/os/api/solicitacao/engenharia/criar", json=corpo)
     assert r.status_code == 200 and r.get_json()["ok"], r.get_data(as_text=True)[:300]
     ordem = [e.get("ao_vivo") or e.get("pedido") for e in fr.eventos if e.get("ao_vivo") or e.get("pedido")]
     assert ordem[:2] == ["pessoal", "etiquetas"] and INSERIR_TAREFA in ordem[2:]      # conferiu as duas antes de gravar
-    assert len(juntou) == (1 if agrupar else 2)
+    assert len(juntou) == 1
     etiquetas = [e["params"]["id_labels"] for e in fr.eventos if e.get("pedido") == ETIQUETAS]
     assert etiquetas == [[900]] * len(juntou)                                           # só a ENGENHARIA, em cada OS
     # a pessoa que não está mais no Fracttal ao vivo: nenhuma OS sai, e nenhum pedido de gravação

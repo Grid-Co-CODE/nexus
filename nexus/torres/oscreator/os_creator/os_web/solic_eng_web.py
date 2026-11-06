@@ -21,8 +21,9 @@ têm — e aqui vale qualquer ativo. O resto, pedido por ele:
   - o tipo de ativo dá para escrever, e a sigla do cadastro (NBRK) aparece com o nome (Nobreak).
 
 Pedidos do Levi de 08/10/2026:
-  - "Agrupar ativos em atividades por OS": além de uma OS por ativo (o padrão, como era), uma OS só, com uma atividade
-    (tarefa) por ativo — o `api.create_work_orders_agrupada`, o mesmo do "Agrupar em UMA OS" do Tradicional;
+  - "Agrupar ativos em atividades por OS": uma OS só, com uma atividade (tarefa) por ativo — o
+    `api.create_work_orders_agrupada`, o mesmo do "Agrupar em UMA OS" do Tradicional. Desde 06/11/2026 sem escolha na
+    tela ("UM ATIVO UMA OS, SE FOR MAIS QUE UM ATIVO JÁ VIRA UMA OS com mais ativos!"): mais de um ativo, sempre a OS só;
   - "Engenharia poder anexar arquivos": PDF, imagem, planilha ou documento, que sobem DEPOIS de a OS existir, pelo mesmo
     caminho do anexo de hoje (`api.attach_imagem_os`), em cada OS criada; a tela diz o que subiu e o que falhou.
 
@@ -238,8 +239,9 @@ def montar(corpo: dict, assets_por_id: dict, permitidos: list, agora: dt.datetim
     prog = data_padrao(agora, urgente)          # uma "programada" no pedido é ignorada: a data não se edita
     # o título '[Ativo] - Descrição' é o da OS de cada ativo e, na OS agrupada, o da atividade de cada ativo
     por_ativo = {a.get("code"): {"description": nome_os(a, descricao)} for a in assets}
-    # com um ativo só, as duas escolhas dão a mesma OS: vai pelo caminho de sempre (o Tradicional faz igual)
-    agrupar = bool(corpo.get("agrupar")) and len(assets) > 1
+    # a regra, sem escolha na tela (Levi, 06/11/2026: "UM ATIVO UMA OS, SE FOR MAIS QUE UM ATIVO JÁ VIRA UMA OS com mais
+    # ativos!"): um ativo, a OS dele; mais de um, uma OS só, com uma atividade por ativo. Um "agrupar" no pedido é ignorado
+    agrupar = len(assets) > 1
     campos = {"descricao": descricao, "note": problema, "urgente": urgente, "event_date": evento, "prog_date": prog,
               "id_responsible": pessoa["id_personnel"], "responsible_code": pessoa.get("code") or "",
               "responsible_name": pessoa.get("name") or "", "por_ativo": por_ativo, "agrupar": agrupar}
@@ -325,10 +327,10 @@ MAX_ARQUIVOS = 5              # por criação: é documento de apoio, não acerv
 MAX_MB_ARQUIVO = 10           # um relatório em PDF ou a foto do celular cabem; vídeo não
 MAX_MB_TOTAL = 20             # o que um pedido carrega. O app aceita 4 MB (as imagens do Tradicional): esta rota abre
 LIMITE_PEDIDO = (MAX_MB_TOTAL + 1) * MB      # para os anexos + 1 MB do resto do formulário
-# Com uma OS por ativo, cada anexo sobe para CADA OS. Cada envio custa 2 pedidos ao Fracttal (a cota é da EMPRESA,
-# 200/min, dividida com o App de Campo) mais o arquivo para o S3, e a resposta tem de voltar antes de o túnel desistir
-# (o cloudflared do supervisório corta em ~100 s). Passou disto, a tela pede "Uma OS com todos os ativos" (os anexos
-# sobem uma vez) ou menos anexos — e nada é criado.
+# Cada anexo sobe para CADA OS criada. Cada envio custa 2 pedidos ao Fracttal (a cota é da EMPRESA, 200/min, dividida
+# com o App de Campo) mais o arquivo para o S3, e a resposta tem de voltar antes de o túnel desistir (o cloudflared do
+# supervisório corta em ~100 s). Desde 06/11/2026 a criação é sempre de UMA OS (mais de um ativo = a OS só), e o limite
+# fica de guarda; passou dele, a tela pede menos anexos — e nada é criado.
 MAX_ENVIOS = 30
 MAX_MB_ENVIOS = 100
 ENVIOS_PARALELOS = 4          # ao mesmo tempo: menos rajada na cota que os 8 das leituras do card da OS
@@ -444,9 +446,8 @@ def erro_envios(anexos_ok, n_os: int) -> str:
     volume = sum(a["tamanho"] for a in anexos_ok) * n_os
     if envios <= MAX_ENVIOS and volume <= MAX_MB_ENVIOS * MB:
         return ""
-    return ("Com uma OS por ativo, cada anexo sobe para cada OS: %d OS × %d anexo(s) = %d envios (%s). O limite por "
-            "criação é %d envios e %d MB. Escolha “Uma OS com todos os ativos” (os anexos sobem uma vez só) ou anexe "
-            "menos arquivos. Nenhuma OS foi criada."
+    return ("Cada anexo sobe para cada OS: %d OS × %d anexo(s) = %d envios (%s). O limite por criação é %d envios e "
+            "%d MB: anexe menos arquivos. Nenhuma OS foi criada."
             % (n_os, len(anexos_ok), envios, tamanho_br(volume), MAX_ENVIOS, MAX_MB_ENVIOS))
 
 

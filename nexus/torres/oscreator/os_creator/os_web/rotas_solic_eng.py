@@ -1,8 +1,8 @@
 # os_creator/os_web/rotas_solic_eng.py
 """Rotas da Nova solicitação para a ENGENHARIA (06/10/2026). As regras moram no `solic_eng_web`; aqui só a tela, a
-cascata e a criação. Uma OS por ativo sai pelo `api.create_work_orders_bulk` — o mesmo caminho da OS de análise
-(`api.create_os_analise`); uma OS com todos os ativos (08/10), pelo `api.create_work_orders_agrupada`, o do "Agrupar em
-UMA OS" do Tradicional. Nos dois: tipo 'Administrativa', só a Classificação 1 'Programada' (pelo nome), a etiqueta
+cascata e a criação. Um ativo sai pelo `api.create_work_orders_bulk` — o mesmo caminho da OS de análise
+(`api.create_os_analise`); mais de um (08/10; sem escolha desde 06/11/2026), numa OS só, pelo
+`api.create_work_orders_agrupada`, o do "Agrupar em UMA OS" do Tradicional. Nos dois: tipo 'Administrativa', só a Classificação 1 'Programada' (pelo nome), a etiqueta
 ENGENHARIA (só ela desde 21/10/2026; antes ia também a BACKOFFICE, e até 13/10 a REMOTO), sem plano e com o título por
 ativo no `por_ativo`. Os anexos (08/10) sobem depois de a
 OS existir, pelo `api.attach_imagem_os`, o mesmo caminho das imagens da Performance e do Tradicional.

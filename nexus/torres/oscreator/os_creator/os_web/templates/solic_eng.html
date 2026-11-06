@@ -38,19 +38,13 @@
 
   <div class="os-cardf"><div class="os-cardf-h"><span class="os-badge">2</span><span class="os-cardf-t">Ativos</span></div>
     <div class="os-linha-ativos">
-      <span class="os-lbl">Ativos <i>*</i> <small id="lb_ativos">(marque um ou vários — cada um vira uma OS)</small></span>
+      <span class="os-lbl">Ativos <i>*</i> <small id="lb_ativos">(marque um ou vários — com mais de um, uma OS só, uma atividade por ativo)</small></span>
       <span class="os-cresce"></span>
       <button type="button" class="os-btn secondary mini" id="b_all" disabled>Selecionar todos</button>
       <button type="button" class="os-btn secondary mini" id="b_none" disabled>Limpar</button>
     </div>
-    {# Uma OS por ativo (o padrão, como era) ou uma OS só, com uma atividade por ativo (Levi, 08/10/2026: "Agrupar ativos
-       em atividades por OS"). Antes da tabela, que numa usina grande tem centenas de linhas: a escolha fica à vista. #}
-    <div class="eng-modo" role="radiogroup" aria-label="Como criar as OS">
-      <label class="eng-modo-op on"><input type="radio" name="eng_modo" value="por_ativo" checked>
-        <span><b>Uma OS por ativo</b><small>cada ativo marcado vira uma OS</small></span></label>
-      <label class="eng-modo-op"><input type="radio" name="eng_modo" value="agrupada">
-        <span><b>Uma OS com todos os ativos</b><small>uma atividade por ativo, todas na mesma OS</small></span></label>
-    </div>
+    {# Sem a escolha "Uma OS por ativo" × "Uma OS com todos os ativos" (Levi, 06/11/2026: "UM ATIVO UMA OS, SE FOR MAIS QUE UM
+       ATIVO JÁ VIRA UMA OS com mais ativos!"): um ativo, uma OS; mais de um, uma OS só com uma atividade por ativo #}
     <div class="os-tbl-wrap">
       <table class="os-tbl" id="tbl">
         <thead><tr><th class="c-chk"></th><th>Ativo</th><th>Tipo</th></tr></thead>
@@ -74,7 +68,7 @@
       <div class="eng-anexos-linha">
         <button type="button" class="os-btn secondary mini" id="b_anexar" aria-controls="anexo_lista">Adicionar arquivos</button>
         <input id="anexo_in" type="file" multiple accept="{{ anexo_aceitar }}" hidden>
-        <span class="os-ajuda" id="anexo_regras">Até {{ anexo_max }} arquivos, {{ anexo_mb }} MB cada e {{ anexo_total_mb }} MB no total — cada anexo vai para cada OS criada.</span>
+        <span class="os-ajuda" id="anexo_regras">Até {{ anexo_max }} arquivos, {{ anexo_mb }} MB cada e {{ anexo_total_mb }} MB no total — os anexos vão para a OS.</span>
       </div>
       <div class="os-ajuda">Tipos aceitos: {{ anexo_tipos }}.</div>
       <ul class="eng-anexo-lista" id="anexo_lista" hidden></ul>
