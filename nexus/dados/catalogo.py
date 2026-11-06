@@ -1713,6 +1713,11 @@ CONHECIDAS = (
               "o pedido do Atualizar do Dashboard Thopen (03/11/2026): o 5080 grava 1 linha a cada clique da conta da "
               "Grid (só a hora, sem quem pediu); o Nexus confere de minuto em minuto e grava as normalizações do COS na "
               "hora (nexus/cos/normalizacoes_banco.py)"),
+    Conhecida("thopen_disp_excecao", ("disp_dia",), "apoio",
+              "a disponibilidade de outubro/2026 por exceção, da planilha do Levi (06/11/2026: \"será uma exceção para "
+              "outubro!\"): 1 linha = parte da usina × dia, com o kWp da parte; o Dashboard Thopen pondera as partes e "
+              "usa o número no lugar da conta das OS e dos comentários, só nesse mês (thopen/disp_excecao.py da "
+              "plataforma); gravada uma vez, de fora do 5080"),
     Conhecida("organizacao_app_campo", ("Atribuicoes",), "apoio",
               "a foto das atribuições do App de Campo (usina × pessoa em HMAC × papel), publicada pelo App para o PCM "
               "comparar na tela Técnicos por usina antes de o App passar a ler o nexus_pcm_atribuicoes (17/10/2026); "
