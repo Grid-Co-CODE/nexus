@@ -243,7 +243,10 @@ setor gravado na linha muda o filtro dela na hora (`static/acessos-pessoas.js`).
 com o setor dela** e a lista inteira entra ao tocar nele (o `<template id="fr-opcoes">`): com a lista em cada linha a
 página passava de 300 KB (medido com 180 pessoas: 319 KB). **O Fracttal ligado às fichas fica guardado 2 min**
 (`telas_fracttal._dados`, `RELACAO_S`): vencido, a cópia na hora e a releitura por trás, uma por vez (a 1ª abertura
-fria levava ~2,4 s no PC); o "Ler o Fracttal de novo" lê na hora; leitura ruim não fica guardada. Prova:
+fria levava ~2,4 s no PC); o "Ler o Fracttal de novo" lê na hora; leitura ruim não fica guardada. **A aba dos
+administradores do App usa a mesma cópia, sem nunca ler o Fracttal na hora** (`telas_fracttal.copia_sem_esperar`, 2ª
+revisão de 05/11/2026: a cópia como está e, vencida ou sem cópia, a releitura por trás; a leitura que falha fica anotada até a próxima boa, para aquela aba dizer "ainda está chegando" só quando não falhou; as pessoas daqui viram escolha de
+administrador do App pela ligação de hoje de cada usuário; regras em `nexus/casca/CLAUDE.md`, seção Acessos). Prova:
 `tests/test_base_acessos_pessoas_25_10.py` e `tests/test_base_fracttal.py`.
 
 

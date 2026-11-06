@@ -12,9 +12,9 @@ Acionamentos, OS em aberto, Passagem de turno) moram no "!" amarelo ao lado do t
 
 ## O que a torre vai ser
 
-As telas estão declaradas em `__init__.py`. Ronda padronizada, Parede de eventos, Ocorrências, Religamentos e
-Acionamentos já leem o Andamento da Ronda COS, a Passagem de turno grava no banco do Nexus e OS em aberto é o Panorama da
-Ronda COS (seções abaixo); as outras são placeholder (cada uma diz a pergunta que vai responder e a fonte prevista). A base de produto são as specs do Fillipe, no SharePoint `Gridco/4. O&M/6.Gerencial/10. Nexus`:
+As telas estão declaradas em `__init__.py`. Mesa do operador, Desempenho da equipe, Ronda padronizada, Parede de eventos,
+Ocorrências, Religamentos e Acionamentos já leem o Andamento da Ronda COS, a Passagem de turno grava no banco do Nexus e OS
+em aberto é o Panorama da Ronda COS (seções abaixo). Desde 05/11/2026 nenhuma tela do COS é placeholder. A base de produto são as specs do Fillipe, no SharePoint `Gridco/4. O&M/6.Gerencial/10. Nexus`:
 
 - **R04, COS como visão global:**
   - **Mesas:** cada operador tem uma carteira de clientes, e o líder enxerga todas.
@@ -296,6 +296,37 @@ plataforma vê a gravação nova e refaz a conta da Thopen (o `CLAUDE.md` da pla
 - Testes: `tests/test_cos_normalizacoes_rapida_29_10.py` (a cópia vencida por trás, uma releitura só, as linhas do mês
   com os atributos e as de fora escondidas; 7 mutações pegas) e `tests/test_cos_normalizacoes.py` (o upsert pelo registro, a paginação que continua, a pausa de 1 min depois
   da falha e a desfeita fora: mutados, vermelhos; os filtros, as colunas, a Indisp., o operador e o técnico e o CSV).
+
+## Mesa do operador e Desempenho da equipe: as mesas da R04 (05/11/2026)
+
+Spec R04: "cada operador tem uma carteira de clientes, e o líder enxerga todas" e "Desempenho por mesa: MTTA, informado no
+prazo e religamento remoto". As duas leem o Andamento e só leem. Logo depois do Acompanhamento no menu: ele segue sendo a
+1ª tela pronta (o cartão do COS no Início, `test_casca_inicio`).
+
+- **A carteira é a da Ronda COS** (decisão do dono, 05/11/2026): a aba "Operador x clientes" de lá, pela rota
+  `GET <Andamento>/api/nexus/carteiras` (`ler_carteiras`, `versao: 1`, 5 min de cópia). Cada carteira vem com `pessoa` =
+  HMAC-SHA256 do e-mail (minúsculo, sem espaço) com a `NEXUS_COS_ANDAMENTO_CHAVE`; o Nexus faz a mesma conta com o e-mail
+  do login (`andamento.chave_da_pessoa`) e acha a carteira de quem entrou. O e-mail não vai ao Andamento e não volta de
+  lá; os testes dos dois lados usam o mesmo vetor. Só o papel OPERADOR tem carteira (o supervisor e a gestão veem tudo lá,
+  o "líder" da spec). Sem carteira, sem e-mail (senha de administrador) ou sem a leitura, a tela mostra todas as mesas e
+  diz por quê; qualquer um troca para "Todas as mesas". Cliente da carteira que o Andamento não acompanha é dito.
+- **Mesa** (`nexus/cos/mesa.py`): o aberto em cada cliente pela fotografia (a conta de `turno.aberto_no_andamento`; um
+  cliente sem leitura deixa a soma em "—", não em zero), e as ocorrências ABERTAS dos últimos 7 dias com a etapa "cliente
+  informado" ou "campo acionado" correndo o prazo ou atrasada, pelos vereditos da tela Ocorrências (`ocorrencias.linha`),
+  a atrasada primeiro. Avisar e acionar são na Ronda COS, pelo link de cada linha.
+- **Desempenho** (`nexus/cos/desempenho.py`), por cliente e por turno, sem nome de operador (decisão do dono: desempenho
+  com nome é dado pessoal), em 7 ou 30 dias:
+  - **MTTA** do início da falha até a hora em que o COS viu (`detectada_em`, o `detectado_em` da Ronda COS, obrigatório no
+    desvio aberto pela tela desde 03/11/2026; decisão do dono). Mediana em minutos, com a amostra ao lado: o desvio do sync
+    ou de antes do campo não tem a hora, e a espera negativa fica fora, como no MTTA de lá.
+  - **Informado no prazo** sobre as já decididas (os `CUMPRIU`/`NAO_CUMPRIU` da tela Ocorrências); a que corre o prazo
+    aparece à parte.
+  - **Religamento remoto** das normalizadas (`religamentos.religamento`).
+  - **O turno** é o do início da falha (`turno.TURNOS`). **A mesa** é cada conjunto de clientes das carteiras, com quantos
+    operadores o têm e a de quem entrou marcada.
+- Testes: `tests/test_cos_mesa.py` e `tests/test_cos_desempenho.py` (controle positivo: a espera negativa no MTTA, o
+  pendente contado como no prazo, o e-mail sem normalizar no HMAC e o turno de 06h na noite, vermelhos; tirar o filtro "só
+  abertas" da Mesa não muda nada, porque a etapa da ocorrência fechada nunca fica correndo nem atrasada).
 
 ## Regras desta torre
 

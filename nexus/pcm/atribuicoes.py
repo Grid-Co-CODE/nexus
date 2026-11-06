@@ -16,7 +16,10 @@ O dado (livro `nexus_pcm_atribuicoes`, registrado em `nexus/dados/catalogo.py`; 
 - Em claro: os IDs, o nome da usina no Fracttal (`usina_fracttal`, por onde o App acha a usina) e os códigos HMAC
   (`pessoa_hmac`, por onde o App acha a pessoa; `decidida_por_hmac`). A observação só cifrada (o Cofre). Cada linha vai
   assinada (`assinatura`): o App lê o livro pela leitura aberta da API e só aplica a linha assinada.
-Gravar troca o livro inteiro, relido do banco antes (leitura que falha não grava), uma gravação por vez neste processo.
+Gravar troca o livro inteiro, relido do banco antes (leitura que falha não grava; a listagem que não traz a aba do
+livro que existe também falha: `livros.abas_conferidas`), uma gravação por vez neste processo. Os administradores do
+App de Campo moram num livro só deles (`admins_app.py`): este livro tem uma aba, e um Nexus antigo que o troque inteiro
+não leva nada de outro dado junto.
 """
 import hashlib
 import hmac
@@ -99,7 +102,8 @@ def _arquivo_local(cfg) -> Path | None:
 
 
 def _ler_cru(cfg) -> list[dict]:
-    """As linhas da aba, lidas agora. Livro que ainda não existe = vazio; erro de leitura sobe. Teste sem o arquivo
+    """As linhas da aba, lidas agora. Livro que ainda não existe = vazio; erro de leitura sobe, e a listagem que não traz
+    a aba do livro que existe também (`livros.abas_conferidas`: "não li" nunca vira "vazio"). Teste sem o arquivo
     nunca vai à rede (vale vazio)."""
     loc = _arquivo_local(cfg)
     if loc is not None:
@@ -112,7 +116,7 @@ def _ler_cru(cfg) -> list[dict]:
         return []
     from .motivos import _banco
     base, sessao = _banco(cfg)
-    a = livros.abas(base, sessao, LIVRO)
+    a = livros.abas_conferidas(base, sessao, LIVRO, (ABA,))
     return list(livros._linhas(base, sessao, a[ABA])) if ABA in a else []
 
 
@@ -264,6 +268,11 @@ def _linha(cfg, p: dict, quem_hmac: str, origem: str, agora: datetime, hoje: int
     obs = " ".join(D._txt(p.get("obs")).split())[:OBS_MAX]
     ult = ultimas.get((uid, pid, papel))
     vale_agora = bool(ult) and (uid, pid, papel) in atuais({"decisoes": [ult]}, hoje, papel=papel)
+    if origem == "reemissao" and (not na or not vale_agora or _int_ou_none(ult.get("de_data_id")) != de
+                                  or _int_ou_none(ult.get("ate_data_id")) != ate):
+        # a reemissão reenvia o que vale agora, com as datas de agora, e nunca põe de volta quem foi tirado (revisão de
+        # 05/11/2026: o pedido montado antes de um "tirar" devolvia a pessoa à usina): o par que mudou pula
+        return None
     if not na and not vale_agora:
         raise Recusada("Essa pessoa já não está nesta usina (alguém mudou agora): atualize a página.")
     # a mesma decisão não grava de novo; o nome da usina no Fracttal e o código da pessoa contam (é o que o App lê:
@@ -290,9 +299,13 @@ def _linha(cfg, p: dict, quem_hmac: str, origem: str, agora: datetime, hoje: int
     return nova
 
 
-def decidir_varias(cfg, pedidos: list[dict], usuario: dict | None, origem: str) -> int:
+def decidir_varias(cfg, pedidos, usuario: dict | None, origem: str, conferir=None) -> int:
     """Várias decisões numa gravação só (a carga inicial, a reemissão). Cada pedido tem as chaves de `decidir`. Devolve
-    quantas linhas entraram; o pedido que não muda nada não entra, e um pedido recusado recusa todos."""
+    quantas linhas entraram; o pedido que não muda nada não entra, e um pedido recusado recusa todos.
+
+    `pedidos` também pode ser uma função (est, hoje) -> pedidos: ela roda DENTRO da trava, sobre a leitura nova do
+    livro, e `conferir(pedidos)`, se vier, recusa antes de gravar (revisão de 05/11/2026, achado 2: o Reenviar tudo
+    montava os pedidos de uma leitura de antes, e um "tirar" no meio voltava atrás)."""
     from .motivos import _quem
     if not str(cfg.get("NEXUS_PESSOA_HMAC") or "").strip():
         # sem a chave a linha iria sem assinatura e o App a descartaria: o Nexus diria uma coisa e o App faria outra
@@ -306,6 +319,17 @@ def decidir_varias(cfg, pedidos: list[dict], usuario: dict | None, origem: str) 
             raise Recusada(f"Não consegui ler os técnicos por usina no banco ({type(ex).__name__}): nada foi gravado, "
                            "para não apagar o que já está lá.") from ex
         agora, hoje = _agora(), hoje_id()
+        if callable(pedidos):
+            pedidos = pedidos({"decisoes": [x for x in cru if _int_ou_none(x.get("usina_id"))
+                                            and _int_ou_none(x.get("pessoa_id"))]}, hoje)
+        if conferir is not None:
+            try:
+                conferir(pedidos)
+            except Recusada:
+                # a leitura de agora vale como a leitura nova também na recusa (re-revisão de 05/11/2026, N3): sem isto a
+                # cópia de 1 minuto seguia velha, e a tela seguinte mostrava (e recusava) o resumo de antes
+                _CACHE[str(_arquivo_local(cfg) or "banco")] = {"decisoes": cru, "erro": "", "lido_em": time.time()}
+                raise
         ultimas = _ultimas(cru)
         novas = []
         for p in pedidos:

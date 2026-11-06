@@ -380,15 +380,29 @@ def nascer_ticket(item: dict, asset: dict, plano_desc, folio, event_date) -> dic
                 "aviso_os": "ocorrência não registrada (%s)" % str(e)[:80]}
 
 
+def _plano_da_performance(id_task, id_item, subtarefas_padrao=None, tipo_tarefa_padrao=None) -> dict:
+    """O plano de uma atividade da Performance como a OS o leva: com o padrão do Nexus no lugar das subtarefas, quando a
+    atividade tem um salvo (05/11/2026, `com_subtarefas_padrao`), senão com as do app (`com_subtarefas_extra`); e o tipo de
+    tarefa do padrão do Nexus (`com_tipo_padrao`), senão o do app (`com_tipo_da_tarefa`)."""
+    p = api.get_plan_details(id_task, id_item)
+    if subtarefas_padrao and p.get("subtasks"):
+        p = api.com_subtarefas_padrao(p, subtarefas_padrao)
+    else:
+        p = api.com_subtarefas_extra(p)
+    return api.com_tipo_padrao(api.com_tipo_da_tarefa(p), tipo_tarefa_padrao)
+
+
 def create_performance_os(itens: list, id_responsible=None, responsible_name: str = "",
                           event_date: datetime = None, id_parent=None, progresso=None,
-                          prog_date: datetime = None, etiquetas_extra=None) -> list:
+                          prog_date: datetime = None, etiquetas_extra=None, subtarefas_padrao=None,
+                          tipo_tarefa_padrao=None) -> list:
     """Cria N OS (1 por ativo). `itens` = [{asset, plano_id_task, plano_id_item, linkar, base, note, imagens}]
     onde imagens = [{'bytes','nome'}]. Lê o plano (cache por id_task), cria a OS '[Ativo] - base' + note,
     marca com a etiqueta 'Performance' e anexa as imagens. → [{ok, asset, folio/erro, n_img_ok, img_erro}].
 
     `event_date` = data do INCIDENTE; `prog_date` = data PROGRAMADA (None → incidente + 10 min, como era).
     `etiquetas_extra` = nomes de etiquetas a somar à 'Performance' (o modo ETM manda 'ENGENHARIA').
+    `subtarefas_padrao` e `tipo_tarefa_padrao` = o padrão do Nexus da atividade (`_plano_da_performance`), ou None (o do plano).
     Um item pode trazer `titulo`: título LITERAL da OS, que pula o prefixo automático `[Ativo] -`."""
     cache, out = {}, []
     lbl_perf = api._label_performance_id()               # etiqueta "Performance" em toda OS criada aqui
@@ -415,8 +429,8 @@ def create_performance_os(itens: list, id_responsible=None, responsible_name: st
         try:
             k = it.get("plano_id_task")
             if k not in cache:
-                # as subtarefas extras entram UMA vez, junto do cache — ver com_subtarefas_extra
-                cache[k] = api.com_tipo_da_tarefa(api.com_subtarefas_extra(api.get_plan_details(k, it.get("plano_id_item"))))
+                # as subtarefas extras (ou o padrão do Nexus) entram UMA vez, junto do cache — ver com_subtarefas_extra
+                cache[k] = api._plano_da_performance(k, it.get("plano_id_item"), subtarefas_padrao, tipo_tarefa_padrao)
             plan = cache[k]
             nome = (it.get("titulo") or "").strip() or \
                 api.perf_os_nome(a, it.get("base") or api.plano_base_nome(plan.get("description")))
@@ -437,10 +451,11 @@ def create_performance_os(itens: list, id_responsible=None, responsible_name: st
                 # para o resto do lote não repetir a tentativa que já falhou.
                 if not api.tem_subtarefas_extra(plan):
                     raise
+                era_padrao = api.tem_subtarefas_padrao(plan)
                 cache[k] = plan = api.sem_subtarefas_extra(plan)
                 res = _criar(plan)
-                aviso_extra = ("as perguntas de fim de atividade não entraram — o Fracttal "
-                               "recusou; a OS foi criada com as subtarefas do plano.")
+                aviso_extra = (("as subtarefas padrão do Nexus" if era_padrao else "as perguntas de fim de atividade")
+                               + " não entraram — o Fracttal recusou; a OS foi criada com as subtarefas do plano.")
             # as ressalvas desta OS vão à tela (04/11/2026): a OS pai que o Fracttal não gravou (o `create_planned_os` confere)
             # e a que não achei pelo nº digitado. Até aqui a OS saía sem pai calada, e o aviso das perguntas se perdia aqui
             # dentro (o `res` não volta à tela, só o `out`)
@@ -711,8 +726,9 @@ def create_work_orders_bulk(assets: list, description: str, task_type: str, subt
                 try:
                     api.apply_labels(r["os"]["id_work_order"], etiqueta_ids)
                     r["os"]["etiquetas"] = list(etiqueta_ids)
-                except FracttalError as e:
-                    r["os"]["aviso"] = f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}"
+                except FracttalError as e:     # junto do aviso do status (`_conferir_ja_realizada`), sem apagá-lo
+                    r["os"]["aviso"] = ((r["os"].get("aviso") or "") + " "
+                                        + f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}").strip()
         # a OS pai foi no mesmo pedido que criou a OS (provado no ar em 04/11/2026, a OS 18564): conferida como na fase 2
         if id_parent:
             for r in [x for x in fase1 if x.get("ok") and x["os"].get("id_work_order")]:
@@ -831,8 +847,14 @@ def create_work_orders_datas(asset: dict, description: str, task_type: str, subt
                 try:
                     api.apply_labels(r["os"]["id_work_order"], etiqueta_ids)
                     r["os"]["etiquetas"] = list(etiqueta_ids)
-                except FracttalError as e:
-                    r["os"]["aviso"] = f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}"
+                except FracttalError as e:     # junto do aviso do status (`_conferir_ja_realizada`), sem apagá-lo
+                    r["os"]["aviso"] = ((r["os"].get("aviso") or "") + " "
+                                        + f"WO {r['os'].get('wo_folio')} criada, mas etiqueta falhou: {e}").strip()
+        if id_parent:                                    # a OS pai conferida, como no uma-OS-por-ativo já realizada
+            for r in [x for x in fase1 if x.get("ok") and x["os"].get("id_work_order")]:
+                aviso_pai = os_juntar.conferir_os_pai(r["os"]["id_work_order"], id_parent, r["os"].get("wo_folio"))
+                if aviso_pai:
+                    r["os"]["aviso"] = (aviso_pai + " " + (r["os"].get("aviso") or "")).strip()
         return fase1
 
     os_juntar.uma_os_por_tarefa(fase1, id_responsible, responsible_name, etiqueta_ids,     # a mesma do uma-OS-por-ativo
@@ -948,7 +970,7 @@ def concluir_os_analise(id_work_order, id_work_order_task=None, observacao: str 
 def create_performance_os_agrupada(itens: list, id_responsible=None, responsible_name: str = "",
                                    event_date: datetime = None, progresso=None,
                                    prog_date: datetime = None, etiquetas_extra=None,
-                                   note_os: str = "") -> dict:
+                                   note_os: str = "", subtarefas_padrao=None, tipo_tarefa_padrao=None) -> dict:
     """UMA OS com N tarefas — uma por ativo — no lugar de N OS (Levi, 21/08).
 
     Mesmo `itens` do `create_performance_os`, para as duas rotas comerem o mesmo prato: trocar de
@@ -981,8 +1003,8 @@ def create_performance_os_agrupada(itens: list, id_responsible=None, responsible
         try:
             k = it.get("plano_id_task")
             if k not in cache:
-                # as subtarefas extras entram UMA vez, junto do cache — ver com_subtarefas_extra
-                cache[k] = api.com_tipo_da_tarefa(api.com_subtarefas_extra(api.get_plan_details(k, it.get("plano_id_item"))))
+                # as subtarefas extras (ou o padrão do Nexus) entram UMA vez, junto do cache — ver com_subtarefas_extra
+                cache[k] = api._plano_da_performance(k, it.get("plano_id_item"), subtarefas_padrao, tipo_tarefa_padrao)
             plan = cache[k]
             plano_de[id(it)] = plan.get("description")
             nome = (it.get("titulo") or "").strip() or \

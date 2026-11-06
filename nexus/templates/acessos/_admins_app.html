@@ -1,0 +1,145 @@
+{# Base → Acessos, aba Administradores do App de Campo (05/11/2026, Levi: "os administradores do App de Campo e os
+   técnicos por usina têm de ser escolhidos no Nexus"). Os que valem hoje, o Pôr (as fichas ativas e as pessoas de
+   Pessoas e setores, com a busca da própria página, e o avulso pelo e-mail: 2ª volta de 05/11/2026, "tem que aparecer
+   todos do pessoas e setores! e tem que ter como fazer avulso também so digitando o e-mail"), o Tirar e o histórico. A
+   explicação da aba mora no "!" do título (acessos/_admins_app_explica.html). O dado: nexus/pcm/admins_app.py; as
+   contas: nexus/auth/telas_admins_app.py; as regras: nexus/casca/CLAUDE.md, seção Acessos. #}
+{# o miolo de cada pessoa da lista, com rádio ou sem (quem não se pode escolher, 2ª revisão de 05/11/2026) #}
+{% macro pessoa_da_lista(p) %}
+        <span class="aa-nome">{{ p.nome }}</span>
+        <span class="aa-det">{{ p.rotulo }}{% if p.cargo %} · {{ p.cargo }}{% endif %}</span>
+        {% if p.bloqueio %}<span class="cad-chip cad-chip--alerta">{{ p.bloqueio }}</span>{% if p.aviso %} <span class="cad-chip cad-chip--alerta">{{ p.aviso }}</span>{% endif %}
+        {% elif p.outra %}<span class="cad-chip cad-chip--alerta">o código dela já está na lista com outra ficha ({{ p.outra }})</span>
+        {% elif p.porque %}<span class="cad-chip cad-chip--alerta">sem código: {{ p.porque }}</span>
+        {% elif not p.tem_codigo %}<span class="cad-chip cad-chip--alerta">sem código: o App não a reconheceria</span>{% endif %}
+        {% if not p.bloqueio and p.outro_dominio %}<span class="cad-chip cad-chip--alerta">outro domínio: o App não o reconhece como administrador</span>{% endif %}
+        {% if not p.bloqueio and p.conta_inativa %}<span class="cad-chip cad-chip--info">conta do Fracttal desativada</span>{% endif %}
+        {% if not p.bloqueio and p.nome_de_desligada %}<span class="cad-chip cad-chip--info">o nome bate com uma ficha desligada: confira se é a mesma pessoa</span>{% endif %}
+{% endmacro %}
+{% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Gravado.</strong> {{ aviso }}</div></div>{% endif %}
+{% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}
+{% if app_sem_hmac %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Só leitura.</strong> Este Nexus não tem a <span class="gc-dado">NEXUS_PESSOA_HMAC</span>: sem ela a linha iria sem assinatura e o App não a aplicaria, então nada se grava.</div></div>{% endif %}
+{% if app_sem_token %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-lock"></i><div><strong>Só leitura.</strong> Este Nexus não tem a chave de gravação do banco (<span class="gc-dado">GRIDCO_SQL_TOKEN</span>).</div></div>{% endif %}
+{% if app_erro %}<div class="cad-aviso cad-aviso--{{ 'alerta' if app_velha else 'critico' }}" role="alert"><i class="ph ph-database"></i><div><strong>{{ 'Mostrando a última leitura boa.' if app_velha else 'Não consegui ler os administradores do App no banco.' }}</strong> {{ app_erro }}. Enquanto isso, nada se grava.</div></div>{% endif %}
+{% if app_erro_cadastro %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-database"></i><div><strong>Não consegui ler o cadastro de pessoas do banco</strong> ({{ app_erro_cadastro }}). Os nomes aparecem pelo número, e o Pôr administrador fica travado.</div></div>{% endif %}
+{% if app_erro_setores %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-database"></i><div><strong>Não consegui ler Pessoas e setores no banco</strong> ({{ app_erro_setores }}). Sem a ligação de hoje de cada usuário do Fracttal, o código da pessoa pode sair errado: a lista mostra só as fichas, e o Pôr administrador fica travado.</div></div>{% endif %}
+{# 3ª revisão de 05/11/2026: depois de todo deploy a cópia ainda não chegou; a 1ª tela não pode parecer erro #}
+{% if app_fracttal == 'chegando' %}<div class="cad-aviso cad-aviso--info" role="status"><i class="ph ph-hourglass-medium"></i><div><strong>A leitura do Fracttal ainda está chegando: recarregue a página em alguns segundos.</strong> Esta aba usa a leitura que a aba <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}">Pessoas e setores</a> guarda, pedida agora, por trás. Até ela chegar, quem tem a ligação de hoje e não tem ficha aparece pelo número do usuário do Fracttal, sem escolha; o Pôr pelo e-mail já vale.</div></div>
+{% elif app_fracttal == 'fora' %}<div class="cad-aviso cad-aviso--alerta" role="status"><i class="ph ph-plugs"></i><div><strong>Sem o pessoal do Fracttal.</strong> Esta aba usa a leitura que a aba <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}">Pessoas e setores</a> guarda, e a última leitura do Fracttal não deu (o Fracttal não respondeu). Até a próxima dar certo, quem tem a ligação de hoje e não tem ficha aparece pelo número do usuário do Fracttal, sem escolha; o Pôr pelo e-mail já vale.</div></div>
+{% elif app_fracttal == 'velha' %}<div class="cad-aviso cad-aviso--info" role="status"><i class="ph ph-clock"></i><div><strong>O pessoal do Fracttal desta lista foi lido há {{ app_fracttal_min }} min.</strong> A leitura nova foi pedida por trás: atualize a página daqui a pouco.</div></div>{% endif %}
+{% if app_sem_chave %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Sem a chave do cadastro, o Nexus não confere os códigos.</strong> Os nomes aparecem pelo número, o e-mail das fichas não é lido (só vale o código do usuário do Fracttal ligado), quem não tem ficha fica sem escolha, e a observação e o avulso pelo e-mail não se gravam.</div></div>{% endif %}
+
+<div class="cad-numeros">
+  <div><div class="r">Administradores do App</div><div class="v">{{ app_vigentes|length }}</div><div class="d">{% if app_sem_ficha %}{{ app_sem_ficha }} sem ficha{% if app_avulsos %}, {{ app_avulsos }} pelo e-mail{% endif %}{% else %}pela lista do Nexus{% endif %}</div></div>
+  <div><div class="r">Pessoas para escolher</div><div class="v">{{ app_escolhiveis }}</div><div class="d">fichas ativas e Pessoas e setores{% if app_sem_radio %}; {{ app_sem_radio }} sem escolha, com o porquê{% endif %}</div></div>
+  <div><div class="r">Sem código</div><div class="v{% if app_sem_codigo %} ace-v-alerta{% endif %}">{{ app_sem_codigo }}</div><div class="d">o App não as reconheceria</div></div>
+  <div><div class="r">Decisões</div><div class="v">{{ app_historico|length }}</div><div class="d">no histórico, que só cresce</div></div>
+</div>
+
+<section class="cad-secao ace-secao" aria-labelledby="aa-vigentes-titulo">
+  <h2 id="aa-vigentes-titulo">Administradores do App de Campo</h2>
+  <div class="cad-rolagem ace-rolagem">
+    <table class="cad-tabela ace-tabela" id="aa-vigentes">
+      <thead><tr><th>Pessoa</th><th>Desde</th><th>Quem decidiu</th><th><span class="ace-oculto">Ação</span></th></tr></thead>
+      <tbody>
+      {% for a in app_vigentes %}
+      <tr>
+        <td><span class="aa-nome">{{ a.nome }}</span>{% if a.avulso %} <span class="cad-chip cad-chip--info">{{ a.detalhe }}</span>{% elif a.detalhe %} <span class="aa-det">{{ a.detalhe }}</span>{% endif %}{% if a.status == 'agendado' %} <span class="cad-chip cad-chip--info">a partir de {{ a.de }}</span>{% endif %}{% if a.ate %} <span class="cad-chip cad-chip--info">até {{ a.ate }}</span>{% endif %}{% if a.outro_dominio %} <span class="cad-chip cad-chip--alerta">outro domínio: o App não o reconhece como administrador</span>{% endif %}
+          {% if a.codigo_mudou %}<span class="aa-aviso">o código desta linha já não é o desta ficha no cadastro (o e-mail mudou, o usuário do Fracttal foi religado a outra ficha ou o código está em duas): tire e, se for o caso, ponha de novo</span>{% endif %}
+          {% if a.tem_ficha_agora %}<span class="aa-aviso">esta pessoa tem ficha agora: tire e ponha de novo para ligar à ficha</span>{% endif %}</td>
+        <td class="num">{{ a.desde or '—' }}</td>
+        <td>{{ a.quem }}</td>
+        <td class="ace-acao">
+          {% if app_pode_tirar %}
+          <form method="post" action="{{ url_for('torre_base.acessos') }}" class="ace-tirar" data-confirmar="Tirar {{ a.nome }} dos administradores do App de Campo? Vale no App na próxima leitura (até 5 minutos).">
+            <input type="hidden" name="codigo" value="{{ codigo }}">
+            <input type="hidden" name="acao" value="admin_app_tirar">
+            <input type="hidden" name="pessoa_hmac" value="{{ a.pessoa_hmac }}">
+            <button class="gc-btn gc-btn--ui gc-btn--contorno ace-btn-tirar" type="submit" aria-label="Tirar {{ a.nome }} dos administradores do App de Campo"><i class="ph ph-user-minus"></i> Tirar</button>
+          </form>
+          {% else %}<span class="mudo">só leitura</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="vazio">Nenhum administrador do App ainda: com a lista vazia, o App não tira ninguém.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if app_pode_por %}
+<section class="cad-secao ace-secao" aria-labelledby="aa-por-titulo">
+  <h2 id="aa-por-titulo">Pôr administrador</h2>
+  <form method="post" action="{{ url_for('torre_base.acessos') }}" class="aa-por" id="aa-por">
+    <input type="hidden" name="codigo" value="{{ codigo }}">
+    <input type="hidden" name="acao" value="admin_app_por">
+    <div class="campo">
+      <label class="gc-rotulo" for="aa-busca">Buscar a pessoa</label>
+      <input id="aa-busca" type="search" class="gc-campo" placeholder="nome ou setor" autocomplete="off"
+             data-aa-busca aria-controls="aa-lista" aria-describedby="aa-conta">
+    </div>
+    <fieldset class="aa-lista" id="aa-lista">
+      <legend class="ace-oculto">Pessoa que vira administradora do App</legend>
+      {% for p in app_escolher %}
+      {% if p.bloqueio %}
+      <div class="aa-pessoa aa-pessoa--fora" data-aa-texto="{{ p.busca }}">{{ pessoa_da_lista(p) }}</div>
+      {% else %}
+      <label class="aa-pessoa" data-aa-texto="{{ p.busca }}">
+        <input type="radio" name="pessoa" value="{{ p.valor }}" required>{{ pessoa_da_lista(p) }}</label>
+      {% endif %}
+      {% else %}<p class="ace-vazio aa-vazio">Ninguém para escolher.</p>{% endfor %}
+      <p class="mudo aa-vazio" data-aa-nada hidden>Ninguém com essa busca.</p>
+    </fieldset>
+    {# conta só quem se pode escolher, como o card (3ª revisão de 05/11/2026); o JavaScript faz a mesma conta na busca #}
+    <p class="gc-ajuda aa-conta" id="aa-conta" aria-live="polite" data-aa-conta>{{ app_escolhiveis }} {{ 'pessoa' if app_escolhiveis == 1 else 'pessoas' }}</p>
+    <div class="campo">
+      <label class="gc-rotulo" for="aa-obs">Observação (opcional)</label>
+      <textarea id="aa-obs" name="obs" class="gc-campo" maxlength="300" rows="2" placeholder="ex.: cobre as férias do supervisor"></textarea>
+      <span class="gc-ajuda">Vai cifrada: só o Nexus lê; o App a ignora.</span>
+    </div>
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-user-plus"></i> Pôr administrador</button>
+  </form>
+  {% if app_pode_por_email %}
+  <form method="post" action="{{ url_for('torre_base.acessos') }}" class="aa-por aa-por--email" id="aa-por-email">
+    <input type="hidden" name="codigo" value="{{ codigo }}">
+    <input type="hidden" name="acao" value="admin_app_por_email">
+    <div class="campo">
+      <label class="gc-rotulo" for="aa-email">Ou pelo e-mail (avulso)</label>
+      <input id="aa-email" name="email" type="email" class="gc-campo" required maxlength="254" autocomplete="off"
+             spellcheck="false" placeholder="nome@gridco.com.br" value="{{ email_digitado or '' }}" aria-describedby="aa-email-ajuda">
+      <span class="gc-ajuda" id="aa-email-ajuda">Para quem não está na lista. Só e-mail @gridco.com.br: o administrador do App entra pela conta Microsoft da Grid. Se o e-mail for de alguém da lista, vai para essa pessoa; senão, entra sem ficha, com o e-mail cifrado.</span>
+    </div>
+    <div class="campo">
+      <label class="gc-rotulo" for="aa-obs-email">Observação (opcional)</label>
+      <textarea id="aa-obs-email" name="obs" class="gc-campo" maxlength="300" rows="2"></textarea>
+    </div>
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-envelope-simple"></i> Pôr pelo e-mail</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="cad-secao ace-secao" aria-labelledby="aa-hist-titulo">
+  <h2 id="aa-hist-titulo">Histórico</h2>
+  <p class="gc-ajuda ace-ajuda">Cada decisão de pôr ou tirar, a mais recente primeiro. O livro só acrescenta: nada se apaga.</p>
+  <div class="cad-rolagem ace-rolagem">
+    <table class="cad-tabela ace-tabela" id="aa-historico">
+      <thead><tr><th>Quando</th><th>Pessoa</th><th>O que</th><th>Quem decidiu</th><th>Observação</th></tr></thead>
+      <tbody>
+      {% for h in app_historico %}
+      <tr>
+        <td class="num">{{ h.quando_br or h.quando }}</td>
+        <td>{{ h.nome }}{% if h.avulso %} <span class="cad-chip cad-chip--info">{{ h.detalhe }}</span>{% endif %}</td>
+        <td>{% if h.acao == 'pôs' %}<span class="cad-chip cad-chip--operacao">pôs</span>{% else %}<span class="cad-chip cad-chip--alerta">tirou</span>{% endif %}</td>
+        <td>{{ h.quem }}</td>
+        <td>{{ h.obs or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="vazio">Nenhuma decisão ainda.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<script src="{{ url_for('static', filename='acessos-admins-app.js') }}"></script>

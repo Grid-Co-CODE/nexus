@@ -1,0 +1,424 @@
+"""A leitura de fundo do pré-filtro (nexus/campo/prefiltro_fundo.py): para cada OS da fila de verificação ainda não
+conferida, UM pedido de leitura ao Fracttal (a lista de anexos) e as fotos pelo S3 (fora da cota da empresa), o hash
+sem o carimbo e a hora de anexação; tudo guardado em memória e em disco, sem miniatura (05/11/2026).
+Fracttal e S3 falsos do começo ao fim."""
+import io
+from pathlib import Path
+import random
+
+import pytest
+from PIL import Image, ImageDraw
+
+from nexus.campo import fracttal, prefiltro_fundo
+
+
+def _jpeg(semente, carimbo="carimbo"):
+    rnd = random.Random(semente)
+    im = Image.new("RGB", (640, 480), (rnd.randint(0, 255),) * 3)
+    d = ImageDraw.Draw(im)
+    for _ in range(30):
+        x, y = rnd.randint(0, 640), rnd.randint(0, 480)
+        d.rectangle([x, y, x + rnd.randint(20, 200), y + rnd.randint(20, 150)], fill=tuple(rnd.randint(0, 255) for _ in "rgb"))
+    d.rectangle([0, 390, 640, 480], fill=(0, 0, 0))
+    d.text((8, 400), carimbo, fill=(255, 255, 255))
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=85)
+    return buf.getvalue()
+
+
+def _tarefa(folio, n=1, fim="2026-10-20T10:00:00", **k):
+    return {"id_work_orders_tasks": int(folio) * 10 + n, "id_work_order": int(folio), "wo_folio": str(folio),
+            "final_date": fim, "tasks_log_task_type_main": "Corretiva", "description": "Troca de fusível", "labels": [],
+            **k}
+
+
+class S3Falso:
+    """Cada URL é uma foto: a semente decide a imagem (mesma semente = mesma foto), a hora vem junto."""
+
+    def __init__(self):
+        self.pedidos, self.falhar, self.lixo = [], set(), set()
+
+    def __call__(self, url):
+        self.pedidos.append(url)
+        if url in self.falhar:
+            raise OSError("S3 fora")
+        if url in self.lixo:                      # o arquivo veio, mas não é imagem (upload cortado)
+            return b"isto nao e uma imagem", "2026-10-20T12:00:00Z"
+        semente, hora = url.split("/")[-1].split(".")[0].split("_")[:2]
+        return _jpeg(int(semente), carimbo=f"carimbo {url}"), hora.replace("h", ":")
+
+
+class FracttalAnexos:
+    """O REST de anexos: `work_orders_attachments?folio=` em páginas de 100 (`start=`)."""
+
+    def __init__(self, anexos_por_os):
+        self.anexos, self.pedidos, self.recusar_em = anexos_por_os, [], None
+
+    def __call__(self, path):
+        self.pedidos.append(path)
+        if self.recusar_em is not None and len(self.pedidos) > self.recusar_em:
+            raise fracttal.Recusado("429")
+        assert path.startswith("work_orders_attachments?folio=")
+        folio = path.split("folio=")[1].split("&")[0]
+        start = int(path.split("start=")[1].split("&")[0]) if "start=" in path else 0
+        return {"data": self.anexos.get(folio, [])[start:start + 100]}
+
+
+def _anexo(folio, semente, hora="2026-10-20T12h00h00Z", tarefa=None, desc="Inversor · GPS -20.1,-47.6 · 2026-10-20T09:00:00Z",
+           n=0):
+    """Cada anexo é um arquivo no S3 (o caminho é a identidade dele); `n` faz arquivos diferentes da mesma foto."""
+    return {"description": desc, "value": f"https://s3.falso/{folio}/{semente}_{hora}_{n}.jpg?X-Amz-Signature=abc",
+            "type": "image", "id_work_order_task": tarefa or int(folio) * 10 + 1, "wo_folio": folio}
+
+
+@pytest.fixture
+def fundo(app, tmp_path, monkeypatch):
+    app.config.update(NEXUS_DADOS=str(tmp_path), NEXUS_PREFILTRO_PAUSA_S="0.5")
+    s3 = S3Falso()
+    monkeypatch.setattr(prefiltro_fundo, "baixar", s3)
+    dormidas = []
+    monkeypatch.setattr(prefiltro_fundo, "_dormir", dormidas.append)
+    prefiltro_fundo.limpar()
+    yield {"app": app, "s3": s3, "dormidas": dormidas, "dados": tmp_path}
+    fracttal.usar_fornecedor(None)
+    prefiltro_fundo.limpar()
+
+
+def _usar(anexos):
+    fx = FracttalAnexos(anexos)
+    fracttal.usar_fornecedor(fx)
+    return fx
+
+
+def test_le_os_nova_uma_vez(fundo):
+    fx = _usar({"15001": [_anexo("15001", 1), _anexo("15001", 2, "2026-10-23T08h00h00Z")]})
+    linhas = [_tarefa(15001)]
+    assert prefiltro_fundo.conferir(fundo["app"], linhas) == 1
+    f = prefiltro_fundo.fatos(15001)
+    assert [a["anexada"] for a in f["anexos"]] == ["2026-10-20T12:00:00Z", "2026-10-23T08:00:00Z"]
+    assert f["pares"] == [] and f["erro"] == "" and all(len(a["id"]) == 16 for a in f["anexos"])
+    assert f["anexos"][0]["desc"] == "Inversor" and f["anexos"][0]["print"] is False
+    assert len(fx.pedidos) == 1 and len(fundo["s3"].pedidos) == 2
+    assert prefiltro_fundo.conferir(fundo["app"], linhas) == 0 and len(fx.pedidos) == 1     # já conferida
+    assert fundo["dormidas"] == [0.5]
+
+
+def test_chave_mudou_rele(fundo):
+    fx = _usar({"15001": [_anexo("15001", 1)]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001), _tarefa(15001, 2)]) == 1     # tarefa nova na OS
+    assert len(fx.pedidos) == 2
+
+
+def test_teto_por_volta_e_a_mais_nova_primeiro(fundo):
+    fundo["app"].config["NEXUS_PREFILTRO_POR_VOLTA"] = "2"
+    _usar({})
+    linhas = [_tarefa(15001, fim="2026-10-01T10:00:00"), _tarefa(15002, fim="2026-10-20T10:00:00"),
+              _tarefa(15003, fim="2026-10-10T10:00:00")]
+    assert prefiltro_fundo.conferir(fundo["app"], linhas) == 2
+    assert prefiltro_fundo.fatos(15002) and prefiltro_fundo.fatos(15003) and prefiltro_fundo.fatos(15001) is None
+    assert prefiltro_fundo.conferir(fundo["app"], linhas) == 1 and prefiltro_fundo.fatos(15001)
+
+
+def test_recusa_espera_e_segue_e_para_no_teto(fundo):
+    """O Fracttal recusou (429): a volta espera um minuto e segue com a próxima OS (05/11/2026: antes ela parava e só
+    voltava na releitura da fila, 10 min depois, e em 40 min só 3 OS eram conferidas); com 5 recusas seguidas ela para e
+    guarda o que leu."""
+    fx = _usar({})
+    fx.recusar_em = 1
+    linhas = [_tarefa(15000 + i, fim=f"2026-10-{20 - i:02d}T10:00:00") for i in range(1, 9)]
+    assert prefiltro_fundo.conferir(fundo["app"], linhas) == 1
+    assert prefiltro_fundo.fatos(15001) and prefiltro_fundo.fatos(15002) is None
+    assert len(fx.pedidos) == 1 + prefiltro_fundo.RECUSAS_POR_VOLTA == 6            # a 7ª e a 8ª ficam para a próxima
+    assert fundo["dormidas"].count(prefiltro_fundo.ESPERA_RECUSA_S) == prefiltro_fundo.RECUSAS_POR_VOLTA - 1 == 4
+    assert "429" in prefiltro_fundo.estado()["erro"]
+
+
+def test_uma_recusa_so_espera_e_a_volta_segue(fundo):
+    fx = _usar({"15001": [_anexo("15001", 1)], "15003": [_anexo("15003", 3)]})
+    original = fx.__call__
+    n = []
+
+    def uma_recusa(path):
+        n.append(path)
+        if len(n) == 2:
+            raise fracttal.Recusado("429")
+        return original(path)
+    fracttal.usar_fornecedor(uma_recusa)
+    linhas = [_tarefa(15001, fim="2026-10-20T10:00:00"), _tarefa(15002, fim="2026-10-19T10:00:00"),
+              _tarefa(15003, fim="2026-10-18T10:00:00")]
+    assert prefiltro_fundo.conferir(fundo["app"], linhas) == 2
+    assert prefiltro_fundo.fatos(15002) is None and prefiltro_fundo.fatos(15003)
+    assert prefiltro_fundo.ESPERA_RECUSA_S in fundo["dormidas"] and prefiltro_fundo.estado()["erro"] == ""
+
+
+def test_falha_no_s3_nao_guarda_a_os(fundo):
+    _usar({"15001": [_anexo("15001", 1), _anexo("15001", 2)]})
+    fundo["s3"].falhar.add(_anexo("15001", 2)["value"])
+    assert prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)]) == 0
+    assert prefiltro_fundo.fatos(15001) is None                    # meia leitura nunca vira "Pronta"
+
+
+def test_pagina_os_com_mais_de_100_anexos(fundo):
+    fx = _usar({"15001": [_anexo("15001", i % 50 + 1, n=i) for i in range(130)]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(prefiltro_fundo.fatos(15001)["anexos"]) == 130
+    assert [p.split("start=")[1] for p in fx.pedidos] == ["0", "100"]
+
+
+def test_repetida_vira_par_sem_guardar_miniatura(fundo, tmp_path):
+    """A imagem é baixada para o hash (a repetida compara a imagem), mas nenhuma miniatura é guardada (Levi, 05/11/2026:
+    "nem precisa mostrar a foto de cara não... pode mostrar o nome das fotos")."""
+    _usar({"15001": [_anexo("15001", 7), _anexo("15001", 8), _anexo("15001", 7, "2026-10-21T12h00h00Z")]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    f = prefiltro_fundo.fatos(15001)
+    ids = [a["id"] for a in f["anexos"]]
+    assert f["pares"] == [[ids[0], ids[2]]]
+    assert not hasattr(prefiltro_fundo, "miniatura")
+    assert not list(Path(fundo["app"].config["NEXUS_DADOS"]).rglob("prefiltro_fotos"))
+
+
+def test_so_imagens_e_so_as_tarefas_da_fila(fundo):
+    pdf = {**_anexo("15001", 1), "value": "https://s3.falso/15001/relatorio.pdf?x=1"}
+    outra = _anexo("15001", 2, tarefa=999)
+    _usar({"15001": [pdf, outra, _anexo("15001", 3)]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(prefiltro_fundo.fatos(15001)["anexos"]) == 1
+
+
+def test_captura_de_tela_e_marcada(fundo):
+    _usar({"15001": [_anexo("15001", 1, desc="Coleta de geração")]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert prefiltro_fundo.fatos(15001)["anexos"][0]["print"] is True
+
+
+def test_fora_do_escopo_nao_e_lido(fundo):
+    fx = _usar({})
+    linhas = [_tarefa(15001, tasks_log_task_type_main="Religamento"),
+              _tarefa(15002, labels=[{"description": "PERFORMANCE"}]), _tarefa(15003)]
+    assert prefiltro_fundo.conferir(fundo["app"], linhas) == 1
+    assert [p.split("folio=")[1].split("&")[0] for p in fx.pedidos] == ["15003"]
+
+
+def test_os_que_saiu_da_fila_some_do_disco(fundo):
+    """A OS que sai da fila sai dos fatos, e a miniatura de antes de 05/11/2026 (quando ainda se guardavam) sai junto."""
+    _usar({"15001": [_anexo("15001", 7), _anexo("15001", 7, "2026-10-21T12h00h00Z")]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    velha = Path(fundo["app"].config["NEXUS_DADOS"]) / "campo" / "prefiltro_fotos" / (
+        prefiltro_fundo.fatos(15001)["pares"][0][0] + ".jpg")
+    velha.parent.mkdir(parents=True, exist_ok=True)
+    velha.write_bytes(b"jpg")
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15002)])
+    assert prefiltro_fundo.fatos(15001) is None and not velha.exists()
+
+
+def test_ida_e_volta_do_disco(fundo):
+    _usar({"15001": [_anexo("15001", 1)]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    antes = prefiltro_fundo.fatos(15001)
+    prefiltro_fundo.limpar()
+    assert prefiltro_fundo.fatos(15001) is None
+    assert prefiltro_fundo.carregar_do_disco(fundo["app"]) is True
+    assert prefiltro_fundo.fatos(15001) == antes
+
+
+def test_a_volta_roda_numa_thread_de_fundo_e_desliga(fundo, monkeypatch):
+    """Fora dos testes, uma thread `nexus-prefiltro` por vez; `NEXUS_PREFILTRO=0` desliga."""
+    import threading
+    criadas = []
+
+    class Thread:
+        def __init__(self, target=None, daemon=None, name=None):
+            self.name = name
+            criadas.append(self)
+
+        def start(self):
+            pass
+    monkeypatch.setattr(threading, "Thread", Thread)
+    app = fundo["app"]
+    app.config.update(TESTING=False, NEXUS_PREFILTRO="0")
+    try:
+        prefiltro_fundo.pedir_conferencia(app)
+        assert criadas == []
+        app.config["NEXUS_PREFILTRO"] = "1"
+        prefiltro_fundo.pedir_conferencia(app)
+        prefiltro_fundo.pedir_conferencia(app)             # já há uma andando: não abre outra
+        assert [t.name for t in criadas] == ["nexus-prefiltro"]
+    finally:
+        app.config["TESTING"] = True
+
+
+def test_a_releitura_da_fila_pede_a_conferencia(app, tmp_path, monkeypatch):
+    """Depois de cada fila boa relida por trás, a volta do pré-filtro (as OS novas da fila)."""
+    from test_campo_aprovacao import FracttalFalso
+
+    from nexus.campo import aprovacao
+    app.config.update(NEXUS_DADOS=str(tmp_path))
+    fracttal.usar_fornecedor(FracttalFalso([_tarefa(15001)]))
+    pedidos = []
+    monkeypatch.setattr(prefiltro_fundo, "pedir_conferencia", pedidos.append)
+    try:
+        aprovacao._reler(app)
+        assert pedidos == [app]
+        aprovacao._preparar(app)                  # o boot com a fila do disco ainda nova também pede
+        assert pedidos == [app, app]
+    finally:
+        fracttal.usar_fornecedor(None)
+        aprovacao.limpar()
+
+
+def test_a_volta_le_o_disco_antes_do_fracttal(fundo, monkeypatch):
+    """Ao subir, a volta pode sair antes da carga do disco (a thread do boot): ela mesma carrega a cópia antes de ler, e
+    as OS já conferidas não voltam ao Fracttal (sem isso, cada deploy relia a fila inteira)."""
+    from nexus.campo import regras_app
+    _usar({"15001": [_anexo("15001", 1)]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    prefiltro_fundo.limpar()
+    fx = _usar({"15001": [_anexo("15001", 1)]})
+    monkeypatch.setitem(regras_app._FILA_CACHE, "linhas", [_tarefa(15001)])
+    prefiltro_fundo._volta(fundo["app"])
+    assert not [p for p in fx.pedidos if p.startswith("work_orders_attachments")]
+    assert prefiltro_fundo.fatos(15001) is not None
+
+
+# ── a revisão final (05/11/2026): relida, foto que não abre, disco no meio da volta, página repetida ──────────────────
+def _epoch(iso):
+    from datetime import datetime, timezone
+    return datetime.fromisoformat(iso).replace(tzinfo=timezone.utc).timestamp()
+
+
+def test_a_os_conferida_e_relida_depois_da_janela_e_ve_a_foto_nova(fundo, monkeypatch):
+    """A foto anexada dias depois do fechamento só existe depois da 1ª leitura (a OS é lida minutos depois de entrar na
+    verificação): passada a janela de 24 h desde o fim, a OS é relida, e só a foto nova é baixada."""
+    from nexus.campo import prefiltro
+    anexos = {"15001": [_anexo("15001", 1, "2026-10-20T10h30h00Z")]}
+    fx = _usar(anexos)
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: _epoch("2026-10-20T11:00:00"))
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    anexos["15001"].append(_anexo("15001", 2, "2026-10-22T12h00h00Z"))
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: _epoch("2026-10-20T15:00:00"))      # ainda na janela
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(prefiltro_fundo.fatos(15001)["anexos"]) == 1 and len(fx.pedidos) == 1
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: _epoch("2026-10-22T13:00:00"))      # passou a janela
+    baixadas = len(fundo["s3"].pedidos)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    f = prefiltro_fundo.fatos(15001)
+    assert [a["anexada"] for a in f["anexos"]] == ["2026-10-20T10:30:00Z", "2026-10-22T12:00:00Z"]
+    assert len(fundo["s3"].pedidos) == baixadas + 1                                           # só a foto nova
+    o = {"os": "15001", "tarefas": [{"pelo_app": True, "qualidade": 90}]}
+    assert prefiltro.classificar(o, f, "2026-10-20T10:00:00Z", prefiltro.parametros({}))["coluna"] == "nao_ok"
+
+
+def test_a_conferida_e_relida_uma_vez_por_dia_sem_baixar_de_novo(fundo, monkeypatch):
+    fx = _usar({"15001": [_anexo("15001", 1)]})
+    t0 = _epoch("2026-10-25T12:00:00")                    # já depois da janela da OS (fim em 20/10)
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: t0)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: t0 + 23 * 3600)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(fx.pedidos) == 1
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: t0 + 25 * 3600)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(fx.pedidos) == 2 and len(fundo["s3"].pedidos) == 1
+
+
+def test_a_os_nova_vem_antes_da_relida(fundo, monkeypatch):
+    fundo["app"].config["NEXUS_PREFILTRO_POR_VOLTA"] = "1"
+    fx = _usar({"15001": [_anexo("15001", 1)], "15002": [_anexo("15002", 2)]})
+    t0 = _epoch("2026-10-25T12:00:00")
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: t0)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    monkeypatch.setattr(prefiltro_fundo, "_agora", lambda: t0 + 25 * 3600)      # a 15001 venceu o dia
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001), _tarefa(15002)])
+    assert fx.pedidos[-1].startswith("work_orders_attachments?folio=15002")
+
+
+def test_foto_que_nao_abre_nao_prende_a_os(fundo):
+    """Upload cortado ou arquivo que não é imagem: a foto fica sem hash ("não abriu") e a OS ganha os fatos; antes ela
+    ficava em "Ainda conferindo" para sempre, relendo tudo a cada volta."""
+    fx = _usar({"15001": [_anexo("15001", 1), _anexo("15001", 2, n=1)]})
+    fundo["s3"].lixo.add(_anexo("15001", 2, n=1)["value"])
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    f = prefiltro_fundo.fatos(15001)
+    assert f is not None and [a["hash"] is None for a in f["anexos"]] == [False, True]
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(fx.pedidos) == 1
+
+
+def test_download_que_falha_tenta_tres_vezes_e_espera(fundo):
+    fx = _usar({"15001": [_anexo("15001", 1)]})
+    fundo["s3"].falhar.add(_anexo("15001", 1)["value"])
+    for _ in range(4):
+        prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert prefiltro_fundo.fatos(15001) is None and len(fx.pedidos) == 3       # a 4ª volta espera
+    assert len(fundo["dormidas"]) == 3                                         # a pausa vale também depois do erro
+    assert prefiltro_fundo.estado()["falhas"] == 1
+
+
+def test_grava_no_disco_durante_a_volta(fundo, monkeypatch):
+    """Cada push na main reinicia o servidor: o que a volta já leu vai ao disco a cada 10 OS, não só no fim."""
+    gravadas = []
+    monkeypatch.setattr(prefiltro_fundo, "_gravar", lambda: gravadas.append(len(prefiltro_fundo._FATOS)))
+    _usar({str(15000 + i): [_anexo(str(15000 + i), i)] for i in range(25)})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15000 + i) for i in range(25)])
+    assert gravadas[:2] == [10, 20] and gravadas[-1] == 25
+
+
+def test_a_paginacao_para_quando_a_pagina_se_repete(fundo):
+    """Se o REST de anexos ignorar o `start`, a mesma página volta sempre: a leitura para, em vez de girar sem fim."""
+    class SemStart(FracttalAnexos):
+        def __call__(self, path):
+            self.pedidos.append(path)
+            return {"data": self.anexos["15001"][:100]}
+    fx = SemStart({"15001": [_anexo("15001", i % 7, n=i) for i in range(100)]})
+    fracttal.usar_fornecedor(fx)
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    assert len(fx.pedidos) == 2 and len(prefiltro_fundo.fatos(15001)["anexos"]) == 100
+
+
+def test_o_mesmo_arquivo_listado_duas_vezes_nao_vira_par(fundo):
+    a = _anexo("15001", 1)
+    _usar({"15001": [a, dict(a)]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    f = prefiltro_fundo.fatos(15001)
+    assert len(f["anexos"]) == 1 and f["pares"] == []
+
+
+def test_fila_vazia_nao_apaga_os_fatos(fundo):
+    """Uma fila vazia é soluço do Fracttal (total 0): apagar tudo faria a fila seguinte reler ~2.000 OS."""
+    _usar({"15001": [_anexo("15001", 1)]})
+    prefiltro_fundo.conferir(fundo["app"], [_tarefa(15001)])
+    prefiltro_fundo.conferir(fundo["app"], [])
+    assert prefiltro_fundo.fatos(15001) is not None
+
+
+def test_ligado_por_padrao_so_onde_o_campo_aquece():
+    """O PC (NEXUS_CAMPO_AQUECER=0) não lê as fotos sem pedir: a primeira visita lá começaria a passada de ~2.000 OS fora
+    do porteiro do servidor. O servidor (que aquece) lê; o NEXUS_PREFILTRO decide quando dito."""
+    assert prefiltro_fundo.ligado({}) is True
+    assert prefiltro_fundo.ligado({"NEXUS_CAMPO_AQUECER": "0"}) is False
+    assert prefiltro_fundo.ligado({"NEXUS_CAMPO_AQUECER": "0", "NEXUS_PREFILTRO": "1"}) is True
+    assert prefiltro_fundo.ligado({"NEXUS_PREFILTRO": "0"}) is False
+
+
+# ── só o que muda a coluna (05/11/2026, "Tem 730 OSs conferindo fotos, veja se travou algo para seguir") ──────────
+def test_os_sem_tarefa_do_app_nao_e_lida(fundo):
+    """A OS fechada inteira fora do App não tem as fotos lidas: elas não mudam a coluna (eram 522 OS e 2.664 tarefas na
+    fila de leitura, uma delas com 66 tarefas, na frente das 728 feitas pelo App). Sem saber quem é do App (a conta
+    pronta ainda não saiu), lê como antes."""
+    fx = _usar({"15001": [_anexo("15001", 1)], "15002": [_anexo("15002", 2)]})
+    linhas = [_tarefa(15001, fim="2026-10-20T10:00:00"), _tarefa(15002, fim="2026-10-19T10:00:00")]
+    assert prefiltro_fundo.conferir(fundo["app"], linhas, None, {"15001": set(), "15002": {"150021"}}) == 1
+    assert [p.split("folio=")[1].split("&")[0] for p in fx.pedidos] == ["15002"]
+    assert prefiltro_fundo.fatos(15001) is None and prefiltro_fundo.fatos(15002)
+    prefiltro_fundo.limpar()
+    assert prefiltro_fundo.conferir(fundo["app"], linhas, None, None) == 2
+
+
+def test_na_os_mista_so_as_fotos_das_tarefas_do_app_sao_baixadas(fundo):
+    """Na OS mista, a foto da tarefa fechada fora do App não é julgada (a hora do App não vale para ela): não é baixada."""
+    sem_tarefa = {**_anexo("15001", 3), "id_work_order_task": None}
+    _usar({"15001": [_anexo("15001", 1, tarefa=150011), _anexo("15001", 2, tarefa=150012), sem_tarefa]})
+    linhas = [_tarefa(15001, 1), _tarefa(15001, 2)]
+    assert prefiltro_fundo.conferir(fundo["app"], linhas, None, {"15001": {"150011"}}) == 1
+    assert len(fundo["s3"].pedidos) == 1 and [a["tarefa"] for a in prefiltro_fundo.fatos(15001)["anexos"]] == ["150011"]

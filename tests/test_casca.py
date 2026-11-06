@@ -29,5 +29,15 @@ def test_inicio_e_botao_direto(logado):
 def test_botao_de_recolher_menu(logado):
     html = logado.get("/t/cos/mesa").get_data(as_text=True)
     assert 'id="recolhe-menu"' in html
-    # No trilho recolhido o nome da torre aparece no title do ícone.
+    # Sem JavaScript, o nome da torre fica no title do ícone do trilho recolhido.
     assert 'title="COS"' in html
+    # Com ele, passar o mouse no ícone abre ao lado as telas da torre (05/11/2026, Levi: "ao passar o mouse aparecesse
+    # as opções daquela área"): a caixa nasce no base.html e o estilo mora no nexus.css
+    assert 'voo.className = "menu-voo"' in html and 'torre.addEventListener("mouseenter"' in html
+
+
+def test_a_caixa_do_menu_recolhido_tem_estilo_so_por_token():
+    from pathlib import Path
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "nexus.css").read_text(encoding="utf-8")
+    bloco = css[css.index(".menu-voo{"):css.index(".menu-voo li a[aria-current")]
+    assert "position:fixed" in bloco and "#" not in bloco and "rgba(" not in bloco

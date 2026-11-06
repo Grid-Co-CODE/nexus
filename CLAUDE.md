@@ -24,7 +24,8 @@ confiabilidade e governança dos dados, não podemos fazer nada nas coxas."
 "Prioridade 0 para a governança e controle de dados"; "precisamos construir e manter uma base sólida para futuras
 análises correlacionadas". O modelo é o de **Kimball** (fato com IDs, dimensão única, grão escrito), e mora em
 `nexus/dados/` — **leia `nexus/dados/CLAUDE.md` antes de pôr qualquer dado novo no banco** (chamados, engenharia, PCM,
-segurança, mais inversores). Em uma linha: fonte nova entra primeiro no catálogo (`nexus/dados/catalogo.py`) com o grão
+segurança, mais inversores). Em uma linha: fonte nova entra primeiro no catálogo (`nexus/dados/catalogo.py`, ou no da área que tem o seu: a Segurança em
+`nexus/hseq/catalogo.py`) com o grão
 e as dimensões declarados; o fato vai ao banco com `data_id`, `usina_id`, `pessoa_id`…, nunca com nome em claro nem ID
 chutado; a qualidade da ligação é medida e aparece em Base → Governança de dados. **Toda tabela do banco tem dono no
 catálogo** (Levi, 09/10/2026: "verifique se aparece a cada tabela nova que aparece!"): o radar da Governança compara o
@@ -42,14 +43,14 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 
 | Área | `.md` |
 |---|---|
-| Casca, login (Fracttal; a conta Microsoft da Grid, pronta em 14/10/2026 e desligada no servidor até a T.I. pôr as `NEXUS_MS_*`), quem é administrador (Base → Acessos), menu, tema (escuro e claro), servidor local, o endereço (raiz desde a fase 4; o prefixo `/nexus` é a volta), o cookie `nexus_sessao`, as Chaves do Nexus e o Raio-X | `nexus/casca/CLAUDE.md` |
+| Casca, login (Fracttal; a conta Microsoft da Grid, pronta em 14/10/2026 e desligada no servidor até a T.I. pôr as `NEXUS_MS_*`), quem é administrador (Base → Acessos; desde 05/11/2026 também os administradores do App de Campo, numa aba de lá, gravados no banco), menu, tema (escuro e claro), servidor local, o endereço (raiz desde a fase 4; o prefixo `/nexus` é a volta), o cookie `nexus_sessao`, as Chaves do Nexus e o Raio-X | `nexus/casca/CLAUDE.md` |
 | Torres (como criar tela; a tabela de cada torre, inclusive Chamados, Pessoas e Comando, que ainda são atalho ou placeholder) | `nexus/torres/CLAUDE.md` |
 | Base (Registro mestre, Equipamentos das usinas, Chaves das fontes; Acessos na casca, com a aba Pessoas e setores, a antiga Integração Fracttal; Governança nos dados) | `nexus/cadastro/CLAUDE.md` |
 | Relatórios (Central de emissão: os quatro do PCM, o executivo do PCM e os da Performance; o setor de cada relatório) | `nexus/pcm/relatorios/CLAUDE.md`, `nexus/pcm/relatorio_exec/CLAUDE.md` e `nexus/torres/CLAUDE.md` |
 | Contratos e clientes (Contestações do cliente, vindas do Dashboard Thopen) | `nexus/torres/contratos/CLAUDE.md` |
 | Comando (desde 03/11/2026: o motor de insights com as regras que cruzam as fontes, a Caixa de entrada por setor, o Assumir e o Concluir no banco e o sino no topo; as fases seguintes, conversa e pedidos entre setores, no PRD do Taskmaster em `.taskmaster/`) | `nexus/comando/CLAUDE.md` |
 | COS | `nexus/torres/cos/CLAUDE.md` |
-| Campo · App (modo gerencial do App de Campo) | `nexus/torres/campo/CLAUDE.md` |
+| Usinas 360° (era Campo · App até 05/11/2026; o id e o /t/campo ficaram): a usina por inteiro, do responsável e, a seguir, do cliente | `nexus/torres/campo/CLAUDE.md` |
 | OS Creator embutido | `nexus/torres/oscreator/README.md` |
 | Performance (porta única: as telas da Plataforma de Performance numa moldura, com o passe `NEXUS_SSO_CHAVE`, o mapa das telas e a ponte de 04/10 como reserva do Tempo real; Clima e risco, alertas públicos por usina em quatro níveis: Agir agora, Atenção, Acompanhar e Sem alerta; Mapa de risco com camadas de calor e modo TV) | `nexus/performance/CLAUDE.md` e `nexus/torres/performance/CLAUDE.md` |
 | PCM (programação semanal: gerar e, desde 09/10/2026, Publicar no App; Quadro da semana com a reprogramação de tarefas e, desde 19/10/2026, o arquivo da semana em curso editável; Gestão PCM, o Plano & Fila das manutenções e, desde 04/11/2026, a aba inteira do painel: os filtros de cima numa barra recolhível, as árvores por cliente, o Só atrasadas e a confiabilidade com a conta da Engenharia; Acompanhamento PCM, desde 14/10/2026: MPA, MPS, Radar de Backlog, Mapa e One Page; Técnicos por usina, desde 17/10/2026: quem vê e pode rondar cada usina no App, editado pelo PCM; Almoxarifado, desde 25/10/2026: o saldo de cada peça em cada almoxarifado do Fracttal, pela varredura diária do App, e o histórico no banco; o inventário do almoxarifado, desde 26/10/2026: o técnico conta no App, o PCM revisa e grava o contado no Fracttal pela ponte `/os/_nexus/inventario`, com o Mínimo e máximo, a Curadoria e a Auditoria) | `nexus/pcm/CLAUDE.md`, `nexus/pcm/motor/README.md` e `nexus/pcm/acompanhamento/CLAUDE.md` |
@@ -135,7 +136,8 @@ PerformancePainel.
   (cifrado ou como HMAC).
 - **Sempre pt-BR**, inclusive comentários. **Sem emoji na interface**; severidade por cor e palavra.
 - **Explicação de tela no "!" amarelo ao lado do título** (05/11/2026, "padrão nexus!"): "Entenda esta tela", "De onde
-  vem", "Como se conta", "Como ler", "O que é" e legendas vão no `_explica.html`, nunca soltos na tela (`DESIGN.md`).
+  vem", "Como se conta", "Como ler", "Como vale", "O que é" e legendas vão no `_explica.html`, nunca soltos na tela
+  (`DESIGN.md`).
 - Tema escuro **navy** (`#090d18` / `#161d30`) + verde Grid, o padrão, que não muda. Nunca lilás (o `#191528` do mockup não
   entra). O claro (08/10/2026) é escolha da pessoa, pelo botão do topo. **Cor só por token**, nos dois temas do
   `nexus.css`: nada de `#hex` ou `rgba()` em regra de CSS nem em template (`nexus/casca/CLAUDE.md`, seção Tema).

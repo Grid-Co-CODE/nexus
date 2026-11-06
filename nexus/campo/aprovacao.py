@@ -114,6 +114,9 @@ def _reler(app):
                     fila_toda(FILA_INTEIRA)
             except Exception:      # noqa: BLE001 — aquecer é conforto; a tela calcula na hora se precisar
                 pass
+            # as fotos das OS novas da fila (o pré-filtro por fatos, 05/11/2026): uma volta por trás, nunca na tela
+            from . import prefiltro_fundo
+            prefiltro_fundo.pedir_conferencia(app)
     except Exception as e:      # noqa: BLE001 — 429, página faltando, rede: a tela segue com a última fila boa
         _ESTADO.update(erro=str(getattr(e, "msg", "") or e)[:160], erro_em=time.time())
     finally:
@@ -151,20 +154,56 @@ def _arquivo():
         return None
 
 
+_TRAVA_ARQUIVO = threading.Lock()
+
+
 def _gravar_no_disco():
-    """Grava a fila da memória (com a hora em que foi lida). Comprimida: são ~5.500 tarefas."""
+    """Grava a fila da memória (com a hora em que foi lida). Comprimida: são ~5.500 tarefas. Uma gravação por vez: duas
+    no mesmo .tmp (a releitura e uma aprovação, ou duas aprovações do lote) podiam deixar a cópia ilegível."""
     arq = _arquivo()
     linhas = regras_app._FILA_CACHE.get("linhas")
     if arq is None or linhas is None:
         return
     try:
-        arq.parent.mkdir(parents=True, exist_ok=True)
-        tmp = arq.with_name(arq.name + ".tmp")
-        with gzip.open(tmp, "wt", encoding="utf-8") as f:
-            json.dump({"t": regras_app._FILA_CACHE.get("t"), "linhas": linhas}, f, ensure_ascii=False)
-        os.replace(tmp, arq)
+        with _TRAVA_ARQUIVO:
+            arq.parent.mkdir(parents=True, exist_ok=True)
+            tmp = arq.with_name(arq.name + ".tmp")
+            with gzip.open(tmp, "wt", encoding="utf-8") as f:
+                json.dump({"t": regras_app._FILA_CACHE.get("t"), "linhas": linhas}, f, ensure_ascii=False)
+            os.replace(tmp, arq)
     except OSError as e:
         logging.warning("fila da Aprovação: não gravei a cópia em disco (%s)", e)
+
+
+# A regravação depois de tirar uma OS da fila (~1,5 s com a fila real): no lote da Aprovação, as aprovações chegam a cada
+# poucos segundos (revisão de 05/11/2026). Uma por vez; a que chega durante outra só marca que falta gravar, e a que está
+# andando grava de novo no fim, uma vez por todas as que chegaram.
+_GRAVA = {"rodando": False, "sujo": False}
+_TRAVA_GRAVA = threading.Lock()
+
+
+def _regravar(app) -> None:
+    with _TRAVA_GRAVA:
+        if _GRAVA["rodando"]:
+            _GRAVA["sujo"] = True
+            return
+        _GRAVA["rodando"] = True
+
+    def laco():
+        try:
+            while True:
+                with app.app_context():
+                    _gravar_no_disco()
+                with _TRAVA_GRAVA:
+                    if not _GRAVA["sujo"]:
+                        _GRAVA["rodando"] = False
+                        return
+                    _GRAVA["sujo"] = False
+        except BaseException:
+            with _TRAVA_GRAVA:
+                _GRAVA.update(rodando=False, sujo=False)
+            raise
+    em_segundo_plano(laco)
 
 
 def carregar_do_disco(app) -> bool:
@@ -218,6 +257,8 @@ def _preparar(app):
             fila_toda(FILA_INTEIRA)
     except Exception:      # noqa: BLE001
         logging.exception("fila da Aprovação: a conta pronta não saiu")
+    from . import prefiltro_fundo                 # e a volta do pré-filtro sobre a fila do disco
+    prefiltro_fundo.pedir_conferencia(app)
 
 
 def fila(params: dict, usinas=None) -> Leitura:
@@ -262,7 +303,11 @@ def fila_toda(params: dict, usinas=None) -> Leitura:
                 break
             pag += 1
         crua = {w.get("id_work_orders_tasks") or w.get("id_work_order"): w for w in regras_app._FILA_CACHE.get("linhas") or []}
+        fechado = _ultimo_fechamento_no_app()
         for x in todas:
+            # o último fechamento da OS no App (o pré-filtro por fatos, 05/11/2026: foto anexada mais de 24 h depois
+            # dele é Não OK); fechada fora do App, vazio (a anexação não é julgada)
+            x["fechado_app"] = fechado.get(str(x.get("os") or "").strip(), "")
             w = crua.get(x.get("id_wt")) or {}
             # a usina do Fracttal e o id da OS (o que o Concluir do OS Creator pede), que a cópia do App não devolve.
             # E a criação da OS (Levi, 08/10: "DATA DA CRIAÇÃO DA OS"): o `creation_date` vem na mesma linha do REST
@@ -283,6 +328,26 @@ def fila_toda(params: dict, usinas=None) -> Leitura:
             del _PRONTA[velha]
         _PRONTA[chave] = r
     return r
+
+
+def _ultimo_fechamento_no_app() -> dict[str, str]:
+    """{folio: a hora do último fechamento da OS no App}, em ISO UTC: em cada linha do registro do App (`qualidadelog`)
+    daquela OS, a maior entre a hora do celular (`dev_ts`) e a da chegada no servidor (`server_ts`), e a maior das linhas.
+    A chegada vale porque o celular sem sinal fecha a OS e só sobe o fechamento e as fotos dias depois: pela hora do
+    celular, "fotos anexadas 3 dias depois" era Não OK falso (revisão de 05/11/2026). É a hora da OS, não a da tarefa
+    (desenho de 05/11/2026). O registro que não abre deixa todas vazias: sem a hora, a anexação não é julgada."""
+    from . import prefiltro
+    out: dict[str, tuple] = {}
+    try:
+        for e in regras_app.tabela_qlog().query_entities("PartitionKey eq 'q'"):
+            folio = str(e.get("os") or e.get("fx_folio") or "").strip()
+            q = max(filter(None, (prefiltro._quando(e.get("dev_ts")), prefiltro._quando(e.get("server_ts")))), default=None)
+            if folio and q and (folio not in out or q > out[folio]):
+                out[folio] = q
+    except Exception as ex:      # noqa: BLE001 — o registro fora: a fila segue, sem a hora do fechamento
+        logging.warning("aprovação: o registro do App não abriu para a hora do fechamento (%s)", str(ex)[:160])
+        return {}
+    return {k: v.isoformat(timespec="seconds") for k, v in out.items()}
 
 
 def motivos(x) -> list[tuple[str, str]]:
@@ -336,16 +401,28 @@ def tirar_da_fila(id_wo) -> int:
         r.dados["linhas"] = [x for x in r.dados.get("linhas") or [] if str(x.get("id_wo")) != str(id_wo)]
     if has_app_context() and len(restam) != len(linhas):
         # a cópia em disco também: um reinício logo depois não pode trazer de volta a OS que acabou de ser aprovada
-        app = current_app._get_current_object()
-
-        def regravar():
-            with app.app_context():
-                _gravar_no_disco()
-        em_segundo_plano(regravar)
+        _regravar(current_app._get_current_object())
     return len(linhas) - len(restam)
+
+
+def tarefas_do_app() -> dict[str, set[str]] | None:
+    """{folio: as tarefas da OS fechadas pelo App (id da tarefa)}, da conta pronta da fila inteira, sem refazer a conta;
+    None se ela ainda não saiu. A leitura de fundo das fotos usa para não ler o que não muda a coluna (05/11/2026): a OS
+    sem tarefa do App e as fotos das tarefas fechadas fora do App."""
+    alvo = tuple(sorted({k: str(v) for k, v in FILA_INTEIRA.items()}.items()))
+    for chave, r in list(_PRONTA.items()):
+        if chave[0] == "fila_toda" and chave[2] is None and chave[3:] == alvo:
+            out: dict[str, set[str]] = {}
+            for x in (r.dados or {}).get("linhas") or ():
+                ids = out.setdefault(str(x.get("os") or ""), set())
+                if x.get("pelo_app") and x.get("id_wt"):
+                    ids.add(str(x["id_wt"]))
+            return out
+    return None
 
 
 def limpar():
     _PRONTA.clear()
     _ESTADO.update(lendo=False, erro="", erro_em=0.0)
+    _GRAVA.update(rodando=False, sujo=False)
     regras_app._FILA_CACHE.update(t=0.0, ts=None, linhas=None)

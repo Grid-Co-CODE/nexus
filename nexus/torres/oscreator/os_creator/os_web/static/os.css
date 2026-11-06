@@ -174,12 +174,49 @@ body.os-modal-aberto{overflow:hidden}
   .det-pill{height:auto;min-height:36px;padding:6px 12px;flex-wrap:wrap}.det-pdf{height:36px}}
 .det-corpo{display:flex;flex-direction:column;gap:14px;padding:18px 22px 22px}
 .det-card{background:var(--f-card);border:1px solid #222c46;border-radius:13px}
-.det-banner{display:flex;align-items:center;gap:14px;padding:16px 18px}
+.det-banner{display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:10px;padding:16px 18px}
 .det-ico-sq{width:46px;height:46px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:none;border:1px solid var(--f-border)}
 .det-ico-sq.v{background:rgba(166,226,46,.14)}.det-ico-sq.a{background:rgba(87,182,245,.14)}
 .det-banner-t{font-size:17px;font-weight:600;color:#fff}.det-banner-code{margin-left:auto;color:var(--f-muted);font-size:12px;white-space:nowrap}
+/* o banner em campos lado a lado (05/11/2026: "Bora aproveitar esse espaço!"): a usina, o ativo (ou os ativos, recolhidos)
+   e o código numa faixa só, separados por um traço; no celular, um embaixo do outro */
+.det-banner-campo{display:flex;flex-direction:column;gap:4px;min-width:0;padding:0 24px}
+.det-banner-campo:first-child{padding-left:0}
+.det-banner-campo+.det-banner-campo{border-left:1px solid var(--f-border)}
+.det-banner>.det-banner-ativos{flex:1 1 0}
+.det-banner-ativo{font-size:15px;font-weight:600}
+.det-banner-campo .det-banner-code{margin-left:0;font-size:13px}
+@media (max-width:560px){.det-banner-campo{flex-basis:100%;padding:0}
+  .det-banner-campo+.det-banner-campo{border-left:0;border-top:1px solid var(--f-border);padding-top:10px}}
+/* os ativos recolhidos (05/11/2026: "Está ocupando muito espaço na tela"; "Quero os ativos fiquem recolhidos e que seja
+   expansível!"): o "ATIVOS (N)" do tamanho do "USINA", e as etiquetas no clique */
+.det-banner-ativos>summary{display:inline-flex;align-items:center;gap:8px;cursor:pointer;list-style:none;user-select:none}
+.det-banner-ativos>summary::-webkit-details-marker{display:none}
+.det-ativos-chev{color:var(--f-muted);font-size:16px;line-height:1;transition:transform .15s}
+.det-banner-ativos[open] .det-ativos-chev{transform:rotate(90deg)}
+.det-banner-ativos[open]>.det-ativos{margin-top:8px}
+/* o card da duração em dois quadrados e um retângulo (05/11/2026): a duração e, à direita, a data de criação, cada uma no
+   meio do seu quadrado, separadas por um traço, e a etiqueta embaixo das duas */
+.det-dur.com-bat{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr auto;
+  grid-template-areas:"txt cri" "etq etq";column-gap:18px;row-gap:10px}
+.det-dur-txt{grid-area:txt;display:flex;flex-direction:column;gap:10px;min-width:0}
+.det-dur.com-bat .det-dur-txt{align-items:center;justify-content:center;text-align:center}
+.det-dur.com-bat .det-criada{grid-area:cri;padding-left:18px;border-left:1px solid var(--f-border)}
+.det-dur.com-bat .det-etq-l{grid-area:etq;align-self:end}
+/* o Feito, deitado, no fim do banner (05/11/2026: "pode ser deitada horizontal mesmo"): a barra com os segmentos inclinados
+   de uma barra de carga (a máscara corta o recheio em faixas); o recheio é o da barra das subtarefas (`det-prog-f`, verde e
+   laranja nos dois temas) */
+.det-banner>.det-feito{margin-left:auto}
+.det-feito-linha{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.det-bat{position:relative;display:block;width:150px;height:20px;border:2px solid var(--f-muted);border-radius:7px;box-sizing:border-box}
+.det-bat-in{position:absolute;inset:3px;overflow:hidden;border-radius:4px}
+.det-bat .det-prog-f{position:absolute;left:0;top:0;bottom:0;height:auto;border-radius:0;
+  -webkit-mask-image:repeating-linear-gradient(120deg,black 0 7px,transparent 7px 10px);
+  mask-image:repeating-linear-gradient(120deg,black 0 7px,transparent 7px 10px)}
+.det-feito.vazia .det-bat{border-style:dashed}
+.det-bat-pct{font-size:15px;font-weight:700}
+@media (max-width:560px){.det-banner>.det-feito{margin-left:0}}
 /* os ativos da OS de vários ativos em etiquetas, na ordem natural (04/11/2026: era uma frase corrida) */
-.det-banner-ativos{display:flex;flex-direction:column;gap:8px;min-width:0}
 .det-ativos{display:flex;flex-wrap:wrap;gap:6px}
 .det-ativo{padding:4px 10px;border:1px solid var(--f-border);border-radius:999px;background:var(--f-input);color:var(--f-muted);
   font-size:12.5px;font-weight:600;white-space:nowrap}
@@ -374,6 +411,18 @@ body.os-form .os-sub .s-x{width:34px;padding:0;display:flex;align-items:center;j
 .os-sub .os-check{height:34px}
 .os-subs-lista{margin:6px 0 0;padding-left:20px;color:#e6e8ef;font-size:13px}
 .os-subs-lista li{margin:3px 0}
+/* as subtarefas padrão da atividade na Performance (05/11/2026): a linha do editor ganha subir e descer, e o tipo ao lado */
+.perf-sub{grid-template-columns:minmax(0,1fr) 150px auto 34px 34px 34px}
+.perf-sub input,.perf-sub select{min-width:0}         /* o tipo comprido ("Lista (do plano)") não empurra a linha */
+#w_subs [hidden]{display:none!important}             /* o .os-btn tem display próprio, que venceria o hidden */
+.perf-sub-tag{color:var(--muted);font-size:11.5px;margin-left:4px}
+.perf-sub-tipo-tarefa{max-width:280px}                /* o tipo de tarefa da atividade, em cima das subtarefas */
+@media (max-width:640px){
+  .perf-sub{grid-template-columns:minmax(0,1fr) auto 30px 30px 30px;gap:6px}
+  .perf-sub .s-desc{grid-column:1/-1}
+  body.os-form .perf-sub .s-x{width:30px}
+  .perf-sub-exige{display:none}                       /* no celular, "anexo": o tipo ganha o espaço */
+}
 /* o painel de contagem: três números clicáveis que também são o filtro da tabela */
 .os-painel{display:flex;gap:10px;flex-wrap:wrap}
 .os-painel-card{display:flex;flex-direction:column;gap:2px;min-width:132px;padding:10px 14px;background:var(--f-card);border:1px solid var(--f-border);border-radius:12px;text-decoration:none}

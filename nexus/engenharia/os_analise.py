@@ -156,6 +156,11 @@ def encerrar(api, os_id, diagnostico: str, inicio, fim, nome: str, agora: dateti
         return ["ja_concluida" if sit == "concluida" else "ja_cancelada"]
     tid = api.id_tarefa_da_os(os_id)
     if not tid:
+        # o clone engole o erro da leitura, e a sessão que caiu no meio vira "nada" (prova no Fracttal de 05/11/2026: o
+        # Fracttal aceita uma sessão por conta, e entrar noutra aba derruba esta): conferir a sessão antes de dizer que a
+        # OS não tem tarefa, para a ponte mandar entrar de novo
+        if not api.is_logged_in():
+            raise api.SessionExpired("A sessão do Fracttal caiu no meio do encerrar")
         raise Falhou("Não achei a tarefa da OS no Fracttal: nada foi encerrado lá")
     feito = []
     item = next((s for s in api.subtarefas_da_tarefa(tid) or [] if _norm(s.get("descricao")) == _norm(SUBTAREFA)), None)

@@ -174,6 +174,40 @@ def test_novo_nome_no_fracttal_ou_novo_codigo_grava_de_novo(cfg, monkeypatch):
     assert _atuais(cfg)[(1, 10, "executa")]["usina_fracttal"] == "Cliente A - Usina 1 - SP (novo)"
 
 
+def test_a_reemissao_nunca_poe_de_volta_quem_foi_tirado(cfg, monkeypatch):
+    """Revisão de 05/11/2026 (achado 5): a reemissão reenvia o que vale agora, com as datas de agora. O pedido de
+    reemissão de um par que já não vale (tirado depois de a tela montar o pedido) ou com outras datas pula, sem gravar."""
+    Relogio(monkeypatch)
+    _por(cfg, 10)
+    _por(cfg, 10, na_usina=False)
+    _por(cfg, 11, ate="2026-10-31")
+    pedido = dict(U1, pessoa_hmac="e" * 24, na_usina=True)
+    assert A.decidir_varias(cfg, [dict(pedido, pessoa_id=10)], PESSOA, "reemissao") == 0       # foi tirado
+    assert A.decidir_varias(cfg, [dict(pedido, pessoa_id=11)], PESSOA, "reemissao") == 0       # as datas mudaram
+    assert A.decidir_varias(cfg, [dict(pedido, pessoa_id=11, ate="2026-10-31")], PESSOA, "reemissao") == 1
+    assert len(A.ler(cfg, forcar=True)["decisoes"]) == 4
+    assert set(_atuais(cfg)) == {(1, 11, "executa")}
+
+
+def test_os_pedidos_montados_dentro_da_trava_e_a_conferencia_antes_de_gravar(cfg, monkeypatch):
+    """Revisão de 05/11/2026 (achado 2): quem reenvia monta os pedidos de uma leitura NOVA do livro, dentro da trava, e
+    confere o resumo antes de gravar; a conferência que recusa não grava nada."""
+    Relogio(monkeypatch)
+    _por(cfg, 10)
+    vistos = []
+
+    def montar(est, hoje):
+        vistos.append(([x["pessoa_id"] for x in est["decisoes"]], hoje))
+        return [dict(U1, pessoa_id=11, pessoa_hmac="f" * 24, na_usina=True)]
+
+    def recusa(pedidos):
+        raise A.Recusada(f"conta de {len(pedidos)}: não confere")
+    with pytest.raises(A.Recusada, match="não confere"):
+        A.decidir_varias(cfg, montar, PESSOA, "tela", conferir=recusa)
+    assert vistos == [([10], 20261017)] and len(A.ler(cfg, forcar=True)["decisoes"]) == 1
+    assert A.decidir_varias(cfg, montar, PESSOA, "tela", conferir=lambda p: None) == 1
+
+
 def test_sem_a_chave_hmac_nada_grava(cfg, monkeypatch):
     """Sem a NEXUS_PESSOA_HMAC a linha iria sem assinatura e o App a descartaria: o Nexus diria uma coisa e o App faria
     outra (revisão de 17/10). Nada se grava."""

@@ -24,13 +24,22 @@ aceita esse trabalho por **pull request**:
 1. Crie um ramo (`hseq/<assunto>`), commite e faça push dele.
 2. Abra o pull request para a `main`. A conferência **pasta-da-area** (`.github/workflows/pasta-da-area.yml`) aprova se
    o pedido mexe só na área da Segurança e reprova, listando os arquivos, se mexe fora dela.
-3. Verde: pode juntar (merge). Produção segue a `main` sozinha: em ~2 min o servidor reinicia com o pedido (teste
-   antes de juntar: `python -m pytest -q`, e a tela no navegador, desktop e 375 px).
+3. Verde: junte você mesma (merge). A regra da `main` não pede aprovação de ninguém (0 revisões): a conferência
+   verde basta. Produção segue a `main` sozinha: em ~2 min o servidor reinicia com o pedido (teste antes de juntar:
+   `python -m pytest -q`, e a tela no navegador, desktop e 375 px).
+
+**Dado novo no banco, sem esperar ninguém** (05/11/2026, Levi: "eu quero deixar ela independente, não podemos deixar
+travas com ela"; "independente no setor dela, claro"): o catálogo da Segurança mora em `nexus/hseq/catalogo.py`, dentro
+da área. Livro novo (`nexus_hseq_<assunto>`), o fato com o grão, o tipo e a chave, e as duas frases (`RESUMO` e
+`PARA_QUE`) entram lá, no mesmo pedido e ANTES da 1ª gravação; o catálogo central junta, e as regras de
+`nexus/dados/CLAUDE.md` valem igual (pessoa por `pessoa_id` ou código, nunca nome nem CPF; o pessoal e o texto livre
+cifrados). `tests/test_hseq_catalogo.py` segura o "no setor dela": dali só sai fato da área `hseq`, em livro
+`nexus_hseq_*`.
 
 **Área da Segurança:** `nexus/torres/hseq/` (rotas, templates e este `.md`), `nexus/hseq/` (a regra sem Flask),
 `nexus/static/hseq*` (o estilo), `tests/test_hseq*.py` e o desenho e o plano em `docs/superpowers/specs/` e
 `docs/superpowers/plans/` com "hseq" ou "seguranca" no nome. Fora dela, com o Levi: o App de Campo (`nexus/campo/`, de
-onde vêm as rondas, as PT e as APR), o catálogo dos dados (`nexus/dados/`), o cadastro, o PCM, o menu, a casca, o
+onde vêm as rondas, as PT e as APR), o catálogo central e as regras dos dados (`nexus/dados/`), o cadastro, o PCM, o menu, a casca, o
 `requirements.txt` e a própria conferência. Precisou mexer fora? Abra o pedido assim mesmo e peça ao Levi: ele revisa e
 junta. Quem é da área: a variável `LOGINS_HSEQ` do repositório (os logins do GitHub ficam fora do código, que é
 público).
@@ -81,7 +90,7 @@ linha por destinatário, uma vez por semana; o App lê, manda e diz o que mandou
   responsáveis recebem, nenhum de fora. Caso igual se resolve assim, nunca pelo nome).
 - **O que vai no livro** (a API é compartilhada, regra 8): o código (HMAC) e o número da pessoa, nunca nome nem e-mail.
   O assunto e o corpo (texto e HTML) levam os quatro de agora, os de atenção, as usinas com mais pendências (até 25) e
-  dois botões, sempre pelo número da pessoa (`?r=`): o responsável abre o **Painel dele no Campo · App** (03/11/2026,
+  dois botões, sempre pelo número da pessoa (`?r=`): o responsável abre o **Painel dele no Usinas 360°** (ex-Campo · App) (03/11/2026,
   Levi: "tem que ser o nexus > campo app > painel (filtrado no responsável)"; o Campo traduz o `r`), a TST, a Mesa; e
   a planilha da Mesa filtrada, com o selo XLSX. Cada linha assinada (HMAC, rótulo `nexus:hseq:email`).
 - **O visual** (03/11/2026, Levi: "Deixe a estrutura um pouco mais bonita e o link para o arquivo em excel deixe mais

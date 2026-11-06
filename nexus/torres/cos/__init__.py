@@ -22,6 +22,8 @@ from flask import Response, abort, current_app, redirect, render_template, reque
 
 from ...cos import acionamentos as AC
 from ...cos import andamento as AND
+from ...cos import desempenho as DE
+from ...cos import mesa as ME
 from ...cos import normalizacoes as NO
 from ...cos import ocorrencias as OC
 from ...cos import os_abertas as OA
@@ -40,17 +42,20 @@ TORRE = Torre(
     icone="broadcast",
     descricao="Mesa do operador: ver, informar o cliente e acionar o campo em minutos.",
     telas=[
-        Tela("mesa", "Mesa do operador",
-             "O que está aberto na minha mesa e o que falta avisar ao cliente?",
-             "Tempo real da Performance + ocorrências do Nexus"),
-        Tela("desempenho", "Desempenho da equipe",
-             "As mesas estão dentro do MTTA e do aviso no prazo?",
-             "Ocorrências do Nexus"),
         # Porta única (09/10/2026): o /cos da Plataforma de Performance (MTTA das OS), numa moldura do Nexus. A view sai do
         # mapa das telas da plataforma (nexus/performance/porta.py), pelo registrar_molduras abaixo.
         Tela("acompanhamento", "Acompanhamento COS",
              "As OS do COS estão sendo atendidas no prazo (MTTA)?",
              "Plataforma de Performance (/cos)"),
+        # 05/11/2026: a Mesa do operador e o Desempenho da equipe (spec R04) leem o Andamento: a carteira de cada operador
+        # da Ronda COS (sem e-mail: o HMAC com a chave do Nexus), a fotografia e o ciclo das ocorrências. Logo depois do
+        # Acompanhamento, que segue sendo a 1ª tela pronta (o cartão do COS no Início).
+        Tela("mesa", "Mesa do operador",
+             "O que está aberto na minha mesa e o que falta avisar ao cliente?",
+             "Andamento da Ronda COS (a carteira de cada operador, a fotografia e o ciclo das ocorrências)"),
+        Tela("desempenho", "Desempenho da equipe",
+             "As mesas estão dentro do MTTA e do aviso no prazo?",
+             "Andamento da Ronda COS (o ciclo das ocorrências, com a hora em que o COS viu)"),
         # As duas do Andamento (22/10/2026) vêm DEPOIS do Acompanhamento de propósito: o cartão do COS na página inicial
         # leva à primeira tela pronta, e o Acompanhamento (com a porta ligada) continua sendo ela. A Ronda e a Parede
         # contam como prontas mesmo antes de a fonte ser ligada no servidor (a conta de telas_com_conteudo é pela rota).
@@ -384,3 +389,49 @@ def normalizacoes():
         p=p, mes=mes, meses=NO.meses(agora), cliente=cliente, usina=usina, status=status, busca=busca,
         operador=operador, tecnico=tecnico, falha=falha,
         status_filtro=NO.STATUS_FILTRO, lido=_lido([leitura]), url=_url)
+
+
+# ── Mesa do operador e Desempenho da equipe (05/11/2026) ─────────────────────────────────────────────────────────────
+def _carteiras(cfg, fonte):
+    return AND.ler_carteiras(cfg) if fonte.ligada else AND.Leitura("", None)
+
+
+@bp.route("/mesa")
+def mesa():
+    """Mesa do operador (spec R04: "cada operador tem uma carteira de clientes, e o líder enxerga todas"): o que está
+    aberto nos clientes da carteira de quem entrou (a da Ronda COS, pelo HMAC do e-mail) e o que falta avisar ao cliente
+    ou acionar o campo, com os prazos da tela Ocorrências. Sem carteira, todas as mesas. Só lê (nexus/cos/mesa.py)."""
+    cfg = current_app.config
+    fonte = AND.fonte(cfg)
+    clientes, erro_clientes = AND.clientes(cfg)
+    carteiras = _carteiras(cfg, fonte)
+    email = (session.get("usuario") or {}).get("email") or ""
+    m = ME.escolher(email, fonte.chave, carteiras, clientes, request.args.get("mesa", ""))
+    fotos = [AND.ler(cfg, c) for c in m.clientes] if fonte.ligada else []
+    ciclos = [AND.ler_ocorrencias(cfg, c, ME.DIAS_DA_MESA) for c in m.clientes] if fonte.ligada else []
+    p = ME.painel(fotos, ciclos, AND.agora(), fonte.url) if fonte.ligada and m.clientes else None
+    return render_template(
+        "cos/mesa.html", torre=TORRE, tela=TORRE.tela("mesa"), ligada=fonte.ligada, mesa=m, p=p,
+        erro_clientes=erro_clientes if fonte.ligada else "", ver=request.args.get("mesa", ""), prazos=OC.PRAZOS,
+        dias=ME.DIAS_DA_MESA,
+        lido=_lido(fotos + ciclos), url=_url)
+
+
+@bp.route("/desempenho")
+def desempenho():
+    """Desempenho da equipe (spec R04: "MTTA, informado no prazo e religamento remoto"): por cliente e por turno, sem
+    nome de operador, e as mesas como os conjuntos de clientes das carteiras. MTTA até a hora em que o COS viu. Só lê
+    (nexus/cos/desempenho.py)."""
+    cfg = current_app.config
+    fonte = AND.fonte(cfg)
+    clientes, erro_clientes = AND.clientes(cfg)
+    dias = DE.dias_pedidos(request.args.get("dias"))
+    leituras = [AND.ler_ocorrencias(cfg, c, dias) for c in clientes] if fonte.ligada else []
+    carteiras = _carteiras(cfg, fonte)
+    email = (session.get("usuario") or {}).get("email") or ""
+    minha, _fora = ME.carteira_de(email, carteiras, fonte.chave)
+    p = DE.painel(leituras, AND.agora(), ME.mesas(carteiras, clientes), minha) if fonte.ligada else None
+    return render_template(
+        "cos/desempenho.html", torre=TORRE, tela=TORRE.tela("desempenho"), ligada=fonte.ligada, p=p, dias=dias,
+        dias_opcoes=DE.DIAS_OPCOES, turnos=TU.TURNOS, prazos=OC.PRAZOS, carteiras=carteiras,
+        erro_clientes=erro_clientes if fonte.ligada else "", lido=_lido(leituras), url=_url)

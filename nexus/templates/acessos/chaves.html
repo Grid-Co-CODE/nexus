@@ -6,7 +6,14 @@
    nunca mostra o valor. Regras em nexus/auth/chaves.py e na seção "Chaves do Nexus" do nexus/casca/CLAUDE.md. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
 <p class="gc-eyebrow">Base · {{ tela.nome }}</p>
-<h1 class="titulo-pagina">{{ tela.nome }}</h1>
+{# o "Como vale." no "!" do título (05/11/2026: ficava solto na tela; o padrão do Nexus é o _explica.html) #}
+{% from "_explica.html" import explica %}
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">{{ tela.nome }}</h1>
+  {% call explica('Entenda esta tela') %}
+  <p><b>Como vale.</b> A chave colada aqui fica cifrada na pasta de dados deste servidor (nunca no GitHub nem no banco),
+    vale na hora e vence a do .env. "Apagar" volta à do .env, se a T.I. tiver posto uma. Guarde a chave também no cofre
+    de senhas da Grid Co.: perder a chave das contestações é perder o que já foi gravado.</p>
+  {% endcall %}</div>
 {# as abas das Chaves das fontes (14/10/2026): as da Performance (a tela da plataforma) e as do Nexus, aqui #}
 <nav class="gc-subabas" aria-label="{{ tela.nome }}">
   {% for a in abas %}<a href="{{ a.url|na_raiz }}"{% if a.atual %} aria-current="page"{% endif %}>{{ a.nome }}</a>{% endfor %}
@@ -16,12 +23,6 @@
 {% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Feito.</strong> {{ aviso }}</div></div>{% endif %}
 {% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}
 {% if sem_pasta %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-folder-simple-dashed"></i><div><strong>Sem pasta de dados.</strong> Este Nexus não tem a <span class="gc-dado">NEXUS_DADOS</span>: a chave não tem onde ficar.</div></div>{% endif %}
-
-<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>
-  <strong>Como vale.</strong> A chave colada aqui fica cifrada na pasta de dados deste servidor (nunca no GitHub nem no
-  banco), vale na hora e vence a do .env. "Apagar" volta à do .env, se a T.I. tiver posto uma. Guarde a chave também no
-  cofre de senhas da Grid Co.: perder a chave das contestações é perder o que já foi gravado.
-</div></div>
 
 {% for c in chaves %}
 <section class="cad-secao chv-chave" id="{{ c.id }}" aria-labelledby="{{ c.id }}-t">

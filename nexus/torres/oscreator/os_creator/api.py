@@ -720,8 +720,13 @@ def create_os_rpc(asset: dict, description: str, task_type: str, subtasks: list,
         "id_priorities": prio,
         "id_failure_severity": 0, "id_damage_type": 1,
         "failure_asset": False,
+        # "já realizada": a tarefa vai FEITA (`work_done`), com o fim e as respostas, e o destino é a Verificação
+        # (`to_in_review`) ou os Finalizados. Até 05/11/2026 o `work_done` ia False quando o destino era a Verificação, e o
+        # Fracttal tratava a tarefa como não feita: a OS 18630 (TESTE - PA), "enviar para Verificação", nasceu Em Processo,
+        # sem fim e com "0 de 1" subtarefas, sem erro nenhum (achado da revisão das OS na prova no Fracttal de verdade).
+        # O status é conferido depois de gravar (`_conferir_ja_realizada`)
         "to_in_review": em_verificacao,
-        "work_done": finalizada and not em_verificacao,  # Finalizados → concluída
+        "work_done": finalizada,
         "to_work_order": finalizada,                     # finalizada vira WO direto (sem Fase 2)
         "stop_assets": False,
         "duration": dur, "real_duration": dur,           # o web manda os dois iguais (a captura: 600 e 600)
@@ -805,11 +810,40 @@ def create_os_rpc(asset: dict, description: str, task_type: str, subtasks: list,
         raise FracttalError(_msg_rpc(result.get("message")))
     data = result.get("data") if isinstance(result, dict) else {}
     data = data if isinstance(data, dict) else {}
-    return {"id_task": data.get("id_task"),
-            "id_work_order": data.get("id_work_order"),
-            "wo_folio": data.get("wo_folio"),
-            "duracao": dur,                   # o tempo da tarefa: a OS que junta as tarefas soma este
-            "raw": result}
+    saida = {"id_task": data.get("id_task"),
+             "id_work_order": data.get("id_work_order"),
+             "wo_folio": data.get("wo_folio"),
+             "duracao": dur,                   # o tempo da tarefa: a OS que junta as tarefas soma este
+             "raw": result}
+    if finalizada and saida["id_work_order"]:
+        aviso = _conferir_ja_realizada(saida["id_work_order"], em_verificacao, saida["wo_folio"])
+        if aviso:
+            saida["aviso"] = aviso
+    return saida
+
+
+def _conferir_ja_realizada(id_work_order, em_verificacao: bool, folio) -> str:
+    """A OS "já realizada" conferida no Fracttal, depois de gravar (05/11/2026; a OS 18630, "enviar para Verificação",
+    nasceu Em Processo e o Fracttal não disse nada). Lê o status (1 leitura): a de Verificação que ficou Em Processo vai
+    para Em Verificação (`mudar_status_os`, o que a revisão provou que funciona) e é lida de novo; o que não ficou como
+    pedido vira o aviso da tela. Sem a leitura, sem aviso (a OS já existe)."""
+    esperado = 2 if em_verificacao else 3
+    try:
+        st = (_cabecalho_os(id_work_order) or {}).get("id_status_work_order")
+    except Exception:                                    # noqa: BLE001 — sem a leitura, sem a conferência
+        return ""
+    if st is None or st == esperado:                     # o cabeçalho sem o status: não há o que conferir
+        return ""
+    if em_verificacao and st == 1:
+        try:
+            if (mudar_status_os(id_work_order, 2) or {}).get("ok"):
+                st = (_cabecalho_os(id_work_order) or {}).get("id_status_work_order")
+        except Exception:                                # noqa: BLE001 — fica o status lido, e o aviso
+            pass
+        if st == 2:
+            return ""
+    return ("OS %s criada, mas ficou %s no Fracttal, e não %s: confira no Fracttal e avise o administrador do Nexus."
+            % (folio, WO_STATUS.get(st, "com outro status"), WO_STATUS.get(esperado)))
 
 
 # As leituras de UMA OS que o card e a contagem de anexos fazem uma logo depois da outra (19/10/2026, superplano do
@@ -1186,11 +1220,12 @@ from os_execucao import (  # noqa: E402,F401
     registrar_execucao, retomar_execucao, salvar_subtarefas, subtarefas_da_tarefa, tempo_trabalhado,
     tempo_trabalhado_em_massa, validar_seguranca_tarefa)
 from os_planos import (  # noqa: E402,F401
-    RPC_TASK_DETAILS, RPC_TASK_EVENTS, RPC_TASK_TEMPLATE_ITEMS, SUBTAREFAS_EXTRA, TIPO_TAREFA_DO_PLANO,
+    RPC_TASK_DETAILS, RPC_TASK_EVENTS, RPC_TASK_TEMPLATE_ITEMS, SUBTAREFAS_EXTRA, TIPO_SUB_ID, TIPO_TAREFA_DO_PLANO,
     _DURACAO_PLANO, _MARCA_EXTRA, _PERF_PLANOS, _TIPO_ITEM_DESC, _duracao_do_modelo, _find_subtasks, _norm_txt,
-    _plan_family, _subtarefas_de_modelo, atualizar_modelos_subtarefas, com_subtarefas_extra, com_tipo_da_tarefa,
-    duracao_do_plano, get_plan_details, get_plans_for_assets, get_subtask_counts, get_subtask_names, get_task_plans,
-    get_template_subtarefas, ler_planos_do_ativo, sem_subtarefas_extra, tem_subtarefas_extra)
+    _plan_family, _subtarefas_de_modelo, atualizar_modelos_subtarefas, com_subtarefas_extra, com_subtarefas_padrao,
+    com_tipo_da_tarefa, com_tipo_padrao, duracao_do_plano, get_plan_details, get_plans_for_assets, get_subtask_counts, get_subtask_names,
+    get_task_plans, get_template_subtarefas, ler_planos_do_ativo, sem_subtarefas_extra, subtarefas_para_editor,
+    tem_subtarefas_extra, tem_subtarefas_padrao)
 from perf_alvos import (  # noqa: E402,F401
     CARTEIRA_EQUIP, PERF_TIPOS, PERF_TIPOS_TRACKER_CONJUNTO, _CONECTIVOS, _asset_short_name,
     _eh_tracker_generalizado, _usina_short, get_performance_alvos, perf_os_nome, plano_base_nome)
@@ -1205,9 +1240,9 @@ from os_estado import (  # noqa: E402,F401
     _wo_id_por_folio, _wo_resumo, cancel_os, cancelamento_da_os, checar_data_fim, concluir_os, concluir_os_checado,
     editar_nota_os, fluxo_da_os, get_cancel_motivos, mudar_responsavel, mudar_status_os, os_por_folio, status_da_os)
 from os_detalhe import (  # noqa: E402,F401
-    RPC_WO_PARENTS, _ATRIB_NOME_KEYS, _FORM_RESP_KEYS, _VERIF_MAP, _cabecalho_os, _folio_da_os_pai,
+    RPC_WO_PARENTS, _ATRIB_NOME_KEYS, _FORM_RESP_KEYS, _VERIF_MAP, _cabecalho_os, _campo_de_nota, _folio_da_os_pai,
     _form_item_resposta, _ids_atribuido, _juntos, _nome_atribuido, _personnel_nome_por_id, _solicitacao_da_os,
-    buscar_os_pai, get_os_detalhes, get_os_detalhes_por_folio, get_os_para_clonar)
+    _usinas_da_os, buscar_os_pai, get_os_detalhes, get_os_detalhes_por_folio, get_os_para_clonar, juntar_notas)
 from os_historico import (  # noqa: E402,F401
     HISTORICO_CAP, RPC_WO_FORMIT, RPC_WO_TASKS, TIPOS_COS, _MetaLida, _Passos, _code_to_loc, _extrai_code,
     _extrai_codigos, _lista_pela_metade, _meta_tarefa_por_os, _primeiro, _shape_wo_row, contar_minhas_analises,
@@ -1221,7 +1256,7 @@ from os_solicitacoes import (  # noqa: E402,F401
     get_solicitacao_por_os, list_minhas_solicitacoes, mudar_status_solicitacao, status_solicitacao_catalogo)
 from os_criar import (  # noqa: E402,F401
     ANALISE_CLASSIF_1, ANALISE_CLASSIF_2, RPC_KANBAN, RPC_LABELS_SYNC, RPC_WO_INSERT, TIPO_ANALISE,
-    _WO_TASK_DEFAULTS, _anexa_imagens_bulk, _kanban_records, _work_order_insert, apply_labels, clonar_os,
+    _WO_TASK_DEFAULTS, _anexa_imagens_bulk, _kanban_records, _plano_da_performance, _work_order_insert, apply_labels, clonar_os,
     concluir_os_analise, create_inspecao_chamado, create_os_analise, create_os_chamado, create_os_sem_plano,
     create_performance_os, create_performance_os_agrupada, create_planned_os, create_planned_os_multi,
     create_planned_os_one_wo, create_work_orders_agrupada, create_work_orders_bulk, create_work_orders_datas,

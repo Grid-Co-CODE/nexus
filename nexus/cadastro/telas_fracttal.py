@@ -29,7 +29,10 @@ _CHAVE_AVISO = "fracttal_aviso"
 # que já está carregada"): a 1ª abertura fria levava ~2,4 s (o cadastro de pessoas e as equipes do banco, as fichas
 # decifradas; no servidor, mais o Fracttal). Fresco, a cópia; vencido, a cópia na hora e a releitura por trás, uma por vez.
 RELACAO_S = 120
-_TELA: dict = {"g": None, "renovando": False}
+# `falhou`: a última leitura que não deu (o Fracttal fora, o cadastro fora, vazia), até a próxima boa. É o que separa, na
+# aba dos administradores do App, "a leitura ainda está chegando" (todo deploy começa sem cópia) de "o Fracttal não
+# respondeu" (3ª revisão de 05/11/2026)
+_TELA: dict = {"g": None, "renovando": False, "falhou": None}
 _TELA_TRAVA = threading.Lock()
 
 
@@ -68,12 +71,40 @@ def _dados(cfg, reler: bool = False) -> tuple:
     return _ler_agora(cfg, reler)
 
 
+def copia_sem_esperar() -> dict:
+    """A cópia do Fracttal ligado às fichas sem NUNCA ler o Fracttal na hora (a aba dos administradores do App de Base →
+    Acessos, 2ª revisão de 05/11/2026: aquela aba lia na hora, num GET ou num POST, quando não havia cópia). A cópia como
+    está, fresca ou vencida; vencida ou sem cópia, a releitura por trás (a mesma do `_dados`, uma por vez), se este Nexus
+    tem o Fracttal. {"lido", "rel", "idade_s", "vencida", "estado"}: o `estado` é "copia"; sem cópia, "chegando" (a 1ª
+    leitura vem vindo: todo deploy começa assim) ou "fora" (a última leitura falhou, ou este Nexus não lê o Fracttal). A
+    `idade_s` é a da leitura do Fracttal (`lido_em`; o pessoal fica guardado 1 hora), não a da cópia."""
+    from ..campo import fracttal
+    with _TELA_TRAVA:
+        g, falhou = _TELA["g"], _TELA["falhou"]
+        pedir = (g is None or time.time() - g["t"] >= RELACAO_S) and not _TELA["renovando"]
+    configurado = fracttal.configurado() if pedir or g is None else True
+    if pedir and configurado:
+        with _TELA_TRAVA:
+            if not _TELA["renovando"]:
+                _TELA["renovando"] = True
+                threading.Thread(target=_renovar, args=(current_app._get_current_object(),),
+                                 name="nexus-pessoas-fracttal", daemon=True).start()
+    if g is None:
+        return {"lido": {"pessoas": [], "erro": "", "lido_em": None}, "rel": {"linhas": []}, "idade_s": None,
+                "vencida": False, "estado": "chegando" if configurado and not falhou else "fora"}
+    agora = time.time()
+    return {"lido": g["lido"], "rel": g["rel"], "idade_s": max(0.0, agora - (g["lido"].get("lido_em") or g["t"])),
+            "vencida": agora - g["t"] >= RELACAO_S, "estado": "copia"}
+
+
 def _ler_agora(cfg, reler: bool) -> tuple:
     lido = FP.ler_pessoal(forcar=reler)
     rel, erro_cadastro = _relacao(cfg, lido)
-    if lido["pessoas"] and not erro_cadastro and not lido.get("erro"):     # só a leitura boa fica guardada
-        with _TELA_TRAVA:
-            _TELA["g"] = {"t": time.time(), "lido": lido, "rel": rel, "erro": erro_cadastro}
+    with _TELA_TRAVA:
+        if lido["pessoas"] and not erro_cadastro and not lido.get("erro"):     # só a leitura boa fica guardada
+            _TELA.update(g={"t": time.time(), "lido": lido, "rel": rel, "erro": erro_cadastro}, falhou=None)
+        else:
+            _TELA["falhou"] = {"t": time.time(), "erro": lido.get("erro") or erro_cadastro or "vazio"}
     return lido, rel, erro_cadastro
 
 
@@ -83,6 +114,8 @@ def _renovar(app) -> None:
             _ler_agora(app.config, False)
     except Exception as ex:      # noqa: BLE001 — fica a cópia; a próxima visita vencida tenta de novo
         log.warning("Pessoas e setores: a releitura por trás falhou (%s: %s).", type(ex).__name__, ex)
+        with _TELA_TRAVA:
+            _TELA["falhou"] = {"t": time.time(), "erro": type(ex).__name__}
     finally:
         with _TELA_TRAVA:
             _TELA["renovando"] = False
@@ -91,7 +124,7 @@ def _renovar(app) -> None:
 def esquecer() -> None:
     """Tira a cópia da tela (os testes)."""
     with _TELA_TRAVA:
-        _TELA.update(g=None, renovando=False)
+        _TELA.update(g=None, renovando=False, falhou=None)
 
 
 def _relacao(cfg, lido: dict) -> tuple[dict, str]:

@@ -102,8 +102,11 @@ download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
   não avisa (decisão de 04/11/2026: custaria ler no Fracttal as solicitações de cada pessoa).
 - **No sino:** a parte "avisos das suas OS", no alto; o clique abre o card da OS (`oscreator/card_os_abrir.html`, com o
   botão do PDF) por cima da tela, e sem JavaScript a página da OS. "Marcar como lida" e "Marcar todas como lidas" são
-  formulários (`POST /t/comando/aviso/lida`, sem JavaScript, como o tema), e o lido vale em qualquer computador (o
-  banco). **Mora em `/t/comando/`** porque o Caddy do servidor só manda ao Nexus a raiz, `/t/*` e poucos outros
+  formulários (`POST /t/comando/aviso/lida`) que o script do sino manda por fetch pedindo JSON, **sem recarregar a tela**
+  (Levi, 05/11/2026: "cada vez que clico em marcar como lida a tela atualiza... atrapalha a experiência do usuário"): o
+  aviso sai da lista, o número do botão e o do título descem, e o sino fica aberto; o que não gravou diz "Não marcou:
+  tente de novo". Sem JavaScript (ou sem resposta que se leia, como o login vencido), o formulário volta para a mesma tela,
+  como antes. O lido vale em qualquer computador (o banco). **Mora em `/t/comando/`** porque o Caddy do servidor só manda ao Nexus a raiz, `/t/*` e poucos outros
   caminhos: nasceu em `/avisos/lida` (04/11/2026), que no servidor caía na plataforma, e o Marcar como lida não gravava
   (`tests/test_rotas_no_caminho_do_nexus.py` pegou; regra em `nexus/casca/CLAUDE.md`, "Regras que já custaram caro").
   O portão por setor abre o caminho a quem tem uma tela do Comando, e a Caixa de entrada é de todo setor; "aviso" no

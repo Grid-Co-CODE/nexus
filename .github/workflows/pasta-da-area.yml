@@ -46,7 +46,8 @@ jobs:
           # plano da Engenharia; o catálogo dos dados, a ponte do OS Creator, o menu e a casca ficam com o Levi
           AREA_ENGENHARIA: '^(nexus/torres/engenharia/|nexus/engenharia/|nexus/static/engenharia[^/]*$|tests/test_engenharia[^/]*\.py$|docs/superpowers/(specs|plans)/[^/]*engenharia[^/]*\.md$)'
           # a torre da Segurança · HSEQ (rotas, templates e o CLAUDE.md), a regra sem Flask, o estilo, os testes e o
-          # desenho e o plano; o App de Campo, o catálogo dos dados, o cadastro e o PCM, que ela lê, ficam com o Levi
+          # desenho e o plano, e o catálogo dela (nexus/hseq/catalogo.py, desde 05/11/2026); o App de Campo, o catálogo
+          # central, o cadastro e o PCM, que ela lê, ficam com o Levi
           AREA_HSEQ: '^(nexus/torres/hseq/|nexus/hseq/|nexus/static/hseq[^/]*$|nexus/static/hseq/|tests/test_hseq[^/]*\.py$|docs/superpowers/(specs|plans)/[^/]*(hseq|seguranca)[^/]*\.md$)'
         run: |
           for livre in $LIVRES; do

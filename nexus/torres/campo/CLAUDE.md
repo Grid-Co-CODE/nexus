@@ -1,4 +1,13 @@
-# CLAUDE.md — torre Campo · App
+# CLAUDE.md — torre Usinas 360° (o id `campo`)
+
+**O nome (05/11/2026):** a torre se chamava "Campo · App". Levi, pelo Scrum master: "Quero ideias de nomes
+alternativos para o campo 'Campo app'. Como ele engloba pendências e visão geral do supervisor queria que tivesse um
+nome mais aberto, até para botar a visão do cliente também junto!"; depois, "Usinas 360°" e "Mande!". Só o nome que
+aparece mudou (`TORRE.nome`, a descrição do Início e os textos das telas que diziam o nome): o id `campo`, o
+`/t/campo`, as chaves `campo/<tela>` dos Acessos e os livros ficaram, para nenhum link, favorito, acesso ou teste de
+rota quebrar. No menu, logo abaixo de Comando (`ordem=5`; no mesmo dia: "usina 360 abaixo de Comando"), e a
+Zeladoria logo abaixo de Chamados (`ordem=55`). O Nexus não tem busca no menu: nada a normalizar no "°".
+Abaixo, "Campo · App" é o nome de quando cada coisa foi feita.
 
 A visão do Nexus sobre o trabalho de campo. **Nenhuma tela abre o painel do App nem aponta para o Azure** (Levi,
 05/10/2026: "quero parar de referenciar o Azure e ter uma visão nossa!"): todas leem o banco do Nexus (API db_performace).
@@ -12,17 +21,18 @@ App nem no Fracttal. Devolver OS e encaminhar ponto continuam no App. Sem link p
 
 **Exceções: a decisão da PT** (Levi, 05/10: "Técnico faz APR e PT -> Chega no PG -> Atualiza para os steakholders ->
 Atualiza na aprovação de PT -> Supervisor faz -> Fica salvo!"; ver "Aprovação de PT no Nexus" abaixo) **e a
-Aprovação de OS** (desde 18/10/2026 a OS abre o card do OS Creator, cujo Concluir aprova no Fracttal com o login de quem
-clica, como no OS Creator Web; ver "Aprovação de OS").
+Aprovação de OS** (desde 05/11/2026 o quadro por fatos, com o Aprovar no cartão e em lote: o Concluir do OS Creator, com
+o login do Fracttal de quem clica, como no OS Creator Web; ver "Aprovação de OS").
 
 ## As telas
 
 | Tela | De onde vem | Quem calcula |
 |---|---|---|
 | **Visão do responsável** (12/10/2026, a 1ª do Campo) | o **Painel** (28/10/2026, a tela inicial de um responsável: seis quadros, ver "O Painel do responsável" abaixo) e três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
+| **Visão do cliente** (05/11/2026) | o tempo real da plataforma (a Entrada, pela ponte só de leitura) + o Gerencial (a meta, a mesma linha da Visão do responsável) + o Andamento da Ronda COS (os chamados à distribuidora) + `fato_tarefa_os` (as OS) + `fato_programacao` (a próxima visita) | `campo/visao_cliente.py` (junta; nenhuma conta nova, ver "Visão do cliente" abaixo) |
 | **Ocorrências** (18/10/2026) | o livro `nexus_ocorrencias` (escrito nesta tela) + cadastro do Nexus | `campo/ocorrencias.py` (ver "Ocorrências com plano de ação" abaixo) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
-| Aprovação de OS | fila de verificação do Fracttal INTEIRA (só GET) + nota do livro do App + o Responsável O&M da usina (cadastro); aprovar é o Concluir do card do OS Creator | regras copiadas do App (a conta pronta por fila lida) |
+| Aprovação de OS (quadro por fatos desde 05/11/2026) | fila de verificação do Fracttal INTEIRA (só GET) + nota e fechamento do livro do App + os anexos das OS (1 GET por OS, lido por trás, e as fotos pelo S3) + o Responsável O&M da usina (cadastro); aprovar é o Concluir do OS Creator, no cartão ou em lote | `campo/prefiltro.py` (as colunas) sobre a conta pronta das regras copiadas do App; `campo/prefiltro_fundo.py` (as fotos) |
 | Permissões de trabalho → **em Segurança · HSEQ > APR e PT desde 09/10/2026** (`/t/hseq/apr-pt`; `/t/campo/pt` leva para lá). O código continua aqui (`pagina_pt`, a aprovação `/t/campo/pt/<número>`, os PDFs da PT e da APR); a regra de lá está em `nexus/torres/hseq/CLAUDE.md` | `fato_pt` (+ `pt_app_campo` para o texto) | `visao.pts` (conta nossa) |
 | Rondas | `fato_ronda` (App, checklist da carga única, avulsa) + usinas mobilizadas do cadastro + `fato_fechamento` (última OS da usina) + a validação por foto (só sujidade e vegetação) | `visao.rondas` (conta nossa) |
 | Ronda avulsa (`/t/campo/rondas/avulsa`) | lançada à mão no Nexus, com o login do Fracttal | `campo/ronda_avulsa.py` |
@@ -244,7 +254,7 @@ gaveta) em `__init__.py`.
 
 ## As explicações das telas (05/11/2026)
 
-Em todas as telas do Campo · App, "De onde vem", "Como ler", "Entenda esta tela" e afins moram no "!" amarelo ao lado do
+Em todas as telas da torre (Usinas 360°), "De onde vem", "Como ler", "Entenda esta tela" e afins moram no "!" amarelo ao lado do
 título (`explica` de `nexus/templates/_explica.html`, o padrão do Nexus): Aprovação de OS, Central de atenção, PT, a
 decisão da PT, Ranking, Triagem, Zeladoria, Responsáveis e Rondas. Fica fora dele o que muda com o dado (a nota do
 Ranking com as linhas sem nome, os avisos de dado faltando, as usinas sem mobilização da Central de atenção). A
@@ -464,9 +474,14 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     duas páginas incluem; ronda sem OS ou avulsa fica sem botão, com o porquê no `title`; medido em 08/10: 288 botões
     nas 300 linhas de 30 dias): o botão Fotos de cada ronda com OS carrega os anexos da OS no
     Fracttal (1 pedido por OS, guardado 20 min; o link assinado fica no servidor e o Nexus entrega a imagem). Separação
-    pela descrição que o App escreve ("Sujidade dos módulos — 4", "Altura da vegetação — 5"); as demais vêm recolhidas
-    e, abertas, por tipo (sensores, vala, infraestrutura, pragas/dejeto/trincado, zonas, capa), com o nome curto do
-    item na miniatura ("deixe recolhido, quando expandir quero que mostre por tipo, o que é piranômetro e etc"). A 1ª
+    pela descrição que o App escreve ("Sujidade dos módulos — 4", "Altura da vegetação — 5"); as demais vêm **abertas,
+    por tipo** (sensores, vala, infraestrutura, pragas/dejeto/trincado, zonas, capa), cada tipo com o título no nível
+    de Sujidade e Vegetação e o nome curto do item embaixo da miniatura. Eram um "Demais fotos da ronda" recolhido (06/10:
+    "deixe recolhido, quando expandir quero que mostre por tipo"); desde 05/11/2026, abertas ("Ao clicar na ronda tire
+    esse 'demais fotos' quero tudo expandido"). A etiqueta da resposta ("limpo") mora na própria foto (`cn-foto-img`) e a
+    legenda fica embaixo: presa a 24 px do fim do cartão, ela caía em cima da legenda quando a barra lateral esticava o
+    cartão para quadrado ("O texto não está encaixando onde deveria encaixar, conserte!"); na barra, a foto é que fica
+    quadrada e o cartão cresce com a legenda (`tests/test_campo_ronda_fotos_0511.py`). A 1ª
     foto o App descreve como a capa da ronda. Miniatura de 240 px pelo Pillow (medido em 06/10: 7 a 14 kB contra 182 a
     690 kB a foto inteira), feitas em paralelo assim que a grade é pedida; a mesma foto pedida duas vezes baixa uma vez
     (a chave de "em andamento" leva a cache: com a mesma chave a miniatura esperava por si mesma 60 s). Clicar amplia,
@@ -751,8 +766,9 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
   (`ordem_da_manutencao`); o Acompanhamento pela ronda, a pior em cima (`ordem_da_ronda`: nunca teve; sem ronda há 7
   dias ou mais, mais dias primeiro; longa pendente; em dia, a mais antiga primeiro; sem dado). As réguas de cada alerta
   ficam no "!" amarelo ao lado do título (o `explica` de `_explica.html`, desde 05/11/2026; de 18/10 a 05/11 ficavam
-  atrás de um "!" abaixo da tabela), fechado ao abrir a tela; o que muda com o dado (usinas sem de-para, livro que não
-  chegou) segue numa nota no pé.
+  atrás de um "!" abaixo da tabela), fechado ao abrir a tela, com a hora da leitura (a caixa "Gerencial, Confiabilidade
+  (...) lido às" do canto do cabeçalho saiu no mesmo dia; Levi: "pode ficar nos disclaimers"); o que muda com o dado
+  (usinas sem de-para, livro que não chegou) segue numa nota no pé.
 - **Nenhum indicador refeito com régua nova.** Cada número vem da tela dona, pela MESMA fonte que o Nexus já usa, e cada
   alerta usa a régua de lá (`REGUAS`, mostradas na nota da tela, por bloco).
   - Meta do mês: `nexus_performance · fato_meta_usina_mes`, o `_gerencial_payload` da plataforma publicado pelo worker
@@ -991,7 +1007,19 @@ no responsável)"): `/t/campo/responsaveis?r=<número da pessoa>&modo=painel`. O
   - **Concluir e PDF:** são os do OS Creator, com a sessão do Fracttal da pessoa.
     - O Concluir é `POST /os/api/os/<id>/concluir`, irreversível, com a confirmação antes. O PDF é `POST /os/api/os/pdf`
       e depois o download.
-    - Sem a sessão (401), a janela manda entrar no Fracttal pelo OS Creator.
+    - Sem a sessão do Fracttal (401), a janela manda entrar no Fracttal pelo OS Creator.
+    - **"Concluída" só com o ok do OS Creator** (revisão de 05/11/2026, achado na Aprovação por fatos, que usa a mesma
+      rota): `r.ok && !r.redirected && r.j.ok === true`, com a frase da rota (`mensagem`), em âmbar quando o `aviso`
+      (um booleano: fechou sem a data de fim) vem ligado. Antes, a sessão do Nexus vencida (12 h, ou o Sair noutra aba)
+      fazia o portão responder 302 para /entrar, o fetch seguia, recebia 200 em HTML e a tela dizia "OS X concluída."
+      sem nada ter ido ao Fracttal; e o aviso saía como "concluída. true". Redirecionado, ou resposta sem JSON: "A sua
+      sessão do Nexus acabou: recarregue a página e entre de novo." O PDF segue a mesma regra. Prova na bancada (fila
+      real de 29/10): o Concluir depois do /sair deu o aviso da sessão, e a resposta simulada da rota (com e sem o
+      aviso, o erro e sem o ok) deu a frase certa em cada caso. No ar (05/11/2026, 15:11 de Brasília, e4df64a): o POST
+      sem sessão na produção volta 302 para /entrar e, seguido, 200 em HTML (o caso do defeito), e a página no ar traz o
+      script novo. A OS de TESTE - PA não aparece nesta lista (não é usina da Visão), então o Concluir de verdade pela
+      tela pediria uma OS de cliente: não foi feito; a mesma rota respondendo `ok: true` com o status 3 lido de volta foi
+      provada no Fracttal pela Aprovação de OS (OS 18630, acima).
     - A OS concluída, ou mudada no card, sai da fila guardada pela conferência da Aprovação
       (`/t/campo/aprovacao/<id>/conferir`: só sai o que o Fracttal confirma).
   - **Exemplo:** na bancada, um responsável com 26 usinas tinha 212 esperando; ficaram de fora 69 por etiqueta e 95
@@ -1302,7 +1330,8 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   (`nexus/campo/central_usina.py`): os técnicos de hoje (PCM › Técnicos por usina, `atribuicoes.atuais`), as ocorrências
   abertas (`ocorrencias.estado` + `ordenar`, com o cofre), as pendências da Segurança (`hseq._pendencias`, a conta da Mesa,
   só as linhas da usina), os chamados finalizados no mês (`responsaveis.chamados_finalizados`, o fato do quadro
-  Acompanhamento de chamados pelo dia do fim) e as PT pedidas no mês (`visao.pts().historico`, pelo dia em Brasília).
+  Acompanhamento de chamados pelo dia do fim) e as PT esperando o De acordo na lista do Painel
+  (`painel_responsavel.pts([u])`).
 - **A busca** é a das Rondas, num pedaço só (`_busca_usina.html`, a lista do Nexus com nome e cliente · UF; a rota e o
   endereço de cada usina vêm de quem inclui). Sem o script, o `nome` acha a usina pela regra das Rondas (`CU.achar`: o
   nome igual sem acento nem caixa, ou o único que contém).
@@ -1315,12 +1344,11 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   74,4%), disponibilidade 100,0%, S3 V3, ronda longa pendente, 7 OS atrasadas (a mais antiga há 72 dias), sem luvas desde
   03/11, a PT 15688 De acordo; a busca com 131 usinas, "coracao" leva à usina; a janela do PR e o card da OS abrem; a 375
   px uma coluna, sem rolagem de lado. Testes: `tests/test_campo_central_usina_0411.py`.
-- **2ª rodada (04/11/2026):** "Deixar a lista de 'buscar usina' já no estilo nexus": sem usina escolhida, a lista
-  fica aberta em grade embaixo do campo (`busca_aberta` do `_busca_usina.html`, com a contagem que filtra junto); com a
-  usina, volta a abrir só no foco. "Melhore o visual dos cards, está simples demais e as linhas estão muito coladas": o
-  cabeçalho com as pessoas em selos (as iniciais, o papel e o nome), o quadro com o ícone num selo verde, as linhas
-  separadas por um fio com 13 px de respiro, o ponto da situação nas pendências (`det_linhas(..., marca=)`, a cor da
-  régua da Visão) e a contagem nas linhas de chamados e de PT. Só `.cu-*`: a Visão geral não muda.
+- **2ª rodada (04/11/2026):** "Deixar a lista de 'buscar usina' já no estilo nexus" (a lista aberta em grade que entrou
+  aqui saiu na 3ª rodada: só o campo). "Melhore o visual dos cards, está simples demais e as linhas estão muito
+  coladas": o cabeçalho com as pessoas em selos (as iniciais, o papel e o nome), o quadro com o ícone num selo verde, as
+  linhas separadas por um fio com 13 px de respiro, o ponto da situação nas pendências (`det_linhas(..., marca=)`, a cor
+  da régua da Visão) e a contagem nas linhas de chamados. Só `.cu-*`: a Visão geral não muda.
 - **O relatório da usina para o cliente (2ª rodada):** "é interessante que dê para baixar um relatório da usina também!
   Algo bem profissional para o cliente!". O "Baixar relatório" do cabeçalho abre a janela do mês e dos temas (a do
   Painel: "Tem que poder escolher que nem é no painel"); a rota `responsaveis_usina_relatorio`
@@ -1335,6 +1363,110 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   tabelas; o evento de disponibilidade da usina que junta duas do Gerencial (Coração 1 e 2) diz a parte
   (`os_disponibilidade` leva a `usina` do Gerencial). Prova: o de outubro da Coração 1 e 2 (671,4 MWh, 72% da meta, PR
   101,9%, 99,1%, 4 eventos, 5 tarefas, 0 ronda no mês: a usina só tem a ronda de 03/11 nos 90 dias) em 0,9 s.
+- **3ª rodada (05/11/2026), nove pedidos do Levi:**
+  1. "Nesses KPIS quero campos separados por linhas invisíveis separando cabeçalho e valor / quero que centralize
+     horizontal e verticalmente": cada número da faixa ocupa três linhas da grade (o nome, o valor, o complemento), as
+     MESMAS em todos (`grid-template-rows:subgrid`), cada pedaço no meio da casa; o complemento longo quebra parelho
+     (`text-wrap:balance`).
+  2. e 3. O cabeçalho da Visão (todas as abas) sem a caixa "lido às" do canto: a hora da leitura foi para o "!" amarelo
+     ao lado do título, que outra frente do mesmo dia pôs como padrão do Nexus (`_explica.html`, acima, na Visão do
+     responsável).
+  4. "Quando não tem nenhum usina não precisa amontoar um monte de card de usinas, deixa só a parte de pesquisar
+     mesmo!": a lista aberta em grade da 2ª rodada saiu (e o `busca_aberta` do `_busca_usina.html` com ela); a lista
+     abre no foco, por cima, como nas Rondas.
+  5. "Quero o 'Buscar usinas' do lado direito paralelizando com os botões a visão dos responsáveis!": a busca fica na
+     linha das abas, à direita (`.cu-topo`); abaixo de 700 px, embaixo das abas, na largura toda.
+  6. "Quando clicar em baixar relatórios: escolher qual o mês!": a janela do relatório pergunta primeiro "Qual mês?",
+     com os três meses em botões (o anterior marcado), e depois "Quais temas?".
+  7. "Quero que o gráfico de geração também apareça na visão do responsável > central da usina": o gráfico da janela do
+     PR (a mesma macro, `campo/_graficos.html` · `geracao`) no quadro da Performance, do mesmo leitor
+     (`serie_diaria` + `responsaveis_graficos.geracao`); sem a série no banco, o quadro fica sem ele. Na meia largura os
+     eixos crescem e o valor em cima de cada barra sai (encavalava; o valor do dia fica na dica da coluna). Achado no
+     caminho: o eixo de passo 2,5 escrevia "2" e "8" nas marcas 2,5 e 7,5 (0 casa); agora o eixo com marca quebrada leva
+     uma casa em todas (`_casas`), na janela do PR também.
+  8. "SE NÃO TIVER VERIFICAÇÃO OU CONCLUSÃO NÃO PRECISA APARECER NA TELA": no quadro Chamados só aparece a linha que tem
+     chamado (a dos abertos também, pela mesma regra); sem nenhum, uma frase só.
+  9. "o KPI de PT já tem a informação, ao clicar no KPI aparece o mesmo card que aparece em visão do responsável >
+     painel": o quadro da PT saiu (com ele, as "Pedidas no mês" e o `central_usina.pts_do_mes`); o número da PT abre na
+     janela a lista do Painel, da mesma macro (`lista_pts`), só da usina.
+  Prova (05/11/2026, bancada só leitura com o banco real): a Altair e a Nova Xavantina 2 a 1440 px e a 375 px (sem
+  rolagem de lado; a exclamação no celular presa à tela), a PT de 29 d 22 h na janela do número, o relatório com
+  outubro marcado.
+
+## Visão do cliente (05/11/2026)
+
+De onde veio: a sugestão "Visão do cliente" (Início → Sugestões, 04/11/2026, com o mockup). O Levi decidiu a **fase 1**
+("Sim, fase 1"; "cuida, começa e já vai cuidando"): a tela para a Grid (COS, PCM e Performance), com o login de hoje, em
+Usinas 360° › Visão do cliente (`/t/campo/cliente`), para responder o cliente em segundos, sem abrir cinco telas. A fase 2
+(o cliente entra com o login dele e vê a mesma síntese, só do `cliente_id` dele) e a fase 3 (a equipe saiu da base, a
+hora prevista de chegada, pelo App) estão FORA.
+
+- **O recorte é o `cliente_id` da usina** (o cadastro do Nexus): "contrato" não existe como entidade, e a fase 2 filtra
+  pelo mesmo campo. A conta é feita por cliente, no servidor, e já sai **sem o que é interno**: nada de nome ou telefone
+  de técnico, custo, horas, comentário interno da OS nem causa de falha (a plataforma diz o sintoma, não a causa). O teste
+  `test_a_sintese_nao_leva_nada_interno` trava as chaves que saem. O lugar da usina é só a cidade, **sem o nome da
+  equipe**: o PCM avisou (05/11/2026) que ele pode ser o de uma pessoa (`test_o_nome_da_equipe_nao_sai`).
+- **Nenhuma conta nova; cada número é o da tela dona**:
+  - Status: o tempo real da plataforma (`/api/entrada/tempo-real`) pela ponte SÓ DE LEITURA (`ler_tempo_real`, guardado
+    2 min): a plataforma serve o que já montou e não fala com a API PV (a SunOp é paga). A resposta sem o
+    `X-Nexus-Leitura-Ok: 1` não vale. Usina que o tempo real não traz é "Sem leitura", nunca parada. À noite a plataforma
+    manda status ok com a causa "Sem sol (fora da janela solar)": aqui fica "Sem sol", nunca "Gerando" (na bancada às
+    18:15, as 10 usinas da Athon). A última leitura de outro dia leva a data ("04/11 22:43"; sem ela, parecia de hoje).
+  - Performance do mês: o Gerencial, a mesma linha da Visão do responsável (`meta.prod_kwh` e `meta_kwh`). O do cliente é
+    a **soma** da geração sobre a soma da meta, não a média dos % (a usina grande pesa mais).
+  - Chamados na distribuidora: o Andamento da Ronda COS (a tela Acionamentos), 30 dias, com o protocolo, sem os
+    DISPENSADOS. O Andamento não diz quando a distribuidora resolveu: a tela escreve "nos últimos 30 dias", não "abertos".
+  - OSs: `fato_tarefa_os` pela régua do quadro "OS e manutenção" da Visão (`manutencao.tarefas_por_usina`): fora o
+    backoffice, o Teste, a zeladoria e as OS de chamado. O número é o que **ainda vai ser feito** (a fazer + em
+    execução); a concluída que espera a conferência da Grid fica à parte, porque na bancada a Athon tinha 382 de 422 em
+    conferência: o número do cliente não pode ser a nossa fila de aprovação.
+  - Próxima visita: a programação do PCM (`fato_programacao`, a semana corrente e a próxima), o bloco não finalizado
+    mais cedo de hoje em diante; de hoje, só o que ainda vai começar (o bloco das 09:00 visto às 18:00 já foi feito ou
+    está em execução, não é "a próxima"). O código de plano do PCM ("MPA") vira "preventiva (MPA)".
+- **Fonte que não respondeu = "sem leitura", nunca 0**, com o aviso amarelo no topo dizendo qual; o resto da tela vale.
+  No PC o Andamento não está ligado (os chamados ficam "sem leitura"); no servidor está.
+- A ordem da tabela: quem pede atenção primeiro (parada, sem comunicação, com perda, sem leitura; depois mais chamados,
+  pior %, mais OS a fazer). As sem pendência (gerando ou sem sol, sem chamado, sem OS a fazer e % ≥ 90) ficam dobradas
+  em "+ N usinas sem pendência". A cor da performance é a régua do Gerencial: ≥ 97% verde, ≥ 90% amarelo, abaixo vermelho.
+- No menu, logo depois das Ocorrências (a Visão do responsável e as Ocorrências ficam juntas, regra do teste delas). Sem
+  o cadastro (o banco fora), a tela abre com o aviso, como as outras do Campo, nunca o erro 500.
+- Acesso: a tela é `campo/cliente` em Base › Acessos; tela nova nasce fechada para os setores (só o administrador vê) e
+  quem libera para COS, PCM e Performance é o Levi.
+
+Prova (05/11/2026): `tests/test_campo_visao_cliente_0511.py` (13 testes; e 11 quebras de propósito na conta, todas pegas:
+média no lugar da soma, sem sol vira gerando, sem leitura vira zero, chamado leva tudo, ordem invertida, dispensado
+entra, visita já feita conta, OS de chamado entra, visita de hoje que já passou, tipo sem normalizar, conferência conta
+como aberta) e a bancada só leitura com o banco real e o tempo real de produção: a Thopen (81 usinas, 80 com o status
+igual ao da Entrada; a que a Entrada não trouxe, "Sem leitura") e a Athon (10 usinas, 101,4%), a 1440 px e a 375 px (a
+tabela desliza dentro do quadro; a página não rola de lado).
+
+**O detalhe da usina** (a entrega 2, 05/11/2026, como no mockup): o painel ao lado da tabela (a partir de 1280 px; abaixo
+dela na tela estreita, e a página desce até ele sem ficar sob o topo fixo). Abre na primeira usina que pede atenção; o
+clique na linha troca o painel sem recarregar e o endereço guarda a escolha (`&usina=`, que só vale para usina DESTE
+cliente; a de outro cliente volta para a primeira). Todos os painéis vêm na página (escondidos), da mesma conta: nenhuma
+leitura a mais por clique. O painel tem:
+- o status e a última leitura do monitoramento; as **paradas abertas** (as OS de parada da disponibilidade, a mesma
+  fonte da faixa "Parada agora" da Visão: o escopo, desde quando, o tipo e a OS; sem o código do ativo); a próxima visita;
+- **Hoje**, a linha do dia, só com o que a fonte guarda COM HORA: a parada que começou hoje, o chamado aberto na
+  distribuidora (o envio; sem envio, quando foi registrado) e o protocolo, os blocos de hoje da programação (um por hora e
+  tipo, com a situação pelas tarefas do bloco: em execução, feita, pausada, **não iniciada** quando a hora passou sem
+  começar, ou programada; na bancada da Athon, às 18:50, o bloco das 09:00 dizia "programada"). A OS aberta hoje vai no
+  fim com "hoje" (o fato das OS guarda o dia, não a hora), e a que já está em conferência diz "aberta e concluída" (na
+  bancada, duas OS de religamento abertas no dia já estavam concluídas);
+- os chamados na distribuidora de 30 dias, com o protocolo (ou "sem protocolo ainda"), a distribuidora, a UC, quando
+  abriu e a situação. **Um protocolo de várias UCs é um item só, com as UCs** (`chamados_agrupados`), e na linha do dia
+  uma linha só com "· N UCs": em produção (05/11/2026, Mandaguaçu) a COPEL deu um protocolo para as 4 UCs e o painel
+  repetia a mesma linha 4 vezes. A contagem da tabela e do topo segue por chamado, como a tela Acionamentos;
+- as OS a fazer com a situação, e a contagem das concluídas em conferência.
+
+Defeito achado e corrigido na entrega 2: o instante do Andamento vem com fuso, e a ordem dos chamados usava o
+`datetime.min` sem fuso: um chamado sem `criado_em` derrubava a leitura inteira dos chamados ("sem leitura" na tela).
+
+Prova da entrega 2 (05/11/2026): 23 testes no mesmo arquivo e 21 quebras de propósito, todas pegas (as 12 da entrega 1,
+com a equipe de volta ao lugar, e 9 do detalhe: parada, chamado e protocolo de outro dia no dia, o envio ignorado, o
+bloco que passou como programada, a OS concluída como só aberta, o bloco "feita" com uma tarefa só, o código do ativo e
+a ordem sem fuso); a bancada com o banco real a 1440 px (a tabela de 6 colunas cabe ao lado do painel: 711 px por
+dentro do quadro) e a 375 px (sem rolagem de lado; o clique desce ao painel).
 
 ## Estrutura de O&M de 10/2026: região de campo e gestor de contrato (08/10/2026)
 
@@ -1587,70 +1719,136 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     pedidos ao mesmo tempo, no máximo 4 por segundo, e em segundo plano tenta de novo depois de um 429 (5 s, 10 s); a
     fila é lida ao subir o Nexus (`aprovacao.aquecer`, 20 s depois; `NEXUS_CAMPO_AQUECER=0` desliga). Medido: fila
     inteira em ~20 s.
-  - **Tela para insight** (Levi, 05/10: "refaça essa parte de aprovação de OS para retirada de bons insights";
-    `aprovacao.fila_toda` + `_agrupa_os`): a fila pela conta do App (a cópia devolve 200 linhas por chamada; as páginas
-    são juntadas, ~4 s na 1ª, e a conta fica pronta logo depois de cada releitura). **A fila INTEIRA, sem período**
-    (Levi, 08/10: "não deve ter filtro 'OS fechadas nos X dias' ... ficar preso nessa visão é foda"): a conta do App só
-    conta por janela, e `aprovacao.FILA_INTEIRA` = 3650 dias (o teto do `_janela`), que pega toda OS em verificação; é
-    essa a conta que a releitura deixa pronta (antes, a de 30 dias). Seis indicadores (esperando, prontas para aprovar,
-    pedem olho, paradas há 30 dias, espera máxima, uso do App) e a barra da idade da fila: os números são da fila toda;
-    o clique filtra os cartões e a tabela, sempre as MESMAS OS que o número conta ("paradas há 30 dias" = `idade=30-`,
-    30 dias ou mais; até 08/10 levava à faixa 31 a 60 e, com a fila inteira, escondia as mais antigas). **Uma visão só,
-    a dos cartões** (08/10: "a visão de por técnico e fila pode matar"), hoje **por região de campo** (estrutura de O&M
-    de 10/2026; alternância "por gestor de contrato", `por=gestor`), o que mais tem parada há 30 dias primeiro: a
-    equipe, a região e o gestor saem do cadastro pela usina do Fracttal; o cartão da região diz o Supervisor de Campo, o
-    Coordenador e quem aprova ali; OS de usina sem de-para cai no cartão "Sem cadastro" e a de equipe fora da estrutura
-    em "Sem região de campo", os dois por último. **O cartão abre a tabela das OS dele** (`?ver=`;
-    08/10: "quando clica aparece a OS, dia, data da criação da OS, data fim, supervisor, prontas, pedem olho, fora do
-    App, uso do App, nota média e devolvidas"), nessa ordem, uma linha por OS: Dia = dias esperando (a tarefa mais
-    antiga); criação = `creation_date` da OS, que vem na MESMA linha do REST que a fila já lê (sem pedido novo;
-    conferido em 08/10 nas 1.583 linhas em verificação guardadas pela Engenharia, todas com a data); datas em Brasília
-    (o Fracttal fala UTC); Prontas, Pedem olho e Fora do App = tarefas da OS em cada grupo; Uso do App = % das tarefas
-    pelo App; Nota média = das tarefas pelo App; Devolvidas = tarefas já devolvidas. Medido em 05/10 (90 dias): 1.827 OS
-    e 4.736 tarefas esperando; 937 prontas; 1.780 tarefas paradas há 30 dias ou mais; uso do App 41%.
-  - **Por responsável da UFV, com o card da OS (18/10/2026)** (Levi: "está por região e gestor de contrato quero apenas
-    por responsável da UFV, quando abrir aparece uma lista das usinas que tem OSs não concluídas, ao clicar na linha
-    aparece o mesmo card que aparece ao clicar na OS do histórico de OS do OS Creator Web"; e, no quiz do mesmo dia: só
-    as OS esperando aprovação, a usina abre as OS dela, aprovar pelo Concluir do card, os indicadores do responsável
-    escolhido). Os cartões por região de campo e por gestor de contrato, o `ver=`, o `por=` e os filtros de equipe,
-    região e gestor SAÍRAM (o endereço velho abre a lista). O filtro é o **Responsável O&M da usina** (`responsavel=`,
-    "*" = todos; quem entrou pelo Fracttal e é responsável já vem nele, `_responsavel_logado_pelo_cadastro`); o
-    responsável e o cliente vêm do cadastro pela usina do Fracttal (`por_nome` de `visao.usinas_do_fracttal`; usina sem
-    de-para sai com o nome do Fracttal, só em "Todos"). **A lista é uma linha por usina** (`_usinas_da_fila`: as OS, os
-    três grupos, a mais antiga e o uso do App; a com mais OS paradas há 30 dias, e depois a que espera há mais tempo,
-    primeiro) que abre a tabela das OS dela (a mais antiga primeiro; colunas OS, Dia, criação, fim, Técnicos, Grupo,
-    Prontas, Pedem olho, Fora do App, Uso do App, Nota média, Devolvidas; o porquê do grupo, `aprovacao.motivos`, fica
-    no selo do Grupo, no mouse). **A OS abre o card do OS Creator** (`NexusOsCard.abrir`, status "Em Verificação"): o
-    Concluir dele aprova, com o login do Fracttal de quem clica, como no OS Creator Web (a regra de "só o supervisor de
-    campo da região ou admin" era do botão do Nexus, que saiu da tela). Fechado o card com mudança, a tela chama
-    `POST /t/campo/aprovacao/<id>/conferir`: só sai da fila guardada a OS que o Fracttal já não tem em verificação (1
-    pedido de leitura, `work_orders?id_status_work_order=2&wo_folio=`), e ninguém esconde OS da fila. Os seis
-    indicadores e a idade são do responsável escolhido e filtram a lista. CSV: OS, dias, criação, fim, Responsável O&M,
-    usina, cliente, técnicos, tarefas, os grupos, uso do App, nota, devolvidas e o grupo.
+  - **A fila INTEIRA, sem período** (Levi, 08/10: "não deve ter filtro 'OS fechadas nos X dias' ... ficar preso nessa
+    visão é foda"): a conta do App (`aprovacao.fila_toda`; a cópia devolve 200 linhas por chamada e as páginas são
+    juntadas) só conta por janela, e `aprovacao.FILA_INTEIRA` = 3650 dias (o teto do `_janela`) pega toda OS em
+    verificação. **Contada por OS** (05/10: "ele não consegue aprovar uma tarefa em si, e sim uma PT ou uma OS";
+    `_por_os`): a espera é a da tarefa mais antiga, a nota é a pior. A criação é o `creation_date` da OS, que vem na mesma
+    linha do REST; datas em Brasília (o Fracttal fala UTC). Medido em 05/10 (90 dias): 1.827 OS e 4.736 tarefas.
+  - **O quadro por fatos (05/11/2026)** (Levi, 04/11: "No nexus, em campo app crie uma aba de aprovação de OS. Pode fazer
+    por cima da aba Aprovação de OS, refaça com essas regras e deixe algo bem fácil e dinâmico para os supervisores!"; no
+    quiz: todos os supervisores veem; "uma a uma pelo card, tem que ter um botão de aprovar logo após todo o score e
+    avisos, deve ser possível também aprovar mais que uma de uma vez!"; três colunas). A lista por usina, os seis
+    indicadores e a barra da idade (18/10) saíram; o endereço velho (`ver=`, `por=`, `balde=`, `idade=`, `vista=`) abre
+    o quadro. Desenho: `docs/superpowers/specs/2026-11-05-aprovacao-por-fatos-design.md`.
+    - **As colunas** (`nexus/campo/prefiltro.py`, `classificar`; medidas nas 30 OS de 26/10, relatório "Pré-filtro da
+      Verificação: fatos primeiro"). **Não OK**: foto anexada mais de `NEXUS_PREFILTRO_HORAS_TARDE` (24) h depois do
+      último fechamento da OS no App; pegou 4 devolvidas e nenhuma aprovada. A anexação é o `Last-Modified` do arquivo no
+      S3 (o REST de anexos não dá data); o fechamento, em cada linha do `qualidadelog` da OS, a maior entre a hora do
+      celular (`dev_ts`) e a da chegada no servidor (`server_ts`), e a última das linhas (`fechado_app` na conta pronta;
+      sem ela, a anexação não é julgada). A chegada conta porque o celular sem sinal sobe o fechamento e as fotos juntos
+      dias depois (era Não OK falso). Só as fotos das tarefas do App são julgadas, pelo id da tarefa: na OS mista, a tarefa
+      fechada fora do App tem as fotos anexadas na hora dela. **Em dúvida**: foto repetida (dHash de 256 bits dos 75% de
+      cima, SEM o carimbo do App, que muda a cada anexo; diferença até `NEXUS_PREFILTRO_DIF` 12; captura de tela, sem
+      "GPS " na descrição, só até `NEXUS_PREFILTRO_DIF_PRINT` 4, porque telas parecidas enganam), tarefa fechada fora do
+      App ou foto que não abriu no Nexus (upload cortado). **Pronta**: nenhum fato. A OS fica na pior coluna; um fato
+      com fotos ainda por ler já a põe na coluna pior, com "Faltam fotos por ler"; sem fato e sem as fotos lidas, ela
+      fica em **Ainda conferindo** (abaixo do quadro: aprova pelo cartão, não entra no lote). A OS **fechada inteira fora
+      do App não espera foto nenhuma** (05/11/2026): as fotos não mudam a coluna dela (Em dúvida pela tarefa fora do App; a
+      foto atrasada só se mede contra o fechamento no App), então vai direto para Em dúvida, sem "Faltam fotos por ler",
+      e entra no lote. A regra do App de antes
+      (nota abaixo de 80, já devolvida, foto divergente, ronda; `aprovacao.motivos`) virou só aviso, sem mudar a coluna.
+      "Menos de 5 min no App" e "subtarefas respondidas" não separaram na medição e ficaram de fora.
+    - **Fora do pré-filtro** (abaixo do quadro, com o motivo; aprova pelo cartão; **não entra na conta** das OS
+      esperando, Levi 05/11/2026: "O que tiver fora do pré filtro não é contabilizado"): religamento, pelo tipo ou pela
+      tarefa, e a etiqueta PERFORMANCE (Levi, 04/11: "religamento remoto ou religamento real não entra, nem OSs com
+      etiqueta de performance!"); a etiqueta CHAMADOS e as OS criadas pelo COS, como nas OSs em verificação do Painel.
+      **A ENGENHARIA entra no pré-filtro** (Levi, 05/11/2026: "Engenharia entra no pré filtro"; `prefiltro.ETIQUETAS_FORA`
+      olha todas as etiquetas da OS); no Painel ela segue de fora (`verificacao.etiqueta_fora`, a regra de 29/10). Com
+      isso a leitura de fundo passa a conferir também as OS da Engenharia (um GET por OS). Quem é do COS vem da última
+      conta (`verificacao.cos_guardado`, a da volta).
+    - **As fotos, por trás** (`nexus/campo/prefiltro_fundo.py`): depois de cada releitura da fila (`aprovacao._reler`) e
+      no boot com a fila do disco (`_preparar`), uma thread `nexus-prefiltro` declarada de fundo no porteiro confere as
+      OS do escopo sem fatos (ou cujas tarefas mudaram), a mais nova primeiro: UM GET de anexos por OS no Fracttal
+      (`work_orders_attachments?folio=`, 100 por página) e as imagens pelo S3, fora da cota de 200/min; no máximo
+      `NEXUS_PREFILTRO_POR_VOLTA` (150) OS por volta e `NEXUS_PREFILTRO_PAUSA_S` (2) s entre elas (também depois de um
+      erro). **O 429** (o Fracttal recusou pela cota) espera `ESPERA_RECUSA_S` (60 s) e segue com a próxima OS; com
+      `RECUSAS_POR_VOLTA` (5) recusas seguidas a volta para e guarda o que leu (até 05/11/2026 parava na 1ª e só voltava
+      na releitura da fila, 10 min depois). **Só o que muda a coluna** (05/11/2026, "Tem 730 OSs conferindo fotos, veja
+      se travou algo para seguir"; medido em produção: 72 OS conferidas em 90 min, com 522 OS fechadas inteiras fora do
+      App, 2.664 tarefas, uma com 66, na fila de leitura na frente das 728 feitas pelo App): a OS sem tarefa do App não é
+      lida, e na OS mista só as fotos das tarefas do App são baixadas (a repetida entre uma foto do App e uma de fora não
+      é mais vista; a OS mista já é Em dúvida pela tarefa fora do App). Quem é do App vem da conta pronta da fila
+      (`aprovacao.tarefas_do_app`, sem refazer a conta); sem ela, lê como antes. **A OS conferida é relida** (revisão de 05/11/2026): ela é lida
+      minutos depois de entrar na verificação, e a foto anexada dias depois só existe depois; relê uma vez quando a janela
+      de 24 h desde o fim no Fracttal fecha e, depois, uma vez por dia enquanto espera, baixando só as fotos novas (o id é
+      o caminho no S3). As OS novas passam na frente das relidas. Foto que não baixou deixa a OS sem fatos (meia leitura
+      nunca vira Pronta); três falhas seguidas e ela espera 6 h. Foto que baixou e não abre fica "não abriu", sem hash.
+      Fica o hash, a hora de anexação e o campo, nunca os bytes. **Sem miniatura** desde 05/11/2026 (Levi: "nem
+      precisa mostrar a foto de cara não... pode mostrar o nome das fotos e se a pessoa clicar ela vai abrir o card da
+      OS"): a imagem ainda é baixada, porque a repetida compara a própria imagem (a mesma foto em dois campos ganha nome
+      e carimbo diferentes), mas não se guarda miniatura e a rota `/t/campo/aprovacao/foto/<id>` saiu; as miniaturas de
+      antes (`dados/campo/prefiltro_fotos/`) saem quando a OS deixa a fila.
+      Memória e `dados/campo/prefiltro.json.gz`, gravada a cada 10 OS (cada push reinicia o servidor); a volta carrega o
+      disco antes de ler, a OS que sai da fila sai dali com as miniaturas e a fila vazia (soluço) não apaga nada. Medido
+      nas 476 fotos da medição: 10 ms de CPU e 144 KB por foto, 16 fotos por OS. **Onde roda** (`prefiltro_fundo.ligado`):
+      `NEXUS_PREFILTRO` decide quando dito (0 desliga); sem ele, segue o `NEXUS_CAMPO_AQUECER` (o servidor lê, o PC não;
+      a cópia de prova põe 0). **A visita só lê memória** (nem Fracttal, nem banco, nem S3).
+    - **O cartão** (2ª rodada, 05/11/2026: o modelo do cartão do Quadro da equipe da Engenharia, "porém com o botão
+      aprovar"; a coluna e o cartão com o fio na cor da coluna, o cartão na superfície 2), nesta ordem: no topo a OS em
+      **verde Grid, sem sublinhado** ("tire esse underline estranho!") e os dias; logo abaixo o **motivo da coluna em
+      destaque** (`apq-motivo`: "Sempre destacar o motivo de estar em dúvida ou não OK! tem que estar bem visual e
+      acessível"): o fundo e o fio na cor, o ícone e a mensagem na cor da coluna, sem repetir o nome da coluna (3ª rodada:
+      "tire esse 'EM DÚVIDA' da OS deixe só a mensagem em laranja"), com os fatos que puseram a OS ali
+      (`prefiltro.TIPOS_DO_MOTIVO`: tarde, repetida, não abriu, fora do App); em Fora do pré-filtro e Ainda conferindo, o
+      mesmo bloco, neutro; depois a tarefa (a 1ª, "e mais N") com a nota do App ao lado (pequena; "Fora do App" sem ela);
+      a linha de baixo com quantas tarefas, a UFV e o cliente (o ativo já vem no título: "não precisa repetir o nome do
+      ativo abaixo, ao invés disso bote a quantidade de tarefas"); os outros avisos (a regra do App, as fotos por ler); e
+      o pé com o técnico (as iniciais), quando as fotos foram conferidas e, na ponta direita, o **Aprovar** pequeno. A
+      caixa de marcar é a do Nexus (o fundo da superfície e o fio; marcada, o verde com o visto), não a nativa, branca no
+      tema escuro. **A barra lateral** (3ª rodada: "clica no número da OS ou no próprio card da OS e abre uma barra
+      lateral detalhando qual é a pendência, em que tarefa é (...) poupa informação inicial e vai aprofundando"): o
+      número e o cartão (fora da caixa e dos botões; o Enter também) abrem a barra das Rondas (`rd-gaveta`, 1/3 da tela à
+      direita), que busca `/t/campo/aprovacao/<id>/detalhe` (`_aprovacao_detalhe.html`, só memória, 404 fora da fila):
+      a OS, a coluna, a UFV e o responsável; cada fato com a prova (a hora do fechamento no App e cada foto atrasada com o
+      campo, a tarefa e a hora de anexação; os pares repetidos; as tarefas fechadas fora do App); as tarefas da OS (pelo
+      App com a nota e os avisos do App, ou fora do App); e o estado das fotos. O número de cada foto e o "Abrir o card da
+      OS" abrem o card do OS Creator (`NexusOsCard.abrir`, status "Em Verificação"), onde as fotos estão; o "Baixar o PDF
+      da OS" é o do OS Creator (`POST /os/api/os/pdf`, o mesmo das OSs em verificação do Painel; Levi: "Quero o botão de
+      baixar o PDF da OS!"); o Aprovar da barra é o do cartão. Logo depois do score e dos avisos vem o **Aprovar** = o Concluir do OS Creator (`POST /os/api/os/<id>/concluir` com
+      `{folio}`, a rota do Painel do responsável e do OS Creator Web: status 3 + recalculate + reconferência da data de
+      fim), com o login do Fracttal de quem clica; IRREVERSÍVEL, pede confirmação; o 401 vira "Entre no OS Creator com a
+      sua conta do Fracttal". Aprovada só com `ok: true` na resposta: sem a sessão do Nexus, o portão dá 302 para /entrar
+      e o fetch recebe 200 em HTML, que NÃO é aprovada ("A sua sessão do Nexus acabou"). A conferência
+      (`POST /t/campo/aprovacao/<id>/conferir`: só sai da fila guardada o que o Fracttal já não tem em verificação, 1
+      pedido de leitura; ninguém esconde OS da fila) tira o cartão, e a cópia da fila em disco é regravada uma vez por vez
+      (`aprovacao._regravar`: a que chega durante outra só marca que falta). A leitura (a fila de verificação, a hora em
+      que foi lida, as notas do App e quantas OS tiveram as fotos conferidas) fica no "!" amarelo do título, não no canto
+      (Levi, 05/11/2026: "pode deixar no disclaimer da exclamação em amarelo").
+    - **O lote**: caixa de marcar só em Pronta e Em dúvida (não na OS com "Faltam fotos por ler", que pode virar Não OK),
+      "Selecionar todas" por coluna e "Aprovar as marcadas (N)", com a confirmação que diz quantas e de que coluna. Uma OS
+      a cada 4 s (`PAUSA_LOTE_MS`: cada aprovação custa 5 a 7 pedidos ao Fracttal), com o andamento; para no que se
+      repetiria em todas (401 do Fracttal, 403, 429 e 5xx, a sessão do Nexus e 3 erros seguidos), e o outro erro fica no
+      cartão e o lote segue. O quadro é montado na visita e não muda sozinho na frente da pessoa.
+    - **Prova no Fracttal de verdade (05/11/2026)**: a OS 18630 (TESTE - PA, TESTE100-CHSC1), criada pela rota da OS
+      tradicional com 3 fotos (duas iguais), posta em Em Verificação e lida numa cópia local do código novo (a fila só com
+      ela, sem ler a fila inteira no horário de campo): caiu em Em dúvida com "Foto repetida: p03 é a mesma imagem de p01"
+      (as duas miniaturas baixadas do S3) e "fechada fora do App"; o Aprovar do cartão concluiu, a conferência tirou o
+      cartão e o REST leu de volta o status 3. Para pôr uma OS de teste em verificação: a OS "já realizada" com
+      `to_in_review` nasce Em Processo (o Fracttal ignora calado); vale `api.mudar_status_os(wid, 2)` na sessão de quem
+      entrou (rota de prova só da cópia).
+    - **Pendente** (05/11/2026): o veredito no banco (o fato `fato_prefiltro_os`, a medida da sombra contra a decisão do
+      supervisor; a Task 6 do plano); e, para as capturas de tela do mesmo layout (que só mudam os números), um hash maior
+      (32×32), a medir nas 30 OS antes de mudar a regra.
+    - **Filtros**: o Responsável O&M da usina vai ao servidor (`responsavel=`, "*" = todos; quem entrou pelo Fracttal e é
+      responsável já vem nele, `_responsavel_logado_pelo_cadastro`; o responsável e o cliente vêm do cadastro pela usina
+      do Fracttal, `visao.usinas_do_fracttal`); cliente e busca (OS, UFV, técnico, sem acento) filtram na página e
+      recontam as colunas. CSV: OS, dias, criação, fim, Responsável O&M, usina, cliente, técnicos, tarefas, nota do App,
+      a coluna ("Fora do pré-filtro (motivo)") e os motivos. No celular as colunas deslizam de lado dentro do quadro.
+      Prova: `test_campo_aprovacao_responsavel.py`, `test_campo_aprovacao_visual_0511.py` (a 2ª rodada),
+      `test_campo_aprovacao_gaveta_0511.py` (a 3ª), `test_campo_prefiltro.py` e `test_campo_prefiltro_fundo.py`.
   - **A conta pronta (18/10/2026, "Está demorando muito para carregar")**: a regra do App sobre a fila inteira leva uns
     3,5 s só de conta (medido em 18/10 com uma fila falsa de 5.500 tarefas), mais a leitura das notas no banco, e a
     cópia de 5 min (`leitura.ler`) vencia entre uma releitura e outra: quase toda visita pagava, e cada filtro de região
     fazia a sua. Agora `aprovacao.fila_toda` guarda a conta da fila inteira até a fila mudar (`_PRONTA`, pela hora da
     leitura), feita logo depois da releitura e ao subir com a fila do disco (`_preparar`), e a tela filtra sobre ela. A OS
     que sai da fila (`tirar_da_fila`) sai da conta pronta também. Prova: `test_a_visita_nao_refaz_a_conta_da_fila`.
-  - **Contada por OS, não por tarefa** (Levi, 05/10: "ele não consegue aprovar uma tarefa em si, e sim uma PT ou uma
-    OS"; `_por_os`, `_agrupa_os`): a OS fica no pior grupo das tarefas dela (olho > fora do App > completa), a espera é
-    a da tarefa mais antiga, a nota é a pior; indicadores, idade, cartões e técnicos em OS. A linha aberta mostra cada
-    tarefa com o grupo e os motivos dela.
-  - **A linha aberta diz o porquê do grupo e aprova** (Levi, 05/10): `aprovacao.motivos` = a regra `_triagem` do App
-    mostrando TODOS os motivos que valem (nota abaixo de 80, ronda com pendência, já devolvida, tempo fora por causa
-    do técnico, foto divergente; ou por que está completa). **Aprovar = o Concluir do OS Creator Web** ("usando o
-    mesmo caminho que o OS Creator Web"), com o login do Fracttal de quem clica (status 3 + recalculate +
-    reconferência da data de fim; IRREVERSÍVEL, pede confirmação). O id da OS vem da fila crua.
   - **O portão do Aprovar do Nexus saiu (18/10/2026, Levi: "pode tirar a rota antiga!")**: de 08/10 a 18/10 o Aprovar
-    da linha chamava `POST /os/_nexus/aprovacao/<id>/aprovar`, que só deixava o Supervisor de Campo da região da usina
-    (com a vaga aberta, o Coordenador) ou um administrador. Com a OS abrindo o card do OS Creator, cujo Concluir aprova
-    (a mesma rota do clone, `/os/api/os/<id>/concluir`, como no OS Creator Web), o botão saiu da tela e a rota, o
-    `aprovar_os.py` e a conta de quem aprova por região (`visao._Base._aprovador`) saíram do servidor. O papel de quem
-    entrou pelo Fracttal, que as outras telas usam para vir filtradas, mora em `papel.py`. A OS aprovada pelo card sai
-    da lista pela conferência (`POST /t/campo/aprovacao/<id>/conferir`, acima).
-    **Até 08/10 o script desta tela não rodava**: o `confirm()` do Aprovar tinha uma quebra de linha dentro da string
-    (SyntaxError no navegador), então nem a linha abria nem o Aprovar funcionava; um teste roda `node --check` no script.
+    chamava `POST /os/_nexus/aprovacao/<id>/aprovar`, que só deixava o Supervisor de Campo da região da usina ou um
+    administrador; a rota, o `aprovar_os.py` e a conta de quem aprova por região saíram do servidor. Desde então aprova
+    quem o Fracttal deixar, pelo Concluir do OS Creator (o do cartão, acima). O papel de quem entrou pelo Fracttal, que as
+    outras telas usam para vir filtradas, mora em `papel.py`. **Até 08/10 o script desta tela não rodava** (um
+    `confirm()` com quebra de linha dentro da string): um teste roda `node --check` no script.
     **Cuidado com a cota:** cada reinício do Nexus relê a fila (55 páginas; as rondas aprovadas vêm do arquivo desde 06/10); em 05/10, com
     muitos reinícios seguidos, o Fracttal passou a recusar (429). Em desenvolvimento, `NEXUS_CAMPO_AQUECER=0`.
 
@@ -1662,8 +1860,10 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   `montar`, `bloco`, `soma`, e os leitores das janelas (`serie_diaria`, `tabela_meta`, `disp_diaria`,
   `os_disponibilidade`); desde 18/10/2026, a Limpeza (`limpeza`), as paradas abertas (`paradas_abertas`) e o bloco
   Manutenção (`manutencao_fonte`, `alertas_manutencao`, `linha_manutencao`, `com_manutencao`, `limite_do_pedido`).
-- `central_usina.py`: a Central da usina (04/11/2026, acima): a busca, os técnicos, as ocorrências, a Segurança e as PT
-  do mês da usina escolhida; o resto é a linha dela na Visão.
+- `central_usina.py`: a Central da usina (04/11/2026, acima): a busca, os técnicos, as ocorrências e a Segurança da
+  usina escolhida; o resto é a linha dela na Visão.
+- `visao_cliente.py`: a Visão do cliente (05/11/2026, acima): o recorte por `cliente_id`, o status pelo tempo real,
+  as OS, os chamados e a próxima visita por usina, os 5 números e a ordem; a leitura do tempo real pela ponte.
 - `relatorio_usina.py`: o relatório da usina em PDF para o cliente (04/11/2026, acima): os meses, os temas, os dados
   das telas donas e o PDF (reportlab, a paleta e a fonte dos outros relatórios).
   `manutencao.py`: a conta pura do bloco Manutenção. `tarefas_os.py`: o laço que lê as tarefas das OS do Fracttal e
@@ -1688,7 +1888,7 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
 Telas: `templates/campo/*.html` + `static/campo.css`; filtros pela URL.
 
 Prova: `tests/test_torre_campo.py` (nenhuma tela com Azure, moldura ou "Abrir no App"), `test_campo_responsaveis.py`
-(a Visão do responsável), `test_campo_ocorrencias.py` (as ocorrências com plano de ação), `test_campo_chamados_acompanhamento.py` (os chamados no banco), `test_campo_visao.py` (as
+(a Visão do responsável), `test_campo_ocorrencias.py` (as ocorrências com plano de ação), `test_campo_visao_cliente_0511.py` (a Visão do cliente), `test_campo_chamados_acompanhamento.py` (os chamados no banco), `test_campo_visao.py` (as
 contas nossas, a Central em três visões e a aprovação da PT com o login do OS Creator, banco falso), `test_campo_ronda_avulsa.py` (lançar, cobertura, selo, recusas, anulação, catálogo; 08/10: vala do App, sensor em três estados, anulação sem dia nem usina, o caminho de gravação que a importação usa), `test_campo_importar_avulsas.py` (a importação da validação por foto com planilha sintética: de-para exato, data mais recente, "Sem foto", a pessoa que tem de ser uma ficha com e-mail, gravação, conferência linha a linha, idempotência, fora do fato de ronda), `test_campo_rondas_pedido_0810.py` (Rondas de 08/10: colunas e dica da duração, Fotos na tabela, nunca tiveram ronda, Sem ronda, criticidade, Quem ronda em blocos com as pendentes, Painel), `test_campo_sujidade.py`, `test_campo_zeladoria_semanal.py` (a Zeladoria de 26/10/2026), `test_campo_regras_app.py`, `test_campo_aprovacao.py`, `test_campo_fila_rapida.py`,
 `test_campo_aprovacao_supervisor.py` (08/10: fila inteira, cartões por região e por gestor, a tabela, o portão do
 Aprovar: supervisor de campo, coordenador com a vaga aberta, só admin sem os dois ou sem a estrutura publicada, gestor

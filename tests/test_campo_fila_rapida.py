@@ -108,11 +108,11 @@ def test_o_filtro_e_so_o_responsavel_e_os_de_antes_nao_valem_mais(fila_e_cadastr
     Fracttal é a Usina A do cadastro; os filtros de equipe e de região de campo de antes são ignorados."""
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
     assert 'name="responsavel"' in html and 'name="equipe"' not in html and 'name="regiao_campo"' not in html
-    assert "Usina A</b>" in html and ">15102<" in html and ">15088<" in html and ">15002<" in html
+    assert "Usina A</b>" in html and all(f'data-folio="{f}"' in html for f in ("15102", "15088", "15002"))
     html = logado.get("/t/campo/aprovacao?equipe=SC+Oeste+01&regiao_campo=Sul+01").get_data(as_text=True)
-    assert ">15102<" in html                                                      # o endereço velho abre a lista
+    assert 'data-folio="15102"' in html                                            # o endereço velho abre o quadro
     html = logado.get("/t/campo/aprovacao?responsavel=Ningu%C3%A9m").get_data(as_text=True)
-    assert "Nada na fila com esses filtros" in html and ">15102<" not in html
+    assert "Nenhuma OS aqui." in html and "data-folio=" not in html
 
 
 # ── OS Creator: sessão do Fracttal vencida volta ao login ──────────────────────────────────────────────────────
@@ -137,17 +137,13 @@ def test_jwt_vencido_no_os_creator_volta_ao_login(logado, monkeypatch):
 
 
 def test_aprovacao_para_insight(fila_e_cadastro, logado):
-    """Levi, 05/10: "refaça essa parte de aprovação de OS para retirada de bons insights"."""
+    """Levi, 05/10: "refaça essa parte de aprovação de OS para retirada de bons insights"; desde 05/11/2026 o quadro por
+    fatos ("deixe algo bem fácil e dinâmico para os supervisores!")."""
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
-    # abre na lista das usinas (do cadastro, pela usina do Fracttal "SP 01"), com os números de cada uma
-    assert 'class="ap-usinas"' in html and "Usina A</b>" in html and "Usinas com OS esperando aprovação" in html
-    assert "Prontas para aprovar" in html and "Precisam do seu olho" in html and "Uso do App" in html
-    assert "Idade da fila" in html and "31 a 60 dias" in html                       # a OS 15002 espera 33 dias
-    # os indicadores e a idade filtram a lista
-    html = logado.get("/t/campo/aprovacao?balde=completa").get_data(as_text=True)
-    assert ">15102<" in html and ">15088<" not in html
-    html = logado.get("/t/campo/aprovacao?idade=31-60").get_data(as_text=True)
-    assert ">15002<" in html and ">15102<" not in html and "Usina A</b>" in html
+    # a usina do cadastro (pela usina do Fracttal "SP 01") no cartão de cada OS, e o total de OS esperando no alto
+    assert 'class="apq-quadro"' in html and "Usina A</b>" in html
+    assert '<b class="gc-num">3</b> OS esperando aprovação' in html
+    assert 'data-folio="15002"' in html and "33 d" in html                       # a OS 15002 espera 33 dias
     r = logado.get("/t/campo/aprovacao?csv=1")
     assert r.mimetype == "text/csv" and "15102" in r.get_data(as_text=True)
 
@@ -164,7 +160,7 @@ def test_linha_da_fila_diz_por_que_do_grupo_e_aprova_pelo_os_creator(fila_e_cada
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
     # o porquê do grupo fica no selo da OS; a OS abre o card do OS Creator, cujo Concluir aprova (Levi, 18/10/2026)
     assert "Nota do registro 71%" in html and 'data-wo="15088"' in html and "NexusOsCard.abrir(" in html
-    assert "Aprovar a OS 15088" not in html
+    assert "nexusRota('/os/api/os/')" in html and "/os/_nexus/aprovacao/" not in html   # o Aprovar é o Concluir do OS Creator
     # o voltar do login do Fracttal (o da assinatura da PT) só leva a telas do Campo
     assert logado.get("/os/_nexus/voltar?para=/t/campo/aprovacao%3Fver%3DSudeste%2B03").headers["Location"].endswith("/t/campo/aprovacao?ver=Sudeste+03")
     assert logado.get("/os/_nexus/voltar?para=https://fora.test/x").headers["Location"].endswith("/t/campo/aprovacao")
@@ -173,13 +169,13 @@ def test_linha_da_fila_diz_por_que_do_grupo_e_aprova_pelo_os_creator(fila_e_cada
     antes = len(regras_app._FILA_CACHE["linhas"])
     assert _ap.tirar_da_fila(15088) == 1
     assert len(regras_app._FILA_CACHE["linhas"]) == antes - 1
-    assert ">15088<" not in logado.get("/t/campo/aprovacao").get_data(as_text=True)
+    assert 'data-folio="15088"' not in logado.get("/t/campo/aprovacao").get_data(as_text=True)
 
 
 def test_a_fila_e_contada_por_os():
     """Levi, 05/10: "Está separando por tarefa, não faz sentido, ele não consegue aprovar uma tarefa em si, e sim uma PT
     ou uma OS". A OS fica no pior grupo das tarefas dela; a espera é a da tarefa mais antiga."""
-    from nexus.torres.campo import _agrupa_os, _por_os
+    from nexus.torres.campo import _por_os
     t = lambda os_, balde, espera, **kw: {"os": os_, "id_wo": int(os_), "balde": balde, "espera_d": espera,
                                           "tecnico": kw.get("tec", "Ana Souza"), "fim": "2026-10-01",
                                           "pelo_app": balde != "fora_do_app", "qualidade": kw.get("q", 90),
@@ -190,5 +186,3 @@ def test_a_fila_e_contada_por_os():
     assert (por["100"]["balde"], por["100"]["espera_d"], por["100"]["nota"]) == ("olho", 9, 70)
     assert por["200"]["balde"] == "completa" and por["300"]["balde"] == "fora_do_app"
     assert por["300"]["tecnicos"] == ["Ana Souza", "Bia Lima"] and oss[0]["os"] == "300"     # a mais antiga primeiro
-    sup = _agrupa_os(oss, lambda o: [o["regiao_cad"]])[0]
-    assert (sup["ordens"], sup["tarefas"], sup["completa"], sup["olho"], sup["fora_do_app"], sup["aged30"]) == (3, 5, 1, 1, 1, 1)

@@ -5,33 +5,39 @@
    administradores eram só a NEXUS_ADMINS do .env do servidor. O desenho é o das telas do Cadastro (cad-*): faixa de
    números, seções com tabela, avisos por cor e palavra. Regras e o porquê em nexus/casca/CLAUDE.md, seção Acessos. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+{% from "_explica.html" import explica %}
 <p class="gc-eyebrow">Base · Acessos</p>
 <div class="cad-topo">
   <div>
-    <h1 class="titulo-pagina">Acessos</h1>
-    {% if aba != 'pessoas' %}<p class="cad-sub">O que cada setor vê no Nexus, quem é administrador e quem entrou nos últimos 30 dias.</p>{% endif %}
+    {# o "!" do título explica a aba aberta (2ª revisão de 05/11/2026: os "Como vale." ficavam soltos na tela; o padrão
+       do Nexus é o _explica.html, DESIGN.md seção 6). Pessoas e setores não tem o que explicar ali #}
+    <div class="gc-titulo-explica"><h1 class="titulo-pagina">Acessos</h1>
+      {% if aba == 'admins_app' %}{% include "acessos/_admins_app_explica.html" %}
+      {% elif aba == 'telas' %}{% call explica('Entenda esta tela') %}
+      <p><b>Como vale.</b> Dar ou tirar o acesso vale no próximo clique da pessoa no Nexus, sem ela precisar sair e entrar.
+        Os administradores <em>do servidor</em> (a <span class="gc-dado">NEXUS_ADMINS</span> do .env) só mudam com a T.I. e
+        não saem por aqui; a senha de administrador vale sempre. Administrador vê tudo, com ou sem setor: o setor dele só
+        aparece na lista, não restringe. Nas telas da Performance, a sessão que a moldura já abriu guarda o acesso de antes
+        até ser renovada (no máximo 11 horas).</p>
+      {% endcall %}{% endif %}</div>
+    {% if aba == 'telas' %}<p class="cad-sub">O que cada setor vê no Nexus, quem é administrador e quem entrou nos últimos 30 dias.</p>{% endif %}
   </div>
 </div>
 {# as abas (25/10/2026, Levi: "gostaria que não tivesse uma tela só para integração fractall e sim fosse para acessos"):
-   a antiga tela Base > Integração Fracttal é a aba Pessoas e setores; só ela lê o Fracttal #}
+   a antiga tela Base > Integração Fracttal é a aba Pessoas e setores, que lê o Fracttal. A dos administradores do
+   App de Campo (05/11/2026: "os administradores do App de Campo [...] têm de ser escolhidos no Nexus") é a terceira e
+   usa a cópia dela; a de telas não lê o Fracttal #}
 <nav class="gc-subabas" aria-label="Acessos">
-  <a href="{{ url_for('torre_base.acessos') }}"{% if aba != 'pessoas' %} aria-current="page"{% endif %}>Telas e administradores</a>
+  <a href="{{ url_for('torre_base.acessos') }}"{% if aba == 'telas' %} aria-current="page"{% endif %}>Telas e administradores</a>
   <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}"{% if aba == 'pessoas' %} aria-current="page"{% endif %}>Pessoas e setores</a>
+  <a href="{{ url_for('torre_base.acessos', aba='admins_app') }}"{% if aba == 'admins_app' %} aria-current="page"{% endif %}>Administradores do App de Campo</a>
 </nav>
-{% if aba == 'pessoas' %}{% include "acessos/_pessoas.html" %}{% else %}
+{% if aba == 'pessoas' %}{% include "acessos/_pessoas.html" %}{% elif aba == 'admins_app' %}{% include "acessos/_admins_app.html" %}{% else %}
 
 {% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Gravado.</strong> {{ aviso }}</div></div>{% endif %}
 {% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}
 {% if arquivo_erro %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-warning-octagon"></i><div><strong>A lista da tela não abriu</strong> ({{ arquivo_erro }}). Até ser corrigida, só os administradores do servidor valem, e a tela não grava por cima. Avise a T.I.</div></div>{% endif %}
 {% if sem_pasta %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-folder-simple-dashed"></i><div><strong>Sem pasta de dados.</strong> Este Nexus não tem a <span class="gc-dado">NEXUS_DADOS</span>: a lista da tela e o registro de quem entrou não são lidos nem gravados.</div></div>{% endif %}
-
-<div class="cad-aviso cad-aviso--info ace-como"><i class="ph ph-info"></i><div>
-  <strong>Como vale.</strong> Dar ou tirar o acesso vale no próximo clique da pessoa no Nexus, sem ela precisar sair e entrar.
-  Os administradores <em>do servidor</em> (a <span class="gc-dado">NEXUS_ADMINS</span> do .env) só mudam com a T.I. e não saem por aqui;
-  a senha de administrador vale sempre. Administrador vê tudo, com ou sem setor: o setor dele só aparece na lista, não
-  restringe. Nas telas da Performance, a sessão que a moldura já abriu guarda o acesso de antes até
-  ser renovada (no máximo 11 horas).
-</div></div>
 
 <div class="cad-numeros ace-numeros">
   <div><div class="r">Setores</div><div class="v">{{ setores|length }}</div><div class="d">{{ pessoas_com_setor }} pessoa{{ "s" if pessoas_com_setor != 1 }} do Fracttal com setor</div></div>

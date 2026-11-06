@@ -19,8 +19,9 @@ arquivo diz quais usar, para quê e as regras que os testes cobram. Regra mudou:
 - **Verde Grid é superfície, não texto, no claro:** o `#a9db21` dá 1,6:1 no branco. Texto verde é sempre `--verde-texto`.
 - **Explicação mora no "!" amarelo ao lado do título** (05/11/2026, Levi: "Disclaimers de 'entenda o que aconteceu'
   'o que é' precisa estar em um símbolo de exclamação amarelo no estilo segurança > extintores ... padrão nexus!"):
-  "Entenda esta tela", "De onde vem", "Como se conta", "Como funciona", "Como ler", "O que é" e a legenda de
-  termos nunca ficam soltos na tela, nem no pé dela. Componente na seção 6; `tests/test_explica_padrao.py` cobra.
+  "Entenda esta tela", "De onde vem", "Como se conta", "Como funciona", "Como ler", "Como vale", "O que é" e a
+  legenda de termos nunca ficam soltos na tela, nem no pé dela. Componente na seção 6; `tests/test_explica_padrao.py`
+  cobra, em `<b>` ou em `<strong>` (o "Como vale." em `<strong>` passava até a revisão de 05/11/2026).
 - **Contraste AA (4,5:1)** em todo texto do claro, sobre o branco, o `#f5f6f8`, o `#eceef2` e o fundo "-suave".
 
 ## 2. Cores
@@ -87,6 +88,8 @@ Número em coluna ou em cartão leva `.gc-num` (algarismos de largura igual). As
 
 - Raios: `--raio-tag` 6px (etiqueta), `--raio-controle` 8px (botão, campo), `--raio-md` 10px (cartão, caixa).
 - Topo: `--topo` 60px.
+- **Menu recolhido (trilho de ícones):** passar o mouse num ícone abre ao lado a caixa com o nome da área e as telas
+  dela (`.menu-voo`, o verde da tela pronta e a tela aberta, como no menu aberto); o clique no ícone leva à 1ª tela.
 - **Até 820px:** o menu sai da lateral e abre pelo botão "Menu" (um checkbox, sem JavaScript); some o nome de quem
   entrou.
 - **De 821 a 1180px:** o menu estreita (196px) e o setor do topo encolhe.

@@ -715,6 +715,22 @@ def registrar_pcm(bp) -> None:
             session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
         return redirect(na_raiz("/t/pcm/tecnicos-por-usina") + ("?" + urlencode(volta) if volta else ""), code=303)
 
+    @bp.route("/tecnicos-por-usina/reemitir-tudo", methods=["POST"])
+    def tecnicos_reemitir_tudo():
+        """O "Reenviar tudo ao App" (05/11/2026): as ligações de todas as usinas cujo nome no Fracttal ou código da
+        pessoa mudou, numa gravação só, com as regras do Reenviar de uma usina. Quem `pode_programar`. O `esperado` é a
+        conta que a pessoa confirmou: diferente da de agora (alguém mudou a lista no meio), nada grava."""
+        cfg = current_app.config
+        if not pode_programar() or _de_outro_site():
+            abort(403)
+        f = request.form
+        volta = {k: str(f.get("v_" + k))[:80] for k in ("ver", "todas") + TU.FILTROS if f.get("v_" + k)}
+        try:
+            session["pcm_tecnicos_aviso"] = {"ok": _tecnicos_reemitir_tudo(cfg, f)}
+        except (AT.Recusada, TU.SemCadastro) as ex:
+            session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
+        return redirect(na_raiz("/t/pcm/tecnicos-por-usina") + ("?" + urlencode(volta) if volta else ""), code=303)
+
     @bp.route("/tecnicos-por-usina/carga-inicial", methods=["POST"])
     def tecnicos_carga_inicial():
         """A regra da equipe (cada pessoa de campo recebe as usinas da equipe dela), uma vez, com o livro vazio: a lista
@@ -766,17 +782,16 @@ def _tecnicos_decidir(cfg, f) -> str:
         raise AT.Recusada("A usina não foi achada no cadastro: atualize a página.")
     pessoas = TU.pessoas_de_campo(base, cfg)
     if acao == "reemitir":
-        n = AT.decidir_varias(cfg, TU.pedidos_da_reemissao(base, pessoas, est, uid, AT.hoje_id()), _usuario(),
-                              "reemissao")
-        return (f"{n} {'ligação reenviada' if n == 1 else 'ligações reenviadas'} ao App." if n
-                else "Nada a reenviar: o App já tem o nome e os códigos de hoje.")
+        n = _reemitir(cfg, base, pessoas, f, usina_id=uid)
+        return f"{n} {'ligação reenviada' if n == 1 else 'ligações reenviadas'} ao App."
     pid = _num_arg(f.get("pessoa_id"))
     if not pid:
         raise AT.Recusada("Escolha a pessoa.")
     if acao == "por":
         if pid not in pessoas:
             raise AT.Recusada("Essa pessoa não é de campo ativa no cadastro: confira a ficha dela.")
-        r = AT.decidir(cfg, usina_id=uid, usina_fracttal=TU.nome_no_fracttal(base, uid), pessoa_id=pid,
+        # sem a foto do App, a usina de duas grafias vai com o nome das linhas que já valem nela (o livro, `est`)
+        r = AT.decidir(cfg, usina_id=uid, usina_fracttal=TU.nome_no_fracttal(base, uid, est), pessoa_id=pid,
                        pessoa_hmac=pessoas[pid]["hmac"], na_usina=True, usuario=_usuario(), de=f.get("de") or "",
                        ate=f.get("ate") or "", obs=f.get("obs") or "")
     elif acao == "tirar":
@@ -787,6 +802,39 @@ def _tecnicos_decidir(cfg, f) -> str:
     else:
         abort(400)
     return r["texto"]
+
+
+def _tecnicos_reemitir_tudo(cfg, f) -> str:
+    """O "Reenviar tudo ao App"; devolve o texto do aviso ou levanta `AT.Recusada` (ou `TU.SemCadastro`)."""
+    base = TU.ler_base()
+    n = _reemitir(cfg, base, TU.pessoas_de_campo(base, cfg), f)
+    return f"{n} {'ligação reenviada' if n == 1 else 'ligações reenviadas'} ao App, numa gravação só."
+
+
+def _reemitir(cfg, base, pessoas: dict, f, usina_id: int | None = None) -> int:
+    """A reemissão (de uma usina ou de todas) que a tela confirmou. Revisão de 05/11/2026 (achados 2 e 5): os pedidos
+    saem de uma leitura NOVA do livro, dentro da trava do `decidir_varias`, e só gravam se o resumo deles
+    (`TU.resumo_da_reemissao`: os pares usina, pessoa, nome e código) for o que a tela mostrou e a pessoa confirmou. O
+    `esperado` é obrigatório; sem ele, ou com nada a reenviar, a recusa é clara e nada grava. Antes, a conta da tela e a
+    gravação tinham uma janela entre elas, e um "tirar" no meio voltava atrás."""
+    esperado = str(f.get("esperado") or "").strip()[:40]
+    if not esperado:
+        raise AT.Recusada("Faltou a conferência da tela (o resumo das ligações a reenviar): atualize a página e reenvie. "
+                          "Nada foi gravado.")
+    foto = TU.usinas_do_app()
+
+    def montar(est, hoje):
+        fr = TU._fracttal(base, do_app=foto, est=est, hoje=hoje)
+        return TU._reemissoes(base, pessoas, est, hoje, usina_id=usina_id, fr=fr)
+
+    def conferir(pedidos):
+        if not pedidos:
+            raise AT.Recusada("Nada a reenviar: o App já tem o nome e os códigos de hoje. Nada foi gravado.")
+        if TU.resumo_da_reemissao(pedidos) != esperado:
+            raise AT.Recusada(f"A conta mudou desde que a tela abriu (agora são {len(pedidos)} "
+                              f"{'ligação' if len(pedidos) == 1 else 'ligações'} a reenviar): confira na tela e "
+                              "reenvie. Nada foi gravado.")
+    return AT.decidir_varias(cfg, montar, _usuario(), "reemissao", conferir=conferir)
 
 
 # ── Gestão PCM: a aba Gestão PCM do painel (nexus/pcm/gestao.py) ────────────────────────────────────────────────

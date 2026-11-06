@@ -40,6 +40,34 @@
 {% block scripts %}
 <script>
 // "N subtarefas · ver lista" em cada card, como no app (busca em segundo plano; se falhar, fica em "…")
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+// o painel do "ver lista" mostra a lista em vigor da atividade (o padrão do Nexus ou a do plano) e leva ao editor dela
+// (Levi, 05/11/2026, mostrando este painel ao procurar onde editar as subtarefas): o "Editar as subtarefas" abre a
+// atividade com o editor do card 4 já aberto (`perf.js`, `?subtarefas=editar`). Sem a resposta, os nomes da contagem
+function mostrarSubtarefas(el, nomes) {
+  const box = document.getElementById('os-subs-lista'), a = el.closest('a.os-plano');
+  const titulo = a ? a.querySelector('.os-plano-titulo').textContent : '';
+  const editar = new URL(a ? a.href : location.href); editar.searchParams.set('subtarefas', 'editar');
+  const desenhar = (itens, origem, podeEditar, tipo) => {
+    box.innerHTML = '<h3>Subtarefas da atividade' + (titulo ? ': ' + esc(titulo) : '') + '</h3>'
+      + (origem ? '<p class="os-ajuda">' + esc(origem) + '</p>' : '')
+      + (tipo ? '<p class="os-resumo"><b>Tipo de tarefa:</b> ' + esc(tipo) + '</p>' : '')
+      + '<ol class="os-subs-lista">' + itens.map((x) => '<li>' + esc(x.desc) + (x.tipo ? ' <small class="perf-sub-tag">' + esc(x.tipo) + '</small>' : '')
+        + (x.anexo ? ' <small class="perf-sub-tag">exige anexo</small>' : '') + '</li>').join('') + '</ol>'
+      + (podeEditar ? '<p><a class="os-btn primaria mini" href="' + esc(editar.pathname + editar.search) + '">Editar as subtarefas</a></p>' : '');
+    box.hidden = false; box.scrollIntoView({behavior: 'smooth'});
+  };
+  desenhar(nomes.map((x) => ({desc: x})), '', false);
+  fetch('/os/api/performance/subtarefas?frase=' + encodeURIComponent(el.dataset.frase)).then((r) => r.ok ? r.json() : null).then((j) => {
+    if (!j || !Array.isArray(j.lista)) return;
+    const rotulos = Object.fromEntries((j.tipos || []).map((t) => [t[0], t[1]]));
+    const origem = j.origem === 'nexus' ? 'Padrão do Nexus' + (j.por ? ', salvo por ' + j.por : '') + (j.quando ? ' em ' + j.quando : '') + '.'
+                                        : 'Do plano do Fracttal.';
+    desenhar(j.lista.map((x) => ({desc: x.desc, anexo: x.anexo,
+                                  tipo: x.tipo === 'plano' ? (x.tipo_rotulo || 'Tipo') + ' (do plano)' : (rotulos[x.tipo] || x.tipo)})),
+             origem + (j.erro ? ' ' + j.erro : ''), !!j.pode_salvar, j.tipo_tarefa || '');
+  }).catch(() => {});
+}
 fetch('/os/api/performance/contagens').then(r => r.json()).then(j => {
   const c = (j && j.contagens) || {};
   document.querySelectorAll('.os-plano-subs').forEach(el => {
@@ -47,10 +75,7 @@ fetch('/os/api/performance/contagens').then(r => r.json()).then(j => {
     if (!Array.isArray(nomes)) return;
     const n = nomes.length;
     el.textContent = n + ' subtarefa' + (n !== 1 ? 's' : '') + (n ? '  ·  ver lista' : '');
-    if (n) el.onclick = (ev) => { ev.preventDefault(); ev.stopPropagation();
-      const box = document.getElementById('os-subs-lista');
-      box.innerHTML = '<h3>Subtarefas do plano</h3><ol>' + nomes.map(x => '<li>' + x.replace(/</g, '&lt;') + '</li>').join('') + '</ol>';
-      box.hidden = false; box.scrollIntoView({behavior: 'smooth'}); };
+    if (n) el.onclick = (ev) => { ev.preventDefault(); ev.stopPropagation(); mostrarSubtarefas(el, nomes); };
   });
 }).catch(() => {});
 </script>

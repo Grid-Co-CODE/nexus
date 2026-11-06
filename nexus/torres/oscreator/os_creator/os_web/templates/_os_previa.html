@@ -12,8 +12,10 @@
   </header>
   <div class="det-corpo">
     <div class="det-card det-banner">
-      <span class="det-banner-t">{{ l.ativo or '—' }}</span>
-      {% if l.code %}<span class="det-banner-code">{{ l.code }}</span>{% endif %}
+      {% set tem_usina = l.usina and l.usina != '—' %}
+      {% if tem_usina %}<div class="det-banner-campo det-banner-usina"><span class="det-sec">Usina</span><b class="det-banner-t">{{ l.usina }}</b></div>{% endif %}
+      <div class="det-banner-campo"><span class="det-sec">Ativo</span><span class="{{ 'det-banner-ativo' if tem_usina else 'det-banner-t' }}">{{ l.ativo or '—' }}</span></div>
+      {% if l.code %}<div class="det-banner-campo"><span class="det-sec">Código</span><span class="det-banner-code">{{ l.code }}</span></div>{% endif %}
     </div>
     <div class="det-cols">
       <div class="det-card det-rows">
@@ -21,6 +23,7 @@
         <div class="det-row"><span class="det-k">Data fim</span><span class="det-v">{{ fmt(l.data_fim) if l.data_fim else '—' }}</span></div>
         <div class="det-row"><span class="det-k">Atribuído a</span><span class="det-v">{{ l.atribuido_a or '—' }}</span></div>
         <div class="det-row"><span class="det-k">Criado por</span><span class="det-v">{{ l.criado_por or '—' }}</span></div>
+        <div class="det-row"><span class="det-k">Data de criação</span><span class="det-v">{{ fmt(l.data) if l.data else '—' }}</span></div>
       </div>
     </div>
     <div class="det-card det-rows">

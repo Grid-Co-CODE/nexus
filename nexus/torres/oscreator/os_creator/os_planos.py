@@ -117,6 +117,14 @@ TIPO_TAREFA_DO_PLANO = {
 }
 
 
+def com_tipo_padrao(plan: dict, tipo: str) -> dict:
+    """O tipo de tarefa do padrão do Nexus da atividade (05/11/2026, Levi: "quero que dê para editar o tipo de tarefa
+    também!") no lugar do do plano e do TIPO_TAREFA_DO_PLANO. CÓPIA; tipo vazio ou desconhecido, o mesmo plano."""
+    if not tipo or tipo not in api.TASK_TYPE_MAIN:
+        return plan
+    return dict(plan, id_task_type_main=api.TASK_TYPE_MAIN[tipo], tasks_types_main_description=tipo)
+
+
 def com_tipo_da_tarefa(plan: dict) -> dict:
     """O plano com o tipo de tarefa do TIPO_TAREFA_DO_PLANO, quando o nome casa. Devolve uma CÓPIA (o plano fica em cache
     por id_task); sem regra para o plano, devolve o mesmo."""
@@ -167,11 +175,15 @@ _MARCA_EXTRA = "_n_subtarefas_do_app"
 
 
 def sem_subtarefas_extra(plan: dict) -> dict:
-    """O plano de volta ao que veio do Fracttal, sem as subtarefas que o app acrescentou.
+    """O plano de volta ao que veio do Fracttal, sem as subtarefas que o app acrescentou (as extras ou o padrão do Nexus).
 
     É a REDE DE SEGURANÇA da criação: se o RPC recusar a OS com as perguntas novas, ela sai sem
     elas em vez de não sair. A OS de tracker é rotina diária — perdê-la por causa de uma
     melhoria seria trocar um incômodo por uma parada."""
+    if plan.get(_MARCA_PADRAO) is not None:
+        sobra = {k: v for k, v in plan.items() if k != _MARCA_PADRAO}
+        sobra["subtasks"] = list(plan[_MARCA_PADRAO])
+        return sobra
     n = int(plan.get(_MARCA_EXTRA) or 0)
     if not n:
         return plan
@@ -181,7 +193,69 @@ def sem_subtarefas_extra(plan: dict) -> dict:
 
 
 def tem_subtarefas_extra(plan: dict) -> bool:
-    return bool(plan.get(_MARCA_EXTRA))
+    return bool(plan.get(_MARCA_EXTRA)) or plan.get(_MARCA_PADRAO) is not None
+
+
+def tem_subtarefas_padrao(plan: dict) -> bool:
+    return plan.get(_MARCA_PADRAO) is not None
+
+
+# ── O PADRÃO DO NEXUS (05/11/2026) ─────────────────────────────────────────────────────────────
+# Levi: "Quero que no OS Creator > Performance tenha um campo para subtarefas, que vamos poder editar as subtarefas padrões
+# de cada atividade!". A lista salva no Nexus (`nexus/torres/oscreator/subtarefas_padrao.py`) vale NO LUGAR das subtarefas
+# do plano e das do app; o plano do Fracttal não muda. Cada subtarefa da lista: {"desc", "tipo", "anexo", "origem"}, com os
+# tipos do editor de Temas da Solicitação (`solic_spec.TIPO_ID`) e "plano" para o tipo que o editor não monta (a lista de
+# opções, a unidade): esse fica como está no plano. "origem" = o id da subtarefa do plano de onde ela veio.
+TIPO_SUB_ID = {"texto": 1, "simnao": 2, "num": 3, "verif": 4}
+_ID_TIPO_SUB = {v: k for k, v in TIPO_SUB_ID.items()}
+_MARCA_PADRAO = "_subtarefas_do_plano"
+
+
+def subtarefas_para_editor(subtasks: list) -> list:
+    """As subtarefas (form items do plano) no formato do editor: {"desc", "tipo", "anexo", "origem"[, "tipo_rotulo"]}."""
+    out = []
+    for s in subtasks or []:
+        if not isinstance(s, dict):
+            continue
+        desc = str(s.get("description") or "").strip()
+        if not desc:
+            continue
+        tid = s.get("id_task_form_item_type")
+        item = {"desc": desc, "tipo": _ID_TIPO_SUB.get(tid, "plano"), "anexo": bool(s.get("attachments_required")),
+                "origem": str(s["id"]) if s.get("id") not in (None, "") else None}
+        if item["tipo"] == "plano":
+            item["tipo_rotulo"] = "Lista" if tid == 7 else str(s.get("task_form_item_type_description") or "do plano")
+        out.append(item)
+    return out
+
+
+def com_subtarefas_padrao(plan: dict, lista: list) -> dict:
+    """O plano com a lista do padrão do Nexus no lugar das subtarefas (as do plano e as do app). Devolve uma CÓPIA (o plano
+    fica em cache por id_task). Cada subtarefa sai da FORMA de uma do plano, como as do app (`com_subtarefas_extra`): a de
+    onde veio (`origem`), com o tipo, as opções e a unidade dela quando o tipo não mudou; a nova, da forma da 1ª. A marca
+    guarda as subtarefas do plano para a rede de segurança (`sem_subtarefas_extra`)."""
+    subs = list(plan.get("subtasks") or [])
+    if not subs or not lista:
+        return plan                        # sem modelo para clonar, não invento estrutura
+    por_id = {str(s.get("id")): s for s in subs if s.get("id") not in (None, "")}
+    novas = []
+    for i, it in enumerate(lista):
+        base = por_id.get(str(it.get("origem") or ""))
+        tipo = str(it.get("tipo") or "texto")
+        novo = dict(base or subs[0])
+        if base is not None and (tipo == "plano" or TIPO_SUB_ID.get(tipo) == base.get("id_task_form_item_type")):
+            pass                           # o tipo do plano, com as opções e a unidade dele
+        else:
+            tid = TIPO_SUB_ID.get(tipo, 1)  # o "plano" sem a subtarefa de origem (o plano mudou no Fracttal) vira texto
+            novo.update({"id_task_form_item_type": tid, "task_form_item_type_description": _TIPO_ITEM_DESC.get(tid),
+                         "dropdown_options": None, "id_unit": None, "unit_description": None, "units_code": None})
+        if base is None:
+            novo.update({"id": str(uuid.uuid4()), "is_required": True, "is_configured": True, "is_changed": False})
+        novo.update({"description": str(it.get("desc") or "").strip(), "order_number": i + 1,
+                     "attachments_required": bool(it.get("anexo"))})
+        novas.append(novo)
+    sobra = {k: v for k, v in plan.items() if k != _MARCA_EXTRA}
+    return {**sobra, "subtasks": novas, _MARCA_PADRAO: subs}
 
 
 def _norm_txt(s) -> str:

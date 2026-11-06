@@ -267,3 +267,18 @@ def test_comentario_de_varias_linhas_sai_inteiro_da_nota(fracttal, tela, cliente
     (c2,) = AC.estado(AC.ler(forcar=True)["eventos"])[aid]["comentarios"]
     html = _post(cliente, f"/{aid}/comentario/{c2['id']}/apagar", cod="IBI200-INV02").get_data(as_text=True)
     assert "mudou junto" in html and fracttal.nota == "Nota antiga"
+
+
+def test_editar_e_apagar_so_aparecem_ao_passar_o_mouse():
+    """Levi, 05/11/2026: "esse apagar ou editar comentário deve aparecer apenas ao passar o mouse no comentário!". Na
+    gaveta (a lista do acompanhamento) e na página da OS do Quadro, os dois ficam apagados até o mouse passar (ou o
+    teclado chegar) no comentário; no toque, sem mouse, ficam à vista (a regra só vale com `hover:hover`)."""
+    from pathlib import Path
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    esconde = ".eg-tl-e .eg-coment-acoes,.eg-acomp-tl>li .eg-coment-acoes{opacity:0"
+    assert esconde in css
+    antes = css[:css.index(esconde)]
+    assert antes.rstrip().endswith("@media (hover:hover){")
+    for mostra in (".eg-tl-e:hover .eg-coment-acoes", ".eg-tl-e:focus-within .eg-coment-acoes",
+                   ".eg-acomp-tl>li:hover .eg-coment-acoes", ".eg-acomp-tl>li:focus-within .eg-coment-acoes"):
+        assert mostra in css

@@ -376,6 +376,11 @@ def _criar_clone(app):
 
     from ..chamados import ufv
     rotas_acomp.RESPONSAVEL_UFV = ufv.ligar(app)
+    # as subtarefas padrão de cada atividade da Performance, no livro do Nexus (05/11/2026; subtarefas_padrao.py)
+    from os_web import perf_web
+
+    from . import subtarefas_padrao
+    perf_web.SUBTAREFAS_PADRAO = subtarefas_padrao.ligar(app)
     # o original fala http com a plataforma na mesma máquina; aqui o cookie segue o do Nexus (Secure no servidor)
     clone.config["SESSION_COOKIE_SECURE"] = bool(app.config.get("SESSION_COOKIE_SECURE"))
     # e mora no /os do Nexus, debaixo do prefixo em que ele roda (o clone fixa "/os", que debaixo de /nexus não ia ao
@@ -902,6 +907,16 @@ class _NotaNaoGravou(RuntimeError):
     """O Fracttal não gravou a nota (a mensagem dele vai junto)."""
 
 
+def _base_da_nota(d: dict) -> str:
+    """O texto que o `editar_nota_os` regrava: a `note` da OS (onde o Nexus escreve) ou, na 1ª vez, a nota com que a OS
+    nasceu (`task_note`). Nunca a junção das duas que o card mostra (`notas`): regravar a junção punha a nota de entrada de
+    novo a cada comentário (prova no Fracttal de 05/11/2026, OS 18591 de TESTE - PA: depois de um comentário e uma edição,
+    a nota de entrada estava três vezes). O detalhe sem os campos crus (de antes desta regra): a junção, como antes."""
+    if "nota_gravada" in d or "nota_da_tarefa" in d:
+        return str(d.get("nota_gravada") or d.get("nota_da_tarefa") or "").strip()
+    return str(d.get("notas") or "").strip()
+
+
 def _acrescentar_na_nota(os_api, regra, o: dict, linhas: list[str]) -> str:
     """As linhas no fim da nota da OS no Fracttal (o comentário da Engenharia e, uma vez, o histórico do app de ETM),
     com a regra medida do card: OS concluída, cancelada ou de várias tarefas não deixa editar a nota (com várias, ela
@@ -916,9 +931,10 @@ def _acrescentar_na_nota(os_api, regra, o: dict, linhas: list[str]) -> str:
     pode_nota, motivo = regra.nota_pode_editar(regra.status_id_de(o.get("status"), d), len(d.get("tarefas") or []))
     if not pode_nota:
         return motivo
-    atual = str(d.get("notas") or "").strip()
+    atual = _base_da_nota(d)
     na_pagina = " ".join(str(o.get("nota") or "").split())
-    if na_pagina and na_pagina not in " ".join(atual.split()):
+    # a conferência é com o que o card mostra (a junção): a página lê a `task_note` primeiro (os_equipe._nota_da_os)
+    if na_pagina and na_pagina not in " ".join(str(d.get("notas") or "").split()):
         return ("a nota da OS no Fracttal não bateu com a leitura da página; para não sobrescrever, o comentário ficou "
                 "só no Nexus")
     # a linha inteira, não um trecho (revisão final de 26/10/2026: "Trocar o chip" se achava dentro de "Trocar o chip
@@ -1494,7 +1510,7 @@ def _mudar_linha_na_nota(api, regra, wid, candidatas: list[str], nova: str | Non
     pode_nota, motivo = regra.nota_pode_editar(regra.status_id_de(None, d), len(d.get("tarefas") or []))
     if not pode_nota:
         return motivo
-    linhas = str(d.get("notas") or "").replace("\r\n", "\n").split("\n")
+    linhas = _base_da_nota(d).replace("\r\n", "\n").split("\n")
 
     def _n(x):
         return " ".join(str(x).split())

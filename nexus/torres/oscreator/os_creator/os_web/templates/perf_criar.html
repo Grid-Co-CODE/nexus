@@ -3,7 +3,7 @@
 {% block body_class %}os-form{% endblock %}
 {% block conteudo %}
 {# PerfCriar: cabeçalho (← Planos + título [+ segmentado]), Card 1 Ativo (cascata), Card 2 Ativos (tabela),
-   Card 3 Nome da OS + resumo do plano, Card 4 Responsável e datas, botão Criar #}
+   Card 3 Nome da OS + resumo do plano, Card 4 Subtarefas da atividade (05/11/2026), Card 5 Responsável e datas, botão Criar #}
 <section class="os-pagina" id="perf" data-frase="{{ plano.frase }}" data-titulo="{{ plano.titulo }}"
          data-tem-modos="{{ 1 if tem_modos else 0 }}" data-tracker="{{ 1 if eh_tracker else 0 }}"
          data-aba-ticket="{{ aba_ticket }}"
@@ -67,7 +67,32 @@
     <div class="os-resumo" id="resumo">Selecione a usina para carregar o plano.</div>
   </div>
 
-  <div class="os-cardf"><div class="os-cardf-h"><span class="os-badge">4</span><span class="os-cardf-t">Responsável e datas</span></div>
+  {# as subtarefas padrão da atividade (Levi, 05/11/2026: "Quero que no OS Creator > Performance tenha um campo para
+     subtarefas, que vamos poder editar as subtarefas padrões de cada atividade!"; "Quando criamos uma OS as atividades já
+     vem com aquelas subtarefas"; e "quero que dê para editar o tipo de tarefa também!"): o tipo e a lista que toda OS desta
+     atividade leva. O Salvar padrão vale para todo mundo, a partir da próxima OS; o plano no Fracttal não muda. Quem monta é
+     o perf.js (`/os/api/performance/subtarefas`) #}
+  <div class="os-cardf" id="w_subs"><div class="os-cardf-h"><span class="os-badge">4</span><span class="os-cardf-t">Tipo e subtarefas da atividade</span>
+      <span class="os-cresce"></span><button type="button" class="os-btn secondary mini" id="b_subs_editar" hidden>Editar</button></div>
+    <div class="os-ajuda" id="subs_origem">Carregando as subtarefas…</div>
+    <div class="os-resumo" id="subs_tipo" hidden></div>
+    <ol class="os-subs-lista" id="subs_lista"></ol>
+    <div id="subs_ed" hidden>
+      <label class="os-campo perf-sub-tipo-tarefa"><span class="os-lbl">Tipo de tarefa</span><select id="subs_tipo_sel"></select></label>
+      <div class="os-subs" id="subs_linhas"></div>
+      <div><button type="button" class="os-btn secondary mini" id="b_subs_mais">+ Acrescentar subtarefa</button></div>
+      <div class="os-ajuda">Salvar vale para todas as OS novas desta atividade, para todo mundo. O plano no Fracttal não muda.</div>
+      <p class="os-erro" id="subs_erro" hidden></p>
+      <div class="os-rodape">
+        <button type="button" class="os-btn secondary" id="b_subs_fracttal" hidden>Voltar ao do Fracttal</button>
+        <span class="os-cresce"></span>
+        <button type="button" class="os-btn secondary" id="b_subs_cancelar">Cancelar</button>
+        <button type="button" class="os-btn primaria" id="b_subs_salvar">Salvar padrão</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="os-cardf"><div class="os-cardf-h"><span class="os-badge">5</span><span class="os-cardf-t">Responsável e datas</span></div>
     <div class="os-linha2">
       {# digitável (Levi, 08/10/2026: "conseguir digitar no responsável na criação de OS"): o os_busca põe a busca por
          cima do <select>, que continua guardando o id_personnel que vai ao servidor. O for= é de propósito: sem ele, o

@@ -25,6 +25,7 @@ RESUMO = {
     "pedido_area": "Os pedidos de retorno a cada área, com o prazo e a resposta",
     "mensagem_conversa": "As mensagens com @menção de cada insight, OS e usina",
     "evento_aviso": "Os avisos das OS no sino: solicitação que virou OS e quem já leu",
+    "versao_subtarefas": "As subtarefas padrão de cada atividade da Performance",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
     "normalizacao": "Quando cada usina voltou pela hora do COS, o tipo e as proteções",
@@ -60,6 +61,7 @@ RESUMO = {
     "decisao_motivo_pcm": "O motivo de cada tarefa do PCM, e as que saíram da programação por ele",
     "decisao_backoffice_pcm": "Quem é do backoffice: as OS dessas pessoas ficam fora da programação",
     "decisao_atribuicao_pcm": "Quem cobre cada usina: os técnicos que o PCM põe e tira",
+    "decisao_admin_app": "Quem administra o App de Campo, escolhido no Nexus",
     "saldo_almox": "O saldo de cada peça em cada almoxarifado, a cada varredura diária",
     "ciclo_varredura": "Cada varredura do almoxarifado: se leu tudo e se valeu",
     "peca_lancada": "Cada peça que o técnico lançou (ou tentou lançar) pelo App numa OS",
@@ -67,10 +69,6 @@ RESUMO = {
     "evento_inventario": "Cada passo do inventário do almoxarifado, para auditar",
     "regua_minimo": "O mínimo e o máximo de cada peça, o recomendado e o acordado",
     "curadoria_inventario": "O que o PCM decidiu sobre a peça contada fora do catálogo",
-    "exclusao_extintor": "Os extintores que a Segurança excluiu, e por quê",
-    "pedido_ronda_extintor": "As novas rondas de extintores que a Segurança pediu, por usina",
-    "edicao_extintor": "As edições que a Segurança fez no cadastro dos extintores",
-    "email_pendencias_seguranca": "O e-mail semanal das pendências da Segurança, por destinatário",
     "envio_email_seguranca": "O que o App mandou do e-mail semanal da Segurança",
     "geracao_usina_dia": "Quanto cada usina gerou por dia, com a irradiação",
     "geracao_inversor_dia": "Quanto cada inversor gerou por dia",
@@ -122,6 +120,10 @@ PARA_QUE = {
     "mensagem_conversa": "Guarda as mensagens que as pessoas trocam na conversa de cada insight, OS e usina, com quem "
                          "foi mencionado (uma pessoa ou uma área inteira) e quem já leu. Serve para a Caixa de entrada "
                          "e o sino avisarem quem foi chamado e para o combinado entre os setores ficar registrado.",
+    "versao_subtarefas": "Guarda cada versão das subtarefas padrão de uma atividade da Performance (a inspeção do inversor, "
+                         "a recomposição de string, o tracker parado, a coleta de geração), com quem salvou e quando. "
+                         "Serve para toda OS nova da atividade já sair com essas subtarefas, sem mexer no plano do "
+                         "Fracttal, e para saber quem mudou o padrão.",
     "evento_aviso": "Guarda os avisos das OS de cada pessoa no sino do topo: a solicitação aprovada no OS Creator que "
                     "virou OS (para quem pediu) e cada Marcar como lida. O aviso de OS executada vem da lista central de "
                     "OS e não é gravado aqui, só o lido dele. Os nomes vão cifrados; serve para o sino não repetir o que "
@@ -144,7 +146,7 @@ PARA_QUE = {
                          "de cada uma (o que fazer, quem faz, até quando e em que pé está) e o andamento, com o dia e "
                          "a hora. Serve para cobrar as ações que vencem, ver as ocorrências abertas de cada usina na "
                          "Visão geral e, com o tempo, saber o que se repete por usina e equipamento. O texto e quem "
-                         "escreveu vão cifrados; a tela Campo · App → Ocorrências mostra.",
+                         "escreveu vão cifrados; a tela Usinas 360° → Ocorrências mostra.",
     "tratamento_contestacao": "Guarda o acompanhamento de cada contestação do cliente: quem pegou a demanda (\"Pegar "
                               "para mim\") e cada atualização que o responsável escreveu, com o dia e a hora. Quem e o "
                               "texto vão cifrados; a tela Contratos e clientes → Contestações mostra.",
@@ -242,23 +244,16 @@ PARA_QUE = {
     "decisao_backoffice_pcm": "Guarda quem entra e quem sai da lista do backoffice, mantida no Gerar a semana: a OS "
                               "cujo responsável no Fracttal é alguém da lista não entra na programação da semana. O "
                               "nome vai cifrado.",
-    "exclusao_extintor": "Guarda cada extintor que a Segurança excluiu na tela Extintores, com o motivo: o que a "
-                         "equipe não achou na usina (o Aceitar) ou o que saiu pelo botão direito (retirado, duplicado, "
-                         "outro). O excluído sai das telas e vai para o histórico de excluídos; volta se a equipe o "
-                         "conferir numa ronda depois.",
-    "pedido_ronda_extintor": "Guarda cada nova ronda de extintores, do zero, que a Segurança pede numa usina. É para o "
-                             "App de Campo mostrar à equipe como ronda pendente; vale até a equipe refazer a ronda inteira.",
     "envio_email_seguranca": "Guarda, para cada e-mail semanal da Segurança, se o App de Campo conseguiu mandar, por "
                              "onde, em quantas tentativas e o erro, quando houve. Não leva e-mail nem nome, só o código.",
-    "email_pendencias_seguranca": "Guarda o e-mail de cada segunda com as pendências da Segurança: um para a TST, "
-                                  "com todas as usinas, e um para cada Responsável UFV, com as usinas dele. O Nexus "
-                                  "monta e o App de Campo manda. Não leva nome nem e-mail de pessoa, só o código.",
-    "edicao_extintor": "Guarda cada edição que a Segurança fez no cadastro de um extintor na tela Extintores (local, "
-                       "posição, classe, peso e as validades), só com o que mudou. A tela mostra o editado na hora, e o "
-                       "App de Campo grava no cadastro dele. Quem editou vai cifrado.",
     "decisao_atribuicao_pcm": "Guarda cada vez que o PCM põe ou tira um técnico de uma usina na tela Técnicos por "
                               "usina, fixo ou de apoio (com as datas). É a lista de quem vê e pode rondar cada usina no "
                               "App de Campo: o App lê daqui. A observação vai cifrada.",
+    "decisao_admin_app": "Guarda cada vez que um administrador do Nexus põe ou tira alguém dos administradores do App de "
+                         "Campo, na aba de Base → Acessos: uma ficha do cadastro, uma pessoa de Pessoas e setores ou um "
+                         "e-mail da Grid digitado (o avulso). O App lê esta lista de 5 em 5 minutos e reconhece a pessoa "
+                         "pelo código do e-mail; com a lista vazia ele não tira ninguém. A observação e o e-mail do "
+                         "avulso vão cifrados.",
     "saldo_almox": "Guarda, a cada varredura diária do App, quanto de cada peça há em cada almoxarifado do "
                    "Fracttal, o mínimo cadastrado e o custo unitário que o Fracttal deu. É o histórico que o "
                    "Fracttal não mostra: dá para ver quando uma peça ficou abaixo do mínimo e, mais adiante, prever a "
@@ -377,3 +372,10 @@ PARA_QUE = {
                            "aperto de verdade e se cada mudança alivia a cota. O pico não se soma: o de uma hora não é a "
                            "soma dos de cada tela.",
 }
+
+
+# os textos dos fatos que cada área declara na pasta dela (a Segurança desde 05/11/2026)
+from ..hseq import catalogo as _hseq  # noqa: E402
+
+RESUMO.update(_hseq.RESUMO)
+PARA_QUE.update(_hseq.PARA_QUE)

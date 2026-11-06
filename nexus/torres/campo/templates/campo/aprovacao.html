@@ -3,30 +3,82 @@
 {% block conteudo %}
 {% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# Aprovação de OS, para tirar insight (Levi, 05/10/2026), contada por OS: é a OS que se aprova, não a tarefa. A fila, os
-   grupos e os números são os do App (a fila inteira pela _fila_supervisao, nexus/campo/aprovacao.py: fila_toda).
-   18/10/2026 (Levi): "está por região e gestor de contrato quero apenas por responsável da UFV, quando abrir aparece uma
-   lista das usinas que tem OSs não concluídas, ao clicar na linha aparece o mesmo card que aparece ao clicar na OS do
-   histórico de OS do OS Creator Web". O filtro é só o Responsável O&M da usina (do cadastro, pela usina do Fracttal); a
-   lista é das usinas com OS esperando aprovação; a usina abre a tabela das OS dela e a OS abre o card do OS Creator,
-   cujo Concluir aprova (com o login do Fracttal de quem clica, como no OS Creator Web). Os indicadores e a idade são do
-   responsável escolhido e filtram a lista. #}
-{% macro barra_grupos(a) %}<div class="cn-barra cn-barra--grupos" role="img" aria-label="{{ a.completa }} prontas, {{ a.olho }} pedem olho, {{ a.fora_do_app }} fora do App">{% if a.ordens %}<span class="ok" style="width: {{ (100 * a.completa / a.ordens)|round(1) }}%"></span><span class="alerta" style="width: {{ (100 * a.olho / a.ordens)|round(1) }}%"></span><span class="neutro" style="width: {{ (100 * a.fora_do_app / a.ordens)|round(1) }}%"></span>{% endif %}</div>{% endmacro %}
-{% macro cor_uso(u) %}{{ 'ok' if (u or 0) >= 80 else ('alerta' if (u or 0) >= 50 else 'critico') }}{% endmacro %}
+{# Aprovação de OS em quadro por fatos (Levi, 04/11/2026: "No nexus, em campo app crie uma aba de aprovação de OS. Pode
+   fazer por cima da aba Aprovação de OS, refaça com essas regras e deixe algo bem fácil e dinâmico para os supervisores!").
+   No quiz: todos os supervisores veem; "uma a uma pelo card, tem que ter um botão de aprovar logo após todo o score e
+   avisos, deve ser possível também aprovar mais que uma de uma vez!"; três colunas. A coluna de cada OS sai dos fatos
+   (nexus/campo/prefiltro.py); o quadro é montado na visita e não muda sozinho na frente da pessoa: a marcação vive na
+   página, e a OS aprovada sai do quadro quando o Fracttal confirma (a conferência). #}
+{# O cartão no modelo do Quadro da equipe da Engenharia, com o Aprovar (Levi, 05/11/2026: "pode adotar um visual de card
+   de OS parecido com Engenharia > Quadro da equipe porém com o botão aprovar"): no topo o número da OS (verde, sem
+   sublinhado: "deixa o número da OS em verde Grid e tire esse underline estranho!") e os dias; logo abaixo, o motivo da
+   coluna em destaque ("Sempre destacar o motivo de estar em dúvida ou não OK! tem que estar bem visual e acessível": a
+   cor, o ícone e a palavra, nunca só a cor), com a prova; depois a tarefa, onde, o score e os outros avisos; no pé, o
+   técnico e as tarefas, e o Aprovar logo depois do score e dos avisos (a decisão de 04/11). Mais compacto no mesmo dia
+   ("o botão aprovar pode ficar paralelo ao extremo direita do nome do técnico / Nota do app pode ficar ao lado direito de
+   tarefa (...) diminua o tamanho do botão para caber, nota também!"): a nota na linha da tarefa, o Aprovar no pé.
+   A OS com fotos ainda por ler pode virar Não OK depois da leitura: aprova pelo cartão, mas não entra no lote.
+   3ª rodada (05/11/2026): a coluna já diz Em dúvida ou Não OK, o cartão traz só a mensagem, na cor da coluna, com o ícone
+   ("tire esse 'EM DÚVIDA' da OS deixe só a mensagem em laranja"); a linha de baixo diz quantas tarefas, sem repetir o
+   ativo do título; o número da OS e o cartão abrem a barra lateral com o detalhe (a pendência, em que tarefa, as fotos),
+   e o card da OS abre de lá ("poupa informação inicial e vai aprofundando"). #}
+{% macro cartao(o, marcar) %}{% set tom = 'neutro' if o.nota is none else ('ok' if o.nota >= 80 else ('alerta' if o.nota >= 50 else 'critico')) %}{% set marcar = marcar and not (o.avisos|selectattr('tipo', 'equalto', 'faltam')|list) %}{% set motivos = o.avisos|selectattr('tipo', 'in', tipos_motivo)|list %}{% set resto = o.avisos|rejectattr('tipo', 'in', tipos_motivo)|list %}{% set n_t = o.tarefas|length %}
+<article class="apq-cartao" data-wo="{{ o.id_wo or '' }}" data-folio="{{ o.os }}" data-coluna="{{ o.coluna }}" data-cliente="{{ o.cliente_cad }}" data-busca="{{ o.busca }}"{% if o.id_wo %} data-apq-detalhe="{{ url_for('torre_campo.aprovacao_detalhe', id_wo=o.id_wo) }}" tabindex="0"{% endif %}>
+  <header class="apq-c-cab">
+    {% if marcar %}<input class="apq-marcar" type="checkbox" data-apq-marcar aria-label="Marcar a OS {{ o.os }} para aprovar">{% endif %}
+    <button type="button" class="apq-c-os" data-apq-ver title="Ver o detalhe da OS {{ o.os }}: a pendência, em que tarefa, as fotos">OS {{ o.os }}</button>
+    <span class="apq-c-dias cn-t-{{ cor_espera(o.espera_d) }}" title="Dias esperando aprovação, desde o fim da tarefa mais antiga">{{ 'hoje' if o.espera_d == 0 else 'há ' ~ o.espera_d ~ ' d' }}</span>
+  </header>
+  {% if motivos %}{% set grave = o.coluna == 'nao_ok' %}
+  <div class="apq-motivo" data-nivel="{{ 'critico' if grave else 'alerta' }}" role="note">
+    <i class="ph {{ 'ph-x-circle' if grave else 'ph-warning' }}" aria-hidden="true"></i>
+    <ul>{% for a in motivos %}<li>{{ a.texto }}</li>{% endfor %}</ul>
+  </div>
+  {% elif o.fora_motivo %}
+  <div class="apq-motivo" data-nivel="neutro" role="note"><i class="ph ph-funnel-x" aria-hidden="true"></i><ul><li>{{ o.fora_motivo }}</li></ul></div>
+  {% elif o.coluna == 'conferindo' %}
+  {# dado pela metade não vai para a tela como inteiro: sem as fotos lidas, o cartão diz o que falta #}
+  <div class="apq-motivo" data-nivel="neutro" role="note"><i class="ph ph-hourglass-medium" aria-hidden="true"></i><ul><li>Fotos ainda não conferidas</li></ul></div>
+  {% endif %}
+  <div class="apq-c-tarefa">
+    <h3 class="apq-c-tit">{{ o.tarefas[0].tarefa or '(sem título)' }}{% if n_t > 1 %}<small> e mais {{ n_t - 1 }}</small>{% endif %}</h3>
+    <p class="apq-score" data-tom="{{ tom }}" title="{{ 'Sem a nota do App: tarefa fechada fora do App' if o.nota is none else ('A pior nota do App entre as tarefas da OS' if n_t > 1 else 'A nota do App da tarefa') }}">{% if o.nota is none %}<span>Fora do App</span>{% else %}<span>Nota do App</span><b class="gc-num cn-t-{{ tom }}">{{ o.nota }}</b>{% endif %}</p>
+  </div>
+  <p class="apq-c-onde">{{ n_t }} tarefa{{ 's' if n_t != 1 }} · <b>{{ o.usina_cad or sem_cadastro }}</b> · {{ o.cliente_cad or 'sem cliente no cadastro' }}</p>
+  <ul class="apq-avisos">
+    {% for a in resto %}<li class="apq-aviso" data-nivel="{{ a.nivel }}">{{ a.texto }}</li>{% endfor %}
+    {% if o.coluna == 'pronta' %}<li class="apq-aviso" data-nivel="ok"><i class="ph ph-check-circle" aria-hidden="true"></i> Nenhum fato contra</li>{% endif %}
+  </ul>
+  <footer class="apq-c-pe">
+    <span class="cn-avatar apq-c-av" aria-hidden="true">{{ iniciais(o.tecnicos[0]) if o.tecnicos and o.tecnicos[0] != '—' else '—' }}</span>
+    <span class="apq-c-quem">{{ o.tecnicos|join(', ') }}{% if not responsavel %} · {{ o.responsavel_cad or sem_responsavel }}{% endif %}{% if o.fotos_em %}<small>fotos conferidas em {{ o.fotos_em }}</small>{% endif %}</span>
+    <button type="button" class="gc-btn gc-btn--primario apq-aprovar" data-apq-aprovar>Aprovar</button>
+  </footer>
+  <p class="apq-msg" data-apq-msg role="status" hidden></p>
+</article>{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
-      {% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal (fechadas e esperando a
-    aprovação), inteira, relida pelo Nexus a cada 10 minutos, contada por OS, que é o que se aprova. Cada tarefa ganha o
-    grupo pela regra do painel do App, e a OS fica no pior grupo das tarefas dela: <b>prontas</b> = subtarefas
-    respondidas, nota alta, tempo dentro do previsto e nenhuma foto marcada; <b>pedem olho</b> = nota abaixo de 80, tempo
-    muito fora do previsto, foto marcada ou já devolvida; <b>fora do App</b> = fechada sem o App, sem evidência. O
-    responsável e o cliente saem do cadastro do Nexus pela usina da OS (o de-para do Fracttal). <b>Aprovar</b> é o
-    Concluir do card da OS, o mesmo do OS Creator Web, com o login do Fracttal de quem clica; aprovada, a OS sai da
-    lista.</p>{% endcall %}</div>
-      <p class="cn-pergunta">Toda OS fechada no Fracttal espera aprovação. Nas usinas de cada responsável, o que dá para
-        aprovar já e o que precisa de olho?</p></div>
-    <div class="cn-frescor">fila de verificação do Fracttal, inteira{% if coleta %} · notas do App até {{ coleta }}{% endif %}<br><b>{% if fila.lida_em %}fila lida em {{ fila.lida_em }}{% else %}fila ainda não lida{% endif %}</b>{% if fila.lendo %} · relendo agora{% endif %}</div>
+      {% call explica('Entenda esta tela') %}<p><b>A leitura.</b> Fila de verificação do Fracttal, inteira{% if coleta %},
+      com as notas do App até {{ coleta }}{% endif %}: {% if fila.lida_em %}fila lida em {{ fila.lida_em }}{% else %}a fila
+      ainda não foi lida{% endif %}{% if fila.lendo %} (relendo agora){% endif %}; fotos conferidas de {{ fotos.conferidas }}
+      OS{% if fotos.lendo %} (conferindo agora){% endif %}.</p>
+      <p><b>De onde vem.</b> A fila é a das OS em verificação no Fracttal (fechadas e
+      esperando a aprovação), relida pelo Nexus a cada 10 minutos e contada por OS, que é o que se aprova. Por trás, sem a
+      tela esperar, o Nexus confere as fotos de cada OS nova: um pedido ao Fracttal por OS e as imagens baixadas do
+      arquivo. O responsável e o cliente saem do cadastro do Nexus pela usina da OS.</p>
+      <p><b>As colunas.</b> <b>Não OK</b>: foto anexada mais de {{ horas_tarde }} h depois do último fechamento da OS no App
+      (nas 30 OS medidas em 26/10, toda OS assim foi devolvida). <b>Em dúvida</b>: a mesma foto duas vezes na OS, comparada
+      sem o carimbo do App, ou tarefa fechada fora do App. <b>Pronta</b>: nenhum desses fatos. A OS fica na pior coluna. A
+      nota do App, a devolução anterior e a foto marcada pelo App aparecem como aviso, sem mudar a coluna.</p>
+      <p><b>Ainda conferindo.</b> OS cujas fotos o Nexus ainda não leu: aprova pelo cartão, mas não entra no lote.
+      <b>Fora do pré-filtro.</b> Religamento (remoto ou no local), OS com as etiquetas PERFORMANCE ou CHAMADOS e OS
+      criadas pelo COS: ficam sem as regras e não entram na conta. A ENGENHARIA entra no pré-filtro.</p>
+      <p><b>Aprovar.</b> É o Concluir do OS Creator, com a sua conta do Fracttal: não tem volta, a OS sai da verificação.
+      Para aprovar várias, marque os cartões (ou Selecionar todas) e use Aprovar as marcadas: o Nexus aprova uma depois da
+      outra e para no primeiro pedido de login. O número da OS abre o card dela. Devolver segue no App.</p>{% endcall %}</div>
+      <p class="cn-pergunta">Toda OS fechada no Fracttal espera aprovação. O que dá para aprovar já, o que pede o seu olho e
+        o que tem prova de problema?</p></div>
   </div>
 
   {# a tela nunca espera o Fracttal: a fila é relida em segundo plano (nexus/campo/aprovacao.py) #}
@@ -42,118 +94,312 @@
   <div class="cn-erro cn-aviso" role="status"><b>A última releitura falhou ({{ fila.erro }}).</b> Mostrando a fila lida em
     {{ fila.lida_em }}; o Nexus tenta de novo em 5 minutos.</div>
   {% endif %}
+  {% if fotos.erro %}<div class="cn-erro cn-aviso" role="status"><b>A conferência das fotos parou ({{ fotos.erro }}).</b> O que já foi conferido segue no quadro; o resto continua na próxima volta.</div>{% endif %}
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
   {% if mapa_erro %}<div class="cn-erro cn-aviso" role="status"><b>Não consegui ler o cadastro agora ({{ mapa_erro }}).</b> As usinas saem com o nome do Fracttal, sem o responsável.</div>{% endif %}
 
-  {# só o responsável da usina (Levi, 18/10/2026: "quero apenas por responsável da UFV") #}
-  <form class="cn-barra-filtros" method="get">
-    <label class="gc-rotulo" for="ap-responsavel">Responsável O&amp;M</label>
-    <select class="gc-campo" id="ap-responsavel" name="responsavel" onchange="this.form.submit()">
+  {# o responsável vai ao servidor (Levi, 18/10/2026: "quero apenas por responsável da UFV"); cliente e busca filtram na
+     página, sem recarregar #}
+  <form class="cn-barra-filtros apq-filtros" method="get" data-apq-filtros>
+    {# cada rótulo junto do seu campo: quando a linha quebra, o par desce junto #}
+    <span class="apq-filtro"><label class="gc-rotulo" for="apq-responsavel">Responsável O&amp;M</label>
+    <select class="gc-campo" id="apq-responsavel" name="responsavel" onchange="this.form.submit()">
       <option value="*"{% if not responsavel %} selected{% endif %}>Todos</option>{% for r in opcoes_responsavel %}<option value="{{ r }}"{% if r == responsavel %} selected{% endif %}>{{ r }}</option>{% endfor %}
-    </select>
-    {% for x in ('balde', 'idade') %}{% if request.args.get(x) %}<input type="hidden" name="{{ x }}" value="{{ request.args.get(x) }}">{% endif %}{% endfor %}
+    </select></span>
+    <span class="apq-filtro"><label class="gc-rotulo" for="apq-cliente">Cliente</label>
+    <select class="gc-campo" id="apq-cliente" data-apq-cliente>
+      <option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+    </select></span>
+    <span class="apq-filtro"><label class="gc-rotulo" for="apq-busca">Buscar</label>
+    <input class="gc-campo apq-busca" id="apq-busca" type="search" data-apq-busca placeholder="OS, UFV ou técnico" autocomplete="off"></span>
     <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}">Exportar CSV</a>
   </form>
 
-  {# os indicadores filtram a lista; o ativo fica marcado e o clique de novo tira #}
-  {% set limpo = dict(balde=None, idade=None) %}
-  {% macro card(ativo, destino) %}<a class="cn-kpi cn-kpi--link" href="{{ url(**dict(limpo, **({} if ativo else destino))) }}"{% if ativo %} aria-current="true"{% endif %}>{% endmacro %}
-  {% set b = k.baldes %}
-  <div class="cn-kpis">
-    {{ card(not balde and not idade, {}) }}<span class="gc-rotulo">Esperando aprovação</span>
-      <span class="v">{{ k.ordens }}<small>OS</small></span><span class="d">com {{ k.tarefas }} tarefas{% if not responsavel %}, a fila inteira{% else %}, nas usinas de {{ responsavel }}{% endif %}</span></a>
-    {{ card(balde == 'completa', dict(balde='completa')) }}<span class="gc-rotulo">Prontas para aprovar</span>
-      <span class="v cn-t-ok">{{ b.get('completa', 0) }}<small>OS</small></span><span class="d">todas as tarefas com evidência completa: é decisão, não análise</span></a>
-    {{ card(balde == 'olho', dict(balde='olho')) }}<span class="gc-rotulo">Precisam do seu olho</span>
-      <span class="v cn-t-alerta">{{ b.get('olho', 0) }}<small>OS</small></span><span class="d">alguma tarefa com nota abaixo de 80, tempo fora, foto marcada ou já devolvida</span></a>
-    {# filtra as mesmas OS que conta: 30 dias ou mais (levava a "31 a 60 dias" e escondia as mais antigas) #}
-    {{ card(idade and idade[0] == '30-', dict(idade='30-')) }}<span class="gc-rotulo">Paradas há 30 dias ou mais</span>
-      <span class="v{% if k.aged30 %} cn-t-critico{% endif %}">{{ k.aged30 }}<small>OS</small></span><span class="d">esquecidas na fila</span></a>
-    {{ card(idade and idade[0] == '61-', dict(idade='61-')) }}<span class="gc-rotulo">Espera máxima</span>
-      <span class="v{% if k.espera_max >= 30 %} cn-t-critico{% endif %}">{{ k.espera_max }}<small>dias</small></span>
-      <span class="d">{% if k.mais_antiga %}OS {{ k.mais_antiga.os }} · {{ k.mais_antiga.usina_cad or '—' }}{% endif %}</span></a>
-    {{ card(balde == 'fora_do_app', dict(balde='fora_do_app')) }}<span class="gc-rotulo">Uso do App</span>
-      <span class="v{% if k.uso_app is not none and k.uso_app < 50 %} cn-t-alerta{% endif %}">{{ '—' if k.uso_app is none else k.uso_app }}<small>%</small></span>
-      <span class="d">das OS com todas as tarefas pelo App · {{ b.get('fora_do_app', 0) }} com tarefa fechada fora do App</span></a>
+  <div class="apq-lote" role="region" aria-label="Aprovar várias OS de uma vez">
+    <p class="apq-lote-total"><b class="gc-num">{{ n_os }}</b> OS esperando aprovação{% if responsavel %} nas usinas de {{ responsavel }}{% else %}, a fila inteira{% endif %}</p>
+    <button type="button" class="gc-btn gc-btn--primario" data-apq-lote disabled><span>Aprovar as marcadas (<span data-apq-lote-n>0</span>)</span></button>
+    <p class="apq-lote-msg" data-apq-lote-msg role="status" aria-live="polite"></p>
   </div>
 
-  {# há quanto tempo a fila espera: cada faixa filtra #}
-  <div class="cn-idades">
-    <span class="gc-rotulo">Idade da fila</span>
-    <div class="cn-idades-barra" role="group" aria-label="OS por tempo de espera">
-      {% for i, n in idades if n %}<a class="cn-idade cn-idade--{{ loop.index0 }}{% if idade and idade[0] == i[0] %} ativa{% endif %}" style="flex: {{ n }}" href="{{ url(idade=None if idade and idade[0] == i[0] else i[0]) }}" title="{{ n }} OS esperando {{ i[1] }}"><b>{{ n }}</b><span>{{ i[1] }}</span></a>{% endfor %}
-    </div>
+  <div class="apq-quadro">
+  {% for c in colunas %}
+    <section class="apq-coluna" data-coluna="{{ c[0] }}" data-tom="{{ c[2] }}" aria-labelledby="apq-t-{{ c[0] }}">
+      <header class="apq-col-cab">
+        <h2 id="apq-t-{{ c[0] }}"><span class="cn-st cn-t-{{ c[2] }}">{{ c[1] }}</span><b class="apq-col-n gc-num" data-apq-n>{{ q[c[0]]|length }}</b></h2>
+        <p class="mudo">{{ c[3] }}</p>
+        {% if c[0] != 'nao_ok' and q[c[0]] %}<label class="apq-todas"><input type="checkbox" data-apq-todas> Selecionar todas</label>{% endif %}
+      </header>
+      <div class="apq-cartoes">
+        {% for o in q[c[0]] %}{{ cartao(o, c[0] != 'nao_ok') }}{% else %}<p class="mudo apq-vazio">Nenhuma OS aqui.</p>{% endfor %}
+      </div>
+    </section>
+  {% endfor %}
   </div>
 
-  <section class="cn-painel">
-    {% if balde or idade %}
-    <div class="cn-painel-barra">
-      <a class="cn-filtro-ativo" href="{{ url(balde=None, idade=None) }}">{% if balde %}{{ nome_grupo[balde][0] }}{% endif %}{% if balde and idade %} · {% endif %}{% if idade %}esperando {{ idade[1] }}{% endif %} <span aria-hidden="true">×</span></a>
-    </div>
-    {% endif %}
-
-    <div class="cn-lista-cab"><h2>Usinas com OS esperando aprovação</h2><span class="mudo">{{ usinas_fila|length }} usina{{ 's' if usinas_fila|length != 1 }}, a com OS parada há mais tempo primeiro. A usina abre as OS dela; a OS abre o card do OS Creator, onde o Concluir aprova</span></div>
-    <div class="ap-usinas">
-    {% for a in usinas_fila %}{% set cor = 'critico' if a.aged30 else ('alerta' if a.aged7 else 'ok') %}
-      <details class="ap-usina ap-usina--{{ cor }}">
-        <summary class="ap-u">
-          <span class="ap-u-nome"><b>{{ a.nome }}</b><small>{{ a.cliente or '—' }}{% if not responsavel %} · {{ a.responsavel or sem_responsavel }}{% endif %}{% if not a.cadastrada %} · sem de-para do Fracttal no cadastro{% endif %}</small></span>
-          <span class="ap-u-n"><b class="cn-t-{{ cor }}">{{ a.ordens }}</b> OS</span>
-          <span class="ap-u-g">{{ barra_grupos(a) }}<span class="ap-u-leg"><b class="cn-t-ok">{{ a.completa }}</b> prontas · <b class="cn-t-alerta">{{ a.olho }}</b> pedem olho · <b>{{ a.fora_do_app }}</b> fora do App</span></span>
-          <span class="ap-u-d"><b{% if a.espera_max >= 30 %} class="cn-t-critico"{% endif %}>{{ a.espera_max }} d</b> a mais antiga · uso do App <b class="cn-t-{{ cor_uso(a.uso_app) }}">{{ a.uso_app }}%</b></span>
-          <i class="ph ph-caret-down ap-seta" aria-hidden="true"></i>
-        </summary>
-        <div class="cn-tab cn-tab--compacta"><table class="ap-tab">
-          <thead><tr><th>OS</th><th title="Dias esperando aprovação, desde o fim da tarefa mais antiga da OS">Dia</th><th>Data da criação da OS</th><th>Data fim</th><th>Técnicos</th>
-            <th title="O grupo da OS pela regra do App: o porquê no mouse">Grupo</th><th title="Tarefas da OS com evidência completa">Prontas</th><th title="Tarefas da OS que pedem o seu olho">Pedem olho</th><th title="Tarefas da OS fechadas fora do App">Fora do App</th>
-            <th title="Tarefas da OS feitas pelo App">Uso do App</th><th title="Nota média do registro das tarefas feitas pelo App">Nota média</th><th title="Tarefas da OS já devolvidas ao técnico">Devolvidas</th></tr></thead>
-          <tbody>
-          {% for o in a.oss %}{% set g = nome_grupo.get(o.balde, (o.balde, 'neutro')) %}{% set n = o.n_por_grupo %}
-            <tr class="ap-os" tabindex="0" data-wo="{{ o.id_wo or '' }}" data-folio="{{ o.os }}" title="Abrir o card da OS {{ o.os }}">
-              <td class="m"><b>{{ o.os }}</b></td>
-              <td><span class="cn-st cn-t-{{ cor_espera(o.espera_d) }}">{{ 'hoje' if o.espera_d == 0 else o.espera_d ~ ' d' }}</span></td>
-              <td class="m">{{ data_br(o.criada) }}</td>
-              <td class="m">{{ data_br(o.fim) }}</td>
-              <td class="cn-menor">{{ o.tecnicos|join(', ') or '—' }}</td>
-              <td><span class="cn-selo cn-selo--{{ g[1] }}" title="{{ porque(o) }}">{{ g[0] }}</span></td>
-              <td class="m{% if n.completa %} cn-t-ok{% endif %}">{{ n.completa }}</td>
-              <td class="m{% if n.olho %} cn-t-alerta{% endif %}">{{ n.olho }}</td>
-              <td class="m">{{ n.fora_do_app }}</td>
-              <td><span class="cn-st cn-t-{{ cor_uso(o.uso_app) }}">{{ o.uso_app }}%</span></td>
-              <td class="m">{% if o.nota_media is not none %}<span class="cn-t-{{ 'ok' if o.nota_media >= 80 else 'alerta' }}">{{ o.nota_media }}%</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
-              <td class="m{% if o.n_devolvidas %} cn-t-critico{% endif %}">{{ o.n_devolvidas or '—' }}</td></tr>
-          {% endfor %}
-          </tbody></table></div>
-      </details>
-    {% else %}<p class="mudo">Nada na fila com esses filtros.</p>{% endfor %}
-    </div>
-  </section>
-
-  {# A explicação da tela foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html). #}
+  {% if q.conferindo %}
+  <details class="apq-extra" id="apq-conferindo">
+    <summary>Ainda conferindo as fotos: <b class="gc-num" data-apq-n>{{ q.conferindo|length }}</b> OS</summary>
+    <p class="mudo">Aprovam pelo cartão; entram no quadro quando as fotos forem lidas (no máximo umas 150 OS por volta).</p>
+    <div class="apq-cartoes apq-cartoes--grade">{% for o in q.conferindo %}{{ cartao(o, False) }}{% endfor %}</div>
+  </details>
+  {% endif %}
+  {% if q.fora %}
+  <details class="apq-extra" id="apq-fora">
+    <summary>Fora do pré-filtro: <b class="gc-num" data-apq-n>{{ q.fora|length }}</b> OS, que não entram na conta</summary>
+    <p class="mudo">Religamento, as etiquetas PERFORMANCE e CHAMADOS e as criadas pelo COS ficam sem as regras e não entram na conta das OS esperando; aprovam pelo cartão.</p>
+    <div class="apq-cartoes apq-cartoes--grade">{% for o in q.fora %}{{ cartao(o, False) }}{% endfor %}</div>
+  </details>
+  {% endif %}
 </div>
+{# a barra lateral da OS (a das Rondas: 1/3 da tela, à direita); o detalhe vem da rota no clique #}
+<aside class="rd-gaveta apq-gaveta" id="apq-gaveta" role="dialog" aria-modal="false" aria-labelledby="apq-g-titulo" hidden>
+  <button type="button" class="rd-fechar rd-gaveta-fechar" data-apq-g-fechar aria-label="Fechar o detalhe da OS" title="Fechar (Esc)">&times;</button>
+  <div class="rd-gaveta-corpo"></div>
+</aside>
 {% include "oscreator/card_os_abrir.html" %}
 <script>
-  // a OS abre o card do OS Creator por cima (Levi, 18/10/2026: "ao clicar na linha aparece o mesmo card que aparece ao
-  // clicar na OS do histórico de OS do OS Creator Web"): o Concluir dele aprova. Fechado o card com mudança, o Nexus
-  // confere a OS no Fracttal e, fora da verificação, tira da lista
+  // O Aprovar é o Concluir do OS Creator (o mesmo do Painel do responsável), com a conta do Fracttal de quem clica; depois,
+  // a conferência tira a OS do quadro quando o Fracttal confirma. O lote aprova uma OS a cada PAUSA_LOTE_MS (cada uma custa
+  // 5 a 7 pedidos ao Fracttal, e a cota de 200 por minuto é da empresa inteira) e para no que se repetiria em todas: o
+  // login do Fracttal (401), o acesso (403), o Fracttal recusando (429, 5xx), a sessão do Nexus que acabou e 3 erros
+  // seguidos; outro erro fica no cartão e o lote segue (revisão de 05/11/2026).
   (function () {
-    function conferir(wo) {
+    var NOMES = {pronta: 'Pronta', duvida: 'Em dúvida', nao_ok: 'Não OK'};
+    var PAUSA_LOTE_MS = 4000;
+    var ENTRAR = 'Entre no OS Creator com a sua conta do Fracttal e tente de novo: <a class="cn-link" href="' +
+      nexusRota('/os/login') + '" target="_blank" rel="noopener">entrar no Fracttal</a>.';
+    // sem a sessão do Nexus, o portão responde 302 para /entrar, o fetch segue e recebe 200 em HTML: isso não é aprovada
+    var SESSAO = 'A sua sessão do Nexus acabou: recarregue a página e entre de novo.';
+    var RECUSA = 'O Fracttal recusou agora: tente daqui a alguns minutos.';
+    var lote = document.querySelector('[data-apq-lote]'), loteN = document.querySelector('[data-apq-lote-n]');
+    var loteMsg = document.querySelector('[data-apq-lote-msg]');
+    var selCli = document.querySelector('[data-apq-cliente]'), busca = document.querySelector('[data-apq-busca]');
+    var andando = false;
+    function semAcento(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+    function pedir(url, corpo) {
+      return fetch(url, {method: 'POST', credentials: 'same-origin', body: JSON.stringify(corpo),
+                         headers: {'Accept': 'application/json', 'Content-Type': 'application/json'}})
+        .then(function (r) {
+          return r.json().catch(function () { return null; }).then(function (j) {
+            return {ok: r.ok, status: r.status, redirected: r.redirected, json: j !== null, j: j || {}};
+          });
+        });
+    }
+    function marcadas() {
+      return Array.prototype.slice.call(document.querySelectorAll('.apq-cartao:not([hidden]) [data-apq-marcar]:checked'));
+    }
+    function contar() {
+      document.querySelectorAll('.apq-coluna, .apq-extra').forEach(function (s) {
+        var n = s.querySelector('[data-apq-n]');
+        if (n) { n.textContent = s.querySelectorAll('.apq-cartao:not([hidden])').length; }
+      });
+      var m = marcadas().length;
+      loteN.textContent = m;
+      lote.disabled = andando || !m;
+    }
+    // tom: 'ok', 'alerta' ou 'critico'
+    function msg(c, txt, tom, html) {
+      var m = c.querySelector('[data-apq-msg]');
+      m.hidden = !txt;
+      m.className = 'apq-msg cn-t-' + (tom || 'ok');
+      if (html) { m.innerHTML = txt; } else { m.textContent = txt; }      // o texto do servidor nunca vira HTML
+    }
+    function conferir(wo, c) {
       fetch(nexusRota('/t/campo/aprovacao/') + wo + '/conferir', {method: 'POST', credentials: 'same-origin'})
         .then(function (r) { return r.json(); })
-        .then(function (j) { if (j && j.saiu) { location.reload(); } })
+        .then(function (j) { if (j && j.saiu && c.parentNode) { c.remove(); contar(); } })
         .catch(function () { /* sem resposta: a OS sai na releitura de 10 min */ });
     }
-    function abrir(tr) {
+    // 'ok', 'erro' ou o motivo de parar o lote: 'login' (Fracttal), 'sessao' (Nexus), 'recusa' (403, 429, 5xx)
+    function aprovar(c) {
+      var wo = c.getAttribute('data-wo'), folio = c.getAttribute('data-folio');
+      var b = c.querySelector('[data-apq-aprovar]');
+      if (!wo) { msg(c, 'Sem o número interno da OS ' + folio + ': abra o card e conclua por lá.', 'critico'); return Promise.resolve('erro'); }
+      b.disabled = true; b.textContent = 'Aprovando…';
+      return pedir(nexusRota('/os/api/os/') + wo + '/concluir', {folio: folio}).then(function (r) {
+        if (r.ok && !r.redirected && r.j.ok === true) {
+          c.setAttribute('data-estado', 'aprovada'); b.textContent = 'Aprovada';
+          var m = c.querySelector('[data-apq-marcar]');
+          if (m) { m.checked = false; m.disabled = true; }
+          // a frase do OS Creator (com o aviso de quando fechou sem a data de fim), não "aprovada" genérico
+          msg(c, r.j.mensagem || ('OS ' + folio + ' aprovada.'), r.j.aviso ? 'alerta' : 'ok');
+          conferir(wo, c);
+          return 'ok';
+        }
+        b.disabled = false; b.textContent = 'Aprovar';
+        if (r.redirected) { msg(c, SESSAO, 'critico'); return 'sessao'; }
+        if (r.status === 401) { msg(c, ENTRAR, 'critico', true); return 'login'; }
+        if (r.status === 403 || r.status === 429 || r.status >= 500) {
+          msg(c, r.j.erro || (r.status === 403 ? 'O seu acesso não deixa concluir OS pelo OS Creator.' : RECUSA), 'critico');
+          return 'recusa';
+        }
+        if (!r.json) { msg(c, SESSAO, 'critico'); return 'sessao'; }
+        msg(c, r.j.erro || ('Não consegui aprovar a OS ' + folio + '.'), 'critico');
+        return 'erro';
+      }).catch(function (e) {
+        b.disabled = false; b.textContent = 'Aprovar';
+        msg(c, 'Não consegui falar com o OS Creator (' + e.message + ').', 'critico');
+        return 'erro';
+      });
+    }
+    // o card da OS do OS Creator (as fotos estão lá), aberto pela barra lateral; mudou a OS, a conferência
+    function abrirCard(wo, folio) {
       if (!window.NexusOsCard) { return; }
-      var wo = tr.getAttribute('data-wo'), folio = tr.getAttribute('data-folio');
-      var op = {status: 'Em Verificação', folio: folio, aoFechar: function (mudou) { if (mudou && wo) { conferir(wo); } }};
+      var c = wo ? document.querySelector('.apq-cartao[data-wo="' + wo + '"]') : null;
+      var op = {status: 'Em Verificação', folio: folio, aoFechar: function (mudou) { if (mudou && wo && c) { conferir(wo, c); } }};
       if (wo) { NexusOsCard.abrir(wo, op); } else { NexusOsCard.abrirFolio(folio, op); }
     }
-    document.querySelectorAll('tr.ap-os').forEach(function (tr) {
-      var wo = tr.getAttribute('data-wo');
-      if (wo && window.NexusOsCard) { NexusOsCard.prepararAoParar(tr, wo); }
-      tr.addEventListener('click', function () { abrir(tr); });
-      tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abrir(tr); } });
+    // a barra lateral (05/11/2026: "clica no número da OS ou no próprio card da OS e abre uma barra lateral detalhando
+    // qual é a pendência, em que tarefa é"): o detalhe vem da rota, só memória; o cartão aberto fica marcado
+    var gaveta = document.getElementById('apq-gaveta'), gCorpo = gaveta.querySelector('.rd-gaveta-corpo');
+    var gAtivo = null, gPedido = 0;
+    function abrirGaveta(c) {
+      if (!c.getAttribute('data-apq-detalhe')) { return; }
+      if (gAtivo) { gAtivo.classList.remove('apq-cartao--ativo'); }
+      gAtivo = c; c.classList.add('apq-cartao--ativo');
+      gaveta.hidden = false;
+      gCorpo.innerHTML = '<p class="mudo">Abrindo a OS ' + c.getAttribute('data-folio') + '…</p>';
+      var meu = ++gPedido;
+      fetch(c.getAttribute('data-apq-detalhe'), {credentials: 'same-origin'}).then(function (r) {
+        if (!r.ok || r.redirected) { throw new Error(r.redirected ? 'sessão' : 'HTTP ' + r.status); }
+        return r.text();
+      }).then(function (html) {
+        if (meu !== gPedido) { return; }                 // outro cartão foi clicado no meio
+        gCorpo.innerHTML = html; gCorpo.scrollTop = 0;
+        if (window.NexusOsCard && NexusOsCard.prepararAoParar) {
+          gCorpo.querySelectorAll('[data-apq-card]').forEach(function (b) { NexusOsCard.prepararAoParar(b, b.getAttribute('data-apq-card')); });
+        }
+      }).catch(function (e) {
+        if (meu !== gPedido) { return; }
+        gCorpo.innerHTML = '';
+        var p = document.createElement('p');
+        p.className = 'cn-t-alerta';
+        p.textContent = e.message === 'sessão' ? SESSAO : 'Não consegui abrir o detalhe da OS agora (' + e.message + '). Tente de novo.';
+        gCorpo.appendChild(p);
+      });
+    }
+    function fecharGaveta() {
+      gaveta.hidden = true;
+      if (gAtivo) { gAtivo.classList.remove('apq-cartao--ativo'); gAtivo.focus(); gAtivo = null; }
+    }
+    function filtrar() {
+      var cli = selCli ? selCli.value : '', termo = semAcento(busca ? busca.value : '').trim();
+      document.querySelectorAll('.apq-cartao').forEach(function (c) {
+        c.hidden = !((!cli || c.getAttribute('data-cliente') === cli) &&
+                     (!termo || (c.getAttribute('data-busca') || '').indexOf(termo) >= 0));
+      });
+      contar();
+    }
+    document.addEventListener('click', function (ev) {
+      if (ev.target.closest('[data-apq-g-fechar]')) { fecharGaveta(); return; }
+      var card = ev.target.closest('[data-apq-card]');
+      if (card) { abrirCard(card.getAttribute('data-apq-card'), card.getAttribute('data-folio')); return; }
+      // o PDF da OS (05/11/2026: "Quero o botão de baixar o PDF da OS!"): o do OS Creator, como nas OSs em verificação do
+      // Painel, com a sessão do Fracttal de quem clica; a mensagem fica na barra
+      var pdf = ev.target.closest('[data-apq-pdf]');
+      if (pdf) {
+        var gm = gCorpo.querySelector('[data-apq-g-msg]'), rotPdf = pdf.innerHTML, folioPdf = pdf.getAttribute('data-folio');
+        function dizer(txt, html) {
+          if (!gm) { return; }
+          gm.hidden = !txt; gm.className = 'apq-msg cn-t-critico';
+          if (html) { gm.innerHTML = txt; } else { gm.textContent = txt; }
+        }
+        pdf.disabled = true; pdf.textContent = 'Gerando o PDF…'; dizer('');
+        pedir(nexusRota('/os/api/os/pdf'), {wid: pdf.getAttribute('data-apq-pdf'), folio: folioPdf}).then(function (r) {
+          pdf.disabled = false; pdf.innerHTML = rotPdf;
+          if (r.ok && !r.redirected && r.j.url) { location.href = nexusRota(r.j.url); return; }
+          if (r.status === 401) { dizer(ENTRAR, true); return; }
+          if (r.redirected || !r.json) { dizer(SESSAO); return; }
+          dizer(r.j.erro || ('Não consegui gerar o PDF da OS ' + folioPdf + '.'));
+        }).catch(function (e) { pdf.disabled = false; pdf.innerHTML = rotPdf; dizer('Não consegui gerar o PDF (' + e.message + ').'); });
+        return;
+      }
+      // o Aprovar da barra é o do cartão: a mesma confirmação, o mesmo pedido e a mesma conferência
+      var de = ev.target.closest('[data-apq-aprovar-de]');
+      if (de) {
+        var alvo = document.querySelector('.apq-cartao[data-wo="' + de.getAttribute('data-apq-aprovar-de') + '"]');
+        if (!alvo || andando || de.disabled) { return; }
+        if (!window.confirm('Aprovar a OS ' + alvo.getAttribute('data-folio') + ' no Fracttal? Não tem volta: ela sai da verificação.')) { return; }
+        de.disabled = true;
+        aprovar(alvo).then(function () {
+          var m = alvo.querySelector('[data-apq-msg]'), g = gCorpo.querySelector('[data-apq-g-msg]');
+          if (g && m) { g.hidden = m.hidden; g.className = m.className; g.innerHTML = m.innerHTML; }
+          de.disabled = alvo.getAttribute('data-estado') === 'aprovada';
+        });
+        return;
+      }
+      var b = ev.target.closest('[data-apq-aprovar]');
+      var c = ev.target.closest('.apq-cartao');
+      if (!c) { return; }
+      if (b) {
+        if (andando || b.disabled) { return; }
+        if (!window.confirm('Aprovar a OS ' + c.getAttribute('data-folio') + ' no Fracttal? Não tem volta: ela sai da verificação.')) { return; }
+        aprovar(c);
+        return;
+      }
+      // o número da OS ou o próprio cartão (fora da caixa de marcar e dos botões) abre a barra lateral
+      if (ev.target.closest('[data-apq-ver]') || !ev.target.closest('input, label, button, a')) { abrirGaveta(c); }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && !gaveta.hidden) { fecharGaveta(); return; }
+      if (ev.key === 'Enter' && ev.target.matches && ev.target.matches('.apq-cartao')) { ev.preventDefault(); abrirGaveta(ev.target); }
+    });
+    document.addEventListener('change', function (ev) {
+      var t = ev.target;
+      if (t.hasAttribute('data-apq-todas')) {
+        t.closest('.apq-coluna').querySelectorAll('.apq-cartao:not([hidden]) [data-apq-marcar]:not(:disabled)')
+          .forEach(function (m) { m.checked = t.checked; });
+      }
+      if (t.hasAttribute('data-apq-marcar') || t.hasAttribute('data-apq-todas')) { contar(); }
+    });
+    lote.addEventListener('click', function () {
+      var cartoes = marcadas().map(function (m) { return m.closest('.apq-cartao'); });
+      if (!cartoes.length || andando) { return; }
+      var por = {};
+      cartoes.forEach(function (c) { var k = c.getAttribute('data-coluna'); por[k] = (por[k] || 0) + 1; });
+      var partes = Object.keys(por).map(function (k) { return por[k] + ' de ' + (NOMES[k] || k); });
+      if (!window.confirm('Aprovar ' + cartoes.length + ' OS no Fracttal (' + partes.join(', ') + ')? Não tem volta: elas saem da verificação.')) { return; }
+      andando = true; contar();
+      var feitas = 0, erros = 0, seguidos = 0, i = 0;
+      function aprovadas() { return feitas + (feitas === 1 ? ' aprovada' : ' aprovadas'); }
+      // o número da OS entra como texto; só o link de entrar no Fracttal (fixo, sem dado) entra como HTML
+      function parar(c, r) {
+        andando = false;
+        loteMsg.textContent = 'Parei na OS ' + c.getAttribute('data-folio') + ' (' + aprovadas() + ' antes). ';
+        var resto = document.createElement('span');
+        if (r === 'login') { resto.innerHTML = ENTRAR; } else { resto.textContent = r === 'sessao' ? SESSAO : RECUSA; }
+        loteMsg.appendChild(resto);
+        contar();
+      }
+      function proxima() {
+        if (i >= cartoes.length) {
+          andando = false;
+          loteMsg.textContent = feitas + (feitas === 1 ? ' OS aprovada' : ' OS aprovadas') +
+            (erros ? '; ' + erros + ' com erro (o motivo está no cartão).' : '.');
+          contar();
+          return;
+        }
+        var c = cartoes[i++];
+        loteMsg.textContent = 'Aprovando ' + i + ' de ' + cartoes.length + '… (uma OS a cada ' + (PAUSA_LOTE_MS / 1000) + ' s)';
+        aprovar(c).then(function (r) {
+          if (r === 'login' || r === 'sessao' || r === 'recusa') { parar(c, r); return; }
+          if (r === 'ok') { feitas++; seguidos = 0; } else { erros++; seguidos++; }
+          if (seguidos >= 3) {
+            andando = false;
+            loteMsg.textContent = 'Parei depois de 3 erros seguidos (' + aprovadas() + '): o motivo está em cada cartão.';
+            contar();
+            return;
+          }
+          if (i < cartoes.length) { setTimeout(proxima, PAUSA_LOTE_MS); } else { proxima(); }
+        });
+      }
+      proxima();
+    });
+    if (selCli) { selCli.addEventListener('change', filtrar); }
+    if (busca) { busca.addEventListener('input', filtrar); }
+    // o Enter na busca não recarrega a página (a busca é na página; o formulário só leva o responsável)
+    document.querySelector('[data-apq-filtros]').addEventListener('submit', function (ev) {
+      if (document.activeElement === busca) { ev.preventDefault(); }
     });
   })();
 </script>

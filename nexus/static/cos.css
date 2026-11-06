@@ -108,3 +108,10 @@ tr.cos-os:focus-visible{outline:2px solid var(--verde);outline-offset:-2px}
 .cos-det dt{color:var(--mudo);font-weight:600}
 .cos-det dd{margin:0;color:var(--tinta-2);white-space:pre-wrap;overflow-wrap:anywhere}
 .cos-det ul{margin:0;padding-left:18px;display:grid;gap:4px}
+
+/* Mesa do operador e Desempenho da equipe: a carteira ao lado do seletor; no desempenho, a linha do cliente em negrito e
+   as dos turnos recuadas embaixo dela */
+.cos-mesa-clientes{margin:0;color:var(--tinta-2);font-size:13px}
+.cos-mesa-clientes b{color:var(--tinta)}
+tr.cos-total td{border-top:1px solid var(--linha-forte)}
+tr.cos-turno td:first-child{padding-left:28px;color:var(--tinta-2)}

@@ -109,6 +109,24 @@ def test_o_sino_mostra_o_aviso_abre_o_card_e_marcar_como_lida_tira(app, banco, l
     assert len(banco.linhas(AV.LIVRO, AV.ABA)) == 1
 
 
+def test_o_sino_marca_como_lida_sem_recarregar_a_tela(app, banco, limpo, lista, avisos_limpos, monkeypatch):
+    """Levi, 05/11/2026: "cada vez que clico em marcar como lida a tela atualiza... atrapalha a experiência do usuário". O
+    script do sino manda o formulário por fetch pedindo JSON: grava e responde, sem o redirect; o que não gravou diz por quê,
+    e o formulário sem JavaScript segue voltando para a tela (o teste acima)."""
+    c = _cliente_de(app, PESSOA)
+    html = c.get("/").get_data(as_text=True)
+    assert "'Accept': 'application/json'" in html and 'class="sino-t sino-t-avisos" data-n="1"' in _sino(html)
+    aid = re.search(r'name="aviso" value="([^"]+)"', _sino(html)).group(1)
+    r = c.post(LIDA, data={"aviso": aid, "voltar": "/"}, headers={"Accept": "application/json"})
+    assert r.status_code == 200 and r.get_json() == {"ok": True, "lidos": 1}
+    assert [(l["aviso_id"], l["evento"]) for l in banco.linhas(AV.LIVRO, AV.ABA)] == [(aid, "leu")]
+    def fora(*a, **k):
+        raise RuntimeError("o banco caiu")
+    monkeypatch.setattr(AV, "marcar_lidos", fora)
+    r = c.post(LIDA, data={"todos": "1", "voltar": "/"}, headers={"Accept": "application/json"})
+    assert r.status_code == 503 and r.get_json()["ok"] is False and "segue no sino" in r.get_json()["erro"]
+
+
 def test_marcar_todas_como_lidas_e_o_id_que_nao_e_de_aviso(app, banco, limpo, lista, avisos_limpos):
     lista.linhas.append(Reg(106, "18379", "Limpeza", "Técnico Exemplo", 3, _fim(2)))
     c = _cliente_de(app, PESSOA)

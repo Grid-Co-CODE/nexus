@@ -40,8 +40,11 @@ def _abas(base, s) -> dict:
 
 
 def codigo_da_pessoa(chave: str, email) -> str | None:
-    """O mesmo código que o App manda (`_pessoa_hmac` do function_app.py v226)."""
+    """O mesmo código que o App manda (`_pessoa_hmac` do function_app.py v226). A chave vai sem espaço nas pontas (2ª
+    revisão de 05/11/2026: a lista dos administradores do App, o avulso e o `setores.definir` aparavam a chave cada um do
+    seu jeito, e com um espaço no .env dariam códigos diferentes para o mesmo e-mail); sem espaço, nada muda."""
     em = str(email or "").strip().lower()
+    chave = str(chave or "").strip()
     if not chave or not em:
         return None
     return hmac.new(chave.encode("utf-8"), em.encode("utf-8"), hashlib.sha256).hexdigest()[:24]

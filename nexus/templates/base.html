@@ -47,8 +47,9 @@
       <i class="ph ph-{{ sino.icone_os or 'clipboard-text' }}" aria-hidden="true"></i>{% if sino.n %}<b class="sino-n{% if sino.criticos %} sino-n--critico{% endif %}">{{ sino.n }}</b>{% endif %}</summary>
     <div class="sino-caixa" role="region" aria-label="Avisos">
       {# os avisos das OS da pessoa (04/11/2026, comando/avisos.py): o clique abre o card da OS (o mesmo do Histórico, com o
-         PDF) por cima da tela; sem JavaScript, a página da OS. "Marcar como lida" é um formulário, como o tema #}
-      {% if sino.n_avisos %}<p class="sino-t"><b>{{ sino.n_avisos }} {{ 'aviso das suas OS' if sino.n_avisos == 1 else 'avisos das suas OS' }}</b></p>
+         PDF) por cima da tela; sem JavaScript, a página da OS. "Marcar como lida" é um formulário, como o tema, que o script
+         abaixo manda por fetch, sem recarregar a tela (05/11/2026) #}
+      {% if sino.n_avisos %}<p class="sino-t sino-t-avisos" data-n="{{ sino.n_avisos }}"><b>{{ sino.n_avisos }} {{ 'aviso das suas OS' if sino.n_avisos == 1 else 'avisos das suas OS' }}</b></p>
       <ul class="sino-avisos">{% for a in sino.avisos %}<li>
         <a class="sino-aviso" href="{{ raiz }}/os/_nexus/card/{% if a.wid %}{{ a.wid }}{% else %}folio/{{ a.folio }}{% endif %}?status={{ a.status|urlencode }}" data-os-wid="{{ a.wid or '' }}" data-os-folio="{{ a.folio }}" data-os-status="{{ a.status }}"><span class="sino-sev sino-sev--{{ 'ok' if a.tipo == 'execucao' else 'mencao' }}">{{ 'Executada' if a.tipo == 'execucao' else 'Solicitação' }}</span> {{ a.titulo }}<small class="sino-aviso-d">{{ a.detalhe }} · {{ a.quando_txt }}</small></a>
         <form method="post" action="{{ raiz }}/t/comando/aviso/lida"><input type="hidden" name="aviso" value="{{ a.id }}"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar como lida</button></form>
@@ -71,6 +72,52 @@
         if (wid ? NexusOsCard.abrir(wid, op) : NexusOsCard.abrirFolio(op.folio, op)) ev.preventDefault();
       });
     });
+    // o "Marcar como lida" sem recarregar a tela (Levi, 05/11/2026: "cada vez que clico em marcar como lida a tela
+    // atualiza... atrapalha a experiência do usuário"): o formulário vai por fetch, o aviso sai da lista, os números descem
+    // e o sino fica aberto. Sem resposta que se leia (o login vencido, a rede), o formulário de sempre
+    (function () {
+      var caixa = document.querySelector('.sino-caixa');
+      if (!caixa || !window.fetch || !window.FormData) return;
+      function descer(k) {
+        var bt = document.querySelector('.sino-bt'), b = bt && bt.querySelector('.sino-n');
+        var n = Math.max(0, (parseInt(b ? b.textContent : '0', 10) || 0) - k);
+        if (b) { if (n) b.textContent = n; else b.remove(); }
+        if (bt) bt.setAttribute('aria-label', 'Avisos: ' + n);
+        var t = caixa.querySelector('.sino-t-avisos'), ul = caixa.querySelector('.sino-avisos');
+        var na = Math.max(0, (parseInt(t ? t.getAttribute('data-n') : '0', 10) || 0) - k);
+        if (t && na) {
+          t.setAttribute('data-n', na);
+          t.querySelector('b').textContent = na + (na === 1 ? ' aviso das suas OS' : ' avisos das suas OS');
+          if (ul && !ul.querySelector('li')) {        // os visíveis acabaram, e há mais: o clique traz os próximos
+            var li = document.createElement('li'), a = document.createElement('a');
+            a.className = 'sino-aviso'; a.href = location.href; a.textContent = 'Mostrar os outros ' + na;
+            li.appendChild(a); ul.appendChild(li);
+          }
+        } else if (t) {
+          [t, ul, caixa.querySelector('.sino-lidas')].forEach(function (e) { if (e) e.remove(); });
+        }
+        if (!n && !caixa.querySelector('.sino-vazio')) {
+          var p = document.createElement('p'); p.className = 'sino-vazio'; p.textContent = 'Nada novo para você.';
+          caixa.insertBefore(p, caixa.querySelector('.sino-todos'));
+        }
+      }
+      caixa.addEventListener('submit', function (ev) {
+        var f = ev.target;
+        // a rota pelo nexusRota (o prefixo), como todo caminho do Nexus no JavaScript (tests/test_prefixo.py)
+        if (!f.matches('form[action$="' + nexusRota('/t/comando/aviso/lida') + '"]')) return;
+        ev.preventDefault();
+        var bt = f.querySelector('button'), todos = f.classList.contains('sino-lidas');
+        if (bt) bt.disabled = true;
+        fetch(f.action, {method: 'POST', body: new FormData(f), credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+          .then(function (r) { return r.json().then(function (j) { return {ok: r.ok && j.ok, j: j}; }); })
+          .then(function (x) {
+            if (!x.ok) { if (bt) { bt.disabled = false; bt.textContent = 'Não marcou: tente de novo'; bt.title = x.j.erro || ''; } return; }
+            if (todos) { var t = caixa.querySelector('.sino-t-avisos'); descer(parseInt(t ? t.getAttribute('data-n') : '0', 10) || 0); }
+            else { var li = f.closest('li'); if (li) li.remove(); descer(1); }
+          })
+          .catch(function () { f.submit(); });
+      });
+    })();
   </script>{% endif %}{% endif %}
   <label for="abre-menu" class="gc-btn gc-btn--ui gc-btn--contorno botao-menu"><i class="ph ph-list"></i> Menu</label>
   {# O menu da conta (03/11/2026, Levi: "esse negócio de tema e setor fique oculto nessa barra inicial, que só apareça
@@ -234,6 +281,56 @@
       }
     });
   });
+  // ...e as sub-telas aparecem ao passar o mouse (05/11/2026, Levi: "Quando estou com a barra lateral esquerda recolhida
+  // gostaria que ao passar o mouse aparecesse as opções daquela área"): uma caixa ao lado do trilho com o nome da torre e
+  // as telas dela, os mesmos links do menu (o verde da tela pronta e a tela aberta vêm junto). Some ao tirar o mouse, com
+  // 150 ms de folga para atravessar do ícone até ela, ou com o Esc. O foco do teclado no ícone também abre. Só no trilho
+  // recolhido e acima de 820 px: no celular o menu é a lista inteira. O title do ícone sai, para a dica do navegador não
+  // cobrir a caixa (o nome já está nela).
+  var voo = document.createElement("nav");
+  voo.className = "menu-voo";
+  voo.hidden = true;
+  voo.setAttribute("aria-label", "Telas da área");
+  document.body.appendChild(voo);
+  var vooDe = null, vooRelogio = 0;
+  function noTrilho() { return raiz.classList.contains("menu-recolhido") && window.innerWidth > 820; }
+  function abrirVoo(torre) {
+    if (!noTrilho()) return;
+    clearTimeout(vooRelogio);
+    if (vooDe === torre && !voo.hidden) return;
+    var nome = torre.querySelector("summary span"), lista = torre.querySelector("ul");
+    var t = document.createElement("p");
+    t.className = "menu-voo-t" + (torre.classList.contains("com-conteudo") ? " com-conteudo" : "");
+    t.textContent = nome ? nome.textContent : "";
+    voo.replaceChildren(t);
+    if (lista) voo.appendChild(lista.cloneNode(true));
+    var ic = torre.querySelector("summary").getBoundingClientRect();
+    voo.style.left = (document.querySelector(".menu").getBoundingClientRect().right + 6) + "px";
+    voo.style.top = "0px";
+    voo.hidden = false;
+    voo.style.top = Math.max(8, Math.min(ic.top - 6, window.innerHeight - voo.offsetHeight - 8)) + "px";
+    vooDe = torre;
+  }
+  function fecharVoo(agora) {
+    clearTimeout(vooRelogio);
+    vooRelogio = setTimeout(function () { voo.hidden = true; vooDe = null; }, agora ? 0 : 150);
+  }
+  document.querySelectorAll(".menu .torre").forEach(function (torre) {
+    var s = torre.querySelector("summary");
+    s.removeAttribute("title");
+    torre.addEventListener("mouseenter", function () { abrirVoo(torre); });
+    torre.addEventListener("mouseleave", function () { fecharVoo(false); });
+    s.addEventListener("focus", function () { abrirVoo(torre); });
+    s.addEventListener("blur", function () { fecharVoo(false); });
+  });
+  voo.addEventListener("mouseenter", function () { clearTimeout(vooRelogio); });
+  voo.addEventListener("mouseleave", function () { fecharVoo(false); });
+  voo.addEventListener("focusin", function () { clearTimeout(vooRelogio); });
+  voo.addEventListener("focusout", function (ev) { if (!voo.contains(ev.relatedTarget)) fecharVoo(false); });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !voo.hidden) fecharVoo(true); });
+  // rolar a página ou o próprio trilho tira o ícone do lugar: a caixa fecha em vez de ficar solta
+  window.addEventListener("scroll", function (ev) { if (!voo.hidden && !voo.contains(ev.target)) fecharVoo(true); }, true);
+  document.getElementById("recolhe-menu").addEventListener("click", function () { fecharVoo(true); });
 })();
 </script>
 </body>

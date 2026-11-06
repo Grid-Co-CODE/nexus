@@ -466,6 +466,18 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .menu-recolhido .menu{width:64px;min-width:0;padding:14px 8px 40px}
 .menu-recolhido .menu span,
 .menu-recolhido .torre ul{display:none}
+/* o trilho recolhido mostra as telas da torre ao passar o mouse (05/11/2026; o JS no base.html): uma caixa ao lado do
+   trilho, com o nome da torre e os mesmos links do menu */
+.menu-voo{position:fixed;z-index:40;min-width:208px;max-width:300px;max-height:calc(100vh - 16px);overflow:auto;padding:8px;
+  background:var(--superficie);border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 8px 24px var(--sombra)}
+.menu-voo-t{margin:2px 10px 6px;font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.menu-voo-t.com-conteudo{color:var(--verde-texto)}
+.menu-voo ul{list-style:none;margin:0;padding:0}
+.menu-voo li a{display:block;padding:6px 10px;border-radius:var(--raio-controle);font-size:13px;color:var(--mudo);
+  text-decoration:none;white-space:nowrap}
+.menu-voo li a.com-conteudo{color:var(--verde-texto)}
+.menu-voo li a:hover,.menu-voo li a:focus-visible{color:var(--tinta);background:var(--superficie-2)}
+.menu-voo li a[aria-current="page"]{color:var(--tinta);background:var(--verde-suave)}
 .menu-recolhido .item-inicio,
 .menu-recolhido .torre summary{justify-content:center;padding:10px 0}
 

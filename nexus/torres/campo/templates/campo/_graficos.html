@@ -1,0 +1,21 @@
+{# Os gráficos do dia a dia da usina num lugar só: a janela da Meta e do PR (`_resp_painel.html`) e o quadro da Performance
+   da Central da usina (05/11/2026, Levi: "Quero que o gráfico de geração também apareça na visão do responsável > central
+   da usina"). `g` = `responsaveis_graficos.geracao(dias, dias_mes)`: a barra é a geração que o Gerencial conta no dia, na
+   cor da régua dele; a linha azul, o POA do PR diário do Painel NOC (eixo da direita) #}
+{% macro geracao(g) %}
+  <section class="cr-graf">
+    <div class="cr-graf-cab"><h3>Geração diária (MWh) e POA (kWh/m²)</h3>
+      <span class="cr-leg"><i class="cr-leg-barra"></i>geração <i class="cr-leg-meta"></i>meta {{ g.meta }} MWh/dia <i class="cr-leg-poa"></i>POA <i class="cr-leg-meta-poa"></i>meta POA {{ g.meta_poa }}</span></div>
+    <svg class="cr-svg" viewBox="{{ g.viewbox }}" role="img" aria-label="Geração diária em barras, com a linha do POA">
+      {% for l in g.grades %}<line class="cr-grade" x1="{{ g.esq }}" x2="{{ g.dir }}" y1="{{ l.y }}" y2="{{ l.y }}"/><text class="cr-eixo" x="{{ g.esq - 6 }}" y="{{ l.y + 4 }}" text-anchor="end">{{ l.rotulo }}</text>{% endfor %}
+      {% for l in g.grades_dir %}<text class="cr-eixo cr-eixo--poa" x="{{ g.dir + 6 }}" y="{{ l.y + 4 }}">{{ l.rotulo }}</text>{% endfor %}
+      {% for b in g.barras %}<rect class="cr-barra cr-barra--{{ b.cls }}" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"/><text class="cr-rot" x="{{ b.rx }}" y="{{ b.ry }}" text-anchor="middle">{{ b.rotulo }}</text>{% endfor %}
+      {% if g.meta_y is not none %}<line class="cr-meta" x1="{{ g.esq }}" x2="{{ g.dir }}" y1="{{ g.meta_y }}" y2="{{ g.meta_y }}"/>{% endif %}
+      {% if g.meta_poa_y is not none %}<line class="cr-meta cr-meta--poa" x1="{{ g.esq }}" x2="{{ g.dir }}" y1="{{ g.meta_poa_y }}" y2="{{ g.meta_poa_y }}"/>{% endif %}
+      {% for t in g.poa %}<polyline class="cr-linha-poa" points="{{ t }}"/>{% endfor %}
+      {% for p in g.poa_pontos %}<circle class="cr-ponto-poa" cx="{{ p.x }}" cy="{{ p.y }}" r="3"/>{% endfor %}
+      {% for x in g.dias %}<text class="cr-eixo" x="{{ x.x }}" y="{{ g.base + 18 }}" text-anchor="middle">{{ x.rotulo }}</text>{% endfor %}
+      {% for c in g.colunas %}<rect class="cr-coluna" x="{{ c.x }}" y="0" width="{{ c.w }}" height="{{ g.base }}"><title>{{ c.dica }}</title></rect>{% endfor %}
+    </svg>
+  </section>
+{% endmacro %}

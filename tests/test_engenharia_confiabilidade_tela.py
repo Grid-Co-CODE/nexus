@@ -49,3 +49,11 @@ def test_ativos_com_sinal_mostra_20_e_rola_com_as_etiquetas_so_na_cor(tela, clie
     # o nível (CRÍTICO, ATENÇÃO) também só na cor da letra, sem a pílula
     niveis = lista.split('class="eg-pill ')[1:]
     assert niveis and all(t.startswith("eg-pill--sem ") for t in niveis)
+
+
+def test_a_gaveta_nao_mostra_o_macro_do_ponto_de_exclamacao(tela, cliente):
+    # o caso (05/11/2026): o `aviso` do "!" importado na página tomava o lugar do `aviso` da gaveta (a mensagem verde do
+    # _gaveta.html), e toda gaveta da Confiabilidade mostrava "<Macro 'aviso'>"
+    html = _pagina(cliente)
+    assert 'id="g0"' in html or "<template" in html
+    assert "Macro" not in html

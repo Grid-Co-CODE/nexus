@@ -401,7 +401,7 @@ tr.cn-fotos-linha td{background:var(--superficie-2);text-align:left;padding:12px
 .cn-fotos-grupo--vegetacao h3{color:var(--serie-vegetacao)}
 .cn-fotos-grade{display:flex;flex-wrap:wrap;gap:8px}
 .cn-foto{position:relative;display:block;width:96px;height:96px;border-radius:8px;overflow:hidden;border:1px solid var(--linha);
-  background:var(--superficie-3)}
+  background:var(--superficie-3);text-decoration:none}
 .cn-foto img{width:100%;height:100%;object-fit:cover;display:block}
 .cn-foto:hover,.cn-foto:focus{border-color:var(--verde-texto);outline:none}
 .cn-foto-resp{position:absolute;left:4px;bottom:4px;padding:1px 6px;border-radius:5px;font:700 11px var(--font-sans);
@@ -417,18 +417,14 @@ tr.cn-fotos-linha td{background:var(--superficie-2);text-align:left;padding:12px
   font:600 22px/1 var(--font-sans);width:44px;height:44px;cursor:pointer}
 .cn-caixa-foto button:hover{border-color:var(--foto-borda-hover)}
 .cn-caixa-fechar{position:absolute;top:16px;right:16px}
-.cn-fotos-demais{border-top:1px solid var(--linha);padding-top:10px}
-.cn-fotos-demais summary{cursor:pointer;font:700 13px var(--font-sans);color:var(--tinta);list-style-position:inside}
-.cn-fotos-demais summary:hover{color:var(--verde-texto)}
-.cn-fotos-tipos{margin-left:10px;font:500 12px var(--font-sans);color:var(--tinta-2)}
-.cn-fotos-demais[open] .cn-fotos-tipos{display:none}
-.cn-fotos-demais .cn-fotos-grupo{margin-top:12px}
-.cn-fotos-grupo h4{margin:0 0 8px;font:600 12.5px var(--font-sans);color:var(--tinta-2)}
-.cn-foto--legenda{height:116px}
+/* as demais fotos, abertas por tipo (05/11/2026); com legenda, o cartão é a foto mais a legenda, e a etiqueta da
+   resposta fica dentro da foto (`cn-foto-img`): presa ao fim do cartão, ela caía em cima da legenda */
+.cn-foto--legenda{height:auto}
+.cn-foto-img{position:relative;display:block}
 .cn-foto--legenda img{height:96px}
 .cn-foto-rotulo{display:block;height:20px;padding:2px 4px;font:600 10.5px/16px var(--font-sans);color:var(--tinta-2);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--superficie-2)}
-.cn-foto--legenda .cn-foto-resp{bottom:24px}
+.cn-foto--legenda .cn-foto-resp{bottom:4px}
 
 /* Ronda avulsa (07/10/2026): o selo diz que foi lançada à mão; o title explica no mouse, o foco do teclado também */
 .cn-avulsa{display:inline-block;font:700 10.5px/14px var(--font-sans);padding:2px 9px;border-radius:999px;cursor:help;
@@ -1137,38 +1133,156 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .cr-ronda-amp img{max-width:100%;max-height:60vh;border-radius:var(--raio-md);background:var(--superficie-2)}
 .cr-ronda-amp figcaption{color:var(--mudo);font-size:12px;text-align:center}
 
-/* A lista da Aprovação de OS por responsável da UFV (18/10/2026, Levi: "quando abrir aparece uma lista das usinas que
-   tem OSs não concluídas, ao clicar na linha aparece o mesmo card que aparece ao clicar na OS do histórico de OS do OS
-   Creator Web"): uma linha por usina, que abre a tabela das OS dela; a OS abre o card */
-/* a coluna da lista não cresce com a tabela (980 px de mínimo): no celular a tabela rola dentro do quadro */
-.ap-usinas{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
-.ap-usina{min-width:0;background:var(--superficie);border:1px solid var(--linha);border-left:3px solid var(--ok-cheio);
-  border-radius:var(--raio-md)}
-.ap-usina--alerta{border-left-color:var(--alerta-cheio)}
-.ap-usina--critico{border-left-color:var(--critico-cheio)}
-.ap-u{display:grid;grid-template-columns:minmax(180px,2fr) minmax(64px,.5fr) minmax(220px,2fr) minmax(150px,1.2fr) 14px;
-  align-items:center;gap:12px;padding:10px 14px;cursor:pointer;list-style:none}
-.ap-u::-webkit-details-marker{display:none}
-.ap-u:hover,.ap-usina[open] > .ap-u{background:var(--superficie-2)}
-.ap-u:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
-.ap-u-nome{display:grid;min-width:0}
-.ap-u-nome b{font:600 14px/1.3 var(--font-sans);overflow-wrap:anywhere}
-.ap-u-nome small{color:var(--mudo);font-size:12px;line-height:1.35;overflow-wrap:anywhere}
-.ap-u-n{font-size:12.5px;color:var(--mudo)}
-.ap-u-n b{font:700 18px/1 var(--font-sans)}
-.ap-u-g{display:grid;gap:5px;min-width:0}
-.ap-u-leg{font-size:12px;color:var(--tinta-2)}
-.ap-u-d{font-size:12.5px;color:var(--mudo)}
-.ap-seta{color:var(--mudo);transition:transform .15s ease}
-.ap-usina[open] .ap-seta{transform:rotate(180deg)}
-.ap-usina > .cn-tab{margin:0 14px 12px}
-tr.ap-os{cursor:pointer}
-tr.ap-os:hover td{background:var(--superficie-2)}
-tr.ap-os:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
-@media (max-width:760px){
-  .ap-u{grid-template-columns:minmax(0,1fr) auto 14px}
-  .ap-u-g,.ap-u-d{grid-column:1 / -1}
-  .ap-seta{grid-row:1;grid-column:3}
+/* A Aprovação de OS em quadro por fatos (05/11/2026, Levi: "refaça com essas regras e deixe algo bem fácil e dinâmico
+   para os supervisores!"): as três colunas lado a lado, cada uma rolando por dentro; no celular cada coluna ocupa quase a
+   tela e o quadro desliza de lado dentro da própria caixa (a página não rola de lado), como um quadro de tarefas. O
+   cartão: a OS, onde, o score, os avisos com a prova e o Aprovar, nessa ordem */
+.apq-filtro{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.apq-busca{min-width:180px}
+.apq-lote{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:14px;padding:10px 14px;
+  background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.apq-lote-total{flex:1 1 240px;margin:0;font-size:13px;color:var(--tinta-2)}
+.apq-lote-total b{font-size:16px;color:var(--tinta)}
+.apq-lote-msg{flex:1 1 100%;margin:0;font-size:13px;color:var(--tinta-2)}
+.apq-lote-msg:empty{display:none}
+.apq-quadro{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start;margin-top:14px}
+/* 2ª rodada (05/11/2026, Levi: "pode adotar um visual de card de OS parecido com Engenharia > Quadro da equipe porém com o
+   botão aprovar"): a coluna e o cartão do Quadro da equipe (o kb-col e o kb-card do engenharia.css), o fio de cima da
+   coluna e o da esquerda do cartão na cor da coluna */
+.apq-coluna{display:flex;flex-direction:column;min-width:0;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:14px;box-shadow:inset 0 3px 0 var(--ok-cheio)}
+.apq-coluna[data-tom="alerta"]{box-shadow:inset 0 3px 0 var(--alerta-cheio)}
+.apq-coluna[data-tom="critico"]{box-shadow:inset 0 3px 0 var(--critico-cheio)}
+.apq-col-cab{display:grid;gap:2px;padding:12px 14px;border-bottom:1px solid var(--linha)}
+.apq-col-cab h2{display:flex;align-items:center;gap:8px;margin:0;font:700 13.5px/1.3 var(--font-sans);color:var(--tinta)}
+.apq-col-n{margin-left:auto;font:700 12px var(--font-sans);padding:1px 8px;border-radius:999px;background:var(--superficie-3);
+  color:var(--tinta-2)}
+.apq-col-cab p{margin:0;font-size:12px}
+.apq-todas{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:12.5px;color:var(--tinta-2);cursor:pointer}
+.apq-cartoes{display:grid;gap:10px;align-content:start;padding:10px;max-height:calc(100vh - 230px);overflow-y:auto}
+.apq-cartoes--grade{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));max-height:none;overflow:visible;padding:10px 0 0}
+.apq-cartao{display:grid;gap:7px;min-width:0;padding:12px 12px 10px;background:var(--superficie-2);border:1px solid var(--linha);
+  border-radius:12px;box-shadow:inset 3px 0 0 var(--linha-forte);content-visibility:auto;contain-intrinsic-size:auto 230px}
+.apq-cartao[data-coluna="pronta"]{box-shadow:inset 3px 0 0 var(--ok-cheio)}
+.apq-cartao[data-coluna="duvida"]{box-shadow:inset 3px 0 0 var(--alerta-cheio)}
+.apq-cartao[data-coluna="nao_ok"]{box-shadow:inset 3px 0 0 var(--critico-cheio)}
+.apq-cartao[hidden]{display:none}
+.apq-cartao[data-apq-detalhe]{cursor:pointer}
+.apq-cartao[data-apq-detalhe]:hover{border-color:var(--linha-forte)}
+.apq-cartao:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.apq-cartao--ativo{border-color:var(--verde)}
+.apq-cartao[data-estado="aprovada"]{border-color:var(--ok-cheio);box-shadow:inset 3px 0 0 var(--ok-cheio)}
+.apq-c-cab{display:flex;align-items:center;gap:8px;min-width:0}
+/* a caixa de marcar do Nexus (05/11/2026: "Esse check box branco no tema escuro é muito feio!"): o fundo da superfície,
+   o fio e, marcada, o verde com o visto */
+.apq-marcar,.apq-todas input{appearance:none;-webkit-appearance:none;flex:none;display:inline-grid;place-content:center;width:18px;height:18px;
+  margin:0;border:1.5px solid var(--linha-forte);border-radius:5px;background:var(--superficie);cursor:pointer}
+.apq-marcar:hover,.apq-todas input:hover{border-color:var(--verde)}
+.apq-marcar:checked,.apq-todas input:checked{border-color:var(--verde);background:var(--verde)}
+.apq-marcar:checked::after,.apq-todas input:checked::after{content:"";width:5px;height:9px;margin-top:-2px;
+  border:solid var(--sobre-verde);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.apq-marcar:focus-visible,.apq-todas input:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.apq-marcar:disabled{opacity:.45;cursor:default}
+/* o número da OS no verde da Grid, sem sublinhado (05/11/2026: "tire esse underline estranho!") */
+.apq-c-os{padding:0;border:0;background:none;color:var(--verde-texto);font:700 13px/1.2 var(--font-mono);cursor:pointer;text-decoration:none}
+.apq-c-os:hover{color:var(--tinta)}
+.apq-c-os:focus-visible{outline:2px solid var(--foco);outline-offset:2px;border-radius:4px}
+.apq-c-dias{margin-left:auto;font:700 11.5px var(--font-sans)}
+/* o motivo da coluna em destaque (05/11/2026: "Sempre destacar o motivo de estar em dúvida ou não OK! tem que estar bem
+   visual e acessível"): o fundo e o fio na cor, o ícone e a palavra (a cor nunca sozinha), o texto na tinta */
+.apq-motivo{display:flex;gap:9px;align-items:flex-start;padding:9px 10px;border-radius:9px;border:1px solid var(--linha-forte);
+  border-left-width:4px;background:var(--superficie-3);color:var(--tinta)}
+.apq-motivo > .ph{flex:none;font-size:19px;line-height:1.2;color:var(--tinta-2)}
+/* a coluna já diz Em dúvida ou Não OK (05/11/2026: "tire esse 'EM DÚVIDA' da OS deixe só a mensagem em laranja"): a
+   mensagem na cor da coluna, com o ícone */
+.apq-motivo ul{display:grid;gap:4px;min-width:0;margin:0;padding:0;list-style:none;font:600 13px/1.4 var(--font-sans);overflow-wrap:anywhere}
+.apq-motivo[data-nivel="critico"]{background:var(--critico-suave);border-color:var(--critico-cheio)}
+.apq-motivo[data-nivel="critico"] > .ph{color:var(--critico)}
+.apq-motivo[data-nivel="critico"] li{color:var(--critico)}
+.apq-motivo[data-nivel="alerta"]{background:var(--alerta-suave);border-color:var(--alerta-cheio)}
+.apq-motivo[data-nivel="alerta"] > .ph{color:var(--alerta)}
+.apq-motivo[data-nivel="alerta"] li{color:var(--alerta)}
+.apq-motivo[data-nivel="neutro"] ul{font-weight:500;color:var(--tinta-2)}
+/* a tarefa e a nota na mesma linha (05/11/2026: "Nota do app pode ficar ao lado direito de tarefa") */
+.apq-c-tarefa{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.apq-c-tarefa .apq-c-tit{flex:1 1 auto;min-width:0}
+.apq-c-tit{margin:0;font:600 13.5px/1.35 var(--font-sans);color:var(--tinta);overflow-wrap:anywhere}
+.apq-c-tit small{font-weight:500;color:var(--mudo)}
+.apq-c-onde{margin:0;font-size:12px;line-height:1.35;color:var(--mudo);overflow-wrap:anywhere}
+.apq-c-onde b{color:var(--tinta-2);font-weight:600}
+.apq-score{flex:none;display:flex;align-items:baseline;gap:5px;margin:0;font:700 9.5px/1.3 var(--font-sans);
+  letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);white-space:nowrap}
+.apq-score b{font:700 15px/1 var(--font-sans);letter-spacing:0}
+.apq-avisos{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.apq-avisos:empty{display:none}
+.apq-aviso{padding:4px 8px 4px 9px;border-left:3px solid var(--linha-forte);border-radius:0 6px 6px 0;background:var(--superficie);
+  font-size:12.5px;line-height:1.4;color:var(--tinta-2);overflow-wrap:anywhere}
+.apq-aviso[data-nivel="critico"]{border-left-color:var(--critico-cheio);color:var(--tinta);font-weight:600}
+.apq-aviso[data-nivel="alerta"]{border-left-color:var(--alerta-cheio)}
+.apq-aviso[data-nivel="ok"]{border-left-color:var(--ok-cheio);color:var(--ok)}
+/* o nome das duas fotos do par, que abre o card da OS (05/11/2026: sem a foto no cartão) */
+.apq-par-igual{font:700 12px var(--font-mono);color:var(--mudo)}
+.apq-foto{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid var(--linha-forte);border-radius:999px;
+  background:var(--superficie);color:var(--verde-texto);font:600 12px/18px var(--font-sans);cursor:pointer;text-decoration:none}
+.apq-foto:hover{border-color:var(--verde-texto)}
+.apq-foto:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.apq-c-pe{display:flex;align-items:center;gap:8px;min-width:0;padding-top:7px;border-top:1px solid var(--linha);font-size:11.5px;
+  color:var(--tinta-2)}
+.apq-c-av{flex:none;width:24px;height:24px;margin:0;font-size:10px}
+.apq-c-quem{min-width:0;overflow-wrap:anywhere}
+.apq-c-quem small{display:block;color:var(--mudo)}
+/* o Aprovar menor, na ponta direita do pé (05/11/2026: "paralelo ao extremo direita do nome do técnico") */
+.apq-c-pe .apq-aprovar{flex:none;margin-left:auto;padding:5px 12px;font-size:12.5px;line-height:16px}
+.apq-msg{margin:0;font-size:12.5px;line-height:1.4}
+/* a barra lateral da OS (05/11/2026): a das Rondas (rd-gaveta), com o detalhe da pendência em seções */
+.apq-g-cab{padding-right:36px}
+.apq-g-cab h2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:4px 0 2px;font:700 19px/1.25 var(--font-sans)}
+.apq-g-os{font:700 19px/1.25 var(--font-mono);color:var(--verde-texto)}
+.apq-g-onde{margin:0;font-size:12.5px;color:var(--tinta-2)}
+.apq-g-acoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.apq-g-acoes .gc-btn{padding:6px 12px;font-size:12.5px}
+.apq-g-cab .apq-msg{margin-top:8px}
+.apq-g-sec{margin-top:18px;padding-top:14px;border-top:1px solid var(--linha)}
+.apq-g-sec h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font:700 13px/1.3 var(--font-sans);letter-spacing:.04em;
+  text-transform:uppercase;color:var(--mudo)}
+.apq-g-n{padding:0 7px;border-radius:999px;background:var(--superficie-3);font:700 11.5px/18px var(--font-sans);color:var(--tinta-2);
+  letter-spacing:0}
+.apq-g-fato{margin-bottom:10px;padding:10px 12px;border:1px solid var(--linha-forte);border-left-width:4px;border-radius:9px;
+  background:var(--superficie-2)}
+.apq-g-fato[data-nivel="critico"]{border-color:var(--critico-cheio);background:var(--critico-suave)}
+.apq-g-fato[data-nivel="alerta"]{border-color:var(--alerta-cheio);background:var(--alerta-suave)}
+.apq-g-fato-t{display:flex;gap:8px;align-items:flex-start;margin:0;font:600 13.5px/1.4 var(--font-sans);color:var(--tinta)}
+.apq-g-fato-t .ph{flex:none;font-size:18px;line-height:1.1}
+.apq-g-fato[data-nivel="critico"] .apq-g-fato-t .ph{color:var(--critico)}
+.apq-g-fato[data-nivel="alerta"] .apq-g-fato-t .ph{color:var(--alerta)}
+.apq-g-det{margin:6px 0 0 26px;font-size:12.5px;color:var(--tinta-2)}
+.apq-g-lista{display:grid;gap:6px;margin:8px 0 0 26px;padding:0;list-style:none;font-size:12.5px;color:var(--tinta-2)}
+.apq-g-lista li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.apq-g-nota{display:flex;gap:6px;align-items:center;margin:0 0 6px;font-size:13px;color:var(--tinta-2)}
+.apq-g-tarefas{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.apq-g-tarefas > li{padding:9px 11px;border:1px solid var(--linha);border-radius:9px;background:var(--superficie-2)}
+.apq-g-tarefa{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;margin:0;font-size:13px;color:var(--tinta)}
+.apq-g-tarefa b{font-weight:600}
+.apq-g-chip{margin-left:auto;padding:1px 8px;border-radius:999px;border:1px solid var(--linha-forte);font:700 11px/17px var(--font-sans);
+  color:var(--tinta-2);white-space:nowrap}
+.apq-g-chip[data-tom="ok"]{border-color:var(--ok-cheio);color:var(--ok)}
+.apq-g-chip[data-tom="alerta"]{border-color:var(--alerta-cheio);color:var(--alerta)}
+.apq-g-chip[data-tom="critico"]{border-color:var(--critico-cheio);color:var(--critico)}
+.apq-g-meta{margin:3px 0 0;font-size:12px;color:var(--mudo);overflow-wrap:anywhere}
+.apq-g-motivos{margin:6px 0 0;padding-left:16px;font-size:12px;color:var(--tinta-2)}
+.apq-msg[hidden]{display:none}
+.apq-vazio{margin:6px 2px;font-size:12.5px}
+.apq-extra{margin-top:14px;padding:10px 14px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.apq-extra > summary{font:600 14px/1.4 var(--font-sans);cursor:pointer}
+.apq-extra > p{margin:8px 0 0;font-size:12.5px}
+@media (max-width:560px){
+  .apq-filtro{flex:1 1 100%}
+  .apq-filtro .gc-campo{flex:1;min-width:0}
+}
+@media (max-width:900px){
+  .apq-quadro{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}
+  .apq-coluna{flex:0 0 86%;scroll-snap-align:start}
+  .apq-cartoes{max-height:none;overflow:visible}
 }
 
 /* APR e PT (24/10/2026): as páginas do histórico, de 20 em 20 */
@@ -1644,6 +1758,9 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .rg-fotos{margin-top:16px}
 .rg-fotos .cn-fotos-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
 .rg-fotos .cn-foto{width:auto;height:auto;aspect-ratio:1}
+/* com legenda, a foto é que fica quadrada, e o cartão cresce com a legenda embaixo */
+.rg-fotos .cn-foto--legenda{aspect-ratio:auto}
+.rg-fotos .cn-foto--legenda img{height:auto;aspect-ratio:1}
 .rg-vazio{color:var(--mudo)}
 @media (max-width:900px){.rd-gaveta{width:100vw;min-width:0}}
 @media (max-width:480px){.rg-grade{grid-template-columns:repeat(2,minmax(0,1fr))}.rg-check{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -1654,18 +1771,13 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 /* a Central da usina (04/11/2026, a aba da Visão do responsável), numa superfície só (à la Nexus, sem azul em camadas).
    2ª rodada no mesmo dia ("está simples demais e as linhas estão muito coladas"): o cabeçalho com as pessoas, os quadros
    com o ícone num selo, as linhas separadas por um fio com respiro, o ponto da situação e a contagem de cada linha */
-.cu-busca{display:flex;margin-top:16px}
-.cu-busca .rd-usina{flex:0 1 440px}
+/* a busca da usina à direita, na linha das abas (05/11/2026: "Quero o 'Buscar usinas' do lado direito paralelizando com
+   os botões a visão dos responsáveis!"); a lista abre no foco, por cima, como nas Rondas */
+.cu-topo{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:18px}
+.cu-topo > .cn-filtros{margin-top:0}
+.cu-busca{display:flex;flex:0 1 380px;min-width:0}
+.cu-busca .rd-usina{flex:1 1 auto}
 .cu-busca .rd-campo input{width:100%}
-/* sem usina escolhida, a lista já aberta, em grade (04/11/2026: "Deixar a lista de 'buscar usina' já no estilo nexus") */
-.cu-busca--aberta .rd-usina{flex:1 1 auto}
-.rd-usina--aberta .rd-campo{max-width:440px}
-.rd-usinas-n{margin-left:auto;font-size:12px;color:var(--mudo);white-space:nowrap}
-.rd-usinas--aberta{position:static;width:auto;max-height:min(62vh,560px);margin:12px 0 0;padding:6px;overflow:auto;
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:2px;list-style:none;background:var(--superficie);
-  border:1px solid var(--linha);border-radius:var(--raio-md);box-shadow:none}
-.rd-usinas--aberta li[role="option"]{padding:10px 12px}
-.rd-usinas--aberta .rd-usinas-nada{grid-column:1/-1;padding:12px;color:var(--mudo)}
 .cu-vazio{margin:14px 0 0;font-size:13.5px}
 .cu-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 24px;margin-top:22px}
 .cu-nome{margin:0;font:700 26px/1.2 var(--font-sans);letter-spacing:-.01em;color:var(--tinta)}
@@ -1682,9 +1794,15 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
   color:inherit;font:inherit;text-align:left;cursor:pointer}
 .cn-numeros > button:hover{background:var(--superficie-3)}
 .cn-numeros > button:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
-/* os oito números numa linha (a faixa das outras telas quebra em 150 px) */
+/* os oito números numa linha (a faixa das outras telas quebra em 150 px). Cada um ocupa três linhas da faixa, as MESMAS
+   em todos (a subgrade): o nome, o valor e o complemento alinhados entre si, cada pedaço no meio da casa dele (05/11/2026,
+   Levi: "campos separados por linhas invisíveis separando cabeçalho e valor / quero que centralize horizontal e
+   verticalmente") */
 .cu-numeros{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
-.cu-numeros > *{padding:14px 16px}
+.cn-numeros.cu-numeros > *{display:grid;grid-row:span 3;grid-template-rows:subgrid;place-items:center;row-gap:2px;padding:14px 12px;text-align:center}
+.cu-numeros .v{margin-top:0}
+/* o complemento que não cabe quebra em duas linhas parelhas ("a mais antiga / há 57 d"), não com o "d" sozinho */
+.cu-numeros .d{text-wrap:balance}
 .cu-numeros .v{font-size:20px;line-height:26px;white-space:nowrap}
 /* duas colunas que se empilham por dentro: o quadro mais curto não deixa buraco embaixo */
 .cu-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px;align-items:start}
@@ -1713,7 +1831,106 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .cu-dt--alerta::before{background:var(--alerta)}
 .cu-dt--ok::before{background:var(--ok)}
 .cu-pe{display:flex;flex-wrap:wrap;gap:8px 20px;padding:12px 20px;border-top:1px solid var(--linha);font-size:12.5px}
-.cu-rel-mes{display:block;width:100%;max-width:280px;margin:4px 0 14px}
+/* o gráfico da geração dentro do quadro da Performance: sem a caixa da janela (uma superfície só) */
+.cu-q .cr-graf{margin:0;padding:14px 20px 8px;border:0;border-top:1px solid var(--linha);border-radius:0;background:transparent}
+/* na meia largura o desenho da janela encolhe ~30%: os eixos crescem para ler a ~10 px e o valor em cima de cada barra
+   sai (encavalava; o valor do dia fica na dica de cada coluna, e o total na linha da Meta) */
+.cu-q .cr-svg .cr-eixo{font-size:14px}
+.cu-q .cr-svg .cr-rot{display:none}
+/* o mês do relatório, primeiro e em botões (05/11/2026: "Quando clicar em baixar relatórios: escolher qual o mês!") */
+.cu-rel-meses{margin:0 0 16px;padding:0;border:0}
+.cu-rel-meses legend{margin:0 0 8px;padding:0}
+.cu-rel-chips{display:flex;flex-wrap:wrap;gap:8px}
+.cu-rel-chips label{position:relative;cursor:pointer}
+.cu-rel-chips input{position:absolute;opacity:0;pointer-events:none}
+.cu-rel-chips span{display:block;padding:8px 16px;border:1px solid var(--linha-forte);border-radius:999px;
+  font:600 13px/18px var(--font-sans);color:var(--tinta-2);white-space:nowrap}
+.cu-rel-chips small{margin-left:6px;font-weight:400;font-size:11.5px;color:inherit;opacity:.8}
+.cu-rel-chips label:hover span{border-color:var(--verde);color:var(--tinta)}
+.cu-rel-chips input:checked + span{border-color:var(--verde);background:var(--verde);color:var(--sobre-verde)}
+.cu-rel-chips input:focus-visible + span{outline:2px solid var(--foco);outline-offset:2px}
+.cu-rel-t{margin:0 0 4px}
 @media (max-width:900px){.cu-grade{grid-template-columns:1fr}}
+@media (max-width:700px){.cu-busca{flex:1 1 100%}}
 @media (max-width:480px){.cu-q .cr-dl{grid-template-columns:1fr}.cu-q .cr-dl > dd{padding-top:0;border-top:0}
-  .cu-gente li{flex:1 1 100%}.rd-usinas--aberta{grid-template-columns:1fr}}
+  .cu-gente li{flex:1 1 100%}}
+/* a Visão do cliente (05/11/2026, fase 1; a tela do mockup da sugestão, no desenho do Nexus): uma superfície só */
+.vc-escolha .gc-campo{min-width:260px}
+.vc-vazio{margin:16px 0 0;font-size:13.5px}
+.vc-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px;margin-top:22px}
+.vc-nome{margin:0;font:700 26px/1.2 var(--font-sans);letter-spacing:-.01em;color:var(--tinta)}
+.vc-onde{margin:5px 0 0;font-size:13.5px;color:var(--mudo)}
+.vc-lido{margin:0;font-size:12.5px;color:var(--mudo)}
+.vc-numeros{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:16px}
+.vc-num{min-width:0;padding:14px 18px 16px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.vc-num-t{display:flex;align-items:center;gap:8px;margin:0;font:600 12.5px/18px var(--font-sans);color:var(--tinta-2)}
+.vc-num-t .ph{font-size:16px;color:var(--verde-texto)}
+.vc-num-v{margin:10px 0 0;font-size:14px;color:var(--tinta-2)}
+.vc-num-v b{font:700 28px/1.1 var(--font-sans);letter-spacing:-.02em;color:var(--tinta);font-variant-numeric:tabular-nums}
+.vc-num-v b.cn-t-ok{color:var(--ok)}
+.vc-num-v b.cn-t-alerta{color:var(--alerta)}
+.vc-num-v b.cn-t-critico{color:var(--critico)}
+.vc-num-d{margin:6px 0 0;font-size:12.5px;line-height:1.45;color:var(--mudo)}
+.vc-sem{color:var(--mudo);font-size:15px}
+.vc-selos{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.vc-q{margin-top:16px;padding:14px 18px 16px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.vc-q-cab{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px}
+.vc-q-cab h2{margin:0;font:600 15px/22px var(--font-sans);color:var(--tinta)}
+.vc-q-cab p{margin:0;font-size:12.5px}
+.vc-tab{border:0;background:transparent}
+/* o cabeçalho da tabela sem a faixa de outra cor: o quadro já é a superfície (à la Nexus, sem azul em camadas) */
+.vc-tab th{background:transparent;border-bottom:1px solid var(--linha)}
+.vc-tab table{min-width:760px}
+.vc-tab .vc-esq,.vc-tab td.vc-usina{text-align:left}
+.vc-perf{white-space:nowrap}
+.vc-barra{display:block;width:96px;height:5px;margin:6px auto 0;border-radius:3px;background:var(--superficie-3);overflow:hidden}
+.vc-barra i{display:block;height:100%;border-radius:3px;background:var(--mudo)}
+.vc-barra i.vc-barra--ok{background:var(--ok)}
+.vc-barra i.vc-barra--alerta{background:var(--alerta)}
+.vc-barra i.vc-barra--critico{background:var(--critico)}
+.vc-normais{margin-top:6px}
+.vc-normais summary{cursor:pointer;padding:10px 0;text-align:center;font:600 13px var(--font-sans);color:var(--tinta-2)}
+.vc-normais summary:hover{color:var(--verde-texto)}
+/* o detalhe da usina (entrega 2): ao lado da tabela na tela larga, como no mockup; abaixo dela na estreita. Um nível
+   de superfície só: o painel é um quadro como o da tabela, e por dentro só linhas e pílulas */
+.vc-corpo{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start;margin-top:16px}
+.vc-corpo > .vc-q{margin-top:0}
+.vc-det{padding:14px 18px 16px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+@media (min-width:1280px){.vc-corpo{grid-template-columns:minmax(0,1fr) 380px}.vc-corpo .vc-tab table{min-width:680px}
+  .vc-corpo .vc-tab th,.vc-corpo .vc-tab td{padding-left:9px;padding-right:9px}
+  .vc-corpo .vc-tab th{white-space:normal}.vc-corpo .vc-barra{width:80px}
+  .vc-det{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}}
+.vc-linha{cursor:pointer}
+.vc-linha.vc-sel td{background:var(--superficie-2)}
+.vc-linha.vc-sel td:first-child{box-shadow:inset 3px 0 0 var(--verde)}
+.vc-ir{color:var(--tinta);font-weight:700;text-decoration:none}
+.vc-ir:hover,.vc-ir:focus-visible{color:var(--verde-texto)}
+.vc-det-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.vc-det-nome{margin:0;font:600 16px/22px var(--font-sans);color:var(--tinta)}
+.vc-det-onde,.vc-det-lido{margin:2px 0 0;font-size:12.5px;color:var(--mudo)}
+.vc-det-lido{margin-top:8px}
+.vc-det-paradas{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px;font-size:13px;color:var(--tinta-2)}
+.vc-det-paradas b{color:var(--critico);font-weight:600}
+.vc-det-visita{display:flex;align-items:baseline;gap:8px;margin:12px 0 0;padding:10px 12px;border:1px solid var(--linha);border-radius:var(--raio-md);font-size:13px;color:var(--tinta-2)}
+.vc-det-visita .ph{color:var(--verde-texto)}
+.vc-det-visita b{color:var(--tinta)}
+.vc-det-t{margin:16px 0 8px;padding-top:12px;border-top:1px solid var(--linha);font:600 11.5px/16px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.vc-det-t span{text-transform:none;letter-spacing:0;font-weight:500}
+.vc-det-vazio{margin:0;font-size:13px}
+.vc-dia{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.vc-dia li{display:grid;grid-template-columns:44px 8px minmax(0,1fr);gap:10px;align-items:center;font-size:13px;line-height:1.4;color:var(--tinta-2)}
+.vc-dia-h{font:500 12px/1.4 var(--font-mono);color:var(--mudo);font-variant-numeric:tabular-nums}
+.vc-ponto{display:block;width:8px;height:8px;border-radius:50%;background:var(--mudo)}
+.vc-ponto--ok{background:var(--ok)}
+.vc-ponto--alerta{background:var(--alerta)}
+.vc-ponto--critico{background:var(--critico)}
+.vc-ponto--info{background:var(--info)}
+.vc-det-lista{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.vc-det-lista li{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;font-size:13px;color:var(--tinta-2)}
+.vc-det-lista li > div{min-width:0}
+.vc-det-lista b{color:var(--tinta);font-weight:600}
+.vc-det-lista .cn-pill{flex:none}
+.vc-det-d{display:block;margin-top:2px;font-size:12px;line-height:1.4;color:var(--mudo)}
+.vc-det-conf{margin:10px 0 0}
+@media (max-width:480px){.vc-num-v b{font-size:24px}.vc-escolha .gc-campo{min-width:0;width:100%}
+  .vc-det{padding:12px 14px 14px}}

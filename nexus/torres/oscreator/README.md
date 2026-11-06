@@ -363,6 +363,11 @@ Acompanhamento é dividido entre quem vê o mesmo no Fracttal (seção "O quadro
   conferência antes de gravar o ticket). Eram até 5 pedidos em fila. Tarefas, subtarefas e cabeçalho vão juntos;
   solicitação, OS pai e motivo do cancelamento vão juntos depois. Os mesmos pedidos; a ordem das subtarefas é a da
   seção "O card da OS com várias tarefas".
+- **A nota em dois campos (05/11/2026):** `api.get_os_detalhes` devolve `notas`, a `note` e a `task_note` de cada tarefa
+  sem repetir a que já está DENTRO de outra (`os_detalhe.juntar_notas`), e, crus, `nota_gravada` (a `note` da 1ª tarefa,
+  o que o `editar_nota_os` grava) e `nota_da_tarefa` (a `task_note`, a nota com que a OS nasceu). Quem regrava a nota parte
+  do cru, nunca da junção (a ponte da Engenharia, `ponte._base_da_nota`): regravar a junção repetia a nota de entrada a
+  cada comentário (prova no Fracttal da OS 18591 de TESTE - PA). A prova: `tests/test_engenharia_nota_da_os.py`.
 - **Leitura enxuta, por contexto:** `with api.enxuta("vinculos")` pula a 2ª leva (a tela de um chamado não mostra
   solicitação nem OS pai); `with api.enxuta("url")` traz as listas de anexos sem a URL pré-assinada. É por contexto, e
   não por argumento, porque as rotas chamam essas funções com um argumento só e os testes do oem as trocam por
@@ -2564,10 +2569,10 @@ Uma colega avisou ao Levi: "o OS Creator do nexus não tá puxando a OS pai". Pr
 - **Os caminhos que criam a OS de uma vez** (`to_work_order=True`: a OS já realizada, a Performance de uma OS por ativo e a
   inspeção do chamado) mandam a OS pai no mesmo pedido que cria a OS, e ela fica: provado no ar em 04/11/2026 em TESTE - PA,
   a OS 18564 (realizada) e a 18571 (Performance de uma OS por ativo) nasceram com a 18560 de pai, no card e no Fluxo.
-- **Conferir depois de gravar** (`os_juntar.conferir_os_pai`, 1 leitura do cabeçalho, só com OS pai): a fase 2 e os três
+- **Conferir depois de gravar** (`os_juntar.conferir_os_pai`, 1 leitura do cabeçalho, só com OS pai): a fase 2 e os
   caminhos de uma vez leem a OS criada e, se o Fracttal não gravou a OS pai, a tela diz. Foi o silêncio que deixou o defeito
-  passar semanas. Os três de uma vez ganharam a conferência no mesmo dia, depois do pedido do Levi ("Performance e
-  engenharia também tem OS pai, veja se está funcionando normalmente!").
+  passar semanas. Os de uma vez ganharam a conferência no mesmo dia, depois do pedido do Levi ("Performance e engenharia
+  também tem OS pai, veja se está funcionando normalmente!"); a OS já realizada do COS por data, em 05/11/2026.
 - **A Performance de uma OS por ativo diz o que houve:** o nº de OS pai digitado que não existe no Fracttal vira "OS X criada
   sem a OS pai" (a agrupada já dizia), e as ressalvas de cada OS (essa, a OS pai não gravada e as perguntas de fim de
   atividade recusadas, que se perdiam dentro do `create_performance_os`) chegam à tela em "Atenção:", com o resultado em
@@ -2577,6 +2582,31 @@ Uma colega avisou ao Levi: "o OS Creator do nexus não tá puxando a OS pai". Pr
 - Prova: `test_a_os_pai_vai_no_pedido_que_cria_a_os_numerada` (vermelho nos 7 caminhos antes da correção),
   `test_a_os_que_nasce_numerada_tambem_confere_a_os_pai` e `test_a_performance_diz_a_os_pai_que_nao_achou_e_a_tela_mostra`
   (vermelhos antes da conferência), em `tests/test_oscreator_os_juntar.py`.
+
+## A OS já realizada vai feita aos dois destinos (05/11/2026)
+
+A revisão das OS achou, na prova no Fracttal de verdade: a OS 18630 (TESTE - PA), criada como "já realizada" com "enviar
+para Verificação", nasceu Em Processo, sem fim e com "0 de 1" subtarefas, e o Fracttal não disse nada.
+- **A causa:** o `create_os_rpc` mandava `work_done` False sempre que o destino era a Verificação (`to_in_review`), e o
+  Fracttal tratava a tarefa como não feita. Agora ela vai feita (`work_done` True) nos dois destinos; o `to_in_review` diz
+  qual.
+- **Conferir depois de gravar** (`api._conferir_ja_realizada`, 1 leitura do cabeçalho por OS já realizada): o status tem de
+  ser o pedido (Em Verificação ou Concluída). A de Verificação que ficou Em Processo vai para Em Verificação pelo
+  `mudar_status_os` e é lida de novo. O resto (a dos Finalizados que ficou Em Processo, a de Verificação que o Fracttal
+  concluiu) vira o aviso da OS na tela, sem mexer: concluir daqui fecharia a OS sem a pessoa ver, e fechar é irreversível.
+  Cabeçalho sem status ou leitura que falhou: sem aviso (a OS existe).
+- Vale para o Criar OS do zero (uma OS por ativo, também o da Engenharia) e o COS (uma por ativo e "várias datas"), que
+  chegam ao `create_os_rpc` pelo `create_work_orders_bulk` e pelo `create_work_orders_datas`. Os avisos de cada OS se somam
+  (o do status, o da etiqueta que falhou e o da OS pai); até aqui o da etiqueta apagava o que vinha antes.
+- **Provado no ar** em 05/11/2026, em TESTE - PA: a OS 18635, criada pelo Criar OS do zero como já realizada com "enviar
+  para Verificação", nasceu Em Verificação, com a data de fim e "1 de 1" subtarefas, sem aviso (lida de volta pelo Fluxo e
+  pelo card), e foi cancelada. Os Finalizados não foram criados no ar (a OS concluída não se cancela): o pedido deles não
+  mudou, o `work_done` já ia True; só ganhou a leitura do cabeçalho.
+- Prova: `test_a_os_ja_realizada_vai_feita_aos_dois_destinos`, `test_a_verificacao_que_ficou_em_processo_vai_para_a_verificacao`,
+  `test_o_destino_que_nao_ficou_vira_aviso`, `test_sem_o_status_no_cabecalho_nao_ha_aviso` e
+  `test_o_aviso_do_status_fica_junto_do_da_etiqueta_e_do_da_os_pai`, em `tests/test_oscreator_os_juntar.py`. O ouro
+  (`oscreator_payloads_antes_da_5_1.json`) foi regravado: a única mudança é a leitura do cabeçalho no
+  `uma_os_por_ativo_ja_realizada`.
 
 ## A OS de vários ativos: ordem natural, anexos por tarefa e "Vários" no Histórico (04/11/2026)
 
@@ -2597,6 +2627,29 @@ tarefa e dê para baixar tudo de uma vez, o download sai com o nome do ativo!"; 
   "Vários (N)" no Exportar); a de um ativo, o nome curto de sempre.
 - Prova: `tests/test_oscreator_card_ativos_anexos_04_11.py`; os 2 testes de `test_oscreator_card_por_ativo_28_10.py`
   aceitam o `data-ativo` novo na tarefa.
+
+## O card diz a usina, a data de criação e quanto já foi feito (05/11/2026)
+
+Levi, 05/11/2026, em várias voltas na bancada e no ar: "as vezes clico na OS sem contexto e não sei que usina é. adicione
+também data de criação da OS"; "Usina sempre acima dos ativos! pois a usina é mais importante"; uma barra "tipo barra de
+bateria do celular"; na OS de 14 ativos, "Está ocupando muito espaço na tela", "Quero os ativos fiquem recolhidos e que
+seja expansível!" e "Tire esse emoji"; "Bora aproveitar esse espaço!"; e, por fim, "separe data de criação, deixe ao lado
+direito de duração total" e "a barra tente colocar em outro canto, pode ser deitada horizontal mesmo".
+- **O banner** (sem o ícone), em campos lado a lado numa faixa só, separados por um traço (no celular, um embaixo do
+  outro): a USINA primeiro (`os_detalhe._usinas_da_os`: a mesma da coluna Usina do Histórico, o nome curto, pelo código de
+  cada ativo das tarefas no catálogo central em memória, `ativos_central.atual().local_por_codigo`, cada uma uma vez;
+  "Usina" ou "Usinas"); depois o ATIVO e o CÓDIGO, ou "ATIVOS (N)" do tamanho do "USINA", recolhido num `<details>` que
+  abre as etiquetas no clique; e o FEITO no fim, à direita. Sem o catálogo carregado, o card não espera a carga: sem o
+  campo da usina.
+- **O Feito**: a barra deitada, com os segmentos inclinados de uma barra de carga (a máscara corta o recheio em faixas),
+  a porcentagem e o "X de Y subtarefas": as subtarefas concluídas, a mesma conta da barra das subtarefas. O recheio é o
+  da barra (`det-prog-f`, verde completa e laranja em andamento, nos dois temas); vazia sem nada feito e tracejada, com
+  "—", na OS sem subtarefas.
+- **O card da duração** em dois quadrados e um retângulo: a duração e, ao lado direito, a data de criação (`criada`: o
+  `creation_date` do cabeçalho da OS, ou da 1ª tarefa, em Brasília: o dia grande e "às HH:MM" embaixo), cada uma no meio
+  do seu quadrado, e a etiqueta embaixo das duas. A 1ª pintura do card (`_os_previa.html`) mostra a usina e a data de
+  criação pela linha da lista central (`usina` e `data`).
+- Prova: `tests/test_oscreator_card_usina_criacao_05_11.py`; conferido na bancada (desktop e 375 px).
 
 ## A solicitação aprovada avisa quem pediu (04/11/2026)
 
@@ -2922,3 +2975,35 @@ do `nexus/casca/CLAUDE.md`) e separa o clique da pessoa do que a tela pede sozin
 - a conferência da sessão de 5 min (`/os/_nexus/sessao`) é do Nexus (`nexus/templates/_confere_sessao_js.html`).
 O oem (congelado) não recebe estes arquivos: nada muda no 5090. Tela nova que
 se renova sozinha põe o cabeçalho; sem ele conta como clique.
+
+## As subtarefas padrão de cada atividade da Performance (05/11/2026)
+
+Levi: "Quero que no OS Creator > Performance tenha um campo para subtarefas, que vamos poder editar as subtarefas padrões de
+cada atividade!"; "Quando criamos uma OS as atividades já vem com aquelas subtarefas"; quem muda: "Qualquer um"; e no mesmo
+dia, "quero que dê para editar o tipo de tarefa também!".
+- **A tela:** o card 4 da tela de criar OS da Performance, "Tipo e subtarefas da atividade", mostra o tipo de tarefa e a
+  lista que a OS leva e de onde vêm ("Do plano do Fracttal" ou "Padrão do Nexus, salvo por X em ..."). O Editar muda o tipo de
+  tarefa (os do `api.TASK_TYPE_MAIN`; sem padrão, o do plano com o do app: a inspeção do inversor, Corretiva) e, em cada
+  subtarefa, o texto, o tipo (os do editor de Temas: texto, sim/não, verificação, numérico; o que o editor não monta, como a
+  lista de opções, fica "do plano"), o "exige anexo" e a ordem, tira e acrescenta. **Salvar padrão** vale para toda OS nova
+  da atividade, para todo mundo (escrito ao lado do botão, sem janela de confirmação); **Voltar ao do Fracttal** desfaz. O
+  resumo do plano (card 3) diz o tipo do padrão.
+- **A tela inicial da Performance:** o card da atividade conta o padrão salvo, e o "ver lista" (onde o Levi procurou o
+  editor) mostra o tipo e a lista em vigor e o botão **Editar as subtarefas**, que abre a atividade com o editor já aberto
+  (`?subtarefas=editar`).
+- **Onde mora:** o livro `nexus_subtarefas_performance · fato_versao_subtarefas`
+  (`nexus/torres/oscreator/subtarefas_padrao.py`, no catálogo de dados), uma linha por versão salva, com quem salvou (o
+  código do e-mail; o nome só cifrado). A ponte liga o gancho (`perf_web.SUBTAREFAS_PADRAO`); sem ele, a lista é a do plano e
+  não se salva (503). O plano do Fracttal não muda: ele é de outra área e vale para quem cria OS por fora.
+- **Na criação** (uma OS por ativo e agrupada): o padrão salvo vai no lugar das subtarefas do plano e das do app
+  (`os_planos.com_subtarefas_padrao`), cada uma na forma da subtarefa do plano de onde veio (a `origem`: o tipo, as opções e
+  a unidade ficam quando o tipo não mudou), o tipo de tarefa do padrão no lugar do do plano (`os_planos.com_tipo_padrao`; a
+  coluna `tipo_tarefa` do livro, vazia = o do plano), e a OS segue ligada ao plano. Se o Fracttal recusar, a OS sai com as do plano e
+  a tela diz (a rede de segurança das extras). Sem conseguir ler o padrão, a OS sai com as do plano e a tela também diz.
+- Prova: `tests/test_oscreator_perf_subtarefas.py`; a tela conferida numa bancada (desktop e 375 px); e no ar, em
+  05/11/2026, em TESTE - PA: com um padrão de teste da Inspeção Geral do Inversor (a 1ª renomeada, a 2ª de Verificação para
+  Sim/Não, a última do plano fora e uma nova no fim), a OS 18600 nasceu com essa lista, na ordem, lida de volta; o padrão
+  voltou ao do Fracttal e a OS foi cancelada. O plano real tem 9 subtarefas, todas com `origem` (o `id` do item do plano).
+  O tipo de tarefa, no mesmo dia: com o padrão de teste em Inspeção (o do app é Corretiva), o resumo do plano disse "Tipo:
+  Inspeção" e a OS 18625 nasceu com o tipo Inspeção, lido de volta; o padrão voltou e a OS foi cancelada. A 1ª gravação
+  depois da coluna `tipo_tarefa` regravou o livro com ela, sem recusa.

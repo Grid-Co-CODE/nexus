@@ -117,19 +117,100 @@ def _usinas(base, todas: bool = True) -> dict:
             if not _excluida(u) and (todas or D._txt(u.get("status")).upper() == visao.STATUS_OPERACAO)}
 
 
-def _fracttal(base) -> dict:
-    """{usina_id: [nomes no Fracttal]} pelo `de_para`, em ordem alfabética (o 1º é o que vai ao App)."""
-    out: dict[int, list[str]] = {}
+def _sem_classificacao(nome) -> bool:
+    """O "(sem Classificação 1) …" é o agrupamento do Fracttal para o ativo sem classificação, não o nome da usina."""
+    return _norm(nome).startswith("(sem classificacao")
+
+
+def usinas_do_app() -> set | None:
+    """As grafias de usina que o App de Campo já usa: a foto `organizacao_app_campo · Atribuicoes` (a mesma que a
+    Comparação lê), pelo `_norm` com que o App casa a usina. None = a foto não veio (ausente, vazia ou o banco fora: o
+    `_fracttal` então não troca o nome das usinas de duas grafias); set() = veio, sem nome de usina."""
+    try:
+        linhas = visao._livro(APP_LIVRO, APP_ABA)
+    except Exception:            # noqa: BLE001 — a foto fora do ar: "não veio", não "o App não usa nenhuma"
+        return None
+    if not linhas:
+        return None
+    return {_norm(x.get("Usina")) for x in linhas if D._txt(x.get("Usina"))}
+
+
+_LER = object()                  # o `_fracttal` lê a foto do App agora
+
+
+def _reais(nomes) -> list:
+    return [n for n in nomes if not _sem_classificacao(n)]
+
+
+class Nomes(dict):
+    """{usina_id: [nomes no Fracttal]}, o 1º é o que vai numa linha nova; e `sem_foto`: a foto do App não veio."""
+    sem_foto = False
+
+
+def _nome_da_linha(fr, uid, atual) -> str:
+    """O nome que a linha de `uid` que hoje vai como `atual` deve ter: o 1º da lista; sem a foto do App, a usina com dois
+    ou mais nomes de verdade fica com o da linha, se for um deles (revisão de 05/11/2026, achado 3: sem a foto, o
+    desempate virava a ordem alfabética, e o laço e a reemissão trocariam o nome que o App já conhece). Sem nome no
+    de-para, vazio (quem chama decide: a reemissão mantém o gravado, o Responsável UFV conta "sem nome no Fracttal")."""
+    lista = fr.get(uid) or []
+    reais = _reais(lista)
+    if getattr(fr, "sem_foto", False) and len(reais) >= 2 and atual in reais:
+        return atual
+    return lista[0] if lista else ""
+
+
+def _nomes_vigentes(est: dict | None, hoje: int) -> dict:
+    """{usina_id: Counter(nome)} dos nomes das ligações que valem no livro (todos os papéis)."""
+    out: dict = collections.defaultdict(collections.Counter)
+    if est:
+        for (uid, _pid, _papel), x in A.atuais(est, hoje, papel=None).items():
+            nome = " ".join(D._txt(x.get("usina_fracttal")).split())
+            if nome:
+                out[uid][nome] += 1
+    return out
+
+
+def _fracttal(base, do_app=_LER, est: dict | None = None, hoje: int | None = None) -> Nomes:
+    """{usina_id: [nomes no Fracttal]} pelo `de_para`; o 1º é o que vai ao App numa linha nova. A ordem (05/11/2026):
+    nunca primeiro um "(sem Classificação …)" quando a usina tem outro nome; entre os de verdade, o que o App já usa
+    (`usinas_do_app`) e, sem ele, a ordem alfabética. Medido em 05/11: na ordem alfabética pura o "(sem Classificação 1)
+    …" vinha antes das letras, e 4 usinas (6 vínculos) iam ao App com ele tendo o nome de verdade no de-para; uma usina
+    com "… - CE" e "… - MT" depende da foto do App para saber qual ele conhece. Sem a foto (`do_app` None), o desempate
+    entre os de verdade é o nome que mais vale no livro (`est`), e a linha que já existe fica com o dela
+    (`_nome_da_linha`)."""
+    if do_app is _LER:
+        do_app = usinas_do_app()
+    vig = _nomes_vigentes(est, hoje or A.hoje_id()) if do_app is None else {}
+    nomes: dict[int, list[str]] = {}
     for d in base.de_para:
         uid = D._id(d.get("usina_id"))
         if uid and D._txt(d.get("sistema")) == SISTEMA_FRACTTAL and D._txt(d.get("chave_externa")):
-            out.setdefault(uid, []).append(" ".join(D._txt(d.get("chave_externa")).split()))
-    return {k: sorted(set(v)) for k, v in out.items()}
+            nomes.setdefault(uid, []).append(" ".join(D._txt(d.get("chave_externa")).split()))
+
+    def ordem(uid, n):
+        if do_app is None:
+            return _sem_classificacao(n), -(vig.get(uid) or {}).get(n, 0), n
+        return _sem_classificacao(n), _norm(n) not in do_app, n
+    out = Nomes({k: sorted(set(v), key=lambda n, k=k: ordem(k, n)) for k, v in nomes.items()})
+    out.sem_foto = do_app is None
+    return out
 
 
-def nome_no_fracttal(base, usina_id: int) -> str:
-    """O nome da usina no Fracttal que vai ao App (o 1º do `de_para`, em ordem alfabética); vazio = sem `de_para`."""
-    return (_fracttal(base).get(usina_id) or [""])[0]
+def nome_no_fracttal(base, usina_id: int, est: dict | None = None) -> str:
+    """O nome da usina no Fracttal que vai numa linha nova (o 1º do `_fracttal`); vazio = sem `de_para`. Com o livro
+    (`est`), sem a foto do App, a usina de duas grafias vai com o nome das linhas que já valem nela."""
+    return (_fracttal(base, est=est).get(usina_id) or [""])[0]
+
+
+def resumo_da_reemissao(pedidos: list[dict]) -> str:
+    """O resumo que a tela mostra para confirmar e que o envio confere dentro da trava: a quantidade e um hash dos pares
+    (usina, pessoa, nome no Fracttal, código), não só a quantidade (revisão de 05/11/2026, achado 2: a mesma conta com
+    outras ligações é outra conta)."""
+    import hashlib
+    pares = sorted((int(p["usina_id"]), int(p["pessoa_id"]), D._txt(p.get("usina_fracttal")),
+                    D._txt(p.get("pessoa_hmac"))) for p in pedidos)
+    h = hashlib.sha256(json.dumps(pares, ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
+    return f"{len(pares)}-{h}"
 
 
 def _pedido(uid, fracttal, pid, pessoas, de=None, ate=None) -> dict:
@@ -153,21 +234,36 @@ def pedidos_da_carga_inicial(base, pessoas: dict) -> list[dict]:
     return out
 
 
-def pedidos_da_reemissao(base, pessoas: dict, est: dict, usina_id: int, hoje: int) -> list[dict]:
-    """As ligações atuais da usina (valendo e agendadas) com o nome do Fracttal e o código de hoje: o que o App lê
-    mudou (a usina foi renomeada no Fracttal, o e-mail foi corrigido no cadastro) e a linha precisa ir de novo."""
-    fr = _fracttal(base)
+def _reemissoes(base, pessoas: dict, est: dict, hoje: int, usina_id: int | None = None, fr: dict | None = None) -> list:
+    """As ligações atuais (valendo e agendadas) cujo nome do Fracttal ou código de hoje difere do que foi ao App, com
+    os de hoje: o que o App lê mudou (a usina renomeada no Fracttal ou com outro nome escolhido pela regra do
+    `_fracttal`, o e-mail corrigido no cadastro) e a linha precisa ir de novo. Só as usinas do cadastro (a excluída não
+    se reenvia); `usina_id` None = todas."""
+    fr = _fracttal(base, est=est, hoje=hoje) if fr is None else fr
+    usinas = _usinas(base, todas=True)
     out = []
     for (uid, pid, _papel), x in sorted(A.atuais(est, hoje).items()):
-        if uid != usina_id:
+        if uid not in usinas or (usina_id is not None and uid != usina_id):
             continue
-        p = _pedido(usina_id, fr, pid, pessoas, D._id(x.get("de_data_id")), D._id(x.get("ate_data_id")))
+        p = _pedido(uid, fr, pid, pessoas, D._id(x.get("de_data_id")), D._id(x.get("ate_data_id")))
         # sem o código de hoje (o Nexus sem a chave do cadastro, o técnico promovido, a ficha sem e-mail), vai o gravado:
         # trocar o código bom por vazio tiraria a usina da pessoa no App sem o PCM decidir (revisão de 17/10)
         p["pessoa_hmac"] = p["pessoa_hmac"] or D._txt(x.get("pessoa_hmac"))
-        p["usina_fracttal"] = p["usina_fracttal"] or D._txt(x.get("usina_fracttal"))
-        out.append(p)
+        p["usina_fracttal"] = _nome_da_linha(fr, uid, D._txt(x.get("usina_fracttal"))) or D._txt(x.get("usina_fracttal"))
+        if (p["pessoa_hmac"], p["usina_fracttal"]) != (D._txt(x.get("pessoa_hmac")), D._txt(x.get("usina_fracttal"))):
+            out.append(p)
     return out
+
+
+def pedidos_da_reemissao(base, pessoas: dict, est: dict, usina_id: int, hoje: int) -> list[dict]:
+    """O "Reenviar ao App" de uma usina: as ligações dela que mudaram (`_reemissoes`)."""
+    return _reemissoes(base, pessoas, est, hoje, usina_id)
+
+
+def pedidos_da_reemissao_geral(base, pessoas: dict, est: dict, hoje: int, fr: dict | None = None) -> list[dict]:
+    """O "Reenviar tudo ao App" (05/11/2026): as ligações de todas as usinas que mudaram, para um `decidir_varias` só
+    (uma gravação do livro, não uma por usina). As regras são as do Reenviar de uma usina."""
+    return _reemissoes(base, pessoas, est, hoje, fr=fr)
 
 
 # ── a evidência de campo ──────────────────────────────────────────────────────────────────────────────────────
@@ -349,11 +445,14 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
                 "opcoes": {k: [] for k in FILTROS if k != "q"}, "todas": str(args.get("todas") or "") == "1",
                 "situacoes": dict(SITUACOES), "hoje": hoje, "pessoas_json": [],
                 "app": {"existe": False, "so_no_app": [], "so_no_nexus": [], "pendencias": []}, "livro_vazio": False,
-                "erro": "", "erro_cadastro": ex.args[0] if ex.args else "erro", "avisos_gerais": []}
+                "erro": "", "erro_cadastro": ex.args[0] if ex.args else "erro", "avisos_gerais": [],
+                "reenviar_total": 0, "reenviar_usinas": 0, "reenviar_resumo": ""}
     pessoas = pessoas_de_campo(base, cfg)
     est = A.ler(cfg)
     atuais = A.atuais(est, hoje)
-    fr = _fracttal(base)
+    fr = _fracttal(base, est=est, hoje=hoje)
+    # o "Reenviar tudo ao App" (05/11/2026): o que a confirmação mostra; o envio refaz a conta dentro da trava
+    reenviar = pedidos_da_reemissao_geral(base, pessoas, est, hoje, fr=fr)
     ev, erro_ev = _evidencia(hoje, meta)
     todas = str(args.get("todas") or "") == "1"
     # todas as usinas vão à página (as fora de operação escondidas): o filtro "Todas" é na própria página (17/10/2026)
@@ -385,7 +484,8 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
             tecnicos.append({"pessoa_id": pid, "nome": nome_pessoa(pid), "status": x["status"],
                              "de": _dm(D._id(x.get("de_data_id"))), "ate": _dm(D._id(x.get("ate_data_id"))),
                              "sem_email": not gravado})
-            mudou_nome |= bool(nomes_fr) and D._txt(x.get("usina_fracttal")) != nomes_fr[0]
+            atual = D._txt(x.get("usina_fracttal"))
+            mudou_nome |= bool(nomes_fr) and atual != _nome_da_linha(fr, uid, atual)
             mudou_codigo |= bool(hm) and gravado != hm
         na_lista = {t["pessoa_id"] for t in tecnicos}
         do_cad = D._id(u.get("tecnico_om_id"))
@@ -401,7 +501,7 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
         if not nomes_fr:
             avisos.append("Sem nome do Fracttal: o App não acha esta usina")
         elif len(nomes_fr) > 1:
-            avisos.append("Duas grafias no Fracttal: vai ao App a primeira")
+            avisos.append(f"Duas grafias no Fracttal: vai ao App {nomes_fr[0]}")
         if mudou_nome:
             avisos.append("O nome no Fracttal mudou: reenviar ao App")
         if mudou_codigo:
@@ -414,12 +514,15 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
                 avisos.append(f"{e['nome']} {'rondou' if e['rondas'] else 'fechou tarefa'} aqui e não está na lista")
         nome = nome_usina(uid)
         sit = ("critico", "Sem técnico") if not tem else ("alerta", "Com aviso") if avisos else ("ok", "Com técnico")
+        # o Reenviar de uma usina confirma o resumo das ligações dela (o mesmo conferido dentro da trava)
+        reenviar_daqui = [p for p in reenviar if p["usina_id"] == uid]
         linhas.append({"sit": sit, "op": D._txt(u.get("status")).upper() == visao.STATUS_OPERACAO, "usina_id": uid, "nome": nome, "status": D._txt(u.get("status")), "equipe_id": eid,
                        "cliente": base.nome_cliente.get(D._id(u.get("cliente_id"))) or SEM_CLIENTE,
                        "equipe": base.nome_equipe.get(eid) or SEM_EQUIPE, "regiao": reg.get("nome") or SEM_REGIAO,
                        "responsavel": nome_pessoa(resp) if resp else SEM_RESPONSAVEL,
                        "fracttal": nomes_fr[0] if nomes_fr else "", "fracttal_mudou": mudou_nome,
-                       "reenviar": mudou_nome or mudou_codigo, "tecnicos": tecnicos, "tem_tecnico": tem,
+                       "reenviar": bool(reenviar_daqui), "reenviar_resumo": resumo_da_reemissao(reenviar_daqui),
+                       "tecnicos": tecnicos, "tem_tecnico": tem,
                        "evidencia": evidencia, "avisos": avisos,
                        "_busca": norm(" ".join([nome] + [t["nome"] for t in tecnicos]))})
     linhas.sort(key=lambda l: norm(l["nome"]))
@@ -464,6 +567,9 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
     if erro_ev:
         avisos_gerais.append(f"A evidência de campo não foi lida agora ({erro_ev}): a lista e os avisos de técnico "
                              "seguem valendo.")
+    if fr.sem_foto and any(len(_reais(v)) >= 2 for v in fr.values()):
+        # revisão de 05/11/2026 (achado 3): sem a foto, o nome dessas usinas fica o do livro
+        avisos_gerais.append("A foto do App não veio: o nome das usinas com duas grafias não muda até ela voltar.")
     # o topo, como o da tela de PT: o universo da tela (as usinas da lista e as pessoas de campo), sem os filtros; as duas
     # contas (em operação e todas) vão à página, que troca ao clicar em "Todas"
     def _resumo(ls):
@@ -487,6 +593,8 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
     opcoes_todas["equipe"] = sorted(set(opcoes_todas["equipe"]) | {t["equipe"] for t in todos_v}, key=norm)
     chips = dict(opcoes["situacao"], todas=sum(1 for l in linhas if _passa(l, pedido, menos="situacao")))
     return {"ver": ver, "linhas": [l for l in linhas if _passa(l, pedido)], "tecnicos": tecnicos_v, "lido": lido,
+            "reenviar_total": len(reenviar), "reenviar_usinas": len({p["usina_id"] for p in reenviar}),
+            "reenviar_resumo": resumo_da_reemissao(reenviar),
             "resumo": resumo, "resumo_op": resumo_op, "resumo_todas": resumo_todas, "chips": chips,
             "todas_linhas": todas_linhas, "todos_tecnicos": sorted(todos_v, key=lambda t: norm(t["nome"])),
             "opcoes_todas": opcoes_todas,

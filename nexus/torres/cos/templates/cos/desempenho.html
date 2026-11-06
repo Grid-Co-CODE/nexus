@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+{# Desempenho da equipe (05/11/2026): MTTA, informado no prazo e religamento remoto, por cliente e por turno, sem nome de
+   operador; as mesas como os conjuntos de clientes das carteiras (nexus/cos/desempenho.py). Só lê. #}
+{% macro mtta(r) %}{% if r.mtta is none %}<span class="mudo">—</span>{% else %}<b>{{ r.mtta }} min</b>{% endif %}<span class="det">{{ r.mtta_amostra }} de {{ r.ocorrencias }} com a hora em que o COS viu</span>{% endmacro %}
+{% macro informado(r) %}{% if r.informado_pct is none %}<span class="mudo">—</span>{% else %}<b class="{% if r.informado_fora %}cn-t-critico{% else %}cn-t-ok{% endif %}">{{ r.informado_pct }}%</b>{% endif %}<span class="det">{{ r.informado_cumpriu }} no prazo · {{ r.informado_fora }} fora{% if r.informado_correndo %} · {{ r.informado_correndo }} correndo{% endif %}</span>{% endmacro %}
+{% macro remoto(r) %}{% if r.remoto_pct is none %}<span class="mudo">—</span>{% else %}<b>{{ r.remoto_pct }}%</b>{% endif %}<span class="det">{{ r.remoto }} de {{ r.normalizadas }} normalizadas</span>{% endmacro %}
+{% macro colunas(r) %}<td>{{ r.ocorrencias }}</td><td class="cos-esq">{{ mtta(r) }}</td><td class="cos-esq">{{ informado(r) }}</td><td class="cos-esq">{{ remoto(r) }}</td>{% endmacro %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>Os três números da spec R04</b>, por cliente e por turno, sem nome de
+      operador: desempenho com nome é dado pessoal.</p>
+      <p><b>MTTA</b> é a mediana do tempo entre o início da falha e a hora em que o COS viu, que a Ronda COS pergunta a quem
+      abre o desvio na tela desde 03/11/2026. O desvio que veio do sync ou de antes disso não tem essa hora e fica fora da
+      conta: a amostra está ao lado.</p>
+      <p><b>Informado no prazo</b> é o veredito da tela Ocorrências: o cliente avisado em até {{ prazos.informado.minutos }}
+      min do início, contado sobre as ocorrências já decididas. As que ainda correm o prazo, e as que não se medem (antes de o
+      Andamento mandar ao cliente, alarme não confirmado), ficam fora.</p>
+      <p><b>Religamento remoto</b> é a parte das normalizadas que teve religamento remoto, a regra da tela Religamentos.</p>
+      <p><b>O turno</b> é o da hora do início da falha: dia das 06h, noite das 18h, os da Ronda COS. <b>A mesa</b> é o conjunto
+      de clientes de uma carteira da Ronda COS (a aba Operador x clientes), com quantos operadores a têm.</p>{% endcall %}</div>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Andamento da Ronda COS{% if lido %}<br>lido às <b>{{ lido }}</b>{% endif %}</div>
+  </div>
+
+  {% if not ligada %}
+  <div class="cn-vazio cos-aviso">A fonte do Andamento ainda não está ligada neste servidor: faltam o endereço e a chave
+    (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>), que um administrador grava em Base →
+    Chaves do Nexus. O resto do Nexus segue igual.</div>
+  {% else %}
+  {% if erro_clientes %}<div class="cn-erro" role="alert"><b>{{ erro_clientes[:1]|upper }}{{ erro_clientes[1:] }}.</b></div>{% endif %}
+  {% if p %}
+  {% for c, erro, velha in p.erros %}<div class="cn-erro{% if velha %} cn-aviso{% endif %}" role="alert"><b>{{ c }}: {{ erro }}.</b>
+    {% if velha %}A tela mostra a última leitura boa.{% else %}Este cliente fica de fora da conta agora.{% endif %}</div>{% endfor %}
+  {% if not p.com_deteccao and p.total.ocorrencias %}<div class="cn-erro cn-aviso" role="status"><b>O Andamento deste servidor
+    ainda não manda a hora em que o COS viu.</b> Sem ela, o MTTA não se mede.</div>{% endif %}
+  {% if p.truncado %}<p class="mudo">O Andamento mandou só as mais recentes de {{ p.truncado|join(', ') }}: o período tem mais
+    ocorrências do que cabem numa resposta.</p>{% endif %}
+
+  <div class="cn-filtros">
+    <div class="cn-seg" aria-label="Período">
+      {% for d in dias_opcoes %}<a href="{{ url(dias=d) }}"{% if d == dias %} aria-current="page"{% endif %}>Últimos {{ d }} dias</a>{% endfor %}
+    </div>
+  </div>
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">MTTA</span><span class="v">{{ '—' if p.total.mtta is none else p.total.mtta ~ ' min' }}</span>
+      <span class="d">mediana de {{ p.total.mtta_amostra }} de {{ p.total.ocorrencias }} ocorrências</span></span>
+    <span><span class="gc-rotulo">Informado no prazo</span><span class="v{% if p.total.informado_fora %} ruim{% endif %}">{{ '—' if p.total.informado_pct is none else p.total.informado_pct ~ '%' }}</span>
+      <span class="d">{{ p.total.informado_fora }} fora dos {{ prazos.informado.minutos }} min{% if not p.completo %} · falta um cliente{% endif %}</span></span>
+    <span><span class="gc-rotulo">Religamento remoto</span><span class="v">{{ '—' if p.total.remoto_pct is none else p.total.remoto_pct ~ '%' }}</span>
+      <span class="d">{{ p.total.remoto }} de {{ p.total.normalizadas }} normalizadas</span></span>
+  </div>
+
+  <h2 class="cos-sub">Por turno</h2>
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Turno</th><th>Ocorrências</th><th class="cos-esq">MTTA</th><th class="cos-esq">Informado no prazo</th><th class="cos-esq">Religamento remoto</th></tr></thead>
+    <tbody>
+    {% for t in turnos %}<tr><td class="cos-esq"><b>{{ t.nome }}</b><span class="det">das {{ '%02d'|format(t.inicio_h) }}h</span></td>{{ colunas(p.turnos[t.id]) }}</tr>{% endfor %}
+    </tbody>
+  </table></div>
+
+  <h2 class="cos-sub">Por cliente</h2>
+  {% if p.clientes %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Cliente</th><th>Ocorrências</th><th class="cos-esq">MTTA</th><th class="cos-esq">Informado no prazo</th><th class="cos-esq">Religamento remoto</th></tr></thead>
+    <tbody>
+    {% for c in p.clientes %}
+      <tr class="cos-total"><td class="cos-esq"><b>{{ c.cliente }}</b></td>{{ colunas(c.total) }}</tr>
+      {% for t in turnos %}<tr class="cos-turno"><td class="cos-esq">{{ t.nome }}</td>{{ colunas(c.turnos[t.id]) }}</tr>{% endfor %}
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="cn-vazio">Nenhuma ocorrência no período.</p>{% endif %}
+
+  <h2 class="cos-sub">Por mesa</h2>
+  {% if p.mesas %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Mesa (os clientes da carteira)</th><th>Ocorrências</th><th class="cos-esq">MTTA</th><th class="cos-esq">Informado no prazo</th><th class="cos-esq">Religamento remoto</th></tr></thead>
+    <tbody>
+    {% for m in p.mesas %}
+      <tr><td class="cos-esq"><b>{{ m.clientes|join(' · ') }}</b>{% if m.minha %} <span class="cn-pill cn-info">sua mesa</span>{% endif %}
+        <span class="det">{{ m.operadores }} operador{{ '' if m.operadores == 1 else 'es' }} com esta carteira</span></td>{{ colunas(m.resumo) }}</tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% elif carteiras.erro %}<p class="cn-vazio">Não consegui ler as carteiras da Ronda COS ({{ carteiras.erro }}).</p>
+  {% else %}<p class="cn-vazio">Nenhuma carteira de operador na Ronda COS com clientes que o Andamento acompanha.</p>{% endif %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

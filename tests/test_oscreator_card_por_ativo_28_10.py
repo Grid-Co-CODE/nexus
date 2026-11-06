@@ -32,7 +32,7 @@ def test_dois_ativos_com_o_mesmo_titulo_abrem_pelo_ativo(monkeypatch):
         assert b.count('<details class="det-sub') == 2
     banner = html[html.index('class="det-card det-banner"'):]
     banner = banner[:banner.index("</div>")]
-    assert "2 ativos" in banner and "Inversor 1.1" in banner and "Inversor 1.2" in banner
+    assert "Ativos (2)" in banner and "Inversor 1.1" in banner and "Inversor 1.2" in banner
 
 
 def test_muitos_ativos_seguem_pelo_ativo_mas_fechados(monkeypatch):
