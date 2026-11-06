@@ -18,7 +18,8 @@
    dele é a etapa 5.
 
    O login é o do Nexus: `onAuthStateChange` entrega a pessoa de /api/eu, e as telas de senha do Radar não servem mais.
-   Sem `storage`: sem ele, o clone pede as fotos da ronda à função `fracttal-fotos`, que a torre atende.
+   O `storage` só conhece o arquivo dos PDFs dos contratos, que mora no servidor do Nexus; as fotos da ronda, o clone pede
+   à função `fracttal-fotos`, que a torre atende.
 
    A configuração vem do servidor em `window.ZELADORIA` = {api, somenteLeitura, sair, chaves}, com os endereços já
    montados (o Nexus pode rodar debaixo de um prefixo); `chaves` = a coluna-chave das tabelas cuja chave não é `id`. */
@@ -314,6 +315,23 @@
         signUp: login,
         resetPasswordForEmail: login,
         updateUser: login,
+      },
+      // o arquivo dos PDFs dos contratos (06/11/2026) mora no servidor do Nexus; as fotos das rondas vêm do Fracttal (a
+      // função fracttal-fotos), e por isso o arquivo `rondas-fotos` volta vazio e o Radar oferece buscar no Fracttal
+      storage: {
+        from: function (arquivo) {
+          return {
+            createSignedUrl: function (caminho) {
+              if (arquivo !== "contratos-zeladoria") {
+                return Promise.resolve({ data: null, error: { message: "Esse arquivo não está no Nexus." } });
+              }
+              return pedir(cfg.api + "/contrato-pdf?caminho=" + encodeURIComponent(caminho)).then(function (r) {
+                return { data: r.error ? null : r.data, error: r.error };
+              });
+            },
+            createSignedUrls: function () { return Promise.resolve({ data: [], error: null }); },
+          };
+        },
       },
       functions: {
         invoke: function (nome, opcoes) {

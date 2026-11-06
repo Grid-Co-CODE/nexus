@@ -564,6 +564,16 @@
     .kpi-row { grid-template-columns: repeat(2, 1fr); }
     .bar-row .bname { width: 120px; }
   }
+  /* Zeladoria contratual (Visão Geral): no celular a tabela vira cards empilhados */
+  @media (max-width: 700px) {
+    .zc-tabela, .zc-tabela tbody, .zc-tabela tr, .zc-tabela td { display: block; width: 100%; box-sizing: border-box; }
+    .zc-tabela { min-width: 0; }
+    .zc-tabela thead { display: none; }
+    .zc-tabela tr.zc-cli { border: 1px solid var(--border); border-radius: 10px; margin-top: 10px; padding: 6px 4px; }
+    .zc-tabela tr.zc-cli td { display: flex; justify-content: space-between; gap: 10px; border: 0; padding: 4px 8px; }
+    .zc-tabela tr.zc-cli td::before { content: attr(data-label); color: var(--ink-muted); font-size: 11.5px; }
+    .zc-tabela tr.zc-ufvs td { border-radius: 0 0 10px 10px; }
+  }
 </style>
 <style id="zeladoria-paleta">
 /* A paleta da Zeladoria é a do Nexus (nexus/torres/zeladoria/CLAUDE.md): cada variável do clone aponta para um token do
@@ -1674,6 +1684,7 @@ function renderOverview(){
   html += kpiTile('Aguardando decisão do Head da Zeladoria', k.aguardandoHead, 'aguardando validação do gestor', k.aguardandoHead > 0 ? 'tint-warn' : '');
   html += kpiTile('Rodadas de cotação abertas', k.rodadasAbertas, 'usina + serviço com janela ativa', k.rodadasAbertas > 0 ? 'tint-good' : '');
   html += '</div>';
+  html += zelContratualHtml();
 
   html += '<h3 class="section-title">Menor preço já cotado, por usina e serviço <span class="n">' + grupos().length + ' combinações</span></h3>';
   html += leaderboardTable(grupos());
@@ -1696,6 +1707,223 @@ function renderOverview(){
 
   html += funilPorUsinaHtml();
   return html;
+}
+/* ---------- Zeladoria contratual por cliente (painel da Visão Geral, 2026-11-03) ----------
+   O que a GridCo é obrigada a entregar em cada contrato, uma linha por UFV (tabela
+   zeladoria_contratual, carregada do zeladoria_contratual.json pelo seed). Só leitura.
+   Lavagens/roçagens somam só o tipo 'fixo'; "Sob demanda" é badge cinza e não soma. */
+var ZC_ALERTA = { ok: ['pill-good', 'OK'], divergencia: ['pill-warn', 'Divergência'], atencao: ['pill-critical', 'Atenção'] };
+var ZC_PESO = { ok: 0, divergencia: 1, atencao: 2 };
+function linhaParaZelContratual(r){
+  return { id: r.id, cliente: r.cliente || '—', ufv: r.ufv || '—', instrumento: r.instrumento || null, vegetacao: r.controle_vegetacao || null,
+    assinatura: r.data_assinatura ? String(r.data_assinatura).slice(0, 10) : null, inicioVigencia: r.inicio_vigencia || null, prazo: r.prazo || null,
+    lavagens: r.lavagens_ano == null ? null : Number(r.lavagens_ano), lavagensTipo: r.lavagens_ano_tipo || 'sem_contrato',
+    rocagens: r.rocagens_ano == null ? null : Number(r.rocagens_ano), rocagensTipo: r.rocagens_ano_tipo || 'sem_contrato',
+    poda: r.poda_quimica || null, regra: r.regra_contratual || null,
+    extraLavagem: r.valor_extra_lavagem == null ? null : Number(r.valor_extra_lavagem), extraRocagem: r.valor_extra_rocagem == null ? null : Number(r.valor_extra_rocagem),
+    termino: r.termino_previsto ? String(r.termino_previsto).slice(0, 10) : null, status: r.status || '', alerta: ZC_ALERTA[r.nivel_alerta] ? r.nivel_alerta : 'ok',
+    fonte: r.fonte || null, geradoEm: r.gerado_em || null };
+}
+/* Poda química vem em texto livre do contrato: 'sim' ("Sim — …"), 'cond' (sob demanda / se autorizar /
+   se aprovada) ou 'nao' ("Não prevista", "Não citada", "Excluída", "—") */
+function zcPoda(v){
+  var s = String(v || '').trim();
+  if (!s || /^(n[aã]o|sem|nenhuma?|exclu|-|—)/i.test(s)) return 'nao';
+  if (/demanda|autoriz|aprovad|pode ser/i.test(s)) return 'cond';
+  return 'sim';
+}
+/* "—" no lugar da UFV = cliente sem contrato encontrado; não conta como UFV */
+function zcEhUfv(r){ return !/^\s*[-—]?\s*$/.test(r.ufv); }
+/* Quantas usinas a linha representa de verdade: "82 UFVs (Anexo II…)" = 82; "Todas as SGDs…" /
+   "Portfólio …" sem número = portfólio (conta 0 e mostra o aviso); o resto = 1 */
+function zcQtdUfv(r){
+  if (!zcEhUfv(r)) return { n: 0, portfolio: false };
+  var m = String(r.ufv).match(/(\d+)\s*(ufvs?|usinas?|sgds?)\b/i);
+  if (m) return { n: Number(m[1]), portfolio: false };
+  if (/^\s*(todas?|portf[oó]lio)/i.test(r.ufv)) return { n: 0, portfolio: true };
+  return { n: 1, portfolio: false };
+}
+function zcContaUfvs(lista){
+  return lista.reduce(function(a, r){ var q = zcQtdUfv(r); a.n += q.n; if (q.portfolio) a.port++; return a; }, { n: 0, port: 0 });
+}
+/* vencido ou vence em até 90 dias */
+function zcPrazoPerto(d){ return !!d && analiseDiasEntre(hoje(), d) <= 90; }
+function zcBadgeAlerta(nivel, dica){ var a = ZC_ALERTA[nivel] || ZC_ALERTA.ok; return '<span class="pill ' + a[0] + '" data-zc-alerta="' + nivel + '"' + (dica ? ' title="' + esc(dica) + '"' : '') + '>' + a[1] + '</span>'; }
+/* Quantidade por ano: soma dos 'fixo' + badge cinza se alguma UFV é sob demanda */
+function zcQtdHtml(lista, campo){
+  var fixos = lista.filter(function(r){ return r[campo + 'Tipo'] === 'fixo' && r[campo] != null; });
+  var soma = fixos.reduce(function(a, r){ return a + r[campo]; }, 0);
+  var dem = lista.some(function(r){ return r[campo + 'Tipo'] === 'sob_demanda'; });
+  var h = fixos.length ? '<b class="mono">' + soma.toLocaleString('pt-BR') + '</b>' : '';
+  if (dem) h += (h ? ' ' : '') + '<span class="pill pill-neutral" data-zc-demanda>Sob demanda</span>';
+  return h || '<span class="cell-muted">Sem contrato</span>';
+}
+function zcPrazoHtml(d){
+  if (!d) return '<span class="cell-muted">—</span>';
+  var perto = zcPrazoPerto(d), vencido = d < hoje();
+  return '<span class="mono" style="white-space:nowrap;' + (perto ? 'color:var(--critical);font-weight:700;' : '') + '"' + (perto ? ' data-zc-prazo title="' + (vencido ? 'Vencido' : 'Vence em até 90 dias') + '"' : '') + '>' + (perto ? '' : '') + fmtDate(d) + '</span>';
+}
+/* Início do contrato: a data que o levantamento tem é a da assinatura. Se a vigência começa na assinatura,
+   é a data de início; se começa num evento (Ordem de Início, Termo de Início…), mostra a assinatura e o evento.
+   Cliente com contratos em datas diferentes: a mais antiga + "(n datas)" e a lista no tooltip. */
+function zcInicioHtml(lista){
+  var datas = lista.map(function(r){ return r.assinatura; }).filter(Boolean).filter(function(d, i, a){ return a.indexOf(d) === i; }).sort();
+  if (!datas.length) return '<span class="cell-muted">—</span>';
+  var eventos = lista.filter(function(r){ return r.assinatura && r.inicioVigencia && !/^\s*assinatura\s*$/i.test(r.inicioVigencia); })
+    .map(function(r){ return r.inicioVigencia; }).filter(function(e, i, a){ return a.indexOf(e) === i; });
+  var dica = datas.length > 1 ? 'Assinaturas: ' + datas.map(fmtDate).join(', ') : '';
+  return '<span class="mono" style="white-space:nowrap;"' + (dica ? ' title="' + esc(dica) + '"' : '') + ' data-zc-inicio>' + fmtDate(datas[0]) + '</span>' +
+    (datas.length > 1 ? ' <span class="cell-muted">(' + datas.length + ' datas)</span>' : '') +
+    (eventos.length ? (function(ev){ return '<div class="cell-muted" style="font-size:11px;line-height:1.3;" title="' + esc(ev) + '">assinado; início: ' + esc(ev.length > 60 ? ev.slice(0, 57) + '…' : ev) + '</div>'; })(eventos.join(' / ')) : '');
+}
+function zelContratualHtml(){
+  var todos = state.zelContratual || [];
+  var fCli = ui.zcCliente || 'todos', fAl = ui.zcAlerta || 'todos';
+  var clientes = todos.map(function(r){ return r.cliente; }).filter(function(c, i, a){ return a.indexOf(c) === i; }).sort(function(a, b){ return a.localeCompare(b, 'pt-BR'); });
+  var regs = todos.filter(function(r){ return (fCli === 'todos' || r.cliente === fCli) && (fAl === 'todos' || r.alerta === fAl); });
+  var porCli = {};
+  regs.forEach(function(r){ (porCli[r.cliente] = porCli[r.cliente] || []).push(r); });
+  var linhas = Object.keys(porCli).map(function(c){
+    var l = porCli[c].slice().sort(function(a, b){ return a.ufv.localeCompare(b.ufv, 'pt-BR'); });
+    var termino = l.reduce(function(m, r){ return r.termino && (!m || r.termino < m) ? r.termino : m; }, null);
+    var alerta = l.reduce(function(m, r){ return ZC_PESO[r.alerta] > ZC_PESO[m] ? r.alerta : m; }, 'ok');
+    return { cliente: c, ufvs: l, termino: termino, perto: zcPrazoPerto(termino), alerta: alerta };
+  }).sort(function(a, b){
+    if (a.perto !== b.perto) return a.perto ? -1 : 1;
+    if (a.perto) return a.termino.localeCompare(b.termino);
+    return a.cliente.localeCompare(b.cliente, 'pt-BR');
+  });
+  var soma = function(campo){ return regs.reduce(function(a, r){ return a + (r[campo + 'Tipo'] === 'fixo' && r[campo] != null ? r[campo] : 0); }, 0); };
+  var comAlerta = linhas.filter(function(x){ return x.alerta !== 'ok'; }).length;
+  var gerado = todos.reduce(function(m, r){ return r.geradoEm && (!m || r.geradoEm > m) ? r.geradoEm : m; }, null);
+  var abertos = ui.zcAbertos || {};
+
+  var html = '<div class="card card-pad zc-painel" style="margin-bottom:22px;">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' +
+    '<h3 class="section-title" style="margin:0;">Zeladoria Contratual por Cliente</h3>' +
+    (todos.length ? '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+      selectFiltro('flt-zc-cliente', ['todos'].concat(clientes), fCli, { todos: 'Cliente (todos)' }) +
+      selectFiltro('flt-zc-alerta', ['todos', 'atencao', 'divergencia', 'ok'], fAl, { todos: 'Alerta (todos)', atencao: 'Atenção', divergencia: 'Divergência', ok: 'OK' }) + '</div>' : '') + '</div>';
+  if (!todos.length) return html + '<div class="empty-note">Ainda sem dados dos contratos — falta carregar o zeladoria_contratual.json.</div></div>';
+  html += '<p class="zc-legenda" style="font-size:12px;color:var(--ink-muted);margin:0 0 10px;">' + zcBadgeAlerta('ok') + ' contrato claro, nada a resolver · ' +
+    zcBadgeAlerta('divergencia') + ' documentos do mesmo contrato dizem coisas diferentes (alinhar com o cliente qual vale) · ' +
+    zcBadgeAlerta('atencao') + ' vencido ou vencendo, falta documento ou outro ponto a resolver. Os motivos estão em "Pontos a resolver", abaixo da tabela.</p>';
+
+  html += '<div class="grid zc-kpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px;">' +
+    zcMiniKpi('Clientes', linhas.length) + zcMiniKpi('UFVs', (function(c){ return c.n.toLocaleString('pt-BR') + (c.port ? ' <span class="cell-muted" style="font-size:11px;font-weight:400;" title="Contratos que cobrem um portfólio inteiro sem o número de usinas no levantamento">+ ' + c.port + ' portfólio' + (c.port > 1 ? 's' : '') + ' sem nº</span>' : ''); })(zcContaUfvs(regs))) +
+    zcMiniKpi('Lavagens/ano contratadas', soma('lavagens').toLocaleString('pt-BR')) + zcMiniKpi('Roçagens/ano contratadas', soma('rocagens').toLocaleString('pt-BR')) +
+    zcMiniKpi('Contratos com alerta', comAlerta, comAlerta ? 'tint-warn' : '') + '</div>';
+
+  html += '<div class="table-wrap"><table class="zc-tabela"><thead><tr><th>Cliente</th><th>UFVs</th><th>Lavagens/ano</th><th>Roçagens/ano</th><th>Poda química</th><th>Início do contrato</th><th>Término mais próximo</th><th>Alerta</th></tr></thead><tbody>';
+  if (!linhas.length) html += '<tr><td colspan="8"><div class="empty-note">Nenhum contrato com esses filtros.</div></td></tr>';
+  linhas.forEach(function(x){
+    var aberto = !!abertos[x.cliente];
+    var nPoda = x.ufvs.filter(function(r){ return zcPoda(r.poda) === 'sim'; }).length;
+    var cond = x.ufvs.filter(function(r){ return zcPoda(r.poda) === 'cond'; });
+    var cUfv = zcContaUfvs(x.ufvs);
+    var dica = x.ufvs.filter(function(r){ return r.alerta !== 'ok' && r.status; }).map(function(r){ return r.ufv + ': ' + r.status; }).join('\n') || x.ufvs.map(function(r){ return r.status; }).filter(Boolean)[0] || '';
+    html += '<tr class="zc-cli" data-zc-cliente="' + esc(x.cliente) + '" style="cursor:pointer;" title="Clique para ver as UFVs">' +
+      '<td data-label="Cliente"><b>' + (aberto ? '▾ ' : '▸ ') + esc(x.cliente) + '</b></td>' +
+      '<td data-label="UFVs" class="mono" data-zc-qtd-ufv>' + (cUfv.n ? cUfv.n.toLocaleString('pt-BR') : '') +
+        (cUfv.port ? (cUfv.n ? ' ' : '') + '<span class="pill pill-neutral" data-zc-portfolio title="O contrato cobre um portfólio inteiro, mas o levantamento não traz o número de usinas">Portfólio</span>' : '') +
+        (!cUfv.n && !cUfv.port ? '<span class="cell-muted">—</span>' : '') + '</td>' +
+      '<td data-label="Lavagens/ano">' + zcQtdHtml(x.ufvs, 'lavagens') + '</td>' +
+      '<td data-label="Roçagens/ano">' + zcQtdHtml(x.ufvs, 'rocagens') + '</td>' +
+      '<td data-label="Poda química">' + (nPoda ? 'Sim' + (nPoda < x.ufvs.length ? ' <span class="cell-muted">(' + nPoda + ' de ' + x.ufvs.length + ')</span>' : '') + ' ' : '') +
+        (cond.length ? '<span class="pill pill-neutral" data-zc-poda-cond title="' + esc(cond[0].poda) + '">Condicional</span>' : '') +
+        (!nPoda && !cond.length ? '<span class="cell-muted">Não</span>' : '') + '</td>' +
+      '<td data-label="Início do contrato">' + zcInicioHtml(x.ufvs) + '</td>' +
+      '<td data-label="Término mais próximo">' + zcPrazoHtml(x.termino) + '</td>' +
+      '<td data-label="Alerta">' + zcBadgeAlerta(x.alerta, dica) + '</td></tr>';
+    if (aberto) {
+      html += '<tr class="zc-ufvs" data-zc-ufvs="' + esc(x.cliente) + '"><td colspan="8" style="background:var(--surface-2);padding:8px 12px;">' + zcDocsHtml(x.cliente);
+      x.ufvs.forEach(function(r){
+        html += '<div class="zc-ufv" style="padding:8px 0;border-top:1px solid var(--border);font-size:12.5px;">' +
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><b>' + esc(r.ufv) + '</b>' + zcBadgeAlerta(r.alerta, r.status) +
+            '<span>Lavagens/ano: ' + zcQtdHtml([r], 'lavagens') + '</span><span>Roçagens/ano: ' + zcQtdHtml([r], 'rocagens') + '</span>' +
+            '<span>Poda química: ' + esc(r.poda || '—') + '</span><span>Término: ' + zcPrazoHtml(r.termino) + '</span></div>' +
+          (r.regra ? '<div style="margin-top:4px;"><span class="cell-muted">Regra contratual:</span> ' + esc(r.regra) + '</div>' : '') +
+          (r.vegetacao ? '<div style="margin-top:2px;"><span class="cell-muted">Controle de vegetação:</span> ' + esc(r.vegetacao) + '</div>' : '') +
+          (r.status ? '<div style="margin-top:2px;"><span class="cell-muted">Situação:</span> ' + esc(r.status) + '</div>' : '') +
+          ((r.instrumento && r.instrumento !== '—') || r.prazo || r.assinatura ? '<div style="margin-top:2px;"><span class="cell-muted">Contrato:</span> ' + esc([r.instrumento && r.instrumento !== '—' ? r.instrumento : '', r.assinatura ? 'assinado em ' + fmtDate(r.assinatura) : '', r.prazo ? 'prazo ' + r.prazo : '', r.inicioVigencia ? 'início: ' + r.inicioVigencia : ''].filter(Boolean).join(' · ')) + '</div>' : '') +
+          '<div style="margin-top:2px;"><span class="cell-muted">Valor extra:</span> lavagem ' + fmtMoney(r.extraLavagem) + ' · roçagem ' + fmtMoney(r.extraRocagem) + '</div>' +
+          (r.fonte ? '<div class="cell-muted" style="margin-top:2px;font-size:11.5px;">Fonte: ' + esc(r.fonte) + '</div>' : '') + '</div>';
+      });
+      html += '</td></tr>';
+    }
+  });
+  html += '</tbody></table></div>';
+  html += zcPontosHtml(linhas);
+  html += '<p class="zc-rodape" style="font-size:11px;color:var(--ink-muted);margin:10px 0 0;">Fonte: contratos SharePoint 4. O&amp;M/3.Em Operação — atualizado em ' + (gerado ? fmtDate(String(gerado).slice(0, 10)) : '—') + '</p>';
+  return html + '</div>';
+}
+/* "Pontos a resolver": cada motivo de Atenção/Divergência escrito por extenso (Atenção primeiro, na ordem da
+   tabela). UFVs do mesmo cliente com o mesmo motivo viram uma linha só. */
+function zcPontosHtml(linhas){
+  var itens = [];
+  ['atencao', 'divergencia'].forEach(function(nivel){
+    linhas.forEach(function(x){
+      var grupos = {}, ordem = [];
+      x.ufvs.forEach(function(r){
+        if (r.alerta !== nivel) return;
+        var txt = String(r.status || '').replace(/^\s*(aten[cç][aã]o|diverg[eê]ncia)\s*:\s*/i, '') || 'Sem detalhe no contrato.';
+        if (!grupos[txt]) { grupos[txt] = []; ordem.push(txt); }
+        if (zcEhUfv(r)) grupos[txt].push(r.ufv);
+      });
+      ordem.forEach(function(txt){
+        var u = grupos[txt], nUfv = x.ufvs.filter(zcEhUfv).length;
+        var onde = !u.length ? '' : (u.length === nUfv && nUfv > 1 ? 'todas as ' + nUfv + ' UFVs' : u.join(', '));
+        itens.push('<li class="zc-ponto" data-zc-ponto="' + nivel + '" style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--border);">' +
+          zcBadgeAlerta(nivel) + '<span><b>' + esc(x.cliente) + '</b>' + (onde ? ' <span class="cell-muted">(' + esc(onde) + ')</span>' : '') + ' — ' + esc(txt) + '</span></li>');
+      });
+    });
+  });
+  if (!itens.length) return '';
+  return '<div class="zc-pontos" style="margin-top:14px;"><h4 style="margin:0 0 4px;font-size:13px;">Pontos a resolver (' + itens.length + ')</h4>' +
+    '<ul style="list-style:none;margin:0;padding:0;font-size:12.5px;">' + itens.join('') + '</ul></div>';
+}
+function zcMiniKpi(label, valor, cls){ return '<div class="card kpi ' + (cls || '') + '" style="padding:10px 12px;"><div class="label">' + esc(label) + '</div><div class="value" style="font-size:22px;">' + valor + '</div></div>'; }
+/* Documentos do contrato (tabela zeladoria_contratual_docs + bucket privado contratos-zeladoria, 2026-11-04):
+   "Ver PDF" = contrato inteiro; "Só zeladoria" = recorte com as páginas que falam de zeladoria. Sem recorte
+   (PDF que não deu para recortar) mas com páginas achadas: abre o inteiro na 1ª página de zeladoria. */
+function zcDocsHtml(cliente){
+  var docs = (state.zelContratualDocs || []).filter(function(d){ return d.cliente === cliente; });
+  if (!docs.length) return '<div class="zc-docs cell-muted" style="font-size:12px;padding:4px 0 8px;">Nenhum PDF do contrato carregado para este cliente.</div>';
+  var h = '<div class="zc-docs" style="padding:4px 0 8px;"><div style="font-weight:700;font-size:12.5px;margin-bottom:4px;">Documentos do contrato</div>';
+  docs.forEach(function(d){
+    var pags = d.paginas_zeladoria || [];
+    var lista = pags.length ? 'págs. ' + pags.join(', ') : '';
+    var zel = d.caminho_zeladoria
+      ? '<button type="button" class="btn btn-sm" data-zc-pdf="' + esc(d.caminho_zeladoria) + '" title="Só as páginas que falam de zeladoria (' + esc(lista) + ' do contrato)">Só zeladoria</button>'
+      : pags.length
+        ? '<button type="button" class="btn btn-sm" data-zc-pdf="' + esc(d.caminho_pdf) + '" data-zc-pagina="' + pags[0] + '" title="Este PDF não deu para recortar: abre o contrato inteiro na pág. ' + pags[0] + '">Zeladoria (pág. ' + pags[0] + ')</button>'
+        : '<span class="cell-muted" style="font-size:11.5px;">' + (d.sem_texto ? 'PDF escaneado: não deu para achar as páginas de zeladoria' : 'não fala de zeladoria') + '</span>';
+    h += '<div class="zc-doc" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0;border-top:1px solid var(--border);font-size:12.5px;">' +
+      '<span style="flex:1 1 260px;min-width:0;overflow-wrap:anywhere;">' + esc(d.titulo) + (d.paginas_total ? ' <span class="cell-muted">(' + d.paginas_total + ' págs.)</span>' : '') +
+        (lista ? '<div class="cell-muted" style="font-size:11px;">zeladoria nas ' + esc(lista) + '</div>' : '') + '</span>' +
+      '<button type="button" class="btn btn-sm" data-zc-pdf="' + esc(d.caminho_pdf) + '">Ver PDF</button>' + zel + '</div>';
+  });
+  return h + '</div>';
+}
+/* Abre a aba antes de pedir o link (senão o navegador bloqueia o pop-up); link assinado vale 10 min */
+function zcAbrirPdf(caminho, pagina){
+  var w = window.open('', '_blank');
+  if (w) w.document.write('<p style="font-family:sans-serif">Abrindo o PDF…</p>');
+  sb.storage.from('contratos-zeladoria').createSignedUrl(caminho, 600).then(function(r){
+    if (!r || r.error || !r.data) throw (r && r.error) || new Error('sem link');
+    var url = r.data.signedUrl + (pagina ? '#page=' + pagina : '');
+    if (w) w.location.href = url; else window.location.href = url;
+  }).catch(function(e){ if (w) w.close(); showToast((e && e.message) || 'Não consegui abrir o PDF. Tente de novo.'); });
+}
+function bindEventsZelContratual(app){
+  app.querySelectorAll('[data-zc-pdf]').forEach(function(b){ b.addEventListener('click', function(ev){
+    ev.stopPropagation(); zcAbrirPdf(b.getAttribute('data-zc-pdf'), Number(b.getAttribute('data-zc-pagina')) || 0);
+  }); });
+  var fc = document.getElementById('flt-zc-cliente'); if (fc) fc.addEventListener('change', function(){ ui.zcCliente = fc.value; render(); });
+  var fa = document.getElementById('flt-zc-alerta'); if (fa) fa.addEventListener('change', function(){ ui.zcAlerta = fa.value; render(); });
+  app.querySelectorAll('[data-zc-cliente]').forEach(function(tr){ tr.addEventListener('click', function(){
+    var c = tr.getAttribute('data-zc-cliente'); ui.zcAbertos = ui.zcAbertos || {}; ui.zcAbertos[c] = !ui.zcAbertos[c]; render();
+  }); });
 }
 function funilPorUsinaHtml(){
   var funil = funilPorUsina();
@@ -2394,7 +2622,7 @@ function rankingFornecedoresHtml(){
 }
 function renderHistorico(){
   var todos = historicoBase();
-  if (todos.length === 0) return '<div class="empty-note">Ainda não há cotações fechadas. Assim que o Head da Zeladoria marcar "Fornecedor Escolhido", ela aparece aqui.</div>' + rotaHistoricoHtml();
+  if (todos.length === 0) return '<div class="empty-note">Ainda não há cotações fechadas. Assim que o Head da Zeladoria marcar "Fornecedor Escolhido", ela aparece aqui.</div>' + rotaHistoricoHtml() + planejadoHistoricoHtml();
 
   var usinasSet = {}; todos.forEach(function(c){ usinasSet[c.usina] = true; });
   var usinasList = Object.keys(usinasSet).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); });
@@ -2479,7 +2707,7 @@ function renderHistorico(){
     }
   });
   html += '</tbody></table></div>';
-  html += rotaHistoricoHtml();
+  html += rotaHistoricoHtml() + planejadoHistoricoHtml();
   return html;
 }
 
@@ -5984,6 +6212,22 @@ function rotaHistoricoHtml(){
   });
   return html + '</tbody></table></div>';
 }
+/* Serviços do Planejamento (diarista/técnico) com fim real lançado — 2026-11-05, pedido do Analista: a lavagem
+   de São José do Egito saiu da Rota da Equipe (quem fez foi um diarista) e foi lançada no Planejamento, e não
+   aparecia em lugar nenhum do histórico. Mesma regra do Farol Contratual: conta quando o fim real já passou. */
+function planejadoHistoricoHtml(){
+  var lista = planejadosAtivos().filter(function(p){ return p.fimReal && p.fimReal <= hoje(); }).sort(function(a, b){ return (b.fimReal || "").localeCompare(a.fimReal || ""); });
+  var html = '<div class="table-wrap" style="margin-top:20px;" id="hist-planejado"><div class="table-toolbar"><span class="count">Planejamento — ' + lista.length + ' <span class="n">serviço(s) feito(s) por diarista/técnico</span></span></div>';
+  html += '<table><thead><tr><th>Usina</th><th>Serviço</th><th>Quem fez</th><th>Execução</th><th>Observação</th></tr></thead><tbody>';
+  if (!lista.length) html += '<tr><td colspan="5"><div class="empty-note">Nenhum serviço do Planejamento com fim real lançado ainda.</div></td></tr>';
+  lista.forEach(function(p){
+    var u = p.usinaId ? usinaById(p.usinaId) : (p.usinaNome ? usinaPorNome(p.usinaNome) : null);
+    html += '<tr data-hist-plan="' + esc(p.id) + '"><td>' + esc(u ? rotuloUsina(u) : (p.usinaNome || "(usina removida)")) + (u && u.status && u.status !== "OPERAÇÃO" ? ' <span class="pill pill-neutral" style="font-size:10.5px;">' + esc(u.status) + '</span>' : "") + '</td>' +
+      '<td>' + esc(nomeServicoCurto(p.servico)) + (p.emergencial ? ' <span class="pill pill-warn" style="font-size:10.5px;">emergencial</span>' : "") + '</td><td>' + esc(p.executor || "—") + '</td>' +
+      '<td class="mono" style="white-space:nowrap;">' + (p.inicioReal && p.inicioReal !== p.fimReal ? fmtDate(p.inicioReal) + " – " : "") + fmtDate(p.fimReal) + '</td><td style="font-size:12px;">' + esc(p.obs || "") + '</td></tr>';
+  });
+  return html + '</tbody></table></div>';
+}
 function statusRotaEquipe(item){
   if (item.problema) return 'problema';
   if (rotaFinalizada(item)) return 'concluida';
@@ -8175,9 +8419,21 @@ function renderLinhaDoTempo(contexto){
     if (ui.tlSoConflitos && !i.conflito && !i.problema) return false;
     if (ui.tlSoEmergencial && !i.emergencial) return false;
     if (busca && semAcentoLower(i.usinaNome + ' ' + i.fonteLabel).indexOf(busca) === -1) return false;
+    if (!tlPassaSituacao(i, ui.tlSituacao)) return false;
     return true;
   });
+  /* "Concluídos" acabou de ser escolhido: a janela volta para pegar o histórico (até 26 semanas
+     terminando nesta semana); o que for mais antigo fica na tabela de resumo, que lista todos. */
+  if (ui.tlSitAjustar) {
+    ui.tlSitAjustar = false;
+    var maisAntigo = filtrados.reduce(function(m, i){ return i.inicio && i.inicio < m ? i.inicio : m; }, hoje());
+    var precisa = Math.ceil((analiseDiasEntre(inicioDaSemana(maisAntigo), hoje()) + 1) / 7) + 1;
+    semanas = ui.tlSemanas = precisa <= 4 ? 4 : (precisa <= 13 ? 13 : 26);
+    ini = ui.tlInicio = precisa <= 26 ? inicioDaSemana(maisAntigo) : somarDias(inicioDaSemana(hoje()), -(semanas - 2) * 7);
+    dias = semanas * 7; fimJanela = somarDias(ini, dias - 1);
+  }
   var noPeriodo = filtrados.filter(function(i){ return i.inicio && i.fim && i.fim >= ini && i.inicio <= fimJanela; });
+  var concluidosAntes = ui.tlSituacao === 'concluido' ? filtrados.filter(function(i){ return i.inicio && i.fim && i.fim < ini; }) : [];
   if (contexto === 'contratos') _tlExportDados = { ini: ini, fim: fimJanela, dias: dias, semanas: semanas, itens: noPeriodo };
   var semData = filtrados.filter(function(i){ return !i.inicio && (contexto === 'rota' ? i.fonte === 'rota' : (i.fonte === 'contrato' || i.fonte === 'planejado')); });
   var conflitos = filtrados.filter(function(i){ return i.conflito && i.servico === 'LIMPEZA DE MÓDULOS'; });
@@ -8188,6 +8444,7 @@ function renderLinhaDoTempo(contexto){
     '<span style="font-size:12.5px;font-weight:700;">' + fmtDate(ini) + ' → ' + fmtDate(fimJanela) + '</span>' +
     selectFiltro('flt-tl-semanas', ['4','13','26'], String(semanas), { '4': '4 semanas', '13': '13 semanas', '26': '26 semanas' }) +
     selectFiltro('flt-tl-servico', ['todos','ROÇAGEM','LIMPEZA DE MÓDULOS'], ui.tlServico || 'todos', { todos: 'Roçagem e lavagem', 'ROÇAGEM': 'Só roçagem', 'LIMPEZA DE MÓDULOS': 'Só lavagem' }) +
+    selectFiltro('flt-tl-situacao', Object.keys(TL_SITUACAO_FILTRO), ui.tlSituacao || 'todos', TL_SITUACAO_FILTRO) +
     multiSelectFiltro(keyCli, ordenar(opsCli), ui[keyCli], null, 'Cliente') +
     (contexto === 'rota' ? '' : multiSelectFiltro(keyExe, ordenar(opsExe), ui[keyExe], null, 'Fornecedor')) +
     selectFiltro('flt-tl-uf', ['todos'].concat(ordenar(opsUf)), fUf, { todos: 'Estado (todos)' }) +
@@ -8278,7 +8535,8 @@ function renderLinhaDoTempo(contexto){
     html += '</div></div>';
   });
   html += '</div>';
-  html += resumoLinhaDoTempoHtml(noPeriodo, contexto);
+  if (concluidosAntes.length) html += '<div class="banner tl-concluidos-antes" style="margin-top:10px;">' + concluidosAntes.length + ' concluído(s) terminaram antes de ' + fmtDate(ini) + ' — estão na tabela de resumo abaixo. Para ver as barras, use ◀.</div>';
+  html += resumoLinhaDoTempoHtml(concluidosAntes.concat(noPeriodo), contexto, concluidosAntes.length > 0);
   if (contexto === 'contratos') html += remarcacoesCronoHtml();
   if (semData.length) {
     html += '<div class="card card-pad tl-a-agendar" style="margin-top:12px;"><h3 class="section-title" style="margin:0 0 6px;">A agendar (sem data) <span class="cell-muted" style="font-weight:400;font-size:12px;">(' + semData.length + ')</span></h3>';
@@ -8292,9 +8550,9 @@ function renderLinhaDoTempo(contexto){
    tabela. Duas colunas lado a lado quando passa de 8 itens (como no slide); clicar abre o mesmo
    editor da barra. */
 function nomeServicoCurto(s){ return s === 'ROÇAGEM' ? 'Roçagem' : (s === 'LIMPEZA DE MÓDULOS' ? 'Lavagem' : (String(s || '').charAt(0) + String(s || '').slice(1).toLowerCase())); }
-function resumoLinhaDoTempoHtml(itens, contexto){
+function resumoLinhaDoTempoHtml(itens, contexto, todoHistorico){
   var lista = itens.slice().sort(function(a, b){ return (a.planIni || a.inicio).localeCompare(b.planIni || b.inicio) || a.fim.localeCompare(b.fim) || String(a.usinaNome).localeCompare(String(b.usinaNome), 'pt-BR'); });
-  var html = '<div class="card card-pad tl-resumo" style="margin-top:12px;"><h3 class="section-title" style="margin:0 0 8px;">Resumo do cronograma <span class="cell-muted" style="font-weight:400;font-size:12px;">(' + lista.length + ' · em ordem de início · segue os filtros e o período acima)</span></h3>';
+  var html = '<div class="card card-pad tl-resumo" style="margin-top:12px;"><h3 class="section-title" style="margin:0 0 8px;">Resumo do cronograma <span class="cell-muted" style="font-weight:400;font-size:12px;">(' + lista.length + ' · em ordem de início · ' + (todoHistorico ? 'segue os filtros · todo o histórico de concluídos' : 'segue os filtros e o período acima') + ')</span></h3>';
   if (!lista.length) return html + '<div class="empty-note" style="padding:10px 0;">Nada programado nesse período com esses filtros.</div></div>';
   function tabela(parte){
     return '<table class="tl-resumo-tabela" style="min-width:0;width:100%;"><thead><tr><th>Usina</th><th>Serviço</th><th>Planejado</th><th>Real</th><th>' + (contexto === 'rota' ? 'Equipe' : 'Fornecedor') + '</th><th>Situação</th></tr></thead><tbody>' +
@@ -8370,6 +8628,7 @@ function bindEventsLinhaDoTempo(app){
   var fs = document.getElementById('flt-tl-semanas'); if (fs) fs.addEventListener('change', function(){ ui.tlSemanas = parseInt(fs.value, 10); render(); });
   var ff = document.getElementById('flt-tl-fonte'); if (ff) ff.addEventListener('change', function(){ var w = ff.closest('.tl-wrap'); ui['tlFonte_' + (w ? w.getAttribute('data-tl-contexto') : 'contratos')] = ff.value; render(); });
   var fv = document.getElementById('flt-tl-servico'); if (fv) fv.addEventListener('change', function(){ ui.tlServico = fv.value; render(); });
+  var fsit = document.getElementById('flt-tl-situacao'); if (fsit) fsit.addEventListener('change', function(){ ui.tlSituacao = fsit.value; ui.tlSitAjustar = fsit.value === 'concluido'; render(); });
   [['flt-tl-cliente', 'tlCliente_'], ['flt-tl-uf', 'tlUf_'], ['flt-tl-supervisor', 'tlSupervisor_']].forEach(function(par){
     var el = document.getElementById(par[0]); if (el) el.addEventListener('change', function(){ var w = el.closest('.tl-wrap'); ui[par[1] + (w ? w.getAttribute('data-tl-contexto') : 'contratos')] = el.value; render(); });
   });
@@ -9127,7 +9386,7 @@ function finRenderExecutivo(){
     (sel.filtrado ? '<div class="fx-aviso fx-aviso-info" data-fin-filtrado="1"><b>Números filtrados.</b> Meta e orçamento continuam sendo do mês inteiro.</div>' : '') +
     finKpisHtml(sel) + finFaixaHtml(sel) + finGraficoHtml(info) + finComposicaoHtml(info, meses);
   h += '<div class="fx-grid2">' + finTabelaHtml(info) + finDetalheHtml(sel) + '</div>';
-  h += finProvisoesHtml() + finCenariosHtml();
+  h += finAlteracoesHtml() + finProvisoesHtml() + finCenariosHtml();
   return h + '</div>';
 }
 function finAvisosHtml(){
@@ -9136,6 +9395,8 @@ function finAvisosHtml(){
   var temPrevistoAntigo = previstosAtivos('terceirizados').length + previstosAtivos('equipe').length > 0;
   var migrado = finCenariosAtivos().some(function(c){ return /^PD[TJ]-/.test(c.origem || ''); });
   if (temPrevistoAntigo && !migrado) h += '<div class="fx-aviso fx-aviso-info" data-fin-nao-migrado="1">O "Previsto decidido" das abas antigas ainda não foi migrado para cá: estes números ainda não incluem aquelas provisões. Até a migração, as abas antigas continuam sendo a referência.</div>';
+  var recentes = finAlteracoes().filter(function(a){ return Date.now() - new Date(a.em).getTime() < 7 * 864e5; }).length;
+  if (recentes) h += '<div class="fx-aviso fx-aviso-info" data-fin-alt-aviso="1">' + recentes + (recentes === 1 ? ' alteração' : ' alterações') + ' de provisão nos últimos 7 dias. <a href="#fin-alteracoes" data-fin-ir-alt="1">Ver quem mudou e o motivo</a></div>';
   var ad = finResumoADefinir();
   if (ad.itens) h += '<div class="fx-aviso fx-aviso-info" data-fin-a-definir="1">' + ad.itens + ' compromisso(s) com <b>fornecedor a definir</b>: ' + finR0(ad.saldo) + ' no previsto, que não conciliam com nenhuma parcela até o fornecedor ser definido (veja "Provisões a alinhar").</div>';
   return h;
@@ -9442,10 +9703,11 @@ function finModalPromover(){
 function finErroMsg(e){ return (e && (e.message || e.details || e.hint)) || String(e); }
 function finIdsSeguintes(prefixo, lista, digitos, n){ var primeiro = parseInt(finProximoId(prefixo, lista, digitos).replace(prefixo, ''), 10), r = []; for (var i = 0; i < n; i++) r.push(prefixo + String(primeiro + i).padStart(digitos, '0')); return r; }
 function finRecarregar(){
-  return Promise.all([finLerTabela('rf_fin_cenario'), finLerTabela('rf_fin_cenario_item'), finLerTabela('rf_fin_provisao'), finLerTabela('rf_fin_provisao_vinculo'), finLerTabela('rf_fin_fornecedor_alias')]).then(function(rs){
+  return Promise.all([finLerTabela('rf_fin_cenario'), finLerTabela('rf_fin_cenario_item'), finLerTabela('rf_fin_provisao'), finLerTabela('rf_fin_provisao_vinculo'), finLerTabela('rf_fin_fornecedor_alias'), finLerTabela('rf_fin_provisao_historico')]).then(function(rs){
     state.finCenarios = rs[0].data.map(finLinhaParaCenario); state.finItens = rs[1].data.map(finLinhaParaItem); state.finProvisoes = rs[2].data.map(finLinhaParaProvisao);
     state.finVinculos = rs[3].data.map(finLinhaParaVinculo); state.finAlias = rs[4].data.map(finLinhaParaAlias);
-    state.finAvisos = rs.map(function(r){ return r.aviso; }).filter(Boolean);
+    state.finHistProv = rs[5].data;
+    state.finAvisos = rs.slice(0, 5).map(function(r){ return r.aviso; }).filter(Boolean);
     _finCtxCache = null; render();
   });
 }
@@ -9658,6 +9920,43 @@ function finModalHistoricoProvisao(){
   }).join('') + '</tbody></table>';
   return h + '</div></div></div>';
 }
+/* Quadro "Alterações e motivos" da Visão Executiva (pedido do Analista, 2026-11-04: os motivos das edições
+   ficavam escondidos no "Histórico" de cada item). Junta as linhas de fin_provisao_historico de uma mesma
+   gravação (item + horário) num evento só: quem, quando, item, o que mudou em cada mês e o motivo. */
+function finAlteracoes(){
+  var g = {};
+  (state.finHistProv || []).forEach(function(l){
+    var k = l.item_id + '|' + l.em;
+    if (!g[k]) g[k] = { itemId: l.item_id, em: l.em, quem: l.quem || '', motivo: l.motivo || '', linhas: [] };
+    g[k].linhas.push(l);
+  });
+  return Object.keys(g).map(function(k){ return g[k]; }).sort(function(a, b){ return String(b.em).localeCompare(String(a.em)); });
+}
+function finTextoAlteracao(l){
+  var v = function(x){ return x != null ? finR0(Number(x)) : '—'; }, m = l.mes ? finMesCurto(l.mes) : '';
+  if (l.campo === 'mes_removido') return m + ': saiu (' + v(l.valor_antigo) + ')';
+  if (l.campo === 'mes_incluido') return m + ': entrou ' + v(l.valor_novo);
+  if (l.campo === 'valor') return m + ': ' + v(l.valor_antigo) + ' → ' + v(l.valor_novo);
+  return (FIN_HIST_CAMPO[l.campo] || l.campo) + ': ' + (l.texto_antigo || '—') + ' → ' + (l.texto_novo || '—');
+}
+function finAlteracoesHtml(){
+  var u = finUi(), lista = finAlteracoes(), mostra = u.altTodas ? lista : lista.slice(0, 5);
+  var h = '<div class="fx-card" id="fin-alteracoes"><h3>Alterações e motivos <small>toda edição de provisão pede um motivo — aqui fica quem mudou, quando e por quê</small></h3>';
+  if (!lista.length) return h + '<div class="fx-vazio" style="margin-top:8px;">Nenhuma alteração registrada ainda.</div></div>';
+  var ordem = { mes_removido: 0, valor: 1, mes_incluido: 2 };
+  h += '<div style="overflow-x:auto;margin-top:8px;"><table><thead><tr><th style="text-align:left">Quando</th><th style="text-align:left">Item</th><th style="text-align:left">O que mudou</th><th style="text-align:left">Motivo</th><th style="text-align:left">Quem</th></tr></thead><tbody>' + mostra.map(function(a){
+    var it = (state.finItens || []).find(function(x){ return x.id === a.itemId; }) || {}, d = new Date(a.em);
+    var quando = isNaN(d) ? '' : d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    var mud = a.linhas.slice().sort(function(x, y){ return String(x.mes || '').localeCompare(String(y.mes || '')) || (ordem[x.campo] == null ? 3 : ordem[x.campo]) - (ordem[y.campo] == null ? 3 : ordem[y.campo]); }).map(finTextoAlteracao);
+    return '<tr data-fin-alt="' + esc(a.itemId) + '"><td style="text-align:left;white-space:nowrap;font-size:12px;">' + esc(quando) + '</td>' +
+      '<td style="text-align:left;white-space:normal;min-width:180px;"><b>' + esc(it.descricao || a.itemId) + '</b><div style="font-size:11.5px;color:var(--ink-muted);">' + esc(finNomeFornecedor(it.fornecedorId, it.fornecedorNome, it.tipo, it.fornecedorADefinir)) + ' · <a href="#" data-fin-hist="' + esc(a.itemId) + '">histórico do item</a></div></td>' +
+      '<td style="text-align:left;white-space:nowrap;font-size:12px;">' + mud.map(esc).join('<br>') + '</td>' +
+      '<td style="text-align:left;white-space:normal;min-width:220px;"><b>' + esc(a.motivo || '—') + '</b></td>' +
+      '<td style="text-align:left;font-size:12px;">' + esc(String(a.quem).split('@')[0]) + '</td></tr>';
+  }).join('') + '</tbody></table></div>';
+  if (lista.length > 5) h += '<div style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-sm" id="fin-alt-todas">' + (u.altTodas ? 'Mostrar só as 5 mais recentes' : 'Ver todas (' + lista.length + ')') + '</button></div>';
+  return h + '</div>';
+}
 /* Marcar alinhado / cancelar: fecha as provisões ABERTAS do item que ainda têm saldo (as conciliadas ficam como estão). */
 function finFecharProvisoes(itemId, fechamento){
   var agora = new Date().toISOString(), quem = whoami();
@@ -9743,6 +10042,8 @@ function finBindEventos(app){
   });
   /* Editar provisão / Histórico */
   app.querySelectorAll('[data-fin-editar]').forEach(function(b){ b.addEventListener('click', function(){ finAbrirEdicaoProvisao(b.getAttribute('data-fin-editar')); render(); }); });
+  var bAlt = document.getElementById('fin-alt-todas'); if (bAlt) bAlt.addEventListener('click', function(){ u.altTodas = !u.altTodas; render(); });
+  app.querySelectorAll('[data-fin-ir-alt]').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); var c = document.getElementById('fin-alteracoes'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }); });
   app.querySelectorAll('[data-fin-hist]').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); finAbrirHistoricoProvisao(a.getAttribute('data-fin-hist')); }); });
   ['#fin-hist-fechar'].forEach(function(s){ var b = app.querySelector(s); if (b) b.addEventListener('click', function(){ u.historico = null; render(); }); });
   if (u.editar) {
@@ -11503,6 +11804,16 @@ function planoDoObjetoServico(o, fallback){
   var pi = etapaPrevisto(o, 'execucaoInicio') || fallback || null, pf = etapaPrevisto(o, 'execucaoFim') || fallback || null;
   return { ini: pi || pf, fim: pf || pi, conf: false };
 }
+/* Filtro "Situação" da linha do tempo (pedido do Analista, 2026-11-03): pendente = ainda não começou
+   (proposto/confirmado), andamento = começou e não terminou, atrasado = não terminou e tem atraso. */
+var TL_SITUACAO_FILTRO = { todos: 'Situação (todas)', pendente: 'Pendentes', andamento: 'Em andamento', atrasado: 'Atrasados', concluido: 'Concluídos' };
+function tlPassaSituacao(i, sit){
+  if (!sit || sit === 'todos') return true;
+  if (sit === 'concluido') return i.status === 'feito';
+  if (sit === 'andamento') return i.status === 'execucao';
+  if (sit === 'atrasado') return i.status !== 'feito' && !!i.atrasado;
+  return i.status !== 'feito' && i.status !== 'execucao';
+}
 function situacaoPlanoRealTexto(i){ return (TL_STATUS_LABEL[i.status] || i.status || '') + (i.atrasado ? ' · atrasado' : ''); }
 /* Estilo de cada pedaço da barra */
 function estiloSegmentoTL(tipo, rgb){
@@ -11846,16 +12157,145 @@ function bindEventsPlanejadoAndamento(app){
    e manda para a Lixeira (o serviço ligado não é apagado). Tabela radar_fornecedores.ordens_servico. */
 function linhaParaOrdemServico(r){
   return { id: r.id, numero: r.numero, usinaId: r.usina_id, usinaTexto: r.usina_texto, servico: r.servico, data: r.data, fornecedor: r.fornecedor_texto, status: r.status || 'aberta',
-    concluidaEm: r.concluida_em, justificativa: r.justificativa, vinculo: r.vinculo, vinculoManual: !!r.vinculo_manual, observacao: r.observacao,
+    concluidaEm: r.concluida_em, justificativa: r.justificativa, vinculo: r.vinculo, vinculoManual: !!r.vinculo_manual, observacao: r.observacao, fracttal: r.fracttal || null,
     excluido: !!r.excluido, excluidoEm: r.excluido_em, excluidoPor: r.excluido_por, criadoEm: r.criado_em, criadoPor: r.criado_por, atualizadoEm: r.atualizado_em, atualizadoPor: r.atualizado_por };
 }
 function ordemServicoParaLinha(o){
   return { id: o.id, numero: o.numero, usina_id: o.usinaId || null, usina_texto: o.usinaTexto || null, servico: o.servico || null, data: o.data || null, fornecedor_texto: o.fornecedor || null,
-    status: o.status || 'aberta', concluida_em: o.concluidaEm || null, justificativa: o.justificativa || null, vinculo: o.vinculo || null, vinculo_manual: !!o.vinculoManual, observacao: o.observacao || null,
+    status: o.status || 'aberta', concluida_em: o.concluidaEm || null, justificativa: o.justificativa || null, vinculo: o.vinculo || null, vinculo_manual: !!o.vinculoManual, observacao: o.observacao || null, fracttal: o.fracttal || null,
     excluido: !!o.excluido, excluido_em: o.excluidoEm || null, excluido_por: o.excluidoPor || null, criado_em: o.criadoEm || undefined, criado_por: o.criadoPor || null,
     atualizado_em: o.atualizadoEm || null, atualizado_por: o.atualizadoPor || null };
 }
 function ordensServicoAtivas(){ return (state.ordensServico || []).filter(function(o){ return !o.excluido; }); }
+/* ----- Fracttal (2026-10-28): dados da OS pelo número (Edge Function fracttal-os) -----
+   Técnico, abertura, data marcada, situação, área, usina e texto do serviço ficam em `o.fracttal`
+   (última consulta). O Fracttal só PREENCHE o que está vazio (decisão do Analista); quando o que foi
+   digitado é diferente, o card mostra um aviso com as duas versões: "Usar do Fracttal" ou "Manter
+   assim" (guardado em fracttal.ignorar, para o aviso não voltar enquanto o Fracttal não mudar). */
+var OS_FR_STATUS = { 1: 'Aberta', 2: 'Em revisão', 3: 'Concluída', 4: 'Cancelada' };
+function osUsinaFracttal(fr){ return fr && fr.usina_texto ? usinaDaCriticidade({ usina: fr.usina_texto, usinaId: null }) : null; }
+function osServicoFracttal(fr){ return fr && fr.servico_texto ? servicoDoTextoOS(fr.servico_texto) : null; }
+function osEhZeladoria(fr){ return !fr || !(fr.area || []).length || fr.area.some(function(a){ return semAcentoLower(a) === 'zeladoria'; }); }
+function osNumeroFracttal(n){ return String(n || '').trim().replace(/^(OS|OT)[\s-]*/i, ''); }
+/* consulta em lotes de 10 (a função faz uma por vez, com pausa); fim(resultados por nº, erro) */
+function osConsultarFracttal(numeros, fim){
+  if (!sb.functions || !sb.functions.invoke) { fim({}, 'Consulta ao Fracttal indisponível neste ambiente.'); return; }
+  var lista = numeros.map(osNumeroFracttal).filter(function(f, i, a){ return /^\d{1,12}$/.test(f) && a.indexOf(f) === i; }), res = {}, i = 0;
+  (function proximo(){
+    if (i >= lista.length) { fim(res, null); return; }
+    var lote = lista.slice(i, i + 10); i += 10;
+    sb.functions.invoke('fracttal-os', { body: { folios: lote } }).then(function(r){
+      var d = r && r.data;
+      if ((r && r.error) || !d || d.erro) { fim(res, (d && d.erro) || 'O Fracttal não respondeu agora. Tente de novo em 1 minuto.'); return; }
+      (d.os || []).forEach(function(x){ res[x.folio] = x; });
+      if (d.limite) { fim(res, 'O Fracttal está no limite de consultas da empresa: faltaram ' + (lista.length - Object.keys(res).length) + ' OS. Tente de novo em 1 minuto.'); return; }
+      proximo();
+    }, function(){ fim(res, 'O Fracttal não respondeu agora. Tente de novo em 1 minuto.'); });
+  })();
+}
+function osGuardarFracttal(o, fr){ o.fracttal = Object.assign({}, fr, { consultadoEm: new Date().toISOString(), ignorar: (o.fracttal && o.fracttal.ignorar) || {} }); }
+/* preenche só o que está vazio; devolve true se usina/serviço mudaram (refazer a ligação) */
+function osPreencherDoFracttal(o){
+  var fr = o.fracttal; if (!fr || !fr.encontrada) return false;
+  var u = osUsinaFracttal(fr), s = osServicoFracttal(fr), mudou = false;
+  if (!o.usinaId && u) { o.usinaId = u.id; o.usinaTexto = o.usinaTexto || u.usina; mudou = true; }
+  if (!o.servico && s) { o.servico = s; mudou = true; }
+  if (!o.data && fr.data_marcada) o.data = fr.data_marcada;
+  return mudou;
+}
+function osAvisosFracttal(o, st){
+  var fr = o.fracttal, out = []; if (!fr) return out;
+  var ign = fr.ignorar || {};
+  if (!fr.encontrada) { if (!ign.naoEncontrada) out.push({ campo: 'naoEncontrada', valor: true, texto: 'OS não encontrada no Fracttal — confira o número.' }); return out; }
+  var u = osUsinaFracttal(fr), s = osServicoFracttal(fr), uAqui = o.usinaId ? usinaById(o.usinaId) : null;
+  if (u && o.usinaId && u.id !== o.usinaId && ign.usina !== u.id) out.push({ campo: 'usina', valor: u.id, usar: true, texto: 'Usina no Fracttal: ' + rotuloUsina(u) + ' (aqui: ' + (uAqui ? rotuloUsina(uAqui) : o.usinaTexto || '—') + ').' });
+  if (!u && fr.usina_texto && !o.usinaId && ign.usinaCadastro !== fr.usina_texto) out.push({ campo: 'usinaCadastro', valor: fr.usina_texto, texto: 'A usina do Fracttal ("' + fr.usina_texto + '") não está no cadastro de usinas.' });
+  if (s && o.servico && s !== o.servico && ign.servico !== s) out.push({ campo: 'servico', valor: s, usar: true, texto: 'Serviço no Fracttal: ' + nomeServicoCurto(s) + ' (aqui: ' + nomeServicoCurto(o.servico) + ').' });
+  if (fr.data_marcada && o.data && fr.data_marcada !== o.data && ign.data !== fr.data_marcada) out.push({ campo: 'data', valor: fr.data_marcada, usar: true, texto: 'Data marcada no Fracttal: ' + fmtDate(fr.data_marcada) + ' (aqui: ' + fmtDate(o.data) + ').' });
+  if (!osEhZeladoria(fr) && ign.area !== fr.area.join(', ')) out.push({ campo: 'area', valor: fr.area.join(', '), texto: 'No Fracttal esta OS não é de Zeladoria (área: ' + fr.area.join(', ') + ').' });
+  if (fr.status === 4 && ign.cancelada !== true) out.push({ campo: 'cancelada', valor: true, acao: 'excluir', texto: 'Cancelada no Fracttal' + (fr.concluida_em ? ' em ' + fmtDate(fr.concluida_em) : '') + (fr.nota ? ' — "' + fr.nota + '"' : '') + '.' });
+  if (fr.status === 3 && (st || statusOS(o)).col !== 'concluida' && ign.concluida !== true) out.push({ campo: 'concluida', valor: true, acao: 'concluir', texto: 'Concluída no Fracttal' + (fr.concluida_em ? ' em ' + fmtDate(fr.concluida_em) : '') + '.' });
+  return out;
+}
+function osInfoFracttalTexto(fr){
+  if (!fr || !fr.encontrada) return '';
+  return '' + (fr.tecnico || 'sem técnico') + (fr.aberta_em ? ' · aberta ' + fmtDate(fr.aberta_em) : '') + (OS_FR_STATUS[fr.status] ? ' · ' + OS_FR_STATUS[fr.status] + ' no Fracttal' : '');
+}
+/* confere uma lista de OS no Fracttal, guarda o resultado, preenche o vazio e refaz a ligação de quem ganhou usina/serviço */
+function osConferirFracttal(lista, silencioso){
+  lista = (lista || []).filter(function(o){ return /^\d{1,12}$/.test(osNumeroFracttal(o.numero)); });
+  if (!lista.length || ui.osFracttalRodando) return;
+  if (!sb.functions || !sb.functions.invoke) { if (!silencioso) showToast('Consulta ao Fracttal indisponível neste ambiente.'); return; }
+  ui.osFracttalRodando = true; showToast('Conferindo ' + lista.length + ' OS no Fracttal…');
+  var b = document.getElementById('btn-os-fracttal'); if (b) { b.disabled = true; b.textContent = 'Conferindo no Fracttal…'; }
+  osConsultarFracttal(lista.map(function(o){ return o.numero; }), function(res, erro){
+    ui.osFracttalRodando = false;
+    var n = 0, mudaram = [];
+    lista.forEach(function(o0){
+      var fr = res[osNumeroFracttal(o0.numero)], o = (state.ordensServico || []).find(function(x){ return x.id === o0.id; });
+      if (!fr || fr.erro || !o) return;
+      osGuardarFracttal(o, fr); if (osPreencherDoFracttal(o)) mudaram.push(o); n++;
+    });
+    _itensOSCache = null;
+    var semV = mudaram.filter(function(o){ return !o.vinculo && !o.vinculoManual; }), mapa = atribuirVinculosOS(semV);
+    semV.forEach(function(o){ if (mapa[o.id]) { o.vinculo = mapa[o.id]; gravarNumeroNoServico(o.vinculo, o.numero); } });
+    var comAviso = lista.filter(function(o){ var x = (state.ordensServico || []).find(function(y){ return y.id === o.id; }); return x && osAvisosFracttal(x).length; }).length;
+    if (n) persist(); else render();
+    showToast(erro ? erro + (n ? ' (' + n + ' OS conferida(s) antes disso.)' : '') : '' + n + ' OS conferida(s) no Fracttal' + (comAviso ? ' — ' + comAviso + ' com aviso.' : ', sem avisos.'));
+  });
+}
+function osUsarDoFracttal(o, campo){
+  var fr = o.fracttal; if (!fr) return;
+  var antes = o.usinaId + '|' + o.servico;
+  if (campo === 'usina') { var u = osUsinaFracttal(fr); if (u) { o.usinaId = u.id; o.usinaTexto = u.usina; } }
+  else if (campo === 'servico') { var s = osServicoFracttal(fr); if (s) o.servico = s; }
+  else if (campo === 'data' && fr.data_marcada) o.data = fr.data_marcada;
+  if (antes !== o.usinaId + '|' + o.servico && !o.vinculoManual) { o.vinculo = null; _itensOSCache = null; o.vinculo = melhorVinculoOS(o, o.id); if (o.vinculo) gravarNumeroNoServico(o.vinculo, o.numero); }
+  o.atualizadoEm = new Date().toISOString(); o.atualizadoPor = whoami();
+}
+/* bloco do Fracttal dentro do modal "+ OS / " — compara com o que está nos campos do formulário */
+function osPintarFracttalModal(fr){
+  var box = document.getElementById('ose-fracttal'); if (!box || !fr) return;
+  if (!fr.encontrada) { box.innerHTML = '<span style="color:var(--critical);">OS ' + esc(fr.folio) + ' não encontrada no Fracttal — confira o número.</span>'; return; }
+  var su = document.getElementById('ose-usina'), ss = document.getElementById('ose-servico'), sd = document.getElementById('ose-data');
+  var u = osUsinaFracttal(fr), s = osServicoFracttal(fr), avisos = [];
+  if (u && su && su.value && su.value !== u.id) avisos.push(['usina', 'Usina no Fracttal: ' + rotuloUsina(u) + '.']);
+  if (!u && fr.usina_texto) avisos.push([null, 'A usina do Fracttal ("' + fr.usina_texto + '") não está no cadastro de usinas.']);
+  if (s && ss && ss.value && ss.value !== s) avisos.push(['servico', 'Serviço no Fracttal: ' + nomeServicoCurto(s) + '.']);
+  if (fr.data_marcada && sd && sd.value && sd.value !== fr.data_marcada) avisos.push(['data', 'Data marcada no Fracttal: ' + fmtDate(fr.data_marcada) + '.']);
+  if (!osEhZeladoria(fr)) avisos.push([null, 'No Fracttal esta OS não é de Zeladoria (área: ' + fr.area.join(', ') + ').']);
+  if (fr.status === 4) avisos.push([null, 'Cancelada no Fracttal' + (fr.concluida_em ? ' em ' + fmtDate(fr.concluida_em) : '') + (fr.nota ? ' — "' + fr.nota + '"' : '') + '.']);
+  if (fr.status === 3) avisos.push([null, 'Concluída no Fracttal' + (fr.concluida_em ? ' em ' + fmtDate(fr.concluida_em) : '') + '.']);
+  box.innerHTML = '<div style="font-size:12px;">' + esc(osInfoFracttalTexto(fr)) + (fr.data_marcada ? ' · marcada ' + fmtDate(fr.data_marcada) : '') + '</div>' +
+    '<div class="cell-muted" style="font-size:11px;margin-top:2px;">' + esc((fr.usina_texto || '—') + ' · ' + (fr.servico_texto || '—')) + '</div>' +
+    avisos.map(function(a){ return '<div data-ose-fr-aviso style="font-size:11.5px;color:var(--warn);margin-top:4px;">' + esc(a[1]) + (a[0] ? ' <button type="button" class="btn btn-ghost btn-sm" data-ose-fr-usar="' + a[0] + '">Usar do Fracttal</button>' : '') + '</div>'; }).join('');
+  box.querySelectorAll('[data-ose-fr-usar]').forEach(function(bt){ bt.addEventListener('click', function(){
+    var c = bt.getAttribute('data-ose-fr-usar');
+    if (c === 'usina' && su && u) su.value = u.id; else if (c === 'servico' && ss && s) ss.value = s; else if (c === 'data' && sd) sd.value = fr.data_marcada;
+    osPintarFracttalModal(fr);
+  }); });
+}
+function osBuscarNoModal(){
+  var inp = document.getElementById('ose-numero'), box = document.getElementById('ose-fracttal'); if (!inp || !box) return;
+  var num = osNumeroFracttal(inp.value);
+  if (!/^\d{1,12}$/.test(num)) { box.innerHTML = '<span style="color:var(--critical);">Digite só o número da OS (ex.: 15221).</span>'; return; }
+  if (ui.osBuscandoFr === num) return;
+  ui.osBuscandoFr = num;
+  box.innerHTML = '<span class="cell-muted">Buscando a OS ' + esc(num) + ' no Fracttal…</span>';
+  osConsultarFracttal([num], function(res, erro){
+    ui.osBuscandoFr = null;
+    var fr = res[num]; if (!document.getElementById('ose-fracttal')) return;
+    if (!fr || fr.erro) { document.getElementById('ose-fracttal').innerHTML = '<span style="color:var(--critical);">' + esc(erro || (fr && fr.erro) || 'O Fracttal não respondeu agora.') + '</span>'; return; }
+    ui.osEditarFr = { numero: num, fr: fr, novo: true };
+    if (fr.encontrada) {
+      var u = osUsinaFracttal(fr), s = osServicoFracttal(fr), su = document.getElementById('ose-usina'), ss = document.getElementById('ose-servico'), sd = document.getElementById('ose-data');
+      if (u && su && !su.value) su.value = u.id;
+      if (s && ss && !ss.value) ss.value = s;
+      if (fr.data_marcada && sd && !sd.value) sd.value = fr.data_marcada;
+    }
+    osPintarFracttalModal(fr);
+  });
+}
 function servicoDoTextoOS(t){
   var s = semAcentoLower(t || '');
   if (/supress|rocag|vegeta/.test(s)) return 'ROÇAGEM';
@@ -11886,6 +12326,7 @@ function usinaDoTextoOS(txt){
 }
 function dataDoTextoOS(dm){
   var q = String(dm || '').split('/').map(Number); if (!q[0] || !q[1]) return null;
+  if (q[2]) return (q[2] < 100 ? 2000 + q[2] : q[2]) + '-' + String(q[1]).padStart(2, '0') + '-' + String(q[0]).padStart(2, '0');   /* ano escrito ("04/01/2027") vale como está */
   var ano = parseInt(hoje().slice(0, 4), 10), iso = function(y){ return y + '-' + String(q[1]).padStart(2, '0') + '-' + String(q[0]).padStart(2, '0'); };
   var d = iso(ano); if (analiseDiasEntre(hoje(), d) > 200) d = iso(ano - 1); else if (analiseDiasEntre(d, hoje()) > 200) d = iso(ano + 1);
   return d;
@@ -11893,10 +12334,10 @@ function dataDoTextoOS(dm){
 function lerListaOS(txt){
   var out = [];
   String(txt || '').split(/\r?\n/).forEach(function(l){
-    var bruta = l.trim(); if (!bruta) return;
+    var bruta = l.trim(); if (!bruta || /^OS (ABERTAS|CONCLU[IÍ]DAS)\b/i.test(bruta)) return;   /* títulos do "Exportar lista" */
     var concluida = /^~/.test(bruta) && /~$/.test(bruta);
     var t = bruta.replace(/[~*]/g, '').replace(/\s+/g, ' ').trim();
-    var m = t.match(/^(?:UFV\s+)?(.+?)\s*[-_–]+\s*(SUPRESS[ÃA]O[^-–]*|LAVAGEM[^-–]*|LIMPEZA[^-–]*|RO[ÇC]AGEM[^-–]*|PODA[^-–]*)\s*[-–]\s*(?:DATA\s*)?(\d{1,2}\/\d{1,2})\s*[-–]\s*(.*?)\s*[-–]\s*(?:OS\s*)?(\d{3,})\s*$/i);
+    var m = t.match(/^(?:UFV\s+)?(.+?)\s*[-_–]+\s*(SUPRESS[ÃA]O[^-–]*|LAVAGEM[^-–]*|LIMPEZA[^-–]*|RO[ÇC]AGEM[^-–]*|PODA[^-–]*)\s*[-–]\s*(?:DATA\s*)?(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*[-–]\s*(.*?)\s*[-–]\s*(?:OS\s*)?(\d{3,})\s*$/i);
     if (!m) { out.push({ erro: true, linha: bruta }); return; }
     var u = usinaDoTextoOS(m[1]);
     out.push({ numero: m[5], usinaTexto: m[1].trim(), usina: u, servico: servicoDoTextoOS(m[2]), data: dataDoTextoOS(m[3]), fornecedor: m[4].replace(/^FORNECEDOR\s+/i, '').trim(), concluida: concluida, linha: bruta });
@@ -11996,12 +12437,28 @@ function gravarRealNoServico(chave, ri, rf){
 }
 function proximoIdOS(){ var nums = (state.ordensServico || []).map(function(o){ return parseInt(String(o.id || '').replace(/\D/g, ''), 10) || 0; }); return 'OSP-' + String((nums.length ? Math.max.apply(null, nums) : 0) + 1).padStart(4, '0'); }
 /* ----- Kanban ----- */
-var OS_COLUNAS = [['sem', 'Sem serviço'], ['aberta', 'Aberta'], ['execucao', 'Em execução'], ['concluida', 'Concluída']];
+/* "Concluída" = concluída no Radar e ainda NÃO finalizada no Fracttal (a lista do que avançar lá);
+   "Finalizada no Fracttal" = concluída aqui e finalizada lá (pedido do Analista, 2026-10-28) */
+var OS_COLUNAS = [['sem', 'Sem serviço'], ['aberta', 'Aberta'], ['execucao', 'Em execução'], ['concluida', 'Concluída · falta no Fracttal'], ['finalizada', 'Finalizada no Fracttal']];
+function osColunaKanban(o, st){ return st.col === 'concluida' && osFinalizacaoFracttal(o, st) === 'finalizada' ? 'finalizada' : st.col; }
 function descricaoVinculoOS(it){
   if (!it) return '';
   var tipo = it.fonte === 'contrato' ? 'OS do contrato' : (it.fonte === 'cotacao' ? 'Cotação' : (it.fonte === 'rota' ? 'Rota da Equipe' : 'Planejado'));
   var datas = (it.planIni ? fmtDate(it.planIni).slice(0, 5) + '–' + fmtDate(it.planFim).slice(0, 5) : 'sem data') + (it.realIni ? ' · real ' + fmtDate(it.realIni).slice(0, 5) + (it.realFim ? '–' + fmtDate(it.realFim).slice(0, 5) : ' – em andamento') : '');
   return '' + tipo + ' · ' + (it.fonte === 'rota' ? 'Rota da Equipe' : (it.fonteLabel || '')) + ' · ' + datas + ' · ' + situacaoPlanoRealTexto(it);
+}
+/* "Finalizada no Fracttal" (pedido do Analista, 2026-10-28): a zeladoria conclui a OS no Radar, mas o
+   PCM também precisa finalizar no Fracttal. Só vale para OS concluída aqui: finalizada (status 3) /
+   falta (ainda aberta ou em revisão lá) / cancelada / não conferida / não encontrada. */
+var OS_FINALIZACAO = { finalizada: 'Finalizada no Fracttal', falta: 'Falta finalizar no Fracttal', cancelada: 'Cancelada no Fracttal', naoConferida: 'Ainda não conferida no Fracttal', naoEncontrada: 'Não encontrada no Fracttal' };
+/* técnico responsável pela OS no Fracttal (quem cobrar); null = OS ainda não conferida */
+function osTecnicoOS(o){ var fr = o.fracttal; return fr && fr.encontrada ? (fr.tecnico || 'sem técnico no Fracttal') : null; }
+function osFinalizacaoFracttal(o, st){
+  if ((st || statusOS(o)).col !== 'concluida') return null;
+  var fr = o.fracttal;
+  if (!fr) return 'naoConferida';
+  if (!fr.encontrada) return 'naoEncontrada';
+  return fr.status === 3 ? 'finalizada' : (fr.status === 4 ? 'cancelada' : 'falta');
 }
 function osCardHtml(o, st){
   var u = o.usinaId ? usinaById(o.usinaId) : null;
@@ -12009,6 +12466,17 @@ function osCardHtml(o, st){
   html += '<div style="display:flex;justify-content:space-between;gap:6px;align-items:baseline;"><b style="font-size:13px;">OS ' + esc(o.numero) + '</b><span class="cell-muted mono" style="font-size:11px;">' + fmtDate(o.data) + '</span></div>';
   html += '<div style="font-weight:600;font-size:12.5px;margin-top:2px;">' + esc(u ? u.usina : (o.usinaTexto || '—')) + ' <span class="cell-muted" style="font-weight:400;font-size:11px;">' + esc(u ? ((u.uf || '') + (u.cliente ? ' · ' + u.cliente : '')) : 'usina não encontrada') + '</span></div>';
   html += '<div style="font-size:12px;">' + esc(nomeServicoCurto(o.servico || '')) + ' · <span class="cell-muted">' + esc(o.fornecedor || '—') + '</span></div>';
+  var fr = o.fracttal, tec = osTecnicoOS(o);
+  if (fr && fr.encontrada) html += '<div data-os-tecnico style="font-size:12px;margin-top:3px;">Técnico: <b>' + esc(tec) + '</b></div><div class="cell-muted" data-os-fr-info style="font-size:11px;margin-top:1px;">' + esc((fr.aberta_em ? 'aberta ' + fmtDate(fr.aberta_em) : '') + (OS_FR_STATUS[fr.status] ? (fr.aberta_em ? ' · ' : '') + OS_FR_STATUS[fr.status] + ' no Fracttal' : '')) + '</div>';
+  var fin = osFinalizacaoFracttal(o, st);
+  if (fin) html += '<div data-os-finalizacao="' + fin + '" style="font-size:11.5px;font-weight:600;margin-top:4px;color:' + (fin === 'finalizada' ? 'rgb(31,122,77)' : (fin === 'falta' ? 'var(--critical)' : 'var(--ink-2)')) + ';">' + esc(OS_FINALIZACAO[fin]) + (fin === 'finalizada' && o.fracttal.concluida_em ? ' em ' + fmtDate(o.fracttal.concluida_em) : '') + (fin === 'falta' ? ' <span class="cell-muted" style="font-weight:400;">(' + esc(OS_FR_STATUS[o.fracttal.status] || 'aberta') + ' lá)</span> — cobrar ' + esc(tec) : '') + '</div>';
+  osAvisosFracttal(o, st).forEach(function(a){
+    html += '<div data-os-fr-aviso="' + a.campo + '" style="font-size:11.5px;color:var(--warn);margin-top:4px;line-height:1.35;">' + esc(a.texto) + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">' +
+      (a.usar ? '<button class="btn btn-ghost btn-sm" data-os-fr-usar="' + esc(o.id) + '" data-campo="' + a.campo + '">Usar do Fracttal</button>' : '') +
+      (a.acao === 'excluir' ? '<button class="btn btn-ghost btn-sm" data-os-excluir="' + esc(o.id) + '">Apagar a OS</button>' : '') +
+      (a.acao === 'concluir' ? '<button class="btn btn-ghost btn-sm" data-os-concluir="' + esc(o.id) + '">Concluir aqui</button>' : '') +
+      '<button class="btn btn-ghost btn-sm" data-os-fr-ignorar="' + esc(o.id) + '" data-campo="' + a.campo + '">Manter assim</button></div></div>';
+  });
   if (st.item) html += '<div class="cell-muted" style="font-size:11px;margin-top:4px;line-height:1.35;">' + esc(descricaoVinculoOS(st.item)) + '</div>';
   if (st.col === 'sem') html += '<div style="font-size:11.5px;color:var(--critical);margin-top:4px;">Não achei o serviço desta OS no app.</div>';
   if (!st.item && o.justificativa) html += '<div class="cell-muted" style="font-size:11px;margin-top:4px;">Sem serviço — justificado: ' + esc(o.justificativa) + '</div>';
@@ -12021,34 +12489,86 @@ function osCardHtml(o, st){
   html += '<button class="btn btn-ghost btn-sm" data-os-editar="' + esc(o.id) + '" title="Editar">Editar</button><button class="btn btn-ghost btn-sm" data-os-excluir="' + esc(o.id) + '" title="Apagar (vai para a Lixeira)">Excluir</button>';
   return html + '</div></div>';
 }
+/* filtros da tela de OS (busca, fornecedor, cliente, técnico, estado, serviço, Fracttal) — usados pelo Kanban e pelo Exportar */
+function osFiltrarLinhas(linhas){
+  var busca = semAcentoLower(ui.osBusca || ''), TEC_NC = '— (não conferida no Fracttal)';
+  return linhas.filter(function(l){
+    if (busca && semAcentoLower('OS ' + l.o.numero + ' ' + (l.u ? l.u.usina : l.o.usinaTexto) + ' ' + (l.o.fornecedor || '') + ' ' + (l.o.fracttal && l.o.fracttal.tecnico || '')).indexOf(busca) === -1) return false;
+    if (!msfMatches(ui.osFornMS, l.o.fornecedor || '—')) return false;
+    if (!msfMatches(ui.osCliMS, l.u && l.u.cliente ? l.u.cliente : '—')) return false;
+    if (!msfMatches(ui.osTecMS, osTecnicoOS(l.o) || TEC_NC)) return false;
+    if (ui.osUf && ui.osUf !== 'todos' && (l.u && l.u.uf ? l.u.uf : '—') !== ui.osUf) return false;
+    if (ui.osServ && ui.osServ !== 'todos' && l.o.servico !== ui.osServ) return false;
+    if (ui.osFin && ui.osFin !== 'todos' && osFinalizacaoFracttal(l.o, l.st) !== ui.osFin) return false;
+    return true;
+  });
+}
+/* "Exportar lista" (pedido do Analista, 2026-11-05): o texto das OS filtradas no mesmo formato do "Colar lista",
+   para mandar por mensagem ao fornecedor. Separa abertas (sem serviço/aberta/em execução) e concluídas; as
+   concluídas vão entre ~ … ~ (riscadas no WhatsApp e lidas como concluídas se coladas de volta). */
+function osLinhaExportada(o, u){
+  var serv = o.servico === 'ROÇAGEM' ? 'SUPRESSÃO DE VEGETAÇÃO' : (o.servico === 'LIMPEZA DE MÓDULOS' ? 'LAVAGEM DE MÓDULOS' : String(o.servico || '?').toUpperCase());
+  var d = o.data || '', data = d ? d.slice(8, 10) + '/' + d.slice(5, 7) + (d.slice(0, 4) !== hoje().slice(0, 4) ? '/' + d.slice(0, 4) : '') : '?';
+  return 'UFV ' + String(u ? u.usina : (o.usinaTexto || '?')).toUpperCase() + ' - ' + serv + ' - DATA ' + data + ' - FORNECEDOR ' + String(o.fornecedor || '?').toUpperCase() + ' - OS ' + o.numero;
+}
+function osTextoExportar(){
+  var E = ui.osExportar || {};
+  var vis = osFiltrarLinhas(ordensServicoAtivas().map(function(o){ return { o: o, u: o.usinaId ? usinaById(o.usinaId) : null, st: statusOS(o) }; }))
+    .sort(function(a, b){ return String(a.o.data || '').localeCompare(String(b.o.data || '')) || String(a.o.numero).localeCompare(String(b.o.numero)); });
+  var ab = vis.filter(function(l){ return l.st.col !== 'concluida'; }), co = vis.filter(function(l){ return l.st.col === 'concluida'; });
+  var partes = [];
+  if (E.abertas !== false && ab.length) partes.push('OS ABERTAS (' + ab.length + ')\n' + ab.map(function(l){ return osLinhaExportada(l.o, l.u); }).join('\n'));
+  if (E.concluidas !== false && co.length) partes.push('OS CONCLUÍDAS (' + co.length + ')\n' + co.map(function(l){ return '~' + osLinhaExportada(l.o, l.u) + '~'; }).join('\n'));
+  return { texto: partes.join('\n\n'), abertas: ab.length, concluidas: co.length };
+}
+function modalOSExportar(){
+  if (!ui.osExportar) return '';
+  var E = ui.osExportar, T = osTextoExportar(), forn = ui.osFornMS && ui.osFornMS !== 'todos' ? [].concat(ui.osFornMS).join(', ') : 'todos os fornecedores';
+  return '<div class="overlay open" id="overlay-os-exportar"><div class="modal" style="max-width:900px;width:96vw;"><div class="modal-head"><h3>Exportar lista de OS</h3><button class="modal-close" id="btn-os-exp-fechar">&times;</button></div><div class="modal-body">' +
+    '<p class="cell-muted" style="font-size:12px;margin:0 0 8px;">Usa os filtros da tela (agora: <b>' + esc(forn) + '</b>). Copie e cole na mensagem. As concluídas vão entre ~ … ~ (aparecem riscadas no WhatsApp).</p>' +
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;font-size:13px;">' +
+    '<label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="os-exp-abertas" style="width:auto;"' + (E.abertas !== false ? ' checked' : '') + '> Abertas (' + T.abertas + ')</label>' +
+    '<label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="os-exp-concluidas" style="width:auto;"' + (E.concluidas !== false ? ' checked' : '') + '> Concluídas (' + T.concluidas + ')</label></div>' +
+    (T.texto ? '<textarea id="os-exp-txt" readonly rows="16" style="width:100%;font-family:monospace;font-size:12px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);">' + esc(T.texto) + '</textarea>'
+      : '<div class="empty-note">Nenhuma OS com esses filtros.</div>') +
+    '<div class="modal-actions"><button class="btn btn-ghost" id="btn-os-exp-cancelar">Fechar</button><button class="btn btn-primary" id="btn-os-exp-copiar"' + (T.texto ? '' : ' disabled') + '>Copiar texto</button></div></div></div></div>';
+}
+function osCopiarExportacao(){
+  var ta = document.getElementById('os-exp-txt'); if (!ta) return;
+  var ok = function(){ showToast('Lista copiada — é só colar na mensagem.'); };
+  var reserva = function(){ ta.focus(); ta.select(); try { document.execCommand('copy'); ok(); } catch (e) { showToast('Não consegui copiar — selecione o texto e use Ctrl+C.'); } };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(ok, reserva); else reserva();
+}
 function renderOSKanban(){
   _itensOSCache = null;
   var todas = ordensServicoAtivas(), busca = semAcentoLower(ui.osBusca || '');
-  if (ui.osFornMS === undefined) ui.osFornMS = 'todos'; if (ui.osCliMS === undefined) ui.osCliMS = 'todos';
-  var forns = {}, clis = {}, ufs = {};
-  var linhas = todas.map(function(o){ var u = o.usinaId ? usinaById(o.usinaId) : null; forns[o.fornecedor || '—'] = true; clis[u && u.cliente ? u.cliente : '—'] = true; ufs[u && u.uf ? u.uf : '—'] = true; return { o: o, u: u, st: statusOS(o) }; });
-  var vis = linhas.filter(function(l){
-    if (busca && semAcentoLower('OS ' + l.o.numero + ' ' + (l.u ? l.u.usina : l.o.usinaTexto) + ' ' + (l.o.fornecedor || '')).indexOf(busca) === -1) return false;
-    if (!msfMatches(ui.osFornMS, l.o.fornecedor || '—')) return false;
-    if (!msfMatches(ui.osCliMS, l.u && l.u.cliente ? l.u.cliente : '—')) return false;
-    if (ui.osUf && ui.osUf !== 'todos' && (l.u && l.u.uf ? l.u.uf : '—') !== ui.osUf) return false;
-    if (ui.osServ && ui.osServ !== 'todos' && l.o.servico !== ui.osServ) return false;
-    return true;
-  });
+  if (ui.osFornMS === undefined) ui.osFornMS = 'todos'; if (ui.osCliMS === undefined) ui.osCliMS = 'todos'; if (ui.osTecMS === undefined) ui.osTecMS = 'todos';
+  var forns = {}, clis = {}, ufs = {}, tecs = {}, TEC_NC = '— (não conferida no Fracttal)';
+  var linhas = todas.map(function(o){ var u = o.usinaId ? usinaById(o.usinaId) : null; forns[o.fornecedor || '—'] = true; clis[u && u.cliente ? u.cliente : '—'] = true; ufs[u && u.uf ? u.uf : '—'] = true; tecs[osTecnicoOS(o) || TEC_NC] = true; return { o: o, u: u, st: statusOS(o) }; });
+  var vis = osFiltrarLinhas(linhas);
   var ord = function(o){ return Object.keys(o).sort(function(a, b){ return a.localeCompare(b, 'pt-BR'); }); };
   var html = '<div class="chiprow" style="align-items:center;flex-wrap:wrap;gap:8px;">' +
-    '<input type="text" class="search-box" id="flt-os-busca" placeholder="Nº da OS, usina ou empresa…" value="' + esc(ui.osBusca || '') + '" style="flex:1 1 200px;">' +
-    multiSelectFiltro('osFornMS', ord(forns), ui.osFornMS, null, 'Fornecedor') + multiSelectFiltro('osCliMS', ord(clis), ui.osCliMS, null, 'Cliente') +
+    '<input type="text" class="search-box" id="flt-os-busca" placeholder="Nº da OS, usina, empresa ou técnico…" value="' + esc(ui.osBusca || '') + '" style="flex:1 1 200px;">' +
+    multiSelectFiltro('osFornMS', ord(forns), ui.osFornMS, null, 'Fornecedor') + multiSelectFiltro('osCliMS', ord(clis), ui.osCliMS, null, 'Cliente') + multiSelectFiltro('osTecMS', ord(tecs), ui.osTecMS, null, 'Técnico') +
     selectFiltro('flt-os-uf', ['todos'].concat(ord(ufs)), ui.osUf || 'todos', { todos: 'Estado (todos)' }) +
     selectFiltro('flt-os-serv', ['todos', 'ROÇAGEM', 'LIMPEZA DE MÓDULOS', 'PODA QUÍMICA'], ui.osServ || 'todos', { todos: 'Serviço (todos)', 'ROÇAGEM': 'Roçagem', 'LIMPEZA DE MÓDULOS': 'Lavagem', 'PODA QUÍMICA': 'Poda química' }) +
-    '<button class="btn btn-ghost btn-sm" id="btn-os-colar">Colar lista de OS</button><button class="btn btn-primary btn-sm" id="btn-os-nova">+ OS</button></div>';
+    selectFiltro('flt-os-fin', ['todos', 'falta', 'finalizada', 'naoConferida', 'cancelada', 'naoEncontrada'], ui.osFin || 'todos', { todos: 'Fracttal (todas)', falta: 'Concluídas · falta finalizar no Fracttal', finalizada: 'Concluídas · finalizadas no Fracttal', naoConferida: 'Concluídas · não conferidas', cancelada: 'Concluídas · canceladas no Fracttal', naoEncontrada: 'Concluídas · não encontradas no Fracttal' }) +
+    (todas.length ? '<button class="btn btn-ghost btn-sm" id="btn-os-fracttal" title="Busca no Fracttal técnico, abertura, situação e área das OS (as concluídas aqui também, para saber se já foram finalizadas lá)"' + (ui.osFracttalRodando ? ' disabled>Conferindo no Fracttal…' : '>Conferir no Fracttal') + '</button>' : '') +
+    '<button class="btn btn-ghost btn-sm" id="btn-os-colar">Colar lista de OS</button>' + (todas.length ? '<button class="btn btn-ghost btn-sm" id="btn-os-exportar" title="Texto das OS filtradas, no formato da lista, para mandar ao fornecedor">Exportar lista</button>' : '') + '<button class="btn btn-primary btn-sm" id="btn-os-nova">+ OS</button></div>';
   if (!todas.length) return html + '<div class="empty-note">Nenhuma OS cadastrada ainda. Use "Colar lista de OS" e cole o texto das OS (uma por linha), do jeito que vem do PCM.</div>';
   var semN = linhas.filter(function(l){ return l.st.col === 'sem'; }).length;
   if (semN) html += '<div class="banner banner-warn" style="margin-bottom:10px;">' + semN + ' OS sem serviço no app — crie o serviço ou justifique.</div>';
+  var frN = linhas.filter(function(l){ return osAvisosFracttal(l.o, l.st).length; }).length;
+  if (frN) html += '<div class="banner banner-warn" data-os-fr-banner style="margin-bottom:10px;">' + frN + ' OS com aviso do Fracttal (cancelada, concluída lá, data/usina/serviço diferente ou fora da Zeladoria) — veja nos cards.</div>';
+  var porTec = {}; linhas.forEach(function(l){ if (osFinalizacaoFracttal(l.o, l.st) === 'falta') { var t = osTecnicoOS(l.o); porTec[t] = (porTec[t] || 0) + 1; } });
+  var cobrar = Object.keys(porTec).sort(function(a, b){ return porTec[b] - porTec[a] || a.localeCompare(b, 'pt-BR'); }).map(function(t){ return t + ' (' + porTec[t] + ')'; }).join(' · ');
+  var faltaN = linhas.filter(function(l){ return osFinalizacaoFracttal(l.o, l.st) === 'falta'; }).length, naoConfN = linhas.filter(function(l){ return osFinalizacaoFracttal(l.o, l.st) === 'naoConferida'; }).length;
+  if (faltaN) html += '<div class="banner banner-warn" data-os-falta-banner style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span>' + faltaN + ' OS concluída(s) aqui que ainda falta(m) finalizar no Fracttal. <b data-os-cobrar>Cobrar: ' + esc(cobrar) + '</b></span>' + (ui.osFin === 'falta' ? '' : ' <button class="btn btn-ghost btn-sm" id="btn-os-ver-falta">Ver só essas</button>') + '</div>';
+  if (naoConfN) html += '<div class="cell-muted" data-os-naoconf-aviso style="font-size:12px;margin-bottom:10px;">' + naoConfN + ' OS concluída(s) ainda não conferida(s) no Fracttal — clique em "Conferir no Fracttal".</div>';
   html += '<div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:flex-start;" id="os-kanban">';
   OS_COLUNAS.forEach(function(c){
-    var itens = vis.filter(function(l){ return l.st.col === c[0]; }).sort(function(a, b){ return String(a.o.data || '').localeCompare(String(b.o.data || '')); });
-    html += '<div style="flex:1 0 260px;min-width:260px;" data-os-coluna="' + c[0] + '"><div style="display:flex;justify-content:space-between;padding:8px 10px;background:' + (c[0] === 'sem' ? 'var(--critical-soft)' : 'var(--surface-2)') + ';border-radius:8px 8px 0 0;font-weight:700;font-size:12px;"><span>' + esc(c[1]) + '</span><span class="cell-muted mono">' + itens.length + '</span></div>';
+    var itens = vis.filter(function(l){ return osColunaKanban(l.o, l.st) === c[0]; }).sort(function(a, b){ return String(a.o.data || '').localeCompare(String(b.o.data || '')); });
+    html += '<div style="flex:1 0 260px;min-width:260px;" data-os-coluna="' + c[0] + '"><div style="display:flex;justify-content:space-between;padding:8px 10px;background:' + (c[0] === 'sem' ? 'var(--critical-soft)' : (c[0] === 'finalizada' ? 'rgba(31,122,77,0.12)' : 'var(--surface-2)')) + ';border-radius:8px 8px 0 0;font-weight:700;font-size:12px;"><span>' + esc(c[1]) + '</span><span class="cell-muted mono">' + itens.length + '</span></div>';
     html += '<div style="background:var(--surface-sunken);border-radius:0 0 8px 8px;padding:8px;min-height:60px;">';
     if (!itens.length) html += '<div class="cell-muted" style="font-size:11px;padding:6px 2px;">Nada aqui</div>';
     itens.forEach(function(l){ html += osCardHtml(l.o, l.st); });
@@ -12104,6 +12624,7 @@ function importarListaOS(){
   ui.osColar = null;
   showToast(novas + ' OS nova(s)' + (atual ? ', ' + atual + ' atualizada(s)' : '') + '.');
   persist();
+  osConferirFracttal(tocadas, true);
 }
 function modalOSEditar(){
   if (!ui.osEditar) return '';
@@ -12111,11 +12632,12 @@ function modalOSEditar(){
   var cands = o ? candidatosOS(o, o.id) : [];
   var atualV = o ? (o.vinculo || '') : '';
   var opUsinas = usinasAtivas().slice().sort(function(a, b){ return rotuloUsina(a).localeCompare(rotuloUsina(b), 'pt-BR'); }).map(function(u){ return '<option value="' + esc(u.id) + '"' + (o && o.usinaId === u.id ? ' selected' : '') + '>' + esc(rotuloUsina(u)) + '</option>'; }).join('');
-  var opServ = [['ROÇAGEM', 'Roçagem (supressão de vegetação)'], ['LIMPEZA DE MÓDULOS', 'Lavagem (limpeza de módulos)'], ['PODA QUÍMICA', 'Poda química']].map(function(s){ return '<option value="' + s[0] + '"' + (o && o.servico === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('');
+  var opServ = (o && o.servico ? '' : '<option value="">— escolha —</option>') + [['ROÇAGEM', 'Roçagem (supressão de vegetação)'], ['LIMPEZA DE MÓDULOS', 'Lavagem (limpeza de módulos)'], ['PODA QUÍMICA', 'Poda química']].map(function(s){ return '<option value="' + s[0] + '"' + (o && o.servico === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('');
   var opV = '<option value=""' + (!atualV ? ' selected' : '') + '>Automático (data mais perto)</option><option value="nenhum"' + (atualV === 'nenhum' ? ' selected' : '') + '>Nenhum serviço (sem serviço)</option>' +
     cands.concat(o && o.vinculo && o.vinculo !== 'nenhum' && itemDoVinculo(o.vinculo) && !cands.some(function(i){ return i.chave === o.vinculo; }) ? [itemDoVinculo(o.vinculo)] : []).map(function(i){ return '<option value="' + esc(i.chave) + '"' + (atualV === i.chave ? ' selected' : '') + '>' + esc(descricaoVinculoOS(i).replace('', '')) + '</option>'; }).join('');
   return '<div class="overlay open" id="overlay-os-editar"><div class="modal" style="max-width:560px;"><div class="modal-head"><h3>' + (o ? 'Editar OS ' + esc(o.numero) : '+ OS') + '</h3><button class="modal-close" id="btn-ose-fechar">&times;</button></div><div class="modal-body">' +
-    '<div class="field-row"><div class="field"><label for="ose-numero">Nº da OS *</label><input id="ose-numero" value="' + esc(o ? o.numero : '') + '"></div><div class="field"><label for="ose-data">Data *</label><input id="ose-data" type="date" value="' + esc(o ? o.data || '' : hoje()) + '"></div></div>' +
+    '<div class="field-row"><div class="field"><label for="ose-numero">Nº da OS *</label><div style="display:flex;gap:6px;"><input id="ose-numero" value="' + esc(o ? o.numero : '') + '" style="flex:1;min-width:0;"><button type="button" class="btn btn-ghost btn-sm" id="btn-ose-fracttal" title="Puxa técnico, abertura, usina, serviço e data do Fracttal">Buscar no Fracttal</button></div></div><div class="field"><label for="ose-data">Data marcada *</label><input id="ose-data" type="date" value="' + esc(o ? o.data || '' : '') + '"></div></div>' +
+    '<div id="ose-fracttal" style="margin:-4px 0 10px;padding:' + (ui.osEditarFr ? '8px 10px' : '0') + ';border-radius:8px;background:var(--surface-2);">' + (o ? '' : '<span class="cell-muted" style="font-size:11.5px;">Digite o nº da OS: o Radar busca no Fracttal e preenche usina, serviço e data. A empresa você escolhe.</span>') + '</div>' +
     '<div class="field"><label for="ose-usina">Usina *</label><select id="ose-usina"><option value="">— escolha —</option>' + opUsinas + '</select></div>' +
     '<div class="field-row"><div class="field"><label for="ose-servico">Serviço *</label><select id="ose-servico">' + opServ + '</select></div><div class="field"><label for="ose-fornecedor">Empresa / equipe</label><input id="ose-fornecedor" value="' + esc(o ? o.fornecedor || '' : '') + '"></div></div>' +
     (o ? '<div class="field"><label for="ose-vinculo">Serviço ligado</label><select id="ose-vinculo">' + opV + '</select></div>' : '') +
@@ -12125,7 +12647,7 @@ function modalOSEditar(){
 }
 function onSalvarOSEditar(){
   var numero = document.getElementById('ose-numero').value.trim(), data = document.getElementById('ose-data').value || null, usinaId = document.getElementById('ose-usina').value || null, servico = document.getElementById('ose-servico').value;
-  if (!numero || !data || !usinaId) { showToast('Preencha nº da OS, data e usina.'); return; }
+  if (!numero || !data || !usinaId || !servico) { showToast('Preencha nº da OS, data, usina e serviço.'); return; }
   if (!state.ordensServico) state.ordensServico = [];
   var o = ui.osEditar === 'novo' ? null : state.ordensServico.find(function(x){ return x.id === ui.osEditar; });
   var dup = ordensServicoAtivas().find(function(x){ return String(x.numero) === numero && (!o || x.id !== o.id); });
@@ -12143,17 +12665,18 @@ function onSalvarOSEditar(){
     state.ordensServico.push(o); _itensOSCache = null; o.vinculo = melhorVinculoOS(o, o.id);
   }
   if (o.vinculo && o.vinculo !== 'nenhum') gravarNumeroNoServico(o.vinculo, o.numero);
-  ui.osEditar = null; showToast('OS ' + numero + ' salva.'); persist();
+  if (ui.osEditarFr && ui.osEditarFr.novo && ui.osEditarFr.numero === osNumeroFracttal(numero)) osGuardarFracttal(o, ui.osEditarFr.fr);
+  ui.osEditar = null; ui.osEditarFr = null; showToast('OS ' + numero + ' salva.'); persist();
 }
 function modalOSConcluir(){
   if (!ui.osConcluir) return '';
   var o = (state.ordensServico || []).find(function(x){ return x.id === ui.osConcluir; }); if (!o) return '';
-  var st = statusOS(o), it = st.item;
+  var st = statusOS(o), it = st.item, fimSug = (o.fracttal && o.fracttal.status === 3 && o.fracttal.concluida_em && o.fracttal.concluida_em <= hoje()) ? o.fracttal.concluida_em : hoje();
   return '<div class="overlay open" id="overlay-os-concluir"><div class="modal" style="max-width:500px;"><div class="modal-head"><h3>Concluir OS ' + esc(o.numero) + '</h3><button class="modal-close" id="btn-osc2-fechar">&times;</button></div><div class="modal-body">' +
     (it ? '<p style="font-size:12.5px;margin:0 0 8px;">A OS só acaba quando o serviço acaba: o serviço ligado também vai ser concluído.<br><span class="cell-muted">' + esc(descricaoVinculoOS(it)) + '</span></p>' +
       (!it.realIni ? '<div class="field"><label for="osc2-ini">Início real</label><input id="osc2-ini" type="date" value="' + esc(o.data || '') + '"></div>' : '') +
-      '<div class="field"><label for="osc2-fim">Fim real *</label><input id="osc2-fim" type="date" value="' + esc(hoje()) + '"></div>'
-      : '<p class="cell-muted" style="font-size:12.5px;margin:0 0 8px;">Esta OS não tem serviço ligado no app. Ela será só marcada como concluída.</p><div class="field"><label for="osc2-fim">Concluída em *</label><input id="osc2-fim" type="date" value="' + esc(hoje()) + '"></div>') +
+      '<div class="field"><label for="osc2-fim">Fim real *</label><input id="osc2-fim" type="date" value="' + esc(fimSug) + '"></div>'
+      : '<p class="cell-muted" style="font-size:12.5px;margin:0 0 8px;">Esta OS não tem serviço ligado no app. Ela será só marcada como concluída.</p><div class="field"><label for="osc2-fim">Concluída em *</label><input id="osc2-fim" type="date" value="' + esc(fimSug) + '"></div>') +
     '<div class="modal-actions"><button class="btn btn-ghost" id="btn-osc2-cancelar">Cancelar</button><button class="btn btn-primary" id="btn-osc2-salvar">Concluir</button></div></div></div></div>';
 }
 function onSalvarOSConcluir(){
@@ -12167,6 +12690,7 @@ function onSalvarOSConcluir(){
   o.status = 'concluida'; o.concluidaEm = fim; o.atualizadoEm = new Date().toISOString(); o.atualizadoPor = whoami();
   state.log.push({ em: hoje(), quem: whoami(), acao: 'concluir-os', alvo: o.numero + (st.item ? ' + ' + st.item.chave : '') });
   ui.osConcluir = null; showToast('OS ' + o.numero + ' concluída' + (st.item ? ' — serviço concluído junto.' : '.')); persist();
+  if (!(o.fracttal && o.fracttal.status === 3)) osConferirFracttal([o], true);   // já vê se está finalizada no Fracttal
 }
 function modalOSJustificar(){
   if (!ui.osJustificar) return '';
@@ -12194,19 +12718,41 @@ function bindEventsOSKanban(app){
   var fu = document.getElementById('flt-os-uf'); if (fu) fu.addEventListener('change', function(){ ui.osUf = fu.value; render(); });
   var fs = document.getElementById('flt-os-serv'); if (fs) fs.addEventListener('change', function(){ ui.osServ = fs.value; render(); });
   var bc = document.getElementById('btn-os-colar'); if (bc) bc.addEventListener('click', function(){ ui.osColar = { texto: '', preview: null }; render(); });
-  var bn = document.getElementById('btn-os-nova'); if (bn) bn.addEventListener('click', function(){ ui.osEditar = 'novo'; render(); });
+  var bx = document.getElementById('btn-os-exportar'); if (bx) bx.addEventListener('click', function(){ ui.osExportar = { abertas: true, concluidas: true }; render(); });
+  ['btn-os-exp-fechar', 'btn-os-exp-cancelar'].forEach(function(id){ var el = document.getElementById(id); if (el) el.addEventListener('click', function(){ ui.osExportar = null; render(); }); });
+  ['abertas', 'concluidas'].forEach(function(k){ var el = document.getElementById('os-exp-' + k); if (el) el.addEventListener('change', function(){ ui.osExportar[k] = el.checked; render(); }); });
+  var bxc = document.getElementById('btn-os-exp-copiar'); if (bxc) bxc.addEventListener('click', osCopiarExportacao);
+  var bn = document.getElementById('btn-os-nova'); if (bn) bn.addEventListener('click', function(){ ui.osEditar = 'novo'; ui.osEditarFr = null; render(); });
+  /* concluída aqui E finalizada/cancelada no Fracttal não muda mais → não gasta consulta */
+  var bfr = document.getElementById('btn-os-fracttal'); if (bfr) bfr.addEventListener('click', function(){ osConferirFracttal(ordensServicoAtivas().filter(function(o){ var f = osFinalizacaoFracttal(o); return f !== 'finalizada' && f !== 'cancelada'; })); });
+  var ffin = document.getElementById('flt-os-fin'); if (ffin) ffin.addEventListener('change', function(){ ui.osFin = ffin.value; render(); });
+  var bvf = document.getElementById('btn-os-ver-falta'); if (bvf) bvf.addEventListener('click', function(){ ui.osFin = 'falta'; render(); });
+  var bof = document.getElementById('btn-ose-fracttal'); if (bof) bof.addEventListener('click', osBuscarNoModal);
+  var on = document.getElementById('ose-numero');
+  if (on && ui.osEditar === 'novo') on.addEventListener('change', function(){ if (/^\d{1,12}$/.test(osNumeroFracttal(on.value)) && !(ui.osEditarFr && ui.osEditarFr.numero === osNumeroFracttal(on.value))) osBuscarNoModal(); });
+  if (document.getElementById('ose-fracttal') && ui.osEditarFr) osPintarFracttalModal(ui.osEditarFr.fr);
+  app.querySelectorAll('[data-os-fr-usar]').forEach(function(b){ b.addEventListener('click', function(){
+    var o = (state.ordensServico || []).find(function(x){ return x.id === b.getAttribute('data-os-fr-usar'); }); if (!o) return;
+    osUsarDoFracttal(o, b.getAttribute('data-campo')); showToast('OS ' + o.numero + ' atualizada com o dado do Fracttal.'); persist();
+  }); });
+  app.querySelectorAll('[data-os-fr-ignorar]').forEach(function(b){ b.addEventListener('click', function(){
+    var o = (state.ordensServico || []).find(function(x){ return x.id === b.getAttribute('data-os-fr-ignorar'); }); if (!o || !o.fracttal) return;
+    var campo = b.getAttribute('data-campo'), a = osAvisosFracttal(o).find(function(x){ return x.campo === campo; }); if (!a) return;
+    o.fracttal.ignorar = Object.assign({}, o.fracttal.ignorar || {}); o.fracttal.ignorar[campo] = a.valor;
+    o.atualizadoEm = new Date().toISOString(); o.atualizadoPor = whoami(); persist();
+  }); });
   ['btn-os-colar-fechar', 'btn-os-colar-cancelar'].forEach(function(id){ var el = document.getElementById(id); if (el) el.addEventListener('click', function(){ ui.osColar = null; render(); }); });
   var bl = document.getElementById('btn-os-colar-ler'); if (bl) bl.addEventListener('click', function(){ var t = document.getElementById('os-colar-txt').value; _itensOSCache = null; ui.osColar = { texto: t, preview: lerListaOS(t) }; render(); });
   var bv = document.getElementById('btn-os-colar-voltar'); if (bv) bv.addEventListener('click', function(){ ui.osColar.preview = null; render(); });
   var bi = document.getElementById('btn-os-colar-importar'); if (bi) bi.addEventListener('click', importarListaOS);
-  ['btn-ose-fechar', 'btn-ose-cancelar'].forEach(function(id){ var el = document.getElementById(id); if (el) el.addEventListener('click', function(){ ui.osEditar = null; render(); }); });
+  ['btn-ose-fechar', 'btn-ose-cancelar'].forEach(function(id){ var el = document.getElementById(id); if (el) el.addEventListener('click', function(){ ui.osEditar = null; ui.osEditarFr = null; render(); }); });
   var bs = document.getElementById('btn-ose-salvar'); if (bs) bs.addEventListener('click', onSalvarOSEditar);
   ['btn-osc2-fechar', 'btn-osc2-cancelar'].forEach(function(id){ var el = document.getElementById(id); if (el) el.addEventListener('click', function(){ ui.osConcluir = null; render(); }); });
   var bcs = document.getElementById('btn-osc2-salvar'); if (bcs) bcs.addEventListener('click', onSalvarOSConcluir);
   ['btn-osj-fechar', 'btn-osj-cancelar'].forEach(function(id){ var el = document.getElementById(id); if (el) el.addEventListener('click', function(){ ui.osJustificar = null; render(); }); });
   var bj = document.getElementById('btn-osj-salvar'); if (bj) bj.addEventListener('click', function(){ var o = (state.ordensServico || []).find(function(x){ return x.id === ui.osJustificar; }); if (!o) return; o.justificativa = document.getElementById('osj-txt').value.trim() || null; o.atualizadoEm = new Date().toISOString(); ui.osJustificar = null; showToast(o.justificativa ? 'Justificativa salva.' : 'Justificativa removida.'); persist(); });
   app.querySelectorAll('[data-os-concluir]').forEach(function(b){ b.addEventListener('click', function(){ ui.osConcluir = b.getAttribute('data-os-concluir'); render(); }); });
-  app.querySelectorAll('[data-os-editar]').forEach(function(b){ b.addEventListener('click', function(){ ui.osEditar = b.getAttribute('data-os-editar'); render(); }); });
+  app.querySelectorAll('[data-os-editar]').forEach(function(b){ b.addEventListener('click', function(){ ui.osEditar = b.getAttribute('data-os-editar'); var o = (state.ordensServico || []).find(function(x){ return x.id === ui.osEditar; }); ui.osEditarFr = o && o.fracttal ? { numero: osNumeroFracttal(o.numero), fr: o.fracttal } : null; render(); }); });
   app.querySelectorAll('[data-os-justificar]').forEach(function(b){ b.addEventListener('click', function(){ ui.osJustificar = b.getAttribute('data-os-justificar'); render(); }); });
   app.querySelectorAll('[data-os-criar-servico]').forEach(function(b){ b.addEventListener('click', function(){ var o = (state.ordensServico || []).find(function(x){ return x.id === b.getAttribute('data-os-criar-servico'); }); if (o) criarServicoDaOS(o); }); });
   app.querySelectorAll('[data-os-excluir]').forEach(function(b){ b.addEventListener('click', function(){ var id = b.getAttribute('data-os-excluir'), o = (state.ordensServico || []).find(function(x){ return x.id === id; }); pedirConfirmacao('Apagar a OS ' + (o ? o.numero : '') + '? Ela vai para a Lixeira (dá para restaurar). O serviço ligado não é apagado.', function(){ excluirItem('ordemservico', id); }); }); });
@@ -12487,7 +13033,7 @@ function renderShell(){
   html += finModalPromover() + finModalDefinirFornecedor() + finModalEditarProvisao() + finModalHistoricoProvisao();
   html += modalPlanoReal();
   html += modalReprovarLote();
-  html += modalOSColar() + modalOSEditar() + modalOSConcluir() + modalOSJustificar();
+  html += modalOSColar() + modalOSExportar() + modalOSEditar() + modalOSConcluir() + modalOSJustificar();
   html += modalDadosContrato();
   html += modalTiposGasto();
   html += modalOrcamentoEquipe();
@@ -13682,7 +14228,9 @@ function carregarEstado(){
     Promise.resolve().then(function(){ return sb.from('rf_cronograma_alteracoes').select('*'); }).then(function(r){ return r && !r.error ? r : { data: [] }; }, function(){ return { data: [] }; }),
     Promise.resolve().then(function(){ return sb.from('rf_ordens_servico').select('*'); }).then(function(r){ return r && !r.error ? r : { data: [] }; }, function(){ return { data: [] }; }),
     finLerTabela('rf_fin_cenario'), finLerTabela('rf_fin_cenario_item'), finLerTabela('rf_fin_provisao'),
-    finLerTabela('rf_fin_provisao_vinculo'), finLerTabela('rf_fin_fornecedor_alias')
+    finLerTabela('rf_fin_provisao_vinculo'), finLerTabela('rf_fin_fornecedor_alias'),
+    finLerTabela('rf_zeladoria_contratual'), finLerTabela('rf_zeladoria_contratual_docs'),
+    finLerTabela('rf_fin_provisao_historico')
   ]).then(function(results){
     var erro = results.find(function(r){ return r.error; });
     if (erro) throw erro.error;
@@ -13743,6 +14291,9 @@ function carregarEstado(){
     state.finVinculos = results[32].data.map(finLinhaParaVinculo);
     state.finAlias = results[33].data.map(finLinhaParaAlias);
     state.finAvisos = results.slice(29, 34).map(function(r){ return r.aviso; }).filter(Boolean);
+    state.zelContratual = ((results[34] && results[34].data) || []).map(linhaParaZelContratual);
+    state.zelContratualDocs = (results[35] && results[35].data) || [];
+    state.finHistProv = (results[36] && results[36].data) || [];
     _finCtxCache = null;
     _critEfetivaCache = null;
     logSyncedCount = log.length;
@@ -13961,6 +14512,7 @@ function bindEvents(){
   bindEventsAprovLote(app);
   bindEventsPlanejadoAndamento(app);
   bindEventsOSKanban(app);
+  bindEventsZelContratual(app);
   var btnImpCrono = document.getElementById('btn-importar-cronograma-contratos'); if (btnImpCrono) btnImpCrono.addEventListener('click', function(){ var i = document.getElementById('cronograma-contratos-file'); if (i) i.click(); });
   var fileCrono = document.getElementById('cronograma-contratos-file'); if (fileCrono) fileCrono.addEventListener('change', onArquivoCronogramaSelecionado);
   var btnSalvarDano = document.getElementById('btn-salvar-dano'); if (btnSalvarDano) btnSalvarDano.addEventListener('click', onSalvarDano);

@@ -258,6 +258,10 @@ def vestir(texto: str) -> str:
     texto = _uma_vez(texto, "var t = localStorage.getItem('rf_tema');",
                      "var t = window.ZELADORIA_TEMA || localStorage.getItem('rf_tema');", "o tema salvo do Radar")
     texto = _uma_vez(texto, CARREGANDO_RADAR, CARREGANDO_NEXUS, "a tela de carregamento do Radar")
+    # o PDF do contrato que ainda não veio para o Nexus diz isso, e não "tente de novo" (o motivo vem da torre)
+    texto = _uma_vez(texto, r"\.catch\(function\(\)\{ if \(w\) w\.close\(\); showToast\('Não consegui abrir o PDF\.[^']*'\); \}\);",
+                     ".catch(function(e){ if (w) w.close(); showToast((e && e.message) || 'Não consegui abrir o PDF. "
+                     "Tente de novo.'); });", "o aviso do PDF do contrato", regex=True)
     return _uma_vez(texto, "\n</head>", "\n" + PALETA + "</head>", "o fim do <head>")
 
 

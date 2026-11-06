@@ -15,7 +15,7 @@ import json
 import re
 from pathlib import Path
 
-from flask import Response, abort, current_app, jsonify, render_template, request, session, url_for
+from flask import Response, abort, current_app, jsonify, render_template, request, send_file, session, url_for
 
 from ...casca import tema_do_pedido
 from ...prefixo import na_raiz
@@ -254,6 +254,8 @@ def api_situacao():
 def api_funcao(nome: str):
     if nome.startswith("fin_"):
         return _gravar(lambda g, quem, corpo: g.chamar(nome, corpo.get("args") or {}, quem, corpo.get("versao") or 0))
+    if nome == "fracttal-os":
+        return _fracttal_os()
     if nome != "fracttal-fotos":
         return jsonify(erro=SOMENTE_LEITURA), 405
     est, erro = _estado()
@@ -278,6 +280,99 @@ def api_funcao(nome: str):
              for a in anexos]
     checklist = [{"item": s.get("description") or "", "valor": s.get("value") or ""} for s in sub]
     return jsonify(folio=folio, fotos=fotos, checklist=checklist, validade_horas=24)
+
+
+def _fracttal_os():
+    """A consulta da OS pelo número (`nexus/zeladoria/fracttal_os.py`): só leitura no Fracttal, para quem está aprovado,
+    até 10 números por pedido."""
+    est, erro = _estado()
+    if est is None:
+        return jsonify(erro=erro), 503
+    if _quem(est).get("status") != "aprovado":
+        return jsonify(erro="Sem permissão."), 403
+    from ...zeladoria import fracttal_os
+    pedidos = _corpo().get("folios")
+    if not isinstance(pedidos, list) or not pedidos or len(pedidos) > fracttal_os.LOTE:
+        return jsonify(erro=f"Mande de 1 a {fracttal_os.LOTE} números de OS."), 400
+    folios = [str(f).strip() for f in pedidos]
+    if not all(fracttal_os.FOLIO.match(f) for f in folios):
+        return jsonify(erro="Nº de OS inválido."), 400
+    return jsonify(fracttal_os.consultar(list(dict.fromkeys(folios))))
+
+
+def _contratos(est):
+    from ...zeladoria import contratos_pdf
+    return contratos_pdf, contratos_pdf.caminhos(est)
+
+
+@bp.route("/api/contrato-pdf")
+def api_contrato_pdf():
+    """O "link assinado" do PDF do contrato (o `createSignedUrl` do arquivo `contratos-zeladoria` do Radar): o endereço do
+    PDF no Nexus, se o arquivo já foi trazido (`nexus/zeladoria/contratos_pdf.py`)."""
+    est, erro = _estado()
+    if est is None:
+        return jsonify(erro=erro), 503
+    if _quem(est).get("status") != "aprovado":
+        return jsonify(erro="Sem permissão."), 403
+    cp, conhecidos = _contratos(est)
+    caminho = (request.args.get("caminho") or "").strip()
+    if caminho not in conhecidos:
+        return jsonify(erro="Esse PDF não é de um contrato da zeladoria."), 404
+    if not cp.existe(current_app.config, caminho):
+        return jsonify(erro="O PDF deste contrato ainda não foi trazido do Supabase para o Nexus."), 404
+    return jsonify(signedUrl=url_for(".contrato_pdf", caminho=caminho))
+
+
+@bp.route("/contrato/<path:caminho>")
+def contrato_pdf(caminho: str):
+    est, _erro = _estado()
+    if est is None:
+        abort(503)
+    if _quem(est).get("status") != "aprovado":
+        abort(403)
+    cp, conhecidos = _contratos(est)
+    if caminho not in conhecidos or not cp.existe(current_app.config, caminho):
+        abort(404)
+    resp = send_file(cp.arquivo(current_app.config, caminho), mimetype="application/pdf", conditional=True,
+                     download_name=caminho.rsplit("/", 1)[-1])
+    resp.headers["Cache-Control"] = "private, max-age=3600"
+    return resp
+
+
+@bp.route("/contratos-pdf")
+def contratos_pdf_pagina():
+    """O envio dos PDFs dos contratos para o servidor do Nexus: só o administrador."""
+    if not session.get("admin"):
+        abort(403)
+    est, erro = _estado()
+    if est is None:
+        return render_template("zeladoria/contratos_pdf.html", torre=TORRE, itens=[], erro=erro)
+    cp, _c = _contratos(est)
+    return render_template("zeladoria/contratos_pdf.html", torre=TORRE, itens=cp.situacao(current_app.config, est),
+                           erro=None, max_mb=cp.MAX_MB)
+
+
+@bp.route("/api/contratos/enviar", methods=["POST"])
+def api_contratos_enviar():
+    if not session.get("admin"):
+        return jsonify(erro="Só o administrador envia os PDFs."), 403
+    if _de_outro_site():
+        return jsonify(erro="Pedido de outro site."), 403
+    est, erro = _estado()
+    if est is None:
+        return jsonify(erro=erro), 503
+    cp, conhecidos = _contratos(est)
+    caminho = (request.form.get("caminho") or "").strip()
+    arq = request.files.get("arquivo")
+    if caminho not in conhecidos:
+        return jsonify(erro="Esse caminho não é de um PDF da cópia."), 400
+    if arq is None:
+        return jsonify(erro="Faltou o arquivo."), 400
+    try:
+        tamanho = cp.guardar(current_app.config, caminho, arq.stream.read(cp.MAX_MB * cp.MB + 1))
+    except cp.Recusado as e:
+        return jsonify(erro=str(e)), 400
+    return jsonify(caminho=caminho, mb=round(tamanho / cp.MB, 1))
 
 
 @bp.route("/foto/<folio>/<int:i>")

@@ -6,8 +6,9 @@ Plano e registro: `docs/superpowers/plans/2026-11-03-zeladoria-etapas-1-e-2.md`.
 
 ## Como funciona
 
-- **O app é um clone:** `clone/radar.html`, a versão `f0b4cac` do Radar, limpa de nomes e do Supabase (`clone/ORIGEM.md`).
-  O Radar congela ao fim da etapa 2. Daí em diante este arquivo é a casa da zeladoria e se edita direto.
+- **O app é um clone:** `clone/radar.html`, o Radar como estava no ar em 06/11/2026, limpo de nomes e do Supabase
+  (`clone/ORIGEM.md`). O Radar não congelou (o desenho previa congelar ao fim da etapa 2): enquanto ele mudar, o clone se
+  refaz pela `ferramentas/zeladoria_limpar_clone.py` sobre o Radar baixado do ar, nunca à mão.
 - **Telas:** cada uma das 18 abas do Radar é uma tela no menu do Nexus (`ABAS`: id da tela → id da aba do clone).
   - A tela é a moldura da porta única (`.porta`) com o clone num iframe (`/t/zeladoria/app?aba=...`).
   - A barra lateral do clone some; o menu é o do Nexus.
@@ -16,6 +17,9 @@ Plano e registro: `docs/superpowers/plans/2026-11-03-zeladoria-etapas-1-e-2.md`.
   - `GET /api/rf/<view>` aceita `eq`/`neq`/`order`;
   - `GET /api/eu` devolve `{"user": {"id", "email"}}`;
   - `POST /api/funcao/fracttal-fotos` traz as fotos;
+  - `POST /api/funcao/fracttal-os` traz a OS pelo número (até 10 por pedido; `nexus/zeladoria/fracttal_os.py`, os campos
+    da antiga função do Radar: técnico, datas, situação, área, usina, serviço);
+  - `GET /api/contrato-pdf?caminho=` é o `storage.createSignedUrl` do arquivo `contratos-zeladoria` (abaixo);
   - `GET /foto/<folio>/<i>`.
 
   Até a troca, gravar e as `fin_*` voltam `SOMENTE_LEITURA`. Com a gravação ligada, `POST /api/gravar`,
@@ -29,7 +33,15 @@ Plano e registro: `docs/superpowers/plans/2026-11-03-zeladoria-etapas-1-e-2.md`.
   - Quem não está aprovado no `perfis` do Radar só vê a própria linha. A pessoa é casada pelo e-mail do login do
     Nexus, e o administrador sem linha vale HEAD.
 - **As fotos da ronda** vêm do Fracttal, no clique, pelo `nexus/campo/ronda_fotos.py`: o link assinado fica no
-  servidor, e nada vai para o bucket do Supabase.
+  servidor, e nada vai para o bucket do Supabase. O `storage` da ponte devolve o arquivo `rondas-fotos` vazio, e o Radar
+  oferece buscar no Fracttal.
+- **Os PDFs dos contratos** (06/11/2026, Levi: "Servidor do Nexus"): os 105 arquivos (442 MB) do arquivo privado
+  `contratos-zeladoria` do Supabase moram no disco do servidor, `<NEXUS_DADOS>/zeladoria/contratos/<caminho>`, com o
+  caminho que a tabela `zeladoria_contratual_docs` cita (`nexus/zeladoria/contratos_pdf.py`). Grande demais para o banco,
+  que guarda planilhas. Quem envia: só o administrador, pela página `/t/zeladoria/contratos-pdf` (escolhe a pasta, cada
+  arquivo vai para o caminho que termina igual; só PDF, até 60 MB). Quem abre: quem está aprovado, e só o caminho que a
+  cópia cita. O PDF que ainda não veio diz isso no botão. Os 105 baixados do Supabase em 06/11/2026 estão em
+  `Downloads\Deploy\radar_contratos` no PC do Levi (conferidos: mesmos arquivos e bytes do bucket).
 
 ## A cópia (até a troca)
 

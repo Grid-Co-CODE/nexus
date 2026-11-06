@@ -92,7 +92,22 @@ const testes = {
     assert.strictEqual(pedidos[0].url, "/raiz/t/zeladoria/api/funcao/fracttal-fotos");
     assert.strictEqual(pedidos[0].opcoes.method, "POST");
     igual(JSON.parse(pedidos[0].opcoes.body), { folio: "123" });
-    assert.strictEqual(sb.storage, undefined);       // sem storage, o clone cai sozinho no fracttal-fotos
+  },
+  async "o PDF do contrato vem do Nexus; as fotos das rondas, do Fracttal"() {
+    const { sb, pedidos } = montar((url) => (url.includes("/contrato-pdf")
+      ? { status: 200, corpo: { signedUrl: "/raiz/t/zeladoria/contrato/cliente/a.pdf" } } : { status: 500, corpo: {} }));
+    const r = await sb.storage.from("contratos-zeladoria").createSignedUrl("cliente/a.pdf", 600);
+    igual(r, { data: { signedUrl: "/raiz/t/zeladoria/contrato/cliente/a.pdf" }, error: null });
+    assert.strictEqual(pedidos[0].url, "/raiz/t/zeladoria/api/contrato-pdf?caminho=cliente/a.pdf");
+    // o arquivo das fotos das rondas volta vazio, sem ir ao servidor: o Radar oferece buscar no Fracttal
+    const f = await sb.storage.from("rondas-fotos").createSignedUrls(["x.jpg"], 3600);
+    igual(f, { data: [], error: null });
+    assert.strictEqual(pedidos.length, 1);
+  },
+  async "o PDF que ainda não veio diz isso"() {
+    const { sb } = montar(() => ({ status: 404, corpo: { erro: "O PDF deste contrato ainda não foi trazido do Supabase para o Nexus." } }));
+    const r = await sb.storage.from("contratos-zeladoria").createSignedUrl("cliente/b.pdf", 600);
+    igual([r.data, r.error.message], [null, "O PDF deste contrato ainda não foi trazido do Supabase para o Nexus."]);
   },
   async "rede fora do ar vira erro, nunca exceção"() {
     const { sb } = montar(() => new Error("rede"));

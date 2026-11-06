@@ -1,7 +1,9 @@
 # De onde veio o `radar.html`
 
-É o app do Radar de Fornecedores (a plataforma de zeladoria), versão `f0b4cac`, a mesma que estava no ar em 28/10/2026.
-Veio no pacote que o Levi recebeu nessa data (`public/index.html`). Desenho:
+É o app do Radar de Fornecedores (a plataforma de zeladoria) como estava no ar em 06/11/2026 (baixado de
+zeladoria.gridco.com.br; a 1ª versão foi a `f0b4cac`, do pacote de 28/10/2026). O Radar não congelou como o desenho
+previa: entre as duas ganhou o painel dos contratos por cliente (Visão Geral), os PDFs dos contratos e a consulta da OS
+no Fracttal. O Radar original de cada versão fica fora do repositório, em `Downloads\Deploy\radar_<data>`. Desenho:
 `docs/superpowers/specs/2026-11-03-zeladoria-no-nexus-design.md`.
 
 **Não edite à mão antes do congelamento.** O arquivo sai do `ferramentas/zeladoria_limpar_clone.py`. Depois que o Radar

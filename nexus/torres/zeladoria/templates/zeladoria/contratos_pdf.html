@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from "_explica.html" import explica %}
+{% block titulo %}PDFs dos contratos{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# Os PDFs dos contratos dos clientes no servidor do Nexus (06/11/2026, Levi: guardar no servidor, porque o Supabase
+   restringe o projeto em 10/11). Só o administrador envia; o botão "Ver PDF" da Visão Geral da Zeladoria abre daqui
+   (nexus/zeladoria/contratos_pdf.py). #}
+<p class="gc-eyebrow">Zeladoria</p>
+<div class="gc-titulo-explica">
+  <h1 class="titulo-pagina">PDFs dos contratos</h1>
+  {% call explica("Entenda esta tela") %}
+    <p>Os contratos dos clientes que a Zeladoria mostra no painel de contratos da Visão Geral. O Radar guardava os PDFs no
+      Supabase; aqui eles ficam no servidor do Nexus, com o mesmo caminho.</p>
+    <p>Escolha a pasta com os PDFs baixados do Supabase: cada arquivo vai para o caminho que termina igual a ele, e a
+      linha fica marcada. Só PDF, até {{ max_mb or 60 }} MB por arquivo. Mandar de novo troca o arquivo.</p>
+  {% endcall %}
+</div>
+
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% else %}
+{% set no_nexus = itens|selectattr("mb")|list %}
+<p class="lead"><b id="zpdf-tem">{{ no_nexus|length }}</b> de <b>{{ itens|length }}</b> PDFs já estão no Nexus.</p>
+<div class="zpdf-acoes" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0">
+  <label class="gc-btn gc-btn--primario" for="zpdf-pasta">Escolher a pasta dos PDFs</label>
+  <input id="zpdf-pasta" type="file" accept="application/pdf" webkitdirectory multiple hidden>
+  <span id="zpdf-andamento" class="mudo" role="status"></span>
+</div>
+<div class="cn-tab">
+<table>
+  <thead><tr><th>Cliente</th><th>Documento</th><th>Caminho</th><th>No Nexus</th></tr></thead>
+  <tbody>
+  {% for i in itens %}
+  <tr data-caminho="{{ i.caminho }}">
+    <td>{{ i.cliente or "—" }}</td>
+    <td>{{ i.titulo or "—" }}{% if i.recorte %} <span class="mudo">(só zeladoria)</span>{% endif %}</td>
+    <td class="m">{{ i.caminho }}</td>
+    <td class="zpdf-st">{% if i.mb %}{{ i.mb }} MB{% else %}<span class="mudo">falta</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<script>
+(function () {
+  var entrada = document.getElementById("zpdf-pasta"); if (!entrada) return;
+  var andamento = document.getElementById("zpdf-andamento"), tem = document.getElementById("zpdf-tem");
+  var linhas = Array.prototype.slice.call(document.querySelectorAll("tr[data-caminho]"));
+  // o arquivo escolhido vai para o caminho que termina igual ao caminho dele na pasta; sem pasta, pelo nome, se for único
+  function alvo(f) {
+    var rel = (f.webkitRelativePath || f.name).replace(/\\/g, "/");
+    var porFim = linhas.filter(function (l) { var c = l.getAttribute("data-caminho"); return rel === c || rel.slice(-(c.length + 1)) === "/" + c; });
+    if (porFim.length === 1) return porFim[0];
+    var porNome = linhas.filter(function (l) { return l.getAttribute("data-caminho").split("/").pop() === f.name; });
+    return porNome.length === 1 ? porNome[0] : null;
+  }
+  entrada.addEventListener("change", function () {
+    var fila = [], sobra = 0;
+    Array.prototype.forEach.call(entrada.files, function (f) {
+      if (!/\.pdf$/i.test(f.name)) return;
+      var l = alvo(f); if (l) fila.push([f, l]); else sobra++;
+    });
+    var feitos = 0, falhas = 0;
+    (function proximo() {
+      if (!fila.length) {
+        andamento.textContent = "Enviados " + feitos + (falhas ? ", " + falhas + " com erro" : "") + (sobra ? ", " + sobra + " sem caminho na cópia" : "") + ".";
+        tem.textContent = linhas.filter(function (l) { return !/falta|erro/.test(l.querySelector(".zpdf-st").textContent); }).length;
+        return;
+      }
+      var par = fila.shift(), st = par[1].querySelector(".zpdf-st");
+      andamento.textContent = "Enviando " + (feitos + falhas + 1) + " de " + (feitos + falhas + fila.length + 1) + "…";
+      st.textContent = "enviando…";
+      var dados = new FormData(); dados.append("caminho", par[1].getAttribute("data-caminho")); dados.append("arquivo", par[0]);
+      fetch("{{ url_for('.api_contratos_enviar') }}", { method: "POST", body: dados, credentials: "same-origin" })
+        .then(function (r) { return r.json().then(function (j) { return [r.ok, j]; }); })
+        .then(function (res) {
+          if (res[0]) { feitos++; st.textContent = res[1].mb + " MB"; }
+          else { falhas++; st.textContent = "erro: " + (res[1].erro || "não gravou"); }
+        }, function () { falhas++; st.textContent = "erro: sem conexão"; })
+        .then(proximo);
+    })();
+  });
+})();
+</script>
+{% endblock %}
