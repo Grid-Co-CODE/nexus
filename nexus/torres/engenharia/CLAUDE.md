@@ -410,7 +410,10 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   inversores: "o certo é comentar e já incluir na nota da OS"). A prova no Fracttal (OS 18754 de TESTE - PA, duas
   tarefas, lida de volta) mediu: o `work_orders_update` grava a `note` da OS, igual em todas as tarefas, e a observação
   de cada tarefa (`task_note`) fica como estava. O "Editar observação" do card segue recusando OS de várias tarefas (ele
-  regrava a observação inteira); o comentário só põe uma linha no fim da nota da OS.
+  regrava a observação inteira); o comentário só põe uma linha no fim da nota da OS. Os que ficaram só no Nexus antes
+  disso o administrador leva pelo "Levar para a nota" da página da OS (`/os/_nexus/engenharia/os/<id>/levar-para-a-nota`,
+  na sessão do Fracttal dele): cada um com o autor e a hora dele, do mais antigo ao mais novo, e a linha que já está na
+  nota não volta; no livro, um `comentario_na_nota` aponta cada um (o comentário não muda nem vira "editado").
 - **Status e prioridade** moram no livro `nexus_engenharia_os` (`nexus/engenharia/os_acompanhamento.py`; regra no
   `nexus/dados/CLAUDE.md`): os oito do time (Análise de Solução, Atividade em Andamento, Diagnóstico em Andamento,
   Agendamento de OS, Tratativa com Equipe de Campo, Validação Final, Stand-By, Diagnóstico Concluído; o id é a ordem do

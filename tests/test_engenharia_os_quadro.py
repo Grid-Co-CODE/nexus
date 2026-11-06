@@ -333,6 +333,68 @@ def test_os_concluida_continua_so_no_nexus(fracttal_do_os, pagina, cliente, app)
     assert not fracttal_do_os["escritas"]
 
 
+# ── levar para a nota os comentários que ficaram só no Nexus (06/11/2026) ─────────────────────────────────────────
+LEVAR = "/os/_nexus/engenharia/os/{}/levar-para-a-nota"
+MOTIVO_VARIAS = ("Esta OS tem 6 tarefas, e cada uma tem a sua observação. A edição por aqui só é segura em OS de uma "
+                 "tarefa — use o Fracttal.")
+
+
+def _como_admin(cliente, monkeypatch):
+    """O administrador é o da lista de Base → Acessos, relida a cada pedido (`auth._admin_em_dia`)."""
+    from test_engenharia_acompanhamento import _como
+
+    from nexus import auth
+    monkeypatch.setattr(auth, "_admins", lambda: {ANA["email"]})
+    return _como(cliente, ANA, admin=True)
+
+
+def test_o_administrador_leva_para_a_nota_os_comentarios_que_ficaram_so_no_nexus(fracttal_do_os, pagina, cliente, app, monkeypatch):
+    """Levi, 06/11/2026: "Sim, leva" (os comentários da OS 16289, de seis inversores, que ficaram só no Nexus antes de o
+    comentário da OS de várias tarefas ir para a nota). Cada um vai com o autor e a hora dele, na ordem em que foi
+    feito; no livro, um evento novo marca que foi (`comentario_na_nota`), sem mudar nem marcar como editado."""
+    from test_engenharia_acompanhamento import SAME
+    os_ = {"wid": pagina["id_work_order"], "folio": "16502", "codigo": "X-INV1.1"}
+    O.registrar_comentario(os_, "Primeiro", ANA, True, MOTIVO_VARIAS)
+    O.registrar_comentario(os_, "Segundo", ANA, True, MOTIVO_VARIAS)
+    O.registrar_comentario(os_, "Já foi", ANA, True, "sim", linha_nota="[01/11/2026 10:00] Ana Lima (Engenharia): Já foi")
+    fracttal_do_os["det"]["tarefas"] = [{"id": 1}, {"id": 2}]
+    _como_admin(cliente, monkeypatch)
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(LEVAR.format(pagina["id_work_order"]), json={"folio": "16502"}, headers=SAME)
+    j = r.get_json()
+    assert r.status_code == 200 and j["ok"] and "2 comentários" in j["mensagem"]
+    (wid, nota), = fracttal_do_os["escritas"]
+    assert re.fullmatch(r"Nota antiga da OS\n\[\d\d/\d\d/\d{4} \d\d:\d\d\] Ana Lima \(Engenharia\): Primeiro\n"
+                        r"\[\d\d/\d\d/\d{4} \d\d:\d\d\] Ana Lima \(Engenharia\): Segundo", nota)
+    eventos = [e for e in _est(pagina["id_work_order"])["eventos"] if e["evento"] == "comentario"]
+    assert {e["texto"]: e["nota"] for e in eventos} == {"Primeiro": "sim", "Segundo": "sim", "Já foi": "sim"}
+    assert all(e["linha_nota"] for e in eventos) and not any(e["editado"] for e in eventos)
+
+
+def test_levar_para_a_nota_e_so_do_administrador(fracttal_do_os, pagina, cliente, app):
+    from test_engenharia_acompanhamento import SAME, _como
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(LEVAR.format(pagina["id_work_order"]), json={"folio": "16502"}, headers=SAME)
+    assert r.status_code == 403 and not fracttal_do_os["escritas"]
+
+
+def test_sem_comentario_so_no_nexus_nada_vai_ao_fracttal(fracttal_do_os, pagina, cliente, app, monkeypatch):
+    from test_engenharia_acompanhamento import SAME
+    _como_admin(cliente, monkeypatch)
+    _login_do_fracttal(app, cliente)
+    r = cliente.post(LEVAR.format(pagina["id_work_order"]), json={"folio": "16502"}, headers=SAME)
+    assert r.status_code == 200 and "Nenhum comentário" in r.get_json()["mensagem"] and not fracttal_do_os["escritas"]
+
+
+def test_a_pagina_mostra_o_levar_para_a_nota_so_ao_administrador(pagina, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import _como
+    O.registrar_comentario({"wid": pagina["id_work_order"], "folio": "16502", "codigo": "X-INV1.1"}, "Primeiro", ANA,
+                           True, MOTIVO_VARIAS)
+    assert "data-levar-nota" in _como_admin(cliente, monkeypatch).get(URL).get_data(as_text=True)
+    assert "data-levar-nota" not in _como(cliente, BETO).get(URL).get_data(as_text=True)     # fora da lista de admins
+
+
 def test_erro_do_fracttal_nao_grava_nada(fracttal_do_os, pagina, cliente, app):
     from test_engenharia_acompanhamento import SAME, _como
     fracttal_do_os["resposta"].update(ok=False, erro="O Fracttal recusou")

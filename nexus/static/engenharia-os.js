@@ -317,3 +317,28 @@
     try { localStorage.setItem(CHAVE, recolher ? '1' : '0'); } catch (e) { /* sem onde lembrar: só agora */ }
   });
 })();
+
+/* Levar para a nota os comentários que ficaram só no Nexus (06/11/2026, "Sim, leva"): o administrador manda pela ponte do
+   OS Creator, e a página volta relida com o aviso. Sem o login do Fracttal, o aviso traz o login. */
+(function () {
+  var caixa = document.querySelector('[data-levar-nota]'); if (!caixa) return;
+  var btn = caixa.querySelector('button'), msg = caixa.querySelector('.eg-os-msg');
+  function diz(texto, ruim, link) {
+    msg.replaceChildren(document.createTextNode(texto || ''));
+    if (link) { var a = document.createElement('a'); a.href = link; a.textContent = 'Entrar pelo Fracttal'; msg.appendChild(document.createTextNode(' ')); msg.appendChild(a); }
+    msg.hidden = !texto; msg.classList.toggle('eg-os-msg--ruim', !!ruim);
+  }
+  btn.addEventListener('click', function () {
+    btn.disabled = true; diz('Levando para a nota da OS…');
+    fetch(caixa.dataset.levarNota, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({folio: caixa.dataset.folio})})
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); })
+      .then(function (x) {
+        btn.disabled = false;
+        if (x.r.ok && x.j.ok) { location.replace(location.pathname + '?' + new URLSearchParams({ok: x.j.mensagem || 'Feito.'}).toString()); return; }
+        if (x.j.login) { diz(x.j.erro || 'Para ir à nota da OS, entre pelo Fracttal.', true, x.j.login); return; }
+        diz(x.j.erro || ('O Nexus não levou (HTTP ' + x.r.status + '). Nada mudou; tente de novo.'), true);
+      })
+      .catch(function () { btn.disabled = false; diz('Não consegui falar com o Nexus. Tente de novo.', true); });
+  });
+})();

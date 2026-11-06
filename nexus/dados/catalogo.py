@@ -273,8 +273,8 @@ FATOS = (
                     "apagar um comentário são eventos novos"),
     Fato("acompanhamento_os", "A OS acompanhada pela Engenharia", "engenharia",
          "nexus_engenharia_os · fato_acompanhamento_os",
-         "1 linha = 1 evento (status, prioridade, comentario, comentario_editado ou comentario_apagado) da "
-         "Engenharia sobre 1 OS do Fracttal",
+         "1 linha = 1 evento (status, prioridade, comentario, comentario_editado, comentario_apagado ou "
+         "comentario_na_nota) da Engenharia sobre 1 OS do Fracttal",
          _d(data=("id", "data_id (o dia de Brasília do evento)"),
             usina=("id", "usina_id (a ligação do Quadro da equipe com o cadastro; usina_ligada_por)"),
             equipamento=("id", "equipamento_id (o código do ativo da OS)"),
@@ -284,8 +284,10 @@ FATOS = (
          observacao="os_id é o id da OS no Fracttal e os_folio o nº; status_id e prioridade_id apontam as abas "
                     "dim_status_os e dim_prioridade_os do mesmo livro (as listas fixas do pedido de 24/10/2026); o "
                     "estado de agora é o do último evento de cada tipo. nota_fracttal diz se o comentário foi para a "
-                    "nota da OS (\"sim\") ou por que não foi. alvo_id (no fim, desde 30/10/2026) é o comentário que o "
-                    "comentario_editado ou o comentario_apagado aponta. Quem, o texto e a linha da nota só cifrados "
+                    "nota da OS (\"sim\") ou por que não foi; o comentario_na_nota (desde 06/11/2026) diz que um que tinha "
+                    "ficado só no Nexus foi levado depois. alvo_id (no fim, desde 30/10/2026) é o comentário que o "
+                    "comentario_editado, o comentario_apagado ou o comentario_na_nota aponta. Quem, o texto e a linha "
+                    "da nota só cifrados "
                     "(Cofre, a chave do cadastro). Só acrescenta: editar e apagar um comentário são eventos novos"),
     Fato("marcacao_etm", "O que a Engenharia marca nas OS de ETM", "engenharia",
          "nexus_engenharia_etm · fato_marcacao_etm",

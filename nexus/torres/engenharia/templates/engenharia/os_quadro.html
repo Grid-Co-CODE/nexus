@@ -238,6 +238,14 @@
           <p class="eg-os-msg" role="status" hidden></p>
         </div>
         {% endif %}
+        {# os comentários que ficaram só no Nexus (06/11/2026, "Sim, leva"): o administrador os leva para a nota da OS, com
+           o autor e a hora de cada um (a ponte do OS Creator, na sessão do Fracttal dele) #}
+        {% set presos = (est.eventos or [])|selectattr('evento', 'equalto', 'comentario')|selectattr('nota')|rejectattr('nota', 'equalto', 'sim')|list %}
+        {% if admin and presos and o.coluna not in ('concluida', 'cancelada') %}<div class="eg-levar-nota" data-levar-nota="{{ ('/os/_nexus/engenharia/os/' ~ o.wid ~ '/levar-para-a-nota')|na_raiz }}" data-folio="{{ o.os }}">
+          <span>{{ presos|length }} {{ 'comentário ficou' if presos|length == 1 else 'comentários ficaram' }} só no Nexus.</span>
+          <button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">Levar para a nota</button>
+          <p class="eg-os-msg" role="status" hidden></p>
+        </div>{% endif %}
         {% if est.eventos %}<div class="eg-tl">
           {% for e in est.eventos %}<div class="eg-tl-e{{ ' novo' if loop.first }}{{ ' ev' if e.evento != 'comentario' }}"><div class="eg-tl-g"><div class="eg-tl-d">{{ e.quando.strftime('%d/%m') if e.quando else '—' }}</div><div class="eg-tl-a">{{ e.quando.strftime('%Y') if e.quando else '' }}</div></div>
             <div class="eg-tl-b"><div class="eg-tl-x"><div class="eg-tl-t">{% if e.evento == 'comentario' %}{{ e.texto }}{% elif e.evento == 'status' %}Status: {{ nome_status(e.status_id) }}{% elif e.evento == 'prioridade' %}Prioridade: {{ nome_prioridade(e.prioridade_id) }}{% else %}{{ e.rotulo }}{% endif %}</div><div class="eg-tl-u">{{ e.nome or 'alguém' }} · {{ e.quando_txt }}{% if e.editado %} · editado{% endif %}{% if e.evento == 'comentario' and e.nota and e.nota != 'sim' %} · só no Nexus: {{ e.nota }}{% endif %}</div>

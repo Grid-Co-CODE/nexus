@@ -1074,6 +1074,73 @@ def engenharia_comentar(wid: int):
 # Levi: "Traz 1 vez, para as OSs em aberto bota esses comentários na nota da OS." Mora aqui, em /os/_nexus, porque a nota
 # das OS em aberto vai na sessão do Fracttal de quem importa (o cookie os_sessao só vai para /os). A leitura do GitHub e
 # a importação rodam por trás (`etm_historico`); a tela ETMs do administrador acompanha pelo GET.
+# ── levar para a nota os comentários que ficaram só no Nexus (06/11/2026) ─────────────────────────────────────────
+# Levi: "Sim, leva" (os comentários da OS 16289, de seis inversores, que ficaram só no Nexus antes de o comentário da OS
+# de várias tarefas ir para a nota, d594d31). Só o administrador; na sessão do Fracttal dele. Cada comentário vai com o
+# autor e a hora DELE (a linha de sempre), do mais antigo ao mais novo; a linha que já está na nota não volta
+# (`_acrescentar_na_nota`). No livro, um `comentario_na_nota` para cada um que foi.
+@bp_raiz.route("/os/_nexus/engenharia/os/<int:wid>/levar-para-a-nota", methods=["POST"])
+def engenharia_levar_para_a_nota(wid: int):
+    import logging
+    from urllib.parse import quote, urlencode
+
+    from flask import jsonify
+
+    from ...engenharia import os_acompanhamento as O
+    from ...engenharia import os_equipe
+    from ..engenharia import _os_para_gravar, _quem_pode
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        return jsonify({"erro": "Pedido de outro site: nada foi gravado."}), 403
+    if not session.get("admin"):
+        return jsonify({"erro": "Só o administrador leva os comentários para a nota da OS."}), 403
+    pode, _meu = _quem_pode()
+    folio = str((request.get_json(silent=True) or {}).get("folio") or "").strip()
+    de = f"/t/engenharia/equipe/os/{folio}" if folio.isdigit() else "/t/engenharia/equipe"
+    login = na_raiz("/os/login") + "?next=" + quote("/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/"), safe="")
+    app = current_app._get_current_object()
+    s = sessao_do_os(app)
+    jwt = str(s.get("jwt") or "")
+    if not jwt:
+        return jsonify({"erro": "Para ir à nota da OS, entre pelo Fracttal.", "login": login}), 401
+    presos = O.comentarios_so_no_nexus(wid)
+    if not presos:
+        return jsonify({"ok": True, "mensagem": "Nenhum comentário desta OS ficou só no Nexus."})
+    o = os_equipe.ler_os(folio) if folio.isdigit() else None
+    if not o or str(o.get("wid")) != str(wid):
+        return jsonify({"erro": "Não achei esta OS no Fracttal: recarregue a página."}), 404
+    linhas = [O.linha_da_nota(c["texto"], c["nome"] or "alguém", c["quando"]) for c in presos]
+    clone(app)                                   # põe o `api` do clone no sys.path
+    import api as os_api                         # noqa: E402
+    from os_web import os_acoes_web as regra     # noqa: E402
+    from os_web import sessao as os_sessao       # noqa: E402
+    with _trava_nota, os_sessao.contexto(jwt, str((s.get("conta") or {}).get("email") or "")):
+        try:
+            nota = _acrescentar_na_nota(os_api, regra, o, linhas)
+        except _NotaIncompleta:
+            return jsonify({"erro": "O Fracttal não devolveu a OS inteira agora. Nada foi gravado; tente de novo."}), 502
+        except _NotaNaoGravou as e:
+            return jsonify({"erro": "O Fracttal não gravou a nota (%s). Nada foi gravado; tente de novo." % e}), 502
+        except os_api.SessionExpired:
+            return jsonify({"erro": "A sessão do Fracttal venceu: entre de novo.", "login": login}), 401
+        except Exception as e:                   # noqa: BLE001 — Fracttal fora, cota: nada foi gravado
+            logging.warning("levar para a nota da OS %s: o Fracttal não respondeu (%s: %s)", wid, type(e).__name__,
+                            str(e)[:160])
+            return jsonify({"erro": "O Fracttal não respondeu (%s). Nada foi gravado; tente de novo."
+                                    % type(e).__name__}), 502
+    if nota != "sim":
+        return jsonify({"ok": False, "erro": "Ficaram só no Nexus: %s" % nota}), 409
+    try:
+        n = O.marcar_na_nota(_os_para_gravar(o), [(c["id"], l) for c, l in zip(presos, linhas)],
+                             session.get("usuario"), pode or bool(session.get("admin")))
+    except Exception as e:                       # noqa: BLE001 — a nota já foi: dizer, sem pedir para repetir
+        logging.exception("levar para a nota da OS %s: foi à nota, mas não ao livro do Nexus", wid)
+        return jsonify({"ok": True, "mensagem": "Foi para a nota da OS %s, mas o Nexus não marcou (%s). Não repita: a "
+                                                "linha que já está na nota não volta." % (o["os"], type(e).__name__)})
+    return jsonify({"ok": True, "mensagem": "%d %s para a nota da OS %s, com o autor e a hora de cada um." % (
+        n, "comentário levado" if n == 1 else "comentários levados", o["os"])})
+
+
 @bp_raiz.route("/os/_nexus/engenharia/etm/historico", methods=["GET", "POST"])
 def engenharia_etm_historico():
     from urllib.parse import quote, urlencode

@@ -44,7 +44,9 @@ STATUS = ((1, "Análise de Solução"), (2, "Atividade em Andamento"), (3, "Diag
           (4, "Agendamento de OS"), (5, "Tratativa com Equipe de Campo"), (6, "Validação Final"), (7, "Stand-By"),
           (8, "Diagnóstico Concluído"))
 PRIORIDADES = ((1, "Média"), (2, "Alta"), (3, "Urgente"))
-EVENTOS = ("status", "prioridade", "comentario", "comentario_editado", "comentario_apagado")
+# `comentario_na_nota` (06/11/2026): o comentário que tinha ficado só no Nexus foi levado depois para a nota da OS (o
+# "Levar para a nota" do administrador); aponta o comentário pelo alvo_id e não o muda nem o marca como editado
+EVENTOS = ("status", "prioridade", "comentario", "comentario_editado", "comentario_apagado", "comentario_na_nota")
 ABERTAS = ("fazer", "execucao", "verificacao")   # as colunas do quadro em que a OS ainda pede atenção
 DIAS_PARADA = 7                                   # "OSs que não tiveram atualizações nos últimos 7 dias" (Levi)
 TEXTO_MAX = AC.TEXTO_MAX
@@ -150,12 +152,15 @@ def estado(eventos: list[dict]) -> dict[str, dict]:
             e["status_id"] = _int(l.get("status_id"))
         if ev == "prioridade" and _int(l.get("prioridade_id")):
             e["prioridade_id"] = _int(l.get("prioridade_id"))
-        if ev in ("comentario_editado", "comentario_apagado"):
-            # a edição e a exclusão mudam o comentário apontado, sem entrar na linha do tempo (30/10/2026)
+        if ev in ("comentario_editado", "comentario_apagado", "comentario_na_nota"):
+            # a edição e a exclusão mudam o comentário apontado, sem entrar na linha do tempo (30/10/2026); o levado para
+            # a nota (06/11/2026) só passa a dizer que foi, com a linha que foi
             alvo = next((x for x in e["eventos"] if x["evento"] == "comentario" and x["id"] == _txt(l.get("alvo_id"))),
                         None)
             if alvo and ev == "comentario_apagado":
                 e["eventos"].remove(alvo)
+            elif alvo and ev == "comentario_na_nota":
+                alvo.update(nota="sim", linha_nota=_txt(d.get("linha_nota")) or alvo["linha_nota"])
             elif alvo:
                 alvo.update(texto=_txt(d.get("texto")) or alvo["texto"], editado=True,
                             linha_nota=_txt(d.get("linha_nota")) or alvo["linha_nota"])
@@ -299,6 +304,26 @@ def registrar_comentario(os_: dict, texto, usuario, pode: bool, nota: str, linha
         novo = _evento(cofre, "comentario", quem, os_, texto=t, nota=_txt(nota)[:200] or None, linha_nota=linha_nota)
         _publicar(lido["eventos"] + [novo])
     return novo
+
+
+def comentarios_so_no_nexus(os_id) -> list[dict]:
+    """Os comentários da OS que ficaram só no Nexus (a `nota` é o motivo, não "sim"), do mais antigo ao mais novo."""
+    est = estado(ler(forcar=True)["eventos"]).get(chave_da_os(os_id)) or {"eventos": []}
+    return [c for c in reversed(est["eventos"])
+            if c["evento"] == "comentario" and c["nota"] and c["nota"] != "sim" and c["quando"]]
+
+
+def marcar_na_nota(os_: dict, itens: list[tuple[str, str]], usuario, pode: bool) -> int:
+    """(id do comentário, a linha que foi para a nota): um `comentario_na_nota` para cada, numa gravação só. Quem leva
+    (o administrador) fica no evento; o autor e a hora do comentário não mudam."""
+    quem = AC._quem(usuario, pode, "leva o comentário para a nota")
+    cofre = AC._cofre()
+    with _TRAVA:
+        lido = _reler()
+        novos = [_evento(cofre, "comentario_na_nota", quem, os_, nota="sim", alvo_id=_txt(cid), linha_nota=linha)
+                 for cid, linha in itens]
+        _publicar(lido["eventos"] + novos)
+    return len(novos)
 
 
 def comentario_para_mudar(os_: dict, comentario_id: str, usuario, pode: bool, admin: bool = False,
