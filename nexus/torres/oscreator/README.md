@@ -1244,6 +1244,65 @@ nem fazemos no card da OS no histórico de OS Creator!"
   não (o ambiente é do processo inteiro), e o envio dos tickets não muda: direto só com `RELAY_DIRETO_ENV=1`.
 - Prova: `tests/test_oscreator_garantia_responsavel.py`.
 
+## Incluir anexo e as ações da OS nas telas que abrem a OS (06/11/2026)
+
+Levi: "poderia incluir um botão de incluir anexo? Aí incluiria um anexo na OS e será possível ver o anexo e baixar os
+anexos conforme já temos quando clicamos na OS no histórico de OS. Bote isso em Chamados > Garantias, Performance >
+Quadro de equipe, Engenharia > Quadro de equipe"; "Nessas telas devem ter essas opção também: Enviar para verificação,
+concluir e cancelar!".
+- **Incluir anexo** (`POST /os/api/os/<id>/anexos`, `rotas_os_acoes.api_anexos_incluir`): as regras e o envio dos
+  anexos da Solicitação de Engenharia (`solic_eng_web.anexos`: o tipo conferido pelo conteúdo, 10 MB cada, 20 MB juntos, 5
+  por vez; `solic_eng_web.anexar`: o S3 do Fracttal e a 1ª tarefa da OS). Numa OS que já existe: o nome que já está nela
+  ganha " (2)" (a chave no S3 é `.ot/<OS>/<nome>`, e o novo apagaria o antigo), e os anexos são relidos depois do envio,
+  sem as URLs pré-assinadas (`_nomes_na_os`): o que não aparece na OS volta como falha (o Fracttal aceita calado).
+- **No card** (o que o Quadro da Performance e o Histórico abrem): o "Incluir anexo" embaixo dos dois cards de anexos
+  (`data-acao="anexo-incluir"`, o seletor com o accept, `acoes_anexo_aceitar`); a frase das regras
+  (`acoes_anexo_regra`) vai na dica do botão, e não à vista (06/11/2026: "tire o texto [...] e organize melhor a
+  informação"). A tela do chamado de Garantias, igual.
+- **Os diálogos das ações** (Concluir, Fazer a tarefa, Cancelar e Anexos) moram em `templates/_dlg_acoes_os.html`, que o
+  card e a tela do chamado incluem; ele tira do `d` as contas do Concluir, como o card.
+- **Enviar para verificação** (`POST /os/api/os/<id>/verificacao`): o status 2 pelo `api.mudar_status_os(wid, 2)`
+  (`tasks.work_orders_change_status`), o caminho que a revisão das OS provou no ar (OS 18630 e 18635; o `to_in_review`
+  só vale ao CRIAR a OS). Só a OS Em Processo vai; o status é lido antes e depois (o Fracttal aceita calado), e o quadro
+  de Garantias recebe o status novo (`_no_quadro_de_garantias`, o `rotas_acomp._ajustar` do Finalizar de lá; o Cancelar
+  também). Ele só muda o status: o diálogo (`verificacao`, como o do Concluir) mostra as subtarefas sem resposta e
+  oferece o "Fazer a tarefa" antes (o executar sozinho não muda o status). No card, o botão sai na OS que não está Em
+  Verificação, Concluída nem Cancelada.
+- **Na tela do chamado de Garantias** (`acomp_os.html`, que recebe o `d` da OS): a caixa "Ações da OS" com os anexos (a
+  contagem do card), o Incluir anexo, o Enviar para verificação (OS em processo) e o Cancelar (OS aberta), com
+  `data-os-acoes data-no-lugar`. Sem o Concluir: o "Finalizar chamado" do topo já conclui a OS no Fracttal e ajusta o
+  quadro, e dois finalizar confundiriam. O que muda o status relê a página (`relerPagina` no `os_acoes.js`); o anexo só
+  relê a contagem.
+- **A moldura do card abre numa ação** (`/os/_nexus/card/<id>?acao=`, só as do card: `anexos-os`, `anexos-sub`,
+  `concluir`, `cancelar`, `verificacao`): o `card_os.html` clica no botão do próprio card depois de carregar. O
+  `NexusOsCard.abrir(id, {acao})` manda; é assim que a página da OS da Engenharia abre o Concluir, o Cancelar e os anexos.
+  O Incluir anexo não vai por aí: o seletor de arquivos não abre dentro da moldura com o clique da tela de baixo.
+- **Colar para anexar** (Levi: "anexar com CTRL + V OU WINDOWS + V"): o arquivo ou a imagem da área de transferência
+  (o Win+V cola do histórico pelo mesmo evento `paste`) espera um "Anexar à OS" à vista, para colar sem querer não subir
+  nada; colar num campo de texto segue sendo texto. A imagem colada chega como "image.png" e ganha o nome com a data e a
+  hora (`nomeColado`), para não virar "image (7).png" na OS.
+- **As tarefas da OS, uma a uma** (Levi, 06/11/2026, na página da OS da Engenharia: o check, as subtarefas de cada
+  ativo, "Iniciar atividade" com pausa, "Anexar" na tarefa e "x anexos"):
+  - `GET /os/api/os/<id>/tarefas`: cada tarefa com o ativo, `feita` (a data de fim no Fracttal, `situacao_tarefa`), as
+    subtarefas respondidas e o cronômetro (`execucao_atual`, as tarefas em paralelo).
+  - `POST /os/api/os/<id>/tarefa/<tid>/cronometro` (`acao`: iniciar, pausar com `motivo` de `/os/api/execucao/motivos`,
+    retomar, concluir): as regras do `os_execucao` (a pausada é retomada antes de encerrar), o estado relido depois de
+    cada passo (o Fracttal aceita calado: 502 quando não mudou) e a tarefa tem de ser da OS (404). O concluir pede as
+    obrigatórias respondidas e só encerra o tempo (`finalizar_execucao`): o `/executar` lança outro registro, e as horas
+    dobrariam.
+  - `POST /os/api/os/<id>/tarefa/<tid>/respostas`: grava as respostas (`salvar_subtarefas`) sem lançar execução e diz
+    quantas obrigatórias faltam, relidas.
+  - O Incluir anexo aceita `tarefa`: o arquivo vai para a aba Anexos daquela tarefa, e não para a 1ª. A contagem
+    (`/os/os/<id>/anexos`) passa a trazer `arquivos_por_tarefa` (o `get_os_anexos` diz a tarefa de cada arquivo); o
+    `por_tarefa` segue sendo o das fotos das subtarefas, que o botão dos anexos da tarefa no card mostra.
+  - Provado no TESTE - PA em 06/11/2026 (OS 18750 e 18751, lido de volta): encerrar o cronômetro deixa a tarefa
+    Finalizada (o check); o concluir faz uma execução só (as horas não dobram); o anexo vai para a tarefa escolhida; o
+    Incluir anexo entra na OS Em Processo, Em Verificação, Concluída e Cancelada; o `execucao_atual` devolve o início em
+    UTC sem o fuso (quem mostra converte). O card sem o status no endereço usa o `status_id` do Fracttal para o "Enviar
+    para verificação" (só na OS Em Processo).
+- Prova: `tests/test_oscreator_anexo_incluir.py`, `tests/test_oscreator_acoes_nas_telas.py` e
+  `tests/test_oscreator_tarefas_da_os.py`.
+
 ## O PDF da OS, com a seta na cadeia do chamado (Garantias, 19/10/2026)
 
 Levi, 19/10/2026: "Gostaria de incluir a opção de baixar o mesmo PDF que o fractall gera" ("pelo o que entendo ele baixa

@@ -190,3 +190,10 @@
    as variáveis voltam ao escuro, e as regras do claro (que só usam --osc-*) desenham de novo o escuro de sempre */
 :where(html[data-tema="claro"]) .visor{--f-muted:#8A93A8;--f-border:#2A3550;--f-green:#A6E22E;--f-input:#1A2337;--f-ink:#0B1020;
   --osc-texto:#ffffff;--osc-texto-2:#c4cbdb;--osc-linha-forte:#2A3550;--osc-campo-hover:#43547a;--osc-musgo:#A6E22E;color-scheme:dark}
+
+/* o Incluir anexo do card (06/11/2026): o botão e a regra dos anexos numa linha, embaixo dos dois cards de anexos */
+.det-anx-incluir{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;margin:10px 0 0}
+/* as ações da OS fora do card (a tela do chamado de Garantias, 06/11/2026): Concluir e Cancelar numa linha */
+.det-acoes-os{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
+/* o colado à espera do "Anexar à OS" (06/11/2026): o nome e os dois botões numa linha, embaixo do Incluir anexo */
+.det-anx-colado{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:8px 0 0}

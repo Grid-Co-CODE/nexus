@@ -835,6 +835,9 @@ def _tem_login_fracttal(alvo) -> bool:
     return bool(s.get("jwt"))
 
 
+_ACOES_DO_CARD = ("anexos-os", "anexos-sub", "concluir", "cancelar", "verificacao")
+
+
 def _card(caminho: str, wid=None):
     """A moldura do card (`card_os.html`) para uma página do clone (`/os/os/<id>` ou `/os/os/folio/<nº>`): o fragmento
     dela (?parcial=1) vai para dentro da moldura, com o status que a tela mandou."""
@@ -843,6 +846,9 @@ def _card(caminho: str, wid=None):
     from ...auth import next_seguro
     status = " ".join(str(request.args.get("status") or "").split())[:40]
     de = next_seguro(request.args.get("de"))
+    # a ação que a tela de baixo pediu (06/11/2026: a página da OS da Engenharia abre o card já no diálogo de Concluir,
+    # Cancelar ou dos anexos); só as do card, e o clique é o do botão dele (a mesma regra e a mesma confirmação)
+    acao = request.args.get("acao") if request.args.get("acao") in _ACOES_DO_CARD else ""
     try:
         estado = "ok" if _tem_login_fracttal(clone(current_app._get_current_object())) else "sem"
     except Exception:            # noqa: BLE001 — clone que não sobe: a moldura diz, e a tela de baixo segue
@@ -853,7 +859,7 @@ def _card(caminho: str, wid=None):
     # /os/_nexus/card/voltar (o clone só devolve para /os/...). Até 18/10/2026 era o /entrar do Nexus, que com a conta
     # Microsoft ligada é a porta DELA: o Levi clicava em "Entrar com o Fracttal" e caía na Microsoft
     volta = "/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/")
-    return render_template("oscreator/card_os.html", wid=wid, estado=estado,
+    return render_template("oscreator/card_os.html", wid=wid, estado=estado, acao=acao,
                            fragmento=f"{caminho}?" + urlencode({"parcial": 1, "status": status}),
                            pagina=caminho + ("?" + q if q else ""),
                            entrar=na_raiz("/os/login") + "?next=" + quote(volta, safe=""))

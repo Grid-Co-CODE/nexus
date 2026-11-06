@@ -60,6 +60,65 @@
     const rolo = novo.closest('.os-modal-card'); if (rolo) rolo.scrollTop = 0; else window.scrollTo(0, 0);
     return novo;
   }
+  // O envio do Incluir anexo (06/11/2026), do seletor e do colar: o POST /os/api/os/<id>/anexos, que relê a OS e diz o
+  // que subiu e o que não (o Fracttal aceita calado); depois, o card recarregado ou, fora dele, a contagem relida
+  async function enviarAnexos(d, fs) {
+    const b = q(d, '[data-acao="anexo-incluir"]'), rotulo = b ? b.textContent : '';
+    const fd = new FormData(); fs.forEach((f) => fd.append('anexos', f, f.name)); fd.append('folio', d.dataset.folio || '');
+    if (b) trava(b, true, 'enviando…');
+    mensagem(d, '');
+    try {
+      const r = await OsCarga.buscar('/os/api/os/' + d.dataset.wid + '/anexos',
+        {method: 'POST', credentials: 'same-origin', headers: {'Accept': 'application/json'}, body: fd},
+        fs.length === 1 ? 'Enviando o anexo para o Fracttal…' : 'Enviando ' + fs.length + ' anexos para o Fracttal…');
+      let j = null; try { j = await r.json(); } catch (e) { j = null; }
+      if (!r.ok && !(j && j.incluidos && j.incluidos.length)) throw new Error(apiErro(j, r));
+      anexosCache.delete(d); alterou(d); if (b) trava(b, false, rotulo);
+      if (d.hasAttribute('data-no-lugar')) { contagem(d); mensagem(d, j.mensagem, !j.ok); return; }
+      await recarregar(d, urlCard(d), j.mensagem, !j.ok);
+    } catch (e) { if (b) trava(b, false, rotulo); mensagem(d, 'Não consegui incluir o anexo: ' + e.message, true); }
+  }
+
+  // Colar para anexar (Levi, 06/11/2026: "No anexo pode ser possível anexar com CTRL + V OU WINDOWS + V"): o arquivo ou a
+  // imagem da área de transferência (o Win+V cola do histórico pelo mesmo evento) vai para a OS aberta depois de um
+  // "Anexar à OS" à vista: colar sem querer não sobe nada. Colar num campo de texto segue sendo texto. A imagem colada vem
+  // como "image.png": ganha o nome com a data e a hora, para não virar "image (7).png" na OS.
+  function nomeColado(f, i) {
+    if (f.name && !/^image\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name)) return f;
+    const p = (n) => String(n).padStart(2, '0'), a = new Date();
+    const ext = ((f.type || '').split('/')[1] || 'png').replace('jpeg', 'jpg');
+    const nome = 'colado ' + a.getFullYear() + '-' + p(a.getMonth() + 1) + '-' + p(a.getDate()) + ' ' + p(a.getHours()) + 'h'
+      + p(a.getMinutes()) + 'm' + p(a.getSeconds()) + 's' + (i ? ' ' + (i + 1) : '') + '.' + ext;
+    return new File([f], nome, {type: f.type});
+  }
+  function oferecerColados(d, fs) {
+    const linha = q(d, '.det-anx-incluir'); if (!linha) return;
+    let caixa = q(d, '[data-anx-colado]');
+    if (!caixa) { caixa = document.createElement('div'); caixa.className = 'det-anx-colado'; caixa.setAttribute('data-anx-colado', ''); linha.after(caixa); }
+    caixa.innerHTML = '<span>' + esc(fs.length === 1 ? '1 arquivo colado: ' : fs.length + ' arquivos colados: ')
+      + esc(fs.map((f) => f.name).join(', ')) + '</span>'
+      + '<button type="button" class="det-b verde" data-colado-sim>Anexar à OS</button>'
+      + '<button type="button" class="det-b ghost" data-colado-nao>Descartar</button>';
+    caixa.querySelector('[data-colado-sim]').addEventListener('click', () => { caixa.remove(); enviarAnexos(d, fs); });
+    caixa.querySelector('[data-colado-nao]').addEventListener('click', () => caixa.remove());
+  }
+  document.addEventListener('paste', (e) => {
+    const t = e.target;
+    if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"]')) return;
+    const fs = Array.from((e.clipboardData && e.clipboardData.files) || []).map(nomeColado);
+    if (!fs.length) return;
+    const inp = document.querySelector('.det [data-anx-arquivos], [data-os-acoes] [data-anx-arquivos]');
+    const d = inp && card(inp); if (!d) return;
+    e.preventDefault();
+    oferecerColados(d, fs);
+  });
+
+  // Fora do card (a tela do chamado de Garantias, 06/11/2026): o que mudou o status da OS relê a página inteira, com o
+  // recado à vista um instante antes
+  function relerPagina(d, texto, ruim) {
+    mensagem(d, (texto || 'Feito.') + ' Atualizando a tela…', ruim);
+    setTimeout(() => location.reload(), 1600);
+  }
   const urlCard = (d, status) => '/os/os/' + d.dataset.wid + '?parcial=1&status=' + encodeURIComponent(status || d.dataset.status || '');
   // a OS mudou no Fracttal: quem mostra uma LISTA dela (o Histórico, por baixo do card) sabe que tem de reler ao fechar
   const alterou = (d) => document.dispatchEvent(new CustomEvent('os:alterada', {detail: {wid: d && d.dataset.wid}}));
@@ -226,8 +285,29 @@
         trava(ok, true, 'concluindo…');
         try {
           const j = await pedir('/os/api/os/' + d.dataset.wid + '/concluir', {folio: d.dataset.folio});
-          alterou(d); dlg.fechar(); await recarregar(d, urlCard(d, 'Concluída'), j.mensagem, !!j.aviso);
+          alterou(d); dlg.fechar();
+          if (d.hasAttribute('data-no-lugar')) { relerPagina(d, j.mensagem, !!j.aviso); return; }
+          await recarregar(d, urlCard(d, 'Concluída'), j.mensagem, !!j.aviso);
         } catch (e) { trava(ok, false, 'Concluir OS'); hint(dlg, 'Erro ao concluir OS: ' + e.message); }
+      });
+    },
+
+    // Enviar para verificação (06/11/2026): o diálogo, como o do Concluir, oferece fazer a tarefa antes; o status 2 pela
+    // rota /verificacao, que lê o status antes e depois
+    verificacao(d) {
+      const dlg = dialogo(d, 'verificacao'); if (!dlg) return;
+      const ok = q(dlg.caixa, '[data-conf="verificacao"]');
+      dlg.caixa.querySelectorAll('[data-fazer]').forEach((b) => {
+        b.addEventListener('click', () => { dlg.fechar(); ACOES.executar(d, b.dataset.fazer, b.dataset.fazerTitulo); });
+      });
+      ok.addEventListener('click', async () => {
+        trava(ok, true, 'enviando…');
+        try {
+          const j = await pedir('/os/api/os/' + d.dataset.wid + '/verificacao', {folio: d.dataset.folio});
+          alterou(d); dlg.fechar();
+          if (d.hasAttribute('data-no-lugar')) { relerPagina(d, j.mensagem); return; }
+          await recarregar(d, urlCard(d, 'Em Verificação'), j.mensagem);
+        } catch (e) { trava(ok, false, 'Enviar para verificação'); hint(dlg, 'Não foi possível enviar: ' + e.message); }
       });
     },
 
@@ -259,7 +339,9 @@
         try {
           const j = await pedir('/os/api/os/' + d.dataset.wid + '/tarefa/' + tid + '/executar',
             {valores, inicio: ini.value, fim: fim.value, nota: q(dlg.caixa, '[data-exec-nota]').value});
-          alterou(d); dlg.fechar(); await recarregar(d, urlCard(d), j.mensagem, !!j.aviso);
+          alterou(d); dlg.fechar();
+          if (d.hasAttribute('data-no-lugar')) { relerPagina(d, j.mensagem, !!j.aviso); return; }
+          await recarregar(d, urlCard(d), j.mensagem, !!j.aviso);
         } catch (e) { trava(ok, false, 'Salvar e registrar'); hint(dlg, 'Não consegui registrar: ' + e.message); }
       });
     },
@@ -283,7 +365,9 @@
         trava(ok, true); hint(dlg, 'cancelando no Fracttal…');
         try {
           const j = await pedir('/os/api/os/' + d.dataset.wid + '/cancelar', {id_status_custom: numero(sel.value), note: obs.value.trim(), folio});
-          alterou(d); dlg.fechar(); await recarregar(d, urlCard(d, 'Cancelada'), j.mensagem);
+          alterou(d); dlg.fechar();
+          if (d.hasAttribute('data-no-lugar')) { relerPagina(d, j.mensagem); return; }
+          await recarregar(d, urlCard(d, 'Cancelada'), j.mensagem);
         } catch (e) { trava(ok, false); hint(dlg, 'Não foi possível cancelar: ' + e.message); }
       });
     },
@@ -299,6 +383,15 @@
         e.preventDefault(); dlg.fechar();
         await recarregar(d, no.getAttribute('href') + '&parcial=1');          // o href já traz ?status=
       });
+    },
+
+    // Incluir anexo (Levi, 06/11/2026): o seletor de arquivos e o envio para a 1ª tarefa da OS, com as regras dos anexos
+    // da Solicitação de Engenharia; o servidor relê a OS e diz o que subiu e o que não (o Fracttal aceita calado)
+    'anexo-incluir'(d, b) {
+      const inp = q(d, '[data-anx-arquivos]'); if (!inp) return;
+      inp.value = '';
+      inp.onchange = () => { const fs = Array.from(inp.files || []); if (fs.length) enviarAnexos(d, fs); };
+      inp.click();
     },
 
     'anexos-sub'(d) { return abrirAnexos(d, 'sub', 'Anexos das subtarefas', 'Sem anexos nas subtarefas.'); },

@@ -11,6 +11,7 @@
    esquerda o que a engenharia FAZ (o status e a prioridade, no lugar do ticket do fornecedor; os dados; as OS filhas);
    à direita o que ela LÊ (a nota da OS, a resposta do técnico nas filhas, os comentários). O "Solicitar OS" fica no
    lugar do "Abrir a OS". #}
+{% from "_explica.html" import explica %}
 {% macro tag(texto, cor) %}<span class="eg-tag eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
 {# a seta do PDF de cada OS da cadeia, a mesma da cadeia do chamado da Garantia (o PDF que o Fracttal junta, com as fotos) #}
 {% macro seta_pdf(folio, wid='') -%}
@@ -129,24 +130,79 @@
           {% if o.ativos|length > 1 %}<dt>Ativo</dt><dd>{{ o.ativos|length }} ativos</dd>
           {% else %}<dt>Ativo</dt><dd class="mono">{{ o.codigo or '—' }}</dd>{% endif %}
           <dt>Usina</dt><dd>{{ o.usina or '—' }}</dd>
-          <dt>Responsável</dt><dd class="eg-resp"><span data-resp-nome>{{ o.pessoa or '—' }}</span>{% if pode %}<button type="button" class="eg-resp-bt" data-trocar-resp data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-volta="{{ url_for(volta_endpoint, atualizar=1) }}" title="Atribuir esta OS a outra pessoa">trocar</button>{% endif %}</dd>
+          {# o nome é o botão de trocar (Levi, 06/11/2026: "tire esse botão trocar e a troca pode ser feita ao clicar no nome
+             do responsável") #}
+          <dt>Responsável</dt><dd class="eg-resp">{% if pode %}<button type="button" class="eg-resp-nome" data-resp-nome data-trocar-resp data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-volta="{{ url_for(volta_endpoint, atualizar=1) }}" title="Clique para atribuir esta OS a outra pessoa">{{ o.pessoa or '—' }}</button>{% else %}<span data-resp-nome>{{ o.pessoa or '—' }}</span>{% endif %}</dd>
           <dt>Criado por</dt><dd>{{ o.criado_por or '—' }}</dd>
           <dt>Criada em</dt><dd>{{ o.criada or '—' }}</dd>
           <dt>Etiquetas</dt><dd>{% for e in o.etiquetas %}{{ tag(e.nome, 'neutro') }} {% else %}—{% endfor %}</dd>
         </dl>
         <p class="eg-pdf-msg" data-resp-msg hidden></p>
       </section>
+      {# as ações da OS (Levi, 06/11/2026: "poderia incluir um botão de incluir anexo? Aí incluiria um anexo na OS e será
+         possível ver o anexo e baixar os anexos conforme já temos quando clicamos na OS no histórico de OS"; "Nessas telas
+         devem ter essas opção também: Enviar para verificação, concluir e cancelar!"). O Incluir anexo sobe daqui (o
+         seletor de arquivos só abre com o clique na própria página); os anexos, o Concluir e o Cancelar abrem o card da OS
+         do OS Creator já no diálogo, com as regras dele (engenharia-os.js) #}
+      <section class="eg-bloco eg-os-acoes" data-os-acoes-eng data-wid="{{ o.wid }}" data-folio="{{ o.os }}"
+               data-anexos-url="{{ anexos_url }}" data-incluir-url="{{ incluir_url }}" data-login="{{ login_fracttal }}">
+        <div class="eg-bloco-h"><h2>Ações da OS</h2>
+          {% call explica('Como usar') %}<p><b>Incluir anexo.</b> O arquivo vai para a OS no Fracttal; o Anexar de cada
+          ativo põe o arquivo na tarefa dele.{% if regras_anexo[1] %} Vale {{ regras_anexo[1] }}.{% endif %}</p>
+          <p><b>Colar.</b> Um print ou arquivo copiado entra com Ctrl+V (ou Win+V) fora de um campo de texto; o "Anexar à
+          OS" confirma antes de subir.</p>
+          <p><b>Andamento.</b> Enviar para verificação, Concluir OS e Cancelar OS abrem o card da OS já no diálogo, com as
+          confirmações do OS Creator.</p>{% endcall %}</div>
+        {# dois grupos (Levi, 06/11/2026: "organize melhor a informação"): os Anexos, com o Incluir anexo na ponta e as duas
+           contagens que abrem os anexos no card; o Andamento, com a verificação, o concluir e, à parte, o cancelar. A frase
+           das regras do anexo saiu da caixa: está na dica do botão e no "!" do título #}
+        <div class="eg-acoes-g" data-grupo-anexos>
+          <div class="eg-acoes-g-h"><span>Anexos</span>
+            <button type="button" class="eg-ac-btn eg-ac-btn--g eg-ac-btn--p" data-incluir-anexo title="Anexar arquivos a esta OS no Fracttal{% if regras_anexo[1] %}: {{ regras_anexo[1] }}; ou cole com Ctrl+V{% endif %}">Incluir anexo</button></div>
+          <input type="file" multiple hidden data-anexo-arquivos accept="{{ regras_anexo[0] }}">
+          <button type="button" class="eg-acoes-item" data-card-acao="anexos-os"><span>Da OS</span><b data-n="os">…</b></button>
+          <button type="button" class="eg-acoes-item" data-card-acao="anexos-sub"><span>Das subtarefas</span><b data-n="sub">…</b></button>
+        </div>
+        {% if o.coluna not in ('concluida', 'cancelada') %}<div class="eg-acoes-g">
+          <div class="eg-acoes-g-h"><span>Andamento</span></div>
+          <div class="eg-acoes-bts">
+            {% if o.coluna != 'verificacao' %}<button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" data-card-acao="verificacao">Enviar para verificação</button>{% endif %}
+            <button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" data-card-acao="concluir">Concluir OS</button>
+            <button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p eg-ac-btn--perigo" data-card-acao="cancelar">Cancelar OS</button>
+          </div>
+        </div>{% endif %}
+        <p class="eg-pdf-msg" data-acoes-msg role="status" hidden></p>
+      </section>
     </aside>
     <div>
-      {% if o.ativos|length > 1 %}<section class="eg-bloco">
-        <div class="eg-bloco-h"><h2>Ativos</h2><span class="n">{{ o.ativos|length }}</span></div>
+      {# as tarefas da OS, uma a uma (Levi, 06/11/2026: "Nos ativos deve mostrar um check quando a tarefa for concluída";
+         "Quando temos mais de um ativo deve ter a opção de abrir as subtarefas do ativo e responder a subtarefa"; "Ao lado
+         do ativo deve ter um botão de 'Iniciar atividade' [...] pode ter a opção de pausar"; "Botão de anexar na tarefa,
+         aí terá ao lado do nome do ativo 'x anexos' e os botões de iniciar, pausar ou concluir!"). O engenharia-os.js lê
+         as tarefas pelo OS Creator (/os/api/os/<id>/tarefas, na sessão do Fracttal) e troca a lista do REST por elas; sem
+         a sessão, fica a lista do REST. Os botões que gravam saem para quem `acoes_tarefa` (o administrador, até a prova no
+         Fracttal; depois a Engenharia) #}
+      <section class="eg-bloco" data-tarefas-os data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-tarefas-url="{{ tarefas_url }}"
+               data-tarefa-url="{{ tarefa_url }}" data-motivos-url="{{ motivos_url }}" data-anexos-url="{{ anexos_url }}"
+               data-incluir-url="{{ incluir_url }}" data-login="{{ login_fracttal }}" data-acoes="{{ 'sim' if acoes_tarefa else '' }}">
+        {# recolher os ativos (Levi, 06/11/2026: "quero só que dê para recolher os ativos"): o Esconder do título esconde o
+           corpo, e o navegador lembra a escolha (engenharia-os.js) #}
+        <div class="eg-bloco-h"><h2>{{ 'Ativos' if o.ativos|length > 1 else 'Tarefa' }}</h2>{% if o.ativos|length > 1 %}<span class="n">{{ o.ativos|length }}</span>{% endif %}
+          <button type="button" class="eg-recolher" data-recolher-ativos aria-expanded="true" aria-controls="corpo_ativos"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-recolher-rotulo>Esconder</span></button></div>
+        <div id="corpo_ativos" data-ativos-corpo>
+        <div class="eg-tar-lista" data-tarefas-lista hidden></div>
+        <input type="file" multiple hidden data-tarefa-arquivos accept="{{ regras_anexo[0] }}">
+        <p class="eg-pdf-msg" data-tarefas-msg role="status" hidden></p>
+        {% if o.ativos|length > 1 %}
         {# Levi, 24/10/2026: "no ativos também quero que limite a 5 por vez!": os 5 primeiros e o "Mostrar mais", como a
            tabela de ativos da Nova solicitação (lá de 10 em 10) #}
-        <table class="eg-t"><tbody>{% for a in o.ativos %}<tr data-ativo{% if loop.index > 5 %} hidden{% endif %}><td class="k eg-mono">{{ a.codigo }}</td><td class="v">{{ a.nome }}</td></tr>{% endfor %}</tbody></table>
+        <div data-tarefas-rest><table class="eg-t"><tbody>{% for a in o.ativos %}<tr data-ativo{% if loop.index > 5 %} hidden{% endif %}><td class="k eg-mono">{{ a.codigo }}</td><td class="v">{{ a.nome }}</td></tr>{% endfor %}</tbody></table>
         {% if o.ativos|length > 5 %}{% set resto = o.ativos|length - 5 %}<div class="eg-mais" data-mais-caixa><span data-mais-conta>Mostrando 5 de {{ o.ativos|length }}</span>
           <button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" data-mais-ativos="5">Mostrar mais {{ [resto, 5]|min }}</button>
           {% if resto > 5 %}<button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" data-mais-ativos="tudo">Mostrar todos ({{ o.ativos|length }})</button>{% endif %}</div>{% endif %}
-      </section>{% endif %}
+        </div>{% endif %}
+        </div>
+      </section>
       <section class="eg-bloco">
         <div class="eg-bloco-h"><h2>Na nota da OS</h2></div>
         {% if o.nota %}<p class="eg-ac-nota">{{ o.nota }}</p>{% else %}<p class="eg-vazio-l">A OS está sem nota.</p>{% endif %}
@@ -211,7 +267,8 @@
   {% endif %}
   {% endif %}
 </div>
-{% if o %}<script src="{{ url_for('static', filename='engenharia-os.js') }}"></script>
+{% if o %}{% include "oscreator/card_os_abrir.html" %}
+<script src="{{ url_for('static', filename='engenharia-os.js') }}"></script>
 <script>
 (function () {
   // a seta do PDF de cada OS da cadeia: o engenharia-os.js (o mesmo das últimas OS da gaveta do ativo)

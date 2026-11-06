@@ -63,6 +63,7 @@ window.NexusOsCard = window.NexusOsCard || (function () {
     if (moldura) fechar(false);
     op = opcoes || {}; voltar = document.activeElement;
     var q = new URLSearchParams({status: op.status || '', de: location.pathname + location.search});
+    if (op.acao) q.set('acao', op.acao);              // o card abre já nesta ação (06/11/2026: a página da OS da Engenharia)
     moldura = document.createElement('iframe');
     moldura.className = 'nexus-card-os';
     moldura.title = op.folio ? 'OS ' + op.folio : 'Detalhe da OS';

@@ -29,7 +29,7 @@
 </style>
 </head>
 <body class="os-form os-modal-aberto">
-<div class="os-modal" id="os_card" data-fragmento="{{ (fragmento)|na_raiz }}" data-pagina="{{ (pagina)|na_raiz }}">
+<div class="os-modal" id="os_card" data-fragmento="{{ (fragmento)|na_raiz }}" data-pagina="{{ (pagina)|na_raiz }}" data-acao="{{ acao or '' }}">
   <div class="os-modal-fundo" data-fechar></div>
   <div class="os-modal-card os-form" role="dialog" aria-modal="true" aria-label="Detalhe da OS">
     <button type="button" class="os-modal-x" data-fechar aria-label="Fechar">&times;</button>
@@ -89,6 +89,10 @@
         corpo.innerHTML = h; corpo.scrollTop = 0;
         var det = corpo.querySelector('.det');
         if (det && window.OsAcoes) window.OsAcoes.contagem(det);
+        // a ação que a tela de baixo pediu (06/11/2026): o clique no botão do próprio card, com o diálogo e a regra dele
+        var acao = modal.getAttribute('data-acao');
+        var b = acao && det ? det.querySelector('[data-acao="' + acao + '"]') : null;
+        if (b && !b.disabled) b.click();
       })
       .catch(function () {
         corpo.innerHTML = '<p class="os-erro" style="padding:24px">Não consegui carregar a OS aqui. <a class="os-link" href="'

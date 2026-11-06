@@ -374,11 +374,41 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   04/11/2026 o App de Campo e esta página levaram 429 juntos, com o Nexus a 77 pedidos/min. A OS que não existe (404)
   não tem o botão.
 - **Trocar o responsável** (Levi, 24/10/2026: "em responsável quero a opção de mudar de responsável que nem é feito
-  no chamados"): o "trocar" ao lado do nome nos Dados, só para a Engenharia, abre o diálogo da tela do chamado (Hoje
+  no chamados"): o clique no nome do responsável nos Dados (06/11/2026: "tire esse botão trocar e a troca pode ser feita ao
+  clicar no nome"; o nome leva o traço de clique), só para a Engenharia, abre o diálogo da tela do chamado (Hoje
   está com..., a busca pelo nome, Atribuir), pela API do OS Creator (`/os/api/responsaveis` e
   `/os/api/os/<id>/responsavel`, a mesma do `os_acoes.js`), na sessão do Fracttal da pessoa; sem ela, o aviso traz o
   login do Fracttal. O nome muda ali mesmo, e a volta ao quadro passa a levar `?atualizar=1`: o quadro guarda a leitura
   do Fracttal por até 5 min, e a OS seguiria com quem estava.
+- **Ações da OS** (Levi, 06/11/2026: "poderia incluir um botão de incluir anexo?"; "Nessas telas devem ter essas opção
+  também: Enviar para verificação, concluir e cancelar!"): a caixa embaixo dos Dados (`engenharia-os.js`), em dois grupos (06/11/2026: "organize melhor a informação"):
+  Anexos (o Incluir anexo na ponta e as duas contagens em linhas) e Andamento (a verificação e o concluir lado a lado, o
+  cancelar à parte). As regras do anexo não ficam à vista: estão na dica do botão e no "!" do título da caixa (ao lado
+  do título da OS, longo, a caixa do "!" abria para fora da tela). Os anexos (a
+  contagem do card, `/os/os/<id>/anexos`), o Enviar para verificação (OS a fazer ou em execução), o Concluir e o
+  Cancelar (OS que não fechou) abrem o card do OS Creator já no diálogo (`NexusOsCard.abrir(id, {acao})`: as regras e
+  as confirmações são as dele), e a página relê quando o card mudou a OS.
+  O Incluir anexo sobe daqui mesmo (`POST /os/api/os/<id>/anexos`; o seletor de arquivos não abre dentro da moldura do
+  card), com o accept e as regras do OS Creator (`_regras_do_anexo`), ou colando (Ctrl+V ou Win+V, fora de campo de
+  texto: o "Anexar à OS" confirma). Regras do envio em `nexus/torres/oscreator/README.md`.
+- **As tarefas da OS, uma a uma** (Levi, 06/11/2026, pela OS 16289, de seis inversores: o check no ativo da tarefa
+  concluída, abrir e responder as subtarefas de cada ativo, "Iniciar atividade" com pausa, "Anexar" e "x anexos" ao lado
+  do ativo): o bloco Ativos vira o painel `[data-tarefas-os]` (`engenharia-os.js`) quando a sessão do Fracttal lê as
+  tarefas (`/os/api/os/<id>/tarefas`); sem ela, fica a lista do REST. O Esconder do título recolhe o bloco, e o
+  navegador lembra; as linhas são enxutas, sem caixa por ativo ("reduza as fontes em 30%", "separe por linhas sutis").
+  Cada linha: o ✓ quando o Fracttal tem a data de fim
+  da tarefa, "x de y subtarefas", "x anexos" (as fotos das subtarefas e os arquivos da aba Anexos da tarefa, onde o
+  Anexar grava) e o cronômetro do Fracttal (Iniciar, Pausar com o motivo, Retomar, Concluir). O Concluir pede as
+  obrigatórias respondidas, encerra o tempo e não lança outro registro (as horas dobrariam); o ✓ sai da tarefa relida, e
+  quando o Fracttal não a marca como finalizada a tela diz. O número da subtarefa aceita vírgula ("7,9" vai como 7.9).
+  **Os botões são da Engenharia** (`TAREFAS_PARA_A_EQUIPE = True`) desde a prova no TESTE - PA (OS 18750, de dois
+  inversores, e 18751; 06/11/2026), lida de volta do Fracttal: encerrar o cronômetro deixa a tarefa Finalizada (o ✓); o
+  concluir não lança outro registro (uma execução, as horas não dobram); o anexo da tarefa fica nela; o anexo da OS entra
+  também na Em Verificação, na Concluída e na Cancelada. O início do cronômetro vem do Fracttal em UTC sem o fuso: o
+  painel o lê como UTC. False devolve os botões só ao administrador. Rotas e regras em `nexus/torres/oscreator/README.md`.
+- **O comentário na OS de várias tarefas não vai para o Fracttal** (pedido de 06/11/2026: "o certo é comentar e já
+  incluir na nota da OS"): falta achar o caminho da nota da OS com várias tarefas (a sessão do OS Creator não tem um
+  provado; o experimento é gravar uma marca numa OS de TESTE e reler a nota de cada tarefa). Até lá, fica no Nexus.
 - **Status e prioridade** moram no livro `nexus_engenharia_os` (`nexus/engenharia/os_acompanhamento.py`; regra no
   `nexus/dados/CLAUDE.md`): os oito do time (Análise de Solução, Atividade em Andamento, Diagnóstico em Andamento,
   Agendamento de OS, Tratativa com Equipe de Campo, Validação Final, Stand-By, Diagnóstico Concluído; o id é a ordem do

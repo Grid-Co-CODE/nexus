@@ -118,6 +118,28 @@
         <div class="msg ok" data-msg hidden></div>
         {% with d = {"folio": c.folio, "responsavel": c.responsavel} %}{% include "_dlg_responsavel.html" %}{% endwith %}
       </section>
+      {# as ações da OS aqui mesmo (Levi, 06/11/2026: "Nessas telas devem ter essas opção também: Enviar para verificação,
+         concluir e cancelar!", e o Incluir anexo com os anexos para ver e baixar): os botões e os diálogos do card
+         (os_acoes.js e _dlg_acoes_os.html), sem o card; o que muda o status da OS relê a página (data-no-lugar) #}
+      {% if d and d.get('folio') %}<section class="bloco" data-os-acoes data-no-lugar data-wid="{{ wid }}" data-folio="{{ c.folio }}">
+        <div class="bloco-h"><h2>Ações da OS</h2></div>
+        <div class="det-cols" data-anexos="/os/os/{{ wid }}/anexos">
+          <div class="det-card det-anexo v" data-acao="anexos-sub" role="button" tabindex="0" title="Fotos, arquivos e notas das subtarefas"><span class="det-ico-sq v">{{ icone('camera', '#A6E22E', 22) }}</span><div class="det-anexo-t"><b>Anexos das subtarefas</b><div class="det-ajuda">do técnico</div></div><span class="det-n v" data-n="sub">…</span></div>
+          <div class="det-card det-anexo a" data-acao="anexos-os" role="button" tabindex="0" title="Fotos, arquivos e notas anexados à OS"><span class="det-ico-sq a">{{ icone('monitor', '#57B6F5', 22) }}</span><div class="det-anexo-t"><b>Anexos da OS</b><div class="det-ajuda">por usuário</div></div><span class="det-n a" data-n="os">…</span></div>
+        </div>
+        <div class="det-anx-incluir">
+          <button type="button" class="det-b" data-acao="anexo-incluir" title="Anexar arquivos a esta OS no Fracttal: {{ acoes_anexo_regra() }}">Incluir anexo</button>
+          <input type="file" multiple hidden data-anx-arquivos accept="{{ acoes_anexo_aceitar() }}">
+        </div>
+        {# sem o Concluir: o "Finalizar chamado" do topo já conclui a OS no Fracttal e ajusta o quadro (a resposta da sessão
+           do OS Creator, 06/11/2026: dois finalizar confundiriam). A verificação só na OS em processo; o cancelar, na aberta #}
+        {% if c.status_id in (1, 2) %}<div class="det-acoes-os">
+          {% if c.status_id == 1 %}<button type="button" class="det-b ambar" data-acao="verificacao" title="Muda a OS para Em Verificação no Fracttal (precisa de permissão na sua conta)">Enviar para verificação</button>{% endif %}
+          <button type="button" class="det-b perigo" data-acao="cancelar" title="Cancela a OS no Fracttal (precisa de permissão na sua conta)">Cancelar OS</button>
+        </div>{% endif %}
+        <div class="msg ok" data-msg hidden></div>
+        {% include "_dlg_acoes_os.html" %}
+      </section>{% endif %}
     </aside>
     <div>
       {# o resto do cabeçalho da nota (a OS criada à mão para um chamado que já existia, 20/10/2026: Status atual, Ticket,
@@ -187,4 +209,10 @@
 </section>
 {% endblock %}
 {% block scripts %}<script src="{{ estatico('acomp.js') }}"></script>
-<script src="{{ estatico('os_acoes.js') }}"></script>{% endblock %}
+<script src="{{ estatico('os_acoes.js') }}"></script>
+<script>
+  // a contagem dos anexos da caixa Ações da OS, como o card faz ao abrir
+  document.querySelectorAll('[data-os-acoes] [data-anexos]').forEach(function (el) {
+    if (window.OsAcoes) window.OsAcoes.contagem(el.closest('[data-os-acoes]'));
+  });
+</script>{% endblock %}
