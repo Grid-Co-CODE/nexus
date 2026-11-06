@@ -11,7 +11,6 @@
   // o setor da tela (06/11/2026: a Performance é esta mesma tela, com a etiqueta e a equipe dela): o endereço das rotas e
   // o nome nas frases
   const SETOR = raiz.dataset.setor || 'engenharia', SETOR_NOME = raiz.dataset.setorNome || 'Engenharia';
-  const SETOR_ENV = raiz.dataset.setorEnv || 'OS_WEB_ENGENHARIA_RESPONSAVEIS';
   const API = '/os/api/solicitacao/' + SETOR;
   if (!raiz) return;
   const cbCli = $('cb_cli'), cbUsi = $('cb_usi'), busca = $('busca'), cbTipo = $('cb_tipo'), tbody = $('tbody');
@@ -213,8 +212,7 @@
       cbResp.innerHTML = '<option value="">— Selecione —</option>'
         + pessoas.map((p) => '<option value="' + esc(p.id_personnel) + '">' + esc(p.name) + '</option>').join('');
       cbResp.disabled = !pessoas.length;
-      if (!j.configurado) hintResp.textContent = 'A lista da ' + SETOR_NOME + ' não está configurada (' + SETOR_ENV
-        + ' na tela Chaves do Nexus ou no .env do servidor).';
+      if (!j.configurado) hintResp.textContent = j.aviso || ('A lista da ' + SETOR_NOME + ' não está configurada.');
       else if ((j.faltam || []).length) hintResp.textContent = 'Não achei no Fracttal: ' + j.faltam.join(', ') + '.';
       else hintResp.textContent = '';
     } catch (e) {

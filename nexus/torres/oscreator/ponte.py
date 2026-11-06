@@ -339,6 +339,32 @@ def ligar_leitor_do_clone(app, nome: str) -> bool:
         return False
 
 
+def membros_do_setor(app):
+    """O gancho `solic_eng_web.MEMBROS_DO_SETOR`: (setor da Nova solicitação) → os ids do Fracttal de quem está hoje no
+    setor do Nexus com esse papel (a última decisão de cada pessoa no livro `nexus_setores`, guardado 1 min), em texto; None
+    quando o setor não é dos do Nexus ou não deu para ler o livro (a tela diz). O id do Fracttal da pessoa é o
+    `id_personnel` que o OS Creator usa no responsável."""
+    from ...cadastro import setor_ids
+    por_setor = {"performance": setor_ids.PERFORMANCE}
+
+    def membros(setor):
+        sid = por_setor.get(str(setor or ""))
+        if sid is None:
+            return None
+        try:
+            with app.app_context():
+                from ...cadastro import setores as S
+                from ...campo import visao
+                st = S.ler(visao._base(), visao._sessao())
+        except Exception:        # noqa: BLE001 — sem banco: a tela diz que não leu os setores
+            logging.exception("OS Creator: os setores do Nexus não foram lidos para a Nova solicitação")
+            return None
+        if st.get("erro") and not st.get("decisoes"):
+            return None
+        return {str(fid) for fid, s in S.vigentes(st.get("decisoes") or []).items() if s == sid}
+    return membros
+
+
 def _criar_clone(app):
     # append, não insert: o que já está instalado continua vencendo; os nomes do clone (api, steps, tickets_*...)
     # não existem no Nexus nem na biblioteca padrão
@@ -381,12 +407,10 @@ def _criar_clone(app):
 
     from . import subtarefas_padrao
     perf_web.SUBTAREFAS_PADRAO = subtarefas_padrao.ligar(app)
-    # a equipe da Performance na Nova solicitação (06/11/2026): os nomes gravados na tela Chaves do Nexus valem por cima
-    # do .env do OS Creator (nexus/auth/chaves.py, OS_WEB_PERFORMANCE_RESPONSAVEIS). Variável que a tela não guarda: None
+    # a equipe da Performance na Nova solicitação (06/11/2026, Levi: "Já tem no setor da performance em base > acessos"):
+    # quem está no setor Performance em Base → Acessos → Pessoas e setores, no contexto do Nexus
     from os_web import solic_eng_web
-
-    from ...auth import chaves
-    solic_eng_web.LER_NOMES = lambda var: (chaves.valor(var, app.config) if var in chaves.CHAVES else None)
+    solic_eng_web.MEMBROS_DO_SETOR = membros_do_setor(app)
     # o original fala http com a plataforma na mesma máquina; aqui o cookie segue o do Nexus (Secure no servidor)
     clone.config["SESSION_COOKIE_SECURE"] = bool(app.config.get("SESSION_COOKIE_SECURE"))
     # e mora no /os do Nexus, debaixo do prefixo em que ele roda (o clone fixa "/os", que debaixo de /nexus não ia ao

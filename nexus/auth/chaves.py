@@ -143,18 +143,7 @@ def _conferir_andamento(nome: str):
     return conferir
 
 
-def _conferir_nomes(valor: str) -> str:
-    """Os nomes da equipe, separados por ';' (ou vírgula): ao menos um, e nenhum que pareça outra coisa (dígito, '@')."""
-    nomes = [n.strip() for n in re.split(r"[;,]", valor or "") if n.strip()]
-    if not nomes:
-        raise Recusada("Escreva ao menos um nome (separe os nomes por ponto e vírgula): nada foi gravado.")
-    if any(re.search(r"[0-9@]", n) for n in nomes):
-        raise Recusada("Escreva só os nomes das pessoas, separados por ponto e vírgula: nada foi gravado.")
-    return "%d nome(s); quem não casar com ninguém do Fracttal aparece na tela da solicitação" % len(nomes)
-
-
-# nome da variável → o que é, para que serve, e a conferência antes de gravar. `texto`: o valor é uma lista de nomes, e os
-# espaços de dentro ficam (numa chave, todo espaço colado junto sai)
+# nome da variável → o que é, para que serve, e a conferência antes de gravar
 CHAVES = {
     "NEXUS_CONTESTACAO_CHAVE_PRIVADA": {
         "nome": "Contestações dos clientes (chave privada)",
@@ -194,17 +183,6 @@ CHAVES = {
         "arquivo": "",
         "dica": "a ANDAMENTO_NEXUS_CHAVE do .env do servidor da Ronda COS",
         "conferir": _conferir_andamento("NEXUS_COS_ANDAMENTO_CHAVE"),
-    },
-    # a equipe da Performance na Nova solicitação do OS Creator (06/11/2026; Levi escolheu "Só a equipe da Performance"):
-    # os nomes ficam fora do repositório (público), e pela tela não dependem da T.I. A da Engenharia segue no .env do OS
-    # Creator (OS_WEB_ENGENHARIA_RESPONSAVEIS)
-    "OS_WEB_PERFORMANCE_RESPONSAVEIS": {
-        "nome": "Responsáveis da Performance (Nova solicitação do OS Creator)",
-        "para": "o menu de Responsável da Nova solicitação → Performance, no OS Creator (só esses nomes)",
-        "arquivo": "",
-        "dica": "os nomes da equipe como estão no Fracttal, separados por ponto e vírgula (Nome Sobrenome; Nome Sobrenome)",
-        "texto": True,
-        "conferir": _conferir_nomes,
     },
 }
 
@@ -311,8 +289,7 @@ def gravar(config, nome: str, texto: str, quem: str) -> str:
     """Confere e grava a chave colada; devolve o aviso. Recusada = nada mudou."""
     if nome not in CHAVES:
         raise Recusada("Chave desconhecida: nada foi gravado.")
-    # a linha do arquivo, sem espaço nem quebra colados junto; numa lista de nomes (`texto`), os espaços de dentro ficam
-    v = (" " if CHAVES[nome].get("texto") else "").join(str(texto or "").split())
+    v = "".join(str(texto or "").split())             # a linha do arquivo, sem espaço nem quebra colados junto
     if not v:
         raise Recusada("Cole a chave antes de gravar.")
     if len(v) > TAMANHO_MAX:

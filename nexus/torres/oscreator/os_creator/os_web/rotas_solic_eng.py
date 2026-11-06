@@ -8,7 +8,7 @@ ativo no `por_ativo`. Os anexos (08/10) sobem depois de a
 OS existir, pelo `api.attach_imagem_os`, o mesmo caminho das imagens da Performance e do Tradicional.
 
 A Performance (06/11/2026) é a mesma tela e as mesmas rotas com o setor no endereço (`/solicitacao/performance`): muda a
-etiqueta (PERFORMANCE), a lista de responsáveis e o nome do setor nas frases (`reg.SETORES`)."""
+etiqueta (PERFORMANCE), a equipe (a do setor Performance em Base → Acessos) e o nome do setor nas frases (`reg.SETORES`)."""
 from __future__ import annotations
 import datetime as dt
 import json
@@ -41,7 +41,7 @@ def tela(setor):
     # a hora COM segundos: é a base de onde a tela anda o relógio da data mostrada (que o servidor recalcula ao criar)
     agora_s = dt.datetime.now(reg.BRT).strftime(_FMT + ":%S")
     return render_template("solic_eng.html", conta=_conta(), aba="solic", setor=setor,
-                           setor_nome=reg.setor_de(setor)["nome"], setor_env=reg.setor_de(setor)["env"],
+                           setor_nome=reg.setor_de(setor)["nome"],
                            clientes=sorted(perf_web.clientes_reais(assets)), usinas=perf_web.usinas_para(assets, None),
                            agora=agora_s, evento=agora.strftime(_FMT),
                            programada=reg.data_br(reg.data_padrao(agora, False)), dias=reg.DIAS_PADRAO,
@@ -69,11 +69,8 @@ def api_ativos(setor):
 @bp.route("/api/solicitacao/" + _SETOR + "/responsaveis")
 @exige_sessao
 def api_responsaveis(setor):
-    nomes = reg.nomes_configurados(setor=setor)
-    if not nomes:
-        return jsonify({"pessoas": [], "faltam": [], "configurado": False})
-    pessoas, faltam = reg.responsaveis(rotas.responsaveis_fracttal(), nomes)
-    return jsonify({"pessoas": pessoas, "faltam": faltam, "configurado": True})
+    pessoas, faltam, configurado, aviso = reg.equipe(rotas.responsaveis_fracttal(), setor)
+    return jsonify({"pessoas": pessoas, "faltam": faltam, "configurado": configurado, "aviso": aviso})
 
 
 def _abrir_limite():
@@ -110,7 +107,7 @@ def api_criar(setor):
     # faltando a pessoa ou a etiqueta ENGENHARIA no Fracttal, nenhuma OS sai. O catálogo (`catalogos.py`) serve à TELA; a
     # pessoa desligada e a etiqueta apagada nas últimas horas seguiriam nele até a renovação (a etapa 4 do canto central o
     # tinha posto aqui, e a revisão da 4.1 o tirou). E a sessão morta cai já aqui, antes de gravar: 401 e o login
-    permitidos, _ = reg.responsaveis(api.responsaveis_ao_vivo(), reg.nomes_configurados(setor=setor))
+    permitidos = reg.equipe(api.responsaveis_ao_vivo(), setor)[0]
     ativos, c, erro = reg.montar(corpo, por_id, permitidos, _agora(), api.perf_os_nome, setor=setor)
     if erro:
         return jsonify({"erro": erro}), 400

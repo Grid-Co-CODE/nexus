@@ -2637,11 +2637,11 @@ performance!"; e, no quiz do responsável, "Só a equipe da Performance".
   agrupada); tipo Administrativa e só a Classificação 1, Programada. O que muda vem de `solic_eng_web.SETORES`: a
   etiqueta **PERFORMANCE**, sempre e só ela (faltando no Fracttal, nenhuma OS sai), a lista de responsáveis e
   "Performance" nas frases. A Nova solicitação tem agora três abas: PCM, Engenharia e Performance.
-- **Os responsáveis:** só a equipe da Performance, da `OS_WEB_PERFORMANCE_RESPONSAVEIS` (nomes separados por `;`, que casam
-  com o Fracttal como os da Engenharia). Os nomes não vão ao código (o repositório é público): o administrador os cola em
-  Base → Chaves das fontes → aba Nexus, cifrados na pasta de dados, sem a T.I. (o gancho `solic_eng_web.LER_NOMES`, que
-  a ponte liga, vale por cima do .env do OS Creator). Sem a lista, a tela abre e diz que falta. A da Engenharia segue no
-  .env (`OS_WEB_ENGENHARIA_RESPONSAVEIS`).
+- **Os responsáveis:** só a equipe da Performance, que é quem está no setor Performance em Base → Acessos → Pessoas e
+  setores (Levi: "Já tem no setor da performance em base > acessos"): o gancho `solic_eng_web.MEMBROS_DO_SETOR`, que a
+  ponte liga (`ponte.membros_do_setor`), lê a última decisão de cada pessoa no livro `nexus_setores` (1 min de cópia) e
+  dá os ids do Fracttal, que são o `id_personnel` do responsável. Ninguém do setor no Fracttal, ou o livro fora, a tela
+  abre e diz. Nada no `.env` nem no código. A da Engenharia segue nos nomes do .env (`OS_WEB_ENGENHARIA_RESPONSAVEIS`).
 - Prova: `tests/test_oscreator_solic_performance_06_11.py` (e os da Engenharia, `test_oscreator_solic_engenharia.py`,
   seguem verdes); conferido na bancada (desktop e 375 px).
 

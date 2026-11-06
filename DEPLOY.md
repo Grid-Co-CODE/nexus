@@ -242,8 +242,8 @@ já não traz `/nexus/` (a reescrita da T.I. saiu). A data exata da virada não 
    do `.env` do OS Creator (06/10/2026; o Levi manda a linha, os nomes não vão ao GitHub). Menu vazio = falta a linha.
    O envio com anexos aceita até 21 MB: o Nexus aceita 25 MB por pedido e o Caddy não limita; outro proxy na frente
    precisa de pelo menos 25 MB de corpo. **Solicitação → Performance** (06/11/2026) é a mesma tela com a etiqueta
-   PERFORMANCE; o menu de Responsável traz a equipe da Performance, que o administrador cola em Base → Chaves das fontes →
-   aba Nexus (`OS_WEB_PERFORMANCE_RESPONSAVEIS`, sem a T.I.; a linha no `.env` do OS Creator também vale).
+   PERFORMANCE; o menu de Responsável traz quem está no setor Performance em Base → Acessos → Pessoas e setores (nada no
+   `.env`).
 9. **Depois de subir o canto central do OS Creator (31/10/2026)** (os leitores dos ativos, da lista de OS e dos catálogos
    pequenos; seções 7a e seguintes e `nexus/torres/oscreator/README.md`):
    1. **Nada novo no `.env`.** Os leitores usam a `FRACTTAL_CLIENT_ID`/`FRACTTAL_CLIENT_SECRET` do Campo (a credencial REST da

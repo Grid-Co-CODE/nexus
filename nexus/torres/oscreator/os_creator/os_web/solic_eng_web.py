@@ -28,8 +28,8 @@ Pedidos do Levi de 08/10/2026:
 
 A PERFORMANCE (Levi, 06/11/2026: "adicione mais um em solicitações agora performance, será a mesma coisa porém com
 etiqueta de performance!"): a mesma tela e as mesmas regras, com a etiqueta PERFORMANCE (só ela) e o responsável só entre
-os nomes da equipe da Performance (escolha dele: "Só a equipe da Performance"), da `OS_WEB_PERFORMANCE_RESPONSAVEIS`. Essa
-lista pode vir também da tela Chaves do Nexus (o gancho `LER_NOMES`, que a ponte liga), para não depender da T.I.
+a equipe da Performance ("Só a equipe da Performance"): quem está no setor Performance em Base → Acessos → Pessoas e
+setores ("Já tem no setor da performance em base > acessos"), pelo gancho `MEMBROS_DO_SETOR`, que a ponte liga.
 
 Regras puras (sem Flask): o teste as roda sem rede, e a rota só monta a requisição e a resposta."""
 from __future__ import annotations
@@ -49,12 +49,13 @@ CLASSIF_1 = "Programada"
 # Performance: 06/11/2026, "a mesma coisa porém com etiqueta de performance"
 SETORES = {
     "engenharia": {"nome": "Engenharia", "etiquetas": ("ENGENHARIA",), "env": "OS_WEB_ENGENHARIA_RESPONSAVEIS"},
-    "performance": {"nome": "Performance", "etiquetas": ("PERFORMANCE",), "env": "OS_WEB_PERFORMANCE_RESPONSAVEIS"},
+    "performance": {"nome": "Performance", "etiquetas": ("PERFORMANCE",), "env": None, "do_setor": True},
 }
 ETIQUETAS = SETORES["engenharia"]["etiquetas"]
 ENV_RESPONSAVEIS = SETORES["engenharia"]["env"]
-# o gancho da ponte: (variável) → os nomes gravados na tela Chaves do Nexus, ou None (vale a variável do .env)
-LER_NOMES = None
+# o gancho da ponte: (setor) → os ids do Fracttal (id_personnel, em texto) de quem está hoje no setor do Nexus (Base →
+# Acessos → Pessoas e setores), ou None quando não deu para ler os setores
+MEMBROS_DO_SETOR = None
 SUB_DESCRICAO = "Atividade a ser realizada (de forma direta)"
 ROTULO_PROBLEMA = "Descreva o problema"
 
@@ -116,12 +117,9 @@ def setor_de(setor) -> dict:
 
 # ── os responsáveis do setor ──────────────────────────────────────────────────────────────────────────
 def nomes_configurados(valor: str | None = None, setor: str = "engenharia") -> list:
-    """Os nomes da equipe do setor, separados por ';' (ou vírgula): os da tela Chaves do Nexus (`LER_NOMES`) e, sem eles,
-    os do .env. Sem nenhum dos dois: lista vazia — e a tela diz isso."""
+    """Os nomes da equipe do setor no .env, separados por ';' (ou vírgula). Sem a variável: lista vazia — e a tela diz isso."""
     env = setor_de(setor)["env"]
-    if valor is None:
-        valor = (LER_NOMES(env) if LER_NOMES else None) or os.environ.get(env, "")
-    bruto = valor
+    bruto = (os.environ.get(env, "") if env else "") if valor is None else valor
     return [n.strip() for n in re.split(r"[;,]", bruto or "") if n.strip()]
 
 
@@ -146,6 +144,29 @@ def responsaveis(pessoas, nomes) -> tuple[list, list]:
                 achadas.append({"id_personnel": p["id_personnel"], "code": p.get("code") or "", "name": p.get("name") or ""})
     achadas.sort(key=lambda p: _sem_acento(p["name"]))
     return achadas, faltam
+
+
+def equipe(pessoas, setor: str = "engenharia") -> tuple[list, list, bool, str]:
+    """(as pessoas do Fracttal que podem ser o responsável, os nomes do .env que não acharam ninguém, se a lista existe, o
+    aviso da tela quando não existe). A Engenharia pelos nomes do .env; a Performance pelo setor do Nexus
+    (`MEMBROS_DO_SETOR`): quem está no setor, pelo id do Fracttal, que é o `id_personnel` da pessoa."""
+    st = setor_de(setor)
+    if st.get("do_setor"):
+        ids = MEMBROS_DO_SETOR(setor) if MEMBROS_DO_SETOR else None
+        if ids is None:
+            return [], [], False, "Não consegui ler os setores do Nexus agora: tente de novo em instantes."
+        achadas = sorted(({"id_personnel": p["id_personnel"], "code": p.get("code") or "", "name": p.get("name") or ""}
+                          for p in (pessoas or []) if isinstance(p, dict) and p.get("id_personnel")
+                          and str(p["id_personnel"]) in ids), key=lambda p: _sem_acento(p["name"]))
+        if not achadas:
+            return [], [], False, ("Ninguém do setor %s em Base → Acessos → Pessoas e setores está no Fracttal: ponha a "
+                                   "equipe lá." % st["nome"])
+        return achadas, [], True, ""
+    nomes = nomes_configurados(setor=setor)
+    if not nomes:
+        return [], [], False, "A lista da %s não está configurada (%s no .env do servidor)." % (st["nome"], st["env"])
+    achadas, faltam = responsaveis(pessoas, nomes)
+    return achadas, faltam, True, ""
 
 
 # ── as etiquetas ───────────────────────────────────────────────────────────────────────────────────────
