@@ -515,16 +515,43 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .linha-bloco>*{min-width:0;overflow-wrap:anywhere}
 .linha-bloco:first-child{border-top:0}
 
-/* Entrar */
-.pagina-entrar{display:grid;place-items:center;min-height:100vh}
-.entrar{width:min(380px,calc(100vw - 32px));background:var(--superficie);border:1px solid var(--linha);
-  border-radius:14px;padding:28px}
-.entrar-logo{height:26px;display:block;margin-bottom:18px}
-.entrar form{display:flex;flex-direction:column;gap:8px;margin-top:18px}
+/* Entrar (07/11/2026, Levi: "Essa tela inicial do Nexus é feia demais... consegue melhorar?"): o texto e a porta à esquerda,
+   sem cartão, e atrás deles a usina sem fim (static/entrar-usina.js), que passa da borda da tela e some no fundo. O véu
+   escurece a usina atrás do texto; no celular, o texto desce e o véu vem de baixo */
+.pagina-entrar{position:relative;min-height:100vh;margin:0;display:flex;align-items:center;overflow:hidden}
+.entrar-usina{position:absolute;inset:0;width:100%;height:100%}
+.entrar-veu{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,var(--fundo) 0%,var(--fundo) 30%,transparent 66%)}
+.entrar{position:relative;z-index:1;width:min(620px,100%);padding:48px clamp(24px,7vw,112px);pointer-events:none}
+.entrar > *{pointer-events:auto}
+.entrar-logo{height:30px;width:auto;display:block;margin-bottom:52px}
+.entrar .titulo-pagina{margin:0;font:800 clamp(64px,8.5vw,120px)/.92 var(--font-display);letter-spacing:-.025em}
+.entrar-lead{margin:18px 0 0;max-width:32ch;font-size:clamp(16px,1.4vw,19px);line-height:1.55;color:var(--tinta-2)}
+.entrar form{display:flex;flex-direction:column;gap:8px;margin-top:30px;max-width:380px}
 .entrar .gc-btn{justify-content:center;margin-top:8px}
-/* a porta da Microsoft (14/10/2026): o botão é um link (GET), na largura do cartão, como o do formulário */
-.entrar .entrar-ms{display:flex;width:100%;box-sizing:border-box;margin-top:18px;text-decoration:none}
-.entrar .entrar-erro{margin:14px 0 0}
+/* a porta da Microsoft (14/10/2026): o botão é um link (GET); a marca de quatro quadrados é desenhada no CSS, na cor do
+   texto do botão */
+.entrar .entrar-ms{display:inline-flex;align-items:center;gap:12px;min-height:48px;padding:0 22px;margin-top:30px;
+  font-size:15px;text-decoration:none}
+.entrar-ms-marca{display:grid;grid-template-columns:repeat(2,8px);gap:2px}
+.entrar-ms-marca i{width:8px;height:8px;background:currentColor;display:block}
+.entrar .entrar-erro{margin:24px 0 0;max-width:380px}
+/* a usina: a sombra, os pés, o módulo opaco com as células, a luz que passa ao abrir, a névoa da distância e o realce */
+.eu-sombra{fill:var(--sombra)}
+.eu-pe{stroke:var(--mudo);stroke-width:1.4;opacity:.55}
+.eu-modulo{fill:var(--superficie-3);stroke:var(--fundo);stroke-width:1.3}
+.eu-celula{stroke:var(--linha-forte);stroke-width:.5;opacity:.95}
+.eu-brilho{stop-color:var(--verde)}
+.eu-nevoa{fill:var(--fundo);stroke:var(--fundo);stroke-width:1.3}
+.eu-sombra,.eu-pe,.eu-celula,.eu-luz,.eu-nevoa,.eu-realce{pointer-events:none}
+.eu-realce{fill:none;stroke:var(--verde-hover);stroke-width:2.6;stroke-linejoin:round}
+@media (max-width:820px){
+  .pagina-entrar{align-items:flex-end}
+  .entrar-veu{background:linear-gradient(180deg,transparent 0%,var(--fundo) 52%)}
+  .entrar{padding:28px 20px 40px}
+  .entrar-logo{margin-bottom:28px}
+  .entrar .titulo-pagina{font-size:60px}
+  .entrar .entrar-ms{display:flex;width:100%;justify-content:center}
+}
 
 /* Celular: o menu sobe para cima do conteúdo */
 /* Tela média (notebook pequeno, janela lado a lado): menu mais estreito, nomes longos quebram. */
@@ -601,10 +628,10 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
    sistema (o script nem pede): aí a troca é seca, e o *{transition:none} de cima continua valendo. */
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.18s}
 
-/* No claro: o logo (branco) vai na faixa navy do alto do cartão de entrada, como no topo das telas; o texto de exemplo dos
+/* No claro: o logo (branco) vai numa placa navy, como no topo das telas; o texto de exemplo dos
    campos usa o mudo (o cinza padrão do navegador, #757575, fica abaixo de 4,5:1 no #f5f6f8). */
-:root[data-tema="claro"] .entrar-logo{box-sizing:content-box;width:100%;margin:-28px -28px 22px;padding:22px 28px;
-  background:var(--marca-fundo);border-radius:13px 13px 0 0;object-fit:contain;object-position:left center}
+:root[data-tema="claro"] .entrar-logo{box-sizing:content-box;padding:10px 14px;margin-left:-14px;background:var(--marca-fundo);
+  border-radius:10px}
 :root[data-tema="claro"] ::placeholder{color:var(--mudo);opacity:1}
 
 /* o sino dos insights no topo (03/11/2026): o número de sem dono, vermelho com crítico; a lista curta por cima da tela */
