@@ -76,7 +76,9 @@ def test_setor_tema_e_sair_so_no_menu_da_conta(logado):
 
 
 def test_no_celular_fica_so_o_avatar_ao_lado_do_sino():
-    celular = CSS.split("@media (max-width:820px)", 1)[1].split("\n}\n", 1)[0]
+    # o bloco do topo, e não o primeiro de 820 px do arquivo: a tela de entrar (07/11/2026) tem o seu antes dele
+    celular = next(b for b in (p.split("\n}\n", 1)[0] for p in CSS.split("@media (max-width:820px)")[1:])
+                   if ".botao-menu" in b)
     # linha 1, a marca e o Menu; linha 2, o sino e o avatar (o Setor, o Tema e o Sair moram no menu da conta, 03/11/2026;
     # numa linha só, a 375 px, o "Nexus" da marca entrava por baixo do Menu)
     assert "grid-template-columns:minmax(0,1fr) auto auto;" in celular
