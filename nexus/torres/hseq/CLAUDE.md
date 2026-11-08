@@ -76,9 +76,9 @@ Prova: `tests/test_hseq_mesa.py` (os grupos, os filtros em cascata, os de atenç
 
 **O e-mail semanal das pendências** (24/10/2026; `nexus/hseq/email_semanal.py`, livro
 `nexus_hseq_email · fato_email_pendencias`, no catálogo antes da 1ª gravação). A TST: "Receber report semanal das pendências por email, pra mim e pro
-supervisor responsável"; Levi escolheu mandar pelo App de Campo, que já manda e-mail. Toda segunda depois das 07:00 de
-Brasília o Nexus monta o e-mail de cada destinatário com as mesmas contas da Mesa (`_pendencias(fl)`) e publica uma
-linha por destinatário, uma vez por semana; o App lê, manda e diz o que mandou.
+supervisor responsável"; Levi escolheu mandar pelo App de Campo, que já manda e-mail. Da segunda depois das 07:00 de
+Brasília até o fim da semana (a API fora a segunda inteira não perde a semana; auditoria de 08/11/2026) o Nexus monta o e-mail de cada destinatário com as mesmas contas da Mesa (`_pendencias(fl)`) e publica uma
+linha por destinatário, uma vez por semana (o livro é lido antes de montar, para o laço de 10 min não refazer os e-mails); o App lê, manda e diz o que mandou.
 - **Quem recebe:** a TST (as pessoas do setor Segurança em Base → Acessos → Pessoas e setores, pelo código do e-mail) com todas
   as usinas, e cada Responsável UFV com pendência, só com as usinas dele e **a TST em cópia** (03/11/2026, Levi:
   "sempre mandar para responsável e deixar a [TST] em cópia"; quem copia é o App, com os destinatários das linhas
@@ -342,7 +342,7 @@ extintor é excluído e vai para um histórico de extintores excluídos com o mo
   à equipe): o pedido sai quando TODOS os extintores atuais da usina, sem os excluídos, chegam conferidos depois dele
   (a "Recebida em", UTC, do livro `extintores_conferencias_app_campo · Conferências`, lido só quando há pedido:
   `extintores.recebidas`) ou marcados como não reconhecidos depois dele; pedido às 10h e ronda às 14h do mesmo dia é
-  atendido. A marca de não reconhecido conta pela hora a partir da v296 do App (o "Não reconhecido em" passa a vir com a hora UTC
+  atendido. Usina que já tem pedido pendente recusa o 2º (ele zeraria o que a equipe já refez). A marca de não reconhecido conta pela hora a partir da v296 do App (o "Não reconhecido em" passa a vir com a hora UTC
   em que o servidor a recebeu); antes, só com o dia, ela conta do dia seguinte ao pedido em diante; usina sem extintor segue
   pendente. Grava também o nome da usina que o App usa (`usina_app`).
 - Saiu a "Editar quantidade de extintores" (Levi: "como cada extintor tem um cadastro unitário então o certo seria" a
@@ -361,7 +361,7 @@ extintor é excluído e vai para um histórico de extintores excluídos com o mo
 - **Editar o extintor** (`fato_edicao_extintor`; a TST, 24/10/2026: "Eu consigo editar o cadastro de extintores?"), no
   mesmo botão direito ("Editar extintor"): a caixa vem com o que a tela mostra (local, posição, classe, peso e as duas
   validades; o código não muda, nem se cadastra extintor novo, que entra pelo App) e grava só o que mudou
-  (`decisoes.editar`, `campos` = JSON {coluna do livro do App: valor novo}). As validades no formato da etiqueta
+  (o JS desabilita o campo igual ao que a caixa abriu, para a página velha não desfazer a edição de outra pessoa; `decisoes.editar`, `campos` = JSON {coluna do livro do App: valor novo}). As validades no formato da etiqueta
   (recarga MM/AAAA ou Sem data; hidrostático AAAA, MM/AAAA ou Sem selo), o peso em kg (vazio não mexe: há extintor
   sem peso no cadastro). Local, posição e classe vêm numa lista com tudo o que já foi registrado no cadastro (Levi,
   26/10/2026: "todas as classe possíveis e posições possíveis e locais possíveis registrados até o momento"; a lista
