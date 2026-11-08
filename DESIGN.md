@@ -95,6 +95,11 @@ Número em coluna ou em cartão leva `.gc-num` (algarismos de largura igual). As
 - **De 821 a 1180px:** o menu estreita (196px) e o setor do topo encolhe.
 - **Até 1180px:** o botão de tema mostra só o ícone.
 - **A prova é a 375px:** nenhuma rolagem lateral da página (tabela larga rola dentro da própria caixa).
+- **As larguras de quebra (`@media`) são seis:** 480 (celular pequeno), 640 (celular), 820 (o menu vira botão), 900
+  (tablet), 1100 (desktop estreito) e 1180 (o menu estreito). O par de cada uma vale (`max-width:639px` com
+  `min-width:640px`). Em 08/11/2026 havia mais de 15 larguras diferentes, e o responsivo de uma tela não batia com o da
+  vizinha; as antigas estão em `tests/test_larguras_de_quebra.py` e só diminuem (sai a da tela conferida a 375px e no
+  desktop com a largura padrão mais perto). CSS novo com outra largura não passa no teste.
 
 ## 5. Como uma tela se monta
 
