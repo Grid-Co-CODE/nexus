@@ -73,13 +73,16 @@ def test_o_cliente_ve_so_as_usinas_dele(app, dados, cliente_tela, logado):
     link = re.search(r'id="cli-link" type="text" readonly value="([^"]+)"', html).group(1)
     assert "/entrar?convite=" in link and "esperando a senha" in html
     assert 'id="cli-link"' not in logado.get(URL + "?aba=clientes").get_data(as_text=True)   # o link aparece uma vez
-    # o setor Clientes na matriz: só a tela que recorta pelo cliente se marca
+    # o setor Clientes na matriz (08/11/2026): toda tela se marca; a que ainda não recorta pelo cliente leva "falta o
+    # filtro" e não abre para ele (a Central de atenção, marcada, segue fechada para o cliente)
     mat = logado.get(URL + f"?setor={SID.CLIENTES}").get_data(as_text=True)
-    assert "Clientes" in mat and 'value="campo/cliente"' in mat and 'value="campo/atencao"' not in mat
-    assert logado.post(URL, data={"codigo": _codigo(logado, URL), "acao": "telas_setor", "setor": str(SID.CLIENTES),
-                                  "tela": ["campo/cliente", "campo/atencao"]}).status_code == 400
-    assert logado.post(URL, data={"codigo": _codigo(logado, URL), "acao": "telas_setor", "setor": str(SID.CLIENTES),
-                                  "tela": ["campo/cliente"]}).status_code == 303
+    assert "Clientes" in mat and 'value="campo/cliente"' in mat and 'value="campo/atencao"' in mat
+    item = mat[mat.index('value="campo/atencao"'):].split("</li>", 1)[0]
+    assert "falta o filtro" in item and "falta o filtro" not in mat[mat.index('value="campo/cliente"'):].split("</li>", 1)[0]
+    r = logado.post(URL, data={"codigo": _codigo(logado, URL), "acao": "telas_setor", "setor": str(SID.CLIENTES),
+                               "tela": ["campo/cliente", "campo/atencao"]})
+    assert r.status_code == 303
+    assert "1 marcada espera o filtro por cliente" in logado.get(r.headers["Location"]).get_data(as_text=True)
     ST.limpar()
     # o cliente cria a senha pelo link e entra
     c = app.test_client()

@@ -120,6 +120,7 @@ def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]
         contas = CL.estado(cfg)["contas"]
         setores.append({"id": SID.CLIENTES, "nome": "Clientes", "cliente": True,
                         "pessoas": sum(1 for c in contas if c.get("status") == "ativa"),
+                        # a conta é a das telas que o cliente JÁ vê (marcadas e com o filtro pronto)
                         "telas": len(matriz.get(SID.CLIENTES, set()) & possiveis)})
     sel = next((s for s in setores if s["id"] == escolhido), None) or (setores[0] if setores else None)
     do_setor = ST.das_do_setor(sel) if sel and not sel.get("cliente") else set()
@@ -129,8 +130,10 @@ def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]
         telas = [{"chave": ST.chave(t.id, s.id), "nome": s.nome, "pronta": f"/t/{t.id}/{s.id}" in prontas,
                   "marcada": ST.chave(t.id, s.id) in marcadas, "do_setor": ST.chave(t.id, s.id) in do_setor,
                   "de_todos": s.de_todos,
-                  # no setor Clientes, a tela que não recorta pelas usinas do cliente fica presa e desmarcada
-                  "fora_cliente": bool(sel and sel.get("cliente")) and not s.do_cliente}
+                  # no setor Clientes (08/11/2026, Levi: "a ideia é liberar os campos e conforme for o cliente
+                  # aparecerá as usinas só daquele cliente"): toda tela se marca; a que ainda não recorta pelas usinas
+                  # do cliente leva o aviso "falta o filtro" e não abre para ele até o filtro dela ficar pronto
+                  "falta_filtro": bool(sel and sel.get("cliente")) and not s.do_cliente}
                  for s in t.telas]
         arvore.append({"id": t.id, "nome": t.nome, "icone": t.icone, "telas": telas,
                        "marcadas": sum(x["marcada"] for x in telas)})
@@ -341,25 +344,29 @@ def _gravar_telas():
 
 
 def _gravar_telas_clientes(marcadas: list[str]):
-    """O Salvar do setor Clientes: só as telas que recortam pelas usinas do cliente (Tela.do_cliente)."""
+    """O Salvar do setor Clientes: qualquer tela se marca (08/11/2026); o cliente só abre as marcadas que já recortam
+    pelas usinas dele (Tela.do_cliente; `setor_telas._acesso_do_cliente`), e a marca das outras espera o filtro."""
     cfg = current_app.config
     possiveis = ST.telas_do_cliente_possiveis()
+    todas = _todas_as_telas()
     try:
-        if not set(marcadas) <= possiveis:
-            raise ST.Recusada("Só as telas que mostram apenas as usinas do cliente podem ser marcadas para Clientes: "
-                              "nada foi gravado.")
+        if not set(marcadas) <= todas:
+            raise ST.Recusada("Tela desconhecida na matriz: nada foi gravado.")
         base, sessao = ST._banco()
-        r = ST.gravar(SID.CLIENTES, marcadas, possiveis, cfg, base, sessao, _meu_email())
+        r = ST.gravar(SID.CLIENTES, marcadas, todas, cfg, base, sessao, _meu_email())
     except ST.Recusada as ex:
         return _pagina(erro=str(ex), status=400, setor_escolhido=SID.CLIENTES)
     except Exception as ex:      # noqa: BLE001
         log.error("Telas por setor (Clientes): a gravação falhou (%s: %s); nada mudou.", type(ex).__name__, ex)
         return _pagina(erro=f"Não consegui gravar no banco ({type(ex).__name__}): nada mudou.", status=500,
                        setor_escolhido=SID.CLIENTES)
-    n = r["liberadas"]
-    telas = "nenhuma tela" if not n else "1 tela" if n == 1 else f"{n} telas"
-    session[_CHAVE_AVISO] = (f"Clientes agora veem {telas}. Vale no próximo clique de cada cliente." if r["gravadas"]
-                             else f"Nada mudou: Clientes já viam {telas}.")
+    prontas = len(set(marcadas) & possiveis)
+    esperam = len(set(marcadas) - possiveis)
+    txt = ("nenhuma tela" if not prontas else "1 tela" if prontas == 1 else f"{prontas} telas")
+    espera = (f" {esperam} {'marcada espera' if esperam == 1 else 'marcadas esperam'} o filtro por cliente e "
+              f"{'aparece' if esperam == 1 else 'aparecem'} quando ele ficar pronto." if esperam else "")
+    session[_CHAVE_AVISO] = ((f"Clientes agora veem {txt}." if r["gravadas"] else f"Nada mudou: Clientes já viam {txt}.")
+                             + espera)
     return redirect(url_for("torre_base.acessos", setor=SID.CLIENTES, _anchor="ace-setores"), code=303)
 
 

@@ -635,4 +635,3 @@ details.ace-mais>summary:focus-visible{outline:2px solid var(--foco);outline-off
 .cli-link-linha{display:flex;gap:8px;flex-wrap:wrap}
 .cli-link-linha input{flex:1 1 320px;min-width:0;font-family:var(--font-mono);font-size:12px}
 .cli-novo{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
-.ace-fora-cliente label{color:var(--mudo)}

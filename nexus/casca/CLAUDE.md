@@ -140,8 +140,12 @@ avulso"):** a 5ª aba, **Clientes** (`?aba=clientes`, `auth/clientes.py`). Decid
   atômica e trava. No arquivo vão o resumo da senha e o sha256 do convite, nunca a senha nem o token.
 - **Cada conta é ligada a um cliente do cadastro** (`cliente_id`): a sessão leva o `cliente_id` e as telas recortam por
   ele, nunca pelo endereço (a Visão do cliente ignora o `?cliente=` do cliente; `cliente_tela.py`).
-- **O setor Clientes** (`setor_ids.CLIENTES = 900`, fora do `dim_setor`) aparece na matriz de telas; só se marcam as telas
-  com `Tela.do_cliente` (hoje só a Visão do cliente); as outras ficam presas, com "todos os clientes".
+- **O setor Clientes** (`setor_ids.CLIENTES = 900`, fora do `dim_setor`) aparece na matriz de telas. Desde 08/11/2026
+  (Levi: "a ideia é liberar os campos e conforme for o cliente aparecerá as usinas só daquele cliente") TODA tela se
+  marca; a que ainda não recorta pelas usinas do cliente leva "falta o filtro" e NÃO abre para ele: o cliente vê só as
+  marcadas com `Tela.do_cliente` (hoje só a Visão do cliente). As marcadas sem filtro são a fila de trabalho: cada uma
+  ganha o filtro por `setor_telas.cliente_da_sessao()`, um teste tentando ver a usina de outro cliente, e o
+  `do_cliente=True`. As telas da Performance que são molduras da plataforma pedem o filtro também do lado de lá.
 - **O portão do cliente** (`setor_telas.portao_cliente`), sempre ligado (com a `NEXUS_ACESSO_POR_SETOR` em 0 também): só
   a tela exata marcada, só GET; o Início leva à 1ª tela dele; o resto, 403 (página "Esta página não faz parte do seu
   acesso") ou JSON. Sem sino, sem a conferência do Fracttal. A cada clique o portão confere a conta (ativa, com senha,

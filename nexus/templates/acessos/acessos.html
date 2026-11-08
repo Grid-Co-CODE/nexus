@@ -9,7 +9,7 @@
 {# uma tela na caixa da torre: a que é DO setor (Tela.do_setor, 13/10/2026) fica marcada e presa, sem ir ao Salvar #}
 {% macro item(s) %}
   {% if s.do_setor %}<li><label><input type="checkbox" data-do-setor checked disabled> {{ s.nome }}</label>{% if s.de_todos %}<span class="ace-do-setor" title="Todo setor vê esta tela sem marcar">de todos</span>{% else %}<span class="ace-do-setor" title="Tela do setor {{ setor_sel.nome }}: quem é dele vê sem marcar">do setor</span>{% endif %}</li>
-  {% elif s.fora_cliente %}<li class="ace-fora-cliente"><label><input type="checkbox" disabled> {{ s.nome }}</label><span class="ace-construcao" title="Esta tela mostra as usinas de todos os clientes: o setor Clientes não a vê">todos os clientes</span></li>
+  {% elif s.falta_filtro %}<li><label><input type="checkbox" name="tela" value="{{ s.chave }}" {% if s.marcada %}checked{% endif %}> {{ s.nome }}</label><span class="ace-construcao" title="Esta tela ainda mostra as usinas de todos os clientes: marcada, ela aparece para o cliente quando o filtro por cliente dela ficar pronto">falta o filtro</span></li>
   {% else %}<li><label><input type="checkbox" name="tela" value="{{ s.chave }}" {% if s.marcada %}checked{% endif %}> {{ s.nome }}</label>{% if not s.pronta %}<span class="ace-construcao">em construção</span>{% endif %}</li>{% endif %}
 {% endmacro %}
 <p class="gc-eyebrow">Base · Acessos</p>
