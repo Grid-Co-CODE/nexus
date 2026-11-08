@@ -269,9 +269,11 @@ def test_o_parado_fora_de_usina_mostra_a_cidade_e_o_estado(app, cliente, pontos,
     """A cidade sai da malha de municípios do IBGE no disco (Task 7b): "Cidade/UF". Sem a malha (nos testes o IBGE
     nunca é chamado de verdade), só o estado, como no teste de cima."""
     from test_equipe_municipios import IBGE
-    # a malha de Goiás baixada antes (a mentira do IBGE), e o processo reiniciado: a tela lê só o disco
+    # a malha de Goiás baixada antes (a mentira do IBGE, numa "thread" que termina na hora), e o processo reiniciado:
+    # a tela lê só o disco
     pasta = Path(app.config["NEXUS_DADOS"])
-    assert MU.cidade(-16.8123, -49.8321, "GO", pasta=pasta, baixar=IBGE()) == "Cidade Um Teste"
+    assert MU.cidade(-16.8123, -49.8321, "GO", pasta=pasta, baixar=IBGE(), iniciar=lambda alvo: alvo()) is None
+    assert (pasta / "equipe" / "ibge" / "GO.json").exists()
     MU.limpar()
     _, html = _html(_entrar(cliente, EMAIL[PCM]))
     fora = html.split('class="eq-lado"', 1)[1].split("Parados fora de usina", 1)[1].split("</section>", 1)[0]
@@ -282,6 +284,24 @@ def test_o_parado_fora_de_usina_mostra_a_cidade_e_o_estado(app, cliente, pontos,
     # quem está na usina não ganha cidade nenhuma (está no mapa)
     _, html = _html(cliente, query_string={"tecnico": NA_USINA})
     assert "Cidade Um Teste" not in html
+
+
+def test_a_pagina_nunca_baixa_do_ibge_e_a_cidade_vem_na_proxima(cliente, pontos, setor, monkeypatch):
+    """Revisão de 08/11/2026: a abertura do mapa nunca espera o IBGE. Sem a malha da UF no disco, a página sai já com
+    só o estado e manda UMA ida ao IBGE para o fundo; a próxima abertura tem a cidade."""
+    from test_equipe_municipios import IBGE, Fundo
+    ibge, fundo = IBGE(), Fundo()
+    monkeypatch.setattr(MU, "_baixador", lambda: ibge)
+    monkeypatch.setattr(MU, "_em_fundo", fundo)
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    fora = html.split('class="eq-lado"', 1)[1].split("Parados fora de usina", 1)[1].split("</section>", 1)[0]
+    assert NOME[FORA] in fora and "· GO ·" in fora and "/GO" not in fora
+    assert ibge.pedidos == [] and len(fundo.alvos) == 1               # a página não baixou; uma ida em fundo
+    _html(cliente, query_string={"tecnico": FORA})                     # a ida corre: não dispara outra
+    assert len(fundo.alvos) == 1
+    fundo.terminar()
+    _, html = _html(cliente)
+    assert "Cidade Um Teste/GO" in html.split('class="eq-lado"', 1)[1] and len(ibge.pedidos) == 2
 
 
 # ── o Abrir rota ─────────────────────────────────────────────────────────────────────────────────────────────────────
