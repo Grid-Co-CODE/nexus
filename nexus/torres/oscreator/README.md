@@ -2720,8 +2720,12 @@ O desenho "o chamado do tracker na ronda" (Levi, 08/11/2026: "segue!"; o texto m
     vez, com a sessão de quem abriu (a credencial da empresa só lê); só no servidor acha alguma coisa (a lista central).
     Só as Inspeções realizadas a partir da data de início: ligar não cria administrativa para as antigas.
 - Prova: `tests/test_chamado_garantia_acompanhamento.py`, `tests/test_dados_chamado_aberto.py` e
-  `tests/test_oscreator_acomp_cadeia_08_11.py`. **Não conferido no Fracttal**: a criação espera a prova no TESTE - PA com
-  o OK do Levi, antes de ligar.
+  `tests/test_oscreator_acomp_cadeia_08_11.py`. **Conferido no Fracttal** em 08/11/2026 (TESTE - PA, numa cópia com o
+  Fracttal de verdade e o banco falso): a Inspeção 18862 (Inversor 1.1 Huawei, duas respostas, posta em verificação) ganhou
+  a administrativa 18863, lida de volta com a 18862 de pai, tipo Administrativa, etiqueta CHAMADOS, a nota com as respostas
+  pela chave do formulário e a subtarefa do ticket; a volta seguinte não criou outra; as duas canceladas. A prova achou a
+  "Data da falha" da nota na hora UTC do Fracttal, 3 h à frente de Brasília (o pacote desde 30/07, igual no App):
+  corrigido no pacote 1.3.1.
 
 ## A Nova solicitação para a Performance (06/11/2026)
 

@@ -41,7 +41,11 @@ d = cg.montar_acompanhamento(inspecao, fabricante,
 - A subtarefa única é "Nº do ticket / protocolo aberto no fabricante": o quadro acha o ticket por "ticket"/"protocolo".
 - Fica fora daqui: o payload do RPC, os ids do Fracttal e o responsável (cada lado tem o seu).
 - O App copia a pasta inteira para `middleware/chamado_garantia`; as duas pontas sobem a 1.3.0 juntas.
-- Prova: `tests/test_chamado_garantia_acompanhamento.py` (a nota comparada com a cópia do laço do App v332).
+- **1.3.1 (08/11/2026): a data da falha na hora de Brasília** (`spec.derivados`). O Fracttal grava em UTC, às vezes sem o
+  fuso, e a nota escrevia essa hora como se fosse daqui, 3 h à frente (a prova no TESTE - PA: a OS criada às 02:49 saiu
+  "05:49"; perto da meia-noite, o dia e o "Menos de 7 dias" erravam também). Sem fuso = UTC; o "hoje" sem fuso é o de
+  Brasília. Vale para as duas pontas: o App copia a pasta.
+- Prova: `tests/test_chamado_garantia_acompanhamento.py` (a nota comparada com a cópia do laço do App v332, e a hora).
 
 ## Uso no app de campo
 

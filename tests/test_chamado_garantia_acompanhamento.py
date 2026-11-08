@@ -99,7 +99,7 @@ def _checklist():
 
 
 def test_versao_e_o_que_o_pacote_expoe():
-    assert cg.__version__ == "1.3.0"
+    assert cg.__version__ == "1.3.1"
     for nome in ("montar_acompanhamento", "mapa_chaves", "respostas_de", "nota_aguardando", "AGUARDANDO_INSPECAO",
                  "SUBTAREFA_TICKET"):
         assert nome in cg.__all__ and hasattr(cg, nome), nome
@@ -163,3 +163,21 @@ def test_o_quadro_do_acompanhamento_reconhece_a_os():
     assert d["nota"].startswith(acomp_web.MARCA_NOTA)
     item = acomp_web.item_do_ticket([{"descricao": d["subtarefas"][0]["description"], "resposta": ""}])
     assert item is not None
+
+
+def test_a_data_da_falha_na_hora_de_brasilia():
+    """1.3.1 (08/11/2026): o Fracttal grava em UTC, às vezes sem o fuso; a nota escrevia essa hora 3 h à frente (a prova no
+    TESTE - PA: a OS criada às 02:49 saiu "05:49"). Sem fuso = UTC; o dia muda perto da meia-noite."""
+    import datetime as dt
+    assert cg.__version__ == "1.3.1"
+    assert cg.derivados({"tipo": TIPO}, "2026-11-08T05:49:00")["data_falha"] == "08/11/2026 02:49"
+    assert cg.derivados({"tipo": TIPO}, "2026-11-08T02:30:00Z")["data_falha"] == "07/11/2026 23:30"
+    assert cg.derivados({"tipo": TIPO}, "2026-11-07T23:30:00-03:00")["data_falha"] == "07/11/2026 23:30"
+    brt = dt.timezone(dt.timedelta(hours=-3))
+    # o "Menos de 7 dias" pelo mesmo instante: 6 dias e 23 h depois ainda é Sim; o "hoje" sem fuso é o de Brasília
+    d = cg.derivados({"tipo": TIPO}, "2026-11-01T03:00:00Z", hoje=dt.datetime(2026, 11, 7, 23, 0, tzinfo=brt))
+    assert (d["data_falha"], d["menos_7d"], d["dias_desde_incidente"]) == ("01/11/2026 00:00", "Sim", "6")
+    d = cg.derivados({"tipo": TIPO}, "2026-11-01T03:00:00", hoje=dt.datetime(2026, 11, 8, 0, 0))
+    assert (d["menos_7d"], d["dias_desde_incidente"]) == ("Não", "7")
+    nota = cg.montar_acompanhamento(dict(INSPECAO, event_date="2026-11-08T05:49:00"), MARCA)["nota"]
+    assert "Data da falha: 08/11/2026 02:49" in nota

@@ -29,6 +29,7 @@ Tipos de subtarefa
 Sondados ao vivo na conta 4987 (1=Texto, 2=Sim/Não, 3=Número, 4=Verificação, 7=Lista). NÃO existe tipo Data nesta conta (o id 3 é
 Número), então data/hora vai como texto com o formato na própria pergunta.
 """
+import datetime as _datetime
 import re
 import unicodedata
 
@@ -357,6 +358,9 @@ def subtarefas(tipo_ativo: str, fabricante: str) -> list:
 DIAS_DOA = 7          # a Huawei trata à parte o equipamento com pouco tempo de operação
 
 
+_BRT = _datetime.timezone(_datetime.timedelta(hours=-3))   # o fuso da data da falha na nota (1.3.1)
+
+
 def derivados(tipo_ativo: str, event_date, hoje=None) -> dict:
     """Campos do chamado que o APP sabe — não viram pergunta para o técnico.
 
@@ -385,8 +389,17 @@ def derivados(tipo_ativo: str, event_date, hoje=None) -> dict:
         except ValueError:
             dt = None
     if dt is not None:
+        # A HORA DE BRASÍLIA (1.3.1, 08/11/2026): o Fracttal grava em UTC, às vezes sem o fuso ("2026-11-08T05:49:00"), e até
+        # a 1.3.0 a nota escrevia essa hora como se fosse daqui, 3 h à frente (a prova no TESTE - PA: a OS criada às 02:49
+        # saiu "Data da falha: 08/11/2026 05:49"; perto da meia-noite, o dia errado e o "Menos de 7 dias" também). Sem fuso
+        # = UTC, como o Fracttal grava; e o "hoje" sem fuso é o de Brasília
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_dt.timezone.utc)
+        dt = dt.astimezone(_BRT)
         out["data_falha"] = dt.strftime("%d/%m/%Y %H:%M")
-        ref = hoje or _dt.datetime.now(dt.tzinfo) if dt.tzinfo else (hoje or _dt.datetime.now())
+        ref = hoje or _dt.datetime.now(_BRT)
+        if ref.tzinfo is None:
+            ref = ref.replace(tzinfo=_BRT)
         try:
             dias = (ref - dt).days
             out["menos_7d"] = "Sim" if dias < DIAS_DOA else "Não"

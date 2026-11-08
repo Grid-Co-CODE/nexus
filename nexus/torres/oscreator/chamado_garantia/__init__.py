@@ -48,5 +48,6 @@ __all__ = [
     # a OS de acompanhamento (a 3ª, do time de chamados), desde a 1.3.0 (08/11/2026): nasce com a Inspeção realizada
     "montar_acompanhamento", "mapa_chaves", "respostas_de", "nota_aguardando", "AGUARDANDO_INSPECAO", "SUBTAREFA_TICKET",
 ]
-__version__ = "1.3.0"     # 1.1.0: ativos.py (tipo do ativo pelo código); 1.2.0: registro.py e a marca por palavra inteira;
+__version__ = "1.3.1"     # 1.1.0: ativos.py (tipo do ativo pelo código); 1.2.0: registro.py e a marca por palavra inteira;
 #                           1.3.0: acompanhamento.py (a OS do time de chamados, com as respostas; 08/11/2026)
+#                           1.3.1: a data da falha na hora de Brasília (o Fracttal grava em UTC; 08/11/2026)
