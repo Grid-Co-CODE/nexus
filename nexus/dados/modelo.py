@@ -20,13 +20,14 @@ TIPO_ROTULO = {"transacao": "transação", "snapshot_periodico": "foto periódic
 # entre usinas). nao: nunca (nota, percentual, RPN: média, mínimo, máximo).
 SOMA = ("aditiva", "semi", "nao")
 # `_ms` entrou em 31/10/2026 com o tempo de resposta das telas do OS Creator (fato_uso_os: mediana e p95 em milissegundos)
-SUFIXOS_UNIDADE = ("_min", "_kwh", "_kwh_m2", "_mm", "_pct", "_qtd", "_pts", "_nivel", "_brl", "_ms")
+# `_km` entrou em 08/11/2026 com a distância entre usinas do Mapa de equipe (fato_deslocamento_equipe)
+SUFIXOS_UNIDADE = ("_min", "_kwh", "_kwh_m2", "_mm", "_pct", "_qtd", "_pts", "_nivel", "_brl", "_ms", "_km")
 
 
 @dataclass(frozen=True)
 class Medida:
     coluna: str     # com a unidade no nome (SUFIXOS_UNIDADE); indicador sem sufixo, só 1/0
-    unidade: str    # "min", "kWh", "kWh/m²", "mm", "%", "qtd", "pts", "nível 1-5", "R$", "ms", "1/0"
+    unidade: str    # "min", "kWh", "kWh/m²", "mm", "%", "qtd", "pts", "nível 1-5", "R$", "ms", "km", "1/0"
     soma: str       # SOMA
 
 

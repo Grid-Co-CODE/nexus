@@ -22,6 +22,12 @@ RESUMO = {
     "sugestao": "As sugestões que as pessoas mandam para melhorar o Nexus",
     "status_sugestao": "Cada mudança de status das sugestões, de Iniciada a Concluída",
     "evento_insight": "Quem assumiu ou concluiu cada insight do motor de regras",
+    # ── Mapa de equipe (08/11/2026) ──
+    "ponto_equipe": "Os pontos de posição do técnico no expediente, só cifrados",
+    "deslocamento_equipe": "Cada deslocamento do técnico entre duas usinas, com tempo e distância",
+    "evento_aparelho": "Cada aparelho que recebeu ou perdeu a chave do mapa de equipe",
+    "decisao_piloto": "Quem entrou ou saiu do piloto do mapa de equipe, e quem decidiu",
+    "acesso_mapa": "Quem abriu o mapa de equipe ou a rota de um técnico, e quando",
     "pedido_area": "Os pedidos de retorno a cada área, com o prazo e a resposta",
     "mensagem_conversa": "As mensagens com @menção de cada insight, OS e usina",
     "evento_aviso": "Os avisos das OS no sino: solicitação que virou OS e quem já leu",
@@ -99,6 +105,20 @@ RESUMO = {
 }
 
 PARA_QUE = {
+    "ponto_equipe": "Guarda os pontos de posição que o celular do técnico manda durante o expediente (das 6h às 22h), "
+                    "para o Mapa de equipe mostrar onde cada um está. A coordenada só existe cifrada (Cofre) e o livro "
+                    "do dia é apagado pela T.I. depois de 7 dias; serve para a coordenação de campo acompanhar a equipe.",
+    "deslocamento_equipe": "Guarda cada deslocamento fechado do técnico, da usina de saída à de chegada, com a hora, o "
+                           "tempo e a distância, sem coordenada. Fica 1 ano; serve para medir o tempo perdido na "
+                           "estrada e planejar melhor a rota das equipes.",
+    "evento_aparelho": "Guarda cada vez que um aparelho recebeu ou perdeu a chave para mandar a posição ao Nexus, com "
+                       "o dia e a hora. Serve para saber qual celular da equipe está habilitado e para revogar o que "
+                       "foi perdido ou trocado.",
+    "decisao_piloto": "Guarda cada decisão de colocar um técnico no piloto do Mapa de equipe ou de tirá-lo, com o dia e "
+                      "a hora, e quem decidiu só por HMAC. Serve para provar que só participa do piloto quem foi "
+                      "incluído de propósito.",
+    "acesso_mapa": "Guarda cada vez que alguém abriu o Mapa de equipe ou a rota de um técnico, com o dia e a hora. É a "
+                   "trilha da LGPD: serve para responder quem viu a localização de quem, e quando.",
     "fechamento": "Guarda cada tarefa de manutenção que o técnico fecha no App de Campo, com a nota que o painel deu, "
                   "as fotos, as peças e o tempo gasto. Serve para acompanhar a qualidade e a produção do campo por "
                   "usina, equipe, técnico e equipamento, e para ligar o que foi feito ao que o PCM programou.",

@@ -147,6 +147,51 @@ FATOS = (
                     "o dono vale o último assumiu/concluiu/reabriu. Avisar uma área e o retorno dela são pedidos com "
                     "prazo (pedido_area, nexus_pedidos, desde 03/11/2026; este livro nunca os gravou). O nome de quem "
                     "fez e a nota só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
+    # 08/11/2026 (Mapa de equipe): onde o técnico está no expediente e o rastro entre usinas. Registrados antes da 1ª
+    # gravação (regra 10). Nada pessoal em claro: a coordenada só cifrada (Cofre), o decisor e quem abriu só por HMAC
+    Fato("ponto_equipe", "Ponto de posição da equipe", "campo", "nexus_equipe_pontos_AAAA_MM_DD · fato_ponto_equipe",
+         "1 linha = 1 ponto de posição de 1 técnico num instante (celular do Nexus Field), dentro do expediente",
+         _d(data=("id", "data_id (o dia de Brasília do ponto)"), pessoa=("id", "pessoa_id do técnico")),
+         tipo="sem_medida", chave=("ponto_id",), fontes=("nexus_equipe_pontos_AAAA_MM_DD · fato_ponto_equipe",),
+         janela_origem="7 dias (o livro do dia some pela T.I.)",
+         observacao="a coordenada só existe cifrada (Cofre, contexto equipe/ponto/<ponto_id>), na coluna cifra; nada em "
+                    "claro. Um livro por dia (nexus_equipe_pontos_AAAA_MM_DD): a T.I. apaga o livro do dia com mais de "
+                    "7 dias (LGPD). O expediente é das 6h às 22h, hora de Brasília"),
+    Fato("deslocamento_equipe", "Deslocamento da equipe entre usinas", "campo",
+         "nexus_equipe_deslocamentos_AAAA_MM · fato_deslocamento_equipe",
+         "1 linha = 1 deslocamento fechado de 1 técnico, da usina de saída à de chegada",
+         _d(data=("id", "data_id (o dia de Brasília da saída)"), pessoa=("id", "pessoa_id do técnico"),
+            usina=("id", "usina_id_saida e usina_id_chegada")),
+         tipo="transacao", chave=("deslocamento_id",),
+         medidas=_m([("duracao_min", "min", "aditiva"), ("distancia_km", "km", "aditiva")]),
+         fontes=("nexus_equipe_deslocamentos_AAAA_MM · fato_deslocamento_equipe",),
+         janela_origem="1 ano (o livro do mês some pela T.I.)",
+         observacao="sem coordenada: só as usinas, as horas, o tempo e a distância entre elas. Um livro por mês "
+                    "(nexus_equipe_deslocamentos_AAAA_MM), guardado por 1 ano"),
+    Fato("evento_aparelho", "Aparelho da equipe habilitado ou revogado", "campo",
+         "nexus_equipe_aparelhos · fato_evento_aparelho",
+         "1 linha = 1 evento (emitida, revogada) da chave de 1 aparelho de 1 técnico para o Mapa de equipe",
+         _d(data=("id", "data_id (o dia de Brasília do evento)"), pessoa=("id", "pessoa_id do técnico")),
+         tipo="sem_medida", chave=("evento_id",), fontes=("nexus_equipe_aparelhos · fato_evento_aparelho",),
+         janela_origem="o Nexus é a fonte",
+         observacao="evento = emitida ou revogada; da chave só o hash (chave_hash), nunca a chave. Só acrescenta: nada "
+                    "se edita nem se apaga"),
+    Fato("decisao_piloto", "Decisão do piloto do Mapa de equipe", "campo", "nexus_equipe_piloto · fato_decisao_piloto",
+         "1 linha = 1 decisão de pôr 1 técnico no piloto do Mapa de equipe ou de tirá-lo",
+         _d(data=("id", "data_id (o dia de Brasília da decisão)"), pessoa=("id", "pessoa_id do técnico")),
+         tipo="sem_medida", chave=("decisao_id",), fontes=("nexus_equipe_piloto · fato_decisao_piloto",),
+         janela_origem="o Nexus é a fonte",
+         observacao="no_piloto = 1 (entrou) ou 0 (saiu); vale a última decisão de cada pessoa. Quem decidiu só por "
+                    "HMAC (decidida_por_hmac). Só acrescenta: nada se edita nem se apaga"),
+    Fato("acesso_mapa", "Acesso ao Mapa de equipe", "campo", "nexus_equipe_acessos · fato_acesso_mapa",
+         "1 linha = 1 vez que 1 pessoa abriu o mapa ou a rota de 1 técnico",
+         _d(data=("id", "data_id (o dia de Brasília do acesso)"),
+            pessoa=("id", "pessoa_id de quem abriu (e o pessoa_hmac); alvo_pessoa_id é o técnico visto"),
+            usina=("id", "usina_id, quando a rota foi aberta a partir de uma usina")),
+         tipo="sem_medida", chave=("acesso_id",), fontes=("nexus_equipe_acessos · fato_acesso_mapa",),
+         janela_origem="o Nexus é a fonte",
+         observacao="trilha da LGPD: quem abriu o mapa ou a rota (acao = abriu_mapa ou abriu_rota) e de quem. Só "
+                    "acrescenta: nada se edita nem se apaga"),
     # 03/11/2026 (Fase 2 dos setores conversando): a conversa presa ao objeto (insight, OS, usina) com @menção de pessoa
     # e de área. Registrado antes da 1ª gravação
     Fato("mensagem_conversa", "Mensagem de conversa com menção", "base", "nexus_conversas · fato_mensagem",
@@ -1619,12 +1664,34 @@ LIVROS = (
           "deixa o pendente onde está e a gravação do dia seguinte leva tudo. Só contagens: nem pessoa nem setor (o corte "
           "por setor fica no disco do servidor)",
           so_cresce=True),
+    # Mapa de equipe (08/11/2026): registrados antes da 1ª gravação (regra 10). Pontos: um livro por dia, que a T.I. apaga
+    # com 7 dias (por isso sem trava de só-cresce); deslocamentos: um por mês, 1 ano
+    Livro("nexus_equipe_pontos_AAAA_MM_DD", ("fato_ponto_equipe",), "a cada envio de pontos do celular do técnico",
+          "nexus/campo/equipe, pela rota /t/campo/equipe/posicoes", False,
+          "registrado em 08/11/2026 antes da 1ª gravação (regra 10): nasce no 1º ponto do dia; a T.I. apaga o do dia "
+          "com mais de 7 dias. Coordenada só cifrada"),
+    Livro("nexus_equipe_deslocamentos_AAAA_MM", ("fato_deslocamento_equipe",), "a cada deslocamento fechado",
+          "nexus/campo/equipe, ao fechar a chegada na usina", False,
+          "registrado em 08/11/2026 antes da 1ª gravação (regra 10): nasce no 1º deslocamento do mês; guardado 1 ano",
+          so_cresce=True),
+    Livro("nexus_equipe_aparelhos", ("fato_evento_aparelho",), "a cada chave emitida ou revogada",
+          "nexus/campo/equipe, pela tela do Mapa de equipe", False,
+          "registrado em 08/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª chave emitida", so_cresce=True),
+    Livro("nexus_equipe_piloto", ("fato_decisao_piloto",), "a cada entrada ou saída do piloto",
+          "nexus/campo/equipe, pela tela do Mapa de equipe", False,
+          "registrado em 08/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª decisão", so_cresce=True),
+    Livro("nexus_equipe_acessos", ("fato_acesso_mapa",), "a cada abertura do mapa ou da rota",
+          "nexus/campo/equipe, pelas rotas do Mapa de equipe", False,
+          "registrado em 08/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª abertura (trilha da LGPD)",
+          so_cresce=True),
 )
 LIVRO_POR_NOME = {l.nome: l for l in LIVROS}
 # Famílias de livro (um por período): o nome real casa pelo padrão, e as abas são as do Livro de molde no LIVROS.
 FAMILIAS = {re.compile(r"^nexus_geracao_inversor_\d{4}_\d{2}$"): "nexus_geracao_inversor_AAAA_MM",
             re.compile(r"^nexus_almoxarifado_saldo_\d{4}_\d{2}$"): "nexus_almoxarifado_saldo_AAAA_MM",
-            re.compile(r"^nexus_oscreator_uso_\d{4}_\d{2}$"): fato_uso_os.LIVRO_MOLDE}
+            re.compile(r"^nexus_oscreator_uso_\d{4}_\d{2}$"): fato_uso_os.LIVRO_MOLDE,
+            re.compile(r"^nexus_equipe_pontos_\d{4}_\d{2}_\d{2}$"): "nexus_equipe_pontos_AAAA_MM_DD",
+            re.compile(r"^nexus_equipe_deslocamentos_\d{4}_\d{2}$"): "nexus_equipe_deslocamentos_AAAA_MM"}
 
 
 def da_familia(livro: str, aba: str) -> bool:
