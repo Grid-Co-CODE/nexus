@@ -24,7 +24,7 @@
    1920 x 1080 e em 3840 x 2160), relógio, "lido às" de cada fonte e nada de rolagem. O login continua valendo: esta página passa
    pelo mesmo portão (sem sessão, vai para o Entrar e volta para cá). Os controles aparecem ao mexer o mouse ou apertar uma tecla. #}
 <body class="mp-tv-pagina">
-{% set rota = 'torre_performance.mapa_de_risco' %}
+{% set rota = v.rota %}
 {% set cr = v.calor_risco %}
 <div class="cl mp mp-tv{% for s in v.sobre if s not in v.ver %} mp-sem-{{ s }}{% endfor %}{% for n in v.ocultar %} mp-oculta-{{ n }}{% endfor %}" data-mapa data-tv data-fundo="{{ v.fundo }}" data-proxima-s="{{ v.proxima_s }}" data-girar="{{ v.girar or 0 }}">
   <header class="mp-tv-cab">

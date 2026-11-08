@@ -1938,6 +1938,10 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 /* O Mapa de equipe (08/11/2026): o desenho do servidor (o contorno do IBGE e o x/y já projetados; a coordenada nunca chega
    ao navegador) e o painel ao lado. Um nível de superfície (à la Nexus, sem azul em camadas): o quadro do mapa e o painel
    são os únicos cartões, os estados só em contorno, e a cor só no estado do técnico (o ponto e a pílula) */
+/* o botão Técnicos | Usinas (08/11/2026) logo abaixo do título; no Usinas, a hora da leitura do Mapa de risco (a pílula do
+   clima.css) fica na linha dela, do tamanho do texto, antes do mapa */
+.eq-ver{margin-top:14px}
+.eq-usinas-hora{display:inline-block;margin:14px 0 0}
 .eq-filtros .gc-campo{min-width:220px}
 .eq-resumo{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 0}
 .eq-msg--ok{border-color:var(--ok);background:var(--ok-suave)}

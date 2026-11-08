@@ -2,7 +2,7 @@
    (o recorte do servidor, com a projeção dela), a camada de fundo (uma por vez), o que vai por cima e o cliente (o mesmo filtro da
    lista). Tudo é link ou formulário com o estado no endereço: funciona sem JavaScript, e o clima-mapa.js troca a tela sem
    recarregar. #}
-{% set rota = 'torre_performance.mapa_de_risco' %}
+{% set rota = v.rota %}
 <div class="mp-barra{% if lado %} mp-barra--lado{% endif %}" data-parte="barra">
   {# na lateral do mapa (27/10/2026) os grupos descem um embaixo do outro, cada um com o nome; no modo TV, a faixa de antes #}
   {% if lado %}<span class="gc-rotulo" id="mp-regiao-r">Região</span>{% endif %}

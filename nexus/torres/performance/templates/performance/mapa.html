@@ -10,7 +10,9 @@
    fontes (data-proxima-s), sem recarregar e sem perder o zoom. Sem JavaScript, a tela se recarrega como a da lista (60 s; 10 s
    enquanto uma fonte é lida pela primeira vez) e os controles são links. #}
 <noscript><meta http-equiv="refresh" content="{{ v.recarrega_em }}"></noscript>
-<div class="cl mp{% for s in v.sobre if s not in v.ver %} mp-sem-{{ s }}{% endfor %}{% for n in v.ocultar %} mp-oculta-{{ n }}{% endfor %}" data-mapa data-fundo="{{ v.fundo }}" data-proxima-s="{{ v.proxima_s }}">
+{# O corpo do mapa (a raiz data-mapa, o palco, as fontes e o rodapé) mora em _mapa_corpo.html desde 08/11/2026: o Mapa de
+   equipe da Usinas 360° mostra o mesmo mapa dentro dele. Aqui fica só o cabeçalho desta tela, que vai dentro da raiz. #}
+{% set cabecalho_do_mapa %}
   {# Cabeçalho de uma linha (Levi, 27/10/2026: "o foco da tela é o mapa, mas até chega no mapa é quase metade da tela só de texto
      e filtros"): a pergunta da tela e a legenda inteira foram para o "!" ao lado do título; os filtros, para a lateral do mapa. #}
   <header class="cl-cab mp-cab">
@@ -24,96 +26,7 @@
       <p class="cl-atualizada" data-parte="hora">Tela atualizada às {{ v.atualizada }}</p>
     </div>
   </header>
-
-  {% if v.erro_cadastro %}
-  <div class="cl-aviso" role="alert">Cadastro indisponível: {{ v.erro_cadastro }}</div>
-  {% elif v.sem_usinas %}
-  <p class="cl-aviso">Nenhuma usina em operação com coordenada no cadastro{% if v.cliente %} para este cliente{% endif %}. Sem coordenada não há onde pôr a usina no mapa.</p>
-  {% else %}
-
-  <div class="mp-palco" id="mp-palco">
-    {# só o que pede atenção fica acima do mapa: a fonte fora, a leitura em curso, o contorno que não abriu, a usina fora do recorte.
-       A frase das "N usinas com coordenada" virou o total da faixa dos níveis e o texto do "!". #}
-    <div class="mp-notas" data-parte="notas">
-      {% if v.fora_do_recorte %}<p class="cl-nota">{{ v.fora_do_recorte }} {{ "usina em operação está fora deste recorte" if v.fora_do_recorte == 1 else "usinas em operação estão fora deste recorte" }}: escolha outra região ou o Brasil inteiro.</p>{% endif %}
-      {% if v.faltando %}<p class="cl-nota cl-nota--atencao">O mapa não inclui: {{ v.faltando|join(", ") }}. A fonte está fora e a tela tenta de novo sozinha.</p>{% endif %}
-      {% if v.lendo %}<p class="cl-nota cl-nota--atencao">Lendo agora: {{ v.lendo|join(", ") }}. O mapa ainda não inclui essa leitura; a tela se atualiza sozinha em {{ v.recarrega_em }} s.</p>{% endif %}
-      {% if v.erro_contorno %}<p class="cl-nota cl-nota--atencao" role="alert">{{ v.erro_contorno }}</p>{% endif %}
-      {# o porquê do cinza fica à vista (era a ajuda da linha na legenda): sem uma fonte, ninguém pode ser "Sem alerta" #}
-      {% if v.contagem.nx %}<p class="cl-nota">Sem leitura completa: sem leitura de {{ v.sem_leitura_de }}, não dá para dizer que não há alerta. Essas usinas ficam em cinza no mapa.</p>{% endif %}
-    </div>
-    <p class="mp-faixa-estado" role="status" aria-live="polite" hidden></p>
-
-    <div class="mp-corpo">
-      {# Os filtros e a chave de cores na lateral do mapa e, à direita, a tabela das usinas com o risco e o motivo resumido
-         (Levi, 09/10/2026, a tabela; 27/10/2026, "talvez seria legal os filtros laterais"). Estreito, o mapa vem primeiro e o
-         resto desce (clima-mapa.css). #}
-      <aside class="mp-lado" aria-label="Filtros e chave do mapa">
-        {% with lado = true %}{% include "performance/_mapa_barra.html" %}{% endwith %}
-        <div class="mp-busca" hidden>
-          <label class="gc-rotulo" for="mp-busca">Buscar usina</label>
-          <input id="mp-busca" class="gc-campo" type="search" list="mp-busca-lista" placeholder="Nome da usina" autocomplete="off" spellcheck="false">
-          <datalist id="mp-busca-lista" data-parte="busca">{% for u in v.tabela %}<option value="{{ u.nome }}"></option>{% endfor %}</datalist>
-          <span class="mp-busca-msg" role="status" aria-live="polite"></span>
-        </div>
-        {% include "performance/_mapa_chave.html" %}
-      </aside>
-      <div class="mp-centro">
-      {% include "performance/_mapa_status.html" %}
-      <figure class="mp-mapa" id="mp-mapa" tabindex="0" aria-label="Mapa de risco: {{ v.regiao_nome }}" aria-describedby="mp-ajuda">
-        <div class="mp-ferramentas" hidden>
-          <div class="mp-zoom" role="group" aria-label="Aproximar e afastar o mapa">
-            <button type="button" class="mp-bt" data-zoom="mais" aria-label="Aproximar" title="Aproximar (+)">+</button>
-            <button type="button" class="mp-bt" data-zoom="menos" aria-label="Afastar" title="Afastar (−)">&minus;</button>
-            <button type="button" class="mp-bt mp-bt--texto" data-zoom="tudo" title="Enquadrar {{ 'o Brasil inteiro' if v.regiao == 'brasil' else 'a região inteira' }} (0)">{{ "Brasil inteiro" if v.regiao == "brasil" else "Região inteira" }}</button>
-            <button type="button" class="mp-bt mp-bt--texto" data-zoom="voltar" title="Voltar ao enquadramento anterior (Backspace)" disabled>Voltar</button>
-          </div>
-          <button type="button" class="mp-bt mp-bt--texto mp-bt-cheia" data-acao="tela-cheia" aria-pressed="false" hidden>Tela cheia</button>
-        </div>
-        {% include "performance/_mapa_svg.html" %}
-        <div class="mp-dica" id="mp-dica" role="tooltip" hidden></div>
-        <figcaption class="mp-mapa-ajuda" id="mp-ajuda">Roda do mouse aproxima, arrastar move, clique no estado aproxima, clique na usina destaca a linha da tabela (outro clique abre a página dela). No teclado: setas movem, + e − aproximam, 0 enquadra tudo, Backspace volta.</figcaption>
-      </figure>
-      </div>
-      {% include "performance/_mapa_tabela.html" %}
-    </div>
-  </div>
-
-  <h2 class="cl-h2">Fontes</h2>
-  <section class="cl-fontes" aria-label="Estado das fontes" data-parte="fontes">
-    {% for f in v.fontes %}
-    <div class="cl-fonte cl-{{ f.estado }}"><span class="cl-fonte-texto">{{ f.texto }}</span>{% if f.detalhe %}<span class="cl-detalhe">{{ f.detalhe }}</span>{% endif %}</div>
-    {% endfor %}
-  </section>
-  <script type="application/json" id="mp-dados" data-parte="dados">{{ v.dados_js|tojson }}</script>
-  {% endif %}
-
-  {% if v.sem_coordenada %}
-  <section class="cl-pendencia">
-    <h2 class="cl-h2">Sem coordenada no cadastro ({{ v.sem_coordenada|length }})</h2>
-    <p class="cl-nota">Usinas em operação sem latitude e longitude utilizáveis: não aparecem no mapa até o cadastro ser corrigido. {{ v.sem_coordenada|join(", ") }}.</p>
-  </section>
-  {% endif %}
-  {% if v.fora_do_brasil %}
-  <section class="cl-pendencia">
-    <h2 class="cl-h2">Coordenada fora do Brasil no cadastro ({{ v.fora_do_brasil|length }})</h2>
-    <p class="cl-nota">Provável erro de digitação (zero, sinal ou latitude e longitude trocadas); não aparecem no mapa até a correção. {{ v.fora_do_brasil|join(", ") }}.</p>
-  </section>
-  {% endif %}
-  {% if v.ilegiveis %}<p class="cl-nota">{{ v.ilegiveis }} {{ "ficha do cadastro não abriu" if v.ilegiveis == 1 else "fichas do cadastro não abriram" }} (a chave do cadastro não confere): fora do mapa.</p>{% endif %}
-
-  <footer class="cl-rodape">
-    <p><strong>Dados: {{ v.nomes.ibge }}, {{ v.nomes.inmet }} e {{ v.nomes.inpe }}, Programa Queimadas.</strong> <strong>Fogo das últimas 24 h: {{ v.nomes.nasa_firms }}.</strong> Somente leitura: esta tela não grava nada.</p>
-    <ul>
-      <li>Estados: {{ v.nomes.ibge }}, Malhas territoriais (resolução mínima), guardadas no próprio Nexus. A projeção é equiretangular, com a escala do eixo leste-oeste corrigida pela latitude do recorte.</li>
-      <li>Posição das usinas: cadastro do Nexus, acessível só com login. Os números da coordenada não são mostrados.</li>
-      <li>Avisos: {{ v.nomes.inmet }}, avisos meteorológicos ativos, cada um com o seu polígono. O contorno tracejado é o aviso que ainda vai começar.</li>
-      <li>Focos: {{ v.nomes.inpe }}, Programa Queimadas, arquivos de 10 em 10 min da última hora. Um foco é um pixel com fogo detectado, não um incêndio confirmado. A densidade de focos é calculada no Nexus com esses mesmos focos (núcleo de 25 km).</li>
-      <li>Risco de fogo: {{ v.nomes.inpe }}, previsão para hoje e os três dias seguintes, em pixels de cerca de 1 km (0 a 1); entra na cor de cada usina pelo pixel dela.</li>
-      <li>Fogo das últimas 24 h: {{ v.nomes.nasa_firms }}, focos dos satélites VIIRS (S-NPP, NOAA-20 e NOAA-21, pixel de 375 m) e MODIS (Aqua e Terra, pixel de 1 km), com a força (FRP) e a confiança de cada um; no mapa, só os que estão a até 25 km de uma usina. Dados e imagens do FIRMS, parte do Earth Science Data and Information System (ESDIS) da NASA.</li>
-      <li>Os níveis da usina são os da lista de Clima e risco: a mesma regra, as mesmas fontes, o mesmo cache.</li>
-    </ul>
-  </footer>
-</div>
+{% endset %}
+{% include "performance/_mapa_corpo.html" %}
 <script src="{{ url_for('static', filename='clima-mapa.js') }}" defer></script>
 {% endblock %}

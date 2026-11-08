@@ -580,6 +580,19 @@ do JavaScript, no node) e o mundo inventado de `tests/clima_mapa_mundo.py`. O id
 placeholder `/<tela_id>` não casa com barra, e a view própria responde); por isso a vitrine estática exporta
 `t/performance/clima/mapa/index.html`, um nível abaixo, e o teste da vitrine conta `t/**/index.html`.
 
+**O mesmo mapa no Mapa de equipe da Usinas 360° (08/11/2026).** Levi, na bancada do Mapa de equipe: "Consegue incluir as
+informações de performance clima e risco? ... aí vai ser possível ver tempestades e pontos de fogo! Tendo um botão de técnico
+e usina, quando clica em usinas aparece os alertas das UFVs". O botão Usinas de `/t/campo/equipe?ver=usinas` mostra ESTE mapa
+dentro daquela página, sem moldura e sem regra copiada: `mapa_tela.modelo(args, endereco)` (o cadastro, o `estado_da_tela` e o
+`montar`) é o da rota daqui e o de lá, e o corpo da página (a raiz `data-mapa`, o palco, as fontes, o rodapé) saiu do
+`mapa.html` para `_mapa_corpo.html`, que as duas incluem (o cabeçalho de cada uma vai em `cabecalho_do_mapa`). **Para onde os
+links voltam é o `mapa.Endereco`**: a rota do `url_for` (o modelo leva `v.rota`, que os pedaços `_mapa_*.html` usam), os
+parâmetros que vão em todo link (`fixos`) e o nome do parâmetro das camadas de cima (`camadas`). O padrão, `PERFORMANCE`, é esta
+tela como sempre foi (`ver` para as camadas, nada fixo). No Mapa de equipe o `ver` é o botão Técnicos | Usinas (o `?ver=` dos
+botões de vista do Campo), então as camadas vão em `camadas` e todo link leva `ver=usinas` na frente. Fora daqui o modo TV não
+liga (`modelo` zera `tv` e `girar`: o video wall é desta tela). Provas: `tests/test_equipe_tela.py` (o mesmo `montar` com o
+endereço de lá, os links de volta, nenhum técnico, sem moldura) e os testes desta tela, que seguem iguais.
+
 **O contorno: fonte e licença.** IBGE, Malhas territoriais, API de malhas v3, divisão por UF, resolução mínima:
 `https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=UF`
 (só leitura, sem chave). Baixado UMA vez em 07/10/2026 e guardado como veio em `nexus/static/clima/ibge-ufs-minima.geojson`

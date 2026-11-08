@@ -3,6 +3,14 @@
 {% block conteudo %}
 {% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{% set usinas = ver == 'usinas' %}
+{% if usinas %}
+{# o botão Usinas (Levi, 08/11/2026): o Mapa de risco da Performance dentro desta página, com o CSS e o JavaScript dele; sem
+   JavaScript, a página se relê sozinha como a da Performance #}
+<link rel="stylesheet" href="{{ url_for('static', filename='clima.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='clima-mapa.css') }}">
+<noscript><meta http-equiv="refresh" content="{{ v.recarrega_em }}"></noscript>
+{% endif %}
 {# O Mapa de equipe (08/11/2026; nexus/torres/campo/equipe_tela.py, a regra em nexus/campo/equipe/situacao.py). O desenho é o
    da Visão geral (campo/responsaveis.html, o mapa das usinas): o contorno dos estados do IBGE e cada técnico como um ponto,
    com o x/y JÁ projetado no servidor. A latitude e a longitude nunca chegam aqui, nem a do técnico nem a da usina; o parado
@@ -16,6 +24,7 @@
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p>
       <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+        {% if usinas %}{% if not v.erro_cadastro and not v.sem_usinas %}{% with tela = tela_risco %}{% include "performance/_mapa_ajuda.html" %}{% endwith %}{% endif %}{% else %}
         {% call explica('O que é coletado, quem vê e por quanto tempo') %}
           <p><b>O que é coletado.</b> A posição do celular de cada técnico de campo do piloto, pelo Nexus Field: da
           primeira abertura do app no dia até as 22h, a cada 2 minutos em deslocamento e mais espaçado parado. Só o técnico
@@ -36,11 +45,16 @@
           <p><b>O ponto no mapa é aproximado</b>: é o lugar no desenho dos estados, não o endereço. A página não traz a
           coordenada em texto.</p>
           <p>As horas são as de Brasília.</p>
-        {% endcall %}
+        {% endcall %}{% endif %}
       </div>
-      <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+      <p class="cn-pergunta">{{ tela_risco.pergunta if usinas else tela.pergunta }}</p></div>
     {% if agora %}<p class="cn-frescor">Lido às <b>{{ agora }}</b> de Brasília</p>{% endif %}
   </div>
+  {# Técnicos | Usinas (Levi, 08/11/2026: "Tendo um botão de técnico e usina, quando clica em usinas aparece os alertas das
+     UFVs, quando é técnico mostra só essa tela padrão!"); quem não vê o mapa não vê o botão #}
+  {% if not recusa %}
+  <nav class="cn-seg eq-ver" aria-label="O que o mapa mostra"><a href="{{ url_for('torre_campo.equipe') }}"{% if not usinas %} aria-current="page"{% endif %}>Técnicos</a><a href="{{ url_for('torre_campo.equipe', ver='usinas') }}"{% if usinas %} aria-current="page"{% endif %}>Usinas</a></nav>
+  {% endif %}
 
   {% if recusa %}
   <section class="eq-recusa" role="alert">
@@ -50,6 +64,12 @@
       <p class="mudo">É a regra do aviso que o técnico lê antes de ligar a coleta. Quem põe a pessoa no setor é o
         administrador, em Base → Acessos → Pessoas e setores.</p></div>
   </section>
+  {% elif usinas %}
+  {# o mesmo corpo da tela da Performance (performance/_mapa_corpo.html), com os links voltando aqui (v.rota); a hora da
+     leitura vai dentro da raiz do mapa, que a releitura troca #}
+  {% set cabecalho_do_mapa %}<p class="cl-atualizada eq-usinas-hora" data-parte="hora">Tela atualizada às {{ v.atualizada }}</p>{% endset %}
+  {% include "performance/_mapa_corpo.html" %}
+  <script src="{{ url_for('static', filename='clima-mapa.js') }}" defer></script>
   {% elif erro %}
   <div class="cn-erro" role="alert"><b>{{ erro }}</b></div>
   {% else %}

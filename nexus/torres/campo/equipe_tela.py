@@ -46,6 +46,7 @@ from ...campo.equipe import servico as S
 from ...campo.equipe import situacao as SI
 from ...campo.equipe import token_ms as T
 from ...campo.ligacao_cadastro import codigo_da_pessoa
+from ...performance.clima import mapa as RISCO
 from . import TORRE, bp
 
 _log = logging.getLogger("nexus.campo.equipe")
@@ -525,12 +526,35 @@ def _tela(contexto: dict, status: int = 200):
     return r
 
 
+# o botão Usinas: o Mapa de risco da Performance com os links voltando aqui. O `ver` desta tela é o botão Técnicos |
+# Usinas (o `?ver=` dos botões de vista do Campo, como Lista | Quadro das Ocorrências): as camadas de cima do mapa, que
+# na tela da Performance vão em `ver`, aqui vão em `camadas`
+ENDERECO_USINAS = RISCO.Endereco(rota="torre_campo.equipe", fixos=(("ver", "usinas"),), camadas="camadas")
+
+
+def _tela_usinas():
+    """O botão Usinas (Levi, 08/11/2026: "Consegue incluir as informações de performance clima e risco? dando certo a
+    gente deixa tudo em mapa de equipe... aí vai ser possível ver tempestades e pontos de fogo! Tendo um botão de técnico
+    e usina, quando clica em usinas aparece os alertas das UFVs, quando é técnico mostra só essa tela padrão!"): o Mapa de
+    risco da Performance DENTRO desta página, do mesmo modelo (`mapa_tela.modelo` -> `clima.mapa.montar`) e do mesmo SVG,
+    sem moldura e sem regra copiada. Nada de técnico aqui: o serviço das posições nem sobe, e a abertura não grava
+    "abriu_mapa" na trilha da LGPD (não há dado pessoal); a releitura sozinha do mapa (clima-mapa.js) pede esta mesma
+    página. Quem vê é o mesmo do Técnicos (`_quem_ve`, conferido antes)."""
+    from ..performance import TORRE as TORRE_PERFORMANCE
+    from ..performance import mapa_tela
+    v, eventos = mapa_tela.modelo(request.args, ENDERECO_USINAS)
+    return _tela({"ver": "usinas", "v": v, "eventos": eventos, "tela_risco": TORRE_PERFORMANCE.tela("clima/mapa")})
+
+
 @bp.route("/equipe", endpoint="equipe")
 def equipe():
-    """O mapa: os técnicos do piloto com a situação de cada um, o painel ao lado e, para o administrador, o piloto."""
+    """O mapa: os técnicos do piloto com a situação de cada um, o painel ao lado e, para o administrador, o piloto. Com
+    `?ver=usinas`, o Mapa de risco das usinas (`_tela_usinas`)."""
     quem = _quem_ve()
     if not quem["pode"]:
         return _tela({"recusa": quem["aviso"]}, 403)
+    if str(request.args.get("ver") or "").strip() == "usinas":
+        return _tela_usinas()
     srv, aviso = _servico_da_tela()
     if srv is None:
         return _tela({"erro": aviso})

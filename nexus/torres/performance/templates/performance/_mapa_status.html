@@ -3,7 +3,7 @@
    na tabela (sem JavaScript, um link que recarrega com o filtro no endereço). O que cada nível quer dizer mora no "!" do título
    (_mapa_ajuda.html). No modo TV, os números são os do lado (mapa_tv.html), não esta faixa. #}
 {% macro nivel(id, rotulo, n) -%}
-<a class="mp-st" href="{{ url_for('torre_performance.mapa_de_risco', **v.links.ocultar[id]) }}" role="button" aria-pressed="{{ 'false' if id in v.ocultar else 'true' }}" data-acao="estado" data-nivel="{{ id }}" title="Mostrar ou esconder no mapa e na tabela"><span class="mp-chave mp-n-{{ id }}" aria-hidden="true"></span><span class="mp-st-r">{{ rotulo }}</span> <strong class="mp-st-n">{{ n }}</strong></a>
+<a class="mp-st" href="{{ url_for(v.rota, **v.links.ocultar[id]) }}" role="button" aria-pressed="{{ 'false' if id in v.ocultar else 'true' }}" data-acao="estado" data-nivel="{{ id }}" title="Mostrar ou esconder no mapa e na tabela"><span class="mp-chave mp-n-{{ id }}" aria-hidden="true"></span><span class="mp-st-r">{{ rotulo }}</span> <strong class="mp-st-n">{{ n }}</strong></a>
 {%- endmacro %}
 <div class="mp-status" role="group" aria-label="Usinas por nível de alerta" data-parte="status">
   {{ nivel("agir", "Agir agora", v.contagem.agir) }}

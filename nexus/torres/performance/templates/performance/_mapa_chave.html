@@ -7,7 +7,7 @@
 {% set fo = v.camada_focos %}
 {% set cd = v.calor_densidade %}
 {% set na = v.camada_nasa %}
-{% set rota = 'torre_performance.mapa_de_risco' %}
+{% set rota = v.rota %}
 {% set recorte = " neste recorte" if v.regiao != "brasil" else "" %}
 {% macro qualifica(lista) %}{% for x in lista %} <span class="mp-leg-q">{{ x }}</span>{% endfor %}{% endmacro %}
 {% macro titulo(nome, ajuda='') %}<h2 class="mp-ch-h"{% if ajuda %} title="{{ ajuda }}"{% endif %}>{{ nome }}</h2>{% endmacro %}

@@ -13,8 +13,10 @@ from ...performance.clima import alertas, mapa, usinas
 from . import TORRE, bp
 
 
-@bp.route("/clima/mapa")
-def mapa_de_risco():
+def modelo(args, endereco: mapa.Endereco = mapa.PERFORMANCE) -> tuple:
+    """(modelo do mapa, eventos que estragam a usina) pelos parâmetros do endereço. É o desta tela e o do Mapa de equipe da
+    Usinas 360°, que mostra este mesmo mapa dentro dele, no botão Usinas (08/11/2026): o `endereco` diz para onde os links
+    voltam. Lá o modo TV não liga (o video wall é desta tela, com o template próprio)."""
     try:
         cadastro, erro = usinas.do_app(), None
     except usinas.SemCadastro as e:
@@ -22,11 +24,19 @@ def mapa_de_risco():
     except Exception:                      # noqa: BLE001 — arquivo do cadastro corrompido, por exemplo: a tela diz, e o log guarda
         current_app.logger.exception("clima: o cadastro não abriu (mapa)")
         cadastro, erro = None, "o cadastro não abriu (o motivo está no log do servidor)."
-    estado = mapa.estado_da_tela(request.args)
-    v = mapa.montar(current_app.config, cadastro=cadastro, erro_cadastro=erro, **estado)
-    modelo = "performance/mapa_tv.html" if estado["tv"] else "performance/mapa.html"
-    resposta = current_app.make_response(render_template(modelo, torre=TORRE, tela=TORRE.tela("clima/mapa"), v=v,
-                                                         eventos=sorted(alertas.EVENTOS_QUE_ESTRAGAM_USINA)))
+    estado = mapa.estado_da_tela(args, endereco)
+    if endereco != mapa.PERFORMANCE:
+        estado.update(tv=False, girar=None)
+    v = mapa.montar(current_app.config, cadastro=cadastro, erro_cadastro=erro, endereco=endereco, **estado)
+    return v, sorted(alertas.EVENTOS_QUE_ESTRAGAM_USINA)
+
+
+@bp.route("/clima/mapa")
+def mapa_de_risco():
+    v, eventos = modelo(request.args)
+    pagina = "performance/mapa_tv.html" if v["tv"] else "performance/mapa.html"
+    resposta = current_app.make_response(render_template(pagina, torre=TORRE, tela=TORRE.tela("clima/mapa"), v=v,
+                                                         eventos=eventos))
     # A tela se relê sozinha (clima-mapa.js): a resposta nunca fica em cache do navegador nem de proxy, senão o modo TV mostraria
     # o mapa velho como se fosse novo.
     resposta.headers["Cache-Control"] = "no-store"

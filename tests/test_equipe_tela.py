@@ -579,3 +579,113 @@ def test_a_leitura_do_piloto_que_cruzou_a_decisao_nao_fica_como_fresca():
     assert copia.valor(1000.0) == frozenset({1})
     assert copia.valor(1001.0) == frozenset({2}) and len(lidas) == 2       # foi ao banco de novo
     assert copia.valor(1002.0) == frozenset({2}) and len(lidas) == 2       # agora, sim, fresca
+
+
+# ── o botão Técnicos | Usinas: o Mapa de risco dentro do Mapa de equipe (08/11/2026) ─────────────────────────────────
+@pytest.fixture
+def risco(monkeypatch):
+    """O Mapa de risco da Performance no mundo inventado dele (`clima_mapa_mundo`): o cadastro das usinas do clima
+    (`usinas.do_app`) e as leituras prontas no lugar das fontes. Nada vai à rede."""
+    from clima_mapa_mundo import REF as REF_RISCO
+    from clima_mapa_mundo import cadastro, instalar_leituras, mundo_completo, mundo_de_usinas
+    from nexus.performance.clima import usinas as U
+    from nexus.performance.clima import visao as V
+    monkeypatch.setattr(U, "do_app", lambda: cadastro(*mundo_de_usinas()))
+    monkeypatch.setattr(V, "agora", lambda: REF_RISCO)
+    mundo_completo(instalar_leituras(monkeypatch))
+
+
+def _hrefs(html, classe):
+    return re.findall(r'<a class="' + re.escape(classe) + r'"[^>]*href="([^"]*)"', html)
+
+
+def test_o_botao_usinas_mostra_o_mapa_de_risco_dentro_da_tela_sem_tecnico(cliente, pontos, setor, risco):
+    """Levi, 08/11/2026: "Consegue incluir as informações de performance clima e risco? ... aí vai ser possível ver
+    tempestades e pontos de fogo! Tendo um botão de técnico e usina, quando clica em usinas aparece os alertas das UFVs,
+    quando é técnico mostra só essa tela padrão!". O mesmo SVG e o mesmo modelo da tela da Performance, nesta página
+    (moldura nenhuma), e nada de técnico: nem nome, nem ponto, nem o filtro de supervisor."""
+    _entrar(cliente, EMAIL[PCM])
+    r = cliente.get(URL, query_string={"ver": "usinas"})
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
+    assert "<iframe" not in html and "data-mapa" in html and 'class="mp-svg' in html
+    assert "Usina Alfa" in html and "Vendaval" in html and "clima-mapa.js" in html and "clima-mapa.css" in html
+    assert not [n for n in NOME.values() if n in html] and "eq-pontos" not in html and 'name="supervisor"' not in html
+    seg = re.search(r'<nav class="cn-seg eq-ver"[^>]*>(.*?)</nav>', html, flags=re.S).group(1)
+    assert re.findall(r'<a href="([^"]*)"( aria-current="page")?>([^<]*)</a>', seg) == [
+        ("/t/campo/equipe", "", "Técnicos"), ("/t/campo/equipe?ver=usinas", ' aria-current="page"', "Usinas")]
+    # o "Técnicos" é a tela de sempre, com o botão marcado do outro lado; o ver que não é "usinas" também
+    for ver in (None, "tecnicos", "lixo"):
+        _, html = _html(cliente, query_string={"ver": ver} if ver else None)
+        assert NOME[NA_USINA] in html and "data-mapa" not in html and 'name="supervisor"' in html, ver
+        assert re.search(r'<a href="/t/campo/equipe" aria-current="page">Técnicos</a>', html), ver
+
+
+def test_os_links_do_mapa_de_risco_voltam_ao_mapa_de_equipe(cliente, banco, setor, risco):
+    """A região, a camada, o "Mostrar", o nível e o cliente levam a /t/campo/equipe?ver=usinas&...: o `ver` daqui é o
+    botão Técnicos | Usinas, e as camadas de cima do mapa (o `ver` da tela da Performance) vão em `camadas`."""
+    _entrar(cliente, EMAIL[PCM])
+    _, html = _html(cliente, query_string={"ver": "usinas"})
+    regioes = _hrefs(html, "mp-regiao")
+    assert regioes == ["/t/campo/equipe?ver=usinas"] + [f"/t/campo/equipe?ver=usinas&amp;regiao={r}"
+                                                       for r in ("norte", "nordeste", "centro-oeste", "sudeste", "sul")]
+    estado = re.findall(r'data-acao="estado"[^>]*href="([^"]*)"|href="([^"]*)"[^>]*data-acao="estado"', html)
+    links = [a or b for a, b in estado]
+    assert len(links) > 10 and all(h == "/t/campo/equipe?ver=usinas" or h.startswith("/t/campo/equipe?ver=usinas&amp;")
+                                   for h in links), links
+    assert "/t/performance/clima/mapa" not in html.split("data-mapa", 1)[1]       # o menu, sim; o mapa, nunca
+    focos = re.search(r'id="mp-sobre-focos"[^>]*href="([^"]*)"', html).group(1)
+    assert "camadas=usinas" in focos and "&amp;ver=" not in focos
+    cliente_form = re.search(r'<form class="cl-filtro mp-cliente"[^>]*action="([^"]*)"(.*?)</form>', html, flags=re.S)
+    assert cliente_form.group(1) == "/t/campo/equipe"
+    assert '<input type="hidden" name="ver" value="usinas">' in cliente_form.group(2)
+    # o endereço manda: as camadas pedidas em `camadas` valem, e o `tv` da Performance não liga aqui
+    _, html = _html(cliente, query_string={"ver": "usinas", "camadas": "usinas", "tv": "1", "regiao": "nordeste"})
+    raiz = re.search(r'<div class="cl mp([^"]*)" data-mapa', html).group(1)
+    assert "mp-sem-focos" in raiz and "mp-sem-siglas" in raiz and "mp-sem-usinas" not in raiz
+    corpo = html.split("data-mapa", 1)[1]
+    assert 'class="mp-tv' not in corpo and "tv=1" not in corpo                  # o tema do topo leva o endereço inteiro
+    assert f'href="/t/campo/equipe?ver=usinas&amp;regiao=nordeste&amp;camadas=usinas' in html
+
+
+def test_o_modo_usinas_nao_grava_na_trilha_nem_sobe_o_servico_da_equipe(cliente, pontos, setor, risco, monkeypatch):
+    """Sem dado pessoal na tela das usinas, nenhuma linha "abriu_mapa" na trilha da LGPD (nem na releitura sozinha do
+    mapa, que pede a mesma página); e o serviço das posições nem sobe."""
+    _entrar(cliente, EMAIL[PCM])
+    assert _html(cliente, query_string={"ver": "usinas"})[0] == 200
+    assert _acessos(pontos) == []
+    _html(cliente)
+    assert [a["acao"] for a in _acessos(pontos)] == ["abriu_mapa"]               # o Técnicos grava, como antes
+
+    def sem_servico(app):
+        raise AssertionError("o modo Usinas subiu o serviço das posições")
+    monkeypatch.setattr(S, "do_app", sem_servico)
+    assert _html(cliente, query_string={"ver": "usinas"})[0] == 200
+
+
+def test_o_modo_usinas_e_o_montar_da_performance_com_o_endereco_daqui(cliente, banco, setor, risco, monkeypatch):
+    from nexus.performance.clima import mapa as M
+    chamadas, montar = [], M.montar
+
+    def espiao(config, **kw):
+        chamadas.append(kw)
+        return montar(config, **kw)
+    monkeypatch.setattr(M, "montar", espiao)
+    _entrar(cliente, EMAIL[PCM])
+    _html(cliente, query_string={"ver": "usinas", "fundo": "densidade"})
+    (kw,) = chamadas
+    assert kw["endereco"].rota == "torre_campo.equipe" and kw["fundo"] == "densidade" and kw["tv"] is False
+    assert kw["cadastro"] is not None and kw["erro_cadastro"] is None
+
+
+def test_quem_nao_ve_o_mapa_de_equipe_nao_ve_as_usinas_dele(app, cliente, banco, setor, risco):
+    _entrar(cliente, OUTRO)                                                        # Engenharia
+    st, html = _html(cliente, query_string={"ver": "usinas"})
+    assert st == 403 and "data-mapa" not in html and "Usina Alfa" not in html
+    # a sessão de cliente nem chega à rota (o portão a manda embora antes), e o mapa não sai
+    with cliente.session_transaction() as s:
+        s["via"] = "cliente"
+    st, html = _html(cliente, query_string={"ver": "usinas"})
+    assert st in (302, 403) and "data-mapa" not in html
+    st, html = _html(_entrar(cliente, EMAIL[ADMIN], admin=True), query_string={"ver": "usinas"})
+    assert st == 200 and "Usina Alfa" in html

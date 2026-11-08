@@ -312,6 +312,20 @@ GIRAR_MIN_S, GIRAR_MAX_S = 10, 600
 _SLUG = re.compile(r"^[a-z0-9-]{1,60}$")
 
 
+class Endereco(NamedTuple):
+    """Onde o mapa é servido (08/11/2026): a rota do Flask dos links, os parâmetros que vão em TODO link e o nome do
+    parâmetro das camadas de cima ("Mostrar"). O padrão é a tela da Performance, que não muda em nada. O Mapa de equipe da
+    Usinas 360° mostra o mesmo mapa dentro dele (Levi, 08/11/2026: "Tendo um botão de técnico e usina, quando clica em
+    usinas aparece os alertas das UFVs"), em /t/campo/equipe?ver=usinas: lá o `ver` já é o botão Técnicos | Usinas (o
+    `?ver=` dos botões de vista do Campo), e as camadas vão em `camadas`."""
+    rota: str = "torre_performance.mapa_de_risco"
+    fixos: tuple = ()                 # ((nome, valor), ...): vão primeiro em todo link
+    camadas: str = "ver"
+
+
+PERFORMANCE = Endereco()
+
+
 def _juntar(nomes: list) -> str:
     """["a", "b", "c"] -> "a, b e c" (o mesmo da tela principal)."""
     return nomes[0] if len(nomes) == 1 else ", ".join(nomes[:-1]) + " e " + nomes[-1]
@@ -326,14 +340,15 @@ def _lista(bruto, validos) -> frozenset:
     return frozenset(x for x in (p.strip().lower() for p in str(bruto or "").split(",")) if x in validos)
 
 
-def estado_da_tela(args) -> dict:
+def estado_da_tela(args, endereco: Endereco = PERFORMANCE) -> dict:
     """O estado da tela pelos parâmetros do endereço: o endereço guarda tudo (é assim que o video wall abre na camada certa, e o
-    recarregar não perde o que a pessoa escolheu). O que não é conhecido cai no padrão, sem erro, como a região."""
+    recarregar não perde o que a pessoa escolheu). O que não é conhecido cai no padrão, sem erro, como a região. As camadas
+    de cima vêm do parâmetro do `endereco` (`ver` aqui; `camadas` no Mapa de equipe)."""
     fundo = str(args.get("fundo") or "").strip().lower()
     dia = str(args.get("dia") or "").strip()
     girar = str(args.get("girar") or "").strip()
     girar_s = int(girar) if girar.isdigit() and GIRAR_MIN_S <= int(girar) <= GIRAR_MAX_S else None
-    ver = args.get("ver")
+    ver = args.get(endereco.camadas)
     return {"regiao": str(args.get("regiao") or ""), "fundo": fundo if fundo in FUNDOS else FUNDO_PADRAO,
             "ver": None if ver is None else _lista(ver, SOBRE), "dia": int(dia) if dia in ("0", "1", "2", "3") else None,
             "cliente": str(args.get("cliente") or "").strip(), "ocultar": _lista(args.get("ocultar"), NIVEIS),
@@ -341,17 +356,18 @@ def estado_da_tela(args) -> dict:
             "tv": str(args.get("tv") or "") == "1", "girar": girar_s}
 
 
-def parametros(estado: dict, **trocas) -> dict:
+def parametros(estado: dict, endereco: Endereco = PERFORMANCE, **trocas) -> dict:
     """Os parâmetros do endereço do estado (com as `trocas`), só o que não é o padrão e numa ordem fixa: os links da tela (região,
-    camada, filtro) levam o resto do estado junto, e o estado padrão não acrescenta nada (o Brasil é o endereço puro)."""
+    camada, filtro) levam o resto do estado junto, e o estado padrão não acrescenta nada (o Brasil é o endereço puro). Os
+    `fixos` do `endereco` vão sempre, na frente (o `ver=usinas` do Mapa de equipe)."""
     e = {**estado, **trocas}
-    p = {}
+    p = dict(endereco.fixos)
     if e.get("regiao") in REGIOES:
         p["regiao"] = e["regiao"]
     if e.get("fundo", FUNDO_PADRAO) != FUNDO_PADRAO:
         p["fundo"] = e["fundo"]
     if e.get("ver") is not None and set(e["ver"]) != set(SOBRE):
-        p["ver"] = ",".join(k for k in SOBRE if k in e["ver"])
+        p[endereco.camadas] = ",".join(k for k in SOBRE if k in e["ver"])
     if e.get("dia") is not None:
         p["dia"] = e["dia"]
     if e.get("cliente"):
@@ -372,20 +388,24 @@ def _alterna(conjunto, item) -> frozenset:
     return conjunto - {item} if item in conjunto else conjunto | {item}
 
 
-def _links(estado: dict, eventos: list) -> dict:
-    """Os parâmetros de cada controle da tela (o template só chama `url_for` com eles): funcionam sem JavaScript, e o JavaScript
-    os usa para trocar a tela sem recarregar."""
+def _links(estado: dict, eventos: list, endereco: Endereco = PERFORMANCE) -> dict:
+    """Os parâmetros de cada controle da tela (o template só chama `url_for(v.rota, ...)` com eles): funcionam sem JavaScript, e
+    o JavaScript os usa para trocar a tela sem recarregar. O `endereco` diz para onde eles voltam (a tela da Performance, ou o
+    Mapa de equipe, que mostra este mapa dentro dele)."""
     ver = frozenset(SOBRE) if estado["ver"] is None else estado["ver"]
+
+    def p(**trocas):
+        return parametros(estado, endereco, **trocas)
     return {
-        "regiao": {r: parametros(estado, regiao=(r if r != BRASIL else "")) for r in (BRASIL, *REGIOES)},
-        "fundo": {f: parametros(estado, fundo=f) for f in FUNDOS},
-        "ver": {s: parametros(estado, ver=_alterna(ver, s)) for s in SOBRE},
-        "ocultar": {n: parametros(estado, ocultar=_alterna(estado["ocultar"], n)) for n in NIVEIS},
-        "dia": {d: parametros(estado, dia=d) for d in range(4)},
-        "sem_eventos": {e["ev"]: parametros(estado, sem_eventos=_alterna(estado["sem_eventos"], e["ev"])) for e in eventos},
-        "tv": parametros(estado, tv=True), "sair_tv": parametros(estado, tv=False, girar=None),
-        "girar": {s: parametros(estado, girar=s) for s in (None, 15, 30, 60, 120)},
-        "aqui": parametros(estado),
+        "regiao": {r: p(regiao=(r if r != BRASIL else "")) for r in (BRASIL, *REGIOES)},
+        "fundo": {f: p(fundo=f) for f in FUNDOS},
+        "ver": {s: p(ver=_alterna(ver, s)) for s in SOBRE},
+        "ocultar": {n: p(ocultar=_alterna(estado["ocultar"], n)) for n in NIVEIS},
+        "dia": {d: p(dia=d) for d in range(4)},
+        "sem_eventos": {e["ev"]: p(sem_eventos=_alterna(estado["sem_eventos"], e["ev"])) for e in eventos},
+        "tv": p(tv=True), "sair_tv": p(tv=False, girar=None),
+        "girar": {s: p(girar=s) for s in (None, 15, 30, 60, 120)},
+        "aqui": p(),
     }
 
 
@@ -692,10 +712,12 @@ def _fontes_que_pesaram(avisos, foco, dias, ref, sem_leitura_de: str, completa: 
 
 
 def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, sessao=None, fundo=FUNDO_PADRAO, ver=None,
-           dia=None, cliente="", ocultar=frozenset(), sem_eventos=frozenset(), tv=False, girar=None) -> dict:
+           dia=None, cliente="", ocultar=frozenset(), sem_eventos=frozenset(), tv=False, girar=None,
+           endereco: Endereco = PERFORMANCE) -> dict:
     """Tudo o que o template do mapa precisa. `cadastro` é o `usinas.Cadastro` (ou None com `erro_cadastro` dizendo por quê); o
     resto é o estado da tela (`estado_da_tela`): a camada de fundo, as de cima, o dia do risco de fogo, o cliente, os níveis e os
-    eventos escondidos, e o modo TV com o giro das camadas.
+    eventos escondidos, e o modo TV com o giro das camadas. O `endereco` (08/11/2026) diz para onde os links voltam: a rota vai
+    em `rota`, e os templates a usam no `url_for` (o Mapa de equipe mostra este mesmo mapa dentro dele).
 
     O mapa lê as MESMAS três fontes da tela principal, pelo mesmo cache (uma visita a uma e outra não vai duas vezes à rede), e
     o nível de cada usina vem da mesma regra (`alertas.nivel_da_usina`). O painel de frescor é o mesmo código da tela principal
@@ -741,7 +763,8 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
          "tabela": [], "fundo": fundo, "fundos": FUNDOS, "fundos_no_svg": fundos_no_svg, "giro": GIRO, "ver": ver,
          "sobre": SOBRE, "ocultar": estado["ocultar"], "tv": bool(tv), "girar": girar, "calor_risco": None,
          "calor_densidade": None, "divisas": "", "clientes": [], "cliente": "", "dados_js": {}, "proxima_s": V.RECARGA_S,
-         "nomes": {k: F.extenso(k) for k in F.NOMES}, "estado": estado, "links": _links(estado, [])}
+         "nomes": {k: F.extenso(k) for k in F.NOMES}, "estado": estado, "links": _links(estado, [], endereco),
+         "rota": endereco.rota}
     if cadastro is None:
         return m
     m["clientes"] = cadastro.clientes()
@@ -755,7 +778,7 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
     m["fora_do_brasil"] = [u.nome for u in cadastro.fora_do_brasil if pertence(u)]
     m["ilegiveis"] = cadastro.ilegiveis
     m["n_usinas"] = len(usinas)
-    m["links"] = _links(estado, [])
+    m["links"] = _links(estado, [], endereco)
     if not usinas:
         m["sem_usinas"] = True            # nada a cruzar: nem se vai à rede
         return m
@@ -784,7 +807,7 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
     m["camada_avisos"] = _camada_avisos(avisos_l, v, ref, por_id["inmet"]["qualifica"], estado["sem_eventos"])
     m["camada_focos"] = _camada_focos(focos_l, indice, usinas, v, por_id["focos"]["qualifica"], ref)
     m["camada_nasa"] = _camada_nasa(firms_l, nasa, usinas, v, por_id["firms"]["qualifica"], ref)
-    m["links"] = _links(estado, m["camada_avisos"]["eventos"])
+    m["links"] = _links(estado, m["camada_avisos"]["eventos"], endereco)
     usadas = [avisos_l, focos_l, risco_l, firms_l]
     if "risco" in fundos_no_svg:
         m["calor_risco"] = _camada_risco(config, sessao, v, dia, ref, arquivo, aneis)

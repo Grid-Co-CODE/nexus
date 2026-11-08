@@ -7,9 +7,9 @@
 {% set cr = v.calor_risco %}
 {% set cd = v.calor_densidade %}
 {% set na = v.camada_nasa %}
-{% set rota = 'torre_performance.mapa_de_risco' %}
+{% set rota = v.rota %}
 {% macro nivel(id, rotulo, n, ajuda) -%}
-<li><a class="mp-leg-filtro" href="{{ url_for('torre_performance.mapa_de_risco', **v.links.ocultar[id]) }}" role="button" aria-pressed="{{ 'false' if id in v.ocultar else 'true' }}" data-acao="estado" data-nivel="{{ id }}" title="Mostrar ou esconder no mapa e na tabela"><span class="mp-chave mp-n-{{ id }}"></span><span class="mp-leg-txt"><strong>{{ rotulo }}</strong> <span class="mp-leg-n">{{ n }}</span><span class="mp-leg-ajuda">{{ ajuda }}</span></span></a></li>
+<li><a class="mp-leg-filtro" href="{{ url_for(rota, **v.links.ocultar[id]) }}" role="button" aria-pressed="{{ 'false' if id in v.ocultar else 'true' }}" data-acao="estado" data-nivel="{{ id }}" title="Mostrar ou esconder no mapa e na tabela"><span class="mp-chave mp-n-{{ id }}"></span><span class="mp-leg-txt"><strong>{{ rotulo }}</strong> <span class="mp-leg-n">{{ n }}</span><span class="mp-leg-ajuda">{{ ajuda }}</span></span></a></li>
 {%- endmacro %}
 <aside class="mp-legenda" aria-label="Legenda" data-parte="legenda">
   <h2 class="mp-leg-h">Usinas{% if v.regiao != "brasil" %} nesta região{% endif %} ({{ v.n_no_recorte }})</h2>

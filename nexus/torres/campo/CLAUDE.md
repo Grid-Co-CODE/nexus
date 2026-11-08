@@ -1504,7 +1504,7 @@ primeira gravação depois do deploy, e a coleta só vale para quem o administra
 | Jornal das filas | `campo/equipe/jornal.py` | os eventos de chave e os acessos esperando o gravador, cifrados em disco (`equipe/fila_*.jsonl`): o reinício antes da rodada não perde nada |
 | Estado do processo | `campo/equipe/servico.py` | junta chaves, diário, piloto e cadastro por trás das rotas; nada daqui grava no banco |
 | Gravador em lote | `campo/equipe/gravador.py` | a cada 5 min leva ao banco o que está nas filas e no diário, e apara o jornal |
-| Rotas e tela | `torres/campo/equipe_tela.py`, `templates/campo/equipe.html`, `static/campo.css` (bloco `eq-*`) | as três rotas do celular, o mapa, o Abrir rota e o piloto |
+| Rotas e tela | `torres/campo/equipe_tela.py`, `templates/campo/equipe.html`, `static/campo.css` (bloco `eq-*`) | as três rotas do celular, o mapa, o Abrir rota, o piloto, o filtro por supervisor e equipe e o botão Usinas (o Mapa de risco da Performance dentro da tela, por `torres/performance/mapa_tela.modelo` e `performance/_mapa_corpo.html`) |
 
 ### De onde vem o dado: o contrato com o Nexus Field
 
@@ -1624,6 +1624,19 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
   (`test_tema`): os dois apontam para o `--papel` (#fff) e o `--papel-tinta`, o par que o Nexus mantém igual nos dois temas.
   O escolhido é desenhado por último (dois técnicos na mesma usina caem no mesmo lugar). Prova: o teste do contraste de
   componente (3:1) nos dois temas, pelos tokens do `nexus.css`.
+- **O botão Técnicos | Usinas** ("Consegue incluir as informações de performance clima e risco? dando certo a gente deixa tudo
+  em mapa de equipe... aí vai ser possível ver tempestades e pontos de fogo! Tendo um botão de técnico e usina, quando clica em
+  usinas aparece os alertas das UFVs, quando é técnico mostra só essa tela padrão!"). `?ver=tecnicos` (o padrão; qualquer
+  outro valor também) é a tela de sempre. **`?ver=usinas` é o Mapa de risco da Performance DENTRO desta página**: o mesmo
+  modelo (`torres/performance/mapa_tela.modelo` → `clima.mapa.montar`) e o mesmo corpo (`performance/_mapa_corpo.html`, com o
+  `_mapa_svg.html`), o CSS e o `clima-mapa.js` dele (camadas, zoom, dica, releitura sozinha), sem moldura (o
+  `test_torre_campo` proíbe iframe) e sem regra copiada. Os links e filtros do mapa voltam a `/t/campo/equipe?ver=usinas&...`
+  (`ENDERECO_USINAS`, um `clima.mapa.Endereco`): aqui o `ver` é o botão, então as camadas de cima do mapa ("Mostrar"), que na
+  Performance vão em `ver`, vão em `camadas`. O modo TV não liga aqui. `Cache-Control: no-store`, como lá. **Nada de técnico
+  no Usinas**: o serviço das posições nem sobe, o filtro de supervisor e equipe some, e a abertura (e a releitura sozinha,
+  que pede a mesma página) **não grava "abriu_mapa"** na trilha da LGPD: não há dado pessoal ali. Quem vê é o mesmo
+  `_quem_ve` dos cinco setores e dos administradores, conferido antes do botão. O clique na usina leva à página dela no Clima
+  e risco da Performance (`/t/performance/clima/usina/<id>`), que segue com o portão dela.
 
 ### Quem vê
 
@@ -1660,7 +1673,9 @@ diretório, o prazo, o 401 e o 503), `test_equipe_aparelhos.py` (a chave só com
 ao reinício sem gravação, o 503 sem leitura boa e na máquina que não grava), `test_equipe_gravador.py` (a união, o que
 nunca encolhe o banco, a fila que volta, o jornal aparado, o corte pelo instante), `test_equipe_situacao.py`,
 `test_equipe_municipios.py` (IBGE injetado, nunca a rede) e `test_equipe_tela.py` (quem vê, a rota, o registro pelo
-e-mail exato, o piloto, nenhuma coordenada na página nem no JSON, a pré-carga que não abre o mapa).
+e-mail exato, o piloto, nenhuma coordenada na página nem no JSON, a pré-carga que não abre o mapa; desde a bancada de
+08/11/2026, o filtro por supervisor e equipe, o anel branco pelo contraste nos dois temas e o botão Usinas: o mesmo
+`montar` da Performance, os links de volta, nenhum técnico e nenhum "abriu_mapa").
 Cada regra de segurança foi provada por quebra de propósito. A bancada só leitura (um técnico falso mandando um lote
 pelo `test_client`, o mapa a 1440 px e 375 px sem rolagem de lado) é o passo final da prova.
 
