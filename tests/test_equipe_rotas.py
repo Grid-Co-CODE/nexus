@@ -12,10 +12,12 @@ mentira."""
 import hashlib
 import json
 import logging
+import threading
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
 import requests
+import test_equipe_token as TT          # o par RSA, o JWKS e o token assinado de verdade, para o conferidor real
 from pg_falso import ApiPGFalsa
 from test_campo_visao import _aba
 
@@ -92,7 +94,8 @@ class MicrosoftFalsa:
     def conferir(self, token, *, cliente, diretorio, dominios=("gridco.com.br",), chaves_jwks=None, agora=None):
         self.chamadas.append({"cliente": cliente, "diretorio": diretorio, "dominios": tuple(dominios), "agora": agora})
         if self.fora:
-            raise T.MicrosoftForaDoAr("chaves da Microsoft: ConnectionError")
+            # o download das chaves que falhou de verdade (o `_baixar`), o único que liga o teto
+            raise T.JwksSemResposta("chaves da Microsoft: ConnectionError")
         if not token.startswith("token:"):
             raise T.TokenRecusado("assinatura não confere")
         return token.removeprefix("token:")
@@ -324,6 +327,90 @@ def test_microsoft_fora_tem_teto_de_1_min(cliente, banco, ms, relogio):
     ms.fora = False
     relogio.andar(seconds=61)
     assert _registrar(cliente).status_code == 200 and len(ms.chamadas) == 3
+
+
+def _token_de_verdade(relogio, kid=None):
+    """O ID token do técnico do piloto assinado com a chave da "Microsoft" do `test_equipe_token` (o conferidor de
+    verdade confere a assinatura); com `kid`, o forjado de quem não tem credencial nenhuma: um kid que ela não publica."""
+    assert (TT.DIRETORIO, TT.CLIENTE) == (DIRETORIO, CLIENTE)
+    return TT._token(cab={"kid": kid} if kid else None, em=relogio.agora.timestamp(),
+                     preferred_username=EMAIL[TECNICO])
+
+
+def test_o_kid_desconhecido_com_a_releitura_em_curso_nao_vira_teto_para_quem_vale(app, cliente, banco, relogio,
+                                                                                  monkeypatch):
+    """A revisão de 08/11/2026: o `token_ms` marca a releitura do kid desconhecido como "sem resposta" ANTES de ir à
+    Microsoft, e o token que chega nesse meio recebe `MicrosoftForaDoAr`. Se isso ligasse o teto, dois tokens forjados
+    juntos, sem credencial nenhuma, dariam 1 min de 503 a todo registro, a cada 5 min. Com o conferidor de verdade."""
+    idas, em_curso, soltar = [], threading.Event(), threading.Event()
+
+    def pedir(url):
+        idas.append(url)
+        if len(idas) > 1:                       # a releitura do kid forjado fica presa até o teste soltar
+            em_curso.set()
+            soltar.wait(10)
+        return TT._Resposta(200, TT.JWKS)
+    monkeypatch.setattr(T, "_pedir_jwks", pedir)
+    assert _registrar(cliente, token=_token_de_verdade(relogio)).get_json()["coleta"] is True   # a cópia de 24 h
+    relogio.andar(minutes=6)                    # a cópia já não é "recém-chegada": o kid desconhecido relê
+    forjado = _token_de_verdade(relogio, kid="kid-forjado")
+    outro = {}
+    t = threading.Thread(target=lambda: outro.update(r=_registrar(app.test_client(), token=forjado)))
+    t.start()
+    try:
+        assert em_curso.wait(10)
+        assert _registrar(cliente, token=forjado).status_code == 503       # a releitura em curso: 503 só para ele
+        r = _registrar(cliente, token=_token_de_verdade(relogio))          # o kid da cópia nunca precisa da Microsoft
+        assert r.status_code == 200 and r.get_json()["coleta"] is True
+    finally:
+        soltar.set()
+        t.join(10)
+    assert outro["r"].status_code == 401 and len(idas) == 2               # a releitura respondeu: o kid é forjado
+
+
+def test_a_releitura_em_curso_nao_liga_o_teto_nem_com_a_copia_a_ponto_de_vencer(app, cliente, banco, relogio,
+                                                                                monkeypatch):
+    """O 503 da releitura em curso não foi download nenhum: se ligasse o teto, a cópia que vence no minuto seguinte
+    deixaria quem vale sem registro, com a Microsoft no ar."""
+    idas = []
+    monkeypatch.setattr(T, "_pedir_jwks", lambda url: idas.append(url) or TT._Resposta(200, TT.JWKS))
+    assert _registrar(cliente, token=_token_de_verdade(relogio)).status_code == 200 and len(idas) == 1
+    relogio.andar(hours=24, seconds=-30)
+    T._RELEITURA[DIRETORIO] = (relogio.agora.timestamp(), False)   # a de outro pedido: o token_ms marca antes de ir
+    assert _registrar(cliente, token=_token_de_verdade(relogio, kid="kid-forjado")).status_code == 503
+    assert len(idas) == 1
+    relogio.andar(seconds=31)                                         # a cópia de 24 h venceu
+    assert _registrar(cliente, token=_token_de_verdade(relogio)).status_code == 200 and len(idas) == 2
+
+
+def test_a_falha_de_verdade_da_microsoft_liga_o_teto_mas_a_copia_fresca_nunca_espera(app, cliente, banco, relogio,
+                                                                                   monkeypatch):
+    idas, fora = [], {"sim": False}
+
+    def pedir(url):
+        idas.append(url)
+        if fora["sim"]:
+            raise requests.ConnectionError("Microsoft fora (teste)")
+        return TT._Resposta(200, TT.JWKS)
+    monkeypatch.setattr(T, "_pedir_jwks", pedir)
+    assert _registrar(cliente, token=_token_de_verdade(relogio)).status_code == 200 and len(idas) == 1
+    fora["sim"] = True
+    relogio.andar(minutes=6)
+    # o forjado relê, e a Microsoft não responde de verdade: 503 para ele...
+    assert _registrar(cliente, token=_token_de_verdade(relogio, kid="kid-forjado")).status_code == 503
+    assert len(idas) == 2
+    # ...mas o kid da cópia fresca registra, sem ir a ela
+    assert _registrar(cliente, token=_token_de_verdade(relogio)).status_code == 200 and len(idas) == 2
+    # passaram as 24 h da cópia, com a Microsoft fora: a 1ª tentativa espera por ela (10 s no servidor) e liga o teto...
+    relogio.andar(hours=24)
+    assert _registrar(cliente, token=_token_de_verdade(relogio)).status_code == 503 and len(idas) == 3
+    # ...e o minuto seguinte responde 503 sem ir a ela
+    assert _registrar(cliente, token=_token_de_verdade(relogio)).status_code == 503 and len(idas) == 3
+    relogio.andar(seconds=61)
+    assert _registrar(cliente, token=_token_de_verdade(relogio)).status_code == 503 and len(idas) == 4
+    fora["sim"] = False
+    relogio.andar(seconds=61)
+    assert _registrar(cliente, token=_token_de_verdade(relogio)).status_code == 200 and len(idas) == 5
 
 
 def test_id_da_configuracao_que_nao_e_guid_e_503_e_nao_vai_a_microsoft(app, cliente, banco):

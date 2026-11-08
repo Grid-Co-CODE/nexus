@@ -73,6 +73,13 @@ class MicrosoftForaDoAr(Exception):
     do 401, que apagaria a chave dela."""
 
 
+class JwksSemResposta(MicrosoftForaDoAr):
+    """O download das chaves foi tentado AGORA e falhou de verdade (rede, prazo, HTTP diferente de 200, resposta que não é
+    a lista de chaves). Só este liga o teto da rota (`servico.conferir_token`). A releitura de kid desconhecido que está
+    em curso noutro pedido (ou falhou há menos de 5 min) é `MicrosoftForaDoAr` sem ir à Microsoft, e não liga: dois
+    tokens forjados juntos, sem credencial nenhuma, dariam 1 min de 503 a todo registro (revisão de 08/11/2026)."""
+
+
 def _guid(valor, rotulo: str) -> str:
     """O GUID da configuração, em minúscula (o Entra escreve o token em minúscula; o colado em maiúscula não pode recusar
     todo mundo). Fora do formato é configuração errada, não token ruim: ValueError, para o engano aparecer no log em vez
@@ -124,17 +131,27 @@ def _baixar(diretorio: str) -> dict:
     try:
         r = _pedir_jwks(url)
     except requests.RequestException as e:
-        raise MicrosoftForaDoAr(f"chaves da Microsoft: {type(e).__name__}") from None
+        raise JwksSemResposta(f"chaves da Microsoft: {type(e).__name__}") from None
     if r.status_code != 200:
-        raise MicrosoftForaDoAr(f"chaves da Microsoft: HTTP {r.status_code}")
+        raise JwksSemResposta(f"chaves da Microsoft: HTTP {r.status_code}")
     try:
         jwks = r.json()
     except ValueError:
         jwks = None
     # um proxy no caminho que devolve uma página com 200, ou um JWKS vazio: não é a Microsoft respondendo, e não se guarda
     if not isinstance(jwks, dict) or not isinstance(jwks.get("keys"), list) or not jwks["keys"]:
-        raise MicrosoftForaDoAr("chaves da Microsoft: a resposta não é a lista de chaves")
+        raise JwksSemResposta("chaves da Microsoft: a resposta não é a lista de chaves")
     return jwks
+
+
+def tem_copia(diretorio: str, agora: float | None = None) -> bool:
+    """Há a cópia de 24 h das chaves do diretório: o token de kid conhecido confere sem ir à Microsoft, e o de kid
+    desconhecido relê pelo teto próprio daqui (5 min). Com ela, a rota nunca responde 503 pelo teto dela."""
+    d = _guid(diretorio, "o diretório (NEXUS_EQUIPE_MS_TENANT_ID)")
+    agora = time.time() if agora is None else float(agora)
+    with _TRAVA:
+        guardada = _GUARDADAS.get(d)
+        return bool(guardada) and _ha_menos_de(GUARDA_S, agora, guardada[0])
 
 
 def chaves_da_microsoft(diretorio: str, *, reler: bool = False, agora: float | None = None) -> dict:

@@ -225,14 +225,18 @@ class Servico:
     # ── quem é ───────────────────────────────────────────────────────────────────────────────────────────────────
     def conferir_token(self, token: str, *, cliente, diretorio, dominios, agora: datetime) -> str:
         """O e-mail do ID token (`token_ms.conferir`), com um teto: sem a cópia das chaves e com a Microsoft fora, cada
-        registro esperaria os 10 s dela; a falha de há menos de 1 min responde `MicrosoftForaDoAr` sem ir a ela."""
+        registro esperaria os 10 s dela; o download que falhou há menos de 1 min responde `MicrosoftForaDoAr` sem ir a
+        ela. Só o download que falhou de verdade (`JwksSemResposta`) liga o teto, e o teto só vale SEM a cópia de 24 h:
+        com ela, o kid conhecido confere na hora, e o desconhecido relê pelo teto do próprio `token_ms` (revisão de
+        08/11/2026: o 503 da releitura em curso ligava o teto, e dois tokens forjados derrubavam todo registro)."""
         ts = agora.timestamp()
         with self._trava:
-            if _ha_menos_de(TETO_FALHA_S, ts, self._ms_falhou_em):
-                raise T.MicrosoftForaDoAr("a Microsoft não respondeu há menos de 1 min")
+            teto = _ha_menos_de(TETO_FALHA_S, ts, self._ms_falhou_em)
+        if teto and not T.tem_copia(diretorio, agora=ts):
+            raise T.MicrosoftForaDoAr("a Microsoft não respondeu há menos de 1 min")
         try:
             return T.conferir(token, cliente=cliente, diretorio=diretorio, dominios=dominios, agora=ts)
-        except T.MicrosoftForaDoAr:
+        except T.JwksSemResposta:
             with self._trava:
                 self._ms_falhou_em = ts
             raise
