@@ -67,11 +67,16 @@ def volta(config, agora: datetime | None = None) -> dict:
         rel["erro"] = "; ".join(f"{k}: {v.erro}" for k, v in lidos.items() if v.dados is None and k in ("bd", "gestao"))
         return rel
     for tipo, ref, extra in pend:
-        folha = emitir(entradas, tipo, ref, agora)
-        if folha is None:
-            log.warning("relatórios do PCM: %s %s sem a semana no banco_dados", tipo, ref)
+        try:      # uma folha com defeito não esconde as outras (auditoria de 08/11/2026: o diário que quebrava segurava o alerta)
+            folha = emitir(entradas, tipo, ref, agora)
+            if folha is None:
+                log.warning("relatórios do PCM: %s %s sem a semana no banco_dados", tipo, ref)
+                continue
+            arquivo.gravar(config, tipo, ref, folha["html"], agora, extra)
+        except Exception as ex:      # noqa: BLE001
+            log.exception("relatórios do PCM: %s %s", tipo, ref)
+            rel["erro"] = "; ".join(x for x in (rel["erro"], f"{tipo} {ref}: {type(ex).__name__}: {str(ex)[:120]}") if x)
             continue
-        arquivo.gravar(config, tipo, ref, folha["html"], agora, extra)
         rel["emitidos"].append(f"{tipo} {ref}")
     arquivo.limpar(config, agora.date())
     return rel

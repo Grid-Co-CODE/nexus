@@ -282,3 +282,21 @@ def test_a_referencia_do_arquivo_nao_sai_da_pasta():
 def test_a_senha_de_admin_ve_a_central(cliente, pcm):
     assert cliente.post("/entrar", data={"senha": SENHA_TESTE}).status_code == 302
     assert cliente.get("/t/relatorios/pcm-tarde").status_code == 200
+
+
+def test_uma_folha_que_da_erro_nao_trava_as_outras_da_volta(app, pcm, monkeypatch):
+    """Auditoria ponytail de 08/11/2026: o laço da emissão não tinha `try` por item; o diário que levantava impedia o alerta
+    da semana recém-publicada de sair, a cada 5 min, e o erro só aparecia no log."""
+    cfg = app.config
+    monkeypatch.setattr(agenda, "devidos", lambda c, a, bd: [("diario", "2026-10-13", {}), ("alerta", "2026-W43", {})])
+    original = agenda.emitir
+
+    def emitir_quebrado(entradas, tipo, ref, agora):
+        if tipo == "diario":
+            raise ValueError("linha sem data (de mentira)")
+        return original(entradas, tipo, ref, agora)
+    monkeypatch.setattr(agenda, "emitir", emitir_quebrado)
+    rel = agenda.volta(cfg, _agora("2026-10-14T07:00"))
+    assert rel["emitidos"] == ["alerta 2026-W43"]
+    assert "diario 2026-10-13" in rel["erro"] and "ValueError" in rel["erro"]
+    assert arquivo.existe(cfg, "alerta", "2026-W43") is not None
