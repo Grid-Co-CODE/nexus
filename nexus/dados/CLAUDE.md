@@ -357,6 +357,30 @@ plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento que
 - **Carga:** cópia sob comando da exportação do Supabase (`ferramentas/copiar_zeladoria.py`), não entra na carga de hora em hora. A cópia de 06/11/2026: 5.148 linhas nas 41 tabelas mais 120 últimas rondas, as 42 abas iguais à origem. A 1ª medida, de 03/11/2026: 4.756 linhas mais 117 últimas rondas, as 40 abas iguais à origem, 13,8 s para gravar. Regra e passo a passo em `nexus/torres/zeladoria/CLAUDE.md`.
 - **Depois da troca, a torre grava** (`nexus/zeladoria/gravacao.py`, só com `NEXUS_ZELADORIA_GRAVA=1`): em lote, os livros que mudaram, pelo `livros.publicar`; a mudança espera num diário cifrado na pasta de dados, fora do banco. A `atualizacao` ganhou a coluna `versao` no fim (0 = a cópia; cada lote grava a sua), e a cópia recusa gravar por cima de uma versão acima de 0.
 
+**Mapa de equipe (08/11/2026).** Cinco livros, todos registrados no catálogo ANTES de existir (regra 10). **Ainda não estão
+no banco: aparecem com a primeira gravação depois do deploy** (a primeira posição, a primeira chave emitida, a primeira
+abertura do mapa). Quem escreve é o gravador em lote (`nexus/campo/equipe/gravador.py`, a cada 5 min), só onde
+`NEXUS_EQUIPE_GRAVA=1`, uma máquina por vez, e a decisão do piloto na hora (`nexus/campo/equipe/piloto.py`). O banco só
+troca o livro inteiro, então cada livro é relido e regravado pela UNIÃO com o que o banco já tem: um disco novo ou uma
+rodada que viu menos nunca encolhe o que já está lá. Regra de uso e do porquê: `nexus/torres/campo/CLAUDE.md`, "Mapa de equipe".
+- **`nexus_equipe_pontos_AAAA_MM_DD`** (família diária · `fato_ponto_equipe`): 1 linha = 1 ponto de posição de 1 técnico
+  dentro do expediente (6h a 22h, hora do técnico), com `ponto_id`, `data_id`, `instante`, `pessoa_id` e `cifra`. **A
+  coordenada só existe na `cifra`** (Cofre, contexto `equipe/ponto/<ponto_id>`; nada de lat/lon em claro em lugar nenhum).
+  **Guarda de 7 dias (LGPD, decisão do Levi): a T.I. apaga o livro do dia com mais de 7 dias**
+  (`docs/mapa-equipe-pedido-ti.md`); o Nexus não usa nem mostra ponto mais velho, mesmo antes. Por isso não tem `so_cresce`.
+- **`nexus_equipe_deslocamentos_AAAA_MM`** (família mensal · `fato_deslocamento_equipe`): 1 linha = 1 deslocamento fechado de
+  1 técnico, da usina de saída à de chegada, no livro do MÊS DA CHEGADA. Sem coordenada: as duas usinas, a saída, a
+  chegada, `duracao_min` e `distancia_km`. Calculado pelo servidor dos pontos; o id é um hash do trecho, então regravar
+  não duplica. **Guarda de 1 ano**; a T.I. apaga o livro do mês com mais de 12 meses. `so_cresce`.
+- **`nexus_equipe_aparelhos`** · `fato_evento_aparelho`: 1 linha = 1 evento (emitida ou revogada) da chave de 1 aparelho. Da
+  chave só o hash (`chave_hash`), nunca a chave: quem lê o livro não se passa por um técnico. É o livro que as chaves
+  releem ao subir o servidor. Só acrescenta (`so_cresce`).
+- **`nexus_equipe_piloto`** · `fato_decisao_piloto`: 1 linha = 1 decisão de pôr um técnico no piloto da coleta ou tirá-lo
+  (`no_piloto` 1 ou 0); vale a última de cada pessoa. Quem decidiu só pelo código HMAC. Só acrescenta.
+- **`nexus_equipe_acessos`** · `fato_acesso_mapa`: a trilha da LGPD, 1 linha = 1 vez que alguém abriu o mapa ou a rota de um
+  técnico (`acao` = `abriu_mapa` ou `abriu_rota`, o técnico visto, a usina). Quem abriu só por `pessoa_hmac` (o e-mail
+  nunca vai ao banco). Só acrescenta.
+
 ## As regras (valem para todo dado novo)
 
 1. **Grão e tipo escritos antes de tudo** ("1 linha = …"; transação, foto periódica, foto acumulada ou sem medida).

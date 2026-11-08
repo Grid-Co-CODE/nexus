@@ -30,6 +30,7 @@ o login do Fracttal de quem clica, como no OS Creator Web; ver "Aprovação de O
 |---|---|---|
 | **Visão do responsável** (12/10/2026, a 1ª do Campo) | o **Painel** (28/10/2026, a tela inicial de um responsável: seis quadros, ver "O Painel do responsável" abaixo) e três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
 | **Visão do cliente** (05/11/2026) | o tempo real da plataforma (a Entrada, pela ponte só de leitura) + o Gerencial (a meta, a mesma linha da Visão do responsável) + o Andamento da Ronda COS (os chamados à distribuidora) + `fato_tarefa_os` (as OS) + `fato_programacao` (a próxima visita) | `campo/visao_cliente.py` (junta; nenhuma conta nova, ver "Visão do cliente" abaixo) |
+| **Mapa de equipe** (08/11/2026) | os pontos de posição que o celular do técnico (Nexus Field) manda às três rotas públicas `/t/campo/equipe/...` + o cadastro (técnicos de campo ativos, coordenada das usinas) + a malha do IBGE (só para a cidade) | `campo/equipe/` (as réguas, os pontos, a situação, os deslocamentos; ver "Mapa de equipe" abaixo) |
 | **Ocorrências** (18/10/2026) | o livro `nexus_ocorrencias` (escrito nesta tela) + cadastro do Nexus | `campo/ocorrencias.py` (ver "Ocorrências com plano de ação" abaixo) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
 | Aprovação de OS (quadro por fatos desde 05/11/2026) | fila de verificação do Fracttal INTEIRA (só GET) + nota e fechamento do livro do App + os anexos das OS (1 GET por OS, lido por trás, e as fotos pelo S3) + o Responsável O&M da usina (cadastro); aprovar é o Concluir do OS Creator, no cartão ou em lote | `campo/prefiltro.py` (as colunas) sobre a conta pronta das regras copiadas do App; `campo/prefiltro_fundo.py` (as fotos) |
@@ -1474,6 +1475,137 @@ bloco que passou como programada, a OS concluída como só aberta, o bloco "feit
 a ordem sem fuso); a bancada com o banco real a 1440 px (a tabela de 6 colunas cabe ao lado do painel: 711 px por
 dentro do quadro) e a 375 px (sem rolagem de lado; o clique desce ao painel).
 
+## Mapa de equipe (08/11/2026)
+
+**O que é e quem pediu.** Ver onde está cada técnico que tem o Nexus Field e abrir a rota dele até uma usina. Pedido do
+Levi em 08/11/2026 (a ideia estava na fila desde 21/10): "identificar onde o técnico está e qual seria a melhor rota
+para ele, claro que vamos avisar que estamos pegando esses dados e será tudo respeitado, mas essa informação é
+essencial", e só dentro da LGPD. A coleta é da casca Android (repositório do Nexus Field; desenho em
+`docs/superpowers/specs/2026-11-08-mapa-de-equipe-design.md` de lá); o dado vem para cá e a tela é o **Mapa de equipe**
+(`/t/campo/equipe`), na Usinas 360°, logo depois da Visão do cliente. O plano está em
+`docs/superpowers/plans/2026-11-08-mapa-de-equipe.md`.
+
+**Estado (08/11/2026):** construído e testado, **ainda fora do ar** (nada sobe sem o OK do Levi). Os livros só nascem com a
+primeira gravação depois do deploy, e a coleta só vale para quem o administrador pôs no piloto.
+
+### As peças
+
+| Peça | Onde | O que faz |
+|---|---|---|
+| Réguas e nomes | `campo/equipe/__init__.py` | a janela (6h a 22h), as guardas (7 dias, 365), o raio (1 km), o sem sinal (30 min), o teto de 200 pontos, os cabeçalhos dos livros. Um número ou nome muda aqui e só aqui |
+| Conferir o login Microsoft | `campo/equipe/token_ms.py` | o ID token que a PÁGINA do App manda ao registrar o celular, pela assinatura (RS256, JWKS da Microsoft, diretório e público da Grid) |
+| Chaves dos aparelhos | `campo/equipe/aparelhos.py` | a chave própria de cada aparelho (só o hash vai ao banco), quem é coletado, o piloto |
+| Pontos | `campo/equipe/pontos.py` | valida o ponto, filtra a janela NA HORA DO TÉCNICO, cifra a coordenada (Cofre) e guarda o dia em disco cifrado |
+| Deslocamentos | `campo/equipe/deslocamentos.py` | fecha "saiu da usina A, chegou na B" dos pontos, sem coordenada na saída |
+| Situação e desenho | `campo/equipe/situacao.py` | a situação de cada técnico pelo último ponto, o desenho do mapa (só x/y), a UF pelo contorno do IBGE, o link da rota |
+| Cidade | `campo/equipe/municipios.py` | a cidade de quem está parado fora de usina, pela malha do IBGE do ESTADO inteiro |
+| Piloto | `campo/equipe/piloto.py` | grava quem entra e quem sai do piloto (`nexus_equipe_piloto`) |
+| Registro da LGPD | `campo/equipe/acessos.py` | quem abriu o mapa ou a rota de quem |
+| Estado do processo | `campo/equipe/servico.py` | junta chaves, diário, piloto e cadastro por trás das rotas; nada daqui grava no banco |
+| Gravador em lote | `campo/equipe/gravador.py` | a cada 5 min leva ao banco o que está na memória e no diário |
+| Rotas e tela | `torres/campo/equipe_tela.py`, `templates/campo/equipe.html`, `static/campo.css` (bloco `eq-*`) | as três rotas do celular, o mapa, o Abrir rota e o piloto |
+
+### De onde vem o dado: o contrato com o Nexus Field
+
+Base `https://app.gridco.com.br`. As três rotas são PÚBLICAS (`auth.ROTAS_PUBLICAS`, de propósito: quem chama é o celular,
+sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft conferido.
+
+- **`POST /t/campo/equipe/aparelho`** (chamada pela PÁGINA do App dentro da casca; CORS só para
+  `https://gridco-campo-mw.azurewebsites.net`, em toda resposta dela, senão a página não separa o 401 do 503).
+  `Authorization: Bearer <ID token Microsoft>`, corpo `{aparelho, app}`. Resposta `200 {coleta: true, chave}` (32 bytes
+  em base64url; um par pessoa + aparelho tem uma chave só, a nova revoga a velha), `200 {coleta: false}`, `401` token
+  inválido, `503` Microsoft ou banco fora ou servidor sem configuração. A página só pede a chave quando o aparelho não
+  tem uma ou depois de um 401.
+- **`POST /t/campo/equipe/posicoes`** (chamada pelo nativo, app aberto ou fechado). `Authorization: Bearer <chave>`, corpo
+  `{aparelho, fuso, pontos: [{t, lat, lon, prec, vel, mov}]}`. `t` em milissegundos UTC; **`fuso` são os minutos que se
+  somam ao UTC para dar a hora do celular** (Brasília -180, Mato Grosso -240); `mov` diz se a própria leitura está em
+  deslocamento (sempre vem). **Até 200 pontos e 64 KB por lote.** Sem a permissão "o tempo todo" o nativo manda
+  `{aparelho, fuso, permissao: "sem", pontos: []}` (no máximo um a cada 30 min), para o mapa separar quem negou de quem não
+  abriu o app. Resposta `200 {aceitos, coleta}` (`coleta: false` faz a casca parar até a próxima carga), `401` chave
+  inválida ou revogada (a casca apaga a chave e para), `413` lote grande, `400` corpo fora do contrato, `503`.
+- **`POST /t/campo/equipe/aparelho/revogar`** (nativo, no Sair): `Authorization: Bearer <chave>`, `{aparelho}`, `204`.
+- **Os códigos são o que a casca faz com eles.** Só o **401 apaga a chave** no celular. **Qualquer 5xx é como sem rede**: a
+  fila e a chave ficam, e a casca tenta de novo. Por isso o banco fora ou o servidor sem configuração respondem **503, nunca
+  401**, e nenhuma resposta é 500 (o que quebrar vira 503 e o log leva só o TIPO do erro). A casca confirmou o contrato
+  (fuso, `permissao: "sem"`, chave só sem chave ou depois de 401, 5xx não apaga, 200 pontos e 64 KB).
+
+### As regras e o caso que criou cada uma
+
+- **Janela das 6h às 22h, na hora do técnico (08/11).** O Levi: a coleta liga na primeira abertura do app no dia e vai até
+  as 22h; férias e folga, sem abrir o app, nada é coletado. Por isso o celular manda o `fuso` e o Nexus descarta o ponto
+  fora da janela na hora local (técnico em Mato Grosso tem a janela dele).
+- **7 dias os pontos, 1 ano os deslocamentos (08/11, LGPD, decisão do Levi).** O Nexus nunca usa nem mostra ponto com mais de
+  7 dias, mesmo antes da limpeza; o diário em disco também apaga o arquivo velho. Quem apaga do banco é a T.I.
+  (`docs/mapa-equipe-pedido-ti.md`).
+- **Sem sinal = 30 minutos sem ponto.** A coleta pode ser cortada pelo Android em celular com economia de bateria; o mapa
+  mostra o buraco e não o esconde.
+- **Na usina = a até 1 km da coordenada (raio confirmado pelo Levi, 08/11)**, a usina mais perto se mais de uma couber.
+  Está em `RAIO_USINA_KM`.
+- **"Hoje" é o dia de Brasília.** A coleta para às 22h e volta na primeira abertura; o ponto de ontem não diz onde o
+  técnico está agora e vira "sem posição hoje" (a hora dele ainda aparece).
+- **Deslocamento só dentro do mesmo dia de Brasília** (decisão da construção): sair de A às 17h e chegar em B às 7h do dia
+  seguinte viraria uma viagem de 14 h que não existiu. Voltar à mesma usina não é deslocamento, e o id é um hash do
+  trecho, então recalcular o mês não duplica linha.
+- **Parado fora de usina (a casa, o hotel) nunca vai ao mapa e não tem Abrir rota** (Levi: o mapa não mostra onde o
+  técnico mora). O painel diz a cidade e a distância até a usina mais perto. Vale também para o "sem sinal" e o "sem
+  permissão" cujo último ponto era parado fora de usina: senão a casa apareceria meia hora depois, em âmbar.
+- **Sem permissão nunca tem rota**: quem negou a localização não tem a posição mandada ao Google.
+- **Identidade só pelo e-mail exato da ficha.** O registro do aparelho acha a pessoa pelo e-mail do token, sem o nome tirado
+  do e-mail e sem desempate: um funcionário de nome igual poderia registrar um celular como técnico do piloto. E-mail de
+  duas fichas = ninguém. Ficha excluída não conta. Técnico sem e-mail no cadastro fica de fora até o cadastro ter o e-mail.
+- **401 é só "esta chave/este token não vale"; 503 é "não sei".** O banco que não respondeu, o livro das chaves ilegível no
+  boot e a Microsoft fora respondem 503: o 401 faria a casca apagar a chave e parar até a próxima abertura do App.
+- **O teto da Microsoft só liga numa falha de verdade ao baixar as chaves.** Sem o JWKS, a rota responde 503 e não tenta de
+  novo antes de 60 s; mas um token forjado com um `kid` desconhecido NÃO pode ligar esse teto (seria um jeito de segurar
+  os registros de todos em 503). O `kid` desconhecido força no máximo uma releitura a cada 5 min.
+- **O ID token é conferido pela assinatura** (aqui, e não no login do Nexus): lá o token chega direto do endpoint da
+  Microsoft numa conexão conferida; aqui vem do navegador, numa rota pública, e sem a assinatura um token forjado registraria
+  um aparelho no nome de um técnico e poria posições falsas no mapa. O `alg` é conferido ANTES de tocar em chave (só RS256);
+  o token de acesso do Graph é recusado (401).
+- **O IBGE baixa o estado inteiro e nunca recebe a posição** (Levi: "Faça puxar uma API do IBGE"). Só a sigla da UF vai
+  ao IBGE; o ponto no polígono roda aqui. A malha fica 30 dias no disco (`pasta_dados/equipe/ibge/<UF>.json`); o IBGE fora
+  deixa só a UF no painel, e o mapa não quebra.
+- **Tolerância de 20 km para a praia (`FOLGA_UF_KM`) — PENDENTE de confirmação do Levi.** O contorno simplificado do IBGE
+  põe ponto de praia no mar (medido: Boa Viagem a 0,4 km, Pajuçara a 0,1 km, Copacabana a 3,9 km). Fora de todo polígono, o
+  ponto fica com a borda mais perto até 20 km; vale para o estado e o município. O Levi pediu para ser consultado antes de
+  parâmetro novo: leve a ele e corrija aqui o valor decidido.
+- **Abrir rota sem a coordenada na página.** O botão leva a `GET /t/campo/equipe/rota`, que monta o link do Google Maps no
+  servidor (origem no técnico, destino na usina) e redireciona (302); a coordenada só sai no clique, para o Google. Só o
+  Google Maps: o link do Waze só recebe o destino e a rota sairia de quem clica, não do técnico. A rota recusa pedido vindo
+  de outro site (`Sec-Fetch-Site`), registra o acesso ANTES do redirecionamento e vai com `no-store` e
+  `Referrer-Policy: no-referrer`. A página e o JSON nunca têm lat/lon (o teste procura a coordenada no HTML).
+- **Ritmo e economia:** o celular manda a cada 2 min em deslocamento e mais espaçado parado; o Nexus recebe, não pede.
+
+### Quem vê
+
+Os setores **PCM, COS, Performance, Supervisão Campo e Responsáveis UFV** e os administradores. É conferido **dentro de
+cada rota** (`_quem_ve`), além do portão por setor da Tela: o portão fica desligado sem a `NEXUS_PESSOA_HMAC`, e a marca de
+outro setor em Base → Acessos abriria a tela. Sessão de cliente: 403. Quem põe o técnico no piloto é só o administrador
+(`POST /t/campo/equipe/piloto`, na própria tela). Cada abertura do mapa e de cada rota vai ao registro da LGPD
+(`nexus_equipe_acessos`, quem abriu só pelo código HMAC do e-mail). O nome do técnico aparece na tela e nunca vai ao banco
+nem ao log.
+
+### Como ligar
+
+Nada liga sozinho; tudo inerte sem a configuração (as rotas respondem 503).
+- `NEXUS_CHAVE_CADASTRO` (a do cadastro; sem ela não há técnico nem usina para casar).
+- `NEXUS_EQUIPE_MS_CLIENT_ID` e `NEXUS_EQUIPE_MS_TENANT_ID` em Base → Chaves: o ID do aplicativo do App de Campo e o ID do
+  diretório da Grid no Entra ID (os GUIDs não são segredo mas ficam fora do repositório público).
+- `NEXUS_EQUIPE_GRAVA=1` **numa máquina só** (o PC e o servidor não gravam juntos): liga o gravador em lote. Nunca em teste.
+- O piloto: o administrador escolhe os técnicos na própria tela. Padrão: ninguém é coletado.
+- Os livros: ver `nexus/dados/CLAUDE.md`. A limpeza do banco é pedido à T.I.: `docs/mapa-equipe-pedido-ti.md`.
+
+### Como provar
+
+`tests/test_equipe_catalogo.py` (o dado no catálogo antes de existir), `test_equipe_token.py` (a assinatura, o `alg`, o
+diretório, o prazo, o 401 e o 503), `test_equipe_aparelhos.py` (a chave só como hash, o piloto, o evento),
+`test_equipe_pontos.py` (a janela na hora do técnico, a cifra, o diário, os 7 dias), `test_equipe_deslocamentos.py`,
+`test_equipe_rotas.py` (o contrato das três rotas, os códigos, o CORS, os limites), `test_equipe_gravador.py` (a união, o
+que nunca encolhe o banco, a fila que volta), `test_equipe_situacao.py`, `test_equipe_municipios.py` (IBGE injetado, nunca
+a rede) e `test_equipe_tela.py` (quem vê, a rota, o registro, o piloto, nenhuma coordenada na página nem no JSON).
+Cada regra de segurança foi provada por quebra de propósito. A bancada só leitura (um técnico falso mandando um lote
+pelo `test_client`, o mapa a 1440 px e 375 px sem rolagem de lado) é o passo final da prova.
+
 ## Estrutura de O&M de 10/2026: região de campo e gestor de contrato (08/10/2026)
 
 Levi, 08/10, sobre a "Nova Estrutura O&M Equipe": "pode adaptar, deixa as vagas preparadas". O antigo "Supervisor de
@@ -1870,6 +2002,9 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   usina escolhida; o resto é a linha dela na Visão.
 - `visao_cliente.py`: a Visão do cliente (05/11/2026, acima): o recorte por `cliente_id`, o status pelo tempo real,
   as OS, os chamados e a próxima visita por usina, os 5 números e a ordem; a leitura do tempo real pela ponte.
+- `equipe/` (Mapa de equipe, 08/11/2026, acima): `__init__.py` (réguas e livros), `token_ms.py`, `aparelhos.py`, `pontos.py`,
+  `deslocamentos.py`, `situacao.py`, `municipios.py`, `piloto.py`, `acessos.py`, `servico.py` e `gravador.py`. As rotas e a
+  tela ficam em `torres/campo/equipe_tela.py`.
 - `relatorio_usina.py`: o relatório da usina em PDF para o cliente (04/11/2026, acima): os meses, os temas, os dados
   das telas donas e o PDF (reportlab, a paleta e a fonte dos outros relatórios).
   `manutencao.py`: a conta pura do bloco Manutenção. `tarefas_os.py`: o laço que lê as tarefas das OS do Fracttal e
