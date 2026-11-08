@@ -162,3 +162,19 @@ def test_a_programacao_usa_a_listagem_da_pre_leitura(tela):
     assert R._programacao_recente({20261012}, meta) == [{"data_id_semana": 20261012, "x": 1}]
     assert b.listagens == 0
     assert R._programacao_recente({20261012}) == [{"data_id_semana": 20261012, "x": 1}] and b.listagens == 1
+
+
+def test_o_cache_de_leituras_solta_as_entradas_vencidas(monkeypatch):
+    """Achado 3 da auditoria de 08/11/2026: a chave da fila leva a hora da leitura, cada releitura criava uma chave nova
+    e as velhas nunca eram lidas de novo (o TTL só valia ao ler a mesma chave): o dicionário só crescia."""
+    from nexus.campo import leitura
+    leitura.limpar()
+    monkeypatch.setattr(leitura, "TTL_S", 0.05)
+    for chave in ("a", "b", "c"):
+        leitura.ler(chave, lambda: {"x": 1})
+    assert len(leitura._CACHE) == 3
+    import time
+    time.sleep(0.1)
+    leitura.ler("d", lambda: {"x": 1})
+    assert list(leitura._CACHE) == ["d"]
+    leitura.limpar()

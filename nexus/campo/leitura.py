@@ -46,5 +46,9 @@ def ler(chave, calcular) -> Leitura:
     erros = sorted(set(tabelas.erros_da_leitura()) | ({falha} if falha else set()))
     leitura = Leitura(dados, time.time(), ("Não consegui ler: " + ", ".join(erros)) if erros else "")
     if not erros:
+        # solta o que venceu: a chave da fila leva a hora da leitura, então cada releitura cria uma chave que ninguém lê
+        # de novo (achado 3 da auditoria de 08/11/2026)
+        for k in [k for k, v in list(_CACHE.items()) if leitura.lido_em - v.lido_em >= TTL_S]:
+            _CACHE.pop(k, None)
         _CACHE[chave] = leitura
     return leitura
