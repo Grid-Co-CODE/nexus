@@ -96,3 +96,29 @@ def test_sem_copia_o_segundo_pedido_espera_o_primeiro_e_nao_baixa_de_novo(leitor
     t2.join(5)
     assert baixados.count(URL_A) == 1
     assert o1["leitura"].dados is o2["leitura"].dados and o2["leitura"].dados
+
+
+def test_o_304_do_github_renova_a_copia_em_memoria(app, monkeypatch):
+    """Auditoria ponytail de 08/11/2026: no 304 a cópia nova só era guardada se o mapa de clientes tivesse mudado, então o
+    relógio da cópia ficava velho e TODA leitura seguinte perguntava ao GitHub de novo (6 pedidos onde bastavam 2)."""
+    app.config["NEXUS_PCM_FONTE"] = URL_B
+    fonte._cache.pop(URL_B, None)
+    baixados = []
+
+    def baixar(url, validar, etag=None):
+        baixados.append(etag)
+        if etag is None:
+            return {"semanas": []}, "e1"
+        return None, etag                                  # 304: o arquivo não mudou
+
+    monkeypatch.setattr(fonte, "_baixar", baixar)
+    monkeypatch.setattr(fonte, "TTL_S", 0.3)
+    try:
+        with app.app_context():
+            fonte.ler(app.config)
+            time.sleep(0.4)                                # a cópia venceu
+            for _ in range(5):
+                assert fonte.ler(app.config).dados is not None
+        assert len(baixados) == 2, baixados                # a 1ª baixa; a 2ª só pergunta e renova; as outras usam a cópia
+    finally:
+        fonte._cache.pop(URL_B, None)

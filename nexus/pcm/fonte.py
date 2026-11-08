@@ -204,6 +204,9 @@ def _ler(config, chave: str, padrao: str, validar) -> Leitura:
             erro = f"{type(ex).__name__}: {str(ex)[:160]}"
         else:
             if dados is None:        # 304: o arquivo não mudou, a cópia em memória vale mais 5 min
+                # renova o relógio mesmo com o mapa de clientes igual (auditoria de 08/11/2026: sem isto cada leitura
+                # depois dos 5 min perguntava ao GitHub de novo)
+                _cache[fonte] = (agora, em_cache[1], em_cache[2], etag, em_cache[4])
                 e = _com_nomes_do_nexus(fonte, (agora, em_cache[1], em_cache[2], etag, em_cache[4]), m)
                 return Leitura(e[1], fonte, baixado_em=e[2])
             e = _com_nomes_do_nexus(fonte, (agora, dados, time.time(), etag, None), m)
