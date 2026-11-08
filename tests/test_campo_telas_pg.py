@@ -7,9 +7,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from pg_falso import ApiPGFalsa
 from test_campo_aprovacao import FracttalFalso, _os
-from test_campo_fonte_pg import BASE, CHAVE, _linha
+from test_campo_fonte_pg import BASE, CHAVE, _linha, semear
 
-from nexus.campo import aprovacao, banco_campo, fonte_pg, fracttal, leitura, tabelas, triagem
+from nexus.campo import aprovacao, fonte_pg, fracttal, leitura, tabelas, triagem
 from nexus.torres.campo import _motivo
 
 
@@ -24,7 +24,7 @@ def banco():
               _linha(502, 15088, fim=_iso(2), nota=45, n_fotos=0, gps_fotos=False),   # não dá para comprovar
               _linha(503, 15077, fim=_iso(3), nota=88, status_os=3, aprovacao=_iso(1)),
               _linha(601, 15002, fim=_iso(4), pelo_app=False, nota=None)]
-    banco_campo.gravar(linhas, banco_campo.resumo(linhas, "x", completa=True), base=BASE, token="t", sessao=api)
+    semear(api, linhas, completa=True)
     tabelas.usar_fornecedor(fonte_pg.Fornecedor({"GRIDCO_DB_API": BASE, "NEXUS_CHAVE_CADASTRO": CHAVE}, sessao=api))
     leitura.limpar_cache()
     yield api

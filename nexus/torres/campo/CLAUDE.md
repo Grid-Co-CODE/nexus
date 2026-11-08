@@ -1699,12 +1699,12 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
 
 - Nenhum módulo importa o SDK do Azure (`tests/test_campo_regras_app.py` trava). A leitura do Storage do App por SAS foi
   feita e removida em 04/10. Chave do Storage no ambiente não liga nada.
-- **O coletor do Fracttal está APOSENTADO** (05/10): gastava a cota de 200/min da empresa inteira para chegar a uma
-  nota que batia com a do painel do App em só 14% das tarefas (11,8 pontos de diferença média). Fica DESLIGADO (sem
-  `NEXUS_CAMPO_COLETOR`). O código (`coletor.py`, `banco_campo.py`, livro `campo_nexus`) é reserva para máquina sem a
-  chave HMAC e sai quando a troca estiver conferida com o painel do App. Se um dia religar: nunca no horário de campo
-  (seg a sex, 6h às 18h, `deve_rodar`), uma máquina só, e nunca o nome do técnico nem o endereço da usina em claro (o
-  `items_log_description` do Fracttal traz o endereço).
+- **O coletor do Fracttal está APOSENTADO** (05/10) e **saiu do código em 08/11/2026**: gastava a cota de 200/min da
+  empresa inteira para chegar a uma nota que batia com a do painel do App em só 14% das tarefas (11,8 pontos de
+  diferença média). Ficam a LEITURA do livro `campo_nexus` (`banco_campo.ler_tudo`, a reserva da fonte sem a chave HMAC)
+  e o `contexto_do_tecnico` em `coletor.py` (o `fonte_pg` decifra o nome com ele); a escrita, o laço, a ferramenta
+  `coletar_campo.py` e o `NEXUS_CAMPO_COLETOR` saíram. Religar seria código novo: nunca no horário de campo, uma máquina
+  só, e nunca o nome do técnico nem o endereço da usina em claro (o `items_log_description` do Fracttal traz o endereço).
 - A Aprovação de OS lê a fila do Fracttal (55 páginas, ~5.500 tarefas, 0,5 s entre pedidos), mas **a tela nunca
   espera** (Levi, 05/10: "fica carregando infinito"; o log mostrava a leitura de 1 min ou mais e, à noite, 4 a 26
   páginas recusadas com 429, e cada visita recomeçava do zero). `aprovacao.py` relê em segundo plano, uma leitura por
@@ -1884,7 +1884,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   conferência da OS que o card aprovou, `aprovacao_conferir`). `leitura.py`: cópia de 5 min e `limpar_cache()` (que também
   recarrega a cópia das regras).
 - `pessoas.py`: `identidades.json` e a tabela dos tokens só na partição `cadastro`.
-- `nota_fracttal.py`, `coletor.py`, `banco_campo.py`: o caminho do coletor aposentado.
+- `coletor.py` e `banco_campo.py`: o que sobrou do coletor, que saiu do código em 08/11/2026 (`coletor.py` ficou só com o
+  `contexto_do_tecnico`; `banco_campo.py`, só com a leitura do livro `campo_nexus`).
 - `fracttal.py` e o **porteiro do Fracttal** (31/10/2026): cada pedido do `ler` tira a vez no porteiro do Nexus ANTES de
   pegar uma das 4 `_VAGAS` (`fracttal_conta.reservar_vez()`), e os laços do Campo que leem o Fracttal por trás se
   declaram fundo no alvo da thread (`fracttal_conta.de_fundo`: `nexus-tarefas-os-banco`, `nexus-chamados-banco`,
@@ -1902,7 +1903,7 @@ não aprova, sessão antiga, script válido),
 `test_campo_central_supervisor.py` (08/10: Central e PT por região de campo e por gestor de contrato, "Sem região de
 campo" e "Sem gestor de contrato", estrutura não publicada, filtros e CSV das Rondas, detalhe da PT e histórico),
 `test_campo_telas_pg.py`, `test_campo_livros_app.py`, `test_campo_fonte_pg.py`, `test_campo_nota_fracttal.py`,
-`test_campo_coletor.py` (`tests/pg_falso.py`), `test_campo_fatos_nas_telas.py` (08/10: o técnico pelo nome e pelo
+`test_campo_coletor.py` (só a ligação do código do App ao cadastro; `tests/pg_falso.py`), `test_campo_fatos_nas_telas.py` (08/10: o técnico pelo nome e pelo
 código no mesmo livro, a coluna nova sem a chave, o fato do banco da mesma versão vale e o velho não, a carga que
 falhou, a ronda repetida que não conta em dobro, o dia de Brasília, a pessoa pelo cadastro, a PT e a última OS pelo
 fato, a validação por foto fora das rondas e no lugar da ronda do mesmo dia) e `tests/test_sem_nomes_no_repositorio.py`

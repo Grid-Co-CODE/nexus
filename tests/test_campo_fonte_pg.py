@@ -30,6 +30,24 @@ def _linha(id_t, folio, **kw):
     return l
 
 
+def semear(api, linhas, *, completa, pendentes=0):
+    """O livro `campo_nexus` no banco falso, como o coletor aposentado o deixou (a aba dos fechamentos e a de
+    atualização). O coletor saiu do código em 08/11/2026; a fonte do banco segue lendo o livro dele como reserva."""
+    api.workbooks[banco_campo.WORKBOOK] = {"key": banco_campo.WORKBOOK}
+
+    def celula(c, v):
+        if v is None or v == "":
+            return None
+        return ("sim" if v else "não") if c in banco_campo.SIM_NAO else v
+    api._id(banco_campo.WORKBOOK, banco_campo.ABA)["linhas"] = [
+        {"headers": list(banco_campo.COLUNAS), "values": [celula(c, l.get(c)) for c in banco_campo.COLUNAS]}
+        for l in sorted(linhas, key=lambda x: x["id_tarefa"])]
+    atualizacao = {"publicado_em": "2026-10-04T20:00:00-03:00", "tarefas": len(linhas), "completa": completa,
+                   "pendentes": pendentes}
+    api._id(banco_campo.WORKBOOK, banco_campo.ABA_ATUALIZACAO)["linhas"] = [
+        {"headers": list(atualizacao), "values": [celula(c, v) for c, v in atualizacao.items()]}]
+
+
 @pytest.fixture
 def banco(tmp_path):
     api = ApiPGFalsa()
@@ -37,7 +55,7 @@ def banco(tmp_path):
               _linha(502, 15378, status_os=3, aprovacao="2026-10-04T11:00:00", devolvida=True),
               _linha(601, 15380, pelo_app=False, nota=None),
               _linha(701, 15390, ronda=True, ronda_dia="2026-10-03", ronda_usina="Usina B", nota=87)]
-    banco_campo.gravar(linhas, banco_campo.resumo(linhas, "x", completa=True), base=BASE, token="t", sessao=api)
+    semear(api, linhas, completa=True)
     ident = tmp_path / "identidades.json"
     ident.write_text(json.dumps({"porEmail": {"tec1@gridco.com.br": {"nome": "Técnico Um", "supervisor": "Sup A"}}}),
                      encoding="utf-8")
@@ -140,8 +158,7 @@ def test_coleta_pela_metade_deixa_a_tela_no_app():
     # 04/10: com 40 de ~2.900 OS calculadas, a Aprovação punha 2.846 tarefas em "fora do App"
     api = ApiPGFalsa()
     linhas = [_linha(501, 15377)]
-    banco_campo.gravar(linhas, banco_campo.resumo(linhas, "x", completa=False, pendentes=2800), base=BASE, token="t",
-                       sessao=api)
+    semear(api, linhas, completa=False, pendentes=2800)
     tabelas.usar_fornecedor(fonte_pg.Fornecedor({"GRIDCO_DB_API": BASE}, sessao=api))
     try:
         assert not tabelas.configurado(("qualidadelog",))

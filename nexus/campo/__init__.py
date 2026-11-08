@@ -1,18 +1,17 @@
 """App de Campo no Nexus: a visão do Nexus sobre o campo. Sem Azure: o dado são os livros que o App grava no banco
 (livros_app.py). Atenção, PT, Rondas e Zeladoria são contas nossas (visao.py); Aprovação e Triagem usam
 as regras do App copiadas (regras_app.py), que leem os livros pela fonte do banco (fonte_pg.py -> tabelas.py). O
-coletor do Fracttal (coletor.py, banco_campo.py) está aposentado. As telas moram na torre Campo · App
+coletor do Fracttal saiu do código em 08/11/2026 (ficou o livro dele, em banco_campo.py, como reserva). As telas moram na torre Campo · App
 (nexus/torres/campo/). Leia nexus/torres/campo/CLAUDE.md antes de mexer.
 """
 
 
 def instalar(app):
-    """Liga a fonte do banco nas telas e, só onde NEXUS_CAMPO_COLETOR=1, o coletor (uma máquina só: duas leriam a
-    mesma fila e gastariam a cota do Fracttal em dobro). Quem chama é o app.py e o servir.py, nunca o create_app: os
-    testes não podem ligar nada que fale com a rede."""
+    """Liga a fonte do banco nas telas. Quem chama é o app.py e o servir.py, nunca o create_app: os testes não podem
+    ligar nada que fale com a rede."""
     import logging
     import threading
-    from . import aprovacao, coletor, fonte_pg, tabelas
+    from . import aprovacao, fonte_pg, tabelas
     tabelas.usar_fornecedor(fonte_pg.Fornecedor(app.config))
     from . import visao
     # as telas do Campo · App prontas na memória, e renovadas antes de vencer. SEMPRE ligado, em toda máquina: lê só o
@@ -64,5 +63,3 @@ def instalar(app):
         h.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
         log.addHandler(h)
         log.setLevel(logging.INFO)
-    if str(app.config.get("NEXUS_CAMPO_COLETOR") or "").strip() == "1":
-        coletor.ligar(app)

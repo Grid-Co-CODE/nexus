@@ -289,8 +289,8 @@ gravar só o código (`Técnico (HMAC)`) só pode ser publicado **depois** que o
 `371eb44` ou mais novo, que lê as duas colunas. Na ordem inversa, as telas de Rondas do servidor ficam sem o nome do
 técnico até a atualização.
 
-**O coletor do Fracttal está aposentado:** não ponha `NEXUS_CAMPO_COLETOR=1` no servidor (o pacote não tem). Ele lia o
-Fracttal com a cota da empresa inteira para recalcular uma nota que o App já grava.
+**O coletor do Fracttal saiu do código em 08/11/2026** (estava aposentado desde 05/10): `NEXUS_CAMPO_COLETOR` não faz
+mais nada. Ele lia o Fracttal com a cota da empresa inteira para recalcular uma nota que o App já grava.
 
 A tela **Aprovação de OS** lê a fila do Fracttal ao vivo quando alguém a abre: ~55 pedidos de uma vez, no máximo a
 cada 10 minutos por servidor (os filtros reusam a mesma leitura). Em hora de pico da cota ela mostra o aviso de fila

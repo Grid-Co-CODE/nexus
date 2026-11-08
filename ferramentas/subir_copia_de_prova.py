@@ -7,7 +7,6 @@ ao lado de uma cópia da plataforma (`plataforma/subir_copia_de_prova.py` no Per
 O que esta cópia NÃO faz, de propósito:
 - a carga de hora em hora no banco (`NEXUS_CARGA_DADOS=0`): a do PC do Levi e a do servidor já disputam a hora;
 - as leituras do Fracttal ao subir (`NEXUS_CAMPO_AQUECER=0`): a cota é de 200/min para a empresa inteira;
-- o coletor do Campo (`NEXUS_CAMPO_COLETOR` vazio);
 - os laços que leem o Fracttal para gravar no banco (`NEXUS_CHAMADOS_PUBLICAR=0`, `NEXUS_OS_PUBLICAR=0`);
 - nenhum pedido sai para a SunOp ou a API PV, e nenhum pedido que não seja GET/HEAD/OPTIONS sai da máquina (gravação
   no banco, no Fracttal, no GitHub do PCM): a trava abaixo recusa com `ConnectionError`, e a tela mostra a falha. Por
@@ -89,7 +88,6 @@ def main() -> None:
     os.environ["NEXUS_CARGA_DADOS"] = "0"
     os.environ["NEXUS_CAMPO_AQUECER"] = "0"
     os.environ["NEXUS_PCM_RELATORIOS_AUTO"] = "0"       # a emissão automática dos relatórios do PCM
-    os.environ["NEXUS_CAMPO_COLETOR"] = ""
     # os laços que leem o Fracttal de hora em hora para gravar no banco: a cópia não grava (a trava recusa), então só
     # gastaria a cota da empresa lendo (18/10/2026: a dos chamados lia desde 12/10 em toda cópia de prova)
     os.environ["NEXUS_CHAMADOS_PUBLICAR"] = "0"
