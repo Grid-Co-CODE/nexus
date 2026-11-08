@@ -4,7 +4,7 @@ semanal das pendências por email, pra mim e pro supervisor responsável". O Nex
 O caso: o `com_cadastro` de test_hseq_extintores.py (Altair e Brodowski 1 da Supervisora Campo, Coração 1 do Coordenador
 Campo, os dois com e-mail na ficha) com as PT e o não reconhecido da Mesa, e uma pessoa do Fracttal no setor Segurança."""
 import re
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from test_campo_visao import CHAVE, _aba, banco  # noqa: F401  (banco é fixture)
@@ -130,6 +130,26 @@ def test_com_a_semana_ja_no_livro_o_laco_nem_monta_os_emails(com_tst, app, monke
     assert r["publicadas"] == 0 and not chamadas
 
 
+def test_o_livro_guarda_so_as_4_ultimas_semanas_e_a_corrente_nunca_sai(com_tst, app, monkeypatch):
+    """08/11/2026 (Levi: "tem alguma utilidade esse livro? se não pode apagar"): o livro é a caixa de saída do App, que
+    lê a semana, manda e confirma; a semana velha não serve. `publicar` grava as 4 últimas semanas ISO e as novas."""
+    gravado = {}
+    monkeypatch.setattr(ES.livros, "publicar", lambda livro, nome, tabelas, **kw: gravado.update(tabelas))
+    app.config["GRIDCO_SQL_TOKEN"] = "x"
+    hoje = date(2026, 10, 12)                                   # W42; a 7ª semana do livro
+    semanas = [ES.semana(date(2026, 9, 1) + timedelta(days=7 * i)) for i in range(6)]    # W36 a W41
+    linha = lambda sem, n: {**{c: None for c in ES.CAB}, "semana": sem, "destinatario_hmac": f"d{n}"}    # noqa: E731
+    velhas = [linha(sem, n) for n, sem in enumerate(semanas)]
+    monkeypatch.setattr(ES, "ler", lambda cfg: velhas)
+    with app.test_request_context():
+        r = ES.publicar(app.config, hoje=hoje)
+    cab, linhas = gravado[ES.ABA]
+    guardadas = {l[list(cab).index("semana")] for l in linhas}
+    assert r["publicadas"] == 3 and ES.SEMANAS_GUARDADAS == 4
+    assert guardadas == {"2026-W42", "2026-W41", "2026-W40", "2026-W39"}     # a corrente e as 3 anteriores
+    assert sum(1 for l in linhas if l[list(cab).index("semana")] == "2026-W42") == 3
+
+
 def test_a_semana_perdida_na_segunda_ainda_e_devida_na_terca():
     """Achado 4 da auditoria de 08/11/2026: com a API fora a segunda inteira, `devido` era falso na terça e a semana nunca
     saia (o App aceita a linha até a segunda seguinte). O "uma vez por semana" do `publicar` impede repetir."""
@@ -148,7 +168,7 @@ def test_a_publicacao_liga_no_servidor_e_nao_no_pc():
 def test_o_livro_esta_no_catalogo_antes_da_primeira_gravacao():
     from nexus.dados import catalogo as C
     livro = C.LIVRO_POR_NOME[ES.LIVRO]
-    assert set(livro.abas) == {ES.ABA} and livro.so_cresce and not livro.no_banco
+    assert set(livro.abas) == {ES.ABA} and not livro.so_cresce and not livro.no_banco
     assert {f.id: f for f in C.FATOS}["email_pendencias_seguranca"].livro.endswith(ES.ABA)
 
 

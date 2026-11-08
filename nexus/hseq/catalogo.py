@@ -87,8 +87,9 @@ LIVROS = (
     Livro("nexus_hseq_email", ("fato_email_pendencias",),
           "toda segunda depois das 07:00, no servidor (NEXUS_HSEQ_EMAIL_AUTO=0 desliga)", "nexus/hseq/email_semanal.py", False,
           "registrado em 24/10/2026 antes de existir: nasce com a 1ª semana publicada, quando o App de Campo estiver "
-          "pronto para ler e mandar",
-          so_cresce=True),
+          "pronto para ler e mandar. NÃO só cresce (exceção declarada, 08/11/2026): é a fila dos e-mails, o App lê a "
+          "semana, manda e confirma, e a linha que não sai vence na segunda seguinte; semana velha não serve, e o "
+          "`publicar` guarda só as 4 últimas semanas ISO (a corrente nunca sai)"),
     Livro("nexus_hseq_extintores", ("fato_exclusao_extintor", "fato_pedido_ronda", "fato_edicao_extintor"),
           "a cada decisão na tela de Extintores", "nexus/hseq/decisoes.py, pela tela Extintores da Segurança", False,
           "registrado em 24/10/2026 antes de existir: nasce com a 1ª decisão. A tela lê com cache de 1 minuto e a "

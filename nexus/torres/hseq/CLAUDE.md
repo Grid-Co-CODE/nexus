@@ -106,8 +106,12 @@ linha por destinatário, uma vez por semana (o livro é lido antes de montar, pa
 - **O teste** (30/10/2026, Levi: "faça testes mandando pra mim!"): o App tem uma trava de teste (o servidor dele a partir
   da v313; o /health diz `hseqEmail.modo`) que manda toda linha só para o Levi, com "[Teste · TST]" ou "[Teste ·
   responsável]" no assunto, e nada grava no Envios. A W44 foi publicada à mão: 6 linhas, 6 códigos casados, 6 e-mails
-  entregues, 0 erro. Ela fica no livro (só cresce) e vence sozinha. **A trava só sai a partir de segunda 02/11**, com o
+  entregues, 0 erro. Ela fica no livro até sair das 4 últimas semanas (abaixo) e vence sozinha. **A trava só sai a partir de segunda 02/11**, com o
   OK do Levi: antes disso a W44 seria a semana corrente e iria aos destinatários reais.
+- **O livro guarda só as 4 últimas semanas** (08/11/2026; Levi: "tem alguma utilidade esse livro? se não pode apagar"). Ele é a
+  caixa de saída: o App lê a semana, manda e confirma nele, e a linha que não sai vence na segunda seguinte. Por isso o
+  livro fica, mas NÃO só cresce (a exceção declarada no `catalogo.py`): o `publicar` grava a semana corrente e as 3
+  anteriores (`SEMANAS_GUARDADAS = 4`) mais as linhas novas; a corrente nunca sai.
 - **Ligar:** ligado no servidor por padrão desde 30/10 (o Levi não tem acesso ao `.env` de lá);
   `NEXUS_HSEQ_EMAIL_AUTO=0` desliga, e não liga onde `NEXUS_CAMPO_AQUECER=0` (o PC e a cópia de prova). Quem chama o
   laço é o `servir.py`, nunca o `app.py`. A **prévia** (`/t/hseq/mesa/email`, o botão "Prévia do e-mail semanal" da Mesa, só para quem decide

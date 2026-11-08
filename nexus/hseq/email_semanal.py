@@ -41,6 +41,10 @@ CAB = ("semana", "gerado_em", "data_id", "papel", "pessoa_id", "destinatario_hma
 ROTULO_CHAVE = b"nexus:hseq:email"
 ENDERECO = "https://app.gridco.com.br"       # o Nexus no servidor (na raiz desde a fase 4): o link do e-mail
 HORA = 7                                     # segunda, 07:00 de Brasília
+# O livro é a caixa de saída: o App lê a semana, manda e confirma nele, e a linha que não saiu vence na segunda seguinte.
+# Semana velha não serve a ninguém e o livro crescia para sempre (Levi, 08/11/2026: "tem alguma utilidade esse livro? se
+# não pode apagar"): o `publicar` guarda a corrente e as 3 anteriores. A corrente nunca sai, nem com o livro cheio.
+SEMANAS_GUARDADAS = 4
 # as cores do e-mail em hex, como as do PDF da Segurança (relatorio.py): o leitor de e-mail não lê as variáveis do
 # nexus.css, e o fundo é claro (o Outlook e o Gmail abrem em branco)
 COR = {"navy": "#090d18", "verde": "#a3d900", "tinta": "#111827", "mudo": "#5b6475", "linha": "#e3e7ee",
@@ -346,7 +350,9 @@ def publicar(cfg, hoje=None) -> dict:
     if d["erros"]:
         return {"publicadas": 0, "semana": d["semana"], "erro": f"fonte sem leitura: {', '.join(d['erros'])}"}
     vazio = (lambda v: None if v in ("", None) else v)      # noqa: E731
-    corpo = [[vazio(x.get(c)) for c in CAB] for x in velhas + d["linhas"]]
+    guardar = {semana((hoje or _agora().date()) - timedelta(days=7 * i)) for i in range(SEMANAS_GUARDADAS)}
+    manter = [x for x in velhas if D._txt(x.get("semana")) in guardar]
+    corpo = [[vazio(x.get(c)) for c in CAB] for x in manter + d["linhas"]]
     base, sessao = _banco(cfg)
     livros.publicar(LIVRO, NOME_LIVRO, {ABA: (list(CAB), corpo)}, base=base, token=token, sessao=sessao)
     return {"publicadas": len(d["linhas"]), "semana": d["semana"], "sem_codigo": len(d["sem_codigo"]), "erro": ""}
