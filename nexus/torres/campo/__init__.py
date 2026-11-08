@@ -2032,3 +2032,5 @@ def triagem():
 from . import ocorrencias_tela  # noqa: E402,F401
 # a Visão do cliente (05/11/2026): as rotas em cliente_tela.py, pelo mesmo motivo
 from . import cliente_tela  # noqa: E402,F401
+# o Mapa de equipe (08/11/2026): as três rotas públicas do contrato com o Nexus Field, em equipe_tela.py
+from . import equipe_tela  # noqa: E402,F401

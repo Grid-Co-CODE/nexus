@@ -46,10 +46,13 @@ log = logging.getLogger(__name__)
 # (26/10/2026), a marca de motivo do técnico pelo App (PCM, 16/10/2026) e as fotos do inventário do almoxarifado (a da
 # peça achada e as do fabricante, do modelo e do número de série; PCM, 30/10/2026) não têm sessão: cada rota confere a
 # assinatura HMAC antes de gravar qualquer coisa (`nexus/hseq/fotos.receber`, `nexus/hseq/info_extintor.receber`,
-# `nexus/pcm/motivos_app.conferir`, `nexus/pcm/inventario/fotos_app.receber`); só elas passam sem login, e só por POST
+# `nexus/pcm/motivos_app.conferir`, `nexus/pcm/inventario/fotos_app.receber`); só elas passam sem login, e só por POST.
+# O Mapa de equipe (08/11/2026, `nexus/torres/campo/equipe_tela.py`): o registro do aparelho vale o ID token da Microsoft
+# conferido pela assinatura; as posições e a revogação, a chave do aparelho
 ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static", "torre_hseq.extintores_foto_receber",
                   "torre_hseq.extintores_info_receber", "torre_pcm.motivo_do_app", "torre_pcm.inventario_foto_receber",
-                  "torre_zeladoria.cronograma_api"}
+                  "torre_zeladoria.cronograma_api", "torre_campo.equipe_aparelho", "torre_campo.equipe_posicoes",
+                  "torre_campo.equipe_revogar"}
 
 # Limite de tentativas do Entrar (auditoria A2 da porta única e revisão adversarial, 10/10/2026). Até a A2 era por IP: 5
 # erros de QUALQUER pessoa no mesmo IP trancavam o Entrar de todos por 15 min, inclusive a senha de administrador, e até o
