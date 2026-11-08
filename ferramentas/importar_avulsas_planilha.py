@@ -43,8 +43,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from nexus.cadastro.cifra import Cofre  # noqa: E402
 from nexus.campo import ronda_avulsa as RA  # noqa: E402
 from nexus.campo import visao  # noqa: E402
-from nexus.campo.ligacao_cadastro import _norm as norm_fracttal  # noqa: E402
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa  # noqa: E402
+from nexus.cadastro.ligacao_campo import _norm as norm_fracttal  # noqa: E402
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa  # noqa: E402
 from nexus.dados import dominios as DOM  # noqa: E402
 from nexus.dados import fatos as D  # noqa: E402
 from nexus.dados import livros  # noqa: E402

@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import requests  # noqa: E402
 
 from nexus import create_app  # noqa: E402
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa  # noqa: E402
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa  # noqa: E402
 from nexus.dados import carga, fatos, livros  # noqa: E402
 
 LIVRO, NOME = "nexus_rondas_checklist", "Nexus · checklist das rondas sem OS (carga única de 06/10/2026)"
