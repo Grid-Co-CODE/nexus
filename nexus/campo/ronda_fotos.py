@@ -15,11 +15,11 @@ import hashlib
 import os
 import threading
 import time
-import unicodedata
 from collections import OrderedDict
 from pathlib import Path
 
 from . import nota_fracttal
+from ..texto import sem_acento as _norm
 
 LISTA_S = 1200               # a lista de anexos de uma OS, 20 min sem pedir de novo (o link assinado vale 24 h)
 # as últimas fotos inteiras baixadas (até ~700 kB cada). Eram 40, e a ronda tem 45 a 50: o `preparar` baixava todas
@@ -113,11 +113,6 @@ def _podar(d: Path) -> None:
             p.unlink()
         except OSError:
             pass
-
-
-def _norm(s) -> str:
-    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
-    return " ".join(s.split())
 
 
 def _ext(url) -> str:

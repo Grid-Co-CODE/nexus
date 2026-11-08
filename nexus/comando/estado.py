@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from flask import current_app
 
 from ..dados import livros
+from ..dados.conexao import banco as _banco
 
 LIVRO, NOME_LIVRO, ABA = "nexus_insights", "Nexus · insights (dono, notificações e retornos)", "fato_evento_insight"
 CAB = ("id", "registrado_em", "data_id", "insight_id", "regra", "torre", "evento", "pessoa_id", "pessoa_hmac",
@@ -46,11 +47,6 @@ def limpar() -> None:
 
 def _txt(v) -> str:
     return "" if v is None else str(v).strip()
-
-
-def _banco():
-    from ..campo import visao
-    return visao._base(), visao._sessao()
 
 
 def _cofre():

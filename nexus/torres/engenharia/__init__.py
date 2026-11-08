@@ -608,7 +608,7 @@ def _acao(cod: str, fazer, aviso: str = "", acomp_id=None, form: str = ""):
     """Roda a ação e responde a gaveta. `fazer()` devolve o aviso (ou None para o de `aviso`) e pode trocar o
     acompanhamento mostrado (o encerrado) devolvendo (aviso, acomp_id). Na recusa e no banco fora, o que foi digitado
     no formulário `form` volta preenchido (revisão final: o comentário de até 2.000 letras se perdia)."""
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     from ...engenharia import acompanhamento as AC
@@ -699,7 +699,7 @@ def _cod_do(acompanhamento_id: str) -> str:
 @bp.route("/confiabilidade/acompanhamento/<aid>/salvar", methods=["POST"])
 def acompanhamento_salvar(aid):
     from ...engenharia import acompanhamento as AC
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():          # antes de qualquer leitura do banco (acabamento da revisão final)
         abort(403)
     cod = request.form.get("cod") or _cod_do(aid)
@@ -743,7 +743,7 @@ def _salvar_acompanhamento(aid: str, cod: str, extra: str = "", pela_ponte: bool
 @bp.route("/confiabilidade/acompanhamento/<aid>/comentar", methods=["POST"])
 def acompanhamento_comentar(aid):
     from ...engenharia import acompanhamento as AC
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     cod = request.form.get("cod") or _cod_do(aid)
@@ -765,7 +765,7 @@ def acompanhamento_diagnostico_novo(aid):
     import logging
 
     from ...engenharia import acompanhamento as AC
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     cod = request.form.get("cod") or _cod_do(aid)
@@ -786,7 +786,7 @@ def acompanhamento_diagnostico_novo(aid):
 
 def _cadastro(fazer, aviso: str):
     """As ações da aba Diagnósticos: grava, guarda o aviso (ou o erro) na sessão e volta à aba."""
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     from ...engenharia import acompanhamento as AC
@@ -1270,7 +1270,7 @@ def etm_os_marcar(folio: int):
 
     from ...engenharia import etm_marcas as M
     from ...engenharia import os_equipe
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     pode, _meu = _quem_pode()
@@ -1323,7 +1323,7 @@ def equipe_os_classificar(folio: int):
 
     from ...engenharia import os_acompanhamento as O
     from ...engenharia import os_equipe
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     pode, _meu = _quem_pode()
@@ -1483,7 +1483,7 @@ def etm_finalizar():
 
     from ...engenharia import etm as ETM
     from ...engenharia import etm_marcas as M
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     pode, _meu = _quem_pode()
@@ -1774,7 +1774,7 @@ def fmea_emitir():
     from ...dados import livros
     from ...engenharia import acompanhamento as AC
     from ...engenharia import fmea as F
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     pode, _ = _quem_pode()

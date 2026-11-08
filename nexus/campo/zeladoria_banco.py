@@ -27,6 +27,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from ..dados import livros
+from ..dados.conexao import base_de as _base
 
 LIVRO = "nexus_zeladoria"
 ABA = "zeladoria_semana"
@@ -41,11 +42,6 @@ FILA_MAX_H = 6
 _BRT = timezone(timedelta(hours=-3))
 _LACO = {"thread": None, "parar": threading.Event(), "ultimo": None, "quando": None}
 log = logging.getLogger("nexus.campo")
-
-
-def _base(config) -> str:
-    from ..cadastro.ligacoes import BASE_API
-    return (config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
 
 
 def _ultima(base, sessao) -> datetime | None:

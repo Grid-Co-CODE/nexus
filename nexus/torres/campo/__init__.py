@@ -869,7 +869,7 @@ def _observacoes(u: dict, d: dict, aviso: str = "", erro: str = "", texto: str =
 def responsaveis_observacao(usina_id):
     """Grava a Observação do responsável e devolve a janela da Meta de novo (com a observação nova, ou com o motivo da
     recusa e o texto digitado). Só da própria página (a régua da moldura: pedido de outro site é 403)."""
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     leitura = campo_resp.visao_responsaveis()
@@ -1525,7 +1525,7 @@ def ronda_avulsa_lancar():
 @bp.route("/rondas/avulsa/<rid>/anular", methods=["POST"])
 def ronda_avulsa_anular(rid):
     """Anular a própria ronda avulsa: vira outra linha no banco (o banco não apaga)."""
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     try:
@@ -1986,7 +1986,7 @@ def aprovacao_conferir(id_wo):
     que aparece ao clicar na OS do histórico de OS do OS Creator Web"), a tela pede para conferir: a OS que o Fracttal
     já não tem em verificação sai da fila guardada na hora, sem esperar a releitura de 10 min. Só sai o que o Fracttal
     confirma (1 pedido de leitura): ninguém esconde OS da fila (o porquê de a rota /tirar ter saído em 08/10)."""
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     o = campo_aprovacao.os_na_fila(id_wo)

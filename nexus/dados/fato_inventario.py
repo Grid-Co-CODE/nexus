@@ -53,6 +53,7 @@ from . import livros
 from .dominios import SITUACAO_INVENTARIO
 from .fato_almoxarifado import LIGADA_DE_PARA
 from .fatos import CAB_QUALIDADE
+from .conexao import banco_de as _banco
 
 LIVRO = "nexus_almoxarifado_inventario"
 NOME_LIVRO = "Nexus · inventário do almoxarifado: eventos, régua de mínimo e máximo e curadoria"
@@ -166,21 +167,6 @@ def _dia_de_brasilia(d: datetime) -> int:
 def _arquivo_local(cfg) -> Path | None:
     p = cfg.get("NEXUS_ALMOX_INVENTARIO_ARQUIVO")
     return Path(p) if p else None
-
-
-def _banco(cfg):
-    from ..cadastro.ligacoes import BASE_API
-    base = str(cfg.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
-    sessao = None
-    try:
-        from flask import current_app
-        sessao = current_app.extensions.get("nexus_dados_sessao")
-    except RuntimeError:            # fora de um pedido (a ferramenta da foto): sessão própria
-        pass
-    if sessao is None:
-        import requests
-        sessao = requests.Session()
-    return base, sessao
 
 
 def _ler_cru(cfg) -> dict:

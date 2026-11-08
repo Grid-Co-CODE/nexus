@@ -38,12 +38,12 @@ Nexus vê e grava, e o POST confere o código do formulário e a origem.
   gravar viraria "nada mudou" com a linha já no livro.
 """
 import json
-import unicodedata
 from types import SimpleNamespace
 
 from ..dados import fatos as D
 from ..pcm import admins_app as AA
 from ..pcm import atribuicoes as A
+from ..texto import sem_acento as _sem_acento
 
 SEM_HMAC = ("Este Nexus não tem a NEXUS_PESSOA_HMAC: a linha iria sem assinatura e o App não a aplicaria. Nada foi "
             "gravado.")
@@ -281,12 +281,6 @@ def _emails_conhecidos(cfg) -> dict:
 
 def _dm(d) -> str:
     return f"{str(d)[6:8]}/{str(d)[4:6]}/{str(d)[:4]}" if d else ""
-
-
-def _sem_acento(s) -> str:
-    """Sem acento, sem caixa, espaço único: o que a busca da página compara (o JavaScript tira o acento do digitado)."""
-    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
-    return " ".join(s.split())
 
 
 def _nome(fichas: dict, pid) -> str:

@@ -37,7 +37,7 @@ cookie permanente), mas é a senha compartilhada. TV 24 h com o login de uma pes
 (o `_rpc_try_refresh` do clone), regra nova que depende da decisão do Levi.
 """
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode
 
 from flask import (current_app, has_request_context, jsonify, make_response, redirect, render_template, request, session,
                    url_for)
@@ -254,21 +254,10 @@ def _json_sem_cache(corpo: dict, status: int):
 
 
 def _de_outro_site() -> bool:
-    """O pedido NÃO veio de uma página deste mesmo endereço. A mesma regra do `_de_outra_origem` da plataforma: pelo
-    Sec-Fetch-Site, só 'same-origin' (o fetch do porta.js; 'same-site' não, porque todo subdomínio de gridco.com.br é
-    'same-site'); sem ele, o Origin tem de ser deste host ('null' não); sem os dois não é navegador, e não há cookie de
-    vítima para usar. A resposta é JSON que outro site não lê (sem CORS); isto fecha também o pedido às cegas."""
-    sfs = (request.headers.get("Sec-Fetch-Site") or "").strip().lower()
-    if sfs:
-        return sfs != "same-origin"
-    origem = request.headers.get("Origin")
-    if origem is None:
-        return False
-    try:
-        de = urlsplit(origem.strip()).netloc.lower()
-    except ValueError:
-        return True
-    return not de or de != (request.host or "").lower()
+    """O pedido NÃO veio de uma página deste mesmo endereço. A regra mora no portão desde 08/11/2026
+    (`nexus/auth/origem.py`); este nome segue valendo para o COS e os ramos em andamento, e chama a de lá na hora."""
+    from ..auth.origem import de_outro_site
+    return de_outro_site()
 
 
 def _passe_novo(t):

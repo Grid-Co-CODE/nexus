@@ -48,13 +48,14 @@ import logging
 import re
 import threading
 import time
-import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ..dados import fatos as D
 from ..dados import livros
 from ..dados.equipamento import canon, equipamento_id
+from ..texto import sem_acento as norm
+from ..dados.conexao import banco_de as _banco
 
 log = logging.getLogger(__name__)
 
@@ -115,12 +116,6 @@ class BancoFora(Recusada):
 
 
 # ── a tarefa e o nome ─────────────────────────────────────────────────────────────────────────────────────────
-def norm(s) -> str:
-    """Sem acento, sem caixa, espaço único: a mesma conta do `tarefa_chave` (e a do robô do PCM no arquivo)."""
-    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
-    return " ".join(s.split())
-
-
 def os_de(v) -> str:
     try:
         return str(int(float(v)))
@@ -177,21 +172,6 @@ def _sim(v) -> bool:
 def _arquivo_local(cfg) -> Path | None:
     p = cfg.get("NEXUS_PCM_MOTIVOS_ARQUIVO")
     return Path(p) if p else None
-
-
-def _banco(cfg):
-    from ..cadastro.ligacoes import BASE_API
-    base = str(cfg.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
-    sessao = None
-    try:
-        from flask import current_app
-        sessao = current_app.extensions.get("nexus_dados_sessao")
-    except RuntimeError:            # fora de um pedido (a ferramenta da foto): sessão própria
-        pass
-    if sessao is None:
-        import requests
-        sessao = requests.Session()
-    return base, sessao
 
 
 def _ler_cru(cfg) -> dict:

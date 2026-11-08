@@ -24,10 +24,10 @@ import base64
 import io
 import re
 import time
-import unicodedata
 from datetime import datetime, timedelta, timezone
 
 from . import nota_fracttal
+from ..texto import sem_acento as _norm
 
 PDF_MAX = 15 * 1024 * 1024
 IMG_MAX = 3 * 1024 * 1024
@@ -37,11 +37,6 @@ _ASSINATURAS: dict = {}
 
 class SemArquivo(LookupError):
     """O Fracttal não tem o que se pediu: o texto diz por quê, para a tela mostrar."""
-
-
-def _norm(s) -> str:
-    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
-    return " ".join(s.split())
 
 
 def _baixar(url: str, limite: int) -> bytes:

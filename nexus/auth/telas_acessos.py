@@ -30,6 +30,8 @@ from . import acessos as A
 from . import clientes as CL
 from . import admins_do_servidor
 from . import setor_telas as ST
+from .sessao import email_da_sessao as _meu_email
+from .origem import de_outro_site as _de_outro_site
 
 log = logging.getLogger(__name__)
 
@@ -43,11 +45,6 @@ _ACOES_CLIENTES = ("cliente_adicionar", "cliente_link", "cliente_remover")
 _ACOES_APP = ("admin_app_por", "admin_app_por_email", "admin_app_tirar")
 
 
-def _meu_email() -> str:
-    u = session.get("usuario")
-    return str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
-
-
 def _quem() -> str:
     """Quem fez a mudança, para a lista e a auditoria: o e-mail do Fracttal, ou "senha de administrador"."""
     return _meu_email() or A.SENHA_DE_ADMIN
@@ -58,11 +55,6 @@ def _codigo() -> str:
     if not session.get(_CHAVE_CODIGO):
         session[_CHAVE_CODIGO] = secrets.token_urlsafe(24)
     return session[_CHAVE_CODIGO]
-
-
-def _de_outro_site() -> bool:
-    from ..torres.moldura import _de_outro_site as regra
-    return regra()
 
 
 def _linhas_de_admins(servidor: set[str], est: dict, ultimo: dict) -> list[dict]:

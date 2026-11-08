@@ -21,6 +21,9 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/auth/__init__.py` | `/entrar` (a porta, a senha de administrador e a ida e a volta da Microsoft), `/sair` (com a porta única ligada, passa pela plataforma: `templates/sair.html`) e o portão (`before_request`) |
 | `nexus/auth/microsoft.py` | o login pela conta Microsoft da Grid (Entra ID), desligado sem as quatro `NEXUS_MS_*` (seção "Entrar com a Microsoft" abaixo) |
 | `nexus/auth/fracttal.py` | o login pelo Fracttal: o `api.fracttal_login` do clone do OS Creator; abre também o cookie `os_sessao` (/os) |
+| `nexus/auth/origem.py` | a regra do pedido de outra página (`de_outro_site`: o `Sec-Fetch-Site` só `same-origin`; sem ele, o `Origin` deste host), que toda gravação confere. Morava em `torres/moldura.py` até 08/11/2026 (37 lugares de 16 arquivos importavam a regra de segurança de dentro de uma torre); o `moldura._de_outro_site` segue valendo e chama esta |
+| `nexus/auth/sessao.py` | `email_da_sessao()`: o e-mail de quem entrou, como o portão guardou. Eram cinco cópias iguais até 08/11/2026 |
+| `nexus/texto.py` | `sem_acento()`: o texto comparável (sem acento, sem caixa, espaço único). Eram 11 cópias iguais até 08/11/2026; as variantes que comparam de outro jeito ficaram onde estavam |
 | `nexus/auth/acessos.py` + `telas_acessos.py` | os administradores dados pela tela Base → Acessos, a auditoria e quem entrou em 30 dias (`templates/acessos/acessos.html`; seção "Acessos" abaixo) |
 | `nexus/auth/telas_admins_app.py` + `templates/acessos/_admins_app.html` (+ `_admins_app_explica.html`, o "!" do título) + `static/acessos-admins-app.js` | a aba Administradores do App de Campo de Base → Acessos (05/11/2026; o dado em `nexus/pcm/admins_app.py`; seção "Acessos" abaixo) |
 | `nexus/auth/setor_telas.py` + `templates/sem_setor.html` | o que cada setor vê: o portão por setor e o menu filtrado (seção "Telas por setor" abaixo) |
@@ -227,7 +230,7 @@ administradores" do Cadastro, `cadastro/sem_permissao.html` com `area`) mostra e
   garantia, que fecha do mesmo jeito. O erro que persiste vai ao journal **uma vez** (`_avisar_uma_vez`), não a cada
   pedido. Se o `stat` falhar depois de o arquivo já ter sido trocado, a gravação conta como feita (o cache sai), para a
   tela não dizer "nada mudou" com a mudança no disco.
-- **POST só da própria página:** `Sec-Fetch-Site`/`Origin` com a régua da moldura (`moldura._de_outro_site`) e um código do
+- **POST só da própria página:** `Sec-Fetch-Site`/`Origin` com a régua do portão (`auth/origem.de_outro_site`) e um código do
   formulário guardado na sessão (o login troca). E-mail validado: sem espaço nas pontas, minúsculas, nenhum espaço ou
   vírgula no meio, `nome@dominio.tld`, até 254 caracteres. Gravou: 303 de volta à tela (F5 não repete).
 - **Em teste sem `NEXUS_DADOS`** nada é lido nem gravado (`acessos.pasta` = None), como o de-para: um teste não pode
@@ -929,7 +932,7 @@ server".
   nomes dos anexos cifrados pelo Cofre). Os anexos no disco: `<pasta de dados>/sugestoes/<id>/1.pdf` (nome neutro; o
   original só no livro). O banco que recusa apaga os anexos já gravados (nada órfão). O `novo_id` do formulário
   segura o duplo clique.
-- **Proteção**: `moldura._de_outro_site()` + o código do formulário na sessão (`sugestoes_codigo`). Anexo servido com
+- **Proteção**: `auth/origem.de_outro_site()` + o código do formulário na sessão (`sugestoes_codigo`). Anexo servido com
   `nosniff` e `no-store`; imagem abre no navegador, o resto baixa.
 - **Baixar arquivos** (24/10/2026, Levi: "gostaria a opção 'Baixar arquivos' baixa todos os arquivos da sugestão"):
   `/?aba=sugestoes&anexo=<id>&n=todos` devolve um .zip com todos os anexos (o nome original; repetido ganha " (2)"),

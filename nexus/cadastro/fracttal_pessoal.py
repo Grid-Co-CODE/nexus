@@ -18,7 +18,7 @@ e-mails não vão ao banco: ficam na memória do servidor e na tela, que é só 
 import json
 import threading
 import time
-import unicodedata
+from ..texto import sem_acento as _norm
 
 TTL_S = 3600
 _CACHE: dict = {}
@@ -28,11 +28,6 @@ ACESSO = {"administrator": "Administrador", "leitura": "Leitura"}
 # leitura, pelo domínio da empresa deles, e e-mails pessoais), todos entre os 88 sem ficha
 DOMINIOS_GRID = ("gridco.com.br", "gridco.com")
 ORIGENS = ("Grid Co.", "Externo")
-
-
-def _norm(s) -> str:
-    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
-    return " ".join(s.split())
 
 
 def _curto(nome) -> str:

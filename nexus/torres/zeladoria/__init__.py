@@ -22,7 +22,7 @@ from ...prefixo import na_raiz
 from ...zeladoria import gravacao, leitura
 from ...zeladoria.tabelas import TabelaDesconhecida
 from ..modelo import Tela, Torre
-from ..moldura import _de_outro_site
+from ...auth.origem import de_outro_site as _de_outro_site
 
 FONTE = "Radar de Fornecedores (cópia do Supabase até a troca)"
 # id da tela no Nexus -> id da aba no app do Radar (o `TABS` do clone)

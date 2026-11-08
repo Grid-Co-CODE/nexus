@@ -21,9 +21,9 @@ import json
 import os
 import threading
 import time
-import unicodedata
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
+from ..texto import sem_acento as _norm
 
 BRT = timezone(timedelta(hours=-3))
 VALIDADE_S = 300
@@ -45,11 +45,6 @@ COLUNAS = (("fazer", "A fazer"), ("execucao", "Em execução"), ("verificacao", 
 _EST = {"ts": 0.0, "pessoas_ts": 0.0, "pessoas": [], "os": [], "lendo": False, "erro": "", "erro_em": 0.0, "faltam": [],
         "usado": 0.0}
 _TRAVA = threading.Lock()
-
-
-def _norm(s) -> str:
-    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
-    return " ".join(s.split())
 
 
 def _ler_fracttal(path):

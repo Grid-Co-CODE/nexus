@@ -21,7 +21,7 @@ from ...comando import pedidos as PD
 from ...comando import regras as RG
 from ...prefixo import na_raiz
 from ..modelo import Tela, Torre
-from ..moldura import _de_outro_site
+from ...auth.origem import de_outro_site as _de_outro_site
 
 TORRE = Torre(
     id="comando",

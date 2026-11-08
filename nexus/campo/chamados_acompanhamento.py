@@ -24,6 +24,7 @@ from ..dados import fato_chamado as F
 from ..dados import fatos as D
 from ..dados import livros
 from . import tarefas_os
+from ..dados.conexao import base_de as _base
 
 INTERVALO_MIN = 50
 # as observações da equipe de chamados (o OS Creator grava: `chamados_obs_store`), de onde sai o status trocado na tela
@@ -33,11 +34,6 @@ MINUTO_DA_HORA = 50         # depois da carga de dados (:40)
 _BRT = timezone(timedelta(hours=-3))
 _LACO = {"thread": None, "parar": threading.Event(), "ultimo": None}
 log = logging.getLogger("nexus.campo")
-
-
-def _base(config) -> str:
-    from ..cadastro.ligacoes import BASE_API
-    return (config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
 
 
 def ler_fracttal(ler, hoje) -> list[dict]:

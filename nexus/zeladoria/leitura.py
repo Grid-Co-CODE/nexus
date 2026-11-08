@@ -20,6 +20,7 @@ from ..cadastro.cifra import CifraErro, Cofre
 from ..dados import livros
 from . import guardar
 from . import tabelas as T
+from ..dados.conexao import base_de as _base
 
 CACHE_S = 300
 LIVROS = (T.LIVRO_APP, T.LIVRO_FRACTTAL, T.LIVRO_HISTORICO)
@@ -51,11 +52,6 @@ def _sessao():
         import requests
         s = requests.Session()
     return s
-
-
-def _base(config) -> str:
-    from ..cadastro.ligacoes import BASE_API
-    return (config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
 
 
 def cofre_de(config) -> Cofre:

@@ -31,6 +31,9 @@ from . import banco as B
 from . import estrutura_usina as E
 from . import ligacoes as L
 from .telas import _quem, _tela
+from ..dados.conexao import banco as _banco
+from ..auth.sessao import email_da_sessao as _meu_email
+from ..auth.origem import de_outro_site as _de_outro_site
 
 log = logging.getLogger(__name__)
 
@@ -40,21 +43,6 @@ FILTROS = (("", "Todas as usinas"), ("sem_chave", "Sem chave do supervisório"),
            ("sem_inversores", "Sem inversores"), ("potencia", "Potência que não fecha"))
 SEM_CLIENTE = "-"            # o valor do filtro de cliente para as usinas sem cliente no Registro mestre
 _CHAVE_AVISO = "equipamentos_aviso"
-
-
-def _meu_email() -> str:
-    u = session.get("usuario")
-    return str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
-
-
-def _de_outro_site() -> bool:
-    from ..torres.moldura import _de_outro_site as regra
-    return regra()
-
-
-def _banco():
-    from ..dados import conexao
-    return conexao.banco()
 
 
 def _hora(ts) -> str:

@@ -25,6 +25,7 @@ from . import atribuicoes as AT, tecnicos_usina as TU
 from . import nota_os as NO, publicar as PB, quadro as Q, semana as S
 from ..auth import setor_telas as ST
 from ..prefixo import na_raiz
+from ..auth.origem import de_outro_site as _de_outro_site
 
 log = logging.getLogger("nexus.pcm")
 POR_PAGINA = 150
@@ -67,11 +68,6 @@ def pode_marcar() -> bool:
 def _usuario() -> dict | None:
     u = session.get("usuario")
     return u if isinstance(u, dict) else None
-
-
-def _de_outro_site() -> bool:
-    from ..torres.moldura import _de_outro_site as regra
-    return regra()
 
 
 def _quem() -> str:

@@ -446,7 +446,7 @@ def _volta(cliente: str, usina: str, **aviso) -> str:
 def _decidir(fazer):
     """O POST de uma decisão da Segurança: grava e volta à usina (303, `?ok=`), ou volta com a recusa (`?erro=`). A
     falha que não é recusa vai ao log (e a tela diz que não gravou)."""
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     cliente, usina = request.form.get("cliente", ""), request.form.get("usina", "")

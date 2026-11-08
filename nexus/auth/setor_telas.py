@@ -43,6 +43,8 @@ from ..cadastro import setor_ids as SID
 from ..cadastro import setores as S
 from ..dados import fatos as D
 from ..dados import livros
+from ..dados.conexao import banco as _banco
+from .sessao import email_da_sessao as _email
 
 log = logging.getLogger(__name__)
 
@@ -257,11 +259,6 @@ def escolhas_de_dono() -> dict[str, int | None]:
 
 
 # ── a pessoa do login ───────────────────────────────────────────────────────────────────────────────────────────────
-def _banco():
-    from ..dados import conexao
-    return conexao.banco()
-
-
 def setor_de_cada_codigo(decisoes: list[dict]) -> dict[str, int | None]:
     """{pessoa_hmac: setor_id ou None} pela última decisão de cada pessoa do Fracttal. O mesmo código em duas pessoas do
     Fracttal (o mesmo e-mail em dois cadastros) fica com a decisão mais nova."""
@@ -291,11 +288,6 @@ def setor_da_pessoa(cfg, email: str, base: str, sessao) -> dict | None:
     if not setor:
         return None
     return {"id": setor["setor_id"], "nome": setor["nome"]}
-
-
-def _email() -> str:
-    u = session.get("usuario")
-    return str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
 
 
 def acesso() -> dict:

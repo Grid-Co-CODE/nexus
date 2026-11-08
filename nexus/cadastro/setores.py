@@ -24,11 +24,11 @@ administrador abre.
 import logging
 import threading
 import time
-import unicodedata
 from datetime import datetime, timedelta, timezone
 
 from ..dados import fatos as D
 from ..dados import livros
+from ..texto import sem_acento as _norm
 
 log = logging.getLogger(__name__)
 
@@ -48,11 +48,6 @@ _CACHE: dict = {}
 
 class Recusada(ValueError):
     """Nada foi gravado: o texto diz por quê, para a tela mostrar."""
-
-
-def _norm(s) -> str:
-    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
-    return " ".join(s.split())
 
 
 def _agora() -> datetime:

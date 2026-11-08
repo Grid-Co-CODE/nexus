@@ -1018,7 +1018,7 @@ def engenharia_comentar(wid: int):
     from ...engenharia import os_acompanhamento as O
     from ...engenharia import os_equipe
     from ..engenharia import _os_para_gravar, _quem_pode
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         return jsonify({"erro": "Pedido de outro site: nada foi gravado."}), 403
     c = request.get_json(silent=True) or {}
@@ -1104,7 +1104,7 @@ def engenharia_levar_para_a_nota(wid: int):
     from ...engenharia import os_acompanhamento as O
     from ...engenharia import os_equipe
     from ..engenharia import _os_para_gravar, _quem_pode
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         return jsonify({"erro": "Pedido de outro site: nada foi gravado."}), 403
     if not session.get("admin"):
@@ -1163,7 +1163,7 @@ def engenharia_etm_historico():
     from flask import jsonify
 
     from ...engenharia import etm_historico as H
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if not session.get("admin"):
         return jsonify({"erro": "Só o administrador traz o histórico do app de ETM."}), 403
     if request.method == "GET":
@@ -1226,7 +1226,7 @@ def pcm_nota():
 
     from ...pcm import nota_os as NO
     from ...pcm.telas import pode_marcar
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         return jsonify({"erro": "Pedido de outro site: nada foi gravado."}), 403
     if not pode_marcar():
@@ -1516,7 +1516,7 @@ def engenharia_acomp_salvar(aid):
     from ...engenharia import acompanhamento as AC
     from ...engenharia import os_analise as OA
     from .. import engenharia as T
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():              # antes de qualquer leitura do banco
         abort(403)
     cod, de = request.form.get("cod") or T._cod_do(aid), _de_volta()
@@ -1560,7 +1560,7 @@ def engenharia_acomp_comentar(aid):
     from ...engenharia import os_acompanhamento as O
     from ...engenharia import os_analise as OA
     from .. import engenharia as T
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     cod, de = request.form.get("cod") or T._cod_do(aid), _de_volta()
@@ -1679,7 +1679,7 @@ def engenharia_acomp_gerar_os(aid):
     from ...dados.equipamento import canon
     from ...engenharia import acompanhamento as AC
     from .. import engenharia as T
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     cod, de = request.form.get("cod") or T._cod_do(aid), _de_volta()
@@ -1723,7 +1723,7 @@ def _mudar_comentario_do_acomp(aid, cid, editar: bool):
 
     from ...engenharia import acompanhamento as AC
     from .. import engenharia as T
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     cod, de = request.form.get("cod") or T._cod_do(aid), _de_volta()
@@ -1777,7 +1777,7 @@ def _mudar_comentario_da_os(wid: int, cid: str, editar: bool):
     from ...engenharia import os_acompanhamento as O
     from ...engenharia import os_equipe
     from ..engenharia import _os_para_gravar, _quem_pode
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         return jsonify({"erro": "Pedido de outro site: nada mudou."}), 403
     c_ = request.get_json(silent=True) or {}

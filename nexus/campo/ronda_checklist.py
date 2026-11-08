@@ -24,10 +24,10 @@ import logging
 import os
 import threading
 import time
-import unicodedata
 from datetime import date, datetime, timedelta, timezone
 
 from . import fracttal, regras_app
+from ..texto import sem_acento as _norm
 
 VALIDADE_S = 600             # as aprovadas novas, no máximo a cada 10 min (1 a 2 páginas)
 ESPERA_APOS_ERRO_S = 300
@@ -40,11 +40,6 @@ ALERTA_ACIMA = 3             # nível 4 e 5 pedem ação (App)
 _APROVADAS = {"ts": 0.0, "resp": {}, "ate": "", "retomar": 0, "topo": "", "lendo": False, "erro": "", "erro_em": 0.0,
               "carregado": False}
 _TRAVA = threading.Lock()
-
-
-def _norm(s) -> str:
-    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
-    return " ".join(s.split())
 
 
 # o rótulo do App -> a nossa chave (pelo começo do rótulo, sem acento: o texto do Fracttal pode vir com outra grafia)

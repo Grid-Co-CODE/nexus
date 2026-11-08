@@ -39,12 +39,12 @@ vazio e conta); `status_por` diz de onde veio (`tela` ou `nota`).
 """
 import json
 import re
-import unicodedata
 from datetime import datetime, timedelta, timezone
 
 from . import dominios
 from .calendario import data_id
 from .fatos import _id, _int, _txt, ligar_equipamento
+from ..texto import sem_acento as _norm
 
 LIVRO, ABA = "nexus_chamados", "fato_chamado"
 NOME_LIVRO = "Nexus · chamados de garantia (OS de acompanhamento de chamado do Fracttal)"
@@ -69,11 +69,6 @@ _BRT = timezone(timedelta(hours=-3))
 _RX_MARCA = re.compile(r"\[CHAMADO\] Acompanhamento\s*[—-]\s*([^·\n]+?)\s*·\s*([^\n]+)")
 _RX_ABERTURA = re.compile(r"^\s*(?:Data da ocorrência(?:\s*/\s*abertura do chamado)?|Abertura do chamado)\s*:\s*"
                           r"(\d{2}/\d{2}/\d{4})", re.IGNORECASE | re.MULTILINE)
-
-
-def _norm(s) -> str:
-    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
-    return " ".join(s.split())
 
 
 def eh_os3(w: dict) -> bool:

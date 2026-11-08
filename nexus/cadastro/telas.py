@@ -30,6 +30,7 @@ from .esquema import (CLIENTES, ENTIDADES, EQUIPES, LISTAS, PESSOAS, REGIOES_CAM
 from .servico import Servico, chave_texto
 from .tipos import Legado
 from ..prefixo import na_raiz
+from ..auth.origem import de_outro_site as _de_outro_site
 
 # Fora do OneDrive e fora do AppData (o Claude desktop virtualiza o AppData: 03/09/2026, banco do gêmeo).
 ARMAZEM_PADRAO = (Path(r"C:\GridcoAuto\nexus\cadastro_ensaio.json") if os.name == "nt"
@@ -678,11 +679,6 @@ _CSV_PREVIAS = "nexus_cadastro_csv_previas"
 _CSV_FEITOS = "nexus_cadastro_csv_feitos"
 _CSV_TTL_S = 30 * 60
 _CSV_MAX = 5 * 1024 * 1024
-
-
-def _de_outro_site() -> bool:
-    from ..torres.moldura import _de_outro_site as regra
-    return regra()
 
 
 def _pessoal_fracttal() -> list:

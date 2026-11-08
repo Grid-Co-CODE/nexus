@@ -180,7 +180,7 @@ def _de_outro_site() -> bool:
     `Origin` com o `request.host`, e no servidor da T.I. o Nexus não recebe o endereço público no Host: toda decisão
     pelo navegador levava "Origem recusada." (uma Responsável UFV, no 1º dia do card de assinar pelo e-mail; o mesmo
     POST com o Origin certo dava 403 em produção)."""
-    from ..moldura import _de_outro_site as regra
+    from ...auth.origem import de_outro_site as regra
     return regra()
 
 

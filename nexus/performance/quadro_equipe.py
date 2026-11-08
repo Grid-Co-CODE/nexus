@@ -14,12 +14,12 @@ espera nem apaga a leitura do outro. Nada vai para o banco.
 import json
 import threading
 import time
-import unicodedata
 from datetime import datetime, timezone
 from urllib.parse import quote
 
 from ..cadastro import setor_ids as SID
 from ..engenharia import os_equipe as OE
+from ..texto import sem_acento as _norm
 
 SETOR = SID.PERFORMANCE         # o setor_id em Base → Acessos (pelo ID: renomear o setor não esvazia o quadro)
 VALIDADE_S = OE.VALIDADE_S
@@ -31,11 +31,6 @@ COLUNAS = OE.COLUNAS
 _EST = {"ts": 0.0, "pessoas_ts": 0.0, "pessoas": [], "os": [], "lendo": False, "erro": "", "erro_em": 0.0, "faltam": [],
         "usado": 0.0, "equipe": []}
 _TRAVA = threading.Lock()
-
-
-def _norm(s) -> str:
-    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
-    return " ".join(s.split())
 
 
 def ids_do_setor(setores: dict) -> list[str]:

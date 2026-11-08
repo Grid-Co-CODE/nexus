@@ -31,6 +31,7 @@ from pathlib import Path
 from flask import current_app
 
 from ..dados import livros
+from ..dados.conexao import banco as _banco
 
 LIVRO, NOME_LIVRO, ABA = "nexus_sugestoes", "Nexus · sugestões", "fato_sugestao"
 CAB = ("id", "registrado_em", "data_id", "area", "pessoa_id", "pessoa_hmac", "dados_cifrados")
@@ -102,11 +103,6 @@ def _cofre():
         raise Recusada("Este Nexus não tem a chave do cadastro (NEXUS_CHAVE_CADASTRO): sem ela o texto não vai cifrado")
     from ..cadastro.cifra import Cofre
     return Cofre(chave)
-
-
-def _banco():
-    from ..campo import visao
-    return visao._base(), visao._sessao()
 
 
 def _txt(v) -> str:

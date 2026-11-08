@@ -163,7 +163,7 @@ def ocorrencia_nova():
     quem = _quem_esta(cad)
     if request.method == "GET":
         return _nova(cad, quem, _form_vazio(D._id(request.args.get("usina"))))
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     form = request.form.to_dict()
@@ -235,7 +235,7 @@ def ocorrencia(oid):
 def _gravar(oid: str, qual: str, fazer):
     """O POST de um formulário da página: grava e volta à página (303, `?ok=`), ou volta com a recusa e o que foi
     digitado. A falha que não é recusa vai ao log da máquina (503)."""
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     if not OID.fullmatch(oid or ""):

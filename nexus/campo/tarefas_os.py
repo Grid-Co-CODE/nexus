@@ -54,6 +54,7 @@ from ..dados import fato_tarefa_os as F
 from ..dados import fatos as D
 from ..dados import livros
 from . import fracttal
+from ..dados.conexao import base_de as _base
 
 INTERVALO_MIN = 50
 PRIMEIRA_S = 120            # a 1ª volta depois de subir (o boot já lê o banco para as telas)
@@ -101,11 +102,6 @@ def _segundos(v):
 
 def _iso_s(segundos: float) -> str:
     return datetime.fromtimestamp(segundos, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
-
-
-def _base(config) -> str:
-    from ..cadastro.ligacoes import BASE_API
-    return (config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
 
 
 def _pagina(ler, path):

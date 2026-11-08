@@ -30,6 +30,7 @@ from datetime import datetime, timedelta, timezone
 from flask import current_app
 
 from ..dados import livros
+from ..dados.conexao import banco as _base_sessao
 
 log = logging.getLogger(__name__)
 
@@ -129,11 +130,6 @@ def _quando(v):
 
 def _br(d, fmt) -> str:
     return d.astimezone(_BRT).strftime(fmt) if d else ""
-
-
-def _base_sessao():
-    from ..dados import conexao
-    return conexao.banco()
 
 
 def _ler(aba_livro=(LIVRO, ABA)) -> list[dict]:

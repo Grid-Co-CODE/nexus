@@ -18,6 +18,8 @@ from flask import current_app, jsonify, redirect, render_template, request, sess
 
 from . import fracttal_pessoal as FP
 from . import setores as S
+from ..auth.sessao import email_da_sessao as _meu_email
+from ..auth.origem import de_outro_site as _de_outro_site
 
 log = logging.getLogger(__name__)
 
@@ -36,19 +38,9 @@ _TELA: dict = {"g": None, "renovando": False, "falhou": None}
 _TELA_TRAVA = threading.Lock()
 
 
-def _meu_email() -> str:
-    u = session.get("usuario")
-    return str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
-
-
 def _sem_permissao():
     return render_template("cadastro/sem_permissao.html", titulo="Acessos", eyebrow="Base · Acessos",
                            area="A tela Acessos", email=_meu_email()), 403
-
-
-def _de_outro_site() -> bool:
-    from ..torres.moldura import _de_outro_site as regra
-    return regra()
 
 
 def _volta(qs: str = "", ancora: str = "") -> str:

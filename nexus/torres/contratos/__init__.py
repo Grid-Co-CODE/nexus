@@ -110,7 +110,7 @@ def contestacoes():
 @bp.route("/contestacoes/<linha_id>/pegar", methods=["POST"])
 def contestacao_pegar(linha_id):
     """'Pegar para mim': a pessoa do login vira a responsável pela demanda e volta à lista do setor."""
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     x, _ = _achar(linha_id)
@@ -151,7 +151,7 @@ def contestacao_card(linha_id):
 @bp.route("/contestacoes/<linha_id>/atualizacao", methods=["POST"])
 def contestacao_atualizar(linha_id):
     """Grava a atualização do responsável e devolve o card de novo (com a nova, ou com o motivo e o texto digitado)."""
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
     x, _ = _achar(linha_id)
@@ -195,7 +195,7 @@ def acessos():
     do formulário da sessão. O link aparece uma vez (guardado na sessão até a volta do 303)."""
     if request.method == "GET":
         return _acessos()
-    from ..moldura import _de_outro_site
+    from ...auth.origem import de_outro_site as _de_outro_site
     if not session.get("admin"):
         return _acessos(erro="Só um administrador do Nexus cria e muda as contas.", status=403)
     if _de_outro_site():

@@ -23,12 +23,33 @@ def sessao():
     return s
 
 
-def base() -> str:
-    """O endereço da API do banco: `GRIDCO_DB_API` da configuração, ou o padrão do cadastro."""
+def base_de(config) -> str:
+    """O endereço da API do banco pela configuração dada (a carga e os laços de fundo, fora de um pedido):
+    `GRIDCO_DB_API`, ou o padrão do cadastro. Eram cinco cópias de `_base(config)` até 08/11/2026."""
     from ..cadastro.ligacoes import BASE_API
-    return (current_app.config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
+    return (config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
+
+
+def base() -> str:
+    """O endereço da API do banco, no pedido."""
+    return base_de(current_app.config)
 
 
 def banco() -> tuple:
     """(base, sessao), o par que `livros.ler` e as leituras de cada área pedem."""
     return base(), sessao()
+
+
+def banco_de(cfg) -> tuple:
+    """(base, sessao) pela configuração dada, dentro ou fora de um pedido: a sessão do app quando há um, senão uma
+    própria (a ferramenta da foto, a carga). Eram duas cópias de `_banco(cfg)` (o inventário e os motivos do PCM)."""
+    base = str(base_de(cfg))
+    s = None
+    try:
+        s = current_app.extensions.get("nexus_dados_sessao")
+    except RuntimeError:            # fora de um pedido: sessão própria
+        pass
+    if s is None:
+        import requests
+        s = requests.Session()
+    return base, s

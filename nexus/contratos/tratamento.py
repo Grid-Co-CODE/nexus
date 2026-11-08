@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 from flask import current_app
 
 from ..dados import livros
+from ..dados.conexao import banco as _banco
 
 LIVRO, NOME_LIVRO = "nexus_contestacoes_tratamento", "Nexus · acompanhamento das contestações dos clientes"
 ABA = "fato_tratamento_contestacao"
@@ -56,11 +57,6 @@ def _cofre_ou_nada():
 
 def _ctx(eid, campo) -> str:
     return f"banco/contestacoes_tratamento/{eid}/{campo}"
-
-
-def _banco():
-    from ..dados import conexao
-    return conexao.banco()
 
 
 def ler_todas() -> list[dict]:

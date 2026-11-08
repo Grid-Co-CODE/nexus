@@ -15,6 +15,7 @@ from ..prefixo import raiz
 from ..torres import montar_menu, telas_com_conteudo
 # no topo, e não dentro do Início: o "no ar desde" do cartão da versão é a hora do import, a do boot (13/10/2026)
 from . import versao
+from ..auth.sessao import email_da_sessao as _email_da_sessao
 
 bp = Blueprint("casca", __name__)
 
@@ -108,11 +109,6 @@ def _codigo() -> str:
     return session[_CHAVE_CODIGO]
 
 
-def _email_da_sessao() -> str:
-    u = session.get("usuario")
-    return str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
-
-
 def _sugestoes_abertas():
     """O número ao lado de "Sugestões" nas abas do Início (28/10/2026): as não concluídas (de todos, para o
     administrador; as da pessoa, para ela). Nunca segura a página: sem a cópia, a aba sai sem número."""
@@ -173,7 +169,7 @@ def _sugestoes():
 def _enviar_sugestao(S, areas: dict) -> tuple[str, dict]:
     """(erro, o que a pessoa digitou). O tamanho é conferido antes de ler o corpo: um pedido maior que o limite não
     chega a ocupar a memória nem o disco do servidor."""
-    from ..torres.moldura import _de_outro_site
+    from ..auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         return "Pedido de outro site: nada foi enviado.", {}
     teto = S.MAX_MB_TOTAL * S.MB + S.MB             # os anexos + o texto do formulário, com folga
@@ -204,7 +200,7 @@ def _enviar_sugestao(S, areas: dict) -> tuple[str, dict]:
 def _mudar_status_sugestao(S, admin: bool):
     """`POST /?aba=sugestoes` com `acao=status`: o administrador muda o status (Iniciada, Em verificação, Concluída). A
     resposta volta à aba, com o aviso (deu certo ou não) no alto da lista."""
-    from ..torres.moldura import _de_outro_site
+    from ..auth.origem import de_outro_site as _de_outro_site
     if not admin:
         abort(403)
     certo = session.get(_CHAVE_CODIGO) or ""

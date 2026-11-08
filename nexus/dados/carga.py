@@ -47,6 +47,7 @@ from datetime import datetime, timedelta, timezone
 from . import almoxarifado as almox
 from . import calendario, equipamento, fato_almoxarifado, fato_pt, fato_ronda, fatos, geracao, historico, livros
 from . import programacao
+from .conexao import base_de as _base
 
 LIVRO_DIM, NOME_DIM = "nexus_dimensoes", "Nexus · dimensões (calendário, feriados, histórico de pessoas e usinas)"
 LIVRO_FATOS, NOME_FATOS = "nexus_fatos", "Nexus · fatos com os IDs do cadastro e a qualidade da ligação"
@@ -67,11 +68,6 @@ _LACO = {"thread": None, "parar": threading.Event(), "ultimo": None}
 
 def _agora():
     return datetime.now(_BRT)
-
-
-def _base(config) -> str:
-    from ..cadastro.ligacoes import BASE_API
-    return (config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
 
 
 def _maquina() -> str:
