@@ -138,9 +138,11 @@ def test_a_sessao_interna_nao_e_de_ninguem(app):
     assert dado == {"logado": True, "admin": True, "pre_carga": True}             # sem usuario: nada de Fracttal de ninguém
 
 
-def test_acessos_mostra_a_ultima_volta(ligada, logado):
-    html = logado.get(URL).get_data(as_text=True)
-    assert "nenhuma volta desde que o Nexus subiu" in html
+def test_a_volta_fica_no_resumo_e_saiu_de_acessos(ligada, logado):
+    """A volta da pré-carga segue contada (`PC.resumo`); o texto dela saiu de Base → Acessos em 07/11/2026 (Levi: o aviso
+    "Pré-carga: última volta em ..." "pode sair")."""
+    assert PC.resumo(ligada)["volta"] is None
     _como(ligada, ANA).get("/")
-    html = logado.get(URL).get_data(as_text=True)
-    assert re.search(r"última volta em \d\d/\d\d \d\d:\d\d: 6 telas em [\d,]+ s", html)
+    v = PC.resumo(ligada)["volta"]
+    assert v and v["telas"] == 6 and not v["erros"]
+    assert "Pré-carga" not in logado.get(URL).get_data(as_text=True)
