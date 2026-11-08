@@ -216,3 +216,15 @@ def test_catalogo_registra_o_fato_com_os_ids():
     assert f.livro.startswith(RA.LIVRO) and f.estado == "parte" and f.parte_de == ("ronda",)
     assert f"{RA.LIVRO} · {RA.ABA}" in catalogo.POR_ID["ronda"].fontes
     assert {k for k, (estado, _c) in f.dims.items() if estado == "id"} >= {"data", "usina", "equipe", "pessoa"}
+
+
+def test_lancar_e_anular_recusam_pedido_de_outro_site(tecnico, banco):  # noqa: F811
+    """Achado 5 da auditoria de 08/11/2026: o cookie Lax não barra pedido de outro subdomínio da empresa (mesmo site);
+    as outras gravações do Campo já recusavam com a régua da moldura, estas duas ficaram sem."""
+    de_fora = {"Sec-Fetch-Site": "same-site"}
+    assert tecnico.post("/t/campo/rondas/avulsa", data=_form(), headers=de_fora).status_code == 403
+    assert _linhas(banco) == []
+    tecnico.post("/t/campo/rondas/avulsa", data=_form())
+    rid = _linhas(banco)[0]["id"]
+    assert tecnico.post(f"/t/campo/rondas/avulsa/{rid}/anular", headers=de_fora).status_code == 403
+    assert len(_linhas(banco)) == 1

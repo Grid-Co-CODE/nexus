@@ -1492,6 +1492,9 @@ def ronda_avulsa_lancar():
     usuario = session.get("usuario")
     erro = None
     if request.method == "POST":
+        from ..moldura import _de_outro_site     # o cookie Lax não barra outro subdomínio da empresa (auditoria 08/11/2026)
+        if _de_outro_site():
+            abort(403)
         try:
             nova = ronda_avulsa.lancar(request.form, usuario)
             session["avulsa_aviso"] = f"Ronda avulsa lançada: {_dia_curto(nova['data'])}, das {nova['inicio'][11:16]} às {nova['fim'][11:16]}."
@@ -1518,6 +1521,9 @@ def ronda_avulsa_lancar():
 @bp.route("/rondas/avulsa/<rid>/anular", methods=["POST"])
 def ronda_avulsa_anular(rid):
     """Anular a própria ronda avulsa: vira outra linha no banco (o banco não apaga)."""
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
     try:
         ronda_avulsa.anular(rid, session.get("usuario"))
     except ronda_avulsa.Recusada as e:
