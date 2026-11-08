@@ -927,3 +927,25 @@ def test_quem_pediu_a_pt_nao_decide_nem_com_outro_email(app):
         pode, porque = decisao_pt.pode_decidir({"solicitante_hmac": "", "solicitante_pessoa_id": 42},
                                                "outro@exemplo.test", "Fulano", admin=True, b=B())
     assert pode is False and porque == decisao_pt.QUEM_PEDIU
+
+
+def test_foto_de_os_que_nao_e_de_ronda_nao_vai_ao_fracttal(banco, logado, monkeypatch):
+    """Achado 4 da auditoria de 08/11/2026: a rota aceitava qualquer número de OS e cada um novo gastava um pedido da
+    cota do Fracttal da empresa. Só as OS que as rondas conhecem abrem os anexos; as listas guardadas são podadas."""
+    from nexus.campo import nota_fracttal, ronda_fotos
+    pedidos = []
+    monkeypatch.setattr(nota_fracttal, "anexos_da_os", lambda os_, ler=None: pedidos.append(os_) or [])
+    ronda_fotos.limpar()
+    try:
+        assert logado.get("/t/campo/rondas/os/999999/fotos").status_code == 404
+        assert logado.get("/t/campo/rondas/os/999999/foto/0").status_code == 404
+        assert pedidos == []
+        assert logado.get("/t/campo/rondas/os/500/fotos").status_code == 200       # a ronda conhecida segue abrindo
+        assert pedidos == ["500"]
+        ronda_fotos._LISTAS["velha"] = (0.0, [])
+        ronda_fotos._PREPARADAS["velha"] = 0.0
+        ronda_fotos.anexos(501)
+        ronda_fotos.preparar(501, lambda f: None)
+        assert "velha" not in ronda_fotos._LISTAS and "velha" not in ronda_fotos._PREPARADAS
+    finally:
+        ronda_fotos.limpar()

@@ -147,7 +147,10 @@ def anexos(os_, ler=None) -> list[dict]:
         resposta = desc.split(" — ", 1)[1].strip() if " — " in desc and not capa else ""
         out.append({"i": len(out), "desc": desc, "resposta": resposta, "grupo": _grupo(desc), "valor": valor,
                     "mime": mime})
-    _LISTAS[chave] = (time.time(), out)
+    agora = time.time()
+    for k in [k for k, v in list(_LISTAS.items()) if agora - v[0] >= LISTA_S]:     # sem poda, uma entrada por OS aberta
+        _LISTAS.pop(k, None)                                                       # ficava para sempre (auditoria 08/11/2026)
+    _LISTAS[chave] = (agora, out)
     return out
 
 
@@ -298,7 +301,10 @@ def preparar(os_, em_segundo_plano=None):
     with _TRAVA:
         if time.time() - _PREPARADAS.get(chave, 0) < LISTA_S:
             return
-        _PREPARADAS[chave] = time.time()
+        agora = time.time()
+        for k in [k for k, t in list(_PREPARADAS.items()) if agora - t >= LISTA_S]:
+            _PREPARADAS.pop(k, None)
+        _PREPARADAS[chave] = agora
 
     def rodar():
         from concurrent.futures import ThreadPoolExecutor

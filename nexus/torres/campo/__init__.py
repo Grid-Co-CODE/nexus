@@ -1535,10 +1535,20 @@ def ronda_avulsa_anular(rid):
     return redirect(na_raiz("/t/campo/rondas/avulsa"), code=303)
 
 
+def _os_de_ronda(os_):
+    """404 para a OS que nenhuma ronda conhece: a rota de fotos abria os anexos de QUALQUER OS do Fracttal da empresa, e
+    cada número novo gastava um pedido da cota do App (auditoria de 08/11/2026). Vale a OS das rondas lidas ou do
+    checklist (as aprovadas, mais antigas que a janela da tela)."""
+    chave = str(os_)
+    if chave not in {str(r.get("os")) for r in (visao.rondas().dados or {}).get("todas") or []}             and chave not in ronda_checklist.respostas():
+        abort(404)
+
+
 @bp.route("/rondas/os/<int:os_>/fotos")
 def ronda_fotos_os(os_):
     """As fotos da OS de ronda, separadas em sujidade, vegetação e as demais (Levi, 06/10: "ao clicar no botão aparecer
     os anexos, separando vegetação e sujidade"). Pedaço de HTML que o botão Fotos do histórico carrega."""
+    _os_de_ronda(os_)
     try:
         gs = ronda_fotos.grupos(os_)
         erro = ""
@@ -1556,6 +1566,7 @@ def ronda_foto(os_, i):
     """Uma foto da OS de ronda: o Nexus baixa do Fracttal e entrega (o link assinado não sai para o navegador)."""
     # a ampliada é a versão de tela (13/10/2026, Levi: "na hora de ver expandido demora muito para carregar"); a
     # original, com ?original=1
+    _os_de_ronda(os_)
     fazer = (ronda_fotos.miniatura if request.args.get("mini")
              else ronda_fotos.foto if request.args.get("original") else ronda_fotos.tela)
     try:
