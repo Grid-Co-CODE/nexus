@@ -19,8 +19,9 @@ REALIZADA (em verificação ou concluída), com as respostas do técnico na nota
   isso acha alguma coisa: é lá que a lista central de OS está fresca.
 - SÓ AS REALIZADAS A PARTIR DE `a_partir_de()`: ligar não pode criar administrativa para as Inspeções antigas que nunca
   tiveram uma. Sem a data, nada se cria.
-DESLIGADO por padrão (`LIGADO_PADRAO`; `OS_WEB_ACOMP_NA_INSPECAO=1` liga numa máquina, `OS_WEB_ACOMP_A_PARTIR_DE` dá a
-data): liga o Levi, depois da prova no TESTE - PA.
+LIGADO desde 08/11/2026 (`LIGADO_PADRAO`, o Levi: "liga", depois da prova no TESTE - PA), para as Inspeções realizadas de
+`A_PARTIR_DE` (08/11/2026) em diante; `OS_WEB_ACOMP_NA_INSPECAO=0` desliga numa máquina e `OS_WEB_ACOMP_A_PARTIR_DE` troca a
+data.
 """
 from __future__ import annotations
 
@@ -38,8 +39,8 @@ from chamado_garantia import regras as cg_regras
 
 from . import acomp_web as aw
 
-LIGADO_PADRAO = False
-A_PARTIR_DE = ""                # AAAA-MM-DD: só as Inspeções realizadas deste dia (Brasília) em diante; vazio = nenhuma
+LIGADO_PADRAO = True            # ligado pelo Levi em 08/11/2026 ("liga"), depois da prova no TESTE - PA (OS 18862 e 18863)
+A_PARTIR_DE = "2026-11-08"      # AAAA-MM-DD: só as Inspeções realizadas deste dia (Brasília) em diante; vazio = nenhuma
 ENV, ENV_DATA = "OS_WEB_ACOMP_NA_INSPECAO", "OS_WEB_ACOMP_A_PARTIR_DE"
 DURACAO_S = 900                 # a da administrativa (a do App; a tarefa é escrever o ticket)
 ESPERA_S = 30 * 60              # depois do fim da Inspeção: a administrativa do App (no fechamento) chega à lista antes

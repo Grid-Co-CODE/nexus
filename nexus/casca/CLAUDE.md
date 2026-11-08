@@ -422,7 +422,7 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
 - **Os minutos ocupados, num lugar só** (`casca/minutos_ocupados.py`, 31/10/2026, decisão AF da etapa 3): os minutos de toda
   hora que já têm dono (:04 as pessoas dos catálogos pequenos do OS Creator, às 05h, 11h, 17h e 23h; :08 e :38 os ativos
   novos, :10 a :20 as tarefas das OS, :22 as normalizações, :25 o sync do App, :32 a zeladoria, :40 a carga, :50 os chamados;
-  :03, :09, :24, :33, :43 e :53 os chamados em aberto para o App de Campo, desligados até o Levi ligar;
+  :03, :09, :24, :33, :43 e :53 os chamados em aberto para o App de Campo (ligados em 08/11/2026);
   e os da lista central de OS: :00, :21, :30, :41 e :51 os 7 dias, :46 as finalizadas, :55 a conferência das abertas), e os
   de uma vez por dia (`DIARIOS`: os ativos inteiros às 02:15, a noite da lista de OS às 03:21 e o uso do OS Creator no banco
   às 04:45; era 03:45 até a revisão final de 31/10/2026: a noite de domingo da lista lê os 365 dias, ~830 páginas a 1 por

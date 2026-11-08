@@ -240,8 +240,8 @@ do ativo, `equipamento_id` e `usina_id` pela dimensão de equipamento (com a lin
 tem (o App trata mais de 30 min, ou menos linhas que o `row_count`, como "não li"). Cada linha e a `atualizacao` vão
 assinadas (HMAC, rótulo `nexus:oscreator:chamados-app`; os vetores de teste estão em
 `tests/test_dados_chamado_aberto.py`). Quem grava é o servidor, de 10 em 10 min, da memória do OS Creator (a lista central
-de OS e a cópia do quadro), sem pedido ao Fracttal: `nexus/torres/oscreator/chamados_abertos.py`, **desligado**
-(`LIGADO_PADRAO`) até a prova e o OK do Levi. A linha que não mudou guarda o `atualizado_em` de quando ficou assim (a API
+de OS e a cópia do quadro), sem pedido ao Fracttal: `nexus/torres/oscreator/chamados_abertos.py`, **ligado em
+08/11/2026** (`LIGADO_PADRAO`, o Levi: "liga"). A linha que não mudou guarda o `atualizado_em` de quando ficou assim (a API
 guarda histórico por linha).
 
 **Chamados de garantia (12/10/2026):** Levi: "O nexus é um ambiente centralizado e precisamos ter os dados se

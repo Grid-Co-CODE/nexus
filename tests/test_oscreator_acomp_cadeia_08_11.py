@@ -100,12 +100,17 @@ def _com_lista(monkeypatch, regs):
     return lista
 
 
-def test_desligado_por_padrao_e_sem_data_nada_se_cria(monkeypatch):
+def test_ligado_desde_08_11_e_sem_data_nada_se_cria(monkeypatch):
+    """Ligado pelo Levi em 08/11/2026, para as Inspeções realizadas desse dia em diante; o 0 desliga numa máquina, e sem a
+    data nada se cria."""
     monkeypatch.delenv(AC.ENV, raising=False)
     monkeypatch.delenv(AC.ENV_DATA, raising=False)
-    assert AC.LIGADO_PADRAO is False and AC.A_PARTIR_DE == "" and AC.ligado() is False
-    assert AC.criar_as_que_faltam() == {"pulou": "desligado"}
+    assert AC.LIGADO_PADRAO is True and AC.ligado() is True
+    assert AC.a_partir_de() == dt.date(2026, 11, 8)
+    monkeypatch.setenv(AC.ENV, "0")
+    assert AC.ligado() is False and AC.criar_as_que_faltam() == {"pulou": "desligado"}
     monkeypatch.setenv(AC.ENV, "1")
+    monkeypatch.setattr(AC, "A_PARTIR_DE", "")
     assert "sem a data" in AC.criar_as_que_faltam()["pulou"]
 
 
@@ -210,7 +215,7 @@ def test_o_quadro_dispara_por_tras_no_maximo_a_cada_10_min(monkeypatch):
     monkeypatch.setattr(rotas_acomp.sessao, "jwt_atual", lambda: "jwt")
     monkeypatch.setattr(rotas_acomp.sessao, "email_atual", lambda: "teste@exemplo.invalid")
     monkeypatch.setitem(rotas_acomp._ANDOU, "em", -1e9)
-    monkeypatch.delenv(AC.ENV, raising=False)
+    monkeypatch.setenv(AC.ENV, "0")
     assert rotas_acomp._andar_junto() is False and rodou == []           # desligado: nada
     monkeypatch.setenv(AC.ENV, "1")
     assert rotas_acomp._andar_junto() is True and len(rodou) == 1

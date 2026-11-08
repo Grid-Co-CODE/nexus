@@ -10,8 +10,8 @@ minutos, a partir do que o OS Creator JÁ tem na memória, sem pedido novo ao Fr
 - a dimensão de equipamento do banco (`nexus_equipamentos · dim_equipamento`), relida de hora em hora, para os IDs.
 
 GUARDAS:
-- Desligado por padrão (`LIGADO_PADRAO`; `NEXUS_CHAMADOS_ABERTOS=1` liga numa máquina, `0` desliga): liga o Levi, depois da
-  prova. Ligar no servidor é um commit que troca o `LIGADO_PADRAO` (a T.I. não precisa mexer no .env).
+- Ligado desde 08/11/2026 (`LIGADO_PADRAO`, o Levi: "liga"; `NEXUS_CHAMADOS_ABERTOS=0` desliga numa máquina). Desligar no
+  servidor é um commit que troca o `LIGADO_PADRAO` (a T.I. não precisa mexer no .env).
 - Só grava com a lista central FRESCA (a última leitura dela há até `FRESCA_S` e uma leitura até o topo, a marca d'água). No
   PC o leitor não roda (só o `servir.py` o liga): a lista não é fresca e nada se grava. Lista velha = foto não regerada, e o
   App, vendo a `atualizacao` velha, trata como "não li" (nunca como "não tem chamado").
@@ -36,7 +36,7 @@ from ...dados import fato_chamado_aberto as F
 from ...dados import fatos as D
 from ...dados import livros
 
-LIGADO_PADRAO = False
+LIGADO_PADRAO = True             # ligado pelo Levi em 08/11/2026 ("liga"), depois da prova; NEXUS_CHAMADOS_ABERTOS=0 desliga
 FRESCA_S = 30 * 60              # a lista central só vale com a última leitura há até isto (a mesma régua do `os_central.FRESCA_S`)
 TICKETS_MAX_S = 2 * 3600        # a cópia do quadro só vale até isto (o `rotas_acomp.VELHA_MAX`)
 DIM_TTL_S = 3600                # a dimensão de equipamento é relida de hora em hora (a carga a regrava de hora em hora)

@@ -2699,10 +2699,11 @@ O desenho "o chamado do tracker na ronda" (Levi, 08/11/2026: "segue!"; o texto m
   Fracttal), os chamados em aberto por ativo e grava o livro `nexus_chamados_abertos`, assinado. O App lê, e o catálogo dos
   trackers ele lê direto da `nexus_equipamentos · dim_equipamento` (`tipo_fracttal` "ETKR"; a usina do Fracttal pelo
   `cadastro_nexus · de_para`, sistema "Fracttal · Classificação 1"). Só grava com a lista central fresca (no PC ela nunca
-  é: o leitor só roda no servidor), com a NEXUS_PESSOA_HMAC e o GRIDCO_SQL_TOKEN. **Desligado** (`LIGADO_PADRAO`): liga o
-  Levi, por commit, depois da prova.
-- **A administrativa da Inspeção realizada** (`os_web/acomp_cadeia.py`, **desligado**: `LIGADO_PADRAO`,
-  `OS_WEB_ACOMP_NA_INSPECAO=1` liga numa máquina e `OS_WEB_ACOMP_A_PARTIR_DE`, ou `A_PARTIR_DE`, dá a data). Levi, no
+  é: o leitor só roda no servidor), com a NEXUS_PESSOA_HMAC e o GRIDCO_SQL_TOKEN. **Ligado desde 08/11/2026**
+  (`LIGADO_PADRAO`, o Levi: "liga"; `NEXUS_CHAMADOS_ABERTOS=0` desliga numa máquina).
+- **A administrativa da Inspeção realizada** (`os_web/acomp_cadeia.py`, **ligada desde 08/11/2026** para as Inspeções
+  realizadas desse dia em diante: `LIGADO_PADRAO` e `A_PARTIR_DE`; `OS_WEB_ACOMP_NA_INSPECAO=0` desliga numa máquina e
+  `OS_WEB_ACOMP_A_PARTIR_DE` troca a data; nos testes, o `conftest` desliga os dois laços). Levi, no
   mesmo dia, ao ver a coluna "Aguardando a inspeção" do desenho: "quero que a administrativa só nasça quando a de inspeção é
   realizada!". Então ela NÃO nasce junto com a Inspeção, e sem ela aberta não há coluna nova nem cancelamento em cascata
   (os dois saíram antes de subir).

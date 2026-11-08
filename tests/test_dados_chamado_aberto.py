@@ -195,11 +195,12 @@ def _publicar(api, regs, fresca=True, tickets=({}, None), cfg=CFG, agora=AGORA):
     return CA.publicar(cfg, api, lista=lista, tickets=tickets, equip=EQUIP, agora=agora)
 
 
-def test_desligado_por_padrao(monkeypatch):
+def test_ligado_desde_08_11(monkeypatch):
+    """Ligado pelo Levi em 08/11/2026; o 0 desliga numa máquina."""
     monkeypatch.delenv("NEXUS_CHAMADOS_ABERTOS", raising=False)
-    assert CA.LIGADO_PADRAO is False and CA.ligado({}) is False
-    monkeypatch.setenv("NEXUS_CHAMADOS_ABERTOS", "1")
-    assert CA.ligado({}) is True
+    assert CA.LIGADO_PADRAO is True and CA.ligado({}) is True
+    monkeypatch.setenv("NEXUS_CHAMADOS_ABERTOS", "0")
+    assert CA.ligado({}) is False
 
 
 def test_nao_grava_sem_lista_fresca_sem_chave_ou_sem_token():

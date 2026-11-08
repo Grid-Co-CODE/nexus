@@ -29,6 +29,15 @@ def _sem_a_rede_do_fracttal(monkeypatch):
     monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", send)
 
 
+@pytest.fixture(autouse=True)
+def _lacos_dos_chamados_desligados(monkeypatch):
+    """Os dois laços dos chamados de garantia ligados no servidor em 08/11/2026 (a administrativa da Inspeção realizada, que
+    o quadro do Acompanhamento dispara por trás, e a foto dos chamados em aberto) ficam desligados nos testes: o quadro aberto
+    num teste não pode soltar uma thread que cria OS. Quem testa o laço liga com `monkeypatch.setenv(..., "1")`."""
+    monkeypatch.setenv("OS_WEB_ACOMP_NA_INSPECAO", "0")
+    monkeypatch.setenv("NEXUS_CHAMADOS_ABERTOS", "0")
+
+
 @pytest.fixture
 def app():
     app = create_app({

@@ -1147,7 +1147,7 @@ FATOS = (
          observacao="coluna = aguardando_inspecao, chegaram ou ticket_aberto, na régua do quadro do Acompanhamento; vazia "
                     "quando o ticket não é conhecido agora (o REST não traz a subtarefa e a cópia do quadro passou de 2 "
                     "h). Cada linha e a atualizacao vão assinadas (HMAC, rótulo nexus:oscreator:chamados-app): o App só "
-                    "aceita a assinada. Sem pessoa nem texto livre (regra 8). Desligado até o Levi ligar "
+                    "aceita a assinada. Sem pessoa nem texto livre (regra 8). Ligado pelo Levi em 08/11/2026 "
                     "(nexus/torres/oscreator/chamados_abertos.py, LIGADO_PADRAO)"),
     # ── PCM ────────────────────────────────────────────────────────────────────────────────────────────────────
     Fato("programacao", "Programação semanal", "pcm", "fora do banco: banco_dados.json do PCM (GitHub público)",
@@ -1490,8 +1490,8 @@ LIVROS = (
     # fato_chamado de hora em hora faria uma gravação apagar a aba da outra. É foto: encolhe quando os chamados fecham
     Livro("nexus_chamados_abertos", ("fato_chamado_aberto", "atualizacao"),
           "de 10 em 10 min (:03, :09, :24, :33, :43, :53), só o servidor (a lista central de OS só é fresca lá)",
-          "nexus/torres/oscreator/chamados_abertos.py (servir.py; desligado por padrão, LIGADO_PADRAO; "
-          "NEXUS_CHAMADOS_ABERTOS=1 liga numa máquina)", False,
+          "nexus/torres/oscreator/chamados_abertos.py (servir.py; ligado desde 08/11/2026, LIGADO_PADRAO; "
+          "NEXUS_CHAMADOS_ABERTOS=0 desliga numa máquina)", False,
           "registrado em 08/11/2026 antes da 1ª gravação; o App de Campo lê (o aviso do tracker com chamado aberto "
           "na ronda) e trata a atualizacao com mais de 30 min como não lida"),
     Livro("nexus_os", ("fato_tarefa_os", "qualidade"), "de hora em hora (entre :10 e :20), uma máquina por vez",

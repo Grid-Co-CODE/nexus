@@ -87,7 +87,7 @@ if __name__ == "__main__":
     # Só aqui; sem a credencial REST não liga, e as pessoas seguem pelo RPC, com a sessão de quem usa (como no app.py)
     ponte_os.ligar_leitor_do_clone(app, "catalogos_leitor")
     # os chamados de garantia em aberto para o App de Campo (08/11/2026): a foto de 10 em 10 min, da lista central de OS acima
-    # (sem pedido ao Fracttal), no livro nexus_chamados_abertos. Desligado até o Levi ligar (`chamados_abertos.LIGADO_PADRAO`)
+    # (sem pedido ao Fracttal), no livro nexus_chamados_abertos. Ligado desde 08/11/2026 (`chamados_abertos.LIGADO_PADRAO`)
     try:
         from nexus.torres.oscreator import chamados_abertos
         chamados_abertos.ligar(app)
