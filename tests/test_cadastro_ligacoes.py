@@ -220,6 +220,24 @@ def test_fracttal_le_a_arvore_ao_lado_da_foto(tmp_path):
     assert itens["Faro - Pedra do Sal 1 - PI"]["origem"] == "árvore de ativos do Fracttal"
 
 
+def test_fracttal_nao_abre_foto_da_pasta_compartilhada_do_pcm(tmp_path):
+    """Auditoria de 08/11/2026: `pickle.load` executa código do arquivo, e a pasta de origem do PCM (OneDrive) é da equipe,
+    não só do motor. A foto lida é só a do Nexus (`geracoes/`); a da pasta de origem não é aberta."""
+    import pickle
+    marcador = tmp_path / "executou.txt"
+
+    class _Planta:
+        def __reduce__(self):
+            return (marcador.write_text, ("x", "utf-8"))
+    origem = tmp_path / "origem"
+    origem.mkdir()
+    with open(origem / ".cache_semanal_api.pkl", "wb") as f:
+        pickle.dump({"df": _Planta()}, f)
+    cfg = {"NEXUS_PCM_TRABALHO": str(tmp_path / "trabalho"), "NEXUS_PCM_ORIGEM": str(origem)}
+    L.fracttal(cfg)
+    assert not marcador.exists()
+
+
 def test_usina_da_arvore_liga_a_mao_na_tela(app_lig, cli):
     """A chave da árvore vira buraco nas Ligações (a Faro do Fracttal não é a "Faro Energy" do cadastro, e o nome não
     casa sozinho) e liga pela decisão da tela, como qualquer chave."""

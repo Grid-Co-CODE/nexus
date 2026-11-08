@@ -379,15 +379,16 @@ def locais_de_almoxarifado(linhas_saldo: list[dict], ja: set) -> list[dict]:
 
 def fracttal(config) -> list[dict]:
     """Usinas do Fracttal ("Cliente - Usina - UF") com o código tirado dos códigos de equipamento das tarefas: a foto
-    mais nova que o motor do PCM gravou (pasta do PCM ou rodadas do Nexus), mais as usinas da árvore de ativos guardada
+    mais nova que o motor do PCM gravou nas rodadas do Nexus, mais as usinas da árvore de ativos guardada
     ao lado dela que ainda não têm tarefa (`usinas_da_arvore`). Sem foto, só a lista de ativos (pelo nome)."""
     from ..pcm import geracao as G
     trab, origem = G.pasta_trabalho(config), G.pasta_origem(config)
-    fotos = [p for p in ([Path(origem) / ".cache_semanal_api.pkl"] if origem else [])
-             + list((Path(trab) / "geracoes").glob("*/.cache_semanal_api.pkl")) if p.exists()]
+    # só a foto das rodadas do Nexus: a da pasta de origem do PCM (OneDrive da equipe) não se abre, porque o `pickle`
+    # executa código do arquivo e quem grava lá não é só o motor (auditoria de 08/11/2026)
+    fotos = [p for p in (Path(trab) / "geracoes").glob("*/.cache_semanal_api.pkl") if p.exists()]
     if fotos:
         foto = max(fotos, key=lambda p: p.stat().st_mtime)
-        with open(foto, "rb") as f:          # arquivo do próprio motor do PCM, gravado nesta máquina ou na pasta do PCM
+        with open(foto, "rb") as f:          # arquivo do motor do PCM, gravado pelo Nexus na rodada (`geracoes/`)
             df = pickle.load(f)["df"]
         itens = []
         df = df.assign(_u=df["Ativo Classificação 1"].fillna("").astype(str).str.strip())

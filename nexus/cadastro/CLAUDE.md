@@ -733,7 +733,7 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
 - **A regra de ignorar "Grid Co." do Fracttal pega "RenoGrid - Colíder 1/2" por acaso** (`ignorado` compara texto
   normalizado contido: "renoGRID COlider"). Desde 27/10/2026 as duas chaves estão ligadas à mão (a decisão da tela vence
   a regra); trocar a regra por chave exata na tela Ligações continua a fazer.
-- **A foto do Fracttal de 05/10 da pasta do PCM não abre neste PC** (`ModuleNotFoundError: pyarrow`: o motor do PCM a
+- **A foto do Fracttal lida é só a das rodadas do Nexus (`geracoes/`), desde 08/11/2026**: a da pasta de origem do PCM (OneDrive da equipe) não se abre, porque o `pickle` executa código do arquivo. Caso antigo que continua: a foto de 05/10 daquela pasta **não abria neste PC** (`ModuleNotFoundError: pyarrow`: o motor do PCM a
   gravou com strings do pyarrow). O `fracttal()` pega a mais nova e "Ler as bases de novo" quebra (e o
   `publicar_cadastro.py` sem `--bases-guardadas` também, ainda em 08/10); as fotos das rodadas do Nexus (02/10) abrem.
   Instalar o `pyarrow` ou apontar outra foto.
