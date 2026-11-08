@@ -756,30 +756,6 @@ def test_o_app_envia_a_foto_assinada_e_ela_aparece_na_tabela_e_no_pdf(com_livro,
     assert len([im for p in paginas for im in p.images if im.name.endswith(".jpg")]) == 1
 
 
-def test_a_miniatura_le_a_foto_inteira_uma_vez_so(com_livro, app, logado, tmp_path, monkeypatch):
-    """19/10/2026: cada miniatura lia a foto inteira do disco antes de olhar a memória e, sem a memória (cada deploy),
-    decodificava a inteira. Agora: memória, depois a cópia de 160 px no disco, e a inteira só na 1ª vez."""
-    from PIL import Image
-    from nexus.hseq import fotos as FOT
-    cod = "ALT100-INFC1-PPCI-EXT01"
-    pasta = tmp_path / "hseq" / "extintores" / "fotos"
-    pasta.mkdir(parents=True)
-    Image.new("RGB", (1200, 1600), (200, 30, 30)).save(pasta / f"{cod}.jpg", quality=82)
-    app.config["NEXUS_DADOS"] = str(tmp_path)
-    lidas = []
-    original = FOT.foto
-    monkeypatch.setattr(FOT, "foto", lambda cfg, c: lidas.append(c) or original(cfg, c))
-    FOT._MINIS.clear()
-    r = logado.get(f"/t/hseq/extintores/foto/{cod}.jpg?mini=1")
-    assert r.status_code == 200 and max(Image.open(__import__("io").BytesIO(r.data)).size) == FOT.MINI_PX
-    assert lidas == [cod] and (pasta / "mini" / f"{cod}.jpg").is_file()
-    logado.get(f"/t/hseq/extintores/foto/{cod}.jpg?mini=1")
-    assert lidas == [cod]                                              # da memória
-    FOT._MINIS.clear()                                                  # o reinício de um deploy
-    assert logado.get(f"/t/hseq/extintores/foto/{cod}.jpg?mini=1").status_code == 200 and lidas == [cod]   # do disco
-    assert FOT.mini(app.config, "ALT100-INFC1-PPCI-EXT09") is None and lidas == [cod]   # sem foto: nem tenta ler
-
-
 def test_a_lista_das_fotos_fica_guardada_e_a_foto_nova_aparece_na_hora(com_livro, app, tmp_path):
     from nexus.hseq import fotos as FOT
     app.config["NEXUS_DADOS"] = str(tmp_path)

@@ -16,11 +16,8 @@ O App envia desde a v265 (14/10/2026). O PDF usa uma cópia de 600 px (`foto_pdf
 por foto recebida: com as 90 primeiras fotos, o PDF de todos os extintores reduzia as 90 a cada pedido (~30 ms cada no
 PC, várias vezes isso no servidor), e o custo crescia com cada conferência nova.
 
-A miniatura (`mini`) segue a mesma regra desde 19/10/2026 (cópia em `mini/<código>.jpg`, feita uma vez e guardada na
-memória), e a listagem da pasta (`disponiveis`) fica guardada 30 s: no Raio-X das 17:15 a tela de Extintores levou 21 s
-no servidor, e cada miniatura lia a foto inteira do disco antes de olhar a memória, listava a pasta inteira e, sem a
-cópia na memória (depois de cada deploy), decodificava a foto inteira. A tela parou de pedir miniaturas (a foto só vem
-no clique), mas a rota `?mini=1` continua e não pode pesar.
+A miniatura de 160 px (`mini`, rota `?mini=1`) saiu em 08/11/2026: a tela parou de pedir miniaturas em 19/10 (a foto só
+vem no clique) e ninguém mais a usava. A listagem da pasta (`disponiveis`) fica guardada 30 s.
 """
 import hashlib
 import hmac
@@ -29,7 +26,6 @@ import json
 import re
 import threading
 import time
-from collections import OrderedDict
 from pathlib import Path
 
 from ..cadastro.ligacoes import pasta_dados
@@ -38,11 +34,9 @@ ROTULO_CHAVE = b"nexus:hseq:fotos-extintor"     # deriva a chave das fotos da NE
 JANELA_S = 15 * 60
 LADO_MAX, QUALIDADE = 1600, 82
 TAMANHO_MAX = 8 * 1024 * 1024
-MINI_PX = 160                                  # a miniatura da tabela (a tela mostra 32 px; 160 fica nítido)
 PDF_PX, PDF_QUALIDADE = 600, 75                # a do PDF: o quadro tem 40 mm (600 px = 380 dpi impresso)
 CODIGO = re.compile(r"[A-Z0-9][A-Z0-9.\-]{2,60}")
 DIA = re.compile(r"\d{4}-\d{2}-\d{2}")
-_MINIS: OrderedDict = OrderedDict()            # (código, dia) -> JPEG da miniatura; as últimas 600 na memória
 DISPONIVEIS_S = 30                             # a listagem da pasta fica guardada este tempo (`receber` a renova)
 _DISP: dict = {}                               # pasta -> (quando, {código: dia})
 
@@ -179,29 +173,9 @@ def foto_pdf(config, codigo) -> bytes | None:
     return _copia(config, codigo, "pdf", PDF_PX, PDF_QUALIDADE)
 
 
-def mini(config, codigo) -> bytes | None:
-    """A miniatura (160 px): a da memória (pelo código e o dia da foto) e, sem ela, a cópia em `mini/<código>.jpg`, que
-    sobrevive ao reinício de cada deploy. Só a 1ª vez de cada foto lê a inteira (ver o cabeçalho, 19/10/2026)."""
-    codigo = str(codigo or "")
-    dia = disponiveis(config).get(codigo)
-    if dia is None:
-        return None
-    k = (codigo, dia)
-    if k in _MINIS:
-        _MINIS.move_to_end(k)
-        return _MINIS[k]
-    dados = _copia(config, codigo, "mini", MINI_PX, 75)
-    if not dados:
-        return None
-    _MINIS[k] = dados
-    while len(_MINIS) > 600:
-        _MINIS.popitem(last=False)
-    return dados
-
-
 def disponiveis(config) -> dict:
-    """{código: dia da foto} das fotos guardadas. A listagem fica guardada `DISPONIVEIS_S` (cada miniatura e cada tela a
-    pediam; `receber` a renova quando chega foto)."""
+    """{código: dia da foto} das fotos guardadas. A listagem fica guardada `DISPONIVEIS_S` (cada tela a
+    pedia; `receber` a renova quando chega foto)."""
     p = pasta(config)
     if p is None or not p.is_dir():
         return {}

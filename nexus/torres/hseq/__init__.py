@@ -640,8 +640,8 @@ def extintores_info(codigo):
 
 @bp.route("/extintores/foto/<codigo>.jpg")
 def extintores_foto(codigo):
-    """A foto do extintor (a mais recente que o App enviou); `mini=1` = a miniatura da tabela."""
-    dados = (FOT.mini if request.args.get("mini") else FOT.foto)(current_app.config, codigo)
+    """A foto do extintor (a mais recente que o App enviou)."""
+    dados = FOT.foto(current_app.config, codigo)
     if not dados:
         abort(404)
     return Response(dados, mimetype="image/jpeg", headers={"Cache-Control": "private, max-age=300"})

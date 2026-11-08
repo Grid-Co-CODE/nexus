@@ -289,8 +289,8 @@ dia); foto de dia mais velho não substitui. É rota sem login (`auth.ROTAS_PUBL
 (a usina aberta e a visão por extintor), o extintor com foto ganha o botão "Foto" com o dia dela (até 19/10/2026, uma
 miniatura: ver "A página é leve"); o clique abre a caixa das fotos da ronda e só então pede a imagem (setas andam entre
 as fotos da usina). O PDF põe a mesma foto ao lado do extintor. No servidor (19/10): a listagem da pasta
-(`fotos.disponiveis`) fica guardada 30 s e o `receber` a renova; a miniatura da rota `?mini=1` (que a tela não usa mais)
-vem da memória ou da cópia de 160 px em `mini/<código>.jpg` e só a 1ª vez lê a foto inteira, reduzida com o `draft`.
+(`fotos.disponiveis`) fica guardada 30 s e o `receber` a renova. A miniatura (rota `?mini=1`,
+`fotos.mini`, cópia `mini/`) saiu em 08/11/2026: a tela não a pedia desde 19/10.
 
 **O App envia desde a v265 (14/10/2026).** Até ali a foto ficava só no App: o técnico fotografava, e o PDF de 13/10 saía
 sem foto (Levi, 14/10: "o Nexus precisa receber a foto!"). Um timer do App, a cada 10 min (minutos 4, 14, 24...), manda
