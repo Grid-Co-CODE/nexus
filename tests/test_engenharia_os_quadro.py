@@ -191,6 +191,27 @@ def test_demais_respostas_vem_da_os_filha(pagina, cliente):
     assert "16511" in html and "não tem a subtarefa" in html
 
 
+def test_a_resposta_da_filha_concluida_fica_guardada_e_a_aberta_e_relida(pagina, cliente, monkeypatch):
+    """Auditoria de 08/11/2026: cada abertura da pagina pedia ao Fracttal as subtarefas de CADA filha, em fila, da cota de
+    200 por minuto que o App de Campo tambem usa. A filha concluida nao muda (a 16511); a aberta (16510) segue relida."""
+    from test_engenharia_acompanhamento import _como
+
+    from nexus.engenharia import os_equipe as E
+    E._ATIVIDADES.clear()
+    pedidos, rest = [], E._ler_fracttal
+
+    def conta(path):
+        if path.startswith("work_orders_subtasks/"):
+            pedidos.append(path.split("folio=")[1].split("&")[0])
+        return rest(path)
+    monkeypatch.setattr(E, "_ler_fracttal", conta)
+    for _ in range(2):
+        html = _secao(_como(cliente, ANA).get(URL).get_data(as_text=True), "Demais respostas do técnico")
+        assert "Troquei o cabo do MPPT 2" in html and "não tem a subtarefa" in html
+    assert pedidos.count("16511") == 1 and pedidos.count("16510") == 2
+    E._ATIVIDADES.clear()
+
+
 def test_classificar_grava_e_volta_com_o_aviso(pagina, cliente):
     from test_engenharia_acompanhamento import SAME, _como
     r = _como(cliente, ANA).post(URL + "/classificar", data={"status_id": "3", "prioridade_id": "3"}, headers=SAME)

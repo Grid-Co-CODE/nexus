@@ -437,8 +437,9 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   para a página; a sessão cassada antes do vencimento encerra o Nexus de quem entrou pelo Fracttal (o /os/login, com o
   JWT morto no cookie, voltava direto para a página) e tira o cookie do OS Creator de quem entrou pela Microsoft. Erro
   do Fracttal não grava nada. O comentário também fica no livro (texto e nome cifrados).
-- **O banco no caminho do clique:** o quadro e a página leem o livro com prazo curto (`PRAZO_S`, 8 s) e guardam a
-  falha pelo minuto da cópia; o livro que existe e veio sem a aba dos eventos é leitura incompleta, não "nada". Sem ler
+- **O banco no caminho do clique:** o quadro, a página, a Mesa e a Confiabilidade (acompanhamentos, FMEA, setores e
+  chamados de garantia) leem o livro com prazo curto (`PRAZO_S`, 8 s) e guardam a
+  falha pelo minuto da cópia (auditoria de 08/11/2026: com a API da T.I. pendurada, cada visita esperava minutos); o livro que existe e veio sem a aba dos eventos é leitura incompleta, não "nada". Sem ler
   o livro, nem pulso no quadro nem "Última atualização" na página (só as datas do Fracttal chutariam a parada).
 - **Solicitar OS:** a Nova solicitação do OS Creator com o ativo marcado, esta OS como OS pai e a data do incidente dela
   (`/os/solicitacao?ativo=&os_pai=&os_pai_folio=&data=`, pelo `/os/_nexus/ir`; regra no README do OS Creator). A data é
@@ -458,7 +459,7 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   fotos; sem a sessão do Fracttal, o aviso traz o login dele, que volta para a página). O REST filtra as filhas por
   `id_parent_wo` (medido em 24/10/2026; a leitura para em 3 páginas, para um filtro ignorado não virar o Fracttal
   inteiro), e de cada filha a resposta de "Descreva a atividade realizada" (`work_orders_subtasks`; toda OS que nasce
-  de solicitação tem a subtarefa).
+  de solicitação tem a subtarefa; a da filha concluída fica guardada 10 min, a aberta é relida).
 - **Quem mexe:** o setor Engenharia e o administrador, com login de pessoa; os demais leem, sem formulários.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_os_quadro.py tests/test_engenharia_equipe.py
   tests/test_oscreator_solic_pcm.py -k "os_quadro or quadro or sugestao"` e a página na cópia de prova.

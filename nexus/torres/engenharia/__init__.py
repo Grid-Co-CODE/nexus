@@ -1201,7 +1201,7 @@ def _pagina_da_os(folio: int, tela_id: str):
         fs = os_equipe.filhas(o["wid"])
         for f in fs:
             try:
-                f["atividade"] = os_equipe.resposta_da_atividade(f["os"])
+                f["atividade"] = os_equipe.resposta_da_atividade(f["os"], f.get("coluna") == "concluida")
             except Exception:  # noqa: BLE001 — a resposta de uma filha não derruba a página: a linha diz que não leu
                 f["atividade"] = None
     except Exception as e:      # noqa: BLE001

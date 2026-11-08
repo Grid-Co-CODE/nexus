@@ -265,12 +265,25 @@ def filhas(wid) -> list[dict]:
 ATIVIDADE = "descreva a atividade realizada"     # a subtarefa de toda OS que nasce de uma solicitação (solic_spec.BASE)
 
 
-def resposta_da_atividade(folio) -> dict:
-    """A resposta de "Descreva a atividade realizada" de uma OS: {"tem": a subtarefa existe, "resposta": o texto}."""
-    subs = _paginas_ate(f"work_orders_subtasks/?folio={int(folio)}")
+_ATIVIDADES: dict = {}          # folio -> (quando, resposta): só da filha concluída, que não muda mais
+ATIVIDADE_S = 600
+
+
+def resposta_da_atividade(folio, concluida: bool = False) -> dict:
+    """A resposta de "Descreva a atividade realizada" de uma OS: {"tem": a subtarefa existe, "resposta": o texto}.
+    A filha concluída fica guardada por ATIVIDADE_S: uma OS pai de recorrência com 20 filhas pedia 20 vezes ao Fracttal,
+    em fila, a cada abertura da página, da cota que o App de Campo também usa (auditoria de 08/11/2026)."""
+    chave = str(int(folio))
+    g = _ATIVIDADES.get(chave)
+    if concluida and g and time.time() - g[0] < ATIVIDADE_S:
+        return g[1]
+    subs = _paginas_ate(f"work_orders_subtasks/?folio={chave}")
     achadas = [s for s in subs if _norm(s.get("description")) == ATIVIDADE]
     textos = [str(s.get("value") or "").strip() for s in achadas if str(s.get("value") or "").strip()]
-    return {"tem": bool(achadas), "resposta": " / ".join(textos)}
+    r = {"tem": bool(achadas), "resposta": " / ".join(textos)}
+    if concluida:
+        _ATIVIDADES[chave] = (time.time(), r)
+    return r
 
 
 def _reler(app):
