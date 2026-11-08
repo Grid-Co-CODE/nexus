@@ -165,6 +165,11 @@ def test_o_id_token_do_app_passa_e_devolve_o_email():
 @pytest.mark.parametrize("caso, mudar, kw, email", [
     ("venceu há 119 s: a folga do relógio", {"exp": AGORA - 119}, {}, EMAIL),
     ("nbf daqui a 119 s: a folga do relógio", {"nbf": AGORA + 119}, {}, EMAIL),
+    # o limite exato da folga ainda vale; 121 s já não (em RECUSADOS)
+    ("venceu há exatamente 120 s", {"exp": AGORA - 120}, {}, EMAIL),
+    ("nbf daqui a exatamente 120 s", {"nbf": AGORA + 120}, {}, EMAIL),
+    # o ID token pode trazer os papéis do App (roles); o que separa o token de acesso é o scp
+    ("os papéis do App (roles) no ID token", {"roles": ["Tecnico"]}, {}, EMAIL),
     ("sem nbf", {"nbf": None}, {}, EMAIL),
     ("aud numa lista", {"aud": [CLIENTE]}, {}, EMAIL),
     ("os GUIDs colados em maiúscula na tela", {}, {"cliente": CLIENTE.upper(), "diretorio": DIRETORIO.upper()}, EMAIL),
@@ -207,7 +212,16 @@ RECUSADOS = [
     ("vencido há mais de 120 s", lambda: _token(exp=AGORA - 121)),
     ("sem exp", lambda: _token(exp=None)),
     ("exp em texto", lambda: _token(exp=str(AGORA + 3600))),
+    ("exp booleano", lambda: _token(exp=True)),
+    ("exp NaN", lambda: _token(exp=float("nan"))),
+    ("exp infinito", lambda: _token(exp=float("inf"))),
+    ("exp inteiro gigante (não cabe num float)", lambda: _token(exp=10 ** 400)),
     ("nbf no futuro além de 120 s", lambda: _token(nbf=AGORA + 121)),
+    ("nbf NaN", lambda: _token(nbf=float("nan"))),
+    ("alg ES256", lambda: _token(cab={"alg": "ES256"})),
+    # o token de ACESSO de uma API exposta pelo próprio registro do App teria o aud = o ID do App: o scp o denuncia
+    # (o ID token nunca traz scp; revisão final de 08/11/2026)
+    ("token de acesso de uma API do App (scp)", lambda: _token(scp="access_as_user")),
     ("convidado pelo #EXT#", lambda: _token(preferred_username="tecnico_exemplo.test#EXT#@gridcoexemplo.onmicrosoft.com")),
     ("convidado de outro diretório (idp)", lambda: _token(idp=f"https://sts.windows.net/{OUTRO_DIRETORIO}/")),
     ("convidado com conta pessoal (idp)", lambda: _token(idp="live.com")),
@@ -249,6 +263,9 @@ def test_recusa(caso, fazer):
     ("RS256 sem assinatura", _token().rsplit(".", 1)[0] + "."),
     ("corpo assinado que não é JSON", _assinar({"alg": "RS256", "kid": KID}, b"nao e json")),
     ("grande demais", _token(name="x" * 20_000)),
+    # o base64 com tamanho ≡ 1 (mod 4) não decodifica (binascii.Error): recusa, nunca 500
+    ("assinatura com tamanho ≡ 1 (mod 4)", _token().rsplit(".", 1)[0] + ".abcde"),
+    ("cabeçalho com tamanho ≡ 1 (mod 4)", "abcde.e30.c2ln"),
 ])
 def test_token_ilegivel_e_recusado_sem_quebrar(caso, token):
     with pytest.raises(T.TokenRecusado):

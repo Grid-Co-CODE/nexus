@@ -17,8 +17,9 @@ dele e poria posições falsas no mapa. A conferência, nesta ordem:
 2. a assinatura confere com a chave pública da Microsoft de mesmo `kid` (o JWKS do diretório,
    `https://login.microsoftonline.com/<diretório>/discovery/v2.0/keys`). Nenhuma declaração do corpo é lida antes dela;
 3. quem é da Grid, pelas regras do login (o topo de `microsoft.py`): `tid` e `iss` do diretório da Grid (v2.0), `aud` = o
-   ID do aplicativo do App de Campo, não convidado (`#EXT#`, `idp` de outra casa, `acct`) e e-mail de um domínio da Grid
-   comparado inteiro (gridco.com.br.x.com e xgridco.com.br não passam);
+   ID do aplicativo do App de Campo, sem `scp` (o token de acesso de uma API do próprio App teria o mesmo `aud`), não
+   convidado (`#EXT#`, `idp` de outra casa, `acct`) e e-mail de um domínio da Grid comparado inteiro
+   (gridco.com.br.x.com e xgridco.com.br não passam);
 4. o prazo: `exp` obrigatório, `exp` e `nbf` com 120 s de folga de relógio.
 A pessoa é o `preferred_username` (sem ele, o `upn`; depois, o `email`), em minúscula: o mesmo que o servidor do App de
 Campo usa para saber quem é, para o Nexus e o App nunca discordarem sobre a pessoa.
@@ -256,6 +257,11 @@ def conferir(token: str, *, cliente: str, diretorio: str, chaves_jwks=None, agor
     aud = [str(a).lower() for a in aud] if isinstance(aud, list) else [str(aud or "").lower()]
     if aud != [cliente]:
         raise TokenRecusado("aud de outro aplicativo: não é o ID token do App de Campo")
+    if "scp" in c:
+        # o token de ACESSO v2 de uma API exposta pelo próprio registro do App teria o aud = o ID do App e passaria pelo
+        # aud: o scp (os escopos delegados) só existe em token de acesso, nunca no ID token. O `roles` não denuncia nada
+        # (o ID token pode trazer os papéis do App) e fica (revisão final de 08/11/2026)
+        raise TokenRecusado("token de acesso (scp): não é o ID token do App de Campo")
 
     # 4. o prazo
     exp = _instante(c.get("exp"))
