@@ -474,6 +474,8 @@ def test_o_livro_que_falha_depois_do_fracttal_nao_cria_outra_os_na_tentativa_seg
     monkeypatch.setattr(AC, "pegar", pegar)
     html = _post(cliente, "/pegar", cod="IBI200-INV02").get_data(as_text=True)
     assert "A OS 12345 já está no Fracttal" in html and "a mesma OS" in html
+    # o limite que a memória impõe (auditoria de 08/11/2026): o reinício esquece a OS, e a mensagem diz o que fazer
+    assert "cancele a OS repetida no Fracttal" in html
     html = _post(cliente, "/pegar", cod="IBI200-INV02").get_data(as_text=True)
     assert "OS 12345" in html and len(_feitas(fracttal, "criar")) == 1
     a = next(a for a in AC.estado(AC.ler(forcar=True)["eventos"]).values() if a["cod"] == "IBI200-INV02")

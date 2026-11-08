@@ -1422,7 +1422,8 @@ def engenharia_acomp_pegar():
             os_ = _no_fracttal(lambda api, regra, curto: _os_para(api, cod, s, para, quem["nome"], agora, falhas,
                                                                   curto), de)
             _depois_do_fracttal(lambda: AC.pegar(T._para_gravar(s), usuario, pode, os=os_), os_["folio"],
-                                f"Tente de novo: o Nexus usa a mesma OS {os_['folio']}, sem criar outra.")
+                                f"Tente de novo: o Nexus usa a mesma OS {os_['folio']}, sem criar outra "
+                                "(se o Nexus reiniciar antes, cancele a OS repetida no Fracttal).")
             _OS_SEM_LIVRO.pop(canon(cod), None)
         finally:
             trava.release()
@@ -1495,7 +1496,8 @@ def engenharia_acomp_encaminhar():
                                             pode, pessoas, os=os_))
             if os_:
                 _depois_do_fracttal(gravar, os_["folio"],
-                                    f"Tente de novo: o Nexus usa a mesma OS {os_['folio']}, sem criar outra.")
+                                    f"Tente de novo: o Nexus usa a mesma OS {os_['folio']}, sem criar outra "
+                                    "(se o Nexus reiniciar antes, cancele a OS repetida no Fracttal).")
                 _OS_SEM_LIVRO.pop(canon(cod), None)
             elif ab and ab.get("os_id") and "passou para" in extra:
                 _depois_do_fracttal(gravar, ab["os_folio"], "Encaminhe de novo: a OS já está com quem recebe.")
@@ -1706,7 +1708,8 @@ def engenharia_acomp_gerar_os(aid):
             os_ = _no_fracttal(lambda api, regra, curto: _os_para(api, a["cod"], ativo, para, quem["nome"], agora,
                                                                   falhas, curto, desde=a.get("desde")), de)
             _depois_do_fracttal(lambda: AC.gerar_os(aid, os_, usuario, pode), os_["folio"],
-                                f"Tente de novo: o Nexus usa a mesma OS {os_['folio']}, sem criar outra.")
+                                f"Tente de novo: o Nexus usa a mesma OS {os_['folio']}, sem criar outra "
+                                "(se o Nexus reiniciar antes, cancele a OS repetida no Fracttal).")
             _OS_SEM_LIVRO.pop(canon(a["cod"]), None)
         finally:
             trava.release()
