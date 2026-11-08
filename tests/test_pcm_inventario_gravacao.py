@@ -1203,3 +1203,29 @@ def test_a_tela_e_a_lista_mostram_o_aviso_de_travado(app, inv, ponte_falsa, monk
     lista = c.get(LISTA).get_data(as_text=True)
     assert "ficou travado em ajuste no Fracttal; quem aprovou precisa continuar para destravar" in lista
     assert 'data-travada="C-1"' in lista and 'href="/t/pcm/pecas/inventario/C-1"' in lista
+
+
+def test_a_vez_do_almoxarifado_solta_mesmo_se_o_controle_nao_grava_ao_parar(app, grav, monkeypatch):
+    """Auditoria ponytail de 08/11/2026: no registro da aprovação, o `t.fim("parada")` grava o controle; com o disco cheio ele
+    levantava antes do `_ATIVAS.pop`, e o almoxarifado ficava 'começando' até reiniciar o Nexus."""
+    falso = _falso(agora=grav["relogio"])
+
+    caiu = []
+
+    def livro_quebrado(self):
+        caiu.append(1)
+        raise RuntimeError("o livro caiu (de mentira)")
+    monkeypatch.setattr(G._Trabalho, "registrar_aprovacao", livro_quebrado)
+    linhas = _linhas({"501": 12, "502": 3, "503": 0})
+    itens = contas.itens_do_lote(linhas, falso.ler("10"), {}, {})
+    gravar_json = G._gravar_json
+
+    def disco_cheio_depois_do_livro(p, d):
+        if caiu:                                   # a 1ª gravação (antes do registro) passa; a do `fim` não
+            raise OSError("disco cheio (de mentira)")
+        gravar_json(p, d)
+    monkeypatch.setattr(G, "_gravar_json", disco_cheio_depois_do_livro)
+    with pytest.raises(OSError):
+        G.iniciar(grav["cfg"], _contagem(linhas), itens, falso, APROVADOR, curadoria={},
+                  dormir=grav["esperas"].append, agora=grav["relogio"])
+    assert caiu and not G._viva("10")

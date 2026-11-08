@@ -929,9 +929,11 @@ def iniciar(cfg, contagem: dict, itens: list[dict], estoque, aprovador: dict, *,
         raise Recusada(f"O livro do inventário não aceitou a aprovação ({p.__cause__ or p.motivo}): nada foi gravado.",
                        503) from None
     except Exception as ex:      # noqa: BLE001 — o banco talvez tenha gravado: a aprovação fica parada, e o "Continuar" refaz
-        t.fim("parada", "não consegui confirmar o registro da aprovação no livro do inventário: continue para tentar de novo")
-        with _TRAVA:
-            _ATIVAS.pop(almox, None)
+        try:
+            t.fim("parada", "não consegui confirmar o registro da aprovação no livro do inventário: continue para tentar de novo")
+        finally:      # o `fim` grava o controle: com o disco cheio ele levanta, e sem isto a vez ficava "viva" até reiniciar
+            with _TRAVA:
+                _ATIVAS.pop(almox, None)
         raise Recusada(f"Não consegui confirmar o registro da aprovação ({type(ex).__name__}): nada foi ao Fracttal; quem "
                        "aprovou pode continuar.", 503) from None
     with _TRAVA:
