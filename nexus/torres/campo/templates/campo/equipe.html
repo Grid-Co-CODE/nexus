@@ -27,7 +27,7 @@
         {% if usinas %}{% if not v.erro_cadastro and not v.sem_usinas %}{% with tela = tela_risco %}{% include "performance/_mapa_ajuda.html" %}{% endwith %}{% endif %}{% else %}
         {% call explica('O que é coletado, quem vê e por quanto tempo') %}
           <p><b>O que é coletado.</b> A posição do celular de cada técnico de campo do piloto, pelo Nexus Field: da
-          primeira abertura do app no dia até as 22h, a cada 2 minutos em deslocamento e mais espaçado parado. Só o técnico
+          primeira abertura do app no dia até as 22h na hora do técnico, a cada 2 minutos em deslocamento e mais espaçado parado. Só o técnico
           de campo ativo do cadastro e escolhido para o piloto é coletado.</p>
           <p><b>Quem vê.</b> Os setores PCM, COS, Performance, Supervisão Campo e Responsáveis UFV, e os administradores do
           Nexus. Cada abertura do mapa e de cada rota fica registrada (quem abriu, quando e de quem), para responder a um

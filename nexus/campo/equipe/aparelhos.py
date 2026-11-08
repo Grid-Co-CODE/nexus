@@ -105,11 +105,17 @@ class Chaveiro:
         """A publicação deu certo: o jornal é aparado destas linhas."""
         self._fila.confirmar(linhas)
 
-    def carregar(self, eventos: list[dict]) -> None:
+    def pendentes(self) -> list[dict]:
+        """O jornal ainda não confirmado, como eventos (para o boot lê-lo ANTES do banco)."""
+        return [dict(zip(CAB_APARELHOS, l)) for l in self._fila.pendentes()]
+
+    def carregar(self, eventos: list[dict], pendentes: list[dict] | None = None) -> None:
         """Reconstrói as ativas no boot a partir do livro e do jornal (as linhas que o banco ainda não tem: a chave
         emitida ou revogada pouco antes do reinício). A API devolve tudo como texto e sem garantia de ordem: por isso
         vale o CONJUNTO (emitida e nunca revogada), não a sequência."""
-        eventos = list(eventos) + [dict(zip(CAB_APARELHOS, l)) for l in self._fila.pendentes()]
+        # `pendentes` tirado ANTES da leitura do banco: a rodada do gravador que publica e apara o jornal no meio das duas
+        # leituras deixa a linha em pelo menos um dos conjuntos (ler o jornal depois a perdia dos dois)
+        eventos = list(eventos) + (self.pendentes() if pendentes is None else list(pendentes))
         revogadas = {str(e.get("chave_hash")) for e in eventos if e.get("evento") == "revogada"}
         with self._trava:
             for e in eventos:

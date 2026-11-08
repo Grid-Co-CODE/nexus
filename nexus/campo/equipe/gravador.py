@@ -88,12 +88,16 @@ class Gravador:
                       ("deslocamentos", lambda: self._deslocamentos(agora)),
                       ("aparelhos", self._aparelhos),
                       ("acessos", self._acessos),
-                      ("diário velho", lambda: self._srv.diario.apagar_velhos(hoje)))
+                      ("diário velho", lambda: self._poda(hoje, agora)))
             for nome, passo in passos:
                 try:
                     passo()
                 except Exception as e:      # noqa: BLE001 — um passo que cai não derruba os outros
                     log.warning("equipe: o gravador falhou em %s (%s)", nome, type(e).__name__)
+
+    def _poda(self, hoje: date, agora: datetime) -> None:
+        self._srv.diario.apagar_velhos(hoje)
+        self._srv.podar(agora)                  # o último ponto em memória também (a poda do diário já ficou marcada)
 
     def _pontos(self, hoje: date) -> None:
         for dia in (hoje, hoje - timedelta(days=1)):

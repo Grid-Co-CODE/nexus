@@ -246,3 +246,40 @@ def test_banco_que_nao_le_nao_grava_nada_e_os_eventos_voltam_a_fila(ambiente, mo
     assert len(api.linhas(LIVRO_ACESSOS, ABA_ACESSOS)) == 1
     assert len(api.linhas(livro_pontos(AGORA.date()), ABA_PONTOS)) == 2
     assert len(api.linhas(livro_deslocamentos(AGORA.date()), ABA_DESLOC)) == 1
+
+
+def test_rodada_do_gravador_no_meio_da_leitura_das_chaves_nao_perde_a_reemissao(ambiente, tmp_path):
+    """Corrida do boot (revisão de 08/11/2026): o serviço lia o banco ANTES do jornal; uma rodada do gravador que
+    publicasse e aparasse o jornal entre as duas leituras deixava a revogação e a chave nova fora dos dois conjuntos:
+    a K1 voltava a valer e a K2 dava 401. Agora o jornal é lido antes do banco."""
+    api, srv, g = ambiente
+    k1 = srv.chaveiro.emitir(7, "cel-1", "app", AGORA)
+    g.rodada(AGORA)                                     # o banco tem só "emitida K1"; o jornal está vazio
+    k2 = srv.chaveiro.emitir(7, "cel-1", "app", AGORA + timedelta(minutes=1))    # revogada K1 + emitida K2, só no jornal
+    srv2 = S.Servico(g._app, tmp_path, srv.cofre, agora=AGORA)          # o reinício
+    g2 = Gravador(g._app, srv2, usinas=lambda: USINAS)
+    real, uma_vez = srv2._ler_livro, []
+
+    def ler_e_deixar_o_gravador_rodar(livro, aba):
+        linhas = list(real(livro, aba))
+        if aba == ABA_APARELHOS and not uma_vez:
+            uma_vez.append(1)
+            g2.rodada(AGORA + timedelta(minutes=5))     # publica e apara o jornal DEPOIS da leitura do banco
+        return linhas
+    srv2._ler_livro = ler_e_deixar_o_gravador_rodar
+    assert srv2.chaves_prontas(AGORA + timedelta(minutes=5))
+    assert uma_vez
+    assert srv2.chaveiro.quem(k2) == (7, "cel-1")
+    assert srv2.chaveiro.quem(k1) is None
+
+
+def test_o_gravador_poda_o_ultimo_ponto_de_quem_calou_ha_mais_de_7_dias(ambiente):
+    """O passo "diário velho" já marca o dia como podado; sem a poda por instante o último ponto (com lat/lon em
+    memória) de quem calou ficava além dos 7 dias na máquina que grava."""
+    api, srv, g = ambiente
+    t = int((AGORA - timedelta(minutes=60)).timestamp() * 1000)
+    srv.receber(7, {"fuso": -180, "pontos": [{"t": t, "lat": -23.0, "lon": -46.0, "prec": 10, "mov": True}]}, AGORA)
+    srv._ultimo[8] = {**srv._ultimo[7], "instante": S._instante(AGORA - timedelta(days=9))}
+    g.rodada(AGORA)
+    assert 8 not in srv._ultimo
+    assert 7 in srv._ultimo

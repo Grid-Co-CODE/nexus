@@ -235,7 +235,8 @@ class Servico:
             self._chaves_lendo = True
         ok = False
         try:
-            self.chaveiro.carregar(self._ler_livro(LIVRO_APARELHOS, ABA_APARELHOS))
+            pendentes = self.chaveiro.pendentes()           # o jornal ANTES do banco (ver `Chaveiro.carregar`)
+            self.chaveiro.carregar(self._ler_livro(LIVRO_APARELHOS, ABA_APARELHOS), pendentes)
             ok = True
         except Exception as e:          # noqa: BLE001
             log.warning("equipe: não consegui ler as chaves dos aparelhos (%s); 503 até ler", type(e).__name__)
@@ -348,8 +349,9 @@ class Servico:
     def podar(self, agora: datetime) -> None:
         """A guarda de 7 dias na memória e no disco, sem esperar o gravador: na virada do dia de Brasília o diário tira
         os dias velhos, e o último ponto de quem parou de mandar há mais de 7 dias sai da memória junto."""
-        if not self.diario.podar(agora):
-            return
+        self.diario.podar(agora)
+        # o último ponto sai por instante, a cada chamada: o "diário velho" do gravador já marca o dia como podado, e
+        # então o diário não poda mais, mas o ponto de quem calou (com lat/lon em memória) não pode passar de 7 dias
         corte = _instante(agora - timedelta(days=GUARDA_PONTOS_DIAS))
         with self._trava:
             for pid in [p for p, u in self._ultimo.items() if u["instante"] < corte]:
