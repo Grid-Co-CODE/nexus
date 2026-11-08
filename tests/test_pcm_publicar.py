@@ -349,3 +349,22 @@ def test_conferencia_aponta_a_os_forcada_alem_das_horas(tmp_path):
     wb.save(tmp_path / "s.xlsx")
     c = C.conferir(tmp_path / "s.xlsx", "2026-W41")
     assert c["excede_hh_os"] == [{"os": "14331", "equipe": "PR Norte 01", "dia": "qua", "tarefas": 4, "horas": 24.0}]
+
+
+def test_o_409_do_arquivo_novo_tambem_e_repetido():
+    """Auditoria ponytail de 08/11/2026: na 1ª publicação da semana a planilha ainda não existe (sem sha), e o robô do PCM
+    commitando no meio dava 409; a repetição só valia com o arquivo já existente, e a publicação parava pela metade."""
+    class Robo(GitHubFalso):
+        def __init__(self):
+            super().__init__({})
+            self.puts = 0
+
+        def put(self, url, headers=None, json=None, timeout=None):
+            self.puts += 1
+            if self.puts == 1:
+                return Resp(409, {"message": "o ramo andou"})
+            return super().put(url, headers=headers, json=json)
+
+    gh = Robo()
+    commit = PB._gravar(gh, "tok", "org/repo", "main", "Programação Semana 41.xlsx", b"x", "msg")
+    assert commit and gh.puts == 2 and len(gh.commits) == 1

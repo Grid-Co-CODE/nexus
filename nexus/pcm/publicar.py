@@ -152,7 +152,9 @@ def _gravar(s, tok: str, repo: str, ramo: str, nome: str, dados: bytes, mensagem
         if atual:
             corpo["sha"] = atual["sha"]
         r = s.put(_url(repo, nome), headers=_cab(tok), json=corpo, timeout=120)
-        if r.status_code in (409, 422) and atual is not None:
+        # 409 é o ramo que andou, com ou sem o arquivo no repositório (auditoria de 08/11/2026: na 1ª publicação da semana
+        # a planilha é nova, e o 409 do robô parava tudo pela metade); só o 422 (sha errado) depende de haver `atual`
+        if r.status_code == 409 or (r.status_code == 422 and atual is not None):
             continue
         r.raise_for_status()
         return ((r.json() or {}).get("commit") or {}).get("sha", "")[:12]
