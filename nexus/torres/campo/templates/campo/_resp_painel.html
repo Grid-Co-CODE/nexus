@@ -60,6 +60,7 @@
     {% endfor %}
     {% if obs.pode %}
     <form class="cr-obs-form" method="post" action="{{ url_for('torre_campo.responsaveis_observacao', usina_id=u.usina_id) }}" data-cr-obs>
+      <input type="hidden" name="novo_id" value="{{ obs.novo_id }}">
       <label class="gc-rotulo" for="cr-obs-txt">Nova observação <span class="mudo">(como {{ obs.quem }}{% if obs.cobrindo %}, cobrindo {{ obs.cobrindo }}{% endif %})</span></label>
       <textarea class="gc-campo" id="cr-obs-txt" name="texto" rows="3" maxlength="2000" required>{{ obs.texto }}</textarea>
       <div class="cn-botoes"><button class="gc-btn gc-btn--primario" type="submit">Salvar observação</button></div>

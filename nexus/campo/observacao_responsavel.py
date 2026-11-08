@@ -17,6 +17,7 @@ nada se edita; o livro é trocado inteiro a cada gravação, sob a trava, com o 
 """
 import json
 import threading
+import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
@@ -113,9 +114,11 @@ def para_relatorio(de: date | None = None, ate: date | None = None) -> list[dict
 
 
 def escrever(uid: int, texto: str, usuario: dict | None, responsavel_logado: str, responsavel_da_usina: str,
-             mes_id: int, tela: str = "meta") -> dict:
+             mes_id: int, tela: str = "meta", novo_id: str = "") -> dict:
     """Valida, grava e confere no banco. `responsavel_logado` = o Responsável O&M de quem entrou pelo Fracttal (vazio =
-    não é responsável de nenhuma usina: recusa); `responsavel_da_usina` = o da usina, para o `do_responsavel`."""
+    não é responsável de nenhuma usina: recusa); `responsavel_da_usina` = o da usina, para o `do_responsavel`.
+    `novo_id` é o id que o formulário traz: a janela que errou depois de gravar e é enviada de novo não duplica a
+    observação (auditoria de 08/11/2026; as ocorrências já faziam assim)."""
     cfg = current_app.config
     email = str((usuario or {}).get("email") or "").strip().lower()
     nome = " ".join(str((usuario or {}).get("nome") or "").split())
@@ -141,7 +144,7 @@ def escrever(uid: int, texto: str, usuario: dict | None, responsavel_logado: str
         pid = visao.pessoa_do_login(email, nome)
     except Exception:               # noqa: BLE001 — sem cadastro: fica o código do e-mail (regra 4: não liga = vazio)
         pid = None
-    oid = uuid.uuid4().hex[:12]
+    oid = novo_id if re.fullmatch(r"[0-9a-f]{12}", str(novo_id or "")) else uuid.uuid4().hex[:12]
     agora = datetime.now(timezone.utc)
     nova = {"id": oid, "escrita_em": agora.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "data_id": int(agora.astimezone(_BRT).strftime("%Y%m%d")), "mes_id": int(mes_id), "usina_id": uid,
@@ -152,6 +155,8 @@ def escrever(uid: int, texto: str, usuario: dict | None, responsavel_logado: str
             else "não", "tela": tela}
     with _TRAVA:
         linhas = ler_todas()
+        if any(l.get("id") == oid for l in linhas):      # já entrou (o envio anterior gravou e falhou na conferência)
+            return next(l for l in linhas if l.get("id") == oid)
         livros.publicar(LIVRO, NOME_LIVRO, {ABA: (list(CAB), [[l.get(c) for c in CAB] for l in linhas + [nova]])},
                         base=visao._base(), token=cfg["GRIDCO_SQL_TOKEN"], sessao=visao._sessao())
     return nova

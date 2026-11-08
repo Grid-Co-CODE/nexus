@@ -482,6 +482,23 @@ def test_so_responsavel_escreve(tela, logado, banco):
     assert r.status_code == 403
 
 
+def test_observacao_enviada_de_novo_com_o_mesmo_id_nao_duplica(tela, cliente, banco):
+    """Achado 9 da auditoria de 08/11/2026: se a gravação entrava no banco e a conferência falhava, a janela dizia "Não
+    consegui gravar" e mantinha o texto; enviar de novo gravava a observação duas vezes (o livro só acrescenta)."""
+    import re
+
+    from nexus.campo import observacao_responsavel as O
+    c = _responsavel(cliente)
+    html = c.get("/t/campo/responsaveis/usina/3/meta").get_data(as_text=True)
+    nid = re.search(r'name="novo_id" value="([0-9a-f]{12})"', html).group(1)
+    dados = {"texto": "Inversor 3 trocado.", "novo_id": nid}
+    assert "Observação salva" in c.post("/t/campo/responsaveis/usina/3/observacao", data=dados).get_data(as_text=True)
+    assert "Observação salva" in c.post("/t/campo/responsaveis/usina/3/observacao", data=dados).get_data(as_text=True)
+    assert len(O.ler_todas()) == 1
+    c.post("/t/campo/responsaveis/usina/3/observacao", data={"texto": "Outra, de outra janela.", "novo_id": "0" * 12})
+    assert len(O.ler_todas()) == 2
+
+
 def test_observacao_vazia_ou_comprida_e_recusada_e_o_texto_fica(tela, cliente, banco):
     from nexus.campo import observacao_responsavel as O
     c = _responsavel(cliente)

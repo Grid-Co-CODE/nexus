@@ -10,6 +10,7 @@ saíram em 08/10/2026 (Levi: "ordens de serviço e imagens da ronda e ranking s�
 """
 import re
 import time
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote, urlencode
 
@@ -858,6 +859,8 @@ def _observacoes(u: dict, d: dict, aviso: str = "", erro: str = "", texto: str =
     pode = bool(logado and usuario.get("email"))
     return {"lista": lista, "pode": pode, "quem": usuario.get("nome") or logado, "aviso": aviso,
             "erro": erro or erro_leitura, "texto": texto,
+            # o mesmo id até gravar: a janela que errou mantém o do envio anterior (não duplica); a salva traz um novo
+            "novo_id": (request.form.get("novo_id") or "") if erro else uuid.uuid4().hex[:12],
             "cobrindo": u.get("responsavel") if pode and visao._norm_nome(logado) != visao._norm_nome(u.get("responsavel"))
             else ""}
 
@@ -877,7 +880,8 @@ def responsaveis_observacao(usina_id):
     texto = request.form.get("texto") or ""
     try:
         campo_obs.escrever(usina_id, texto, session.get("usuario"), _responsavel_do_login(leitura.dados or {}),
-                           u.get("responsavel") or "", hoje.year * 100 + hoje.month)
+                           u.get("responsavel") or "", hoje.year * 100 + hoje.month,
+                           novo_id=request.form.get("novo_id") or "")
     except campo_obs.Recusada as e:
         return _resp_painel(usina_id, "meta", obs_erro=str(e), obs_texto=texto)
     except Exception as e:      # noqa: BLE001 — banco fora: a janela diz, o texto digitado não se perde
