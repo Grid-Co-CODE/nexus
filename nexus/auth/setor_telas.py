@@ -488,6 +488,8 @@ def _acesso_do_cliente() -> dict:
 def primeira_do_cliente() -> str | None:
     """O endereço da 1ª tela do cliente, na ordem do menu (o Início dele leva até ela)."""
     telas = acesso()["telas"]
+    if "campo/cliente" in telas:
+        return "/t/campo/cliente"            # o Comando do cliente (o mockup: "Abre sempre no Comando")
     for t in sorted(current_app.extensions.get("nexus_torres", []), key=lambda x: x.ordem):
         for s in t.telas:
             if chave(t.id, s.id) in telas:

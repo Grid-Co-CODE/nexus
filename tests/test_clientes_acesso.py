@@ -98,7 +98,11 @@ def test_o_cliente_ve_so_as_usinas_dele(app, dados, cliente_tela, logado):
     # o Início leva à tela dele; nela, o cliente da sessão, sem escolha, e o ?cliente= de outro é ignorado
     assert c.get("/").headers["Location"].endswith("/t/campo/cliente")
     html = c.get("/t/campo/cliente?cliente=2&usina=3").get_data(as_text=True)
-    assert '<h2 class="vc-nome">Thopen</h2>' in html and 'id="vc-cliente"' not in html and 'id="vc-det-3"' not in html
+    # o cabeçalho e o menu do próprio cliente (08/11/2026, o mockup): "Bom dia, Thopen", "Comando", só leitura
+    assert re.search(r"(Bom dia|Boa tarde|Boa noite), Thopen</h1>", html) and "2 usinas no contrato" in html
+    menu_c = html.split('<nav class="menu"', 1)[1].split("</nav>", 1)[0]
+    assert "Acesso de cliente · só leitura" in menu_c and ">Comando</span>" in menu_c and "Sair do modo" not in menu_c
+    assert '<h2 class="vc-nome">' not in html and 'id="vc-cliente"' not in html and 'id="vc-det-3"' not in html
     assert 'class="sino-topo"' not in html and "_nexus/sessao" not in html
     menu = re.findall(r'href="(/t/[^"]+)"', html.split('class="conteudo"', 1)[0])
     assert set(menu) <= {"/t/campo/cliente"}
@@ -164,9 +168,10 @@ def test_o_modo_cliente_do_administrador(app, dados, cliente_tela, logado):
     # agora ele vê como o cliente: o Início leva à tela dele, o cliente é o do modo, o resto fecha, sem sino
     assert logado.get("/").headers["Location"].endswith("/t/campo/cliente")
     pag = logado.get("/t/campo/cliente?cliente=2").get_data(as_text=True)
-    assert '<h2 class="vc-nome">Thopen</h2>' in pag and 'id="vc-cliente"' not in pag and 'class="sino-topo"' not in pag
+    assert ", Thopen</h1>" in pag and 'id="vc-cliente"' not in pag and 'class="sino-topo"' not in pag
     menu = pag.split('<nav class="menu"', 1)[1].split("</nav>", 1)[0]
-    assert "Modo cliente<b>Thopen</b>" in menu and "Sair do modo cliente" in menu
+    assert "<b>Thopen</b>Modo cliente · só leitura" in menu and "Sair do modo cliente" in menu
+    assert ">Comando</span>" in menu and ">Início</span>" not in menu        # o menu do cliente (o mockup)
     assert 'id="modo-cliente-card"' not in pag
     assert logado.get("/t/base/acessos").status_code == 403 and logado.get("/t/comando/insights").status_code == 403
     # sai pelo menu lateral e volta ao Nexus inteiro

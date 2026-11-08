@@ -290,6 +290,33 @@ def paleta():
     return render_template("paleta.html", escuro=escuro, claro=claro, grupos=grupos)
 
 
+def _vista_cliente(menu: list[dict]) -> dict | None:
+    """O menu lateral do cliente (e do administrador no Modo cliente), no desenho do mockup da Visão do cliente
+    (08/11/2026, Levi: "a ideia é ter uma visão parecida com essa para o cliente"): no alto, o cliente e "acesso de
+    cliente · só leitura"; a Visão do cliente vira o item **Comando**, o primeiro; torre com uma tela só vira um item com
+    o nome da tela (Rondas); com mais de uma, o grupo da torre (Segurança: Extintores, EPI e EPC). Sem o Início: o Início
+    do cliente já é o Comando. None para quem não é cliente."""
+    modo = setor_telas.em_modo_cliente()
+    if session.get("via") != "cliente" and not modo:
+        return None
+    nome = (session.get("modo_cliente") or {}).get("nome") if modo else (session.get("usuario") or {}).get("nome")
+    itens, comando = [], None
+    for t in menu:
+        telas = []
+        for s in t["telas"]:
+            if f"/t/{t['id']}/{s['id']}" == "/t/campo/cliente":
+                comando = {"tipo": "item", "nome": "Comando", "url": s["url"], "icone": "gauge", "filhas": s["filhas"]}
+            else:
+                telas.append(s)
+        if len(telas) == 1:
+            s = telas[0]
+            itens.append({"tipo": "item", "nome": s["nome"], "url": s["url"], "icone": t["icone"], "filhas": s["filhas"]})
+        elif telas:
+            itens.append({"tipo": "grupo", "nome": t["nome"], "icone": t["icone"], "id": t["id"], "aberta": t["aberta"],
+                          "telas": telas})
+    return {"nome": nome or "Cliente", "modo": modo, "itens": ([comando] if comando else []) + itens}
+
+
 # ── o Modo cliente (07/11/2026) ──────────────────────────────────────────────────────────────────────────────────
 # Levi: "Ao clicar no nome deles e abrir o menu lateral ter um 'Modo Cliente' aí aparecer um card na frente dando um blur
 # de fundo pedindo para escolher o cliente. No menu lateral também tem que ter 'sair do modo cliente'". O administrador
@@ -471,9 +498,10 @@ def instalar_contexto(app) -> None:
         blueprint = request.blueprint or ""
         torre_atual = blueprint.removeprefix("torre_") if blueprint.startswith("torre_") else None
         a = setor_telas.acesso()
+        menu = montar_menu(app.extensions["nexus_torres"], torre_atual, _telas_prontas(app),
+                           None if a["tudo"] else a["telas"])
         return {
-            "menu": montar_menu(app.extensions["nexus_torres"], torre_atual, _telas_prontas(app),
-                                None if a["tudo"] else a["telas"]),
+            "menu": menu,
             # o setor da pessoa, no topo (Base → Acessos → Pessoas e setores); o administrador sem setor não mostra nada
             "setor": a["setor"],
             "caminho": request.path,
@@ -488,5 +516,7 @@ def instalar_contexto(app) -> None:
             # o Modo cliente do administrador (07/11/2026): o cliente que ele está vendo, e o código dos formulários
             # (`cliente_modo`, não `modo_cliente`: a Visão do cliente passa o seu próprio `modo_cliente`, que venceria)
             "cliente_modo": session.get("modo_cliente") if setor_telas.em_modo_cliente() else None,
+            # o que o cliente vê no menu lateral (08/11/2026, o mockup da Visão do cliente): o cliente e "Comando"
+            "vista_cliente": _vista_cliente(menu),
             "codigo_casca": _codigo_casca() if session.get("admin") else "",
         }

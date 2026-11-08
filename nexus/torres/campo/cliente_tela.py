@@ -105,7 +105,13 @@ def cliente():
     return render_template("campo/cliente.html", torre=TORRE, tela=TORRE.tela("cliente"), opcoes=opcoes, cid=cid,
                            nome=(b.nome_cliente.get(cid) or "") if cid else "", sintese=sintese, erros=erros,
                            erro_visao=erro_visao, lido_tr=ts, fontes_nome=FONTES_NOME, sel=sel,
-                           modo_cliente=modo_cliente)
+                           modo_cliente=modo_cliente, saudacao=_saudacao())
+
+
+def _saudacao() -> str:
+    """Bom dia, boa tarde ou boa noite, pela hora de Brasília (o cabeçalho do próprio cliente, 08/11/2026)."""
+    h = visao._agora().hour
+    return "Bom dia" if 5 <= h < 12 else "Boa tarde" if 12 <= h < 18 else "Boa noite"
 
 
 FONTES_NOME = {"tempo_real": "o status do tempo real", "chamados": "os chamados na distribuidora",

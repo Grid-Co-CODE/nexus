@@ -165,16 +165,30 @@
   {# No celular o menu fica fechado atrás do botão Menu; sem JS, via checkbox. #}
   <input type="checkbox" id="abre-menu" class="abre-menu" hidden>
   <nav class="menu" aria-label="Torres">
-    {% if cliente_modo %}
-    {# o Modo cliente (07/11/2026): quem é o cliente e a saída, no alto do menu lateral #}
-    <div class="modo-cliente-menu" title="Vendo como {{ cliente_modo.nome }}">
-      <p class="modo-cliente-rot"><i class="ph ph-eye" aria-hidden="true"></i><span>Modo cliente<b>{{ cliente_modo.nome }}</b></span></p>
-      <form method="post" action="{{ raiz }}/t/base/modo-cliente/sair">
+    {% if vista_cliente %}
+    {# o menu do cliente (08/11/2026, o mockup da Visão do cliente): quem é, o "só leitura", e o Comando primeiro. No Modo
+       cliente do administrador, o mesmo menu com o Sair (07/11/2026: "No menu lateral também tem que ter 'sair do modo
+       cliente'") #}
+    <div class="cli-menu-cab{% if vista_cliente.modo %} modo-cliente-menu{% endif %}" title="{{ vista_cliente.nome }}">
+      <p class="cli-menu-nome"><i class="ph ph-{{ 'eye' if vista_cliente.modo else 'buildings' }}" aria-hidden="true"></i><span><b>{{ vista_cliente.nome }}</b>{{ 'Modo cliente · só leitura' if vista_cliente.modo else 'Acesso de cliente · só leitura' }}</span></p>
+      {% if vista_cliente.modo %}<form method="post" action="{{ raiz }}/t/base/modo-cliente/sair">
         <input type="hidden" name="codigo" value="{{ codigo_casca }}">
         <button type="submit" class="item-inicio modo-cliente-sair" title="Sair do modo cliente"><i class="ph ph-sign-out" aria-hidden="true"></i><span>Sair do modo cliente</span></button>
-      </form>
+      </form>{% endif %}
     </div>
+    {% for x in vista_cliente.itens %}
+    {% if x.tipo == 'item' %}
+    <a class="item-inicio cli-menu-item" href="{{ raiz }}{{ x.url }}" {% if caminho == x.url or caminho in x.filhas %}aria-current="page"{% endif %} title="{{ x.nome }}">
+      <i class="ph ph-{{ x.icone }}"></i><span>{{ x.nome }}</span>
+    </a>
+    {% else %}
+    <details class="torre com-conteudo" data-torre="{{ x.id }}" {% if x.aberta %}open{% endif %}>
+      <summary title="{{ x.nome }}" data-primeira="{{ raiz }}{{ x.telas[0].url }}"><i class="ph ph-{{ x.icone }}"></i><span>{{ x.nome }}</span></summary>
+      <ul>{% for s in x.telas %}<li><a href="{{ raiz }}{{ s.url }}" class="com-conteudo" {% if caminho == s.url or caminho in s.filhas %}aria-current="page"{% endif %}>{{ s.nome }}</a></li>{% endfor %}</ul>
+    </details>
     {% endif %}
+    {% endfor %}
+    {% else %}
     <a class="item-inicio" href="{{ raiz }}/" {% if caminho == '/' %}aria-current="page"{% endif %} title="Início">
       <i class="ph ph-house"></i><span>Início</span>
     </a>
@@ -192,6 +206,7 @@
       </ul>
     </details>
     {% endfor %}
+    {% endif %}
   </nav>
 
 

@@ -722,3 +722,14 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .modo-cliente-sair{width:100%;border:0;background:transparent;cursor:pointer;margin:0;text-align:left}
 .menu-recolhido .modo-cliente-menu{padding:4px;border:0}
 .menu-recolhido .modo-cliente-rot{justify-content:center;margin:0 0 4px}
+
+/* o menu do cliente (08/11/2026, o mockup da Visão do cliente): quem é e o "só leitura" no alto */
+.cli-menu-cab{margin:0 0 10px;padding:6px 6px 10px;border-bottom:1px solid var(--linha)}
+.cli-menu-cab.modo-cliente-menu{padding:8px;border:1px solid var(--verde-a35)}
+.cli-menu-nome{display:flex;align-items:flex-start;gap:8px;margin:0 2px;font:500 11.5px/1.35 var(--font-sans);color:var(--mudo)}
+.cli-menu-nome i{font-size:16px;margin-top:1px;color:var(--verde-texto)}
+.cli-menu-nome span{display:flex;flex-direction:column}
+.cli-menu-nome b{color:var(--tinta);font-size:13.5px;font-weight:700}
+.cli-menu-cab .modo-cliente-sair{margin-top:6px}
+.menu-recolhido .cli-menu-nome span{display:none}
+.menu-recolhido .cli-menu-nome{justify-content:center}

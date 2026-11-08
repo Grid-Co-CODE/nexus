@@ -157,6 +157,12 @@ avulso"):** a 5ª aba, **Clientes** (`?aba=clientes`, `auth/clientes.py`). Decid
   cliente (`setor_telas.em_modo_cliente`, `cliente_da_sessao`), sem sino, e o alto do menu lateral mostra o cliente e o
   "Sair do modo cliente". Quem deixa de ser administrador sai do modo no próximo clique. No template da casca a variável é
   `cliente_modo` (a Visão do cliente passa o seu próprio `modo_cliente`, que venceria a do contexto).
+- **O que o cliente vê** (08/11/2026, o mockup da Visão do cliente que o Levi mandou: "a ideia é ter uma visão parecida
+  com essa para o cliente"): menu lateral próprio (`casca._vista_cliente`): no alto, o cliente e "Acesso de cliente · só
+  leitura" (no Modo cliente, "Modo cliente · só leitura" e o Sair); a Visão do cliente vira o item **Comando**, o
+  primeiro, e é onde o Início dele abre; torre com uma tela vira um item com o nome dela; sem o Início. Na Visão do
+  cliente, o cabeçalho "Comando · Síntese das suas usinas", "Bom dia/Boa tarde/Boa noite, <cliente>", "N usinas no
+  contrato" e "Atualizado às" (a hora do tempo real).
 - **Login:** "Sou cliente" na tela de entrar (`/entrar?cliente=1`), e-mail e senha, com as travas do Entrar
   (5 erradas por e-mail e rede, 20 por e-mail, 50 por IP). Prova: `tests/test_clientes_acesso.py`.
 

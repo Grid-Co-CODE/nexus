@@ -10,6 +10,15 @@
 {% macro numero(icone, titulo) %}<section class="vc-num"><p class="vc-num-t"><i class="ph ph-{{ icone }}" aria-hidden="true"></i>{{ titulo }}</p>{{ caller() }}</section>{% endmacro %}
 {% macro sem_leitura() %}<p class="vc-num-v vc-sem">sem leitura</p>{% endmacro %}
 <div class="campo-nativa">
+  {% if modo_cliente %}
+  {# o cabeçalho do próprio cliente (08/11/2026, o mockup: "Comando · Síntese das suas usinas", "Bom dia, Cliente") #}
+  <div class="cn-cab vc-cab-cliente">
+    <div><p class="gc-eyebrow">Comando · Síntese das suas usinas</p>
+      <h1 class="cn-titulo">{{ saudacao }}, {{ nome or 'cliente' }}</h1>
+      <p class="cn-pergunta">{% if sintese %}{{ sintese.total }} usina{{ 's' if sintese.total != 1 }} no contrato. {% endif %}Aparecem só as usinas deste contrato.</p></div>
+    {% if lido_tr %}<p class="vc-lido"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> Atualizado às {{ lido_tr[:5] }}</p>{% endif %}
+  </div>
+  {% else %}
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p>
       <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
@@ -29,8 +38,9 @@
           e a causa da falha antes da análise da Engenharia.</p>{% endif %}
         {% endcall %}
       </div>
-      <p class="cn-pergunta">{{ 'Como estão agora as suas usinas: o status, a performance do mês, os chamados na distribuidora, as OS e a próxima visita.' if modo_cliente else tela.pergunta }}</p></div>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
   </div>
+  {% endif %}
   {# o próprio cliente (07/11/2026) vê o aviso sem o detalhe técnico do erro, e não escolhe cliente: é o da sessão #}
   {% if erro_visao %}<div class="cn-erro" role="alert"><b>{{ 'Parte das informações não carregou agora. Tente de novo em instantes.' if modo_cliente else erro_visao ~ '.' }}</b></div>{% endif %}
 
@@ -52,11 +62,13 @@
     chamados na distribuidora, as OS e a próxima visita.</p>
   {% else %}{% set s = sintese %}{% set k = s.kpis %}
   {% for f, e in erros.items() %}<div class="cn-erro cn-aviso" role="status">Não consegui ler {{ fontes_nome.get(f, f) }}{% if not modo_cliente %} ({{ e }}){% endif %}: essa parte fica "sem leitura", o resto da tela vale.</div>{% endfor %}
+  {% if not modo_cliente %}
   <header class="vc-cab">
     <div><h2 class="vc-nome">{{ nome }}</h2>
       <p class="vc-onde">{{ s.total }} usina{{ 's' if s.total != 1 }} em operação</p></div>
     {% if lido_tr %}<p class="vc-lido"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> Tempo real de {{ lido_tr }}</p>{% endif %}
   </header>
+  {% endif %}
 
   <div class="vc-numeros">
     {% call numero('power', 'Status das usinas') %}
