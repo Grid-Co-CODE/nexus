@@ -107,3 +107,20 @@ def test_o_livro_da_apr_esta_no_catalogo_antes_da_primeira_gravacao():
     from nexus.hseq import apr as APR
     f = {x.id: x for x in C.FATOS}["apr"]
     assert f.livro == f"{APR.LIVRO} · {APR.ABA}" and f.area == "hseq"
+
+
+def test_sem_o_fato_das_os_a_lista_diz_que_nao_leu_e_nao_mente_que_esta_vazia(banco, logado, monkeypatch):
+    """Achado 1 da auditoria de 08/11/2026: com a leitura do `fato_tarefa_os` falhando, o `except: pass` deixava as datas
+    de criação vazias, a conta descartava TODA OS e a tela dizia "nenhuma OS sem APR" (e a guardava por 5 min)."""
+    _aba(banco, "apr_app_campo", "APR", [_apr("16866", "2026-10-20")])
+    _os_800_criada(banco)
+    visao.limpar()
+    original = visao._livro
+
+    def _livro(nome, aba=None):
+        if nome == "nexus_os":
+            raise RuntimeError("API fora do ar")
+        return original(nome, aba)
+    monkeypatch.setattr(visao, "_livro", _livro)
+    html = logado.get("/t/hseq/apr-pt?aba=sem&tipo=apr").get_data(as_text=True)
+    assert "Nenhuma OS fechada pelo App sem APR" not in html and 'class="cn-erro" role="alert"' in html

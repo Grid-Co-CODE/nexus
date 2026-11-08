@@ -1067,7 +1067,8 @@ def pagina_pt():
     tipo, sem, livro_apr, sem_todas = "", [], True, []
     if aba == "sem":
         from ...hseq import apr as APR
-        da = APR.sem_apr_ou_pt().dados or {}
+        lida = APR.sem_apr_ou_pt()
+        da = lida.dados or {}
         livro_apr = bool(da.get("livro_existe"))
         tipo = "apr" if request.args.get("tipo") == "apr" else "pt"
         sem_todas = da.get("sem_apr" if tipo == "apr" else "sem_pt") or []
@@ -1077,9 +1078,12 @@ def pagina_pt():
     pag = min(_pagina(), n_pag)
     fonte = {"historico": d.get("historico"), "sem": sem_todas}.get(aba, d.get("aguardando"))
     torre, tela = _onde_pt()
+    # a fonte da aba Sem APR ou PT que falhou diz qual (achado 1 da auditoria de 08/11/2026: sem o aviso a tabela vazia
+    # parecia "nenhuma OS sem APR")
+    erro_sem = lida.erro if aba == "sem" else ""
     return render_template("campo/pt.html", **_comum(
         "pt", leitura, torre=torre, tela=tela, titulo="Permissões de trabalho e Análise Preliminar de Risco",
-        aviso=session.pop("pt_aviso", ""), gravada=session.pop("pt_gravada", ""),
+        aviso=session.pop("pt_aviso", "") or (f"Não li a aba Sem APR ou PT: {erro_sem}." if erro_sem else ""), gravada=session.pop("pt_gravada", ""),
         aba=aba, modo=modo, aguardando=aguardando, n_hist=len(historico), contagem_hist=contagem, sit=sit,
         tipo=tipo, sem=sem[(pag - 1) * POR_PAGINA_PT:pag * POR_PAGINA_PT], n_sem=len(sem), livro_apr=livro_apr,
         historico=historico[(pag - 1) * POR_PAGINA_PT:pag * POR_PAGINA_PT], pag=pag, n_pag=n_pag,

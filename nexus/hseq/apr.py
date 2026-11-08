@@ -81,14 +81,13 @@ def sem_apr_ou_pt() -> leitura.Leitura:
         # quando a OS foi criada no Fracttal (Levi, 26/10/2026: "quero uma coluna de data de criação da OS"): o
         # `fato_tarefa_os` (as OS em processo e em verificação, que é onde a OS fica depois de o App fechar a tarefa);
         # a OS já finalizada fica sem (medido em 26/10: 50 das 52)
+        # sem o fato das OS o erro sobe e a tela diz qual fonte falhou: engolir aqui deixava as datas vazias, a conta
+        # descartava TODA OS e a tela dizia "nenhuma OS sem APR" (achado 1 da auditoria de 08/11/2026)
         criada_em = {}
-        try:
-            for t in visao._livro("nexus_os", "fato_tarefa_os"):
-                o, d = _txt(t.get("os")), D._id(t.get("data_id_criacao"))
-                if o and d:
-                    criada_em[o] = min(criada_em.get(o, d), d)
-        except Exception:       # noqa: BLE001 — sem o fato das OS, a coluna fica vazia e a lista segue
-            pass
+        for t in visao._livro("nexus_os", "fato_tarefa_os"):
+            o, d = _txt(t.get("os")), D._id(t.get("data_id_criacao"))
+            if o and d:
+                criada_em[o] = min(criada_em.get(o, d), d)
         grupos = {}
         f = visao._fato("fechamento", b)
         # a "Hora do celular" (quando o técnico fez) do livro cru, junto ao fato pela chave dele
