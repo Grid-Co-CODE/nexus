@@ -140,6 +140,13 @@ tela"). Como criar a tela de uma torre (a rota, o template, o menu): `nexus/torr
 - **Bloco que recolhe:** `<details>`/`<summary>` sem JavaScript, com a seta desenhada no CSS (duas bordas giradas) e o
   marcador do navegador escondido. Exemplos: o dia das Atualizações (`.atu-dia`, a seta à esquerda e o total na ponta
   direita) e a Sugestão (`.sug-dobra`).
+- **O pedido de dados** `nexusPedir(caminho, opcoes)` (`nexus/templates/_pedir_js.html`, no `<head>` do `base.html`,
+  08/11/2026): o endereço pelo `nexusRota`, a sessão encerrada leva ao login, o "entre pelo Fracttal" volta como
+  `e.login`, e o erro do servidor vira a frase dele (`e.message`). Tela nova pede por ele; as antigas mudam aos poucos
+  (eram 61 `fetch` em 32 templates, e 13 tratavam a sessão vencida cada um do seu jeito).
+- **JavaScript da tela em arquivo:** o JS grande vai em `nexus/static/<area>-<tela>.js` (`<script src>` no mesmo ponto
+  da página), com o dado do servidor num `<script type="application/json">`; dentro do HTML só o pouco que precisa de
+  Jinja. Exemplos: `pcm-quadro.js`, `cadastro-equipamentos.js`.
 - **Ícones:** Phosphor regular, `<i class="ph ph-<nome>">` (a folha vem do unpkg no `base.html`). No topo, o ícone do
   tema é desenhado no CSS, sem `<svg>`: as telas com gráfico procuram o primeiro `<svg>` da página.
 

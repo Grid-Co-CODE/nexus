@@ -1,0 +1,27 @@
+{# O pedido de dados de toda tela (08/11/2026, o mapa do desembaraço: 61 fetch em 32 templates, e 13 arquivos tratavam a
+   sessão vencida cada um do seu jeito). Só JavaScript: entra no <script> do <head> do base.html, depois do nexusRota
+   (_raiz_js.html) e do nexusEntrarDeNovo (_entrar_de_novo_js.html). Tela nova pede por aqui; as antigas mudam aos poucos.
+
+   nexusPedir(caminho, opcoes) -> Promise do JSON da resposta:
+   - o caminho sai do nexusRota (o prefixo em que o Nexus roda), com o cookie da sessão;
+   - 401 com "sessao_encerrada" (o portão, auth.encerrar): a janela vai ao login e volta para a página aberta;
+   - outro 401 com "login" (falta entrar pelo Fracttal, o OS Creator): Error com e.login = true e a frase do servidor;
+   - resposta não ok: Error com a frase do servidor ("erro" ou "mensagem") e e.status; JSON que não vem: null. #}
+    window.nexusPedir = function (caminho, opcoes) {
+      var rota = typeof nexusRota === "function" ? nexusRota : function (c) { return c; };
+      var o = Object.assign({credentials: "same-origin", headers: {"Accept": "application/json"}}, opcoes || {});
+      return fetch(rota(caminho), o).then(function (r) {
+        return r.json().catch(function () { return null; }).then(function (d) {
+          if (r.ok) return d;
+          var msg = (d && (d.erro || d.mensagem)) || ("O Nexus respondeu " + r.status + ".");
+          var e = new Error(msg);
+          e.status = r.status;
+          if (r.status === 401 && d && d.sessao_encerrada && typeof window.nexusEntrarDeNovo === "function") {
+            window.nexusEntrarDeNovo(d.entrar);
+          } else if (r.status === 401 && d && d.login) {
+            e.login = true;
+          }
+          throw e;
+        });
+      });
+    };

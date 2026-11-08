@@ -301,10 +301,14 @@ def test_a_tela_mostra_a_lista_e_os_dois_passos_sem_fracttal_e_sem_ligar_nada_so
     for passo in ('id="passo-chave"', 'id="passo-estrutura"', 'id="eq-dados"'):
         assert passo in html
     assert 'id="passo-fracttal"' not in html and "ativos_url" not in html.split('id="eq-dados"')[0]
-    # a tabela nas colunas da aba Equipamentos, e o editor não pede os ativos do Fracttal
+    # a tabela nas colunas da aba Equipamentos, e o editor não pede os ativos do Fracttal. O editor mora em
+    # static/cadastro-equipamentos.js desde 08/11/2026 (saiu de dentro do HTML, sem mudar): a página o carrega
+    from pathlib import Path
+    assert "/static/cadastro-equipamentos.js" in html
+    pagina = html + (Path(__file__).resolve().parents[1] / "nexus/static/cadastro-equipamentos.js").read_text(encoding="utf-8")
     for col in ("Usina Supervisório", "Equipamento Supervisório", "Equipamento Parente", "Strings Ativas"):
-        assert col in html
-    assert "pedirAtivos" not in html and "Ativo no Fracttal" not in html
+        assert col in pagina
+    assert "pedirAtivos" not in pagina and "Ativo no Fracttal" not in pagina
     # as chaves da aba com motivo vêm primeiro, com o porquê, e nenhuma vem escolhida
     sugeridas = html.split('label="Com motivo para esta usina"')[1].split("</optgroup>")[0]
     assert "Brodowski 1 (90) — nome parecido" in sugeridas and " selected" not in sugeridas
