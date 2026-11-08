@@ -7,6 +7,7 @@ import pytest
 from pg_falso import ApiPGFalsa
 
 from nexus.campo import chamados_acompanhamento as P
+from nexus.campo import tarefas_os
 from nexus.dados import fato_chamado as F
 from nexus.dados import fatos as D
 
@@ -76,8 +77,16 @@ class _Fracttal:
     def __call__(self, path):
         self.pedidos.append(path)
         st = int(path.split("id_status_work_order=")[1].split("&")[0])
+        lista = self.por_status.get(st, [])
+        if "start=" not in path:        # o pedido do total (limit=1), que a leitura das tarefas faz antes das páginas
+            return {"success": True, "total": len(lista), "data": lista[:1]}
         ini = int(path.split("start=")[1])
-        return {"data": self.por_status.get(st, [])[ini:ini + 100]}
+        return {"success": True, "total": len(lista), "data": lista[ini:ini + 100]}
+
+
+@pytest.fixture(autouse=True)
+def _sem_pausa(monkeypatch):
+    monkeypatch.setattr(tarefas_os, "PAUSA_S", 0)
 
 
 @pytest.fixture
@@ -127,8 +136,22 @@ def test_fracttal_vazio_nao_apaga_o_livro_e_sem_token_nao_grava(app, banco):
         assert "erro" in P.publicar(app.config, banco, ler=_Fracttal({}), agora=AGORA)
 
 
+def test_leitura_pela_metade_nao_troca_o_livro(app, banco):
+    """Achado 1 da auditoria de 08/11/2026: uma página sem `data` (success false) no meio da leitura virava "fim da
+    lista", e o livro era trocado por menos chamados do que o Fracttal tem."""
+    muitas = [_w(20000 + i, 1, "2026-10-10T13:00:00+00:00") for i in range(150)]
+    inteira = _Fracttal({1: muitas})
+
+    def ler(path):
+        if "start=100" in path:
+            return {"success": False}
+        return inteira(path)
+    with app.app_context():
+        rel = P.publicar(app.config, banco, ler=ler, agora=AGORA)
+    assert "erro" in rel and banco.syncs == 0
+
+
 def test_as_concluidas_param_na_primeira_pagina_mais_velha_que_90_dias(monkeypatch):
-    monkeypatch.setattr(P, "PAUSA_S", 0)
     velhas = [_w(10000 + i, 3, "2026-05-01T12:00:00+00:00", fim="2026-05-02T12:00:00+00:00") for i in range(100)]
     ler = _Fracttal({3: velhas * 3})
     P.ler_fracttal(ler, HOJE)

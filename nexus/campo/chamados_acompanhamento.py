@@ -16,7 +16,6 @@ máquina. O Fracttal que devolve 0 chamados com o livro cheio não apaga o livro
 """
 import logging
 import threading
-import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
@@ -24,14 +23,13 @@ from urllib.parse import quote
 from ..dados import fato_chamado as F
 from ..dados import fatos as D
 from ..dados import livros
+from . import tarefas_os
 
 INTERVALO_MIN = 50
 # as observações da equipe de chamados (o OS Creator grava: `chamados_obs_store`), de onde sai o status trocado na tela
 OBS_LIVRO, OBS_ABA = "os_creator", "chamados_obs"
 PRIMEIRA_S = 120            # a 1ª volta depois de subir (o boot já lê o banco para as telas)
 MINUTO_DA_HORA = 50         # depois da carga de dados (:40)
-PAGINAS_MAX = 40
-PAUSA_S = 1.0               # 1 pedido por segundo, como as outras leituras do Fracttal do Nexus
 _BRT = timezone(timedelta(hours=-3))
 _LACO = {"thread": None, "parar": threading.Event(), "ultimo": None}
 log = logging.getLogger("nexus.campo")
@@ -42,32 +40,21 @@ def _base(config) -> str:
     return (config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
 
 
-def _paginas(ler, path_base: str, para=None) -> list:
-    out, inicio = [], 0
-    for n in range(PAGINAS_MAX):
-        if n:
-            time.sleep(PAUSA_S)
-        r = ler(f"{path_base}&limit=100&start={inicio}")
-        pagina = (r.get("data") if isinstance(r, dict) else r) or []
-        out += pagina
-        if len(pagina) < 100 or (para and para(pagina)):
-            break
-        inicio += 100
-    return out
-
-
 def ler_fracttal(ler, hoje) -> list[dict]:
-    """As linhas do REST que podem ser OS de acompanhamento: a tarefa Administrativa em processo (1) e em verificação
+    """(Paginação de `tarefas_os._paginas`, com o total, a página repetida e a recusa: achado 1 da auditoria de 08/11/2026,
+    uma página sem `data` no meio virava "fim da lista" e o livro era trocado por menos chamados.)
+    As linhas do REST que podem ser OS de acompanhamento: a tarefa Administrativa em processo (1) e em verificação
     (2), todas; a concluída (3), da data de fim mais nova até 90 dias atrás. Quem separa a OS 3 é `fato_chamado`."""
     base = f"work_orders?tasks_log_task_type_main={quote(F.TIPO_TAREFA)}"
     rows = []
     for st in (1, 2):
-        rows += _paginas(ler, f"{base}&id_status_work_order={st}&sort=creation_date:desc")
+        rows += tarefas_os._paginas(ler, f"{base}&id_status_work_order={st}&sort=creation_date:desc")
     piso = (hoje - timedelta(days=F.DIAS_CONCLUIDOS)).isoformat()
 
     def passou(pagina):
         return any(str(w.get("final_date") or "")[:10] < piso for w in pagina if w.get("final_date"))
-    rows += _paginas(ler, f"{base}&id_status_work_order=3&sort=final_date:desc", passou)
+    rows += tarefas_os._paginas(ler, f"{base}&id_status_work_order=3&sort=final_date:desc", passou,
+                                com_total=False, total_no_fim=True)
     return rows
 
 
@@ -97,7 +84,10 @@ def publicar(config, sessao=None, *, ler=None, agora=None, forcar=False) -> dict
         from . import fracttal
         ler = fracttal.ler
     hoje = agora.astimezone(_BRT).date()
-    rows = ler_fracttal(ler, hoje)
+    try:
+        rows = ler_fracttal(ler, hoje)
+    except tarefas_os.LeituraIncompleta as e:     # leitura pela metade não troca o livro: ele fica como está
+        return {"erro": f"leitura incompleta do Fracttal: {e}"[:300]}
     cad = {aba: livros.ler(base, s, "cadastro_nexus", aba) for aba in ("usinas", "de_para", "equipes")}
     lig = D.Ligador(cad["usinas"], cad["de_para"], cad["equipes"], {})
     equip = {D._txt(r.get("codigo")): D._id(r.get("equipamento_id"))
