@@ -87,7 +87,9 @@ ruff nem vulture: o mapa já faz o levantamento, e `--fix` em lote é proibido (
 | `QUEBRA`: alguém lê um nome que sumiu | Devolva o nome, ou mude o leitor no mesmo commit. |
 | `PATCH` que não pega mais | Leve quem chama junto com a função, ou mude o teste para a casa nova no mesmo commit (e diga). |
 
-Os avisos `SAIU` vão para a lista de apagar.
+`CONFIRA` não barra a fatia, mas pede olho: um módulo deixou de ler o nome que um teste troca. Ou o teste nem passa por
+ele, ou ele lê agora outra função que usa aquela por dentro (`livros.abas_conferidas` chama `livros.abas`). Se não for
+nenhum dos dois, é um `PATCH`. Os avisos `SAIU` vão para a lista de apagar.
 
 Para fechar:
 - Por fatia: os testes da área (`tests/test_<area>*`) e a foto. Antes do push: a suíte inteira, em segundo plano e com

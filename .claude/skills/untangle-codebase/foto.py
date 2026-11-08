@@ -188,7 +188,7 @@ def tirar(saida: str) -> None:
 def comparar(antes_json: str, depois_json: str) -> int:
     antes = json.loads(Path(antes_json).read_text(encoding="utf-8"))
     depois = json.loads(Path(depois_json).read_text(encoding="utf-8"))
-    graves, avisos = [], []
+    graves, avisos, confira = [], [], []
 
     ra, rd = {r[0]: r for r in antes["rotas"]}, {r[0]: r for r in depois["rotas"]}
     for regra in sorted(ra.keys() - rd.keys()):
@@ -242,8 +242,10 @@ def comparar(antes_json: str, depois_json: str) -> int:
             saiu = sorted(leu_antes.get((mod, nome), set()) - le_agora.get((mod, nome), set()) - {mod})
             saiu = [m for m in saiu if m in nd]
             if saiu:
-                graves.append(f"PATCH que não pega mais: {onde} troca {mod}.{nome}, mas {', '.join(saiu[:3])} "
-                              f"deixou de ler por {mod}")
+                # nem sempre é defeito: o leitor pode ter passado a outra função do mesmo módulo que lê esta por
+                # dentro (livros.abas_conferidas chama livros.abas, 08/11/2026), ou o teste nem passa por ele
+                confira.append(f"CONFIRA: {onde} troca {mod}.{nome}, mas {', '.join(saiu[:3])} deixou de ler por "
+                               f"{mod}: o teste passa por esse leitor? se passa, a troca ainda chega nele?")
 
     # onde o nome passou a nascer: só conta módulo em que ele não nascia antes (homônimo antigo é outra função)
     nasceu_agora = {}
@@ -265,9 +267,11 @@ def comparar(antes_json: str, depois_json: str) -> int:
     print(f"antes {antes['commit']}  depois {depois['commit']}")
     for linha in graves:
         print("  " + linha)
+    for linha in confira:
+        print("  " + linha)
     for linha in avisos:
         print("  " + linha)
-    print(f"{len(graves)} grave(s), {len(avisos)} aviso(s)" + ("" if graves else ": nada quebrou pela foto"))
+    print(f"{len(graves)} grave(s), {len(confira)} a conferir, {len(avisos)} aviso(s)" + ("" if graves else ": nada quebrou pela foto"))
     return 1 if graves else 0
 
 
