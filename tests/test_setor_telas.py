@@ -354,7 +354,7 @@ def test_o_livro_no_catalogo_da_governanca():
 
 
 def test_acessos_enxuta_07_11(app, setores, logado):
-    """07/11/2026, Levi: cada torre mostra 5 telas e o resto recolhido ("padronizar o tamanho"); sem o aviso, a pré-carga
+    """07/11/2026, Levi: cada torre recolhida, com o "Expandir todas" ("padronizar o tamanho"); sem o aviso, a pré-carga
     e os números; os administradores recolhidos com a contagem; o registro e quem entrou na aba Histórico e registros,
     recolhidos; "Remover" no lugar de "Tirar"."""
     html = logado.get(URL).get_data(as_text=True)
@@ -364,15 +364,14 @@ def test_acessos_enxuta_07_11(app, setores, logado):
     for t in app.extensions["nexus_torres"]:
         caixa = matriz[matriz.index(f'<fieldset class="ace-torre" data-torre="{t.id}"'):]
         caixa = caixa[:caixa.index("</fieldset>")]
+        # depois: "recolha todos os setores mesmo... pode ter um botão de expandir todos também!"
         visiveis = caixa.split('<details class="ace-mais">')[0]
-        assert visiveis.count("<li>") == min(5, len(t.telas))
-        assert ('<details class="ace-mais">' in caixa) == (len(t.telas) > 5)
-        if len(t.telas) > 5:
-            assert f"Mais {len(t.telas) - 5} tela" in caixa and caixa.count("<li>") == len(t.telas)
+        assert visiveis.count("<li>") == 0 and '<details class="ace-mais">' in caixa
+        assert f"Ver {len(t.telas)} tela" in caixa and caixa.count("<li") == len(t.telas)
     adm = html[html.index('aria-labelledby="ace-admins"') - 60:]
     assert adm.startswith('<details class="cad-secao ace-secao ace-recolhe"', adm.index("<details")) and " open" not in adm[:120]
     assert 'class="ace-recolhe-n"' in adm[:400] and "Registro de mudanças" not in html and "Tirar" not in html
-    assert 'href="/t/base/acessos?aba=historico"' in html
+    assert 'href="/t/base/acessos?aba=historico"' in html and "data-expandir" in html
     hist = logado.get(URL + "?aba=historico").get_data(as_text=True)
     assert "Registro de mudanças" in hist and "Quem entrou nos últimos 30 dias" in hist
     assert hist.count('<details class="cad-secao ace-secao ace-recolhe"') == 2 and 'id="ace-matriz"' not in hist

@@ -94,6 +94,7 @@
         {% endif %}
         <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-marcar="tudo">Marcar tudo</button>
         <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-marcar="nada">Limpar</button>
+        <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-expandir aria-pressed="false"><i class="ph ph-arrows-out-simple"></i> <span>Expandir todas</span></button>
       </div>
     </div>
     <div class="ace-torres">
@@ -103,15 +104,13 @@
           <label><input type="checkbox" data-toda {% if t.marcadas == t.telas|length %}checked{% endif %} aria-label="Todas as telas de {{ t.nome }}"><i class="ph ph-{{ t.icone }}" aria-hidden="true"></i> {{ t.nome }}</label>
           <span class="ace-qtd"><span data-conta-torre>{{ t.marcadas }}</span> de {{ t.telas|length }}</span>
         </legend>
-        {# 07/11/2026 (Levi: "a limitação de visualização de 5 [...] por vez, o resto fica recolhido, podendo ser
-           expandido, a ideia é padronizar o tamanho"): as 5 primeiras à vista, o resto num "Mais N". As caixas recolhidas
-           seguem no formulário e na conta #}
-        <ul>{% for s in t.telas[:5] %}{{ item(s) }}{% endfor %}</ul>
-        {% if t.telas|length > 5 %}
-        <details class="ace-mais"><summary>Mais {{ t.telas|length - 5 }} {{ 'tela' if t.telas|length - 5 == 1 else 'telas' }}</summary>
-          <ul>{% for s in t.telas[5:] %}{{ item(s) }}{% endfor %}</ul>
+        {# 07/11/2026 (Levi: "a limitação de visualização [...] o resto fica recolhido [...] a ideia é padronizar o
+           tamanho"; e depois: "recolha todos os setores mesmo... pode ter um botão de expandir todos também!"): cada torre
+           fechada, só o nome e a conta; abre ao clicar, e o "Expandir todas" abre todas. As caixas recolhidas seguem no
+           formulário e na conta #}
+        <details class="ace-mais"><summary>Ver {{ t.telas|length }} {{ 'tela' if t.telas|length == 1 else 'telas' }}</summary>
+          <ul>{% for s in t.telas %}{{ item(s) }}{% endfor %}</ul>
         </details>
-        {% endif %}
       </fieldset>
       {% endfor %}
     </div>
@@ -277,6 +276,23 @@
     copiar.value = '';
     atualizar();
   });
+  // expandir e recolher todas as torres de uma vez (07/11/2026)
+  var expandir = form.querySelector('[data-expandir]');
+  var dobras = Array.prototype.slice.call(form.querySelectorAll('details.ace-mais'));
+  function rotulo() {
+    var abertas = dobras.every(function (d) { return d.open; });
+    expandir.setAttribute('aria-pressed', abertas ? 'true' : 'false');
+    expandir.querySelector('span').textContent = abertas ? 'Recolher todas' : 'Expandir todas';
+    expandir.querySelector('i').className = abertas ? 'ph ph-arrows-in-simple' : 'ph ph-arrows-out-simple';
+  }
+  if (expandir) {
+    expandir.addEventListener('click', function () {
+      var abrir = !dobras.every(function (d) { return d.open; });
+      dobras.forEach(function (d) { d.open = abrir; });
+      rotulo();
+    });
+    dobras.forEach(function (d) { d.addEventListener('toggle', rotulo); });
+  }
   form.addEventListener('submit', function () { salvando = true; });
   // trocar de setor (ou sair) com marcas não salvas pergunta antes
   window.addEventListener('beforeunload', function (ev) {
