@@ -700,8 +700,11 @@ def instalar_portao(app) -> None:
                                                                 session.get("cliente_id")):
                 return encerrar("cliente_fim", _destino_do_pedido())
             return setor_telas.portao_cliente()
-        if request.endpoint == "auth.sair" or not com_pessoa():
+        if request.endpoint == "auth.sair":
             return None
+        if not com_pessoa():
+            # a senha de administrador no Modo cliente (07/11/2026) vê o que o cliente veria
+            return setor_telas.portao_cliente() if setor_telas.em_modo_cliente() else None
         # a sessão do Fracttal acaba junto com a dele; a da Microsoft, nas 12 h do login (o Fracttal fica só no OS
         # Creator, que pede o login dele de novo quando precisa, como para a senha de administrador)
         if via_fracttal() and microsoft.ligado(current_app.config):
@@ -713,8 +716,12 @@ def instalar_portao(app) -> None:
         if motivo:
             return encerrar(motivo, _destino_do_pedido())
         _admin_em_dia()
+        if not session.get("admin"):
+            session.pop("modo_cliente", None)       # perdeu o administrador: sai do Modo cliente junto
         if resposta is not None:
             return resposta
+        if setor_telas.em_modo_cliente():
+            return setor_telas.portao_cliente()
         # o que o setor da pessoa vê (Base → Acessos, 12/10/2026): sem setor, só a mensagem; tela fora do setor, 403
         return setor_telas.portao()
 

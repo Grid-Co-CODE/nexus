@@ -7,7 +7,7 @@ dele. Cada fonte que não responde fica "sem leitura" na tela, com o aviso, e o 
 import logging
 from datetime import timedelta
 
-from flask import current_app, render_template, request, session
+from flask import current_app, render_template, request, session  # noqa: F401  (session: o modo do cliente)
 
 from ...campo import responsaveis as campo_resp
 from ...campo import visao
@@ -82,9 +82,11 @@ def cliente():
     grupos = VC.por_cliente(d.get("usinas") or [], b) if b else {}
     # o próprio cliente (07/11/2026, o acesso dos clientes, `auth/clientes.py`): o cliente vem da SESSÃO, nunca do
     # endereço (o ?cliente= de outro é ignorado), e não há escolha
-    modo_cliente = session.get("via") == "cliente"
+    # (e o administrador no Modo cliente, 07/11/2026: `setor_telas.cliente_da_sessao`)
+    from ...auth import setor_telas
+    modo_cliente = session.get("via") == "cliente" or setor_telas.em_modo_cliente()
     opcoes = [] if modo_cliente else (VC.opcoes_de_cliente(grupos, b.nome_cliente) if b else [])
-    cid = D._id(session.get("cliente_id") if modo_cliente else request.args.get("cliente"))
+    cid = D._id(setor_telas.cliente_da_sessao() if modo_cliente else request.args.get("cliente"))
     if cid not in grupos:
         cid = None
     sintese, erros, ts, sel = None, {}, "", None

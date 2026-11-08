@@ -28,7 +28,9 @@ def dados(app, tmp_path):
 
 
 def _codigo(c, url=URL + "?aba=clientes"):
-    return re.search(r'name="codigo" value="([^"]+)"', c.get(url).get_data(as_text=True)).group(1)
+    # o da tela (dentro do <main>), não o do card do Modo cliente da casca
+    html = c.get(url).get_data(as_text=True)
+    return re.search(r'name="codigo" value="([^"]+)"', html.split("<main", 1)[1]).group(1)
 
 
 def _token(link: str) -> str:
@@ -138,3 +140,43 @@ def test_a_tela_de_entrar_oferece_o_acesso_de_cliente(cliente):
     pag = cliente.get("/entrar?cliente=1").get_data(as_text=True)
     assert 'name="cliente_email"' in pag and 'name="cliente_senha"' in pag
     assert "não vale mais" in cliente.get("/entrar?convite=inventado").get_data(as_text=True)
+
+
+def test_o_modo_cliente_do_administrador(app, dados, cliente_tela, logado):
+    """07/11/2026, Levi: no menu do nome, "Modo Cliente" abre um card (fundo desfocado) para escolher o cliente; o
+    administrador vê o Nexus como ele veria; no menu lateral, "Sair do modo cliente"."""
+    with app.test_request_context():
+        ST.gravar(SID.CLIENTES, ["campo/cliente"], ST.telas_do_cliente_possiveis(), dados, "http://pg.falso",
+                  app.extensions["nexus_dados_sessao"], "admin@exemplo.test")
+    ST.limpar()
+    html = logado.get("/t/base/acessos").get_data(as_text=True)
+    assert "data-abre-modo-cliente" in html and 'id="modo-cliente-card"' in html and "Sair do modo cliente" not in html
+    lista = logado.get("/t/base/modo-cliente/clientes").get_json()
+    assert {"id": 1, "nome": "Thopen", "usinas": 2} in lista["clientes"]
+    codigo = re.search(r'name="codigo" value="([^"]+)"', html.split('id="modo-cliente-card"', 1)[1]).group(1)
+    assert logado.post("/t/base/modo-cliente", data={"codigo": "errado", "cliente_id": "1"}).status_code == 403
+    assert logado.post("/t/base/modo-cliente", data={"codigo": codigo, "cliente_id": "999"}).status_code == 400
+    assert logado.post("/t/base/modo-cliente", data={"codigo": codigo, "cliente_id": "1"}).status_code == 303
+    # agora ele vê como o cliente: o Início leva à tela dele, o cliente é o do modo, o resto fecha, sem sino
+    assert logado.get("/").headers["Location"].endswith("/t/campo/cliente")
+    pag = logado.get("/t/campo/cliente?cliente=2").get_data(as_text=True)
+    assert '<h2 class="vc-nome">Thopen</h2>' in pag and 'id="vc-cliente"' not in pag and 'class="sino-topo"' not in pag
+    menu = pag.split('<nav class="menu"', 1)[1].split("</nav>", 1)[0]
+    assert "Modo cliente<b>Thopen</b>" in menu and "Sair do modo cliente" in menu
+    assert 'id="modo-cliente-card"' not in pag
+    assert logado.get("/t/base/acessos").status_code == 403 and logado.get("/t/comando/insights").status_code == 403
+    # sai pelo menu lateral e volta ao Nexus inteiro
+    assert logado.post("/t/base/modo-cliente/sair", data={"codigo": codigo}).status_code == 303
+    assert logado.get("/t/base/acessos").status_code == 200
+
+
+def test_quem_nao_e_administrador_nao_entra_no_modo(app, dados, cliente_tela):
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s.update(logado=True, admin=False, usuario={"email": "pessoa@exemplo.test", "nome": "Pessoa"}, casca_codigo="x")
+    assert c.post("/t/base/modo-cliente", data={"codigo": "x", "cliente_id": "1"}).status_code == 403
+    assert c.get("/t/base/modo-cliente/clientes").status_code == 403
+    with c.session_transaction() as s:
+        s["modo_cliente"] = {"id": 1, "nome": "Thopen"}               # forjado sem ser administrador: não vale
+        assert "modo_cliente" in s
+    assert "Sair do modo cliente" not in c.get("/").get_data(as_text=True)

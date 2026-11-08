@@ -153,6 +153,9 @@
       </form>
       {# a Paleta Nexus (04/11/2026): o escuro ao lado do claro, só para administradores #}
       {% if session.admin %}<a class="gc-btn gc-btn--ui gc-btn--fantasma conta-paleta" href="{{ raiz }}/t/base/paleta"><i class="ph ph-palette" aria-hidden="true"></i><span>Paleta Nexus</span></a>{% endif %}
+      {# o Modo cliente (07/11/2026): o administrador vê o Nexus como o cliente escolhido no card #}
+      {% if session.admin and not cliente_modo %}<button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma conta-modo-cliente" data-abre-modo-cliente><i class="ph ph-eye" aria-hidden="true"></i><span>Modo cliente</span></button>
+      {% elif cliente_modo %}<form method="post" action="{{ raiz }}/t/base/modo-cliente/sair" class="conta-modo-form"><input type="hidden" name="codigo" value="{{ codigo_casca }}"><button type="submit" class="gc-btn gc-btn--ui gc-btn--fantasma conta-modo-cliente"><i class="ph ph-eye-slash" aria-hidden="true"></i><span>Sair do modo cliente</span></button></form>{% endif %}
       <a class="gc-btn gc-btn--ui gc-btn--fantasma sair" href="{{ raiz }}/sair" aria-label="Sair"><i class="ph ph-sign-out"></i><span class="rotulo-sair">Sair</span></a>
     </div>
   </details>
@@ -162,6 +165,16 @@
   {# No celular o menu fica fechado atrás do botão Menu; sem JS, via checkbox. #}
   <input type="checkbox" id="abre-menu" class="abre-menu" hidden>
   <nav class="menu" aria-label="Torres">
+    {% if cliente_modo %}
+    {# o Modo cliente (07/11/2026): quem é o cliente e a saída, no alto do menu lateral #}
+    <div class="modo-cliente-menu" title="Vendo como {{ cliente_modo.nome }}">
+      <p class="modo-cliente-rot"><i class="ph ph-eye" aria-hidden="true"></i><span>Modo cliente<b>{{ cliente_modo.nome }}</b></span></p>
+      <form method="post" action="{{ raiz }}/t/base/modo-cliente/sair">
+        <input type="hidden" name="codigo" value="{{ codigo_casca }}">
+        <button type="submit" class="item-inicio modo-cliente-sair" title="Sair do modo cliente"><i class="ph ph-sign-out" aria-hidden="true"></i><span>Sair do modo cliente</span></button>
+      </form>
+    </div>
+    {% endif %}
     <a class="item-inicio" href="{{ raiz }}/" {% if caminho == '/' %}aria-current="page"{% endif %} title="Início">
       <i class="ph ph-house"></i><span>Início</span>
     </a>
@@ -181,9 +194,61 @@
     {% endfor %}
   </nav>
 
+
   <main class="conteudo {% block classe_conteudo %}{% endblock %}">
     {% block conteudo %}{% endblock %}
   </main>
+
+  {% if session.admin and not cliente_modo %}
+  {# o card do Modo cliente (07/11/2026): na frente, com o fundo desfocado; a lista vem do cadastro quando ele abre #}
+  <dialog class="modo-cliente-card" id="modo-cliente-card" aria-labelledby="modo-cliente-titulo" data-lista="{{ raiz }}/t/base/modo-cliente/clientes">
+    <form method="post" action="{{ raiz }}/t/base/modo-cliente">
+      <input type="hidden" name="codigo" value="{{ codigo_casca }}">
+      <p class="gc-eyebrow">Administradores</p>
+      <h2 id="modo-cliente-titulo">Modo cliente</h2>
+      <p class="mudo">Veja o Nexus como o cliente escolhido vê: só as telas liberadas para Clientes, com as usinas dele.</p>
+      <label class="gc-rotulo" for="modo-cliente-escolha">Cliente</label>
+      <select id="modo-cliente-escolha" name="cliente_id" class="gc-campo" required><option value="">Carregando…</option></select>
+      <p class="gc-ajuda gc-ajuda--erro" data-erro hidden></p>
+      <div class="modo-cliente-botoes">
+        <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-fecha>Cancelar</button>
+        <button type="submit" class="gc-btn gc-btn--ui gc-btn--primario"><i class="ph ph-eye" aria-hidden="true"></i> Ver como este cliente</button>
+      </div>
+    </form>
+  </dialog>
+  <script>
+  (function () {
+    var card = document.getElementById("modo-cliente-card");
+    if (!card || !card.showModal) return;
+    var escolha = card.querySelector("select"), erro = card.querySelector("[data-erro]"), lido = false;
+    function carregar() {
+      if (lido) return;
+      fetch(card.getAttribute("data-lista"), {credentials: "same-origin", headers: {Accept: "application/json"}})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          lido = d.ok;
+          escolha.innerHTML = '<option value="">Escolha o cliente</option>';
+          (d.clientes || []).forEach(function (c) {
+            var o = document.createElement("option");
+            o.value = c.id;
+            o.textContent = c.nome + " (" + c.usinas + (c.usinas === 1 ? " usina)" : " usinas)");
+            escolha.appendChild(o);
+          });
+          erro.hidden = !d.erro; erro.textContent = d.erro || "";
+        })
+        .catch(function () { erro.hidden = false; erro.textContent = "Não consegui carregar os clientes. Tente de novo."; });
+    }
+    document.querySelectorAll("[data-abre-modo-cliente]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var conta = b.closest("details"); if (conta) conta.open = false;
+        card.showModal(); carregar(); escolha.focus();
+      });
+    });
+    card.querySelector("[data-fecha]").addEventListener("click", function () { card.close(); });
+    card.addEventListener("click", function (ev) { if (ev.target === card) card.close(); });
+  })();
+  </script>
+  {% endif %}
 </div>
 <script>
 (function () {

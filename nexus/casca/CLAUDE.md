@@ -146,6 +146,13 @@ avulso"):** a 5ª aba, **Clientes** (`?aba=clientes`, `auth/clientes.py`). Decid
   a tela exata marcada, só GET; o Início leva à 1ª tela dele; o resto, 403 (página "Esta página não faz parte do seu
   acesso") ou JSON. Sem sino, sem a conferência do Fracttal. A cada clique o portão confere a conta (ativa, com senha,
   no mesmo cliente) e as 12 h do login; removido ou vencido, `encerrar("cliente_fim")`.
+- **Modo cliente do administrador** (07/11/2026, Levi: "ter um 'Modo Cliente' aí aparecer um card na frente dando um blur
+  de fundo pedindo para escolher o cliente"; "No menu lateral também tem que ter 'sair do modo cliente'"): no menu do nome,
+  só para administradores; o card (`<dialog>` com o fundo desfocado) pede a lista ao abrir
+  (`/t/base/modo-cliente/clientes`) e grava `session["modo_cliente"]`; daí o administrador passa pelo MESMO portão do
+  cliente (`setor_telas.em_modo_cliente`, `cliente_da_sessao`), sem sino, e o alto do menu lateral mostra o cliente e o
+  "Sair do modo cliente". Quem deixa de ser administrador sai do modo no próximo clique. No template da casca a variável é
+  `cliente_modo` (a Visão do cliente passa o seu próprio `modo_cliente`, que venceria a do contexto).
 - **Login:** "Sou cliente" na tela de entrar (`/entrar?cliente=1`), e-mail e senha, com as travas do Entrar
   (5 erradas por e-mail e rede, 20 por e-mail, 50 por IP). Prova: `tests/test_clientes_acesso.py`.
 

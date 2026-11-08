@@ -290,6 +290,80 @@ def paleta():
     return render_template("paleta.html", escuro=escuro, claro=claro, grupos=grupos)
 
 
+# ── o Modo cliente (07/11/2026) ──────────────────────────────────────────────────────────────────────────────────
+# Levi: "Ao clicar no nome deles e abrir o menu lateral ter um 'Modo Cliente' aí aparecer um card na frente dando um blur
+# de fundo pedindo para escolher o cliente. No menu lateral também tem que ter 'sair do modo cliente'". O administrador
+# vê o Nexus como o cliente escolhido veria (as telas do setor Clientes, com as usinas dele: `setor_telas.portao_cliente`
+# e `cliente_da_sessao`). Moram em /t/base/ porque o Caddy só manda ao Nexus a raiz, /t/* e poucos outros.
+_CODIGO_CASCA = "casca_codigo"
+
+
+def _codigo_casca() -> str:
+    if not session.get(_CODIGO_CASCA):
+        session[_CODIGO_CASCA] = secrets.token_urlsafe(24)
+    return session[_CODIGO_CASCA]
+
+
+def _form_da_casca_ok() -> bool:
+    from ..torres.moldura import _de_outro_site
+    certo, enviado = session.get(_CODIGO_CASCA) or "", request.form.get("codigo") or ""
+    return not _de_outro_site() and bool(certo) and hmac.compare_digest(enviado.encode(), certo.encode())
+
+
+def _clientes_do_cadastro() -> list[dict]:
+    """[{id, nome, usinas}] do cadastro do Nexus, em ordem de nome (o mesmo recorte da Visão do cliente: cliente_id da
+    usina)."""
+    from ..campo import visao
+    from ..dados import fatos as D
+    b = visao._Base()
+    usinas: dict = {}
+    for u in b.por_id.values():
+        cid = D._id(u.get("cliente_id"))
+        if cid:
+            usinas[cid] = usinas.get(cid, 0) + 1
+    return sorted(({"id": i, "nome": n, "usinas": usinas.get(i, 0)} for i, n in b.nome_cliente.items() if i and n),
+                  key=lambda c: c["nome"].lower())
+
+
+@bp.route("/t/base/modo-cliente/clientes")
+def modo_cliente_clientes():
+    """A lista do card de escolha (pedida só quando o card abre)."""
+    if not session.get("admin"):
+        abort(403)
+    try:
+        return jsonify(ok=True, clientes=_clientes_do_cadastro())
+    except Exception as ex:      # noqa: BLE001 — sem o cadastro, o card diz por quê
+        return jsonify(ok=False, clientes=[], erro=f"Não consegui ler os clientes do cadastro ({type(ex).__name__})")
+
+
+@bp.route("/t/base/modo-cliente", methods=["POST"])
+def modo_cliente_entrar():
+    """Entra (ou troca) no Modo cliente e leva ao Início do cliente, que abre a 1ª tela dele."""
+    if not session.get("admin"):
+        abort(403)
+    if not _form_da_casca_ok():
+        abort(403)
+    cid = request.form.get("cliente_id", type=int)
+    try:
+        cliente = next((c for c in _clientes_do_cadastro() if c["id"] == cid), None)
+    except Exception:            # noqa: BLE001
+        cliente = None
+    if not cliente:
+        abort(400)
+    session["modo_cliente"] = {"id": cliente["id"], "nome": cliente["nome"]}
+    current_app.logger.info("Modo cliente: %s vendo como %s.", (session.get("usuario") or {}).get("email") or
+                            "senha de administrador", cliente["nome"])
+    return redirect(url_for("casca.inicio"), code=303)
+
+
+@bp.route("/t/base/modo-cliente/sair", methods=["POST"])
+def modo_cliente_sair():
+    if not _form_da_casca_ok():
+        abort(403)
+    session.pop("modo_cliente", None)
+    return redirect(url_for("casca.inicio"), code=303)
+
+
 @bp.route("/saude")
 def saude():
     # Público de propósito (monitoramento do servidor). Não diz nada além de "está de pé" e o commit.
@@ -303,8 +377,8 @@ def _sino():
     e escondiam o resto; ficam na Caixa de entrada. Só lê as cópias (a do motor, a das conversas, a dos pedidos e a dos
     avisos): nenhuma página espera uma fonte por causa dele. Sem nenhuma cópia (logo depois de subir), não sai número, e a
     conta começa por trás."""
-    # o cliente (07/11/2026) não vê insights, pedidos nem menções da Grid
-    if not session.get("logado") or session.get("via") == "cliente":
+    # o cliente (07/11/2026) não vê insights, pedidos nem menções da Grid; o administrador no Modo cliente também não
+    if not session.get("logado") or session.get("via") == "cliente" or setor_telas.em_modo_cliente():
         return None
     try:
         from ..comando import conversa as CV
@@ -411,4 +485,8 @@ def instalar_contexto(app) -> None:
             "raiz": raiz(),
             # o sino dos insights (03/11/2026), só das cópias: ver `_sino`
             "sino": _sino(),
+            # o Modo cliente do administrador (07/11/2026): o cliente que ele está vendo, e o código dos formulários
+            # (`cliente_modo`, não `modo_cliente`: a Visão do cliente passa o seu próprio `modo_cliente`, que venceria)
+            "cliente_modo": session.get("modo_cliente") if setor_telas.em_modo_cliente() else None,
+            "codigo_casca": _codigo_casca() if session.get("admin") else "",
         }

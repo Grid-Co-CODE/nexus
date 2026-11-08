@@ -309,9 +309,10 @@ def acesso() -> dict:
     if guardado is not None:
         return guardado
     cfg = current_app.config
-    if session.get("via") == "cliente":
+    if session.get("via") == "cliente" or em_modo_cliente():
         # o cliente (07/11/2026, `auth/clientes.py`): SEMPRE restrito, com o portão por setor ligado ou não; vê as telas
-        # marcadas para o setor Clientes que recortam pelas usinas dele (Tela.do_cliente), e nenhuma outra
+        # marcadas para o setor Clientes que recortam pelas usinas dele (Tela.do_cliente), e nenhuma outra. O
+        # administrador no Modo cliente vê exatamente o mesmo
         request._nexus_acesso = r = _acesso_do_cliente()
         return r
     r = {"tudo": True, "telas": set(), "setor": None, "erro": ""}
@@ -447,6 +448,27 @@ SETOR_CLIENTES = {"id": SID.CLIENTES, "nome": "Clientes"}
 LIVRES_CLIENTE = frozenset({"auth.entrar", "auth.sair", "casca.tema", "casca.saude", "static"})
 
 
+# o Modo cliente (07/11/2026, Levi: "Ao clicar no nome deles [...] ter um 'Modo Cliente' aí aparecer um card [...] pedindo
+# para escolher o cliente"; "No menu lateral também tem que ter 'sair do modo cliente'"): o administrador vê o Nexus como
+# o cliente escolhido veria. As rotas de entrar, trocar e sair do modo (casca) passam pelo portão do cliente só nele
+MODO_CLIENTE_ROTAS = frozenset({"casca.modo_cliente_entrar", "casca.modo_cliente_sair", "casca.modo_cliente_clientes"})
+
+
+def em_modo_cliente() -> bool:
+    """O administrador está vendo o Nexus como um cliente? Só administrador: quem perde o acesso sai do modo."""
+    return bool(has_request_context() and session.get("admin") and isinstance(session.get("modo_cliente"), dict))
+
+
+def cliente_da_sessao():
+    """O cliente_id que as telas do cliente recortam: o da conta do cliente, ou o do Modo cliente do administrador. Nunca
+    o do endereço."""
+    if not has_request_context():
+        return None
+    if session.get("via") == "cliente":
+        return session.get("cliente_id")
+    return session["modo_cliente"].get("id") if em_modo_cliente() else None
+
+
 def telas_do_cliente_possiveis() -> set[str]:
     """As telas que o setor Clientes PODE ver: as que recortam pelas usinas do cliente da sessão (Tela.do_cliente)."""
     return {chave(t.id, s.id) for t in current_app.extensions.get("nexus_torres", []) for s in t.telas if s.do_cliente}
@@ -477,6 +499,8 @@ def portao_cliente():
     """O portão do cliente: só a tela exata (nada do "resto da torre" que vale para os setores), e o Início leva à 1ª
     tela dele. O resto, 403 (página) ou JSON (dados), sem dizer o que há atrás."""
     if request.endpoint in LIVRES_CLIENTE or (request.endpoint or "").endswith(".static"):
+        return None
+    if request.endpoint in MODO_CLIENTE_ROTAS and em_modo_cliente():
         return None
     a = acesso()
     if request.endpoint == "casca.inicio" and request.method == "GET":

@@ -113,7 +113,9 @@ def fracttal_falso(monkeypatch):
 def _codigo(c) -> str:
     """O código do formulário desta sessão: o da página quando ela tem formulário; na que só mostra (sem a chave, sem o
     cadastro), o que a sessão guardou ao abrir a aba (o pedido feito à mão tem de ser recusado igual)."""
-    m = re.search(r'name="codigo" value="([^"]+)"', c.get(ABA).get_data(as_text=True))
+    html = c.get(ABA).get_data(as_text=True)
+    # só o da tela (dentro do <main>): o card do Modo cliente da casca (07/11/2026) também tem um código
+    m = re.search(r'name="codigo" value="([^"]+)"', html.split("<main", 1)[1].split("</main>", 1)[0])
     if m:
         return m.group(1)
     with c.session_transaction() as s:
