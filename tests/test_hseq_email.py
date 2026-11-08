@@ -130,3 +130,20 @@ def test_o_livro_esta_no_catalogo_antes_da_primeira_gravacao():
     livro = C.LIVRO_POR_NOME[ES.LIVRO]
     assert set(livro.abas) == {ES.ABA} and livro.so_cresce and not livro.no_banco
     assert {f.id: f for f in C.FATOS}["email_pendencias_seguranca"].livro.endswith(ES.ABA)
+
+
+def test_a_listagem_que_omite_o_livro_do_email_sobe_em_vez_de_dizer_vazio(app):
+    """Achado 2 da auditoria de 08/11/2026: `ler` com `abas` devolvia [] quando a listagem omitia o livro; a segunda
+    publicaria a semana de novo por cima (e o `so_cresce` só protege a gravação)."""
+    from pg_falso import ApiPGFalsa
+    from nexus.dados import livros
+    api = ApiPGFalsa()
+    api.workbooks[ES.LIVRO] = {}
+    api._id(ES.LIVRO, ES.ABA)["linhas"] = [{"headers": list(ES.CAB), "values": [None] * len(ES.CAB)}]
+    api.omitir.add(ES.LIVRO)
+    app.extensions["nexus_dados_sessao"] = api
+    try:
+        with app.app_context(), pytest.raises(livros.LeituraIncompleta):
+            ES.ler({"GRIDCO_DB_API": "http://pg.falso"})
+    finally:
+        app.extensions.pop("nexus_dados_sessao", None)

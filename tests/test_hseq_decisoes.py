@@ -310,3 +310,25 @@ def test_a_assinatura_da_edicao_e_quem_nao_e_da_seguranca(com_nao_reconhecido, l
         s.update(logado=True, admin=False, usuario={"email": "sup@exemplo.test", "nome": "Sup"})
     assert "Só quem é da Segurança" in _aviso(_editar(cliente, local="Outro"))[1] and not livro.exists()
 
+
+
+def test_a_listagem_que_omite_o_livro_e_nao_li_e_nao_decisoes_vazias(app):
+    """Achado 2 da auditoria de 08/11/2026: com a listagem de abas falhando por um instante (o livro existe, o
+    `sheet_count` diz 3), `abas` voltava {} e a tela guardava "sem decisões" por 60 s: o excluido voltava como vencido."""
+    from pg_falso import ApiPGFalsa
+    api = ApiPGFalsa()
+    api.workbooks[DEC.LIVRO] = {}
+    for aba, cab in DEC.ABAS:
+        api._id(DEC.LIVRO, aba)["linhas"] = [{"headers": list(cab), "values": [None] * len(cab)}]
+    app.extensions["nexus_dados_sessao"] = api
+    cfg = {"GRIDCO_DB_API": "http://pg.falso", "GRIDCO_SQL_TOKEN": "tk"}
+    DEC.limpar()
+    try:
+        with app.app_context():
+            assert DEC.ler(cfg)["erro"] == ""
+            api.omitir.add(DEC.LIVRO)
+            r = DEC.ler(cfg, forcar=True)
+        assert r["erro"] and r.get("velha")
+    finally:
+        DEC.limpar()
+        app.extensions.pop("nexus_dados_sessao", None)

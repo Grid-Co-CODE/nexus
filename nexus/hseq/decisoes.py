@@ -121,7 +121,9 @@ def _ler_cru(cfg) -> dict:
         return {a: [] for a, _cab in ABAS}
     from ..pcm.motivos import _banco
     base, sessao = _banco(cfg)
-    a = livros.abas(base, sessao, LIVRO)
+    # `abas_conferidas`: a listagem que omite o livro por um instante é "não li", não "sem decisões" (achado 2 da
+    # auditoria de 08/11/2026: o extintor excluído voltava como vencido por 1 minuto)
+    a = livros.abas_conferidas(base, sessao, LIVRO, tuple(aba for aba, _cab in ABAS))
     return {aba: (list(livros._linhas(base, sessao, a[aba])) if aba in a else []) for aba, _cab in ABAS}
 
 

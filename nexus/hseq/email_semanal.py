@@ -325,7 +325,7 @@ def _banco(cfg):
 
 def ler(cfg) -> list[dict]:
     base, sessao = _banco(cfg)
-    a = livros.abas(base, sessao, LIVRO)
+    a = livros.abas_conferidas(base, sessao, LIVRO, (ABA,))     # "não li" não vira "semana sem linha"
     return list(livros._linhas(base, sessao, a[ABA])) if ABA in a else []
 
 
