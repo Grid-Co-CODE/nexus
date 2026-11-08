@@ -467,7 +467,7 @@ def test_static_fora(tmp_path, relogio):
     c = _cliente(app)
     c.get("/os/static/inicio.css")                                       # os estáticos do OS Creator
     c.get("/t/campo/ronda/1")                                            # outra torre
-    c.get("/os/historico", headers={"X-Nexus-Pre-Carga": "1"})           # a pré-carga abre as telas por dentro
+    c.get("/os/historico", headers={"X-Nexus-Pre-Carga": teto_os.segredo_da_pre_carga(app)})   # a pré-carga, por dentro
     _cliente(app, None, logado=False).get("/os/historico")               # sem login: o portão responde, não é uso
     app.test_client().get("/os/historico")                               # sem sessão nenhuma
     assert U.instantaneo()["linhas"] == []

@@ -20,8 +20,10 @@ pediria a T.I. (o serviço e o Caddy); o mesmo efeito sai daqui de dentro:
 
 Quem liga é o servir.py (o servidor), nunca o create_app: os testes e o PC seguem sem teto.
 """
+import hmac
 import json
 import logging
+import secrets
 import threading
 import time
 
@@ -39,18 +41,35 @@ _LOG_S = 30.0
 RECADO = "O OS Creator está ocupado esperando o Fracttal. Tente de novo em alguns segundos."
 
 
-def do_os_creator(environ) -> bool:
+SEGREDO = "nexus_pre_carga_segredo"
+
+
+def segredo_da_pre_carga(app) -> str:
+    """O valor do cabeçalho da pré-carga, sorteado a cada subida. Antes o valor era só "1": qualquer pessoa logada podia
+    mandá-lo de um script e o pedido dela passava por cima do teto de 16 e sumia do Raio-X (achado da auditoria de
+    08/11/2026). Agora só o cliente interno, que nasce no mesmo processo, sabe o valor."""
+    return app.extensions.setdefault(SEGREDO, secrets.token_hex(16))
+
+
+def e_pre_carga(environ, segredo) -> bool:
+    """O pedido traz o cabeçalho da pré-carga COM o segredo desta subida? Sem segredo (middleware solto, nos testes)
+    nenhum pedido vale como pré-carga."""
+    valor = environ.get(_PRE_CARGA)
+    return bool(segredo and valor) and hmac.compare_digest(str(valor).encode(), str(segredo).encode())
+
+
+def do_os_creator(environ, segredo=None) -> bool:
     """O pedido é do OS Creator, para o teto e para o uso das telas (`uso_os`)? `/os/*` e `/t/os/*`, menos os estáticos
     e a pré-carga (ela abre as telas por dentro, não é ninguém usando)."""
     caminho = environ.get("PATH_INFO", "") or ""
-    return caminho.startswith(_DO_OS) and not caminho.startswith(_LIVRES) and not environ.get(_PRE_CARGA)
+    return caminho.startswith(_DO_OS) and not caminho.startswith(_LIVRES) and not e_pre_carga(environ, segredo)
 
 
 class Teto:
     """O middleware: no máximo `teto` pedidos do OS Creator em andamento; o seguinte espera `espera` s e volta com 503."""
 
-    def __init__(self, wsgi, teto: int = TETO, espera: float = ESPERA_S):
-        self.wsgi, self.teto, self.espera = wsgi, int(teto), float(espera)
+    def __init__(self, wsgi, teto: int = TETO, espera: float = ESPERA_S, segredo=None):
+        self.wsgi, self.teto, self.espera, self.segredo = wsgi, int(teto), float(espera), segredo
         self.vagas = threading.BoundedSemaphore(self.teto)
         self.trava = threading.Lock()
         self.em_uso = 0
@@ -60,7 +79,7 @@ class Teto:
         self.ao_recusar = None              # quem quer saber de cada 503: `uso_os.recusado(environ)` (o servidor liga)
 
     def conta(self, environ) -> bool:
-        return do_os_creator(environ)
+        return do_os_creator(environ, self.segredo)
 
     def _soltar(self) -> None:
         with self.trava:
@@ -125,7 +144,7 @@ class Teto:
 
 def ligar(app, teto: int = TETO, espera: float = ESPERA_S) -> Teto:
     """Embrulha o wsgi_app (chame ANTES do presos.ligar: o registro dos pedidos fica por fora e vê todos)."""
-    t = Teto(app.wsgi_app, teto, espera)
+    t = Teto(app.wsgi_app, teto, espera, segredo_da_pre_carga(app))
     app.wsgi_app = t
     app.extensions[CHAVE] = t
     return t

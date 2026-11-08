@@ -1001,8 +1001,9 @@ não tem limite e espera a página seguinte, e o waitress tem 16 threads; com as
 fila. De fora não se vê ESPERANDO O QUÊ. O `casca/presos.py` vê de dentro:
 
 - **registro:** o `ligar` embrulha o `wsgi_app` (método, caminho SEM a query, início, thread; sai no `close()` da
-  resposta). A pré-carga fica de fora (cabeçalho `X-Nexus-Pre-Carga`: ela roda no `test_client`, fora das threads do
-  waitress). Quem liga é o `servir.py` (com `THREADS` = 16, o mesmo número do `serve`) e o `app.py` (8, ou 32 com a
+  resposta). A pré-carga fica de fora (cabeçalho `X-Nexus-Pre-Carga` com um segredo sorteado a cada subida, em
+  `app.extensions`: ela roda no `test_client`, fora das threads do waitress; o "1" de um script não vale, e passava por
+  cima do teto do OS Creator, auditoria de 08/11/2026). Quem liga é o `servir.py` (com `THREADS` = 16, o mesmo número do `serve`) e o `app.py` (8, ou 32 com a
   plataforma no PC; lá a conta das threads divide com a plataforma, então "fila cheia" é aproximada); o `create_app`
   nunca liga, e os testes ficam sem.
 - **ronda:** a cada 5 s; pedido com mais de 30 s é PRESO. A pilha da thread dele (`sys._current_frames`) vira

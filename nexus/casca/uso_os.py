@@ -297,7 +297,7 @@ def _antes() -> None:
         marca = fracttal_conta.origem(rota)
         marca.__enter__()
         p.marca = marca
-        if teto_os.do_os_creator(request.environ) and session.get("logado"):
+        if teto_os.do_os_creator(request.environ, current_app.extensions.get(teto_os.SEGREDO)) and session.get("logado"):
             p.automatico = _automatico(rota, request.headers.get(CABECALHO_AUTO), request.args.get(PARAMETRO_AUTO))
             p.pessoa = _pessoa()
             p.inicio = _cronometro()

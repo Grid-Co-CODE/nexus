@@ -31,6 +31,8 @@ from collections import deque
 
 from flask import current_app
 
+from ..casca.teto_os import segredo_da_pre_carga
+
 log = logging.getLogger(__name__)
 
 REAQUECER_S = 120
@@ -143,7 +145,7 @@ def _trabalhar(app) -> None:
     e = _estado(app)
     # sem o pote de cookies: com ele, o cliente troca o cabeçalho Cookie pelo pote (vazio) e a sessão não chega
     cliente = app.test_client(use_cookies=False)
-    cabecalhos = {"Cookie": _biscoito(app), CABECALHO: "1"}
+    cabecalhos = {"Cookie": _biscoito(app), CABECALHO: segredo_da_pre_carga(app)}
     volta = {"inicio": time.time(), "telas": 0, "s": 0.0, "mais_lenta": None, "erros": 0}
     while True:
         with e["trava"]:

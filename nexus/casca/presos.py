@@ -36,6 +36,8 @@ from pathlib import Path
 
 from werkzeug.wsgi import ClosingIterator
 
+from . import teto_os
+
 log = logging.getLogger(__name__)
 
 _BRT = timezone(timedelta(hours=-3))
@@ -46,7 +48,6 @@ FIM_S = 15           # 15 s sem nenhum preso fecha o episódio
 GUARDAR = 30
 MAX_PEDIDOS = 40     # por episódio, os que esperaram mais
 DIA_S = 24 * 3600
-_PRE_CARGA = "HTTP_X_NEXUS_PRE_CARGA"     # o cabeçalho da pré-carga (auth/pre_carga.CABECALHO)
 def _norm(caminho: str) -> str:
     return os.path.normcase(caminho).replace("\\", "/")
 
@@ -277,11 +278,11 @@ class _Estado:
 class _Registro:
     """O middleware: anota o pedido ao entrar e tira quando a resposta termina (o close() do WSGI) ou quebra."""
 
-    def __init__(self, wsgi, estado: _Estado):
-        self.wsgi, self.estado = wsgi, estado
+    def __init__(self, wsgi, estado: _Estado, segredo=None):
+        self.wsgi, self.estado, self.segredo = wsgi, estado, segredo
 
     def __call__(self, environ, start_response):
-        if environ.get(_PRE_CARGA):
+        if teto_os.e_pre_carga(environ, self.segredo):
             return self.wsgi(environ, start_response)
         seq = self.estado.entrar(environ)
         try:
@@ -311,7 +312,7 @@ def ligar(app, threads: int) -> _Estado:
     estado = _Estado(threads, arquivo)
     estado.carregar()
     app.extensions[CHAVE] = estado
-    app.wsgi_app = _Registro(app.wsgi_app, estado)
+    app.wsgi_app = _Registro(app.wsgi_app, estado, teto_os.segredo_da_pre_carga(app))
     threading.Thread(target=_ronda, args=(estado,), daemon=True, name="nexus-presos").start()
     return estado
 

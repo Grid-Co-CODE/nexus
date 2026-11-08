@@ -19,13 +19,13 @@ def _app_lento(solta):
     return app
 
 
-def _chamar(app, caminho, accept="application/json", fetch_mode="cors"):
+def _chamar(app, caminho, accept="application/json", fetch_mode="cors", extra=None):
     status = {}
 
     def sr(s, h):
         status["s"], status["h"] = s, dict(h)
     corpo = b"".join(r := app({"PATH_INFO": caminho, "REQUEST_METHOD": "GET", "HTTP_ACCEPT": accept,
-                               "HTTP_SEC_FETCH_MODE": fetch_mode}, sr))
+                               "HTTP_SEC_FETCH_MODE": fetch_mode, **(extra or {})}, sr))
     if hasattr(r, "close"):
         r.close()
     return status["s"], status["h"], corpo
@@ -75,3 +75,24 @@ def test_o_servidor_liga_32_threads_e_teto_de_16():
     texto = open("servir.py", encoding="utf-8").read()
     assert "THREADS = 32" in texto and "teto_os.ligar(app, teto=THREADS // 2)" in texto
     assert texto.index("teto_os.ligar") < texto.index("presos.ligar(app, THREADS)")
+
+
+def test_o_cabecalho_da_pre_carga_so_vale_com_o_segredo_da_subida():
+    """Auditoria de 08/11/2026: o cabeçalho valia só como "1", e quem estava logado o mandava de um script para passar
+    por cima do teto. Agora vale o segredo sorteado na subida."""
+    solta = threading.Event()
+    app = T.Teto(_app_lento(solta), teto=1, espera=0.1, segredo="segredo-da-subida")
+    preso = threading.Thread(target=_chamar, args=(app, "/os/api/performance/contagens"))
+    preso.start()
+    for _ in range(100):
+        if app.estado()["em_uso"] == 1:
+            break
+        time.sleep(0.01)
+    try:
+        s, _, _ = _chamar(app, "/os/api/selo", extra={"HTTP_X_NEXUS_PRE_CARGA": "1"})
+        assert s.startswith("503")                      # o "1" de um script não passa pelo teto cheio
+        s, _, _ = _chamar(app, "/os/api/selo", extra={"HTTP_X_NEXUS_PRE_CARGA": "segredo-da-subida"})
+        assert s.startswith("200")                      # a pré-carga de verdade, sim
+    finally:
+        solta.set()
+        preso.join(5)

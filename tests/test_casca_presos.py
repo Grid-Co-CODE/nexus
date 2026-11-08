@@ -61,9 +61,12 @@ def test_o_pedido_que_quebra_sai_do_registro_e_a_pre_carga_nem_entra():
         presos._Registro(_wsgi(quebra=True), e)(_pedido(), lambda *a: None)
     assert e.em_curso == {}
     vistos = []
-    presos._Registro(_wsgi(durante=lambda: vistos.append(len(e.em_curso))), e)(
-        _pedido("/t/campo/rondas", HTTP_X_NEXUS_PRE_CARGA="1"), lambda *a: None)
+    presos._Registro(_wsgi(durante=lambda: vistos.append(len(e.em_curso))), e, "segredo-da-subida")(
+        _pedido("/t/campo/rondas", HTTP_X_NEXUS_PRE_CARGA="segredo-da-subida"), lambda *a: None)
     assert vistos == [0]          # a pré-carga roda no test_client, numa thread própria, fora das do waitress
+    presos._Registro(_wsgi(durante=lambda: vistos.append(len(e.em_curso))), e, "segredo-da-subida")(
+        _pedido("/t/campo/rondas", HTTP_X_NEXUS_PRE_CARGA="1"), lambda *a: None)
+    assert vistos == [0, 1]       # o "1" de um script de quem está logado não some do Raio-X (auditoria de 08/11/2026)
 
 
 # ── onde ele está ───────────────────────────────────────────────────────────────────────────────────────────────────
