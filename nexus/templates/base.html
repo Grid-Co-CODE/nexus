@@ -201,53 +201,11 @@
 
   {% if session.admin and not cliente_modo %}
   {# o card do Modo cliente (07/11/2026): na frente, com o fundo desfocado; a lista vem do cadastro quando ele abre #}
-  <dialog class="modo-cliente-card" id="modo-cliente-card" aria-labelledby="modo-cliente-titulo" data-lista="{{ raiz }}/t/base/modo-cliente/clientes">
-    <form method="post" action="{{ raiz }}/t/base/modo-cliente">
-      <input type="hidden" name="codigo" value="{{ codigo_casca }}">
-      <p class="gc-eyebrow">Administradores</p>
-      <h2 id="modo-cliente-titulo">Modo cliente</h2>
-      <p class="mudo">Veja o Nexus como o cliente escolhido vê: só as telas liberadas para Clientes, com as usinas dele.</p>
-      <label class="gc-rotulo" for="modo-cliente-escolha">Cliente</label>
-      <select id="modo-cliente-escolha" name="cliente_id" class="gc-campo" required><option value="">Carregando…</option></select>
-      <p class="gc-ajuda gc-ajuda--erro" data-erro hidden></p>
-      <div class="modo-cliente-botoes">
-        <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-fecha>Cancelar</button>
-        <button type="submit" class="gc-btn gc-btn--ui gc-btn--primario"><i class="ph ph-eye" aria-hidden="true"></i> Ver como este cliente</button>
-      </div>
-    </form>
-  </dialog>
-  <script>
-  (function () {
-    var card = document.getElementById("modo-cliente-card");
-    if (!card || !card.showModal) return;
-    var escolha = card.querySelector("select"), erro = card.querySelector("[data-erro]"), lido = false;
-    function carregar() {
-      if (lido) return;
-      fetch(card.getAttribute("data-lista"), {credentials: "same-origin", headers: {Accept: "application/json"}})
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          lido = d.ok;
-          escolha.innerHTML = '<option value="">Escolha o cliente</option>';
-          (d.clientes || []).forEach(function (c) {
-            var o = document.createElement("option");
-            o.value = c.id;
-            o.textContent = c.nome + " (" + c.usinas + (c.usinas === 1 ? " usina)" : " usinas)");
-            escolha.appendChild(o);
-          });
-          erro.hidden = !d.erro; erro.textContent = d.erro || "";
-        })
-        .catch(function () { erro.hidden = false; erro.textContent = "Não consegui carregar os clientes. Tente de novo."; });
-    }
-    document.querySelectorAll("[data-abre-modo-cliente]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var conta = b.closest("details"); if (conta) conta.open = false;
-        card.showModal(); carregar(); escolha.focus();
-      });
-    });
-    card.querySelector("[data-fecha]").addEventListener("click", function () { card.close(); });
-    card.addEventListener("click", function (ev) { if (ev.target === card) card.close(); });
-  })();
-  </script>
+  {# montado pelo JavaScript ao abrir: um formulário em toda página de administrador entrava nas telas que conferem os
+     formulários delas (o "abrir e salvar sem mexer" do Cadastro, a PT só de leitura) #}
+  <dialog class="modo-cliente-card" id="modo-cliente-card" aria-labelledby="modo-cliente-titulo"
+          data-lista="{{ raiz }}/t/base/modo-cliente/clientes" data-acao="{{ raiz }}/t/base/modo-cliente" data-codigo="{{ codigo_casca }}"></dialog>
+  <script src="{{ url_for('static', filename='modo-cliente.js') }}" defer></script>
   {% endif %}
 </div>
 <script>

@@ -153,7 +153,8 @@ def test_o_modo_cliente_do_administrador(app, dados, cliente_tela, logado):
     assert "data-abre-modo-cliente" in html and 'id="modo-cliente-card"' in html and "Sair do modo cliente" not in html
     lista = logado.get("/t/base/modo-cliente/clientes").get_json()
     assert {"id": 1, "nome": "Thopen", "usinas": 2} in lista["clientes"]
-    codigo = re.search(r'name="codigo" value="([^"]+)"', html.split('id="modo-cliente-card"', 1)[1]).group(1)
+    codigo = re.search(r'data-codigo="([^"]+)"', html.split('id="modo-cliente-card"', 1)[1]).group(1)
+    assert 'name="cliente_id"' not in html                              # o card só se monta ao abrir
     assert logado.post("/t/base/modo-cliente", data={"codigo": "errado", "cliente_id": "1"}).status_code == 403
     assert logado.post("/t/base/modo-cliente", data={"codigo": codigo, "cliente_id": "999"}).status_code == 400
     assert logado.post("/t/base/modo-cliente", data={"codigo": codigo, "cliente_id": "1"}).status_code == 303
