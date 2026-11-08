@@ -212,6 +212,17 @@ def test_pedir_nova_ronda_e_da_usina_inteira(com_nao_reconhecido, livro, tst, mo
     assert "nova ronda pedida" not in fim and 'data-ronda-em' not in fim
 
 
+def test_pedir_a_ronda_de_novo_com_um_pedido_pendente_e_recusado(com_nao_reconhecido, livro, tst, monkeypatch):
+    """Achado 3 da auditoria de 08/11/2026: o pedido vale pela hora; um 2º pedido (outra pessoa da Segurança, ou a página
+    velha) zerava o que a equipe já tinha refeito da usina."""
+    monkeypatch.setattr(DEC, "_agora", lambda: datetime(2026, 10, 9, 10, 0, tzinfo=timezone(timedelta(hours=-3))))
+    form = {"usina_id": "1", "usina": "Altair", "cliente": "Thopen"}
+    assert _aviso(tst.post("/t/hseq/extintores/ronda", data=form))[0].startswith("Nova ronda")
+    ok, erro = _aviso(tst.post("/t/hseq/extintores/ronda", data=form))
+    assert not ok and "já tem uma nova ronda pedida" in erro
+    assert len(_linhas_livro(livro, DEC.ABA_RONDA)) == 1
+
+
 def test_quem_nao_e_da_seguranca_so_ve(com_nao_reconhecido, livro, cliente):
     with cliente.session_transaction() as s:
         s.update(logado=True, admin=False, usuario={"email": "sup@exemplo.test", "nome": "Sup"})

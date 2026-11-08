@@ -529,6 +529,11 @@ def extintores_ronda():
         d = EXT.extintores().dados or {}
         x = next((x for x in (d.get("extintores") or []) + (d.get("nao_reconhecidos") or []) if x.get("usina_id") == uid),
                  None)
+        # um pedido pendente vale pela hora: pedir de novo zeraria o que a equipe já refez (achado 3 da auditoria de
+        # 08/11/2026); só o JS escondia o botão
+        todas, seguem, _ = DEC.separar(d.get("extintores") or [], d.get("nao_reconhecidos") or [], _decisoes())
+        if uid and uid in _rondas(_decisoes(), todas, seguem):
+            raise DEC.Recusada("Esta usina já tem uma nova ronda pedida: espere a equipe refazer.")
         return DEC.pedir_ronda(current_app.config, usina_id=uid, usina=form.get("usina", ""),
                                usina_app=x["usina_fonte"] if x else "", usuario=session.get("usuario"), pode=_pode())
     return _decidir(fazer)
