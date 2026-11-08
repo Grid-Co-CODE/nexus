@@ -37,15 +37,6 @@
       </span></span>
     </div>{% endfor %}
   </section>
-  {% else %}{# o Python de antes na memória (o serviço leu este template antes de reiniciar): a faixa de antes, até o
-     reinício. Sai junto com o .kb-resumo do engenharia.css. #}
-  <section class="kb-resumo" aria-label="A equipe agora">
-    <div><b>{{ total.carga }}</b><span>em aberto</span></div>
-    <div class="{{ 'kb-ruim' if total.atrasadas }}"><b>{{ total.atrasadas }}</b><span>atrasadas</span></div>
-    <div class="{{ 'kb-atento' if total.vence }}"><b>{{ total.vence }}</b><span>vencem em 2 dias</span></div>
-    <div><b>{{ total.verificacao }}</b><span>esperando verificação</span></div>
-    <div class="kb-bom"><b>{{ total.fechadas30 }}</b><span>fechadas em {{ janela }} dias</span></div>
-  </section>
   {% endif %}
 
   <section class="kb-pessoas" aria-label="Pessoas">

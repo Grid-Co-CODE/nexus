@@ -180,15 +180,6 @@
   .kb-kpi:nth-child(odd){padding-left:0;border-left:0}.kb-kpi:nth-child(even){padding:0 0 0 12px;border-left:1px solid var(--linha)}}
 .kb-super-num .kb-ruim b{color:var(--critico)}
 .kb-super-num .kb-bom b{color:var(--ok)}
-/* a faixa de antes (.kb-resumo): o CSS vem do disco na hora, mas o 5070 segue com o equipe.html de antes na memória até
-   reiniciar (Jinja sem auto_reload). Sai no primeiro ajuste depois do reinício. */
-.kb-resumo{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;margin-top:16px;background:var(--linha);
-  border:1px solid var(--linha);border-radius:14px;overflow:hidden}
-.kb-resumo>div{background:var(--superficie);padding:14px 18px;display:grid;gap:2px}
-.kb-resumo b{font:800 26px/1.1 var(--font-sans);color:var(--tinta);font-variant-numeric:tabular-nums}
-.kb-resumo span{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--tinta-2)}
-.kb-resumo .kb-ruim b{color:var(--critico)}.kb-resumo .kb-atento b{color:var(--alerta)}.kb-resumo .kb-bom b{color:var(--ok)}
-@media (max-width:900px){.kb-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .kb-pessoas{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;margin-top:16px}
 .kb-super{display:grid;gap:12px;text-align:left;padding:16px 18px 14px;border-radius:16px;cursor:pointer;color:inherit;font:inherit;
