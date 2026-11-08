@@ -68,8 +68,8 @@ def _conferir_contestacao(valor: str) -> str:
         raise Recusada("Isto não é a chave privada das contestações: cole a linha inteira do arquivo "
                        "nexus_contestacao_privada.segredo.") from None
     try:
-        from ..campo import visao
-        linhas = [l for l in CT.livros.ler(visao._base(), visao._sessao(), CT.LIVRO, CT.ABA) if l.get("dados_cifrados")]
+        from ..dados import conexao
+        linhas = [l for l in CT.livros.ler(*conexao.banco(), CT.LIVRO, CT.ABA) if l.get("dados_cifrados")]
     except Exception as e:       # noqa: BLE001 — banco fora: grava, e diz que não deu para conferir
         return f"não consegui conferir com as contestações do banco ({type(e).__name__}); confira na tela Contestações"
     if not linhas:

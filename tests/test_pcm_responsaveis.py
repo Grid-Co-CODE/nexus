@@ -179,9 +179,9 @@ def _fichas(cfg, emails: dict, desligadas=()):
 def _setores(monkeypatch, decisoes):
     """As decisões de Pessoas e setores (o usuário do Fracttal ligado à ficha), dubladas: o `S.ler` de mentira."""
     from nexus.cadastro import setores as S
-    from nexus.campo import visao
-    monkeypatch.setattr(visao, "_base", lambda: "http://banco")
-    monkeypatch.setattr(visao, "_sessao", lambda: None)
+    from nexus.dados import conexao
+    monkeypatch.setattr(conexao, "base", lambda: "http://banco")
+    monkeypatch.setattr(conexao, "sessao", lambda: None)
     if isinstance(decisoes, Exception):
         def fora(base, sessao):
             raise decisoes

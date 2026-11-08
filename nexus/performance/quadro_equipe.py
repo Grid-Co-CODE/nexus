@@ -51,8 +51,8 @@ def ids_do_setor(setores: dict) -> list[str]:
 
 def _setores() -> dict:
     from ..cadastro import setores as S
-    from ..campo import visao
-    return S.ler(visao._base(), visao._sessao())
+    from ..dados import conexao
+    return S.ler(*conexao.banco())
 
 
 def _reler(app):

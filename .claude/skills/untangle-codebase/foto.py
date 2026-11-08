@@ -201,6 +201,15 @@ def comparar(antes_json: str, depois_json: str) -> int:
 
     na, nd = antes["nomes"], depois["nomes"]
     usa = depois.get("usa", {})
+
+    def leitores(foto):
+        """{(modulo, nome): módulos do nexus que leem modulo.nome}, para achar quem deixou de ler pelo módulo antigo."""
+        r = collections.defaultdict(set)
+        for m, n, como, onde in foto["consumo"]:
+            if como != "patch" and onde.startswith("nexus/"):
+                r[(m, n)].add(_modulo_de(onde))
+        return r
+    leu_antes, le_agora = leitores(antes), leitores(depois)
     vistos = set()
     for mod, nome, como, onde in depois["consumo"]:
         chave = (mod, nome, como, onde)
@@ -216,15 +225,25 @@ def comparar(antes_json: str, depois_json: str) -> int:
             if o_antes == "nasce" and o_agora.startswith("import:"):
                 # a troca em M só vale para quem lê o nome pelo M. Quem chama de dentro da casa nova (ou de quem importa
                 # de lá) segue com a função de verdade: o teste passa sem testar o que diz
-                casa = o_agora[7:].rpartition(".")[0]
-                fora = sorted(m for m in nd if m != mod and nome in usa.get(m, ())
-                              and (m == casa or nd[m].get(nome) == f"import:{casa}.{nome}"))
+                casa, _, real = o_agora[7:].rpartition(".")      # o nome na casa nova pode ser outro (_sessao -> sessao)
+                fora = {m for m in nd if m != mod and (
+                    (m == casa and real in usa.get(m, ()))
+                    or any(o == f"import:{casa}.{real}" and x in usa.get(m, ()) for x, o in nd[m].items()))}
+                fora |= {m for m in le_agora.get((casa, real), ()) if m != mod}
+                fora = sorted(fora)
                 if fora:
                     graves.append(f"PATCH que não pega mais: {onde} troca {mod}.{nome}, mas {nome} agora mora em "
                                   f"{casa} e é chamado de {', '.join(fora[:3])}, que não vê a troca")
                 else:
                     avisos.append(f"patch segue pegando: {onde} troca {mod}.{nome} (veio de {casa}; os chamadores "
                                   f"ficaram em {mod})")
+        if como == "patch" and existe_agora:
+            # quem lia M.x e passou a ler de outro lugar escapa da troca do teste em M.x
+            saiu = sorted(leu_antes.get((mod, nome), set()) - le_agora.get((mod, nome), set()) - {mod})
+            saiu = [m for m in saiu if m in nd]
+            if saiu:
+                graves.append(f"PATCH que não pega mais: {onde} troca {mod}.{nome}, mas {', '.join(saiu[:3])} "
+                              f"deixou de ler por {mod}")
 
     # onde o nome passou a nascer: só conta módulo em que ele não nascia antes (homônimo antigo é outra função)
     nasceu_agora = {}

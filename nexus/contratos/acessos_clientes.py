@@ -132,8 +132,8 @@ def _br(d, fmt) -> str:
 
 
 def _base_sessao():
-    from ..campo import visao
-    return visao._base(), visao._sessao()
+    from ..dados import conexao
+    return conexao.banco()
 
 
 def _ler(aba_livro=(LIVRO, ABA)) -> list[dict]:

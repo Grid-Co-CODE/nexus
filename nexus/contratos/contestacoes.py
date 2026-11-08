@@ -116,9 +116,9 @@ def contestacoes(linhas: list[dict] | None = None) -> dict:
     (os testes passam; a tela lê do banco)."""
     out = {"erro": None, "sem_chave": False, "por_setor": {s: [] for s, _ in SETORES}, "contagem": {}}
     if linhas is None:
-        from ..campo import visao
+        from ..dados import conexao
         try:
-            linhas = livros.ler(visao._base(), visao._sessao(), LIVRO, ABA)
+            linhas = livros.ler(*conexao.banco(), LIVRO, ABA)
         except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, nunca um "nenhuma contestação" falso
             out["erro"] = f"Não consegui ler as contestações do banco ({type(e).__name__})"
             linhas = []

@@ -53,8 +53,8 @@ def _de_outro_site() -> bool:
 
 
 def _banco():
-    from ..campo import visao
-    return visao._base(), visao._sessao()
+    from ..dados import conexao
+    return conexao.banco()
 
 
 def _hora(ts) -> str:

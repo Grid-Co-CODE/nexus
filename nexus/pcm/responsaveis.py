@@ -78,7 +78,7 @@ def conta_dos_codigos(cfg, base) -> dict:
     import json
     from collections import defaultdict
 
-    from ..campo import visao
+    from ..dados import conexao
     from ..campo.ligacao_cadastro import codigo_da_pessoa
     chave, chave_hmac = cfg.get("NEXUS_CHAVE_CADASTRO"), cfg.get("NEXUS_PESSOA_HMAC")
     # a ficha desligada ou excluída não ganha código nem pelo e-mail nem pela ligação (2ª revisão de 05/11/2026: a ligação
@@ -103,7 +103,7 @@ def conta_dos_codigos(cfg, base) -> dict:
     do_fracttal: dict = {}
     try:
         from ..cadastro import setores as S
-        st = S.ler(visao._base(), visao._sessao())
+        st = S.ler(*conexao.banco())
         hoje: dict = {}
         for d in sorted(st.get("decisoes") or [], key=lambda x: x["decidida_em"]):
             hoje[d.get("fracttal_id")] = d          # a ligação de hoje de cada usuário do Fracttal

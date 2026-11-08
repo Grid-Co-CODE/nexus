@@ -258,8 +258,8 @@ def escolhas_de_dono() -> dict[str, int | None]:
 
 # ── a pessoa do login ───────────────────────────────────────────────────────────────────────────────────────────────
 def _banco():
-    from ..campo import visao
-    return visao._base(), visao._sessao()
+    from ..dados import conexao
+    return conexao.banco()
 
 
 def setor_de_cada_codigo(decisoes: list[dict]) -> dict[str, int | None]:

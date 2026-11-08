@@ -93,7 +93,7 @@ def test_o_gancho_da_ponte_le_a_ultima_decisao_de_cada_pessoa(monkeypatch, tmp_p
     """`ponte.membros_do_setor`: quem está HOJE no setor Performance (a última decisão de cada pessoa no livro
     `nexus_setores`), pelo id do Fracttal; quem saiu do setor sai da lista; outro setor da Nova solicitação, None."""
     from nexus.cadastro import setores as S
-    from nexus.campo import visao
+    from nexus.dados import conexao
     decisoes = [
         {"decidida_em": "2026-10-20T10:00:00Z", "fracttal_id": 501, "setor_id": SETOR_PERF},
         {"decidida_em": "2026-10-20T10:00:00Z", "fracttal_id": 502, "setor_id": SETOR_PERF},
@@ -101,7 +101,7 @@ def test_o_gancho_da_ponte_le_a_ultima_decisao_de_cada_pessoa(monkeypatch, tmp_p
         {"decidida_em": "2026-10-21T10:00:00Z", "fracttal_id": 504, "setor_id": SETOR_PERF},
     ]
     monkeypatch.setattr(S, "ler", lambda base, sessao, forcar=False: {"setores": [], "decisoes": list(decisoes), "erro": ""})
-    monkeypatch.setattr(visao, "_sessao", lambda: object())
+    monkeypatch.setattr(conexao, "sessao", lambda: object())
     app = create_app({"NEXUS_SECRET_KEY": "chave-de-teste-" + "x" * 20, "NEXUS_SENHA_ADMIN": "senha-de-teste-1234",
                       "NEXUS_DADOS": str(tmp_path / "dados")})
     membros = ponte.membros_do_setor(app)

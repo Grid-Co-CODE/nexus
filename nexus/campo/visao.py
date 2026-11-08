@@ -35,6 +35,7 @@ from flask import current_app
 
 from ..cadastro.calculos import nome_padrao
 from ..dados import carga as C
+from ..dados import conexao
 from ..dados import dominios as DOM
 from ..dados import fato_pt as FPT
 from ..dados import fato_ronda as FR
@@ -72,8 +73,9 @@ VAGA = "vaga"
 CAMPO = "Colaborador de campo"       # o vínculo de quem vai a campo no cadastro (técnico, eletricista, mantenedor)
 
 
-class SemBanco(RuntimeError):
-    pass
+# a conexão com o banco mora na camada de dados desde 08/11/2026 (`dados/conexao.py`): a classe é a mesma, então o
+# `except visao.SemBanco` de quem lê o Campo segue pegando
+SemBanco = conexao.SemBanco
 
 
 _CACHE: dict = {}
@@ -246,18 +248,13 @@ def manter_quente(app, intervalo_s: int = 60):
 
 
 def _sessao():
-    s = current_app.extensions.get("nexus_dados_sessao")
-    if s is None and current_app.config.get("TESTING"):
-        raise SemBanco("teste sem banco")          # teste nunca vai à rede
-    if s is None:
-        import requests
-        s = requests.Session()
-    return s
+    """A sessão do banco (`dados/conexao.py`). Chama de lá na hora, para a troca no teste valer dos dois lados."""
+    return conexao.sessao()
 
 
 def _base() -> str:
-    from ..cadastro.ligacoes import BASE_API
-    return (current_app.config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
+    """O endereço do banco (`dados/conexao.py`)."""
+    return conexao.base()
 
 
 def carregar(pares) -> dict:

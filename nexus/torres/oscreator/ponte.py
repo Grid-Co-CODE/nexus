@@ -357,8 +357,8 @@ def membros_do_setor(app):
         try:
             with app.app_context():
                 from ...cadastro import setores as S
-                from ...campo import visao
-                st = S.ler(visao._base(), visao._sessao())
+                from ...dados import conexao
+                st = S.ler(*conexao.banco())
         except Exception:        # noqa: BLE001 — sem banco: a tela diz que não leu os setores
             logging.exception("OS Creator: os setores do Nexus não foram lidos para a Nova solicitação")
             return None

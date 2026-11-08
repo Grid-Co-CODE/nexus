@@ -139,8 +139,8 @@ def _ctx(eid) -> str:
 
 
 def _banco():
-    from ..campo import visao
-    return visao._base(), visao._sessao()
+    from ..dados import conexao
+    return conexao.banco()
 
 
 def _ler_banco(base: str, sessao) -> dict:

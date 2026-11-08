@@ -141,8 +141,8 @@ def _ler_setores(app) -> dict:
     """Os setores Engenharia e Chamados de Base → Acessos → Pessoas e setores: quem é de cada um pela última decisão
     (o id do Fracttal) e o nome do Fracttal dessas pessoas (para o solicitante, que é texto livre)."""
     from ..cadastro import setores as S
-    from ..campo import visao
-    st = S.ler(visao._base(), visao._sessao())
+    from ..dados import conexao
+    st = S.ler(*conexao.banco())
     if not st.get("lido_em"):
         raise RuntimeError(st.get("erro") or "o livro dos setores não veio")
     ids = {os_equipe._norm(s["nome"]): s["setor_id"] for s in S.ativos(st.get("setores") or [])}
