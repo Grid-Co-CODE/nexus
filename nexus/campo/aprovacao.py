@@ -56,6 +56,10 @@ _TRAVA = threading.Lock()
 # feita uma vez por fila lida (logo depois da releitura e ao subir, em segundo plano) e vale até a fila mudar; o filtro
 # da tela (o responsável) é feito sobre ela, na hora
 _PRONTA: dict = {}
+# as OS aprovadas pelo Nexus ({id_wo: hora}): a releitura que começou antes do Aprovar não as devolve à fila (achado 2 da
+# auditoria de 08/11/2026: um lote de aprovações durante os minutos da releitura voltava inteiro para o quadro)
+_APROVADAS: dict = {}
+APROVADA_VALE_S = 20 * 60
 
 
 class _Usinas(list):
@@ -101,6 +105,9 @@ def _reler(app):
             # paciente: 2 de uma vez e 1 min de pausa depois de uma recusa (era 6 de uma vez: rajada na cota da empresa)
             linhas = regras_app._fx_wo_paralelo(2, "final_date", regras_app.SUP_CAP_BACKLOG, paciente=True)
         agora = time.time()
+        for k in [k for k, t in _APROVADAS.items() if agora - t > APROVADA_VALE_S]:
+            del _APROVADAS[k]
+        linhas = [w for w in linhas if str(w.get("id_work_order")) not in _APROVADAS]
         regras_app._FILA_CACHE.update(t=agora, ts=agora, linhas=linhas)     # como o _fila_bruta do App grava
         _ESTADO.update(erro="", erro_em=0.0)
         if app:
@@ -391,6 +398,8 @@ def os_na_fila(id_wo) -> dict | None:
 
 def tirar_da_fila(id_wo) -> int:
     """A OS aprovada pelo Nexus sai da fila guardada na hora (sem esperar a releitura de 10 min). Quantas tarefas saíram."""
+    if id_wo:
+        _APROVADAS[str(id_wo)] = time.time()
     linhas = regras_app._FILA_CACHE.get("linhas")
     if not linhas or not id_wo:
         return 0
@@ -423,6 +432,7 @@ def tarefas_do_app() -> dict[str, set[str]] | None:
 
 def limpar():
     _PRONTA.clear()
+    _APROVADAS.clear()
     _ESTADO.update(lendo=False, erro="", erro_em=0.0)
     _GRAVA.update(rodando=False, sujo=False)
     regras_app._FILA_CACHE.update(t=0.0, ts=None, linhas=None)

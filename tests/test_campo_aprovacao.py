@@ -193,3 +193,22 @@ def test_a_os_que_sai_da_fila_sai_da_conta_pronta(app, campo):
         aprovacao.tirar_da_fila(15102)
         depois = aprovacao.fila_toda(aprovacao.FILA_INTEIRA)
     assert 15102 not in {x.get("id_wo") for x in depois.dados["linhas"]}
+
+
+def test_a_os_aprovada_durante_a_releitura_nao_volta_para_a_fila(app, campo, monkeypatch, tmp_path):
+    """Achado 2 da auditoria de 08/11/2026: a releitura da fila (minutos) começa antes do Aprovar; a troca devolvia a OS
+    aprovada à fila e ao disco, e quem clicava de novo mandava Concluir de uma OS já finalizada."""
+    from nexus.campo import regras_app
+    app.config.update(NEXUS_DADOS=str(tmp_path))
+    lida = regras_app._fx_wo_paralelo
+
+    def lendo(*a, **kw):
+        linhas = lida(*a, **kw)             # o Fracttal ainda devolve a OS 15102
+        aprovacao.tirar_da_fila(15102)      # a pessoa aprova no meio da leitura
+        return linhas
+    monkeypatch.setattr(regras_app, "_fx_wo_paralelo", lendo)
+    aprovacao.limpar()
+    aprovacao._reler(app)
+    assert 15102 not in {w.get("id_work_order") for w in regras_app._FILA_CACHE["linhas"]}
+    assert 15002 in {w.get("id_work_order") for w in regras_app._FILA_CACHE["linhas"]}
+    aprovacao.limpar()
