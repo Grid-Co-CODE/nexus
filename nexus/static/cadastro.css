@@ -612,15 +612,19 @@ details.csv-extra>.cad-sub{padding:0 14px 12px}
 
 /* Acessos, 07/11/2026: seções recolhidas (Administradores, os históricos) com a contagem no título, e a caixa de cada
    torre com as 5 primeiras telas à vista e o resto em "Mais N" (Levi: "padronizar o tamanho") */
-details.ace-recolhe>summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer}
+details.ace-recolhe>summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 16px;
+  min-height:44px;box-sizing:border-box}
 details.ace-recolhe>summary::-webkit-details-marker{display:none}
-details.ace-recolhe>summary h2{margin:0}
-details.ace-recolhe>summary::after{content:"";width:8px;height:8px;margin-left:auto;border-right:2px solid var(--mudo);
-  border-bottom:2px solid var(--mudo);transform:rotate(45deg);transition:transform .15s}
-details.ace-recolhe[open]>summary::after{transform:rotate(-135deg)}
-details.ace-recolhe[open]>summary{margin-bottom:12px}
-details.ace-recolhe>summary:focus-visible{outline:2px solid var(--foco);outline-offset:4px;border-radius:4px}
-.ace-recolhe-n{font:600 12px/1 var(--font-sans);color:var(--tinta-2);background:var(--superficie-2);padding:4px 9px;
+/* o título dentro do summary com o mesmo desenho do h2 das outras seções (.cad-secao>h2): sem isso ele pegava o h2
+   grande da página e saía da barra (Levi, 07/11/2026: "Esses nomes não estão cabendo direito na barras") */
+details.ace-recolhe>summary h2{font:700 13px/18px var(--font-sans);margin:0;padding:0;border:0;color:var(--tinta)}
+details.ace-recolhe>summary::after{content:"";flex:none;width:7px;height:7px;margin:0 2px 3px auto;
+  border-right:2px solid var(--mudo);border-bottom:2px solid var(--mudo);transform:rotate(45deg);transition:transform .15s}
+details.ace-recolhe[open]>summary::after{transform:rotate(-135deg);margin-bottom:-3px}
+details.ace-recolhe[open]>summary{border-bottom:1px solid var(--linha)}
+details.ace-recolhe>summary:hover h2{color:var(--verde-texto)}
+details.ace-recolhe>summary:focus-visible{outline:2px solid var(--foco);outline-offset:-2px;border-radius:var(--raio-md)}
+.ace-recolhe-n{font:600 11.5px/1 var(--font-sans);color:var(--tinta-2);background:var(--superficie-2);padding:4px 9px;
   border-radius:999px}
 details.ace-mais>summary{cursor:pointer;font-size:12.5px;color:var(--verde-texto);padding:4px 0 0;font-weight:600}
 details.ace-mais>summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
