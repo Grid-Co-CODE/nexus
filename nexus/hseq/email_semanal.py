@@ -86,7 +86,7 @@ def destinatarios(cfg) -> dict:
     from ..auth.setor_telas import setor_de_cada_codigo
     from ..cadastro import setores as S
     from ..campo import visao
-    from ..campo.ligacao_cadastro import mapas_de
+    from ..cadastro.ligacao_campo import mapas_de
     out = {"tst": [], "responsaveis": {}, "erro": ""}
     b = visao._Base()
     try:

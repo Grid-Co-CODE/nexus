@@ -21,7 +21,7 @@ import hashlib
 from datetime import datetime, timezone
 
 from . import banco_campo, regras_app
-from .ligacao_cadastro import codigo_da_pessoa
+from ..cadastro.ligacao_campo import codigo_da_pessoa
 
 LIVRO_FECHAMENTOS = "fechamentos_app_campo"
 LIVRO_RONDAS = "rondas_app_campo"

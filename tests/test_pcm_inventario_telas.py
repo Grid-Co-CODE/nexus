@@ -18,7 +18,7 @@ from test_pcm_publicar import _no_setor
 from test_setor_telas import ANA, _como, setores  # noqa: F401  (setores é fixture)
 
 from nexus.campo import visao
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.dados import almoxarifado as A
 from nexus.dados import fato_inventario as F
 from nexus.pcm.inventario import estoque as E

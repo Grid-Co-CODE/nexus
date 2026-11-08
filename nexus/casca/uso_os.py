@@ -15,7 +15,7 @@ disco e leva ao banco (`drenar`) e que o Raio-X mostra (`instantaneo`).
 - **O que conta:** todo pedido a `/os/*` e `/t/os/*` de quem entrou (`teto_os.do_os_creator` tira os estáticos e a
   pré-carga; sem sessão o portão manda ao login, e isso não é uso). Medido do `before_request` ao `teardown_request`: é o
   tempo até a resposta estar montada, não o do envio do corpo.
-- **Pessoas distintas, sem guardar quem:** o HMAC do e-mail da sessão (`campo/ligacao_cadastro.codigo_da_pessoa`, com a
+- **Pessoas distintas, sem guardar quem:** o HMAC do e-mail da sessão (`cadastro/ligacao_campo.codigo_da_pessoa`, com a
   chave das pessoas ou, sem ela, a do app) num conjunto só na memória, por balde. Nunca vai a disco nem ao banco, nem
   mesmo o código: o que sobra é a contagem. A senha de administrador não traz pessoa.
 - **Duração:** um histograma de faixas de 3% por balde (só contagens, que somam e se gravam no disco sem guardar um
@@ -271,7 +271,7 @@ def _pessoa() -> str | None:
     email = str(usuario.get("email") or "").strip().lower() if isinstance(usuario, dict) else ""
     if not email:
         return None
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     cfg = current_app.config
     return codigo_da_pessoa(str(cfg.get("NEXUS_PESSOA_HMAC") or cfg.get("SECRET_KEY") or ""), email)
 

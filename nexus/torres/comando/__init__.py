@@ -73,7 +73,7 @@ def _meu_hmac() -> str:
     email = str(u.get("email") or "").strip().lower() if isinstance(u, dict) else ""
     if not email:
         return ""
-    from ...campo.ligacao_cadastro import codigo_da_pessoa
+    from ...cadastro.ligacao_campo import codigo_da_pessoa
     return (codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or "").lower()
 
 

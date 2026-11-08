@@ -79,7 +79,7 @@ def conta_dos_codigos(cfg, base) -> dict:
     from collections import defaultdict
 
     from ..dados import conexao
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     chave, chave_hmac = cfg.get("NEXUS_CHAVE_CADASTRO"), cfg.get("NEXUS_PESSOA_HMAC")
     # a ficha desligada ou excluída não ganha código nem pelo e-mail nem pela ligação (2ª revisão de 05/11/2026: a ligação
     # feita antes do desligamento vencia o e-mail da ficha nova, e o recontratado ficava sem código na ficha ativa)

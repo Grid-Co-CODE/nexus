@@ -17,7 +17,7 @@ from test_campo_visao import CHAVE, CHAVE_CADASTRO, DE_PARA, HOJE, _aba, _pessoa
 from ferramentas import importar_avulsas_planilha as IMP
 from nexus.cadastro.cifra import Cofre
 from nexus.campo import ronda_avulsa as RA
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.dados import fato_ronda as FR
 from nexus.dados import fatos
 

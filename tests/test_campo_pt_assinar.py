@@ -13,7 +13,7 @@ import pytest
 
 from nexus.cadastro.cifra import Cofre
 from nexus.campo import decisao_pt, visao
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from test_campo_visao import (CHAVE, CHAVE_CADASTRO, USINAS, _aba, _entrar_no_fracttal, _jwt, _pessoas, _pt,
                               _pt4_de_dois_equipamentos, banco)  # noqa: F401 (banco é fixture)
 

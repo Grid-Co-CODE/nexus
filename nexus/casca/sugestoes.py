@@ -253,7 +253,7 @@ def _quem(usuario) -> dict:
     if not email:
         raise Recusada("Entre com o seu login (Microsoft ou Fracttal) para mandar uma sugestão: a senha de administrador "
                        "não diz quem é a pessoa")
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     cfg = current_app.config
     codigo = codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), email)
     if not codigo:
@@ -500,7 +500,7 @@ def contador(admin: bool, email: str) -> int | None:
     if not admin:
         if not email:
             return None
-        from ..campo.ligacao_cadastro import codigo_da_pessoa
+        from ..cadastro.ligacao_campo import codigo_da_pessoa
         hmac_p = codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), email)
         if not hmac_p:
             return None

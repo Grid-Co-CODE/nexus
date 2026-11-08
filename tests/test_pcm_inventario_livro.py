@@ -350,7 +350,7 @@ def test_dados_cifrados_nao_entra_pronto(cfg):
 def test_pessoa_hmac_e_o_codigo_de_24_hexadecimais(cfg):
     """O código de verdade é o `ligacao_cadastro.codigo_da_pessoa` (24 hexadecimais minúsculos). Nome, e-mail ou qualquer
     outro texto na coluna é recusado, nos três fatos."""
-    from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+    from nexus.cadastro.ligacao_campo import codigo_da_pessoa
     real = codigo_da_pessoa("chave-hmac-de-teste", "pessoa.teste@exemplo.com")
     assert F._RE_HMAC.fullmatch(real)
     F.acrescentar(cfg, F.ABA_EVENTO, [_ev(pessoa_hmac=real)])

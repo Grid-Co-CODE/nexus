@@ -357,7 +357,7 @@ def _quem(usuario, pode: bool) -> dict:
     if not email:
         raise Recusada("Entre com o seu login (Fracttal ou Microsoft) para registrar: a senha de administrador não diz "
                        "quem é a pessoa")
-    from .ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     cfg = current_app.config
     codigo = codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), email)
     if not codigo:

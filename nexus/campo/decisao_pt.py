@@ -47,7 +47,7 @@ from ..cadastro.esquema import VINCULO_COS
 from ..dados import fatos as D
 from ..dados import livros
 from . import visao
-from .ligacao_cadastro import codigo_da_pessoa
+from ..cadastro.ligacao_campo import codigo_da_pessoa
 
 LIVRO, NOME_LIVRO, ABA = "nexus_pt_decisoes", "Nexus · decisões de PT", "fato_decisao_pt"
 # As colunas de 05/10/2026 e o `codigo_ativo` NO FIM (decisão 4, 11/10/2026): coluna nova entra depois das que existem,

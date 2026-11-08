@@ -18,7 +18,7 @@ import pytest
 from pg_falso import ApiPGFalsa
 
 from nexus.cadastro.cifra import gerar_chave
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.dados import catalogo, explica, livros, radar
 from nexus.pcm import admins_app as AA
 from nexus.pcm import atribuicoes as A

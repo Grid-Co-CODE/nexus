@@ -223,7 +223,7 @@ def excluir(setor_id, cfg, base, sessao, quem: str = "") -> dict:
 def definir(pessoas: list[dict], setor_id, cfg, base, sessao, quem_email: str = "") -> dict:
     """Põe as `pessoas` (do Fracttal, com a ficha ligada: `fracttal_pessoal.ligar`) no setor `setor_id` (None = tira do
     setor). Quem já está nele não ganha linha nova. {"gravadas", "iguais", "setor"}."""
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from .ligacao_campo import codigo_da_pessoa
     if not pessoas:
         raise Recusada("Marque ao menos uma pessoa.")
     if len(pessoas) > LOTE_MAX:

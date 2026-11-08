@@ -78,7 +78,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ...campo.ligacao_cadastro import codigo_da_pessoa
+from ...cadastro.ligacao_campo import codigo_da_pessoa
 from ...dados import almoxarifado as A
 from ...dados import fato_inventario as F
 from . import contas, travas

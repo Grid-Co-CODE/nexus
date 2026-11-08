@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from nexus.cadastro.cifra import gerar_chave
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.pcm import geracao as G
 from nexus.pcm import motivos as M
 from nexus.pcm import quadro as Q

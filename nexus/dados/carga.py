@@ -101,7 +101,7 @@ def _mapas(config, sessao) -> dict:
     NEXUS_PESSOA_HMAC, o mapa dos códigos vem vazio. O nome só fica na memória: nunca vai ao fato."""
     if not config.get("NEXUS_CHAVE_CADASTRO"):
         return {}
-    from ..campo.ligacao_cadastro import mapas
+    from ..cadastro.ligacao_campo import mapas
     return _sem_chave_sem_codigo(config, mapas(config, sessao))
 
 
@@ -110,7 +110,7 @@ def mapas_das_linhas(config, de_para: list[dict], pessoas: list[dict]) -> dict:
     Kimball, 08/10/2026) com a MESMA tradução da carga, sem reler o cadastro."""
     if not config.get("NEXUS_CHAVE_CADASTRO"):
         return {}
-    from ..campo.ligacao_cadastro import mapas_de
+    from ..cadastro.ligacao_campo import mapas_de
     return _sem_chave_sem_codigo(config, mapas_de(config, de_para, pessoas))
 
 

@@ -33,6 +33,7 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 | `estrutura_campo.py` | a carga única da estrutura de O&M de 10/2026 (regiões de campo, código e região das equipes) e a conferência dela (`ferramentas/importar_estrutura_campo.py`) |
 | `fracttal_pessoal.py` + `telas_fracttal.py` | tela Base → Acessos → Pessoas e setores: o pessoal do Fracttal ao lado do cadastro de pessoas (12/10/2026) |
 | `setores.py` | o setor de cada pessoa do Fracttal e a lista de setores, no livro `nexus_setores` do banco (12/10/2026) |
+| `ligacao_campo.py` | a ligação por ID do que o App de Campo grava: `usina_id` pelo `de_para`, `pessoa_id` pelo nome e `codigo_da_pessoa` (o HMAC do e-mail que o App manda). Morava em `campo/ligacao_cadastro.py` até 08/11/2026 (32 módulos, inclusive 5 fatos de `dados/`, iam ao Campo buscar a chave comum); o endereço antigo reexporta daqui para os ramos em andamento |
 | `estrutura_usina.py` + `telas_equipamentos.py` | tela Base → Equipamentos das usinas: a usina ligada à mão às chaves do supervisório e os equipamentos dela nas colunas da aba Equipamentos (cabines, inversores, strings, potência), no livro `nexus_estrutura_usina` (13/10/2026; sem Fracttal na tela) |
 | `telas.py` | as rotas, penduradas nas torres Base e Pessoas |
 

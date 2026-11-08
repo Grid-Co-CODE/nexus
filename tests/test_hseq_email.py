@@ -12,7 +12,7 @@ from test_hseq_extintores import com_cadastro, com_livro  # noqa: F401  (fixture
 from test_hseq_mesa import _com_casos
 
 from nexus.cadastro import setores as S
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.hseq import email_semanal as ES
 
 TST = codigo_da_pessoa(CHAVE, "tst@exemplo.test")

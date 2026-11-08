@@ -84,7 +84,7 @@ def gravar(escolhas: dict[str, int | None], atuais: dict[str, int | None], cfg, 
            quem_email: str = "") -> dict:
     """Grava o dono dos relatórios que MUDARAM (`escolhas` contra o dono de agora, `atuais`, que já conta o padrão do
     código): abrir e salvar sem mexer não grava nada. {"gravadas": n}."""
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     token = cfg.get("GRIDCO_SQL_TOKEN")
     if not token:
         raise Recusada("Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN): nada foi gravado.")

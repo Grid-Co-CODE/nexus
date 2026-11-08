@@ -4,7 +4,7 @@ import pytest
 from test_campo_visao import banco  # noqa: F401  (fixture: o banco falso)
 from test_comando_insights import PESSOA, _aberta, _cliente, _codigo, limpo, motor_dublado  # noqa: F401  (fixtures)
 
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.comando import conversa as CV
 from nexus.comando import motor as MO
 from nexus.dados import catalogo, explica

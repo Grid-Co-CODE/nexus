@@ -48,8 +48,8 @@ import json
 from collections import Counter
 from datetime import datetime, timezone
 
-from ..campo.ligacao_cadastro import _norm as norm_nome
-from ..campo.ligacao_cadastro import codigo_da_pessoa
+from ..cadastro.ligacao_campo import _norm as norm_nome
+from ..cadastro.ligacao_campo import codigo_da_pessoa
 from . import dominios as DOM
 from .equipamento import FORA_DA_DIMENSAO
 from .fatos import _id, _int, _txt, data_do_registro, ligar_equipamento, pct_versao

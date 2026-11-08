@@ -77,7 +77,7 @@ def radar_usina_trocada(rows, lig) -> list[dict]:
     """Os pares (Classificação 1, usina da localização) que não batem, com os ativos, quantas tarefas e as OS: a
     "trocada" primeiro, depois a que tem mais ativos. Não liga nada nem muda a usina do fato: só mostra, para quem
     administra o Fracttal corrigir na origem (o Nexus não escreve no Fracttal)."""
-    from ..campo.ligacao_cadastro import _norm as norm_fracttal
+    from ..cadastro.ligacao_campo import _norm as norm_fracttal
     pares: dict = {}
     for w in rows or ():
         site, loc = _txt(w.get("groups_1_description")), _usina_da_localizacao(w.get("parent_description"))

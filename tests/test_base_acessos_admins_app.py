@@ -28,7 +28,7 @@ from nexus.cadastro import setores as S
 from nexus.cadastro import telas_fracttal as TF
 from nexus.cadastro.cifra import Cofre, gerar_chave
 from nexus.campo import fracttal, visao
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.pcm import admins_app as AA
 from nexus.pcm import atribuicoes as A
 

@@ -16,7 +16,7 @@ from test_campo_visao import CHAVE, CHAVE_CADASTRO, _aba, _dia, _ronda, banco  #
 
 from nexus.cadastro.cifra import Cofre
 from nexus.campo import aprovacao, fonte_pg, livros_app, ronda_checklist, visao
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.dados import carga, fato_pt, fato_ronda, fatos, livros
 
 BASE = "http://pg.falso"

@@ -19,7 +19,7 @@ from test_campo_visao import BRT, CHAVE, CHAVE_CADASTRO, USINAS, _aba, _pessoas,
 
 from nexus.cadastro.cifra import Cofre
 from nexus.campo import visao
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.hseq import extintores as EXT
 from nexus.pcm import atribuicoes as ATR
 

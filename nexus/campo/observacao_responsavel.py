@@ -25,7 +25,7 @@ from flask import current_app
 from ..dados import fatos as D
 from ..dados import livros
 from . import visao
-from .ligacao_cadastro import codigo_da_pessoa
+from ..cadastro.ligacao_campo import codigo_da_pessoa
 
 LIVRO, NOME_LIVRO, ABA = "nexus_observacoes", "Nexus · observações do responsável", "fato_observacao_responsavel"
 CAB = ("id", "escrita_em", "data_id", "mes_id", "usina_id", "pessoa_id", "pessoa_hmac", "quem_cifrado", "texto_cifrado",

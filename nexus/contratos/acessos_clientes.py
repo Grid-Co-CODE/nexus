@@ -142,7 +142,7 @@ def _ler(aba_livro=(LIVRO, ABA)) -> list[dict]:
 
 
 def _quem(usuario) -> str:
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     email = str((usuario or {}).get("email") or "").strip().lower()
     return codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or ("admin" if not email else "")
 

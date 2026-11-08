@@ -348,7 +348,7 @@ def _gravar_cru(cfg, cru: dict) -> None:
 
 def _quem(cfg, usuario: dict | None) -> tuple[str, str]:
     """(o código de quem decide, o nome); sem login de pessoa (a senha de administrador), Recusada."""
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     email = str((usuario or {}).get("email") or "").strip().lower()
     codigo = codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), email) if email else ""
     if not codigo:

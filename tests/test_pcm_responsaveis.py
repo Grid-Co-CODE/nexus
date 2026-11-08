@@ -191,7 +191,7 @@ def _setores(monkeypatch, decisoes):
 
 
 def _h(cfg, email):
-    from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+    from nexus.cadastro.ligacao_campo import codigo_da_pessoa
     return codigo_da_pessoa(cfg["NEXUS_PESSOA_HMAC"], email)
 
 

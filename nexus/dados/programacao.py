@@ -56,7 +56,7 @@ import unicodedata
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
 
-from ..campo.ligacao_cadastro import _norm as norm_nome
+from ..cadastro.ligacao_campo import _norm as norm_nome
 from .calendario import data_id as _data_id
 from .fatos import ligar_equipamento
 from .fatos import tarefa_chave as _tarefa_chave_unica

@@ -33,7 +33,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 from ..cadastro.banco import codigo_do_equipamento, sufixo_codigo
-from ..campo.ligacao_cadastro import _norm as norm_fracttal
+from ..cadastro.ligacao_campo import _norm as norm_fracttal
 from .calendario import data_id as _data_id
 
 SISTEMA_FRACTTAL = "Fracttal · Classificação 1"

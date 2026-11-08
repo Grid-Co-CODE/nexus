@@ -1497,7 +1497,7 @@ def ronda_avulsa_lancar():
         except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, nada some calado
             erro = f"Não consegui gravar no banco ({type(e).__name__}). Tente de novo em instantes."
     leitura = visao.rondas()
-    from ...campo.ligacao_cadastro import codigo_da_pessoa
+    from ...cadastro.ligacao_campo import codigo_da_pessoa
     from flask import current_app
     meu = codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), (usuario or {}).get("email") or "") if usuario else ""
     minhas = [r for r in (leitura.dados or {}).get("todas") or [] if r.get("avulsa") and meu and r.get("avulsa_hmac") == meu]

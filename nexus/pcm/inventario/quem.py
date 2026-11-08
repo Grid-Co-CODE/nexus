@@ -24,7 +24,7 @@ def _mapa_de_codigos(cfg) -> dict:
         return _MAPA["mapa"]
     try:
         from ...campo import visao
-        from ...campo.ligacao_cadastro import mapas_de
+        from ...cadastro.ligacao_campo import mapas_de
         mapa = mapas_de(cfg, [], visao._livro("cadastro_nexus", "pessoas"))["hmac"]
     except Exception:       # noqa: BLE001 — sem o cadastro (banco fora, chave que não vale, teste): sem o pessoa_id
         return {}
@@ -40,7 +40,7 @@ def limpar() -> None:
 def colunas(cfg, pessoa: dict | None) -> dict:
     """`{"pessoa_hmac": ..., "pessoa_id": ...}` de quem decidiu, só com o que se sabe (sem e-mail, vazio). `pessoa` é o
     `{"email", "nome"}` da sessão; um `"id"` já resolvido por quem chama vale."""
-    from ...campo.ligacao_cadastro import codigo_da_pessoa
+    from ...cadastro.ligacao_campo import codigo_da_pessoa
     pessoa = pessoa or {}
     email = str(pessoa.get("email") or "").strip().lower()
     codigo = codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), email) if email else None

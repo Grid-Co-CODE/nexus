@@ -236,7 +236,7 @@ def decidir(cfg, *, pessoa_id, pessoa_hmac: str, ativo: bool, usuario: dict | No
     """Pôr (`ativo`) ou tirar uma pessoa dos administradores do App. {"gravou", "texto"}; `Recusada` com o motivo quando
     não vale. Tirar: o `pessoa_hmac` da linha que pôs (o que vale hoje). `pessoa_id` None = sem ficha (a pessoa de
     Pessoas e setores sem ficha ou o avulso); `email` só no pôr do avulso: o código sai dele, e ele vai só cifrado."""
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     from .motivos import _quem
     chave = str(cfg.get("NEXUS_PESSOA_HMAC") or "").strip()
     if not chave:

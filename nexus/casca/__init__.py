@@ -155,7 +155,7 @@ def _sugestoes():
         # Minhas sugestões (28/10/2026, Levi: "Do lado direito tem um espaço para 'Minhas sugestões' - a pessoa consegue
         # ver o que mandou e qual status está"): pelo código do e-mail, em claro no livro
         if email:
-            from ..campo.ligacao_cadastro import codigo_da_pessoa
+            from ..cadastro.ligacao_campo import codigo_da_pessoa
             meu = (codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or "").lower()
             minhas = [x for x in lista if meu and x["pessoa_hmac"] == meu]
     resp = render_template("sugestoes.html", aba="sugestoes", areas=areas, form=form, erro=erro,

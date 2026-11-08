@@ -148,7 +148,7 @@ def _linha_de(atividade: str, evento: str, lista: list | None, conta: dict, tipo
         raise Recusada("Entre com o seu login do Fracttal no OS Creator: sem ele não se sabe quem mudou o padrão")
     if not current_app.config.get("GRIDCO_SQL_TOKEN"):
         raise Recusada("Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN)")
-    from ...campo.ligacao_cadastro import codigo_da_pessoa
+    from ...cadastro.ligacao_campo import codigo_da_pessoa
     quem = (codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or "").lower()
     if not quem:
         raise Recusada("Este Nexus não tem a chave do código da pessoa (NEXUS_PESSOA_HMAC)")

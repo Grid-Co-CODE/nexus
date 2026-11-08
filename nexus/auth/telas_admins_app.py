@@ -85,7 +85,7 @@ def _cadastro(cfg) -> dict:
     ele sem ficha (Pessoas e setores, o avulso) também não entra. O `dominios` só guarda o domínio (o marcador de outro
     domínio), nunca o e-mail. Sem a chave do cadastro, os nomes pelo número (e só os códigos de Pessoas e setores)."""
     from ..campo import visao
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     from ..pcm import responsaveis as RP
     try:
         linhas = visao._livro("cadastro_nexus", "pessoas")
@@ -131,7 +131,7 @@ def _pessoas_e_setores(cfg) -> dict:
     from ..cadastro import setores as S
     from ..cadastro import telas_fracttal as TF
     from ..campo import visao
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     out = {"pessoas": [], "dominios": {}, "estado_fracttal": "fora", "idade_s": None, "vencida": False,
            "erro_setores": ""}
     try:
@@ -264,7 +264,7 @@ def _do_codigo(uniao: list[dict], codigo: str) -> dict | None:
 def _emails_conhecidos(cfg) -> dict:
     """{código: e-mail} dos administradores do Nexus e de quem entrou em 30 dias: quem decide aqui é administrador, e o
     do escritório não tem ficha no cadastro (o e-mail só aparece nesta tela, que já é de administrador)."""
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     from . import acessos as AC
     from . import admins_do_servidor
     chave = cfg.get("NEXUS_PESSOA_HMAC")
@@ -480,7 +480,7 @@ def por_email(cfg, email, obs, usuario) -> str:
     porquê; o de ninguém, ou o de quem só está sem o nome do Fracttal, vai sem ficha, com o e-mail só cifrado (3ª revisão
     de 05/11/2026: o e-mail digitado já diz quem é, e depois de todo deploy a cópia do Fracttal ainda não chegou). O texto
     do aviso, ou `AA.Recusada`."""
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     chave = str(cfg.get("NEXUS_PESSOA_HMAC") or "").strip()
     if not chave:
         raise AA.Recusada(SEM_HMAC)

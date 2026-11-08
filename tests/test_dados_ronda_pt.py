@@ -9,7 +9,7 @@ import pytest
 from pg_falso import ApiPGFalsa
 
 from nexus.campo import ronda_avulsa
-from nexus.campo.ligacao_cadastro import _norm
+from nexus.cadastro.ligacao_campo import _norm
 from nexus.dados import dominios as DOM
 from nexus.dados import fato_pt as FP
 from nexus.dados import fato_ronda as FR

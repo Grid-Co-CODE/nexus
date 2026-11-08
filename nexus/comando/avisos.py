@@ -87,7 +87,7 @@ def _norm(nome) -> str:
 
 
 def _codigo(texto: str) -> str:
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     return (codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), texto) or "").lower()
 
 

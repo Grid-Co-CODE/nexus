@@ -28,7 +28,7 @@ import re
 from datetime import timedelta, timezone
 
 from ...campo import visao
-from ...campo.ligacao_cadastro import codigo_da_pessoa, mapas_de
+from ...cadastro.ligacao_campo import codigo_da_pessoa, mapas_de
 from ...dados import almoxarifado as A
 from ...dados import fato_inventario as F
 from ...dados import fatos as D

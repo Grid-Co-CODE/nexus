@@ -135,7 +135,7 @@ def vigentes(decisoes: list[dict]) -> dict[int, set[str]]:
 def gravar(setor_id: int, marcadas, todas, cfg, base, sessao, quem_email: str = "") -> dict:
     """Grava o que mudou na matriz de um setor: para cada tela de `todas`, liberada se está em `marcadas`. Só a tela que
     mudou ganha linha (abrir e salvar sem mexer não grava nada). {"gravadas", "liberadas"}."""
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     token = cfg.get("GRIDCO_SQL_TOKEN")
     if not token:
         raise Recusada("Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN): nada foi gravado.")
@@ -279,7 +279,7 @@ def setor_da_pessoa(cfg, email: str, base: str, sessao) -> dict | None:
     """{"id", "nome"} do setor de agora da pessoa do login, ou None: sem setor, setor excluído, ou sem a
     NEXUS_PESSOA_HMAC (sem ela não há como achar a pessoa nas decisões). O banco nunca lido levanta erro: "não consegui
     ler" não é "sem setor"."""
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     codigo = codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), email)
     if not codigo:
         return None

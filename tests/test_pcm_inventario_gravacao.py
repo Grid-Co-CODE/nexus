@@ -18,7 +18,7 @@ from test_campo_visao import CHAVE, banco  # noqa: F401  (banco é fixture)
 from test_pcm_inventario_leitura import AGORA, _linha, inv  # noqa: F401  (inv é fixture)
 from test_pcm_inventario_telas import EMAIL, LISTA, _cenario, _estoque, _pcm
 
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.dados import fato_inventario as F
 from nexus.dados.fato_almoxarifado import LIGADA_DE_PARA
 from nexus.pcm.inventario import contas

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from nexus.campo import visao
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.dados import catalogo
 from test_campo_visao import CHAVE, _aba, banco  # noqa: F401  (fixture)
 

@@ -12,7 +12,7 @@ import pytest
 from pg_falso import ApiPGFalsa
 from nexus.cadastro.cifra import Cofre, gerar_chave
 from nexus.campo import visao
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 from nexus.pcm import atribuicoes as A
 from nexus.pcm import tecnicos_usina as T
 from test_pcm_atribuicoes import Relogio

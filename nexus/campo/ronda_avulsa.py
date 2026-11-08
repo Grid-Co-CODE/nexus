@@ -35,7 +35,7 @@ from ..dados import dominios as DOM
 from ..dados import fatos as D
 from ..dados import livros
 from . import visao
-from .ligacao_cadastro import codigo_da_pessoa
+from ..cadastro.ligacao_campo import codigo_da_pessoa
 
 LIVRO, NOME_LIVRO, ABA = "nexus_rondas_avulsas", "Nexus · rondas avulsas", "fato_ronda_avulsa"
 CAB = ("id", "lancada_em", "data_id", "data", "inicio", "fim", "duracao_min", "usina_id", "equipe_id", "pessoa_id",

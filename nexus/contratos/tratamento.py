@@ -115,7 +115,7 @@ def estado(linhas: list[dict] | None = None) -> dict:
 
 def codigo(usuario) -> str | None:
     """O código da pessoa do login (o mesmo do App e dos setores), ou None sem e-mail ou sem a NEXUS_PESSOA_HMAC."""
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     email = str((usuario or {}).get("email") or "").strip().lower()
     return codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) if email else None
 

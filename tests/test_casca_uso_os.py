@@ -185,7 +185,7 @@ def _cliente(app, email=_UM, **sessao):
 
 
 def _codigo(email):
-    from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+    from nexus.cadastro.ligacao_campo import codigo_da_pessoa
     return codigo_da_pessoa(_CHAVE_PESSOA, email)
 
 

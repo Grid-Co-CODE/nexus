@@ -903,7 +903,7 @@ def test_ponta_a_ponta_grava_as_4h45_o_que_o_disco_guardou_e_nada_pessoal_vai_ao
     assert total[2026103010]["pedidos_qtd"] == 2 and total[2026103010]["pico_minuto_qtd"] == 2
     assert all(l["origem"] != "*" for l in banco.linhas(LIVRO_OUT, ABA_FRA))      # o detalhe não tem a linha de total
     # o setor, o e-mail e o código da pessoa não estão em lugar nenhum do banco (tabelas, cabeçalhos, livros)
-    from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+    from nexus.cadastro.ligacao_campo import codigo_da_pessoa
     tudo = repr(banco.abas) + repr(banco.workbooks)
     for proibido in (_SETOR, _EMAIL, "exemplo.invalid", codigo_da_pessoa(_CHAVE_PESSOA, _EMAIL), "Setor"):
         assert proibido not in tudo, proibido

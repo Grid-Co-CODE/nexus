@@ -10,7 +10,7 @@ from pg_falso import ApiPGFalsa
 
 from nexus.cadastro.cifra import Cofre, gerar_chave
 from nexus.campo import decisao_pt, fracttal, pt_fracttal, visao
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 
 BRT = timezone(timedelta(hours=-3))
 CHAVE = "chave-de-teste"

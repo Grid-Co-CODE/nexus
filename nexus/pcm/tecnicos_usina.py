@@ -23,7 +23,7 @@ import time
 from datetime import date, datetime, timedelta
 
 from ..campo import visao
-from ..campo.ligacao_cadastro import SISTEMA_FRACTTAL, _norm, codigo_da_pessoa, mapas_de
+from ..cadastro.ligacao_campo import SISTEMA_FRACTTAL, _norm, codigo_da_pessoa, mapas_de
 from ..dados import fatos as D
 from ..dados import livros
 from . import atribuicoes as A

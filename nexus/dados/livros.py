@@ -144,6 +144,10 @@ def _linhas(base, sessao, sid) -> list[dict]:
         offset += PAGINA
 
 
+# público para quem já tem o id da aba (a ligação do cadastro, `cadastro/ligacao_campo.py`, 08/11/2026)
+linhas_da_aba = _linhas
+
+
 def ler(base: str, sessao, livro: str, aba: str | None = None) -> list[dict]:
     """As linhas de uma aba (a 1ª, sem `aba`). Livro ou aba que não existe = vazio."""
     a = abas(base, sessao, livro)

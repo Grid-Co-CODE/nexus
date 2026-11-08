@@ -664,7 +664,7 @@ def _agora() -> str:
 
 
 def _quem(cfg, email: str) -> str:
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from .ligacao_campo import codigo_da_pessoa
     return codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), email) or ""
 
 

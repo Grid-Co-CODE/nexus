@@ -25,7 +25,8 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 
-from . import banco_campo, fracttal, ligacao_cadastro, nota_fracttal, regras_app
+from ..cadastro import ligacao_campo as ligacao_cadastro
+from . import banco_campo, fracttal, nota_fracttal, regras_app
 
 log = logging.getLogger(__name__)
 

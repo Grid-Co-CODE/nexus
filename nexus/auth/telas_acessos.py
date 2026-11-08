@@ -99,7 +99,7 @@ def _ler_setores():
 def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]) -> dict:
     """A seção Telas por setor: os setores (com quantas pessoas e telas), a árvore do menu marcada para o setor escolhido
     e o que cada setor vê (para o "Copiar de"). Põe também o setor em cada login de 30 dias e em cada administrador."""
-    from ..campo.ligacao_cadastro import codigo_da_pessoa
+    from ..cadastro.ligacao_campo import codigo_da_pessoa
     from ..casca import _telas_prontas
     app = current_app._get_current_object()
     cfg = current_app.config

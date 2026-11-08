@@ -7,7 +7,7 @@ from flask import Flask
 from pg_falso import ApiPGFalsa
 
 from nexus.campo import fonte_pg, livros_app, regras_app, tabelas
-from nexus.campo.ligacao_cadastro import codigo_da_pessoa
+from nexus.cadastro.ligacao_campo import codigo_da_pessoa
 
 BASE = "http://pg.falso"
 CHAVE = "chave-de-teste-do-codigo"
