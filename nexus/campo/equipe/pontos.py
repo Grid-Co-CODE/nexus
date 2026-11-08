@@ -3,8 +3,10 @@
 O celular manda lotes `{aparelho, fuso, pontos: [{t, lat, lon, prec, vel, mov}]}`. Aqui cada ponto é validado, filtrado pela
 janela de trabalho NA HORA DO TÉCNICO, e a coordenada é cifrada (Cofre, contexto `equipe/ponto/<ponto_id>`): em claro ela
 existe só na memória do processo. O que vai ao banco (`linha_do_banco`) nunca leva lat/lon. O `Diario` guarda os pontos do
-dia em disco, cifrados, para o mapa sobreviver a um reinício antes de o lote chegar ao banco; passou de 7 dias, o arquivo
-sai (a guarda vale também no disco).
+dia em disco, cifrados, para o mapa sobreviver a um reinício antes de o lote chegar ao banco. A guarda de 7 dias vale no
+disco e na memória e o próprio diário a aplica (`podar`), ao carregar e na virada do dia de Brasília, com ou sem o gravador
+(revisão final de 08/11/2026: só o gravador chamava a limpeza, e sem o NEXUS_EQUIPE_GRAVA=1 a trilha ficaria para sempre).
+Fica o dia de hoje e os 6 de antes: o ponto mais velho que sobra tem menos de 7 dias.
 
 Lógica pura + disco local: sem rota, sem banco (vêm nas tarefas seguintes).
 """
@@ -27,12 +29,13 @@ _FUTURO_TOLERADO = timedelta(minutes=5)   # relógio de celular adiantado um pou
 
 
 def _num(v):
-    """Número finito (bool não conta) ou None."""
+    """Número finito (bool não conta) ou None. O inteiro que não cabe num float (`10**400` no JSON) levanta
+    OverflowError no `float()`: também é None (revisão final de 08/11/2026: escapava como 503 com ERROR no log)."""
     if isinstance(v, bool) or v is None:
         return None
     try:
         x = float(v)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return x if x == x and abs(x) != float("inf") else None
 
@@ -98,24 +101,45 @@ def linha_do_banco(p: dict) -> list:
     return [p[c] for c in CAB_PONTOS]
 
 
-class Diario:
-    """Os pontos do dia em disco, uma linha cifrada por ponto, um arquivo por dia de Brasília."""
+def _limite(hoje: date) -> int:
+    """O 1º data_id que fica: hoje e os 6 dias de antes. O ponto do dia `hoje - 6` tem, no fim de hoje, menos de 7 dias;
+    o do dia `hoje - 7` já pode ter mais (o das 6h dele, às 12h de hoje), e sai inteiro na virada."""
+    return int((hoje - timedelta(days=GUARDA_PONTOS_DIAS - 1)).strftime("%Y%m%d"))
 
-    def __init__(self, pasta: Path, cofre):
+
+def _data_id_do_arquivo(arq: Path) -> int | None:
+    try:
+        return int(arq.stem.split("_")[1])
+    except (ValueError, IndexError):
+        return None
+
+
+class Diario:
+    """Os pontos do dia em disco, uma linha cifrada por ponto, um arquivo por dia de Brasília. `agora` é o relógio do
+    boot (o do serviço; nos testes, o parado): a poda ao carregar é por ele."""
+
+    def __init__(self, pasta: Path, cofre, agora: datetime | None = None):
         self._dir = Path(pasta) / "equipe"
         self._cofre = cofre
         self._trava = threading.Lock()
         self._dias: dict[int, dict[str, dict]] = {}     # data_id -> ponto_id -> ponto
+        self._podado_em: date | None = None             # o dia de Brasília da última poda
         self.linhas_ruins = 0
-        self._carregar()
+        hoje = (agora or datetime.now(timezone.utc)).astimezone(_BRT).date()
+        self._carregar(hoje)
+        self.apagar_velhos(hoje)                        # o arquivo velho que ficou no disco sai já, sem ser lido
 
     def _arquivo(self, data_id: int) -> Path:
         return self._dir / f"pontos_{data_id}.jsonl"
 
-    def _carregar(self) -> None:
+    def _carregar(self, hoje: date) -> None:
         if not self._dir.exists():
             return
+        limite = _limite(hoje)
         for arq in sorted(self._dir.glob("pontos_*.jsonl")):
+            data_id = _data_id_do_arquivo(arq)
+            if data_id is not None and data_id < limite:
+                continue                                # passou de 7 dias: nem decifra (o apagar_velhos tira)
             for linha in arq.read_text(encoding="utf-8").splitlines():
                 if not linha.strip():
                     continue
@@ -176,16 +200,29 @@ class Diario:
                         out[p["pessoa_id"]] = p
         return out
 
+    def podar(self, agora_utc: datetime) -> bool:
+        """A guarda de 7 dias sem depender do gravador: na 1ª chamada de cada dia de Brasília, os dias velhos saem do
+        disco e da memória. Barata nas outras (só compara o dia). True = podou agora."""
+        hoje = agora_utc.astimezone(_BRT).date()
+        with self._trava:
+            if self._podado_em == hoje:
+                return False
+        self.apagar_velhos(hoje)
+        return True
+
     def apagar_velhos(self, hoje: date) -> None:
-        """Tira do disco e da memória os dias com mais de 7 dias."""
-        limite = int((hoje - timedelta(days=GUARDA_PONTOS_DIAS)).strftime("%Y%m%d"))
+        """Tira do disco e da memória os dias que passaram da guarda (fica hoje e os 6 de antes, `_limite`)."""
+        limite = _limite(hoje)
         with self._trava:
             for data_id in [d for d in self._dias if d < limite]:
                 del self._dias[data_id]
             if self._dir.exists():
                 for arq in self._dir.glob("pontos_*.jsonl"):
-                    try:
-                        if int(arq.stem.split("_")[1]) < limite:
-                            arq.unlink()
-                    except (ValueError, IndexError, OSError):
+                    data_id = _data_id_do_arquivo(arq)
+                    if data_id is None or data_id >= limite:
                         continue
+                    try:
+                        arq.unlink()
+                    except OSError as e:
+                        log.warning("equipe: não consegui apagar o diário velho %s (%s)", arq.name, type(e).__name__)
+            self._podado_em = hoje

@@ -216,6 +216,28 @@ def test_a_pagina_e_o_json_nao_tem_coordenada(cliente, pontos, setor):
     for pid in (FORA, SEM_POSICAO, SEM_PERMISSAO):
         r = cliente.get(URL_ROTA, query_string={"tecnico": pid, "usina": USINA_A})
         assert r.status_code == 404 and not [d for d in DIGITOS if d in r.get_data(as_text=True)]
+    # o x/y do desenho dá o lugar aproximado: o "!" diz isso, e não promete o que o SVG não cumpre (revisão final de
+    # 08/11/2026)
+    assert "aproximado" in html and "nunca traz a latitude" not in html
+
+
+@pytest.mark.parametrize("valor", ["²", "1" * 5000], ids=["sobrescrito", "5000_algarismos"])
+def test_numero_torto_na_url_nunca_e_500(cliente, pontos, setor, valor):
+    """`"²".isdigit()` é True e o `int("²")` quebra; o número de 5000 algarismos passa do teto de algarismos do `int`
+    (Python 3.11+) e quebra também: os dois eram 500. Só algarismos ASCII, até 12 (revisão final de 08/11/2026)."""
+    _entrar(cliente, EMAIL[ADMIN], admin=True)
+    assert cliente.get(URL, query_string={"tecnico": valor}).status_code == 200          # sem técnico escolhido
+    assert cliente.get(URL_ROTA, query_string={"tecnico": valor, "usina": USINA_A}).status_code == 404
+    assert cliente.get(URL_ROTA, query_string={"tecnico": NA_USINA, "usina": valor}).status_code == 404
+    assert cliente.post(URL_PILOTO, data={"pessoa_id": valor, "no_piloto": "sim"}).status_code == 400
+
+
+def test_a_pre_carga_nunca_abre_o_mapa(app):
+    """A pré-carga abre as telas por dentro, com uma sessão de administrador, e a volta do boot abre todas: no Mapa de
+    equipe isso subiria o serviço e gravaria na trilha da LGPD um "abriu_mapa" que ninguém abriu (revisão final de
+    08/11/2026)."""
+    from nexus.auth import pre_carga as PC
+    assert "campo/equipe" in PC.SEM_PRE_CARGA and "campo/equipe" not in PC.aqueciveis(app)
 
 
 def test_o_mapa_desenha_quem_esta_na_usina_andando_e_sem_sinal(cliente, pontos, setor):
@@ -256,7 +278,9 @@ def test_parado_fora_de_usina_sem_ponto_e_sem_rota(cliente, pontos, setor):
     assert f"tecnico={FORA}\"" not in _svg(html)                        # não está no mapa
     lado = html.split('class="eq-lado"', 1)[1]
     fora = lado.split("Parados fora de usina", 1)[1].split("</section>", 1)[0]
-    assert NOME[FORA] in fora and "GO" in fora and "a 5,0 km da Usina Alfa Teste" in fora
+    # a distância do parado fora de usina vai em km inteiro (revisão final de 08/11/2026): com a casa decimal, a
+    # distância a duas usinas já cercava a casa no mapa
+    assert NOME[FORA] in fora and "GO" in fora and "a 5 km da Usina Alfa Teste" in fora and "5,0 km" not in html
     # o painel dele: o estado e a distância, sem o Abrir rota
     _, html = _html(cliente, query_string={"tecnico": FORA})
     lado = html.split('class="eq-lado"', 1)[1]
@@ -346,6 +370,30 @@ def test_abrir_o_mapa_registra_o_acesso(cliente, pontos, setor):
     assert all(a["pessoa_id"] == PCM and a["pessoa_hmac"] == hmac_pcm and a["usina_id"] is None for a in acesso)
     assert all(a["instante"] == "2026-11-08T15:00:00Z" and a["data_id"] == 20261108 for a in acesso)
     assert EMAIL[PCM] not in repr(acesso)
+
+
+def test_quem_abriu_e_achado_pelo_email_exato_e_nao_pelo_nome(cliente, pontos, setor):
+    """A trilha da LGPD não pode gravar o homônimo (revisão final de 08/11/2026): o `pessoa_do_login`, sem o e-mail no
+    cadastro, acha pelo nome tirado do próprio e-mail (andre.teste@ -> "andre teste"), e o técnico Andre Teste ficaria
+    registrado como quem abriu o mapa. Sem a ficha do e-mail exato, só o código do e-mail identifica."""
+    email = "andre.teste@gridco.com.br"                       # nenhuma ficha tem este e-mail
+    setor[email] = {"id": SID.COS, "nome": "COS"}              # quem abre é do COS
+    assert _html(_entrar(cliente, email))[0] == 200
+    (a,) = _acessos(pontos)
+    assert a["pessoa_id"] is None and a["pessoa_hmac"] == codigo_da_pessoa(CHAVE_HMAC, email)
+
+
+def test_sem_gravar_o_registro_o_mapa_e_a_rota_nao_abrem(cliente, pontos, setor, monkeypatch):
+    """O registro da LGPD vai a um jornal em disco antes de o mapa ou a rota abrir: sem conseguir gravá-lo (o disco
+    cheio), nada abre, e a posição não sai do servidor sem a trilha."""
+    def disco_cheio(*a, **k):
+        raise OSError("disco cheio (teste)")
+    monkeypatch.setattr(pontos.registro, "acrescentar", disco_cheio)
+    _entrar(cliente, EMAIL[PCM])
+    st, html = _html(cliente)
+    assert st == 503 and NOME[NA_USINA] not in html and "registro" in html
+    r = cliente.get(URL_ROTA, query_string={"tecnico": NA_USINA, "usina": USINA_B})
+    assert r.status_code == 503 and "Location" not in r.headers
 
 
 # ── o piloto ─────────────────────────────────────────────────────────────────────────────────────────────────────────

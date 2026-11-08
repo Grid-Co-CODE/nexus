@@ -1,16 +1,21 @@
 """Mapa de equipe: o estado do processo por trás das três rotas do contrato com o Nexus Field (08/11/2026; as rotas em
 `nexus/torres/campo/equipe_tela.py`).
 
-Um `Servico` por app (`do_app`, em `app.extensions["nexus_equipe"]`), criado no primeiro pedido que precisa dele:
-- as chaves dos aparelhos (`Chaveiro`), relidas do livro `nexus_equipe_aparelhos` ao nascer;
+Um `Servico` por app (`do_app`, em `app.extensions["nexus_equipe"]`), criado no primeiro pedido que precisa dele. O
+desenho supõe UM processo do Nexus por servidor (as chaves, o diário e as filas moram na memória dele):
+- as chaves dos aparelhos (`Chaveiro`), relidas ao nascer do livro `nexus_equipe_aparelhos` e do jornal da fila em disco
+  (`equipe/fila_aparelhos.jsonl`, cifrado: a chave emitida ou revogada pouco antes do reinício, que o banco ainda não
+  tem; revisão final de 08/11/2026);
 - os pontos do dia (`Diario`), relidos do disco ao nascer, para o mapa voltar com as últimas posições depois de um
-  reinício, antes de o lote chegar ao banco;
+  reinício, antes de o lote chegar ao banco; a guarda de 7 dias é podada aqui também, na virada do dia (`podar`);
+- o registro da LGPD (`Registro`), com o jornal dele em disco (`equipe/fila_acessos.jsonl`);
 - o último ponto e a permissão de localização de cada pessoa (`estado_de`, para a tela do mapa);
 - quem é coletado: o piloto (`nexus_equipe_piloto`, cópia de 1 min) e os técnicos de campo ativos do cadastro (cópia de
   5 min), sem ir ao banco a cada lote, que chega de cada celular a cada 2 min.
 
-Nada daqui grava no banco: as chaves novas e as revogadas esperam em `chaveiro.eventos_novos()` e os pontos no diário,
-para a gravação em lote. O que vai ao log é o TIPO do erro: nunca token, chave nem coordenada.
+Nada daqui grava no banco: as chaves novas e as revogadas esperam em `chaveiro.eventos_novos()`, os acessos em
+`registro.novos()` e os pontos no diário, para a gravação em lote. O que vai ao log é o TIPO do erro: nunca token, chave
+nem coordenada.
 
 **O banco fora não é chave inválida** (a mesma regra da Microsoft fora no `token_ms`): sem ter lido o livro das chaves,
 o Nexus não sabe se uma chave vale, e o 401 faria a casca apagar a dela e parar até a próxima abertura do App. Até ler,
@@ -19,8 +24,12 @@ as rotas respondem 503 (a casca guarda a fila e a chave e tenta de novo); a leit
 vazio: o `abas_conferidas` confere a conta de abas do livro.
 
 **Quem é coletado quando o banco não responde:** a cópia boa segue valendo (como no `setor_telas.ler`: a leitura que
-falha devolve a última boa), e sem nenhuma leitura boa ninguém é coletado (`coleta: false`, nunca 500). O cadastro que
-volta sem nenhum técnico de campo é a leitura que falhou (a mesma listagem que omite o livro), não a equipe que sumiu.
+falha devolve a última boa). Sem nenhuma leitura boa, o Nexus NÃO SABE quem está no piloto, quem é técnico nem quem é a
+pessoa do e-mail: `BancoFora` sobe e a rota responde 503 (a casca tenta de novo). Antes da revisão final de 08/11/2026
+isso virava `coleta: false`, e depois de um reinício com o banco piscando todo celular do minuto seguinte parava até a
+próxima abertura do App. Piloto lido e vazio é "ninguém" (frozenset vazio), não falha. O cadastro que volta sem nenhum
+técnico de campo, ou sem ficha nenhuma, é a leitura que falhou (a mesma listagem que omite o livro), não a equipe que
+sumiu.
 
 **Quem registra o aparelho:** só a ficha com o e-mail EXATO do token (`pessoa_pelo_email`), nunca o nome (ver lá).
 """
@@ -28,12 +37,14 @@ import json
 import logging
 import threading
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from nexus.campo.equipe import (ABA_APARELHOS, ABA_PILOTO, GUARDA_PONTOS_DIAS, LIVRO_APARELHOS, LIVRO_PILOTO)
 from nexus.campo.equipe import acessos as AC
 from nexus.campo.equipe import aparelhos as AP
 from nexus.campo.equipe import pontos as PT
 from nexus.campo.equipe import token_ms as T
+from nexus.campo.equipe.jornal import Fila
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +62,11 @@ class SemConfiguracao(RuntimeError):
 
 class AindaLendo(RuntimeError):
     """A 1ª leitura do banco está em curso noutro pedido: a rota responde 503 e o aparelho tenta de novo."""
+
+
+class BancoFora(RuntimeError):
+    """A leitura falhou e não há cópia boa: o Nexus não sabe (quem está no piloto, quem é técnico, quem é a pessoa).
+    A rota responde 503, nunca o coleta false que pararia o celular. O texto diz o que não se leu."""
 
 
 def _agora() -> datetime:
@@ -106,8 +122,9 @@ def fichas_decifradas(linhas, cofre):
 class _Copia:
     """Uma leitura do banco guardada por `validade_s`, uma ida por vez. Quem chega com a ida em curso fica com a cópia
     que há (e, sem nenhuma, `AindaLendo`), em vez de esperar: com o banco lento, os pedidos parados juntos ocupariam as
-    threads do Nexus inteiro (o caso de 19/10/2026 em `visao._EM_CALCULO`). A leitura que falha fica com a cópia boa (ou
-    None, sem nenhuma) e só se repete depois de `TETO_FALHA_S`."""
+    threads do Nexus inteiro (o caso de 19/10/2026 em `visao._EM_CALCULO`). A leitura que falha fica com a cópia boa e
+    só se repete depois de `TETO_FALHA_S`; sem nenhuma cópia boa, `BancoFora` (não sei), nunca um "ninguém" que o
+    chamador confundiria com a leitura vazia de verdade (revisão final de 08/11/2026)."""
 
     def __init__(self, nome: str, validade_s: float, ler):
         self._nome, self._validade, self._ler = nome, validade_s, ler
@@ -127,7 +144,7 @@ class _Copia:
                     raise AindaLendo(self._nome)
                 return self._valor
             if _ha_menos_de(TETO_FALHA_S, agora_s, self._falhou_em):
-                return self._valor
+                return self._sem_copia(self._valor)
             self._lendo = True
             geracao = self._geracao
         novo = None
@@ -135,7 +152,7 @@ class _Copia:
             novo = self._ler()
         except Exception as e:      # noqa: BLE001 — banco fora, listagem incompleta: fica a cópia boa
             log.warning("equipe: não consegui ler %s (%s); %s", self._nome, type(e).__name__,
-                        "fica a leitura anterior" if self._valor is not None else "ninguém é coletado até ler")
+                        "fica a leitura anterior" if self._valor is not None else "503 até ler")
         finally:
             with self._trava:
                 self._lendo = False
@@ -147,7 +164,12 @@ class _Copia:
                 else:
                     self._falhou_em = agora_s
                 atual = self._valor
-        return atual
+        return self._sem_copia(atual)
+
+    def _sem_copia(self, valor):
+        if valor is None:
+            raise BancoFora(f"não consegui ler {self._nome} no banco; tente de novo em instantes")
+        return valor
 
     def esquecer(self) -> None:
         """A próxima leitura vai ao banco já, sem esperar a validade nem o teto da falha (a decisão gravada agora pela
@@ -164,9 +186,12 @@ class Servico:
         agora = agora or _agora()
         self._app = app
         self.cofre = cofre
-        self.chaveiro = AP.Chaveiro()
-        self.registro = AC.Registro()        # quem abriu o mapa: a tela acrescenta, o gravador leva ao banco
-        self.diario = PT.Diario(pasta, cofre)
+        dir_ = Path(pasta) / "equipe"
+        # as filas do gravador em jornal cifrado no disco: o reinício antes da rodada de 5 min não perde nada
+        self.chaveiro = AP.Chaveiro(Fila(dir_ / "fila_aparelhos.jsonl", cofre, "equipe/fila/aparelhos"))
+        # quem abriu o mapa: a tela acrescenta (antes de abrir), o gravador leva ao banco
+        self.registro = AC.Registro(Fila(dir_ / "fila_acessos.jsonl", cofre, "equipe/fila/acessos"))
+        self.diario = PT.Diario(pasta, cofre, agora)
         self._trava = threading.Lock()
         self._ultimo: dict[int, dict] = self.diario.ultimos(agora)
         self._estado: dict[int, dict] = {}            # pessoa_id -> {"permissao", "desde"}
@@ -242,31 +267,38 @@ class Servico:
             raise
 
     def pessoa_do_email(self, email: str) -> int | None:
-        """O `pessoa_id` da ÚNICA ficha do cadastro com este e-mail (`pessoa_pelo_email`); nunca pelo nome. Cadastro que
-        não se lê = None: a rota responde coleta false."""
+        """O `pessoa_id` da ÚNICA ficha do cadastro com este e-mail (`pessoa_pelo_email`); nunca pelo nome. None = o
+        cadastro foi lido e ninguém (ou duas fichas) tem o e-mail. O cadastro que não se lê, ou que volta sem ficha
+        nenhuma (a listagem que omite o livro), sobe `BancoFora`: "não sei quem é" é 503, não coleta false."""
         from nexus.campo import visao
         try:
             with self._app.app_context():
                 linhas = visao._livro("cadastro_nexus", "pessoas")      # a mesma aba (e a mesma cópia) do `_Base`
-            return pessoa_pelo_email(email, fichas_decifradas(linhas, self.cofre))
         except Exception as e:          # noqa: BLE001
             log.warning("equipe: não consegui ler o cadastro para achar a pessoa (%s)", type(e).__name__)
-            return None
+            raise BancoFora("não consegui ler o cadastro do Nexus no banco; tente de novo em instantes") from None
+        if not linhas:
+            log.warning("equipe: o cadastro veio sem ficha nenhuma; 503 até ler")
+            raise BancoFora("o cadastro do Nexus veio vazio do banco; tente de novo em instantes")
+        return pessoa_pelo_email(email, fichas_decifradas(linhas, self.cofre))
 
     def coleta_vale(self, pessoa_id, agora: datetime) -> bool:
         """Técnico de campo ativo E no piloto. O piloto vem antes: quem está fora dele nem custa a leitura do cadastro.
-        `AindaLendo` sobe (a 1ª leitura em curso noutro pedido)."""
+        `AindaLendo` (a 1ª leitura em curso noutro pedido) e `BancoFora` (sem leitura boa) sobem: 503 na rota."""
         ts = agora.timestamp()
         piloto = self._piloto.valor(ts)
-        if not piloto or pessoa_id not in piloto:
+        if pessoa_id not in piloto:
             return False
         tecnicos = self._tecnicos.valor(ts)
-        return bool(tecnicos) and AP.coleta_vale(pessoa_id, tecnicos, piloto)
+        return AP.coleta_vale(pessoa_id, tecnicos, piloto)
 
     def piloto(self, agora: datetime | None = None) -> frozenset | None:
         """Quem está no piloto agora: a MESMA cópia de 1 min que decide a coleta (a tela do mapa não mostra quem o
-        celular não manda). None = nenhuma leitura boa ainda; `AindaLendo` sobe."""
-        return self._piloto.valor((agora or _agora()).timestamp())
+        celular não manda). None = nenhuma leitura boa ainda (a tela avisa); `AindaLendo` sobe."""
+        try:
+            return self._piloto.valor((agora or _agora()).timestamp())
+        except BancoFora:
+            return None
 
     def esquecer_piloto(self) -> None:
         """Depois de uma decisão gravada pela tela: o próximo pedido relê o livro, e quem entrou é coletado (e aparece
@@ -297,6 +329,7 @@ class Servico:
         """Os pontos válidos do lote vão ao diário (cifrados) e o estado da pessoa anda. Devolve quantos valeram (o
         reenvio do mesmo ponto conta, e o diário não duplica). Disco cheio sobe `OSError`: nada muda e a rota responde
         503, para a casca mandar de novo."""
+        self.podar(agora)
         pontos = PT.aceitar(pessoa_id, lote, agora, self.cofre)
         if pontos:
             self.diario.acrescentar(pontos)
@@ -312,12 +345,23 @@ class Servico:
                 self._estado[pessoa_id] = {"permissao": permissao, "desde": agora}
         return len(pontos)
 
+    def podar(self, agora: datetime) -> None:
+        """A guarda de 7 dias na memória e no disco, sem esperar o gravador: na virada do dia de Brasília o diário tira
+        os dias velhos, e o último ponto de quem parou de mandar há mais de 7 dias sai da memória junto."""
+        if not self.diario.podar(agora):
+            return
+        corte = _instante(agora - timedelta(days=GUARDA_PONTOS_DIAS))
+        with self._trava:
+            for pid in [p for p, u in self._ultimo.items() if u["instante"] < corte]:
+                del self._ultimo[pid]
+
     # ── para a tela do mapa ──────────────────────────────────────────────────────────────────────────────────────
     def estado_de(self, pessoa_id, agora_utc: datetime | None = None) -> dict:
         """{"ultimo": o último ponto (com lat/lon, só em memória) ou None, "permissao": "ok" | "sem", "desde": quando a
         permissão atual começou a ser dita, ou None}. O ponto com mais de 7 dias não é usado. A permissão vive só na
         memória: depois de um reinício volta "ok" até a casca repetir o "sem" (ela repete a cada 30 min)."""
         agora = agora_utc or _agora()
+        self.podar(agora)
         corte = _instante(agora - timedelta(days=GUARDA_PONTOS_DIAS))
         with self._trava:
             u = self._ultimo.get(pessoa_id)

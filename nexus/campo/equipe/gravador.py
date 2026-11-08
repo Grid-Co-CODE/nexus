@@ -3,18 +3,21 @@ diário: os pontos do dia, os deslocamentos do mês, os eventos de aparelho e os
 
 O banco só SUBSTITUI o livro inteiro (`livros.publicar`): não há "acrescentar". Por isso cada livro é relido e regravado
 inteiro, sempre pela UNIÃO com o que o banco já tem (nada some por uma rodada que viu menos que o banco):
-- pontos: o livro do dia leva todos os pontos do diário (só CAB_PONTOS: a coordenada fica cifrada na coluna `cifra`).
-  Só regrava se o conjunto mudou desde a última gravação boa. Diário com MENOS pontos que o banco para o dia (máquina
-  nova, disco apagado) não publica: o diário perdido não pode encolher o dia que o banco já tem. Dia vazio nunca vai por
-  cima de dia com linhas.
-- deslocamentos: recalculados dos pontos que ainda estão no disco (7 dias) e unidos ao livro do mês que o banco tem. O id
-  é estável: republicar o mês não duplica.
-- aparelhos e acessos: as linhas novas da fila entram no livro relido, sob trava; se a gravação falha, as linhas VOLTAM
-  à fila para a próxima rodada (a chave emitida que não chegasse ao banco deixaria de valer num reinício).
+- pontos: o livro do dia é a união do diário com o que o banco tem (só CAB_PONTOS: a coordenada fica cifrada na coluna
+  `cifra`), publicada sempre que o diário tem um ponto que o banco não tem. O diário MENOR que o banco (máquina nova,
+  disco apagado no meio do dia) também publica: a união nunca encolhe o dia, e o livro é `so_cresce` no catálogo (a
+  trava do `livros.publicar` recusa a gravação que encolheria). Antes (até a revisão final de 08/11/2026) uma trava à mão
+  pela contagem barrava essa gravação, e os pontos novos do dia nunca chegavam ao banco. Dia vazio nunca vai por cima.
+- deslocamentos: recalculados dos pontos de até 7 dias, cortados pelo INSTANTE (o arquivo do dia mais velho ainda tem
+  ponto de mais de 7 dias, e o ponto bruto nunca é usado depois disso), e unidos ao livro do mês que o banco tem. O id é
+  estável: republicar o mês não duplica.
+- aparelhos e acessos: as linhas novas da fila (o jornal em disco, `jornal.py`) entram no livro relido, sob trava; se a
+  gravação falha, as linhas VOLTAM à fila para a próxima rodada; se dá certo, o jornal é aparado.
 Cada passo é isolado (regra 13 de nexus/dados/CLAUDE.md): o erro de um vai ao log (só o TIPO) e os outros seguem. Nada de
 coordenada nem de chave no log.
 
-Só roda onde `NEXUS_EQUIPE_GRAVA=1` (uma máquina por vez: o PC e o servidor não gravam juntos); nunca em teste.
+Só roda onde `NEXUS_EQUIPE_GRAVA=1` (uma máquina por vez: o PC e o servidor não gravam juntos); nunca em teste. As rotas
+do celular respondem 503 na máquina em que ele não roda (quem recebe tem de ser quem grava).
 """
 import hashlib
 import logging
@@ -82,7 +85,7 @@ class Gravador:
         with self._trava, self._app.app_context():
             hoje = agora.astimezone(_BRT).date()
             passos = (("pontos", lambda: self._pontos(hoje)),
-                      ("deslocamentos", lambda: self._deslocamentos(hoje)),
+                      ("deslocamentos", lambda: self._deslocamentos(agora)),
                       ("aparelhos", self._aparelhos),
                       ("acessos", self._acessos),
                       ("diário velho", lambda: self._srv.diario.apagar_velhos(hoje)))
@@ -103,23 +106,30 @@ class Gravador:
                 continue
             livro = livro_pontos(dia)
             no_banco = self._ler(livro, ABA_PONTOS)
-            if len(no_banco) > len(pts):
-                log.warning("equipe: o diário tem menos pontos que o banco em %s (%d x %d); não publico (diário "
-                            "perdido numa máquina nova?)", livro, len(pts), len(no_banco))
+            ids_banco = {str(r.get("ponto_id")) for r in no_banco}
+            if all(p["ponto_id"] in ids_banco for p in pts):
+                self._pontos_gravados[data_id] = sig        # o banco já tem o diário inteiro: nada a gravar
                 continue
-            linhas = [PT.linha_do_banco(p) for p in pts]
+            # a união, sempre (o diário menor que o banco também): a versão do diário de cada ponto que ele tem (com o
+            # tipo certo de cada coluna) e as linhas que só o banco tinha, como vieram
             ids = {p["ponto_id"] for p in pts}
+            linhas = [PT.linha_do_banco(p) for p in pts]
             linhas += [_linha(r, CAB_PONTOS) for r in no_banco if str(r.get("ponto_id")) not in ids]
+            linhas.sort(key=lambda l: (str(l[2]), str(l[0])))       # pela hora do ponto
             self._publicar(livro, f"Mapa de equipe · pontos {dia:%d/%m/%Y}", ABA_PONTOS, CAB_PONTOS, linhas)
             self._pontos_gravados[data_id] = sig
 
-    def _deslocamentos(self, hoje: date) -> None:
+    def _deslocamentos(self, agora: datetime) -> None:
         usinas = self._coordenadas_das_usinas()
         if not usinas:
             return                                          # sem coordenada de usina não há como dizer onde estava
+        hoje = agora.astimezone(_BRT).date()
+        # o ponto bruto nunca é usado depois de 7 dias: o corte é pelo instante, porque o arquivo do dia mais velho
+        # ainda tem pontos de mais de 7 dias (o anti-objetivo do desenho; revisão final de 08/11/2026)
+        corte = (agora - timedelta(days=GUARDA_PONTOS_DIAS)).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         pontos = []
         for k in range(GUARDA_PONTOS_DIAS + 1):
-            pontos += self._srv.diario.do_dia(hoje - timedelta(days=k))
+            pontos += [p for p in self._srv.diario.do_dia(hoje - timedelta(days=k)) if p["instante"] >= corte]
         por_mes: dict[int, list[list]] = {}
         for l in deslocamentos(pontos, usinas):
             por_mes.setdefault(l[1] // 100, []).append(l)       # data_id da chegada -> AAAAMM
@@ -142,26 +152,31 @@ class Gravador:
     def _aparelhos(self) -> None:
         ch = self._srv.chaveiro
         self._acrescentar(LIVRO_APARELHOS, "Mapa de equipe · aparelhos", ABA_APARELHOS, CAB_APARELHOS,
-                          ch.eventos_novos, ch.devolver)
+                          ch.eventos_novos, ch.devolver, ch.confirmar)
 
     def _acessos(self) -> None:
         r = self._srv.registro
-        self._acrescentar(LIVRO_ACESSOS, "Mapa de equipe · acessos", ABA_ACESSOS, CAB_ACESSOS, r.novos, r.devolver)
+        self._acrescentar(LIVRO_ACESSOS, "Mapa de equipe · acessos", ABA_ACESSOS, CAB_ACESSOS, r.novos, r.devolver,
+                          r.confirmar)
 
-    def _acrescentar(self, livro, nome, aba, cab, retirar, devolver) -> None:
+    def _acrescentar(self, livro, nome, aba, cab, retirar, devolver, confirmar) -> None:
         """Acrescenta por regravação: relê, junta as linhas novas (id que o banco já tem não entra de novo) e publica.
-        A primeira coluna é o id. Falhou em qualquer ponto = as linhas voltam à fila."""
+        A primeira coluna é o id. Falhou em qualquer ponto = as linhas voltam à fila (e ficam no jornal). Deu certo =
+        o jornal é aparado. A linha que o banco já tem (o reinício entre a publicação e o aparo a traz de volta) não
+        regrava nada: só sai do jornal."""
         novas = retirar()
         if not novas:
             return
         try:
             no_banco = self._ler(livro, aba)
             tem = {str(r.get(cab[0])) for r in no_banco}
-            linhas = [_linha(r, cab) for r in no_banco] + [l for l in novas if str(l[0]) not in tem]
-            self._publicar(livro, nome, aba, cab, linhas)
+            faltam = [l for l in novas if str(l[0]) not in tem]
+            if faltam:
+                self._publicar(livro, nome, aba, cab, [_linha(r, cab) for r in no_banco] + faltam)
         except Exception:
             devolver(novas)
             raise
+        confirmar(novas)
 
 
 def _laco(app) -> None:

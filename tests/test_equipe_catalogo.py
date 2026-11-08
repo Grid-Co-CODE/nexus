@@ -2,7 +2,7 @@
 from datetime import date
 
 from nexus.campo import equipe as EQ
-from nexus.dados import catalogo, explica
+from nexus.dados import catalogo, explica, livros
 
 FATOS = {  # id do fato -> (livro, aba, cabeçalho)
     "ponto_equipe": (EQ.LIVRO_PONTOS_MOLDE, EQ.ABA_PONTOS, EQ.CAB_PONTOS),
@@ -35,6 +35,11 @@ def test_os_livros_do_mapa_estao_no_catalogo_antes_da_1a_gravacao():
                       (EQ.LIVRO_ACESSOS, EQ.ABA_ACESSOS)):
         l = catalogo.LIVRO_POR_NOME[nome]
         assert l.abas == (aba,) and l.so_cresce == (aba,) and not l.no_banco
+    # o livro do dia dos pontos também só cresce enquanto existe (revisão final de 08/11/2026: o gravador publica a
+    # união do diário com o banco, e a trava do livros.publicar recusa a gravação que encolheria o dia)
+    assert catalogo.LIVRO_POR_NOME[EQ.LIVRO_PONTOS_MOLDE].so_cresce == (EQ.ABA_PONTOS,)
+    assert livros._so_cresce("nexus_equipe_pontos_2026_11_08") == (EQ.ABA_PONTOS,)
+    assert livros._so_cresce("nexus_equipe_deslocamentos_2026_11") == (EQ.ABA_DESLOC,)
     # os de período reconhecidos pela família
     assert catalogo.da_familia("nexus_equipe_pontos_2026_11_08", EQ.ABA_PONTOS)
     assert catalogo.da_familia("nexus_equipe_deslocamentos_2026_11", EQ.ABA_DESLOC)

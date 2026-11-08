@@ -174,12 +174,18 @@ def _revogar(cliente, chave, aparelho="aparelho-1"):
     return cliente.post(URL_REVOGAR, json={"aparelho": aparelho}, headers=h)
 
 
-def _reiniciar(app, api):
-    """O Nexus reinicia: o que a gravação em lote (Task 6) teria publicado dos aparelhos vai ao livro do banco falso, e
-    o serviço sai da memória (o próximo pedido o cria de novo, do diário em disco e do livro)."""
-    srv = app.extensions.pop("nexus_equipe")
-    novas = [dict(zip(CAB_APARELHOS, x)) for x in srv.chaveiro.eventos_novos()]
-    _aba(api, LIVRO_APARELHOS, ABA_APARELHOS, api.linhas(LIVRO_APARELHOS, ABA_APARELHOS) + novas)
+def _reiniciar(app):
+    """O Nexus reinicia ANTES da gravação em lote, sem publicar nada (revisão final de 08/11/2026: a gravação é a cada
+    5 min e todo push reinicia o servidor). O serviço sai da memória, e o próximo pedido o cria de novo do diário e do
+    jornal das filas em disco (cifrados) e do livro do banco."""
+    app.extensions.pop("nexus_equipe")
+
+
+def _gravar(app, relogio):
+    """Uma rodada do gravador em lote (a cada 5 min no servidor), com o banco falso e sem coordenada de usina."""
+    from nexus.campo.equipe.gravador import Gravador
+    app.config["GRIDCO_SQL_TOKEN"] = "token-de-teste"
+    Gravador(app, S.do_app(app), usinas=lambda: {}).rodada(relogio.agora)
 
 
 # ── CORS: só a página do App ──────────────────────────────────────────────────────────────────────────────────────────
@@ -536,7 +542,9 @@ def test_lote_grande_ou_corpo_acima_de_64_kb_e_413(cliente, banco, ms):
                                    {"aparelho": "aparelho-1", "fuso": -180, "pontos": {"t": 1}},
                                    {"aparelho": "aparelho-1", "pontos": [_ponto()]},              # sem o fuso
                                    {"aparelho": "aparelho-1", "fuso": "Brasília", "pontos": [_ponto()]},
-                                   {"aparelho": "aparelho-1", "fuso": 15 * 60, "pontos": [_ponto()]}])
+                                   {"aparelho": "aparelho-1", "fuso": 15 * 60, "pontos": [_ponto()]},
+                                   # o inteiro que não cabe num float (OverflowError): 400, nunca 503 com ERROR no log
+                                   {"aparelho": "aparelho-1", "fuso": 10 ** 400, "pontos": [_ponto()]}])
 def test_corpo_ruim_nas_posicoes_e_400(cliente, banco, ms, corpo):
     chave = _chave(cliente)
     h = {"Authorization": f"Bearer {chave}"}
@@ -545,6 +553,16 @@ def test_corpo_ruim_nas_posicoes_e_400(cliente, banco, ms, corpo):
     else:
         r = cliente.post(URL_POSICOES, json=corpo, headers=h)
     assert r.status_code == 400 and "erro" in r.get_json()
+
+
+def test_o_inteiro_gigante_num_ponto_so_tira_o_ponto(cliente, banco, ms, caplog):
+    """`float(10**400)` levanta OverflowError, que o `pontos._num` não pegava: o lote inteiro virava 503 com uma linha
+    ERROR no log, sem autenticação nenhuma antes (revisão final de 08/11/2026)."""
+    chave = _chave(cliente)
+    with caplog.at_level(logging.WARNING):
+        r = _posicoes(cliente, chave, [{**_ponto(2), "lat": 10 ** 400}, {**_ponto(1), "t": 10 ** 400}, _ponto(0)])
+    assert r.status_code == 200 and r.get_json() == {"aceitos": 1, "coleta": True}
+    assert not [x for x in caplog.records if x.levelno >= logging.ERROR]
 
 
 def test_permissao_sem_fica_no_estado(app, cliente, banco, ms, relogio):
@@ -610,21 +628,49 @@ def test_as_rotas_publicas_nao_pedem_login_e_as_outras_sim(app, cliente, banco):
 
 
 # ── o reinício e o banco fora ────────────────────────────────────────────────────────────────────────────────────────
-def test_o_reinicio_le_as_chaves_do_banco_e_o_diario_do_disco(app, cliente, banco, ms):
+def test_o_reinicio_le_as_chaves_e_o_diario_do_disco(app, cliente, banco, ms):
     chave = _chave(cliente)
     assert _posicoes(cliente, chave, [_ponto(20), _ponto(3)]).get_json()["aceitos"] == 2
-    _reiniciar(app, banco)
+    _reiniciar(app)
     srv = S.do_app(app)
     assert srv.estado_de(TECNICO)["ultimo"]["instante"] == "2026-11-08T14:57:00Z"     # do diário, antes de chegar ponto
     assert _posicoes(cliente, chave, [_ponto(1)]).get_json() == {"aceitos": 1, "coleta": True}
     assert len(srv.diario.do_dia(date(2026, 11, 8))) == 3
 
 
+def test_a_chave_emitida_e_a_revogada_sobrevivem_ao_reinicio_antes_da_gravacao(app, cliente, banco, ms, relogio,
+                                                                              tmp_path):
+    """A gravação em lote é a cada 5 min e todo push reinicia o servidor (revisão final de 08/11/2026): a chave emitida
+    há menos de 5 min sumia no reinício (o celular recebia 401 e parava até a próxima abertura) e a revogação se perdia
+    (a chave velha, que o livro conhece, voltava a valer). O jornal cifrado em disco leva as duas ao próximo boot."""
+    velha = _chave(cliente)
+    _gravar(app, relogio)                                   # a emitida da velha já está no livro do banco
+    assert len(banco.linhas(LIVRO_APARELHOS, ABA_APARELHOS)) == 1
+    nova = _chave(cliente)                                  # o mesmo par pede de novo: a velha cai, só na memória
+    _reiniciar(app)
+    assert _posicoes(cliente, nova, [_ponto(1)]).get_json() == {"aceitos": 1, "coleta": True}
+    assert _posicoes(cliente, velha, [_ponto(0)]).status_code == 401
+    # o Sair também: a revogação que ainda não foi ao banco não deixa a chave voltar a valer
+    assert _revogar(cliente, nova).status_code == 204
+    _reiniciar(app)
+    assert _posicoes(cliente, nova, [_ponto(0)]).status_code == 401
+    # no disco, nada em claro: nem o hash da chave nem o aparelho
+    jornal = (tmp_path / "dados" / "equipe" / "fila_aparelhos.jsonl").read_text(encoding="utf-8")
+    assert jornal and hashlib.sha256(nova.encode()).hexdigest() not in jornal and "aparelho-1" not in jornal
+    # a gravação leva tudo, uma vez cada (o id não repete), e apara o jornal: o boot seguinte não tem o que publicar
+    _gravar(app, relogio)
+    ev = banco.linhas(LIVRO_APARELHOS, ABA_APARELHOS)
+    assert sorted(e["evento"] for e in ev) == ["emitida", "emitida", "revogada", "revogada"]
+    assert len({e["evento_id"] for e in ev}) == 4
+    _reiniciar(app)
+    assert S.do_app(app).chaveiro.eventos_novos() == []
+
+
 def test_banco_fora_no_reinicio_nao_e_chave_invalida(app, cliente, banco, ms, relogio):
     """Sem ler o livro das chaves, o Nexus não sabe se a chave vale: 503 (a casca guarda a fila e a chave), nunca o 401
     que a faria apagar a chave e parar até a próxima abertura. O livro é relido no máximo uma vez por minuto."""
     chave = _chave(cliente)
-    _reiniciar(app, banco)
+    _reiniciar(app)
     app.extensions["nexus_dados_sessao"] = SessaoFora()
     assert _posicoes(cliente, chave, [_ponto()]).status_code == 503
     assert _registrar(cliente).status_code == 503                         # nem chave nova antes de ler as velhas
@@ -638,7 +684,8 @@ def test_a_listagem_que_omite_o_livro_das_chaves_nao_e_livro_vazio(app, cliente,
     """A listagem do banco omite um livro por um instante (achado 6 da revisão de 05/11/2026): lida como livro vazio,
     toda chave daria 401. O `sheet_count` do /api/workbooks pega a falta."""
     chave = _chave(cliente)
-    _reiniciar(app, banco)
+    _gravar(app, relogio)                                   # o livro existe no banco (e o jornal foi aparado)
+    _reiniciar(app)
     banco.omitir.add(LIVRO_APARELHOS)
     assert _posicoes(cliente, chave, [_ponto()]).status_code == 503
     banco.omitir.clear()
@@ -646,11 +693,14 @@ def test_a_listagem_que_omite_o_livro_das_chaves_nao_e_livro_vazio(app, cliente,
     assert _posicoes(cliente, chave, [_ponto()]).status_code == 200
 
 
-def test_piloto_que_nao_se_le_e_ninguem_sem_copia_e_a_copia_boa_com_ela(app, cliente, banco, ms, relogio):
-    # sem nenhuma leitura boa do piloto: ninguém é coletado (o registro diz coleta false, nunca 500)
+def test_piloto_que_nao_se_le_sem_copia_e_503_e_a_copia_boa_vale_com_ela(app, cliente, banco, ms, relogio):
+    """Sem nenhuma leitura boa do piloto o Nexus não sabe quem está nele: 503 (a casca tenta de novo), e não o coleta
+    false, que a faria parar até a próxima abertura do App (revisão final de 08/11/2026: depois de um reinício com o
+    banco piscando, todo registro do minuto seguinte saía coleta false)."""
     banco.omitir.add(LIVRO_PILOTO)
     r = _registrar(cliente)
-    assert r.status_code == 200 and r.get_json() == {"coleta": False}
+    assert r.status_code == 503 and "piloto" in r.get_json()["erro"]
+    assert r.headers["Access-Control-Allow-Origin"] == ORIGEM_APP
     banco.omitir.clear()
     relogio.andar(seconds=61)
     chave = _chave(cliente)
@@ -668,6 +718,56 @@ def test_o_cadastro_que_volta_sem_tecnico_nenhum_e_falha_e_nao_a_equipe_que_sumi
     assert _posicoes(cliente, chave, [_ponto(0)]).get_json() == {"aceitos": 1, "coleta": True}
 
 
+def test_o_cadastro_sem_nenhuma_leitura_boa_e_503_e_nao_coleta_false(app, cliente, banco, ms, relogio):
+    """Depois de um reinício, sem nenhuma leitura boa do cadastro, o Nexus não sabe quem é técnico de campo nem quem é
+    a pessoa do e-mail: 503, e não o coleta false que pararia o celular até a próxima abertura (revisão final de
+    08/11/2026). A listagem que omite o cadastro é falha, não "ninguém"."""
+    chave = _chave(cliente)
+    _reiniciar(app)
+    banco.omitir.add("cadastro_nexus")
+    visao.limpar()
+    r = _posicoes(cliente, chave, [_ponto(0)])
+    assert r.status_code == 503 and "erro" in r.get_json()
+    r = _registrar(cliente)                                 # a pessoa do e-mail também não se acha sem o cadastro
+    assert r.status_code == 503 and "cadastro" in r.get_json()["erro"]
+    banco.omitir.clear()
+    visao.limpar()
+    relogio.andar(seconds=61)
+    assert _posicoes(cliente, chave, [_ponto(0)]).get_json() == {"aceitos": 1, "coleta": True}
+    assert _registrar(cliente).get_json()["coleta"] is True
+
+
+def test_as_rotas_respondem_503_onde_o_gravador_nao_liga(app, cliente, banco, ms):
+    """Quem recebe tem de ser quem grava (revisão final de 08/11/2026): na máquina sem NEXUS_EQUIPE_GRAVA=1 a chave
+    emitida e os pontos ficariam só na memória e no disco dela e nunca chegariam ao banco. Nos testes (TESTING) o
+    gravador nunca liga e as rotas valem."""
+    chave = _chave(cliente)
+    app.config.update(TESTING=False, NEXUS_PRE_CARGA="0")
+    try:
+        respostas = [_registrar(cliente), _posicoes(cliente, chave, [_ponto()]), _revogar(cliente, chave)]
+        for r in respostas:
+            assert r.status_code == 503 and "não grava nesta máquina" in r.get_json()["erro"], r.request.path
+        assert respostas[0].headers["Access-Control-Allow-Origin"] == ORIGEM_APP
+        app.config["NEXUS_EQUIPE_GRAVA"] = "1"
+        assert _posicoes(cliente, chave, [_ponto()]).get_json() == {"aceitos": 1, "coleta": True}
+    finally:
+        app.config["TESTING"] = True
+
+
+def test_as_variaveis_do_mapa_vao_do_env_ao_app_config(tmp_path):
+    """O .env só chega ao app.config pelas OPCIONAIS (revisão final de 08/11/2026: sem elas os dois IDs do Entra só
+    valiam pela tela Base → Chaves, e o NEXUS_EQUIPE_GRAVA=1 do .env nunca ligava o gravador nem abria as rotas)."""
+    from conftest import SENHA_TESTE
+    from nexus import create_app
+    from nexus.campo.equipe import gravador as G
+    a = create_app({"NEXUS_SECRET_KEY": "chave-de-teste", "NEXUS_SENHA_ADMIN": SENHA_TESTE,
+                    "NEXUS_DADOS": str(tmp_path / "dados"), "NEXUS_EQUIPE_MS_CLIENT_ID": CLIENTE,
+                    "NEXUS_EQUIPE_MS_TENANT_ID": DIRETORIO, "NEXUS_EQUIPE_GRAVA": "1"})
+    assert (a.config["NEXUS_EQUIPE_MS_CLIENT_ID"], a.config["NEXUS_EQUIPE_MS_TENANT_ID"]) == (CLIENTE, DIRETORIO)
+    # o gravador (ligado pelo `campo.instalar` do servidor, nunca pelo create_app) e as rotas veem o "1" do .env
+    assert a.config["NEXUS_EQUIPE_GRAVA"] == "1" and G.ativo(a.config)
+
+
 def test_o_log_nao_leva_token_chave_email_nem_coordenada(app, cliente, banco, ms, relogio, caplog):
     caplog.set_level(logging.DEBUG)
     chave = _chave(cliente)
@@ -675,7 +775,7 @@ def test_o_log_nao_leva_token_chave_email_nem_coordenada(app, cliente, banco, ms
     _registrar(cliente, token="token-forjado")
     ms.fora = True
     _registrar(cliente)
-    _reiniciar(app, banco)
+    _reiniciar(app)
     app.extensions["nexus_dados_sessao"] = SessaoFora()
     _posicoes(cliente, chave, [_ponto(0)])
     texto = caplog.text

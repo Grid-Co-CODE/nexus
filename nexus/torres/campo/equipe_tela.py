@@ -10,7 +10,9 @@ As três são PÚBLICAS (`auth.ROTAS_PUBLICAS`), conscientemente: quem chama é 
   chave do aparelho (`Authorization: Bearer <chave>`), que tem de ser do `aparelho` do corpo.
 
 Os códigos são o que a casca faz com eles: 401 apaga a chave dela (só quando a chave ou o token não valem); 503 é "como
-sem rede" (a fila e a chave ficam), para a Microsoft ou o banco fora e o servidor sem configuração; 413 é o lote acima
+sem rede" (a fila e a chave ficam), para a Microsoft ou o banco fora (também o piloto, os técnicos ou o cadastro sem
+nenhuma leitura boa: "não sei" nunca vira coleta false), o disco que não grava, o servidor sem configuração e a máquina
+em que o gravador em lote não roda (quem recebe tem de ser quem grava); 413 é o lote acima
 de 200 pontos ou o corpo acima de 64 KB; 400, o corpo que não segue o contrato (erro de quem programou a casca). Nenhuma
 resposta é 500: o que quebrar responde 503 e vai ao log só pelo tipo do erro.
 
@@ -36,6 +38,7 @@ from ...cadastro.servico import chave_texto
 from ...campo import equipe as E
 from ...campo import mapa_responsaveis as MR
 from ...campo import visao
+from ...campo.equipe import gravador as G
 from ...campo.equipe import municipios as MU
 from ...campo.equipe import piloto as PI
 from ...campo.equipe import pontos as PT
@@ -59,6 +62,11 @@ _CONFIG = (("NEXUS_CHAVE_CADASTRO", "a chave do cadastro, que cifra a posição:
            ("NEXUS_EQUIPE_MS_CLIENT_ID", "o ID do aplicativo do App de Campo: Base → Chaves das fontes → Nexus"),
            ("NEXUS_EQUIPE_MS_TENANT_ID", "o diretório da Grid Co.: Base → Chaves das fontes → Nexus"))
 TEXTO_NAO_LIDAS = "as chaves dos aparelhos ainda não foram lidas do banco; tente de novo em instantes"
+TEXTO_LENDO = "o cadastro está sendo lido; tente de novo em instantes"
+TEXTO_DISCO = "não consegui guardar no disco do servidor agora; tente de novo"
+# o id que vem na URL ou no formulário: só algarismos ASCII, até 12. O `isdigit` aceita "²" (e o `int` quebra: 500), e o
+# número de 5000 algarismos passa do teto de algarismos do `int` (revisão final de 08/11/2026)
+_ID = re.compile(r"[0-9]{1,12}")
 
 
 class _Recusa(Exception):
@@ -89,7 +97,15 @@ def _responder(fazer, cors: bool = False) -> Response:
 
 def _configurado(cfg) -> None:
     """Sem a chave do cadastro o servidor não grava a coordenada (nem em claro, nem cifrada) e não emite chave; sem os
-    dois IDs do Entra não confere o login. A falta é dita pelo nome, para quem configura."""
+    dois IDs do Entra não confere o login. A falta é dita pelo nome, para quem configura.
+
+    E quem recebe tem de ser quem grava (revisão final de 08/11/2026): na máquina em que o gravador em lote não roda
+    (`NEXUS_EQUIPE_GRAVA` diferente de "1"), a chave emitida, a revogação e os pontos ficariam só na memória e no disco
+    dela e nunca chegariam ao banco; a casca recebe 503 (visível, e nenhuma chave se perde). Nos testes o gravador nunca
+    liga, e as rotas valem."""
+    if not cfg.get("TESTING") and not G.ativo(cfg):
+        raise _Recusa(503, "o Mapa de equipe não grava nesta máquina (NEXUS_EQUIPE_GRAVA=1 só no servidor que grava): "
+                           "nada é recebido aqui")
     falta = [f"{nome} ({onde})" for nome, onde in _CONFIG
              if not (str(cfg.get(nome) or "").strip() if nome == "NEXUS_CHAVE_CADASTRO" else chaves.valor(nome, cfg))]
     if falta:
@@ -162,14 +178,24 @@ def _registro():
         raise _Recusa(503, f"o servidor está com a configuração errada: {e}") from None
     if not srv.chaves_prontas(agora):
         raise _Recusa(503, TEXTO_NAO_LIDAS)
-    pid = srv.pessoa_do_email(email)
     try:
+        # "não sei quem é / quem está no piloto" (o banco sem leitura boa) é 503, nunca o coleta false que pararia o
+        # celular até a próxima abertura do App (revisão final de 08/11/2026)
+        pid = srv.pessoa_do_email(email)
         vale = pid is not None and srv.coleta_vale(pid, agora)
     except S.AindaLendo:
-        raise _Recusa(503, "o cadastro está sendo lido; tente de novo em instantes") from None
+        raise _Recusa(503, TEXTO_LENDO) from None
+    except S.BancoFora as e:
+        raise _Recusa(503, str(e)) from None
     if not vale:
         return 200, {"coleta": False}
-    return 200, {"coleta": True, "chave": srv.registrar(pid, aparelho, app, agora)}
+    try:
+        chave = srv.registrar(pid, aparelho, app, agora)
+    except OSError as e:
+        # o evento vai ao jornal em disco antes de a chave valer: sem o disco, nenhuma chave (a velha segue valendo)
+        _log.error("equipe: a chave nova não foi para o jornal (%s)", type(e).__name__)
+        raise _Recusa(503, TEXTO_DISCO) from None
+    return 200, {"coleta": True, "chave": chave}
 
 
 def _posicoes():
@@ -201,7 +227,9 @@ def _posicoes():
             return 200, {"aceitos": 0, "coleta": False}
         aceitos = srv.receber(pid, corpo, agora)
     except S.AindaLendo:
-        raise _Recusa(503, "o cadastro está sendo lido; tente de novo em instantes") from None
+        raise _Recusa(503, TEXTO_LENDO) from None
+    except S.BancoFora as e:
+        raise _Recusa(503, str(e)) from None
     except OSError as e:
         _log.error("equipe: os pontos não foram para o diário (%s)", type(e).__name__)
         raise _Recusa(503, "não consegui guardar os pontos agora; tente de novo") from None
@@ -217,7 +245,12 @@ def _revogacao():
         if not srv.chaves_prontas(agora):
             raise _Recusa(503, TEXTO_NAO_LIDAS)
         # 204 em todo caso: a resposta não diz se a chave valia (sem oráculo); a de outro aparelho não cai
-        srv.revogar(chave, aparelho, agora)
+        try:
+            srv.revogar(chave, aparelho, agora)
+        except OSError as e:
+            # a revogação vai ao jornal antes de a chave cair: sem o disco, a casca tenta o Sair de novo
+            _log.error("equipe: a revogação não foi para o jornal (%s)", type(e).__name__)
+            raise _Recusa(503, TEXTO_DISCO) from None
     return 204, None
 
 
@@ -348,18 +381,37 @@ def _equipe(srv, agora):
     return b, tecnicos, piloto or frozenset(), aviso
 
 
-def _quem_abriu(b) -> tuple:
+def _quem_abriu(srv) -> tuple:
     """(pessoa_id, pessoa_hmac) de quem está olhando, para o registro da LGPD: o código do e-mail (o mesmo do App) e a
-    pessoa do cadastro, quando acha. A senha de administrador não tem e-mail: vai vazio, como nas decisões de setor."""
-    email, nome = _usuario()
+    pessoa do cadastro pelo e-mail EXATO da ficha (`servico.pessoa_do_email`, a mesma regra do registro do aparelho),
+    nunca pelo nome: o `pessoa_do_login` acha pelo nome tirado do e-mail, e a trilha gravaria o homônimo (revisão final
+    de 08/11/2026). Sem a ficha do e-mail, None: o código do e-mail identifica. A senha de administrador não tem e-mail:
+    vai vazio, como nas decisões de setor."""
+    email, _nome = _usuario()
     codigo = codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or ""
     pid = None
-    if b is not None and email:
+    if email:
         try:
-            pid = b.pessoa_do_login(email, nome)
+            pid = srv.pessoa_do_email(email)
         except Exception as e:  # noqa: BLE001 — sem a pessoa, o código basta para o registro
             _log.warning("equipe: não achei a pessoa de quem abriu o mapa (%s)", type(e).__name__)
     return pid, codigo
+
+
+def _registrar_acesso(srv, acao, alvo, usina_id, agora) -> bool:
+    """A linha da LGPD, no jornal em disco ANTES de o mapa ou a rota abrir. O disco que falha = False: a tela não abre
+    sem a trilha."""
+    quem_pid, quem_hmac = _quem_abriu(srv)
+    try:
+        srv.registro.acrescentar(acao, quem_pid, quem_hmac, alvo, usina_id, agora)
+        return True
+    except OSError as e:
+        _log.error("equipe: o registro de acesso não foi para o disco (%s)", type(e).__name__)
+        return False
+
+
+SEM_REGISTRO = ("Não consegui gravar o registro desta abertura no disco do servidor (o registro da LGPD de quem abriu o "
+                "mapa): sem ele o mapa não abre. Tente de novo em instantes.")
 
 
 def _hora(inst, agora) -> str:
@@ -399,10 +451,14 @@ def _linhas(srv, b, tecnicos, piloto, coords, nomes_usina, agora):
         est = srv.estado_de(pid, agora)
         s = SI.situacao(est, coords, agora, cidade=cidade)
         perto = s["usina_perto"]
+        # o parado fora de usina leva o km inteiro (revisão final de 08/11/2026): com a casa decimal, a distância a
+        # duas usinas já cercava a casa ou o hotel que o mapa não mostra
+        inteiro = s["base"] == "fora_usina"
         linhas.append({
             "pid": pid, "nome": t["nome"], "equipe": b.nome_equipe.get(t["equipe_id"]) or "", "s": s,
             "hora": _hora(s["ultima"], agora), "onde": _onde(s),
-            "perto": SI.texto_perto(perto[1], nomes_usina.get(perto[0]) or f"usina {perto[0]}") if perto else "",
+            "perto": SI.texto_perto(perto[1], nomes_usina.get(perto[0]) or f"usina {perto[0]}", inteiro=inteiro)
+                     if perto else "",
             "desde": _hora(s["desde"], agora) if s["chave"] == "sem_permissao" else ""})
         if s["no_mapa"]:
             u = est["ultimo"]
@@ -457,10 +513,10 @@ def equipe():
         _log.warning("equipe: o contorno dos estados não abriu (%s)", type(e).__name__)
         mapa = {"viewbox": None, "ufs": [], "usinas": [], "pontos": []}
     pedido = str(request.args.get("tecnico") or "").strip()
-    sel = next((l for l in linhas if pedido.isdigit() and l["pid"] == int(pedido)), None)
-    # o registro da LGPD: quem abriu, quando e, com um técnico escolhido no painel, de quem
-    quem_pid, quem_hmac = _quem_abriu(b)
-    srv.registro.acrescentar("abriu_mapa", quem_pid, quem_hmac, sel["pid"] if sel else None, None, agora)
+    sel = next((l for l in linhas if _ID.fullmatch(pedido) and l["pid"] == int(pedido)), None)
+    # o registro da LGPD: quem abriu, quando e, com um técnico escolhido no painel, de quem; antes de a página sair
+    if not _registrar_acesso(srv, "abriu_mapa", sel["pid"] if sel else None, None, agora):
+        return _tela({"erro": SEM_REGISTRO}, 503)
     avisos = [a for a in (aviso_piloto,) if a]
     if erro_coords:
         avisos.append(f"Sem as coordenadas das usinas neste servidor ({erro_coords}): ninguém conta como na usina, e o "
@@ -506,12 +562,12 @@ def equipe_rota():
     pedido_t = str(request.args.get("tecnico") or "").strip()
     pedido_u = str(request.args.get("usina") or "").strip()
     coords, _erro = MR.coordenadas()
-    destino = coords.get(pedido_u) if pedido_u.isdigit() else None
-    if not pedido_t.isdigit() or destino is None:
+    destino = coords.get(pedido_u) if _ID.fullmatch(pedido_u) else None
+    if not _ID.fullmatch(pedido_t) or destino is None:
         return _texto(404, NAO_HA_ROTA)
     pid = int(pedido_t)
     try:
-        b, tecnicos, piloto, _aviso = _equipe(srv, agora)
+        _b, tecnicos, piloto, _aviso = _equipe(srv, agora)
     except Exception as e:      # noqa: BLE001
         _log.warning("equipe: não consegui ler o cadastro para a rota (%s)", type(e).__name__)
         return _texto(503, "Não consegui ler o cadastro do Nexus agora; tente de novo em instantes.")
@@ -522,8 +578,8 @@ def equipe_rota():
         return _texto(404, NAO_HA_ROTA)
     u = est["ultimo"]
     url = SI.url_da_rota((u["lat"], u["lon"]), destino[:2])
-    quem_pid, quem_hmac = _quem_abriu(b)
-    srv.registro.acrescentar("abriu_rota", quem_pid, quem_hmac, pid, int(pedido_u), agora)
+    if not _registrar_acesso(srv, "abriu_rota", pid, int(pedido_u), agora):
+        return _texto(503, SEM_REGISTRO)            # sem a trilha, a posição não sai do servidor
     r = redirect(url, code=302)
     r.headers["Cache-Control"] = "no-store"
     # o Google não recebe o endereço do Nexus (com o técnico e a usina) como origem do clique
@@ -543,7 +599,7 @@ def equipe_piloto():
         abort(403)
     pedido = str(request.form.get("pessoa_id") or "").strip()
     quer = str(request.form.get("no_piloto") or "").strip().lower()
-    if not pedido.isdigit() or quer not in ("sim", "nao"):
+    if not _ID.fullmatch(pedido) or quer not in ("sim", "nao"):
         abort(400)
     pid = int(pedido)
     srv, aviso = _servico_da_tela()

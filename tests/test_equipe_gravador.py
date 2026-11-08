@@ -62,16 +62,28 @@ def test_o_gravador_nao_publica_dia_vazio_por_cima(ambiente):
     assert len(api.linhas(livro, ABA_PONTOS)) == 1
 
 
-def test_diario_com_menos_que_o_banco_nao_encolhe_o_dia(ambiente, caplog):
+def test_o_diario_menor_que_o_banco_publica_a_uniao(ambiente):
+    """A máquina nova (ou o disco apagado) no meio do dia tem um diário com MENOS pontos que o banco: a trava à mão
+    pela contagem barrava a gravação, e os pontos novos do dia nunca chegavam ao banco (revisão final de 08/11/2026).
+    Vale a união: o que o banco tem fica, o ponto novo entra, e o livro só cresce (`so_cresce` no catálogo)."""
     api, srv, g = ambiente
     livro = livro_pontos(AGORA.date())
     _livro_com(api, livro, ABA_PONTOS, CAB_PONTOS,
                [[f"P{i:02d}", 20261108, "2026-11-08T13:00:00Z", 7, "c"] for i in range(3)])
-    _ponto(srv, 7, 60, -23.0, -46.0)                    # 1 ponto no diário x 3 no banco
-    with caplog.at_level("WARNING"):
-        g.rodada(AGORA)
-    assert api.syncs == 0 and len(api.linhas(livro, ABA_PONTOS)) == 3
-    assert "menos pontos que o banco" in caplog.text
+    _ponto(srv, 7, 60, -23.0, -46.0)                    # 1 ponto no diário x 3 no banco, que o diário não tem
+    g.rodada(AGORA)
+    ids = {l["ponto_id"] for l in api.linhas(livro, ABA_PONTOS)}
+    assert len(ids) == 4 and {"P00", "P01", "P02"} <= ids
+
+
+def test_o_diario_que_o_banco_ja_tem_inteiro_nao_regrava(ambiente):
+    api, srv, g = ambiente
+    _ponto(srv, 7, 60, -23.0, -46.0)
+    g.rodada(AGORA)
+    antes = api.syncs
+    g2 = Gravador(g._app, srv, usinas=lambda: USINAS)   # reinício: a memória do gravador se perdeu, o banco tem tudo
+    g2.rodada(AGORA + timedelta(minutes=5))
+    assert api.syncs == antes
 
 
 def test_o_livro_do_dia_nao_tem_coordenada_em_claro(ambiente):
@@ -94,6 +106,17 @@ def test_o_diario_local_com_mais_de_7_dias_some(ambiente):
     assert srv.diario.do_dia(velho.date())
     g.rodada(AGORA + timedelta(days=3))                 # 3 dias depois já passou de 7
     assert srv.diario.do_dia(velho.date()) == []
+
+
+def test_o_recalculo_dos_deslocamentos_nao_usa_ponto_de_mais_de_7_dias(ambiente):
+    """O anti-objetivo do desenho: o ponto bruto nunca é usado depois de 7 dias (revisão final de 08/11/2026). O
+    recálculo lia os arquivos dos últimos 8 dias, e o mais velho deles ainda tinha pontos de mais de 7 dias: o corte é
+    pelo INSTANTE do ponto, não pelo arquivo do dia."""
+    api, srv, g = ambiente
+    _ponto(srv, 7, 90, -23.0, -46.0)
+    _ponto(srv, 7, 30, -23.1, -46.0)                    # um trecho 1 -> 2 que nenhuma rodada publicou
+    g.rodada(AGORA + timedelta(days=7, hours=1))        # os dois pontos já têm mais de 7 dias
+    assert api.linhas(livro_deslocamentos(AGORA.date()), ABA_DESLOC) == []
 
 
 def test_os_deslocamentos_do_mes_nao_duplicam_ao_republicar(ambiente):
@@ -147,9 +170,27 @@ def test_evento_que_nao_gravou_volta_a_fila(ambiente, monkeypatch):
         m.setattr("nexus.dados.livros.publicar", cai)
         g.rodada(AGORA)                                 # nenhum passo derruba a rodada
     assert api.syncs == 0
+    # o reinício antes da rodada boa não perde nada: o jornal em disco não foi aparado pela gravação que falhou
+    srv = S.Servico(g._app, srv.diario._dir.parent, srv.cofre, agora=AGORA)
+    g = Gravador(g._app, srv, usinas=lambda: USINAS)
     g.rodada(AGORA + timedelta(minutes=5))              # o banco voltou: as linhas guardadas entram
     assert len(api.linhas(LIVRO_APARELHOS, ABA_APARELHOS)) == 1
     assert len(api.linhas(LIVRO_ACESSOS, ABA_ACESSOS)) == 1
+
+
+def test_o_registro_da_lgpd_sobrevive_ao_reinicio_antes_da_gravacao(ambiente, tmp_path):
+    """O registro de quem abriu o mapa ficava só na memória até a rodada de 5 min, e todo push reinicia o servidor: a
+    linha da LGPD sumia (revisão final de 08/11/2026). O jornal cifrado em disco a leva ao boot seguinte, e a gravação
+    boa o apara."""
+    api, srv, g = ambiente
+    srv.registro.acrescentar("abriu_rota", 1, "hmac-de-quem-abriu", 7, 2, AGORA)
+    jornal = (tmp_path / "equipe" / "fila_acessos.jsonl").read_text(encoding="utf-8")
+    assert jornal and "hmac-de-quem-abriu" not in jornal and "abriu_rota" not in jornal     # cifrado
+    srv2 = S.Servico(g._app, tmp_path, srv.cofre, agora=AGORA)          # o reinício: a memória se perdeu
+    Gravador(g._app, srv2, usinas=lambda: USINAS).rodada(AGORA)
+    (l,) = api.linhas(LIVRO_ACESSOS, ABA_ACESSOS)
+    assert (l["acao"], l["pessoa_hmac"], l["alvo_pessoa_id"]) == ("abriu_rota", "hmac-de-quem-abriu", 7)
+    assert S.Servico(g._app, tmp_path, srv.cofre, agora=AGORA).registro.novos() == []    # aparado depois da gravação
 
 
 def test_o_registro_de_acessos_vira_linhas_do_livro(ambiente):

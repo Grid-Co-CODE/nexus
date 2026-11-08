@@ -156,7 +156,8 @@ FATOS = (
          janela_origem="7 dias (o livro do dia some pela T.I.)",
          observacao="a coordenada só existe cifrada (Cofre, contexto equipe/ponto/<ponto_id>), na coluna cifra; nada em "
                     "claro. Um livro por dia (nexus_equipe_pontos_AAAA_MM_DD): a T.I. apaga o livro do dia com mais de "
-                    "7 dias (LGPD). O expediente é das 6h às 22h, hora de Brasília"),
+                    "7 dias (LGPD). O expediente é das 6h às 22h na hora do técnico (o fuso do lote que o celular "
+                    "manda); o data_id é o dia de Brasília"),
     Fato("deslocamento_equipe", "Deslocamento da equipe entre usinas", "campo",
          "nexus_equipe_deslocamentos_AAAA_MM · fato_deslocamento_equipe",
          "1 linha = 1 deslocamento fechado de 1 técnico, da usina de saída à de chegada",
@@ -187,7 +188,7 @@ FATOS = (
          "1 linha = 1 vez que 1 pessoa abriu o mapa ou a rota de 1 técnico",
          _d(data=("id", "data_id (o dia de Brasília do acesso)"),
             pessoa=("id", "pessoa_id de quem abriu (e o pessoa_hmac); alvo_pessoa_id é o técnico visto"),
-            usina=("id", "usina_id, quando a rota foi aberta a partir de uma usina")),
+            usina=("id", "usina_id: a usina de destino da rota aberta (vazio no abriu_mapa)")),
          tipo="sem_medida", chave=("acesso_id",), fontes=("nexus_equipe_acessos · fato_acesso_mapa",),
          janela_origem="o Nexus é a fonte",
          observacao="trilha da LGPD: quem abriu o mapa ou a rota (acao = abriu_mapa ou abriu_rota) e de quem. Só "
@@ -1665,23 +1666,29 @@ LIVROS = (
           "por setor fica no disco do servidor)",
           so_cresce=True),
     # Mapa de equipe (08/11/2026): registrados antes da 1ª gravação (regra 10). Pontos: um livro por dia, que a T.I. apaga
-    # com 7 dias (por isso sem trava de só-cresce); deslocamentos: um por mês, 1 ano
-    Livro("nexus_equipe_pontos_AAAA_MM_DD", ("fato_ponto_equipe",), "a cada envio de pontos do celular do técnico",
-          "nexus/campo/equipe, pela rota /t/campo/equipe/posicoes", False,
+    # com 7 dias e que, enquanto existe, só cresce (o gravador publica a união do diário com o banco; revisão final de
+    # 08/11/2026); deslocamentos: um por mês, 1 ano
+    Livro("nexus_equipe_pontos_AAAA_MM_DD", ("fato_ponto_equipe",),
+          "o gravador em lote, a cada 5 min, quando o diário do dia tem ponto que o banco não tem",
+          "nexus/campo/equipe/gravador.py, do diário que a rota /t/campo/equipe/posicoes enche", False,
           "registrado em 08/11/2026 antes da 1ª gravação (regra 10): nasce no 1º ponto do dia; a T.I. apaga o do dia "
-          "com mais de 7 dias. Coordenada só cifrada"),
-    Livro("nexus_equipe_deslocamentos_AAAA_MM", ("fato_deslocamento_equipe",), "a cada deslocamento fechado",
-          "nexus/campo/equipe, ao fechar a chegada na usina", False,
+          "com mais de 7 dias. Coordenada só cifrada. Só cresce enquanto existe: cada gravação é a união do diário "
+          "com o banco (a máquina nova no meio do dia não encolhe o dia)", so_cresce=True),
+    Livro("nexus_equipe_deslocamentos_AAAA_MM", ("fato_deslocamento_equipe",),
+          "o gravador em lote, a cada 5 min, quando um deslocamento novo fecha",
+          "nexus/campo/equipe/gravador.py, recalculado dos pontos de até 7 dias (pelo instante)", False,
           "registrado em 08/11/2026 antes da 1ª gravação (regra 10): nasce no 1º deslocamento do mês; guardado 1 ano",
           so_cresce=True),
-    Livro("nexus_equipe_aparelhos", ("fato_evento_aparelho",), "a cada chave emitida ou revogada",
-          "nexus/campo/equipe, pela tela do Mapa de equipe", False,
+    Livro("nexus_equipe_aparelhos", ("fato_evento_aparelho",),
+          "a cada chave emitida ou revogada, levada pelo gravador em lote (a cada 5 min)",
+          "a rota /t/campo/equipe/aparelho (e a de revogar), pelo jornal em disco e o gravador", False,
           "registrado em 08/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª chave emitida", so_cresce=True),
     Livro("nexus_equipe_piloto", ("fato_decisao_piloto",), "a cada entrada ou saída do piloto",
           "nexus/campo/equipe, pela tela do Mapa de equipe", False,
           "registrado em 08/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª decisão", so_cresce=True),
-    Livro("nexus_equipe_acessos", ("fato_acesso_mapa",), "a cada abertura do mapa ou da rota",
-          "nexus/campo/equipe, pelas rotas do Mapa de equipe", False,
+    Livro("nexus_equipe_acessos", ("fato_acesso_mapa",),
+          "a cada abertura do mapa ou da rota, levada pelo gravador em lote (a cada 5 min)",
+          "as rotas do Mapa de equipe, pelo jornal em disco e o gravador", False,
           "registrado em 08/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª abertura (trilha da LGPD)",
           so_cresce=True),
 )

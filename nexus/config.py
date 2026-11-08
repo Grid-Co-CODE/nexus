@@ -106,7 +106,12 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # NEXUS_PREFILTRO=0 desliga a leitura das fotos por trás numa máquina; os limites das regras (horas depois do
              # fechamento, diferença da foto repetida e da captura de tela) e o ritmo da leitura (OS por volta, pausa)
              "NEXUS_PREFILTRO", "NEXUS_PREFILTRO_HORAS_TARDE", "NEXUS_PREFILTRO_DIF", "NEXUS_PREFILTRO_DIF_PRINT",
-             "NEXUS_PREFILTRO_POR_VOLTA", "NEXUS_PREFILTRO_PAUSA_S")
+             "NEXUS_PREFILTRO_POR_VOLTA", "NEXUS_PREFILTRO_PAUSA_S",
+             # Usinas 360° → Mapa de equipe (08/11/2026, nexus/campo/equipe): os dois IDs do Entra que conferem o login
+             # do App de Campo ao registrar o celular (também pela tela Base → Chaves do Nexus) e o gravador em lote, que
+             # só liga onde vale "1" (uma máquina; as rotas do celular respondem 503 onde ele não roda). Sem estarem
+             # aqui, o .env nunca chegava ao app.config (revisão final de 08/11/2026)
+             "NEXUS_EQUIPE_MS_CLIENT_ID", "NEXUS_EQUIPE_MS_TENANT_ID", "NEXUS_EQUIPE_GRAVA")
 
 
 class ConfigErro(RuntimeError):

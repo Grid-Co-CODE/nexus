@@ -37,12 +37,12 @@ LIVRO_ACESSOS, ABA_ACESSOS = "nexus_equipe_acessos", "fato_acesso_mapa"
 CAB_ACESSOS = ("acesso_id", "instante", "data_id", "pessoa_id", "pessoa_hmac", "acao", "alvo_pessoa_id", "usina_id")
 
 # As réguas do desenho, num lugar só
-JANELA_H = (6, 22)            # só se rastreia dentro do expediente (hora de Brasília, [6h, 22h))
-GUARDA_PONTOS_DIAS = 7        # o livro do dia some pela T.I. depois disso
+JANELA_H = (6, 22)            # só se rastreia no expediente: [6h, 22h) na hora do técnico (o `fuso` do lote)
+GUARDA_PONTOS_DIAS = 7        # o livro do dia some pela T.I. depois disso; o diário em disco se poda sozinho
 GUARDA_DESLOC_DIAS = 365
 MAX_PONTOS = 200              # teto de pontos por envio do celular
 SEM_SINAL_MIN = 30            # sem ponto há mais que isto = "sem sinal" no mapa
-RAIO_USINA_KM = 1.0           # a confirmar com o Levi: até onde o técnico conta como "dentro" da usina
+RAIO_USINA_KM = 1.0           # até onde o técnico conta como "dentro" da usina (confirmado pelo Levi em 08/11/2026)
 ORIGEM_APP = "https://gridco-campo-mw.azurewebsites.net"
 
 
