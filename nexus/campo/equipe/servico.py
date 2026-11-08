@@ -30,6 +30,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 from nexus.campo.equipe import (ABA_APARELHOS, ABA_PILOTO, GUARDA_PONTOS_DIAS, LIVRO_APARELHOS, LIVRO_PILOTO)
+from nexus.campo.equipe import acessos as AC
 from nexus.campo.equipe import aparelhos as AP
 from nexus.campo.equipe import pontos as PT
 from nexus.campo.equipe import token_ms as T
@@ -152,6 +153,7 @@ class Servico:
         self._app = app
         self.cofre = cofre
         self.chaveiro = AP.Chaveiro()
+        self.registro = AC.Registro()        # quem abriu o mapa: a tela acrescenta, o gravador leva ao banco
         self.diario = PT.Diario(pasta, cofre)
         self._trava = threading.Lock()
         self._ultimo: dict[int, dict] = self.diario.ultimos(agora)

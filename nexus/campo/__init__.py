@@ -55,6 +55,10 @@ def instalar(app):
         # NEXUS_ZELADORIA_PUBLICAR=0 desliga
         from . import zeladoria_banco
         zeladoria_banco.ligar(app)
+    # o gravador em lote do Mapa de equipe (08/11/2026): pontos, deslocamentos, aparelhos e acessos ao banco a cada
+    # 5 min, só onde NEXUS_EQUIPE_GRAVA=1 (uma máquina por vez: o PC e o servidor não gravam juntos)
+    from .equipe import gravador as equipe_gravador
+    equipe_gravador.ligar(app)
     # o relatório de cada rodada (só contagens) vai para o log do processo: sem isto, um 429 ou um erro de gravação
     # ficava só na memória (1ª carga, 04/10: a rodada parou e ninguém via por quê)
     log = logging.getLogger("nexus.campo")

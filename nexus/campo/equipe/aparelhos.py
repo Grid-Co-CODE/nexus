@@ -90,6 +90,11 @@ class Chaveiro:
             fila, self._fila = self._fila, []
         return fila
 
+    def devolver(self, linhas: list[list]) -> None:
+        """A publicação falhou: os eventos voltam ao começo da fila para a próxima rodada (nenhum se perde)."""
+        with self._trava:
+            self._fila = list(linhas) + self._fila
+
     def carregar(self, eventos: list[dict]) -> None:
         """Reconstrói as ativas no boot a partir do livro. A API devolve tudo como texto e sem garantia de ordem:
         por isso vale o CONJUNTO (emitida e nunca revogada), não a sequência."""
