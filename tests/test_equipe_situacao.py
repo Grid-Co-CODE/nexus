@@ -123,8 +123,9 @@ def test_o_ponto_no_poligono_respeita_o_buraco():
 
 
 def test_a_url_da_rota_e_do_google_maps():
+    # 5 casas (~1 m) bastam para a rota; a 6ª é o centímetro, que ao Google não serve (revisão final de 08/11/2026)
     assert SI.url_da_rota((-16.605173, -49.187654), (-17.334571, -48.712389)) == (
-        "https://www.google.com/maps/dir/?api=1&origin=-16.605173,-49.187654&destination=-17.334571,-48.712389"
+        "https://www.google.com/maps/dir/?api=1&origin=-16.60517,-49.18765&destination=-17.33457,-48.71239"
         "&travelmode=driving")
     with pytest.raises(ValueError):
         SI.url_da_rota((float("nan"), -49.0), (-17.0, -48.0))
@@ -134,6 +135,9 @@ def test_a_distancia_e_o_tempo_em_texto():
     assert SI.km_texto(0.7975) == "0,8 km" and SI.km_texto(9.96) == "10 km" and SI.km_texto(23.4) == "23 km"
     assert SI.tempo_texto(31) == "31 min" and SI.tempo_texto(60) == "1 h 00" and SI.tempo_texto(125) == "2 h 05"
     assert SI.texto_perto(haversine_km(*NA_USINA, *USINAS["7"][:2]), "UFV Teste") == "a 0,8 km da UFV Teste"
+    # o parado fora de usina leva o km inteiro: a casa não sai do painel pela distância com casa decimal
+    assert SI.texto_perto(4.96, "UFV Teste", inteiro=True) == "a 5 km da UFV Teste"
+    assert SI.texto_perto(1.4, "UFV Teste", inteiro=True) == "a 1 km da UFV Teste"
 
 
 def test_o_desenho_so_tem_x_e_y():

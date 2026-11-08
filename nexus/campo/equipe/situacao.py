@@ -175,15 +175,18 @@ def situacao(estado: dict, usinas: dict, agora_utc: datetime, *, cidade=None) ->
 
 
 # ── o texto ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-def km_texto(km: float) -> str:
-    """"0,8 km" (uma casa, com vírgula) até 10 km; daí em diante o km inteiro ("23 km")."""
+def km_texto(km: float, inteiro: bool = False) -> str:
+    """"0,8 km" (uma casa, com vírgula) até 10 km; daí em diante o km inteiro ("23 km"). `inteiro` = sempre o km
+    inteiro (o parado fora de usina)."""
     r = round(float(km), 1)
-    return f"{r:.1f}".replace(".", ",") + " km" if r < 10 else f"{round(km)} km"
+    return f"{r:.1f}".replace(".", ",") + " km" if r < 10 and not inteiro else f"{round(km)} km"
 
 
-def texto_perto(km: float, nome: str) -> str:
-    """A distância até a usina, como o desenho pede: "a 2,3 km da UFV X"."""
-    return f"a {km_texto(km)} da {nome}"
+def texto_perto(km: float, nome: str, inteiro: bool = False) -> str:
+    """A distância até a usina, como o desenho pede: "a 2,3 km da UFV X". Para o parado fora de usina, `inteiro`: o km
+    inteiro ("a 5 km"), porque a casa decimal da distância a duas usinas já cercaria a casa ou o hotel que o mapa não
+    mostra (revisão final de 08/11/2026)."""
+    return f"a {km_texto(km, inteiro)} da {nome}"
 
 
 def tempo_texto(minutos: int) -> str:
@@ -194,10 +197,12 @@ def tempo_texto(minutos: int) -> str:
 
 # ── o Abrir rota ─────────────────────────────────────────────────────────────────────────────────────────────────────
 def _grau(v) -> str:
+    # 5 casas (~1 m) bastam para a rota de carro; a 6ª é o centímetro, que o Google não usa e só entrega a posição mais
+    # fina do que é preciso (revisão final de 08/11/2026)
     x = float(v)
     if not math.isfinite(x):
         raise ValueError("coordenada que não é número")
-    return format(x, ".6f").rstrip("0").rstrip(".")
+    return format(x, ".5f").rstrip("0").rstrip(".")
 
 
 def url_da_rota(origem: tuple, destino: tuple) -> str:
