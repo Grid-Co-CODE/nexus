@@ -34,7 +34,6 @@ from . import curadoria, erros, quem, regua
 from . import estoque as E
 
 bp = Blueprint("pcm_inventario_ponte", __name__, url_prefix="/os/_nexus/inventario")
-bp_raiz = bp                     # o nome que a Task 6 usou; um blueprint só
 
 ENTRAR = "Para ler o saldo e gravar, entre pelo Fracttal."
 SEM_PESSOA = ("Não sei quem está gravando no Fracttal: entre no Nexus com o seu login do Fracttal (o que se grava fica no nome de "
