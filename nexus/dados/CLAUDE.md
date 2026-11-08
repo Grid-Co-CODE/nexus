@@ -242,7 +242,9 @@ assinadas (HMAC, rótulo `nexus:oscreator:chamados-app`; os vetores de teste est
 `tests/test_dados_chamado_aberto.py`). Quem grava é o servidor, de 10 em 10 min, da memória do OS Creator (a lista central
 de OS e a cópia do quadro), sem pedido ao Fracttal: `nexus/torres/oscreator/chamados_abertos.py`, **ligado em
 08/11/2026** (`LIGADO_PADRAO`, o Levi: "liga"). A linha que não mudou guarda o `atualizado_em` de quando ficou assim (a API
-guarda histórico por linha).
+guarda histórico por linha). **1ª foto no banco em 08/11/2026 06:14Z**, conferida por GET: 250 chamados em aberto (201 das
+administrativas retroativas, sem Inspeção), as 250 assinaturas e a da `atualizacao` conferem, 250 com `equipamento_id` e
+248 com `usina_id`; a coluna vazia em 248 porque o quadro ainda não tinha sido aberto depois do reinício (sem os tickets).
 
 **Chamados de garantia (12/10/2026):** Levi: "O nexus é um ambiente centralizado e precisamos ter os dados se
 conversando!". O Nexus publica as OS de acompanhamento de chamado do Fracttal (o quadro Acompanhamento de chamados do OS

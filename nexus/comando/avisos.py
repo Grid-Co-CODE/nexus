@@ -12,7 +12,18 @@ De onde vem cada aviso, sem pedido a mais ao Fracttal:
   executou não avisa;
 - **solicitacao**: o evento `gerou_os`, gravado aqui quando o PCM aprova a solicitação no OS Creator
   (`rotas_solic.api_aprovar`, pelo gancho `AO_APROVAR` que a ponte liga). A aprovada direto no Fracttal não avisa (decidido
-  em 04/11/2026: saber dela custaria ler no Fracttal as solicitações de cada pessoa).
+  em 04/11/2026: saber dela custaria ler no Fracttal as solicitações de cada pessoa);
+- **atribuida** (08/11/2026, a sugestão de uma colega do PCM, "Criação de OS direcionada ao usuário", que o Levi aprovou):
+  a mesma lista central, as OS em processo atribuídas à pessoa (pelo id dela no Fracttal) e criadas por OUTRA pessoa de
+  `ATRIBUIDAS_DESDE` em diante, nos últimos JANELA_DIAS: "OS x criada para você". A OS que nasce em LOTE (`LOTE_MIN` ou mais
+  da mesma pessoa no mesmo minuto: a programação semanal, as clonagens) vira um aviso só, "N OS novas para você", que leva à
+  visão "Atribuídas a mim" do Histórico daquele dia: um aviso por OS encheria o sino de quem recebe a programação.
+QUEM É A PESSOA NO FRACTTAL (08/11/2026): o id dela sai da ligação de Base → Acessos → Pessoas e setores (a última decisão
+com o código do e-mail do login, a mesma que dá o setor), e a conta e o nome que o Fracttal grava, do catálogo de pessoas do
+OS Creator (pelo id, ou pelo e-mail sem a ligação); `_do_fracttal`, só o que já está guardado: nada vai ao Fracttal. Medido
+no PC em 08/11/2026: o e-mail da conta Microsoft de quem testou não estava no Fracttal, e só a ligação o achava. Até então o aviso de execução
+casava só pelo nome da sessão, e quem entra pela conta Microsoft com o nome escrito de outro jeito que o "Criado por" do
+Fracttal ficava sem aviso. Sem a pessoa no catálogo, vale o nome da sessão, como antes.
 
 O livro `nexus_avisos · fato_evento_aviso` (no catálogo antes da 1ª gravação, regra 10 do `nexus/dados/CLAUDE.md`): 1 linha
 por evento, só acrescenta. `gerou_os` é o aviso de solicitação: para quem pediu (`destino_hmac`, o código do NOME, porque a
@@ -20,6 +31,7 @@ solicitação do Fracttal só traz o nome), por quem aprovou (`pessoa_hmac`). `l
 código do e-mail, o mesmo das conversas). Em claro: o aviso, o tipo, o evento, a OS (id e nº) e os códigos; os nomes,
 cifrados (o Cofre). O sino só lê a cópia de 1 minuto (`copia`): nenhuma página espera o banco.
 """
+import hashlib
 import json
 import logging
 import re
@@ -42,8 +54,12 @@ CAB = ("id", "registrado_em", "data_id", "aviso_id", "tipo", "evento", "os_id", 
 EVENTOS = ("gerou_os", "leu")
 JANELA_DIAS = 7
 EXECUTADA = {2: "Em Verificação", 3: "Concluída"}
-# E:<id da OS>:<data de fim, AAAAMMDDHHMM> (a OS executada de novo é outro aviso) ou S:<código da solicitação>
-AVISO_RE = re.compile(r"E:\d{1,12}:\d{12}|S:[A-Za-z0-9_\-]{1,40}")
+ATRIBUIDAS_DESDE = "2026-11-08"   # o aviso de OS criada para a pessoa vale para as criadas deste dia em diante (sem enxurrada)
+LOTE_MIN = 3                      # tantas OS da mesma pessoa no mesmo minuto viram um aviso só
+# E:<id da OS>:<data de fim, AAAAMMDDHHMM> (a OS executada de novo é outro aviso), S:<código da solicitação>, A:<id da OS> (a
+# OS criada para a pessoa) ou L:<quem criou>:<minuto da criação, AAAAMMDDHHMM> (o lote)
+AVISO_RE = re.compile(r"E:\d{1,12}:\d{12}|S:[A-Za-z0-9_\-]{1,40}|A:\d{1,12}|L:[0-9a-f]{1,12}:\d{12}")
+TIPO_DO_PREFIXO = {"E": "execucao", "S": "solicitacao", "A": "atribuida", "L": "atribuida"}
 MAX_POR_VEZ = 200            # quantos avisos um "Marcar todas" grava de uma vez
 TTL_S = 60
 _BRT = timezone(timedelta(hours=-3))
@@ -167,9 +183,74 @@ def _os_central():
     return ponte.modulo_do_clone("os_central")
 
 
-def execucoes(nome: str, agora: datetime | None = None) -> list[dict]:
+def _do_fracttal(email) -> tuple:
+    """(id_personnel, id_account, nome no Fracttal) de quem tem este e-mail, do catálogo de pessoas que o OS Creator já
+    guarda (`catalogos.pessoas_guardadas`): nada vai ao Fracttal. (None, None, "") sem o catálogo ou sem a pessoa nele."""
+    e = _txt(email).lower()
+    if not e:
+        return None, None, ""
+    g = _CACHE.get(("fx", e))                       # o sino está em toda página: a pessoa vale por 1 minuto
+    if g and time.time() - g[0] < TTL_S:
+        return g[1]
+    r = _do_fracttal_agora(e)
+    _CACHE[("fx", e)] = (time.time(), r)
+    return r
+
+
+def _id_pelo_setor(e: str):
+    """O id da pessoa no Fracttal pela ligação de Base → Acessos → Pessoas e setores (a mesma que dá o setor de quem entra:
+    a última decisão com o código deste e-mail). É a ligação governada, e vale também para quem entra pela conta Microsoft
+    com um e-mail que o Fracttal não tem. None sem ela."""
+    try:
+        from ..auth import setor_telas as ST
+        codigo = _codigo(e)
+        if not codigo:
+            return None
+        st = ST._setores_no_clique(*ST._banco())
+        ultima = {}
+        for d in sorted(st.get("decisoes") or [], key=lambda x: x.get("decidida_em") or ""):
+            if _txt(d.get("pessoa_hmac")).lower() == codigo:
+                ultima = d
+        return _int(ultima.get("fracttal_id"))
+    except Exception:            # noqa: BLE001 — sem o banco ou sem a chave: o catálogo pelo e-mail
+        log.debug("avisos: a ligação da pessoa pelo setor não respondeu", exc_info=True)
+        return None
+
+
+def _do_fracttal_agora(e: str) -> tuple:
+    """1º a ligação do setor (o id); depois o catálogo de pessoas do OS Creator, pelo id ou pelo e-mail (a conta e o nome
+    que o Fracttal grava)."""
+    idp = _id_pelo_setor(e)
+    try:
+        from ..torres.oscreator import ponte
+        cat = ponte.modulo_do_clone("catalogos")
+        linhas, _fonte = cat.pessoas_guardadas()
+        achou = None
+        if idp is not None:
+            p = next((x for x in linhas or [] if _int(x.get("id_personnel")) == idp), None)
+            achou = (p.get("id_personnel"), p.get("id_account"), p.get("name") or "") if p else None
+        if achou is None:
+            achou = cat._achar(linhas, cat._hash_email(e))
+    except Exception:            # noqa: BLE001 — sem o clone (os testes do Nexus) ou sem o catálogo: o id do setor, se houver
+        log.debug("avisos: o catálogo de pessoas do OS Creator não respondeu", exc_info=True)
+        achou = None
+    if not achou:
+        return idp, None, ""
+    i, ida, nome = achou
+    return (idp if idp is not None else _int(i)), _int(ida), _txt(nome)
+
+
+def _int(v):
+    try:
+        return int(v) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def execucoes(nome: str, agora: datetime | None = None, id_account=None) -> list[dict]:
     """As OS que `nome` criou e que foram executadas nos últimos JANELA_DIAS, da lista central (nada vai ao Fracttal). Lista
-    vazia quando a lista central não responde pela pessoa (o homônimo, o nome sem OS, a lista ainda sem leitura)."""
+    vazia quando a lista central não responde pela pessoa (o homônimo, o nome sem OS, a lista ainda sem leitura). Com a
+    `id_account` (o catálogo do Fracttal), a OS que traz quem criou pelo id casa por ele."""
     meu = _norm(nome)
     if not meu:
         return []
@@ -184,7 +265,10 @@ def execucoes(nome: str, agora: datetime | None = None) -> list[dict]:
         de = _txt((lista.janela or ("", ""))[0])[:10]
         if not de:
             return []
-        sel = oc.filtrar("criadas", {"nome": nome}, de, agora.strftime("%Y-%m-%d"), status=list(EXECUTADA))
+        pessoa = {"nome": nome}
+        if id_account is not None:
+            pessoa["id_account"] = id_account
+        sel = oc.filtrar("criadas", pessoa, de, agora.strftime("%Y-%m-%d"), status=list(EXECUTADA))
     except Exception:            # noqa: BLE001 — sem a lista central (o PC, os testes do Nexus sem o clone): sem avisos
         log.debug("avisos: a lista central de OS não respondeu", exc_info=True)
         return []
@@ -202,15 +286,75 @@ def execucoes(nome: str, agora: datetime | None = None) -> list[dict]:
     return out
 
 
-def solicitacoes(nome: str, linhas: list[dict], agora: datetime | None = None, cofre=None) -> list[dict]:
-    """Os avisos `gerou_os` para `nome` nos últimos JANELA_DIAS (o código do nome, `codigo_do_nome`)."""
-    meu = codigo_do_nome(nome)
-    if not meu:
+def atribuidas(id_personnel, id_account=None, nome: str = "", agora: datetime | None = None) -> list[dict]:
+    """As OS em processo atribuídas a esta pessoa (o id dela no Fracttal) e criadas por outra, de ATRIBUIDAS_DESDE em diante
+    e nos últimos JANELA_DIAS, da lista central (nada vai ao Fracttal): uma por OS, e o lote (LOTE_MIN ou mais da mesma
+    pessoa no mesmo minuto) num aviso só. Sem o id, ou sem a lista central, nada."""
+    idp = _int(id_personnel)
+    if idp is None:
+        return []
+    agora = agora or datetime.now(_BRT)
+    try:
+        oc = _os_central()
+        lista = oc.atual()
+        guardado = _CACHE.get(("atrib", idp))
+        if guardado and guardado[0] == lista.versao and time.time() - guardado[1] < TTL_S:
+            return list(guardado[2])
+        janela_de = _txt((lista.janela or ("", ""))[0])[:10]
+        if not janela_de:
+            return []
+        de = max(janela_de, ATRIBUIDAS_DESDE, (agora - timedelta(days=JANELA_DIAS)).strftime("%Y-%m-%d"))
+        sel = oc.filtrar("atribuidas", {"id_personnel": idp}, de, agora.strftime("%Y-%m-%d"), status=[1])
+        meu = _norm(nome)
+        novas = []
+        for r in sel or []:
+            if id_account is not None and r.id_criador is not None and r.id_criador == id_account:
+                continue                                    # a que eu mesma criei para mim
+            if meu and _norm(r.criado_por) == meu:
+                continue
+            criada = _quando(r.data)
+            if criada is None or agora - criada > timedelta(days=JANELA_DIAS):
+                continue
+            novas.append((r, criada))
+    except Exception:            # noqa: BLE001 — sem a lista central (o PC, os testes do Nexus sem o clone): sem avisos
+        log.debug("avisos: a lista central de OS não respondeu (atribuídas)", exc_info=True)
+        return []
+    grupos: dict = {}
+    for r, criada in novas:
+        quem = (str(r.id_criador) if r.id_criador is not None
+                else hashlib.sha1(_norm(r.criado_por).encode()).hexdigest()[:10])
+        grupos.setdefault((quem, criada.strftime("%Y%m%d%H%M")), []).append((r, criada))
+    out = []
+    for (quem, minuto), g in grupos.items():
+        criador = _txt(g[0][0].criado_por)
+        if len(g) >= LOTE_MIN:
+            dia = g[0][1].strftime("%Y-%m-%d")
+            out.append({"id": f"L:{quem}:{minuto}", "tipo": "atribuida", "wid": None, "folio": "", "status": "",
+                        "quando": g[0][1], "titulo": f"{len(g)} OS novas para você",
+                        "detalhe": " · ".join(x for x in (f"criadas por {criador}" if criador else "",
+                                                           "Atribuídas a mim") if x),
+                        "link": f"/os/historico?modo=atribuidas&de={dia}&ate={dia}"})
+            continue
+        for r, criada in g:
+            out.append({"id": f"A:{r.id}", "tipo": "atribuida", "wid": r.id, "folio": _txt(r.folio),
+                        "status": "Em Processo", "quando": criada, "titulo": f"OS {_txt(r.folio)} criada para você",
+                        "detalhe": " · ".join(x for x in (f"por {criador}" if criador else "",
+                                                           _txt(r.descricao)[:70]) if x)})
+    _CACHE[("atrib", idp)] = (lista.versao, time.time(), list(out))
+    return out
+
+
+def solicitacoes(nome, linhas: list[dict], agora: datetime | None = None, cofre=None) -> list[dict]:
+    """Os avisos `gerou_os` para `nome` nos últimos JANELA_DIAS (o código do nome, `codigo_do_nome`). `nome` pode ser uma
+    lista: o nome no Fracttal e o da sessão (a solicitação traz o do Fracttal)."""
+    nomes = [nome] if isinstance(nome, str) else list(nome or ())
+    meus = {c for c in (codigo_do_nome(n) for n in nomes) if c}
+    if not meus:
         return []
     agora = agora or datetime.now(_BRT)
     out = {}
     for l in linhas:
-        if _txt(l.get("evento")) != "gerou_os" or _txt(l.get("destino_hmac")).lower() != meu:
+        if _txt(l.get("evento")) != "gerou_os" or _txt(l.get("destino_hmac")).lower() not in meus:
             continue
         aid, q = _txt(l.get("aviso_id")), _quando(l.get("registrado_em"))
         if not AVISO_RE.fullmatch(aid) or q is None or agora - q > timedelta(days=JANELA_DIAS):
@@ -242,10 +386,14 @@ def lidos(linhas: list[dict], meu_hmac: str) -> set:
             if _txt(l.get("evento")) == "leu" and _txt(l.get("pessoa_hmac")).lower() == meu}
 
 
-def da_pessoa(nome: str, meu_hmac: str, linhas: list[dict], agora: datetime | None = None, cofre=None) -> list[dict]:
-    """Os avisos NÃO lidos da pessoa, do mais novo para o mais velho."""
+def da_pessoa(nome: str, meu_hmac: str, linhas: list[dict], agora: datetime | None = None, cofre=None,
+              id_personnel=None, id_account=None, outros_nomes=()) -> list[dict]:
+    """Os avisos NÃO lidos da pessoa, do mais novo para o mais velho. `nome` é o do Fracttal quando o catálogo o tem;
+    `outros_nomes`, o da sessão (a solicitação aprovada casa por qualquer um dos dois)."""
     ja = lidos(linhas, meu_hmac)
-    todos = execucoes(nome, agora) + solicitacoes(nome, linhas, agora, cofre)
+    nomes = list(dict.fromkeys(n for n in (nome, *outros_nomes) if _txt(n)))
+    todos = (execucoes(nome, agora, id_account) + atribuidas(id_personnel, id_account, nome, agora)
+             + solicitacoes(nomes, linhas, agora, cofre))
     return sorted((a for a in todos if a["id"] not in ja), key=lambda a: a["quando"], reverse=True)
 
 
@@ -261,7 +409,9 @@ def para_o_sino(usuario) -> list[dict]:
         cofre = ES._cofre()
     except ES.Recusada:
         cofre = None
-    itens = da_pessoa(nome, _codigo(email), copia(), cofre=cofre)
+    idp, ida, nome_fracttal = _do_fracttal(email)
+    itens = da_pessoa(nome_fracttal or nome, _codigo(email), copia(), cofre=cofre, id_personnel=idp, id_account=ida,
+                      outros_nomes=(nome,))
     for a in itens:
         a["quando_txt"] = a["quando"].strftime("%d/%m %H:%M")
     return itens
@@ -281,8 +431,7 @@ def marcar_lidos(usuario, aviso_ids) -> int:
         raise Recusada("Este Nexus não tem a chave do código da pessoa (NEXUS_PESSOA_HMAC)")
     ja = lidos(ler()["linhas"], meu)
     ids = [a for a in dict.fromkeys(_txt(x) for x in (aviso_ids or [])) if AVISO_RE.fullmatch(a) and a not in ja]
-    novas = [_linha(a, "execucao" if a.startswith("E:") else "solicitacao", "leu", pessoa_hmac=meu)
-             for a in ids[:MAX_POR_VEZ]]
+    novas = [_linha(a, TIPO_DO_PREFIXO.get(a[:1], "execucao"), "leu", pessoa_hmac=meu) for a in ids[:MAX_POR_VEZ]]
     if novas:
         _gravar(novas)
     return len(novas)

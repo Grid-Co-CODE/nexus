@@ -43,8 +43,8 @@ def test_catalogo_declara_grao_estado_e_todas_as_dimensoes():
     r = catalogo.resumo()
     # a programação passou a gravar em 08/10 (decisão 7) e a geração em 11/10 (decisão 8); os três do almoxarifado
     # (25/10/2026) ficam montados até a NEXUS_ALMOX_GRAVAR ligar a gravação depois do ensaio com o 1º ciclo real do App; os
-    # chamados em aberto para o App (08/11/2026), até o Levi ligar o laço (chamados_abertos.LIGADO_PADRAO)
-    assert r["conformados"] >= 6 and r["montados"] == 4
+    # chamados em aberto para o App viraram conformados com a 1ª foto no banco (08/11/2026)
+    assert r["conformados"] >= 6 and r["montados"] == 3
     assert catalogo.POR_ID["geracao_usina_dia"].estado == catalogo.POR_ID["geracao_inversor_dia"].estado == "conformado"
     assert catalogo.POR_ID["programacao"].estado == "conformado"
     # a auditoria de 08/10: ronda e PT tinham o grão errado; checklist e avulsa viraram fonte do fato único de ronda

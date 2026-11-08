@@ -187,8 +187,9 @@ FATOS = (
          tipo="sem_medida", chave=("id",), fontes=("nexus_avisos · fato_evento_aviso",),
          janela_origem="o Nexus é a fonte",
          observacao="aviso_id em claro: E:<id da OS>:<data de fim AAAAMMDDHHMM> (a OS executada, lida da lista central "
-                    "de OS e nunca gravada aqui: só o leu dela) ou S:<código da solicitação>; tipo execucao ou "
-                    "solicitacao; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
+                    "de OS e nunca gravada aqui: só o leu dela), S:<código da solicitação>, A:<id da OS> (a OS criada "
+                    "para a pessoa, 08/11/2026) ou L:<id de quem criou, ou um código curto do nome>:<minuto da criação> "
+                    "(o lote de OS criadas para a pessoa); tipo execucao, solicitacao ou atribuida; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
                     "Fracttal só traz o nome; prefixo nome:, separado do código do e-mail). Os nomes (quem pediu, quem "
                     "aprovou) só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
     # 03/11/2026 (Fase 3 dos setores conversando): o pedido a uma área, com o prazo que quem pede escolhe, e o retorno
@@ -1143,7 +1144,7 @@ FATOS = (
             os=("cod", "inspecao_folio, adm_folio (o nº da Inspeção e o da OS de acompanhamento)")),
          tipo=fato_chamado_aberto.TIPO, chave=fato_chamado_aberto.CHAVE, medidas=_m(fato_chamado_aberto.MEDIDAS),
          fontes=_fontes(fato_chamado_aberto.FONTES), janela_origem=fato_chamado_aberto.JANELA_ORIGEM,
-         estado="montado", conformado_em="nexus_chamados_abertos · fato_chamado_aberto",
+         estado="conformado", conformado_em="nexus_chamados_abertos · fato_chamado_aberto",
          observacao="coluna = aguardando_inspecao, chegaram ou ticket_aberto, na régua do quadro do Acompanhamento; vazia "
                     "quando o ticket não é conhecido agora (o REST não traz a subtarefa e a cópia do quadro passou de 2 "
                     "h). Cada linha e a atualizacao vão assinadas (HMAC, rótulo nexus:oscreator:chamados-app): o App só "
@@ -1491,9 +1492,11 @@ LIVROS = (
     Livro("nexus_chamados_abertos", ("fato_chamado_aberto", "atualizacao"),
           "de 10 em 10 min (:03, :09, :24, :33, :43, :53), só o servidor (a lista central de OS só é fresca lá)",
           "nexus/torres/oscreator/chamados_abertos.py (servir.py; ligado desde 08/11/2026, LIGADO_PADRAO; "
-          "NEXUS_CHAMADOS_ABERTOS=0 desliga numa máquina)", False,
-          "registrado em 08/11/2026 antes da 1ª gravação; o App de Campo lê (o aviso do tracker com chamado aberto "
-          "na ronda) e trata a atualizacao com mais de 30 min como não lida"),
+          "NEXUS_CHAMADOS_ABERTOS=0 desliga numa máquina)", True,
+          "registrado em 08/11/2026 antes da 1ª gravação; no banco desde 08/11/2026 06:14Z (1ª foto, conferida por GET: "
+          "250 linhas, as 250 assinaturas e a da atualizacao conferem, 250 com equipamento_id e 248 com usina_id). O App "
+          "de Campo lê (o aviso do tracker com chamado aberto na ronda) e trata a atualizacao com mais de 30 min como "
+          "não lida"),
     Livro("nexus_os", ("fato_tarefa_os", "qualidade"), "de hora em hora (entre :10 e :20), uma máquina por vez",
           "nexus/campo/tarefas_os.py (laço do Campo; NEXUS_OS_PUBLICAR=0 desliga numa máquina)", True,
           "nasceu na 1ª gravação, à mão depois do ensaio (ferramentas/ensaio_tarefas_os.py --gravar, 18/10/2026: "

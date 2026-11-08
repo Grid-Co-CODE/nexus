@@ -25,7 +25,7 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `conversa.py` | A conversa presa ao objeto com @menção: o livro `nexus_conversas · fato_mensagem`, as menções não lidas (`para_mim`) e a lista do @ (`pessoas_mencionaveis`) |
 | `../torres/comando/templates/comando/_conversa.html` + `static/comando/conversa.js` | O componente da conversa (dentro de cada insight e na página da OS e da usina) e o @ |
 | `../casca/__init__.py` (`_sino`) + `base.html` | O sino do topo |
-| `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS") e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
+| `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS" e, desde 08/11/2026, "OS x criada para você") e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
 
 ## As regras da Fase 1 (e de onde cada uma lê)
 | Regra | Torre dona | Fonte |
@@ -100,6 +100,20 @@ download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
   (`rotas_solic.AO_APROVAR`, que a ponte liga; por trás, no contexto do Nexus). Para quem pediu pelo código do NOME (a
   solicitação do Fracttal só traz o nome; prefixo `nome:`, separado do código do e-mail). A aprovada direto no Fracttal
   não avisa (decisão de 04/11/2026: custaria ler no Fracttal as solicitações de cada pessoa).
+- **"OS x criada para você"** (08/11/2026, a sugestão de uma colega do PCM, "Criação de OS direcionada ao usuário", que o
+  Levi aprovou): as OS em processo atribuídas à pessoa (pelo id dela no Fracttal) e criadas por OUTRA pessoa, de
+  `ATRIBUIDAS_DESDE` (08/11/2026) em diante e nos últimos 7 dias, da mesma lista central (nada vai ao Fracttal). A que a
+  própria pessoa criou para si não avisa. **O lote vira um aviso só:** 3 ou mais da mesma pessoa no mesmo minuto (a
+  programação semanal, as clonagens) dão "N OS novas para você", que leva à visão "Atribuídas a mim" do Histórico daquele
+  dia (sem o card; o `aviso_id` é `L:<quem criou>:<minuto>`, com o id de quem criou ou um código curto do nome, nunca o
+  nome). O selo é "Para você". Os técnicos de campo usam o App: o aviso serve a quem trabalha no Nexus.
+- **Quem a pessoa é no Fracttal** (08/11/2026, `avisos._do_fracttal`, guardado 1 minuto): o id dela pela ligação de Base →
+  Acessos → Pessoas e setores (a última decisão com o código do e-mail do login, a mesma que dá o setor), e a conta e o nome
+  que o Fracttal grava pelo catálogo de pessoas do OS Creator (pelo id; sem a ligação, pelo e-mail). Até então o aviso de
+  execução casava só pelo nome da sessão: quem entra pela conta Microsoft com o nome escrito de outro jeito que o "Criado
+  por" do Fracttal ficava sem aviso, e a solicitação aprovada casa agora pelo nome do Fracttal ou pelo da sessão. Sem a
+  ligação nem o catálogo, vale o nome da sessão, como antes. Medido no PC em 08/11/2026: as 37 pessoas com setor, todas
+  achadas no catálogo pelo id.
 - **No sino:** a parte "avisos das suas OS", no alto; o clique abre o card da OS (`oscreator/card_os_abrir.html`, com o
   botão do PDF) por cima da tela, e sem JavaScript a página da OS. "Marcar como lida" e "Marcar todas como lidas" são
   formulários (`POST /t/comando/aviso/lida`) que o script do sino manda por fetch pedindo JSON, **sem recarregar a tela**
@@ -152,7 +166,8 @@ sem cópia que não espera; a Caixa de todo setor). Os testes da torre (`test_to
 `test_casca_inicio.py`) passaram a esperar o Comando com a Caixa de entrada e os Insights prontos.
 `tests/test_comando_pedidos.py` (Fase 3: um pedido por área com prazo obrigatório, só a área responde, o prazo
 (atrasado, vence hoje, no prazo) e as medianas do painel com linhas inventadas, a Caixa, o sino, a página da OS e o
-Tempo de resposta); `tests/test_comando_conversa.py` (Fase 2); `tests/test_comando_avisos.py` (os avisos das OS: a
+Tempo de resposta); `tests/test_comando_conversa.py` (Fase 2); `tests/test_comando_avisos_atribuidas.py` (a OS criada
+para a pessoa, o lote e quem a pessoa é no Fracttal); `tests/test_comando_avisos.py` (os avisos das OS: a
 execução pela lista central de mentira, a solicitação com os nomes cifrados, o sino com o card e o Marcar como lida
 (os dois formulários no caminho da rota), o "Marcar todas", o caminho aberto no portão de todo setor e o gancho da
 aprovação) e o `test_aprovar_chama_o_gancho_do_aviso_de_quem_pediu` do

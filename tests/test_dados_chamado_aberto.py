@@ -67,7 +67,7 @@ def test_catalogo_registra_o_fato_e_o_livro_antes_de_existir():
     fato = next(f for f in catalogo.FATOS if f.id == "chamado_aberto")
     assert fato.conformado_em == "%s · %s" % (F.LIVRO, F.ABA) and fato.tipo == F.TIPO
     livro = next(l for l in catalogo.LIVROS if l.nome == F.LIVRO)
-    assert set(livro.abas) == {F.ABA, F.ABA_ATU} and livro.no_banco is False and not livro.so_cresce
+    assert set(livro.abas) == {F.ABA, F.ABA_ATU} and livro.no_banco is True and not livro.so_cresce
     assert "chamado_aberto" in explica.RESUMO and "chamado_aberto" in explica.PARA_QUE
     # o livro é só deste laço: o nexus_chamados (o fato_chamado de hora em hora) não ganha a aba nova
     velho = next(l for l in catalogo.LIVROS if l.nome == "nexus_chamados")
