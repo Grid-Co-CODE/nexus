@@ -225,15 +225,17 @@ def comparar(antes_json: str, depois_json: str) -> int:
             if o_antes == "nasce" and o_agora.startswith("import:"):
                 # a troca em M só vale para quem lê o nome pelo M. Quem chama de dentro da casa nova (ou de quem importa
                 # de lá) segue com a função de verdade: o teste passa sem testar o que diz
+                # O que passava pela troca: quem chamava `nome` de dentro de M. Só perde a troca o chamador que SAIU de M
+                # junto (uma função que nascia em M e agora nasce noutro módulo, e lá chama o nome). Quem já lia da casa
+                # nova antes nunca passou pela troca em M (08/11/2026: a fatia 3 deu 3 graves falsos assim).
                 casa, _, real = o_agora[7:].rpartition(".")      # o nome na casa nova pode ser outro (_sessao -> sessao)
-                fora = {m for m in nd if m != mod and (
-                    (m == casa and real in usa.get(m, ()))
-                    or any(o == f"import:{casa}.{real}" and x in usa.get(m, ()) for x, o in nd[m].items()))}
-                fora |= {m for m in le_agora.get((casa, real), ()) if m != mod}
-                fora = sorted(fora)
-                if fora:
-                    graves.append(f"PATCH que não pega mais: {onde} troca {mod}.{nome}, mas {nome} agora mora em "
-                                  f"{casa} e é chamado de {', '.join(fora[:3])}, que não vê a troca")
+                saiu_de_m = {f for f, o in na[mod].items() if o == "nasce" and nd[mod].get(f) != "nasce"} - {nome}
+                foram = sorted({m for m, ns in nd.items() if m != mod
+                                and any(ns.get(f) == "nasce" and na.get(m, {}).get(f) != "nasce" for f in saiu_de_m)
+                                and (real in usa.get(m, ()) or nome in usa.get(m, ()))})
+                if foram:
+                    graves.append(f"PATCH que não pega mais: {onde} troca {mod}.{nome}, mas quem o chamava mudou para "
+                                  f"{', '.join(foram[:3])}, que chama a de {casa} e não vê a troca")
                 else:
                     avisos.append(f"patch segue pegando: {onde} troca {mod}.{nome} (veio de {casa}; os chamadores "
                                   f"ficaram em {mod})")
@@ -257,7 +259,10 @@ def comparar(antes_json: str, depois_json: str) -> int:
         for nome, origem in sorted(ns.items()):
             if origem != "nasce" or nd.get(mod, {}).get(nome) == "nasce":
                 continue
-            if nome in nasceu_agora:
+            veio = nd.get(mod, {}).get(nome, "")
+            if veio.startswith("import:"):              # o nome segue no módulo, agora trazido de outro (a cópia única)
+                avisos.append(f"mudou de casa: {mod}.{nome} -> {veio[7:]}")
+            elif nome in nasceu_agora:
                 avisos.append(f"mudou de casa: {mod}.{nome} -> {', '.join(sorted(nasceu_agora[nome])[:3])}")
             else:
                 avisos.append(f"SAIU: {mod}.{nome} não nasce em módulo nenhum (apagar precisa do OK do Levi)")
