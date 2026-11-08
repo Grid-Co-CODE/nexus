@@ -18,6 +18,7 @@
       <p class="cn-pergunta">{% if sintese %}{{ sintese.total }} usina{{ 's' if sintese.total != 1 }} no contrato. {% endif %}Aparecem só as usinas deste contrato.</p></div>
     {% if lido_tr %}<p class="vc-lido"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> Atualizado às {{ lido_tr[:5] }}</p>{% endif %}
   </div>
+  {% if mes_outro %}<div class="cn-erro cn-aviso" role="status">Mês de <b>{{ mes_nome }}</b>: a performance é a desse mês; o status, os chamados, as OS e a próxima visita são de agora.</div>{% endif %}
   {% else %}
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p>
@@ -76,7 +77,7 @@
         <p class="vc-selos">{% for n, rot, tom in k.status.selos %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% endfor %}</p>
       {% else %}{{ sem_leitura() }}{% endif %}
     {% endcall %}
-    {% call numero('chart-line-up', 'Performance do mês') %}
+    {% call numero('chart-line-up', ('Performance de ' ~ mes_nome) if mes_outro else 'Performance do mês') %}
       {% if k.perf.pct is not none %}<p class="vc-num-v"><b class="cn-t-{{ k.perf.tom }}">{{ ('%.1f'|format(k.perf.pct))|replace('.', ',') }}%</b> do esperado</p>
         <p class="vc-num-d">{{ k.perf.usinas }} usina{{ 's' if k.perf.usinas != 1 }} com meta no Gerencial</p>
       {% else %}{{ sem_leitura() }}{% endif %}
@@ -140,7 +141,7 @@
         <span class="cn-pill cn-{{ x.status.tom }}">{{ x.status.rotulo }}</span>
       </header>
       {% if x.status.lido %}<p class="vc-det-lido">Última leitura do monitoramento: {{ x.status.lido }}</p>{% endif %}
-      {% if x.paradas %}<ul class="vc-det-paradas">{% for p in x.paradas %}<li><b>{{ p.escopo or 'Usina' }}</b>: parada desde {{ p.desde }}{% if p.tipo %} · {{ p.tipo }}{% endif %} · OS {{ p.os }}</li>{% endfor %}</ul>{% endif %}
+      {% if x.paradas %}<ul class="vc-det-paradas">{% for p in x.paradas %}<li><b>{{ p.escopo or 'Usina' }}</b>: parada desde {{ p.desde }}{% if p.tipo %} · {{ p.tipo }}{% endif %} · {% if p.os %}<a class="vc-os" href="{{ raiz }}/t/campo/cliente/os/{{ p.os }}">OS {{ p.os }}</a>{% else %}OS —{% endif %}</li>{% endfor %}</ul>{% endif %}
       {% if x.visita %}<p class="vc-det-visita"><i class="ph ph-van" aria-hidden="true"></i><span>Próxima visita: <b>{{ x.visita_txt }}</b>{% if x.visita.tipo %} · {{ x.visita.tipo }}{% endif %}</span></p>{% endif %}
 
       <h4 class="vc-det-t">Hoje</h4>
@@ -155,7 +156,7 @@
       <h4 class="vc-det-t">Ordens de serviço</h4>
       {% if x.os is none %}<p class="vc-sem vc-det-vazio">sem leitura</p>
       {% else %}{% set a_fazer = x.os|rejectattr('verificacao')|list %}{% set conf = x.os|selectattr('verificacao')|list|length %}
-        {% if a_fazer %}<ul class="vc-det-lista">{% for o in a_fazer %}<li><div><b>OS {{ o.os }}</b><span class="vc-det-d">{{ o.tipo }}</span></div><span class="cn-pill cn-{{ o.tom }}">{{ o.situacao }}</span></li>{% endfor %}</ul>
+        {% if a_fazer %}<ul class="vc-det-lista">{% for o in a_fazer %}<li><div><a class="vc-os" href="{{ raiz }}/t/campo/cliente/os/{{ o.os }}"><b>OS {{ o.os }}</b></a><span class="vc-det-d">{{ o.tipo }}</span></div><span class="cn-pill cn-{{ o.tom }}">{{ o.situacao }}</span></li>{% endfor %}</ul>
         {% else %}<p class="mudo vc-det-vazio">Nenhuma OS a fazer.</p>{% endif %}
         {% if conf %}<p class="vc-det-d vc-det-conf">+ {{ conf }} concluída{{ 's' if conf != 1 }}, em conferência</p>{% endif %}
       {% endif %}

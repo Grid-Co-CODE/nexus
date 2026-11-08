@@ -310,7 +310,9 @@ def _vista_cliente(menu: list[dict]) -> dict | None:
         elif telas:
             itens.append({"tipo": "grupo", "nome": t["nome"], "icone": t["icone"], "id": t["id"], "aberta": t["aberta"],
                           "telas": telas})
-    return {"nome": nome or "Cliente", "modo": modo, "itens": ([comando] if comando else []) + itens}
+    mes = setor_telas.mes_do_cliente()
+    return {"nome": nome or "Cliente", "modo": modo, "itens": ([comando] if comando else []) + itens,
+            "mes": f"{mes:%Y-%m}", "meses": setor_telas.meses_do_cliente()}
 
 
 # ── o Modo cliente (07/11/2026) ──────────────────────────────────────────────────────────────────────────────────
@@ -377,6 +379,21 @@ def modo_cliente_entrar():
     current_app.logger.info("Modo cliente: %s vendo como %s.", (session.get("usuario") or {}).get("email") or
                             "senha de administrador", cliente["nome"])
     return redirect(url_for("casca.inicio"), code=303)
+
+
+@bp.route("/t/base/cliente-mes", methods=["POST"])
+def cliente_mes():
+    """O mês das telas do cliente, escolhido no topo (08/11/2026): fica na sessão e vale para todas. Volta à tela de onde
+    veio (só caminho do próprio Nexus)."""
+    if not setor_telas.visao_de_cliente():
+        abort(403)
+    if not _form_da_casca_ok():
+        abort(403)
+    mes = request.form.get("mes") or ""
+    if mes in {k for k, _ in setor_telas.meses_do_cliente()}:
+        session["cliente_mes"] = mes
+    volta = request.form.get("volta") or "/"
+    return redirect(destino_seguro(volta if volta.startswith("/t/") else "/"), code=303)
 
 
 @bp.route("/t/base/modo-cliente/sair", methods=["POST"])
@@ -514,5 +531,5 @@ def instalar_contexto(app) -> None:
             "cliente_modo": session.get("modo_cliente") if setor_telas.em_modo_cliente() else None,
             # o que o cliente vê no menu lateral (08/11/2026, o mockup da Visão do cliente): o cliente e "Comando"
             "vista_cliente": _vista_cliente(menu),
-            "codigo_casca": _codigo_casca() if session.get("admin") else "",
+            "codigo_casca": _codigo_casca() if session.get("admin") or setor_telas.visao_de_cliente() else "",
         }

@@ -104,8 +104,14 @@ def test_o_cliente_ve_so_as_usinas_dele(app, dados, cliente_tela, logado):
     assert "Acesso de cliente · só leitura" in menu_c and ">Comando</span>" in menu_c and "Sair do modo" not in menu_c
     assert '<h2 class="vc-nome">' not in html and 'id="vc-cliente"' not in html and 'id="vc-det-3"' not in html
     assert 'class="sino-topo"' not in html and "_nexus/sessao" not in html
-    menu = re.findall(r'href="(/t/[^"]+)"', html.split('class="conteudo"', 1)[0])
+    menu = re.findall(r'href="(/t/[^"]+)"', html.split('<nav class="menu"', 1)[1].split("</nav>", 1)[0])
     assert set(menu) <= {"/t/campo/cliente"}
+    # a OS só leitura (08/11/2026): a do cliente abre, do banco; a de outro cliente não
+    assert 'href="/t/campo/cliente/os/901"' in html
+    card = c.get("/t/campo/cliente/os/901")
+    pag = card.get_data(as_text=True)
+    assert card.status_code == 200 and "OS 901" in pag and "só leitura" in pag and "<form" not in pag.split("<main", 1)[1]
+    assert c.get("/t/campo/cliente/os/902").status_code == 404           # a OS 902 é da Coração 1, de outro cliente
     # nada fora da tela dele: telas da Grid, dados, o OS Creator, a gravação
     for url in ("/t/campo/atencao", "/t/comando/caixa-de-entrada", "/t/base/acessos", "/t/campo/responsaveis",
                 "/os/", "/t/comando/conversa/pessoas", "/t/base/paleta"):
@@ -189,3 +195,63 @@ def test_quem_nao_e_administrador_nao_entra_no_modo(app, dados, cliente_tela):
         s["modo_cliente"] = {"id": 1, "nome": "Thopen"}               # forjado sem ser administrador: não vale
         assert "modo_cliente" in s
     assert "Sair do modo cliente" not in c.get("/").get_data(as_text=True)
+
+
+def test_o_mes_escolhido_no_topo(app, dados, cliente_tela):
+    """08/11/2026, Levi: "Gostaria que tivesse um filtro de mês!" (no topo, vale para todas as telas do cliente). Na Visão
+    do cliente, o mês muda a performance (o Gerencial daquele mês); o resto é de agora, e a tela diz."""
+    with app.test_request_context():
+        ST.gravar(SID.CLIENTES, ["campo/cliente"], ST.telas_do_cliente_possiveis(), dados, "http://pg.falso",
+                  app.extensions["nexus_dados_sessao"], "admin@exemplo.test")
+        _e, token = CL.adicionar(dados, EMAIL, 1, "Thopen", "admin@exemplo.test")
+        CL.definir_senha(dados, token, "senha do cliente 1", "senha do cliente 1")
+    ST.limpar()
+    c = app.test_client()
+    c.post("/entrar", data={"cliente_email": EMAIL, "cliente_senha": "senha do cliente 1"})
+    html = c.get("/t/campo/cliente").get_data(as_text=True)
+    topo = html.split('class="cli-mes"', 1)[1].split("</form>", 1)[0]
+    meses = re.findall(r'<option value="(\d{4}-\d\d)"', topo)
+    assert len(meses) == 12 and "Performance do mês" in html and "Mês de <b>" not in html
+    codigo = re.search(r'name="codigo" value="([^"]+)"', topo).group(1)
+    r = c.post("/t/base/cliente-mes", data={"codigo": codigo, "mes": meses[1], "volta": "/t/campo/cliente"})
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/campo/cliente")
+    html = c.get("/t/campo/cliente").get_data(as_text=True)
+    assert "Mês de <b>" in html and "Performance de " in html and f'value="{meses[1]}" selected' in html
+    c.post("/t/base/cliente-mes", data={"codigo": codigo, "mes": "1999-01", "volta": "/t/campo/cliente"})
+    assert f'value="{meses[1]}" selected' in c.get("/t/campo/cliente").get_data(as_text=True)   # fora da janela: não muda
+
+
+def test_as_rondas_na_versao_do_cliente(app, dados, cliente_tela, monkeypatch):
+    """As Rondas do cliente (08/11/2026): só as usinas dele, no mês do topo, sem técnico; as sub-rotas da tela da Grid
+    (a página da usina, o CSV) não abrem para ele."""
+    from nexus.campo import visao
+    from nexus.campo import versao_cliente as VCL
+    hoje = visao._agora().date()
+    dados_r = {"todas": [
+        {"usina_id": 1, "usina": "Altair", "data": hoje.isoformat(), "tipo": "Ronda", "os": 7001, "pendencia": "",
+         "tecnico": "Técnico Secreto"},
+        {"usina_id": 3, "usina": "Coração 1", "data": hoje.isoformat(), "tipo": "Ronda", "os": 7002, "pendencia": "",
+         "tecnico": "Outro"}],
+        "cobertura": [{"usina_id": 1, "usina": "Altair", "ultima": hoje.isoformat(), "dias": 0},
+                      {"usina_id": 2, "usina": "Brodowski 1", "ultima": None, "dias": 999},
+                      {"usina_id": 3, "usina": "Coração 1", "ultima": hoje.isoformat(), "dias": 0}]}
+    r = VCL.rondas(dados_r, {1, 2}, hoje.replace(day=1))
+    assert [x["usina"] for x in r["linhas"]] == ["Altair"] and "Técnico" not in str(r)
+    assert [c["usina"] for c in r["cobertura"]] == ["Brodowski 1", "Altair"] and r["atrasadas"] == 1
+    # pela tela, logado como cliente
+    from nexus.campo import leitura as LE
+    monkeypatch.setattr(visao, "rondas", lambda *a, **k: LE.Leitura(dados_r, 0))
+    with app.test_request_context():
+        ST.gravar(SID.CLIENTES, ["campo/cliente", "campo/rondas"], ST.telas_do_cliente_possiveis(), dados,
+                  "http://pg.falso", app.extensions["nexus_dados_sessao"], "admin@exemplo.test")
+        _e, token = CL.adicionar(dados, EMAIL, 1, "Thopen", "admin@exemplo.test")
+        CL.definir_senha(dados, token, "senha do cliente 1", "senha do cliente 1")
+    ST.limpar()
+    c = app.test_client()
+    c.post("/entrar", data={"cliente_email": EMAIL, "cliente_senha": "senha do cliente 1"})
+    html = c.get("/t/campo/rondas?cliente=Outro%20Cliente").get_data(as_text=True)
+    assert "Rondas nas suas usinas" in html and "Altair" in html and "Coração 1" not in html
+    assert "Técnico Secreto" not in html and 'href="/t/campo/cliente/os/7001?volta=/t/campo/rondas"' in html
+    menu = html.split('<nav class="menu"', 1)[1].split("</nav>", 1)[0]
+    assert ">Rondas</span>" in menu
+    assert c.get("/t/campo/rondas/usina/1").status_code == 403         # a página da usina é da Grid

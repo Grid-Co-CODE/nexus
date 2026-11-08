@@ -167,6 +167,13 @@ avulso"):** a 5ª aba, **Clientes** (`?aba=clientes`, `auth/clientes.py`). Decid
   primeiro, e é onde o Início dele abre; torre com uma tela vira um item com o nome dela; sem o Início. Na Visão do
   cliente, o cabeçalho "Comando · Síntese das suas usinas", "Bom dia/Boa tarde/Boa noite, <cliente>", "N usinas no
   contrato" e "Atualizado às" (a hora do tempo real).
+- **As versões do cliente** (08/11/2026, entrega 1): o **mês no topo** (`setor_telas.mes_do_cliente`, os últimos 12, na
+  sessão, `POST /t/base/cliente-mes`) vale para todas as telas do cliente; cada tela recorta por
+  `setor_telas.usinas_do_cliente()` e tem a conta da versão dela em `campo/versao_cliente.py` (função pura, testada) e um
+  template próprio, sem nome de técnico, nota, duração, filtro interno nem exportação. Prontas: Visão do cliente (o mês
+  muda a performance; o resto é de agora, e a tela diz) e **Rondas**. **A OS só leitura**: toda OS do cliente abre
+  `/t/campo/cliente/os/<n>` (`campo/os_do_cliente.py`), do banco (`fato_tarefa_os`), nunca do Fracttal; OS de outro
+  cliente = 404. O portão do cliente abre só o endereço EXATO da tela (e o cartão da OS): as sub-rotas são da Grid.
 - **Login:** "Sou cliente" na tela de entrar (`/entrar?cliente=1`), e-mail e senha, com as travas do Entrar
   (5 erradas por e-mail e rede, 20 por e-mail, 50 por IP). Prova: `tests/test_clientes_acesso.py`.
 

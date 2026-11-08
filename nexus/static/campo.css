@@ -2018,3 +2018,21 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 /* no celular o SVG tem uns 340 px, não 1000: o ponto do técnico e a marca da usina crescem para dar para ver e tocar */
 @media (max-width:640px){.eq-p,.eq-halo{transform:scale(1.8)}.eq-u{transform:scale(1.5)}
   .eq-dl{grid-template-columns:minmax(0,1fr);gap:2px}.eq-dl dd{margin-bottom:6px}}
+
+/* a OS só leitura do cliente (08/11/2026) e o número clicável na Visão do cliente */
+.vc-os{color:inherit;text-decoration:underline;text-decoration-color:var(--linha-forte);text-underline-offset:3px}
+.vc-os:hover{color:var(--verde-texto);text-decoration-color:currentColor}
+.cos-pagina{max-width:860px}
+.cos-volta{margin:0 0 6px}
+.cos-volta a{color:var(--tinta-2);text-decoration:none;font-size:13px}
+.cos-volta a:hover{color:var(--tinta)}
+.cos-datas{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:18px 0}
+.cos-datas>div{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:12px 14px}
+.cos-datas dt{font:600 11px/1.3 var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--mudo)}
+.cos-datas dd{margin:4px 0 0;font:600 16px/1.3 var(--font-sans);color:var(--tinta)}
+.cos-ativos{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:14px 16px}
+.cos-ativos h2{margin:0 0 8px;font:700 13px/18px var(--font-sans);color:var(--tinta)}
+.cos-ativos ul{list-style:none;margin:0;padding:0}
+.cos-ativos li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--linha)}
+.cos-ativos li:first-child{border-top:0}
+.cos-ativo-d{flex:1;color:var(--mudo);font-size:12.5px}

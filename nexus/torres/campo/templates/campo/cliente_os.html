@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block titulo %}OS {{ o.os if o else numero }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# A OS só leitura (08/11/2026, Levi: "todas as OSs fossem clicáveis para visualização porém não terá a opção de editar
+   nada da OS [...] sendo possível até ver sem acessar o fractall"). Do banco (nexus/campo/os_do_cliente.py), nunca do
+   Fracttal; sem quem fez, horas, custo nem comentário interno. #}
+<div class="campo-nativa cos-pagina">
+  <p class="cos-volta"><a href="{{ raiz }}{{ volta }}"><i class="ph ph-arrow-left" aria-hidden="true"></i> Voltar</a></p>
+  {% if not o %}
+  <div class="cn-cab"><div><p class="gc-eyebrow">Ordem de serviço</p><h1 class="cn-titulo">OS {{ numero }}</h1>
+    <p class="cn-pergunta">Esta OS não está entre as abertas ou em conferência das suas usinas: ela já foi concluída e
+      conferida, ou não é de uma usina sua.</p></div></div>
+  {% else %}
+  <div class="cn-cab"><div><p class="gc-eyebrow">Ordem de serviço · só leitura</p>
+    <h1 class="cn-titulo">OS {{ o.os }}</h1>
+    <p class="cn-pergunta">{{ o.tipo }}{% if o.usina %} · {{ o.usina }}{% endif %}</p></div>
+    <p><span class="cn-pill cn-{{ o.tom }}">{{ o.situacao }}</span></p></div>
+  <dl class="cos-datas">
+    <div><dt>Aberta em</dt><dd>{{ o.aberta.strftime('%d/%m/%Y') if o.aberta else '—' }}</dd></div>
+    <div><dt>Programada para</dt><dd>{{ o.programada.strftime('%d/%m/%Y') if o.programada else '—' }}</dd></div>
+    <div><dt>Concluída em</dt><dd>{{ o.concluida.strftime('%d/%m/%Y') if o.concluida else '—' }}</dd></div>
+  </dl>
+  <section class="cos-ativos" aria-labelledby="cos-ativos-t">
+    <h2 id="cos-ativos-t">O que está na OS</h2>
+    <ul>{% for a in o.ativos %}
+      <li><span class="gc-dado">{{ a.ativo }}</span>
+        <span class="cos-ativo-d">{% if a.fim %}feito em {{ a.fim.strftime('%d/%m') }}{% elif a.programada %}programado para {{ a.programada.strftime('%d/%m') }}{% endif %}</span>
+        <span class="cn-pill cn-{{ a.tom }}">{{ a.situacao }}</span></li>
+    {% endfor %}</ul>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

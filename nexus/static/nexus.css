@@ -733,3 +733,9 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .cli-menu-cab .modo-cliente-sair{margin-top:6px}
 .menu-recolhido .cli-menu-nome span{display:none}
 .menu-recolhido .cli-menu-nome{justify-content:center}
+
+/* o mês das telas do cliente, no topo (08/11/2026) */
+.cli-mes{display:flex;align-items:center;gap:8px;margin:0 10px 0 0}
+.cli-mes-rot{font:600 11px/1 var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--sobre-barra-mudo)}
+.cli-mes select{min-width:0;width:auto;padding:5px 28px 5px 10px;font-size:13px}
+@media (max-width:640px){.cli-mes-rot{display:none}.cli-mes select{max-width:150px}}

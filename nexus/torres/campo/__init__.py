@@ -86,7 +86,8 @@ TORRE = Torre(
         # ronda e ranking são redundantes"): a qualidade do fechamento está na Aprovação e na Triagem, a comparação
         # por região e equipe no Painel das Rondas e as fotos no histórico da usina. O endereço antigo leva à Central
         # (TELAS_QUE_SAIRAM).
-        Tela("rondas", "Rondas", "Que usina está sem ronda de campo há mais tempo?", FONTE_APP),
+        # do_cliente (08/11/2026): o cliente vê a versão dele (campo/versao_cliente.rondas, rondas_cliente.html)
+        Tela("rondas", "Rondas", "Que usina está sem ronda de campo há mais tempo?", FONTE_APP, do_cliente=True),
         # a vegetação e a sujidade das rondas, semana a semana e por cliente, com a zeladoria do Fracttal (Levi,
         # 26/10/2026, no modelo "Rondas Sujidade e Vegetação"); os serviços de terceiros do App ficaram no fim da tela
         Tela("zeladoria", "Zeladoria",
@@ -1311,6 +1312,14 @@ def rondas():
     Exportar CSV dos registros."""
     dias = DIAS_RONDAS
     leitura = visao.rondas()
+    from ...auth import setor_telas
+    if setor_telas.visao_de_cliente():
+        # a versão do cliente (08/11/2026): só as usinas dele, o mês do topo, sem técnico nem filtro interno
+        from ...campo import versao_cliente as VCL
+        mes = setor_telas.mes_do_cliente()
+        return render_template("campo/rondas_cliente.html", torre=TORRE, tela=TORRE.tela("rondas"),
+                               r=VCL.rondas(leitura.dados or {}, setor_telas.usinas_do_cliente() or set(), mes),
+                               mes_nome=setor_telas.nome_do_mes(mes), erro=bool(leitura.erro))
     d = leitura.dados
     regiao, regiao_campo, gestor = request.args.get("regiao", ""), _regiao_campo(), _gestor()
     # cliente pelo cadastro (Levi, 05/10: "filtro por cliente e a cobertura das rondas das UFVs do cliente. Essas usinas

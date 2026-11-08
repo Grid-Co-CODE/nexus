@@ -447,7 +447,7 @@ def pode(caminho: str, telas: set[str]) -> bool:
 SETOR_CLIENTES = {"id": SID.CLIENTES, "nome": "Clientes"}
 # o que o cliente abre fora das telas: entrar e sair, trocar o tema, a saúde e os arquivos estáticos. O Início leva à
 # 1ª tela dele (a casca); nada mais da casca, das torres, do OS Creator ou das APIs
-LIVRES_CLIENTE = frozenset({"auth.entrar", "auth.sair", "casca.tema", "casca.saude", "static"})
+LIVRES_CLIENTE = frozenset({"auth.entrar", "auth.sair", "casca.tema", "casca.saude", "static", "casca.cliente_mes"})
 
 
 # o Modo cliente (07/11/2026, Levi: "Ao clicar no nome deles [...] ter um 'Modo Cliente' aí aparecer um card [...] pedindo
@@ -469,6 +469,60 @@ def cliente_da_sessao():
     if session.get("via") == "cliente":
         return session.get("cliente_id")
     return session["modo_cliente"].get("id") if em_modo_cliente() else None
+
+
+def visao_de_cliente() -> bool:
+    """A sessão vê o Nexus como cliente (a conta do cliente ou o Modo cliente do administrador)?"""
+    return cliente_da_sessao() is not None
+
+
+def usinas_do_cliente() -> set[int] | None:
+    """Os usina_id do cliente da sessão (o `cliente_id` da usina no cadastro); None quando a sessão não é de cliente.
+    Toda tela da versão do cliente recorta por aqui (08/11/2026, Levi: "conforme for o cliente aparecerá as usinas só
+    daquele cliente"). Sem o cadastro, conjunto vazio: fecha, nunca abre tudo."""
+    cid = cliente_da_sessao()
+    if cid is None:
+        return None
+    try:
+        from ..campo import visao
+        b = visao._Base()
+    except Exception:            # noqa: BLE001 — sem o cadastro, nenhuma usina
+        return set()
+    alvo = D._id(cid)
+    return {uid for uid, u in b.por_id.items() if D._id(u.get("cliente_id")) == alvo}
+
+
+# o mês das telas do cliente (08/11/2026, Levi: "Gostaria que tivesse um filtro de mês!"; no topo, vale para todas)
+MESES_ESCOLHA = 12
+_NOMES_MES = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
+              "novembro", "dezembro")
+
+
+def _mes_atual():
+    from ..campo import visao
+    hoje = visao._agora().date()
+    return hoje.replace(day=1)
+
+
+def meses_do_cliente() -> list[tuple[str, str]]:
+    """[(AAAA-MM, "novembro de 2026")] dos últimos 12 meses, o atual primeiro."""
+    d, out = _mes_atual(), []
+    for _ in range(MESES_ESCOLHA):
+        out.append((f"{d:%Y-%m}", f"{_NOMES_MES[d.month - 1]} de {d.year}"))
+        d = (d - timedelta(days=1)).replace(day=1)
+    return out
+
+
+def mes_do_cliente():
+    """O 1º dia do mês escolhido no topo (o atual, se nada foi escolhido ou o escolhido saiu da janela)."""
+    escolhido = str(session.get("cliente_mes") or "") if has_request_context() else ""
+    if escolhido in {k for k, _ in meses_do_cliente()}:
+        return datetime.strptime(escolhido + "-01", "%Y-%m-%d").date()
+    return _mes_atual()
+
+
+def nome_do_mes(d) -> str:
+    return f"{_NOMES_MES[d.month - 1]} de {d.year}"
 
 
 def telas_do_cliente_possiveis() -> set[str]:
@@ -515,7 +569,11 @@ def portao_cliente():
             return redirect(na_raiz(primeira))
         return render_template("sem_setor.html", bloqueada=True, setor=a["setor"], cliente=True), 403
     _torre, tela = _tela_do_caminho(request.path)
-    if tela and tela in a["telas"] and request.method in ("GET", "HEAD"):
+    # só o endereço EXATO da tela (as sub-rotas dela, como /t/campo/rondas/usina/<id>, são da Grid), e o cartão da OS só
+    # leitura, que mora debaixo da Visão do cliente (08/11/2026)
+    exato = request.path.rstrip("/") == f"/t/{tela}" or (tela == "campo/cliente"
+                                                          and request.path.startswith("/t/campo/cliente/os/"))
+    if tela and exato and tela in a["telas"] and request.method in ("GET", "HEAD"):
         return None
     if not _quer_pagina():
         return jsonify(ok=False, erro="Fora do seu acesso."), 403

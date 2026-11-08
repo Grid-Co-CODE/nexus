@@ -90,9 +90,16 @@ def cliente():
     if cid not in grupos:
         cid = None
     sintese, erros, ts, sel = None, {}, "", None
+    # o mês escolhido no topo (08/11/2026, Levi: "filtro de mês", no topo, vale para todas): na Visão do cliente ele
+    # muda a performance do mês (o Gerencial daquele mês); status, chamados, OS e próxima visita são de AGORA
+    mes = setor_telas.mes_do_cliente() if modo_cliente else None
+    mes_outro = bool(mes and mes != visao._agora().date().replace(day=1))
     if cid:
         hoje = visao._agora().date()
         usinas = grupos[cid]
+        if mes_outro:
+            met, _info = campo_resp.metas(campo_resp.Nomes(b), mes.year * 100 + mes.month)
+            usinas = [dict(u, meta=met.get(u["usina_id"]) or {}) for u in usinas]
         fontes, erros = _fontes(b, {u["usina_id"] for u in usinas}, hoje)
         ts = fontes.get("tempo_real_ts") or ""
         sintese = VC.montar(usinas, fontes["tempo_real"], fontes["chamados"], fontes["os"], fontes["visitas"], hoje,
@@ -105,13 +112,27 @@ def cliente():
     return render_template("campo/cliente.html", torre=TORRE, tela=TORRE.tela("cliente"), opcoes=opcoes, cid=cid,
                            nome=(b.nome_cliente.get(cid) or "") if cid else "", sintese=sintese, erros=erros,
                            erro_visao=erro_visao, lido_tr=ts, fontes_nome=FONTES_NOME, sel=sel,
-                           modo_cliente=modo_cliente, saudacao=_saudacao())
+                           modo_cliente=modo_cliente, saudacao=_saudacao(), mes_outro=mes_outro,
+                           mes_nome=setor_telas.nome_do_mes(mes) if mes else "")
 
 
 def _saudacao() -> str:
     """Bom dia, boa tarde ou boa noite, pela hora de Brasília (o cabeçalho do próprio cliente, 08/11/2026)."""
     h = visao._agora().hour
     return "Bom dia" if 5 <= h < 12 else "Boa tarde" if 12 <= h < 18 else "Boa noite"
+
+
+@bp.route("/cliente/os/<int:numero>")
+def cliente_os(numero):
+    """A OS só leitura (08/11/2026): do banco, nunca do Fracttal. O cliente (e o administrador no Modo cliente) só abre
+    OS de usina dele; a Grid, qualquer uma. Mora debaixo de /cliente/ para o portão do cliente a tratar como a tela."""
+    from ...auth import setor_telas
+    from ...campo import os_do_cliente as OSC
+    o = OSC.os_do_cliente(numero, setor_telas.usinas_do_cliente())
+    volta = request.args.get("volta") or ""
+    volta = volta if volta.startswith("/t/") and "//" not in volta else "/t/campo/cliente"
+    return render_template("campo/cliente_os.html", torre=TORRE, tela=TORRE.tela("cliente"), o=o, numero=numero,
+                           volta=volta), (200 if o else 404)
 
 
 FONTES_NOME = {"tempo_real": "o status do tempo real", "chamados": "os chamados na distribuidora",

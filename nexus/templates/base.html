@@ -38,6 +38,17 @@
   <span class="topo-espaco"></span>
   {# a ação da tela no topo (13/10/2026, sem o 2º cabeçalho): hoje só o "Modo TV" do Painel NOC (performance/moldura.html) #}
   {% block topo_acoes %}{% endblock %}
+  {% if vista_cliente %}
+  {# o mês das telas do cliente (08/11/2026, Levi: "Gostaria que tivesse um filtro de mês!"; no topo, vale para todas) #}
+  <form class="cli-mes" method="post" action="{{ raiz }}/t/base/cliente-mes">
+    <input type="hidden" name="codigo" value="{{ codigo_casca }}"><input type="hidden" name="volta" value="{{ caminho }}">
+    <label class="cli-mes-rot" for="cli-mes-escolha">Mês</label>
+    <select id="cli-mes-escolha" name="mes" class="gc-campo" onchange="this.form.submit()">
+      {% for k, nome in vista_cliente.meses %}<option value="{{ k }}"{% if k == vista_cliente.mes %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+    </select>
+    <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Ver</button></noscript>
+  </form>
+  {% endif %}
   {# o sino (03/11/2026, os setores conversando): os avisos das OS da pessoa, as menções e os pedidos para o setor dela;
      leva à Caixa de entrada. Os insights sem dono saíram em 04/11/2026 (Levi: "tira insights sem dono do sino"): eram mais
      de mil e escondiam o resto; ficam na Caixa. O botão leva o ícone do OS Creator do menu lateral, e não o sino (Levi,
