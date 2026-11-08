@@ -170,612 +170,642 @@ def _semana_do_form() -> str | None:
     return s if geracao.SEMANA_RE.match(s) else None
 
 
-def registrar_pcm(bp) -> None:
-    @bp.route("/gerar", methods=["GET", "POST"])
-    def gerar():
-        cfg = current_app.config
-        if request.method == "GET":
-            avisos = {"importado": "Importado da pasta do PCM.", "observacoes": "Observações salvas.",
-                      "copiado": "Observações copiadas da semana anterior.",
-                      "importado_repo": "Observações importadas do repositório do PCM.",
-                      "publicada": "Semana publicada no repositório do PCM. O robô do PCM regrava o banco_dados.json do "
-                                   "App em 5 a 10 minutos."}
-            return render_template("pcm/gerar.html", **_ctx_gerar(
-                cfg, rodada=request.args.get("rodada"), semana=request.args.get("semana"),
-                ok=avisos.get(request.args.get("feito") or "")))
-        if _de_outro_site():
-            abort(403)
-        semana_pedida = (request.form.get("semana") or "").strip()
-        if not geracao.SEMANA_RE.match(semana_pedida):
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
-        if geracao.horario_de_campo() and not request.form.get("confirmo"):
-            return render_template("pcm/gerar.html", **_ctx_gerar(
-                cfg, erro="No horário de campo o motor divide a cota do Fracttal com o App de Campo. Marque a "
-                          "confirmação para rodar mesmo assim.")), 400
-        try:
-            r = geracao.iniciar(cfg, semana_pedida)
-        except geracao.NaoPronto as ex:
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro=f"Ainda não dá para gerar: {ex}.")), 400
-        except geracao.Ocupado as ex:
-            return render_template("pcm/gerar.html", **_ctx_gerar(
-                cfg, erro=f"Já tem uma geração rodando (rodada {ex}). Espere ela terminar.")), 409
-        return redirect(na_raiz("/t/pcm/gerar?rodada=") + r["id"], code=303)
+def gerar():
+    cfg = current_app.config
+    if request.method == "GET":
+        avisos = {"importado": "Importado da pasta do PCM.", "observacoes": "Observações salvas.",
+                  "copiado": "Observações copiadas da semana anterior.",
+                  "importado_repo": "Observações importadas do repositório do PCM.",
+                  "publicada": "Semana publicada no repositório do PCM. O robô do PCM regrava o banco_dados.json do "
+                               "App em 5 a 10 minutos."}
+        return render_template("pcm/gerar.html", **_ctx_gerar(
+            cfg, rodada=request.args.get("rodada"), semana=request.args.get("semana"),
+            ok=avisos.get(request.args.get("feito") or "")))
+    if _de_outro_site():
+        abort(403)
+    semana_pedida = (request.form.get("semana") or "").strip()
+    if not geracao.SEMANA_RE.match(semana_pedida):
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
+    if geracao.horario_de_campo() and not request.form.get("confirmo"):
+        return render_template("pcm/gerar.html", **_ctx_gerar(
+            cfg, erro="No horário de campo o motor divide a cota do Fracttal com o App de Campo. Marque a "
+                      "confirmação para rodar mesmo assim.")), 400
+    try:
+        r = geracao.iniciar(cfg, semana_pedida)
+    except geracao.NaoPronto as ex:
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro=f"Ainda não dá para gerar: {ex}.")), 400
+    except geracao.Ocupado as ex:
+        return render_template("pcm/gerar.html", **_ctx_gerar(
+            cfg, erro=f"Já tem uma geração rodando (rodada {ex}). Espere ela terminar.")), 409
+    return redirect(na_raiz("/t/pcm/gerar?rodada=") + r["id"], code=303)
 
-    @bp.route("/gerar/planilha")
-    def gerar_planilha():
-        """A planilha da rodada (a `sombra.xlsx`, a mesma que o Publicar no App manda), para baixar. Levi, 19/10/2026:
-        "tem que ter a opção de baixar!" (ela só existia no disco do servidor). Vale para quem abre a tela Gerar."""
-        from flask import send_file
-        rid = str(request.args.get("rodada") or "")
-        f = geracao.planilha(current_app.config, rid)
-        if not f:
-            abort(404)
-        st = geracao.ler_status(current_app.config, rid) or {}
-        semana = str(st.get("semana") or rid[-8:])
-        return send_file(f, as_attachment=True, max_age=0,
-                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                         download_name=f"Programação Semana {semana[-2:]} - rodada {rid[:15]}.xlsx")
 
-    @bp.route("/gerar/importar", methods=["POST"])
-    def gerar_importar():
-        """Na sombra, traz para o Nexus os arquivos que a pasta do PCM tem hoje: as duas gerações partem do mesmo dado.
-        As observações entram na semana escolhida."""
-        cfg = current_app.config
-        if _de_outro_site():
-            abort(403)
-        semana = _semana_do_form()
-        if not semana:
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
-        origem = geracao.pasta_origem(cfg)
-        if not (origem and origem.is_dir()):
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
-                                   erro="A pasta do PCM não está nesta máquina.")), 400
-        try:
-            I.importar(geracao.pasta_trabalho(cfg), origem, semana)
-        except I.InsumoErro as ex:
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
-                                   erro=f"Não importei: {ex}")), 400
-        return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=importado"), code=303)
+def gerar_planilha():
+    """A planilha da rodada (a `sombra.xlsx`, a mesma que o Publicar no App manda), para baixar. Levi, 19/10/2026:
+    "tem que ter a opção de baixar!" (ela só existia no disco do servidor). Vale para quem abre a tela Gerar."""
+    from flask import send_file
+    rid = str(request.args.get("rodada") or "")
+    f = geracao.planilha(current_app.config, rid)
+    if not f:
+        abort(404)
+    st = geracao.ler_status(current_app.config, rid) or {}
+    semana = str(st.get("semana") or rid[-8:])
+    return send_file(f, as_attachment=True, max_age=0,
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                     download_name=f"Programação Semana {semana[-2:]} - rodada {rid[:15]}.xlsx")
 
-    @bp.route("/gerar/importar-repositorio", methods=["POST"])
-    def gerar_importar_repositorio():
-        """As observações que estão no repositório do PCM (o Observacoes_Semana.txt que o PC do PCM ou o painel mandou)
-        entram na semana escolhida. Funciona no servidor, onde a pasta do PCM não existe."""
-        cfg = current_app.config
-        if _de_outro_site():
-            abort(403)
-        semana = _semana_do_form()
-        if not semana:
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
-        ler = geracao.leitor_do_repositorio(cfg)
-        try:
-            dados = ler(I.OBSERVACOES) if ler else None
-        except Exception as ex:      # noqa: BLE001
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
-                                   erro=f"Não consegui ler o repositório do PCM ({type(ex).__name__}).")), 502
-        if not dados:
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
-                                   erro="O repositório do PCM não tem o Observacoes_Semana.txt.")), 404
-        repo, ramo = fonte.repositorio(cfg)
-        I.salvar_observacoes(geracao.pasta_trabalho(cfg), semana, dados.decode("utf-8", errors="replace"),
-                             autor="repositório do PCM", origem={"arquivo": f"{repo} · {I.OBSERVACOES}",
-                                                                  "importado_em": I._agora()})
-        return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=importado_repo"), code=303)
 
-    @bp.route("/gerar/publicar", methods=["GET", "POST"])
-    def gerar_publicar():
-        """Publicar no App: a confirmação (GET) e o envio (POST). Administrador ou setor PCM (`pode_programar`): muda a
-        semana de todo o campo."""
-        cfg = current_app.config
-        if request.method == "POST" and _de_outro_site():
-            abort(403)
-        rid = (request.values.get("rodada") or "").strip()
-        st = geracao.ler_status(cfg, rid)
-        if st is None:
-            abort(404)
-        if not pode_programar():
-            return render_template("pcm/publicar.html", st=st, negado=True), 403
-        motivos = PB.motivos_para_nao_publicar(cfg, rid)
-        if request.method == "POST":
-            repo_ja_tem = request.form.get("repo_ja_tem") == "1"
-            comecou = PB.ja_comecou(st["semana"])
-            if (not request.form.get("confirmo") or (repo_ja_tem and not request.form.get("substituir"))
-                    or (comecou and not request.form.get("ciente_comecou"))):
-                return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos,
-                                       erro="Marque a confirmação para publicar.")), 400
-            quem = _quem()
-            try:
-                PB.publicar(cfg, rid, quem)
-            except PB.PublicacaoErro as ex:
-                return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos,
-                                       erro=f"Não publiquei: {ex}.")), 400
-            except Exception as ex:      # noqa: BLE001 — rede, GitHub fora: a tela diz e nada muda na rodada
-                return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos,
-                                       erro=f"O GitHub não respondeu ({type(ex).__name__}): nada foi publicado, ou "
-                                            f"só parte; confira o repositório antes de tentar de novo.")), 502
-            return redirect(na_raiz(f"/t/pcm/gerar?rodada={rid}&feito=publicada"), code=303)
-        return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos))
+def gerar_importar():
+    """Na sombra, traz para o Nexus os arquivos que a pasta do PCM tem hoje: as duas gerações partem do mesmo dado.
+    As observações entram na semana escolhida."""
+    cfg = current_app.config
+    if _de_outro_site():
+        abort(403)
+    semana = _semana_do_form()
+    if not semana:
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
+    origem = geracao.pasta_origem(cfg)
+    if not (origem and origem.is_dir()):
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
+                               erro="A pasta do PCM não está nesta máquina.")), 400
+    try:
+        I.importar(geracao.pasta_trabalho(cfg), origem, semana)
+    except I.InsumoErro as ex:
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
+                               erro=f"Não importei: {ex}")), 400
+    return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=importado"), code=303)
 
-    @bp.route("/gerar/observacoes", methods=["POST"])
-    def gerar_observacoes():
-        cfg = current_app.config
-        if _de_outro_site():
-            abort(403)
-        semana = _semana_do_form()
-        if not semana:
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
-        I.salvar_observacoes(geracao.pasta_trabalho(cfg), semana, request.form.get("texto") or "", autor=_quem())
-        return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=observacoes"), code=303)
 
-    @bp.route("/gerar/observacoes/copiar", methods=["POST"])
-    def gerar_observacoes_copiar():
-        """Os dias de atendimento das usinas quase não mudam de uma semana para outra: começa pela anterior. Só
-        copia para semana VAZIA, para nunca apagar o que alguém já escreveu."""
-        cfg = current_app.config
-        if _de_outro_site():
-            abort(403)
-        semana = _semana_do_form()
-        if not semana:
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
-        trab = geracao.pasta_trabalho(cfg)
-        anterior = O.semana_anterior(semana)
-        if I.observacoes(trab, semana).strip():
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
-                                   erro=f"A semana {semana} já tem observações: não copiei por cima.")), 409
-        texto = I.observacoes(trab, anterior)
-        if not texto.strip():
-            return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
-                                   erro=f"A semana {anterior} não tem observações para copiar.")), 400
-        I.salvar_observacoes(trab, semana, texto, autor=_quem())
-        return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=copiado"), code=303)
+def gerar_importar_repositorio():
+    """As observações que estão no repositório do PCM (o Observacoes_Semana.txt que o PC do PCM ou o painel mandou)
+    entram na semana escolhida. Funciona no servidor, onde a pasta do PCM não existe."""
+    cfg = current_app.config
+    if _de_outro_site():
+        abort(403)
+    semana = _semana_do_form()
+    if not semana:
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
+    ler = geracao.leitor_do_repositorio(cfg)
+    try:
+        dados = ler(I.OBSERVACOES) if ler else None
+    except Exception as ex:      # noqa: BLE001
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
+                               erro=f"Não consegui ler o repositório do PCM ({type(ex).__name__}).")), 502
+    if not dados:
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
+                               erro="O repositório do PCM não tem o Observacoes_Semana.txt.")), 404
+    repo, ramo = fonte.repositorio(cfg)
+    I.salvar_observacoes(geracao.pasta_trabalho(cfg), semana, dados.decode("utf-8", errors="replace"),
+                         autor="repositório do PCM", origem={"arquivo": f"{repo} · {I.OBSERVACOES}",
+                                                              "importado_em": I._agora()})
+    return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=importado_repo"), code=303)
 
-    @bp.route("/gerar/estado")
-    def gerar_estado():
-        cfg = current_app.config
-        st = geracao.ler_status(cfg, request.args.get("rodada") or "")
-        if st is None:
-            abort(404)
-        estado = st.get("estado")
-        if estado == "rodando" and not geracao.ativa(cfg, st["id"]):
-            estado = "interrompida"
-        return jsonify({"id": st["id"], "estado": estado, "duracao_s": st.get("duracao_s")})
 
-    @bp.route("/tarefas")
-    def tarefas():
-        leitura = fonte.ler(current_app.config)
-        ctx = _contexto_fonte(leitura)
-        if leitura.dados is None:
-            return render_template("pcm/tarefas.html", sem=None, **ctx)
-        a = request.args
-        sem = S.achar(leitura.dados, a.get("semana") or None)
-        if sem is None:
-            abort(404)
-        sem = _tipo_do_fracttal(current_app.config, sem)
-        filtros = {"equipe": a.get("equipe") or None, "dia": a.get("dia") or None, "status": a.get("status") or None,
-                   "tipo": a.get("tipo") or None, "busca": a.get("q") or None,
-                   "horario": "fora" if a.get("horario") == "fora" else None}
-        todas = S.tarefas(sem, **filtros)
-        try:
-            pagina = max(1, int(a.get("pagina") or 1))
-        except ValueError:
-            pagina = 1
-        paginas = max(1, -(-len(todas) // POR_PAGINA))
-        pagina = min(pagina, paginas)
-        linhas = []
-        for r in todas[(pagina - 1) * POR_PAGINA: pagina * POR_PAGINA]:
-            d = S.dia_curto(r.get("dia"))
-            linhas.append(dict(r, _dia=S.NOMES_DIA.get(d, r.get("dia") or ""), _situacao=S.situacao(r),
-                               _duracao=_h(r.get("duracao"))))
-        rows = sem.get("rows") or []
-        # as opções de cada filtro com os OUTROS aplicados, e quantas tarefas cada uma tem (09/10/2026)
-        fac = S.facetas(sem, filtros)
-
-        def _com(lista, campo):
-            return [x for x in lista if fac[campo].get(x[0]) or x[0] == filtros.get(campo)]
-
-        opcoes = {
-            "equipes": _com([(e, fac["equipe"][e]) for e in sorted(set(fac["equipe"]) | {filtros["equipe"]} - {None})],
-                            "equipe"),
-            "tipos": _com([(t, fac["tipo"][t]) for t in sorted(set(fac["tipo"]) | {filtros["tipo"]} - {None})], "tipo"),
-            "dias": _com([(d, S.NOMES_DIA[d], fac["dia"][d]) for d in S.DIAS], "dia"),
-            "situacoes": _com([(v, rot, fac["status"][v]) for v, rot in SITUACOES], "status"),
-        }
-        return render_template("pcm/tarefas.html", sem=sem, semanas=S.semanas(leitura.dados), linhas=linhas,
-                               total=len(todas), total_semana=len(rows), pagina=pagina, paginas=paginas,
-                               filtros=filtros, q=a.get("q") or "", opcoes=opcoes, **ctx)
-
-    @bp.route("/gestao")
-    def gestao():
-        # as tarefas pendentes de uma célula do Plano, para o painel lateral (12/10/2026): o mesmo endereço com
-        # pu=<usina>&pc=<coluna>, pedido pelo fetch da própria tela
-        if request.args.get("pu") is not None:
-            ctx = _ctx_pendentes(current_app.config, request.args)
-            if ctx is None:
-                return render_template("pcm/_gestao_pendentes_erro.html"), 503
-            return render_template("pcm/_gestao_pendentes.html", **ctx)
-        # a tabela de um tipo da árvore Cliente ▸ Usina ▸ Tipo (04/11/2026): o mesmo endereço com arv/ac/au/at (e os
-        # filtros de cima), pedido pelo fetch da tela quando o nó abre
-        if request.args.get("arv") is not None:
-            ctx = _ctx_arvore(current_app.config, request.args)
-            if ctx is None:
-                return render_template("pcm/_gestao_arvore.html", erro=True), 503
-            return render_template("pcm/_gestao_arvore.html", **ctx)
-        # as partes seguintes do Só atrasadas (04/11/2026): o mesmo endereço com ap=<de onde seguir>
-        if request.args.get("ap") is not None:
-            ctx = _ctx_atrasadas(current_app.config, request.args)
-            if ctx is None:
-                return render_template("pcm/_gestao_arvore.html", erro=True), 503
-            return render_template("pcm/_gestao_atrasadas.html", parte=True, **ctx)
-        # a Confiabilidade por ativo e o MTTR por equipe cluster (parte C, 04/11/2026), pedidos quando o bloco abre:
-        # cf=conf | mttr | usina (com cc e cu)
-        if request.args.get("cf") is not None:
-            return _confiab(request.args)
-        return render_template("pcm/gestao.html", **_ctx_gestao(current_app.config, request.args))
-
-    @bp.route("/quadro")
-    def quadro():
-        ctx = _ctx_quadro(current_app.config, request.args)
-        if ctx is None:
-            abort(404)
-        return render_template("pcm/quadro.html", **ctx)
-
-    @bp.route("/quadro/reprogramar", methods=["POST"])
-    def quadro_reprogramar():
-        """Grava a fila de reprogramação da página. Administrador ou setor PCM (`pode_programar`). Semana que o Nexus
-        gera: nas observações dela no Nexus, direto. Semana em curso: nos ajustes da semana em curso do repositório do
-        PCM, depois da confirmação."""
-        cfg = current_app.config
-        if _de_outro_site():
-            abort(403)
-        if not pode_programar():
-            abort(403)
-        f = request.form
-        base = _quadro_semana(cfg, (f.get("semana") or "").strip() or None, (f.get("rodada") or "").strip() or None)
-        sem = base["sem"]
-        if sem is None:
-            abort(404)
-        try:
-            itens = json.loads(f.get("itens") or "[]")
-        except ValueError:
-            itens = []
-        linhas, problemas = Q.linhas_da_fila(sem, itens)
-        dest = _destino_quadro(cfg, base)
+def gerar_publicar():
+    """Publicar no App: a confirmação (GET) e o envio (POST). Administrador ou setor PCM (`pode_programar`): muda a
+    semana de todo o campo."""
+    cfg = current_app.config
+    if request.method == "POST" and _de_outro_site():
+        abort(403)
+    rid = (request.values.get("rodada") or "").strip()
+    st = geracao.ler_status(cfg, rid)
+    if st is None:
+        abort(404)
+    if not pode_programar():
+        return render_template("pcm/publicar.html", st=st, negado=True), 403
+    motivos = PB.motivos_para_nao_publicar(cfg, rid)
+    if request.method == "POST":
+        repo_ja_tem = request.form.get("repo_ja_tem") == "1"
+        comecou = PB.ja_comecou(st["semana"])
+        if (not request.form.get("confirmo") or (repo_ja_tem and not request.form.get("substituir"))
+                or (comecou and not request.form.get("ciente_comecou"))):
+            return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos,
+                                   erro="Marque a confirmação para publicar.")), 400
         quem = _quem()
-        volta = {"semana": sem["week"]}
-        if base["rodada"]:
-            volta["rodada"] = base["rodada"]
-        # os filtros da tela voltam junto: quem reprogramou a equipe dele continua nela
-        volta.update({k: str(f.get("f_" + k))[:160] for k in Q.FILTROS if f.get("f_" + k)})
-        if dest["id"] == "nexus":
-            if problemas or not linhas:
-                ctx = _ctx_quadro(cfg, volta, erro="Nada foi gravado: " + ("; ".join(problemas) if problemas
-                                                                              else "a fila está vazia") + ".")
-                return render_template("pcm/quadro.html", **ctx), 400
-            Q.salvar_no_nexus(cfg, sem["week"], linhas, quem, Q.tarefas_por_os(sem))
-            return redirect(na_raiz("/t/pcm/quadro?") + urlencode(dict(volta, feito="salvo", n=len(linhas))), code=303)
-        if dest["id"] != "atual":
-            ctx = _ctx_quadro(cfg, volta, erro="Esta semana não aceita gravar reprogramação: " + dest["texto"])
-            return render_template("pcm/quadro.html", **ctx), 400
-        itens_json = json.dumps(itens if isinstance(itens, list) else [], ensure_ascii=False)
-        if not f.get("confirmo"):
-            return render_template("pcm/reprogramar.html", **_ctx_reprogramar(cfg, sem["week"], linhas, problemas,
-                                                                              itens_json))
+        try:
+            PB.publicar(cfg, rid, quem)
+        except PB.PublicacaoErro as ex:
+            return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos,
+                                   erro=f"Não publiquei: {ex}.")), 400
+        except Exception as ex:      # noqa: BLE001 — rede, GitHub fora: a tela diz e nada muda na rodada
+            return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos,
+                                   erro=f"O GitHub não respondeu ({type(ex).__name__}): nada foi publicado, ou "
+                                        f"só parte; confira o repositório antes de tentar de novo.")), 502
+        return redirect(na_raiz(f"/t/pcm/gerar?rodada={rid}&feito=publicada"), code=303)
+    return render_template("pcm/publicar.html", **_ctx_publicar(cfg, st, motivos))
+
+
+def gerar_observacoes():
+    cfg = current_app.config
+    if _de_outro_site():
+        abort(403)
+    semana = _semana_do_form()
+    if not semana:
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
+    I.salvar_observacoes(geracao.pasta_trabalho(cfg), semana, request.form.get("texto") or "", autor=_quem())
+    return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=observacoes"), code=303)
+
+
+def gerar_observacoes_copiar():
+    """Os dias de atendimento das usinas quase não mudam de uma semana para outra: começa pela anterior. Só
+    copia para semana VAZIA, para nunca apagar o que alguém já escreveu."""
+    cfg = current_app.config
+    if _de_outro_site():
+        abort(403)
+    semana = _semana_do_form()
+    if not semana:
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
+    trab = geracao.pasta_trabalho(cfg)
+    anterior = O.semana_anterior(semana)
+    if I.observacoes(trab, semana).strip():
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
+                               erro=f"A semana {semana} já tem observações: não copiei por cima.")), 409
+    texto = I.observacoes(trab, anterior)
+    if not texto.strip():
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, semana=semana,
+                               erro=f"A semana {anterior} não tem observações para copiar.")), 400
+    I.salvar_observacoes(trab, semana, texto, autor=_quem())
+    return redirect(na_raiz(f"/t/pcm/gerar?semana={semana}&feito=copiado"), code=303)
+
+
+def gerar_estado():
+    cfg = current_app.config
+    st = geracao.ler_status(cfg, request.args.get("rodada") or "")
+    if st is None:
+        abort(404)
+    estado = st.get("estado")
+    if estado == "rodando" and not geracao.ativa(cfg, st["id"]):
+        estado = "interrompida"
+    return jsonify({"id": st["id"], "estado": estado, "duracao_s": st.get("duracao_s")})
+
+
+def tarefas():
+    leitura = fonte.ler(current_app.config)
+    ctx = _contexto_fonte(leitura)
+    if leitura.dados is None:
+        return render_template("pcm/tarefas.html", sem=None, **ctx)
+    a = request.args
+    sem = S.achar(leitura.dados, a.get("semana") or None)
+    if sem is None:
+        abort(404)
+    sem = _tipo_do_fracttal(current_app.config, sem)
+    filtros = {"equipe": a.get("equipe") or None, "dia": a.get("dia") or None, "status": a.get("status") or None,
+               "tipo": a.get("tipo") or None, "busca": a.get("q") or None,
+               "horario": "fora" if a.get("horario") == "fora" else None}
+    todas = S.tarefas(sem, **filtros)
+    try:
+        pagina = max(1, int(a.get("pagina") or 1))
+    except ValueError:
+        pagina = 1
+    paginas = max(1, -(-len(todas) // POR_PAGINA))
+    pagina = min(pagina, paginas)
+    linhas = []
+    for r in todas[(pagina - 1) * POR_PAGINA: pagina * POR_PAGINA]:
+        d = S.dia_curto(r.get("dia"))
+        linhas.append(dict(r, _dia=S.NOMES_DIA.get(d, r.get("dia") or ""), _situacao=S.situacao(r),
+                           _duracao=_h(r.get("duracao"))))
+    rows = sem.get("rows") or []
+    # as opções de cada filtro com os OUTROS aplicados, e quantas tarefas cada uma tem (09/10/2026)
+    fac = S.facetas(sem, filtros)
+
+    def _com(lista, campo):
+        return [x for x in lista if fac[campo].get(x[0]) or x[0] == filtros.get(campo)]
+
+    opcoes = {
+        "equipes": _com([(e, fac["equipe"][e]) for e in sorted(set(fac["equipe"]) | {filtros["equipe"]} - {None})],
+                        "equipe"),
+        "tipos": _com([(t, fac["tipo"][t]) for t in sorted(set(fac["tipo"]) | {filtros["tipo"]} - {None})], "tipo"),
+        "dias": _com([(d, S.NOMES_DIA[d], fac["dia"][d]) for d in S.DIAS], "dia"),
+        "situacoes": _com([(v, rot, fac["status"][v]) for v, rot in SITUACOES], "status"),
+    }
+    return render_template("pcm/tarefas.html", sem=sem, semanas=S.semanas(leitura.dados), linhas=linhas,
+                           total=len(todas), total_semana=len(rows), pagina=pagina, paginas=paginas,
+                           filtros=filtros, q=a.get("q") or "", opcoes=opcoes, **ctx)
+
+
+def gestao():
+    # as tarefas pendentes de uma célula do Plano, para o painel lateral (12/10/2026): o mesmo endereço com
+    # pu=<usina>&pc=<coluna>, pedido pelo fetch da própria tela
+    if request.args.get("pu") is not None:
+        ctx = _ctx_pendentes(current_app.config, request.args)
+        if ctx is None:
+            return render_template("pcm/_gestao_pendentes_erro.html"), 503
+        return render_template("pcm/_gestao_pendentes.html", **ctx)
+    # a tabela de um tipo da árvore Cliente ▸ Usina ▸ Tipo (04/11/2026): o mesmo endereço com arv/ac/au/at (e os
+    # filtros de cima), pedido pelo fetch da tela quando o nó abre
+    if request.args.get("arv") is not None:
+        ctx = _ctx_arvore(current_app.config, request.args)
+        if ctx is None:
+            return render_template("pcm/_gestao_arvore.html", erro=True), 503
+        return render_template("pcm/_gestao_arvore.html", **ctx)
+    # as partes seguintes do Só atrasadas (04/11/2026): o mesmo endereço com ap=<de onde seguir>
+    if request.args.get("ap") is not None:
+        ctx = _ctx_atrasadas(current_app.config, request.args)
+        if ctx is None:
+            return render_template("pcm/_gestao_arvore.html", erro=True), 503
+        return render_template("pcm/_gestao_atrasadas.html", parte=True, **ctx)
+    # a Confiabilidade por ativo e o MTTR por equipe cluster (parte C, 04/11/2026), pedidos quando o bloco abre:
+    # cf=conf | mttr | usina (com cc e cu)
+    if request.args.get("cf") is not None:
+        return _confiab(request.args)
+    return render_template("pcm/gestao.html", **_ctx_gestao(current_app.config, request.args))
+
+
+def quadro():
+    ctx = _ctx_quadro(current_app.config, request.args)
+    if ctx is None:
+        abort(404)
+    return render_template("pcm/quadro.html", **ctx)
+
+
+def quadro_reprogramar():
+    """Grava a fila de reprogramação da página. Administrador ou setor PCM (`pode_programar`). Semana que o Nexus
+    gera: nas observações dela no Nexus, direto. Semana em curso: nos ajustes da semana em curso do repositório do
+    PCM, depois da confirmação."""
+    cfg = current_app.config
+    if _de_outro_site():
+        abort(403)
+    if not pode_programar():
+        abort(403)
+    f = request.form
+    base = _quadro_semana(cfg, (f.get("semana") or "").strip() or None, (f.get("rodada") or "").strip() or None)
+    sem = base["sem"]
+    if sem is None:
+        abort(404)
+    try:
+        itens = json.loads(f.get("itens") or "[]")
+    except ValueError:
+        itens = []
+    linhas, problemas = Q.linhas_da_fila(sem, itens)
+    dest = _destino_quadro(cfg, base)
+    quem = _quem()
+    volta = {"semana": sem["week"]}
+    if base["rodada"]:
+        volta["rodada"] = base["rodada"]
+    # os filtros da tela voltam junto: quem reprogramou a equipe dele continua nela
+    volta.update({k: str(f.get("f_" + k))[:160] for k in Q.FILTROS if f.get("f_" + k)})
+    if dest["id"] == "nexus":
         if problemas or not linhas:
-            return render_template("pcm/reprogramar.html", **_ctx_reprogramar(
-                cfg, sem["week"], linhas, problemas, itens_json, erro="Nada foi gravado.")), 400
-        try:
-            res = Q.aplicar_na_semana_em_curso(cfg, sem["week"], linhas, quem, f.get("sha_visto") or "",
-                                               apagar_sem_semana=f.get("apagar") == "1", ativos=Q.tarefas_por_os(sem))
-        except (Q.QuadroErro, PB.PublicacaoErro) as ex:
-            return render_template("pcm/reprogramar.html", **_ctx_reprogramar(
-                cfg, sem["week"], linhas, problemas, itens_json, erro=f"Não gravei: {ex}.")), 409
-        except Exception as ex:      # noqa: BLE001 — rede, GitHub fora: a tela diz e nada muda
-            return render_template("pcm/reprogramar.html", **_ctx_reprogramar(
-                cfg, sem["week"], linhas, problemas, itens_json,
-                erro=f"O GitHub não respondeu ({type(ex).__name__}): confira o repositório antes de tentar de novo.")), 502
-        return redirect(na_raiz("/t/pcm/quadro?") + urlencode(dict(volta, feito="aplicado", n=len(linhas),
-                                                           commit=res.get("commit") or "")), code=303)
+            ctx = _ctx_quadro(cfg, volta, erro="Nada foi gravado: " + ("; ".join(problemas) if problemas
+                                                                          else "a fila está vazia") + ".")
+            return render_template("pcm/quadro.html", **ctx), 400
+        Q.salvar_no_nexus(cfg, sem["week"], linhas, quem, Q.tarefas_por_os(sem))
+        return redirect(na_raiz("/t/pcm/quadro?") + urlencode(dict(volta, feito="salvo", n=len(linhas))), code=303)
+    if dest["id"] != "atual":
+        ctx = _ctx_quadro(cfg, volta, erro="Esta semana não aceita gravar reprogramação: " + dest["texto"])
+        return render_template("pcm/quadro.html", **ctx), 400
+    itens_json = json.dumps(itens if isinstance(itens, list) else [], ensure_ascii=False)
+    if not f.get("confirmo"):
+        return render_template("pcm/reprogramar.html", **_ctx_reprogramar(cfg, sem["week"], linhas, problemas,
+                                                                          itens_json))
+    if problemas or not linhas:
+        return render_template("pcm/reprogramar.html", **_ctx_reprogramar(
+            cfg, sem["week"], linhas, problemas, itens_json, erro="Nada foi gravado.")), 400
+    try:
+        res = Q.aplicar_na_semana_em_curso(cfg, sem["week"], linhas, quem, f.get("sha_visto") or "",
+                                           apagar_sem_semana=f.get("apagar") == "1", ativos=Q.tarefas_por_os(sem))
+    except (Q.QuadroErro, PB.PublicacaoErro) as ex:
+        return render_template("pcm/reprogramar.html", **_ctx_reprogramar(
+            cfg, sem["week"], linhas, problemas, itens_json, erro=f"Não gravei: {ex}.")), 409
+    except Exception as ex:      # noqa: BLE001 — rede, GitHub fora: a tela diz e nada muda
+        return render_template("pcm/reprogramar.html", **_ctx_reprogramar(
+            cfg, sem["week"], linhas, problemas, itens_json,
+            erro=f"O GitHub não respondeu ({type(ex).__name__}): confira o repositório antes de tentar de novo.")), 502
+    return redirect(na_raiz("/t/pcm/quadro?") + urlencode(dict(volta, feito="aplicado", n=len(linhas),
+                                                       commit=res.get("commit") or "")), code=303)
 
-    @bp.route("/quadro/reprogramacoes", methods=["GET", "POST"])
-    def quadro_reprogramacoes():
-        """As reprogramações da semana em curso (19/10/2026; o programador do PCM: "eu não achei isso da reprogramação",
-        "ainda tá meio que fantasma pra mim, sem poder editar"): o Observacoes_Semana_Atual.txt inteiro, cada linha
-        editável e removível, num bloco no fim do Quadro (Levi escolheu "Dentro do Quadro"). GET ?parte=1 = o bloco, que
-        o pcm-reprogramacoes.js busca (ler o GitHub não atrasa o Quadro). Ver é de quem vê o Quadro; gravar, do PCM e
-        do administrador (`pode_programar`), na semana em curso, com o sha que a pessoa viu."""
-        cfg = current_app.config
-        if request.method == "GET":
-            if request.args.get("parte") != "1":
-                return redirect(na_raiz("/t/pcm/quadro#reprogramacoes"), code=303)
-            return render_template("pcm/_reprogramacoes.html", rp=_ctx_reprogramacoes(cfg))
-        if not pode_programar() or _de_outro_site():
-            abort(403)
-        f = request.form
-        tela = _linhas_do_form(f)
-        sha = f.get("sha_visto") or ""
-        sem, _ = _semana_em_curso(cfg)
-        if sem is None or sem["week"] != (f.get("semana") or ""):
-            return _quadro_com_reprogramacoes(cfg, f.get("semana"), 409, _ctx_reprogramacoes(
-                cfg, erro="Não gravei: a semana em curso não é mais a que você abriu. Confira o arquivo de novo.",
-                tentativa=[t for t, x in tela if not x]))
-        if not f.get("confirmo"):
-            return _quadro_com_reprogramacoes(cfg, sem["week"], 400, _ctx_reprogramacoes(
-                cfg, tela=tela, sha=sha, erro="Nada foi gravado: marque o \"Confirmo\" antes de gravar."))
-        ficam = [t for t, x in tela if not x]
-        if Q.problemas_das_linhas(ficam):
-            return _quadro_com_reprogramacoes(cfg, sem["week"], 400, _ctx_reprogramacoes(
-                cfg, tela=tela, sha=sha, erro="Nada foi gravado: arrume ou tire as linhas marcadas em vermelho."))
-        try:
-            res = Q.regravar_semana_em_curso(cfg, sem["week"], ficam, _quem(), sha)
-        except (Q.QuadroErro, PB.PublicacaoErro) as ex:
-            return _quadro_com_reprogramacoes(cfg, sem["week"], 409, _ctx_reprogramacoes(
-                cfg, erro=f"Não gravei: {ex}.", tentativa=ficam))
-        except Exception as ex:      # noqa: BLE001 — rede, GitHub fora: a tela diz e nada muda
-            return _quadro_com_reprogramacoes(cfg, sem["week"], 502, _ctx_reprogramacoes(
-                cfg, erro=f"O GitHub não respondeu ({type(ex).__name__}): confira o repositório antes de tentar de novo.",
-                tentativa=ficam))
-        volta = {"semana": sem["week"], "rp": "gravado" if res["mudou"] else "igual"}
-        if res["mudou"]:
-            volta.update(commit=res["commit"] or "", entram=len(res["entram"]), saem=len(res["saem"]))
-        return redirect(na_raiz("/t/pcm/quadro?") + urlencode(volta) + "#reprogramacoes", code=303)
 
-    # ── os motivos das tarefas e o backoffice (16/10/2026, nexus/pcm/motivos.py) ──────────────────────────────────
-    @bp.route("/quadro/motivo", methods=["POST"])
-    def quadro_motivo():
-        """Marca, troca ou tira o motivo de uma tarefa pela janela da OS. JSON {semana, rodada, os, tarefa, codigo,
-        motivo_id, obs, tirar}. A tarefa vem da SEMANA (a página só diz qual): OS e tarefa que a semana não tem não
-        gravam. Com a marca feita pela OS (vale em todos os ativos dela), trocar ou tirar mexe nela."""
-        cfg = current_app.config
-        if not pode_marcar() or _de_outro_site():
-            abort(403)
-        d = request.get_json(silent=True) or {}
-        base = _quadro_semana(cfg, str(d.get("semana") or "").strip() or None, str(d.get("rodada") or "").strip() or None)
-        sem = base["sem"]
-        if sem is None:
-            return jsonify(ok=False, erro="A semana não foi achada: atualize a página."), 404
-        linha = _tarefa_da_semana(sem, d)
-        if linha is None:
-            return jsonify(ok=False, erro="Esta tarefa não está nesta semana: atualize a página."), 400
-        tirar = bool(d.get("tirar"))
-        if not tirar and not str(d.get("motivo_id") or "").strip():
-            return jsonify(ok=False, erro="Escolha o motivo."), 400
+def quadro_reprogramacoes():
+    """As reprogramações da semana em curso (19/10/2026; o programador do PCM: "eu não achei isso da reprogramação",
+    "ainda tá meio que fantasma pra mim, sem poder editar"): o Observacoes_Semana_Atual.txt inteiro, cada linha
+    editável e removível, num bloco no fim do Quadro (Levi escolheu "Dentro do Quadro"). GET ?parte=1 = o bloco, que
+    o pcm-reprogramacoes.js busca (ler o GitHub não atrasa o Quadro). Ver é de quem vê o Quadro; gravar, do PCM e
+    do administrador (`pode_programar`), na semana em curso, com o sha que a pessoa viu."""
+    cfg = current_app.config
+    if request.method == "GET":
+        if request.args.get("parte") != "1":
+            return redirect(na_raiz("/t/pcm/quadro#reprogramacoes"), code=303)
+        return render_template("pcm/_reprogramacoes.html", rp=_ctx_reprogramacoes(cfg))
+    if not pode_programar() or _de_outro_site():
+        abort(403)
+    f = request.form
+    tela = _linhas_do_form(f)
+    sha = f.get("sha_visto") or ""
+    sem, _ = _semana_em_curso(cfg)
+    if sem is None or sem["week"] != (f.get("semana") or ""):
+        return _quadro_com_reprogramacoes(cfg, f.get("semana"), 409, _ctx_reprogramacoes(
+            cfg, erro="Não gravei: a semana em curso não é mais a que você abriu. Confira o arquivo de novo.",
+            tentativa=[t for t, x in tela if not x]))
+    if not f.get("confirmo"):
+        return _quadro_com_reprogramacoes(cfg, sem["week"], 400, _ctx_reprogramacoes(
+            cfg, tela=tela, sha=sha, erro="Nada foi gravado: marque o \"Confirmo\" antes de gravar."))
+    ficam = [t for t, x in tela if not x]
+    if Q.problemas_das_linhas(ficam):
+        return _quadro_com_reprogramacoes(cfg, sem["week"], 400, _ctx_reprogramacoes(
+            cfg, tela=tela, sha=sha, erro="Nada foi gravado: arrume ou tire as linhas marcadas em vermelho."))
+    try:
+        res = Q.regravar_semana_em_curso(cfg, sem["week"], ficam, _quem(), sha)
+    except (Q.QuadroErro, PB.PublicacaoErro) as ex:
+        return _quadro_com_reprogramacoes(cfg, sem["week"], 409, _ctx_reprogramacoes(
+            cfg, erro=f"Não gravei: {ex}.", tentativa=ficam))
+    except Exception as ex:      # noqa: BLE001 — rede, GitHub fora: a tela diz e nada muda
+        return _quadro_com_reprogramacoes(cfg, sem["week"], 502, _ctx_reprogramacoes(
+            cfg, erro=f"O GitHub não respondeu ({type(ex).__name__}): confira o repositório antes de tentar de novo.",
+            tentativa=ficam))
+    volta = {"semana": sem["week"], "rp": "gravado" if res["mudou"] else "igual"}
+    if res["mudou"]:
+        volta.update(commit=res["commit"] or "", entram=len(res["entram"]), saem=len(res["saem"]))
+    return redirect(na_raiz("/t/pcm/quadro?") + urlencode(volta) + "#reprogramacoes", code=303)
+
+
+# ── os motivos das tarefas e o backoffice (16/10/2026, nexus/pcm/motivos.py) ──────────────────────────────────
+def quadro_motivo():
+    """Marca, troca ou tira o motivo de uma tarefa pela janela da OS. JSON {semana, rodada, os, tarefa, codigo,
+    motivo_id, obs, tirar}. A tarefa vem da SEMANA (a página só diz qual): OS e tarefa que a semana não tem não
+    gravam. Com a marca feita pela OS (vale em todos os ativos dela), trocar ou tirar mexe nela."""
+    cfg = current_app.config
+    if not pode_marcar() or _de_outro_site():
+        abort(403)
+    d = request.get_json(silent=True) or {}
+    base = _quadro_semana(cfg, str(d.get("semana") or "").strip() or None, str(d.get("rodada") or "").strip() or None)
+    sem = base["sem"]
+    if sem is None:
+        return jsonify(ok=False, erro="A semana não foi achada: atualize a página."), 404
+    linha = _tarefa_da_semana(sem, d)
+    if linha is None:
+        return jsonify(ok=False, erro="Esta tarefa não está nesta semana: atualize a página."), 400
+    tirar = bool(d.get("tirar"))
+    if not tirar and not str(d.get("motivo_id") or "").strip():
+        return jsonify(ok=False, erro="Escolha o motivo."), 400
+    est = M.ler(cfg, forcar=True)
+    if est.get("erro"):
+        return jsonify(ok=False, erro=f"Não consegui ler os motivos no banco ({est['erro']}): nada foi gravado."), 503
+    antes = M.indice(M.vigentes(cfg, est))
+    atual = M.motivo_de(antes, linha["os"], linha["codigo"], linha["tarefa"])
+    # a marca que vale na linha é a da OS (sem código): trocar ou tirar mexe nela, em todos os ativos
+    alvo = dict(linha, codigo="") if atual and not atual["codigo"] else linha
+    try:
+        r = M.marcar(cfg, alvo, None if tirar else d.get("motivo_id"), "" if tirar else str(d.get("obs") or ""),
+                     _usuario(), semana=sem["week"], origem="quadro")
+    except M.Recusada as ex:
+        return jsonify(ok=False, erro=str(ex)), 400
+    arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
+    marca = r["marca"]
+    geral = not alvo["codigo"]
+    # a nota da OS no Fracttal ao ESCOLHER o motivo (20/10/2026, `nota_os`): marcar ou trocar; a observação e o tirar,
+    # não. Quem escreve é a ponte /os/_nexus/pcm/nota, que a janela chama com este pedido (o cookie do Fracttal não
+    # vem a /t/pcm; 26/10/2026)
+    nota_pedido = None
+    if not tirar and r["gravou"] and marca and (not atual or atual["motivo_id"] != marca["motivo_id"]):
+        nota_pedido = NO.pedido(current_app._get_current_object(), linha["os"], NO.linha(
+            M._agora(), marca["motivo"], linha["tarefa"], alvo["codigo"], str(d.get("obs") or "")), _usuario())
+    os_, t_ = linha["os"], M.norm(linha["tarefa"])
+    # a que passou a valer na linha: a do ativo vence a da OS
+    efetiva = ((antes.get((os_, M.canon(linha["codigo"]), t_)) if linha["codigo"] else None) or marca) if geral             else (marca or antes.get((os_, "", t_)))
+    return jsonify(ok=True, gravou=r["gravou"], geral=geral, marca=_marca_curta(marca) if marca else None,
+                   efetiva=_marca_curta(efetiva) if efetiva else None, arquivo=arq, nota_pedido=nota_pedido,
+                   efeito=_efeito(efetiva, _destino_quadro(cfg, base)["id"], tirou=tirar and not efetiva))
+
+
+def motivo_do_app():
+    """A marca do técnico pelo App de Campo (16/10/2026, Levi: "Sim, e já vale"; `motivos_app.py`). Sem sessão: vale
+    a assinatura (a rota está em `auth.ROTAS_PUBLICAS`). Com a marca da OS valendo na tarefa, trocar ou tirar mexe
+    nela, como na janela do Quadro."""
+    cfg = current_app.config
+    status, d = MA.conferir(cfg, request.headers.get("X-Nexus-Ts"), request.headers.get("X-Nexus-Assinatura"),
+                            request.get_data())
+    if status != 200:
+        return jsonify(ok=False, erro=d), status
+    # na fila do gravador, numa leitura e numa gravação do livro com as outras que esperam; das 8 threads do Nexus,
+    # o App segura no máximo duas, por no máximo 15 s (22/10/2026, `motivos_app.entregar`)
+    corpo, st = MA.entregar(current_app._get_current_object(), d, _motivos_do_app)
+    return jsonify(corpo), st
+
+
+def fora():
+    cfg = current_app.config
+    if request.args.get("ver") == "cadastro":
+        return render_template("pcm/motivos_cadastro.html", **_ctx_cadastro(cfg))
+    if request.args.get("ver") == "historico":
+        return render_template("pcm/motivos_historico.html", **_ctx_historico(cfg, request.args))
+    return render_template("pcm/fora.html", **_ctx_fora(cfg, request.args))
+
+
+def fora_marcar():
+    """Do painel, numa tarefa que já tem motivo (`item`): troca o motivo marcado pelo PCM (na própria célula Motivo),
+    edita a observação (na própria célula Observação) ou tira o motivo. O motivo que o técnico mandou pelo App não
+    se troca aqui (Levi, 16/10/2026: "se o técnico disse tá dito"); a observação e o "Tirar motivo", sim. O
+    "Marcar pela OS" saiu ("atrapalha mais que ajuda"): marca-se no Quadro da semana e pelo App."""
+    cfg = current_app.config
+    if not pode_marcar() or _de_outro_site():
+        abort(403)
+    f = request.form
+    volta = {k: str(f.get("v_" + k))[:80] for k in FILTROS_FORA if f.get("v_" + k)}
+    tirar = f.get("tirar") == "1"
+    try:
+        iid = (f.get("item") or "").strip()
+        if not iid or iid.startswith("_"):
+            raise M.Recusada("A tarefa não foi achada: atualize a página.")
         est = M.ler(cfg, forcar=True)
         if est.get("erro"):
-            return jsonify(ok=False, erro=f"Não consegui ler os motivos no banco ({est['erro']}): nada foi gravado."), 503
-        antes = M.indice(M.vigentes(cfg, est))
-        atual = M.motivo_de(antes, linha["os"], linha["codigo"], linha["tarefa"])
-        # a marca que vale na linha é a da OS (sem código): trocar ou tirar mexe nela, em todos os ativos
-        alvo = dict(linha, codigo="") if atual and not atual["codigo"] else linha
-        try:
-            r = M.marcar(cfg, alvo, None if tirar else d.get("motivo_id"), "" if tirar else str(d.get("obs") or ""),
-                         _usuario(), semana=sem["week"], origem="quadro")
-        except M.Recusada as ex:
-            return jsonify(ok=False, erro=str(ex)), 400
+            raise M.Recusada(f"Não consegui ler os motivos no banco ({est['erro']}): nada foi gravado.")
+        m = M.vigentes(cfg, est).get(iid)
+        if not m:
+            raise M.Recusada("Essa tarefa não tem mais motivo (alguém mudou agora): atualize a página.")
+        alvo = {k: m[k] for k in ("os", "codigo", "tarefa", "usina", "cliente", "tipo", "cluster", "data_prog")}
+        pedido = str(f.get("motivo_id") or "").strip()
+        motivo_id = pedido or m["motivo_id"]
+        if not tirar and m["origem_motivo"] == "app" and str(motivo_id) != str(m["motivo_id"]):
+            raise M.Recusada("O motivo que o técnico mandou pelo App não se troca: dá para editar a observação ou "
+                             "tirar o motivo.")
+        obs = f.get("obs") if f.get("obs") is not None else m["obs"]
+        r = M.marcar(cfg, alvo, None if tirar else motivo_id, "" if tirar else obs, _usuario(), origem="painel")
+    except M.Recusada as ex:
+        session["pcm_motivos_aviso"] = {"erro": str(ex)}
+    else:
         arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
-        marca = r["marca"]
-        geral = not alvo["codigo"]
-        # a nota da OS no Fracttal ao ESCOLHER o motivo (20/10/2026, `nota_os`): marcar ou trocar; a observação e o tirar,
-        # não. Quem escreve é a ponte /os/_nexus/pcm/nota, que a janela chama com este pedido (o cookie do Fracttal não
-        # vem a /t/pcm; 26/10/2026)
+        nova = r["marca"]
+        # trocar o motivo é escolher: a nota da OS no Fracttal (20/10/2026, `nota_os`), que a página escreve pela ponte
+        # /os/_nexus/pcm/nota ao abrir com este pedido (o cookie do Fracttal não vem a /t/pcm; 26/10/2026)
         nota_pedido = None
-        if not tirar and r["gravou"] and marca and (not atual or atual["motivo_id"] != marca["motivo_id"]):
-            nota_pedido = NO.pedido(current_app._get_current_object(), linha["os"], NO.linha(
-                M._agora(), marca["motivo"], linha["tarefa"], alvo["codigo"], str(d.get("obs") or "")), _usuario())
-        os_, t_ = linha["os"], M.norm(linha["tarefa"])
-        # a que passou a valer na linha: a do ativo vence a da OS
-        efetiva = ((antes.get((os_, M.canon(linha["codigo"]), t_)) if linha["codigo"] else None) or marca) if geral             else (marca or antes.get((os_, "", t_)))
-        return jsonify(ok=True, gravou=r["gravou"], geral=geral, marca=_marca_curta(marca) if marca else None,
-                       efetiva=_marca_curta(efetiva) if efetiva else None, arquivo=arq, nota_pedido=nota_pedido,
-                       efeito=_efeito(efetiva, _destino_quadro(cfg, base)["id"], tirou=tirar and not efetiva))
+        if not tirar and r["gravou"] and nova and nova["motivo_id"] != m["motivo_id"]:
+            nota_pedido = NO.pedido(current_app._get_current_object(), alvo["os"], NO.linha(
+                M._agora(), nova["motivo"], alvo["tarefa"], alvo["codigo"], obs), _usuario())
+        ok = ("Nada mudou." if not r["gravou"] else
+              f"Motivo tirado da OS {alvo['os']}." if tirar else
+              f"OS {alvo['os']}: {nova['motivo']}." if nova and nova["motivo_id"] != m["motivo_id"] else
+              f"OS {alvo['os']}: observação salva.")
+        session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
+                                        "erro": "" if arq["ok"] else arq["texto"], "nota_pedido": nota_pedido}
+    return redirect(na_raiz("/t/pcm/fora-da-programacao") + ("?" + urlencode(volta) if volta else ""), code=303)
 
-    @bp.route("/motivos/app", methods=["POST"])
-    def motivo_do_app():
-        """A marca do técnico pelo App de Campo (16/10/2026, Levi: "Sim, e já vale"; `motivos_app.py`). Sem sessão: vale
-        a assinatura (a rota está em `auth.ROTAS_PUBLICAS`). Com a marca da OS valendo na tarefa, trocar ou tirar mexe
-        nela, como na janela do Quadro."""
-        cfg = current_app.config
-        status, d = MA.conferir(cfg, request.headers.get("X-Nexus-Ts"), request.headers.get("X-Nexus-Assinatura"),
-                                request.get_data())
-        if status != 200:
-            return jsonify(ok=False, erro=d), status
-        # na fila do gravador, numa leitura e numa gravação do livro com as outras que esperam; das 8 threads do Nexus,
-        # o App segura no máximo duas, por no máximo 15 s (22/10/2026, `motivos_app.entregar`)
-        corpo, st = MA.entregar(current_app._get_current_object(), d, _motivos_do_app)
-        return jsonify(corpo), st
 
-    @bp.route("/fora-da-programacao")
-    def fora():
-        cfg = current_app.config
-        if request.args.get("ver") == "cadastro":
-            return render_template("pcm/motivos_cadastro.html", **_ctx_cadastro(cfg))
-        if request.args.get("ver") == "historico":
-            return render_template("pcm/motivos_historico.html", **_ctx_historico(cfg, request.args))
-        return render_template("pcm/fora.html", **_ctx_fora(cfg, request.args))
+def fora_cadastro():
+    """O cadastro dos motivos: incluir, editar (nome, descrição, se tira da programação) e tirar. Administrador e
+    setor PCM (Levi, 16/10/2026: "Administrador e setor PCM")."""
+    cfg = current_app.config
+    if not pode_programar() or _de_outro_site():
+        abort(403)
+    f = request.form
+    acao = f.get("acao") or ""
+    try:
+        r = M.cadastro(cfg, acao, _usuario(), motivo_id=f.get("motivo_id"), nome=f.get("nome"),
+                       descricao=f.get("descricao"), tira=f.get("tira") == "1", etiqueta=f.get("etiqueta"))
+    except M.Recusada as ex:
+        session["pcm_motivos_aviso"] = {"erro": str(ex)}
+    else:
+        mudou = acao != "editar" or r.get("mudou")
+        arq = _publicar_arquivo(cfg) if mudou else {"ok": True, "texto": ""}
+        ok = {"criar": f"Motivo {r['nome']} incluído.", "excluir": f"Motivo {r['nome']} tirado do cadastro.",
+              "editar": f"Motivo {r['nome']} salvo." if mudou else "Nada mudou."}.get(acao, "Salvo.")
+        session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
+                                        "erro": "" if arq["ok"] else arq["texto"]}
+    return redirect(na_raiz("/t/pcm/fora-da-programacao?ver=cadastro"), code=303)
 
-    @bp.route("/fora-da-programacao/marcar", methods=["POST"])
-    def fora_marcar():
-        """Do painel, numa tarefa que já tem motivo (`item`): troca o motivo marcado pelo PCM (na própria célula Motivo),
-        edita a observação (na própria célula Observação) ou tira o motivo. O motivo que o técnico mandou pelo App não
-        se troca aqui (Levi, 16/10/2026: "se o técnico disse tá dito"); a observação e o "Tirar motivo", sim. O
-        "Marcar pela OS" saiu ("atrapalha mais que ajuda"): marca-se no Quadro da semana e pelo App."""
-        cfg = current_app.config
-        if not pode_marcar() or _de_outro_site():
-            abort(403)
-        f = request.form
-        volta = {k: str(f.get("v_" + k))[:80] for k in FILTROS_FORA if f.get("v_" + k)}
-        tirar = f.get("tirar") == "1"
-        try:
-            iid = (f.get("item") or "").strip()
-            if not iid or iid.startswith("_"):
-                raise M.Recusada("A tarefa não foi achada: atualize a página.")
-            est = M.ler(cfg, forcar=True)
-            if est.get("erro"):
-                raise M.Recusada(f"Não consegui ler os motivos no banco ({est['erro']}): nada foi gravado.")
-            m = M.vigentes(cfg, est).get(iid)
-            if not m:
-                raise M.Recusada("Essa tarefa não tem mais motivo (alguém mudou agora): atualize a página.")
-            alvo = {k: m[k] for k in ("os", "codigo", "tarefa", "usina", "cliente", "tipo", "cluster", "data_prog")}
-            pedido = str(f.get("motivo_id") or "").strip()
-            motivo_id = pedido or m["motivo_id"]
-            if not tirar and m["origem_motivo"] == "app" and str(motivo_id) != str(m["motivo_id"]):
-                raise M.Recusada("O motivo que o técnico mandou pelo App não se troca: dá para editar a observação ou "
-                                 "tirar o motivo.")
-            obs = f.get("obs") if f.get("obs") is not None else m["obs"]
-            r = M.marcar(cfg, alvo, None if tirar else motivo_id, "" if tirar else obs, _usuario(), origem="painel")
-        except M.Recusada as ex:
-            session["pcm_motivos_aviso"] = {"erro": str(ex)}
-        else:
-            arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
-            nova = r["marca"]
-            # trocar o motivo é escolher: a nota da OS no Fracttal (20/10/2026, `nota_os`), que a página escreve pela ponte
-            # /os/_nexus/pcm/nota ao abrir com este pedido (o cookie do Fracttal não vem a /t/pcm; 26/10/2026)
-            nota_pedido = None
-            if not tirar and r["gravou"] and nova and nova["motivo_id"] != m["motivo_id"]:
-                nota_pedido = NO.pedido(current_app._get_current_object(), alvo["os"], NO.linha(
-                    M._agora(), nova["motivo"], alvo["tarefa"], alvo["codigo"], obs), _usuario())
-            ok = ("Nada mudou." if not r["gravou"] else
-                  f"Motivo tirado da OS {alvo['os']}." if tirar else
-                  f"OS {alvo['os']}: {nova['motivo']}." if nova and nova["motivo_id"] != m["motivo_id"] else
-                  f"OS {alvo['os']}: observação salva.")
-            session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
-                                            "erro": "" if arq["ok"] else arq["texto"], "nota_pedido": nota_pedido}
-        return redirect(na_raiz("/t/pcm/fora-da-programacao") + ("?" + urlencode(volta) if volta else ""), code=303)
 
-    @bp.route("/fora-da-programacao/cadastro", methods=["POST"])
-    def fora_cadastro():
-        """O cadastro dos motivos: incluir, editar (nome, descrição, se tira da programação) e tirar. Administrador e
-        setor PCM (Levi, 16/10/2026: "Administrador e setor PCM")."""
-        cfg = current_app.config
-        if not pode_programar() or _de_outro_site():
-            abort(403)
-        f = request.form
-        acao = f.get("acao") or ""
-        try:
-            r = M.cadastro(cfg, acao, _usuario(), motivo_id=f.get("motivo_id"), nome=f.get("nome"),
-                           descricao=f.get("descricao"), tira=f.get("tira") == "1", etiqueta=f.get("etiqueta"))
-        except M.Recusada as ex:
-            session["pcm_motivos_aviso"] = {"erro": str(ex)}
-        else:
-            mudou = acao != "editar" or r.get("mudou")
-            arq = _publicar_arquivo(cfg) if mudou else {"ok": True, "texto": ""}
-            ok = {"criar": f"Motivo {r['nome']} incluído.", "excluir": f"Motivo {r['nome']} tirado do cadastro.",
-                  "editar": f"Motivo {r['nome']} salvo." if mudou else "Nada mudou."}.get(acao, "Salvo.")
-            session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
-                                            "erro": "" if arq["ok"] else arq["texto"]}
-        return redirect(na_raiz("/t/pcm/fora-da-programacao?ver=cadastro"), code=303)
+def fora_publicar():
+    """Manda de novo o arquivo do robô (quando a última marca não chegou ao repositório do PCM)."""
+    cfg = current_app.config
+    if not pode_marcar() or _de_outro_site():
+        abort(403)
+    arq = _publicar_arquivo(cfg, agora=True)
+    session["pcm_motivos_aviso"] = ({"ok": arq["texto"] or "O arquivo do robô já estava em dia."} if arq["ok"]
+                                    else {"erro": arq["texto"]})
+    return redirect(na_raiz("/t/pcm/fora-da-programacao"), code=303)
 
-    @bp.route("/fora-da-programacao/publicar", methods=["POST"])
-    def fora_publicar():
-        """Manda de novo o arquivo do robô (quando a última marca não chegou ao repositório do PCM)."""
-        cfg = current_app.config
-        if not pode_marcar() or _de_outro_site():
-            abort(403)
-        arq = _publicar_arquivo(cfg, agora=True)
-        session["pcm_motivos_aviso"] = ({"ok": arq["texto"] or "O arquivo do robô já estava em dia."} if arq["ok"]
-                                        else {"erro": arq["texto"]})
-        return redirect(na_raiz("/t/pcm/fora-da-programacao"), code=303)
 
-    @bp.route("/gerar/backoffice", methods=["POST"])
-    def gerar_backoffice():
-        """A lista do backoffice (Gerar a semana, bloco 1): pôr ou tirar um nome. Quem abre a tela Gerar mexe nela,
-        como nas observações."""
-        cfg = current_app.config
-        if _de_outro_site():
-            abort(403)
-        semana = _semana_do_form() or ""
-        f = request.form
-        try:
-            r = M.backoffice_definir(cfg, f.get("nome"), f.get("acao") == "por", _usuario())
-        except M.Recusada as ex:
-            session["pcm_motivos_aviso"] = {"erro": str(ex)}
-        else:
-            arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
-            ok = (f"{r['nome']} {'entrou na' if f.get('acao') == 'por' else 'saiu da'} lista do backoffice."
-                  if r["gravou"] else "Nada mudou.")
-            session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
-                                            "erro": "" if arq["ok"] else arq["texto"]}
-        return redirect(na_raiz("/t/pcm/gerar?") + urlencode({"semana": semana}) + "#backoffice", code=303)
+def gerar_backoffice():
+    """A lista do backoffice (Gerar a semana, bloco 1): pôr ou tirar um nome. Quem abre a tela Gerar mexe nela,
+    como nas observações."""
+    cfg = current_app.config
+    if _de_outro_site():
+        abort(403)
+    semana = _semana_do_form() or ""
+    f = request.form
+    try:
+        r = M.backoffice_definir(cfg, f.get("nome"), f.get("acao") == "por", _usuario())
+    except M.Recusada as ex:
+        session["pcm_motivos_aviso"] = {"erro": str(ex)}
+    else:
+        arq = _publicar_arquivo(cfg) if r["gravou"] else {"ok": True, "texto": ""}
+        ok = (f"{r['nome']} {'entrou na' if f.get('acao') == 'por' else 'saiu da'} lista do backoffice."
+              if r["gravou"] else "Nada mudou.")
+        session["pcm_motivos_aviso"] = {"ok": " ".join(x for x in (ok, arq["texto"] if arq["ok"] else "") if x),
+                                        "erro": "" if arq["ok"] else arq["texto"]}
+    return redirect(na_raiz("/t/pcm/gerar?") + urlencode({"semana": semana}) + "#backoffice", code=303)
 
-    # ── Técnicos por usina (17/10/2026; nexus/pcm/atribuicoes.py e tecnicos_usina.py) ──────────────────────────────
-    @bp.route("/tecnicos-por-usina")
-    def tecnicos():
-        """Quem vê e pode rondar cada usina no App de Campo (Levi, 17/10/2026: "cria uma estrutura que liga usina e
-        técnico e o PCM pode editar a vontade"). Veem os setores PCM e Responsáveis UFV; edita quem `pode_programar`."""
-        cfg = current_app.config
-        ctx = TU.montar(cfg, request.args)
-        aviso = session.pop("pcm_tecnicos_aviso", None) or {}
-        return render_template("pcm/tecnicos.html", **ctx, pode=pode_programar() and not ctx["erro_cadastro"],
-                               admin=bool(session.get("admin")),
-                               ok=aviso.get("ok", ""), erro_acao=aviso.get("erro", ""),
-                               algum_filtro=any(ctx["pedido"].values()))
 
-    @bp.route("/tecnicos-por-usina/decidir", methods=["POST"])
-    def tecnicos_decidir():
-        """Pôr (fixo, ou apoio com datas) ou tirar um técnico de uma usina, e reenviar ao App as ligações de uma usina
-        cujo nome no Fracttal (ou o e-mail de um técnico) mudou. O nome da usina e o código da pessoa saem do cadastro,
-        nunca da página."""
-        cfg = current_app.config
-        if not pode_programar() or _de_outro_site():
-            abort(403)
-        f = request.form
-        volta = {k: str(f.get("v_" + k))[:80] for k in ("ver", "todas") + TU.FILTROS if f.get("v_" + k)}
-        try:
-            session["pcm_tecnicos_aviso"] = {"ok": _tecnicos_decidir(cfg, f)}
-        except (AT.Recusada, TU.SemCadastro) as ex:
-            session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
-        return redirect(na_raiz("/t/pcm/tecnicos-por-usina") + ("?" + urlencode(volta) if volta else ""), code=303)
+# ── Técnicos por usina (17/10/2026; nexus/pcm/atribuicoes.py e tecnicos_usina.py) ──────────────────────────────
+def tecnicos():
+    """Quem vê e pode rondar cada usina no App de Campo (Levi, 17/10/2026: "cria uma estrutura que liga usina e
+    técnico e o PCM pode editar a vontade"). Veem os setores PCM e Responsáveis UFV; edita quem `pode_programar`."""
+    cfg = current_app.config
+    ctx = TU.montar(cfg, request.args)
+    aviso = session.pop("pcm_tecnicos_aviso", None) or {}
+    return render_template("pcm/tecnicos.html", **ctx, pode=pode_programar() and not ctx["erro_cadastro"],
+                           admin=bool(session.get("admin")),
+                           ok=aviso.get("ok", ""), erro_acao=aviso.get("erro", ""),
+                           algum_filtro=any(ctx["pedido"].values()))
 
-    @bp.route("/tecnicos-por-usina/reemitir-tudo", methods=["POST"])
-    def tecnicos_reemitir_tudo():
-        """O "Reenviar tudo ao App" (05/11/2026): as ligações de todas as usinas cujo nome no Fracttal ou código da
-        pessoa mudou, numa gravação só, com as regras do Reenviar de uma usina. Quem `pode_programar`. O `esperado` é a
-        conta que a pessoa confirmou: diferente da de agora (alguém mudou a lista no meio), nada grava."""
-        cfg = current_app.config
-        if not pode_programar() or _de_outro_site():
-            abort(403)
-        f = request.form
-        volta = {k: str(f.get("v_" + k))[:80] for k in ("ver", "todas") + TU.FILTROS if f.get("v_" + k)}
-        try:
-            session["pcm_tecnicos_aviso"] = {"ok": _tecnicos_reemitir_tudo(cfg, f)}
-        except (AT.Recusada, TU.SemCadastro) as ex:
-            session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
-        return redirect(na_raiz("/t/pcm/tecnicos-por-usina") + ("?" + urlencode(volta) if volta else ""), code=303)
 
-    @bp.route("/tecnicos-por-usina/carga-inicial", methods=["POST"])
-    def tecnicos_carga_inicial():
-        """A regra da equipe (cada pessoa de campo recebe as usinas da equipe dela), uma vez, com o livro vazio: a lista
-        nasce perto do que o App mostra hoje. Só administrador."""
-        cfg = current_app.config
-        if not session.get("admin") or _de_outro_site():
-            abort(403)
-        try:
-            est = AT.ler(cfg, forcar=True)
-            if est.get("erro"):
-                raise AT.Recusada(f"Não consegui ler os técnicos por usina no banco ({est['erro']}): nada foi gravado.")
-            if est["decisoes"]:
-                raise AT.Recusada("A carga inicial é só para o começo: o livro já tem decisões, e nada foi gravado.")
-            base = TU.ler_base()
-            n = AT.decidir_varias(cfg, TU.pedidos_da_carga_inicial(base, TU.pessoas_de_campo(base, cfg)), _usuario(),
-                                  "carga_inicial")
-            session["pcm_tecnicos_aviso"] = {"ok": f"Carga inicial feita: {n} ligações pela regra da equipe."}
-        except (AT.Recusada, TU.SemCadastro) as ex:
-            session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
-        return redirect(na_raiz("/t/pcm/tecnicos-por-usina"), code=303)
+def tecnicos_decidir():
+    """Pôr (fixo, ou apoio com datas) ou tirar um técnico de uma usina, e reenviar ao App as ligações de uma usina
+    cujo nome no Fracttal (ou o e-mail de um técnico) mudou. O nome da usina e o código da pessoa saem do cadastro,
+    nunca da página."""
+    cfg = current_app.config
+    if not pode_programar() or _de_outro_site():
+        abort(403)
+    f = request.form
+    volta = {k: str(f.get("v_" + k))[:80] for k in ("ver", "todas") + TU.FILTROS if f.get("v_" + k)}
+    try:
+        session["pcm_tecnicos_aviso"] = {"ok": _tecnicos_decidir(cfg, f)}
+    except (AT.Recusada, TU.SemCadastro) as ex:
+        session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
+    return redirect(na_raiz("/t/pcm/tecnicos-por-usina") + ("?" + urlencode(volta) if volta else ""), code=303)
 
-    @bp.route("/tecnicos-por-usina/historico")
-    def tecnicos_historico():
-        """O histórico de uma usina (a tela pede por fetch e põe na janela ao lado)."""
-        cfg = current_app.config
-        uid = _num_arg(request.args.get("usina"))
-        try:
-            base = TU.ler_base()
-        except TU.SemCadastro:
-            abort(503)
-        if not uid or uid not in base.por_id:
-            abort(404)
-        hist = TU.historico_da_usina(cfg, base, TU.pessoas_de_campo(base, cfg), uid)
-        return render_template("pcm/_tecnicos_historico.html", hist=hist,
-                               usina=str(base.por_id[uid].get("nome") or f"Usina {uid}"))
+
+def tecnicos_reemitir_tudo():
+    """O "Reenviar tudo ao App" (05/11/2026): as ligações de todas as usinas cujo nome no Fracttal ou código da
+    pessoa mudou, numa gravação só, com as regras do Reenviar de uma usina. Quem `pode_programar`. O `esperado` é a
+    conta que a pessoa confirmou: diferente da de agora (alguém mudou a lista no meio), nada grava."""
+    cfg = current_app.config
+    if not pode_programar() or _de_outro_site():
+        abort(403)
+    f = request.form
+    volta = {k: str(f.get("v_" + k))[:80] for k in ("ver", "todas") + TU.FILTROS if f.get("v_" + k)}
+    try:
+        session["pcm_tecnicos_aviso"] = {"ok": _tecnicos_reemitir_tudo(cfg, f)}
+    except (AT.Recusada, TU.SemCadastro) as ex:
+        session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
+    return redirect(na_raiz("/t/pcm/tecnicos-por-usina") + ("?" + urlencode(volta) if volta else ""), code=303)
+
+
+def tecnicos_carga_inicial():
+    """A regra da equipe (cada pessoa de campo recebe as usinas da equipe dela), uma vez, com o livro vazio: a lista
+    nasce perto do que o App mostra hoje. Só administrador."""
+    cfg = current_app.config
+    if not session.get("admin") or _de_outro_site():
+        abort(403)
+    try:
+        est = AT.ler(cfg, forcar=True)
+        if est.get("erro"):
+            raise AT.Recusada(f"Não consegui ler os técnicos por usina no banco ({est['erro']}): nada foi gravado.")
+        if est["decisoes"]:
+            raise AT.Recusada("A carga inicial é só para o começo: o livro já tem decisões, e nada foi gravado.")
+        base = TU.ler_base()
+        n = AT.decidir_varias(cfg, TU.pedidos_da_carga_inicial(base, TU.pessoas_de_campo(base, cfg)), _usuario(),
+                              "carga_inicial")
+        session["pcm_tecnicos_aviso"] = {"ok": f"Carga inicial feita: {n} ligações pela regra da equipe."}
+    except (AT.Recusada, TU.SemCadastro) as ex:
+        session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
+    return redirect(na_raiz("/t/pcm/tecnicos-por-usina"), code=303)
+
+
+def tecnicos_historico():
+    """O histórico de uma usina (a tela pede por fetch e põe na janela ao lado)."""
+    cfg = current_app.config
+    uid = _num_arg(request.args.get("usina"))
+    try:
+        base = TU.ler_base()
+    except TU.SemCadastro:
+        abort(503)
+    if not uid or uid not in base.por_id:
+        abort(404)
+    hist = TU.historico_da_usina(cfg, base, TU.pessoas_de_campo(base, cfg), uid)
+    return render_template("pcm/_tecnicos_historico.html", hist=hist,
+                           usina=str(base.por_id[uid].get("nome") or f"Usina {uid}"))
+
+
+def registrar_pcm(bp) -> None:
+    """As rotas da programação semanal na torre PCM, na ordem de antes. Cada uma mora no alto deste módulo desde
+    08/11/2026 (o mapa do desembaraço: eram 25 funções dentro desta, que não se testavam nem se trocavam sozinhas);
+    aqui só se ligam ao `bp` da torre, com o mesmo endereço, os mesmos métodos e o mesmo endpoint (o nome da
+    função), e o PCM segue sem importar a torre."""
+    bp.add_url_rule("/gerar", view_func=gerar, methods=["GET", "POST"])
+    bp.add_url_rule("/gerar/planilha", view_func=gerar_planilha)
+    bp.add_url_rule("/gerar/importar", view_func=gerar_importar, methods=["POST"])
+    bp.add_url_rule("/gerar/importar-repositorio", view_func=gerar_importar_repositorio, methods=["POST"])
+    bp.add_url_rule("/gerar/publicar", view_func=gerar_publicar, methods=["GET", "POST"])
+    bp.add_url_rule("/gerar/observacoes", view_func=gerar_observacoes, methods=["POST"])
+    bp.add_url_rule("/gerar/observacoes/copiar", view_func=gerar_observacoes_copiar, methods=["POST"])
+    bp.add_url_rule("/gerar/estado", view_func=gerar_estado)
+    bp.add_url_rule("/tarefas", view_func=tarefas)
+    bp.add_url_rule("/gestao", view_func=gestao)
+    bp.add_url_rule("/quadro", view_func=quadro)
+    bp.add_url_rule("/quadro/reprogramar", view_func=quadro_reprogramar, methods=["POST"])
+    bp.add_url_rule("/quadro/reprogramacoes", view_func=quadro_reprogramacoes, methods=["GET", "POST"])
+    bp.add_url_rule("/quadro/motivo", view_func=quadro_motivo, methods=["POST"])
+    bp.add_url_rule("/motivos/app", view_func=motivo_do_app, methods=["POST"])
+    bp.add_url_rule("/fora-da-programacao", view_func=fora)
+    bp.add_url_rule("/fora-da-programacao/marcar", view_func=fora_marcar, methods=["POST"])
+    bp.add_url_rule("/fora-da-programacao/cadastro", view_func=fora_cadastro, methods=["POST"])
+    bp.add_url_rule("/fora-da-programacao/publicar", view_func=fora_publicar, methods=["POST"])
+    bp.add_url_rule("/gerar/backoffice", view_func=gerar_backoffice, methods=["POST"])
+    bp.add_url_rule("/tecnicos-por-usina", view_func=tecnicos)
+    bp.add_url_rule("/tecnicos-por-usina/decidir", view_func=tecnicos_decidir, methods=["POST"])
+    bp.add_url_rule("/tecnicos-por-usina/reemitir-tudo", view_func=tecnicos_reemitir_tudo, methods=["POST"])
+    bp.add_url_rule("/tecnicos-por-usina/carga-inicial", view_func=tecnicos_carga_inicial, methods=["POST"])
+    bp.add_url_rule("/tecnicos-por-usina/historico", view_func=tecnicos_historico)
 
 
 def _tecnicos_decidir(cfg, f) -> str:
