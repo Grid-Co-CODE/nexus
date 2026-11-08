@@ -336,12 +336,15 @@ def publicar(cfg, hoje=None) -> dict:
     token = cfg.get("GRIDCO_SQL_TOKEN")
     if not token:
         return {"publicadas": 0, "erro": "sem a GRIDCO_SQL_TOKEN"}
+    # o livro primeiro: com a semana já nele, o laço (de 10 em 10 min, a semana inteira) não monta os e-mails de todos
+    # para jogar fora (achado 5 da auditoria de 08/11/2026)
+    velhas = ler(cfg)
+    sem = semana(hoje or _agora().date())
+    if any(D._txt(x.get("semana")) == sem for x in velhas):
+        return {"publicadas": 0, "semana": sem, "erro": ""}
     d = da_semana(cfg, hoje)
     if d["erros"]:
         return {"publicadas": 0, "semana": d["semana"], "erro": f"fonte sem leitura: {', '.join(d['erros'])}"}
-    velhas = ler(cfg)
-    if any(D._txt(x.get("semana")) == d["semana"] for x in velhas):
-        return {"publicadas": 0, "semana": d["semana"], "erro": ""}
     vazio = (lambda v: None if v in ("", None) else v)      # noqa: E731
     corpo = [[vazio(x.get(c)) for c in CAB] for x in velhas + d["linhas"]]
     base, sessao = _banco(cfg)

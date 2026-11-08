@@ -117,6 +117,19 @@ def test_publica_uma_vez_por_semana(com_tst, app, monkeypatch):
         ES._agora().replace(year=2026, month=10, day=26, hour=6))
 
 
+def test_com_a_semana_ja_no_livro_o_laco_nem_monta_os_emails(com_tst, app, monkeypatch):
+    """Achado 5 da auditoria de 08/11/2026: `publicar` montava os e-mails de todos (setores, pessoas e a pendência de cada
+    responsável) a cada 10 min só para jogar fora ao ver a semana no livro."""
+    app.config["GRIDCO_SQL_TOKEN"] = "x"
+    semana = ES.semana(date(2026, 10, 12))
+    monkeypatch.setattr(ES, "ler", lambda cfg: [{"semana": semana}])
+    chamadas = []
+    monkeypatch.setattr(ES, "da_semana", lambda *a, **k: chamadas.append(1) or {"erros": [], "semana": semana})
+    with app.test_request_context():
+        r = ES.publicar(app.config, hoje=date(2026, 10, 12))
+    assert r["publicadas"] == 0 and not chamadas
+
+
 def test_a_semana_perdida_na_segunda_ainda_e_devida_na_terca():
     """Achado 4 da auditoria de 08/11/2026: com a API fora a segunda inteira, `devido` era falso na terça e a semana nunca
     saia (o App aceita a linha até a segunda seguinte). O "uma vez por semana" do `publicar` impede repetir."""
