@@ -16,7 +16,31 @@ mesmo fabricante, que é o problema que este projeto veio resolver.
 | 2 | **De chamados** | **Inspeção** | **Aguardando Garantia** | técnico, em campo |
 | 3 | De acompanhamento | Administrativa | CHAMADOS | equipe de chamados |
 
-Este pacote monta a **2**.
+Este pacote monta a **2** e, desde a **1.3.0** (08/11/2026), também a **3** (`acompanhamento.py`).
+
+## A OS de acompanhamento (1.3.0, 08/11/2026)
+
+Desenho do chamado do tracker na ronda (aprovado pelo Levi, "segue!"): a administrativa do time de chamados nasce **logo
+depois da Inspeção**, nos três caminhos (a ronda e a corretiva no App, o supervisor no OS Creator), com os campos do
+fabricante vazios; o fechamento da Inspeção só **preenche a nota** dela, nunca cria outra. Até a 1.2.0 isso morava só no
+servidor do App (`_acompanhamento_se_chamado` e `_mapa_chaves`).
+
+```python
+d = cg.montar_acompanhamento(inspecao, fabricante)                      # junto com a Inspeção: "aguardando a inspeção"
+d = cg.montar_acompanhamento(inspecao, fabricante,
+                             cg.respostas_de(checklist, itens))         # no fechamento: as respostas do técnico
+# inspecao = {"folio", "code", "nome_ativo", "tipo", "os_pai", "event_date"}
+# d = {"titulo", "nota", "tipo_tarefa", "etiqueta", "subtarefas", "campos", "extras", "aguardando"}
+```
+
+- A nota sai **igual** à do App de hoje: a 1ª linha "[CHAMADO] Acompanhamento — <marca> · <tipo>" (o quadro do
+  Acompanhamento de chamados do OS Creator a lê), a OS de campo, a Inspeção e o ativo, a data da falha, e os campos do
+  formulário do fabricante (pela `chave`, `mapa_chaves`) mais as demais respostas; até 3800 caracteres, cada resposta até
+  300. Sem respostas: "Campos do formulário do fabricante: aguardando a inspeção" (`nota_aguardando` reconhece).
+- A subtarefa única é "Nº do ticket / protocolo aberto no fabricante": o quadro acha o ticket por "ticket"/"protocolo".
+- Fica fora daqui: o payload do RPC, os ids do Fracttal e o responsável (cada lado tem o seu).
+- O App copia a pasta inteira para `middleware/chamado_garantia`; as duas pontas sobem a 1.3.0 juntas.
+- Prova: `tests/test_chamado_garantia_acompanhamento.py` (a nota comparada com a cópia do laço do App v332).
 
 ## Uso no app de campo
 

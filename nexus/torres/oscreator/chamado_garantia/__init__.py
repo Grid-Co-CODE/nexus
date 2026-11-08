@@ -24,6 +24,8 @@ Quem for criar a OS de fato precisa de um cliente Fracttal. O `payload.py` monta
 RPC sem falar com a rede, então serve tanto ao desktop quanto a um backend do app de campo.
 """
 from . import registro
+from .acompanhamento import (AGUARDANDO_INSPECAO, SUBTAREFA_TICKET, mapa_chaves, montar_acompanhamento,
+                             nota_aguardando, respostas_de)
 from .ativos import TIPO_POR_SUFIXO, tipo_do_ativo, tipo_e_sufixo
 from .regras import (CLASSIF_1, CLASSIF_2, ETIQUETA, ETIQUETA_ACOMPANHAMENTO, TIPO_TAREFA,
                      TIPO_TAREFA_ACOMPANHAMENTO, TIPOS_ORIGEM, derivados, descobrir_marca,
@@ -43,5 +45,8 @@ __all__ = [
     "TIPO_ID", "APELIDOS_NO_FRACTTAL",
     # o Controle de fornecedores do Nexus por cima do código (20/10/2026): quem lê a aba entrega as linhas aqui
     "registro",
+    # a OS de acompanhamento (a 3ª, do time de chamados), desde a 1.3.0 (08/11/2026): nasce junto com a Inspeção
+    "montar_acompanhamento", "mapa_chaves", "respostas_de", "nota_aguardando", "AGUARDANDO_INSPECAO", "SUBTAREFA_TICKET",
 ]
-__version__ = "1.2.0"     # 1.1.0: ativos.py (tipo do ativo pelo código); 1.2.0: registro.py e a marca por palavra inteira
+__version__ = "1.3.0"     # 1.1.0: ativos.py (tipo do ativo pelo código); 1.2.0: registro.py e a marca por palavra inteira;
+#                           1.3.0: acompanhamento.py (a OS do time de chamados, junto com a Inspeção; 08/11/2026)
