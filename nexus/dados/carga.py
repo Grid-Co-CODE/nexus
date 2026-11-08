@@ -58,6 +58,7 @@ GEMEO_ALIAS = ("gemeo_digital", "alias")
 CADASTRO = "cadastro_nexus"
 INTERVALO_MIN = 50
 MINUTO_DA_HORA = 40
+ATRASO_DO_PC_S = 20
 CAB_ATUALIZACAO = ["gerado_em", "maquina", "duracao_s", "linhas", "como_ler"]
 _BRT = timezone(timedelta(hours=-3))
 log = logging.getLogger("nexus.dados")
@@ -835,7 +836,9 @@ def _espera_s(agora=None) -> float:
     alvo = agora.replace(minute=MINUTO_DA_HORA, second=0, microsecond=0)
     if alvo <= agora:
         alvo += timedelta(hours=1)
-    return (alvo - agora).total_seconds()
+    # o PC chega depois do servidor: acordando juntos, os dois liam a "última carga" antes de qualquer um gravar e os dois
+    # trocavam os mesmos livros (achado da auditoria de 08/11/2026); 20 s depois o PC já vê a gravação do servidor
+    return (alvo - agora).total_seconds() + (ATRASO_DO_PC_S if _maquina() == "pc" else 0)
 
 
 def ligar(app):

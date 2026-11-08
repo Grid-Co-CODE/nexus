@@ -413,7 +413,8 @@ plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento que
     `dim_<assunto>`, `<dimensão>_historico`, `qualidade`, `atualizacao`; exceção só com motivo em
     `catalogo.ABAS_FORA_DA_REGRA`. **Registre em `catalogo.LIVROS` antes de criar** (o teste cobra).
 11. **Uma carga por hora, uma máquina por vez:** grava só se a última tiver mais de 50 min. PC e servidor podem estar no
-    ar juntos sem gravar em dobro. `NEXUS_CARGA_DADOS=0` desliga numa máquina. Livro grande que muda pouco (a dimensão
+    ar juntos sem gravar em dobro (o PC acorda 20 s depois do servidor, `ATRASO_DO_PC_S`: acordando juntos, os dois
+    liam a última carga antes de qualquer um gravar, auditoria de 08/11/2026). `NEXUS_CARGA_DADOS=0` desliga numa máquina. Livro grande que muda pouco (a dimensão
     de equipamento) grava só quando o sha das linhas muda; tudo sai ORDENADO, senão o sha muda de máquina para máquina.
 12. **A carga só lê o que as duas máquinas leem igual** (o banco e o `banco_dados.json` público do PCM). Arquivo local
     do PC (as fotos do OS Creator, o `os_falhas.json`, o `rondas_aprovadas.json`) nunca entra na carga de hora em hora:

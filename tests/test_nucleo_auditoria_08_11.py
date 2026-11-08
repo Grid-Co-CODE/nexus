@@ -24,3 +24,16 @@ def test_o_rest_do_fracttal_nao_dorme_mais_de_5_s_dentro_do_pedido(app, monkeypa
     monkeypatch.setattr(os_api.time, "sleep", dormiu.append)
     assert os_api._req("GET", "work_orders") == {"ok": True}
     assert len(dormiu) == 1 and 0 < dormiu[0] <= 5
+
+
+def test_o_pc_acorda_20_s_depois_do_servidor_na_carga_das_40(monkeypatch):
+    """O PC e o servidor acordavam no mesmo segundo, liam a "última carga" antes de qualquer um gravar e gravavam os mesmos
+    livros em dobro. O PC chega 20 s depois e já vê a gravação do servidor (e então pula)."""
+    from datetime import datetime, timezone
+
+    from nexus.dados import carga
+    agora = datetime(2026, 11, 8, 13, 10, tzinfo=timezone.utc)
+    monkeypatch.setattr(carga, "_maquina", lambda: "servidor")
+    no_servidor = carga._espera_s(agora)
+    monkeypatch.setattr(carga, "_maquina", lambda: "pc")
+    assert carga._espera_s(agora) == no_servidor + carga.ATRASO_DO_PC_S == no_servidor + 20
