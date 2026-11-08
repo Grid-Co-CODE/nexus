@@ -97,13 +97,19 @@ def ler(forcar: bool = False) -> dict:
     g = _CACHE.get("livro")
     if g and not forcar and time.time() - g["lido_em"] < TTL_S:
         return g
+    f = _CACHE.get("falha")      # a falha também fica pelo minuto, com o prazo curto (como o acompanhamento)
+    if f and not forcar and time.time() - f["em"] < TTL_S:
+        return dict(g, erro=f["erro"], velha=True) if g else {"linhas": [], "lido_em": None, "erro": f["erro"]}
     try:
-        linhas = _ler_banco(*AC._banco())
+        base, sessao = AC._banco()
+        linhas = _ler_banco(base, AC._Curta(sessao))
     except Exception as ex:      # noqa: BLE001 — banco fora, rede: a tela diz e não deixa emitir
         erro = f"{type(ex).__name__}: {str(ex)[:160]}"
+        _CACHE["falha"] = {"em": time.time(), "erro": erro}
         if g:
             return dict(g, erro=erro, velha=True)
         return {"linhas": [], "lido_em": None, "erro": erro}
+    _CACHE.pop("falha", None)
     g = {"linhas": linhas, "lido_em": time.time(), "erro": ""}
     _CACHE["livro"] = g
     return g

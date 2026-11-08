@@ -761,3 +761,46 @@ def test_gaveta_mostra_os_chamados_de_garantia_do_ativo(tela, cliente, monkeypat
     torre._CACHE.clear()
     html = cliente.get(URL + "?aba=acompanhamento").get_data(as_text=True)
     assert "Chamados de garantia" not in html and "IBI200-INVR1.3" in html
+
+
+# ── a API do banco pendurada não pode prender cada visita (auditoria de 08/11/2026) ──────────────────────────────────
+def test_leitura_que_falha_fica_lembrada_pelo_minuto_e_a_sessao_vai_com_prazo_curto(monkeypatch):
+    """Caso: a API da T.I. pendura. Sem lembrar a falha, cada abertura da Mesa refazia as chamadas e 8 visitas paravam as
+    8 threads. Vale para o acompanhamento, os relatórios FMEA, os setores e o livro lido pela visão do Campo."""
+    from nexus.cadastro import setores as S
+    from nexus.campo import visao
+    from nexus.dados import livros
+    from nexus.engenharia import fmea as F
+
+    chamadas = []
+
+    class Sessao:
+        def get(self, *a, **k):
+            chamadas.append(k.get("timeout"))
+            raise TimeoutError("pendurada")
+
+    monkeypatch.setattr(A, "_banco", lambda: ("http://banco", Sessao()))
+    for mod in (A, F, S):
+        mod._CACHE.clear()
+    A.ler(); n = len(chamadas)
+    assert n >= 1 and max(chamadas) <= A.PRAZO_S           # o prazo curto, e não os 60 s do padrão
+    assert A.ler()["erro"] and len(chamadas) == n          # a 2ª visita não chama a sessão
+    F.ler(); m = len(chamadas)
+    assert m > n
+    assert F.ler()["erro"] and len(chamadas) == m
+    S.ler("http://banco", Sessao()); k = len(chamadas)
+    assert k > m
+    assert S.ler("http://banco", Sessao())["erro"] and len(chamadas) == k
+
+    vezes = []
+    monkeypatch.setattr(livros, "ler", lambda *a, **kw: (vezes.append(1), (_ for _ in ()).throw(TimeoutError("x")))[1])
+    monkeypatch.setattr(visao, "_base", lambda: "b")
+    monkeypatch.setattr(visao, "_sessao", lambda: object())
+    visao._LIVROS.clear()
+    for _ in range(2):
+        with pytest.raises(TimeoutError):
+            visao._livro("nexus_chamados", "fato_chamado")
+    assert len(vezes) == 1
+    visao._LIVROS.clear()            # a falha lembrada não pode vazar para o teste seguinte
+    for mod in (A, F, S):
+        mod._CACHE.clear()

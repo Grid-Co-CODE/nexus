@@ -87,6 +87,7 @@ _USADO: dict = {}            # chave -> quando a tela pediu pela última vez
 _RENOVANDO: set = set()
 _LIVROS: dict = {}           # (livro, aba) -> (quando, linhas): as contas de um mesmo ciclo leem o banco uma vez
 LIVRO_S = 120
+FALHA_LIVRO_S = 60
 USO_S = 2 * 3600             # conta que ninguém abriu em 2 h para de ser renovada (volta na próxima visita)
 _TRAVA = __import__("threading").Lock()
 # a conta em andamento de cada chave (fria, no pedido, ou por trás, no `_renovar`): {"pronto": Event, "r": Leitura}.
@@ -341,7 +342,16 @@ def _livro(nome, aba=None) -> list[dict]:
     g = _LIVROS.get(chave)
     if g and time.time() - g[0] < LIVRO_S:
         return g[1]
-    linhas = livros.ler(_base(), _sessao(), nome, aba)
+    # a falha mora no mesmo `_LIVROS` (chave "_falha"): quem zera a cópia dos livros zera a falha lembrada junto
+    f = _LIVROS.get(("_falha", nome, aba))
+    if f and time.time() - f[0] < FALHA_LIVRO_S:
+        raise f[1]       # a Mesa não refaz a leitura pendurada a cada visita (auditoria de 08/11/2026)
+    try:
+        linhas = livros.ler(_base(), _sessao(), nome, aba)
+    except Exception as ex:      # noqa: BLE001
+        _LIVROS[("_falha", nome, aba)] = (time.time(), ex)
+        raise
+    _LIVROS.pop(("_falha", nome, aba), None)
     _LIVROS[chave] = (time.time(), linhas)
     return linhas
 

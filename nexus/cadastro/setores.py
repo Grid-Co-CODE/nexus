@@ -40,6 +40,7 @@ CAB_DECISAO = ("decidida_em", "data_id", "fracttal_id", "pessoa_id", "pessoa_lig
 NOME_MIN, NOME_MAX = 2, 60
 LOTE_MAX = 300                   # o Fracttal tinha 150 pessoas em 12/10: marcar todas cabe com folga
 TTL_S = 60
+PRAZO_S = 8
 _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()
 _CACHE: dict = {}
@@ -89,19 +90,36 @@ def _ler_banco(base: str, sessao) -> dict:
     return {"setores": setores, "decisoes": decisoes}
 
 
+class _Curta:
+    """A sessão do banco com prazo curto: a leitura vai no caminho do clique e não espera os 60 s do padrão."""
+
+    def __init__(self, sessao):
+        self._s = sessao
+
+    def get(self, *a, **k):
+        k["timeout"] = min(float(k.get("timeout") or PRAZO_S), PRAZO_S)
+        return self._s.get(*a, **k)
+
+
 def ler(base: str, sessao, forcar: bool = False) -> dict:
     """{"setores", "decisoes", "lido_em", "erro"}: o livro, guardado por 1 minuto. Leitura que falha devolve a última
     boa com `velha` e o erro; sem nenhuma, vazio com o erro (a tela não deixa gravar sem saber o que há no banco)."""
     g = _CACHE.get("livro")
     if g and not forcar and time.time() - g["lido_em"] < TTL_S:
         return g
+    f = _CACHE.get("falha")      # a falha também fica pelo minuto (auditoria de 08/11/2026: API do banco pendurada)
+    if f and not forcar and time.time() - f["em"] < TTL_S:
+        return dict(g, erro=f["erro"], velha=True) if g else {"setores": [], "decisoes": [], "lido_em": None,
+                                                              "erro": f["erro"]}
     try:
-        d = _ler_banco(base, sessao)
+        d = _ler_banco(base, _Curta(sessao))
     except Exception as ex:      # noqa: BLE001 — banco fora, rede: a tela diz e não deixa gravar
         erro = f"{type(ex).__name__}: {str(ex)[:160]}"
+        _CACHE["falha"] = {"em": time.time(), "erro": erro}
         if g:
             return dict(g, erro=erro, velha=True)
         return {"setores": [], "decisoes": [], "lido_em": None, "erro": erro}
+    _CACHE.pop("falha", None)
     g = dict(d, lido_em=time.time(), erro="")
     _CACHE["livro"] = g
     return g
