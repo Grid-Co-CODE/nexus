@@ -174,3 +174,34 @@ def test_um_passo_que_cai_nao_para_os_outros(ambiente, monkeypatch):
     g.rodada(AGORA)
     assert len(api.linhas(livro_pontos(AGORA.date()), ABA_PONTOS)) == 1
     assert len(api.linhas(LIVRO_ACESSOS, ABA_ACESSOS)) == 1
+
+
+def test_o_dia_publicado_leva_o_diario_e_mais_as_linhas_que_so_o_banco_tinha(ambiente):
+    api, srv, g = ambiente
+    livro = livro_pontos(AGORA.date())
+    _livro_com(api, livro, ABA_PONTOS, CAB_PONTOS, [["Pso_banco", 20261108, "2026-11-08T12:00:00Z", 8, "c"]])
+    _ponto(srv, 7, 60, -23.0, -46.0)
+    _ponto(srv, 7, 30, -23.001, -46.0)                  # 2 no diário x 1 no banco (que o diário não tem)
+    g.rodada(AGORA)
+    ids = {l["ponto_id"] for l in api.linhas(livro, ABA_PONTOS)}
+    assert "Pso_banco" in ids and len(ids) == 3
+
+
+def test_banco_que_nao_le_nao_grava_nada_e_os_eventos_voltam_a_fila(ambiente, monkeypatch):
+    api, srv, g = ambiente
+    _ponto(srv, 7, 90, -23.0, -46.0)
+    _ponto(srv, 7, 30, -23.1, -46.0)                    # um deslocamento 1 -> 2 a gravar
+    srv.chaveiro.emitir(7, "cel-1", "app", AGORA)
+    srv.registro.acrescentar("abriu_mapa", 1, "hmac-x", None, None, AGORA)
+
+    def nao_le(*a, **k):
+        raise RuntimeError("listagem incompleta")
+    with monkeypatch.context() as m:
+        m.setattr("nexus.dados.livros.abas_conferidas", nao_le)
+        g.rodada(AGORA)
+    assert api.syncs == 0                               # nem pontos, nem trechos, nem eventos por cima do que não se leu
+    g.rodada(AGORA + timedelta(minutes=5))              # o banco voltou: tudo o que ficou na fila entra
+    assert len(api.linhas(LIVRO_APARELHOS, ABA_APARELHOS)) == 1
+    assert len(api.linhas(LIVRO_ACESSOS, ABA_ACESSOS)) == 1
+    assert len(api.linhas(livro_pontos(AGORA.date()), ABA_PONTOS)) == 2
+    assert len(api.linhas(livro_deslocamentos(AGORA.date()), ABA_DESLOC)) == 1

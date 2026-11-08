@@ -52,7 +52,13 @@ def deslocamentos(pontos: list[dict], usinas: dict, raio_km: float = RAIO_USINA_
     for pessoa_id, lista in por_pessoa.items():
         lista.sort(key=lambda p: p["instante"])
         ultimo = None                        # (usina, índice do último ponto nela)
+        dia_antes = None
         for i, p in enumerate(lista):
+            # o trecho só existe dentro de um dia de Brasília: a coleta para às 22h e recomeça na 1ª abertura do App,
+            # então da noite para a manhã não houve trajeto observado (ex.: A às 21:50 e B às 07:10 não são 9 h de viagem)
+            dia = _instante(p["instante"]).astimezone(_BRT).date()
+            if dia != dia_antes:
+                ultimo, dia_antes = None, dia
             u = _usina_do_ponto(p, usinas, raio_km)
             if u is None:
                 continue

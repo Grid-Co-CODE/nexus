@@ -57,3 +57,14 @@ def test_o_raio_conta_a_partir_da_usina():
     pts = [_p(7, "12:00", -23.0045, -46.0), _p(7, "12:30", -23.1, -46.0)]
     assert len(deslocamentos(pts, USINAS)) == 1
     assert deslocamentos(pts, USINAS, raio_km=0.3) == []
+
+
+def test_atravessar_a_meia_noite_de_brasilia_nao_e_deslocamento():
+    # o último ponto em A às 18:50 (21:50Z) e o primeiro em B no dia seguinte às 07:10 (10:10Z): a coleta para às 22h e
+    # recomeça na 1ª abertura do App; entre os dois dias não houve trajeto observado
+    pts = [{"pessoa_id": 7, "instante": "2026-11-07T21:50:00Z", "lat": -23.0, "lon": -46.0},
+           {"pessoa_id": 7, "instante": "2026-11-08T10:10:00Z", "lat": -23.1, "lon": -46.0}]
+    assert deslocamentos(pts, USINAS) == []
+    # o mesmo trecho dentro de um dia só continua sendo deslocamento
+    pts[1]["instante"] = "2026-11-07T22:30:00Z"
+    assert len(deslocamentos(pts, USINAS)) == 1
