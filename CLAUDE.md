@@ -61,6 +61,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | **Camada de dados: fatos, dimensões, qualidade (PRIORIDADE 0)** | `nexus/dados/CLAUDE.md` |
 | **Design: o visual (as regras, as cores de cada tema, a tipografia, como uma tela se monta, os componentes e como provar)** | `DESIGN.md` |
 | **Desempenho (Nexus lento: como ler o Raio-X, as regras de prova, o que já foi corrigido e a fila do chat de desempenho)** | `DESEMPENHO.md` |
+| Desembaraçar o código (quebrar arquivo gigante, unificar repetida, import entre áreas, faxina: mudar o lugar sem mudar o comportamento, com a foto de antes e depois) | `.claude/skills/untangle-codebase/SKILL.md` |
 | Servidor da T.I. | `DEPLOY.md` |
 
 Desenho da fase atual: `docs/superpowers/specs/2026-09-29-casca-nexus-design.md`; a porta única da Performance (o Nexus
