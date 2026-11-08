@@ -160,7 +160,7 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   prova (banco falso, Fracttal de verdade) perde a sessão quando o Fracttal é aberto noutra aba (uma sessão por conta).
   Encaminhar um acompanhamento com OS troca o responsável
   dela (`mudar_responsavel`, a nota fica) e escreve a linha na nota; o comentário vai para a nota da OS, como no Quadro da
-  equipe (a mesma `_acrescentar_na_nota` e a mesma trava). Com a OS, a gaveta mostra o número (a página dela no Quadro) e o
+  equipe (a mesma `_acrescentar_na_nota` e a mesma trava, uma por OS desde 08/11/2026: comentar em OS diferentes não espera o Fracttal da outra). Com a OS, a gaveta mostra o número (a página dela no Quadro) e o
   Solicitar OS e o Criar OS com ela como OS pai e a data do evento dela, como a página da OS do Quadro. As ações da gaveta
   (e o Pegar do cartão da Mesa) vão para a ponte do OS Creator (`/os/_nexus/engenharia/acompanhamento/...`, em
   `nexus/torres/oscreator/ponte.py`), porque o cookie do Fracttal só vai para /os; o Fracttal vem ANTES do livro (o que ele
@@ -174,7 +174,7 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
     está com o ativo); um ativo por vez (`ponte._trava_do_ativo`, o servidor é um processo só: o segundo ouve "agora
     mesmo");
   - a OS criada que o livro não gravou fica em `ponte._OS_SEM_LIVRO`, e a tentativa seguinte (Pegar ou Encaminhar) usa a
-    MESMA, passando o responsável se for outra pessoa: repetir não cria outra OS;
+    MESMA, passando o responsável se for outra pessoa: repetir não cria outra OS. A lembrança é da memória, então o aviso diz para cancelar a OS repetida no Fracttal se o Nexus reiniciar antes da nova tentativa (08/11/2026);
   - a OS concluída ou cancelada no próprio Fracttal (`os_analise.situacao`, pelo `status_da_os`) não recebe nada: o
     encerrar, o comentário e o encaminhar seguem só no Nexus e dizem isso; o erro de OS fechada casa com ou sem o "_";
   - encerrar não lança uma execução a cada tentativa (a tarefa que já tem execução não ganha outra), e sem a subtarefa
@@ -509,7 +509,7 @@ como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenhar
   pedido torto (sem a usina, a lista que não é lista, mais de 500 OS) volta 400; enquanto o pedido está no ar o botão
   fica desligado, e a resposta só aparece na usina do pedido. E **Ver histórico desta usina**, que abre a usina no
   Histórico. As duas rotas (`/etm/finalizar` e `/etm/usina/comentarios`) respondem 503 "lendo" com a cópia ainda
-  vazia, logo depois de subir: "nenhum comentário" ou "não está mais finalizada" seria mentira. Sem o livro das marcações, a aba diz e não lista nada
+  vazia, logo depois de subir: "nenhum comentário" ou "não está mais finalizada" seria mentira. A página só se recarrega sozinha (8 s) enquanto a 1ª leitura está em curso; com o Fracttal recusando ela mostra o erro e para (auditoria de 08/11/2026: a aba esquecida recarregava de 8 em 8 s, cada vez com uma leitura). Sem o livro das marcações, a aba diz e não lista nada
   (não dá para saber o que está aberto para a Engenharia).
 - **A leitura** (`nexus/engenharia/etm.py`, medida em 26/10/2026, só leitura): `items?field_1=Estação Meteorológica` dá
   as 172 ETMs (a descrição confere) e `work_orders?items_log_description=Estação Meteorológica` as 1213 OS delas: 15

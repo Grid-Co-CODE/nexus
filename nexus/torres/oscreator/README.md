@@ -1834,7 +1834,7 @@ Cada página chega cortada no que a lista lê (`os_registro.enxuta`), e as abert
   ou a página conhecida, rodada 2: sem ele a regra sumia calada) ou quando mais linhas que o maior dos dois, 5 ou 1% das
   lidas, vêm criadas mais de 1 h depois da linha anterior (a ordem qualquer inverte metade delas). A folga de 1 h e a conta
   deixam passar a linha fora do lugar que o REST pode trazer (o `sort` é da OS e a linha é da tarefa; a ordem das finalizadas
-  já se mostrou só aproximada, `nexus/campo/coletor.py`): duas linhas dias fora do lugar passam, um teste prova.
+  já se mostrou só aproximada no coletor do Campo, que saiu em 08/11/2026): duas linhas dias fora do lugar passam, um teste prova.
 - **As pendentes:** a OS que a ação deixou para a próxima faixa, pelo nº (até 5 por vez, as de menos falhas primeiro), depois
   das novas e dos 7 dias, cada pedido depois da pausa de 1 s (o 1º também: nunca 2 pedidos colados). A que o nº não traz mais
   (apagada no Fracttal) sai da fila e do disco e segue "a conferir" até a noite; a leitura que falha conta uma falha para
@@ -2433,6 +2433,7 @@ Os módulos que as etapas 1 a 4 criaram (`ativos_central`, `ativos_leitor`, `ati
   (`ASSETS_CACHE_LEGADO`, `DASH_CONFIG_FILE`) ficou no `api`.
 
 **O que ficou no `api.py`, e por quê**
+- **O 406/429 do REST** (`_req`) espera o `ratelimit-reset` com teto de 5 s e tenta uma vez; o valor que não é número vale 3 s (auditoria de 08/11/2026: o Fracttal manda o valor sem teto, e 120 segurava a thread do pedido por 120 s; uma data no lugar dava 500).
 - **Quem fala com a rede direto** (`_get_token`, `_req`, `fracttal_login`, `_rpc_try_refresh`, `_rpc_chamar`, `create_os_rpc`,
   `_react_insert_post`, `s3_get_url`, `baixar_imagem`, o S3 e o `attach_imagem_os`): o Raio-X rotula o pedido preso pelo arquivo da
   linha NOSSA mais de dentro (`nexus/casca/presos.py`: `os_creator/api.py` e os módulos que saíram dele nas etapas 5.1 e 5.3,

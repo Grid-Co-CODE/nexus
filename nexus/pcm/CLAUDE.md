@@ -46,7 +46,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 
 | Arquivo | O que faz |
 |---|---|
-| `fonte.py` | lê o `banco_dados.json` do App (a semana que está valendo) e, para a Gestão PCM, o `gestao_pcm.json` e o `mpas.json`; cópia de 5 min e, passado isso, confere pelo ETag (304 = segue a cópia, sem baixar de novo); na cópia em memória, o `cliente` já vem pelo nome do cadastro (`clientes.py`). **Uma trava por arquivo** (27/10/2026, ronda de dados do PCM): com uma só, o download lento do `gestao_pcm.json` (14,9 MB, até 30 s) segurava a leitura de todos os outros arquivos, mesmo com cópia válida; e quem já tem cópia não espera o download que outro pedido já faz do mesmo arquivo (`tests/test_pcm_fonte_trava.py`) |
+| `fonte.py` | lê o `banco_dados.json` do App (a semana que está valendo) e, para a Gestão PCM, o `gestao_pcm.json` e o `mpas.json`; cópia de 5 min e, passado isso, confere pelo ETag (304 = segue a cópia, sem baixar de novo, e o relógio dos 5 min recomeça: sem isso cada leitura depois dos 5 min perguntava de novo, auditoria de 08/11/2026); na cópia em memória, o `cliente` já vem pelo nome do cadastro (`clientes.py`). **Uma trava por arquivo** (27/10/2026, ronda de dados do PCM): com uma só, o download lento do `gestao_pcm.json` (14,9 MB, até 30 s) segurava a leitura de todos os outros arquivos, mesmo com cópia válida; e quem já tem cópia não espera o download que outro pedido já faz do mesmo arquivo (`tests/test_pcm_fonte_trava.py`) |
 | `clientes.py` | **o nome do cliente é o do cadastro do Nexus** (18/10/2026, seção abaixo) |
 | `gestao.py` | as contas da Gestão PCM (o Plano & Fila, do `js/preventivas.js` do painel; os filtros de cima, os números do alto, as árvores e o Só atrasadas, do `js/app.js`) |
 | `gestao_confiab.py` | a Confiabilidade por ativo e o MTTR por equipe cluster da Gestão PCM, sobre a conta da Engenharia (a cópia de 5 min da torre de lá) |
@@ -1435,7 +1435,7 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
   conflitos"); o controle fica `encerrada` e a vez do almoxarifado é solta.
 - **O controle** `<NEXUS_DADOS>/almox_inventario/<contagem>.json` (o estado de cada lote e de cada peça, a hora da sessão) e
   **a vez** `trava-<almoxarifado>.json`: uma gravação por almoxarifado ("já tem uma gravação em andamento neste almoxarifado"),
-  e a parada no meio segura a vez até quem aprovou continuar ou alguém encerrar (o arquivo segura a reinicialização). **Nunca
+  e a parada no meio segura a vez até quem aprovou continuar ou alguém encerrar (o arquivo segura a reinicialização). A aprovação que para sem confirmar o registro no livro solta a vez da memória mesmo se o controle não grava (o disco cheio: sem isso a vez ficava viva até reiniciar; auditoria de 08/11/2026). **Nunca
   o login:** o JWT e o e-mail vivem só na instância do `Estoque`. Os eventos vão ao livro SEMPRE com a sessão fechada (o banco
   lento não segura o almoxarifado travado), com o `evento_id` tirado da contagem, do tipo e da peça: registrar de novo não
   duplica a auditoria.
@@ -1608,6 +1608,7 @@ escolhe a semana ativa pela data de hoje: a W43 publicada na quinta vira a do Ap
 - **Pede confirmação a mais:** a semana já começou (troca a programação no meio dela); o repositório já tem a planilha
   da semana (mostra quando e por quem foi gravada). Avisa: geração com mais de 24 h (o Fracttal mudou), corretiva
   forçada além das horas do dia (`excede_hh_os`), observações sem nenhuma OS fora ou com dia fixo.
+- **Gravar:** o 409 do GitHub (o ramo andou no meio) repete o PUT, com ou sem a planilha no repositório; o 422 (sha errado) só quando há o arquivo (auditoria de 08/11/2026: na 1ª publicação da semana a planilha é nova, e o 409 parava tudo pela metade).
 - **Depois:** relê cada arquivo do repositório e compara o sha256 (conferir depois de gravar); grava `publicacao.json`
   na rodada e o `status.json`; põe o plano na reserva do histórico (`insumos.registrar_plano_publicado`: a semana
   publicada de novo troca o plano). A rodada mostra "Publicada no App" e se o `banco_dados.json` já tem a semana.

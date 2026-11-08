@@ -36,7 +36,7 @@ numa moldura em `nexus/pcm/relatorio_exec` (tela `pcm-executivo`, ver o CLAUDE.m
   recuperar no sábado; alerta quando aparece semana mais nova que a ativa no banco_dados (publicada pelo Nexus ou pelo
   PC do PCM) e de novo quando ela é republicada (`geradaEm`). Uma thread por processo (`app.py`, `servir.py`), volta a
   cada 5 min, `NEXUS_PCM_RELATORIOS_AUTO=0` desliga numa máquina. "Já emitido" é a folha guardada: o servidor que
-  reinicia (todo push) emite o que faltou e não emite duas vezes.
+  reinicia (todo push) emite o que faltou e não emite duas vezes. Uma folha com erro não segura as outras da volta: o erro vai para o log e fica anotado (auditoria de 08/11/2026: o diário que quebrava segurava o alerta).
 - **O arquivo** (`arquivo.py`): `<pasta de dados>/pcm/relatorios/<tipo>/<ref>.html`, diário e tarde por 30 dias,
   fechamento e alerta sem limpeza, como o `relatorios/` do PCM. É documento, não dado: não vai ao banco. O que a emissão
   precisa saber de volta vai em `<meta name="nexus-...">` no próprio HTML.

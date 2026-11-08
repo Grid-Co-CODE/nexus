@@ -1127,7 +1127,7 @@ conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no
     ou sem; um login certo no meio não o zera. O IP é o do visitante: o `trusted_proxy` do `servir.py` lê o
     X-Forwarded-For do Caddy;
   - acertar zera os contadores DESTE e-mail (o par com a rede, o teto e o do navegador);
-  - a **senha de administrador** tem o próprio contador (5 por IP): o Fracttal dos colegas não a tranca, e ela não tranca o
+  - a **senha de administrador** tem o próprio contador (5 por IP, e `TETO_ADMIN_GLOBAL` = 30 em 15 min somando todas as redes, que fecha a senha para todos por 15 min: o Nexus está em endereço público, e quem tem muitos endereços tentava 5 por endereço sem limite; auditoria de 08/11/2026; o Fracttal e a Microsoft seguem como portas): o Fracttal dos colegas não a tranca, e ela não tranca o
     Fracttal de ninguém;
   - **senha não conferida não conta**, e o motivo aparece. `fracttal.FracttalOcupado` (429/406, 5xx, limite, rede fora;
     lido da mensagem que o clone monta, porque ele não devolve o status) leva `motivo` (DNS, certificado, proxy, tempo,

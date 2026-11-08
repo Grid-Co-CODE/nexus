@@ -306,7 +306,7 @@ a noite de 365 dias não junta 83 mil linhas inteiras; o pico caiu de ~390 para 
 (`ForaDeOrdem`, uma `LeituraIncompleta`): a 1ª página tem de chegar ao `topo_minimo` que quem chama dá (o REST que devolve da
 mais velha para a mais nova; com o piso ou a página conhecida ele é obrigatório, ValueError antes de qualquer pedido), e mais
 linhas que o maior dos dois, 5 ou 1% das lidas, criadas mais de 1 h depois da anterior derrubam a leitura (a ordem qualquer
-inverte metade delas; a folga deixa passar a linha fora do lugar, como a ordem só aproximada das finalizadas, `coletor.py`).
+inverte metade delas; a folga deixa passar a linha fora do lugar, como a ordem só aproximada das finalizadas que o coletor do Campo via, até ele sair em 08/11/2026).
 Com o `sort` ignorado, a noite da lista tiraria de vez as OS de 90 dias. E (rodada 2) a leitura sem o total no começo que
 acaba ANTES do que a faria parar, na página curta ou vazia, pede o total ali e confere (`_paginas(total_no_fim=True)`, que os
 7 dias e a noite da lista passam): o Fracttal já devolveu 0 registros calado (a rodada do robô do PCM de 26/10, acima), e na

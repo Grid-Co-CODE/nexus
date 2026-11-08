@@ -169,7 +169,7 @@ só o Nexus. Desenho e as decisões dele no quiz: `docs/superpowers/specs/2026-1
   filtrada pela usina (para quem abre a tela Ocorrências; para o setor sem ela, a etiqueta sem link). O livro que não
   abre deixa a Visão geral sem as etiquetas, nunca quebrada, e a leitura que falhou espera 1 minuto antes de tentar de
   novo (a Visão geral não fica esperando o banco lento a cada carga). Depois de gravar, a cópia de 1 minuto já tem o
-  que foi gravado; a página que não acha a ocorrência relê o livro antes do 404 (gravada noutro processo). **A Visão
+  que foi gravado; a página que não acha a ocorrência relê o livro antes do 404 (gravada noutro processo), no máximo uma vez por minuto (o id apagado, de favorito, relia o livro todo a cada abertura; auditoria de 08/11/2026). **A Visão
   geral não espera a releitura** (19/10/2026, `ocorrencias.ler_sem_esperar`): a cópia vencida volta na hora e o livro
   é relido por trás, uma releitura por vez (só a 1ª vez depois de subir lê no pedido). A tela Ocorrências segue no
   `ler` (espera a cópia nova).
@@ -473,7 +473,7 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     nem no histórico da usina", então também na aba Registros, pelo MESMO componente `_ronda_fotos_caixa.html`, que as
     duas páginas incluem; ronda sem OS ou avulsa fica sem botão, com o porquê no `title`; medido em 08/10: 288 botões
     nas 300 linhas de 30 dias): o botão Fotos de cada ronda com OS carrega os anexos da OS no
-    Fracttal (1 pedido por OS, guardado 20 min; o link assinado fica no servidor e o Nexus entrega a imagem). Separação
+    Fracttal (1 pedido por OS, guardado 20 min, e a lista vencida sai a cada gravação; o link assinado fica no servidor e o Nexus entrega a imagem). Separação
     pela descrição que o App escreve ("Sujidade dos módulos — 4", "Altura da vegetação — 5"); as demais vêm **abertas,
     por tipo** (sensores, vala, infraestrutura, pragas/dejeto/trincado, zonas, capa), cada tipo com o título no nível
     de Sujidade e Vegetação e o nome curto do item embaixo da miniatura. Eram um "Demais fotos da ronda" recolhido (06/10:
@@ -1246,7 +1246,7 @@ para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-res
 - Fora da carga de hora em hora de propósito (aquela não toca no Fracttal). Laço próprio no `campo.instalar`: 1ª volta 2
   min depois de subir, depois aos :50. Grava a máquina que chegar primeiro (regra 11: a última gravação do livro tem de
   ter mais de 50 min). `NEXUS_CHAMADOS_PUBLICAR=0` desliga numa máquina. Fracttal que devolve 0 com o livro cheio não
-  apaga o livro. Enquanto o servidor não atualiza, quem publica é o Nexus do PC.
+  apaga o livro. A leitura vai pela paginação conferida das tarefas das OS (`tarefas_os._paginas`: o total, a página repetida, a recusa), e a leitura pela metade não troca o livro (auditoria de 08/11/2026: uma página sem `data` no meio virava "fim da lista" e o livro ficava com menos chamados). Enquanto o servidor não atualiza, quem publica é o Nexus do PC.
 - Sem pessoa e sem a nota (regra 8): o fabricante e o componente saem da marca (categorias).
 - Prova: `tests/test_campo_chamados_acompanhamento.py`.
 
@@ -1882,7 +1882,7 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   (`query_entities`, `get_entity`); erro de leitura fica anotado e vira aviso.
 - `aprovacao.py`, `triagem.py`: as telas pelas regras copiadas (`aprovacao.os_na_fila` e `tirar_da_fila` servem à
   conferência da OS que o card aprovou, `aprovacao_conferir`). `leitura.py`: cópia de 5 min e `limpar_cache()` (que também
-  recarrega a cópia das regras).
+  recarrega a cópia das regras); a entrada vencida sai a cada leitura (a chave da fila leva a hora da leitura: sem a poda, cada releitura deixava uma chave que ninguém lia de novo; auditoria de 08/11/2026).
 - `pessoas.py`: `identidades.json` e a tabela dos tokens só na partição `cadastro`.
 - `coletor.py` e `banco_campo.py`: o que sobrou do coletor, que saiu do código em 08/11/2026 (`coletor.py` ficou só com o
   `contexto_do_tecnico`; `banco_campo.py`, só com a leitura do livro `campo_nexus`).

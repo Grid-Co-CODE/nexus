@@ -91,7 +91,7 @@ diferentes apagariam um ao outro. Levi escolheu "Salvo em 1 s, banco logo depois
   a da página aberta (de `/api/eu`).
 - **Quem grava:** só quem está aprovado no `perfis`, como no RLS do Supabase. O `perfis` e as `fin_*`, só o HEAD; o
   administrador do Nexus sem linha vale HEAD. A pessoa nova que abre a torre ganha a linha "pendente" (`garantir_perfil`).
-  POST de outro site, 403 (a régua `_de_outro_site` da moldura).
+  POST de outro site, 403 (a régua `de_outro_site` de `nexus/auth/origem.py`, que morava na moldura até 08/11/2026).
 - **Como o Postgres do Radar:** coluna que a tabela não tem e valor fora do tipo (texto em número, "8.5" em bigint) são
   recusados. Sem isso, a coluna sumia calada no lote, e o texto em número derrubava a leitura no boot seguinte.
 - **Exclusão:** a definitiva deixa uma linha no `log` (`acao` "excluir-definitivo", `alvo` "<tabela>:<id>", quem, e em

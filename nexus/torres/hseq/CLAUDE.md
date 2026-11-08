@@ -78,7 +78,7 @@ Prova: `tests/test_hseq_mesa.py` (os grupos, os filtros em cascata, os de atenç
 `nexus_hseq_email · fato_email_pendencias`, no catálogo antes da 1ª gravação). A TST: "Receber report semanal das pendências por email, pra mim e pro
 supervisor responsável"; Levi escolheu mandar pelo App de Campo, que já manda e-mail. Da segunda depois das 07:00 de
 Brasília até o fim da semana (a API fora a segunda inteira não perde a semana; auditoria de 08/11/2026) o Nexus monta o e-mail de cada destinatário com as mesmas contas da Mesa (`_pendencias(fl)`) e publica uma
-linha por destinatário, uma vez por semana (o livro é lido antes de montar, para o laço de 10 min não refazer os e-mails); o App lê, manda e diz o que mandou.
+linha por destinatário, uma vez por semana (o livro é lido antes de montar, pelas abas conferidas, para o laço de 10 min não refazer os e-mails); o App lê, manda e diz o que mandou.
 - **Quem recebe:** a TST (as pessoas do setor Segurança em Base → Acessos → Pessoas e setores, pelo código do e-mail) com todas
   as usinas, e cada Responsável UFV com pendência, só com as usinas dele e **a TST em cópia** (03/11/2026, Levi:
   "sempre mandar para responsável e deixar a [TST] em cópia"; quem copia é o App, com os destinatários das linhas
@@ -233,7 +233,7 @@ deles, a Tabela (o padrão) ou os cartões **Por responsável**.
   extintor na ordem da tabela (cliente, usina, responsável, técnicos, o extintor, as validades como a etiqueta diz e o
   dia em que vencem como data, a situação, a conferência como data, quem conferiu pelo nome, a carga, os itens com NÃO,
   o status da TST e o motivo), com o título, quando foi gerado e os filtros em cima, o cabeçalho congelado e o filtro do
-  Excel; aba "Não reconhecidos" quando o recorte os leva (a regra do PDF). Sem cor nem fórmula. Medido em 19/10 no banco
+  Excel; aba "Não reconhecidos" quando o recorte os leva (a regra do PDF). Sem cor nem fórmula: o texto que começa com "=" vai como texto (Local, Posição e Classe são digitados; auditoria de 08/11/2026). Medido em 19/10 no banco
   real (só leitura): os 11 clientes com o Excel igual à tela, extintor por extintor contado; o da Thopen (550
   extintores) em 0,5 s, o PDF dela em 3,4 s.
 - **A usina se separa pelo ID do cadastro, não pelo nome** (`extintores.chave_usina`): o cadastro tem duas "Linhares 1"
@@ -293,7 +293,7 @@ dia); foto de dia mais velho não substitui. É rota sem login (`auth.ROTAS_PUBL
 (a usina aberta e a visão por extintor), o extintor com foto ganha o botão "Foto" com o dia dela (até 19/10/2026, uma
 miniatura: ver "A página é leve"); o clique abre a caixa das fotos da ronda e só então pede a imagem (setas andam entre
 as fotos da usina). O PDF põe a mesma foto ao lado do extintor. No servidor (19/10): a listagem da pasta
-(`fotos.disponiveis`) fica guardada 30 s e o `receber` a renova. A miniatura (rota `?mini=1`,
+(`fotos.disponiveis`) fica guardada 30 s e o `receber` a renova. O temporário da foto e do texto leva o id da thread (o reenvio do App com o 1º POST ainda rodando dava FileNotFoundError), e a assinatura se compara em bytes (letra fora do ASCII é 401, não 500); auditoria de 08/11/2026. A miniatura (rota `?mini=1`,
 `fotos.mini`, cópia `mini/`) saiu em 08/11/2026: a tela não a pedia desde 19/10.
 
 **O App envia desde a v265 (14/10/2026).** Até ali a foto ficava só no App: o técnico fotografava, e o PDF de 13/10 saía
@@ -326,7 +326,7 @@ faz:
 Prova: `tests/test_hseq_extintores.py` (os testes do não reconhecido).
 
 **A Segurança decide na usina** (24/10/2026; `nexus/hseq/decisoes.py`, o livro `nexus_hseq_extintores`, registrado no
-catálogo antes da 1ª gravação). Levi: a pessoa da Segurança pode aceitar o não reconhecido "e aí o extintor vai sumir ou
+catálogo antes da 1ª gravação; lido pelas abas conferidas, porque a listagem que omite o livro por um instante é "não li", não "sem decisões": o extintor excluído voltava como vencido por 1 minuto, auditoria de 08/11/2026). Levi: a pessoa da Segurança pode aceitar o não reconhecido "e aí o extintor vai sumir ou
 solicitar que o técnico faça uma nova ronda"; "ao ir para a usina a TST resolve"; e, na 2ª rodada, "pedir uma nova
 ronda é uma nova ronda do zero então será por usina, por extintor é só o botão de aceitar, quando a TST aceita o
 extintor é excluído e vai para um histórico de extintores excluídos com o motivo 'Não reconhecido em campo'".
@@ -447,7 +447,7 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   Por responsável e não filtram.
 - **A aba Sem APR ou PT** (a TST, 24/10/2026: "preciso de uma visibilidade de atividades realizadas sem APR e sem PT";
   os dois botões com espaço dos filtros e da tabela, `pt-sem-seg`, 26/10: "esses botões muito colados";
-  `nexus/hseq/apr.py`): do livro `apr_app_campo · APR` que o App publica desde a v298 do servidor (no catálogo antes da
+  `nexus/hseq/apr.py`; sem o `fato_tarefa_os` a aba diz "Não li a aba Sem APR ou PT" em vez de sair vazia, que parecia "nenhuma OS sem APR", auditoria de 08/11/2026): do livro `apr_app_campo · APR` que o App publica desde a v298 do servidor (no catálogo antes da
   1ª gravação, fato `apr`; contrato com a sessão do App de Campo), duas listas de 20 em 20 com os mesmos filtros:
   **APR que pedia PT e ficou sem** ("Precisa de PT" = sim e PT vazia; vazio = ainda não medido, não entra) e **OS
   fechada sem APR** (a tarefa do `fato_fechamento` de OS criada desde 10/10/2026 sem APR nenhuma da OS até o dia do
