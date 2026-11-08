@@ -368,3 +368,14 @@ def test_o_409_do_arquivo_novo_tambem_e_repetido():
     gh = Robo()
     commit = PB._gravar(gh, "tok", "org/repo", "main", "Programação Semana 41.xlsx", b"x", "msg")
     assert commit and gh.puts == 2 and len(gh.commits) == 1
+
+
+@pytest.mark.parametrize("rota", ["/t/pcm/gerar", "/t/pcm/gerar/importar", "/t/pcm/gerar/importar-repositorio",
+                                  "/t/pcm/gerar/publicar", "/t/pcm/gerar/observacoes", "/t/pcm/gerar/observacoes/copiar",
+                                  "/t/pcm/quadro/reprogramar", "/t/pcm/gerar/backoffice"])
+def test_as_gravacoes_do_gerar_recusam_pedido_de_outro_subdominio(logado, rota):
+    """Auditoria ponytail de 08/11/2026: publicar, gerar, importar, observações e reprogramar não conferiam a origem; só o
+    cookie SameSite=Lax protegia, e ele deixa passar um POST de outro subdomínio de gridco.com.br ('same-site')."""
+    r = logado.post(rota, data={"semana": "2026-W41", "rodada": "x", "confirmo": "1"},
+                    headers={"Sec-Fetch-Site": "same-site"})
+    assert r.status_code == 403

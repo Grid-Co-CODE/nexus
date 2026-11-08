@@ -31,7 +31,9 @@ Responsáveis UFV"):** Gerar a semana e o Quadro da semana são telas de DOIS se
 (`do_setor=(SID.PCM, SID.RESPONSAVEL_UFV)`, pelo setor_id desde 04/11/2026: quem é deles as vê sem marcar em Base →
 Acessos; os outros setores, só se marcadas); dentro delas, gerar e mexer nas observações é de quem abre a tela;
 publicar no App e gravar a reprogramação do Quadro é do administrador ou de quem é do setor PCM (`telas.pode_programar`,
-pelo setor da pessoa do login): os supervisores montam a fila e copiam para o PCM. Testes: `test_o_setor_pcm_gera_e_publica`
+pelo setor da pessoa do login): os supervisores montam a fila e copiam para o PCM. Todo POST do Gerar e do Quadro
+recusa pedido de outro site (`_de_outro_site`, 403; auditoria de 08/11/2026: só o cookie Lax não barra outro subdomínio
+de gridco.com.br). Testes: `test_o_setor_pcm_gera_e_publica`
 e `test_o_setor_pcm_grava_a_reprogramacao`.
 
 **A programação publicada também está no banco (08/10/2026):** o `banco_dados.json` vira o fato

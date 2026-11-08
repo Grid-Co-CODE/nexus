@@ -187,6 +187,8 @@ def registrar_pcm(bp) -> None:
             return render_template("pcm/gerar.html", **_ctx_gerar(
                 cfg, rodada=request.args.get("rodada"), semana=request.args.get("semana"),
                 ok=avisos.get(request.args.get("feito") or "")))
+        if _de_outro_site():
+            abort(403)
         semana_pedida = (request.form.get("semana") or "").strip()
         if not geracao.SEMANA_RE.match(semana_pedida):
             return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
@@ -223,6 +225,8 @@ def registrar_pcm(bp) -> None:
         """Na sombra, traz para o Nexus os arquivos que a pasta do PCM tem hoje: as duas gerações partem do mesmo dado.
         As observações entram na semana escolhida."""
         cfg = current_app.config
+        if _de_outro_site():
+            abort(403)
         semana = _semana_do_form()
         if not semana:
             return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
@@ -242,6 +246,8 @@ def registrar_pcm(bp) -> None:
         """As observações que estão no repositório do PCM (o Observacoes_Semana.txt que o PC do PCM ou o painel mandou)
         entram na semana escolhida. Funciona no servidor, onde a pasta do PCM não existe."""
         cfg = current_app.config
+        if _de_outro_site():
+            abort(403)
         semana = _semana_do_form()
         if not semana:
             return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
@@ -265,6 +271,8 @@ def registrar_pcm(bp) -> None:
         """Publicar no App: a confirmação (GET) e o envio (POST). Administrador ou setor PCM (`pode_programar`): muda a
         semana de todo o campo."""
         cfg = current_app.config
+        if request.method == "POST" and _de_outro_site():
+            abort(403)
         rid = (request.values.get("rodada") or "").strip()
         st = geracao.ler_status(cfg, rid)
         if st is None:
@@ -295,6 +303,8 @@ def registrar_pcm(bp) -> None:
     @bp.route("/gerar/observacoes", methods=["POST"])
     def gerar_observacoes():
         cfg = current_app.config
+        if _de_outro_site():
+            abort(403)
         semana = _semana_do_form()
         if not semana:
             return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
@@ -306,6 +316,8 @@ def registrar_pcm(bp) -> None:
         """Os dias de atendimento das usinas quase não mudam de uma semana para outra: começa pela anterior. Só
         copia para semana VAZIA, para nunca apagar o que alguém já escreveu."""
         cfg = current_app.config
+        if _de_outro_site():
+            abort(403)
         semana = _semana_do_form()
         if not semana:
             return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro="Semana inválida. Use o formato 2026-W41.")), 400
@@ -417,6 +429,8 @@ def registrar_pcm(bp) -> None:
         gera: nas observações dela no Nexus, direto. Semana em curso: nos ajustes da semana em curso do repositório do
         PCM, depois da confirmação."""
         cfg = current_app.config
+        if _de_outro_site():
+            abort(403)
         if not pode_programar():
             abort(403)
         f = request.form
