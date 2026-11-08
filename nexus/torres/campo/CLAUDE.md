@@ -468,7 +468,7 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     mostra a OS, quem fez, o dia com a hora (início e fim) e os dois níveis (Levi, 06/10). A data do eixo vai em meia
     fonte e, com muitas rondas, uma a cada tantos pontos (a última sempre; Crateús, 25 rondas, encavalava); o texto entra por
     `textContent`, nunca como HTML, porque vem do livro do App.
-    **Fotos** (`nexus/campo/ronda_fotos.py`; Levi, 06/10: "ao clicar no botão aparecer os anexos, separando vegetação e
+    **Fotos** (`nexus/campo/ronda_fotos.py`; a rota só abre OS que as rondas conhecem, 404 para as outras, para não gastar a cota do Fracttal, 08/11/2026; Levi, 06/10: "ao clicar no botão aparecer os anexos, separando vegetação e
     sujidade, aparece pequeno e se eu clicar expande!"; 08/10: "quero que tenha como clicar em um botão de fotos que
     nem no histórico da usina", então também na aba Registros, pelo MESMO componente `_ronda_fotos_caixa.html`, que as
     duas páginas incluem; ronda sem OS ou avulsa fica sem botão, com o porquê no `title`; medido em 08/10: 288 botões
@@ -878,7 +878,7 @@ Campo. Conta em `nexus/campo/responsaveis.py`.
     `pessoa_id` + `pessoa_hmac`, `do_responsavel` sim/não. **Quem escreve:** quem entrou pelo Fracttal e é Responsável
     O&M de alguma usina, em qualquer usina; o administrador pela senha não escreve. A gravação devolve a janela da
     Meta de novo (o script da tela envia sem sair da janela; recusa volta com o motivo e o texto digitado); pedido de
-    outro site é 403 (a régua da moldura). Para relatório: `para_relatorio(de, ate)` decifra no Nexus. O livro nasce na
+    outro site é 403 (a régua da moldura; o lançar e o anular da ronda avulsa também, desde 08/11/2026). O formulário leva um `novo_id`: enviar de novo depois de um erro tardio (gravou e falhou na conferência) não duplica. Para relatório: `para_relatorio(de, ate)` decifra no Nexus. O livro nasce na
     1ª observação de um responsável (registrado no catálogo antes). Nada se edita nem se apaga.
   - Sem o dado no banco (a série ou as OS antes da 1ª publicação; a usina sem aba no BD), a janela diz por quê.
 - **Isolamento** (regra 13): cada fonte em `_ler_fonte`; a que falha volta vazia e a tela diz qual. Sem o livro da meta
@@ -1848,7 +1848,7 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     cópia de 5 min (`leitura.ler`) vencia entre uma releitura e outra: quase toda visita pagava, e cada filtro de região
     fazia a sua. Agora `aprovacao.fila_toda` guarda a conta da fila inteira até a fila mudar (`_PRONTA`, pela hora da
     leitura), feita logo depois da releitura e ao subir com a fila do disco (`_preparar`), e a tela filtra sobre ela. A OS
-    que sai da fila (`tirar_da_fila`) sai da conta pronta também. Prova: `test_a_visita_nao_refaz_a_conta_da_fila`.
+    que sai da fila (`tirar_da_fila`) sai da conta pronta também, e fica anotada por 20 min para a releitura que começou antes não a devolver ao quadro (08/11/2026). Prova: `test_a_visita_nao_refaz_a_conta_da_fila`.
   - **O portão do Aprovar do Nexus saiu (18/10/2026, Levi: "pode tirar a rota antiga!")**: de 08/10 a 18/10 o Aprovar
     chamava `POST /os/_nexus/aprovacao/<id>/aprovar`, que só deixava o Supervisor de Campo da região da usina ou um
     administrador; a rota, o `aprovar_os.py` e a conta de quem aprova por região saíram do servidor. Desde então aprova
