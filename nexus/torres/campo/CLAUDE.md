@@ -1395,6 +1395,12 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
 
 ## Visão do cliente (05/11/2026)
 
+**O próprio cliente na tela (07/11/2026, o acesso dos clientes; regras em `nexus/casca/CLAUDE.md`, seção Acessos):** a
+tela é `Tela.do_cliente`, a única que o setor Clientes pode ver. Com a sessão de cliente (`session["via"] == "cliente"`),
+o cliente vem de `session["cliente_id"]`, NUNCA do `?cliente=` (o de outro é ignorado), sem a escolha, sem o detalhe
+técnico dos erros e com a pergunta na voz dele. Mexeu na tela: o que aparece aqui o cliente vê (nada de nome de técnico,
+custo, horas, comentário interno nem causa antes da Engenharia).
+
 De onde veio: a sugestão "Visão do cliente" (Início → Sugestões, 04/11/2026, com o mockup). O Levi decidiu a **fase 1**
 ("Sim, fase 1"; "cuida, começa e já vai cuidando"): a tela para a Grid (COS, PCM e Performance), com o login de hoje, em
 Usinas 360° › Visão do cliente (`/t/campo/cliente`), para responder o cliente em segundos, sem abrir cinco telas. A fase 2
