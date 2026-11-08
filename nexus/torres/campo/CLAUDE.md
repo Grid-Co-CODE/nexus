@@ -1618,6 +1618,12 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
   valem juntos (sem ninguém, a tela diz "Nenhum técnico do piloto neste filtro."). Não filtra o controle do piloto (é quem
   o administrador põe e tira da coleta) nem as usinas do Abrir rota (o técnico pode ir à usina de outra equipe; estreitar
   seria regra nova, a perguntar ao Levi).
+- **O anel do técnico escolhido é branco** ("Ao clicar no técnico o círculo que fica em volta do técnico ser branco, esse
+  verde não está dando contraste!"). Anel de 4 px no `--eq-anel` e, atrás do ponto, o `.eq-halo` de 8 px no `--eq-halo`: sobram
+  2 px escuros por fora, que o deixam visível no claro (o branco sobre o cartão cinza some). Cor fixa no CSS é proibida
+  (`test_tema`): os dois apontam para o `--papel` (#fff) e o `--papel-tinta`, o par que o Nexus mantém igual nos dois temas.
+  O escolhido é desenhado por último (dois técnicos na mesma usina caem no mesmo lugar). Prova: o teste do contraste de
+  componente (3:1) nos dois temas, pelos tokens do `nexus.css`.
 
 ### Quem vê
 

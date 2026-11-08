@@ -79,7 +79,11 @@
         <g class="eq-ufs">{% for f in mapa.ufs %}<path d="{{ f.d }}"/>{% endfor %}</g>
         <g class="eq-siglas" aria-hidden="true">{% for f in mapa.ufs if f.x %}<text x="{{ f.x }}" y="{{ f.y }}">{{ f.sigla }}</text>{% endfor %}</g>
         <g class="eq-usinas">{% for u in mapa.usinas %}<circle class="eq-u" cx="{{ u.x }}" cy="{{ u.y }}" r="4"><title>{{ nomes_usina.get(u.usina_id) or ('Usina ' ~ u.usina_id) }}</title></circle>{% endfor %}</g>
-        <g class="eq-pontos">{% for p in mapa.pontos %}{% set l = nome_de[p.pessoa_id] %}<a href="{{ url_for('torre_campo.equipe', tecnico=p.pessoa_id, **filtro.q) }}"><circle class="eq-p eq-p--{{ p.tom }}{% if sel and sel.pid == p.pessoa_id %} eq-p--sel{% endif %}" cx="{{ p.x }}" cy="{{ p.y }}" r="11"><title>{{ l.nome }}: {{ l.s.rotulo }}</title></circle></a>{% endfor %}</g>
+        {# o escolhido vai por último, com o halo escuro atrás do anel branco (08/11/2026): dois técnicos na mesma usina
+           caem no mesmo lugar, e o anel ficaria embaixo do outro #}
+        {% set sel_pid = sel.pid if sel else none %}
+        {% macro ponto(p, escolhido) %}{% set l = nome_de[p.pessoa_id] %}<a href="{{ url_for('torre_campo.equipe', tecnico=p.pessoa_id, **filtro.q) }}">{% if escolhido %}<circle class="eq-halo" cx="{{ p.x }}" cy="{{ p.y }}" r="11"/>{% endif %}<circle class="eq-p eq-p--{{ p.tom }}{% if escolhido %} eq-p--sel{% endif %}" cx="{{ p.x }}" cy="{{ p.y }}" r="11"><title>{{ l.nome }}: {{ l.s.rotulo }}</title></circle></a>{% endmacro %}
+        <g class="eq-pontos">{% for p in mapa.pontos if p.pessoa_id != sel_pid %}{{ ponto(p, false) }}{% endfor %}{% for p in mapa.pontos if p.pessoa_id == sel_pid %}{{ ponto(p, true) }}{% endfor %}</g>
       </svg>
       {% else %}
       <p class="mudo eq-vazio">Sem usina com coordenada no cadastro e sem técnico no mapa agora: não há o que desenhar.</p>

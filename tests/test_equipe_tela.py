@@ -342,6 +342,55 @@ def test_a_pagina_nunca_baixa_do_ibge_e_a_cidade_vem_na_proxima(cliente, pontos,
     assert "Cidade Um Teste/GO" in html.split('class="eq-lado"', 1)[1] and len(ibge.pedidos) == 2
 
 
+# ── o anel do técnico escolhido (08/11/2026) ─────────────────────────────────────────────────────────────────────────
+def test_o_anel_do_escolhido_e_branco_com_halo_escuro_e_se_ve_nos_dois_temas():
+    """Levi, 08/11/2026: "Ao clicar no técnico o círculo que fica em volta do técnico ser branco, esse verde não está
+    dando contraste!". O anel é branco nos dois temas, por token (a cor fixa no CSS é proibida, `test_tema`), e um halo
+    escuro fino por fora o deixa visível no claro, onde o branco sobre o cartão cinza some. A conta é a do contraste de
+    componente da WCAG (3:1): no escuro, o branco contra o cartão; no claro, o halo contra o cartão; e o anel contra o
+    halo nos dois."""
+    from test_tema import SELETOR_CLARO, SELETOR_ESCURO, _razao, _rgba, _tokens
+    css = re.sub(r"/\*.*?\*/", "", (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css")
+                 .read_text(encoding="utf-8"), flags=re.S)
+
+    def regra(seletor):
+        return re.search(r"(?:^|[}\s])" + re.escape(seletor) + r"\{([^}]*)\}", css).group(1)
+
+    def valor(corpo, prop):
+        return re.search(r"(?:^|;)\s*" + re.escape(prop) + r"\s*:\s*([^;]+)", corpo).group(1).strip()
+    sel, halo, local = regra(".eq-p--sel"), regra(".eq-halo"), regra(".eq-svg")
+    assert valor(sel, "stroke") == "var(--eq-anel)" and "--verde" not in sel
+    assert valor(halo, "stroke") == "var(--eq-halo)" and valor(halo, "pointer-events") == "none"
+    # o halo é mais largo que o anel: a sobra (metade da diferença) é o contorno escuro que fica de fora
+    assert float(valor(halo, "stroke-width").rstrip("px")) - float(valor(sel, "stroke-width").rstrip("px")) >= 3
+    anel_tok = re.fullmatch(r"var\((--[\w-]+)\)", valor(local, "--eq-anel")).group(1)
+    halo_tok = re.fullmatch(r"var\((--[\w-]+)\)", valor(local, "--eq-halo")).group(1)
+    for tema in (SELETOR_ESCURO, SELETOR_CLARO):
+        t = _tokens(tema)
+        branco, escuro, cartao = _rgba(t[anel_tok]), _rgba(t[halo_tok]), _rgba(t["--superficie"])
+        assert branco[:3] == [255, 255, 255], tema                     # branco de verdade, nos dois temas
+        assert _razao(branco, escuro) >= 3, tema
+        assert max(_razao(branco, cartao), _razao(escuro, cartao)) >= 3, tema
+    assert _razao(_rgba(_tokens(SELETOR_CLARO)[halo_tok]), _rgba(_tokens(SELETOR_CLARO)["--superficie"])) >= 3
+    # no celular o ponto cresce 1,8 vez: o halo cresce junto, senão ficaria dentro do ponto
+    assert re.search(r"@media \(max-width:700px\)\{[^}]*\.eq-halo[^}]*transform:scale\(1\.8\)", css)
+
+
+def test_o_escolhido_tem_o_halo_e_vai_por_cima_dos_outros(cliente, pontos, setor):
+    """O halo é um círculo atrás do ponto escolhido (o SVG não tem dois contornos num círculo só), e o escolhido é
+    desenhado por último: dois técnicos na mesma usina caem no mesmo lugar, e o anel ficaria embaixo do outro."""
+    _entrar(cliente, EMAIL[PCM])
+    svg = _svg(_html(cliente)[1])
+    assert "eq-halo" not in svg and "eq-p--sel" not in svg                # ninguém escolhido
+    svg = _svg(_html(cliente, query_string={"tecnico": NA_USINA})[1])
+    pontos_svg = svg.split('<g class="eq-pontos">', 1)[1]
+    links = re.findall(r"<a href=[^>]*>.*?</a>", pontos_svg, flags=re.S)
+    assert len(links) == 3 and f"tecnico={NA_USINA}\"" in links[-1]        # o escolhido por último
+    assert re.search(r'<circle class="eq-halo" cx="[^"]+" cy="[^"]+" r="11"/><circle class="eq-p eq-p--ok eq-p--sel"',
+                     links[-1])
+    assert svg.count("eq-halo") == 1 and svg.count("eq-p--sel") == 1
+
+
 # ── o filtro por supervisor e por equipe (08/11/2026) ────────────────────────────────────────────────────────────────
 def _opcoes(html, nome):
     corpo = html.split(f'name="{nome}"', 1)[1].split("</select>", 1)[0]

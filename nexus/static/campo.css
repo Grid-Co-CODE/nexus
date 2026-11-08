@@ -1945,7 +1945,13 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 @media (min-width:1180px){.eq-corpo{grid-template-columns:minmax(0,1fr) 360px}
   .eq-lado{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}}
 .eq-quadro{min-width:0;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:8px}
-.eq-svg{display:block;width:100%;height:auto;max-height:72vh}
+.eq-svg{display:block;width:100%;height:auto;max-height:72vh;
+  /* o anel do técnico escolhido (Levi, 08/11/2026: "o círculo que fica em volta do técnico ser branco, esse verde não
+     está dando contraste!"): BRANCO nos dois temas, com um halo escuro fino por fora (o .eq-halo, um círculo atrás do
+     ponto: o SVG não faz dois contornos num círculo só), que o deixa visível no claro, onde o branco sobre o cartão
+     cinza some. Cor fixa no CSS é proibida (test_tema): o branco é o --papel e o escuro, o --papel-tinta, o par que o
+     Nexus mantém igual nos dois temas (a folha de papel é sempre branca, com a tinta escura) */
+  --eq-anel:var(--papel);--eq-halo:var(--papel-tinta)}
 .eq-ufs path{fill:none;stroke:var(--linha-forte);stroke-width:1px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 .eq-siglas text{font:600 13px var(--font-sans);fill:var(--mudo);text-anchor:middle;pointer-events:none}
 .eq-u{fill:var(--mudo);opacity:.6;transform-box:fill-box;transform-origin:center}
@@ -1955,7 +1961,10 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-p--ok{fill:var(--ok-cheio)}
 .eq-p--alerta{fill:var(--alerta-cheio)}
 .eq-p--critico{fill:var(--critico)}
-.eq-p--sel{stroke:var(--verde);stroke-width:3.5px}
+.eq-p--sel{stroke:var(--eq-anel);stroke-width:4px}
+/* 8 px atrás dos 4 px do anel: sobram 2 px de escuro por fora; não pega o clique (o ponto é o link) */
+.eq-halo{fill:none;stroke:var(--eq-halo);stroke-width:8px;vector-effect:non-scaling-stroke;pointer-events:none;
+  transform-box:fill-box;transform-origin:center}
 .eq-pontos a:focus-visible .eq-p{stroke:var(--foco);stroke-width:3.5px}
 .eq-leg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 4px 2px;font-size:12px}
 .eq-lado{display:grid;gap:16px;min-width:0;padding:14px 16px 16px;background:var(--superficie);border:1px solid var(--linha);
@@ -2003,5 +2012,5 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 @media (max-width:480px){.eq-piloto-lista li{display:grid;justify-content:stretch;gap:6px}
   .eq-filtros .gc-campo{min-width:0;width:100%}}
 /* no celular o SVG tem uns 340 px, não 1000: o ponto do técnico e a marca da usina crescem para dar para ver e tocar */
-@media (max-width:700px){.eq-p{transform:scale(1.8)}.eq-u{transform:scale(1.5)}
+@media (max-width:700px){.eq-p,.eq-halo{transform:scale(1.8)}.eq-u{transform:scale(1.5)}
   .eq-dl{grid-template-columns:minmax(0,1fr);gap:2px}.eq-dl dd{margin-bottom:6px}}
