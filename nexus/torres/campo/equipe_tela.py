@@ -36,6 +36,7 @@ from ...cadastro.servico import chave_texto
 from ...campo import equipe as E
 from ...campo import mapa_responsaveis as MR
 from ...campo import visao
+from ...campo.equipe import municipios as MU
 from ...campo.equipe import piloto as PI
 from ...campo.equipe import pontos as PT
 from ...campo.equipe import servico as S
@@ -372,18 +373,31 @@ def _hora(inst, agora) -> str:
 
 
 def _onde(s: dict) -> str:
-    """O lugar do parado fora de usina, sem o ponto: o estado (e, com a Task 7b, a cidade)."""
+    """O lugar do parado fora de usina, sem o ponto: "Cidade/UF" pela malha do IBGE; sem a cidade, só a UF."""
+    if s.get("cidade") and s.get("uf"):
+        return f"{s['cidade']}/{s['uf']}"
     return s.get("uf") or ""
+
+
+def _cidade_de():
+    """A função da cidade para a `situacao`: a malha de municípios do IBGE guardada na pasta de dados (baixada do IBGE
+    só pela sigla do estado). Sem a pasta de dados, sem cidade: o painel mostra o estado."""
+    from ...cadastro.ligacoes import pasta_dados
+    try:
+        pasta = pasta_dados(current_app.config)
+    except Exception:           # noqa: BLE001
+        return None
+    return lambda lat, lon, uf: MU.cidade(lat, lon, uf, pasta=pasta)
 
 
 def _linhas(srv, b, tecnicos, piloto, coords, nomes_usina, agora):
     """As linhas do painel (uma por técnico do piloto, pelo nome) e os pontos do mapa [(pessoa_id, lat, lon, tom)],
     estes só de quem vai ao mapa. A coordenada fica aqui, na memória do processo: a página recebe o x/y do `desenho`."""
-    linhas, pontos = [], []
+    linhas, pontos, cidade = [], [], _cidade_de()
     for pid in sorted((p for p in tecnicos if p in piloto), key=lambda p: chave_texto(tecnicos[p]["nome"])):
         t = tecnicos[pid]
         est = srv.estado_de(pid, agora)
-        s = SI.situacao(est, coords, agora)
+        s = SI.situacao(est, coords, agora, cidade=cidade)
         perto = s["usina_perto"]
         linhas.append({
             "pid": pid, "nome": t["nome"], "equipe": b.nome_equipe.get(t["equipe_id"]) or "", "s": s,

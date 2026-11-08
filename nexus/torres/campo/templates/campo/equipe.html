@@ -25,8 +25,9 @@
           pedido da LGPD.</p>
           <p><b>Por quanto tempo.</b> 7 dias os pontos de posição; 1 ano os deslocamentos entre usinas (de onde, para onde,
           a saída, a chegada e a duração, sem a coordenada). Ponto com mais de 7 dias nunca aparece.</p>
-          <p><b>Parado fora de usina</b> (a casa, o hotel): o mapa nunca mostra o ponto exato. O painel diz só o estado e a
-          distância até a usina mais perto, e a rota não sai dele.</p>
+          <p><b>Parado fora de usina</b> (a casa, o hotel): o mapa nunca mostra o ponto exato. O painel diz só a cidade e o
+          estado, e a distância até a usina mais perto; a rota não sai dele. A cidade sai da malha de municípios do IBGE,
+          baixada pelo estado inteiro: a posição do técnico não vai ao IBGE.</p>
           <p><b>As situações.</b> Em deslocamento, em azul; na usina (parado a até 1 km dela), em verde; sem sinal (o último
           ponto há 30 minutos ou mais), em âmbar, no último ponto; sem permissão de localização, em vermelho. Parado fora de
           usina e sem posição hoje ficam só na lista do painel.</p>
@@ -61,7 +62,7 @@
         <g class="eq-ufs">{% for f in mapa.ufs %}<path d="{{ f.d }}"/>{% endfor %}</g>
         <g class="eq-siglas" aria-hidden="true">{% for f in mapa.ufs if f.x %}<text x="{{ f.x }}" y="{{ f.y }}">{{ f.sigla }}</text>{% endfor %}</g>
         <g class="eq-usinas">{% for u in mapa.usinas %}<circle class="eq-u" cx="{{ u.x }}" cy="{{ u.y }}" r="4"><title>{{ nomes_usina.get(u.usina_id) or ('Usina ' ~ u.usina_id) }}</title></circle>{% endfor %}</g>
-        <g class="eq-pontos">{% for p in mapa.pontos %}{% set l = nome_de[p.pessoa_id] %}<a href="{{ url_for('torre_campo.equipe', tecnico=p.pessoa_id) }}"><circle class="eq-p eq-p--{{ p.tom }}{% if sel and sel.pid == p.pessoa_id %} eq-p--sel{% endif %}" cx="{{ p.x }}" cy="{{ p.y }}" r="9"><title>{{ l.nome }}: {{ l.s.rotulo }}</title></circle></a>{% endfor %}</g>
+        <g class="eq-pontos">{% for p in mapa.pontos %}{% set l = nome_de[p.pessoa_id] %}<a href="{{ url_for('torre_campo.equipe', tecnico=p.pessoa_id) }}"><circle class="eq-p eq-p--{{ p.tom }}{% if sel and sel.pid == p.pessoa_id %} eq-p--sel{% endif %}" cx="{{ p.x }}" cy="{{ p.y }}" r="11"><title>{{ l.nome }}: {{ l.s.rotulo }}</title></circle></a>{% endfor %}</g>
       </svg>
       {% else %}
       <p class="mudo eq-vazio">Sem usina com coordenada no cadastro e sem técnico no mapa agora: não há o que desenhar.</p>
@@ -77,7 +78,7 @@
         <dl class="eq-dl">
           <dt>Última posição</dt><dd>{{ sel.hora or 'nenhuma nos últimos 7 dias' }}</dd>
           {% if sel.perto %}<dt>Usina mais perto</dt><dd>{{ sel.perto }}</dd>{% endif %}
-          {% if sel.onde %}<dt>Onde</dt><dd>{{ sel.onde }}</dd>{% endif %}
+          {% if sel.onde %}<dt>{{ 'Cidade' if s.cidade else 'Estado' }}</dt><dd>{{ sel.onde }}</dd>{% endif %}
           {% if sel.desde %}<dt>Sem permissão desde</dt><dd>{{ sel.desde }}</dd>{% endif %}
         </dl>
         {% if s.rota %}

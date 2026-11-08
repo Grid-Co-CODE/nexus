@@ -5,8 +5,9 @@ As decisões do Levi (08/11/2026, no plano `docs/superpowers/plans/2026-11-08-ma
 - "sem sinal" = o último ponto tem SEM_SINAL_MIN (30 min) ou mais;
 - as cores: em deslocamento = info, na usina = ok, parado fora de usina = neutro, sem sinal = alerta, sem permissão de
   localização = crítico; "sem posição hoje" só na lista do painel, fora do mapa;
-- "parado fora de usina" (a casa, o hotel) NUNCA vai ao mapa e não tem o Abrir rota: o painel diz o estado (e, pela
-  Task 7b, a cidade) e a distância até a usina mais perto. O ponto que ficou velho não muda de natureza: o "sem sinal"
+- "parado fora de usina" (a casa, o hotel) NUNCA vai ao mapa e não tem o Abrir rota: o painel diz a cidade e o estado
+  (a malha do IBGE, `municipios.py`) e a distância até a usina mais perto. O ponto que ficou velho não muda de
+  natureza: o "sem sinal"
   e o "sem permissão" cujo último ponto era parado fora de usina também ficam fora do mapa (senão a casa apareceria
   meia hora depois, no âmbar);
 - o Abrir rota sai do último ponto conhecido em deslocamento, na usina e no "sem sinal" de um desses; nunca no "sem
@@ -92,7 +93,9 @@ def km_da_borda(lon: float, lat: float, poligono) -> float:
     return menor * KM_POR_GRAU
 
 
-def _perto_da_caixa(lon, lat, caixa, km) -> bool:
+def perto_da_caixa(lon, lat, caixa, km) -> bool:
+    """O ponto cai na caixa (lon mín., lat mín., lon máx., lat máx.) com `km` de folga em volta? O corte barato antes
+    do ponto no polígono."""
     folga = km / KM_POR_GRAU
     folga_lon = folga / max(math.cos(math.radians(lat)), 0.1)
     return caixa[0] - folga_lon <= lon <= caixa[2] + folga_lon and caixa[1] - folga <= lat <= caixa[3] + folga
@@ -107,11 +110,11 @@ def uf_do_ponto(lat: float, lon: float) -> str | None:
     except ValueError:                  # o arquivo do contorno que não abre: sem estado, o resto da situação vale
         return None
     for e in estados:
-        if _perto_da_caixa(lon, lat, e.caixa, 0) and any(no_poligono(lon, lat, p) for p in e.poligonos):
+        if perto_da_caixa(lon, lat, e.caixa, 0) and any(no_poligono(lon, lat, p) for p in e.poligonos):
             return e.sigla
     melhor, menor = None, FOLGA_UF_KM
     for e in estados:
-        if not _perto_da_caixa(lon, lat, e.caixa, FOLGA_UF_KM):
+        if not perto_da_caixa(lon, lat, e.caixa, FOLGA_UF_KM):
             continue
         km = min(km_da_borda(lon, lat, p) for p in e.poligonos)
         if km <= menor:
@@ -120,13 +123,15 @@ def uf_do_ponto(lat: float, lon: float) -> str | None:
 
 
 # ── a situação ───────────────────────────────────────────────────────────────────────────────────────────────────────
-def situacao(estado: dict, usinas: dict, agora_utc: datetime) -> dict:
+def situacao(estado: dict, usinas: dict, agora_utc: datetime, *, cidade=None) -> dict:
     """A situação do técnico pelo `estado` do serviço (`Servico.estado_de`: o último ponto, a permissão e desde quando).
     `usinas` = {usina_id: (lat, lon, uf)} (`mapa_responsaveis.coordenadas`). Devolve {chave, rotulo, tom, idade_min,
-    usina_perto: (usina_id, km) | None, uf, base, no_mapa, rota, ultima, desde}, sem coordenada nenhuma:
+    usina_perto: (usina_id, km) | None, uf, cidade, base, no_mapa, rota, ultima, desde}, sem coordenada nenhuma:
     - `base`: o que o último ponto de hoje era (deslocamento, na_usina ou fora_usina), também quando ele envelheceu;
     - `no_mapa`: o ponto pode ser desenhado; `rota`: o Abrir rota vale;
-    - `uf`: o estado do ponto parado fora de usina (só nele: os outros estão no mapa);
+    - `uf` e `cidade`: o estado e o município do ponto parado fora de usina (só nele: os outros estão no mapa). A cidade
+      vem de `cidade(lat, lon, uf) -> nome | None` (`municipios.cidade`, a malha do IBGE no servidor); sem ela, ou com
+      ela falhando, None, e o painel mostra só o estado;
     - `ultima`: o instante do último ponto (até 7 dias), para a hora de Brasília no painel."""
     u = estado.get("ultimo")
     inst = _instante(u.get("instante")) if u else None
@@ -156,9 +161,17 @@ def situacao(estado: dict, usinas: dict, agora_utc: datetime) -> dict:
     rotulo = ROTULO[chave]
     if chave == "sem_sinal":
         rotulo += " há " + tempo_texto(int(idade))
+    uf = nome_cidade = None
+    if base == "fora_usina":
+        uf = uf_do_ponto(u["lat"], u["lon"])
+        if uf and cidade is not None:
+            try:
+                nome_cidade = cidade(u["lat"], u["lon"], uf)
+            except Exception:       # noqa: BLE001 — a cidade é enfeite do painel: sem ela, o estado basta
+                nome_cidade = None
     return {"chave": chave, "rotulo": rotulo, "tom": TOM[chave], "idade_min": int(idade) if idade is not None else None,
-            "usina_perto": perto, "uf": uf_do_ponto(u["lat"], u["lon"]) if base == "fora_usina" else None,
-            "base": base, "no_mapa": no_mapa, "rota": rota, "ultima": inst, "desde": estado.get("desde")}
+            "usina_perto": perto, "uf": uf, "cidade": nome_cidade, "base": base, "no_mapa": no_mapa, "rota": rota,
+            "ultima": inst, "desde": estado.get("desde")}
 
 
 # ── o texto ──────────────────────────────────────────────────────────────────────────────────────────────────────────

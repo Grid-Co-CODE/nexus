@@ -9,6 +9,7 @@ SVG, e o "parado fora de usina" nem isso.
 Banco de mentira (`ApiPGFalsa`), relógio parado, coordenadas e pessoas inventadas; nada vai à rede."""
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from pg_falso import ApiPGFalsa
@@ -20,6 +21,7 @@ from nexus.cadastro.cifra import Cofre, gerar_chave
 from nexus.campo import mapa_responsaveis as MR
 from nexus.campo import visao
 from nexus.campo.equipe import ABA_PILOTO, CAB_ACESSOS, LIVRO_PILOTO
+from nexus.campo.equipe import municipios as MU
 from nexus.campo.equipe import servico as S
 from nexus.campo.equipe import situacao as SI
 from nexus.campo.ligacao_cadastro import codigo_da_pessoa
@@ -96,8 +98,10 @@ def banco(app, tmp_path, monkeypatch, relogio):
     app.extensions["nexus_dados_sessao"] = api
     monkeypatch.setattr(MR, "coordenadas", lambda: (dict(COORDS), ""))
     visao.limpar()
+    MU.limpar()
     yield api
     visao.limpar()
+    MU.limpar()
 
 
 @pytest.fixture
@@ -259,6 +263,25 @@ def test_parado_fora_de_usina_sem_ponto_e_sem_rota(cliente, pontos, setor):
     assert NOME[FORA] in lado and "Parado fora de usina" in lado and "GO" in lado
     assert "/t/campo/equipe/rota" not in html and "Abrir rota" not in lado
     assert f"tecnico={FORA}\"" not in _svg(html)
+
+
+def test_o_parado_fora_de_usina_mostra_a_cidade_e_o_estado(app, cliente, pontos, setor):
+    """A cidade sai da malha de municípios do IBGE no disco (Task 7b): "Cidade/UF". Sem a malha (nos testes o IBGE
+    nunca é chamado de verdade), só o estado, como no teste de cima."""
+    from test_equipe_municipios import IBGE
+    # a malha de Goiás baixada antes (a mentira do IBGE), e o processo reiniciado: a tela lê só o disco
+    pasta = Path(app.config["NEXUS_DADOS"])
+    assert MU.cidade(-16.8123, -49.8321, "GO", pasta=pasta, baixar=IBGE()) == "Cidade Um Teste"
+    MU.limpar()
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    fora = html.split('class="eq-lado"', 1)[1].split("Parados fora de usina", 1)[1].split("</section>", 1)[0]
+    assert NOME[FORA] in fora and "Cidade Um Teste/GO" in fora
+    _, html = _html(cliente, query_string={"tecnico": FORA})
+    lado = html.split('class="eq-lado"', 1)[1]
+    assert "<dt>Cidade</dt><dd>Cidade Um Teste/GO</dd>" in lado
+    # quem está na usina não ganha cidade nenhuma (está no mapa)
+    _, html = _html(cliente, query_string={"tecnico": NA_USINA})
+    assert "Cidade Um Teste" not in html
 
 
 # ── o Abrir rota ─────────────────────────────────────────────────────────────────────────────────────────────────────
