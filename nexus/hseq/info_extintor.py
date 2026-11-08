@@ -73,7 +73,9 @@ def receber(config, codigo, dia, ts, texto, assinatura_recebida, agora=None) -> 
     texto = str(texto or "")
     if len(texto) > TEXTO_MAX:
         return 400, f"texto maior que {TEXTO_MAX} letras"
-    if not hmac.compare_digest(assinatura(k, codigo, dia, ts, texto), str(assinatura_recebida or "")):
+    # em bytes: letra fora do ASCII na assinatura daria TypeError (500) em vez de 401 (achado 8 da auditoria de 08/11/2026)
+    if not hmac.compare_digest(assinatura(k, codigo, dia, ts, texto).encode(),
+                               str(assinatura_recebida or "").encode()):
         return 401, "assinatura não confere"
     destino.mkdir(parents=True, exist_ok=True)
     arq = destino / f"{codigo}.json"

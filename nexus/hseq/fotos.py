@@ -83,7 +83,9 @@ def receber(config, codigo, dia, ts, assinatura_recebida, dados: bytes, agora=No
         return 401, "hora do envio fora da janela de 15 min"
     if not dados or len(dados) > TAMANHO_MAX:
         return 400, "foto vazia ou maior que 8 MB"
-    if not hmac.compare_digest(assinatura(k, codigo, dia, ts, dados), str(assinatura_recebida or "")):
+    # em bytes: letra fora do ASCII na assinatura daria TypeError (500) em vez de 401 (achado 8 da auditoria de 08/11/2026)
+    if not hmac.compare_digest(assinatura(k, codigo, dia, ts, dados).encode(),
+                               str(assinatura_recebida or "").encode()):
         return 401, "assinatura não confere"
     try:
         from PIL import Image

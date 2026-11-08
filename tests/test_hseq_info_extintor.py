@@ -96,3 +96,8 @@ def test_as_listas_da_caixa_de_editar_e_o_outro(com_livro, logado, app, tmp_path
     linha = json.loads((tmp_path / "decisoes.json").read_text(encoding="utf-8"))[DEC.ABA_EDIT][0]
     assert linha["campos"] == '{"Local":"Casa de força"}'
     DEC.limpar()
+
+
+def test_assinatura_fora_do_ascii_e_401_e_nao_500(dados, app, cliente):
+    """Achado 8 da auditoria de 08/11/2026: `compare_digest(str, str)` levanta TypeError com letra não ASCII (500)."""
+    assert _enviar(cliente, app, assinatura="é").status_code == 401

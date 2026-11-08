@@ -885,3 +885,11 @@ def test_nao_reconhecido_no_pdf_vai_a_parte_so_no_relatorio_de_todos(com_nao_rec
     # o link de antes, com o dia: só os marcados naquele dia
     dia01 = _pdf_texto(logado.get("/t/hseq/extintores/relatorio.pdf?usina=Altair&dia=2026-10-01&baixar=1").data)
     assert "Não reconhecidos em campo" not in dia01
+
+
+def test_assinatura_fora_do_ascii_e_401_e_nao_500_nas_rotas_publicas(com_livro, app, tmp_path):
+    """Achado 8 da auditoria de 08/11/2026: `hmac.compare_digest(str, str)` levanta TypeError com letra não ASCII, e um
+    POST sem login com `assinatura=é` dava 500 com traceback em vez de 401."""
+    app.config["NEXUS_DADOS"] = str(tmp_path)
+    anon = app.test_client()
+    assert _enviar(anon, app, assinatura="é").status_code == 401
