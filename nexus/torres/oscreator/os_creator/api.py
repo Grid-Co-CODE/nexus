@@ -214,7 +214,13 @@ def _req(method: str, ep: str, **kw):
             _tok["token"] = ""
             r = requests.request(method, url, headers=_headers(), timeout=timeout, **kw)
         if r.status_code in (406, 429):                    # rate limit → espera e tenta 1x
-            time.sleep(float(r.headers.get("ratelimit-reset") or 3))
+            # espera de no máximo 5 s: o valor vem do Fracttal sem teto (120 segurava a thread do pedido por 120 s), e uma
+            # data no lugar do número dava ValueError e 500 (auditoria de 08/11/2026)
+            try:
+                espera = float(r.headers.get("ratelimit-reset") or 3)
+            except ValueError:
+                espera = 3.0
+            time.sleep(min(max(espera, 0.0), 5.0))
             r = requests.request(method, url, headers=_headers(), timeout=timeout, **kw)
     except requests.RequestException as e:
         raise FracttalError(f"Erro de conexão com o Fracttal: {e}")
