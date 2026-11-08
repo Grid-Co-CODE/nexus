@@ -1526,12 +1526,12 @@ def engenharia_acomp_salvar(aid):
         pode, _ = T._quem_pode()
         usuario = session.get("usuario")
         if not f.get("fim"):          # sem o fim, só o início e o diagnóstico mudam: nada vai ao Fracttal
-            return T._salvar_acompanhamento(aid, cod, pela_ponte=True)
+            return T._salvar_acompanhamento(aid, cod)
         lido = AC.ler(forcar=True)
         _livro_lido(lido, "encerrado")
         a = AC.estado(lido["eventos"]).get(aid)
         if not (a and a["aberto"] and a.get("os_id")):
-            return T._salvar_acompanhamento(aid, cod, pela_ponte=True)
+            return T._salvar_acompanhamento(aid, cod)
         # o encerrar com OS: as regras do Nexus primeiro (concluir no Fracttal não volta), depois o Fracttal
         c = AC.conferir_encerrar(aid, f.get("inicio", ""), f.get("fim", ""), f.get("diagnostico", ""), usuario, pode)
         feito = _no_fracttal(lambda api, regra, curto: OA.encerrar(
@@ -1547,7 +1547,7 @@ def engenharia_acomp_salvar(aid):
                         else "a subtarefa já tinha o diagnóstico")
                      + (" e o fim da análise virou o fim da atividade." if "execucao" in feito
                         else "; a atividade já tinha a execução lançada."))
-        return _depois_do_fracttal(lambda: T._salvar_acompanhamento(aid, cod, extra, pela_ponte=True), n,
+        return _depois_do_fracttal(lambda: T._salvar_acompanhamento(aid, cod, extra), n,
                                    "Salve de novo: a OS concluída não se conclui duas vezes.")
     return _resposta_da_gaveta(T._acao(cod, fazer, form="salvar"))
 

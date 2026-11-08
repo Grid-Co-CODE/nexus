@@ -524,28 +524,6 @@ def test_encerrar_com_o_livro_ilegivel_e_recusado(fracttal, tela, cliente, app, 
     assert "Não consegui ler os acompanhamentos" in html and _feitas(fracttal, "concluir") == []
 
 
-def test_a_rota_antiga_nao_mexe_no_acompanhamento_com_os(fracttal, tela, cliente, app):
-    """A página aberta antes do deploy posta nas rotas antigas: com a OS, encerrar, comentar e encaminhar por elas
-    deixariam o Fracttal para trás."""
-    _como(cliente, ANA)
-    _login_do_fracttal(app, cliente)
-    _post(cliente, "/pegar", cod="IBI200-INV02")
-    aid = _aid_de("IBI200-INV02")
-    hoje = datetime.now(BRT).date().isoformat()
-    antiga = "/t/engenharia/confiabilidade/acompanhamento"
-    for caminho, dados in ((f"/{aid}/salvar", {"inicio": hoje, "fim": hoje, "diagnostico": "2"}),
-                           (f"/{aid}/comentar", {"texto": "Pela rota antiga"}),
-                           ("/encaminhar", {"para": AC.codigo(BETO)})):
-        html = cliente.post(antiga + caminho, data=dict(dados, cod="IBI200-INV02"), headers=SAME).get_data(as_text=True)
-        assert "recarregue a página" in html, caminho
-    a = AC.estado(AC.ler(forcar=True)["eventos"])[aid]
-    assert a["aberto"] and a["comentarios"] == [] and a["responsavel"]["nome"] == "Ana Lima"
-    # mudar só o início ou o diagnóstico pela rota antiga segue (não mexe no Fracttal)
-    html = cliente.post(antiga + f"/{aid}/salvar", data={"cod": "IBI200-INV02", "inicio": hoje, "diagnostico": "1"},
-                        headers=SAME).get_data(as_text=True)
-    assert "Salvo." in html
-
-
 def test_salvar_diagnostico_nao_e_botao_de_enviar_o_formulario(fracttal, tela, cliente, app):
     """Enter num campo de data, ou um navegador sem o `submitter`, mandariam o formulário pelo 1º botão de enviar: o
     "Salvar diagnóstico" vinha antes do Salvar (e o Salvar com o fim conclui a OS)."""
@@ -585,3 +563,152 @@ def test_a_trava_das_notas_e_por_os(monkeypatch):
     a.join(5)
     c.join(5)
     assert saida == ["B", "C"]
+
+
+# ── as ações da gaveta pela ponte (08/11/2026): as rotas velhas da Confiabilidade saíram, e estes testes, que postavam
+# nelas, passaram a postar na ponte com a mesma asserção do comportamento ─────────────────────────────────────────────
+def test_pegar_pela_gaveta_e_comentar(fracttal, tela, cliente, app):
+    from test_engenharia_acompanhamento import _lista
+    _como(cliente, BETO)
+    _login_do_fracttal(app, cliente)
+    r = _post(cliente, "/pegar", cod="IBI200-INV02")
+    g = r.get_data(as_text=True)
+    assert r.status_code == 200 and "Com <b>Beto Souza</b> (você)" in g
+    assert "Em acompanhamento" in g                                          # o aviso diz para onde o ativo foi
+    aid = _aid_de("IBI200-INV02")
+    g = _post(cliente, f"/{aid}/comentar", texto="Trocar cabo").get_data(as_text=True)
+    assert "Comentário salvo" in g and "Trocar cabo" in g
+    # e a página já mostra o ativo na outra aba
+    URL = "/t/engenharia/confiabilidade"
+    assert "IBI200-INV02" not in _lista(cliente.get(URL).get_data(as_text=True))
+    assert "IBI200-INV02" in _lista(cliente.get(URL + "?aba=acompanhamento").get_data(as_text=True))
+
+
+def test_encaminhar_lista_so_a_engenharia(fracttal, tela, cliente, app):
+    import re
+
+    from test_engenharia_acompanhamento import PESSOAS
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    g = _post(cliente, "/encaminhar", cod="IBI200-INV02", para=AC.codigo(BETO)).get_data(as_text=True)
+    sel = re.search(r'<select name="para".*?</select>', g, re.S).group(0)
+    assert "Com <b>Beto Souza</b>" in g and "Encaminhado para Beto Souza" in g
+    assert sel.count("<option") == len(PESSOAS())          # o "Escolha" e quem não está com o ativo agora (Ana)
+    g = _post(cliente, "/encaminhar", cod="IBI200-INV02", para="hmac-de-fora").get_data(as_text=True)
+    assert "Escolha uma pessoa da Engenharia" in g and "Com <b>Beto Souza</b>" in g
+
+
+def test_salvar_encerra_e_avisa_quando_volta(fracttal, tela, cliente, app):
+    _login_do_fracttal(app, cliente)
+    import re
+
+    from test_engenharia_acompanhamento import _lista
+    # INVR1.3 teve falha em 05/10 (1 dia antes de AGORA): encerrar com fim 04/10 faz o ativo voltar
+    html = _como(cliente, ANA).get("/t/engenharia/confiabilidade?aba=acompanhamento").get_data(as_text=True)
+    assert re.search(r'data-falhas="[^"]*2026-10-05', html)
+    g = _post(cliente, f"/{_aid_de('IBI200-INVR1.3')}/salvar", inicio="2026-10-01", fim="2026-10-04",
+              diagnostico="1").get_data(as_text=True)
+    assert "Encerrado." in g and "volta para Ativos com sinal" in g and "Salvar comentário" not in g
+    lista = _lista(cliente.get("/t/engenharia/confiabilidade").get_data(as_text=True))
+    assert "IBI200-INVR1.3" in lista and "já acompanhado · Comunicação em 04/10" in lista
+
+
+def test_salvar_recusado_responde_a_gaveta_com_o_erro(fracttal, tela, cliente, app):
+    _login_do_fracttal(app, cliente)
+    g = _post(_como(cliente, ANA), f"/{_aid_de('IBI200-INVR1.3')}/salvar", inicio="2026-10-01", fim="2026-10-04",
+              diagnostico="").get_data(as_text=True)
+    assert "Para encerrar, escolha o diagnóstico" in g and "Gerar OS" in g      # nada mudou: segue aberto
+
+
+def test_pegar_de_outro_site_ou_sem_poder_nao_grava(fracttal, tela, cliente, app, monkeypatch):
+    from nexus.auth import setor_telas as ST
+    from nexus.cadastro import setor_ids as SID
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    assert cliente.post(PONTE + "/pegar", data={"cod": "IBI200-INV02"},
+                        headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
+                                               "erro": ""})
+    g = _post(cliente, "/pegar", cod="IBI200-INV02").get_data(as_text=True)
+    assert "Só quem é da Engenharia" in g and _aid_de("IBI200-INV02") is None and _feitas(fracttal, "criar") == []
+
+
+def test_pegar_ativo_que_nao_esta_na_lista_recusa(fracttal, tela, cliente, app):
+    # TRK07 foi encerrado e não falhou depois do fim: não está em Ativos com sinal, não se pega de uma página velha
+    _como(cliente, ANA)
+    _login_do_fracttal(app, cliente)
+    g = _post(cliente, "/pegar", cod="IBI200-TRK07").get_data(as_text=True)
+    assert "não está em Ativos com sinal" in g and _aid_de("IBI200-TRK07") is None and _feitas(fracttal, "criar") == []
+
+
+def test_texto_digitado_nao_se_perde_ao_salvar(fracttal, tela, cliente, app):
+    _login_do_fracttal(app, cliente)
+    # a recusa respondia a gaveta sem o que a pessoa tinha digitado (o comentário, que só existe com a OS, tem o teste
+    # test_engenharia_comentarios::test_o_comentario_digitado_volta_quando_o_livro_falha)
+    _como(cliente, ANA)
+    g = _post(cliente, f"/{_aid_de('IBI200-INVR1.3')}/salvar", inicio="2026-10-01", fim="2026-10-04",
+              diagnostico="").get_data(as_text=True)
+    assert "Para encerrar, escolha o diagnóstico" in g and 'value="2026-10-04"' in g and 'value="2026-10-01"' in g
+
+
+def test_pegar_de_pagina_velha_diz_com_quem_esta(fracttal, tela, cliente, app):
+    # a regra 1 do desenho ("o segundo recebe 'já está com <pessoa>'")
+    _como(cliente, BETO)
+    _login_do_fracttal(app, cliente)
+    g = _post(cliente, "/pegar", cod="IBI200-INVR1.3").get_data(as_text=True)
+    assert "já está com Ana Lima" in g and _feitas(fracttal, "criar") == []
+
+
+def test_encaminhar_de_pagina_velha_nao_toma_o_acompanhamento_de_outro(fracttal, tela, cliente, app):
+    # o ativo estava livre quando a página abriu e outra pessoa o pegou depois: o Encaminhar da gaveta velha passava o
+    # acompanhamento dela adiante sem ninguém pedir
+    html = _como(cliente, BETO).get("/t/engenharia/confiabilidade").get_data(as_text=True)
+    assert 'name="livre" value="1"' in html                       # a gaveta do ativo livre diz que o viu livre
+    _login_do_fracttal(app, cliente)
+    g = _post(cliente, "/encaminhar", cod="IBI200-INVR1.3", para=AC.codigo(BETO), livre="1").get_data(as_text=True)
+    assert "já está com Ana Lima" in g
+    a = next(x for x in AC.estado(AC.ler(forcar=True)["eventos"]).values() if x["cod"] == "IBI200-INVR1.3")
+    assert a["responsavel"]["nome"] == "Ana Lima"
+
+
+def test_aviso_de_volta_so_com_sinal(fracttal, tela, cliente, app, monkeypatch):
+    _login_do_fracttal(app, cliente)
+    # o "volta para Ativos com sinal" só vale para o ativo que ainda tem o sinal de 30 dias
+    from test_engenharia_confiabilidade import _os
+
+    from nexus.engenharia import os_falhas
+    from nexus.torres import engenharia as torre
+    linhas = ([_os("IBI200-INVR1.3", d) for d in (1, 2, 3, 10)] + [_os("IBI200-TRK07", d) for d in (5, 20)]
+              + [_os("IBI200-INV02", d) for d in (1, 4)] + [_os("IBI200-INV09", 40)])        # INV09: sem sinal agora
+    monkeypatch.setattr(os_falhas, "linhas", lambda: linhas)
+    torre._CACHE.clear()
+    AC.pegar({"cod": "IBI200-INV09", "usina_id": 1, "usina_ligada_por": "de-para do Fracttal"}, ANA, pode=True)
+    html = _como(cliente, ANA).get("/t/engenharia/confiabilidade?aba=acompanhamento").get_data(as_text=True)
+    gaveta = next(t for t in html.split('<template id="')[1:] if "IBI200-INV09" in t)
+    assert 'data-falhas=""' in gaveta
+    g = _post(cliente, f"/{_aid_de('IBI200-INV09')}/salvar", inicio="2026-08-01", fim="2026-08-20", diagnostico="1",
+              cod="IBI200-INV09").get_data(as_text=True)
+    assert "Encerrado." in g and "volta para Ativos com sinal" not in g
+
+
+def test_acao_de_outro_site_nao_le_o_livro(fracttal, tela, cliente, app, monkeypatch):
+    _login_do_fracttal(app, cliente)
+    # a conferência de origem vem antes de qualquer leitura do banco
+    _como(cliente, ANA)
+    aid = _aid_de("IBI200-INVR1.3")
+    monkeypatch.setattr(AC, "ler", lambda *a, **k: (_ for _ in ()).throw(AssertionError("leu o livro")))
+    for acao, dados in (("salvar", {"inicio": "2026-10-01"}), ("comentar", {"texto": "x"})):
+        r = cliente.post(f"{PONTE}/{aid}/{acao}", data=dados, headers={"Sec-Fetch-Site": "cross-site"})
+        assert r.status_code == 403
+
+
+def test_conferencia_que_falha_depois_de_gravar_nao_diz_nada_mudou(fracttal, tela, cliente, app, monkeypatch):
+    _login_do_fracttal(app, cliente)
+    # quando a contagem não bate depois da troca, a troca já foi feita: repetir pode duplicar a linha
+    from nexus.dados import livros
+    _como(cliente, ANA)
+    aid = _aid_de("IBI200-INVR1.3")
+    monkeypatch.setattr(livros, "publicar",
+                        lambda *a, **k: (_ for _ in ()).throw(livros.GravacaoErro("enviei 3 linhas e o banco tem 2")))
+    g = _post(cliente, f"/{aid}/salvar", inicio="2026-10-02", cod="IBI200-INVR1.3").get_data(as_text=True)
+    assert "Nada mudou" not in g and "confira" in g.lower()

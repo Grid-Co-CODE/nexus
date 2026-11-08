@@ -88,7 +88,7 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
 |---|---|
 | Regras e o livro | `nexus/engenharia/acompanhamento.py` (o molde é o "Pegar para mim" das Contestações e o cadastro dos motivos do PCM) |
 | As falhas de cada ativo | `confiabilidade.calcular(...)["falhasEm"]` (pelo código canônico, todo o período, a regra do sinal) |
-| Tela e ações | `__init__.py` (`_gavetas_e_listas`, `_gaveta_de` e as rotas `confiabilidade/acompanhamento/*` e `confiabilidade/diagnosticos/*`), `templates/engenharia/confiabilidade.html` e `_gaveta.html`, classes `eg-acomp*`, `eg-cartao`, `eg-diag*` em `engenharia.css` |
+| Tela e ações | `__init__.py` (`_gavetas_e_listas`, `_gaveta_de` e a rota `confiabilidade/acompanhamento/<aid>/diagnostico-novo` (as outras ações vão pela ponte) e `confiabilidade/diagnosticos/*`), `templates/engenharia/confiabilidade.html` e `_gaveta.html`, classes `eg-acomp*`, `eg-cartao`, `eg-diag*` em `engenharia.css` |
 
 - **Abas:** Ativos com sinal · Em acompanhamento · Encerrados · Indicadores · Diagnósticos (esta só para quem age). O
   ativo com acompanhamento aberto sai de Ativos com sinal; o encerrado também, e **só volta com falha nova** depois do
@@ -139,7 +139,7 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   mudou no Fracttal deixam a nota como está, e a tela diz. O "Apagar" pergunta antes. Editar e Apagar só aparecem ao
   passar o mouse no comentário (Levi, 05/11/2026: "deve aparecer apenas ao passar o mouse no comentário!"), ou com o
   teclado nele; no toque, sem mouse, ficam à vista (`@media (hover:hover)` no `engenharia.css`). A rota antiga de comentar
-  da Confiabilidade (só a página aberta antes do deploy a usa) segue sem a regra.
+  da Confiabilidade saiu em 08/11/2026.
 - **Falha nova** é a do sinal (corretiva e corretiva emergencial, sem o serviço registrado como corretiva): "desde que
   entrou" conta da gravação do Pegar (o início pode ser anterior), e o retorno conta do dia seguinte ao fim.
 - **A OS de análise no Fracttal** (29/10/2026: "quando eu clico em pegar para acompanhar criar uma OS para a pessoa que
@@ -167,9 +167,9 @@ de engenharia para aplicar nos demais setores"). Desenho, decisões e o rascunho
   recusa não entra no Nexus), e o livro que falha depois diz o número da OS e pede para não repetir. Sem a sessão do
   Fracttal (quem entrou pela Microsoft), a recusa traz o "Entrar pelo Fracttal", que volta à tela; a sessão vencida no
   meio tira do Nexus quem entrou pelo Fracttal (a regra do comentário da OS). O acompanhamento aberto antes de 29/10/2026
-  fica sem OS e segue só no Nexus (o quiz: "Ficam sem OS"). As rotas antigas da Confiabilidade continuam, sem o
-  Fracttal, mas recusam encerrar, comentar e encaminhar um acompanhamento COM OS ("recarregue a página"): a página aberta
-  antes do deploy posta nelas, e o Fracttal ficaria para trás. Da revisão independente de 29/10/2026:
+  fica sem OS e segue só no Nexus (o quiz: "Ficam sem OS"). As rotas antigas da Confiabilidade (`confiabilidade/acompanhamento/pegar`,
+  `/encaminhar`, `/<aid>/salvar` e `/<aid>/comentar`) saíram em 08/11/2026: as ações da gaveta só vão pela ponte; ficou
+  só o `/<aid>/diagnostico-novo`. Da revisão independente de 29/10/2026:
   - nada vai ao Fracttal sem o livro lido agora (`_livro_lido`: a leitura que falhou ou a cópia velha não confere quem
     está com o ativo); um ativo por vez (`ponte._trava_do_ativo`, o servidor é um processo só: o segundo ouve "agora
     mesmo");

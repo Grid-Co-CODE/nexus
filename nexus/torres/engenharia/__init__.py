@@ -639,92 +639,17 @@ def _acao(cod: str, fazer, aviso: str = "", acomp_id=None, form: str = ""):
     return _gaveta_de(cod, acomp_id=acomp_id, aviso=aviso)
 
 
-@bp.route("/confiabilidade/acompanhamento/pegar", methods=["POST"])
-def acompanhamento_pegar():
-    from ...dados.equipamento import canon
-    from ...engenharia import acompanhamento as AC
-    cod = request.form.get("cod", "")
-
-    def fazer():
-        pode, _ = _quem_pode()
-        if not pode:              # a recusa de quem não pode vale antes de todas
-            AC.pegar({"cod": cod}, session.get("usuario"), pode)
-        _d, _l, acomps, sep = _agora_do_livro()
-        ab = AC.aberto_de(acomps, cod)
-        if ab:                    # quem chegou depois sabe com quem está (a regra 1 do desenho), mesmo de página velha
-            raise AC.Recusada(f"Este ativo já está com {ab['responsavel']['nome'] or 'outra pessoa'}: recarregue a página")
-        s = next((x for x in sep["sinal"] if canon(x["cod"]) == canon(cod)), None)
-        if not s:
-            raise AC.Recusada("Este ativo não está em Ativos com sinal agora: recarregue a página")
-        AC.pegar(_para_gravar(s), session.get("usuario"), pode)
-    return _acao(cod, fazer, "Agora este ativo está com você: ele saiu de Ativos com sinal e foi para Em acompanhamento.",
-                 form="pegar")
-
-
-@bp.route("/confiabilidade/acompanhamento/encaminhar", methods=["POST"])
-def acompanhamento_encaminhar():
-    from ...dados.equipamento import canon
-    from ...engenharia import acompanhamento as AC
-    cod, para = request.form.get("cod", ""), request.form.get("para", "")
-    viu_livre = request.form.get("livre") == "1"
-
-    def fazer():
-        pode, _ = _quem_pode()
-        pessoas = _pessoas(pode)
-        _d, _l, _a, sep = _agora_do_livro()
-        s = next((x for x in sep["sinal"] if canon(x["cod"]) == canon(cod)), None)
-        ab = next((x["acomp"] for x in sep["aberto"] if canon(x["acomp"]["cod"]) == canon(cod)), None)
-        aberto = ab is not None
-        if not pode:
-            AC.encaminhar({"cod": cod}, para, session.get("usuario"), pode, pessoas)
-        if viu_livre and ab:      # a gaveta viu o ativo livre e alguém o pegou depois (revisão final)
-            raise AC.Recusada(f"Este ativo já está com {ab['responsavel']['nome'] or 'outra pessoa'}: recarregue a "
-                              "página para encaminhar")
-        _sem_os_ou_recarregue(ab, "encaminhar", "a OS muda de responsável lá")
-        if not s and not aberto:
-            raise AC.Recusada("Este ativo não está em Ativos com sinal nem em acompanhamento: recarregue a página")
-        AC.encaminhar(_para_gravar(s) if s and not aberto else {"cod": cod}, para, session.get("usuario"), pode,
-                      pessoas)
-        nome = next((p["nome"] for p in pessoas if p["hmac"] == para), "")
-        return f"Encaminhado para {nome}." if nome else "Encaminhado."
-    return _acao(cod, fazer, form="encaminhar")
-
-
 def _cod_do(acompanhamento_id: str) -> str:
     from ...engenharia import acompanhamento as AC
     a = AC.estado(AC.ler(forcar=True)["eventos"]).get(acompanhamento_id)
     return a["cod"] if a else ""
 
 
-@bp.route("/confiabilidade/acompanhamento/<aid>/salvar", methods=["POST"])
-def acompanhamento_salvar(aid):
-    from ...engenharia import acompanhamento as AC
-    from ...auth.origem import de_outro_site as _de_outro_site
-    if _de_outro_site():          # antes de qualquer leitura do banco (acabamento da revisão final)
-        abort(403)
-    cod = request.form.get("cod") or _cod_do(aid)
-    return _acao(cod, lambda: _salvar_acompanhamento(aid, cod), form="salvar")
-
-
-def _sem_os_ou_recarregue(a: dict | None, acao: str, porque: str) -> None:
-    """As rotas daqui não mexem no acompanhamento com OS: a página aberta antes de 29/10/2026 posta nelas, e encerrar,
-    comentar ou encaminhar por aqui deixaria o Fracttal para trás (revisão de 29/10/2026). A gaveta de agora vai pela
-    ponte do OS Creator."""
-    from ...engenharia import acompanhamento as AC
-    if a and a.get("aberto") and a.get("os_id"):
-        raise AC.Recusada(f"Este acompanhamento tem a OS {a['os_folio']} no Fracttal: recarregue a página para {acao} "
-                          f"por ela ({porque})")
-
-
-def _salvar_acompanhamento(aid: str, cod: str, extra: str = "", pela_ponte: bool = False):
-    """O salvar do formulário da gaveta (a rota daqui e a da ponte, que antes conclui a OS no Fracttal): o aviso, e no
-    encerrar o acompanhamento mostrado (o encerrado). `extra` = o que a ponte fez no Fracttal; sem `pela_ponte`, o
-    encerrar de um acompanhamento com OS é recusado (concluir a OS é da ponte)."""
+def _salvar_acompanhamento(aid: str, cod: str, extra: str = ""):
+    """O salvar do formulário da gaveta (a rota da ponte, que antes conclui a OS no Fracttal): o aviso, e no encerrar o
+    acompanhamento mostrado (o encerrado). `extra` = o que a ponte fez no Fracttal."""
     from ...engenharia import acompanhamento as AC
     pode, _ = _quem_pode()
-    if not pela_ponte and request.form.get("fim"):
-        _sem_os_ou_recarregue(AC.estado(AC.ler(forcar=True)["eventos"]).get(aid), "encerrar",
-                              "encerrar conclui a OS lá")
     ev = AC.salvar(aid, request.form.get("inicio", ""), request.form.get("fim", ""), request.form.get("diagnostico", ""),
                    session.get("usuario"), pode)
     if ev["evento"] != "encerrou":
@@ -738,22 +663,6 @@ def _salvar_acompanhamento(aid: str, cod: str, extra: str = "", pela_ponte: bool
     volta = tem_sinal and any(x["quando"] >= marco for x in (d.get("falhasEm") or {}).get(canon(cod), []))
     return ("Encerrado." + (" O ativo volta para Ativos com sinal: teve falha depois do fim." if volta else "") + extra,
             aid)
-
-
-@bp.route("/confiabilidade/acompanhamento/<aid>/comentar", methods=["POST"])
-def acompanhamento_comentar(aid):
-    from ...engenharia import acompanhamento as AC
-    from ...auth.origem import de_outro_site as _de_outro_site
-    if _de_outro_site():
-        abort(403)
-    cod = request.form.get("cod") or _cod_do(aid)
-
-    def fazer():
-        pode, _ = _quem_pode()
-        _sem_os_ou_recarregue(AC.estado(AC.ler(forcar=True)["eventos"]).get(aid), "comentar",
-                              "o comentário vai também para a nota da OS")
-        AC.comentar(aid, request.form.get("texto", ""), session.get("usuario"), pode)
-    return _acao(cod, fazer, "Comentário salvo.", form="comentar")
 
 
 @bp.route("/confiabilidade/acompanhamento/<aid>/diagnostico-novo", methods=["POST"])

@@ -416,69 +416,6 @@ SAME = {"Sec-Fetch-Site": "same-origin"}
 URL = "/t/engenharia/confiabilidade"
 
 
-def test_pegar_pela_gaveta_e_comentar(tela, cliente):
-    _como(cliente, BETO)
-    r = cliente.post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-INV02"}, headers=SAME)
-    g = r.get_data(as_text=True)
-    assert r.status_code == 200 and "Com <b>Beto Souza</b> (você)" in g and "Gerar OS" in g
-    assert "Em acompanhamento" in g                                          # o aviso diz para onde o ativo foi
-    aid = _aid_de("IBI200-INV02")
-    r = cliente.post(f"{URL}/acompanhamento/{aid}/comentar", data={"texto": "Trocar cabo"}, headers=SAME)
-    g = r.get_data(as_text=True)
-    assert "Comentário salvo" in g and "Trocar cabo" in g
-    # e a página já mostra o ativo na outra aba
-    assert "IBI200-INV02" not in _lista(cliente.get(URL).get_data(as_text=True))
-    assert "IBI200-INV02" in _lista(cliente.get(URL + "?aba=acompanhamento").get_data(as_text=True))
-
-
-def test_encaminhar_lista_so_a_engenharia(tela, cliente):
-    g = _como(cliente, ANA).post(URL + "/acompanhamento/encaminhar", data={"cod": "IBI200-INV02", "para": A.codigo(BETO)},
-                                 headers=SAME).get_data(as_text=True)
-    sel = re.search(r'<select name="para".*?</select>', g, re.S).group(0)
-    assert "Com <b>Beto Souza</b>" in g and "Encaminhado para Beto Souza" in g
-    assert sel.count("<option") == len(PESSOAS())          # o "Escolha" e quem não está com o ativo agora (Ana)
-    g = cliente.post(URL + "/acompanhamento/encaminhar", data={"cod": "IBI200-INV02", "para": "hmac-de-fora"},
-                     headers=SAME).get_data(as_text=True)
-    assert "Escolha uma pessoa da Engenharia" in g and "Com <b>Beto Souza</b>" in g
-
-
-def test_salvar_encerra_e_avisa_quando_volta(tela, cliente):
-    # INVR1.3 teve falha em 05/10 (1 dia antes de AGORA): encerrar com fim 04/10 faz o ativo voltar
-    html = _como(cliente, ANA).get(URL + "?aba=acompanhamento").get_data(as_text=True)
-    assert re.search(r'data-falhas="[^"]*2026-10-05', html)
-    g = cliente.post(f"{URL}/acompanhamento/{_aid_de('IBI200-INVR1.3')}/salvar",
-                     data={"inicio": "2026-10-01", "fim": "2026-10-04", "diagnostico": "1"}, headers=SAME).get_data(as_text=True)
-    assert "Encerrado." in g and "volta para Ativos com sinal" in g and "Salvar comentário" not in g
-    lista = _lista(cliente.get(URL).get_data(as_text=True))
-    assert "IBI200-INVR1.3" in lista and "já acompanhado · Comunicação em 04/10" in lista
-
-
-def test_salvar_recusado_responde_a_gaveta_com_o_erro(tela, cliente):
-    g = _como(cliente, ANA).post(f"{URL}/acompanhamento/{_aid_de('IBI200-INVR1.3')}/salvar",
-                                 data={"inicio": "2026-10-01", "fim": "2026-10-04", "diagnostico": ""},
-                                 headers=SAME).get_data(as_text=True)
-    assert "Para encerrar, escolha o diagnóstico" in g and "Gerar OS" in g      # nada mudou: segue aberto
-
-
-def test_acao_de_outro_site_ou_sem_poder_nao_grava(tela, cliente, monkeypatch):
-    from nexus.auth import setor_telas as ST
-    _como(cliente, ANA)
-    assert cliente.post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-INV02"},
-                        headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
-                                               "erro": ""})
-    g = cliente.post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-INV02"}, headers=SAME).get_data(as_text=True)
-    assert "Só quem é da Engenharia" in g and _aid_de("IBI200-INV02") is None
-    r = cliente.post(URL + "/diagnosticos/criar", data={"nome": "Proteção"}, headers=SAME)
-    assert r.status_code == 303 and "Proteção" not in [d["nome"] for d in A.diagnosticos(A.ler(forcar=True)["diagnosticos"])]
-
-
-def test_pegar_ativo_que_nao_esta_na_lista_recusa(tela, cliente):
-    # TRK07 foi encerrado e não falhou depois do fim: não está em Ativos com sinal, não se pega de uma página velha
-    g = _como(cliente, ANA).post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-TRK07"}, headers=SAME).get_data(as_text=True)
-    assert "não está em Ativos com sinal" in g and _aid_de("IBI200-TRK07") is None
-
-
 def test_cadastro_pela_aba_diagnosticos(tela, cliente):
     r = _como(cliente, ANA).post(URL + "/diagnosticos/criar", data={"nome": "Proteção", "descricao": "Relé atuando"},
                                  headers=SAME)
@@ -532,42 +469,6 @@ def test_copia_velha_avisa_a_hora(tela, cliente, monkeypatch):
     assert "IBI200-INVR1.3" in _lista(html) and "última leitura boa" in html
 
 
-def test_texto_digitado_nao_se_perde(tela, cliente, monkeypatch):
-    # a recusa e o banco fora respondiam a gaveta sem o que a pessoa tinha digitado (o comentário de até 2.000 letras)
-    from nexus.dados import livros
-    _como(cliente, ANA)
-    aid = _aid_de("IBI200-INVR1.3")
-    g = cliente.post(f"{URL}/acompanhamento/{aid}/salvar", data={"inicio": "2026-10-01", "fim": "2026-10-04",
-                                                                  "diagnostico": ""}, headers=SAME).get_data(as_text=True)
-    assert "Para encerrar, escolha o diagnóstico" in g and 'value="2026-10-04"' in g and 'value="2026-10-01"' in g
-    monkeypatch.setattr(livros, "publicar", lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError("fora")))
-    g = cliente.post(f"{URL}/acompanhamento/{aid}/comentar", data={"texto": "Trocar o cabo de rede"},
-                     headers=SAME).get_data(as_text=True)
-    # o texto digitado volta no campo do comentário, que desde 30/10/2026 só existe com a OS (o teste é o
-    # test_engenharia_comentarios::test_o_comentario_digitado_volta_quando_o_livro_falha)
-    assert "Não consegui gravar no banco" in g
-
-
-def test_pegar_de_pagina_velha_diz_com_quem_esta(tela, cliente):
-    # a regra 1 do desenho ("o segundo recebe 'já está com <pessoa>'") valia no módulo, mas a rota respondia antes que o
-    # ativo não estava na lista
-    g = _como(cliente, BETO).post(URL + "/acompanhamento/pegar", data={"cod": "IBI200-INVR1.3"},
-                                  headers=SAME).get_data(as_text=True)
-    assert "já está com Ana Lima" in g
-
-
-def test_encaminhar_de_pagina_velha_nao_toma_o_acompanhamento_de_outro(tela, cliente):
-    # o ativo estava livre quando a página abriu e outra pessoa o pegou depois: o Encaminhar da gaveta velha passava o
-    # acompanhamento dela adiante sem ninguém pedir
-    html = _como(cliente, BETO).get(URL).get_data(as_text=True)
-    assert 'name="livre" value="1"' in html                       # a gaveta do ativo livre diz que o viu livre
-    g = cliente.post(URL + "/acompanhamento/encaminhar", data={"cod": "IBI200-INVR1.3", "para": A.codigo(BETO),
-                                                               "livre": "1"}, headers=SAME).get_data(as_text=True)
-    assert "já está com Ana Lima" in g
-    a = next(x for x in A.estado(A.ler(forcar=True)["eventos"]).values() if x["cod"] == "IBI200-INVR1.3")
-    assert a["responsavel"]["nome"] == "Ana Lima"
-
-
 def test_com_quem_desde_conta_do_encaminhamento(tela, cliente):
     # "Com <pessoa> desde" mostrava o começo do acompanhamento, não quando a pessoa o recebeu
     linhas = tela.abas[(A.LIVRO, A.ABA_EVENTO)]["linhas"]
@@ -614,48 +515,6 @@ def test_aba_diagnosticos_sem_erro_de_js(tela, cliente):
               "globalThis.window = globalThis;\nglobalThis.egGaveta = {ligar: () => {}};\n" + js)
     r = subprocess.run(["node", "-e", pagina], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
-
-
-def test_aviso_de_volta_so_com_sinal(tela, cliente, monkeypatch):
-    # o "volta para Ativos com sinal" só vale para o ativo que ainda tem o sinal de 30 dias
-    from test_engenharia_confiabilidade import _os
-
-    from nexus.engenharia import os_falhas
-    from nexus.torres import engenharia as torre
-    linhas = ([_os("IBI200-INVR1.3", d) for d in (1, 2, 3, 10)] + [_os("IBI200-TRK07", d) for d in (5, 20)]
-              + [_os("IBI200-INV02", d) for d in (1, 4)] + [_os("IBI200-INV09", 40)])        # INV09: sem sinal agora
-    monkeypatch.setattr(os_falhas, "linhas", lambda: linhas)
-    torre._CACHE.clear()
-    A.pegar({"cod": "IBI200-INV09", "usina_id": 1, "usina_ligada_por": "de-para do Fracttal"}, ANA, pode=True)
-    html = _como(cliente, ANA).get(URL + "?aba=acompanhamento").get_data(as_text=True)
-    gaveta = next(t for t in html.split('<template id="')[1:] if "IBI200-INV09" in t)
-    assert 'data-falhas=""' in gaveta
-    g = cliente.post(f"{URL}/acompanhamento/{_aid_de('IBI200-INV09')}/salvar",
-                     data={"inicio": "2026-08-01", "fim": "2026-08-20", "diagnostico": "1", "cod": "IBI200-INV09"},
-                     headers=SAME).get_data(as_text=True)
-    assert "Encerrado." in g and "volta para Ativos com sinal" not in g
-
-
-def test_acao_de_outro_site_nao_le_o_livro(tela, cliente, monkeypatch):
-    # a conferência de origem vem antes de qualquer leitura do banco
-    _como(cliente, ANA)
-    aid = _aid_de("IBI200-INVR1.3")
-    monkeypatch.setattr(A, "ler", lambda *a, **k: (_ for _ in ()).throw(AssertionError("leu o livro")))
-    for acao, dados in (("salvar", {"inicio": "2026-10-01"}), ("comentar", {"texto": "x"})):
-        r = cliente.post(f"{URL}/acompanhamento/{aid}/{acao}", data=dados, headers={"Sec-Fetch-Site": "cross-site"})
-        assert r.status_code == 403
-
-
-def test_conferencia_que_falha_depois_de_gravar_nao_diz_nada_mudou(tela, cliente, monkeypatch):
-    # quando a contagem não bate depois da troca, a troca já foi feita: repetir pode duplicar o comentário
-    from nexus.dados import livros
-    _como(cliente, ANA)
-    aid = _aid_de("IBI200-INVR1.3")
-    monkeypatch.setattr(livros, "publicar",
-                        lambda *a, **k: (_ for _ in ()).throw(livros.GravacaoErro("enviei 3 linhas e o banco tem 2")))
-    g = cliente.post(f"{URL}/acompanhamento/{aid}/comentar", data={"texto": "Trocar cabo", "cod": "IBI200-INVR1.3"},
-                     headers=SAME).get_data(as_text=True)
-    assert "Nada mudou" not in g and "confira" in g.lower()
 
 
 def test_diagnostico_nao_aceita_email(banco):
