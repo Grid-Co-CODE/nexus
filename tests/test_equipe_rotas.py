@@ -44,19 +44,26 @@ EMAIL = {TECNICO: "tecnico.um@gridco.com.br", FORA_DO_PILOTO: "tecnico.dois@grid
          SUPERVISORA: "supervisora.campo@gridco.com.br", DESLIGADO: "tecnico.saiu@gridco.com.br"}
 
 
-def _pessoas(desligar=()):
-    cofre = Cofre(CHAVE_CADASTRO)
+HOMONIMO = 5            # a 5ª ficha, que cada teste da identidade monta do seu jeito
 
-    def p(pid, vinculo, status, nome):
-        if pid in desligar:
-            status = "Desligado"
-        sensivel = json.dumps({"nome": nome, "nome_padrao": nome, "email": EMAIL[pid]})
-        return {"pessoa_id": pid, "vinculo": vinculo, "cargo": "Técnico O&M", "equipe_id": 10, "status": status,
-                "excluido": "não", "sensivel_cifrado": cofre.cifrar(sensivel, f"banco/pessoas/{pid}")}
-    return [p(TECNICO, "Colaborador de campo", "Ativo", "Técnico Um Teste"),
-            p(FORA_DO_PILOTO, "Colaborador de campo", "Ativo", "Técnico Dois Teste"),
-            p(SUPERVISORA, "Supervisor de Campo", "Ativo", "Supervisora Campo Teste"),
-            p(DESLIGADO, "Colaborador de campo", "Desligado", "Técnico Saiu Teste")]
+
+def _ficha(pid, nome, email, vinculo="Colaborador de campo", status="Ativo", excluido="não"):
+    """Uma linha de `cadastro_nexus · pessoas` como no banco: o nome e o e-mail só dentro da cifra."""
+    sensivel = {"nome": nome, "nome_padrao": nome, **({"email": email} if email is not None else {})}
+    return {"pessoa_id": pid, "vinculo": vinculo, "cargo": "Técnico O&M", "equipe_id": 10, "status": status,
+            "excluido": excluido,
+            "sensivel_cifrado": Cofre(CHAVE_CADASTRO).cifrar(json.dumps(sensivel), f"banco/pessoas/{pid}")}
+
+
+def _pessoas(desligar=(), extra=()):
+    fichas = [_ficha(TECNICO, "Técnico Um Teste", EMAIL[TECNICO]),
+              _ficha(FORA_DO_PILOTO, "Técnico Dois Teste", EMAIL[FORA_DO_PILOTO]),
+              _ficha(SUPERVISORA, "Supervisora Campo Teste", EMAIL[SUPERVISORA], vinculo="Supervisor de Campo"),
+              _ficha(DESLIGADO, "Técnico Saiu Teste", EMAIL[DESLIGADO], status="Desligado"), *extra]
+    for f in fichas:
+        if f["pessoa_id"] in desligar:
+            f["status"] = "Desligado"
+    return fichas
 
 
 def _decisao(pid, no_piloto, instante="2026-11-07T12:00:00Z"):
@@ -230,6 +237,67 @@ def test_registro_fora_do_piloto_devolve_coleta_false(app, cliente, banco, ms):
         r = _registrar(cliente, token=token)
         assert r.status_code == 200 and r.get_json() == {"coleta": False}, token
     assert S.do_app(app).chaveiro.eventos_novos() == []                    # ninguém recebeu chave
+
+
+# ── quem é: só o e-mail exato da ficha ───────────────────────────────────────────────────────────────────────────────
+def _com_a_5a_ficha(banco, ficha):
+    """O cadastro com a 5ª ficha, que entra no piloto como técnica de campo ativa (só a identidade decide)."""
+    _aba(banco, "cadastro_nexus", "pessoas", _pessoas(extra=[ficha]))
+    _aba(banco, LIVRO_PILOTO, ABA_PILOTO, PILOTO + [_decisao(HOMONIMO, "sim")])
+    visao.limpar()
+
+
+@pytest.mark.parametrize("email_da_ficha", ["outro.endereco@gridco.com.br", None], ids=["outro_email", "sem_email"])
+def test_o_registro_nao_acha_a_pessoa_pelo_nome_tirado_do_email(app, cliente, banco, ms, email_da_ficha):
+    """O login do Fracttal (`pessoa_do_login`) aceita o nome de UMA pessoa quando o e-mail não está no cadastro, e o
+    nome sai do próprio e-mail (fulana.souza@ -> "fulana souza"). No registro do aparelho isso deixaria outra conta da
+    Grid, de nome igual ao de um técnico do piloto, mandar posições no lugar dele (decisão do controlador, 08/11/2026):
+    aqui a pessoa é só a ficha com o e-mail exato."""
+    _com_a_5a_ficha(banco, _ficha(HOMONIMO, "Técnico Homônimo", email_da_ficha))
+    email = "tecnico.homonimo@gridco.com.br"
+    with app.app_context():
+        assert visao.pessoa_do_login(email) == HOMONIMO                    # o caminho do nome a acharia
+    r = _registrar(cliente, token="token:" + email)
+    assert r.status_code == 200 and r.get_json() == {"coleta": False}
+    assert S.do_app(app).chaveiro.eventos_novos() == []
+
+
+def test_o_email_exato_da_ficha_registra_sem_diferenca_de_maiuscula_nem_espaco(app, cliente, banco, ms):
+    _com_a_5a_ficha(banco, _ficha(HOMONIMO, "Técnico Cinco Teste", "  Tecnico.Cinco@GridCo.com.br "))
+    r = _registrar(cliente, token="token:tecnico.cinco@gridco.com.br")
+    assert r.status_code == 200 and r.get_json()["coleta"] is True
+    ev = [dict(zip(CAB_APARELHOS, x)) for x in S.do_app(app).chaveiro.eventos_novos()]
+    assert [e["pessoa_id"] for e in ev] == [HOMONIMO]
+
+
+def test_duas_fichas_com_o_mesmo_email_nao_registram(app, cliente, banco, ms):
+    _com_a_5a_ficha(banco, _ficha(HOMONIMO, "Outra Pessoa Teste", EMAIL[TECNICO]))
+    r = _registrar(cliente)
+    assert r.status_code == 200 and r.get_json() == {"coleta": False}
+    assert S.do_app(app).chaveiro.eventos_novos() == []
+
+
+def test_a_ficha_excluida_nao_conta_nem_como_pessoa_nem_como_repetida(app, cliente, banco, ms):
+    """A ficha excluída do cadastro (a repetida que o administrador tirou) não é pessoa, como no `pessoa_do_login`:
+    não registra e não deixa o técnico de verdade, de mesmo e-mail, sem chave."""
+    _com_a_5a_ficha(banco, _ficha(HOMONIMO, "Técnico Repetido Teste", EMAIL[TECNICO], excluido="sim"))
+    assert _registrar(cliente).get_json()["coleta"] is True
+    ev = [dict(zip(CAB_APARELHOS, x)) for x in S.do_app(app).chaveiro.eventos_novos()]
+    assert [e["pessoa_id"] for e in ev] == [TECNICO]
+    _com_a_5a_ficha(banco, _ficha(HOMONIMO, "Técnico Excluído Teste", "tecnico.excluido@gridco.com.br",
+                                  excluido="sim"))
+    assert _registrar(cliente, token="token:tecnico.excluido@gridco.com.br").get_json() == {"coleta": False}
+
+
+def test_a_pessoa_pelo_email_exato_e_uma_so():
+    fichas = [(1, "a@gridco.com.br"), (2, " B@GridCo.com.br "), (3, ""), (4, None)]
+    assert S.pessoa_pelo_email("a@gridco.com.br", fichas) == 1
+    assert S.pessoa_pelo_email(" A@GRIDCO.COM.BR ", fichas) == 1
+    assert S.pessoa_pelo_email("b@gridco.com.br", fichas) == 2
+    assert S.pessoa_pelo_email("c@gridco.com.br", fichas) is None
+    assert S.pessoa_pelo_email("", fichas) is None and S.pessoa_pelo_email(None, fichas) is None
+    assert S.pessoa_pelo_email("a@gridco.com.br", fichas + [(5, "a@gridco.com.br")]) is None   # duas: ninguém
+    assert S.pessoa_pelo_email("a@gridco.com.br", fichas + [(1, "a@gridco.com.br")]) == 1      # a mesma, duas vezes
 
 
 def test_token_invalido_e_401_e_microsoft_fora_e_503(cliente, banco, ms):

@@ -1114,7 +1114,8 @@ conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no
   cronograma da zeladoria, `torre_zeladoria.cronograma_api` (06/11/2026, só GET, com a chave no header `x-api-key`;
   `nexus/torres/zeladoria/CLAUDE.md`), e as três do Mapa de equipe com o Nexus Field (08/11/2026, só POST,
   `nexus/torres/campo/equipe_tela.py`): o registro do aparelho, `torre_campo.equipe_aparelho` (vale o ID token da
-  Microsoft conferido pela assinatura; o único com CORS, só para a origem do App de Campo), e as posições e a revogação,
+  Microsoft conferido pela assinatura, e a pessoa é só a ficha com o e-mail exato do token, nunca o nome como no
+  `pessoa_do_login`; o único com CORS, só para a origem do App de Campo), e as posições e a revogação,
   `torre_campo.equipe_posicoes` e `torre_campo.equipe_revogar` (vale a chave do aparelho). O teste
   `test_toda_rota_nao_publica_exige_login` pega rota nova esquecida.
 - **Limite de tentativas do Entrar** (auditoria A2 e revisão adversarial da porta única, 10/10/2026). Era 5 erros por

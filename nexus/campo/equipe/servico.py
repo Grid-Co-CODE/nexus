@@ -21,7 +21,10 @@ vazio: o `abas_conferidas` confere a conta de abas do livro.
 **Quem é coletado quando o banco não responde:** a cópia boa segue valendo (como no `setor_telas.ler`: a leitura que
 falha devolve a última boa), e sem nenhuma leitura boa ninguém é coletado (`coleta: false`, nunca 500). O cadastro que
 volta sem nenhum técnico de campo é a leitura que falhou (a mesma listagem que omite o livro), não a equipe que sumiu.
+
+**Quem registra o aparelho:** só a ficha com o e-mail EXATO do token (`pessoa_pelo_email`), nunca o nome (ver lá).
 """
+import json
 import logging
 import threading
 from datetime import datetime, timedelta, timezone
@@ -60,6 +63,43 @@ def _ha_menos_de(segundos: float, agora: float, quando: float | None) -> bool:
 
 def _instante(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _email_normal(email) -> str:
+    return str(email or "").strip().lower()
+
+
+def pessoa_pelo_email(email, fichas) -> int | None:
+    """Quem registra o aparelho: o `pessoa_id` da ÚNICA ficha com este e-mail (sem diferença de maiúscula nem de espaço
+    nas pontas). `fichas` = (pessoa_id, e-mail da ficha), já decifradas. Nenhuma ou duas fichas = None.
+
+    Nada de nome, de propósito (decisão do controlador, 08/11/2026): o `pessoa_do_login` do login do Fracttal, sem o
+    e-mail no cadastro, aceita o nome de UMA pessoa, e o nome sai do próprio e-mail (fulana.souza@ -> "fulana souza").
+    Aqui isso deixaria outra conta da Grid, de nome igual ao de um técnico do piloto cuja ficha não tem o e-mail (ou tem
+    outro), registrar o celular dela e mandar posições no lugar dele. O técnico sem o e-mail na ficha não é coletado até
+    o cadastro ter o e-mail certo."""
+    alvo = _email_normal(email)
+    if not alvo:
+        return None
+    achadas = {pid for pid, e in fichas if _email_normal(e) == alvo}
+    return achadas.pop() if len(achadas) == 1 else None
+
+
+def fichas_decifradas(linhas, cofre):
+    """(pessoa_id, e-mail) de cada ficha de `cadastro_nexus · pessoas` que não foi excluída. A excluída não é pessoa
+    (nem conta como repetida), e a que não abre (cifra de outra chave) fica de fora, como no `pessoa_do_login`."""
+    from nexus.cadastro.cifra import CifraErro
+    from nexus.dados import fatos as D
+    for p in linhas:
+        pid = D._id(p.get("pessoa_id"))
+        if not pid or not p.get("sensivel_cifrado") or str(p.get("excluido") or "").strip().lower() == "sim":
+            continue
+        try:
+            dados = json.loads(cofre.decifrar(p["sensivel_cifrado"], f"banco/pessoas/{pid}"))
+        except (CifraErro, ValueError):
+            continue
+        if isinstance(dados, dict):
+            yield pid, dados.get("email")
 
 
 class _Copia:
@@ -184,12 +224,13 @@ class Servico:
             raise
 
     def pessoa_do_email(self, email: str) -> int | None:
-        """O `pessoa_id` do e-mail pelo cadastro (`pessoa_do_login`: a ficha com o e-mail ou, sem ela, o nome de UMA
-        pessoa). Cadastro que não se lê = None: a rota responde coleta false."""
+        """O `pessoa_id` da ÚNICA ficha do cadastro com este e-mail (`pessoa_pelo_email`); nunca pelo nome. Cadastro que
+        não se lê = None: a rota responde coleta false."""
         from nexus.campo import visao
         try:
             with self._app.app_context():
-                return visao._Base().pessoa_do_login(email, "")
+                linhas = visao._livro("cadastro_nexus", "pessoas")      # a mesma aba (e a mesma cópia) do `_Base`
+            return pessoa_pelo_email(email, fichas_decifradas(linhas, self.cofre))
         except Exception as e:          # noqa: BLE001
             log.warning("equipe: não consegui ler o cadastro para achar a pessoa (%s)", type(e).__name__)
             return None
