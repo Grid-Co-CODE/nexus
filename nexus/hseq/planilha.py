@@ -80,7 +80,11 @@ def _aba(ws, titulo: str, topo: list[str], colunas, linhas) -> None:
     for valores in linhas:
         ws.append(valores)
         for cel in ws[ws.max_row]:
-            if isinstance(cel.value, datetime):
+            if isinstance(cel.value, str) and cel.value.startswith("="):
+                # texto que começa com "=" abriria como fórmula no arquivo que vai ao cliente (achado 9 da auditoria de
+                # 08/11/2026: Local, Posição e Classe são digitados; a Tarefa vem do Fracttal)
+                cel.data_type = "s"
+            elif isinstance(cel.value, datetime):
                 cel.number_format = DATA + " HH:MM"
             elif isinstance(cel.value, date):
                 cel.number_format = DATA

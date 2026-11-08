@@ -926,3 +926,17 @@ def test_dois_envios_iguais_da_mesma_foto_nao_disputam_o_arquivo_temporario(com_
     [f.start() for f in fios]
     [f.join(20) for f in fios]
     assert [s[0] for s in saidas] == [200, 200], saidas
+
+
+def test_texto_que_comeca_com_igual_vai_para_a_planilha_como_texto_e_nao_formula():
+    """Achado 9 da auditoria de 08/11/2026: o openpyxl grava `str` que começa com "=" como fórmula; Local, Posição, Classe
+    (digitados pela Segurança) e o texto do Fracttal entram nas planilhas que a TST manda ao cliente."""
+    import io
+    from openpyxl import Workbook, load_workbook
+    from nexus.hseq import planilha as PLA
+    wb = Workbook()
+    PLA._aba(wb.active, "T", [], [("Local", 10, None), ("Outro", 10, None)], [["=1+1", "normal"]])
+    buf = io.BytesIO()
+    wb.save(buf)
+    cel = load_workbook(io.BytesIO(buf.getvalue())).active["A4"]
+    assert cel.data_type == "s" and cel.value == "=1+1"
