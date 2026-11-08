@@ -116,6 +116,7 @@ class _Copia:
         self._lida_em: float | None = None
         self._falhou_em: float | None = None
         self._lendo = False
+        self._geracao = 0           # muda a cada `esquecer`: a leitura que começou antes dele não conta como fresca
 
     def valor(self, agora_s: float):
         with self._trava:
@@ -128,6 +129,7 @@ class _Copia:
             if _ha_menos_de(TETO_FALHA_S, agora_s, self._falhou_em):
                 return self._valor
             self._lendo = True
+            geracao = self._geracao
         novo = None
         try:
             novo = self._ler()
@@ -138,11 +140,21 @@ class _Copia:
             with self._trava:
                 self._lendo = False
                 if novo is not None:
-                    self._valor, self._lida_em, self._falhou_em = novo, agora_s, None
+                    # a leitura que começou antes de um `esquecer` pode ter visto o banco de antes da decisão: vale como
+                    # a cópia boa (para o banco que cair), mas não como fresca, e a próxima vai ao banco de novo
+                    self._valor, self._falhou_em = novo, None
+                    self._lida_em = agora_s if geracao == self._geracao else None
                 else:
                     self._falhou_em = agora_s
                 atual = self._valor
         return atual
+
+    def esquecer(self) -> None:
+        """A próxima leitura vai ao banco já, sem esperar a validade nem o teto da falha (a decisão gravada agora pela
+        tela vale no próximo pedido). A cópia boa fica, para o banco que não responder."""
+        with self._trava:
+            self._geracao += 1
+            self._lida_em = self._falhou_em = None
 
 
 class Servico:
@@ -246,6 +258,16 @@ class Servico:
             return False
         tecnicos = self._tecnicos.valor(ts)
         return bool(tecnicos) and AP.coleta_vale(pessoa_id, tecnicos, piloto)
+
+    def piloto(self, agora: datetime | None = None) -> frozenset | None:
+        """Quem está no piloto agora: a MESMA cópia de 1 min que decide a coleta (a tela do mapa não mostra quem o
+        celular não manda). None = nenhuma leitura boa ainda; `AindaLendo` sobe."""
+        return self._piloto.valor((agora or _agora()).timestamp())
+
+    def esquecer_piloto(self) -> None:
+        """Depois de uma decisão gravada pela tela: o próximo pedido relê o livro, e quem entrou é coletado (e aparece
+        no mapa) sem esperar o minuto da cópia."""
+        self._piloto.esquecer()
 
     def quem(self, chave, aparelho) -> int | None:
         """O `pessoa_id` da chave ativa, se ela é deste aparelho; None para chave desconhecida, revogada ou de outro."""

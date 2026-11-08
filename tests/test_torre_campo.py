@@ -5,8 +5,10 @@ from nexus.torres import descobrir_torres
 
 # Ordens de serviço ("os"), Ranking e Imagens da ronda saíram em 08/10/2026 (Levi: "são redundantes"); a Visão do
 # responsável entrou em 12/10/2026, a 1ª do Campo
-# o Ranking de pontos (13/10/2026) também é nosso: lê o livro ranking_app_campo que o App publica
-NOSSAS = ("responsaveis", "ocorrencias", "cliente", "atencao", "aprovacao", "rondas", "zeladoria", "triagem", "ranking")
+# o Ranking de pontos (13/10/2026) também é nosso: lê o livro ranking_app_campo que o App publica; o Mapa de equipe
+# (08/11/2026) lê as posições do Nexus Field
+NOSSAS = ("responsaveis", "ocorrencias", "cliente", "equipe", "atencao", "aprovacao", "rondas", "zeladoria", "triagem",
+          "ranking")
 
 
 def _campo():

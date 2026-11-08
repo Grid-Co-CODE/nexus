@@ -68,6 +68,12 @@ TORRE = Torre(
              "Como estão agora as usinas de um cliente, e o que responder a ele sem abrir cinco telas?",
              "Tempo real da plataforma (só leitura) + Gerencial + Andamento da Ronda COS + OS e programação no banco",
              do_cliente=True),
+        # o Mapa de equipe (08/11/2026; o pedido do Levi: "identificar onde o técnico está e qual seria a melhor rota para
+        # ele"): a posição dos técnicos do piloto do Nexus Field, nas rotas de equipe_tela.py. Os donos são a regra escrita
+        # no aviso ao técnico (quem vê), e a rota a confere de novo: a marca de outro setor em Base → Acessos não abre o mapa
+        Tela("equipe", "Mapa de equipe", "Onde está cada técnico de campo agora, e qual a rota dele até uma usina?",
+             "Posições do Nexus Field (o diário do dia e os livros nexus_equipe_*) + cadastro do Nexus",
+             do_setor=(SID.PCM, SID.COS, SID.PERFORMANCE, SID.SUPERVISAO_CAMPO, SID.RESPONSAVEL_UFV)),
         Tela("atencao", "Central de atenção",
              "O que no campo pede ação agora: usina sem ronda, PT parada, ronda sem OS?", FONTE_APP),
         Tela("aprovacao", "Aprovação de OS",
@@ -2032,5 +2038,6 @@ def triagem():
 from . import ocorrencias_tela  # noqa: E402,F401
 # a Visão do cliente (05/11/2026): as rotas em cliente_tela.py, pelo mesmo motivo
 from . import cliente_tela  # noqa: E402,F401
-# o Mapa de equipe (08/11/2026): as três rotas públicas do contrato com o Nexus Field, em equipe_tela.py
+# o Mapa de equipe (08/11/2026): as três rotas públicas do contrato com o Nexus Field e a tela (o mapa, o Abrir rota e o
+# piloto), em equipe_tela.py
 from . import equipe_tela  # noqa: E402,F401

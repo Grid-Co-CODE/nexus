@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# O Mapa de equipe (08/11/2026; nexus/torres/campo/equipe_tela.py, a regra em nexus/campo/equipe/situacao.py). O desenho é o
+   da Visão geral (campo/responsaveis.html, o mapa das usinas): o contorno dos estados do IBGE e cada técnico como um ponto,
+   com o x/y JÁ projetado no servidor. A latitude e a longitude nunca chegam aqui, nem a do técnico nem a da usina; o parado
+   fora de usina nem o x/y (o mapa não mostra a casa nem o hotel): ele fica só na lista, com o estado e a distância até a
+   usina mais perto. O Abrir rota é um formulário que vai ao servidor, e o servidor manda ao Google. #}
+{% set vazio = {'mapa': 'Ninguém em deslocamento nem na usina agora.',
+                'sem_permissao': 'Todos com a permissão de localização ligada.',
+                'fora': 'Ninguém parado fora de usina.',
+                'sem_posicao': 'Todos os técnicos do piloto mandaram posição hoje.'} %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+        {% call explica('O que é coletado, quem vê e por quanto tempo') %}
+          <p><b>O que é coletado.</b> A posição do celular de cada técnico de campo do piloto, pelo Nexus Field: da
+          primeira abertura do app no dia até as 22h, a cada 2 minutos em deslocamento e mais espaçado parado. Só o técnico
+          de campo ativo do cadastro e escolhido para o piloto é coletado.</p>
+          <p><b>Quem vê.</b> Os setores PCM, COS, Performance, Supervisão Campo e Responsáveis UFV, e os administradores do
+          Nexus. Cada abertura do mapa e de cada rota fica registrada (quem abriu, quando e de quem), para responder a um
+          pedido da LGPD.</p>
+          <p><b>Por quanto tempo.</b> 7 dias os pontos de posição; 1 ano os deslocamentos entre usinas (de onde, para onde,
+          a saída, a chegada e a duração, sem a coordenada). Ponto com mais de 7 dias nunca aparece.</p>
+          <p><b>Parado fora de usina</b> (a casa, o hotel): o mapa nunca mostra o ponto exato. O painel diz só o estado e a
+          distância até a usina mais perto, e a rota não sai dele.</p>
+          <p><b>As situações.</b> Em deslocamento, em azul; na usina (parado a até 1 km dela), em verde; sem sinal (o último
+          ponto há 30 minutos ou mais), em âmbar, no último ponto; sem permissão de localização, em vermelho. Parado fora de
+          usina e sem posição hoje ficam só na lista do painel.</p>
+          <p><b>Abrir rota.</b> O servidor monta o link do Google Maps, do último ponto do técnico até a usina escolhida: a
+          posição sai só nesse clique, para o Google. A página nunca traz a latitude nem a longitude.</p>
+          <p>As horas são as de Brasília.</p>
+        {% endcall %}
+      </div>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    {% if agora %}<p class="cn-frescor">Lido às <b>{{ agora }}</b> de Brasília</p>{% endif %}
+  </div>
+
+  {% if recusa %}
+  <section class="eq-recusa" role="alert">
+    <i class="ph ph-lock-key" aria-hidden="true"></i>
+    <div><h2>O Mapa de equipe não abre para você</h2>
+      <p>{{ recusa }}</p>
+      <p class="mudo">É a regra do aviso que o técnico lê antes de ligar a coleta. Quem põe a pessoa no setor é o
+        administrador, em Base → Acessos → Pessoas e setores.</p></div>
+  </section>
+  {% elif erro %}
+  <div class="cn-erro" role="alert"><b>{{ erro }}</b></div>
+  {% else %}
+  {% if piloto_msg %}<div class="cn-erro eq-msg eq-msg--{{ piloto_msg[0] }}" role="status">{{ piloto_msg[1] }}</div>{% endif %}
+  {% for a in avisos %}<div class="cn-erro cn-aviso" role="status">{{ a }}</div>{% endfor %}
+  <p class="eq-resumo">{% for n, rot, tom in resumo %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% else %}<span class="mudo">Nenhum técnico no piloto da coleta agora.</span>{% endfor %}</p>
+
+  <div class="eq-corpo">
+    <div class="eq-quadro">
+      {% if mapa.viewbox %}
+      <svg class="eq-svg" viewBox="{{ mapa.viewbox }}" role="img" aria-label="Os técnicos de campo no mapa">
+        <g class="eq-ufs">{% for f in mapa.ufs %}<path d="{{ f.d }}"/>{% endfor %}</g>
+        <g class="eq-siglas" aria-hidden="true">{% for f in mapa.ufs if f.x %}<text x="{{ f.x }}" y="{{ f.y }}">{{ f.sigla }}</text>{% endfor %}</g>
+        <g class="eq-usinas">{% for u in mapa.usinas %}<circle class="eq-u" cx="{{ u.x }}" cy="{{ u.y }}" r="4"><title>{{ nomes_usina.get(u.usina_id) or ('Usina ' ~ u.usina_id) }}</title></circle>{% endfor %}</g>
+        <g class="eq-pontos">{% for p in mapa.pontos %}{% set l = nome_de[p.pessoa_id] %}<a href="{{ url_for('torre_campo.equipe', tecnico=p.pessoa_id) }}"><circle class="eq-p eq-p--{{ p.tom }}{% if sel and sel.pid == p.pessoa_id %} eq-p--sel{% endif %}" cx="{{ p.x }}" cy="{{ p.y }}" r="9"><title>{{ l.nome }}: {{ l.s.rotulo }}</title></circle></a>{% endfor %}</g>
+      </svg>
+      {% else %}
+      <p class="mudo eq-vazio">Sem usina com coordenada no cadastro e sem técnico no mapa agora: não há o que desenhar.</p>
+      {% endif %}
+      <p class="eq-leg"><span class="cn-pill cn-info">em deslocamento</span><span class="cn-pill cn-ok">na usina, até 1 km</span><span class="cn-pill cn-alerta">sem sinal há 30 min ou mais</span><span class="cn-pill cn-critico">sem permissão</span><span class="mudo">O cinza é a usina. Parado fora de usina e sem posição hoje ficam só na lista.</span></p>
+    </div>
+
+    <aside class="eq-lado" aria-label="Os técnicos do piloto">
+      {% if sel %}{% set s = sel.s %}
+      <section class="eq-det">
+        <div class="eq-det-cab"><h2 class="eq-det-nome">{{ sel.nome }}</h2><span class="cn-pill cn-{{ s.tom }}">{{ s.rotulo }}</span></div>
+        <p class="eq-det-eq">{{ sel.equipe or 'Sem equipe no cadastro' }}</p>
+        <dl class="eq-dl">
+          <dt>Última posição</dt><dd>{{ sel.hora or 'nenhuma nos últimos 7 dias' }}</dd>
+          {% if sel.perto %}<dt>Usina mais perto</dt><dd>{{ sel.perto }}</dd>{% endif %}
+          {% if sel.onde %}<dt>Onde</dt><dd>{{ sel.onde }}</dd>{% endif %}
+          {% if sel.desde %}<dt>Sem permissão desde</dt><dd>{{ sel.desde }}</dd>{% endif %}
+        </dl>
+        {% if s.rota %}
+        <form class="eq-rota" method="get" action="{{ url_for('torre_campo.equipe_rota') }}" target="_blank" rel="noopener noreferrer">
+          <input type="hidden" name="tecnico" value="{{ sel.pid }}">
+          <label class="gc-rotulo" for="eq-usina">Abrir rota até a usina</label>
+          <select class="gc-campo" id="eq-usina" name="usina" required>
+            <option value="">Escolha a usina</option>
+            {% for uid, nome in opcoes_rota %}<option value="{{ uid }}">{{ nome }}</option>{% endfor %}
+          </select>
+          <button class="gc-btn gc-btn--primario" type="submit"><i class="ph ph-navigation-arrow" aria-hidden="true"></i>Abrir rota no Google Maps</button>
+          <p class="eq-nota">{% if s.chave == 'sem_sinal' %}A rota sai do último ponto conhecido ({{ sel.hora }}). {% endif %}O Google recebe a posição do técnico e a da usina só neste clique, e o clique fica registrado.</p>
+        </form>
+        {% elif s.base == 'fora_usina' %}
+        <p class="eq-nota">Parado fora de usina: o mapa não mostra o ponto exato e a rota não sai daqui (pode ser a casa ou o hotel).</p>
+        {% elif s.chave == 'sem_permissao' %}
+        <p class="eq-nota">Sem a permissão de localização "o tempo todo" no celular, o Nexus Field não manda a posição. Quem resolve com o técnico é o supervisor.</p>
+        {% elif s.chave == 'sem_posicao' %}
+        <p class="eq-nota">O celular não mandou posição hoje: o Nexus Field não foi aberto hoje, ou a coleta não ligou.</p>
+        {% endif %}
+        <a class="cn-link eq-voltar" href="{{ url_for('torre_campo.equipe') }}">Ver todos os técnicos</a>
+      </section>
+      {% else %}
+      {% for chave, titulo, lista in grupos %}
+      <section class="eq-grupo">
+        <h2>{{ titulo }} <span>{{ lista|length }}</span></h2>
+        {% if lista %}
+        <ul class="eq-lista">
+          {% for l in lista %}
+          <li><a href="{{ url_for('torre_campo.equipe', tecnico=l.pid) }}">
+            <span class="eq-lin"><b>{{ l.nome }}</b><small>{{ l.equipe or 'sem equipe' }}{% if chave == 'fora' and l.onde %} · {{ l.onde }}{% endif %}{% if chave in ('mapa', 'fora') and l.perto %} · {{ l.perto }}{% endif %}{% if l.hora %} · {{ l.hora }}{% endif %}</small></span>
+            <span class="cn-pill cn-{{ l.s.tom }}">{{ l.s.rotulo }}</span></a></li>
+          {% endfor %}
+        </ul>
+        {% else %}<p class="eq-vazio">{{ vazio[chave] }}</p>{% endif %}
+      </section>
+      {% endfor %}
+      {% endif %}
+    </aside>
+  </div>
+
+  {% if admin %}
+  {# o piloto (só administradores): no piloto, o Nexus Field só coleta quem foi escolhido aqui (padrão: ninguém) #}
+  <details class="eq-piloto"{% if piloto_msg %} open{% endif %}>
+    <summary><b>Piloto da coleta</b> <span>{{ no_piloto }} técnico{{ 's' if no_piloto != 1 }} no piloto · só administradores</span></summary>
+    <p class="eq-nota">O Nexus Field só coleta o técnico de campo ativo do cadastro que está no piloto (padrão: ninguém). A
+      decisão vai ao livro do piloto com o código de quem decidiu, e vale para o celular no próximo envio.</p>
+    <ul class="eq-piloto-lista">
+      {% for t in todos %}
+      <li><span class="eq-lin"><b>{{ t.nome }}</b><small>{{ t.equipe or 'sem equipe' }}</small></span>
+        <form method="post" action="{{ url_for('torre_campo.equipe_piloto') }}">
+          <input type="hidden" name="pessoa_id" value="{{ t.pid }}">
+          <input type="hidden" name="no_piloto" value="{{ 'nao' if t.no_piloto else 'sim' }}">
+          {% if t.no_piloto %}<span class="cn-pill cn-ok">no piloto</span>{% endif %}
+          <button class="gc-btn gc-btn--contorno" type="submit">{{ 'Tirar do piloto' if t.no_piloto else 'Pôr no piloto' }}</button>
+        </form></li>
+      {% else %}<li class="eq-vazio">Nenhum técnico de campo ativo no cadastro.</li>{% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -13,20 +13,36 @@ Os códigos são o que a casca faz com eles: 401 apaga a chave dela (só quando 
 sem rede" (a fila e a chave ficam), para a Microsoft ou o banco fora e o servidor sem configuração; 413 é o lote acima
 de 200 pontos ou o corpo acima de 64 KB; 400, o corpo que não segue o contrato (erro de quem programou a casca). Nenhuma
 resposta é 500: o que quebrar responde 503 e vai ao log só pelo tipo do erro.
+
+A tela (Task 7, no fim deste arquivo): `GET /t/campo/equipe` (o mapa e o painel), `GET /t/campo/equipe/rota` (o Abrir
+rota: o servidor monta o link do Google Maps e redireciona; a página nunca tem a coordenada) e `POST
+/t/campo/equipe/piloto` (quem entra no piloto da coleta; só o administrador). Quem vê é conferido DENTRO de cada uma
+(`_quem_ve`), além do portão por setor: o portão fica desligado sem a NEXUS_PESSOA_HMAC, e a marca de outro setor em
+Base → Acessos abriria a tela. Cada abertura do mapa e de cada rota vai ao registro da LGPD (`servico.registro`). O
+nome do técnico aparece na tela (é para isso que ela existe), decifrado do cadastro, e nunca vai ao banco nem ao log.
 """
 import json
 import logging
 import re
+from collections import Counter
+from datetime import timedelta, timezone
 
-from flask import Response, current_app, jsonify, request
+from flask import Response, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from ...auth import chaves, microsoft
+from ...auth import chaves, microsoft, setor_telas
+from ...cadastro import setor_ids as SID
+from ...cadastro.servico import chave_texto
 from ...campo import equipe as E
+from ...campo import mapa_responsaveis as MR
+from ...campo import visao
+from ...campo.equipe import piloto as PI
 from ...campo.equipe import pontos as PT
 from ...campo.equipe import servico as S
+from ...campo.equipe import situacao as SI
 from ...campo.equipe import token_ms as T
-from . import bp
+from ...campo.ligacao_cadastro import codigo_da_pessoa
+from . import TORRE, bp
 
 _log = logging.getLogger("nexus.campo.equipe")
 
@@ -226,3 +242,320 @@ def equipe_posicoes():
 def equipe_revogar():
     """O Sair da casca: `{aparelho}` com a chave -> 204."""
     return _responder(_revogacao)
+
+
+# ── a tela do Mapa de equipe (Task 7) ────────────────────────────────────────────────────────────────────────────────
+_BRT = timezone(timedelta(hours=-3))
+# o nome de cada setor que vê o mapa, para a recusa dizer a regra; quem vê de verdade é o `do_setor` da Tela
+NOME_DO_SETOR = {SID.PCM: "PCM", SID.COS: "COS", SID.PERFORMANCE: "Performance",
+                 SID.SUPERVISAO_CAMPO: "Supervisão Campo", SID.RESPONSAVEL_UFV: "Responsáveis UFV"}
+NAO_HA_ROTA = ("A rota não abre para este técnico agora: ela só sai do ponto em deslocamento ou na usina (não do "
+               "parado fora de usina, de quem está sem permissão de localização nem de quem está sem posição hoje). "
+               "Volte ao Mapa de equipe e atualize a página.")
+# o resumo do topo, na ordem de quem pede atenção: (chave da situação, singular, plural)
+RESUMO = (("sem_permissao", "sem permissão", "sem permissão"), ("sem_sinal", "sem sinal", "sem sinal"),
+          ("deslocamento", "em deslocamento", "em deslocamento"), ("na_usina", "na usina", "na usina"),
+          ("fora_usina", "parado fora de usina", "parados fora de usina"),
+          ("sem_posicao", "sem posição hoje", "sem posição hoje"))
+PILOTO_MSG = {"ok": ("ok", "Decisão do piloto gravada: vale para o celular no próximo envio."),
+              "erro": ("critico", "Não consegui gravar a decisão do piloto (o banco não respondeu): nada mudou. "
+                                  "Tente de novo em instantes."),
+              "sem_token": ("critico", "Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN): a decisão "
+                                       "do piloto não foi gravada.")}
+
+
+def _juntar(nomes: list) -> str:
+    return nomes[0] if len(nomes) == 1 else ", ".join(nomes[:-1]) + " e " + nomes[-1]
+
+
+def _setores_que_veem() -> tuple:
+    return setor_telas.donos_do_codigo(TORRE.tela("equipe"))
+
+
+def _regra() -> str:
+    nomes = [NOME_DO_SETOR.get(s, f"setor {s}") for s in _setores_que_veem()]
+    return f"O Mapa de equipe é visto só pelos setores {_juntar(nomes)} e pelos administradores do Nexus."
+
+
+def _usuario() -> tuple[str, str]:
+    u = session.get("usuario")
+    if not isinstance(u, dict):
+        return "", ""
+    return str(u.get("email") or "").strip().lower(), str(u.get("nome") or "").strip()
+
+
+def _quem_ve() -> dict:
+    """{"pode", "aviso"}: o administrador, ou quem é de um dos setores donos da tela. É a regra escrita no aviso ao
+    técnico (quem vê a posição dele), conferida aqui também, e não só no portão: o portão fica desligado sem a
+    NEXUS_PESSOA_HMAC (e nos testes), e a marca de OUTRO setor em Base → Acessos abriria a tela. Sem saber o setor (sem
+    a chave HMAC, o banco que não respondeu), só o administrador; o cliente, nunca."""
+    regra = _regra()
+    if session.get("via") == "cliente":
+        return {"pode": False, "aviso": regra}
+    if session.get("admin"):
+        return {"pode": True, "aviso": ""}
+    cfg = current_app.config
+    if not cfg.get("NEXUS_PESSOA_HMAC"):
+        return {"pode": False, "aviso": regra + " Este Nexus ainda não sabe o setor de cada pessoa (falta a "
+                                                "NEXUS_PESSOA_HMAC no servidor): por enquanto só o administrador vê o "
+                                                "mapa."}
+    email, _nome = _usuario()
+    try:
+        setor = setor_telas.setor_da_pessoa(cfg, email, *setor_telas._banco())
+    except Exception as e:      # noqa: BLE001 — sem saber o setor, fecha (e diz que é leitura, não falta de setor)
+        _log.warning("equipe: não consegui ler o setor de quem abriu o mapa (%s)", type(e).__name__)
+        return {"pode": False, "aviso": regra + " Não consegui ler o seu setor agora; tente de novo em instantes."}
+    if setor and setor.get("id") in _setores_que_veem():
+        return {"pode": True, "aviso": ""}
+    onde = f"Você está no setor {setor['nome']}." if setor else "Você está sem setor no Nexus."
+    return {"pode": False, "aviso": f"{regra} {onde}"}
+
+
+def _texto(status: int, texto: str) -> Response:
+    r = Response(texto, status=status, mimetype="text/plain")
+    r.headers["Cache-Control"] = "no-store"
+    return r
+
+
+def _servico_da_tela():
+    """(serviço, aviso): sem a chave do cadastro (ou com a pasta de dados que não abre), o mapa não tem o que mostrar e
+    diz o porquê, sem 500."""
+    try:
+        return S.do_app(current_app._get_current_object()), ""
+    except S.SemConfiguracao:
+        return None, ("O Mapa de equipe precisa da chave do cadastro neste servidor (NEXUS_CHAVE_CADASTRO): sem ela as "
+                      "posições não são recebidas nem mostradas.")
+    except Exception as e:      # noqa: BLE001
+        _log.error("equipe: o serviço do mapa não subiu (%s)", type(e).__name__)
+        return None, f"O serviço do Mapa de equipe não subiu neste servidor ({type(e).__name__})."
+
+
+def _equipe(srv, agora):
+    """(cadastro, técnicos de campo, piloto, aviso). Quem o mapa mostra é quem a coleta vale (`servico.coleta_vale`):
+    técnico de campo ativo do cadastro E no piloto. Quem não é coletado não aparece, nem como "sem posição hoje", e
+    quem saiu do piloto sai do mapa, mesmo com ponto de hoje. O cadastro que não se lê sobe."""
+    from ...pcm.tecnicos_usina import pessoas_de_campo
+    b = visao._Base()
+    tecnicos = pessoas_de_campo(b, current_app.config)
+    try:
+        piloto, aviso = srv.piloto(agora), ""
+        if piloto is None:
+            aviso = ("Não consegui ler o piloto no banco agora: o mapa fica sem técnicos até ler. Tente de novo em "
+                     "instantes.")
+    except S.AindaLendo:
+        piloto, aviso = None, "O piloto está sendo lido do banco agora; atualize a página em instantes."
+    return b, tecnicos, piloto or frozenset(), aviso
+
+
+def _quem_abriu(b) -> tuple:
+    """(pessoa_id, pessoa_hmac) de quem está olhando, para o registro da LGPD: o código do e-mail (o mesmo do App) e a
+    pessoa do cadastro, quando acha. A senha de administrador não tem e-mail: vai vazio, como nas decisões de setor."""
+    email, nome = _usuario()
+    codigo = codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or ""
+    pid = None
+    if b is not None and email:
+        try:
+            pid = b.pessoa_do_login(email, nome)
+        except Exception as e:  # noqa: BLE001 — sem a pessoa, o código basta para o registro
+            _log.warning("equipe: não achei a pessoa de quem abriu o mapa (%s)", type(e).__name__)
+    return pid, codigo
+
+
+def _hora(inst, agora) -> str:
+    """A hora de Brasília: "hoje às 11:57" ou "07/11 às 21:40"."""
+    if inst is None:
+        return ""
+    local = inst.astimezone(_BRT)
+    if local.date() == agora.astimezone(_BRT).date():
+        return f"hoje às {local:%H:%M}"
+    return f"{local:%d/%m} às {local:%H:%M}"
+
+
+def _onde(s: dict) -> str:
+    """O lugar do parado fora de usina, sem o ponto: o estado (e, com a Task 7b, a cidade)."""
+    return s.get("uf") or ""
+
+
+def _linhas(srv, b, tecnicos, piloto, coords, nomes_usina, agora):
+    """As linhas do painel (uma por técnico do piloto, pelo nome) e os pontos do mapa [(pessoa_id, lat, lon, tom)],
+    estes só de quem vai ao mapa. A coordenada fica aqui, na memória do processo: a página recebe o x/y do `desenho`."""
+    linhas, pontos = [], []
+    for pid in sorted((p for p in tecnicos if p in piloto), key=lambda p: chave_texto(tecnicos[p]["nome"])):
+        t = tecnicos[pid]
+        est = srv.estado_de(pid, agora)
+        s = SI.situacao(est, coords, agora)
+        perto = s["usina_perto"]
+        linhas.append({
+            "pid": pid, "nome": t["nome"], "equipe": b.nome_equipe.get(t["equipe_id"]) or "", "s": s,
+            "hora": _hora(s["ultima"], agora), "onde": _onde(s),
+            "perto": SI.texto_perto(perto[1], nomes_usina.get(perto[0]) or f"usina {perto[0]}") if perto else "",
+            "desde": _hora(s["desde"], agora) if s["chave"] == "sem_permissao" else ""})
+        if s["no_mapa"]:
+            u = est["ultimo"]
+            pontos.append((pid, u["lat"], u["lon"], s["tom"]))
+    return linhas, pontos
+
+
+def _grupos(linhas: list) -> list:
+    """O painel sem técnico escolhido: quem está no mapa, e os três grupos que ficam só na lista."""
+    no_mapa = [l for l in linhas if l["s"]["no_mapa"]]
+    fora = [l for l in linhas if not l["s"]["no_mapa"] and l["s"]["chave"] in ("fora_usina", "sem_sinal")]
+    sem_perm = [l for l in linhas if not l["s"]["no_mapa"] and l["s"]["chave"] == "sem_permissao"]
+    sem_pos = [l for l in linhas if l["s"]["chave"] == "sem_posicao"]
+    return [("mapa", "No mapa", no_mapa), ("sem_permissao", "Sem permissão de localização", sem_perm),
+            ("fora", "Parados fora de usina", fora), ("sem_posicao", "Sem posição hoje", sem_pos)]
+
+
+def _resumo(linhas: list) -> list:
+    n = Counter(l["s"]["chave"] for l in linhas)
+    return [(n[k], um if n[k] == 1 else varios, SI.TOM[k]) for k, um, varios in RESUMO if n[k]]
+
+
+def _tela(contexto: dict, status: int = 200):
+    tela = TORRE.tela("equipe")
+    r = current_app.make_response((render_template("campo/equipe.html", torre=TORRE, tela=tela, **contexto), status))
+    r.headers["Cache-Control"] = "no-store"         # a posição de pessoas não fica na cópia do navegador nem de proxy
+    return r
+
+
+@bp.route("/equipe", endpoint="equipe")
+def equipe():
+    """O mapa: os técnicos do piloto com a situação de cada um, o painel ao lado e, para o administrador, o piloto."""
+    quem = _quem_ve()
+    if not quem["pode"]:
+        return _tela({"recusa": quem["aviso"]}, 403)
+    srv, aviso = _servico_da_tela()
+    if srv is None:
+        return _tela({"erro": aviso})
+    agora = S._agora()
+    try:
+        b, tecnicos, piloto, aviso_piloto = _equipe(srv, agora)
+    except Exception as e:      # noqa: BLE001 — sem o cadastro, a tela diz por quê
+        _log.warning("equipe: não consegui ler o cadastro para o mapa (%s)", type(e).__name__)
+        return _tela({"erro": f"Não consegui ler o cadastro do Nexus agora ({type(e).__name__}); tente de novo em "
+                              "instantes."})
+    coords, erro_coords = MR.coordenadas()
+    nomes_usina = {str(uid): str(u.get("nome") or "").strip() for uid, u in b.por_id.items()}
+    linhas, pontos = _linhas(srv, b, tecnicos, piloto, coords, nomes_usina, agora)
+    try:
+        mapa = SI.desenho(coords, pontos)
+    except ValueError as e:     # o contorno do IBGE que não abre: a lista continua valendo
+        _log.warning("equipe: o contorno dos estados não abriu (%s)", type(e).__name__)
+        mapa = {"viewbox": None, "ufs": [], "usinas": [], "pontos": []}
+    pedido = str(request.args.get("tecnico") or "").strip()
+    sel = next((l for l in linhas if pedido.isdigit() and l["pid"] == int(pedido)), None)
+    # o registro da LGPD: quem abriu, quando e, com um técnico escolhido no painel, de quem
+    quem_pid, quem_hmac = _quem_abriu(b)
+    srv.registro.acrescentar("abriu_mapa", quem_pid, quem_hmac, sel["pid"] if sel else None, None, agora)
+    avisos = [a for a in (aviso_piloto,) if a]
+    if erro_coords:
+        avisos.append(f"Sem as coordenadas das usinas neste servidor ({erro_coords}): ninguém conta como na usina, e o "
+                      "parado fica fora do mapa.")
+    admin = bool(session.get("admin"))
+    todos = []
+    if admin:
+        todos = sorted(({"pid": pid, "nome": t["nome"], "equipe": b.nome_equipe.get(t["equipe_id"]) or "",
+                         "no_piloto": pid in piloto} for pid, t in tecnicos.items()),
+                       key=lambda t: (not t["no_piloto"], chave_texto(t["nome"])))
+    return _tela({
+        "linhas": linhas, "grupos": _grupos(linhas), "resumo": _resumo(linhas), "mapa": mapa, "sel": sel,
+        "nome_de": {l["pid"]: l for l in linhas}, "nomes_usina": nomes_usina,
+        "opcoes_rota": sorted(((uid, nomes_usina.get(uid) or f"Usina {uid}") for uid in coords),
+                              key=lambda x: chave_texto(x[1])),
+        "avisos": avisos, "admin": admin, "todos": todos, "no_piloto": sum(1 for t in todos if t["no_piloto"]),
+        "piloto_msg": PILOTO_MSG.get(str(request.args.get("piloto") or "")),
+        "agora": f"{agora.astimezone(_BRT):%H:%M}"})
+
+
+def _de_outro_site_na_navegacao() -> bool:
+    """A navegação que veio de OUTRO site (Sec-Fetch-Site `cross-site`, ou `same-site`: todo subdomínio de gridco.com.br
+    é same-site). O botão da tela manda `same-origin`; o endereço digitado ou o favorito, `none`. Sem isto, uma página
+    de fora abriria a rota em nome de quem está logado (a posição iria ao Google e o registro diria que ele abriu)."""
+    return (request.headers.get("Sec-Fetch-Site") or "").strip().lower() in ("cross-site", "same-site")
+
+
+@bp.route("/equipe/rota", endpoint="equipe_rota")
+def equipe_rota():
+    """O Abrir rota: `?tecnico=<pessoa_id>&usina=<usina_id>` -> 302 para o Google Maps, do último ponto do técnico até a
+    usina. Só para quem vê o mapa, e só quando a situação dá rota (`situacao.rota`): parado fora de usina, sem
+    permissão e sem posição respondem 404. O registro vem ANTES do redirecionamento: a coordenada sai do servidor
+    nesta hora."""
+    if _de_outro_site_na_navegacao():
+        abort(403)
+    quem = _quem_ve()
+    if not quem["pode"]:
+        return _texto(403, quem["aviso"])
+    srv, aviso = _servico_da_tela()
+    if srv is None:
+        return _texto(503, aviso)
+    agora = S._agora()
+    pedido_t = str(request.args.get("tecnico") or "").strip()
+    pedido_u = str(request.args.get("usina") or "").strip()
+    coords, _erro = MR.coordenadas()
+    destino = coords.get(pedido_u) if pedido_u.isdigit() else None
+    if not pedido_t.isdigit() or destino is None:
+        return _texto(404, NAO_HA_ROTA)
+    pid = int(pedido_t)
+    try:
+        b, tecnicos, piloto, _aviso = _equipe(srv, agora)
+    except Exception as e:      # noqa: BLE001
+        _log.warning("equipe: não consegui ler o cadastro para a rota (%s)", type(e).__name__)
+        return _texto(503, "Não consegui ler o cadastro do Nexus agora; tente de novo em instantes.")
+    if pid not in tecnicos or pid not in piloto:
+        return _texto(404, NAO_HA_ROTA)
+    est = srv.estado_de(pid, agora)
+    if not SI.situacao(est, coords, agora)["rota"]:
+        return _texto(404, NAO_HA_ROTA)
+    u = est["ultimo"]
+    url = SI.url_da_rota((u["lat"], u["lon"]), destino[:2])
+    quem_pid, quem_hmac = _quem_abriu(b)
+    srv.registro.acrescentar("abriu_rota", quem_pid, quem_hmac, pid, int(pedido_u), agora)
+    r = redirect(url, code=302)
+    r.headers["Cache-Control"] = "no-store"
+    # o Google não recebe o endereço do Nexus (com o técnico e a usina) como origem do clique
+    r.headers["Referrer-Policy"] = "no-referrer"
+    return r
+
+
+@bp.route("/equipe/piloto", methods=["POST"], endpoint="equipe_piloto")
+def equipe_piloto():
+    """Pôr um técnico de campo no piloto da coleta ou tirá-lo (`pessoa_id`, `no_piloto` = sim | nao). Só o
+    administrador; só técnico de campo ativo do cadastro. Grava no livro (`piloto.decidir`) e a cópia do piloto cai,
+    para a decisão valer já no mapa e no próximo envio do celular."""
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    if not session.get("admin"):
+        abort(403)
+    pedido = str(request.form.get("pessoa_id") or "").strip()
+    quer = str(request.form.get("no_piloto") or "").strip().lower()
+    if not pedido.isdigit() or quer not in ("sim", "nao"):
+        abort(400)
+    pid = int(pedido)
+    srv, aviso = _servico_da_tela()
+    if srv is None:
+        return _texto(503, aviso)
+    try:
+        from ...pcm.tecnicos_usina import pessoas_de_campo
+        tecnicos = pessoas_de_campo(visao._Base(), current_app.config)
+    except Exception as e:      # noqa: BLE001
+        _log.warning("equipe: não consegui ler o cadastro para o piloto (%s)", type(e).__name__)
+        return redirect(url_for("torre_campo.equipe", piloto="erro"), code=303)
+    if pid not in tecnicos:
+        abort(400)              # só técnico de campo ativo é coletado: pôr outro no piloto não teria efeito
+    email, _nome = _usuario()
+    quem = codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or ""
+    try:
+        PI.decidir(current_app.config, pid, quer == "sim", quem, S._agora())
+        resultado = "ok"
+    except PI.Recusada:
+        resultado = "sem_token"
+    except Exception as e:      # noqa: BLE001 — banco fora, leitura incompleta: nada gravado
+        _log.warning("equipe: a decisão do piloto não foi gravada (%s)", type(e).__name__)
+        resultado = "erro"
+    finally:
+        srv.esquecer_piloto()   # gravou (ou pode ter gravado antes de a conferência falhar): o próximo pedido relê
+    if resultado == "ok":
+        _log.info("equipe: a pessoa %s %s o piloto (decisão de um administrador)", pid,
+                  "entrou no" if quer == "sim" else "saiu do")
+    return redirect(url_for("torre_campo.equipe", piloto=resultado), code=303)
