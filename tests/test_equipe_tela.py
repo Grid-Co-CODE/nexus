@@ -372,8 +372,9 @@ def test_o_anel_do_escolhido_e_branco_com_halo_escuro_e_se_ve_nos_dois_temas():
         assert _razao(branco, escuro) >= 3, tema
         assert max(_razao(branco, cartao), _razao(escuro, cartao)) >= 3, tema
     assert _razao(_rgba(_tokens(SELETOR_CLARO)[halo_tok]), _rgba(_tokens(SELETOR_CLARO)["--superficie"])) >= 3
-    # no celular o ponto cresce 1,8 vez: o halo cresce junto, senão ficaria dentro do ponto
-    assert re.search(r"@media \(max-width:700px\)\{[^}]*\.eq-halo[^}]*transform:scale\(1\.8\)", css)
+    # no celular o ponto cresce 1,8 vez: o halo cresce junto, senão ficaria dentro do ponto. A largura é a do padrão
+    # (DESIGN.md, seção 4; `test_larguras_de_quebra`): era 700 px e virou 640 px no rebase de 08/11/2026
+    assert re.search(r"@media \(max-width:640px\)\{[^}]*\.eq-halo[^}]*transform:scale\(1\.8\)", css)
 
 
 def test_o_escolhido_tem_o_halo_e_vai_por_cima_dos_outros(cliente, pontos, setor):
