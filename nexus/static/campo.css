@@ -1953,7 +1953,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-p--info{fill:var(--info-cheio)}
 .eq-p--ok{fill:var(--ok-cheio)}
 .eq-p--alerta{fill:var(--alerta-cheio)}
-.eq-p--critico{fill:var(--critico-cheio)}
+.eq-p--critico{fill:var(--critico)}
 .eq-p--sel{stroke:var(--verde);stroke-width:3.5px}
 .eq-pontos a:focus-visible .eq-p{stroke:var(--foco);stroke-width:3.5px}
 .eq-leg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 4px 2px;font-size:12px}

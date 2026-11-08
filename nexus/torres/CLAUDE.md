@@ -58,6 +58,10 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
 - **Tela nova que lê o Fracttal ao abrir entra na `FORA` de `nexus/auth/pre_carga.py`** (12/10/2026): a pré-carga
   abre por trás as telas de quem tem setor, e a cota do Fracttal (200/min) é da empresa inteira. Se esquecer, a
   pré-carga anota a tela na 1ª vez, tira ela da volta e o log avisa.
+- **Tela nova cuja ABERTURA grava um fato entra na `SEM_PRE_CARGA` do mesmo arquivo** (08/11/2026): a pré-carga abre
+  com uma sessão interna de administrador, e na volta do boot abre todas. O Mapa de equipe (`campo/equipe`) registra
+  cada abertura na trilha da LGPD; aquecido, gravaria um "abriu_mapa" que ninguém abriu. Aqui não há aviso automático:
+  quem cria a tela lembra.
 - `montar_menu` mostra só as telas que o setor da pessoa vê (`liberadas`, chaves `torre/tela`; None = tudo) e tira a
   torre sem nenhuma. A cadeira, que punha a torre dela primeiro, saiu em 12/10/2026 (Base → Acessos).
 - O módulo-modelo chama `modelo.py`, não `base.py`: `base` colidia com o pacote da torre Base.

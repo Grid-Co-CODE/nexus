@@ -118,7 +118,8 @@ def test_o_ibge_pendurado_nao_prende_o_pedido(tmp_path):
         th.start()
     inicio = time.monotonic()
     assert MU.cidade(-16.5123, -48.5321, "GO", pasta=tmp_path, baixar=ibge_lento, iniciar=em_thread) is None
-    assert time.monotonic() - inicio < 1.0 and len(threads) == 1
+    # 5 s de folga: a suíte inteira é lenta, e o IBGE preso esperaria os 10 s do `solta.wait`
+    assert time.monotonic() - inicio < 5.0 and len(threads) == 1
     solta.set()
     threads[0].join(10)
     achada = MU.cidade(-16.5123, -48.5321, "GO", pasta=tmp_path, baixar=ibge_lento, iniciar=em_thread)

@@ -21,7 +21,8 @@ todos: a tela aquecida para uma pessoa fica quente para quem vier depois.
   Campo vive dela), o OS Creator (a torre OS lê o Fracttal com o login da pessoa) e as telas da plataforma na moldura (o
   peso delas é da plataforma, que tem a própria pré-carga). Uma tela fora da FORA que leia o Fracttal durante a
   pré-carga é anotada (`campo.fracttal.marcar_pre_carga`), sai da pré-carga até o Nexus reiniciar, e o log pede para
-  pô-la na FORA.
+  pô-la na FORA. E a SEM_PRE_CARGA: a tela cuja abertura grava um fato (o Mapa de equipe, que registra cada abertura
+  na trilha da LGPD, 08/11/2026).
 - `NEXUS_PRE_CARGA=0` desliga numa máquina. Nos testes, só liga quando o teste pede, e roda na hora (sem thread).
 """
 import logging
@@ -43,6 +44,11 @@ PAUSA_S = 0.3
 # o Quadro da equipe da Performance (04/11/2026) lê o Fracttal ao abrir sem cópia, como o da Engenharia
 FORA = frozenset({"engenharia/mesa", "engenharia/confiabilidade", "engenharia/equipe", "campo/aprovacao",
                   "performance/equipe"})
+# as telas que a pré-carga nunca abre por OUTRO motivo que não o Fracttal: abrir a tela já é um fato que fica gravado. O
+# Mapa de equipe (08/11/2026) põe cada abertura na trilha da LGPD (quem abriu a posição de quem): aquecido aqui, com a
+# sessão interna de administrador, ele subiria o serviço e gravaria um "abriu_mapa" que ninguém abriu, a cada volta e a
+# cada boot (`aquecer_ao_subir`). Tela nova cuja abertura grava alguma coisa entra aqui.
+SEM_PRE_CARGA = frozenset({"campo/equipe"})
 CABECALHO = "X-Nexus-Pre-Carga"
 
 
@@ -63,12 +69,13 @@ def _estado(app) -> dict:
 
 
 def aqueciveis(app) -> list[str]:
-    """As telas que a pré-carga abre, na ordem do menu: todas menos a FORA, a torre OS e as molduras da plataforma."""
+    """As telas que a pré-carga abre, na ordem do menu: todas menos a FORA, a SEM_PRE_CARGA, a torre OS e as molduras
+    da plataforma."""
     e = _estado(app)
     if e["aqueciveis"] is None:
         from ..performance import porta
         torres = sorted(app.extensions["nexus_torres"], key=lambda t: t.ordem)
-        fora = FORA | {f"{m.torre}/{m.tela}" for t in torres for m in porta.da_torre(t.id)}
+        fora = FORA | SEM_PRE_CARGA | {f"{m.torre}/{m.tela}" for t in torres for m in porta.da_torre(t.id)}
         e["aqueciveis"] = [f"{t.id}/{s.id}" for t in torres if t.id != "os" for s in t.telas
                            if f"{t.id}/{s.id}" not in fora]
     return e["aqueciveis"]
