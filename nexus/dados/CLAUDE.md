@@ -360,14 +360,21 @@ plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento que
 **Mapa de equipe (08/11/2026).** Cinco livros, todos registrados no catálogo ANTES de existir (regra 10). **Ainda não estão
 no banco: aparecem com a primeira gravação depois do deploy** (a primeira posição, a primeira chave emitida, a primeira
 abertura do mapa). Quem escreve é o gravador em lote (`nexus/campo/equipe/gravador.py`, a cada 5 min), só onde
-`NEXUS_EQUIPE_GRAVA=1`, uma máquina por vez, e a decisão do piloto na hora (`nexus/campo/equipe/piloto.py`). O banco só
-troca o livro inteiro, então cada livro é relido e regravado pela UNIÃO com o que o banco já tem: um disco novo ou uma
-rodada que viu menos nunca encolhe o que já está lá. Regra de uso e do porquê: `nexus/torres/campo/CLAUDE.md`, "Mapa de equipe".
+`NEXUS_EQUIPE_GRAVA=1`, uma máquina por vez, e a decisão do piloto na hora (`nexus/campo/equipe/piloto.py`). O que espera
+a rodada fica num jornal cifrado na pasta de dados (`equipe/fila_*.jsonl` e o diário dos pontos): o reinício antes da
+gravação não perde nada. O banco só troca o livro inteiro, então cada livro é relido e regravado pela UNIÃO com o que o
+banco já tem: um disco novo ou uma rodada que viu menos nunca encolhe o que já está lá, e os cinco são `so_cresce`.
+Regra de uso e do porquê: `nexus/torres/campo/CLAUDE.md`, "Mapa de equipe".
 - **`nexus_equipe_pontos_AAAA_MM_DD`** (família diária · `fato_ponto_equipe`): 1 linha = 1 ponto de posição de 1 técnico
-  dentro do expediente (6h a 22h, hora do técnico), com `ponto_id`, `data_id`, `instante`, `pessoa_id` e `cifra`. **A
-  coordenada só existe na `cifra`** (Cofre, contexto `equipe/ponto/<ponto_id>`; nada de lat/lon em claro em lugar nenhum).
+  dentro do expediente (6h a 22h na hora do técnico, o `fuso` do lote; o `data_id` é o dia de Brasília), com `ponto_id`,
+  `data_id`, `instante`, `pessoa_id` e `cifra`. **A coordenada só existe na `cifra`** (Cofre, contexto
+  `equipe/ponto/<ponto_id>`; nada de lat/lon em claro em lugar nenhum).
   **Guarda de 7 dias (LGPD, decisão do Levi): a T.I. apaga o livro do dia com mais de 7 dias**
-  (`docs/mapa-equipe-pedido-ti.md`); o Nexus não usa nem mostra ponto mais velho, mesmo antes. Por isso não tem `so_cresce`.
+  (`docs/mapa-equipe-pedido-ti.md`); o Nexus não usa nem mostra ponto mais velho, mesmo antes. **Enquanto existe, só cresce
+  (`so_cresce`, revisão final de 08/11/2026):** o gravador publica a união do diário com o banco sempre que o diário tem
+  um ponto que o banco não tem, e a trava do `livros.publicar` recusa a gravação que encolheria o dia. Antes não havia
+  `so_cresce` e uma trava à mão pela contagem (diário menor que o banco não publica) barrava a máquina nova no meio do
+  dia: os pontos novos daquele dia nunca chegavam ao banco.
 - **`nexus_equipe_deslocamentos_AAAA_MM`** (família mensal · `fato_deslocamento_equipe`): 1 linha = 1 deslocamento fechado de
   1 técnico, da usina de saída à de chegada, no livro do MÊS DA CHEGADA. Sem coordenada: as duas usinas, a saída, a
   chegada, `duracao_min` e `distancia_km`. Calculado pelo servidor dos pontos; o id é um hash do trecho, então regravar

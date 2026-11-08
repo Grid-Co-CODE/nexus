@@ -1501,8 +1501,9 @@ primeira gravação depois do deploy, e a coleta só vale para quem o administra
 | Cidade | `campo/equipe/municipios.py` | a cidade de quem está parado fora de usina, pela malha do IBGE do ESTADO inteiro |
 | Piloto | `campo/equipe/piloto.py` | grava quem entra e quem sai do piloto (`nexus_equipe_piloto`) |
 | Registro da LGPD | `campo/equipe/acessos.py` | quem abriu o mapa ou a rota de quem |
+| Jornal das filas | `campo/equipe/jornal.py` | os eventos de chave e os acessos esperando o gravador, cifrados em disco (`equipe/fila_*.jsonl`): o reinício antes da rodada não perde nada |
 | Estado do processo | `campo/equipe/servico.py` | junta chaves, diário, piloto e cadastro por trás das rotas; nada daqui grava no banco |
-| Gravador em lote | `campo/equipe/gravador.py` | a cada 5 min leva ao banco o que está na memória e no diário |
+| Gravador em lote | `campo/equipe/gravador.py` | a cada 5 min leva ao banco o que está nas filas e no diário, e apara o jornal |
 | Rotas e tela | `torres/campo/equipe_tela.py`, `templates/campo/equipe.html`, `static/campo.css` (bloco `eq-*`) | as três rotas do celular, o mapa, o Abrir rota e o piloto |
 
 ### De onde vem o dado: o contrato com o Nexus Field
@@ -1514,8 +1515,9 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
   `https://gridco-campo-mw.azurewebsites.net`, em toda resposta dela, senão a página não separa o 401 do 503).
   `Authorization: Bearer <ID token Microsoft>`, corpo `{aparelho, app}`. Resposta `200 {coleta: true, chave}` (32 bytes
   em base64url; um par pessoa + aparelho tem uma chave só, a nova revoga a velha), `200 {coleta: false}`, `401` token
-  inválido, `503` Microsoft ou banco fora ou servidor sem configuração. A página só pede a chave quando o aparelho não
-  tem uma ou depois de um 401.
+  inválido, `503` Microsoft ou banco fora (inclusive o piloto, os técnicos ou o cadastro sem nenhuma leitura boa),
+  servidor sem configuração ou máquina que não grava. A página só pede a chave quando o aparelho não tem uma ou depois
+  de um 401.
 - **`POST /t/campo/equipe/posicoes`** (chamada pelo nativo, app aberto ou fechado). `Authorization: Bearer <chave>`, corpo
   `{aparelho, fuso, pontos: [{t, lat, lon, prec, vel, mov}]}`. `t` em milissegundos UTC; **`fuso` são os minutos que se
   somam ao UTC para dar a hora do celular** (Brasília -180, Mato Grosso -240); `mov` diz se a própria leitura está em
@@ -1535,8 +1537,17 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
   as 22h; férias e folga, sem abrir o app, nada é coletado. Por isso o celular manda o `fuso` e o Nexus descarta o ponto
   fora da janela na hora local (técnico em Mato Grosso tem a janela dele).
 - **7 dias os pontos, 1 ano os deslocamentos (08/11, LGPD, decisão do Levi).** O Nexus nunca usa nem mostra ponto com mais de
-  7 dias, mesmo antes da limpeza; o diário em disco também apaga o arquivo velho. Quem apaga do banco é a T.I.
-  (`docs/mapa-equipe-pedido-ti.md`).
+  7 dias, mesmo antes da limpeza. O diário em disco **se poda sozinho** (`Diario.podar`, ao carregar e na virada do dia de
+  Brasília: fica hoje e os 6 dias de antes, e o ponto mais velho que sobra tem menos de 7 dias), com ou sem o gravador;
+  até a revisão final de 08/11/2026 só o gravador limpava, e sem o `NEXUS_EQUIPE_GRAVA=1` a trilha ficaria para sempre.
+  O recálculo dos deslocamentos corta o ponto pelo INSTANTE (o arquivo do dia mais velho ainda tem ponto de mais de 7
+  dias). Quem apaga do banco é a T.I. (`docs/mapa-equipe-pedido-ti.md`).
+- **O reinício não perde a chave, a revogação nem o registro da LGPD (revisão final de 08/11/2026).** A gravação é a cada
+  5 min e todo push reinicia o servidor: a chave emitida pouco antes sumia (o celular recebia 401 e parava), a revogação
+  se perdia (a chave velha, que o livro conhece, voltava a valer) e a linha da LGPD desaparecia. As duas filas moram num
+  jornal cifrado em disco (`campo/equipe/jornal.py`, `flush` + `fsync` antes de responder); no boot ele volta à fila e às
+  chaves junto com o livro do banco, e a publicação boa o apara (o id que o banco já tem não entra de novo). O disco que
+  falha responde 503 e nada muda; no mapa e na rota, sem o registro gravado a tela não abre.
 - **Sem sinal = 30 minutos sem ponto.** A coleta pode ser cortada pelo Android em celular com economia de bateria; o mapa
   mostra o buraco e não o esconde.
 - **Na usina = a até 1 km da coordenada (raio confirmado pelo Levi, 08/11)**, a usina mais perto se mais de uma couber.
@@ -1547,21 +1558,28 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
   seguinte viraria uma viagem de 14 h que não existiu. Voltar à mesma usina não é deslocamento, e o id é um hash do
   trecho, então recalcular o mês não duplica linha.
 - **Parado fora de usina (a casa, o hotel) nunca vai ao mapa e não tem Abrir rota** (Levi: o mapa não mostra onde o
-  técnico mora). O painel diz a cidade e a distância até a usina mais perto. Vale também para o "sem sinal" e o "sem
+  técnico mora). O painel diz a cidade e a distância até a usina mais perto, **em km inteiro** (revisão final de
+  08/11/2026: com a casa decimal, a distância a duas usinas já cercava a casa). Vale também para o "sem sinal" e o "sem
   permissão" cujo último ponto era parado fora de usina: senão a casa apareceria meia hora depois, em âmbar.
 - **Sem permissão nunca tem rota**: quem negou a localização não tem a posição mandada ao Google.
 - **Identidade só pelo e-mail exato da ficha.** O registro do aparelho acha a pessoa pelo e-mail do token, sem o nome tirado
   do e-mail e sem desempate: um funcionário de nome igual poderia registrar um celular como técnico do piloto. E-mail de
   duas fichas = ninguém. Ficha excluída não conta. Técnico sem e-mail no cadastro fica de fora até o cadastro ter o e-mail.
 - **401 é só "esta chave/este token não vale"; 503 é "não sei".** O banco que não respondeu, o livro das chaves ilegível no
-  boot e a Microsoft fora respondem 503: o 401 faria a casca apagar a chave e parar até a próxima abertura do App.
-- **O teto da Microsoft só liga numa falha de verdade ao baixar as chaves.** Sem o JWKS, a rota responde 503 e não tenta de
-  novo antes de 60 s; mas um token forjado com um `kid` desconhecido NÃO pode ligar esse teto (seria um jeito de segurar
-  os registros de todos em 503). O `kid` desconhecido força no máximo uma releitura a cada 5 min.
+  boot e a Microsoft fora respondem 503: o 401 faria a casca apagar a chave e parar até a próxima abertura do App. O
+  mesmo vale para o `coleta: false`, que também para a casca: **sem nenhuma leitura boa do piloto, dos técnicos de campo
+  ou do cadastro (a pessoa do e-mail), a rota responde 503** (`servico.BancoFora`), e não coleta false (revisão final de
+  08/11/2026: depois de um reinício com o banco piscando, todo celular do minuto seguinte parava até a próxima abertura).
+  O piloto lido e vazio é "ninguém", não falha; o cadastro que volta sem ficha nenhuma, ou sem técnico nenhum, é falha.
+- **O teto da Microsoft só liga com o download que falhou de verdade e não vale com a cópia de 24 h das chaves.** Sem o
+  JWKS e sem a cópia, a rota responde 503 e não tenta de novo antes de 60 s. Com a cópia, o `kid` conhecido confere na
+  hora e o desconhecido relê pelo teto próprio do `token_ms` (no máximo uma releitura a cada 5 min); e um token forjado
+  com `kid` desconhecido NÃO liga o teto (seria um jeito de segurar os registros de todos em 503).
 - **O ID token é conferido pela assinatura** (aqui, e não no login do Nexus): lá o token chega direto do endpoint da
   Microsoft numa conexão conferida; aqui vem do navegador, numa rota pública, e sem a assinatura um token forjado registraria
   um aparelho no nome de um técnico e poria posições falsas no mapa. O `alg` é conferido ANTES de tocar em chave (só RS256);
-  o token de acesso do Graph é recusado (401).
+  o token de acesso do Graph é recusado (401), e o token com `scp` também (o token de acesso de uma API do próprio App
+  teria o `aud` certo; o ID token nunca traz `scp`; o `roles` fica, porque o ID token pode trazê-lo).
 - **O IBGE baixa o estado inteiro e nunca recebe a posição** (Levi: "Faça puxar uma API do IBGE"). Só a sigla da UF vai
   ao IBGE; o ponto no polígono roda aqui. A malha fica 30 dias no disco (`pasta_dados/equipe/ibge/<UF>.json`); o IBGE fora
   deixa só a UF no painel, e o mapa não quebra.
@@ -1573,7 +1591,14 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
   servidor (origem no técnico, destino na usina) e redireciona (302); a coordenada só sai no clique, para o Google. Só o
   Google Maps: o link do Waze só recebe o destino e a rota sairia de quem clica, não do técnico. A rota recusa pedido vindo
   de outro site (`Sec-Fetch-Site`), registra o acesso ANTES do redirecionamento e vai com `no-store` e
-  `Referrer-Policy: no-referrer`. A página e o JSON nunca têm lat/lon (o teste procura a coordenada no HTML).
+  `Referrer-Policy: no-referrer`. O link leva 5 casas (~1 m; a 6ª é o centímetro). A página e o JSON nunca têm a lat/lon
+  em texto (o teste procura a coordenada no HTML); o x/y do desenho dá o lugar aproximado, e o "!" da tela diz isso, sem
+  prometer mais.
+- **Quem abriu é achado pelo e-mail exato da ficha** (`servico.pessoa_do_email`, revisão final de 08/11/2026), como no
+  registro do aparelho: o `pessoa_do_login` acha pelo nome tirado do e-mail, e a trilha da LGPD gravaria o homônimo. Sem a
+  ficha do e-mail, `pessoa_id` vazio e o código HMAC identifica.
+- **A pré-carga nunca abre o Mapa de equipe** (`pre_carga.SEM_PRE_CARGA`): ela abre as telas com uma sessão interna de
+  administrador, e cada abertura grava uma linha na trilha da LGPD.
 - **Ritmo e economia:** o celular manda a cada 2 min em deslocamento e mais espaçado parado; o Nexus recebe, não pede.
 
 ### Quem vê
@@ -1592,6 +1617,13 @@ Nada liga sozinho; tudo inerte sem a configuração (as rotas respondem 503).
 - `NEXUS_EQUIPE_MS_CLIENT_ID` e `NEXUS_EQUIPE_MS_TENANT_ID` em Base → Chaves: o ID do aplicativo do App de Campo e o ID do
   diretório da Grid no Entra ID (os GUIDs não são segredo mas ficam fora do repositório público).
 - `NEXUS_EQUIPE_GRAVA=1` **numa máquina só** (o PC e o servidor não gravam juntos): liga o gravador em lote. Nunca em teste.
+  **Vai ao servidor ANTES de alguém entrar no piloto:** as três rotas do celular respondem 503 ("o Mapa de equipe não
+  grava nesta máquina") onde ela não vale, porque quem recebe tem de ser quem grava (a chave e os pontos ficariam só no
+  disco de uma máquina que nunca os publica). As três variáveis (e os dois IDs do Entra) entram pelo `.env` desde a
+  revisão final de 08/11/2026 (`config.OPCIONAIS`; antes só a tela Base → Chaves chegava ao app).
+- **O desenho supõe UM processo do Nexus no servidor**: as chaves ativas, o diário, as filas e as cópias do piloto moram
+  na memória dele (e no disco da pasta de dados). Dois processos (dois workers) teriam chaves diferentes e respostas
+  diferentes para o mesmo celular.
 - O piloto: o administrador escolhe os técnicos na própria tela. Padrão: ninguém é coletado.
 - Os livros: ver `nexus/dados/CLAUDE.md`. A limpeza do banco é pedido à T.I.: `docs/mapa-equipe-pedido-ti.md`.
 
@@ -1600,9 +1632,11 @@ Nada liga sozinho; tudo inerte sem a configuração (as rotas respondem 503).
 `tests/test_equipe_catalogo.py` (o dado no catálogo antes de existir), `test_equipe_token.py` (a assinatura, o `alg`, o
 diretório, o prazo, o 401 e o 503), `test_equipe_aparelhos.py` (a chave só como hash, o piloto, o evento),
 `test_equipe_pontos.py` (a janela na hora do técnico, a cifra, o diário, os 7 dias), `test_equipe_deslocamentos.py`,
-`test_equipe_rotas.py` (o contrato das três rotas, os códigos, o CORS, os limites), `test_equipe_gravador.py` (a união, o
-que nunca encolhe o banco, a fila que volta), `test_equipe_situacao.py`, `test_equipe_municipios.py` (IBGE injetado, nunca
-a rede) e `test_equipe_tela.py` (quem vê, a rota, o registro, o piloto, nenhuma coordenada na página nem no JSON).
+`test_equipe_rotas.py` (o contrato das três rotas, os códigos, o CORS, os limites, a chave e a revogação que sobrevivem
+ao reinício sem gravação, o 503 sem leitura boa e na máquina que não grava), `test_equipe_gravador.py` (a união, o que
+nunca encolhe o banco, a fila que volta, o jornal aparado, o corte pelo instante), `test_equipe_situacao.py`,
+`test_equipe_municipios.py` (IBGE injetado, nunca a rede) e `test_equipe_tela.py` (quem vê, a rota, o registro pelo
+e-mail exato, o piloto, nenhuma coordenada na página nem no JSON, a pré-carga que não abre o mapa).
 Cada regra de segurança foi provada por quebra de propósito. A bancada só leitura (um técnico falso mandando um lote
 pelo `test_client`, o mapa a 1440 px e 375 px sem rolagem de lado) é o passo final da prova.
 
@@ -2003,8 +2037,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
 - `visao_cliente.py`: a Visão do cliente (05/11/2026, acima): o recorte por `cliente_id`, o status pelo tempo real,
   as OS, os chamados e a próxima visita por usina, os 5 números e a ordem; a leitura do tempo real pela ponte.
 - `equipe/` (Mapa de equipe, 08/11/2026, acima): `__init__.py` (réguas e livros), `token_ms.py`, `aparelhos.py`, `pontos.py`,
-  `deslocamentos.py`, `situacao.py`, `municipios.py`, `piloto.py`, `acessos.py`, `servico.py` e `gravador.py`. As rotas e a
-  tela ficam em `torres/campo/equipe_tela.py`.
+  `deslocamentos.py`, `situacao.py`, `municipios.py`, `piloto.py`, `acessos.py`, `jornal.py`, `servico.py` e
+  `gravador.py`. As rotas e a tela ficam em `torres/campo/equipe_tela.py`.
 - `relatorio_usina.py`: o relatório da usina em PDF para o cliente (04/11/2026, acima): os meses, os temas, os dados
   das telas donas e o PDF (reportlab, a paleta e a fonte dos outros relatórios).
   `manutencao.py`: a conta pura do bloco Manutenção. `tarefas_os.py`: o laço que lê as tarefas das OS do Fracttal e
