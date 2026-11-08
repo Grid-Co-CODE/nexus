@@ -66,7 +66,7 @@ def campo():
 
 
 def test_fila_tem_os_grupos_e_numeros_do_painel_do_app(campo):
-    d = aprovacao.fila({"dias": "60"}).dados
+    d = aprovacao.fila_toda({"dias": "60"}).dados
     assert d["baldes"] == {"completa": 1, "olho": 1, "fora_do_app": 1}
     r = d["resumo"]
     assert (r["tarefas"], r["aged7d"], r["aged30d"], r["pelo_app"]) == (3, 2, 1, 2)
@@ -75,21 +75,23 @@ def test_fila_tem_os_grupos_e_numeros_do_painel_do_app(campo):
     assert {x["os"]: x["balde"] for x in d["linhas"]} == {"15002": "fora_do_app", "15088": "olho", "15102": "completa"}
 
 
-def test_filtro_por_grupo_vale_para_a_lista_e_os_numeros(campo):
-    d = aprovacao.fila({"dias": "60", "balde": "olho"}).dados
-    assert [x["os"] for x in d["linhas"]] == ["15088"]
-    assert d["resumo"]["tarefas"] == 1               # no App o resumo também é do grupo escolhido
-    assert d["baldes"]["completa"] == 1              # e os grupos continuam contando todos
+def test_filtro_por_grupo_nao_entra_na_conta_da_fila_toda(campo):
+    # 08/11/2026: a `fila` filtrada por grupo saiu (só os testes a usavam); a `fila_toda` descarta o `balde` e a tela
+    # filtra em cima da conta pronta. A lista e os grupos continuam inteiros.
+    d = aprovacao.fila_toda({"dias": "60", "balde": "olho"}).dados
+    assert [x["os"] for x in d["linhas"]] == ["15002", "15088", "15102"]
+    assert d["resumo"]["tarefas"] == 3
+    assert d["baldes"] == {"completa": 1, "olho": 1, "fora_do_app": 1}
 
 
 def test_parametro_estranho_nao_chega_nas_regras(campo):
-    d = aprovacao.fila({"dias": "60", "qualquer": "coisa"}).dados
+    d = aprovacao.fila_toda({"dias": "60", "qualquer": "coisa"}).dados
     assert d["resumo"]["tarefas"] == 3
 
 
 def test_nexus_so_le_o_fracttal_e_uma_vez_a_cada_10_min(campo):
-    aprovacao.fila({"dias": "60"})
-    aprovacao.fila({"dias": "60", "balde": "olho"})     # outro filtro, mesma fila crua (cache do próprio App)
+    aprovacao.fila_toda({"dias": "60"})
+    aprovacao.fila_toda({"dias": "60", "balde": "olho"})     # outro filtro, mesma fila crua (cache do próprio App)
     paginas = [p for p in campo.pedidos if "start=" in p]
     assert len(paginas) == 1 and len(campo.pedidos) == 2
     with pytest.raises(fracttal.Recusado):
@@ -105,7 +107,7 @@ def test_fila_de_mais_de_6_mil_tarefas_vem_inteira(campo):
     20.000 (v243, 08/10); a recópia de 09/10 (App v256) o trouxe. A lista falsa vem na ordem do Fracttal."""
     from nexus.campo import regras_app
     campo.linhas = [_os(20000 + i, 1 + i * 39 / 6177) for i in range(6177)]
-    d = aprovacao.fila({"dias": "60"}).dados
+    d = aprovacao.fila_toda({"dias": "60"}).dados
     assert len(regras_app._FILA_CACHE["linhas"]) == 6177 and d["resumo"]["tarefas"] == 6177
     assert regras_app._FILA_CACHE["linhas"][-1]["wo_folio"] == "26176"          # a mais antiga, a do fim, está na fila
     assert d["resumo"]["espera_max"] >= 39                                      # e é ela a espera máxima da tela
@@ -115,7 +117,7 @@ def test_fila_de_mais_de_6_mil_tarefas_vem_inteira(campo):
 def test_fracttal_recusou_vira_aviso(campo):
     campo.recusar = True
     leitura.limpar_cache()
-    lida = aprovacao.fila({"dias": "60"})
+    lida = aprovacao.fila_toda({"dias": "60"})
     assert not lida.dados and "recusou" in aprovacao.estado()["erro"]
 
 

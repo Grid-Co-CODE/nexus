@@ -52,7 +52,7 @@ def test_aprovacao_usa_a_nota_do_banco(banco):
     fracttal.usar_fornecedor(FracttalFalso([_os(15002, 4, "Técnico 7"), _os(15088, 2, "Técnico 4"),
                                             _os(15102, 1, "Técnico 5")]))
     try:
-        d = aprovacao.fila({"dias": "30"}).dados
+        d = aprovacao.fila_toda({"dias": "30"}).dados
     finally:
         fracttal.usar_fornecedor(None)
     assert {x["os"]: (x["balde"], x["qualidade"]) for x in d["linhas"]} == {

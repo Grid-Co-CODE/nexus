@@ -36,8 +36,6 @@ from .leitura import Leitura
 TABELAS = ("qualidadelog", "rondas", "rondaativos", "rondaos", ("fracttaltokens", "cadastro"))
 # a que ela EXIGE para sair do painel do App: sem o registro dos fechamentos, todo mundo cairia em "fora do App"
 EXIGIDAS = ("qualidadelog",)
-# os parâmetros que a rota do App entende; o resto da URL não chega às regras
-PARAMETROS = ("de", "ate", "dias", "sup", "funcao", "colab", "regiao", "os", "balde", "nome", "pag", "tam")
 # escopo de Admin: vê a fila inteira (no Nexus só entra quem tem a senha de admin)
 ESCOPO_ADMIN = {"clusters": None, "papel": "Admin"}
 # A fila INTEIRA, sem janela de dias (Levi, 08/10/2026: "NÃO DEVE TER FILTRO 'OS fechadas nos X dias'. A visão de ideia
@@ -60,15 +58,6 @@ _PRONTA: dict = {}
 # auditoria de 08/11/2026: um lote de aprovações durante os minutos da releitura voltava inteiro para o quadro)
 _APROVADAS: dict = {}
 APROVADA_VALE_S = 20 * 60
-
-
-class _Usinas(list):
-    """O escopo "estas usinas" que a cópia do App entende (`_area_ok`: `clusters.usinas`, comparado com a usina do
-    Fracttal, `groups_1_description`). É assim que o filtro de equipe e de supervisor entra na conta do App."""
-
-    def __init__(self, nomes):
-        super().__init__(sorted(nomes))
-        self.usinas = {regras_app._norm(n) for n in nomes}
 
 
 class _Pedido:
@@ -268,25 +257,7 @@ def _preparar(app):
     prefiltro_fundo.pedir_conferencia(app)
 
 
-def fila(params: dict, usinas=None) -> Leitura:
-    """`usinas` = os nomes do Fracttal (Classificação 1) das usinas da equipe ou do supervisor escolhido; None = todas."""
-    p = {k: str(v) for k, v in params.items() if k in PARAMETROS and v not in (None, "")}
-    regras_app.FILA_TTL_S = _SEMPRE        # a cópia é recarregada nos testes: reafirma a cada visita
-    _pedir_releitura()
-    lida = _lida_em()
-    if regras_app._FILA_CACHE.get("linhas") is None:
-        return Leitura({}, time.time(), "")      # 1ª leitura em andamento (ou recusada): a tela diz qual
-
-    escopo = ESCOPO_ADMIN if usinas is None else {**ESCOPO_ADMIN, "clusters": _Usinas(usinas)}
-
-    def calcular():
-        return regras_app._fila_supervisao(_Pedido(p), escopo)
-    # a fila relida entra na conta na hora: a data da fila faz parte da chave da cópia de 5 min
-    filtro = tuple(sorted(usinas)) if usinas is not None else None
-    return leitura.ler(("fila", str(lida), filtro) + tuple(sorted(p.items())), calcular)
-
-
-def fila_toda(params: dict, usinas=None) -> Leitura:
+def fila_toda(params: dict) -> Leitura:
     """A fila inteira, tarefa a tarefa, pela conta do App (`_fila_supervisao`), para os insights da tela (Levi, 05/10:
     "refaça essa parte de aprovação de OS para retirada de bons insights"). A cópia do App devolve no máximo 200 linhas
     por chamada; aqui as páginas são juntadas (medido em 05/10: 24 páginas, 0,1 s cada depois da 1ª, que leva ~3,5 s
@@ -298,7 +269,7 @@ def fila_toda(params: dict, usinas=None) -> Leitura:
     lida = _lida_em()
     if regras_app._FILA_CACHE.get("linhas") is None:
         return Leitura({}, time.time(), "")
-    escopo = ESCOPO_ADMIN if usinas is None else {**ESCOPO_ADMIN, "clusters": _Usinas(usinas)}
+    escopo = ESCOPO_ADMIN
 
     def calcular():
         pag, todas, primeira = 1, [], None
@@ -324,8 +295,7 @@ def fila_toda(params: dict, usinas=None) -> Leitura:
             x["criada"] = str(w.get("creation_date") or "")
         return {"janela": primeira.get("janela"), "resumo": primeira.get("resumo"), "baldes": primeira.get("baldes"),
                 "sem_cadastro": primeira.get("sem_cadastro"), "linhas": todas}
-    filtro = tuple(sorted(usinas)) if usinas is not None else None
-    chave = ("fila_toda", str(lida), filtro) + tuple(sorted(p.items()))
+    chave = ("fila_toda", str(lida)) + tuple(sorted(p.items()))
     pronta = _PRONTA.get(chave)
     if pronta is not None:
         return pronta
@@ -420,7 +390,7 @@ def tarefas_do_app() -> dict[str, set[str]] | None:
     sem tarefa do App e as fotos das tarefas fechadas fora do App."""
     alvo = tuple(sorted({k: str(v) for k, v in FILA_INTEIRA.items()}.items()))
     for chave, r in list(_PRONTA.items()):
-        if chave[0] == "fila_toda" and chave[2] is None and chave[3:] == alvo:
+        if chave[0] == "fila_toda" and chave[2:] == alvo:
             out: dict[str, set[str]] = {}
             for x in (r.dados or {}).get("linhas") or ():
                 ids = out.setdefault(str(x.get("os") or ""), set())

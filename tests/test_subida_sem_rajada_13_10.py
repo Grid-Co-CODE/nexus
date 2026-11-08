@@ -29,7 +29,7 @@ def fila(app, tmp_path, monkeypatch):
         chamadas.append(k)
         return [{"id_work_order": 1, "id_work_orders_tasks": 11}, {"id_work_order": 2, "id_work_orders_tasks": 22}]
     monkeypatch.setattr(regras_app, "_fx_wo_paralelo", varredura)
-    monkeypatch.setattr(aprovacao, "fila_toda", lambda params, usinas=None: None)    # a conta da tela não importa aqui
+    monkeypatch.setattr(aprovacao, "fila_toda", lambda params: None)    # a conta da tela não importa aqui
     monkeypatch.setattr(aprovacao.threading, "Thread", _NaHora)
     yield chamadas
     aprovacao.limpar()
