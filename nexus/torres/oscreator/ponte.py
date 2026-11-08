@@ -935,7 +935,19 @@ def ir():
 # (06/11/2026, Levi, pela OS 16289: "o certo é comentar e já incluir na nota da OS"): a prova no Fracttal (OS 18754 de
 # TESTE - PA, duas tarefas) mediu que o `work_orders_update` grava a `note` da OS, igual em todas as tarefas, e que a
 # observação de cada tarefa (`task_note`) fica como estava. O que é só do Nexus fica aqui, nunca na cópia.
-_trava_nota = threading.Lock()      # dois comentários juntos na mesma OS: um não apaga o outro na nota
+# Uma trava por OS (pelo nº da OS, que todo lugar tem; a PCM só tem o nº), como a `_trava_do_ativo`: dois comentários
+# juntos na MESMA OS não se apagam na nota, e OS diferentes não esperam uma pela outra. Antes era uma trava só para todas,
+# segurada durante as chamadas ao Fracttal (até 45 s cada): com o Fracttal lento, comentar em OS diferentes enchia o
+# teto de threads do OS Creator (achado da auditoria de 08/11/2026).
+_TRAVAS_NOTA: dict = {}
+_trava_das_travas_nota = threading.Lock()
+
+
+def _trava_da_os(folio) -> threading.Lock:
+    with _trava_das_travas_nota:
+        return _TRAVAS_NOTA.setdefault(str(folio or "").strip().split(".")[0], threading.Lock())
+
+
 # a página da OS de onde veio o comentário (a do Quadro da equipe ou a da tela ETMs): o login do Fracttal volta para ela
 _PAGINA_DA_OS = re.compile(r"^/t/engenharia/(equipe|etm)/os/\d+$")
 
@@ -1036,7 +1048,7 @@ def engenharia_comentar(wid: int):
     import api as os_api                         # noqa: E402
     from os_web import os_acoes_web as regra     # noqa: E402
     from os_web import sessao as os_sessao       # noqa: E402
-    with _trava_nota, os_sessao.contexto(jwt, str((s.get("conta") or {}).get("email") or "")):
+    with _trava_da_os(folio), os_sessao.contexto(jwt, str((s.get("conta") or {}).get("email") or "")):
         try:
             nota = _acrescentar_na_nota(os_api, regra, o, [linha])
         except _NotaIncompleta:
@@ -1117,7 +1129,7 @@ def engenharia_levar_para_a_nota(wid: int):
     import api as os_api                         # noqa: E402
     from os_web import os_acoes_web as regra     # noqa: E402
     from os_web import sessao as os_sessao       # noqa: E402
-    with _trava_nota, os_sessao.contexto(jwt, str((s.get("conta") or {}).get("email") or "")):
+    with _trava_da_os(folio), os_sessao.contexto(jwt, str((s.get("conta") or {}).get("email") or "")):
         try:
             nota = _acrescentar_na_nota(os_api, regra, o, linhas)
         except _NotaIncompleta:
@@ -1186,7 +1198,7 @@ def _nota_do_historico(app, jwt: str, email: str, o: dict, linhas: list[str]) ->
     import api as os_api                         # noqa: E402
     from os_web import os_acoes_web as regra     # noqa: E402
     from os_web import sessao as os_sessao       # noqa: E402
-    with _trava_nota, os_sessao.contexto(jwt, email):
+    with _trava_da_os(o.get("os") or o.get("folio")), os_sessao.contexto(jwt, email):
         try:
             return _acrescentar_na_nota(os_api, regra, o, linhas)
         except os_api.SessionExpired as e:
@@ -1232,7 +1244,7 @@ def pcm_nota():
                                                          safe="")
         r = {"ok": False, "erro": "entre pelo Fracttal para o Nexus escrever na nota"}
         return jsonify({"nota": r, "nota_txt": NO.frase(r), "login": login}), 401
-    with _trava_nota:                            # duas marcas juntas na mesma OS: uma não apaga a outra na nota
+    with _trava_da_os(p["os"]):                  # duas marcas juntas na mesma OS: uma não apaga a outra na nota
         r = NO.escrever(app, p["os"], p["texto"])
     return jsonify({"nota": r, "nota_txt": NO.frase(r)})
 
@@ -1477,7 +1489,7 @@ def engenharia_acomp_encaminhar():
                         nota = f"a linha do encaminhar não foi à nota ({type(e).__name__})"
                     return f"a OS {ab['os_folio']} passou para {para['nome']} no Fracttal" + (
                         "" if nota == "sim" else f" ({nota})")
-                with _trava_nota:     # a linha da nota, como o comentário: um não apaga o outro
+                with _trava_da_os(ab["os_folio"]):     # a linha da nota, como o comentário: um não apaga o outro
                     extra = "; " + _no_fracttal(trocar, de)
             gravar = (lambda: AC.encaminhar(T._para_gravar(s) if s and not ab else {"cod": cod}, para["hmac"], usuario,
                                             pode, pessoas, os=os_))
@@ -1577,7 +1589,7 @@ def engenharia_acomp_comentar(aid):
                     from None
             except _NotaNaoGravou as e:
                 raise AC.Recusada(f"O Fracttal não gravou a nota ({e}). Nada foi gravado; tente de novo.") from None
-        with _trava_nota:
+        with _trava_da_os(a["os_folio"]):
             nota = _no_fracttal(escrever, de)
         if nota == "sim":
             _depois_do_fracttal(lambda: AC.comentar(aid, texto, usuario, pode, linha_nota=linha), a["os_folio"],
@@ -1640,10 +1652,10 @@ def _mudar_linha_na_nota(api, regra, wid, candidatas: list[str], nova: str | Non
     return "a linha do comentário não está mais na nota da OS (mudou no Fracttal)"
 
 
-def _na_nota(fazer, de: str):
-    """`_no_fracttal` sob a trava das notas, com as falhas da nota ditas em português."""
+def _na_nota(fazer, de: str, folio):
+    """`_no_fracttal` sob a trava da nota da OS `folio`, com as falhas da nota ditas em português."""
     from ...engenharia import acompanhamento as AC
-    with _trava_nota:
+    with _trava_da_os(folio):
         try:
             return _no_fracttal(fazer, de)
         except _NotaIncompleta:
@@ -1724,7 +1736,7 @@ def _mudar_comentario_do_acomp(aid, cid, editar: bool):
         if a.get("os_id") and candidatas:
             linha = _linha_editada(c, texto) if editar else None
             nota = _na_nota(lambda api, regra, curto: _mudar_linha_na_nota(api, regra, a["os_id"], candidatas, linha),
-                            de)
+                            de, a.get("os_folio"))
             if nota == "sim":
                 nova = linha or ""
                 extra = f" A nota da OS {a['os_folio']} mudou junto."
@@ -1791,7 +1803,8 @@ def _mudar_comentario_da_os(wid: int, cid: str, editar: bool):
             return jsonify({"erro": "Para mudar a nota da OS, entre pelo Fracttal.", "login": login}), 401
         linha = _linha_editada(c, texto) if editar else None
         try:
-            nota = _na_nota(lambda api, regra, curto: _mudar_linha_na_nota(api, regra, wid, candidatas, linha), de)
+            nota = _na_nota(lambda api, regra, curto: _mudar_linha_na_nota(api, regra, wid, candidatas, linha), de,
+                         folio)
         except AC.Recusada as e:
             return jsonify({"erro": str(e), "login": getattr(e, "entrar", "") and na_raiz(e.entrar)}), 502
         nova = (linha or "") if nota == "sim" else ""

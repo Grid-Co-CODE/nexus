@@ -250,7 +250,7 @@ def fracttal(tela, app, monkeypatch):
 
     def editar(wid, nota):
         # a nota da OS é escrita sob a trava das notas: um comentário junto não apaga o outro (revisão de 29/10/2026)
-        falso.sob_trava.append(P._trava_nota.locked())
+        falso.sob_trava.append(any(t.locked() for t in P._TRAVAS_NOTA.values()))   # a trava da OS, uma por OS
         notas.append((wid, nota))
         return {"ok": True}
     monkeypatch.setattr(os_api, "editar_nota_os", editar)
@@ -551,3 +551,35 @@ def test_salvar_diagnostico_nao_e_botao_de_enviar_o_formulario(fracttal, tela, c
     _login_do_fracttal(app, cliente)
     html = _post(cliente, "/pegar", cod="IBI200-INV02").get_data(as_text=True)
     assert "formaction=" not in html and 'type="button" class="gc-btn gc-btn--contorno eg-btn-peq" data-eg-acao=' in html
+
+
+# ── a trava das notas é por OS (auditoria de 08/11/2026): OS diferentes não esperam, a mesma OS sim ────────────────────
+def test_a_trava_das_notas_e_por_os(monkeypatch):
+    import threading
+
+    from nexus.torres.oscreator import ponte as P
+    segura, solta, entrou = threading.Event(), threading.Event(), []
+
+    def no_fracttal(fazer, de):
+        entrou.append(fazer)
+        if fazer == "A":
+            segura.set()
+            assert solta.wait(5)
+        return fazer
+    monkeypatch.setattr(P, "_no_fracttal", no_fracttal)
+    a = threading.Thread(target=lambda: P._na_nota("A", "/", "100"))
+    a.start()
+    assert segura.wait(5)
+    saida = []
+    b = threading.Thread(target=lambda: saida.append(P._na_nota("B", "/", "200")))
+    b.start()
+    b.join(2)
+    assert saida == ["B"]                      # a OS 200 não esperou a 100 (a A segue presa no Fracttal)
+    c = threading.Thread(target=lambda: saida.append(P._na_nota("C", "/", "100.0")))
+    c.start()
+    c.join(0.5)
+    assert c.is_alive() and "C" not in entrou  # a mesma OS espera: um comentário não apaga o outro na nota
+    solta.set()
+    a.join(5)
+    c.join(5)
+    assert saida == ["B", "C"]
