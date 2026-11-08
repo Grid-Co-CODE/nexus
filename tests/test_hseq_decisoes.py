@@ -300,6 +300,21 @@ def test_editar_grava_so_o_que_mudou_e_a_tela_mostra_na_hora(com_nao_reconhecido
     assert "Atrasados 3" in _texto(tst.get("/t/hseq/extintores").get_data(as_text=True))       # eram 2
 
 
+def test_editar_so_o_local_nao_desfaz_a_validade_de_outra_pessoa(com_nao_reconhecido, livro, tst, monkeypatch):
+    """Achado 6 da auditoria de 08/11/2026: a caixa mandava TODOS os campos, e a página velha de quem mexeu só no Local
+    levava a validade de antes, que o servidor regravava (o extintor voltava a atrasado). O JS agora desabilita o campo
+    que não mudou (não vai no POST); aqui, o servidor com o POST assim, e o JS no template."""
+    monkeypatch.setattr(DEC, "_agora", lambda: datetime(2026, 10, 9, 10, 0, tzinfo=timezone(timedelta(hours=-3))))
+    assert _aviso(_editar(tst, val2="08/2027"))[0].startswith("EXT03 da Altair editado: validade da recarga")
+    # a pessoa B (página velha, val2 de antes) edita só o Local: o POST leva só o que mudou
+    r = tst.post("/t/hseq/extintores/editar", data={"codigo": EXT03, "local": "__outro", "local_outro": "Sala nova"})
+    assert _aviso(r)[0].startswith("EXT03 da Altair editado: local")
+    campos = [x["campos"] for x in _linhas_livro(livro, DEC.ABA_EDIT)]
+    assert campos[-1] == '{"Local":"Sala nova"}' and "Validade da recarga" not in campos[-1]
+    html = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
+    assert "fe.elements[k].disabled = true" in html and "fe._aberto" in html
+
+
 def test_a_edicao_vale_ate_uma_conferencia_num_dia_depois(com_nao_reconhecido, livro, tst):
     """O EXT01 foi conferido em 05/10 e o EXT03 em 01/10: a edição de 01/10 vale no EXT03 (no mesmo dia vale a edição) e
     não no EXT01 (a conferência depois dela é o que vale; o App já tem a edição ou a equipe conferiu outra coisa)."""

@@ -402,6 +402,18 @@
         ctx.style.top = Math.min(ev.clientY, window.innerHeight - 100) + 'px';
         ctx.hidden = false; ctx.querySelector('button').focus();
       });
+      // Campo igual ao que a caixa abriu não vai no POST (disabled): a página velha de quem editou só o Local mandava a
+      // validade de ANTES e desfazia a edição de outra pessoa (achado 6 da auditoria de 08/11/2026)
+      document.addEventListener('submit', function (ev) {
+        var fe = ev.target;
+        if (!fe._aberto || !fe.closest('#hs-editar')) return;
+        Object.keys(fe._aberto).forEach(function (k) {
+          if (fe.elements[k].value === fe._aberto[k]) {
+            fe.elements[k].disabled = true;
+            if (fe.elements[k + '_outro']) fe.elements[k + '_outro'].disabled = true;
+          }
+        });
+      });
       document.addEventListener('click', function (ev) {
         var b = ev.target.closest('.hs-tres');
         if (b) { ev.stopPropagation(); if (dono === b) fecha(); else { fecha(); abre(b); } return; }
@@ -420,6 +432,8 @@
           fe.elements.codigo.value = ce;
           ['peso', 'val2', 'val3'].forEach(function (k) { fe.elements[k].value = alvo.dataset[k] || ''; });
           fe.elements.obs.value = '';
+          // o que a caixa abriu mostrando: no envio só vai o que a pessoa mudou (ver o submit abaixo)
+          fe._aberto = {}; ['local', 'posicao', 'classe', 'peso', 'val2', 'val3'].forEach(function (k) { fe._aberto[k] = alvo.dataset[k] || ''; fe.elements[k].disabled = false; if (fe.elements[k + '_outro']) fe.elements[k + '_outro'].disabled = false; });
           de.querySelector('.hs-dlg-ext').textContent = (me ? me.textContent : ce) + ' · ' + ce;
           var linha = alvo;
           listas().then(function (op) {
