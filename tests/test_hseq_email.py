@@ -117,6 +117,13 @@ def test_publica_uma_vez_por_semana(com_tst, app, monkeypatch):
         ES._agora().replace(year=2026, month=10, day=26, hour=6))
 
 
+def test_a_semana_perdida_na_segunda_ainda_e_devida_na_terca():
+    """Achado 4 da auditoria de 08/11/2026: com a API fora a segunda inteira, `devido` era falso na terça e a semana nunca
+    saia (o App aceita a linha até a segunda seguinte). O "uma vez por semana" do `publicar` impede repetir."""
+    terca = ES._agora().replace(year=2026, month=10, day=27, hour=9)
+    assert ES.devido(terca) and ES.devido(terca.replace(day=31)) and not ES.devido(terca.replace(day=26, hour=6))
+
+
 def test_a_publicacao_liga_no_servidor_e_nao_no_pc():
     """Ligada por padrão desde 30/10/2026 (o teste do App deu 6 de 6 e o Levi não tem acesso ao .env do servidor); "0"
     desliga, e o PC (NEXUS_CAMPO_AQUECER=0) não publica."""

@@ -350,7 +350,9 @@ def publicar(cfg, hoje=None) -> dict:
 
 
 def devido(agora: datetime) -> bool:
-    return agora.weekday() == 0 and agora.hour >= HORA
+    """Da segunda, 07:00, até o fim da semana: a API fora a segunda inteira não perde a semana (achado 4 da auditoria de
+    08/11/2026; o App aceita a linha até a segunda seguinte). Repetir quem impede é o `publicar` (uma vez por semana)."""
+    return agora.weekday() > 0 or agora.hour >= HORA
 
 
 def ligado(cfg) -> bool:
@@ -360,7 +362,7 @@ def ligado(cfg) -> bool:
 
 
 def ligar(app):
-    """O laço: a cada 10 min, na segunda depois das 07:00, publica a semana (uma vez). Só onde `ligado`. Quem chama é o
+    """O laço: a cada 10 min, da segunda depois das 07:00 em diante, publica a semana (uma vez). Só onde `ligado`. Quem chama é o
     servir.py (o servidor), nunca o create_app nem o app.py: teste não fala com a rede."""
     if _LACO["thread"] is not None or not ligado(app.config):
         return
