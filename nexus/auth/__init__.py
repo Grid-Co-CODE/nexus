@@ -76,6 +76,10 @@ ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static", "torre_hseq.extintores
 MAX_ERROS_POR_EMAIL = 5          # por e-mail E rede (e por navegador conhecido)
 TETO_POR_EMAIL = 20              # por e-mail, de qualquer rede
 MAX_ERROS_ADMIN = 5
+# a senha de administrador, somando TODAS as redes (achado da auditoria de 08/11/2026): o Nexus está em endereço público,
+# e quem tem muitos endereços tentava 5 senhas por endereço sem limite total. Passou disto, a reserva fecha por 15 min
+# para todos; o Fracttal e a Microsoft seguem como portas.
+TETO_ADMIN_GLOBAL = 30
 TETO_POR_IP = 50
 JANELA_S = 15 * 60
 # o navegador conhecido: 90 dias desde o último login certo nele; até 8 contas por navegador (o PC da sala do NOC)
@@ -579,12 +583,12 @@ def entrar():
 
     # a senha de administrador: contador próprio, por IP
     chave = ("admin", ip)
-    if _erros_na_janela(chave) >= MAX_ERROS_ADMIN:
+    if _erros_na_janela(chave) >= MAX_ERROS_ADMIN or _erros_na_janela(("admin", "*")) >= TETO_ADMIN_GLOBAL:
         return _tela_entrar(erro=TEXTO_ADMIN_TRANCADO, destino=destino, admin=True), 429
     senha = request.form.get("senha", "")
     certa = current_app.config["NEXUS_SENHA_ADMIN"]
     if not hmac.compare_digest(senha.encode(), certa.encode()):
-        _contar_erro(chave, ("ip", ip))
+        _contar_erro(chave, ("ip", ip), ("admin", "*"))
         return _tela_entrar(erro="Senha incorreta.", destino=destino, admin=True), 401
 
     _zerar_erros(chave)

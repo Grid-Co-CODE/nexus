@@ -18,7 +18,7 @@ import pytest
 import requests
 
 from nexus.auth import (COOKIE_DISPOSITIVO, DISPOSITIVO_S, JANELA_S, MAX_ERROS_ADMIN, MAX_ERROS_POR_EMAIL,
-                        TETO_POR_EMAIL, TETO_POR_IP, fracttal)
+                        TETO_ADMIN_GLOBAL, TETO_POR_EMAIL, TETO_POR_IP, fracttal)
 
 from conftest import SENHA_TESTE
 
@@ -404,3 +404,14 @@ def test_os_emails_vencidos_saem_da_memoria(app, monkeypatch):
     chaves = app.extensions["nexus_erros_login"]
     assert not any(c[1].startswith("velho") for c in chaves)          # os de mais de 15 min saíram
     assert sum(c[0] == "email" for c in chaves) == 3
+
+
+def test_a_senha_de_admin_tem_teto_somando_todas_as_redes(app, monkeypatch):
+    """Auditoria de 08/11/2026: 5 por rede, mas sem teto total: quem tinha muitos endereços tentava sem limite."""
+    _fracttal_falso(monkeypatch)
+    cli = app.test_client()
+    for ip in _redes(TETO_ADMIN_GLOBAL, base=100):
+        assert _admin(cli, "errada", ip=ip).status_code == 401       # cada rede erra uma vez: nenhuma estoura a sua
+    r = _admin(cli, SENHA_TESTE, ip="203.0.113.250")                 # rede nova, senha certa: a reserva está fechada
+    assert r.status_code == 429 and "senha de administrador" in r.get_data(as_text=True)
+    assert _entrar(app.test_client(), "certa@exemplo.com").status_code == 302      # o Fracttal segue como porta
