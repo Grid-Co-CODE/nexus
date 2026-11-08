@@ -330,6 +330,8 @@ def _sem_copia():
 def cad(banco, app):
     """O cadastro com o Responsável O&M de cada usina (a Altair e a Brodowski 1 do 91, a Coração 1 do 90) e o
     administrador pelo e-mail (NEXUS_ADMINS)."""
+    from nexus.torres.campo import ocorrencias_tela
+    ocorrencias_tela._RELIDA["em"] = 0.0         # a trava de 1 min da releitura forçada não vaza de um teste para outro
     from test_campo_visao import USINAS, _aba
     from nexus.campo import visao
     _aba(banco, "cadastro_nexus", "usinas", [dict(u, responsavel_om_id={1: 91, 2: 91, 3: 90}.get(u["usina_id"]))
@@ -785,3 +787,22 @@ def test_os_ids_nunca_parecem_numero(banco):
     assert re.fullmatch(r"o[0-9a-f]{11}", ev["ocorrencia_id"]) and re.fullmatch(r"e[0-9a-f]{11}", ev["id"])
     a = O.salvar_acao(ev["ocorrencia_id"], _acao_form(), ADMIN, True, PESSOAS)
     assert re.fullmatch(r"a[0-9a-f]{11}", a["acao_id"])
+
+
+def test_link_velho_de_ocorrencia_nao_rele_o_livro_a_cada_abertura(cad, cliente, monkeypatch):
+    """Achado 8 da auditoria de 08/11/2026: o id que não existe (favorito de ocorrência apagada) fazia uma leitura
+    forçada do livro inteiro a cada abertura, por cima do TTL; agora no máximo uma por minuto."""
+    from nexus.torres.campo import ocorrencias_tela
+    c = _entra(cliente, ADMIN)
+    c.get("/t/campo/ocorrencias")                        # a cópia existe (com lido_em)
+    ocorrencias_tela._RELIDA["em"] = 0.0
+    forcadas = []
+    original = O.ler
+
+    def ler(forcar=False):
+        forcadas.extend([1] if forcar else [])
+        return original(forcar)
+    monkeypatch.setattr(O, "ler", ler)
+    assert c.get("/t/campo/ocorrencias/o00000000000").status_code == 404
+    assert c.get("/t/campo/ocorrencias/o00000000000").status_code == 404
+    assert len(forcadas) == 1

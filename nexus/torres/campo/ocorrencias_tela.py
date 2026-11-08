@@ -7,6 +7,7 @@ moldura: pedido de outro site é 403) e volta pela página da ocorrência (303, 
 recusa volta na mesma página, com o porquê e o que a pessoa digitou.
 """
 import logging
+import time
 from datetime import timedelta
 
 from flask import abort, redirect, render_template, request, session, url_for
@@ -177,6 +178,9 @@ def ocorrencia_nova():
     return redirect(url_for("torre_campo.ocorrencia", oid=nova["ocorrencia_id"], ok="criada"), code=303)
 
 
+_RELIDA = {"em": 0.0}      # a última releitura forçada do livro por um id que a cópia não achou
+
+
 def _pagina(oid: str, cad: dict, quem: dict, erro: str = "", form: dict | None = None, qual: str = "",
             status: int = 200):
     """A página de uma ocorrência: os dados, o plano de ação e o andamento; `form`/`qual` devolvem o que a pessoa
@@ -186,8 +190,10 @@ def _pagina(oid: str, cad: dict, quem: dict, erro: str = "", form: dict | None =
     lido = O.ler()
     cofre = O.cofre_ou_nada()
     o = O.estado(lido["eventos"], cofre).get(oid)
-    if o is None and lido["lido_em"]:
-        # gravada há pouco noutra máquina (ou noutro processo): a cópia deste pode ser de antes; relê antes do 404
+    if o is None and lido["lido_em"] and time.time() - _RELIDA["em"] > 60:
+        # gravada há pouco noutra máquina (ou noutro processo): a cópia deste pode ser de antes; relê antes do 404, no
+        # máximo uma vez por minuto (o id apagado, de favorito, lia o livro todo a cada abertura: auditoria 08/11/2026)
+        _RELIDA["em"] = time.time()
         lido = O.ler(forcar=True)
         o = O.estado(lido["eventos"], cofre).get(oid)
     if o is None:
