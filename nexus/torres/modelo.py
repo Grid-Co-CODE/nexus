@@ -34,6 +34,9 @@ class Tela:
     # a tela de TODO setor (03/11/2026, a Caixa de entrada; Levi: "libera a caixa para todos os setores"): quem tem setor
     # a vê sem marca, como a do dono; quem é mencionado numa conversa precisa dela para ver o aviso
     de_todos: bool = False
+    # a tela que recorta pelas usinas do cliente da sessão (07/11/2026, o acesso dos clientes, `auth/clientes.py`): só
+    # estas o setor Clientes pode marcar em Base → Acessos, e o cliente não abre nenhuma outra
+    do_cliente: bool = False
 
 
 @dataclass

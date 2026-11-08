@@ -35,7 +35,40 @@
   <p class="entrar-lead">A operação e a manutenção das usinas da Grid Co. num lugar só.</p>
   {% if aviso %}<p class="entrar-aviso" role="status">{{ aviso }}</p>{% endif %}
   {% set acao = raiz ~ '/entrar' ~ ('?next=' ~ (destino|urlencode) if destino and destino != '/' else '') %}
-  {% if admin %}
+  {% if modo == 'convite' %}
+  {# o link de convite do cliente (07/11/2026, nexus/auth/clientes.py): ele escolhe a senha; o link vale uma vez #}
+  {% if convite %}
+  <form method="post" action="{{ (raiz ~ '/entrar')|na_raiz }}" class="entrar-cliente">
+    <input type="hidden" name="convite" value="{{ convite }}">
+    <p class="entrar-alt">Crie a senha do acesso de <b>{{ convite_email }}</b>.</p>
+    <label class="gc-rotulo" for="senha">Senha (pelo menos 10 caracteres)</label>
+    <input id="senha" name="senha" type="password" class="gc-campo" autocomplete="new-password" minlength="10"
+           maxlength="200" autofocus required {% if erro %}aria-invalid="true" aria-describedby="erro"{% endif %}>
+    <label class="gc-rotulo" for="senha2">Repita a senha</label>
+    <input id="senha2" name="senha2" type="password" class="gc-campo" autocomplete="new-password" minlength="10"
+           maxlength="200" required>
+    {% if erro %}<p id="erro" class="gc-ajuda gc-ajuda--erro">{{ erro }}</p>{% endif %}
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Criar a senha</button>
+  </form>
+  {% else %}
+  <p class="entrar-aviso" role="alert">Este link não vale mais: ele já foi usado ou passou dos 7 dias. Peça um novo à Grid Co.</p>
+  <p class="entrar-alt"><a href="{{ raiz }}/entrar?cliente=1">Já tenho senha: entrar</a></p>
+  {% endif %}
+  {% elif modo == 'cliente' %}
+  {# o login do cliente (07/11/2026): e-mail e a senha que ele criou pelo convite #}
+  <form method="post" action="{{ acao|na_raiz }}" class="entrar-cliente">
+    <label class="gc-rotulo" for="cliente_email">E-mail</label>
+    <input id="cliente_email" name="cliente_email" type="email" class="gc-campo" autocomplete="username"
+           value="{{ email or '' }}" {% if not email %}autofocus{% endif %} required>
+    <label class="gc-rotulo" for="cliente_senha">Senha</label>
+    <input id="cliente_senha" name="cliente_senha" type="password" class="gc-campo" autocomplete="current-password"
+           {% if email %}autofocus{% endif %} required {% if erro %}aria-invalid="true" aria-describedby="erro"{% endif %}>
+    {% if erro %}<p id="erro" class="gc-ajuda gc-ajuda--erro">{{ erro }}</p>{% endif %}
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Entrar</button>
+  </form>
+  <p class="entrar-alt mudo">Esqueceu a senha? Peça um link novo à Grid Co.<br>
+    <a href="{{ raiz }}/entrar">Sou da Grid Co.</a></p>
+  {% elif admin %}
   <form method="post" action="{{ acao|na_raiz }}">
     <label class="gc-rotulo" for="senha">Senha de administrador</label>
     <input id="senha" name="senha" type="password" class="gc-campo" autocomplete="current-password"
@@ -52,7 +85,8 @@
   <a class="gc-btn gc-btn--ui gc-btn--primario entrar-ms" href="{{ raiz }}/entrar?ms=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}"><span class="entrar-ms-marca" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Entrar com a Microsoft</a>
   <p class="entrar-alt mudo">Com a sua conta da Grid Co. ({{ ms_dominios }}). O OS Creator pede o login do Fracttal na
     primeira vez que você o abrir.<br>
-    <a href="{{ raiz }}/entrar?admin=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Entrar com a senha de administrador</a></p>
+    <a href="{{ raiz }}/entrar?admin=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Entrar com a senha de administrador</a>
+    · <a href="{{ raiz }}/entrar?cliente=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Sou cliente</a></p>
   {% else %}
   {# o login do Fracttal: o mesmo e-mail e a mesma senha do Fracttal e do OS Creator (06/10/2026) #}
   <form method="post" action="{{ acao|na_raiz }}">
@@ -66,7 +100,8 @@
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Entrar com o Fracttal</button>
   </form>
   <p class="entrar-alt mudo">O mesmo login do Fracttal e do OS Creator. A senha vai direto ao Fracttal e não é guardada.<br>
-    <a href="{{ raiz }}/entrar?admin=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Entrar com a senha de administrador</a></p>
+    <a href="{{ raiz }}/entrar?admin=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Entrar com a senha de administrador</a>
+    · <a href="{{ raiz }}/entrar?cliente=1{% if destino and destino != '/' %}&next={{ destino|urlencode }}{% endif %}">Sou cliente</a></p>
   {% endif %}
 </main>
 <script src="{{ url_for('static', filename='entrar-usina.js') }}"></script>

@@ -21,4 +21,9 @@ PCM = 9
 RESPONSAVEL_UFV = 10
 
 # os IDs desta lista, para o teste e para quem precisa conferir
+# o setor dos CLIENTES (07/11/2026): não mora no dim_setor (não há pessoa do Fracttal nele); é quem entra pelo acesso
+# de cliente (`auth/clientes.py`). As telas dele se marcam em Base → Acessos como as de qualquer setor, mas só as que
+# recortam pelas usinas do cliente (`Tela.do_cliente`). Fora de TODOS de propósito: nenhuma tela é DONA dele
+CLIENTES = 900
+
 TODOS = frozenset({ENGENHARIA, PERFORMANCE, ZELADORIA, SEGURANCA, COS, SUPERVISAO_CAMPO, CHAMADOS, PCM, RESPONSAVEL_UFV})

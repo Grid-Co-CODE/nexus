@@ -39,6 +39,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import current_app, has_request_context, jsonify, render_template, request, session
 
+from ..cadastro import setor_ids as SID
 from ..cadastro import setores as S
 from ..dados import fatos as D
 from ..dados import livros
@@ -308,6 +309,11 @@ def acesso() -> dict:
     if guardado is not None:
         return guardado
     cfg = current_app.config
+    if session.get("via") == "cliente":
+        # o cliente (07/11/2026, `auth/clientes.py`): SEMPRE restrito, com o portão por setor ligado ou não; vê as telas
+        # marcadas para o setor Clientes que recortam pelas usinas dele (Tela.do_cliente), e nenhuma outra
+        request._nexus_acesso = r = _acesso_do_cliente()
+        return r
     r = {"tudo": True, "telas": set(), "setor": None, "erro": ""}
     if ligado(cfg) and session.get("logado") and not session.get("admin"):
         try:
@@ -432,6 +438,60 @@ def pode(caminho: str, telas: set[str]) -> bool:
     if tela:
         return tela in telas
     return any(t.startswith(torre_id + "/") for t in telas)
+
+
+# ── o setor dos clientes (07/11/2026) ─────────────────────────────────────────────────────────────────────────────
+SETOR_CLIENTES = {"id": SID.CLIENTES, "nome": "Clientes"}
+# o que o cliente abre fora das telas: entrar e sair, trocar o tema, a saúde e os arquivos estáticos. O Início leva à
+# 1ª tela dele (a casca); nada mais da casca, das torres, do OS Creator ou das APIs
+LIVRES_CLIENTE = frozenset({"auth.entrar", "auth.sair", "casca.tema", "casca.saude", "static"})
+
+
+def telas_do_cliente_possiveis() -> set[str]:
+    """As telas que o setor Clientes PODE ver: as que recortam pelas usinas do cliente da sessão (Tela.do_cliente)."""
+    return {chave(t.id, s.id) for t in current_app.extensions.get("nexus_torres", []) for s in t.telas if s.do_cliente}
+
+
+def _acesso_do_cliente() -> dict:
+    try:
+        d = _telas_no_clique(*_banco())
+        marcadas = vigentes(d["decisoes"]).get(SID.CLIENTES, set())
+        erro = d["erro"] if not d.get("lido_em") else ""
+    except Exception as e:   # noqa: BLE001 — sem saber as telas, fecha
+        marcadas, erro = set(), type(e).__name__
+    return {"tudo": False, "telas": marcadas & telas_do_cliente_possiveis(), "setor": dict(SETOR_CLIENTES),
+            "erro": erro}
+
+
+def primeira_do_cliente() -> str | None:
+    """O endereço da 1ª tela do cliente, na ordem do menu (o Início dele leva até ela)."""
+    telas = acesso()["telas"]
+    for t in sorted(current_app.extensions.get("nexus_torres", []), key=lambda x: x.ordem):
+        for s in t.telas:
+            if chave(t.id, s.id) in telas:
+                return f"/t/{t.id}/{s.id}"
+    return None
+
+
+def portao_cliente():
+    """O portão do cliente: só a tela exata (nada do "resto da torre" que vale para os setores), e o Início leva à 1ª
+    tela dele. O resto, 403 (página) ou JSON (dados), sem dizer o que há atrás."""
+    if request.endpoint in LIVRES_CLIENTE or (request.endpoint or "").endswith(".static"):
+        return None
+    a = acesso()
+    if request.endpoint == "casca.inicio" and request.method == "GET":
+        from flask import redirect
+        from ..prefixo import na_raiz
+        primeira = primeira_do_cliente()
+        if primeira:
+            return redirect(na_raiz(primeira))
+        return render_template("sem_setor.html", bloqueada=True, setor=a["setor"], cliente=True), 403
+    _torre, tela = _tela_do_caminho(request.path)
+    if tela and tela in a["telas"] and request.method in ("GET", "HEAD"):
+        return None
+    if not _quer_pagina():
+        return jsonify(ok=False, erro="Fora do seu acesso."), 403
+    return render_template("sem_setor.html", bloqueada=True, setor=a["setor"], cliente=True), 403
 
 
 def _quer_pagina() -> bool:

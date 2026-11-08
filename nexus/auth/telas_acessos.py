@@ -24,8 +24,10 @@ from collections import Counter
 
 from flask import current_app, redirect, render_template, request, session, url_for
 
+from ..cadastro import setor_ids as SID
 from ..cadastro import setores as S
 from . import acessos as A
+from . import clientes as CL
 from . import admins_do_servidor
 from . import setor_telas as ST
 
@@ -35,6 +37,9 @@ _CHAVE_CODIGO = "acessos_codigo"
 _CHAVE_AVISO = "acessos_aviso"
 _CHAVE_AVISO_APP = "acessos_app_aviso"
 ABA_APP = "admins_app"
+ABA_CLIENTES = "clientes"
+_CHAVE_LINK = "acessos_cliente_link"
+_ACOES_CLIENTES = ("cliente_adicionar", "cliente_link", "cliente_remover")
 _ACOES_APP = ("admin_app_por", "admin_app_por_email", "admin_app_tirar")
 
 
@@ -109,14 +114,23 @@ def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]
                 "telas": len((matriz.get(s["setor_id"], set()) | ST.das_do_setor({"id": s["setor_id"], "nome": s["nome"]}))
                              & todas)}
                for s in S.ativos(st["setores"])]
+    # o setor dos clientes (07/11/2026): não está no dim_setor; vê só as telas que recortam pelas usinas do cliente
+    possiveis = ST.telas_do_cliente_possiveis()
+    if setores or not st.get("erro"):
+        contas = CL.estado(cfg)["contas"]
+        setores.append({"id": SID.CLIENTES, "nome": "Clientes", "cliente": True,
+                        "pessoas": sum(1 for c in contas if c.get("status") == "ativa"),
+                        "telas": len(matriz.get(SID.CLIENTES, set()) & possiveis)})
     sel = next((s for s in setores if s["id"] == escolhido), None) or (setores[0] if setores else None)
-    do_setor = ST.das_do_setor(sel) if sel else set()
+    do_setor = ST.das_do_setor(sel) if sel and not sel.get("cliente") else set()
     marcadas = (matriz.get(sel["id"], set()) if sel else set()) | do_setor
     arvore = []
     for t in torres:
         telas = [{"chave": ST.chave(t.id, s.id), "nome": s.nome, "pronta": f"/t/{t.id}/{s.id}" in prontas,
                   "marcada": ST.chave(t.id, s.id) in marcadas, "do_setor": ST.chave(t.id, s.id) in do_setor,
-                  "de_todos": s.de_todos}
+                  "de_todos": s.de_todos,
+                  # no setor Clientes, a tela que não recorta pelas usinas do cliente fica presa e desmarcada
+                  "fora_cliente": bool(sel and sel.get("cliente")) and not s.do_cliente}
                  for s in t.telas]
         arvore.append({"id": t.id, "nome": t.nome, "icone": t.icone, "telas": telas,
                        "marcadas": sum(x["marcada"] for x in telas)})
@@ -125,9 +139,12 @@ def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]
     por_codigo = ST.setor_de_cada_codigo(st["decisoes"])
     nome_do = {s["id"]: s["nome"] for s in setores}
     chave_hmac = cfg.get("NEXUS_PESSOA_HMAC")
+    de_clientes = {c["email"] for c in CL.estado(cfg)["contas"]}
     for x in logins + admins:
         cod = None if x.get("senha") else codigo_da_pessoa(chave_hmac, x["email"])
         x["setor"] = nome_do.get(por_codigo.get(cod)) if cod else None
+        if not x["setor"] and x.get("email") in de_clientes:
+            x["setor"] = "Clientes"            # quem entrou pelo acesso de cliente (07/11/2026) não é "sem setor"
     ilegivel = not st.get("lido_em") or not tl.get("lido_em")
     from . import pre_carga as PC
     pc = PC.resumo(app)
@@ -168,6 +185,8 @@ def _pagina(erro: str | None = None, status: int = 200, email_digitado: str = ""
         return render_template("acessos/acessos.html", aba="pessoas", **TF.contexto(cfg, request.args)), status
     if request.method == "GET" and request.args.get("aba") == ABA_APP:
         return _pagina_admins_app(erro, status)
+    if request.method == "GET" and request.args.get("aba") == ABA_CLIENTES:
+        return _pagina_clientes(erro, status)
     servidor = admins_do_servidor()
     est = A.estado(cfg)
     da_tela = {a["email"] for a in est["admins"]}
@@ -205,7 +224,8 @@ def _sem_permissao():
 def _gravar():
     acao = request.form.get("acao")
     # a recusa volta à aba de onde o pedido veio
-    pagina = _pagina_admins_app if acao in _ACOES_APP else _pagina
+    pagina = (_pagina_admins_app if acao in _ACOES_APP else _pagina_clientes if acao in _ACOES_CLIENTES
+              else _pagina)
     if _de_outro_site():
         return pagina(erro="Pedido de outro site: nada foi gravado.", status=403)
     certo = session.get(_CHAVE_CODIGO) or ""
@@ -218,6 +238,8 @@ def _gravar():
         return _gravar_telas()
     if acao in _ACOES_APP:
         return _gravar_admins_app(acao)
+    if acao in _ACOES_CLIENTES:
+        return _gravar_clientes(acao)
     digitado = (request.form.get("email") or "")[:300]
     try:
         if acao == "adicionar":
@@ -287,6 +309,8 @@ def _gravar_telas():
     cfg = current_app.config
     sid = request.form.get("setor", type=int)
     marcadas = request.form.getlist("tela")
+    if sid == SID.CLIENTES:
+        return _gravar_telas_clientes(marcadas)
     try:
         base, sessao = ST._banco()
         st = S.ler(base, sessao, forcar=True)
@@ -314,6 +338,98 @@ def _gravar_telas():
         aviso = f"Nada mudou: {setor['nome']} já via {telas}."
     session[_CHAVE_AVISO] = aviso
     return redirect(url_for("torre_base.acessos", setor=sid, _anchor="ace-setores"), code=303)
+
+
+def _gravar_telas_clientes(marcadas: list[str]):
+    """O Salvar do setor Clientes: só as telas que recortam pelas usinas do cliente (Tela.do_cliente)."""
+    cfg = current_app.config
+    possiveis = ST.telas_do_cliente_possiveis()
+    try:
+        if not set(marcadas) <= possiveis:
+            raise ST.Recusada("Só as telas que mostram apenas as usinas do cliente podem ser marcadas para Clientes: "
+                              "nada foi gravado.")
+        base, sessao = ST._banco()
+        r = ST.gravar(SID.CLIENTES, marcadas, possiveis, cfg, base, sessao, _meu_email())
+    except ST.Recusada as ex:
+        return _pagina(erro=str(ex), status=400, setor_escolhido=SID.CLIENTES)
+    except Exception as ex:      # noqa: BLE001
+        log.error("Telas por setor (Clientes): a gravação falhou (%s: %s); nada mudou.", type(ex).__name__, ex)
+        return _pagina(erro=f"Não consegui gravar no banco ({type(ex).__name__}): nada mudou.", status=500,
+                       setor_escolhido=SID.CLIENTES)
+    n = r["liberadas"]
+    telas = "nenhuma tela" if not n else "1 tela" if n == 1 else f"{n} telas"
+    session[_CHAVE_AVISO] = (f"Clientes agora veem {telas}. Vale no próximo clique de cada cliente." if r["gravadas"]
+                             else f"Nada mudou: Clientes já viam {telas}.")
+    return redirect(url_for("torre_base.acessos", setor=SID.CLIENTES, _anchor="ace-setores"), code=303)
+
+
+# ── a aba Clientes (07/11/2026): as contas de acesso dos clientes ──────────────────────────────────────────────
+def _clientes_do_cadastro() -> tuple[list[tuple[int, str]], str]:
+    """[(cliente_id, nome)] do cadastro do Nexus, em ordem de nome; e o erro, se o cadastro não abriu."""
+    try:
+        from ..campo import visao
+        nomes = visao._Base().nome_cliente
+        return sorted(((i, n) for i, n in nomes.items() if i and n), key=lambda x: x[1].lower()), ""
+    except Exception as ex:      # noqa: BLE001 — sem o cadastro, a aba avisa e não cria conta
+        return [], type(ex).__name__
+
+
+def _pagina_clientes(erro: str | None = None, status: int = 200, email_digitado: str = ""):
+    cfg = current_app.config
+    est = CL.estado(cfg)
+    opcoes, erro_cadastro = _clientes_do_cadastro()
+    contas = []
+    for c in sorted(est["contas"], key=lambda x: (x.get("status") != "ativa", x.get("cliente") or "", x["email"])):
+        expira = A._de_iso(c.get("convite_expira"))
+        situacao = ("removida" if c.get("status") != "ativa" else "ativa" if c.get("senha")
+                    else "convite" if expira and expira > A._agora() else "convite_vencido")
+        contas.append({**c, "situacao": situacao, "criada_br": A.hora_br(c.get("criada_em")),
+                       "senha_br": A.hora_br(c.get("senha_em")), "expira_br": A.hora_br(c.get("convite_expira"))})
+    return render_template("acessos/acessos.html", aba=ABA_CLIENTES, contas_clientes=contas, opcoes_clientes=opcoes,
+                           erro_cadastro=erro_cadastro, sem_pasta=est["sem_pasta"], arquivo_erro=est["erro"],
+                           link_cliente=session.pop(_CHAVE_LINK, None), codigo=_codigo(), erro=erro,
+                           aviso=session.pop(_CHAVE_AVISO, None), email_digitado=email_digitado,
+                           pode_gravar=not est["sem_pasta"] and not est["erro"],
+                           auditoria_clientes=[dict(x, quando_br=A.hora_br(x.get("quando")))
+                                               for x in reversed(est["auditoria"])]), status
+
+
+def _link_do_convite(token: str) -> str:
+    from ..prefixo import na_raiz
+    return request.host_url.rstrip("/") + na_raiz("/entrar") + "?convite=" + token
+
+
+def _gravar_clientes(acao: str):
+    """Criar a conta (com o link), gerar um link novo ou remover o acesso de um cliente."""
+    cfg = current_app.config
+    digitado = (request.form.get("email") or "")[:300]
+    try:
+        if acao == "cliente_adicionar":
+            cid = request.form.get("cliente_id", type=int)
+            opcoes = dict(_clientes_do_cadastro()[0])
+            if cid not in opcoes:
+                raise CL.Recusado("Escolha o cliente do cadastro: é por ele que o Nexus mostra só as usinas dele.")
+            e, token = CL.adicionar(cfg, digitado, cid, opcoes[cid], _quem())
+            session[_CHAVE_LINK] = {"email": e, "link": _link_do_convite(token), "novo": True}
+            aviso = f"{e} agora tem acesso de cliente ({opcoes[cid]}). Mande o link abaixo: ele cria a senha por ele."
+        elif acao == "cliente_link":
+            e = A.email_normal(digitado)
+            token = CL.gerar_link(cfg, e, _quem())
+            session[_CHAVE_LINK] = {"email": e, "link": _link_do_convite(token), "novo": False}
+            aviso = f"Link novo para {e}. O anterior deixou de valer."
+        else:
+            e = CL.remover(cfg, digitado, _quem())
+            aviso = f"{e} não tem mais acesso. Se estiver dentro do Nexus, sai no próximo clique."
+    except CL.Recusado as ex:
+        return _pagina_clientes(erro=str(ex), status=400, email_digitado=digitado if acao == "cliente_adicionar" else "")
+    except CL.Ilegivel as ex:
+        return _pagina_clientes(erro=f"Não gravei: {ex}. Gravar agora apagaria o que está nele; avise a T.I.", status=409)
+    except OSError as ex:
+        log.error("Clientes: a gravação falhou (%s: %s); nada mudou.", type(ex).__name__, ex)
+        return _pagina_clientes(erro=f"Não consegui gravar no disco ({type(ex).__name__}): nada mudou.", status=500)
+    log.info("Clientes: %s %s (por %s).", acao, e, _quem())
+    session[_CHAVE_AVISO] = aviso
+    return redirect(url_for("torre_base.acessos", aba=ABA_CLIENTES), code=303)
 
 
 def registrar_acessos(bp) -> None:

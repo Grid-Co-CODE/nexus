@@ -25,14 +25,16 @@
           conferência da Grid aparecem à parte.</p>
           <p><b>Próxima visita:</b> a programação do PCM (o Quadro da semana), o próximo bloco ainda não feito. A hora
           prevista de chegada da equipe vem numa fase seguinte.</p>
-          <p><b>Fica de fora, de propósito:</b> nomes e telefones de técnicos, custos, horas, comentários internos da OS
-          e a causa da falha antes da análise da Engenharia.</p>
+          {% if not modo_cliente %}<p><b>Fica de fora, de propósito:</b> nomes e telefones de técnicos, custos, horas, comentários internos da OS
+          e a causa da falha antes da análise da Engenharia.</p>{% endif %}
         {% endcall %}
       </div>
-      <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+      <p class="cn-pergunta">{{ 'Como estão agora as suas usinas: o status, a performance do mês, os chamados na distribuidora, as OS e a próxima visita.' if modo_cliente else tela.pergunta }}</p></div>
   </div>
-  {% if erro_visao %}<div class="cn-erro" role="alert"><b>{{ erro_visao }}.</b></div>{% endif %}
+  {# o próprio cliente (07/11/2026) vê o aviso sem o detalhe técnico do erro, e não escolhe cliente: é o da sessão #}
+  {% if erro_visao %}<div class="cn-erro" role="alert"><b>{{ 'Parte das informações não carregou agora. Tente de novo em instantes.' if modo_cliente else erro_visao ~ '.' }}</b></div>{% endif %}
 
+  {% if not modo_cliente %}
   <form class="cn-filtros vc-escolha" method="get">
     <label class="gc-rotulo" for="vc-cliente">Cliente</label>
     <select class="gc-campo" id="vc-cliente" name="cliente" onchange="this.form.submit()">
@@ -41,12 +43,15 @@
     </select>
     <noscript><button class="gc-btn gc-btn--contorno" type="submit">Ver</button></noscript>
   </form>
+  {% endif %}
 
-  {% if not cid %}
+  {% if not cid and modo_cliente %}
+  <p class="mudo vc-vazio">Ainda não há usina ligada ao seu acesso. Fale com a Grid Co.</p>
+  {% elif not cid %}
   <p class="mudo vc-vazio">Escolha um cliente para ver a síntese das usinas dele: o status agora, a performance do mês, os
     chamados na distribuidora, as OS e a próxima visita.</p>
   {% else %}{% set s = sintese %}{% set k = s.kpis %}
-  {% for f, e in erros.items() %}<div class="cn-erro cn-aviso" role="status">Não consegui ler {{ fontes_nome.get(f, f) }} ({{ e }}): essa parte fica "sem leitura", o resto da tela vale.</div>{% endfor %}
+  {% for f, e in erros.items() %}<div class="cn-erro cn-aviso" role="status">Não consegui ler {{ fontes_nome.get(f, f) }}{% if not modo_cliente %} ({{ e }}){% endif %}: essa parte fica "sem leitura", o resto da tela vale.</div>{% endfor %}
   <header class="vc-cab">
     <div><h2 class="vc-nome">{{ nome }}</h2>
       <p class="vc-onde">{{ s.total }} usina{{ 's' if s.total != 1 }} em operação</p></div>

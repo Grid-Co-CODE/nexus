@@ -7,7 +7,7 @@ dele. Cada fonte que não responde fica "sem leitura" na tela, com o aviso, e o 
 import logging
 from datetime import timedelta
 
-from flask import current_app, render_template, request
+from flask import current_app, render_template, request, session
 
 from ...campo import responsaveis as campo_resp
 from ...campo import visao
@@ -80,8 +80,11 @@ def cliente():
         _log.warning("Visão do cliente: não consegui ler o cadastro (%s)", type(e).__name__)
         b, erro_visao = None, f"Não consegui ler o cadastro do Nexus ({type(e).__name__})"
     grupos = VC.por_cliente(d.get("usinas") or [], b) if b else {}
-    opcoes = VC.opcoes_de_cliente(grupos, b.nome_cliente) if b else []
-    cid = D._id(request.args.get("cliente"))
+    # o próprio cliente (07/11/2026, o acesso dos clientes, `auth/clientes.py`): o cliente vem da SESSÃO, nunca do
+    # endereço (o ?cliente= de outro é ignorado), e não há escolha
+    modo_cliente = session.get("via") == "cliente"
+    opcoes = [] if modo_cliente else (VC.opcoes_de_cliente(grupos, b.nome_cliente) if b else [])
+    cid = D._id(session.get("cliente_id") if modo_cliente else request.args.get("cliente"))
     if cid not in grupos:
         cid = None
     sintese, erros, ts, sel = None, {}, "", None
@@ -99,7 +102,8 @@ def cliente():
             sel = ids[0] if ids else None
     return render_template("campo/cliente.html", torre=TORRE, tela=TORRE.tela("cliente"), opcoes=opcoes, cid=cid,
                            nome=(b.nome_cliente.get(cid) or "") if cid else "", sintese=sintese, erros=erros,
-                           erro_visao=erro_visao, lido_tr=ts, fontes_nome=FONTES_NOME, sel=sel)
+                           erro_visao=erro_visao, lido_tr=ts, fontes_nome=FONTES_NOME, sel=sel,
+                           modo_cliente=modo_cliente)
 
 
 FONTES_NOME = {"tempo_real": "o status do tempo real", "chamados": "os chamados na distribuidora",

@@ -269,7 +269,8 @@
     var d = document.querySelector("details.gc-explica[open]");
     if (d) { d.open = false; d.querySelector("summary").focus(); }
   });
-  {% if session.usuario %}
+  {# o cliente (07/11/2026) não tem sessão do Fracttal a conferir: o portão confere a conta dele a cada clique #}
+  {% if session.usuario and session.via != 'cliente' %}
   {% include "_confere_sessao_js.html" %}
   {% endif %}
   // No trilho recolhido não há espaço para as sub-telas: o ícone leva direto à primeira tela.

@@ -130,6 +130,25 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
 
 ## Acessos: quem é administrador (Base → Acessos, 11/10/2026)
 
+**O acesso dos clientes (07/11/2026, Levi: "Quero um acesso extra chamado 'clientes' onde eu boto o e-mail do cliente
+avulso"):** a 5ª aba, **Clientes** (`?aba=clientes`, `auth/clientes.py`). Decidido com ele no mesmo dia:
+- **A senha nasce por um link de convite**, nunca no "primeiro login": o e-mail do cliente não é segredo, e quem o
+  soubesse criaria a senha antes dele. O link (`/entrar?convite=...`, debaixo de `/entrar` porque o Caddy só manda ao
+  Nexus a raiz, `/t/*`, `/entrar` e poucos outros) aparece UMA vez na tela, vale 7 dias e uma vez; "Gerar link" troca o
+  anterior (serve para a senha esquecida). A senha: scrypt, mínimo 10 caracteres.
+- **Tudo fora do banco** (leitura aberta): o `clientes.json` da NEXUS_DADOS, como o `acessos.json`, com a mesma escrita
+  atômica e trava. No arquivo vão o resumo da senha e o sha256 do convite, nunca a senha nem o token.
+- **Cada conta é ligada a um cliente do cadastro** (`cliente_id`): a sessão leva o `cliente_id` e as telas recortam por
+  ele, nunca pelo endereço (a Visão do cliente ignora o `?cliente=` do cliente; `cliente_tela.py`).
+- **O setor Clientes** (`setor_ids.CLIENTES = 900`, fora do `dim_setor`) aparece na matriz de telas; só se marcam as telas
+  com `Tela.do_cliente` (hoje só a Visão do cliente); as outras ficam presas, com "todos os clientes".
+- **O portão do cliente** (`setor_telas.portao_cliente`), sempre ligado (com a `NEXUS_ACESSO_POR_SETOR` em 0 também): só
+  a tela exata marcada, só GET; o Início leva à 1ª tela dele; o resto, 403 (página "Esta página não faz parte do seu
+  acesso") ou JSON. Sem sino, sem a conferência do Fracttal. A cada clique o portão confere a conta (ativa, com senha,
+  no mesmo cliente) e as 12 h do login; removido ou vencido, `encerrar("cliente_fim")`.
+- **Login:** "Sou cliente" na tela de entrar (`/entrar?cliente=1`), e-mail e senha, com as travas do Entrar
+  (5 erradas por e-mail e rede, 20 por e-mail, 50 por IP). Prova: `tests/test_clientes_acesso.py`.
+
 **A tela enxuta (07/11/2026, Levi):** cada torre da matriz mostra 5 telas e o resto em "Mais N" ("padronizar o
 tamanho"; as caixas recolhidas seguem no formulário e na conta); sem a faixa de números nem o aviso e a pré-carga do topo
 (nas três abas que tinham); Administradores recolhidos, com a contagem no título; o Registro de mudanças e Quem entrou

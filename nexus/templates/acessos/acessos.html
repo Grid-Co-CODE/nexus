@@ -9,6 +9,7 @@
 {# uma tela na caixa da torre: a que é DO setor (Tela.do_setor, 13/10/2026) fica marcada e presa, sem ir ao Salvar #}
 {% macro item(s) %}
   {% if s.do_setor %}<li><label><input type="checkbox" data-do-setor checked disabled> {{ s.nome }}</label>{% if s.de_todos %}<span class="ace-do-setor" title="Todo setor vê esta tela sem marcar">de todos</span>{% else %}<span class="ace-do-setor" title="Tela do setor {{ setor_sel.nome }}: quem é dele vê sem marcar">do setor</span>{% endif %}</li>
+  {% elif s.fora_cliente %}<li class="ace-fora-cliente"><label><input type="checkbox" disabled> {{ s.nome }}</label><span class="ace-construcao" title="Esta tela mostra as usinas de todos os clientes: o setor Clientes não a vê">todos os clientes</span></li>
   {% else %}<li><label><input type="checkbox" name="tela" value="{{ s.chave }}" {% if s.marcada %}checked{% endif %}> {{ s.nome }}</label>{% if not s.pronta %}<span class="ace-construcao">em construção</span>{% endif %}</li>{% endif %}
 {% endmacro %}
 <p class="gc-eyebrow">Base · Acessos</p>
@@ -26,6 +27,7 @@
         até ser renovada (no máximo 11 horas).</p>
       {% endcall %}{% endif %}</div>
     {% if aba == 'telas' %}<p class="cad-sub">O que cada setor vê no Nexus e quem é administrador.</p>
+    {% elif aba == 'clientes' %}<p class="cad-sub">Quem é cliente entra no Nexus com e-mail e senha e vê só as usinas dele.</p>
     {% elif aba == 'historico' %}<p class="cad-sub">Quem deu ou removeu acesso pela tela, e quem entrou nos últimos 30 dias.</p>{% endif %}
   </div>
 </div>
@@ -37,9 +39,10 @@
   <a href="{{ url_for('torre_base.acessos') }}"{% if aba == 'telas' %} aria-current="page"{% endif %}>Telas e administradores</a>
   <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}"{% if aba == 'pessoas' %} aria-current="page"{% endif %}>Pessoas e setores</a>
   <a href="{{ url_for('torre_base.acessos', aba='admins_app') }}"{% if aba == 'admins_app' %} aria-current="page"{% endif %}>Administradores do App de Campo</a>
+  <a href="{{ url_for('torre_base.acessos', aba='clientes') }}"{% if aba == 'clientes' %} aria-current="page"{% endif %}>Clientes</a>
   <a href="{{ url_for('torre_base.acessos', aba='historico') }}"{% if aba == 'historico' %} aria-current="page"{% endif %}>Histórico e registros</a>
 </nav>
-{% if aba == 'pessoas' %}{% include "acessos/_pessoas.html" %}{% elif aba == 'admins_app' %}{% include "acessos/_admins_app.html" %}{% else %}
+{% if aba == 'pessoas' %}{% include "acessos/_pessoas.html" %}{% elif aba == 'admins_app' %}{% include "acessos/_admins_app.html" %}{% elif aba == 'clientes' %}{% include "acessos/_clientes.html" %}{% else %}
 
 {% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Gravado.</strong> {{ aviso }}</div></div>{% endif %}
 {% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}
@@ -70,7 +73,7 @@
     {% for s in setores %}
     <a class="ace-setor{% if s.id == setor_sel.id %} ativo{% endif %}" href="{{ url_for('torre_base.acessos', setor=s.id) }}#ace-setores"{% if s.id == setor_sel.id %} aria-current="true"{% endif %}>
       <span class="nome">{{ s.nome }}</span>
-      <span class="det">{{ s.telas }} de {{ total_telas_menu }} telas · {{ s.pessoas }} pessoa{{ "s" if s.pessoas != 1 }}</span>
+      <span class="det">{{ s.telas }} de {{ total_telas_menu }} telas · {% if s.cliente %}{{ s.pessoas }} conta{{ "s" if s.pessoas != 1 }}{% else %}{{ s.pessoas }} pessoa{{ "s" if s.pessoas != 1 }}{% endif %}</span>
     </a>
     {% endfor %}
   </nav>
@@ -229,7 +232,7 @@
   if (!form) return;
   var dados = {};
   try { dados = JSON.parse(document.getElementById('ace-matriz-dados').textContent || '{}'); } catch (e) { dados = {}; }
-  var telas = Array.prototype.slice.call(form.querySelectorAll('input[name="tela"]'));
+  var telas = Array.prototype.slice.call(form.querySelectorAll('input[name="tela"]:not([disabled])'));
   var inicial = telas.map(function (c) { return c.checked; });
   var conta = form.querySelector('[data-conta]');
   var mudou = form.querySelector('[data-mudou]');

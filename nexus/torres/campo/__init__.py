@@ -65,7 +65,8 @@ TORRE = Torre(
         # a Visão do cliente (05/11/2026, fase 1): a síntese das usinas de um cliente (nexus/campo/visao_cliente.py)
         Tela("cliente", "Visão do cliente",
              "Como estão agora as usinas de um cliente, e o que responder a ele sem abrir cinco telas?",
-             "Tempo real da plataforma (só leitura) + Gerencial + Andamento da Ronda COS + OS e programação no banco"),
+             "Tempo real da plataforma (só leitura) + Gerencial + Andamento da Ronda COS + OS e programação no banco",
+             do_cliente=True),
         Tela("atencao", "Central de atenção",
              "O que no campo pede ação agora: usina sem ronda, PT parada, ronda sem OS?", FONTE_APP),
         Tela("aprovacao", "Aprovação de OS",

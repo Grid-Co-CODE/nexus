@@ -35,7 +35,7 @@ from flask import (Blueprint, current_app, jsonify, make_response, redirect, ren
                    url_for)
 from itsdangerous import URLSafeTimedSerializer
 
-from . import acessos, fracttal, microsoft
+from . import acessos, clientes, fracttal, microsoft
 from . import setor_telas
 from ..prefixo import na_raiz, raiz
 
@@ -109,7 +109,11 @@ MOTIVOS = {
     "expirou": "A sua sessão do Nexus venceu (ela dura 12 horas a partir do login). Entre de novo para continuar.",
     # a Microsoft ligou com a pessoa dentro pelo Fracttal (14/10/2026): a porta só aceita quem é da Grid
     "porta_microsoft": "O Nexus agora entra com a conta Microsoft da Grid Co. Entre de novo, com ela, para continuar.",
+    # o cliente (07/11/2026): as 12 h do login passaram, ou a Grid removeu o acesso
+    "cliente_fim": "O seu acesso terminou (ele dura 12 horas a partir do login). Entre de novo para continuar.",
 }
+TEXTO_CLIENTE_ERRADO = "E-mail ou senha incorretos."
+TEXTO_CLIENTE_TRANCADO = "Muitas tentativas erradas com este e-mail. Aguarde 15 minutos e tente de novo."
 # A sessão que nasceu da Microsoft dura 12 h a partir do LOGIN (não do último clique): é o prazo que a do Fracttal já
 # tinha, e é o que tira do Nexus, em até 12 h, quem saiu da empresa (a conta desligada no Entra não entra de novo)
 SESSAO_MS_S = 12 * 3600
@@ -543,6 +547,13 @@ def entrar():
         return _volta_da_microsoft()
     if leitura and request.args.get("ms") == "1":
         return _ida_para_a_microsoft(destino)
+    if leitura and request.args.get("convite"):
+        # o link de convite do cliente (07/11/2026, `clientes.py`): a tela de criar a senha, se ele ainda vale
+        conta = clientes.conta_do_convite(current_app.config, request.args.get("convite"))
+        return _tela_entrar(modo="convite", convite=request.args.get("convite") if conta else "",
+                            convite_email=(conta or {}).get("email", ""), destino="/")
+    if leitura and request.args.get("cliente") == "1":
+        return _tela_entrar(modo="cliente", destino=destino, aviso=MOTIVOS.get(session.pop("motivo_entrar", None)))
     if leitura:
         guardado = session.pop("motivo_entrar", None)
         motivo = request.args.get("motivo")
@@ -550,6 +561,10 @@ def entrar():
         return _tela_entrar(erro=None, destino=destino, admin=admin, motivo=motivo, aviso=MOTIVOS.get(motivo))
 
     ip = _ip()
+    if request.form.get("convite") is not None:
+        return _criar_senha_do_cliente()
+    if request.form.get("cliente_email") is not None:
+        return _entrar_cliente(destino, ip)
     pelo_fracttal = request.form.get("email") is not None
     if _erros_na_janela(("ip", ip)) >= TETO_POR_IP:
         return _tela_entrar(erro=TEXTO_IP_TRANCADO, email=(request.form.get("email") or "").strip(),
@@ -582,6 +597,47 @@ def entrar():
     # como no login da Microsoft: o `os_sessao` de quem usou este navegador antes é o Fracttal de OUTRA pessoa, e o OS Creator e
     # a ponte do inventário falariam com o Fracttal no login dela (a revisão final do inventário, 27/10/2026). Quem entrou pela
     # senha e precisa do Fracttal entra nele pelo /os/login, com a conta dele
+    resp.delete_cookie("os_sessao", path=os_cookie_path())
+    return _sem_a_sessao_velha_da_raiz(resp)
+
+
+def _criar_senha_do_cliente():
+    """O POST do link de convite: a senha que o próprio cliente escolhe. O link vale uma vez."""
+    token = request.form.get("convite") or ""
+    conta = clientes.conta_do_convite(current_app.config, token)
+    if not conta:
+        return _tela_entrar(modo="convite", convite="", convite_email="", destino="/"), 400
+    try:
+        email = clientes.definir_senha(current_app.config, token, request.form.get("senha"), request.form.get("senha2"))
+    except clientes.Recusado as ex:
+        return _tela_entrar(modo="convite", convite=token, convite_email=conta["email"], erro=str(ex), destino="/"), 400
+    except (clientes.Ilegivel, OSError) as ex:
+        log.error("Clientes: a senha não gravou (%s).", type(ex).__name__)
+        return _tela_entrar(modo="convite", convite=token, convite_email=conta["email"], destino="/",
+                            erro="Não consegui gravar agora. Tente de novo em instantes; se continuar, fale com a Grid Co."), 500
+    log.info("Clientes: %s definiu a senha pelo convite.", email)
+    return _tela_entrar(modo="cliente", email=email, destino="/", aviso="Senha criada. Entre com o seu e-mail e ela.")
+
+
+def _entrar_cliente(destino: str, ip: str):
+    """O login do cliente (e-mail e senha do convite): as mesmas travas do Fracttal, com contadores próprios."""
+    email = (request.form.get("cliente_email") or "").strip().lower()[:254]
+    par, teto = ("cliente", email, ip), ("cliente_teto", email)
+    if _erros_na_janela(par) >= MAX_ERROS_POR_EMAIL or _erros_na_janela(teto) >= TETO_POR_EMAIL:
+        return _tela_entrar(modo="cliente", erro=TEXTO_CLIENTE_TRANCADO, email=email, destino=destino), 429
+    conta = clientes.conferir(current_app.config, email, request.form.get("cliente_senha") or "")
+    if not conta:
+        _contar_erro(par, teto, ("ip", ip))
+        return _tela_entrar(modo="cliente", erro=TEXTO_CLIENTE_ERRADO, email=email, destino=destino), 401
+    _zerar_erros(par)
+    session.clear()
+    session.permanent = True
+    session.update(logado=True, admin=False, via="cliente", cliente_id=conta["cliente_id"],
+                   cliente_ate=time.time() + clientes.SESSAO_S,
+                   usuario={"email": conta["email"], "nome": conta.get("cliente") or conta["email"], "perfil": "Cliente"})
+    acessos.registrar_login(current_app.config, conta["email"])
+    log.info("Clientes: %s entrou (cliente %s).", conta["email"], conta["cliente_id"])
+    resp = redirect(na_raiz(destino))
     resp.delete_cookie("os_sessao", path=os_cookie_path())
     return _sem_a_sessao_velha_da_raiz(resp)
 
@@ -633,6 +689,17 @@ def instalar_portao(app) -> None:
             # o "sair" do OS Creator ("Sair do Fracttal nesta área") sai do Nexus também, como o Sair do Nexus sai do OS
             # Creator: sair, de qualquer lugar, sai de tudo
             return encerrar("saiu", json=False)
+        if session.get("via") == "cliente":
+            # o cliente (07/11/2026, `clientes.py`): a conta segue ativa e no mesmo cliente, e nas 12 h do login; senão
+            # sai. Depois, só as telas dele
+            if request.endpoint == "auth.sair":
+                return None
+            u = session.get("usuario") or {}
+            ate = float(session.get("cliente_ate") or 0)
+            if time.time() >= ate or not clientes.conta_ativa(current_app.config, str(u.get("email") or ""),
+                                                                session.get("cliente_id")):
+                return encerrar("cliente_fim", _destino_do_pedido())
+            return setor_telas.portao_cliente()
         if request.endpoint == "auth.sair" or not com_pessoa():
             return None
         # a sessão do Fracttal acaba junto com a dele; a da Microsoft, nas 12 h do login (o Fracttal fica só no OS

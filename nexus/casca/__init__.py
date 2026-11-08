@@ -303,7 +303,8 @@ def _sino():
     e escondiam o resto; ficam na Caixa de entrada. Só lê as cópias (a do motor, a das conversas, a dos pedidos e a dos
     avisos): nenhuma página espera uma fonte por causa dele. Sem nenhuma cópia (logo depois de subir), não sai número, e a
     conta começa por trás."""
-    if not session.get("logado"):
+    # o cliente (07/11/2026) não vê insights, pedidos nem menções da Grid
+    if not session.get("logado") or session.get("via") == "cliente":
         return None
     try:
         from ..comando import conversa as CV

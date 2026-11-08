@@ -5,7 +5,10 @@
    'Sem setor, fale com o responsável'". O menu já vem só com o que o setor vê (vazio sem setor). #}
 <section class="sem-setor" aria-labelledby="sem-setor-titulo">
   <i class="ph ph-lock-key" aria-hidden="true"></i>
-  {% if bloqueada %}
+  {% if cliente %}
+  <h1 id="sem-setor-titulo">Esta página não faz parte do seu acesso</h1>
+  <p>O seu acesso mostra as telas das suas usinas. Se precisar de outra informação, fale com a Grid Co.</p>
+  {% elif bloqueada %}
   <h1 id="sem-setor-titulo">Esta tela não está liberada para o seu setor</h1>
   <p>O setor <strong>{{ setor.nome }}</strong> não vê esta tela. Fale com o responsável.</p>
   <p><a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/">Voltar ao Início</a></p>

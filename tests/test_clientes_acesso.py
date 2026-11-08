@@ -1,0 +1,140 @@
+"""O acesso dos clientes ao Nexus (07/11/2026, Levi: "Quero um acesso extra chamado 'clientes' onde eu boto o e-mail do
+cliente avulso"; com ele, no mesmo dia: a senha nasce por um link de convite de uso único, e o cliente vê SÓ as usinas
+dele). Seguram: o convite (uma vez, 7 dias), a senha só embaralhada e fora do banco, o login com trava, o portão que só
+abre as telas marcadas para o setor Clientes que recortam pelo cliente, o cliente que vem da sessão e nunca do
+endereço, e o acesso removido que cai no próximo clique. Nomes e e-mails inventados."""
+import re
+import time
+
+import pytest
+from test_campo_responsaveis import manut, tela  # noqa: F401  (fixtures)
+from test_campo_visao import banco  # noqa: F401
+from test_campo_visao_cliente_0511 import cliente_tela  # noqa: F401
+
+from nexus.auth import clientes as CL
+from nexus.auth import setor_telas as ST
+from nexus.cadastro import setor_ids as SID
+
+EMAIL = "compras@cliente-exemplo.test"
+URL = "/t/base/acessos"
+
+
+@pytest.fixture
+def dados(app, tmp_path):
+    app.config["NEXUS_DADOS"] = str(tmp_path / "dados")
+    ST.limpar()
+    yield app.config
+    ST.limpar()
+
+
+def _codigo(c, url=URL + "?aba=clientes"):
+    return re.search(r'name="codigo" value="([^"]+)"', c.get(url).get_data(as_text=True)).group(1)
+
+
+def _token(link: str) -> str:
+    return link.split("convite=", 1)[1]
+
+
+def test_o_convite_a_senha_e_a_conferencia(app, dados):
+    with app.test_request_context():
+        e, token = CL.adicionar(dados, EMAIL.upper(), 1, "Thopen", "admin@exemplo.test")
+        assert e == EMAIL and CL.conta_do_convite(dados, token)["email"] == EMAIL
+        assert CL.conferir(dados, EMAIL, "qualquer coisa") is None                  # sem senha ainda, não entra
+        for a, b in (("curta", "curta"), ("senha-boa-123", "outra-senha-123")):
+            with pytest.raises(CL.Recusado):
+                CL.definir_senha(dados, token, a, b)
+        assert CL.definir_senha(dados, token, "uma senha boa 2026", "uma senha boa 2026") == EMAIL
+        assert CL.conta_do_convite(dados, token) is None                            # o link vale uma vez
+        with pytest.raises(CL.Recusado):
+            CL.definir_senha(dados, token, "outra senha boa 99", "outra senha boa 99")
+        assert CL.conferir(dados, EMAIL, "uma senha boa 2026")["cliente_id"] == 1
+        assert CL.conferir(dados, EMAIL, "senha errada 2026") is None
+        assert CL.conferir(dados, "ninguem@exemplo.test", "uma senha boa 2026") is None
+        bruto = (dados["NEXUS_DADOS"] + "/clientes.json")
+        texto = open(bruto, encoding="utf-8").read()
+        assert "uma senha boa" not in texto and token not in texto and "scrypt$" in texto   # só o resumo
+        # o link novo troca o velho; remover tira a senha e o convite
+        novo = CL.gerar_link(dados, EMAIL, "admin@exemplo.test")
+        assert CL.conta_do_convite(dados, novo) and CL.conta_ativa(dados, EMAIL, 1)
+        CL.remover(dados, EMAIL, "admin@exemplo.test")
+        assert not CL.conta_ativa(dados, EMAIL, 1) and CL.conta_do_convite(dados, novo) is None
+        assert CL.conferir(dados, EMAIL, "uma senha boa 2026") is None
+
+
+def test_o_cliente_ve_so_as_usinas_dele(app, dados, cliente_tela, logado):
+    # o administrador cria a conta na aba Clientes e marca a Visão do cliente para o setor Clientes
+    html = logado.get(URL + "?aba=clientes").get_data(as_text=True)
+    assert "Dar acesso a um cliente" in html and '<option value="1">Thopen</option>' in html
+    r = logado.post(URL, data={"codigo": _codigo(logado), "acao": "cliente_adicionar", "email": EMAIL, "cliente_id": "1"})
+    assert r.status_code == 303
+    html = logado.get(URL + "?aba=clientes").get_data(as_text=True)
+    link = re.search(r'id="cli-link" type="text" readonly value="([^"]+)"', html).group(1)
+    assert "/entrar?convite=" in link and "esperando a senha" in html
+    assert 'id="cli-link"' not in logado.get(URL + "?aba=clientes").get_data(as_text=True)   # o link aparece uma vez
+    # o setor Clientes na matriz: só a tela que recorta pelo cliente se marca
+    mat = logado.get(URL + f"?setor={SID.CLIENTES}").get_data(as_text=True)
+    assert "Clientes" in mat and 'value="campo/cliente"' in mat and 'value="campo/atencao"' not in mat
+    assert logado.post(URL, data={"codigo": _codigo(logado, URL), "acao": "telas_setor", "setor": str(SID.CLIENTES),
+                                  "tela": ["campo/cliente", "campo/atencao"]}).status_code == 400
+    assert logado.post(URL, data={"codigo": _codigo(logado, URL), "acao": "telas_setor", "setor": str(SID.CLIENTES),
+                                  "tela": ["campo/cliente"]}).status_code == 303
+    ST.limpar()
+    # o cliente cria a senha pelo link e entra
+    c = app.test_client()
+    pag = c.get("/entrar?convite=" + _token(link)).get_data(as_text=True)
+    assert "Crie a senha do acesso de <b>" + EMAIL in pag
+    c.post("/entrar", data={"convite": _token(link), "senha": "senha do cliente 1", "senha2": "senha do cliente 1"})
+    assert "não vale mais" in c.get("/entrar?convite=" + _token(link)).get_data(as_text=True)
+    assert c.post("/entrar", data={"cliente_email": EMAIL, "cliente_senha": "errada errada"}).status_code == 401
+    r = c.post("/entrar", data={"cliente_email": EMAIL, "cliente_senha": "senha do cliente 1"})
+    assert r.status_code == 302
+    with c.session_transaction() as s:
+        assert s["via"] == "cliente" and s["cliente_id"] == 1 and not s["admin"]
+    # o Início leva à tela dele; nela, o cliente da sessão, sem escolha, e o ?cliente= de outro é ignorado
+    assert c.get("/").headers["Location"].endswith("/t/campo/cliente")
+    html = c.get("/t/campo/cliente?cliente=2&usina=3").get_data(as_text=True)
+    assert '<h2 class="vc-nome">Thopen</h2>' in html and 'id="vc-cliente"' not in html and 'id="vc-det-3"' not in html
+    assert 'class="sino-topo"' not in html and "_nexus/sessao" not in html
+    menu = re.findall(r'href="(/t/[^"]+)"', html.split('class="conteudo"', 1)[0])
+    assert set(menu) <= {"/t/campo/cliente"}
+    # nada fora da tela dele: telas da Grid, dados, o OS Creator, a gravação
+    for url in ("/t/campo/atencao", "/t/comando/caixa-de-entrada", "/t/base/acessos", "/t/campo/responsaveis",
+                "/os/", "/t/comando/conversa/pessoas", "/t/base/paleta"):
+        assert c.get(url).status_code == 403, url
+    assert c.post("/t/campo/cliente").status_code in (403, 405)
+    # removido, cai no próximo clique
+    logado.post(URL, data={"codigo": _codigo(logado), "acao": "cliente_remover", "email": EMAIL})
+    r = c.get("/t/campo/cliente")
+    assert r.status_code == 302 and "motivo=cliente_fim" in r.headers["Location"]
+
+
+def test_a_sessao_do_cliente_dura_12_horas(app, dados, cliente_tela):
+    with app.test_request_context():
+        _e, token = CL.adicionar(dados, EMAIL, 1, "Thopen", "admin@exemplo.test")
+        CL.definir_senha(dados, token, "senha do cliente 1", "senha do cliente 1")
+    c = app.test_client()
+    c.post("/entrar", data={"cliente_email": EMAIL, "cliente_senha": "senha do cliente 1"})
+    with c.session_transaction() as s:
+        assert time.time() + 11 * 3600 < s["cliente_ate"] <= time.time() + 12 * 3600 + 5
+        s["cliente_ate"] = time.time() - 1
+    r = c.get("/t/campo/cliente")
+    assert r.status_code == 302 and "motivo=cliente_fim" in r.headers["Location"]
+
+
+def test_a_trava_das_tentativas_do_cliente(app, dados):
+    with app.test_request_context():
+        _e, token = CL.adicionar(dados, EMAIL, 1, "Thopen", "admin@exemplo.test")
+        CL.definir_senha(dados, token, "senha do cliente 1", "senha do cliente 1")
+    c = app.test_client()
+    for _ in range(5):
+        assert c.post("/entrar", data={"cliente_email": EMAIL, "cliente_senha": "errada errada"}).status_code == 401
+    r = c.post("/entrar", data={"cliente_email": EMAIL, "cliente_senha": "senha do cliente 1"})
+    assert r.status_code == 429                                         # nem a certa passa até a janela acabar
+
+
+def test_a_tela_de_entrar_oferece_o_acesso_de_cliente(cliente):
+    html = cliente.get("/entrar").get_data(as_text=True)
+    assert 'href="/entrar?cliente=1"' in html and "Sou cliente" in html
+    pag = cliente.get("/entrar?cliente=1").get_data(as_text=True)
+    assert 'name="cliente_email"' in pag and 'name="cliente_senha"' in pag
+    assert "não vale mais" in cliente.get("/entrar?convite=inventado").get_data(as_text=True)

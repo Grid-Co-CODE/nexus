@@ -1,0 +1,108 @@
+{# Base → Acessos, aba Clientes (07/11/2026, Levi: "Quero um acesso extra chamado 'clientes' onde eu boto o e-mail do
+   cliente avulso"). Cada conta é ligada a um cliente do cadastro e nasce com um link de convite de uso único (7 dias):
+   só quem abre o link cria a senha. O que os clientes veem se marca no setor Clientes da aba Telas e administradores.
+   A conta e o resumo da senha moram no clientes.json da pasta de dados do Nexus, fora do banco (nexus/auth/clientes.py). #}
+{% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Gravado.</strong> {{ aviso }}</div></div>{% endif %}
+{% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}
+{% if arquivo_erro %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-warning-octagon"></i><div><strong>A lista de clientes não abriu</strong> ({{ arquivo_erro }}). Nenhum cliente entra até ser corrigida, e a tela não grava por cima. Avise a T.I.</div></div>{% endif %}
+{% if sem_pasta %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-folder-simple-dashed"></i><div><strong>Sem pasta de dados.</strong> Este Nexus não tem a <span class="gc-dado">NEXUS_DADOS</span>: as contas de cliente não são lidas nem gravadas.</div></div>{% endif %}
+{% if erro_cadastro %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-database"></i><div><strong>Não consegui ler os clientes do cadastro</strong> ({{ erro_cadastro }}). Sem eles não dá para criar conta: é pelo cliente que o Nexus separa as usinas.</div></div>{% endif %}
+
+{% if link_cliente %}
+<div class="cad-aviso cad-aviso--info cli-link" role="status"><i class="ph ph-link"></i><div>
+  <strong>{{ 'Link de convite' if link_cliente.novo else 'Link novo' }} de {{ link_cliente.email }}</strong>
+  <p>Mande este link ao cliente (WhatsApp, Teams ou o seu e-mail). Ele aparece só agora, vale 7 dias e uma vez: quem abre cria a senha.</p>
+  <div class="cli-link-linha"><input class="gc-campo" id="cli-link" type="text" readonly value="{{ link_cliente.link }}" aria-label="Link de convite">
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="button" data-copiar="cli-link"><i class="ph ph-copy"></i> Copiar</button></div>
+</div></div>
+{% endif %}
+
+{% if pode_gravar %}
+<section class="cad-secao ace-secao" aria-labelledby="cli-novo-titulo">
+  <h2 id="cli-novo-titulo">Dar acesso a um cliente</h2>
+  <form class="cad-filtros ace-dar cli-novo" method="post" action="{{ url_for('torre_base.acessos') }}">
+    <input type="hidden" name="codigo" value="{{ codigo }}">
+    <input type="hidden" name="acao" value="cliente_adicionar">
+    <div class="campo busca">
+      <label class="gc-rotulo" for="cli-email">E-mail do cliente</label>
+      <input id="cli-email" name="email" type="email" class="gc-campo" autocomplete="off" inputmode="email"
+             placeholder="nome@cliente.com.br" maxlength="254" required value="{{ email_digitado }}">
+    </div>
+    <div class="campo">
+      <label class="gc-rotulo" for="cli-cliente">Cliente do cadastro</label>
+      <select id="cli-cliente" name="cliente_id" class="gc-campo" required {% if not opcoes_clientes %}disabled{% endif %}>
+        <option value="">Escolha</option>
+        {% for i, n in opcoes_clientes %}<option value="{{ i }}">{{ n }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" {% if not opcoes_clientes %}disabled{% endif %}><i class="ph ph-user-plus"></i> Dar acesso</button>
+  </form>
+  <p class="gc-ajuda ace-ajuda">O cliente vê só as usinas do cliente escolhido, e só as telas marcadas para o setor Clientes em <a href="{{ url_for('torre_base.acessos', setor=900) }}#ace-setores">Telas e administradores</a>. A senha ele cria pelo link.</p>
+</section>
+{% endif %}
+
+<section class="cad-secao ace-secao" aria-labelledby="cli-contas-titulo">
+  <h2 id="cli-contas-titulo">Clientes com acesso</h2>
+  <div class="cad-rolagem ace-rolagem">
+    <table class="cad-tabela ace-tabela">
+      <thead><tr><th>E-mail</th><th>Cliente</th><th>Situação</th><th>Desde</th><th><span class="ace-oculto">Ação</span></th></tr></thead>
+      <tbody>
+      {% for c in contas_clientes %}
+      <tr>
+        <td class="ace-email"><span class="gc-dado">{{ c.email }}</span></td>
+        <td>{{ c.cliente or '—' }}</td>
+        <td>{% if c.situacao == 'ativa' %}<span class="cad-chip cad-chip--operacao">ativa</span> <span class="mudo">senha em {{ c.senha_br }}</span>
+          {% elif c.situacao == 'convite' %}<span class="cad-chip cad-chip--info">esperando a senha</span> <span class="mudo">link até {{ c.expira_br }}</span>
+          {% elif c.situacao == 'convite_vencido' %}<span class="cad-chip cad-chip--alerta">link vencido</span>
+          {% else %}<span class="cad-chip">removida</span>{% endif %}</td>
+        <td class="num">{{ c.criada_br or '—' }}</td>
+        <td class="ace-acao">
+          {% if c.status == 'ativa' and pode_gravar %}
+          <form method="post" action="{{ url_for('torre_base.acessos') }}" class="ace-tirar">
+            <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="email" value="{{ c.email }}">
+            <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="cliente_link"
+                    aria-label="Gerar um link novo para {{ c.email }}"><i class="ph ph-link"></i> Gerar link</button>
+            <button class="gc-btn gc-btn--ui gc-btn--contorno ace-btn-tirar" type="submit" name="acao" value="cliente_remover"
+                    aria-label="Remover o acesso de {{ c.email }}" data-confirmar="Remover o acesso de {{ c.email }}? Se estiver dentro do Nexus, sai no próximo clique."><i class="ph ph-user-minus"></i> Remover</button>
+          </form>
+          {% elif c.status != 'ativa' and pode_gravar %}<span class="mudo">para voltar, dê acesso de novo</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="vazio">Nenhum cliente com acesso ainda.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<details class="cad-secao ace-secao ace-recolhe" aria-labelledby="cli-hist-titulo">
+  <summary><h2 id="cli-hist-titulo">Histórico</h2><span class="ace-recolhe-n">{{ auditoria_clientes|length }}</span></summary>
+  <div class="cad-rolagem ace-rolagem">
+    <table class="cad-tabela ace-tabela">
+      <thead><tr><th>Quando</th><th>Quem</th><th>O que</th><th>E-mail</th><th>Cliente</th></tr></thead>
+      <tbody>
+      {% for x in auditoria_clientes %}
+      <tr><td class="num">{{ x.quando_br }}</td><td>{{ x.quem }}</td><td>{{ x.acao }}</td><td><span class="gc-dado">{{ x.email }}</span></td><td>{{ x.cliente or '—' }}</td></tr>
+      {% else %}
+      <tr><td colspan="5" class="vazio">Nada ainda.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+<script>
+(function () {
+  document.querySelectorAll("[data-copiar]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var c = document.getElementById(b.getAttribute("data-copiar"));
+      c.select();
+      try { navigator.clipboard.writeText(c.value); } catch (e) { document.execCommand("copy"); }
+      b.textContent = "Copiado";
+    });
+  });
+  document.querySelectorAll("button[data-confirmar]").forEach(function (b) {
+    b.addEventListener("click", function (ev) { if (!window.confirm(b.getAttribute("data-confirmar"))) ev.preventDefault(); });
+  });
+})();
+</script>
