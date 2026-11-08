@@ -392,6 +392,19 @@ def test_atualizar_rele_o_fracttal_e_a_leitura_que_falhou_diz(tela, cliente, mon
     assert "O Fracttal recusou a leitura agora" in html and "HTTP 429" in html
 
 
+def test_leitura_que_o_fracttal_recusou_nao_recarrega_a_tela_de_8_em_8_segundos(tela, cliente, monkeypatch):
+    """Auditoria de 08/11/2026: `nunca_lido` vale tambem quando a leitura falhou, e a aba esquecida recarregava a pagina
+    inteira a cada 8 s (e cada recarga tentava uma leitura sincrona). So a leitura em curso, sem erro, recarrega."""
+    from test_engenharia_acompanhamento import ANA, _como
+    monkeypatch.setattr(E, "dados", lambda: {"os": [], "lido": 0, "lendo": False,
+                                             "erro": "o Fracttal recusou por excesso de pedidos (HTTP 429)"})
+    html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
+    assert _dados_da_tela(html)["nunca_lido"] is True and "HTTP 429" in html
+    assert "location.reload()" not in html
+    monkeypatch.setattr(E, "dados", lambda: {"os": [], "lido": 0, "lendo": True, "erro": ""})
+    assert "location.reload()" in _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
+
+
 def test_a_subida_liga_a_releitura_por_tras(app, monkeypatch):
     from nexus import engenharia as eng_pkg
     from nexus.engenharia import os_equipe

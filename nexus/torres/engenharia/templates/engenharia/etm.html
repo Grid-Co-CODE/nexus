@@ -915,7 +915,9 @@
     acompanhar();
   }
   {% endif %}
-  if (D.nunca_lido) setTimeout(function () { location.reload(); }, 8000);
+  {# só a primeira leitura em curso recarrega: com o Fracttal recusando (`erro`) a aba esquecida recarregava a página
+     inteira de 8 em 8 s, cada recarga com uma leitura síncrona (auditoria de 08/11/2026) #}
+  {% if nunca_lido and not erro %}setTimeout(function () { location.reload(); }, 8000);{% endif %}
   // voltou da OS com a tela relida: o ?atualizar=1 sai do endereço (a aba fica), para o F5 não reler de novo
   if (/[?&]atualizar=1(&|$)/.test(location.search)) { try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* sem history */ } }
   restaurar();
