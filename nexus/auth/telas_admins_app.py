@@ -62,7 +62,7 @@ SEM_CHAVE = "sem a chave do cadastro, o Nexus não confere se ela já tem ficha"
 OUTRO_DOMINIO = "outro domínio: o App não o reconhece como administrador"
 CONTA_INATIVA = "conta do Fracttal desativada"
 NOME_DE_DESLIGADA = "o nome bate com uma ficha desligada: confira se é a mesma pessoa"
-TEM_FICHA_AGORA = "esta pessoa tem ficha agora: tire e ponha de novo para ligar à ficha"
+TEM_FICHA_AGORA = "esta pessoa tem ficha agora: remova e ponha de novo para ligar à ficha"
 
 
 class SemCadastro(Exception):
@@ -454,7 +454,7 @@ def _por_pessoa(cfg, cad: dict, p: dict, obs, usuario) -> str:
         # o código já vale na lista por outra ficha (o usuário do Fracttal religado leva o código junto); o
         # `admins_app.decidir` também recusa, aqui é para dizer quem
         raise AA.Recusada(f"{nome}: o código dela já está na lista de administradores do App com outra ficha "
-                          f"({_nome(cad['fichas'], outra_pid)}): tire aquela antes. Nada foi gravado.")
+                          f"({_nome(cad['fichas'], outra_pid)}): remova aquela antes. Nada foi gravado.")
     r = AA.decidir(cfg, pessoa_id=p["pessoa_id"], pessoa_hmac=p["codigo"], ativo=True, usuario=usuario, obs=obs or "")
     if not r["gravou"]:
         return f"Nada mudou: {nome} já é administrador do App de Campo."
@@ -498,7 +498,7 @@ def por_email(cfg, email, obs, usuario) -> str:
     outra_pid = A._int_ou_none(outra.get("pessoa_id")) if outra else None
     if outra and outra_pid is not None:
         raise AA.Recusada(f"{email}: o código deste e-mail já está na lista de administradores do App com uma ficha "
-                          f"({_nome(cad['fichas'], outra_pid)}): tire aquela antes. Nada foi gravado.")
+                          f"({_nome(cad['fichas'], outra_pid)}): remova aquela antes. Nada foi gravado.")
     r = AA.decidir(cfg, pessoa_id=None, pessoa_hmac=codigo, ativo=True, usuario=usuario, obs=obs or "", email=email)
     if not r["gravou"]:
         return f"Nada mudou: {email} já é administrador do App de Campo."

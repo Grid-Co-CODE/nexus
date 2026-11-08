@@ -609,3 +609,19 @@ details.csv-extra>.cad-sub{padding:0 14px 12px}
 .rx-n{display:inline-block;min-width:4ch;text-align:right;font-variant-numeric:tabular-nums}
 .rx-tom--alerta{color:var(--alerta);font-weight:600}
 .rx-tom--critico{color:var(--critico);font-weight:600}
+
+/* Acessos, 07/11/2026: seções recolhidas (Administradores, os históricos) com a contagem no título, e a caixa de cada
+   torre com as 5 primeiras telas à vista e o resto em "Mais N" (Levi: "padronizar o tamanho") */
+details.ace-recolhe>summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer}
+details.ace-recolhe>summary::-webkit-details-marker{display:none}
+details.ace-recolhe>summary h2{margin:0}
+details.ace-recolhe>summary::after{content:"";width:8px;height:8px;margin-left:auto;border-right:2px solid var(--mudo);
+  border-bottom:2px solid var(--mudo);transform:rotate(45deg);transition:transform .15s}
+details.ace-recolhe[open]>summary::after{transform:rotate(-135deg)}
+details.ace-recolhe[open]>summary{margin-bottom:12px}
+details.ace-recolhe>summary:focus-visible{outline:2px solid var(--foco);outline-offset:4px;border-radius:4px}
+.ace-recolhe-n{font:600 12px/1 var(--font-sans);color:var(--tinta-2);background:var(--superficie-2);padding:4px 9px;
+  border-radius:999px}
+details.ace-mais>summary{cursor:pointer;font-size:12.5px;color:var(--verde-texto);padding:4px 0 0;font-weight:600}
+details.ace-mais>summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){details.ace-recolhe>summary::after{transition:none}}

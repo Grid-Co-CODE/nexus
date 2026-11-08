@@ -192,7 +192,9 @@ def _pagina(erro: str | None = None, status: int = 200, email_digitado: str = ""
         "pode_gravar": not est["sem_pasta"] and not est["erro"],
         **secao,
     }
-    return render_template("acessos/acessos.html", aba="telas", **contexto), status
+    # a aba Histórico e registros (07/11/2026) usa a mesma conta: o registro de mudanças e quem entrou em 30 dias
+    aba = "historico" if request.method == "GET" and request.args.get("aba") == "historico" else "telas"
+    return render_template("acessos/acessos.html", aba=aba, **contexto), status
 
 
 def _sem_permissao():

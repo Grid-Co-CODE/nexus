@@ -130,6 +130,12 @@ calma para que não ocorra bugs!". O escuro navy segue o padrão e **não mudou 
 
 ## Acessos: quem é administrador (Base → Acessos, 11/10/2026)
 
+**A tela enxuta (07/11/2026, Levi):** cada torre da matriz mostra 5 telas e o resto em "Mais N" ("padronizar o
+tamanho"; as caixas recolhidas seguem no formulário e na conta); sem a faixa de números nem o aviso e a pré-carga do topo
+(nas três abas que tinham); Administradores recolhidos, com a contagem no título; o Registro de mudanças e Quem entrou
+em 30 dias moram na 4ª aba, **Histórico e registros** (`?aba=historico`, a mesma conta da 1ª), os dois recolhidos; na
+aba do App, o Pôr administrador vem antes da lista e o Histórico recolhido; o botão é **Remover**, não "Tirar".
+
 **Três abas:** Telas e administradores (o que está abaixo), Pessoas e setores (desde 25/10/2026, a antiga Base →
 Integração Fracttal: o pessoal do Fracttal e o setor de cada um; regras em `nexus/cadastro/CLAUDE.md`) e Administradores
 do App de Campo (desde 05/11/2026, `?aba=admins_app`; bloco no fim desta seção). A segunda lê o Fracttal; a terceira usa só a

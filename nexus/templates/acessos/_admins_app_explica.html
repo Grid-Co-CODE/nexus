@@ -2,7 +2,7 @@
    solto na tela; o padrão do Nexus é o _explica.html, DESIGN.md seção 6). As regras: nexus/casca/CLAUDE.md, seção Acessos. #}
 {% from "_explica.html" import explica %}
 {% call explica('Entenda esta tela') %}
-<p><b>Como vale.</b> O App de Campo lê esta lista de 5 em 5 min; com a lista vazia ele não tira ninguém (não tranca o App).</p>
+<p><b>Como vale.</b> O App de Campo lê esta lista de 5 em 5 min; com a lista vazia ele não remove ninguém (não tranca o App).</p>
 <p><b>Quem o App reconhece.</b> O App acha a pessoa pelo código do e-mail: o do usuário do Fracttal ligado a ela em
   <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}">Pessoas e setores</a> ou, sem ele, o do e-mail da ficha;
   quem não tem ficha vai pelo e-mail do Fracttal ou pelo e-mail digitado (o avulso).</p>

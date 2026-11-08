@@ -139,7 +139,7 @@ def test_o_administrador_ve_a_aba_com_a_nota_do_app(admin):
     assert r.status_code == 200
     assert 'aria-current="page">Administradores do App de Campo</a>' in html
     assert ">Telas e administradores</a>" in html and ">Pessoas e setores</a>" in html
-    assert "O App de Campo lê esta lista de 5 em 5 min; com a lista vazia ele não tira ninguém (não tranca o App)" in html
+    assert "O App de Campo lê esta lista de 5 em 5 min; com a lista vazia ele não remove ninguém (não tranca o App)" in html
     assert "Nenhum administrador do App ainda" in html
     # a aba de telas segue sem a seção nova, e o menu das abas está nas três
     t = admin.get(URL).get_data(as_text=True)
@@ -175,7 +175,7 @@ def test_por_tirar_e_o_historico(app, admin):
     html = admin.get(ABA).get_data(as_text=True)
     assert "Técnico Dez deixou de ser administrador do App de Campo" in html
     hist = html.split('id="aa-historico"', 1)[1].split("</table>", 1)[0]
-    assert hist.index("tirou") < hist.index("pôs") and "cobre as férias do supervisor" in hist
+    assert hist.index("removeu") < hist.index("pôs") and "cobre as férias do supervisor" in hist
     # tirar de novo (a página velha) é recusado, e nada grava
     r = _post(admin, "admin_app_tirar", pessoa_hmac=_h(EMAILS[10]))
     assert r.status_code == 409 and "já não é administradora" in r.get_data(as_text=True) and len(_linhas(app)) == 2
@@ -699,7 +699,7 @@ def test_a_contagem_aria_live_conta_so_quem_se_pode_escolher(app, admin, pessoas
     com_radio = len(re.findall(r'<label class="aa-pessoa"', lista))
     assert '<div class="aa-pessoa aa-pessoa--fora"' in lista and com_radio == 6
     assert re.search(r"data-aa-conta>\s*6 pessoas\s*<", html)
-    assert re.search(r'Pessoas para escolher</div><div class="v">6<', html)
+    assert "Pessoas para escolher" not in html                             # os números da aba saíram (07/11/2026)
 
 
 def test_a_conta_do_fracttal_desativada_so_ganha_etiqueta(app, admin, pessoas_e_setores):
@@ -753,7 +753,7 @@ def test_a_explicacao_mora_no_explica_do_titulo(app, admin):
     """O padrão de 05/11/2026 (DESIGN.md): o "Como vale." e a regra do domínio no "!" amarelo ao lado do título."""
     html = admin.get(ABA).get_data(as_text=True)
     caixa = html.split('<details class="gc-explica">', 1)[1].split("</details>", 1)[0]
-    assert "<b>Como vale.</b>" in caixa and "com a lista vazia ele não tira ninguém" in caixa
+    assert "<b>Como vale.</b>" in caixa and "com a lista vazia ele não remove ninguém" in caixa
     assert "outro domínio" in caixa and "@gridco.com.br" in caixa
     assert "<strong>Como vale.</strong>" not in html
 
@@ -766,7 +766,7 @@ def test_quem_vale_sem_ficha_e_hoje_tem_ficha_ganha_o_aviso(app, admin, pessoas_
     _aba(api, "cadastro_nexus", "pessoas", _pessoas({**EMAILS, 12: GERENTE}))     # a ficha 12 com o e-mail dela
     visao.limpar()
     vig = admin.get(ABA).get_data(as_text=True).split('id="aa-vigentes"', 1)[1].split("</table>", 1)[0]
-    assert "esta pessoa tem ficha agora: tire e ponha de novo para ligar à ficha" in vig
+    assert "esta pessoa tem ficha agora: remova e ponha de novo para ligar à ficha" in vig
 
 
 def test_a_pagina_aberta_antes_da_troca_ainda_poe_pelo_campo_de_antes(app, admin):

@@ -6,6 +6,11 @@
    números, seções com tabela, avisos por cor e palavra. Regras e o porquê em nexus/casca/CLAUDE.md, seção Acessos. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
 {% from "_explica.html" import explica %}
+{# uma tela na caixa da torre: a que é DO setor (Tela.do_setor, 13/10/2026) fica marcada e presa, sem ir ao Salvar #}
+{% macro item(s) %}
+  {% if s.do_setor %}<li><label><input type="checkbox" data-do-setor checked disabled> {{ s.nome }}</label>{% if s.de_todos %}<span class="ace-do-setor" title="Todo setor vê esta tela sem marcar">de todos</span>{% else %}<span class="ace-do-setor" title="Tela do setor {{ setor_sel.nome }}: quem é dele vê sem marcar">do setor</span>{% endif %}</li>
+  {% else %}<li><label><input type="checkbox" name="tela" value="{{ s.chave }}" {% if s.marcada %}checked{% endif %}> {{ s.nome }}</label>{% if not s.pronta %}<span class="ace-construcao">em construção</span>{% endif %}</li>{% endif %}
+{% endmacro %}
 <p class="gc-eyebrow">Base · Acessos</p>
 <div class="cad-topo">
   <div>
@@ -20,7 +25,8 @@
         aparece na lista, não restringe. Nas telas da Performance, a sessão que a moldura já abriu guarda o acesso de antes
         até ser renovada (no máximo 11 horas).</p>
       {% endcall %}{% endif %}</div>
-    {% if aba == 'telas' %}<p class="cad-sub">O que cada setor vê no Nexus, quem é administrador e quem entrou nos últimos 30 dias.</p>{% endif %}
+    {% if aba == 'telas' %}<p class="cad-sub">O que cada setor vê no Nexus e quem é administrador.</p>
+    {% elif aba == 'historico' %}<p class="cad-sub">Quem deu ou removeu acesso pela tela, e quem entrou nos últimos 30 dias.</p>{% endif %}
   </div>
 </div>
 {# as abas (25/10/2026, Levi: "gostaria que não tivesse uma tela só para integração fractall e sim fosse para acessos"):
@@ -31,6 +37,7 @@
   <a href="{{ url_for('torre_base.acessos') }}"{% if aba == 'telas' %} aria-current="page"{% endif %}>Telas e administradores</a>
   <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}"{% if aba == 'pessoas' %} aria-current="page"{% endif %}>Pessoas e setores</a>
   <a href="{{ url_for('torre_base.acessos', aba='admins_app') }}"{% if aba == 'admins_app' %} aria-current="page"{% endif %}>Administradores do App de Campo</a>
+  <a href="{{ url_for('torre_base.acessos', aba='historico') }}"{% if aba == 'historico' %} aria-current="page"{% endif %}>Histórico e registros</a>
 </nav>
 {% if aba == 'pessoas' %}{% include "acessos/_pessoas.html" %}{% elif aba == 'admins_app' %}{% include "acessos/_admins_app.html" %}{% else %}
 
@@ -39,28 +46,11 @@
 {% if arquivo_erro %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-warning-octagon"></i><div><strong>A lista da tela não abriu</strong> ({{ arquivo_erro }}). Até ser corrigida, só os administradores do servidor valem, e a tela não grava por cima. Avise a T.I.</div></div>{% endif %}
 {% if sem_pasta %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-folder-simple-dashed"></i><div><strong>Sem pasta de dados.</strong> Este Nexus não tem a <span class="gc-dado">NEXUS_DADOS</span>: a lista da tela e o registro de quem entrou não são lidos nem gravados.</div></div>{% endif %}
 
-<div class="cad-numeros ace-numeros">
-  <div><div class="r">Setores</div><div class="v">{{ setores|length }}</div><div class="d">{{ pessoas_com_setor }} pessoa{{ "s" if pessoas_com_setor != 1 }} do Fracttal com setor</div></div>
-  <div><div class="r">Entraram sem setor</div><div class="v{% if sem_setor_30d and portao == 'ligado' %} ace-v-alerta{% endif %}">{{ sem_setor_30d if tem_hmac else "—" }}</div><div class="d">{% if not tem_hmac %}sem a NEXUS_PESSOA_HMAC não dá para saber{% elif portao == "ligado" %}em 30 dias: veem só “Sem setor”{% else %}em 30 dias (o controle está desligado){% endif %}</div></div>
-  <div><div class="r">Administradores</div><div class="v">{{ total_servidor + total_tela }}</div><div class="d">{{ total_servidor }} do servidor · {{ total_tela }} pela tela</div></div>
-  <div><div class="r">Entraram em 30 dias</div><div class="v">{{ pessoas_30d }}</div><div class="d">pessoas, pelo login do Fracttal</div></div>
-  <div><div class="r">Administradores ativos</div><div class="v">{{ admins_30d }}</div><div class="d">entraram nos últimos 30 dias</div></div>
-</div>
-
+{% if aba == 'telas' %}
 <section class="cad-secao ace-secao ace-secao--setores" id="ace-setores" aria-labelledby="ace-setores-titulo">
   {# Telas por setor (12/10/2026, Levi: "uma seção no BASE > ACESSOS onde eu possa controlar o que cada pessoa de setor
      pode ver ao logar no Nexus"). Um setor por vez; o Salvar grava só o que mudou (nexus/auth/setor_telas.py). #}
   <h2 id="ace-setores-titulo">Telas por setor</h2>
-  <p class="gc-ajuda ace-ajuda ace-ajuda--topo">Marque o que cada setor vê no menu ao entrar no Nexus; o Início é de todos.
-    Quem não tem setor vê só “Sem setor, fale com o responsável”. O setor de cada pessoa se escolhe em
-    <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}">Pessoas e setores</a>. Quem está em Administradores (abaixo) vê tudo, com ou sem setor.</p>
-  {# a pré-carga (nexus/auth/pre_carga.py): abre por trás as telas do setor de quem entra, para o clique já achar tudo pronto #}
-  <p class="gc-ajuda ace-ajuda ace-pre-carga"><strong>Pré-carga:</strong>
-    {% if not pre_carga.ligada %}desligada neste Nexus (<span class="gc-dado">NEXUS_PRE_CARGA=0</span>).
-    {% elif pre_carga.trabalhando %}aquecendo agora ({{ pre_carga.na_fila }} tela{{ "s" if pre_carga.na_fila != 1 }} na fila).
-    {% elif pre_carga.volta %}última volta em {{ pre_carga.volta.hora }}: {{ pre_carga.volta.telas }} tela{{ "s" if pre_carga.volta.telas != 1 }} em {{ pre_carga.volta.s_txt }} s (a mais lenta, {{ pre_carga.volta.lenta[0] }}: {{ pre_carga.volta.lenta[1] }} s){% if pre_carga.volta.erros %}, {{ pre_carga.volta.erros }} com erro{% endif %}.
-    {% else %}nenhuma volta desde que o Nexus subiu (ninguém com setor entrou ainda).{% endif %}
-    Quando alguém com setor entra, o Nexus abre por trás as telas liberadas para ele, uma por vez, e repete a cada 2 minutos enquanto ele usa. Administradores e quem não tem setor ficam de fora, e também as telas que leem o Fracttal ao abrir, o OS Creator e as telas da plataforma.{% if pre_carga.fracttal %} Saíram por ler o Fracttal: {{ pre_carga.fracttal|join(", ") }}.{% endif %}</p>
   {% if portao == "desligado" %}
   <div class="cad-aviso cad-aviso--alerta ace-aviso-secao"><i class="ph ph-toggle-left"></i><div><strong>Desligado neste Nexus.</strong> A <span class="gc-dado">NEXUS_ACESSO_POR_SETOR</span> do .env está em 0: todos veem tudo. As marcas abaixo passam a valer quando ela for ligada.</div></div>
   {% elif portao == "sem_chave" %}
@@ -110,13 +100,15 @@
           <label><input type="checkbox" data-toda {% if t.marcadas == t.telas|length %}checked{% endif %} aria-label="Todas as telas de {{ t.nome }}"><i class="ph ph-{{ t.icone }}" aria-hidden="true"></i> {{ t.nome }}</label>
           <span class="ace-qtd"><span data-conta-torre>{{ t.marcadas }}</span> de {{ t.telas|length }}</span>
         </legend>
-        <ul>
-          {% for s in t.telas %}
-          {# a tela que é DO setor (Tela.do_setor, 13/10/2026): ele a vê sempre; a caixa fica marcada e presa, sem ir ao Salvar #}
-          {% if s.do_setor %}<li><label><input type="checkbox" data-do-setor checked disabled> {{ s.nome }}</label>{% if s.de_todos %}<span class="ace-do-setor" title="Todo setor vê esta tela sem marcar">de todos</span>{% else %}<span class="ace-do-setor" title="Tela do setor {{ setor_sel.nome }}: quem é dele vê sem marcar">do setor</span>{% endif %}</li>
-          {% else %}<li><label><input type="checkbox" name="tela" value="{{ s.chave }}" {% if s.marcada %}checked{% endif %}> {{ s.nome }}</label>{% if not s.pronta %}<span class="ace-construcao">em construção</span>{% endif %}</li>{% endif %}
-          {% endfor %}
-        </ul>
+        {# 07/11/2026 (Levi: "a limitação de visualização de 5 [...] por vez, o resto fica recolhido, podendo ser
+           expandido, a ideia é padronizar o tamanho"): as 5 primeiras à vista, o resto num "Mais N". As caixas recolhidas
+           seguem no formulário e na conta #}
+        <ul>{% for s in t.telas[:5] %}{{ item(s) }}{% endfor %}</ul>
+        {% if t.telas|length > 5 %}
+        <details class="ace-mais"><summary>Mais {{ t.telas|length - 5 }} {{ 'tela' if t.telas|length - 5 == 1 else 'telas' }}</summary>
+          <ul>{% for s in t.telas[5:] %}{{ item(s) }}{% endfor %}</ul>
+        </details>
+        {% endif %}
       </fieldset>
       {% endfor %}
     </div>
@@ -129,8 +121,8 @@
   {% endif %}
 </section>
 
-<section class="cad-secao ace-secao" aria-labelledby="ace-admins">
-  <h2 id="ace-admins">Administradores</h2>
+<details class="cad-secao ace-secao ace-recolhe" aria-labelledby="ace-admins">
+  <summary><h2 id="ace-admins">Administradores</h2><span class="ace-recolhe-n">{{ admins|length }}</span></summary>
   {% if pode_gravar %}
   <form class="cad-filtros ace-dar" method="post" action="{{ url_for('torre_base.acessos') }}">
     <input type="hidden" name="codigo" value="{{ codigo }}">
@@ -160,14 +152,14 @@
           {# também na NEXUS_ADMINS: tirar da lista da tela não tiraria o acesso (o servidor dá) e o pedido é recusado;
              e o último da tela não tira a si mesmo. O botão some para a tela não oferecer o que o servidor recusa. #}
           {% if a.origem == "servidor" or a.tambem_servidor %}<span class="mudo">só pela T.I.</span>
-          {% elif a.eu and n_tela == 1 %}<span class="mudo">o último da tela não tira o próprio acesso</span>
+          {% elif a.eu and n_tela == 1 %}<span class="mudo">o último da tela não remove o próprio acesso</span>
           {% elif pode_gravar %}
           <form method="post" action="{{ url_for('torre_base.acessos') }}" class="ace-tirar">
             <input type="hidden" name="codigo" value="{{ codigo }}">
             <input type="hidden" name="acao" value="remover">
             <input type="hidden" name="email" value="{{ a.email }}">
-            {% if a.eu %}<label class="ace-confirmo"><input type="checkbox" name="confirmo" value="1" required> tirar o meu acesso</label>{% endif %}
-            <button class="gc-btn gc-btn--ui gc-btn--contorno ace-btn-tirar" type="submit" aria-label="Tirar o acesso de administrador de {{ a.email }}"><i class="ph ph-user-minus"></i> Tirar</button>
+            {% if a.eu %}<label class="ace-confirmo"><input type="checkbox" name="confirmo" value="1" required> remover o meu acesso</label>{% endif %}
+            <button class="gc-btn gc-btn--ui gc-btn--contorno ace-btn-tirar" type="submit" aria-label="Remover o acesso de administrador de {{ a.email }}"><i class="ph ph-user-minus"></i> Remover</button>
           </form>
           {% endif %}
         </td>
@@ -178,11 +170,15 @@
       </tbody>
     </table>
   </div>
-</section>
+</details>
+{% endif %}
 
-<section class="cad-secao ace-secao" aria-labelledby="ace-registro">
-  <h2 id="ace-registro">Registro de mudanças</h2>
-  <p class="gc-ajuda ace-ajuda">Quem deu ou tirou acesso pela tela, e quando. A mais recente primeiro.</p>
+{% if aba == 'historico' %}
+{# a aba Histórico e registros (07/11/2026, Levi: "pode ser só mais uma aba da seção acessos [...] Os dois também ficam
+   recolhidos default") #}
+<details class="cad-secao ace-secao ace-recolhe" aria-labelledby="ace-registro">
+  <summary><h2 id="ace-registro">Registro de mudanças</h2><span class="ace-recolhe-n">{{ auditoria|length }}</span></summary>
+  <p class="gc-ajuda ace-ajuda">Quem deu ou removeu acesso pela tela, e quando. A mais recente primeiro.</p>
   <div class="cad-rolagem ace-rolagem">
     <table class="cad-tabela ace-tabela">
       <thead><tr><th>Quando</th><th>Quem fez</th><th>O que</th><th>E-mail</th></tr></thead>
@@ -191,7 +187,7 @@
       <tr>
         <td class="num">{{ x.quando_br }}</td>
         <td>{{ x.quem }}</td>
-        <td>{% if x.acao == "adicionou" %}<span class="cad-chip cad-chip--operacao">deu acesso</span>{% else %}<span class="cad-chip cad-chip--alerta">tirou acesso</span>{% endif %}</td>
+        <td>{% if x.acao == "adicionou" %}<span class="cad-chip cad-chip--operacao">deu acesso</span>{% else %}<span class="cad-chip cad-chip--alerta">removeu acesso</span>{% endif %}</td>
         <td><span class="gc-dado">{{ x.email }}</span></td>
       </tr>
       {% else %}
@@ -200,10 +196,10 @@
       </tbody>
     </table>
   </div>
-</section>
+</details>
 
-<section class="cad-secao ace-secao" aria-labelledby="ace-logins">
-  <h2 id="ace-logins">Quem entrou nos últimos 30 dias</h2>
+<details class="cad-secao ace-secao ace-recolhe" aria-labelledby="ace-logins">
+  <summary><h2 id="ace-logins">Quem entrou nos últimos 30 dias</h2><span class="ace-recolhe-n">{{ logins|length }}</span></summary>
   <p class="gc-ajuda ace-ajuda">Só o e-mail e a hora do último login de cada pessoa (até {{ max_logins }} pessoas), guardados no servidor do Nexus, fora do banco.</p>
   <div class="cad-rolagem ace-rolagem">
     <table class="cad-tabela ace-tabela">
@@ -222,7 +218,8 @@
       </tbody>
     </table>
   </div>
-</section>
+</details>
+{% else %}
 <script>
 /* Telas por setor (12/10/2026): a caixa da torre marca ou limpa a torre inteira (fica "meio marcada" com parte); a conta
    e o aviso de mudanças não salvas acompanham; "Copiar de" põe as marcas de outro setor, que só gravam no Salvar. Sem
@@ -285,5 +282,6 @@
   atualizar();
 })();
 </script>
+{% endif %}
 {% endif %}
 {% endblock %}

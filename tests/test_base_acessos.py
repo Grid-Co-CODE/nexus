@@ -175,8 +175,8 @@ def test_ninguem_se_tira_sozinho_por_engano(app, fracttal_falso):
     adm = _admin(app)
     assert _post(adm, "adicionar", PESSOA).status_code == 303
     eu = _pelo_fracttal(app, PESSOA)
-    # o último da tela não tira o próprio acesso, nem confirmando (e a tela nem oferece o botão)
-    assert "o último da tela não tira o próprio acesso" in eu.get(URL).get_data(as_text=True)
+    # o último da tela não remove o próprio acesso, nem confirmando (e a tela nem oferece o botão)
+    assert "o último da tela não remove o próprio acesso" in eu.get(URL).get_data(as_text=True)
     r = _post(eu, "remover", PESSOA, confirmo="1")
     assert r.status_code == 400 and "último administrador dado pela tela" in r.get_data(as_text=True)
     assert _post(adm, "adicionar", OUTRA).status_code == 303
@@ -238,8 +238,8 @@ def test_auditoria_grava_quem_fez_o_que_e_quando(app, fracttal_falso):
     assert [(x["quem"], x["acao"], x["email"]) for x in aud] == [("senha de administrador", "adicionou", PESSOA),
                                                                   (SERVIDOR, "removeu", PESSOA)]
     assert all(re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", x["quando"]) for x in aud)
-    html = srv.get(URL).get_data(as_text=True)
-    assert html.index("tirou acesso") < html.index("deu acesso")             # a mais recente primeiro
+    html = srv.get(URL + "?aba=historico").get_data(as_text=True)          # a aba Histórico e registros (07/11/2026)
+    assert html.index("removeu acesso") < html.index("deu acesso")             # a mais recente primeiro
 
 
 def test_auditoria_tem_teto(app, monkeypatch):
@@ -339,7 +339,7 @@ def test_quem_entrou_nos_ultimos_30_dias(app, fracttal_falso):
     A.adicionar(app.config, PESSOA, "teste", set())
     for e in (PESSOA, OUTRA, SERVIDOR):
         _pelo_fracttal(app, e)
-    html = _admin(app).get(URL).get_data(as_text=True)
+    html = _admin(app).get(URL + "?aba=historico").get_data(as_text=True)
     secao = html[html.index("Quem entrou nos últimos 30 dias"):]
     for e in (PESSOA, OUTRA, SERVIDOR):
         assert e in secao

@@ -324,20 +324,21 @@ def test_quem_entrou_aparece_com_o_setor(app, setores, logado, tmp_path):
     app.config["NEXUS_DADOS"] = str(tmp_path / "dados")
     for e in (ANA, BIA, CAIO):
         A.registrar_login(app.config, e)
-    html = logado.get(URL).get_data(as_text=True)
+    html = logado.get(URL + "?aba=historico").get_data(as_text=True)      # a aba Histórico e registros (07/11/2026)
     tabela = html[html.index("Quem entrou nos últimos 30 dias"):]
     linha = {e: re.search(re.escape(e) + r".*?</tr>", tabela, re.S).group(0) for e in (ANA, BIA, CAIO)}
     assert "<td>Performance</td>" in linha[ANA]
     assert "<td>Administrador</td>" in linha[BIA] and '<span class="mudo">não</span>' in linha[BIA]
     assert "pelo setor" not in html
     assert "sem setor" in linha[CAIO] and "cad-chip--alerta" in linha[CAIO]
-    assert re.search(r'<div class="r">Entraram sem setor</div><div class="v ace-v-alerta">1</div>', html)
+    assert "Entraram sem setor" not in html                                # os números saíram (07/11/2026)
 
 
 def test_cada_administrador_aparece_com_o_setor(app, setores, logado):
     app.config["NEXUS_ADMINS"] = f"{ANA},fora@exemplo.test"
     html = logado.get(URL).get_data(as_text=True)
-    tabela = html[html.index('id="ace-admins"'):html.index('id="ace-registro"')]
+    ini = html.index('id="ace-admins"')
+    tabela = html[ini:html.index("</details>", ini)]
     assert "<th>Setor</th>" in tabela
     assert re.search(re.escape(ANA) + r".*?<td>Performance</td>", tabela, re.S)
     assert re.search(r"fora@exemplo\.test.*?<td><span class=\"mudo\">—</span></td>", tabela, re.S)
@@ -350,3 +351,28 @@ def test_o_livro_no_catalogo_da_governanca():
     f = catalogo.POR_ID["decisao_tela_setor"]
     assert f.livro == f"{ST.LIVRO} · {ST.ABA}" and all(c in ST.CAB for c in f.chave) and f.area == "base"
     assert not [c for c in ST.CAB if c in ("nome", "email") or c.startswith(("nome_", "email_"))]
+
+
+def test_acessos_enxuta_07_11(app, setores, logado):
+    """07/11/2026, Levi: cada torre mostra 5 telas e o resto recolhido ("padronizar o tamanho"); sem o aviso, a pré-carga
+    e os números; os administradores recolhidos com a contagem; o registro e quem entrou na aba Histórico e registros,
+    recolhidos; "Remover" no lugar de "Tirar"."""
+    html = logado.get(URL).get_data(as_text=True)
+    assert "Marque o que cada setor vê no menu" not in html and "Pré-carga:" not in html
+    assert 'class="cad-numeros' not in html
+    matriz = html[html.index('id="ace-matriz"'):]
+    for t in app.extensions["nexus_torres"]:
+        caixa = matriz[matriz.index(f'<fieldset class="ace-torre" data-torre="{t.id}"'):]
+        caixa = caixa[:caixa.index("</fieldset>")]
+        visiveis = caixa.split('<details class="ace-mais">')[0]
+        assert visiveis.count("<li>") == min(5, len(t.telas))
+        assert ('<details class="ace-mais">' in caixa) == (len(t.telas) > 5)
+        if len(t.telas) > 5:
+            assert f"Mais {len(t.telas) - 5} tela" in caixa and caixa.count("<li>") == len(t.telas)
+    adm = html[html.index('aria-labelledby="ace-admins"') - 60:]
+    assert adm.startswith('<details class="cad-secao ace-secao ace-recolhe"', adm.index("<details")) and " open" not in adm[:120]
+    assert 'class="ace-recolhe-n"' in adm[:400] and "Registro de mudanças" not in html and "Tirar" not in html
+    assert 'href="/t/base/acessos?aba=historico"' in html
+    hist = logado.get(URL + "?aba=historico").get_data(as_text=True)
+    assert "Registro de mudanças" in hist and "Quem entrou nos últimos 30 dias" in hist
+    assert hist.count('<details class="cad-secao ace-secao ace-recolhe"') == 2 and 'id="ace-matriz"' not in hist
