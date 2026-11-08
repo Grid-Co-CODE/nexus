@@ -151,6 +151,20 @@ def _conferir_cronograma(valor: str) -> str:
     return f"a chave tem {len(valor)} caracteres"
 
 
+def _conferir_guid(rotulo: str):
+    """Os dois IDs do Mapa de equipe (08/11/2026, `nexus/campo/equipe/token_ms.py`): GUIDs de 8-4-4-4-12 caracteres
+    hexadecimais, como o Entra ID mostra. Sem um token de verdade não há contra o que conferir (a prova é o celular
+    registrar); o formato pega o engano comum: o domínio no lugar do diretório nunca casaria com o `tid` do token, e o
+    Nexus recusaria todo celular."""
+    def conferir(valor: str) -> str:
+        from . import microsoft
+        if not microsoft._GUID.fullmatch(valor.lower()):
+            raise Recusada(f"{rotulo}: isto não é um GUID do Entra ID (8-4-4-4-12 caracteres hexadecimais, como o portal "
+                           "mostra; o domínio da empresa não serve): nada foi gravado.")
+        return "é um GUID no formato do Entra ID"
+    return conferir
+
+
 # nome da variável → o que é, para que serve, e a conferência antes de gravar
 CHAVES = {
     "NEXUS_CONTESTACAO_CHAVE_PRIVADA": {
@@ -200,6 +214,28 @@ CHAVES = {
         "arquivo": "",
         "dica": "uma chave longa (32 caracteres ou mais), a mesma que vai para quem lê o cronograma",
         "conferir": _conferir_cronograma,
+    },
+    # o Mapa de equipe (08/11/2026): a página do App de Campo, dentro do Nexus Field, manda o ID token da Microsoft ao
+    # registrar o celular, e o Nexus confere a assinatura, o público (o registro SPA do App) e o diretório (o da Grid).
+    # Os dois IDs não são segredo (estão no JavaScript do App), mas ficam fora do repositório público, como o endereço
+    # do COS; pela tela, mudam sem a T.I.
+    "NEXUS_EQUIPE_MS_CLIENT_ID": {
+        "nome": "Mapa de equipe: ID do aplicativo do App de Campo (Entra ID)",
+        "para": "conferir o login Microsoft que a página do App de Campo manda ao registrar o celular do técnico no "
+                "Nexus Field (Mapa de equipe): o token tem de ser do registro SPA do App de Campo, não de outro aplicativo",
+        "arquivo": "",
+        "dica": "o ID do aplicativo (client id) do registro do App de Campo no Entra ID, um GUID de 8-4-4-4-12 "
+                "caracteres (o clientId do msalConfig do campo.html)",
+        "conferir": _conferir_guid("ID do aplicativo do App de Campo"),
+    },
+    "NEXUS_EQUIPE_MS_TENANT_ID": {
+        "nome": "Mapa de equipe: diretório da Grid Co. no Entra ID",
+        "para": "conferir que o login Microsoft que a página do App de Campo manda ao registrar o celular do técnico no "
+                "Nexus Field (Mapa de equipe) é de uma conta da Grid Co., e não de outro diretório",
+        "arquivo": "",
+        "dica": "o ID do diretório (tenant id) da Grid Co. no Entra ID, um GUID de 8-4-4-4-12 caracteres (o da "
+                "authority do msalConfig do campo.html), não o domínio",
+        "conferir": _conferir_guid("ID do diretório da Grid Co."),
     },
 }
 

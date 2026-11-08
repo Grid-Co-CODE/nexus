@@ -756,7 +756,11 @@ gravar) e VENCE a do .env; "Apagar" volta à do .env. A tela nunca mostra o valo
   tem a forma ghp_/github_pat_, o GitHub o aceita, ele enxerga o repositório, a conta pode gravar e, sendo clássico, tem o
   escopo repo ou public_repo; `pcm/publicar.token` usa o da tela primeiro) e, desde 06/11, a
   `NEXUS_ZELADORIA_CRONOGRAMA_CHAVE` (o link do cronograma da zeladoria: 32 caracteres ou mais, sem espaço; não há contra
-  o que conferir, é a chave combinada com quem lê). A tela não edita o .env: nome fora da lista é recusado.
+  o que conferir, é a chave combinada com quem lê) e, desde 08/11, a `NEXUS_EQUIPE_MS_CLIENT_ID` e a
+  `NEXUS_EQUIPE_MS_TENANT_ID` (os dois GUIDs do Entra ID com que o Mapa de equipe confere, pela assinatura, o ID token que
+  a página do App de Campo manda ao registrar o celular no Nexus Field, `nexus/campo/equipe/token_ms.py`: o registro SPA
+  do App e o diretório da Grid; a tela só confere o formato de GUID, e o domínio no lugar do diretório é recusado; a prova
+  é o celular registrar). A tela não edita o .env: nome fora da lista é recusado.
 - **Quem lê usa `chaves.valor(nome)`** (a da tela e, sem ela, a do .env), nunca `config.get` direto: as Contestações
   (`nexus/contratos/contestacoes.py`) e os Acessos dos clientes (`nexus/contratos/acessos_clientes.py`) leem assim.
 - **NEXUS_SECRET_KEY trocada:** a gravada não abre; vale a do .env (ou nenhuma), e a tela diz "não abre, cole de novo".
