@@ -33,7 +33,7 @@ Estados de cada fato (`ESTADOS_FATO`):
 import re
 from dataclasses import dataclass
 
-from . import almoxarifado, fato_chamado, fato_inventario, fato_pt, fato_ronda, fato_tarefa_os, fato_uso_os, fatos, geracao
+from . import almoxarifado, fato_chamado, fato_chamado_aberto, fato_inventario, fato_pt, fato_ronda, fato_tarefa_os, fato_uso_os, fatos, geracao
 from . import programacao
 from ..zeladoria import tabelas as zeladoria_tabelas
 
@@ -1132,6 +1132,23 @@ FATOS = (
                     "REST não traz a subtarefa do ticket (testado em 12/10/2026): 'aguardando ticket' × 'com o "
                     "fabricante' só no quadro. fabricante e componente saem da marca da nota (categorias), nunca a "
                     "nota; sem pessoa (regra 8)"),
+    # os chamados em aberto para o App de Campo (08/11/2026, desenho "o chamado do tracker na ronda"): o tracker com chamado
+    # aberto aparece na ronda só com o aviso. Foto de 10 em 10 min pelo servidor, da lista central de OS do OS Creator
+    Fato("chamado_aberto", "Chamado de garantia em aberto (para o App de Campo)", "chamados",
+         "fora do banco: a lista central de OS do OS Creator (Inspeção de garantia e OS de acompanhamento)",
+         fato_chamado_aberto.GRAO,
+         _d(data=("id", "data_id_inspecao (o dia de Brasília em que a Inspeção nasceu)"),
+            usina=("id", "usina_id (o do ativo na dimensão de equipamento)"),
+            equipamento=("id", "equipamento_id (o código do ativo na dimensão de equipamento)"),
+            os=("cod", "inspecao_folio, adm_folio (o nº da Inspeção e o da OS de acompanhamento)")),
+         tipo=fato_chamado_aberto.TIPO, chave=fato_chamado_aberto.CHAVE, medidas=_m(fato_chamado_aberto.MEDIDAS),
+         fontes=_fontes(fato_chamado_aberto.FONTES), janela_origem=fato_chamado_aberto.JANELA_ORIGEM,
+         estado="montado", conformado_em="nexus_chamados_abertos · fato_chamado_aberto",
+         observacao="coluna = aguardando_inspecao, chegaram ou ticket_aberto, na régua do quadro do Acompanhamento; vazia "
+                    "quando o ticket não é conhecido agora (o REST não traz a subtarefa e a cópia do quadro passou de 2 "
+                    "h). Cada linha e a atualizacao vão assinadas (HMAC, rótulo nexus:oscreator:chamados-app): o App só "
+                    "aceita a assinada. Sem pessoa nem texto livre (regra 8). Desligado até o Levi ligar "
+                    "(nexus/torres/oscreator/chamados_abertos.py, LIGADO_PADRAO)"),
     # ── PCM ────────────────────────────────────────────────────────────────────────────────────────────────────
     Fato("programacao", "Programação semanal", "pcm", "fora do banco: banco_dados.json do PCM (GitHub público)",
          programacao.GRAO,
@@ -1469,6 +1486,14 @@ LIVROS = (
           "nexus/campo/chamados_acompanhamento.py (laço do Campo; NEXUS_CHAMADOS_PUBLICAR=0 desliga numa máquina)", True,
           "no banco desde 12/10/2026 (1ª gravação pelo Nexus do PC, conferida por GET: 18 linhas, 17 abertas e 1 em "
           "verificação, todas com usina); grava se a última gravação tiver mais de 50 min"),
+    # um livro só do laço de 10 em 10 min (08/11/2026): a gravação troca o livro inteiro, e dividir o nexus_chamados com o
+    # fato_chamado de hora em hora faria uma gravação apagar a aba da outra. É foto: encolhe quando os chamados fecham
+    Livro("nexus_chamados_abertos", ("fato_chamado_aberto", "atualizacao"),
+          "de 10 em 10 min (:03, :09, :24, :33, :43, :53), só o servidor (a lista central de OS só é fresca lá)",
+          "nexus/torres/oscreator/chamados_abertos.py (servir.py; desligado por padrão, LIGADO_PADRAO; "
+          "NEXUS_CHAMADOS_ABERTOS=1 liga numa máquina)", False,
+          "registrado em 08/11/2026 antes da 1ª gravação; o App de Campo lê (o aviso do tracker com chamado aberto "
+          "na ronda) e trata a atualizacao com mais de 30 min como não lida"),
     Livro("nexus_os", ("fato_tarefa_os", "qualidade"), "de hora em hora (entre :10 e :20), uma máquina por vez",
           "nexus/campo/tarefas_os.py (laço do Campo; NEXUS_OS_PUBLICAR=0 desliga numa máquina)", True,
           "nasceu na 1ª gravação, à mão depois do ensaio (ferramentas/ensaio_tarefas_os.py --gravar, 18/10/2026: "

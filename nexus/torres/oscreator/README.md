@@ -2688,6 +2688,41 @@ tarefa e dê para baixar tudo de uma vez, o download sai com o nome do ativo!"; 
 - Prova: `tests/test_oscreator_card_ativos_anexos_04_11.py`; os 2 testes de `test_oscreator_card_por_ativo_28_10.py`
   aceitam o `data-ativo` novo na tarefa.
 
+## Os chamados em aberto para o App de Campo e o pacote 1.3.0 (08/11/2026)
+
+O desenho "o chamado do tracker na ronda" (Levi, 08/11/2026: "segue!"; o texto mora na pasta do App de Campo,
+`DOC/desenhos/2026-11-08-chamado-do-tracker-na-ronda.md`) dá ao OS Creator três partes:
+- **O pacote `chamado_garantia` 1.3.0** (`montar_acompanhamento`, `mapa_chaves`, `respostas_de`, `nota_aguardando`): o que
+  a OS de acompanhamento leva sai daqui para as duas pontas (o App copia a pasta). README do pacote.
+- **A leitura para o App** (`chamados_abertos.py`, aqui ao lado do clone, e o fato em `nexus/dados/fato_chamado_aberto.py`):
+  de 10 em 10 min o servidor monta, da lista central de OS e da cópia do quadro do Acompanhamento (a memória, sem pedido ao
+  Fracttal), os chamados em aberto por ativo e grava o livro `nexus_chamados_abertos`, assinado. O App lê, e o catálogo dos
+  trackers ele lê direto da `nexus_equipamentos · dim_equipamento` (`tipo_fracttal` "ETKR"; a usina do Fracttal pelo
+  `cadastro_nexus · de_para`, sistema "Fracttal · Classificação 1"). Só grava com a lista central fresca (no PC ela nunca
+  é: o leitor só roda no servidor), com a NEXUS_PESSOA_HMAC e o GRIDCO_SQL_TOKEN. **Desligado** (`LIGADO_PADRAO`): liga o
+  Levi, por commit, depois da prova.
+- **A administrativa da Inspeção realizada** (`os_web/acomp_cadeia.py`, **desligado**: `LIGADO_PADRAO`,
+  `OS_WEB_ACOMP_NA_INSPECAO=1` liga numa máquina e `OS_WEB_ACOMP_A_PARTIR_DE`, ou `A_PARTIR_DE`, dá a data). Levi, no
+  mesmo dia, ao ver a coluna "Aguardando a inspeção" do desenho: "quero que a administrativa só nasça quando a de inspeção é
+  realizada!". Então ela NÃO nasce junto com a Inspeção, e sem ela aberta não há coluna nova nem cancelamento em cascata
+  (os dois saíram antes de subir).
+  - O App segue criando a dele no fechamento da Inspeção que ele abriu, na hora (a v332).
+  - A Inspeção de garantia realizada (em verificação ou concluída) há mais de 30 min sem administrativa ganha uma criada
+    pelo OS Creator: a do supervisor, que nunca ganhava, e a fechada na web. Filha da Inspeção (o pai no pedido que cria a
+    OS numerada, conferido depois), tipo Administrativa, etiqueta CHAMADOS, no nome da equipe de chamados
+    (`OS_WEB_CHAMADO_RESP_ID`/`NOME`, as do quadro), com a nota e a subtarefa do ticket do pacote e as respostas lidas do
+    Fracttal (a nota igual à do App; a marca sai do título da Inspeção). Os 30 min dão a vez ao App.
+  - A chave é o nº da Inspeção: a que já tem administrativa (a da lista central, que aponta a Inspeção na nota, ou a do
+    registro das que este OS Creator criou, `<dados>/oscreator/garantias/acomp_criadas.json`) não ganha outra. O status
+    da Inspeção é conferido ao vivo antes; falhou, fica anotada em `acomp_pendentes.json` e é tentada de novo depois de 1
+    h (até 10 vezes).
+  - Roda na abertura do quadro do Acompanhamento de chamados, por trás, no máximo a cada 10 min por processo e até 3 por
+    vez, com a sessão de quem abriu (a credencial da empresa só lê); só no servidor acha alguma coisa (a lista central).
+    Só as Inspeções realizadas a partir da data de início: ligar não cria administrativa para as antigas.
+- Prova: `tests/test_chamado_garantia_acompanhamento.py`, `tests/test_dados_chamado_aberto.py` e
+  `tests/test_oscreator_acomp_cadeia_08_11.py`. **Não conferido no Fracttal**: a criação espera a prova no TESTE - PA com
+  o OK do Levi, antes de ligar.
+
 ## A Nova solicitação para a Performance (06/11/2026)
 
 Levi, 06/11/2026: "adicione mais um em solicitações agora performance, será a mesma coisa porém com etiqueta de

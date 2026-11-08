@@ -32,6 +32,7 @@ import chamado_spec as cs
 import chamados_obs_store as obs_store
 import gridco_abas as ga
 
+from . import acomp_cadeia
 from . import acomp_web as aw
 from . import historico_store as HS
 from . import lista_central, rotas, sessao
@@ -558,6 +559,38 @@ def _com_responsavel_ufv(q: dict) -> None:
                           if RESPONSAVEL_UFV is not None else None)
 
 
+# a Inspeção de garantia realizada sem administrativa ganha a dela (08/11/2026, `acomp_cadeia`; desligado até a prova): a
+# abertura do quadro a cria por trás, com a sessão de quem abriu (a credencial da empresa só lê), no máximo a cada
+# ANDAR_A_CADA_S por processo: é o quadro que mostra essas OS, e a cota do Fracttal é da empresa
+ANDAR_A_CADA_S = 10 * 60
+_ANDOU = {"em": -1e9, "ultimo": None}
+
+
+def _andar_junto() -> bool:
+    if not acomp_cadeia.ligado():
+        return False
+    with _RENOV_TRAVA:
+        if time.monotonic() - _ANDOU["em"] < ANDAR_A_CADA_S:
+            return False
+        _ANDOU["em"] = time.monotonic()
+    jwt, email = sessao.jwt_atual(), sessao.email_atual()
+
+    def rodar():
+        try:
+            with sessao.contexto(jwt, email):
+                r = acomp_cadeia.criar_as_que_faltam()
+            _ANDOU["ultimo"] = r
+            if r.get("criadas"):
+                log.info("Garantias: administrativas criadas para as Inspeções realizadas: %s", r["criadas"])
+                _esquecer()                     # a próxima visita relê e mostra as novas em Chegaram
+            for e in r.get("erros") or ():
+                log.warning("Garantias: %s", e)
+        except Exception:               # noqa: BLE001 — o quadro segue; a próxima abertura tenta de novo
+            log.exception("Garantias: as administrativas que faltam não foram criadas")
+    _em_segundo_plano(_de_fundo("fundo:os-web-acomp-cadeia", rodar))
+    return True
+
+
 def _montar(forcar: bool = False) -> dict:
     """O quadro como a tela mostra (o mesmo do Exportar relatório e do Exportar tabela)."""
     # as observações (banco da Gridco) vêm ao mesmo tempo que o Fracttal, e não depois dele (08/10/2026), e a conferência
@@ -580,6 +613,7 @@ def _montar(forcar: bool = False) -> dict:
     q = aw.montar_quadro(d["linhas"], d["tickets"], ultimas, aw.agora_brt(), fins, obs_lidas=not erro_obs,
                          status=status)
     _com_responsavel_ufv(q)
+    _andar_junto()
     return {"q": q, "d": d, "erro": erro, "erro_obs": erro_obs, "por_tras": por_tras}
 
 

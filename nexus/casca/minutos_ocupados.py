@@ -34,6 +34,11 @@ USO_OS_BANCO = (4, 45)
 # 23h (2 pedidos, 1 por segundo) no :04, o primeiro minuto livre depois do :00 dos 7 dias (~15 s de leitura) e antes do :08
 # dos ativos novos (o :05 do `uso_os` só grava no disco local)
 CATALOGOS_PESSOAS = 4
+# os chamados de garantia em aberto para o App de Campo (`nexus/torres/oscreator/chamados_abertos.py`, 08/11/2026): só o banco
+# (lê a foto anterior e grava a nova; nada vai ao Fracttal), logo depois de cada leitura dos 7 dias da lista central (:00,
+# :21, :30, :41, :51; o :23 fica livre: é o próximo minuto livre depois do :10, o que um laço novo pede) e no :09; o maior
+# intervalo é de 15 min, longe dos 30 min em que o App trata a foto como velha
+CHAMADOS_ABERTOS = (3, 9, 24, 33, 43, 53)
 
 # {minuto: quem}: os donos de cada minuto de toda hora
 OCUPADOS: dict = {}
@@ -59,6 +64,7 @@ _ocupar(OCUPADOS, OS_SETE_DIAS, "a lista central de OS do OS Creator: os 7 dias 
 _ocupar(OCUPADOS, (OS_FINALIZADAS,), "a lista central de OS do OS Creator: as finalizadas")
 _ocupar(OCUPADOS, (OS_ABERTAS,), "a lista central de OS do OS Creator: a conferência das abertas")
 _ocupar(OCUPADOS, (CATALOGOS_PESSOAS,), "os catálogos pequenos do OS Creator: as pessoas pelo REST (05h, 11h, 17h e 23h)")
+_ocupar(OCUPADOS, CHAMADOS_ABERTOS, "os chamados de garantia em aberto para o App de Campo (só o banco)")
 
 # {(hora, minuto): quem}: os de uma vez por dia
 DIARIOS = {

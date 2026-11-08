@@ -88,6 +88,7 @@ RESUMO = {
     # ── Chamados ──
     "ticket": "Os tickets de performance abertos para cada falha",
     "chamado": "Cada chamado de garantia aberto com o fabricante e em que pé está",
+    "chamado_aberto": "Os chamados de garantia abertos agora, para o técnico ver na ronda",
     # ── PCM ──
     "programacao": "A agenda semanal de manutenção montada pelo PCM",
     "tarefa_os": "Cada tarefa das OS abertas no Fracttal e a zeladoria feita",
@@ -348,6 +349,10 @@ PARA_QUE = {
     "chamado": "Guarda cada chamado de garantia aberto com o fabricante (a OS de acompanhamento de chamado do "
                "Fracttal): a usina, o equipamento, o fabricante e se está aberto, em verificação ou concluído. É de onde "
                "a Visão do responsável conta os chamados de cada usina, os mesmos do quadro Acompanhamento de chamados.",
+    "chamado_aberto": "Guarda os chamados de garantia que estão abertos agora (a Inspeção ainda aberta ou a OS de "
+                      "acompanhamento em processo): o ativo, a usina, o nº das duas OS e em que coluna do quadro do "
+                      "Acompanhamento de chamados ele está. O App de Campo lê para mostrar na ronda que o tracker já tem "
+                      "chamado aberto, e o técnico não abrir outro em cima.",
     "programacao": "A agenda semanal de manutenção que o PCM monta: que tarefa, em que usina, com qual equipe e em "
                    "que dia e hora. Serve para comparar o planejado com o que o campo fez e ver a carga de cada "
                    "equipe. O Nexus guarda as semanas desde a W21 de 2026, além das 4 que o arquivo do PCM guarda.",

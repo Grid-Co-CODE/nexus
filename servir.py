@@ -9,6 +9,7 @@ Diferente do app.py, que é para desenvolvimento local:
 
 Uso:  python servir.py        (o serviço do systemd chama assim; ver deploy/nexus.service e DEPLOY.md)
 """
+import logging
 import os
 import sys
 
@@ -85,6 +86,13 @@ if __name__ == "__main__":
     # pede nada) e as pessoas pelo REST da empresa às 05h, 11h, 17h e 23h, no minuto que a lista de minutos ocupados lhes dá.
     # Só aqui; sem a credencial REST não liga, e as pessoas seguem pelo RPC, com a sessão de quem usa (como no app.py)
     ponte_os.ligar_leitor_do_clone(app, "catalogos_leitor")
+    # os chamados de garantia em aberto para o App de Campo (08/11/2026): a foto de 10 em 10 min, da lista central de OS acima
+    # (sem pedido ao Fracttal), no livro nexus_chamados_abertos. Desligado até o Levi ligar (`chamados_abertos.LIGADO_PADRAO`)
+    try:
+        from nexus.torres.oscreator import chamados_abertos
+        chamados_abertos.ligar(app)
+    except Exception:                       # noqa: BLE001 — o Nexus sobe sem ele; o log tem a pilha
+        logging.exception("OS Creator: os chamados em aberto para o App não ligaram")
     host = os.environ.get("NEXUS_HOST", "127.0.0.1")
     porta = int(os.environ.get("NEXUS_PORTA", "5070"))
     prefixo = app.config.get("NEXUS_PREFIXO") or "(raiz)"

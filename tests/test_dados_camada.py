@@ -16,6 +16,7 @@ from nexus.campo import decisao_pt, ronda_avulsa
 from nexus.cos import normalizacoes_banco
 from nexus.dados import calendario, carga, catalogo, equipamento, fato_pt, fato_ronda, fatos, geracao, historico, livros
 from nexus.dados import fato_almoxarifado, fato_chamado, fato_inventario, fato_tarefa_os, fato_uso_os, programacao
+from nexus.dados import fato_chamado_aberto
 from nexus.dados import telas as telas_dados
 
 BASE = "http://pg.falso"
@@ -41,8 +42,9 @@ def test_catalogo_declara_grao_estado_e_todas_as_dimensoes():
                    for p in f.parte_de), f.id
     r = catalogo.resumo()
     # a programação passou a gravar em 08/10 (decisão 7) e a geração em 11/10 (decisão 8); os três do almoxarifado
-    # (25/10/2026) ficam montados até a NEXUS_ALMOX_GRAVAR ligar a gravação depois do ensaio com o 1º ciclo real do App
-    assert r["conformados"] >= 6 and r["montados"] == 3
+    # (25/10/2026) ficam montados até a NEXUS_ALMOX_GRAVAR ligar a gravação depois do ensaio com o 1º ciclo real do App; os
+    # chamados em aberto para o App (08/11/2026), até o Levi ligar o laço (chamados_abertos.LIGADO_PADRAO)
+    assert r["conformados"] >= 6 and r["montados"] == 4
     assert catalogo.POR_ID["geracao_usina_dia"].estado == catalogo.POR_ID["geracao_inversor_dia"].estado == "conformado"
     assert catalogo.POR_ID["programacao"].estado == "conformado"
     # a auditoria de 08/10: ronda e PT tinham o grão errado; checklist e avulsa viraram fonte do fato único de ronda
@@ -85,7 +87,9 @@ CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt":
         "normalizacao": normalizacoes_banco.CAB, "ocorrencia_aberta": normalizacoes_banco.CAB_ABERTA,
         # o uso das telas do OS Creator e os pedidos ao Fracttal por hora (31/10/2026): o servidor mede e grava
         "uso_os_hora": fato_uso_os.CAB_USO, "fracttal_hora": fato_uso_os.CAB_FRACTTAL,
-        "fracttal_total_hora": fato_uso_os.CAB_FRACTTAL_TOTAL}
+        "fracttal_total_hora": fato_uso_os.CAB_FRACTTAL_TOTAL,
+        # os chamados em aberto para o App de Campo (08/11/2026): o servidor grava de 10 em 10 min, desligado até a prova
+        "chamado_aberto": fato_chamado_aberto.CAB}
 PROIBIDAS = ("nome", "email", "tecnico", "observacao", "comentario", "motivo", "tarefa", "relatorio", "atividades")
 
 

@@ -20,15 +20,15 @@ Este pacote monta a **2** e, desde a **1.3.0** (08/11/2026), também a **3** (`a
 
 ## A OS de acompanhamento (1.3.0, 08/11/2026)
 
-Desenho do chamado do tracker na ronda (aprovado pelo Levi, "segue!"): a administrativa do time de chamados nasce **logo
-depois da Inspeção**, nos três caminhos (a ronda e a corretiva no App, o supervisor no OS Creator), com os campos do
-fabricante vazios; o fechamento da Inspeção só **preenche a nota** dela, nunca cria outra. Até a 1.2.0 isso morava só no
-servidor do App (`_acompanhamento_se_chamado` e `_mapa_chaves`).
+A administrativa do time de chamados nasce quando a Inspeção é **realizada**, com as respostas do técnico na nota (Levi,
+08/11/2026: "quero que a administrativa só nasça quando a de inspeção é realizada!"; o desenho do mesmo dia a fazia nascer
+junto com a Inspeção, e foi revertido). O App cria a dele no fechamento; o OS Creator, a da Inspeção realizada que ficou
+sem (a do supervisor, a fechada na web). Até a 1.2.0 isso morava só no servidor do App (`_acompanhamento_se_chamado` e
+`_mapa_chaves`).
 
 ```python
-d = cg.montar_acompanhamento(inspecao, fabricante)                      # junto com a Inspeção: "aguardando a inspeção"
 d = cg.montar_acompanhamento(inspecao, fabricante,
-                             cg.respostas_de(checklist, itens))         # no fechamento: as respostas do técnico
+                             cg.respostas_de(checklist, itens))         # a Inspeção realizada: as respostas do técnico
 # inspecao = {"folio", "code", "nome_ativo", "tipo", "os_pai", "event_date"}
 # d = {"titulo", "nota", "tipo_tarefa", "etiqueta", "subtarefas", "campos", "extras", "aguardando"}
 ```
@@ -36,7 +36,8 @@ d = cg.montar_acompanhamento(inspecao, fabricante,
 - A nota sai **igual** à do App de hoje: a 1ª linha "[CHAMADO] Acompanhamento — <marca> · <tipo>" (o quadro do
   Acompanhamento de chamados do OS Creator a lê), a OS de campo, a Inspeção e o ativo, a data da falha, e os campos do
   formulário do fabricante (pela `chave`, `mapa_chaves`) mais as demais respostas; até 3800 caracteres, cada resposta até
-  300. Sem respostas: "Campos do formulário do fabricante: aguardando a inspeção" (`nota_aguardando` reconhece).
+  300. Sem respostas (`respostas=None`): "Campos do formulário do fabricante: aguardando a inspeção" (`nota_aguardando`
+  reconhece), do desenho revertido; ninguém usa hoje.
 - A subtarefa única é "Nº do ticket / protocolo aberto no fabricante": o quadro acha o ticket por "ticket"/"protocolo".
 - Fica fora daqui: o payload do RPC, os ids do Fracttal e o responsável (cada lado tem o seu).
 - O App copia a pasta inteira para `middleware/chamado_garantia`; as duas pontas sobem a 1.3.0 juntas.

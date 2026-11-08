@@ -228,6 +228,22 @@ varredura da `disponibilidade_dia` (`disponibilidade._varrer`): as linhas de uma
 escreve com ela o comentário de cada dia (Levi, 14/10/2026: "A partir de outubro quero os comentários 100% OS Fracttal.
 Comentários e disponibilidade!"). Índice de antes do código conta VAZIO na `atualizacao` (não publicada), nunca 0.
 
+**Chamados em aberto para o App de Campo (08/11/2026, registrado antes de existir):** o desenho "o chamado do tracker na
+ronda" (Levi: "segue!"): o tracker com chamado aberto aparece na ronda só com o aviso, e o técnico não abre outro em cima.
+Livro `nexus_chamados_abertos` (só dele: a gravação troca o livro inteiro, e dividir o `nexus_chamados` com o
+`fato_chamado` de hora em hora faria uma apagar a aba da outra), abas `fato_chamado_aberto` e `atualizacao`
+(`fato_chamado_aberto.py`, montado, sem medida, chave `inspecao_folio` + `adm_folio`): 1 linha = 1 chamado em aberto
+agora (a Inspeção de garantia não concluída sem OS de acompanhamento, ou a OS de acompanhamento em processo), com o código
+do ativo, `equipamento_id` e `usina_id` pela dimensão de equipamento (com a linhagem), a coluna do quadro
+(`aguardando_inspecao`, `chegaram`, `ticket_aberto`; vazia quando o ticket não é conhecido agora) e o
+`data_id_inspecao`. É foto: encolhe quando os chamados fecham, e a `atualizacao` diz quando foi gerada e quantas linhas
+tem (o App trata mais de 30 min, ou menos linhas que o `row_count`, como "não li"). Cada linha e a `atualizacao` vão
+assinadas (HMAC, rótulo `nexus:oscreator:chamados-app`; os vetores de teste estão em
+`tests/test_dados_chamado_aberto.py`). Quem grava é o servidor, de 10 em 10 min, da memória do OS Creator (a lista central
+de OS e a cópia do quadro), sem pedido ao Fracttal: `nexus/torres/oscreator/chamados_abertos.py`, **desligado**
+(`LIGADO_PADRAO`) até a prova e o OK do Levi. A linha que não mudou guarda o `atualizado_em` de quando ficou assim (a API
+guarda histórico por linha).
+
 **Chamados de garantia (12/10/2026):** Levi: "O nexus é um ambiente centralizado e precisamos ter os dados se
 conversando!". O Nexus publica as OS de acompanhamento de chamado do Fracttal (o quadro Acompanhamento de chamados do OS
 Creator) no livro `nexus_chamados · fato_chamado` (`fato_chamado.py`, conformado, foto acumulada, chave `os`): 1 linha =

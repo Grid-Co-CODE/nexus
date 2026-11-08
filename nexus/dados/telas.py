@@ -191,6 +191,8 @@ QUEM_GRAVA_ORIGEM = (
     ("igual", "Ronda COS (API de normalizações)", "Ronda COS (o Nexus lê a API de normalizações, só leitura)"),
     # as ocorrências abertas (30/10/2026): o Nexus lê a fotografia do Andamento e grava o retrato da hora
     ("igual", "Ronda COS (API do Andamento)", "Ronda COS (o Nexus lê a fotografia do Andamento, só leitura)"),
+    # os chamados em aberto para o App (08/11/2026): o Nexus lê da memória do OS Creator (a lista central de OS e o quadro)
+    ("prefixo", "OS Creator (", "OS Creator (o Nexus lê a lista central de OS e o quadro, da memória)"),
     ("prefixo", "nexus_", "Nexus"),                              # livro do Nexus fora do LIVROS: viola a regra 10
 )
 A_DECLARAR = "a declarar"

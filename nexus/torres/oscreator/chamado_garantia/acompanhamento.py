@@ -1,10 +1,10 @@
 """A OS de ACOMPANHAMENTO do chamado (a 3ª do fluxo: Administrativa, etiqueta CHAMADOS, do time de chamados).
 
-Desenho de 08/11/2026 (aprovado pelo Levi, "segue!"): a administrativa nasce LOGO DEPOIS da Inspeção, nos três caminhos (a
-ronda e a corretiva no App de Campo, o supervisor no OS Creator), com os campos do fabricante vazios ("aguardando a
-inspeção"); o fechamento da Inspeção só PREENCHE a nota dela, em vez de criar outra. Até a 1.2.0 o que a administrativa
-leva morava só no servidor do App (`_acompanhamento_se_chamado` e `_mapa_chaves`); passou para cá para as duas pontas
-seguirem um padrão só. A nota com as respostas sai IGUAL à do App de hoje: o quadro do Acompanhamento de chamados do OS
+A administrativa nasce quando a Inspeção é REALIZADA, com as respostas do técnico na nota (Levi, 08/11/2026: "quero que a
+administrativa só nasça quando a de inspeção é realizada!"; o desenho do mesmo dia a fazia nascer junto com a Inspeção, e
+isso foi revertido): o App cria a dele no fechamento, e o OS Creator a da Inspeção realizada que ficou sem (a do
+supervisor, a fechada na web). Até a 1.2.0 o que a administrativa leva morava só no servidor do App
+(`_acompanhamento_se_chamado` e `_mapa_chaves`); passou para cá para as duas pontas seguirem um padrão só. A nota com as respostas sai IGUAL à do App de hoje: o quadro do Acompanhamento de chamados do OS
 Creator (`acomp_web`) lê a 1ª linha ("[CHAMADO] Acompanhamento") e acha o ticket pela subtarefa ("ticket"/"protocolo").
 
 Fica FORA daqui, como no `montar` da Inspeção: o payload do RPC, os ids do Fracttal (tipo, etiqueta, pessoa) e o
@@ -91,9 +91,9 @@ def montar_acompanhamento(inspecao: dict, fabricante: str, respostas=None) -> di
     """O que a OS de acompanhamento leva, num dicionário só.
 
     `inspecao` = {"folio", "code", "nome_ativo", "tipo", "os_pai" ("" sem OS pai), "event_date" (ISO, o incidente)};
-    `respostas` = None quando a administrativa nasce junto com a Inspeção (o bloco diz "aguardando a inspeção"), ou a lista
-    [(descrição, valor)] do `respostas_de` (aceita também a chave do formulário no lugar da descrição) quando a Inspeção
-    fecha e a nota é preenchida.
+    `respostas` = a lista [(descrição, valor)] do `respostas_de` (aceita também a chave do formulário no lugar da
+    descrição), as respostas da Inspeção realizada. None dá o bloco "aguardando a inspeção" (do desenho revertido em
+    08/11/2026, a administrativa junto com a Inspeção): hoje ninguém a usa.
 
     → {"titulo", "nota", "tipo_tarefa", "etiqueta", "subtarefas", "campos", "extras", "aguardando"}"""
     i = inspecao or {}

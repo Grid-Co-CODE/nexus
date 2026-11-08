@@ -302,6 +302,9 @@ def ligar_garantias(app) -> None:
     from os_web import rotas_acomp
     if not app.config.get("TESTING"):
         rotas_acomp.configurar_disco(os.path.join(api._data_dir(), "oscreator", "garantias"))
+        # as administrativas das Inspeções realizadas (08/11/2026): as pendentes e as criadas, ao lado da cópia do quadro
+        from os_web import acomp_cadeia
+        acomp_cadeia.configurar_pasta(os.path.join(api._data_dir(), "oscreator", "garantias"))
 
 
 def modulo_do_clone(nome: str):

@@ -45,8 +45,8 @@ __all__ = [
     "TIPO_ID", "APELIDOS_NO_FRACTTAL",
     # o Controle de fornecedores do Nexus por cima do código (20/10/2026): quem lê a aba entrega as linhas aqui
     "registro",
-    # a OS de acompanhamento (a 3ª, do time de chamados), desde a 1.3.0 (08/11/2026): nasce junto com a Inspeção
+    # a OS de acompanhamento (a 3ª, do time de chamados), desde a 1.3.0 (08/11/2026): nasce com a Inspeção realizada
     "montar_acompanhamento", "mapa_chaves", "respostas_de", "nota_aguardando", "AGUARDANDO_INSPECAO", "SUBTAREFA_TICKET",
 ]
 __version__ = "1.3.0"     # 1.1.0: ativos.py (tipo do ativo pelo código); 1.2.0: registro.py e a marca por palavra inteira;
-#                           1.3.0: acompanhamento.py (a OS do time de chamados, junto com a Inspeção; 08/11/2026)
+#                           1.3.0: acompanhamento.py (a OS do time de chamados, com as respostas; 08/11/2026)
