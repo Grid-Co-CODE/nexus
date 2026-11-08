@@ -1544,7 +1544,8 @@ def _os_de_ronda(os_):
     cada número novo gastava um pedido da cota do App (auditoria de 08/11/2026). Vale a OS das rondas lidas ou do
     checklist (as aprovadas, mais antigas que a janela da tela)."""
     chave = str(os_)
-    if chave not in {str(r.get("os")) for r in (visao.rondas().dados or {}).get("todas") or []}             and chave not in ronda_checklist.respostas():
+    das_rondas = {str(r.get("os")) for r in (visao.rondas().dados or {}).get("todas") or []}
+    if chave not in das_rondas and chave not in ronda_checklist.respostas():
         abort(404)
 
 

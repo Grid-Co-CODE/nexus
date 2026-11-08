@@ -115,7 +115,8 @@ def test_fotos_com_o_fracttal_recusando_marca_o_erro_para_tentar_de_novo(banco, 
         raise RuntimeError("HTTP 429 Too Many Requests")
     monkeypatch.setattr(nota_fracttal, "anexos_da_os", recusa)
     ronda_fotos.limpar()
-    html = logado.get("/t/campo/rondas/os/501/fotos").get_data(as_text=True)
+    # a OS 500 é de ronda no banco de mentira (desde 08/11/2026 a rota só abre OS que as rondas conhecem)
+    html = logado.get("/t/campo/rondas/os/500/fotos").get_data(as_text=True)
     assert 'data-erro="1"' in html and "excesso de pedidos" in html and 'class="cn-bt-tentar"' in html
     pag = logado.get("/t/campo/rondas/usina/1").get_data(as_text=True)
     assert "delete linha.dataset.carregada; esperar(b, linha)" in pag and "Tento de novo sozinho em" in pag
