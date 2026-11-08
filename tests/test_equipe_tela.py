@@ -8,6 +8,7 @@ SVG, e o "parado fora de usina" nem isso.
 
 Banco de mentira (`ApiPGFalsa`), relógio parado, coordenadas e pessoas inventadas; nada vai à rede."""
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -49,6 +50,15 @@ PONTO = {NA_USINA: ((-16.605173, -49.187654), 3, False),           # 0,8 km da A
 NOME = {NA_USINA: "Naira Teste", ANDANDO: "Andre Teste", FORA: "Fabio Teste", SEM_SINAL: "Sinara Teste",
         SEM_PERMISSAO: "Pietra Teste", SEM_POSICAO: "Paulo Teste", FORA_DO_PILOTO: "Otavio Teste"}
 PILOTO = (NA_USINA, ANDANDO, FORA, SEM_SINAL, SEM_PERMISSAO, SEM_POSICAO)
+# a estrutura de O&M de 10/2026, como o cadastro a modela (`visao._Base`): a equipe é de uma região de campo, e o
+# supervisor do técnico é o Supervisor de Campo da região da equipe dele. A Oeste só tem o técnico fora do piloto
+CENTRO, LESTE, OESTE = 10, 11, 12
+EQUIPE = {CENTRO: "Equipe Centro Teste", LESTE: "Equipe Leste Teste", OESTE: "Equipe Oeste Teste"}
+SUP_CENTRO, SUP_LESTE, SUP_OESTE = 30, 31, 32
+NOME_SUP = {SUP_CENTRO: "Sergio Teste", SUP_LESTE: "Silvia Teste", SUP_OESTE: "Sandro Teste"}
+REGIAO = {CENTRO: (1, SUP_CENTRO), LESTE: (2, SUP_LESTE), OESTE: (3, SUP_OESTE)}       # equipe: (região, supervisor)
+EQUIPE_DE = {NA_USINA: CENTRO, ANDANDO: CENTRO, FORA: CENTRO, SEM_SINAL: CENTRO, SEM_PERMISSAO: LESTE,
+             SEM_POSICAO: LESTE, FORA_DO_PILOTO: OESTE}
 # quem olha o mapa
 PCM, ADMIN = 20, 21
 EMAIL = {PCM: "pcm.teste@gridco.com.br", ADMIN: "admin.teste@gridco.com.br"}
@@ -57,9 +67,9 @@ DIGITOS = ("612345", "187654", "334571", "712389", "605173", "981237", "954321",
            "712311", "295127", "701263")
 
 
-def _ficha(pid, nome, email=None, vinculo="Colaborador de campo"):
+def _ficha(pid, nome, email=None, vinculo="Colaborador de campo", equipe_id=CENTRO):
     sensivel = {"nome": nome, "nome_padrao": nome, **({"email": email} if email else {})}
-    return {"pessoa_id": pid, "vinculo": vinculo, "cargo": "Técnico O&M", "equipe_id": 10, "status": "Ativo",
+    return {"pessoa_id": pid, "vinculo": vinculo, "cargo": "Técnico O&M", "equipe_id": equipe_id, "status": "Ativo",
             "excluido": "não",
             "sensivel_cifrado": Cofre(CHAVE_CADASTRO).cifrar(json.dumps(sensivel), f"banco/pessoas/{pid}")}
 
@@ -84,11 +94,15 @@ def relogio(monkeypatch):
 @pytest.fixture
 def banco(app, tmp_path, monkeypatch, relogio):
     api = ApiPGFalsa()
-    fichas = [_ficha(pid, nome) for pid, nome in NOME.items()]
+    fichas = [_ficha(pid, nome, equipe_id=EQUIPE_DE[pid]) for pid, nome in NOME.items()]
     fichas += [_ficha(PCM, "Analista Pcm Teste", EMAIL[PCM], vinculo="Colaborador"),
                _ficha(ADMIN, "Administradora Teste", EMAIL[ADMIN], vinculo="Colaborador")]
+    fichas += [_ficha(sid, nome, vinculo="Colaborador", equipe_id=None) for sid, nome in NOME_SUP.items()]
     _aba(api, "cadastro_nexus", "pessoas", fichas)
-    _aba(api, "cadastro_nexus", "equipes", [{"equipe_id": 10, "nome": "Equipe Centro Teste"}])
+    _aba(api, "cadastro_nexus", "equipes", [{"equipe_id": e, "nome": n, "regiao_campo_id": REGIAO[e][0]}
+                                            for e, n in EQUIPE.items()])
+    _aba(api, "cadastro_nexus", "regioes_campo", [{"regiao_campo_id": r, "nome": f"Região {r} Teste",
+                                                   "supervisor_campo_id": s, "ordem": r} for r, s in REGIAO.values()])
     _aba(api, "cadastro_nexus", "usinas", [{"usina_id": u, "nome": n, "status": "OPERAÇÃO", "equipe_id": 10}
                                            for u, n in NOME_USINA.items()])
     _aba(api, LIVRO_PILOTO, ABA_PILOTO, [_decisao(p) for p in PILOTO])
@@ -326,6 +340,73 @@ def test_a_pagina_nunca_baixa_do_ibge_e_a_cidade_vem_na_proxima(cliente, pontos,
     fundo.terminar()
     _, html = _html(cliente)
     assert "Cidade Um Teste/GO" in html.split('class="eq-lado"', 1)[1] and len(ibge.pedidos) == 2
+
+
+# ── o filtro por supervisor e por equipe (08/11/2026) ────────────────────────────────────────────────────────────────
+def _opcoes(html, nome):
+    corpo = html.split(f'name="{nome}"', 1)[1].split("</select>", 1)[0]
+    return re.findall(r'<option value="([^"]*)"(?: selected)?>([^<]*)</option>', corpo)
+
+
+def _no_painel(html):
+    lado = html.split('class="eq-lado"', 1)[1]
+    return {pid for pid, nome in NOME.items() if nome in lado}
+
+
+def test_os_filtros_listam_so_o_supervisor_e_a_equipe_de_quem_esta_no_piloto(cliente, pontos, setor):
+    """Levi, 08/11/2026: "Opção de filtrar por supervisor ou equipe". As opções são as de quem o mapa mostra (técnico de
+    campo ativo E no piloto), com o nome do cadastro: o supervisor (o Supervisor de Campo da região da equipe) e a equipe
+    que só têm o técnico de fora do piloto não entram."""
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    assert _opcoes(html, "supervisor") == [("", "Todos os supervisores"), (str(SUP_CENTRO), NOME_SUP[SUP_CENTRO]),
+                                           (str(SUP_LESTE), NOME_SUP[SUP_LESTE])]
+    assert _opcoes(html, "equipe") == [("", "Todas as equipes"), (str(CENTRO), EQUIPE[CENTRO]),
+                                       (str(LESTE), EQUIPE[LESTE])]
+    assert NOME_SUP[SUP_OESTE] not in html and EQUIPE[OESTE] not in html
+    # sem JavaScript, o botão Filtrar; com ele, a troca do select já envia (o mesmo da Visão do cliente)
+    form = re.search(r'<form class="cn-filtros eq-filtros"[^>]*>(.*?)</form>', html, flags=re.S)
+    assert 'method="get"' in form.group(0) and form.group(1).count('onchange="this.form.submit()"') == 2
+    assert "<noscript><button" in form.group(1)
+
+
+def test_o_filtro_estreita_o_mapa_a_lista_e_o_resumo(cliente, pontos, setor):
+    _entrar(cliente, EMAIL[PCM])
+    assert _no_painel(_html(cliente)[1]) == set(PILOTO)                  # sem filtro: todos
+    # a Equipe Leste: os dois de lá, nenhum no mapa (sem permissão e sem posição ficam só na lista)
+    _, html = _html(cliente, query_string={"equipe": LESTE})
+    assert _no_painel(html) == {SEM_PERMISSAO, SEM_POSICAO} and "tecnico=" not in _svg(html)
+    resumo = html.split('class="eq-resumo"', 1)[1].split("</p>", 1)[0]
+    assert "1 sem permissão" in resumo and "1 sem posição hoje" in resumo and "na usina" not in resumo
+    assert f'<option value="{LESTE}" selected>' in html
+    # o link do técnico leva o filtro junto, e o "Ver todos" do painel dele volta ao filtro, não a todos
+    assert f'href="/t/campo/equipe?tecnico={SEM_POSICAO}&amp;equipe={LESTE}"' in html
+    _, html = _html(cliente, query_string={"equipe": LESTE, "tecnico": SEM_POSICAO})
+    assert f'href="/t/campo/equipe?equipe={LESTE}">Ver todos os técnicos' in html
+    # o técnico de fora do filtro não abre o painel dele
+    _, html = _html(cliente, query_string={"equipe": LESTE, "tecnico": NA_USINA})
+    assert "eq-det" not in html and NOME[NA_USINA] not in html
+    # o supervisor da Centro: os quatro dela, e os três que estão no mapa
+    _, html = _html(cliente, query_string={"supervisor": SUP_CENTRO})
+    assert _no_painel(html) == {NA_USINA, ANDANDO, FORA, SEM_SINAL}
+    svg = _svg(html)
+    assert all(f"tecnico={p}&amp;supervisor={SUP_CENTRO}\"" in svg for p in (NA_USINA, ANDANDO, SEM_SINAL))
+    assert f'<option value="{SUP_CENTRO}" selected>' in html
+    # os dois juntos valem juntos: o supervisor da Centro e a equipe Leste não têm ninguém, e a tela diz
+    _, html = _html(cliente, query_string={"supervisor": SUP_CENTRO, "equipe": LESTE})
+    assert _no_painel(html) == set() and "Nenhum técnico do piloto neste filtro." in html
+
+
+@pytest.mark.parametrize("pedido", [{"supervisor": 999}, {"equipe": 999}, {"supervisor": SUP_OESTE}, {"equipe": OESTE},
+                                    {"supervisor": "x"}, {"equipe": "²"}, {"supervisor": "1" * 5000},
+                                    {"equipe": "", "supervisor": ""}],
+                         ids=["sup_999", "eq_999", "sup_fora_do_piloto", "eq_fora_do_piloto", "letra", "sobrescrito",
+                              "5000_algarismos", "vazios"])
+def test_id_desconhecido_no_filtro_mostra_todos_sem_erro(cliente, pontos, setor, pedido):
+    """O id que não está nas opções (não existe, é de quem está fora do piloto, ou vem torto) não filtra: a tela mostra
+    todos, sem 500 e sem nada marcado no select."""
+    st, html = _html(_entrar(cliente, EMAIL[PCM]), query_string=pedido)
+    assert st == 200 and _no_painel(html) == set(PILOTO)
+    assert " selected>" not in html.split('class="cn-filtros eq-filtros"', 1)[1].split("</form>", 1)[0]
 
 
 # ── o Abrir rota ─────────────────────────────────────────────────────────────────────────────────────────────────────

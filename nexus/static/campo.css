@@ -1938,6 +1938,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 /* O Mapa de equipe (08/11/2026): o desenho do servidor (o contorno do IBGE e o x/y já projetados; a coordenada nunca chega
    ao navegador) e o painel ao lado. Um nível de superfície (à la Nexus, sem azul em camadas): o quadro do mapa e o painel
    são os únicos cartões, os estados só em contorno, e a cor só no estado do técnico (o ponto e a pílula) */
+.eq-filtros .gc-campo{min-width:220px}
 .eq-resumo{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 0}
 .eq-msg--ok{border-color:var(--ok);background:var(--ok-suave)}
 .eq-corpo{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start;margin-top:14px}
@@ -1999,7 +2000,8 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
   padding:8px 0;border-top:1px solid var(--linha)}
 .eq-piloto-lista form{display:flex;align-items:center;gap:8px;margin:0}
 /* no celular, o nome numa linha e o botão na de baixo em TODAS as linhas (o nome curto e o longo quebravam diferente) */
-@media (max-width:480px){.eq-piloto-lista li{display:grid;justify-content:stretch;gap:6px}}
+@media (max-width:480px){.eq-piloto-lista li{display:grid;justify-content:stretch;gap:6px}
+  .eq-filtros .gc-campo{min-width:0;width:100%}}
 /* no celular o SVG tem uns 340 px, não 1000: o ponto do técnico e a marca da usina crescem para dar para ver e tocar */
 @media (max-width:700px){.eq-p{transform:scale(1.8)}.eq-u{transform:scale(1.5)}
   .eq-dl{grid-template-columns:minmax(0,1fr);gap:2px}.eq-dl dd{margin-bottom:6px}}

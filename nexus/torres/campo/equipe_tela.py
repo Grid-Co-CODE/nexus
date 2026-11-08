@@ -481,6 +481,43 @@ def _resumo(linhas: list) -> list:
     return [(n[k], um if n[k] == 1 else varios, SI.TOM[k]) for k, um, varios in RESUMO if n[k]]
 
 
+def _supervisor_da_equipe(b, equipe_id):
+    """O Supervisor de Campo da região de campo da equipe (`equipes.regiao_campo_id` -> `regioes_campo.
+    supervisor_campo_id`), ou None (equipe sem região, vaga aberta). É assim que o cadastro diz quem lidera o técnico
+    desde a estrutura de O&M de 10/2026 (`visao._Base`): o `supervisor_id` da ficha da pessoa saiu das telas, porque na
+    prática era o Gestor de contrato."""
+    r = b.regiao.get(b.regiao_da_equipe.get(equipe_id))
+    return r["supervisor_id"] if r else None
+
+
+def _filtro(b, tecnicos: dict, piloto) -> dict:
+    """O filtro por supervisor e por equipe (Levi, 08/11/2026: "Opção de filtrar por supervisor ou equipe"), pela URL
+    (`?supervisor=<pessoa_id>&equipe=<equipe_id>`). As opções são só as de quem o mapa mostra (técnico de campo ativo E
+    no piloto), com o nome do cadastro (o da pessoa decifrado da ficha; o da equipe, de `cadastro_nexus · equipes`). O
+    id que não está nas opções (o que não existe, o de quem está fora do piloto, o torto) não filtra: a tela mostra
+    todos, sem erro. Os dois juntos valem juntos. Devolve {"supervisor", "equipe" (o id escolhido ou None), "opcoes_*"
+    [(id, nome)], "q" (o que vai em todo link da tela, para o clique no técnico não perder o filtro)}."""
+    no_mapa = [t for pid, t in tecnicos.items() if pid in piloto]
+    sups = {s for s in (_supervisor_da_equipe(b, t["equipe_id"]) for t in no_mapa) if s}
+    nomes = b.nomes(sups)
+    opcoes_sup = sorted(((s, nomes.get(s) or f"Supervisor {s}") for s in sups), key=lambda x: chave_texto(x[1]))
+    opcoes_eq = sorted(((e, b.nome_equipe.get(e) or f"Equipe {e}") for e in {t["equipe_id"] for t in no_mapa} if e),
+                       key=lambda x: chave_texto(x[1]))
+
+    def escolha(nome, opcoes):
+        pedido = str(request.args.get(nome) or "").strip()
+        return int(pedido) if _ID.fullmatch(pedido) and int(pedido) in {i for i, _n in opcoes} else None
+    f = {"supervisor": escolha("supervisor", opcoes_sup), "equipe": escolha("equipe", opcoes_eq),
+         "opcoes_supervisor": opcoes_sup, "opcoes_equipe": opcoes_eq}
+    f["q"] = {k: f[k] for k in ("supervisor", "equipe") if f[k] is not None}
+    return f
+
+
+def _no_filtro(b, t: dict, f: dict) -> bool:
+    return ((f["equipe"] is None or t["equipe_id"] == f["equipe"])
+            and (f["supervisor"] is None or _supervisor_da_equipe(b, t["equipe_id"]) == f["supervisor"]))
+
+
 def _tela(contexto: dict, status: int = 200):
     tela = TORRE.tela("equipe")
     r = current_app.make_response((render_template("campo/equipe.html", torre=TORRE, tela=tela, **contexto), status))
@@ -506,7 +543,11 @@ def equipe():
                               "instantes."})
     coords, erro_coords = MR.coordenadas()
     nomes_usina = {str(uid): str(u.get("nome") or "").strip() for uid, u in b.por_id.items()}
-    linhas, pontos = _linhas(srv, b, tecnicos, piloto, coords, nomes_usina, agora)
+    filtro = _filtro(b, tecnicos, piloto)
+    # o filtro vale para tudo o que mostra técnico: os pontos, as listas, o resumo e o painel do escolhido (que sai
+    # das linhas). O controle do piloto, não: é quem o administrador põe e tira da coleta, filtro nenhum o esconde
+    vistos = {pid: t for pid, t in tecnicos.items() if _no_filtro(b, t, filtro)}
+    linhas, pontos = _linhas(srv, b, vistos, piloto, coords, nomes_usina, agora)
     try:
         mapa = SI.desenho(coords, pontos)
     except ValueError as e:     # o contorno do IBGE que não abre: a lista continua valendo
@@ -532,6 +573,7 @@ def equipe():
         "nome_de": {l["pid"]: l for l in linhas}, "nomes_usina": nomes_usina,
         "opcoes_rota": sorted(((uid, nomes_usina.get(uid) or f"Usina {uid}") for uid in coords),
                               key=lambda x: chave_texto(x[1])),
+        "filtro": filtro,
         "avisos": avisos, "admin": admin, "todos": todos, "no_piloto": sum(1 for t in todos if t["no_piloto"]),
         "piloto_msg": PILOTO_MSG.get(str(request.args.get("piloto") or "")),
         "agora": f"{agora.astimezone(_BRT):%H:%M}"})

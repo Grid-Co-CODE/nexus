@@ -55,7 +55,22 @@
   {% else %}
   {% if piloto_msg %}<div class="cn-erro eq-msg eq-msg--{{ piloto_msg[0] }}" role="status">{{ piloto_msg[1] }}</div>{% endif %}
   {% for a in avisos %}<div class="cn-erro cn-aviso" role="status">{{ a }}</div>{% endfor %}
-  <p class="eq-resumo">{% for n, rot, tom in resumo %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% else %}<span class="mudo">Nenhum técnico no piloto da coleta agora.</span>{% endfor %}</p>
+  {# o filtro por supervisor e por equipe (Levi, 08/11/2026): as opções são de quem está no piloto; a troca do select já
+     envia (sem JavaScript, o botão), e o filtro vai junto em todo link de técnico #}
+  <form class="cn-filtros eq-filtros" method="get" action="{{ url_for('torre_campo.equipe') }}">
+    <label class="gc-rotulo" for="eq-supervisor">Supervisor</label>
+    <select class="gc-campo" id="eq-supervisor" name="supervisor" onchange="this.form.submit()">
+      <option value="">Todos os supervisores</option>
+      {% for i, nome in filtro.opcoes_supervisor %}<option value="{{ i }}"{% if i == filtro.supervisor %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+    </select>
+    <label class="gc-rotulo" for="eq-equipe">Equipe</label>
+    <select class="gc-campo" id="eq-equipe" name="equipe" onchange="this.form.submit()">
+      <option value="">Todas as equipes</option>
+      {% for i, nome in filtro.opcoes_equipe %}<option value="{{ i }}"{% if i == filtro.equipe %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+    </select>
+    <noscript><button class="gc-btn gc-btn--contorno" type="submit">Filtrar</button></noscript>
+  </form>
+  <p class="eq-resumo">{% for n, rot, tom in resumo %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% else %}<span class="mudo">{{ 'Nenhum técnico do piloto neste filtro.' if filtro.q else 'Nenhum técnico no piloto da coleta agora.' }}</span>{% endfor %}</p>
 
   <div class="eq-corpo">
     <div class="eq-quadro">
@@ -64,7 +79,7 @@
         <g class="eq-ufs">{% for f in mapa.ufs %}<path d="{{ f.d }}"/>{% endfor %}</g>
         <g class="eq-siglas" aria-hidden="true">{% for f in mapa.ufs if f.x %}<text x="{{ f.x }}" y="{{ f.y }}">{{ f.sigla }}</text>{% endfor %}</g>
         <g class="eq-usinas">{% for u in mapa.usinas %}<circle class="eq-u" cx="{{ u.x }}" cy="{{ u.y }}" r="4"><title>{{ nomes_usina.get(u.usina_id) or ('Usina ' ~ u.usina_id) }}</title></circle>{% endfor %}</g>
-        <g class="eq-pontos">{% for p in mapa.pontos %}{% set l = nome_de[p.pessoa_id] %}<a href="{{ url_for('torre_campo.equipe', tecnico=p.pessoa_id) }}"><circle class="eq-p eq-p--{{ p.tom }}{% if sel and sel.pid == p.pessoa_id %} eq-p--sel{% endif %}" cx="{{ p.x }}" cy="{{ p.y }}" r="11"><title>{{ l.nome }}: {{ l.s.rotulo }}</title></circle></a>{% endfor %}</g>
+        <g class="eq-pontos">{% for p in mapa.pontos %}{% set l = nome_de[p.pessoa_id] %}<a href="{{ url_for('torre_campo.equipe', tecnico=p.pessoa_id, **filtro.q) }}"><circle class="eq-p eq-p--{{ p.tom }}{% if sel and sel.pid == p.pessoa_id %} eq-p--sel{% endif %}" cx="{{ p.x }}" cy="{{ p.y }}" r="11"><title>{{ l.nome }}: {{ l.s.rotulo }}</title></circle></a>{% endfor %}</g>
       </svg>
       {% else %}
       <p class="mudo eq-vazio">Sem usina com coordenada no cadastro e sem técnico no mapa agora: não há o que desenhar.</p>
@@ -101,7 +116,7 @@
         {% elif s.chave == 'sem_posicao' %}
         <p class="eq-nota">O celular não mandou posição hoje: o Nexus Field não foi aberto hoje, ou a coleta não ligou.</p>
         {% endif %}
-        <a class="cn-link eq-voltar" href="{{ url_for('torre_campo.equipe') }}">Ver todos os técnicos</a>
+        <a class="cn-link eq-voltar" href="{{ url_for('torre_campo.equipe', **filtro.q) }}">Ver todos os técnicos</a>
       </section>
       {% else %}
       {% for chave, titulo, lista in grupos %}
@@ -110,7 +125,7 @@
         {% if lista %}
         <ul class="eq-lista">
           {% for l in lista %}
-          <li><a href="{{ url_for('torre_campo.equipe', tecnico=l.pid) }}">
+          <li><a href="{{ url_for('torre_campo.equipe', tecnico=l.pid, **filtro.q) }}">
             <span class="eq-lin"><b>{{ l.nome }}</b><small>{{ l.equipe or 'sem equipe' }}{% if chave == 'fora' and l.onde %} · {{ l.onde }}{% endif %}{% if chave in ('mapa', 'fora') and l.perto %} · {{ l.perto }}{% endif %}{% if l.hora %} · {{ l.hora }}{% endif %}</small></span>
             <span class="cn-pill cn-{{ l.s.tom }}">{{ l.s.rotulo }}</span></a></li>
           {% endfor %}
