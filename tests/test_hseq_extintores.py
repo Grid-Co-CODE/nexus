@@ -893,3 +893,36 @@ def test_assinatura_fora_do_ascii_e_401_e_nao_500_nas_rotas_publicas(com_livro, 
     app.config["NEXUS_DADOS"] = str(tmp_path)
     anon = app.test_client()
     assert _enviar(anon, app, assinatura="é").status_code == 401
+
+
+def test_dois_envios_iguais_da_mesma_foto_nao_disputam_o_arquivo_temporario(com_livro, app, tmp_path, monkeypatch):
+    """Achado 11 da auditoria de 08/11/2026: o `.parcial` tinha nome fixo; o reenvio do App com o 1º POST ainda rodando
+    escrevia no mesmo arquivo, e o 2º `replace` dava FileNotFoundError (500)."""
+    import pathlib
+    import threading
+    import time
+    from nexus.hseq import fotos as FOT
+    app.config["NEXUS_DADOS"] = str(tmp_path)
+    dados, ts, dia, cod = _foto_jpeg(), int(time.time()), "2026-10-08", "ALT100-INFC1-PPCI-EXT01"
+    sig = FOT.assinatura(FOT.chave(app.config), cod, dia, ts, dados)
+    ponto = threading.Barrier(2, timeout=10)
+    replace, trava = pathlib.Path.replace, threading.Lock()   # a trava: no Windows o replace simultâneo no MESMO destino falha à parte
+
+    def replace_juntos(self, alvo):          # os dois já escreveram o temporário quando o 1º troca de nome
+        if self.name.endswith(".parcial"):
+            ponto.wait()
+            with trava:
+                return replace(self, alvo)
+        return replace(self, alvo)
+    monkeypatch.setattr(pathlib.Path, "replace", replace_juntos)
+    saidas = []
+
+    def envia():
+        try:
+            saidas.append(FOT.receber(app.config, cod, dia, ts, sig, dados))
+        except Exception as e:      # noqa: BLE001 — o que o teste prova é que não levanta
+            saidas.append(e)
+    fios = [threading.Thread(target=envia) for _ in range(2)]
+    [f.start() for f in fios]
+    [f.join(20) for f in fios]
+    assert [s[0] for s in saidas] == [200, 200], saidas

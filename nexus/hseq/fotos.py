@@ -104,7 +104,9 @@ def receber(config, codigo, dia, ts, assinatura_recebida, dados: bytes, agora=No
         antes = ""
     if antes and antes > dia:
         return 200, f"guardada a de {antes}, mais nova que a de {dia}"
-    tmp = destino / f"{codigo}.jpg.parcial"
+    # com o id da thread: o reenvio do App com o 1º POST ainda rodando não escreve no mesmo temporário (achado 11 da
+    # auditoria de 08/11/2026: o 2º `replace` dava FileNotFoundError)
+    tmp = destino / f"{codigo}.jpg.{threading.get_ident()}.parcial"
     tmp.write_bytes(out.getvalue())
     tmp.replace(destino / f"{codigo}.jpg")
     meta.write_text(json.dumps({"dia": dia, "recebida_em": int(agora or time.time())}), encoding="utf-8")

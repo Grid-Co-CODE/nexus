@@ -101,3 +101,32 @@ def test_as_listas_da_caixa_de_editar_e_o_outro(com_livro, logado, app, tmp_path
 def test_assinatura_fora_do_ascii_e_401_e_nao_500(dados, app, cliente):
     """Achado 8 da auditoria de 08/11/2026: `compare_digest(str, str)` levanta TypeError com letra não ASCII (500)."""
     assert _enviar(cliente, app, assinatura="é").status_code == 401
+
+
+def test_dois_envios_iguais_do_texto_nao_disputam_o_arquivo_temporario(dados, app, monkeypatch):
+    """Achado 11 da auditoria de 08/11/2026: o `.json.parcial` tinha nome fixo (o 2º `replace` dava FileNotFoundError)."""
+    import pathlib
+    import threading
+    ts, dia, texto = int(time.time()), "2026-10-05", "Suporte solto"
+    sig = INFO.assinatura(INFO.chave(app.config), EXT03, dia, ts, texto)
+    ponto = threading.Barrier(2, timeout=10)
+    replace, trava = pathlib.Path.replace, threading.Lock()   # a trava: no Windows o replace simultâneo no MESMO destino falha à parte
+
+    def replace_juntos(self, alvo):
+        if self.name.endswith(".parcial"):
+            ponto.wait()
+            with trava:
+                return replace(self, alvo)
+        return replace(self, alvo)
+    monkeypatch.setattr(pathlib.Path, "replace", replace_juntos)
+    saidas = []
+
+    def envia():
+        try:
+            saidas.append(INFO.receber(app.config, EXT03, dia, ts, texto, sig))
+        except Exception as e:      # noqa: BLE001
+            saidas.append(e)
+    fios = [threading.Thread(target=envia) for _ in range(2)]
+    [f.start() for f in fios]
+    [f.join(20) for f in fios]
+    assert [s[0] for s in saidas] == [200, 200], saidas

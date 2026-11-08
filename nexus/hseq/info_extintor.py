@@ -14,6 +14,7 @@ dia em diante (a conferência nova sem informação).
 import hashlib
 import hmac
 import json
+import threading
 import time
 from pathlib import Path
 
@@ -89,7 +90,7 @@ def receber(config, codigo, dia, ts, texto, assinatura_recebida, agora=None) -> 
     if not texto:
         arq.unlink(missing_ok=True)
         return 200, "sem informação adicional: nada guardado"
-    tmp = destino / f"{codigo}.json.parcial"
+    tmp = destino / f"{codigo}.json.{threading.get_ident()}.parcial"      # por thread: ver `fotos.receber` (achado 11)
     tmp.write_text(json.dumps({"dia": dia, "recebido_em": int(agora or time.time()),
                                "cifrado": cofre.cifrar(texto, _ctx(codigo))}), encoding="utf-8")
     tmp.replace(arq)
