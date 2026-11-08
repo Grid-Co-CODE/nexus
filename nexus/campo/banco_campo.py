@@ -16,7 +16,6 @@ ABA = "fechamentos"
 ABA_ATUALIZACAO = "atualizacao"
 # Levi, 05/10/2026: "esses dados de ronda têm sim que ir para a API, guardados como informação de ronda, salvando o
 # número da OS e todas essas informações". Uma linha por OS de ronda, com o que o App escreveu nela no Fracttal.
-ABA_RONDAS = "rondas"
 BASE_API = "https://app.gridco.com.br/db_performace"
 
 INTEIRAS = ("id_tarefa", "id_os", "tecnico_id", "status_os", "status_tarefa", "dur_prev_min", "dur_real_min", "rating",
@@ -98,15 +97,6 @@ def ler_tudo(base: str = BASE_API, sessao=None) -> tuple[dict, dict]:
     if ABA_ATUALIZACAO in abas:
         atualizacao = next(iter(_linhas_da_aba(base, s, abas[ABA_ATUALIZACAO])), {})
     return out, atualizacao
-
-
-def ler_rondas(base: str = BASE_API, sessao=None) -> list[dict]:
-    """As linhas da aba de rondas, como a API devolve."""
-    import requests
-    s = sessao or requests
-    base = base.rstrip("/")
-    abas = _abas(base, s)
-    return _linhas_da_aba(base, s, abas[ABA_RONDAS]) if ABA_RONDAS in abas else []
 
 
 def ler(base: str = BASE_API, sessao=None) -> dict:

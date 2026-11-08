@@ -18,8 +18,6 @@ OBRIGATORIAS = ("NEXUS_SECRET_KEY", "NEXUS_SENHA_ADMIN")
 OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # tela Base → Ligações (04/10/2026): onde moram as decisões e o token para publicar no banco
              "NEXUS_DADOS", "NEXUS_DE_PARA_REGRAS", "GRIDCO_SQL_TOKEN", "GRIDCO_DB_API",
-             # torre Campo · App (04/10/2026): o coletor do Fracttal roda só onde NEXUS_CAMPO_COLETOR=1, a cada N minutos
-             "NEXUS_CAMPO_COLETOR", "NEXUS_CAMPO_COLETOR_MIN",
              # as leituras do Fracttal ao subir: a fila da Aprovação de OS, as rondas aprovadas, as OS de falha e o Quadro
              # da equipe da Engenharia (NEXUS_CAMPO_AQUECER=0 desliga numa máquina; a pré-carga das telas pelo banco
              # fica sempre ligada)
