@@ -1660,10 +1660,12 @@ Nada liga sozinho; tudo inerte sem a configuração (as rotas respondem 503).
   conferência aceita só 1 ou 0. **Vale sem reiniciar:** `gravador.ativo` lê a chave a cada pedido das rotas (a cópia de
   30 s do chaves.json, zerada ao gravar) e o laço do gravador sobe em toda máquina e confere a cada rodada (desligado, só
   dorme). O administrador vê na própria tela (o bloco do piloto) se a gravação está ligada nesta máquina. **Liga ANTES de
-  alguém entrar no piloto e DEPOIS de a T.I. confirmar a limpeza dos 7 dias no banco**: as três rotas do celular
-  respondem 503 ("o Mapa de equipe não grava nesta máquina") onde ela não vale, porque quem recebe tem de ser quem grava;
-  e sem a limpeza da T.I. os pontos ficam no banco além dos 7 dias do aviso ao técnico (o Nexus não apaga livro do banco:
-  `so_cresce`, regra do nexus/dados). A variável do `.env` (`config.OPCIONAIS`) continua valendo como reserva.
+  alguém entrar no piloto**: as três rotas do celular respondem 503 ("o Mapa de equipe não grava nesta máquina") onde
+  ela não vale, porque quem recebe tem de ser quem grava. **A guarda de 7 dias no banco é da T.I.** (o Nexus não apaga
+  livro do banco: `so_cresce`, regra do nexus/dados): sem a limpeza dela, os pontos ficam no banco além dos 7 dias do
+  aviso ao técnico. O Levi decidiu em 09/11/2026 ligar no mesmo dia, para o piloto de 1 ou 2 técnicos, com a carta da
+  limpeza indo à T.I. junto: o primeiro ponto completa 7 dias em 16/11, então a limpeza tem de rodar até 15/11 (conferir).
+  A variável do `.env` (`config.OPCIONAIS`) continua valendo como reserva.
 - **O desenho supõe UM processo do Nexus no servidor**: as chaves ativas, o diário, as filas e as cópias do piloto moram
   na memória dele (e no disco da pasta de dados). Dois processos (dois workers) teriam chaves diferentes e respostas
   diferentes para o mesmo celular.

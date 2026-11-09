@@ -253,8 +253,8 @@ CHAVES = {
         "nome": "Mapa de equipe: gravar nesta máquina",
         "para": "ligar (1) ou desligar (0) o Mapa de equipe NESTA máquina: as rotas do celular recebem e o gravador põe "
                 "no banco os pontos, os deslocamentos, as chaves dos aparelhos e o registro de quem viu. Uma máquina só "
-                "(o servidor): o PC e o servidor nunca gravam juntos. Antes de ligar, a limpeza dos 7 dias no banco "
-                "tem de estar com a T.I. (docs/mapa-equipe-pedido-ti.md)",
+                "(o servidor): o PC e o servidor nunca gravam juntos. A guarda de 7 dias no banco é a limpeza da "
+                "T.I. (docs/mapa-equipe-pedido-ti.md)",
         "arquivo": "",
         "dica": "1 para ligar, 0 para desligar; Apagar volta ao .env do servidor (sem ele, desligado)",
         "conferir": _conferir_grava,

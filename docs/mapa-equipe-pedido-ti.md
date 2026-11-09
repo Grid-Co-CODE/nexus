@@ -32,8 +32,9 @@ Peço que confirmem que o backup e o histórico de versões do banco não guarda
 guarda acima (7 dias para os pontos, 12 meses para os deslocamentos). Se guardarem, por favor me avisem o prazo real e
 me digam como encurtar ou excluir esses itens também, porque a guarda só vale se valer nas cópias.
 
-Nada muda no servidor de vocês: a gravação do Mapa de equipe é ligada por mim, pela tela do próprio Nexus. Peço só que
-me avisem quando a limpeza estiver rodando, porque eu só ligo a gravação depois disso.
+Nada muda no servidor de vocês: a gravação do Mapa de equipe é ligada por mim, pela tela do próprio Nexus. Vou ligar
+hoje, 09/11, para um piloto com 1 ou 2 técnicos. Como o primeiro ponto completa 7 dias em 16/11, preciso da limpeza dos
+pontos rodando até 15/11. Podem me confirmar quando estiver rodando?
 
 Se preferirem outra forma de fazer a limpeza (um agendamento seu, por exemplo), sem problema: o que importa é o prazo.
 Podem me confirmar quando a rotina estiver rodando?
@@ -49,6 +50,8 @@ Levi
   em `nexus/torres/campo/CLAUDE.md`, seção "Mapa de equipe".
 - Os livros ainda não existem no banco: nascem com a primeira gravação, quando a gravação for ligada em Base → Chaves →
   Nexus (`NEXUS_EQUIPE_GRAVA` = 1, no servidor; desde 09/11/2026 pela tela, sem variável da T.I.). A limpeza só tem o que
-  apagar depois disso, e a gravação só deve ser ligada depois de a T.I. confirmar a limpeza.
+  apagar depois disso. Decisão do Levi em 09/11/2026: ligar no mesmo dia, para o piloto de 1 ou 2 técnicos, com esta
+  carta indo à T.I. junto; o primeiro ponto completa 7 dias em 16/11, então a limpeza dos pontos tem de rodar até 15/11
+  (sem ela, a localização fica no banco além dos 7 dias do aviso ao técnico).
 - Para conferir depois da primeira rodada de limpeza: listar as abas do banco e ver que nenhum
   `nexus_equipe_pontos_*` tem mais de 7 dias.
