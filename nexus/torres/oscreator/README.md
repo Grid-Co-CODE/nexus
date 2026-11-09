@@ -2702,9 +2702,14 @@ Nexus acabou".
   arquivo X não está mais no Fracttal"); pedido em JSON, o JSON. **O Baixar** (`os_acoes.baixarArquivo`) pede o arquivo pela
   tela e só salva quando veio o arquivo; o erro vira a frase no rodapé dos anexos. A pré-assinada do S3 segue direto.
 - **O PDF responde sempre em JSON**, inclusive o erro inesperado (o motivo à tela, a pilha ao log), e **as fotos têm prazo**
-  (`PRAZO_FOTOS_S`, 45 s): passado o prazo, as que faltam saem no PDF como "não veio", e o PDF chega antes do tempo que o
-  caminho até o servidor espera. A causa exata da OS 8159 não foi vista (sem acesso ao log do servidor): o prazo cobre a OS
-  de muitas fotos, e o JSON cobre o erro de montar.
+  (`PRAZO_FOTOS_S`, 45 s): passado o prazo, as que faltam saem no PDF como "não veio".
+- **A causa da OS 8159 era o `LayoutError`** (o JSON novo a mostrou: "Não consegui montar o PDF desta OS (LayoutError)"):
+  um bloco maior que uma página derruba o PDF inteiro no reportlab, e ele não quebra linha de tabela entre páginas.
+  Reproduzido com a resposta longa de uma subtarefa e com a legenda longa de uma foto. Agora as tabelas quebram a linha
+  entre páginas (`splitInRow`), a legenda da foto tem teto (`LEGENDA_FOTO_MAX`) e, se ainda assim um bloco não couber, o PDF
+  sai de novo com os textos longos cortados e dizendo (`cortar_textos`), em vez de não sair. **Provado com a OS 8159 real**
+  (cópia local com o Fracttal de verdade, 09/11/2026): o PDF saiu com 5 páginas e as 14 fotos, e a observação virou nota.
+  A 1ª subida (17fa3bb) foi sem essa prova: o Levi achou o LayoutError no ar.
 - **O POST que só lê** (o PDF e o "Baixar todos") tem o aviso de leitura no `carga.js` (`SO_LEITURA`): "O servidor não
   respondeu a tempo... Nada foi gravado no Fracttal", e não o da gravação.
 - A Aprovação de OS (Usinas 360°) passa a separar a sessão que acabou (o redirect) do servidor que não respondeu: combinado

@@ -88,3 +88,36 @@ def test_o_post_que_so_le_tem_o_aviso_de_leitura_e_o_baixar_confere():
     card = (WEB / "static" / "os_acoes.js").read_text(encoding="utf-8")
     assert card.count("data-baixar-arq>Baixar</a>") == 2 and "async function baixarArquivo(e, dlg, a)" in card
     assert "if (a.origin !== location.origin) return;" in card            # a pré-assinada do S3 segue direto
+
+
+LONGO = ("linha de texto comprida " * 12 + "\n") * 120
+
+
+def test_texto_longo_nao_derruba_o_pdf():
+    """A OS 8159 dava LayoutError: uma linha de tabela (a resposta longa de uma subtarefa) maior que uma página, que o
+    reportlab não quebra sem o splitInRow; e a legenda longa da foto não cabia no quadro dela."""
+    from os_web import os_pdf
+    m = os_pdf.modelo({"folio": "1", "descricao": "Teste",
+                       "subtarefas": [{"descricao": LONGO, "resposta": LONGO, "feito": True, "tipo": "Texto"}],
+                       "tarefas": [{"id": 1, "titulo": "T", "nota": LONGO}]},
+                      anexos_sub=[{"url": "u", "value": "a/b.jpg", "nome": "b.jpg", "is_image": True,
+                                   "descricao": LONGO[:6000], "subtarefa": LONGO[:4000]}],
+                      recursos=[{"tipo": "Peça", "descricao": LONGO, "qtd": 1}])
+    assert os_pdf.gerar(m, fotos=[os_pdf.reduzir(_jpeg())]).startswith(b"%PDF")
+
+
+def test_o_bloco_que_ainda_nao_cabe_sai_com_o_texto_cortado(monkeypatch):
+    from reportlab.platypus.doctemplate import LayoutError
+    from os_web import os_pdf
+    vistos = []
+    original = os_pdf._gerar
+
+    def primeiro_falha(m, **k):
+        vistos.append(m)
+        if len(vistos) == 1:
+            raise LayoutError("não coube")
+        return original(m, **k)
+    monkeypatch.setattr(os_pdf, "_gerar", primeiro_falha)
+    m = os_pdf.modelo({"folio": "1", "descricao": "Teste", "notas": LONGO, "subtarefas": [], "tarefas": []})
+    assert os_pdf.gerar(m).startswith(b"%PDF") and len(vistos) == 2
+    assert "texto cortado no PDF" in str(vistos[1]) and len(str(vistos[1])) < len(str(vistos[0]))
