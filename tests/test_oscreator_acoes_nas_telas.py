@@ -27,13 +27,15 @@ def test_a_tela_do_chamado_tem_as_acoes_da_os(fr, fila):
     cli.get(URL)
     html = cli.get(URL + "/9104").get_data(as_text=True)
     caixa = html.split("<h2>Ações da OS</h2>", 1)[1].split("</section>", 1)[0]
-    for a in ("anexos-os", "anexos-sub", "anexo-incluir", "verificacao", "cancelar"):
+    for a in ("verificacao", "cancelar"):
         assert 'data-acao="%s"' % a in caixa, a
     # sem o Concluir: o "Finalizar chamado" do topo já conclui a OS no Fracttal (dois finalizar confundiriam)
     assert 'data-acao="concluir"' not in caixa
-    assert re.search(r'data-acao="anexo-incluir"[^>]*title="[^"]*até 10 MB cada', caixa)
-    assert '<span class="det-ajuda">PDF' not in caixa
-    for dlg in ("verificacao", "cancelar", "anexos"):
+    # sem os anexos desde 09/11/2026 (Levi: "em chamados a parte de anexos está toda bugada"): no Nexus eles moram na
+    # página da OS da Engenharia, que o "Abrir a OS" abre (test_oscreator_garantias_pagina_da_os_09_11.py)
+    for a in ("anexos-os", "anexos-sub", "anexo-incluir"):
+        assert 'data-acao="%s"' % a not in html, a
+    for dlg in ("verificacao", "cancelar"):
         assert '<template data-dlg="%s">' % dlg in caixa, dlg
     assert "data-no-lugar" in html.split("<h2>Ações da OS</h2>", 1)[0].rsplit("<section", 1)[1]
 

@@ -893,7 +893,8 @@ def detalhe(folio):
                            canal=cs.CANAL.get(c["marca"], ""),
                            menos7=aw.menos_7d(n["data_falha"], hoje), copiar=aw.copiar_tudo(n["campos"]),
                            erro_obs=erro_obs, pode_gravar=ga.pode_gravar(), equipe=aw.equipe()[1],
-                           opcoes_status=aw.STATUS_CHAMADO, pode_obs=_pode_mexer_obs().get("pode", True))
+                           opcoes_status=aw.STATUS_CHAMADO, pode_obs=_pode_mexer_obs().get("pode", True),
+                           pagina_os=_pagina_da_os())
 
 
 def _status_trocado(obs):
@@ -1010,6 +1011,17 @@ def api_status(folio):
 # (`ponte.obs_chamados`). Sem a chave (o OS Creator sozinho, o oem), fica aberto, como a Área PCM.
 OBS_CHAMADOS = "os_web.obs_chamados"
 AVISO_OBS = "Editar e excluir observações em Garantias é do setor Performance e dos administradores do Nexus."
+
+
+# Onde a OS abre na tela do chamado (09/11/2026, Levi: o mesmo desenho da página da OS da Engenharia, com os anexos, as
+# tarefas e as subtarefas): o Nexus põe no pedido {"os": o começo do endereço da página, "volta": o começo da volta para
+# o chamado} (`ponte.pagina_da_os`). Sem a chave (o OS Creator sozinho), a OS abre o card do OS Creator, como antes.
+PAGINA_DA_OS = "os_web.pagina_da_os"
+
+
+def _pagina_da_os():
+    v = request.environ.get(PAGINA_DA_OS)
+    return v if isinstance(v, dict) and v.get("os") else None
 
 
 def _pode_mexer_obs() -> dict:

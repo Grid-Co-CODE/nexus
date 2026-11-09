@@ -3018,6 +3018,27 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   cliente, o relatório (um PDF; dois clientes, um .zip) e a planilha; a 375 px a página não rola para o lado e a caixa
   dos avisos fica na tela.
 
+## Garantias: a OS abre a página da OS da Engenharia (09/11/2026)
+
+Levi, pelo chat do scrum master: "em chamados a parte de anexos está toda bugada", e o mesmo desenho da página da OS da
+Engenharia (Quadro da equipe → página da OS) ao clicar na OS. No quiz ele escolheu "Abrir a OS leva a ela": a tela do
+chamado continua com o que é do chamado (status, ticket, observações, histórico, relatório); o "Abrir a OS" e os números
+da cadeia (OS de campo, inspeção, acompanhamento) abrem a página da OS da Engenharia (`/t/engenharia/equipe/os/<nº>`),
+que tem os anexos, as tarefas e as subtarefas (o início e o fim, o cronômetro), sem cópia: a página é a da Engenharia, e
+quem mexe nela é o chat da Engenharia.
+- **Como chega ao clone:** a ponte põe no pedido da tela do chamado `os_web.pagina_da_os` = {"os": o começo do endereço
+  da página, com o prefixo; "volta": `/t/chamados/garantias?abrir=/os/chamados/acompanhamento/`} (`ponte.pagina_da_os`;
+  só nas rotas do `_ROTA_OBS`). O link (`link_os` no `acomp_os.html`) leva `?de=<volta><nº do chamado>` e `target="_top"`
+  (a página é do Nexus, fora da moldura do OS Creator); a página confere o `de` e volta para o chamado na moldura de
+  Garantias. Sozinho (sem a chave), a OS abre o card do OS Creator, como antes.
+- **Os anexos saíram da tela do chamado** (o "Anexos das subtarefas", o "Anexos da OS" e o Incluir anexo, de 06/11); as
+  Ações da OS ficam só com o Enviar para verificação e o Cancelar, na OS a fazer ou em execução.
+- **O que é da página:** a volta pelo `de`, o acesso de quem faz Chamados (o setor Performance, que não tem a
+  `engenharia/equipe`) e as ações para ele (Incluir anexo, tarefas, Andamento) foram pedidos ao chat da Engenharia; os
+  links daqui só sobem junto com isso.
+- **Prova:** `tests/test_oscreator_garantias_pagina_da_os_09_11.py` (os links com a chave, o card sem ela, os anexos fora
+  e o prefixo da ponte).
+
 ## Garantias: os filtros no modelo do Histórico (05/11/2026)
 
 Levi: "quero que os filtros dos chamados sejam no estilo OS CREATOR WEB > HISTÓRICO", "algo suspenso e moderno, do jeito

@@ -520,6 +520,19 @@ SETOR_OBS_GARANTIAS = SID.PERFORMANCE
 _ROTA_OBS = re.compile(r"chamados/acompanhamento/\d+|api/acomp/\d+/obs/[^/]+/(?:editar|excluir)")
 
 
+# A OS na tela do chamado de Garantias abre a página da OS da Engenharia (09/11/2026, Levi, pelo chat do scrum master:
+# "em chamados a parte de anexos está toda bugada", e o mesmo desenho da página da OS da Engenharia; no quiz, "Abrir a OS
+# leva a ela": a tela do chamado continua, e o "Abrir a OS" e os números da cadeia levam à página, que tem os anexos, as
+# tarefas e as subtarefas). Vai ao clone no pedido da tela do chamado: o endereço da página, já com o prefixo, e a volta
+# para o chamado dentro da moldura de Garantias (a página confere o `de`). Sem a chave (o OS Creator sozinho), a OS
+# segue abrindo o card do OS Creator.
+PAGINA_DA_OS = "os_web.pagina_da_os"
+
+
+def pagina_da_os() -> dict:
+    return {"os": na_raiz("/t/engenharia/equipe/os/"), "volta": "/t/chamados/garantias?abrir=/os/chamados/acompanhamento/"}
+
+
 def obs_chamados() -> dict:
     """{"pode": bool, "aviso": str}: quem edita e exclui as observações de Garantias."""
     return _do_setor_ou_admin(SETOR_OBS_GARANTIAS, "Performance", "Editar e excluir observações em Garantias é do setor "
@@ -608,6 +621,7 @@ def encaminhar(resto: str):
         environ[AREA_PCM] = area_pcm()          # a Área PCM é do setor PCM ou do administrador (ver `area_pcm`)
     if _ROTA_OBS.fullmatch(resto):              # só a tela de um chamado e o editar/excluir: o quadro não lê o setor
         environ[OBS_CHAMADOS] = obs_chamados()  # editar e excluir as observações (ver `obs_chamados`)
+        environ[PAGINA_DA_OS] = pagina_da_os()  # a OS abre a página da OS da Engenharia (ver `pagina_da_os`)
     base = raiz()
     ajusta_js = resto == "static/abas.js"
     # debaixo do prefixo todo .js do clone sai reescrito, e a pergunta "mudou?" vale para a versão reescrita (abaixo)

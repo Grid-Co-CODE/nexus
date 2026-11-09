@@ -20,6 +20,12 @@
 {% macro seta_pdf(folio, wid='') -%}
 <button type="button" class="cad-pdf" data-os-pdf="{{ folio }}"{% if wid %} data-wid="{{ wid }}"{% endif %} title="Baixar o PDF da OS {{ folio }}" aria-label="Baixar o PDF da OS {{ folio }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 {%- endmacro %}
+{# onde a OS abre (09/11/2026, Levi: "em chamados a parte de anexos está toda bugada", e o mesmo desenho da página da OS
+   da Engenharia): no Nexus, a página da OS da Engenharia, com os anexos, as tarefas e as subtarefas, e a volta para este
+   chamado (`pagina_os`, da ponte; target _top: a página é do Nexus, fora da moldura do OS Creator); sozinho, o card #}
+{% macro link_os(folio, wid='', classe='', texto='') -%}
+<a{% if classe %} class="{{ classe }}"{% endif %} href="{% if pagina_os %}{{ pagina_os.os }}{{ folio }}?de={{ (pagina_os.volta ~ c.folio)|urlencode }}{% elif wid %}/os/os/{{ wid }}{% else %}/os/os/folio/{{ folio }}{% endif %}"{% if pagina_os %} target="_top"{% endif %}>{{ texto or folio }}</a>
+{%- endmacro %}
 {% set eb = {'chegou': 'u-r', 'ticket': 'u-a', 'fim': 'u-g', '': 'u-m'}[c.col] %}
 <section class="ac" id="acomp-os" data-folio="{{ c.folio }}" data-wid="{{ wid }}" data-ativo="{{ c.code }}" data-pode-obs="{{ '1' if pode_obs else '0' }}">
   <div class="ac-head">
@@ -30,7 +36,7 @@
       <p class="ac-sub">{{ c.local or '—' }}{% if c.marca %} · <b>{{ c.marca }}</b>{% endif %}{% if c.status %} · {{ c.status }} no Fracttal{% endif %}</p>
     </div>
     <div class="ac-acoes">
-      <a class="btn btn-o" href="/os/os/{{ wid }}">Abrir a OS</a>
+      {{ link_os(c.folio, wid, 'btn btn-o', 'Abrir a OS') }}
       {% if c.col in ('chegou', 'ticket') %}<button type="button" class="btn btn-i" id="b_finalizar">Finalizar chamado</button>{% endif %}
     </div>
   </div>
@@ -93,9 +99,9 @@
       <section class="bloco" data-pdf-caixa>
         <div class="bloco-h"><h2>A cadeia do chamado</h2></div>
         <ol class="cadeia">
-          <li><span class="i">1</span><span class="t">OS de campo</span>{% if c.os_campo %}<a href="/os/os/folio/{{ c.os_campo }}">{{ c.os_campo }}</a>{{ seta_pdf(c.os_campo) }}{% else %}<span class="t">—</span><span></span>{% endif %}</li>
-          <li><span class="i">2</span><span class="t">Inspeção · fotos e vídeos</span>{% if c.inspecao %}<a href="/os/os/folio/{{ c.inspecao }}">{{ c.inspecao }}</a>{{ seta_pdf(c.inspecao) }}{% else %}<span class="t">—</span><span></span>{% endif %}</li>
-          <li class="aqui"><span class="i">3</span><span class="t">Acompanhamento</span><a href="/os/os/{{ wid }}">{{ c.folio }}</a>{{ seta_pdf(c.folio, wid) }}</li>
+          <li><span class="i">1</span><span class="t">OS de campo</span>{% if c.os_campo %}{{ link_os(c.os_campo) }}{{ seta_pdf(c.os_campo) }}{% else %}<span class="t">—</span><span></span>{% endif %}</li>
+          <li><span class="i">2</span><span class="t">Inspeção · fotos e vídeos</span>{% if c.inspecao %}{{ link_os(c.inspecao) }}{{ seta_pdf(c.inspecao) }}{% else %}<span class="t">—</span><span></span>{% endif %}</li>
+          <li class="aqui"><span class="i">3</span><span class="t">Acompanhamento</span>{{ link_os(c.folio, wid) }}{{ seta_pdf(c.folio, wid) }}</li>
         </ol>
         <div class="msg" data-pdf-msg hidden></div>
       </section>
@@ -119,24 +125,17 @@
         {% with d = {"folio": c.folio, "responsavel": c.responsavel} %}{% include "_dlg_responsavel.html" %}{% endwith %}
       </section>
       {# as ações da OS aqui mesmo (Levi, 06/11/2026: "Nessas telas devem ter essas opção também: Enviar para verificação,
-         concluir e cancelar!", e o Incluir anexo com os anexos para ver e baixar): os botões e os diálogos do card
-         (os_acoes.js e _dlg_acoes_os.html), sem o card; o que muda o status da OS relê a página (data-no-lugar) #}
-      {% if d and d.get('folio') %}<section class="bloco" data-os-acoes data-no-lugar data-wid="{{ wid }}" data-folio="{{ c.folio }}">
+         concluir e cancelar!"): os botões e os diálogos do card (os_acoes.js e _dlg_acoes_os.html), sem o card; o que muda
+         o status da OS relê a página (data-no-lugar). Os anexos saíram daqui em 09/11/2026 ("em chamados a parte de anexos
+         está toda bugada"): no Nexus, eles moram na página da OS da Engenharia, que o "Abrir a OS" abre; sozinho, no card #}
+      {% if d and d.get('folio') and c.status_id in (1, 2) %}<section class="bloco" data-os-acoes data-no-lugar data-wid="{{ wid }}" data-folio="{{ c.folio }}">
         <div class="bloco-h"><h2>Ações da OS</h2></div>
-        <div class="det-cols" data-anexos="/os/os/{{ wid }}/anexos">
-          <div class="det-card det-anexo v" data-acao="anexos-sub" role="button" tabindex="0" title="Fotos, arquivos e notas das subtarefas"><span class="det-ico-sq v">{{ icone('camera', '#A6E22E', 22) }}</span><div class="det-anexo-t"><b>Anexos das subtarefas</b><div class="det-ajuda">do técnico</div></div><span class="det-n v" data-n="sub">…</span></div>
-          <div class="det-card det-anexo a" data-acao="anexos-os" role="button" tabindex="0" title="Fotos, arquivos e notas anexados à OS"><span class="det-ico-sq a">{{ icone('monitor', '#57B6F5', 22) }}</span><div class="det-anexo-t"><b>Anexos da OS</b><div class="det-ajuda">por usuário</div></div><span class="det-n a" data-n="os">…</span></div>
-        </div>
-        <div class="det-anx-incluir">
-          <button type="button" class="det-b" data-acao="anexo-incluir" title="Anexar arquivos a esta OS no Fracttal: {{ acoes_anexo_regra() }}">Incluir anexo</button>
-          <input type="file" multiple hidden data-anx-arquivos accept="{{ acoes_anexo_aceitar() }}">
-        </div>
         {# sem o Concluir: o "Finalizar chamado" do topo já conclui a OS no Fracttal e ajusta o quadro (a resposta da sessão
            do OS Creator, 06/11/2026: dois finalizar confundiriam). A verificação só na OS em processo; o cancelar, na aberta #}
-        {% if c.status_id in (1, 2) %}<div class="det-acoes-os">
+        <div class="det-acoes-os">
           {% if c.status_id == 1 %}<button type="button" class="det-b ambar" data-acao="verificacao" title="Muda a OS para Em Verificação no Fracttal (precisa de permissão na sua conta)">Enviar para verificação</button>{% endif %}
           <button type="button" class="det-b perigo" data-acao="cancelar" title="Cancela a OS no Fracttal (precisa de permissão na sua conta)">Cancelar OS</button>
-        </div>{% endif %}
+        </div>
         <div class="msg ok" data-msg hidden></div>
         {% include "_dlg_acoes_os.html" %}
       </section>{% endif %}
