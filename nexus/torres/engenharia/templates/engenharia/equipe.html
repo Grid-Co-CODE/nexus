@@ -9,21 +9,22 @@
    clicar quero uma visão parecida com o que aparece quando clica na OS da parte de CHAMADOS > GARANTIA"; até então era o
    card do OS Creator), e a OS aberta sem atualização há mais de 7 dias pulsa em laranja. #}
 {# O mesmo quadro serve à Performance (04/11/2026, Levi: "clone o quadro de equipe da engenharia para o time de
-   performance"): `area` = "performance" troca o texto da área, a equipe vem do setor Performance (Base → Acessos) e o
-   clique abre o card da OS do OS Creator, não a página da OS da Engenharia (que carrega o status e a prioridade dela). #}
+   performance"): `area` = "performance" troca o texto da área e a equipe vem do setor Performance (Base → Acessos). Desde
+   09/11/2026 o clique da Performance abre a MESMA página da OS da Engenharia (Levi: "quando clico na parte de performance
+   não abre a tela personalizada"), com ?de=performance para a página saber de onde veio; até então era o card do OS
+   Creator. A página é do chat da Engenharia: aqui só o link, para herdar o que ela ganhar. #}
 {% set area = area|default('engenharia') %}
-{% set card = area != 'engenharia' %}
-{% if card %}{% include "oscreator/card_os_abrir.html" %}{% endif %}
+{% set perf = area != 'engenharia' %}
 <div class="campo-nativa kb">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }} · Quadro da equipe</p>
       <h1 class="cn-titulo">Quem está com o quê</h1>
       <p class="cn-pergunta">As OS de quem é da {{ area }} no Fracttal: as que vão abrir, as abertas, as em verificação e as
-        fechadas. Clique numa pessoa para ver só as dela, e numa OS para abrir {% if card %}o card dela (o mesmo do Histórico do OS Creator){% else %}a página dela (status, prioridade, comentários e a cadeia){% endif %}.</p></div>
+        fechadas. Clique numa pessoa para ver só as dela, e numa OS para abrir a página dela (status, prioridade, comentários e a cadeia).</p></div>
     <div class="cn-frescor">OS do Fracttal<br><b>lidas às {{ lido }}</b></div>
   </div>
   {% if erro %}<div class="cn-erro cn-aviso" role="status"><b>O Fracttal recusou a leitura agora ({{ erro }}).</b> Mostrando a última leitura; nova tentativa em 1 minuto.</div>{% endif %}
-  {% if faltam %}<div class="cn-erro cn-aviso" role="status"><b>Não achei no Fracttal: {{ faltam|join(', ') }}.</b> {% if card %}Confira a pessoa em Base → Acessos → Pessoas e setores.{% else %}Confira o nome na lista de responsáveis da engenharia (a mesma da Nova solicitação | Engenharia).{% endif %}</div>{% endif %}
+  {% if faltam %}<div class="cn-erro cn-aviso" role="status"><b>Não achei no Fracttal: {{ faltam|join(', ') }}.</b> {% if perf %}Confira a pessoa em Base → Acessos → Pessoas e setores.{% else %}Confira o nome na lista de responsáveis da engenharia (a mesma da Nova solicitação | Engenharia).{% endif %}</div>{% endif %}
 
   {# A faixa de números no modelo do Acompanhamento de chamados do OS Creator (Levi, 08/10/2026: "o card de KPIS eu gostei
      mais do de chamados"): o rótulo em cima, o número colorido pela gravidade e, ao lado, o detalhe que diz por onde
@@ -58,30 +59,61 @@
       <span class="kb-faixa-legenda"><span>hoje</span><span>{{ c.faixa[7].dia }}</span><span>{{ c.faixa[-1].dia }}</span></span>
       <span class="kb-proxima">{% if c.proxima %}Próxima: OS {{ c.proxima.os }} em {{ c.proxima.programada }}{% elif c.carga %}Nenhuma programada daqui para a frente{% else %}Sem OS em aberto{% endif %}</span>
     </button>
-    {% else %}<p class="mudo">{% if card %}Ninguém no setor Performance em Base → Acessos → Pessoas e setores.{% else %}Nenhum responsável da engenharia achado no Fracttal.{% endif %}</p>{% endfor %}
+    {% else %}<p class="mudo">{% if perf %}Ninguém no setor Performance em Base → Acessos → Pessoas e setores.{% else %}Nenhum responsável da engenharia achado no Fracttal.{% endif %}</p>{% endfor %}
   </section>
 
   <div class="kb-barra">
     <input type="search" class="gc-campo kb-busca" placeholder="buscar OS, título, ativo, usina" aria-label="Buscar">
+    {# Os Parâmetros (Levi, 09/11/2026: "um campo chamado 'Parâmetros' que será no estilo de filtros do OS Creator, suspenso
+       porém ao salvar o parâmetro deixa filtrado fixo mesmo que carregue ou reinicie, terá como filtros o responsável e a
+       etiqueta"): o painel suspenso do Histórico do OS Creator (o modelo A), com o Salvar no rodapé. O salvo fica no
+       navegador (localStorage, um por quadro) e vale até alguém tirar: recarregar ou reiniciar não solta. #}
+    <div class="kb-param">
+      <button type="button" class="kb-param-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="kb-param-painel">Parâmetros <span class="kb-param-n" hidden>0</span></button>
+      <div class="kb-param-painel" id="kb-param-painel" role="dialog" aria-label="Parâmetros" tabindex="-1" hidden>
+        <div class="kb-param-topo"><h4>Parâmetros</h4><button type="button" class="kb-param-fechar" aria-label="Fechar sem salvar" title="Fechar sem salvar">&times;</button></div>
+        <div class="kb-param-grade">
+          <div class="kb-param-cel" data-campo="pessoas"><span class="kb-param-rot">Responsável</span>
+            <input type="search" class="kb-param-busca" placeholder="buscar responsável" aria-label="Buscar responsável">
+            <div class="kb-param-lista" role="group" aria-label="Responsável"></div></div>
+          <div class="kb-param-cel" data-campo="etiquetas"><span class="kb-param-rot">Etiqueta</span>
+            <input type="search" class="kb-param-busca" placeholder="buscar etiqueta" aria-label="Buscar etiqueta">
+            <div class="kb-param-lista" role="group" aria-label="Etiqueta"></div></div>
+        </div>
+        <div class="kb-param-rodape"><button type="button" class="kb-param-limpar">Limpar</button>
+          <span class="kb-param-nalt" aria-live="polite">Sem alterações</span><button type="button" class="kb-param-salvar" disabled>Salvar</button></div>
+      </div>
+    </div>
     <div class="cn-seg kb-modo" role="group" aria-label="Como ver">
       <a href="#" data-modo="quadro" aria-current="page">Quadro</a><a href="#" data-modo="pessoas">Por pessoa</a></div>
     <label class="kb-marca"><input type="checkbox" class="kb-todas-concl"> concluídas de todo o período</label>
     <label class="kb-marca"><input type="checkbox" class="kb-canceladas"> mostrar canceladas</label>
     <button type="button" class="kb-limpar" hidden>Ver a equipe toda</button>
   </div>
+  <div class="kb-param-chips" role="group" aria-label="Parâmetros salvos" hidden></div>
   <div class="kb-quadro" aria-live="polite"></div>
   <p class="mudo kb-rodape">Coluna: A fazer = aberta e não começou (a data programada diz se atrasou, se vence em 2 dias ou se
     ainda vai abrir); Em execução = alguma tarefa começou; Em verificação = esperando a aprovação; Concluídas = aprovadas
-    (as dos últimos {{ janela }} dias, ou de todo o período). {% if card %}O clique abre o card da OS, o mesmo do Histórico do OS Creator.{% else %}O clique abre a página da OS da engenharia: o status, a
-    prioridade, os comentários (vão para a nota da OS) e o Solicitar OS.{% endif %} Pulsa em laranja a OS aberta sem atualização há
+    (as dos últimos {{ janela }} dias, ou de todo o período). O clique abre a página da OS da engenharia: o status, a
+    prioridade, os comentários (vão para a nota da OS) e o Solicitar OS. Pulsa em laranja a OS aberta sem atualização há
     mais de 7 dias.{% if erro_eng %} <b>Agora sem o status da engenharia ({{ erro_eng }}): sem o pulso.</b>{% endif %}</p>
 </div>
-<script type="application/json" id="kb-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "piso": piso_concluidas, "card": card}|tojson }}</script>
+<script type="application/json" id="kb-dados">{{ {"oss": oss, "colunas": colunas, "hoje": hoje, "piso": piso_concluidas, "area": area}|tojson }}</script>
 <script>
 (function () {
   var D = JSON.parse(document.getElementById('kb-dados').textContent);
   var quadro = document.querySelector('.kb-quadro');
   var estado = {pessoa: null, q: '', modo: 'quadro', todas: false, canceladas: false};
+  // os Parâmetros salvos (09/11/2026): {pessoas: [id do Fracttal], etiquetas: [nome]}, um por quadro, no navegador
+  var CHAVE_PARAM = 'kb_parametros_' + D.area;
+  function lerParam() {
+    try {
+      var v = JSON.parse(localStorage.getItem(CHAVE_PARAM) || 'null');
+      if (v && typeof v === 'object') return {pessoas: (v.pessoas || []).map(String), etiquetas: (v.etiquetas || []).map(String)};
+    } catch (e) { /* sem localStorage (aba anônima com bloqueio): sem parâmetro salvo */ }
+    return {pessoas: [], etiquetas: []};
+  }
+  var param = lerParam();
   var ROT = {fazer: 'A fazer', execucao: 'Em execução', verificacao: 'Em verificação', concluida: 'Concluídas', cancelada: 'Canceladas'};
 
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
@@ -97,6 +129,8 @@
     return (o.coluna === 'fazer' ? 'abre em ' : 'vence em ') + o.dias + ' d';
   }
   function passa(o) {
+    if (param.pessoas.length && param.pessoas.indexOf(String(o.pid)) < 0) return false;
+    if (param.etiquetas.length && !(o.etiquetas || []).some(function (e) { return param.etiquetas.indexOf(e.nome) >= 0; })) return false;
     if (estado.pessoa && String(o.pid) !== estado.pessoa) return false;
     if (o.coluna === 'cancelada' && !estado.canceladas) return false;
     if (o.coluna === 'concluida' && !estado.todas && (o.fim_iso || '') < D.piso) return false;
@@ -114,12 +148,11 @@
   }
   // a página da OS da engenharia (Levi, 24/10/2026: "Ao clicar quero uma visão parecida com o que aparece quando clica
   // na OS da parte de CHAMADOS > GARANTIA"). O nº é o link dela: Ctrl+clique ou o botão do meio a abrem numa aba nova.
-  function paginaOs(o) { return D.card ? (o.url || '#') : nexusRota('/t/engenharia/equipe/os/') + encodeURIComponent(o.os); }
-  // a Performance (04/11/2026): o card da OS do OS Creator por cima do quadro; mudou a OS, o quadro relê o Fracttal
-  {% if card %}function abrirOs(o) {
-    var op = {status: o.status || '', folio: o.os, aoFechar: function (mudou) { if (mudou) location.href = location.pathname + '?atualizar=1'; }};
-    if (o.wid) NexusOsCard.abrir(o.wid, op); else NexusOsCard.abrirFolio(o.os, op);
-  }{% else %}function abrirOs(o) { location.href = paginaOs(o); }{% endif %}
+  // a Performance também (09/11/2026), com o ?de= dizendo de qual quadro a pessoa veio
+  function paginaOs(o) {
+    return nexusRota('/t/engenharia/equipe/os/') + encodeURIComponent(o.os) + (D.area !== 'engenharia' ? '?de=' + encodeURIComponent(D.area) : '');
+  }
+  function abrirOs(o) { location.href = paginaOs(o); }
   var GRAV = {1: 'neutro', 2: 'alerta', 3: 'critico'};
   function cartao(o) {
     var c = el('article', 'kb-card kb-card--' + (o.prazo || o.coluna) + (o.parada ? ' kb-card--parada' : ''));
@@ -223,6 +256,110 @@
   });
   document.querySelector('.kb-todas-concl').addEventListener('change', function (ev) { estado.todas = ev.target.checked; desenha(); });
   document.querySelector('.kb-canceladas').addEventListener('change', function (ev) { estado.canceladas = ev.target.checked; desenha(); });
+  // ── os Parâmetros: o painel, o Salvar e as etiquetas dos salvos ──
+  var pBtn = document.querySelector('.kb-param-btn'), pPainel = document.getElementById('kb-param-painel');
+  var pSalvar = document.querySelector('.kb-param-salvar'), pNalt = document.querySelector('.kb-param-nalt');
+  var pN = document.querySelector('.kb-param-n'), pChips = document.querySelector('.kb-param-chips');
+  var NOME_PESSOA = {};
+  // as pessoas do quadro são as dos supercards (o id do Fracttal e o nome)
+  document.querySelectorAll('.kb-super').forEach(function (s) {
+    var nb = s.querySelector('.kb-super-nome b');
+    NOME_PESSOA[String(s.dataset.pid)] = nb ? nb.textContent : s.dataset.pid;
+  });
+  var ETIQUETAS = [];
+  D.oss.forEach(function (o) { (o.etiquetas || []).forEach(function (e) { if (ETIQUETAS.indexOf(e.nome) < 0) ETIQUETAS.push(e.nome); }); });
+  ETIQUETAS.sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); });
+  var rascunho = null;
+  function semAcento(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+  function opcoes(campo) {
+    // as de hoje e as salvas que sumiram do quadro (a pessoa saiu do setor, a etiqueta não está em nenhuma OS): ficam
+    // marcáveis, para a pessoa poder tirá-las
+    var base = campo === 'pessoas' ? Object.keys(NOME_PESSOA) : ETIQUETAS.slice();
+    param[campo].forEach(function (v) { if (base.indexOf(v) < 0) base.push(v); });
+    return base.map(function (v) { return {v: v, txt: campo === 'pessoas' ? (NOME_PESSOA[v] || 'id ' + v) : v}; });
+  }
+  function montaLista(cel) {
+    var campo = cel.dataset.campo, lista = cel.querySelector('.kb-param-lista');
+    lista.replaceChildren();
+    var ops = opcoes(campo);
+    if (!ops.length) lista.appendChild(el('p', 'kb-param-vazio', campo === 'pessoas' ? 'Ninguém no quadro.' : 'Nenhuma OS com etiqueta.'));
+    ops.forEach(function (op) {
+      var l = el('label', 'kb-param-op'), c = document.createElement('input');
+      c.type = 'checkbox'; c.value = op.v; c.checked = rascunho[campo].indexOf(op.v) >= 0;
+      c.addEventListener('change', function () {
+        var i = rascunho[campo].indexOf(op.v);
+        if (c.checked && i < 0) rascunho[campo].push(op.v);
+        if (!c.checked && i >= 0) rascunho[campo].splice(i, 1);
+        mudou();
+      });
+      l.appendChild(c); l.appendChild(document.createTextNode(' ' + op.txt)); l.dataset.busca = semAcento(op.txt);
+      lista.appendChild(l);
+    });
+  }
+  function igual(a, b) { return a.length === b.length && a.every(function (x) { return b.indexOf(x) >= 0; }); }
+  function mudou() {
+    var n = ['pessoas', 'etiquetas'].filter(function (k) { return !igual(rascunho[k], param[k]); }).length;
+    pSalvar.disabled = !n;
+    pNalt.textContent = n ? (n === 1 ? '1 parâmetro alterado' : n + ' parâmetros alterados') : 'Sem alterações';
+  }
+  function abrePainel() {
+    rascunho = {pessoas: param.pessoas.slice(), etiquetas: param.etiquetas.slice()};
+    pPainel.querySelectorAll('.kb-param-cel').forEach(function (cel) { cel.querySelector('.kb-param-busca').value = ''; montaLista(cel); });
+    mudou(); pPainel.hidden = false; pBtn.setAttribute('aria-expanded', 'true'); pPainel.focus();
+  }
+  function fechaPainel() { pPainel.hidden = true; pBtn.setAttribute('aria-expanded', 'false'); rascunho = null; }
+  function guarda(novo) {
+    param = novo;
+    try { localStorage.setItem(CHAVE_PARAM, JSON.stringify(param)); } catch (e) { /* sem localStorage: vale até recarregar */ }
+    aplicaParam();
+  }
+  function aplicaParam() {
+    var n = param.pessoas.length + param.etiquetas.length;
+    pN.hidden = !n; pN.textContent = String(n);
+    // o supercard de quem ficou de fora dos parâmetros some; a faixa de números do topo segue sendo a da equipe toda
+    document.querySelectorAll('.kb-super').forEach(function (b) {
+      b.hidden = !!param.pessoas.length && param.pessoas.indexOf(String(b.dataset.pid)) < 0;
+    });
+    pChips.replaceChildren();
+    [['pessoas', 'Responsável'], ['etiquetas', 'Etiqueta']].forEach(function (par) {
+      param[par[0]].forEach(function (v) {
+        var chip = el('span', 'kb-param-chip'), rot = el('i', null, par[1] + ':'), x = el('button', 'kb-param-chip-x', '\u00d7');
+        var txt = par[0] === 'pessoas' ? (NOME_PESSOA[v] || 'id ' + v) : v;
+        chip.appendChild(rot); chip.appendChild(document.createTextNode(' ' + txt));
+        x.type = 'button'; x.setAttribute('aria-label', 'Tirar ' + par[1] + ' ' + txt); x.title = 'Tirar este parâmetro';
+        x.addEventListener('click', function () {
+          var novo = {pessoas: param.pessoas.slice(), etiquetas: param.etiquetas.slice()};
+          novo[par[0]].splice(novo[par[0]].indexOf(v), 1);
+          guarda(novo); desenha();
+        });
+        chip.appendChild(x); pChips.appendChild(chip);
+      });
+    });
+    if (n) {
+      var tudo = el('button', 'kb-param-tudo', 'Tirar todos'); tudo.type = 'button';
+      tudo.addEventListener('click', function () { guarda({pessoas: [], etiquetas: []}); desenha(); });
+      pChips.appendChild(tudo);
+    }
+    pChips.hidden = !n;
+  }
+  pBtn.addEventListener('click', function () { if (pPainel.hidden) abrePainel(); else fechaPainel(); });
+  document.querySelector('.kb-param-fechar').addEventListener('click', fechaPainel);
+  document.querySelector('.kb-param-limpar').addEventListener('click', function () {
+    rascunho = {pessoas: [], etiquetas: []};
+    pPainel.querySelectorAll('.kb-param-cel').forEach(montaLista); mudou();
+  });
+  pSalvar.addEventListener('click', function () { guarda(rascunho); fechaPainel(); desenha(); });
+  pPainel.querySelectorAll('.kb-param-busca').forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      var q = semAcento(inp.value.trim());
+      inp.parentNode.querySelectorAll('.kb-param-op').forEach(function (l) { l.hidden = !!q && l.dataset.busca.indexOf(q) < 0; });
+    });
+  });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !pPainel.hidden) { fechaPainel(); pBtn.focus(); } });
+  document.addEventListener('click', function (ev) {
+    if (!pPainel.hidden && !pPainel.contains(ev.target) && !pBtn.contains(ev.target)) fechaPainel();
+  });
+  aplicaParam();
   // voltou do card com o quadro relido: o ?atualizar=1 sai do endereço, para o F5 não reler de novo
   if (/[?&]atualizar=1(&|$)/.test(location.search)) { try { history.replaceState(null, '', location.pathname); } catch (e) { /* sem history */ } }
   // o "abrir o quadro" da Mesa traz a pessoa (?pessoa=<id do Fracttal>): o quadro abre filtrado nela (30/10/2026)

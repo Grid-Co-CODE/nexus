@@ -97,15 +97,17 @@ def _tela(logado, monkeypatch, oss, faltam=()):
     return r.status_code, r.get_data(as_text=True)
 
 
-def test_a_tela_e_o_quadro_da_engenharia_com_o_card_do_os_creator(logado, monkeypatch):
+def test_a_tela_e_o_quadro_da_engenharia_e_abre_a_pagina_da_os_dela(logado, monkeypatch):
     oss = OE.montar([_w("1", 1, prog_dias=-2), _w("2", 2)], {"id": 10, "nome": "Paula Teste"}, AGORA)
     st, html = _tela(logado, monkeypatch, oss, faltam=["id 13"])
     assert st == 200
     assert "Quem está com o quê" in html and 'class="kb-super"' in html and 'class="kb-kpis"' in html
     assert "As OS de quem é da performance" in html and "Base → Acessos → Pessoas e setores" in html
-    assert "window.NexusOsCard" in html and "NexusOsCard.abrir(o.wid, op)" in html
+    # desde 09/11/2026 a MESMA página da OS da Engenharia (Levi: "quando clico na parte de performance não abre a tela
+    # personalizada"), com o ?de= dizendo de onde veio; o card do OS Creator saiu
+    assert "window.NexusOsCard" not in html and "nexusRota('/t/engenharia/equipe/os/')" in html and "'?de='" in html
     dados = html.split('id="kb-dados">', 1)[1].split("</script>", 1)[0]
-    assert '"card": true' in dados and '"wid": 9001' in dados and '"status": "Em Processo"' in dados
+    assert '"area": "performance"' in dados and '"wid": 9001' in dados and '"status": "Em Processo"' in dados
 
 
 def test_o_pulso_conta_so_o_fracttal(logado, monkeypatch):
@@ -137,7 +139,7 @@ def test_o_quadro_da_engenharia_segue_igual(logado, monkeypatch):
                                               "erro": ""})
     html = logado.get("/t/engenharia/equipe").get_data(as_text=True)
     assert "As OS de quem é da engenharia" in html and "window.NexusOsCard" not in html
-    assert '"card": false' in html.split('id="kb-dados">', 1)[1]
+    assert '"area": "engenharia"' in html.split('id="kb-dados">', 1)[1]
 
 
 def test_tique_so_rele_com_alguem_usando(monkeypatch):
@@ -148,3 +150,16 @@ def test_tique_so_rele_com_alguem_usando(monkeypatch):
     Q.marcar_uso()
     assert Q._tique(None) is True and pedidos == [True]
     Q.limpar()
+
+
+def test_os_parametros_responsavel_e_etiqueta_salvos_no_navegador(logado, monkeypatch):
+    """Levi, 09/11/2026: "um campo chamado 'Parâmetros' [...] suspenso porém ao salvar o parâmetro deixa filtrado fixo mesmo
+    que carregue ou reinicie, terá como filtros o responsável e a etiqueta". O painel vem logo depois da busca, o salvo
+    fica no localStorage de cada quadro e o filtro do quadro o respeita."""
+    oss = OE.montar([_w("1", 1)], {"id": 10, "nome": "Paula Teste"}, AGORA)
+    _st, html = _tela(logado, monkeypatch, oss)
+    barra = html.split('class="kb-barra"', 1)[1]
+    assert barra.index("kb-busca") < barra.index('class="kb-param-btn"') < barra.index("kb-modo")
+    assert ">Responsável<" in html and ">Etiqueta<" in html and 'class="kb-param-salvar" disabled>Salvar<' in html
+    assert "'kb_parametros_' + D.area" in html and "localStorage.setItem(CHAVE_PARAM" in html
+    assert "param.pessoas.indexOf(String(o.pid)) < 0" in html and "param.etiquetas.indexOf(e.nome) >= 0" in html

@@ -312,7 +312,8 @@ serão abertas para essas pessoas" e "FAÇA UMA TELA DINÂMICA, ESTILO KANBAN E 
   faixa dos próximos 14 dias (um degrau por dia, um ponto por OS programada; fim de semana vazado, hoje marcado). O
   clique filtra o quadro. Busca, Quadro/Por pessoa, concluídas de todo o período e canceladas sem recarregar.
 - **Serve também à Performance (04/11/2026):** o template `equipe.html`, os `supercards` e a `faixa_kpis` daqui desenham
-  o Quadro da equipe da torre Performance (`area="performance"`: o texto da área, o card do OS Creator no clique; a
+  o Quadro da equipe da torre Performance (`area="performance"`: o texto da área; desde 09/11/2026 o clique abre a página
+  da OS DAQUI com `?de=performance`, e os Parâmetros, Responsável e Etiqueta salvos no navegador, valem nos dois quadros; a
   equipe é o setor Performance de Base → Acessos, em `nexus/performance/quadro_equipe.py`). Mudou o quadro aqui, confira
   lá: `tests/test_performance_quadro_equipe.py`.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_equipe.py` (a faixa: número, gravidade e nota de cada um, e
