@@ -24,7 +24,6 @@ from werkzeug.datastructures import ImmutableMultiDict
 from ...campo import aprovacao as campo_aprovacao
 from ...campo import fonte_pg as campo_fonte
 from ...campo import responsaveis as campo_resp
-from ...campo import ranking_equipes as campo_ranking
 from ...campo import observacao_responsavel as campo_obs
 from ...campo import ocorrencias as campo_oc
 from ...campo import responsaveis_graficos as campo_graficos
@@ -545,6 +544,10 @@ def responsaveis():
     # ENTÃO PODE TIRAR O ONDE FOCAR"): o endereço antigo (`modo=foco`, link guardado) abre a Visão geral
     if modo == "foco":
         modo = "geral"
+    # o Ranking das equipes saiu em 09/11/2026 (Levi, pelo Scrum master: "Pode remover o ranking das equipes de 'Visão do
+    # Responsável'"): o endereço guardado (`modo=ranking`, e o `equipe` que o cartão dele punha) abre o Painel
+    if modo == "ranking":
+        modo = "painel"
     # o Painel do responsável (28/10/2026, Levi: "quero uma tela feita mesmo para o responsável que não seja um tabelão
     # (...) uma tela inicial claro, se for para se aprofundar aí é outro nível"): a tela de entrada de quem tem um
     # responsável escolhido (pelo login, pelo cartão ou pelo filtro); a Visão geral e o Ranking são o outro nível
@@ -552,8 +555,8 @@ def responsaveis():
         # o responsável logado nunca vê os cartões dos outros responsáveis; o Painel, o Ranking das equipes e a Visão
         # geral das usinas dele, sim (18/10/2026; o Painel em 28/10/2026). Com "Todos" escolhido não há um responsável:
         # fica a Visão geral de todas, como antes
-        modo = modo if modo in ("painel", "ranking", "geral", "usina") else ("painel" if responsavel else "geral")
-    elif modo not in ("cartoes", "ranking", "geral", "painel", "usina"):
+        modo = modo if modo in ("painel", "geral", "usina") else ("painel" if responsavel else "geral")
+    elif modo not in ("cartoes", "geral", "painel", "usina"):
         modo = "painel" if responsavel else "cartoes"
     # a Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas"): todas as usinas do filtro numa lista
     # só, e o clique num bloco, nível ou número do resumo filtra (`filtro`, a condição daquele número no `soma`)
@@ -583,15 +586,10 @@ def responsaveis():
         mapa = campo_mapa.desenho(lista_geral, coords, bloco_sel)
         pedida = str(request.args.get("usina") or "")
         usina_sel = next((u for u in lista_geral if str(u.get("usina_id")) == pedida), None) if pedida else None
-    # o Ranking das equipes (18/10/2026, Levi: "qual equipe cobrar"): a régua do ranking por região do App sobre TODAS
-    # as usinas, no limite das atrasadas de quem olha; os filtros só escolhem os cartões ("O ranking das equipes tem que
-    # permancer mesmo filtrados": filtrado por um responsável, as equipes dele contavam de 1 a 11). Em
-    # nexus/campo/ranking_equipes.py
-    ranking = (campo_ranking.cartoes(todas, d.get("ranking_por_usina") or {}, d.get("tecnicos_por_equipe") or {}, usinas)
-               if modo in ("ranking", "painel") else None)
-    # o Painel: os cinco quadros sobre as MESMAS usinas e o mesmo Ranking (nexus/campo/painel_responsavel.py)
+    # o Painel: os quadros sobre as MESMAS usinas (nexus/campo/painel_responsavel.py); as Pendências de OS no lugar do
+    # Ranking das equipes desde 09/11/2026
     from ...campo import painel_responsavel as campo_painel
-    painel = campo_painel.montar(responsavel or "Todos os responsáveis", usinas, ranking) if modo == "painel" else None
+    painel = campo_painel.montar(responsavel or "Todos os responsáveis", usinas) if modo == "painel" else None
     # a Central da usina (Levi, 04/11/2026, "como aba alternativa"): a busca com TODAS as usinas da Visão (sem o filtro
     # de responsável, de cliente e da busca: buscar é ir à usina) e a usina escolhida
     central = _central_da_usina(todas) if modo == "usina" else None
@@ -603,7 +601,7 @@ def responsaveis():
     from ...campo import tarefas_os
     html = render_template("campo/responsaveis.html", **_comum(
         "responsaveis", leitura, responsavel=responsavel, cliente=cliente, q=request.args.get("q", ""), modo=modo,
-        equipe=equipe, ranking=ranking, ranking_cor=campo_ranking.cor, sem_regiao=visao.SEM_REGIAO, painel=painel,
+        equipe=equipe, sem_regiao=visao.SEM_REGIAO, painel=painel,
         temas_relatorio=campo_relatorio.TEMAS,
         filtro=filtro, filtros_geral=campo_resp.FILTROS_GERAL, lista_geral=lista_geral, contagem_geral=contagem_geral,
         ocorrencias_abertas=ocorrencias_abertas, cor_ocorrencia=campo_oc.COR_ETIQUETA, ocorrencias_link=ocorrencias_link,
@@ -679,75 +677,6 @@ def _resp_ronda(usina_id):
                            dia_longo=lambda s: f"{s[8:10]}/{s[5:7]}/{s[:4]}" if s and len(s) >= 10 else (s or "—"))
 
 
-@bp.route("/responsaveis/equipe")
-def responsaveis_equipe():
-    """O motivo da nota da equipe, por cima do Ranking das equipes (Levi, 18/10/2026: "Clicando na equipe deve dar um
-    breve resumo do motivo da pontuação da equipe estar abaixo para que o supervisor possa cobrar a equipe"): os pontos
-    que a nota perde na qualidade (por critério da nota do App e nas rondas) e na cobertura, as notas mais baixas com o
-    que faltou, a média por técnico e as usinas sem ronda (`ranking_equipes.motivos`). A equipe vai pelo nome exato do
-    cadastro; o `responsavel` só leva o filtro da tela ao link da Visão geral."""
-    from werkzeug.exceptions import HTTPException
-    equipe = request.args.get("equipe", "")
-    try:
-        return _resp_equipe_montar(equipe)
-    except HTTPException:
-        raise
-    except Exception as e:      # noqa: BLE001 — a janela diz o erro; o Ranking segue
-        _log_campo.exception("Visão do responsável: o motivo da nota da equipe não montou")
-        return (f'<header class="cr-jan-cab"><div><p class="gc-eyebrow">Motivo da nota</p>'
-                f'<h2>Não consegui montar esta janela</h2></div></header>'
-                f'<div class="cn-erro" role="alert"><b>{escape(type(e).__name__)}: {escape(str(e)[:200])}.</b> Feche e '
-                f'abra de novo; se repetir, mande este texto a quem cuida do Nexus.</div>')
-
-
-def _resp_equipe_montar(equipe: str):
-    leitura = campo_resp.visao_responsaveis()
-    d = leitura.dados or {}
-    todas = d.get("usinas") or []
-    # as usinas da equipe com o bloco Manutenção no limite de quem olha (o cookie da Visão): as mesmas etiquetas do
-    # cartão, agora com a prova (`ranking_equipes.cobrar`)
-    limite = campo_resp.limite_do_pedido(request.cookies.get(COOKIE_LIMITE))
-    us = campo_resp.com_manutencao([u for u in todas if u.get("equipe") == equipe], limite)
-    if not equipe or equipe == visao.SEM_EQUIPE or not us:
-        abort(404)
-    por = d.get("ranking_por_usina") or {}
-    cl = campo_ranking.classificar(todas, por)
-    n = cl["atual"][equipe]
-    ctx = {"equipe": equipe, "n": n, "posicao": cl["pos"].get(equipe), "total": cl["total"],
-           "antes": {"nota": cl["antes"][equipe]["nota"], "posicao": cl["pos_antes"].get(equipe)},
-           "seta": campo_ranking.seta(cl["pos"].get(equipe), cl["pos_antes"].get(equipe)),
-           "cor": campo_ranking.cor(n["nota"]), "ranking_cor": campo_ranking.cor, "tecnicos": (d.get("tecnicos_por_equipe") or {}).get(equipe, 0),
-           "regiao_campo": next((u["regiao_campo"] for u in us if u.get("regiao_campo")), ""),
-           "sem_regiao": visao.SEM_REGIAO, "info": (d.get("info") or {}).get("ranking") or {}, "dia_curto": _dia_curto,
-           "erro": "", "m": None, "responsavel": request.args.get("responsavel") or TODOS,
-           "cob": campo_ranking.cobrar(campo_resp.soma(equipe, us), us), "mat": campo_ranking.matriz(us),
-           "nomes_tecnicos": []}
-    try:
-        ctx["nomes_tecnicos"] = campo_resp.tecnicos_da_equipe({u["usina_id"] for u in us})
-    except Exception:       # noqa: BLE001 — sem o cadastro agora: a janela diz quantos são
-        _log_campo.exception("Visão do responsável: os nomes dos técnicos da equipe não vieram")
-    if "ranking" in (d.get("erros") or {}):
-        ctx["erro"] = "Não consegui ler as notas do App agora: sem elas, o motivo da nota não sai"
-    else:
-        try:
-            det = campo_resp.ranking_detalhe({u["usina_id"] for u in us}, date.fromisoformat(d["hoje"]))
-        except Exception as e:      # noqa: BLE001 — banco fora: a janela diz, o Ranking segue
-            _log_campo.exception("Visão do responsável: a leitura do motivo da nota da equipe falhou")
-            det, ctx["erro"] = None, f"Não consegui ler as notas do App no banco ({type(e).__name__}: {str(e)[:160]})"
-        if det is not None:
-            ctx["m"] = campo_ranking.motivos(n, det, us, por)
-    # o placar do ciclo do App dos técnicos da equipe (Levi, 29/10/2026: "pontos por ronda, bonus, quantidade de tarefas
-    # etc"): o livro que o App publica de hora em hora; sem ele, a janela segue sem a tabela
-    ctx["placar"], ctx["placar_hora"] = None, ""
-    try:
-        ctx["placar"] = campo_ranking.placar_da_equipe(ctx["nomes_tecnicos"], visao.ranking_pontos().dados or {},
-                                                       date.fromisoformat(d["hoje"]))
-        ctx["placar_hora"] = _hora_brt(ctx["placar"]["calculado_em"]) if ctx["placar"]["calculado_em"] else ""
-    except Exception:       # noqa: BLE001 — o placar do App fora: o resto da janela vale
-        _log_campo.exception("Visão do responsável: o placar do ciclo da equipe não veio")
-    return render_template("campo/_resp_equipe.html", **ctx)
-
-
 def _filtros_do_painel(d: dict) -> tuple[str, str, str]:
     """(responsável, cliente, busca) do pedido, como o Painel lê: sem `responsavel`, o do login; "Todos" vai como "*"."""
     pedido = request.args.get("responsavel")
@@ -812,8 +741,7 @@ def responsaveis_relatorio():
     todas = campo_resp.com_manutencao(d.get("usinas") or [], limite)
     responsavel, cliente, q = _filtros_do_painel(d)
     usinas = [u for u in todas if _no_painel(u, responsavel, cliente, q)]
-    ranking = campo_ranking.cartoes(todas, d.get("ranking_por_usina") or {}, d.get("tecnicos_por_equipe") or {}, usinas)
-    painel = campo_painel.montar(responsavel or "Todos os responsáveis", usinas, ranking)
+    painel = campo_painel.montar(responsavel or "Todos os responsáveis", usinas)
     faixa = sorted(((u, p) for u in usinas for p in u.get("paradas_abertas") or ()),
                    key=lambda up: (up[1]["_ini"], up[0]["usina"]))
     # os temas que a pessoa marcou na janela do Exportar (Levi, 30/10/2026: "a pessoa possa marcar o tema que ela quer

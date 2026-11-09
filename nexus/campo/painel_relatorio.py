@@ -9,7 +9,8 @@ informação, terá um resumo no início e depois aprofunda!"
 - **Primeiro o resumo:** os números de cada quadro e "O que cobrar primeiro", as frases do que falta, a pior primeiro.
 - **Depois o detalhe, só o que falta:** as usinas abaixo da meta (não as que estão na meta), as paradas, as PT, as OSs
   em verificação, os chamados abertos, as usinas sem ronda há 7 dias ou mais (e as que nunca tiveram) e a longa
-  pendente, os extintores vencidos e o ranking das equipes.
+  pendente, os extintores vencidos e as pendências de OS (no lugar do ranking das equipes desde 09/11/2026, como no
+  Painel).
 - Fonte Helvetica, como o relatório dos extintores (`nexus/hseq/relatorio.py`, o mesmo reportlab e a mesma paleta):
   nada de "≥" ou de seta, que ela não tem.
 """
@@ -38,7 +39,7 @@ MAX_FRASE = 4               # nomes por frase do resumo, o resto vira "e mais N"
 # tema que fica de fora sai do resumo, de "O que cobrar primeiro" e do detalhe; sem escolha nenhuma, vão todos
 TEMAS = (("perf", "Usinas abaixo da meta"), ("paradas", "Parada agora"), ("pts", "PTs pendentes"),
          ("verif", "OSs em verificação"), ("chamados", "Chamados de garantia"), ("rondas", "Rondas"),
-         ("extintores", "Extintores vencidos"), ("ranking", "Ranking das equipes"))
+         ("extintores", "Extintores vencidos"), ("pendencias", "Pendências de OS"))
 CHAVES_TEMAS = tuple(k for k, _ in TEMAS)
 
 
@@ -109,8 +110,8 @@ def _p(txt: str, e: dict, estilo: str = "base") -> Paragraph:
 
 def resumo(painel: dict, faixa: list, verif: dict | None, temas=CHAVES_TEMAS) -> list[dict]:
     """Os números do resumo: [{"tema", "rot", "num", "cor", "txt"}], na ordem da tela, só dos `temas` escolhidos."""
-    pf, pt, ch, rd, ex, rk = (painel["perf"], painel["pts"], painel["chamados"], painel["rondas"], painel["extintores"],
-                              painel["ranking"])
+    pf, pt, ch, rd, ex, po = (painel["perf"], painel["pts"], painel["chamados"], painel["rondas"], painel["extintores"],
+                              painel["pendencias"])
     n_verif = len(verif["lista"]) if verif else None
     todos = [
         {"tema": "perf", "rot": "Usinas abaixo da meta", "num": pf["abaixo"], "cor": "critico" if pf["criticas"] else (
@@ -133,8 +134,9 @@ def resumo(painel: dict, faixa: list, verif: dict | None, temas=CHAVES_TEMAS) ->
         {"tema": "extintores", "rot": "Extintores vencidos", "num": ex["vencidos"],
          "cor": "critico" if ex["vencidos"] else "ok",
          "txt": f"em {ex['usinas']} usina{'s' if ex['usinas'] != 1 else ''} · {ex['a_vencer']} a vencer"},
-        {"tema": "ranking", "rot": f"Equipes ({rk['mes']})", "num": rk["n_equipes"], "cor": "neutro",
-         "txt": f"no ranking de {rk['total']} equipes"},
+        {"tema": "pendencias", "rot": "OS pendentes", "num": po["os"], "cor": "alerta" if po["os"] else "ok",
+         "txt": f"{po['atrasadas']} tarefa{'s' if po['atrasadas'] != 1 else ''} atrasada"
+                f"{'s' if po['atrasadas'] != 1 else ''} · {po['pausadas']} pausada{'s' if po['pausadas'] != 1 else ''}"},
     ]
     return [x for x in todos if x["tema"] in temas]
 
@@ -142,8 +144,8 @@ def resumo(painel: dict, faixa: list, verif: dict | None, temas=CHAVES_TEMAS) ->
 def frases(painel: dict, faixa: list, verif: dict | None, temas=CHAVES_TEMAS) -> list[str]:
     """O que cobrar primeiro, em frases curtas: o que está parado, o que está vencido e o que falta, nessa ordem, só dos
     `temas` escolhidos. Já com as marcas de cor (texto de fora escapado)."""
-    pf, pt, ch, rd, ex, rk = (painel["perf"], painel["pts"], painel["chamados"], painel["rondas"], painel["extintores"],
-                              painel["ranking"])
+    pf, pt, ch, rd, ex, po = (painel["perf"], painel["pts"], painel["chamados"], painel["rondas"], painel["extintores"],
+                              painel["pendencias"])
     out = []
     if faixa and "paradas" in temas:
         out.append(_tom(f"{len(faixa)} parada{'s' if len(faixa) != 1 else ''} agora", "critico", True) + ": "
@@ -179,13 +181,11 @@ def frases(painel: dict, faixa: list, verif: dict | None, temas=CHAVES_TEMAS) ->
         out.append(_tom(f"{ch['abertos']} chamado{'s' if ch['abertos'] != 1 else ''} de garantia em aberto", "alerta",
                         True) + _t(f": o mais antigo é a OS {it.get('os') or '—'} ({g['usina']}, {it['ativo']}"
                                    + (f", há {it['dias']} d" if it.get("dias") is not None else "") + ")"))
-    piores = ([c for c in reversed(rk["equipes"]) if c.get("nota") is not None and not c.get("sem_equipe")][:1]
-              if "ranking" in temas else [])
-    if piores:
-        c = piores[0]
-        out.append(_tom("Equipe com a menor nota", "alerta", True)
-                   + _t(f": {c['equipe']}, nota {c['nota']}" + (f" ({c['posicao']}º de {rk['total']})"
-                                                                  if c.get("posicao") else "")))
+    if po["grupos"] and "pendencias" in temas:
+        g = po["grupos"][0]
+        it = g["itens"][0]
+        out.append(_tom(f"{po['os']} OS pendente{'s' if po['os'] != 1 else ''}", "alerta", True)
+                   + _t(f": a mais antiga é a OS {it['os']} ({g['usina']}, {it['situacao'].lower()}: {it['motivo']})"))
     return out
 
 
@@ -293,19 +293,12 @@ def gerar(painel: dict, faixa: list, verif: dict | None, *, filtros: list[str], 
              for x in ex["linhas"]]
         secao(f"Extintores vencidos ({ex['vencidos']})",
               _tabela(e, ["Usina", "Vencidos", "A vencer", "O pior"], L, [w * largura for w in (.28, .1, .1, .52)]))
-    rk = painel["ranking"]
-    if rk["equipes"] and "ranking" in temas:
-        L = [[f"{c['posicao']}º" if c.get("posicao") else "—", c["equipe"] if not c.get("sem_equipe") else "Sem equipe",
-              c.get("nota") if c.get("nota") is not None else "—",
-              c.get("qualidade") if c.get("qualidade") is not None else "—",
-              _pct(c.get("cobertura")) if c.get("cobertura") is not None else "—",
-              c.get("n_os", 0), c.get("n_ronda", 0)] for c in rk["equipes"]]
-        secao(f"Ranking das equipes · {rk['mes']} ({rk['n_equipes']} equipes, de {rk['total']})",
-              _tabela(e, ["Posição", "Equipe", "Nota", "Qualidade", "Cobertura", "Tarefas", "Rondas"], L,
-                      [w * largura for w in (.1, .34, .1, .12, .12, .11, .11)]))
-    if "ranking" in temas:
-        h += [Spacer(1, 6), _p(_t("A nota da equipe = 60% da qualidade (a média das notas das tarefas e rondas do "
-                                  "App) + 40% da cobertura (usinas com ronda no mês)."), e, "mudo")]
+    po = painel["pendencias"]
+    if po["grupos"] and "pendencias" in temas:
+        L = [[g["usina"], f"OS {it['os']}", it["situacao"], it["motivo"],
+              f"{it['dias']} d" if it.get("dias") is not None else "—"] for g in po["grupos"] for it in g["itens"]]
+        secao(f"Pendências de OS ({po['os']} OS)",
+              _tabela(e, ["Usina", "OS", "Situação", "Motivo", "Há"], L, [w * largura for w in (.22, .1, .1, .48, .1)]))
     h.append(_p(_t("Os números são os da tela, na hora em que o relatório foi gerado."), e, "mudo"))
     doc.build(h)
     return buf.getvalue()

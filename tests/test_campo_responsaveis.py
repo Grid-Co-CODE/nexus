@@ -792,23 +792,6 @@ def test_a_programacao_e_lida_do_fim(tela, monkeypatch):
 
 
 # ── O Ranking das equipes (18/10/2026, Levi: "qual equipe cobrar", a posição pela régua do ranking por região do App) ──
-def test_a_aba_ranking_das_equipes(tela, logado):
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
-    assert 'aria-current="page">Ranking das equipes</a>' in html and 'class="cn-equipes cr-rk"' in html
-    grade = html[html.index('class="cn-equipes cr-rk"'):]                    # os números de cima citam a melhor equipe
-    assert grade.index("SC Oeste 01") < grade.index("SP Norte 01")           # sem nota antes da ranqueada
-    assert "1º" in html and "de 1" in html and ">93<" in html and "sem nota do App" in html
-    assert "60% qualidade" in html and "equipe=SP+Norte+01" in html and "modo=geral" in html
-
-
-def test_o_responsavel_logado_ve_o_ranking_das_equipes_dele(tela, cliente):
-    html = _responsavel(cliente).get("/t/campo/responsaveis?modo=ranking").get_data(as_text=True)
-    assert ">Ranking das equipes</a>" in html and ">Por responsável</a>" not in html
-    assert "SC Oeste 01" in html and "SP Norte 01" not in html                # Beltrano é o responsável da Coração 1
-    html = cliente.get("/t/campo/responsaveis?modo=cartoes").get_data(as_text=True)
-    assert 'class="pn"' in html and 'class="cn-equipes"' not in html         # nunca os cartões dos outros: o Painel dele
-
-
 def test_o_filtro_de_equipe_na_visao_geral(tela, logado):
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&equipe=SP+Norte+01").get_data(as_text=True)
     assert "Altair" in html and "Brodowski 1" in html and "Coração 1" not in html
@@ -817,46 +800,12 @@ def test_o_filtro_de_equipe_na_visao_geral(tela, logado):
     assert "Altair" not in html                                               # o nome exato, nunca um pedaço
 
 
-def test_sem_as_notas_do_app_o_ranking_avisa(tela, logado, monkeypatch):
-    monkeypatch.setattr(R, "ranking_fonte", lambda *a, **k: (_ for _ in ()).throw(ConnectionError("fato fora")))
-    visao.limpar()
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
-    assert "Não consegui ler as notas do App" in html and 'class="cn-equipes cr-rk"' not in html
-    assert 'class="cr-gr"' in logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
-
-
 def test_o_filtro_de_equipe_nao_fica_escondido(tela, logado):
     # achado 2 da revisão do ranking: o "Todos os responsáveis ×" levava aos cartões com o `equipe=` escondido, e os
     # números saíam recortados sem aviso. Na Visão geral o × fica na Visão geral, e a equipe segue à vista, com o × dela
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe&modo=geral&equipe=SP+Norte+01").get_data(as_text=True)
     todos = re.search(r'href="([^"]*)" title="As usinas de todos os responsáveis"', html).group(1)
     assert "modo=geral" in todos and "Equipe SP Norte 01" in html
-
-
-def test_a_regua_do_ranking_diz_o_desempate_e_a_legenda_do_semaforo(tela, logado):
-    # achados 4 e 6 da revisão: com 41 de 52 equipes empatadas, a posição saía do desempate sem a tela dizer; e os três
-    # números do semáforo só se distinguiam pela cor (a regra da casa: severidade por cor E palavra)
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
-    assert "No empate, vence a maior qualidade, depois a maior cobertura, mais notas e o nome" in html
-    assert 'class="cr-rk-leg"' in html and ">focar</b>" in html and ">acompanhar</b>" in html and ">em dia</b>" in html
-
-
-def test_equipe_com_ronda_sem_nota_nao_e_chamada_de_sem_ronda(tela, logado, monkeypatch):
-    # achado 5 da revisão: "nenhuma OS nem ronda pelo App" saía também quando havia ronda do App sem nota
-    vazio = {"q_soma": 0, "q_n": 0, "n_os": 0, "n_ronda": 0, "rondada": False}
-    por = {1: {"atual": dict(vazio), "anterior": dict(vazio)}, 2: {"atual": dict(vazio), "anterior": dict(vazio)},
-           3: {"atual": dict(vazio, n_ronda=1, rondada=True), "anterior": dict(vazio)}}
-    monkeypatch.setattr(R, "ranking_fonte", lambda *a, **k: (por, {}))
-    visao.limpar()
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
-    assert "sem nota do App: 1 ronda no mês, nenhuma com nota" in html
-    assert "sem nota do App: nenhuma OS nem ronda pelo App no mês" in html      # a SP Norte 01, sem nada
-
-
-def test_o_filtro_de_cliente_escolhe_as_equipes(tela, logado):
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking&cliente=Thopen").get_data(as_text=True)
-    grade = html[html.index('class="cn-equipes cr-rk"'):]
-    assert "SP Norte 01" in grade and "SC Oeste 01" not in grade              # a Coração 1 é de outro cliente
 
 
 def _comp(faltas=None) -> str:
@@ -898,25 +847,6 @@ def _grade(html):
     return html[html.index('class="cn-equipes cr-rk"'):]
 
 
-def test_filtrado_a_posicao_fica_a_do_ranking_inteiro(duas_equipes, logado):
-    # Levi, 18/10/2026: "O ranking das equipes tem que permancer mesmo filtrados, o que está acontecendo agora é que se
-    # eu filtro [um responsável] vai contar de 1 a 11, tem que contar de acordo com o ranking"
-    grade = _grade(logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True))
-    assert grade.index("SC Oeste 01") < grade.index("SP Norte 01")          # da última para a 1ª
-    assert '2º<small> de 2</small>' in grade and '1º<small> de 2</small>' in grade
-    for filtro in ("responsavel=Beltrano+Supervisor", "responsavel=*&cliente=Outro+Cliente", "responsavel=*&q=cora"):
-        html = logado.get(f"/t/campo/responsaveis?{filtro}&modo=ranking").get_data(as_text=True)
-        grade = _grade(html)
-        assert "SC Oeste 01" in grade and "SP Norte 01" not in grade, filtro
-        assert '2º<small> de 2</small>' in grade and "1º" not in grade, filtro
-        assert ">73<" in grade, filtro
-
-
-def test_o_responsavel_logado_ve_a_posicao_do_ranking_inteiro(duas_equipes, cliente):
-    grade = _grade(_responsavel(cliente).get("/t/campo/responsaveis?modo=ranking").get_data(as_text=True))
-    assert "SC Oeste 01" in grade and "SP Norte 01" not in grade and '2º<small> de 2</small>' in grade
-
-
 def _com_nome(api, pid, nome):
     """O técnico `pid` com o nome na ficha (cifrado, como no banco); só a aba de pessoas é trocada."""
     import json
@@ -930,66 +860,6 @@ def _com_nome(api, pid, nome):
     cab = list(linhas[0])
     api._id("cadastro_nexus", "pessoas")["linhas"] = [{"headers": cab, "values": [x.get(c) for c in cab]} for x in linhas]
     visao.limpar()
-
-
-def test_o_cartao_abre_o_que_cobrar_com_a_prova(duas_equipes, logado):
-    # Levi, 18/10/2026: "Clicando na equipe deve dar um breve resumo do motivo da pontuação da equipe estar abaixo para
-    # que o supervisor possa cobrar a equipe"; depois, "quero ao clicar na equipe um detalhamento melhor [do Em quê
-    # cobrar], não cheio de informações mas quero a informação, ao resumido e direto onde o supervisor bata o olho e
-    # possa cobrar o técnico com dados!" (no quiz: "Item a item com a prova") e, nas OS mais baixas, "Faltou os pontos"
-    _com_nome(duas_equipes, 4, "Operador Lima")
-    html = logado.get("/t/campo/responsaveis?responsavel=Beltrano+Supervisor&modo=ranking").get_data(as_text=True)
-    painel = re.search(r'data-cr-painel="([^"]*/responsaveis/equipe\?[^"]*)"', _grade(html)).group(1)
-    assert "equipe=SC+Oeste+01" in painel and "responsavel=Beltrano+Supervisor" in painel
-    jan = logado.get(painel.replace("&amp;", "&")).get_data(as_text=True)
-    assert "SC Oeste 01" in jan and "2º de 2" in jan and ">73<" in jan and "Técnicos: Operador Lima" in jan
-    # o "Em quê cobrar": as áreas da etiqueta do cartão, com a prova (o extintor, a OS do chamado) e a usina
-    cobrar = jan[jan.index('class="cr-rk-j-itens"'):jan.index("Nota do App")]
-    assert "Acompanhar" in jan and ">Extintores</b>" in cobrar and ">Chamados</b>" in cobrar
-    assert "Extintor EXT01 · Coração 1 · " in cobrar
-    # a OS citada é o botão verde que abre o card dela (Levi, 19/10/2026: "ao citar uma OS tem que ficar verde grid e
-    # deve ser possível clicar e ver o card da OS que nem quando clicamos em uma OS no OS Creator Web")
-    assert re.search(r'<button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="16050"[^>]*>'
-                     r'OS 16050</button> · Coração 1 · ', cobrar)
-    # a nota: perde 27, todos na qualidade (55; cobertura 100%): a ronda tira 15 (0,6 × 50 ÷ 2), as fotos e o GPS da
-    # tarefa, 6 cada (0,6 × 20 ÷ 2)
-    nota = jan[jan.index("Nota do App"):]
-    # (29/10/2026, "-1 oq?"): o ponto é da nota da equipe, com onde aconteceu, quanto vale e o que fazer
-    assert "perdeu 27 pontos de 100 no mês" in nota and "não é OS anulada" in nota
-    assert re.findall(r'<li><b class="cr-rk-j-menos">−(\d+) pontos?</b><div><b>([^<]+)</b>', nota) == [
-        ("15", "Rondas"), ("6", "Fotos"), ("6", "GPS no fechamento")]
-    assert "vale 20 de 100 em cada tarefa · o que fazer: tirar ao menos 3 fotos na tarefa" in nota
-    # as OS com nota mais baixa: a nota, a OS, a usina, quem fez, o dia e os pontos que perdeu
-    os_ = nota[nota.index("OS com nota mais baixa"):]
-    assert os_.index(">50<") < os_.index(">60<")
-    assert "Fotos 0/20 · GPS no fechamento 0/20" in os_ and "checklist incompleto; item sem foto de evidência" in os_
-    assert re.search(r'data-wid="8001" data-folio="801"[^>]*>OS 801</button> · Coração 1 · Técnico Silva', os_)
-    assert re.search(r'Ronda · <button[^>]*data-folio="501"[^>]*>OS 501</button> · Coração 1 · Fulano Souza', os_)
-    visao_geral = re.search(r'href="([^"]*modo=geral[^"]*)"', jan).group(1)
-    assert "equipe=SC+Oeste+01" in visao_geral and "responsavel=Beltrano+Supervisor" in visao_geral
-
-
-def test_o_que_cobrar_traz_a_pt_e_quem_pediu(duas_equipes, logado):
-    jan = logado.get("/t/campo/responsaveis/equipe?equipe=SP+Norte+01").get_data(as_text=True)
-    focar = jan[jan.index(">Focar "):jan.index("Nota do App")]
-    # o Focar em tabela (28/10/2026): a área na coluna, a usina na linha e, na célula, a prova sem o nome dela
-    assert '<th scope="col">PT parada</th>' in focar and '<th scope="row">Altair</th>' in focar
-    assert "PT-1 · pedida por Técnico Silva há 1 d 6 h" in focar
-
-
-def test_o_motivo_da_equipe_sem_nota_diz_o_que_falta(tela, logado):
-    jan = logado.get("/t/campo/responsaveis/equipe?equipe=SC+Oeste+01").get_data(as_text=True)
-    assert "Sem nota do App" in jan and "Coração 1" in jan                    # a usina sem ronda em 30 dias
-    assert logado.get("/t/campo/responsaveis/equipe?equipe=Nao+Existe").status_code == 404
-    assert logado.get("/t/campo/responsaveis/equipe").status_code == 404
-
-
-def test_sem_as_notas_do_app_o_motivo_avisa(tela, logado, monkeypatch):
-    monkeypatch.setattr(R, "ranking_fonte", lambda *a, **k: (_ for _ in ()).throw(ConnectionError("fato fora")))
-    visao.limpar()
-    jan = logado.get("/t/campo/responsaveis/equipe?equipe=SP+Norte+01").get_data(as_text=True)
-    assert "Não consegui ler as notas do App" in jan and "perde " not in jan
-    assert '<th scope="col">PT parada</th>' in jan          # o "Em quê cobrar" não depende das notas do App
 
 
 # ── A Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas", com os KPIs dos três blocos que
@@ -1060,28 +930,10 @@ def test_o_cabecalho_e_as_colunas_ficam_no_centro():
     assert re.search(r'\.cr-g > \[class\*="cr-col-"\]\{[^}]*justify-self:center', css)
 
 
-def test_o_ranking_diz_o_periodo_e_de_onde_vieram_as_notas(tela, logado):
-    # pendência da revisão (achado 8): a aba não dizia as datas dos dois períodos nem que as notas saíram na hora
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
-    # o mês vigente e o mesmo trecho do mês anterior (28/10/2026: "Ranking das Equipes - Outubro, sempre o mês vigente")
-    fim_passado = HOJE.replace(day=1) - timedelta(days=1)
-    atual = f"de 01/{HOJE:%m} a {HOJE:%d/%m}"
-    anterior = f"de 01/{fim_passado:%m} a {fim_passado.replace(day=min(HOJE.day, fim_passado.day)):%d/%m}"
-    assert f"Período: {atual} (o anterior: {anterior})" in html
-    assert "fato_fechamento calculado na hora" in html          # o banco falso não tem o fato: a conta é feita na hora
-
-
 def test_a_faixa_da_visao_geral_diz_que_a_equipe_e_filtro(tela, logado):
     # pendência da revisão (achado 10): com a equipe escolhida, a faixa não dizia "com os filtros"
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral&equipe=SP+Norte+01").get_data(as_text=True)
     assert "mobilizadas, com os filtros" in html
-
-
-def test_a_dica_da_base_pequena_usa_a_constante(tela, logado, monkeypatch):
-    # pendência da revisão (achado 11): o 3 estava escrito na dica; a régua é `visao.BASE_PEQUENA`, a do Painel das Rondas
-    monkeypatch.setattr(visao, "BASE_PEQUENA", 4)
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=ranking").get_data(as_text=True)
-    assert 'title="Menos de 4 usinas' in html
 
 
 def _linha_geral(html, usina):
@@ -1477,16 +1329,6 @@ def test_o_cliente_e_o_das_usinas_do_responsavel(tela, logado):
     assert clientes(logado.get(url + "*").get_data(as_text=True)) == ["", "Outro Cliente", "Thopen"]
     html = logado.get(url + "Beltrano+Supervisor&cliente=Thopen").get_data(as_text=True)
     assert "<b>Coração 1" in html and '<option value="Thopen" selected>' not in html
-
-
-def test_focar_e_acompanhar_encolhem(duas_equipes, logado):
-    # Levi, 19/10/2026: "deve ser possível encolher Focar e acompanhar, eles aparecem expandidos que nem estão agora"
-    jan = logado.get("/t/campo/responsaveis/equipe?equipe=SP+Norte+01").get_data(as_text=True)
-    assert re.search(r'<details class="cr-rk-j-bloco cr-rk-j-dobra" open>\s*<summary class="cr-rk-j-nivel '
-                     r'cn-t-critico">Focar', jan)
-    jan = logado.get("/t/campo/responsaveis/equipe?equipe=SC+Oeste+01").get_data(as_text=True)
-    assert re.search(r'<details class="cr-rk-j-bloco cr-rk-j-dobra" open>\s*<summary class="cr-rk-j-nivel '
-                     r'cn-t-alerta">Acompanhar', jan)
 
 
 def test_o_card_da_os_abre_por_cima_da_janela_e_ela_volta(tela, logado, tmp_path):

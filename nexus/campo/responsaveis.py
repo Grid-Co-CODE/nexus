@@ -407,80 +407,6 @@ def limpeza() -> tuple[dict, dict]:
     return por, {"com_leitura": len(por)}
 
 
-# ── O Ranking das equipes (18/10/2026): a régua do ranking por região do App, por usina, nos dois períodos ──────────
-def ranking_fonte(b, hoje) -> tuple[dict, dict]:
-    """{usina_id: {"atual", "anterior"}} com as notas do App (as tarefas fechadas e as rondas) e a ronda de cada usina
-    mobilizada (`ranking_equipes.agregar`). O agrupamento por equipe sai no pedido, porque os filtros são de quem olha.
-    As duas leituras já estão na cópia do ciclo quando a Visão é feita (medido no banco real em 18/10/2026: as rondas em
-    0,03 s e o fato de fechamento em 0,00 s depois da conta da Visão, que lê os dois para a Central)."""
-    from . import ranking_equipes
-    fech = visao._fato("fechamento", b)
-    per = ranking_equipes.periodos(hoje)
-    desde = {uid: str(u.get("data_mobilizacao") or "")[:10] for uid, u in b.mobilizadas.items()}
-    return (ranking_equipes.agregar(fech["linhas"], visao._rondas_ligadas(b), b.mobilizadas, hoje, desde),
-            {"de": fech["de"], "aviso": fech["aviso"],
-             **{p: (ini.isoformat(), fim.isoformat()) for p, (ini, fim) in per.items()}})
-
-
-def tecnicos_da_equipe(usina_ids) -> list[str]:
-    """Os nomes dos técnicos da equipe dessas usinas, pelo cadastro de pessoas (a regra de `visao._tecnicos_por_equipe`:
-    colaborador de campo da equipe que não está Desligado), para o topo da janela da equipe: quem o supervisor cobra."""
-    b = visao._Base()
-    eids = {visao.D._id((b.por_id.get(uid) or {}).get("equipe_id")) for uid in usina_ids} - {None, 0}
-    nomes = visao._tecnicos_por_equipe(b) if eids else {}
-    return sorted({n for e in eids for n in nomes.get(e, [])})
-
-
-def _itens_da_nota(v) -> list[dict]:
-    """A "Composição da nota" que o App grava em cada tarefa (JSON: rótulo, peso, pontos e o detalhe de cada critério);
-    texto que não é a lista esperada vira lista vazia (a tarefa fica em "sem a composição da nota")."""
-    import json
-    try:
-        itens = json.loads(v) if isinstance(v, str) else v
-    except ValueError:
-        return []
-    if not isinstance(itens, list):
-        return []
-    return [{"rot": str(i.get("rot") or ""), "peso": i.get("peso"), "pts": i.get("pts"), "det": str(i.get("det") or "")}
-            for i in itens if isinstance(i, dict) and i.get("rot")]
-
-
-def ranking_detalhe(usina_ids: set, hoje) -> dict:
-    """As notas do App do período atual nas usinas de UMA equipe, cada uma com o porquê, para a janela do motivo da nota
-    (`ranking_equipes.motivos`). São as MESMAS linhas da conta do ranking (`ranking_fonte` -> `agregar`): a tarefa
-    fechada pelo App com nota (`fato_fechamento`) e a ronda do App com nota (`fato_ronda`; a avulsa não tem nota). O
-    porquê vem do livro cru, pela chave do fato: a "Composição da nota" da tarefa (`fechamento_id`) e as "Falhas" da ronda
-    (`_rondas_ligadas`). O nome é o "Nome padrão" da ficha pelo `pessoa_id`; sem ele, o do cadastro do App pelo código."""
-    from . import ranking_equipes
-    D = visao.D
-    b = visao._Base()
-    ini, fim = ranking_equipes.periodos(hoje)["atual"]
-    linhas = []
-    for x in visao._fato("fechamento", b)["linhas"]:
-        uid, nota = D._id(x.get("usina_id")), D._int(x.get("nota_pts"))
-        dia = ranking_equipes._dia_do_id(x.get("data_id"))
-        if uid in usina_ids and nota is not None and dia and ini <= dia <= fim:
-            linhas.append((x, uid, nota, dia))
-    cru = {D.chave_fechamento(a): a for a in visao._livro(*visao.C.ORIGEM_FECHAMENTOS)} if linhas else {}
-    quem = visao._quem() if linhas else {}
-    nomes = b.nomes({D._id(x.get("pessoa_id")) for x, *_ in linhas})
-    tarefas = []
-    for x, uid, nota, dia in linhas:
-        a = cru.get(D._txt(x.get("fechamento_id"))) or {}
-        tarefas.append({"dia": dia.isoformat(), "usina_id": uid, "os": D._txt(x.get("os")),
-                        "wid": D._txt(x.get("id_os_fracttal")),
-                        "tarefa": D._txt(a.get("Tarefa")),
-                        "tecnico": nomes.get(D._id(x.get("pessoa_id"))) or visao._nome(quem, a.get("Técnico (HMAC)")),
-                        "nota": nota, "itens": _itens_da_nota(a.get("Composição da nota"))})
-    de, ate = ini.isoformat(), fim.isoformat()
-    rondas = [{"dia": r["data"], "usina_id": r["usina_id"], "os": r.get("os") or "", "tecnico": r.get("tecnico") or "",
-               "nota": r["nota"], "falhas": r.get("falhas") or ""}
-              for r in visao._rondas_ligadas(b)
-              if r["usina_id"] in usina_ids and not r.get("avulsa") and r.get("nota") is not None
-              and de <= (r.get("data") or "") <= ate]
-    return {"tarefas": tarefas, "rondas": rondas}
-
-
 # ── Ativos falhando (Engenharia › Confiabilidade) ───────────────────────────────────────────────────────────────
 def _engenharia() -> dict:
     """Os dados da Confiabilidade, com a cópia dela (as OS de falha do Fracttal lidas em segundo plano)."""
@@ -1605,7 +1531,8 @@ def visao_responsaveis() -> "visao.leitura.Leitura":
         lim, lim_i = _ler_fonte("limpeza", limpeza, erros)
         par, par_i = _ler_fonte("paradas", lambda: paradas_abertas(nomes, mes), erros)
         man, man_i = _ler_fonte("manut", lambda: manutencao_fonte(b, hoje, agora, listagem), erros)
-        rk, rk_i = _ler_fonte("ranking", lambda: ranking_fonte(b, hoje), erros)
+        # as notas do App do Ranking das equipes saíram da conta em 09/11/2026, junto com o Ranking (Levi: "Pode remover o
+        # ranking das equipes de 'Visão do Responsável'"): a conta de 5 min lê menos (a régua dele está no histórico do git)
         if pts.erro:
             erros["pt"] = pts.erro
         fontes = {"metas": met, "disp": dsp, "ativos": atv, "chamados": cha, "extintores": ext, "limpeza": lim,
@@ -1619,10 +1546,7 @@ def visao_responsaveis() -> "visao.leitura.Leitura":
                 responsaveis_por_pessoa[pid] = b.responsavel_da_usina(uid)
         return {"usinas": usinas, "mes_id": mes_id, "hoje": hoje.isoformat(), "erros": erros,
                 "info": {"metas": met_i, "disp": dsp_i, "ativos": atv_i, "chamados": cha_i, "extintores": ext_i,
-                         "limpeza": lim_i, "paradas": par_i, "manut": man_i, "ranking": rk_i},
-                # o Ranking das equipes (18/10/2026): as notas do App por usina e quantos técnicos cada equipe tem
-                "ranking_por_usina": rk,
-                "tecnicos_por_equipe": {nome: t.get("tecnicos", 0) for nome, t in b.times().items()},
+                         "limpeza": lim_i, "paradas": par_i, "manut": man_i},
                 "responsaveis_por_pessoa": responsaveis_por_pessoa, "sem_mobilizacao": b.sem_mobilizacao,
                 # o nome do site no Fracttal (o link das OS não iniciadas) vem na conta, e não no pedido: o de-para do
                 # cadastro relido a cada 2 min fazia o filtro esperar o banco (19/10/2026)

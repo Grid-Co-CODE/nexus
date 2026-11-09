@@ -2,13 +2,12 @@
 Concluir e o PDF do OS Creator), o relatório em PDF, e a janela da equipe (o ativo limpo, o "e mais" que abre em linhas,
 a pontuação do mês com o placar do ciclo e o "−1" explicado). Nomes de pessoas fictícios (o repositório é público)."""
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from test_campo_responsaveis import _responsavel, banco, tela  # noqa: F401  (fixtures)
 
 from nexus.campo import aprovacao, painel_relatorio, regras_app
-from nexus.campo import ranking_equipes as RK
 from nexus.campo import verificacao as V
 
 AGORA = datetime(2026, 10, 29, 18, 0, tzinfo=timezone.utc)
@@ -166,7 +165,7 @@ def test_os_temas_escolhidos_tiram_do_resumo_e_das_frases():
     pdf = painel_relatorio.gerar(p, faixa, verif, filtros=[], gerado_em="x", temas=temas)
     assert pdf[:5] == b"%PDF-"
     # um tema só: o resumo com uma caixa (a linha do resumo é completada, a tabela é retangular)
-    assert painel_relatorio.gerar(p, [], None, filtros=[], gerado_em="x", temas=("ranking",))[:5] == b"%PDF-"
+    assert painel_relatorio.gerar(p, [], None, filtros=[], gerado_em="x", temas=("pendencias",))[:5] == b"%PDF-"
 
 
 def _painel_falso():
@@ -185,9 +184,11 @@ def _painel_falso():
                 {"usina": "Brodowski 1", "situacao": "em_dia", "dias": 2, "ultima": "27/10", "tecnico": ""}]},
             "extintores": {"usinas": 1, "vencidos": 2, "a_vencer": 1, "linhas": [
                 {"usina": "Altair", "vencidos": 2, "a_vencer": 1, "pior": "recarga venceu", "pior_ext": "EXT1"}]},
-            "ranking": {"mes": "Outubro", "n_equipes": 1, "total": 9, "equipes": [
-                {"equipe": "SP Norte 01", "posicao": 4, "nota": 80, "qualidade": 75, "cobertura": 90, "n_os": 10,
-                 "n_ronda": 3}]}}
+            # as Pendências de OS no lugar do Ranking das equipes (09/11/2026)
+            "pendencias": {"os": 1, "atrasadas": 1, "pausadas": 0, "grupos": [
+                {"usina_id": 1, "usina": "Altair", "pior": 40, "itens": [
+                    {"os": 702, "wid": None, "situacao": "Atrasada", "dias": 40,
+                     "motivo": "programada há 40 dias e não feita"}]}]}}
 
 
 def test_o_resumo_e_o_que_cobrar_primeiro_do_pdf():
@@ -201,61 +202,12 @@ def test_o_resumo_e_o_que_cobrar_primeiro_do_pdf():
     assert "1 parada agora" in fr[0] and "Altair (Inversor 1, desde 28/10 10:00)" in fr[0]
     assert "1 PT parada" in fr[1] and "abaixo de 90% da meta" in fr[2] and "sem nenhuma ronda" in fr[3]
     assert any("2 OSs em verificação" in f and "OS 9006" in f for f in fr)
+    assert any("1 OS pendente" in f and "OS 702 (Altair, atrasada: programada há 40 dias" in f for f in fr)
+    assert nums["OS pendentes"] == 1 and "Equipes (Outubro)" not in nums
     pdf = painel_relatorio.gerar(p, faixa, verif, filtros=["cliente Thopen"], gerado_em="29/10/2026 18:00")
     assert pdf[:5] == b"%PDF-" and len(pdf) > 3000
     # sem a fila lida, o número das OSs fica em branco, sem quebrar
     assert painel_relatorio.gerar(p, [], None, filtros=[], gerado_em="x")[:5] == b"%PDF-"
-
-
-def test_o_placar_da_equipe_casa_pelo_nome():
-    rk = {"meses": [{"mes": "2026-10", "calculado_em": "2026-10-29T18:25:00Z", "regua": {"piso": 70},
-                     "classificacao": [{"tecnico": "Ciclano Araújo", "posicao": 2, "total": 900},
-                                       {"tecnico": "Outro Técnico", "posicao": 1, "total": 1000}],
-                     "fora": [{"tecnico": "Fulana  Prado", "posicao": None, "total": 10}]}]}
-    p = RK.placar_da_equipe(["Ciclano Araujo", "Fulana Prado", "Sem Placar"], rk, date(2026, 10, 29))
-    assert [(x["tecnico"], x["fora"]) for x in p["linhas"]] == [("Ciclano Araújo", False), ("Fulana  Prado", True)]
-    assert p["sem_placar"] == ["Sem Placar"] and p["total"] == 2 and p["regua"] == {"piso": 70}
-    assert RK.placar_da_equipe(["X"], rk, date(2026, 11, 2))["linhas"] == []           # o mês sem placar ainda
-
-
-def test_o_ativo_limpo_nas_provas_da_equipe():
-    us = [{"usina": "Altair", "chamados": {"lista": [
-               {"situacao": "aberto", "dias": 59, "os": 1715, "equip": "Inversor 2.1 Fabricante SUN2000-215KTL-H3",
-                "ativo": "Inversor 2.1", "fabricante": "Fabricante"},
-               {"situacao": "aberto", "dias": 205, "os": 1731, "equip": "Estrutura Trackers BR 226/304, S/N, Zona Rural",
-                "fabricante": "STI"}]},
-           "ativos": {"lista": [{"nome": "Inversor 2.4 Fabricante SUN2000-215KTL-H3", "cod": "X-INV2.4",
-                                 "nivel": "critico", "falhas": 5, "porque": "5 falhas em 30 dias"}]}}]
-    _, ps, _ = RK._provas("chamados", us)
-    assert [p["txt"] for _o, p in sorted(ps, key=lambda x: x[0])] == ["Altair · Estrutura de Trackers · há 205 d",
-                                                                       "Altair · Inversor 2.1 · há 59 d"]
-    _, ps, _ = RK._provas("ativos", us)
-    assert ps[0][1]["txt"] == "Inversor 2.4 · Altair · 5 falhas em 30 dias"
-
-
-def test_as_partes_da_nota_dizem_quanto_vale_e_o_que_fazer():
-    n = {"nota": 97, "qualidade": 95, "cobertura": 100, "n_notas": 2}
-    item = lambda rot, peso, pts: {"rot": rot, "peso": peso, "pts": pts}       # noqa: E731
-    det = {"tarefas": [{"nota": 90, "itens": [item("Fotos com descrição", 10, 0), item("Fotos", 20, 20)]},
-                       {"nota": 100, "itens": [item("Fotos com descrição", 10, 10), item("Fotos", 20, 20)]}],
-           "rondas": []}
-    m = RK.motivos(n, det, [{"usina_id": 1, "usina": "Altair"}], {1: {"atual": {"rondada": True}}})
-    p = m["qualidade"]["partes"][0]
-    assert (p["rot"], p["perde"], p["det"], p["peso"]) == ("Fotos com descrição", 3, "em 1 de 2 tarefas", "10")
-    assert p["como"] == "escrever a descrição de cada foto"
-
-
-def test_a_janela_da_equipe_traz_a_pontuacao_e_o_mais_que_abre(tela, logado):
-    from pathlib import Path
-    jan = logado.get("/t/campo/responsaveis/equipe?equipe=SP+Norte+01").get_data(as_text=True)
-    assert "Pontuação do mês" in jan and jan.index("Pontuação do mês") < jan.index(">Focar ")
-    assert re.search(r'class="cr-rk-j-formula"><b class="cn-t-\w+">\d+</b> = 60% da qualidade <b>\d+</b> \+ 40% da '
-                     r'cobertura <b>\d+%</b>', jan)
-    # o "e mais" com a lista dentro (o <details> não arruma os filhos em grade no Chrome)
-    tpl = Path(__file__).resolve().parents[1].joinpath("nexus", "torres", "campo", "templates", "campo",
-                                                       "_resp_equipe.html").read_text(encoding="utf-8")
-    assert ('<details class="cr-rk-j-mais"><summary>e mais {{ resto|length }}</summary><div class="cr-rk-j-mais-lista">'
-            in tpl)
 
 
 def test_o_css_do_mais_e_das_perdas():

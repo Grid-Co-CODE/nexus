@@ -4,7 +4,7 @@ como [título] e mostrará: Usinas abaixo da performance, chamados abertos, PTs 
 para menor, acompanhamento de rondas! (...) uma tela inicial claro, se for para se aprofundar aí é outro nível".
 
 Nenhum número novo e nenhuma régua nova: cada quadro reorganiza o que a Visão do responsável já calcula por usina
-(`responsaveis.montar`, a conta guardada de 5 min) e o Ranking das equipes (`ranking_equipes.cartoes`). **Nada fica de
+(`responsaveis.montar`, a conta guardada de 5 min). **Nada fica de
 fora** (Levi, no mesmo dia, ao ver a 1ª versão com 5 linhas e "e mais N": "poderia ter um scroll para o que não cabe no
 card (...) Tem que ter todas as usinas e equipes daquele supervisor, não podemos deixar nada de fora"): cada quadro traz
 a lista inteira, a que mais pede em cima, e a tela rola dentro do quadro. A Performance e as Rondas trazem TODAS as usinas
@@ -13,6 +13,9 @@ O detalhe é o outro nível: a Visão geral com o filtro do quadro e as janelas 
 A 2ª rodada (28/10/2026, Levi ao ver no ar): os chamados por usina, com o ativo sem a marca e o status do chamado, e o
 clique abre a tela do chamado de Garantias por cima; o número das Rondas é o das usinas sem ronda há 7 dias ou mais; o
 texto das PT enxuto; o Ranking do mês vigente; e o 6º quadro, as usinas com extintor vencido.
+Em 09/11/2026 (Levi, pelo Scrum master) o Ranking das equipes saiu ("Pode remover o ranking das equipes de 'Visão do
+Responsável'") e as Pendências de OS entraram no lugar dele ("Em Visão do responsável > Painel deve ter um acompanhamento
+de pendências de OSs com OSs e motivos!").
 """
 import collections
 
@@ -105,24 +108,39 @@ def pts(usinas: list[dict]) -> dict:
             "agora": sum(1 for p in itens if p.get("parada") and p.get("hoje")), "linhas": itens}
 
 
-def ranking(rk: dict | None, hoje=None) -> dict:
-    """Todas as equipes das usinas da tela, pela posição do ranking de TODAS as equipes (`ranking_equipes.classificar`:
-    a maior nota do App primeiro, com o desempate dele; Levi: "do maior para menor"). Sem nota no fim. As usinas sem equipe no cadastro
-    vêm por último, como no Ranking (o conserto é no cadastro), para nenhuma usina ficar de fora. O título leva o mês do
-    período ("Ranking das Equipes - Outubro, sempre o mês vigente", 28/10/2026)."""
-    from . import ranking_equipes
+def pendencias_os(usinas: list[dict], hoje=None) -> dict:
+    """As OS pendentes das usinas da tela, cada uma com o número e o motivo (Levi, 09/11/2026: "um acompanhamento de
+    pendências de OSs com OSs e motivos!"). Nenhuma régua nova: são as listas INTEIRAS do bloco Manutenção da Visão
+    (`manutencao.por_usina`: `todas_atrasadas` e `todas_paradas`; a linha da Visão geral mostra só as 5 primeiras, e o
+    Painel não deixa nada de fora). A atrasada é a tarefa programada há mais de 10 dias e não feita (a régua do PCM); a
+    pausada é a tarefa tirada da programação por um motivo do PCM ou justificada pelo técnico no App, com o motivo, desde
+    quando e quem. Por usina, a da pendência mais antiga primeiro; dentro dela, a atrasada mais antiga e depois a pausada
+    mais antiga. O número do quadro é o das OS (uma OS com duas tarefas pendentes conta uma vez)."""
     hoje = hoje or visao._agora().date()
-    cartoes = list((rk or {}).get("cartoes") or ())
-    # pela POSIÇÃO do ranking (Levi, 28/10/2026: "O ranking também tem que ordenar por posição aqui o 4° lugar está
-    # acima do 2°, não faz sentido!"): a nota da tela é arredondada, e no empate de 98 a 98 quem decide é o desempate do
-    # ranking (qualidade, cobertura, volume), não o nome da equipe
-    eq = sorted((c for c in cartoes if not c.get("sem_equipe")),
-                key=lambda c: (c.get("posicao") is None, c.get("posicao") or 0, -(c.get("nota") or 0), c["equipe"]))
-    # o número do quadro é a quantidade de equipes das usinas da tela (Levi, 28/10/2026: "Em ranking das equipes quero
-    # a quantidade de equipes"); as usinas sem equipe no cadastro não são uma equipe
-    return {"equipes": eq + [c for c in cartoes if c.get("sem_equipe")], "n_equipes": len(eq),
-            "total": (rk or {}).get("total") or 0,
-            "mes": ranking_equipes.mes(hoje), "desde": ranking_equipes.periodos(hoje)["atual"][0]}
+    grupos, todas, n_atr, n_par = [], set(), 0, 0
+    for u in usinas:
+        m = u.get("manutencao") or {}
+        itens = []
+        for x in m.get("todas_atrasadas") or ():
+            tipo = str(x.get("tipo") or "").replace("_", " ")
+            itens.append({"os": x["os"], "wid": x.get("wid"), "situacao": "Atrasada", "dias": x.get("dias"),
+                          "motivo": f"programada há {x.get('dias')} dias e não feita" + (f" · {tipo}" if tipo else "")})
+        for x in m.get("todas_paradas") or ():
+            desde = x.get("desde")
+            motivo = str(x.get("motivo") or "").strip() or "pausada sem motivo escrito"
+            itens.append({"os": x["os"], "wid": x.get("wid"), "situacao": "Pausada",
+                          "dias": (hoje - desde).days if desde else None,
+                          "motivo": motivo + (f" · por {x['quem']}" if x.get("quem") else "")})
+        if not itens:
+            continue
+        n_atr += sum(1 for i in itens if i["situacao"] == "Atrasada")
+        n_par += sum(1 for i in itens if i["situacao"] == "Pausada")
+        todas |= {(u["usina_id"], i["os"]) for i in itens}
+        itens.sort(key=lambda i: (i["situacao"] != "Atrasada", -(i["dias"] if i["dias"] is not None else -1)))
+        grupos.append({"usina_id": u["usina_id"], "usina": u["usina"], "itens": itens,
+                       "pior": max((i["dias"] for i in itens if i["dias"] is not None), default=-1)})
+    grupos.sort(key=lambda g: (-g["pior"], g["usina"]))
+    return {"os": len(todas), "atrasadas": n_atr, "pausadas": n_par, "grupos": grupos}
 
 
 def _situacao_da_ronda(u: dict) -> str:
@@ -171,11 +189,11 @@ def extintores(usinas: list[dict]) -> dict:
             "a_vencer": sum((u.get("extintores") or {}).get("a_vencer") or 0 for u in com), "linhas": linhas}
 
 
-def montar(nome: str, usinas: list[dict], rk: dict | None, hoje=None) -> dict:
+def montar(nome: str, usinas: list[dict], hoje=None) -> dict:
     """O painel de um responsável (ou de todos, sem escolha): o cabeçalho, o número das PT (à esquerda da faixa "Parada
-    agora", desde 29/10/2026) e os cinco quadros."""
+    agora", desde 29/10/2026) e os cinco quadros (as Pendências de OS no lugar do Ranking desde 09/11/2026)."""
     clientes = sorted({u.get("cliente") for u in usinas if u.get("cliente")})
     equipes = sorted({u.get("equipe") for u in usinas if u.get("equipe") and u.get("equipe") != visao.SEM_EQUIPE})
     return {"nome": nome, "usinas": len(usinas), "clientes": clientes, "equipes": equipes,
             "perf": performance(usinas), "chamados": chamados(usinas), "pts": pts(usinas),
-            "ranking": ranking(rk, hoje), "rondas": rondas(usinas), "extintores": extintores(usinas)}
+            "pendencias": pendencias_os(usinas, hoje), "rondas": rondas(usinas), "extintores": extintores(usinas)}

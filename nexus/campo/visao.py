@@ -46,11 +46,10 @@ from . import apr_dia, leitura, livros_app
 _BRT = timezone(timedelta(hours=-3))
 STATUS_OPERACAO = "OPERAÇÃO"
 DIAS_SEM_RONDA_ALERTA = 7        # usina mobilizada sem ronda há 7 dias ou mais = ronda pendente
-DIAS_COBERTURA = 14              # janela da cobertura de ronda da Central e da Visão (o Ranking das equipes usa o mês
-                                 # vigente desde 28/10/2026: `ranking_equipes.periodos`)
+DIAS_COBERTURA = 14              # janela da cobertura de ronda da Central e da Visão
 PT_PARADA_MIN = DOM.PT_PARADA_MIN  # PT esperando o De acordo há mais de 2 h = parada (o mesmo limite do fato_pt)
-# os pesos do ranking por região do painel do App (`_ranking_regioes`): o Índice das rondas do Painel (só as rondas) e o
-# Ranking das equipes da Visão do responsável (as rondas e as tarefas fechadas pelo App, `ranking_equipes`)
+# os pesos do ranking por região do painel do App (`_ranking_regioes`): o Índice das rondas do Painel (só as rondas). O
+# Ranking das equipes da Visão do responsável também os usava e saiu em 09/11/2026
 PESO_QUALIDADE, PESO_COBERTURA = 0.6, 0.4
 _DATA_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}")
 # Região do Brasil pela UF do cadastro (Levi, 05/10: "Adicione uma coluna de região do Brasil"). Pela UF, e não pela

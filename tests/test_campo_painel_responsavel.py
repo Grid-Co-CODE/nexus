@@ -103,34 +103,39 @@ def test_extintores_so_as_usinas_com_vencido_a_com_mais_primeiro():
     assert e["linhas"][1]["pior"] == "recarga venceu em 12/10" and e["linhas"][1]["pior_ext"] == "EXT-02"
 
 
-def test_ranking_todas_as_equipes_pela_posicao_e_o_mes():
-    rk = {"total": 12, "cartoes": [
-        {"equipe": "B", "nota": 70, "posicao": 11, "sem_equipe": False},
-        {"equipe": "Sem equipe", "nota": None, "posicao": None, "sem_equipe": True},
-        {"equipe": "A", "nota": 93, "posicao": 1, "sem_equipe": False},
-        {"equipe": "C", "nota": None, "posicao": None, "sem_equipe": False},
-        *({"equipe": f"E{i}", "nota": 50 + i, "posicao": 12 - i if i else 12, "sem_equipe": False} for i in range(9))]}
-    r = P.ranking(rk, date(2026, 10, 28))
-    nomes = [c["equipe"] for c in r["equipes"]]
-    assert nomes[:2] == ["A", "E8"] and nomes[-2:] == ["C", "Sem equipe"] and len(nomes) == 13    # nada fica de fora
-    # "Ranking das Equipes - Outubro, sempre o mês vigente"; o número do quadro, as equipes (29/10/2026: "quero a
-    # quantidade de equipes"), sem contar as usinas sem equipe
-    assert (r["total"], r["mes"], r["desde"], r["n_equipes"]) == (12, "Outubro", date(2026, 10, 1), 12)
-
-
-def test_ranking_no_empate_da_nota_vale_a_posicao():
-    """Levi, 28/10/2026: "O ranking também tem que ordenar por posição aqui o 4° lugar está acima do 2°, não faz
-    sentido!" (CE Leste 01 e MG Centro 01 com 98: o desempate do ranking pôs a MG em 2º, e o nome punha a CE em cima)."""
-    rk = {"total": 53, "cartoes": [{"equipe": "CE Leste 01", "nota": 98, "posicao": 4, "sem_equipe": False},
-                                   {"equipe": "MG Centro 01", "nota": 98, "posicao": 2, "sem_equipe": False},
-                                   {"equipe": "CE Leste 02", "nota": 97, "posicao": 5, "sem_equipe": False}]}
-    assert [c["posicao"] for c in P.ranking(rk, date(2026, 10, 28))["equipes"]] == [2, 4, 5]
+def test_pendencias_de_os_com_a_os_e_o_motivo_todas_e_a_mais_antiga_primeiro():
+    """Levi, 09/11/2026 (pelo Scrum master): "Em Visão do responsável > Painel deve ter um acompanhamento de pendências de
+    OSs com OSs e motivos!". As listas INTEIRAS do bloco Manutenção (`todas_atrasadas`, `todas_paradas`; a linha da Visão
+    geral corta em 5): a atrasada com os dias e o tipo, a pausada com o motivo do PCM, desde quando e quem."""
+    def _m(atr=(), par=()):
+        return {"todas_atrasadas": [{"os": o, "wid": 9000 + o, "dias": d, "tipo": t} for o, d, t in atr],
+                "lista_atrasadas": [], "todas_paradas": [{"os": o, "wid": None, "motivo": mo, "desde": de, "quem": q}
+                                                         for o, mo, de, q in par], "lista_paradas": []}
+    us = [dict(USINAS[0], manutencao=_m(atr=[(701, 14, "preventiva"), (702, 40, None)])),
+          dict(USINAS[1], manutencao=_m(par=[(703, "Aguardando peça", date(2026, 10, 1), "PCM"),
+                                             (704, "", None, "")])),
+          dict(USINAS[2], manutencao=_m(atr=[(705 + i, 11, "corretiva") for i in range(7)])),
+          dict(USINAS[3], manutencao={})]
+    p = P.pendencias_os(us, date(2026, 11, 9))
+    assert (p["os"], p["atrasadas"], p["pausadas"]) == (11, 9, 2)
+    # a usina da pendência mais antiga primeiro: a pausada desde 01/10 (39 d) vem antes da atrasada de 40 d? não: 40 > 39
+    assert [g["usina"] for g in p["grupos"]] == ["Altair", "Brodowski 1", USINAS[2]["usina"]]
+    alt = p["grupos"][0]["itens"]
+    assert [(x["os"], x["situacao"], x["dias"]) for x in alt] == [(702, "Atrasada", 40), (701, "Atrasada", 14)]
+    assert alt[1]["motivo"] == "programada há 14 dias e não feita · preventiva" and alt[1]["wid"] == 9701
+    bro = p["grupos"][1]["itens"]
+    assert bro[0]["motivo"] == "Aguardando peça · por PCM" and bro[0]["dias"] == 39 and bro[0]["situacao"] == "Pausada"
+    assert bro[1]["motivo"] == "pausada sem motivo escrito" and bro[1]["dias"] is None
+    assert len(p["grupos"][2]["itens"]) == 7                                       # nada fica de fora (a linha corta em 5)
+    assert P.pendencias_os([], date(2026, 11, 9)) == {"os": 0, "atrasadas": 0, "pausadas": 0, "grupos": []}
 
 
 def test_montar_e_o_cabecalho():
-    p = P.montar("Ciclano Chefe", USINAS, {"cartoes": [], "total": 0}, date(2026, 10, 28))
+    p = P.montar("Ciclano Chefe", USINAS, date(2026, 10, 28))
     assert (p["nome"], p["usinas"], p["clientes"], p["equipes"]) == ("Ciclano Chefe", 5, ["Thopen"], ["SP Norte 01"])
-    assert all(k in p for k in ("perf", "chamados", "pts", "ranking", "rondas", "extintores"))
+    # o Ranking das equipes saiu do Painel em 09/11/2026 ("Pode remover o ranking das equipes de 'Visão do Responsável'");
+    # as Pendências de OS entraram no lugar dele
+    assert all(k in p for k in ("perf", "chamados", "pts", "pendencias", "rondas", "extintores")) and "ranking" not in p
 
 
 def test_o_nome_do_ativo_sem_a_marca():
@@ -158,7 +163,7 @@ def test_a_tela_do_painel_do_responsavel(tela, logado):
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
     assert 'aria-current="page">Painel' in html and '<h1 class="cn-titulo">Ciclano Chefe</h1>' in html
     assert '<div class="campo-nativa pn-pagina">' in html                     # a página 20% menor (29/10/2026)
-    for t in ("Usinas abaixo da performance", "Chamados abertos", "PTs pendentes", "Ranking das Equipes - ",
+    for t in ("Usinas abaixo da performance", "Chamados abertos", "PTs pendentes", "Pendências de OS",
               "Acompanhamento de rondas", "Extintores vencidos"):
         assert t in html
     # todas as usinas do responsável na Performance e nas Rondas (Altair e Brodowski 1), nunca a do outro
@@ -192,14 +197,18 @@ def test_a_tela_do_painel_do_responsavel(tela, logado):
     assert 'class="pn-seg"' not in html and 'class="pn-nota"' not in html
     i = html.index('id="pn-ch-t"')
     assert re.search(r'</b>\s*<span>chamados? em aberto</span>', html[i:html.index("</section>", i)])
-    i = html.index('id="pn-rk-t"')
-    assert re.search(r'<div class="pn-num"><b>\d+</b><span>equipes?</span>', html[i:html.index("</section>", i)])
+    # as Pendências de OS no lugar do Ranking das equipes (09/11/2026): o número das OS e as atrasadas e pausadas
+    i = html.index('id="pn-os-t"')
+    assert re.search(r'<b class="cn-t-\w+">\d+</b>\s*<span>OS pendentes? · \d+ atrasadas? e \d+ pausadas?</span>',
+                     html[i:html.index("</section>", i)])
+    assert "Ranking das" not in html and 'id="pn-rk-t"' not in html
     i = html.index('id="pn-ex-t"')
     assert re.search(r'</b>\s*<span>extintor(es)? vencidos?( e \d+ a vencer)?</span>', html[i:html.index("</section>", i)])
     # o outro nível: o dia a dia da meta, a PT por cima, a equipe e a Visão geral com o filtro do quadro
     assert "/t/campo/responsaveis/usina/1/meta" in html and "/t/campo/responsaveis/pt/PT-1" in html
-    assert "/t/campo/responsaveis/equipe" in html and "filtro=perf.abaixo_meta" in html
-    assert "filtro=acomp.chamados" in html and "filtro=acomp.rondas" in html and "modo=ranking" in html
+    assert "/t/campo/responsaveis/equipe" not in html and "filtro=perf.abaixo_meta" in html
+    assert "filtro=acomp.chamados" in html and "filtro=acomp.rondas" in html and "modo=ranking" not in html
+    assert "filtro=manut.atrasadas" in html
     assert "filtro=acomp.ext" in html
     # o chamado abre a tela dele de Garantias por cima (a moldura da ponte), sem sair do Painel
     assert 'id="cr-chamado"' in html and "nexusRota('/os/_nexus/chamado/')" in html
