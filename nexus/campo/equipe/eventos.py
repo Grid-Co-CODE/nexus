@@ -139,7 +139,7 @@ def do_tecnico(pessoa_id, pontos: list, usinas: dict, nomes_usina: dict, agora: 
                    f"sem sinal desde {ultimo.astimezone(_BRT):%H:%M}")
     desde = estado.get("desde")
     if estado.get("permissao") == "sem" and isinstance(desde, datetime) and desde.astimezone(_BRT).date() == hoje:
-        evento("sem_permissao", desde, "sem permissão de localização no celular")
+        evento("sem_permissao", desde, "sem permissão no celular")
     return sorted(out, key=lambda e: e["instante"])
 
 

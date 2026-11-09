@@ -9,7 +9,8 @@ desenho supõe UM processo do Nexus por servidor (as chaves, o diário e as fila
 - os pontos do dia (`Diario`), relidos do disco ao nascer, para o mapa voltar com as últimas posições depois de um
   reinício, antes de o lote chegar ao banco; a guarda de 7 dias é podada aqui também, na virada do dia (`podar`);
 - o registro da LGPD (`Registro`), com o jornal dele em disco (`equipe/fila_acessos.jsonl`);
-- o último ponto e a permissão de localização de cada pessoa (`estado_de`, para a tela do mapa);
+- o último ponto e a permissão no celular de cada pessoa (`estado_de`, para a tela do mapa; o "sem" da casca é sem a
+  localização precisa ou sem a notificação fixa à vista, desde 09/11/2026);
 - quem é coletado: o piloto (`nexus_equipe_piloto`, cópia de 1 min) e os técnicos de campo ativos do cadastro (cópia de
   5 min), sem ir ao banco a cada lote, que chega de cada celular a cada 2 min.
 

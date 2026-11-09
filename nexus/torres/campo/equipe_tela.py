@@ -292,7 +292,7 @@ _BRT = timezone(timedelta(hours=-3))
 NOME_DO_SETOR = {SID.PCM: "PCM", SID.COS: "COS", SID.PERFORMANCE: "Performance",
                  SID.SUPERVISAO_CAMPO: "Supervisão Campo", SID.RESPONSAVEL_UFV: "Responsáveis UFV"}
 NAO_HA_ROTA = ("A rota não abre para este técnico agora: ela só sai do ponto de hoje (não de quem está sem permissão "
-               "de localização nem do ponto de outro dia). Volte ao Mapa de equipe e atualize a página.")
+               "no celular nem do ponto de outro dia). Volte ao Mapa de equipe e atualize a página.")
 # o resumo do topo, na ordem de quem pede atenção: (chave da situação, singular, plural)
 RESUMO = (("sem_permissao", "sem permissão", "sem permissão"), ("sem_sinal", "sem sinal", "sem sinal"),
           ("deslocamento", "em deslocamento", "em deslocamento"), ("na_usina", "na usina", "na usina"),
@@ -499,7 +499,7 @@ def _linhas(srv, b, tecnicos, piloto, coords, nomes_usina, agora):
 
 
 # os grupos do painel sem técnico escolhido, na ordem do resumo (quem pede atenção primeiro); o título no plural
-GRUPOS = (("sem_permissao", "Sem permissão de localização"), ("sem_sinal", "Sem sinal"),
+GRUPOS = (("sem_permissao", "Sem permissão no celular"), ("sem_sinal", "Sem sinal"),
           ("deslocamento", "Em deslocamento"), ("na_usina", "Na usina"), ("fora_usina", "Parados fora de usina"),
           ("sem_posicao", "Sem posição hoje"))
 

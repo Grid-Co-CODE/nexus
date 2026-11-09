@@ -671,7 +671,7 @@ def test_os_eventos_do_dia_no_estilo_do_quadro_de_ocorrencias(cliente, pontos, s
         ("11:55", NOME[FORA], "primeira posição do dia, fora de usina"),
         ("11:50", NOME[SEM_SINAL], "sem sinal desde 11:20"),
         ("11:20", NOME[SEM_SINAL], "primeira posição do dia, na Usina Bravo Teste"),
-        ("11:00", NOME[SEM_PERMISSAO], "sem permissão de localização no celular")]
+        ("11:00", NOME[SEM_PERMISSAO], "sem permissão no celular")]
     assert ev.count("<small>Nexus Field</small>") == 6 and "cn-pill cn-alerta" in ev and "cn-pill cn-critico" in ev
     links = {n: parse_qs(urlsplit(unescape(href)).query) for _h, href, n, _t in itens}
     assert links[NOME[ANDANDO]] == {"tecnico": [str(ANDANDO)], "de": ["2026-11-08T06:00"], "ate": ["2026-11-08T12:00"]}

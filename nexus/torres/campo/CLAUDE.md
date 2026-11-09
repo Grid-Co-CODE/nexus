@@ -1472,15 +1472,23 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
 - **`POST /t/campo/equipe/posicoes`** (chamada pelo nativo, app aberto ou fechado). `Authorization: Bearer <chave>`, corpo
   `{aparelho, fuso, pontos: [{t, lat, lon, prec, vel, mov}]}`. `t` em milissegundos UTC; **`fuso` são os minutos que se
   somam ao UTC para dar a hora do celular** (Brasília -180, Mato Grosso -240); `mov` diz se a própria leitura está em
-  deslocamento (sempre vem). **Até 200 pontos e 64 KB por lote.** Sem a permissão "o tempo todo" o nativo manda
-  `{aparelho, fuso, permissao: "sem", pontos: []}` (no máximo um a cada 30 min), para o mapa separar quem negou de quem não
-  abriu o app. Resposta `200 {aceitos, coleta}` (`coleta: false` faz a casca parar até a próxima carga), `401` chave
+  deslocamento (sempre vem). **Até 200 pontos e 64 KB por lote.** Sem a localização precisa ou sem a notificação fixa à
+  vista (o sentido desde 09/11/2026, pela casca: o pedido do "o tempo todo" saiu do app, que só pede "durante o uso"), o
+  nativo manda `{aparelho, fuso, permissao: "sem", pontos: []}` (no máximo um a cada 30 min), para o mapa separar quem
+  está sem a permissão no celular de quem não abriu o app. O aparelho que o Android mata (falta de memória, tirar dos
+  recentes, Forçar parada) para até a próxima abertura e aparece como sem sinal, sem o "sem". Resposta `200 {aceitos, coleta}` (`coleta: false` faz a casca parar até a próxima carga), `401` chave
   inválida ou revogada (a casca apaga a chave e para), `413` lote grande, `400` corpo fora do contrato, `503`.
 - **`POST /t/campo/equipe/aparelho/revogar`** (nativo, no Sair): `Authorization: Bearer <chave>`, `{aparelho}`, `204`.
 - **Os códigos são o que a casca faz com eles.** Só o **401 apaga a chave** no celular. **Qualquer 5xx é como sem rede**: a
   fila e a chave ficam, e a casca tenta de novo. Por isso o banco fora ou o servidor sem configuração respondem **503, nunca
   401**, e nenhuma resposta é 500 (o que quebrar vira 503 e o log leva só o TIPO do erro). A casca confirmou o contrato
-  (fuso, `permissao: "sem"`, chave só sem chave ou depois de 401, 5xx não apaga, 200 pontos e 64 KB).
+  (fuso, `permissao: "sem"`, chave só sem chave ou depois de 401, 5xx não apaga, 200 pontos e 64 KB). **O que a casca faz
+  com cada resposta (09/11/2026, cf64b52 do nexus-field):** 401 apaga a chave e para; 5xx, 403, 404, 405, 408, 429, 3xx e
+  sem rede guardam a fila e a chave; **qualquer outro 4xx (400, 413, 422...) tira o lote da fila e ele se perde**: mudar o
+  contrato de um jeito que devolva 400 apaga posições, então avise a sessão Nexus Field antes. O 200 só confirma o lote
+  com o `coleta` booleano (sem ele, a casca manda de novo): o reenvio não duplica, porque o id do ponto é da pessoa e do
+  instante (`pontos._ponto_id`) e o diário guarda um por id. Os pontos podem chegar até 24 h atrasados (a fila do celular
+  guarda até 1000): o servidor aceita até 7 dias para trás, dentro da janela da hora do técnico.
 
 ### As regras e o caso que criou cada uma
 

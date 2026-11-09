@@ -82,7 +82,7 @@ def test_sem_sinal_e_sem_permissao_entram_como_eventos_do_dia():
     assert (s["hora"], s["texto"], s["rotulo"], s["tom"]) == ("11:30", "sem sinal desde 11:00", "Sem sinal", "alerta")
     ev = _eventos([_p(6, 30, NA_A), _p(11, 50, NA_A)], estado={"permissao": "sem", "desde": AGORA - timedelta(hours=1)})
     (s,) = [e for e in ev if e["tipo"] == "sem_permissao"]
-    assert (s["hora"], s["texto"], s["tom"]) == ("11:00", "sem permissão de localização no celular", "critico")
+    assert (s["hora"], s["texto"], s["tom"]) == ("11:00", "sem permissão no celular", "critico")
     assert not [e for e in ev if e["tipo"] == "sem_sinal"]                 # 10 min: ainda com sinal
     # o aviso de ontem não é evento de hoje
     ev = _eventos([_p(6, 30, NA_A)], estado={"permissao": "sem", "desde": AGORA - timedelta(days=1)})

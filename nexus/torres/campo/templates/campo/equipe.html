@@ -33,13 +33,14 @@
           a saída, a chegada e a duração, sem a coordenada). Ponto com mais de 7 dias nunca aparece.</p>
           <p><b>As situações.</b> O mapa mostra a última posição de cada técnico, onde ele estiver: em deslocamento, em azul;
           na usina (parado a até 1 km dela), em verde; parado fora de usina, em cinza; sem sinal (o último ponto há 30
-          minutos ou mais), em âmbar; sem permissão de localização, em vermelho, no último ponto de hoje. A última posição de
-          outro dia aparece só com o contorno. O painel diz a cidade de quem está parado fora de usina, pela malha de
-          municípios do IBGE baixada pelo estado inteiro: a posição do técnico não vai ao IBGE.</p>
+          minutos ou mais), em âmbar; sem permissão no celular (sem a localização precisa ou sem a notificação fixa do Nexus
+          Field à vista), em vermelho, no último ponto de hoje. A última posição de outro dia aparece só com o contorno. O
+          painel diz a cidade de quem está parado fora de usina, pela malha de municípios do IBGE baixada pelo estado
+          inteiro: a posição do técnico não vai ao IBGE.</p>
           <p><b>Ver percurso.</b> No painel do técnico, escolha o dia e a hora do início e do fim (dentro dos últimos 7 dias):
           o mapa desenha a linha do percurso, com os pontos na ordem e a hora de cada um, e o painel lista cada ponto.</p>
           <p><b>Abrir rota.</b> O servidor monta o link do Google Maps, do último ponto de hoje do técnico até a usina
-          escolhida: a posição sai só nesse clique, para o Google. Não sai de quem está sem permissão de localização nem do
+          escolhida: a posição sai só nesse clique, para o Google. Não sai de quem está sem permissão no celular nem do
           ponto de outro dia.</p>
           <p><b>O ponto no mapa é aproximado</b>: é o lugar no desenho dos estados, não o endereço. A página não traz a
           coordenada em texto.</p>
@@ -168,7 +169,9 @@
           <p class="eq-nota">{% if s.chave == 'sem_sinal' %}A rota sai do último ponto conhecido ({{ sel.hora }}). {% endif %}O Google recebe a posição do técnico e a da usina só neste clique, e o clique fica registrado.</p>
         </form>
         {% elif s.chave == 'sem_permissao' %}
-        <p class="eq-nota">Sem a permissão de localização "o tempo todo" no celular, o Nexus Field não manda a posição. Quem resolve com o técnico é o supervisor.</p>
+        {# o "sem" da casca desde 09/11/2026: sem a localização precisa ou sem a notificação fixa à vista (o pedido do
+           "o tempo todo" saiu do app, que só pede "durante o uso"); ela avisa no máximo a cada 30 min #}
+        <p class="eq-nota">Sem a localização precisa ou sem a notificação fixa do Nexus Field à vista, o celular não manda a posição (o Nexus Field avisa isso no máximo a cada 30 min). Quem resolve com o técnico é o supervisor.</p>
         {% elif s.chave == 'sem_posicao' %}
         <p class="eq-nota">O celular não mandou posição hoje: o Nexus Field não foi aberto hoje, ou a coleta não ligou.{% if s.no_mapa %} O ponto com contorno no mapa é a última posição ({{ sel.hora }}); a rota não sai dele.{% endif %}</p>
         {% endif %}

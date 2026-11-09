@@ -54,7 +54,7 @@ CHAVES = ("deslocamento", "na_usina", "fora_usina", "sem_sinal", "sem_permissao"
 TOM = {"deslocamento": "info", "na_usina": "ok", "fora_usina": "neutro", "sem_sinal": "alerta",
        "sem_permissao": "critico", "sem_posicao": "neutro"}
 ROTULO = {"deslocamento": "Em deslocamento", "na_usina": "Na usina", "fora_usina": "Parado fora de usina",
-          "sem_sinal": "Sem sinal", "sem_permissao": "Sem permissão de localização", "sem_posicao": "Sem posição hoje"}
+          "sem_sinal": "Sem sinal", "sem_permissao": "Sem permissão no celular", "sem_posicao": "Sem posição hoje"}
 # o que pede ação é desenhado por último, por cima dos outros
 ORDEM_TOM = {"neutro": 0, "info": 1, "ok": 2, "alerta": 3, "critico": 4}
 

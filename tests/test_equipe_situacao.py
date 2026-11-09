@@ -58,7 +58,7 @@ def test_a_situacao_de_cada_tecnico():
     # o técnico negou a localização "o tempo todo"
     s = SI.situacao(_estado(None, permissao="sem", desde=AGORA - timedelta(hours=2)), USINAS, AGORA)
     assert (s["chave"], s["tom"], s["no_mapa"], s["rota"]) == ("sem_permissao", "critico", False, False)
-    assert s["rotulo"] == "Sem permissão de localização" and s["desde"] == AGORA - timedelta(hours=2)
+    assert s["rotulo"] == "Sem permissão no celular" and s["desde"] == AGORA - timedelta(hours=2)
     # ponto de 8 dias: sem posição, e nem a hora nem a usina dele aparecem
     s = SI.situacao(_estado(_ponto(*NA_USINA, dias=8)), USINAS, AGORA)
     assert (s["chave"], s["no_mapa"], s["rota"]) == ("sem_posicao", False, False)
