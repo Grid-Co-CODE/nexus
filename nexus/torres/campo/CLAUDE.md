@@ -1475,6 +1475,29 @@ bloco que passou como programada, a OS concluída como só aberta, o bloco "feit
 a ordem sem fuso); a bancada com o banco real a 1440 px (a tabela de 6 colunas cabe ao lado do painel: 711 px por
 dentro do quadro) e a 375 px (sem rolagem de lado; o clique desce ao painel).
 
+### O cliente olhando a tela (08/11/2026, entrega 1 das versões do cliente)
+
+Levi: "Gostaria que tivesse um filtro de mês!" e "todas as OSs fossem clicáveis para visualização porém não terá a opção
+de editar nada da OS, dessa forma sendo possível até ver sem acessar o fractall". Decidido: o mês **no topo, vale para
+todas**; as telas sensíveis (Mapa de equipe, FMEA, Incidentes) ganham **versão do cliente**; a ordem é a da Operação.
+
+- **O mês** (`setor_telas.mes_do_cliente`, o seletor do topo da casca; ver `nexus/casca/CLAUDE.md`). Na Visão do cliente
+  ele muda **só a performance** (a meta do mês pelo `campo_resp.metas`); o status, os chamados, as OS e a próxima visita
+  são de agora, e a tela diz isso num aviso, porque o Andamento guarda 30 dias e o retrato das OS só as abertas: mostrar
+  um mês passado com eles seria inventar ("sem dado não se inventa").
+- **A OS só leitura** (`campo/os_do_cliente.py`, `/t/campo/cliente/os/<n>`, `campo/cliente_os.html`): do retrato
+  `fato_tarefa_os`, nunca do Fracttal (o cliente não tem login lá e a cota é de 200/min por empresa). Número, usina,
+  tipo, situação (a régua da Visão do cliente), aberta, programada, concluída e os ativos com a situação de cada um;
+  sem quem fez, horas, custo nem comentário. OS de usina de outro cliente = 404; a que saiu do retrato (concluída e
+  conferida) diz isso. `?volta=` só aceita `/t/...`. Toda OS que o cliente vê numa tela linka para cá.
+- **Rondas** (`campo/versao_cliente.rondas`, `campo/rondas_cliente.html`; a tela `rondas` tem `do_cliente=True`): as
+  rondas do mês nas usinas dele (data, usina, tipo, situação, OS) e a última ronda de cada usina (agora). Sem técnico,
+  nota, duração, filtros nem Excel. As sub-rotas das Rondas (`/t/campo/rondas/usina/...`) são da Grid: o portão do
+  cliente abre só o endereço exato da tela.
+
+Prova: `tests/test_clientes_acesso.py` (o cartão da OS 901 abre e o da 902, de outro cliente, dá 404; o mês escolhido
+no topo; as Rondas só das usinas dele e a sub-rota 403) e a prévia local na porta 5215.
+
 ## Mapa de equipe (08/11/2026)
 
 **O que é e quem pediu.** Ver onde está cada técnico que tem o Nexus Field e abrir a rota dele até uma usina. Pedido do
@@ -2083,6 +2106,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   usina escolhida; o resto é a linha dela na Visão.
 - `visao_cliente.py`: a Visão do cliente (05/11/2026, acima): o recorte por `cliente_id`, o status pelo tempo real,
   as OS, os chamados e a próxima visita por usina, os 5 números e a ordem; a leitura do tempo real pela ponte.
+- `os_do_cliente.py`: a OS só leitura do cliente (08/11/2026, acima), do retrato `fato_tarefa_os`.
+- `versao_cliente.py`: as contas das versões do cliente das telas (08/11/2026, acima; hoje as Rondas), funções puras.
 - `equipe/` (Mapa de equipe, 08/11/2026, acima): `__init__.py` (réguas e livros), `token_ms.py`, `aparelhos.py`, `pontos.py`,
   `deslocamentos.py`, `situacao.py`, `municipios.py`, `piloto.py`, `acessos.py`, `jornal.py`, `servico.py` e
   `gravador.py`. As rotas e a tela ficam em `torres/campo/equipe_tela.py`.
