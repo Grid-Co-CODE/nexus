@@ -88,6 +88,18 @@ def test_nenhum_nome_nem_texto_livre_no_fato():
     assert not {"tecnico", "os_aberta_por", "impacto", "detalhes", "informe", "usina"} & set(NB.CAB)
 
 
+
+def test_o_relato_ao_cliente_entra_e_o_texto_livre_continua_fora():
+    """09/11/2026: o relato que a Ronda COS monta por regras (sem copiar as notas) vai ao fato, para o Comentário do dia
+    na Plataforma; o texto livre do time (impacto, detalhes, informe) segue fora. Sem o relato (o Andamento de antes),
+    a coluna fica vazia."""
+    relato = "Usina desligada de 27/10 às 09:00 a 27/10 às 10:30 (1 h 30 min). A usina voltou a gerar em 27/10 às 10:30."
+    continua = "Continuação: Usina desligada de 27/10 às 09:00 a 27/10 às 10:30."
+    l = _linha(_n("r1", relato_cliente=relato, relato_continuacao=continua))
+    assert l["relato_cliente"] == relato and l["relato_continuacao"] == continua
+    assert "texto livre" not in " ".join(str(v) for v in l.values())
+    assert _linha(_n("r2"))["relato_cliente"] == "" and _linha(_n("r2"))["relato_continuacao"] == ""
+
 def test_fato_ordenado_pelo_registro_e_conta_as_ligadas():
     linhas, rel = NB.fato([_n("r2"), _n("r1", usina_codigo="TSTE-ZZZ900"), {"sem": "registro"}], USINAS)
     assert [l[0] for l in linhas] == ["r1", "r2"]

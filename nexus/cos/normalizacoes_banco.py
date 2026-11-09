@@ -15,6 +15,14 @@ Registro mestre (`equipamento.usina_do_codigo`, a mesma ligação dos fatos do C
 Regra 8: os dois nomes de pessoa da API (`os_aberta_por`, `tecnico`) e o texto livre (`impacto`, `detalhes`,
 `informe`) não entram; as proteções entram como o time as escreve, só os códigos curtos (`PROTECAO`).
 
+**O relato ao cliente** (09/11/2026, o dono: "precisamos, de alguma forma, unir todas as informações para uma informação
+final e completa pro cliente"): `relato_cliente` (o parágrafo do primeiro dia) e `relato_continuacao` (a linha curta dos
+dias seguintes) entram, para a Plataforma mostrar no Comentário do dia em vez da linha montada só com o tipo, as horas,
+a proteção e a OS. Eles NÃO são texto livre: a Ronda COS os monta por regras fixas, só com frases-modelo e valores
+(horários, protocolos, códigos de proteção, a causa reconhecida), sem copiar nada das notas, então nome, telefone e
+bastidor não passam (`apps/andamento/src/regras/relato-cliente.ts` da Ronda COS). Vazio: sem hora real da volta, ou o
+Andamento de antes de 09/11/2026.
+
 **As ocorrências ainda abertas** (30/10/2026, Levi: "para as em aberto contar na disponibilidade precisamos puxar os
 dados dessa fonte"): a parada que o COS ainda não normalizou não está na API de normalizações, e a Thopen só contava
 quando a usina voltava (a OS 16958 de Santarém, inversor parado desde 12/07 aguardando peça, não contava nada). A aba
@@ -53,7 +61,7 @@ CHAVE = ("registro",)
 CAB = ("registro", "os", "os_relacionadas", "cliente", "usina_codigo", "usina_id", "usina_ligada_por",
        "equipamentos_codigos", "equipamentos_qtd", "tipo_falha", "severidade", "estado", "normalizada", "hora_real",
        "fim_corrigido", "declarada_por", "inicio", "normalizado_em", "data_id_inicio", "data_id_volta", "fora_min",
-       "geracao_parou", "protecoes", "fora_do_escopo_oem", "mudou_em")
+       "geracao_parou", "protecoes", "fora_do_escopo_oem", "mudou_em", "relato_cliente", "relato_continuacao")
 MEDIDAS = (("fora_min", "min", "aditiva"), ("equipamentos_qtd", "qtd", "nao"), ("normalizada", "1/0", "aditiva"),
            ("hora_real", "1/0", "aditiva"), ("geracao_parou", "1/0", "aditiva"))
 CAB_ATUALIZACAO = ("atualizado_em", "linhas_qtd", "desde", "ligadas_qtd", "abertas_em", "abertas_qtd")
@@ -143,7 +151,8 @@ def linha(n: dict, idx) -> list:
             int(n.get("normalizada") is not False), int(n.get("hora_real") is not False),
             int(bool(n.get("fim_corrigido"))), _txt(n.get("declarada_por")), _iso(inicio), _iso(volta),
             _data_id(inicio), _data_id(volta), fora, _um_zero(n.get("geracao_parou")), protecoes(n.get("protecoes")),
-            int(bool(n.get("fora_do_escopo_oem"))), _iso(AND.instante(n.get("mudou_em")))]
+            int(bool(n.get("fora_do_escopo_oem"))), _iso(AND.instante(n.get("mudou_em"))),
+            _txt(n.get("relato_cliente")), _txt(n.get("relato_continuacao"))]
 
 
 def fato(itens, usinas) -> tuple[list, dict]:
