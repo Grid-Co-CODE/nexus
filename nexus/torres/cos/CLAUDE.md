@@ -395,6 +395,26 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   Acompanhamento segue a 1ª tela pronta, `test_casca_inicio`).
 - Testes: `tests/test_cos_monitoramento.py`. Controle positivo: a soma com a leitura velha, a ponte por cima da falta de
   amostra, a gerando antes da parada, os links do corpo com o `parcial` e o teto de 5 s, todos vermelhos.
+- **O videowall** (`?tv=1`, 09/11/2026; o dono: "preciso de uma tela de monitoramento adequada pra videowall, essa está
+  feia"): `templates/cos/monitoramento_tv.html`, sem a casca (como o modo TV do Mapa de risco), a mesma leitura e a mesma
+  conta, com o botão "Abrir no videowall" na tela normal.
+  - **A regra das salas de controle (ISA-101):** a usina normal é neutra (superfície, nome, kW e a curva no verde do
+    dado); só a anormal ganha cor E palavra: parada (crítico), sem comunicação (o `--semcom` da casa), sem leitura nova
+    (alerta). Numa parede de 150 usinas o olho vai direto ao problema.
+  - **Ordem fixa** (`painel(..., fixa=True)`): por cliente e nome, sempre a mesma; na parede o operador aprende onde
+    cada usina fica. Cada cliente abre o grupo com um cartão com o total dele (`monitoramento.parede`).
+  - **"Atenção agora"**, a coluna da direita, sempre à vista: a parada, a sem comunicação e a sem leitura nova, nessa
+    ordem e a mais antiga primeiro. Quando as usinas não cabem legíveis (cartão abaixo de 8,5 rem), a grade gira em
+    páginas de 15 s (`static/cos/monitoramento-tv.js`), e a coluna não sai da tela: nenhum problema fica na página
+    escondida.
+  - **Caber sem rolagem:** a letra base segue a altura da tela (1,6vh) e a do cartão segue o cartão (container query,
+    `cqh`); o JavaScript acha as colunas que dão o maior cartão. ⚠ O cartão é o contêiner e o espaçamento fica no miolo
+    (`.i`): no próprio contêiner o `cq` se mede pelo de fora, e o padding em `cqh` comia a altura do cartão.
+  - **O endereço de cada tela da parede:** `?tv=1&cliente=Thopen` (um cliente por monitor) e `?escala=0.5` para a parede
+    2 x 2 de 1080 (uma tela de 2160 com o dobro do tamanho físico; entre 0,4 e 2). Medido na prova com 150 usinas: numa
+    tela de 1080, 3 páginas; na 2 x 2 com 0,5, tudo de uma vez.
+  - Ao vivo como a tela normal (o corpo a cada 30 s pelo `nexusPedir`), com o relógio de Brasília, a tela acesa (Wake
+    Lock, onde o navegador deixa) e os controles (tela cheia, sair) só ao mexer o mouse.
 
 ## Regras desta torre
 

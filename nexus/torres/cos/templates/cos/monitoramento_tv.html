@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR" class="cos-tv-html" data-nexus data-tema="{{ tema }}"{% if escala != 1 %} style="--escala:{{ escala }}"{% endif %}>
+<head>
+  <meta charset="utf-8">
+  <script>
+    // O Nexus nunca fica dentro de moldura (o mesmo guarda do base.html): o videowall também não.
+    try { if (window.top !== window.self) window.top.location.href = location.href; } catch (e) {}
+    {% include "_entrar_de_novo_js.html" %}
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ tela.nome }} · videowall · Grid Co.</title>
+  {% include "_icone.html" %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='cos/monitoramento-tv.css') }}">
+  <script>{% include "_tema_cabeca.html" %}{% include "_raiz_js.html" %}{% include "_pedir_js.html" %}</script>
+  {# Sem JavaScript a parede ainda se recarrega a cada minuto; com ele, troca só o corpo a cada 30 s. #}
+  <noscript><meta http-equiv="refresh" content="60"></noscript>
+</head>
+{# O videowall do Monitoramento (09/11/2026; o dono: "preciso de uma tela de monitoramento adequada pra videowall"): sem a
+   casca do Nexus (sem menu e sem topo), as usinas ocupando a tela toda, sem rolagem, e as letras do tamanho de cada
+   cartão (o mesmo desenho em 1920 x 1080 e em 3840 x 2160). O login continua valendo: a página passa pelo mesmo portão.
+   A ordem é sempre a mesma (cliente e nome): na parede o operador aprende onde cada usina fica. Os controles aparecem ao
+   mexer o mouse. `?cliente=` deixa cada tela da parede com um cliente. #}
+<body class="cos-tv">
+  <header class="cos-tv-cab">
+    <div class="cos-tv-titulo"><p class="gc-eyebrow">Nexus · {{ torre.nome }}</p>
+      <h1>{{ tela.nome }}{% if cliente %} <span>· {{ cliente }}</span>{% endif %}</h1></div>
+    <div class="cos-tv-relogio" aria-label="Hora de agora, em Brasília"><time id="cos-tv-hora">{{ agora.strftime('%H:%M') }}</time>
+      <span id="cos-tv-data">{{ agora.strftime('%d/%m') }}</span></div>
+  </header>
+  <main class="cos-tv-corpo" id="cos-tv-corpo">{% include "cos/_monitoramento_tv_corpo.html" %}</main>
+  <nav class="cos-tv-controles" aria-label="Videowall">
+    <button type="button" class="gc-btn gc-btn--contorno" id="cos-tv-cheia">Tela cheia</button>
+    <a class="gc-btn gc-btn--contorno" href="{{ url(tv=None, escala=None) }}">Sair do videowall</a>
+  </nav>
+  <script src="{{ url_for('static', filename='cos/monitoramento-tv.js') }}" defer></script>
+</body>
+</html>
