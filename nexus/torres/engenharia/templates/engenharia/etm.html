@@ -6,7 +6,7 @@
 {# A tela ETMs (Levi, 26/10/2026: "Quero que inclua essa visão de ETMs no Nexus, engenharia, aba própria. Deixe o design
    alá Nexus!"): as abas do app de ETM da Engenharia no desenho do Nexus, montadas no navegador a partir do JSON abaixo.
    O Planner (as colunas e os filtros do app: cliente, usina, Engenharia, Chamados ou Campo, o status da OS, quem criou, o
-   responsável, o período em que a OS esteve ativa e, na coluna Em andamento, as etiquetas), o Histórico (cliente → usina
+   responsável, o período em que a OS esteve ativa e, na coluna Em andamento, em andamento ou em verificação), o Histórico (cliente → usina
    → OS, com o chat da usina) e as Estações em Aberto (as usinas com OS aberta para a Engenharia e as em acompanhamento,
    com o quadro de cada usina e o Finalizar pela Engenharia em lote) e os Fechamentos (as OS fechadas por semana, no
    Fracttal ou pela Engenharia). A leitura está em nexus/engenharia/etm.py e as marcações em
@@ -67,8 +67,10 @@
     </aside>
     <div class="etm-main">
       <section class="etm-painel" id="etm-p-planner" aria-label="Planner">
-        {# as etiquetas da Engenharia filtram a coluna Em andamento, como no app (o JS põe os botões no cabeçalho dela) #}
-        <template id="etm-etiquetas">{% for n in etiquetas_eng %}<button type="button" class="etm-chip etm-chip--p" data-etiqueta="{{ n }}" aria-pressed="false">{{ n }}</button>{% endfor %}</template>
+        {# a coluna Em andamento filtra o que está em andamento e o que está em verificação (Levi, 09/11/2026: "ao invés de
+           'OS em campo', 'Stand By' e 'Validação Final' quero filtros do que está em andamento e o que está em
+           verificação"); o JS põe os botões no cabeçalho dela. As etiquetas da Engenharia seguem nos cartões #}
+        <template id="etm-fases"><button type="button" class="etm-chip etm-chip--p" data-fase="andamento" aria-pressed="false">Em andamento</button><button type="button" class="etm-chip etm-chip--p" data-fase="verificacao" aria-pressed="false">Em verificação</button></template>
         <div class="kb-quadro" id="etm-quadro" aria-live="polite"></div>
         <p class="mudo kb-rodape">Coluna: Não iniciadas = a OS aberta sem nenhuma tarefa começada; Em andamento = alguma tarefa
           começou ou a OS espera a verificação; Finalizadas e Canceladas, como no Fracttal. Engenharia e Chamados = a OS está
@@ -210,7 +212,7 @@
   });
   function novoEstado() {
     var f = {}; FILTROS.forEach(function (d) { f[d.k] = new Set(); });
-    return {f: f, q: '', ini: '', fim: '', etiquetas: []};
+    return {f: f, q: '', ini: '', fim: '', fases: []};
   }
   var estado = novoEstado();
   // a aba e onde ela está: o Histórico no cliente e na usina (com o período e as canceladas da lista), as Estações em
@@ -232,7 +234,7 @@
       var f = {};
       FILTROS.forEach(function (d) { var s = estado.f[d.k]; f[d.k] = !d.padrao && s.size === OPTS[d.k].length ? [] : Array.from(s); });
       sessionStorage.setItem(GUARDA, JSON.stringify({vista: vista, f: f, q: estado.q, ini: estado.ini, fim: estado.fim,
-                                                      etiquetas: estado.etiquetas}));
+                                                      fases: estado.fases}));
     } catch (e) { /* sem o armazenamento da aba: a tela funciona, só não lembra */ }
   }
   function restaurar() {
@@ -252,7 +254,7 @@
         estado.q = typeof s.q === 'string' ? s.q : '';
         estado.ini = typeof s.ini === 'string' ? s.ini : '';
         estado.fim = typeof s.fim === 'string' ? s.fim : '';
-        estado.etiquetas = Array.isArray(s.etiquetas) ? s.etiquetas.filter(function (x) { return typeof x === 'string'; }) : [];
+        estado.fases = Array.isArray(s.fases) ? s.fases.filter(function (x) { return x === 'andamento' || x === 'verificacao'; }) : [];
       }
     } catch (e) {     // o guardado torto (de outra versão da tela) não impede a tela de desenhar: começa do zero
       estado = novoEstado();
@@ -402,9 +404,10 @@
   function mostrando(texto) { document.getElementById('etm-mostrando').textContent = texto; }
 
   // ── o quadro (o Planner e o de cada usina nas Estações em Aberto) ──
-  function passaEtiquetas(o) {
-    if (!estado.etiquetas.length) return true;
-    return o.etiquetas_eng.some(function (n) { return estado.etiquetas.indexOf(n) >= 0; });
+  // o filtro da coluna Em andamento (09/11/2026): a fase da OS, nenhum marcado = as duas
+  function passaFase(o) {
+    if (!estado.fases.length) return true;
+    return estado.fases.indexOf(o.fase) >= 0;
   }
   function paginaOs(o) { return nexusRota('/t/engenharia/etm/os/') + encodeURIComponent(o.os); }
   function selo(texto, cor) { return el('span', 'eg-tag eg-tag--' + cor, texto); }
@@ -450,7 +453,7 @@
     var g = el('div', 'kb-colunas');
     g.style.setProperty('--n', cols.length);
     cols.forEach(function (c) {
-      var itens = lista.filter(function (o) { return o.coluna === c && (c !== 'em_andamento' || passaEtiquetas(o)); })
+      var itens = lista.filter(function (o) { return o.coluna === c && (c !== 'em_andamento' || passaFase(o)); })
         .sort(function (a, b) { return (b.criada_dia || '').localeCompare(a.criada_dia || ''); });
       var col = el('section', 'kb-col kb-col--' + COR[c]);
       var h = el('header', 'kb-col-cab');
@@ -459,9 +462,9 @@
       col.appendChild(h);
       if (c === 'em_andamento') {
         var fil = el('div', 'etm-col-etq');
-        fil.appendChild(document.getElementById('etm-etiquetas').content.cloneNode(true));
-        fil.querySelectorAll('[data-etiqueta]').forEach(function (b) {
-          b.setAttribute('aria-pressed', String(estado.etiquetas.indexOf(b.dataset.etiqueta) >= 0));
+        fil.appendChild(document.getElementById('etm-fases').content.cloneNode(true));
+        fil.querySelectorAll('[data-fase]').forEach(function (b) {
+          b.setAttribute('aria-pressed', String(estado.fases.indexOf(b.dataset.fase) >= 0));
         });
         col.appendChild(fil);
       }
@@ -864,9 +867,9 @@
   dFim.addEventListener('input', function () { estado.fim = dFim.value; desenha(); });
   [quadro, abQuadro].forEach(function (q) {
     q.addEventListener('click', function (ev) {
-      var b = ev.target.closest('[data-etiqueta]'); if (!b) return;
-      var i = estado.etiquetas.indexOf(b.dataset.etiqueta);
-      if (i >= 0) estado.etiquetas.splice(i, 1); else estado.etiquetas.push(b.dataset.etiqueta);
+      var b = ev.target.closest('[data-fase]'); if (!b) return;
+      var i = estado.fases.indexOf(b.dataset.fase);
+      if (i >= 0) estado.fases.splice(i, 1); else estado.fases.push(b.dataset.fase);
       desenha();
     });
   });

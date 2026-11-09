@@ -60,3 +60,14 @@ def test_o_card_sem_o_status_no_endereco_le_o_do_fracttal(monkeypatch):
     api.esquecer_os()
     assert 'data-acao="verificacao"' in _card(status="")
     api.esquecer_os()
+
+
+def test_a_resposta_de_texto_do_fazer_a_tarefa_quebra_a_linha():
+    """09/11/2026: a mesma caixa de várias linhas no "Fazer a tarefa" do card (a página da OS da Engenharia abre o card
+    no Concluir, e o Fazer a tarefa vem junto)."""
+    from pathlib import Path
+    js = Path("nexus/torres/oscreator/os_creator/os_web/static/os_acoes.js").read_text(encoding="utf-8")
+    css = Path("nexus/torres/oscreator/os_creator/os_web/static/os_acoes.css").read_text(encoding="utf-8")
+    assert "<textarea class=\"acoes-ta acoes-resp\"" in js
+    assert re.search(r"\.acoes-ta\.acoes-resp\{[^}]*field-sizing:content", css)
+

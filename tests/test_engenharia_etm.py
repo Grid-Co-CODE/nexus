@@ -325,8 +325,9 @@ def test_os_filtros_do_planner_no_padrao_do_nexus(tela, cliente):
     assert "etm-ms-painel" in html and "'Selecionar todos'" in html
     # a caixa marcada filtra na hora: sem Aplicar nem Cancelar
     assert "'Aplicar'" not in html and "'Cancelar'" not in html and "addEventListener('change'" in html
-    # o filtro das etiquetas da Engenharia, na coluna Em andamento como no app
-    assert all(f'data-etiqueta="{n}"' in html for n in ("OS em campo", "Stand By", "Validação Final"))
+    # a coluna Em andamento filtra o que está em andamento e o que está em verificação (Levi, 09/11/2026: "ao invés de
+    # 'OS em campo', 'Stand By' e 'Validação Final' quero filtros do que está em andamento e o que está em verificação")
+    assert 'data-fase="andamento"' in html and 'data-fase="verificacao"' in html and "data-etiqueta=" not in html
 
 
 def test_o_status_da_os_vai_no_json_e_as_canceladas_so_pelo_filtro(tela, cliente):
@@ -864,3 +865,17 @@ def test_a_tela_leva_o_dia_do_fechamento_pela_engenharia(tela, cliente):
     hoje = datetime.now(timezone(timedelta(hours=-3))).date().isoformat()
     assert o["1"]["eng_fim_dia"] == hoje                          # aberta no Fracttal, encerrada pela Engenharia hoje
     assert o["3"]["eng_fim_dia"] == "" and o["3"]["fim_dia"]       # fechada no Fracttal, a Engenharia ainda não
+
+
+def test_cada_os_em_andamento_diz_se_esta_em_verificacao(tela, cliente):
+    """09/11/2026: o filtro da coluna Em andamento é pela fase da OS: "verificacao" a que espera a verificação (a coluna
+    Em verificação do Quadro da equipe), "andamento" a outra; as das outras colunas, sem fase."""
+    from test_engenharia_acompanhamento import ANA, _como
+    d = _dados_da_tela(_como(cliente, ANA).get(URL_TELA).get_data(as_text=True))
+    for o in d["oss"]:
+        if o["coluna"] == "em_andamento":
+            assert o["fase"] == ("verificacao" if o["status"] == "Em Verificação" else "andamento"), o["os"]
+        else:
+            assert o["fase"] == "", o["os"]
+    assert any(o["fase"] for o in d["oss"])
+

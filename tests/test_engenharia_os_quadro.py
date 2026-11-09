@@ -3,6 +3,7 @@ aparece quando clica na OS da parte de CHAMADOS > GARANTIA"), com o status e a p
 na nota da OS, as OS filhas e o pulso das paradas. Desenho em docs/superpowers/specs/2026-10-24-engenharia-os-do-quadro-
 design.md. Banco falso (tests/pg_falso.py) e Fracttal falso; os nomes são fictícios."""
 import json
+from urllib.parse import urlencode
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -924,4 +925,100 @@ def test_quem_nao_e_da_engenharia_ve_as_tarefas_sem_os_botoes(pagina, cliente, m
                                                "erro": ""})
     html = _como(cliente, BETO).get(URL).get_data(as_text=True)
     assert 'data-acoes=""' in html.split("data-tarefas-os", 1)[1].split(">", 1)[0]
+
+
+def test_a_resposta_de_texto_da_subtarefa_quebra_a_linha():
+    """Levi, 09/11/2026: "quando clica na OS e vai digitar na subtarefa tem que abrir uma caixa de texto que quebra o
+    texto, está rolando infinito para o lado". A resposta de texto é uma caixa de várias linhas que cresce com o texto; o
+    número segue numa linha só (o teclado numérico)."""
+    from pathlib import Path
+    js = Path("nexus/static/engenharia-os.js").read_text(encoding="utf-8")
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    assert "<textarea class=\"eg-ac-campo eg-ac-texto\"" in js
+    assert re.search(r"\.eg-ac-texto\{[^}]*field-sizing:content", css) and re.search(r"\.eg-ac-texto\{[^}]*overflow-wrap:anywhere", css)
+
+
+def test_anexar_abre_o_cartao_de_colar_ou_fazer_o_upload():
+    """Levi, 09/11/2026: "ao clicar em anexar aparecesse uma tela card sobrepondo porém sem blur de fundo aparecendo um
+    ícone de imagem a mensagem 'Cole ou faça o upload do anexo' o 'faça upload do anexo' será clicável em verde grid".
+    O Anexar da tarefa e o Incluir anexo da OS abrem o mesmo cartão; com ele aberto, o colar vai para ele (e não para a
+    linha "Anexar à OS" da página)."""
+    from pathlib import Path
+    js = Path("nexus/static/engenharia-os.js").read_text(encoding="utf-8")
+    css = Path("nexus/static/engenharia.css").read_text(encoding="utf-8")
+    assert "window.egCartaoAnexo = function" in js and "Cole ou " in js and "faça o upload do anexo" in js
+    assert js.count("window.egCartaoAnexo({") == 2                       # a tarefa e a OS
+    assert "dialog.eg-anx[open]" in js                                    # o colar da página cede ao cartão
+    anx = re.search(r"\.eg-anx\{[^}]*\}", css).group(0)
+    assert "backdrop-filter" not in anx and re.search(r"\.eg-anx::backdrop\{background:transparent\}", css)
+    assert re.search(r"\.eg-anx-up\{[^}]*color:var\(--verde-texto\)", css)
+
+
+# ── a página da OS para quem chega de Chamados e da Performance (09/11/2026) ─────────────────────────────────────────
+# Levi: "gostaria que essas mudanças feitas para essa tela fossem também para chamados, performance etc" e, perguntado o
+# que fazem os que não são da Engenharia, "Tudo, inclusive comentários". O Quadro da Performance e a tela do chamado de
+# Garantias abrem esta página; a volta é a de onde veio (`?de=`).
+def _de_fora(monkeypatch, telas=("performance/equipe",)):
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(telas),
+                                               "setor": {"id": SID.PERFORMANCE, "nome": "Performance"}, "erro": ""})
+
+
+def test_o_portao_abre_a_pagina_da_os_para_quem_tem_o_quadro_da_performance_ou_garantias(app):
+    from nexus.auth import setor_telas as ST
+    with app.test_request_context():
+        for telas in ({"performance/equipe"}, {"chamados/garantias"}, {"engenharia/equipe"}):
+            assert ST.pode("/t/engenharia/equipe/os/16502", telas), telas
+            assert ST.pode("/t/engenharia/equipe/os/16502/classificar", telas), telas
+        assert not ST.pode("/t/engenharia/equipe", {"performance/equipe"})          # o Quadro da Engenharia, não
+        assert not ST.pode("/t/engenharia/etm/os/16502", {"chamados/garantias"})   # nem a OS de ETM
+        assert not ST.pode("/t/engenharia/equipe/os/16502", {"performance/clima"})
+
+
+def test_quem_tem_o_quadro_da_performance_age_na_pagina_da_os(pagina, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import SAME, _como
+    _de_fora(monkeypatch)
+    html = _como(cliente, BETO).get(URL).get_data(as_text=True)
+    assert "data-trocar-resp" in html and 'data-acoes="sim"' in html.split("data-tarefas-os", 1)[1].split(">", 1)[0]
+    assert "data-comentar=" in html
+    r = cliente.post(URL + "/classificar", data={"status_id": "3"}, headers=SAME)
+    assert r.status_code == 303 and "ok=" in r.headers["Location"]
+    assert _est(pagina["id_work_order"])["status_id"] == 3
+
+
+def test_quem_nao_tem_as_telas_da_pagina_so_ve(pagina, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import _como
+    _de_fora(monkeypatch, telas=("performance/clima",))
+    html = _como(cliente, BETO).get(URL).get_data(as_text=True)
+    assert "data-trocar-resp" not in html and "data-comentar=" not in html
+
+
+def test_a_volta_e_a_de_onde_veio(pagina, cliente):
+    from test_engenharia_acompanhamento import _como
+    _como(cliente, ANA)
+    perf = cliente.get(URL + "?de=performance").get_data(as_text=True)
+    assert '<a class="eg-ac-volta" href="/t/performance/equipe">← Quadro da equipe</a>' in perf
+    de = "/t/chamados/garantias?abrir=/os/chamados/acompanhamento/812"
+    cham = cliente.get(URL + "?" + urlencode({"de": de})).get_data(as_text=True)
+    assert '<a class="eg-ac-volta" href="/t/chamados/garantias?abrir=/os/chamados/acompanhamento/812">← Chamado 812</a>' in cham
+    for ruim in ("https://fora.exemplo/x", "/t/chamados/garantias?abrir=/os/chamados/acompanhamento/812&x=1", "/t/pcm"):
+        outra = cliente.get(URL + "?" + urlencode({"de": ruim})).get_data(as_text=True)
+        assert '<a class="eg-ac-volta" href="/t/engenharia/equipe">← Quadro da equipe</a>' in outra, ruim
+
+
+def test_o_de_segue_no_salvar_da_pagina(pagina, cliente):
+    from test_engenharia_acompanhamento import SAME, _como
+    _como(cliente, ANA)
+    html = cliente.get(URL + "?de=performance").get_data(as_text=True)
+    assert '<input type="hidden" name="de" value="performance">' in html
+    r = cliente.post(URL + "/classificar", data={"status_id": "3", "de": "performance"}, headers=SAME)
+    assert r.status_code == 303 and "de=performance" in r.headers["Location"]
+    r = cliente.post(URL + "/classificar", data={"status_id": "3", "de": "https://fora.exemplo"}, headers=SAME)
+    assert "fora.exemplo" not in r.headers["Location"]
+    # o comentário e o levar para a nota relêem a página com o aviso e o mesmo `de`
+    from pathlib import Path
+    tpl = Path("nexus/torres/engenharia/templates/engenharia/os_quadro.html").read_text(encoding="utf-8")
+    js = Path("nexus/static/engenharia-os.js").read_text(encoding="utf-8")
+    assert "window.egVoltarComOk = function" in js and "new URLSearchParams(location.search)" in js
+    assert tpl.count("window.egVoltarComOk(") == 2 and js.count("window.egVoltarComOk(") == 1    # comentar, mudar e levar
 

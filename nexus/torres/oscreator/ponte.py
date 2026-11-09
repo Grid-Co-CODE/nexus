@@ -1017,7 +1017,7 @@ def engenharia_comentar(wid: int):
 
     from ...engenharia import os_acompanhamento as O
     from ...engenharia import os_equipe
-    from ..engenharia import _os_para_gravar, _quem_pode
+    from ..engenharia import _os_para_gravar, _quem_pode_na_os as _quem_pode
     from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         return jsonify({"erro": "Pedido de outro site: nada foi gravado."}), 403
@@ -1103,7 +1103,7 @@ def engenharia_levar_para_a_nota(wid: int):
 
     from ...engenharia import os_acompanhamento as O
     from ...engenharia import os_equipe
-    from ..engenharia import _os_para_gravar, _quem_pode
+    from ..engenharia import _os_para_gravar, _quem_pode_na_os as _quem_pode
     from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         return jsonify({"erro": "Pedido de outro site: nada foi gravado."}), 403
@@ -1776,7 +1776,7 @@ def _mudar_comentario_da_os(wid: int, cid: str, editar: bool):
     from ...engenharia import acompanhamento as AC
     from ...engenharia import os_acompanhamento as O
     from ...engenharia import os_equipe
-    from ..engenharia import _os_para_gravar, _quem_pode
+    from ..engenharia import _os_para_gravar, _quem_pode_na_os as _quem_pode
     from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         return jsonify({"erro": "Pedido de outro site: nada mudou."}), 403

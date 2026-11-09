@@ -144,7 +144,8 @@
     } else if (c.tipo_nome === 'num') {
       ctrl = '<input type="number" step="any" data-fid="' + esc(c.id_form_item) + '" id="' + id + '" value="' + esc(c.valor) + '">';
     } else {
-      ctrl = '<input type="text" data-fid="' + esc(c.id_form_item) + '" id="' + id + '" value="' + esc(c.valor) + '">';
+      // o texto numa caixa que quebra a linha e cresce (09/11/2026: "está rolando infinito para o lado")
+      ctrl = '<textarea class="acoes-ta acoes-resp" rows="2" data-fid="' + esc(c.id_form_item) + '" id="' + id + '">' + esc(c.valor) + '</textarea>';
     }
     return '<label class="os-campo acoes-exec-c"><span class="os-lbl">' + esc(c.descricao) + req + fot + '</span>' + ctrl + '</label>';
   }

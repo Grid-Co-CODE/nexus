@@ -919,3 +919,24 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 /* os comentários que ficaram só no Nexus e o Levar para a nota do administrador (06/11/2026) */
 .eg-levar-nota{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:0 0 12px;font-size:12.5px;color:var(--mudo)}
 .eg-levar-nota .eg-os-msg{flex-basis:100%;margin:0}
+/* a resposta de texto da subtarefa quebra a linha e cresce com o texto (09/11/2026: "está rolando infinito para o lado") */
+.eg-ac-texto{display:block;min-height:2.6em;max-height:40vh;resize:vertical;field-sizing:content;line-height:1.4;
+  white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;color:inherit}
+/* o cartão do anexo (09/11/2026: "uma tela card sobrepondo porém sem blur de fundo"): por cima, sem véu nem desfoque;
+   o ícone de imagem, o "Cole ou faça o upload do anexo" com o link em verde e o resultado embaixo */
+.eg-anx{width:min(360px,calc(100vw - 32px));padding:24px 22px 20px;border:1px solid var(--linha-forte);border-radius:14px;
+  background:var(--superficie);color:var(--tinta);box-shadow:0 12px 32px var(--sombra);text-align:center}
+.eg-anx::backdrop{background:transparent}
+.eg-anx--sobre{border-color:var(--verde)}
+.eg-anx-x{position:absolute;top:8px;right:10px;background:transparent;border:0;color:var(--mudo);font:400 20px/1 var(--fonte-ac);
+  cursor:pointer;padding:4px}
+.eg-anx-x:hover,.eg-anx-x:focus-visible{color:var(--tinta)}
+.eg-anx-ico{display:block;width:46px;height:46px;margin:2px auto 12px;color:var(--mudo)}
+.eg-anx-t{margin:0;font:600 14px/1.45 var(--fonte-ac)}
+.eg-anx-up{background:transparent;border:0;padding:0;font:inherit;font-weight:700;color:var(--verde-texto);cursor:pointer}
+.eg-anx-up:hover,.eg-anx-up:focus-visible{text-decoration:underline;text-underline-offset:3px}
+.eg-anx-up:disabled{opacity:.6;cursor:default}
+.eg-anx-s{margin:6px 0 0;font-size:12px;color:var(--mudo)}
+.eg-anx-msg{margin:12px 0 0;font-size:12.5px;color:var(--tinta-2)}
+.eg-anx-msg--ruim{color:var(--critico)}
+

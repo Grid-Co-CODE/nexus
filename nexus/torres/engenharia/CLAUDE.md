@@ -391,6 +391,21 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   O Incluir anexo sobe daqui mesmo (`POST /os/api/os/<id>/anexos`; o seletor de arquivos não abre dentro da moldura do
   card), com o accept e as regras do OS Creator (`_regras_do_anexo`), ou colando (Ctrl+V ou Win+V, fora de campo de
   texto: o "Anexar à OS" confirma). Regras do envio em `nexus/torres/oscreator/README.md`.
+- **A página da OS para Chamados e a Performance** (09/11/2026, Levi: "gostaria que essas mudanças feitas para essa
+  tela fossem também para chamados, performance etc"; e, perguntado o que fazem os que não são da Engenharia, "Tudo,
+  inclusive comentários"). O Quadro da Performance e a tela do chamado de Garantias abrem esta página, sem cópia; quem
+  tem uma dessas telas a abre (o portão, `nexus/casca/CLAUDE.md`) e age como a Engenharia (`_quem_pode_na_os`: classifica,
+  comenta, as tarefas, os anexos e o andamento; o comentário vai à nota marcado "(Engenharia)"). O acompanhamento da
+  Confiabilidade segue só da Engenharia (`_quem_pode`). **A volta é a de onde veio** (`?de=`, `_volta_de`): `performance`
+  volta ao Quadro da Performance; `/t/chamados/garantias?abrir=/os/chamados/acompanhamento/<nº>` volta ao chamado
+  ("← Chamado <nº>"); outro valor é ignorado. O `de` segue no Salvar do status, no comentário e no Levar para a nota
+  (`window.egVoltarComOk`).
+- **O cartão do anexo** (09/11/2026, Levi: "ao clicar em anexar aparecesse uma tela card sobrepondo porém sem blur de
+  fundo aparecendo um ícone de imagem a mensagem 'Cole ou faça o upload do anexo'"): o Anexar da tarefa e o Incluir
+  anexo da OS abrem o `window.egCartaoAnexo` (sem véu nem desfoque atrás); o "faça o upload do anexo", em verde, abre o
+  seletor; o Ctrl+V (ou o Win+V) e o arrastar também mandam. Com ele aberto, o colar da página cede a ele.
+- **A resposta de texto da subtarefa quebra a linha** (09/11/2026: "está rolando infinito para o lado"): caixa de várias
+  linhas que cresce com o texto (`.eg-ac-texto`); o número segue numa linha. O mesmo no Fazer a tarefa do card.
 - **As tarefas da OS, uma a uma** (Levi, 06/11/2026, pela OS 16289, de seis inversores: o check no ativo da tarefa
   concluída, abrir e responder as subtarefas de cada ativo, "Iniciar atividade" com pausa, "Anexar" e "x anexos" ao lado
   do ativo): o bloco Ativos vira o painel `[data-tarefas-os]` (`engenharia-os.js`) quando a sessão do Fracttal lê as
@@ -482,7 +497,10 @@ como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenhar
   (a busca, as caixas de marcar com a conta de cada opção com os outros filtros, Selecionar todos e Limpar; o painel
   abre dentro da coluna, que rola sozinha), o período e "Redefinir filtros"; à direita o quadro, com as colunas Não
   iniciadas, Em andamento, Finalizadas e Canceladas (a coluna do quadro levada à do app: a verificação ainda está em
-  andamento) e, na coluna Em andamento, as etiquetas da Engenharia. **O clique filtra** (Levi: "não precisa desse botão
+  andamento) e, na coluna Em andamento, os filtros Em andamento e Em verificação (09/11/2026, Levi: "ao invés de 'OS
+  em campo', 'Stand By' e 'Validação Final' quero filtros do que está em andamento e o que está em verificação"; a
+  `fase` de cada OS: "verificacao" a que está na coluna Em verificação do Quadro da equipe; as etiquetas seguem nos
+  cartões). **O clique filtra** (Levi: "não precisa desse botão
   "aplicar" clicou já filtrou!"): a caixa marcada vale na hora e o painel fica aberto, na mesma busca e rolagem; nada
   ou tudo marcado é Todos. O Solicitante saiu ("tire o filtro do solicitante!"; segue na pesquisa geral). A **usina vai
   curta** ("o nome da usina está vindo completo, o ideal seria sem a informação do nome do cliente e estado!",

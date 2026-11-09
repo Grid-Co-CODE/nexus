@@ -8,6 +8,7 @@ O Quadro da equipe também é nosso, e a tela ETMs (26/10/2026) traz o app de ET
 no placeholder da casca.
 Leia o CLAUDE.md desta pasta antes de mexer.
 """
+import re
 import collections
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -290,6 +291,35 @@ def _quem_pode() -> tuple[bool, str | None]:
     from ...engenharia import acompanhamento as AC
     setor = (ST.acesso() or {}).get("setor")
     return AC.pode_agir(setor, bool(session.get("admin"))), AC.codigo(session.get("usuario"))
+
+
+def _quem_pode_na_os() -> tuple[bool, str | None]:
+    """O `_quem_pode` da página da OS: além da Engenharia e do administrador, quem tem o Quadro da Performance ou
+    Garantias, as telas que abrem a página (09/11/2026, Levi: "Tudo, inclusive comentários"). Só a página da OS e as rotas
+    dela (classificar, comentar); o acompanhamento da Confiabilidade segue com o `_quem_pode`."""
+    pode, meu = _quem_pode()
+    if not pode:
+        from ...auth import setor_telas as ST
+        a = ST.acesso() or {}
+        pode = bool(a.get("tudo")) or bool(set(a.get("telas") or ()) & set(ST.TELAS_DA_PAGINA_DA_OS))
+    return pode, meu
+
+
+# a volta pedida no `?de=` (09/11/2026): o Quadro da Performance e a tela do chamado de Garantias abrem a página da OS
+_DE_CHAMADO = re.compile(r"^/t/chamados/garantias\?abrir=/os/chamados/acompanhamento/(\d+)$")
+
+
+def _volta_de(de) -> tuple[str, str] | None:
+    """(o endereço, o texto) da volta pedida, ou None (a volta da tela). Só os dois de fora conhecidos: o "performance"
+    (o Quadro da equipe da Performance) e a tela do chamado de Garantias pelo nº; outro valor é ignorado."""
+    de = str(de or "").strip()
+    if de == "performance":
+        return url_for("torre_performance.equipe"), "Quadro da equipe"
+    m = _DE_CHAMADO.match(de)
+    if m:
+        from ...prefixo import na_raiz
+        return na_raiz(de), "Chamado " + m.group(1)
+    return None
 
 
 def _pessoas(pode: bool) -> list[dict]:
@@ -1061,12 +1091,18 @@ def _pagina_da_os(folio: int, tela_id: str):
     from ...prefixo import na_raiz
     from ...engenharia import os_acompanhamento as O
     from ...engenharia import os_equipe
-    pode, _meu = _quem_pode()
     eh_etm = tela_id == "etm"
+    # quem chega do Quadro da Performance ou de Garantias age na página como a Engenharia (09/11/2026)
+    pode, _meu = _quem_pode() if eh_etm else _quem_pode_na_os()
+    # a volta e a OS de cada tela: o Quadro da equipe ou a tela ETMs; ou a de onde veio, pelo `?de=` (09/11/2026)
+    fora = None if eh_etm else _volta_de(request.args.get("de"))
     base = {"torre": TORRE, "tela": TORRE.tela(tela_id), "folio": folio,
             "msg_ok": request.args.get("ok", ""), "msg_erro": request.args.get("erro", ""),
-            # a volta e a OS de cada tela: o Quadro da equipe ou a tela ETMs
-            "volta_endpoint": "torre_engenharia." + tela_id, "volta_texto": TORRE.tela(tela_id).nome,
+            "volta_endpoint": "torre_engenharia." + tela_id, "volta_texto": fora[1] if fora else TORRE.tela(tela_id).nome,
+            "volta_href": fora[0] if fora else url_for("torre_engenharia." + tela_id),
+            # depois de trocar o responsável, a volta ao Quadro da Engenharia relê o Fracttal (?atualizar=1)
+            "volta_atualizar": fora[0] if fora else url_for("torre_engenharia." + tela_id, atualizar=1),
+            "de": str(request.args.get("de") or "").strip() if fora else "",
             "rota_os": "torre_engenharia.etm_os" if eh_etm else "torre_engenharia.equipe_os"}
     try:
         o = os_equipe.ler_os(folio)
@@ -1235,8 +1271,11 @@ def equipe_os_classificar(folio: int):
     from ...auth.origem import de_outro_site as _de_outro_site
     if _de_outro_site():
         abort(403)
-    pode, _meu = _quem_pode()
+    pode, _meu = _quem_pode_na_os()
     volta = url_for("torre_engenharia.equipe_os", folio=folio)
+    # o `de` (de onde a página veio) segue no aviso da volta, se for um dos conhecidos (09/11/2026)
+    de = str(request.form.get("de") or "").strip()
+    de = {"de": de} if _volta_de(de) else {}
     try:
         o = os_equipe.ler_os(folio)                     # a OS conferida agora no Fracttal, não o que o formulário diz
         if not o:
@@ -1245,12 +1284,12 @@ def equipe_os_classificar(folio: int):
                           session.get("usuario"), pode)
         partes = [x for x in (r["status"] and "status " + r["status"],
                               r["prioridade"] and "prioridade " + r["prioridade"]) if x]
-        return redirect(volta + "?" + urlencode({"ok": "Salvo: " + " e ".join(partes) + "."}), 303)
+        return redirect(volta + "?" + urlencode({"ok": "Salvo: " + " e ".join(partes) + ".", **de}), 303)
     except O.Recusada as e:
-        return redirect(volta + "?" + urlencode({"erro": str(e)}), 303)
+        return redirect(volta + "?" + urlencode({"erro": str(e), **de}), 303)
     except Exception as e:      # noqa: BLE001 — banco ou Fracttal fora: nada mudou (a trava recusa antes de gravar)
         logging.exception("quadro da equipe: o status da OS %s não gravou", folio)
-        return redirect(volta + "?" + urlencode({"erro": FALHOU_BANCO.format(type(e).__name__)}), 303)
+        return redirect(volta + "?" + urlencode({"erro": FALHOU_BANCO.format(type(e).__name__), **de}), 303)
 
 
 def _com_a_engenharia(oss: list[dict]) -> tuple[list[dict], str]:
@@ -1290,6 +1329,9 @@ def _os_do_planner(o: dict, m: dict | None, n_coment: int | None = None) -> dict
             "ativo": o["ativo"], "responsavel": o["responsavel"], "solicitante": o["solicitante"],
             "criado_por": o["criado_por"], "trabalho": o["trabalho"], "coluna": o["coluna_etm"], "tipo": o["tipo"],
             "status": o["status"], "criada": criada[:10],
+            # a fase da OS em andamento (09/11/2026): o filtro da coluna separa a que espera a verificação da outra
+            "fase": ("verificacao" if o.get("coluna") == "verificacao" else "andamento")
+                    if o["coluna_etm"] == "em_andamento" else "",
             # o dia de Brasília da criação e o do fim: o "OS ativa entre" do app compara dias
             "criada_dia": "-".join(reversed(criada[:10].split("/"))) if criada else "", "fim_dia": o.get("fim_iso") or "",
             "etiquetas": o["etiquetas"], "n_tarefas": len(o.get("tarefas") or []),
@@ -1377,7 +1419,7 @@ def etm():
         kpis=faixa_etm(oss, hoje, sem_marcas=bool(erro_marcas), sem_leitura=not d["lido"]), erro=d["erro"],
         erro_marcas=erro_marcas, nunca_lido=not d["lido"], lendo=d["lendo"], erro_setores=d.get("erro_setores") or "",
         # os status da OS no Fracttal, na ordem dele (o filtro "Status da OS", 26/10/2026)
-        status=list(os_equipe.STATUS_OS.values()), etiquetas_eng=[n for _, n in M.ETIQUETAS], hoje=hoje.isoformat(),
+        status=list(os_equipe.STATUS_OS.values()), hoje=hoje.isoformat(),
         admin=bool(session.get("admin")),           # o painel do histórico do app de ETM (uma vez, só o administrador)
         lido=datetime.fromtimestamp(d["lido"], BRT).strftime("%H:%M") if d["lido"] else "—")
 

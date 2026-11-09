@@ -32,6 +32,7 @@ dependerem do banco de setores). `NEXUS_ACESSO_POR_SETOR=0` desliga numa máquin
 NEXUS_PESSOA_HMAC também fica desligado: sem ela não há como achar a pessoa do login nas decisões de setor, e ligar
 trancaria todo mundo fora. A tela Acessos diz qual é o caso.
 """
+import re
 import logging
 import threading
 import time
@@ -419,12 +420,21 @@ def _tela_do_caminho(caminho: str):
     return torre_id, (chave(torre_id, max(achadas, key=len)) if achadas else None)
 
 
+# A página da OS da Engenharia (09/11/2026, Levi: "gostaria que essas mudanças feitas para essa tela fossem também para
+# chamados, performance etc"): o Quadro da Performance e a tela do chamado de Garantias a abrem, e quem tem uma dessas
+# telas abre a página e as rotas dela (classificar), sem ganhar o resto da Engenharia (o Quadro, a OS de ETM).
+PAGINA_DA_OS = re.compile(r"^/t/engenharia/equipe/os/\d+(/[a-z_]+)?$")
+TELAS_DA_PAGINA_DA_OS = ("engenharia/equipe", "performance/equipe", "chamados/garantias")
+
+
 def pode(caminho: str, telas: set[str]) -> bool:
     """O caminho abre para quem tem estas telas? A tela segue a marca dela; o resto da torre (dados, sub-rotas), quem tem
     ao menos uma tela da torre; o OS Creator em /os/ (fora as ações /os/_nexus/), quem tem uma tela da torre OS; o
     resto, sim."""
     if caminho.startswith("/os/") and not caminho.startswith("/os/_nexus/"):
         return any(t.startswith("os/") for t in telas)
+    if PAGINA_DA_OS.match(caminho):
+        return any(t in telas for t in TELAS_DA_PAGINA_DA_OS)
     torre_id, tela = _tela_do_caminho(caminho)
     if torre_id is None:
         return True
