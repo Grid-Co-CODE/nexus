@@ -258,6 +258,9 @@ CHAVES = {
         "arquivo": "",
         "dica": "1 para ligar, 0 para desligar; Apagar volta ao .env do servidor (sem ele, desligado)",
         "conferir": _conferir_grava,
+        # não é segredo: uma escolha, e a tela diz como está (09/11/2026, a 1ª tentativa no servidor: o campo de senha
+        # recebeu o que o navegador preencheu sozinho, e a tela recusou "use 1 (liga) ou 0 (desliga)")
+        "escolha": (("1", "1 · liga o Mapa de equipe nesta máquina"), ("0", "0 · desliga")),
     },
 }
 
@@ -353,8 +356,13 @@ def estado(config) -> list[dict]:
                 nao_abre = True
         env = bool(str(config.get(nome) or "").strip())
         origem = "tela" if item and not nao_abre else ("env" if env else None)
+        # a chave de escolha (a gravação do Mapa de equipe) não é segredo: a tela diz como está agora
+        agora = ""
+        if d.get("escolha"):
+            atual = str(valor(nome, config) or "").strip()
+            agora = "ligada" if atual == "1" else "desligada"
         out.append({"id": nome, "nome": d["nome"], "para": d["para"], "arquivo": d["arquivo"], "dica": d.get("dica", ""),
-                    "origem": origem,
+                    "escolha": d.get("escolha") or (), "agora": agora, "origem": origem,
                     "quando": A.hora_br(item.get("quando")) if item else "", "por": (item or {}).get("por", ""),
                     "nao_abre": nao_abre, "env_tambem": env and bool(item)})
     return out

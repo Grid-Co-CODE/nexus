@@ -38,9 +38,17 @@
   <form method="post" action="{{ acao|na_raiz }}" class="chv-form" autocomplete="off">
     <input type="hidden" name="codigo" value="{{ codigo }}">
     <input type="hidden" name="chave" value="{{ c.id }}">
+    {% if c.escolha %}
+    {# a chave que é uma escolha, não um segredo (a gravação do Mapa de equipe, 09/11/2026): sem campo de senha, que o
+       navegador preenchia sozinho, e com o estado de agora #}
+    <p class="chv-quando"><b>Agora: {{ c.agora }}.</b></p>
+    <label class="gc-rotulo" for="{{ c.id }}-v">Escolher</label>
+    <select id="{{ c.id }}-v" name="valor" class="gc-campo" {% if sem_pasta %}disabled{% endif %}>{% for v, rot in c.escolha %}<option value="{{ v }}">{{ rot }}</option>{% endfor %}</select>
+    {% else %}
     <label class="gc-rotulo" for="{{ c.id }}-v">{{ 'Trocar a chave' if c.origem else 'Colar a chave' }}</label>
     <input id="{{ c.id }}-v" name="valor" type="password" class="gc-campo" autocomplete="off" spellcheck="false"
            placeholder="{% if c.arquivo %}a linha inteira do arquivo {{ c.arquivo }}{% else %}{{ c.dica }}{% endif %}" {% if sem_pasta %}disabled{% endif %}>
+    {% endif %}
     <div class="chv-acoes">
       <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" name="acao" value="gravar" {% if sem_pasta %}disabled{% endif %}><i class="ph ph-key"></i> Conferir e gravar</button>
       {% if c.origem == 'tela' or c.nao_abre %}<button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="apagar" formnovalidate><i class="ph ph-trash"></i> Apagar a da tela</button>{% endif %}

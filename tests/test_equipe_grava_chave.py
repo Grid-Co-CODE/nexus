@@ -95,3 +95,22 @@ def test_o_laco_sobe_em_toda_maquina_fora_dos_testes(monkeypatch):
     _App.config = {"TESTING": True}
     G.ligar(_App())
     assert iniciados == ["nexus-equipe-gravador"]             # nunca em teste
+
+
+def test_a_gravacao_na_tela_e_uma_escolha_e_nao_um_campo_de_senha(app, cfg, logado):
+    """Na 1ª tentativa no servidor (09/11/2026) o campo de senha recebeu o que o navegador preencheu sozinho e a tela
+    recusou ("use 1 (liga) ou 0 (desliga)"). A gravação não é segredo: é uma escolha, e a tela diz como está agora."""
+    def cartao():
+        html = logado.get("/t/base/chaves-fontes?aba=nexus").get_data(as_text=True)
+        c = html[html.index(f'<section class="cad-secao chv-chave" id="{NOME}"'):]
+        return c[:c.index("</section>")]
+    c = cartao()
+    assert f'<select id="{NOME}-v" name="valor"' in c and 'type="password"' not in c
+    assert '<option value="1">' in c and '<option value="0">' in c and "Agora: desligada" in c
+    with app.test_request_context():
+        chaves.gravar(cfg, NOME, "1", "admin")
+    assert "Agora: ligada" in cartao()
+    # as outras chaves seguem como senha: o valor nunca aparece de volta
+    html = logado.get("/t/base/chaves-fontes?aba=nexus").get_data(as_text=True)
+    outra = html[html.index('id="NEXUS_EQUIPE_MS_CLIENT_ID"'):]
+    assert 'type="password"' in outra[:outra.index("</section>")]
