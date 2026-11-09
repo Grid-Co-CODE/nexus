@@ -118,11 +118,16 @@ def test_o_concluir_so_diz_concluida_com_o_ok_do_os_creator(tela, logado, fila, 
     assert "if (r.ok && !r.redirected && r.j.ok === true)" in concluir
     assert "r.j.mensagem || ('OS ' + folio + ' concluída.')" in concluir and "r.j.aviso ? 'alerta' : 'ok'" in concluir
     assert "' ' + r.j.aviso" not in js                                           # o "concluída. true" saiu
-    # a sessão do Nexus que acabou (redirecionado, ou sem JSON) tem frase própria; o 401 segue o ENTRAR do Fracttal
+    # a sessão do Nexus que acabou (redirecionado) tem frase própria; o 401 segue o ENTRAR do Fracttal; a resposta sem
+    # JSON sem redirecionar é o servidor que não respondeu (09/11/2026, o PDF da OS 8159 com o chat OS Creator): no
+    # Concluir manda conferir no Fracttal, no PDF diz que nada foi gravado
     assert "var SESSAO = 'A sua sessão do Nexus acabou: recarregue a página e entre de novo.';" in js
     assert concluir.index("if (r.redirected)") < concluir.index("r.status === 401") < concluir.index("if (!r.json)")
+    assert "if (!r.json) { aviso(SEM_RESPOSTA_CONCLUIR, 'critico'); return; }" in concluir
     pdf = js[js.index("nexusRota('/os/api/os/pdf')"):]
-    assert "if (r.ok && !r.redirected && r.j.url)" in pdf and "if (r.redirected || !r.json)" in pdf
+    assert "if (r.ok && !r.redirected && r.j.url)" in pdf and "if (r.redirected || !r.json)" not in pdf
+    assert "if (r.redirected) { aviso(SESSAO, 'critico'); return; }" in pdf
+    assert "if (!r.json) { aviso(SEM_RESPOSTA_PDF, 'critico'); return; }" in pdf
     if shutil.which("node"):
         arq = tmp_path / "verificacao.js"
         arq.write_text("var nexusRota = function (x) { return x; };" + chr(10) + js, encoding="utf-8")

@@ -795,6 +795,10 @@
   // sem a sessão do Nexus (12 h, ou o Sair noutra aba), o portão responde 302 para /entrar, o fetch segue e recebe 200 em
   // HTML: isso não é "concluída" (revisão de 05/11/2026, achado na Aprovação por fatos, que usa a mesma rota)
   var SESSAO = 'A sua sessão do Nexus acabou: recarregue a página e entre de novo.';
+  // a resposta sem JSON que não foi para o /entrar é o servidor (ou o caminho até ele) que não respondeu a tempo, não a
+  // sessão (09/11/2026, com o chat OS Creator, o PDF da OS 8159 na Aprovação; a mesma regra aqui)
+  var SEM_RESPOSTA_PDF = 'O servidor não respondeu a tempo: tente de novo em instantes. Nada foi gravado no Fracttal.';
+  var SEM_RESPOSTA_CONCLUIR = 'O servidor não respondeu a tempo: confira a OS no Fracttal antes de tentar de novo, a conclusão pode ter sido gravada.';
   function pedir(url, corpo) {
     return fetch(url, {method: 'POST', credentials: 'same-origin', body: JSON.stringify(corpo),
                                   headers: {'Accept': 'application/json', 'Content-Type': 'application/json'}})
@@ -843,7 +847,7 @@
         b.disabled = false; b.textContent = rot;
         if (r.redirected) { aviso(SESSAO, 'critico'); return; }
         if (r.status === 401) { aviso(ENTRAR, 'critico', true); return; }
-        if (!r.json) { aviso(SESSAO, 'critico'); return; }
+        if (!r.json) { aviso(SEM_RESPOSTA_CONCLUIR, 'critico'); return; }
         aviso(r.j.erro || ('Não consegui concluir a OS ' + folio + '.'), 'critico');
       }).catch(function (e) { b.disabled = false; b.textContent = rot; aviso('Não consegui falar com o OS Creator (' + e.message + ').', 'critico'); });
       return;
@@ -853,7 +857,8 @@
       b.disabled = false;
       if (r.ok && !r.redirected && r.j.url) { location.href = nexusRota(r.j.url); return; }
       if (r.status === 401) { aviso(ENTRAR, 'critico', true); return; }
-      if (r.redirected || !r.json) { aviso(SESSAO, 'critico'); return; }
+      if (r.redirected) { aviso(SESSAO, 'critico'); return; }
+      if (!r.json) { aviso(SEM_RESPOSTA_PDF, 'critico'); return; }
       aviso(r.j.erro || ('Não consegui gerar o PDF da OS ' + folio + '.'), 'critico');
     }).catch(function (e) { b.disabled = false; aviso('Não consegui gerar o PDF (' + e.message + ').', 'critico'); });
   });

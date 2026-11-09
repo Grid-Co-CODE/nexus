@@ -28,8 +28,8 @@ o login do Fracttal de quem clica, como no OS Creator Web; ver "Aprovação de O
 
 | Tela | De onde vem | Quem calcula |
 |---|---|---|
-| **Visão do responsável** (12/10/2026, a 1ª do Campo) | o **Painel** (28/10/2026, a tela inicial de um responsável: seis quadros, ver "O Painel do responsável" abaixo) e três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação); e a aba **Ranking das equipes** (18/10/2026: as notas do App em `fato_fechamento` e `fato_ronda`) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção) e `campo/ranking_equipes.py` (a régua do ranking por região do App) |
-| **Visão do cliente** (05/11/2026) | o tempo real da plataforma (a Entrada, pela ponte só de leitura) + o Gerencial (a meta, a mesma linha da Visão do responsável) + o Andamento da Ronda COS (os chamados à distribuidora) + `fato_tarefa_os` (as OS) + `fato_programacao` (a próxima visita) | `campo/visao_cliente.py` (junta; nenhuma conta nova, ver "Visão do cliente" abaixo) |
+| **Visão do responsável** (12/10/2026, a 1ª do Campo) | o **Painel** (28/10/2026, a tela inicial de um responsável: seis quadros, ver "O Painel do responsável" abaixo) e três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação). A aba Ranking das equipes saiu em 09/11/2026 (abaixo) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção e das Pendências de OS do Painel) |
+| **Visão do cliente** (05/11/2026) — **só do cliente desde 09/11/2026** (`Tela.so_do_cliente`: o Comando do cliente e do Modo cliente; sai do menu da Grid e da lista dos setores da Grid em Base → Acessos, e o endereço leva a Grid à Visão do responsável) | o tempo real da plataforma (a Entrada, pela ponte só de leitura) + o Gerencial (a meta, a mesma linha da Visão do responsável) + o Andamento da Ronda COS (os chamados à distribuidora) + `fato_tarefa_os` (as OS) + `fato_programacao` (a próxima visita) | `campo/visao_cliente.py` (junta; nenhuma conta nova, ver "Visão do cliente" abaixo) |
 | **Mapa de equipe** (08/11/2026) | os pontos de posição que o celular do técnico (Nexus Field) manda às três rotas públicas `/t/campo/equipe/...` + o cadastro (técnicos de campo ativos, coordenada das usinas) + a malha do IBGE (só para a cidade) | `campo/equipe/` (as réguas, os pontos, a situação, os deslocamentos; ver "Mapa de equipe" abaixo) |
 | **Ocorrências** (18/10/2026) | o livro `nexus_ocorrencias` (escrito nesta tela) + cadastro do Nexus | `campo/ocorrencias.py` (ver "Ocorrências com plano de ação" abaixo) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
@@ -37,8 +37,6 @@ o login do Fracttal de quem clica, como no OS Creator Web; ver "Aprovação de O
 | Permissões de trabalho → **em Segurança · HSEQ > APR e PT desde 09/10/2026** (`/t/hseq/apr-pt`; `/t/campo/pt` leva para lá). O código continua aqui (`pagina_pt`, a aprovação `/t/campo/pt/<número>`, os PDFs da PT e da APR); a regra de lá está em `nexus/torres/hseq/CLAUDE.md` | `fato_pt` (+ `pt_app_campo` para o texto) | `visao.pts` (conta nossa) |
 | Rondas | `fato_ronda` (App, checklist da carga única, avulsa) + usinas mobilizadas do cadastro + `fato_fechamento` (última OS da usina) + a validação por foto (só sujidade e vegetação) | `visao.rondas` (conta nossa) |
 | Ronda avulsa (`/t/campo/rondas/avulsa`) | lançada à mão no Nexus, com o login do Fracttal | `campo/ronda_avulsa.py` |
-| **Zeladoria** (26/10/2026) | as rondas (o checklist da OS de ronda, a carga, a avulsa e a validação por foto, como na aba Sujidade e vegetação) + as tarefas de Zeladoria do Fracttal (`nexus_os · fato_tarefa_os`) + `zeladoria_app_campo` (os serviços de terceiros, no fim da tela) | `campo/zeladoria.py` (conta nossa; ver "Zeladoria" abaixo) |
-| Triagem de qualidade | `fechamentos_app_campo` + rondas | regras copiadas do App |
 | **Ranking de pontos** (13/10/2026) | `ranking_app_campo` (o placar do ciclo, que o App publica) | **o App** (`_ciclo_v2`); o Nexus só mostra (ver "Ranking de pontos" abaixo) |
 | Rotas do dia | placeholder: programação do PCM + localização das usinas | — |
 
@@ -49,6 +47,20 @@ supervisor no Painel das Rondas, as fotos no histórico da usina. Saíram do men
 endereço). O `/ranking` voltou em 13/10/2026 com OUTRA tela, o Ranking de pontos (abaixo); a comparação por região e
 equipe não voltou. O `_gestao_os` (a conta da antiga Ordens) saiu da cópia das regras do App na recópia de 09/10
 (ver "As contas copiadas do App").
+
+**Saíram em 09/11/2026: Zeladoria e Triagem de qualidade** (Levi, pelo Scrum master: "Exclua o campo 'Zeladoria' pois
+já temos como uma página"; "Pode excluir o campo triagem de qualidade também, fica redundante pois aprovação de OS traz
+isso e muito mais"). `/t/campo/zeladoria` (e a gaveta `/zeladoria/usina/<id>`) leva à torre Zeladoria > Criticidade (a
+vegetação e a sujidade pela última ronda); `/t/campo/triagem`, à Aprovação de OS. As contas ficam: `campo/zeladoria.py`
+é a da Zeladoria no banco (`zeladoria_banco.py`, a aba Zeladoria do 5080) e `campo/triagem.py` segue testada, sem tela.
+Os serviços de terceiros do App (`visao.zeladoria`) ficaram sem tela junto com a Zeladoria.
+
+**O Responsável UFV que entrou abre filtrado no nome dele** (Levi, 09/11/2026: "Se o usuário do nexus for algum
+responsável por usina sempre que ele for acessar essas telas serão filtradas no nome dele"): a Visão do responsável, a
+Aprovação e as Ocorrências já faziam; a Central de atenção (rondas pendentes e PT) e as Rondas passaram a fazer. É a
+ficha das usinas (`usinas.responsavel_om_id`, `_responsavel_logado_pelo_cadastro`); o filtro continua trocável, o
+"Todos" vai como "*" (os links da tela o levam adiante: sem ele, o próximo clique voltaria ao padrão) e quem não é
+responsável de usina (o administrador, o coordenador) abre em todas. Prova: `tests/test_campo_filtro_responsavel_0911.py`.
 
 Fora daqui: a "APR e PT" da torre HSEQ responde outra pergunta (OS de risco sem APR ou PT assinada).
 
@@ -902,6 +914,16 @@ seja um tabelão. Então eu escolheria o responsável, vai ter o nome do respons
 da performance, chamados abertos, PTs pendentes, Ranking das equipes do maior para menor, acompanhamento de rondas! (...)
 uma tela inicial claro, se for para se aprofundar aí é outro nível". A aba **Painel** (`modo=painel`), a conta em
 `nexus/campo/painel_responsavel.py` (pura) e o bloco `{% if modo == 'painel' %}` do `responsaveis.html`.
+
+**As Pendências de OS no lugar do Ranking das equipes (09/11/2026**, Levi: "Em Visão do responsável > Painel deve ter um
+acompanhamento de pendências de OSs com OSs e motivos!"; `painel_responsavel.pendencias_os`): as listas INTEIRAS do bloco
+Manutenção (`manutencao.por_usina`: `todas_atrasadas` e `todas_paradas`; a linha da Visão geral corta em 5), por usina, a
+da pendência mais antiga primeiro. A atrasada (programada há mais de 10 dias e não feita, a régua do PCM) diz os dias e o
+tipo; a pausada (tirada da programação por um motivo do PCM ou justificada no App) diz o motivo, há quantos dias e quem.
+O número do quadro é o das OS (a OS com duas tarefas pendentes conta uma vez); a OS abre o card por cima (`.cr-os`); o
+"ver todas" é a Visão geral com `manut.atrasadas`. Nenhuma régua nova. O relatório em PDF troca o tema também
+(`painel_relatorio`: "Pendências de OS", com a tabela usina, OS, situação, motivo e dias). As frases de 28/10 abaixo que
+falam do Ranking contam a história do quadro que saiu.
 **O link do e-mail semanal da Segurança** abre aqui (03/11/2026, Levi: "tem que ser o nexus > campo app > painel (filtrado
 no responsável)"): `/t/campo/responsaveis?r=<número da pessoa>&modo=painel`. O `r` vira o responsável pelo
 `responsaveis_por_pessoa` da visão (o livro do e-mail fica na API compartilhada e não leva o nome); o número de quem não
@@ -1013,8 +1035,11 @@ no responsável)"): `/t/campo/responsaveis?r=<número da pessoa>&modo=painel`. O
       rota): `r.ok && !r.redirected && r.j.ok === true`, com a frase da rota (`mensagem`), em âmbar quando o `aviso`
       (um booleano: fechou sem a data de fim) vem ligado. Antes, a sessão do Nexus vencida (12 h, ou o Sair noutra aba)
       fazia o portão responder 302 para /entrar, o fetch seguia, recebia 200 em HTML e a tela dizia "OS X concluída."
-      sem nada ter ido ao Fracttal; e o aviso saía como "concluída. true". Redirecionado, ou resposta sem JSON: "A sua
-      sessão do Nexus acabou: recarregue a página e entre de novo." O PDF segue a mesma regra. Prova na bancada (fila
+      sem nada ter ido ao Fracttal; e o aviso saía como "concluída. true". Redirecionado: "A sua sessão do Nexus acabou:
+      recarregue a página e entre de novo." Resposta sem JSON sem redirecionar (09/11/2026, com o chat OS Creator: o PDF
+      da OS 8159 dizia "sessão acabou" quando o servidor não respondeu a tempo): "O servidor não respondeu a tempo", que
+      no Concluir manda conferir no Fracttal (pode ter gravado) e no PDF diz que nada foi gravado. A Aprovação de OS
+      segue a mesma regra. Prova na bancada (fila
       real de 29/10): o Concluir depois do /sair deu o aviso da sessão, e a resposta simulada da rota (com e sem o
       aviso, o erro e sem o ok) deu a frase certa em cada caso. No ar (05/11/2026, 15:11 de Brasília, e4df64a): o POST
       sem sessão na produção volta 302 para /entrar e, seguido, 200 em HTML (o caso do defeito), e a página no ar traz o
@@ -1117,120 +1142,15 @@ das usinas dele. Levi, 18/10/2026: o objetivo é os responsáveis largarem os pa
   atrasadas, 19 paradas, a semana passada (W41) em 52%, 31 OS de parada abertas; 60 usinas em Focar, 35 em Acompanhar e
   36 em dia com o limite de 30; a 1920, 1536, 1440, 1366, 1024 e 375 px, escuro e claro, sem rolagem lateral.
 
-### O Ranking das equipes (18/10/2026)
+### O Ranking das equipes saiu (09/11/2026)
 
-A peça 2 da Visão (Levi: os responsáveis largarem os painéis próprios). Responde "qual equipe cobrar": a aba `modo=ranking`
-mostra um cartão por equipe das usinas do filtro (o responsável logado vê as dele; quem não é responsável, todas), da pior
-para a melhor. Desenho e decisões: `docs/superpowers/specs/2026-10-18-visao-responsavel-ranking-equipes-design.md`.
-- **Filtrado, o ranking é o mesmo** (Levi, 18/10/2026: "O ranking das equipes tem que permancer mesmo filtrados, o que
-  está acontecendo agora é que se eu filtro [um responsável] vai contar de 1 a 11"): `ranking_equipes.classificar` faz a
-  nota, a posição, o "de N" e a seta sobre TODAS as equipes; o filtro (responsável, cliente, busca, equipe) só escolhe os
-  cartões, e o cartão é o da equipe inteira. Os números de cima são os dos cartões que aparecem. O "Sem equipe" fica com
-  as usinas do filtro (é a lista do conserto no cadastro). Medido em 18/10/2026: nenhuma das 55 equipes tem usina de dois
-  responsáveis; o responsável com 12 equipes passou de 1º a 12º para 7º a 42º de 52.
-- **A janela da equipe** (Levi, 18/10/2026: "Clicando na equipe deve dar um breve resumo do motivo da pontuação da
-  equipe estar abaixo para que o supervisor possa cobrar a equipe"; depois, "quero ao clicar na equipe um detalhamento
-  melhor [do Em quê cobrar], não cheio de informações mas quero a informação, ao resumido e direto onde o supervisor
-  bata o olho e possa cobrar o técnico com dados!"; no quiz, "Item a item com a prova" e, nas OS mais baixas, "Faltou
-  os pontos"): o clique no cartão abre `/t/campo/responsaveis/equipe?equipe=` (o pedaço `_resp_equipe.html`).
-  - No topo, os técnicos da equipe pelo nome (`responsaveis.tecnicos_da_equipe`, o cadastro), a posição e a nota.
-  - **Em quê cobrar** (`ranking_equipes.cobrar`): as MESMAS áreas e níveis das etiquetas do cartão (Focar = crítico,
-    Acompanhar = atenção; as usinas da equipe com o bloco Manutenção no limite de quem olha, o cookie da Visão), cada
-    uma com até 3 provas, uma por linha, a pior primeiro: a OS e os dias (parada, atrasadas, pausadas, chamados), a PT e
-    quem pediu (o `solicitante` entra na lista da PT em `montar`), o extintor, o ativo; nas áreas sem lista (ronda,
-    limpeza, meta, semana, zeladoria), o título do alerta da usina; a disponibilidade, a usina e o valor. A OS atrasada
-    não tem técnico no banco (o `fato_tarefa_os` não guarda pessoa, regra 8): ela cobra a equipe, cujos técnicos estão
-    no topo.
-  - **O Focar em tabela e o "e mais" que abre** (Levi, 28/10/2026, na janela de uma equipe: "ao clicar nas equipes
-    aparece esse 'e mais x' tem que dar para expandir esses 'e mais' o supervisor deve saber o que é. Consegue trazer em
-    um formato melhor? Usinas em linhas e essas linhas em coluna. pelo menos no focar"): o Focar é a tabela de
-    `ranking_equipes.matriz`, as áreas em crítico nas colunas e as usinas com algum alerta delas nas linhas (a com mais
-    áreas em crítico primeiro); a célula traz a prova sem o nome da usina (`_provas(..., com_usina=False)`), 2 à vista
-    e o resto no "e mais" dela, e a usina em crítico naquela área leva a borda vermelha. Com a tabela, a janela fica
-    mais larga (`.cr-modal:has(.cr-rk-j-mat)`). O Acompanhar segue em lista, com o "e mais N" que abre o `resto` ali
-    mesmo. Para abrir TUDO, as atrasadas e as pausadas vêm inteiras (`manutencao`: `todas_atrasadas`/`todas_paradas`;
-    a linha da Visão geral segue com as 5 piores, `lista_*`).
-  - **O "e mais" aberto, em linhas, e o ativo limpo** (6ª rodada).
-    - **O "e mais":** "o e mais 2 não sumiu, os mais dois não quebraram como os demais, vieram juntos numa linha só".
-      Aberto, o resumo some, e as provas ficam numa lista dentro do `<details>` (`.cr-rk-j-mais-lista`): o `<details>`
-      não arruma os filhos em grade no Chrome.
-    - **O ativo:** "o nome do ativo pode aparecer sem nome de fabricante, modelo ou código do ativo. Só o nome limpo".
-      Os chamados e os ativos das provas passam pelo `responsaveis.nome_do_ativo`, o mesmo do quadro de chamados.
-  - **A pontuação do mês** (6ª rodada: "quero uma explicação da pontuação mensal daquela equipe, pontos por ronda, bonus,
-    quantidade de tarefas etc, um resumo do que temos no ranking das equipes"). Fica embaixo do cabeçalho.
-    - **A conta da nota:** "97 = 60% da qualidade 95 + 40% da cobertura 100%".
-    - **Três números:** a qualidade (a média de N notas: tarefas e rondas), a cobertura (usinas com ronda) e a posição
-      com a seta.
-    - **O placar do ciclo do App, por técnico:** sai de `ranking_equipes.placar_da_equipe` sobre o
-      `visao.ranking_pontos` do mês, casado pelo nome do cadastro. As colunas são posição, pontos, tarefas (registradas,
-      pontos, quantas contam, nota média), rondas (pontos, no teto), bônus e devolvidas.
-    - **A régua:** a frase do piso, do teto e do bônus, com os números que o App publicou.
-  - **Nota do App** (`ranking_equipes.motivos`): o que ela perde, uma linha por motivo. Desde a 6ª rodada ("-1 oq? -1
-    ponto? 1 OS anulada? explique melhor e explique o que impacta, o supervisor não tem uma cristal ball"), cada linha
-    diz:
-    - quantos pontos da nota da equipe, de 100;
-    - onde aconteceu ("em 58 de 125 tarefas");
-    - quanto o critério vale em cada tarefa (o peso da composição);
-    - o que o técnico faz para não perder (`ranking_equipes.COMO_RECUPERA`).
-
-    A cobertura diz as usinas sem ronda e que ela vale 40%. A nota perde 100 − nota pontos: a qualidade tira 0,6 × (100 − qualidade), a cobertura o resto; a parte
-    da qualidade vai a cada critério (a "Composição da nota" de cada tarefa, no livro cru pela chave do fato: subtarefas
-    25, fotos 20, descrição das fotos 10, assinatura 10, observação 15, GPS 20, que somam a nota; medido em 18/10/2026,
-    fecha em 3.790 de 3.790 tarefas) e às rondas. Os inteiros são repartidos pelo maior resto e sempre fecham com a nota
-    (provado nas 52 equipes). Depois, as 5 OS com nota mais baixa: a nota, a OS, a usina, quem fez, o dia e os pontos de
-    cada critério que perdeu ("Fotos 0/20 · Observações 0/15"; a ronda, as falhas); tarefas iguais da mesma OS numa
-    linha ("7 tarefas iguais").
-  - **A OS citada é o botão verde que abre o card dela** (Levi, 19/10/2026: "ao citar uma OS tem que ficar verde grid e
-    deve ser possível clicar e ver o card da OS que nem quando clicamos em uma OS no OS Creator Web"): nas provas
-    (parada, atrasadas, chamados, pausadas) e nas OS com nota mais baixa, `cr-os` com o número e o id do Fracttal quando
-    o dado tem (a atrasada e a pausada pelo `fato_tarefa_os`, a tarefa pelo `fato_fechamento.id_os_fracttal`; a parada,
-    o chamado e a ronda só com o número, e o card acha a OS por ele). A janela é um `<dialog>` modal, na camada do topo, e
-    cobriria o card: o clique fecha a janela, abre o card (`NexusOsCard`) e a reabre como estava quando o card fecha
-    (`aoFechar`), no script da Visão. A PT segue pelo número dela.
-  - **Focar e Acompanhar encolhem** (Levi, 19/10/2026: "eles aparecem expandidos que nem estão agora mas deve ser
-    possível encolher!"): `<details open>`, o título com a seta e quantos itens.
-  - `responsaveis.ranking_detalhe` lê as MESMAS linhas da conta (o número de notas bate com o do cartão nas 52
-    equipes). A janela leva 0,1 a 0,2 s; sem as notas do App, diz, e o "Em quê cobrar" continua.
-
-- **A posição é a régua do App** ("de acordo com as regras do ranking do app de campo"): o Ranking por região do painel
-  do App (`_ranking_regioes`), a única conta por equipe que o App tem (o placar do ciclo é só por técnico). Nota = 60%
-  qualidade + 40% cobertura, no **mês vigente** (do dia 1º até hoje; Levi, 28/10/2026: "Ranking das Equipes - Outubro,
-  sempre o mês vigente", no Painel e no Ranking; até então, os últimos 30 dias, porque o App não tem janela oficial; no
-  começo do mês a nota tem poucos dias, e ele aceitou). Qualidade = a média
-  simples das notas das tarefas fechadas pelo App (`fato_fechamento.nota_pts`) e das rondas do App (`fato_ronda.nota_pts`);
-  cobertura = usinas da equipe com ronda ÷ usinas. A cor é a escala do painel do App (85 verde, 70 âmbar), não régua da
-  nota. Empate: qualidade, cobertura, volume, nome (a tela diz). Sem nota (nenhuma OS nem ronda do App): sem posição,
-  antes das ranqueadas; "Sem equipe" no fim. A seta compara com o mesmo trecho do mês anterior (do dia 1º ao mesmo dia,
-  ou ao último dia do mês passado quando ele é mais curto: `ranking_equipes.periodos`; a mesma lista de equipes); a usina
-  mobilizada depois do fim do período anterior fica fora dele (revisão de 18/10/2026: contava como "sem ronda" de antes,
-  e a seta "subia" sem a equipe ter melhorado).
-  A régua da tela diz as datas dos dois períodos e, quando o fato de fechamento saiu na hora (o banco sem a carga desta
-  versão do livro do App), diz isso; a dica do "base pequena" usa o `visao.BASE_PEQUENA`.
-- **Diferenças contra o painel do App** (a tela diz): a equipe da usina é a do cadastro do Nexus (no App, a OS vai ao
-  cluster da tarefa na programação do PCM ou da usina no catálogo dele); a base da cobertura são as usinas mobilizadas; o
-  dia é o de Brasília; a ronda avulsa do Nexus conta na cobertura.
-- **Em quê cobrar** (`ranking_equipes.etiquetas`): uma etiqueta por área com alerta nas usinas da equipe, tirada dos
-  MESMOS alertas que fazem o semáforo do cartão (os três blocos, no limite de quem olha), no nível do pior: "nada a
-  cobrar" só com o semáforo todo em dia (revisão de 18/10/2026: saíam de 12 números à parte, e uma equipe só com um ativo
-  em crítico mostrava "nada a cobrar"). O crítico primeiro, até 4 no cartão; **não mudam a posição** (decisão do Levi). A
-  meta conta usinas abaixo de 97%, nunca a meta somada do grupo (uma usina com a meta errada no Gerencial punha a equipe
-  em 2.207%); a disponibilidade conta usinas, não a média do grupo. Uma legenda diz o que são os três números do
-  semáforo (cor e palavra).
-- **De onde vem:** `responsaveis.ranking_fonte` agrega por usina, nos dois períodos, na cópia de 5 min da Visão (as duas
-  leituras já estão no ciclo quando a Visão é feita); `ranking_equipes.cartoes` agrupa no pedido, porque os filtros e o
-  limite das atrasadas são de quem olha. Nada novo no banco. Sem as notas, a aba diz e não mostra cartão.
-- **O filtro `equipe=`**: o endereço do cartão (quem abre noutra aba) e o link da janela do motivo levam à Visão geral só
-  com as usinas da equipe (o nome exato do cadastro), com o "×"; a volta aos cartões dos responsáveis tira o filtro
-  (revisão de 18/10/2026: ele vazava escondido para lá).
-- **Prova:** `tests/test_campo_ranking_equipes.py` (a régua, igual à aritmética do App, as etiquetas, os cartões, a seta,
-  a posição com filtro, o motivo que fecha com a nota; mutações pegas; os testes que leem as notas da fixture usam a
-  `tela_no_mes`, que leva as rondas e os fechamentos para perto de 18/10 e dubla o dia do ranking, porque no começo do
-  mês a ronda de "3 dias atrás" é do mês passado e sai, como deve: em 03/11/2026 dois falharam assim) e os testes da aba e da janela em
-  `tests/test_campo_responsaveis.py` (`duas_equipes`: a SC Oeste 01 com nota, 2ª de 2 com qualquer filtro). Com o banco real (18/10/2026, só GET, o
-  `test_client` com a sessão de administrador e o HTML servido local): em "Todos", 55 cartões (52 ranqueadas, notas de 41
-  a 98; 2 sem nota; 1 "Sem equipe"); o responsável com mais equipes vê 12. O agrupamento no pedido leva 7 a 8 ms para as
-  55; a conta fria da Visão ficou em 22 a 24 s, como antes (as leituras do ranking já estão no ciclo). A 1440 e a 375 px,
-  escuro e claro, sem rolagem lateral; o "Acompanhamento" do mini-bloco vira "Acompanh." (a palavra inteira cortava).
+Levi, pelo Scrum master: "Pode remover o ranking das equipes de 'Visão do Responsável'". Saíram a aba (`modo=ranking`, o
+endereço guardado abre o Painel), o quadro do Painel, a janela da equipe (`/responsaveis/equipe`, o motivo da nota da
+equipe), a régua (`campo/ranking_equipes.py`) e a leitura das notas do App na conta de 5 min da Visão
+(`responsaveis.ranking_fonte`), com os testes deles. A régua de 18/10/2026 (60% qualidade + 40% cobertura, o período do
+mês vigente) está no histórico do git e no desenho `docs/superpowers/specs/2026-10-18-visao-responsavel-ranking-equipes-design.md`.
+A leitura da "Composição da nota" do App, que era da janela da equipe, foi para `campo/nota_app.py` (a Aprovação usa).
+O **Ranking de pontos** (o placar do ciclo do App, tela própria) é outra coisa e continua.
 
 ### Os chamados de garantia no banco (`nexus_chamados · fato_chamado`, 12/10/2026)
 
@@ -1395,6 +1315,12 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   outubro marcado.
 
 ## Visão do cliente (05/11/2026)
+
+**Só do cliente desde 09/11/2026** (Levi, pelo Scrum master: "O 'visão do cliente' pode tirar pois já temos no modo cliente
+do nosso menu"): `Tela.so_do_cliente` tira a tela do menu da Grid (`montar_menu(cliente=...)`) e da lista dos setores da
+Grid em Base → Acessos; a rota leva quem é da Grid fora do Modo cliente à Visão do responsável. Para o cliente e para o
+administrador no Modo cliente nada mudou: é o Comando deles (`casca._vista_cliente`, `setor_telas.primeira_do_cliente`).
+A escolha do cliente (a fase 1, abaixo) não abre mais para a Grid; a conta (`campo/visao_cliente.py`) é a mesma.
 
 **O próprio cliente na tela (07/11/2026, o acesso dos clientes; regras em `nexus/casca/CLAUDE.md`, seção Acessos):** a
 tela é `Tela.do_cliente`, a única que o setor Clientes pode ver. Com a sessão de cliente (`session["via"] == "cliente"`),
@@ -2073,7 +1999,13 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       do App não espera foto nenhuma** (05/11/2026): as fotos não mudam a coluna dela (Em dúvida pela tarefa fora do App; a
       foto atrasada só se mede contra o fechamento no App), então vai direto para Em dúvida, sem "Faltam fotos por ler",
       e entra no lote. A regra do App de antes
-      (nota abaixo de 80, já devolvida, foto divergente, ronda; `aprovacao.motivos`) virou só aviso, sem mudar a coluna.
+      (já devolvida, foto divergente, ronda com pendência; `aprovacao.motivos`) virou só aviso, sem mudar a coluna.
+      **A nota do App abaixo de 80 é motivo de Em dúvida desde 09/11/2026** (Levi, pelo Scrum master: "Em OS 8159
+      aprovação de OS diz que está aprovado porém a OS tem nota 50 no app (...) tem que ter 'motivo da nota abaixo de
+      80'"; até ali era aviso e a OS caía em Pronta): o aviso `nota` é o motivo em destaque do cartão, com o porquê, os
+      critérios em que a tarefa perdeu pontos pela "Composição da nota" que o App grava (`campo/nota_app.py`; a
+      composição do fechamento da OS com a MESMA nota, o mais novo: `aprovacao._composicao_de`). Sem a composição no
+      livro, diz "o App não guardou a composição desta nota". A ronda fica de fora (a nota dela vem com as falhas).
       "Menos de 5 min no App" e "subtarefas respondidas" não separaram na medição e ficaram de fora.
     - **Fora do pré-filtro** (abaixo do quadro, com o motivo; aprova pelo cartão; **não entra na conta** das OS
       esperando, Levi 05/11/2026: "O que tiver fora do pré filtro não é contabilizado"): religamento, pelo tipo ou pela
@@ -2116,7 +2048,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       destaque** (`apq-motivo`: "Sempre destacar o motivo de estar em dúvida ou não OK! tem que estar bem visual e
       acessível"): o fundo e o fio na cor, o ícone e a mensagem na cor da coluna, sem repetir o nome da coluna (3ª rodada:
       "tire esse 'EM DÚVIDA' da OS deixe só a mensagem em laranja"), com os fatos que puseram a OS ali
-      (`prefiltro.TIPOS_DO_MOTIVO`: tarde, repetida, não abriu, fora do App); em Fora do pré-filtro e Ainda conferindo, o
+      (`prefiltro.TIPOS_DO_MOTIVO`: tarde, repetida, não abriu, fora do App e, desde 09/11/2026, a nota do App abaixo de
+      80); em Fora do pré-filtro e Ainda conferindo, o
       mesmo bloco, neutro; depois a tarefa (a 1ª, "e mais N") com a nota do App ao lado (pequena; "Fora do App" sem ela);
       a linha de baixo com quantas tarefas, a UFV e o cliente (o ativo já vem no título: "não precisa repetir o nome do
       ativo abaixo, ao invés disso bote a quantidade de tarefas"); os outros avisos (a regra do App, as fotos por ler); e
