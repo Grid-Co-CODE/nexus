@@ -231,6 +231,13 @@ minuto em minuto pela versão do livro (uma leitura da listagem): o pedido mais 
 hora (`forcar`), no máximo uma a cada 2 min; a volta que não grava (a memória ainda carregando) tenta de novo. A
 plataforma vê a gravação nova e refaz a conta da Thopen (o `CLAUDE.md` da plataforma). Prova:
 `tests/test_cos_normalizacoes_banco.py`.
+**O relato ao cliente no fato (09/11/2026**, o dono: "precisamos, de alguma forma, unir todas as informações para uma
+informação final e completa pro cliente"): `relato_cliente` e `relato_continuacao`, que a API de normalizações passou a
+mandar, vão ao `fato_normalizacao` (as duas últimas colunas). A Plataforma mostra o relato no Comentário do primeiro dia
+em que a ocorrência aparece, e a continuação nos dias seguintes, no lugar da linha montada com o tipo, as horas, a
+proteção e a OS. Não é texto livre: a Ronda COS monta o relato por regras fixas, sem copiar as notas, e a regra 8 segue
+valendo para `impacto`, `detalhes` e `informe`. As colunas são calculadas na leitura da API, então valem para todas as
+normalizações desde 01/10/2026 depois que o processo relê a memória (no deploy).
 
 - **De onde:** `GET <Andamento>/api/normalizacoes?desde=&limite=` (contrato `versao: 1`, a mesma chave `X-Nexus-Chave`). A
   API é **incremental**: devolve `cursor` e `mais`. O Nexus guarda em memória (`nexus/cos/normalizacoes.py`) desde o
