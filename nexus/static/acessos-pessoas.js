@@ -100,6 +100,10 @@
     var v = e.target.querySelector && e.target.querySelector('input[name="volta"]');
     if (v) v.value = location.search.replace(/^\?/, "");
   });
+  // o Excluir do setor pergunta antes (09/11/2026: excluir deixa sem setor quem estava nele, e não se desfaz)
+  document.querySelectorAll("#fr-setores button[data-confirmar]").forEach(function (b) {
+    b.addEventListener("click", function (e) { if (!window.confirm(b.getAttribute("data-confirmar"))) e.preventDefault(); });
+  });
   document.getElementById("fr-lote-limpar").addEventListener("click", function () {
     caixas().forEach(function (c) { c.checked = false; }); atualizar();
   });

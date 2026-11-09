@@ -264,7 +264,10 @@ def _gravar_lista():
         elif acao == "renomear" and sid:
             texto = f"O setor agora se chama {S.renomear(sid, nome, cfg, base, sessao, quem)['nome']}."
         elif acao == "excluir" and sid:
-            texto = f"Setor {S.excluir(sid, cfg, base, sessao, quem)['nome']} excluído."
+            r = S.excluir(sid, cfg, base, sessao, quem, quem_email=_meu_email())
+            n = r["tiradas"]
+            texto = f"Setor {r['nome']} excluído." + (f" {n} {'pessoa ficou' if n == 1 else 'pessoas ficaram'} sem setor."
+                                                      if n else "")
         else:
             return _responder(False, "Ação desconhecida: nada foi gravado.", 400, painel=True)
     except S.Recusada as ex:

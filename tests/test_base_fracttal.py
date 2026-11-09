@@ -99,16 +99,14 @@ def test_a_tela_mostra_o_pessoal_e_as_fichas_sem_conta(banco, com_fracttal, loga
     assert "Pessoal do Fracttal" not in html and "<th>Código</th>" not in html
     assert 'class="fr-dica-botao"' in html and 'role="tooltip"' in html and "Como liga." in html
     assert "cad-aviso--info" not in html
-    # 4 no Fracttal; Beltrano pelo e-mail e Ciclano pelo nome (fichas 90 e 91 do banco falso); 2 sem ficha
-    assert '<div class="r">No Fracttal</div><div class="v">4</div>' in html
-    assert '<div class="r">Com ficha no Nexus</div><div class="v">2</div>' in html
-    assert '<div class="r">Sem ficha no Nexus</div><div class="v">2</div>' in html
+    # 09/11/2026, Levi: "Em pessoas e setores pode tirar esse KPI" (a faixa No Fracttal / Com ficha / Sem ficha / Fichas
+    # sem conta); Beltrano pelo e-mail e Ciclano pelo nome (fichas 90 e 91 do banco falso) seguem na tabela
+    assert 'class="cad-numeros' not in html and '<div class="r">No Fracttal</div>' not in html
     assert 'href="/t/pessoas/colaborador/90">Beltrano Supervisor</a>' in html and "pelo e-mail" in html
     assert 'href="/t/pessoas/colaborador/91">Ciclano Chefe</a>' in html and "pelo nome" in html
     # as fichas ativas sem conta no Fracttal: a supervisora e o coordenador de campo
     sem = html[html.index("Fichas do Nexus sem conta no Fracttal"):]
     assert "Supervisora Campo" in sem and "Coordenador Campo" in sem and "Beltrano" not in sem
-    assert "0 da Grid Co. · 2 externos" in html                                   # Fulana e a sem conta, sem gridco
     so_ext = logado.get(URL + "&origem=Externo").get_data(as_text=True)
     assert _visivel(so_ext, 503)                                                  # os quatro são externos
     # filtros e a leitura guardada: a 2ª visita não pede de novo ao Fracttal
@@ -166,18 +164,28 @@ def test_criar_renomear_excluir_e_definir_no_banco(app, banco):
     # regra 8: nenhum nome nem e-mail de pessoa no banco
     tudo = [str(v) for x in linhas + banco.linhas(S.LIVRO, S.ABA_SETOR) for v in x.values()]
     assert not [v for v in tudo if "@" in v or "Beltrano" in v or "Fulana" in v]
-    # excluir só setor sem ninguém; renomear mantém o ID e as decisões
-    with pytest.raises(S.Recusada, match="2 pessoas estão no setor PCM"):
-        S.excluir(1, cfg, base, sessao)
+    # renomear mantém o ID e as decisões
     assert S.renomear(1, "PCM e Programação", cfg, base, sessao)["setor_id"] == 1
-    S.definir([pessoa, sem_ficha], None, cfg, base, sessao)                     # tira as duas do setor
-    assert S.excluir(1, cfg, base, sessao)["excluido"]
+    # 09/11/2026, Levi: "não estou conseguindo excluir o setor" (só saía setor vazio). Agora excluir deixa SEM SETOR quem
+    # estava nele, com a ficha e o código da última decisão, inclusive quem já saiu do Fracttal (a tela não o mostra)
+    S.definir([{"id": 777, "email": "saiu@exemplo.test", "ficha": None, "por": ""}], 2, cfg, base, sessao)   # COS
+    r = S.excluir(1, cfg, base, sessao, quem_email="admin@exemplo.test")
+    assert r["excluido"] and r["tiradas"] == 2
+    vig = S.vigentes(S.ler(base, sessao, forcar=True)["decisoes"])
+    assert vig[501] is None and vig[503] is None and vig[777] == 2              # quem era de outro setor fica nele
+    tiradas = [x for x in banco.linhas(S.LIVRO, S.ABA_DECISAO) if x["origem"] == "excluir"]
+    assert sorted(x["fracttal_id"] for x in tiradas) == [501, 503] and all(x["setor_id"] is None for x in tiradas)
+    assert [x["pessoa_id"] for x in tiradas if x["fracttal_id"] == 501] == [90] and all(x["decidida_por_hmac"] for x in tiradas)
     setores = {x["setor_id"]: x for x in banco.linhas(S.LIVRO, S.ABA_SETOR)}
     assert setores[1]["excluido"] == "sim" and setores[1]["nome"] == "PCM e Programação" and setores[2]["excluido"] is None
     with pytest.raises(S.Recusada, match="não existe mais"):
         S.definir([pessoa], 1, cfg, base, sessao)                               # setor excluído não recebe ninguém
+    with pytest.raises(S.Recusada, match="não existe mais"):
+        S.excluir(1, cfg, base, sessao)                                         # nem sai duas vezes
     assert S.criar("Engenharia", cfg, base, sessao)["setor_id"] == 3            # o ID do excluído não volta
-    assert len(banco.linhas(S.LIVRO, S.ABA_DECISAO)) == 4                       # 2 decisões + as 2 de tirar
+    # um setor vazio sai sem decisão nova
+    assert S.excluir(3, cfg, base, sessao)["tiradas"] == 0
+    assert len(banco.linhas(S.LIVRO, S.ABA_DECISAO)) == 5                       # 2 + a de quem saiu + as 2 de tirar
 
 
 def test_leitura_que_falha_nao_grava_e_sem_token_nao_grava(app, banco):
@@ -214,8 +222,9 @@ def test_a_tela_cria_o_setor_e_poe_a_pessoa_nele(banco, com_fracttal, logado):
     linha = html[html.index('id="p-501"'):html.index('id="p-502"')]
     assert '<option value="1" selected>PCM</option>' in linha
     assert "PCM (1)" in html and "Sem setor (3)" in html and "1 pessoa</span>" in html
-    # o painel não deixa excluir setor com gente; o filtro acha quem está nele
-    assert 'value="excluir" formnovalidate disabled' in html
+    # 09/11/2026: o Excluir de setor com gente fica ativo e pergunta antes, dizendo quem fica sem setor
+    assert 'value="excluir" formnovalidate data-confirmar="Excluir o setor PCM? A pessoa dele fica sem setor.' in html
+    assert 'value="excluir" formnovalidate disabled' not in html
     so_pcm = logado.get(URL + "&setor=1").get_data(as_text=True)
     assert _visivel(so_pcm, 501) and not _visivel(so_pcm, 503)
     sem = logado.get(URL + "&setor=sem").get_data(as_text=True)
@@ -252,3 +261,16 @@ def test_setores_no_catalogo_da_governanca():
     assert f.livro == f"{S.LIVRO} · {S.ABA_DECISAO}" and all(c in S.CAB_DECISAO for c in f.chave)
     assert f.dims["pessoa"][0] == "id" and f.area == "base"
     assert not [c for c in S.CAB_DECISAO if c in ("nome", "email") or c.startswith(("nome_", "email_"))]
+
+
+def test_excluir_setor_com_gente_pela_tela_09_11(banco, com_fracttal, logado):
+    """09/11/2026, Levi: "Em pessoas e setores não estou conseguindo excluir o setor". O Excluir de setor com gente grava,
+    diz quantas pessoas ficaram sem setor, e elas voltam a "a definir" na lista."""
+    logado.post("/t/base/fracttal/setores", data={"acao": "criar", "nome": "PCM"})
+    logado.post("/t/base/fracttal/setor", data={"pessoa": ["501", "502"], "setor_id": "1"})
+    r = logado.post("/t/base/fracttal/setores", data={"acao": "excluir", "setor_id": "1", "nome": "PCM"})
+    assert r.status_code == 303
+    html = logado.get(URL).get_data(as_text=True)
+    assert "Setor PCM excluído. 2 pessoas ficaram sem setor." in html and "Setores (0)" in html
+    assert 'class="cad-numeros' not in html                    # 09/11: "pode tirar esse KPI"
+    assert S.vigentes(S.ler("http://pg.falso", banco, forcar=True)["decisoes"]) == {501: None, 502: None}

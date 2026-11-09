@@ -616,7 +616,8 @@ FATOS = (
          fontes=("nexus_setores · fato_decisao_setor",),
          janela_origem="o Nexus é a fonte (só acrescenta: o setor de cada pessoa é a última decisão dela)",
          observacao="o setor liga pelo setor_id à dim_setor do mesmo livro (a lista nasce na tela; excluir marca "
-                    "excluido = sim e o ID não volta). As duas abas vão juntas a cada gravação (gravar sem uma a "
+                    "excluido = sim e o ID não volta; desde 09/11/2026 quem estava nele ganha a decisão sem setor, com "
+                    "origem = excluir; a da tela é origem = tela). As duas abas vão juntas a cada gravação (gravar sem uma a "
                     "apagaria). Nada de nome nem e-mail (regra 8): quem decidiu vai em decidida_por_hmac e no log da "
                     "máquina"),
     # O que cada setor vê no Nexus (12/10/2026, Levi: "uma seção no BASE > ACESSOS onde eu possa controlar o que cada

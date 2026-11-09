@@ -265,8 +265,12 @@ gestão; a falta de verdade) e 43 externas (clientes com acesso de leitura, pelo
 e-mails pessoais); filtro Origem e a etiqueta "externo" na linha.
 - **Setor** (`setores.py`; Levi, 12/10: "Como faço para definir um setor???? tem que dar possibilidade"): o Fracttal
   não diz o setor de ninguém (grupo 1, grupo 2 e campos próprios vazios nas 150) e não há base, então a lista nasce na
-  tela. Botão **Setores** (ao lado da contagem): criar, renomear, excluir (só setor sem ninguém; o ID do excluído não
-  volta). Na linha, a caixa Setor grava na hora, sem recarregar (fetch; o resultado no aviso do canto e na borda da
+  tela. Botão **Setores** (ao lado da contagem): criar, renomear, excluir (o ID do excluído não
+  volta). **Excluir deixa SEM SETOR quem estava nele** (09/11/2026, Levi: "não estou conseguindo excluir o setor"; até
+  ali só setor vazio saía e 7 dos 8 tinham gente; a conta do banco leva até quem saiu do Fracttal, que a tela não mostra):
+  cada pessoa ganha a decisão sem setor com `origem = excluir`, e o botão pergunta antes dizendo quantas ficam sem setor.
+  A faixa de números do alto da aba (No Fracttal, Com ficha, Sem ficha, Fichas sem conta) saiu no mesmo dia ("pode
+  tirar esse KPI"). Na linha, a caixa Setor grava na hora, sem recarregar (fetch; o resultado no aviso do canto e na borda da
   caixa: texto na linha mudava a largura da coluna); marcar várias abre a barra "Pôr no setor" embaixo. Filtro Setor (com
   "Sem setor") e a busca acham pelo nome do setor. Grava no livro **`nexus_setores`** (`dim_setor` + `fato_decisao_setor`,
   só acrescenta, vale a última decisão de cada pessoa; regras em `nexus/dados/CLAUDE.md`, "Setor do pessoal"): a pessoa

@@ -219,17 +219,31 @@ def renomear(setor_id, nome, cfg, base, sessao, quem: str = "") -> dict:
     return s
 
 
-def excluir(setor_id, cfg, base, sessao, quem: str = "") -> dict:
+def excluir(setor_id, cfg, base, sessao, quem: str = "", quem_email: str = "") -> dict:
+    """Exclui o setor e deixa SEM SETOR quem estava nele: {o setor, "tiradas": quantas pessoas saíram dele}.
+    09/11/2026, Levi: "Em pessoas e setores não estou conseguindo excluir o setor" (escolheu "Excluir e deixar sem
+    setor"). Até ali só setor vazio saía: no banco, 7 dos 8 setores tinham gente (o botão ficava cinza, com a razão só no
+    passar do mouse), e a conta do banco leva quem já saiu do Fracttal, que a tela não mostra e não havia como tirar.
+    Cada pessoa ganha a decisão "sem setor" (origem `excluir`), com a ficha e o código da última decisão dela."""
+    from .ligacao_campo import codigo_da_pessoa
+    por = codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), quem_email) or ""
+
     def mudar(setores, decisoes):
         s = _do_livro(setores, setor_id)
-        n = sum(1 for v in vigentes(decisoes).values() if v == setor_id)
-        if n:
-            raise Recusada(f"{n} {'pessoa está' if n == 1 else 'pessoas estão'} no setor {s['nome']}: mude o setor "
-                           f"{'dela' if n == 1 else 'delas'} antes de excluir.")
-        s["excluido"], s["alterado_em"] = True, _iso(_agora())
-        return s, True
+        ultima = {}
+        for d in sorted(decisoes, key=lambda x: x["decidida_em"]):      # a mesma ordem de `vigentes`
+            ultima[d["fracttal_id"]] = d
+        agora = _agora()
+        novas = [{"decidida_em": _iso(agora), "data_id": int(agora.astimezone(_BRT).strftime("%Y%m%d")),
+                  "fracttal_id": fid, "pessoa_id": d["pessoa_id"], "pessoa_ligada_por": d["pessoa_ligada_por"],
+                  "pessoa_hmac": d["pessoa_hmac"], "setor_id": None, "decidida_por_hmac": por, "origem": "excluir"}
+                 for fid, d in ultima.items() if d["setor_id"] == setor_id]
+        decisoes.extend(novas)
+        s["excluido"], s["alterado_em"] = True, _iso(agora)
+        return dict(s, tiradas=len(novas)), True
     s = _gravar(mudar, cfg, base, sessao)
-    log.info("Setores: excluiu %s (setor %s), por %s.", s["nome"], setor_id, quem or "?")
+    log.info("Setores: excluiu %s (setor %s) e deixou %s pessoa(s) sem setor, por %s.", s["nome"], setor_id,
+             s["tiradas"], quem or "?")
     return s
 
 

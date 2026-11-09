@@ -34,12 +34,7 @@
 {% elif sem_token %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Este Nexus não grava no banco.</strong>
   Sem a <span class="gc-dado">GRIDCO_SQL_TOKEN</span>, o setor fica só para ver.</div></div>{% endif %}
 
-<div class="cad-numeros">
-  <div><div class="r">No Fracttal</div><div class="v">{{ total }}</div><div class="d">{{ admins }} administradores · {{ leitura }} de leitura · {{ sem_acesso }} sem acesso</div></div>
-  <div><div class="r">Com ficha no Nexus</div><div class="v">{{ rel.ligadas }}</div><div class="d">ligadas pelo e-mail ou pelo nome</div></div>
-  <div><div class="r">Sem ficha no Nexus</div><div class="v">{{ rel.sem_ficha }}</div><div class="d">{{ sem_ficha_grid }} da Grid Co. · {{ sem_ficha_ext }} externos (clientes, e-mail pessoal){% if rel.ambiguas %} · {{ rel.ambiguas }} com nome de duas fichas{% endif %}</div></div>
-  <div><div class="r">Fichas sem conta no Fracttal</div><div class="v">{{ sem_conta_total }}</div><div class="d">do cadastro de pessoas</div></div>
-</div>
+{# a faixa de números saiu em 09/11/2026 (Levi: "Em pessoas e setores pode tirar esse KPI") #}
 
 <form class="cad-filtros" method="get" action="{{ url_for('torre_base.acessos') }}" id="fr-filtros" data-filtro-local>
   <input type="hidden" name="aba" value="pessoas">
@@ -83,14 +78,14 @@
   <details class="cad-colunas fr-setores" id="fr-setores"{% if abrir_setores %} open{% endif %}>
     <summary class="gc-btn gc-btn--ui gc-btn--contorno"><i class="ph ph-tag"></i> Setores ({{ setores|length }})</summary>
     <div class="cad-colunas-painel fr-setores-painel">
-      <p class="gc-ajuda">A lista de setores da casa. Excluir só vale para setor sem ninguém.</p>
+      <p class="gc-ajuda">A lista de setores da casa. Excluir deixa sem setor quem estava nele.</p>
       {% for s in setores %}
       <form method="post" action="{{ url_for('torre_base.fracttal_setores') }}" class="fr-setor-linha">
         <input type="hidden" name="volta" value="{{ volta }}"><input type="hidden" name="setor_id" value="{{ s.setor_id }}">
         <input class="gc-campo" name="nome" value="{{ s.nome }}" maxlength="60" required aria-label="Nome do setor {{ s.nome }}"{% if not pode_gravar_setor %} disabled{% endif %}>
         <span class="fr-setor-n">{{ s.n }} {{ 'pessoa' if s.n == 1 else 'pessoas' }}</span>
         <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="renomear"{% if not pode_gravar_setor %} disabled{% endif %}>Renomear</button>
-        <button class="gc-btn gc-btn--ui gc-btn--fantasma" type="submit" name="acao" value="excluir" formnovalidate{% if s.n or not pode_gravar_setor %} disabled{% endif %}{% if s.n %} title="Mude o setor {{ 'da pessoa' if s.n == 1 else 'das ' ~ s.n ~ ' pessoas' }} antes"{% endif %}>Excluir</button>
+        <button class="gc-btn gc-btn--ui gc-btn--fantasma" type="submit" name="acao" value="excluir" formnovalidate data-confirmar="Excluir o setor {{ s.nome }}?{% if s.n %} {{ 'A pessoa dele fica' if s.n == 1 else 'As ' ~ s.n ~ ' pessoas dele ficam' }} sem setor.{% endif %} Não dá para desfazer."{% if not pode_gravar_setor %} disabled{% endif %}>Excluir</button>
       </form>
       {% else %}<p class="mudo fr-setor-vazio">Nenhum setor ainda: crie o primeiro abaixo.</p>{% endfor %}
       <form method="post" action="{{ url_for('torre_base.fracttal_setores') }}" class="fr-setor-linha">

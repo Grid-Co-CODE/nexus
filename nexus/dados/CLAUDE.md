@@ -170,7 +170,7 @@ quem lê é só a própria plataforma (PC e servidor, cache de 60 s). Registrado
 **Setor do pessoal (12/10/2026):** Levi: "Como faço para definir um setor???? tem que dar possibilidade". O Fracttal não
 diz o setor de ninguém e ainda não há base, então a lista nasce no Nexus: a aba Pessoas e setores de Base · Acessos (só admin)
 grava o livro `nexus_setores` (`nexus/cadastro/setores.py`), com `dim_setor` (1 linha = 1 setor; excluir marca
-`excluido = sim` e o ID não volta) e `fato_decisao_setor` (1 linha = 1 decisão de pôr 1 pessoa do Fracttal num setor, ou
+`excluido = sim`, o ID não volta e quem estava nele ganha a decisão sem setor com `origem = excluir`, 09/11/2026) e `fato_decisao_setor` (1 linha = 1 decisão de pôr 1 pessoa do Fracttal num setor, ou
 de tirá-la; só acrescenta, vale a última de cada pessoa). O setor é atributo da **pessoa** (como a região de campo é da
 equipe), não uma dimensão à parte. A pessoa vai pelo `fracttal_id` (o id_personnel, o mesmo `tecnico_id` do coletor do
 Campo), pelo `pessoa_id` quando tem ficha (critério do login, `pessoa_ligada_por`) e pelo `pessoa_hmac`; nome e e-mail
