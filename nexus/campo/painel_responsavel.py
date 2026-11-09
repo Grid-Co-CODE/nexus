@@ -115,9 +115,11 @@ def pendencias_os(usinas: list[dict], hoje=None) -> dict:
     Painel não deixa nada de fora). A atrasada é a tarefa programada há mais de 10 dias e não feita (a régua do PCM); a
     pausada é a tarefa tirada da programação por um motivo do PCM ou justificada pelo técnico no App, com o motivo, desde
     quando e quem. Por usina, a da pendência mais antiga primeiro; dentro dela, a atrasada mais antiga e depois a pausada
-    mais antiga. O número do quadro é o das OS (uma OS com duas tarefas pendentes conta uma vez)."""
+    mais antiga. O número do quadro é o das OS (uma OS com duas tarefas pendentes conta uma vez), e as duas contas de
+    baixo também são de OS: com tarefa atrasada e com tarefa pausada (a OS com as duas entra nas duas; na bancada de
+    09/11/2026, "158 atrasadas e 96 pausadas" de 187 OS misturava OS e tarefas)."""
     hoje = hoje or visao._agora().date()
-    grupos, todas, n_atr, n_par = [], set(), 0, 0
+    grupos, todas, com_atr, com_par = [], set(), set(), set()
     for u in usinas:
         m = u.get("manutencao") or {}
         itens = []
@@ -133,14 +135,14 @@ def pendencias_os(usinas: list[dict], hoje=None) -> dict:
                           "motivo": motivo + (f" · por {x['quem']}" if x.get("quem") else "")})
         if not itens:
             continue
-        n_atr += sum(1 for i in itens if i["situacao"] == "Atrasada")
-        n_par += sum(1 for i in itens if i["situacao"] == "Pausada")
+        com_atr |= {(u["usina_id"], i["os"]) for i in itens if i["situacao"] == "Atrasada"}
+        com_par |= {(u["usina_id"], i["os"]) for i in itens if i["situacao"] == "Pausada"}
         todas |= {(u["usina_id"], i["os"]) for i in itens}
         itens.sort(key=lambda i: (i["situacao"] != "Atrasada", -(i["dias"] if i["dias"] is not None else -1)))
         grupos.append({"usina_id": u["usina_id"], "usina": u["usina"], "itens": itens,
                        "pior": max((i["dias"] for i in itens if i["dias"] is not None), default=-1)})
     grupos.sort(key=lambda g: (-g["pior"], g["usina"]))
-    return {"os": len(todas), "atrasadas": n_atr, "pausadas": n_par, "grupos": grupos}
+    return {"os": len(todas), "atrasadas": len(com_atr), "pausadas": len(com_par), "grupos": grupos}
 
 
 def _situacao_da_ronda(u: dict) -> str:

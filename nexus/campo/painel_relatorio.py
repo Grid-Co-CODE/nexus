@@ -135,8 +135,7 @@ def resumo(painel: dict, faixa: list, verif: dict | None, temas=CHAVES_TEMAS) ->
          "cor": "critico" if ex["vencidos"] else "ok",
          "txt": f"em {ex['usinas']} usina{'s' if ex['usinas'] != 1 else ''} · {ex['a_vencer']} a vencer"},
         {"tema": "pendencias", "rot": "OS pendentes", "num": po["os"], "cor": "alerta" if po["os"] else "ok",
-         "txt": f"{po['atrasadas']} tarefa{'s' if po['atrasadas'] != 1 else ''} atrasada"
-                f"{'s' if po['atrasadas'] != 1 else ''} · {po['pausadas']} pausada{'s' if po['pausadas'] != 1 else ''}"},
+         "txt": f"{po['atrasadas']} com tarefa atrasada · {po['pausadas']} com tarefa pausada"},
     ]
     return [x for x in todos if x["tema"] in temas]
 

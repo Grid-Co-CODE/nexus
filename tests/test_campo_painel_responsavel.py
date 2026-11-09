@@ -111,21 +111,27 @@ def test_pendencias_de_os_com_a_os_e_o_motivo_todas_e_a_mais_antiga_primeiro():
         return {"todas_atrasadas": [{"os": o, "wid": 9000 + o, "dias": d, "tipo": t} for o, d, t in atr],
                 "lista_atrasadas": [], "todas_paradas": [{"os": o, "wid": None, "motivo": mo, "desde": de, "quem": q}
                                                          for o, mo, de, q in par], "lista_paradas": []}
-    us = [dict(USINAS[0], manutencao=_m(atr=[(701, 14, "preventiva"), (702, 40, None)])),
+    us = [dict(USINAS[0], manutencao=_m(atr=[(701, 14, "preventiva"), (702, 40, None)],
+                                        par=[(701, "Aguardando cliente", date(2026, 11, 1), "")])),
           dict(USINAS[1], manutencao=_m(par=[(703, "Aguardando peça", date(2026, 10, 1), "PCM"),
+                                             (703, "Aguardando clima", date(2026, 10, 20), "PCM"),
                                              (704, "", None, "")])),
           dict(USINAS[2], manutencao=_m(atr=[(705 + i, 11, "corretiva") for i in range(7)])),
           dict(USINAS[3], manutencao={})]
     p = P.pendencias_os(us, date(2026, 11, 9))
-    assert (p["os"], p["atrasadas"], p["pausadas"]) == (11, 9, 2)
+    # as contas são de OS: a 701 da Altair, atrasada numa tarefa e pausada noutra, conta uma vez no total e uma em cada
+    # lado (na bancada de 09/11/2026 os lados contavam tarefas e somavam mais que o total)
+    assert (p["os"], p["atrasadas"], p["pausadas"]) == (11, 9, 3)
     # a usina da pendência mais antiga primeiro: a pausada desde 01/10 (39 d) vem antes da atrasada de 40 d? não: 40 > 39
     assert [g["usina"] for g in p["grupos"]] == ["Altair", "Brodowski 1", USINAS[2]["usina"]]
     alt = p["grupos"][0]["itens"]
-    assert [(x["os"], x["situacao"], x["dias"]) for x in alt] == [(702, "Atrasada", 40), (701, "Atrasada", 14)]
+    assert [(x["os"], x["situacao"], x["dias"]) for x in alt] == [(702, "Atrasada", 40), (701, "Atrasada", 14),
+                                                                  (701, "Pausada", 8)]
     assert alt[1]["motivo"] == "programada há 14 dias e não feita · preventiva" and alt[1]["wid"] == 9701
     bro = p["grupos"][1]["itens"]
     assert bro[0]["motivo"] == "Aguardando peça · por PCM" and bro[0]["dias"] == 39 and bro[0]["situacao"] == "Pausada"
-    assert bro[1]["motivo"] == "pausada sem motivo escrito" and bro[1]["dias"] is None
+    assert (bro[1]["os"], bro[1]["motivo"], bro[1]["dias"]) == (703, "Aguardando clima · por PCM", 20)
+    assert bro[2]["motivo"] == "pausada sem motivo escrito" and bro[2]["dias"] is None
     assert len(p["grupos"][2]["itens"]) == 7                                       # nada fica de fora (a linha corta em 5)
     assert P.pendencias_os([], date(2026, 11, 9)) == {"os": 0, "atrasadas": 0, "pausadas": 0, "grupos": []}
 
@@ -199,7 +205,7 @@ def test_a_tela_do_painel_do_responsavel(tela, logado):
     assert re.search(r'</b>\s*<span>chamados? em aberto</span>', html[i:html.index("</section>", i)])
     # as Pendências de OS no lugar do Ranking das equipes (09/11/2026): o número das OS e as atrasadas e pausadas
     i = html.index('id="pn-os-t"')
-    assert re.search(r'<b class="cn-t-\w+">\d+</b>\s*<span>OS pendentes? · \d+ atrasadas? e \d+ pausadas?</span>',
+    assert re.search(r'<b class="cn-t-\w+">\d+</b>\s*<span>OS pendentes? · \d+ com atraso e \d+ com pausa</span>',
                      html[i:html.index("</section>", i)])
     assert "Ranking das" not in html and 'id="pn-rk-t"' not in html
     i = html.index('id="pn-ex-t"')

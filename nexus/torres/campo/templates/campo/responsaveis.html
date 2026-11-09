@@ -252,7 +252,7 @@
     <section class="pn-q" aria-labelledby="pn-os-t">
       <header class="pn-cab"><h2 id="pn-os-t"><i class="ph ph-wrench" aria-hidden="true"></i>Pendências de OS</h2>{{ ver(modo='geral', filtro='manut.atrasadas', bloco=None, equipe=None) }}</header>
       <div class="pn-num"><b class="{{ 'cn-t-alerta' if po.os else 'cn-t-ok' }}">{{ po.os }}</b>
-        <span>OS pendente{{ 's' if po.os != 1 }} · {{ po.atrasadas }} atrasada{{ 's' if po.atrasadas != 1 }} e {{ po.pausadas }} pausada{{ 's' if po.pausadas != 1 }}</span></div>
+        <span>OS pendente{{ 's' if po.os != 1 }} · {{ po.atrasadas }} com atraso e {{ po.pausadas }} com pausa</span></div>
       <ol class="pn-lista pn-ch" tabindex="0" aria-label="Todas as OS pendentes, por usina, a mais antiga primeiro">
         {% for g in po.grupos %}
         <li class="pn-grupo"><p class="pn-grupo-cab"><b>{{ g.usina }}</b><span>{{ g.itens|length }} pendência{{ 's' if g.itens|length != 1 }}</span></p>
