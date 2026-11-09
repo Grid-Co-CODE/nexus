@@ -15,10 +15,9 @@ def _campo():
     return next(t for t in descobrir_torres() if t.id == "campo")
 
 
-def test_zeladoria_tem_tela_e_a_pt_foi_para_seguranca(logado):
+def test_a_pt_foi_para_seguranca(logado):
     # Levi, 04/10: "crie para PT, ZELADORIA". Em 09/10 a PT foi para Segurança · HSEQ > APR e PT ("quero que esse
     # visual e caminho vá para APR e PT de Segurança · HSEQ"): o endereço antigo leva para lá, com os filtros
-    assert _campo().tela("zeladoria") is not None and "Zeladoria" in logado.get("/t/campo/zeladoria").get_data(as_text=True)
     assert _campo().tela("pt") is None
     r = logado.get("/t/campo/pt?aba=historico&dias=7")
     assert r.status_code == 302 and r.headers["Location"].endswith("/t/hseq/apr-pt?aba=historico&dias=7")
@@ -26,10 +25,17 @@ def test_zeladoria_tem_tela_e_a_pt_foi_para_seguranca(logado):
     assert "Permissões de trabalho e Análise Preliminar de Risco" in html and "Segurança · HSEQ" in html
 
 
-def test_zeladoria_fica_junto_das_telas_parecidas():
-    # a zeladoria é acompanhamento do dia, como a ronda
-    ids = [t.id for t in _campo().telas]
-    assert ids.index("zeladoria") == ids.index("rondas") + 1
+def test_zeladoria_e_triagem_sairam_e_o_endereco_leva_ao_lugar_novo(logado):
+    """Levi, 09/11/2026 (pelo Scrum master): "Exclua o campo 'Zeladoria' pois já temos como uma página" e "Pode excluir o
+    campo triagem de qualidade também, fica redundante pois aprovação de OS traz isso e muito mais"."""
+    assert _campo().tela("zeladoria") is None and _campo().tela("triagem") is None
+    for velho, novo in (("/t/campo/zeladoria", "/t/zeladoria/criticidade"),
+                        ("/t/campo/zeladoria/usina/1?semana=2026-W45", "/t/zeladoria/criticidade"),
+                        ("/t/campo/triagem?dias=7", "/t/campo/aprovacao")):
+        r = logado.get(velho)
+        assert r.status_code == 302 and r.headers["Location"].endswith(novo), velho
+    menu = logado.get("/t/campo/rondas").get_data(as_text=True).split('<nav class="menu"', 1)[1].split("</nav>", 1)[0]
+    assert 'href="/t/campo/zeladoria"' not in menu and 'href="/t/campo/triagem"' not in menu
 
 
 def test_nenhuma_tela_aponta_para_o_azure_nem_abre_moldura(logado):

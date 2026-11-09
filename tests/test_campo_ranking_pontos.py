@@ -125,7 +125,7 @@ def test_sem_o_livro_a_tela_explica(banco, logado):    # noqa: F811
 def test_o_ranking_de_pontos_e_uma_tela_do_campo_e_o_endereco_nao_cai_mais_na_central(app, logado):
     from nexus.torres.campo import TELAS_QUE_SAIRAM, TORRE
     assert TORRE.tela("ranking").nome == "Ranking de pontos" and "ranking" not in TELAS_QUE_SAIRAM
-    menu = logado.get("/t/campo/zeladoria").get_data(as_text=True)
+    menu = logado.get("/t/campo/rondas").get_data(as_text=True)
     assert 'href="/t/campo/ranking"' in menu and "Ranking de pontos" in menu
     assert logado.get("/t/campo/ranking").status_code == 200
     for saiu in ("os", "imagens"):                                                 # essas continuam levando à Central

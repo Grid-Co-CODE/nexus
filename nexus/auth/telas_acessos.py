@@ -126,7 +126,8 @@ def _secao_setores(escolhido: int | None, logins: list[dict], admins: list[dict]
                   # aparecerá as usinas só daquele cliente"): toda tela se marca; a que ainda não recorta pelas usinas
                   # do cliente leva o aviso "falta o filtro" e não abre para ele até o filtro dela ficar pronto
                   "falta_filtro": bool(sel and sel.get("cliente")) and not s.do_cliente}
-                 for s in t.telas]
+                 # a tela só do cliente (a Visão do cliente, 09/11/2026) não se marca para um setor da Grid
+                 for s in t.telas if not s.so_do_cliente or (sel and sel.get("cliente"))]
         arvore.append({"id": t.id, "nome": t.nome, "icone": t.icone, "telas": telas,
                        "marcadas": sum(x["marcada"] for x in telas)})
     # o setor de quem entrou e de cada administrador: pelo código do e-mail, o mesmo que a decisão de setor grava (o

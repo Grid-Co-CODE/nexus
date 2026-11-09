@@ -1,12 +1,9 @@
 """A Zeladoria do Campo · App (Levi, 26/10/2026, com o modelo "Rondas Sujidade e Vegetação": "a evolução por usina deve
 ser por cliente!"): as semanas, as leituras pela regra da aba Sujidade e vegetação, a zeladoria do Fracttal pelas três
-tarefas do plano, as recomendações, a evolução por cliente e a tela com o banco falso."""
-from datetime import date, timedelta
+tarefas do plano, as recomendações e a evolução por cliente. A tela saiu da torre em 09/11/2026 (o endereço leva à
+torre Zeladoria, `test_torre_campo`); a conta fica, porque é dela a Zeladoria no banco."""
+from datetime import date
 
-from test_campo_sujidade import NOTA
-from test_campo_visao import banco  # noqa: F401  (fixture)
-
-from nexus.campo import aprovacao, ronda_checklist, visao
 from nexus.campo import zeladoria as Z
 from nexus.dados.fatos import tarefa_chave
 
@@ -196,49 +193,3 @@ def test_evolucao_por_cliente_situacao_resumo_e_fila():
     # o nível 5 primeiro; no mesmo nível, sem OS antes de aberta
     assert [(f["u"]["usina"], f["campo"], f["status"]) for f in fila] == [
         ("Coração 1", "sujidade", "sem_os"), ("Coração 1", "vegetacao", "aberta"), ("Altair", "sujidade", "sem_os")]
-
-
-# ── a tela, com o banco falso ───────────────────────────────────────────────────────────────────────────────────────
-def _sem_fracttal(monkeypatch):
-    monkeypatch.setattr(ronda_checklist, "respostas", lambda: {"500": ronda_checklist.ler_nota(NOTA)})
-    monkeypatch.setattr(ronda_checklist, "pedir_releitura", lambda app=None: None)
-    monkeypatch.setattr(ronda_checklist, "estado", lambda: {"lendo": False, "erro": "", "lidas": True, "fila": True})
-    monkeypatch.setattr(aprovacao, "_pedir_releitura", lambda: None)
-
-
-def test_tela_da_zeladoria(banco, logado, monkeypatch):  # noqa: F811
-    _sem_fracttal(monkeypatch)
-    html = logado.get("/t/campo/zeladoria").get_data(as_text=True)
-    assert "Vegetação e sujidade dos módulos" in html and "Evolução por cliente" in html
-    assert "Recomendações" in html and "Situação por usina" in html and "Como classificamos" in html
-    # os grupos da evolução são os clientes do cadastro; a Altair (sujidade 4 na OS 500) pede limpeza de módulos
-    assert '<button type="button" class="zl-cli-bt" aria-expanded="true">Thopen' in html
-    assert "Outro Cliente" in html and "Limpeza de módulos" in html
-    # o banco falso não tem as OS do Fracttal: a tela diz, e a recomendação não acusa falta de OS
-    assert "As OS do Fracttal ainda não chegaram ao banco" in html and "sem a situação da OS" in html
-    assert "sem OS de zeladoria no Fracttal" not in html
-    # os serviços de terceiros do App continuam no fim
-    assert "Serviços de terceiros registrados pelo App" in html and "Nenhum registro de zeladoria pelo App ainda" in html
-    assert logado.get("/t/campo/zeladoria?modulo=sujidade&semana=lixo&situacao=lixo").status_code == 200
-    html = logado.get("/t/campo/zeladoria?situacao=sem_alerta").get_data(as_text=True)
-    assert 'class="zl-linha" data-usina="1"' not in html
-
-
-def test_tela_com_as_os_de_zeladoria_e_a_gaveta(banco, logado, monkeypatch):  # noqa: F811
-    _sem_fracttal(monkeypatch)
-    hoje = visao._agora().date()
-    prog = (hoje + timedelta(days=2)).strftime("%Y%m%d")
-    linhas = [{"fracttal_tarefa_id": 1, "os": 900, "fracttal_os_id": 9900, "tarefa_chave": LIMPEZA, "usina_id": 1,
-               "tipo_tarefa": "zeladoria", "status_os": "em_processo", "estado_tarefa": "nao_iniciada",
-               "data_id_programada": prog, "data_id_fim": None}]
-    banco.workbooks["nexus_os"] = {}
-    banco._id("nexus_os", "fato_tarefa_os")["linhas"] = [{"headers": list(linhas[0]), "values": list(linhas[0].values())}]
-    visao.limpar()
-    html = logado.get("/t/campo/zeladoria").get_data(as_text=True)
-    assert "OS 900 · programada para" in html and "As OS do Fracttal ainda não chegaram ao banco" not in html
-    g = logado.get(f"/t/campo/zeladoria/usina/1?semana={Z.semana_de(hoje)}").get_data(as_text=True)
-    assert "Altair" in g and "Evolução nas últimas 8 semanas" in g and "Zeladoria no Fracttal" in g
-    assert "Limpeza de módulos" in g and "OS 900" in g and "Histórico de rondas da usina" in g
-    # as fotos só no clique: o botão aponta para as fotos da OS de ronda, a gaveta não vai ao Fracttal
-    assert "/t/campo/rondas/os/500/fotos" in g and 'class="zl-bt-fotos"' in g
-    assert logado.get("/t/campo/zeladoria/usina/4040").status_code == 404

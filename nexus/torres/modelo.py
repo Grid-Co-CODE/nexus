@@ -37,6 +37,10 @@ class Tela:
     # a tela que recorta pelas usinas do cliente da sessão (07/11/2026, o acesso dos clientes, `auth/clientes.py`): só
     # estas o setor Clientes pode marcar em Base → Acessos, e o cliente não abre nenhuma outra
     do_cliente: bool = False
+    # a tela SÓ do cliente (09/11/2026, a Visão do cliente; Levi: "pode tirar pois já temos no modo cliente do nosso
+    # menu"): fica no menu do cliente e do administrador no Modo cliente, e sai do menu de quem é da Grid e da lista de
+    # telas dos setores da Grid em Base → Acessos
+    so_do_cliente: bool = False
 
 
 @dataclass

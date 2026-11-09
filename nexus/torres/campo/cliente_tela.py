@@ -7,12 +7,13 @@ dele. Cada fonte que não responde fica "sem leitura" na tela, com o aviso, e o 
 import logging
 from datetime import timedelta
 
-from flask import current_app, render_template, request, session  # noqa: F401  (session: o modo do cliente)
+from flask import current_app, redirect, render_template, request, session  # noqa: F401  (session: o modo do cliente)
 
 from ...campo import responsaveis as campo_resp
 from ...campo import visao
 from ...campo import visao_cliente as VC
 from ...dados import fatos as D
+from ...prefixo import na_raiz
 from . import TORRE, bp
 
 _log = logging.getLogger("nexus.campo")
@@ -71,6 +72,12 @@ def _fontes(b, uids: set, hoje) -> tuple[dict, dict]:
 @bp.route("/cliente")
 def cliente():
     """A Visão do cliente: a escolha do cliente e, com um escolhido, os 5 números e a tabela das usinas dele."""
+    from ...auth import setor_telas
+    # só do cliente desde 09/11/2026 (`Tela.so_do_cliente`; Levi: "pode tirar pois já temos no modo cliente do nosso
+    # menu"): quem é da Grid fora do Modo cliente não vê mais a escolha do cliente, e o endereço guardado leva à Visão do
+    # responsável. Antes da conta: a leitura da Visão não sai à toa
+    if not (session.get("via") == "cliente" or setor_telas.em_modo_cliente()):
+        return redirect(na_raiz("/t/campo/responsaveis"))
     leitura = campo_resp.visao_responsaveis()
     d = leitura.dados or {}
     erro_visao = leitura.erro

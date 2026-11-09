@@ -368,12 +368,38 @@ def cliente_tela(manut, monkeypatch):
     return manut
 
 
-def test_a_tela_escolhe_o_cliente_e_mostra_a_sintese(cliente_tela, logado):
-    html = logado.get("/t/campo/cliente").get_data(as_text=True)
-    assert "Visão do cliente" in html and "Thopen (2 usinas)" in html and "Outro Cliente (1 usina)" in html
-    assert 'class="vc-numeros"' not in html                               # sem cliente, só a escolha
-    html = logado.get("/t/campo/cliente?cliente=1").get_data(as_text=True)
-    assert '<h2 class="vc-nome">Thopen</h2>' in html and "Coração 1" not in html.split('class="vc-numeros"', 1)[1]
+@pytest.fixture
+def modo_cliente(app, tmp_path, logado):
+    """O administrador no Modo cliente da Thopen (cliente 1), com a Visão do cliente marcada para o setor Clientes: desde
+    09/11/2026 é só por aqui (ou como o próprio cliente) que a tela abre (`Tela.so_do_cliente`)."""
+    from nexus.auth import setor_telas as ST
+    from nexus.cadastro import setor_ids as SID
+    app.config["NEXUS_DADOS"] = str(tmp_path / "dados")
+    ST.limpar()
+    with app.test_request_context():
+        ST.gravar(SID.CLIENTES, ["campo/cliente"], ST.telas_do_cliente_possiveis(), app.config, "http://pg.falso",
+                  app.extensions["nexus_dados_sessao"], "admin@exemplo.test")
+    ST.limpar()
+    with logado.session_transaction() as s:
+        s["modo_cliente"] = {"id": 1, "nome": "Thopen"}
+    yield logado
+    ST.limpar()
+
+
+def test_a_grid_nao_ve_mais_a_tela_fora_do_modo_cliente(cliente_tela, logado):
+    """Levi, 09/11/2026 (pelo Scrum master): "O 'visão do cliente' pode tirar pois já temos no modo cliente do nosso
+    menu". Quem é da Grid vai à Visão do responsável (o endereço guardado, com ou sem cliente) e o item sai do menu."""
+    for url in ("/t/campo/cliente", "/t/campo/cliente?cliente=1", "/t/campo/cliente?cliente=999"):
+        r = logado.get(url)
+        assert r.status_code == 302 and r.headers["Location"].endswith("/t/campo/responsaveis"), url
+    menu = logado.get("/t/campo/responsaveis").get_data(as_text=True).split('<nav class="menu"', 1)[1].split("</nav>", 1)[0]
+    assert "/t/campo/cliente" not in menu and "/t/campo/responsaveis" in menu
+
+
+def test_no_modo_cliente_a_tela_mostra_a_sintese(cliente_tela, modo_cliente):
+    html = modo_cliente.get("/t/campo/cliente").get_data(as_text=True)
+    # no Modo cliente o nome vai no cumprimento do alto (o mockup do cliente), não no título da escolha
+    assert ", Thopen</h1>" in html and "Coração 1" not in html.split('class="vc-numeros"', 1)[1]
     numeros = html.split('class="vc-numeros"', 1)[1].split('<section class="vc-q"', 1)[0]
     assert "<b>1</b> de 2 gerando" in numeros and "1 parada" in numeros
     assert "92,5%</b> do esperado" in numeros                            # (850 + 1000) ÷ (1000 + 1000), a soma
@@ -383,17 +409,17 @@ def test_a_tela_escolhe_o_cliente_e_mostra_a_sintese(cliente_tela, logado):
     tabela = html.split('<section class="vc-q"', 1)[1]
     assert tabela.index("Altair") < tabela.index("Brodowski 1")           # a parada primeiro
     assert "Não consegui ler os chamados na distribuidora" in html
-    assert '<details class="gc-explica">' in html and "De onde vem cada número" in html
-    assert "/t/campo/cliente" in logado.get("/t/campo/responsaveis").get_data(as_text=True)   # no menu da torre
+    assert "De onde vem cada número" not in html                         # a explicação interna é da Grid
 
 
-def test_sem_cadastro_a_tela_abre_com_o_aviso(cliente_tela, logado, monkeypatch):
+def test_sem_cadastro_a_tela_abre_com_o_aviso(cliente_tela, modo_cliente, monkeypatch):
     """Sem o banco (o cadastro não responde), a tela abre com o aviso, como as outras do Campo; nunca o erro 500."""
     def _sem(*a, **k):
         raise visao.SemBanco("sem banco")
     monkeypatch.setattr(visao, "_Base", _sem)
-    r = logado.get("/t/campo/cliente?cliente=1")
-    assert r.status_code == 200 and "Não consegui ler o cadastro do Nexus" in r.get_data(as_text=True)
+    r = modo_cliente.get("/t/campo/cliente")
+    # para o cliente, o aviso sem o nome do erro interno
+    assert r.status_code == 200 and "Parte das informações não carregou agora" in r.get_data(as_text=True)
 
 
 def test_fica_logo_depois_das_ocorrencias_no_menu():
@@ -402,7 +428,8 @@ def test_fica_logo_depois_das_ocorrencias_no_menu():
     assert ids.index("cliente") == ids.index("ocorrencias") + 1         # a Visão do responsável e as Ocorrências juntas
 
 
-def test_a_tela_abre_o_detalhe_da_usina_escolhida(cliente_tela, logado):
+def test_a_tela_abre_o_detalhe_da_usina_escolhida(cliente_tela, modo_cliente):
+    logado = modo_cliente
     html = logado.get("/t/campo/cliente?cliente=1").get_data(as_text=True)
     det = html.split('<aside class="vc-det"', 1)[1]
     # sem escolha: o detalhe da primeira que pede atenção (a Altair, parada); as outras escondidas
@@ -419,7 +446,8 @@ def test_a_tela_abre_o_detalhe_da_usina_escolhida(cliente_tela, logado):
     assert 'id="vc-det-3"' not in html and 'id="vc-det-1" class="vc-det-u">' in html
 
 
-def test_o_painel_lista_o_protocolo_de_varias_ucs_uma_vez(cliente_tela, logado, monkeypatch):
+def test_o_painel_lista_o_protocolo_de_varias_ucs_uma_vez(cliente_tela, modo_cliente, monkeypatch):
+    logado = modo_cliente
     from nexus.torres.campo import cliente_tela as CT
     original = CT._fontes
 
@@ -433,7 +461,3 @@ def test_o_painel_lista_o_protocolo_de_varias_ucs_uma_vez(cliente_tela, logado, 
     det = html.split('id="vc-det-1"', 1)[1].split("</section>", 1)[0]
     assert det.count("Protocolo 20266296905597</b>") == 1 and "2 UCs (11, 12)" in det
 
-
-def test_cliente_que_nao_existe_volta_a_escolha(cliente_tela, logado):
-    html = logado.get("/t/campo/cliente?cliente=999").get_data(as_text=True)
-    assert 'class="vc-numeros"' not in html and "Escolha um cliente" in html

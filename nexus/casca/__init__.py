@@ -512,7 +512,8 @@ def instalar_contexto(app) -> None:
         torre_atual = blueprint.removeprefix("torre_") if blueprint.startswith("torre_") else None
         a = setor_telas.acesso()
         menu = montar_menu(app.extensions["nexus_torres"], torre_atual, _telas_prontas(app),
-                           None if a["tudo"] else a["telas"])
+                           None if a["tudo"] else a["telas"],
+                           cliente=session.get("via") == "cliente" or setor_telas.em_modo_cliente())
         return {
             "menu": menu,
             # o setor da pessoa, no topo (Base → Acessos → Pessoas e setores); o administrador sem setor não mostra nada

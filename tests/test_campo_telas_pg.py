@@ -10,7 +10,6 @@ from test_campo_aprovacao import FracttalFalso, _os
 from test_campo_fonte_pg import BASE, CHAVE, _linha, semear
 
 from nexus.campo import aprovacao, fonte_pg, fracttal, leitura, tabelas, triagem
-from nexus.torres.campo import _motivo
 
 
 def _iso(dias_atras):
@@ -38,14 +37,10 @@ def test_triagem_pelo_banco(logado, banco):
     os_ = {i["id"]: i for i in d["itens"] if i["tipo"] == "os"}
     assert os_["15088"]["nivel"] == "critico" and "sem GPS, sem foto" in os_["15088"]["motivo"]
     assert [e["id"] for e in d["exemplares"]] == ["15102"]          # 96%, 3 fotos, GPS e assinatura
-    html = logado.get("/t/campo/triagem").get_data(as_text=True)
-    assert "Exige ação hoje" in html and "OS 15088" in html and "<b>sem GPS, sem foto</b>" in html
-    assert "<iframe" not in html
-
-
-def test_motivo_do_app_so_deixa_passar_o_negrito():
-    assert str(_motivo("<script>x</script> qualidade <b>45%</b>")) == \
-        "&lt;script&gt;x&lt;/script&gt; qualidade <b>45%</b>"
+    # a tela saiu em 09/11/2026 (Levi: "fica redundante pois aprovação de OS traz isso e muito mais"): a conta fica e o
+    # endereço guardado leva à Aprovação de OS
+    r = logado.get("/t/campo/triagem")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/campo/aprovacao")
 
 
 def test_aprovacao_usa_a_nota_do_banco(banco):

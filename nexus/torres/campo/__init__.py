@@ -15,7 +15,7 @@ from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote, urlencode
 
 from flask import Response, abort, current_app, make_response, redirect, render_template, request, session, url_for
-from markupsafe import Markup, escape
+from markupsafe import escape
 
 import logging as _logging
 _log_campo = _logging.getLogger("nexus.campo")
@@ -28,7 +28,6 @@ from ...campo import ranking_equipes as campo_ranking
 from ...campo import observacao_responsavel as campo_obs
 from ...campo import ocorrencias as campo_oc
 from ...campo import responsaveis_graficos as campo_graficos
-from ...campo import triagem as campo_triagem
 from ...campo import verificacao as campo_verif
 from ...campo import painel_relatorio as campo_relatorio
 from ...campo import regras_app, visao
@@ -64,10 +63,13 @@ TORRE = Torre(
         Tela("ocorrencias", "Ocorrências", "Que ocorrência das minhas usinas tem ação vencendo, e com quem ela está?",
              "Livro nexus_ocorrencias (escrito nesta tela) + cadastro do Nexus", do_setor=SID.RESPONSAVEL_UFV),
         # a Visão do cliente (05/11/2026, fase 1): a síntese das usinas de um cliente (nexus/campo/visao_cliente.py)
+        # só do cliente desde 09/11/2026 (Levi, pelo Scrum master: "O 'visão do cliente' pode tirar pois já temos no modo
+        # cliente do nosso menu"): é o Comando do cliente (casca._vista_cliente, setor_telas.primeira_do_cliente) e a Grid a
+        # vê pelo Modo cliente; sai do menu de quem é da Grid, e o endereço leva à Visão do responsável (cliente_tela.py)
         Tela("cliente", "Visão do cliente",
              "Como estão agora as usinas de um cliente, e o que responder a ele sem abrir cinco telas?",
              "Tempo real da plataforma (só leitura) + Gerencial + Andamento da Ronda COS + OS e programação no banco",
-             do_cliente=True),
+             do_cliente=True, so_do_cliente=True),
         # o Mapa de equipe (08/11/2026; o pedido do Levi: "identificar onde o técnico está e qual seria a melhor rota para
         # ele"): a posição dos técnicos do piloto do Nexus Field, nas rotas de equipe_tela.py. Os donos são a regra escrita
         # no aviso ao técnico (quem vê), e a rota a confere de novo: a marca de outro setor em Base → Acessos não abre o mapa
@@ -88,12 +90,9 @@ TORRE = Torre(
         # (TELAS_QUE_SAIRAM).
         # do_cliente (08/11/2026): o cliente vê a versão dele (campo/versao_cliente.rondas, rondas_cliente.html)
         Tela("rondas", "Rondas", "Que usina está sem ronda de campo há mais tempo?", FONTE_APP, do_cliente=True),
-        # a vegetação e a sujidade das rondas, semana a semana e por cliente, com a zeladoria do Fracttal (Levi,
-        # 26/10/2026, no modelo "Rondas Sujidade e Vegetação"); os serviços de terceiros do App ficaram no fim da tela
-        Tela("zeladoria", "Zeladoria",
-             "Como estão a vegetação e a sujidade dos módulos em cada usina, semana a semana, e onde a zeladoria tem de agir?",
-             "Rondas do App (o checklist da OS de ronda no Fracttal) + tarefas de Zeladoria do Fracttal no banco do Nexus"),
-        Tela("triagem", "Triagem de qualidade", "O que exige ação hoje na qualidade do fechamento?", FONTE_APP),
+        # a Zeladoria e a Triagem de qualidade saíram em 09/11/2026 (Levi, pelo Scrum master: "Exclua o campo
+        # 'Zeladoria' pois já temos como uma página"; "Pode excluir o campo triagem de qualidade também, fica redundante
+        # pois aprovação de OS traz isso e muito mais"): o endereço antigo leva à tela que ficou no lugar (abaixo, as rotas)
         # o placar do ciclo de pontos do App (Levi, 13/10/2026: "Cria uma seção de Ranking de Pontos no App de Campo!"):
         # quem calcula é o App, que publica no livro ranking_app_campo (visao.ranking_pontos). Não é o Ranking de 08/10
         Tela("ranking", "Ranking de pontos", "Quem lidera a classificação de pontos do App no mês, e por quê?",
@@ -1600,97 +1599,21 @@ def ronda_foto(os_, i):
     return Response(corpo, mimetype=mime, headers={"Cache-Control": guarda})
 
 
-# ── Zeladoria (26/10/2026) ───────────────────────────────────────────────────────────────────────────────────────
-# Levi, com o modelo "Rondas Sujidade e Vegetação": "Quero algo nesses padrões para a parte de zeladoria da seção campo
-# app do nexus. deixe no estilo do Nexus porém nesse padrão! a evolução por usina deve ser por cliente!". A conta é
-# `nexus/campo/zeladoria.py`, sobre o que as Rondas já leem (as rondas e o checklist da OS) e as tarefas de Zeladoria do
-# Fracttal no banco (as mesmas da Visão do responsável). Os serviços de terceiros que o App registra (`visao.zeladoria`)
-# ficaram no fim da tela.
-CAMPOS_ZELADORIA = ("vegetacao", "sujidade")
-
-
-def _tarefas_de_zeladoria() -> tuple[list[dict], str, dict]:
-    """As tarefas das OS do Fracttal no banco (`nexus_os · fato_tarefa_os`) e de quando é a foto delas (a mesma conta da
-    Visão do responsável, `foto_das_os`); sem o banco, nenhuma e o motivo (a tela diz, e as recomendações saem sem a
-    situação da OS)."""
-    from ...dados import fato_tarefa_os as FT
-    try:
-        tarefas = visao._livro(FT.LIVRO, FT.ABA)
-        q = next(iter(visao._livro(FT.LIVRO, "qualidade")), {})
-    except Exception as e:      # noqa: BLE001 — sem as OS, o resto da tela vale
-        return [], f"{type(e).__name__}: {str(e)[:120]}", {}
-    return tarefas, "", campo_resp.foto_das_os(q.get("gerado_em"), visao._agora())
-
-
-def _zeladoria_conta(semana=None):
-    """A conta da Zeladoria com a leitura das Rondas (cópia de 2 min), as respostas do checklist (as OS de ronda lidas
-    do Fracttal, relidas por trás, como na aba Sujidade e vegetação) e as tarefas de zeladoria."""
-    from ...campo import zeladoria as ZL
-    leitura = visao.rondas()
-    d = leitura.dados or {}
-    ronda_checklist.pedir_releitura()
-    campo_aprovacao._pedir_releitura()
-    tarefas, erro_os, foto = _tarefas_de_zeladoria()
-    hoje = date.fromisoformat(d["hoje"]) if d.get("hoje") else visao._agora().date()
-    z = ZL.montar(d.get("todas") or [], d.get("cobertura") or [], ronda_checklist.respostas(),
-                  d.get("validacoes") or [], tarefas, hoje, semana)
-    z["foto_os"] = foto
-    return leitura, d, z, erro_os, hoje
-
-
+# ── Zeladoria e Triagem de qualidade: saíram do menu em 09/11/2026 ─────────────────────────────────────────────────
+# A Zeladoria da torre (26/10/2026, a vegetação e a sujidade das rondas semana a semana) tem a página dela na torre
+# Zeladoria: a Criticidade, a vegetação e a sujidade pela última ronda. Quem guardou o endereço (o da tela e o da gaveta de
+# uma usina) cai lá. A conta continua em `nexus/campo/zeladoria.py`: é dela a Zeladoria no banco (`zeladoria_banco.py`,
+# a aba Zeladoria do 5080). A Triagem de qualidade cai na Aprovação de OS, que traz o mesmo julgamento e mais (a conta
+# `nexus/campo/triagem.py` fica, sem tela).
 @bp.route("/zeladoria")
-def zeladoria():
-    """Vegetação e sujidade dos módulos por usina: os números da semana, a evolução das 8 semanas agrupada por cliente,
-    as recomendações que pedem ação, a tabela por usina (a gaveta no clique) e a régua. Filtros: semana, cliente,
-    usina, situação, a região de campo e o gestor de contrato (como as Rondas); o módulo troca a evolução."""
-    from ...campo import zeladoria as ZL
-    leitura, d, z, erro_os, hoje = _zeladoria_conta(request.args.get("semana"))
-    regiao_campo, gestor = _regiao_campo(), _gestor()
-    cliente, usina = request.args.get("cliente", ""), request.args.get("usina", "")
-    campo = request.args.get("modulo") if request.args.get("modulo") in CAMPOS_ZELADORIA else "vegetacao"
-    sit = request.args.get("situacao", "") if request.args.get("situacao") in dict(ZL.SITUACOES) else ""
-
-    def filtra(lst, sem_usina=False):
-        return [u for u in lst if _do_papel(u, regiao_campo, gestor) and (not cliente or u.get("cliente") == cliente)
-                and (sem_usina or not usina or str(u["usina_id"]) == usina)]
-    base = filtra(z["usinas"])
-    linhas = [u for u in base if ZL.situacao(u, sit)]
-    # a ordem da tabela é a da aba Sujidade e vegetação: o mais crítico primeiro, depois o maior nível, depois o nome
-    linhas.sort(key=lambda u: _ordem_do_nome(u["usina"]))
-    linhas.sort(key=lambda u: (-u["pontos"], -max((u["leitura"] or {}).get("sujidade") or 0,
-                                                   (u["leitura"] or {}).get("vegetacao") or 0)))
-    clientes = sorted({u.get("cliente") for u in z["usinas"] if u.get("cliente")}, key=_ordem_do_nome)
-    opcoes_usina = sorted({(str(u["usina_id"]), u["usina"]) for u in filtra(z["usinas"], sem_usina=True)},
-                          key=lambda kv: _ordem_do_nome(kv[1]))
-    return render_template("campo/zeladoria.html", **_comum(
-        "zeladoria", leitura, z=z, linhas=linhas, grupos=ZL.por_cliente(linhas, z["semana"], z["janela"], campo),
-        fila=ZL.fila(base), r=ZL.resumo(base), campo=campo, sit=sit, situacoes=ZL.SITUACOES, cliente=cliente,
-        clientes=clientes, usina=usina, opcoes_usina=opcoes_usina, erro_os=erro_os, hoje=hoje.isoformat(),
-        alerta_acima=ZL.ALERTA_ACIMA, prazo_dias=ZL.PRAZO_DIAS, dias_velha=ZL.DIAS_LEITURA_VELHA,
-        suj_estado=ronda_checklist.estado(), servicos=visao.zeladoria(),
-        explicacao_avulsa=ronda_avulsa.EXPLICACAO, explicacao_validada=visao.VALIDADA_EXPLICACAO,
-        **_papeis(d, d.get("cobertura") or [], regiao_campo, gestor)))
-
-
 @bp.route("/zeladoria/usina/<int:usina_id>")
-def zeladoria_usina(usina_id):
-    """A gaveta de uma usina (o clique na linha, na célula da evolução ou na recomendação): a última leitura, a evolução
-    das 8 semanas nos dois campos, as leituras da semana clicada, a recomendação, a zeladoria do Fracttal e o botão das
-    fotos da última ronda com OS (o Fracttal só é lido no clique do botão)."""
-    from ...campo import zeladoria as ZL
-    _, d, z, erro_os, hoje = _zeladoria_conta(request.args.get("semana"))
-    u = next((x for x in z["usinas"] if x["usina_id"] == usina_id), None)
-    if u is None:
-        abort(404)
-    # a semana das leituras: a da célula clicada; sem ela (o clique na linha ou na recomendação), a da última leitura,
-    # se cair nas 8 semanas (na semana corrente ainda sem ronda, "sem leitura" não diz nada)
-    ultima = ZL.semana_de(u["leitura"]["data"]) if u["leitura"] else ""
-    sem = next((s for s in (request.args.get("ver"), ultima) if s in z["janela"]), z["semana"])
-    lidas = [x for s in z["janela"] for x in u["celulas"][s]["leituras"]]
-    com_os = next((x for x in reversed(lidas) if x.get("os")), None)
-    return render_template("campo/_zeladoria_gaveta.html", u=u, z=z, sem=sem, com_os=com_os, erro_os=erro_os,
-                           hoje=hoje.isoformat(), dia_curto=_dia_curto, alerta_acima=ZL.ALERTA_ACIMA,
-                           explicacao_avulsa=ronda_avulsa.EXPLICACAO, explicacao_validada=visao.VALIDADA_EXPLICACAO)
+def zeladoria(usina_id=None):
+    return redirect(na_raiz("/t/zeladoria/criticidade"))
+
+
+@bp.route("/triagem")
+def triagem():
+    return redirect(na_raiz("/t/campo/aprovacao"))
 
 
 # ── Ranking de pontos (13/10/2026) ───────────────────────────────────────────────────────────────────────────────
@@ -2017,29 +1940,6 @@ def aprovacao_conferir(id_wo):
         return {"saiu": False}
     campo_aprovacao.tirar_da_fila(id_wo)
     return {"saiu": True}
-
-
-# ── Triagem de qualidade (a mesa de triagem do App, nexus/campo/triagem.py) ──────────────────────────────────────
-def _rot_item(i) -> str:
-    if i.get("tipo") == "os":
-        return f"OS {i.get('id')}"
-    if i.get("tipo") == "ronda":
-        return f"Ronda {_dia_curto(i.get('data') or i.get('quando') or i.get('id'))}"
-    if i.get("tipo") in ("usina", "usina_nunca"):
-        return i.get("onde") or "Cobertura"
-    return i.get("quem") or str(i.get("id") or "")
-
-
-def _motivo(texto) -> Markup:
-    """O motivo vem das regras do App com <b> no número que importa: escapa tudo e devolve só o negrito."""
-    return Markup(str(escape(texto or "")).replace("&lt;b&gt;", "<b>").replace("&lt;/b&gt;", "</b>"))
-
-
-@bp.route("/triagem")
-def triagem():
-    dias = _dias((7, 30, 90), 30)
-    return render_template("campo/triagem.html", **_comum("triagem", campo_triagem.painel(dias), dias=dias,
-                                                          rot_item=_rot_item, motivo=_motivo, coleta=_coleta()))
 
 
 # As ocorrências com plano de ação (18/10/2026): as rotas moram em ocorrencias_tela.py, importada aqui no fim porque

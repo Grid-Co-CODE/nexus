@@ -60,9 +60,10 @@ def telas_com_conteudo(app) -> frozenset[str]:
 
 
 def montar_menu(torres: list[Torre], torre_atual: str | None, prontas: frozenset[str] = frozenset(),
-                liberadas: set[str] | None = None) -> list[dict]:
+                liberadas: set[str] | None = None, cliente: bool = False) -> list[dict]:
     """As torres na ordem do catálogo, só com as telas que o setor da pessoa vê (`liberadas`, chaves `torre/tela`; None =
-    tudo, o administrador). Torre sem nenhuma tela liberada some. A cadeira (a torre dela subia para o topo) saiu em
+    tudo, o administrador). Torre sem nenhuma tela liberada some. A tela só do cliente (`Tela.so_do_cliente`) entra só
+    no menu do cliente e do Modo cliente (`cliente`). A cadeira (a torre dela subia para o topo) saiu em
     12/10/2026: os setores a substituíram (Base → Acessos).
 
     O Início não entra aqui: é um botão da casca, fixo no topo do menu. Antes era uma torre cujo
@@ -74,7 +75,8 @@ def montar_menu(torres: list[Torre], torre_atual: str | None, prontas: frozenset
         # item: entra nas `filhas` da outra, que acende quando ela está aberta
         telas = [{"id": s.id, "nome": s.nome, "url": f"/t/{t.id}/{s.id}", "pronta": f"/t/{t.id}/{s.id}" in prontas,
                   "filhas": [f"/t/{t.id}/{f.id}" for f in t.telas if f.dentro_de == s.id]}
-                 for s in t.telas if not s.dentro_de and (liberadas is None or f"{t.id}/{s.id}" in liberadas)]
+                 for s in t.telas if not s.dentro_de and (cliente or not s.so_do_cliente)
+                 and (liberadas is None or f"{t.id}/{s.id}" in liberadas)]
         if not telas:
             continue
         menu.append({

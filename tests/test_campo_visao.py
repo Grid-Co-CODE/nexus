@@ -209,11 +209,6 @@ def test_central_em_tres_visoes(banco):
     assert [p["numero"] for p in d["pts"]] == ["PT-1", "PT-2"]
 
 
-def test_zeladoria_vazia_diz_por_que(banco, logado):
-    html = logado.get("/t/campo/zeladoria").get_data(as_text=True)
-    assert "Nenhum registro de zeladoria pelo App ainda" in html
-
-
 def test_telas_mostram_o_dado_do_banco(banco, logado):
     assert "Coração 1" in logado.get("/t/campo/rondas").get_data(as_text=True)
     assert "PT-1" in logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
