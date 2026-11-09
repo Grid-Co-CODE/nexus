@@ -18,7 +18,7 @@
       <p class="cn-pergunta">{% if sintese %}{{ sintese.total }} usina{{ 's' if sintese.total != 1 }} no contrato. {% endif %}Aparecem só as usinas deste contrato.</p></div>
     {% if lido_tr %}<p class="vc-lido"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> Atualizado às {{ lido_tr[:5] }}</p>{% endif %}
   </div>
-  {% if mes_outro %}<div class="cn-erro cn-aviso" role="status">Mês de <b>{{ mes_nome }}</b>: a performance é a desse mês; o status, os chamados, as OS e a próxima visita são de agora.</div>{% endif %}
+  {% if mes_outro %}<div class="cn-erro cn-aviso" role="status"><span>Mês de <b>{{ mes_nome }}</b>: a performance é a desse mês; o status, os chamados, as OS e a próxima visita são de agora.</span></div>{% endif %}
   {% else %}
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p>

@@ -18,20 +18,20 @@
     <div class="vc-q-cab"><h2 id="cli-rondas-t">Rondas de {{ mes_nome }}</h2></div>
     {% if r.linhas %}
     <div class="cn-tab"><table>
-      <thead><tr><th class="ins-esq">Data</th><th class="ins-esq">Usina</th><th class="ins-esq">Tipo</th><th class="ins-esq">Situação</th><th class="ins-esq">OS</th></tr></thead>
+      <thead><tr><th>Data</th><th>Usina</th><th>Tipo</th><th>Situação</th><th>OS</th></tr></thead>
       <tbody>{% for x in r.linhas %}
-        <tr><td class="ins-esq">{{ x.data[8:10] }}/{{ x.data[5:7] }}</td><td class="ins-esq"><b>{{ x.usina }}</b></td><td class="ins-esq">{{ x.tipo }}</td>
-          <td class="ins-esq"><span class="cn-pill cn-{{ 'alerta' if x.pendente else 'ok' }}">{{ x.situacao }}</span></td>
-          <td class="ins-esq">{% if x.os %}<a class="vc-os" href="{{ raiz }}/t/campo/cliente/os/{{ x.os }}?volta=/t/campo/rondas">OS {{ x.os }}</a>{% else %}—{% endif %}</td></tr>
+        <tr><td>{{ x.data[8:10] }}/{{ x.data[5:7] }}</td><td><b>{{ x.usina }}</b></td><td>{{ x.tipo }}</td>
+          <td><span class="cn-pill cn-{{ 'alerta' if x.pendente else 'ok' }}">{{ x.situacao }}</span></td>
+          <td>{% if x.os %}<a class="vc-os" href="{{ raiz }}/t/campo/cliente/os/{{ x.os }}?volta=/t/campo/rondas">OS {{ x.os }}</a>{% else %}—{% endif %}</td></tr>
       {% endfor %}</tbody></table></div>
     {% else %}<p class="mudo vc-vazio">Nenhuma ronda registrada nas suas usinas em {{ mes_nome }}.</p>{% endif %}
   </section>
   <section class="vc-q cli-tab" aria-labelledby="cli-cob-t">
     <div class="vc-q-cab"><h2 id="cli-cob-t">Última ronda de cada usina</h2><span class="mudo">agora</span></div>
     <div class="cn-tab"><table>
-      <thead><tr><th class="ins-esq">Usina</th><th class="ins-esq">Última ronda</th><th>Há</th></tr></thead>
+      <thead><tr><th>Usina</th><th>Última ronda</th><th>Há</th></tr></thead>
       <tbody>{% for c in r.cobertura %}
-        <tr><td class="ins-esq"><b>{{ c.usina }}</b></td><td class="ins-esq">{{ (c.ultima[8:10] ~ '/' ~ c.ultima[5:7] ~ '/' ~ c.ultima[:4]) if c.ultima else 'nenhuma registrada' }}</td>
+        <tr><td><b>{{ c.usina }}</b></td><td>{{ (c.ultima[8:10] ~ '/' ~ c.ultima[5:7] ~ '/' ~ c.ultima[:4]) if c.ultima else 'nenhuma registrada' }}</td>
           <td>{% if c.dias is none %}—{% else %}<span class="cn-pill cn-{{ 'alerta' if c.dias >= 7 else 'ok' }}">{{ c.dias }} {{ 'dia' if c.dias == 1 else 'dias' }}</span>{% endif %}</td></tr>
       {% else %}<tr><td colspan="3" class="mudo">Nenhuma usina.</td></tr>{% endfor %}</tbody></table></div>
   </section>
